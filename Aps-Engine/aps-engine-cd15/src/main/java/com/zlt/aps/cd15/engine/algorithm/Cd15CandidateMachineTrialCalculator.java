@@ -51,11 +51,25 @@ public class Cd15CandidateMachineTrialCalculator {
                         input.getNetDemandQuantity(), input.isCloseOut(),
                         lossRate.getLossRatePercent(), input.getMinimumStartQuantity(),
                         input.getVehiclePlanQuantity(), input.getEqualShareThreshold(),
-                        input.getCraftWidth())
+                        input.getCraftWidth(), input.isEqualShareAlreadyApplied())
                 : quantityCalculator.calculateActualQuantity(
                         input.getNetDemandQuantity(), input.isCloseOut(),
                         lossRate.getLossRatePercent(), input.getMinimumStartQuantity(),
-                        input.getVehiclePlanQuantity(), input.getEqualShareThreshold());
+                        input.getVehiclePlanQuantity(), input.getEqualShareThreshold(),
+                        input.isEqualShareAlreadyApplied());
+        boolean equalShareApplied = input.isSingleSpecSplit()
+                && quantityCalculator.requiresSingleSpecSplitEqualShare(
+                        input.getNetDemandQuantity(), input.isCloseOut(),
+                        lossRate.getLossRatePercent(), input.getMinimumStartQuantity(),
+                        input.getVehiclePlanQuantity(), input.getEqualShareThreshold(),
+                        input.isEqualShareAlreadyApplied());
+        BigDecimal equalShareRemainderQuantity = equalShareApplied
+                ? quantityCalculator.calculateSingleSpecSplitEqualShareRemainder(
+                        input.getNetDemandQuantity(), input.isCloseOut(),
+                        lossRate.getLossRatePercent(), input.getMinimumStartQuantity(),
+                        input.getVehiclePlanQuantity(), input.getEqualShareThreshold(),
+                        input.getCraftWidth(), input.isEqualShareAlreadyApplied())
+                : BigDecimal.ZERO;
         // 工装试算：根据实际排产量和工装总数（卷轴）计算每台机可同时上机数量
         Cd15ToolingTrial tooling = input.isSingleSpecSplit()
                 ? toolingCalculator.calculateSingleSpecSplit(
@@ -73,6 +87,8 @@ public class Cd15CandidateMachineTrialCalculator {
                     .lossRatePercent(lossRate.getLossRatePercent())
                     .lossRateLevel(lossRate.getMatchedLevel())
                     .actualQuantity(actualQuantity)
+                    .equalShareApplied(equalShareApplied)
+                    .equalShareRemainderQuantity(equalShareRemainderQuantity)
                     .vehiclePlanQuantity(input.getVehiclePlanQuantity())
                     .toolingQuantity(tooling.getSchedulableQuantity())
                     .capacityQuantity(BigDecimal.ZERO)
@@ -138,6 +154,8 @@ public class Cd15CandidateMachineTrialCalculator {
                 .lossRatePercent(lossRate.getLossRatePercent())
                 .lossRateLevel(lossRate.getMatchedLevel())
                 .actualQuantity(actualQuantity)
+                .equalShareApplied(equalShareApplied)
+                .equalShareRemainderQuantity(equalShareRemainderQuantity)
                 .vehiclePlanQuantity(input.getVehiclePlanQuantity())
                 .toolingQuantity(tooling.getSchedulableQuantity())
                 .capacityQuantity(capacity.getCapacityQuantity())

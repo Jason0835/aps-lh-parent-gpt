@@ -69,13 +69,13 @@ public class Cd15ScheduleCandidateSorter {
     private int continuityRank(Cd15ScheduleCandidate item,
                                Collection<Cd15MachineTailState> tails) {
         if (item == null || tails == null || tails.isEmpty()) {
-            return 3;
+            return 5;
         }
         return tails.stream()
                 .filter(Objects::nonNull)
                 .mapToInt(tail -> continuityRank(item, tail))
                 .min()
-                .orElse(3);
+                .orElse(5);
     }
 
     private int continuityRank(Cd15ScheduleCandidate item, Cd15MachineTailState tail) {
@@ -85,13 +85,20 @@ public class Cd15ScheduleCandidateSorter {
                 : Objects.equals(tail.getSteelStripCode(), item.getSteelStripCode())
                         && Objects.equals(tail.getCuttingAngle(), item.getCuttingAngle());
         boolean sameRoll = Objects.equals(tail.getBigRollCode(), item.getBigRollCode());
+        boolean sameAngle = Objects.equals(tail.getCuttingAngle(), item.getCuttingAngle());
         if (sameSpec && sameRoll) {
             return 0;
         }
         if (sameSpec) {
             return 1;
         }
-        return sameRoll ? 2 : 3;
+        if (sameRoll && sameAngle) {
+            return 2;
+        }
+        if (sameRoll) {
+            return 3;
+        }
+        return sameAngle ? 4 : 5;
     }
 
     private BigDecimal value(BigDecimal value) {

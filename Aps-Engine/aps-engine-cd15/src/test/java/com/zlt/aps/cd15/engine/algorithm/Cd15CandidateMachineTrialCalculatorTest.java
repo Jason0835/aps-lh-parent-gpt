@@ -13,6 +13,7 @@ import java.util.Collections;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 /**
  * 候选机台组合试算测试。
@@ -69,6 +70,40 @@ public class Cd15CandidateMachineTrialCalculatorTest {
         Cd15MachineTrial result = calculator.calculate(input);
         assertEquals(new BigDecimal("310"), result.getActualQuantity());
         assertEquals(new BigDecimal("310"), result.getFinalSchedulableQuantity());
+    }
+
+    /** 单规格分裁超过均分阈值时，试排必须携带首班量和下一班精确余量。 */
+    @Test
+    public void shouldExposeSingleSpecSplitEqualShareRemainder() {
+        Cd15CandidateMachineTrialInput input = Cd15CandidateMachineTrialInput.builder()
+                .machineCode("G1101")
+                .netDemandQuantity(new BigDecimal("45.384"))
+                .closeOut(false)
+                .singleSpecSplit(true)
+                .minimumStartQuantity(new BigDecimal("300"))
+                .equalShareThreshold(new BigDecimal("2000"))
+                .vehiclePlanQuantity(new BigDecimal("5305.5384"))
+                .craftWidth(new BigDecimal("37.2"))
+                .totalToolingCount(10)
+                .occupiedVehicleCount(0)
+                .shiftCapacity(new BigDecimal("20000"))
+                .shiftHours(8)
+                .remainingSeconds(28800)
+                .previousSpec("CSSC6020")
+                .currentSpec("CSSC6020")
+                .specChangeMinutes(0)
+                .lossRateRules(Collections.singletonList(
+                        Cd15LossRateRule.builder()
+                                .lossRatePercent(BigDecimal.ZERO)
+                                .build()))
+                .build();
+
+        Cd15MachineTrial result = calculator.calculate(input);
+
+        assertTrue(result.isEqualShareApplied());
+        assertEquals(new BigDecimal("2652.8064"), result.getActualQuantity());
+        assertEquals(new BigDecimal("2652.732"),
+                result.getEqualShareRemainderQuantity());
     }
 
     /** 单规格一出二受产能限制时必须向下取完整的双片步长。 */

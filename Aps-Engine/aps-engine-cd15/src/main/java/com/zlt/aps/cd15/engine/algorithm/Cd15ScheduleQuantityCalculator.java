@@ -16,16 +16,47 @@ public class Cd15ScheduleQuantityCalculator {
     private static final BigDecimal ONE_HUNDRED = new BigDecimal("100");
 
     /**
-     * 根据净需求、收尾标识和候选机台损耗率计算实际排产量。
+     * 按均分前完整计划量判断是否拆分班次；均分后的剩余量不重复叠加损耗和整车取整。
      *
      * @param netDemandQuantity 净需求量
      * @param closeOut 是否收尾规格
      * @param lossRatePercent 损耗率百分数，5表示5%
      * @param minimumStartQuantity 最小起排量
      * @param vehiclePlanQuantity 单车对应的斜裁排程米数
-     * @param equalShareThreshold 各班计划量均分阈值，按加损耗前的净需求量判断
+     * @param equalShareThreshold 各班计划量均分阈值，按均分前完整计划量判断
+     * @param equalShareAlreadyApplied 是否已执行过首次均分
      * @return 实际排产量
      */
+    public BigDecimal calculateActualQuantity(BigDecimal netDemandQuantity,
+                                              boolean closeOut,
+                                              BigDecimal lossRatePercent,
+                                              BigDecimal minimumStartQuantity,
+                                              BigDecimal vehiclePlanQuantity,
+                                              BigDecimal equalShareThreshold,
+                                              boolean equalShareAlreadyApplied) {
+        requireNonNegative(netDemandQuantity, "净需求量");
+        requireNonNegative(lossRatePercent, "损耗率");
+        requirePositive(minimumStartQuantity, "最小起排量");
+        requirePositive(vehiclePlanQuantity, "单车斜裁排程米数");
+        requirePositive(equalShareThreshold, "各班计划量均分阈值");
+        if (equalShareAlreadyApplied) {
+            return normalize(netDemandQuantity);
+        }
+        BigDecimal quantityWithLoss = netDemandQuantity.multiply(
+                BigDecimal.ONE.add(lossRatePercent.divide(ONE_HUNDRED, 10,
+                        RoundingMode.HALF_UP)));
+        if (closeOut) {
+            return normalize(quantityWithLoss);
+        }
+        BigDecimal startQuantity = quantityWithLoss.max(minimumStartQuantity);
+        BigDecimal vehicleCount = startQuantity.divide(vehiclePlanQuantity,
+                0, RoundingMode.CEILING);
+        BigDecimal fullPlanQuantity = normalize(vehicleCount.multiply(vehiclePlanQuantity));
+        return fullPlanQuantity.compareTo(equalShareThreshold) > 0
+                ? normalize(fullPlanQuantity.divide(new BigDecimal("2"), 10,
+                        RoundingMode.HALF_UP)) : fullPlanQuantity;
+    }
+
     public BigDecimal calculateActualQuantity(BigDecimal netDemandQuantity,
                                               boolean closeOut,
                                               BigDecimal lossRatePercent,
@@ -38,16 +69,96 @@ public class Cd15ScheduleQuantityCalculator {
         requirePositive(vehiclePlanQuantity, "单车斜裁排程米数");
         requirePositive(equalShareThreshold, "各班计划量均分阈值");
 
-        BigDecimal baseDemandQuantity = adjustDemandForEqualShare(netDemandQuantity, closeOut, equalShareThreshold);
-        BigDecimal quantityWithLoss = baseDemandQuantity.multiply(
-                BigDecimal.ONE.add(lossRatePercent.divide(ONE_HUNDRED, 10, RoundingMode.HALF_UP)));
-        if (closeOut) {
-            return normalize(quantityWithLoss);
-        }
+        return this.calculateActualQuantity(netDemandQuantity, closeOut, lossRatePercent,
+                minimumStartQuantity, vehiclePlanQuantity, equalShareThreshold, false);
+    }
 
+    /**
+     * 按均分前完整双路计划量判断是否拆分班次；后续班次按剩余量直接排产。
+     */
+    public BigDecimal calculateSingleSpecSplitActualQuantity(
+            BigDecimal netDemandQuantity,
+            boolean closeOut,
+            BigDecimal lossRatePercent,
+            BigDecimal minimumStartQuantity,
+            BigDecimal vehiclePlanQuantity,
+            BigDecimal equalShareThreshold,
+            BigDecimal craftWidthMillimeter,
+            boolean equalShareAlreadyApplied) {
+        requireNonNegative(netDemandQuantity, "净需求量");
+        requireNonNegative(lossRatePercent, "损耗率");
+        requirePositive(minimumStartQuantity, "最小起排量");
+        requirePositive(vehiclePlanQuantity, "单车斜裁排程米数");
+        requirePositive(equalShareThreshold, "各班计划量均分阈值");
+        requirePositive(craftWidthMillimeter, "斜裁宽度");
+        if (equalShareAlreadyApplied) {
+            return this.roundSingleSpecSplitUp(netDemandQuantity, craftWidthMillimeter);
+        }
+        BigDecimal quantityWithLoss = netDemandQuantity.multiply(
+                BigDecimal.ONE.add(lossRatePercent.divide(
+                        ONE_HUNDRED, 10, RoundingMode.HALF_UP)));
+        if (closeOut) {
+            return this.roundSingleSpecSplitUp(
+                    quantityWithLoss, craftWidthMillimeter);
+        }
         BigDecimal startQuantity = quantityWithLoss.max(minimumStartQuantity);
-        BigDecimal vehicleCount = startQuantity.divide(vehiclePlanQuantity, 0, RoundingMode.CEILING);
-        return normalize(vehicleCount.multiply(vehiclePlanQuantity));
+        BigDecimal vehicleCount = startQuantity.divide(
+                vehiclePlanQuantity, 0, RoundingMode.CEILING);
+        BigDecimal fullPlanQuantity = normalize(
+                vehicleCount.multiply(vehiclePlanQuantity));
+        return fullPlanQuantity.compareTo(equalShareThreshold) > 0
+                ? this.roundSingleSpecSplitUp(
+                        fullPlanQuantity.divide(new BigDecimal("2"), 10,
+                                RoundingMode.HALF_UP), craftWidthMillimeter)
+                : fullPlanQuantity;
+    }
+
+    /** 判断单规格分裁本次试算是否触发跨班均分。 */
+    public boolean requiresSingleSpecSplitEqualShare(
+            BigDecimal netDemandQuantity, boolean closeOut, BigDecimal lossRatePercent,
+            BigDecimal minimumStartQuantity, BigDecimal vehiclePlanQuantity,
+            BigDecimal equalShareThreshold, boolean equalShareAlreadyApplied) {
+        requireNonNegative(netDemandQuantity, "净需求量");
+        requireNonNegative(lossRatePercent, "损耗率");
+        requirePositive(minimumStartQuantity, "最小起排量");
+        requirePositive(vehiclePlanQuantity, "单车斜裁排程米数");
+        requirePositive(equalShareThreshold, "各班计划量均分阈值");
+        if (closeOut || equalShareAlreadyApplied) {
+            return false;
+        }
+        BigDecimal quantityWithLoss = netDemandQuantity.multiply(
+                BigDecimal.ONE.add(lossRatePercent.divide(
+                        ONE_HUNDRED, 10, RoundingMode.HALF_UP)));
+        BigDecimal fullPlanQuantity = normalize(quantityWithLoss.max(minimumStartQuantity)
+                .divide(vehiclePlanQuantity, 0, RoundingMode.CEILING)
+                .multiply(vehiclePlanQuantity));
+        return fullPlanQuantity.compareTo(equalShareThreshold) > 0;
+    }
+
+    /**
+     * 计算单规格分裁首次均分后必须转入下一班的精确余量。
+     * 首班量按双片步长向上取整，下一班取完整计划量与首班量之差，保证两班合计不变。
+     */
+    public BigDecimal calculateSingleSpecSplitEqualShareRemainder(
+            BigDecimal netDemandQuantity, boolean closeOut, BigDecimal lossRatePercent,
+            BigDecimal minimumStartQuantity, BigDecimal vehiclePlanQuantity,
+            BigDecimal equalShareThreshold, BigDecimal craftWidthMillimeter,
+            boolean equalShareAlreadyApplied) {
+        if (!this.requiresSingleSpecSplitEqualShare(
+                netDemandQuantity, closeOut, lossRatePercent,
+                minimumStartQuantity, vehiclePlanQuantity,
+                equalShareThreshold, equalShareAlreadyApplied)) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal fullPlanQuantity = this.calculateSingleSpecSplitFullPlanQuantity(
+                netDemandQuantity, lossRatePercent,
+                minimumStartQuantity, vehiclePlanQuantity);
+        BigDecimal firstShiftQuantity = this.calculateSingleSpecSplitActualQuantity(
+                netDemandQuantity, closeOut, lossRatePercent,
+                minimumStartQuantity, vehiclePlanQuantity,
+                equalShareThreshold, craftWidthMillimeter,
+                equalShareAlreadyApplied);
+        return normalize(fullPlanQuantity.subtract(firstShiftQuantity));
     }
 
     /**
@@ -68,21 +179,9 @@ public class Cd15ScheduleQuantityCalculator {
         requirePositive(vehiclePlanQuantity, "单车斜裁排程米数");
         requirePositive(equalShareThreshold, "各班计划量均分阈值");
         requirePositive(craftWidthMillimeter, "斜裁宽度");
-        BigDecimal baseDemandQuantity = this.adjustDemandForEqualShare(
-                netDemandQuantity, closeOut, equalShareThreshold);
-        BigDecimal quantityWithLoss = baseDemandQuantity.multiply(
-                BigDecimal.ONE.add(lossRatePercent.divide(
-                        ONE_HUNDRED, 10, RoundingMode.HALF_UP)));
-        if (closeOut) {
-            return this.roundSingleSpecSplitUp(
-                    quantityWithLoss, craftWidthMillimeter);
-        }
-        BigDecimal startQuantity = quantityWithLoss.max(minimumStartQuantity);
-        BigDecimal twoStreamVehicleQuantity = vehiclePlanQuantity
-                .multiply(new BigDecimal("2"));
-        BigDecimal vehiclePairCount = startQuantity.divide(
-                twoStreamVehicleQuantity, 0, RoundingMode.CEILING);
-        return normalize(vehiclePairCount.multiply(twoStreamVehicleQuantity));
+        return this.calculateSingleSpecSplitActualQuantity(netDemandQuantity, closeOut,
+                lossRatePercent, minimumStartQuantity, vehiclePlanQuantity,
+                equalShareThreshold, craftWidthMillimeter, false);
     }
 
     /** 将受限可排量向下归整为完整的一出二双片步长。 */
@@ -107,16 +206,18 @@ public class Cd15ScheduleQuantityCalculator {
                 .divide(new BigDecimal("1000"), 10, RoundingMode.HALF_UP);
     }
 
-    /**
-     * 非收尾规格按加损耗前的净需求量判断是否触发均分；触发后先除以2，再进入损耗和整卷计算。
-     */
-    private BigDecimal adjustDemandForEqualShare(BigDecimal netDemandQuantity,
-                                                 boolean closeOut,
-                                                 BigDecimal equalShareThreshold) {
-        if (closeOut || netDemandQuantity.compareTo(equalShareThreshold) <= 0) {
-            return netDemandQuantity;
-        }
-        return netDemandQuantity.divide(new BigDecimal("2"), 10, RoundingMode.HALF_UP);
+
+    private BigDecimal calculateSingleSpecSplitFullPlanQuantity(
+            BigDecimal netDemandQuantity,
+            BigDecimal lossRatePercent,
+            BigDecimal minimumStartQuantity,
+            BigDecimal vehiclePlanQuantity) {
+        BigDecimal quantityWithLoss = netDemandQuantity.multiply(
+                BigDecimal.ONE.add(lossRatePercent.divide(
+                        ONE_HUNDRED, 10, RoundingMode.HALF_UP)));
+        return normalize(quantityWithLoss.max(minimumStartQuantity)
+                .divide(vehiclePlanQuantity, 0, RoundingMode.CEILING)
+                .multiply(vehiclePlanQuantity));
     }
 
     private BigDecimal normalize(BigDecimal value) {

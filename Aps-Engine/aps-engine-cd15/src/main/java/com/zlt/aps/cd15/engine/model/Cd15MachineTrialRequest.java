@@ -51,6 +51,8 @@ public class Cd15MachineTrialRequest {
     private BigDecimal netDemandQuantity;
     /** 是否清尾：清尾时起排量门槛降低、允许跨机台合并 */
     private boolean closeOut;
+    /** 是否为均分后转入下一班的剩余计划量；为true时不得再次均分或重复叠加损耗。 */
+    private boolean equalShareAlreadyApplied;
     /** 已占用车数（前序班次已安排入库的部分） */
     private int occupiedVehicleCount;
     /** 班次可用小时数 */

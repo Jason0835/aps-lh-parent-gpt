@@ -317,8 +317,19 @@ public class Cd15ShiftResourceCommitter {
                             .bigRollCode(request.getBigRollCode())
                             .cuttingAngle(request.getCuttingAngle()).build());
             working.getTasks().add(task);
-            String partialReason = pairVehicleCount < requiredPairVehicleCount
-                    ? "STORAGE_LANE_LIMIT" : trial.getLimitReason();
+            String partialReason = trial.isEqualShareApplied()
+                    ? "EQUAL_SHARE"
+                    : pairVehicleCount < requiredPairVehicleCount
+                            ? "STORAGE_LANE_LIMIT" : trial.getLimitReason();
+            BigDecimal equalShareRemainderQuantity = null;
+            if (trial.isEqualShareApplied()) {
+                BigDecimal plannedRemainder = trial.getEqualShareRemainderQuantity() == null
+                        ? BigDecimal.ZERO : trial.getEqualShareRemainderQuantity();
+                BigDecimal currentShiftShortage = trial.getActualQuantity()
+                        .subtract(committedQuantity).max(BigDecimal.ZERO);
+                equalShareRemainderQuantity = this.normalize(
+                        plannedRemainder.add(currentShiftShortage));
+            }
             log.info("[斜裁自动排程] 单规格分裁资源提交成功, classField={}, "
                             + "steelStripCode={}, machineCode={}, planQuantity={}, "
                             + "branchQuantity={}, vehicleCount={}",
@@ -326,7 +337,10 @@ public class Cd15ShiftResourceCommitter {
                     trial.getMachineCode(), committedQuantity,
                     branchCommittedQuantity, totalVehicleCount);
             return Cd15ShiftCommitResult.builder().success(true)
-                    .partialReason(partialReason).state(working).task(task).build();
+                    .partialReason(partialReason)
+                    .equalShareRemainderQuantity(
+                            equalShareRemainderQuantity)
+                    .state(working).task(task).build();
         }
         return Cd15ShiftCommitResult.builder().success(false)
                 .failureReason(lastFailureReason).state(originalState).build();

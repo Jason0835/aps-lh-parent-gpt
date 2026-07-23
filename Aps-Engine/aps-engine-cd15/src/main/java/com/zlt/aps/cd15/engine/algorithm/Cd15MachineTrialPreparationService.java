@@ -91,6 +91,7 @@ public class Cd15MachineTrialPreparationService {
                         // 最小起排量、均分阈值
                         .minimumStartQuantity(parameters.getMinStartQty())
                         .equalShareThreshold(parameters.getEqualShareThreshold())
+                        .equalShareAlreadyApplied(request.isEqualShareAlreadyApplied())
                         // 单车等价排程量，用于整车取整及工装数量试算
                         .vehiclePlanQuantity(vehiclePlanQuantity)
                         .craftWidth(request.getCraftWidth())

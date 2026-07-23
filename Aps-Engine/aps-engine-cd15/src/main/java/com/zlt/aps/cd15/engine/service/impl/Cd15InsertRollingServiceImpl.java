@@ -1919,7 +1919,7 @@ public class Cd15InsertRollingServiceImpl implements Cd15InsertRollingService {
 
     private int continuityRank(Segment segment, Cd15MachineTailState previousTail) {
         if (segment == null || segment.result == null || previousTail == null) {
-            return 3;
+            return 5;
         }
         boolean sameSpec = Objects.equals(
                 previousTail.getSteelStripCode(), segment.result.getSteelStripCode())
@@ -1927,13 +1927,21 @@ public class Cd15InsertRollingServiceImpl implements Cd15InsertRollingService {
                         previousTail.getCuttingAngle(), segment.result.getCuttingAngle());
         boolean sameRoll = Objects.equals(
                 previousTail.getBigRollCode(), segment.result.getBigRollCode());
+        boolean sameAngle = Objects.equals(
+                previousTail.getCuttingAngle(), segment.result.getCuttingAngle());
         if (sameSpec && sameRoll) {
             return 0;
         }
         if (sameSpec) {
             return 1;
         }
-        return sameRoll ? 2 : 3;
+        if (sameRoll && sameAngle) {
+            return 2;
+        }
+        if (sameRoll) {
+            return 3;
+        }
+        return sameAngle ? 4 : 5;
     }
 
     private void mergeCarryovers(List<Segment> segments,

@@ -9,6 +9,7 @@ import com.zlt.aps.cd15.engine.model.Cd15MachineTailState;
 import com.zlt.aps.cd15.engine.model.Cd15MachineResource;
 import com.zlt.aps.cd15.engine.model.Cd15MachineResourceSnapshot;
 import com.zlt.aps.cd15.engine.model.Cd15MachineRollBinding;
+import com.zlt.aps.cd15.engine.model.Cd15RollingScheduleContext;
 import com.zlt.aps.cd15.engine.model.Cd15ScheduleCandidate;
 import com.zlt.aps.cd15.engine.model.Cd15ShiftDemandDecision;
 import com.zlt.aps.cd15.engine.model.Cd15ShiftDescriptor;
@@ -30,6 +31,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 /** 单班执行器规格失败隔离测试。 */
 public class Cd15SingleShiftScheduleExecutorTest {
@@ -177,6 +179,43 @@ public class Cd15SingleShiftScheduleExecutorTest {
                 .getNetDemandQuantity());
         assertEquals(new BigDecimal("70"), result.getTasks().get(0).getPlanQuantity());
     }
+
+    /** 均分余量完成后，续作量、待办任务和均分标记必须同时清理。 */
+    @Test
+    public void shouldClearEqualShareStateWhenRemainderCompleted() {
+        Cd15ScheduleCandidate candidate = candidate("C2");
+        String materialKey = "C2|BR2|15|80|80|80";
+        candidate.setMaterialKey(materialKey);
+        Cd15ScheduleCandidatePreparationService candidates = (context, input, classField, rolling) ->
+                Collections.singletonList(candidate);
+        Cd15ShiftDemandProvider demandProvider = (context, input, shift, selected, rolling) ->
+                Cd15ShiftDemandDecision.builder().netDemandQuantity(new BigDecimal("160")).build();
+        Cd15SingleShiftScheduleExecutor executor = new Cd15SingleShiftScheduleExecutor(
+                candidates, demandProvider, (factoryCode, start, end) -> machineSnapshot(),
+                trialPreparation(), committer(), new Cd15CloseOutCalculator(),
+                new Cd15ScheduleCandidateSorter(), new Cd15SplitCutGroupBuilder());
+        com.zlt.aps.cd15.engine.model.Cd15RollingScheduleContext rolling =
+                com.zlt.aps.cd15.engine.model.Cd15RollingScheduleContext.builder()
+                        .continueDemandBySteelStrip(new HashMap<>(
+                                Collections.singletonMap(materialKey, new BigDecimal("160"))))
+                        .pendingTasks(new java.util.ArrayList<>(Collections.singletonList(
+                                com.zlt.aps.cd15.engine.model.Cd15RollingPendingTask.builder()
+                                        .materialKey(materialKey).build())))
+                        .equalSharePendingMaterialKeys(new java.util.HashSet<>(
+                                Collections.singleton(materialKey)))
+                        .build();
+        Cd15AutoScheduleInput input = input();
+        Cd15ShiftResourceState state = state();
+        Cd15AutoScheduleContext context = context();
+        context.getParameters().setMinStartQty(BigDecimal.ONE);
+        Cd15ShiftExecutionResult result = executor.execute(
+                context, input, shift(), state, rolling);
+
+        assertEquals(1, result.getTasks().size());
+        assertTrue(rolling.getContinueDemandBySteelStrip().isEmpty());
+        assertTrue(rolling.getPendingTasks().isEmpty());
+        assertTrue(rolling.getEqualSharePendingMaterialKeys().isEmpty());
+    }
     /** 班初存在多台机尾连续候选时，应按机台顺序优先续作各自机尾规格。 */
     @Test
     public void shouldPrioritizeShiftStartTailCandidatesByMachineOrder() {
@@ -230,6 +269,44 @@ public class Cd15SingleShiftScheduleExecutorTest {
         assertEquals("211400022", result.getTasks().get(1).getSteelStripCode());
     }
 
+    /** 同一钢带存在多个角度时，下一班顺序1必须承接上一班的完整机尾材料。 */
+    @Test
+    public void shouldPrioritizeExactMaterialTailForSameSteelDifferentAngles() {
+        Cd15ScheduleCandidate angle15 = splitCandidate("211500015", "15");
+        Cd15ScheduleCandidate angle24 = splitCandidate("211500015", "24");
+        Cd15SingleShiftScheduleExecutor executor = new Cd15SingleShiftScheduleExecutor(
+                (context, input, classField, rolling) ->
+                        Arrays.asList(angle15, angle24),
+                (context, input, shift, candidate, rolling) ->
+                        Cd15ShiftDemandDecision.builder()
+                                .netDemandQuantity(new BigDecimal("100")).build(),
+                (factoryCode, start, end) -> splitMachineSnapshotWithAngles(),
+                trialPreparation(), committer(), new Cd15CloseOutCalculator(),
+                new Cd15ScheduleCandidateSorter(), new Cd15SplitCutGroupBuilder());
+        Cd15ShiftResourceState state = splitState();
+        state.getTailByMachine().put("G1401", Cd15MachineTailState.builder()
+                .materialKey("211500015|BR-SPLIT|24|80|80|80")
+                .steelStripCode("211500015")
+                .bigRollCode("BR-SPLIT")
+                .cuttingAngle("24")
+                .build());
+        Cd15AutoScheduleContext context = context();
+        context.getParameters().setMinStartQty(BigDecimal.ONE);
+
+        Cd15ShiftExecutionResult result = executor.execute(
+                context,
+                Cd15AutoScheduleInput.builder()
+                        .constructionMaterials(Arrays.asList(
+                                splitMaterial("211500015", "15"),
+                                splitMaterial("211500015", "24")))
+                        .build(),
+                shift(), state, null);
+
+        assertEquals(result.getFailures().toString(), 2, result.getTasks().size());
+        assertEquals("24", result.getTasks().get(0).getCuttingAngle());
+        assertEquals("G1401", result.getTasks().get(0).getMachineCode());
+        assertEquals(1, result.getTasks().get(0).getProduceOrder());
+    }
     /** 滚动规划器已给出稳定顺序时，班初机尾连续性不能再次打乱候选顺序。 */
     @Test
     public void shouldPreservePreparedOrderBeforeShiftStartTailPriority() {
@@ -252,6 +329,157 @@ public class Cd15SingleShiftScheduleExecutorTest {
         assertEquals("211400022", result.getTasks().get(1).getSteelStripCode());
     }
 
+    /** 单规格分裁超过阈值后必须连续两班排完，且两班合计保持完整计划量。 */
+    @Test
+    public void shouldScheduleSingleSpecSplitEqualShareAcrossTwoShifts() {
+        Cd15SingleShiftScheduleExecutor executor = new Cd15SingleShiftScheduleExecutor(
+                (context, input, classField, rolling) -> {
+                    Cd15ScheduleCandidate prepared = splitCandidate("C1");
+                    if (rolling != null
+                            && rolling.getEqualSharePendingMaterialKeys() != null
+                            && !rolling.getEqualSharePendingMaterialKeys().isEmpty()) {
+                        prepared.setContinueFromPreviousShift(true);
+                        prepared.setSourceMachineCode("G1401");
+                    }
+                    return Collections.singletonList(prepared);
+                },
+                (context, input, shift, selected, rolling) ->
+                        Cd15ShiftDemandDecision.builder()
+                                .netDemandQuantity(BigDecimal.ONE).build(),
+                (factoryCode, start, end) -> splitMachineSnapshot(),
+                trialPreparation(), committer(), new Cd15CloseOutCalculator(),
+                new Cd15ScheduleCandidateSorter(), new Cd15SplitCutGroupBuilder());
+        Cd15AutoScheduleInput input = Cd15AutoScheduleInput.builder()
+                .constructionMaterials(Collections.singletonList(
+                        splitMaterial("C1")))
+                .build();
+        Cd15RollingScheduleContext rolling = Cd15RollingScheduleContext.builder()
+                .continueDemandBySteelStrip(new HashMap<>())
+                .pendingTasks(new java.util.ArrayList<>())
+                .equalSharePendingMaterialKeys(new java.util.HashSet<>())
+                .build();
+        Cd15AutoScheduleContext context = context();
+        context.getParameters().setMinStartQty(BigDecimal.ONE);
+        context.getParameters().setEqualShareThreshold(new BigDecimal("50"));
+
+        Cd15ShiftExecutionResult firstShift = executor.execute(
+                context, input, shift(), splitState(), rolling);
+        Cd15ShiftExecutionResult secondShift = executor.execute(
+                context, input, shift(), splitState(), rolling);
+
+        assertEquals(new BigDecimal("40"),
+                firstShift.getTasks().get(0).getPlanQuantity());
+        assertEquals(new BigDecimal("40"),
+                secondShift.getTasks().get(0).getPlanQuantity());
+        assertEquals(new BigDecimal("80"),
+                firstShift.getTasks().get(0).getPlanQuantity().add(
+                        secondShift.getTasks().get(0).getPlanQuantity()));
+        assertEquals("G1401", firstShift.getTasks().get(0).getMachineCode());
+        assertEquals("G1401", secondShift.getTasks().get(0).getMachineCode());
+        assertEquals("SPLIT", firstShift.getTasks().get(0).getCutMode());
+        assertEquals("SPLIT", secondShift.getTasks().get(0).getCutMode());
+        assertTrue(rolling.getContinueDemandBySteelStrip().isEmpty());
+        assertTrue(rolling.getPendingTasks().isEmpty());
+        assertTrue(rolling.getEqualSharePendingMaterialKeys().isEmpty());
+    }
+
+    /** 毫米口径施工的跨班续作量已经是计划米数，不得再次按单耗和宽度换算。 */
+    @Test
+    public void shouldKeepNormalizedRemainderForMillimeterConstruction() {
+        Cd15ScheduleCandidate candidate = millimeterSplitCandidate();
+        candidate.setContinueFromPreviousShift(true);
+        candidate.setSourceMachineCode("G1401");
+        String materialKey = candidate.getMaterialKey();
+        Cd15SingleShiftScheduleExecutor executor = new Cd15SingleShiftScheduleExecutor(
+                (context, input, classField, rolling) ->
+                        Collections.singletonList(candidate),
+                (context, input, shift, selected, rolling) ->
+                        Cd15ShiftDemandDecision.builder()
+                                .netDemandQuantity(BigDecimal.ONE).build(),
+                (factoryCode, start, end) -> splitMachineSnapshot(),
+                trialPreparation(), committer(), new Cd15CloseOutCalculator(),
+                new Cd15ScheduleCandidateSorter(), new Cd15SplitCutGroupBuilder());
+        Cd15RollingScheduleContext rolling = Cd15RollingScheduleContext.builder()
+                .continueDemandBySteelStrip(new HashMap<>(Collections.singletonMap(
+                        materialKey, new BigDecimal("301.0968"))))
+                .pendingTasks(new java.util.ArrayList<>(Collections.singletonList(
+                        com.zlt.aps.cd15.engine.model.Cd15RollingPendingTask.builder()
+                                .materialKey(materialKey)
+                                .cutMode("SPLIT")
+                                .sourceMachineCode("G1401")
+                                .build())))
+                .equalSharePendingMaterialKeys(new java.util.HashSet<>(
+                        Collections.singleton(materialKey)))
+                .lastMachineBySteelStrip(new HashMap<>(Collections.singletonMap(
+                        materialKey, "G1401")))
+                .build();
+        Cd15AutoScheduleContext context = context();
+        context.getParameters().setMinStartQty(new BigDecimal("300"));
+        context.getParameters().setEqualShareThreshold(new BigDecimal("2000"));
+        context.getParameters().setRollTotalCount(200);
+
+        Cd15ShiftExecutionResult result = executor.execute(
+                context,
+                Cd15AutoScheduleInput.builder()
+                        .constructionMaterials(Collections.singletonList(
+                                millimeterSplitMaterial()))
+                        .build(),
+                shift(), millimeterContinuationState(), rolling);
+
+        assertEquals(result.getFailures().toString(), 1, result.getTasks().size());
+        assertEquals(new BigDecimal("301.0968"),
+                result.getTasks().get(0).getPlanQuantity());
+        assertTrue(rolling.getContinueDemandBySteelStrip().isEmpty());
+        assertTrue(rolling.getPendingTasks().isEmpty());
+        assertTrue(rolling.getEqualSharePendingMaterialKeys().isEmpty());
+    }
+    /** 均分续作的原机台不可排时必须保留余量，不得转到其他分裁机台。 */
+    @Test
+    public void shouldNotMoveEqualShareSplitRemainderToAnotherMachine() {
+        Cd15ScheduleCandidate candidate = splitCandidate("C1");
+        candidate.setContinueFromPreviousShift(true);
+        candidate.setSourceMachineCode("G1401");
+        String materialKey = candidate.getMaterialKey();
+        Cd15SingleShiftScheduleExecutor executor = new Cd15SingleShiftScheduleExecutor(
+                (context, input, classField, rolling) ->
+                        Collections.singletonList(candidate),
+                (context, input, shift, selected, rolling) ->
+                        Cd15ShiftDemandDecision.builder()
+                                .netDemandQuantity(BigDecimal.ONE).build(),
+                (factoryCode, start, end) -> equalShareTwoSplitMachineSnapshot(),
+                trialPreparation(), committer(), new Cd15CloseOutCalculator(),
+                new Cd15ScheduleCandidateSorter(), new Cd15SplitCutGroupBuilder());
+        Cd15RollingScheduleContext rolling = Cd15RollingScheduleContext.builder()
+                .continueDemandBySteelStrip(new HashMap<>(
+                        Collections.singletonMap(materialKey, new BigDecimal("40"))))
+                .pendingTasks(new java.util.ArrayList<>(Collections.singletonList(
+                        com.zlt.aps.cd15.engine.model.Cd15RollingPendingTask.builder()
+                                .materialKey(materialKey)
+                                .cutMode("SPLIT")
+                                .sourceMachineCode("G1401")
+                                .build())))
+                .equalSharePendingMaterialKeys(new java.util.HashSet<>(
+                        Collections.singleton(materialKey)))
+                .lastMachineBySteelStrip(new HashMap<>(
+                        Collections.singletonMap(materialKey, "G1401")))
+                .build();
+        Cd15AutoScheduleContext context = context();
+        context.getParameters().setMinStartQty(BigDecimal.ONE);
+
+        Cd15ShiftExecutionResult result = executor.execute(
+                context,
+                Cd15AutoScheduleInput.builder()
+                        .constructionMaterials(Collections.singletonList(
+                                splitMaterial("C1")))
+                        .build(),
+                shift(), equalShareSourceMachineUnavailableState(), rolling);
+
+        assertTrue(result.getTasks().isEmpty());
+        assertEquals(new BigDecimal("40"),
+                rolling.getContinueDemandBySteelStrip().get(materialKey));
+        assertTrue(rolling.getEqualSharePendingMaterialKeys().contains(materialKey));
+        assertTrue(result.getFailures().toString(), result.getFailures().containsValue("NO_AVAILABLE_MACHINE"));
+    }
     /** 新排程仅生成单规格分裁，不再把两个不同钢带组成新分裁组。 */
     @Test
     public void shouldCommitEachCandidateAsIndependentSingleSpecSplit() {
@@ -334,11 +562,17 @@ public class Cd15SingleShiftScheduleExecutorTest {
     }
 
     private Cd15ScheduleCandidate splitCandidate(String steelStripCode) {
+        return this.splitCandidate(steelStripCode, "15");
+    }
+
+    private Cd15ScheduleCandidate splitCandidate(
+            String steelStripCode, String cuttingAngle) {
         return Cd15ScheduleCandidate.builder()
-                .materialKey(steelStripCode + "|BR-SPLIT|15|80|80|80|false")
+                .materialKey(steelStripCode + "|BR-SPLIT|" + cuttingAngle
+                        + "|80|80|80|false")
                 .steelStripCode(steelStripCode)
                 .bigRollCode("BR-SPLIT")
-                .cuttingAngle("15")
+                .cuttingAngle(cuttingAngle)
                 .craftWidth(new BigDecimal("80"))
                 .unitConsumeMillimeter(new BigDecimal("80"))
                 .build();
@@ -352,16 +586,43 @@ public class Cd15SingleShiftScheduleExecutorTest {
     }
 
     private Cd15ConstructionMaterial splitMaterial(String steelStripCode) {
+        return this.splitMaterial(steelStripCode, "15");
+    }
+
+    private Cd15ConstructionMaterial splitMaterial(
+            String steelStripCode, String cuttingAngle) {
         return Cd15ConstructionMaterial.builder()
                 .steelStripCode(steelStripCode)
                 .bigRollCode("BR-SPLIT")
-                .cuttingAngle("15")
+                .cuttingAngle(cuttingAngle)
                 .unitConsumeMillimeter(new BigDecimal("80"))
                 .craftWidth(new BigDecimal("80"))
                 .curlLength(new BigDecimal("80"))
                 .build();
     }
 
+    private Cd15ScheduleCandidate millimeterSplitCandidate() {
+        return Cd15ScheduleCandidate.builder()
+                .materialKey("C1|BR-SPLIT|15|37.2|610|87")
+                .steelStripCode("C1")
+                .bigRollCode("BR-SPLIT")
+                .cuttingAngle("15")
+                .craftWidth(new BigDecimal("37.2"))
+                .unitConsumeMillimeter(new BigDecimal("610"))
+                .curlLength(new BigDecimal("87"))
+                .build();
+    }
+
+    private Cd15ConstructionMaterial millimeterSplitMaterial() {
+        return Cd15ConstructionMaterial.builder()
+                .steelStripCode("C1")
+                .bigRollCode("BR-SPLIT")
+                .cuttingAngle("15")
+                .unitConsumeMillimeter(new BigDecimal("610"))
+                .craftWidth(new BigDecimal("37.2"))
+                .curlLength(new BigDecimal("87"))
+                .build();
+    }
     private Cd15MachineResourceSnapshot splitMachineSnapshot() {
         return Cd15MachineResourceSnapshot.builder()
                 .machines(Arrays.asList(
@@ -388,6 +649,70 @@ public class Cd15SingleShiftScheduleExecutorTest {
                 .build();
     }
 
+    private Cd15MachineResourceSnapshot splitMachineSnapshotWithAngles() {
+        Cd15MachineResourceSnapshot snapshot = splitMachineSnapshot();
+        HashMap<String, BigDecimal> angleWidths = new HashMap<>(
+                snapshot.getAngleWidthMaxByAngle());
+        angleWidths.put("24", new BigDecimal("1000"));
+        snapshot.setAngleWidthMaxByAngle(angleWidths);
+        return snapshot;
+    }
+    private Cd15MachineResourceSnapshot equalShareTwoSplitMachineSnapshot() {
+        return Cd15MachineResourceSnapshot.builder()
+                .machines(Arrays.asList(
+                        Cd15MachineResource.builder().machineCode("G1401").status("1")
+                                .openMachineClass("SHIFT1").splitCutSupported(true)
+                                .defaultCutMode("SPLIT")
+                                .splitShiftCapacity(new BigDecimal("800")).build(),
+                        Cd15MachineResource.builder().machineCode("G1501").status("1")
+                                .openMachineClass("SHIFT1").splitCutSupported(true)
+                                .defaultCutMode("SPLIT")
+                                .splitShiftCapacity(new BigDecimal("800")).build()))
+                .bindings(Arrays.asList(
+                        Cd15MachineRollBinding.builder().machineCode("G1401")
+                                .bigRollCode("BR-SPLIT").shiftCode("SHIFT1").build(),
+                        Cd15MachineRollBinding.builder().machineCode("G1501")
+                                .bigRollCode("BR-SPLIT").shiftCode("SHIFT1").build()))
+                .restrictions(Collections.emptyList())
+                .lossRateRules(Collections.singletonList(Cd15LossRateRule.builder()
+                        .lossRatePercent(BigDecimal.ZERO).build()))
+                .angleWidthMaxByAngle(Collections.singletonMap(
+                        "15", new BigDecimal("1000")))
+                .build();
+    }
+
+    private Cd15ShiftResourceState millimeterContinuationState() {
+        HashMap<String, Integer> seconds = new HashMap<>();
+        seconds.put("G1101", 28800);
+        seconds.put("G1401", 28800);
+        return Cd15ShiftResourceState.builder()
+                .lanes(Arrays.asList(
+                        Cd15StorageLaneState.builder().laneCode("L1")
+                                .vehicleCount(0).maxVehicleCount(100).build(),
+                        Cd15StorageLaneState.builder().laneCode("L2")
+                                .vehicleCount(0).maxVehicleCount(100).build()))
+                .totalToolingCount(200).occupiedToolingCount(0)
+                .remainingSecondsByMachine(seconds)
+                .tailSpecByMachine(new HashMap<>())
+                .tailByMachine(new HashMap<>())
+                .tasks(new java.util.ArrayList<>()).build();
+    }
+    private Cd15ShiftResourceState equalShareSourceMachineUnavailableState() {
+        HashMap<String, Integer> seconds = new HashMap<>();
+        seconds.put("G1401", 0);
+        seconds.put("G1501", 28800);
+        return Cd15ShiftResourceState.builder()
+                .lanes(Arrays.asList(
+                        Cd15StorageLaneState.builder().laneCode("L1")
+                                .vehicleCount(0).maxVehicleCount(10).build(),
+                        Cd15StorageLaneState.builder().laneCode("L2")
+                                .vehicleCount(0).maxVehicleCount(10).build()))
+                .totalToolingCount(20).occupiedToolingCount(0)
+                .remainingSecondsByMachine(seconds)
+                .tailSpecByMachine(new HashMap<>())
+                .tailByMachine(new HashMap<>())
+                .tasks(new java.util.ArrayList<>()).build();
+    }
     private Cd15ShiftResourceState splitState() {
         HashMap<String, Integer> seconds = new HashMap<>();
         seconds.put("G1101", 28800);

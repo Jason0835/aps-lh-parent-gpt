@@ -37,6 +37,8 @@ public class Cd15RollingScheduleContext {
     private Map<String, BigDecimal> newSpecAdvanceRemainingBySteelStrip;
     /** 已按施工宽度换算过的新增规格剩余量，后续班次不得重复换算。 */
     private Set<String> normalizedNewSpecAdvanceSteelStripCodes;
+    /** 已执行首次均分、等待下一班完成的施工材料稳定键。 */
+    private Set<String> equalSharePendingMaterialKeys;
     /** 跨班保留的大卷成熟库存及已分配米数。 */
     private List<Cd15BigRollAgingStock> bigRollAgingStocks;
     /** 各机台最近一次已提交任务的机尾规格。 */

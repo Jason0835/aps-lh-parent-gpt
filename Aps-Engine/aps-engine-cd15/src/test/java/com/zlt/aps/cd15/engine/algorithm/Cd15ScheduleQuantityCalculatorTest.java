@@ -5,6 +5,7 @@ import org.junit.Test;
 import java.math.BigDecimal;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 /**
  * 斜裁自动排程数量计算测试。
@@ -37,7 +38,7 @@ public class Cd15ScheduleQuantityCalculatorTest {
         assertEquals(new BigDecimal("348"), result);
     }
     /**
-     * T-06：非收尾规格净需求量超过均分阈值时，先按净需求量除以2，再叠加损耗并按整卷向上取整。
+     * T-06：非收尾规格先加损耗并按整车取整，再按完整计划量判断阈值并均分。
      */
     @Test
     public void normalQuantityShouldShareWhenNetDemandExceedsThreshold() {
@@ -45,7 +46,7 @@ public class Cd15ScheduleQuantityCalculatorTest {
                 new BigDecimal("2500"), false, new BigDecimal("5"),
                 new BigDecimal("300"), new BigDecimal("80"), new BigDecimal("2000"));
 
-        assertEquals(new BigDecimal("1360"), result);
+        assertEquals(new BigDecimal("1320"), result);
     }
     @Test
     public void normalQuantityShouldRoundByVehiclePlanQuantity() {
@@ -56,4 +57,48 @@ public class Cd15ScheduleQuantityCalculatorTest {
         assertEquals(new BigDecimal("1315.44"), result);
     }
 
+    /** T-07：单规格一出二按均分前完整双路计划量拆分，并按双片宽度步长向上取整。 */
+    @Test
+    public void singleSpecSplitShouldShareFinalPlanQuantityAcrossShifts() {
+        BigDecimal result = calculator.calculateSingleSpecSplitActualQuantity(
+                new BigDecimal("5405.778"), false, BigDecimal.ZERO,
+                new BigDecimal("300"), new BigDecimal("2702.889"),
+                new BigDecimal("2000"), new BigDecimal("37.8"), false);
+
+        assertEquals(new BigDecimal("2702.9268"), result);
+    }
+
+    /** T-08：真实单规格分裁计划量超过阈值时，按双片步长拆为相邻两班且合计不变。 */
+    @Test
+    public void realSingleSpecSplitQuantityShouldBeSharedAcrossTwoShifts() {
+        BigDecimal firstShiftQuantity = calculator.calculateSingleSpecSplitActualQuantity(
+                new BigDecimal("45.384"), false, BigDecimal.ZERO,
+                new BigDecimal("300"), new BigDecimal("5305.5384"),
+                new BigDecimal("2000"), new BigDecimal("37.2"), false);
+        BigDecimal remainderQuantity =
+                calculator.calculateSingleSpecSplitEqualShareRemainder(
+                        new BigDecimal("45.384"), false, BigDecimal.ZERO,
+                        new BigDecimal("300"), new BigDecimal("5305.5384"),
+                        new BigDecimal("2000"), new BigDecimal("37.2"), false);
+
+        assertTrue(calculator.requiresSingleSpecSplitEqualShare(
+                new BigDecimal("45.384"), false, BigDecimal.ZERO,
+                new BigDecimal("300"), new BigDecimal("5305.5384"),
+                new BigDecimal("2000"), false));
+        assertEquals(new BigDecimal("2652.8064"), firstShiftQuantity);
+        assertEquals(new BigDecimal("2652.732"), remainderQuantity);
+        assertEquals(new BigDecimal("5305.5384"),
+                firstShiftQuantity.add(remainderQuantity));
+    }
+
+    /** T-09：下一班承接均分余量时不再均分或重复叠加损耗。 */
+    @Test
+    public void equalShareRemainderShouldNotBeSharedAgain() {
+        BigDecimal result = calculator.calculateSingleSpecSplitActualQuantity(
+                new BigDecimal("2702.8512"), false, new BigDecimal("5"),
+                new BigDecimal("300"), new BigDecimal("2702.889"),
+                new BigDecimal("2000"), new BigDecimal("37.8"), true);
+
+        assertEquals(new BigDecimal("2702.8512"), result);
+    }
 }

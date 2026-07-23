@@ -60,6 +60,27 @@ public class Cd15ScheduleCandidateSorterTest {
     }
 
     /**
+     * 同大卷连续生产时，同角度候选必须先于需要切换角度的候选。
+     */
+    @Test
+    public void shouldKeepSameAngleTogetherWithinSameRoll() {
+        LocalDateTime shortageTime = LocalDateTime.of(2026, 7, 22, 0, 0);
+        Cd15MachineTailState tail = Cd15MachineTailState.builder()
+                .steelStripCode("211500015")
+                .bigRollCode("CSSC6020")
+                .cuttingAngle("24")
+                .build();
+
+        List<Cd15ScheduleCandidate> result = sorter.sort(Arrays.asList(
+                candidate("211500012", "CSSC6020", "15", shortageTime),
+                candidate("211500012", "CSSC6020", "24", shortageTime)
+        ), tail);
+
+        assertEquals("24", result.get(0).getCuttingAngle());
+        assertEquals("15", result.get(1).getCuttingAngle());
+    }
+
+    /**
      * 连续生产规则不能覆盖更紧急的本班缺料候选。
      */
     @Test
@@ -153,6 +174,19 @@ public class Cd15ScheduleCandidateSorterTest {
                 .continueFromPreviousShift(continueFromPreviousShift)
                 .earliestShortageTime(shortageTime)
                 .stockSupplyHours(new BigDecimal(supplyHours))
+                .build();
+    }
+
+    private Cd15ScheduleCandidate candidate(String steelStripCode,
+                                            String bigRollCode,
+                                            String cuttingAngle,
+                                            LocalDateTime shortageTime) {
+        return Cd15ScheduleCandidate.builder()
+                .steelStripCode(steelStripCode)
+                .bigRollCode(bigRollCode)
+                .cuttingAngle(cuttingAngle)
+                .earliestShortageTime(shortageTime)
+                .stockSupplyHours(BigDecimal.ONE)
                 .build();
     }
 

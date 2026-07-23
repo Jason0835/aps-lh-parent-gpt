@@ -271,6 +271,33 @@ public class Cd15ShiftResourceCommitterTest {
         assertTrue(state.getTasks().isEmpty());
     }
 
+    /** 单规格分裁均分提交后必须把精确余量交给班次执行器。 */
+    @Test
+    public void shouldReturnExactRemainderAfterSingleSpecSplitEqualShare() {
+        Cd15MachineTrial trial = Cd15MachineTrial.builder()
+                .machineCode("M1")
+                .actualQuantity(new BigDecimal("2652.8064"))
+                .finalSchedulableQuantity(new BigDecimal("2652.8064"))
+                .vehiclePlanQuantity(new BigDecimal("5305.5384"))
+                .equalShareApplied(true)
+                .equalShareRemainderQuantity(new BigDecimal("2652.732"))
+                .fullyAccommodated(true)
+                .preferredMachine(true)
+                .priorityOrder(0)
+                .changeSeconds(0)
+                .productionSeconds(1000)
+                .remainingSeconds(27800)
+                .build();
+
+        Cd15ShiftCommitResult result = committer.commitSingleSpecSplit(
+                splitRequest("211500012", trial), splitState(2));
+
+        assertTrue(result.isSuccess());
+        assertEquals("EQUAL_SHARE", result.getPartialReason());
+        assertEquals(new BigDecimal("2652.732"),
+                result.getEqualShareRemainderQuantity());
+    }
+
     /** 单规格一出二第二路无法分配时必须丢弃工作副本。 */
     @Test
     public void shouldKeepOriginalStateWhenSecondSingleSpecSplitLaneFails() {
