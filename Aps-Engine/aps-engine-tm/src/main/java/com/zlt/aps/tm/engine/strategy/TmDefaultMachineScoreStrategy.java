@@ -7,6 +7,7 @@ import com.zlt.aps.tm.api.enums.TmScheduleErrorCodeEnum;
 import com.zlt.aps.tm.api.enums.TmScheduleStrategyEnum;
 import com.zlt.aps.tm.engine.domain.TmMachineCandidate;
 import com.zlt.aps.tm.engine.domain.TmMachineRuleContext;
+import com.zlt.aps.tm.engine.domain.TmParamValue;
 import com.zlt.aps.tm.engine.domain.TmTaskDraft;
 import com.zlt.aps.tm.engine.util.TmGlueSimilarityUtils;
 import org.springframework.stereotype.Component;
@@ -61,27 +62,45 @@ public class TmDefaultMachineScoreStrategy implements ITmMachineScoreStrategy {
             return result;
         }
         TmTaskDraft task = context.getTaskDraft();
-        // 1. 剩余产能适配分（权重 10）
-        BigDecimal capacityScore = this.capacityFitScore(task, candidate);
-        // 2. 主胶料连续分（权重 10）
+        BigDecimal remainCapacityWeight = this.resolveWeight(context,
+                TmScheduleConstants.PARAM_SCORE_WEIGHT_REMAIN_CAP,
+                TmScheduleConstants.DEFAULT_SCORE_WEIGHT_REMAIN_CAP);
+        BigDecimal mainGlueWeight = this.resolveWeight(context,
+                TmScheduleConstants.PARAM_SCORE_WEIGHT_GLUE_CONT,
+                TmScheduleConstants.DEFAULT_SCORE_WEIGHT_GLUE_CONT);
+        BigDecimal baseGlueWeight = this.resolveWeight(context,
+                TmScheduleConstants.PARAM_SCORE_WEIGHT_BASE_GLUE,
+                TmScheduleConstants.DEFAULT_SCORE_WEIGHT_BASE_GLUE);
+        BigDecimal mouthPlateWeight = this.resolveWeight(context,
+                TmScheduleConstants.PARAM_SCORE_WEIGHT_MOUTH_CONT,
+                TmScheduleConstants.DEFAULT_SCORE_WEIGHT_MOUTH_CONT);
+        BigDecimal switchCostWeight = this.resolveWeight(context,
+                TmScheduleConstants.PARAM_SCORE_WEIGHT_SWITCH_COST,
+                TmScheduleConstants.DEFAULT_SCORE_WEIGHT_SWITCH_COST);
+        BigDecimal fixedMachineWeight = this.resolveWeight(context,
+                TmScheduleConstants.PARAM_SCORE_WEIGHT_FIXED_MACHINE,
+                TmScheduleConstants.DEFAULT_SCORE_WEIGHT_FIXED_MACHINE);
+        // 1. 剩余产能适配分
+        BigDecimal capacityScore = this.capacityFitScore(task, candidate, remainCapacityWeight);
+        // 2. 主胶料连续分
         BigDecimal mainGlueScore = TmGlueSimilarityUtils.isSameNonBlank(
                 task.getGlueCode(), candidate.getTailMainGlueCode())
-                ? BigDecimal.TEN : BigDecimal.ZERO;
-        // 3. 基部胶相似分（权重 8）：主胶料相同时不再计基部胶分，按基部胶交集元素数量折算分值。
+                ? mainGlueWeight : BigDecimal.ZERO;
+        // 3. 基部胶相似分：主胶料相同时不再计基部胶分，按基部胶交集元素数量折算分值。
         BigDecimal baseGlueScore = mainGlueScore.compareTo(BigDecimal.ZERO) > 0
                 ? BigDecimal.ZERO
                 : TmGlueSimilarityUtils.calculateSimilarityScore(task.getBaseGlueCode(),
-                        candidate.getTailBaseGlueCode(), BigDecimal.valueOf(8));
-        // 4. 同口型连续分（权重 10）
+                        candidate.getTailBaseGlueCode(), baseGlueWeight);
+        // 4. 同口型连续分
         BigDecimal mouthPlateScore = TmGlueSimilarityUtils.isSameNonBlank(
                 task.getMouthPlateCode(), candidate.getTailMouthPlateCode())
-                ? BigDecimal.TEN : BigDecimal.ZERO;
-        // 5. 切换成本分（权重 10）：切换时长越短分越高
-        BigDecimal switchCostScore = BigDecimal.TEN.subtract(
+                ? mouthPlateWeight : BigDecimal.ZERO;
+        // 5. 切换成本分：切换时长越短分越高
+        BigDecimal switchCostScore = switchCostWeight.subtract(
                 this.nvl(candidate.getSwitchCostHours())).max(BigDecimal.ZERO);
-        // 6. 定点生产分（权重 10）
+        // 6. 定点生产分
         BigDecimal fixedScore = Boolean.TRUE.equals(candidate.getFixedMachineMatched())
-                ? BigDecimal.TEN : BigDecimal.ZERO;
+                ? fixedMachineWeight : BigDecimal.ZERO;
         BigDecimal totalScore = capacityScore.add(mainGlueScore).add(baseGlueScore)
                 .add(mouthPlateScore).add(switchCostScore).add(fixedScore);
 
@@ -94,7 +113,7 @@ public class TmDefaultMachineScoreStrategy implements ITmMachineScoreStrategy {
         scoreItems.put("fixedScore", fixedScore);
         result.setScoreItems(scoreItems);
         result.setTotalScore(totalScore);
-        result.setDescription("默认评分：产能10/主胶料10/基部胶8/口型10/切换10/定点10");
+        result.setDescription("按当前 TM_SCORE_WEIGHT_* 参数完成机台评分");
         candidate.setScore(totalScore);
         candidate.getEvidence().putAll(scoreItems);
         candidate.applyScore(result);
@@ -106,9 +125,10 @@ public class TmDefaultMachineScoreStrategy implements ITmMachineScoreStrategy {
      *
      * @param task      胎面任务草稿
      * @param candidate 候选机台
-     * @return 产能适配分，最高 10
+     * @param weight 当前评分项权重
+     * @return 产能适配分，最高为当前权重
      */
-    private BigDecimal capacityFitScore(TmTaskDraft task, TmMachineCandidate candidate) {
+    private BigDecimal capacityFitScore(TmTaskDraft task, TmMachineCandidate candidate, BigDecimal weight) {
         if (task == null) {
             return BigDecimal.ZERO;
         }
@@ -122,8 +142,33 @@ public class TmDefaultMachineScoreStrategy implements ITmMachineScoreStrategy {
         BigDecimal wasteRatio = remainCapacity.subtract(planQty)
                 .divide(remainCapacity, TmScheduleConstants.DECIMAL_CALCULATION_SCALE,
                         RoundingMode.HALF_UP);
-        return BigDecimal.TEN.multiply(BigDecimal.ONE.subtract(wasteRatio))
+        return weight.multiply(BigDecimal.ONE.subtract(wasteRatio))
                 .max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * 从本次排程参数快照读取评分权重，非法值或负数回退为默认值。
+     *
+     * @param context 机台规则上下文
+     * @param paramCode 参数编码
+     * @param defaultValue 默认值
+     * @return 非负评分权重
+     */
+    private BigDecimal resolveWeight(TmMachineRuleContext context, String paramCode, String defaultValue) {
+        String effectiveValue = defaultValue;
+        if (context.getScheduleContext() != null) {
+            TmParamValue paramValue = context.getScheduleContext().getParamMap().get(paramCode);
+            if (paramValue != null && paramValue.getEffectiveValue() != null
+                    && !paramValue.getEffectiveValue().trim().isEmpty()) {
+                effectiveValue = paramValue.getEffectiveValue().trim();
+            }
+        }
+        try {
+            BigDecimal weight = new BigDecimal(effectiveValue);
+            return weight.compareTo(BigDecimal.ZERO) < 0 ? new BigDecimal(defaultValue) : weight;
+        } catch (NumberFormatException exception) {
+            return new BigDecimal(defaultValue);
+        }
     }
 
     /**

@@ -493,7 +493,7 @@ public class TcManualInsertRollingService {
             unplanned.setUnplannedReasonCode("CAPACITY_NOT_ENOUGH");
             unplanned.setUnplannedReasonDesc(I18nUtil.getMessage("ui.tc.schedule.unplanned.capacityNotEnough"));
             unplanned.setUnplannedEvidenceJson(
-                    "{\"schemaVersion\":1,\"rule\":\"TC_SHIFT_MAX_CAPACITY\",\"source\":\"MANUAL_ROLLING\"}");
+                    "{\"schemaVersion\":1,\"rule\":\"T_TC_MACHINE_INFO.MAX_CAPACITY\",\"source\":\"MANUAL_ROLLING\"}");
     }
 
     /** 更新已有未排任务。 */

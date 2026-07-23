@@ -509,8 +509,8 @@ public class TmPlanCalcService implements ITmPlanCalcService {
     /**
      * 初始化全局可用工装数量。
      *
-     * <p>首个任务的可用工装数量等于总工装数量减去所有胎面14点预计库存折算的占用工装数量。工装数量是全局池，
-     * 因此不能按单个胎面重复使用总工装数量。</p>
+     * <p>首个任务的可用工装数量等于总工装数量减去所有胎面14点预计库存折算的占用工装数量，
+     * 再乘以整车率。工装数量是全局池，因此不能按单个胎面重复使用总工装数量。</p>
      *
      * @param context          排程上下文
      * @param stockForecastMap 胎面库存预测结果
@@ -537,7 +537,10 @@ public class TmPlanCalcService implements ITmPlanCalcService {
             initialUsedToolQty = initialUsedToolQty.add(forecastStockQty.divide(curlLength,
                     TmScheduleConstants.DECIMAL_CALCULATION_SCALE, RoundingMode.HALF_UP));
         }
+        BigDecimal vehicleRate = this.readDecimalParam(context, TmScheduleConstants.PARAM_VEHICLE_RATE,
+                BigDecimal.ONE).max(BigDecimal.ZERO);
         return totalToolQty.subtract(initialUsedToolQty).max(BigDecimal.ZERO)
+                .multiply(vehicleRate)
                 .setScale(TmScheduleConstants.DECIMAL_CALCULATION_SCALE, RoundingMode.HALF_UP);
     }
 

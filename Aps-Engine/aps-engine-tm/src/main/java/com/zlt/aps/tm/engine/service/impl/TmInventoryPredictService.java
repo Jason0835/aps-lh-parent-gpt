@@ -18,6 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.text.MessageFormat;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -75,14 +76,16 @@ public class TmInventoryPredictService implements ITmInventoryPredictService {
         String factoryCode = context.getFactoryCode();
 
         // 查询每个胎面的6点库存（取排程日期前一天的库存快照）
-        Map<String, BigDecimal> sixClockStockMap = querySixClockStock(scheduleDate, treadCodes);
+        Map<String, BigDecimal> sixClockStockMap = this.querySixClockStock(scheduleDate, treadCodes);
+        this.handleMissingStock(context, treadCodes, sixClockStockMap, scheduleDate);
 
         // 查询早班需求量（当天早班成型消耗，按胎面标准长度折算）
-        boolean useRecipe = isRecipeMode(context);
-        Map<String, BigDecimal> firstShiftDemandMap = queryFirstShiftDemand(factoryCode, scheduleDate, treadCodes, useRecipe);
+        boolean useRecipe = this.isRecipeMode(context);
+        Map<String, BigDecimal> firstShiftDemandMap = this.queryFirstShiftDemand(
+                factoryCode, scheduleDate, treadCodes, useRecipe);
 
         // 查询早班计划量（前一天夜班胎面排程计划量）
-        Map<String, BigDecimal> firstShiftPlanMap = queryFirstShiftPlan(factoryCode, scheduleDate, treadCodes);
+        Map<String, BigDecimal> firstShiftPlanMap = this.queryFirstShiftPlan(factoryCode, scheduleDate, treadCodes);
 
         // 构建库存预测结果
         Map<String, TmStockForecast> stockForecastMap = new HashMap<>();
@@ -105,6 +108,39 @@ public class TmInventoryPredictService implements ITmInventoryPredictService {
 
         context.setStockForecastMap(stockForecastMap);
         log.info("库存预测完成，共预测{}个胎面规格", stockForecastMap.size());
+    }
+
+    /**
+     * 按参数处理缺少库存快照的胎面规格。
+     *
+     * @param context 排程上下文
+     * @param treadCodes 待排胎面编码
+     * @param stockMap 已查询库存映射
+     * @param scheduleDate 排程日期
+     * @throws ServiceException 策略为 ERROR 且存在缺失库存时抛出
+     */
+    private void handleMissingStock(TmScheduleContext context, List<String> treadCodes,
+                                    Map<String, BigDecimal> stockMap, Date scheduleDate) {
+        List<String> missingCodeList = treadCodes.stream()
+                .filter(treadCode -> !stockMap.containsKey(treadCode))
+                .collect(Collectors.toList());
+        if (missingCodeList.isEmpty()) {
+            return;
+        }
+        String policy = context.getParam(TmScheduleConstants.PARAM_STOCK_MISSING_POLICY).getEffectiveValue();
+        String stockDate = DateUtil.formatDate(DateUtil.offsetDay(scheduleDate, -1));
+        if ("ERROR".equalsIgnoreCase(policy)) {
+            throw new ServiceException(MessageFormat.format(
+                    I18nUtil.getMessage("ui.tm.schedule.stockMissingBlocked"),
+                    stockDate, String.join(",", missingCodeList)));
+        }
+        for (String treadCode : missingCodeList) {
+            String message = MessageFormat.format(I18nUtil.getMessage("ui.tm.schedule.stockMissingZero"),
+                    stockDate, treadCode);
+            context.getIssueCollector().addStockMissingIssue(treadCode, message);
+            log.warn("[TM_STOCK_MISSING] policy=ZERO, scheduleDate={}, treadCode={}",
+                    DateUtil.formatDate(scheduleDate), treadCode);
+        }
     }
 
     /**
