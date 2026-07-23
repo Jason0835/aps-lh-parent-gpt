@@ -15,8 +15,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.text.MessageFormat;
 import java.util.StringJoiner;
 
@@ -145,11 +143,8 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
     public List<DjScheduleResult> autoDjSchedule(String factoryCode, Date scheduleDate) {
         log.info("===== 垫胶自动排程开始，工厂：{}，排产日期：{} =====", factoryCode, DateUtil.formatDate(scheduleDate));
 
-        // 初始化上下文
-        DjScheduleContext context = new DjScheduleContext();
-        context.setFactoryCode(factoryCode);
-        context.setScheduleDate(scheduleDate);
-        context.setLastSpecOfPrevShift(new HashMap<>());
+        // 初始化上下文及缓存
+        DjScheduleContext context = this.initContext(factoryCode, scheduleDate);
 
         // ==================== 步骤1：加载成型计划 ====================
         List<CxScheduleResult> cxScheduleList = this.loadCxSchedule(factoryCode, scheduleDate);
@@ -177,6 +172,29 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
         log.info("步骤5.1~5.4：排产完成，生成 {} 条排产结果", scheduleResults.size());
 
         return this.step5ProcessResults(scheduleResults, context, factoryCode, scheduleDate);
+    }
+
+    /**
+     * 初始化排程上下文及缓存数据
+     *
+     * @param factoryCode  工厂编码
+     * @param scheduleDate 排产日期
+     * @return 已初始化的排程上下文
+     */
+    private DjScheduleContext initContext(String factoryCode, Date scheduleDate) {
+        DjScheduleContext context = new DjScheduleContext();
+        context.setFactoryCode(factoryCode);
+        context.setScheduleDate(scheduleDate);
+        context.setLastSpecOfPrevShift(new HashMap<>());
+
+        // 加载前一日排产结果缓存（用于接班库存计算和首班最后生产规格判断）
+        Date prevDate = DateUtil.offsetDay(scheduleDate, -1);
+        List<DjScheduleResult> prevDayResults = djEngineScheduleResultMapper.selectList(
+                new LambdaQueryWrapper<DjScheduleResult>()
+                        .eq(DjScheduleResult::getScheduleDate, prevDate));
+        context.setPrevDayScheduleResults(prevDayResults);
+
+        return context;
     }
 
     // ==================== 步骤2：解析成型计划，获取垫胶施工清单 ====================
@@ -394,35 +412,14 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
             context.appendLog("  规格 {0}：有效库存 {1}", context.getPaddingNameByCode(entry.getKey()), entry.getValue());
         }
 
-        // 判断新规格
+        // 判断新规格：计算时间窗口阈值 = 排产日 - 新规格天数阈值，查询窗口内有排产记录的垫胶代码
         int newSpecDaysThreshold = this.getParamAsDecimal(context, DjEngineConstants.PARAM_NEW_SPEC_DAYS_THRESHOLD).intValue();
-        List<Map<String, Object>> lastScheduleList = djEngineScheduleResultMapper.selectLastScheduleDate(
-                factoryCode, scheduleDate, new ArrayList<>(paddingCodes));
-        Map<String, Date> lastScheduleMap = new HashMap<>();
-        if (lastScheduleList != null) {
-            for (Map<String, Object> row : lastScheduleList) {
-                String code = (String) row.get("PADDING_CODE");
-                Object lastDateObj = row.get("LAST_DATE");
-                Date lastDate = null;
-                if (lastDateObj instanceof LocalDateTime) {
-                    lastDate = Date.from(((LocalDateTime) lastDateObj).atZone(ZoneId.systemDefault()).toInstant());
-                } else if (lastDateObj instanceof Date) {
-                    lastDate = (Date) lastDateObj;
-                }
-                lastScheduleMap.put(code, lastDate);
-            }
-        }
-        Set<String> newSpecPaddingCodes = new HashSet<>();
-        for (String code : paddingCodes) {
-            Date lastDate = lastScheduleMap.get(code);
-            if (lastDate == null) {
-                newSpecPaddingCodes.add(code);
-            } else {
-                long daysBetween = DateUtil.betweenDay(lastDate, scheduleDate, true);
-                if (daysBetween >= newSpecDaysThreshold) {
-                    newSpecPaddingCodes.add(code);
-                }
-            }
+        Date thresholdDate = DateUtil.offsetDay(scheduleDate, -newSpecDaysThreshold);
+        Set<String> scheduledPaddingCodes = djEngineScheduleResultMapper.selectLastScheduleDate(
+                factoryCode, thresholdDate, scheduleDate, paddingCodes);
+        Set<String> newSpecPaddingCodes = new HashSet<>(paddingCodes);
+        if (scheduledPaddingCodes != null) {
+            scheduledPaddingCodes.forEach(newSpecPaddingCodes::remove);
         }
 
         // 3.2 供应窗口超出成型范围时，加载月计划余量
@@ -460,17 +457,12 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
 
         // 计算第1班接班库存
         Map<String, BigDecimal> handoverInventory = new HashMap<>();
-        Date prevDate = DateUtil.offsetDay(scheduleDate, -1);
-        List<DjScheduleResult> prevDayResults = djEngineScheduleResultMapper.selectList(
-                new LambdaQueryWrapper<DjScheduleResult>()
-                        .eq(DjScheduleResult::getScheduleDate, prevDate));
         Map<String, BigDecimal> prevDayClass3Plan = new HashMap<>();
-        if (!CollectionUtils.isEmpty(prevDayResults)) {
-            for (DjScheduleResult r : prevDayResults) {
-                BigDecimal class3Plan = r.getClass3PlanQty();
-                if (BigDecimalUtils.gtZero(class3Plan)) {
-                    prevDayClass3Plan.merge(r.getPaddingCode(), class3Plan, BigDecimal::add);
-                }
+        List<DjScheduleResult> prevDayResults = context.getPrevDayScheduleResults();
+        for (DjScheduleResult r : prevDayResults) {
+            BigDecimal class3Plan = r.getClass3PlanQty();
+            if (BigDecimalUtils.gtZero(class3Plan)) {
+                prevDayClass3Plan.merge(r.getPaddingCode(), class3Plan, BigDecimal::add);
             }
         }
         for (DjPaddingDemand demand : demandList) {
@@ -1392,6 +1384,20 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
 
         // 各机台各班的最后生产规格
         Map<String, String> lastSpecInShift = new HashMap<>();
+        // 首班（第1班）继承昨日垫胶第3班最后生产的规格（用于规格续作判断，避免首班无上一规格导致切换损失异常）
+        List<DjScheduleResult> prevDayResults = context.getPrevDayScheduleResults();
+        Map<String, Integer> machineMaxSeq = new HashMap<>();
+        for (DjScheduleResult r : prevDayResults) {
+            String mc = r.getMachineCode();
+            if (StringUtils.isEmpty(mc)) continue;
+            Integer seq = r.getClass3Sequence();
+            if (seq == null || seq <= 0) continue;
+            Integer currentMax = machineMaxSeq.get(mc);
+            if (currentMax == null || seq > currentMax) {
+                machineMaxSeq.put(mc, seq);
+                lastSpecInShift.put(mc, r.getPaddingCode());
+            }
+        }
         // 排产结果
         Map<String, DjScheduleResult> resultMap = new HashMap<>();
 
@@ -1666,8 +1672,9 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
         String lastSpecCode = lastSpecInShift.get(machineCode);
 
         // 日志：记录待排产规格
+        String lastSpecName = lastSpecCode != null ? context.getPaddingNameByCode(lastSpecCode) : "无";
         context.appendLog("--- 机台 {0}（产能={1}，上一规格={2}）---",
-                machineCode, remainingCapacity, lastSpecCode != null ? lastSpecCode : "无");
+                machineCode, remainingCapacity, lastSpecName);
 
         // 优先级排序
         pendingSpecs.sort(buildPriorityComparator(demandList, lastSpecCode, context, shiftIndex));
@@ -2499,16 +2506,27 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
     }
 
     /**
-     * 构建优先级比较器（10级规则）
+     * 构建优先级比较器（11级规则）
      */
     private Comparator<DjPaddingDemand> buildPriorityComparator(List<DjPaddingDemand> demandList, String lastSpecCode,
             DjScheduleContext context, int shiftIndex) {
         return (a, b) -> {
-            // 1. 本班有供应缺口且后续窗口无需求的最优先（若本班不生产则无补救机会）
-            boolean aCritical = a.isNeedProduce() && !a.isWindowHasDemand();
-            boolean bCritical = b.isNeedProduce() && !b.isWindowHasDemand();
-            if (aCritical != bCritical) {
-                return aCritical ? -1 : 1;
+            // 0. 续作且有供应缺口的规格最优先（本班若不续作则缺口无法补救，切换损失最小）
+            boolean aContinueGap = a.getPaddingCode() != null && a.getPaddingCode().equals(lastSpecCode)
+                    && a.isSupplyGapMode();
+            boolean bContinueGap = b.getPaddingCode() != null && b.getPaddingCode().equals(lastSpecCode)
+                    && b.isSupplyGapMode();
+            if (aContinueGap != bContinueGap) {
+                return aContinueGap ? -1 : 1;
+            }
+
+            // 1. 有供应缺口但非续作的规格（缺口必须本班生产，否则无其他机台可补救）
+            boolean aGapNonContinue = a.isSupplyGapMode()
+                    && !a.getPaddingCode().equals(lastSpecCode);
+            boolean bGapNonContinue = b.isSupplyGapMode()
+                    && !b.getPaddingCode().equals(lastSpecCode);
+            if (aGapNonContinue != bGapNonContinue) {
+                return aGapNonContinue ? -1 : 1;
             }
 
             // 2. 本班有缺口优先
