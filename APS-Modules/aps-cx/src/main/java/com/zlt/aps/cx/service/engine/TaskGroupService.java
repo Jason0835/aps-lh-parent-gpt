@@ -74,7 +74,7 @@ public class TaskGroupService {
     private static final int LOOKAHEAD_ADVANCE = 2;
 
     /** R3（第三轮）开关：false=跳过R3分配 */
-    private static final boolean R3_ENABLED = false;
+    private static final boolean R3_ENABLED = true;
 
     // ==================== 参数配置编码 ====================
 
