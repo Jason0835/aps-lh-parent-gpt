@@ -517,7 +517,7 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
             }
             Set<Integer> preProductionDaySet = Sets.newHashSet();
             Set<Integer> stopDaySet = Sets.newHashSet();
-            setProductionAndStopDayInfo(productionContext, preProductionDaySet, stopDaySet, preAllocationInfo, allCxMachineInfo);
+            GroupProductionAllocationHelper.setProductionAndStopDayInfo(productionContext, preProductionDaySet, stopDaySet, preAllocationInfo, allCxMachineInfo);
             if (CollectionUtils.isEmpty(preProductionDaySet)) {
                 return;
             }
@@ -532,47 +532,6 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
             return Collections.emptyList();
         }
         return discontinueList.stream().map(GroupPreAllocationInfoHelper::getGroupInfo).collect(Collectors.toList());
-    }
-
-    /**
-     * 获取分组的所有可排产日以及各机台的停产日
-     * 将排产日信息加入到preProductionDaySet集合中
-     * 将机台的停产日加入到stopDaySet集合中
-     *
-     * @param productionContext   排产上下文
-     * @param preProductionDaySet 需要加入的排产日集合，初始为空集合
-     * @param stopDaySet          需要加入的停产日集合，初始为空集合
-     * @param preAllocationInfo   预分配信息
-     * @param allCxMachineInfo    所有机台信息
-     */
-    private void setProductionAndStopDayInfo(TbrProductionContext productionContext, Set<Integer> preProductionDaySet, Set<Integer> stopDaySet, Set<CxMachineAllocationPlanHelper> preAllocationInfo, Map<String, CxMachineBaseInfoVo> allCxMachineInfo) {
-        if (CollectionUtils.isEmpty(allCxMachineInfo) || null == preProductionDaySet || null == stopDaySet) {
-            return;
-        }
-        if (CollectionUtils.isEmpty(preAllocationInfo) || preAllocationInfo.size() <= BigDecimal.ONE.intValue()) {
-            return;
-        }
-        //设置全局停产日
-        if (!CollectionUtils.isEmpty(productionContext.getStopDays())) {
-            stopDaySet.addAll(productionContext.getStopDays());
-        }
-        //迭代 每个分配信息
-        preAllocationInfo.forEach(singlePreAllocation -> {
-            CxMachineBaseInfoVo cxMachineInfo = allCxMachineInfo.get(singlePreAllocation.getCxMachineCode());
-            if (null == cxMachineInfo) {
-                return;
-            }
-            Set<Integer> singleStopDaySet = Optional.ofNullable(cxMachineInfo.getStopDayInfo()).orElse(Collections.emptySet());
-            Integer startDay = singlePreAllocation.getStartDay();
-            Integer endDay = singlePreAllocation.getEndDay();
-            for (int index = startDay; index <= endDay; index++) {
-                if (singleStopDaySet.contains(index)) {
-                    stopDaySet.add(index);
-                    continue;
-                }
-                preProductionDaySet.add(index);
-            }
-        });
     }
 
 }

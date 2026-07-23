@@ -61,6 +61,7 @@ import com.zlt.aps.dj.service.IDjShiftConfigService;
 import com.zlt.aps.utils.ApsBeanUtils;
 import com.zlt.bill.common.service.AbstractBillService;
 
+import cn.hutool.core.collection.CollectionUtil;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -130,9 +131,7 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
      */
     @Override
     public void fillMachineName(List<DjScheduleResult> list) {
-        List<DjMachineInfo> machineInfoList = machineInfoService.selectMachineInfoList(new DjMachineInfo());
-        Map<String, DjMachineInfo> machineInfoMap = machineInfoList.stream()
-                .collect(Collectors.toMap(DjMachineInfo::getMachineCode, Function.identity(), (s1, s2) -> s1));
+        Map<String, DjMachineInfo> machineInfoMap = this.getMachineInfoMap(list);
         for (DjScheduleResult scheduleResult : list) {
             String machineCodeStr = scheduleResult.getMachineCode();
             if (StringUtils.isNotBlank(machineCodeStr)) {
@@ -148,6 +147,26 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
                 scheduleResult.setMachineName(String.join(",", machineNameList));
             }
         }
+    }
+
+    /**
+     * 获取机台对应的Map
+     * 
+     * @param list
+     * @return
+     */
+    private Map<String, DjMachineInfo> getMachineInfoMap(List<DjScheduleResult> list) {
+        Map<String, DjMachineInfo> machineInfoMap;
+        if (CollectionUtil.isNotEmpty(list)) {
+            DjMachineInfo params = new DjMachineInfo();
+            params.setFactoryCode(list.get(0).getFactoryCode());
+            List<DjMachineInfo> machineInfoList = machineInfoService.selectMachineInfoList(params);
+            machineInfoMap = machineInfoList.stream()
+                    .collect(Collectors.toMap(DjMachineInfo::getMachineCode, Function.identity(), (s1, s2) -> s1));
+        } else {
+            machineInfoMap = new HashMap<>();
+        }
+        return machineInfoMap;
     }
 
     /**
