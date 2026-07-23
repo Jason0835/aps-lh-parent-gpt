@@ -73,22 +73,32 @@ public class Cd15AutoScheduleEngineServiceImpl implements Cd15AutoScheduleEngine
         // 输出窗口按业务班次顺序截取，保证后续滚动计算和结果CLASS字段顺序一致。
         List<Cd15ShiftDescriptor> shifts = shiftWindowResolver.resolve(localScheduleDate, enabledShifts)
                 .stream().limit(parameters.getScheduleWindow()).collect(Collectors.toList());
-        // 输入版本指纹会在最终事务前复核，防止计算期间基础数据变化后覆盖新数据。
+        LocalDateTime startTime = LocalDateTime.now();
+        Cd15ShiftDescriptor resourceBaselineShift = shiftWindowResolver
+                .resolveCurrentResourceShift(startTime, enabledShifts);
+        // 输入版本指纹会在最终事务前按任务启动时冻结的当前资源班次复核。
         Cd15AutoScheduleContext context = Cd15AutoScheduleContext.builder()
                 .factoryCode(factoryCode)
                 .scheduleDate(localScheduleDate)
-                .startTime(LocalDateTime.now())
+                .startTime(startTime)
+                .resourceBaselineDate(resourceBaselineShift.getScheduleDate())
+                .resourceBaselineShiftCode(resourceBaselineShift.getShiftCode())
                 .currentStage(STAGE_BASIC_VALIDATION)
                 .parameters(parameters)
                 .shifts(shifts)
                 .enabledShiftCount(enabledShifts.size())
-                .inputVersionFingerprint(inputVersionService.fingerprint(factoryCode, localScheduleDate))
+                .inputVersionFingerprint(inputVersionService.fingerprint(
+                        factoryCode, localScheduleDate,
+                        resourceBaselineShift.getScheduleDate(),
+                        resourceBaselineShift.getShiftCode()))
                 .build();
 
         log.info("[斜裁自动排程] Engine计算上下文准备完成, factoryCode={}, scheduleDate={}, "
+                        + "resourceBaselineDate={}, resourceBaselineShiftCode={}, "
                         + "enabledShiftCount={}, scheduleWindow={}, fingerprint={}",
-                factoryCode, localScheduleDate, enabledShifts.size(),
-                parameters.getScheduleWindow(), parameters.getFingerprint());
+                factoryCode, localScheduleDate,
+                resourceBaselineShift.getScheduleDate(), resourceBaselineShift.getShiftCode(),
+                enabledShifts.size(), parameters.getScheduleWindow(), parameters.getFingerprint());
         return context;
     }
 

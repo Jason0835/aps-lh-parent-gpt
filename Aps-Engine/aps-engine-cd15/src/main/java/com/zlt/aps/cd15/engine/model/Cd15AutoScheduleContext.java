@@ -20,6 +20,10 @@ public class Cd15AutoScheduleContext {
     private LocalDate scheduleDate;
     /** 本次计算启动时间。 */
     private LocalDateTime startTime;
+    /** 任务启动时当前资源班次的快照日期。 */
+    private LocalDate resourceBaselineDate;
+    /** 任务启动时当前资源班次编码。 */
+    private String resourceBaselineShiftCode;
     /** 当前执行阶段。 */
     private String currentStage;
     /** 启动时固定的参数快照。 */

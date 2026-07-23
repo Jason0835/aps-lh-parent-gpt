@@ -37,7 +37,9 @@ public class Cd15RollingInputVersionServiceImpl implements Cd15RollingInputVersi
             throw new IllegalArgumentException("滚动目标和排程日期不能为空");
         }
         String base = baseVersionService.fingerprint(
-                target.getFactoryCode(), target.getScheduleDate());
+                target.getFactoryCode(), target.getScheduleDate(),
+                target.getHandoverTime().toLocalDate(),
+                target.getTargetShiftCode());
         List<Cd15ScheduleResult> results = scheduleResultMapper.selectList(
                 new LambdaQueryWrapper<Cd15ScheduleResult>()
                         .eq(Cd15ScheduleResult::getFactoryCode, target.getFactoryCode())

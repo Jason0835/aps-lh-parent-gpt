@@ -640,6 +640,8 @@ public class Cd15TimedRollingEngineExecutor {
                                             Cd15ShiftDescriptor shift) {
         return inputService.load(context.getFactoryCode(), context.getScheduleDate(),
                 shift.getClassField(), shift.getShiftCode(),
+                context.getResourceBaselineDate(),
+                context.getResourceBaselineShiftCode(),
                 context.getParameters().getAgingPeriodHours());
     }
 

@@ -25,7 +25,9 @@ public class Cd15AutoScheduleVersionVerifier {
             throw new IllegalStateException("自动排程参数已发生变化，请重新发起排程");
         }
         String currentInputVersion = inputVersionService.fingerprint(
-                context.getFactoryCode(), context.getScheduleDate());
+                context.getFactoryCode(), context.getScheduleDate(),
+                context.getResourceBaselineDate(),
+                context.getResourceBaselineShiftCode());
         if (!Objects.equals(context.getInputVersionFingerprint(), currentInputVersion)) {
             throw new IllegalStateException("自动排程关键输入已发生变化，请重新发起排程");
         }

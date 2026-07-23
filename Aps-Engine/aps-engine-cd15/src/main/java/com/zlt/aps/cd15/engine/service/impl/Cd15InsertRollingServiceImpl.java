@@ -209,6 +209,8 @@ public class Cd15InsertRollingServiceImpl implements Cd15InsertRollingService {
             int classIndex = classIndex(shift.getClassField());
             Cd15AutoScheduleInput input = inputService.load(context.getFactoryCode(),
                     context.getScheduleDate(), shift.getClassField(), shift.getShiftCode(),
+                    context.getResourceBaselineDate(),
+                    context.getResourceBaselineShiftCode(),
                     context.getParameters().getAgingPeriodHours());
             Cd15MachineResourceSnapshot machineSnapshot = machineResourceService.load(
                     context.getFactoryCode(), shift.getStartTime(), shift.getEndTime());

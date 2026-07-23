@@ -14,6 +14,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -61,6 +62,84 @@ public class Cd15ShiftWindowResolver {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * 根据任务启动时刻解析当前现场资源班次，快照日期沿用班次业务日期口径。
+     *
+     * @param executionTime 任务启动时刻
+     * @param configs 班次配置
+     * @return 当前资源班次
+     */
+    public Cd15ShiftDescriptor resolveCurrentResourceShift(
+            LocalDateTime executionTime, List<Cd15ShiftConfig> configs) {
+        if (executionTime == null) {
+            throw new IllegalArgumentException("任务启动时刻不能为空");
+        }
+        if (configs == null || configs.isEmpty()) {
+            throw new IllegalArgumentException("未找到启用的CD15班次配置");
+        }
+        Map<String, Cd15ShiftConfig> configByShiftCode = configs.stream()
+                .filter(this::isEnabled)
+                .peek(this::validate)
+                .collect(Collectors.toMap(
+                        config -> config.getShiftCode().trim(),
+                        Function.identity(),
+                        this::mergeSameResourceShift,
+                        LinkedHashMap::new));
+        List<Cd15ShiftConfig> matched = configByShiftCode.values().stream()
+                .filter(config -> this.contains(
+                        executionTime.toLocalTime(), config))
+                .collect(Collectors.toList());
+        if (matched.size() != 1) {
+            throw new IllegalArgumentException("任务启动时刻 " + executionTime
+                    + " 必须且只能命中一个启用班次, 当前命中数=" + matched.size());
+        }
+        Cd15ShiftConfig config = matched.get(0);
+        LocalTime startTime = this.parseTime(
+                config.getStartTime(), config.getClassField(), "开始时间");
+        LocalTime endTime = this.parseTime(
+                config.getEndTime(), config.getClassField(), "结束时间");
+        boolean crossDay = Integer.valueOf(1).equals(config.getIsCrossDay());
+        LocalDate startDate = executionTime.toLocalDate();
+        if (crossDay && executionTime.toLocalTime().isBefore(endTime)) {
+            startDate = startDate.minusDays(1);
+        }
+        LocalDate endDate = crossDay ? startDate.plusDays(1) : startDate;
+        LocalDate businessDate = crossDay ? endDate : startDate;
+        LocalDateTime start = LocalDateTime.of(startDate, startTime);
+        LocalDateTime end = LocalDateTime.of(endDate, endTime);
+        return Cd15ShiftDescriptor.builder()
+                .shiftCode(config.getShiftCode().trim())
+                .shiftDisplayName(config.getShiftName())
+                .scheduleDate(businessDate)
+                .startTime(start)
+                .endTime(end)
+                .durationSeconds((int) ChronoUnit.SECONDS.between(start, end))
+                .build();
+    }
+
+    /** 同一班次编码的多日配置必须保持相同的资源班次定义。 */
+    private Cd15ShiftConfig mergeSameResourceShift(Cd15ShiftConfig left,
+                                                    Cd15ShiftConfig right) {
+        if (!this.trim(left.getStartTime()).equals(this.trim(right.getStartTime()))
+                || !this.trim(left.getEndTime()).equals(this.trim(right.getEndTime()))
+                || !left.getIsCrossDay().equals(right.getIsCrossDay())) {
+            throw new IllegalArgumentException("同一班次编码存在不同时间定义: "
+                    + left.getShiftCode());
+        }
+        return left;
+    }
+
+    /** 使用左闭右开区间判断任务启动时刻所属班次。 */
+    private boolean contains(LocalTime currentTime, Cd15ShiftConfig config) {
+        LocalTime startTime = this.parseTime(
+                config.getStartTime(), config.getClassField(), "开始时间");
+        LocalTime endTime = this.parseTime(
+                config.getEndTime(), config.getClassField(), "结束时间");
+        if (Integer.valueOf(1).equals(config.getIsCrossDay())) {
+            return !currentTime.isBefore(startTime) || currentTime.isBefore(endTime);
+        }
+        return !currentTime.isBefore(startTime) && currentTime.isBefore(endTime);
+    }
     private Cd15ShiftDescriptor resolveOne(
             LocalDate scheduleDate, Cd15ShiftConfig config) {
         this.validate(config);

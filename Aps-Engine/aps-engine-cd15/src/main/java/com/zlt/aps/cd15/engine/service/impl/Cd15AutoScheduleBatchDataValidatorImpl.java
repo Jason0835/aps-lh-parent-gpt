@@ -5,14 +5,17 @@ import com.zlt.aps.cd15.api.domain.entity.Cd15AngleWidthMapping;
 import com.zlt.aps.cd15.api.domain.entity.Cd15CurlLength;
 import com.zlt.aps.cd15.api.domain.entity.Cd15MachineInfo;
 import com.zlt.aps.cd15.api.domain.entity.Cd15ShiftConfig;
+import com.zlt.aps.cd15.api.domain.entity.Cd15StorageLaneLimit;
 import com.zlt.aps.cd15.engine.constant.Cd15CutMode;
 import com.zlt.aps.cd15.engine.algorithm.Cd15ShiftWindowResolver;
+import com.zlt.aps.cd15.engine.algorithm.Cd15StorageLaneBaselineValidator;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineAngleWidthMappingMapper;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineConstructionMapper;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineCurlLengthMapper;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineCxScheduleMapper;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineMachineInfoMapper;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineShiftConfigMapper;
+import com.zlt.aps.cd15.engine.mapper.Cd15EngineStorageLaneMapper;
 import com.zlt.aps.cd15.engine.model.Cd15BatchDataCheckResult;
 import com.zlt.aps.cd15.engine.model.Cd15ShiftDescriptor;
 import com.zlt.aps.cd15.engine.service.Cd15AutoScheduleBatchDataValidator;
@@ -28,6 +31,7 @@ import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.sql.Date;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -54,6 +58,7 @@ public class Cd15AutoScheduleBatchDataValidatorImpl implements Cd15AutoScheduleB
     private static final int ACTIVE = 1;
     private static final String DATA_MISSING = "DATA_MISSING";
     private static final String ANGLE_WIDTH_CONFIG_MISSING = "ANGLE_WIDTH_CONFIG_MISSING";
+    private static final String DUPLICATE_STORAGE_LANE = "DUPLICATE_STORAGE_LANE";
     private static final String[] MAIN_LAYER_CODE_COLUMNS = {"BELT_CODE1", "BELT_CODE2", "BELT_CODE3"};
     private static final String[] MAIN_LAYER_CRAFT_COLUMNS = {"BELT_CRAFT1", "BELT_CRAFT2", "BELT_CRAFT3"};
     private static final String[] MAIN_LAYER_LENGTH_COLUMNS = {"BELT1_LENGTH", "BELT2_LENGTH", "BELT3_LENGTH"};
@@ -64,7 +69,9 @@ public class Cd15AutoScheduleBatchDataValidatorImpl implements Cd15AutoScheduleB
     private final Cd15EngineMachineInfoMapper machineInfoMapper;
     private final Cd15EngineAngleWidthMappingMapper angleWidthMappingMapper;
     private final Cd15EngineShiftConfigMapper shiftConfigMapper;
+    private final Cd15EngineStorageLaneMapper storageLaneMapper;
     private final Cd15ShiftWindowResolver shiftWindowResolver;
+    private final Cd15StorageLaneBaselineValidator storageLaneBaselineValidator;
 
     @Override
     public Cd15BatchDataCheckResult check(String factoryCode, LocalDate scheduleDate) {
@@ -82,6 +89,7 @@ public class Cd15AutoScheduleBatchDataValidatorImpl implements Cd15AutoScheduleB
         Cd15BatchDataCheckResult.Builder builder = Cd15BatchDataCheckResult.builder();
         List<Cd15ShiftDescriptor> shifts = this.checkShiftConfig(
                 builder, factoryCode, scheduleDate);
+        this.checkStorageLaneBaseline(builder, factoryCode);
         Set<Integer> activeClassIndexes = shifts.stream()
                 .map(Cd15ShiftDescriptor::getShiftOrder)
                 .filter(Objects::nonNull)
@@ -112,6 +120,50 @@ public class Cd15AutoScheduleBatchDataValidatorImpl implements Cd15AutoScheduleB
         return result;
     }
 
+    /**
+     * 检查任务启动时当前班次库排资源基线是否存在，且同一物理库排只有一条活动记录。
+     */
+    private void checkStorageLaneBaseline(Cd15BatchDataCheckResult.Builder builder,
+                                          String factoryCode) {
+        List<Cd15ShiftConfig> configs = this.shiftConfigMapper.selectList(
+                Wrappers.<Cd15ShiftConfig>lambdaQuery()
+                        .eq(Cd15ShiftConfig::getFactoryCode, factoryCode)
+                        .eq(Cd15ShiftConfig::getIsActive, ACTIVE));
+        Cd15ShiftDescriptor baselineShift;
+        try {
+            baselineShift = this.shiftWindowResolver.resolveCurrentResourceShift(
+                    LocalDateTime.now(), configs);
+        } catch (IllegalArgumentException exception) {
+            builder.addError("库排资源", DATA_MISSING,
+                    "无法确定任务启动时的当前资源班次: " + exception.getMessage(),
+                    "请检查CD15启用班次的起止时间和跨天配置");
+            return;
+        }
+        List<Cd15StorageLaneLimit> lanes = this.storageLaneMapper.selectList(
+                Wrappers.<Cd15StorageLaneLimit>lambdaQuery()
+                        .eq(Cd15StorageLaneLimit::getFactoryCode, factoryCode)
+                        .eq(Cd15StorageLaneLimit::getLaneDate,
+                                Date.valueOf(baselineShift.getScheduleDate()))
+                        .eq(Cd15StorageLaneLimit::getShiftCode,
+                                baselineShift.getShiftCode())
+                        .orderByAsc(Cd15StorageLaneLimit::getStorageLaneCode));
+        if (lanes == null || lanes.isEmpty()) {
+            builder.addError("库排资源", DATA_MISSING,
+                    "未找到任务启动时当前班次 " + baselineShift.getScheduleDate() + "/"
+                            + baselineShift.getShiftCode() + " 的库排资源基线",
+                    "请同步当前自然班次库排快照，后续排程班次无需预先维护");
+            return;
+        }
+        List<String> duplicateLaneCodes =
+                this.storageLaneBaselineValidator.findDuplicateLaneCodes(lanes);
+        if (!duplicateLaneCodes.isEmpty()) {
+            builder.addError("库排资源", DUPLICATE_STORAGE_LANE,
+                    "任务启动时当前班次 " + baselineShift.getScheduleDate() + "/"
+                            + baselineShift.getShiftCode() + " 存在重复库排号: "
+                            + String.join(",", duplicateLaneCodes),
+                    "请按工厂、日期、班次、库排号清理重复的活动记录");
+        }
+    }
     /** 检查并解析排程、滚动共用的启用班次配置。 */
     private List<Cd15ShiftDescriptor> checkShiftConfig(Cd15BatchDataCheckResult.Builder builder,
                                                        String factoryCode,
