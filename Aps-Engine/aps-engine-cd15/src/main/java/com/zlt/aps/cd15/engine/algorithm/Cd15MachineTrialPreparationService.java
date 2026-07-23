@@ -42,6 +42,10 @@ public class Cd15MachineTrialPreparationService {
             throw new IllegalArgumentException("机台资源快照不能为空");
         }
         Cd15AutoScheduleParameters parameters = request.getParameters();
+        BigDecimal scheduleQuantityThreshold =
+                request.getScheduleQuantityThreshold() == null
+                        ? parameters.getEqualShareThreshold()
+                        : request.getScheduleQuantityThreshold();
         BigDecimal vehiclePlanQuantity = vehiclePlanQuantityCalculator.calculate(
                 request.getUnitConsumeMillimeter(), request.getCraftWidth(),
                 request.getCurlLength());
@@ -90,8 +94,10 @@ public class Cd15MachineTrialPreparationService {
                         .singleSpecSplit(request.isSingleSpecSplit())
                         // 最小起排量、均分阈值
                         .minimumStartQuantity(parameters.getMinStartQty())
-                        .equalShareThreshold(parameters.getEqualShareThreshold())
+                        .equalShareThreshold(scheduleQuantityThreshold)
                         .equalShareAlreadyApplied(request.isEqualShareAlreadyApplied())
+                        .remainingSpecShiftQuantity(
+                                request.getRemainingSpecShiftQuantity())
                         // 单车等价排程量，用于整车取整及工装数量试算
                         .vehiclePlanQuantity(vehiclePlanQuantity)
                         .craftWidth(request.getCraftWidth())

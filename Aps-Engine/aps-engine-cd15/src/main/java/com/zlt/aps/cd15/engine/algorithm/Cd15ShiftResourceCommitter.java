@@ -82,8 +82,10 @@ public class Cd15ShiftResourceCommitter {
                 continue;
             }
             int allocatedVehicles = allocation.getAllocatedVehicleCount();
-            String partialReason = allocatedVehicles < allocation.getRequiredVehicleCount()
-                    ? "STORAGE_LANE_LIMIT" : trial.getLimitReason();
+            String partialReason = trial.isEqualShareApplied()
+                    ? "EQUAL_SHARE"
+                    : allocatedVehicles < allocation.getRequiredVehicleCount()
+                            ? "STORAGE_LANE_LIMIT" : trial.getLimitReason();
             int availableTooling = working.getTotalToolingCount() - working.getOccupiedToolingCount();
             if (allocatedVehicles > availableTooling) {
                 // 工装数按实际入库车数占用；不足时继续尝试其他方案但仍保留稳定失败原因。
@@ -94,6 +96,10 @@ public class Cd15ShiftResourceCommitter {
             int beforeSeconds = working.getRemainingSecondsByMachine().getOrDefault(
                     trial.getMachineCode(), fullShiftSeconds(request));
             BigDecimal committedQuantity = committedQuantity(trial, vehiclePlanQuantity, allocatedVehicles);
+            if (trial.getRemainingSpecShiftQuantity() != null) {
+                committedQuantity = committedQuantity.min(
+                        trial.getRemainingSpecShiftQuantity());
+            }
             BigDecimal bigRollConsumeQuantity = bigRollMeterCalculator.calculateForPlanQuantity(
                     committedQuantity, request.getUnitConsumeMillimeter(),
                     request.getCraftWidth(), request.getCordWidth());
@@ -147,7 +153,18 @@ public class Cd15ShiftResourceCommitter {
                             + "planQuantity={}, vehicleCount={}, requiredVehicleCount={}, produceOrder={}",
                     request.getClassField(), request.getSteelStripCode(), trial.getMachineCode(),
                     committedQuantity, allocatedVehicles, allocation.getRequiredVehicleCount(), produceOrder);
-            return Cd15ShiftCommitResult.builder().success(true).partialReason(partialReason)
+            BigDecimal equalShareRemainderQuantity = null;
+            if (trial.isEqualShareApplied()) {
+                BigDecimal plannedRemainder = trial.getEqualShareRemainderQuantity() == null
+                        ? BigDecimal.ZERO : trial.getEqualShareRemainderQuantity();
+                BigDecimal currentShiftShortage = trial.getActualQuantity()
+                        .subtract(committedQuantity).max(BigDecimal.ZERO);
+                equalShareRemainderQuantity = this.normalize(
+                        plannedRemainder.add(currentShiftShortage));
+            }
+            return Cd15ShiftCommitResult.builder().success(true)
+                    .partialReason(partialReason)
+                    .equalShareRemainderQuantity(equalShareRemainderQuantity)
                     .state(working).task(task).build();
         }
         log.warn("[斜裁自动排程] 当前班次资源提交失败, classField={}, steelStripCode={}, reason={}",

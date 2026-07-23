@@ -45,31 +45,34 @@ public class Cd15CandidateMachineTrialCalculator {
         Cd15LossRateSelection lossRate = lossRateResolver.resolve(
                 input.getSteelStripCode(), input.getMachineCode(), input.getLossRateRules(),
                 input.getFallbackLossRatePercent());
-        // 计算含损耗的实际排产量：在净需求基础上上浮损耗量，同时受起排量门槛和均分阈值约束
+        // 计算含损耗的实际排产量，并按当前班该钢带剩余额度封顶。
         BigDecimal actualQuantity = input.isSingleSpecSplit()
                 ? quantityCalculator.calculateSingleSpecSplitActualQuantity(
                         input.getNetDemandQuantity(), input.isCloseOut(),
                         lossRate.getLossRatePercent(), input.getMinimumStartQuantity(),
                         input.getVehiclePlanQuantity(), input.getEqualShareThreshold(),
-                        input.getCraftWidth(), input.isEqualShareAlreadyApplied())
+                        input.getCraftWidth(), input.isEqualShareAlreadyApplied(),
+                        input.getRemainingSpecShiftQuantity())
                 : quantityCalculator.calculateActualQuantity(
                         input.getNetDemandQuantity(), input.isCloseOut(),
                         lossRate.getLossRatePercent(), input.getMinimumStartQuantity(),
                         input.getVehiclePlanQuantity(), input.getEqualShareThreshold(),
-                        input.isEqualShareAlreadyApplied());
-        boolean equalShareApplied = input.isSingleSpecSplit()
-                && quantityCalculator.requiresSingleSpecSplitEqualShare(
-                        input.getNetDemandQuantity(), input.isCloseOut(),
-                        lossRate.getLossRatePercent(), input.getMinimumStartQuantity(),
-                        input.getVehiclePlanQuantity(), input.getEqualShareThreshold(),
-                        input.isEqualShareAlreadyApplied());
-        BigDecimal equalShareRemainderQuantity = equalShareApplied
+                        input.isEqualShareAlreadyApplied(),
+                        input.getRemainingSpecShiftQuantity());
+        BigDecimal equalShareRemainderQuantity = input.isSingleSpecSplit()
                 ? quantityCalculator.calculateSingleSpecSplitEqualShareRemainder(
                         input.getNetDemandQuantity(), input.isCloseOut(),
                         lossRate.getLossRatePercent(), input.getMinimumStartQuantity(),
                         input.getVehiclePlanQuantity(), input.getEqualShareThreshold(),
-                        input.getCraftWidth(), input.isEqualShareAlreadyApplied())
-                : BigDecimal.ZERO;
+                        input.getCraftWidth(), input.isEqualShareAlreadyApplied(),
+                        input.getRemainingSpecShiftQuantity())
+                : quantityCalculator.calculateActualQuantityRemainder(
+                        input.getNetDemandQuantity(), input.isCloseOut(),
+                        lossRate.getLossRatePercent(), input.getMinimumStartQuantity(),
+                        input.getVehiclePlanQuantity(), input.getEqualShareThreshold(),
+                        input.isEqualShareAlreadyApplied(),
+                        input.getRemainingSpecShiftQuantity());
+        boolean equalShareApplied = equalShareRemainderQuantity.signum() > 0;
         // 工装试算：根据实际排产量和工装总数（卷轴）计算每台机可同时上机数量
         Cd15ToolingTrial tooling = input.isSingleSpecSplit()
                 ? toolingCalculator.calculateSingleSpecSplit(
@@ -89,6 +92,8 @@ public class Cd15CandidateMachineTrialCalculator {
                     .actualQuantity(actualQuantity)
                     .equalShareApplied(equalShareApplied)
                     .equalShareRemainderQuantity(equalShareRemainderQuantity)
+                    .remainingSpecShiftQuantity(
+                            input.getRemainingSpecShiftQuantity())
                     .vehiclePlanQuantity(input.getVehiclePlanQuantity())
                     .toolingQuantity(tooling.getSchedulableQuantity())
                     .capacityQuantity(BigDecimal.ZERO)
@@ -156,6 +161,8 @@ public class Cd15CandidateMachineTrialCalculator {
                 .actualQuantity(actualQuantity)
                 .equalShareApplied(equalShareApplied)
                 .equalShareRemainderQuantity(equalShareRemainderQuantity)
+                .remainingSpecShiftQuantity(
+                        input.getRemainingSpecShiftQuantity())
                 .vehiclePlanQuantity(input.getVehiclePlanQuantity())
                 .toolingQuantity(tooling.getSchedulableQuantity())
                 .capacityQuantity(capacity.getCapacityQuantity())

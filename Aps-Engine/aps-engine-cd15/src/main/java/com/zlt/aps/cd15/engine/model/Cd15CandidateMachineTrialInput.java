@@ -32,6 +32,8 @@ public class Cd15CandidateMachineTrialInput {
     private BigDecimal equalShareThreshold;
     /** 是否为均分后转入下一班的剩余计划量。 */
     private boolean equalShareAlreadyApplied;
+    /** 扣除当前班同钢带已排量后的剩余可排额度。 */
+    private BigDecimal remainingSpecShiftQuantity;
     /** 单车按胎体长度方向卷取后，对应的斜裁排程米数。 */
     private BigDecimal vehiclePlanQuantity;
     /** 斜裁宽度，单位毫米。 */

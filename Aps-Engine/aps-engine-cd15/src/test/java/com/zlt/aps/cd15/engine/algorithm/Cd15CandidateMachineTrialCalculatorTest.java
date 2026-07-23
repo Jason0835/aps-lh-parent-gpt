@@ -101,8 +101,8 @@ public class Cd15CandidateMachineTrialCalculatorTest {
         Cd15MachineTrial result = calculator.calculate(input);
 
         assertTrue(result.isEqualShareApplied());
-        assertEquals(new BigDecimal("2652.8064"), result.getActualQuantity());
-        assertEquals(new BigDecimal("2652.732"),
+        assertEquals(new BigDecimal("1768.5624"), result.getActualQuantity());
+        assertEquals(new BigDecimal("3536.976"),
                 result.getEqualShareRemainderQuantity());
     }
 

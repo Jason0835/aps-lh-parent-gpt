@@ -46,7 +46,8 @@ public class Cd15SingleShiftScheduleExecutorTest {
         Cd15MachineResourceService machineService = (factoryCode, start, end) -> machineSnapshot();
         Cd15SingleShiftScheduleExecutor executor = new Cd15SingleShiftScheduleExecutor(
                 candidates, demandProvider, machineService, trialPreparation(), committer(),
-                new Cd15CloseOutCalculator(), new Cd15ScheduleCandidateSorter(), new Cd15SplitCutGroupBuilder());
+                new Cd15CloseOutCalculator(), new Cd15ScheduleCandidateSorter(), new Cd15SplitCutGroupBuilder(),
+                new Cd15SpecShiftQuantityLimitResolver());
 
         Cd15ShiftExecutionResult result = executor.execute(context(), input(), shift(), state(), null);
 
@@ -78,7 +79,8 @@ public class Cd15SingleShiftScheduleExecutorTest {
         Cd15MachineResourceService machineService = (factoryCode, start, end) -> machineSnapshot();
         Cd15SingleShiftScheduleExecutor executor = new Cd15SingleShiftScheduleExecutor(
                 candidates, demandProvider, machineService, trialPreparation(), committer(),
-                new Cd15CloseOutCalculator(), new Cd15ScheduleCandidateSorter(), new Cd15SplitCutGroupBuilder());
+                new Cd15CloseOutCalculator(), new Cd15ScheduleCandidateSorter(), new Cd15SplitCutGroupBuilder(),
+                new Cd15SpecShiftQuantityLimitResolver());
         Cd15AutoScheduleInput input = input();
         input.setBigRollAgingDataMissingCodes(Collections.singleton("BR2"));
 
@@ -98,7 +100,8 @@ public class Cd15SingleShiftScheduleExecutorTest {
         Cd15MachineResourceService machineService = (factoryCode, start, end) -> machineSnapshot();
         Cd15SingleShiftScheduleExecutor executor = new Cd15SingleShiftScheduleExecutor(
                 candidates, demandProvider, machineService, trialPreparation(), committer(),
-                new Cd15CloseOutCalculator(), new Cd15ScheduleCandidateSorter(), new Cd15SplitCutGroupBuilder());
+                new Cd15CloseOutCalculator(), new Cd15ScheduleCandidateSorter(), new Cd15SplitCutGroupBuilder(),
+                new Cd15SpecShiftQuantityLimitResolver());
 
         Cd15ShiftExecutionResult result = executor.execute(context(), input(), shift(), state(), null);
 
@@ -117,7 +120,8 @@ public class Cd15SingleShiftScheduleExecutorTest {
         Cd15SingleShiftScheduleExecutor executor = new Cd15SingleShiftScheduleExecutor(
                 candidates, demandProvider, (factoryCode, start, end) -> machineSnapshot(),
                 trialPreparation(), committer(), new Cd15CloseOutCalculator(),
-                new Cd15ScheduleCandidateSorter(), new Cd15SplitCutGroupBuilder());
+                new Cd15ScheduleCandidateSorter(), new Cd15SplitCutGroupBuilder(),
+                new Cd15SpecShiftQuantityLimitResolver());
         Cd15AutoScheduleInput input = Cd15AutoScheduleInput.builder()
                 .constructionMaterials(Collections.singletonList(Cd15ConstructionMaterial.builder()
                         .steelStripCode("C2").bigRollCode("BR2").cuttingAngle("15")
@@ -150,7 +154,8 @@ public class Cd15SingleShiftScheduleExecutorTest {
         Cd15SingleShiftScheduleExecutor executor = new Cd15SingleShiftScheduleExecutor(
                 candidates, demandProvider, (factoryCode, start, end) -> machineSnapshot(),
                 trialPreparation(), committer(), new Cd15CloseOutCalculator(),
-                new Cd15ScheduleCandidateSorter(), new Cd15SplitCutGroupBuilder());
+                new Cd15ScheduleCandidateSorter(), new Cd15SplitCutGroupBuilder(),
+                new Cd15SpecShiftQuantityLimitResolver());
         Cd15AutoScheduleInput input = Cd15AutoScheduleInput.builder()
                 .constructionMaterials(Collections.singletonList(Cd15ConstructionMaterial.builder()
                         .steelStripCode("C2").bigRollCode("BR2").cuttingAngle("15")
@@ -193,7 +198,8 @@ public class Cd15SingleShiftScheduleExecutorTest {
         Cd15SingleShiftScheduleExecutor executor = new Cd15SingleShiftScheduleExecutor(
                 candidates, demandProvider, (factoryCode, start, end) -> machineSnapshot(),
                 trialPreparation(), committer(), new Cd15CloseOutCalculator(),
-                new Cd15ScheduleCandidateSorter(), new Cd15SplitCutGroupBuilder());
+                new Cd15ScheduleCandidateSorter(), new Cd15SplitCutGroupBuilder(),
+                new Cd15SpecShiftQuantityLimitResolver());
         com.zlt.aps.cd15.engine.model.Cd15RollingScheduleContext rolling =
                 com.zlt.aps.cd15.engine.model.Cd15RollingScheduleContext.builder()
                         .continueDemandBySteelStrip(new HashMap<>(
@@ -226,7 +232,8 @@ public class Cd15SingleShiftScheduleExecutorTest {
         Cd15SingleShiftScheduleExecutor executor = new Cd15SingleShiftScheduleExecutor(
                 candidates, demandProvider, (factoryCode, start, end) -> twoMachineSnapshot(),
                 trialPreparation(), committer(), new Cd15CloseOutCalculator(),
-                new Cd15ScheduleCandidateSorter(), new Cd15SplitCutGroupBuilder());
+                new Cd15ScheduleCandidateSorter(), new Cd15SplitCutGroupBuilder(),
+                new Cd15SpecShiftQuantityLimitResolver());
         Cd15ShiftResourceState state = twoMachineTailState();
         Cd15AutoScheduleContext context = context();
         context.getParameters().setMinStartQty(BigDecimal.ONE);
@@ -254,7 +261,8 @@ public class Cd15SingleShiftScheduleExecutorTest {
         Cd15SingleShiftScheduleExecutor executor = new Cd15SingleShiftScheduleExecutor(
                 candidates, demandProvider, (factoryCode, start, end) -> twoMachineSnapshot(),
                 trialPreparation(), committer(), new Cd15CloseOutCalculator(),
-                new Cd15ScheduleCandidateSorter(), new Cd15SplitCutGroupBuilder());
+                new Cd15ScheduleCandidateSorter(), new Cd15SplitCutGroupBuilder(),
+                new Cd15SpecShiftQuantityLimitResolver());
         Cd15ShiftResourceState state = twoMachineTailState();
         state.getTailByMachine().put("G1301", Cd15MachineTailState.builder()
                 .steelStripCode("211400161").build());
@@ -282,7 +290,8 @@ public class Cd15SingleShiftScheduleExecutorTest {
                                 .netDemandQuantity(new BigDecimal("100")).build(),
                 (factoryCode, start, end) -> splitMachineSnapshotWithAngles(),
                 trialPreparation(), committer(), new Cd15CloseOutCalculator(),
-                new Cd15ScheduleCandidateSorter(), new Cd15SplitCutGroupBuilder());
+                new Cd15ScheduleCandidateSorter(), new Cd15SplitCutGroupBuilder(),
+                new Cd15SpecShiftQuantityLimitResolver());
         Cd15ShiftResourceState state = splitState();
         state.getTailByMachine().put("G1401", Cd15MachineTailState.builder()
                 .materialKey("211500015|BR-SPLIT|24|80|80|80")
@@ -316,7 +325,8 @@ public class Cd15SingleShiftScheduleExecutorTest {
                         Cd15ShiftDemandDecision.builder().netDemandQuantity(new BigDecimal("100")).build(),
                 (factoryCode, start, end) -> twoMachineSnapshot(),
                 trialPreparation(), committer(), new Cd15CloseOutCalculator(),
-                new Cd15ScheduleCandidateSorter(), new Cd15SplitCutGroupBuilder());
+                new Cd15ScheduleCandidateSorter(), new Cd15SplitCutGroupBuilder(),
+                new Cd15SpecShiftQuantityLimitResolver());
         Cd15AutoScheduleContext context = context();
         context.getParameters().setMinStartQty(BigDecimal.ONE);
         Cd15ShiftExecutionResult result = executor.executePrepared(
@@ -348,7 +358,8 @@ public class Cd15SingleShiftScheduleExecutorTest {
                                 .netDemandQuantity(BigDecimal.ONE).build(),
                 (factoryCode, start, end) -> splitMachineSnapshot(),
                 trialPreparation(), committer(), new Cd15CloseOutCalculator(),
-                new Cd15ScheduleCandidateSorter(), new Cd15SplitCutGroupBuilder());
+                new Cd15ScheduleCandidateSorter(), new Cd15SplitCutGroupBuilder(),
+                new Cd15SpecShiftQuantityLimitResolver());
         Cd15AutoScheduleInput input = Cd15AutoScheduleInput.builder()
                 .constructionMaterials(Collections.singletonList(
                         splitMaterial("C1")))
@@ -364,6 +375,9 @@ public class Cd15SingleShiftScheduleExecutorTest {
 
         Cd15ShiftExecutionResult firstShift = executor.execute(
                 context, input, shift(), splitState(), rolling);
+        assertEquals(1, rolling.getEqualSharePendingMaterialKeys().size());
+        assertEquals(1, rolling.getPendingTasks().size());
+        assertEquals("SPLIT", rolling.getPendingTasks().get(0).getCutMode());
         Cd15ShiftExecutionResult secondShift = executor.execute(
                 context, input, shift(), splitState(), rolling);
 
@@ -398,7 +412,8 @@ public class Cd15SingleShiftScheduleExecutorTest {
                                 .netDemandQuantity(BigDecimal.ONE).build(),
                 (factoryCode, start, end) -> splitMachineSnapshot(),
                 trialPreparation(), committer(), new Cd15CloseOutCalculator(),
-                new Cd15ScheduleCandidateSorter(), new Cd15SplitCutGroupBuilder());
+                new Cd15ScheduleCandidateSorter(), new Cd15SplitCutGroupBuilder(),
+                new Cd15SpecShiftQuantityLimitResolver());
         Cd15RollingScheduleContext rolling = Cd15RollingScheduleContext.builder()
                 .continueDemandBySteelStrip(new HashMap<>(Collections.singletonMap(
                         materialKey, new BigDecimal("301.0968"))))
@@ -448,7 +463,8 @@ public class Cd15SingleShiftScheduleExecutorTest {
                                 .netDemandQuantity(BigDecimal.ONE).build(),
                 (factoryCode, start, end) -> equalShareTwoSplitMachineSnapshot(),
                 trialPreparation(), committer(), new Cd15CloseOutCalculator(),
-                new Cd15ScheduleCandidateSorter(), new Cd15SplitCutGroupBuilder());
+                new Cd15ScheduleCandidateSorter(), new Cd15SplitCutGroupBuilder(),
+                new Cd15SpecShiftQuantityLimitResolver());
         Cd15RollingScheduleContext rolling = Cd15RollingScheduleContext.builder()
                 .continueDemandBySteelStrip(new HashMap<>(
                         Collections.singletonMap(materialKey, new BigDecimal("40"))))
@@ -492,7 +508,8 @@ public class Cd15SingleShiftScheduleExecutorTest {
                                 .netDemandQuantity(new BigDecimal("100")).build(),
                 (factoryCode, start, end) -> splitMachineSnapshot(),
                 trialPreparation(), committer(), new Cd15CloseOutCalculator(),
-                new Cd15ScheduleCandidateSorter(), new Cd15SplitCutGroupBuilder());
+                new Cd15ScheduleCandidateSorter(), new Cd15SplitCutGroupBuilder(),
+                new Cd15SpecShiftQuantityLimitResolver());
         Cd15AutoScheduleContext context = context();
         context.getParameters().setMinStartQty(BigDecimal.ONE);
 
@@ -528,7 +545,8 @@ public class Cd15SingleShiftScheduleExecutorTest {
                                 .netDemandQuantity(new BigDecimal("100")).build(),
                 (factoryCode, start, end) -> splitMachineSnapshot(),
                 trialPreparation(), committer(), new Cd15CloseOutCalculator(),
-                new Cd15ScheduleCandidateSorter(), new Cd15SplitCutGroupBuilder());
+                new Cd15ScheduleCandidateSorter(), new Cd15SplitCutGroupBuilder(),
+                new Cd15SpecShiftQuantityLimitResolver());
         Cd15AutoScheduleContext context = context();
         context.getParameters().setMinStartQty(BigDecimal.ONE);
 

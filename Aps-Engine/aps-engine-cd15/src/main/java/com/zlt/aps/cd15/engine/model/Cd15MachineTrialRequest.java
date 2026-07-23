@@ -53,6 +53,10 @@ public class Cd15MachineTrialRequest {
     private boolean closeOut;
     /** 是否为均分后转入下一班的剩余计划量；为true时不得再次均分或重复叠加损耗。 */
     private boolean equalShareAlreadyApplied;
+    /** 当前班实际采用的单规格均分及班产上限。 */
+    private BigDecimal scheduleQuantityThreshold;
+    /** 扣除当前班同钢带已排量后的剩余可排额度。 */
+    private BigDecimal remainingSpecShiftQuantity;
     /** 已占用车数（前序班次已安排入库的部分） */
     private int occupiedVehicleCount;
     /** 班次可用小时数 */

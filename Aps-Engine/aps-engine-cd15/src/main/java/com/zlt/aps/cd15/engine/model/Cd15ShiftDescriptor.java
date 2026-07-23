@@ -29,4 +29,6 @@ public class Cd15ShiftDescriptor {
     private LocalDateTime endTime;
     /** 班次总秒数。 */
     private int durationSeconds;
+    /** 是否为停班后恢复生产的实际复产班次。 */
+    private boolean restartStockMode;
 }

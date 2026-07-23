@@ -77,6 +77,21 @@ public class Cd15ShiftResourceCommitterTest {
     }
 
     @Test
+    public void shouldNotRoundBeyondSameSteelStripRemainingShiftQuantity() {
+        Cd15ShiftResourceState state = state(4);
+        Cd15MachineTrial trial = trial(
+                "M1", "261.8055555555", 20000, true);
+        trial.setRemainingSpecShiftQuantity(
+                new BigDecimal("261.8055555555"));
+
+        Cd15ShiftCommitResult result = committer.commit(
+                request(plan(trial)), state);
+
+        assertTrue(result.isSuccess());
+        assertEquals(new BigDecimal("261.8055555555"),
+                result.getTask().getPlanQuantity());
+    }
+    @Test
     public void shouldKeepToolingLimitWhenLaneAllocationIsComplete() {
         Cd15ShiftResourceState state = state(10);
         Cd15MachineTrial trial = trial("M1", "500", 20000, true);

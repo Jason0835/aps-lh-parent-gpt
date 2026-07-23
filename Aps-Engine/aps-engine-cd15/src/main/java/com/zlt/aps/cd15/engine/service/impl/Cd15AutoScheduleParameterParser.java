@@ -70,7 +70,7 @@ public class Cd15AutoScheduleParameterParser {
                 .machinePriority(parseMachinePriority(values.get(Cd15AutoScheduleParamCode.MACHINE_PRIORITY)))
                 .maxTime4Shift(positiveInt(values, Cd15AutoScheduleParamCode.MAX_TIME_4SHIFT))
                 .stopLookaheadDays(positiveInt(values, Cd15AutoScheduleParamCode.STOP_LOOKAHEAD_DAYS))
-                .restartStockThreshold(nonNegativeDecimal(values, Cd15AutoScheduleParamCode.RESTART_STOCK_THRESHOLD))
+                .restartStockThreshold(positiveDecimal(values, Cd15AutoScheduleParamCode.RESTART_STOCK_THRESHOLD))
                 .rollTotalCount(positiveInt(values, Cd15AutoScheduleParamCode.ROLL_TOTAL_COUNT))
                 .equalShareThreshold(positiveDecimal(values, Cd15AutoScheduleParamCode.EQUAL_SHARE_THRESHOLD))
                 .rollCoilMeter(positiveDecimal(values, Cd15AutoScheduleParamCode.CRIMP_LENGTH))

@@ -5,9 +5,11 @@ import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.cd15.api.domain.entity.Cd15ShiftConfig;
 import com.zlt.aps.cd15.engine.algorithm.Cd15ShiftWindowResolver;
+import com.zlt.aps.cd15.engine.algorithm.Cd15RestartShiftResolver;
 import com.zlt.aps.cd15.engine.algorithm.Cd15AutoScheduleOutputDraftBuilder;
 import com.zlt.aps.cd15.engine.algorithm.Cd15MultiShiftScheduleExecutor;
 import com.zlt.aps.cd15.engine.mapper.Cd15AutoScheduleShiftMapper;
+import com.zlt.aps.cd15.engine.mapper.Cd15EngineWorkCalendarMapper;
 import com.zlt.aps.cd15.engine.model.Cd15AutoScheduleContext;
 import com.zlt.aps.cd15.engine.model.Cd15AutoScheduleParameters;
 import com.zlt.aps.cd15.engine.model.Cd15AutoScheduleOutputDraft;
@@ -17,6 +19,7 @@ import com.zlt.aps.cd15.engine.service.Cd15AutoScheduleEngineService;
 import com.zlt.aps.cd15.engine.service.Cd15AutoScheduleParameterService;
 import com.zlt.aps.cd15.engine.service.Cd15AutoScheduleInputVersionService;
 import com.zlt.aps.cd15.engine.service.Cd15ScheduleProgressListener;
+import com.zlt.aps.mdm.api.domain.entity.MdmWorkCalendar;
 import com.zlt.aps.cd15.engine.algorithm.Cd15AutoScheduleRuntimeGuard;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,6 +30,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Date;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -40,10 +44,13 @@ public class Cd15AutoScheduleEngineServiceImpl implements Cd15AutoScheduleEngine
 
     private static final int ACTIVE = 1;
     private static final String STAGE_BASIC_VALIDATION = "基础数据校验";
+    private static final String CD15_PROCESS_CODE = "10";
 
     private final Cd15AutoScheduleShiftMapper shiftMapper;
+    private final Cd15EngineWorkCalendarMapper workCalendarMapper;
     private final Cd15AutoScheduleParameterService parameterService;
     private final Cd15ShiftWindowResolver shiftWindowResolver;
+    private final Cd15RestartShiftResolver restartShiftResolver;
     private final Cd15MultiShiftScheduleExecutor multiShiftScheduleExecutor;
     private final Cd15AutoScheduleOutputDraftBuilder outputDraftBuilder;
     private final Cd15AutoScheduleInputVersionService inputVersionService;
@@ -73,6 +80,9 @@ public class Cd15AutoScheduleEngineServiceImpl implements Cd15AutoScheduleEngine
         // 输出窗口按业务班次顺序截取，保证后续滚动计算和结果CLASS字段顺序一致。
         List<Cd15ShiftDescriptor> shifts = shiftWindowResolver.resolve(localScheduleDate, enabledShifts)
                 .stream().limit(parameters.getScheduleWindow()).collect(Collectors.toList());
+        this.restartShiftResolver.markRestartShifts(
+                shifts, enabledShifts,
+                this.loadWorkCalendars(factoryCode, shifts));
         LocalDateTime startTime = LocalDateTime.now();
         Cd15ShiftDescriptor resourceBaselineShift = shiftWindowResolver
                 .resolveCurrentResourceShift(startTime, enabledShifts);
@@ -128,6 +138,32 @@ public class Cd15AutoScheduleEngineServiceImpl implements Cd15AutoScheduleEngine
         log.info("[斜裁自动排程] Engine输出草稿构建完成, resultCount={}, unscheduledCount={}",
                 output.getScheduleResults().size(), output.getUnscheduledResults().size());
         return output;
+    }
+
+    /** 加载输出窗口及其前一自然班涉及的斜裁工作日历。 */
+    private List<MdmWorkCalendar> loadWorkCalendars(
+            String factoryCode, List<Cd15ShiftDescriptor> shifts) {
+        if (shifts == null || shifts.isEmpty()) {
+            return Collections.emptyList();
+        }
+        LocalDate startDate = shifts.stream()
+                .map(Cd15ShiftDescriptor::getScheduleDate)
+                .min(LocalDate::compareTo).orElseThrow(IllegalStateException::new)
+                .minusDays(1);
+        LocalDate endDate = shifts.stream()
+                .map(Cd15ShiftDescriptor::getScheduleDate)
+                .max(LocalDate::compareTo).orElseThrow(IllegalStateException::new);
+        ZoneId zoneId = ZoneId.systemDefault();
+        Date start = Date.from(startDate.atStartOfDay(zoneId).toInstant());
+        Date end = Date.from(endDate.plusDays(1).atStartOfDay(zoneId)
+                .minusNanos(1).toInstant());
+        LambdaQueryWrapper<MdmWorkCalendar> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(MdmWorkCalendar::getFactoryCode, factoryCode)
+                .eq(MdmWorkCalendar::getProcCode, CD15_PROCESS_CODE)
+                .ge(MdmWorkCalendar::getProductionDate, start)
+                .le(MdmWorkCalendar::getProductionDate, end)
+                .orderByAsc(MdmWorkCalendar::getProductionDate);
+        return this.workCalendarMapper.selectList(wrapper);
     }
 
     /**
