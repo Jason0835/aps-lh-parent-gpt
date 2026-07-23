@@ -130,8 +130,11 @@ public class MesBomItfServiceImpl implements MesBomItfService {
      * @return
      */
     private String getMapKey(MdmRawMaterialConversion info) {
-        return GenerageMapKeyUtils.createMapKey(info.getFactoryCode(), info.getMaterialCode(),
-                info.getRawMaterialName(), info.getRawMaterialWeight());
+        return GenerageMapKeyUtils.createMapKey(
+                info.getFactoryCode(), 
+                info.getMaterialCode(),
+                info.getRawMaterialName(), 
+                BigDecimalUtils.valueOf(info.getRawMaterialWeight()).toPlainString());
     }
 
     /**
@@ -529,38 +532,40 @@ public class MesBomItfServiceImpl implements MesBomItfService {
                 DynamicDataSourceContextHolder.push(DataSource.APS);
                 List<MdmRawMaterialConversion> apsDataList = mdmRawMaterialConversionEntityMapper
                         .selectList(queryWrapper); // 取出APS数据
-                List<MdmRawMaterialConversion> saveList = new ArrayList<>();
-                if (CollectionUtils.isNotEmpty(apsDataList)) {
-                    // 先筛选出删除状态的记录
-                    Set<String> deleteSet = syncList.stream()
-                            .filter(item -> Objects.equals(item.getIsDelete(), YesOrNoEnum.YES.getValue()))
-                            .map(item -> this.getMapKey(item)).distinct().collect(Collectors.toSet());
-                    // 筛选出非删除记录
-                    Map<String, List<MdmRawMaterialConversion>> refMap = syncList.stream()
-                            .filter(item -> Objects.equals(item.getIsDelete(), YesOrNoEnum.NO.getValue())) // 拿出未删除的
-                            .collect(Collectors.groupingBy(item -> this.getMapKey(item))); // 按业务主键分组
-                    apsDataList.stream().filter(r -> refMap.containsKey(this.getMapKey(r))).forEach(item -> {
-                        // 只有删除和新增场景，没有更新
-                        String key = this.getMapKey(item);
-                        // 判断是否删除场景
-                        if (deleteSet.contains(key)) {
-                            // 原有材料被标记为删除状态，则先标记为删除后结束
-                            item.setIsDelete(YesOrNoEnum.YES.getValue());
-                            item.setBaseVale(item.getId());
-                            saveList.add(item);
-                            return;
-                        }
-                        // 判断是否新增场景
-                        List<MdmRawMaterialConversion> refList = refMap.get(key);
-                        if (CollectionUtils.isEmpty(refList)) {
-                            saveList.addAll(refList);
-                        }
-                    });
+                List<MdmRawMaterialConversion> delList = new ArrayList<>();
+                List<MdmRawMaterialConversion> addNewList = new ArrayList<>();
+                // 根据key对现有数据分组
+                Map<String, List<MdmRawMaterialConversion>> refMap = apsDataList.stream()
+                        .collect(Collectors.groupingBy(item -> this.getMapKey(item))); // 按业务主键分组
+
+                // 遍历列表，区分出新增或者删除场景（只有删除和新增场景，没有更新）
+                for (MdmRawMaterialConversion item : syncList) {
+                    String key = this.getMapKey(item);
+                    List<MdmRawMaterialConversion> oldItemList = refMap.get(key);
+                    // 新增场景，直接添加到列表即可
+                    if (Objects.equals(item.getIsDelete(), YesOrNoEnum.YES.getValue())
+                            && !CollectionUtils.isEmpty(oldItemList)) {
+                        List<MdmRawMaterialConversion> delItemList = oldItemList.stream()
+                                .filter(oldItem -> Objects.equals(oldItem.getIsDelete(), YesOrNoEnum.YES.getValue()))
+                                .map(oldItem -> {
+                                    oldItem.setIsDelete(YesOrNoEnum.YES.getValue());
+                                    oldItem.setBaseVale(oldItem.getId());
+                                    return oldItem;
+                                }).collect(Collectors.toList());
+                        delList.addAll(delItemList);
+                    } else if (!Objects.equals(item.getIsDelete(), YesOrNoEnum.YES.getValue())
+                            && CollectionUtils.isEmpty(oldItemList)) {
+                        addNewList.add(item);
+                    }
                 }
                 // 处理待保存记录
-                List<List<MdmRawMaterialConversion>> splitList = ScmListUtils.getSplitList(saveList, 1000);
-                for (List<MdmRawMaterialConversion> itemList : splitList) { // 分批保存，防止长度超出限制
-                    baseDao.saveBatch(itemList);
+                List<List<MdmRawMaterialConversion>> splitDelList = ScmListUtils.getSplitList(delList, 1000);
+                for (List<MdmRawMaterialConversion> itemDelList : splitDelList) { // 分批保存，防止长度超出限制
+                    baseDao.saveBatch(itemDelList);
+                }
+                List<List<MdmRawMaterialConversion>> splitAddNewList = ScmListUtils.getSplitList(addNewList, 1000);
+                for (List<MdmRawMaterialConversion> itemAddNewList : splitAddNewList) { // 分批保存，防止长度超出限制
+                    baseDao.saveBatch(itemAddNewList);
                 }
             } finally {
                 DynamicDataSourceContextHolder.clear();

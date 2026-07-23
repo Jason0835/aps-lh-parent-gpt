@@ -127,7 +127,6 @@
     <!-- 成品原材料折算接口 -->
     <select id="selectMdmRawMaterialConversion" resultType="com.zlt.aps.mdm.api.domain.entity.MdmRawMaterialConversion">
         SELECT
-            ID,
             MATERIAL_CODE,
             MES_MATERIAL_CODE,
             MATERIAL_DESC,
