@@ -114,7 +114,6 @@
             MATERIAL_VERSION,
             MATERIAL_DESC,
             PROCESS_CODE,
-            PRODUCT_TYPE_CODE,
             PROCESS_VALUE,
             UNIT,
             DATA_VERSION,
