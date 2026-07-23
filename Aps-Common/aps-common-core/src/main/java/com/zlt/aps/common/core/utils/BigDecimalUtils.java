@@ -559,6 +559,16 @@ public class BigDecimalUtils {
     }
     
     /**
+     * 小数转换成百分数
+     * @param var
+     * @return
+     */
+    public static BigDecimal decimals2Percentages(Number var) {
+        BigDecimal bigDecimalVar = valueOf(var);
+        return bigDecimalVar.multiply(HUNDRED);
+    }
+    
+    /**
      * 区间比较大小，闭区间
      * @param var
      * @param min
@@ -617,5 +627,50 @@ public class BigDecimalUtils {
         boolean leftResult = isLeftClosed? bigVar.compareTo(bigMin) >= 0: bigVar.compareTo(bigMin) > 0;
         boolean rightResult = isRightClosed? bigVar.compareTo(bigMax) <= 0: bigVar.compareTo(bigMax) < 0;
         return leftResult && rightResult;
+    }
+    
+    /**
+     * 判断是否小于0
+     * @param var
+     * @return
+     */
+    public static boolean ltZero(Number var) {
+        return valueOf(var).compareTo(BigDecimal.ZERO) < 0;
+    }
+
+    /**
+     * 判断是否小于等于0
+     * @param var
+     * @return
+     */
+    public static boolean leZero(Number var) {
+        return valueOf(var).compareTo(BigDecimal.ZERO) <= 0;
+    }
+
+    /**
+     * 判断是否大于0
+     * @param var
+     * @return
+     */
+    public static boolean gtZero(Number var) {
+        return valueOf(var).compareTo(BigDecimal.ZERO) > 0;
+    }
+
+    /**
+     * 判断是否大于等于0
+     * @param var
+     * @return
+     */
+    public static boolean geZero(Number var) {
+        return valueOf(var).compareTo(BigDecimal.ZERO) >= 0;
+    }
+
+    /**
+     * 判断是否等于0
+     * @param var
+     * @return
+     */
+    public static boolean eqZero(Number var) {
+        return valueOf(var).compareTo(BigDecimal.ZERO) == 0;
     }
 }

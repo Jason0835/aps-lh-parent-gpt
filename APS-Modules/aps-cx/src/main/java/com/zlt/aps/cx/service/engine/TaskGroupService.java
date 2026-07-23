@@ -73,6 +73,9 @@ public class TaskGroupService {
     /** 提前腾机结构：本班 + 往后看 2 个班次（命中即停，不合并计划量） */
     private static final int LOOKAHEAD_ADVANCE = 2;
 
+    /** R3（第三轮）开关：false=跳过R3分配 */
+    private static final boolean R3_ENABLED = true;
+
     // ==================== 参数配置编码 ====================
 
     /** 参数编码：收尾舍弃阈值 */
@@ -223,14 +226,13 @@ public class TaskGroupService {
 
         // 初始化日志
         if (state.isEnabled()) {
-            int cxStockRecordCount = context.getStocks() != null ? context.getStocks().size() : 0;
             log.info("【立库库容管控】参数: 立库总库容={}条, 预警比例={}%, 预警线={}条, " +
                             "单胎胚可供硫化>{}h即封顶, 立库中有库存的胎胚种类={}种, " +
                             "本班次总硫化消耗={}条(预扣), 初始总库存={}条, " +
                             "预扣后立库预计={}条, 剩余可用={}条",
                     state.getWarehouseCapacity(), (int)(state.getWarehouseCapacityRatio() * 100),
                     state.getWarehouseThreshold(), state.getStockHoursCap(),
-                    embryoTotalStockMap.size(), cxStockRecordCount,
+                    embryoTotalStockMap.size(),
                     totalShiftVulcConsumption, initialTotalStock,
                     state.getRunningTotalProjectedStock(),
                     Math.max(0, state.getWarehouseThreshold() - state.getRunningTotalProjectedStock()));
@@ -723,7 +725,9 @@ public class TaskGroupService {
             processRound1(state, currentStructure, structActiveResults, structureLookAhead);
             enrollFirstRoundToDeferred(state);
             processRound2(state, currentStructure);
-            processRound3(state, currentStructure);
+            if (R3_ENABLED) {
+                processRound3(state, currentStructure);
+            }
 
             updateMachineOccupationAndEndingStatus(currentStructure, state.context,
                     state.structureRecommendedMachinesCache, state.structureCumulativeTimeMap,
