@@ -1,18 +1,20 @@
 package com.zlt.aps.cx.vo;
 
-import com.zlt.aps.cx.entity.*;
+import com.zlt.aps.cx.api.domain.entity.CxMachineOnlineInfo;
+import com.zlt.aps.cx.api.domain.entity.CxPrecisionPlan;
 import com.zlt.aps.cx.api.domain.entity.CxStock;
+import com.zlt.aps.cx.api.domain.entity.CxStructureTreadConfig;
+import com.zlt.aps.cx.entity.CxAlertConfig;
+import com.zlt.aps.cx.entity.CxMaterialEnding;
+import com.zlt.aps.cx.entity.CxMaterialException;
+import com.zlt.aps.cx.entity.CxTreadParkingConfig;
 import com.zlt.aps.cx.entity.config.CxKeyProduct;
 import com.zlt.aps.cx.entity.config.CxParamConfig;
 import com.zlt.aps.cx.entity.config.CxShiftConfig;
 import com.zlt.aps.cx.entity.config.CxStructurePriority;
-import com.zlt.aps.cx.api.domain.entity.CxPrecisionPlan;
-import com.zlt.aps.cx.api.domain.entity.CxMachineOnlineInfo;
-import com.zlt.aps.cx.api.domain.entity.CxStructureTreadConfig;
-import com.zlt.aps.mp.api.domain.entity.MdmDevicePlanShut;
-import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
 import com.zlt.aps.cx.entity.schedule.LhScheduleResult;
+import com.zlt.aps.mp.api.domain.entity.*;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 
@@ -459,13 +461,13 @@ public class ScheduleContextVo {
      * 硫化余量(PLAN_SURPLUS_QTY)已由系统计算好（总计划量 - 硫化真实完成量）
      * 用于计算收尾余量：收尾余量 = 硫化余量 - 胎胚库存
      */
-    private List<com.zlt.aps.mp.api.domain.entity.MdmMonthSurplus> monthSurplusList;
+    private List<MdmMonthSurplus> monthSurplusList;
 
     /**
      * 月度计划余量映射（物料编码+产品状态 -> 余量信息）
      * 快速查询用
      */
-    private Map<String, com.zlt.aps.mp.api.domain.entity.MdmMonthSurplus> monthSurplusMap;
+    private Map<String, MdmMonthSurplus> monthSurplusMap;
 
     /**
      * 初始月度计划余量映射（排程开始前的快照，不会被后续班次硫化消耗影响）
@@ -478,7 +480,7 @@ public class ScheduleContextVo {
      * SKU排产分类列表
      * 用于判断是否为主销产品（SCHEDULE_TYPE='01'表示主销产品，月均销量>=500条）
      */
-    private List<com.zlt.aps.mp.api.domain.entity.MdmSkuScheduleCategory> skuScheduleCategories;
+    private List<MdmSkuScheduleCategory> skuScheduleCategories;
 
     /**
      * 主销产品编码集合
@@ -524,11 +526,16 @@ public class ScheduleContextVo {
     private Map<String, List<MpCxCapacityConfiguration>> advanceProductionMachineMap;
 
     /**
-     * 跨班次机台切换剩余耗时（机台编码 -> 剩余切换秒数）
-     * <p>当切换耗时超过本班次剩余可用时间时，记录剩余切换耗时，下个班次继续扣除
-     * <p>场景：班次1不同英寸切换8h，但只剩6h可用，剩余2h记录到此处；
-     *        班次2该机台无前结构占用时，可用产能 = 8h - 2h = 6h
-     * <p>切换完成后立即清除该机台的记录
+     * 跨班次机台切换状态（key=机台编码|提前生产结构名, value=切换状态秒数）
+     * <p>value 含义：
+     * <ul>
+     *   <li>null（无记录）：未尝试过切换，需计算完整切换耗时</li>
+     *   <li>0L：切换已完成，后续班次不再扣除切换耗时</li>
+     *   <li>>0：切换未完成，值为剩余切换秒数，下个班次继续扣除</li>
+     * </ul>
+     * <p>场景1（切换2h，剩余9258s）：班次1切换完成(9258>7200)，记录0L；班次2发现已切换，不再扣除
+     * <p>场景2（切换8h，剩余9258s）：班次1切换未完成(9258<28800)，记录剩余19542s；
+     *        班次2扣除剩余19542s，切换完成后记录0L
      */
     private Map<String, Long> machineSwitchRemainingMap;
 
