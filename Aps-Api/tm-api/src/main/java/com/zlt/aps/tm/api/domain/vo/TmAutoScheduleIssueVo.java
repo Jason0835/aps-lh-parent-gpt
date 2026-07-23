@@ -42,6 +42,10 @@ public class TmAutoScheduleIssueVo implements Serializable {
     @ApiModelProperty(value = "胎胚代码", name = "embryoCode")
     private String embryoCode;
 
+    /** 胎面编码 */
+    @ApiModelProperty(value = "胎面编码", name = "treadCode")
+    private String treadCode;
+
     /** 示方书编号 */
     @ApiModelProperty(value = "示方书编号", name = "recipeNo")
     private String recipeNo;

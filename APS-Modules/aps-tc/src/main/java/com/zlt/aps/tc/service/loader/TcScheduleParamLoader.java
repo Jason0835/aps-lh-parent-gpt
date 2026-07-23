@@ -86,6 +86,8 @@ public class TcScheduleParamLoader {
     private void fillDefaultParams(Map<String, TcParamValue> paramMap) {
         this.putDefaultParam(paramMap, TcScheduleConstants.PARAM_ALGORITHM_SWITCH,
                 TcScheduleConstants.DEFAULT_ALGORITHM_SWITCH);
+        this.putDefaultParam(paramMap, TcScheduleConstants.PARAM_ALG1_LOOKBACK_SHIFTS,
+                String.valueOf(TcScheduleConstants.DEFAULT_ALG1_LOOKBACK_SHIFTS_VALUE));
         this.putDefaultParam(paramMap, TcScheduleConstants.PARAM_MIN_STOCK_CLASS,
                 TcScheduleConstants.DEFAULT_MIN_STOCK_CLASS);
         this.putDefaultParam(paramMap, TcScheduleConstants.PARAM_MIN_START_QTY,
@@ -134,8 +136,6 @@ public class TcScheduleParamLoader {
                 TcScheduleConstants.DEFAULT_GLUE_CHANGE_CAPACITY_DEDUCT);
         this.putDefaultParam(paramMap, TcScheduleConstants.PARAM_VEHICLE_RATE,
                 TcScheduleConstants.DEFAULT_VEHICLE_RATE);
-        this.putDefaultParam(paramMap, TcScheduleConstants.PARAM_SHIFT_MAX_CAPACITY,
-                TcScheduleConstants.DEFAULT_SHIFT_MAX_CAPACITY);
         this.putDefaultParam(paramMap, TcScheduleConstants.PARAM_STOCK_MISSING_POLICY,
                 TcScheduleConstants.DEFAULT_STOCK_MISSING_POLICY);
         this.putDefaultParam(paramMap, TcScheduleConstants.PARAM_FILTER_RULE_ORDER,

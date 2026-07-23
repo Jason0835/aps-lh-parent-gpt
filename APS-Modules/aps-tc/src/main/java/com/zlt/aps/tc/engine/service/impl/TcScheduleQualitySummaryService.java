@@ -1,11 +1,10 @@
 package com.zlt.aps.tc.engine.service.impl;
 
-import cn.hutool.core.util.StrUtil;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.engine.schedule.ScheduleTaskLinkedList;
 import com.zlt.aps.common.engine.schedule.ScheduleTaskNode;
 import com.zlt.aps.tc.api.constant.TcScheduleConstants;
-import com.zlt.aps.tc.engine.domain.TcParamValue;
+import com.zlt.aps.tc.engine.domain.TcMachineCandidate;
 import com.zlt.aps.tc.engine.domain.TcPersistResult;
 import com.zlt.aps.tc.engine.domain.TcScheduleContext;
 import com.zlt.aps.tc.engine.domain.TcTaskDraft;
@@ -76,8 +75,19 @@ public class TcScheduleQualitySummaryService {
                 .map(ScheduleTaskNode::getPlanQty)
                 .filter(this::isPositive)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal totalCapacity = this.resolveShiftMaxCapacity(context)
-                .multiply(BigDecimal.valueOf(chainList.size()));
+        Map<String, BigDecimal> machineCapacityMap = context.getMachineCandidateList().stream()
+                .filter(candidate -> candidate != null && candidate.getMachineCode() != null)
+                .collect(Collectors.toMap(TcMachineCandidate::getMachineCode,
+                        this::resolveMachineMaxCapacity, (existing, replacement) -> existing));
+        BigDecimal defaultCapacity = new BigDecimal(TcScheduleConstants.DEFAULT_MACHINE_MAX_CAPACITY);
+        BigDecimal totalCapacity = chainList.stream()
+                .map(chain -> chain.toList().stream()
+                        .map(ScheduleTaskNode::getTask)
+                        .filter(task -> task != null && task.getMachineCode() != null)
+                        .findFirst().orElse(null))
+                .filter(task -> task != null)
+                .map(task -> machineCapacityMap.getOrDefault(task.getMachineCode(), defaultCapacity))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
         if (!this.isPositive(totalCapacity)) {
             return 0D;
         }
@@ -153,22 +163,15 @@ public class TcScheduleQualitySummaryService {
     }
 
     /**
-     * 读取单机单班最大可排量，参数缺失或非法时使用 TC 默认值。
+     * 读取候选机台最大班产，基础数据无效时使用固定兼容值。
      *
-     * @param context 排程运行上下文
-     * @return 正数班产定额
+     * @param candidate 候选机台
+     * @return 正数最大班产
      */
-    private BigDecimal resolveShiftMaxCapacity(TcScheduleContext context) {
-        TcParamValue paramValue = context.getParamMap().get(TcScheduleConstants.PARAM_SHIFT_MAX_CAPACITY);
-        String effectiveValue = paramValue == null ? null : paramValue.getEffectiveValue();
-        try {
-            BigDecimal capacity = new BigDecimal(StrUtil.blankToDefault(effectiveValue,
-                    TcScheduleConstants.DEFAULT_SHIFT_MAX_CAPACITY));
-            return this.isPositive(capacity)
-                    ? capacity : new BigDecimal(TcScheduleConstants.DEFAULT_SHIFT_MAX_CAPACITY);
-        } catch (NumberFormatException exception) {
-            return new BigDecimal(TcScheduleConstants.DEFAULT_SHIFT_MAX_CAPACITY);
-        }
+    private BigDecimal resolveMachineMaxCapacity(TcMachineCandidate candidate) {
+        BigDecimal maxCapacity = candidate == null ? null : candidate.getMaxCapacity();
+        return this.isPositive(maxCapacity)
+                ? maxCapacity : new BigDecimal(TcScheduleConstants.DEFAULT_MACHINE_MAX_CAPACITY);
     }
 
     /**

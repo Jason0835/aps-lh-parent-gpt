@@ -130,6 +130,24 @@ public class TmScheduleParamLoader {
                 TmScheduleConstants.DEFAULT_SPEC_CHANGE_MINUTES);
         this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_GLUE_CHANGE_CAPACITY_DEDUCT,
                 TmScheduleConstants.DEFAULT_GLUE_CHANGE_CAPACITY_DEDUCT);
+        this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_VEHICLE_RATE,
+                TmScheduleConstants.DEFAULT_VEHICLE_RATE);
+        this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_STOCK_MISSING_POLICY,
+                TmScheduleConstants.DEFAULT_STOCK_MISSING_POLICY);
+        this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_FILTER_RULE_ORDER,
+                TmScheduleConstants.DEFAULT_FILTER_RULE_ORDER);
+        this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_SCORE_WEIGHT_REMAIN_CAP,
+                TmScheduleConstants.DEFAULT_SCORE_WEIGHT_REMAIN_CAP);
+        this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_SCORE_WEIGHT_GLUE_CONT,
+                TmScheduleConstants.DEFAULT_SCORE_WEIGHT_GLUE_CONT);
+        this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_SCORE_WEIGHT_BASE_GLUE,
+                TmScheduleConstants.DEFAULT_SCORE_WEIGHT_BASE_GLUE);
+        this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_SCORE_WEIGHT_MOUTH_CONT,
+                TmScheduleConstants.DEFAULT_SCORE_WEIGHT_MOUTH_CONT);
+        this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_SCORE_WEIGHT_SWITCH_COST,
+                TmScheduleConstants.DEFAULT_SCORE_WEIGHT_SWITCH_COST);
+        this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_SCORE_WEIGHT_FIXED_MACHINE,
+                TmScheduleConstants.DEFAULT_SCORE_WEIGHT_FIXED_MACHINE);
     }
 
     /**

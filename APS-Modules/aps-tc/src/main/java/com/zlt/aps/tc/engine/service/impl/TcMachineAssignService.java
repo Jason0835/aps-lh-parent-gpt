@@ -2175,7 +2175,7 @@ public class TcMachineAssignService implements ITcMachineAssignService {
             return speed;
         }
         // 无胎侧规格速度时，使用最大产能 / 班次小时数作为机台生产速度
-        BigDecimal maxCapacity = nvl(candidate.getMaxCapacity());
+        BigDecimal maxCapacity = this.resolveMachineMaxCapacity(candidate);
         BigDecimal shiftHours = nvl(context.getShiftHoursMap().get(task.getShiftOrder()));
         if (maxCapacity.compareTo(BigDecimal.ZERO) > 0 && shiftHours.compareTo(BigDecimal.ZERO) > 0) {
         return maxCapacity.divide(shiftHours, TcScheduleConstants.DECIMAL_CALCULATION_SCALE,
@@ -2196,9 +2196,7 @@ public class TcMachineAssignService implements ITcMachineAssignService {
     private BigDecimal resolveRemainCapacityWithoutNewSwitch(TcTaskDraft task, TcScheduleContext context,
                                                               TcMachineCandidate candidate,
                                                               BigDecimal machineSpeed) {
-        BigDecimal maxCapacity = candidate.getMaxCapacity() == null
-                ? candidate.getRemainCapacity() : candidate.getMaxCapacity();
-        maxCapacity = this.applyShiftMaxCapacity(context, maxCapacity);
+        BigDecimal maxCapacity = this.resolveMachineMaxCapacity(candidate);
         BigDecimal maintenanceDeduct = this.resolveMaintenanceHours(task, candidate).multiply(this.nvl(machineSpeed));
         BigDecimal assignedPlanQty = this.resolveAssignedPlanQty(context, candidate.getMachineCode(),
                 task.getShiftOrder());
@@ -2230,9 +2228,7 @@ public class TcMachineAssignService implements ITcMachineAssignService {
      */
     private BigDecimal resolvePrependRemainCapacity(TcTaskDraft task, TcScheduleContext context,
                                                     TcMachineCandidate candidate, BigDecimal machineSpeed) {
-        BigDecimal maxCapacity = candidate.getMaxCapacity() == null
-                ? candidate.getRemainCapacity() : candidate.getMaxCapacity();
-        maxCapacity = this.applyShiftMaxCapacity(context, maxCapacity);
+        BigDecimal maxCapacity = this.resolveMachineMaxCapacity(candidate);
         BigDecimal maintenanceDeduct = this.resolveMaintenanceHours(task, candidate).multiply(this.nvl(machineSpeed));
         BigDecimal assignedPlanQty = this.resolveAssignedPlanQty(context, candidate.getMachineCode(),
                 task.getShiftOrder());
@@ -2321,8 +2317,7 @@ public class TcMachineAssignService implements ITcMachineAssignService {
      */
     private BigDecimal resolveRemainCapacity(TcTaskDraft task, TcScheduleContext context,
                                              TcMachineCandidate candidate, BigDecimal machineSpeed) {
-        BigDecimal maxCapacity = candidate.getMaxCapacity() == null ? candidate.getRemainCapacity() : candidate.getMaxCapacity();
-        maxCapacity = this.applyShiftMaxCapacity(context, maxCapacity);
+        BigDecimal maxCapacity = this.resolveMachineMaxCapacity(candidate);
         BigDecimal maintenanceDeduct = this.resolveMaintenanceHours(task, candidate).multiply(nvl(machineSpeed));
         BigDecimal assignedPlanQty = resolveAssignedPlanQty(context, candidate.getMachineCode(), task.getShiftOrder());
         BigDecimal existingSwitchDeduct = this.resolveExistingSwitchDeduct(context, candidate.getMachineCode(),
@@ -2344,22 +2339,17 @@ public class TcMachineAssignService implements ITcMachineAssignService {
     }
 
     /**
-     * 应用胎侧单机单班最大可排量限制。
+     * 解析候选机台最大班产，基础数据无效时使用固定兼容值。
      *
-     * @param context 排程上下文
-     * @param machineCapacity 机台原始班产能
-     * @return 参数上限与机台产能的较小值
+     * @param candidate 候选机台
+     * @return 正数最大班产
      */
-    private BigDecimal applyShiftMaxCapacity(TcScheduleContext context, BigDecimal machineCapacity) {
-        BigDecimal shiftMaxCapacity = new BigDecimal(context.getParam(
-                TcScheduleConstants.PARAM_SHIFT_MAX_CAPACITY).getEffectiveValue());
-        if (shiftMaxCapacity.compareTo(BigDecimal.ZERO) <= 0) {
-            return this.nvl(machineCapacity);
+    private BigDecimal resolveMachineMaxCapacity(TcMachineCandidate candidate) {
+        BigDecimal maxCapacity = candidate == null ? null : candidate.getMaxCapacity();
+        if (maxCapacity == null || maxCapacity.compareTo(BigDecimal.ZERO) <= 0) {
+            return new BigDecimal(TcScheduleConstants.DEFAULT_MACHINE_MAX_CAPACITY);
         }
-        if (machineCapacity == null || machineCapacity.compareTo(BigDecimal.ZERO) <= 0) {
-            return shiftMaxCapacity;
-        }
-        return machineCapacity.min(shiftMaxCapacity);
+        return maxCapacity;
     }
 
 

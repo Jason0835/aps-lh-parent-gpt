@@ -101,6 +101,39 @@ public final class TmScheduleConstants {
     /** 主胶料切换固定产能扣减参数键。 */
     public static final String PARAM_GLUE_CHANGE_CAPACITY_DEDUCT = "TM_GLUE_CHANGE_CAPACITY_DEDUCT";
 
+    /** 整车率参数键，控制工厂级工装实际可用比例。 */
+    public static final String PARAM_VEHICLE_RATE = "TM_VEHICLE_RATE";
+
+    /** 缺库存快照处理策略参数键。 */
+    public static final String PARAM_STOCK_MISSING_POLICY = "TM_STOCK_MISSING_POLICY";
+
+    /** 机台过滤规则执行顺序参数键。 */
+    public static final String PARAM_FILTER_RULE_ORDER = "TM_FILTER_RULE_ORDER";
+
+    /** 单项机台过滤规则启停参数前缀。 */
+    public static final String PARAM_FILTER_RULE_ENABLED_PREFIX = "TM_FILTER_RULE_";
+
+    /** 单项机台过滤规则启停参数后缀。 */
+    public static final String PARAM_FILTER_RULE_ENABLED_SUFFIX = "_ENABLED";
+
+    /** 剩余产能适配评分权重参数键。 */
+    public static final String PARAM_SCORE_WEIGHT_REMAIN_CAP = "TM_SCORE_WEIGHT_REMAIN_CAP";
+
+    /** 主胶料连续评分权重参数键。 */
+    public static final String PARAM_SCORE_WEIGHT_GLUE_CONT = "TM_SCORE_WEIGHT_GLUE_CONT";
+
+    /** 基部胶相似评分权重参数键。 */
+    public static final String PARAM_SCORE_WEIGHT_BASE_GLUE = "TM_SCORE_WEIGHT_BASE_GLUE";
+
+    /** 口型连续评分权重参数键。 */
+    public static final String PARAM_SCORE_WEIGHT_MOUTH_CONT = "TM_SCORE_WEIGHT_MOUTH_CONT";
+
+    /** 切换成本评分权重参数键。 */
+    public static final String PARAM_SCORE_WEIGHT_SWITCH_COST = "TM_SCORE_WEIGHT_SWITCH_COST";
+
+    /** 定点生产评分权重参数键。 */
+    public static final String PARAM_SCORE_WEIGHT_FIXED_MACHINE = "TM_SCORE_WEIGHT_FIXED_MACHINE";
+
     /** 需求量算法默认编码。 */
     public static final String DEFAULT_ALGORITHM_SWITCH = "1";
 
@@ -194,6 +227,37 @@ public final class TmScheduleConstants {
 
     /** 主胶料切换固定产能扣减默认值，单位米。 */
     public static final String DEFAULT_GLUE_CHANGE_CAPACITY_DEDUCT = "200";
+
+    /** 整车率默认值。 */
+    public static final String DEFAULT_VEHICLE_RATE = "1";
+
+    /** 缺库存快照默认按零继续排程。 */
+    public static final String DEFAULT_STOCK_MISSING_POLICY = "ZERO";
+
+    /** 默认机台过滤规则链顺序。 */
+    public static final String DEFAULT_FILTER_RULE_ORDER =
+            "MACHINE_STATUS,REMAIN_CAPACITY,MOUTH_PLATE,GLUE_MACHINE,FIXED_MACHINE,EXCLUDE_FIXED";
+
+    /** 默认启用单项机台过滤规则。 */
+    public static final String DEFAULT_FILTER_RULE_ENABLED = "1";
+
+    /** 剩余产能适配评分默认权重。 */
+    public static final String DEFAULT_SCORE_WEIGHT_REMAIN_CAP = "10";
+
+    /** 主胶料连续评分默认权重。 */
+    public static final String DEFAULT_SCORE_WEIGHT_GLUE_CONT = "10";
+
+    /** 基部胶相似评分默认权重。 */
+    public static final String DEFAULT_SCORE_WEIGHT_BASE_GLUE = "8";
+
+    /** 口型连续评分默认权重。 */
+    public static final String DEFAULT_SCORE_WEIGHT_MOUTH_CONT = "10";
+
+    /** 切换成本评分默认权重。 */
+    public static final String DEFAULT_SCORE_WEIGHT_SWITCH_COST = "10";
+
+    /** 定点生产评分默认权重。 */
+    public static final String DEFAULT_SCORE_WEIGHT_FIXED_MACHINE = "10";
 
     /** 自动排程基础资料缓存键前缀。 */
     public static final String BASE_DATA_CACHE_KEY_PREFIX = "aps:tm:autoSchedule:baseData:";

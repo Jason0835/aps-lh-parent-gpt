@@ -145,7 +145,7 @@ public class TcInventoryPredictService implements ITcInventoryPredictService {
      * 判断当前是否 RECIPE 模式（按示方书版本关联施工）。
      *
      * <p>读取数据加载阶段写入上下文的 {@code TC_VERSION_MATCH_MODE} 参数，默认 RECIPE；
-     * 仅当显式配置为 B 时返回 false，保证与数据加载口径一致；早期 BOM 配置值由枚举兼容解析。</p>
+     * 仅当显式配置为 BOM 时返回 false，保证与数据加载口径一致。</p>
      *
      * @param context 自动排程上下文
      * @return true 表示 RECIPE 模式

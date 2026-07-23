@@ -10,6 +10,9 @@ public final class TcScheduleConstants {
     /** 需求量算法参数键。 */
     public static final String PARAM_ALGORITHM_SWITCH = "TC_ALGORITHM_SWITCH";
 
+    /** 算法1回看成型班次数参数键。 */
+    public static final String PARAM_ALG1_LOOKBACK_SHIFTS = "TC_ALG1_LOOKBACK_SHIFTS";
+
     /** 最低库存班数参数键。 */
     public static final String PARAM_MIN_STOCK_CLASS = "TC_MIN_STOCK_CLASS";
 
@@ -85,9 +88,6 @@ public final class TcScheduleConstants {
 
     /** 整车率参数键，控制工厂级工装实际可用比例。 */
     public static final String PARAM_VEHICLE_RATE = "TC_VEHICLE_RATE";
-
-    /** 单机单班最大可排量参数键。 */
-    public static final String PARAM_SHIFT_MAX_CAPACITY = "TC_SHIFT_MAX_CAPACITY";
 
     /** 缺库存快照处理策略参数键。 */
     public static final String PARAM_STOCK_MISSING_POLICY = "TC_STOCK_MISSING_POLICY";
@@ -210,8 +210,8 @@ public final class TcScheduleConstants {
     /** 整车率默认值。 */
     public static final String DEFAULT_VEHICLE_RATE = "1";
 
-    /** 单机单班最大可排量默认值，单位米。 */
-    public static final String DEFAULT_SHIFT_MAX_CAPACITY = "5500";
+    /** 机台最大班产无效时的固定兜底值，单位米。 */
+    public static final String DEFAULT_MACHINE_MAX_CAPACITY = "5500";
 
     /** 缺库存快照默认按零继续排程。 */
     public static final String DEFAULT_STOCK_MISSING_POLICY = "ZERO";
@@ -330,6 +330,9 @@ public final class TcScheduleConstants {
 
     /** 最低库存班数数值默认值。 */
     public static final int DEFAULT_MIN_STOCK_CLASS_VALUE = 3;
+
+    /** 算法1回看成型班次数值默认值。 */
+    public static final int DEFAULT_ALG1_LOOKBACK_SHIFTS_VALUE = 3;
 
     /** 新规格回看天数数值默认值。 */
     public static final int DEFAULT_NEW_SPEC_LOOKBACK_DAYS_VALUE = 7;
