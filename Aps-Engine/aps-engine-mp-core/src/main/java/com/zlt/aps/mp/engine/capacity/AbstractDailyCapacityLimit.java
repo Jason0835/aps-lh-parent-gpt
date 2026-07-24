@@ -657,6 +657,11 @@ public abstract class AbstractDailyCapacityLimit {
             analysisDiffMachines(iDiffCount, iDiffValue, changeMouldBlockQty, changeMouldFirstQty, resultArr,bSpecialChangeMould);
             //设置换模次数
             resultArr[2] = iDiffCount;
+            if (day1Field.equals(dayField)){
+                //针对1号有续作的情况
+                //(6.30)46 	(7.1)66  (7.2)92
+                resultArr[2] = iDiffCount - curMachines;
+            }
             //多扣的机台数
             resultArr[3] = curMachines;
             return resultArr;
