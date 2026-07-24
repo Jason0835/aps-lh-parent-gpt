@@ -172,7 +172,7 @@ public class Cd15SingleShiftScheduleExecutorTest {
 
         assertEquals(new BigDecimal("140"), result.getAttemptTraces().get(0)
                 .getNetDemandQuantity());
-        assertEquals(new BigDecimal("140"), result.getTasks().get(0).getPlanQuantity());
+        assertEquals(new BigDecimal("200"), result.getTasks().get(0).getPlanQuantity());
     }
     /** 验证均分后的新增规格剩余量已是斜裁米数，后续班次不再按施工长度重复换算。 */
     @Test
@@ -372,9 +372,9 @@ public class Cd15SingleShiftScheduleExecutorTest {
         assertEquals("211400022", result.getTasks().get(1).getSteelStripCode());
     }
 
-    /** 单规格分裁超过阈值后必须连续两班排完，且两班合计保持完整计划量。 */
+    /** 单规格分裁两路各补一车后按阈值跨四班排完，且合计保持完整计划量。 */
     @Test
-    public void shouldScheduleSingleSpecSplitEqualShareAcrossTwoShifts() {
+    public void shouldScheduleSingleSpecSplitEqualShareAcrossFourShifts() {
         Cd15SingleShiftScheduleExecutor executor = new Cd15SingleShiftScheduleExecutor(
                 (context, input, classField, rolling) -> {
                     Cd15ScheduleCandidate prepared = splitCandidate("C1");
@@ -413,18 +413,32 @@ public class Cd15SingleShiftScheduleExecutorTest {
         assertEquals("SPLIT", rolling.getPendingTasks().get(0).getCutMode());
         Cd15ShiftExecutionResult secondShift = executor.execute(
                 context, input, shift(), splitState(), rolling);
+        Cd15ShiftExecutionResult thirdShift = executor.execute(
+                context, input, shift(), splitState(), rolling);
+        Cd15ShiftExecutionResult fourthShift = executor.execute(
+                context, input, shift(), splitState(), rolling);
 
         assertEquals(new BigDecimal("40"),
                 firstShift.getTasks().get(0).getPlanQuantity());
         assertEquals(new BigDecimal("40"),
                 secondShift.getTasks().get(0).getPlanQuantity());
-        assertEquals(new BigDecimal("80"),
+        assertEquals(new BigDecimal("40"),
+                thirdShift.getTasks().get(0).getPlanQuantity());
+        assertEquals(new BigDecimal("40"),
+                fourthShift.getTasks().get(0).getPlanQuantity());
+        assertEquals(new BigDecimal("160"),
                 firstShift.getTasks().get(0).getPlanQuantity().add(
-                        secondShift.getTasks().get(0).getPlanQuantity()));
+                        secondShift.getTasks().get(0).getPlanQuantity()).add(
+                        thirdShift.getTasks().get(0).getPlanQuantity()).add(
+                        fourthShift.getTasks().get(0).getPlanQuantity()));
         assertEquals("G1401", firstShift.getTasks().get(0).getMachineCode());
         assertEquals("G1401", secondShift.getTasks().get(0).getMachineCode());
+        assertEquals("G1401", thirdShift.getTasks().get(0).getMachineCode());
+        assertEquals("G1401", fourthShift.getTasks().get(0).getMachineCode());
         assertEquals("SPLIT", firstShift.getTasks().get(0).getCutMode());
         assertEquals("SPLIT", secondShift.getTasks().get(0).getCutMode());
+        assertEquals("SPLIT", thirdShift.getTasks().get(0).getCutMode());
+        assertEquals("SPLIT", fourthShift.getTasks().get(0).getCutMode());
         assertTrue(rolling.getContinueDemandBySteelStrip().isEmpty());
         assertTrue(rolling.getPendingTasks().isEmpty());
         assertTrue(rolling.getEqualSharePendingMaterialKeys().isEmpty());

@@ -82,7 +82,7 @@ public class Cd15CandidateMachineTrialCalculatorTest {
                 .singleSpecSplit(true)
                 .minimumStartQuantity(new BigDecimal("300"))
                 .equalShareThreshold(new BigDecimal("2000"))
-                .vehiclePlanQuantity(new BigDecimal("5305.5384"))
+                .vehiclePlanQuantity(new BigDecimal("2652.7692"))
                 .craftWidth(new BigDecimal("37.2"))
                 .totalToolingCount(10)
                 .occupiedVehicleCount(0)

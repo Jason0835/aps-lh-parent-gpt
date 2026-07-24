@@ -50,10 +50,10 @@ public class Cd15ScheduleQuantityCalculatorTest {
     public void normalQuantityShouldRoundByVehiclePlanQuantity() {
         BigDecimal result = calculator.calculateActualQuantity(
                 new BigDecimal("1305"), false, BigDecimal.ZERO,
-                new BigDecimal("10"), new BigDecimal("31.32"),
+                new BigDecimal("10"), new BigDecimal("78"),
                 new BigDecimal("2000"));
 
-        assertEquals(new BigDecimal("1315.44"), result);
+        assertEquals(new BigDecimal("1326"), result);
     }
 
     /** T-07：5405.778米按2000米上限动态均衡为三个班次。 */
@@ -79,26 +79,26 @@ public class Cd15ScheduleQuantityCalculatorTest {
     public void realSingleSpecSplitQuantityShouldBeBalancedAcrossThreeShifts() {
         BigDecimal first = calculator.calculateSingleSpecSplitActualQuantity(
                 new BigDecimal("45.384"), false, BigDecimal.ZERO,
-                new BigDecimal("300"), new BigDecimal("5305.5384"),
+                new BigDecimal("300"), new BigDecimal("2652.7692"),
                 new BigDecimal("2000"), new BigDecimal("37.2"), false);
         BigDecimal firstRemainder =
                 calculator.calculateSingleSpecSplitEqualShareRemainder(
                         new BigDecimal("45.384"), false, BigDecimal.ZERO,
-                        new BigDecimal("300"), new BigDecimal("5305.5384"),
+                        new BigDecimal("300"), new BigDecimal("2652.7692"),
                         new BigDecimal("2000"), new BigDecimal("37.2"), false);
         BigDecimal second = calculator.calculateSingleSpecSplitActualQuantity(
                 firstRemainder, false, new BigDecimal("5"),
-                new BigDecimal("300"), new BigDecimal("5305.5384"),
+                new BigDecimal("300"), new BigDecimal("2652.7692"),
                 new BigDecimal("2000"), new BigDecimal("37.2"), true);
         BigDecimal third =
                 calculator.calculateSingleSpecSplitEqualShareRemainder(
                         firstRemainder, false, new BigDecimal("5"),
-                        new BigDecimal("300"), new BigDecimal("5305.5384"),
+                        new BigDecimal("300"), new BigDecimal("2652.7692"),
                         new BigDecimal("2000"), new BigDecimal("37.2"), true);
 
         assertTrue(calculator.requiresSingleSpecSplitEqualShare(
                 new BigDecimal("45.384"), false, BigDecimal.ZERO,
-                new BigDecimal("300"), new BigDecimal("5305.5384"),
+                new BigDecimal("300"), new BigDecimal("2652.7692"),
                 new BigDecimal("2000"), false));
         assertEquals(new BigDecimal("1768.5624"), first);
         assertEquals(new BigDecimal("1768.488"), second);
@@ -112,7 +112,7 @@ public class Cd15ScheduleQuantityCalculatorTest {
     public void sameSteelStripRemainingShiftQuantityShouldCapCurrentCandidate() {
         BigDecimal result = calculator.calculateSingleSpecSplitActualQuantity(
                 new BigDecimal("45.384"), false, BigDecimal.ZERO,
-                new BigDecimal("300"), new BigDecimal("5305.5384"),
+                new BigDecimal("300"), new BigDecimal("2652.7692"),
                 new BigDecimal("2000"), new BigDecimal("37.2"), false,
                 new BigDecimal("1000"));
 
@@ -124,12 +124,12 @@ public class Cd15ScheduleQuantityCalculatorTest {
     public void restartShiftShouldUseRestartStockThresholdAsLimit() {
         BigDecimal first = calculator.calculateSingleSpecSplitActualQuantity(
                 new BigDecimal("45.384"), false, BigDecimal.ZERO,
-                new BigDecimal("300"), new BigDecimal("5305.5384"),
+                new BigDecimal("300"), new BigDecimal("2652.7692"),
                 new BigDecimal("3000"), new BigDecimal("37.2"), false);
         BigDecimal remainder =
                 calculator.calculateSingleSpecSplitEqualShareRemainder(
                         new BigDecimal("45.384"), false, BigDecimal.ZERO,
-                        new BigDecimal("300"), new BigDecimal("5305.5384"),
+                        new BigDecimal("300"), new BigDecimal("2652.7692"),
                         new BigDecimal("3000"), new BigDecimal("37.2"), false);
 
         assertEquals(new BigDecimal("2652.8064"), first);
@@ -145,6 +145,39 @@ public class Cd15ScheduleQuantityCalculatorTest {
                 new BigDecimal("2000"), new BigDecimal("21.6"), true);
 
         assertEquals(new BigDecimal("3.5856"), result);
+    }
+
+    /** 正常单规格分裁不足一车时，两路分别补足一辆完整小车。 */
+    @Test
+    public void normalSingleSpecSplitShouldFillOneVehiclePerBranch() {
+        BigDecimal result = calculator.calculateSingleSpecSplitActualQuantity(
+                new BigDecimal("303.8"), false, BigDecimal.ZERO,
+                new BigDecimal("10"), new BigDecimal("181.3"),
+                new BigDecimal("2000"), new BigDecimal("20"));
+
+        assertEquals(new BigDecimal("362.6"), result);
+    }
+
+    /** 两路分别向上取整，不能把三辆车的总量分摊成两路各一辆半。 */
+    @Test
+    public void normalSingleSpecSplitShouldRoundEachBranchIndependently() {
+        BigDecimal result = calculator.calculateSingleSpecSplitActualQuantity(
+                new BigDecimal("400"), false, BigDecimal.ZERO,
+                new BigDecimal("10"), new BigDecimal("181.3"),
+                new BigDecimal("2000"), new BigDecimal("20"));
+
+        assertEquals(new BigDecimal("725.2"), result);
+    }
+
+    /** 收尾单规格分裁不补整车，只保留实际需求量。 */
+    @Test
+    public void closeOutSingleSpecSplitShouldKeepActualDemand() {
+        BigDecimal result = calculator.calculateSingleSpecSplitActualQuantity(
+                new BigDecimal("303.8"), true, BigDecimal.ZERO,
+                new BigDecimal("300"), new BigDecimal("181.3"),
+                new BigDecimal("2000"), new BigDecimal("20"));
+
+        assertEquals(new BigDecimal("303.8"), result);
     }
 
 }

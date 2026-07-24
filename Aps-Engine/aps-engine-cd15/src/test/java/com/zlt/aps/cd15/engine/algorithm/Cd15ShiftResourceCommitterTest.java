@@ -210,17 +210,16 @@ public class Cd15ShiftResourceCommitterTest {
     }
 
     @Test
-    public void shouldAllocateVehiclesByLengthDirectionEquivalentQuantity() {
-        Cd15ShiftResourceState state = state(50);
-        state.setTotalToolingCount(50);
-        Cd15MachineTrial trial = trial("M1", "1315.44", 20000, true);
-        trial.setVehiclePlanQuantity(new BigDecimal("31.32"));
+    public void shouldAllocateVehiclesBySteelStripCurlLength() {
+        Cd15ShiftResourceState state = state(2);
+        Cd15MachineTrial trial = trial("M1", "303.8", 20000, true);
+        trial.setVehiclePlanQuantity(new BigDecimal("181.3"));
 
         Cd15ShiftCommitResult result = committer.commit(request(plan(trial)), state);
 
         assertTrue(result.isSuccess());
-        assertEquals(42, result.getTask().getVehicleCount());
-        assertEquals(new BigDecimal("1316"), result.getTask().getPlanQuantity());
+        assertEquals(2, result.getTask().getVehicleCount());
+        assertEquals(new BigDecimal("304"), result.getTask().getPlanQuantity());
     }
 
     @Test
@@ -284,6 +283,22 @@ public class Cd15ShiftResourceCommitterTest {
                 result.getTask().getBigRollConsumeQuantity());
         assertEquals(0, state.getOccupiedToolingCount());
         assertTrue(state.getTasks().isEmpty());
+    }
+
+    /** 收尾分裁量不足整车时，两路仍各占一辆小车和一个工装。 */
+    @Test
+    public void closeOutSingleSpecSplitShouldKeepActualQuantityAndUseTwoVehicles() {
+        Cd15MachineTrial trial = trial("M1", "303.8", 20000, true);
+        trial.setVehiclePlanQuantity(new BigDecimal("181.3"));
+        Cd15ShiftCommitRequest request = splitRequest("211500013", trial);
+        request.setCloseOut(true);
+
+        Cd15ShiftCommitResult result =
+                committer.commitSingleSpecSplit(request, splitState(2));
+
+        assertTrue(result.isSuccess());
+        assertEquals(new BigDecimal("303.8"), result.getTask().getPlanQuantity());
+        assertEquals(2, result.getTask().getVehicleCount());
     }
 
     /** 单规格分裁均分提交后必须把精确余量交给班次执行器。 */
