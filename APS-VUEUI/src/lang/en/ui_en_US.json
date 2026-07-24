@@ -1490,6 +1490,7 @@
   "ui.tc.schedule.releasePollTimeout": "Release is still running in the background; refresh later to check the status",
   "ui.tm.schedule.excelFactoryDateRequired": "Select a factory and schedule date",
   "ui.tm.schedule.shiftPlanQty": "Shift {shift} Plan Qty",
+  "ui.tm.schedule.planQty": " Plan Qty",
   "ui.tm.schedule.totalStockQty": "Stock Total",
   "ui.data.column.tm.scheduleResult.operationProgress": "Tread Manual Operation Progress",
   "ui.data.column.tm.scheduleResult.operationProgressHint": "The task is running in the background and can be restored after refresh",

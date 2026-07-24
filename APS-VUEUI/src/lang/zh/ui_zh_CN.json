@@ -4286,6 +4286,7 @@
   "ui.tc.schedule.releasePollTimeout": "发布仍在后台处理中，请稍后刷新查看状态",
   "ui.tm.schedule.excelFactoryDateRequired": "请选择工厂和排程日期",
   "ui.tm.schedule.shiftPlanQty": "{shift}班计划量",
+  "ui.tm.schedule.planQty": "计划量",
   "ui.tm.schedule.totalStockQty": "库存合计",
   "ui.data.column.tm.scheduleResult.operationProgress": "胎面人工操作进度",
   "ui.data.column.tm.scheduleResult.operationProgressHint": "任务正在后台执行，刷新页面后可恢复进度",
