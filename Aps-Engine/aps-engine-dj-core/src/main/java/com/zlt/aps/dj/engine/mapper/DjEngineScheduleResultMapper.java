@@ -5,8 +5,7 @@ import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.Date;
-import java.util.List;
-import java.util.Map;
+import java.util.Set;
 
 /**
  * 垫胶排程结果 Mapper
@@ -21,13 +20,15 @@ public interface DjEngineScheduleResultMapper extends CommBaseMapper<DjScheduleR
     int deleteDjSchedule(@Param("scheduleDate") String scheduleDate);
 
     /**
-     * 查询各垫胶代码最近一次有排产量的排产日期（仅查当天之前的排产记录，排除当天重排干扰）
+     * 查询指定时间窗口内有排产量的垫胶代码集合
      * @param factoryCode 工厂编码
-     * @param scheduleDate 排产日期（当天记录被排除）
-     * @param paddingCodes 垫胶代码列表
-     * @return 垫胶代码 -> 最近排产日期 的映射列表
+     * @param thresholdDate 时间窗口下限（排产日 - 新规格天数阈值）
+     * @param scheduleDate 时间窗口上限（排产日）
+     * @param paddingCodes 垫胶代码集合
+     * @return 窗口内有排产记录的垫胶代码集合
      */
-    List<Map<String, Object>> selectLastScheduleDate(@Param("factoryCode") String factoryCode,
+    Set<String> selectLastScheduleDate(@Param("factoryCode") String factoryCode,
+            @Param("thresholdDate") Date thresholdDate,
             @Param("scheduleDate") Date scheduleDate,
-            @Param("paddingCodes") List<String> paddingCodes);
+            @Param("paddingCodes") Set<String> paddingCodes);
 }
