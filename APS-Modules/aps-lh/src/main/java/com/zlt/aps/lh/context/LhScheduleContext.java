@@ -1366,6 +1366,26 @@ public class LhScheduleContext {
     }
 
     /**
+     * 累加并返回新增排产SKU本次选机日志序号。
+     * <p>物料编码与产品状态共同构成计数维度，避免同物料不同产品状态共用序号。
+     * 本方法只允许在真正写选机顺序日志前调用，局部搜索等静默分支不得调用。</p>
+     *
+     * @param sku 当前进入选机流程的SKU
+     * @return 当前SKU本次选机序号；SKU为空时返回0
+     */
+    public int nextNewSpecMachineSelectionCount(SkuScheduleDTO sku) {
+        if (Objects.isNull(sku)) {
+            return 0;
+        }
+        String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(
+                sku.getMaterialCode(), sku.getProductStatus());
+        Integer currentCount = newSpecMachineSelectionCountMap.get(skuKey);
+        int nextCount = Math.max(0, Objects.isNull(currentCount) ? 0 : currentCount) + 1;
+        newSpecMachineSelectionCountMap.put(skuKey, nextCount);
+        return nextCount;
+    }
+
+    /**
      * 将已移出待排队列的SKU同步从结构分组中剔除。
      * <p>structureSkuMap 在 S4.4 / S4.5 期间既用于顺序3结构收尾判断，也作为 SKU 兜底查询来源，
      * 因此需要与当前待排视图保持一致，避免已消费SKU继续影响后续排序与查询。</p>
