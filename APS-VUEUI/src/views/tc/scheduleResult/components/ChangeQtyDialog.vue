@@ -47,7 +47,7 @@
 </template>
 
 <script>
-import { changeQty, getManualOptions } from '@/api/tc/tcScheduleResult'
+import {changeQty, getManualOptions} from '@/api/tc/tcScheduleResult'
 
 export default {
   name: 'TcChangeQtyDialog',
@@ -115,16 +115,15 @@ export default {
         }
         this.submitting = true
         try {
-          await changeQty({
+          const task = await changeQty({
             resultId: this.row.id,
             shiftOrder: this.form.shiftOrder,
             newPlanQty: this.form.newPlanQty,
             expectedTaskVersion: this.row.taskVersion,
             reason: this.form.reason
           })
-          this.$modal.msgSuccess(this.$t('ui.tc.schedule.changeQtySuccess'))
           this.visible = false
-          this.$emit('success')
+          this.$emit('success', task)
         } finally {
           this.submitting = false
         }

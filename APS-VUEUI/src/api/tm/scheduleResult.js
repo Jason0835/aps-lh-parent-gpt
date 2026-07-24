@@ -16,7 +16,7 @@ export function saveTmScheduleResult(data) {
 }
 export function removeTmScheduleResult(query) {
   return request({
-    url: '/tm/tmScheduleResult/remove',
+    url: '/tm/tmScheduleResult/operation/remove',
     method: 'post',
     data: query
   })
@@ -66,9 +66,17 @@ export function listTmScheduleBoard(query) {
   })
 }
 
+export function listTmScheduleSummary(query) {
+  return request({
+    url: '/tm/tmScheduleResult/summary',
+    method: 'post',
+    data: query
+  })
+}
+
 export function insertTask(data) {
   return request({
-    url: '/tm/tmScheduleResult/insertTask',
+    url: '/tm/tmScheduleResult/operation/insertTask',
     method: 'post',
     data: data
   })
@@ -76,7 +84,7 @@ export function insertTask(data) {
 
 export function changeQty(data) {
   return request({
-    url: '/tm/tmScheduleResult/changeQty',
+    url: '/tm/tmScheduleResult/operation/changeQty',
     method: 'post',
     data: data
   })
@@ -84,7 +92,7 @@ export function changeQty(data) {
 
 export function batchChangeMachine(machineCode, data) {
   return request({
-    url: '/tm/tmScheduleResult/batchChangeMachine/' + machineCode,
+    url: '/tm/tmScheduleResult/operation/batchChangeMachine/' + machineCode,
     method: 'post',
     data: data
   })
@@ -100,9 +108,24 @@ export function publishValidate(ids) {
 
 export function publishScheduleResult(ids) {
   return request({
-    url: '/tm/tmScheduleResult/publish',
+    url: '/tm/tmScheduleResult/operation/publish',
     method: 'post',
     data: { ids: ids.join(',') }
+  })
+}
+
+export function getOperationTask(taskId) {
+  return request({
+    url: '/tm/tmScheduleResult/operation/task/' + taskId,
+    method: 'get'
+  })
+}
+
+export function getLatestOperationTask(query) {
+  return request({
+    url: '/tm/tmScheduleResult/operation/task/latest',
+    method: 'get',
+    params: query
   })
 }
 

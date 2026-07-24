@@ -15,5 +15,5 @@ public class TmScheduleResultExcelParseResult {
     private Date scheduleDate;
 
     /** Excel 有效明细行。 */
-    private List<TmScheduleResultExcelRow> rowList;
+    private List<TmScheduleResultVo> rowList;
 }

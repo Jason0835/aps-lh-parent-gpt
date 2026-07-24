@@ -9,10 +9,7 @@ import com.zlt.aps.tc.api.domain.entity.TcScheduleResult;
 import com.zlt.aps.tc.api.domain.entity.TcScheduleResultExplain;
 import com.zlt.aps.tc.api.domain.entity.TcScheduleUnplanned;
 import com.zlt.aps.tc.api.domain.vo.*;
-import com.zlt.aps.tc.service.ITcScheduleResultService;
-import com.zlt.aps.tc.service.TcAutoRollingApplicationService;
-import com.zlt.aps.tc.service.TcReleaseApplicationService;
-import com.zlt.aps.tc.service.TcReleaseRecoveryService;
+import com.zlt.aps.tc.service.*;
 import com.zlt.aps.tc.service.impl.TcManualScheduleApplicationService;
 import com.zlt.aps.tc.service.query.TcManualOptionsService;
 import com.zlt.aps.tc.service.query.TcScheduleBoardQueryService;
@@ -56,6 +53,9 @@ public class TcScheduleResultController extends AbstractDocBizController<TcSched
 
     @Resource
     private TcAutoRollingApplicationService tcAutoRollingApplicationService;
+
+    @Resource
+    private TcOperationTaskApplicationService tcOperationTaskApplicationService;
 
     /**
      * 校验所选胎侧结果是否允许发布。
@@ -246,6 +246,81 @@ public class TcScheduleResultController extends AbstractDocBizController<TcSched
     public AjaxResult remove(@RequestBody List<Long> resultIdList) {
         int affectedCount = this.tcManualScheduleApplicationService.remove(resultIdList);
         return AjaxResult.success(I18nUtil.getMessage("ui.tc.schedule.remove.success"), affectedCount);
+    }
+
+    /**
+     * 提交胎侧人工插单异步任务。
+     *
+     * @param requestVO 插单请求
+     * @return 初始任务
+     */
+    @ApiOperation("提交胎侧人工插单异步任务")
+    @PostMapping("/operation/insertTask")
+    public TcOperationTaskVo submitInsertTask(@RequestBody TcInsertTaskRequestVo requestVO) {
+        return this.tcOperationTaskApplicationService.submitInsert(requestVO);
+    }
+
+    /**
+     * 提交胎侧调量异步任务。
+     *
+     * @param requestVO 调量请求
+     * @return 初始任务
+     */
+    @ApiOperation("提交胎侧调量异步任务")
+    @PostMapping("/operation/changeQty")
+    public TcOperationTaskVo submitChangeQty(@RequestBody TcChangeQtyRequestVo requestVO) {
+        return this.tcOperationTaskApplicationService.submitChangeQty(requestVO);
+    }
+
+    /**
+     * 提交胎侧单条或批量转机台异步任务。
+     *
+     * @param requestVO 转机台请求
+     * @return 初始任务
+     */
+    @ApiOperation("提交胎侧转机台异步任务")
+    @PostMapping("/operation/changeMachine")
+    public TcOperationTaskVo submitChangeMachine(@RequestBody TcChangeMachineRequestVo requestVO) {
+        return this.tcOperationTaskApplicationService.submitChangeMachine(requestVO);
+    }
+
+    /**
+     * 提交胎侧删除异步任务。
+     *
+     * @param resultIdList 结果ID
+     * @return 初始任务
+     */
+    @ApiOperation("提交胎侧删除异步任务")
+    @DeleteMapping("/operation/remove")
+    public TcOperationTaskVo submitRemove(@RequestBody List<Long> resultIdList) {
+        return this.tcOperationTaskApplicationService.submitDelete(resultIdList);
+    }
+
+    /**
+     * 查询胎侧人工操作任务。
+     *
+     * @param taskId 任务编号
+     * @return 任务状态
+     */
+    @ApiOperation("查询胎侧人工操作任务")
+    @GetMapping("/operation/task/{taskId}")
+    public TcOperationTaskVo getOperationTask(@PathVariable("taskId") String taskId) {
+        return this.tcOperationTaskApplicationService.getTask(taskId);
+    }
+
+    /**
+     * 查询最近胎侧人工操作任务。
+     *
+     * @param factoryCode 工厂编码
+     * @param scheduleDate 排程日期
+     * @return 最近任务
+     */
+    @ApiOperation("查询最近胎侧人工操作任务")
+    @GetMapping("/operation/task/latest")
+    public TcOperationTaskVo getLatestOperationTask(
+            @RequestParam("factoryCode") String factoryCode,
+            @RequestParam("scheduleDate") @DateTimeFormat(pattern = "yyyy-MM-dd") Date scheduleDate) {
+        return this.tcOperationTaskApplicationService.getLatestTask(factoryCode, scheduleDate);
     }
 
     /**

@@ -15,12 +15,14 @@ import com.zlt.aps.tm.api.domain.dto.TmScheduleResultImportDTO;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
 import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleRequestVo;
 import com.zlt.aps.tm.api.domain.vo.TmInsertTaskRequestVo;
+import com.zlt.aps.tm.api.domain.vo.TmOperationTaskVo;
 import com.zlt.aps.tm.api.domain.vo.TmScheduleShiftDateVO;
 import com.zlt.aps.tm.domain.TmAutoScheduleTask;
 import com.zlt.aps.tm.mapper.TmScheduleResultMapper;
 import com.zlt.aps.tm.service.ITmScheduleResultExcelService;
 import com.zlt.aps.tm.service.ITmScheduleResultService;
 import com.zlt.aps.tm.service.TmAutoScheduleTaskService;
+import com.zlt.aps.tm.service.TmOperationTaskApplicationService;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.PubUtil;
@@ -55,6 +57,9 @@ public class TmScheduleResultController extends AbstractDocBizController<TmSched
 
     @Resource
     private TmAutoScheduleTaskService tmAutoScheduleTaskService;
+
+    @Resource
+    private TmOperationTaskApplicationService tmOperationTaskApplicationService;
 
     @Resource
     private ITmScheduleResultExcelService tmScheduleResultExcelService;
@@ -182,6 +187,23 @@ public class TmScheduleResultController extends AbstractDocBizController<TmSched
     }
 
     /**
+     * 查询排程结果合计（库存合计与各班次计划量合计）。
+     *
+     * <p>复用 {@link #builderCondition(QueryWrapper, TmScheduleResult)} 构建与列表同口径的查询条件，
+     * 汇总基于全部匹配行（非仅当前页），供排程管理页面合计条展示。</p>
+     *
+     * @param queryVO 查询条件
+     * @return 库存合计与各班次计划量合计
+     */
+    @ApiOperation("查询排程结果合计")
+    @PostMapping("/summary")
+    public AjaxResult summary(@RequestBody TmScheduleResult queryVO) {
+        QueryWrapper<TmScheduleResult> wrapper = new QueryWrapper<>();
+        this.builderCondition(wrapper, queryVO);
+        return AjaxResult.success(tmScheduleResultService.summarizeScheduleResult(wrapper));
+    }
+
+    /**
      * 人工插单。
      *
      * @param requestVo 插单请求
@@ -284,6 +306,107 @@ public class TmScheduleResultController extends AbstractDocBizController<TmSched
     @PostMapping("/publish")
     public AjaxResult publish(@RequestBody List<Long> ids) {
         return toAjax(tmScheduleResultService.publish(ids));
+    }
+
+    /**
+     * 提交胎面人工插单异步任务。
+     *
+     * @param requestVo 插单请求
+     * @return 初始任务
+     */
+    @ApiOperation("提交胎面人工插单异步任务")
+    @PostMapping("/operation/insertTask")
+    public TmOperationTaskVo submitInsertTask(@RequestBody TmInsertTaskRequestVo requestVo) {
+        return this.tmOperationTaskApplicationService.submitInsert(requestVo);
+    }
+
+    /**
+     * 提交胎面调量异步任务。
+     *
+     * @param scheduleResult 调量请求
+     * @return 初始任务
+     */
+    @ApiOperation("提交胎面调量异步任务")
+    @PostMapping("/operation/changeQty")
+    public TmOperationTaskVo submitChangeQty(@RequestBody TmScheduleResult scheduleResult) {
+        return this.tmOperationTaskApplicationService.submitChangeQty(scheduleResult);
+    }
+
+    /**
+     * 提交胎面单条转机台异步任务。
+     *
+     * @param scheduleResult 转机台请求
+     * @return 初始任务
+     */
+    @ApiOperation("提交胎面单条转机台异步任务")
+    @PostMapping("/operation/changeMachine")
+    public TmOperationTaskVo submitChangeMachine(@RequestBody TmScheduleResult scheduleResult) {
+        return this.tmOperationTaskApplicationService.submitChangeMachine(scheduleResult);
+    }
+
+    /**
+     * 提交胎面批量转机台异步任务。
+     *
+     * @param machineCode 目标机台
+     * @param scheduleResultList 转机台请求
+     * @return 初始任务
+     */
+    @ApiOperation("提交胎面批量转机台异步任务")
+    @PostMapping("/operation/batchChangeMachine/{machineCode}")
+    public TmOperationTaskVo submitBatchChangeMachine(@PathVariable("machineCode") String machineCode,
+                                                      @RequestBody List<TmScheduleResult> scheduleResultList) {
+        return this.tmOperationTaskApplicationService.submitBatchChangeMachine(machineCode, scheduleResultList);
+    }
+
+    /**
+     * 提交胎面删除异步任务。
+     *
+     * @param ids 结果ID
+     * @return 初始任务
+     */
+    @ApiOperation("提交胎面删除异步任务")
+    @DeleteMapping("/operation/remove")
+    public TmOperationTaskVo submitRemove(@RequestBody List<Long> ids) {
+        return this.tmOperationTaskApplicationService.submitDelete(ids);
+    }
+
+    /**
+     * 提交胎面发布异步任务。
+     *
+     * @param ids 结果ID
+     * @return 初始任务
+     */
+    @ApiOperation("提交胎面发布异步任务")
+    @PostMapping("/operation/publish")
+    public TmOperationTaskVo submitPublish(@RequestBody List<Long> ids) {
+        return this.tmOperationTaskApplicationService.submitPublish(ids);
+    }
+
+    /**
+     * 查询胎面人工操作任务。
+     *
+     * @param taskId 任务编号
+     * @return 任务状态
+     */
+    @ApiOperation("查询胎面人工操作任务")
+    @GetMapping("/operation/task/{taskId}")
+    public TmOperationTaskVo getOperationTask(@PathVariable("taskId") String taskId) {
+        return this.tmOperationTaskApplicationService.getTask(taskId);
+    }
+
+    /**
+     * 查询最近胎面人工操作任务。
+     *
+     * @param factoryCode 工厂编码
+     * @param scheduleDate 排程日期
+     * @return 最近任务
+     */
+    @ApiOperation("查询最近胎面人工操作任务")
+    @GetMapping("/operation/task/latest")
+    public TmOperationTaskVo getLatestOperationTask(
+            @RequestParam("factoryCode") String factoryCode,
+            @RequestParam("scheduleDate") @DateTimeFormat(pattern = "yyyy-MM-dd") Date scheduleDate) {
+        return this.tmOperationTaskApplicationService.getLatestTask(factoryCode, scheduleDate);
     }
 
     /**

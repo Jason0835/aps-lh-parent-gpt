@@ -7,6 +7,7 @@ import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.StrUtil;
 import com.alibaba.fastjson.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
@@ -14,6 +15,7 @@ import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.tm.api.constant.TmScheduleConstants;
 import com.zlt.aps.tm.api.domain.dto.TmRollingRecalcRequestDTO;
 import com.zlt.aps.tm.api.domain.entity.TmDispatcherLog;
@@ -45,6 +47,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import javax.annotation.Resource;
+import java.math.BigDecimal;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -615,6 +618,38 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
                 TmScheduleResult::getClass1Sequence, TmScheduleResult::getClass2Sequence, TmScheduleResult::getClass3Sequence,
                 TmScheduleResult::getClass4Sequence, TmScheduleResult::getClass5Sequence, TmScheduleResult::getClass6Sequence);
         return tmScheduleResultMapper.selectList(wrapper);
+    }
+
+    /**
+     * 按列表同口径汇总胎面排程结果的库存合计与各班次计划量合计。
+     *
+     * <p>查询条件由 Controller 复用 {@code builderCondition} 构建，与列表查询口径一致；
+     * 汇总基于全部匹配行（非仅当前页）。库存取 {@code sixClockStockQty}，
+     * 班次计划量通过 {@code getFieldValueByFieldName} 配合班次字段名模板动态读取，避免逐班硬编码。</p>
+     *
+     * @param wrapper 列表同口径查询条件
+     * @return 库存合计与各班次计划量合计
+     */
+    @Override
+    public TmScheduleSummaryVo summarizeScheduleResult(QueryWrapper<TmScheduleResult> wrapper) {
+        List<TmScheduleResult> resultList = tmScheduleResultMapper.selectList(wrapper);
+        BigDecimal totalStockQty = BigDecimal.ZERO;
+        // 各班次计划量合计，下标 0 对应 1 班，长度固定为最大班次序号
+        List<BigDecimal> shiftPlanQtyList = new ArrayList<>(
+                Collections.nCopies(TmScheduleConstants.TM_MAX_SHIFT_ORDER, BigDecimal.ZERO));
+        for (TmScheduleResult result : resultList) {
+            totalStockQty = totalStockQty.add(BigDecimalUtils.valueOf(result.getSixClockStockQty()));
+            for (int shiftOrder = 1; shiftOrder <= TmScheduleConstants.TM_MAX_SHIFT_ORDER; shiftOrder++) {
+                String planQtyField = String.format(TmScheduleConstants.SHIFT_PLAN_QTY_FIELD_TEMPLATE, shiftOrder);
+                Object fieldValue = result.getFieldValueByFieldName(planQtyField);
+                BigDecimal shiftPlanQty = fieldValue instanceof BigDecimal ? (BigDecimal) fieldValue : BigDecimal.ZERO;
+                shiftPlanQtyList.set(shiftOrder - 1, shiftPlanQtyList.get(shiftOrder - 1).add(shiftPlanQty));
+            }
+        }
+        TmScheduleSummaryVo summaryVo = new TmScheduleSummaryVo();
+        summaryVo.setTotalStockQty(totalStockQty);
+        summaryVo.setShiftPlanQtyList(shiftPlanQtyList);
+        return summaryVo;
     }
 
     /**

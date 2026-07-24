@@ -19,6 +19,7 @@ import com.zlt.aps.tm.engine.validator.TmInsertPositionValidator;
 import com.zlt.aps.tm.mapper.TmDispatcherLogMapper;
 import com.zlt.aps.tm.mapper.TmScheduleResultExplainMapper;
 import com.zlt.aps.tm.mapper.TmScheduleResultMapper;
+import com.zlt.aps.tm.service.TmOperationAuditContext;
 import lombok.RequiredArgsConstructor;
 import org.redisson.RedissonMultiLock;
 import org.redisson.api.RLock;
@@ -988,6 +989,9 @@ public class TmManualOperationFacade {
         dispatcherLog.setUndoStatus(deleteOperation ? UNDO_STATUS_DONE : UNDO_STATUS_NORMAL);
         dispatcherLog.setAffectedBeforeJson(JSON.toJSONString(beforeList));
         dispatcherLog.setAffectedAfterJson(JSON.toJSONString(afterList));
+        if (StrUtil.isNotBlank(TmOperationAuditContext.getOperator())) {
+            dispatcherLog.setCreateBy(TmOperationAuditContext.getOperator());
+        }
         if (tmDispatcherLogMapper.insert(dispatcherLog) != 1) {
             throw new ServiceException(this.resolveTmMessage("ui.data.alert.tm.schedule.operationFailed",
                     "人工排程操作失败"));
