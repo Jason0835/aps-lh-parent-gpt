@@ -2669,29 +2669,20 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     }
 
     /**
-     * 按排程日期匹配胶囊使用次数。
-     * <p>先找获取日期与排程日期同一天的记录；若不存在，则取获取日期距离排程日期最近的一条。</p>
+     * 按排程日期匹配胶囊使用次数，取排程日期前一天（T-1日）的记录。
      *
      * @param capsuleList  同一硫化机台下的胶囊使用次数列表
      * @param scheduleDate 排程日期
-     * @return 匹配到的胶囊使用次数
+     * @return 匹配到的胶囊使用次数，无对应记录返回null
      */
     private LhRepairCapsule matchRepairCapsuleByScheduleDate(List<LhRepairCapsule> capsuleList, Date scheduleDate) {
-        if (PubUtil.isEmpty(capsuleList)) {
+        if (PubUtil.isEmpty(capsuleList) || Objects.isNull(scheduleDate)) {
             return null;
         }
-        if (Objects.isNull(scheduleDate)) {
-            return capsuleList.stream()
-                    .filter(item -> Objects.nonNull(item.getObtainTime()))
-                    .max(Comparator.comparing(LhRepairCapsule::getObtainTime))
-                    .orElse(capsuleList.get(0));
-        }
-        Date scheduleDay = DateUtil.beginOfDay(scheduleDate);
+        Date targetDay = DateUtil.beginOfDay(DateUtil.offsetDay(scheduleDate, -1));
         return capsuleList.stream()
-                .filter(item -> Objects.nonNull(item.getObtainTime()))
-                .min(Comparator
-                        .comparing((LhRepairCapsule item) -> DateUtil.isSameDay(item.getObtainTime(), scheduleDay) ? 0 : 1)
-                        .thenComparingLong(item -> Math.abs(DateUtil.beginOfDay(item.getObtainTime()).getTime() - scheduleDay.getTime())))
+                .filter(item -> Objects.nonNull(item.getObtainTime()) && DateUtil.isSameDay(item.getObtainTime(), targetDay))
+                .findFirst()
                 .orElse(null);
     }
 
