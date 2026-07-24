@@ -706,6 +706,18 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
     }
 
     /**
+     * 查询成型机台类型
+     *
+     * @param mpStructureAllocation
+     */
+    private Map<String, String> queryMoldingMachineTypeCode(MpStructureAllocation mpStructureAllocation) {
+        LambdaQueryWrapper<MdmMoldingMachine> moldingMachineQueryWrapper = new LambdaQueryWrapper<>();
+        moldingMachineQueryWrapper.eq(MdmMoldingMachine::getFactoryCode, mpStructureAllocation.getFactoryCode());
+        return moldingMachineEntityMapper.selectList(moldingMachineQueryWrapper).stream().collect(Collectors
+                .toMap(MdmMoldingMachine::getCxMachineCode, MdmMoldingMachine::getCxMachineTypeCode, (m1, m2) -> m1));
+    }
+
+    /**
      * 查询SKU与施工（示方书）关系
      *
      * @param mpStructureAllocation
@@ -2850,7 +2862,12 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         CompletableFuture<List<MdmSkuConstructionRef>> skuConstructionRefFuture = CompletableFuture.supplyAsync(
                 () -> querySkuConstructionRef(mpStructureAllocation)
         );
-
+        // 查询成型机台类型
+        CompletableFuture<Map<String, String>> moldingMachineTypeCodeFuture = CompletableFuture.supplyAsync(
+                () -> queryMoldingMachineTypeCode(mpStructureAllocation)
+        );
+        
+        
         try {
             // 等待所有异步任务执行完成
             CompletableFuture.allOf(
@@ -2861,7 +2878,8 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                     materialConsumeDetailFuture,
                     rawSpecialMaterialRecordFuture,
                     skuStructureRefFuture,
-                    skuConstructionRefFuture
+                    skuConstructionRefFuture,
+                    moldingMachineTypeCodeFuture
             ).join();
 
             log.info("并行查询数据执行完成");
@@ -2885,6 +2903,8 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         List<RawSpecialMaterialRecord> specialMaterialList = rawSpecialMaterialRecordFuture.join();
         List<MdmSkuStructureRef> skuStructureRefList = skuStructureRefFuture.join();
         List<MdmSkuConstructionRef> skuConstructionRefList = skuConstructionRefFuture.join();
+        Map<String, String> cxMachineTypeCodeMap = moldingMachineTypeCodeFuture.join();
+        Map<String, MdmStructureLhRatio> structureLhRatioMap = this.buildStructureLhRatioMap(structureLhRatioList);
 
         for (MpStructureAllocation structure : insertList) {
             String structureName = structure.getStructureName();
@@ -2904,8 +2924,9 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
 
 
             // 设置最大胎胚种类数、最大硫化机台数
-            if (PubUtil.isNotEmpty(structureLhRatioList)) {
-                MdmStructureLhRatio mdmStructureLhRatio = structureLhRatioList.get(0);
+            MdmStructureLhRatio mdmStructureLhRatio = this.getStructureLhRatio(structure, cxMachineTypeCodeMap,
+                    structureLhRatioMap);
+            if (mdmStructureLhRatio != null) {
                 structure.setMaxEmbryoCodeCount(mdmStructureLhRatio.getMaxEmbryoQty());
                 structure.setMaxLhMachineCount(mdmStructureLhRatio.getLhMachineMaxQty());
             }
@@ -2936,6 +2957,40 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         }
     }
 
+    /**
+     * 构建结构成型硫化配比Map,key=结构+成型机类型
+     * @param structureLhRatioList
+     * @return
+     */
+    private Map<String, MdmStructureLhRatio> buildStructureLhRatioMap(List<MdmStructureLhRatio> structureLhRatioList) {
+        Map<String, MdmStructureLhRatio> structureLhRatioMap;
+        if (PubUtil.isNotEmpty(structureLhRatioList)) {
+            structureLhRatioMap = structureLhRatioList.stream().collect(Collectors.toMap(
+                    ratio -> GenerageMapKeyUtils.createMapKey(ratio.getStructureName(), ratio.getCxMachineTypeCode()),
+                    Function.identity(), (v1, v2) -> v1));
+        } else {
+            structureLhRatioMap = new HashMap<>();
+        }
+        return structureLhRatioMap;
+    }
+
+    /**
+     * 获取结构对应的成型硫化配比
+     * @param structure
+     * @param cxMachineTypeCodeMap
+     * @param structureLhRatioMap
+     * @return
+     */
+    private MdmStructureLhRatio getStructureLhRatio(MpStructureAllocation structure,
+            Map<String, String> cxMachineTypeCodeMap, Map<String, MdmStructureLhRatio> structureLhRatioMap) {
+        String cxMachineTypeCode = cxMachineTypeCodeMap.get(structure.getCxMachineCode());
+        if (StringUtils.isEmpty(cxMachineTypeCode)) {
+            return null;
+        }
+        String key = GenerageMapKeyUtils.createMapKey(structure.getStructureName(), cxMachineTypeCode);
+        return structureLhRatioMap.get(key);
+    }
+    
     /**
      * 处理结构交替类型
      *
