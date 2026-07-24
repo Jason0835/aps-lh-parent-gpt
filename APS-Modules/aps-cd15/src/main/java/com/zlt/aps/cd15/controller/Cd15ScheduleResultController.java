@@ -312,6 +312,7 @@ public class Cd15ScheduleResultController extends AbstractDocBizController<Cd15S
 
     @Override
     protected String getOrderBy() {
-        return " MACHINE_CODE ASC,BIG_ROLL_CODE ASC,CLASS1_PRODUCE_ORDER IS NULL ASC,CLASS1_PRODUCE_ORDER ASC";
+        return " MACHINE_CODE ASC,CLASS1_PRODUCE_ORDER IS NULL ASC,"
+                + "CLASS1_PRODUCE_ORDER ASC,BIG_ROLL_CODE ASC,ID ASC";
     }
 }
