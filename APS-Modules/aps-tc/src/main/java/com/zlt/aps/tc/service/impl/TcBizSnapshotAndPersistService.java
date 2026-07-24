@@ -470,6 +470,8 @@ public class TcBizSnapshotAndPersistService implements ITcSnapshotAndPersistServ
         unplanned.setBatchNo(context == null ? null : context.getBatchNo());
         unplanned.setScheduleDate(context == null ? null : context.getScheduleDate());
         if (taskDraft != null) {
+            // 保留未排任务稳定业务键，确保未排表可以与解释表关联追踪。
+            unplanned.setTaskBusinessKey(taskDraft.getBusinessKey());
             unplanned.setSidewallCode(taskDraft.getSidewallCode());
             unplanned.setGlueCode(taskDraft.getGlueCode());
             unplanned.setMouthPlateCode(taskDraft.getMouthPlateCode());
