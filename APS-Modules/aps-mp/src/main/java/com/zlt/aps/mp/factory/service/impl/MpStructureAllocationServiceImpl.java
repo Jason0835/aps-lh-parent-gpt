@@ -838,8 +838,6 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
     public List<MdmStructureLhRatio> queryMdmStructureLhRatio(MpStructureAllocation mpStructureAllocation) {
         LambdaQueryWrapper<MdmStructureLhRatio> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(MdmStructureLhRatio::getFactoryCode, mpStructureAllocation.getFactoryCode());
-        queryWrapper.eq(StringUtils.isNotEmpty(mpStructureAllocation.getStructureName()),
-                MdmStructureLhRatio::getStructureName, mpStructureAllocation.getStructureName());
         return mdmStructureLhRatioEntityMapper.selectList(queryWrapper);
     }
 
@@ -2929,6 +2927,9 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             if (mdmStructureLhRatio != null) {
                 structure.setMaxEmbryoCodeCount(mdmStructureLhRatio.getMaxEmbryoQty());
                 structure.setMaxLhMachineCount(mdmStructureLhRatio.getLhMachineMaxQty());
+            } else {
+                structure.setMaxEmbryoCodeCount(0);
+                structure.setMaxLhMachineCount(0);
             }
 
             // 设置实单最低硫化机台数
