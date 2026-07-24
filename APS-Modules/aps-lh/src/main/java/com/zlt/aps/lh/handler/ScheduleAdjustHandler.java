@@ -154,11 +154,12 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         pruneSharedEmbryoZeroSurplusSkus(context);
 
         /*
-         * S4.3.3.2 冻结当前3天、8班窗口可全部收尾的结构，并按月计划结构类型读取最低机台数。
-         * 必须在续作/新增分类前完成，后续结构待排视图会随着SKU出队而动态缩小，不能再作为全量结构快照。
+         * S4.3.3.2 冻结全部有效结构并按月计划结构类型读取最低机台数。
+         * 本规则不再依赖“3天内收尾”标记；必须在续作/新增分类前完成，因为后续待排结构视图会随
+         * SKU出队动态缩小，而真实下机判断必须始终能够找到当前SKU的原始结构配置。
          */
         if (Objects.nonNull(structureMinMachineRetentionService)) {
-            structureMinMachineRetentionService.initializeEligibleStructures(context);
+            structureMinMachineRetentionService.initializeStructureMinimumMachineConfigs(context);
         }
 
         // S4.3.4 区分续作SKU和新增SKU
@@ -1921,6 +1922,12 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         // 第二轮才沿用既有物料降级，避免未知状态机台抢占后续可精确匹配的S/T/X月计划SKU。
         assignContinuousSkus(context, skuByMaterialMap, continuousTemplateMap, continuousSkuList, true);
 
+        /*
+         * 续作识别完成后、进入S4.4续作排产前，先拦截完整判断范围无日计划量的
+         * 试制、量试SKU。过滤后列表保持原顺序，后续续作机台、加减机台和数量账本不做额外分支。
+         */
+        filterContinuousTrialDailyPlanAdmission(context, continuousSkuList);
+
         for (List<SkuScheduleDTO> skuList : context.getStructureSkuMap().values()) {
             for (SkuScheduleDTO sku : skuList) {
                 if (StringUtils.equals(ScheduleTypeEnum.CONTINUOUS.getCode(), sku.getScheduleType())) {
@@ -1947,7 +1954,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
 
         // 遍历完成后统一清理，避免修改正在遍历的结构SKU集合。
         for (SkuScheduleDTO blockedSku : blockedDailyPlanSkuList) {
-            cleanupBlockedNewSku(context, blockedSku,
+            cleanupBlockedSku(context, blockedSku,
                     PendingSkuUnscheduledRule.DAILY_PLAN_ADMISSION_UNSCHEDULED_REASON);
         }
 
@@ -1978,7 +1985,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * @param sku 被拦截的SKU
      * @param reason 未排原因，用于胎胚活跃集合清理日志
      */
-    private void cleanupBlockedNewSku(LhScheduleContext context, SkuScheduleDTO sku, String reason) {
+    private void cleanupBlockedSku(LhScheduleContext context, SkuScheduleDTO sku, String reason) {
         if (Objects.isNull(context) || Objects.isNull(sku)) {
             return;
         }
@@ -1988,6 +1995,92 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         context.getAllSkuScheduleDtoMap().remove(MonthPlanDateResolver.buildMaterialStatusKey(
                 sku.getMaterialCode(), sku.getProductStatus()));
         getTargetScheduleQtyResolver().removeActiveEmbryoSku(context, sku, reason);
+    }
+
+    /**
+     * 过滤完整准入范围无日计划量的续作试制、量试SKU。
+     * <p>同一物料和产品状态可能因多台续作机台形成多个SKU副本，本方法只评估
+     * 和写入一次未排，再按复合键移除全部副本，避免重复未排和残留续作入口。</p>
+     *
+     * @param context 排程上下文
+     * @param continuousSkuList 续作SKU列表
+     */
+    private void filterContinuousTrialDailyPlanAdmission(LhScheduleContext context,
+                                                         List<SkuScheduleDTO> continuousSkuList) {
+        if (Objects.isNull(context) || CollectionUtils.isEmpty(continuousSkuList)) {
+            return;
+        }
+        Set<String> evaluatedSkuKeySet = new HashSet<String>(8);
+        Map<String, SkuScheduleDTO> blockedSkuMap = new LinkedHashMap<String, SkuScheduleDTO>(8);
+        Map<String, LhUnscheduledResult> blockedResultMap =
+                new LinkedHashMap<String, LhUnscheduledResult>(8);
+        for (SkuScheduleDTO sku : continuousSkuList) {
+            if (Objects.isNull(sku)) {
+                continue;
+            }
+            String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(
+                    sku.getMaterialCode(), sku.getProductStatus());
+            if (!evaluatedSkuKeySet.add(skuKey)) {
+                continue;
+            }
+            LhUnscheduledResult unscheduledResult =
+                    PendingSkuUnscheduledRule.evaluateContinuousTrialDailyPlanAdmission(context, sku);
+            if (Objects.isNull(unscheduledResult)) {
+                continue;
+            }
+            blockedSkuMap.put(skuKey, sku);
+            blockedResultMap.put(skuKey, unscheduledResult);
+        }
+        if (CollectionUtils.isEmpty(blockedSkuMap)) {
+            return;
+        }
+
+        // 先移除所有同键续作副本，确保S4.4及加减机台链路不再获取被拦截SKU。
+        Iterator<SkuScheduleDTO> iterator = continuousSkuList.iterator();
+        while (iterator.hasNext()) {
+            SkuScheduleDTO sku = iterator.next();
+            String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(
+                    sku.getMaterialCode(), sku.getProductStatus());
+            if (!blockedSkuMap.containsKey(skuKey)) {
+                continue;
+            }
+            sku.setTargetScheduleQty(0);
+            sku.setRemainingScheduleQty(0);
+            iterator.remove();
+        }
+
+        // 每个物料+产品状态只保留一条未排，并统一清理结构、胎胚和后置索引。
+        for (Map.Entry<String, SkuScheduleDTO> entry : blockedSkuMap.entrySet()) {
+            appendOrReplaceUnscheduledResult(context, blockedResultMap.get(entry.getKey()));
+            cleanupBlockedSku(context, entry.getValue(),
+                    PendingSkuUnscheduledRule.CONTINUOUS_TRIAL_DAILY_PLAN_ADMISSION_UNSCHEDULED_REASON);
+        }
+    }
+
+    /**
+     * 按物料和产品状态写入或替换未排结果。
+     * <p>准入拦截是当前SKU最终不进入排产主链的原因，若前置阶段已生成同键未排，
+     * 则保持列表位置并替换为本次准入结果，避免同一SKU重复落库。</p>
+     *
+     * @param context 排程上下文
+     * @param unscheduledResult 未排结果
+     */
+    private void appendOrReplaceUnscheduledResult(LhScheduleContext context,
+                                                  LhUnscheduledResult unscheduledResult) {
+        if (Objects.isNull(context) || Objects.isNull(unscheduledResult)) {
+            return;
+        }
+        for (int index = 0; index < context.getUnscheduledResultList().size(); index++) {
+            LhUnscheduledResult existing = context.getUnscheduledResultList().get(index);
+            if (Objects.nonNull(existing)
+                    && StringUtils.equals(existing.getMaterialCode(), unscheduledResult.getMaterialCode())
+                    && StringUtils.equals(StringUtils.trimToEmpty(existing.getProductStatus()),
+                    StringUtils.trimToEmpty(unscheduledResult.getProductStatus()))) {
+                context.getUnscheduledResultList().set(index, unscheduledResult);
+                return;
+            }
+        }
+        context.getUnscheduledResultList().add(unscheduledResult);
     }
 
 

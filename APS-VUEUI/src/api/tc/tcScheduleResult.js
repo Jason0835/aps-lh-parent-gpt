@@ -42,7 +42,7 @@ export function getManualOptions(query) {
 
 export function insertTask(query) {
   return request({
-    url: '/tc/tcScheduleResult/insertTask',
+    url: '/tc/tcScheduleResult/operation/insertTask',
     method: 'post',
     headers: { 'Content-Type': 'application/json;charset=UTF-8' },
     data: query
@@ -51,7 +51,7 @@ export function insertTask(query) {
 
 export function changeQty(query) {
   return request({
-    url: '/tc/tcScheduleResult/changeQty',
+    url: '/tc/tcScheduleResult/operation/changeQty',
     method: 'post',
     headers: { 'Content-Type': 'application/json;charset=UTF-8' },
     data: query
@@ -60,7 +60,7 @@ export function changeQty(query) {
 
 export function changeMachine(query) {
   return request({
-    url: '/tc/tcScheduleResult/changeMachine',
+    url: '/tc/tcScheduleResult/operation/changeMachine',
     method: 'post',
     headers: { 'Content-Type': 'application/json;charset=UTF-8' },
     data: query
@@ -69,10 +69,25 @@ export function changeMachine(query) {
 
 export function removeScheduleResult(resultIdList) {
   return request({
-    url: '/tc/tcScheduleResult/remove',
+    url: '/tc/tcScheduleResult/operation/remove',
     method: 'delete',
     headers: { 'Content-Type': 'application/json;charset=UTF-8' },
     data: resultIdList
+  })
+}
+
+export function getOperationTask(taskId) {
+  return request({
+    url: `/tc/tcScheduleResult/operation/task/${taskId}`,
+    method: 'get'
+  })
+}
+
+export function getLatestOperationTask(query) {
+  return request({
+    url: '/tc/tcScheduleResult/operation/task/latest',
+    method: 'get',
+    params: query
   })
 }
 

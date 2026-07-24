@@ -15,6 +15,7 @@ import com.zlt.common.utils.StringUtil;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 日产能限制抽象类
@@ -285,6 +286,13 @@ public abstract class AbstractDailyCapacityLimit {
         String day2Field = FactoryConstant.DAY_FIELD + (iDay +1 > FactoryConstant.MONTH_MAX_DAY ? FactoryConstant.MONTH_MAX_DAY:iDay +1);
         String embryoFieldValue;
         dailyCapacityLimitVo.getEmbryoCodes().clear();
+        Map<String, Long> embryoCodePreDayCountMap = mpProdFinalList.stream()
+                .filter(vo -> vo != null && vo.getFieldValueByFieldName(getEmbryoCodeField()) != null
+                        && vo.getFieldValueByFieldName(day1Field) != null && (Integer) vo.getFieldValueByFieldName(day1Field) > 0)
+                .collect(Collectors.groupingBy(
+                        vo -> (String) vo.getFieldValueByFieldName(getEmbryoCodeField()),
+                        Collectors.counting()
+                ));
         for (BaseEntity mpFinalVo: mpProdFinalList){
             // 日硫化量 = 单模硫化量 * 2；
             dailyLhQty = getDayVulcanizationQty(mpFinalVo);
@@ -341,11 +349,14 @@ public abstract class AbstractDailyCapacityLimit {
                 // 取整(日计划量/日单台硫化量)
                 fullMachinesAddMould += addFullMachines(mpFinalVo, day1Field, dailyLhQty, dayPlanQty);
                 // 统计有余数的SKU个数
-                int[]addMouldArr = getAddMouldMachines(mpFinalVo,dailyLhQty,paramMap,dayField,day1Field,day2Field);
+                int[]addMouldArr = getAddMouldMachines(mpFinalVo,dailyLhQty,paramMap,dayField,day1Field,day2Field,embryoCodePreDayCountMap);
                 openMachinesAddMould += addMouldArr[0];
                 blockMachinesAddMould += addMouldArr[1];
                 // 统计换模次数(区别于addMouldArr[0]，主要是将收尾的排除)
                 iChangeMouldCount += addMouldArr[2];
+                if (addMouldArr[3] > 0){
+                    fullMachinesAddMould -= addMouldArr[3];
+                }
                 // 计算主花纹向下的硫化机台数
                 if (mpFinalVo.getFieldValueByFieldName(getMainPatternField()) != null &&
                         mpFinalVo.getFieldValueByFieldName(getMainPatternField()).equals(mainPattern)){
@@ -584,19 +595,23 @@ public abstract class AbstractDailyCapacityLimit {
      * [0]--新增模机台数
      * [1]--换活字块机台数20条
      * [2]--换模次数
+     * [3]--多扣的机台数
      * @param mpFinalVo
      */
-    public int[] getAddMouldMachines(BaseEntity mpFinalVo,Integer dailyLhQty,Map<String,Object> paramMap,String dayField,String day1Field,String day2Field) {
+    public int[] getAddMouldMachines(BaseEntity mpFinalVo,Integer dailyLhQty,Map<String,Object> paramMap,String dayField,String day1Field,String day2Field,Map<String, Long> embryoCodePreDayCountMap) {
         //增模台数：有余数(日计划量/日单台硫化量)，记1台
         // 日计划量
         Integer dayPlanQty = (Integer) mpFinalVo.getFieldValueByFieldName(dayField);
         //换模起排量
         int changeMouldFirstQty = (Integer) paramMap.get(MonthPlanEnums.CHANGE_MOULD_FIRST_QTY.getCode());
-        //换活字块20条
+        //换活字块32条
         int changeMouldBlockQty = (Integer) paramMap.get(MonthPlanEnums.CHANGE_TYPE_BLOCK_QTY.getCode());
+        // 特殊换模，8->32
+        String embryoCode = (String) mpFinalVo.getFieldValueByFieldName(getEmbryoCodeField());
+        boolean bSpecialChangeMould = embryoCodePreDayCountMap != null && embryoCodePreDayCountMap.get(embryoCode) != null && embryoCodePreDayCountMap.get(embryoCode) > 0;
         //余量
         int remainQty = dayPlanQty % dailyLhQty;
-        int[] resultArr = {0,0,0};
+        int[] resultArr = {0,0,0,0};
         if (remainQty == 0){
             //没有余量，直接退回
             return resultArr;
@@ -611,7 +626,7 @@ public abstract class AbstractDailyCapacityLimit {
             int iDiffCount = curMachines - preMachines;
             int iDiffValue = dayPlanQty - prePlanQty;
             //解析差异机台数
-            analysisDiffMachines(iDiffCount, iDiffValue, changeMouldBlockQty, changeMouldFirstQty, resultArr);
+            analysisDiffMachines(iDiffCount, iDiffValue, changeMouldBlockQty, changeMouldFirstQty, resultArr, bSpecialChangeMould);
             if (iDiffCount ==0 && curMachines == 1 && dayPlanQty < dailyLhQty ){
                 //例子：32 	42
                 resultArr[0] = 1;
@@ -621,9 +636,39 @@ public abstract class AbstractDailyCapacityLimit {
             return resultArr;
         }
 
+        if ((mpFinalVo.getFieldValueByFieldName(day1Field) == null || day1Field.equals(dayField))
+                && mpFinalVo.getFieldValueByFieldName(day2Field) != null){
+            //今天起模，日硫化量60，例子：
+            //96 180
+            //换活字块3次（32+32+32）
+            //64 128
+            //32 68
+            int nextPlanQty = (Integer) mpFinalVo.getFieldValueByFieldName(day2Field);
+            //不向上取整
+            int nextMachines = nextPlanQty / dailyLhQty;
+            if (nextMachines <=0){
+                //32 18
+                nextMachines = 1;
+            }
+            int curMachines = dayPlanQty / dailyLhQty;
+            int iDiffCount = nextMachines;
+            int iDiffValue = dayPlanQty;
+            //解析差异机台数
+            analysisDiffMachines(iDiffCount, iDiffValue, changeMouldBlockQty, changeMouldFirstQty, resultArr,bSpecialChangeMould);
+            //设置换模次数
+            resultArr[2] = iDiffCount;
+            //多扣的机台数
+            resultArr[3] = curMachines;
+            return resultArr;
+        }
+
         if (remainQty == changeMouldBlockQty){
-            //若余数 == 换活字块20条
-            resultArr[1] = 1;
+            //若余数 == 换活字块32条
+            if (bSpecialChangeMould){
+                resultArr[0] = 1;
+            }else{
+                resultArr[1] = 1;
+            }
             resultArr[2] = 1;
         }else if (remainQty == changeMouldFirstQty) {
             resultArr[0] = 1;
@@ -687,7 +732,7 @@ public abstract class AbstractDailyCapacityLimit {
      * @param resultArr 拆解返回值
      * @return
      */
-    private static void analysisDiffMachines(int  iDiffCount, int iDiffValue, int changeMouldBlockQty, int changeMouldFirstQty, int[] resultArr) {
+    private static void analysisDiffMachines(int  iDiffCount, int iDiffValue, int changeMouldBlockQty, int changeMouldFirstQty, int[] resultArr,boolean bSpecialChangeMould) {
         if (iDiffCount <= 0){
             return;
         }
@@ -696,7 +741,12 @@ public abstract class AbstractDailyCapacityLimit {
             case 1:
                 if (iDiffValue >= changeMouldBlockQty){
                     //32
-                    resultArr[1] = 1;
+                    if (bSpecialChangeMould){
+                        resultArr[0] = 1;
+                    }else {
+                        resultArr[1] = 1;
+                    }
+
                 }else{
                     //8
                     resultArr[0] = 1;
@@ -705,11 +755,21 @@ public abstract class AbstractDailyCapacityLimit {
             case 2:
                 if (iDiffValue >= 2 * changeMouldBlockQty){
                     //32+32
-                    resultArr[1] = 2;
+                    if (bSpecialChangeMould){
+                        resultArr[0] = 2;
+                    }else{
+                        resultArr[1] = 2;
+                    }
+
                 }else if (iDiffValue >= changeMouldBlockQty + changeMouldFirstQty){
                     //32+8
-                    resultArr[0] = 1;
-                    resultArr[1] = 1;
+                    if (bSpecialChangeMould){
+                        resultArr[0] = 2;
+                    }else{
+                        resultArr[0] = 1;
+                        resultArr[1] = 1;
+                    }
+
                 }else{
                     //8+8
                     resultArr[0] = 2;
@@ -718,15 +778,29 @@ public abstract class AbstractDailyCapacityLimit {
             case 3:
                 if (iDiffValue >= 3 * changeMouldBlockQty){
                     //32+32+32
-                    resultArr[1] = 3;
+                    if (bSpecialChangeMould){
+                        resultArr[0] = 3;
+                    }else{
+                        resultArr[1] = 3;
+                    }
+
                 }else if (iDiffValue >= 2 * changeMouldBlockQty + changeMouldFirstQty){
                     //32+32+8
-                    resultArr[0] = 1;
-                    resultArr[1] = 2;
+                    if (bSpecialChangeMould){
+                        resultArr[0] = 3;
+                    }else{
+                        resultArr[0] = 1;
+                        resultArr[1] = 2;
+                    }
+
                 }else if (iDiffValue >= changeMouldBlockQty + changeMouldFirstQty){
                     //32+8+8
-                    resultArr[0] = 2;
-                    resultArr[1] = 1;
+                    if (bSpecialChangeMould){
+                        resultArr[0] = 3;
+                    }else{
+                        resultArr[0] = 2;
+                        resultArr[1] = 1;
+                    }
                 }else{
                     //8+8+8
                     resultArr[0] = 3;

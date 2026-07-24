@@ -1,5 +1,6 @@
 package com.zlt.aps.tm.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.zlt.aps.tm.api.domain.dto.TmRollingRecalcRequestDTO;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
 import com.zlt.aps.tm.api.domain.vo.*;
@@ -111,6 +112,17 @@ public interface ITmScheduleResultService extends IDocService<TmScheduleResult> 
      * @return 看板结果列表
      */
     List<TmScheduleResult> listBoard(TmScheduleResult query);
+
+    /**
+     * 按列表同口径汇总胎面排程结果的库存合计与各班次计划量合计。
+     *
+     * <p>传入的查询条件由 Controller 复用 {@code builderCondition} 构建，与列表查询口径一致，
+     * 汇总基于全部匹配行（非仅当前页），供排程管理页面合计条展示。</p>
+     *
+     * @param wrapper 列表同口径查询条件
+     * @return 库存合计与各班次计划量合计
+     */
+    TmScheduleSummaryVo summarizeScheduleResult(QueryWrapper<TmScheduleResult> wrapper);
 
     /**
      * 插入人工插单排程结果。

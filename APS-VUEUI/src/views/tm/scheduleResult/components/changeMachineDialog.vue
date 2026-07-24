@@ -82,9 +82,8 @@ export default {
         const result = await batchChangeMachine(params.machineCode, {
           selects: JSON.stringify(this.tableRows),
         });
-        if (result.code == 200) {
-          this.$modal.msgSuccess(this.$t("common.message.success"));
-          this.$emit("success");
+        if (result && result.taskId) {
+          this.$emit("success", result);
           this.hide();
         }
 

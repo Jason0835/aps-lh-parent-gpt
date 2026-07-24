@@ -11,6 +11,9 @@ public enum TmAutoScheduleIssueCategoryEnum {
     /** 未匹配到施工信息。 */
     CONSTRUCTION_MISSING("CONSTRUCTION_MISSING", "未匹配到施工信息"),
 
+    /** 缺少库存快照。 */
+    STOCK_MISSING("STOCK_MISSING", "缺少库存快照"),
+
     /** 部分排程结果持久化失败。 */
     PERSIST_PARTIAL_FAILED("PERSIST_PARTIAL_FAILED", "部分排程结果持久化失败");
 

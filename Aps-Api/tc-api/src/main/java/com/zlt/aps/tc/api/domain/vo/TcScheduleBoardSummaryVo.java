@@ -6,6 +6,8 @@ import lombok.Data;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * 胎侧排程看板汇总。
@@ -27,4 +29,16 @@ public class TcScheduleBoardSummaryVo implements Serializable {
     /** 已排结果数。 */
     @ApiModelProperty(value = "已排结果数")
     private Long resultCount = 0L;
+
+    /** 库存合计（六点库存汇总）。 */
+    @ApiModelProperty(value = "库存合计")
+    private BigDecimal totalStockQty = BigDecimal.ZERO;
+
+    /**
+     * 各班次计划量合计列表。
+     *
+     * <p>下标 0 对应 1 班，依此类推至 6 班；长度固定为 {@code TcScheduleConstants.TC_MAX_SHIFT_ORDER}。</p>
+     */
+    @ApiModelProperty(value = "各班次计划量合计")
+    private List<BigDecimal> shiftPlanQtyList = new ArrayList<>();
 }

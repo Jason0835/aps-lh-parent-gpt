@@ -101,7 +101,7 @@
 </template>
 
 <script>
-import { getManualOptions, insertTask } from '@/api/tc/tcScheduleResult'
+import {getManualOptions, insertTask} from '@/api/tc/tcScheduleResult'
 
 const formatDate = date => {
   const year = date.getFullYear()
@@ -222,7 +222,7 @@ export default {
         }
         this.submitting = true
         try {
-          await insertTask({
+          const task = await insertTask({
             factoryCode: this.form.factoryCode,
             scheduleDate: this.form.scheduleDate,
             machineCode: this.form.machineCode,
@@ -231,9 +231,8 @@ export default {
             shiftList,
             reason: this.form.reason
           })
-          this.$modal.msgSuccess(this.$t('ui.tc.schedule.insertSuccess'))
           this.visible = false
-          this.$emit('success')
+          this.$emit('success', task)
         } finally {
           this.submitting = false
         }

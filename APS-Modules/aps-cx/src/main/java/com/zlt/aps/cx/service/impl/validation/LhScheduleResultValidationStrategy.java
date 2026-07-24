@@ -34,7 +34,8 @@ public class LhScheduleResultValidationStrategy extends BaseValidationStrategy {
             "MOULD_QTY",
             "SINGLE_MOULD_SHIFT_QTY",
             "CONSTRUCTION_STAGE",
-            "PRODUCTION_VERSION"
+            "PRODUCTION_VERSION",
+            "PRODUCT_STATUS"
     ));
 
     @Override
@@ -92,6 +93,7 @@ public class LhScheduleResultValidationStrategy extends BaseValidationStrategy {
             checkNumericField(r.getSingleMouldShiftQty(), "SINGLE_MOULD_SHIFT_QTY", materialCode, missingCountMap, missingSampleMap);
             checkField(r.getConstructionStage(), "CONSTRUCTION_STAGE", materialCode, missingCountMap, missingSampleMap);
             checkField(r.getProductionVersion(), "PRODUCTION_VERSION", materialCode, missingCountMap, missingSampleMap);
+            checkField(r.getProductStatus(), "PRODUCT_STATUS", materialCode, missingCountMap, missingSampleMap);
         }
 
         boolean hasError = false;
@@ -400,9 +402,7 @@ public class LhScheduleResultValidationStrategy extends BaseValidationStrategy {
         if (value == null || value.trim().isEmpty()) {
             missingCountMap.merge(field, 1, Integer::sum);
             List<String> samples = missingSampleMap.get(field);
-            if (samples.size() < 5) {
-                samples.add(materialCode);
-            }
+            samples.add(materialCode);
         }
     }
 
@@ -412,9 +412,7 @@ public class LhScheduleResultValidationStrategy extends BaseValidationStrategy {
         if (value == null || value <= 0) {
             missingCountMap.merge(field, 1, Integer::sum);
             List<String> samples = missingSampleMap.get(field);
-            if (samples.size() < 5) {
-                samples.add(materialCode + "(当前值:" + value + ")");
-            }
+            samples.add(materialCode + "(当前值:" + value + ")");
         }
     }
 
@@ -446,6 +444,7 @@ public class LhScheduleResultValidationStrategy extends BaseValidationStrategy {
         if (isBlank(record.getMainMaterialDesc())) return false;
         if (isBlank(record.getConstructionStage())) return false;
         if (isBlank(record.getProductionVersion())) return false;
+        if (isBlank(record.getProductStatus())) return false;
         // 数值字段：null或<=0视为无效
         if (record.getLhTime() == null || record.getLhTime() <= 0) return false;
         if (record.getMouldQty() == null || record.getMouldQty() <= 0) return false;

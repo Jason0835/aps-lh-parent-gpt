@@ -116,6 +116,68 @@ public interface ITcScheduleResultRemoteService {
     @DeleteMapping("/tcScheduleResult/remove")
     AjaxResult remove(@RequestBody List<Long> resultIdList);
 
+    /**
+     * 提交胎侧人工插单异步任务。
+     *
+     * @param requestVO 插单请求
+     * @return 初始任务
+     */
+    @ApiOperation("提交胎侧人工插单异步任务")
+    @PostMapping("/tcScheduleResult/operation/insertTask")
+    TcOperationTaskVo submitInsertTask(@RequestBody TcInsertTaskRequestVo requestVO);
+
+    /**
+     * 提交胎侧调量异步任务。
+     *
+     * @param requestVO 调量请求
+     * @return 初始任务
+     */
+    @ApiOperation("提交胎侧调量异步任务")
+    @PostMapping("/tcScheduleResult/operation/changeQty")
+    TcOperationTaskVo submitChangeQty(@RequestBody TcChangeQtyRequestVo requestVO);
+
+    /**
+     * 提交胎侧单条或批量转机台异步任务。
+     *
+     * @param requestVO 转机台请求
+     * @return 初始任务
+     */
+    @ApiOperation("提交胎侧转机台异步任务")
+    @PostMapping("/tcScheduleResult/operation/changeMachine")
+    TcOperationTaskVo submitChangeMachine(@RequestBody TcChangeMachineRequestVo requestVO);
+
+    /**
+     * 提交胎侧删除异步任务。
+     *
+     * @param resultIdList 结果ID
+     * @return 初始任务
+     */
+    @ApiOperation("提交胎侧删除异步任务")
+    @DeleteMapping("/tcScheduleResult/operation/remove")
+    TcOperationTaskVo submitRemove(@RequestBody List<Long> resultIdList);
+
+    /**
+     * 查询胎侧人工操作任务。
+     *
+     * @param taskId 任务编号
+     * @return 任务状态
+     */
+    @ApiOperation("查询胎侧人工操作任务")
+    @GetMapping("/tcScheduleResult/operation/task/{taskId}")
+    TcOperationTaskVo getOperationTask(@PathVariable("taskId") String taskId);
+
+    /**
+     * 查询最近胎侧人工操作任务。
+     *
+     * @param factoryCode 工厂编码
+     * @param scheduleDate 排程日期
+     * @return 最近任务
+     */
+    @ApiOperation("查询最近胎侧人工操作任务")
+    @GetMapping("/tcScheduleResult/operation/task/latest")
+    TcOperationTaskVo getLatestOperationTask(@RequestParam("factoryCode") String factoryCode,
+                                             @RequestParam("scheduleDate") String scheduleDate);
+
     // ===== 自动排程 =====
 
     /**

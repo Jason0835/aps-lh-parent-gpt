@@ -5,6 +5,8 @@ import com.zlt.aps.common.engine.schedule.MachineShiftTaskChain;
 import com.zlt.aps.common.engine.schedule.ScheduleOperationContext;
 import com.zlt.aps.common.engine.schedule.ScheduleTaskLinkedList;
 import com.zlt.aps.common.engine.schedule.ScheduleTaskNode;
+import com.zlt.aps.common.engine.schedule.constraint.ScheduleConstraintCalculator;
+import com.zlt.aps.common.engine.schedule.constraint.ScheduleTaskConstraint;
 import com.zlt.aps.tm.api.constant.TmScheduleConstants;
 import com.zlt.aps.tm.engine.domain.manual.*;
 import org.springframework.stereotype.Service;
@@ -30,6 +32,9 @@ public class TmManualRollingEngineService {
 
     /** 转机台拆分结果分组前缀 */
     private static final String MOVE_GROUP_PREFIX = "MOVE:";
+
+    /** 胎面、胎侧共用排程约束纯计算器 */
+    private final ScheduleConstraintCalculator constraintCalculator = new ScheduleConstraintCalculator();
 
     /**
      * 执行一批人工滚动命令。
@@ -83,6 +88,7 @@ public class TmManualRollingEngineService {
         for (TmManualRollingScope scope : scopeList) {
             taskList = this.repackMachine(taskList, scope, context, unplannedTaskList);
         }
+        taskList = this.applyToolLimit(taskList, context, unplannedTaskList);
 
         MachineShiftTaskChain<TmManualTaskDraft> taskChainGroup = this.buildTaskChains(taskList, context);
         this.validateResult(taskList, unplannedTaskList, taskChainGroup, context,
@@ -352,6 +358,8 @@ public class TmManualRollingEngineService {
         int fragmentIndex = 1;
         for (int shiftOrder = startShiftOrder; shiftOrder <= TmScheduleConstants.TM_MAX_SHIFT_ORDER; shiftOrder++) {
             final int currentShiftOrder = shiftOrder;
+            BigDecimal shiftCapacity = this.resolveShiftCapacity(context, scope.getMachineCode(),
+                    currentShiftOrder, machineCapacity);
             List<TmManualTaskDraft> currentShiftTaskList = repackedTaskList.stream()
                     .filter(task -> Objects.equals(scope.getMachineCode(), task.getMachineCode()))
                     .filter(task -> Objects.equals(currentShiftOrder, task.getShiftOrder()))
@@ -360,25 +368,46 @@ public class TmManualRollingEngineService {
             BigDecimal usedCapacity = currentShiftTaskList.stream()
                     .map(TmManualTaskDraft::getPlanQty).map(this::nvl)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
-            BigDecimal remainCapacity = machineCapacity.subtract(usedCapacity).max(BigDecimal.ZERO);
+            TmManualTaskDraft predecessorTask = this.findPredecessorTask(
+                    repackedTaskList, context, scope.getMachineCode(), currentShiftOrder);
+            BigDecimal existingSwitchCapacityDeduct = this.calculateSwitchCapacityDeduct(
+                    currentShiftTaskList, predecessorTask, context);
             int nextSequence = currentShiftTaskList.size() + 1;
-            while (!rollingQueue.isEmpty() && remainCapacity.compareTo(BigDecimal.ZERO) > 0) {
+            while (!rollingQueue.isEmpty()) {
                 TmManualTaskDraft currentTask = rollingQueue.get(0);
                 if (currentTask.getMinimumShiftOrder() != null
                         && shiftOrder < currentTask.getMinimumShiftOrder()) {
                     break;
                 }
-                rollingQueue.remove(0);
                 BigDecimal currentPlanQty = this.nvl(currentTask.getPlanQty());
-                BigDecimal assignedQty = currentPlanQty.min(remainCapacity);
+                currentTask.setMachineSpeed(context.getMachineSpecSpeedMap().getOrDefault(
+                        scope.getMachineCode() + "|" + currentTask.getTreadCode(), currentTask.getMachineSpeed()));
+                TmManualTaskDraft mergeTarget = this.findSameGroupTask(repackedTaskList,
+                        scope.getMachineCode(), shiftOrder, currentTask.getResultGroupKey());
+                TmManualTaskDraft previousTask = this.findLastTask(currentShiftTaskList);
+                if (previousTask == null) {
+                    previousTask = predecessorTask;
+                }
+                BigDecimal currentSwitchCapacityDeduct = mergeTarget == null
+                        ? this.calculateTransitionCapacityDeduct(
+                        previousTask, currentTask, context)
+                        : BigDecimal.ZERO;
+                BigDecimal maintenanceCapacityDeduct = this.resolveMaintenanceCapacityDeduct(
+                        context, scope.getMachineCode(), currentShiftOrder, currentTask.getMachineSpeed());
+                BigDecimal availablePlanCapacity = this.constraintCalculator.calculateRemainCapacity(
+                        shiftCapacity.subtract(maintenanceCapacityDeduct).max(BigDecimal.ZERO),
+                        usedCapacity, existingSwitchCapacityDeduct.add(currentSwitchCapacityDeduct));
+                if (availablePlanCapacity.compareTo(BigDecimal.ZERO) <= 0) {
+                    break;
+                }
+                rollingQueue.remove(0);
+                BigDecimal assignedQty = currentPlanQty.min(availablePlanCapacity);
                 if (this.nvl(currentTask.getFinishQty()).compareTo(assignedQty) > 0) {
                     assignedQty = this.nvl(currentTask.getFinishQty());
                 }
                 if (assignedQty.compareTo(BigDecimal.ZERO) <= 0) {
                     break;
                 }
-                TmManualTaskDraft mergeTarget = this.findSameGroupTask(repackedTaskList,
-                        scope.getMachineCode(), shiftOrder, currentTask.getResultGroupKey());
                 if (mergeTarget == null) {
                     TmManualTaskDraft assignedTask = currentTask.copy();
                     assignedTask.setShiftOrder(shiftOrder);
@@ -387,12 +416,14 @@ public class TmManualRollingEngineService {
                     assignedTask.setFinishQty(this.nvl(currentTask.getFinishQty()).min(assignedQty));
                     assignedTask.setOperationPriority(false);
                     repackedTaskList.add(assignedTask);
+                    currentShiftTaskList.add(assignedTask);
                 } else {
                     mergeTarget.setPlanQty(this.nvl(mergeTarget.getPlanQty()).add(assignedQty));
                     mergeTarget.setFinishQty(this.nvl(mergeTarget.getFinishQty())
                             .add(this.nvl(currentTask.getFinishQty()).min(assignedQty)));
                 }
-                remainCapacity = remainCapacity.subtract(assignedQty).max(BigDecimal.ZERO);
+                usedCapacity = usedCapacity.add(assignedQty);
+                existingSwitchCapacityDeduct = existingSwitchCapacityDeduct.add(currentSwitchCapacityDeduct);
                 BigDecimal overflowQty = currentPlanQty.subtract(assignedQty);
                 if (overflowQty.compareTo(BigDecimal.ZERO) > 0) {
                     TmManualTaskDraft carryTask = currentTask.copy();
@@ -412,6 +443,170 @@ public class TmManualRollingEngineService {
             }
         }
         return repackedTaskList;
+    }
+
+    /**
+     * 按维修小时和当前任务机台速度计算维修产能扣减。
+     *
+     * @param context 人工滚动上下文
+     * @param machineCode 机台编码
+     * @param shiftOrder 班次顺序
+     * @param machineSpeed 当前任务机台速度
+     * @return 维修产能扣减；未维护维修时长或速度时返回 0
+     */
+    private BigDecimal resolveMaintenanceCapacityDeduct(TmManualRollingContext context, String machineCode,
+                                                        Integer shiftOrder, BigDecimal machineSpeed) {
+        BigDecimal maintenanceHours = context.getMaintenanceHoursMap().get(machineCode + "|" + shiftOrder);
+        if (maintenanceHours == null || machineSpeed == null) {
+            return BigDecimal.ZERO;
+        }
+        return maintenanceHours.max(BigDecimal.ZERO).multiply(machineSpeed.max(BigDecimal.ZERO));
+    }
+
+    /**
+     * 解析机台班次有效基础产能。
+     *
+     * @param context 人工滚动上下文
+     * @param machineCode 机台编码
+     * @param shiftOrder 班次顺序
+     * @param machineCapacity 机台最大班产
+     * @return 班次有效基础产能；未单独维护时返回机台最大班产
+     */
+    private BigDecimal resolveShiftCapacity(TmManualRollingContext context, String machineCode,
+                                            Integer shiftOrder, BigDecimal machineCapacity) {
+        BigDecimal shiftCapacity = context.getShiftCapacityMap().get(machineCode + "|" + shiftOrder);
+        return shiftCapacity == null ? machineCapacity : shiftCapacity;
+    }
+
+    /**
+     * 计算班次当前完整任务链的切换产能扣减。
+     *
+     * @param taskList 班次有序任务
+     * @param predecessorTask 班次开始前的前置任务
+     * @param context 人工滚动上下文
+     * @return 全部相邻任务切换扣减合计
+     */
+    private BigDecimal calculateSwitchCapacityDeduct(List<TmManualTaskDraft> taskList,
+                                                     TmManualTaskDraft predecessorTask,
+                                                     TmManualRollingContext context) {
+        BigDecimal totalCapacityDeduct = BigDecimal.ZERO;
+        TmManualTaskDraft previousTask = predecessorTask;
+        for (TmManualTaskDraft currentTask : taskList) {
+            totalCapacityDeduct = totalCapacityDeduct.add(
+                    this.calculateTransitionCapacityDeduct(previousTask, currentTask, context));
+            previousTask = currentTask;
+        }
+        return totalCapacityDeduct;
+    }
+
+    /**
+     * 查找指定班次开始前的同机台链尾任务。
+     *
+     * @param taskList 当前重装箱任务
+     * @param context 人工滚动上下文
+     * @param machineCode 机台编码
+     * @param shiftOrder 班次顺序
+     * @return 前一班链尾；一班没有当日前置时返回前日链尾
+     */
+    private TmManualTaskDraft findPredecessorTask(List<TmManualTaskDraft> taskList,
+                                                  TmManualRollingContext context,
+                                                  String machineCode,
+                                                  Integer shiftOrder) {
+        return taskList.stream()
+                .filter(task -> Objects.equals(machineCode, task.getMachineCode()))
+                .filter(task -> task.getShiftOrder() != null && task.getShiftOrder() < shiftOrder)
+                .max(Comparator.comparing(TmManualTaskDraft::getShiftOrder)
+                        .thenComparing(task -> this.defaultSequence(task.getSequence())))
+                .orElse(context.getPredecessorTaskMap().get(machineCode));
+    }
+
+    /**
+     * 计算两个相邻胎面任务的切换产能。
+     *
+     * @param previousTask 前置任务
+     * @param currentTask 当前任务
+     * @param context 人工滚动上下文
+     * @return 相邻任务切换产能扣减
+     */
+    private BigDecimal calculateTransitionCapacityDeduct(TmManualTaskDraft previousTask,
+                                                         TmManualTaskDraft currentTask,
+                                                         TmManualRollingContext context) {
+        return this.constraintCalculator.calculateTransition(this.toConstraintTask(previousTask),
+                this.toConstraintTask(currentTask), context.getConstraintConfig()).getTotalCapacityDeduct();
+    }
+
+    /**
+     * 将胎面人工任务映射为共用约束快照。
+     *
+     * @param task 胎面人工任务
+     * @return 共用约束快照；任务为空时返回空
+     */
+    private ScheduleTaskConstraint toConstraintTask(TmManualTaskDraft task) {
+        if (task == null) {
+            return null;
+        }
+        ScheduleTaskConstraint constraintTask = new ScheduleTaskConstraint();
+        constraintTask.setSpecCode(task.getTreadCode());
+        constraintTask.setGlueCode(task.getGlueCode());
+        constraintTask.setMachineSpeed(task.getMachineSpeed());
+        return constraintTask;
+    }
+
+    /**
+     * 获取当前班次任务链尾任务。
+     *
+     * @param taskList 班次有序任务
+     * @return 链尾任务；空链返回空
+     */
+    private TmManualTaskDraft findLastTask(List<TmManualTaskDraft> taskList) {
+        return taskList == null || taskList.isEmpty() ? null : taskList.get(taskList.size() - 1);
+    }
+
+    /**
+     * 按当前批次全局可用工装限制已排任务，并将工装溢出量转为未排。
+     *
+     * @param taskList 当前已排任务
+     * @param context 人工滚动上下文
+     * @param unplannedTaskList 未排任务收集器
+     * @return 应用工装限制后的已排任务
+     */
+    private List<TmManualTaskDraft> applyToolLimit(List<TmManualTaskDraft> taskList,
+                                                   TmManualRollingContext context,
+                                                   List<TmManualTaskDraft> unplannedTaskList) {
+        if (context.getInitialAvailableToolQty() == null) {
+            return taskList;
+        }
+        BigDecimal availableToolQty = context.getInitialAvailableToolQty().max(BigDecimal.ZERO);
+        List<TmManualTaskDraft> sortedTaskList = taskList.stream()
+                .sorted(Comparator.comparing(TmManualTaskDraft::getShiftOrder)
+                        .thenComparing(TmManualTaskDraft::getMachineCode)
+                        .thenComparing(task -> this.defaultSequence(task.getSequence())))
+                .collect(Collectors.toList());
+        List<TmManualTaskDraft> limitedTaskList = new ArrayList<>();
+        for (TmManualTaskDraft task : sortedTaskList) {
+            BigDecimal originalPlanQty = this.nvl(task.getPlanQty());
+            BigDecimal limitedPlanQty = this.constraintCalculator.limitPlanQtyByTool(
+                    originalPlanQty, availableToolQty, task.getCurlRollLength());
+            limitedPlanQty = limitedPlanQty.max(this.nvl(task.getFinishQty())).min(originalPlanQty);
+            if (limitedPlanQty.compareTo(BigDecimal.ZERO) > 0) {
+                TmManualTaskDraft limitedTask = task.copy();
+                limitedTask.setPlanQty(limitedPlanQty);
+                limitedTaskList.add(limitedTask);
+                availableToolQty = availableToolQty.subtract(
+                        this.constraintCalculator.calculateToolUsedQty(
+                                limitedPlanQty, task.getCurlRollLength())).max(BigDecimal.ZERO);
+            }
+            BigDecimal overflowQty = originalPlanQty.subtract(limitedPlanQty).max(BigDecimal.ZERO);
+            if (overflowQty.compareTo(BigDecimal.ZERO) > 0) {
+                TmManualTaskDraft overflowTask = task.copy();
+                overflowTask.setTaskId(task.getTaskId() + ":TOOL");
+                overflowTask.setPlanQty(overflowQty);
+                overflowTask.setFinishQty(BigDecimal.ZERO);
+                overflowTask.setCarryoverTask(true);
+                unplannedTaskList.add(overflowTask);
+            }
+        }
+        return limitedTaskList;
     }
 
     /**

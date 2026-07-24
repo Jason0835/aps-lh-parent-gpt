@@ -43,8 +43,6 @@ public class TcManualMachineRuleValidator {
 
     private final TcScheduleResultMapper scheduleResultMapper;
 
-    private final TcParamsMapper paramsMapper;
-
     /**
      * 构造人工转机台校验器。
      *
@@ -57,7 +55,6 @@ public class TcManualMachineRuleValidator {
      * @param specifyMachineMapper 定点与禁排 Mapper
      * @param djSharedMachineMapper 胎侧垫胶共机 Mapper
      * @param scheduleResultMapper 排程结果 Mapper
-     * @param paramsMapper 胎侧参数 Mapper
      */
     public TcManualMachineRuleValidator(TcMachineInfoMapper machineInfoMapper,
                                         TcShiftConfigMapper shiftConfigMapper,
@@ -67,8 +64,7 @@ public class TcManualMachineRuleValidator {
                                         TcGlueMachineRealMapper glueMachineRealMapper,
                                         TcSpecifyMachineMapper specifyMachineMapper,
                                         TcDjSharedMachineMapper djSharedMachineMapper,
-                                        TcScheduleResultMapper scheduleResultMapper,
-                                        TcParamsMapper paramsMapper) {
+                                        TcScheduleResultMapper scheduleResultMapper) {
         this.machineInfoMapper = machineInfoMapper;
         this.shiftConfigMapper = shiftConfigMapper;
         this.machineMaintenanceMapper = machineMaintenanceMapper;
@@ -78,7 +74,6 @@ public class TcManualMachineRuleValidator {
         this.specifyMachineMapper = specifyMachineMapper;
         this.djSharedMachineMapper = djSharedMachineMapper;
         this.scheduleResultMapper = scheduleResultMapper;
-        this.paramsMapper = paramsMapper;
     }
 
     /**
@@ -170,11 +165,16 @@ public class TcManualMachineRuleValidator {
         }
         LambdaQueryWrapper<TcMouthPlate> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(TcMouthPlate::getFactoryCode, sourceResult.getFactoryCode());
-        wrapper.eq(TcMouthPlate::getMouthPlateCode, sourceResult.getMouthPlateCode());
+        wrapper.eq(TcMouthPlate::getMachineCode, targetMachineCode);
         List<TcMouthPlate> mouthPlateList = this.mouthPlateMapper.selectList(wrapper);
-        boolean targetMatched = mouthPlateList != null && mouthPlateList.stream()
-                .anyMatch(item -> Objects.equals(item.getMachineCode(), targetMachineCode)
-                        && "1".equals(item.getPlateStatus()));
+        List<TcMouthPlate> enabledMouthPlateList = mouthPlateList == null
+                ? Collections.emptyList()
+                : mouthPlateList.stream()
+                .filter(item -> "1".equals(item.getPlateStatus()))
+                .collect(Collectors.toList());
+        // 目标机台没有有效口型板配置时表示不限制；存在配置时才按本机白名单校验。
+        boolean targetMatched = enabledMouthPlateList.isEmpty() || enabledMouthPlateList.stream()
+                .anyMatch(item -> Objects.equals(item.getMouthPlateCode(), sourceResult.getMouthPlateCode()));
         if (!targetMatched) {
             throw new ServiceException(I18nUtil.getMessage("ui.tc.schedule.changeMachine.mouthPlateRejected"));
         }
@@ -194,6 +194,7 @@ public class TcManualMachineRuleValidator {
         List<TcGlueMachineReal> ruleList = this.glueMachineRealMapper.selectList(wrapper);
         List<TcGlueMachineReal> relevantRuleList = ruleList == null ? Collections.emptyList()
                 : ruleList.stream().filter(item -> Objects.equals(item.getGlueCode(), sourceResult.getGlueCode()))
+                .filter(item -> "0".equals(item.getAllowFlag()) || "1".equals(item.getAllowFlag()))
                 .filter(item -> StringUtils.isBlank(item.getBaseGlueCode())
                         || Objects.equals(item.getBaseGlueCode(), sourceResult.getBaseGlueCode()))
                 .filter(item -> StringUtils.isBlank(item.getShiftCode())
@@ -203,10 +204,12 @@ public class TcManualMachineRuleValidator {
         }
         List<TcGlueMachineReal> targetRuleList = relevantRuleList.stream()
                 .filter(item -> Objects.equals(item.getMachineCode(), targetMachineCode)).collect(Collectors.toList());
+        if (targetRuleList.isEmpty()) {
+            return;
+        }
         boolean forbidden = targetRuleList.stream().anyMatch(item -> "0".equals(item.getAllowFlag()));
-        boolean hasAllowRule = relevantRuleList.stream().anyMatch(item -> "1".equals(item.getAllowFlag()));
         boolean allowed = targetRuleList.stream().anyMatch(item -> "1".equals(item.getAllowFlag()));
-        if (forbidden || hasAllowRule && !allowed) {
+        if (forbidden || !allowed) {
             throw new ServiceException(I18nUtil.getMessage("ui.tc.schedule.changeMachine.glueRejected"));
         }
     }
@@ -361,7 +364,7 @@ public class TcManualMachineRuleValidator {
     }
 
     /**
-     * 计算单机单班扣除参数上限和维修停机后的有效产能。
+     * 计算单机单班扣除维修停机后的有效产能。
      *
      * @param sourceResult 排程结果参考
      * @param targetMachineCode 目标机台编码
@@ -373,9 +376,8 @@ public class TcManualMachineRuleValidator {
                                                   TcShiftConfig shiftConfig, TcMachineInfo machineInfo) {
         BigDecimal machineCapacity = machineInfo.getMaxCapacity() == null
                 || machineInfo.getMaxCapacity().compareTo(BigDecimal.ZERO) <= 0
-                ? new BigDecimal(TcScheduleConstants.DEFAULT_SHIFT_MAX_CAPACITY) : machineInfo.getMaxCapacity();
-        BigDecimal shiftLimit = this.loadShiftCapacityLimit(sourceResult);
-        BigDecimal effectiveCapacity = machineCapacity.min(shiftLimit);
+                ? new BigDecimal(TcScheduleConstants.DEFAULT_MACHINE_MAX_CAPACITY) : machineInfo.getMaxCapacity();
+        BigDecimal effectiveCapacity = machineCapacity;
         BigDecimal maintenanceHours = this.loadMaintenanceHours(sourceResult, targetMachineCode,
                 shiftConfig.getShiftCode());
         BigDecimal productSpeed = this.loadProductSpeed(sourceResult, targetMachineCode);
@@ -388,42 +390,6 @@ public class TcManualMachineRuleValidator {
             effectiveCapacity = BigDecimal.ZERO;
         }
         return effectiveCapacity;
-    }
-
-    /**
-     * 读取排程日生效的胎侧单班最大可排量参数。
-     *
-     * @param sourceResult 排程结果
-     * @return 生效参数值，未配置或无效时返回 5500 米默认值
-     */
-    private BigDecimal loadShiftCapacityLimit(TcScheduleResult sourceResult) {
-        LambdaQueryWrapper<TcParams> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(TcParams::getFactoryCode, sourceResult.getFactoryCode());
-        wrapper.eq(TcParams::getParamCode, TcScheduleConstants.PARAM_SHIFT_MAX_CAPACITY);
-        wrapper.eq(TcParams::getEnableStatus, "1");
-        List<TcParams> paramsList = this.paramsMapper.selectList(wrapper);
-        if (paramsList == null) {
-            return new BigDecimal(TcScheduleConstants.DEFAULT_SHIFT_MAX_CAPACITY);
-        }
-        return paramsList.stream().map(item -> StringUtils.isNotBlank(item.getParamValue())
-                        ? item.getParamValue() : item.getDefaultValue())
-                .filter(StringUtils::isNotBlank).map(this::parsePositiveCapacity)
-                .filter(value -> value.compareTo(BigDecimal.ZERO) > 0).findFirst()
-                .orElseGet(() -> new BigDecimal(TcScheduleConstants.DEFAULT_SHIFT_MAX_CAPACITY));
-    }
-
-    /**
-     * 将参数文本解析为正数产能。
-     *
-     * @param value 参数文本
-     * @return 解析值，格式非法时返回 0
-     */
-    private BigDecimal parsePositiveCapacity(String value) {
-        try {
-            return new BigDecimal(value.trim());
-        } catch (NumberFormatException exception) {
-            return BigDecimal.ZERO;
-        }
     }
 
     /**

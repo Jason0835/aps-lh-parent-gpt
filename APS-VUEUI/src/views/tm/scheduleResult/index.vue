@@ -1,5 +1,12 @@
 <template>
   <basic-container>
+    <div class="summary-bar">
+      <span>{{ $t('ui.tm.schedule.totalStockQty') }}：{{ summary.totalStockQty || 0 }}</span>
+      <span
+        v-for="(planQty, index) in shiftPlanQtyList"
+        :key="index"
+      >{{ $t('ui.tm.schedule.shiftPlanQty', { shift: index + 1 }) }}：{{ planQty || 0 }}</span>
+    </div>
     <page-table
       tableRef="tmScheduleResultMainTable"
       :calcHeight="true"
@@ -21,29 +28,31 @@
         <el-button
           type="warning"
           v-hasPermi="['tm:tmScheduleResult:autoPlan']"
+          :disabled="writeTaskRunning"
           @click="handleAutoPlan"
         >{{ $t("ui.data.column.scheduleResult.autoPlan") }}</el-button>
         <el-button
           type="warning"
           v-hasPermi="['tm:tmScheduleResult:add']"
+          :disabled="writeTaskRunning"
           @click="handleAdd"
         >{{ $t("ui.data.column.scheduleResult.insertOrder") }}</el-button>
         <el-button
           v-hasPermi="['tm:tmScheduleResult:edit']"
-          :disabled="selection.length !== 1"
+          :disabled="writeTaskRunning || selection.length !== 1"
           type="warning"
           @click="handleChangeQty"
         >{{ $t("ui.data.column.scheduleResult.changePlan") }}</el-button>
         <el-button
           v-hasPermi="['tm:tmScheduleResult:changeMachine']"
-          :disabled="selection.length === 0"
+          :disabled="writeTaskRunning || selection.length === 0"
           type="primary"
           @click="handleChangeMachine"
         >{{ $t("ui.data.column.scheduleResult.changeMachine") }}</el-button>
         <el-button
           type="danger"
           v-hasPermi="['tm:tmScheduleResult:remove']"
-          :disabled="selection.length == 0"
+          :disabled="writeTaskRunning || selection.length == 0"
           @click="handleDeleteAll"
         >{{ $t("ui.frame.btn.delete") }}</el-button>
         <el-button
@@ -54,17 +63,18 @@
         <el-button
           type="primary"
           v-hasPermi="['tm:tmScheduleResult:import']"
+          :disabled="writeTaskRunning"
           @click="handleImport"
         >{{ $t("ui.frame.btn.import") }}</el-button>
         <el-button
           type="primary"
-          :disabled="selection.length === 0"
+          :disabled="writeTaskRunning || selection.length === 0"
           v-hasPermi="['tm:tmScheduleResult:publish']"
           @click="handlePublish"
         >{{ $t("ui.data.column.scheduleResult.publish") }}</el-button>
         <el-button
           v-hasRole="['admin']"
-          :disabled="selection.length === 0"
+          :disabled="writeTaskRunning || selection.length === 0"
           type="primary"
           @click="handleChangeReleaseStatus"
         >{{ $t("ui.data.column.scheduleResult.changeReleaseStatus") }}</el-button>
@@ -82,8 +92,8 @@
       uploadUrl="/tm/tmScheduleResult/importDataCust"
     ></tlt-upload-form>
     <autoPlanDialog ref="autoPlanRef" @success="handleAutoPlanSuccess" />
-    <infoDialog ref="infoRef" :machine-options="machines" @success="getList" />
-    <changeMachineDialog ref="changeMachineRef" @success="getList" />
+    <infoDialog ref="infoRef" :machine-options="machines" @success="handleOperationTask" />
+    <changeMachineDialog ref="changeMachineRef" @success="handleOperationTask" />
     <releaseStatusDialog ref="releaseStatusRef" @success="getList" />
     <el-dialog
       :close-on-click-modal="false"
@@ -107,6 +117,29 @@
       />
       <div style="margin-top:10px;color:#909399;font-size:12px;text-align:center;">
         {{ autoPlanProgressHint }}
+      </div>
+    </el-dialog>
+    <el-dialog
+      :close-on-click-modal="false"
+      :close-on-press-escape="false"
+      :show-close="false"
+      :title="$t('ui.data.column.tm.scheduleResult.operationProgress')"
+      :visible.sync="operationProgressVisible"
+      append-to-body
+      width="420px"
+    >
+      <div style="text-align:center;margin-bottom:12px;color:#606266;font-size:14px;">
+        {{ operationProgressStage }}
+      </div>
+      <el-progress
+        :percentage="operationProgressValue"
+        :status="operationProgressStatus"
+        :stroke-width="18"
+        :text-inside="true"
+        text-color="#fff"
+      />
+      <div style="margin-top:10px;color:#909399;font-size:12px;text-align:center;">
+        {{ $t("ui.data.column.tm.scheduleResult.operationProgressHint") }}
       </div>
     </el-dialog>
     <el-dialog
@@ -135,8 +168,11 @@ import {downloadLink} from "@/utils/request";
 import {
   getAutoPlanTask,
   getLatestAutoPlanTask,
+  getLatestOperationTask,
+  getOperationTask,
   listScheduleShiftDates,
   listTmScheduleResult,
+  listTmScheduleSummary,
   publishScheduleResult,
   publishValidate,
   removeTmScheduleResult,
@@ -182,6 +218,7 @@ export default {
       loading: false,
       data: [],
       selection: [],
+      summary: {},
       page: {
         current: 1,
         pageSize: 20,
@@ -217,6 +254,14 @@ export default {
       autoPlanProgressHint: "",
       autoPlanIssueVisible: false,
       autoPlanIssues: [],
+      operationTimer: null,
+      operationPollTimes: 0,
+      maxOperationPollTimes: 120,
+      operationRunning: false,
+      operationProgressVisible: false,
+      operationProgressValue: 0,
+      operationProgressStage: "",
+      operationProgressStatus: null,
       dateList: [
         { shift: 1, shiftType: "night", shiftDate: "" },
         { shift: 2, shiftType: "morning", shiftDate: "" },
@@ -231,6 +276,13 @@ export default {
     ...mapState({
       machines: (state) => state.tm.machines,
     }),
+    writeTaskRunning() {
+      return this.operationRunning || this.autoPlanProgressVisible;
+    },
+    // 各班次计划量合计列表，后端返回下标 0=1班，长度 6；为空时回退为空数组避免渲染异常
+    shiftPlanQtyList() {
+      return (this.summary && this.summary.shiftPlanQtyList) || [];
+    },
     // 导入弹窗列配置放在 computed 中，确保 this.dict 已初始化（data() 执行时字典 mixin 尚未注入 dict）
     importColumns() {
       return [
@@ -584,6 +636,7 @@ export default {
       }
     },
     handleAdd() {
+      if (this.writeTaskRunning) return;
       if (this.$refs.infoRef) {
         this.$refs.infoRef.show({
           factoryCode: this.query.factoryCode || this.search.factoryCode || "116",
@@ -704,10 +757,91 @@ export default {
     },
     // 转机台弹窗
     handleChangeMachine() {
+      if (this.writeTaskRunning) return;
       if (this.$refs.changeMachineRef) {
         let row = this.selection;
         this.$refs.changeMachineRef.show(row);
       }
+    },
+    handleOperationTask(task) {
+      if (!task || !task.taskId) {
+        return;
+      }
+      this.pollOperationTask(task.taskId, task);
+    },
+    pollOperationTask(taskId, initialTask) {
+      this.clearOperationTimer();
+      this.operationPollTimes = 0;
+      this.operationRunning = true;
+      this.operationProgressVisible = true;
+      this.operationProgressValue = Number((initialTask && initialTask.progress) || 0);
+      this.operationProgressStage = (initialTask && (initialTask.currentStageName || initialTask.currentStage)) || "";
+      this.operationProgressStatus = null;
+      const poll = () => {
+        getOperationTask(taskId).then(task => {
+          this.operationPollTimes += 1;
+          this.operationProgressValue = Math.min(100, Math.max(0, Number(task.progress || 0)));
+          this.operationProgressStage = task.currentStageName || task.currentStage || "";
+          if (task.taskStatus === "SUCCESS") {
+            this.clearOperationTimer();
+            this.operationRunning = false;
+            this.operationProgressValue = 100;
+            this.operationProgressStatus = "success";
+            this.$modal.msgSuccess(this.$t("ui.data.column.tm.scheduleResult.operationSuccess"));
+            this.getList();
+            window.setTimeout(() => { this.closeOperationProgress(); }, 600);
+            return;
+          }
+          if (task.taskStatus === "FAILED") {
+            this.clearOperationTimer();
+            this.operationRunning = false;
+            this.operationProgressStatus = "exception";
+            this.$modal.msgError(task.message || this.$t("ui.data.column.tm.scheduleResult.operationFailed"));
+            window.setTimeout(() => { this.closeOperationProgress(); }, 3000);
+            return;
+          }
+          if (this.operationPollTimes >= this.maxOperationPollTimes) {
+            this.clearOperationTimer();
+            this.operationRunning = false;
+            this.operationProgressStatus = "exception";
+            this.$modal.msgWarning(this.$t("ui.data.column.tm.scheduleResult.operationTimeout"));
+            window.setTimeout(() => { this.closeOperationProgress(); }, 3000);
+            return;
+          }
+          this.operationTimer = window.setTimeout(poll, 3000);
+        }).catch(() => {
+          this.clearOperationTimer();
+          this.operationRunning = false;
+          this.operationProgressStatus = "exception";
+          this.$modal.msgWarning(this.$t("ui.data.column.tm.scheduleResult.operationTimeout"));
+          window.setTimeout(() => { this.closeOperationProgress(); }, 3000);
+        });
+      };
+      poll();
+    },
+    clearOperationTimer() {
+      if (this.operationTimer) {
+        window.clearTimeout(this.operationTimer);
+        this.operationTimer = null;
+      }
+    },
+    closeOperationProgress() {
+      this.operationProgressVisible = false;
+      this.operationProgressValue = 0;
+      this.operationProgressStage = "";
+      this.operationProgressStatus = null;
+    },
+    restoreLatestOperationTask() {
+      const factoryCode = this.query.factoryCode || this.search.factoryCode;
+      const scheduleDate = this.query.scheduleDate || this.search.scheduleDate;
+      if (!factoryCode || !scheduleDate) {
+        return;
+      }
+      getLatestOperationTask({ factoryCode, scheduleDate }).then(task => {
+        if (task && task.taskId && (task.taskStatus === "PENDING" || task.taskStatus === "RUNNING")) {
+          this.pollOperationTask(task.taskId, task);
+        }
+      }).catch(() => {});
     },
     // 更改发布状态弹窗
     handleChangeReleaseStatus() {
@@ -717,21 +851,20 @@ export default {
     },
     // 调量入口：复用编辑弹窗，由弹窗根据编辑状态调用调量接口。
     handleChangeQty() {
+      if (this.writeTaskRunning) return;
       if (this.$refs.infoRef && this.selection.length === 1) {
         this.$refs.infoRef.show(this.selection[0]);
       }
     },
     // 发布入口：先校验再标记待发布，真实 MES 发布由后续发布流程接入。
     handlePublish() {
+      if (this.writeTaskRunning) return;
       const ids = this.selection.map((item) => item.id);
       this.$confirm(this.$t("ui.biz.alter.makeSurePublish"), {
         type: "warning",
       }).then(() => {
         publishValidate(ids).then(() => {
-          publishScheduleResult(ids).then((data) => {
-            this.$modal.msgSuccess(data.msg);
-            this.getList();
-          });
+          publishScheduleResult(ids).then(task => this.handleOperationTask(task));
         });
       });
     },
@@ -741,18 +874,19 @@ export default {
       }
     },
     handleDelete(row) {
+      if (this.writeTaskRunning) return;
       this.$confirm(this.$t("common.confirm.delete"), {
         type: "warning",
       }).then(() => {
         const ids = row.id;
-        removeTmScheduleResult({ ids }).then((data) => {
-          this.$modal.msgSuccess(data.msg);
+        removeTmScheduleResult({ ids }).then((task) => {
           this.$set(this.page, "current", 1);
-          this.getList();
+          this.handleOperationTask(task);
         });
       });
     },
     handleDeleteAll() {
+      if (this.writeTaskRunning) return;
       let ids = "";
       for (let i = 0; i < this.selection.length; i++) {
         if (i == this.selection.length - 1) {
@@ -764,10 +898,9 @@ export default {
       this.$confirm(this.$t("common.confirm.delete"), {
         type: "warning",
       }).then(() => {
-        removeTmScheduleResult({ ids }).then((data) => {
-          this.$modal.msgSuccess(data.msg);
+        removeTmScheduleResult({ ids }).then((task) => {
           this.$set(this.page, "current", 1);
-          this.getList();
+          this.handleOperationTask(task);
         });
       });
     },
@@ -853,6 +986,9 @@ export default {
         const data = await listTmScheduleResult(this.formatParams());
         this.data = data.rows;
         this.page.total = data.total;
+        // 合计基于查询条件下全部匹配行，与列表同口径，单独调用合计接口
+        const summary = await listTmScheduleSummary(this.formatParams(false));
+        this.summary = summary || {};
       } catch (error) {
         console.error(error);
       } finally {
@@ -875,12 +1011,14 @@ export default {
     };
     this.getList();
     this.restoreLatestAutoPlanTask();
+    this.restoreLatestOperationTask();
   },
   activated() {
     // this.getList();
   },
   beforeDestroy() {
     this.clearAutoPlanTimer();
+    this.clearOperationTimer();
   },
 };
 </script>
@@ -888,5 +1026,15 @@ export default {
 .more-btn {
   margin: 2px 0;
   width: 100%;
+}
+.summary-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  margin-bottom: 10px;
+  padding: 10px 14px;
+  color: #606266;
+  background: #f5f7fa;
+  border-radius: 4px;
 }
 </style>

@@ -9,7 +9,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
@@ -46,6 +49,7 @@ import com.zlt.aps.dj.mapper.DjDayFinishQtyMapper;
 import com.zlt.aps.dj.mapper.DjScheduleResultMapper;
 import com.zlt.aps.dj.mapper.DjSpecifyMachineMapper;
 import com.zlt.aps.dj.model.DjAdjustScheduleContext;
+import com.zlt.aps.dj.model.ScheduleDateGroup;
 import com.zlt.aps.dj.service.DjDispatcherLogService;
 import com.zlt.aps.dj.service.DjMachineInfoService;
 import com.zlt.aps.dj.service.DjScheduleResultService;
@@ -199,8 +203,16 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
         String factoryCode = insertVO.getFactoryCode();
         String machineCode = insertVO.getMachineCode();
 
-        // 根据首班班次计算实际排产日期（取代前端直接传入的 scheduleDate）
-        Date scheduleDate = this.calculateInsertScheduleDate(insertVO);
+        // 2.1.1 计算排产日期分组（支持跨排产日拆分多笔记录）
+        List<ScheduleDateGroup> dateGroups = this.calculateInsertScheduleDateGroups(insertVO);
+        if (dateGroups.isEmpty()) {
+            log.warn("插单排产日期计算为空");
+            return AjaxResult.error(I18nUtil.getMessage("ui.message.data.error"));
+        }
+
+        // 取第一组排产日期为主日，用于校验和顺延
+        ScheduleDateGroup firstGroup = dateGroups.get(0);
+        Date scheduleDate = firstGroup.getScheduleDate();
         insertVO.setScheduleDate(scheduleDate);
 
         // 1. 公共数据预加载
@@ -218,7 +230,7 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
             return paramCheck;
         }
 
-        // 确定目标班次和顺位
+        // 确定目标班次和顺位（基于第一组）
         int targetClass = resolveTargetClass(insertVO);
         int targetSeq = resolveTargetSequence(insertVO, targetClass);
 
@@ -237,7 +249,7 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
 
         // 第一档：插单量 ≤ 剩余产能（定额 - 当班原有计划量），无产能问题直接执行插单
         if (capacityResult.isWithinQuota()) {
-            return executeInsertInternal(insertVO, targetClass, targetSeq, ctx);
+            return executeInsertInternalWithGroups(insertVO, targetClass, targetSeq, ctx, dateGroups);
         }
 
         // 第三档：插单量 > 实际剩余产能（定额 - 已生产量），超当班剩余产能，拒绝插单
@@ -247,8 +259,7 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
         }
 
         // 第二档在 insertOrderValidate 中已处理，用户确认后直接执行
-        // 若走到这里说明未经过前置校验或前置已确认，直接执行插单
-        return executeInsertInternal(insertVO, targetClass, targetSeq, ctx);
+        return executeInsertInternalWithGroups(insertVO, targetClass, targetSeq, ctx, dateGroups);
     }
 
     /**
@@ -269,8 +280,15 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
      */
     @Override
     public AjaxResult insertOrderValidate(DjScheduleResult insertVO) {
-        // 2.1.1 根据首班班次计算实际排产日期（取代前端直接传入的 scheduleDate）
-        Date scheduleDate = this.calculateInsertScheduleDate(insertVO);
+        // 2.1.1 计算排产日期分组，取第一组排产日用于校验
+        List<ScheduleDateGroup> dateGroups = this.calculateInsertScheduleDateGroups(insertVO);
+        if (dateGroups.isEmpty()) {
+            log.warn("插单排产日期计算为空");
+            return AjaxResult.error(I18nUtil.getMessage("ui.message.data.error"));
+        }
+
+        ScheduleDateGroup firstGroup = dateGroups.get(0);
+        Date scheduleDate = firstGroup.getScheduleDate();
         insertVO.setScheduleDate(scheduleDate);
 
         String factoryCode = insertVO.getFactoryCode();
@@ -282,7 +300,7 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
             return lockedCheck;
         }
 
-        // 2.1.2 排程计划存在性校验：使用计算后的实际排产日期
+        // 2.1.2 排程计划存在性校验：使用计算后的第一个排产日
         AjaxResult scheduleExistCheck = this.checkScheduleExists(factoryCode, scheduleDate, machineCode);
         if (scheduleExistCheck != null) {
             return scheduleExistCheck;
@@ -325,8 +343,15 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
         String factoryCode = insertVO.getFactoryCode();
         String machineCode = insertVO.getMachineCode();
 
-        // 根据首班班次计算实际排产日期
-        Date scheduleDate = this.calculateInsertScheduleDate(insertVO);
+        // 计算排产日期分组
+        List<ScheduleDateGroup> dateGroups = this.calculateInsertScheduleDateGroups(insertVO);
+        if (dateGroups.isEmpty()) {
+            log.warn("插单排产日期计算为空");
+            return AjaxResult.error(I18nUtil.getMessage("ui.message.data.error"));
+        }
+
+        ScheduleDateGroup firstGroup = dateGroups.get(0);
+        Date scheduleDate = firstGroup.getScheduleDate();
         insertVO.setScheduleDate(scheduleDate);
 
         DjAdjustScheduleContext ctx = this.loadBaseData(factoryCode, scheduleDate);
@@ -339,14 +364,17 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
         int targetClass = resolveTargetClass(insertVO);
         int targetSeq = resolveTargetSequence(insertVO, targetClass);
 
-        return executeInsertInternal(insertVO, targetClass, targetSeq, ctx);
+        return executeInsertInternalWithGroups(insertVO, targetClass, targetSeq, ctx, dateGroups);
     }
 
     /**
-     * 插单内部执行
+     * 插单内部执行（支持多排产日分组）
+     * <p>
+     * 第一组执行顺延处理，后续组直接插入新记录。
+     * </p>
      */
-    private AjaxResult executeInsertInternal(DjScheduleResult insertVO, int targetClass, int targetSeq,
-            DjAdjustScheduleContext ctx) {
+    private AjaxResult executeInsertInternalWithGroups(DjScheduleResult insertVO, int targetClass, int targetSeq,
+            DjAdjustScheduleContext ctx, List<ScheduleDateGroup> dateGroups) {
         String factoryCode = ctx.getFactoryCode();
         Date scheduleDate = ctx.getScheduleDate();
         String machineCode = insertVO.getMachineCode();
@@ -357,8 +385,10 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
             specName = insertVO.getPaddingCode();
         }
 
-        // 2.4.1：生成工单号
-        // 批次号取当前排产日其余记录的值（同一排产日内所有记录批次号一致）
+        // ====== 第一组：按现有逻辑执行顺延 ======
+        ScheduleDateGroup firstGroup = dateGroups.get(0);
+
+        // 2.4.1：生成工单号（基于第一组的排产日）
         String batchNoFromExisting = "";
         for (DjScheduleResult r : ctx.getScheduleResults()) {
             if (StringUtils.isNotBlank(r.getBatchNo())) {
@@ -366,10 +396,9 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
                 break;
             }
         }
-        // 计算当前最大工单流水号
         int maxOrderSeq = 0;
         for (DjScheduleResult r : ctx.getScheduleResults()) {
-            if (r.getOrderNo() != null && r.getOrderNo().endsWith("-")) {
+            if (r.getOrderNo() != null && r.getOrderNo().contains("-")) {
                 String seqPart = r.getOrderNo().substring(r.getOrderNo().lastIndexOf("-") + 1);
                 try {
                     int seq = Integer.parseInt(seqPart);
@@ -383,13 +412,13 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
         String orderNo = iDjOrderGeneratorService.generateOrderNo(batchNoFromExisting, maxOrderSeq);
         insertVO.setOrderNo(orderNo);
         insertVO.setBatchNo(batchNoFromExisting);
-        insertVO.setDataSource(DjEngineConstants.DATA_SOURCE_INSERT); // "2"=插单
+        insertVO.setDataSource(DjEngineConstants.DATA_SOURCE_INSERT);
         insertVO.setReleaseStatus(ApsConstant.NO_RELEASE);
         insertVO.setPublishSuccessCount(0);
         insertVO.setFactoryCode(factoryCode);
         insertVO.setScheduleDate(scheduleDate);
 
-        // 加载施工表数据，填充胶料等字段
+        // 加载施工表数据
         MdmConstructionInfo construction = loadConstructionByPadding(factoryCode, insertVO.getPaddingCode());
         if (construction != null) {
             if (StringUtils.isBlank(insertVO.getPaddingName())) {
@@ -404,32 +433,19 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
         BigDecimal stockQty = loadPaddingStock(factoryCode, scheduleDate, insertVO.getPaddingCode());
         insertVO.setStockQty(BigDecimalUtils.valueOf(stockQty));
 
-        // 开产班次取当前排产日其余记录的值（同一批数据值都一样）
+        // 开产班次取当前排产日其余记录的值
         for (DjScheduleResult r : ctx.getScheduleResults()) {
             if (StringUtils.isNotBlank(r.getScheduleShiftClass())) {
                 insertVO.setScheduleShiftClass(r.getScheduleShiftClass());
                 break;
             }
         }
-
-        // 收尾标记默认 0（否）
         insertVO.setTailFlag("0");
-
-        // 确保只有目标班次有计划量
-        for (int c = 1; c <= DjEngineConstants.SHIFT_COUNT; c++) {
-            if (c == targetClass) {
-                setPlanQtyByClass(insertVO, c, getPlanQtyByClass(insertVO, c)); // 需从insertVO提取实际值
-                setSeqByClass(insertVO, c, targetSeq);
-            } else {
-                setPlanQtyByClass(insertVO, c, null);
-                setSeqByClass(insertVO, c, null);
-            }
-        }
 
         // 获取当前排程结果（深拷贝）
         List<DjScheduleResult> currentResults = new ArrayList<>(ctx.getScheduleResults());
 
-        // 2.4.2+2.4.3+2.4.4：执行顺延
+        // 2.4.2+2.4.3+2.4.4：对第一组的目标班次执行顺延
         ShiftContext shiftCtx = new ShiftContext().setFactoryCode(factoryCode).setScheduleDate(scheduleDate)
                 .setMachineCode(machineCode).setTargetClass(targetClass).setTargetSeq(targetSeq)
                 .setInsertSpecName(specName).setInsertPlanQty(getPlanQtyByClass(insertVO, targetClass))
@@ -437,8 +453,7 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
 
         List<DjScheduleResult> updatedResults = iDjScheduleShiftEngineService.processInsertAndCascade(shiftCtx);
 
-        // 2.5：保存数据
-        // 先保存新插单记录
+        // 保存第一组的新插单记录
         djScheduleResultMapper.insert(insertVO);
 
         // 更新被顺延的记录
@@ -448,7 +463,62 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
             }
         }
 
-        // 记录操作日志
+        // ====== 后续组：直接插入新记录（无需顺延） ======
+        if (dateGroups.size() > 1) {
+            for (int i = 1; i < dateGroups.size(); i++) {
+                ScheduleDateGroup group = dateGroups.get(i);
+                DjScheduleResult groupRecord = new DjScheduleResult();
+                BeanUtils.copyProperties(insertVO, groupRecord);
+                groupRecord.setId(null); // 新记录
+                groupRecord.setScheduleDate(group.getScheduleDate());
+                groupRecord.setScheduleShiftClass(group.getScheduleShiftClass());
+
+                // 为后续组单独生成工单号（基于该排产日已有记录）
+                // 仅查询排产日已有排程结果获取批次号和最大工单流水号，避免完整加载机台/定点机台等数据
+                List<DjScheduleResult> groupResults = djScheduleResultMapper
+                        .selectList(new LambdaQueryWrapper<DjScheduleResult>()
+                                .eq(DjScheduleResult::getFactoryCode, factoryCode)
+                                .eq(DjScheduleResult::getScheduleDate, group.getScheduleDate()));
+                String groupBatchNo = "";
+                for (DjScheduleResult r : groupResults) {
+                    if (StringUtils.isNotBlank(r.getBatchNo())) {
+                        groupBatchNo = r.getBatchNo();
+                        break;
+                    }
+                }
+                int groupMaxOrderSeq = 0;
+                for (DjScheduleResult r : groupResults) {
+                    if (r.getOrderNo() != null && r.getOrderNo().contains("-")) {
+                        String seqPart = r.getOrderNo().substring(r.getOrderNo().lastIndexOf("-") + 1);
+                        try {
+                            int seq = Integer.parseInt(seqPart);
+                            if (seq > groupMaxOrderSeq) {
+                                groupMaxOrderSeq = seq;
+                            }
+                        } catch (NumberFormatException ignored) {
+                        }
+                    }
+                }
+                groupRecord.setBatchNo(groupBatchNo);
+                groupRecord.setOrderNo(iDjOrderGeneratorService.generateOrderNo(groupBatchNo, groupMaxOrderSeq));
+
+                // 填充该组班次的计划量和顺位
+                for (int origPos : group.getPositions()) {
+                    BigDecimal qty = getPlanQtyByClass(insertVO, origPos);
+                    Integer seq = getSeqByClass(insertVO, origPos);
+                    if (qty != null) {
+                        setPlanQtyByClass(groupRecord, origPos, qty);
+                    }
+                    if (seq != null) {
+                        setSeqByClass(groupRecord, origPos, seq);
+                    }
+                }
+
+                djScheduleResultMapper.insert(groupRecord);
+            }
+        }
+
+        // 记录操作日志（基于第一组）
         this.recordDispatcherLog(ApsConstant.DISPATCHER_OPER_INSERT_ORDER, insertVO, ctx.getScheduleResults(),
                 insertVO);
 
@@ -784,7 +854,15 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
             // 逻辑删除
             djScheduleResultMapper.deleteBatchIds(canDeleteIds);
 
-            // 生产顺位补位：遍历所有班次索引（1~6），对有顺位的班次执行顺位前移
+            // 生产顺位补位：先查询同一机台排产日的所有剩余记录（框架自动过滤已删除数据），避免循环内重复查询
+            DjScheduleResult firstDeleted = deletedRecords.get(0);
+            List<DjScheduleResult> allSameMachineRecords = djScheduleResultMapper.selectList(
+                    new LambdaQueryWrapper<DjScheduleResult>()
+                            .eq(DjScheduleResult::getFactoryCode, firstDeleted.getFactoryCode())
+                            .eq(DjScheduleResult::getScheduleDate, firstDeleted.getScheduleDate())
+                            .eq(DjScheduleResult::getMachineCode, firstDeleted.getMachineCode()));
+
+            // 遍历所有班次索引（1~6），对有顺位的班次执行顺位前移
             for (int classIdx = 1; classIdx <= DjEngineConstants.SHIFT_COUNT; classIdx++) {
                 final int idx = classIdx;
                 List<DjScheduleResult> recordsWithSeq = deletedRecords.stream()
@@ -794,7 +872,7 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
                         })
                         .collect(Collectors.toList());
                 if (CollectionUtils.isNotEmpty(recordsWithSeq)) {
-                    this.fixSequenceAfterDelete(recordsWithSeq, idx);
+                    this.fixSequenceAfterDelete(recordsWithSeq, idx, allSameMachineRecords);
                 }
             }
 
@@ -828,11 +906,12 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
      * 将同一机台相同排产日的剩余记录中该班次索引的顺位减去前面被删除的个数。
      * </p>
      *
-     * @param deletedGroup 被删除的记录列表（需包含在该班次索引有顺位的记录）
-     * @param classIndex   班次索引（1~6）
+     * @param deletedGroup        被删除的记录列表（需包含在该班次索引有顺位的记录）
+     * @param classIndex          班次索引（1~6）
+     * @param sameMachineRecords  同一机台排产日下的所有剩余记录（预查询传入，避免循环内重复查库）
      */
-    private void fixSequenceAfterDelete(List<DjScheduleResult> deletedGroup, int classIndex) {
-        DjScheduleResult first = deletedGroup.get(0);
+    private void fixSequenceAfterDelete(List<DjScheduleResult> deletedGroup, int classIndex,
+            List<DjScheduleResult> sameMachineRecords) {
 
         // 收集该班次索引下所有被删除的顺位
         List<Integer> deletedSequences = deletedGroup.stream()
@@ -844,13 +923,6 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
         if (deletedSequences.isEmpty()) {
             return;
         }
-
-        // 查询同一机台排产日下的所有剩余记录（框架自动过滤已删除数据）
-        List<DjScheduleResult> sameMachineRecords = djScheduleResultMapper.selectList(
-                new LambdaQueryWrapper<DjScheduleResult>()
-                        .eq(DjScheduleResult::getFactoryCode, first.getFactoryCode())
-                        .eq(DjScheduleResult::getScheduleDate, first.getScheduleDate())
-                        .eq(DjScheduleResult::getMachineCode, first.getMachineCode()));
 
         // 前移顺位：每个剩余记录在该班次索引的顺位减去其之前被删除的记录数
         for (DjScheduleResult rec : sameMachineRecords) {
@@ -966,20 +1038,29 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
         List<DjScheduleResult> batchList = new ArrayList<>();
         List<DjScheduleResult> newItemList = new ArrayList<>();
 
+        // 6.2 校验/合并导入数据：批量查询已有工单号的排程记录，避免逐条查询 N+1
+        List<String> orderNos = importList.stream()
+                .map(DjScheduleResult::getOrderNo)
+                .filter(StringUtils::isNotBlank)
+                .collect(Collectors.toList());
+        Map<String, DjScheduleResult> existingOrderMap = new HashMap<>();
+        if (CollectionUtils.isNotEmpty(orderNos)) {
+            List<DjScheduleResult> existingList = djScheduleResultMapper.selectList(
+                    new LambdaQueryWrapper<DjScheduleResult>().in(DjScheduleResult::getOrderNo, orderNos));
+            for (DjScheduleResult r : existingList) {
+                existingOrderMap.putIfAbsent(r.getOrderNo(), r);
+            }
+        }
+
         for (DjScheduleResult item : importList) {
             String orderNo = item.getOrderNo();
-            if (StringUtils.isNotBlank(orderNo)) {
-                // 工单号存在 → 查系统内已有记录
-                List<DjScheduleResult> existing = djScheduleResultMapper
-                        .selectList(new LambdaQueryWrapper<DjScheduleResult>().eq(DjScheduleResult::getOrderNo, orderNo));
-                if (CollectionUtils.isNotEmpty(existing)) {
-                    // 视为调整操作，合并班次数据后加入批量保存列表
-                    DjScheduleResult target = existing.get(0);
-                    mergeClassData(target, item);
-                    updateReleaseStatusAfterAdjust(target);
-                    batchList.add(target);
-                    continue;
-                }
+            if (StringUtils.isNotBlank(orderNo) && existingOrderMap.containsKey(orderNo)) {
+                // 工单号存在 → 视为调整操作，合并班次数据后加入批量保存列表
+                DjScheduleResult target = existingOrderMap.get(orderNo);
+                mergeClassData(target, item);
+                updateReleaseStatusAfterAdjust(target);
+                batchList.add(target);
+                continue;
             }
             // 工单号为空或不存在 → 走插单逻辑
             newItemList.add(item);
@@ -1060,6 +1141,19 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
      */
     private int resolveTargetClass(DjScheduleResult vo) {
         for (int c = 1; c <= DjEngineConstants.SHIFT_COUNT; c++) {
+            BigDecimal planQty = getPlanQtyByClass(vo, c);
+            if (planQty != null && planQty.compareTo(BigDecimal.ZERO) > 0) {
+                return c;
+            }
+        }
+        return 1;
+    }
+
+    /**
+     * 获取最后一个有计划量的班次位置
+     */
+    private int resolveLastClass(DjScheduleResult vo) {
+        for (int c = DjEngineConstants.SHIFT_COUNT; c >= 1; c--) {
             BigDecimal planQty = getPlanQtyByClass(vo, c);
             if (planQty != null && planQty.compareTo(BigDecimal.ZERO) > 0) {
                 return c;
@@ -1153,10 +1247,157 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
         }
 
         // 计算排产日期
-        LocalDate calculatedDate = hasCrossDay ? serverProductionDate.plusDays(1) : serverProductionDate;
+        LocalDate localCalculatedDate = hasCrossDay ? serverProductionDate.plusDays(1) : serverProductionDate;
+        Date calculatedDate = Date.from(localCalculatedDate.atStartOfDay(ZoneId.systemDefault()).toInstant());
         log.info("插单排产日期计算：startShiftClass={}, targetClass={}, hasCrossDay={}, serverProductionDate={}, calculatedDate={}",
                 startShiftClass, targetClass, hasCrossDay, serverProductionDate, calculatedDate);
-        return Date.from(calculatedDate.atStartOfDay(ZoneId.systemDefault()).toInstant());
+        return calculatedDate;
+    }
+
+    /**
+     * 插单排产日期组 — 班次粒度计算，支持跨排产日拆分
+     * <p>
+     * 按设计文档 2.1.1 精细化算法：对 position=1~lastClass 逐位计算独立排产日期，
+     * 将有量班次按排产日期分组返回。
+     * </p>
+     *
+     * @param insertVO 插单参数
+     * @return 排产日期分组列表（按日期升序）
+     */
+    private List<ScheduleDateGroup> calculateInsertScheduleDateGroups(DjScheduleResult insertVO) {
+        String startShiftClass = insertVO.getScheduleShiftClass();
+        if (StringUtils.isBlank(startShiftClass)) {
+            // 无首班班次时直接使用前端传入的排产日期（兼容旧逻辑如调量转插单）
+            ScheduleDateGroup group = new ScheduleDateGroup();
+            group.setScheduleDate(insertVO.getScheduleDate());
+            group.setScheduleShiftClass(insertVO.getScheduleShiftClass());
+            for (int p = 1; p <= DjEngineConstants.SHIFT_COUNT; p++) {
+                BigDecimal qty = getPlanQtyByClass(insertVO, p);
+                if (qty != null && qty.compareTo(BigDecimal.ZERO) > 0) {
+                    group.getPositions().add(p);
+                    group.getPositionDates().put(p, insertVO.getScheduleDate());
+                }
+            }
+            return Collections.singletonList(group);
+        }
+
+        int lastClass = resolveLastClass(insertVO);
+
+        // 查询活动班次配置
+        List<DjShiftConfig> activeShifts = djShiftConfigService.listActiveShifts();
+        if (CollectionUtils.isEmpty(activeShifts)) {
+            ScheduleDateGroup group = new ScheduleDateGroup();
+            group.setScheduleDate(insertVO.getScheduleDate());
+            group.setScheduleShiftClass(startShiftClass);
+            for (int p = 1; p <= lastClass; p++) {
+                if (hasPlanQty(insertVO, p)) {
+                    group.getPositions().add(p);
+                    group.getPositionDates().put(p, insertVO.getScheduleDate());
+                }
+            }
+            return Collections.singletonList(group);
+        }
+
+        // 计算当前服务器时间所在的排产日
+        LocalTime now = LocalTime.now();
+        LocalDate serverDate = LocalDate.now();
+        LocalDate serverProductionDate = serverDate;
+        for (DjShiftConfig config : activeShifts) {
+            LocalTime startTime = LocalTime.parse(config.getPlanStartTime());
+            LocalTime endTime = LocalTime.parse(config.getPlanEndTime());
+            boolean inRange;
+            if (ApsConstant.TRUE.equals(config.getCrossDayFlag())) {
+                inRange = !now.isBefore(startTime) || now.isBefore(endTime);
+                if (inRange && !now.isBefore(startTime)) {
+                    serverProductionDate = serverDate.plusDays(1);
+                }
+            } else {
+                inRange = !now.isBefore(startTime) && now.isBefore(endTime);
+            }
+            if (inRange) {
+                break;
+            }
+        }
+
+        // 查找首班班次索引
+        int startIndex = -1;
+        int totalShifts = activeShifts.size();
+        for (int i = 0; i < totalShifts; i++) {
+            if (activeShifts.get(i).getShiftCode().equals(startShiftClass)) {
+                startIndex = i;
+                break;
+            }
+        }
+        if (startIndex < 0) {
+            ScheduleDateGroup group = new ScheduleDateGroup();
+            group.setScheduleDate(insertVO.getScheduleDate());
+            group.setScheduleShiftClass(startShiftClass);
+            for (int p = 1; p <= lastClass; p++) {
+                if (hasPlanQty(insertVO, p)) {
+                    group.getPositions().add(p);
+                    group.getPositionDates().put(p, insertVO.getScheduleDate());
+                }
+            }
+            return Collections.singletonList(group);
+        }
+
+        // 按班次位置计算每班的独立排产日期（position=1~lastClass）
+        boolean hasCrossDay = false;
+        for (int position = 1; position <= lastClass; position++) {
+            int shiftIndex = (startIndex + position - 1) % totalShifts;
+            if (ApsConstant.TRUE.equals(activeShifts.get(shiftIndex).getCrossDayFlag())) {
+                hasCrossDay = true;
+            }
+        }
+
+        // 如果所有有量班次都在同一排产日（lastClass 范围内无跨天），直接返回单组
+        if (!hasCrossDay) {
+            ScheduleDateGroup group = new ScheduleDateGroup();
+            group.setScheduleDate(Date.from(serverProductionDate.atStartOfDay(ZoneId.systemDefault()).toInstant()));
+            group.setScheduleShiftClass(startShiftClass);
+            for (int p = 1; p <= lastClass; p++) {
+                if (hasPlanQty(insertVO, p)) {
+                    group.getPositions().add(p);
+                    group.getPositionDates().put(p, group.getScheduleDate());
+                }
+            }
+            return Collections.singletonList(group);
+        }
+
+        // 有跨天：逐位计算日期并按排产日分组
+        Map<LocalDate, ScheduleDateGroup> dateGroupMap = new LinkedHashMap<>();
+        hasCrossDay = false;
+        for (int position = 1; position <= lastClass; position++) {
+            int shiftIndex = (startIndex + position - 1) % totalShifts;
+            if (ApsConstant.TRUE.equals(activeShifts.get(shiftIndex).getCrossDayFlag())) {
+                hasCrossDay = true;
+            }
+            LocalDate posDate = hasCrossDay ? serverProductionDate.plusDays(1) : serverProductionDate;
+            // 该位置对应的班次编码（用于该组的 scheduleShiftClass）
+            String shiftCode = activeShifts.get(shiftIndex).getShiftCode();
+
+            dateGroupMap.computeIfAbsent(posDate, k -> {
+                ScheduleDateGroup g = new ScheduleDateGroup();
+                g.setScheduleDate(Date.from(k.atStartOfDay(ZoneId.systemDefault()).toInstant()));
+                return g;
+            });
+
+            ScheduleDateGroup g = dateGroupMap.get(posDate);
+            if (hasPlanQty(insertVO, position)) {
+                g.getPositions().add(position);
+                g.getPositionDates().put(position, g.getScheduleDate());
+            }
+            // 第一个遇到该组的班次设为首班班次
+            if (g.getScheduleShiftClass() == null) {
+                g.setScheduleShiftClass(shiftCode);
+            }
+        }
+        return new ArrayList<>(dateGroupMap.values());
+    }
+
+    private boolean hasPlanQty(DjScheduleResult vo, int position) {
+        BigDecimal qty = getPlanQtyByClass(vo, position);
+        return qty != null && qty.compareTo(BigDecimal.ZERO) > 0;
     }
 
     /**

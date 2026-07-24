@@ -19,6 +19,7 @@ import com.zlt.aps.tm.engine.validator.TmInsertPositionValidator;
 import com.zlt.aps.tm.mapper.TmDispatcherLogMapper;
 import com.zlt.aps.tm.mapper.TmScheduleResultExplainMapper;
 import com.zlt.aps.tm.mapper.TmScheduleResultMapper;
+import com.zlt.aps.tm.service.TmOperationAuditContext;
 import lombok.RequiredArgsConstructor;
 import org.redisson.RedissonMultiLock;
 import org.redisson.api.RLock;
@@ -45,6 +46,9 @@ import java.util.stream.Collectors;
 public class TmManualOperationFacade {
 
     private static final String LOCK_PREFIX = "TM_SCHEDULE:OPER_LOCK:";
+
+    /** 同一工厂排程日全局约束锁后缀，用于串行化跨机台工装池重放。 */
+    private static final String CONSTRAINT_LOCK_SUFFIX = ":__CONSTRAINT__";
 
     private static final String UNDO_STATUS_NORMAL = "0";
 
@@ -329,10 +333,16 @@ public class TmManualOperationFacade {
             throw new ServiceException(this.resolveTmMessage(
                     "ui.data.alert.tm.schedule.operationFailed", "人工排程操作失败"));
         }
-        return resultList.stream()
+        List<String> machineLockKeyList = resultList.stream()
                 .map(result -> LOCK_PREFIX + StrUtil.trim(result.getFactoryCode()) + ":"
                         + DateUtil.formatDate(result.getScheduleDate()) + ":" + StrUtil.trim(result.getMachineCode()))
                 .distinct().sorted().collect(Collectors.toList());
+        List<String> constraintLockKeyList = resultList.stream()
+                .map(result -> LOCK_PREFIX + StrUtil.trim(result.getFactoryCode()) + ":"
+                        + DateUtil.formatDate(result.getScheduleDate()) + CONSTRAINT_LOCK_SUFFIX)
+                .distinct().collect(Collectors.toList());
+        machineLockKeyList.addAll(constraintLockKeyList);
+        return machineLockKeyList.stream().distinct().sorted().collect(Collectors.toList());
     }
 
     /**
@@ -729,10 +739,17 @@ public class TmManualOperationFacade {
         if (machineCodes == null) {
             return Collections.emptyList();
         }
-        return machineCodes.stream().filter(StrUtil::isNotBlank).map(StrUtil::trim).distinct().sorted()
+        List<String> machineLockKeyList = machineCodes.stream()
+                .filter(StrUtil::isNotBlank).map(StrUtil::trim).distinct().sorted()
                 .map(machineCode -> LOCK_PREFIX + normalizedFactoryCode + ":" + DateUtil.formatDate(scheduleDate)
                         + ":" + machineCode)
                 .collect(Collectors.toList());
+        if (machineLockKeyList.isEmpty()) {
+            return machineLockKeyList;
+        }
+        machineLockKeyList.add(LOCK_PREFIX + normalizedFactoryCode + ":" + DateUtil.formatDate(scheduleDate)
+                + CONSTRAINT_LOCK_SUFFIX);
+        return machineLockKeyList.stream().distinct().sorted().collect(Collectors.toList());
     }
 
     /**
@@ -972,6 +989,9 @@ public class TmManualOperationFacade {
         dispatcherLog.setUndoStatus(deleteOperation ? UNDO_STATUS_DONE : UNDO_STATUS_NORMAL);
         dispatcherLog.setAffectedBeforeJson(JSON.toJSONString(beforeList));
         dispatcherLog.setAffectedAfterJson(JSON.toJSONString(afterList));
+        if (StrUtil.isNotBlank(TmOperationAuditContext.getOperator())) {
+            dispatcherLog.setCreateBy(TmOperationAuditContext.getOperator());
+        }
         if (tmDispatcherLogMapper.insert(dispatcherLog) != 1) {
             throw new ServiceException(this.resolveTmMessage("ui.data.alert.tm.schedule.operationFailed",
                     "人工排程操作失败"));

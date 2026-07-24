@@ -4,6 +4,7 @@ import com.zlt.aps.cx.api.domain.entity.CxScheduleResult;
 import com.zlt.aps.dj.api.domain.entity.DjMachineInfo;
 import com.zlt.aps.dj.api.domain.entity.DjMachineMaintenance;
 import com.zlt.aps.dj.api.domain.entity.DjParams;
+import com.zlt.aps.dj.api.domain.entity.DjScheduleResult;
 import com.zlt.aps.mdm.api.domain.entity.MdmConstructionInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmWorkCalendar;
 import lombok.Data;
@@ -109,9 +110,15 @@ public class DjScheduleContext {
     /** 各班各规格垫胶消耗量缓存（仅量试/试制）Map<paddingCode, Map<formingClassIndex, consumeQty>> */
     private Map<String, Map<Integer, BigDecimal>> shiftConsumeTrialCache = new HashMap<>();
 
+    /** 前一日排产结果列表缓存（避免重复查询） */
+    private List<DjScheduleResult> prevDayScheduleResults;
+
     /** 各班次索引对应的排产日数组（长度6），根据 DjShiftConfig 班次顺序动态构建
      *  scheduleDay 从1开始，当班次从last shift绕回first shift时递增 */
     private int[] scheduleDays;
+
+    /** 每日班次数（从 DjShiftConfig 启用的班次记录数），用于计算提前备料天数对应的成型班次前移量 */
+    private int shiftCountPerDay;
 
     /** 排程过程日志收集器 */
     private StringBuilder processLog;

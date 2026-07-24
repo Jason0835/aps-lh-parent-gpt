@@ -156,6 +156,90 @@ public class TcScheduleResultUIController extends BaseUIController<TcScheduleRes
     }
 
     /**
+     * 提交胎侧人工插单异步任务。
+     *
+     * @param requestVO 插单请求
+     * @return 初始任务
+     */
+    @ApiOperation("提交胎侧人工插单异步任务")
+    @PostMapping("/operation/insertTask")
+    @RequiresPermissions("tc:tcScheduleResult:add")
+    @ResponseBody
+    public TcOperationTaskVo submitInsertTask(@RequestBody TcInsertTaskRequestVo requestVO) {
+        return this.iTcScheduleResultService.submitInsertTask(requestVO);
+    }
+
+    /**
+     * 提交胎侧调量异步任务。
+     *
+     * @param requestVO 调量请求
+     * @return 初始任务
+     */
+    @ApiOperation("提交胎侧调量异步任务")
+    @PostMapping("/operation/changeQty")
+    @RequiresPermissions("tc:tcScheduleResult:edit")
+    @ResponseBody
+    public TcOperationTaskVo submitChangeQty(@RequestBody TcChangeQtyRequestVo requestVO) {
+        return this.iTcScheduleResultService.submitChangeQty(requestVO);
+    }
+
+    /**
+     * 提交胎侧单条或批量转机台异步任务。
+     *
+     * @param requestVO 转机台请求
+     * @return 初始任务
+     */
+    @ApiOperation("提交胎侧转机台异步任务")
+    @PostMapping("/operation/changeMachine")
+    @RequiresPermissions("tc:tcScheduleResult:changeMachine")
+    @ResponseBody
+    public TcOperationTaskVo submitChangeMachine(@RequestBody TcChangeMachineRequestVo requestVO) {
+        return this.iTcScheduleResultService.submitChangeMachine(requestVO);
+    }
+
+    /**
+     * 提交胎侧删除异步任务。
+     *
+     * @param resultIdList 结果ID
+     * @return 初始任务
+     */
+    @ApiOperation("提交胎侧删除异步任务")
+    @DeleteMapping("/operation/remove")
+    @RequiresPermissions("tc:tcScheduleResult:remove")
+    @ResponseBody
+    public TcOperationTaskVo submitRemove(@RequestBody List<Long> resultIdList) {
+        return this.iTcScheduleResultService.submitRemove(resultIdList);
+    }
+
+    /**
+     * 查询胎侧人工操作任务。
+     *
+     * @param taskId 任务编号
+     * @return 任务状态
+     */
+    @ApiOperation("查询胎侧人工操作任务")
+    @GetMapping("/operation/task/{taskId}")
+    @ResponseBody
+    public TcOperationTaskVo getOperationTask(@PathVariable("taskId") String taskId) {
+        return this.iTcScheduleResultService.getOperationTask(taskId);
+    }
+
+    /**
+     * 查询最近胎侧人工操作任务。
+     *
+     * @param factoryCode 工厂编码
+     * @param scheduleDate 排程日期
+     * @return 最近任务
+     */
+    @ApiOperation("查询最近胎侧人工操作任务")
+    @GetMapping("/operation/task/latest")
+    @ResponseBody
+    public TcOperationTaskVo getLatestOperationTask(@RequestParam("factoryCode") String factoryCode,
+                                                    @RequestParam("scheduleDate") String scheduleDate) {
+        return this.iTcScheduleResultService.getLatestOperationTask(factoryCode, scheduleDate);
+    }
+
+    /**
      * 校验自动排程请求及旧结果覆盖条件。
      *
      * @param request 自动排程请求

@@ -391,6 +391,11 @@ public class SupplementCxMachineDistributionHandler {
         if (addAllocation.getAllocationDay() < groupMinAllocationDays && !productionContext.isProductionEndDay(addAllocation.getEndDay())) {
             return null;
         }
+        //20260722+ 结构间断判断
+        boolean isDiscontinueAddPreAllocation = isDiscontinueSelectedGroup(productionContext, addPlanGroup, addAllocation);
+        if (isDiscontinueAddPreAllocation) {
+            return null;
+        }
         //前结构延长天数
         if (refundDay > BigDecimal.ZERO.intValue()) {
             CxMachineAllocationPlanHelper refundAllocation = CxCapacityAllocationHandler.createAllocationPlanHelper(selectCxMachine, lhRatioInfo, addPlanGroup, null, refundDay, startDay, productionContext.getMonthDays());
@@ -440,6 +445,28 @@ public class SupplementCxMachineDistributionHandler {
         Integer startDay = lastAllocationInfo.getEndDay() + BigDecimal.ONE.intValue();
         ProductGroupCxCapacityInfo lhRatioInfo = addPlanGroup.getLhRatioByCxMachine(selectCxMachine);
         return CxCapacityAllocationHandler.createAllocationPlanHelper(selectCxMachine, lhRatioInfo, addPlanGroup, null, realAllocationDays, startDay, productionContext.getMonthDays());
+    }
+
+    /**
+     * 判断是否存在间断排产，如果存在则不能补充分配
+     *
+     * @param productionContext 排产上下文
+     * @param preSelectGroup    预分配的分组(TBR 结构)
+     * @param preAllocation     预分配段信息
+     * @return
+     */
+    private boolean isDiscontinueSelectedGroup(TbrProductionContext productionContext, ProductionPlanGroupInfo preSelectGroup, CxMachineAllocationPlanHelper preAllocation) {
+        if (null == preSelectGroup || null == preAllocation) {
+            return false;
+        }
+        //获取当前已分配信息
+        Set<CxMachineAllocationPlanHelper> assignedInfo = GroupProductionAllocationHelper.getAllAssignedInfoByGroup(productionContext, preSelectGroup);
+        if (CollectionUtils.isEmpty(assignedInfo)) {
+            return false;
+        }
+        //加入当前预分配信息
+        assignedInfo.add(preAllocation);
+        return GroupProductionAllocationHelper.isDiscontinueProduction(productionContext, preSelectGroup, assignedInfo);
     }
 
 }

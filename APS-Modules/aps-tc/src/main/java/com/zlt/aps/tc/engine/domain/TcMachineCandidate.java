@@ -41,13 +41,13 @@ public class TcMachineCandidate {
     /** 胎侧规格生产速度映射，key 为胎侧编码 */
     private Map<String, BigDecimal> sidewallSpeedMap = new LinkedHashMap<>();
 
-    /** 当前工厂候选机台已配置的口型板集合，用于判断未配置口型板是否不限制机台 */
+    /** 当前机台已配置的口型板集合，空集合表示该机台不限制口型板 */
     private Set<String> configuredMouthPlateCodes;
 
     /** 当前机台可用口型板集合 */
     private Set<String> mouthPlateCodes;
 
-    /** 当前工厂候选机台已配置过胶料关系的主胶料集合，用于解释基础数据覆盖范围 */
+    /** 当前机台已配置过胶料关系的主胶料集合，用于判断未配置主胶料时是否不限制 */
     private Set<String> configuredGlueCodes;
 
     /** 当前机台明确允许生产的主胶料集合 */

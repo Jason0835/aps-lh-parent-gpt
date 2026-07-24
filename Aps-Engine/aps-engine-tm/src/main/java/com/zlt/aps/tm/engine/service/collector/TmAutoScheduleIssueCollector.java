@@ -70,6 +70,24 @@ public class TmAutoScheduleIssueCollector {
     }
 
     /**
+     * 记录缺库存快照告警。
+     *
+     * @param treadCode 胎面编码
+     * @param message 告警说明
+     */
+    public void addStockMissingIssue(String treadCode, String message) {
+        TmAutoScheduleIssueVo issue = new TmAutoScheduleIssueVo();
+        issue.setLevel(TmAutoScheduleIssueLevelEnum.WARN.getCode());
+        issue.setStageCode(TmScheduleStepEnum.INVENTORY_PREDICT.getCode());
+        issue.setStageName(TmScheduleStepEnum.INVENTORY_PREDICT.getDesc());
+        issue.setCategory(TmAutoScheduleIssueCategoryEnum.STOCK_MISSING.getCode());
+        issue.setTreadCode(treadCode);
+        issue.setFieldName("stockQty");
+        issue.setMessage(message);
+        issues.add(issue);
+    }
+
+    /**
      * 获取异常明细副本。
      *
      * @return 异常明细列表

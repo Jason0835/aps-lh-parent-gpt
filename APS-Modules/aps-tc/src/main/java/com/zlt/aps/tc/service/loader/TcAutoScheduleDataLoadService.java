@@ -142,8 +142,9 @@ public class TcAutoScheduleDataLoadService {
             TcMachineCandidate candidate = new TcMachineCandidate();
             candidate.setMachineCode(machineInfo.getMachineCode());
             candidate.setEnabled(isMachineEnabled(machineInfo));
-            candidate.setMaxCapacity(nvl(machineInfo.getMaxCapacity()));
-            candidate.setRemainCapacity(nvl(machineInfo.getMaxCapacity()));
+            BigDecimal machineMaxCapacity = this.resolveMachineMaxCapacity(machineInfo.getMaxCapacity());
+            candidate.setMaxCapacity(machineMaxCapacity);
+            candidate.setRemainCapacity(machineMaxCapacity);
             candidate.setMaintenanceHours(BigDecimal.ZERO);
             candidate.setSwitchCostHours(BigDecimal.ZERO);
             candidate.setConfiguredMouthPlateCodes(new HashSet<>());
@@ -218,21 +219,16 @@ public class TcAutoScheduleDataLoadService {
         wrapper.eq(TcMouthPlate::getFactoryCode, context.getFactoryCode());
         wrapper.in(TcMouthPlate::getMachineCode, candidateMap.keySet());
         List<TcMouthPlate> mouthPlateList = tmMouthPlateMapper.selectList(wrapper);
-        Set<String> configuredMouthPlateCodes = mouthPlateList.stream()
-                .map(TcMouthPlate::getMouthPlateCode)
-                .filter(StrUtil::isNotBlank)
-                .collect(Collectors.toSet());
-        for (TcMachineCandidate candidate : candidateMap.values()) {
-            if (candidate.getConfiguredMouthPlateCodes() == null) {
-                candidate.setConfiguredMouthPlateCodes(new HashSet<>());
-            }
-            candidate.getConfiguredMouthPlateCodes().addAll(configuredMouthPlateCodes);
-        }
         for (TcMouthPlate mouthPlate : mouthPlateList) {
             TcMachineCandidate candidate = candidateMap.get(mouthPlate.getMachineCode());
             if (candidate == null || StrUtil.isBlank(mouthPlate.getMouthPlateCode())) {
                 continue;
             }
+            // 口型板配置必须按机台隔离；候选机台自身无有效配置时，空集合表示不限制口型板。
+            if (candidate.getConfiguredMouthPlateCodes() == null) {
+                candidate.setConfiguredMouthPlateCodes(new HashSet<>());
+            }
+            candidate.getConfiguredMouthPlateCodes().add(mouthPlate.getMouthPlateCode());
             if (candidate.getMouthPlateCodes() == null) {
                 candidate.setMouthPlateCodes(new HashSet<>());
             }
@@ -255,18 +251,6 @@ public class TcAutoScheduleDataLoadService {
         wrapper.eq(TcGlueMachineReal::getEnableStatus, TcYesNoEnum.YES.getCode());
         wrapper.in(TcGlueMachineReal::getMachineCode, candidateMap.keySet());
         List<TcGlueMachineReal> glueRuleList = tmGlueMachineRealMapper.selectList(wrapper);
-        Set<String> configuredGlueCodes = glueRuleList.stream()
-                .filter(glueRule -> TcYesNoEnum.YES.getCode().equals(glueRule.getAllowFlag())
-                        || TcYesNoEnum.NO.getCode().equals(glueRule.getAllowFlag()))
-                .map(TcGlueMachineReal::getGlueCode)
-                .filter(StrUtil::isNotBlank)
-                .collect(Collectors.toSet());
-        for (TcMachineCandidate candidate : candidateMap.values()) {
-            if (candidate.getConfiguredGlueCodes() == null) {
-                candidate.setConfiguredGlueCodes(new HashSet<>());
-            }
-            candidate.getConfiguredGlueCodes().addAll(configuredGlueCodes);
-        }
         for (TcGlueMachineReal glueRule : glueRuleList) {
             if (StrUtil.isBlank(glueRule.getGlueCode())
                     || (!TcYesNoEnum.YES.getCode().equals(glueRule.getAllowFlag())
@@ -277,6 +261,11 @@ public class TcAutoScheduleDataLoadService {
             if (candidate == null) {
                 continue;
             }
+            // 胶料关系必须按机台隔离；当前机台未配置该主胶料时默认不限制。
+            if (candidate.getConfiguredGlueCodes() == null) {
+                candidate.setConfiguredGlueCodes(new HashSet<>());
+            }
+            candidate.getConfiguredGlueCodes().add(glueRule.getGlueCode());
             if (TcYesNoEnum.YES.getCode().equals(glueRule.getAllowFlag())) {
                 if (candidate.getAllowedGlueCodes() == null) {
                     candidate.setAllowedGlueCodes(new HashSet<>());
@@ -779,6 +768,9 @@ public class TcAutoScheduleDataLoadService {
         List<TcFormingDemandRowVo> demandRowList = rowList;
         String algorithmCode = getParamValue(context, TcScheduleConstants.PARAM_ALGORITHM_SWITCH,
                 TcScheduleConstants.DEFAULT_ALGORITHM_SWITCH);
+        Integer alg1LookbackShifts = getPositiveIntegerParam(context,
+                TcScheduleConstants.PARAM_ALG1_LOOKBACK_SHIFTS,
+                TcScheduleConstants.DEFAULT_ALG1_LOOKBACK_SHIFTS_VALUE);
         BigDecimal minStartQty = getDecimalParam(context, TcScheduleConstants.PARAM_MIN_START_QTY);
         BigDecimal defaultCurlLength = getDecimalParam(context, TcScheduleConstants.PARAM_DEFAULT_CURL_LENGTH);
         BigDecimal toolTotalQty = getDecimalParam(context, TcScheduleConstants.PARAM_TOOL_TOTAL_QTY);
@@ -814,7 +806,8 @@ public class TcAutoScheduleDataLoadService {
                     depthConfigList, fallbackGuardShiftCount);
             boolean noShutdownAvailableShift = redistributeShutdownDemand(context, classQtyArray, tmCalendar, cxCalendar);
             for (int shiftOrder = 1; shiftOrder <= TcScheduleConstants.TC_MAX_SHIFT_ORDER; shiftOrder++) {
-                BigDecimal formingQty = resolveFormingQty(classQtyArray, shiftOrder, algorithmCode, formingShiftOffset);
+                BigDecimal formingQty = this.resolveFormingQty(classQtyArray, shiftOrder, algorithmCode,
+                        formingShiftOffset, alg1LookbackShifts);
                 BigDecimal demandQty = formingQty.multiply(sidewallLength);
                 if (demandQty.compareTo(BigDecimal.ZERO) <= 0) {
                     continue;
@@ -854,7 +847,7 @@ public class TcAutoScheduleDataLoadService {
                     taskDraft.setUnplannedReasonCode(TcUnplannedReasonEnum.TC_SHUTDOWN_NO_AVAILABLE_SHIFT.getCode());
                     taskDraft.setUnplannedReasonDesc(TcUnplannedReasonEnum.TC_SHUTDOWN_NO_AVAILABLE_SHIFT.getDesc());
                 }
-                this.addVersionMatchTrace(context, taskDraft, "B", row.getBomDataVersion(),
+                this.addVersionMatchTrace(context, taskDraft, "BOM", row.getBomDataVersion(),
                         row.getConstructionVersion(), !Objects.equals(row.getBomDataVersion(), row.getConstructionVersion()));
                 taskDraftList.add(taskDraft);
             }
@@ -930,6 +923,9 @@ public class TcAutoScheduleDataLoadService {
         // 参数与基础数据
         String algorithmCode = getParamValue(context, TcScheduleConstants.PARAM_ALGORITHM_SWITCH,
                 TcScheduleConstants.DEFAULT_ALGORITHM_SWITCH);
+        Integer alg1LookbackShifts = getPositiveIntegerParam(context,
+                TcScheduleConstants.PARAM_ALG1_LOOKBACK_SHIFTS,
+                TcScheduleConstants.DEFAULT_ALG1_LOOKBACK_SHIFTS_VALUE);
         BigDecimal minStartQty = getDecimalParam(context, TcScheduleConstants.PARAM_MIN_START_QTY);
         BigDecimal defaultCurlLength = getDecimalParam(context, TcScheduleConstants.PARAM_DEFAULT_CURL_LENGTH);
         BigDecimal toolTotalQty = getDecimalParam(context, TcScheduleConstants.PARAM_TOOL_TOTAL_QTY);
@@ -1018,7 +1014,8 @@ public class TcAutoScheduleDataLoadService {
                     depthConfigList, fallbackGuardShiftCount);
             boolean noShutdownAvailableShift = redistributeShutdownDemand(context, classQtyArray, tmCalendar, cxCalendar);
             for (int shiftOrder = 1; shiftOrder <= TcScheduleConstants.TC_MAX_SHIFT_ORDER; shiftOrder++) {
-                BigDecimal formingQty = resolveFormingQty(classQtyArray, shiftOrder, algorithmCode, formingShiftOffset);
+                BigDecimal formingQty = this.resolveFormingQty(classQtyArray, shiftOrder, algorithmCode,
+                        formingShiftOffset, alg1LookbackShifts);
                 if (formingQty.compareTo(BigDecimal.ZERO) <= 0) {
                     skippedShiftNoFormingQty++;
                     continue;
@@ -2286,16 +2283,18 @@ public class TcAutoScheduleDataLoadService {
      * @param shiftOrder 胎侧排程班次，从 1 开始
      * @param algorithmCode 需求量算法编码
      * @param formingShiftOffset 胎侧班次到成型班次的偏移量，0 表示同序号班次
+     * @param alg1LookbackShifts 算法1连续回看的成型班次数
      * @return 对应成型计划量；超过已加载成型班次时返回 0
      */
     private BigDecimal resolveFormingQty(BigDecimal[] classQtyArray, int shiftOrder, String algorithmCode,
-            int formingShiftOffset) {
+            int formingShiftOffset, int alg1LookbackShifts) {
         int startIndex = resolveFormingStartIndex(shiftOrder, formingShiftOffset);
         if ("2".equals(algorithmCode)) {
             return readClassQty(classQtyArray, startIndex);
         }
         BigDecimal maxQty = BigDecimal.ZERO;
-        for (int index = startIndex; index < startIndex + 3; index++) {
+        int lookbackShifts = Math.max(alg1LookbackShifts, 1);
+        for (int index = startIndex; index < startIndex + lookbackShifts; index++) {
             maxQty = maxQty.max(readClassQty(classQtyArray, index));
         }
         return maxQty;
@@ -2378,6 +2377,19 @@ public class TcAutoScheduleDataLoadService {
      */
     private BigDecimal nvl(BigDecimal value) {
         return value == null ? BigDecimal.ZERO : value;
+    }
+
+    /**
+     * 解析胎侧机台最大班产，基础数据无效时使用固定兼容值。
+     *
+     * @param maxCapacity 机台表最大班产
+     * @return 正数最大班产
+     */
+    private BigDecimal resolveMachineMaxCapacity(BigDecimal maxCapacity) {
+        if (maxCapacity == null || maxCapacity.compareTo(BigDecimal.ZERO) <= 0) {
+            return new BigDecimal(TcScheduleConstants.DEFAULT_MACHINE_MAX_CAPACITY);
+        }
+        return maxCapacity;
     }
 
     /**

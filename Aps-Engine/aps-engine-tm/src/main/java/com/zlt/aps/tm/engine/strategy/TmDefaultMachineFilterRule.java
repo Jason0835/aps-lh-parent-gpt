@@ -2,17 +2,22 @@ package com.zlt.aps.tm.engine.strategy;
 
 import com.ruoyi.common.exception.ServiceException;
 import com.zlt.aps.common.engine.schedule.ScheduleRuleResult;
+import com.zlt.aps.tm.api.constant.TmScheduleConstants;
 import com.zlt.aps.tm.api.enums.TmMachineFilterReasonEnum;
 import com.zlt.aps.tm.api.enums.TmScheduleErrorCodeEnum;
 import com.zlt.aps.tm.api.enums.TmScheduleStrategyEnum;
 import com.zlt.aps.tm.engine.domain.TmMachineCandidate;
 import com.zlt.aps.tm.engine.domain.TmMachineRuleContext;
+import com.zlt.aps.tm.engine.domain.TmParamValue;
 import com.zlt.aps.tm.engine.domain.TmTaskDraft;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 胎面默认机台过滤规则链。
@@ -24,6 +29,13 @@ import java.util.Map;
  */
 @Component
 public class TmDefaultMachineFilterRule implements ITmMachineFilterRule {
+
+    private static final String RULE_MACHINE_STATUS = "MACHINE_STATUS";
+    private static final String RULE_REMAIN_CAPACITY = "REMAIN_CAPACITY";
+    private static final String RULE_MOUTH_PLATE = "MOUTH_PLATE";
+    private static final String RULE_GLUE_MACHINE = "GLUE_MACHINE";
+    private static final String RULE_FIXED_MACHINE = "FIXED_MACHINE";
+    private static final String RULE_EXCLUDE_FIXED = "EXCLUDE_FIXED";
 
     /**
      * 获取规则编码。
@@ -49,30 +61,17 @@ public class TmDefaultMachineFilterRule implements ITmMachineFilterRule {
             throw new ServiceException(TmScheduleErrorCodeEnum.TM_MACHINE_CANDIDATE_EMPTY.getDefaultMessage());
         }
         TmTaskDraft task = context.getTaskDraft();
-        // 1. 机台状态启用
-        if (Boolean.FALSE.equals(candidate.getEnabled())) {
-            return reject(candidate, TmMachineFilterReasonEnum.MACHINE_DISABLED);
-        }
-        // 2. 剩余产能大于 0
-        if (candidate.getRemainCapacity() == null
-                || candidate.getRemainCapacity().compareTo(BigDecimal.ZERO) <= 0) {
-            return reject(candidate, TmMachineFilterReasonEnum.NO_REMAIN_CAPACITY);
-        }
-        // 3. 口型板匹配
-        if (Boolean.FALSE.equals(candidate.getMouthPlateMatched())) {
-            return reject(candidate, TmMachineFilterReasonEnum.MOUTH_PLATE_NOT_MATCH);
-        }
-        // 4. 胶料机台关系
-        if (Boolean.FALSE.equals(candidate.getGlueMachineMatched())) {
-            return reject(candidate, TmMachineFilterReasonEnum.GLUE_MACHINE_NOT_MATCH);
-        }
-        // 5. 选择定点生产机台
-        if (Boolean.FALSE.equals(candidate.getFixedMachineSelected())) {
-            return reject(candidate, TmMachineFilterReasonEnum.FIXED_MACHINE_NOT_SELECTED);
-        }
-        // 6. 排除定点不可生产机台
-        if (Boolean.TRUE.equals(candidate.getFixedMachineExcluded())) {
-            return reject(candidate, TmMachineFilterReasonEnum.FIXED_MACHINE_EXCLUDED);
+        List<String> ruleOrder = this.resolveRuleOrder(context);
+        candidate.getEvidence().put("filterRuleOrder", ruleOrder);
+        for (String ruleCode : ruleOrder) {
+            if (!this.isRuleEnabled(context, ruleCode)) {
+                candidate.getEvidence().put("filterRuleDisabled:" + ruleCode, Boolean.TRUE);
+                continue;
+            }
+            TmMachineFilterReasonEnum rejectReason = this.evaluateRule(ruleCode, candidate);
+            if (rejectReason != null) {
+                return this.reject(candidate, rejectReason);
+            }
         }
         candidate.setFiltered(Boolean.FALSE);
         Map<String, Object> evidence = new LinkedHashMap<>();
@@ -81,6 +80,95 @@ public class TmDefaultMachineFilterRule implements ITmMachineFilterRule {
         candidate.getEvidence().putAll(evidence);
         return ScheduleRuleResult.pass(TmMachineFilterReasonEnum.DEFAULT_PASS.getCode(),
                 TmMachineFilterReasonEnum.DEFAULT_PASS.getDesc(), evidence);
+    }
+
+    /**
+     * 按规则编码执行单项机台过滤判断。
+     *
+     * @param ruleCode 过滤规则编码
+     * @param candidate 候选机台
+     * @return 不通过时返回未排原因，通过或未知规则返回 null
+     */
+    private TmMachineFilterReasonEnum evaluateRule(String ruleCode, TmMachineCandidate candidate) {
+        if (RULE_MACHINE_STATUS.equals(ruleCode) && Boolean.FALSE.equals(candidate.getEnabled())) {
+            return TmMachineFilterReasonEnum.MACHINE_DISABLED;
+        }
+        if (RULE_REMAIN_CAPACITY.equals(ruleCode) && (candidate.getRemainCapacity() == null
+                || candidate.getRemainCapacity().compareTo(BigDecimal.ZERO) <= 0)) {
+            return TmMachineFilterReasonEnum.NO_REMAIN_CAPACITY;
+        }
+        if (RULE_MOUTH_PLATE.equals(ruleCode) && Boolean.FALSE.equals(candidate.getMouthPlateMatched())) {
+            return TmMachineFilterReasonEnum.MOUTH_PLATE_NOT_MATCH;
+        }
+        if (RULE_GLUE_MACHINE.equals(ruleCode) && Boolean.FALSE.equals(candidate.getGlueMachineMatched())) {
+            return TmMachineFilterReasonEnum.GLUE_MACHINE_NOT_MATCH;
+        }
+        if (RULE_FIXED_MACHINE.equals(ruleCode) && Boolean.FALSE.equals(candidate.getFixedMachineSelected())) {
+            return TmMachineFilterReasonEnum.FIXED_MACHINE_NOT_SELECTED;
+        }
+        if (RULE_EXCLUDE_FIXED.equals(ruleCode) && Boolean.TRUE.equals(candidate.getFixedMachineExcluded())) {
+            return TmMachineFilterReasonEnum.FIXED_MACHINE_EXCLUDED;
+        }
+        if (!this.isKnownRule(ruleCode)) {
+            candidate.getEvidence().put("unknownFilterRule:" + ruleCode, Boolean.TRUE);
+        }
+        return null;
+    }
+
+    /**
+     * 解析本次排程实际使用的过滤规则顺序。
+     *
+     * @param context 机台规则上下文
+     * @return 去空并转为大写的过滤规则编码列表
+     */
+    private List<String> resolveRuleOrder(TmMachineRuleContext context) {
+        String ruleOrder = TmScheduleConstants.DEFAULT_FILTER_RULE_ORDER;
+        if (context.getScheduleContext() != null) {
+            TmParamValue paramValue = context.getScheduleContext().getParamMap()
+                    .get(TmScheduleConstants.PARAM_FILTER_RULE_ORDER);
+            if (paramValue != null && paramValue.getEffectiveValue() != null
+                    && !paramValue.getEffectiveValue().trim().isEmpty()) {
+                ruleOrder = paramValue.getEffectiveValue();
+            }
+        }
+        return Arrays.stream(ruleOrder.split(","))
+                .map(String::trim)
+                .filter(value -> !value.isEmpty())
+                .map(String::toUpperCase)
+                .distinct()
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 判断单项过滤规则是否启用，未配置时默认启用。
+     *
+     * @param context 机台规则上下文
+     * @param ruleCode 过滤规则编码
+     * @return true 表示执行该规则
+     */
+    private boolean isRuleEnabled(TmMachineRuleContext context, String ruleCode) {
+        if (context.getScheduleContext() == null) {
+            return true;
+        }
+        String paramCode = TmScheduleConstants.PARAM_FILTER_RULE_ENABLED_PREFIX
+                + ruleCode + TmScheduleConstants.PARAM_FILTER_RULE_ENABLED_SUFFIX;
+        TmParamValue paramValue = context.getScheduleContext().getParamMap().get(paramCode);
+        return paramValue == null || !"0".equals(paramValue.getEffectiveValue());
+    }
+
+    /**
+     * 判断是否为内置过滤规则编码。
+     *
+     * @param ruleCode 过滤规则编码
+     * @return true 表示为内置规则
+     */
+    private boolean isKnownRule(String ruleCode) {
+        return RULE_MACHINE_STATUS.equals(ruleCode)
+                || RULE_REMAIN_CAPACITY.equals(ruleCode)
+                || RULE_MOUTH_PLATE.equals(ruleCode)
+                || RULE_GLUE_MACHINE.equals(ruleCode)
+                || RULE_FIXED_MACHINE.equals(ruleCode)
+                || RULE_EXCLUDE_FIXED.equals(ruleCode);
     }
 
     /**

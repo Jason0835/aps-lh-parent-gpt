@@ -338,7 +338,21 @@ public class MesItfController {
         syncDataLogs.setDataVersion(dataVersion);
         return mesBomItfService.syncConstructionInfo(syncDataLogs);
     }
-
+    
+    /**
+     * 成品原材料折算接口
+     *
+     * @return 结果
+     */
+    @ApiOperation("成品原材料折算接口")
+    @PostMapping("/syncRawMaterialConversion")
+    public AjaxResult syncRawMaterialConversion(String factoryCode, String dataVersion) {
+        AuxReqSyncDataLogs syncDataLogs = new AuxReqSyncDataLogs();
+        syncDataLogs.setFactoryCode(factoryCode);
+        syncDataLogs.setDataVersion(dataVersion);
+        return mesBomItfService.syncRawMaterialConversion(syncDataLogs);
+    }
+    
     /**
      * 同步BOM
      *

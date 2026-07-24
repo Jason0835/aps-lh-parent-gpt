@@ -46,6 +46,9 @@ public class DjEngineConstants {
     /** SYS1401016 实验量试生产阶段编码集合（逗号分隔），匹配 MdmConstructionInfo.productionStage，默认 T,X */
     public static final String PARAM_TRIAL_PRODUCTION_STAGES = "SYS1401016";
 
+    /** SYS1401017 新规格提前备料天数，成型第一次使用这个新规格的前N天排产，默认1；大于2时按2处理 */
+    public static final String PARAM_NEW_SPEC_ADVANCE_DAYS = "SYS1401017";
+
     // ==================== 班次常量 ====================
 
     /** 垫胶排产班次数 */

@@ -2103,8 +2103,6 @@ public class TmMachineAssignService implements ITmMachineAssignService {
      */
     private void prepareCandidatesForTask(TmTaskDraft task, TmScheduleContext context,
                                           List<TmMachineCandidate> candidates) {
-        boolean hasGlueAllowRule = candidates.stream()
-                .anyMatch(candidate -> contains(candidate.getAllowedGlueCodes(), task.getGlueCode()));
         boolean hasFixedAllowRule = candidates.stream()
                 .anyMatch(candidate -> contains(candidate.getConfiguredFixedAllowTreadCodes(), task.getTreadCode()));
         for (TmMachineCandidate candidate : candidates) {
@@ -2114,7 +2112,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
             candidate.setMachineSpeed(machineSpeed);
             candidate.setRemainCapacity(remainCapacity);
             candidate.setMouthPlateMatched(isMouthPlateMatched(task, candidate));
-            candidate.setGlueMachineMatched(isGlueMachineMatched(task, candidate, hasGlueAllowRule));
+            candidate.setGlueMachineMatched(isGlueMachineMatched(task, candidate));
             boolean fixedAllowMatched = contains(candidate.getFixedAllowTreadCodes(), task.getTreadCode());
             candidate.setFixedMachineSelected(!hasFixedAllowRule || fixedAllowMatched);
             candidate.setFixedMachineMatched(fixedAllowMatched);
@@ -2163,21 +2161,23 @@ public class TmMachineAssignService implements ITmMachineAssignService {
     /**
      * 判断当前任务胶料是否符合候选机台胶料关系。
      *
-     * <p>禁用关系始终优先排除；存在允许配置时按允许机台白名单筛选；没有允许配置时不限制。</p>
+     * <p>禁用关系始终优先排除；当前机台没有配置任务主胶料时不限制，存在配置时按本机关系判断。</p>
      *
      * @param task             待排任务草稿
      * @param candidate        候选机台
-     * @param hasGlueAllowRule 当前任务主胶料是否存在允许配置
      * @return true 表示匹配
      */
-    private boolean isGlueMachineMatched(TmTaskDraft task, TmMachineCandidate candidate, boolean hasGlueAllowRule) {
+    private boolean isGlueMachineMatched(TmTaskDraft task, TmMachineCandidate candidate) {
         if (StrUtil.isBlank(task.getGlueCode())) {
             return true;
         }
         if (contains(candidate.getForbiddenGlueCodes(), task.getGlueCode())) {
             return false;
         }
-        return !hasGlueAllowRule || contains(candidate.getAllowedGlueCodes(), task.getGlueCode());
+        if (!contains(candidate.getConfiguredGlueCodes(), task.getGlueCode())) {
+            return true;
+        }
+        return contains(candidate.getAllowedGlueCodes(), task.getGlueCode());
     }
 
     /**

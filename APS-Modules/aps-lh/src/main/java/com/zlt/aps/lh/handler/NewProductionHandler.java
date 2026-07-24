@@ -7,6 +7,7 @@ import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.factory.ScheduleStrategyFactory;
 import com.zlt.aps.lh.engine.strategy.ICapacityCalculateStrategy;
 import com.zlt.aps.lh.engine.strategy.IFirstInspectionBalanceStrategy;
+import com.zlt.aps.lh.engine.strategy.IHistoricalMouldChangeReverseSelectionStrategy;
 import com.zlt.aps.lh.engine.strategy.IMachineMatchStrategy;
 import com.zlt.aps.lh.engine.strategy.IMouldChangeBalanceStrategy;
 import com.zlt.aps.lh.engine.strategy.IProductionStrategy;
@@ -39,6 +40,8 @@ public class NewProductionHandler extends AbsScheduleStepHandler {
     @Resource
     private ScheduleStrategyFactory strategyFactory;
     @Resource
+    private IHistoricalMouldChangeReverseSelectionStrategy historicalReverseSelectionStrategy;
+    @Resource
     private StructureMinMachineRetentionService structureMinMachineRetentionService =
             new StructureMinMachineRetentionService();
 
@@ -57,28 +60,39 @@ public class NewProductionHandler extends AbsScheduleStepHandler {
         priorityStrategy.sortByPriority(context);
         log.debug("新增规格SKU优先级排序完成, 待排新增SKU: {}", context.getNewSpecSkuList().size());
 
-        // S4.5.3 遍历新增SKU, 匹配机台
+        /*
+         * S4.5.3 前日交替计划机台反选：
+         * 必须在新增SKU业务优先级排序完成后、普通新增选机前执行。反选策略会按历史班次4、5的
+         * “机台+后物料”指令重新前置目标SKU，避免业务排序再次覆盖反选顺序并让普通SKU提前占机。
+         */
+        historicalReverseSelectionStrategy.reverseSelect(context);
+        log.info("前日交替计划机台反选完成, 排程结果数: {}, 待新增SKU: {}, 指令数: {}",
+                context.getScheduleResultList().size(), context.getNewSpecSkuList().size(),
+                context.getHistoricalReverseSelectionDirectiveList().size());
+
+        // S4.5.4 遍历新增SKU, 匹配机台
         IMachineMatchStrategy machineMatchStrategy = strategyFactory.getMachineMatchStrategy();
 
-        // S4.5.4 换模时间分配（开关开启时附带换模均衡）
+        // S4.5.5 换模时间分配（开关开启时附带换模均衡）
         IMouldChangeBalanceStrategy mouldChangeStrategy = strategyFactory.getMouldChangeBalanceStrategy();
 
-        // S4.5.5 首检均衡分配
+        // S4.5.6 首检均衡分配
         IFirstInspectionBalanceStrategy inspectionStrategy = strategyFactory.getFirstInspectionBalanceStrategy();
 
-        // S4.5.6 计算开产时间
+        // S4.5.7 计算开产时间
         ICapacityCalculateStrategy capacityStrategy = strategyFactory.getCapacityCalculateStrategy();
 
         /** 对每个新增SKU执行以下流程:
          * 1. 按优先级排序
-         * 2. 匹配可用硫化机台
-         * 3. 基础换模时间分配（可选换模均衡：早<=8, 中<=7, 总<=15）
-         * 4. 首检均衡分配(早/中班操作数均衡)
-         * 5. 计算开产时间(考虑保养/维修/清洗重叠)
-         * 6. 分配班次计划量
-         * 7. 胎胚库存校正与零计划收口
-         * 8. 新增排产降模处理
-         * 9. 标记未排产SKU和原因
+         * 2. 按历史交替计划前置反选SKU并登记指定机台
+         * 3. 匹配可用硫化机台
+         * 4. 基础换模时间分配（可选换模均衡：早<=8, 中<=7, 总<=15）
+         * 5. 首检均衡分配(早/中班操作数均衡)
+         * 6. 计算开产时间(考虑保养/维修/清洗重叠)
+         * 7. 分配班次计划量
+         * 8. 胎胚库存校正与零计划收口
+         * 9. 新增排产降模处理
+         * 10. 标记未排产SKU和原因
          */
         strategy.scheduleNewSpecs(context, machineMatchStrategy,
                 mouldChangeStrategy, inspectionStrategy, capacityStrategy);
@@ -91,8 +105,11 @@ public class NewProductionHandler extends AbsScheduleStepHandler {
                 context.getScheduleResultList().size(), context.getNewSpecSkuList().size(),
                 context.getUnscheduledResultList().size());
         strategy.scheduleReduceMould(context);
-        // 新增后置库存裁剪和机台状态同步完成后再刷新一次，确保统一释放时间不会被后置同步提前覆盖。
-        structureMinMachineRetentionService.refreshRetention(context);
+        /*
+         * 最终只做已命中结构的幂等状态校正，不再按阶段聚合数量进行第二次决策；用于统一后续新增
+         * 结果标识，并防止普通机台状态同步覆盖实时下机入口已经顺延的保机结束时间。
+         */
+        structureMinMachineRetentionService.synchronizeRetainedState(context);
         log.info("新增规格排产处理完成, 排程结果数: {}, 未排产数: {}",
                 context.getScheduleResultList().size(), context.getUnscheduledResultList().size());
     }

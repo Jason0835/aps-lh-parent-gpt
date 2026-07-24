@@ -5,12 +5,14 @@ import cn.hutool.core.util.StrUtil;
 import com.alibaba.fastjson.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.tm.api.constant.TmScheduleConstants;
 import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleIssueVo;
 import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleRequestVo;
 import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleResponseVo;
 import com.zlt.aps.tm.api.enums.TmAutoScheduleTaskStatusEnum;
+import com.zlt.aps.tm.api.enums.TmBackgroundTaskTypeEnum;
 import com.zlt.aps.tm.domain.TmAutoScheduleTask;
 import com.zlt.aps.tm.mapper.TmAutoScheduleTaskMapper;
 import com.zlt.aps.tm.service.TmAutoScheduleTaskService;
@@ -49,13 +51,17 @@ public class TmAutoScheduleTaskServiceImpl implements TmAutoScheduleTaskService 
     public TmAutoScheduleTask createPending(TmAutoScheduleRequestVo request, TmAutoScheduleResponseVo response) {
         TmAutoScheduleTask activeTask = this.findActive(request.getFactoryCode(), request.getScheduleDate());
         if (activeTask != null) {
-            return activeTask;
+            if (TmBackgroundTaskTypeEnum.AUTO_PLAN.getCode().equals(activeTask.getTaskType())) {
+                return activeTask;
+            }
+            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.schedule.running"));
         }
         TmAutoScheduleTask task = new TmAutoScheduleTask();
         task.setTaskId(TmScheduleConstants.AUTO_SCHEDULE_TASK_ID_PREFIX
                 + IdUtil.fastSimpleUUID().toUpperCase());
         task.setFactoryCode(request.getFactoryCode());
         task.setScheduleDate(request.getScheduleDate());
+        task.setTaskType(TmBackgroundTaskTypeEnum.AUTO_PLAN.getCode());
         task.setBatchNo(response.getBatchNo());
         task.setTraceId(response.getTraceId());
         task.setTaskStatus(TmAutoScheduleTaskStatusEnum.PENDING.getCode());
@@ -82,6 +88,7 @@ public class TmAutoScheduleTaskServiceImpl implements TmAutoScheduleTaskService 
         return taskMapper.selectOne(new LambdaQueryWrapper<TmAutoScheduleTask>()
                 .eq(TmAutoScheduleTask::getFactoryCode, factoryCode)
                 .eq(TmAutoScheduleTask::getScheduleDate, scheduleDate)
+                .eq(TmAutoScheduleTask::getTaskType, TmBackgroundTaskTypeEnum.AUTO_PLAN.getCode())
                 .orderByDesc(TmAutoScheduleTask::getCreateTime)
                 .last("limit 1"));
     }

@@ -286,7 +286,9 @@ public class NewTaskProcessor {
                     continueLoadMap, continueTypeMap, continueLhMachineCodeMap,
                     loadDiffThreshold, typeDiffThreshold);
 
-            log.info("结构 {} 均衡分配完成", structureName);
+            logFinalBalancingSummary(structureName, balancingResult, existAllocations,
+                    continueLoadMap, continueTypeMap, availableMachines,
+                    loadDiffThreshold, typeDiffThreshold);
 
             // 5.3.3.2.7 BalancingResult → MachineAllocationResult（按 EmbryoAssignment 逐条转换，禁止按胎胚合并）
             for (MachineAssignment assignment : balancingResult.getAssignments()) {
@@ -1559,5 +1561,136 @@ public class NewTaskProcessor {
         }
         // 添加到 toMachine
         continueLhMachineCodeMap.computeIfAbsent(toMachine, k -> new HashSet<>()).add(movedLhMc);
+    }
+
+    /**
+     * 打印结构级均衡最终结果：算法路径、新增分配阶段 P1、后置续作调整后的各机台续作+新增明细及最终负荷/种类差。
+     */
+    private void logFinalBalancingSummary(
+            String structureName,
+            BalancingResult balancingResult,
+            List<MachineAllocationResult> existAllocations,
+            Map<String, Integer> continueLoadMap,
+            Map<String, Set<String>> continueTypeMap,
+            List<MpCxCapacityConfiguration> availableMachines,
+            int loadDiffThreshold,
+            int typeDiffThreshold) {
+
+        log.info("====== 【均衡最终结果】结构 {} ======", structureName);
+        log.info("  算法路径: {}", describeAlgorithmPath(balancingResult));
+        log.info("  新增任务分配阶段: 全部分配={}, 负荷差={}, 种类差={}, P1={}",
+                balancingResult.getAllAssigned(),
+                balancingResult.getLoadGap(),
+                balancingResult.getTypeGap(),
+                Boolean.TRUE.equals(balancingResult.getP1Satisfied()) ? "满足" : "未满足");
+
+        Map<String, Map<String, Integer>> newTaskByMachine = new LinkedHashMap<>();
+        Map<String, Integer> newLoadByMachine = new HashMap<>();
+        if (balancingResult.getAssignments() != null) {
+            for (MachineAssignment ma : balancingResult.getAssignments()) {
+                String machineCode = ma.getMachineCode();
+                Map<String, Integer> embryoCounts = newTaskByMachine.computeIfAbsent(machineCode, k -> new LinkedHashMap<>());
+                int newLoad = 0;
+                if (ma.getEmbryoAssignments() != null) {
+                    for (EmbryoAssignment ea : ma.getEmbryoAssignments()) {
+                        embryoCounts.merge(ea.getEmbryoCode(), ea.getAssignedQty(), Integer::sum);
+                        newLoad += ea.getAssignedQty();
+                    }
+                }
+                newLoadByMachine.put(machineCode, newLoad);
+            }
+        }
+
+        Set<String> allMachines = new TreeSet<>();
+        if (availableMachines != null) {
+            for (MpCxCapacityConfiguration config : availableMachines) {
+                if (config.getCxMachineCode() != null) {
+                    allMachines.add(config.getCxMachineCode());
+                }
+            }
+        }
+        allMachines.addAll(continueLoadMap.keySet());
+        allMachines.addAll(newTaskByMachine.keySet());
+
+        int minLoad = Integer.MAX_VALUE;
+        int maxLoad = 0;
+        int minTypes = Integer.MAX_VALUE;
+        int maxTypes = 0;
+
+        for (String machine : allMachines) {
+            int continueLoad = continueLoadMap.getOrDefault(machine, 0);
+            Map<String, Integer> continueEmbryoCounts = summarizeContinueEmbryos(existAllocations, machine);
+            Map<String, Integer> newCounts = newTaskByMachine.getOrDefault(machine, Collections.emptyMap());
+            int newLoad = newLoadByMachine.getOrDefault(machine, 0);
+            int totalLoad = continueLoad + newLoad;
+
+            Set<String> allTypes = new HashSet<>(continueTypeMap.getOrDefault(machine, Collections.emptySet()));
+            allTypes.addAll(newCounts.keySet());
+
+            minLoad = Math.min(minLoad, totalLoad);
+            maxLoad = Math.max(maxLoad, totalLoad);
+            minTypes = Math.min(minTypes, allTypes.size());
+            maxTypes = Math.max(maxTypes, allTypes.size());
+
+            String continueDetail = formatEmbryoCounts(continueEmbryoCounts);
+            String newDetail = formatEmbryoCounts(newCounts);
+            String typeList = allTypes.isEmpty() ? "无" : String.join(",", new TreeSet<>(allTypes));
+
+            log.info("  机台 {}: 续作{}台{} + 新增{}台{} => 合计{}台/{}种 [{}]",
+                    machine, continueLoad,
+                    continueDetail.isEmpty() ? "" : continueDetail,
+                    newLoad,
+                    newDetail.isEmpty() ? "" : newDetail,
+                    totalLoad, allTypes.size(), typeList);
+        }
+
+        int finalLoadGap = allMachines.isEmpty() ? 0 : maxLoad - minLoad;
+        int finalTypeGap = allMachines.isEmpty() ? 0 : maxTypes - minTypes;
+        boolean finalP1 = finalLoadGap <= loadDiffThreshold
+                && finalTypeGap <= typeDiffThreshold
+                && Boolean.TRUE.equals(balancingResult.getAllAssigned());
+
+        log.info("  后置续作调整后: 负荷差={}(阈值{}), 种类差={}(阈值{}), 最终P1={}",
+                finalLoadGap, loadDiffThreshold, finalTypeGap, typeDiffThreshold,
+                finalP1 ? "满足" : "未满足");
+        log.info("====== 【均衡最终结果】结构 {} 结束 ======", structureName);
+    }
+
+    private String describeAlgorithmPath(BalancingResult balancingResult) {
+        if (balancingResult == null || balancingResult.getAlgorithmPath() == null) {
+            return "未知";
+        }
+        switch (balancingResult.getAlgorithmPath()) {
+            case "GREEDY_R1":
+                return "贪心R1（一次满足P1）";
+            case "GREEDY_R2":
+                return "贪心R1未满足 → 贪心R2（突破容量上限+局部搜索）";
+            default:
+                return balancingResult.getAlgorithmPath();
+        }
+    }
+
+    private Map<String, Integer> summarizeContinueEmbryos(List<MachineAllocationResult> existAllocations, String machineCode) {
+        Map<String, Integer> counts = new LinkedHashMap<>();
+        for (MachineAllocationResult alloc : existAllocations) {
+            if (!machineCode.equals(alloc.getMachineCode())) {
+                continue;
+            }
+            for (TaskAllocation taskAllocation : alloc.getTaskAllocations()) {
+                int vulcCount = taskAllocation.getVulcanizeMachineCount() != null
+                        ? taskAllocation.getVulcanizeMachineCount() : 0;
+                counts.merge(taskAllocation.getEmbryoCode(), vulcCount, Integer::sum);
+            }
+        }
+        return counts;
+    }
+
+    private String formatEmbryoCounts(Map<String, Integer> counts) {
+        if (counts == null || counts.isEmpty()) {
+            return "";
+        }
+        return "[" + counts.entrySet().stream()
+                .map(entry -> entry.getKey() + "×" + entry.getValue())
+                .collect(Collectors.joining(", ")) + "]";
     }
 }

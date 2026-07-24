@@ -1,13 +1,18 @@
 package com.zlt.aps.tc.service;
 
+import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.StrUtil;
 import com.alibaba.fastjson.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.ruoyi.common.exception.ServiceException;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.tc.api.constant.TcScheduleConstants;
 import com.zlt.aps.tc.api.domain.vo.TcAutoScheduleIssueVo;
+import com.zlt.aps.tc.api.domain.vo.TcOperationTaskVo;
 import com.zlt.aps.tc.api.domain.vo.TcReleaseTaskVo;
 import com.zlt.aps.tc.api.enums.TcAutoScheduleTaskStatusEnum;
+import com.zlt.aps.tc.api.enums.TcBackgroundTaskTypeEnum;
 import com.zlt.aps.tc.domain.TcAutoScheduleTask;
 import com.zlt.aps.tc.mapper.TcAutoScheduleTaskMapper;
 import lombok.RequiredArgsConstructor;
@@ -18,7 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.*;
 
 /**
- * 胎侧发布和自动滚动后台任务状态服务。
+ * 胎侧发布、自动滚动和人工操作后台任务状态服务。
  *
  * <p>自动排程保留原有强类型任务服务，本服务只承接新增后台任务并以独立短事务更新状态。</p>
  */
@@ -27,6 +32,39 @@ import java.util.*;
 public class TcBackgroundTaskService {
 
     private final TcAutoScheduleTaskMapper taskMapper;
+
+    /**
+     * 创建等待执行的人工操作任务。
+     *
+     * @param taskType 任务类型
+     * @param factoryCode 工厂编码
+     * @param scheduleDate 排程日期
+     * @param requestSnapshot 请求快照
+     * @param operator 操作人
+     * @return 新建任务
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
+    public TcAutoScheduleTask createOperationPending(String taskType, String factoryCode, Date scheduleDate,
+                                                     Object requestSnapshot, String operator) {
+        if (this.findActive(factoryCode, scheduleDate) != null) {
+            throw new ServiceException(I18nUtil.getMessage("ui.tc.schedule.concurrentTask"));
+        }
+        TcAutoScheduleTask task = new TcAutoScheduleTask();
+        task.setTaskId("TC-OP-" + IdUtil.fastSimpleUUID().toUpperCase());
+        task.setTaskType(taskType);
+        task.setFactoryCode(factoryCode);
+        task.setScheduleDate(scheduleDate);
+        task.setTaskStatus(TcAutoScheduleTaskStatusEnum.PENDING.getCode());
+        task.setProgress(0);
+        task.setCurrentStage(TcAutoScheduleTaskStatusEnum.PENDING.getCode());
+        task.setCurrentStageName(I18nUtil.getMessage("ui.tc.schedule.operationTaskPending"));
+        task.setRequestSnapshot(JSON.toJSONString(requestSnapshot));
+        task.setCreateBy(StrUtil.blankToDefault(operator, "system"));
+        if (this.taskMapper.insert(task) != 1) {
+            throw new ServiceException(I18nUtil.getMessage("ui.tc.schedule.operationTaskCreateFailed"));
+        }
+        return task;
+    }
 
     /**
      * 按任务ID查询后台任务。
@@ -78,6 +116,22 @@ public class TcBackgroundTaskService {
     }
 
     /**
+     * 查询最近一次人工操作任务。
+     *
+     * @param factoryCode 工厂编码
+     * @param scheduleDate 排程日期
+     * @return 最近任务，不存在返回null
+     */
+    public TcAutoScheduleTask findLatestOperation(String factoryCode, Date scheduleDate) {
+        return this.taskMapper.selectOne(new LambdaQueryWrapper<TcAutoScheduleTask>()
+                .eq(TcAutoScheduleTask::getFactoryCode, factoryCode)
+                .eq(TcAutoScheduleTask::getScheduleDate, scheduleDate)
+                .in(TcAutoScheduleTask::getTaskType, TcBackgroundTaskTypeEnum.manualOperationCodes())
+                .orderByDesc(TcAutoScheduleTask::getCreateTime)
+                .last("limit 1"));
+    }
+
+    /**
      * 查询指定MES数据版本任务。
      *
      * @param mesDataVersion MES数据版本
@@ -111,6 +165,27 @@ public class TcBackgroundTaskService {
                 .set(TcAutoScheduleTask::getProgress, 10)
                 .set(TcAutoScheduleTask::getCurrentStage, stage)
                 .set(TcAutoScheduleTask::getCurrentStageName, stageName)
+                .set(TcAutoScheduleTask::getStartTime, now)
+                .set(TcAutoScheduleTask::getLastHeartbeatTime, now)) == 1;
+    }
+
+    /**
+     * 启动人工操作任务。
+     *
+     * @param taskId 任务编号
+     * @return 是否启动成功
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
+    public boolean startOperation(String taskId) {
+        Date now = new Date();
+        return this.taskMapper.update(null, new LambdaUpdateWrapper<TcAutoScheduleTask>()
+                .eq(TcAutoScheduleTask::getTaskId, taskId)
+                .eq(TcAutoScheduleTask::getTaskStatus, TcAutoScheduleTaskStatusEnum.PENDING.getCode())
+                .set(TcAutoScheduleTask::getTaskStatus, TcAutoScheduleTaskStatusEnum.RUNNING.getCode())
+                .set(TcAutoScheduleTask::getProgress, 20)
+                .set(TcAutoScheduleTask::getCurrentStage, "VALIDATING")
+                .set(TcAutoScheduleTask::getCurrentStageName,
+                        I18nUtil.getMessage("ui.tc.schedule.operationTaskValidating"))
                 .set(TcAutoScheduleTask::getStartTime, now)
                 .set(TcAutoScheduleTask::getLastHeartbeatTime, now)) == 1;
     }
@@ -199,6 +274,83 @@ public class TcBackgroundTaskService {
                         issues == null ? new ArrayList<>() : issues))
                 .set(TcAutoScheduleTask::getEndTime, now)
                 .set(TcAutoScheduleTask::getLastHeartbeatTime, now)) == 1;
+    }
+
+    /**
+     * 标记人工操作任务成功。
+     *
+     * @param taskId 任务编号
+     * @param affectedCount 影响行数
+     * @return 是否更新成功
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
+    public boolean markOperationSuccess(String taskId, int affectedCount) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("affectedCount", affectedCount);
+        Date now = new Date();
+        return this.taskMapper.update(null, new LambdaUpdateWrapper<TcAutoScheduleTask>()
+                .eq(TcAutoScheduleTask::getTaskId, taskId)
+                .eq(TcAutoScheduleTask::getTaskStatus, TcAutoScheduleTaskStatusEnum.RUNNING.getCode())
+                .set(TcAutoScheduleTask::getTaskStatus, TcAutoScheduleTaskStatusEnum.SUCCESS.getCode())
+                .set(TcAutoScheduleTask::getProgress, 100)
+                .set(TcAutoScheduleTask::getCurrentStage, "SUCCESS")
+                .set(TcAutoScheduleTask::getCurrentStageName,
+                        I18nUtil.getMessage("ui.tc.schedule.operationTaskSuccess"))
+                .set(TcAutoScheduleTask::getResultJson, JSON.toJSONString(result))
+                .set(TcAutoScheduleTask::getEndTime, now)
+                .set(TcAutoScheduleTask::getLastHeartbeatTime, now)) == 1;
+    }
+
+    /**
+     * 标记人工操作任务失败。
+     *
+     * @param taskId 任务编号
+     * @param errorMessage 错误摘要
+     * @return 是否更新成功
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
+    public boolean markOperationFailed(String taskId, String errorMessage) {
+        Date now = new Date();
+        String normalizedError = this.truncateError(errorMessage);
+        return this.taskMapper.update(null, new LambdaUpdateWrapper<TcAutoScheduleTask>()
+                .eq(TcAutoScheduleTask::getTaskId, taskId)
+                .in(TcAutoScheduleTask::getTaskStatus, Arrays.asList(
+                        TcAutoScheduleTaskStatusEnum.PENDING.getCode(),
+                        TcAutoScheduleTaskStatusEnum.RUNNING.getCode()))
+                .set(TcAutoScheduleTask::getTaskStatus, TcAutoScheduleTaskStatusEnum.FAILED.getCode())
+                .set(TcAutoScheduleTask::getCurrentStage, "FAILED")
+                .set(TcAutoScheduleTask::getCurrentStageName,
+                        I18nUtil.getMessage("ui.tc.schedule.operationTaskFailed"))
+                .set(TcAutoScheduleTask::getErrorMessage, normalizedError)
+                .set(TcAutoScheduleTask::getErrorSummary, normalizedError)
+                .set(TcAutoScheduleTask::getEndTime, now)
+                .set(TcAutoScheduleTask::getLastHeartbeatTime, now)) == 1;
+    }
+
+    /**
+     * 转换为人工操作轮询响应。
+     *
+     * @param task 任务实体
+     * @return 人工操作任务响应
+     */
+    public TcOperationTaskVo toOperationTaskVo(TcAutoScheduleTask task) {
+        if (task == null) {
+            return null;
+        }
+        TcOperationTaskVo response = new TcOperationTaskVo();
+        response.setTaskId(task.getTaskId());
+        response.setTaskType(task.getTaskType());
+        response.setTaskStatus(task.getTaskStatus());
+        response.setProgress(task.getProgress());
+        response.setCurrentStage(task.getCurrentStage());
+        response.setCurrentStageName(task.getCurrentStageName());
+        response.setMessage(task.getErrorMessage());
+        response.setFactoryCode(task.getFactoryCode());
+        response.setScheduleDate(task.getScheduleDate());
+        if (StrUtil.isNotBlank(task.getResultJson())) {
+            response.setAffectedCount(JSON.parseObject(task.getResultJson()).getInteger("affectedCount"));
+        }
+        return response;
     }
 
     /**

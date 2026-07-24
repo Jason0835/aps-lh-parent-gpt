@@ -16,6 +16,7 @@ import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.mp.api.domain.vo.MpCheckItemVo;
+import com.zlt.aps.mp.engine.basedata.assemble.appoint.GroupAppointHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.cyclegroup.CycleGroupDataHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.datalist.GroupListHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.history.CxMachineProductionHistoryInfo;
@@ -62,17 +63,21 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
 
     private final GroupListHandler groupListHandler;
 
+    private final GroupAppointHandler groupAppointHandler;
+
     private final ProductionHistoryHandler productionHistoryHandler;
 
 
     public AbstractDataLoaderService(GroupListHandler groupListHandler,
                                      ProductionMdmDataService dataService,
+                                     GroupAppointHandler groupAppointHandler,
                                      DpRequireDataService dpRequireDataService,
                                      CycleGroupDataHandler cycleGroupDataHandler,
                                      ProductionHistoryHandler productionHistoryHandler,
                                      MonthProductionDataService monthProductionDataService) {
         super(dataService, dpRequireDataService, cycleGroupDataHandler, monthProductionDataService);
         this.groupListHandler = groupListHandler;
+        this.groupAppointHandler = groupAppointHandler;
         this.productionHistoryHandler = productionHistoryHandler;
     }
 
@@ -175,6 +180,8 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         productionContext.getBaseDataContainer().setCxMachineProductionHistoryInfo(cxMachineProductionHistoryInfo);
         Map<String, GroupPlanProductionHistoryInfo> groupPlanHistoryInfoMap = productionHistoryHandler.buildGroupPlanProductionHistory(productionContext, historyAllocationList);
         productionContext.getBaseDataContainer().setGroupPlanHistoryInfoMap(groupPlanHistoryInfoMap);
+        //17、加载特定结构机台排产范围信息
+        groupAppointHandler.loadAppointInfo(productionContext);
         if (CollectionUtils.isEmpty(requirePlanList)) {
             return;
         }

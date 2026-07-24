@@ -16,6 +16,7 @@ import com.zlt.aps.tc.engine.validator.TcInsertPositionValidator;
 import com.zlt.aps.tc.mapper.TcDispatcherLogMapper;
 import com.zlt.aps.tc.mapper.TcScheduleResultMapper;
 import com.zlt.aps.tc.service.TcAutoScheduleTaskService;
+import com.zlt.aps.tc.service.TcOperationAuditContext;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.stereotype.Service;
@@ -527,8 +528,9 @@ public class TcManualOperationFacade {
      */
     private void recordDispatcherLog(String operationType, TcScheduleResult operationResult, String reason,
                                      List<TcScheduleResult> beforeList, List<TcScheduleResult> afterList) {
+        String asynchronousOperator = TcOperationAuditContext.getOperator();
         this.recordDispatcherLog(operationType, operationResult, reason, beforeList, afterList,
-                SecurityUtils.getUsername());
+                StrUtil.isNotBlank(asynchronousOperator) ? asynchronousOperator : SecurityUtils.getUsername());
     }
 
     /**

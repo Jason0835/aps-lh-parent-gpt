@@ -10,10 +10,7 @@ import com.zlt.aps.mp.engine.daylimit.*;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.CxMouldDayProductionHelper;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
-import com.zlt.aps.mp.engine.domain.vo.CxMachineBaseInfoVo;
-import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductMouldInfoVo;
-import com.zlt.aps.mp.engine.domain.vo.MonthPlanStructureLhRatioVo;
-import com.zlt.aps.mp.engine.domain.vo.ProductionMouldInfoVo;
+import com.zlt.aps.mp.engine.domain.vo.*;
 import com.zlt.aps.mp.engine.logrecorder.DayLimitLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
 import lombok.Data;
@@ -136,6 +133,11 @@ public class BaseDataContainer implements Serializable {
      * key=分组名 : value=机台数
      */
     private Map<String, Integer> groupMachineLimitMap;
+    /**
+     * 20260713+ 当月特殊的指定生产信息
+     * key=分组名 : value=指定生产信息(成型机台/生产天数)
+     */
+    private Map<String, GroupAppointProductionInfoVo> appointMap;
 
     /**
      * 判断同结构下前后两个Sku是否共用模具
@@ -198,6 +200,23 @@ public class BaseDataContainer implements Serializable {
             return Collections.emptyList();
         }
         return ratioList;
+    }
+
+    /**
+     * 20260714+
+     * 根据成型机编码，获取成型对象信息
+     *
+     * @param cxMachineCode 成型机编码
+     * @return
+     */
+    public CxMachineBaseInfoVo getCxMachineInfoByCode(String cxMachineCode) {
+        if (StringUtils.isBlank(cxMachineCode)) {
+            return null;
+        }
+        if (CollectionUtils.isEmpty(cxMachineBaseInfo)) {
+            return null;
+        }
+        return cxMachineBaseInfo.get(cxMachineCode);
     }
 
     /**

@@ -9,6 +9,7 @@ import com.zlt.aps.enums.MonthPlanNoProductionReasonEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.api.domain.entity.MpCheckItemRecord;
 import com.zlt.aps.mp.api.domain.vo.MpCheckItemVo;
+import com.zlt.aps.mp.engine.basedata.assemble.appoint.GroupAppointHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.calendar.WorkerCalendarHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.cyclegroup.CycleGroupDataHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.datalist.GroupListHandler;
@@ -52,20 +53,18 @@ public class MpCheckItemServiceImpl extends AbstractDataLoaderService implements
 
     private final IMpCheckItemRecordService iMpCheckItemRecordService;
 
-    private final CycleGroupDataHandler cycleGroupDataHandler;
-
     private final WorkerCalendarHandler workerCalendarHandler;
 
     public MpCheckItemServiceImpl(GroupListHandler groupListHandler,
                                   ProductionMdmDataService dataService,
+                                  GroupAppointHandler groupAppointHandler,
                                   DpRequireDataService dpRequireDataService,
                                   CycleGroupDataHandler cycleGroupDataHandler,
                                   WorkerCalendarHandler workerCalendarHandler,
                                   ProductionHistoryHandler productionHistoryHandler,
                                   IMpCheckItemRecordService iMpCheckItemRecordService,
                                   MonthProductionDataService monthProductionDataService) {
-        super(groupListHandler, dataService, dpRequireDataService, cycleGroupDataHandler, productionHistoryHandler, monthProductionDataService);
-        this.cycleGroupDataHandler = cycleGroupDataHandler;
+        super(groupListHandler, dataService, groupAppointHandler, dpRequireDataService, cycleGroupDataHandler, productionHistoryHandler, monthProductionDataService);
         this.workerCalendarHandler = workerCalendarHandler;
         this.iMpCheckItemRecordService = iMpCheckItemRecordService;
     }

@@ -2086,8 +2086,6 @@ public class TcMachineAssignService implements ITcMachineAssignService {
      */
     private void prepareCandidatesForTask(TcTaskDraft task, TcScheduleContext context,
                                           List<TcMachineCandidate> candidates) {
-        boolean hasGlueAllowRule = candidates.stream()
-                .anyMatch(candidate -> contains(candidate.getAllowedGlueCodes(), task.getGlueCode()));
         boolean hasFixedAllowRule = candidates.stream()
                 .anyMatch(candidate -> contains(candidate.getConfiguredFixedAllowSidewallCodes(), task.getSidewallCode()));
         for (TcMachineCandidate candidate : candidates) {
@@ -2097,7 +2095,7 @@ public class TcMachineAssignService implements ITcMachineAssignService {
             candidate.setMachineSpeed(machineSpeed);
             candidate.setRemainCapacity(remainCapacity);
             candidate.setMouthPlateMatched(isMouthPlateMatched(task, candidate));
-            candidate.setGlueMachineMatched(isGlueMachineMatched(task, candidate, hasGlueAllowRule));
+            candidate.setGlueMachineMatched(isGlueMachineMatched(task, candidate));
             boolean fixedAllowMatched = contains(candidate.getFixedAllowSidewallCodes(), task.getSidewallCode());
             candidate.setFixedMachineSelected(!hasFixedAllowRule || fixedAllowMatched);
             candidate.setFixedMachineMatched(fixedAllowMatched);
@@ -2135,7 +2133,7 @@ public class TcMachineAssignService implements ITcMachineAssignService {
         if (StrUtil.isBlank(task.getMouthPlateCode())) {
             return true;
         }
-        if (!contains(candidate.getConfiguredMouthPlateCodes(), task.getMouthPlateCode())) {
+        if (CollUtil.isEmpty(candidate.getConfiguredMouthPlateCodes())) {
             return true;
         }
         return contains(candidate.getMouthPlateCodes(), task.getMouthPlateCode());
@@ -2144,21 +2142,23 @@ public class TcMachineAssignService implements ITcMachineAssignService {
     /**
      * 判断当前任务胶料是否符合候选机台胶料关系。
      *
-     * <p>禁用关系始终优先排除；存在允许配置时按允许机台白名单筛选；没有允许配置时不限制。</p>
+     * <p>禁用关系始终优先排除；当前机台没有配置任务主胶料时不限制，存在配置时按本机关系判断。</p>
      *
      * @param task             待排任务草稿
      * @param candidate        候选机台
-     * @param hasGlueAllowRule 当前任务主胶料是否存在允许配置
      * @return true 表示匹配
      */
-    private boolean isGlueMachineMatched(TcTaskDraft task, TcMachineCandidate candidate, boolean hasGlueAllowRule) {
+    private boolean isGlueMachineMatched(TcTaskDraft task, TcMachineCandidate candidate) {
         if (StrUtil.isBlank(task.getGlueCode())) {
             return true;
         }
         if (contains(candidate.getForbiddenGlueCodes(), task.getGlueCode())) {
             return false;
         }
-        return !hasGlueAllowRule || contains(candidate.getAllowedGlueCodes(), task.getGlueCode());
+        if (!contains(candidate.getConfiguredGlueCodes(), task.getGlueCode())) {
+            return true;
+        }
+        return contains(candidate.getAllowedGlueCodes(), task.getGlueCode());
     }
 
     /**
@@ -2175,7 +2175,7 @@ public class TcMachineAssignService implements ITcMachineAssignService {
             return speed;
         }
         // 无胎侧规格速度时，使用最大产能 / 班次小时数作为机台生产速度
-        BigDecimal maxCapacity = nvl(candidate.getMaxCapacity());
+        BigDecimal maxCapacity = this.resolveMachineMaxCapacity(candidate);
         BigDecimal shiftHours = nvl(context.getShiftHoursMap().get(task.getShiftOrder()));
         if (maxCapacity.compareTo(BigDecimal.ZERO) > 0 && shiftHours.compareTo(BigDecimal.ZERO) > 0) {
         return maxCapacity.divide(shiftHours, TcScheduleConstants.DECIMAL_CALCULATION_SCALE,
@@ -2196,9 +2196,7 @@ public class TcMachineAssignService implements ITcMachineAssignService {
     private BigDecimal resolveRemainCapacityWithoutNewSwitch(TcTaskDraft task, TcScheduleContext context,
                                                               TcMachineCandidate candidate,
                                                               BigDecimal machineSpeed) {
-        BigDecimal maxCapacity = candidate.getMaxCapacity() == null
-                ? candidate.getRemainCapacity() : candidate.getMaxCapacity();
-        maxCapacity = this.applyShiftMaxCapacity(context, maxCapacity);
+        BigDecimal maxCapacity = this.resolveMachineMaxCapacity(candidate);
         BigDecimal maintenanceDeduct = this.resolveMaintenanceHours(task, candidate).multiply(this.nvl(machineSpeed));
         BigDecimal assignedPlanQty = this.resolveAssignedPlanQty(context, candidate.getMachineCode(),
                 task.getShiftOrder());
@@ -2230,9 +2228,7 @@ public class TcMachineAssignService implements ITcMachineAssignService {
      */
     private BigDecimal resolvePrependRemainCapacity(TcTaskDraft task, TcScheduleContext context,
                                                     TcMachineCandidate candidate, BigDecimal machineSpeed) {
-        BigDecimal maxCapacity = candidate.getMaxCapacity() == null
-                ? candidate.getRemainCapacity() : candidate.getMaxCapacity();
-        maxCapacity = this.applyShiftMaxCapacity(context, maxCapacity);
+        BigDecimal maxCapacity = this.resolveMachineMaxCapacity(candidate);
         BigDecimal maintenanceDeduct = this.resolveMaintenanceHours(task, candidate).multiply(this.nvl(machineSpeed));
         BigDecimal assignedPlanQty = this.resolveAssignedPlanQty(context, candidate.getMachineCode(),
                 task.getShiftOrder());
@@ -2321,8 +2317,7 @@ public class TcMachineAssignService implements ITcMachineAssignService {
      */
     private BigDecimal resolveRemainCapacity(TcTaskDraft task, TcScheduleContext context,
                                              TcMachineCandidate candidate, BigDecimal machineSpeed) {
-        BigDecimal maxCapacity = candidate.getMaxCapacity() == null ? candidate.getRemainCapacity() : candidate.getMaxCapacity();
-        maxCapacity = this.applyShiftMaxCapacity(context, maxCapacity);
+        BigDecimal maxCapacity = this.resolveMachineMaxCapacity(candidate);
         BigDecimal maintenanceDeduct = this.resolveMaintenanceHours(task, candidate).multiply(nvl(machineSpeed));
         BigDecimal assignedPlanQty = resolveAssignedPlanQty(context, candidate.getMachineCode(), task.getShiftOrder());
         BigDecimal existingSwitchDeduct = this.resolveExistingSwitchDeduct(context, candidate.getMachineCode(),
@@ -2344,22 +2339,17 @@ public class TcMachineAssignService implements ITcMachineAssignService {
     }
 
     /**
-     * 应用胎侧单机单班最大可排量限制。
+     * 解析候选机台最大班产，基础数据无效时使用固定兼容值。
      *
-     * @param context 排程上下文
-     * @param machineCapacity 机台原始班产能
-     * @return 参数上限与机台产能的较小值
+     * @param candidate 候选机台
+     * @return 正数最大班产
      */
-    private BigDecimal applyShiftMaxCapacity(TcScheduleContext context, BigDecimal machineCapacity) {
-        BigDecimal shiftMaxCapacity = new BigDecimal(context.getParam(
-                TcScheduleConstants.PARAM_SHIFT_MAX_CAPACITY).getEffectiveValue());
-        if (shiftMaxCapacity.compareTo(BigDecimal.ZERO) <= 0) {
-            return this.nvl(machineCapacity);
+    private BigDecimal resolveMachineMaxCapacity(TcMachineCandidate candidate) {
+        BigDecimal maxCapacity = candidate == null ? null : candidate.getMaxCapacity();
+        if (maxCapacity == null || maxCapacity.compareTo(BigDecimal.ZERO) <= 0) {
+            return new BigDecimal(TcScheduleConstants.DEFAULT_MACHINE_MAX_CAPACITY);
         }
-        if (machineCapacity == null || machineCapacity.compareTo(BigDecimal.ZERO) <= 0) {
-            return shiftMaxCapacity;
-        }
-        return machineCapacity.min(shiftMaxCapacity);
+        return maxCapacity;
     }
 
 

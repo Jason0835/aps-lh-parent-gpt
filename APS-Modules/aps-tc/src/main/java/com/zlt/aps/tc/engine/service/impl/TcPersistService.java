@@ -174,7 +174,7 @@ public class TcPersistService {
                 "SIDEWALL_LENGTH/CURL_LENGTH", task.getCalcFormulaDesc());
         this.addBreakdownItem(itemArray, "CAPACITY", "机台产能调整",
                 null, task.getPlanQty(), nvl(task.getCapacityAdjustQty()),
-                TcScheduleConstants.PARAM_SHIFT_MAX_CAPACITY, "单机单班产能限制与顺延");
+                "T_TC_MACHINE_INFO.MAX_CAPACITY", "机台最大班产限制与顺延");
         result.set("items", itemArray);
         return JSONUtil.toJsonPrettyStr(result);
     }
