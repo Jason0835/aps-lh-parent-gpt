@@ -3274,11 +3274,14 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
 
             LhScheduleResult pendingCloseOutRow = pendingCloseOutRowMap.get(machineCode);
             if (Objects.nonNull(pendingCloseOutRow) && hasAnyPlanQty(result)) {
-                styleFlag.setMachineCodeGray(true);
-                styleFlag.setMaterialInfoGray(true);
-                ExportRowStyleFlag closeOutStyleFlag = styleFlagMap.get(pendingCloseOutRow);
-                if (Objects.nonNull(closeOutStyleFlag)) {
-                    closeOutStyleFlag.setMachineCodeGray(true);
+                // 同物料不同产品状态切换（如正规→量试→试制）不是新开规格，不涂灰
+                if (!StringUtils.equals(result.getMaterialCode(), pendingCloseOutRow.getMaterialCode())) {
+                    styleFlag.setMachineCodeGray(true);
+                    styleFlag.setMaterialInfoGray(true);
+                    ExportRowStyleFlag closeOutStyleFlag = styleFlagMap.get(pendingCloseOutRow);
+                    if (Objects.nonNull(closeOutStyleFlag)) {
+                        closeOutStyleFlag.setMachineCodeGray(true);
+                    }
                 }
             }
 
