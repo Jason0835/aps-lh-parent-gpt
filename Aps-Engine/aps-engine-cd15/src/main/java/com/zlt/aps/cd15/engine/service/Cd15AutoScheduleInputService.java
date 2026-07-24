@@ -16,10 +16,15 @@ public interface Cd15AutoScheduleInputService {
      * @param factoryCode 工厂编码
      * @param scheduleDate 排程日期
      * @param classField 斜裁结果班次字段
-     * @param shiftCode 业务班次编码，用于读取班次基础数据
+     * @param shiftCode 当前业务班次编码
+     * @param resourceBaselineDate 库排资源基线日期
+     * @param resourceBaselineShiftCode 库排资源基线班次
      * @param agingPeriodHours 大卷静置时长（小时）
      * @return 标准化输入数据
      */
     Cd15AutoScheduleInput load(String factoryCode, LocalDate scheduleDate,
-                               String classField, String shiftCode, int agingPeriodHours);
+                               String classField, String shiftCode,
+                               LocalDate resourceBaselineDate,
+                               String resourceBaselineShiftCode,
+                               int agingPeriodHours);
 }

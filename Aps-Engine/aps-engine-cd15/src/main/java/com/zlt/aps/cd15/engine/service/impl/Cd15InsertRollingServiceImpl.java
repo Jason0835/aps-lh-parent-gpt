@@ -209,6 +209,8 @@ public class Cd15InsertRollingServiceImpl implements Cd15InsertRollingService {
             int classIndex = classIndex(shift.getClassField());
             Cd15AutoScheduleInput input = inputService.load(context.getFactoryCode(),
                     context.getScheduleDate(), shift.getClassField(), shift.getShiftCode(),
+                    context.getResourceBaselineDate(),
+                    context.getResourceBaselineShiftCode(),
                     context.getParameters().getAgingPeriodHours());
             Cd15MachineResourceSnapshot machineSnapshot = machineResourceService.load(
                     context.getFactoryCode(), shift.getStartTime(), shift.getEndTime());
@@ -713,7 +715,9 @@ public class Cd15InsertRollingServiceImpl implements Cd15InsertRollingService {
                     .calculateForPlanQuantity(segment.quantity,
                             taskMaterial.getUnitConsumeMillimeter(),
                             taskMaterial.getCraftWidth(),
-                            taskMaterial.getCordWidth());
+                            taskMaterial.getCordWidth(),
+                            taskMaterial.getSteelStripCode(),
+                            taskMaterial.getBigRollCode());
             String bigRollFailureReason = this.bigRollFailureReason(
                     input, segment.result, resourceState);
             Cd15BigRollAgingAllocation agingPreview =
@@ -827,7 +831,9 @@ public class Cd15InsertRollingServiceImpl implements Cd15InsertRollingService {
                         .calculateForPlanQuantity(scheduled,
                                 taskMaterial.getUnitConsumeMillimeter(),
                                 taskMaterial.getCraftWidth(),
-                                taskMaterial.getCordWidth());
+                                taskMaterial.getCordWidth(),
+                                taskMaterial.getSteelStripCode(),
+                                taskMaterial.getBigRollCode());
                 Cd15BigRollAgingAllocation allocation = this.bigRollAgingAllocator.allocate(
                         resourceState.getBigRollAgingStocks(),
                         segment.result.getBigRollCode(),
@@ -1057,10 +1063,12 @@ public class Cd15InsertRollingServiceImpl implements Cd15InsertRollingService {
         Cd15ShiftResourceState working = this.copyShiftState(resourceState);
         BigDecimal firstConsume = bigRollMeterCalculator.calculateForPlanQuantity(
                 first.quantity, firstMaterial.getUnitConsumeMillimeter(),
-                firstMaterial.getCraftWidth(), firstMaterial.getCordWidth());
+                firstMaterial.getCraftWidth(), firstMaterial.getCordWidth(),
+                firstMaterial.getSteelStripCode(), firstMaterial.getBigRollCode());
         BigDecimal secondConsume = bigRollMeterCalculator.calculateForPlanQuantity(
                 second.quantity, secondMaterial.getUnitConsumeMillimeter(),
-                secondMaterial.getCraftWidth(), secondMaterial.getCordWidth());
+                secondMaterial.getCraftWidth(), secondMaterial.getCordWidth(),
+                secondMaterial.getSteelStripCode(), secondMaterial.getBigRollCode());
         int fullSeconds = Math.max(1, shift.getDurationSeconds());
         LocalDateTime originalStart = shift.getStartTime().plusSeconds(
                 Math.max(0, fullSeconds - remainingSeconds));
@@ -1439,7 +1447,8 @@ public class Cd15InsertRollingServiceImpl implements Cd15InsertRollingService {
         BigDecimal consumption = this.bigRollMeterCalculator
                 .calculateForPlanQuantity(quantity,
                         material.getUnitConsumeMillimeter(),
-                        material.getCraftWidth(), material.getCordWidth());
+                        material.getCraftWidth(), material.getCordWidth(),
+                        material.getSteelStripCode(), material.getBigRollCode());
         Cd15BigRollAgingAllocation allocation = this.bigRollAgingAllocator.allocate(
                 state.getBigRollAgingStocks(), result.getBigRollCode(),
                 consumption, originalStart);
@@ -1919,7 +1928,7 @@ public class Cd15InsertRollingServiceImpl implements Cd15InsertRollingService {
 
     private int continuityRank(Segment segment, Cd15MachineTailState previousTail) {
         if (segment == null || segment.result == null || previousTail == null) {
-            return 3;
+            return 5;
         }
         boolean sameSpec = Objects.equals(
                 previousTail.getSteelStripCode(), segment.result.getSteelStripCode())
@@ -1927,13 +1936,21 @@ public class Cd15InsertRollingServiceImpl implements Cd15InsertRollingService {
                         previousTail.getCuttingAngle(), segment.result.getCuttingAngle());
         boolean sameRoll = Objects.equals(
                 previousTail.getBigRollCode(), segment.result.getBigRollCode());
+        boolean sameAngle = Objects.equals(
+                previousTail.getCuttingAngle(), segment.result.getCuttingAngle());
         if (sameSpec && sameRoll) {
             return 0;
         }
         if (sameSpec) {
             return 1;
         }
-        return sameRoll ? 2 : 3;
+        if (sameRoll && sameAngle) {
+            return 2;
+        }
+        if (sameRoll) {
+            return 3;
+        }
+        return sameAngle ? 4 : 5;
     }
 
     private void mergeCarryovers(List<Segment> segments,

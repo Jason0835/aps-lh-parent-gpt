@@ -74,10 +74,13 @@ public class Cd15MultiShiftScheduleExecutor {
             runtimeGuard.checkNotTimedOut(context, shiftStageName(shift, "班次开始"));
             progressListener.onProgress(progress(index, shiftCount), "SHIFT_EXECUTION",
                     shiftStageName(shift, "班次开始"), shift);
-            // 每班重新读取需求、库存和库排，不能复用首班输入，否则滚动数据变化无法生效。
+            // 每班重新读取需求、库存和大卷数据；库排始终读取任务启动时当前班次基线。
             Cd15AutoScheduleInput input = inputService.load(
                     context.getFactoryCode(), context.getScheduleDate(),
-                    shift.getClassField(), shift.getShiftCode(), context.getParameters().getAgingPeriodHours());
+                    shift.getClassField(), shift.getShiftCode(),
+                    context.getResourceBaselineDate(),
+                    context.getResourceBaselineShiftCode(),
+                    context.getParameters().getAgingPeriodHours());
             if (rolling == null) {
                 steelStripSourceTraceBySteelStrip = input.getSteelStripSourceTraceBySteelStrip() == null
                         ? Collections.emptyMap()

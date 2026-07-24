@@ -9,6 +9,7 @@ import com.zlt.aps.cd15.api.domain.entity.Cd15StorageLaneLimit;
 import com.zlt.aps.cd15.engine.algorithm.Cd15BigRollAgingStockBuilder;
 import com.zlt.aps.cd15.engine.algorithm.Cd15SteelStripDepthResolver;
 import com.zlt.aps.cd15.engine.algorithm.Cd15SteelStripSourceTraceResolver;
+import com.zlt.aps.cd15.engine.algorithm.Cd15StorageLaneBaselineValidator;
 import com.zlt.aps.cd15.engine.mapper.Cd15AutoScheduleSourceMapper;
 import com.zlt.aps.cd15.engine.mapper.Cd15ConstructionMaterialMapper;
 import com.zlt.aps.cd15.engine.algorithm.Cd15FormingDemandExpander;
@@ -76,23 +77,32 @@ public class Cd15AutoScheduleInputServiceImpl implements Cd15AutoScheduleInputSe
     private final Cd15FormingDemandExpander formingDemandExpander;
     private final Cd15SteelStripDepthResolver steelStripDepthResolver;
     private final Cd15SteelStripSourceTraceResolver steelStripSourceTraceResolver;
+    private final Cd15StorageLaneBaselineValidator storageLaneBaselineValidator;
 
     /**
-     * 加载第1至5步所需的成型计划、施工、6点库存和当前班次库排快照。
+     * 加载第1至5步所需的成型计划、施工、6点库存和任务启动时当前班次库排基线。
      *
      * @param factoryCode 工厂编码
      * @param scheduleDate 排程日期
      * @param classField 斜裁结果班次字段
-     * @param shiftCode 业务班次编码，用于匹配库排班次
+     * @param shiftCode 当前业务班次编码
+     * @param resourceBaselineDate 库排资源基线日期
+     * @param resourceBaselineShiftCode 库排资源基线班次
+     * @param agingPeriodHours 大卷静置时长（小时）
      * @return 标准化输入数据
      */
     @Override
     public Cd15AutoScheduleInput load(String factoryCode, LocalDate scheduleDate,
-                                      String classField, String shiftCode, int agingPeriodHours) {
+                                      String classField, String shiftCode,
+                                      LocalDate resourceBaselineDate,
+                                      String resourceBaselineShiftCode,
+                                      int agingPeriodHours) {
         Assert.hasText(factoryCode, "工厂编码不能为空");
         Assert.notNull(scheduleDate, "排程日期不能为空");
         Assert.hasText(classField, "班次字段不能为空");
         Assert.hasText(shiftCode, "班次编码不能为空");
+        Assert.notNull(resourceBaselineDate, "库排资源基线日期不能为空");
+        Assert.hasText(resourceBaselineShiftCode, "库排资源基线班次不能为空");
 
         LocalDate formingStartDate = scheduleDate.minusDays(1);
         LocalDate formingEndDate = scheduleDate.plusDays(3);
@@ -140,13 +150,17 @@ public class Cd15AutoScheduleInputServiceImpl implements Cd15AutoScheduleInputSe
                 .map(sourceMapper::mapStock)
                 .collect(Collectors.toList());
 
-        List<Cd15StorageLaneState> storageLanesAtSix = storageLaneMapper.selectList(
-                        Wrappers.<Cd15StorageLaneLimit>lambdaQuery()
-                                .eq(Cd15StorageLaneLimit::getFactoryCode, factoryCode)
-                                .eq(Cd15StorageLaneLimit::getLaneDate, Date.valueOf(scheduleDate))
-                                .eq(Cd15StorageLaneLimit::getShiftCode, shiftCode)
-                                .orderByAsc(Cd15StorageLaneLimit::getStorageLaneCode))
-                .stream()
+        List<Cd15StorageLaneLimit> storageLaneBaseline = storageLaneMapper.selectList(
+                Wrappers.<Cd15StorageLaneLimit>lambdaQuery()
+                        .eq(Cd15StorageLaneLimit::getFactoryCode, factoryCode)
+                        .eq(Cd15StorageLaneLimit::getLaneDate,
+                                Date.valueOf(resourceBaselineDate))
+                        .eq(Cd15StorageLaneLimit::getShiftCode,
+                                resourceBaselineShiftCode)
+                        .orderByAsc(Cd15StorageLaneLimit::getStorageLaneCode));
+        this.storageLaneBaselineValidator.validateUnique(
+                resourceBaselineDate, resourceBaselineShiftCode, storageLaneBaseline);
+        List<Cd15StorageLaneState> storageLanesAtSix = storageLaneBaseline.stream()
                 .map(sourceMapper::mapStorageLane)
                 .collect(Collectors.toList());
 
@@ -175,12 +189,12 @@ public class Cd15AutoScheduleInputServiceImpl implements Cd15AutoScheduleInputSe
 
         log.info("[斜裁自动排程] 输入数据加载完成, factoryCode={}, scheduleDate={}, classField={}, shiftCode={}, "
                         + "formingRange={}~{}, formingCount={}, constructionMaterialCount={}, "
-                        + "demandShiftCount={}, depthSteelStripCount={}, resourceBaselineShiftCode={}, "
-                        + "stockCount={}, storageLaneCount={}",
+                        + "demandShiftCount={}, depthSteelStripCount={}, resourceBaselineDate={}, "
+                        + "resourceBaselineShiftCode={}, stockCount={}, storageLaneCount={}",
                 factoryCode, scheduleDate, classField, shiftCode, formingStartDate, formingEndDate,
                 formingSchedules.size(), constructionMaterials.size(), demandShifts.size(),
-                depthClassQtyBySteelStrip.size(), shiftCode, stocksAtSix.size(),
-                storageLanesAtSix.size());
+                depthClassQtyBySteelStrip.size(), resourceBaselineDate,
+                resourceBaselineShiftCode, stocksAtSix.size(), storageLanesAtSix.size());
 
         return Cd15AutoScheduleInput.builder()
                 .formingSchedules(formingSchedules)

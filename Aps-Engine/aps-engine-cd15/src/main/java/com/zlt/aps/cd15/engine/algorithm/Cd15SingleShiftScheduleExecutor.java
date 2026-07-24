@@ -25,6 +25,7 @@ import com.zlt.aps.cd15.engine.model.Cd15ShiftResourceState;
 import com.zlt.aps.cd15.engine.model.Cd15ShiftScheduleTask;
 import com.zlt.aps.cd15.engine.model.Cd15StorageLaneState;
 import com.zlt.aps.cd15.engine.model.Cd15SplitCutGroup;
+import com.zlt.aps.cd15.engine.model.Cd15SpecShiftQuantityLimit;
 import com.zlt.aps.cd15.engine.service.Cd15MachineResourceService;
 import com.zlt.aps.cd15.engine.service.Cd15ScheduleCandidatePreparationService;
 import com.zlt.aps.cd15.engine.service.Cd15ShiftDemandProvider;
@@ -67,6 +68,7 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
     private final Cd15CloseOutCalculator closeOutCalculator;
     private final Cd15ScheduleCandidateSorter candidateSorter;
     private final Cd15SplitCutGroupBuilder splitCutGroupBuilder;
+    private final Cd15SpecShiftQuantityLimitResolver specShiftQuantityLimitResolver;
 
     /**
      * 逐规格执行机台试算和资源原子提交；规格失败不会中断后续候选。
@@ -98,6 +100,7 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
         if (preparedCandidates == null) {
             candidates = new ArrayList<>(candidatePreparationService.prepare(
                     context, input, shift.getClassField(), rolling));
+            attachConstructionFields(candidates, input.getConstructionMaterials());
             appendContinueCandidates(candidates, continueDemandBySteelStrip,
                     lastMachineBySteelStrip, input.getConstructionMaterials());
         } else {
@@ -121,12 +124,23 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
         while (!candidates.isEmpty() || !immediateContinueCandidates.isEmpty()
                 || !shiftStartTailCandidates.isEmpty()) {
             // 本班真实部分排产生的续作要尽量贴在上一段任务尾部继续排，避免被普通候选插队。
+            boolean shiftStartTailSelection = !preservePreparedOrder
+                    && immediateContinueCandidates.isEmpty()
+                    && !shiftStartTailCandidates.isEmpty();
+            int shiftStartTailCount = shiftStartTailCandidates.size();
             Cd15ScheduleCandidate candidate = selectCandidate(candidates, immediateContinueCandidates,
                     shiftStartTailCandidates, state, preservePreparedOrder);
+            this.applyToolingFairShare(candidate, state,
+                    shiftStartTailSelection, shiftStartTailCount);
             String steelStripCode = candidate == null ? null : candidate.getSteelStripCode();
             if (!StringUtils.hasText(steelStripCode)) {
                 continue;
             }
+            attachSourceMachine(candidate, lastMachineBySteelStrip);
+            boolean equalShareSplitContinuation =
+                    this.isSingleSpecSplitEqualShareContinuation(candidate, rolling);
+            boolean singleSpecSplitModeLocked =
+                    this.isSingleSpecSplitModeLocked(candidate, rolling);
             java.util.Optional<Cd15SplitCutGroup> splitGroup = this.splitCutGroupBuilder.find(
                     candidate, candidates, machineSnapshot.getAngleWidthMaxByAngle(),
                     shift.getClassField());
@@ -145,9 +159,11 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
                 }
             }
             if (SINGLE_SPEC_SPLIT_ONLY
-                    && this.splitCutGroupBuilder.canSingleSpecSplit(
+                    && (singleSpecSplitModeLocked
+                    || equalShareSplitContinuation
+                    || this.splitCutGroupBuilder.canSingleSpecSplit(
                             candidate,
-                            machineSnapshot.getAngleWidthMaxByAngle())) {
+                            machineSnapshot.getAngleWidthMaxByAngle()))) {
                 Cd15ShiftResourceState singleSpecSplitState =
                         this.tryExecuteSingleSpecSplit(
                                 context, input, shift, state, rolling,
@@ -159,10 +175,14 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
                     state = singleSpecSplitState;
                     continue;
                 }
+                if (singleSpecSplitModeLocked || equalShareSplitContinuation) {
+                    // 已进入单规格分裁的材料必须保持原模式和原机台，资源不足时顺延，不能降级为单裁。
+                    continue;
+                }
             }
             // 优先使用前序真实部分排留下的续作需求；没有续作时再按库存和前序入库计算本班净需求。
-            attachSourceMachine(candidate, lastMachineBySteelStrip);
             boolean continueDemand = isContinueDemand(candidate, continueDemandBySteelStrip);
+            candidate.setExactContinuationQuantity(continueDemand);
             BigDecimal rawDemand = resolveDemandQuantity(
                     context, input, shift, candidate, rolling, continueDemandBySteelStrip);
             if (rawDemand.signum() <= 0) {
@@ -217,6 +237,12 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
             }
             log.info("[斜裁自动排程] 规格收尾判断完成, classField={}, steelStripCode={}, closeOut={}, details={}",
                     shift.getClassField(), steelStripCode, closeOut.isCloseOut(), closeOut.getEmbryoItems());
+            if (this.deferWhenSpecShiftLimitExhausted(
+                    context, shift, state, candidate, construction, netDemand,
+                    rolling, continueDemandBySteelStrip,
+                    immediateContinueCandidates, attemptTraces, null)) {
+                continue;
+            }
             // 先生成全部可行机台试算，再由资源提交器按优先级逐个尝试库排和工装占用。
             Cd15MachineTrialPlan trialPlan = trialPreparationService.prepare(
                     trialRequest(context, shift, state, construction, netDemand,
@@ -254,7 +280,8 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
                     attemptTraces.size() + 1));
             this.handleRemainingDemand(shift, candidate, netDemand, scheduledQuantity,
                     commit.getTask().getMachineCode(), partialReason, rolling,
-                    continueDemandBySteelStrip, immediateContinueCandidates);
+                    continueDemandBySteelStrip, immediateContinueCandidates,
+                    commit.getEqualShareRemainderQuantity());
         }
         saveContinueDemand(rolling, continueDemandBySteelStrip);
         log.info("[斜裁自动排程] 当前班次执行完成, classField={}, taskCount={}, failureCount={}",
@@ -382,12 +409,50 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
         if (prepared == null) {
             return null;
         }
+        if (this.deferWhenSpecShiftLimitExhausted(
+                context, shift, originalState, prepared.candidate,
+                prepared.construction, prepared.netDemand, rolling,
+                continueDemandBySteelStrip, immediateContinueCandidates,
+                attemptTraces, prepared.construction.getCraftWidth()
+                        .multiply(new BigDecimal("2"))
+                        .divide(new BigDecimal("1000"), 10,
+                                RoundingMode.HALF_UP))) {
+            return originalState;
+        }
         Cd15MachineTrialPlan trialPlan = this.trialPreparationService.prepare(
                 this.trialRequest(context, shift, originalState,
                         prepared.construction, prepared.netDemand,
                         prepared.closeOut, prepared.candidate, rolling,
                         true, true),
                 machineSnapshot);
+        boolean equalShareSplitContinuation =
+                this.isSingleSpecSplitEqualShareContinuation(prepared.candidate, rolling);
+        boolean singleSpecSplitModeLocked =
+                this.isSingleSpecSplitModeLocked(prepared.candidate, rolling);
+        if (singleSpecSplitModeLocked || equalShareSplitContinuation) {
+            String sourceMachineCode = this.preferredHistoryMachineCode(
+                    prepared.candidate, rolling);
+            Cd15MachineTrial sourceMachineTrial = this.safe(trialPlan.getTrials()).stream()
+                    .filter(trial -> trial != null
+                            && StringUtils.hasText(sourceMachineCode)
+                            && sourceMachineCode.equals(trial.getMachineCode()))
+                    .findFirst()
+                    .orElse(null);
+            if (sourceMachineTrial == null) {
+                String reason = "NO_AVAILABLE_MACHINE";
+                this.recordFailure(failures, shift, prepared.candidate, reason);
+                attemptTraces.add(this.trace(
+                        shift, prepared.candidate, prepared.construction.getBigRollCode(),
+                        prepared.netDemand, BigDecimal.ZERO, reason,
+                        attemptTraces.size() + 1));
+                log.warn("[斜裁自动排程] 单规格分裁锁定续作未找到原机台试算, "
+                                + "classField={}, steelStripCode={}, sourceMachineCode={}",
+                        shift.getClassField(), prepared.candidate.getSteelStripCode(),
+                        sourceMachineCode);
+                return null;
+            }
+            trialPlan = this.singleMachinePlan(trialPlan, sourceMachineTrial);
+        }
         Cd15ShiftCommitResult commit =
                 this.resourceCommitter.commitSingleSpecSplit(
                         this.commitRequest(
@@ -396,10 +461,24 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
                                 prepared.closeOut, "SPLIT", null),
                         originalState);
         if (!commit.isSuccess()) {
+            if (singleSpecSplitModeLocked || equalShareSplitContinuation) {
+                this.recordFailure(failures, shift, prepared.candidate,
+                        commit.getFailureReason());
+                attemptTraces.add(this.trace(
+                        shift, prepared.candidate, prepared.construction.getBigRollCode(),
+                        prepared.netDemand, BigDecimal.ZERO,
+                        commit.getFailureReason(), attemptTraces.size() + 1));
+                log.warn("[斜裁自动排程] 单规格分裁锁定续作原机台提交失败，保留到后续班次, "
+                                + "classField={}, steelStripCode={}, sourceMachineCode={}, reason={}",
+                        shift.getClassField(), prepared.candidate.getSteelStripCode(),
+                        this.preferredHistoryMachineCode(prepared.candidate, rolling),
+                        commit.getFailureReason());
+            }
             return null;
         }
         prepared.candidate.setCutMode("SPLIT");
         prepared.candidate.setSplitGroupKey(null);
+        this.lockSingleSpecSplitMode(rolling, prepared.candidate);
         this.attachRollingSource(
                 prepared.candidate, commit.getTask(), sourceTasks);
         this.recordSplitSuccess(
@@ -436,13 +515,24 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
                 && input.getBigRollAgingDataMissingCodes().contains(candidate.getBigRollCode())) {
             return null;
         }
-        BigDecimal unitLengthMeter = construction.getUnitConsumeMillimeter()
-                .divide(BigDecimal.valueOf(1000), 10, RoundingMode.HALF_UP);
-        BigDecimal craftWidthMeter = construction.getCraftWidth()
-                .divide(BigDecimal.valueOf(1000), 10, RoundingMode.HALF_UP);
-        BigDecimal pieceCount = rawDemand.divide(
-                unitLengthMeter, 0, RoundingMode.CEILING);
-        BigDecimal netDemand = this.normalize(pieceCount.multiply(craftWidthMeter));
+        boolean normalizedPlanQuantity = this.isContinueDemand(
+                candidate, continueDemandBySteelStrip)
+                || candidate.isNewSpecAdvanceQuantityNormalized();
+        candidate.setExactContinuationQuantity(
+                this.isContinueDemand(candidate, continueDemandBySteelStrip));
+        BigDecimal netDemand;
+        if (normalizedPlanQuantity) {
+            // 跨班续作保存的已经是斜裁计划米数，不得再次按单耗和斜裁宽度换算。
+            netDemand = this.normalize(rawDemand);
+        } else {
+            BigDecimal unitLengthMeter = construction.getUnitConsumeMillimeter()
+                    .divide(BigDecimal.valueOf(1000), 10, RoundingMode.HALF_UP);
+            BigDecimal craftWidthMeter = construction.getCraftWidth()
+                    .divide(BigDecimal.valueOf(1000), 10, RoundingMode.HALF_UP);
+            BigDecimal pieceCount = rawDemand.divide(
+                    unitLengthMeter, 0, RoundingMode.CEILING);
+            netDemand = this.normalize(pieceCount.multiply(craftWidthMeter));
+        }
         Cd15CloseOutDecision closeOut = this.closeOutCalculator.decide(
                 this.closeOutItems(candidate.getSteelStripCode(), input));
         return new SplitPreparedCandidate(
@@ -488,6 +578,51 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
         second.setExpectedEndTime(expectedEnd);
     }
 
+    /** 当前班同钢带额度耗尽时，将候选原样保留到下一班，避免规格换机台绕过上限。 */
+    private boolean deferWhenSpecShiftLimitExhausted(
+            Cd15AutoScheduleContext context,
+            Cd15ShiftDescriptor shift,
+            Cd15ShiftResourceState state,
+            Cd15ScheduleCandidate candidate,
+            Cd15ConstructionMaterial construction,
+            BigDecimal netDemand,
+            Cd15RollingScheduleContext rolling,
+            Map<String, BigDecimal> continueDemandBySteelStrip,
+            Deque<Cd15ScheduleCandidate> immediateContinueCandidates,
+            List<Cd15ScheduleAttemptTrace> attemptTraces,
+            BigDecimal minimumProductionStep) {
+        Cd15SpecShiftQuantityLimit quantityLimit =
+                this.specShiftQuantityLimitResolver.resolve(
+                        shift, state, context.getParameters(),
+                        construction.getSteelStripCode());
+        if (quantityLimit.getRemainingQuantity().signum() > 0
+                && (minimumProductionStep == null
+                        || quantityLimit.getRemainingQuantity().compareTo(
+                                minimumProductionStep) >= 0)) {
+            return false;
+        }
+        boolean equalShareContinuation =
+                this.equalShareAlreadyApplied(candidate, rolling);
+        String partialReason = equalShareContinuation
+                ? "EQUAL_SHARE" : "SPEC_SHIFT_QTY_LIMIT";
+        this.handleRemainingDemand(
+                shift, candidate, netDemand, BigDecimal.ZERO,
+                this.preferredHistoryMachineCode(candidate, rolling),
+                partialReason, rolling, continueDemandBySteelStrip,
+                immediateContinueCandidates,
+                equalShareContinuation ? netDemand : null);
+        attemptTraces.add(this.trace(
+                shift, candidate, construction.getBigRollCode(),
+                netDemand, BigDecimal.ZERO, null, partialReason,
+                attemptTraces.size() + 1));
+        log.info("[斜裁自动排程] 当前班同钢带累计计划量达到上限，需求转入下一班, "
+                        + "classField={}, steelStripCode={}, shiftLimit={}, "
+                        + "scheduledQuantity={}, restartStockMode={}",
+                shift.getClassField(), construction.getSteelStripCode(),
+                quantityLimit.getShiftLimit(), quantityLimit.getScheduledQuantity(),
+                quantityLimit.isRestartStockMode());
+        return true;
+    }
     private void recordSplitSuccess(
             Cd15ShiftDescriptor shift,
             SplitPreparedCandidate prepared,
@@ -509,7 +644,8 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
         this.handleRemainingDemand(
                 shift, prepared.candidate, prepared.netDemand, scheduledQuantity,
                 commit.getTask().getMachineCode(), partialReason, rolling,
-                continueDemandBySteelStrip, immediateContinueCandidates);
+                continueDemandBySteelStrip, immediateContinueCandidates,
+                commit.getEqualShareRemainderQuantity());
     }
 
     private static final class SplitPreparedCandidate {
@@ -557,15 +693,12 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
                 || state.getTailByMachine().isEmpty() || candidates == null || candidates.isEmpty()) {
             return result;
         }
-        Map<String, Cd15ScheduleCandidate> candidateBySteelStrip = candidates.stream()
-                .filter(item -> item != null && StringUtils.hasText(item.getSteelStripCode()))
-                .collect(Collectors.toMap(Cd15ScheduleCandidate::getSteelStripCode,
-                        item -> item, (first, second) -> first, LinkedHashMap::new));
         state.getTailByMachine().entrySet().stream()
                 .filter(entry -> StringUtils.hasText(entry.getKey()))
                 .filter(entry -> entry.getValue() != null)
                 .sorted(Map.Entry.comparingByKey())
-                .map(entry -> candidateBySteelStrip.get(entry.getValue().getSteelStripCode()))
+                .map(entry -> this.findShiftStartTailCandidate(
+                        candidates, entry.getValue()))
                 .filter(java.util.Objects::nonNull)
                 .distinct()
                 .forEach(candidate -> {
@@ -573,6 +706,36 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
                     result.addLast(candidate);
                 });
         return result;
+    }
+
+    /**
+     * 班初续作必须匹配上一班真实机尾材料；同一钢带存在不同角度时不能只按钢带代码取首条。
+     */
+    private Cd15ScheduleCandidate findShiftStartTailCandidate(
+            List<Cd15ScheduleCandidate> candidates, Cd15MachineTailState tail) {
+        if (tail == null) {
+            return null;
+        }
+        if (StringUtils.hasText(tail.getMaterialKey())) {
+            Cd15ScheduleCandidate exact = candidates.stream()
+                    .filter(java.util.Objects::nonNull)
+                    .filter(item -> tail.getMaterialKey().equals(item.getMaterialKey()))
+                    .findFirst().orElse(null);
+            if (exact != null) {
+                return exact;
+            }
+        }
+        return candidates.stream()
+                .filter(java.util.Objects::nonNull)
+                .filter(item -> java.util.Objects.equals(
+                        tail.getSteelStripCode(), item.getSteelStripCode()))
+                .filter(item -> !StringUtils.hasText(tail.getBigRollCode())
+                        || java.util.Objects.equals(
+                                tail.getBigRollCode(), item.getBigRollCode()))
+                .filter(item -> !StringUtils.hasText(tail.getCuttingAngle())
+                        || java.util.Objects.equals(
+                                tail.getCuttingAngle(), item.getCuttingAngle()))
+                .findFirst().orElse(null);
     }
 
     private BigDecimal resolveDemandQuantity(Cd15AutoScheduleContext context,
@@ -635,7 +798,14 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
                                        String partialReason,
                                        Cd15RollingScheduleContext rolling,
                                        Map<String, BigDecimal> continueDemandBySteelStrip,
-                                       Deque<Cd15ScheduleCandidate> immediateContinueCandidates) {
+                                       Deque<Cd15ScheduleCandidate> immediateContinueCandidates,
+                                       BigDecimal equalShareRemainderQuantity) {
+        if ("EQUAL_SHARE".equals(partialReason)) {
+            this.handleEqualShareRemainder(shift, candidate, netDemand, scheduledQuantity,
+                    sourceMachineCode, rolling, continueDemandBySteelStrip,
+                    equalShareRemainderQuantity);
+            return;
+        }
         if (!candidate.isNewSpecAdvance()) {
             this.handleContinueDemand(shift, candidate, netDemand, scheduledQuantity,
                     sourceMachineCode, partialReason, rolling, continueDemandBySteelStrip,
@@ -656,15 +826,8 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
             advanceRemainingBySteelStrip.remove(candidate.getSteelStripCode());
             normalizedAdvanceSteelStripCodes.remove(candidate.getSteelStripCode());
             continueDemandBySteelStrip.remove(this.candidateKey(candidate));
-            return;
-        }
-        if ("EQUAL_SHARE".equals(partialReason)) {
-            advanceRemainingBySteelStrip.put(candidate.getSteelStripCode(), remainingDemand);
-            normalizedAdvanceSteelStripCodes.add(candidate.getSteelStripCode());
-            continueDemandBySteelStrip.remove(this.candidateKey(candidate));
-            log.info("[斜裁自动排程] 新增规格均分后保留提前需求属性, classField={}, steelStripCode={}, "
-                            + "scheduledQuantity={}, remainingDemand={}",
-                    shift.getClassField(), candidate.getSteelStripCode(), scheduledQuantity, remainingDemand);
+            this.removePendingTask(rolling, this.candidateKey(candidate));
+            this.clearEqualShareState(rolling, candidate);
             return;
         }
         advanceRemainingBySteelStrip.remove(candidate.getSteelStripCode());
@@ -678,6 +841,50 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
                 remainingDemand, partialReason);
     }
 
+    private void handleEqualShareRemainder(
+            Cd15ShiftDescriptor shift,
+            Cd15ScheduleCandidate candidate,
+            BigDecimal netDemand,
+            BigDecimal scheduledQuantity,
+            String sourceMachineCode,
+            Cd15RollingScheduleContext rolling,
+            Map<String, BigDecimal> continueDemandBySteelStrip,
+            BigDecimal equalShareRemainderQuantity) {
+        String materialKey = this.candidateKey(candidate);
+        BigDecimal remainingDemand = equalShareRemainderQuantity != null
+                && equalShareRemainderQuantity.signum() > 0
+                        ? equalShareRemainderQuantity
+                        : this.remainingDemand(netDemand, scheduledQuantity);
+        Set<String> pendingMaterialKeys = rolling == null
+                ? null : rolling.getEqualSharePendingMaterialKeys();
+        if (remainingDemand.signum() <= 0) {
+            continueDemandBySteelStrip.remove(materialKey);
+            this.removePendingTask(rolling, materialKey);
+            if (pendingMaterialKeys != null) {
+                pendingMaterialKeys.remove(materialKey);
+            }
+            return;
+        }
+        continueDemandBySteelStrip.put(materialKey, remainingDemand);
+        if (pendingMaterialKeys != null) {
+            pendingMaterialKeys.add(materialKey);
+        }
+        this.savePendingTask(rolling, shift, candidate, netDemand, scheduledQuantity,
+                remainingDemand, sourceMachineCode, "EQUAL_SHARE");
+        if (candidate.isNewSpecAdvance() && rolling != null
+                && rolling.getNewSpecAdvanceRemainingBySteelStrip() != null
+                && rolling.getNormalizedNewSpecAdvanceSteelStripCodes() != null) {
+            rolling.getNewSpecAdvanceRemainingBySteelStrip()
+                    .put(candidate.getSteelStripCode(), remainingDemand);
+            rolling.getNormalizedNewSpecAdvanceSteelStripCodes()
+                    .add(candidate.getSteelStripCode());
+        }
+        log.info("[斜裁自动排程] 均分后保留下一班剩余计划量, classField={}, steelStripCode={}, "
+                        + "scheduledQuantity={}, remainingDemand={}",
+                shift.getClassField(), candidate.getSteelStripCode(),
+                scheduledQuantity, remainingDemand);
+    }
+
     private void handleContinueDemand(Cd15ShiftDescriptor shift,
                                       Cd15ScheduleCandidate candidate,
                                       BigDecimal netDemand,
@@ -688,9 +895,10 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
                                       Map<String, BigDecimal> continueDemandBySteelStrip,
                                       Deque<Cd15ScheduleCandidate> immediateContinueCandidates) {
         BigDecimal remainingDemand = this.remainingDemand(netDemand, scheduledQuantity);
-        if (remainingDemand.signum() <= 0 || "EQUAL_SHARE".equals(partialReason)) {
+        if (remainingDemand.signum() <= 0) {
             continueDemandBySteelStrip.remove(this.candidateKey(candidate));
             this.removePendingTask(rolling, this.candidateKey(candidate));
+            this.clearEqualShareState(rolling, candidate);
             return;
         }
         continueDemandBySteelStrip.put(this.candidateKey(candidate), remainingDemand);
@@ -701,7 +909,9 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
             candidate.setSourceMachineCode(sourceMachineCode);
         }
         // 机台产能不足时，本班不再把剩余量切到其他机台，留到后续班次优先回原机台续作。
-        if (!"CAPACITY_LIMIT".equals(partialReason)) {
+        if (!candidate.isToolingFairShareApplied()
+                && !"CAPACITY_LIMIT".equals(partialReason)
+                && !"SPEC_SHIFT_QTY_LIMIT".equals(partialReason)) {
             immediateContinueCandidates.addFirst(candidate);
         }
         log.info("[斜裁自动排程] 当前规格部分排后进入续作队列, classField={}, steelStripCode={}, sourceMachineCode={}, scheduledQuantity={}, remainingDemand={}, partialReason={}",
@@ -760,6 +970,14 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
         rolling.getPendingTasks().removeIf(item -> materialKey.equals(item.getMaterialKey()));
     }
 
+    private void clearEqualShareState(Cd15RollingScheduleContext rolling,
+                                      Cd15ScheduleCandidate candidate) {
+        if (rolling == null || rolling.getEqualSharePendingMaterialKeys() == null) {
+            return;
+        }
+        rolling.getEqualSharePendingMaterialKeys().remove(this.candidateKey(candidate));
+    }
+
     private BigDecimal remainingDemand(BigDecimal netDemand, BigDecimal scheduledQuantity) {
         BigDecimal safeNetDemand = netDemand == null ? BigDecimal.ZERO : netDemand;
         BigDecimal safeScheduledQuantity = scheduledQuantity == null ? BigDecimal.ZERO : scheduledQuantity;
@@ -793,6 +1011,51 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
         BigDecimal continueDemand = candidate == null || continueDemandBySteelStrip == null
                 ? null : continueDemandBySteelStrip.get(this.candidateKey(candidate));
         return continueDemand != null && continueDemand.signum() > 0;
+    }
+
+    private boolean equalShareAlreadyApplied(Cd15ScheduleCandidate candidate,
+                                              Cd15RollingScheduleContext rolling) {
+        if (candidate == null || rolling == null
+                || rolling.getEqualSharePendingMaterialKeys() == null) {
+            return false;
+        }
+        return rolling.getEqualSharePendingMaterialKeys()
+                .contains(this.candidateKey(candidate));
+    }
+
+    private boolean isSingleSpecSplitEqualShareContinuation(
+            Cd15ScheduleCandidate candidate,
+            Cd15RollingScheduleContext rolling) {
+        if (!this.equalShareAlreadyApplied(candidate, rolling)
+                || rolling.getPendingTasks() == null) {
+            return false;
+        }
+        String materialKey = this.candidateKey(candidate);
+        return rolling.getPendingTasks().stream()
+                .filter(java.util.Objects::nonNull)
+                .anyMatch(task -> materialKey.equals(task.getMaterialKey())
+                        && "SPLIT".equals(task.getCutMode())
+                        && !StringUtils.hasText(task.getSplitGroupKey()));
+    }
+    private boolean isSingleSpecSplitModeLocked(
+            Cd15ScheduleCandidate candidate,
+            Cd15RollingScheduleContext rolling) {
+        return candidate != null && rolling != null
+                && rolling.getSingleSpecSplitMaterialKeys() != null
+                && rolling.getSingleSpecSplitMaterialKeys()
+                .contains(this.candidateKey(candidate));
+    }
+
+    private void lockSingleSpecSplitMode(
+            Cd15RollingScheduleContext rolling,
+            Cd15ScheduleCandidate candidate) {
+        if (rolling == null || candidate == null) {
+            return;
+        }
+        if (rolling.getSingleSpecSplitMaterialKeys() == null) {
+            rolling.setSingleSpecSplitMaterialKeys(new java.util.HashSet<>());
+        }
+        rolling.getSingleSpecSplitMaterialKeys().add(this.candidateKey(candidate));
     }
 
     private void attachSourceMachine(Cd15ScheduleCandidate candidate,
@@ -900,6 +1163,10 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
                                                   Cd15RollingScheduleContext rolling,
                                                   boolean splitCut,
                                                   boolean singleSpecSplit) {
+        Cd15SpecShiftQuantityLimit quantityLimit =
+                this.specShiftQuantityLimitResolver.resolve(
+                        shift, state, context.getParameters(),
+                        construction.getSteelStripCode());
         return Cd15MachineTrialRequest.builder()
                 .materialKey(candidate.getMaterialKey())
                 .steelStripCode(construction.getSteelStripCode())
@@ -920,7 +1187,14 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
                 .shiftCode(shift.getShiftCode())
                 .shiftStart(shift.getStartTime()).shiftEnd(shift.getEndTime())
                 .netDemandQuantity(netDemand).closeOut(closeOut)
-                .occupiedVehicleCount(occupiedVehicles(state.getLanes()))
+                .equalShareAlreadyApplied(
+                        candidate.isExactContinuationQuantity()
+                                || this.equalShareAlreadyApplied(candidate, rolling))
+                .scheduleQuantityThreshold(quantityLimit.getShiftLimit())
+                .remainingSpecShiftQuantity(quantityLimit.getRemainingQuantity())
+                .occupiedVehicleCount(this.trialOccupiedVehicleCount(
+                        state, candidate,
+                        context.getParameters().getRollTotalCount()))
                 .shiftHours(Math.max(1, shift.getDurationSeconds() / 3600))
                 .remainingSecondsByMachine(state.getRemainingSecondsByMachine())
                 .previousSpecByMachine(state.getTailSpecByMachine())
@@ -928,6 +1202,52 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
                 .bigRollAgingStocks(state.getBigRollAgingStocks())
                 .preferredHistoryMachineCode(preferredHistoryMachineCode(candidate, rolling))
                 .parameters(context.getParameters()).build();
+    }
+
+    /**
+     * 班初多个机尾续作共享当时可用工装，前一个续作只能按公平份额试算，
+     * 防止其一次占完全部新释放工装导致后续机尾规格饥饿。
+     */
+    private void applyToolingFairShare(
+            Cd15ScheduleCandidate candidate,
+            Cd15ShiftResourceState state,
+            boolean shiftStartTailSelection,
+            int shiftStartTailCount) {
+        if (candidate == null) {
+            return;
+        }
+        candidate.setMaxToolingVehicleCount(null);
+        candidate.setToolingFairShareApplied(false);
+        if (!shiftStartTailSelection || shiftStartTailCount <= 1 || state == null) {
+            return;
+        }
+        int occupiedVehicleCount = this.occupiedVehicles(state.getLanes());
+        int availableToolingCount = Math.max(
+                0, state.getTotalToolingCount() - occupiedVehicleCount);
+        int fairShareCount = availableToolingCount / shiftStartTailCount;
+        candidate.setMaxToolingVehicleCount(fairShareCount);
+        candidate.setToolingFairShareApplied(true);
+        log.info("[斜裁自动排程] 班初机尾续作应用工装公平份额, "
+                        + "steelStripCode={}, tailCandidateCount={}, availableToolingCount={}, "
+                        + "maxToolingVehicleCount={}",
+                candidate.getSteelStripCode(), shiftStartTailCount,
+                availableToolingCount, fairShareCount);
+    }
+
+    /** 将公平份额换算为试算占用数；真实资源提交仍使用当前班实际占用数校验。 */
+    private int trialOccupiedVehicleCount(
+            Cd15ShiftResourceState state,
+            Cd15ScheduleCandidate candidate,
+            int trialTotalToolingCount) {
+        int actualOccupiedVehicleCount = this.occupiedVehicles(state.getLanes());
+        Integer maxToolingVehicleCount = candidate == null
+                ? null : candidate.getMaxToolingVehicleCount();
+        if (maxToolingVehicleCount == null) {
+            return actualOccupiedVehicleCount;
+        }
+        int syntheticOccupiedVehicleCount = trialTotalToolingCount
+                - Math.max(0, maxToolingVehicleCount);
+        return Math.max(actualOccupiedVehicleCount, syntheticOccupiedVehicleCount);
     }
 
 

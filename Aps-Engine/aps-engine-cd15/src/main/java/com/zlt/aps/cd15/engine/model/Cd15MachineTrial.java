@@ -21,6 +21,12 @@ public class Cd15MachineTrial {
     private String lossRateLevel;
     /** 实际排产量。 */
     private BigDecimal actualQuantity;
+    /** 本次试算是否因均分阈值只返回首班计划量。 */
+    private boolean equalShareApplied;
+    /** 单规格分裁首次均分后必须转入下一班的精确余量。 */
+    private BigDecimal equalShareRemainderQuantity;
+    /** 当前班该钢带扣除已排量后的剩余可排额度。 */
+    private BigDecimal remainingSpecShiftQuantity;
     /** 单车按胎体长度方向卷取后，对应的斜裁排程米数。 */
     private BigDecimal vehiclePlanQuantity;
     /** 工装可排量。 */

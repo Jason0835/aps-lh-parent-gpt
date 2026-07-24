@@ -42,6 +42,7 @@ import java.security.NoSuchAlgorithmException;
 import java.sql.Date;
 import java.time.LocalDate;
 import java.util.Arrays;
+import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -103,7 +104,9 @@ public class Cd15AutoScheduleInputVersionServiceImpl implements Cd15AutoSchedule
     }
 
     @Override
-    public String fingerprint(String factoryCode, LocalDate scheduleDate) {
+    public String fingerprint(String factoryCode, LocalDate scheduleDate,
+                              LocalDate resourceBaselineDate,
+                              String resourceBaselineShiftCode) {
         String forming = cxMapper.selectList(Wrappers.<CxScheduleResult>lambdaQuery()
                         .eq(CxScheduleResult::getFactoryCode, factoryCode)
                         .between(CxScheduleResult::getScheduleDate,
@@ -179,10 +182,12 @@ public class Cd15AutoScheduleInputVersionServiceImpl implements Cd15AutoSchedule
                         + ":" + item.getDowntimeStartTime() + ":" + item.getDowntimeEndTime()
                         + ":" + item.getUpdateTime())
                 .collect(Collectors.joining("|"));
-        String shifts = shiftConfigMapper.selectList(Wrappers.<Cd15ShiftConfig>lambdaQuery()
+        List<Cd15ShiftConfig> shiftConfigs = shiftConfigMapper.selectList(
+                Wrappers.<Cd15ShiftConfig>lambdaQuery()
                         .eq(Cd15ShiftConfig::getFactoryCode, factoryCode)
-                        .orderByAsc(Cd15ShiftConfig::getId))
-                .stream()
+                        .orderByAsc(Cd15ShiftConfig::getId));
+
+        String shifts = shiftConfigs.stream()
                 .map(item -> item.getId() + ":" + item.getShiftCode() + ":" + item.getShiftName()
                         + ":" + item.getShiftOrder() + ":" + item.getStartTime() + ":" + item.getEndTime()
                         + ":" + item.getShiftHours() + ":" + item.getIsCrossDay()
@@ -205,7 +210,10 @@ public class Cd15AutoScheduleInputVersionServiceImpl implements Cd15AutoSchedule
                 .collect(Collectors.joining("|"));
         String lanes = laneMapper.selectList(Wrappers.<Cd15StorageLaneLimit>lambdaQuery()
                         .eq(Cd15StorageLaneLimit::getFactoryCode, factoryCode)
-                        .eq(Cd15StorageLaneLimit::getLaneDate, Date.valueOf(scheduleDate))
+                        .eq(Cd15StorageLaneLimit::getLaneDate,
+                                Date.valueOf(resourceBaselineDate))
+                        .eq(Cd15StorageLaneLimit::getShiftCode,
+                                resourceBaselineShiftCode)
                         .orderByAsc(Cd15StorageLaneLimit::getId))
                 .stream()
                 .map(item -> this.row(item.getId(), item.getLaneDate(), item.getMaterialCode(),
@@ -237,9 +245,10 @@ public class Cd15AutoScheduleInputVersionServiceImpl implements Cd15AutoSchedule
                 .map(item -> item.getId() + ":" + item.getBatchNo() + ":" + item.getBigRollCode()
                         + ":" + item.getMachineCode() + ":" + item.getUpdateTime())
                 .collect(Collectors.joining("|"));
+        String resourceBaseline = resourceBaselineDate + ":" + resourceBaselineShiftCode;
         return this.sha256(String.join("#", forming, constructions, stock, curls, angleWidths, machines,
                 machineRolls, specifyMachines, maintenances, shifts, depthConfigs, lossSettings,
-                lanes, parameters, gdyyStock, gdyyPlan));
+                resourceBaseline, lanes, parameters, gdyyStock, gdyyPlan));
     }
 
     /**

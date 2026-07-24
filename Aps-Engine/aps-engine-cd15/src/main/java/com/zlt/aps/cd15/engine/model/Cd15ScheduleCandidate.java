@@ -59,4 +59,10 @@ public class Cd15ScheduleCandidate {
     private String rollingTaskKey;
     /** 本条原任务实际分配到的待排数量。 */
     private BigDecimal rollingRequestedQuantity;
+    /** 本次班初机尾续作可使用的最大工装数；为空表示不限制公平份额。 */
+    private Integer maxToolingVehicleCount;
+    /** 当前需求是否为已经完成损耗、起排量和取整处理的精确跨班余量。 */
+    private boolean exactContinuationQuantity;
+    /** 本次是否应用了班初机尾工装公平份额。 */
+    private boolean toolingFairShareApplied;
 }

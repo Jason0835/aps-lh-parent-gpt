@@ -467,7 +467,8 @@ public class Cd15TimedRollingEngineExecutor {
                 ? BigDecimal.ZERO
                 : bigRollMeterCalculator.calculateForPlanQuantity(
                         totalQuantity, result.getUnitConsumeMillimeter(),
-                        result.getCraftWidth(), result.getCordWidth()));
+                        result.getCraftWidth(), result.getCordWidth(),
+                        result.getSteelStripCode(), result.getBigRollCode()));
     }
 
     private Cd15RollingPendingTask pending(Cd15ScheduleResult result,
@@ -640,6 +641,8 @@ public class Cd15TimedRollingEngineExecutor {
                                             Cd15ShiftDescriptor shift) {
         return inputService.load(context.getFactoryCode(), context.getScheduleDate(),
                 shift.getClassField(), shift.getShiftCode(),
+                context.getResourceBaselineDate(),
+                context.getResourceBaselineShiftCode(),
                 context.getParameters().getAgingPeriodHours());
     }
 

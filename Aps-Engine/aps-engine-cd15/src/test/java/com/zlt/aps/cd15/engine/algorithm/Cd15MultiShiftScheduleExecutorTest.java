@@ -35,7 +35,14 @@ public class Cd15MultiShiftScheduleExecutorTest {
     public void shouldReloadInputAndExecuteCandidatesForEveryShift() {
         AtomicInteger loadCount = new AtomicInteger();
         AtomicInteger executeCount = new AtomicInteger();
-        Cd15AutoScheduleInputService inputService = (factory, date, classField, shiftCode, agingHours) -> {
+        List<LocalDate> resourceBaselineDates = new ArrayList<>();
+        List<String> resourceBaselineShiftCodes = new ArrayList<>();
+        Cd15AutoScheduleInputService inputService = (factory, date, classField, shiftCode,
+                                                      resourceBaselineDate,
+                                                      resourceBaselineShiftCode,
+                                                      agingHours) -> {
+            resourceBaselineDates.add(resourceBaselineDate);
+            resourceBaselineShiftCodes.add(resourceBaselineShiftCode);
             int loadIndex = loadCount.incrementAndGet();
             Cd15SteelStripSourceTrace trace = Cd15SteelStripSourceTrace.builder()
                     .cxBatchNo(loadIndex == 1 ? "FIRST" : "SECOND").build();
@@ -94,6 +101,9 @@ public class Cd15MultiShiftScheduleExecutorTest {
 
         assertEquals(2, loadCount.get());
         assertEquals(2, executeCount.get());
+        assertEquals(Arrays.asList(LocalDate.of(2026, 6, 11),
+                LocalDate.of(2026, 6, 11)), resourceBaselineDates);
+        assertEquals(Arrays.asList("CURRENT", "CURRENT"), resourceBaselineShiftCodes);
         assertEquals(2, result.getShiftResults().size());
         assertEquals(2, result.getAttemptTraces().size());
         assertEquals(2, result.getUnscheduledResults().size());
@@ -118,6 +128,8 @@ public class Cd15MultiShiftScheduleExecutorTest {
         return Cd15AutoScheduleContext.builder().factoryCode("116")
                 .scheduleDate(LocalDate.of(2026, 6, 13))
                 .startTime(LocalDateTime.now())
+                .resourceBaselineDate(LocalDate.of(2026, 6, 11))
+                .resourceBaselineShiftCode("CURRENT")
                 .parameters(Cd15AutoScheduleParameters.builder()
                         .rollCoilMeter(new BigDecimal("100")).rollTotalCount(10)
                         .newSpecLookbackDays(10).newSpecAdvanceDays(2)
@@ -129,7 +141,7 @@ public class Cd15MultiShiftScheduleExecutorTest {
     private Cd15ShiftDescriptor shift(String classField, String shiftCode, String shiftDisplayName, int hour) {
         LocalDateTime start = LocalDateTime.of(2026, 6, 12, 0, 0).plusHours(hour);
         return Cd15ShiftDescriptor.builder().classField(classField).shiftCode(shiftCode)
-                .shiftDisplayName(shiftDisplayName)
+                .shiftDisplayName(shiftDisplayName).scheduleDate(start.toLocalDate())
                 .startTime(start).endTime(start.plusHours(8)).durationSeconds(28800).build();
     }
 }
