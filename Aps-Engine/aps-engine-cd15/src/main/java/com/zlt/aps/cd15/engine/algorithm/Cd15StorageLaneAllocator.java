@@ -30,7 +30,7 @@ public class Cd15StorageLaneAllocator {
      *
      * @param steelStripCode 钢带代码
      * @param planQuantity 计划量,单位米
-     * @param vehiclePlanQuantity 单车对应的斜裁排程米数
+     * @param vehiclePlanQuantity 单车可承载的钢带米数
      * @param originalLanes 原库排状态
      * @return 分配结果
      */
@@ -57,7 +57,7 @@ public class Cd15StorageLaneAllocator {
             throw new IllegalArgumentException("库排分配计划量必须大于0");
         }
         if (vehiclePlanQuantity == null || vehiclePlanQuantity.signum() <= 0) {
-            throw new IllegalArgumentException("单车斜裁排程米数必须大于0");
+            throw new IllegalArgumentException("单车钢带承载米数必须大于0");
         }
         int required = planQuantity.divide(vehiclePlanQuantity, 0, RoundingMode.CEILING).intValueExact();
         List<Cd15StorageLaneState> lanes = originalLanes == null ? new ArrayList<>()

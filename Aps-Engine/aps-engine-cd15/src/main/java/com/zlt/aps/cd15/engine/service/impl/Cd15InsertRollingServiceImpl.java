@@ -1129,8 +1129,7 @@ public class Cd15InsertRollingServiceImpl implements Cd15InsertRollingService {
                 ? context.getParameters().getRollCoilMeter()
                 : material.getCurlLength();
         BigDecimal vehicleQuantity = vehiclePlanQuantityCalculator.calculate(
-                material.getUnitConsumeMillimeter(), material.getCraftWidth(),
-                curlLength);
+                material.getUnitConsumeMillimeter(), curlLength);
         Cd15MachineTrial trial = Cd15MachineTrial.builder()
                 .machineCode(machineCode).actualQuantity(segment.quantity)
                 .vehiclePlanQuantity(vehicleQuantity)
@@ -1636,7 +1635,7 @@ public class Cd15InsertRollingServiceImpl implements Cd15InsertRollingService {
         BigDecimal curlLength = material.getCurlLength() == null
                 || material.getCurlLength().signum() <= 0 ? fallback : material.getCurlLength();
         BigDecimal vehicleQuantity = vehiclePlanQuantityCalculator.calculate(
-                material.getUnitConsumeMillimeter(), material.getCraftWidth(), curlLength);
+                material.getUnitConsumeMillimeter(), curlLength);
         int availableTooling = Math.max(0,
                 state.getTotalToolingCount() - state.getOccupiedToolingCount());
         if (availableTooling <= 0) {
@@ -1688,8 +1687,7 @@ public class Cd15InsertRollingServiceImpl implements Cd15InsertRollingService {
                 || material.getCurlLength().signum() <= 0
                 ? fallback : material.getCurlLength();
         BigDecimal vehicleQuantity = this.vehiclePlanQuantityCalculator.calculate(
-                material.getUnitConsumeMillimeter(), material.getCraftWidth(),
-                curlLength);
+                material.getUnitConsumeMillimeter(), curlLength);
         int availableTooling = Math.max(0,
                 state.getTotalToolingCount() - state.getOccupiedToolingCount());
         int availablePairCount = availableTooling / 2;

@@ -14,4 +14,6 @@ public class Cd15ShiftDemandDecision {
     private BigDecimal netDemandQuantity;
     /** 月计划剩余量；为空时按非收尾继续并记录告警。 */
     private BigDecimal planSurplusQuantity;
+    /** 当前选中需求窗口是否包含停产班次。 */
+    private boolean stopAffected;
 }

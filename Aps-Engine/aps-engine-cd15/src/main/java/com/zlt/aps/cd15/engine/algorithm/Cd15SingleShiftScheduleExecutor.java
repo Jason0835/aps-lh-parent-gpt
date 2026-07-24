@@ -183,8 +183,9 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
             // 优先使用前序真实部分排留下的续作需求；没有续作时再按库存和前序入库计算本班净需求。
             boolean continueDemand = isContinueDemand(candidate, continueDemandBySteelStrip);
             candidate.setExactContinuationQuantity(continueDemand);
-            BigDecimal rawDemand = resolveDemandQuantity(
+            Cd15ShiftDemandDecision demandDecision = this.resolveDemandDecision(
                     context, input, shift, candidate, rolling, continueDemandBySteelStrip);
+            BigDecimal rawDemand = this.normalize(demandDecision.getNetDemandQuantity());
             if (rawDemand.signum() <= 0) {
                 log.info("[斜裁自动排程] 当前班次规格净需求为0，跳过资源试算, classField={}, shiftCode={}, steelStripCode={}, netDemand={}",
                         shift.getClassField(), shift.getShiftCode(), steelStripCode, rawDemand);
@@ -216,7 +217,7 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
                 netDemand = this.normalize(pieceCount.multiply(craftWidthM));
                 // vehicleDemand: 小车实际卷取米数 = pieceCount x unitLength (胎体长度方向)
                 // 小车收取是头尾相连沿 TIRE_FABRIC_LENGTH 方向，不是 craftWidth 方向。
-                // 此值仅用于日志复盘原需求方向；试算服务按施工数据独立计算单车等价量。
+                // 此值仅用于日志复盘原需求方向；试算服务按施工数据独立计算单车钢带承载量。
                 vehicleDemand = this.normalize(pieceCount.multiply(unitLengthM));
                 log.info("[斜裁自动排程] 净需求按单片长度取整并按斜裁宽度换算, classField={}, steelStripCode={}, rawDemand={}, unitLength={}mm, craftWidth={}mm, pieceCount={}, roundedDemand={}, vehicleDemand={}",
                         shift.getClassField(), steelStripCode, rawDemand, unitLengthMm, craftWidthMm, pieceCount, netDemand, vehicleDemand);
@@ -246,7 +247,7 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
             // 先生成全部可行机台试算，再由资源提交器按优先级逐个尝试库排和工装占用。
             Cd15MachineTrialPlan trialPlan = trialPreparationService.prepare(
                     trialRequest(context, shift, state, construction, netDemand,
-                            closeOut.isCloseOut(), candidate, rolling,
+                            closeOut.isCloseOut(), demandDecision.isStopAffected(), candidate, rolling,
                             false, false),
                     machineSnapshot);
             String cutMode = "SINGLE";
@@ -321,11 +322,13 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
         Cd15MachineTrialPlan firstPlan = this.trialPreparationService.prepare(
                 this.trialRequest(context, shift, originalState,
                         first.construction, first.netDemand, first.closeOut,
+                        first.stopAffected,
                         first.candidate, rolling, true, false),
                 machineSnapshot);
         Cd15MachineTrialPlan secondPlan = this.trialPreparationService.prepare(
                 this.trialRequest(context, shift, originalState,
                         second.construction, second.netDemand, second.closeOut,
+                        second.stopAffected,
                         second.candidate, rolling, true, false),
                 machineSnapshot);
         Set<String> firstMachineCodes = this.safe(firstPlan.getTrials()).stream()
@@ -422,7 +425,8 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
         Cd15MachineTrialPlan trialPlan = this.trialPreparationService.prepare(
                 this.trialRequest(context, shift, originalState,
                         prepared.construction, prepared.netDemand,
-                        prepared.closeOut, prepared.candidate, rolling,
+                        prepared.closeOut, prepared.stopAffected,
+                        prepared.candidate, rolling,
                         true, true),
                 machineSnapshot);
         boolean equalShareSplitContinuation =
@@ -503,8 +507,9 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
             Cd15ScheduleCandidate candidate,
             Cd15RollingScheduleContext rolling,
             Map<String, BigDecimal> continueDemandBySteelStrip) {
-        BigDecimal rawDemand = this.resolveDemandQuantity(
+        Cd15ShiftDemandDecision demandDecision = this.resolveDemandDecision(
                 context, input, shift, candidate, rolling, continueDemandBySteelStrip);
+        BigDecimal rawDemand = this.normalize(demandDecision.getNetDemandQuantity());
         if (rawDemand.signum() <= 0) {
             return null;
         }
@@ -536,7 +541,8 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
         Cd15CloseOutDecision closeOut = this.closeOutCalculator.decide(
                 this.closeOutItems(candidate.getSteelStripCode(), input));
         return new SplitPreparedCandidate(
-                candidate, construction, netDemand, closeOut.isCloseOut());
+                candidate, construction, netDemand, closeOut.isCloseOut(),
+                demandDecision.isStopAffected());
     }
 
     private Cd15MachineTrialPlan singleMachinePlan(
@@ -653,16 +659,19 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
         private final Cd15ConstructionMaterial construction;
         private final BigDecimal netDemand;
         private final boolean closeOut;
+        private final boolean stopAffected;
 
         private SplitPreparedCandidate(
                 Cd15ScheduleCandidate candidate,
                 Cd15ConstructionMaterial construction,
                 BigDecimal netDemand,
-                boolean closeOut) {
+                boolean closeOut,
+                boolean stopAffected) {
             this.candidate = candidate;
             this.construction = construction;
             this.netDemand = netDemand;
             this.closeOut = closeOut;
+            this.stopAffected = stopAffected;
         }
     }
 
@@ -680,7 +689,8 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
         if (shiftStartTailCandidates != null && !shiftStartTailCandidates.isEmpty()) {
             return shiftStartTailCandidates.removeFirst();
         }
-        List<Cd15ScheduleCandidate> sorted = candidateSorter.sort(candidates, this.continuityTails(state));
+        List<Cd15ScheduleCandidate> sorted = candidateSorter.sort(
+                candidates, this.continuityTails(state), this.previousDifferentAngle(state));
         candidates.clear();
         candidates.addAll(sorted);
         return candidates.remove(0);
@@ -738,24 +748,29 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
                 .findFirst().orElse(null);
     }
 
-    private BigDecimal resolveDemandQuantity(Cd15AutoScheduleContext context,
-                                             Cd15AutoScheduleInput input,
-                                             Cd15ShiftDescriptor shift,
-                                             Cd15ScheduleCandidate candidate,
-                                             Cd15RollingScheduleContext rolling,
-                                             Map<String, BigDecimal> continueDemandBySteelStrip) {
+    private Cd15ShiftDemandDecision resolveDemandDecision(
+            Cd15AutoScheduleContext context,
+            Cd15AutoScheduleInput input,
+            Cd15ShiftDescriptor shift,
+            Cd15ScheduleCandidate candidate,
+            Cd15RollingScheduleContext rolling,
+            Map<String, BigDecimal> continueDemandBySteelStrip) {
         if (candidate.getRollingRequestedQuantity() != null) {
-            return candidate.getRollingRequestedQuantity();
+            return Cd15ShiftDemandDecision.builder()
+                    .netDemandQuantity(candidate.getRollingRequestedQuantity()).build();
         }
         BigDecimal continueDemand = continueDemandBySteelStrip.get(this.candidateKey(candidate));
         if (continueDemand != null && continueDemand.signum() > 0) {
             log.info("[斜裁自动排程] 使用续作需求进入本班试算, classField={}, shiftCode={}, steelStripCode={}, continueDemand={}",
                     shift.getClassField(), shift.getShiftCode(), candidate.getSteelStripCode(), continueDemand);
-            return continueDemand;
+            return Cd15ShiftDemandDecision.builder()
+                    .netDemandQuantity(continueDemand).build();
         }
         Cd15ShiftDemandDecision demand = demandProvider.resolve(context, input, shift, candidate, rolling);
-        return demand == null || demand.getNetDemandQuantity() == null
-                ? BigDecimal.ZERO : demand.getNetDemandQuantity();
+        return demand == null
+                ? Cd15ShiftDemandDecision.builder()
+                        .netDemandQuantity(BigDecimal.ZERO).build()
+                : demand;
     }
 
     private BigDecimal roundUpByUnitLength(Cd15ShiftDescriptor shift,
@@ -1156,10 +1171,11 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
     private Cd15MachineTrialRequest trialRequest(Cd15AutoScheduleContext context,
                                                   Cd15ShiftDescriptor shift,
                                                   Cd15ShiftResourceState state,
-                                                  Cd15ConstructionMaterial construction,
-                                                  BigDecimal netDemand,
-                                                  boolean closeOut,
-                                                  Cd15ScheduleCandidate candidate,
+                                                   Cd15ConstructionMaterial construction,
+                                                   BigDecimal netDemand,
+                                                   boolean closeOut,
+                                                   boolean stopAffected,
+                                                   Cd15ScheduleCandidate candidate,
                                                   Cd15RollingScheduleContext rolling,
                                                   boolean splitCut,
                                                   boolean singleSpecSplit) {
@@ -1187,8 +1203,10 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
                 .shiftCode(shift.getShiftCode())
                 .shiftStart(shift.getStartTime()).shiftEnd(shift.getEndTime())
                 .netDemandQuantity(netDemand).closeOut(closeOut)
+                .stopAffected(stopAffected)
                 .equalShareAlreadyApplied(
                         candidate.isExactContinuationQuantity()
+                                || candidate.isNewSpecAdvanceQuantityNormalized()
                                 || this.equalShareAlreadyApplied(candidate, rolling))
                 .scheduleQuantityThreshold(quantityLimit.getShiftLimit())
                 .remainingSpecShiftQuantity(quantityLimit.getRemainingQuantity())
@@ -1221,7 +1239,7 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
         if (!shiftStartTailSelection || shiftStartTailCount <= 1 || state == null) {
             return;
         }
-        int occupiedVehicleCount = this.occupiedVehicles(state.getLanes());
+        int occupiedVehicleCount = state.getLanes().stream().mapToInt(Cd15StorageLaneState::getVehicleCount).sum();
         int availableToolingCount = Math.max(
                 0, state.getTotalToolingCount() - occupiedVehicleCount);
         int fairShareCount = availableToolingCount / shiftStartTailCount;
@@ -1239,7 +1257,7 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
             Cd15ShiftResourceState state,
             Cd15ScheduleCandidate candidate,
             int trialTotalToolingCount) {
-        int actualOccupiedVehicleCount = this.occupiedVehicles(state.getLanes());
+        int actualOccupiedVehicleCount = state.getLanes().stream().mapToInt(Cd15StorageLaneState::getVehicleCount).sum();
         Integer maxToolingVehicleCount = candidate == null
                 ? null : candidate.getMaxToolingVehicleCount();
         if (maxToolingVehicleCount == null) {
@@ -1417,8 +1435,29 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
                 .collect(Collectors.toList());
     }
 
-    private int occupiedVehicles(List<Cd15StorageLaneState> lanes) {
-        return safe(lanes).stream().mapToInt(Cd15StorageLaneState::getVehicleCount).sum();
+    /**
+     * 查找当前任务链尾在同一机台上的前一个不同角度，用于确定递增或递减方向。
+     */
+    private String previousDifferentAngle(Cd15ShiftResourceState state) {
+        if (state == null || state.getTasks() == null || state.getTasks().size() < 2) {
+            return null;
+        }
+        List<Cd15ShiftScheduleTask> tasks = state.getTasks();
+        Cd15ShiftScheduleTask tail = tasks.get(tasks.size() - 1);
+        if (tail == null || !StringUtils.hasText(tail.getMachineCode())
+                || !StringUtils.hasText(tail.getCuttingAngle())) {
+            return null;
+        }
+        for (int index = tasks.size() - 2; index >= 0; index--) {
+            Cd15ShiftScheduleTask task = tasks.get(index);
+            if (task != null
+                    && java.util.Objects.equals(tail.getMachineCode(), task.getMachineCode())
+                    && StringUtils.hasText(task.getCuttingAngle())
+                    && !tail.getCuttingAngle().equals(task.getCuttingAngle())) {
+                return task.getCuttingAngle();
+            }
+        }
+        return null;
     }
 
     /** 汇总当前斜裁规格关联胎胚的计划量，并与各自月计划剩余量配对。 */

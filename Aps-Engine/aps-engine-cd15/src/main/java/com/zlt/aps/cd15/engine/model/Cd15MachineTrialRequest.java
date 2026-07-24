@@ -37,7 +37,7 @@ public class Cd15MachineTrialRequest {
     private BigDecimal unitConsumeMillimeter;
     /** 本规格采用的标准卷曲长度，单位米；标准表缺失时由CRIMP_LENGTH兜底 */
     private BigDecimal curlLength;
-    /** 大卷幅宽，单位毫米；为空时大卷占用按计划量兜底。 */
+    /** 大卷幅宽，单位毫米；为空时按单条钢带长度作为有效幅宽。 */
     private BigDecimal cordWidth;
 
 
@@ -51,6 +51,8 @@ public class Cd15MachineTrialRequest {
     private BigDecimal netDemandQuantity;
     /** 是否清尾：清尾时起排量门槛降低、允许跨机台合并 */
     private boolean closeOut;
+    /** 当前需求窗口是否包含停产班次；停产需求不补最小起排量和整车米数。 */
+    private boolean stopAffected;
     /** 是否为均分后转入下一班的剩余计划量；为true时不得再次均分或重复叠加损耗。 */
     private boolean equalShareAlreadyApplied;
     /** 当前班实际采用的单规格均分及班产上限。 */
