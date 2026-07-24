@@ -102,7 +102,8 @@ public class Cd15ShiftResourceCommitter {
             }
             BigDecimal bigRollConsumeQuantity = bigRollMeterCalculator.calculateForPlanQuantity(
                     committedQuantity, request.getUnitConsumeMillimeter(),
-                    request.getCraftWidth(), request.getCordWidth());
+                    request.getCraftWidth(), request.getCordWidth(),
+                    request.getSteelStripCode(), request.getBigRollCode());
             int afterSeconds = adjustedRemainingSeconds(request, trial, beforeSeconds, committedQuantity);
             int elapsedBefore = Math.max(0, fullShiftSeconds(request) - beforeSeconds);
             int productionDurationSeconds = Math.max(0, beforeSeconds - afterSeconds - trial.getAgingDelaySeconds());
@@ -267,7 +268,8 @@ public class Cd15ShiftResourceCommitter {
                     this.bigRollMeterCalculator.calculateForPlanQuantity(
                             committedQuantity,
                             request.getUnitConsumeMillimeter(),
-                            request.getCraftWidth(), request.getCordWidth());
+                            request.getCraftWidth(), request.getCordWidth(),
+                            request.getSteelStripCode(), request.getBigRollCode());
             int beforeSeconds = working.getRemainingSecondsByMachine()
                     .getOrDefault(trial.getMachineCode(),
                             this.fullShiftSeconds(request));
@@ -456,10 +458,12 @@ public class Cd15ShiftResourceCommitter {
                     secondTrial, secondTrial.getVehiclePlanQuantity(), secondVehicles);
             BigDecimal firstBigRollConsume = bigRollMeterCalculator.calculateForPlanQuantity(
                     firstQuantity, firstRequest.getUnitConsumeMillimeter(),
-                    firstRequest.getCraftWidth(), firstRequest.getCordWidth());
+                    firstRequest.getCraftWidth(), firstRequest.getCordWidth(),
+                    firstRequest.getSteelStripCode(), firstRequest.getBigRollCode());
             BigDecimal secondBigRollConsume = bigRollMeterCalculator.calculateForPlanQuantity(
                     secondQuantity, secondRequest.getUnitConsumeMillimeter(),
-                    secondRequest.getCraftWidth(), secondRequest.getCordWidth());
+                    secondRequest.getCraftWidth(), secondRequest.getCordWidth(),
+                    secondRequest.getSteelStripCode(), secondRequest.getBigRollCode());
             BigDecimal combinedBigRollConsume =
                     firstBigRollConsume.add(secondBigRollConsume);
 

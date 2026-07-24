@@ -205,7 +205,8 @@ public class Cd15CandidateMachineTrialCalculator {
         }
         BigDecimal bigRollConsumeQuantity = bigRollMeterCalculator.calculateForPlanQuantity(
                 actualQuantity, input.getUnitConsumeMillimeter(),
-                input.getCraftWidth(), input.getCordWidth());
+                input.getCraftWidth(), input.getCordWidth(),
+                input.getSteelStripCode(), input.getBigRollCode());
         return agingAllocator.preview(input.getBigRollAgingStocks(), input.getBigRollCode(),
                 bigRollConsumeQuantity, input.getOriginalStartTime());
     }

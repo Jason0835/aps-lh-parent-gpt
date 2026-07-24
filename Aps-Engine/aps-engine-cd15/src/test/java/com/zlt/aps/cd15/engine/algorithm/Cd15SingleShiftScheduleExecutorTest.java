@@ -36,6 +36,39 @@ import static org.junit.Assert.assertTrue;
 /** 单班执行器规格失败隔离测试。 */
 public class Cd15SingleShiftScheduleExecutorTest {
 
+    /** 两个班初机尾续作共享27个空闲工装时，首个候选最多按13个工装试算。 */
+    @Test
+    public void shouldFairShareAvailableToolingBetweenShiftStartTails() throws Exception {
+        Cd15SingleShiftScheduleExecutor executor = new Cd15SingleShiftScheduleExecutor(
+                null, null, null, null, null,
+                new Cd15CloseOutCalculator(), new Cd15ScheduleCandidateSorter(),
+                new Cd15SplitCutGroupBuilder(), new Cd15SpecShiftQuantityLimitResolver());
+        Cd15ScheduleCandidate candidate = candidate("C2");
+        Cd15ShiftResourceState state = Cd15ShiftResourceState.builder()
+                .lanes(Collections.singletonList(Cd15StorageLaneState.builder()
+                        .laneCode("L1").steelStripCode("C1")
+                        .vehicleCount(673).maxVehicleCount(700).build()))
+                .totalToolingCount(700).occupiedToolingCount(673)
+                .remainingSecondsByMachine(new HashMap<>())
+                .tailSpecByMachine(new HashMap<>())
+                .tailByMachine(new HashMap<>())
+                .tasks(new java.util.ArrayList<>()).build();
+        java.lang.reflect.Method fairShare = Cd15SingleShiftScheduleExecutor.class
+                .getDeclaredMethod("applyToolingFairShare", Cd15ScheduleCandidate.class,
+                        Cd15ShiftResourceState.class, boolean.class, int.class);
+        fairShare.setAccessible(true);
+        fairShare.invoke(executor, candidate, state, true, 2);
+        java.lang.reflect.Method occupied = Cd15SingleShiftScheduleExecutor.class
+                .getDeclaredMethod("trialOccupiedVehicleCount",
+                        Cd15ShiftResourceState.class, Cd15ScheduleCandidate.class,
+                        int.class);
+        occupied.setAccessible(true);
+        int trialOccupied = (Integer) occupied.invoke(executor, state, candidate, 700);
+        assertEquals(Integer.valueOf(13), candidate.getMaxToolingVehicleCount());
+        assertTrue(candidate.isToolingFairShareApplied());
+        assertEquals(687, trialOccupied);
+    }
+
     @Test
     public void shouldContinueNextCandidateWhenPreviousConstructionIsMissing() {
         Cd15ScheduleCandidatePreparationService candidates = (context, input, classField, rolling) ->
@@ -448,20 +481,21 @@ public class Cd15SingleShiftScheduleExecutorTest {
         assertTrue(rolling.getPendingTasks().isEmpty());
         assertTrue(rolling.getEqualSharePendingMaterialKeys().isEmpty());
     }
-    /** 均分续作的原机台不可排时必须保留余量，不得转到其他分裁机台。 */
+    /** 单规格分裁锁定后原机台不可排时必须保留余量，不得降级到其他单裁机台。 */
     @Test
-    public void shouldNotMoveEqualShareSplitRemainderToAnotherMachine() {
+    public void shouldNotDowngradeLockedSingleSpecSplitToSingleCut() {
         Cd15ScheduleCandidate candidate = splitCandidate("C1");
         candidate.setContinueFromPreviousShift(true);
         candidate.setSourceMachineCode("G1401");
-        String materialKey = candidate.getMaterialKey();
+        String materialKey = "C1|BR-SPLIT|15|80|80|80";
+        candidate.setMaterialKey(materialKey);
         Cd15SingleShiftScheduleExecutor executor = new Cd15SingleShiftScheduleExecutor(
                 (context, input, classField, rolling) ->
                         Collections.singletonList(candidate),
                 (context, input, shift, selected, rolling) ->
                         Cd15ShiftDemandDecision.builder()
                                 .netDemandQuantity(BigDecimal.ONE).build(),
-                (factoryCode, start, end) -> equalShareTwoSplitMachineSnapshot(),
+                (factoryCode, start, end) -> splitMachineSnapshot(),
                 trialPreparation(), committer(), new Cd15CloseOutCalculator(),
                 new Cd15ScheduleCandidateSorter(), new Cd15SplitCutGroupBuilder(),
                 new Cd15SpecShiftQuantityLimitResolver());
@@ -474,7 +508,7 @@ public class Cd15SingleShiftScheduleExecutorTest {
                                 .cutMode("SPLIT")
                                 .sourceMachineCode("G1401")
                                 .build())))
-                .equalSharePendingMaterialKeys(new java.util.HashSet<>(
+                .singleSpecSplitMaterialKeys(new java.util.HashSet<>(
                         Collections.singleton(materialKey)))
                 .lastMachineBySteelStrip(new HashMap<>(
                         Collections.singletonMap(materialKey, "G1401")))
@@ -488,13 +522,13 @@ public class Cd15SingleShiftScheduleExecutorTest {
                         .constructionMaterials(Collections.singletonList(
                                 splitMaterial("C1")))
                         .build(),
-                shift(), equalShareSourceMachineUnavailableState(), rolling);
+                shift(), lockedSplitSourceMachineUnavailableState(), rolling);
 
-        assertTrue(result.getTasks().isEmpty());
+        assertTrue(result.getTasks().toString(), result.getTasks().isEmpty());
         assertEquals(new BigDecimal("40"),
                 rolling.getContinueDemandBySteelStrip().get(materialKey));
-        assertTrue(rolling.getEqualSharePendingMaterialKeys().contains(materialKey));
-        assertTrue(result.getFailures().toString(), result.getFailures().containsValue("NO_AVAILABLE_MACHINE"));
+        assertTrue(rolling.getSingleSpecSplitMaterialKeys().contains(materialKey));
+        assertTrue(result.getFailures().toString(), result.getFailures().containsValue("CAPACITY_LIMIT"));
     }
     /** 新排程仅生成单规格分裁，不再把两个不同钢带组成新分裁组。 */
     @Test
@@ -715,10 +749,10 @@ public class Cd15SingleShiftScheduleExecutorTest {
                 .tailByMachine(new HashMap<>())
                 .tasks(new java.util.ArrayList<>()).build();
     }
-    private Cd15ShiftResourceState equalShareSourceMachineUnavailableState() {
+    private Cd15ShiftResourceState lockedSplitSourceMachineUnavailableState() {
         HashMap<String, Integer> seconds = new HashMap<>();
         seconds.put("G1401", 0);
-        seconds.put("G1501", 28800);
+        seconds.put("G1101", 28800);
         return Cd15ShiftResourceState.builder()
                 .lanes(Arrays.asList(
                         Cd15StorageLaneState.builder().laneCode("L1")

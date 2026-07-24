@@ -384,7 +384,8 @@ public class Cd15ExistingScheduleResourceReserver {
                                       BigDecimal quantity) {
         return bigRollMeterCalculator.calculateForPlanQuantity(
                 quantity, result.getUnitConsumeMillimeter(),
-                result.getCraftWidth(), result.getCordWidth());
+                result.getCraftWidth(), result.getCordWidth(),
+                result.getSteelStripCode(), result.getBigRollCode());
     }
 
     private Cd15BigRollAgingAllocation reserveBigRoll(

@@ -135,4 +135,16 @@ public class Cd15ScheduleQuantityCalculatorTest {
         assertEquals(new BigDecimal("2652.8064"), first);
         assertEquals(new BigDecimal("2652.732"), remainder);
     }
+
+    /** T-11：精确跨班余量不得再次补最小起排量，且保持一出二双片步长。 */
+    @Test
+    public void exactContinuationShouldNotFillMinimumStartQuantityAgain() {
+        BigDecimal result = calculator.calculateSingleSpecSplitActualQuantity(
+                new BigDecimal("3.5856"), false, new BigDecimal("5"),
+                new BigDecimal("300"), new BigDecimal("3.2184"),
+                new BigDecimal("2000"), new BigDecimal("21.6"), true);
+
+        assertEquals(new BigDecimal("3.5856"), result);
+    }
+
 }

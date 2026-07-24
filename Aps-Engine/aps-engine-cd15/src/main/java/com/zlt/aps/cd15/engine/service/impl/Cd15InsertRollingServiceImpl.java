@@ -715,7 +715,9 @@ public class Cd15InsertRollingServiceImpl implements Cd15InsertRollingService {
                     .calculateForPlanQuantity(segment.quantity,
                             taskMaterial.getUnitConsumeMillimeter(),
                             taskMaterial.getCraftWidth(),
-                            taskMaterial.getCordWidth());
+                            taskMaterial.getCordWidth(),
+                            taskMaterial.getSteelStripCode(),
+                            taskMaterial.getBigRollCode());
             String bigRollFailureReason = this.bigRollFailureReason(
                     input, segment.result, resourceState);
             Cd15BigRollAgingAllocation agingPreview =
@@ -829,7 +831,9 @@ public class Cd15InsertRollingServiceImpl implements Cd15InsertRollingService {
                         .calculateForPlanQuantity(scheduled,
                                 taskMaterial.getUnitConsumeMillimeter(),
                                 taskMaterial.getCraftWidth(),
-                                taskMaterial.getCordWidth());
+                                taskMaterial.getCordWidth(),
+                                taskMaterial.getSteelStripCode(),
+                                taskMaterial.getBigRollCode());
                 Cd15BigRollAgingAllocation allocation = this.bigRollAgingAllocator.allocate(
                         resourceState.getBigRollAgingStocks(),
                         segment.result.getBigRollCode(),
@@ -1059,10 +1063,12 @@ public class Cd15InsertRollingServiceImpl implements Cd15InsertRollingService {
         Cd15ShiftResourceState working = this.copyShiftState(resourceState);
         BigDecimal firstConsume = bigRollMeterCalculator.calculateForPlanQuantity(
                 first.quantity, firstMaterial.getUnitConsumeMillimeter(),
-                firstMaterial.getCraftWidth(), firstMaterial.getCordWidth());
+                firstMaterial.getCraftWidth(), firstMaterial.getCordWidth(),
+                firstMaterial.getSteelStripCode(), firstMaterial.getBigRollCode());
         BigDecimal secondConsume = bigRollMeterCalculator.calculateForPlanQuantity(
                 second.quantity, secondMaterial.getUnitConsumeMillimeter(),
-                secondMaterial.getCraftWidth(), secondMaterial.getCordWidth());
+                secondMaterial.getCraftWidth(), secondMaterial.getCordWidth(),
+                secondMaterial.getSteelStripCode(), secondMaterial.getBigRollCode());
         int fullSeconds = Math.max(1, shift.getDurationSeconds());
         LocalDateTime originalStart = shift.getStartTime().plusSeconds(
                 Math.max(0, fullSeconds - remainingSeconds));
@@ -1441,7 +1447,8 @@ public class Cd15InsertRollingServiceImpl implements Cd15InsertRollingService {
         BigDecimal consumption = this.bigRollMeterCalculator
                 .calculateForPlanQuantity(quantity,
                         material.getUnitConsumeMillimeter(),
-                        material.getCraftWidth(), material.getCordWidth());
+                        material.getCraftWidth(), material.getCordWidth(),
+                        material.getSteelStripCode(), material.getBigRollCode());
         Cd15BigRollAgingAllocation allocation = this.bigRollAgingAllocator.allocate(
                 state.getBigRollAgingStocks(), result.getBigRollCode(),
                 consumption, originalStart);

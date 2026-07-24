@@ -76,6 +76,7 @@ public class Cd15RollingScheduleContextManager {
                 .newSpecAdvanceRemainingBySteelStrip(remainingBySteelStrip)
                 .normalizedNewSpecAdvanceSteelStripCodes(new HashSet<>())
                 .equalSharePendingMaterialKeys(new HashSet<>())
+                .singleSpecSplitMaterialKeys(new HashSet<>())
                 .tailSpecByMachine(new HashMap<>())
                 .lastMachineBySteelStrip(new HashMap<>())
                 .tailByMachine(new HashMap<>())
