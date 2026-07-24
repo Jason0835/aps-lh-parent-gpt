@@ -163,6 +163,7 @@ public class TmSnapshotBuildService {
                     rejectedCandidates.add(buildFilterEvidenceObject(item.getEvidence()));
                 } else if (TmScheduleRuleCodeEnum.TOOL_LIMIT_UNPLANNED.getCode().equals(ruleCode)
                         || TmScheduleRuleCodeEnum.CAPACITY_OVERFLOW_UNPLANNED.getCode().equals(ruleCode)
+                        || TmScheduleRuleCodeEnum.CAPACITY_BLOCKED_CARRYOVER.getCode().equals(ruleCode)
                         || (TmScheduleRuleCodeEnum.MACHINE_ASSIGN.getCode().equals(ruleCode)
                         && TmScheduleRuleResultEnum.REJECT.getCode().equals(item.getResult()))) {
                     JSONObject evObj = new JSONObject();

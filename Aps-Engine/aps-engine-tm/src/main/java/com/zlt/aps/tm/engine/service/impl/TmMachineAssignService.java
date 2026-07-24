@@ -442,6 +442,16 @@ public class TmMachineAssignService implements ITmMachineAssignService {
 
         // 全部候选机台被过滤，按过滤原因归类未排原因
         if (passedCandidates.isEmpty()) {
+            if (this.isCapacityBlockedCarryover(task, context, filterRule)) {
+                context.getCandidateTraceMap().put(task.getBusinessKey(), candidates);
+                log.info("[TM_MACHINE_ASSIGN] 任务[{}]静态硬约束通过但当前班无剩余产能，进入后续班次承接",
+                        task.getBusinessKey());
+                this.removeContextTask(context, task);
+                this.appendCarryoverQty(task, null, Collections.emptyList(), filterRule, scoreStrategy, context,
+                        nvl(task.getPlanQty()), nvl(task.getPlanQty()), BigDecimal.ZERO,
+                        this.normalizeShiftOrder(task.getShiftOrder()), true);
+                return;
+            }
             TmUnplannedReasonEnum unplannedReason = this.resolveUnplannedReasonFromCandidates(candidates);
             log.info("[TM_MACHINE_ASSIGN] 任务[{}]所有候选机台均被过滤，未排原因={}",
                     task.getBusinessKey(), unplannedReason.getCode());
@@ -486,6 +496,49 @@ public class TmMachineAssignService implements ITmMachineAssignService {
     }
 
     /**
+     * 判断任务是否仅因当前班次没有剩余产能而可进入后续班次承接。
+     *
+     * @param task 当前待排任务
+     * @param context 排程上下文
+     * @param filterRule 机台过滤规则
+     * @return true 表示至少存在静态可行机台，且所有静态可行机台当前班剩余产能均不足
+     */
+    private boolean isCapacityBlockedCarryover(TmTaskDraft task, TmScheduleContext context,
+                                               ITmMachineFilterRule filterRule) {
+        List<TmMachineCandidate> staticCandidates = this.copyCandidates(context.getMachineCandidateList());
+        this.prepareCandidatesForTask(task, context, staticCandidates);
+        TmMachineRuleContext ruleContext = new TmMachineRuleContext();
+        ruleContext.setTaskDraft(task);
+        ruleContext.setScheduleContext(context);
+        List<TmMachineCandidate> staticPassedCandidates = staticCandidates.stream()
+                .filter(candidate -> filterRule.evaluateStatic(candidate, ruleContext).isPassed())
+                .collect(Collectors.toList());
+        return CollUtil.isNotEmpty(staticPassedCandidates)
+                && staticPassedCandidates.stream().allMatch(candidate -> nvl(candidate.getRemainCapacity())
+                .compareTo(BigDecimal.ZERO) <= 0);
+    }
+
+    /**
+     * 从待持久化任务集合移除已转换为顺延任务的来源任务。
+     *
+     * @param context 排程上下文
+     * @param task 已转换为顺延任务的来源任务
+     */
+    private void removeContextTask(TmScheduleContext context, TmTaskDraft task) {
+        List<TmTaskDraft> taskList = context.getTaskDraftList();
+        if (taskList == null || taskList.isEmpty()) {
+            return;
+        }
+        try {
+            taskList.remove(task);
+        } catch (UnsupportedOperationException exception) {
+            List<TmTaskDraft> mutableTaskList = new ArrayList<>(taskList);
+            mutableTaskList.remove(task);
+            context.setTaskDraftList(mutableTaskList);
+        }
+    }
+
+    /**
      * 按当前班真实产能分配，并将工装或产能溢出量从下一班开始顺延承接。
      *
      * <p>首段只使用本轮评分选中的机台，避免同班其他机台抢先承接导致下班计划丢失。
@@ -523,11 +576,11 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         }
         if (currentShiftPlanQty.compareTo(BigDecimal.ZERO) <= 0
                 && toolOverflowQty.compareTo(BigDecimal.ZERO) > 0) {
-            // 工装限制将计划量压为零且存在工装溢出：原任务标记产能不足未排并记证据，溢出量继续顺延承接，避免 machineCode 留空形成 null 原因孤儿任务
-            this.markUnplanned(task, TmUnplannedReasonEnum.CAPACITY_NOT_ENOUGH);
+            // 工装限制将计划量压为零且存在工装溢出：原任务标记工装不足未排，溢出量继续顺延承接，避免 machineCode 留空形成 null 原因孤儿任务
+            this.markUnplanned(task, TmUnplannedReasonEnum.TOOL_NOT_ENOUGH);
             this.addToolLimitUnplannedTrace(context, task, toolOverflowQty, startShiftOrder);
             this.appendCarryoverQty(task, selectedCandidate, firstShiftCandidates, filterRule, scoreStrategy,
-                    context, toolOverflowQty, BigDecimal.ZERO, toolOverflowQty, startShiftOrder);
+                    context, toolOverflowQty, BigDecimal.ZERO, toolOverflowQty, startShiftOrder, false);
             return;
         }
 
@@ -563,7 +616,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         BigDecimal carryoverQty = capacityOverflowQty.add(toolOverflowQty);
         if (carryoverQty.compareTo(BigDecimal.ZERO) > 0) {
             this.appendCarryoverQty(task, selectedCandidate, firstShiftCandidates, filterRule, scoreStrategy, context,
-                    carryoverQty, capacityOverflowQty, toolOverflowQty, startShiftOrder);
+                    carryoverQty, capacityOverflowQty, toolOverflowQty, startShiftOrder, false);
         }
     }
 
@@ -893,9 +946,10 @@ public class TmMachineAssignService implements ITmMachineAssignService {
                                     ITmMachineFilterRule filterRule, ITmMachineScoreStrategy scoreStrategy,
                                     TmScheduleContext context, BigDecimal carryoverQty,
                                     BigDecimal capacityOverflowQty, BigDecimal toolOverflowQty,
-                                    Integer sourceShiftOrder) {
+                                    Integer sourceShiftOrder, boolean capacityBlockedCarryover) {
         BigDecimal remainingQty = nvl(carryoverQty);
-        String sourceType = this.resolveCarryoverSourceType(capacityOverflowQty, toolOverflowQty);
+        String sourceType = capacityBlockedCarryover ? "CAPACITY_BLOCKED_CARRYOVER"
+                : this.resolveCarryoverSourceType(capacityOverflowQty, toolOverflowQty);
         int overflowIndex = 1;
         for (int shiftOrder = sourceShiftOrder + 1;
              shiftOrder <= TmScheduleConstants.TM_MAX_SHIFT_ORDER
@@ -933,6 +987,10 @@ public class TmMachineAssignService implements ITmMachineAssignService {
                     this.taskChainScheduleService.changeQty(mergeTarget.getBusinessKey(), afterMergeQty, shiftOrder, context);
                     mergeTarget.setPlanQty(afterMergeQty);
                     this.applyCarryoverMergeToolState(mergeTarget, assignedQty, context);
+                    if (capacityBlockedCarryover) {
+                        mergeTarget.setCalcFormulaDesc(this.appendFormulaDesc(mergeTarget.getCalcFormulaDesc(),
+                                "静态可行但当前班产能不足，后续班承接"));
+                    }
                     context.getCandidateTraceMap().put(mergeTarget.getBusinessKey(), Collections.singletonList(runtimeCandidate));
                     this.addCarryoverTrace(context, mergeTarget, sourceTask, sourceType, assignedQty, sourceShiftOrder,
                             shiftOrder, candidate.getMachineCode(), beforeMergeQty, afterMergeQty, true);
@@ -948,6 +1006,10 @@ public class TmMachineAssignService implements ITmMachineAssignService {
                             sourceShiftOrder, overflowIndex, candidate.getMachineCode());
                     this.applyCapacitySplitResult(overflowTask, beforeAssignQty, assignedQty, remainCapacity,
                             machineSpeed, "顺延量承接");
+                    if (capacityBlockedCarryover) {
+                        overflowTask.setCalcFormulaDesc(this.appendFormulaDesc(overflowTask.getCalcFormulaDesc(),
+                                "静态可行但当前班产能不足，后续班承接"));
+                    }
                     this.settleAssignedTaskToolState(overflowTask, context);
                     this.addContextTask(context, overflowTask);
                     context.getCandidateTraceMap().put(overflowTask.getBusinessKey(), Collections.singletonList(runtimeCandidate));
@@ -975,12 +1037,22 @@ public class TmMachineAssignService implements ITmMachineAssignService {
             unplannedTask.setPlanQty(remainingQty.setScale(0, java.math.RoundingMode.CEILING));
             unplannedTask.setShiftOrder(TmScheduleConstants.TM_MAX_SHIFT_ORDER);
             unplannedTask.setMachineCode(null);
-            unplannedTask.setUnplannedReasonCode(TmUnplannedReasonEnum.CAPACITY_NOT_ENOUGH.getCode());
-            unplannedTask.setUnplannedReasonDesc(TmUnplannedReasonEnum.CAPACITY_NOT_ENOUGH.getDesc());
+            TmUnplannedReasonEnum unplannedReason = this.resolveCarryoverUnplannedReason(capacityOverflowQty,
+                    toolOverflowQty);
+            unplannedTask.setUnplannedReasonCode(unplannedReason.getCode());
+            unplannedTask.setUnplannedReasonDesc(unplannedReason.getDesc());
+            if (capacityBlockedCarryover) {
+                unplannedTask.setCalcFormulaDesc(this.appendFormulaDesc(unplannedTask.getCalcFormulaDesc(),
+                        "6班承接结束仍有剩余"));
+            }
             this.addContextTask(context, unplannedTask);
             // 以第六班最终产能重新执行候选过滤，使未排任务的运行态与持久化快照保留终态拒绝原因。
             this.buildPassedAndScoredCandidates(unplannedTask, context, filterRule, scoreStrategy);
-            this.addCapacityUnplannedTrace(context, unplannedTask, remainingQty);
+            if (TmUnplannedReasonEnum.TOOL_NOT_ENOUGH.equals(unplannedReason)) {
+                this.addToolLimitUnplannedTrace(context, unplannedTask, remainingQty, sourceShiftOrder);
+            } else {
+                this.addCapacityUnplannedTrace(context, unplannedTask, remainingQty);
+            }
             this.addCarryoverTrace(context, unplannedTask, sourceTask, sourceType, remainingQty, sourceShiftOrder,
                     TmScheduleConstants.TM_MAX_SHIFT_ORDER, null,
                     BigDecimal.ZERO, BigDecimal.ZERO, false);
@@ -988,9 +1060,8 @@ public class TmMachineAssignService implements ITmMachineAssignService {
                     capacityOverflowQty, toolOverflowQty, sourceShiftOrder,
                     TmScheduleConstants.TM_MAX_SHIFT_ORDER, null,
                     BigDecimal.ZERO, BigDecimal.ZERO, remainingQty, false);
-        this.addAssignTrace(context, unplannedTask, TmScheduleRuleResultEnum.REJECT, null,
-                    TmUnplannedReasonEnum.CAPACITY_NOT_ENOUGH.getCode(),
-                    TmUnplannedReasonEnum.CAPACITY_NOT_ENOUGH.getDesc());
+            this.addAssignTrace(context, unplannedTask, TmScheduleRuleResultEnum.REJECT, null,
+                    unplannedReason.getCode(), unplannedReason.getDesc());
         }
     }
 
@@ -1649,7 +1720,9 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         evidence.put("merged", merged);
         evidence.put("beforeMergePlanQty", beforeMergeQty);
         evidence.put("afterMergePlanQty", afterMergeQty);
-        traceOf(context, targetTask).addRuleHit(TmScheduleRuleCodeEnum.PLAN_QTY_CARRYOVER,
+        TmScheduleRuleCodeEnum ruleCode = "CAPACITY_BLOCKED_CARRYOVER".equals(sourceType)
+                ? TmScheduleRuleCodeEnum.CAPACITY_BLOCKED_CARRYOVER : TmScheduleRuleCodeEnum.PLAN_QTY_CARRYOVER;
+        traceOf(context, targetTask).addRuleHit(ruleCode,
                 TmScheduleRuleResultEnum.PASS, evidence);
     }
 
@@ -1733,7 +1806,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
      * 写入工装限制压零未排证据。
      *
      * <p>当全局工装池耗尽导致 {@code finalizeSelectedTaskPlan} 将计划量压为零、且存在工装溢出顺延时，
-     * 原任务无法在当前班次占用机台产能，标记产能不足未排并记录工装证据，便于后续追溯工装耗尽与顺延目标。</p>
+     * 原任务无法在当前班次占用机台产能，标记工装不足未排并记录工装证据，便于后续追溯工装耗尽与顺延目标。</p>
      *
      * @param context           排程上下文
      * @param task              当前未排任务
@@ -1743,8 +1816,8 @@ public class TmMachineAssignService implements ITmMachineAssignService {
     private void addToolLimitUnplannedTrace(TmScheduleContext context, TmTaskDraft task,
                                             BigDecimal toolOverflowQty, Integer sourceShiftOrder) {
         Map<String, Object> evidence = new LinkedHashMap<>();
-        evidence.put("reasonCode", TmUnplannedReasonEnum.CAPACITY_NOT_ENOUGH.getCode());
-        evidence.put("reasonDesc", TmUnplannedReasonEnum.CAPACITY_NOT_ENOUGH.getDesc());
+        evidence.put("reasonCode", TmUnplannedReasonEnum.TOOL_NOT_ENOUGH.getCode());
+        evidence.put("reasonDesc", TmUnplannedReasonEnum.TOOL_NOT_ENOUGH.getDesc());
         evidence.put("sourceType", TmScheduleConstants.CARRYOVER_SOURCE_TOOL_LIMIT);
         evidence.put("sourceShiftOrder", sourceShiftOrder);
         evidence.put("toolOverflowQty", toolOverflowQty);
@@ -2007,6 +2080,24 @@ public class TmMachineAssignService implements ITmMachineAssignService {
     private void markUnplanned(TmTaskDraft task, TmUnplannedReasonEnum reason) {
         task.setUnplannedReasonCode(reason.getCode());
         task.setUnplannedReasonDesc(reason.getDesc());
+    }
+
+    /**
+     * 根据顺延来源确定六班后仍未排任务的主原因，工装与产能同时溢出时优先暴露工装瓶颈。
+     *
+     * @param capacityOverflowQty 产能溢出量
+     * @param toolOverflowQty      工装溢出量
+     * @return 未排原因
+     */
+    private TmUnplannedReasonEnum resolveCarryoverUnplannedReason(BigDecimal capacityOverflowQty,
+                                                                  BigDecimal toolOverflowQty) {
+        if (nvl(toolOverflowQty).compareTo(BigDecimal.ZERO) > 0) {
+            return TmUnplannedReasonEnum.TOOL_NOT_ENOUGH;
+        }
+        if (nvl(capacityOverflowQty).compareTo(BigDecimal.ZERO) > 0) {
+            return TmUnplannedReasonEnum.CAPACITY_NOT_ENOUGH;
+        }
+        return TmUnplannedReasonEnum.NO_AVAILABLE_MACHINE;
     }
 
     /**

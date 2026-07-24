@@ -60,16 +60,16 @@
         </el-button>
       </template>
       <template slot="headerRight">
-        <div class="summary-bar">
-          <span>{{ $t('ui.tc.schedule.totalStockQty') }}：{{ summary.totalStockQty || 0 }}</span>
-          <span>{{ $t('ui.tc.schedule.totalPlanQty') }}：{{ summary.totalPlanQty || 0 }}</span>
-          <span>{{ $t('ui.tc.schedule.totalFinishQty') }}：{{ summary.totalFinishQty || 0 }}</span>
-          <span>{{ $t('ui.tc.schedule.resultCount') }}：{{ summary.resultCount || 0 }}</span>
-          <span>{{ $t('ui.tc.schedule.unplannedCount') }}：{{ unplannedCount || 0 }}</span>
+        <div class="summary-bar stat-info">
+          <span>{{ $t('ui.tc.schedule.totalStockQty') }}：<span class="stat-value">{{ summary.totalStockQty || 0 }}</span></span>
+          <span>{{ $t('ui.tc.schedule.totalPlanQty') }}：<span class="stat-value">{{ summary.totalPlanQty || 0 }}</span></span>
+          <span>{{ $t('ui.tc.schedule.totalFinishQty') }}：<span class="stat-value">{{ summary.totalFinishQty || 0 }}</span></span>
+          <span>{{ $t('ui.tc.schedule.resultCount') }}：<span class="stat-value">{{ summary.resultCount || 0 }}</span></span>
+          <span>{{ $t('ui.tc.schedule.unplannedCount') }}：<span class="stat-value">{{ unplannedCount || 0 }}</span></span>
           <span
             v-for="(planQty, index) in shiftPlanQtyList"
             :key="index"
-          >{{ shiftLabel(index + 1) }}{{ $t('ui.tc.schedule.planQty') }}：{{ planQty || 0 }}</span>
+          >{{ shiftLabel(index + 1) }}{{ $t('ui.tc.schedule.planQty') }}：<span class="stat-value">{{ planQty || 0 }}</span></span>
         </div>
       </template>
     </page-table>
@@ -389,7 +389,7 @@ export default {
   methods: {
     shiftLabel(shiftOrder) {
       const option = this.dateColumns.find(item => item.shiftOrder === shiftOrder)
-      return option ? `${shiftOrder}. ${option.shiftName || option.shiftCode || ''}` : `${this.$t('ui.tc.schedule.shift')} ${shiftOrder}`
+      return option ? (option.shiftName || option.shiftCode || '') : `${this.$t('ui.tc.schedule.shift')} ${shiftOrder}`
     },
     formatQuery(includePage = true) {
       const scheduleRange = this.query.scheduleRange || []
@@ -814,8 +814,15 @@ export default {
   gap: 12px;
   max-width: calc(100vw - 160px);
   margin-right: 12px;
-  color: #606266;
+  color: #676a6c;
+  font-size: 12px;
+  font-weight: bold;
   white-space: nowrap;
+
+  .stat-value {
+    margin-left: 5px;
+    color: #0088cc;
+  }
 }
 .progress-stage {
   margin-bottom: 12px;

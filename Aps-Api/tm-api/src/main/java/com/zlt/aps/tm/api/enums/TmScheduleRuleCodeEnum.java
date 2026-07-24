@@ -23,6 +23,9 @@ public enum TmScheduleRuleCodeEnum {
     /** 计划量结转。 */
     PLAN_QTY_CARRYOVER("PLAN_QTY_CARRYOVER", "计划量结转"),
 
+    /** 静态可行但当前班产能不足的顺延。 */
+    CAPACITY_BLOCKED_CARRYOVER("CAPACITY_BLOCKED_CARRYOVER", "当前班产能不足顺延"),
+
     /** 产能溢出拆分。 */
     CAPACITY_OVERFLOW_SPLIT("CAPACITY_OVERFLOW_SPLIT", "产能溢出拆分"),
 
