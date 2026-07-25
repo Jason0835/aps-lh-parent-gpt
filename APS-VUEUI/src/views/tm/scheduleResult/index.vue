@@ -1,12 +1,5 @@
 <template>
   <basic-container>
-    <div class="summary-bar">
-      <span>{{ $t('ui.tm.schedule.totalStockQty') }}：{{ summary.totalStockQty || 0 }}</span>
-      <span
-        v-for="(planQty, index) in shiftPlanQtyList"
-        :key="index"
-      >{{ $t('ui.tm.schedule.shiftPlanQty', { shift: index + 1 }) }}：{{ planQty || 0 }}</span>
-    </div>
     <page-table
       tableRef="tmScheduleResultMainTable"
       :calcHeight="true"
@@ -78,6 +71,15 @@
           type="primary"
           @click="handleChangeReleaseStatus"
         >{{ $t("ui.data.column.scheduleResult.changeReleaseStatus") }}</el-button>
+      </template>
+      <template slot="headerRight">
+        <div class="summary-bar">
+          <span>{{ $t('ui.tm.schedule.totalStockQty') }}：{{ summary.totalStockQty || 0 }}</span>
+          <span
+            v-for="(planQty, index) in shiftPlanQtyList"
+            :key="index"
+          >{{ getShiftLabel(index + 1) }}{{ $t('ui.tm.schedule.planQty') }}：{{ planQty || 0 }}</span>
+        </div>
       </template>
     </page-table>
     <tlt-upload-form
@@ -1030,11 +1032,11 @@ export default {
 .summary-bar {
   display: flex;
   flex-wrap: wrap;
-  gap: 24px;
-  margin-bottom: 10px;
-  padding: 10px 14px;
+  justify-content: flex-end;
+  gap: 12px;
+  max-width: calc(100vw - 160px);
+  margin-right: 12px;
   color: #606266;
-  background: #f5f7fa;
-  border-radius: 4px;
+  white-space: nowrap;
 }
 </style>

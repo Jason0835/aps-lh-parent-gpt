@@ -1,16 +1,5 @@
 <template>
   <basic-container>
-    <div class="summary-bar">
-      <span>{{ $t('ui.tc.schedule.totalStockQty') }}：{{ summary.totalStockQty || 0 }}</span>
-      <span>{{ $t('ui.tc.schedule.totalPlanQty') }}：{{ summary.totalPlanQty || 0 }}</span>
-      <span>{{ $t('ui.tc.schedule.totalFinishQty') }}：{{ summary.totalFinishQty || 0 }}</span>
-      <span>{{ $t('ui.tc.schedule.resultCount') }}：{{ summary.resultCount || 0 }}</span>
-      <span>{{ $t('ui.tc.schedule.unplannedCount') }}：{{ unplannedCount || 0 }}</span>
-      <span
-        v-for="(planQty, index) in shiftPlanQtyList"
-        :key="index"
-      >{{ $t('ui.tc.schedule.shiftPlanQty', { shift: index + 1 }) }}：{{ planQty || 0 }}</span>
-    </div>
     <page-table
       v-loading="loading"
       :calc-height="true"
@@ -69,6 +58,19 @@
         <el-button v-hasPermi="['tc:tcScheduleResult:query']" plain type="info" @click="handleUnplanned">
           {{ $t('ui.tc.schedule.unplannedTasks') }}（{{ unplannedCount || 0 }}）
         </el-button>
+      </template>
+      <template slot="headerRight">
+        <div class="summary-bar">
+          <span>{{ $t('ui.tc.schedule.totalStockQty') }}：{{ summary.totalStockQty || 0 }}</span>
+          <span>{{ $t('ui.tc.schedule.totalPlanQty') }}：{{ summary.totalPlanQty || 0 }}</span>
+          <span>{{ $t('ui.tc.schedule.totalFinishQty') }}：{{ summary.totalFinishQty || 0 }}</span>
+          <span>{{ $t('ui.tc.schedule.resultCount') }}：{{ summary.resultCount || 0 }}</span>
+          <span>{{ $t('ui.tc.schedule.unplannedCount') }}：{{ unplannedCount || 0 }}</span>
+          <span
+            v-for="(planQty, index) in shiftPlanQtyList"
+            :key="index"
+          >{{ shiftLabel(index + 1) }}{{ $t('ui.tc.schedule.planQty') }}：{{ planQty || 0 }}</span>
+        </div>
       </template>
     </page-table>
 
@@ -808,12 +810,12 @@ export default {
 .summary-bar {
   display: flex;
   flex-wrap: wrap;
-  gap: 24px;
-  margin-bottom: 10px;
-  padding: 10px 14px;
+  justify-content: flex-end;
+  gap: 12px;
+  max-width: calc(100vw - 160px);
+  margin-right: 12px;
   color: #606266;
-  background: #f5f7fa;
-  border-radius: 4px;
+  white-space: nowrap;
 }
 .progress-stage {
   margin-bottom: 12px;
