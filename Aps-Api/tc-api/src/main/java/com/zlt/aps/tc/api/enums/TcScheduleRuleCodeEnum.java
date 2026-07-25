@@ -71,6 +71,12 @@ public enum TcScheduleRuleCodeEnum {
     /** 计划量计算。 */
     PLAN_QTY_CALC("PLAN_QTY_CALC", "计划量计算"),
 
+    /** 同胎侧同班次计划量汇总。 */
+    PLAN_QTY_AGGREGATE("PLAN_QTY_AGGREGATE", "同胎侧同班次计划量汇总"),
+
+    /** 汇总计划量按成型来源分摊。 */
+    PLAN_QTY_SOURCE_ALLOCATE("PLAN_QTY_SOURCE_ALLOCATE", "汇总计划量按成型来源分摊"),
+
     /** 任务排序。 */
     TASK_SORT("TASK_SORT", "任务排序");
 

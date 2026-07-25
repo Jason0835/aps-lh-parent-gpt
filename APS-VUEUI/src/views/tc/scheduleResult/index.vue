@@ -58,6 +58,21 @@
         <el-button v-hasPermi="['tc:tcScheduleResult:query']" plain type="info" @click="handleUnplanned">
           {{ $t('ui.tc.schedule.unplannedTasks') }}（{{ unplannedCount || 0 }}）
         </el-button>
+        <el-button
+          v-hasPermi="['tc:tcScheduleResult:export']"
+          type="primary"
+          @click="handleExport"
+        >
+          {{ $t('ui.frame.btn.export') }}
+        </el-button>
+        <el-button
+          v-hasPermi="['tc:tcScheduleResult:import']"
+          :disabled="writeTaskRunning"
+          type="primary"
+          @click="handleImport"
+        >
+          {{ $t('ui.frame.btn.import') }}
+        </el-button>
       </template>
       <template slot="headerRight">
         <div class="summary-bar stat-info">
@@ -73,6 +88,17 @@
         </div>
       </template>
     </page-table>
+
+    <tlt-upload-form
+      ref="tltUpload"
+      :columns="importColumns"
+      :download-url-formatter="form => handleTemplateDownload('/tc/tcScheduleResult/importTemplateCust', form)"
+      :rules="importRules"
+      download-url="/tc/tcScheduleResult/importTemplateCust"
+      label-width="90px"
+      upload-url="/tc/tcScheduleResult/importDataCust"
+      @uploadSuccess="getList"
+    />
 
     <auto-plan-dialog ref="autoPlanRef" @success="handleAutoPlanSuccess" />
     <insert-task-dialog ref="insertTaskRef" @success="handleOperationTask" />
@@ -178,6 +204,8 @@ import {
   removeScheduleResult,
   validateRelease
 } from '@/api/tc/tcScheduleResult'
+import {downloadLink} from '@/utils/request'
+import TltUploadForm from '@/views/components/tltUploadForm.vue'
 import AutoPlanDialog from './components/AutoPlanDialog.vue'
 import ChangeMachineDialog from './components/ChangeMachineDialog.vue'
 import ChangeQtyDialog from './components/ChangeQtyDialog.vue'
@@ -206,6 +234,7 @@ export default {
     ChangeQtyDialog,
     ExplainDrawer,
     InsertTaskDialog,
+    TltUploadForm,
     UnplannedDialog
   },
   dicts: ['biz_factory_name', 'IS_RELEASE'],
@@ -261,7 +290,23 @@ export default {
       operationProgressVisible: false,
       operationProgressValue: 0,
       operationProgressStage: '',
-      operationProgressStatus: null
+      operationProgressStatus: null,
+      importRules: {
+        factoryCode: [
+          {
+            required: true,
+            message: this.$t('common.rule.select'),
+            trigger: 'change'
+          }
+        ],
+        scheduleDate: [
+          {
+            required: true,
+            message: this.$t('common.rule.select'),
+            trigger: 'change'
+          }
+        ]
+      }
     }
   },
   computed: {
@@ -271,6 +316,36 @@ export default {
     // 各班次计划量合计列表，后端返回下标 0=1班，长度 6；为空时回退为空数组避免渲染异常
     shiftPlanQtyList() {
       return (this.summary && this.summary.shiftPlanQtyList) || []
+    },
+    // 导入弹窗独立选择工厂和单日排程日期，工厂下拉支持输入筛选。
+    importColumns() {
+      return [
+        {
+          label: this.$t('ui.tc.schedule.factoryCode'),
+          prop: 'factoryCode',
+          type: 'select',
+          dictData: this.dict.type.biz_factory_name,
+          filterable: true,
+          clearable: false
+        },
+        {
+          label: this.$t('ui.tc.schedule.scheduleDate'),
+          prop: 'scheduleDate',
+          type: 'date',
+          dateType: 'date',
+          valueFormat: 'yyyy-MM-dd',
+          clearable: false
+        },
+        {
+          label: '',
+          prop: 'updateSupport',
+          render: form => (
+            <el-checkbox v-model={form.updateSupport}>
+              {this.$t('common.rule.updateSupport')}
+            </el-checkbox>
+          )
+        }
+      ]
     },
     columns() {
       const baseColumns = [
@@ -450,6 +525,42 @@ export default {
     },
     handleSelectionChange(rows) {
       this.selection = rows
+    },
+    handleImport() {
+      const scheduleRange = this.query.scheduleRange || []
+      this.$refs.tltUpload.handleImport({
+        factoryCode: this.query.factoryCode || this.search.factoryCode,
+        scheduleDate: scheduleRange[0],
+        updateSupport: true
+      })
+    },
+    handleTemplateDownload(url, formValues) {
+      const params = {
+        ...formValues,
+        exportTemplate: true
+      }
+      const paramsStr = Object.keys(params)
+        .filter(key => params[key] !== undefined && params[key] !== null && params[key] !== '')
+        .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(params[key])}`)
+        .join('&')
+      return `${url}${paramsStr ? '?' + paramsStr : ''}`
+    },
+    handleExport() {
+      const scheduleRange = this.query.scheduleRange || []
+      if (!this.query.factoryCode || !scheduleRange[0] || !scheduleRange[1]) {
+        this.$modal.msgWarning(this.$t('ui.tc.schedule.excelFactoryDateRequired'))
+        return
+      }
+      if (scheduleRange[0] !== scheduleRange[1]) {
+        this.$modal.msgWarning(this.$t('ui.tc.schedule.excelSingleDateRequired'))
+        return
+      }
+      downloadLink('/tc/tcScheduleResult/export', {
+        factoryCode: this.query.factoryCode,
+        scheduleDate: scheduleRange[0],
+        machineCode: this.query.machineCode,
+        sidewallCode: this.query.sidewallCode
+      })
     },
     handleAutoPlan() {
       const range = this.query.scheduleRange || []

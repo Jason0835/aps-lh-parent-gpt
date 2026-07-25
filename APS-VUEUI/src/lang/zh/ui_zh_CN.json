@@ -4297,5 +4297,7 @@
   "ui.tc.schedule.operationProgressHint": "任务正在后台执行，刷新页面后可恢复进度",
   "ui.tc.schedule.operationSuccess": "胎侧人工操作执行成功",
   "ui.tc.schedule.operationFailed": "胎侧人工操作执行失败",
-  "ui.tc.schedule.operationTimeout": "任务仍在后台处理中，请稍后刷新查看状态"
+  "ui.tc.schedule.operationTimeout": "任务仍在后台处理中，请稍后刷新查看状态",
+  "ui.tc.schedule.excelFactoryDateRequired": "请选择工厂和排程日期",
+  "ui.tc.schedule.excelSingleDateRequired": "胎侧排程结果只能按单个排程日期导出"
 }

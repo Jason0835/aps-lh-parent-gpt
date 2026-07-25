@@ -1501,5 +1501,7 @@
   "ui.tc.schedule.operationProgressHint": "The task is running in the background and can be restored after refresh",
   "ui.tc.schedule.operationSuccess": "Sidewall manual operation completed successfully",
   "ui.tc.schedule.operationFailed": "Sidewall manual operation failed",
-  "ui.tc.schedule.operationTimeout": "The task is still running in the background; refresh later to check the status"
+  "ui.tc.schedule.operationTimeout": "The task is still running in the background; refresh later to check the status",
+  "ui.tc.schedule.excelFactoryDateRequired": "Select a factory and schedule date",
+  "ui.tc.schedule.excelSingleDateRequired": "Sidewall schedule results can only be exported for one schedule date"
 }

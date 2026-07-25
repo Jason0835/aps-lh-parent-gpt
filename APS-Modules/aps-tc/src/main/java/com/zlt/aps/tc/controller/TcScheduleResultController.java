@@ -2,9 +2,12 @@ package com.zlt.aps.tc.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.ruoyi.common.annotation.Log;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.tc.api.domain.dto.TcScheduleResultImportDTO;
 import com.zlt.aps.tc.api.domain.entity.TcScheduleResult;
 import com.zlt.aps.tc.api.domain.entity.TcScheduleResultExplain;
 import com.zlt.aps.tc.api.domain.entity.TcScheduleUnplanned;
@@ -56,6 +59,41 @@ public class TcScheduleResultController extends AbstractDocBizController<TcSched
 
     @Resource
     private TcOperationTaskApplicationService tcOperationTaskApplicationService;
+
+    @Resource
+    private ITcScheduleResultExcelService tcScheduleResultExcelService;
+
+    /**
+     * 按专用模板导出胎侧排程结果。
+     *
+     * @param queryVO 工厂和单日排程条件
+     * @param fileName 文件名称
+     * @return Excel 文件字节
+     */
+    @Log(title = "ui.tc.schedule.scheduleResult.modelName", businessType = BusinessType.EXPORT)
+    @ApiOperation("按专用模板导出胎侧排程结果")
+    @PostMapping("/exportDataScheduleResult/{fileName}")
+    public byte[] exportDataScheduleResult(@RequestBody TcScheduleResult queryVO,
+                                           @PathVariable("fileName") String fileName) {
+        return this.tcScheduleResultExcelService.exportDataScheduleResult(queryVO, fileName);
+    }
+
+    /**
+     * 按专用模板导入胎侧排程结果。
+     *
+     * @param importDTO 文件和工厂日期上下文
+     * @param updateSupport 是否允许覆盖更新
+     * @return 导入结果和行级错误
+     * @throws Exception 文件解析或日志处理失败时抛出
+     */
+    @Log(title = "ui.tc.schedule.scheduleResult.modelName", businessType = BusinessType.IMPORT)
+    @ApiOperation("按专用模板导入胎侧排程结果")
+    @PostMapping("/importDataScheduleResult")
+    public AjaxResult importDataScheduleResult(@RequestBody TcScheduleResultImportDTO importDTO,
+                                               @RequestParam("updateSupport") boolean updateSupport)
+            throws Exception {
+        return this.tcScheduleResultExcelService.importDataScheduleResult(importDTO, updateSupport);
+    }
 
     /**
      * 校验所选胎侧结果是否允许发布。

@@ -74,6 +74,33 @@ public class TmMachineAssignService implements ITmMachineAssignService {
             }
             this.fillCurrentShiftIdleCapacity(entry.getKey(), shiftTaskMap, context);
         }
+        this.logUnplannedSummary(context);
+    }
+
+    /**
+     * 输出本次排程的未排任务摘要，重点保留工装不足的最终计划量和工装状态。
+     *
+     * @param context 胎面排程上下文
+     */
+    private void logUnplannedSummary(TmScheduleContext context) {
+        if (context == null || CollUtil.isEmpty(context.getTaskDraftList())) {
+            return;
+        }
+        context.getTaskDraftList().stream()
+                .filter(Objects::nonNull)
+                .filter(task -> StrUtil.isNotBlank(task.getUnplannedReasonCode()))
+                .forEach(task -> {
+                    TmRuleTrace trace = context.getRuleTraceMap().get(task.getBusinessKey());
+                    log.warn("[TM_SCHEDULE_UNPLANNED] batchNo={}, traceId={}, factoryCode={}, scheduleDate={}, "
+                                    + "businessKey={}, treadCode={}, shiftOrder={}, planQty={}, reasonCode={}, "
+                                    + "reasonDesc={}, toolOverflowQty={}, availableToolQty={}, "
+                                    + "planQtyBeforeToolLimit={}, evidence={}",
+                            context.getBatchNo(), context.getTraceId(), context.getFactoryCode(),
+                            this.formatScheduleDate(context), task.getBusinessKey(), task.getTreadCode(),
+                            task.getShiftOrder(), task.getPlanQty(), task.getUnplannedReasonCode(),
+                            task.getUnplannedReasonDesc(), task.getToolOverflowQty(), task.getAvailableToolQty(),
+                            task.getPlanQtyBeforeToolLimit(), trace == null ? null : trace.toExplainJson());
+                });
     }
 
     /**
@@ -1563,6 +1590,17 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         target.setNewSpecInfo(source.getNewSpecInfo());
         target.setExperimentSpecInfo(source.getExperimentSpecInfo());
         target.setSmallGlueFlag(source.getSmallGlueFlag());
+        // 汇总任务拆分、顺延和提前补产必须保留同一计划量汇总组及来源关系。
+        target.setPlanGroupKey(source.getPlanGroupKey());
+        target.setSourceTaskBusinessKeyList(source.getSourceTaskBusinessKeyList() == null
+                ? null : new ArrayList<>(source.getSourceTaskBusinessKeyList()));
+        target.setSourceExplainTask(Boolean.FALSE);
+        target.setGroupSourceCount(source.getGroupSourceCount());
+        target.setGroupRequiredQty(source.getGroupRequiredQty());
+        target.setGroupBaseDemandQty(source.getGroupBaseDemandQty());
+        target.setGroupMinStartAdjustQty(source.getGroupMinStartAdjustQty());
+        target.setGroupRoundAdjustQty(source.getGroupRoundAdjustQty());
+        target.setGroupFinalPlanQty(source.getGroupFinalPlanQty());
         target.setBusinessKeySuffix(this.buildOverflowBusinessKeySuffix(source, sourceShift, shiftOrder, machineCode, overflowIndex));
         return target;
     }

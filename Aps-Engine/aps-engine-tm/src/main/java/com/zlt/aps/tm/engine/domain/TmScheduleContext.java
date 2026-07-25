@@ -44,6 +44,12 @@ public class TmScheduleContext {
     /** 待排任务草稿列表 */
     private List<TmTaskDraft> taskDraftList = new ArrayList<>();
 
+    /** 计划量汇总前的原始成型来源任务快照列表 */
+    private List<TmTaskDraft> sourceTaskDraftList = new ArrayList<>();
+
+    /** 同胎面同班次计划量汇总组，key=计划量汇总组业务键 */
+    private Map<String, TmPlanTaskGroup> planTaskGroupMap = new LinkedHashMap<>();
+
     /** 机台班次任务链集合 */
     private MachineShiftTaskChain<TmTaskDraft> taskChainGroup = new MachineShiftTaskChain<>();
 
@@ -141,6 +147,14 @@ public class TmScheduleContext {
 
     public void setTaskDraftList(List<TmTaskDraft> taskDraftList) {
         this.taskDraftList = taskDraftList == null ? new ArrayList<>() : taskDraftList;
+    }
+
+    public void setSourceTaskDraftList(List<TmTaskDraft> sourceTaskDraftList) {
+        this.sourceTaskDraftList = sourceTaskDraftList == null ? new ArrayList<>() : sourceTaskDraftList;
+    }
+
+    public void setPlanTaskGroupMap(Map<String, TmPlanTaskGroup> planTaskGroupMap) {
+        this.planTaskGroupMap = planTaskGroupMap == null ? new LinkedHashMap<>() : planTaskGroupMap;
     }
 
     public void setTaskChainGroup(MachineShiftTaskChain<TmTaskDraft> taskChainGroup) {

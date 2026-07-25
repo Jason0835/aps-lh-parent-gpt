@@ -1541,6 +1541,17 @@ public class TcMachineAssignService implements ITcMachineAssignService {
         target.setNewSpecInfo(source.getNewSpecInfo());
         target.setExperimentSpecInfo(source.getExperimentSpecInfo());
         target.setSmallGlueFlag(source.getSmallGlueFlag());
+        // 汇总任务拆分、顺延和提前补产必须保留同一计划量汇总组及来源关系。
+        target.setPlanGroupKey(source.getPlanGroupKey());
+        target.setSourceTaskBusinessKeyList(source.getSourceTaskBusinessKeyList() == null
+                ? null : new ArrayList<>(source.getSourceTaskBusinessKeyList()));
+        target.setSourceExplainTask(Boolean.FALSE);
+        target.setGroupSourceCount(source.getGroupSourceCount());
+        target.setGroupRequiredQty(source.getGroupRequiredQty());
+        target.setGroupBaseDemandQty(source.getGroupBaseDemandQty());
+        target.setGroupMinStartAdjustQty(source.getGroupMinStartAdjustQty());
+        target.setGroupRoundAdjustQty(source.getGroupRoundAdjustQty());
+        target.setGroupFinalPlanQty(source.getGroupFinalPlanQty());
         target.setBusinessKeySuffix(this.buildOverflowBusinessKeySuffix(source, sourceShift, shiftOrder, machineCode, overflowIndex));
         return target;
     }

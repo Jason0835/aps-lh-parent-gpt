@@ -382,6 +382,9 @@ public final class TcScheduleConstants {
     /** 自动排程结果数据来源编码。 */
     public static final String AUTO_SCHEDULE_DATA_SOURCE = "AUTO";
 
+    /** Excel 模板导入排程结果数据来源编码。 */
+    public static final String IMPORT_SCHEDULE_DATA_SOURCE = "IMPORT";
+
     /** 预置机台绑定来源。 */
     public static final String PRESET_MACHINE_BIND_SOURCE = "PRESET_MACHINE";
 
