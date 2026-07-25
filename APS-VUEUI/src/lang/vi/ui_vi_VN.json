@@ -441,7 +441,7 @@
   "ui.data.column.dj.scheduleResult.scheduleDate": "Ngày lịch",
   "ui.data.column.dj.scheduleResult.mouthPlateCode": "Mã tấm miệng",
   "ui.data.column.dj.scheduleResult.releaseStatus": "Trạng thái phát hành",
-  "ui.data.column.dj.scheduleResult.paddingCode": "Đệm cao su",
+  "ui.data.column.dj.scheduleResult.paddingCode": "Mã đệm cao su",
   "ui.data.column.dj.scheduleResult.paddingName": "Đệm cao su",
   "ui.data.column.dj.scheduleResult.glueCode": "Keo",
   "ui.data.column.dj.scheduleResult.machineCode": "Máy",

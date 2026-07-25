@@ -119,7 +119,7 @@ export default {
           halign: "center",
           label: this.$t("ui.dj.params.column.paramName"),
           titleTooltip: true,
-          width: 180,
+          width: 190,
         },
         {
           prop: "paramValue",

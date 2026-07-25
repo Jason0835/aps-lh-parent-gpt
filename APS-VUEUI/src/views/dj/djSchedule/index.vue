@@ -334,6 +334,14 @@ export default {
           halign: 'center',
           align: 'center',
           minWidth: 120,
+          label: this.$t("ui.data.column.dj.scheduleResult.paddingName"),
+        },
+        {
+          prop: "paddingCode",
+          valign: "middle",
+          halign: 'center',
+          align: 'center',
+          minWidth: 120,
           label: this.$t("ui.data.column.dj.scheduleResult.paddingCode"),
         },
         {
@@ -706,8 +714,8 @@ export default {
           },
         },
         {
-          label: this.$t("ui.data.column.dj.scheduleResult.paddingCode"),
-          prop: "paddingCode",
+          label: this.$t("ui.data.column.dj.scheduleResult.paddingName"),
+          prop: "paddingName",
         },
         {
           label: this.$t("ui.data.column.dj.scheduleResult.glueCode"),
