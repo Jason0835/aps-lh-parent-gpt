@@ -26,4 +26,17 @@ public interface ITmMachineFilterRule {
      * @return 规则执行结果
      */
     ScheduleRuleResult evaluate(TmMachineCandidate candidate, TmMachineRuleContext context);
+
+    /**
+     * 执行不含当前班次剩余产能的静态机台过滤。
+     *
+     * <p>默认复用完整过滤，保证既有自定义策略在未适配前仍保持保守的原有语义。</p>
+     *
+     * @param candidate 候选机台
+     * @param context   机台规则上下文
+     * @return 规则执行结果
+     */
+    default ScheduleRuleResult evaluateStatic(TmMachineCandidate candidate, TmMachineRuleContext context) {
+        return this.evaluate(candidate, context);
+    }
 }

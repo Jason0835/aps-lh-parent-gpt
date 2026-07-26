@@ -21,4 +21,15 @@
           and SCHEDULE_DATE = #{scheduleDate}
     </update>
 
+    <!-- Excel 导入短事务使用：锁定当前有效批次全部结果，保证版本和顺序校验基于同一快照。 -->
+    <select id="selectScopeForUpdate" resultType="com.zlt.aps.tc.api.domain.entity.TcScheduleResult">
+        SELECT *
+        FROM T_TC_SCHEDULE_RESULT
+        WHERE FACTORY_CODE = #{factoryCode}
+          AND SCHEDULE_DATE = #{scheduleDate}
+          AND BATCH_NO = #{batchNo}
+        ORDER BY ID
+        FOR UPDATE
+    </select>
+
 </mapper>

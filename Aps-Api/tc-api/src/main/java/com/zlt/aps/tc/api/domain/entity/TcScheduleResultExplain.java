@@ -10,6 +10,7 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 import java.util.Date;
+import java.util.List;
 
 /**
  * 胎侧排程任务级解释实体。
@@ -43,6 +44,43 @@ public class TcScheduleResultExplain extends BaseEntity {
     /** 班次顺序 */
     @TableField("SHIFT_ORDER")
     private Integer shiftOrder;
+
+    /** 同胎侧同班次计划量汇总组业务键 */
+    @TableField("PLAN_GROUP_KEY")
+    private String planGroupKey;
+
+    /** 汇总组来源任务数量 */
+    @TableField("GROUP_SOURCE_COUNT")
+    private Integer groupSourceCount;
+
+    /** 当前来源参与汇总的需求量 */
+    @TableField("SOURCE_REQUIRED_QTY")
+    private BigDecimal sourceRequiredQty;
+
+    /** 汇总组库存抵扣前需求量 */
+    @TableField("GROUP_REQUIRED_QTY")
+    private BigDecimal groupRequiredQty;
+
+    /** 汇总组库存抵扣后基础需求量 */
+    @TableField("GROUP_BASE_DEMAND_QTY")
+    private BigDecimal groupBaseDemandQty;
+
+    /** 汇总组最小起排调整量 */
+    @TableField("GROUP_MIN_START_ADJUST_QTY")
+    private BigDecimal groupMinStartAdjustQty;
+
+    /** 汇总组收尾或卷曲取整调整量 */
+    @TableField("GROUP_ROUND_ADJUST_QTY")
+    private BigDecimal groupRoundAdjustQty;
+
+    /** 汇总组最终计划量 */
+    @TableField("GROUP_FINAL_PLAN_QTY")
+    private BigDecimal groupFinalPlanQty;
+
+    /** 来源解释关联的已排或未排目标片段 */
+    @ApiModelProperty(value = "来源解释目标关联列表", name = "targetRelationList")
+    @TableField(exist = false)
+    private List<TcScheduleExplainTargetRel> targetRelationList;
 
     /** 排程日期 */
     @JsonFormat(pattern = "yyyy-MM-dd", timezone = "GMT+8")

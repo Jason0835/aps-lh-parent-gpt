@@ -73,12 +73,12 @@
         >{{ $t("ui.data.column.scheduleResult.changeReleaseStatus") }}</el-button>
       </template>
       <template slot="headerRight">
-        <div class="summary-bar">
-          <span>{{ $t('ui.tm.schedule.totalStockQty') }}：{{ summary.totalStockQty || 0 }}</span>
+        <div class="summary-bar stat-info">
+          <span>{{ $t('ui.tm.schedule.totalStockQty') }}：<span class="stat-value">{{ summary.totalStockQty || 0 }}</span></span>
           <span
             v-for="(planQty, index) in shiftPlanQtyList"
             :key="index"
-          >{{ getShiftLabel(index + 1) }}{{ $t('ui.tm.schedule.planQty') }}：{{ planQty || 0 }}</span>
+          >{{ getShiftLabel(index + 1) }}{{ $t('ui.tm.schedule.planQty') }}：<span class="stat-value">{{ planQty || 0 }}</span></span>
         </div>
       </template>
     </page-table>
@@ -1036,7 +1036,14 @@ export default {
   gap: 12px;
   max-width: calc(100vw - 160px);
   margin-right: 12px;
-  color: #606266;
+  color: #676a6c;
+  font-size: 12px;
+  font-weight: bold;
   white-space: nowrap;
+
+  .stat-value {
+    margin-left: 5px;
+    color: #0088cc;
+  }
 }
 </style>

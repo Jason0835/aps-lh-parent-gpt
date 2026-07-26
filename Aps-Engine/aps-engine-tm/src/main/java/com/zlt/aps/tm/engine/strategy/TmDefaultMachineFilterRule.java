@@ -57,13 +57,42 @@ public class TmDefaultMachineFilterRule implements ITmMachineFilterRule {
      */
     @Override
     public ScheduleRuleResult evaluate(TmMachineCandidate candidate, TmMachineRuleContext context) {
+        return this.evaluateInternal(candidate, context, false);
+    }
+
+    /**
+     * 执行不含剩余产能判断的静态机台过滤。
+     *
+     * @param candidate 候选机台
+     * @param context   机台规则上下文
+     * @return 规则执行结果，passed=true 表示静态硬约束通过
+     */
+    @Override
+    public ScheduleRuleResult evaluateStatic(TmMachineCandidate candidate, TmMachineRuleContext context) {
+        return this.evaluateInternal(candidate, context, true);
+    }
+
+    /**
+     * 按指定过滤范围执行默认机台规则链。
+     *
+     * @param candidate 候选机台
+     * @param context 机台规则上下文
+     * @param staticOnly true 表示跳过当前班次剩余产能判断
+     * @return 规则执行结果
+     */
+    private ScheduleRuleResult evaluateInternal(TmMachineCandidate candidate, TmMachineRuleContext context,
+                                                boolean staticOnly) {
         if (candidate == null || context == null) {
             throw new ServiceException(TmScheduleErrorCodeEnum.TM_MACHINE_CANDIDATE_EMPTY.getDefaultMessage());
         }
         TmTaskDraft task = context.getTaskDraft();
         List<String> ruleOrder = this.resolveRuleOrder(context);
-        candidate.getEvidence().put("filterRuleOrder", ruleOrder);
+        candidate.getEvidence().put(staticOnly ? "staticFilterRuleOrder" : "filterRuleOrder", ruleOrder);
         for (String ruleCode : ruleOrder) {
+            if (staticOnly && RULE_REMAIN_CAPACITY.equals(ruleCode)) {
+                candidate.getEvidence().put("staticFilterSkipped:" + ruleCode, Boolean.TRUE);
+                continue;
+            }
             if (!this.isRuleEnabled(context, ruleCode)) {
                 candidate.getEvidence().put("filterRuleDisabled:" + ruleCode, Boolean.TRUE);
                 continue;

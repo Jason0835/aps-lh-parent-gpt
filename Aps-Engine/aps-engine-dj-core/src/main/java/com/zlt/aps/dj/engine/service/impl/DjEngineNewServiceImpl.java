@@ -1693,15 +1693,16 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
         }
         // 记录各规格的库消比
         for (DjPaddingDemand ps : pendingSpecs) {
-            BigDecimal ratio = this.calcStockConsumeRatio(ps, context);
-            if (ps.isNeedProduce()) {
-                context.appendLog("    规格 {0}：剩余需求={1}，库消比={2}，胶料={3}，口型={4}",
-                        context.getPaddingNameByCode(ps.getPaddingCode()),
-                        BigDecimalUtils.valueOf(ps.getRemainingDemand()),
-                        ratio != null ? ratio : "N/A",
-                        ps.getGlueCode() != null ? ps.getGlueCode() : "无",
-                        ps.getMouthPlateCode() != null ? ps.getMouthPlateCode() : "无");
+            if (!ps.isNeedProduce() || !BigDecimalUtils.gtZero(ps.getRemainingDemand())) {
+                continue;
             }
+            BigDecimal ratio = this.calcStockConsumeRatio(ps, context);
+            context.appendLog("    规格 {0}：剩余需求={1}，库消比={2}，胶料={3}，口型={4}",
+                    context.getPaddingNameByCode(ps.getPaddingCode()),
+                    BigDecimalUtils.valueOf(ps.getRemainingDemand()),
+                    ratio != null ? ratio : "N/A",
+                    ps.getGlueCode() != null ? ps.getGlueCode() : "无",
+                    ps.getMouthPlateCode() != null ? ps.getMouthPlateCode() : "无");
         }
 
         // 机台剩余产能不能超过本班台车约束的剩余量

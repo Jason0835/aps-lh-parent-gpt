@@ -442,6 +442,16 @@ public class TcMachineAssignService implements ITcMachineAssignService {
 
         // 全部候选机台被过滤，按过滤原因归类未排原因
         if (passedCandidates.isEmpty()) {
+            if (this.isCapacityBlockedCarryover(task, context, filterRule)) {
+                context.getCandidateTraceMap().put(task.getBusinessKey(), candidates);
+                log.info("[TC_MACHINE_ASSIGN] 任务[{}]静态硬约束通过但当前班无剩余产能，进入后续班次承接",
+                        task.getBusinessKey());
+                this.removeContextTask(context, task);
+                this.appendCarryoverQty(task, null, Collections.emptyList(), filterRule, scoreStrategy, context,
+                        nvl(task.getPlanQty()), BigDecimal.ZERO, BigDecimal.ZERO,
+                        this.normalizeShiftOrder(task.getShiftOrder()), true);
+                return;
+            }
             TcUnplannedReasonEnum unplannedReason = this.resolveUnplannedReasonFromCandidates(candidates);
             log.info("[TC_MACHINE_ASSIGN] 任务[{}]所有候选机台均被过滤，未排原因={}",
                     task.getBusinessKey(), unplannedReason.getCode());
@@ -486,6 +496,49 @@ public class TcMachineAssignService implements ITcMachineAssignService {
     }
 
     /**
+     * 判断任务是否仅因当前班次没有剩余产能而可进入后续班次承接。
+     *
+     * @param task 当前待排任务
+     * @param context 排程上下文
+     * @param filterRule 机台过滤规则
+     * @return true 表示至少存在静态可行机台，且所有静态可行机台当前班剩余产能均不足
+     */
+    private boolean isCapacityBlockedCarryover(TcTaskDraft task, TcScheduleContext context,
+                                               ITcMachineFilterRule filterRule) {
+        List<TcMachineCandidate> staticCandidates = this.copyCandidates(context.getMachineCandidateList());
+        this.prepareCandidatesForTask(task, context, staticCandidates);
+        TcMachineRuleContext ruleContext = new TcMachineRuleContext();
+        ruleContext.setTaskDraft(task);
+        ruleContext.setScheduleContext(context);
+        List<TcMachineCandidate> staticPassedCandidates = staticCandidates.stream()
+                .filter(candidate -> filterRule.evaluateStatic(candidate, ruleContext).isPassed())
+                .collect(Collectors.toList());
+        return CollUtil.isNotEmpty(staticPassedCandidates)
+                && staticPassedCandidates.stream().allMatch(candidate -> nvl(candidate.getRemainCapacity())
+                .compareTo(BigDecimal.ZERO) <= 0);
+    }
+
+    /**
+     * 从待持久化任务集合移除已转换为顺延任务的来源任务。
+     *
+     * @param context 排程上下文
+     * @param task 已转换为顺延任务的来源任务
+     */
+    private void removeContextTask(TcScheduleContext context, TcTaskDraft task) {
+        List<TcTaskDraft> taskList = context.getTaskDraftList();
+        if (taskList == null || taskList.isEmpty()) {
+            return;
+        }
+        try {
+            taskList.remove(task);
+        } catch (UnsupportedOperationException exception) {
+            List<TcTaskDraft> mutableTaskList = new ArrayList<>(taskList);
+            mutableTaskList.remove(task);
+            context.setTaskDraftList(mutableTaskList);
+        }
+    }
+
+    /**
      * 按当前班真实产能分配，并按“同班其他机台优先、其后跨班”承接溢出量。
      *
      * <p>首段先使用本轮评分选中的机台；产能不足量再尝试同班其他候选机台，
@@ -527,7 +580,7 @@ public class TcMachineAssignService implements ITcMachineAssignService {
             this.markUnplanned(task, TcUnplannedReasonEnum.CAPACITY_NOT_ENOUGH);
             this.addToolLimitUnplannedTrace(context, task, toolOverflowQty, startShiftOrder);
             this.appendCarryoverQty(task, selectedCandidate, firstShiftCandidates, filterRule, scoreStrategy,
-                    context, toolOverflowQty, BigDecimal.ZERO, toolOverflowQty, startShiftOrder);
+                    context, toolOverflowQty, BigDecimal.ZERO, toolOverflowQty, startShiftOrder, false);
             return;
         }
 
@@ -563,7 +616,7 @@ public class TcMachineAssignService implements ITcMachineAssignService {
         BigDecimal carryoverQty = capacityOverflowQty.add(toolOverflowQty);
         if (carryoverQty.compareTo(BigDecimal.ZERO) > 0) {
             this.appendCarryoverQty(task, selectedCandidate, firstShiftCandidates, filterRule, scoreStrategy, context,
-                    carryoverQty, capacityOverflowQty, toolOverflowQty, startShiftOrder);
+                    carryoverQty, capacityOverflowQty, toolOverflowQty, startShiftOrder, false);
         }
     }
 
@@ -862,10 +915,11 @@ public class TcMachineAssignService implements ITcMachineAssignService {
                                     ITcMachineFilterRule filterRule, ITcMachineScoreStrategy scoreStrategy,
                                     TcScheduleContext context, BigDecimal carryoverQty,
                                     BigDecimal capacityOverflowQty, BigDecimal toolOverflowQty,
-                                    Integer sourceShiftOrder) {
+                                    Integer sourceShiftOrder, boolean capacityBlockedCarryover) {
         BigDecimal remainingQty = nvl(carryoverQty);
         BigDecimal sameShiftCapacityQty = nvl(capacityOverflowQty);
-        String sourceType = this.resolveCarryoverSourceType(capacityOverflowQty, toolOverflowQty);
+        String sourceType = capacityBlockedCarryover ? "CAPACITY_BLOCKED_CARRYOVER"
+                : this.resolveCarryoverSourceType(capacityOverflowQty, toolOverflowQty);
         int overflowIndex = 1;
         int firstTargetShiftOrder = sameShiftCapacityQty.compareTo(BigDecimal.ZERO) > 0
                 ? sourceShiftOrder : sourceShiftOrder + 1;
@@ -915,6 +969,10 @@ public class TcMachineAssignService implements ITcMachineAssignService {
                     this.taskChainScheduleService.changeQty(mergeTarget.getBusinessKey(), afterMergeQty, shiftOrder, context);
                     mergeTarget.setPlanQty(afterMergeQty);
                     this.applyCarryoverMergeToolState(mergeTarget, assignedQty, context);
+                    if (capacityBlockedCarryover) {
+                        mergeTarget.setCalcFormulaDesc(this.appendFormulaDesc(mergeTarget.getCalcFormulaDesc(),
+                                "静态可行但当前班产能不足，后续班承接"));
+                    }
                     context.getCandidateTraceMap().put(mergeTarget.getBusinessKey(), Collections.singletonList(runtimeCandidate));
                     this.addCarryoverTrace(context, mergeTarget, sourceTask, sourceType, assignedQty, sourceShiftOrder,
                             shiftOrder, candidate.getMachineCode(), beforeMergeQty, afterMergeQty, true);
@@ -930,6 +988,10 @@ public class TcMachineAssignService implements ITcMachineAssignService {
                             sourceShiftOrder, overflowIndex, candidate.getMachineCode());
                     this.applyCapacitySplitResult(overflowTask, beforeAssignQty, assignedQty, remainCapacity,
                             machineSpeed, "顺延量承接");
+                    if (capacityBlockedCarryover) {
+                        overflowTask.setCalcFormulaDesc(this.appendFormulaDesc(overflowTask.getCalcFormulaDesc(),
+                                "静态可行但当前班产能不足，后续班承接"));
+                    }
                     this.settleAssignedTaskToolState(overflowTask, context);
                     this.addContextTask(context, overflowTask);
                     context.getCandidateTraceMap().put(overflowTask.getBusinessKey(), Collections.singletonList(runtimeCandidate));
@@ -962,6 +1024,10 @@ public class TcMachineAssignService implements ITcMachineAssignService {
             unplannedTask.setMachineCode(null);
             unplannedTask.setUnplannedReasonCode(TcUnplannedReasonEnum.CAPACITY_NOT_ENOUGH.getCode());
             unplannedTask.setUnplannedReasonDesc(TcUnplannedReasonEnum.CAPACITY_NOT_ENOUGH.getDesc());
+            if (capacityBlockedCarryover) {
+                unplannedTask.setCalcFormulaDesc(this.appendFormulaDesc(unplannedTask.getCalcFormulaDesc(),
+                        "6班承接结束仍有剩余"));
+            }
             this.addContextTask(context, unplannedTask);
             this.addCapacityUnplannedTrace(context, unplannedTask, remainingQty);
             this.addCarryoverTrace(context, unplannedTask, sourceTask, sourceType, remainingQty, sourceShiftOrder,
@@ -1475,6 +1541,17 @@ public class TcMachineAssignService implements ITcMachineAssignService {
         target.setNewSpecInfo(source.getNewSpecInfo());
         target.setExperimentSpecInfo(source.getExperimentSpecInfo());
         target.setSmallGlueFlag(source.getSmallGlueFlag());
+        // 汇总任务拆分、顺延和提前补产必须保留同一计划量汇总组及来源关系。
+        target.setPlanGroupKey(source.getPlanGroupKey());
+        target.setSourceTaskBusinessKeyList(source.getSourceTaskBusinessKeyList() == null
+                ? null : new ArrayList<>(source.getSourceTaskBusinessKeyList()));
+        target.setSourceExplainTask(Boolean.FALSE);
+        target.setGroupSourceCount(source.getGroupSourceCount());
+        target.setGroupRequiredQty(source.getGroupRequiredQty());
+        target.setGroupBaseDemandQty(source.getGroupBaseDemandQty());
+        target.setGroupMinStartAdjustQty(source.getGroupMinStartAdjustQty());
+        target.setGroupRoundAdjustQty(source.getGroupRoundAdjustQty());
+        target.setGroupFinalPlanQty(source.getGroupFinalPlanQty());
         target.setBusinessKeySuffix(this.buildOverflowBusinessKeySuffix(source, sourceShift, shiftOrder, machineCode, overflowIndex));
         return target;
     }
@@ -1632,7 +1709,9 @@ public class TcMachineAssignService implements ITcMachineAssignService {
         evidence.put("merged", merged);
         evidence.put("beforeMergePlanQty", beforeMergeQty);
         evidence.put("afterMergePlanQty", afterMergeQty);
-        traceOf(context, targetTask).addRuleHit(TcScheduleRuleCodeEnum.PLAN_QTY_CARRYOVER,
+        TcScheduleRuleCodeEnum ruleCode = "CAPACITY_BLOCKED_CARRYOVER".equals(sourceType)
+                ? TcScheduleRuleCodeEnum.CAPACITY_BLOCKED_CARRYOVER : TcScheduleRuleCodeEnum.PLAN_QTY_CARRYOVER;
+        traceOf(context, targetTask).addRuleHit(ruleCode,
                 TcScheduleRuleResultEnum.PASS, evidence);
     }
 

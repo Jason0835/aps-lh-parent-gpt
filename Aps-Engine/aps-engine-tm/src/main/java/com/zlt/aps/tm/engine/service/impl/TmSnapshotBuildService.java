@@ -13,8 +13,7 @@ import com.zlt.aps.tm.engine.domain.*;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * 胎面解释快照构建服务。
@@ -37,11 +36,13 @@ public class TmSnapshotBuildService {
         if (context != null && task != null) {
             TmRuleTrace ruleTrace = context.getRuleTraceMap().get(task.getBusinessKey());
             result.setRuleHitJson(buildRuleHitJson(ruleTrace));
-            List<TmMachineCandidate> candidates = context.getCandidateTraceMap().get(task.getBusinessKey());
+            List<TmMachineCandidate> candidates = this.resolveCandidates(task, context);
             result.setCandidateMachineJson(buildCandidateMachineJson(candidates));
             String assignStatus = resolveAssignStatus(task);
-            result.setSelectedMachineScore(resolveSelectedMachineScore(task, candidates));
-            result.setMachineSelectReason(buildMachineSelectReason(task, result.getSelectedMachineScore(), assignStatus));
+            boolean splitAcrossMachines = this.isSplitAcrossMachines(task, context);
+            result.setSelectedMachineScore(resolveSelectedMachineScore(task, candidates, splitAcrossMachines));
+            result.setMachineSelectReason(buildMachineSelectReason(task, result.getSelectedMachineScore(), assignStatus,
+                    splitAcrossMachines));
             result.setAssignStatus(assignStatus);
             if (isUnplannedTask(task)) {
                 result.setUnplannedEvidenceJson(buildUnplannedEvidenceJson(ruleTrace, task));
@@ -102,12 +103,14 @@ public class TmSnapshotBuildService {
      * @param candidates 候选机台列表
      * @return 选中机台评分；未排或无需生产时返回 null
      */
-    private BigDecimal resolveSelectedMachineScore(TmTaskDraft task, List<TmMachineCandidate> candidates) {
-        if (task == null || isUnplannedTask(task) || isNoProductionNeeded(task) || CollUtil.isEmpty(candidates)) {
+    private BigDecimal resolveSelectedMachineScore(TmTaskDraft task, List<TmMachineCandidate> candidates,
+                                                   boolean splitAcrossMachines) {
+        if (task == null || isUnplannedTask(task) || isNoProductionNeeded(task)
+                || splitAcrossMachines || CollUtil.isEmpty(candidates)) {
             return null;
         }
         for (TmMachineCandidate candidate : candidates) {
-            if (task.getMachineCode().equals(candidate.getMachineCode())) {
+            if (Objects.equals(task.getMachineCode(), candidate.getMachineCode())) {
                 return candidate.getScore();
             }
         }
@@ -122,7 +125,8 @@ public class TmSnapshotBuildService {
      * @param assignStatus         分配状态编码
      * @return 选机说明
      */
-    private String buildMachineSelectReason(TmTaskDraft task, BigDecimal selectedMachineScore, String assignStatus) {
+    private String buildMachineSelectReason(TmTaskDraft task, BigDecimal selectedMachineScore, String assignStatus,
+                                            boolean splitAcrossMachines) {
         if (task == null) {
             return "任务为空，无法选机";
         }
@@ -133,7 +137,64 @@ public class TmSnapshotBuildService {
         if (TmScheduleTaskStatusEnum.NO_PRODUCTION_NEEDED.getCode().equals(assignStatus)) {
             return "无需排产：最终计划量为0，保留任务解释但不占用机台产能";
         }
+        if (splitAcrossMachines) {
+            return "同胎面同班次汇总后分配至多台机台，来源解释不展示单一选中机台评分";
+        }
         return "选中机台 " + task.getMachineCode() + "，评分=" + selectedMachineScore + "，按默认过滤和评分规则选择";
+    }
+
+    /**
+     * 解析任务候选机台证据；来源解释任务没有直接候选证据时，按同一汇总组合并实际片段证据。
+     *
+     * @param task    待解释任务
+     * @param context 胎面排程上下文
+     * @return 去重后的候选机台证据
+     */
+    private List<TmMachineCandidate> resolveCandidates(TmTaskDraft task, TmScheduleContext context) {
+        if (task == null || context == null) {
+            return new ArrayList<>();
+        }
+        List<TmMachineCandidate> directCandidates = context.getCandidateTraceMap().get(task.getBusinessKey());
+        if (CollUtil.isNotEmpty(directCandidates)) {
+            return directCandidates;
+        }
+        if (StrUtil.isBlank(task.getPlanGroupKey())) {
+            return new ArrayList<>();
+        }
+        Map<String, TmMachineCandidate> candidateMap = new LinkedHashMap<>();
+        context.getTaskDraftList().stream()
+                .filter(Objects::nonNull)
+                .filter(fragment -> task.getPlanGroupKey().equals(fragment.getPlanGroupKey()))
+                .map(fragment -> context.getCandidateTraceMap().get(fragment.getBusinessKey()))
+                .filter(CollUtil::isNotEmpty)
+                .flatMap(List::stream)
+                .filter(Objects::nonNull)
+                .forEach(candidate -> candidateMap.putIfAbsent(candidate.getMachineCode(), candidate));
+        return new ArrayList<>(candidateMap.values());
+    }
+
+    /**
+     * 判断同一汇总组的实际片段是否分配到多台机台。
+     *
+     * @param task    来源或实际任务
+     * @param context 胎面排程上下文
+     * @return true 表示实际片段使用了多台机台
+     */
+    private boolean isSplitAcrossMachines(TmTaskDraft task, TmScheduleContext context) {
+        if (task == null || context == null || StrUtil.isBlank(task.getPlanGroupKey())) {
+            return false;
+        }
+        long machineCount = context.getTaskDraftList().stream()
+                .filter(Objects::nonNull)
+                .filter(fragment -> task.getPlanGroupKey().equals(fragment.getPlanGroupKey()))
+                .filter(fragment -> !isUnplannedTask(fragment))
+                .filter(fragment -> fragment.getPlanQty() != null
+                        && fragment.getPlanQty().compareTo(BigDecimal.ZERO) > 0)
+                .map(TmTaskDraft::getMachineCode)
+                .filter(StrUtil::isNotBlank)
+                .distinct()
+                .count();
+        return machineCount > 1;
     }
 
     /**
@@ -163,6 +224,7 @@ public class TmSnapshotBuildService {
                     rejectedCandidates.add(buildFilterEvidenceObject(item.getEvidence()));
                 } else if (TmScheduleRuleCodeEnum.TOOL_LIMIT_UNPLANNED.getCode().equals(ruleCode)
                         || TmScheduleRuleCodeEnum.CAPACITY_OVERFLOW_UNPLANNED.getCode().equals(ruleCode)
+                        || TmScheduleRuleCodeEnum.CAPACITY_BLOCKED_CARRYOVER.getCode().equals(ruleCode)
                         || (TmScheduleRuleCodeEnum.MACHINE_ASSIGN.getCode().equals(ruleCode)
                         && TmScheduleRuleResultEnum.REJECT.getCode().equals(item.getResult()))) {
                     JSONObject evObj = new JSONObject();

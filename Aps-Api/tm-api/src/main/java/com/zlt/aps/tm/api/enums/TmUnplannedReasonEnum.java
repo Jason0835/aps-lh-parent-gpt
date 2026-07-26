@@ -25,6 +25,9 @@ public enum TmUnplannedReasonEnum {
     /** 产能不足 */
     CAPACITY_NOT_ENOUGH("CAPACITY_NOT_ENOUGH", "产能不足"),
 
+    /** 工装不足 */
+    TOOL_NOT_ENOUGH("TOOL_NOT_ENOUGH", "工装不足"),
+
     /** 规则冲突 */
     RULE_CONFLICT("RULE_CONFLICT", "规则冲突"),
 

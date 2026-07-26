@@ -208,6 +208,36 @@ public class TmTaskDraft {
     /** 业务键后缀，用于拆分来源任务或顺延任务，避免同规格同班次任务业务键冲突 */
     private String businessKeySuffix;
 
+    /** 同胎面同班次计划量汇总组业务键 */
+    private String planGroupKey;
+
+    /** 汇总组包含的原始来源任务业务键列表 */
+    private java.util.List<String> sourceTaskBusinessKeyList;
+
+    /** 是否为仅用于落库追溯的原始来源解释任务 */
+    private Boolean sourceExplainTask;
+
+    /** 来源任务参与汇总计算的需求量 */
+    private BigDecimal sourceRequiredQty;
+
+    /** 汇总组来源任务数量 */
+    private Integer groupSourceCount;
+
+    /** 汇总组库存抵扣前需求量 */
+    private BigDecimal groupRequiredQty;
+
+    /** 汇总组库存抵扣后基础需求量 */
+    private BigDecimal groupBaseDemandQty;
+
+    /** 汇总组最小起排调整量 */
+    private BigDecimal groupMinStartAdjustQty;
+
+    /** 汇总组收尾或卷曲取整调整量 */
+    private BigDecimal groupRoundAdjustQty;
+
+    /** 汇总组最终计划量 */
+    private BigDecimal groupFinalPlanQty;
+
     /** 新规格判断与提前排产证据 */
     private TmNewSpecInfo newSpecInfo;
 

@@ -123,7 +123,7 @@
   "ui.data.column.dj.scheduleResult.scheduleDate": "Schedule Date",
   "ui.data.column.dj.scheduleResult.mouthPlateCode": "Mouth Plate Code",
   "ui.data.column.dj.scheduleResult.releaseStatus": "Release Status",
-  "ui.data.column.dj.scheduleResult.paddingCode": "Padding",
+  "ui.data.column.dj.scheduleResult.paddingCode": "Padding Code",
   "ui.data.column.dj.scheduleResult.paddingName": "Padding",
   "ui.data.column.dj.scheduleResult.glueCode": "Glue",
   "ui.data.column.dj.scheduleResult.machineCode": "Machine",
@@ -1501,5 +1501,7 @@
   "ui.tc.schedule.operationProgressHint": "The task is running in the background and can be restored after refresh",
   "ui.tc.schedule.operationSuccess": "Sidewall manual operation completed successfully",
   "ui.tc.schedule.operationFailed": "Sidewall manual operation failed",
-  "ui.tc.schedule.operationTimeout": "The task is still running in the background; refresh later to check the status"
+  "ui.tc.schedule.operationTimeout": "The task is still running in the background; refresh later to check the status",
+  "ui.tc.schedule.excelFactoryDateRequired": "Select a factory and schedule date",
+  "ui.tc.schedule.excelSingleDateRequired": "Sidewall schedule results can only be exported for one schedule date"
 }

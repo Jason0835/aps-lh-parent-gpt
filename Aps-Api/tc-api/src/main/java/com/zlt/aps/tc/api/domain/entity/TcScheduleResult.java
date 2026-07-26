@@ -370,6 +370,11 @@ public class TcScheduleResult extends BaseEntity {
     @TableField(exist = false)
     private Long currentTaskVersion;
 
+    /** 是否仅导出空白模板 */
+    @ApiModelProperty(value = "是否仅导出空白模板", name = "exportTemplate")
+    @TableField(exist = false)
+    private Boolean exportTemplate;
+
     /** 是否收尾任务 */
     @Excel(name = "ui.tc.schedule.scheduleResult.tailFlag", dictType = "biz_yes_no")
     @ApiModelProperty(value = "是否收尾任务", name = "tailFlag")
