@@ -797,6 +797,15 @@ public class DjScheduleResultController extends AbstractBillBizController<DjSche
         orderStr.append("ISNULL(CLASS6_SEQUENCE), CLASS6_SEQUENCE");
         return orderStr.toString();
     }
+    
+    @Override
+    protected void builderCondition(QueryWrapper<DjScheduleResult> queryWrapper, DjScheduleResult queryVO) {
+        queryWrapper.eq("FACTORY_CODE", queryVO.getFactoryCode());
+        queryWrapper.like(StringUtils.isNotEmpty(queryVO.getPaddingName()), "PADDING_NAME", queryVO.getPaddingName());
+        queryWrapper.like(StringUtils.isNotEmpty(queryVO.getGlueCode()), "GLUE_CODE", queryVO.getGlueCode());
+        queryWrapper.eq(StringUtils.isNotEmpty(queryVO.getReleaseStatus()), "RELEASE_STATUS", queryVO.getReleaseStatus());
+        queryWrapper.eq(StringUtils.isNotEmpty(queryVO.getMachineCode()), "MACHINE_CODE", queryVO.getMachineCode());
+    }
 
     @Override
     protected String getTypeCode() {
