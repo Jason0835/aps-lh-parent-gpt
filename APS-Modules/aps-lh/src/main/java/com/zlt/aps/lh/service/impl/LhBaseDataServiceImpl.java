@@ -1017,7 +1017,10 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         List<Date> allProductionDate = Lists.newArrayList(context.getAllProductionDateInfo());
         YearMonth nextMonth = SkuMonthPlanCalculator.getNextMonth(allProductionDate);
         Map<YearMonth, Date> monthStartDayMap = getStartDay(nextMonth);
-        context.setPlanStartDate(monthStartDayMap.get(SkuMonthPlanCalculator.getFirstYearMonth(allProductionDate)));
+        Date date = monthStartDayMap.get(SkuMonthPlanCalculator.getFirstYearMonth(allProductionDate));
+        if (date != null && (context.getScheduleDate().after(date) || context.getScheduleDate().equals(date))) {
+            context.setPlanStartDate(date);
+        }
         List<FactoryMonthPlanProductionFinalResult> loadedPlanList = new ArrayList<FactoryMonthPlanProductionFinalResult>(256);
         if (CollectionUtils.isEmpty(requiredMonthMap)) {
             Calendar cal = Calendar.getInstance();
@@ -1903,7 +1906,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         calendar.set(Calendar.DAY_OF_MONTH, 1);
         //20260707+ 下个月定稿后，完成量起始日从下个月定稿库存日开始计算
         Date monthStart;
-        if (null == monthStartDate || monthStartDate.after(cutoffDay)) {
+        if (null == monthStartDate) {
             monthStart = LhScheduleTimeUtil.clearTime(calendar.getTime());
         } else {
             monthStart = monthStartDate;
