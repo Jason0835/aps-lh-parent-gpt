@@ -20,11 +20,13 @@ import com.zlt.aps.cx.api.service.ICxPrecisionPlanRemoteService;
 import com.zlt.aps.enums.LocationTypeEnum;
 import com.zlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.gsq.api.domain.entity.GsqScheduleResultIssue;
 import com.zlt.aps.itf.constant.DataSource;
 import com.zlt.aps.itf.constant.SysCode;
 import com.zlt.aps.itf.mes.enums.ItfSyncKeyEnum;
 import com.zlt.aps.itf.mes.enums.MouldCategoryConvertEnum;
 import com.zlt.aps.itf.mes.mapper.*;
+import com.zlt.aps.itf.mes.service.IGsqScheduleResultIssueService;
 import com.zlt.aps.itf.mes.service.IPrecisionPlanIssueService;
 import com.zlt.aps.itf.mes.service.ITmScheduleResultIssueService;
 import com.zlt.aps.itf.mes.service.MesItfService;
@@ -130,6 +132,9 @@ public class MesItfServiceImpl implements MesItfService {
 
     @Autowired
     private ITmScheduleResultIssueService tmScheduleResultIssueService;
+
+    @Autowired
+    private IGsqScheduleResultIssueService gsqScheduleResultIssueService;
 
     @Autowired
     private ILhMesSyncRemoteService lhMesSyncRemoteService;
@@ -988,10 +993,13 @@ public class MesItfServiceImpl implements MesItfService {
             Date onlineDate = insertList.stream().map(LhMachineOnlineInfo::getOnlineDate).filter(Objects::nonNull).findFirst().orElse(DateUtils.getNowDate());
             String onlineDateStr = DateUtil.formatDate(onlineDate);
             log.info("硫化在机同步：开始同步，factoryCode={}, onlineDate={}, 待插入数量={}", factoryCode, onlineDateStr, insertList.size());
-
-            FeignTokenHelper.runWithToken(() -> {
-                lhMesSyncRemoteService.logicDeleteAndSaveMachineOnlineInfo(factoryCode, onlineDateStr, "MES", insertList);
-            });
+            AjaxResult saveResult = FeignTokenHelper.callWithToken(() ->
+                    lhMesSyncRemoteService.logicDeleteAndSaveMachineOnlineInfo(factoryCode, onlineDateStr, "MES", insertList));
+            if (AjaxResult.Type.SUCCESS.value() != (Integer) saveResult.get(AjaxResult.CODE_TAG)) {
+                log.error("硫化在机同步：同步失败，factoryCode={}, 返回code={}, 返回消息={}",
+                        factoryCode, saveResult.get(AjaxResult.CODE_TAG), saveResult.get(AjaxResult.MSG_TAG));
+                return AjaxResult.error("硫化在机同步失败：" + saveResult.get(AjaxResult.MSG_TAG));
+            }
 
             log.info("硫化在机同步：同步完成，factoryCode={}, 插入数量={}", factoryCode, insertList.size());
         } catch (Exception e) {
@@ -2782,11 +2790,10 @@ public class MesItfServiceImpl implements MesItfService {
         TrialStatusEnum status = TrialStatusEnum.getByCode(lhType);
         return TrialStatusEnum.TRIAL == status || TrialStatusEnum.MASS_TRIAL == status;
     }
-
     /**
      * 判断量试充抵正规开关是否开启。
-     * <p>读取硫化参数 SYS0312001 的值，默认为开启（"1"），与存量行为一致。
-     * 参数值为 "0" 时关闭，不再额外插入量试→正规充抵记录。</p>
+     * <p>读取硫化参数 SYS0312001 的值，默认为关闭（"0"），不再额外插入量试→正规充抵记录。
+     * 参数值为 "1" 时开启，与存量行为一致。</p>
      *
      * @param factoryCode 分厂编码
      * @return true-开关开启（执行充抵），false-开关关闭（跳过充抵）
@@ -2797,16 +2804,16 @@ public class MesItfServiceImpl implements MesItfService {
                     lhMesSyncRemoteService.selectLhParamsByCode(
                             LhScheduleParamConstant.ENABLE_MASS_TRIAL_TO_FORMAL, factoryCode));
             if (paramResult == null || StringUtils.isBlank(paramResult.getParamValue())) {
-                // 未配置时默认开启，与存量行为一致
-                return true;
+                // 未配置时默认关闭，与存量行为一致
+                return false;
             }
             boolean enabled = "1".equals(paramResult.getParamValue().trim());
             log.info("量试充抵正规开关：factoryCode={}, paramValue={}, enabled={}",
                     factoryCode, paramResult.getParamValue(), enabled);
             return enabled;
         } catch (Exception e) {
-            log.error("量试充抵正规开关：读取硫化参数异常，factoryCode={}，默认开启", factoryCode, e);
-            return true;
+            log.error("量试充抵正规开关：读取硫化参数异常，factoryCode={}，默认关闭", factoryCode, e);
+            return false;
         }
     }
 
@@ -3488,6 +3495,25 @@ public class MesItfServiceImpl implements MesItfService {
         String factoryCode = FactoryConstant.DEFAULT_FACTORY_CODE;
         String companyCode = factoryCode;
         return tmScheduleResultIssueService.issueTmScheduleResult(tmScheduleResultIssueList, factoryCode, companyCode);
+    }
+
+    /**
+     * 钢丝圈排程结果下发到MES
+     * 业务规则（与胎圈一致）：
+     * 1. D日（今天）：更新中班数据（钢丝圈1班→MES中班），夜班早班已过不下发
+     * 2. D+1日（明天）：更新夜早中3班数据（钢丝圈2/3/4班→MES夜/早/中班）
+     * 3. D+2日（后天）：先删后插夜早2班数据（钢丝圈5/6班→MES夜/早班），中班尚未排产不下发
+     * TQ_CLASS1~6_PLAN 全量传递到每条记录
+     *
+     * @param gsqScheduleResultIssueList 钢丝圈排程结果下发列表（已按3天拆分）
+     * @return 下发结果（data 字段携带 mesStatus：IS_RELEASE/FAILURE_RELEASE/TIMEOUT_FAILURE）
+     */
+    @Override
+    public AjaxResult issueGsqScheduleResult(List<GsqScheduleResultIssue> gsqScheduleResultIssueList) {
+        // 分公司编码与分厂编码保持一致
+        String factoryCode = FactoryConstant.DEFAULT_FACTORY_CODE;
+        String companyCode = factoryCode;
+        return gsqScheduleResultIssueService.issueGsqScheduleResult(gsqScheduleResultIssueList, factoryCode, companyCode);
     }
 
     @Override
