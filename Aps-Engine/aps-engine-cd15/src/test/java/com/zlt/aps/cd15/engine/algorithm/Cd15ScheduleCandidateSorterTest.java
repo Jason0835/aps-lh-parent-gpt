@@ -146,6 +146,76 @@ public class Cd15ScheduleCandidateSorterTest {
     }
 
     /**
+     * 当前班不缺料时，班初机尾位于中间角度也必须从大卷边界形成单方向路线。
+     */
+    @Test
+    public void shouldStartNonShortageSingleDirectionFromRollBoundary() {
+        LocalDateTime futureShortage = LocalDateTime.of(2026, 7, 25, 6, 0);
+        Cd15MachineTailState tail = Cd15MachineTailState.builder()
+                .steelStripCode("CURRENT")
+                .bigRollCode("CST75523")
+                .cuttingAngle("18")
+                .build();
+        Cd15ScheduleCandidate angle18 = candidate(
+                "ANGLE18", "CST75523", "18", futureShortage);
+        angle18.setContinueFromPreviousShift(true);
+
+        List<Cd15ScheduleCandidate> result = sorter.sort(Arrays.asList(
+                angle18,
+                candidate("ANGLE15", "CST75523", "15", futureShortage),
+                candidate("ANGLE24", "CST75523", "24", futureShortage),
+                candidate("ANGLE51", "CST75523", "51", futureShortage)
+        ), Collections.singletonList(tail), null);
+
+        assertEquals("15", result.get(0).getCuttingAngle());
+        assertEquals("18", result.get(1).getCuttingAngle());
+        assertEquals("24", result.get(2).getCuttingAngle());
+        assertEquals("51", result.get(3).getCuttingAngle());
+    }
+
+    /** 非缺料续作不能越过当前角度，导致同一角度被拆成首尾两段。 */
+    @Test
+    public void shouldKeepCurrentAngleGroupBeforeNonShortageContinuation() {
+        LocalDateTime futureShortage = LocalDateTime.of(2026, 7, 25, 14, 0);
+        Cd15MachineTailState tail = Cd15MachineTailState.builder()
+                .steelStripCode("CURRENT")
+                .bigRollCode("CST75523")
+                .cuttingAngle("51")
+                .build();
+        Cd15ScheduleCandidate angle18 = candidate(
+                "ANGLE18", "CST75523", "18", futureShortage);
+        angle18.setContinueFromPreviousShift(true);
+
+        List<Cd15ScheduleCandidate> result = sorter.sort(Arrays.asList(
+                angle18,
+                candidate("ANGLE51-A", "CST75523", "51", futureShortage),
+                candidate("ANGLE51-B", "CST75523", "51", futureShortage),
+                candidate("ANGLE24", "CST75523", "24", futureShortage)
+        ), Collections.singletonList(tail), null);
+
+        assertEquals("51", result.get(0).getCuttingAngle());
+        assertEquals("51", result.get(1).getCuttingAngle());
+    }
+    /** 当前班真实缺料仍保持最高优先级，允许打断非缺料角度路线。 */
+    @Test
+    public void shouldAllowCurrentShortageToInterruptAngleRoute() {
+        LocalDateTime currentShift = LocalDateTime.of(2026, 7, 24, 22, 0);
+        Cd15MachineTailState tail = Cd15MachineTailState.builder()
+                .bigRollCode("CST75523")
+                .cuttingAngle("51")
+                .build();
+        Cd15ScheduleCandidate urgentAngle18 = candidate(
+                "URGENT18", "CST75523", "18", currentShift);
+        urgentAngle18.setShortageInCurrentShift(true);
+
+        List<Cd15ScheduleCandidate> result = sorter.sort(Arrays.asList(
+                candidate("NORMAL51", "CST75523", "51", currentShift.plusHours(8)),
+                urgentAngle18
+        ), Collections.singletonList(tail), null);
+
+        assertEquals("18", result.get(0).getCuttingAngle());
+    }
+    /**
      * 非缺料大卷不得拆分，并应选择可衔接端点较多的起始卷以减少跨卷换角。
      */
     @Test

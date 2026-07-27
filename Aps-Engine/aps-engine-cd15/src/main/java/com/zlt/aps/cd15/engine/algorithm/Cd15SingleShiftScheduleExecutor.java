@@ -710,6 +710,7 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
                 .map(entry -> this.findShiftStartTailCandidate(
                         candidates, entry.getValue()))
                 .filter(java.util.Objects::nonNull)
+                .filter(Cd15ScheduleCandidate::isShortageInCurrentShift)
                 .distinct()
                 .forEach(candidate -> {
                     candidates.remove(candidate);
@@ -719,7 +720,7 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
     }
 
     /**
-     * 班初续作必须匹配上一班真实机尾材料；同一钢带存在不同角度时不能只按钢带代码取首条。
+     * 当前班缺料的班初续作必须匹配上一班真实机尾材料；非缺料机尾留在角度路线中统一排序。
      */
     private Cd15ScheduleCandidate findShiftStartTailCandidate(
             List<Cd15ScheduleCandidate> candidates, Cd15MachineTailState tail) {

@@ -88,6 +88,23 @@ public class Cd15ScheduleCandidateSorter {
         if (compare != 0) {
             return compare;
         }
+        if (!first.isShortageInCurrentShift()) {
+            // 非缺料候选先锁定不可拆分大卷及单方向角度路线，续作和机尾连续性只能在路线内排序。
+            compare = Integer.compare(
+                    angleRouteRanks.getOrDefault(first, Integer.MAX_VALUE),
+                    angleRouteRanks.getOrDefault(second, Integer.MAX_VALUE));
+            if (compare != 0) {
+                return compare;
+            }
+            compare = this.compareAngleDirection(first, second, angleDirection);
+            if (compare != 0) {
+                return compare;
+            }
+            compare = this.compareAngle(first, second);
+            if (compare != 0) {
+                return compare;
+            }
+        }
         compare = Boolean.compare(
                 second.isContinueFromPreviousShift(), first.isContinueFromPreviousShift());
         if (compare != 0) {
@@ -108,21 +125,15 @@ public class Cd15ScheduleCandidateSorter {
         if (compare != 0) {
             return compare;
         }
-        if (!first.isShortageInCurrentShift()) {
-            compare = Integer.compare(
-                    angleRouteRanks.getOrDefault(first, Integer.MAX_VALUE),
-                    angleRouteRanks.getOrDefault(second, Integer.MAX_VALUE));
+        if (first.isShortageInCurrentShift()) {
+            compare = this.compareAngleDirection(first, second, angleDirection);
             if (compare != 0) {
                 return compare;
             }
-        }
-        compare = this.compareAngleDirection(first, second, angleDirection);
-        if (compare != 0) {
-            return compare;
-        }
-        compare = this.compareAngle(first, second);
-        if (compare != 0) {
-            return compare;
+            compare = this.compareAngle(first, second);
+            if (compare != 0) {
+                return compare;
+            }
         }
         compare = Comparator.nullsLast(String::compareTo).compare(
                 first.getBigRollCode(), second.getBigRollCode());
@@ -148,7 +159,6 @@ public class Cd15ScheduleCandidateSorter {
         return Comparator.nullsLast(String::compareTo).compare(
                 first.getMaterialKey(), second.getMaterialKey());
     }
-
     private int compareShortageTime(Cd15ScheduleCandidate first,
                                     Cd15ScheduleCandidate second) {
         return Comparator.nullsLast(LocalDateTime::compareTo).compare(
@@ -170,42 +180,32 @@ public class Cd15ScheduleCandidateSorter {
     }
 
     /**
-     * 非缺料候选按续作和新增规格层级分别规划，避免角度路线跨越既有特殊优先级。
+     * 非缺料候选统一规划不可拆分大卷路线，续作和新增规格只能在同一路线位置内排序。
      */
     private Map<Cd15ScheduleCandidate, Integer> buildAngleRouteRanks(
             List<Cd15ScheduleCandidate> candidates,
             Collection<Cd15MachineTailState> tails,
             AngleDirection angleDirection) {
         Map<Cd15ScheduleCandidate, Integer> result = new IdentityHashMap<>();
-        Map<String, List<Cd15ScheduleCandidate>> candidatesByPriority = new LinkedHashMap<>();
-        candidates.stream()
+        List<Cd15ScheduleCandidate> routeCandidates = candidates.stream()
                 .filter(Objects::nonNull)
                 .filter(candidate -> !candidate.isShortageInCurrentShift())
-                .forEach(candidate -> {
-                    result.put(candidate, 2);
-                    String priorityKey = candidate.isContinueFromPreviousShift() + "|"
-                            + candidate.isNewSpecAdvance();
-                    candidatesByPriority.computeIfAbsent(
-                            priorityKey, key -> new ArrayList<>()).add(candidate);
-                });
-        candidatesByPriority.values().forEach(priorityCandidates -> {
-            RouteChoice choice = this.chooseRouteStart(
-                    priorityCandidates, tails, angleDirection);
-            if (choice == null) {
+                .collect(java.util.stream.Collectors.toList());
+        routeCandidates.forEach(candidate -> result.put(candidate, 2));
+        RouteChoice choice = this.chooseRouteStart(routeCandidates, tails, angleDirection);
+        if (choice == null) {
+            return result;
+        }
+        routeCandidates.forEach(candidate -> {
+            if (!Objects.equals(choice.groupKey, candidate.getBigRollCode())) {
                 return;
             }
-            priorityCandidates.forEach(candidate -> {
-                if (!Objects.equals(choice.groupKey, candidate.getBigRollCode())) {
-                    return;
-                }
-                BigDecimal candidateAngle = this.decimal(candidate.getCuttingAngle());
-                result.put(candidate, candidateAngle != null
-                        && candidateAngle.compareTo(choice.startAngle) == 0 ? 0 : 1);
-            });
+            BigDecimal candidateAngle = this.decimal(candidate.getCuttingAngle());
+            result.put(candidate, candidateAngle != null
+                    && candidateAngle.compareTo(choice.startAngle) == 0 ? 0 : 1);
         });
         return result;
     }
-
     /** 以大卷为不可拆分路线段，选择剩余路线换角次数最少的起始大卷和角度。 */
     private RouteChoice chooseRouteStart(List<Cd15ScheduleCandidate> candidates,
                                          Collection<Cd15MachineTailState> tails,

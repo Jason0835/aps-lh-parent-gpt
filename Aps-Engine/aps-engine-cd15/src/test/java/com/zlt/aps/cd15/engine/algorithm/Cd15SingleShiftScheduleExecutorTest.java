@@ -255,11 +255,15 @@ public class Cd15SingleShiftScheduleExecutorTest {
         assertTrue(rolling.getPendingTasks().isEmpty());
         assertTrue(rolling.getEqualSharePendingMaterialKeys().isEmpty());
     }
-    /** 班初存在多台机尾连续候选时，应按机台顺序优先续作各自机尾规格。 */
+    /** 班初存在多台缺料机尾候选时，应按机台顺序优先续作各自机尾规格。 */
     @Test
     public void shouldPrioritizeShiftStartTailCandidatesByMachineOrder() {
+        Cd15ScheduleCandidate firstTail = candidate("211400161");
+        firstTail.setShortageInCurrentShift(true);
+        Cd15ScheduleCandidate secondTail = candidate("211400022");
+        secondTail.setShortageInCurrentShift(true);
         Cd15ScheduleCandidatePreparationService candidates = (context, input, classField, rolling) ->
-                Arrays.asList(candidate("211400161"), candidate("211400022"));
+                Arrays.asList(firstTail, secondTail);
         Cd15ShiftDemandProvider demandProvider = (context, input, shift, candidate, rolling) ->
                 Cd15ShiftDemandDecision.builder().netDemandQuantity(new BigDecimal("100")).build();
         Cd15SingleShiftScheduleExecutor executor = new Cd15SingleShiftScheduleExecutor(
@@ -280,10 +284,11 @@ public class Cd15SingleShiftScheduleExecutorTest {
         assertEquals("G1302", result.getTasks().get(1).getMachineCode());
     }
 
-    /** 与CD90一致，班初先执行上一班真实机尾候选，再处理普通候选。 */
+    /** 当前班缺料时，班初先执行上一班真实机尾候选，再处理普通候选。 */
     @Test
     public void shouldPrioritizeInheritedMachineTailAtShiftStartLikeCd90() {
         Cd15ScheduleCandidate inheritedTail = candidate("211400161");
+        inheritedTail.setShortageInCurrentShift(true);
         Cd15ScheduleCandidate ordinaryCandidate = candidate("211400022");
         Cd15ScheduleCandidatePreparationService candidates =
                 (context, input, classField, rolling) -> Arrays.asList(
@@ -348,6 +353,39 @@ public class Cd15SingleShiftScheduleExecutorTest {
         assertEquals("24", result.getTasks().get(0).getCuttingAngle());
         assertEquals("G1401", result.getTasks().get(0).getMachineCode());
         assertEquals(1, result.getTasks().get(0).getProduceOrder());
+    }
+    /** 非缺料班初机尾留在普通候选中，由大卷角度路线统一选择起始端点。 */
+    @Test
+    @SuppressWarnings("unchecked")
+    public void shouldLeaveNonShortageShiftStartTailInAngleRoute() throws Exception {
+        Cd15SingleShiftScheduleExecutor executor = new Cd15SingleShiftScheduleExecutor(
+                null, null, null, null, null,
+                new Cd15CloseOutCalculator(), new Cd15ScheduleCandidateSorter(),
+                new Cd15SplitCutGroupBuilder(), new Cd15SpecShiftQuantityLimitResolver());
+        List<Cd15ScheduleCandidate> candidates = new java.util.ArrayList<>(Arrays.asList(
+                splitCandidate("ANGLE15", "15"),
+                splitCandidate("ANGLE18", "18"),
+                splitCandidate("ANGLE24", "24"),
+                splitCandidate("ANGLE51", "51")));
+        Cd15ShiftResourceState state = splitState();
+        Cd15ScheduleCandidate angle18 = candidates.get(1);
+        state.getTailByMachine().put("G1401", Cd15MachineTailState.builder()
+                .materialKey(angle18.getMaterialKey())
+                .steelStripCode(angle18.getSteelStripCode())
+                .bigRollCode(angle18.getBigRollCode())
+                .cuttingAngle(angle18.getCuttingAngle())
+                .build());
+        java.lang.reflect.Method build = Cd15SingleShiftScheduleExecutor.class
+                .getDeclaredMethod("buildShiftStartTailCandidates",
+                        List.class, Cd15ShiftResourceState.class);
+        build.setAccessible(true);
+
+        java.util.Deque<Cd15ScheduleCandidate> shiftStartTails =
+                (java.util.Deque<Cd15ScheduleCandidate>) build.invoke(
+                        executor, candidates, state);
+
+        assertTrue(shiftStartTails.isEmpty());
+        assertEquals(4, candidates.size());
     }
     /** 滚动规划器已给出稳定顺序时，班初机尾连续性不能再次打乱候选顺序。 */
     @Test
