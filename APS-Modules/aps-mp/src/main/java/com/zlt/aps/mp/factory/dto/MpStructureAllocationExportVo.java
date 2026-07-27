@@ -315,4 +315,9 @@ public class MpStructureAllocationExportVo extends MpStructureAllocation {
      * 上月31日
      */
     private Integer lastDay31;
+    
+    /**
+     * 上月开始时间
+     */
+    private Integer lastBeginDay;
 }
