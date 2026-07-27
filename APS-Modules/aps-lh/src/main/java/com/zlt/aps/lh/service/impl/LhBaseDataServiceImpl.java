@@ -1903,7 +1903,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         calendar.set(Calendar.DAY_OF_MONTH, 1);
         //20260707+ 下个月定稿后，完成量起始日从下个月定稿库存日开始计算
         Date monthStart;
-        if (null == monthStartDate) {
+        if (null == monthStartDate || monthStartDate.after(cutoffDay)) {
             monthStart = LhScheduleTimeUtil.clearTime(calendar.getTime());
         } else {
             monthStart = monthStartDate;
