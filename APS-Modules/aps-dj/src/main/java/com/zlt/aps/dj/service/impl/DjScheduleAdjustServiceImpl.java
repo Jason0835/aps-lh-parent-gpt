@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -473,17 +474,20 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
                 groupRecord.setScheduleShiftClass(group.getScheduleShiftClass());
 
                 // 为后续组单独生成工单号（基于该排产日已有记录）
-                // 加载指定排产日的数据，获取批次号和最大工单流水号
-                DjAdjustScheduleContext groupCtx = this.loadBaseData(factoryCode, group.getScheduleDate());
+                // 仅查询排产日已有排程结果获取批次号和最大工单流水号，避免完整加载机台/定点机台等数据
+                List<DjScheduleResult> groupResults = djScheduleResultMapper
+                        .selectList(new LambdaQueryWrapper<DjScheduleResult>()
+                                .eq(DjScheduleResult::getFactoryCode, factoryCode)
+                                .eq(DjScheduleResult::getScheduleDate, group.getScheduleDate()));
                 String groupBatchNo = "";
-                for (DjScheduleResult r : groupCtx.getScheduleResults()) {
+                for (DjScheduleResult r : groupResults) {
                     if (StringUtils.isNotBlank(r.getBatchNo())) {
                         groupBatchNo = r.getBatchNo();
                         break;
                     }
                 }
                 int groupMaxOrderSeq = 0;
-                for (DjScheduleResult r : groupCtx.getScheduleResults()) {
+                for (DjScheduleResult r : groupResults) {
                     if (r.getOrderNo() != null && r.getOrderNo().contains("-")) {
                         String seqPart = r.getOrderNo().substring(r.getOrderNo().lastIndexOf("-") + 1);
                         try {
@@ -850,7 +854,15 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
             // 逻辑删除
             djScheduleResultMapper.deleteBatchIds(canDeleteIds);
 
-            // 生产顺位补位：遍历所有班次索引（1~6），对有顺位的班次执行顺位前移
+            // 生产顺位补位：先查询同一机台排产日的所有剩余记录（框架自动过滤已删除数据），避免循环内重复查询
+            DjScheduleResult firstDeleted = deletedRecords.get(0);
+            List<DjScheduleResult> allSameMachineRecords = djScheduleResultMapper.selectList(
+                    new LambdaQueryWrapper<DjScheduleResult>()
+                            .eq(DjScheduleResult::getFactoryCode, firstDeleted.getFactoryCode())
+                            .eq(DjScheduleResult::getScheduleDate, firstDeleted.getScheduleDate())
+                            .eq(DjScheduleResult::getMachineCode, firstDeleted.getMachineCode()));
+
+            // 遍历所有班次索引（1~6），对有顺位的班次执行顺位前移
             for (int classIdx = 1; classIdx <= DjEngineConstants.SHIFT_COUNT; classIdx++) {
                 final int idx = classIdx;
                 List<DjScheduleResult> recordsWithSeq = deletedRecords.stream()
@@ -860,7 +872,7 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
                         })
                         .collect(Collectors.toList());
                 if (CollectionUtils.isNotEmpty(recordsWithSeq)) {
-                    this.fixSequenceAfterDelete(recordsWithSeq, idx);
+                    this.fixSequenceAfterDelete(recordsWithSeq, idx, allSameMachineRecords);
                 }
             }
 
@@ -894,11 +906,12 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
      * 将同一机台相同排产日的剩余记录中该班次索引的顺位减去前面被删除的个数。
      * </p>
      *
-     * @param deletedGroup 被删除的记录列表（需包含在该班次索引有顺位的记录）
-     * @param classIndex   班次索引（1~6）
+     * @param deletedGroup        被删除的记录列表（需包含在该班次索引有顺位的记录）
+     * @param classIndex          班次索引（1~6）
+     * @param sameMachineRecords  同一机台排产日下的所有剩余记录（预查询传入，避免循环内重复查库）
      */
-    private void fixSequenceAfterDelete(List<DjScheduleResult> deletedGroup, int classIndex) {
-        DjScheduleResult first = deletedGroup.get(0);
+    private void fixSequenceAfterDelete(List<DjScheduleResult> deletedGroup, int classIndex,
+            List<DjScheduleResult> sameMachineRecords) {
 
         // 收集该班次索引下所有被删除的顺位
         List<Integer> deletedSequences = deletedGroup.stream()
@@ -910,13 +923,6 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
         if (deletedSequences.isEmpty()) {
             return;
         }
-
-        // 查询同一机台排产日下的所有剩余记录（框架自动过滤已删除数据）
-        List<DjScheduleResult> sameMachineRecords = djScheduleResultMapper.selectList(
-                new LambdaQueryWrapper<DjScheduleResult>()
-                        .eq(DjScheduleResult::getFactoryCode, first.getFactoryCode())
-                        .eq(DjScheduleResult::getScheduleDate, first.getScheduleDate())
-                        .eq(DjScheduleResult::getMachineCode, first.getMachineCode()));
 
         // 前移顺位：每个剩余记录在该班次索引的顺位减去其之前被删除的记录数
         for (DjScheduleResult rec : sameMachineRecords) {
@@ -1032,20 +1038,29 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
         List<DjScheduleResult> batchList = new ArrayList<>();
         List<DjScheduleResult> newItemList = new ArrayList<>();
 
+        // 6.2 校验/合并导入数据：批量查询已有工单号的排程记录，避免逐条查询 N+1
+        List<String> orderNos = importList.stream()
+                .map(DjScheduleResult::getOrderNo)
+                .filter(StringUtils::isNotBlank)
+                .collect(Collectors.toList());
+        Map<String, DjScheduleResult> existingOrderMap = new HashMap<>();
+        if (CollectionUtils.isNotEmpty(orderNos)) {
+            List<DjScheduleResult> existingList = djScheduleResultMapper.selectList(
+                    new LambdaQueryWrapper<DjScheduleResult>().in(DjScheduleResult::getOrderNo, orderNos));
+            for (DjScheduleResult r : existingList) {
+                existingOrderMap.putIfAbsent(r.getOrderNo(), r);
+            }
+        }
+
         for (DjScheduleResult item : importList) {
             String orderNo = item.getOrderNo();
-            if (StringUtils.isNotBlank(orderNo)) {
-                // 工单号存在 → 查系统内已有记录
-                List<DjScheduleResult> existing = djScheduleResultMapper
-                        .selectList(new LambdaQueryWrapper<DjScheduleResult>().eq(DjScheduleResult::getOrderNo, orderNo));
-                if (CollectionUtils.isNotEmpty(existing)) {
-                    // 视为调整操作，合并班次数据后加入批量保存列表
-                    DjScheduleResult target = existing.get(0);
-                    mergeClassData(target, item);
-                    updateReleaseStatusAfterAdjust(target);
-                    batchList.add(target);
-                    continue;
-                }
+            if (StringUtils.isNotBlank(orderNo) && existingOrderMap.containsKey(orderNo)) {
+                // 工单号存在 → 视为调整操作，合并班次数据后加入批量保存列表
+                DjScheduleResult target = existingOrderMap.get(orderNo);
+                mergeClassData(target, item);
+                updateReleaseStatusAfterAdjust(target);
+                batchList.add(target);
+                continue;
             }
             // 工单号为空或不存在 → 走插单逻辑
             newItemList.add(item);

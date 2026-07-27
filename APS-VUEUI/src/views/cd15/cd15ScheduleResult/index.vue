@@ -222,18 +222,12 @@ export default {
         { label: this.$t('ui.data.column.cd15UnscheduleResult.steelStripCode'), prop: 'steelStripCode', minWidth: 150 },
         { label: this.$t('ui.data.column.cd15UnscheduleResult.bigRollCode'), prop: 'bigRollCode', minWidth: 140 },
         { label: this.$t('ui.data.column.cd15UnscheduleResult.cuttingAngle'), prop: 'cuttingAngle', minWidth: 110 },
-        { label: this.$t('ui.data.column.cd15UnscheduleResult.groupNo'), prop: 'groupNo', minWidth: 150 },
-        { label: this.$t('ui.data.column.cd15UnscheduleResult.orderNo'), prop: 'orderNo', align: 'left', minWidth: 160 },
-        { label: this.$t('ui.data.column.cd15UnscheduleResult.machineCode'), prop: 'machineCode', minWidth: 120 },
-        { label: this.$t('ui.data.column.cd15UnscheduleResult.classField'), prop: 'classField', minWidth: 120 },
         { label: this.$t('ui.data.column.cd15UnscheduleResult.demandQty'), prop: 'demandQty', minWidth: 120, align: 'right' },
         { label: this.$t('ui.data.column.cd15UnscheduleResult.scheduledQty'), prop: 'scheduledQty', minWidth: 120, align: 'right' },
         { label: this.$t('ui.data.column.cd15UnscheduleResult.unscheduledQty'), prop: 'unscheduledQty', minWidth: 120, align: 'right' },
         { label: this.$t('ui.data.column.cd15UnscheduleResult.failStage'), prop: 'failStage', minWidth: 140 },
         { label: this.$t('ui.data.column.cd15UnscheduleResult.unscheduleReasonCode'), prop: 'unscheduleReasonCode', minWidth: 180 },
-        { label: this.$t('ui.data.column.cd15UnscheduleResult.reasonOrder'), prop: 'reasonOrder', minWidth: 100, align: 'right' },
-        { label: this.$t('ui.data.column.cd15UnscheduleResult.unscheduledReason'), prop: 'unscheduledReason', minWidth: 260, showOverflowTooltip: true },
-        { label: this.$t('ui.data.column.cd15UnscheduleResult.candidateMachineCodes'), prop: 'candidateMachineCodes', minWidth: 200, showOverflowTooltip: true }
+        { label: this.$t('ui.data.column.cd15UnscheduleResult.unscheduledReason'), prop: 'unscheduledReason', minWidth: 260, showOverflowTooltip: true }
       ]
     },
     unscheduleSearchColumns() {

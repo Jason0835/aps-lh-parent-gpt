@@ -301,6 +301,12 @@ export default {
         // 传入排产起始班次，供后端计算实际排程日期和班次
         params.scheduleShiftClass = this.startShiftClass;
 
+        // 将垫胶名称一同提交给后端
+        const paddingItem = this.paddingList.find(p => p.value === params.paddingCode);
+        if (paddingItem) {
+          params.paddingName = paddingItem.label;
+        }
+
         const groupLabels = this.shiftList.map((s) => s.label || "class" + s.classIndex);
         // 自定义校验：至少一个班有录入计划量
         const shifts = [

@@ -40,6 +40,11 @@ public class TmAutoScheduleTask extends BaseEntity implements Serializable {
     @ApiModelProperty(value = "排程日期", name = "scheduleDate")
     private Date scheduleDate;
 
+    /** 后台任务类型 */
+    @TableField("TASK_TYPE")
+    @ApiModelProperty(value = "后台任务类型", name = "taskType")
+    private String taskType;
+
     /** 批次号 */
     @TableField("BATCH_NO")
     @ApiModelProperty(value = "批次号", name = "batchNo")

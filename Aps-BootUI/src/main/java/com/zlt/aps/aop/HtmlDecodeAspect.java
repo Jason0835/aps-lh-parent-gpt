@@ -159,7 +159,7 @@ public class HtmlDecodeAspect {
             return null;
         }
         try {
-            input = URLDecoder.decode(input, StandardCharsets.UTF_8.toString());
+            input = URLDecoder.decode(input.replace("+", "%2B"), StandardCharsets.UTF_8.toString());
         } catch (Exception e) {
             log.debug("URL解码失败，使用原文: {}", e.getMessage());
         }

@@ -1,11 +1,5 @@
 <template>
   <basic-container>
-    <div class="summary-bar">
-      <span>{{ $t('ui.tc.schedule.totalPlanQty') }}：{{ summary.totalPlanQty || 0 }}</span>
-      <span>{{ $t('ui.tc.schedule.totalFinishQty') }}：{{ summary.totalFinishQty || 0 }}</span>
-      <span>{{ $t('ui.tc.schedule.resultCount') }}：{{ summary.resultCount || 0 }}</span>
-      <span>{{ $t('ui.tc.schedule.unplannedCount') }}：{{ unplannedCount || 0 }}</span>
-    </div>
     <page-table
       v-loading="loading"
       :calc-height="true"
@@ -23,23 +17,23 @@
       @selection-change="handleSelectionChange"
     >
       <template slot="header">
-        <el-button v-hasPermi="['tc:tcScheduleResult:autoPlan']" type="warning" @click="handleAutoPlan">
+        <el-button v-hasPermi="['tc:tcScheduleResult:autoPlan']" :disabled="writeTaskRunning" type="warning" @click="handleAutoPlan">
           {{ $t('ui.tc.schedule.autoPlan') }}
         </el-button>
         <el-button
           v-hasPermi="['tc:tcScheduleResult:publish']"
-          :disabled="selection.length === 0"
+          :disabled="writeTaskRunning || selection.length === 0"
           type="success"
           @click="handleRelease"
         >
           {{ $t('ui.tc.schedule.publish') }}
         </el-button>
-        <el-button v-hasPermi="['tc:tcScheduleResult:add']" type="warning" @click="handleAdd">
+        <el-button v-hasPermi="['tc:tcScheduleResult:add']" :disabled="writeTaskRunning" type="warning" @click="handleAdd">
           {{ $t('ui.tc.schedule.insertTask') }}
         </el-button>
         <el-button
           v-hasPermi="['tc:tcScheduleResult:edit']"
-          :disabled="selection.length !== 1"
+          :disabled="writeTaskRunning || selection.length !== 1"
           type="warning"
           @click="handleChangeQty"
         >
@@ -47,7 +41,7 @@
         </el-button>
         <el-button
           v-hasPermi="['tc:tcScheduleResult:changeMachine']"
-          :disabled="selection.length === 0"
+          :disabled="writeTaskRunning || selection.length === 0"
           type="primary"
           @click="handleChangeMachine"
         >
@@ -55,7 +49,7 @@
         </el-button>
         <el-button
           v-hasPermi="['tc:tcScheduleResult:remove']"
-          :disabled="selection.length === 0"
+          :disabled="writeTaskRunning || selection.length === 0"
           type="danger"
           @click="handleRemove"
         >
@@ -64,13 +58,52 @@
         <el-button v-hasPermi="['tc:tcScheduleResult:query']" plain type="info" @click="handleUnplanned">
           {{ $t('ui.tc.schedule.unplannedTasks') }}（{{ unplannedCount || 0 }}）
         </el-button>
+        <el-button
+          v-hasPermi="['tc:tcScheduleResult:export']"
+          type="primary"
+          @click="handleExport"
+        >
+          {{ $t('ui.frame.btn.export') }}
+        </el-button>
+        <el-button
+          v-hasPermi="['tc:tcScheduleResult:import']"
+          :disabled="writeTaskRunning"
+          type="primary"
+          @click="handleImport"
+        >
+          {{ $t('ui.frame.btn.import') }}
+        </el-button>
+      </template>
+      <template slot="headerRight">
+        <div class="summary-bar stat-info">
+          <span>{{ $t('ui.tc.schedule.totalStockQty') }}：<span class="stat-value">{{ summary.totalStockQty || 0 }}</span></span>
+          <span>{{ $t('ui.tc.schedule.totalPlanQty') }}：<span class="stat-value">{{ summary.totalPlanQty || 0 }}</span></span>
+          <span>{{ $t('ui.tc.schedule.totalFinishQty') }}：<span class="stat-value">{{ summary.totalFinishQty || 0 }}</span></span>
+          <span>{{ $t('ui.tc.schedule.resultCount') }}：<span class="stat-value">{{ summary.resultCount || 0 }}</span></span>
+          <span>{{ $t('ui.tc.schedule.unplannedCount') }}：<span class="stat-value">{{ unplannedCount || 0 }}</span></span>
+          <span
+            v-for="(planQty, index) in shiftPlanQtyList"
+            :key="index"
+          >{{ shiftLabel(index + 1) }}{{ $t('ui.tc.schedule.planQty') }}：<span class="stat-value">{{ planQty || 0 }}</span></span>
+        </div>
       </template>
     </page-table>
 
+    <tlt-upload-form
+      ref="tltUpload"
+      :columns="importColumns"
+      :download-url-formatter="form => handleTemplateDownload('/tc/tcScheduleResult/importTemplateCust', form)"
+      :rules="importRules"
+      download-url="/tc/tcScheduleResult/importTemplateCust"
+      label-width="90px"
+      upload-url="/tc/tcScheduleResult/importDataCust"
+      @uploadSuccess="getList"
+    />
+
     <auto-plan-dialog ref="autoPlanRef" @success="handleAutoPlanSuccess" />
-    <insert-task-dialog ref="insertTaskRef" @success="getList" />
-    <change-qty-dialog ref="changeQtyRef" @success="getList" />
-    <change-machine-dialog ref="changeMachineRef" @success="getList" />
+    <insert-task-dialog ref="insertTaskRef" @success="handleOperationTask" />
+    <change-qty-dialog ref="changeQtyRef" @success="handleOperationTask" />
+    <change-machine-dialog ref="changeMachineRef" @success="handleOperationTask" />
     <unplanned-dialog ref="unplannedRef" />
     <explain-drawer ref="explainRef" />
 
@@ -92,6 +125,26 @@
         text-color="#fff"
       />
       <div class="progress-hint">{{ $t('ui.tc.schedule.autoPlanProgressHint') }}</div>
+    </el-dialog>
+
+    <el-dialog
+      :close-on-click-modal="false"
+      :close-on-press-escape="false"
+      :show-close="false"
+      :title="$t('ui.tc.schedule.operationProgress')"
+      :visible.sync="operationProgressVisible"
+      append-to-body
+      width="440px"
+    >
+      <div class="progress-stage">{{ operationProgressStage }}</div>
+      <el-progress
+        :percentage="operationProgressValue"
+        :status="operationProgressStatus"
+        :stroke-width="18"
+        :text-inside="true"
+        text-color="#fff"
+      />
+      <div class="progress-hint">{{ $t('ui.tc.schedule.operationProgressHint') }}</div>
     </el-dialog>
 
     <el-dialog :title="$t('ui.tc.schedule.autoPlanIssues')" :visible.sync="autoPlanIssueVisible" append-to-body width="82%">
@@ -141,14 +194,18 @@
 import {
   getAutoPlanTask,
   getLatestAutoPlanTask,
+  getLatestOperationTask,
   getLatestReleaseTask,
   getManualOptions,
+  getOperationTask,
   getReleaseTask,
   queryScheduleBoard,
   releaseScheduleResult,
   removeScheduleResult,
   validateRelease
 } from '@/api/tc/tcScheduleResult'
+import {downloadLink} from '@/utils/request'
+import TltUploadForm from '@/views/components/tltUploadForm.vue'
 import AutoPlanDialog from './components/AutoPlanDialog.vue'
 import ChangeMachineDialog from './components/ChangeMachineDialog.vue'
 import ChangeQtyDialog from './components/ChangeQtyDialog.vue'
@@ -177,6 +234,7 @@ export default {
     ChangeQtyDialog,
     ExplainDrawer,
     InsertTaskDialog,
+    TltUploadForm,
     UnplannedDialog
   },
   dicts: ['biz_factory_name', 'IS_RELEASE'],
@@ -224,10 +282,71 @@ export default {
       releaseProgressStage: '',
       releaseProgressStatus: null,
       releaseIssueVisible: false,
-      releaseIssues: []
+      releaseIssues: [],
+      operationTimer: null,
+      operationPollTimes: 0,
+      maxOperationPollTimes: 120,
+      operationRunning: false,
+      operationProgressVisible: false,
+      operationProgressValue: 0,
+      operationProgressStage: '',
+      operationProgressStatus: null,
+      importRules: {
+        factoryCode: [
+          {
+            required: true,
+            message: this.$t('common.rule.select'),
+            trigger: 'change'
+          }
+        ],
+        scheduleDate: [
+          {
+            required: true,
+            message: this.$t('common.rule.select'),
+            trigger: 'change'
+          }
+        ]
+      }
     }
   },
   computed: {
+    writeTaskRunning() {
+      return this.operationRunning || this.autoPlanProgressVisible || this.releaseProgressVisible
+    },
+    // 各班次计划量合计列表，后端返回下标 0=1班，长度 6；为空时回退为空数组避免渲染异常
+    shiftPlanQtyList() {
+      return (this.summary && this.summary.shiftPlanQtyList) || []
+    },
+    // 导入弹窗独立选择工厂和单日排程日期，工厂下拉支持输入筛选。
+    importColumns() {
+      return [
+        {
+          label: this.$t('ui.tc.schedule.factoryCode'),
+          prop: 'factoryCode',
+          type: 'select',
+          dictData: this.dict.type.biz_factory_name,
+          filterable: true,
+          clearable: false
+        },
+        {
+          label: this.$t('ui.tc.schedule.scheduleDate'),
+          prop: 'scheduleDate',
+          type: 'date',
+          dateType: 'date',
+          valueFormat: 'yyyy-MM-dd',
+          clearable: false
+        },
+        {
+          label: '',
+          prop: 'updateSupport',
+          render: form => (
+            <el-checkbox v-model={form.updateSupport}>
+              {this.$t('common.rule.updateSupport')}
+            </el-checkbox>
+          )
+        }
+      ]
+    },
     columns() {
       const baseColumns = [
         { type: 'selection', fixed: 'left' },
@@ -335,15 +454,17 @@ export default {
     }
     this.restoreLatestAutoPlanTask(true)
     this.restoreLatestReleaseTask(true)
+    this.restoreLatestOperationTask(true)
   },
   beforeDestroy() {
     this.clearAutoPlanTimer()
     this.clearReleaseTimer()
+    this.clearOperationTimer()
   },
   methods: {
     shiftLabel(shiftOrder) {
       const option = this.dateColumns.find(item => item.shiftOrder === shiftOrder)
-      return option ? `${shiftOrder}. ${option.shiftName || option.shiftCode || ''}` : `${this.$t('ui.tc.schedule.shift')} ${shiftOrder}`
+      return option ? (option.shiftName || option.shiftCode || '') : `${this.$t('ui.tc.schedule.shift')} ${shiftOrder}`
     },
     formatQuery(includePage = true) {
       const scheduleRange = this.query.scheduleRange || []
@@ -404,6 +525,42 @@ export default {
     },
     handleSelectionChange(rows) {
       this.selection = rows
+    },
+    handleImport() {
+      const scheduleRange = this.query.scheduleRange || []
+      this.$refs.tltUpload.handleImport({
+        factoryCode: this.query.factoryCode || this.search.factoryCode,
+        scheduleDate: scheduleRange[0],
+        updateSupport: true
+      })
+    },
+    handleTemplateDownload(url, formValues) {
+      const params = {
+        ...formValues,
+        exportTemplate: true
+      }
+      const paramsStr = Object.keys(params)
+        .filter(key => params[key] !== undefined && params[key] !== null && params[key] !== '')
+        .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(params[key])}`)
+        .join('&')
+      return `${url}${paramsStr ? '?' + paramsStr : ''}`
+    },
+    handleExport() {
+      const scheduleRange = this.query.scheduleRange || []
+      if (!this.query.factoryCode || !scheduleRange[0] || !scheduleRange[1]) {
+        this.$modal.msgWarning(this.$t('ui.tc.schedule.excelFactoryDateRequired'))
+        return
+      }
+      if (scheduleRange[0] !== scheduleRange[1]) {
+        this.$modal.msgWarning(this.$t('ui.tc.schedule.excelSingleDateRequired'))
+        return
+      }
+      downloadLink('/tc/tcScheduleResult/export', {
+        factoryCode: this.query.factoryCode,
+        scheduleDate: scheduleRange[0],
+        machineCode: this.query.machineCode,
+        sidewallCode: this.query.sidewallCode
+      })
     },
     handleAutoPlan() {
       const range = this.query.scheduleRange || []
@@ -467,15 +624,18 @@ export default {
       this.pollReleaseTask(task.taskId)
     },
     handleAdd() {
+      if (this.writeTaskRunning) return
       const range = this.query.scheduleRange || []
       this.$refs.insertTaskRef.show(this.query.factoryCode, range[0])
     },
     handleChangeQty() {
+      if (this.writeTaskRunning) return
       const row = this.selection[0]
       if (this.isManualBlocked(row)) return
       this.$refs.changeQtyRef.show(row)
     },
     handleChangeMachine() {
+      if (this.writeTaskRunning) return
       if (this.selection.some(row => this.isManualBlocked(row))) return
       const scopeKeySet = new Set(this.selection.map(item => `${item.factoryCode}|${item.scheduleDate}|${item.batchNo}`))
       if (scopeKeySet.size !== 1) {
@@ -492,17 +652,97 @@ export default {
       return false
     },
     handleRemove() {
+      if (this.writeTaskRunning) return
       const invalidRow = this.selection.find(item => !['0', '2', '5'].includes(String(item.releaseStatus)))
       if (invalidRow) {
         this.$modal.msgWarning(this.$t('ui.tc.schedule.removeReleaseBlocked'))
         return
       }
       this.$confirm(this.$t('ui.tc.schedule.confirmRemoveWholeRow'), { type: 'warning' }).then(async() => {
-        await removeScheduleResult(this.selection.map(item => item.id))
-        this.$modal.msgSuccess(this.$t('ui.tc.schedule.removeSuccess'))
+        const task = await removeScheduleResult(this.selection.map(item => item.id))
         this.page.current = 1
-        this.getList()
+        this.handleOperationTask(task)
       })
+    },
+    handleOperationTask(task) {
+      if (!task || !task.taskId) return
+      const scheduleDate = String(task.scheduleDate || '').substring(0, 10)
+      window.sessionStorage.setItem('tcOperationLatestScope', JSON.stringify({
+        factoryCode: task.factoryCode,
+        scheduleDate
+      }))
+      this.pollOperationTask(task.taskId, task)
+    },
+    pollOperationTask(taskId, initialTask) {
+      this.clearOperationTimer()
+      this.operationPollTimes = 0
+      this.operationRunning = true
+      this.operationProgressVisible = true
+      this.operationProgressValue = Number((initialTask && initialTask.progress) || 0)
+      this.operationProgressStage = (initialTask && (initialTask.currentStageName || initialTask.currentStage)) || ''
+      this.operationProgressStatus = null
+      const poll = () => {
+        getOperationTask(taskId).then(task => {
+          this.operationPollTimes += 1
+          this.operationProgressValue = Math.min(100, Math.max(0, Number(task.progress || 0)))
+          this.operationProgressStage = task.currentStageName || task.currentStage || ''
+          if (task.taskStatus === 'SUCCESS') {
+            this.clearOperationTimer()
+            this.operationRunning = false
+            this.operationProgressValue = 100
+            this.operationProgressStatus = 'success'
+            this.$modal.msgSuccess(this.$t('ui.tc.schedule.operationSuccess'))
+            this.getList()
+            window.setTimeout(() => { this.operationProgressVisible = false }, 600)
+            return
+          }
+          if (task.taskStatus === 'FAILED') {
+            this.clearOperationTimer()
+            this.operationRunning = false
+            this.operationProgressStatus = 'exception'
+            this.$modal.msgError(task.message || this.$t('ui.tc.schedule.operationFailed'))
+            window.setTimeout(() => { this.operationProgressVisible = false }, 3000)
+            return
+          }
+          if (this.operationPollTimes >= this.maxOperationPollTimes) {
+            this.clearOperationTimer()
+            this.operationRunning = false
+            this.operationProgressStatus = 'exception'
+            this.$modal.msgWarning(this.$t('ui.tc.schedule.operationTimeout'))
+            window.setTimeout(() => { this.operationProgressVisible = false }, 3000)
+            return
+          }
+          this.operationTimer = window.setTimeout(poll, 3000)
+        }).catch(() => {
+          this.clearOperationTimer()
+          this.operationRunning = false
+          this.operationProgressStatus = 'exception'
+          this.$modal.msgWarning(this.$t('ui.tc.schedule.operationTimeout'))
+        })
+      }
+      poll()
+    },
+    restoreLatestOperationTask(preferStoredScope = false) {
+      const range = this.query.scheduleRange || []
+      let factoryCode = this.query.factoryCode
+      let scheduleDate = range[0]
+      if (preferStoredScope) {
+        try {
+          const storedScope = JSON.parse(window.sessionStorage.getItem('tcOperationLatestScope') || '{}')
+          factoryCode = storedScope.factoryCode || factoryCode
+          scheduleDate = storedScope.scheduleDate || scheduleDate
+        } catch (error) {
+          window.sessionStorage.removeItem('tcOperationLatestScope')
+        }
+      } else if (!range[0] || range[0] !== range[1]) {
+        return
+      }
+      if (!factoryCode || !scheduleDate) return
+      getLatestOperationTask({ factoryCode, scheduleDate }).then(task => {
+        if (task && task.taskId && ['PENDING', 'RUNNING'].includes(task.taskStatus)) {
+          this.pollOperationTask(task.taskId, task)
+        }
+      }).catch(() => {})
     },
     handleUnplanned() {
       this.$refs.unplannedRef.show(this.formatQuery(false))
@@ -666,6 +906,12 @@ export default {
         window.clearTimeout(this.releaseTimer)
         this.releaseTimer = null
       }
+    },
+    clearOperationTimer() {
+      if (this.operationTimer) {
+        window.clearTimeout(this.operationTimer)
+        this.operationTimer = null
+      }
     }
   }
 }
@@ -675,12 +921,19 @@ export default {
 .summary-bar {
   display: flex;
   flex-wrap: wrap;
-  gap: 24px;
-  margin-bottom: 10px;
-  padding: 10px 14px;
-  color: #606266;
-  background: #f5f7fa;
-  border-radius: 4px;
+  justify-content: flex-end;
+  gap: 12px;
+  max-width: calc(100vw - 160px);
+  margin-right: 12px;
+  color: #676a6c;
+  font-size: 12px;
+  font-weight: bold;
+  white-space: nowrap;
+
+  .stat-value {
+    margin-left: 5px;
+    color: #0088cc;
+  }
 }
 .progress-stage {
   margin-bottom: 12px;

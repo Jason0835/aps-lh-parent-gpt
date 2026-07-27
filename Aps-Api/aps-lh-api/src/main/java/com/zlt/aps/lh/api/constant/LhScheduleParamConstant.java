@@ -138,6 +138,8 @@ public final class LhScheduleParamConstant {
     public static final String CAPSULE_PREHEAT_HOURS = "SYS0307009";
     /** 维保重叠切换耗时（小时） */
     public static final String MAINTENANCE_OVERLAP_SWITCH_HOURS = "SYS0307010";
+    /** 精度计划执行日前允许插排的SKU最大完整待排量 */
+    public static final String PRECISION_PRE_INSERT_MAX_QTY = "SYS0307011";
     /** 排程天数 */
     public static final String SCHEDULE_DAYS = "SYS0304004";
     /** 是否按产能满排 */
@@ -160,9 +162,9 @@ public final class LhScheduleParamConstant {
     public static final String PLANNED_REPAIR_FIXED_QTY = "SYS0308010";
     /** 胶囊预警次数 */
     public static final String CAPSULE_WARNING_COUNT = "SYS0309001";
-    /** 胶囊使用次数上限；仅在扣减前实际可排量使累计次数严格超限时触发更换 */
+    /** 胶囊使用次数上限；本批按左右最大值初始化，仅首次严格跨限时触发扣量 */
     public static final String CAPSULE_FORCE_DOWN_COUNT = "SYS0309002";
-    /** 换胶囊班次固定扣减计划量；默认2条，对应固定占用1小时 */
+    /** 本批首次严格跨限的固定扣减计划量；默认2条，对应固定占用1小时 */
     public static final String CAPSULE_CHANGE_LOSS_QTY = "SYS0309003";
     /** 停产前第3天产能比例 */
     public static final String SHUTDOWN_DAY_MINUS_3_RATE = "SYS0310001";

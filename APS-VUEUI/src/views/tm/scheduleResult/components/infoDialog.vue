@@ -633,8 +633,7 @@ export default {
         const res = this.isEdit
           ? await changeQty(requestParams)
           : await insertTask(requestParams);
-        this.$modal.msgSuccess(res.msg);
-        this.$emit("success");
+        this.$emit("success", res);
         this.hide();
         this.loading = false;
       } catch (error) {

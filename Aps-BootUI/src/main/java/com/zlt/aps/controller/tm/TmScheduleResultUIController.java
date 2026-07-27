@@ -13,6 +13,7 @@ import com.zlt.aps.tm.api.domain.dto.TmScheduleResultImportDTO;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
 import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleRequestVo;
 import com.zlt.aps.tm.api.domain.vo.TmInsertTaskRequestVo;
+import com.zlt.aps.tm.api.domain.vo.TmOperationTaskVo;
 import com.zlt.aps.tm.api.domain.vo.TmScheduleShiftDateVO;
 import com.zlt.aps.tm.api.service.ITmScheduleResultRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
@@ -186,6 +187,19 @@ public class TmScheduleResultUIController extends BaseUIController<TmScheduleRes
     }
 
     /**
+     * 查询胎面排程结果合计（库存合计与各班次计划量合计）。
+     *
+     * @param query 查询条件，与列表同口径
+     * @return 库存合计与各班次计划量合计
+     */
+    @ApiOperation("查询胎面排程结果合计")
+    @PostMapping("/summary")
+    @ResponseBody
+    public AjaxResult summary(TmScheduleResult query) {
+        return iTmScheduleResultService.summary(query);
+    }
+
+    /**
      * 人工插入排程任务。
      *
      * @param requestVo 插单内容
@@ -253,6 +267,121 @@ public class TmScheduleResultUIController extends BaseUIController<TmScheduleRes
     public AjaxResult batchChangeMachine(@PathVariable("machineCode") String machineCode, String selects) {
         List<TmScheduleResult> scheduleResultList = JSON.parseArray(selects, TmScheduleResult.class);
         return iTmScheduleResultService.batchChangeMachine(machineCode, scheduleResultList);
+    }
+
+    /**
+     * 提交胎面人工插单异步任务。
+     *
+     * @param requestVo 插单内容
+     * @return 初始任务
+     */
+    @ApiOperation("提交胎面人工插单异步任务")
+    @PostMapping("/operation/insertTask")
+    @RequiresPermissions("tm:tmScheduleResult:add")
+    @ResponseBody
+    public TmOperationTaskVo submitInsertTask(TmInsertTaskRequestVo requestVo) {
+        return this.iTmScheduleResultService.submitInsertTask(requestVo);
+    }
+
+    /**
+     * 提交胎面调量异步任务。
+     *
+     * @param scheduleResult 调量内容
+     * @return 初始任务
+     */
+    @ApiOperation("提交胎面调量异步任务")
+    @PostMapping("/operation/changeQty")
+    @RequiresPermissions("tm:tmScheduleResult:edit")
+    @ResponseBody
+    public TmOperationTaskVo submitChangeQty(TmScheduleResult scheduleResult) {
+        return this.iTmScheduleResultService.submitChangeQty(scheduleResult);
+    }
+
+    /**
+     * 提交胎面单条转机台异步任务。
+     *
+     * @param scheduleResult 转机台内容
+     * @return 初始任务
+     */
+    @ApiOperation("提交胎面单条转机台异步任务")
+    @PostMapping("/operation/changeMachine")
+    @RequiresPermissions("tm:tmScheduleResult:changeMachine")
+    @ResponseBody
+    public TmOperationTaskVo submitChangeMachine(TmScheduleResult scheduleResult) {
+        return this.iTmScheduleResultService.submitChangeMachine(scheduleResult);
+    }
+
+    /**
+     * 提交胎面批量转机台异步任务。
+     *
+     * @param machineCode 目标机台
+     * @param selects 选中结果JSON
+     * @return 初始任务
+     */
+    @ApiOperation("提交胎面批量转机台异步任务")
+    @PostMapping("/operation/batchChangeMachine/{machineCode}")
+    @RequiresPermissions("tm:tmScheduleResult:changeMachine")
+    @ResponseBody
+    public TmOperationTaskVo submitBatchChangeMachine(@PathVariable("machineCode") String machineCode,
+                                                      String selects) {
+        List<TmScheduleResult> scheduleResultList = JSON.parseArray(selects, TmScheduleResult.class);
+        return this.iTmScheduleResultService.submitBatchChangeMachine(machineCode, scheduleResultList);
+    }
+
+    /**
+     * 提交胎面删除异步任务。
+     *
+     * @param ids 逗号分隔结果ID
+     * @return 初始任务
+     */
+    @ApiOperation("提交胎面删除异步任务")
+    @PostMapping("/operation/remove")
+    @RequiresPermissions("tm:tmScheduleResult:remove")
+    @ResponseBody
+    public TmOperationTaskVo submitRemove(@RequestParam String ids) {
+        return this.iTmScheduleResultService.submitRemove(Arrays.asList(Convert.toLongArray(ids)));
+    }
+
+    /**
+     * 提交胎面发布异步任务。
+     *
+     * @param ids 逗号分隔结果ID
+     * @return 初始任务
+     */
+    @ApiOperation("提交胎面发布异步任务")
+    @PostMapping("/operation/publish")
+    @RequiresPermissions("tm:tmScheduleResult:publish")
+    @ResponseBody
+    public TmOperationTaskVo submitPublish(@RequestParam("ids") String ids) {
+        return this.iTmScheduleResultService.submitPublish(Arrays.asList(Convert.toLongArray(ids)));
+    }
+
+    /**
+     * 查询胎面人工操作任务。
+     *
+     * @param taskId 任务编号
+     * @return 任务状态
+     */
+    @ApiOperation("查询胎面人工操作任务")
+    @GetMapping("/operation/task/{taskId}")
+    @ResponseBody
+    public TmOperationTaskVo getOperationTask(@PathVariable("taskId") String taskId) {
+        return this.iTmScheduleResultService.getOperationTask(taskId);
+    }
+
+    /**
+     * 查询最近胎面人工操作任务。
+     *
+     * @param factoryCode 工厂编码
+     * @param scheduleDate 排程日期
+     * @return 最近任务
+     */
+    @ApiOperation("查询最近胎面人工操作任务")
+    @GetMapping("/operation/task/latest")
+    @ResponseBody
+    public TmOperationTaskVo getLatestOperationTask(@RequestParam("factoryCode") String factoryCode,
+                                                    @RequestParam("scheduleDate") String scheduleDate) {
+        return this.iTmScheduleResultService.getLatestOperationTask(factoryCode, scheduleDate);
     }
 
     /**

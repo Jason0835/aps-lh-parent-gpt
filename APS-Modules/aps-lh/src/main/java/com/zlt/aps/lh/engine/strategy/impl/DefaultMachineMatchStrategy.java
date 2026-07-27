@@ -15,11 +15,13 @@ import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.enums.ConstructionStageEnum;
 import com.zlt.aps.lh.api.enums.LhSpecialMaterialCategoryEnum;
 import com.zlt.aps.lh.api.enums.SkuTagEnum;
+import com.zlt.aps.lh.component.StructureMinMachineRetentionService;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.IMachineMatchStrategy;
 import com.zlt.aps.lh.engine.strategy.support.MouldResourceAllocationResult;
 import com.zlt.aps.lh.engine.strategy.support.MouldResourceContext;
 import com.zlt.aps.lh.engine.strategy.support.SpecifiedMachineMatchResult;
+import com.zlt.aps.lh.service.impl.LhMaintenanceScheduleService;
 import com.zlt.aps.lh.util.LhMachineHardMatchUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
@@ -37,6 +39,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
+import javax.annotation.Resource;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -69,6 +72,16 @@ import java.util.stream.Collectors;
 @Slf4j
 @Component
 public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
+
+    /** 结构停产保机机台可接管时间统一解析入口。 */
+    @Resource
+    private StructureMinMachineRetentionService structureMinMachineRetentionService =
+            new StructureMinMachineRetentionService();
+
+    /** 精度计划时间轴服务，用于在候选分层前取得机台真实可接续时间。 */
+    @Resource
+    private LhMaintenanceScheduleService maintenanceScheduleService =
+            new LhMaintenanceScheduleService();
 
     /** 每小时毫秒数 */
     private static final long MILLIS_PER_HOUR = 60L * 60L * 1000L;
@@ -144,7 +157,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
         }
         MachineAvailabilityReason availabilityReason = resolveMachineAvailabilityReason(
                 context, sku, mouldResourceContext, skuInch, matchResult, machine);
-        Date referenceTime = resolveAlignedCandidateReferenceTime(context, machine);
+        Date referenceTime = resolveAlignedCandidateReferenceTime(context, sku, machine);
         return MachineAvailabilityReason.AVAILABLE == availabilityReason
                 && (Objects.isNull(windowEndTime) || Objects.isNull(referenceTime)
                 || referenceTime.before(windowEndTime));
@@ -210,7 +223,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
                 continue;
             }
             // 长时间停机只在存在其他可用机台时才触发换机，避免唯一候选机台被提前误排除。
-            if (hasPlanStopExceededTimeout(context, machine)) {
+            if (hasPlanStopExceededTimeout(context, sku, machine)) {
                 stopTimeoutCandidates.add(machine);
                 continue;
             }
@@ -1213,10 +1226,13 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
      * @param machine 候选机台
      * @return true-超过阈值，false-未超过阈值
      */
-    private boolean hasPlanStopExceededTimeout(LhScheduleContext context, MachineScheduleDTO machine) {
+    private boolean hasPlanStopExceededTimeout(LhScheduleContext context,
+                                               SkuScheduleDTO sku,
+                                               MachineScheduleDTO machine) {
         int timeoutHours = context.getParamIntValue(LhScheduleParamConstant.MACHINE_STOP_TIMEOUT_HOURS,
                 LhScheduleConstant.MACHINE_STOP_TIMEOUT_HOURS);
-        Date candidateReferenceTime = resolveAlignedCandidateReferenceTime(context, machine);
+        Date candidateReferenceTime =
+                resolveAlignedCandidateReferenceTime(context, sku, machine);
         Date candidateWindowEndTime = resolveCandidateWindowEndTime(context, candidateReferenceTime);
         for (MdmDevicePlanShut planShut : context.getDevicePlanShutList()) {
             if (planShut == null || StringUtils.isEmpty(planShut.getMachineCode())
@@ -1356,12 +1372,40 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
                 && isSingleControlMachine(context, machine.getMachineCode())
                 && LhSingleControlMachineUtil.isWholeMachineGranularitySku(context, sku)) {
             MachineScheduleDTO pairMachine = LhSingleControlMachineUtil.resolvePairMachine(context, machine.getMachineCode());
-            Date currentSideReferenceTime = resolveAlignedCandidateReferenceTime(context, machine);
-            Date pairSideReferenceTime = resolveAlignedCandidateReferenceTime(context, pairMachine);
+            Date currentSideReferenceTime = resolveRetentionAwareAlignedReferenceTime(
+                    context, sku, machine);
+            Date pairSideReferenceTime = resolveRetentionAwareAlignedReferenceTime(
+                    context, sku, pairMachine);
             // 正规SKU按整机占用单控机台，最早换模起点必须等L/R两边都释放。
             return resolveLaterTime(currentSideReferenceTime, pairSideReferenceTime);
         }
-        return resolveAlignedCandidateReferenceTime(context, machine);
+        return resolveRetentionAwareAlignedReferenceTime(context, sku, machine);
+    }
+
+    /**
+     * 解析结构停产保机约束下的候选参考时间。
+     *
+     * <p>保持现有候选排序器和排序键不变，只替换机台可用时间来源：同结构使用前物料最后实际
+     * 生产时间，不同结构不得早于结构统一释放时间。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 当前待排SKU
+     * @param machine 候选机台
+     * @return 与排程窗口首班对齐后的参考时间
+     */
+    private Date resolveRetentionAwareAlignedReferenceTime(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            MachineScheduleDTO machine) {
+        if (Objects.isNull(machine)) {
+            return null;
+        }
+        Date normalReferenceTime = resolveCandidateReferenceTime(context, machine);
+        Date retentionAwareReferenceTime =
+                structureMinMachineRetentionService.resolveRetentionAwareOccupationEndTime(
+                        context, sku, machine.getMachineCode(), normalReferenceTime);
+        return alignCandidateReferenceTimeToWindowStart(
+                context, retentionAwareReferenceTime);
     }
 
     /**
@@ -1551,7 +1595,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
         if (CollectionUtils.isEmpty(candidates)) {
             return EndingWindowContext.empty(originalCount);
         }
-        // 基准 = 最早参考收尾时间(referenceTime)所在班次；与"收尾时间同班次"语义及选机规则spec保持一致
+        // 基准使用精度时间轴调整后的有效参考时间，防止实际无法接产的精度机台占据最早候选层。
         Date earliestReferenceTime = resolveEarliestCandidateReferenceTime(context, candidates, sku, profileCache);
         LhShiftConfigVO baseShift = resolveBaseShiftByTime(context, earliestReferenceTime);
         if (Objects.isNull(baseShift) || baseShift.getShiftIndex() == null
@@ -1568,8 +1612,8 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
         List<MachineScheduleDTO> filteredSingleControlCandidates = new ArrayList<>(2);
         for (MachineScheduleDTO candidate : candidates) {
             CandidateWindowProfile profile = resolveCandidateWindowProfile(context, sku, candidate, profileCache);
-            // 同班次判定：机台收尾时间落在基准班次区间内
-            if (isInEndingWindow(profile.getReferenceTime(), windowStartTime, windowEndTime)) {
+            // 基准和过滤必须使用同一有效参考时间，避免先按原收尾分层、再被精度时间轴排除。
+            if (isInEndingWindow(profile.getEndingWindowReferenceTime(), windowStartTime, windowEndTime)) {
                 windowCandidates.add(candidate);
             } else if (isSingleControlMachine(context, candidate.getMachineCode())
                     && LhSingleControlMachineUtil.isSingleSideGranularitySku(context, sku)) {
@@ -1594,9 +1638,9 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
     }
 
     /**
-     * 解析候选机台中最早的参考收尾时间，作为同班次筛选的基准。
-     * <p>参考收尾时间 = 机台已占用结束时间(或释放时间)对齐排程窗口首班后的值；
-     * 取所有候选机台中的最小值。基准与过滤口径必须同为收尾时间，避免换模耗时跨班次导致全量过滤。</p>
+     * 解析候选机台中最早的有效参考时间，作为同班次筛选的基准。
+     * <p>普通机台继续使用原收尾或释放时间；不能继续精度前插排的机台使用精度保养及胶囊预热
+     * 完成后的真实就绪时间。这样既保持普通候选原有排序，又避免精度不可排机台形成队头阻塞。</p>
      *
      * @param context 排程上下文
      * @param candidates 候选机台
@@ -1611,7 +1655,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
         Date earliest = null;
         for (MachineScheduleDTO candidate : candidates) {
             CandidateWindowProfile profile = resolveCandidateWindowProfile(context, sku, candidate, profileCache);
-            Date referenceTime = profile.getReferenceTime();
+            Date referenceTime = profile.getEndingWindowReferenceTime();
             if (Objects.isNull(referenceTime)) {
                 continue;
             }
@@ -2196,10 +2240,17 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
         CandidateWindowProfile profile = new CandidateWindowProfile();
         Date referenceTime = resolveAlignedCandidateReferenceTime(context, sku, machine);
         profile.setReferenceTime(referenceTime);
-        boolean hitNoMouldChange = referenceTime != null
-                && LhScheduleTimeUtil.isNoMouldChangeTime(context, referenceTime);
+        /*
+         * 最早收尾班次分层必须与正式排产使用同一精度就绪口径。尚未使用的前置插排窗口保留原始
+         * 参考时间，继续进入06:00前完整测算；其余精度机台按保养及预热完成时间参与候选分层。
+         */
+        Date endingWindowReferenceTime = resolvePrecisionAwareEndingWindowReferenceTime(
+                context, machine, referenceTime);
+        profile.setEndingWindowReferenceTime(endingWindowReferenceTime);
+        boolean hitNoMouldChange = endingWindowReferenceTime != null
+                && LhScheduleTimeUtil.isNoMouldChangeTime(context, endingWindowReferenceTime);
         profile.setHitNoMouldChange(hitNoMouldChange);
-        Date switchStartTime = resolveCandidateSwitchStartTime(context, referenceTime);
+        Date switchStartTime = resolveCandidateSwitchStartTime(context, endingWindowReferenceTime);
         profile.setSwitchStartTime(switchStartTime);
         profile.setFirstSwitchShiftIndex(resolveShiftIndex(context, switchStartTime));
         profile.setProductionStartTime(resolveCandidateProductionStartTime(context, switchStartTime));
@@ -2209,6 +2260,31 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
         profile.setTodayIdleScore(resolveTodayIdleScore(context, sku, machine, profile));
         profileCache.put(machine.getMachineCode(), profile);
         return profile;
+    }
+
+    /**
+     * 解析精度计划约束下用于候选分层的有效参考时间。
+     * <p>本方法只修正选机窗口画像，不提前扣减计划量、模具、首检或胎胚资源。正式排产仍由新增
+     * 主链完成全时间轴测算和最终校验；这里仅保证已被精度顺延的机台不会错误过滤其他候选。</p>
+     *
+     * @param context 排程上下文
+     * @param machine 候选机台
+     * @param referenceTime 机台原始参考收尾时间
+     * @return 精度时间轴调整后的候选分层参考时间
+     */
+    private Date resolvePrecisionAwareEndingWindowReferenceTime(LhScheduleContext context,
+                                                                MachineScheduleDTO machine,
+                                                                Date referenceTime) {
+        if (Objects.isNull(referenceTime) || Objects.isNull(machine)
+                || !machine.isHasMaintenancePlan()) {
+            return referenceTime;
+        }
+        // 精度前插排机会尚未使用时不能提前推迟候选，否则符合阈值的小余量SKU永远无法进入完整测算。
+        if (maintenanceScheduleService.hasOpenPrecisionPreInsertWindow(machine)) {
+            return referenceTime;
+        }
+        return maintenanceScheduleService.resolveMaintenanceResumeProductionTime(
+                context, machine, referenceTime);
     }
 
     /**
@@ -2689,7 +2765,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
             int singleCtrlScore = resolveSingleControlScore(context, sku, machine);
             int normalMachineScore = resolveNormalMachinePriorityValue(matchResult, machine);
             int specialSupportCapabilityCount = resolveSpecialSupportCapabilityCount(machine);
-            boolean inEndingWindow = isInEndingWindow(profile.getReferenceTime(),
+            boolean inEndingWindow = isInEndingWindow(profile.getEndingWindowReferenceTime(),
                     endingWindowContext.getWindowStartTime(), endingWindowContext.getWindowEndTime());
             int embryoMatchScore = resolveEmbryoMatchScore(context, sku, machine);
             int specMatchScore = resolveSpecMatchScore(sku, machine);
@@ -2759,6 +2835,8 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
                             + ", " + PriorityTraceLogHelper.kv("机台适用模套型号", machine.getShellStandard())
                             + ", " + PriorityTraceLogHelper.kv("特殊材料匹配", PriorityTraceLogHelper.oneZero(specialMatched))
                             + ", " + PriorityTraceLogHelper.kv("当前在机", machine.getPreviousMaterialCode())
+                            + ", " + PriorityTraceLogHelper.kv("精度调整后窗口参考时间",
+                            PriorityTraceLogHelper.formatDateTime(profile.getEndingWindowReferenceTime()))
                             + ", " + PriorityTraceLogHelper.kv("最早换模时间", PriorityTraceLogHelper.formatDateTime(profile.getSwitchStartTime()))
                             + ", " + PriorityTraceLogHelper.kv("最早可换模班次", profile.getFirstSwitchShiftIndex())
                             + ", " + PriorityTraceLogHelper.kv("最早可开产时间", PriorityTraceLogHelper.formatDateTime(profile.getProductionStartTime()))
@@ -3202,6 +3280,8 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
     private static class CandidateWindowProfile {
         /** 参考收尾时间 */
         private Date referenceTime;
+        /** 精度及胶囊预热约束调整后，用于最早收尾班次分层的有效参考时间 */
+        private Date endingWindowReferenceTime;
         /** 最早可换模时间 */
         private Date switchStartTime;
         /** 最早可换模班次 */
@@ -3237,6 +3317,14 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
 
         private void setReferenceTime(Date referenceTime) {
             this.referenceTime = referenceTime;
+        }
+
+        private Date getEndingWindowReferenceTime() {
+            return endingWindowReferenceTime;
+        }
+
+        private void setEndingWindowReferenceTime(Date endingWindowReferenceTime) {
+            this.endingWindowReferenceTime = endingWindowReferenceTime;
         }
 
         private Date getSwitchStartTime() {

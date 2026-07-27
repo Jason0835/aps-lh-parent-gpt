@@ -17,6 +17,7 @@ import com.zlt.aps.tc.mapper.TcMachineInfoMapper;
 import com.zlt.aps.tc.mapper.TcShiftConfigMapper;
 import org.springframework.stereotype.Service;
 
+import java.text.MessageFormat;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -97,6 +98,44 @@ public class TcManualOptionsService {
         result.setWholeGlueCode(optionVo.getWholeGlueCode());
         result.setMouthPlateCode(optionVo.getMouthPlateCode());
         return result;
+    }
+
+    /**
+     * 按胎侧编码批量解析唯一有效施工快照。
+     *
+     * <p>Excel 新增行不接收用户指定的施工版本，因此同一胎侧编码必须在当前工厂唯一对应
+     * 一个有效胎侧施工版本；不存在或存在多个版本时由调用方整批拒绝导入。</p>
+     *
+     * @param factoryCode 工厂编码
+     * @param sidewallCodeSet 待解析的胎侧编码集合
+     * @return 胎侧编码对应的可信施工快照
+     * @throws ServiceException 施工不存在、版本不唯一或施工关键字段无效时抛出
+     */
+    public Map<String, TcScheduleResult> resolveUniqueConstructions(String factoryCode,
+                                                                     Set<String> sidewallCodeSet) {
+        if (sidewallCodeSet == null || sidewallCodeSet.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        Map<String, List<TcManualConstructionOptionVo>> groupedOptionMap = this.listConstructionOptions(factoryCode)
+                .stream().filter(item -> sidewallCodeSet.contains(item.getSidewallCode()))
+                .collect(Collectors.groupingBy(TcManualConstructionOptionVo::getSidewallCode,
+                        LinkedHashMap::new, Collectors.toList()));
+        Map<String, TcScheduleResult> resultMap = new LinkedHashMap<>();
+        for (String sidewallCode : sidewallCodeSet) {
+            List<TcManualConstructionOptionVo> optionList = groupedOptionMap.get(sidewallCode);
+            if (optionList == null || optionList.isEmpty()) {
+                throw new ServiceException(MessageFormat.format(I18nUtil.getMessage(
+                        "ui.data.alert.tc.schedule.excel.constructionNotFound"), sidewallCode));
+            }
+            if (optionList.size() != 1) {
+                throw new ServiceException(MessageFormat.format(I18nUtil.getMessage(
+                        "ui.data.alert.tc.schedule.excel.constructionAmbiguous"), sidewallCode));
+            }
+            TcManualConstructionOptionVo optionVo = optionList.get(0);
+            resultMap.put(sidewallCode, this.resolveConstruction(factoryCode, sidewallCode,
+                    optionVo.getConstructionVersion()));
+        }
+        return resultMap;
     }
 
     /**

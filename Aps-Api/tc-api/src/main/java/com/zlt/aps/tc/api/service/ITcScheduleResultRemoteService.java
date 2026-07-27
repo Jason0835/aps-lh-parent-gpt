@@ -2,6 +2,8 @@ package com.zlt.aps.tc.api.service;
 
 import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.zlt.aps.tc.api.domain.dto.TcScheduleResultImportDTO;
+import com.zlt.aps.tc.api.domain.entity.TcScheduleResult;
 import com.zlt.aps.tc.api.domain.entity.TcScheduleResultExplain;
 import com.zlt.aps.tc.api.domain.vo.*;
 import io.swagger.annotations.ApiOperation;
@@ -21,6 +23,30 @@ import java.util.List;
 public interface ITcScheduleResultRemoteService {
 
     // ===== 看板与未排查询 =====
+
+    /**
+     * 按专用模板导出胎侧排程结果。
+     *
+     * @param queryVO 工厂和单日排程条件
+     * @param fileName 文件名称
+     * @return Excel 文件字节
+     */
+    @ApiOperation("按专用模板导出胎侧排程结果")
+    @PostMapping("/tcScheduleResult/exportDataScheduleResult/{fileName}")
+    byte[] exportDataScheduleResult(@RequestBody TcScheduleResult queryVO,
+                                    @PathVariable("fileName") String fileName);
+
+    /**
+     * 按专用模板导入胎侧排程结果。
+     *
+     * @param importDTO 文件和工厂日期上下文
+     * @param updateSupport 是否允许覆盖更新
+     * @return 导入结果
+     */
+    @ApiOperation("按专用模板导入胎侧排程结果")
+    @PostMapping("/tcScheduleResult/importDataScheduleResult")
+    AjaxResult importDataScheduleResult(@RequestBody TcScheduleResultImportDTO importDTO,
+                                        @RequestParam("updateSupport") boolean updateSupport);
 
     /**
      * 查询胎侧排程平铺看板。
@@ -115,6 +141,68 @@ public interface ITcScheduleResultRemoteService {
     @ApiOperation("整行删除胎侧排程结果")
     @DeleteMapping("/tcScheduleResult/remove")
     AjaxResult remove(@RequestBody List<Long> resultIdList);
+
+    /**
+     * 提交胎侧人工插单异步任务。
+     *
+     * @param requestVO 插单请求
+     * @return 初始任务
+     */
+    @ApiOperation("提交胎侧人工插单异步任务")
+    @PostMapping("/tcScheduleResult/operation/insertTask")
+    TcOperationTaskVo submitInsertTask(@RequestBody TcInsertTaskRequestVo requestVO);
+
+    /**
+     * 提交胎侧调量异步任务。
+     *
+     * @param requestVO 调量请求
+     * @return 初始任务
+     */
+    @ApiOperation("提交胎侧调量异步任务")
+    @PostMapping("/tcScheduleResult/operation/changeQty")
+    TcOperationTaskVo submitChangeQty(@RequestBody TcChangeQtyRequestVo requestVO);
+
+    /**
+     * 提交胎侧单条或批量转机台异步任务。
+     *
+     * @param requestVO 转机台请求
+     * @return 初始任务
+     */
+    @ApiOperation("提交胎侧转机台异步任务")
+    @PostMapping("/tcScheduleResult/operation/changeMachine")
+    TcOperationTaskVo submitChangeMachine(@RequestBody TcChangeMachineRequestVo requestVO);
+
+    /**
+     * 提交胎侧删除异步任务。
+     *
+     * @param resultIdList 结果ID
+     * @return 初始任务
+     */
+    @ApiOperation("提交胎侧删除异步任务")
+    @DeleteMapping("/tcScheduleResult/operation/remove")
+    TcOperationTaskVo submitRemove(@RequestBody List<Long> resultIdList);
+
+    /**
+     * 查询胎侧人工操作任务。
+     *
+     * @param taskId 任务编号
+     * @return 任务状态
+     */
+    @ApiOperation("查询胎侧人工操作任务")
+    @GetMapping("/tcScheduleResult/operation/task/{taskId}")
+    TcOperationTaskVo getOperationTask(@PathVariable("taskId") String taskId);
+
+    /**
+     * 查询最近胎侧人工操作任务。
+     *
+     * @param factoryCode 工厂编码
+     * @param scheduleDate 排程日期
+     * @return 最近任务
+     */
+    @ApiOperation("查询最近胎侧人工操作任务")
+    @GetMapping("/tcScheduleResult/operation/task/latest")
+    TcOperationTaskVo getLatestOperationTask(@RequestParam("factoryCode") String factoryCode,
+                                             @RequestParam("scheduleDate") String scheduleDate);
 
     // ===== 自动排程 =====
 

@@ -5,6 +5,7 @@ import cn.hutool.core.util.StrUtil;
 import com.alibaba.fastjson.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.tc.api.constant.TcScheduleConstants;
 import com.zlt.aps.tc.api.domain.vo.TcAutoScheduleIssueVo;
@@ -50,7 +51,10 @@ public class TcAutoScheduleTaskServiceImpl implements TcAutoScheduleTaskService 
     public TcAutoScheduleTask createPending(TcAutoScheduleRequestVo request, TcAutoScheduleResponseVo response) {
         TcAutoScheduleTask activeTask = this.findActive(request.getFactoryCode(), request.getScheduleDate());
         if (activeTask != null) {
-            return activeTask;
+            if (TcBackgroundTaskTypeEnum.AUTO_PLAN.getCode().equals(activeTask.getTaskType())) {
+                return activeTask;
+            }
+            throw new ServiceException(I18nUtil.getMessage("ui.tc.schedule.concurrentTask"));
         }
         TcAutoScheduleTask task = new TcAutoScheduleTask();
         task.setTaskId(TcScheduleConstants.AUTO_SCHEDULE_TASK_ID_PREFIX

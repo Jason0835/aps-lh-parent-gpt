@@ -46,7 +46,7 @@
 </template>
 
 <script>
-import { changeMachine, getManualOptions } from '@/api/tc/tcScheduleResult'
+import {changeMachine, getManualOptions} from '@/api/tc/tcScheduleResult'
 
 export default {
   name: 'TcChangeMachineDialog',
@@ -121,7 +121,7 @@ export default {
         }
         this.submitting = true
         try {
-          await changeMachine({
+          const task = await changeMachine({
             targetMachineCode: this.form.targetMachineCode,
             taskList: this.form.taskList.map(item => ({
               resultId: item.id,
@@ -130,9 +130,8 @@ export default {
             })),
             reason: this.form.reason
           })
-          this.$modal.msgSuccess(this.$t('ui.tc.schedule.changeMachineSuccess'))
           this.visible = false
-          this.$emit('success')
+          this.$emit('success', task)
         } finally {
           this.submitting = false
         }

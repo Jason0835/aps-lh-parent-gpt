@@ -9,7 +9,6 @@ import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
 /**
@@ -48,29 +47,9 @@ public class TcAutoScheduleRedisCacheService {
      * @return 集合副本
      */
     public <T> List<T> getCachedList(String cacheKeySuffix, Supplier<List<T>> loader) {
-        String cacheKey = TcScheduleConstants.BASE_DATA_CACHE_KEY_PREFIX + cacheKeySuffix;
-        if (redisService == null) {
-            return copyList(loader.get());
-        }
-        try {
-            List<T> cachedList = redisService.getCacheObject(cacheKey);
-            if (cachedList != null) {
-                return copyList(cachedList);
-            }
-        } catch (RuntimeException ex) {
-            log.warn("[TC_AUTO_SCHEDULE_CACHE] 读取 Redis 缓存失败，cacheKey={}，原因={}，将回源加载",
-                    cacheKey, ex.getMessage());
-            return copyList(loader.get());
-        }
-        List<T> loadedList = copyList(loader.get());
-        try {
-            redisService.setCacheObject(cacheKey, loadedList,
-                    TcScheduleConstants.BASE_DATA_CACHE_TTL_MINUTES, TimeUnit.MINUTES);
-        } catch (RuntimeException ex) {
-            log.warn("[TC_AUTO_SCHEDULE_CACHE] 写入 Redis 缓存失败，cacheKey={}，原因={}，本次使用回源数据",
-                    cacheKey, ex.getMessage());
-        }
-        return copyList(loadedList);
+        // 暂不使用 Redis 缓存：每次直接回源加载，确保参数等基础资料修改后立即生效。
+        // 保留方法签名与 clear() 清理入口，便于后续按需恢复缓存。
+        return copyList(loader.get());
     }
 
     /**

@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
+import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.tc.api.constant.TcScheduleConstants;
 import com.zlt.aps.tc.api.domain.entity.TcScheduleResult;
 import com.zlt.aps.tc.api.domain.entity.TcScheduleResultExplain;
@@ -307,26 +308,35 @@ public class TcScheduleBoardQueryService {
     }
 
     /**
-     * 汇总六班计划量和完成量。
+     * 汇总六班计划量、完成量、库存及各班次计划量。
      *
      * @param resultList 排程结果
      * @return 看板汇总
      */
     private TcScheduleBoardSummaryVo buildSummary(List<TcScheduleResult> resultList) {
         TcScheduleBoardSummaryVo summaryVo = new TcScheduleBoardSummaryVo();
+        BigDecimal totalStockQty = BigDecimal.ZERO;
         BigDecimal totalPlanQty = BigDecimal.ZERO;
         BigDecimal totalFinishQty = BigDecimal.ZERO;
+        // 各班次计划量合计，下标 0 对应 1 班，长度固定为最大班次序号
+        List<BigDecimal> shiftPlanQtyList = new ArrayList<>(
+                Collections.nCopies(TcScheduleConstants.TC_MAX_SHIFT_ORDER, BigDecimal.ZERO));
         for (TcScheduleResult result : resultList) {
+            totalStockQty = totalStockQty.add(BigDecimalUtils.valueOf(result.getStockQty()));
             for (int shiftOrder = 1; shiftOrder <= TcScheduleConstants.TC_MAX_SHIFT_ORDER; shiftOrder++) {
-                totalPlanQty = totalPlanQty.add(this.readDecimal(result,
-                        String.format(TcScheduleConstants.SHIFT_PLAN_QTY_FIELD_TEMPLATE, shiftOrder)));
+                BigDecimal shiftPlanQty = this.readDecimal(result,
+                        String.format(TcScheduleConstants.SHIFT_PLAN_QTY_FIELD_TEMPLATE, shiftOrder));
+                totalPlanQty = totalPlanQty.add(shiftPlanQty);
                 totalFinishQty = totalFinishQty.add(this.readDecimal(result,
                         String.format(TcScheduleConstants.SHIFT_FINISH_QTY_FIELD_TEMPLATE, shiftOrder)));
+                shiftPlanQtyList.set(shiftOrder - 1, shiftPlanQtyList.get(shiftOrder - 1).add(shiftPlanQty));
             }
         }
+        summaryVo.setTotalStockQty(totalStockQty);
         summaryVo.setTotalPlanQty(totalPlanQty);
         summaryVo.setTotalFinishQty(totalFinishQty);
         summaryVo.setResultCount((long) resultList.size());
+        summaryVo.setShiftPlanQtyList(shiftPlanQtyList);
         return summaryVo;
     }
 

@@ -24,6 +24,7 @@ import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
 import com.zlt.aps.lh.component.CapsuleReplacementRuleService;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.component.OrderNoGenerator;
+import com.zlt.aps.lh.component.StructureMinMachineRetentionService;
 import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.ICapacityCalculateStrategy;
@@ -34,6 +35,7 @@ import com.zlt.aps.lh.engine.strategy.IMouldChangeBalanceStrategy;
 import com.zlt.aps.lh.engine.strategy.ITypeBlockProductionStrategy;
 import com.zlt.aps.lh.engine.strategy.support.DailyMachineExpansionPlanner;
 import com.zlt.aps.lh.engine.strategy.support.DailyMachineShortageQuotaPlan;
+import com.zlt.aps.lh.engine.strategy.support.DailyQuotaLedgerBaseline;
 import com.zlt.aps.lh.engine.strategy.support.PendingSkuUnscheduledRule;
 import com.zlt.aps.lh.engine.strategy.support.SpecifiedMachineScheduleResult;
 import com.zlt.aps.lh.service.impl.LhMaintenanceScheduleService;
@@ -135,6 +137,10 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
     private ICapacityCalculateStrategy capacityCalculateStrategy;
     @Resource
     private IMachineMatchStrategy machineMatchStrategy;
+    /** 历史反选和特殊材料指定机台共用的结构停产保机约束。 */
+    @Resource
+    private StructureMinMachineRetentionService structureMinMachineRetentionService =
+            new StructureMinMachineRetentionService();
     /** 胶囊次数累计与换胶囊班次扣减统一入口 */
     @Resource
     private CapsuleReplacementRuleService capsuleReplacementRuleService = new CapsuleReplacementRuleService();
@@ -258,9 +264,8 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                     log.info("释放机台换活字块候选SKU列表, machineCode: {}, currentMaterialCode: {}, candidates: {}",
                             machineCode, machine.getCurrentMaterialCode(), buildSkuCodeSummary(typeBlockCandidates));
                 }
-                SkuScheduleDTO typeBlockSku = selectPreferredSkuFromCandidates(typeBlockCandidates);
                 String matchedLayer = !CollectionUtils.isEmpty(typeBlockCandidates) ? "同胎胚+同模具" : "未命中";
-                if (typeBlockSku == null) {
+                if (CollectionUtils.isEmpty(typeBlockCandidates)) {
                     log.debug("换活字块未匹配到SKU, 机台: {}, 触发来源: {}, 候选数: {}",
                             machineCode, machineTriggerSourceMap.get(machineCode),
                             typeBlockCandidates.size());
@@ -270,37 +275,55 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                     completedMachineMap.put(machineCode, true);
                     continue;
                 }
-                // 候选SKU如需完整换模/首检能力评估，则让渡给新增排产链路。
-                if (shouldReserveMachineForNewSpecPath(context, machine, typeBlockSku, shifts)) {
-                    completedMachineMap.put(machineCode, true);
-                    log.info("候选SKU需走新增换模主链，当前阶段预留机台, machineCode: {}, materialCode: {}",
-                            machineCode, typeBlockSku.getMaterialCode());
-                    continue;
-                }
-                if (endingJudgmentStrategy.isCurrentWindowEnding(context, typeBlockSku)) {
-                    getMaintenanceScheduleService().tryAttachMaintenanceAfterFirstEnding(
-                            context, machine, machine.getEstimatedEndTime());
-                }
-                // 换活字块切换起点需要避开晚班不可换模、保养、停机等窗口。
-                Date typeBlockSwitchStartTime = allocateTypeBlockSwitchStartTime(
-                        context, machine, typeBlockSku, machine.getEstimatedEndTime());
-                Date typeBlockStartTime = resolveTypeBlockProductionStartTime(
-                        context, machine, typeBlockSku, machine.getEstimatedEndTime(),
-                        typeBlockSwitchStartTime, shifts);
-                int eligibleMachineCount = countEligibleTypeBlockMachines(context, typeBlockSku, activeMachines);
-                // 换活字块本阶段不主动扩多台；eligibleMachineCount 只用于单台目标量口径判断。
-                StringBuilder failureReason = new StringBuilder(128);
-                boolean success = appendTypeBlockResultWithRollback(
-                        context, machine, typeBlockSku, typeBlockStartTime, typeBlockSwitchStartTime, shifts,
-                        eligibleMachineCount == 1, failureReason);
-                traceTypeBlockDecision(context, machine, typeBlockCandidates,
-                        typeBlockSku, matchedLayer, success, typeBlockSwitchStartTime, typeBlockStartTime,
-                        machineTriggerSourceMap.get(machineCode), failureReason.toString());
-                if (!success) {
-                    log.warn("换活字块排产失败, 机台: {}, materialCode: {}, 结构: {}, 开始时间: {}, 匹配层级: {}, 失败原因: {}",
+                boolean precisionPreInsertSearch = getMaintenanceScheduleService()
+                        .hasOpenPrecisionPreInsertWindow(machine);
+                SkuScheduleDTO typeBlockSku = null;
+                boolean success = false;
+                for (SkuScheduleDTO candidateSku : typeBlockCandidates) {
+                    // 普通换活字块保持历史行为只尝试排序第一名；精度前窗口才按同一既有顺序遍历全部候选。
+                    if (!precisionPreInsertSearch && Objects.nonNull(typeBlockSku)) {
+                        break;
+                    }
+                    typeBlockSku = candidateSku;
+                    if (shouldReserveMachineForNewSpecPath(context, machine, typeBlockSku, shifts)) {
+                        log.info("候选SKU需走新增换模主链，当前阶段不执行换活字块, machineCode: {}, materialCode: {}",
+                                machineCode, typeBlockSku.getMaterialCode());
+                        if (precisionPreInsertSearch) {
+                            continue;
+                        }
+                        break;
+                    }
+                    if (endingJudgmentStrategy.isCurrentWindowEnding(context, typeBlockSku)) {
+                        getMaintenanceScheduleService().tryAttachMaintenanceAfterFirstEnding(
+                                context, machine, machine.getEstimatedEndTime());
+                    }
+                    Date typeBlockSwitchStartTime = allocateTypeBlockSwitchStartTime(
+                            context, machine, typeBlockSku, machine.getEstimatedEndTime());
+                    Date typeBlockStartTime = resolveTypeBlockProductionStartTime(
+                            context, machine, typeBlockSku, machine.getEstimatedEndTime(),
+                            typeBlockSwitchStartTime, shifts);
+                    int eligibleMachineCount = countEligibleTypeBlockMachines(
+                            context, typeBlockSku, activeMachines);
+                    StringBuilder failureReason = new StringBuilder(128);
+                    success = appendTypeBlockResultWithRollback(
+                            context, machine, typeBlockSku, typeBlockStartTime,
+                            typeBlockSwitchStartTime, shifts,
+                            eligibleMachineCount == 1, failureReason);
+                    traceTypeBlockDecision(context, machine, typeBlockCandidates,
+                            typeBlockSku, matchedLayer, success, typeBlockSwitchStartTime,
+                            typeBlockStartTime, machineTriggerSourceMap.get(machineCode),
+                            failureReason.toString());
+                    if (success) {
+                        break;
+                    }
+                    log.warn("换活字块排产失败, 机台: {}, materialCode: {}, 结构: {}, 开始时间: {}, "
+                                    + "匹配层级: {}, 失败原因: {}, 是否继续精度前候选: {}",
                             machineCode, typeBlockSku.getMaterialCode(), typeBlockSku.getStructureName(),
                             LhScheduleTimeUtil.formatDateTime(typeBlockStartTime), matchedLayer,
-                            StringUtils.isNotEmpty(failureReason.toString()) ? failureReason.toString() : "-");
+                            StringUtils.isNotEmpty(failureReason.toString())
+                                    ? failureReason.toString() : "-", precisionPreInsertSearch);
+                }
+                if (!success) {
                     completedMachineMap.put(machineCode, true);
                     continue;
                 }
@@ -366,7 +389,20 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                     MouldChangeTypeEnum.TYPE_BLOCK.getCode(),
                     "历史班次无法映射到本批次有效班次");
         }
-        Date machineEndTime = machine.getEstimatedEndTime();
+        /*
+         * 历史指定机台绕过普通候选排序，因此必须在该入口单独执行相同的结构保机可用性判断。
+         * 同结构直接放行；不同结构若整个历史映射班次都未越过统一释放时间，则当前指令不可执行。
+         */
+        if (structureMinMachineRetentionService.isDifferentStructureRetentionBlocked(
+                context, sku, machine.getMachineCode(),
+                mappedShift.getShiftEndDateTime())) {
+            return SpecifiedMachineScheduleResult.failed(
+                    MouldChangeTypeEnum.TYPE_BLOCK.getCode(),
+                    "历史指定机台在映射班次内仍被不同结构停产保机占用");
+        }
+        Date machineEndTime =
+                structureMinMachineRetentionService.resolveRetentionAwareOccupationEndTime(
+                        context, sku, machine.getMachineCode(), machine.getEstimatedEndTime());
         if (Objects.isNull(machineEndTime)) {
             return SpecifiedMachineScheduleResult.failed(
                     MouldChangeTypeEnum.TYPE_BLOCK.getCode(),
@@ -429,6 +465,115 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                     MouldChangeTypeEnum.TYPE_BLOCK.getCode(),
                     "换活字块主链返回成功但未找到对应排程结果");
         }
+        // 指定机台同结构接管成功后立即清理旧保机占位，避免后续历史指令重复看到同班次占用。
+        structureMinMachineRetentionService.synchronizeRetainedState(context);
+        return SpecifiedMachineScheduleResult.success(
+                result, MouldChangeTypeEnum.TYPE_BLOCK.getCode());
+    }
+
+    /**
+     * 在特殊材料置换选定的续作机台上尝试换活字块排产。
+     *
+     * <p>候选关系、切换均衡、20:00 后禁换模、设备停机、首检、班次产能和账本扣减全部复用
+     * 正式换活字块主链。与历史反选不同，本入口不锁死某一个班次，允许现有切换规则从
+     * {@code earliestSwitchTime} 起继续顺延到下一个合法班次。</p>
+     *
+     * @param context 排程上下文
+     * @param machine 特殊材料准备接管的续作机台
+     * @param sku 特殊材料 SKU
+     * @param earliestSwitchTime 置换预演得出的最早允许切换时间
+     * @return 换活字块执行结果；不满足同胎胚、同模具等关系时返回不适用
+     */
+    /**
+     * 无副作用判断特殊材料置换是否适用换活字块时长。
+     *
+     * @param context 排程上下文
+     * @param machine 特殊材料准备接管的续作机台
+     * @param sku 特殊材料 SKU
+     * @return true-满足现有换活字块关系；false-应按正规换模预演
+     */
+    @Override
+    public boolean isSpecialMaterialSubstitutionTypeBlockApplicable(
+            LhScheduleContext context,
+            MachineScheduleDTO machine,
+            SkuScheduleDTO sku) {
+        // 只复用现有候选判断且关闭决策日志，不执行时间分配、计数登记或结果写入。
+        return Objects.nonNull(context)
+                && Objects.nonNull(machine)
+                && Objects.nonNull(sku)
+                && isTypeBlockCandidate(context, machine, sku, false);
+    }
+
+    @Override
+    public SpecifiedMachineScheduleResult tryScheduleSpecialMaterialSubstitution(
+            LhScheduleContext context,
+            MachineScheduleDTO machine,
+            SkuScheduleDTO sku,
+            Date earliestSwitchTime) {
+        if (Objects.isNull(context) || Objects.isNull(machine) || Objects.isNull(sku)
+                || Objects.isNull(earliestSwitchTime)) {
+            return SpecifiedMachineScheduleResult.failed(
+                    MouldChangeTypeEnum.TYPE_BLOCK.getCode(),
+                    "排程上下文、指定机台、目标SKU或最早切换时间为空");
+        }
+        if (!isTypeBlockCandidate(context, machine, sku)) {
+            return SpecifiedMachineScheduleResult.notApplicable(
+                    "当前机台物料与特殊材料SKU不满足换活字块条件");
+        }
+        Date machineEndTime =
+                structureMinMachineRetentionService.resolveRetentionAwareOccupationEndTime(
+                        context, sku, machine.getMachineCode(), machine.getEstimatedEndTime());
+        if (Objects.isNull(machineEndTime)) {
+            return SpecifiedMachineScheduleResult.failed(
+                    MouldChangeTypeEnum.TYPE_BLOCK.getCode(),
+                    "特殊材料置换机台没有可用于计算的续作下机时间");
+        }
+        Date alignedEndTime = machineEndTime.before(earliestSwitchTime)
+                ? earliestSwitchTime : machineEndTime;
+        int resultStartIndex = context.getScheduleResultList().size();
+        int unscheduledStartIndex = context.getUnscheduledResultList().size();
+        boolean pendingBefore = context.getNewSpecSkuList().contains(sku);
+        Integer originalTargetQty = sku.getTargetScheduleQty();
+        Integer originalRemainingQty = sku.getRemainingScheduleQty();
+
+        // 调用正式切换分配入口，由现有规则决定早班、中班或顺延到下一允许班次。
+        Date switchStartTime = allocateTypeBlockSwitchStartTime(
+                context, machine, sku, alignedEndTime);
+        if (Objects.isNull(switchStartTime)) {
+            return SpecifiedMachineScheduleResult.failed(
+                    MouldChangeTypeEnum.TYPE_BLOCK.getCode(),
+                    "特殊材料置换未找到合法换活字块时间");
+        }
+        List<LhShiftConfigVO> shifts =
+                LhScheduleTimeUtil.getScheduleShifts(context, context.getScheduleDate());
+        Date productionStartTime = resolveTypeBlockProductionStartTime(
+                context, machine, sku, alignedEndTime, switchStartTime, shifts);
+        StringBuilder failureReason = new StringBuilder(128);
+        boolean success = appendTypeBlockResultWithRollback(
+                context, machine, sku, productionStartTime, switchStartTime, shifts,
+                true, failureReason);
+        if (!success) {
+            // 正式主链已回滚换模/首检配额，此处只恢复其可能写入的待排运行态。
+            clearAddedUnscheduledResults(context, unscheduledStartIndex);
+            sku.setTargetScheduleQty(originalTargetQty);
+            sku.setRemainingScheduleQty(originalRemainingQty);
+            if (pendingBefore && !context.getNewSpecSkuList().contains(sku)) {
+                context.getNewSpecSkuList().add(sku);
+            }
+            return SpecifiedMachineScheduleResult.failed(
+                    MouldChangeTypeEnum.TYPE_BLOCK.getCode(),
+                    StringUtils.isNotEmpty(failureReason.toString())
+                            ? failureReason.toString() : "换活字块主链未生成有效排程结果");
+        }
+        LhScheduleResult result = findSpecifiedTypeBlockResult(
+                context, machine, sku, resultStartIndex);
+        if (Objects.isNull(result)) {
+            return SpecifiedMachineScheduleResult.failed(
+                    MouldChangeTypeEnum.TYPE_BLOCK.getCode(),
+                    "换活字块主链返回成功但未找到特殊材料置换结果");
+        }
+        // 特殊材料指定机台成功后同步同结构接管及剩余保机占位，保持结果和机台运行态一致。
+        structureMinMachineRetentionService.synchronizeRetainedState(context);
         return SpecifiedMachineScheduleResult.success(
                 result, MouldChangeTypeEnum.TYPE_BLOCK.getCode());
     }
@@ -1349,29 +1494,23 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
     }
 
     /**
-     * 判断换活字块是否仍应沿用维保重叠专用切换口径。
+     * 判断换活字块是否使用精度重叠切换口径。
+     *
+     * <p>最新规则明确精度计划不得与换活字块并行，切换开始时间已由统一时间轴顺延到
+     * 精度及胶囊预热结束后，因此该方法固定返回false。保留方法入口是为了不改变现有
+     * 换活字块时长解析结构，计划性维修的并行判断仍由其独立逻辑负责。</p>
      *
      * @param context 排程上下文
      * @param machine 机台
      * @param estimatedEndTime 预计收尾时间
      * @param switchStartTime 实际切换开始时间
-     * @return true-沿用维保重叠专用口径；false-按普通换活字块口径
+     * @return 固定false
      */
     private boolean isTypeBlockMaintenanceOverlapSwitch(LhScheduleContext context,
                                                         MachineScheduleDTO machine,
                                                         Date estimatedEndTime,
                                                         Date switchStartTime) {
-        if (machine == null || estimatedEndTime == null || switchStartTime == null) {
-            return false;
-        }
-        Date rawSwitchStartTime = resolveAllowedSwitchStartTime(
-                context, machine.getMachineCode(), estimatedEndTime);
-        if (!getMaintenanceScheduleService().shouldApplyMaintenanceOverlapSwitchRule(
-                context, machine, rawSwitchStartTime)) {
-            return false;
-        }
-        Date maintenanceEndTime = getMaintenanceScheduleService().resolveMaintenanceEndTime(context, machine);
-        return maintenanceEndTime != null && !switchStartTime.after(maintenanceEndTime);
+        return false;
     }
 
     /**
@@ -1526,6 +1665,9 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
         Integer originalTargetScheduleQty = sku.getTargetScheduleQty();
         int originalRemainingScheduleQty = sku.getRemainingScheduleQty();
         boolean originalStrictTargetQty = sku.isStrictTargetQty();
+        // 精度前插排必须一次排完整真实余量，保存换活字块目标调整前的统一生产余量口径。
+        int precisionPendingQty = getTargetScheduleQtyResolver()
+                .resolveProductionRemainingQty(context, sku);
         boolean isEnding = endingJudgmentStrategy.isCurrentWindowEnding(context, sku);
         boolean smallEndingRuleEnding = isEnding || shortageQuotaPlan.isForceEndingByNoFuturePlan();
         // S4.4 在正式生成换活字块结果前执行同一前置未排规则，避免提前消费本应进入未排的SKU。
@@ -1579,9 +1721,32 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                 ? buildWholeSingleControlTypeBlockPairResult(
                 context, result, pairMachine, sku, machineMouldQty, shifts)
                 : null;
+        int precisionPlannedQty = wholeSingleControlUnit
+                ? ShiftFieldUtil.resolveScheduledQty(result) + ShiftFieldUtil.resolveScheduledQty(pairResult)
+                : ShiftFieldUtil.resolveScheduledQty(result);
+        Date precisionCompletionTime = actualCompletionTime;
+        if (Objects.nonNull(pairResult) && Objects.nonNull(pairResult.getSpecEndTime())
+                && pairResult.getSpecEndTime().after(precisionCompletionTime)) {
+            precisionCompletionTime = pairResult.getSpecEndTime();
+        }
+        String precisionRejectReason = getMaintenanceScheduleService()
+                .resolvePrecisionCandidateRejectReason(
+                        context, machine, sku, precisionPendingQty, precisionPlannedQty,
+                        switchStartTime, startTime, precisionCompletionTime);
+        if (StringUtils.isNotEmpty(precisionRejectReason)) {
+            recordTypeBlockAppendFailure(failureReason, precisionRejectReason);
+            rollbackTypeBlockFirstInspectionSequence(
+                    context, machine, sku, switchStartTime, startTime, shifts);
+            sku.setTargetScheduleQty(originalTargetScheduleQty);
+            sku.setRemainingScheduleQty(originalRemainingScheduleQty);
+            sku.setStrictTargetQty(originalStrictTargetQty);
+            return false;
+        }
 
         // 换活字块结果按日计划账本回裁，收尾严格截断，避免超产。
         // 非收尾正规/量试可保留满班补齐口径，剩余缺口继续留给 S4.5。
+        DailyQuotaLedgerBaseline precisionQuotaBaseline =
+                DailyQuotaLedgerBaseline.capture(context, sku);
         int quotaTrimmedQty = wholeSingleControlUnit
                 ? applyWholeSingleControlTypeBlockToDailyQuota(context, sku, result, pairResult, shifts)
                 : applyTypeBlockToDailyQuota(context, sku, result, shifts);
@@ -1595,9 +1760,56 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
             sku.setStrictTargetQty(originalStrictTargetQty);
             return false;
         }
+        int finalPrecisionPlannedQty = wholeSingleControlUnit
+                ? ShiftFieldUtil.resolveScheduledQty(result) + ShiftFieldUtil.resolveScheduledQty(pairResult)
+                : ShiftFieldUtil.resolveScheduledQty(result);
+        Date finalPrecisionCompletionTime = result.getSpecEndTime();
+        if (Objects.nonNull(pairResult) && Objects.nonNull(pairResult.getSpecEndTime())
+                && (Objects.isNull(finalPrecisionCompletionTime)
+                || pairResult.getSpecEndTime().after(finalPrecisionCompletionTime))) {
+            finalPrecisionCompletionTime = pairResult.getSpecEndTime();
+        }
+        String finalPrecisionRejectReason = getMaintenanceScheduleService()
+                .resolvePrecisionCandidateRejectReason(
+                        context, machine, sku, precisionPendingQty, finalPrecisionPlannedQty,
+                        switchStartTime, startTime, finalPrecisionCompletionTime);
+        if (StringUtils.isNotEmpty(finalPrecisionRejectReason)) {
+            // dayN回裁可能把原本完整的候选缩成部分数量，必须按扣账前快照恢复，
+            // 禁止以“少排一点”的方式占用精度前空闲时间。
+            precisionQuotaBaseline.restore(context, sku);
+            recordTypeBlockAppendFailure(failureReason, finalPrecisionRejectReason);
+            rollbackTypeBlockFirstInspectionSequence(
+                    context, machine, sku, switchStartTime, startTime, shifts);
+            sku.setTargetScheduleQty(originalTargetScheduleQty);
+            sku.setRemainingScheduleQty(originalRemainingScheduleQty);
+            sku.setStrictTargetQty(originalStrictTargetQty);
+            return false;
+        }
 
         context.getScheduleResultList().add(result);
         context.getScheduleResultSourceSkuMap().put(result, sku);
+        if (getMaintenanceScheduleService().shouldMarkPrecisionPreInsert(
+                machine, switchStartTime)) {
+            getMaintenanceScheduleService().markPrecisionPreInsertScheduled(
+                    context, machine, result);
+            Date precisionSwitchCompleteTime = resolveTypeBlockSwitchCompleteTime(
+                    context, machine, switchStartTime, startTime);
+            Date precisionInspectionBaseTime = resolveTypeBlockFirstInspectionBaseTime(
+                    context, machine, machine.getEstimatedEndTime(),
+                    switchStartTime, precisionSwitchCompleteTime);
+            LhShiftConfigVO precisionInspectionShift =
+                    FirstInspectionQtyUtil.resolveFirstInspectionAttributionShift(
+                            context, sku, shifts, precisionInspectionBaseTime,
+                            ScheduleTypeEnum.TYPE_BLOCK.getCode());
+            if (Objects.nonNull(precisionInspectionShift)) {
+                // 换活字块只消费班次首检顺序，不消费新增规格早/中班首检均衡额度。
+                context.getPrecisionPreInsertInspectionShiftIndexMap().put(
+                        result, precisionInspectionShift.getShiftIndex());
+            }
+            if (Objects.nonNull(pairResult)) {
+                context.getPrecisionPreInsertResultSet().add(pairResult);
+            }
+        }
         Date switchCompleteTime = resolveTypeBlockSwitchCompleteTime(
                 context, machine, switchStartTime, startTime);
         if (ShiftCapacityResolverUtil.isPlannedRepairAffectingSwitch(

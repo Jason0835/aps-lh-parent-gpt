@@ -2,11 +2,13 @@ package com.zlt.aps.lh.handler;
 
 import com.zlt.aps.lh.api.enums.ScheduleStepEnum;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
+import com.zlt.aps.lh.component.StructureMinMachineRetentionService;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.factory.ScheduleStrategyFactory;
 import com.zlt.aps.lh.engine.strategy.IProductionStrategy;
 import com.zlt.aps.lh.engine.strategy.ISkuPriorityStrategy;
 import com.zlt.aps.lh.engine.strategy.ITypeBlockProductionStrategy;
+import com.zlt.aps.lh.service.impl.LhMaintenanceScheduleService;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -36,6 +38,10 @@ public class ContinuousProductionHandler extends AbsScheduleStepHandler {
     private ScheduleStrategyFactory strategyFactory;
     @Resource
     private ITypeBlockProductionStrategy typeBlockProductionStrategy;
+    @Resource
+    private StructureMinMachineRetentionService structureMinMachineRetentionService;
+    @Resource
+    private LhMaintenanceScheduleService maintenanceScheduleService;
 
     @Override
     protected void doHandle(LhScheduleContext context) {
@@ -47,6 +53,12 @@ public class ContinuousProductionHandler extends AbsScheduleStepHandler {
         priorityStrategy.sortByPriority(context);
         log.debug("续作排产优先级排序完成, 续作SKU: {}, 新增SKU: {}",
                 context.getContinuousSkuList().size(), context.getNewSpecSkuList().size());
+
+        /*
+         * S4.4开始前按到期天数、计划日期和物理机台编码统一预留精度窗口。
+         * 必须先于逐SKU续作排产执行，避免普通SKU遍历顺序抢占3天内精度计划的每日名额。
+         */
+        maintenanceScheduleService.prepareMaintenancePlanWindows(context);
 
         IProductionStrategy strategy = strategyFactory.getProductionStrategy(
                 ScheduleTypeEnum.CONTINUOUS.getCode());
@@ -77,7 +89,14 @@ public class ContinuousProductionHandler extends AbsScheduleStepHandler {
         log.info("换活字块衔接排产完成, 排程结果数: {}, 待新增SKU: {}",
                 context.getScheduleResultList().size(), context.getNewSpecSkuList().size());
 
-        // S4.4.6 续作后全量启用机台排序日志：排除续作排满机台、保留续作收尾机台，不依赖具体SKU。
+        /*
+         * S4.4.6 结构停产保机阶段判断：
+         * 必须等续作、降模和换活字块结果全部稳定后执行，并且必须早于S4.5新增SKU选机。
+         * 判断只使用当前结构最晚正量班次及该班次真实在机关系，不再在逐台下机时实时决策。
+         */
+        structureMinMachineRetentionService.applyRetentionAfterContinuousAndTypeBlock(context);
+
+        // S4.4.7 续作后全量启用机台排序日志：排序逻辑不变，只展示阶段判断后的真实机台状态。
         strategyFactory.getMachineMatchStrategy().traceEnabledMachineSort(context);
     }
 

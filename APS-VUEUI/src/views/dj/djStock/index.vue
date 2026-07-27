@@ -121,12 +121,18 @@ export default {
           minWidth: 100,
           // sortable: "custom",
         },
-
+        {
+          prop: "materialName",
+          align: "center",
+          halign: "center",
+          label: this.$t("ui.data.column.dj.scheduleResult.paddingName"),
+          // sortable: "custom",
+        },
         {
           prop: "materialCode",
           align: "center",
           halign: "center",
-          label: this.$t("ui.data.column.quota.paddingCode"),
+          label: this.$t("ui.data.column.dj.scheduleResult.paddingCode"),
           // sortable: "custom",
         },
         {
@@ -209,8 +215,8 @@ export default {
           valueFormat: "yyyy-MM-dd",
         },
         {
-          label: this.$t("ui.data.column.quota.paddingCode"),
-          prop: "materialCode",
+          label: this.$t("ui.data.column.dj.scheduleResult.paddingCode"),
+          prop: "materialName",
         },
       ];
     },

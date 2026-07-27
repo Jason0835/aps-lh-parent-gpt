@@ -28,8 +28,12 @@ public class Cd15CandidateMachineTrialInput {
     private boolean singleSpecSplit;
     /** 最小起排量。 */
     private BigDecimal minimumStartQuantity;
-    /** 各班计划量均分阈值，按加损耗前的净需求量判断是否触发均分。 */
+    /** 各班计划量均分阈值，按均分前完整计划量判断是否触发均分。 */
     private BigDecimal equalShareThreshold;
+    /** 是否为均分后转入下一班的剩余计划量。 */
+    private boolean equalShareAlreadyApplied;
+    /** 扣除当前班同钢带已排量后的剩余可排额度。 */
+    private BigDecimal remainingSpecShiftQuantity;
     /** 单车按胎体长度方向卷取后，对应的斜裁排程米数。 */
     private BigDecimal vehiclePlanQuantity;
     /** 斜裁宽度，单位毫米。 */

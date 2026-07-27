@@ -8,30 +8,29 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.common.engine.quantity.PlanQuantityAllocationItem;
+import com.zlt.aps.common.engine.quantity.PlanQuantityAllocationUtils;
 import com.zlt.aps.common.engine.schedule.ScheduleTaskLinkedList;
 import com.zlt.aps.common.engine.schedule.ScheduleTaskNode;
 import com.zlt.aps.tc.api.constant.TcScheduleConstants;
+import com.zlt.aps.tc.api.domain.entity.TcScheduleExplainTargetRel;
 import com.zlt.aps.tc.api.domain.entity.TcScheduleResult;
 import com.zlt.aps.tc.api.domain.entity.TcScheduleResultExplain;
 import com.zlt.aps.tc.api.domain.entity.TcScheduleUnplanned;
 import com.zlt.aps.tc.api.domain.vo.TcAutoScheduleResponseVo;
 import com.zlt.aps.tc.api.enums.TcAutoScheduleTaskStatusEnum;
 import com.zlt.aps.tc.api.enums.TcMachineAssignStatusEnum;
+import com.zlt.aps.tc.api.enums.TcScheduleRuleCodeEnum;
 import com.zlt.aps.tc.domain.TcAutoScheduleTask;
-import com.zlt.aps.tc.engine.domain.TcPersistResult;
-import com.zlt.aps.tc.engine.domain.TcScheduleContext;
-import com.zlt.aps.tc.engine.domain.TcSnapshotBuildResult;
-import com.zlt.aps.tc.engine.domain.TcTaskDraft;
+import com.zlt.aps.tc.engine.domain.*;
 import com.zlt.aps.tc.engine.service.ITcSnapshotAndPersistService;
 import com.zlt.aps.tc.engine.service.impl.TcPersistService;
 import com.zlt.aps.tc.engine.service.impl.TcScheduleQualitySummaryService;
 import com.zlt.aps.tc.engine.service.impl.TcSnapshotBuildService;
-import com.zlt.aps.tc.mapper.TcAutoScheduleTaskMapper;
-import com.zlt.aps.tc.mapper.TcScheduleResultExplainMapper;
-import com.zlt.aps.tc.mapper.TcScheduleResultMapper;
-import com.zlt.aps.tc.mapper.TcScheduleUnplannedMapper;
+import com.zlt.aps.tc.mapper.*;
 import com.zlt.core.dao.basedao.BaseDao;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -63,6 +62,8 @@ public class TcBizSnapshotAndPersistService implements ITcSnapshotAndPersistServ
 
     private final TcScheduleUnplannedMapper scheduleUnplannedMapper;
 
+    private final TcScheduleExplainTargetRelMapper scheduleExplainTargetRelMapper;
+
     private final TcAutoScheduleTaskMapper autoScheduleTaskMapper;
 
     /** 排程质量指标统一汇总服务。 */
@@ -82,8 +83,45 @@ public class TcBizSnapshotAndPersistService implements ITcSnapshotAndPersistServ
      * @param scheduleResultMapper        胎侧排程结果 Mapper
      * @param scheduleResultExplainMapper 胎侧排程解释 Mapper
      * @param scheduleUnplannedMapper     胎侧未排任务 Mapper
+     * @param scheduleExplainTargetRelMapper 胎侧来源解释目标关联 Mapper
      * @param baseDao                     通用批量写入服务
      * @param transactionManager          事务管理器
+     */
+    @Autowired
+    public TcBizSnapshotAndPersistService(TcSnapshotBuildService snapshotBuildService,
+                                          TcPersistService persistService,
+                                          TcScheduleResultMapper scheduleResultMapper,
+                                          TcScheduleResultExplainMapper scheduleResultExplainMapper,
+                                          TcScheduleUnplannedMapper scheduleUnplannedMapper,
+                                          TcScheduleExplainTargetRelMapper scheduleExplainTargetRelMapper,
+                                          TcAutoScheduleTaskMapper autoScheduleTaskMapper,
+                                          TcScheduleQualitySummaryService qualitySummaryService,
+                                          BaseDao baseDao,
+                                          PlatformTransactionManager transactionManager) {
+        this.snapshotBuildService = snapshotBuildService;
+        this.persistService = persistService;
+        this.scheduleResultMapper = scheduleResultMapper;
+        this.scheduleResultExplainMapper = scheduleResultExplainMapper;
+        this.scheduleUnplannedMapper = scheduleUnplannedMapper;
+        this.scheduleExplainTargetRelMapper = scheduleExplainTargetRelMapper;
+        this.autoScheduleTaskMapper = autoScheduleTaskMapper;
+        this.qualitySummaryService = qualitySummaryService;
+        this.baseDao = baseDao;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
+    }
+
+    /**
+     * 创建兼容旧测试装配的胎侧快照和落库服务。
+     *
+     * @param snapshotBuildService 解释快照构建服务
+     * @param persistService 落库实体转换服务
+     * @param scheduleResultMapper 胎侧排程结果 Mapper
+     * @param scheduleResultExplainMapper 胎侧排程解释 Mapper
+     * @param scheduleUnplannedMapper 胎侧未排任务 Mapper
+     * @param autoScheduleTaskMapper 异步任务 Mapper
+     * @param qualitySummaryService 质量摘要服务
+     * @param baseDao 通用批量写入服务
+     * @param transactionManager 事务管理器
      */
     public TcBizSnapshotAndPersistService(TcSnapshotBuildService snapshotBuildService,
                                           TcPersistService persistService,
@@ -94,15 +132,9 @@ public class TcBizSnapshotAndPersistService implements ITcSnapshotAndPersistServ
                                           TcScheduleQualitySummaryService qualitySummaryService,
                                           BaseDao baseDao,
                                           PlatformTransactionManager transactionManager) {
-        this.snapshotBuildService = snapshotBuildService;
-        this.persistService = persistService;
-        this.scheduleResultMapper = scheduleResultMapper;
-        this.scheduleResultExplainMapper = scheduleResultExplainMapper;
-        this.scheduleUnplannedMapper = scheduleUnplannedMapper;
-        this.autoScheduleTaskMapper = autoScheduleTaskMapper;
-        this.qualitySummaryService = qualitySummaryService;
-        this.baseDao = baseDao;
-        this.transactionTemplate = new TransactionTemplate(transactionManager);
+        this(snapshotBuildService, persistService, scheduleResultMapper, scheduleResultExplainMapper,
+                scheduleUnplannedMapper, null, autoScheduleTaskMapper, qualitySummaryService,
+                baseDao, transactionManager);
     }
 
     /**
@@ -115,6 +147,7 @@ public class TcBizSnapshotAndPersistService implements ITcSnapshotAndPersistServ
         if (context == null) {
             throw new IllegalArgumentException(I18nUtil.getMessage("ui.tc.schedule.contextEmpty"));
         }
+        this.prepareSourceTaskAllocations(context);
         // 解释快照在事务外完成；最终事务只承担旧批次删除与新批次写入。
         this.buildSnapshot(context);
         TcPersistResult persistResult = transactionTemplate.execute(transactionStatus -> {
@@ -196,10 +229,11 @@ public class TcBizSnapshotAndPersistService implements ITcSnapshotAndPersistServ
      * @param context 胎侧排程上下文
      */
     private void buildSnapshot(TcScheduleContext context) {
-        if (CollUtil.isEmpty(context.getTaskDraftList())) {
+        List<TcTaskDraft> explainTaskList = this.resolveExplainTaskList(context);
+        if (CollUtil.isEmpty(explainTaskList)) {
             return;
         }
-        for (TcTaskDraft task : context.getTaskDraftList()) {
+        for (TcTaskDraft task : explainTaskList) {
             TcSnapshotBuildResult snapshot = snapshotBuildService.buildTaskExplain(task, context);
             context.getSnapshotMap().put(task.getBusinessKey(), snapshot);
         }
@@ -220,6 +254,7 @@ public class TcBizSnapshotAndPersistService implements ITcSnapshotAndPersistServ
         List<TcTaskDraft> unplannedTaskList = new ArrayList<>();
         Map<TcScheduleResult, List<String>> resultBusinessKeyMap = new IdentityHashMap<>();
         Map<String, Long> resultIdMap = new HashMap<>();
+        Map<String, Long> unplannedIdMap = new HashMap<>();
         for (TcTaskDraft taskDraft : context.getTaskDraftList()) {
             if (isUnplannedTask(taskDraft)) {
                 unplannedTaskList.add(taskDraft);
@@ -250,14 +285,22 @@ public class TcBizSnapshotAndPersistService implements ITcSnapshotAndPersistServ
             List<TcScheduleUnplanned> unplannedList = new ArrayList<>(unplannedMap.values());
             this.batchSaveWithFallback(unplannedList, transactionStatus,
                     TcMachineAssignStatusEnum.UNPLANNED.getCode(), this::buildUnplannedErrorMsg);
+            for (TcTaskDraft unplannedTask : unplannedTaskList) {
+                TcScheduleUnplanned unplanned = unplannedMap.get(this.buildUnplannedMergeKey(
+                        this.buildScheduleUnplanned(unplannedTask,
+                                context.getSnapshotMap().get(unplannedTask.getBusinessKey()), context)));
+                if (unplanned != null && unplanned.getId() != null) {
+                    unplannedIdMap.put(unplannedTask.getBusinessKey(), unplanned.getId());
+                }
+            }
             persistResult.setUnplannedCount(unplannedList.size());
         }
         // 解释表落库统一批量写入，任何单行失败都会回滚整个最终事务。
         List<TcScheduleResultExplain> explainList = new ArrayList<>();
-        for (TcTaskDraft taskDraft : context.getTaskDraftList()) {
+        for (TcTaskDraft taskDraft : this.resolveExplainTaskList(context)) {
             TcSnapshotBuildResult snapshot = context.getSnapshotMap().get(taskDraft.getBusinessKey());
             TcScheduleResultExplain explain = persistService.convertExplain(taskDraft, snapshot, context);
-            Long resultId = resolveOptionalResultId(taskDraft, resultIdMap);
+            Long resultId = this.resolveSourceSingleResultId(taskDraft, context, resultIdMap);
             if (resultId != null) {
                 explain.setResultId(resultId);
             }
@@ -268,7 +311,194 @@ public class TcBizSnapshotAndPersistService implements ITcSnapshotAndPersistServ
                     (explain, exception) -> this.buildExplainErrorMsg(null, exception));
             persistResult.setExplainCount(explainList.size());
         }
+        List<TcScheduleExplainTargetRel> targetRelList = this.buildExplainTargetRelList(
+                context, explainList, resultIdMap, unplannedIdMap);
+        if (CollUtil.isNotEmpty(targetRelList) && scheduleExplainTargetRelMapper != null) {
+            this.batchSaveWithFallback(targetRelList, transactionStatus, "EXPLAIN_TARGET_REL",
+                    (relation, exception) -> MessageFormat.format(
+                            I18nUtil.getMessage("ui.tc.schedule.explainTargetPersistFailed"),
+                            relation.getSourceTaskBusinessKey(), exception.getMessage()));
+        }
         return persistResult;
+    }
+
+    /**
+     * 解析解释落库任务列表。
+     *
+     * @param context 排程上下文
+     * @return 已生成汇总组时返回原始来源任务，否则兼容返回生产任务
+     */
+    private List<TcTaskDraft> resolveExplainTaskList(TcScheduleContext context) {
+        return CollUtil.isNotEmpty(context.getSourceTaskDraftList())
+                ? context.getSourceTaskDraftList() : context.getTaskDraftList();
+    }
+
+    /**
+     * 按机台分配后的实际结果片段重新汇总并分摊来源最终计划量。
+     *
+     * @param context 排程上下文
+     */
+    private void prepareSourceTaskAllocations(TcScheduleContext context) {
+        if (context == null || CollUtil.isEmpty(context.getPlanTaskGroupMap())) {
+            return;
+        }
+        Map<String, List<TcTaskDraft>> fragmentMap = context.getTaskDraftList().stream()
+                .filter(Objects::nonNull)
+                .filter(task -> StrUtil.isNotBlank(task.getPlanGroupKey()))
+                .collect(java.util.stream.Collectors.groupingBy(TcTaskDraft::getPlanGroupKey,
+                        LinkedHashMap::new, java.util.stream.Collectors.toList()));
+        for (TcPlanTaskGroup taskGroup : context.getPlanTaskGroupMap().values()) {
+            List<TcTaskDraft> fragmentList = fragmentMap.getOrDefault(
+                    taskGroup.getPlanGroupKey(), Collections.emptyList());
+            Map<String, BigDecimal> sourceFinalQtyMap = taskGroup.getSourceTaskList().stream()
+                    .collect(java.util.stream.Collectors.toMap(TcTaskDraft::getBusinessKey,
+                            task -> BigDecimal.ZERO, BigDecimal::add, LinkedHashMap::new));
+            for (TcTaskDraft fragment : fragmentList) {
+                Map<String, BigDecimal> fragmentAllocationMap = this.allocateByWeight(
+                        fragment.getPlanQty(), taskGroup.getSourceWeightMap());
+                fragmentAllocationMap.forEach((sourceBusinessKey, allocatedQty) ->
+                        sourceFinalQtyMap.merge(sourceBusinessKey, allocatedQty, BigDecimal::add));
+            }
+            BigDecimal groupFinalPlanQty = fragmentList.stream().map(TcTaskDraft::getPlanQty)
+                    .filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
+            taskGroup.setGroupFinalPlanQty(groupFinalPlanQty);
+            List<TcTaskDraft> assignedFragmentList = fragmentList.stream()
+                    .filter(task -> !this.isUnplannedTask(task) && this.isPositiveQty(task.getPlanQty()))
+                    .collect(java.util.stream.Collectors.toList());
+            boolean allUnplanned = CollUtil.isNotEmpty(fragmentList)
+                    && assignedFragmentList.isEmpty() && groupFinalPlanQty.compareTo(BigDecimal.ZERO) > 0;
+            for (TcTaskDraft sourceTask : taskGroup.getSourceTaskList()) {
+                sourceTask.setPlanQty(sourceFinalQtyMap.getOrDefault(sourceTask.getBusinessKey(), BigDecimal.ZERO));
+                sourceTask.setGroupFinalPlanQty(groupFinalPlanQty);
+                if (context.getRuleTraceMap().get(sourceTask.getBusinessKey()) != null) {
+                    context.getRuleTraceMap().get(sourceTask.getBusinessKey()).getRuleHits().stream()
+                            .filter(item -> TcScheduleRuleCodeEnum.PLAN_QTY_SOURCE_ALLOCATE.getCode()
+                                    .equals(item.getRuleCode()))
+                            .filter(item -> item.getEvidence() instanceof Map)
+                            .forEach(item -> {
+                                Map<String, Object> evidence = (Map<String, Object>) item.getEvidence();
+                                evidence.put("allocatedPlanQty", sourceTask.getPlanQty());
+                                evidence.put("allocationStage", "SNAPSHOT");
+                            });
+                }
+                sourceTask.setMachineCode(assignedFragmentList.isEmpty()
+                        ? null : assignedFragmentList.get(0).getMachineCode());
+                if (allUnplanned) {
+                    TcTaskDraft unplannedFragment = fragmentList.get(0);
+                    sourceTask.setUnplannedReasonCode(unplannedFragment.getUnplannedReasonCode());
+                    sourceTask.setUnplannedReasonDesc(unplannedFragment.getUnplannedReasonDesc());
+                } else {
+                    sourceTask.setUnplannedReasonCode(null);
+                    sourceTask.setUnplannedReasonDesc(null);
+                }
+            }
+        }
+    }
+
+    /**
+     * 单一已排结果兼容回填旧 RESULT_ID。
+     *
+     * @param sourceTask 来源解释任务
+     * @param context 排程上下文
+     * @param resultIdMap 任务业务键与结果主键映射
+     * @return 仅关联一个结果且没有未排片段时返回结果主键，否则返回空
+     */
+    private Long resolveSourceSingleResultId(TcTaskDraft sourceTask, TcScheduleContext context,
+                                             Map<String, Long> resultIdMap) {
+        List<TcTaskDraft> groupFragmentList = context.getTaskDraftList().stream()
+                .filter(task -> Objects.equals(sourceTask.getPlanGroupKey(), task.getPlanGroupKey()))
+                .filter(task -> this.isPositiveQty(task.getPlanQty()))
+                .collect(java.util.stream.Collectors.toList());
+        if (groupFragmentList.stream().anyMatch(this::isUnplannedTask)) {
+            return null;
+        }
+        Set<Long> resultIdSet = groupFragmentList.stream()
+                .map(task -> resultIdMap.get(task.getBusinessKey()))
+                .filter(Objects::nonNull)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+        return resultIdSet.size() == 1 ? resultIdSet.iterator().next() : null;
+    }
+
+    /**
+     * 构建来源解释与结果或未排片段关联记录。
+     *
+     * @param context 排程上下文
+     * @param explainList 已保存解释列表
+     * @param resultIdMap 任务业务键与结果主键映射
+     * @param unplannedIdMap 任务业务键与未排主键映射
+     * @return 关联记录列表
+     */
+    private List<TcScheduleExplainTargetRel> buildExplainTargetRelList(
+            TcScheduleContext context, List<TcScheduleResultExplain> explainList,
+            Map<String, Long> resultIdMap, Map<String, Long> unplannedIdMap) {
+        Map<String, TcScheduleResultExplain> explainMap = explainList.stream()
+                .collect(java.util.stream.Collectors.toMap(TcScheduleResultExplain::getTaskBusinessKey,
+                        explain -> explain, (first, second) -> first, LinkedHashMap::new));
+        List<TcScheduleExplainTargetRel> relationList = new ArrayList<>();
+        for (TcPlanTaskGroup taskGroup : context.getPlanTaskGroupMap().values()) {
+            List<TcTaskDraft> fragmentList = context.getTaskDraftList().stream()
+                    .filter(task -> Objects.equals(taskGroup.getPlanGroupKey(), task.getPlanGroupKey()))
+                    .filter(task -> this.isPositiveQty(task.getPlanQty()))
+                    .collect(java.util.stream.Collectors.toList());
+            for (TcTaskDraft fragment : fragmentList) {
+                Map<String, BigDecimal> allocationMap = this.allocateByWeight(
+                        fragment.getPlanQty(), taskGroup.getSourceWeightMap());
+                for (Map.Entry<String, BigDecimal> allocationEntry : allocationMap.entrySet()) {
+                    if (!this.isPositiveQty(allocationEntry.getValue())) {
+                        continue;
+                    }
+                    TcScheduleResultExplain explain = explainMap.get(allocationEntry.getKey());
+                    if (explain == null) {
+                        continue;
+                    }
+                    boolean unplanned = this.isUnplannedTask(fragment);
+                    TcScheduleExplainTargetRel relation = new TcScheduleExplainTargetRel();
+                    relation.setFactoryCode(context.getFactoryCode());
+                    relation.setBatchNo(context.getBatchNo());
+                    relation.setScheduleDate(context.getScheduleDate());
+                    relation.setExplainId(explain.getId());
+                    relation.setPlanGroupKey(taskGroup.getPlanGroupKey());
+                    relation.setSourceTaskBusinessKey(allocationEntry.getKey());
+                    relation.setTargetType(unplanned ? "UNPLANNED" : "RESULT");
+                    Long targetId = unplanned
+                            ? unplannedIdMap.get(fragment.getBusinessKey())
+                            : resultIdMap.get(fragment.getBusinessKey());
+                    if (targetId == null) {
+                        throw new ServiceException(MessageFormat.format(
+                                I18nUtil.getMessage("ui.tc.schedule.explainTargetMissing"),
+                                fragment.getBusinessKey()));
+                    }
+                    relation.setTargetId(targetId);
+                    relation.setTargetBusinessKey(fragment.getBusinessKey());
+                    relation.setShiftOrder(fragment.getShiftOrder());
+                    relation.setMachineCode(fragment.getMachineCode());
+                    relation.setAllocatedQty(allocationEntry.getValue());
+                    relationList.add(relation);
+                }
+            }
+        }
+        return relationList;
+    }
+
+    /**
+     * 按来源权重分摊指定数量。
+     *
+     * @param totalQty 汇总数量
+     * @param sourceWeightMap 来源权重
+     * @return 来源业务键与分摊数量
+     */
+    private Map<String, BigDecimal> allocateByWeight(BigDecimal totalQty,
+                                                      Map<String, BigDecimal> sourceWeightMap) {
+        List<PlanQuantityAllocationItem> allocationItemList = sourceWeightMap.entrySet().stream()
+                .map(entry -> new PlanQuantityAllocationItem(
+                        entry.getKey(), entry.getValue(), BigDecimal.ZERO))
+                .collect(java.util.stream.Collectors.toList());
+        return PlanQuantityAllocationUtils.allocate(
+                        totalQty, allocationItemList, TcScheduleConstants.DECIMAL_CALCULATION_SCALE).stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        PlanQuantityAllocationItem::getSourceBusinessKey,
+                        PlanQuantityAllocationItem::getAllocatedQty,
+                        BigDecimal::add, LinkedHashMap::new));
     }
 
     /**
@@ -295,6 +525,12 @@ public class TcBizSnapshotAndPersistService implements ITcSnapshotAndPersistServ
         if (CollUtil.isNotEmpty(oldBatchNoSet)) {
             scheduleResultExplainMapper.logicDeleteByFactoryCodeAndBatchNos(context.getFactoryCode(),
                     new ArrayList<>(oldBatchNoSet));
+        }
+        LambdaQueryWrapper<TcScheduleExplainTargetRel> relationWrapper = new LambdaQueryWrapper<>();
+        relationWrapper.eq(TcScheduleExplainTargetRel::getFactoryCode, context.getFactoryCode());
+        relationWrapper.eq(TcScheduleExplainTargetRel::getScheduleDate, context.getScheduleDate());
+        if (scheduleExplainTargetRelMapper != null) {
+            scheduleExplainTargetRelMapper.delete(relationWrapper);
         }
         scheduleResultExplainMapper.logicDeleteByFactoryCodeAndScheduleDate(context.getFactoryCode(), context.getScheduleDate());
         scheduleUnplannedMapper.logicDeleteByFactoryCodeAndScheduleDate(context.getFactoryCode(), context.getScheduleDate());
@@ -470,6 +706,8 @@ public class TcBizSnapshotAndPersistService implements ITcSnapshotAndPersistServ
         unplanned.setBatchNo(context == null ? null : context.getBatchNo());
         unplanned.setScheduleDate(context == null ? null : context.getScheduleDate());
         if (taskDraft != null) {
+            // 保留未排任务稳定业务键，确保未排表可以与解释表关联追踪。
+            unplanned.setTaskBusinessKey(taskDraft.getBusinessKey());
             unplanned.setSidewallCode(taskDraft.getSidewallCode());
             unplanned.setGlueCode(taskDraft.getGlueCode());
             unplanned.setMouthPlateCode(taskDraft.getMouthPlateCode());

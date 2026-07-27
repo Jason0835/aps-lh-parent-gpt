@@ -8,6 +8,7 @@ import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 /**
  * 胎面排程结果解释表实体类。
@@ -61,6 +62,51 @@ public class TmScheduleResultExplain extends BaseEntity {
     @ApiModelProperty(value = "班次顺序", name = "shiftOrder")
     @TableField(value = "SHIFT_ORDER")
     private Integer shiftOrder;
+
+    /** 同胎面同班次计划量汇总组业务键 */
+    @ApiModelProperty(value = "计划量汇总组业务键", name = "planGroupKey")
+    @TableField(value = "PLAN_GROUP_KEY")
+    private String planGroupKey;
+
+    /** 汇总组来源任务数量 */
+    @ApiModelProperty(value = "汇总组来源任务数量", name = "groupSourceCount")
+    @TableField(value = "GROUP_SOURCE_COUNT")
+    private Integer groupSourceCount;
+
+    /** 当前来源参与汇总的需求量 */
+    @ApiModelProperty(value = "来源参与汇总需求量", name = "sourceRequiredQty")
+    @TableField(value = "SOURCE_REQUIRED_QTY")
+    private BigDecimal sourceRequiredQty;
+
+    /** 汇总组库存抵扣前需求量 */
+    @ApiModelProperty(value = "汇总组需求量", name = "groupRequiredQty")
+    @TableField(value = "GROUP_REQUIRED_QTY")
+    private BigDecimal groupRequiredQty;
+
+    /** 汇总组库存抵扣后基础需求量 */
+    @ApiModelProperty(value = "汇总组基础需求量", name = "groupBaseDemandQty")
+    @TableField(value = "GROUP_BASE_DEMAND_QTY")
+    private BigDecimal groupBaseDemandQty;
+
+    /** 汇总组最小起排调整量 */
+    @ApiModelProperty(value = "汇总组最小起排调整量", name = "groupMinStartAdjustQty")
+    @TableField(value = "GROUP_MIN_START_ADJUST_QTY")
+    private BigDecimal groupMinStartAdjustQty;
+
+    /** 汇总组收尾或卷曲取整调整量 */
+    @ApiModelProperty(value = "汇总组收尾或卷曲取整调整量", name = "groupRoundAdjustQty")
+    @TableField(value = "GROUP_ROUND_ADJUST_QTY")
+    private BigDecimal groupRoundAdjustQty;
+
+    /** 汇总组最终计划量 */
+    @ApiModelProperty(value = "汇总组最终计划量", name = "groupFinalPlanQty")
+    @TableField(value = "GROUP_FINAL_PLAN_QTY")
+    private BigDecimal groupFinalPlanQty;
+
+    /** 来源解释关联的已排或未排目标片段 */
+    @ApiModelProperty(value = "来源解释目标关联列表", name = "targetRelationList")
+    @TableField(exist = false)
+    private List<TmScheduleExplainTargetRel> targetRelationList;
 
     /** 基础需求量 */
     @ApiModelProperty(value = "基础需求量", name = "baseDemandQty")

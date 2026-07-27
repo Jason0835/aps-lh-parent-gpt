@@ -9,6 +9,8 @@
         <result column="EMBRYO_CODE" property="embryoCode"/>
         <result column="BOM_DATA_VERSION" property="bomDataVersion"/>
         <result column="LH_MACHINE_CODE" property="lhMachineCode"/>
+        <result column="CX_MACHINE_CODE" property="cxMachineCode"/>
+        <result column="MATERIAL_DESC" property="materialDesc"/>
         <result column="CLASS1_PLAN_QTY" property="class1PlanQty"/>
         <result column="CLASS2_PLAN_QTY" property="class2PlanQty"/>
         <result column="CLASS3_PLAN_QTY" property="class3PlanQty"/>
@@ -59,6 +61,8 @@
                cx.EMBRYO_CODE,
                cx.BOM_DATA_VERSION,
                cx.LH_MACHINE_CODE,
+               cx.CX_MACHINE_CODE,
+               cx.MATERIAL_DESC,
                cx.CLASS1_PLAN_QTY,
                cx.CLASS2_PLAN_QTY,
                cx.CLASS3_PLAN_QTY,
@@ -173,6 +177,8 @@
         <result column="ORDER_NO" property="orderNo"/>
         <result column="EMBRYO_CODE" property="embryoCode"/>
         <result column="LH_MACHINE_CODE" property="lhMachineCode"/>
+        <result column="CX_MACHINE_CODE" property="cxMachineCode"/>
+        <result column="MATERIAL_DESC" property="materialDesc"/>
         <result column="CLASS1_PLAN_QTY" property="class1PlanQty"/>
         <result column="CLASS2_PLAN_QTY" property="class2PlanQty"/>
         <result column="CLASS3_PLAN_QTY" property="class3PlanQty"/>
@@ -211,6 +217,8 @@
         SELECT cx.ORDER_NO,
                cx.EMBRYO_CODE,
                cx.LH_MACHINE_CODE,
+               cx.CX_MACHINE_CODE,
+               cx.MATERIAL_DESC,
                cx.CLASS1_PLAN_QTY,
                cx.CLASS2_PLAN_QTY,
                cx.CLASS3_PLAN_QTY,

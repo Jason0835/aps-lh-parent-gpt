@@ -22,6 +22,12 @@ public class TcFormingDemandRecipeRowVo {
     /** 硫化机编码，多个编码使用英文逗号分隔 */
     private String lhMachineCode;
 
+    /** 成型机台编码。 */
+    private String cxMachineCode;
+
+    /** 成型物料描述。 */
+    private String materialDesc;
+
     /** 1班成型计划量 */
     private BigDecimal class1PlanQty;
 

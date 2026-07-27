@@ -4,6 +4,9 @@ import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.StrUtil;
 import com.ruoyi.common.exception.ServiceException;
+import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.common.engine.quantity.PlanQuantityAllocationItem;
+import com.zlt.aps.common.engine.quantity.PlanQuantityAllocationUtils;
 import com.zlt.aps.tm.api.constant.TmScheduleConstants;
 import com.zlt.aps.tm.api.enums.TmScheduleErrorCodeEnum;
 import com.zlt.aps.tm.api.enums.TmScheduleRuleCodeEnum;
@@ -11,15 +14,20 @@ import com.zlt.aps.tm.api.enums.TmScheduleRuleResultEnum;
 import com.zlt.aps.tm.api.enums.TmScheduleStrategyEnum;
 import com.zlt.aps.tm.engine.domain.*;
 import com.zlt.aps.tm.engine.service.ITmPlanCalcService;
+import com.zlt.aps.tm.engine.service.ITmPlanTailDecisionService;
 import com.zlt.aps.tm.engine.strategy.ITmDemandQtyStrategy;
 import com.zlt.aps.tm.engine.strategy.ITmPlanQtyStrategy;
 import com.zlt.aps.tm.engine.strategy.TmStrategyRegistry;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.text.MessageFormat;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * 胎面需求量和计划量默认计算步骤服务。
@@ -35,13 +43,28 @@ public class TmPlanCalcService implements ITmPlanCalcService {
 
     private final TmStrategyRegistry strategyRegistry;
 
+    private final ITmPlanTailDecisionService planTailDecisionService;
+
     /**
      * 创建计划量计算服务。
      *
      * @param strategyRegistry 胎面策略注册表
      */
     public TmPlanCalcService(TmStrategyRegistry strategyRegistry) {
+        this(strategyRegistry, new TmLegacyPlanTailDecisionService());
+    }
+
+    /**
+     * 创建支持可替换收尾判定的计划量计算服务。
+     *
+     * @param strategyRegistry 胎面策略注册表
+     * @param planTailDecisionService 收尾判定服务
+     */
+    @Autowired
+    public TmPlanCalcService(TmStrategyRegistry strategyRegistry,
+                             ITmPlanTailDecisionService planTailDecisionService) {
         this.strategyRegistry = strategyRegistry;
+        this.planTailDecisionService = planTailDecisionService;
     }
 
     @Override
@@ -52,6 +75,9 @@ public class TmPlanCalcService implements ITmPlanCalcService {
         if (CollUtil.isEmpty(context.getTaskDraftList())) {
             return;
         }
+
+        // 在计划量计算前按胎面编码和班次生成唯一生产任务，原始来源任务保留在上下文中供解释落库。
+        this.aggregateTaskDrafts(context);
 
         // 获取库存预测结果
         Map<String, TmStockForecast> stockForecastMap = context.getStockForecastMap();
@@ -138,6 +164,7 @@ public class TmPlanCalcService implements ITmPlanCalcService {
                 applyPlanQtyResult(task, planQtyResult);
             }
             this.applyStartupThreshold(context, task);
+            this.applyPlanGroupResult(context, task);
             this.calculateLatestStartPriority(context, task);
             task.setToolUsedQty(BigDecimal.ZERO.setScale(TmScheduleConstants.DECIMAL_CALCULATION_SCALE,
                     RoundingMode.HALF_UP));
@@ -167,6 +194,290 @@ public class TmPlanCalcService implements ITmPlanCalcService {
                         task.getRemainingToolQty(), task.getPlanStockQty(), task.getPlanQty());
             }
         }
+    }
+
+    /**
+     * 按胎面编码和班次汇总原始成型来源任务。
+     *
+     * <p>预置计划量任务保持独立，避免改变实验规格等特殊规则；普通来源任务按同代码同班次汇总，
+     * 汇总生产任务进入后续排程，来源任务快照仅用于解释和数量分摊。</p>
+     *
+     * @param context 排程上下文
+     * @throws ServiceException 同组生产属性不一致时抛出
+     */
+    private void aggregateTaskDrafts(TmScheduleContext context) {
+        if (CollUtil.isNotEmpty(context.getPlanTaskGroupMap())
+                && CollUtil.isNotEmpty(context.getSourceTaskDraftList())) {
+            return;
+        }
+        List<TmTaskDraft> originalTaskList = new ArrayList<>(context.getTaskDraftList());
+        Map<String, List<TmTaskDraft>> groupedTaskMap = originalTaskList.stream()
+                .filter(Objects::nonNull)
+                .collect(Collectors.groupingBy(task -> this.buildPlanGroupKey(context, task),
+                        LinkedHashMap::new, Collectors.toList()));
+        List<TmTaskDraft> aggregateTaskList = new ArrayList<>();
+        List<TmTaskDraft> sourceTaskList = new ArrayList<>();
+        Map<String, TmPlanTaskGroup> planTaskGroupMap = new LinkedHashMap<>();
+        for (Map.Entry<String, List<TmTaskDraft>> entry : groupedTaskMap.entrySet()) {
+            String planGroupKey = entry.getKey();
+            List<TmTaskDraft> groupSourceList = entry.getValue();
+            this.validateGroupAttributes(planGroupKey, groupSourceList);
+            TmTaskDraft aggregateTask = groupSourceList.size() == 1
+                    ? groupSourceList.get(0) : new TmTaskDraft();
+            if (groupSourceList.size() > 1) {
+                BeanUtils.copyProperties(groupSourceList.get(0), aggregateTask);
+            }
+            this.planTailDecisionService.applyTailDecision(aggregateTask, groupSourceList);
+            List<TmTaskDraft> sourceSnapshotList = groupSourceList.stream()
+                    .map(sourceTask -> this.copySourceTask(sourceTask, planGroupKey))
+                    .collect(Collectors.toList());
+            BigDecimal currentShiftDemandQty = groupSourceList.stream()
+                    .map(TmTaskDraft::getCurrentShiftDemandQty).map(this::nvl)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal guardDemandQty = groupSourceList.stream()
+                    .map(TmTaskDraft::getGuardDemandQty).map(this::nvl)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            aggregateTask.setPlanGroupKey(planGroupKey);
+            aggregateTask.setSourceTaskBusinessKeyList(sourceSnapshotList.stream()
+                    .map(TmTaskDraft::getBusinessKey).collect(Collectors.toList()));
+            aggregateTask.setSourceExplainTask(Boolean.FALSE);
+            if (groupSourceList.size() > 1) {
+                aggregateTask.setBusinessKeySuffix("PLAN_GROUP_" + Integer.toHexString(planGroupKey.hashCode()));
+            }
+            aggregateTask.setSourceOrderNos(groupSourceList.stream()
+                    .map(TmTaskDraft::getSourceOrderNos)
+                    .filter(StrUtil::isNotBlank)
+                    .flatMap(value -> Arrays.stream(value.split(",")))
+                    .map(String::trim)
+                    .filter(StrUtil::isNotBlank)
+                    .distinct()
+                    .collect(Collectors.joining(",")));
+            aggregateTask.setCurrentShiftDemandQty(currentShiftDemandQty);
+            aggregateTask.setGuardDemandQty(guardDemandQty);
+            aggregateTask.setDemandQty(null);
+            if (groupSourceList.size() > 1) {
+                aggregateTask.setPlanQty(null);
+            }
+
+            TmPlanTaskGroup taskGroup = new TmPlanTaskGroup();
+            taskGroup.setPlanGroupKey(planGroupKey);
+            taskGroup.setAggregateTask(aggregateTask);
+            taskGroup.setSourceTaskList(sourceSnapshotList);
+            taskGroup.setGroupCurrentShiftDemandQty(currentShiftDemandQty);
+            taskGroup.setGroupGuardDemandQty(guardDemandQty);
+            planTaskGroupMap.put(planGroupKey, taskGroup);
+            aggregateTaskList.add(aggregateTask);
+            sourceTaskList.addAll(sourceSnapshotList);
+        }
+        context.setPlanTaskGroupMap(planTaskGroupMap);
+        context.setSourceTaskDraftList(sourceTaskList);
+        context.setTaskDraftList(aggregateTaskList);
+    }
+
+    /**
+     * 构建计划量汇总组业务键。
+     *
+     * @param context 排程上下文
+     * @param task    原始来源任务
+     * @return 工厂、日期、胎面编码和班次组成的稳定组键；预置计划量任务追加来源业务键保持独立
+     */
+    private String buildPlanGroupKey(TmScheduleContext context, TmTaskDraft task) {
+        String groupKey = StrUtil.blankToDefault(context.getFactoryCode(), "")
+                + "|" + formatScheduleDate(context)
+                + "|" + StrUtil.blankToDefault(task.getTreadCode(), "")
+                + "|" + String.valueOf(task.getShiftOrder());
+        if (task.getPlanQty() != null) {
+            return groupKey + "|PRESET|" + task.getBusinessKey();
+        }
+        return groupKey;
+    }
+
+    /**
+     * 复制原始来源任务作为解释快照。
+     *
+     * @param sourceTask  原始来源任务
+     * @param planGroupKey 汇总组业务键
+     * @return 不参与后续机台分配的来源任务快照
+     */
+    private TmTaskDraft copySourceTask(TmTaskDraft sourceTask, String planGroupKey) {
+        TmTaskDraft sourceSnapshot = new TmTaskDraft();
+        BeanUtils.copyProperties(sourceTask, sourceSnapshot);
+        sourceSnapshot.setPlanGroupKey(planGroupKey);
+        sourceSnapshot.setSourceExplainTask(Boolean.TRUE);
+        sourceSnapshot.setSourceTaskBusinessKeyList(null);
+        return sourceSnapshot;
+    }
+
+    /**
+     * 校验同胎面同班次生产属性一致。
+     *
+     * @param planGroupKey  汇总组业务键
+     * @param sourceTaskList 来源任务列表
+     * @throws ServiceException 胶料、口型、长度、卷长、最小起排或收尾属性不一致时抛出
+     */
+    private void validateGroupAttributes(String planGroupKey, List<TmTaskDraft> sourceTaskList) {
+        if (sourceTaskList.size() <= 1) {
+            return;
+        }
+        List<String> allSourceBusinessKeyList = sourceTaskList.stream()
+                .map(TmTaskDraft::getBusinessKey)
+                .collect(Collectors.toList());
+        if (new LinkedHashSet<>(allSourceBusinessKeyList).size() != allSourceBusinessKeyList.size()) {
+            throw new ServiceException(MessageFormat.format(
+                    I18nUtil.getMessage("ui.tm.schedule.planGroupAttributeConflict"),
+                    planGroupKey, String.join(",", allSourceBusinessKeyList)));
+        }
+        TmTaskDraft referenceTask = sourceTaskList.get(0);
+        List<String> conflictBusinessKeyList = sourceTaskList.stream()
+                .filter(task -> !Objects.equals(referenceTask.getGlueCode(), task.getGlueCode())
+                        || !Objects.equals(referenceTask.getBaseGlueCode(), task.getBaseGlueCode())
+                        || !Objects.equals(referenceTask.getMouthPlateCode(), task.getMouthPlateCode())
+                        || !this.quantityEquals(referenceTask.getTreadShoulderLength(), task.getTreadShoulderLength())
+                        || !this.quantityEquals(referenceTask.getCurlRollLength(), task.getCurlRollLength())
+                        || !this.quantityEquals(referenceTask.getDefaultCurlRollLength(), task.getDefaultCurlRollLength())
+                        || !this.quantityEquals(referenceTask.getMinStartQty(), task.getMinStartQty())
+                        || !Objects.equals(referenceTask.getTailFlag(), task.getTailFlag())
+                        || !this.quantityEquals(referenceTask.getTailBalanceQty(), task.getTailBalanceQty()))
+                .map(TmTaskDraft::getBusinessKey)
+                .collect(Collectors.toList());
+        if (CollUtil.isNotEmpty(conflictBusinessKeyList)) {
+            throw new ServiceException(MessageFormat.format(
+                    I18nUtil.getMessage("ui.tm.schedule.planGroupAttributeConflict"),
+                    planGroupKey, String.join(",", allSourceBusinessKeyList)));
+        }
+    }
+
+    /**
+     * 将组级计算结果分摊回原始来源任务。
+     *
+     * @param context 排程上下文
+     * @param aggregateTask 汇总生产任务
+     */
+    private void applyPlanGroupResult(TmScheduleContext context, TmTaskDraft aggregateTask) {
+        TmPlanTaskGroup taskGroup = context.getPlanTaskGroupMap().get(aggregateTask.getPlanGroupKey());
+        if (taskGroup == null || CollUtil.isEmpty(taskGroup.getSourceTaskList())) {
+            return;
+        }
+        boolean useCurrentShiftDemand = nvl(aggregateTask.getCurrentShiftDemandQty())
+                .compareTo(nvl(aggregateTask.getGuardDemandQty())) >= 0;
+        Map<String, BigDecimal> sourceWeightMap = taskGroup.getSourceTaskList().stream()
+                .collect(Collectors.toMap(TmTaskDraft::getBusinessKey,
+                        sourceTask -> useCurrentShiftDemand
+                                ? nvl(sourceTask.getCurrentShiftDemandQty())
+                                : nvl(sourceTask.getGuardDemandQty()),
+                        BigDecimal::add, LinkedHashMap::new));
+        taskGroup.setSourceWeightMap(sourceWeightMap);
+        taskGroup.setGroupBaseDemandQty(aggregateTask.getBaseDemandQty());
+        taskGroup.setGroupMinStartAdjustQty(aggregateTask.getMinStartAdjustQty());
+        taskGroup.setGroupRoundAdjustQty(aggregateTask.getTailRoundAdjustQty());
+        taskGroup.setGroupFinalPlanQty(aggregateTask.getPlanQty());
+        this.fillGroupFields(aggregateTask, taskGroup);
+
+        Map<String, BigDecimal> stockDeductAllocationMap = this.allocateByWeight(
+                aggregateTask.getStockDeductQty(), sourceWeightMap);
+        Map<String, BigDecimal> baseDemandAllocationMap = this.allocateByWeight(
+                aggregateTask.getBaseDemandQty(), sourceWeightMap);
+        Map<String, BigDecimal> minStartAllocationMap = this.allocateByWeight(
+                aggregateTask.getMinStartAdjustQty(), sourceWeightMap);
+        Map<String, BigDecimal> roundAllocationMap = this.allocateByWeight(
+                aggregateTask.getTailRoundAdjustQty(), sourceWeightMap);
+        Map<String, BigDecimal> finalPlanAllocationMap = this.allocateByWeight(
+                aggregateTask.getPlanQty(), sourceWeightMap);
+        Map<String, BigDecimal> planStockAllocationMap = this.allocateByWeight(
+                aggregateTask.getPlanStockQty(), sourceWeightMap);
+        for (TmTaskDraft sourceTask : taskGroup.getSourceTaskList()) {
+            String sourceBusinessKey = sourceTask.getBusinessKey();
+            sourceTask.setSourceRequiredQty(sourceWeightMap.get(sourceBusinessKey));
+            sourceTask.setStockDeductQty(stockDeductAllocationMap.get(sourceBusinessKey));
+            sourceTask.setBaseDemandQty(baseDemandAllocationMap.get(sourceBusinessKey));
+            sourceTask.setMinStartAdjustQty(minStartAllocationMap.get(sourceBusinessKey));
+            sourceTask.setTailRoundAdjustQty(roundAllocationMap.get(sourceBusinessKey));
+            sourceTask.setPlanQty(finalPlanAllocationMap.get(sourceBusinessKey));
+            sourceTask.setPlanStockQty(planStockAllocationMap.get(sourceBusinessKey));
+            sourceTask.setCalcFormulaDesc("同胎面同班次汇总后按来源需求分摊");
+            this.fillGroupFields(sourceTask, taskGroup);
+            Map<String, Object> sourceEvidence = this.buildPlanGroupEvidence(taskGroup);
+            sourceEvidence.put("sourceBusinessKey", sourceBusinessKey);
+            sourceEvidence.put("sourceWeight", sourceWeightMap.get(sourceBusinessKey));
+            sourceEvidence.put("allocatedPlanQty", sourceTask.getPlanQty());
+            traceOf(context, sourceTask).addRuleHit(TmScheduleRuleCodeEnum.PLAN_QTY_SOURCE_ALLOCATE,
+                    TmScheduleRuleResultEnum.PASS, sourceEvidence);
+        }
+        traceOf(context, aggregateTask).addRuleHit(TmScheduleRuleCodeEnum.PLAN_QTY_AGGREGATE,
+                TmScheduleRuleResultEnum.PASS, this.buildPlanGroupEvidence(taskGroup));
+        log.info("[TM_PLAN_QTY_AGGREGATE] batchNo={}, traceId={}, planGroupKey={}, sourceCount={}, currentShiftDemandQty={}, guardDemandQty={}, stockDeductQty={}, baseDemandQty={}, minStartAdjustQty={}, roundAdjustQty={}, finalPlanQty={}",
+                context.getBatchNo(), context.getTraceId(), taskGroup.getPlanGroupKey(),
+                taskGroup.getSourceTaskList().size(), taskGroup.getGroupCurrentShiftDemandQty(),
+                taskGroup.getGroupGuardDemandQty(), aggregateTask.getStockDeductQty(),
+                taskGroup.getGroupBaseDemandQty(), taskGroup.getGroupMinStartAdjustQty(),
+                taskGroup.getGroupRoundAdjustQty(), taskGroup.getGroupFinalPlanQty());
+    }
+
+    /**
+     * 填充任务的组级解释字段。
+     *
+     * @param task      待填充任务
+     * @param taskGroup 计划量汇总组
+     */
+    private void fillGroupFields(TmTaskDraft task, TmPlanTaskGroup taskGroup) {
+        task.setPlanGroupKey(taskGroup.getPlanGroupKey());
+        task.setGroupSourceCount(taskGroup.getSourceTaskList().size());
+        task.setGroupRequiredQty(nvl(taskGroup.getGroupCurrentShiftDemandQty())
+                .max(nvl(taskGroup.getGroupGuardDemandQty())));
+        task.setGroupBaseDemandQty(taskGroup.getGroupBaseDemandQty());
+        task.setGroupMinStartAdjustQty(taskGroup.getGroupMinStartAdjustQty());
+        task.setGroupRoundAdjustQty(taskGroup.getGroupRoundAdjustQty());
+        task.setGroupFinalPlanQty(taskGroup.getGroupFinalPlanQty());
+    }
+
+    /**
+     * 构建组级规则证据。
+     *
+     * @param taskGroup 计划量汇总组
+     * @return 可序列化规则证据
+     */
+    private Map<String, Object> buildPlanGroupEvidence(TmPlanTaskGroup taskGroup) {
+        Map<String, Object> evidence = new LinkedHashMap<>();
+        evidence.put("planGroupKey", taskGroup.getPlanGroupKey());
+        evidence.put("sourceCount", taskGroup.getSourceTaskList().size());
+        evidence.put("groupCurrentShiftDemandQty", taskGroup.getGroupCurrentShiftDemandQty());
+        evidence.put("groupGuardDemandQty", taskGroup.getGroupGuardDemandQty());
+        evidence.put("groupBaseDemandQty", taskGroup.getGroupBaseDemandQty());
+        evidence.put("groupMinStartAdjustQty", taskGroup.getGroupMinStartAdjustQty());
+        evidence.put("groupRoundAdjustQty", taskGroup.getGroupRoundAdjustQty());
+        evidence.put("groupFinalPlanQty", taskGroup.getGroupFinalPlanQty());
+        evidence.put("tailDecisionMode", "LEGACY_TAIL_FLAG");
+        return evidence;
+    }
+
+    /**
+     * 按来源权重分摊数量。
+     *
+     * @param totalQty        汇总数量
+     * @param sourceWeightMap 来源权重
+     * @return key=来源业务键、value=分摊数量
+     */
+    private Map<String, BigDecimal> allocateByWeight(BigDecimal totalQty,
+                                                     Map<String, BigDecimal> sourceWeightMap) {
+        List<PlanQuantityAllocationItem> allocationItemList = sourceWeightMap.entrySet().stream()
+                .map(entry -> new PlanQuantityAllocationItem(entry.getKey(), entry.getValue(), BigDecimal.ZERO))
+                .collect(Collectors.toList());
+        return PlanQuantityAllocationUtils.allocate(totalQty, allocationItemList,
+                        TmScheduleConstants.DECIMAL_CALCULATION_SCALE).stream()
+                .collect(Collectors.toMap(PlanQuantityAllocationItem::getSourceBusinessKey,
+                        PlanQuantityAllocationItem::getAllocatedQty,
+                        BigDecimal::add, LinkedHashMap::new));
+    }
+
+    /**
+     * 比较两个可空数量。
+     *
+     * @param first  第一个数量
+     * @param second 第二个数量
+     * @return 数值相等返回 true
+     */
+    private boolean quantityEquals(BigDecimal first, BigDecimal second) {
+        return nvl(first).compareTo(nvl(second)) == 0;
     }
 
     /**

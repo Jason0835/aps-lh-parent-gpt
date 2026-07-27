@@ -411,7 +411,8 @@ public class TcManualRollingEngineService {
                                                   Integer shiftOrder) {
         return taskList.stream()
                 .filter(task -> Objects.equals(machineCode, task.getMachineCode()))
-                .filter(task -> task.getShiftOrder() != null && task.getShiftOrder() < shiftOrder)
+                .filter(task -> task.getShiftOrder() != null && shiftOrder != null
+                        && task.getShiftOrder() < shiftOrder)
                 .max(Comparator.comparing(TcManualTaskDraft::getShiftOrder)
                         .thenComparing(task -> this.defaultSequence(task.getSequence())))
                 .orElse(context.getPredecessorTaskMap().get(machineCode));
@@ -606,6 +607,16 @@ public class TcManualRollingEngineService {
     private BigDecimal sumQty(List<TcManualTaskDraft> taskList) {
         return taskList.stream().map(TcManualTaskDraft::getPlanQty).map(this::qty)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    /**
+     * 将空顺序映射为最大值，保证缺少顺序的任务不会被误判为链尾。
+     *
+     * @param sequence 任务顺序
+     * @return 用于排序的顺序值
+     */
+    private Integer defaultSequence(Integer sequence) {
+        return sequence == null ? Integer.MAX_VALUE : sequence;
     }
 
     /** 空数量按零处理。 */

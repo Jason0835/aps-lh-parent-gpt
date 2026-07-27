@@ -11,6 +11,7 @@ import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.api.gateway.system.service.IExportLogService;
 import com.ruoyi.api.gateway.system.service.IImportErrorLogService;
 import com.ruoyi.api.gateway.system.service.IImportLogService;
+import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
@@ -47,6 +48,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.Field;
 import java.math.BigDecimal;
 import java.text.MessageFormat;
 import java.util.*;
@@ -57,6 +59,10 @@ import java.util.stream.Collectors;
 
 /**
  * 胎面排程结果模板导入导出服务实现。
+ *
+ * <p>参照 {@code LhMouldChangePlanController} 的模板导入导出：导出时将 {@link TmScheduleResultVo}
+ * 的 {@link Excel#name()} 国际化回写值写入模板第 1 行（隐藏元数据行）的 {@code {fieldName}} 占位符；
+ * 导入时按第 1 行国际化表头匹配列号，逐行解析为 {@code List<TmScheduleResultVo>}。</p>
  */
 @Slf4j
 @Service
@@ -65,11 +71,8 @@ public class TmScheduleResultExcelServiceImpl implements ITmScheduleResultExcelS
     /** 模板资源路径。 */
     private static final String TEMPLATE_RESOURCE = "excelModel/tmScheduleResult.xlsx";
 
-    /** 模板工作表名称。 */
-    private static final String TEMPLATE_SHEET_NAME = "Sheet1";
-
-    /** 模板版本标识。 */
-    private static final String TEMPLATE_VERSION = "TM_SCHEDULE_RESULT_V1";
+    /** 导出工作表名称（导入按此名称匹配工作表）。 */
+    private static final String SHEET_NAME = "胎面 TD Mặt lốp";
 
     /** 标题日期格式。 */
     private static final String TITLE_DATE_FORMAT = "yyyy年MM月dd日";
@@ -77,59 +80,14 @@ public class TmScheduleResultExcelServiceImpl implements ITmScheduleResultExcelS
     /** 模板标题日期正则。 */
     private static final Pattern TITLE_DATE_PATTERN = Pattern.compile("^(\\d{4}年\\d{2}月\\d{2}日).*$");
 
+    /** 隐藏的国际化表头行索引（第 1 行）。 */
+    private static final int HEADER_ROW_INDEX = 0;
+
+    /** 标题行索引（第 2 行）。 */
+    private static final int TITLE_ROW_INDEX = 1;
+
     /** Excel 明细起始行索引，第 5 行。 */
     private static final int DATA_START_ROW_INDEX = 4;
-
-    /** 模板版本标识列索引 X。 */
-    private static final int TEMPLATE_VERSION_COLUMN_INDEX = 23;
-
-    /** 胎面编码列索引 A。 */
-    private static final int TREAD_CODE_COLUMN_INDEX = 0;
-
-    /** 胎面长度列索引 B。 */
-    private static final int TREAD_LENGTH_COLUMN_INDEX = 1;
-
-    /** 成型余量列索引 C。 */
-    private static final int CX_REMAIN_QTY_COLUMN_INDEX = 2;
-
-    /** 物料编码列索引 D。 */
-    private static final int MATERIAL_CODE_COLUMN_INDEX = 3;
-
-    /** 物料描述列索引 E。 */
-    private static final int MATERIAL_DESC_COLUMN_INDEX = 4;
-
-    /** 整条胶料组合列索引 F。 */
-    private static final int WHOLE_GLUE_CODE_COLUMN_INDEX = 5;
-
-    /** 6 点库存列索引 G。 */
-    private static final int STOCK_QTY_COLUMN_INDEX = 6;
-
-    /** CLASS1 计划量列索引 J。 */
-    private static final int CLASS1_PLAN_QTY_COLUMN_INDEX = 9;
-
-    /** CLASS2 计划量列索引 L。 */
-    private static final int CLASS2_PLAN_QTY_COLUMN_INDEX = 11;
-
-    /** CLASS3 计划量列索引 N。 */
-    private static final int CLASS3_PLAN_QTY_COLUMN_INDEX = 13;
-
-    /** 卷曲长度列索引 Q。 */
-    private static final int CURL_ROLL_LENGTH_COLUMN_INDEX = 16;
-
-    /** 成型机台列索引 R。 */
-    private static final int CX_MACHINE_CODE_COLUMN_INDEX = 17;
-
-    /** 胎面机台隐藏列索引 T。 */
-    private static final int MACHINE_CODE_COLUMN_INDEX = 19;
-
-    /** CLASS1 顺序隐藏列索引 U。 */
-    private static final int CLASS1_SEQUENCE_COLUMN_INDEX = 20;
-
-    /** CLASS2 顺序隐藏列索引 V。 */
-    private static final int CLASS2_SEQUENCE_COLUMN_INDEX = 21;
-
-    /** CLASS3 顺序隐藏列索引 W。 */
-    private static final int CLASS3_SEQUENCE_COLUMN_INDEX = 22;
 
     @Resource
     private TmScheduleResultMapper tmScheduleResultMapper;
@@ -163,6 +121,46 @@ public class TmScheduleResultExcelServiceImpl implements ITmScheduleResultExcelS
     private IImportErrorLogService iImportErrorLogService;
 
     /**
+     * 获取表头与标题占位符 map。
+     *
+     * @param queryVO 参数
+     * @return 标题、4 个班次组标题占位符
+     */
+    private static Map<String, Object> getTitleMap(TmScheduleResult queryVO) {
+        Map<String, Object> tableMap = new HashMap<>();
+        String formatDate = DateUtil.format(queryVO.getScheduleDate(), TITLE_DATE_FORMAT);
+        String title = "{0}全钢压出工程生产计划单 Đơn kế hoạch sản xuất của công đoạn ép đùn toàn thép";
+        tableMap.put("title", MessageFormat.format(title, formatDate));
+
+        // 4 个班次组标题写入对应合并起始单元格 H3/K3/N3/Q3（用户可见的班次+日期）：
+        //   标题显示日期：H:J 早班(lastDayTitle)、K:M 中班(midTitle) 显示前一日(D-1)；
+        //                 N:P 夜班(nightTitle)、Q:S 早班(dayTitle) 显示当日(D)。
+        //   取数来源（见 buildExportDataList）：H:J = 前一日同机台同胎面 CLASS3；
+        //                 K:M = 当日 CLASS1；N:P = 当日 CLASS2；Q:S = 当日 CLASS3。
+        //   注意：按业务需要 K:M 中班标题显示前一日，但取数来源为当日 CLASS1，二者日期不同。
+        String previousDay = DateUtil.format(DateUtils.addDays(queryVO.getScheduleDate(), -1), "MM/dd");
+        String currentDay = DateUtil.format(queryVO.getScheduleDate(), "MM/dd");
+        tableMap.put("lastDayTitle", MessageFormat.format("早班{0}\nCa sáng {0}", previousDay));
+        tableMap.put("midTitle", MessageFormat.format("中班{0}\nCa chiều {0}", previousDay));
+        tableMap.put("nightTitle", MessageFormat.format("夜班{0}\nCa đêm {0}", currentDay));
+        tableMap.put("dayTitle", MessageFormat.format("早班{0}\nCa sáng {0}", currentDay));
+        return tableMap;
+    }
+
+    /**
+     * 库存、计划量、完成量为 0（或 null）时返回 null，使导出单元格留空，不显示无意义的 0。
+     *
+     * @param value 数值
+     * @return 非空且非 0 返回原值，否则返回 null
+     */
+    private static BigDecimal blankIfZero(BigDecimal value) {
+        if (value == null || value.compareTo(BigDecimal.ZERO) == 0) {
+            return null;
+        }
+        return value;
+    }
+
+    /**
      * 按专用模板导出胎面排程结果。
      *
      * @param queryVO 查询条件，必须包含工厂和排程日期
@@ -187,29 +185,15 @@ public class TmScheduleResultExcelServiceImpl implements ITmScheduleResultExcelS
             if (inputStream == null) {
                 throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.schedule.excel.templateMissing"));
             }
-            Map<String, Object> tableMap = new HashMap<>();
-            String title = "{0}全钢压出工程生产计划单 Đơn kế hoạch sản xuất của công đoạn ép đùn toàn thép";
-            String formatDate = DateUtil.format(queryVO.getScheduleDate(), "yyyy年-MM月-dd日");
-            tableMap.put("title", MessageFormat.format(title, formatDate));
-
-            String formatDay = DateUtil.format(queryVO.getScheduleDate(), "MM/dd");
-            String lastDayTitle = "早班{0}\nCa sáng {1}";
-            tableMap.put("lastDayTitle", MessageFormat.format(lastDayTitle, formatDay, formatDay));
-            String midTitle = "中班{0}\nCa sáng {1}";
-            tableMap.put("midTitle", MessageFormat.format(midTitle, formatDay, formatDay));
-
-            String formatNextDay = DateUtil.format(DateUtils.addDays(queryVO.getScheduleDate(), 1), "MM/dd");
-            String nightTitle = "夜班{0}\nCa sáng {1}";
-            tableMap.put("nightTitle", MessageFormat.format(nightTitle, formatNextDay, formatNextDay));
-            String dayTitle = "早班{0}\nCa sáng {1}";
-            tableMap.put("dayTitle", MessageFormat.format(dayTitle, formatNextDay, formatNextDay));
-
+            Map<String, Object> tableMap = this.getTitleMap(queryVO);
+            // 回写第 1 行 @Excel 国际化字段名，作为导入列匹配表头
+            this.setExportTitleFieldName(tableMap);
             resultBytes = ExcelUtils.writeMultiList(inputStream, 0, tableMap, excelDataList);
         } catch (IOException exception) {
             log.error("生成胎面排程结果模板失败", exception);
             throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.schedule.excel.generateFailed"));
         }
-        resultBytes = this.finishExportWorkbook(resultBytes, queryVO.getScheduleDate(), dataList.isEmpty());
+        resultBytes = this.finishExportWorkbook(resultBytes, dataList.isEmpty());
         this.saveExportLog(queryVO, fileName, resultList.size(), beginTime);
         return resultBytes;
     }
@@ -326,6 +310,27 @@ public class TmScheduleResultExcelServiceImpl implements ITmScheduleResultExcelS
     }
 
     /**
+     * 将 {@link TmScheduleResultVo} 各 {@link Excel} 字段的国际化名称写入表头占位符 map，
+     * 供模板第 1 行 {@code {fieldName}} 占位符回写，作为导入列匹配表头。
+     *
+     * @param tableMap 表头占位符 map
+     */
+    private void setExportTitleFieldName(Map<String, Object> tableMap) {
+        for (Field field : TmScheduleResultVo.class.getDeclaredFields()) {
+            Excel attr = field.getAnnotation(Excel.class);
+            if (attr == null || (attr.type() != Excel.Type.ALL && attr.type() != Excel.Type.IMPORT)) {
+                continue;
+            }
+            String attrName = StrUtil.blankToDefault(attr.importName(), attr.name());
+            if (StrUtil.isNotBlank(attrName)) {
+                attrName = attrName.replaceAll("\\{", "").replaceAll("}", "");
+                attrName = I18nUtil.getMessage(attrName);
+            }
+            tableMap.put(field.getName(), attrName);
+        }
+    }
+
+    /**
      * 构建模板明细数据。
      *
      * @param resultList 排程结果
@@ -344,29 +349,32 @@ public class TmScheduleResultExcelServiceImpl implements ITmScheduleResultExcelS
         for (TmScheduleResult result : resultList) {
             Map<String, Object> rowMap = new LinkedHashMap<>();
             TmScheduleResult previousResult = previousResultMap.get(this.buildResultBusinessKey(result));
-            rowMap.put("treadCode", result.getTreadCode());
+            // 班次组取数来源（标题显示日期见 getTitleMap；K:M 中班标题显示前一日，但此处取当日 CLASS1）：
+            //   H:J = 前一日同机台同胎面 CLASS3 计划量/完成量/顺序
+            //   K:M = 当日 CLASS1、N:P = 当日 CLASS2、Q:S = 当日 CLASS3
+            rowMap.put("machineCode", result.getMachineCode());
             rowMap.put("treadLength", result.getTreadShoulderLength());
             rowMap.put("cxRemainQty", result.getCxRemainQty());
-            rowMap.put("materialCode", result.getMaterialCode());
+            rowMap.put("treadCode", result.getTreadCode());
             rowMap.put("materialDesc", result.getMaterialDesc());
             rowMap.put("wholeGlueCode", result.getWholeGlueCode());
-            rowMap.put("stockQty", result.getSixClockStockQty());
-            rowMap.put("lastDayPlanQty", previousResult == null ? null : previousResult.getClass3PlanQty());
-            rowMap.put("lastDayFinishQty", previousResult == null ? null : previousResult.getClass3FinishQty());
-            rowMap.put("class1PlanQty", result.getClass1PlanQty());
-            rowMap.put("class1FinishQty", result.getClass1FinishQty());
-            rowMap.put("class2PlanQty", result.getClass2PlanQty());
-            rowMap.put("class2FinishQty", result.getClass2FinishQty());
-            rowMap.put("class3PlanQty", result.getClass3PlanQty());
-            rowMap.put("class3FinishQty", result.getClass3FinishQty());
+            rowMap.put("stockQty", this.blankIfZero(result.getSixClockStockQty()));
+            rowMap.put("lastDayPlanQty", this.blankIfZero(previousResult == null ? null : previousResult.getClass3PlanQty()));
+            rowMap.put("lastDayFinishQty", this.blankIfZero(previousResult == null ? null : previousResult.getClass3FinishQty()));
+            rowMap.put("lastDaySequence", previousResult == null ? null : previousResult.getClass3Sequence());
+            rowMap.put("class1PlanQty", this.blankIfZero(result.getClass1PlanQty()));
+            rowMap.put("class1FinishQty", this.blankIfZero(result.getClass1FinishQty()));
+            rowMap.put("class1Sequence", result.getClass1Sequence());
+            rowMap.put("class2PlanQty", this.blankIfZero(result.getClass2PlanQty()));
+            rowMap.put("class2FinishQty", this.blankIfZero(result.getClass2FinishQty()));
+            rowMap.put("class2Sequence", result.getClass2Sequence());
+            rowMap.put("class3PlanQty", this.blankIfZero(result.getClass3PlanQty()));
+            rowMap.put("class3FinishQty", this.blankIfZero(result.getClass3FinishQty()));
+            rowMap.put("class3Sequence", result.getClass3Sequence());
             rowMap.put("cxPlanQty", formingPlanQtyMap.getOrDefault(result.getTreadCode(), BigDecimal.ZERO));
             rowMap.put("curlRollLength", result.getCurlRollLength());
             rowMap.put("cxMachineCode", result.getCxMachineCode());
             rowMap.put("type", TmYesNoEnum.YES.getCode().equals(result.getTailFlag()) ? "收尾" : "");
-            rowMap.put("machineCode", result.getMachineCode());
-            rowMap.put("class1Sequence", result.getClass1Sequence());
-            rowMap.put("class2Sequence", result.getClass2Sequence());
-            rowMap.put("class3Sequence", result.getClass3Sequence());
             dataList.add(rowMap);
         }
         return dataList;
@@ -517,34 +525,25 @@ public class TmScheduleResultExcelServiceImpl implements ITmScheduleResultExcelS
     }
 
     /**
-     * 完成导出工作簿的动态标题、表头、模板标识和隐藏设置。
+     * 完成导出工作簿的隐藏表头行和空模板清理。
      *
      * @param sourceBytes 模板填充后的字节
-     * @param scheduleDate 排程日期
      * @param emptyData 是否为空模板
      * @return 最终工作簿字节
      * @throws ServiceException 工作簿处理失败时抛出
      */
-    private byte[] finishExportWorkbook(byte[] sourceBytes, Date scheduleDate, boolean emptyData) {
+    private byte[] finishExportWorkbook(byte[] sourceBytes, boolean emptyData) {
         try (ByteArrayInputStream inputStream = new ByteArrayInputStream(sourceBytes);
              XSSFWorkbook workbook = new XSSFWorkbook(inputStream);
              ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
             Sheet sheet = workbook.getSheetAt(0);
-            workbook.setSheetName(0, TEMPLATE_SHEET_NAME);
-            Row metadataRow = this.getOrCreateRow(sheet, 0);
-            metadataRow.setZeroHeight(true);
-            this.getOrCreateCell(metadataRow, TEMPLATE_VERSION_COLUMN_INDEX).setCellValue(TEMPLATE_VERSION);
-            for (int columnIndex = MACHINE_CODE_COLUMN_INDEX;
-                 columnIndex <= TEMPLATE_VERSION_COLUMN_INDEX; columnIndex++) {
-                sheet.setColumnHidden(columnIndex, true);
-            }
-            this.getOrCreateCell(this.getOrCreateRow(sheet, 1), 0)
-                    .setCellValue(this.buildTitle(scheduleDate));
-            this.fillDynamicHeaders(sheet, scheduleDate);
+            workbook.setSheetName(0, SHEET_NAME);
+            // 隐藏第 1 行国际化表头元数据行
+            this.getOrCreateRow(sheet, HEADER_ROW_INDEX).setZeroHeight(true);
             this.normalizeEmptyStringCells(sheet);
             if (emptyData) {
                 Row dataRow = this.getOrCreateRow(sheet, DATA_START_ROW_INDEX);
-                for (int columnIndex = 0; columnIndex <= CLASS3_SEQUENCE_COLUMN_INDEX; columnIndex++) {
+                for (int columnIndex = 0; columnIndex < dataRow.getLastCellNum(); columnIndex++) {
                     this.getOrCreateCell(dataRow, columnIndex).setBlank();
                 }
             }
@@ -557,29 +556,7 @@ public class TmScheduleResultExcelServiceImpl implements ITmScheduleResultExcelS
     }
 
     /**
-     * 填充动态班次日期表头。
-     *
-     * @param sheet 模板工作表
-     * @param scheduleDate 排程日期
-     */
-    private void fillDynamicHeaders(Sheet sheet, Date scheduleDate) {
-        Date previousDate = DateUtil.offsetDay(scheduleDate, -1);
-        String previousDateText = DateUtil.format(previousDate, "MM/dd");
-        String currentDateText = DateUtil.format(scheduleDate, "MM/dd");
-        Row headerRow = this.getOrCreateRow(sheet, 2);
-        this.getOrCreateCell(headerRow, 7).setCellValue("早班" + previousDateText + "\nCa sáng " + previousDateText);
-        this.getOrCreateCell(headerRow, 9).setCellValue("中班" + previousDateText + "\nCa chiều " + previousDateText);
-        this.getOrCreateCell(headerRow, 11).setCellValue("夜班" + currentDateText + "\nCa đêm " + currentDateText);
-        this.getOrCreateCell(headerRow, 13).setCellValue("早班" + currentDateText + "\nCa sáng " + currentDateText);
-        this.getOrCreateCell(headerRow, 15).setCellValue("成型产量 Sản lượng TH\n早班"
-                + previousDateText + "到早班" + currentDateText + "\nCa sáng "
-                + previousDateText + " đến ca sáng " + currentDateText);
-    }
-
-    /**
      * 将模板引擎生成的空字符串单元格标准化为空白单元格。
-     *
-     * <p>该处理既避免导出文件显示空字符串内部值，也保证空模板和未收尾行保持真正的空白类型。</p>
      *
      * @param sheet 待处理工作表
      */
@@ -603,27 +580,18 @@ public class TmScheduleResultExcelServiceImpl implements ITmScheduleResultExcelS
      */
     private TmScheduleResultExcelParseResult parseWorkbook(byte[] fileBytes, TmScheduleResult condition) {
         try (Workbook workbook = WorkbookFactory.create(new ByteArrayInputStream(fileBytes))) {
-            Sheet sheet = workbook.getSheet(TEMPLATE_SHEET_NAME);
-            if (sheet == null || sheet.getRow(0) == null
-                    || !TEMPLATE_VERSION.equals(this.readCellText(sheet.getRow(0), TEMPLATE_VERSION_COLUMN_INDEX,
-                    new DataFormatter(), workbook.getCreationHelper().createFormulaEvaluator()))) {
+            Sheet sheet = workbook.getSheet(SHEET_NAME);
+            if (sheet == null || sheet.getRow(HEADER_ROW_INDEX) == null) {
                 throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.schedule.excel.templateInvalid"));
             }
             DataFormatter dataFormatter = new DataFormatter();
             FormulaEvaluator formulaEvaluator = workbook.getCreationHelper().createFormulaEvaluator();
-            String title = this.readCellText(sheet.getRow(1), 0, dataFormatter, formulaEvaluator);
+            String title = this.readCellText(sheet.getRow(TITLE_ROW_INDEX), 0, dataFormatter, formulaEvaluator);
             Date scheduleDate = this.parseScheduleDate(title);
             if (!DateUtil.isSameDay(scheduleDate, condition.getScheduleDate())) {
                 throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.schedule.excel.dateMismatch"));
             }
-            List<TmScheduleResultExcelRow> rowList = new ArrayList<>();
-            for (int rowIndex = DATA_START_ROW_INDEX; rowIndex <= sheet.getLastRowNum(); rowIndex++) {
-                Row row = sheet.getRow(rowIndex);
-                if (this.isEmptyDataRow(row, dataFormatter, formulaEvaluator)) {
-                    continue;
-                }
-                rowList.add(this.parseDataRow(row, rowIndex + 1, dataFormatter, formulaEvaluator));
-            }
+            List<TmScheduleResultVo> rowList = this.parseVoList(sheet, dataFormatter, formulaEvaluator);
             if (rowList.isEmpty()) {
                 throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.schedule.excel.noData"));
             }
@@ -659,52 +627,112 @@ public class TmScheduleResultExcelServiceImpl implements ITmScheduleResultExcelS
     }
 
     /**
-     * 解析一条 Excel 明细。
+     * 按第 1 行国际化表头匹配列号，将数据行解析为 {@link TmScheduleResultVo} 列表。
      *
-     * @param row Excel 行
-     * @param rowNum Excel 行号
+     * <p>表头文本与 {@link Excel#name()} 的 {@link I18nUtil#getMessage(String)} 回写值同口径匹配，
+     * 列位置变更不影响解析；类型转换按字段类型显式处理（String/BigDecimal/Integer）。</p>
+     *
+     * @param sheet 模板工作表
      * @param dataFormatter 单元格格式化器
      * @param formulaEvaluator 公式计算器
-     * @return 明细行对象
+     * @return 明细行对象列表
      */
-    private TmScheduleResultExcelRow parseDataRow(Row row, int rowNum, DataFormatter dataFormatter,
-                                                   FormulaEvaluator formulaEvaluator) {
-        TmScheduleResultExcelRow result = new TmScheduleResultExcelRow();
-        result.setRowNum(rowNum);
-        result.setTreadCode(this.readCellText(row, TREAD_CODE_COLUMN_INDEX, dataFormatter, formulaEvaluator));
-        result.setTreadLength(this.readDecimalCell(row, TREAD_LENGTH_COLUMN_INDEX, rowNum,
-                "ui.data.column.tm.scheduleResult.treadShoulderLength", false, result.getErrors(),
-                dataFormatter, formulaEvaluator));
-        result.setCxRemainQty(this.readDecimalCell(row, CX_REMAIN_QTY_COLUMN_INDEX, rowNum,
-                "ui.data.column.tm.scheduleResult.cxRemainQty", false, result.getErrors(),
-                dataFormatter, formulaEvaluator));
-        result.setMaterialCode(this.readCellText(row, MATERIAL_CODE_COLUMN_INDEX, dataFormatter, formulaEvaluator));
-        result.setMaterialDesc(this.readCellText(row, MATERIAL_DESC_COLUMN_INDEX, dataFormatter, formulaEvaluator));
-        result.setWholeGlueCode(this.readCellText(row, WHOLE_GLUE_CODE_COLUMN_INDEX, dataFormatter, formulaEvaluator));
-        result.setStockQty(this.readDecimalCell(row, STOCK_QTY_COLUMN_INDEX, rowNum,
-                "ui.data.column.tm.scheduleResult.sixClockStockQty", false, result.getErrors(),
-                dataFormatter, formulaEvaluator));
-        result.setClass1PlanQty(this.readDecimalCell(row, CLASS1_PLAN_QTY_COLUMN_INDEX, rowNum,
-                "ui.data.column.tm.scheduleResult.class1PlanQty", true, result.getErrors(),
-                dataFormatter, formulaEvaluator));
-        result.setClass2PlanQty(this.readDecimalCell(row, CLASS2_PLAN_QTY_COLUMN_INDEX, rowNum,
-                "ui.data.column.tm.scheduleResult.class2PlanQty", true, result.getErrors(),
-                dataFormatter, formulaEvaluator));
-        result.setClass3PlanQty(this.readDecimalCell(row, CLASS3_PLAN_QTY_COLUMN_INDEX, rowNum,
-                "ui.data.column.tm.scheduleResult.class3PlanQty", true, result.getErrors(),
-                dataFormatter, formulaEvaluator));
-        result.setCurlRollLength(this.readDecimalCell(row, CURL_ROLL_LENGTH_COLUMN_INDEX, rowNum,
-                "ui.data.column.tm.scheduleResult.curlRollLength", false, result.getErrors(),
-                dataFormatter, formulaEvaluator));
-        result.setCxMachineCode(this.readCellText(row, CX_MACHINE_CODE_COLUMN_INDEX, dataFormatter, formulaEvaluator));
-        result.setMachineCode(this.readCellText(row, MACHINE_CODE_COLUMN_INDEX, dataFormatter, formulaEvaluator));
-        result.setClass1Sequence(this.readIntegerCell(row, CLASS1_SEQUENCE_COLUMN_INDEX, rowNum,
-                "ui.data.column.tm.scheduleResult.class1Sequence", result.getErrors(), dataFormatter, formulaEvaluator));
-        result.setClass2Sequence(this.readIntegerCell(row, CLASS2_SEQUENCE_COLUMN_INDEX, rowNum,
-                "ui.data.column.tm.scheduleResult.class2Sequence", result.getErrors(), dataFormatter, formulaEvaluator));
-        result.setClass3Sequence(this.readIntegerCell(row, CLASS3_SEQUENCE_COLUMN_INDEX, rowNum,
-                "ui.data.column.tm.scheduleResult.class3Sequence", result.getErrors(), dataFormatter, formulaEvaluator));
-        return result;
+    private List<TmScheduleResultVo> parseVoList(Sheet sheet, DataFormatter dataFormatter,
+                                                  FormulaEvaluator formulaEvaluator) {
+        // 第 1 行隐藏国际化表头 -> i18n 名 -> 列号
+        Row headerRow = sheet.getRow(HEADER_ROW_INDEX);
+        Map<String, Integer> headerCellMap = new HashMap<>();
+        if (headerRow != null) {
+            for (int columnIndex = 0; columnIndex < headerRow.getLastCellNum(); columnIndex++) {
+                String headerText = this.readCellText(headerRow, columnIndex, dataFormatter, formulaEvaluator);
+                if (StrUtil.isNotBlank(headerText)) {
+                    headerCellMap.put(headerText.trim(), columnIndex);
+                }
+            }
+        }
+        // VO @Excel 字段 -> 列号
+        Map<Integer, Field> fieldsMap = new LinkedHashMap<>();
+        for (Field field : TmScheduleResultVo.class.getDeclaredFields()) {
+            Excel attr = field.getAnnotation(Excel.class);
+            if (attr == null || (attr.type() != Excel.Type.ALL && attr.type() != Excel.Type.IMPORT)) {
+                continue;
+            }
+            String attrName = StrUtil.blankToDefault(attr.importName(), attr.name());
+            if (StrUtil.isNotBlank(attrName)) {
+                attrName = attrName.replaceAll("\\{", "").replaceAll("}", "");
+                attrName = I18nUtil.getMessage(attrName);
+            }
+            Integer columnIndex = headerCellMap.get(attrName);
+            if (columnIndex != null) {
+                field.setAccessible(true);
+                fieldsMap.put(columnIndex, field);
+            }
+        }
+        // 第 5 行起逐行解析，全空行停止
+        List<TmScheduleResultVo> rowList = new ArrayList<>();
+        for (int rowIndex = DATA_START_ROW_INDEX; rowIndex <= sheet.getLastRowNum(); rowIndex++) {
+            Row row = sheet.getRow(rowIndex);
+            if (row == null) {
+                continue;
+            }
+            TmScheduleResultVo vo = new TmScheduleResultVo();
+            vo.setRowNum(rowIndex + 1);
+            int emptyCount = 0;
+            for (Map.Entry<Integer, Field> entry : fieldsMap.entrySet()) {
+                String text = this.readCellText(row, entry.getKey(), dataFormatter, formulaEvaluator);
+                if (StrUtil.isBlank(text)) {
+                    emptyCount++;
+                    continue;
+                }
+                Object converted = this.convertCellValue(text, entry.getValue().getType());
+                if (converted != null) {
+                    try {
+                        entry.getValue().set(vo, converted);
+                    } catch (IllegalAccessException exception) {
+                        // setAccessible(true) 已调用，运行期不会触发；仅满足编译期受检异常处理
+                        throw new RuntimeException(exception);
+                    }
+                }
+            }
+            if (fieldsMap.isEmpty() || emptyCount == fieldsMap.size()) {
+                break;
+            }
+            rowList.add(vo);
+        }
+        return rowList;
+    }
+
+    /**
+     * 按字段类型转换单元格文本。
+     *
+     * @param text 单元格文本
+     * @param fieldType 字段类型
+     * @return 转换后的值；无法转换时返回 null
+     */
+    private Object convertCellValue(String text, Class<?> fieldType) {
+        String normalized = text.replace(",", "");
+        if (fieldType == String.class) {
+            // 数值文本去尾 ".0"
+            if (normalized.endsWith(".0")) {
+                return normalized.substring(0, normalized.length() - 2);
+            }
+            return text;
+        }
+        try {
+            BigDecimal decimal = new BigDecimal(normalized);
+            if (fieldType == BigDecimal.class) {
+                return decimal;
+            }
+            if (fieldType == Integer.class || fieldType == Integer.TYPE) {
+                return decimal.intValue();
+            }
+            if (fieldType == Long.class || fieldType == Long.TYPE) {
+                return decimal.longValue();
+            }
+        } catch (RuntimeException ignore) {
+            return null;
+        }
+        return text;
     }
 
     /**
@@ -720,10 +748,10 @@ public class TmScheduleResultExcelServiceImpl implements ITmScheduleResultExcelS
                                 boolean updateSupport, Long importLogId) {
         String factoryCode = condition.getFactoryCode().trim();
         Date scheduleDate = parseResult.getScheduleDate();
-        List<TmScheduleResultExcelRow> rowList = parseResult.getRowList();
-        Set<String> machineCodeSet = rowList.stream().map(TmScheduleResultExcelRow::getMachineCode)
+        List<TmScheduleResultVo> rowList = parseResult.getRowList();
+        Set<String> machineCodeSet = rowList.stream().map(TmScheduleResultVo::getMachineCode)
                 .filter(StrUtil::isNotBlank).map(String::trim).collect(Collectors.toSet());
-        Set<String> treadCodeSet = rowList.stream().map(TmScheduleResultExcelRow::getTreadCode)
+        Set<String> treadCodeSet = rowList.stream().map(TmScheduleResultVo::getTreadCode)
                 .filter(StrUtil::isNotBlank).map(String::trim).collect(Collectors.toSet());
         Set<String> validMachineCodeSet = this.loadValidMachineCodes(factoryCode, machineCodeSet);
         Map<String, List<TmScheduleResult>> existingResultMap = this.loadExistingResultMap(factoryCode,
@@ -735,9 +763,9 @@ public class TmScheduleResultExcelServiceImpl implements ITmScheduleResultExcelS
         }
 
         List<ImportErrorLog> importErrorLogs = new ArrayList<>();
-        List<TmScheduleResultExcelRow> validRowList = new ArrayList<>();
+        List<TmScheduleResultVo> validRowList = new ArrayList<>();
         Set<String> importBusinessKeySet = new HashSet<>();
-        for (TmScheduleResultExcelRow row : rowList) {
+        for (TmScheduleResultVo row : rowList) {
             this.validateImportRow(row, validMachineCodeSet, existingResultMap, updateSupport,
                     importBusinessKeySet);
             if (CollUtil.isNotEmpty(row.getErrors())) {
@@ -756,7 +784,7 @@ public class TmScheduleResultExcelServiceImpl implements ITmScheduleResultExcelS
         List<TmScheduleResult> insertList = new ArrayList<>();
         List<TmScheduleResult> updateList = new ArrayList<>();
         int insertOrder = 1;
-        for (TmScheduleResultExcelRow row : validRowList) {
+        for (TmScheduleResultVo row : validRowList) {
             String businessKey = this.buildImportBusinessKey(row.getMachineCode(), row.getTreadCode());
             List<TmScheduleResult> existingList = existingResultMap.get(businessKey);
             if (CollUtil.isNotEmpty(existingList)) {
@@ -788,9 +816,9 @@ public class TmScheduleResultExcelServiceImpl implements ITmScheduleResultExcelS
      * @param importLogId 导入日志 ID
      * @return 阻断结果；不存在阻断时返回 null
      */
-    private AjaxResult checkHardBlock(List<TmScheduleResultExcelRow> rowList,
+    private AjaxResult checkHardBlock(List<TmScheduleResultVo> rowList,
                                       Map<String, List<TmScheduleResult>> existingResultMap, Long importLogId) {
-        for (TmScheduleResultExcelRow row : rowList) {
+        for (TmScheduleResultVo row : rowList) {
             if (StrUtil.isBlank(row.getMachineCode()) || StrUtil.isBlank(row.getTreadCode())) {
                 continue;
             }
@@ -825,7 +853,7 @@ public class TmScheduleResultExcelServiceImpl implements ITmScheduleResultExcelS
      * @param updateSupport 已存在记录是否更新
      * @param importBusinessKeySet 文件内业务键集合
      */
-    private void validateImportRow(TmScheduleResultExcelRow row, Set<String> validMachineCodeSet,
+    private void validateImportRow(TmScheduleResultVo row, Set<String> validMachineCodeSet,
                                    Map<String, List<TmScheduleResult>> existingResultMap,
                                    boolean updateSupport, Set<String> importBusinessKeySet) {
         if (StrUtil.isBlank(row.getTreadCode())) {
@@ -871,7 +899,7 @@ public class TmScheduleResultExcelServiceImpl implements ITmScheduleResultExcelS
      * @param sequence 顺序
      * @param shiftOrder 班次序号
      */
-    private void validatePlanAndSequence(TmScheduleResultExcelRow row, BigDecimal planQty,
+    private void validatePlanAndSequence(TmScheduleResultVo row, BigDecimal planQty,
                                          Integer sequence, int shiftOrder) {
         BigDecimal normalizedPlanQty = BigDecimalUtils.valueOf(planQty);
         if (normalizedPlanQty.compareTo(BigDecimal.ZERO) < 0) {
@@ -939,7 +967,7 @@ public class TmScheduleResultExcelServiceImpl implements ITmScheduleResultExcelS
      * @param insertOrder 新增行序号
      * @return 新增排程结果
      */
-    private TmScheduleResult buildInsertedResult(TmScheduleResultExcelRow row, String factoryCode,
+    private TmScheduleResult buildInsertedResult(TmScheduleResultVo row, String factoryCode,
                                                   Date scheduleDate, String batchNo, int insertOrder) {
         TmScheduleResult target = new TmScheduleResult();
         target.setFactoryCode(factoryCode);
@@ -950,7 +978,6 @@ public class TmScheduleResultExcelServiceImpl implements ITmScheduleResultExcelS
         target.setTreadCode(row.getTreadCode());
         target.setTreadShoulderLength(row.getTreadLength());
         target.setCxRemainQty(row.getCxRemainQty());
-        target.setMaterialCode(row.getMaterialCode());
         target.setMaterialDesc(row.getMaterialDesc());
         target.setWholeGlueCode(row.getWholeGlueCode());
         target.setSixClockStockQty(row.getStockQty());
@@ -969,7 +996,7 @@ public class TmScheduleResultExcelServiceImpl implements ITmScheduleResultExcelS
      * @param row 导入行
      * @param target 目标排程结果
      */
-    private void applyImportPlanFields(TmScheduleResultExcelRow row, TmScheduleResult target) {
+    private void applyImportPlanFields(TmScheduleResultVo row, TmScheduleResult target) {
         BigDecimal class1PlanQty = BigDecimalUtils.valueOf(row.getClass1PlanQty());
         BigDecimal class2PlanQty = BigDecimalUtils.valueOf(row.getClass2PlanQty());
         BigDecimal class3PlanQty = BigDecimalUtils.valueOf(row.getClass3PlanQty());
@@ -1036,25 +1063,6 @@ public class TmScheduleResultExcelServiceImpl implements ITmScheduleResultExcelS
     }
 
     /**
-     * 判断 Excel 行是否为空。
-     *
-     * @param row Excel 行
-     * @param dataFormatter 单元格格式化器
-     * @param formulaEvaluator 公式计算器
-     * @return true 表示明细关键列均为空
-     */
-    private boolean isEmptyDataRow(Row row, DataFormatter dataFormatter, FormulaEvaluator formulaEvaluator) {
-        if (row == null) {
-            return true;
-        }
-        return StrUtil.isBlank(this.readCellText(row, TREAD_CODE_COLUMN_INDEX, dataFormatter, formulaEvaluator))
-                && StrUtil.isBlank(this.readCellText(row, MACHINE_CODE_COLUMN_INDEX, dataFormatter, formulaEvaluator))
-                && StrUtil.isBlank(this.readCellText(row, CLASS1_PLAN_QTY_COLUMN_INDEX, dataFormatter, formulaEvaluator))
-                && StrUtil.isBlank(this.readCellText(row, CLASS2_PLAN_QTY_COLUMN_INDEX, dataFormatter, formulaEvaluator))
-                && StrUtil.isBlank(this.readCellText(row, CLASS3_PLAN_QTY_COLUMN_INDEX, dataFormatter, formulaEvaluator));
-    }
-
-    /**
      * 读取单元格文本。
      *
      * @param row Excel 行
@@ -1073,63 +1081,6 @@ public class TmScheduleResultExcelServiceImpl implements ITmScheduleResultExcelS
             return "";
         }
         return StrUtil.trim(dataFormatter.formatCellValue(cell, formulaEvaluator));
-    }
-
-    /**
-     * 读取 BigDecimal 单元格。
-     *
-     * @param row Excel 行
-     * @param columnIndex 列索引
-     * @param rowNum Excel 行号
-     * @param fieldKey 字段多语言 key
-     * @param blankAsZero 空值是否按 0 处理
-     * @param errors 行错误集合
-     * @param dataFormatter 单元格格式化器
-     * @param formulaEvaluator 公式计算器
-     * @return 数值；可选空值返回 null
-     */
-    private BigDecimal readDecimalCell(Row row, int columnIndex, int rowNum, String fieldKey,
-                                       boolean blankAsZero, List<String> errors, DataFormatter dataFormatter,
-                                       FormulaEvaluator formulaEvaluator) {
-        String text = this.readCellText(row, columnIndex, dataFormatter, formulaEvaluator);
-        if (StrUtil.isBlank(text)) {
-            return blankAsZero ? BigDecimal.ZERO : null;
-        }
-        try {
-            return BigDecimalUtils.valueOf(text.replace(",", ""));
-        } catch (RuntimeException exception) {
-            errors.add(MessageFormat.format(I18nUtil.getMessage(
-                    "ui.data.alert.tm.schedule.excel.invalidNumber"), rowNum, I18nUtil.getMessage(fieldKey)));
-            return blankAsZero ? BigDecimal.ZERO : null;
-        }
-    }
-
-    /**
-     * 读取整数单元格。
-     *
-     * @param row Excel 行
-     * @param columnIndex 列索引
-     * @param rowNum Excel 行号
-     * @param fieldKey 字段多语言 key
-     * @param errors 行错误集合
-     * @param dataFormatter 单元格格式化器
-     * @param formulaEvaluator 公式计算器
-     * @return 整数；空值返回 null
-     */
-    private Integer readIntegerCell(Row row, int columnIndex, int rowNum, String fieldKey,
-                                    List<String> errors, DataFormatter dataFormatter,
-                                    FormulaEvaluator formulaEvaluator) {
-        String text = this.readCellText(row, columnIndex, dataFormatter, formulaEvaluator);
-        if (StrUtil.isBlank(text)) {
-            return null;
-        }
-        try {
-            return BigDecimalUtils.valueOf(text.replace(",", "")).intValueExact();
-        } catch (RuntimeException exception) {
-            errors.add(MessageFormat.format(I18nUtil.getMessage(
-                    "ui.data.alert.tm.schedule.excel.invalidInteger"), rowNum, I18nUtil.getMessage(fieldKey)));
-            return null;
-        }
     }
 
     /**
@@ -1167,23 +1118,12 @@ public class TmScheduleResultExcelServiceImpl implements ITmScheduleResultExcelS
     }
 
     /**
-     * 构建模板标题。
-     *
-     * @param scheduleDate 排程日期
-     * @return 中越双语标题
-     */
-    private String buildTitle(Date scheduleDate) {
-        return DateUtil.format(scheduleDate, TITLE_DATE_FORMAT)
-                + "全钢压出工程生产计划单 Đơn kế hoạch sản xuất của công đoạn ép đùn toàn thép";
-    }
-
-    /**
      * 判断导入行是否至少一个班次计划量大于 0。
      *
      * @param row 导入行
      * @return true 表示至少一个班次计划量大于 0
      */
-    private boolean hasPositivePlanQty(TmScheduleResultExcelRow row) {
+    private boolean hasPositivePlanQty(TmScheduleResultVo row) {
         return BigDecimalUtils.valueOf(row.getClass1PlanQty()).compareTo(BigDecimal.ZERO) > 0
                 || BigDecimalUtils.valueOf(row.getClass2PlanQty()).compareTo(BigDecimal.ZERO) > 0
                 || BigDecimalUtils.valueOf(row.getClass3PlanQty()).compareTo(BigDecimal.ZERO) > 0;

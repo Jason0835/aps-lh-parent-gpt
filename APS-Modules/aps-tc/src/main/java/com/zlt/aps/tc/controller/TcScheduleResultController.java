@@ -2,17 +2,17 @@ package com.zlt.aps.tc.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.ruoyi.common.annotation.Log;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.tc.api.domain.dto.TcScheduleResultImportDTO;
 import com.zlt.aps.tc.api.domain.entity.TcScheduleResult;
 import com.zlt.aps.tc.api.domain.entity.TcScheduleResultExplain;
 import com.zlt.aps.tc.api.domain.entity.TcScheduleUnplanned;
 import com.zlt.aps.tc.api.domain.vo.*;
-import com.zlt.aps.tc.service.ITcScheduleResultService;
-import com.zlt.aps.tc.service.TcAutoRollingApplicationService;
-import com.zlt.aps.tc.service.TcReleaseApplicationService;
-import com.zlt.aps.tc.service.TcReleaseRecoveryService;
+import com.zlt.aps.tc.service.*;
 import com.zlt.aps.tc.service.impl.TcManualScheduleApplicationService;
 import com.zlt.aps.tc.service.query.TcManualOptionsService;
 import com.zlt.aps.tc.service.query.TcScheduleBoardQueryService;
@@ -56,6 +56,44 @@ public class TcScheduleResultController extends AbstractDocBizController<TcSched
 
     @Resource
     private TcAutoRollingApplicationService tcAutoRollingApplicationService;
+
+    @Resource
+    private TcOperationTaskApplicationService tcOperationTaskApplicationService;
+
+    @Resource
+    private ITcScheduleResultExcelService tcScheduleResultExcelService;
+
+    /**
+     * 按专用模板导出胎侧排程结果。
+     *
+     * @param queryVO 工厂和单日排程条件
+     * @param fileName 文件名称
+     * @return Excel 文件字节
+     */
+    @Log(title = "ui.tc.schedule.scheduleResult.modelName", businessType = BusinessType.EXPORT)
+    @ApiOperation("按专用模板导出胎侧排程结果")
+    @PostMapping("/exportDataScheduleResult/{fileName}")
+    public byte[] exportDataScheduleResult(@RequestBody TcScheduleResult queryVO,
+                                           @PathVariable("fileName") String fileName) {
+        return this.tcScheduleResultExcelService.exportDataScheduleResult(queryVO, fileName);
+    }
+
+    /**
+     * 按专用模板导入胎侧排程结果。
+     *
+     * @param importDTO 文件和工厂日期上下文
+     * @param updateSupport 是否允许覆盖更新
+     * @return 导入结果和行级错误
+     * @throws Exception 文件解析或日志处理失败时抛出
+     */
+    @Log(title = "ui.tc.schedule.scheduleResult.modelName", businessType = BusinessType.IMPORT)
+    @ApiOperation("按专用模板导入胎侧排程结果")
+    @PostMapping("/importDataScheduleResult")
+    public AjaxResult importDataScheduleResult(@RequestBody TcScheduleResultImportDTO importDTO,
+                                               @RequestParam("updateSupport") boolean updateSupport)
+            throws Exception {
+        return this.tcScheduleResultExcelService.importDataScheduleResult(importDTO, updateSupport);
+    }
 
     /**
      * 校验所选胎侧结果是否允许发布。
@@ -246,6 +284,81 @@ public class TcScheduleResultController extends AbstractDocBizController<TcSched
     public AjaxResult remove(@RequestBody List<Long> resultIdList) {
         int affectedCount = this.tcManualScheduleApplicationService.remove(resultIdList);
         return AjaxResult.success(I18nUtil.getMessage("ui.tc.schedule.remove.success"), affectedCount);
+    }
+
+    /**
+     * 提交胎侧人工插单异步任务。
+     *
+     * @param requestVO 插单请求
+     * @return 初始任务
+     */
+    @ApiOperation("提交胎侧人工插单异步任务")
+    @PostMapping("/operation/insertTask")
+    public TcOperationTaskVo submitInsertTask(@RequestBody TcInsertTaskRequestVo requestVO) {
+        return this.tcOperationTaskApplicationService.submitInsert(requestVO);
+    }
+
+    /**
+     * 提交胎侧调量异步任务。
+     *
+     * @param requestVO 调量请求
+     * @return 初始任务
+     */
+    @ApiOperation("提交胎侧调量异步任务")
+    @PostMapping("/operation/changeQty")
+    public TcOperationTaskVo submitChangeQty(@RequestBody TcChangeQtyRequestVo requestVO) {
+        return this.tcOperationTaskApplicationService.submitChangeQty(requestVO);
+    }
+
+    /**
+     * 提交胎侧单条或批量转机台异步任务。
+     *
+     * @param requestVO 转机台请求
+     * @return 初始任务
+     */
+    @ApiOperation("提交胎侧转机台异步任务")
+    @PostMapping("/operation/changeMachine")
+    public TcOperationTaskVo submitChangeMachine(@RequestBody TcChangeMachineRequestVo requestVO) {
+        return this.tcOperationTaskApplicationService.submitChangeMachine(requestVO);
+    }
+
+    /**
+     * 提交胎侧删除异步任务。
+     *
+     * @param resultIdList 结果ID
+     * @return 初始任务
+     */
+    @ApiOperation("提交胎侧删除异步任务")
+    @DeleteMapping("/operation/remove")
+    public TcOperationTaskVo submitRemove(@RequestBody List<Long> resultIdList) {
+        return this.tcOperationTaskApplicationService.submitDelete(resultIdList);
+    }
+
+    /**
+     * 查询胎侧人工操作任务。
+     *
+     * @param taskId 任务编号
+     * @return 任务状态
+     */
+    @ApiOperation("查询胎侧人工操作任务")
+    @GetMapping("/operation/task/{taskId}")
+    public TcOperationTaskVo getOperationTask(@PathVariable("taskId") String taskId) {
+        return this.tcOperationTaskApplicationService.getTask(taskId);
+    }
+
+    /**
+     * 查询最近胎侧人工操作任务。
+     *
+     * @param factoryCode 工厂编码
+     * @param scheduleDate 排程日期
+     * @return 最近任务
+     */
+    @ApiOperation("查询最近胎侧人工操作任务")
+    @GetMapping("/operation/task/latest")
+    public TcOperationTaskVo getLatestOperationTask(
+            @RequestParam("factoryCode") String factoryCode,
+            @RequestParam("scheduleDate") @DateTimeFormat(pattern = "yyyy-MM-dd") Date scheduleDate) {
+        return this.tcOperationTaskApplicationService.getLatestTask(factoryCode, scheduleDate);
     }
 
     /**
