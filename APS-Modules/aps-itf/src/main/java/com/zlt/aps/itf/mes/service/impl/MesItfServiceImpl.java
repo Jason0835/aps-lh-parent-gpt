@@ -20,13 +20,13 @@ import com.zlt.aps.cx.api.service.ICxPrecisionPlanRemoteService;
 import com.zlt.aps.enums.LocationTypeEnum;
 import com.zlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
-import com.zlt.aps.gsq.api.domain.entity.GsqScheduleResultIssue;
+//import com.zlt.aps.gsq.api.domain.entity.GsqScheduleResultIssue;
 import com.zlt.aps.itf.constant.DataSource;
 import com.zlt.aps.itf.constant.SysCode;
 import com.zlt.aps.itf.mes.enums.ItfSyncKeyEnum;
 import com.zlt.aps.itf.mes.enums.MouldCategoryConvertEnum;
 import com.zlt.aps.itf.mes.mapper.*;
-import com.zlt.aps.itf.mes.service.IGsqScheduleResultIssueService;
+//import com.zlt.aps.itf.mes.service.IGsqScheduleResultIssueService;
 import com.zlt.aps.itf.mes.service.IPrecisionPlanIssueService;
 import com.zlt.aps.itf.mes.service.ITmScheduleResultIssueService;
 import com.zlt.aps.itf.mes.service.MesItfService;
@@ -133,8 +133,8 @@ public class MesItfServiceImpl implements MesItfService {
     @Autowired
     private ITmScheduleResultIssueService tmScheduleResultIssueService;
 
-    @Autowired
-    private IGsqScheduleResultIssueService gsqScheduleResultIssueService;
+//    @Autowired
+//    private IGsqScheduleResultIssueService gsqScheduleResultIssueService;
 
     @Autowired
     private ILhMesSyncRemoteService lhMesSyncRemoteService;
@@ -3508,13 +3508,13 @@ public class MesItfServiceImpl implements MesItfService {
      * @param gsqScheduleResultIssueList 钢丝圈排程结果下发列表（已按3天拆分）
      * @return 下发结果（data 字段携带 mesStatus：IS_RELEASE/FAILURE_RELEASE/TIMEOUT_FAILURE）
      */
-    @Override
-    public AjaxResult issueGsqScheduleResult(List<GsqScheduleResultIssue> gsqScheduleResultIssueList) {
-        // 分公司编码与分厂编码保持一致
-        String factoryCode = FactoryConstant.DEFAULT_FACTORY_CODE;
-        String companyCode = factoryCode;
-        return gsqScheduleResultIssueService.issueGsqScheduleResult(gsqScheduleResultIssueList, factoryCode, companyCode);
-    }
+//    @Override
+//    public AjaxResult issueGsqScheduleResult(List<GsqScheduleResultIssue> gsqScheduleResultIssueList) {
+//        // 分公司编码与分厂编码保持一致
+//        String factoryCode = FactoryConstant.DEFAULT_FACTORY_CODE;
+//        String companyCode = factoryCode;
+//        return gsqScheduleResultIssueService.issueGsqScheduleResult(gsqScheduleResultIssueList, factoryCode, companyCode);
+//    }
 
     @Override
     public AjaxResult syncLhPrecisionPlanActual(AuxReqSyncDataLogs syncDataLogs) {
