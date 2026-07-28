@@ -90,15 +90,10 @@
 </template>
 <script>
 //lib
-import moment from "moment";
 //utils
-import { downloadLink } from "@/utils/request";
+import {downloadLink} from "@/utils/request";
 //interface
-import {
-  listMdmProductConstruction,
-  mesCapture,
-  updateMaterial,
-} from "@/api/maindata/mdmProductConstruction";
+import {listMdmProductConstruction, mesCapture, updateMaterial,} from "@/api/maindata/mdmProductConstruction";
 //components
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
@@ -220,6 +215,11 @@ export default {
         {
           prop: "constructionCode",
           label: this.$t("ui.data.column.mdmSkuConstructionRef.constructionCode"),
+          width: 180,
+        },
+        {
+          prop: "formingNo",
+          label: this.$t("ui.data.column.mdmSkuConstructionRef.formingNo"),
           width: 180,
         },
         {
