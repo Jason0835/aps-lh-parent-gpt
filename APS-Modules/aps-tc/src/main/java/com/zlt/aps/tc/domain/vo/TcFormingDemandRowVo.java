@@ -12,6 +12,9 @@ import java.math.BigDecimal;
 @Data
 public class TcFormingDemandRowVo {
 
+    /** 成型排程源记录主键，用于生成稳定业务键 */
+    private Long sourceRecordId;
+
     /** 成型工单号 */
     private String orderNo;
 
@@ -23,6 +26,12 @@ public class TcFormingDemandRowVo {
 
     /** 硫化机编码，多个编码使用英文逗号分隔 */
     private String lhMachineCode;
+
+    /** 成型机台编码。 */
+    private String cxMachineCode;
+
+    /** 成型物料描述。 */
+    private String materialDesc;
 
     /** 1班成型计划量 */
     private BigDecimal class1PlanQty;

@@ -109,6 +109,14 @@ public class TcPersistService {
         if (task != null) {
             explain.setTaskBusinessKey(task.getBusinessKey());
             explain.setShiftOrder(task.getShiftOrder());
+            explain.setPlanGroupKey(task.getPlanGroupKey());
+            explain.setGroupSourceCount(task.getGroupSourceCount());
+            explain.setSourceRequiredQty(task.getSourceRequiredQty());
+            explain.setGroupRequiredQty(task.getGroupRequiredQty());
+            explain.setGroupBaseDemandQty(task.getGroupBaseDemandQty());
+            explain.setGroupMinStartAdjustQty(task.getGroupMinStartAdjustQty());
+            explain.setGroupRoundAdjustQty(task.getGroupRoundAdjustQty());
+            explain.setGroupFinalPlanQty(task.getGroupFinalPlanQty());
             explain.setBaseDemandQty(task.getBaseDemandQty() == null ? task.getDemandQty() : task.getBaseDemandQty());
             explain.setStockDeductQty(task.getStockDeductQty());
             explain.setFinalPlanQty(task.getPlanQty());

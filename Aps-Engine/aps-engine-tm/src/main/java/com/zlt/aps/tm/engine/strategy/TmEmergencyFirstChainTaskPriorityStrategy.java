@@ -6,6 +6,7 @@ import com.zlt.aps.tm.api.enums.TmScheduleStrategyEnum;
 import com.zlt.aps.tm.engine.domain.TmChainSortScore;
 import com.zlt.aps.tm.engine.domain.TmScheduleContext;
 import com.zlt.aps.tm.engine.domain.TmTaskDraft;
+import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -14,7 +15,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-/** 库存紧急优先策略，预置机台仍作为硬约束优先处理。 */
+/** 库存紧急优先策略，预置机台仍作为硬约束优先处理，由 TmStrategyRegistry 收集注册。 */
+@Component
 public class TmEmergencyFirstChainTaskPriorityStrategy implements ITmChainTaskPriorityStrategy {
 
     @Override
@@ -35,8 +37,12 @@ public class TmEmergencyFirstChainTaskPriorityStrategy implements ITmChainTaskPr
         candidateTaskList.sort(Comparator
                 .comparing((TmTaskDraft task) -> task.getSupplyHours() == null)
                 .thenComparing(task -> task.getSupplyHours() == null ? BigDecimal.ZERO : task.getSupplyHours())
+                .thenComparing(TmTaskDraft::getLatestStartTime,
+                        Comparator.nullsLast(Comparator.naturalOrder()))
                 .thenComparing((TmTaskDraft task) -> chainScoreMap.getOrDefault(task.getBusinessKey(), TmChainSortScore.ZERO),
                         Comparator.reverseOrder())
+                .thenComparing(TmTaskDraft::getBaseSortIndex,
+                        Comparator.nullsLast(Comparator.naturalOrder()))
                 .thenComparing(task -> StrUtil.blankToDefault(task.getBusinessKey(), "")));
         return candidateTaskList.get(0);
     }

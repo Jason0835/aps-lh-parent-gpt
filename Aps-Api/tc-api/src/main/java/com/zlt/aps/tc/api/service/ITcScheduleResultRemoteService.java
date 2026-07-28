@@ -2,6 +2,8 @@ package com.zlt.aps.tc.api.service;
 
 import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.zlt.aps.tc.api.domain.dto.TcScheduleResultImportDTO;
+import com.zlt.aps.tc.api.domain.entity.TcScheduleResult;
 import com.zlt.aps.tc.api.domain.entity.TcScheduleResultExplain;
 import com.zlt.aps.tc.api.domain.vo.*;
 import io.swagger.annotations.ApiOperation;
@@ -21,6 +23,30 @@ import java.util.List;
 public interface ITcScheduleResultRemoteService {
 
     // ===== 看板与未排查询 =====
+
+    /**
+     * 按专用模板导出胎侧排程结果。
+     *
+     * @param queryVO 工厂和单日排程条件
+     * @param fileName 文件名称
+     * @return Excel 文件字节
+     */
+    @ApiOperation("按专用模板导出胎侧排程结果")
+    @PostMapping("/tcScheduleResult/exportDataScheduleResult")
+    byte[] exportDataScheduleResult(@RequestBody TcScheduleResult queryVO,
+                                    @RequestParam("fileName") String fileName);
+
+    /**
+     * 按专用模板导入胎侧排程结果。
+     *
+     * @param importDTO 文件和工厂日期上下文
+     * @param updateSupport 是否允许覆盖更新
+     * @return 导入结果
+     */
+    @ApiOperation("按专用模板导入胎侧排程结果")
+    @PostMapping("/tcScheduleResult/importDataScheduleResult")
+    AjaxResult importDataScheduleResult(@RequestBody TcScheduleResultImportDTO importDTO,
+                                        @RequestParam("updateSupport") boolean updateSupport);
 
     /**
      * 查询胎侧排程平铺看板。

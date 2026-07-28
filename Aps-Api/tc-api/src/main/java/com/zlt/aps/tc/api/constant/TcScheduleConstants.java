@@ -49,6 +49,9 @@ public final class TcScheduleConstants {
     /** 成型需求偏移班次数参数键。 */
     public static final String PARAM_FORMING_SHIFT_OFFSET = "TC_FORMING_SHIFT_OFFSET";
 
+    /** 班次表头起始日期相对排程日期的偏移天数参数键。 */
+    public static final String PARAM_SHIFT_DATE_START_OFFSET = "TC_SHIFT_DATE_START_OFFSET";
+
     /** 小胶种编码参数键。 */
     public static final String PARAM_SMALL_GLUE_CODES = "TC_SMALL_GLUE_CODES";
 
@@ -175,6 +178,9 @@ public final class TcScheduleConstants {
 
     /** 成型需求偏移班次数默认值。 */
     public static final String DEFAULT_FORMING_SHIFT_OFFSET = "2";
+
+    /** 班次表头起始日期相对排程日期的默认偏移天数。 */
+    public static final int DEFAULT_SHIFT_DATE_START_OFFSET = -1;
 
     /** 小胶种编码默认值。 */
     public static final String DEFAULT_SMALL_GLUE_CODES = "";
@@ -381,6 +387,9 @@ public final class TcScheduleConstants {
 
     /** 自动排程结果数据来源编码。 */
     public static final String AUTO_SCHEDULE_DATA_SOURCE = "AUTO";
+
+    /** Excel 模板导入排程结果数据来源编码。 */
+    public static final String IMPORT_SCHEDULE_DATA_SOURCE = "IMPORT";
 
     /** 预置机台绑定来源。 */
     public static final String PRESET_MACHINE_BIND_SOURCE = "PRESET_MACHINE";

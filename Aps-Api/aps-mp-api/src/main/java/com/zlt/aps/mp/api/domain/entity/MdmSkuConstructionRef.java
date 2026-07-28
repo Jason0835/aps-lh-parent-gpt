@@ -80,6 +80,12 @@ public class MdmSkuConstructionRef extends BaseEntity {
     @TableField(value = "CONSTRUCTION_CODE")
     private String constructionCode;
 
+    /** 成型编号 */
+    @Excel(name = "ui.data.column.mdmSkuConstructionRef.formingNo", sort = 35)
+    @ApiModelProperty(value = "成型编号", name = "formingNo")
+    @TableField(value = "FORMING_NO")
+    private String formingNo;
+
     /** 胎胚号 */
     @Excel(name = "ui.data.column.mdmSkuConstructionRef.embryoCode", sort = 45)
     @ApiModelProperty(value = "胎胚号", name = "embryoCode")

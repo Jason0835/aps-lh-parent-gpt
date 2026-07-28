@@ -229,7 +229,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectByUniqueKeyList" resultType="com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo">
         select *
         from T_MDM_MATERIAL_INFO
-        where CONCAT(FACTORY_CODE, "|", MATERIAL_CODE) in
+        where IS_DELETE = 0 AND CONCAT(FACTORY_CODE, "|", MATERIAL_CODE) in
         <foreach item="item" collection="list" open="(" separator="," close=")">
             #{item}
         </foreach>

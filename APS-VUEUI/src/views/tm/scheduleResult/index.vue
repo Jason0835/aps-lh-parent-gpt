@@ -1,12 +1,5 @@
 <template>
   <basic-container>
-    <div class="summary-bar">
-      <span>{{ $t('ui.tm.schedule.totalStockQty') }}：{{ summary.totalStockQty || 0 }}</span>
-      <span
-        v-for="(planQty, index) in shiftPlanQtyList"
-        :key="index"
-      >{{ $t('ui.tm.schedule.shiftPlanQty', { shift: index + 1 }) }}：{{ planQty || 0 }}</span>
-    </div>
     <page-table
       tableRef="tmScheduleResultMainTable"
       :calcHeight="true"
@@ -78,6 +71,15 @@
           type="primary"
           @click="handleChangeReleaseStatus"
         >{{ $t("ui.data.column.scheduleResult.changeReleaseStatus") }}</el-button>
+      </template>
+      <template slot="headerRight">
+        <div class="summary-bar stat-info">
+          <span>{{ $t('ui.tm.schedule.totalStockQty') }}：<span class="stat-value">{{ summary.totalStockQty || 0 }}</span></span>
+          <span
+            v-for="(planQty, index) in shiftPlanQtyList"
+            :key="index"
+          >{{ getShiftLabel(index + 1) }}{{ $t('ui.tm.schedule.planQty') }}：<span class="stat-value">{{ planQty || 0 }}</span></span>
+        </div>
       </template>
     </page-table>
     <tlt-upload-form
@@ -626,6 +628,7 @@ export default {
     async getDate() {
       try {
         let res = await listScheduleShiftDates({
+          factoryCode: this.query.factoryCode || this.search.factoryCode,
           scheduleDate: this.query.scheduleDate || this.search.scheduleDate,
         });
         if (res && res.length > 0) {
@@ -1030,11 +1033,18 @@ export default {
 .summary-bar {
   display: flex;
   flex-wrap: wrap;
-  gap: 24px;
-  margin-bottom: 10px;
-  padding: 10px 14px;
-  color: #606266;
-  background: #f5f7fa;
-  border-radius: 4px;
+  justify-content: flex-end;
+  gap: 12px;
+  max-width: calc(100vw - 160px);
+  margin-right: 12px;
+  color: #676a6c;
+  font-size: 12px;
+  font-weight: bold;
+  white-space: nowrap;
+
+  .stat-value {
+    margin-left: 5px;
+    color: #0088cc;
+  }
 }
 </style>

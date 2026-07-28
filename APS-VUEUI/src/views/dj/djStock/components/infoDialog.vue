@@ -34,6 +34,7 @@ import moment from "moment";
 import infoForm from "@/views/components/infoForm.vue";
 
 import { editStock } from "@/api/dj/stock";
+import { getPaddingDistList } from "@/api/dj/djScheduleResult";
 
 export default {
   components: { infoForm },
@@ -44,6 +45,7 @@ export default {
       isEdit: false,
       editType: null,
       form: {},
+      paddingList: [],
       rules: {
         stockDate: [
           {
@@ -85,11 +87,13 @@ export default {
           disabled: this.editType === "2",
         },
         {
-          label: this.$t("ui.data.column.quota.liningCode"),
+          label: this.$t("ui.data.column.dj.scheduleResult.paddingName"),
           prop: "materialCode",
           span: 24,
           required: true,
-          maxlength: "50",
+          type: "select",
+          dictData: this.paddingList,
+          filterable: true,
           disabled: this.editType === "2",
         },
         // {
@@ -185,9 +189,22 @@ export default {
     },
 
     //utils
+    loadPaddingList() {
+      getPaddingDistList().then((res) => {
+        const seen = new Set();
+        this.paddingList = (res || []).filter((p) => {
+          if (seen.has(p.value)) {
+            return false;
+          }
+          seen.add(p.value);
+          return true;
+        });
+      });
+    },
     show(data, editType) {
       this.visible = true;
       this.editType = editType;
+      this.loadPaddingList();
       if (data) {
         this.isEdit = true;
         this.form = {
@@ -216,6 +233,11 @@ export default {
           return;
         }
 
+        // 根据选中的垫胶编码补充垫胶名称
+        const paddingItem = this.paddingList.find(p => p.value === params.materialCode);
+        if (paddingItem) {
+          params.materialName = paddingItem.label;
+        }
         this.save({
           ...params,
           editType: this.editType,

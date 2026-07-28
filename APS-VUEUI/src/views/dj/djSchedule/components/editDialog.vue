@@ -36,7 +36,7 @@ import { numberEmpty } from "@/utils/index";
 
 import infoForm from "@/views/components/infoForm.vue";
 
-import { editScheduleResult } from "@/api/dj/djScheduleResult.js";
+import { editScheduleResult, getWorkClass } from "@/api/dj/djScheduleResult.js";
 
 export default {
   components: { infoForm },
@@ -46,6 +46,7 @@ export default {
       loading: false,
       visible: false,
       isEdit: false,
+      classHeaders: [],
       form: {
         scheduleDate: moment().add(1, "days").format("yyyy-MM-DD"),
       },
@@ -76,6 +77,12 @@ export default {
         {
           label: this.$t("ui.data.column.scheduleResult.scheduleDate"),
           prop: "scheduleDate",
+          span: 12,
+          disabled: true,
+        },
+        {
+          label: this.$t("ui.data.column.dj.scheduleResult.paddingName"),
+          prop: "paddingName",
           span: 12,
           disabled: true,
         },
@@ -126,7 +133,7 @@ export default {
 
         // ============ 中班（class1） ============
         {
-          label: this.$t("ui.data.column.scheduleResult.class1PlanQty"),
+          label: this.classHeaders[1],
           type: "title",
         },
         {
@@ -168,7 +175,7 @@ export default {
 
         // ============ 夜班（class2） ============
         {
-          label: this.$t("ui.data.column.scheduleResult.class2PlanQty"),
+          label: this.classHeaders[2],
           type: "title",
         },
         {
@@ -210,7 +217,7 @@ export default {
 
         // ============ 早班（class3） ============
         {
-          label: this.$t("ui.data.column.scheduleResult.class3PlanQty"),
+          label: this.classHeaders[3],
           type: "title",
         },
         {
@@ -249,6 +256,132 @@ export default {
           span: 12,
           maxlength: "100",
         },
+
+        // ============ 4班 ============
+        {
+          label: this.classHeaders[4],
+          type: "title",
+        },
+        {
+          label: this.$t("ui.data.column.dj.scheduleResult.planQty"),
+          prop: "class4PlanQty",
+          span: 12,
+          type: "number",
+          min: 0,
+          max: 999999,
+          precision: 0,
+        },
+        {
+          label: this.$t("ui.data.column.dj.scheduleResult.finishQty"),
+          prop: "class4FinishQty",
+          span: 12,
+          disabled: true,
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.finish"),
+          prop: "class4FinishRate",
+          span: 12,
+          disabled: true,
+        },
+        {
+          label: this.$t("ui.data.column.dj.scheduleResult.sequence"),
+          prop: "class4Sequence",
+          span: 12,
+          type: "number",
+          min: 0,
+          max: 999999,
+          precision: 0,
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.class4Analysis"),
+          prop: "class4Analysis",
+          span: 12,
+          maxlength: "100",
+        },
+
+        // ============ 5班 ============
+        {
+          label: this.classHeaders[5],
+          type: "title",
+        },
+        {
+          label: this.$t("ui.data.column.dj.scheduleResult.planQty"),
+          prop: "class5PlanQty",
+          span: 12,
+          type: "number",
+          min: 0,
+          max: 999999,
+          precision: 0,
+        },
+        {
+          label: this.$t("ui.data.column.dj.scheduleResult.finishQty"),
+          prop: "class5FinishQty",
+          span: 12,
+          disabled: true,
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.finish"),
+          prop: "class5FinishRate",
+          span: 12,
+          disabled: true,
+        },
+        {
+          label: this.$t("ui.data.column.dj.scheduleResult.sequence"),
+          prop: "class5Sequence",
+          span: 12,
+          type: "number",
+          min: 0,
+          max: 999999,
+          precision: 0,
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.class5Analysis"),
+          prop: "class5Analysis",
+          span: 12,
+          maxlength: "100",
+        },
+
+        // ============ 6班 ============
+        {
+          label: this.classHeaders[6],
+          type: "title",
+        },
+        {
+          label: this.$t("ui.data.column.dj.scheduleResult.planQty"),
+          prop: "class6PlanQty",
+          span: 12,
+          type: "number",
+          min: 0,
+          max: 999999,
+          precision: 0,
+        },
+        {
+          label: this.$t("ui.data.column.dj.scheduleResult.finishQty"),
+          prop: "class6FinishQty",
+          span: 12,
+          disabled: true,
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.finish"),
+          prop: "class6FinishRate",
+          span: 12,
+          disabled: true,
+        },
+        {
+          label: this.$t("ui.data.column.dj.scheduleResult.sequence"),
+          prop: "class6Sequence",
+          span: 12,
+          type: "number",
+          min: 0,
+          max: 999999,
+          precision: 0,
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.class6Analysis"),
+          prop: "class6Analysis",
+          span: 12,
+          maxlength: "100",
+        },
       ];
     },
   },
@@ -281,8 +414,19 @@ export default {
           class2Sequence: numberEmpty(data.class2Sequence),
           class3PlanQty: numberEmpty(data.class3PlanQty),
           class3Sequence: numberEmpty(data.class3Sequence),
+          class4PlanQty: numberEmpty(data.class4PlanQty),
+          class4Sequence: numberEmpty(data.class4Sequence),
+          class5PlanQty: numberEmpty(data.class5PlanQty),
+          class5Sequence: numberEmpty(data.class5Sequence),
+          class6PlanQty: numberEmpty(data.class6PlanQty),
+          class6Sequence: numberEmpty(data.class6Sequence),
         };
       }
+      // 获取班次标题
+      const scheduleDate = this.form.scheduleDate;
+      getWorkClass({ scheduleDate }).then((res) => {
+        this.classHeaders = res;
+      });
     },
     hide() {
       this.form = {};

@@ -27,6 +27,8 @@ public class TmStrategyRegistry {
 
     private final Map<String, ITmTaskSortStrategy> taskSortStrategyMap = new HashMap<>();
 
+    private final Map<String, ITmChainTaskPriorityStrategy> chainTaskPriorityStrategyMap = new HashMap<>();
+
     /**
      * 创建策略注册表。
      *
@@ -35,17 +37,20 @@ public class TmStrategyRegistry {
      * @param machineFilterRules      机台过滤规则集合
      * @param machineScoreStrategies  机台评分策略集合
      * @param taskSortStrategies      任务排序策略集合
+     * @param chainTaskPriorityStrategies 班次内任务优先策略集合
      */
     public TmStrategyRegistry(List<ITmDemandQtyStrategy> demandQtyStrategies,
                               List<ITmPlanQtyStrategy> planQtyStrategies,
                               List<ITmMachineFilterRule> machineFilterRules,
                               List<ITmMachineScoreStrategy> machineScoreStrategies,
-                              List<ITmTaskSortStrategy> taskSortStrategies) {
+                              List<ITmTaskSortStrategy> taskSortStrategies,
+                              List<ITmChainTaskPriorityStrategy> chainTaskPriorityStrategies) {
         registerDemandQtyStrategies(demandQtyStrategies);
         registerPlanQtyStrategies(planQtyStrategies);
         registerMachineFilterRules(machineFilterRules);
         registerMachineScoreStrategies(machineScoreStrategies);
         registerTaskSortStrategies(taskSortStrategies);
+        registerChainTaskPriorityStrategies(chainTaskPriorityStrategies);
     }
 
     /**
@@ -116,6 +121,21 @@ public class TmStrategyRegistry {
      */
     public ITmTaskSortStrategy getTaskSortStrategy(String strategyCode) {
         ITmTaskSortStrategy strategy = taskSortStrategyMap.get(strategyCode);
+        if (strategy == null) {
+            throw new ServiceException(TmScheduleErrorCodeEnum.TM_STRATEGY_NOT_REGISTERED.getDefaultMessage() + ":" + strategyCode);
+        }
+        return strategy;
+    }
+
+    /**
+     * 获取班次内任务优先策略。
+     *
+     * @param strategyCode 策略编码
+     * @return 班次内任务优先策略
+     * @throws ServiceException 策略编码未注册时抛出
+     */
+    public ITmChainTaskPriorityStrategy getChainTaskPriorityStrategy(String strategyCode) {
+        ITmChainTaskPriorityStrategy strategy = chainTaskPriorityStrategyMap.get(strategyCode);
         if (strategy == null) {
             throw new ServiceException(TmScheduleErrorCodeEnum.TM_STRATEGY_NOT_REGISTERED.getDefaultMessage() + ":" + strategyCode);
         }
@@ -204,6 +224,23 @@ public class TmStrategyRegistry {
                                 + "，新注册: " + strategy.getClass().getSimpleName());
             }
             taskSortStrategyMap.put(code, strategy);
+        }
+    }
+
+    private void registerChainTaskPriorityStrategies(List<ITmChainTaskPriorityStrategy> strategies) {
+        if (strategies == null) {
+            return;
+        }
+        for (ITmChainTaskPriorityStrategy strategy : strategies) {
+            String code = strategy.getStrategyCode();
+            ITmChainTaskPriorityStrategy existing = chainTaskPriorityStrategyMap.get(code);
+            if (existing != null) {
+                throw new IllegalStateException(
+                        "胎面班次内任务优先策略编码重复: " + code
+                                + "，已注册: " + existing.getClass().getSimpleName()
+                                + "，新注册: " + strategy.getClass().getSimpleName());
+            }
+            chainTaskPriorityStrategyMap.put(code, strategy);
         }
     }
 }

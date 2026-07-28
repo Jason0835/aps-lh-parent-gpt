@@ -1,16 +1,5 @@
 <template>
   <basic-container>
-    <div class="summary-bar">
-      <span>{{ $t('ui.tc.schedule.totalStockQty') }}：{{ summary.totalStockQty || 0 }}</span>
-      <span>{{ $t('ui.tc.schedule.totalPlanQty') }}：{{ summary.totalPlanQty || 0 }}</span>
-      <span>{{ $t('ui.tc.schedule.totalFinishQty') }}：{{ summary.totalFinishQty || 0 }}</span>
-      <span>{{ $t('ui.tc.schedule.resultCount') }}：{{ summary.resultCount || 0 }}</span>
-      <span>{{ $t('ui.tc.schedule.unplannedCount') }}：{{ unplannedCount || 0 }}</span>
-      <span
-        v-for="(planQty, index) in shiftPlanQtyList"
-        :key="index"
-      >{{ $t('ui.tc.schedule.shiftPlanQty', { shift: index + 1 }) }}：{{ planQty || 0 }}</span>
-    </div>
     <page-table
       v-loading="loading"
       :calc-height="true"
@@ -69,8 +58,47 @@
         <el-button v-hasPermi="['tc:tcScheduleResult:query']" plain type="info" @click="handleUnplanned">
           {{ $t('ui.tc.schedule.unplannedTasks') }}（{{ unplannedCount || 0 }}）
         </el-button>
+        <el-button
+          v-hasPermi="['tc:tcScheduleResult:export']"
+          type="primary"
+          @click="handleExport"
+        >
+          {{ $t('ui.frame.btn.export') }}
+        </el-button>
+        <el-button
+          v-hasPermi="['tc:tcScheduleResult:import']"
+          :disabled="writeTaskRunning"
+          type="primary"
+          @click="handleImport"
+        >
+          {{ $t('ui.frame.btn.import') }}
+        </el-button>
+      </template>
+      <template slot="headerRight">
+        <div class="summary-bar stat-info">
+          <span>{{ $t('ui.tc.schedule.totalStockQty') }}：<span class="stat-value">{{ summary.totalStockQty || 0 }}</span></span>
+          <span>{{ $t('ui.tc.schedule.totalPlanQty') }}：<span class="stat-value">{{ summary.totalPlanQty || 0 }}</span></span>
+          <span>{{ $t('ui.tc.schedule.totalFinishQty') }}：<span class="stat-value">{{ summary.totalFinishQty || 0 }}</span></span>
+          <span>{{ $t('ui.tc.schedule.resultCount') }}：<span class="stat-value">{{ summary.resultCount || 0 }}</span></span>
+          <span>{{ $t('ui.tc.schedule.unplannedCount') }}：<span class="stat-value">{{ unplannedCount || 0 }}</span></span>
+          <span
+            v-for="(planQty, index) in shiftPlanQtyList"
+            :key="index"
+          >{{ shiftLabel(index + 1) }}{{ $t('ui.tc.schedule.planQty') }}：<span class="stat-value">{{ planQty || 0 }}</span></span>
+        </div>
       </template>
     </page-table>
+
+    <tlt-upload-form
+      ref="tltUpload"
+      :columns="importColumns"
+      :download-url-formatter="form => handleTemplateDownload('/tc/tcScheduleResult/importTemplateCust', form)"
+      :rules="importRules"
+      download-url="/tc/tcScheduleResult/importTemplateCust"
+      label-width="90px"
+      upload-url="/tc/tcScheduleResult/importDataCust"
+      @uploadSuccess="getList"
+    />
 
     <auto-plan-dialog ref="autoPlanRef" @success="handleAutoPlanSuccess" />
     <insert-task-dialog ref="insertTaskRef" @success="handleOperationTask" />
@@ -176,6 +204,8 @@ import {
   removeScheduleResult,
   validateRelease
 } from '@/api/tc/tcScheduleResult'
+import {downloadLink} from '@/utils/request'
+import TltUploadForm from '@/views/components/tltUploadForm.vue'
 import AutoPlanDialog from './components/AutoPlanDialog.vue'
 import ChangeMachineDialog from './components/ChangeMachineDialog.vue'
 import ChangeQtyDialog from './components/ChangeQtyDialog.vue'
@@ -204,6 +234,7 @@ export default {
     ChangeQtyDialog,
     ExplainDrawer,
     InsertTaskDialog,
+    TltUploadForm,
     UnplannedDialog
   },
   dicts: ['biz_factory_name', 'IS_RELEASE'],
@@ -211,16 +242,9 @@ export default {
     return { parentDict: this.dict }
   },
   data() {
-    let storedFactoryCode = ''
-    try {
-      const storedScope = JSON.parse(window.sessionStorage.getItem('tcAutoPlanLatestScope') || '{}')
-      storedFactoryCode = storedScope.factoryCode || ''
-    } catch (error) {
-      window.sessionStorage.removeItem('tcAutoPlanLatestScope')
-    }
     const defaultQuery = {
-      factoryCode: storedFactoryCode,
-      scheduleRange: [offsetDate(0), offsetDate(2)]
+      factoryCode: '116',
+      scheduleDate: offsetDate(0)
     }
     return {
       loading: false,
@@ -259,7 +283,23 @@ export default {
       operationProgressVisible: false,
       operationProgressValue: 0,
       operationProgressStage: '',
-      operationProgressStatus: null
+      operationProgressStatus: null,
+      importRules: {
+        factoryCode: [
+          {
+            required: true,
+            message: this.$t('common.rule.select'),
+            trigger: 'change'
+          }
+        ],
+        scheduleDate: [
+          {
+            required: true,
+            message: this.$t('common.rule.select'),
+            trigger: 'change'
+          }
+        ]
+      }
     }
   },
   computed: {
@@ -269,6 +309,36 @@ export default {
     // 各班次计划量合计列表，后端返回下标 0=1班，长度 6；为空时回退为空数组避免渲染异常
     shiftPlanQtyList() {
       return (this.summary && this.summary.shiftPlanQtyList) || []
+    },
+    // 导入弹窗独立选择工厂和单日排程日期，工厂下拉支持输入筛选。
+    importColumns() {
+      return [
+        {
+          label: this.$t('ui.tc.schedule.factoryCode'),
+          prop: 'factoryCode',
+          type: 'select',
+          dictData: this.dict.type.biz_factory_name,
+          filterable: true,
+          clearable: false
+        },
+        {
+          label: this.$t('ui.tc.schedule.scheduleDate'),
+          prop: 'scheduleDate',
+          type: 'date',
+          dateType: 'date',
+          valueFormat: 'yyyy-MM-dd',
+          clearable: false
+        },
+        {
+          label: '',
+          prop: 'updateSupport',
+          render: form => (
+            <el-checkbox v-model={form.updateSupport}>
+              {this.$t('common.rule.updateSupport')}
+            </el-checkbox>
+          )
+        }
+      ]
     },
     columns() {
       const baseColumns = [
@@ -333,10 +403,10 @@ export default {
           filterable: true
         },
         {
-          prop: 'scheduleRange',
-          label: this.$t('ui.tc.schedule.scheduleDateRange'),
+          prop: 'scheduleDate',
+          label: this.$t('ui.tc.schedule.scheduleDate'),
           type: 'date',
-          dateType: 'daterange',
+          dateType: 'date',
           valueFormat: 'yyyy-MM-dd'
         },
         {
@@ -387,16 +457,22 @@ export default {
   methods: {
     shiftLabel(shiftOrder) {
       const option = this.dateColumns.find(item => item.shiftOrder === shiftOrder)
-      return option ? `${shiftOrder}. ${option.shiftName || option.shiftCode || ''}` : `${this.$t('ui.tc.schedule.shift')} ${shiftOrder}`
+      const shiftName = option
+        ? (option.shiftName || option.shiftCode || '')
+        : `${this.$t('ui.tc.schedule.shift')} ${shiftOrder}`
+      const scheduleDate = option && option.scheduleDate
+        ? String(option.scheduleDate).substring(0, 10)
+        : ''
+      const displayDate = scheduleDate ? scheduleDate.substring(5, 10).replace('-', '/') : ''
+      return `${shiftName} ${displayDate}`.trim()
     },
     formatQuery(includePage = true) {
-      const scheduleRange = this.query.scheduleRange || []
       const params = {
         ...this.query,
-        startDate: scheduleRange[0],
-        endDate: scheduleRange[1]
+        startDate: this.query.scheduleDate,
+        endDate: this.query.scheduleDate
       }
-      delete params.scheduleRange
+      delete params.scheduleDate
       if (includePage) {
         params.pageNum = this.page.current
         params.pageSize = this.page.pageSize
@@ -449,13 +525,42 @@ export default {
     handleSelectionChange(rows) {
       this.selection = rows
     },
+    handleImport() {
+      this.$refs.tltUpload.handleImport({
+        factoryCode: this.query.factoryCode || this.search.factoryCode,
+        scheduleDate: this.query.scheduleDate,
+        updateSupport: true
+      })
+    },
+    handleTemplateDownload(url, formValues) {
+      const params = {
+        ...formValues,
+        exportTemplate: true
+      }
+      const paramsStr = Object.keys(params)
+        .filter(key => params[key] !== undefined && params[key] !== null && params[key] !== '')
+        .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(params[key])}`)
+        .join('&')
+      return `${url}${paramsStr ? '?' + paramsStr : ''}`
+    },
+    handleExport() {
+      if (!this.query.factoryCode || !this.query.scheduleDate) {
+        this.$modal.msgWarning(this.$t('ui.tc.schedule.excelFactoryDateRequired'))
+        return
+      }
+      downloadLink('/tc/tcScheduleResult/export', {
+        factoryCode: this.query.factoryCode,
+        scheduleDate: this.query.scheduleDate,
+        machineCode: this.query.machineCode,
+        sidewallCode: this.query.sidewallCode
+      })
+    },
     handleAutoPlan() {
-      const range = this.query.scheduleRange || []
-      this.$refs.autoPlanRef.show(this.query.factoryCode, range[0])
+      this.$refs.autoPlanRef.show(this.query.factoryCode, this.query.scheduleDate)
     },
     handleAutoPlanSuccess(scheduleDate, task) {
       if (scheduleDate) {
-        this.query.scheduleRange = [scheduleDate, scheduleDate]
+        this.query.scheduleDate = scheduleDate
         this.search = { ...this.query }
         window.sessionStorage.setItem('tcAutoPlanLatestScope', JSON.stringify({
           factoryCode: this.query.factoryCode,
@@ -512,8 +617,7 @@ export default {
     },
     handleAdd() {
       if (this.writeTaskRunning) return
-      const range = this.query.scheduleRange || []
-      this.$refs.insertTaskRef.show(this.query.factoryCode, range[0])
+      this.$refs.insertTaskRef.show(this.query.factoryCode, this.query.scheduleDate)
     },
     handleChangeQty() {
       if (this.writeTaskRunning) return
@@ -610,9 +714,8 @@ export default {
       poll()
     },
     restoreLatestOperationTask(preferStoredScope = false) {
-      const range = this.query.scheduleRange || []
       let factoryCode = this.query.factoryCode
-      let scheduleDate = range[0]
+      let scheduleDate = this.query.scheduleDate
       if (preferStoredScope) {
         try {
           const storedScope = JSON.parse(window.sessionStorage.getItem('tcOperationLatestScope') || '{}')
@@ -621,8 +724,6 @@ export default {
         } catch (error) {
           window.sessionStorage.removeItem('tcOperationLatestScope')
         }
-      } else if (!range[0] || range[0] !== range[1]) {
-        return
       }
       if (!factoryCode || !scheduleDate) return
       getLatestOperationTask({ factoryCode, scheduleDate }).then(task => {
@@ -681,9 +782,8 @@ export default {
       poll()
     },
     restoreLatestAutoPlanTask(preferStoredScope = false) {
-      const range = this.query.scheduleRange || []
       let factoryCode = this.query.factoryCode
-      let scheduleDate = range[0]
+      let scheduleDate = this.query.scheduleDate
       if (preferStoredScope) {
         try {
           const storedScope = JSON.parse(window.sessionStorage.getItem('tcAutoPlanLatestScope') || '{}')
@@ -692,14 +792,12 @@ export default {
         } catch (error) {
           window.sessionStorage.removeItem('tcAutoPlanLatestScope')
         }
-      } else if (!range[0] || range[0] !== range[1]) {
-        return
       }
       if (!factoryCode || !scheduleDate) return
       getLatestAutoPlanTask({ factoryCode, scheduleDate }).then(task => {
         if (task && task.taskId && ['PENDING', 'RUNNING'].includes(task.taskStatus)) {
           this.query.factoryCode = factoryCode
-          this.query.scheduleRange = [scheduleDate, scheduleDate]
+          this.query.scheduleDate = scheduleDate
           this.search = { ...this.query }
           this.pollAutoPlanTask(task.taskId)
         }
@@ -753,9 +851,8 @@ export default {
       poll()
     },
     restoreLatestReleaseTask(preferStoredScope = false) {
-      const range = this.query.scheduleRange || []
       let factoryCode = this.query.factoryCode
-      let scheduleDate = range[0]
+      let scheduleDate = this.query.scheduleDate
       if (preferStoredScope) {
         try {
           const storedScope = JSON.parse(window.sessionStorage.getItem('tcReleaseLatestScope') || '{}')
@@ -764,8 +861,6 @@ export default {
         } catch (error) {
           window.sessionStorage.removeItem('tcReleaseLatestScope')
         }
-      } else if (!range[0] || range[0] !== range[1]) {
-        return
       }
       if (!factoryCode || !scheduleDate) return
       getLatestReleaseTask({ factoryCode, scheduleDate }).then(task => {
@@ -808,12 +903,19 @@ export default {
 .summary-bar {
   display: flex;
   flex-wrap: wrap;
-  gap: 24px;
-  margin-bottom: 10px;
-  padding: 10px 14px;
-  color: #606266;
-  background: #f5f7fa;
-  border-radius: 4px;
+  justify-content: flex-end;
+  gap: 12px;
+  max-width: calc(100vw - 160px);
+  margin-right: 12px;
+  color: #676a6c;
+  font-size: 12px;
+  font-weight: bold;
+  white-space: nowrap;
+
+  .stat-value {
+    margin-left: 5px;
+    color: #0088cc;
+  }
 }
 .progress-stage {
   margin-bottom: 12px;

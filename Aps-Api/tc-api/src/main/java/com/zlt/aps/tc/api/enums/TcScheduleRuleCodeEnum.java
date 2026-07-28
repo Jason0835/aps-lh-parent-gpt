@@ -14,6 +14,9 @@ public enum TcScheduleRuleCodeEnum {
     /** 施工版本匹配及回退。 */
     VERSION_MATCH("VERSION_MATCH", "施工版本匹配及回退"),
 
+    /** 库存保证范围时长(用于库存供应时长 supplyHours 与排序库存紧急度)。 */
+    GUARD_RANGE_HOURS("GUARD_RANGE_HOURS", "库存保证范围时长"),
+
     /** 开机阈值调整。 */
     STARTUP_THRESHOLD_ADJUST("STARTUP_THRESHOLD_ADJUST", "开机阈值调整"),
 
@@ -25,6 +28,9 @@ public enum TcScheduleRuleCodeEnum {
 
     /** 计划量结转。 */
     PLAN_QTY_CARRYOVER("PLAN_QTY_CARRYOVER", "计划量结转"),
+
+    /** 静态可行但当前班产能不足的顺延。 */
+    CAPACITY_BLOCKED_CARRYOVER("CAPACITY_BLOCKED_CARRYOVER", "当前班产能不足顺延"),
 
     /** 产能溢出拆分。 */
     CAPACITY_OVERFLOW_SPLIT("CAPACITY_OVERFLOW_SPLIT", "产能溢出拆分"),
@@ -67,6 +73,12 @@ public enum TcScheduleRuleCodeEnum {
 
     /** 计划量计算。 */
     PLAN_QTY_CALC("PLAN_QTY_CALC", "计划量计算"),
+
+    /** 同胎侧同班次计划量汇总。 */
+    PLAN_QTY_AGGREGATE("PLAN_QTY_AGGREGATE", "同胎侧同班次计划量汇总"),
+
+    /** 汇总计划量按成型来源分摊。 */
+    PLAN_QTY_SOURCE_ALLOCATE("PLAN_QTY_SOURCE_ALLOCATE", "汇总计划量按成型来源分摊"),
 
     /** 任务排序。 */
     TASK_SORT("TASK_SORT", "任务排序");

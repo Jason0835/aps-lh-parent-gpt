@@ -3,6 +3,8 @@ package com.zlt.aps.tm.service.loader;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.ruoyi.common.exception.ServiceException;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.tm.api.constant.TmScheduleConstants;
 import com.zlt.aps.tm.api.domain.entity.TmParams;
 import com.zlt.aps.tm.api.enums.TmParamValueSourceEnum;
@@ -14,6 +16,7 @@ import com.zlt.aps.tm.engine.domain.TmScheduleContext;
 import com.zlt.aps.tm.mapper.TmParamsMapper;
 import com.zlt.aps.tm.service.cache.TmAutoScheduleRedisCacheService;
 
+import java.text.MessageFormat;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -56,9 +59,37 @@ public class TmScheduleParamLoader {
                     .forEach(params -> paramMap.put(params.getParamCode(), this.toParamValue(params)));
         }
         this.fillDefaultParams(paramMap);
+        this.validateFilterRuleOrder(paramMap.get(TmScheduleConstants.PARAM_FILTER_RULE_ORDER));
         context.setParamMap(paramMap);
         context.setSmallGlueCodeSet(this.parseSmallGlueCodes(
                 paramMap.get(TmScheduleConstants.PARAM_SMALL_GLUE_CODES)));
+    }
+
+    /**
+     * 在参数装载阶段校验过滤规则顺序，避免错误配置到候选计算时才暴露。
+     *
+     * @param paramValue 过滤规则顺序参数
+     * @throws ServiceException 存在未知或重复规则编码时抛出
+     */
+    private void validateFilterRuleOrder(TmParamValue paramValue) {
+        String configuredOrder = paramValue == null ? null : paramValue.getEffectiveValue();
+        Set<String> supportedRuleSet = Arrays.stream(TmScheduleConstants.DEFAULT_FILTER_RULE_ORDER.split(","))
+                .map(String::trim)
+                .filter(StrUtil::isNotBlank)
+                .map(String::toUpperCase)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        Set<String> configuredRuleSet = new HashSet<>();
+        Arrays.stream(StrUtil.blankToDefault(configuredOrder,
+                        TmScheduleConstants.DEFAULT_FILTER_RULE_ORDER).split(","))
+                .map(String::trim)
+                .filter(StrUtil::isNotBlank)
+                .map(String::toUpperCase)
+                .forEach(ruleCode -> {
+                    if (!supportedRuleSet.contains(ruleCode) || !configuredRuleSet.add(ruleCode)) {
+                        throw new ServiceException(MessageFormat.format(
+                                I18nUtil.getMessage("ui.tm.schedule.filterRuleOrderInvalid"), ruleCode));
+                    }
+                });
     }
 
     /**

@@ -1,10 +1,13 @@
 import request from '@/utils/request'
 
 export function listScheduleResult(query) {
+  // 分页参数需同时放在 URL query param 中（startPage() 从 request.params 读取）
+  const { pageNum, pageSize, ...dataBody } = query || {};
   return request({
     url: 'dj/djScheduleResult/list',
     method: 'post',
-    data: query
+    params: { pageNum, pageSize },
+    data: dataBody
   })
 }
 export function removeScheduleResult(query) {

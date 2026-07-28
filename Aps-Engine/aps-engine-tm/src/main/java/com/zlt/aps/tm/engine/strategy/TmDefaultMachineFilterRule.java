@@ -1,6 +1,7 @@
 package com.zlt.aps.tm.engine.strategy;
 
 import com.ruoyi.common.exception.ServiceException;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.engine.schedule.ScheduleRuleResult;
 import com.zlt.aps.tm.api.constant.TmScheduleConstants;
 import com.zlt.aps.tm.api.enums.TmMachineFilterReasonEnum;
@@ -13,10 +14,8 @@ import com.zlt.aps.tm.engine.domain.TmTaskDraft;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
-import java.util.Arrays;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.text.MessageFormat;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -57,13 +56,42 @@ public class TmDefaultMachineFilterRule implements ITmMachineFilterRule {
      */
     @Override
     public ScheduleRuleResult evaluate(TmMachineCandidate candidate, TmMachineRuleContext context) {
+        return this.evaluateInternal(candidate, context, false);
+    }
+
+    /**
+     * 执行不含剩余产能判断的静态机台过滤。
+     *
+     * @param candidate 候选机台
+     * @param context   机台规则上下文
+     * @return 规则执行结果，passed=true 表示静态硬约束通过
+     */
+    @Override
+    public ScheduleRuleResult evaluateStatic(TmMachineCandidate candidate, TmMachineRuleContext context) {
+        return this.evaluateInternal(candidate, context, true);
+    }
+
+    /**
+     * 按指定过滤范围执行默认机台规则链。
+     *
+     * @param candidate 候选机台
+     * @param context 机台规则上下文
+     * @param staticOnly true 表示跳过当前班次剩余产能判断
+     * @return 规则执行结果
+     */
+    private ScheduleRuleResult evaluateInternal(TmMachineCandidate candidate, TmMachineRuleContext context,
+                                                boolean staticOnly) {
         if (candidate == null || context == null) {
             throw new ServiceException(TmScheduleErrorCodeEnum.TM_MACHINE_CANDIDATE_EMPTY.getDefaultMessage());
         }
         TmTaskDraft task = context.getTaskDraft();
         List<String> ruleOrder = this.resolveRuleOrder(context);
-        candidate.getEvidence().put("filterRuleOrder", ruleOrder);
+        candidate.getEvidence().put(staticOnly ? "staticFilterRuleOrder" : "filterRuleOrder", ruleOrder);
         for (String ruleCode : ruleOrder) {
+            if (staticOnly && RULE_REMAIN_CAPACITY.equals(ruleCode)) {
+                candidate.getEvidence().put("staticFilterSkipped:" + ruleCode, Boolean.TRUE);
+                continue;
+            }
             if (!this.isRuleEnabled(context, ruleCode)) {
                 candidate.getEvidence().put("filterRuleDisabled:" + ruleCode, Boolean.TRUE);
                 continue;
@@ -122,21 +150,40 @@ public class TmDefaultMachineFilterRule implements ITmMachineFilterRule {
      * @return 去空并转为大写的过滤规则编码列表
      */
     private List<String> resolveRuleOrder(TmMachineRuleContext context) {
-        String ruleOrder = TmScheduleConstants.DEFAULT_FILTER_RULE_ORDER;
+        String configuredRuleOrder = null;
         if (context.getScheduleContext() != null) {
             TmParamValue paramValue = context.getScheduleContext().getParamMap()
                     .get(TmScheduleConstants.PARAM_FILTER_RULE_ORDER);
             if (paramValue != null && paramValue.getEffectiveValue() != null
                     && !paramValue.getEffectiveValue().trim().isEmpty()) {
-                ruleOrder = paramValue.getEffectiveValue();
+                configuredRuleOrder = paramValue.getEffectiveValue();
             }
         }
-        return Arrays.stream(ruleOrder.split(","))
+        List<String> defaultRuleOrder = Arrays.stream(TmScheduleConstants.DEFAULT_FILTER_RULE_ORDER.split(","))
                 .map(String::trim)
                 .filter(value -> !value.isEmpty())
                 .map(String::toUpperCase)
-                .distinct()
                 .collect(Collectors.toList());
+        if (configuredRuleOrder == null) {
+            return defaultRuleOrder;
+        }
+        List<String> configuredRuleList = Arrays.stream(configuredRuleOrder.split(","))
+                .map(String::trim)
+                .filter(value -> !value.isEmpty())
+                .map(String::toUpperCase)
+                .collect(Collectors.toList());
+        Set<String> configuredRuleSet = new HashSet<>();
+        for (String ruleCode : configuredRuleList) {
+            if (!this.isKnownRule(ruleCode) || !configuredRuleSet.add(ruleCode)) {
+                throw new ServiceException(MessageFormat.format(
+                        I18nUtil.getMessage("ui.tm.schedule.filterRuleOrderInvalid"), ruleCode));
+            }
+        }
+        List<String> resolvedRuleOrder = new ArrayList<>(configuredRuleList);
+        defaultRuleOrder.stream()
+                .filter(ruleCode -> !configuredRuleSet.contains(ruleCode))
+                .forEach(resolvedRuleOrder::add);
+        return resolvedRuleOrder;
     }
 
     /**

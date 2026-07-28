@@ -441,7 +441,7 @@
   "ui.data.column.dj.scheduleResult.scheduleDate": "Ngày lịch",
   "ui.data.column.dj.scheduleResult.mouthPlateCode": "Mã tấm miệng",
   "ui.data.column.dj.scheduleResult.releaseStatus": "Trạng thái phát hành",
-  "ui.data.column.dj.scheduleResult.paddingCode": "Đệm cao su",
+  "ui.data.column.dj.scheduleResult.paddingCode": "Mã đệm cao su",
   "ui.data.column.dj.scheduleResult.paddingName": "Đệm cao su",
   "ui.data.column.dj.scheduleResult.glueCode": "Keo",
   "ui.data.column.dj.scheduleResult.machineCode": "Máy",
@@ -2426,6 +2426,7 @@
   "ui.tc.schedule.releasePollTimeout": "Tác vụ vẫn đang chạy nền, vui lòng làm mới sau để xem trạng thái",
   "ui.tm.schedule.excelFactoryDateRequired": "Vui lòng chọn nhà máy và ngày xếp lịch",
   "ui.tm.schedule.shiftPlanQty": "Số lượng kế hoạch ca {shift}",
+  "ui.tm.schedule.planQty": "Số lượng kế hoạch",
   "ui.tm.schedule.totalStockQty": "Tổng tồn kho",
   "ui.data.column.tm.scheduleResult.operationProgress": "Tiến độ thao tác thủ công mặt lốp",
   "ui.data.column.tm.scheduleResult.operationProgressHint": "Tác vụ đang chạy nền và có thể khôi phục sau khi làm mới",
@@ -2436,5 +2437,7 @@
   "ui.tc.schedule.operationProgressHint": "Tác vụ đang chạy nền và có thể khôi phục sau khi làm mới",
   "ui.tc.schedule.operationSuccess": "Thao tác thủ công hông lốp thành công",
   "ui.tc.schedule.operationFailed": "Thao tác thủ công hông lốp thất bại",
-  "ui.tc.schedule.operationTimeout": "Tác vụ vẫn đang chạy nền, vui lòng làm mới sau để xem trạng thái"
+  "ui.tc.schedule.operationTimeout": "Tác vụ vẫn đang chạy nền, vui lòng làm mới sau để xem trạng thái",
+  "ui.tc.schedule.excelFactoryDateRequired": "Vui lòng chọn nhà máy và ngày lập lịch",
+  "ui.tc.schedule.excelSingleDateRequired": "Kết quả lập lịch hông lốp chỉ được xuất cho một ngày"
 }

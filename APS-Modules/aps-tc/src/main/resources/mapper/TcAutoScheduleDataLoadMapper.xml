@@ -5,10 +5,13 @@
 <mapper namespace="com.zlt.aps.tc.mapper.TcAutoScheduleDataLoadMapper">
 
     <resultMap id="TcFormingDemandRowResult" type="com.zlt.aps.tc.domain.vo.TcFormingDemandRowVo">
+        <result column="SOURCE_RECORD_ID" property="sourceRecordId"/>
         <result column="ORDER_NO" property="orderNo"/>
         <result column="EMBRYO_CODE" property="embryoCode"/>
         <result column="BOM_DATA_VERSION" property="bomDataVersion"/>
         <result column="LH_MACHINE_CODE" property="lhMachineCode"/>
+        <result column="CX_MACHINE_CODE" property="cxMachineCode"/>
+        <result column="MATERIAL_DESC" property="materialDesc"/>
         <result column="CLASS1_PLAN_QTY" property="class1PlanQty"/>
         <result column="CLASS2_PLAN_QTY" property="class2PlanQty"/>
         <result column="CLASS3_PLAN_QTY" property="class3PlanQty"/>
@@ -20,6 +23,9 @@
         <result column="MARK_CLOSE_OUT_TIP" property="markCloseOutTip"/>
         <result column="CX_REMAIN_QTY" property="cxRemainQty"/>
         <result column="SIDEWALL_CODE" property="sidewallCode"/>
+        <!-- constructionVersion 属性存放胎侧施工版本(来源 SIDEWALL_VERSION 列，详设§3.1)；
+             SQL 用 CONSTRUCTION_VERSION 列匹配 BOM_DATA_VERSION 仅用于 BOM 择版，不映射到本属性。
+             SIDEWALL_VERSION 为空时结果 CONSTRUCTION_VERSION 即为空(属数据问题，非映射错误)。 -->
         <result column="SIDEWALL_VERSION" property="constructionVersion"/>
         <result column="SIDEWALL_CRAFT" property="sidewallCraft"/>
         <result column="SIDEWALL_LENGTH" property="sidewallLength"/>
@@ -46,6 +52,9 @@
         <result column="EMBRYO_CODE" property="embryoCode"/>
         <result column="CONSTRUCTION_STAGE" property="constructionStage"/>
         <result column="SIDEWALL_CODE" property="sidewallCode"/>
+        <!-- constructionVersion 属性存放胎侧施工版本(来源 SIDEWALL_VERSION 列，详设§3.1)；
+             SQL 用 CONSTRUCTION_VERSION 列匹配 BOM_DATA_VERSION 仅用于 BOM 择版，不映射到本属性。
+             SIDEWALL_VERSION 为空时结果 CONSTRUCTION_VERSION 即为空(属数据问题，非映射错误)。 -->
         <result column="SIDEWALL_VERSION" property="constructionVersion"/>
         <result column="SIDEWALL_CRAFT" property="sidewallCraft"/>
         <result column="SIDEWALL_LENGTH" property="sidewallLength"/>
@@ -55,10 +64,13 @@
         <result column="SIDEWALL_WEARP_RUBBER_WEIGHT" property="sidewallWearpRubberWeight"/>
     </resultMap>
     <select id="selectFormingDemandRows" resultMap="TcFormingDemandRowResult">
-        SELECT cx.ORDER_NO,
+        SELECT cx.ID AS SOURCE_RECORD_ID,
+               cx.ORDER_NO,
                cx.EMBRYO_CODE,
                cx.BOM_DATA_VERSION,
                cx.LH_MACHINE_CODE,
+               cx.CX_MACHINE_CODE,
+               cx.MATERIAL_DESC,
                cx.CLASS1_PLAN_QTY,
                cx.CLASS2_PLAN_QTY,
                cx.CLASS3_PLAN_QTY,
@@ -107,6 +119,7 @@
         WHERE cx.IS_DELETE = 0
           AND cx.FACTORY_CODE = #{factoryCode}
           AND cx.SCHEDULE_DATE = #{scheduleDate}
+        ORDER BY cx.ID, ci.SIDEWALL_CODE
     </select>
 
     <select id="selectExperimentSpecMonthPlanRows" resultMap="TcExperimentSpecMonthPlanRowResult">
@@ -170,9 +183,12 @@
         ORDER BY PRODUCTION_DATE
     </select>
     <resultMap id="TcFormingDemandRecipeRowResult" type="com.zlt.aps.tc.domain.vo.TcFormingDemandRecipeRowVo">
+        <result column="SOURCE_RECORD_ID" property="sourceRecordId"/>
         <result column="ORDER_NO" property="orderNo"/>
         <result column="EMBRYO_CODE" property="embryoCode"/>
         <result column="LH_MACHINE_CODE" property="lhMachineCode"/>
+        <result column="CX_MACHINE_CODE" property="cxMachineCode"/>
+        <result column="MATERIAL_DESC" property="materialDesc"/>
         <result column="CLASS1_PLAN_QTY" property="class1PlanQty"/>
         <result column="CLASS2_PLAN_QTY" property="class2PlanQty"/>
         <result column="CLASS3_PLAN_QTY" property="class3PlanQty"/>
@@ -208,9 +224,12 @@
 
     <!-- RECIPE 模式：仅查成型排程结果，不 JOIN 施工表，施工信息由 Java 按 (EMBRYO_CODE, CLASSn_RECIPE_NO) 关联解析 -->
     <select id="selectFormingDemandRowsByRecipe" resultMap="TcFormingDemandRecipeRowResult">
-        SELECT cx.ORDER_NO,
+        SELECT cx.ID AS SOURCE_RECORD_ID,
+               cx.ORDER_NO,
                cx.EMBRYO_CODE,
                cx.LH_MACHINE_CODE,
+               cx.CX_MACHINE_CODE,
+               cx.MATERIAL_DESC,
                cx.CLASS1_PLAN_QTY,
                cx.CLASS2_PLAN_QTY,
                cx.CLASS3_PLAN_QTY,
@@ -233,6 +252,7 @@
         WHERE cx.IS_DELETE = 0
           AND cx.FACTORY_CODE = #{factoryCode}
           AND cx.SCHEDULE_DATE = #{scheduleDate}
+        ORDER BY cx.ID
     </select>
 
     <!-- RECIPE 模式：按 (CONSTRUCTION_CODE, CONSTRUCTION_VERSION) 批量加载施工胎侧属性 -->

@@ -304,6 +304,24 @@ public class LhScheduleContext {
      */
     private Map<String, LhPrecisionPlan> maintenancePlanMap = new HashMap<>();
     /**
+     * 当前批次待处理的精度计划有序列表。
+     * <p>列表只包含数据源 daysToDue 不为空且进入预警窗口的未完成计划，统一按
+     * daysToDue、计划日期、物理机台编码升序排列；原 maintenancePlanMap 继续供历史调用点查询。</p>
+     */
+    private List<LhPrecisionPlan> orderedMaintenancePlanList = new ArrayList<>();
+    /**
+     * 是否已经完成本批精度计划中心预决策。
+     * <p>用于阻止旧的“首个SKU收尾后再单机挂窗”入口覆盖全局排序、06:00截止和到期前风险结论。</p>
+     */
+    private boolean maintenancePreDecisionCompleted;
+    /**
+     * 中心预决策时因在机SKU收尾时间未知而暂缓的物理机台。
+     * <p>这些机台允许在续作主链得到真实首个收尾时间后补做一次精度日期决策；
+     * 其他已经完成中心决策的机台仍禁止旧入口重复挂窗。</p>
+     */
+    private Set<String> maintenanceDeferredPhysicalMachineCodeSet =
+            new LinkedHashSet<String>(8);
+    /**
      * 排程年度精准计划条数：machineCode -> 当年有效记录数。
      * <p>包含已完成与未完成计划，仅用于“一机一年一条”完整性告警；实际排程仍只读取
      * maintenancePlanMap 中未完成且实际完成时间为空的计划。</p>
@@ -380,7 +398,8 @@ public class LhScheduleContext {
     /**
      * 结构最低机台规则使用的全量结构SKU快照。
      * <p>该快照在S4.3按现有结构分组一次性冻结，不受后续待排结构视图出队影响；规则不再以
-     * “当前3天内可收尾”为准入条件，S4.4/S4.5每次真实下机前均从该快照解析结构归属。</p>
+     * “当前3天内可收尾”为准入条件。S4.4续作和换活字块全部完成后，结构停产保机统一从该快照
+     * 解析结构归属；S4.5选机继续使用同一快照比较待排SKU与保机前物料的结构。</p>
      */
     private Map<String, List<SkuScheduleDTO>> structureMinMachineSkuSnapshotMap = new LinkedHashMap<>();
     /** 结构最低硫化机台数，key=结构名称，value=周期结构配置或常规结构工厂参数解析值 */
@@ -403,6 +422,22 @@ public class LhScheduleContext {
     private Set<String> structureMinMachineRetainedStructureSet = new LinkedHashSet<>();
     /** 命中规则后的机台统一释放时间，key=运行态机台编码，value=结构最晚有量班次结束时间 */
     private Map<String, Date> structureMinMachineRetentionEndTimeMap = new LinkedHashMap<>();
+    /**
+     * 结构停产保机机台的前物料编码，key=运行态机台编码。
+     * <p>该快照在S4.4阶段级判断命中时写入，新增选机不得通过机台后续可变的当前物料反推结构，
+     * 必须固定使用真正触发保机的前物料进行同结构放行或不同结构拦截。</p>
+     */
+    private Map<String, String> structureMinMachineRetentionPreMaterialMap = new LinkedHashMap<>();
+    /**
+     * 结构停产保机机台的前物料结构，key=运行态机台编码。
+     * <p>同结构SKU允许在保机零量班次换模或换活字块；不同结构SKU只能在统一释放时间后使用机台。</p>
+     */
+    private Map<String, String> structureMinMachineRetentionPreStructureMap = new LinkedHashMap<>();
+    /**
+     * 结构停产保机前物料最后实际生产结束时间，key=运行态机台编码。
+     * <p>同结构接管时以该时间作为最早切换基准，不使用为了保机而顺延后的机台预计结束时间。</p>
+     */
+    private Map<String, Date> structureMinMachineRetentionActualEndTimeMap = new LinkedHashMap<>();
     /**
      * 业务日期 -> 产品结构 -> 计划硫化机台数，来源于月计划统计表 dayN.lhMachines
      */
@@ -566,6 +601,32 @@ public class LhScheduleContext {
      * 运行态结果来源SKU映射，使用对象身份避免结果行可变字段影响Map命中，供后置校验回到原始日计划账本
      */
     private Map<LhScheduleResult, SkuScheduleDTO> scheduleResultSourceSkuMap = new IdentityHashMap<>();
+    /**
+     * 已正式提交的精度前插排结果集合。
+     * <p>使用对象身份精确标记结果，保存前时间轴复核只能撤销真正的插排结果，
+     * 不能把同机台在06:00前自然收尾的前SKU误识别为插排。</p>
+     */
+    private Set<LhScheduleResult> precisionPreInsertResultSet =
+            Collections.newSetFromMap(new IdentityHashMap<LhScheduleResult, Boolean>());
+    /**
+     * 精度前插排结果实际占用的首检均衡时间。
+     * <p>仅记录真正消费早/中班首检均衡额度的新增规格主结果，供保存前最终撤销时精确释放。</p>
+     */
+    private Map<LhScheduleResult, Date> precisionPreInsertInspectionTimeMap =
+            new IdentityHashMap<LhScheduleResult, Date>();
+    /**
+     * 精度前插排结果实际占用的换模均衡时间。
+     * <p>只有新增规格换模成功占用早/中班换模名额时才登记；换活字块结果虽然也有切换开始时间，
+     * 但没有消费换模名额，最终撤销时不得仅凭结果时间误减其他SKU的换模计数。</p>
+     */
+    private Map<LhScheduleResult, Date> precisionPreInsertMouldChangeTimeMap =
+            new IdentityHashMap<LhScheduleResult, Date>();
+    /**
+     * 精度前插排结果占用的首检数量归属班次索引。
+     * <p>换模和换活字块均会登记班次首检顺序，最终撤销时必须按原班次回退一次。</p>
+     */
+    private Map<LhScheduleResult, Integer> precisionPreInsertInspectionShiftIndexMap =
+            new IdentityHashMap<LhScheduleResult, Integer>();
     /**
      * 前日交替计划反选成功的机台集合。
      * <p>key=物料+产品状态复合键，value=本阶段已经成功占用的机台编码。

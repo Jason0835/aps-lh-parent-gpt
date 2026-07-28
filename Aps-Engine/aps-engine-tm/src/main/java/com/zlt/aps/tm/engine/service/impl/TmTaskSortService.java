@@ -67,6 +67,7 @@ public class TmTaskSortService implements ITmTaskSortService {
                 strategyCode, context.getTaskDraftList().size(), beforeOrder, afterOrder);
         for (int i = 0; i < context.getTaskDraftList().size(); i++) {
             TmTaskDraft task = context.getTaskDraftList().get(i);
+            task.setBaseSortIndex(i + 1);
             Map<String, Object> evidence = new LinkedHashMap<>();
             evidence.put("strategyCode", strategyCode);
             evidence.put("sortIndex", i + 1);

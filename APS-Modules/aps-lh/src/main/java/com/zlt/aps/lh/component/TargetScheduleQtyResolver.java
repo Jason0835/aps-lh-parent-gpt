@@ -3,6 +3,7 @@ package com.zlt.aps.lh.component;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
 import com.zlt.aps.lh.api.domain.dto.MachineCleaningWindowDTO;
+import com.zlt.aps.lh.api.domain.dto.MachineMaintenanceWindowDTO;
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.api.domain.dto.ShiftProductionControlDTO;
 import com.zlt.aps.lh.api.domain.dto.SkuDailyPlanQuotaDTO;
@@ -778,10 +779,18 @@ public class TargetScheduleQtyResolver {
             int currentShiftQty = resolveRetainedShiftQty(
                     context, sku, Math.min(planQty, remainingRetainQty), mouldQty);
             Date shiftStartTime = ShiftFieldUtil.getShiftStartTime(result, shift.getShiftIndex());
+            Date originalShiftEndTime = ShiftFieldUtil.getShiftEndTime(result, shift.getShiftIndex());
             if (currentShiftQty <= 0) {
                 ShiftFieldUtil.setShiftPlanQty(result, shift.getShiftIndex(), 0, null, null);
             } else {
-                ShiftFieldUtil.setShiftPlanQty(result, shift.getShiftIndex(), currentShiftQty, shiftStartTime, null);
+                Date retainedShiftEndTime = currentShiftQty == planQty
+                        ? originalShiftEndTime
+                        : resolveRetainedShiftEndTime(
+                                context, result, shift, shiftStartTime, originalShiftEndTime,
+                                currentShiftQty, planQty);
+                ShiftFieldUtil.setShiftPlanQty(
+                        result, shift.getShiftIndex(), currentShiftQty,
+                        shiftStartTime, retainedShiftEndTime);
             }
             remainingRetainQty -= currentShiftQty;
             actualRetainedQty += currentShiftQty;
@@ -792,6 +801,47 @@ public class TargetScheduleQtyResolver {
                 scene, sku.getMaterialCode(), result.getLhMachineCode(), resultQty, remainingQty,
                 allowedOverQty, actualRetainedQty);
         return actualRetainedQty;
+    }
+
+    /**
+     * 结果按实际余量裁剪后，重新计算当前班次的真实结束时间。
+     *
+     * @param context 排程上下文
+     * @param result 排程结果
+     * @param shift 当前班次
+     * @param shiftStartTime 当前班次实际开始时间
+     * @param originalShiftEndTime 裁剪前实际结束时间
+     * @param retainedQty 裁剪后保留量
+     * @param originalQty 裁剪前计划量
+     * @return 裁剪后班次实际结束时间
+     */
+    private Date resolveRetainedShiftEndTime(LhScheduleContext context,
+                                             LhScheduleResult result,
+                                             LhShiftConfigVO shift,
+                                             Date shiftStartTime,
+                                             Date originalShiftEndTime,
+                                             int retainedQty,
+                                             int originalQty) {
+        if (Objects.isNull(context) || Objects.isNull(result) || Objects.isNull(shift)
+                || Objects.isNull(shiftStartTime) || retainedQty <= 0 || originalQty <= 0) {
+            return originalShiftEndTime;
+        }
+        MachineScheduleDTO machine = context.getMachineScheduleMap().get(result.getLhMachineCode());
+        List<MachineCleaningWindowDTO> cleaningWindowList =
+                Objects.isNull(machine) || CollectionUtils.isEmpty(machine.getCleaningWindowList())
+                        ? new ArrayList<MachineCleaningWindowDTO>(0) : machine.getCleaningWindowList();
+        List<MachineMaintenanceWindowDTO> maintenanceWindowList =
+                Objects.isNull(machine) || CollectionUtils.isEmpty(machine.getMaintenanceWindowList())
+                        ? new ArrayList<MachineMaintenanceWindowDTO>(0)
+                        : ShiftCapacityResolverUtil.resolveCapacityMaintenanceWindowList(
+                                context, context.getDevicePlanShutList(), result.getLhMachineCode(),
+                                machine.getMaintenanceWindowList());
+        Date calculationEndTime = Objects.nonNull(originalShiftEndTime)
+                ? originalShiftEndTime : shift.getShiftEndDateTime();
+        return ShiftCapacityResolverUtil.resolveShiftPlanEndTime(
+                context.getDevicePlanShutList(), cleaningWindowList, maintenanceWindowList,
+                result.getLhMachineCode(), shiftStartTime, calculationEndTime,
+                retainedQty, originalQty);
     }
 
     /**
@@ -930,6 +980,48 @@ public class TargetScheduleQtyResolver {
             return Math.max(0, allocationQty);
         }
         return ShiftCapacityResolverUtil.normalizeAllocatedShiftQty(allocationQty, shiftMaxQty, mouldQty);
+    }
+
+    /**
+     * 解析最终收尾判断使用的严格目标量。
+     * <p>成型胎胚库存收尾属于精确硬目标，直接使用已经完成单胎胚库存赋值或共用胎胚分摊后的SKU目标量，
+     * 不再按模台数向上归整；普通收尾继续沿用共用胎胚仅取硫化余量、单胎胚取MAX(余量,库存)并按模台数归整的口径。</p>
+     *
+     * @param context 排程上下文
+     * @param sku SKU排程DTO
+     * @return 最终收尾比较目标量
+     */
+    public int resolveFinalEndingTargetQty(LhScheduleContext context, SkuScheduleDTO sku) {
+        if (Objects.isNull(sku)) {
+            return 0;
+        }
+        int originalTargetQty = Math.max(0, sku.resolveTargetScheduleQty());
+        int mouldQty = ShiftCapacityResolverUtil.resolveMachineMouldQty(sku.getMouldQty());
+        if (isEmbryoStockEnding(context, sku)) {
+            log.info("最终收尾目标量解析, materialCode: {}, 胎胚编码: {}, 原始目标量: {}, "
+                            + "精确硬目标: {}, 模台数: {}, 最终比较目标: {}, rule: 胎胚库存硬目标不做模台数归整",
+                    sku.getMaterialCode(), sku.getEmbryoCode(), originalTargetQty,
+                    originalTargetQty, mouldQty, originalTargetQty);
+            return originalTargetQty;
+        }
+
+        int surplusQty = Math.max(0, sku.getSurplusQty());
+        int embryoStock = Math.max(0, sku.getEmbryoStock());
+        boolean sharedEmbryo = isSharedEmbryoInWindow(context, sku);
+        int baseTargetQty = sharedEmbryo ? surplusQty : Math.max(surplusQty, embryoStock);
+        int finalTargetQty = ShiftCapacityResolverUtil.roundUpQtyToMouldMultiple(baseTargetQty, mouldQty);
+        if (sharedEmbryo && embryoStock > surplusQty) {
+            log.debug("共用胎胚收尾判定比较量下调, materialCode: {}, 胎胚编码: {}, "
+                            + "原口径MAX(余量,库存): {}, 新口径仅余量: {}, 下调幅度: {}",
+                    sku.getMaterialCode(), sku.getEmbryoCode(),
+                    Math.max(surplusQty, embryoStock), surplusQty,
+                    Math.max(surplusQty, embryoStock) - surplusQty);
+        }
+        log.debug("最终收尾目标量解析, materialCode: {}, 胎胚编码: {}, 原始目标量: {}, "
+                        + "精确硬目标: 无, 基础比较量: {}, 模台数: {}, 最终比较目标: {}",
+                sku.getMaterialCode(), sku.getEmbryoCode(), originalTargetQty,
+                baseTargetQty, mouldQty, finalTargetQty);
+        return finalTargetQty;
     }
 
     /**

@@ -103,6 +103,14 @@ public class TmPersistService {
             explain.setTaskOrderNo(task.getOrderNo());
             explain.setSourceOrderNos(task.getSourceOrderNos());
             explain.setShiftOrder(task.getShiftOrder());
+            explain.setPlanGroupKey(task.getPlanGroupKey());
+            explain.setGroupSourceCount(task.getGroupSourceCount());
+            explain.setSourceRequiredQty(task.getSourceRequiredQty());
+            explain.setGroupRequiredQty(task.getGroupRequiredQty());
+            explain.setGroupBaseDemandQty(task.getGroupBaseDemandQty());
+            explain.setGroupMinStartAdjustQty(task.getGroupMinStartAdjustQty());
+            explain.setGroupRoundAdjustQty(task.getGroupRoundAdjustQty());
+            explain.setGroupFinalPlanQty(task.getGroupFinalPlanQty());
             explain.setBaseDemandQty(task.getBaseDemandQty() == null ? task.getDemandQty() : task.getBaseDemandQty());
             explain.setLossAddQty(task.getLossAddQty());
             explain.setStockDeductQty(task.getStockDeductQty());
@@ -162,7 +170,14 @@ public class TmPersistService {
      * @return true 表示任务需要进入未排语义
      */
     private boolean isUnplannedTask(TmTaskDraft task) {
-        return task != null && (task.isUnassigned() || StrUtil.isNotBlank(task.getUnplannedReasonCode()));
+        if (task == null) {
+            return false;
+        }
+        if (StrUtil.isNotBlank(task.getUnplannedReasonCode())) {
+            return true;
+        }
+        return task.isUnassigned() && task.getPlanQty() != null
+                && task.getPlanQty().compareTo(BigDecimal.ZERO) > 0;
     }
 
     /**

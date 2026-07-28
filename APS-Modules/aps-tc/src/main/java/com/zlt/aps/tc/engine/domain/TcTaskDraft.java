@@ -44,6 +44,9 @@ public class TcTaskDraft {
     /** 班次顺序 */
     private Integer shiftOrder;
 
+    /** TASK_SORT 阶段生成的稳定基础优先级，数值越小越优先 */
+    private Integer baseSortIndex;
+
     /** 当前班成型胎侧需求量，单位米 */
     private BigDecimal currentShiftDemandQty;
 
@@ -178,6 +181,9 @@ public class TcTaskDraft {
     /** 上个主胶料切换固定产能扣减量，单位米 */
     private BigDecimal previousGlueSwitchCapacityDeduct;
 
+    /** 上个任务口型板是否切换(与前一有效任务口型不同且均非空)，用于规格切换次数统计(详设§14.11 胶料/口型) */
+    private Boolean previousMouthPlateSwitched;
+
     /** 按当前班次开始时间和库存供应时长推算的库存不足时间 */
     private Date stockShortageTime;
 
@@ -201,6 +207,36 @@ public class TcTaskDraft {
 
     /** 业务键后缀，用于拆分来源任务或顺延任务，避免同规格同班次任务业务键冲突 */
     private String businessKeySuffix;
+
+    /** 同胎侧同班次计划量汇总组业务键 */
+    private String planGroupKey;
+
+    /** 汇总组包含的原始来源任务业务键列表 */
+    private java.util.List<String> sourceTaskBusinessKeyList;
+
+    /** 是否为仅用于落库追溯的原始来源解释任务 */
+    private Boolean sourceExplainTask;
+
+    /** 来源任务参与汇总计算的需求量 */
+    private BigDecimal sourceRequiredQty;
+
+    /** 汇总组来源任务数量 */
+    private Integer groupSourceCount;
+
+    /** 汇总组库存抵扣前需求量 */
+    private BigDecimal groupRequiredQty;
+
+    /** 汇总组库存抵扣后基础需求量 */
+    private BigDecimal groupBaseDemandQty;
+
+    /** 汇总组最小起排调整量 */
+    private BigDecimal groupMinStartAdjustQty;
+
+    /** 汇总组收尾或卷曲取整调整量 */
+    private BigDecimal groupRoundAdjustQty;
+
+    /** 汇总组最终计划量 */
+    private BigDecimal groupFinalPlanQty;
 
     /** 新规格判断与提前排产证据 */
     private TcNewSpecInfo newSpecInfo;

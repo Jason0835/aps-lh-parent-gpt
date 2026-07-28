@@ -6,6 +6,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.Date;
+import java.util.List;
 
 /**
  * 胎侧排程结果表 Mapper接口
@@ -27,4 +28,16 @@ public interface TcScheduleResultMapper extends CommBaseMapper<TcScheduleResult>
      * @return 影响行数
      */
     int logicDeleteByFactoryCodeAndScheduleDate(@Param("factoryCode") String factoryCode, @Param("scheduleDate") Date scheduleDate);
+
+    /**
+     * 锁定指定工厂、日期和批次的当前排程结果。
+     *
+     * @param factoryCode 工厂编码
+     * @param scheduleDate 排程日期
+     * @param batchNo 当前批次
+     * @return 加行锁后的排程结果
+     */
+    List<TcScheduleResult> selectScopeForUpdate(@Param("factoryCode") String factoryCode,
+                                                @Param("scheduleDate") Date scheduleDate,
+                                                @Param("batchNo") String batchNo);
 }

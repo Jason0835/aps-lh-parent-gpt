@@ -173,6 +173,7 @@ public class TcSnapshotBuildService {
                     rejectedCandidates.add(buildFilterEvidenceObject(item.getEvidence()));
                 } else if (TcScheduleRuleCodeEnum.TOOL_LIMIT_UNPLANNED.getCode().equals(ruleCode)
                         || TcScheduleRuleCodeEnum.CAPACITY_OVERFLOW_UNPLANNED.getCode().equals(ruleCode)
+                        || TcScheduleRuleCodeEnum.CAPACITY_BLOCKED_CARRYOVER.getCode().equals(ruleCode)
                         || (TcScheduleRuleCodeEnum.MACHINE_ASSIGN.getCode().equals(ruleCode)
                         && TcScheduleRuleResultEnum.REJECT.getCode().equals(item.getResult()))) {
                     JSONObject evObj = new JSONObject();
