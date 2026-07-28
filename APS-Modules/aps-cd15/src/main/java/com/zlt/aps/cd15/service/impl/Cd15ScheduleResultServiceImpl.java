@@ -15,9 +15,12 @@ import com.zlt.aps.cd15.engine.constant.Cd15ScheduleTaskType;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineShiftConfigMapper;
 import com.zlt.aps.cd15.engine.domain.Cd15ScheduleTask;
 import com.zlt.aps.cd15.engine.model.Cd15BatchDataCheckResult;
+import com.zlt.aps.cd15.engine.model.Cd15InsertCarryoverImpact;
+import com.zlt.aps.cd15.engine.model.Cd15InsertRollingOutput;
 import com.zlt.aps.cd15.engine.model.Cd15ShiftDescriptor;
 import com.zlt.aps.cd15.engine.service.Cd15AutoScheduleBatchDataValidator;
-
+import com.zlt.aps.cd15.engine.service.Cd15AutoScheduleLockService;
+import com.zlt.aps.cd15.engine.service.Cd15InsertRollingService;
 import com.zlt.aps.cd15.engine.service.Cd15ScheduleTaskService;
 import com.zlt.aps.cd15.mapper.Cd15ScheduleResultMapper;
 import com.zlt.aps.cd15.model.Cd15ScheduleOverwriteDecision;
@@ -29,6 +32,7 @@ import com.zlt.aps.cd15.service.ICd15ScheduleResultService;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
+import org.redisson.api.RLock;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,6 +44,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -76,6 +81,11 @@ public class Cd15ScheduleResultServiceImpl extends AbstractDocService<Cd15Schedu
     @Resource
     private Cd15AutoScheduleBatchDataValidator batchDataValidator;
 
+    @Resource
+    private Cd15AutoScheduleLockService lockService;
+
+    @Resource
+    private Cd15InsertRollingService insertRollingService;
 
     @Resource
     private Cd15ScheduleOverwriteValidator overwriteValidator;
@@ -301,11 +311,94 @@ public class Cd15ScheduleResultServiceImpl extends AbstractDocService<Cd15Schedu
         if (activeTask != null) {
             return AjaxResult.error(I18nUtil.getMessage("ui.cd15.schedule.taskActive"));
         }
+        if (!Boolean.TRUE.equals(request.getConfirmed())) {
+            AjaxResult previewResult = this.previewTransferMachine(
+                    request, this.toLocalDate(request.getScheduleDate()));
+            if (previewResult != null) {
+                return previewResult;
+            }
+        }
         Cd15ScheduleTask task = taskService.createPending(request.getFactoryCode(), request.getScheduleDate(),
                 Cd15ScheduleTaskType.TRANSFER_MACHINE, "MANUAL", request.toString(), null);
         insertOrderAsyncExecutor.executeTransfer(task.getTaskId(), request);
         return AjaxResult.success(I18nUtil.getMessage("ui.message.operation.success"), this.toTaskData(task));
     }
+    /**
+     * 使用正式滚动内核执行转机台只读预演，发现跨班顺延时返回确认明细。
+     *
+     * @param request 转机台请求
+     * @param scheduleDate 排程日期
+     * @return 需要确认时返回确认结构，无顺延时返回null
+     */
+    private AjaxResult previewTransferMachine(Cd15TransferMachineRequest request,
+                                              LocalDate scheduleDate) {
+        RLock lock = lockService.getLock(request.getFactoryCode(), scheduleDate);
+        try {
+            if (!lock.tryLock()) {
+                return AjaxResult.error(I18nUtil.getMessage("ui.cd15.schedule.taskActive"));
+            }
+            if (taskService.findActive(request.getFactoryCode(), request.getScheduleDate()) != null) {
+                return AjaxResult.error(I18nUtil.getMessage("ui.cd15.schedule.taskActive"));
+            }
+            Cd15InsertRollingOutput output = insertRollingService.executeTransfer(request);
+            List<Cd15InsertCarryoverImpact> impacts = output.getCarryoverImpacts() == null
+                    ? Collections.emptyList() : output.getCarryoverImpacts();
+            if (impacts.isEmpty()) {
+                return null;
+            }
+            Map<String, Object> data = new LinkedHashMap<>();
+            data.put("needConfirm", true);
+            data.put("carryoverDetails", impacts.stream()
+                    .map(this::toCarryoverDetail)
+                    .collect(Collectors.toList()));
+            return AjaxResult.success(
+                    I18nUtil.getMessage("ui.cd15.transfer.carryoverConfirm"), data);
+        } finally {
+            if (lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
+        }
+    }
+
+    /** 将引擎顺延影响转换为前端确认结构。 */
+    private Map<String, Object> toCarryoverDetail(Cd15InsertCarryoverImpact impact) {
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("steelStripCode", impact.getSteelStripCode());
+        detail.put("affectedType", impact.getAffectedType());
+        detail.put("sourceClassField", impact.getSourceClassField());
+        detail.put("targetClassField", impact.getTargetClassField());
+        detail.put("carryoverQty", impact.getCarryoverQty());
+        detail.put("reasonCode", impact.getReasonCode());
+        detail.put("reasonMessage", this.resolveCarryoverReason(impact.getReasonCode()));
+        return detail;
+    }
+
+    /** 将滚动限制原因转换为用户可理解的国际化说明。 */
+    private String resolveCarryoverReason(String reasonCode) {
+        if ("CAPACITY_LIMIT".equals(reasonCode)) {
+            return I18nUtil.getMessage("ui.cd15.transfer.reason.capacityLimit");
+        }
+        if ("STORAGE_LANE_LIMIT".equals(reasonCode)) {
+            return I18nUtil.getMessage("ui.cd15.transfer.reason.storageLaneLimit");
+        }
+        if ("ROLL_TOOL_LIMIT".equals(reasonCode) || "TOOLING_LIMIT".equals(reasonCode)) {
+            return I18nUtil.getMessage("ui.cd15.transfer.reason.toolingLimit");
+        }
+        if ("BIG_ROLL_STOCK_DATA_MISSING".equals(reasonCode)) {
+            return I18nUtil.getMessage("ui.cd15.transfer.reason.bigRollStockDataMissing");
+        }
+        if ("CONSTRUCTION_MISSING".equals(reasonCode) || "DATA_MISSING".equals(reasonCode)) {
+            return I18nUtil.getMessage("ui.cd15.transfer.reason.constructionMissing");
+        }
+        if ("AGING_PERIOD_LIMIT".equals(reasonCode)) {
+            return I18nUtil.getMessage("ui.cd15.transfer.reason.agingPeriodLimit");
+        }
+        if ("SCHEDULE_WINDOW_LIMIT".equals(reasonCode)) {
+            return I18nUtil.getMessage("ui.cd15.transfer.reason.scheduleWindowLimit");
+        }
+        return I18nUtil.getMessage("ui.cd15.transfer.reason.other");
+    }
+
     @Override
     public AjaxResult getTransferMachineTask(String taskId) {
         return this.taskView(taskId, Cd15ScheduleTaskType.TRANSFER_MACHINE);
