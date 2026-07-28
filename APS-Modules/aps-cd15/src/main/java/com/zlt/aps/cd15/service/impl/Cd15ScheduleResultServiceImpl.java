@@ -841,6 +841,24 @@ public class Cd15ScheduleResultServiceImpl extends AbstractDocService<Cd15Schedu
 
     @Override
     public AjaxResult validateChangeQty(Cd15ChangeQtyRequest request) {
+        AjaxResult validation = this.validateChangeQtyBasic(request);
+        if (!Objects.equals(200, validation.get("code"))) {
+            return validation;
+        }
+        AjaxResult batchValidation = this.validateBatchData(
+                request.getFactoryCode(), request.getScheduleDate());
+        if (batchValidation != null) {
+            return batchValidation;
+        }
+        AjaxResult previewResult = this.previewChangeQty(
+                request, this.toLocalDate(request.getScheduleDate()));
+        return previewResult != null
+                && !Objects.equals(200, previewResult.get("code"))
+                ? previewResult : AjaxResult.success();
+    }
+
+    /** 校验调量请求的字段、目标记录、班次窗口及完成量。 */
+    private AjaxResult validateChangeQtyBasic(Cd15ChangeQtyRequest request) {
         if (request == null) {
             return this.required("request");
         }
@@ -994,7 +1012,7 @@ public class Cd15ScheduleResultServiceImpl extends AbstractDocService<Cd15Schedu
      */
     @Override
     public AjaxResult changeQty(Cd15ChangeQtyRequest request) {
-        AjaxResult validation = this.validateChangeQty(request);
+        AjaxResult validation = this.validateChangeQtyBasic(request);
         if (!Objects.equals(200, validation.get("code"))) {
             return validation;
         }

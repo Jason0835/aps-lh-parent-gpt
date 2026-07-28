@@ -1596,6 +1596,30 @@ public class Cd15InsertRollingServiceImpl implements Cd15InsertRollingService {
             return allocateLanes(Segment.existing(result, classIndex(shift.getClassField()),
                     quantity, null, true), shift, quantity, state, input, context);
         }
+        List<String> capacityChangedLaneCodes = rows.stream()
+                .filter(row -> {
+                    Cd15StorageLaneState lane = state.getLanes().stream()
+                            .filter(item -> row.getStorageLaneCode().equals(item.getLaneCode()))
+                            .findFirst().orElse(null);
+                    if (lane == null) {
+                        return false;
+                    }
+                    int vehicles = row.getAllocatedCartCount() == null
+                            ? 0 : row.getAllocatedCartCount();
+                    return vehicles <= 0
+                            || lane.getVehicleCount() + vehicles > lane.getMaxVehicleCount();
+                })
+                .map(Cd15ScheduleLaneAllocation::getStorageLaneCode)
+                .distinct()
+                .collect(Collectors.toList());
+        if (!capacityChangedLaneCodes.isEmpty()
+                && !this.isLocked(result, classIndex(shift.getClassField()))) {
+            log.warn("[斜裁插单] 未开始任务原库排容量不足,降级为重新分配, "
+                            + "steelStripCode={}, changedLanes={}",
+                    result.getSteelStripCode(), capacityChangedLaneCodes);
+            return allocateLanes(Segment.existing(result, classIndex(shift.getClassField()),
+                    quantity, null, true), shift, quantity, state, input, context);
+        }
         List<Cd15StorageLaneAllocation> allocations = rows.stream().map(row -> {
             Cd15StorageLaneState lane = state.getLanes().stream()
                     .filter(item -> row.getStorageLaneCode().equals(item.getLaneCode()))
@@ -2067,6 +2091,8 @@ public class Cd15InsertRollingServiceImpl implements Cd15InsertRollingService {
                 : "插单后因" + limitReason + "部分顺延至下一班";
         result.setFieldValueByFieldName(String.format("class%dAnalysis", classIndex), analysis);
         if ("INSERT".equals(result.getSourceType())) {
+            result.setFieldValueByFieldName(
+                    String.format("class%dFinishRate", classIndex), 0D);
             result.setFieldValueByFieldName(String.format("class%dAnalysisInput", classIndex),
                     request.getFieldValueByFieldName(String.format("class%dAnalysisInput", classIndex)));
         }

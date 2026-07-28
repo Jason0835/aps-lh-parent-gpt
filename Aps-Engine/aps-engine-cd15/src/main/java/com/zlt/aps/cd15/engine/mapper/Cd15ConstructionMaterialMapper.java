@@ -62,12 +62,23 @@ public class Cd15ConstructionMaterialMapper {
                 .constructionVersion(construction.getConstructionVersion())
                 .steelStripCode(steelStripCode.trim())
                 .bigRollCode(this.trim(bigRollCode))
-                .cordWidth(construction.getCordWidth())
+                .cordWidth(this.effectiveCordWidth(
+                        construction.getCordWidth(), unitConsumeMillimeter))
                 .cuttingAngle(this.trim(cuttingAngle))
                 .layerNo(layerNo)
                 .unitConsumeMillimeter(unitConsumeMillimeter)
                 .craftWidth(craftWidth)
                 .build());
+    }
+
+    /**
+     * 施工大卷幅宽为空时，按当前层位单耗补齐有效幅宽。
+     */
+    private java.math.BigDecimal effectiveCordWidth(
+            java.math.BigDecimal cordWidth,
+            java.math.BigDecimal unitConsumeMillimeter) {
+        return cordWidth == null || cordWidth.signum() <= 0
+                ? unitConsumeMillimeter : cordWidth;
     }
 
     private String trim(String value) {

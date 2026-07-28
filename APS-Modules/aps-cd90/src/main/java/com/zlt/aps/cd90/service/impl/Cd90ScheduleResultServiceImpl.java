@@ -1076,6 +1076,34 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
     */
     @Override
     public AjaxResult validateChangeQty(Cd90ChangeQtyRequest request) {
+        AjaxResult validation = this.validateChangeQtyBasic(request);
+        if (!Integer.valueOf(200).equals(validation.get("code"))) {
+            return validation;
+        }
+        LocalDate localScheduleDate = request.getScheduleDate().toInstant()
+                .atZone(ZoneId.systemDefault()).toLocalDate();
+        Cd90BatchDataCheckResult batchCheck = batchDataValidator.check(
+                request.getFactoryCode(), localScheduleDate);
+        if (batchCheck.isFailed()) {
+            Map<String, Object> data = new HashMap<>();
+            data.put("batchCheckFailed", true);
+            data.put("errors", toErrorList(batchCheck.getErrors()));
+            data.put("warnings", toErrorList(batchCheck.getWarnings()));
+            return AjaxResult.success(batchCheck.getPrimaryMessage(), data);
+        }
+        AjaxResult previewResult = this.previewChangeQty(request, localScheduleDate);
+        return previewResult != null
+                && !Integer.valueOf(200).equals(previewResult.get("code"))
+                ? previewResult : AjaxResult.success();
+    }
+
+    /**
+     * 校验调量请求的字段、目标记录、班次窗口及完成量。
+     *
+     * @param request 调量请求
+     * @return 基础校验结果
+     */
+    private AjaxResult validateChangeQtyBasic(Cd90ChangeQtyRequest request) {
         if (request == null || request.getScheduleDate() == null
                 || isBlank(request.getFactoryCode()) || isBlank(request.getMachineCode())
                 || isBlank(request.getClothCode())) {
@@ -1134,7 +1162,7 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
     */
     @Override
     public AjaxResult changeQty(Cd90ChangeQtyRequest request) {
-        AjaxResult validation = this.validateChangeQty(request);
+        AjaxResult validation = this.validateChangeQtyBasic(request);
         if (!Integer.valueOf(200).equals(validation.get("code"))) {
             return validation;
         }
