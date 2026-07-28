@@ -11,6 +11,7 @@ import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.constant.Constant;
 import com.zlt.aps.constant.StringConstant;
 import com.zlt.aps.maindata.mapper.*;
+import com.zlt.aps.mdm.api.domain.entity.MdmRawMaterialConversion;
 import com.zlt.aps.maindata.service.IRawMaterialRequirePlanService;
 import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.mp.api.domain.vo.PredictionVersionInfoVo;
@@ -60,7 +61,7 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
     private MpProductionPredictionEntityMapper mpOrderPredictionMapper;
 
     @Autowired
-    private MdmMaterialConsumeDetailMapper mdmMaterialConsumeDetailMapper;
+    private MdmRawMaterialConversionEntityMapper mdmRawMaterialConversionMapper;
 
     @Autowired
     private RawMaterialRequirePlanEntityMapper rawMaterialRequirePlanMapper;
@@ -556,13 +557,13 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
     private Map<String, RawMaterialRequirePlan> calculateCurrentMonthRequirements(
             List<FactoryMonthPlanProdFinal> monthPlans, Map<String, List<RawSpecialMaterialRecord>> specialMaterialCodes) {
 
-        // 1. 收集所有不重复的胎胚代码，批量查询所有BOM结构
-        List<String> embryoCodes = monthPlans.stream()
-                .map(FactoryMonthPlanProdFinal::getEmbryoCode)
+        // 1. 收集所有不重复的成品物料编码，批量查询所有原材料折算数据
+        List<String> materialCodes = monthPlans.stream()
+                .map(FactoryMonthPlanProdFinal::getMaterialCode)
                 .filter(Objects::nonNull)
                 .distinct()
                 .collect(Collectors.toList());
-        Map<String, List<MdmMaterialConsumeDetail>> bomMap = getBomDetailsByEmbryoCodes(embryoCodes);
+        Map<String, List<MdmRawMaterialConversion>> bomMap = getBomDetailsByMaterialCodes(materialCodes);
 
         // 2. 计算原材料需求
         Map<String, RawMaterialRequirePlan> requirements = new HashMap<>();
@@ -572,8 +573,8 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
                 return;
             }
 
-            String embryoCode = plan.getEmbryoCode();
-            List<MdmMaterialConsumeDetail> bomDetails = bomMap.get(embryoCode);
+            String materialCode = plan.getMaterialCode();
+            List<MdmRawMaterialConversion> bomDetails = bomMap.get(materialCode);
             if (CollectionUtils.isEmpty(bomDetails)) {
                 return;
             }
@@ -586,26 +587,26 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
     }
 
     /**
-     * 批量查询BOM结构（优化数据库查询）
+     * 批量查询原材料折算数据（优化数据库查询）
      */
-    private Map<String, List<MdmMaterialConsumeDetail>> getBomDetailsByEmbryoCodes(List<String> embryoCodes) {
-        QueryWrapper<MdmMaterialConsumeDetail> queryWrapper = new QueryWrapper<>();
-        queryWrapper.in("EMBRYO_CODE", embryoCodes);
+    private Map<String, List<MdmRawMaterialConversion>> getBomDetailsByMaterialCodes(List<String> materialCodes) {
+        QueryWrapper<MdmRawMaterialConversion> queryWrapper = new QueryWrapper<>();
+        queryWrapper.in("MATERIAL_CODE", materialCodes);
 
-        if (CollectionUtils.isEmpty(embryoCodes)){
+        if (CollectionUtils.isEmpty(materialCodes)){
             return new HashMap<>();
         }
-        List<MdmMaterialConsumeDetail> allBomDetails = mdmMaterialConsumeDetailMapper.selectList(queryWrapper);
+        List<MdmRawMaterialConversion> allBomDetails = mdmRawMaterialConversionMapper.selectList(queryWrapper);
 
         return allBomDetails.stream()
-                .collect(Collectors.groupingBy(MdmMaterialConsumeDetail::getEmbryoCode));
+                .collect(Collectors.groupingBy(MdmRawMaterialConversion::getMaterialCode));
     }
 
     /**
      * 计算物料需求
      */
     private void calculateMaterialRequirements(Map<String, RawMaterialRequirePlan> requirements,
-                                               List<MdmMaterialConsumeDetail> bomDetails,
+                                               List<MdmRawMaterialConversion> bomDetails,
                                                Integer totalQty,
                                                Map<String, List<RawSpecialMaterialRecord>> specialMaterialCodes,
                                                FactoryMonthPlanProdFinal plan) {
@@ -614,9 +615,9 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
         int eudrQty = plan.getEudrQty() != null ? plan.getEudrQty() : 0;
 
         bomDetails.forEach(detail -> {
-            String materialCode = detail.getChildMaterialCode();
-            String materialDesc = detail.getChildMaterialName();
-            BigDecimal dosage = detail.getDosage() != null ? detail.getDosage() : BigDecimal.ZERO;
+            String materialCode = detail.getRawMaterialCode();
+            String materialDesc = detail.getRawMaterialName();
+            BigDecimal dosage = detail.getRawMaterialWeight() != null ? detail.getRawMaterialWeight() : BigDecimal.ZERO;
             String materialType;
             List<RawSpecialMaterialRecord> specialMaterialRecords = specialMaterialCodes.get(materialCode);
             if (!CollectionUtils.isEmpty(specialMaterialRecords)) {
@@ -917,20 +918,20 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
 
         Map<String, RawMaterialRequirePlan> requirements = new HashMap<>();
 
-        // 1. 收集所有不重复的胎胚代码
-        List<String> embryoCodes = resultList.stream()
-                .map(FactoryMonthPlanMouldDayResult::getEmbryoCode)
+        // 1. 收集所有不重复的成品物料编码
+        List<String> materialCodes = resultList.stream()
+                .map(FactoryMonthPlanMouldDayResult::getMaterialCode)
                 .filter(Objects::nonNull)
                 .distinct()
                 .collect(Collectors.toList());
 
-        // 2. 批量查询所有BOM结构
-        Map<String, List<MdmMaterialConsumeDetail>> bomMap = getBomDetailsByEmbryoCodes(embryoCodes);
+        // 2. 批量查询所有原材料折算数据
+        Map<String, List<MdmRawMaterialConversion>> bomMap = getBomDetailsByMaterialCodes(materialCodes);
 
         // 3. 计算每个物料的需求
         for (FactoryMonthPlanMouldDayResult prediction : resultList) {
-            String embryoCode = prediction.getEmbryoCode();
-            if (embryoCode == null) {
+            String materialCode = prediction.getMaterialCode();
+            if (materialCode == null) {
                 continue;
             }
 
@@ -942,8 +943,8 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
             int nonEudrQty = prediction.getTotalQty();
             int eudrQty = prediction.getEudrQty();
 
-            // 获取BOM详情
-            List<MdmMaterialConsumeDetail> bomDetails = bomMap.get(embryoCode);
+            // 获取原材料折算详情
+            List<MdmRawMaterialConversion> bomDetails = bomMap.get(materialCode);
             if (CollectionUtils.isEmpty(bomDetails)) {
                 continue;
             }
@@ -962,15 +963,15 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
      */
     private void calculatePredictionMaterialRequirements(
             Map<String, RawMaterialRequirePlan> requirements,
-            List<MdmMaterialConsumeDetail> bomDetails,
+            List<MdmRawMaterialConversion> bomDetails,
             int nonEudrQty, int eudrQty,
             Map<String, List<RawSpecialMaterialRecord>> specialMaterialCodes,
             String qtyField, String eudrQtyField) {
 
-        for (MdmMaterialConsumeDetail detail : bomDetails) {
-            String materialCode = detail.getChildMaterialCode();
-            String materialDesc = detail.getChildMaterialName();
-            BigDecimal dosage = detail.getDosage() != null ? detail.getDosage() : BigDecimal.ZERO;
+        for (MdmRawMaterialConversion detail : bomDetails) {
+            String materialCode = detail.getRawMaterialCode();
+            String materialDesc = detail.getRawMaterialName();
+            BigDecimal dosage = detail.getRawMaterialWeight() != null ? detail.getRawMaterialWeight() : BigDecimal.ZERO;
             String materialType;
             List<RawSpecialMaterialRecord> specialMaterialRecords = specialMaterialCodes.get(materialCode);
             if (!CollectionUtils.isEmpty(specialMaterialRecords)) {

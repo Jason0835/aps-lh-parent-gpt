@@ -4,10 +4,10 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.service.ISysDictDataCacheService;
 import com.ruoyi.common.core.domain.SysDictData;
 import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.zlt.aps.maindata.mapper.MdmMaterialConsumeDetailMapper;
+import com.zlt.aps.maindata.mapper.MdmRawMaterialConversionEntityMapper;
 import com.zlt.aps.maindata.mapper.RawWeekUsageEntityMapper;
+import com.zlt.aps.mdm.api.domain.entity.MdmRawMaterialConversion;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProdFinal;
-import com.zlt.aps.mp.api.domain.entity.MdmMaterialConsumeDetail;
 import com.zlt.aps.mp.api.domain.entity.RawWeekUsage;
 import com.zlt.aps.mp.factory.mapper.FactoryMonthPlanProdFinalMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -29,7 +29,7 @@ public class RawWeekUsageGenerateServiceImpl {
     private FactoryMonthPlanProdFinalMapper factoryMonthPlanProdFinalMapper;
 
     @Autowired
-    private MdmMaterialConsumeDetailMapper mdmMaterialConsumeDetailMapper;
+    private MdmRawMaterialConversionEntityMapper mdmRawMaterialConversionMapper;
 
     @Autowired
     private RawWeekUsageEntityMapper rawWeekUsageEntityMapper;
@@ -213,34 +213,37 @@ public class RawWeekUsageGenerateServiceImpl {
      * 计算一周的原材料用量
      */
     private Map<String, BigDecimal> calculateWeekMaterialUsage(List<FactoryMonthPlanProdFinal> weekPlans) {
-        // 按胎胚代码分组生产数量
-        Map<String, Integer> embryoProductionMap = new HashMap<>();
+        // 按成品物料编码分组生产数量
+        Map<String, Integer> materialProductionMap = new HashMap<>();
 
         for (FactoryMonthPlanProdFinal plan : weekPlans) {
-            String embryoCode = plan.getEmbryoCode();
+            String materialCode = plan.getMaterialCode();
             int productionQty = plan.getTotalQty();
 
             if (productionQty > 0) {
-                embryoProductionMap.merge(embryoCode, productionQty, Integer::sum);
+                materialProductionMap.merge(materialCode, productionQty, Integer::sum);
             }
         }
 
         // 计算所有原材料的用量
         Map<String, BigDecimal> totalMaterialUsage = new HashMap<>();
 
-        for (Map.Entry<String, Integer> entry : embryoProductionMap.entrySet()) {
-            String embryoCode = entry.getKey();
+        for (Map.Entry<String, Integer> entry : materialProductionMap.entrySet()) {
+            String materialCode = entry.getKey();
             int productionQty = entry.getValue();
 
-            // 获取该胎胚的BOM详情
-            List<MdmMaterialConsumeDetail> bomDetails = getBomDetails(embryoCode);
+            // 获取该成品的原材料折算详情
+            List<MdmRawMaterialConversion> bomDetails = getBomDetails(materialCode);
 
-            for (MdmMaterialConsumeDetail detail : bomDetails) {
-                if (detail.isValid()) {
-                    String materialCode = detail.getChildMaterialCode();
-                    String materialName = detail.getChildMaterialName();
-                    String materialKey = materialCode + "|" + materialName;
-                    BigDecimal dosage = detail.getDosage();
+            for (MdmRawMaterialConversion detail : bomDetails) {
+                // 校验原材料编码和重量是否有效
+                if (detail.getRawMaterialCode() != null && !detail.getRawMaterialCode().isEmpty()
+                        && detail.getRawMaterialWeight() != null
+                        && detail.getRawMaterialWeight().compareTo(BigDecimal.ZERO) > 0) {
+                    String rawMaterialCode = detail.getRawMaterialCode();
+                    String rawMaterialName = detail.getRawMaterialName();
+                    String materialKey = rawMaterialCode + "|" + rawMaterialName;
+                    BigDecimal dosage = detail.getRawMaterialWeight();
 
                     // 计算原材料用量
                     BigDecimal materialQty = BigDecimal.valueOf(productionQty).multiply(dosage);
@@ -539,12 +542,12 @@ public class RawWeekUsageGenerateServiceImpl {
     }
 
     /**
-     * 获取BOM结构详情
+     * 获取原材料折算详情
      */
-    private List<MdmMaterialConsumeDetail> getBomDetails(String embryoCode) {
-        QueryWrapper<MdmMaterialConsumeDetail> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("EMBRYO_CODE", embryoCode);
-        return mdmMaterialConsumeDetailMapper.selectList(queryWrapper);
+    private List<MdmRawMaterialConversion> getBomDetails(String materialCode) {
+        QueryWrapper<MdmRawMaterialConversion> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("MATERIAL_CODE", materialCode);
+        return mdmRawMaterialConversionMapper.selectList(queryWrapper);
     }
 
 }

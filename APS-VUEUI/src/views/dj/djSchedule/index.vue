@@ -837,8 +837,8 @@ export default {
       });
     },
     handlePageChange(current, pageSize) {
-      // this.$set(this.page, "current", current);
-      // this.$set(this.page, "pageSize", pageSize);
+      this.$set(this.page, "current", current);
+      this.$set(this.page, "pageSize", pageSize);
       this.getList();
     },
     handelSuccess() {
@@ -932,8 +932,8 @@ export default {
     },
     formatParams() {
       const params = {
-        // pageSize: this.page.pageSize,
-        // pageNum: this.page.current,
+        pageSize: this.page.pageSize,
+        pageNum: this.page.current,
         ...this.query,
         ...this.sort,
       };
@@ -964,7 +964,7 @@ export default {
           ? this.stat.scheduleShiftClass : '01';
         // 根据首班班次决定是否展示 T-1 日中班栏位
         this.showPrevDayClass1 = this.stat && this.stat.scheduleShiftClass === '01';
-        // this.page.total = data.total;
+        this.page.total = data.total;
       } catch (error) {
         console.error(error);
       } finally {

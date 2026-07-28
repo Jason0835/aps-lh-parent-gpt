@@ -17,7 +17,6 @@ import com.zlt.aps.lh.api.domain.entity.LhRepairCapsule;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.entity.LhUnscheduledResult;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
-import com.zlt.aps.lh.api.enums.ConstructionStageEnum;
 import com.zlt.aps.lh.api.enums.MachineStopTypeEnum;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
 import com.zlt.aps.lh.api.enums.ShiftEnum;
@@ -27,7 +26,6 @@ import com.zlt.aps.lh.api.enums.TrialStatusEnum;
 import com.zlt.aps.lh.component.CapsuleReplacementRuleService;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.component.OrderNoGenerator;
-import com.zlt.aps.lh.component.StructureMinMachineRetentionService;
 import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.ICapacityCalculateStrategy;
@@ -142,10 +140,6 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
     private TargetScheduleQtyResolver targetScheduleQtyResolver;
     @Resource
     private LhMaintenanceScheduleService maintenanceScheduleService;
-    /** 续作机台每次真实降模前统一执行结构最低机台数实时判断。 */
-    @Resource
-    private StructureMinMachineRetentionService structureMinMachineRetentionService =
-            new StructureMinMachineRetentionService();
     /** 胶囊次数累计与换胶囊班次扣减统一入口 */
     @Resource
     private CapsuleReplacementRuleService capsuleReplacementRuleService = new CapsuleReplacementRuleService();
@@ -287,6 +281,24 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                     startTime, effectiveShifts, machineMouldQty, isEnding)
                     : buildScheduleResult(context, machine, sku, startTime, null, effectiveShifts, machineMouldQty, isEnding);
             if (result != null) {
+                /*
+                 * 3天内精度计划已经在S4.4入口预留执行窗口。续作结果生成后立即以执行日06:00
+                 * 为硬截止截断，截断量同步恢复生产余量、dayN账本和机台产能，禁止只设置forceDown标志。
+                 */
+                int precisionForceRemovedQty = applyPrecisionForceDownIfNecessary(
+                        context, machine, sku, result, shifts);
+                if (Objects.nonNull(result.getDailyPlanQty()) && result.getDailyPlanQty() <= 0) {
+                    // 滚动继承结果可能已经存在于结果集和机台分配索引中；强制截断为零后必须
+                    // 同步删除，禁止留下“零量但仍占机”的脏结果。新建结果尚未入集，重复删除无副作用。
+                    context.getScheduleResultList().remove(result);
+                    context.getScheduleResultSourceSkuMap().remove(result);
+                    removeResultsFromMachineAssignments(
+                            context, Collections.singletonList(result));
+                    log.info("续作SKU因精度计划到期强制下机后无可保留计划量, materialCode: {}, "
+                                    + "machineCode: {}, removedQty: {}",
+                            sku.getMaterialCode(), machineCode, precisionForceRemovedQty);
+                    continue;
+                }
                 result.setScheduleType("01");
                 result.setIsChangeMould("0");
                 result.setIsTypeBlock("0");
@@ -4066,9 +4078,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             recordSharedEmbryoEndingStaggerReleaseCandidate(context, sourceSku, result);
             redistributeShiftQty(context, result, shifts, 0);
             /*
-             * 收尾单机降模已经明确由保留机台承载SKU余量，因此当前全零机台属于收尾归集产生的
-             * 冗余机台，应优先正常释放；统一收口方法仍会校验同SKU是否确有正量承载机台，避免
-             * 库存或账本把同组全部结果裁零时误放行。未命中该业务前提时继续执行结构最低机台判断。
+             * 收尾单机降模已经明确由保留机台承载SKU余量，当前全零机台先按续作原规则登记释放。
+             * 结构是否需要重新保留，将在全部续作和换活字块结果稳定后由阶段级服务统一判断。
              */
             completeContinuousMachineOfflineDecision(context, sourceSku, result,
                     firstPositiveShiftIndex, lastPositiveShiftIndex, "续作收尾单机降模");
@@ -6214,8 +6225,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                 recordSharedEmbryoEndingStaggerReleaseCandidate(context, sourceSku, result);
                 redistributeShiftQty(context, result, shifts, 0);
                 /*
-                 * 整窗降模清零完成后立即完成保机或释放状态登记。释放边界必须在处理下一台机台前
-                 * 落地，保证连续下机每次都按最新在机关系重算；不可换模晚班仍有正量时不进入本分支。
+                 * 整窗降模清零后立即登记续作释放边界；阶段级结构判断稍后会撤销需要保机机台的
+                 * 提前释放状态。不可换模晚班仍有正量时不进入本分支。
                  */
                 completeContinuousMachineOfflineDecision(context, sourceSku, result,
                         firstPositiveShiftIndex, lastPositiveShiftIndex, "续作整窗降模");
@@ -6569,12 +6580,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                 clearContinuationShiftsAfterDate(
                         context, result, allShifts, productionDate, !recoverable);
             }
-            /*
-             * 当前机台的补量、不可换模晚班保护和后续班次清理完成后，必须立即执行结构保机判断并
-             * 落地释放或保机状态，再开始清理下一台机台。不能先批量清空所有待下机机台，否则下一台
-             * 判断时其他候选已经失去正量在机关系，统计服务只能逐台补回当前机台，连续下机会反复得到
-             * 相同的下机前数量，无法体现前一次释放对最新运行态的影响。
-             */
+            // 当前机台完成逐日降模后先登记原释放边界，供阶段级结构判断识别真实下机状态。
             completeContinuousMachineOfflineDecision(
                     context, sourceSku, result,
                     firstPositiveShiftBeforeOfflineMap.getOrDefault(result, -1),
@@ -7574,19 +7580,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         Date machineReadyTime = getCapacityCalculateStrategy().calculateStartTime(
                 context, machine.getMachineCode(), endingTime);
         int switchDurationHours = LhScheduleTimeUtil.getMouldChangeTotalHours(context);
-        boolean trialConstructionStage = StringUtils.equals(
-                ConstructionStageEnum.TRIAL.getCode(), specifySku.getConstructionStage());
-        boolean maintenanceOverlapSwitch = !trialConstructionStage
-                && getMaintenanceScheduleService().shouldParallelMouldChangeWithMaintenance(
-                context, machine, endingTime, switchDurationHours);
-        boolean trialMaintenanceOverlap = trialConstructionStage
-                && getMaintenanceScheduleService().isNormalSwitchOverlapMaintenance(
-                context, machine, endingTime, switchDurationHours);
-        // 试制SKU实际落地前会清除重叠精度窗口，预判时使用原机台结束时间模拟早班换模，且不修改运行态。
-        Date switchReadyTime = maintenanceOverlapSwitch
-                ? getMaintenanceScheduleService().resolveParallelMouldChangeStartTime(
-                context, machine, endingTime, switchDurationHours)
-                : trialMaintenanceOverlap ? endingTime : machineReadyTime;
+        // 精度计划与换模禁止并行，试制和正规SKU统一从精度及预热结束后的真实机台就绪时间开始。
+        Date switchReadyTime = machineReadyTime;
         switchReadyTime = ShiftProductionControlUtil.resolveEarliestSwitchStartTime(context, switchReadyTime);
         // 定点物料预演继续携带真实切换时长、SKU和动作类型，保留换模均衡、试制及次数限制语义；
         // 默认实现内部仅对05维修放开并行，其他停机仍按原规则顺延。
@@ -7605,13 +7600,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         Date inspectionTime = null;
         try {
             Date mouldChangeCompleteTime = LhScheduleTimeUtil.addHours(mouldChangeStartTime, switchDurationHours);
-            maintenanceOverlapSwitch = !trialConstructionStage
-                    && getMaintenanceScheduleService().hasMouldChangeMaintenanceOverlap(
-                    context, machine, mouldChangeStartTime, mouldChangeCompleteTime);
-            Date maintenanceReadyTime = maintenanceOverlapSwitch
-                    ? getMaintenanceScheduleService().resolveParallelMouldChangeReadyTime(
-                    context, machine, mouldChangeStartTime, mouldChangeCompleteTime)
-                    : mouldChangeCompleteTime;
+            Date maintenanceReadyTime = mouldChangeCompleteTime;
             boolean plannedRepairAffectingSwitch = ShiftCapacityResolverUtil.isPlannedRepairAffectingSwitch(
                     context, context.getDevicePlanShutList(), machine.getMachineCode(), endingTime,
                     mouldChangeStartTime, mouldChangeCompleteTime);
@@ -7631,9 +7620,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                 return false;
             }
             Date productionStartTime = plannedRepairAffectingSwitch
-                    ? firstInspectionBaseTime : maintenanceOverlapSwitch
-                    ? firstInspectionBaseTime
-                    : inspectionTime;
+                    ? firstInspectionBaseTime : inspectionTime;
             int machineMouldQty = ShiftCapacityResolverUtil.resolveMachineMouldQty(machine);
             int runtimeShiftCapacity = ShiftCapacityResolverUtil.resolveRuntimeShiftCapacity(
                     context, machine, specifySku.getShiftCapacity());
@@ -7962,6 +7949,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         int plannedRepairFixedQty = context.getParamIntValue(
                 LhScheduleParamConstant.PLANNED_REPAIR_FIXED_QTY, LhScheduleConstant.PLANNED_REPAIR_FIXED_QTY);
         String configPlusShiftType = ShiftCapacityResolverUtil.resolveOddShiftCapacityPlusShiftType(context);
+        // 续作首次分配同时执行结构准入和日标准量修正，未命中结构只保留原班产及既有扣减。
         Map<Integer, Integer> dailyStandardShiftCapacityMap = calculateDailyStandardShiftCapacityMap(
                 context, result, shifts, startTime, shiftCapacity, lhTimeSeconds, mouldQty,
                 cleaningWindowList, maintenanceWindowList, "续作排产");
@@ -8116,6 +8104,9 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                 LhScheduleParamConstant.PLANNED_REPAIR_FIXED_QTY, LhScheduleConstant.PLANNED_REPAIR_FIXED_QTY);
         String configPlusShiftType = ShiftCapacityResolverUtil.resolveOddShiftCapacityPlusShiftType(context);
         String remainShiftType = ShiftCapacityResolverUtil.resolveDailyStandardCapacityRemainShiftType(context);
+        boolean dailyStandardStructureMatched =
+                ShiftCapacityResolverUtil.isDailyStandardCapacityStructureMatched(
+                        context, result.getStructureName());
         int remainShiftCapacityUpperLimit =
                 ShiftCapacityResolverUtil.resolveDailyStandardRemainShiftCapacityUpperLimit(
                         context, result.getMaterialCode(), shiftCapacity);
@@ -8134,8 +8125,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             if (control == null || !control.isCanSchedule()) {
                 continue;
             }
-            // 日标准量高于“班产×3”时，仅剩余班次使用独立理论上限计算真实可排量。
-            int currentShiftCapacity = !singleControlMachine
+            // 仅参数清单内结构允许剩余班次使用独立理论上限；未命中结构始终从原始班产开始扣减。
+            int currentShiftCapacity = dailyStandardStructureMatched && !singleControlMachine
                     && ShiftCapacityResolverUtil.isDailyStandardRemainShift(shift, remainShiftType)
                     ? remainShiftCapacityUpperLimit : shiftCapacity;
             int shiftMaxQty = ShiftCapacityResolverUtil.resolveShiftCapacityWithDowntime(
@@ -8159,16 +8150,20 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             rawShiftCapacityMap.put(shift.getShiftIndex(), Math.max(0, shiftMaxQty));
         }
         int dailyStandardQty = ShiftCapacityResolverUtil.resolveDailyStandardQty(context, result.getMaterialCode());
-        Map<Integer, Integer> adjustedMap = ShiftCapacityResolverUtil.adjustShiftPlanQtyMapByDailyStandard(
-                shifts, rawShiftCapacityMap, rawShiftCapacityMap, dailyStandardQty, shiftCapacity,
-                remainShiftCapacityUpperLimit, remainShiftType,
-                singleControlMachine, ScheduleTypeEnum.CONTINUOUS.getCode());
+        Map<Integer, Integer> adjustedMap = dailyStandardStructureMatched
+                ? ShiftCapacityResolverUtil.adjustShiftPlanQtyMapByDailyStandard(
+                        shifts, rawShiftCapacityMap, rawShiftCapacityMap, dailyStandardQty, shiftCapacity,
+                        remainShiftCapacityUpperLimit, remainShiftType,
+                        singleControlMachine, ScheduleTypeEnum.CONTINUOUS.getCode())
+                : rawShiftCapacityMap;
         if (!Objects.equals(rawShiftCapacityMap, adjustedMap)) {
-            log.info("日标准产量班次计划量修正, 当前流程: {}, materialCode: {}, machineCode: {}, "
-                            + "是否单控机台: {}, SKU日标准产量: {}, 班产: {}, 剩余班次理论上限: {}, "
+            log.info("日标准产量班次计划量修正, 当前流程: {}, materialCode: {}, structureName: {}, "
+                            + "结构是否命中参数: {}, machineCode: {}, 是否单控机台: {}, "
+                            + "SKU日标准产量: {}, 班产: {}, 剩余班次理论上限: {}, "
                             + "日标准产量剩余班次参数值: {}, "
                             + "修正前班次计划量: {}, 修正后班次计划量: {}",
-                    processName, result.getMaterialCode(), result.getLhMachineCode(), singleControlMachine,
+                    processName, result.getMaterialCode(), result.getStructureName(),
+                    dailyStandardStructureMatched, result.getLhMachineCode(), singleControlMachine,
                     dailyStandardQty, shiftCapacity, remainShiftCapacityUpperLimit,
                     remainShiftType, rawShiftCapacityMap, adjustedMap);
         }
@@ -8205,6 +8200,9 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                 continue;
             }
             Map<Integer, Integer> rawPlanQtyMap = buildResultShiftPlanQtyMap(result, shifts);
+            boolean dailyStandardStructureMatched =
+                    ShiftCapacityResolverUtil.isDailyStandardCapacityStructureMatched(
+                            context, result.getStructureName());
             int dailyStandardQty = ShiftCapacityResolverUtil.resolveDailyStandardQty(
                     context, result.getMaterialCode());
             String remainShiftType = ShiftCapacityResolverUtil.resolveDailyStandardCapacityRemainShiftType(context);
@@ -8220,14 +8218,20 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                     context, result, resolveFirstPlannedShiftStartTime(result));
             List<MachineMaintenanceWindowDTO> maintenanceWindowList = resolveMachineMaintenanceWindowList(
                     context, result.getLhMachineCode());
-            // 最终结果中的残班量不是物理上限，需重算剩余班次真实可排产能后再执行向上修正。
-            Map<Integer, Integer> remainShiftCapacityMap = calculateDailyStandardShiftCapacityMap(
-                    context, result, shifts, resolveFirstPlannedShiftStartTime(result), shiftCapacity,
-                    lhTimeSeconds, mouldQty, cleaningWindowList, maintenanceWindowList, "续作结果收敛");
-            Map<Integer, Integer> adjustedPlanQtyMap = ShiftCapacityResolverUtil.adjustShiftPlanQtyMapByDailyStandard(
-                    shifts, rawPlanQtyMap, remainShiftCapacityMap, dailyStandardQty, shiftCapacity,
-                    remainShiftCapacityUpperLimit, remainShiftType,
-                    singleControlMachine, ScheduleTypeEnum.CONTINUOUS.getCode());
+            // 未命中结构时无需重算剩余班次真实可排产能，避免停机、清洗、保养等扣减的冗余计算；
+            // 命中结构时残班量不是物理上限，需重算剩余班次真实可排产能后再执行向上修正。
+            Map<Integer, Integer> remainShiftCapacityMap = dailyStandardStructureMatched
+                    ? calculateDailyStandardShiftCapacityMap(
+                            context, result, shifts, resolveFirstPlannedShiftStartTime(result), shiftCapacity,
+                            lhTimeSeconds, mouldQty, cleaningWindowList, maintenanceWindowList, "续作结果收敛")
+                    : Collections.emptyMap();
+            // 未命中结构时必须保留后置补满和停产释放链，只跳过日标准量结果收敛，不能提前结束当前结果处理。
+            Map<Integer, Integer> adjustedPlanQtyMap = dailyStandardStructureMatched
+                    ? ShiftCapacityResolverUtil.adjustShiftPlanQtyMapByDailyStandard(
+                            shifts, rawPlanQtyMap, remainShiftCapacityMap, dailyStandardQty, shiftCapacity,
+                            remainShiftCapacityUpperLimit, remainShiftType,
+                            singleControlMachine, ScheduleTypeEnum.CONTINUOUS.getCode())
+                    : rawPlanQtyMap;
             SkuScheduleDTO sourceSku = resolveResultSourceSku(context, result);
             if (Objects.equals(rawPlanQtyMap, adjustedPlanQtyMap)) {
                 applyEndingFillIfNecessary(context, result, sourceSku, shifts);
@@ -8239,12 +8243,14 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             refreshResultSummary(context, result, shifts);
             applyEndingFillIfNecessary(context, result, sourceSku, shifts);
             enforceContinuousStopHoldAndReleaseBoundary(context, result, shifts, rawPlanQtyMap);
-            log.info("日标准产量结果计划量收敛, 当前流程: 续作排产, materialCode: {}, machineCode: {}, "
-                            + "SKU日标准产量: {}, 班产: {}, 剩余班次理论上限: {}, "
+            log.info("日标准产量结果计划量收敛, 当前流程: 续作排产, materialCode: {}, structureName: {}, "
+                            + "结构是否命中参数: {}, machineCode: {}, SKU日标准产量: {}, "
+                            + "班产: {}, 剩余班次理论上限: {}, "
                             + "日标准产量剩余班次参数值: {}, "
                             + "修正前班次计划量: {}, 修正后班次计划量: {}",
-                    result.getMaterialCode(), result.getLhMachineCode(), dailyStandardQty, shiftCapacity,
-                    remainShiftCapacityUpperLimit, remainShiftType, rawPlanQtyMap, adjustedPlanQtyMap);
+                    result.getMaterialCode(), result.getStructureName(), dailyStandardStructureMatched,
+                    result.getLhMachineCode(), dailyStandardQty, shiftCapacity, remainShiftCapacityUpperLimit,
+                    remainShiftType, rawPlanQtyMap, adjustedPlanQtyMap);
         }
     }
 
@@ -8837,6 +8843,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         int plannedRepairFixedQty = context.getParamIntValue(
                 LhScheduleParamConstant.PLANNED_REPAIR_FIXED_QTY, LhScheduleConstant.PLANNED_REPAIR_FIXED_QTY);
         String configPlusShiftType = ShiftCapacityResolverUtil.resolveOddShiftCapacityPlusShiftType(context);
+        // 续作跨日追加继续复用同一结构门控，防止后续业务日重新启用未配置结构的理论上限。
         Map<Integer, Integer> dailyStandardShiftCapacityMap = calculateDailyStandardShiftCapacityMap(
                 context, result, shifts, cursorStartTime, shiftCapacity, result.getLhTime(), mouldQty,
                 cleaningWindowList, maintenanceWindowList, "续作排产");
@@ -9109,16 +9116,10 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             SkuScheduleDTO sourceSku = requireContinuousPhaseSourceSku(context, result);
             int firstOccupiedShiftIndex = resolveFirstOccupiedShiftIndex(result);
             int lastOccupiedShiftIndex = resolveLastOccupiedShiftIndex(result);
-            /*
-             * 零结果可能来自两类原因：一是SKU余量收尾已经归集到同SKU其他正量机台，此时当前
-             * 冗余机台应正常释放；二是库存或账本后置裁剪导致结果整体为零，此时仍须执行结构保机。
-             * 统一收口方法按既有收尾标记和同SKU正量承载结果区分，禁止仅凭计划量为0直接放行。
-             */
-            if (completeContinuousMachineOfflineDecision(
+            // 零结果先按续作原规则释放；阶段级结构判断只处理仍有实际生产结果的结构机台。
+            completeContinuousMachineOfflineDecision(
                     context, sourceSku, result, firstOccupiedShiftIndex,
-                    lastOccupiedShiftIndex, "续作零结果收口")) {
-                continue;
-            }
+                    lastOccupiedShiftIndex, "续作零结果收口");
             result.setSpecEndTime(null);
             result.setTdaySpecEndTime(null);
             zeroPlanResults.add(result);
@@ -10983,6 +10984,214 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         }
     }
 
+    /**
+     * 对3天内精度计划执行真实强制下机。
+     *
+     * <p>按执行日06:00截断物理机台当前续作结果。跨越截止时间的班次使用现有停机、清洗和
+     * 实际硫化节拍计算可保留量；截止后的班次全部清零。被移除数量同步恢复SKU生产余量、
+     * dayN账本及机台剩余产能，并写入明确未排原因。</p>
+     *
+     * @param context 排程上下文
+     * @param machine 当前机台
+     * @param sku 当前续作SKU
+     * @param result 待截断结果
+     * @param shifts 排程窗口班次
+     * @return 被截断总量
+     */
+    private int applyPrecisionForceDownIfNecessary(LhScheduleContext context,
+                                                   MachineScheduleDTO machine,
+                                                   SkuScheduleDTO sku,
+                                                   LhScheduleResult result,
+                                                   List<LhShiftConfigVO> shifts) {
+        Date cutoffTime = getMaintenanceScheduleService().resolveForceDownCutoffTime(machine);
+        if (Objects.isNull(cutoffTime) || Objects.isNull(result)) {
+            return 0;
+        }
+        int removedTotalQty = 0;
+        Map<LocalDate, Integer> removedQtyByDate = new LinkedHashMap<LocalDate, Integer>(4);
+        for (int shiftIndex = 1;
+             shiftIndex <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT;
+             shiftIndex++) {
+            Integer originalQtyValue = ShiftFieldUtil.getShiftPlanQty(result, shiftIndex);
+            int originalQty = Objects.isNull(originalQtyValue) ? 0 : Math.max(0, originalQtyValue);
+            if (originalQty <= 0) {
+                continue;
+            }
+            Date shiftStartTime = ShiftFieldUtil.getShiftStartTime(result, shiftIndex);
+            Date shiftEndTime = ShiftFieldUtil.getShiftEndTime(result, shiftIndex);
+            if (Objects.isNull(shiftStartTime) || Objects.isNull(shiftEndTime)
+                    || !shiftEndTime.after(cutoffTime)) {
+                continue;
+            }
+            int retainedQty = 0;
+            if (shiftStartTime.before(cutoffTime)) {
+                long shiftDurationSeconds = Math.max(1L,
+                        (shiftEndTime.getTime() - shiftStartTime.getTime()) / 1000L);
+                retainedQty = ShiftCapacityResolverUtil.resolveShiftCapacityWithDowntime(
+                        context.getDevicePlanShutList(), machine.getCleaningWindowList(),
+                        Collections.<MachineMaintenanceWindowDTO>emptyList(),
+                        machine.getMachineCode(), shiftStartTime, cutoffTime,
+                        Math.max(originalQty, sku.getShiftCapacity()), sku.getLhTimeSeconds(),
+                        ShiftCapacityResolverUtil.resolveMachineMouldQty(result.getMouldQty()),
+                        shiftDurationSeconds, 0, 0, 0);
+                retainedQty = Math.min(originalQty, Math.max(0, retainedQty));
+            }
+            int removedQty = originalQty - retainedQty;
+            if (removedQty <= 0) {
+                continue;
+            }
+            Date retainedEndTime = retainedQty > 0
+                    ? ShiftCapacityResolverUtil.resolveShiftPlanEndTime(
+                    context.getDevicePlanShutList(), machine.getCleaningWindowList(),
+                    Collections.<MachineMaintenanceWindowDTO>emptyList(),
+                    machine.getMachineCode(), shiftStartTime, cutoffTime,
+                    retainedQty, originalQty)
+                    : null;
+            ShiftFieldUtil.setShiftPlanQty(result, shiftIndex, retainedQty,
+                    retainedQty > 0 ? shiftStartTime : null, retainedEndTime);
+            removedTotalQty += removedQty;
+            LocalDate productionDate = resolveShiftBusinessDate(shifts, shiftIndex);
+            if (Objects.nonNull(productionDate)) {
+                removedQtyByDate.merge(productionDate, removedQty, Integer::sum);
+            }
+            releasePrecisionForceDownCapacity(context, machine, shiftIndex, removedQty);
+        }
+        if (removedTotalQty <= 0) {
+            return 0;
+        }
+        ShiftFieldUtil.syncDailyPlanQty(result);
+        result.setTotalDailyPlanQty(result.getDailyPlanQty());
+        ShiftFieldUtil.clearUnplannedShiftCureFormulaFields(result);
+        int lastShiftIndex = ShiftFieldUtil.applyLastPlannedShiftEndMark(result, false);
+        Date lastEndTime = lastShiftIndex > 0
+                ? ShiftFieldUtil.getShiftEndTime(result, lastShiftIndex) : null;
+        result.setSpecEndTime(lastEndTime);
+        result.setTdaySpecEndTime(lastEndTime);
+        result.setIsEnd("0");
+        result.setMouldSurplusQty((Objects.isNull(result.getMouldSurplusQty())
+                ? 0 : result.getMouldSurplusQty()) + removedTotalQty);
+        context.getEndingFillAllowedOverQtyMap().remove(result);
+        context.getSharedEmbryoEndingStaggerAllowedOverQtyMap().remove(result);
+        getTargetScheduleQtyResolver().restoreProductionRemainingQty(
+                context, sku, removedTotalQty,
+                LhMaintenanceScheduleService.TRIGGER_REASON_FORCE_DOWN, machine.getMachineCode());
+        restorePrecisionForceDownDailyQuota(context, sku, removedQtyByDate);
+        addPrecisionForceDownUnscheduledResult(
+                context, sku, machine.getMachineCode(), removedTotalQty);
+        machine.setEnding(true);
+        machine.setEstimatedEndTime(cutoffTime);
+        log.warn("精度计划到期触发强制下机, 机台: {}, SKU: {}, 截止时间: {}, 截断量: {}, "
+                        + "保留量: {}, 未排原因: {}",
+                machine.getMachineCode(), sku.getMaterialCode(),
+                LhScheduleTimeUtil.formatDateTime(cutoffTime), removedTotalQty,
+                Objects.isNull(result.getDailyPlanQty()) ? 0 : result.getDailyPlanQty(),
+                LhMaintenanceScheduleService.TRIGGER_REASON_FORCE_DOWN);
+        return removedTotalQty;
+    }
+
+    /**
+     * 解析班次所属业务日期。
+     *
+     * @param shifts 排程班次
+     * @param shiftIndex 班次索引
+     * @return 业务日期
+     */
+    private LocalDate resolveShiftBusinessDate(List<LhShiftConfigVO> shifts, int shiftIndex) {
+        for (LhShiftConfigVO shift : shifts) {
+            if (Objects.nonNull(shift) && Objects.nonNull(shift.getShiftIndex())
+                    && shift.getShiftIndex() == shiftIndex && Objects.nonNull(shift.getWorkDate())) {
+                return shift.getWorkDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 释放强制下机截断后的机台班次产能。
+     */
+    private void releasePrecisionForceDownCapacity(LhScheduleContext context,
+                                                   MachineScheduleDTO machine,
+                                                   int shiftIndex,
+                                                   int removedQty) {
+        int[] machineCapacity = machine.getShiftRemainingCapacity();
+        int[] contextCapacity = context.getMachineShiftCapacityMap().get(machine.getMachineCode());
+        if (Objects.nonNull(machineCapacity) && shiftIndex < machineCapacity.length) {
+            machineCapacity[shiftIndex] += removedQty;
+        }
+        if (Objects.nonNull(contextCapacity) && contextCapacity != machineCapacity
+                && shiftIndex < contextCapacity.length) {
+            contextCapacity[shiftIndex] += removedQty;
+        }
+    }
+
+    /**
+     * 按被截断班次业务日倒序恢复dayN账本。
+     *
+     * <p>每个生产日均复用统一滚动账本的逆向恢复方法，先撤销该生产日最后借用的未来额度，
+     * 再撤销历史欠产额度；禁止再从整个账本尾部任意退量，避免跨日强制下机把dayN恢复错位。</p>
+     */
+    private void restorePrecisionForceDownDailyQuota(LhScheduleContext context,
+                                                     SkuScheduleDTO sku,
+                                                     Map<LocalDate, Integer> removedQtyByDate) {
+        if (CollectionUtils.isEmpty(sku.getDailyPlanQuotaMap())
+                || CollectionUtils.isEmpty(removedQtyByDate)) {
+            return;
+        }
+        List<Map.Entry<LocalDate, Integer>> removedEntries =
+                new ArrayList<Map.Entry<LocalDate, Integer>>(removedQtyByDate.entrySet());
+        removedEntries.sort(Map.Entry.<LocalDate, Integer>comparingByKey().reversed());
+        for (Map.Entry<LocalDate, Integer> removedEntry : removedEntries) {
+            int pendingRestoreQty = Math.max(0, removedEntry.getValue());
+            int restoredQty = SkuDailyPlanQuotaUtil.restoreRollingQuota(
+                    sku.getDailyPlanQuotaMap(), removedEntry.getKey(), pendingRestoreQty, null);
+            if (restoredQty != pendingRestoreQty) {
+                log.warn("精度强制下机dayN账本恢复量不一致, materialCode: {}, productionDate: {}, "
+                                + "expectedRestoreQty: {}, actualRestoreQty: {}",
+                        sku.getMaterialCode(), removedEntry.getKey(), pendingRestoreQty, restoredQty);
+            }
+        }
+    }
+
+    /**
+     * 写入或合并精度计划强制下机未排记录。
+     */
+    private void addPrecisionForceDownUnscheduledResult(LhScheduleContext context,
+                                                        SkuScheduleDTO sku,
+                                                        String machineCode,
+                                                        int removedQty) {
+        String reason = LhMaintenanceScheduleService.TRIGGER_REASON_FORCE_DOWN
+                + "，机台 " + machineCode;
+        for (LhUnscheduledResult existing : context.getUnscheduledResultList()) {
+            if (StringUtils.equals(sku.getMaterialCode(), existing.getMaterialCode())
+                    && StringUtils.equals(sku.getProductStatus(), existing.getProductStatus())
+                    && StringUtils.equals(reason, existing.getUnscheduledReason())) {
+                existing.setUnscheduledQty((Objects.isNull(existing.getUnscheduledQty())
+                        ? 0 : existing.getUnscheduledQty()) + removedQty);
+                return;
+            }
+        }
+        LhUnscheduledResult unscheduled = new LhUnscheduledResult();
+        unscheduled.setFactoryCode(context.getFactoryCode());
+        unscheduled.setBatchNo(context.getBatchNo());
+        unscheduled.setScheduleDate(context.getScheduleTargetDate());
+        unscheduled.setMonthPlanVersion(sku.getMonthPlanVersion());
+        unscheduled.setProductionVersion(sku.getProductionVersion());
+        unscheduled.setMaterialCode(sku.getMaterialCode());
+        unscheduled.setProductStatus(sku.getProductStatus());
+        unscheduled.setMaterialDesc(sku.getMaterialDesc());
+        unscheduled.setStructureName(sku.getStructureName());
+        unscheduled.setMainMaterialDesc(sku.getMainMaterialDesc());
+        unscheduled.setSpecCode(sku.getSpecCode());
+        unscheduled.setSpecDesc(sku.getSpecDesc());
+        unscheduled.setEmbryoCode(sku.getEmbryoCode());
+        unscheduled.setMouldQty(sku.getMouldQty());
+        unscheduled.setUnscheduledQty(removedQty);
+        unscheduled.setUnscheduledReason(reason);
+        unscheduled.setDataSource(AUTO_DATA_SOURCE);
+        unscheduled.setIsDelete(0);
+        context.getUnscheduledResultList().add(unscheduled);
+    }
+
     private Date resolveActualCompletionTime(LhScheduleContext context, LhScheduleResult result) {
         if (result == null) {
             return null;
@@ -11047,52 +11256,10 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
     }
 
     /**
-     * 在续作机台即将登记真实释放状态前，调用结构最低机台数统一判断入口。
+     * 统一完成续作机台的正常释放状态登记。
      *
-     * <p>调用方传入清零前的首末有量班次。本方法再读取清零后的最后有量班次：仍有前序产量时，
-     * 下一个班次就是实际下机班次；已经全窗清零时，使用清零前首班作为下机班次。若清理后仍生产到
-     * 窗口末班，说明本窗口内没有真实下机动作，不提前触发保机。</p>
-     *
-     * @param context 排程上下文
-     * @param sourceSku 续作来源SKU
-     * @param result 准备下机的现有结果行
-     * @param firstPositiveShiftBeforeOffline 清零前首个有量班次
-     * @param lastPositiveShiftBeforeOffline 清零前最后有量班次
-     * @param offlineReason 下机原因
-     * @return true-命中结构最低机台数并已保机；false-允许原逻辑释放或本窗口内尚未下机
-     */
-    private boolean retainStructureMachineBeforeOfflineIfNecessary(
-            LhScheduleContext context,
-            SkuScheduleDTO sourceSku,
-            LhScheduleResult result,
-            int firstPositiveShiftBeforeOffline,
-            int lastPositiveShiftBeforeOffline,
-            String offlineReason) {
-        if (Objects.isNull(result) || firstPositiveShiftBeforeOffline < 1
-                || lastPositiveShiftBeforeOffline < 1) {
-            return false;
-        }
-        int currentLastPositiveShiftIndex = resolveLastPlannedShiftIndex(result);
-        if (currentLastPositiveShiftIndex >= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT) {
-            return false;
-        }
-        int offlineShiftIndex = currentLastPositiveShiftIndex > 0
-                ? currentLastPositiveShiftIndex + 1 : firstPositiveShiftBeforeOffline;
-        return structureMinMachineRetentionService.retainMachineBeforeOffline(
-                context, sourceSku, result, offlineShiftIndex,
-                lastPositiveShiftBeforeOffline, offlineReason);
-    }
-
-    /**
-     * 统一完成续作机台下机前的结构保机判断和正常释放状态登记。
-     *
-     * <p>处理顺序固定为：</p>
-     * <ol>
-     *   <li>若当前全零结果是SKU余量收尾归集后的冗余机台，且同SKU仍有正量机台承载收尾计划，
-     *   则按正常排程语义直接放行，不执行结构最低机台保留；</li>
-     *   <li>其他场景继续复用结构最低机台统一服务，命中后保留原结果和机台占用；</li>
-     *   <li>未命中保机时立即登记真实释放边界并解除停产保机硬占用，使下一次连续下机读取最新状态。</li>
-     * </ol>
+     * <p>结构停产保机已经调整为续作与换活字块全部完成后的阶段级判断。本方法只维护续作原有
+     * 释放边界和停产保机解除状态，不再在逐台下机时改变结构判断结果。</p>
      *
      * <p>若机台已经登记的释放边界不晚于本次最新边界，说明前序下机状态已经生效，不再重复判断；
      * 若旧边界晚于本次最新边界，则必须重新判断并向前刷新边界。该处理用于逐日降模连续收口，
@@ -11104,9 +11271,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
      * @param firstPositiveShiftBeforeOffline 清零前首个有量或占用班次
      * @param lastPositiveShiftBeforeOffline 清零前最后有量或占用班次
      * @param offlineReason 下机原因
-     * @return true-命中结构最低机台数并已保机；false-正常释放或本窗口内没有真实下机
      */
-    private boolean completeContinuousMachineOfflineDecision(
+    private void completeContinuousMachineOfflineDecision(
             LhScheduleContext context,
             SkuScheduleDTO sourceSku,
             LhScheduleResult result,
@@ -11115,7 +11281,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             String offlineReason) {
         if (Objects.isNull(context) || Objects.isNull(result)
                 || firstPositiveShiftBeforeOffline < 1 || lastPositiveShiftBeforeOffline < 1) {
-            return false;
+            return;
         }
         int currentLastPositiveShiftIndex = resolveLastPlannedShiftIndex(result);
         Integer registeredReleaseBoundary = context.getContinuousReducedMachineReleaseBoundaryShiftIndex(
@@ -11123,19 +11289,14 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         if (Objects.nonNull(registeredReleaseBoundary)
                 && registeredReleaseBoundary <= currentLastPositiveShiftIndex) {
             // 已登记边界与最新排程状态一致或更早，说明机台已经完成真实释放，避免最终收口重复判断。
-            return false;
+            return;
         }
         if (currentLastPositiveShiftIndex >= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT) {
             // 当前机台仍生产到窗口末班，本窗口内没有实际下机动作，不得提前登记释放状态。
-            return false;
+            return;
         }
 
         boolean endingRedundantMachine = isSkuEndingRedundantZeroMachine(context, sourceSku, result);
-        if (!endingRedundantMachine && retainStructureMachineBeforeOfflineIfNecessary(
-                context, sourceSku, result, firstPositiveShiftBeforeOffline,
-                lastPositiveShiftBeforeOffline, offlineReason)) {
-            return true;
-        }
 
         // 正常放行后立即登记最后允许生产班次；全窗为零时登记0，明确本批首班前已释放。
         int releaseBoundaryShiftIndex = Math.max(0, currentLastPositiveShiftIndex);
@@ -11158,7 +11319,6 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                     result.getLhMachineCode(), StringUtils.defaultString(offlineReason),
                     registeredReleaseBoundary, releaseBoundaryShiftIndex);
         }
-        return false;
     }
 
     /**

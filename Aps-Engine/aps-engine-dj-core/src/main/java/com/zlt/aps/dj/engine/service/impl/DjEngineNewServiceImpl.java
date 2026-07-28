@@ -521,9 +521,9 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
 
         context.appendLog("===== 步骤4：机台分配 =====");
         for (DjPaddingDemand demand : demandList) {
-            context.appendLog("  规格 {0}：是否新规格={1}，是否收尾={2}，是否量试/试制={3}，机台={4}",
+            context.appendLog("  规格 {0}：是否新规格={1}，是否量试/试制={2}，机台={3}",
                     DjScheduleContext.buildDisplayName(demand.getPaddingName(), demand.getPaddingCode()),
-                    demand.isNewSpec(), demand.isTailFinished(),
+                    demand.isNewSpec(),
                     this.hasTrialConsumption(context, demand.getPaddingCode()),
                     demand.getMachineCode());
         }
@@ -1145,9 +1145,6 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
                 demand.setMouthPlateCode(firstConstruction.getPaddingMouthPlate());
             }
 
-            // 判断是否已收尾：遍历使用该垫胶的所有成型计划，各班原因分析均含收尾关键字时才视为收尾
-            demand.setTailFinished(this.isAllFormingPlansFinished(context, paddingCode));
-
             // 判断是否新规格：15日内未排产且当前库存为0
             // BigDecimal stock = effectiveStockMap.getOrDefault(paddingCode, BigDecimal.ZERO);
             demand.setNewSpec(newSpecPaddingCodes.contains(paddingCode));
@@ -1178,16 +1175,17 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
      * 判断使用该垫胶的所有成型计划是否都已收尾
      * <p>
      * 遍历成型计划列表，找到使用该垫胶的所有成型计划，
-     * 检查每个成型计划各班的系统原因分析或手动原因分析是否包含收尾关键字，
+     * 检查每个成型计划 1 班到供应窗口结束班次（windowEndClass）之间的系统原因分析或手动原因分析是否包含收尾关键字，
      * 任意一个班包含即表示该成型计划已收尾。
      * 必须所有成型计划都收尾，该规格垫胶才算收尾。
      * </p>
      *
-     * @param context 排产上下文（含成型计划列表及参数）
+     * @param context     排产上下文（含成型计划列表及参数）
      * @param paddingCode 垫胶编码
+     * @param windowEndClass 供应窗口结束班次（含，1~8）
      * @return true 表示所有使用该垫胶的成型计划都已收尾
      */
-    private boolean isAllFormingPlansFinished(DjScheduleContext context, String paddingCode) {
+    private boolean isAllFormingPlansFinished(DjScheduleContext context, String paddingCode, int windowEndClass) {
         List<CxScheduleResult> cxScheduleList = context.getCxScheduleList();
         if (CollectionUtils.isEmpty(cxScheduleList)) {
             return false;
@@ -1207,8 +1205,8 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
                 MdmConstructionInfo construction = this.resolveConstructionForShift(cx, shiftIndex, context);
                 if (construction != null && paddingCode.equals(construction.getPaddingCode())) {
                     hasMatched = true;
-                    // 检查该成型计划任意一个班的原因分析是否包含收尾关键字
-                    if (!isCxPlanFinishedByAnalysis(cx, keyword)) {
+                    // 检查该成型计划 1~windowEndClass 班的原因分析是否包含收尾关键字
+                    if (!isCxPlanFinishedByAnalysis(cx, keyword, windowEndClass)) {
                         return false;
                     }
                     break; // 该成型计划已匹配，无需继续检查其他班次
@@ -1222,16 +1220,17 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
     /**
      * 判断单个成型计划是否已收尾（根据各班原因分析字段判断）
      * <p>
-     * 遍历 1~8 班的系统原因分析和手动原因分析字段，
+     * 遍历 1 班到供应窗口结束班次（windowEndClass）的系统原因分析和手动原因分析字段，
      * 任意一个班包含收尾关键字即视为收尾。
      * </p>
      *
-     * @param cx 成型计划
-     * @param keyword 收尾关键字
+     * @param cx             成型计划
+     * @param keyword        收尾关键字
+     * @param windowEndClass 供应窗口结束班次（含，1~8）
      * @return true 表示该成型计划已收尾
      */
-    private boolean isCxPlanFinishedByAnalysis(CxScheduleResult cx, String keyword) {
-        for (int shiftIndex = 1; shiftIndex <= DjEngineConstants.CX_SHIFT_COUNT; shiftIndex++) {
+    private boolean isCxPlanFinishedByAnalysis(CxScheduleResult cx, String keyword, int windowEndClass) {
+        for (int shiftIndex = 1; shiftIndex <= windowEndClass; shiftIndex++) {
             // 检查系统原因分析
             String sysAnalysisField = String.format(DjEngineConstants.CLASS_ANALYSIS_FIELD, shiftIndex);
             String sysAnalysis = (String) cx.getFieldValueByFieldName(sysAnalysisField);
@@ -1445,6 +1444,7 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
         context.appendLog("--- 班次 {0} 需求判定结果 ---", shiftIndex);
         for (DjPaddingDemand spec : demandList) {
             String needProduceStr = spec.isNeedProduce() ? "需要排产" : "库存充足不排产";
+            String isTailStr = spec.isTailFinished() ? "，收尾" : "";
             String tailNote = "";
             if (spec.isTailFinished() && spec.getLossRatePercent() != null
                     && BigDecimalUtils.gtZero(spec.getLossRatePercent())
@@ -1456,13 +1456,13 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
                         BigDecimalUtils.decimals2Percentages(rateFactor).setScale(0, RoundingMode.HALF_UP));
             }
             if (BigDecimalUtils.gtZero(spec.getRemainingDemand())) {
-                context.appendLog("  规格 {0}：{1}，可覆盖班次={2}，触发阈值≤{3}，剩余待排={4}{5}",
-                        context.getPaddingNameByCode(spec.getPaddingCode()), needProduceStr, spec.getCoverableShiftCount(),
+                context.appendLog("  规格 {0}：{1}{2}，可覆盖班次={3}，触发阈值≤{4}，剩余待排={5}{6}",
+                        context.getPaddingNameByCode(spec.getPaddingCode()), needProduceStr, isTailStr, spec.getCoverableShiftCount(),
                         this.getParamAsDecimal(context, DjEngineConstants.PARAM_SCHEDULE_THRESHOLD).intValue(),
                         spec.getRemainingDemand(), tailNote);
             } else {
-                context.appendLog("  规格 {0}：{1}，可覆盖班次={2}，触发阈值≤{3}",
-                        context.getPaddingNameByCode(spec.getPaddingCode()), needProduceStr, spec.getCoverableShiftCount(),
+                context.appendLog("  规格 {0}：{1}{2}，可覆盖班次={3}，触发阈值≤{4}",
+                        context.getPaddingNameByCode(spec.getPaddingCode()), needProduceStr, isTailStr, spec.getCoverableShiftCount(),
                         this.getParamAsDecimal(context, DjEngineConstants.PARAM_SCHEDULE_THRESHOLD).intValue());
             }
         }
@@ -1970,6 +1970,9 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
                 windowEndClass = Math.min(Math.max(windowEndClass, minWindowEnd),
                         DjEngineConstants.CX_SHIFT_COUNT);
             }
+
+            // 按当前供应窗口重算是否收尾（供应窗口变化时重新判断，检查 1~windowEndClass 班次）
+            spec.setTailFinished(this.isAllFormingPlansFinished(context, spec.getPaddingCode(), windowEndClass));
 
             Map<Integer, BigDecimal> shiftConsume = new HashMap<>();
             BigDecimal windowDemandSum = BigDecimal.ZERO;
@@ -2507,51 +2510,32 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
     }
 
     /**
-     * 构建优先级比较器（11级规则）
+     * 构建优先级比较器（三层顺位结构）
+     * <p>
+     * 第一层顺位：有供应缺口 &gt; 无库存的新规格 &gt; 其他规格；第一层相同才比较第二层，以此类推。
+     * </p>
      */
     private Comparator<DjPaddingDemand> buildPriorityComparator(List<DjPaddingDemand> demandList, String lastSpecCode,
             DjScheduleContext context, int shiftIndex) {
         return (a, b) -> {
-            // 0. 续作且有供应缺口的规格最优先（本班若不续作则缺口无法补救，切换损失最小）
-            boolean aContinueGap = a.getPaddingCode() != null && a.getPaddingCode().equals(lastSpecCode)
-                    && a.isSupplyGapMode();
-            boolean bContinueGap = b.getPaddingCode() != null && b.getPaddingCode().equals(lastSpecCode)
-                    && b.isSupplyGapMode();
-            if (aContinueGap != bContinueGap) {
-                return aContinueGap ? -1 : 1;
+            // ========== 第一层顺位：按规格紧急程度分层 ==========
+            // 有供应缺口 > 无库存的新规格 > 其他规格
+            int aLayer1 = this.getLayer1Order(a);
+            int bLayer1 = this.getLayer1Order(b);
+            if (aLayer1 != bLayer1) {
+                return Integer.compare(aLayer1, bLayer1);
             }
 
-            // 1. 有供应缺口但非续作的规格（缺口必须本班生产，否则无其他机台可补救）
-            boolean aGapNonContinue = a.isSupplyGapMode()
-                    && !a.getPaddingCode().equals(lastSpecCode);
-            boolean bGapNonContinue = b.isSupplyGapMode()
-                    && !b.getPaddingCode().equals(lastSpecCode);
-            if (aGapNonContinue != bGapNonContinue) {
-                return aGapNonContinue ? -1 : 1;
+            // ========== 第二层顺位：按规格状态分层 ==========
+            int aLayer2 = this.getLayer2Order(a, lastSpecCode);
+            int bLayer2 = this.getLayer2Order(b, lastSpecCode);
+            if (aLayer2 != bLayer2) {
+                return Integer.compare(aLayer2, bLayer2);
             }
 
-            // 2. 本班有缺口优先
-            if (a.isNeedProduce() != b.isNeedProduce()) {
-                return a.isNeedProduce() ? -1 : 1;
-            }
+            // ========== 第三层顺位：胶料/口型/序号/库消比/编码 ==========
 
-            // 3. 新规格且无库存优先（在补供应缺口的规格之后）
-            boolean aNoInvNewSpec = a.isNewSpec() && a.getIncomingInventory() != null
-                    && BigDecimalUtils.leZero(a.getIncomingInventory());
-            boolean bNoInvNewSpec = b.isNewSpec() && b.getIncomingInventory() != null
-                    && BigDecimalUtils.leZero(b.getIncomingInventory());
-            if (aNoInvNewSpec != bNoInvNewSpec) {
-                return aNoInvNewSpec ? -1 : 1;
-            }
-
-            // 4. 规格续作优先
-            boolean aIsLast = a.getPaddingCode() != null && a.getPaddingCode().equals(lastSpecCode);
-            boolean bIsLast = b.getPaddingCode() != null && b.getPaddingCode().equals(lastSpecCode);
-            if (aIsLast != bIsLast) {
-                return aIsLast ? -1 : 1;
-            }
-
-            // 5. 胶料相同 + 口型相同优先
+            // 1. 与上一个规格胶料相同、口型也相同优先
             if (lastSpecCode != null) {
                 DjPaddingDemand lastSpec = this.findSpecByCode(demandList, lastSpecCode);
                 if (lastSpec != null) {
@@ -2561,14 +2545,14 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
                         return aMatchGlueAndMouth ? -1 : 1;
                     }
 
-                    // 6. 胶料相同优先
+                    // 2. 与上一个规格胶料相同优先
                     boolean aGlueMatch = a.getGlueCode() != null && a.getGlueCode().equals(lastSpec.getGlueCode());
                     boolean bGlueMatch = b.getGlueCode() != null && b.getGlueCode().equals(lastSpec.getGlueCode());
                     if (aGlueMatch != bGlueMatch) {
                         return aGlueMatch ? -1 : 1;
                     }
 
-                    // 7. 口型相同优先
+                    // 3. 与上一个规格口型相同优先
                     boolean aMouthMatch = a.getMouthPlateCode() != null
                             && a.getMouthPlateCode().equals(lastSpec.getMouthPlateCode());
                     boolean bMouthMatch = b.getMouthPlateCode() != null
@@ -2579,7 +2563,7 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
                 }
             }
 
-            // 8. 胶料组相同优先
+            // 4. 胶料组相同优先
             Map<String, String> glueGroupMap = context.getGlueGroupMap();
             String aGroup = glueGroupMap != null ? glueGroupMap.get(a.getGlueCode()) : null;
             String bGroup = glueGroupMap != null ? glueGroupMap.get(b.getGlueCode()) : null;
@@ -2595,7 +2579,7 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
                 }
             }
 
-            // 9. 胶料序号升序
+            // 5. 胶料序号升序
             Map<String, Integer> glueOrderMap = context.getGlueOrderMap();
             Integer aSeq = glueOrderMap != null ? glueOrderMap.get(a.getGlueCode()) : null;
             Integer bSeq = glueOrderMap != null ? glueOrderMap.get(b.getGlueCode()) : null;
@@ -2603,7 +2587,7 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
                 return Integer.compare(aSeq, bSeq);
             }
 
-            // 10. 库消比升序
+            // 6. 库消比（库存:成型消耗量）的比值升序
             BigDecimal aRatio = this.calcStockConsumeRatio(a, context);
             BigDecimal bRatio = this.calcStockConsumeRatio(b, context);
             if (aRatio != null && bRatio != null) {
@@ -2613,12 +2597,59 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
                 }
             }
 
-            // 11. 垫胶编码升序（兜底）
+            // 7. 垫胶编码升序（兜底）
             if (a.getPaddingCode() != null && b.getPaddingCode() != null) {
                 return a.getPaddingCode().compareTo(b.getPaddingCode());
             }
             return 0;
         };
+    }
+
+    /**
+     * 获取规格的第一层顺位值
+     * <p>
+     * 有供应缺口（0）&lt; 无库存的新规格（1）&lt; 其他规格（2）
+     * </p>
+     */
+    private int getLayer1Order(DjPaddingDemand spec) {
+        // 1. 有供应缺口
+        if (spec.isSupplyGapMode()) {
+            return 0;
+        }
+        // 2. 无库存的新规格（近期无排产记录且当前有效库存为 0）
+        if (spec.isNewSpec() && spec.getIncomingInventory() != null
+                && BigDecimalUtils.leZero(spec.getIncomingInventory())) {
+            return 1;
+        }
+        // 3. 其他规格
+        return 2;
+    }
+
+    /**
+     * 获取规格的第二层顺位值
+     * <p>
+     * 续作规格（0）&lt; 收尾规格（1）&lt; 本班有需求（2）&lt; 其他规格（3）
+     * </p>
+     *
+     * @param spec         规格
+     * @param lastSpecCode 上一班最后一个生产的规格编码
+     * @return 第二层顺位值（越小越优先）
+     */
+    private int getLayer2Order(DjPaddingDemand spec, String lastSpecCode) {
+        // 1. 续作规格（当前机台上一班正在生产的规格，切换成本最低）
+        if (spec.getPaddingCode() != null && spec.getPaddingCode().equals(lastSpecCode)) {
+            return 0;
+        }
+        // 2. 收尾规格（已完成收尾确认，本班需完成剩余量）
+        if (spec.isTailFinished()) {
+            return 1;
+        }
+        // 3. 本班有需求（需本班安排生产）
+        if (spec.isNeedProduce()) {
+            return 2;
+        }
+        // 4. 其他规格
+        return 3;
     }
 
     /**
@@ -2726,8 +2757,8 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
             return BigDecimal.ZERO;
         }
 
-        // 供应缺口填补模式：仅补本班成型消耗缺口，不补供应窗口净需求
-        if (spec.isSupplyGapMode()) {
+        // 供应缺口填补模式：仅补本班成型消耗缺口，不补供应窗口净需求（收尾规格跳过，直接用含损耗率的原始待排量）
+        if (spec.isSupplyGapMode() && !spec.isTailFinished()) {
             int firstFormingClass = this.getFormingClassByShiftIndex(shiftIndex, context);
             if (firstFormingClass < 1) {
                 int formingShiftOffset = context.getFormingShiftOffset() != null ? context.getFormingShiftOffset() : 0;
@@ -2776,7 +2807,7 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
                 // 可一次排完，无需后续排程，精确排产
                 baseProduceQty = remainingDemand;
             } else {
-                // 无法一次排完，按整车取整（同非收尾规格逻辑）
+                // 无法一次排完，按整车取整
                 int maxTrolleys = remainingCapacity.divide(trolleyCapacity, 0, RoundingMode.FLOOR).intValue();
                 int needTrolleys = remainingDemand.divide(trolleyCapacity, 0, RoundingMode.CEILING).intValue();
                 int actualTrolleys = Math.min(maxTrolleys, needTrolleys);
@@ -2784,6 +2815,10 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
                     return BigDecimal.ZERO;
                 }
                 baseProduceQty = BigDecimal.valueOf(actualTrolleys).multiply(trolleyCapacity);
+                // 收尾规格：整车量不能超过剩余待排量
+                if (baseProduceQty.compareTo(remainingDemand) > 0) {
+                    baseProduceQty = remainingDemand;
+                }
             }
         } else {
             // 未收尾规格：需台车容量整倍数

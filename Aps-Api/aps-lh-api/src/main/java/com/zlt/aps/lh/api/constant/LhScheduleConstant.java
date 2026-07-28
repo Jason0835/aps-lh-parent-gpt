@@ -213,6 +213,10 @@ public final class LhScheduleConstant {
 
     /** 维保重叠切换耗时（小时） */
     public static final int MAINTENANCE_OVERLAP_SWITCH_HOURS = 4;
+    /** 精度计划执行日前允许插排的SKU最大完整待排量 */
+    public static final int PRECISION_PRE_INSERT_MAX_QTY = 50;
+    /** 精度计划执行日前生产任务必须完成的固定小时 */
+    public static final int PRECISION_PRODUCTION_CUTOFF_HOUR = 6;
 
     // ======================== 停机超时阈值 ========================
 
@@ -236,10 +240,10 @@ public final class LhScheduleConstant {
     /** 胶囊预警次数 */
     public static final int CAPSULE_WARNING_COUNT = 430;
 
-    /** 胶囊使用次数上限默认值 */
+    /** 胶囊使用次数上限默认值；本批按机台总量累计并仅首次严格跨限触发 */
     public static final int CAPSULE_FORCE_DOWN_COUNT = 450;
 
-    /** 换胶囊班次固定扣减计划量默认值；2条对应固定占用1小时 */
+    /** 本批首次严格跨限固定扣减计划量默认值；2条对应固定占用1小时 */
     public static final int CAPSULE_CHANGE_LOSS_QTY = 2;
 
     // ======================== 工作日历工序代码 ========================
@@ -376,6 +380,9 @@ public final class LhScheduleConstant {
 
     /** 日标准产量剩余班次默认值，3-中班 */
     public static final int DAILY_STANDARD_CAPACITY_REMAIN_SHIFT_TYPE = 3;
+
+    /** 按日标准量排产结构清单默认值，空值表示所有结构均按原始班产排产 */
+    public static final String DAILY_STANDARD_CAPACITY_STRUCTURE_LIST = "";
 
     /** 当天空闲机台优先开关默认值（0-关闭，1-开启） */
     public static final int ENABLE_TODAY_IDLE_MACHINE_PRIORITY = 1;
