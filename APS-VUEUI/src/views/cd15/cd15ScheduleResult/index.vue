@@ -9,6 +9,7 @@
       :data="data"
       :page="page"
       :search="search"
+      :isReset="true"
       :showSummary="false"
       :selectArea="false"
       @refresh="getList"
@@ -278,11 +279,12 @@ export default {
     },
     handleReset() {
       const scheduleDate = moment().add(1, 'days').format('YYYY-MM-DD')
-      this.search = { factoryCode: '116', scheduleDate }
+      this.search = { factoryCode: '116', scheduleDate, steelStripCode: '', bigRollCode: '', machineCode: '', releaseStatus: '' }
       this.query = { ...this.search }
       this.dateList = this.buildDateList(scheduleDate)
       this.page.current = 1
       this.getList()
+      this.loadMachineOptions()
     },
     handlePageChange(current, pageSize) {
       this.page.current = current

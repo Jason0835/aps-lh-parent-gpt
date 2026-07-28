@@ -1,6 +1,7 @@
 package com.zlt.aps.cd15.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
@@ -37,6 +38,8 @@ import org.redisson.api.RLock;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import javax.annotation.Resource;
 import java.math.BigDecimal;
@@ -47,12 +50,15 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -97,6 +103,280 @@ public class Cd15ScheduleResultServiceImpl extends AbstractDocService<Cd15Schedu
 
     @Resource
     private Cd15TimedRollingCheckService timedRollingCheckService;
+
+    /**
+     * 删除排程结果，不触发滚动重排；删除后只压缩同工厂、日期、机台的 CLASS1 后续生产顺位。
+     *
+     * @param ids 待删除排程结果主键
+     * @return 删除结果
+     */
+    @Override
+    public AjaxResult removeScheduleResults(List<Long> ids) {
+        // 先过滤空主键并去重，避免重复 ID 影响删除数量校验。
+        List<Long> deleteIds = ids == null ? Collections.emptyList() : ids.stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .collect(Collectors.toList());
+        if (deleteIds.isEmpty()) {
+            return this.required("ids");
+        }
+        // 首次查询用于确认所有待删除记录均存在，并确定需要加锁的工厂和排程日期范围。
+        List<Cd15ScheduleResult> selected = this.selectDeleteResults(deleteIds);
+        if (selected.size() != deleteIds.size()) {
+            return AjaxResult.error(I18nUtil.getMessage(
+                    "ui.message.parameter.error"));
+        }
+        // 同一请求允许包含多个排程范围；按固定顺序获取锁，避免并发批量删除产生交叉等待。
+        List<Cd15ScheduleResult> scopeSamples = new ArrayList<>(selected.stream()
+                .collect(Collectors.toMap(this::scheduleScopeKey,
+                        result -> result, (first, second) -> first,
+                        LinkedHashMap::new)).values());
+        scopeSamples.sort(Comparator
+                .comparing(Cd15ScheduleResult::getFactoryCode,
+                        Comparator.nullsFirst(String::compareTo))
+                .thenComparing(Cd15ScheduleResult::getScheduleDate,
+                        Comparator.nullsFirst(Date::compareTo)));
+
+        // 删除与自动排程共用“工厂 + 排程日期”锁，确保排程写入与删除不能并发执行。
+        List<RLock> acquiredLocks = new ArrayList<>();
+        boolean releaseAfterTransaction = false;
+        try {
+            for (Cd15ScheduleResult scope : scopeSamples) {
+                if (this.isBlank(scope.getFactoryCode())
+                        || scope.getScheduleDate() == null) {
+                    return AjaxResult.error(I18nUtil.getMessage(
+                            "ui.message.parameter.error"));
+                }
+                RLock lock = lockService.getLock(scope.getFactoryCode(),
+                        this.toLocalDate(scope.getScheduleDate()));
+                if (!lock.tryLock()) {
+                    return AjaxResult.error(I18nUtil.getMessage(
+                            "ui.cd15.schedule.taskActive"));
+                }
+                acquiredLocks.add(lock);
+            }
+            // 锁必须覆盖整个数据库事务，事务提交或回滚后再统一释放。
+            releaseAfterTransaction = this.releaseLocksAfterTransaction(
+                    acquiredLocks);
+
+            // 获取锁后重新查询，防止加锁前后记录状态发生变化。
+            selected = this.selectDeleteResults(deleteIds);
+            if (selected.size() != deleteIds.size()) {
+                return AjaxResult.error(I18nUtil.getMessage(
+                        "ui.message.parameter.error"));
+            }
+            // 锁内再次确认没有待执行或执行中的排程任务，避免删除任务即将使用的数据。
+            for (Cd15ScheduleResult scope : scopeSamples) {
+                if (taskService.findActive(scope.getFactoryCode(),
+                        scope.getScheduleDate()) != null) {
+                    return AjaxResult.error(I18nUtil.getMessage(
+                            "ui.cd15.schedule.taskActive"));
+                }
+            }
+            // 统一校验发布成功、已有完成量以及分裁组合必须完整删除等业务规则。
+            AjaxResult validation = this.validateDeleteResults(selected);
+            if (validation != null) {
+                return validation;
+            }
+            // 主表采用框架逻辑删除；删除数量不一致时抛错，使当前事务整体回滚。
+            int deletedCount = this.removeByIds(deleteIds);
+            if (deletedCount != deleteIds.size()) {
+                throw new IllegalStateException(I18nUtil.getMessage(
+                        "ui.message.operation.failed"));
+            }
+            // 删除成功后只压缩同机台 CLASS1 后续生产顺位，不修改其他班次，也不触发滚动重排。
+            this.compactClass1ProduceOrders(selected);
+            return AjaxResult.success(I18nUtil.getMessage(
+                    "ui.message.operation.success"));
+        } finally {
+            if (!releaseAfterTransaction) {
+                // 尚未注册事务回调时由当前线程兜底释放已获得的锁。
+                this.unlockDeleteLocks(acquiredLocks);
+            }
+        }
+    }
+
+    /** 查询待删除且尚未逻辑删除的结果。 */
+    private List<Cd15ScheduleResult> selectDeleteResults(List<Long> ids) {
+        return resultMapper.selectList(new LambdaQueryWrapper<Cd15ScheduleResult>()
+                .in(Cd15ScheduleResult::getId, ids));
+    }
+
+    /** 校验发布、完成量和分裁组合删除规则。 */
+    private AjaxResult validateDeleteResults(List<Cd15ScheduleResult> selected) {
+        boolean published = selected.stream().anyMatch(result ->
+                result.getPublishSuccessCount() != null
+                        && result.getPublishSuccessCount() > 0);
+        if (published) {
+            return AjaxResult.error(I18nUtil.getMessage(
+                    "ui.cd15.scheduleResult.publishedCannotDelete"));
+        }
+        if (selected.stream().anyMatch(this::hasFinishQuantity)) {
+            return AjaxResult.error(I18nUtil.getMessage(
+                    "ui.cd15.scheduleResult.finishQtyCannotDelete"));
+        }
+        boolean missingGroupNo = selected.stream()
+                .filter(result -> Cd15CutMode.SPLIT.equalsIgnoreCase(
+                        result.getCutMode()))
+                .anyMatch(result -> this.isBlank(result.getGroupNo()));
+        if (missingGroupNo) {
+            return AjaxResult.error(I18nUtil.getMessage(
+                    "ui.cd15.scheduleResult.splitDeleteTogether"));
+        }
+        Map<String, List<Cd15ScheduleResult>> splitGroups = selected.stream()
+                .filter(result -> Cd15CutMode.SPLIT.equalsIgnoreCase(
+                        result.getCutMode()))
+                .collect(Collectors.groupingBy(this::splitGroupKey,
+                        LinkedHashMap::new, Collectors.toList()));
+        for (List<Cd15ScheduleResult> selectedGroup : splitGroups.values()) {
+            Cd15ScheduleResult sample = selectedGroup.get(0);
+            List<Cd15ScheduleResult> completeGroup = resultMapper.selectList(
+                    new LambdaQueryWrapper<Cd15ScheduleResult>()
+                            .eq(Cd15ScheduleResult::getFactoryCode,
+                                    sample.getFactoryCode())
+                            .eq(Cd15ScheduleResult::getScheduleDate,
+                                    sample.getScheduleDate())
+                            .eq(Cd15ScheduleResult::getGroupNo,
+                                    sample.getGroupNo())
+                            .eq(Cd15ScheduleResult::getCutMode,
+                                    Cd15CutMode.SPLIT));
+            Set<Long> selectedIds = selectedGroup.stream()
+                    .map(Cd15ScheduleResult::getId)
+                    .collect(Collectors.toSet());
+            boolean selectedAll = completeGroup.size() == selectedGroup.size()
+                    && completeGroup.stream()
+                    .map(Cd15ScheduleResult::getId)
+                    .allMatch(selectedIds::contains)
+                    && (completeGroup.size() == 1
+                    || completeGroup.size() == 2
+                    && completeGroup.stream()
+                    .map(Cd15ScheduleResult::getSteelStripCode)
+                    .filter(code -> !this.isBlank(code))
+                    .distinct().count() == 2L);
+            if (!selectedAll) {
+                return AjaxResult.error(I18nUtil.getMessage(
+                        "ui.cd15.scheduleResult.splitDeleteTogether"));
+            }
+        }
+        return null;
+    }
+
+    /** 任一班次已有正完成量时禁止删除。 */
+    private boolean hasFinishQuantity(Cd15ScheduleResult result) {
+        return IntStream.rangeClosed(1, CLASS_COUNT)
+                .mapToObj(classIndex -> result.getFieldValueByFieldName(
+                        String.format("class%dFinishQty", classIndex)))
+                .filter(Objects::nonNull)
+                .map(Number.class::cast)
+                .anyMatch(finishQuantity -> finishQuantity.doubleValue() > 0D);
+    }
+
+    /** 删除后仅压缩 CLASS1 后续生产顺位，其他班次不调整。 */
+    private void compactClass1ProduceOrders(
+            List<Cd15ScheduleResult> deletedResults) {
+        Map<String, List<Cd15ScheduleResult>> deletedByScope = deletedResults
+                .stream()
+                .filter(result -> result.getClass1ProduceOrder() != null
+                        && result.getClass1ProduceOrder() > 0)
+                .collect(Collectors.groupingBy(this::class1OrderScopeKey,
+                        LinkedHashMap::new, Collectors.toList()));
+        deletedByScope.values().forEach(this::compactClass1ScopeOrders);
+    }
+
+    /** 压缩单个工厂、日期、机台范围内被删除顺位之后的 CLASS1 顺位。 */
+    private void compactClass1ScopeOrders(
+            List<Cd15ScheduleResult> deletedScopeResults) {
+        Cd15ScheduleResult sample = deletedScopeResults.get(0);
+        LambdaQueryWrapper<Cd15ScheduleResult> queryWrapper =
+                new LambdaQueryWrapper<Cd15ScheduleResult>()
+                        .eq(Cd15ScheduleResult::getFactoryCode,
+                                sample.getFactoryCode())
+                        .eq(Cd15ScheduleResult::getScheduleDate,
+                                sample.getScheduleDate())
+                        .isNotNull(Cd15ScheduleResult::getClass1ProduceOrder)
+                        .gt(Cd15ScheduleResult::getClass1ProduceOrder, 0)
+                        .orderByAsc(Cd15ScheduleResult::getClass1ProduceOrder)
+                        .orderByAsc(Cd15ScheduleResult::getId);
+        if (sample.getMachineCode() == null) {
+            queryWrapper.isNull(Cd15ScheduleResult::getMachineCode);
+        } else {
+            queryWrapper.eq(Cd15ScheduleResult::getMachineCode,
+                    sample.getMachineCode());
+        }
+        List<Cd15ScheduleResult> remaining = resultMapper.selectList(
+                queryWrapper);
+        Set<Integer> removedOrders = deletedScopeResults.stream()
+                .map(Cd15ScheduleResult::getClass1ProduceOrder)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        Set<Integer> remainingOrders = remaining.stream()
+                .map(Cd15ScheduleResult::getClass1ProduceOrder)
+                .collect(Collectors.toSet());
+        removedOrders.removeAll(remainingOrders);
+        if (removedOrders.isEmpty()) {
+            return;
+        }
+        remaining.forEach(result -> {
+            Integer currentOrder = result.getClass1ProduceOrder();
+            long removedBefore = removedOrders.stream()
+                    .filter(removedOrder -> removedOrder < currentOrder)
+                    .count();
+            if (removedBefore <= 0) {
+                return;
+            }
+            int targetOrder = currentOrder - (int) removedBefore;
+            resultMapper.update(null,
+                    new LambdaUpdateWrapper<Cd15ScheduleResult>()
+                            .set(Cd15ScheduleResult::getClass1ProduceOrder,
+                                    targetOrder)
+                            .eq(Cd15ScheduleResult::getId,
+                                    result.getId()));
+        });
+    }
+
+    /** 在当前事务结束后释放删除持有的排程锁。 */
+    private boolean releaseLocksAfterTransaction(List<RLock> acquiredLocks) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            return false;
+        }
+        List<RLock> locksToRelease = new ArrayList<>(acquiredLocks);
+        TransactionSynchronizationManager.registerSynchronization(
+                new TransactionSynchronization() {
+                    @Override
+                    public void afterCompletion(int status) {
+                        Cd15ScheduleResultServiceImpl.this.unlockDeleteLocks(
+                                locksToRelease);
+                    }
+                });
+        return true;
+    }
+
+    /** 按获取逆序释放删除排程锁。 */
+    private void unlockDeleteLocks(List<RLock> acquiredLocks) {
+        for (int index = acquiredLocks.size() - 1; index >= 0; index--) {
+            RLock lock = acquiredLocks.get(index);
+            if (lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
+        }
+    }
+
+    /** 构造工厂和排程日期维度的锁排序键。 */
+    private String scheduleScopeKey(Cd15ScheduleResult result) {
+        return String.valueOf(result.getFactoryCode()) + "|"
+                + String.valueOf(result.getScheduleDate());
+    }
+
+    /** 构造 CLASS1 顺位压缩范围键。 */
+    private String class1OrderScopeKey(Cd15ScheduleResult result) {
+        return this.scheduleScopeKey(result) + "|"
+                + String.valueOf(result.getMachineCode());
+    }
+
+    /** 构造分裁组合删除校验键。 */
+    private String splitGroupKey(Cd15ScheduleResult result) {
+        return this.scheduleScopeKey(result) + "|"
+                + String.valueOf(result.getGroupNo());
+    }
 
     /**
      * 斜裁自动排程 Service 入口。
