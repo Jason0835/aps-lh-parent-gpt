@@ -10,34 +10,18 @@
 
     <!-- 查询各垫胶代码最近一次有排产量的排产日期（联合主表和日志表） -->
     <select id="selectLastScheduleDate" resultType="java.util.Map">
-        SELECT t.LINING_CODE, MAX(t.SCHEDULE_DATE) AS LAST_DATE
-        FROM (
-            SELECT LINING_CODE, SCHEDULE_DATE FROM T_NC_SCHEDULE_RESULT
-            WHERE FACTORY_CODE = #{factoryCode}
-              AND LINING_CODE IN
-              <foreach collection="liningCodes" item="code" open="(" separator="," close=")">
-                  #{code}
-              </foreach>
-              AND (CLASS1_PLAN_QTY IS NOT NULL AND CLASS1_PLAN_QTY > 0
-                OR CLASS2_PLAN_QTY IS NOT NULL AND CLASS2_PLAN_QTY > 0
-                OR CLASS3_PLAN_QTY IS NOT NULL AND CLASS3_PLAN_QTY > 0
-                OR CLASS4_PLAN_QTY IS NOT NULL AND CLASS4_PLAN_QTY > 0
-                OR CLASS5_PLAN_QTY IS NOT NULL AND CLASS5_PLAN_QTY > 0
-                OR CLASS6_PLAN_QTY IS NOT NULL AND CLASS6_PLAN_QTY > 0)
-            UNION ALL
-            SELECT LINING_CODE, SCHEDULE_DATE FROM T_NC_SCHEDULE_RESULT_LOG
-            WHERE FACTORY_CODE = #{factoryCode}
-              AND LINING_CODE IN
-              <foreach collection="liningCodes" item="code" open="(" separator="," close=")">
-                  #{code}
-              </foreach>
-              AND (CLASS1_PLAN_QTY IS NOT NULL AND CLASS1_PLAN_QTY > 0
-                OR CLASS2_PLAN_QTY IS NOT NULL AND CLASS2_PLAN_QTY > 0
-                OR CLASS3_PLAN_QTY IS NOT NULL AND CLASS3_PLAN_QTY > 0
-                OR CLASS4_PLAN_QTY IS NOT NULL AND CLASS4_PLAN_QTY > 0
-                OR CLASS5_PLAN_QTY IS NOT NULL AND CLASS5_PLAN_QTY > 0
-                OR CLASS6_PLAN_QTY IS NOT NULL AND CLASS6_PLAN_QTY > 0)
-        ) t
-        GROUP BY t.LINING_CODE
+        SELECT DISTINCT LINING_CODE
+          FROM T_NC_SCHEDULE_RESULT
+        WHERE FACTORY_CODE = #{factoryCode}
+          AND LINING_CODE IN
+          <foreach collection="liningCodes" item="code" open="(" separator="," close=")">
+              #{code}
+          </foreach>
+          AND (CLASS1_PLAN_QTY IS NOT NULL AND CLASS1_PLAN_QTY > 0
+            OR CLASS2_PLAN_QTY IS NOT NULL AND CLASS2_PLAN_QTY > 0
+            OR CLASS3_PLAN_QTY IS NOT NULL AND CLASS3_PLAN_QTY > 0
+            OR CLASS4_PLAN_QTY IS NOT NULL AND CLASS4_PLAN_QTY > 0
+            OR CLASS5_PLAN_QTY IS NOT NULL AND CLASS5_PLAN_QTY > 0
+            OR CLASS6_PLAN_QTY IS NOT NULL AND CLASS6_PLAN_QTY > 0)
     </select>
 </mapper>
