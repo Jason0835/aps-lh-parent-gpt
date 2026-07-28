@@ -18,7 +18,7 @@ public enum TcMachineFilterReasonEnum {
     GLUE_MACHINE_NOT_MATCH("GLUE_MACHINE_NOT_MATCH", "胶料机台关系不匹配"),
 
     /** 胎侧与垫胶共用机台当前班次不允许生产胎侧。 */
-    TC_DJ_SHARED_SHIFT_CONFLICT("TC_DJ_SHARED_SHIFT_CONFLICT", "胎侧与垫胶共用机台班次冲突"),
+    SHARED_MACHINE_SHIFT_NOT_MATCH("SHARED_MACHINE_SHIFT_NOT_MATCH", "胎侧与垫胶共用机台班次不匹配"),
 
     /** 未命中选择定点机台。 */
     FIXED_MACHINE_NOT_SELECTED("FIXED_MACHINE_NOT_SELECTED", "未命中选择定点生产机台"),

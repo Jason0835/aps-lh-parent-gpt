@@ -628,6 +628,7 @@ export default {
     async getDate() {
       try {
         let res = await listScheduleShiftDates({
+          factoryCode: this.query.factoryCode || this.search.factoryCode,
           scheduleDate: this.query.scheduleDate || this.search.scheduleDate,
         });
         if (res && res.length > 0) {

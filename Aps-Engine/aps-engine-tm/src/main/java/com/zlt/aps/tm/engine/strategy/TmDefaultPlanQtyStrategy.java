@@ -52,8 +52,11 @@ public class TmDefaultPlanQtyStrategy implements ITmPlanQtyStrategy {
 
         boolean tailTask = isTailTask(taskDraft, planQty);
         if (tailTask) {
+            // 详设 §14.3 Step11：收尾规格实际排产 = min(需排产量, 月计划余量)，不执行最小起排和卷曲取整。
+            // planQty 当前为 baseDemand(需排产量)，收尾分支取 min(baseDemand, tailBalanceQty×标准长度)。
             BigDecimal beforeTail = planQty;
-            planQty = nvl(taskDraft.getTailBalanceQty()).multiply(nvl(taskDraft.getTreadShoulderLength()));
+            BigDecimal tailBaseQty = nvl(taskDraft.getTailBalanceQty()).multiply(nvl(taskDraft.getTreadShoulderLength()));
+            planQty = planQty.min(tailBaseQty);
             result.setTailRoundAdjustQty(planQty.subtract(beforeTail));
         } else {
             BigDecimal beforeMinStart = planQty;
@@ -75,11 +78,11 @@ public class TmDefaultPlanQtyStrategy implements ITmPlanQtyStrategy {
     }
 
     private boolean isTailTask(TmTaskDraft taskDraft, BigDecimal baseDemandQty) {
-        BigDecimal tailBaseQty = nvl(taskDraft.getTailBalanceQty()).multiply(nvl(taskDraft.getTreadShoulderLength()));
+        // 详设 §14.3 Step11：收尾判定只看收尾标识与余量/长度有效性，不再要求 月计划余量<=需排产量。
+        // 月计划余量>需排产量时仍按收尾口径取 min(需排产量, 月计划余量)=需排产量，不执行 minStart/卷曲取整。
         return TmYesNoEnum.YES.getCode().equals(taskDraft.getTailFlag())
                 && nvl(taskDraft.getTailBalanceQty()).compareTo(BigDecimal.ZERO) > 0
-                && nvl(taskDraft.getTreadShoulderLength()).compareTo(BigDecimal.ZERO) > 0
-                && tailBaseQty.compareTo(nvl(baseDemandQty)) <= 0;
+                && nvl(taskDraft.getTreadShoulderLength()).compareTo(BigDecimal.ZERO) > 0;
     }
 
     private BigDecimal applyMinStartQty(TmTaskDraft taskDraft, BigDecimal planQty) {

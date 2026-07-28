@@ -77,6 +77,12 @@ public class TcScheduleContext {
     /** 胎侧班初滚动库存状态，key=胎侧编码；初值为14点预计库存，任务完成后回写交接班预计库存 */
     private Map<String, BigDecimal> remainingStockMap = new HashMap<>();
 
+    /** 机台分配前的胎侧期初库存快照，key=胎侧编码 */
+    private Map<String, BigDecimal> initialStockMap = new HashMap<>();
+
+    /** 胎侧班次实际短缺台账，key=胎侧编码|班次 */
+    private Map<String, BigDecimal> productShiftShortageMap = new LinkedHashMap<>();
+
     /** 工厂可用机台候选列表，由数据加载层填充，供机台分配步骤过滤评分使用 */
     private List<TcMachineCandidate> machineCandidateList = new ArrayList<>();
 

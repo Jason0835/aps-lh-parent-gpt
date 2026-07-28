@@ -5,6 +5,7 @@
 <mapper namespace="com.zlt.aps.tm.mapper.TmAutoScheduleDataLoadMapper">
 
     <resultMap id="TmFormingDemandRowResult" type="com.zlt.aps.tm.domain.vo.TmFormingDemandRowVo">
+        <result column="SOURCE_RECORD_ID" property="sourceRecordId"/>
         <result column="ORDER_NO" property="orderNo"/>
         <result column="EMBRYO_CODE" property="embryoCode"/>
         <result column="MATERIAL_CODE" property="materialCode"/>
@@ -59,7 +60,8 @@
         <result column="TREAD_RUBBER_CATEGORY" property="treadRubberCategory"/>
     </resultMap>
     <select id="selectFormingDemandRows" resultMap="TmFormingDemandRowResult">
-        SELECT cx.ORDER_NO,
+        SELECT cx.ID AS SOURCE_RECORD_ID,
+               cx.ORDER_NO,
                cx.EMBRYO_CODE,
                cx.MATERIAL_CODE,
                cx.MATERIAL_DESC,
@@ -115,6 +117,7 @@
         WHERE cx.IS_DELETE = 0
           AND cx.FACTORY_CODE = #{factoryCode}
           AND cx.SCHEDULE_DATE = #{scheduleDate}
+        ORDER BY cx.ID, ci.TREAD_CODE
     </select>
 
     <select id="selectExperimentSpecMonthPlanRows" resultMap="TmExperimentSpecMonthPlanRowResult">
@@ -174,6 +177,7 @@
         ORDER BY PRODUCTION_DATE
     </select>
     <resultMap id="TmFormingDemandRecipeRowResult" type="com.zlt.aps.tm.domain.vo.TmFormingDemandRecipeRowVo">
+        <result column="SOURCE_RECORD_ID" property="sourceRecordId"/>
         <result column="ORDER_NO" property="orderNo"/>
         <result column="EMBRYO_CODE" property="embryoCode"/>
         <result column="MATERIAL_CODE" property="materialCode"/>
@@ -220,7 +224,8 @@
 
     <!-- RECIPE 模式：仅查成型排程结果，不 JOIN 施工表，施工信息由 Java 按 (EMBRYO_CODE, CLASSn_RECIPE_NO) 关联解析 -->
     <select id="selectFormingDemandRowsByRecipe" resultMap="TmFormingDemandRecipeRowResult">
-        SELECT cx.ORDER_NO,
+        SELECT cx.ID AS SOURCE_RECORD_ID,
+               cx.ORDER_NO,
                cx.EMBRYO_CODE,
                cx.MATERIAL_CODE,
                cx.MATERIAL_DESC,
@@ -257,6 +262,7 @@
         WHERE cx.IS_DELETE = 0
           AND cx.FACTORY_CODE = #{factoryCode}
           AND cx.SCHEDULE_DATE = #{scheduleDate}
+        ORDER BY cx.ID
     </select>
 
     <!-- RECIPE 模式：按 (CONSTRUCTION_CODE, CONSTRUCTION_VERSION) 批量加载施工胎面属性 -->

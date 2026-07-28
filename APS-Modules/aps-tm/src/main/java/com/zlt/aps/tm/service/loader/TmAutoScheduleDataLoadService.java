@@ -1495,8 +1495,10 @@ public class TmAutoScheduleDataLoadService {
      */
     private String buildSourceTaskBusinessKeySuffix(TmFormingDemandRowVo row, int sourceRowIndex, int shiftOrder) {
         String sourceOrderNo = row == null ? null : row.getOrderNo();
-        String sourceKey = StrUtil.blankToDefault(sourceOrderNo, "ROW" + sourceRowIndex);
-        return sourceKey + "-CLASS" + shiftOrder + "-ROW" + sourceRowIndex;
+        String sourceKey = row != null && row.getSourceRecordId() != null
+                ? "ID" + row.getSourceRecordId()
+                : StrUtil.blankToDefault(sourceOrderNo, "ROW" + sourceRowIndex);
+        return sourceKey + "-CLASS" + shiftOrder;
     }
 
     /**
@@ -1509,8 +1511,10 @@ public class TmAutoScheduleDataLoadService {
      */
     private String buildSourceTaskBusinessKeySuffix(TmFormingDemandRecipeRowVo row, int sourceRowIndex, int shiftOrder) {
         String sourceOrderNo = row == null ? null : row.getOrderNo();
-        String sourceKey = StrUtil.blankToDefault(sourceOrderNo, "ROW" + sourceRowIndex);
-        return sourceKey + "-CLASS" + shiftOrder + "-ROW" + sourceRowIndex;
+        String sourceKey = row != null && row.getSourceRecordId() != null
+                ? "ID" + row.getSourceRecordId()
+                : StrUtil.blankToDefault(sourceOrderNo, "ROW" + sourceRowIndex);
+        return sourceKey + "-CLASS" + shiftOrder;
     }
 
     /**

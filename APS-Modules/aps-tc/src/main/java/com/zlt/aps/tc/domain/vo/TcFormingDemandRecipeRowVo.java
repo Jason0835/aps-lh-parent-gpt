@@ -13,6 +13,9 @@ import java.math.BigDecimal;
 @Data
 public class TcFormingDemandRecipeRowVo {
 
+    /** 成型排程源记录主键，用于生成稳定业务键 */
+    private Long sourceRecordId;
+
     /** 成型工单号 */
     private String orderNo;
 

@@ -62,19 +62,172 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         if (context.getCurrentAvailableToolQty() == null) {
             context.setCurrentAvailableToolQty(context.getInitialAvailableToolQty());
         }
+        Map<String, BigDecimal> runtimeStockMap = new HashMap<>(context.getInitialStockMap());
+        boolean inventoryClosedLoopEnabled = CollUtil.isNotEmpty(context.getPlanTaskGroupMap());
         Map<Integer, List<TmTaskDraft>> shiftTaskMap = new ArrayList<>(context.getTaskDraftList()).stream()
+                .filter(Objects::nonNull)
+                .filter(task -> !Boolean.TRUE.equals(task.getSourceExplainTask()))
                 .collect(Collectors.groupingBy(task -> this.normalizeShiftOrder(task.getShiftOrder()),
                         TreeMap::new, Collectors.toList()));
         for (Map.Entry<Integer, List<TmTaskDraft>> entry : shiftTaskMap.entrySet()) {
-            List<TmTaskDraft> remainingTaskList = new ArrayList<>(entry.getValue());
+            if (inventoryClosedLoopEnabled) {
+                this.recalculateShiftPlans(context, entry.getValue(), runtimeStockMap);
+            }
+            List<TmTaskDraft> remainingTaskList = entry.getValue().stream()
+                    .filter(this::isMachineAssignmentRequired)
+                    .collect(Collectors.toList());
             while (CollUtil.isNotEmpty(remainingTaskList)) {
                 TmTaskDraft task = this.selectNextTaskByMachinePredecessor(remainingTaskList, context);
                 remainingTaskList.remove(task);
                 this.assignSingleTask(task, context);
             }
             this.fillCurrentShiftIdleCapacity(entry.getKey(), shiftTaskMap, context);
+            if (inventoryClosedLoopEnabled) {
+                this.closeShiftInventory(context, entry.getKey(), entry.getValue(), runtimeStockMap);
+            }
         }
         this.logUnplannedSummary(context);
+    }
+
+    /**
+     * 判断任务是否需要进入机台分配。
+     *
+     * @param task 待排任务
+     * @return true 表示计划量为正且没有明确未排原因
+     */
+    private boolean isMachineAssignmentRequired(TmTaskDraft task) {
+        return task != null && this.nvl(task.getPlanQty()).compareTo(BigDecimal.ZERO) > 0
+                && StrUtil.isBlank(task.getUnplannedReasonCode());
+    }
+
+    /**
+     * 按当前实际班初库存重新计算本班计划量。
+     *
+     * @param context         胎面排程上下文
+     * @param shiftTaskList   当前班原始生产任务
+     * @param runtimeStockMap 已完成班次形成的实际可用库存
+     */
+    private void recalculateShiftPlans(TmScheduleContext context, List<TmTaskDraft> shiftTaskList,
+                                       Map<String, BigDecimal> runtimeStockMap) {
+        if (CollUtil.isEmpty(shiftTaskList)) {
+            return;
+        }
+        ITmPlanQtyStrategy planQtyStrategy = strategyRegistry.getPlanQtyStrategy(this.resolveParamValue(context,
+                TmScheduleConstants.PARAM_PLAN_QTY_STRATEGY, TmScheduleStrategyEnum.DEFAULT.getCode()));
+        Map<String, BigDecimal> planningStockMap = new HashMap<>(runtimeStockMap);
+        Set<String> recalculatedTreadCodeSet = new HashSet<>();
+        shiftTaskList.stream()
+                .filter(Objects::nonNull)
+                .sorted(Comparator.comparing(TmTaskDraft::getTreadCode,
+                                Comparator.nullsLast(Comparator.naturalOrder()))
+                        .thenComparing(TmTaskDraft::getBaseSortIndex,
+                                Comparator.nullsLast(Comparator.naturalOrder()))
+                        .thenComparing(TmTaskDraft::getBusinessKey,
+                                Comparator.nullsLast(Comparator.naturalOrder())))
+                .forEach(task -> {
+                    if (StrUtil.isBlank(task.getTreadCode())
+                            || StrUtil.isNotBlank(task.getUnplannedReasonCode())) {
+                        return;
+                    }
+                    BigDecimal openingStock = planningStockMap.getOrDefault(
+                            task.getTreadCode(), this.nvl(task.getRollingStockQty()));
+                    runtimeStockMap.putIfAbsent(task.getTreadCode(), openingStock);
+                    task.setRollingStockQty(openingStock);
+                    if (StrUtil.contains(task.getPlanGroupKey(), "|PRESET|")) {
+                        planningStockMap.put(task.getTreadCode(), openingStock.add(this.nvl(task.getPlanQty()))
+                                .subtract(this.nvl(task.getCurrentShiftDemandQty())).max(BigDecimal.ZERO));
+                        return;
+                    }
+                    if (!recalculatedTreadCodeSet.add(task.getTreadCode())) {
+                        this.clearDuplicateProductShiftPlan(task, openingStock);
+                        return;
+                    }
+                    task.setPlanQty(null);
+                    TmPlanQtyResult planQtyResult = planQtyStrategy.calculate(task, context);
+                    this.applyRuntimePlanQtyResult(task, planQtyResult);
+                    planningStockMap.put(task.getTreadCode(), this.nvl(task.getPlanStockQty()));
+                });
+    }
+
+    /**
+     * 清空同产品同班重复任务的运行计划量，原始需求只由稳定排序后的首个任务消费一次。
+     *
+     * @param task 重复任务
+     * @param openingStock 当前班可用库存
+     */
+    private void clearDuplicateProductShiftPlan(TmTaskDraft task, BigDecimal openingStock) {
+        task.setPreLossPlanQty(BigDecimal.ZERO);
+        task.setLossAddQty(BigDecimal.ZERO);
+        task.setPlanQtyBeforeToolLimit(BigDecimal.ZERO);
+        task.setPlanQty(BigDecimal.ZERO);
+        task.setPlanStockQty(openingStock);
+    }
+
+    /**
+     * 使用本班实际已排量关账并生成可用库存与短缺台账。
+     *
+     * @param context         胎面排程上下文
+     * @param shiftOrder      当前班次
+     * @param shiftTaskList   当前班原始生产任务
+     * @param runtimeStockMap 实际库存运行态
+     */
+    private void closeShiftInventory(TmScheduleContext context, Integer shiftOrder,
+                                     List<TmTaskDraft> shiftTaskList,
+                                     Map<String, BigDecimal> runtimeStockMap) {
+        Map<String, BigDecimal> demandQtyMap = shiftTaskList.stream()
+                .filter(Objects::nonNull)
+                .filter(task -> StrUtil.isNotBlank(task.getTreadCode()))
+                .collect(Collectors.groupingBy(TmTaskDraft::getTreadCode, LinkedHashMap::new,
+                        Collectors.reducing(BigDecimal.ZERO,
+                                task -> this.nvl(task.getCurrentShiftDemandQty()), BigDecimal::max)));
+        Map<String, BigDecimal> assignedQtyMap = context.getTaskChainGroup().values().stream()
+                .filter(Objects::nonNull)
+                .flatMap(chain -> chain.toList().stream())
+                .map(ScheduleTaskNode::getTask)
+                .filter(Objects::nonNull)
+                .filter(task -> Objects.equals(this.normalizeShiftOrder(task.getShiftOrder()), shiftOrder))
+                .filter(task -> StrUtil.isNotBlank(task.getTreadCode()))
+                .collect(Collectors.groupingBy(TmTaskDraft::getTreadCode, LinkedHashMap::new,
+                        Collectors.reducing(BigDecimal.ZERO,
+                                task -> this.nvl(task.getPlanQty()), BigDecimal::add)));
+        Set<String> treadCodeSet = new LinkedHashSet<>(demandQtyMap.keySet());
+        treadCodeSet.addAll(assignedQtyMap.keySet());
+        for (String treadCode : treadCodeSet) {
+            BigDecimal rawBalance = runtimeStockMap.getOrDefault(treadCode, BigDecimal.ZERO)
+                    .add(assignedQtyMap.getOrDefault(treadCode, BigDecimal.ZERO))
+                    .subtract(demandQtyMap.getOrDefault(treadCode, BigDecimal.ZERO));
+            BigDecimal shortageQty = rawBalance.min(BigDecimal.ZERO).abs();
+            BigDecimal availableStockQty = rawBalance.max(BigDecimal.ZERO);
+            runtimeStockMap.put(treadCode, availableStockQty);
+            context.getProductShiftShortageMap().put(treadCode + "|" + shiftOrder, shortageQty);
+            shiftTaskList.stream()
+                    .filter(task -> Objects.equals(treadCode, task.getTreadCode()))
+                    .forEach(task -> task.setPlanStockQty(availableStockQty));
+        }
+        context.setRemainingStockMap(new HashMap<>(runtimeStockMap));
+    }
+
+    /**
+     * 将逐班重算结果回填任务草稿。
+     *
+     * @param task   当前任务
+     * @param result 计划量策略结果
+     */
+    private void applyRuntimePlanQtyResult(TmTaskDraft task, TmPlanQtyResult result) {
+        if (result == null) {
+            return;
+        }
+        task.setBaseDemandQty(result.getBaseDemandQty());
+        task.setLossAddQty(result.getLossAddQty());
+        task.setToolLimitAdjustQty(result.getToolLimitAdjustQty());
+        task.setToolOverflowQty(result.getToolOverflowQty());
+        task.setMinStartAdjustQty(result.getMinStartAdjustQty());
+        task.setTailRoundAdjustQty(result.getTailRoundAdjustQty());
+        task.setCapacityAdjustQty(result.getCapacityAdjustQty());
+        task.setPreLossPlanQty(result.getPreLossPlanQty());
+        task.setPlanQtyBeforeToolLimit(result.getPlanQtyBeforeToolLimit());
+        task.setPlanQty(result.getFinalPlanQty());
+        task.setCalcFormulaDesc(result.getCalcFormulaDesc());
     }
 
     /**
@@ -200,14 +353,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         String strategyCode = this.resolveParamValue(context,
                 TmScheduleConstants.PARAM_CHAIN_TASK_PRIORITY_STRATEGY,
                 TmScheduleStrategyEnum.CONTINUITY_FIRST.getCode());
-        if (TmScheduleStrategyEnum.CONTINUITY_FIRST.getCode().equals(strategyCode)) {
-            return new TmContinuityFirstChainTaskPriorityStrategy();
-        }
-        if (TmScheduleStrategyEnum.EMERGENCY_FIRST.getCode().equals(strategyCode)) {
-            return new TmEmergencyFirstChainTaskPriorityStrategy();
-        }
-        throw new ServiceException(TmScheduleErrorCodeEnum.TM_STRATEGY_NOT_REGISTERED.getDefaultMessage()
-                + ":" + strategyCode);
+        return strategyRegistry.getChainTaskPriorityStrategy(strategyCode);
     }
 
     private String resolveParamValue(TmScheduleContext context, String paramCode, String defaultValue) {
@@ -219,8 +365,18 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         if (CollUtil.isEmpty(context.getMachineCandidateList())) {
             return TmChainSortScore.ZERO;
         }
+        List<TmMachineCandidate> candidates = this.copyCandidates(context.getMachineCandidateList());
+        this.prepareCandidatesForTask(task, context, candidates);
+        ITmMachineFilterRule filterRule = strategyRegistry.getMachineFilterRule(this.resolveParamValue(context,
+                TmScheduleConstants.PARAM_MACHINE_FILTER_STRATEGY, TmScheduleStrategyEnum.DEFAULT.getCode()));
+        TmMachineRuleContext ruleContext = new TmMachineRuleContext();
+        ruleContext.setTaskDraft(task);
+        ruleContext.setScheduleContext(context);
         TmChainSortScore bestScore = TmChainSortScore.ZERO;
-        for (TmMachineCandidate candidate : context.getMachineCandidateList()) {
+        for (TmMachineCandidate candidate : candidates) {
+            if (!filterRule.evaluate(candidate, ruleContext).isPassed()) {
+                continue;
+            }
             TmChainSortScore currentScore = this.calculateChainSortScore(task, context, candidate);
             if (currentScore.compareTo(bestScore) > 0) {
                 bestScore = currentScore;
@@ -242,14 +398,31 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         if (Boolean.FALSE.equals(candidate.getEnabled())) {
             return TmChainSortScore.ZERO;
         }
-        TmTaskPredecessor predecessor = this.resolveEffectivePredecessor(context, candidate.getMachineCode(),
-                task.getShiftOrder());
-        String tailMainGlueCode = predecessor == null ? candidate.getTailMainGlueCode() : predecessor.getGlueCode();
-        String tailBaseGlueCode = predecessor == null ? candidate.getTailBaseGlueCode() : predecessor.getBaseGlueCode();
-        String tailMouthPlateCode = predecessor == null ? candidate.getTailMouthPlateCode() : predecessor.getMouthPlateCode();
-        BigDecimal machineSpeed = this.resolveMachineSpeed(task, candidate, context);
-        BigDecimal remainCapacity = this.resolveRemainCapacity(task, context, candidate, machineSpeed);
-        BigDecimal capacityScore = this.capacityFitScore(task, remainCapacity);
+        String tailMainGlueCode = candidate.getTailMainGlueCode();
+        String tailBaseGlueCode = candidate.getTailBaseGlueCode();
+        String tailMouthPlateCode = candidate.getTailMouthPlateCode();
+        BigDecimal remainCapacity = candidate.getRemainCapacity();
+        // 评分权重统一从 TM_SCORE_WEIGHT_* 参数读取，与机台评分 TmDefaultMachineScoreStrategy 同口径，
+        // 使调参同时影响机台选择与班内任务链排序（businessScore = capacityScore + switchCostScore + fixedScore）。
+        BigDecimal remainCapWeight = this.resolveScoreWeight(context,
+                TmScheduleConstants.PARAM_SCORE_WEIGHT_REMAIN_CAP,
+                TmScheduleConstants.DEFAULT_SCORE_WEIGHT_REMAIN_CAP);
+        BigDecimal mainGlueWeight = this.resolveScoreWeight(context,
+                TmScheduleConstants.PARAM_SCORE_WEIGHT_GLUE_CONT,
+                TmScheduleConstants.DEFAULT_SCORE_WEIGHT_GLUE_CONT);
+        BigDecimal baseGlueWeight = this.resolveScoreWeight(context,
+                TmScheduleConstants.PARAM_SCORE_WEIGHT_BASE_GLUE,
+                TmScheduleConstants.DEFAULT_SCORE_WEIGHT_BASE_GLUE);
+        BigDecimal mouthPlateWeight = this.resolveScoreWeight(context,
+                TmScheduleConstants.PARAM_SCORE_WEIGHT_MOUTH_CONT,
+                TmScheduleConstants.DEFAULT_SCORE_WEIGHT_MOUTH_CONT);
+        BigDecimal switchCostWeight = this.resolveScoreWeight(context,
+                TmScheduleConstants.PARAM_SCORE_WEIGHT_SWITCH_COST,
+                TmScheduleConstants.DEFAULT_SCORE_WEIGHT_SWITCH_COST);
+        BigDecimal fixedWeight = this.resolveScoreWeight(context,
+                TmScheduleConstants.PARAM_SCORE_WEIGHT_FIXED_MACHINE,
+                TmScheduleConstants.DEFAULT_SCORE_WEIGHT_FIXED_MACHINE);
+        BigDecimal capacityScore = this.capacityFitScore(task, remainCapacity, remainCapWeight);
         boolean mainGlueMatched = TmGlueSimilarityUtils.isSameNonBlank(task.getGlueCode(), tailMainGlueCode);
         int baseGlueMatchedCount = mainGlueMatched ? 0
                 : TmGlueSimilarityUtils.calculateIntersectionCount(
@@ -257,16 +430,38 @@ public class TmMachineAssignService implements ITmMachineAssignService {
                         TmGlueSimilarityUtils.parseCodeSet(tailBaseGlueCode));
         boolean mouthPlateMatched = TmGlueSimilarityUtils.isSameNonBlank(
                 task.getMouthPlateCode(), tailMouthPlateCode);
-        BigDecimal mainGlueScore = mainGlueMatched ? BigDecimal.TEN : BigDecimal.ZERO;
+        BigDecimal mainGlueScore = mainGlueMatched ? mainGlueWeight : BigDecimal.ZERO;
         BigDecimal baseGlueScore = mainGlueMatched ? BigDecimal.ZERO
                 : TmGlueSimilarityUtils.calculateSimilarityScore(
-                        task.getBaseGlueCode(), tailBaseGlueCode, BigDecimal.valueOf(8));
-        BigDecimal mouthPlateScore = mouthPlateMatched ? BigDecimal.TEN : BigDecimal.ZERO;
-        BigDecimal switchCostScore = BigDecimal.TEN.subtract(this.nvl(candidate.getSwitchCostHours())).max(BigDecimal.ZERO);
-        BigDecimal fixedScore = Boolean.TRUE.equals(candidate.getFixedMachineMatched()) ? BigDecimal.TEN : BigDecimal.ZERO;
+                        task.getBaseGlueCode(), tailBaseGlueCode, baseGlueWeight);
+        BigDecimal mouthPlateScore = mouthPlateMatched ? mouthPlateWeight : BigDecimal.ZERO;
+        BigDecimal switchCostScore = switchCostWeight.subtract(this.nvl(candidate.getSwitchCostHours())).max(BigDecimal.ZERO);
+        BigDecimal fixedScore = Boolean.TRUE.equals(candidate.getFixedMachineMatched()) ? fixedWeight : BigDecimal.ZERO;
         return new TmChainSortScore(mainGlueMatched ? 1 : 0, baseGlueMatchedCount,
                 mouthPlateMatched ? 1 : 0, capacityScore, mainGlueScore, baseGlueScore, mouthPlateScore,
                 switchCostScore, fixedScore);
+    }
+
+    /**
+     * 从本次排程参数快照读取评分权重(BigDecimal)，非法值回退为详设默认值。
+     *
+     * @param context      排程上下文
+     * @param paramCode    参数编码
+     * @param defaultValue 详设默认值(字符串)
+     * @return 非负评分权重
+     */
+    private BigDecimal resolveScoreWeight(TmScheduleContext context, String paramCode, String defaultValue) {
+        String effectiveValue = defaultValue;
+        TmParamValue paramValue = context == null ? null : context.getParamMap().get(paramCode);
+        if (paramValue != null && paramValue.getEffectiveValue() != null
+                && !paramValue.getEffectiveValue().trim().isEmpty()) {
+            effectiveValue = paramValue.getEffectiveValue().trim();
+        }
+        try {
+            return new BigDecimal(effectiveValue).max(BigDecimal.ZERO);
+        } catch (NumberFormatException exception) {
+            return new BigDecimal(defaultValue);
+        }
     }
 
     /**
@@ -389,7 +584,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
      * @param remainCapacity 剩余产能
      * @return 产能适配分
      */
-    private BigDecimal capacityFitScore(TmTaskDraft task, BigDecimal remainCapacity) {
+    private BigDecimal capacityFitScore(TmTaskDraft task, BigDecimal remainCapacity, BigDecimal weight) {
         BigDecimal planQty = nvl(task.getPlanQty());
         BigDecimal normalizedRemainCapacity = nvl(remainCapacity);
         if (normalizedRemainCapacity.compareTo(BigDecimal.ZERO) <= 0 || planQty.compareTo(BigDecimal.ZERO) <= 0
@@ -399,7 +594,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         BigDecimal wasteRatio = normalizedRemainCapacity.subtract(planQty)
                 .divide(normalizedRemainCapacity, TmScheduleConstants.DECIMAL_CALCULATION_SCALE,
                         java.math.RoundingMode.HALF_UP);
-        return BigDecimal.TEN.multiply(BigDecimal.ONE.subtract(wasteRatio))
+        return weight.multiply(BigDecimal.ONE.subtract(wasteRatio))
                 .max(BigDecimal.ZERO).setScale(2, java.math.RoundingMode.HALF_UP);
     }
 
@@ -2246,15 +2441,14 @@ public class TmMachineAssignService implements ITmMachineAssignService {
             candidate.setFixedMachineSelected(!hasFixedAllowRule || fixedAllowMatched);
             candidate.setFixedMachineMatched(fixedAllowMatched);
             candidate.setFixedMachineExcluded(contains(candidate.getFixedForbidTreadCodes(), task.getTreadCode()));
-            // 打印机台速度选择来源
-            log.info("[TM_MACHINE_SPEED] treadCode={}, machineCode={}, 机台速度【{}】，来源={}",
+            // 候选级速度与容量证据仅在 DEBUG 输出，避免 INFO 随任务与机台笛卡尔积膨胀。
+            log.debug("[TM_MACHINE_SPEED] treadCode={}, machineCode={}, 机台速度【{}】，来源={}",
                     task.getTreadCode(), candidate.getMachineCode(), machineSpeed,
                     candidate.getTreadSpeedMap().containsKey(task.getTreadCode()) ? "胎面规格速度" : "最大产能/班次小时数");
-            // 打印机台产能计算公式
-            log.info("[TM_MACHINE_CAPACITY] treadCode={}, machineCode={}, shiftOrder={}, 最大产能【maxCapacity】-检修折算量【maintenanceDeduct】-已排计划量【assignedPlanQty】-已发生切换折算量【existingSwitchDeduct】-当前切换折算量【currentSwitchDeduct】=剩余产能【remainCapacity】",
+            log.debug("[TM_MACHINE_CAPACITY] treadCode={}, machineCode={}, shiftOrder={}, 最大产能【maxCapacity】-检修折算量【maintenanceDeduct】-已排计划量【assignedPlanQty】-已发生切换折算量【existingSwitchDeduct】-当前切换折算量【currentSwitchDeduct】=剩余产能【remainCapacity】",
                     task.getTreadCode(), candidate.getMachineCode(), task.getShiftOrder());
             BigDecimal shiftMaintenanceHours = this.resolveMaintenanceHours(task, candidate);
-            log.info("[TM_MACHINE_CAPACITY_DETAIL] treadCode={}, machineCode={}, shiftOrder={}, maxCapacity={}, maintenanceHours={}, totalMaintenanceHours={}, machineSpeed={}, assignedPlanQty={}, previousGlueCode={}, currentGlueCode={}, glueChangeCapacityDeductParam={}, currentGlueSwitchCapacityDeduct={}, existingSwitchCapacityDeduct={}, currentSwitchCapacityDeduct={}, remainCapacity={}",
+            log.debug("[TM_MACHINE_CAPACITY_DETAIL] treadCode={}, machineCode={}, shiftOrder={}, maxCapacity={}, maintenanceHours={}, totalMaintenanceHours={}, machineSpeed={}, assignedPlanQty={}, previousGlueCode={}, currentGlueCode={}, glueChangeCapacityDeductParam={}, currentGlueSwitchCapacityDeduct={}, existingSwitchCapacityDeduct={}, currentSwitchCapacityDeduct={}, remainCapacity={}",
                     task.getTreadCode(), candidate.getMachineCode(), task.getShiftOrder(),
                     candidate.getMaxCapacity(), shiftMaintenanceHours, candidate.getMaintenanceHours(), machineSpeed,
                     resolveAssignedPlanQty(context, candidate.getMachineCode(), task.getShiftOrder()),
@@ -2319,17 +2513,21 @@ public class TmMachineAssignService implements ITmMachineAssignService {
      */
     private BigDecimal resolveMachineSpeed(TmTaskDraft task, TmMachineCandidate candidate, TmScheduleContext context) {
         BigDecimal speed = candidate.getTreadSpeedMap().get(task.getTreadCode());
-        if (speed != null) {
+        if (speed != null && speed.compareTo(BigDecimal.ZERO) > 0) {
             return speed;
         }
-        // 无胎面规格速度时，使用最大产能 / 班次小时数作为机台生产速度
+        // 规格速度未命中时优先使用机台级速度，最后才按最大产能和班次时长推导。
+        if (candidate.getMachineSpeed() != null
+                && candidate.getMachineSpeed().compareTo(BigDecimal.ZERO) > 0) {
+            return candidate.getMachineSpeed();
+        }
         BigDecimal maxCapacity = nvl(candidate.getMaxCapacity());
         BigDecimal shiftHours = nvl(context.getShiftHoursMap().get(task.getShiftOrder()));
         if (maxCapacity.compareTo(BigDecimal.ZERO) > 0 && shiftHours.compareTo(BigDecimal.ZERO) > 0) {
-        return maxCapacity.divide(shiftHours, TmScheduleConstants.DECIMAL_CALCULATION_SCALE,
-                java.math.RoundingMode.HALF_UP);
+            return maxCapacity.divide(shiftHours, TmScheduleConstants.DECIMAL_CALCULATION_SCALE,
+                    java.math.RoundingMode.HALF_UP);
         }
-        return nvl(candidate.getMachineSpeed());
+        return BigDecimal.ZERO;
     }
 
     /**

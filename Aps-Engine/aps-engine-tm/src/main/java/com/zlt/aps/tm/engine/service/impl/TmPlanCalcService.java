@@ -97,6 +97,8 @@ public class TmPlanCalcService implements ITmPlanCalcService {
                 remainingStockMap.put(entry.getKey(), rollingStock != null ? rollingStock : BigDecimal.ZERO);
             }
         }
+        context.setInitialStockMap(new HashMap<>(remainingStockMap));
+        context.setProductShiftShortageMap(new LinkedHashMap<>());
         context.setRemainingStockMap(remainingStockMap);
 
         // 防御性稳定排序：先按班次、再按胎面编码升序，保证全局工装池和同胎面库存都按任务顺序滚动。
@@ -215,13 +217,21 @@ public class TmPlanCalcService implements ITmPlanCalcService {
                 .filter(Objects::nonNull)
                 .collect(Collectors.groupingBy(task -> this.buildPlanGroupKey(context, task),
                         LinkedHashMap::new, Collectors.toList()));
+        List<String> groupConflictMessageList = groupedTaskMap.entrySet().stream()
+                .map(entry -> this.buildGroupAttributeConflictMessage(entry.getKey(), entry.getValue()))
+                .filter(StrUtil::isNotBlank)
+                .collect(Collectors.toList());
+        if (CollUtil.isNotEmpty(groupConflictMessageList)) {
+            throw new ServiceException(MessageFormat.format(
+                    I18nUtil.getMessage("ui.tm.schedule.planGroupAttributeConflictSummary"),
+                    String.join("；", groupConflictMessageList)));
+        }
         List<TmTaskDraft> aggregateTaskList = new ArrayList<>();
         List<TmTaskDraft> sourceTaskList = new ArrayList<>();
         Map<String, TmPlanTaskGroup> planTaskGroupMap = new LinkedHashMap<>();
         for (Map.Entry<String, List<TmTaskDraft>> entry : groupedTaskMap.entrySet()) {
             String planGroupKey = entry.getKey();
             List<TmTaskDraft> groupSourceList = entry.getValue();
-            this.validateGroupAttributes(planGroupKey, groupSourceList);
             TmTaskDraft aggregateTask = groupSourceList.size() == 1
                     ? groupSourceList.get(0) : new TmTaskDraft();
             if (groupSourceList.size() > 1) {
@@ -309,23 +319,21 @@ public class TmPlanCalcService implements ITmPlanCalcService {
     }
 
     /**
-     * 校验同胎面同班次生产属性一致。
+     * 构建同胎面同班次生产属性冲突消息。
      *
      * @param planGroupKey  汇总组业务键
      * @param sourceTaskList 来源任务列表
-     * @throws ServiceException 胶料、口型、长度、卷长、最小起排或收尾属性不一致时抛出
+     * @return 无冲突时返回空字符串；存在冲突时返回单个汇总组的国际化消息
      */
-    private void validateGroupAttributes(String planGroupKey, List<TmTaskDraft> sourceTaskList) {
+    private String buildGroupAttributeConflictMessage(String planGroupKey, List<TmTaskDraft> sourceTaskList) {
         if (sourceTaskList.size() <= 1) {
-            return;
+            return StrUtil.EMPTY;
         }
         List<String> allSourceBusinessKeyList = sourceTaskList.stream()
                 .map(TmTaskDraft::getBusinessKey)
                 .collect(Collectors.toList());
         if (new LinkedHashSet<>(allSourceBusinessKeyList).size() != allSourceBusinessKeyList.size()) {
-            throw new ServiceException(MessageFormat.format(
-                    I18nUtil.getMessage("ui.tm.schedule.planGroupAttributeConflict"),
-                    planGroupKey, String.join(",", allSourceBusinessKeyList)));
+            return this.formatPlanGroupAttributeConflictItem(planGroupKey, allSourceBusinessKeyList);
         }
         TmTaskDraft referenceTask = sourceTaskList.get(0);
         List<String> conflictBusinessKeyList = sourceTaskList.stream()
@@ -336,15 +344,27 @@ public class TmPlanCalcService implements ITmPlanCalcService {
                         || !this.quantityEquals(referenceTask.getCurlRollLength(), task.getCurlRollLength())
                         || !this.quantityEquals(referenceTask.getDefaultCurlRollLength(), task.getDefaultCurlRollLength())
                         || !this.quantityEquals(referenceTask.getMinStartQty(), task.getMinStartQty())
-                        || !Objects.equals(referenceTask.getTailFlag(), task.getTailFlag())
-                        || !this.quantityEquals(referenceTask.getTailBalanceQty(), task.getTailBalanceQty()))
+                        // 成型余量属于来源行级数据，汇总组会按独立来源累加，不作为生产属性比较。
+                        || !Objects.equals(referenceTask.getTailFlag(), task.getTailFlag()))
                 .map(TmTaskDraft::getBusinessKey)
                 .collect(Collectors.toList());
         if (CollUtil.isNotEmpty(conflictBusinessKeyList)) {
-            throw new ServiceException(MessageFormat.format(
-                    I18nUtil.getMessage("ui.tm.schedule.planGroupAttributeConflict"),
-                    planGroupKey, String.join(",", allSourceBusinessKeyList)));
+            return this.formatPlanGroupAttributeConflictItem(planGroupKey, allSourceBusinessKeyList);
         }
+        return StrUtil.EMPTY;
+    }
+
+    /**
+     * 格式化单个计划量汇总组的生产属性冲突消息。
+     *
+     * @param planGroupKey 汇总组业务键
+     * @param sourceBusinessKeyList 冲突来源业务键列表
+     * @return 国际化单组冲突消息
+     */
+    private String formatPlanGroupAttributeConflictItem(String planGroupKey,
+                                                         List<String> sourceBusinessKeyList) {
+        return MessageFormat.format(I18nUtil.getMessage("ui.tm.schedule.planGroupAttributeConflictItem"),
+                planGroupKey, String.join(",", sourceBusinessKeyList));
     }
 
     /**
@@ -510,6 +530,12 @@ public class TmPlanCalcService implements ITmPlanCalcService {
         task.setPlanQty(finalPlanQty);
         task.setPlanStockQty(nvl(task.getRollingStockQty()).add(finalPlanQty)
                 .subtract(nvl(task.getCurrentShiftDemandQty())).max(BigDecimal.ZERO));
+        // 开产阈值截断计划量后，同步最小起排与卷曲取整分量，使 baseDemand + 分量 = finalPlanQty 保持闭合，
+        // 避免 applyPlanGroupResult 用未更新的分量分摊导致 plan_qty_breakdown 不闭合。
+        if (finalPlanQty.compareTo(originalPlanQty) < 0) {
+            task.setMinStartAdjustQty(BigDecimal.ZERO);
+            task.setTailRoundAdjustQty(finalPlanQty.subtract(nvl(task.getBaseDemandQty())));
+        }
         Map<String, Object> evidence = new LinkedHashMap<>();
         evidence.put("ruleCode", TmScheduleRuleCodeEnum.STARTUP_THRESHOLD_ADJUST.getCode());
         evidence.put("date", this.formatScheduleDate(context));
@@ -549,7 +575,15 @@ public class TmPlanCalcService implements ITmPlanCalcService {
         evidence.put("supplyHours", task.getSupplyHours());
         Date shiftStartTime = this.resolveShiftStartTime(context, task.getShiftOrder());
         evidence.put("shiftStartTime", shiftStartTime);
-        if (defaultSpeed.compareTo(BigDecimal.ZERO) <= 0) {
+        // 详设§4.3 速度链尾部：TM_DEFAULT_PRODUCTION_SPEED 未配(<=0)时，用 max(启用机台MAX_CAPACITY)/当前班shiftHours 兜底
+        BigDecimal resolvedSpeed = defaultSpeed;
+        if (resolvedSpeed.compareTo(BigDecimal.ZERO) <= 0) {
+            BigDecimal fallbackSpeed = this.resolveFallbackProductionSpeed(context, task.getShiftOrder());
+            evidence.put("fallbackProductionSpeed", fallbackSpeed);
+            resolvedSpeed = fallbackSpeed;
+        }
+        evidence.put("resolvedProductionSpeed", resolvedSpeed);
+        if (resolvedSpeed.compareTo(BigDecimal.ZERO) <= 0) {
             evidence.put("reason", TmScheduleConstants.SKIP_REASON_DEFAULT_PRODUCTION_SPEED_NON_POSITIVE);
             traceOf(context, task).addRuleHit(TmScheduleRuleCodeEnum.LATEST_START_PRIORITY,
                     TmScheduleRuleResultEnum.SKIP, evidence);
@@ -563,7 +597,7 @@ public class TmPlanCalcService implements ITmPlanCalcService {
         }
         BigDecimal supplyHours = nvl(task.getSupplyHours());
         BigDecimal estimatedProductionHours = nvl(task.getPlanQty())
-                .divide(defaultSpeed, TmScheduleConstants.DECIMAL_CALCULATION_SCALE, RoundingMode.HALF_UP);
+                .divide(resolvedSpeed, TmScheduleConstants.DECIMAL_CALCULATION_SCALE, RoundingMode.HALF_UP);
         Date stockShortageTime = this.offsetHours(shiftStartTime, supplyHours);
         Date latestStartTime = this.offsetHours(stockShortageTime,
                 standingHours.add(estimatedProductionHours).negate());
@@ -576,6 +610,35 @@ public class TmPlanCalcService implements ITmPlanCalcService {
         evidence.put("formula", "shiftStart+supplyHours-standingHours-planQty/defaultSpeed");
         traceOf(context, task).addRuleHit(TmScheduleRuleCodeEnum.LATEST_START_PRIORITY,
                 TmScheduleRuleResultEnum.PASS, evidence);
+    }
+
+    /**
+     * 兜底解析生产速度：TM_DEFAULT_PRODUCTION_SPEED 未配置(<=0)时，按详设§4.3 速度链尾部取
+     * max(启用机台 MAX_CAPACITY) / 当前班 shiftHours；机台容量无效时回退默认生产速度。
+     *
+     * @param context    排程上下文
+     * @param shiftOrder 当前班次序号
+     * @return 兜底生产速度(米/小时)；班次时长或机台配置缺失时返回 0
+     */
+    private BigDecimal resolveFallbackProductionSpeed(TmScheduleContext context, Integer shiftOrder) {
+        if (context == null || shiftOrder == null || context.getShiftHoursMap() == null) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal shiftHours = context.getShiftHoursMap().get(shiftOrder);
+        if (shiftHours == null || shiftHours.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal maxCapacity = context.getMachineCandidateList().stream()
+                .filter(candidate -> candidate != null
+                        && !Boolean.FALSE.equals(candidate.getEnabled())
+                        && candidate.getMaxCapacity() != null
+                        && candidate.getMaxCapacity().signum() > 0)
+                .map(candidate -> candidate.getMaxCapacity())
+                .reduce(BigDecimal.ZERO, BigDecimal::max);
+        if (maxCapacity.compareTo(BigDecimal.ZERO) <= 0) {
+            return new BigDecimal(TmScheduleConstants.DEFAULT_PRODUCTION_SPEED);
+        }
+        return maxCapacity.divide(shiftHours, TmScheduleConstants.DECIMAL_CALCULATION_SCALE, RoundingMode.HALF_UP);
     }
 
     /**
@@ -894,37 +957,6 @@ public class TmPlanCalcService implements ITmPlanCalcService {
             }
         }
         return nvl(task.getRollingStockQty());
-    }
-
-    /**
-     * 按当前任务计划量和当前班成型需求量滚动全局工装池，生产增加占用，成型消耗库存释放占用。
-     *
-     * @param task                    任务草稿
-     * @param currentAvailableToolQty 当前任务计算前全局可用工装数量
-     * @return 当前任务计算后的全局剩余工装数量
-     */
-    private BigDecimal updateGlobalToolState(TmTaskDraft task, BigDecimal currentAvailableToolQty) {
-        if (currentAvailableToolQty == null) {
-            return null;
-        }
-        BigDecimal curlLength = this.resolveCurlLength(task);
-        if (curlLength.compareTo(BigDecimal.ZERO) <= 0) {
-            task.setToolUsedQty(BigDecimal.ZERO.setScale(TmScheduleConstants.DECIMAL_CALCULATION_SCALE,
-                    RoundingMode.HALF_UP));
-            task.setRemainingToolQty(currentAvailableToolQty);
-            return currentAvailableToolQty;
-        }
-        BigDecimal netUsedToolQty = nvl(task.getPlanQty()).subtract(nvl(task.getCurrentShiftDemandQty()))
-                .divide(curlLength, TmScheduleConstants.DECIMAL_CALCULATION_SCALE, RoundingMode.HALF_UP);
-        BigDecimal remainingToolQty = currentAvailableToolQty.subtract(netUsedToolQty).max(BigDecimal.ZERO);
-        if (task.getTotalToolQty() != null) {
-            remainingToolQty = remainingToolQty.min(task.getTotalToolQty());
-        }
-        remainingToolQty = remainingToolQty.setScale(TmScheduleConstants.DECIMAL_CALCULATION_SCALE,
-                RoundingMode.HALF_UP);
-        task.setToolUsedQty(netUsedToolQty);
-        task.setRemainingToolQty(remainingToolQty);
-        return remainingToolQty;
     }
 
     /**
