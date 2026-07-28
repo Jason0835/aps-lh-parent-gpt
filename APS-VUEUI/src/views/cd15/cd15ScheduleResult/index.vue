@@ -495,7 +495,12 @@ export default {
       }
       const data = payload || {}
       if (data.taskId) {
-        this.handleTaskResult({ data }, getChangeQtyTask).then(() => this.getList())
+        this.pollScheduleTask(data.taskId, getChangeQtyTask, {
+          titleKey: 'ui.data.column.cd15ScheduleResult.changeQtyTitle',
+          hintKey: 'ui.data.column.cd15ScheduleResult.changeQtyProgressHint',
+          successKey: 'ui.data.column.cd15ScheduleResult.changeQtySuccess',
+          failedKey: 'ui.data.column.cd15ScheduleResult.changeQtyFailed'
+        })
       } else {
         this.getList()
       }

@@ -252,10 +252,33 @@ export default {
       try {
         const params = this.buildRequest()
         await validateChangeQty(params)
-        const response = this.normalizeResponse(await changeQty(params))
+        let response = this.normalizeResponse(await changeQty({ ...params, confirmed: false }))
         if (response.batchCheckFailed) {
           this.showBatchCheckAlert(response.data, response.msg)
           return
+        }
+        if (response.needConfirm) {
+          this.loading = false
+          try {
+            await this.$confirm(
+              this.buildCarryoverConfirmHtml(response.carryoverDetails, response.msg),
+              this.$t('ui.data.column.cd15ScheduleResult.changeQtyCarryoverTitle'),
+              {
+                dangerouslyUseHTMLString: true,
+                type: 'warning',
+                confirmButtonText: this.$t('common.button.confirm'),
+                cancelButtonText: this.$t('common.button.cancel')
+              }
+            )
+          } catch (error) {
+            return
+          }
+          this.loading = true
+          response = this.normalizeResponse(await changeQty({ ...params, confirmed: true }))
+          if (response.batchCheckFailed) {
+            this.showBatchCheckAlert(response.data, response.msg)
+            return
+          }
         }
         this.$emit('success', params.scheduleDate, response.data)
         this.hide()
@@ -268,8 +291,29 @@ export default {
       return {
         data,
         msg: (result && result.msg) || '',
-        batchCheckFailed: !!(data.batchCheckFailed || (result && result.batchCheckFailed))
+        batchCheckFailed: !!(data.batchCheckFailed || (result && result.batchCheckFailed)),
+        needConfirm: !!(data.needConfirm || (result && result.needConfirm)),
+        carryoverDetails: data.carryoverDetails || (result && result.carryoverDetails) || []
       }
+    },
+    buildCarryoverConfirmHtml(details, fallbackMsg) {
+      let html = '<div style="max-height:55vh;overflow:auto;text-align:left;">'
+      if (fallbackMsg) {
+        html += '<div style="margin-bottom:12px;color:#606266;">' + this.escapeHtml(fallbackMsg) + '</div>'
+      }
+      ;(details || []).forEach(item => {
+        const targetClass = item.targetClassField || this.$t('ui.data.column.cd15ScheduleResult.changeQtyWindowEnd')
+        html += '<div style="padding:10px 0;border-top:1px solid #EBEEF5;font-size:13px;line-height:1.8;color:#606266;">'
+        html += '<b>' + this.escapeHtml(item.steelStripCode || '-') + '</b> '
+        html += this.escapeHtml(item.sourceClassField || '-') + ' → ' + this.escapeHtml(targetClass)
+        html += '<br/>' + this.$t('ui.data.column.cd15ScheduleResult.changeQtyCarryoverQty') + ' '
+        html += this.escapeHtml(item.carryoverQty)
+        html += '<br/><span style="color:#E6A23C;">'
+        html += this.escapeHtml(item.reasonMessage || item.reasonCode || '') + '</span>'
+        html += '</div>'
+      })
+      html += '</div>'
+      return html
     },
     showBatchCheckAlert(data, fallbackMsg) {
       const errors = (data && data.errors) || []

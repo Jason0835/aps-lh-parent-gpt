@@ -11,6 +11,7 @@ import com.zlt.aps.cd15.api.domain.vo.Cd15InsertOrderRequest;
 import com.zlt.aps.cd15.api.domain.vo.Cd15RollingCheckRequest;
 import com.zlt.aps.cd15.api.domain.vo.Cd15TransferMachineRequest;
 import com.zlt.aps.cd15.engine.algorithm.Cd15ShiftWindowResolver;
+import com.zlt.aps.cd15.engine.constant.Cd15CutMode;
 import com.zlt.aps.cd15.engine.constant.Cd15ScheduleTaskType;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineShiftConfigMapper;
 import com.zlt.aps.cd15.engine.domain.Cd15ScheduleTask;
@@ -38,6 +39,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
+import java.math.BigDecimal;
 import java.text.MessageFormat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -268,11 +270,7 @@ public class Cd15ScheduleResultServiceImpl extends AbstractDocService<Cd15Schedu
             return this.required("steelStripCode");
         }
         if (request.getSourceMachineCode().equals(request.getTargetMachineCode())) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.message.parameter.error"));
-        }
-        List<Integer> classIndexes = this.transferClassIndexes(request);
-        if (classIndexes.isEmpty()) {
-            return this.required("classProduceOrder");
+            return AjaxResult.error(I18nUtil.getMessage("ui.cd15.transfer.sameMachine"));
         }
         Cd15ScheduleResult source = this.findSelectedResult(
                 request.getScheduleResultId(), request.getFactoryCode(),
@@ -285,11 +283,168 @@ public class Cd15ScheduleResultServiceImpl extends AbstractDocService<Cd15Schedu
             return AjaxResult.error(I18nUtil.getMessage(
                     "ui.cd15.adjust.resultMismatch"));
         }
-        return this.validateEditableClasses(request.getFactoryCode(),
-                request.getScheduleDate(), classIndexes,
-                "ui.cd15.adjust.transferShiftEnded");
+        List<Cd15ScheduleResult> transferSources = this.resolveTransferSources(
+                source, request.getFactoryCode(), request.getScheduleDate());
+        if (transferSources.isEmpty()) {
+            return AjaxResult.error(I18nUtil.getMessage(
+                    "ui.cd15.adjust.resultMismatch"));
+        }
+        List<Integer> editableClassIndexes = this.resolveTransferEditableClassIndexes(
+                request.getFactoryCode(), request.getScheduleDate());
+        int editableFromClassIndex = this.resolveTransferEditableFromClassIndex(
+                editableClassIndexes);
+        if (editableFromClassIndex > CLASS_COUNT) {
+            return AjaxResult.error(I18nUtil.getMessage(
+                    "ui.cd15.transfer.windowEnded"));
+        }
+        request.setStartClassField("CLASS" + editableFromClassIndex);
+        boolean invalidClassOrder = IntStream.rangeClosed(1, CLASS_COUNT)
+                .anyMatch(classIndex -> this.readTransferProduceOrder(request, classIndex) != null
+                        && !editableClassIndexes.contains(classIndex));
+        if (invalidClassOrder) {
+            return AjaxResult.error(I18nUtil.getMessage(
+                    "ui.cd15.transfer.pastShift"));
+        }
+        boolean zeroQuantitySelected = editableClassIndexes.stream()
+                .anyMatch(classIndex -> this.readTransferProduceOrder(request, classIndex) != null
+                        && !this.hasCompleteTransferPlan(transferSources, classIndex));
+        if (zeroQuantitySelected) {
+            return AjaxResult.error(I18nUtil.getMessage(
+                    "ui.cd15.transfer.zeroPlan"));
+        }
+        boolean missingProduceOrder = editableClassIndexes.stream()
+                .anyMatch(classIndex -> this.hasCompleteTransferPlan(transferSources, classIndex)
+                        && this.readTransferProduceOrder(request, classIndex) == null);
+        if (missingProduceOrder) {
+            return AjaxResult.error(I18nUtil.getMessage(
+                    "ui.cd15.transfer.targetOrderRequired"));
+        }
+        boolean hasTransferPlan = editableClassIndexes.stream()
+                .anyMatch(classIndex -> this.hasCompleteTransferPlan(
+                        transferSources, classIndex));
+        if (!hasTransferPlan) {
+            return AjaxResult.error(I18nUtil.getMessage(
+                    "ui.cd15.transfer.noTransferPlan"));
+        }
+        boolean lockedTransfer = editableClassIndexes.stream()
+                .filter(classIndex -> this.hasCompleteTransferPlan(
+                        transferSources, classIndex))
+                .anyMatch(classIndex -> this.isTransferClassLocked(
+                        transferSources, classIndex));
+        return lockedTransfer
+                ? AjaxResult.error(I18nUtil.getMessage("ui.cd15.transfer.locked"))
+                : AjaxResult.success();
     }
 
+    /** 解析转机台选中的单裁结果或同批次完整分裁作业单元。 */
+    private List<Cd15ScheduleResult> resolveTransferSources(Cd15ScheduleResult source,
+                                                             String factoryCode,
+                                                             Date scheduleDate) {
+        if (!Cd15CutMode.SPLIT.equals(source.getCutMode())) {
+            return Collections.singletonList(source);
+        }
+        if (this.isBlank(source.getGroupNo())) {
+            return Collections.emptyList();
+        }
+        List<Cd15ScheduleResult> groupResults = this.selectByDateAndFactory(
+                        scheduleDate, factoryCode).stream()
+                .filter(item -> Objects.equals(source.getCd15BatchNo(), item.getCd15BatchNo()))
+                .filter(item -> Objects.equals(source.getGroupNo(), item.getGroupNo()))
+                .filter(item -> Objects.equals(source.getMachineCode(), item.getMachineCode()))
+                .filter(item -> Cd15CutMode.SPLIT.equals(item.getCutMode()))
+                .collect(Collectors.toList());
+        if (groupResults.size() == 1) {
+            return groupResults;
+        }
+        boolean validPair = groupResults.size() == 2
+                && groupResults.stream().map(Cd15ScheduleResult::getSteelStripCode)
+                .filter(Objects::nonNull).distinct().count() == 2L
+                && groupResults.stream().map(Cd15ScheduleResult::getBigRollCode)
+                .distinct().count() == 1L
+                && groupResults.stream().map(Cd15ScheduleResult::getCuttingAngle)
+                .distinct().count() == 1L;
+        return validPair ? groupResults : Collections.emptyList();
+    }
+
+    /** 解析当前排程窗口内尚未结束的可转班次。 */
+    private List<Integer> resolveTransferEditableClassIndexes(String factoryCode,
+                                                               Date scheduleDateValue) {
+        LocalDate scheduleDate = this.toLocalDate(scheduleDateValue);
+        LocalDateTime now = LocalDateTime.now();
+        return shiftWindowResolver.resolve(
+                        scheduleDate,
+                        shiftConfigMapper.selectList(Wrappers.<Cd15ShiftConfig>lambdaQuery()
+                                .eq(Cd15ShiftConfig::getFactoryCode, factoryCode)))
+                .stream()
+                .filter(shift -> now.isBefore(shift.getEndTime()))
+                .map(Cd15ShiftDescriptor::getClassField)
+                .map(this::parseTransferClassIndex)
+                .filter(Objects::nonNull)
+                .distinct()
+                .sorted()
+                .collect(Collectors.toList());
+    }
+
+    /** 获取当前可转班次的起始索引；窗口结束时返回班次数量加一。 */
+    private int resolveTransferEditableFromClassIndex(List<Integer> editableClassIndexes) {
+        return editableClassIndexes.stream().findFirst().orElse(CLASS_COUNT + 1);
+    }
+
+    /** 解析CLASSn字段中的班次索引。 */
+    private Integer parseTransferClassIndex(String classField) {
+        if (this.isBlank(classField) || !classField.startsWith("CLASS")) {
+            return null;
+        }
+        try {
+            int classIndex = Integer.parseInt(classField.substring("CLASS".length()));
+            return classIndex >= 1 && classIndex <= CLASS_COUNT ? classIndex : null;
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
+    /** 读取转机台指定班次的目标生产顺序，非正数按未填写处理。 */
+    private Integer readTransferProduceOrder(Cd15TransferMachineRequest request,
+                                             int classIndex) {
+        Integer produceOrder = (Integer) request.getFieldValueByFieldName(
+                String.format("class%dProduceOrder", classIndex));
+        return produceOrder != null && produceOrder > 0 ? produceOrder : null;
+    }
+
+    /** 判断单裁结果或分裁作业单元在指定班次是否都有可转计划。 */
+    private boolean hasCompleteTransferPlan(List<Cd15ScheduleResult> transferSources,
+                                            int classIndex) {
+        return !transferSources.isEmpty() && transferSources.stream()
+                .allMatch(item -> this.readTransferPlanQuantity(item, classIndex) > 0D);
+    }
+
+    /** 判断指定班次是否包含已锁定、已完成或生产中的结果。 */
+    private boolean isTransferClassLocked(List<Cd15ScheduleResult> transferSources,
+                                          int classIndex) {
+        return transferSources.stream()
+                .anyMatch(item -> this.readTransferPlanQuantity(item, classIndex) > 0D
+                        && this.isTransferResultLocked(item, classIndex));
+    }
+
+    /** 读取排程结果指定班次的计划量。 */
+    private double readTransferPlanQuantity(Cd15ScheduleResult result, int classIndex) {
+        Double planQuantity = (Double) result.getFieldValueByFieldName(
+                String.format("class%dPlanQty", classIndex));
+        return planQuantity == null ? 0D : planQuantity;
+    }
+
+    /** 按CD90同口径判断转机台班次是否已锁定或已生产。 */
+    private boolean isTransferResultLocked(Cd15ScheduleResult result, int classIndex) {
+        Double finishQuantity = (Double) result.getFieldValueByFieldName(
+                String.format("class%dFinishQty", classIndex));
+        Double planQuantity = (Double) result.getFieldValueByFieldName(
+                String.format("class%dPlanQty", classIndex));
+        return "1".equals(result.getIsLocked())
+                || (finishQuantity != null && finishQuantity > 0D)
+                || ("1".equals(result.getProductionStatus())
+                && planQuantity != null
+                && (finishQuantity == null || finishQuantity < planQuantity));
+    }
     /**
      * 斜裁转机台 Service 入口。
      * 当前阶段先创建真实异步任务记录，滚动重排链路后续补齐。
@@ -424,16 +579,19 @@ public class Cd15ScheduleResultServiceImpl extends AbstractDocService<Cd15Schedu
         if (this.isBlank(request.getSteelStripCode())) {
             return this.required("steelStripCode");
         }
-        boolean hasTargetQty = request.getTargetPlanQty() != null
-                || IntStream.rangeClosed(1, CLASS_COUNT)
-                .mapToObj(classIndex -> this.readPlanQty(request, classIndex))
-                .anyMatch(Objects::nonNull);
-        if (!hasTargetQty) {
-            return this.required("targetPlanQty");
+        Map<Integer, Double> targetQtyByClass;
+        try {
+            targetQtyByClass = this.resolveChangeQtyTargets(request);
+        } catch (IllegalArgumentException exception) {
+            return AjaxResult.error(exception.getMessage());
         }
-        Cd15ScheduleResult source = this.findSelectedResult(
-                request.getScheduleResultId(), request.getFactoryCode(),
-                request.getScheduleDate()).orElse(null);
+        List<Cd15ScheduleResult> latestResults = this.latestBatchResults(
+                this.selectByDateAndFactory(request.getScheduleDate(),
+                        request.getFactoryCode()));
+        Cd15ScheduleResult source = latestResults.stream()
+                .filter(item -> Objects.equals(
+                        item.getId(), request.getScheduleResultId()))
+                .findFirst().orElse(null);
         if (source == null
                 || !Objects.equals(source.getMachineCode(), request.getMachineCode())
                 || !Objects.equals(source.getSteelStripCode(), request.getSteelStripCode())
@@ -442,13 +600,109 @@ public class Cd15ScheduleResultServiceImpl extends AbstractDocService<Cd15Schedu
             return AjaxResult.error(I18nUtil.getMessage(
                     "ui.cd15.adjust.resultMismatch"));
         }
-        List<Integer> classIndexes = this.changeQtyClassIndexes(request);
-        if (classIndexes.isEmpty()) {
-            return this.required("targetPlanQty");
+        List<Cd15ScheduleResult> adjustmentSources = this.resolveTransferSources(
+                source, request.getFactoryCode(), request.getScheduleDate());
+        if (adjustmentSources.isEmpty()) {
+            return AjaxResult.error(I18nUtil.getMessage(
+                    "ui.cd15.adjust.resultMismatch"));
         }
-        return this.validateEditableClasses(request.getFactoryCode(),
-                request.getScheduleDate(), classIndexes,
-                "ui.cd15.adjust.changeQtyShiftEnded");
+        boolean allSame = targetQtyByClass.entrySet().stream().allMatch(entry ->
+                BigDecimal.valueOf(this.readTransferPlanQuantity(source, entry.getKey()))
+                        .compareTo(BigDecimal.valueOf(entry.getValue())) == 0);
+        if (allSame) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.cd15.changeQty.same"));
+        }
+        List<Integer> editableClassIndexes = this.resolveTransferEditableClassIndexes(
+                request.getFactoryCode(), request.getScheduleDate());
+        if (editableClassIndexes.isEmpty()) {
+            return AjaxResult.error(I18nUtil.getMessage(
+                    "ui.cd15.changeQty.windowEnded"));
+        }
+        boolean containsPastShift = targetQtyByClass.keySet().stream()
+                .anyMatch(classIndex -> !editableClassIndexes.contains(classIndex));
+        if (containsPastShift) {
+            return AjaxResult.error(I18nUtil.getMessage(
+                    "ui.cd15.changeQty.pastShift"));
+        }
+        boolean splitCut = Cd15CutMode.SPLIT.equals(source.getCutMode());
+        if (splitCut && targetQtyByClass.values().stream()
+                .anyMatch(targetQuantity -> targetQuantity <= 0D)) {
+            return AjaxResult.error(I18nUtil.getMessage(
+                    "ui.cd15.changeQty.splitPositive"));
+        }
+        boolean splitPlanMissing = splitCut && targetQtyByClass.keySet().stream()
+                .anyMatch(classIndex -> adjustmentSources.stream()
+                        .anyMatch(item -> this.readTransferPlanQuantity(
+                                item, classIndex) <= 0D));
+        if (splitPlanMissing) {
+            return AjaxResult.error(I18nUtil.getMessage(
+                    "ui.cd15.changeQty.splitPlanMissing"));
+        }
+        boolean lockedClass = targetQtyByClass.keySet().stream()
+                .anyMatch(classIndex -> adjustmentSources.stream()
+                        .anyMatch(item -> this.isTransferResultLocked(
+                                item, classIndex)));
+        if (lockedClass) {
+            return AjaxResult.error(I18nUtil.getMessage(
+                    "ui.cd15.changeQty.locked"));
+        }
+        boolean lessThanFinish = targetQtyByClass.entrySet().stream()
+                .anyMatch(entry -> {
+                    Double finishQuantity = this.readChangeQtyFinishQuantity(
+                            source, entry.getKey());
+                    return finishQuantity != null
+                            && entry.getValue() < finishQuantity;
+                });
+        return lessThanFinish
+                ? AjaxResult.error(I18nUtil.getMessage(
+                "ui.cd15.changeQty.lessThanFinish"))
+                : AjaxResult.success();
+    }
+
+    /** 解析调量目标量，兼容单班字段和逐班字段两种入参。 */
+    private Map<Integer, Double> resolveChangeQtyTargets(
+            Cd15ChangeQtyRequest request) {
+        Map<Integer, Double> targetQtyByClass = new LinkedHashMap<>();
+        boolean hasLegacyClass = !this.isBlank(request.getStartClassField());
+        boolean hasLegacyQuantity = request.getTargetPlanQty() != null;
+        if (hasLegacyClass || hasLegacyQuantity) {
+            Integer classIndex = hasLegacyClass
+                    ? this.parseTransferClassIndex(
+                    request.getStartClassField().trim().toUpperCase())
+                    : null;
+            if (classIndex == null || !hasLegacyQuantity) {
+                throw new IllegalArgumentException(I18nUtil.getMessage(
+                        "ui.cd15.changeQty.invalidTarget"));
+            }
+            targetQtyByClass.put(classIndex, request.getTargetPlanQty());
+        }
+        IntStream.rangeClosed(1, CLASS_COUNT).forEach(classIndex -> {
+            Double targetQuantity = this.readPlanQty(request, classIndex);
+            if (targetQuantity != null) {
+                targetQtyByClass.put(classIndex, targetQuantity);
+            }
+        });
+        if (targetQtyByClass.isEmpty()) {
+            throw new IllegalArgumentException(I18nUtil.getMessage(
+                    "ui.cd15.changeQty.invalidTarget"));
+        }
+        boolean invalidTarget = targetQtyByClass.entrySet().stream()
+                .anyMatch(entry -> entry.getKey() < 1 || entry.getKey() > CLASS_COUNT
+                        || entry.getValue() == null
+                        || !Double.isFinite(entry.getValue())
+                        || entry.getValue() < 0D);
+        if (invalidTarget) {
+            throw new IllegalArgumentException(I18nUtil.getMessage(
+                    "ui.cd15.changeQty.invalidTarget"));
+        }
+        return targetQtyByClass;
+    }
+
+    /** 读取调量目标结果指定班次的完成量。 */
+    private Double readChangeQtyFinishQuantity(Cd15ScheduleResult result,
+                                               int classIndex) {
+        return (Double) result.getFieldValueByFieldName(
+                String.format("class%dFinishQty", classIndex));
     }
 
     /**
@@ -472,11 +726,52 @@ public class Cd15ScheduleResultServiceImpl extends AbstractDocService<Cd15Schedu
         if (activeTask != null) {
             return AjaxResult.error(I18nUtil.getMessage("ui.cd15.schedule.taskActive"));
         }
+        if (!Boolean.TRUE.equals(request.getConfirmed())) {
+            AjaxResult previewResult = this.previewChangeQty(
+                    request, this.toLocalDate(request.getScheduleDate()));
+            if (previewResult != null) {
+                return previewResult;
+            }
+        }
         Cd15ScheduleTask task = taskService.createPending(request.getFactoryCode(), request.getScheduleDate(),
                 Cd15ScheduleTaskType.CHANGE_QTY, "MANUAL", request.toString(), null);
         insertOrderAsyncExecutor.executeChangeQty(task.getTaskId(), request);
         return AjaxResult.success(I18nUtil.getMessage("ui.message.operation.success"), this.toTaskData(task));
     }
+    /** 使用正式滚动内核预演调量，发现跨班顺延时返回确认明细。 */
+    private AjaxResult previewChangeQty(Cd15ChangeQtyRequest request,
+                                        LocalDate scheduleDate) {
+        RLock lock = lockService.getLock(request.getFactoryCode(), scheduleDate);
+        try {
+            if (!lock.tryLock()) {
+                return AjaxResult.error(I18nUtil.getMessage(
+                        "ui.cd15.schedule.taskActive"));
+            }
+            if (taskService.findActive(request.getFactoryCode(),
+                    request.getScheduleDate()) != null) {
+                return AjaxResult.error(I18nUtil.getMessage(
+                        "ui.cd15.schedule.taskActive"));
+            }
+            Cd15InsertRollingOutput output = insertRollingService.executeChangeQty(request);
+            List<Cd15InsertCarryoverImpact> impacts = output.getCarryoverImpacts() == null
+                    ? Collections.emptyList() : output.getCarryoverImpacts();
+            if (impacts.isEmpty()) {
+                return null;
+            }
+            Map<String, Object> data = new LinkedHashMap<>();
+            data.put("needConfirm", true);
+            data.put("carryoverDetails", impacts.stream()
+                    .map(this::toCarryoverDetail)
+                    .collect(Collectors.toList()));
+            return AjaxResult.success(I18nUtil.getMessage(
+                    "ui.cd15.changeQty.carryoverConfirm"), data);
+        } finally {
+            if (lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
+        }
+    }
+
     @Override
     public AjaxResult getChangeQtyTask(String taskId) {
         return this.taskView(taskId, Cd15ScheduleTaskType.CHANGE_QTY);
@@ -634,6 +929,25 @@ public class Cd15ScheduleResultServiceImpl extends AbstractDocService<Cd15Schedu
             }
         }
         return AjaxResult.success();
+    }
+
+    /** 只保留同日同工厂最新批次的排程结果。 */
+    private List<Cd15ScheduleResult> latestBatchResults(
+            List<Cd15ScheduleResult> results) {
+        if (results == null || results.isEmpty()) {
+            return Collections.emptyList();
+        }
+        String latestBatchNo = results.stream()
+                .map(Cd15ScheduleResult::getCd15BatchNo)
+                .filter(Objects::nonNull)
+                .max(String::compareTo).orElse(null);
+        if (latestBatchNo == null) {
+            return Collections.emptyList();
+        }
+        return results.stream()
+                .filter(item -> Objects.equals(
+                        latestBatchNo, item.getCd15BatchNo()))
+                .collect(Collectors.toList());
     }
 
     /** 按主键、工厂和排程日期定位页面选中的排程结果。 */
