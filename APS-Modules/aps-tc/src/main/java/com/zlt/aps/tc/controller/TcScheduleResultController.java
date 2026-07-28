@@ -2,11 +2,11 @@ package com.zlt.aps.tc.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.ruoyi.common.annotation.Log;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
-import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.ruoyi.common.log.annotation.Log;
+import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.tc.api.domain.dto.TcScheduleResultImportDTO;
 import com.zlt.aps.tc.api.domain.entity.TcScheduleResult;
 import com.zlt.aps.tc.api.domain.entity.TcScheduleResultExplain;
@@ -72,9 +72,9 @@ public class TcScheduleResultController extends AbstractDocBizController<TcSched
      */
     @Log(title = "ui.tc.schedule.scheduleResult.modelName", businessType = BusinessType.EXPORT)
     @ApiOperation("按专用模板导出胎侧排程结果")
-    @PostMapping("/exportDataScheduleResult/{fileName}")
+    @PostMapping("/exportDataScheduleResult")
     public byte[] exportDataScheduleResult(@RequestBody TcScheduleResult queryVO,
-                                           @PathVariable("fileName") String fileName) {
+                                           @RequestParam("fileName") String fileName) {
         return this.tcScheduleResultExcelService.exportDataScheduleResult(queryVO, fileName);
     }
 

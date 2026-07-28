@@ -6,13 +6,15 @@ import com.zlt.aps.tm.api.enums.TmScheduleStrategyEnum;
 import com.zlt.aps.tm.engine.domain.TmChainSortScore;
 import com.zlt.aps.tm.engine.domain.TmScheduleContext;
 import com.zlt.aps.tm.engine.domain.TmTaskDraft;
+import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
-/** 连续性优先策略，保持二期实施前的生产排序口径。 */
+/** 连续性优先策略，保持二期实施前的生产排序口径，由 TmStrategyRegistry 收集注册。 */
+@Component
 public class TmContinuityFirstChainTaskPriorityStrategy implements ITmChainTaskPriorityStrategy {
 
     @Override
@@ -35,6 +37,8 @@ public class TmContinuityFirstChainTaskPriorityStrategy implements ITmChainTaskP
         orderedTaskList.sort(Comparator
                 .comparing((TmTaskDraft task) -> chainScoreMap.getOrDefault(task.getBusinessKey(), TmChainSortScore.ZERO),
                         Comparator.reverseOrder())
+                .thenComparing(TmTaskDraft::getBaseSortIndex,
+                        Comparator.nullsLast(Comparator.naturalOrder()))
                 .thenComparing(task -> StrUtil.blankToDefault(task.getBusinessKey(), "")));
         return orderedTaskList.get(0);
     }

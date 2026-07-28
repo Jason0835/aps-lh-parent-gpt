@@ -272,6 +272,10 @@ public class TcBizSnapshotAndPersistService implements ITcSnapshotAndPersistServ
             normalizeResultShiftFields(result);
         }
         List<TcScheduleResult> visibleResultList = filterVisibleScheduleResults(mergedResultList, mergedResultBusinessKeyMap);
+        visibleResultList.sort(Comparator
+                .comparing((TcScheduleResult result) -> StrUtil.blankToDefault(result.getMachineCode(), ""))
+                .thenComparing(result -> StrUtil.blankToDefault(result.getSidewallCode(), ""))
+                .thenComparing(result -> StrUtil.blankToDefault(result.getConstructionVersion(), "")));
         assignTcOrderNo(visibleResultList, context.getBatchNo());
         resequenceVisibleShiftSequences(visibleResultList);
         this.batchSaveWithFallback(visibleResultList, transactionStatus, "RESULT", this::buildResultErrorMsg);
@@ -951,7 +955,8 @@ public class TcBizSnapshotAndPersistService implements ITcSnapshotAndPersistServ
                 + "|" + StrUtil.blankToDefault(result == null ? null : result.getWholeGlueCode(), "")
                 + "|" + StrUtil.blankToDefault(result == null ? null : result.getGlueSeq(), "")
                 + "|" + StrUtil.blankToDefault(result == null ? null : result.getMouthPlateCode(), "")
-                + "|" + StrUtil.blankToDefault(result == null ? null : result.getTailFlag(), "");
+                + "|" + StrUtil.blankToDefault(result == null ? null : result.getTailFlag(), "")
+                + "|" + StrUtil.blankToDefault(result == null ? null : result.getDataSource(), "");
     }
 
     /**

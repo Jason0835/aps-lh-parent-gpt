@@ -419,7 +419,8 @@ public class TmScheduleResultController extends AbstractDocBizController<TmSched
     @ApiOperation("获取胎面排程班次日期列表")
     @PostMapping("/listScheduleShiftDates")
     public List<TmScheduleShiftDateVO> listScheduleShiftDates(@RequestBody TmScheduleResult scheduleResult) {
-        return tmScheduleResultService.listScheduleShiftDates(scheduleResult.getScheduleDate());
+        return tmScheduleResultService.listScheduleShiftDates(
+                scheduleResult.getFactoryCode(), scheduleResult.getScheduleDate());
     }
 
     @Log(title = "ui.data.column.tm.scheduleResult.modelName", businessType = BusinessType.UPDATE)

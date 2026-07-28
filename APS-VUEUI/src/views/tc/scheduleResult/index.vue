@@ -242,16 +242,9 @@ export default {
     return { parentDict: this.dict }
   },
   data() {
-    let storedFactoryCode = ''
-    try {
-      const storedScope = JSON.parse(window.sessionStorage.getItem('tcAutoPlanLatestScope') || '{}')
-      storedFactoryCode = storedScope.factoryCode || ''
-    } catch (error) {
-      window.sessionStorage.removeItem('tcAutoPlanLatestScope')
-    }
     const defaultQuery = {
-      factoryCode: storedFactoryCode,
-      scheduleRange: [offsetDate(0), offsetDate(2)]
+      factoryCode: '116',
+      scheduleDate: offsetDate(0)
     }
     return {
       loading: false,
@@ -410,10 +403,10 @@ export default {
           filterable: true
         },
         {
-          prop: 'scheduleRange',
-          label: this.$t('ui.tc.schedule.scheduleDateRange'),
+          prop: 'scheduleDate',
+          label: this.$t('ui.tc.schedule.scheduleDate'),
           type: 'date',
-          dateType: 'daterange',
+          dateType: 'date',
           valueFormat: 'yyyy-MM-dd'
         },
         {
@@ -464,16 +457,22 @@ export default {
   methods: {
     shiftLabel(shiftOrder) {
       const option = this.dateColumns.find(item => item.shiftOrder === shiftOrder)
-      return option ? (option.shiftName || option.shiftCode || '') : `${this.$t('ui.tc.schedule.shift')} ${shiftOrder}`
+      const shiftName = option
+        ? (option.shiftName || option.shiftCode || '')
+        : `${this.$t('ui.tc.schedule.shift')} ${shiftOrder}`
+      const scheduleDate = option && option.scheduleDate
+        ? String(option.scheduleDate).substring(0, 10)
+        : ''
+      const displayDate = scheduleDate ? scheduleDate.substring(5, 10).replace('-', '/') : ''
+      return `${shiftName} ${displayDate}`.trim()
     },
     formatQuery(includePage = true) {
-      const scheduleRange = this.query.scheduleRange || []
       const params = {
         ...this.query,
-        startDate: scheduleRange[0],
-        endDate: scheduleRange[1]
+        startDate: this.query.scheduleDate,
+        endDate: this.query.scheduleDate
       }
-      delete params.scheduleRange
+      delete params.scheduleDate
       if (includePage) {
         params.pageNum = this.page.current
         params.pageSize = this.page.pageSize
@@ -527,10 +526,9 @@ export default {
       this.selection = rows
     },
     handleImport() {
-      const scheduleRange = this.query.scheduleRange || []
       this.$refs.tltUpload.handleImport({
         factoryCode: this.query.factoryCode || this.search.factoryCode,
-        scheduleDate: scheduleRange[0],
+        scheduleDate: this.query.scheduleDate,
         updateSupport: true
       })
     },
@@ -546,29 +544,23 @@ export default {
       return `${url}${paramsStr ? '?' + paramsStr : ''}`
     },
     handleExport() {
-      const scheduleRange = this.query.scheduleRange || []
-      if (!this.query.factoryCode || !scheduleRange[0] || !scheduleRange[1]) {
+      if (!this.query.factoryCode || !this.query.scheduleDate) {
         this.$modal.msgWarning(this.$t('ui.tc.schedule.excelFactoryDateRequired'))
-        return
-      }
-      if (scheduleRange[0] !== scheduleRange[1]) {
-        this.$modal.msgWarning(this.$t('ui.tc.schedule.excelSingleDateRequired'))
         return
       }
       downloadLink('/tc/tcScheduleResult/export', {
         factoryCode: this.query.factoryCode,
-        scheduleDate: scheduleRange[0],
+        scheduleDate: this.query.scheduleDate,
         machineCode: this.query.machineCode,
         sidewallCode: this.query.sidewallCode
       })
     },
     handleAutoPlan() {
-      const range = this.query.scheduleRange || []
-      this.$refs.autoPlanRef.show(this.query.factoryCode, range[0])
+      this.$refs.autoPlanRef.show(this.query.factoryCode, this.query.scheduleDate)
     },
     handleAutoPlanSuccess(scheduleDate, task) {
       if (scheduleDate) {
-        this.query.scheduleRange = [scheduleDate, scheduleDate]
+        this.query.scheduleDate = scheduleDate
         this.search = { ...this.query }
         window.sessionStorage.setItem('tcAutoPlanLatestScope', JSON.stringify({
           factoryCode: this.query.factoryCode,
@@ -625,8 +617,7 @@ export default {
     },
     handleAdd() {
       if (this.writeTaskRunning) return
-      const range = this.query.scheduleRange || []
-      this.$refs.insertTaskRef.show(this.query.factoryCode, range[0])
+      this.$refs.insertTaskRef.show(this.query.factoryCode, this.query.scheduleDate)
     },
     handleChangeQty() {
       if (this.writeTaskRunning) return
@@ -723,9 +714,8 @@ export default {
       poll()
     },
     restoreLatestOperationTask(preferStoredScope = false) {
-      const range = this.query.scheduleRange || []
       let factoryCode = this.query.factoryCode
-      let scheduleDate = range[0]
+      let scheduleDate = this.query.scheduleDate
       if (preferStoredScope) {
         try {
           const storedScope = JSON.parse(window.sessionStorage.getItem('tcOperationLatestScope') || '{}')
@@ -734,8 +724,6 @@ export default {
         } catch (error) {
           window.sessionStorage.removeItem('tcOperationLatestScope')
         }
-      } else if (!range[0] || range[0] !== range[1]) {
-        return
       }
       if (!factoryCode || !scheduleDate) return
       getLatestOperationTask({ factoryCode, scheduleDate }).then(task => {
@@ -794,9 +782,8 @@ export default {
       poll()
     },
     restoreLatestAutoPlanTask(preferStoredScope = false) {
-      const range = this.query.scheduleRange || []
       let factoryCode = this.query.factoryCode
-      let scheduleDate = range[0]
+      let scheduleDate = this.query.scheduleDate
       if (preferStoredScope) {
         try {
           const storedScope = JSON.parse(window.sessionStorage.getItem('tcAutoPlanLatestScope') || '{}')
@@ -805,14 +792,12 @@ export default {
         } catch (error) {
           window.sessionStorage.removeItem('tcAutoPlanLatestScope')
         }
-      } else if (!range[0] || range[0] !== range[1]) {
-        return
       }
       if (!factoryCode || !scheduleDate) return
       getLatestAutoPlanTask({ factoryCode, scheduleDate }).then(task => {
         if (task && task.taskId && ['PENDING', 'RUNNING'].includes(task.taskStatus)) {
           this.query.factoryCode = factoryCode
-          this.query.scheduleRange = [scheduleDate, scheduleDate]
+          this.query.scheduleDate = scheduleDate
           this.search = { ...this.query }
           this.pollAutoPlanTask(task.taskId)
         }
@@ -866,9 +851,8 @@ export default {
       poll()
     },
     restoreLatestReleaseTask(preferStoredScope = false) {
-      const range = this.query.scheduleRange || []
       let factoryCode = this.query.factoryCode
-      let scheduleDate = range[0]
+      let scheduleDate = this.query.scheduleDate
       if (preferStoredScope) {
         try {
           const storedScope = JSON.parse(window.sessionStorage.getItem('tcReleaseLatestScope') || '{}')
@@ -877,8 +861,6 @@ export default {
         } catch (error) {
           window.sessionStorage.removeItem('tcReleaseLatestScope')
         }
-      } else if (!range[0] || range[0] !== range[1]) {
-        return
       }
       if (!factoryCode || !scheduleDate) return
       getLatestReleaseTask({ factoryCode, scheduleDate }).then(task => {
