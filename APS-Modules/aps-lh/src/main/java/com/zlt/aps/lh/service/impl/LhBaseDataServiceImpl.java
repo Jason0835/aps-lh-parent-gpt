@@ -1310,7 +1310,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         List<CxEmbryoLhTime> configuredTimeList = cxEmbryoLhTimeMapper.selectList(
                 new LambdaQueryWrapper<CxEmbryoLhTime>()
                         .eq(CxEmbryoLhTime::getFactoryCode, factoryCode)
-                        .ge(CxEmbryoLhTime::getScheduleDate, queryStartDate)
+                        .eq(CxEmbryoLhTime::getScheduleDate, queryStartDate)
                         // 已逻辑删除的成型配置不再代表有效胎胚供料承诺，禁止作为生产时间下限。
                         .eq(CxEmbryoLhTime::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
         int ignoredCount = 0;
