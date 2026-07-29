@@ -80,7 +80,11 @@ public class GroupPriorityProductionScheduler {
      * @param preSelectedGroupAllocationMap 计划可分配产能的分组分配情况-初始空集合
      * @param discontinueGroupSet           有间断的分组对象集合
      */
-    public void allocationCxMachine(Context context, Set<String> excludeGroupPlan, Set<String> preSelectedGroupSet, Map<String, Set<CxMachineAllocationPlanHelper>> preSelectedGroupAllocationMap, Set<String> discontinueGroupSet) {
+    public void allocationCxMachine(Context context,
+                                    Set<String> excludeGroupPlan,
+                                    Set<String> preSelectedGroupSet,
+                                    Map<String, Set<CxMachineAllocationPlanHelper>> preSelectedGroupAllocationMap,
+                                    Set<String> discontinueGroupSet) {
         //1、获取还需排产分组的当前Top列表
         TbrSimulateProductionLogRecorder.addHeightPriorityExcludeGroupInfo(context, excludeGroupPlan);
         List<ProductionPlanGroupInfo> topList = getTopList(context, excludeGroupPlan);
@@ -128,7 +132,7 @@ public class GroupPriorityProductionScheduler {
         }
         TbrSimulateProductionLogRecorder.addFinalSelectedGroupLog(context, finalSelected);
         //5、对成型机台进行模拟模具排产
-        cxMouldProductionHandler.noContinueGroupPlanMouldProduction(context, selectedCxMachine.getCxMachineCode(), addHelper, new HashSet<>());
+        cxMouldProductionHandler.noContinueGroupPlanMouldProduction(context, false, selectedCxMachine.getCxMachineCode(), addHelper, new HashSet<>(), true);
         //重新获取剩余天数：可能因提前收尾变化，导致计划实际没有排，下轮直接排除,不能设置分配完成
         Integer newNeedAllocationDaysByGroupPlan = addNewGroupPlan.getLeftOverNeedAllocationDays();
         if (newNeedAllocationDaysByGroupPlan.equals(originNeedAllocationDaysByGroupPlan)) {
@@ -198,8 +202,10 @@ public class GroupPriorityProductionScheduler {
             productionAppointGroupCxMachine(context, excludeGroupPlan, appointPriorityGroupList, discontinueGroupSet, isFixed);
             return;
         }
+        //20260727+ 多段分配忽略高优先级判断
+        boolean isIgnoreHighPriority = discontinueGroupSet.contains(groupName);
         //5、对成型机台进行模拟模具排产
-        cxMouldProductionHandler.noContinueGroupPlanMouldProduction(context, selectedCxMachine.getCxMachineCode(), addHelper, new HashSet<>());
+        cxMouldProductionHandler.noContinueGroupPlanMouldProduction(context, isIgnoreHighPriority, selectedCxMachine.getCxMachineCode(), addHelper, new HashSet<>(), true);
         //重新获取剩余天数：可能因提前收尾变化，导致计划实际没有排，下轮直接排除,不能设置分配完成
         Integer newNeedAllocationDaysByGroupPlan = addNewGroupPlan.getLeftOverNeedAllocationDays();
         if (newNeedAllocationDaysByGroupPlan.equals(originNeedAllocationDaysByGroupPlan)) {
@@ -256,8 +262,10 @@ public class GroupPriorityProductionScheduler {
                 excludeGroupPlan.add(groupName);
                 return;
             }
+            //20260727+ 多段分配忽略高优先级判断
+            boolean isIgnoreHighPriority = discontinueGroupSet.contains(groupName);
             //对成型机台进行模拟模具排产
-            cxMouldProductionHandler.noContinueGroupPlanMouldProduction(context, selectedCxMachine.getCxMachineCode(), addHelper, new HashSet<>());
+            cxMouldProductionHandler.noContinueGroupPlanMouldProduction(context, isIgnoreHighPriority, selectedCxMachine.getCxMachineCode(), addHelper, new HashSet<>(), true);
             //重新获取剩余天数：可能因提前收尾变化，导致计划实际没有排，下轮直接排除,不能设置分配完成
             Integer newNeedAllocationDaysByGroupPlan = addNewGroupPlan.getLeftOverNeedAllocationDays();
             if (newNeedAllocationDaysByGroupPlan.equals(originNeedAllocationDaysByGroupPlan)) {

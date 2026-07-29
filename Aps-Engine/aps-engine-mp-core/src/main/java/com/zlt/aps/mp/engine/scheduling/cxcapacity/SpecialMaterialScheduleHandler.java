@@ -1,9 +1,12 @@
 package com.zlt.aps.mp.engine.scheduling.cxcapacity;
 
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
+import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanMouldDayResult;
+import com.zlt.aps.mp.api.domain.entity.SpecialMaterialResult;
 import com.zlt.aps.mp.engine.domain.dto.CxMachineAllocationPlanHelper;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.mp.engine.domain.vo.CxMachineBaseInfoVo;
+import com.zlt.aps.mp.engine.domain.vo.SpecialMaterialBomRelationVo;
 import com.zlt.aps.mp.engine.domain.vo.SpecialMaterialInfoVo;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +16,9 @@ import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -156,6 +162,239 @@ public class SpecialMaterialScheduleHandler {
         return resultTheoryDays;
     }
 
+    /**
+     * 计算特殊材料排程结果<br/>
+     * 通过 BOM 关联 VO 获取胎胚、半部件、原材料、工艺信息的完整链路，计算每种原材料的需求量（米），
+     * 公式：planList.totalQty * 长度 * 宽度 / 幅宽<br/>
+     * 按 childMaterialCode 合并总需求量后，结合库存计算出实际可领取量（整 standardLength 倍数）。
+     *
+     * @param planList        生产计划列表
+     * @param bomRelationList BOM 关联 VO 列表（含胎胚→半部件→原材料→工艺信息）
+     * @param stockList       特殊材料库存列表
+     * @return 特殊材料排程结果
+     */
+    public List<SpecialMaterialResult> calSpecialMaterialResult(List<FactoryMonthPlanMouldDayResult> planList,
+            List<SpecialMaterialBomRelationVo> bomRelationList, List<SpecialMaterialInfoVo> stockList) {
+        if (CollectionUtils.isEmpty(planList) || CollectionUtils.isEmpty(bomRelationList)) {
+            return Collections.emptyList();
+        }
+
+        // ========== 步骤1：按胎胚汇总计划量 ==========
+        Map<String, Long> embryoTotalQtyMap = planList.stream()
+                .filter(p -> p.getTotalQty() != null && p.getTotalQty() > 0)
+                .collect(Collectors.groupingBy(
+                        FactoryMonthPlanMouldDayResult::getEmbryoCode,
+                        Collectors.summingLong(FactoryMonthPlanMouldDayResult::getTotalQty)
+                ));
+
+        // ========== 步骤2：按 embryoCode 分组 VO，计算每种原材料的需求量 ==========
+        Map<String, List<SpecialMaterialBomRelationVo>> embryoVoMap = bomRelationList.stream()
+                .collect(Collectors.groupingBy(SpecialMaterialBomRelationVo::getEmbryoCode));
+
+        Map<String, Long> demandMap = new HashMap<>();
+        for (Map.Entry<String, Long> entry : embryoTotalQtyMap.entrySet()) {
+            String embryoCode = entry.getKey();
+            Long planQty = entry.getValue();
+            List<SpecialMaterialBomRelationVo> vos = embryoVoMap.get(embryoCode);
+            if (CollectionUtils.isEmpty(vos)) {
+                continue;
+            }
+            for (SpecialMaterialBomRelationVo vo : vos) {
+                // 需求量（米）= 计划量 * 长度 * 宽度 / 幅宽，向上取整
+                BigDecimal length = new BigDecimal(vo.getProcessLength());
+                BigDecimal width = new BigDecimal(vo.getProcessWidth());
+                BigDecimal fabricWidth = new BigDecimal(vo.getProcessFabricWidth());
+                BigDecimal demand = BigDecimalUtils.valueOf(planQty)
+                        .multiply(length).multiply(width)
+                        .divide(fabricWidth, 0, RoundingMode.CEILING);
+                demandMap.merge(vo.getChildMaterialCode(), demand.longValue(), Long::sum);
+            }
+        }
+
+        // ========== 步骤3：按库存计算实际可领取量（整 standardLength 倍数）==========
+        Map<String, List<SpecialMaterialInfoVo>> stockGroupMap = Collections.emptyMap();
+        if (!CollectionUtils.isEmpty(stockList)) {
+            stockGroupMap = stockList.stream()
+                    .filter(s -> s.getStandardLength() != null && s.getStandardLength() > 0)
+                    .collect(Collectors.groupingBy(SpecialMaterialInfoVo::getMaterialCode));
+        }
+
+        // ========== 步骤4：生成结果（按标准长度拆分，每条标准长度生成一笔记录）==========
+        List<SpecialMaterialResult> resultList = new ArrayList<>();
+        for (Map.Entry<String, Long> entry : demandMap.entrySet()) {
+            String materialCode = entry.getKey();
+            Long demand = entry.getValue();
+            if (demand <= 0) {
+                continue;
+            }
+
+            List<SpecialMaterialInfoVo> stocks = stockGroupMap.getOrDefault(materialCode, Collections.emptyList());
+
+            if (CollectionUtils.isEmpty(stocks)) {
+                // 无库存，按需求量作为总需求
+                SpecialMaterialResult result = new SpecialMaterialResult();
+                result.setMaterialCode(materialCode);
+                result.setMaterialDesc("");
+                result.setStandardLength(0L);
+                result.setOriStandardLength(0L);
+                result.setTotalQty(demand);
+                resultList.add(result);
+            } else {
+                // 最优搭配明细：standardLength → 总长度
+                Map<Long, Long> breakdown = buildOptimalSupplyBreakdown(demand, stocks);
+                long totalSupply = breakdown.values().stream()
+                        .mapToLong(Long::longValue).sum();
+
+                if (totalSupply <= demand) {
+                    // 总供应不足或刚好，直接使用供应量作为 totalQty
+                    for (Map.Entry<Long, Long> be : breakdown.entrySet()) {
+                        addResultItem(resultList, materialCode, stocks, be.getKey(), be.getValue());
+                    }
+                } else {
+                    // 总供应超出需求量，将需求量分配到各笔（按标准长降序，每笔不超过其供应量）
+                    long remainingDemand = demand;
+                    List<Map.Entry<Long, Long>> sortedEntries = new ArrayList<>(breakdown.entrySet());
+                    sortedEntries.sort((a, b) -> Long.compare(b.getKey(), a.getKey()));
+                    for (Map.Entry<Long, Long> be : sortedEntries) {
+                        Long stdLen = be.getKey();
+                        Long supply = be.getValue();
+                        long allocQty = Math.min(supply, remainingDemand);
+                        if (allocQty <= 0) continue;
+                        addResultItem(resultList, materialCode, stocks, stdLen, allocQty);
+                        remainingDemand -= allocQty;
+                    }
+                }
+            }
+        }
+
+        return resultList;
+    }
+
+    /**
+     * 最优搭配计算（带明细拆分）：使用受限背包DP（二进制拆分优化），
+     * 找出最接近需求量的库存领取组合，返回 {standardLength → 领取总长度} 映射。
+     * <p>
+     * 示例：需求2200米，库存有600米(2卷)、1000米(2卷)，最优组合为1000×1+600×2=2200，
+     * 返回 {1000 → 1000, 600 → 1200}。
+     * </p>
+     *
+     * @param demand 需求量（米）
+     * @param stocks 库存列表（不同 standardLength）
+     * @return 最优搭配明细映射：standardLength → 领取总长度
+     */
+    private Map<Long, Long> buildOptimalSupplyBreakdown(long demand, List<SpecialMaterialInfoVo> stocks) {
+        // 所有库存可供应总量
+        long totalAvailable = stocks.stream()
+                .mapToLong(s -> {
+                    long sl = s.getStandardLength();
+                    long avail = s.getStock() != null ? s.getStock() : 0L;
+                    return sl * avail;
+                }).sum();
+        // 库存全部用完
+        if (totalAvailable <= demand) {
+            Map<Long, Long> fullMap = new HashMap<>();
+            for (SpecialMaterialInfoVo s : stocks) {
+                long sl = s.getStandardLength();
+                long avail = s.getStock() != null ? s.getStock() : 0L;
+                fullMap.merge(sl, sl * avail, Long::sum);
+            }
+            return fullMap;
+        }
+        // 最大标准长度（决定DP上界）
+        long maxSl = stocks.stream()
+                .mapToLong(SpecialMaterialInfoVo::getStandardLength)
+                .max().orElse(0L);
+        int limit = (int) Math.min(demand + maxSl, totalAvailable);
+
+        // 二进制拆分构建物品列表，每件物品记录其标准长度和总长度
+        List<Long> itemStdLengths = new ArrayList<>();  // 每件物品的标准长度
+        List<Long> itemAmounts = new ArrayList<>();     // 每件物品的总长度
+
+        for (SpecialMaterialInfoVo stock : stocks) {
+            long sl = stock.getStandardLength();
+            int avail = stock.getStock() != null ? stock.getStock().intValue() : 0;
+            if (avail <= 0) continue;
+
+            int remaining = avail;
+            for (int bit = 1; bit <= remaining; bit <<= 1) {
+                remaining -= bit;
+                long addAmount = sl * bit;
+                if (addAmount > limit) break;
+                itemStdLengths.add(sl);
+                itemAmounts.add(addAmount);
+            }
+            if (remaining > 0) {
+                long addAmount = sl * remaining;
+                if (addAmount <= limit) {
+                    itemStdLengths.add(sl);
+                    itemAmounts.add(addAmount);
+                }
+            }
+        }
+
+        // DP 求可达值 + 记录路径（prev[v] = 使v可达的物品下标）
+        boolean[] dp = new boolean[limit + 1];
+        int[] prev = new int[limit + 1];
+        Arrays.fill(prev, -1);
+        dp[0] = true;
+
+        for (int i = 0; i < itemAmounts.size(); i++) {
+            long addAmount = itemAmounts.get(i);
+            if (addAmount > limit) continue;
+            for (int v = limit; v >= addAmount; v--) {
+                if (dp[v - (int) addAmount] && !dp[v]) {
+                    dp[v] = true;
+                    prev[v] = i;
+                }
+            }
+        }
+
+        // 找 >= demand 的最小可达值
+        int bestV = (int) demand;
+        while (bestV <= limit && !dp[bestV]) {
+            bestV++;
+        }
+        if (bestV > limit) {
+            bestV = (int) totalAvailable;
+        }
+
+        // 回溯还原组合
+        Map<Long, Long> breakdown = new HashMap<>();
+        int v = bestV;
+        while (v > 0) {
+            int idx = prev[v];
+            if (idx < 0) break;
+            long stdLen = itemStdLengths.get(idx);
+            long amount = itemAmounts.get(idx);
+            breakdown.merge(stdLen, amount, Long::sum);
+            v -= (int) amount;
+        }
+        return breakdown;
+    }
+
+    /**
+     * 添加一笔 SpecialMaterialResult 到结果列表
+     *
+     * @param resultList   结果列表
+     * @param materialCode 原材料编码
+     * @param stocks       该原材料的库存列表（用于查找描述信息）
+     * @param stdLen       标准长度
+     * @param totalQty     分配量（米）
+     */
+    private void addResultItem(List<SpecialMaterialResult> resultList, String materialCode,
+            List<SpecialMaterialInfoVo> stocks, Long stdLen, Long totalQty) {
+        SpecialMaterialInfoVo match = stocks.stream()
+                .filter(s -> s.getStandardLength() != null
+                        && s.getStandardLength().equals(stdLen))
+                .findFirst().orElse(null);
+        SpecialMaterialResult result = new SpecialMaterialResult();
+        result.setMaterialCode(materialCode);
+        result.setMaterialDesc(match != null ? match.getMaterialDesc() : "");
+        result.setStandardLength(stdLen);
+        result.setOriStandardLength(match != null ? match.getOriStandardLength() : 0L);
+        result.setTotalQty(totalQty);
+        resultList.add(result);
+    }
 
     /**
      * 是否需要执行查找其它还需排产的特殊材料分组计划

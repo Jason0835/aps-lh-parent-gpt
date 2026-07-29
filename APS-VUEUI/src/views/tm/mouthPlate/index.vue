@@ -65,7 +65,7 @@ import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import infoDialog from "./components/infoDialog.vue";
 
 export default {
-  name: "TmMouthPlate",
+  name: "/tm/tmMouthPlate",
   components: {
     tltUpload,
     infoDialog,

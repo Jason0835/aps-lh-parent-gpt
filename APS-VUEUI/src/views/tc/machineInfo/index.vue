@@ -67,7 +67,7 @@ import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import infoDialog from "./components/infoDialog.vue";
 
 export default {
-  name: "TcMachineInfo",
+  name: "/tc/tcMachineInfo",
   components: {
     tltUpload,
     infoDialog,

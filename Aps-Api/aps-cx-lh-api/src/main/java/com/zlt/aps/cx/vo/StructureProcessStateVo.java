@@ -38,6 +38,7 @@ public class StructureProcessStateVo {
     public Map<String, Set<String>> machineOnlineEmbryoMap;
     public boolean isOpeningShift;
     public int stockHoursCap;
+    public int stockHoursSoftTrigger;
     public boolean stockHoursCapEnabled;
     public Map<LhScheduleResult, String> priorityDescMap;
     public Set<String> allKeyProductStructures;

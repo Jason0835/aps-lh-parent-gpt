@@ -1,21 +1,23 @@
 package com.zlt.aps.tc.service.impl;
 
 import cn.hutool.core.util.StrUtil;
+import com.alibaba.fastjson.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.tc.api.constant.TcScheduleConstants;
 import com.zlt.aps.tc.api.domain.entity.TcParams;
 import com.zlt.aps.tc.api.domain.entity.TcScheduleResult;
-import com.zlt.aps.tc.api.domain.entity.TcStock;
+import com.zlt.aps.tc.api.domain.entity.TcShiftStock;
 import com.zlt.aps.tc.api.domain.vo.TcAutoScheduleIssueVo;
 import com.zlt.aps.tc.api.domain.vo.TcRollingTaskVo;
 import com.zlt.aps.tc.domain.TcAutoScheduleTask;
+import com.zlt.aps.tc.domain.vo.TcRollingWindow;
 import com.zlt.aps.tc.engine.domain.TcScheduleContext;
 import com.zlt.aps.tc.engine.domain.TcTaskDraft;
 import com.zlt.aps.tc.mapper.TcParamsMapper;
 import com.zlt.aps.tc.mapper.TcScheduleResultMapper;
-import com.zlt.aps.tc.mapper.TcStockMapper;
+import com.zlt.aps.tc.mapper.TcShiftStockMapper;
 import com.zlt.aps.tc.service.TcAutoRollingAsyncExecutor;
 import com.zlt.aps.tc.service.TcBackgroundTaskService;
 import com.zlt.aps.tc.service.loader.TcAutoScheduleDataLoadService;
@@ -40,7 +42,7 @@ public class TcAutoRollingAsyncExecutorImpl implements TcAutoRollingAsyncExecuto
     private final TcBackgroundTaskService backgroundTaskService;
     private final TcAutoScheduleDataLoadService dataLoadService;
     private final TcScheduleResultMapper scheduleResultMapper;
-    private final TcStockMapper stockMapper;
+    private final TcShiftStockMapper shiftStockMapper;
     private final TcParamsMapper paramsMapper;
     private final TcManualOperationFacade manualOperationFacade;
 
@@ -307,16 +309,26 @@ public class TcAutoRollingAsyncExecutorImpl implements TcAutoRollingAsyncExecuto
      * @return 胎侧库存映射
      */
     private Map<String, BigDecimal> loadStockMap(TcAutoScheduleTask task) {
-        List<TcStock> stockList = this.stockMapper.selectList(new LambdaQueryWrapper<TcStock>()
-                .eq(TcStock::getFactoryCode, task.getFactoryCode())
-                .eq(TcStock::getStockDate, task.getScheduleDate()));
-        return CollectionUtils.emptyIfNull(stockList).stream()
+        TcRollingWindow window = StrUtil.isBlank(task.getRequestSnapshot()) ? null
+                : JSON.parseObject(task.getRequestSnapshot(), TcRollingWindow.class);
+        if (window == null || window.getStockDate() == null) {
+            throw new IllegalArgumentException(I18nUtil.getMessage("ui.tc.schedule.rolling.taskInvalid"));
+        }
+        List<TcShiftStock> stockList = this.shiftStockMapper.selectList(new LambdaQueryWrapper<TcShiftStock>()
+                .eq(TcShiftStock::getFactoryCode, task.getFactoryCode())
+                .eq(TcShiftStock::getStockDate, window.getStockDate())
+                .eq(TcShiftStock::getShiftOrder, task.getTargetShiftOrder()));
+        Map<String, BigDecimal> stockMap = CollectionUtils.emptyIfNull(stockList).stream()
                 .filter(stock -> StrUtil.isNotBlank(stock.getSidewallCode()))
-                .collect(Collectors.groupingBy(TcStock::getSidewallCode, LinkedHashMap::new,
+                .collect(Collectors.groupingBy(TcShiftStock::getSidewallCode, LinkedHashMap::new,
                         Collectors.mapping(stock -> BigDecimalUtils.valueOf(stock.getStockQty())
                                         .add(BigDecimalUtils.valueOf(stock.getAdjustQty()))
                                         .subtract(BigDecimalUtils.valueOf(stock.getBadQty())),
                                 Collectors.reducing(BigDecimal.ZERO, BigDecimal::add))));
+        if (stockMap.isEmpty()) {
+            throw new IllegalArgumentException(I18nUtil.getMessage("ui.tc.schedule.rolling.shiftStockMissing"));
+        }
+        return stockMap;
     }
 
     /**

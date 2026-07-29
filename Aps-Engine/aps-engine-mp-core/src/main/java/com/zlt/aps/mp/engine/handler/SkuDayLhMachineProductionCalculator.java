@@ -6,6 +6,7 @@ import com.zlt.aps.mp.engine.domain.dto.CxLhProductionHelper;
 import com.zlt.aps.mp.engine.domain.dto.LhProductionQtyHelper;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
+import com.zlt.aps.mp.engine.enums.ContinueTypeEnum;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
 import com.zlt.aps.mp.engine.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
 import lombok.extern.slf4j.Slf4j;
@@ -53,7 +54,7 @@ public class SkuDayLhMachineProductionCalculator {
      * @param conclusionDay         收尾日
      * @return
      */
-    public static DayProductionQtyHelper calculateSingleLhGroupQty(Context context, LhProductionQtyHelper lhProductionQtyHelper, Integer productionDay, Integer firstDay, Integer conclusionDay, MonthPlanProductionRequirePlanVo productionSkuInfo) {
+    public static DayProductionQtyHelper calculateSingleLhGroupQty(Context context, ContinueTypeEnum continueType, LhProductionQtyHelper lhProductionQtyHelper, Integer productionDay, Integer firstDay, Integer conclusionDay, MonthPlanProductionRequirePlanVo productionSkuInfo) {
         //不是首日即为排产Sku续作日，则直接=日硫化量
         if (!firstDay.equals(productionDay)) {
             return new DayProductionQtyHelper(productionDay, false, lhProductionQtyHelper.getDayMaxProductionQty(), BigDecimal.ZERO.intValue(), BigDecimal.ZERO.intValue(), false);
@@ -66,6 +67,12 @@ public class SkuDayLhMachineProductionCalculator {
         if (!firstDay.equals(conclusionDay)) {
             //20260425+ 前日胎胚有排产，首日32
             return buildByFirstNoConclusion(productionDay, lhProductionQtyHelper, paramConfiguration, productionSkuInfo);
+        }
+        if (ContinueTypeEnum.SAME_SPECIFICATIONS_PATTERN == continueType || ContinueTypeEnum.SAME_EMBRYO_CODE_SHARE_MOULD == continueType) {
+            //换活字块
+            Integer afterSkuProductionQty = paramConfiguration.getChangeTypeBlockQty();
+            Integer lossQty = lhProductionQtyHelper.getDayMaxProductionQty() - afterSkuProductionQty;
+            return new DayProductionQtyHelper(productionDay, false, afterSkuProductionQty, lossQty, BigDecimal.ZERO.intValue(), true);
         }
         CxLhProductionHelper cxLhGroup = lhProductionQtyHelper.getCxLhGroup();
         String beforeSku = cxLhGroup.getBeforeSku().getMaterialDesc();

@@ -5,13 +5,11 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.tc.api.domain.entity.TcDayFinishQty;
 import com.zlt.aps.tc.api.domain.entity.TcScheFinishQty;
+import com.zlt.aps.tc.api.domain.entity.TcShiftStock;
 import com.zlt.aps.tc.api.domain.entity.TcStock;
 import com.zlt.aps.tc.api.domain.vo.TcReleaseFeedbackVo;
 import com.zlt.aps.tc.api.service.ITcMesSyncRemoteService;
-import com.zlt.aps.tc.service.ITcDayFinishQtyService;
-import com.zlt.aps.tc.service.ITcScheFinishQtyService;
-import com.zlt.aps.tc.service.ITcStockService;
-import com.zlt.aps.tc.service.TcReleaseFeedbackService;
+import com.zlt.aps.tc.service.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -25,6 +23,7 @@ import java.util.List;
 public class TcMesSyncController implements ITcMesSyncRemoteService {
 
     private final ITcStockService stockService;
+    private final ITcShiftStockService shiftStockService;
     private final ITcScheFinishQtyService scheFinishQtyService;
     private final ITcDayFinishQtyService dayFinishQtyService;
     private final TcReleaseFeedbackService releaseFeedbackService;
@@ -42,6 +41,24 @@ public class TcMesSyncController implements ITcMesSyncRemoteService {
     public AjaxResult logicDeleteAndSaveStock(String factoryCode, String stockDate, String updateBy,
                                                List<TcStock> stockList) {
         this.stockService.logicDeleteAndSaveBatch(factoryCode, DateUtil.parseDate(stockDate), updateBy, stockList);
+        return AjaxResult.success(I18nUtil.getMessage("ui.tc.schedule.mes.stockSyncSuccess"));
+    }
+
+    /**
+     * 替换胎侧自动滚动班次库存快照。
+     *
+     * @param factoryCode 工厂编码
+     * @param stockDate MES库存物理日期
+     * @param shiftOrder 班次顺序
+     * @param updateBy 更新人
+     * @param stockList 班次库存列表
+     * @return 保存结果
+     */
+    @Override
+    public AjaxResult replaceShiftStock(String factoryCode, String stockDate, Integer shiftOrder,
+                                        String updateBy, List<TcShiftStock> stockList) {
+        this.shiftStockService.replaceShiftStock(factoryCode, DateUtil.parseDate(stockDate),
+                shiftOrder, updateBy, stockList);
         return AjaxResult.success(I18nUtil.getMessage("ui.tc.schedule.mes.stockSyncSuccess"));
     }
 

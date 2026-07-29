@@ -131,6 +131,30 @@ public class TbrProductionContext extends Context {
     private Map<String, GroupContinueAllocationInfoVo> continueCalculationAllocationInfo;
 
     /**
+     * 获取计划Sku基础信息
+     * 任意一条计划即可
+     *
+     * @param materialDesc
+     * @return
+     */
+    public MonthPlanProductionRequirePlanVo getBaseSkuInfoByPlan(String materialDesc) {
+        if (StringUtils.isBlank(materialDesc)) {
+            return null;
+        }
+        if (CollectionUtils.isEmpty(allSkuProductionPlan)) {
+            return null;
+        }
+        if (!allSkuProductionPlan.containsKey(materialDesc)) {
+            return null;
+        }
+        List<MonthPlanProductionRequirePlanVo> planList = allSkuProductionPlan.get(materialDesc);
+        if (CollectionUtils.isEmpty(planList)) {
+            return null;
+        }
+        return planList.get(BigDecimal.ZERO.intValue());
+    }
+
+    /**
      * 加入收尾，方向匹配结构集合
      *
      * @param cxMachineCode
@@ -678,6 +702,7 @@ public class TbrProductionContext extends Context {
 
         this.roundSpecialMaterialPlanQtyStandardLength(groupInfo);
     }
+
     /**
      * 20260721+
      * 更新特殊材料库存--因结构延长收尾
@@ -696,6 +721,7 @@ public class TbrProductionContext extends Context {
                 SpecialMaterialInfoVo::setSumNoRoundProductionQty, SpecialMaterialInfoVo::getStock);
         this.roundSpecialMaterialPlanQtyStandardLength(groupInfo);
     }
+
     /**
      * 更新特殊材料库存<br/>
      * 根据结构分组的分配数量量，更新涉及特殊材料的已排库存信息
