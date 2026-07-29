@@ -27,3 +27,5 @@ yarn-error.log*
 # CD90 test directories - do not upload to git
 APS-Modules/aps-cd90/src/test/
 Aps-Engine/aps-engine-cd90/src/test/
+# CD15 test directories - do not upload to git
+Aps-Engine/aps-engine-cd15/src/test/

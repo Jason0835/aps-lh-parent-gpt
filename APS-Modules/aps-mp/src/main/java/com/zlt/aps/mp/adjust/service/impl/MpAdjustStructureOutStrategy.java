@@ -117,6 +117,8 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         // 5、按照结构、物料编码维度进行分组，并汇总订单量
         resultList = sumByStructureAndMaterial(resultList, Boolean.FALSE);
         contextDTO.setAdjustDetailList(resultList);
+        // 设置上次订单量
+        setLastOrderQty(contextDTO);
         // 6、设置是否特殊材料
         setHasSpecialMaterial(contextDTO);
         // 7、设置净需求

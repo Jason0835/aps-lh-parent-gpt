@@ -145,6 +145,9 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
 
     private static final int DEFAULT_MAX_TRIAL_SKU_PER_DAY = 2;
 
+    /** 机台班初准备时间（分钟） */
+    private static final int DEFAULT_MACHINE_PREPARE_MINUTES = 30;
+
     /**
      * 执行完整成型排程（实现 {@link CoreScheduleAlgorithmService#executeSchedule}）。
      *
@@ -365,6 +368,8 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         // 5. 收集所有 ShiftProductionResult，按结构分组
         // structureName -> machineCode -> List<SPR>（按班次顺序）
         Map<String, Map<String, List<ShiftProductionResult>>> structureMachineSprMap = new LinkedHashMap<>();
+        // 同时构建机台级别的结构时间线：machineCode -> 按班次顺序出现的结构列表（去重连续相同）
+        Map<String, List<String>> machineStructureTimelineMap = new LinkedHashMap<>();
         for (ShiftScheduleResult sr : shiftResults) {
             if (sr.getShiftProductionResults() == null) continue;
             for (ShiftProductionResult spr : sr.getShiftProductionResults()) {
@@ -376,6 +381,11 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                         .computeIfAbsent(structName, k -> new LinkedHashMap<>())
                         .computeIfAbsent(mCode, k -> new ArrayList<>())
                         .add(spr);
+                // 构建机台结构时间线（连续相同结构只记录一次）
+                List<String> timeline = machineStructureTimelineMap.computeIfAbsent(mCode, k -> new ArrayList<>());
+                if (timeline.isEmpty() || !timeline.get(timeline.size() - 1).equals(structName)) {
+                    timeline.add(structName);
+                }
             }
         }
 
@@ -397,6 +407,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 // 场景1：全部收尾 -> 结构切换
                 CxEmbryoLhTime record = processScenario1(structureName, machineSprMap, context,
                         materialByEmbryoMap, materialByCodeMap, machineFutureStructureMap,
+                        machineStructureTimelineMap,
                         sameInchHours, diffInchHours, structureRemainder, factoryCode);
                 if (record != null) {
                     records.add(record);
@@ -466,30 +477,60 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             Map<String, MdmMaterialInfo> materialByEmbryoMap,
             Map<String, MdmMaterialInfo> materialByCodeMap,
             Map<String, String> machineFutureStructureMap,
+            Map<String, List<String>> machineStructureTimelineMap,
             int sameInchHours, int diffInchHours,
             Integer structureRemainder, String factoryCode) {
 
-        // 1. 取所有机台中最晚的 planEndTime，并记录对应机台
+        // 1. 计算每个机台前结构的结束时间（班次开始时间 + 该班次内该结构的总生产耗时）
+        // 取所有机台中最晚的结束时间
         LocalDateTime latestEndTime = null;
         String latestMachineCode = null;
         for (Map.Entry<String, List<ShiftProductionResult>> machineEntry : machineSprMap.entrySet()) {
             String machineCode = machineEntry.getKey();
-            for (ShiftProductionResult spr : machineEntry.getValue()) {
-                if (spr.getPlanEndTime() != null) {
-                    if (latestEndTime == null || spr.getPlanEndTime().isAfter(latestEndTime)) {
-                        latestEndTime = spr.getPlanEndTime();
-                        latestMachineCode = machineCode;
-                    }
+            List<ShiftProductionResult> sprList = machineEntry.getValue();
+
+            // 按 planStartTime 分组（同一 planStartTime = 同一班次），找到最后一个班次
+            LocalDateTime lastShiftPlanStart = null;
+            for (ShiftProductionResult spr : sprList) {
+                if (spr.getPlanStartTime() == null) continue;
+                if (lastShiftPlanStart == null || spr.getPlanStartTime().isAfter(lastShiftPlanStart)) {
+                    lastShiftPlanStart = spr.getPlanStartTime();
                 }
+            }
+            if (lastShiftPlanStart == null) continue;
+
+            // 汇总最后一个班次中该结构的所有 SPR 生产耗时
+            long totalProductionSeconds = 0;
+            int sprCount = 0;
+            for (ShiftProductionResult spr : sprList) {
+                if (spr.getPlanStartTime() != null && spr.getPlanStartTime().equals(lastShiftPlanStart)
+                        && spr.getPlanEndTime() != null) {
+                    totalProductionSeconds += java.time.Duration.between(
+                            spr.getPlanStartTime(), spr.getPlanEndTime()).getSeconds();
+                    sprCount++;
+                }
+            }
+
+            // 班次开始时间 = planStartTime - 30min（机器准备时间）
+            LocalDateTime shiftStart = lastShiftPlanStart.minusMinutes(DEFAULT_MACHINE_PREPARE_MINUTES);
+            // 结束时间 = 班次开始时间 + 总生产耗时
+            LocalDateTime machineEndTime = shiftStart.plusSeconds(totalProductionSeconds);
+
+            log.info("场景1：机台={}，最后班次planStart={}，班次开始={}，SPR数={}，总生产耗时={}s，结束时间={}",
+                    machineCode, lastShiftPlanStart, shiftStart, sprCount, totalProductionSeconds, machineEndTime);
+
+            if (latestEndTime == null || machineEndTime.isAfter(latestEndTime)) {
+                latestEndTime = machineEndTime;
+                latestMachineCode = machineCode;
             }
         }
         if (latestEndTime == null) {
-            log.warn("场景1：结构 {} 无法获取任何 planEndTime，跳过", structureName);
+            log.warn("场景1：结构 {} 无法计算结束时间，跳过", structureName);
             return null;
         }
 
-        // 2. 查找后结构
-        String nextStructureName = findNextStructure(structureName, machineSprMap, context, machineFutureStructureMap);
+        // 2. 查找后结构：优先从排程结果中找（机台结构时间线中前结构后面的结构），回退到未来结构配置
+        String nextStructureName = findNextStructure(structureName, machineSprMap, machineStructureTimelineMap, machineFutureStructureMap, latestMachineCode);
 
         // 3. 计算切换耗时
         int switchHours = 0;
@@ -621,16 +662,46 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
     }
 
     /**
-     * 查找后结构：优先从排程结果中找（同机台后续出现的其他结构），回退到未来结构配置。
+     * 查找后结构：优先从排程结果中找（机台结构时间线中前结构后面的结构），回退到未来结构配置。
+     *
+     * @param prevStructureName          前结构
+     * @param machineSprMap             该结构下各机台的SPR列表
+     * @param machineStructureTimelineMap 机台->结构时间线（按班次顺序去重）
+     * @param machineFutureStructureMap  机台->未来结构映射
+     * @param preferredMachineCode       优先查找的机台（最晚结束时间的机台）
+     * @return 后结构名称，找不到返回null
      */
     private String findNextStructure(String prevStructureName,
                                      Map<String, List<ShiftProductionResult>> machineSprMap,
-                                     ScheduleContextVo context,
-                                     Map<String, String> machineFutureStructureMap) {
-        // 1. 从排程结果中找：同机台后续出现的其他结构
-        // 需要从 shiftResults 全局查找，但这里只有结构维度的数据
-        // 改为从 futureStructureAllocationMap 反查
-        for (String machineCode : machineSprMap.keySet()) {
+                                     Map<String, List<String>> machineStructureTimelineMap,
+                                     Map<String, String> machineFutureStructureMap,
+                                     String preferredMachineCode) {
+        // 1. 优先从排程结果中找：在机台结构时间线中，前结构后面的第一个不同结构就是后结构
+        // 优先查最晚结束时间的机台，再遍历其他机台
+        List<String> orderedMachines = new ArrayList<>();
+        if (preferredMachineCode != null) {
+            orderedMachines.add(preferredMachineCode);
+        }
+        for (String mCode : machineSprMap.keySet()) {
+            if (!mCode.equals(preferredMachineCode)) {
+                orderedMachines.add(mCode);
+            }
+        }
+        for (String machineCode : orderedMachines) {
+            List<String> timeline = machineStructureTimelineMap.get(machineCode);
+            if (timeline == null || timeline.size() < 2) continue;
+            for (int i = 0; i < timeline.size() - 1; i++) {
+                if (timeline.get(i).equals(prevStructureName)) {
+                    String nextStruct = timeline.get(i + 1);
+                    if (!nextStruct.equals(prevStructureName)) {
+                        return nextStruct;
+                    }
+                }
+            }
+        }
+
+        // 2. 回退到未来结构配置
+        for (String machineCode : orderedMachines) {
             String futureStruct = machineFutureStructureMap.get(machineCode);
             if (futureStruct != null && !futureStruct.equals(prevStructureName)) {
                 return futureStruct;
