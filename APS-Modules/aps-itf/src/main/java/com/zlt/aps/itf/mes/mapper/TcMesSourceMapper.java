@@ -3,6 +3,7 @@ package com.zlt.aps.itf.mes.mapper;
 import com.baomidou.dynamic.datasource.annotation.DS;
 import com.zlt.aps.itf.constant.DataSource;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
+import com.zlt.aps.itf.vo.MesShiftStockSyncRequest;
 import com.zlt.aps.tc.api.domain.entity.TcDayFinishQty;
 import com.zlt.aps.tc.api.domain.entity.TcMesStock;
 import com.zlt.aps.tc.api.domain.entity.TcScheFinishQty;
@@ -24,6 +25,14 @@ public interface TcMesSourceMapper {
      * @return 库存列表
      */
     List<TcMesStock> selectStockList(AuxReqSyncDataLogs request);
+
+    /**
+     * 查询胎侧自动滚动指定物理日的最新库存。
+     *
+     * @param request 工厂、物理库存日和可选版本
+     * @return 库存列表
+     */
+    List<TcMesStock> selectShiftStockList(MesShiftStockSyncRequest request);
 
     /**
      * 查询胎侧当天三班完成量最新快照。

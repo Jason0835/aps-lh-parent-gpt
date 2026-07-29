@@ -8,14 +8,13 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.autoLogin.feign.FeignTokenHelper;
+import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.itf.mes.mapper.TcMesSourceMapper;
 import com.zlt.aps.itf.mes.service.ITcMesBridgeService;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
-import com.zlt.aps.tc.api.domain.entity.TcDayFinishQty;
-import com.zlt.aps.tc.api.domain.entity.TcMesStock;
-import com.zlt.aps.tc.api.domain.entity.TcScheFinishQty;
-import com.zlt.aps.tc.api.domain.entity.TcStock;
+import com.zlt.aps.itf.vo.MesShiftStockSyncRequest;
+import com.zlt.aps.tc.api.domain.entity.*;
 import com.zlt.aps.tc.api.service.ITcMesSyncRemoteService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -67,6 +66,41 @@ public class TcMesBridgeServiceImpl implements ITcMesBridgeService {
                     firstItem.getFactoryCode(), DateUtil.formatDate(firstItem.getStockDate()), "MES", group));
             this.assertRemoteSuccess(result);
         });
+        return AjaxResult.success(I18nUtil.getMessage("ui.tc.schedule.mes.stockSyncSuccess"), stockList.size());
+    }
+
+    /**
+     * 从MES读取指定物理日的胎侧库存，并替换自动滚动班次快照。
+     *
+     * <p>MES无数据时仍调用TC清空对应快照，防止自动滚动继续使用旧库存。</p>
+     *
+     * @param request 工厂、物理库存日和班序
+     * @return 同步数量
+     * @throws ServiceException 参数非法或远程保存失败时抛出
+     */
+    @Override
+    public AjaxResult syncShiftStock(MesShiftStockSyncRequest request) {
+        MesShiftStockSyncRequest normalizedRequest = this.normalizeShiftStockRequest(request);
+        List<TcMesStock> sourceList = this.sourceMapper.selectShiftStockList(normalizedRequest);
+        Map<String, TcMesStock> uniqueMap = CollectionUtils.emptyIfNull(sourceList).stream()
+                .filter(source -> StrUtil.isNotBlank(source.getSidewallCode()))
+                .collect(Collectors.toMap(TcMesStock::getSidewallCode, Function.identity(),
+                        (first, ignored) -> first, LinkedHashMap::new));
+        List<TcShiftStock> stockList = uniqueMap.values().stream().map(source -> {
+            TcShiftStock target = new TcShiftStock();
+            target.setFactoryCode(normalizedRequest.getFactoryCode());
+            target.setStockDate(normalizedRequest.getStockDate());
+            target.setShiftOrder(normalizedRequest.getShiftOrder());
+            target.setSidewallCode(source.getSidewallCode());
+            target.setStockQty(BigDecimalUtils.valueOf(source.getStockQty()));
+            target.setBadQty(BigDecimalUtils.valueOf(source.getBadQty()));
+            target.setAdjustQty(BigDecimalUtils.valueOf(source.getAdjustQty()));
+            return target;
+        }).collect(Collectors.toList());
+        AjaxResult result = FeignTokenHelper.callWithToken(() -> this.remoteService.replaceShiftStock(
+                normalizedRequest.getFactoryCode(), DateUtil.formatDate(normalizedRequest.getStockDate()),
+                normalizedRequest.getShiftOrder(), "MES", stockList));
+        this.assertRemoteSuccess(result);
         return AjaxResult.success(I18nUtil.getMessage("ui.tc.schedule.mes.stockSyncSuccess"), stockList.size());
     }
 
@@ -151,6 +185,25 @@ public class TcMesBridgeServiceImpl implements ITcMesBridgeService {
         normalizedRequest.setCompanyCode(StrUtil.blankToDefault(normalizedRequest.getCompanyCode(),
                 normalizedRequest.getFactoryCode()));
         return normalizedRequest;
+    }
+
+    /**
+     * 校验并补齐自动滚动班次库存同步请求。
+     *
+     * @param request 原请求
+     * @return 规范化请求
+     * @throws ServiceException 日期或班序缺失时抛出
+     */
+    private MesShiftStockSyncRequest normalizeShiftStockRequest(MesShiftStockSyncRequest request) {
+        if (request == null || request.getStockDate() == null || request.getShiftOrder() == null
+                || request.getShiftOrder() < 1 || request.getShiftOrder() > 6) {
+            throw new ServiceException(I18nUtil.getMessage("ui.itf.mes.shiftStockArgumentsInvalid"));
+        }
+        request.setFactoryCode(StrUtil.blankToDefault(request.getFactoryCode(),
+                FactoryConstant.DEFAULT_FACTORY_CODE));
+        request.setCompanyCode(StrUtil.blankToDefault(request.getCompanyCode(), request.getFactoryCode()));
+        request.setStockDate(DateUtil.beginOfDay(request.getStockDate()));
+        return request;
     }
 
     /**

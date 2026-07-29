@@ -11,6 +11,7 @@ import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.redissonLock.annotation.DistributedLock;
+import com.zlt.aps.tm.api.domain.dto.TmRollingCheckRequestDTO;
 import com.zlt.aps.tm.api.domain.dto.TmRollingRecalcRequestDTO;
 import com.zlt.aps.tm.api.domain.dto.TmScheduleResultImportDTO;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
@@ -18,10 +19,7 @@ import com.zlt.aps.tm.api.domain.entity.TmScheduleUnplanned;
 import com.zlt.aps.tm.api.domain.vo.*;
 import com.zlt.aps.tm.domain.TmAutoScheduleTask;
 import com.zlt.aps.tm.mapper.TmScheduleResultMapper;
-import com.zlt.aps.tm.service.ITmScheduleResultExcelService;
-import com.zlt.aps.tm.service.ITmScheduleResultService;
-import com.zlt.aps.tm.service.TmAutoScheduleTaskService;
-import com.zlt.aps.tm.service.TmOperationTaskApplicationService;
+import com.zlt.aps.tm.service.*;
 import com.zlt.aps.tm.service.query.TmScheduleUnplannedQueryService;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
@@ -57,6 +55,9 @@ public class TmScheduleResultController extends AbstractDocBizController<TmSched
 
     @Resource
     private TmAutoScheduleTaskService tmAutoScheduleTaskService;
+
+    @Resource
+    private TmAutoRollingApplicationService tmAutoRollingApplicationService;
 
     @Resource
     private TmOperationTaskApplicationService tmOperationTaskApplicationService;
@@ -302,6 +303,18 @@ public class TmScheduleResultController extends AbstractDocBizController<TmSched
     public AjaxResult rollingRecalc(@RequestBody TmRollingRecalcRequestDTO request) {
         request.setOperator(SecurityUtils.getUsername());
         return AjaxResult.success(tmScheduleResultService.rollingRecalc(request));
+    }
+
+    /**
+     * 供job服务检查当前分钟是否命中胎面自动滚动窗口。
+     *
+     * @param request 可选工厂和触发时间
+     * @return 本次命中的滚动结果
+     */
+    @ApiOperation("检查胎面自动滚动班次窗口")
+    @PostMapping("/internal/checkTimedRolling")
+    public AjaxResult checkTimedRolling(@RequestBody TmRollingCheckRequestDTO request) {
+        return AjaxResult.success(this.tmAutoRollingApplicationService.checkAndExecute(request));
     }
 
     /**

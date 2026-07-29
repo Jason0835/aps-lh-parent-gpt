@@ -26,6 +26,11 @@ public class TmRollingRecalcRequestDTO implements Serializable {
     @ApiModelProperty(value = "排程日期", required = true)
     private Date scheduleDate;
 
+    /** MES库存物理日期；自动入口必传，人工入口可由班次配置解析。 */
+    @JsonFormat(pattern = "yyyy-MM-dd", timezone = "GMT+8")
+    @ApiModelProperty(value = "MES库存物理日期")
+    private Date stockDate;
+
     /** 目标逻辑班次，取值一至六。 */
     @ApiModelProperty(value = "目标逻辑班次", required = true)
     private Integer targetShiftOrder;

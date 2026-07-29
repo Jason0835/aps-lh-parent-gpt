@@ -6,6 +6,8 @@ import com.baomidou.dynamic.datasource.toolkit.DynamicDataSourceContextHolder;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.exception.ServiceException;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.autoLogin.feign.FeignTokenHelper;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ShiftConfig;
 import com.zlt.aps.cd90.api.domain.entity.Cd90Stock;
@@ -13,6 +15,7 @@ import com.zlt.aps.cd90.api.service.ICd90StockRemoteService;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.enums.MouldFinishStatusEnum;
 import com.zlt.aps.common.core.utils.AjaxResultUtils;
+import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.cx.api.domain.entity.*;
 import com.zlt.aps.cx.api.service.ICxMesSyncRemoteService;
@@ -20,13 +23,11 @@ import com.zlt.aps.cx.api.service.ICxPrecisionPlanRemoteService;
 import com.zlt.aps.enums.LocationTypeEnum;
 import com.zlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
-//import com.zlt.aps.gsq.api.domain.entity.GsqScheduleResultIssue;
 import com.zlt.aps.itf.constant.DataSource;
 import com.zlt.aps.itf.constant.SysCode;
 import com.zlt.aps.itf.mes.enums.ItfSyncKeyEnum;
 import com.zlt.aps.itf.mes.enums.MouldCategoryConvertEnum;
 import com.zlt.aps.itf.mes.mapper.*;
-//import com.zlt.aps.itf.mes.service.IGsqScheduleResultIssueService;
 import com.zlt.aps.itf.mes.service.IPrecisionPlanIssueService;
 import com.zlt.aps.itf.mes.service.ITmScheduleResultIssueService;
 import com.zlt.aps.itf.mes.service.MesItfService;
@@ -3354,6 +3355,58 @@ public class MesItfServiceImpl implements MesItfService {
             return AjaxResult.error("胎面库存同步失败：" + e.getMessage());
         }
         return AjaxResult.success();
+    }
+
+    /**
+     * 从MES读取指定物理日的胎面库存，并替换自动滚动班次快照。
+     *
+     * <p>MES无数据时仍调用TM清空对应快照，防止自动滚动继续使用旧库存。
+     * 动态数据源上下文始终在finally中恢复，避免查询异常污染后续线程调用。</p>
+     *
+     * @param request 工厂、物理库存日和班序
+     * @return 同步数量
+     * @throws ServiceException 参数非法或远程保存失败时抛出
+     */
+    @Override
+    public AjaxResult syncTreadShiftStock(MesShiftStockSyncRequest request) {
+        if (request == null || request.getStockDate() == null || request.getShiftOrder() == null
+                || request.getShiftOrder() < 1 || request.getShiftOrder() > 6) {
+            throw new ServiceException(I18nUtil.getMessage("ui.itf.mes.shiftStockArgumentsInvalid"));
+        }
+        request.setFactoryCode(StringUtils.defaultIfBlank(request.getFactoryCode(),
+                FactoryConstant.DEFAULT_FACTORY_CODE));
+        request.setCompanyCode(StringUtils.defaultIfBlank(request.getCompanyCode(), request.getFactoryCode()));
+        request.setStockDate(DateUtil.beginOfDay(request.getStockDate()));
+        List<TmMesStock> sourceList;
+        DynamicDataSourceContextHolder.push(DataSource.MES);
+        try {
+            sourceList = this.mesItfMapper.selectTreadShiftStockList(request);
+        } finally {
+            DynamicDataSourceContextHolder.poll();
+        }
+        Map<String, TmMesStock> uniqueMap = CollectionUtils.emptyIfNull(sourceList).stream()
+                .filter(source -> StringUtils.isNotBlank(source.getMaterialCode()))
+                .collect(Collectors.toMap(TmMesStock::getMaterialCode, Function.identity(),
+                        (first, ignored) -> first, LinkedHashMap::new));
+        List<TmShiftStock> stockList = uniqueMap.values().stream().map(source -> {
+            TmShiftStock target = new TmShiftStock();
+            target.setFactoryCode(request.getFactoryCode());
+            target.setStockDate(request.getStockDate());
+            target.setShiftOrder(request.getShiftOrder());
+            target.setTreadCode(source.getMaterialCode());
+            target.setStockQty(BigDecimalUtils.valueOf(source.getAvailableStock()));
+            target.setBadQty(BigDecimal.ZERO);
+            target.setAdjustQty(BigDecimal.ZERO);
+            return target;
+        }).collect(Collectors.toList());
+        AjaxResult saveResult = FeignTokenHelper.callWithToken(() ->
+                this.tmMesSyncRemoteService.replaceShiftStock(request.getFactoryCode(),
+                        DateUtil.formatDate(request.getStockDate()), request.getShiftOrder(), "MES", stockList));
+        if (saveResult == null || !Objects.equals(AjaxResult.Type.SUCCESS.value(),
+                saveResult.get(AjaxResult.CODE_TAG))) {
+            throw new ServiceException(I18nUtil.getMessage("ui.itf.mes.shiftStockRemoteFailed"));
+        }
+        return AjaxResult.success(stockList.size());
     }
 
     /**
