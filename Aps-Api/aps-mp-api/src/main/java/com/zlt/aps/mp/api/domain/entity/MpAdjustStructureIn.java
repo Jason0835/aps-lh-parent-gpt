@@ -2,6 +2,7 @@ package com.zlt.aps.mp.api.domain.entity;
 
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.zlt.common.annotation.ImportExcelValidated;
@@ -9,8 +10,10 @@ import com.zlt.common.utils.StringUtil;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
+import org.springframework.format.annotation.DateTimeFormat;
 
 import java.math.BigDecimal;
+import java.util.Date;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -462,6 +465,33 @@ public class MpAdjustStructureIn extends BaseEntity {
     @ApiModelProperty(value = "库销比")
     @TableField(value = "INVENTORY_SALES_RATIO")
     private BigDecimal inventorySalesRatio;
+
+    /**
+     * 调整前订单量（上次）
+     */
+    @ApiModelProperty(value = "调整前订单量（上次）")
+    @TableField(value = "PREVIOUS_ORDER_QTY")
+    private Integer previousOrderQty;
+
+    /**
+     * 当前订单量
+     */
+    @ApiModelProperty(value = "当前订单量")
+    @TableField(value = "CURRENT_ORDER_QTY")
+    private Integer currentOrderQty;
+
+    /**
+     * 本次订单增减量
+     */
+    @ApiModelProperty(value = "本次订单增减量")
+    @TableField(value = "ORDER_ADD_DEC_QTY")
+    private Integer orderAddDecQty;
+
+    @ApiModelProperty(value = "库存抓取日")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @TableField("STOCK_CAPTURE_DATE")
+    private Date stockCaptureDate;
 
     /**
      * 最大的型腔数，用于排序

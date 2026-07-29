@@ -154,6 +154,9 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
     @Autowired
     private MpAdjustStructureInEntityMapper mpAdjustStructureInEntityMapper;
 
+    @Autowired
+    private MdmMonthSurplusEntityMapper monthSurplusEntityMapper;
+
     private final MpSkuAdjustInfoService mpSkuAdjustInfoService;
     @Autowired
     private DataManager dataManager;
@@ -542,6 +545,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         String prefixKey = IncrementConstant.MONTH_FINAL + com.ruoyi.common.core.utils.DateUtils.dateTimeNow("yyMMdd");
         // 批次号
         String batchNo = String.format("%02d", incrementService.getIncrementNumber(prefixKey));
+        Date stockCaptureDate = getStockCaptureDate(param.getMonthPlanVersion());
         // 1.从版本排产结果表：t_mp_moulding_day_result 获取对应年月、版本号的数据存入 t_mp_month_plan_prod_final，自动生成排产单号
         // LAST_MONTH_PLAN_VERSION = MONTH_PLAN_VERSION
         // IS_RELEASE = 未发布
@@ -566,6 +570,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
             finalResult.setIsRelease(ReleaseStatusEnum.UN_RELEASE.getCode());
             finalResult.setRemark(dayResult.getRemark());
             finalResult.setOriginalTotalQty(dayResult.getTotalQty());
+            finalResult.setStockCaptureDate(stockCaptureDate);
             finalResult.setAdjustQty1(0);
             finalResult.setAdjustQty2(0);
             finalResult.setAdjustQty3(0);
@@ -577,6 +582,22 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         return finalList;
     }
 
+    /**
+     * 根据需求版本获取库存抓取日
+     * @param monthPlanVersion
+     * @return
+     */
+    private Date getStockCaptureDate(String monthPlanVersion){
+        LambdaQueryWrapper<MdmMonthSurplus> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(MdmMonthSurplus::getRequireVersion, monthPlanVersion)
+                .eq(MdmMonthSurplus::getIsDelete, YesOrNoEnum.NO.getCode())
+                .last("limit 1");  // 追加 SQL limit 语句
+        List<MdmMonthSurplus> monthSurplusList = monthSurplusEntityMapper.selectList(wrapper);
+        if (PubUtil.isNotEmpty(monthSurplusList)){
+            return monthSurplusList.get(0).getStockCapTureDate();
+        }
+        return new Date();
+    }
     /**
      * 对定稿版本的结构分配及排产统计进行备份
      * 用以调整后，查询结构分配及排产统计信息还能正确
