@@ -1668,6 +1668,10 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             }
             // 获取最早有值的日期
             Integer day = getFirstHasValueDay(adjustResult);
+            // 如果试产试制规格没有排量，day会为空，该sku不需要更新
+            if (day == null || day <= 0) {
+                continue;
+            }
             // 获取当前日期
             Date productionDate = getCurrentDate(contextDTO.getMpYear(), contextDTO.getMpMonth(), day);
             for (String trialPlanId : trialPlanIdList) {

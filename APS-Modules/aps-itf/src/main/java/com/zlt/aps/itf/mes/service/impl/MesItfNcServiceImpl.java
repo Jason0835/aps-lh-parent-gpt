@@ -245,7 +245,6 @@ public class MesItfNcServiceImpl implements IMesItfNcService {
         mesItem.setLiningCode(item.getLiningCode());
         mesItem.setMaterialCode(item.getMachineCode());
         mesItem.setGlueCode(item.getGlueCode());
-        mesItem.setMouthPlateCode(item.getMouthPlateCode());
         mesItem.setMachineCode(item.getMachineCode());
         // 班次计划量
         mesItem.setMidPlanQty(item.getClass1PlanQty());
