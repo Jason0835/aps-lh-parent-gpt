@@ -55,15 +55,24 @@ public class CxMouldProductionHandler {
     /**
      * 非在机结构，模具排产
      *
-     * @param context        排产上下文
-     * @param cxMachineCode  成型机台
-     * @param productionPlan 分配段
-     * @param handledDayInfo 已延长处理日期
+     * @param context               排产上下文
+     * @param isIgnoreHighPriority  是否忽略高优先级机台数判断
+     * @param cxMachineCode         成型机台
+     * @param productionPlan        分配段
+     * @param handledDayInfo        已延长处理日期
+     * @param isForcedTimeExtension 是否需要强制延长探测处理，默认需要
      */
-    public void noContinueGroupPlanMouldProduction(Context context, String cxMachineCode, CxMachineAllocationPlanHelper productionPlan, Set<String> handledDayInfo) {
+    public void noContinueGroupPlanMouldProduction(Context context,
+                                                   boolean isIgnoreHighPriority,
+                                                   String cxMachineCode,
+                                                   CxMachineAllocationPlanHelper productionPlan,
+                                                   Set<String> handledDayInfo,
+                                                   boolean isForcedTimeExtension) {
         TbrProductionContext productionContext = (TbrProductionContext) context;
         ProductionPlanGroupInfo productionPlanInfo = productionPlan.getProductionPlanInfo();
         String groupName = productionPlanInfo.getGroupName();
+        Integer originStartDay = productionPlan.getStartDay();
+        Integer originEndDay = productionPlan.getEndDay();
         TbrMouldProductionLogRecorder.addStartCxMachineMouldProductionPlanLog(context, cxMachineCode, groupName);
         dayProductionStatisticsHandler.printDayLimitKeyInformationLog(productionContext);
         List<MonthPlanProductionRequirePlanVo> groupPlanData = productionPlanInfo.getGroupPlanData();
@@ -99,9 +108,12 @@ public class CxMouldProductionHandler {
         productionPlanInfo.setThisRoundCanProduction();
         cxAddSkuProductionHandler.productionAddSku(context, cxMachineCode, hasProductionPlanList, productionPlan, productionContext.getBaseDataContainer().getMouldShellMap(), new HashSet<>());
         //处理结构提前收尾
-        groupPlanBeforeConclusionHandler.handlerBeforeConclusion(context, productionPlanInfo, cxMachineInfo, cxLhRatio, productionPlan);
+        groupPlanBeforeConclusionHandler.handlerBeforeConclusion(context, isIgnoreHighPriority, productionPlanInfo, cxMachineInfo, cxLhRatio, productionPlan);
         //20260330 分组计划标记分配完成，需要验证是否需要进行分组计划分配延长处理
-        groupTimeExtensionHandler.handlerTimeExtension(this, context, productionPlan, handledDayInfo);
+        if (!isTimeExtensionHandlerFlag(isForcedTimeExtension, originStartDay, originEndDay, productionPlan)) {
+            return;
+        }
+        groupTimeExtensionHandler.handlerTimeExtension(this, context, isIgnoreHighPriority, productionPlan, handledDayInfo);
     }
 
     /**
@@ -225,6 +237,30 @@ public class CxMouldProductionHandler {
         BeforeSkuProductionInfo beforeSku = BeforeSkuProductionInfo.buildEmpty(startDay);
         newHelper.setBeforeSku(beforeSku);
         cxLhRatioMap.put(cxLhGroupNo, newHelper);
+    }
+
+    /**
+     * 是否需要进行延长探测处理
+     * 1、强制延长探测则结果为true
+     * 2、否则如果排产时间范围一直，则不再延长探测
+     *
+     * @param isForcedTimeExtension 是否需要强制延长探测
+     * @param originStartDay        初始排产开始日
+     * @param originEndDay          初始排产结束日
+     * @param productionPlan        新排产范围
+     * @return
+     */
+    private boolean isTimeExtensionHandlerFlag(boolean isForcedTimeExtension,
+                                               Integer originStartDay,
+                                               Integer originEndDay,
+                                               CxMachineAllocationPlanHelper productionPlan) {
+        if (null == originStartDay || null == originEndDay || null == productionPlan) {
+            return true;
+        }
+        if (isForcedTimeExtension) {
+            return true;
+        }
+        return !(originStartDay.equals(productionPlan.getStartDay()) && originEndDay.equals(productionPlan.getEndDay()));
     }
 
 }
