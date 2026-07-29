@@ -58,6 +58,24 @@ public class GroupTimeExtensionConclusionLogRecorder {
     }
 
     /**
+     * 增加 分组计划无需延长收尾，重排 -日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 机台：%s 无需延长收尾后重排 ====
+     *
+     * @param context       排程上下文
+     * @param groupName     分组
+     * @param cxMachineCode 机台信息
+     * @return
+     */
+    public static String addNoTimeExtensionConclusionResetProductionLog(Context context, String groupName, String cxMachineCode) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 机台：%s 无需延长收尾后重排确认 ====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName, cxMachineCode);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_TIME_EXTENSION_CONCLUSION, logContent);
+        return logContent;
+    }
+
+    /**
      * 增加 分组计划机台已整月不可延长 -日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 机台：%s 已整月不可延长 ====
      *

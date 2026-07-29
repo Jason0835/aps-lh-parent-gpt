@@ -218,7 +218,7 @@ public class CxCapacityAllocationHandler {
         addHelper.setBeforeAllocationByChangeLimit(beforeGroupAllocation);
         allocationGroupPlan.updateLeftOverNeedAllocationDays(needAllocationDays);
         //20260109 标记分配完成--不能标记分配完成，有可能因提前收尾导致需要在其它机台进行分配 对成型机台进行模拟模具排产
-        cxMouldProductionHandler.noContinueGroupPlanMouldProduction(context, cxMachineInfo.getCxMachineCode(), addHelper, new HashSet<>());
+        cxMouldProductionHandler.noContinueGroupPlanMouldProduction(context, false, cxMachineInfo.getCxMachineCode(), addHelper, new HashSet<>(), true);
         //20260429+ 前分组分配强制延长处理
         cxMouldProductionHandler.handlerTimeExtensionDayConclusionByBeforeGroup(productionContext, addHelper);
         //20260322 剩余时间-有可能因提前收尾，导致时间变化
@@ -230,62 +230,6 @@ public class CxCapacityAllocationHandler {
             selectedGroupPlanByCxMachine(context, estimateGroupCxAllocationMap, cxMachineInfo, excludeGroupPlan);
         }
     }
-
-//    private String selectedOneGroupAndHandler(Context context, Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap, CxMachineBaseInfoVo cxMachineInfo, Set<String> excludeGroupPlan){
-//        //获取合适优先级的一个结构
-//        ProductionPlanGroupInfo allocationGroupPlan = getSelectedGroup(context, estimateGroupCxAllocationMap, cxMachineInfo, excludeGroupPlan);
-//        if (null == allocationGroupPlan) {
-//            //记录日志
-//            TbrProductionGroupLogRecorder.addReverseCxMachineNoFindMatchPlanLog(context, cxMachineInfo);
-//            return StringUtils.EMPTY;
-//        }
-//        TbrProductionContext productionContext = (TbrProductionContext) context;
-//        String groupName = allocationGroupPlan.getGroupName();
-//        Integer startDay = cxMachineInfo.getNextStartDay();
-//        //20260329 机台反选不再要求产能覆盖，故而不能直接取需求剩余天数allocationGroupPlan.getLeftOverNeedAllocationDays()
-//        Integer leftOverDays = allocationGroupPlan.getMachineReverseAllocationDays();
-//        ProductGroupCxCapacityInfo lhRatioInfo = allocationGroupPlan.getLhRatioByCxMachine(cxMachineInfo);
-//        //20260209 特殊材料是否需要拉量或是舍弃
-//        CxMachineAllocationPlanHelper calculationAllocation = createAllocationPlanHelper(cxMachineInfo, lhRatioInfo, allocationGroupPlan, null, leftOverDays, startDay, context.getMonthDays());
-//        Integer confirmNeedAllocationDays = specialMaterialScheduleHandler.calculateConfirmAllocationDaysBySpecialMaterial(calculationAllocation, productionContext, allocationGroupPlan);
-//        if (null == confirmNeedAllocationDays || confirmNeedAllocationDays <= BigDecimal.ZERO.intValue()) {
-//            TbrProductionGroupLogRecorder.addSpecialMaterialStockLimitLog(productionContext, groupName, false);
-//            allocationGroupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
-//            selectedGroupPlanByCxMachine(context, estimateGroupCxAllocationMap, cxMachineInfo, excludeGroupPlan);
-//            return;
-//        }
-//        leftOverDays = confirmNeedAllocationDays;
-//        //20260206 结构剩余需分配天数小于最短上机天数，则标记分配完成，查找下一个
-//        Integer minAllocationDays = allocationGroupPlan.getMinAllocationDays(productionContext);
-//        if (!allocationGroupPlan.isNextAllocation(leftOverDays, productionContext)) {
-//            TbrProductionGroupLogRecorder.addGroupLeftOverNoReachMinAllocationDayLog(productionContext, groupName, false, leftOverDays, minAllocationDays);
-//            allocationGroupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
-//            selectedGroupPlanByCxMachine(context, estimateGroupCxAllocationMap, cxMachineInfo, excludeGroupPlan);
-//            return;
-//        }
-//        TbrProductionGroupLogRecorder.addReverseCxMachineSelectedGroupPlanLog(context, cxMachineInfo, allocationGroupPlan);
-//        //重新计算分配的起始时间
-//        Set<Integer> hasProductionDaySet = cxMachineInfo.confirmProductionRange(context, allocationGroupPlan);
-//        Integer realStartDay = hasProductionDaySet.stream().mapToInt(Integer::intValue).min().getAsInt();
-//        startDay = Math.max(startDay, realStartDay);
-//        //20260121 切换结构的控制
-//        DayCapacityLimitVo dayCapacityLimitVo = productionContext.getBaseDataContainer().getDayCapacityLimit();
-//        Integer realChangeDay = dayCapacityLimitVo.confirmStartDayByChangeGroup(productionContext, startDay, groupName, cxMachineInfo, hasProductionDaySet);
-//        if (null == realChangeDay) {
-//            //记录日志
-//            Integer maxChangeLimit = productionContext.getBaseDataContainer().getParamConfiguration().getDayChangeGroupCount();
-//            TbrProductionGroupLogRecorder.addChangeGroupLimitCxMachineLog(context, cxMachineInfo.getCxMachineCode(), maxChangeLimit);
-//            return;
-//        }
-//        startDay = realChangeDay;
-//        //20260209 采用新的分配天数
-//        Integer needAllocationDays = confirmNeedAllocationDays;
-//        CxMachineAllocationPlanHelper addHelper = createAllocationPlanHelper(cxMachineInfo, lhRatioInfo, allocationGroupPlan, null, needAllocationDays, startDay, context.getMonthDays());
-//        cxMachineInfo.addAllocationPlanInfo(context, addHelper);
-//        allocationGroupPlan.updateLeftOverNeedAllocationDays(needAllocationDays);
-//        //20260109 标记分配完成--不能标记分配完成，有可能因提前收尾导致需要在其它机台进行分配 对成型机台进行模拟模具排产
-//        cxMouldProductionHandler.noContinueGroupPlanMouldProduction(context, cxMachineInfo.getCxMachineCode(), addHelper, new HashSet<>());
-//    }
 
     /**
      * 获取新增分组计划上机 --新增结构

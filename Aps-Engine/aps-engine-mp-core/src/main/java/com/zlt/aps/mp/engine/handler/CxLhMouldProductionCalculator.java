@@ -132,7 +132,7 @@ public class CxLhMouldProductionCalculator {
                 firstDay = day;
             }
             //需要考虑首日：换活字块，换模场景，此时双模日硫化量会有变化
-            DayProductionQtyHelper dayProductionInfo = SkuDayLhMachineProductionCalculator.calculateSingleLhGroupQty(context, lhProductionQtyHelper, day, firstDay, startDay, productionPlan);
+            DayProductionQtyHelper dayProductionInfo = SkuDayLhMachineProductionCalculator.calculateSingleLhGroupQty(context, continueType, lhProductionQtyHelper, day, firstDay, startDay, productionPlan);
             dayProductionInfo.updateDoubleProductionQty();
             Integer dayProductionQty = dayProductionInfo.getProductionQty();
             if (!isContinueProduction(sumProductionQty, firstDay, day, dayProductionQty, continueType, maxProductionDays, skuProductionPlanList)) {
@@ -225,7 +225,7 @@ public class CxLhMouldProductionCalculator {
                 firstDay = day;
             }
             //需要考虑首日：换活字块，换模场景，此时双模日硫化量会有变化
-            DayProductionQtyHelper dayProductionInfo = SkuDayLhMachineProductionCalculator.calculateSingleLhGroupQty(context, lhProductionQtyHelper, day, firstDay, startDay, productionSkuInfo);
+            DayProductionQtyHelper dayProductionInfo = SkuDayLhMachineProductionCalculator.calculateSingleLhGroupQty(context, ContinueTypeEnum.NO_CONTINUE, lhProductionQtyHelper, day, firstDay, startDay, productionSkuInfo);
             dayProductionInfo.updateDoubleProductionQty();
             Integer lossQty;
             if (dayProductionInfo.isProductionNextDay()) {
