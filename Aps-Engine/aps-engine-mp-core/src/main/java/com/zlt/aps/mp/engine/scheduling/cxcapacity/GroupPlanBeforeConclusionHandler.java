@@ -110,13 +110,19 @@ public class GroupPlanBeforeConclusionHandler {
      * 处理结构提前收尾
      * 实单排产量的硫化机台数低于最低硫化配比的硫化机台数，则进行提前收尾
      *
-     * @param context         排产上下文
-     * @param groupPlanInfo   排产分组计划
-     * @param cxMachineInfo   排产机台
-     * @param cxLhRatio       对应的硫化配比信息
-     * @param conclusionRange 当前排产分配段信息
+     * @param context              排产上下文
+     * @param isIgnoreHighPriority 是否忽略高优先级机台数判断
+     * @param groupPlanInfo        排产分组计划
+     * @param cxMachineInfo        排产机台
+     * @param cxLhRatio            对应的硫化配比信息
+     * @param conclusionRange      当前排产分配段信息
      */
-    public void handlerBeforeConclusion(Context context, ProductionPlanGroupInfo groupPlanInfo, CxMachineBaseInfoVo cxMachineInfo, MonthPlanStructureLhRatioVo cxLhRatio, CxMachineAllocationPlanHelper conclusionRange) {
+    public void handlerBeforeConclusion(Context context,
+                                        boolean isIgnoreHighPriority,
+                                        ProductionPlanGroupInfo groupPlanInfo,
+                                        CxMachineBaseInfoVo cxMachineInfo,
+                                        MonthPlanStructureLhRatioVo cxLhRatio,
+                                        CxMachineAllocationPlanHelper conclusionRange) {
         //20260211 需要拉量的特殊结构，不能进行提前收尾处理
         if (!groupPlanInfo.isHasBeforeConclusionHandler()) {
             return;
@@ -125,7 +131,7 @@ public class GroupPlanBeforeConclusionHandler {
         String cxMachineCode = cxMachineInfo.getCxMachineCode();
         TbrProductionContext productionContext = (TbrProductionContext) context;
         addGroupStartBeforeConclusionLog(context, groupName, cxMachineCode);
-        GroupConclusionInfoVo groupConclusionInfo = groupPlanConclusionHandler.getConclusionInfoByProductionInfo(productionContext, groupPlanInfo, cxMachineInfo, cxLhRatio, conclusionRange);
+        GroupConclusionInfoVo groupConclusionInfo = groupPlanConclusionHandler.getConclusionInfoByProductionInfo(productionContext, isIgnoreHighPriority, groupPlanInfo, cxMachineInfo, cxLhRatio, conclusionRange);
         if (null == groupConclusionInfo) {
             addBeforeConclusionConditionErrorInfoLog(context, groupName);
             return;

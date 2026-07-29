@@ -144,6 +144,17 @@ public class CxContinueSkuInfoHelper implements Serializable {
     }
 
     /**
+     * 获取规格+花纹Key
+     * 规格|*|花纹
+     *
+     * @return
+     */
+    public String getSpecificationsPatternKey() {
+        String keyFormat = "%s|*|%s";
+        return String.format(keyFormat, specifications, pattern);
+    }
+
+    /**
      * 根据模具数，得到使用的硫化机台数
      *
      * @return
