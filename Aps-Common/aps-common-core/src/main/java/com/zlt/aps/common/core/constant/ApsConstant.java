@@ -549,6 +549,11 @@ public class ApsConstant {
      * 结构调整-自动调整
      */
     public static final String REDIS_ADJUST_STRUCT_AUTO = "APS:STRUCT:AUTO:";
+
+    /**
+     * 生产对齐
+     */
+    public static final String REDIS_ADJUST_PRODUCT_ALIGN = "APS:PRODUCT:ALIGN:";
     /**
      * 实单模拟排产
      */
