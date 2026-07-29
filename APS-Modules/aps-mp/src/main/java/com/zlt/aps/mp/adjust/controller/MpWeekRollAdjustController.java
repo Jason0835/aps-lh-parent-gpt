@@ -182,6 +182,37 @@ public class MpWeekRollAdjustController extends BaseController {
     }
 
     /**
+     * 生产对齐
+     */
+    @ApiOperation("生产对齐")
+    @PostMapping("/productAlign")
+    public AjaxResult productAlign(@RequestBody MpWeekRollAdjustDTO weekRollAdjustDTO) {
+        String key = ApsConstant.REDIS_ADJUST_PRODUCT_ALIGN + weekRollAdjustDTO.getFactoryCode();
+        if (ApsConstant.TRUE.equals(redisService.getCacheObject(key))) {
+            throw new BusinessException(I18nUtil.getMessage("ui.data.alert.distributed.lock.fail"));
+        }
+        redisService.setCacheObject(key, ApsConstant.TRUE, ApsConstant.EXPIRE_ONE, TimeUnit.HOURS);
+        try{
+            // 获取周程滚动调整策略
+            weekRollAdjustDTO.setAdjustType(WeekAdjustTypeEnum.STRUCTURE_IN.getCode());
+            IMpWeekAdjustService weekAdjustStrategy = mpWeekAdjustFactory.getStrategy(weekRollAdjustDTO.getAdjustType());
+            if (weekAdjustStrategy == null) {
+                throw new BusinessException(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.notFindStrategy"));
+            }
+            // 构建上下文对象
+            MpRollAdjustContextDTO contextDTO = buildAlignAdjustContext(weekRollAdjustDTO,weekAdjustStrategy);
+            log.info("生产对齐 ==> 开始执行策略:[{}] 年月:[{}]", WeekAdjustTypeEnum.getByCode(weekRollAdjustDTO.getAdjustType()).getName(),
+                    String.format("%d%02d", contextDTO.getMpYear(), contextDTO.getMpMonth()));
+            // 执行周程滚动调整策略（生产对齐）
+            weekAdjustStrategy.productAlign(contextDTO);
+
+            return AjaxResult.success(contextDTO.getAdjustResultList());
+        }finally {
+            redisService.setCacheObject(key, ApsConstant.FALSE, ApsConstant.EXPIRE_ONE, TimeUnit.HOURS);
+        }
+    }
+
+    /**
      * 导出结构间调整记录列表
      */
     @Log(title = "ui.data.alert.mpWeekRollAdjust.yearMonthEmpty", businessType = BusinessType.EXPORT)
@@ -398,6 +429,96 @@ public class MpWeekRollAdjustController extends BaseController {
         matchingAdjuestProductionHandler.initAdjustContextDTO(contextDTO);
         Date endTime = new Date();
         log.debug(String.format("自动调整初始化,结束时间:%s,总耗时:%s毫秒", DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS, endTime), DateUtils.getDiffMillTime(startTime, endTime)));
+        return contextDTO;
+    }
+
+    /**
+     * 构建生产对齐上下文对象（并行优化版）
+     * @param weekRollAdjustDTO 请求参数
+     * @param weekAdjustStrategy 周程滚动调整策略
+     * @return 上下文对象
+     */
+    private MpRollAdjustContextDTO buildAlignAdjustContext(MpWeekRollAdjustDTO weekRollAdjustDTO, IMpWeekAdjustService weekAdjustStrategy) {
+        Date startTime = new Date();
+        log.debug(String.format("自动调整初始化,开始时间:%s", DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS, startTime)));
+        MpRollAdjustContextDTO contextDTO = BeanUtil.copyProperties(weekRollAdjustDTO, MpRollAdjustContextDTO.class);
+        // ===== 阶段1（串行）：初始定稿版本信息，后续查询依赖 productionVersion / productType =====
+        weekAdjustStrategy.initVersion(contextDTO);
+        if (PubUtil.isEmpty(contextDTO.getFactoryProductionVersionList())) {
+            throw new BusinessException(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.monthPlanFinalRecordNotFound"),
+                    contextDTO.getMpYear(), contextDTO.getMpMonth()));
+        }
+        MpFactoryProductionVersion firstVersion = contextDTO.getFactoryProductionVersionList().get(0);
+        contextDTO.setMonthPlanVersion(firstVersion.getMonthPlanVersion());
+        contextDTO.setProductType(firstVersion.getProductTypeCode());
+        contextDTO.setProductionVersion(firstVersion.getProductionVersion());
+
+        // ===== 阶段2（并行）：各独立查询并发执行，互不依赖 =====
+        // 2.1 月定稿数据
+        CompletableFuture<Void> finalListFuture = CompletableFuture.runAsync(
+                () -> contextDTO.setFactoryMonthPlanProdFinalList(mpAdjustStructureInService.selectMpFinalList(contextDTO)));
+        // 2.2 结构转产列表
+        CompletableFuture<Void> structureAllocationFuture = CompletableFuture.runAsync(
+                () -> contextDTO.setStructureAllocationList(mpAdjustStructureInService.selectMpStructureAllocationList(contextDTO)));
+        // 2.3 周程滚动参数
+        CompletableFuture<Void> paramMapFuture = CompletableFuture.runAsync(
+                () -> contextDTO.setParamMap(mpAdjustStructureInService.getMpWeekAdjustParam(contextDTO.getFactoryCode(), contextDTO.getProductType())));
+        // 2.4 结构硫化配比
+        CompletableFuture<Void> structureLhRatioFuture = CompletableFuture.runAsync(
+                () -> contextDTO.setStructureLhRatio(mpAdjustStructureInService.getStructureLhRatio(contextDTO)));
+        // 2.5 工作日历
+        CompletableFuture<Void> workCalendarFuture = CompletableFuture.runAsync(
+                () -> contextDTO.setWorkCalendarMap(mpAdjustStructureInService.getWorkCalendarMap(contextDTO)));
+        // 2.6 周期结构最低硫化机台数
+        CompletableFuture<Void> cycleStructureMinFuture = CompletableFuture.runAsync(
+                () -> contextDTO.setCycleStructureMinLhMachinesMap(mpAdjustStructureInService.getCycleStructureMinMachinesMap(contextDTO)));
+        // 2.7 型腔与活块数量
+        CompletableFuture<Void> cavityBlockFuture = CompletableFuture.runAsync(
+                () -> contextDTO.setCavity2BlockMap(mpAdjustStructureInService.getCavityAndBlockQtyMap(contextDTO)));
+        // 2.8 总硫化机台数
+        CompletableFuture<Void> lhMachineCountFuture = CompletableFuture.runAsync(
+                () -> contextDTO.setTotalLhMachines(mpAdjustStructureInService.getLhMachineCount(contextDTO)));
+        // 2.9 结构统计
+        CompletableFuture<Void> structureStatisticFuture = CompletableFuture.runAsync(
+                () -> contextDTO.setStructureStatisticMap(mpAdjustStructureInService.loadMpMonthPlanStatistics(contextDTO)));
+
+        // 2.11 工厂名称
+        CompletableFuture<Void> factoryNameFuture = CompletableFuture.runAsync(() -> {
+            List<SysDictData> dictDataList = iSysDictDataCacheService.getType("biz_factory_name");
+            String factoryName = dictDataList.stream()
+                    .filter(dictData -> dictData.getDictValue().equals(contextDTO.getFactoryCode()))
+                    .findFirst().get().getDictLabel();
+            contextDTO.setFactoryName(factoryName);
+        });
+
+        try {
+            CompletableFuture.allOf(
+                    finalListFuture, structureAllocationFuture, paramMapFuture,
+                    structureLhRatioFuture, workCalendarFuture, cycleStructureMinFuture,
+                    cavityBlockFuture, lhMachineCountFuture, structureStatisticFuture,
+                    factoryNameFuture
+            ).join();
+            log.debug("生产对齐初始化,并行数据查询全部完成");
+        } catch (CompletionException e) {
+            Throwable cause = e.getCause();
+            log.error("生产对齐初始化,并行数据查询失败! 原因:{}", cause.getMessage(), cause);
+            if (cause instanceof BusinessException) {
+                throw (BusinessException) cause;
+            }
+            throw new BusinessException(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.initDataFailure"), cause);
+        }
+
+        // 设置调整日（依赖 paramMap）
+        setAdjustDate(contextDTO);
+        contextDTO.setVersion(weekRollAdjustDTO.getVersion());
+        contextDTO.setAdjustType(weekRollAdjustDTO.getAdjustType());
+        // 初始调整过程日志
+        contextDTO.setAdjustProcLogList(new ArrayList<>());
+        contextDTO.setLogCheck(new StringBuilder());
+        // 设置OEM配置集合（依赖 paramMap）
+        initOemParam(contextDTO);
+        Date endTime = new Date();
+        log.debug(String.format("生产对齐初始化,结束时间:%s,总耗时:%s毫秒", DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS, endTime), DateUtils.getDiffMillTime(startTime, endTime)));
         return contextDTO;
     }
 
