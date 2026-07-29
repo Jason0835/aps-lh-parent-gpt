@@ -206,7 +206,26 @@ public class TcScheduleResultServiceImpl extends AbstractDocService<TcScheduleRe
             response.setIssues(context.getIssueCollector().getIssues());
             response.setIssueCount(response.getIssues().size());
             response.setSummary(new LinkedHashMap<>(finalContext.getQualitySummary()));
-            response.setMessage(I18nUtil.getMessage("ui.tc.schedule.executeFinished"));
+            if (CollUtil.isEmpty(context.getTaskDraftList())) {
+                response.setMessage(I18nUtil.getMessage("ui.tc.schedule.noTaskGenerated"));
+                log.warn("{} step=NO_TASK_GENERATED factoryCode={}, scheduleDate={}, batchNo={}, traceId={}, reason=noSchedulableTask",
+                        TcScheduleConstants.AUTO_PLAN_LOG_PREFIX, request.getFactoryCode(),
+                        DateUtil.formatDate(request.getScheduleDate()), response.getBatchNo(), response.getTraceId());
+            } else if (persistResult.getResultCount() == 0 && persistResult.getUnplannedCount() == 0) {
+                response.setMessage(I18nUtil.getMessage("ui.tc.schedule.allNoProductionNeeded"));
+                log.info("{} step=NO_PRODUCTION_NEEDED factoryCode={}, scheduleDate={}, batchNo={}, traceId={}, taskCount={}",
+                        TcScheduleConstants.AUTO_PLAN_LOG_PREFIX, request.getFactoryCode(),
+                        DateUtil.formatDate(request.getScheduleDate()), response.getBatchNo(), response.getTraceId(),
+                        context.getTaskDraftList().size());
+            } else if (persistResult.getResultCount() == 0) {
+                response.setMessage(I18nUtil.getMessage("ui.tc.schedule.allUnplanned"));
+                log.warn("{} step=ALL_UNPLANNED factoryCode={}, scheduleDate={}, batchNo={}, traceId={}, unplannedCount={}",
+                        TcScheduleConstants.AUTO_PLAN_LOG_PREFIX, request.getFactoryCode(),
+                        DateUtil.formatDate(request.getScheduleDate()), response.getBatchNo(), response.getTraceId(),
+                        persistResult.getUnplannedCount());
+            } else {
+                response.setMessage(I18nUtil.getMessage("ui.tc.schedule.executeFinished"));
+            }
             response.setTaskId(taskId);
             response.setTaskStatus(TcAutoScheduleTaskStatusEnum.SUCCESS.getCode());
             response.setProgress(100);

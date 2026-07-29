@@ -497,6 +497,26 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
                         TmScheduleConstants.AUTO_PLAN_LOG_PREFIX, context.getFactoryCode(),
                         formatAutoPlanDate(context.getScheduleDate()),
                         context.getBatchNo(), context.getTraceId(), persistResult.getErrorCount(), persistResult.getLastErrorMsg());
+            } else if (CollUtil.isEmpty(context.getTaskDraftList())) {
+                response.setMessage(resolveTmMessage("ui.data.alert.tm.schedule.noTaskGenerated",
+                        "No schedulable forming demand was loaded"));
+                log.warn("{} step=NO_TASK_GENERATED factoryCode={}, scheduleDate={}, batchNo={}, traceId={}, reason=noSchedulableTask",
+                        TmScheduleConstants.AUTO_PLAN_LOG_PREFIX, context.getFactoryCode(),
+                        formatAutoPlanDate(context.getScheduleDate()), context.getBatchNo(), context.getTraceId());
+            } else if (persistResult.getResultCount() == 0 && persistResult.getUnplannedCount() == 0) {
+                response.setMessage(resolveTmMessage("ui.data.alert.tm.schedule.noProductionNeeded",
+                        "No production is needed because demand has been covered by inventory or scheduling rules"));
+                log.info("{} step=NO_PRODUCTION_NEEDED factoryCode={}, scheduleDate={}, batchNo={}, traceId={}, taskCount={}",
+                        TmScheduleConstants.AUTO_PLAN_LOG_PREFIX, context.getFactoryCode(),
+                        formatAutoPlanDate(context.getScheduleDate()), context.getBatchNo(), context.getTraceId(),
+                        context.getTaskDraftList().size());
+            } else if (persistResult.getResultCount() == 0) {
+                response.setMessage(resolveTmMessage("ui.data.alert.tm.schedule.allUnplanned",
+                        "No scheduled result was generated. Please review unplanned tasks and explanation details"));
+                log.warn("{} step=ALL_UNPLANNED factoryCode={}, scheduleDate={}, batchNo={}, traceId={}, unplannedCount={}",
+                        TmScheduleConstants.AUTO_PLAN_LOG_PREFIX, context.getFactoryCode(),
+                        formatAutoPlanDate(context.getScheduleDate()), context.getBatchNo(), context.getTraceId(),
+                        persistResult.getUnplannedCount());
             } else {
                 response.setMessage(resolveTmMessage("ui.data.alert.tm.schedule.executeFinished", "胎面自动排程执行完成"));
             }

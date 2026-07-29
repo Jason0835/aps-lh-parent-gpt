@@ -40,15 +40,15 @@ public class TmPersistService {
         if (context == null || CollUtil.isEmpty(context.getTaskDraftList())) {
             return result;
         }
-        result.setResultCount(context.getTaskDraftList().size());
-        result.setExplainCount(result.getResultCount());
-        int unplannedCount = 0;
-        for (TmTaskDraft task : context.getTaskDraftList()) {
-            if (task.isUnassigned() || StrUtil.isNotBlank(task.getUnplannedReasonCode())) {
-                unplannedCount++;
-            }
-        }
-        result.setUnplannedCount(unplannedCount);
+        long resultCount = context.getTaskDraftList().stream()
+                .filter(task -> task != null && !this.isUnplannedTask(task) && !this.isNoProductionNeeded(task))
+                .count();
+        long unplannedCount = context.getTaskDraftList().stream()
+                .filter(this::isUnplannedTask)
+                .count();
+        result.setResultCount((int) resultCount);
+        result.setExplainCount(context.getTaskDraftList().size());
+        result.setUnplannedCount((int) unplannedCount);
         return result;
     }
 

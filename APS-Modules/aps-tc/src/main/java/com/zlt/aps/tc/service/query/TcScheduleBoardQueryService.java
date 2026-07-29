@@ -136,9 +136,10 @@ public class TcScheduleBoardQueryService {
      */
     public Page<TcScheduleUnplanned> listUnplanned(TcScheduleBoardQueryVo queryVo) {
         this.validateQuery(queryVo);
-        Map<String, String> batchMap = this.buildBatchMap(this.loadCurrentBatchResultList(queryVo),
-                this.loadCurrentBatchUnplannedList(queryVo));
-        List<String> batchNoList = new ArrayList<>(batchMap.values());
+        List<String> batchNoList = StringUtils.isNotBlank(queryVo.getBatchNo())
+                ? Collections.singletonList(queryVo.getBatchNo())
+                : new ArrayList<>(this.buildBatchMap(this.loadCurrentBatchResultList(queryVo),
+                this.loadCurrentBatchUnplannedList(queryVo)).values());
         int pageNum = queryVo.getPageNum() == null || queryVo.getPageNum() < 1 ? 1 : queryVo.getPageNum();
         int pageSize = queryVo.getPageSize() == null || queryVo.getPageSize() < 1 ? 20 : queryVo.getPageSize();
         if (batchNoList.isEmpty()) {

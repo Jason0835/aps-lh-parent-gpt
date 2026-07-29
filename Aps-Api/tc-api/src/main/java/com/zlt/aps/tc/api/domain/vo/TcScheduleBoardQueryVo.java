@@ -55,6 +55,10 @@ public class TcScheduleBoardQueryVo implements Serializable {
     @ApiModelProperty(value = "分配状态")
     private String assignStatus;
 
+    /** 自动排程批次号；传入时精确查询该批次。 */
+    @ApiModelProperty(value = "自动排程批次号")
+    private String batchNo;
+
     /** 当前页码。 */
     @ApiModelProperty(value = "当前页码", example = "1")
     private Integer pageNum = 1;

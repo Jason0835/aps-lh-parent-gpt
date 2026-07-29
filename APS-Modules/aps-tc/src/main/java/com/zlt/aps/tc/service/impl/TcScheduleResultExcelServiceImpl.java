@@ -373,7 +373,7 @@ public class TcScheduleResultExcelServiceImpl implements ITcScheduleResultExcelS
             rowMap.put("cxRemainQty", this.blankIfZero(formingData == null ? null : formingData.getCxRemainQty()));
             rowMap.put("sidewallCode", result.getSidewallCode());
             rowMap.put("materialDesc", formingData == null ? null : formingData.getMaterialDesc());
-            rowMap.put("wholeGlueCode", result.getWholeGlueCode());
+            rowMap.put("wholeGlueCode", this.buildExportGlueCode(result));
             rowMap.put("stockQty", this.blankIfZero(result.getStockQty()));
             rowMap.put("lastDayPlanQty", this.blankIfZero(
                     previousResult == null ? null : previousResult.getClass3PlanQty()));
@@ -399,6 +399,18 @@ public class TcScheduleResultExcelServiceImpl implements ITcScheduleResultExcelS
             rowMap.put("taskVersion", result.getTaskVersion() == null ? 0L : result.getTaskVersion());
             return rowMap;
         }).collect(Collectors.toList());
+    }
+
+    /**
+     * 组合排程结果的主胶料和基部胶编码，供专用模板胶种列导出使用。
+     *
+     * @param result 排程结果
+     * @return 使用英文逗号分隔的有效胶料编码；无有效编码时返回空字符串
+     */
+    private String buildExportGlueCode(TcScheduleResult result) {
+        return Arrays.asList(result.getGlueCode(), result.getBaseGlueCode()).stream()
+                .filter(StrUtil::isNotBlank)
+                .collect(Collectors.joining(","));
     }
 
     /**
