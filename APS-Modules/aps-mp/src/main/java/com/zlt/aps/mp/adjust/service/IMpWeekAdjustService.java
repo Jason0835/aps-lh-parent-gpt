@@ -21,6 +21,12 @@ public interface IMpWeekAdjustService {
     void autoAdjust(MpRollAdjustContextDTO contextDTO);
 
     /**
+     * 生产对齐
+     * @param contextDTO 周程滚动调整上下文对象
+     */
+    void productAlign(MpRollAdjustContextDTO contextDTO);
+
+    /**
      * 调整确认
      * @param contextDTO 周程滚动调整上下文对象
      */

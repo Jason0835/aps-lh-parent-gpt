@@ -514,6 +514,11 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
     }
 
     @Override
+    public void productAlign(MpRollAdjustContextDTO contextDTO) {
+        System.out.println("生产对齐");
+    }
+
+    @Override
     public void autoAdjust(MpRollAdjustContextDTO contextDTO) throws BusinessException {
         //1、执行自动调整
         doAutoAdjust(contextDTO);

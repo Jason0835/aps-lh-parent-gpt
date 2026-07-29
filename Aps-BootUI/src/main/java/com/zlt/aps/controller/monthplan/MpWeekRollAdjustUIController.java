@@ -63,6 +63,17 @@ public class MpWeekRollAdjustUIController extends BaseController {
         return mpWeekRollAdjustRemoteService.getAdjustDetailList(weekRollAdjustDTO);
     }
 
+
+    /**
+     * 生产对齐
+     */
+    @RequiresPermissions("monthplan:mpWeekRollAdjust:productAlign")
+    @ApiOperation("生产对齐")
+    @PostMapping("/productAlign")
+    @ResponseBody
+    public TableDataInfo productAlign(MpWeekRollAdjustDTO weekRollAdjustDTO) {
+        return mpWeekRollAdjustRemoteService.productAlign(weekRollAdjustDTO);
+    }
     /**
      * 自动调整
      */
