@@ -36,7 +36,7 @@
 </template>
 
 <script>
-import { autoPlan, validateAutoPlan } from '@/api/tc/tcScheduleResult'
+import {autoPlan, validateAutoPlan} from '@/api/tc/tcScheduleResult'
 
 export default {
   name: 'TcAutoPlanDialog',
@@ -82,7 +82,7 @@ export default {
           }
           const validateResult = this.unwrap(await validateAutoPlan(request))
           if (validateResult.confirmRequired) {
-            await this.$confirm(this.$t('ui.tc.schedule.confirmOverwrite'), {
+            await this.$confirm(validateResult.message || this.$t('ui.tc.schedule.confirmOverwrite'), {
               type: 'warning'
             })
             request.confirmOverwrite = true

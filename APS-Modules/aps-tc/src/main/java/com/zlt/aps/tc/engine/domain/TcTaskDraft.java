@@ -44,6 +44,9 @@ public class TcTaskDraft {
     /** 班次顺序 */
     private Integer shiftOrder;
 
+    /** TASK_SORT 阶段生成的稳定基础优先级，数值越小越优先 */
+    private Integer baseSortIndex;
+
     /** 当前班成型胎侧需求量，单位米 */
     private BigDecimal currentShiftDemandQty;
 
@@ -177,6 +180,9 @@ public class TcTaskDraft {
 
     /** 上个主胶料切换固定产能扣减量，单位米 */
     private BigDecimal previousGlueSwitchCapacityDeduct;
+
+    /** 上个任务口型板是否切换(与前一有效任务口型不同且均非空)，用于规格切换次数统计(详设§14.11 胶料/口型) */
+    private Boolean previousMouthPlateSwitched;
 
     /** 按当前班次开始时间和库存供应时长推算的库存不足时间 */
     private Date stockShortageTime;

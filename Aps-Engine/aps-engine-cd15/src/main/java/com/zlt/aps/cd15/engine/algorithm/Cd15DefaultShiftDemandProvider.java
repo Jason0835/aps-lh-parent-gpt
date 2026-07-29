@@ -82,7 +82,9 @@ public class Cd15DefaultShiftDemandProvider implements Cd15ShiftDemandProvider {
                 shift.getClassField(), candidate.getSteelStripCode(),
                 candidate.getMaterialKey(), demandQuantity, netDemand);
         return Cd15ShiftDemandDecision.builder()
-                .netDemandQuantity(netDemand).planSurplusQuantity(null).build();
+                .netDemandQuantity(netDemand).planSurplusQuantity(null)
+                .stopAffected(window.stream().anyMatch(Cd15DemandShift::isStopped))
+                .build();
     }
 
     /**

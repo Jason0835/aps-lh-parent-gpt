@@ -14,6 +14,9 @@ public enum TcScheduleRuleCodeEnum {
     /** 施工版本匹配及回退。 */
     VERSION_MATCH("VERSION_MATCH", "施工版本匹配及回退"),
 
+    /** 库存保证范围时长(用于库存供应时长 supplyHours 与排序库存紧急度)。 */
+    GUARD_RANGE_HOURS("GUARD_RANGE_HOURS", "库存保证范围时长"),
+
     /** 开机阈值调整。 */
     STARTUP_THRESHOLD_ADJUST("STARTUP_THRESHOLD_ADJUST", "开机阈值调整"),
 

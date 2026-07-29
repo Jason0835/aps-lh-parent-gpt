@@ -1,6 +1,7 @@
 package com.zlt.aps.tm.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
@@ -13,16 +14,15 @@ import com.zlt.aps.redissonLock.annotation.DistributedLock;
 import com.zlt.aps.tm.api.domain.dto.TmRollingRecalcRequestDTO;
 import com.zlt.aps.tm.api.domain.dto.TmScheduleResultImportDTO;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
-import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleRequestVo;
-import com.zlt.aps.tm.api.domain.vo.TmInsertTaskRequestVo;
-import com.zlt.aps.tm.api.domain.vo.TmOperationTaskVo;
-import com.zlt.aps.tm.api.domain.vo.TmScheduleShiftDateVO;
+import com.zlt.aps.tm.api.domain.entity.TmScheduleUnplanned;
+import com.zlt.aps.tm.api.domain.vo.*;
 import com.zlt.aps.tm.domain.TmAutoScheduleTask;
 import com.zlt.aps.tm.mapper.TmScheduleResultMapper;
 import com.zlt.aps.tm.service.ITmScheduleResultExcelService;
 import com.zlt.aps.tm.service.ITmScheduleResultService;
 import com.zlt.aps.tm.service.TmAutoScheduleTaskService;
 import com.zlt.aps.tm.service.TmOperationTaskApplicationService;
+import com.zlt.aps.tm.service.query.TmScheduleUnplannedQueryService;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.PubUtil;
@@ -63,6 +63,9 @@ public class TmScheduleResultController extends AbstractDocBizController<TmSched
 
     @Resource
     private ITmScheduleResultExcelService tmScheduleResultExcelService;
+
+    @Resource
+    private TmScheduleUnplannedQueryService tmScheduleUnplannedQueryService;
 
     @ApiOperation("查询列表")
     @PostMapping("/list")
@@ -184,6 +187,18 @@ public class TmScheduleResultController extends AbstractDocBizController<TmSched
     @PostMapping("/board")
     public AjaxResult board(@RequestBody TmScheduleResult query) {
         return AjaxResult.success(tmScheduleResultService.listBoard(query));
+    }
+
+    /**
+     * 分页查询胎面未排任务。
+     *
+     * @param queryVo 查询条件
+     * @return 未排任务分页结果
+     */
+    @ApiOperation("查询胎面未排任务")
+    @PostMapping("/unplanned/list")
+    public Page<TmScheduleUnplanned> listUnplanned(@RequestBody TmScheduleUnplannedQueryVo queryVo) {
+        return tmScheduleUnplannedQueryService.listUnplanned(queryVo);
     }
 
     /**
@@ -419,7 +434,8 @@ public class TmScheduleResultController extends AbstractDocBizController<TmSched
     @ApiOperation("获取胎面排程班次日期列表")
     @PostMapping("/listScheduleShiftDates")
     public List<TmScheduleShiftDateVO> listScheduleShiftDates(@RequestBody TmScheduleResult scheduleResult) {
-        return tmScheduleResultService.listScheduleShiftDates(scheduleResult.getScheduleDate());
+        return tmScheduleResultService.listScheduleShiftDates(
+                scheduleResult.getFactoryCode(), scheduleResult.getScheduleDate());
     }
 
     @Log(title = "ui.data.column.tm.scheduleResult.modelName", businessType = BusinessType.UPDATE)

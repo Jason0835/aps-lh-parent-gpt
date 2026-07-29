@@ -115,7 +115,18 @@ public class Cd15InsertRollingServiceImpl implements Cd15InsertRollingService {
         insertRequest.setSteelStripCode(request.getSteelStripCode());
         insertRequest.setRemark(request.getRemark());
         insertRequest.setConfirmed(request.getConfirmed());
+        this.copyTransferProduceOrders(request, insertRequest);
         return this.executeInternal(insertRequest, request, null);
+    }
+
+    /** 将转机台逐班目标顺序传入滚动请求，保持与直裁一致的硬插入位置语义。 */
+    private void copyTransferProduceOrders(Cd15TransferMachineRequest transferRequest,
+                                           Cd15InsertOrderRequest rollingRequest) {
+        IntStream.rangeClosed(1, 8).forEach(classIndex -> {
+            String fieldName = String.format("class%dProduceOrder", classIndex);
+            Integer produceOrder = (Integer) transferRequest.getFieldValueByFieldName(fieldName);
+            rollingRequest.setFieldValueByFieldName(fieldName, produceOrder);
+        });
     }
 
     @Override
@@ -1129,8 +1140,7 @@ public class Cd15InsertRollingServiceImpl implements Cd15InsertRollingService {
                 ? context.getParameters().getRollCoilMeter()
                 : material.getCurlLength();
         BigDecimal vehicleQuantity = vehiclePlanQuantityCalculator.calculate(
-                material.getUnitConsumeMillimeter(), material.getCraftWidth(),
-                curlLength);
+                material.getUnitConsumeMillimeter(), curlLength);
         Cd15MachineTrial trial = Cd15MachineTrial.builder()
                 .machineCode(machineCode).actualQuantity(segment.quantity)
                 .vehiclePlanQuantity(vehicleQuantity)
@@ -1586,6 +1596,30 @@ public class Cd15InsertRollingServiceImpl implements Cd15InsertRollingService {
             return allocateLanes(Segment.existing(result, classIndex(shift.getClassField()),
                     quantity, null, true), shift, quantity, state, input, context);
         }
+        List<String> capacityChangedLaneCodes = rows.stream()
+                .filter(row -> {
+                    Cd15StorageLaneState lane = state.getLanes().stream()
+                            .filter(item -> row.getStorageLaneCode().equals(item.getLaneCode()))
+                            .findFirst().orElse(null);
+                    if (lane == null) {
+                        return false;
+                    }
+                    int vehicles = row.getAllocatedCartCount() == null
+                            ? 0 : row.getAllocatedCartCount();
+                    return vehicles <= 0
+                            || lane.getVehicleCount() + vehicles > lane.getMaxVehicleCount();
+                })
+                .map(Cd15ScheduleLaneAllocation::getStorageLaneCode)
+                .distinct()
+                .collect(Collectors.toList());
+        if (!capacityChangedLaneCodes.isEmpty()
+                && !this.isLocked(result, classIndex(shift.getClassField()))) {
+            log.warn("[斜裁插单] 未开始任务原库排容量不足,降级为重新分配, "
+                            + "steelStripCode={}, changedLanes={}",
+                    result.getSteelStripCode(), capacityChangedLaneCodes);
+            return allocateLanes(Segment.existing(result, classIndex(shift.getClassField()),
+                    quantity, null, true), shift, quantity, state, input, context);
+        }
         List<Cd15StorageLaneAllocation> allocations = rows.stream().map(row -> {
             Cd15StorageLaneState lane = state.getLanes().stream()
                     .filter(item -> row.getStorageLaneCode().equals(item.getLaneCode()))
@@ -1636,7 +1670,7 @@ public class Cd15InsertRollingServiceImpl implements Cd15InsertRollingService {
         BigDecimal curlLength = material.getCurlLength() == null
                 || material.getCurlLength().signum() <= 0 ? fallback : material.getCurlLength();
         BigDecimal vehicleQuantity = vehiclePlanQuantityCalculator.calculate(
-                material.getUnitConsumeMillimeter(), material.getCraftWidth(), curlLength);
+                material.getUnitConsumeMillimeter(), curlLength);
         int availableTooling = Math.max(0,
                 state.getTotalToolingCount() - state.getOccupiedToolingCount());
         if (availableTooling <= 0) {
@@ -1688,8 +1722,7 @@ public class Cd15InsertRollingServiceImpl implements Cd15InsertRollingService {
                 || material.getCurlLength().signum() <= 0
                 ? fallback : material.getCurlLength();
         BigDecimal vehicleQuantity = this.vehiclePlanQuantityCalculator.calculate(
-                material.getUnitConsumeMillimeter(), material.getCraftWidth(),
-                curlLength);
+                material.getUnitConsumeMillimeter(), curlLength);
         int availableTooling = Math.max(0,
                 state.getTotalToolingCount() - state.getOccupiedToolingCount());
         int availablePairCount = availableTooling / 2;
@@ -1904,6 +1937,7 @@ public class Cd15InsertRollingServiceImpl implements Cd15InsertRollingService {
         return first != null && second != null && first.compareTo(second) == 0;
     }
 
+
     private void orderSegments(List<Segment> segments, Integer insertOrder,
                                Cd15MachineTailState previousTail) {
         List<Segment> sorted = segments.stream()
@@ -1915,15 +1949,42 @@ public class Cd15InsertRollingServiceImpl implements Cd15InsertRollingService {
                         .thenComparing(item -> item.result.getId(),
                                 Comparator.nullsLast(Long::compareTo)))
                 .collect(Collectors.toList());
-        Segment hardInsert = sorted.stream().filter(item -> item.hardInsert)
-                .findFirst().orElse(null);
-        if (hardInsert != null && insertOrder != null) {
-            sorted.remove(hardInsert);
-            int position = Math.max(0, Math.min(insertOrder - 1, sorted.size()));
-            sorted.add(position, hardInsert);
+        List<Segment> hardInsertSegments = sorted.stream()
+                .filter(item -> item.hardInsert)
+                .collect(Collectors.toList());
+        if (!hardInsertSegments.isEmpty() && insertOrder != null) {
+            sorted.removeAll(hardInsertSegments);
+            int position = this.resolveHardInsertPosition(sorted, insertOrder);
+            sorted.addAll(position, hardInsertSegments);
         }
         segments.clear();
         segments.addAll(sorted);
+    }
+
+    /**
+     * 按生产作业单元计算硬插入位置。分裁两条结果共用一个顺序，因此只能计作一个单元。
+     */
+    private int resolveHardInsertPosition(List<Segment> segments, int insertOrder) {
+        int precedingUnitCount = Math.max(0, insertOrder - 1);
+        if (precedingUnitCount == 0) {
+            return 0;
+        }
+        Set<String> countedSplitGroups = new HashSet<>();
+        int unitCount = 0;
+        for (int index = 0; index < segments.size(); index++) {
+            Segment segment = segments.get(index);
+            if (Cd15CutMode.SPLIT.equals(this.cutMode(segment.result))) {
+                String groupNo = segment.result.getGroupNo();
+                if (!countedSplitGroups.add(groupNo)) {
+                    continue;
+                }
+            }
+            unitCount++;
+            if (unitCount >= precedingUnitCount) {
+                return index + 1;
+            }
+        }
+        return segments.size();
     }
 
     private int continuityRank(Segment segment, Cd15MachineTailState previousTail) {
@@ -2030,6 +2091,8 @@ public class Cd15InsertRollingServiceImpl implements Cd15InsertRollingService {
                 : "插单后因" + limitReason + "部分顺延至下一班";
         result.setFieldValueByFieldName(String.format("class%dAnalysis", classIndex), analysis);
         if ("INSERT".equals(result.getSourceType())) {
+            result.setFieldValueByFieldName(
+                    String.format("class%dFinishRate", classIndex), 0D);
             result.setFieldValueByFieldName(String.format("class%dAnalysisInput", classIndex),
                     request.getFieldValueByFieldName(String.format("class%dAnalysisInput", classIndex)));
         }

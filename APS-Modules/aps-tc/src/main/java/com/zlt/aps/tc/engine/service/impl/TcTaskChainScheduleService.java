@@ -351,6 +351,16 @@ public class TcTaskChainScheduleService {
                 currentTask.setPreviousSpecSwitchHours(specSwitchHours);
                 currentTask.setPreviousGlueSwitchHours(glueSwitchHours);
                 currentTask.setPreviousGlueSwitchCapacityDeduct(glueSwitchCapacityDeduct);
+                // 口型板切换标记：与上一有效任务口型不同且均非空，用于规格切换次数统计(详设§14.11 胶料/口型)
+                String previousMouthPlateCode = previousTask == null
+                        ? (externalPredecessor == null ? null : externalPredecessor.getMouthPlateCode())
+                        : previousTask.getMouthPlateCode();
+                String currentMouthPlateCode = currentTask.getMouthPlateCode();
+                boolean mouthPlateBothNonBlank = previousMouthPlateCode != null && !previousMouthPlateCode.trim().isEmpty()
+                        && currentMouthPlateCode != null && !currentMouthPlateCode.trim().isEmpty();
+                boolean mouthPlateSwitched = mouthPlateBothNonBlank
+                        && !previousMouthPlateCode.trim().equals(currentMouthPlateCode.trim());
+                currentTask.setPreviousMouthPlateSwitched(mouthPlateSwitched);
             }
             long switchSeconds = specSwitchHours.add(glueSwitchHours)
                     .multiply(BigDecimal.valueOf(TcScheduleConstants.SECONDS_PER_HOUR))

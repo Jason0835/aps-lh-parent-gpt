@@ -21,6 +21,7 @@ import com.zlt.aps.tm.api.enums.TmScheduleRuleCodeEnum;
 import com.zlt.aps.tm.engine.domain.*;
 import com.zlt.aps.tm.engine.service.ITmSnapshotAndPersistService;
 import com.zlt.aps.tm.engine.service.impl.TmPersistService;
+import com.zlt.aps.tm.engine.service.impl.TmScheduleQualitySummaryService;
 import com.zlt.aps.tm.engine.service.impl.TmSnapshotBuildService;
 import com.zlt.aps.tm.mapper.TmScheduleExplainTargetRelMapper;
 import com.zlt.aps.tm.mapper.TmScheduleResultExplainMapper;
@@ -67,6 +68,10 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
 
     /** 最终持久化短事务模板。 */
     private final TransactionTemplate transactionTemplate;
+
+    /** 无外部依赖的内部质量快照计算器。 */
+    private final TmScheduleQualitySummaryService qualitySummaryService =
+            new TmScheduleQualitySummaryService();
 
     /**
      * 创建胎面自动排程业务快照和落库步骤服务。
@@ -142,6 +147,7 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
             throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.schedule.persistFailed"));
         }
         context.setPersistResult(persistResult);
+        context.setQualitySummary(this.qualitySummaryService.build(context, persistResult));
     }
 
     /**
@@ -206,6 +212,9 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
             normalizeResultShiftFields(result);
         }
         List<TmScheduleResult> visibleResultList = filterVisibleScheduleResults(mergedResultList, mergedResultBusinessKeyMap);
+        visibleResultList.sort(Comparator
+                .comparing((TmScheduleResult result) -> StrUtil.blankToDefault(result.getMachineCode(), ""))
+                .thenComparing(result -> StrUtil.blankToDefault(result.getTreadCode(), "")));
         assignTmOrderNo(visibleResultList, context.getBatchNo());
         resequenceVisibleShiftSequences(visibleResultList);
         this.batchSaveWithFallback(visibleResultList, transactionStatus, "RESULT", this::buildResultErrorMsg);
@@ -910,7 +919,8 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
                 + "|" + StrUtil.blankToDefault(result == null ? null : result.getBatchNo(), "")
                 + "|" + (scheduleDate == null ? "" : String.valueOf(scheduleDate.getTime()))
                 + "|" + StrUtil.blankToDefault(result == null ? null : result.getMachineCode(), "")
-                + "|" + StrUtil.blankToDefault(result == null ? null : result.getTreadCode(), "");
+                + "|" + StrUtil.blankToDefault(result == null ? null : result.getTreadCode(), "")
+                + "|" + StrUtil.blankToDefault(result == null ? null : result.getDataSource(), "");
     }
 
     /**

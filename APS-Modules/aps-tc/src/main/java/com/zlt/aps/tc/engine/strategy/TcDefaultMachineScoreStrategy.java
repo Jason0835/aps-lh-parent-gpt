@@ -134,15 +134,14 @@ public class TcDefaultMachineScoreStrategy implements ITcMachineScoreStrategy {
         }
         BigDecimal remainCapacity = this.nvl(candidate.getRemainCapacity());
         BigDecimal planQty = this.nvl(task.getPlanQty());
-        if (remainCapacity.compareTo(BigDecimal.ZERO) <= 0 || planQty.compareTo(BigDecimal.ZERO) <= 0
-                || remainCapacity.compareTo(planQty) < 0) {
+        if (remainCapacity.compareTo(BigDecimal.ZERO) <= 0 || planQty.compareTo(BigDecimal.ZERO) <= 0) {
             return BigDecimal.ZERO;
         }
-        // 产能利用率越高分越高：产能完全利用得满分 10，剩余越多浪费越多分越低
-        BigDecimal wasteRatio = remainCapacity.subtract(planQty)
-                .divide(remainCapacity, TcScheduleConstants.DECIMAL_CALCULATION_SCALE,
-                        RoundingMode.HALF_UP);
-        return weight.multiply(BigDecimal.ONE.subtract(wasteRatio))
+        // 当前任务量超过单机剩余产能时仍可同班拆分，按本机实际可排量计算填充率。
+        BigDecimal assignedQty = planQty.min(remainCapacity);
+        BigDecimal fillRatio = assignedQty.divide(remainCapacity,
+                TcScheduleConstants.DECIMAL_CALCULATION_SCALE, RoundingMode.HALF_UP);
+        return weight.multiply(fillRatio)
                 .max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
     }
 

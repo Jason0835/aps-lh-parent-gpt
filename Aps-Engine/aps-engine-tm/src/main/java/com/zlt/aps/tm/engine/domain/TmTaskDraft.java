@@ -53,6 +53,9 @@ public class TmTaskDraft {
     /** 班次顺序 */
     private Integer shiftOrder;
 
+    /** TASK_SORT 阶段生成的稳定基础优先级，数值越小越优先 */
+    private Integer baseSortIndex;
+
     /** 成型需求原始映射到的胎面逻辑班次，自动提前时与实际排程班次不同。 */
     private Integer sourceShiftOrder;
 

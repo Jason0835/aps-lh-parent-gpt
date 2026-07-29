@@ -22,7 +22,7 @@ public class Cd15ScheduleQuantityCalculator {
      * @param closeOut 是否收尾规格
      * @param lossRatePercent 损耗率百分数，5表示5%
      * @param minimumStartQuantity 最小起排量
-     * @param vehiclePlanQuantity 单车对应的斜裁排程米数
+     * @param vehiclePlanQuantity 单车可承载的钢带米数
      * @param equalShareThreshold 单规格均分及班产上限阈值
      * @param equalShareAlreadyApplied 是否为已完成损耗、起排量和整车取整的跨班余量
      * @return 实际排产量
@@ -240,10 +240,26 @@ public class Cd15ScheduleQuantityCalculator {
             BigDecimal vehiclePlanQuantity,
             BigDecimal craftWidthMillimeter,
             boolean equalShareAlreadyApplied) {
-        BigDecimal fullPlanQuantity = this.calculateFullPlanQuantity(
-                netDemandQuantity, closeOut, lossRatePercent,
-                minimumStartQuantity, vehiclePlanQuantity,
-                equalShareAlreadyApplied);
+        BigDecimal fullPlanQuantity;
+        if (equalShareAlreadyApplied) {
+            fullPlanQuantity = netDemandQuantity;
+        } else {
+            BigDecimal quantityWithLoss = netDemandQuantity.multiply(
+                    BigDecimal.ONE.add(lossRatePercent.divide(
+                            ONE_HUNDRED, 10, RoundingMode.HALF_UP)));
+            if (closeOut) {
+                fullPlanQuantity = quantityWithLoss;
+            } else {
+                BigDecimal branchQuantity = quantityWithLoss
+                        .max(minimumStartQuantity)
+                        .divide(new BigDecimal("2"));
+                BigDecimal branchVehicleCount = branchQuantity.divide(
+                        vehiclePlanQuantity, 0, RoundingMode.CEILING);
+                fullPlanQuantity = branchVehicleCount
+                        .multiply(vehiclePlanQuantity)
+                        .multiply(new BigDecimal("2"));
+            }
+        }
         return this.roundSingleSpecSplitUp(
                 fullPlanQuantity, craftWidthMillimeter);
     }
@@ -338,7 +354,7 @@ public class Cd15ScheduleQuantityCalculator {
         this.requireNonNegative(netDemandQuantity, "净需求量");
         this.requireNonNegative(lossRatePercent, "损耗率");
         this.requirePositive(minimumStartQuantity, "最小起排量");
-        this.requirePositive(vehiclePlanQuantity, "单车斜裁排程米数");
+        this.requirePositive(vehiclePlanQuantity, "单车钢带承载米数");
         this.requirePositive(equalShareThreshold, "单规格均分及班产上限阈值");
     }
 

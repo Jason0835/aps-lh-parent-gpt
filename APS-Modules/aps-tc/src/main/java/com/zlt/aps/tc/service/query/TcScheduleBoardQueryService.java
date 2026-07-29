@@ -8,15 +8,11 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.tc.api.constant.TcScheduleConstants;
-import com.zlt.aps.tc.api.domain.entity.TcScheduleResult;
-import com.zlt.aps.tc.api.domain.entity.TcScheduleResultExplain;
-import com.zlt.aps.tc.api.domain.entity.TcScheduleUnplanned;
-import com.zlt.aps.tc.api.domain.entity.TcShiftConfig;
+import com.zlt.aps.tc.api.domain.entity.*;
 import com.zlt.aps.tc.api.domain.vo.*;
-import com.zlt.aps.tc.mapper.TcScheduleResultExplainMapper;
-import com.zlt.aps.tc.mapper.TcScheduleResultMapper;
-import com.zlt.aps.tc.mapper.TcScheduleUnplannedMapper;
-import com.zlt.aps.tc.mapper.TcShiftConfigMapper;
+import com.zlt.aps.tc.api.enums.TcYesNoEnum;
+import com.zlt.aps.tc.mapper.*;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -30,6 +26,7 @@ import java.util.stream.Collectors;
  * <p>看板列表只读取排程与班次基础字段，解释大字段由明细方法按需加载，避免列表 N+1 查询。</p>
  */
 @Service
+@Slf4j
 public class TcScheduleBoardQueryService {
 
     private final TcScheduleResultMapper scheduleResultMapper;
@@ -40,6 +37,8 @@ public class TcScheduleBoardQueryService {
 
     private final TcShiftConfigMapper shiftConfigMapper;
 
+    private final TcParamsMapper paramsMapper;
+
     /**
      * 构造胎侧排程看板查询服务。
      *
@@ -47,15 +46,18 @@ public class TcScheduleBoardQueryService {
      * @param scheduleUnplannedMapper 未排任务 Mapper
      * @param scheduleResultExplainMapper 排程解释 Mapper
      * @param shiftConfigMapper 班次配置 Mapper
+     * @param paramsMapper 胎侧参数 Mapper
      */
     public TcScheduleBoardQueryService(TcScheduleResultMapper scheduleResultMapper,
                                        TcScheduleUnplannedMapper scheduleUnplannedMapper,
                                        TcScheduleResultExplainMapper scheduleResultExplainMapper,
-                                       TcShiftConfigMapper shiftConfigMapper) {
+                                       TcShiftConfigMapper shiftConfigMapper,
+                                       TcParamsMapper paramsMapper) {
         this.scheduleResultMapper = scheduleResultMapper;
         this.scheduleUnplannedMapper = scheduleUnplannedMapper;
         this.scheduleResultExplainMapper = scheduleResultExplainMapper;
         this.shiftConfigMapper = shiftConfigMapper;
+        this.paramsMapper = paramsMapper;
     }
 
     /**
@@ -134,9 +136,10 @@ public class TcScheduleBoardQueryService {
      */
     public Page<TcScheduleUnplanned> listUnplanned(TcScheduleBoardQueryVo queryVo) {
         this.validateQuery(queryVo);
-        Map<String, String> batchMap = this.buildBatchMap(this.loadCurrentBatchResultList(queryVo),
-                this.loadCurrentBatchUnplannedList(queryVo));
-        List<String> batchNoList = new ArrayList<>(batchMap.values());
+        List<String> batchNoList = StringUtils.isNotBlank(queryVo.getBatchNo())
+                ? Collections.singletonList(queryVo.getBatchNo())
+                : new ArrayList<>(this.buildBatchMap(this.loadCurrentBatchResultList(queryVo),
+                this.loadCurrentBatchUnplannedList(queryVo)).values());
         int pageNum = queryVo.getPageNum() == null || queryVo.getPageNum() < 1 ? 1 : queryVo.getPageNum();
         int pageSize = queryVo.getPageSize() == null || queryVo.getPageSize() < 1 ? 20 : queryVo.getPageSize();
         if (batchNoList.isEmpty()) {
@@ -250,12 +253,14 @@ public class TcScheduleBoardQueryService {
         wrapper.eq(TcShiftConfig::getFactoryCode, queryVo.getFactoryCode());
         wrapper.orderByAsc(TcShiftConfig::getShiftOrder);
         List<TcShiftConfig> shiftConfigList = this.emptyIfNull(this.shiftConfigMapper.selectList(wrapper));
+        int shiftDateStartOffset = this.resolveShiftDateStartOffset(queryVo.getFactoryCode());
         List<TcScheduleBoardDateColumnVo> columnList = new ArrayList<>();
         Date currentDate = DateUtil.beginOfDay(queryVo.getStartDate());
         Date endDate = DateUtil.beginOfDay(queryVo.getEndDate());
         while (!currentDate.after(endDate)) {
             Date scheduleDate = currentDate;
-            shiftConfigList.forEach(shiftConfig -> columnList.add(this.buildDateColumn(scheduleDate, shiftConfig)));
+            shiftConfigList.forEach(shiftConfig -> columnList.add(
+                    this.buildDateColumn(scheduleDate, shiftConfig, shiftDateStartOffset)));
             currentDate = DateUtil.offsetDay(currentDate, 1);
         }
         return columnList;
@@ -266,16 +271,67 @@ public class TcScheduleBoardQueryService {
      *
      * @param scheduleDate 排程日期
      * @param shiftConfig 班次配置
+     * @param shiftDateStartOffset 一班相对排程日期的偏移天数
      * @return 日期班次列
      */
-    private TcScheduleBoardDateColumnVo buildDateColumn(Date scheduleDate, TcShiftConfig shiftConfig) {
+    private TcScheduleBoardDateColumnVo buildDateColumn(Date scheduleDate, TcShiftConfig shiftConfig,
+                                                         int shiftDateStartOffset) {
         TcScheduleBoardDateColumnVo columnVo = new TcScheduleBoardDateColumnVo();
-        columnVo.setScheduleDate(scheduleDate);
+        columnVo.setScheduleDate(this.resolveShiftScheduleDate(
+                scheduleDate, shiftConfig.getShiftOrder(), shiftDateStartOffset));
         columnVo.setShiftOrder(shiftConfig.getShiftOrder());
         columnVo.setShiftCode(shiftConfig.getShiftCode());
         columnVo.setShiftName(shiftConfig.getShiftName());
         columnVo.setOpenFlag(shiftConfig.getOpenFlag());
         return columnVo;
+    }
+
+    /**
+     * 根据排程日期和班次顺序计算班次实际生产日期。
+     * 胎侧六班日期映射与胎面一致：1班使用参数定义的起始日期，
+     * 2~4班在起始日期基础上加1天，5~6班加2天。
+     *
+     * @param scheduleDate 排程日期
+     * @param shiftOrder 班次顺序
+     * @param shiftDateStartOffset 一班相对排程日期的偏移天数
+     * @return 班次实际生产日期
+     */
+    private Date resolveShiftScheduleDate(Date scheduleDate, Integer shiftOrder, int shiftDateStartOffset) {
+        if (shiftOrder == null) {
+            return scheduleDate;
+        }
+        int shiftWindowDayOffset = shiftOrder == 1 ? 0 : (shiftOrder >= 5 ? 2 : 1);
+        return DateUtil.offsetDay(scheduleDate, shiftDateStartOffset + shiftWindowDayOffset);
+    }
+
+    /**
+     * 读取一班相对排程日期的偏移天数。
+     * 参数未维护、未启用、为空或不是整数时使用兼容旧逻辑的默认值。
+     *
+     * @param factoryCode 工厂编码
+     * @return 一班相对排程日期的偏移天数
+     */
+    private int resolveShiftDateStartOffset(String factoryCode) {
+        LambdaQueryWrapper<TcParams> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(TcParams::getFactoryCode, factoryCode);
+        wrapper.eq(TcParams::getParamCode, TcScheduleConstants.PARAM_SHIFT_DATE_START_OFFSET);
+        wrapper.eq(TcParams::getEnableStatus, TcYesNoEnum.YES.getCode());
+        TcParams params = this.paramsMapper.selectOne(wrapper);
+        if (params == null) {
+            return TcScheduleConstants.DEFAULT_SHIFT_DATE_START_OFFSET;
+        }
+        String effectiveValue = StringUtils.isNotBlank(params.getParamValue())
+                ? params.getParamValue() : params.getDefaultValue();
+        if (StringUtils.isBlank(effectiveValue)) {
+            return TcScheduleConstants.DEFAULT_SHIFT_DATE_START_OFFSET;
+        }
+        try {
+            return Integer.parseInt(effectiveValue.trim());
+        } catch (NumberFormatException exception) {
+            log.warn("胎侧班次表头日期偏移参数格式错误，factoryCode={}, paramCode={}, paramValue={}",
+                    factoryCode, TcScheduleConstants.PARAM_SHIFT_DATE_START_OFFSET, effectiveValue);
+            return TcScheduleConstants.DEFAULT_SHIFT_DATE_START_OFFSET;
+        }
     }
 
     /**

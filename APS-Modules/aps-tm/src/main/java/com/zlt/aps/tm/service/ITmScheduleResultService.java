@@ -219,8 +219,9 @@ public interface ITmScheduleResultService extends IDocService<TmScheduleResult> 
      * 胎面排程班次日期列表
      * 根据排程日期构建6个班次的日期展示列表
      *
+     * @param factoryCode 工厂编码
      * @param scheduleDate 排程日期
      * @return 班次日期列表
      */
-    List<TmScheduleShiftDateVO> listScheduleShiftDates(Date scheduleDate);
+    List<TmScheduleShiftDateVO> listScheduleShiftDates(String factoryCode, Date scheduleDate);
 }

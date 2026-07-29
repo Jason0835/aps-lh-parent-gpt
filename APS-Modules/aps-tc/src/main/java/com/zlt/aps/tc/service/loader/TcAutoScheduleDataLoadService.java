@@ -692,7 +692,8 @@ public class TcAutoScheduleDataLoadService {
      * 从成型计划和施工信息构造胎侧待排任务。
      *
      * <p>按参数 {@code TC_VERSION_MATCH_MODE} 分流：{@code RECIPE}（默认）走逐班示方书版本解析，
-     * {@code B} 走 {@code BOM_DATA_VERSION} 关联逻辑；同时兼容早期内部使用的 {@code BOM} 配置值。</p>
+     * {@code BOM} 走 {@code BOM_DATA_VERSION} 关联逻辑。仅识别 {@code RECIPE}/{@code BOM}，
+     * 其他值(含早期内部 {@code B})由 {@link TcVersionMatchModeEnum#resolve} 回退为 {@code RECIPE}。</p>
      *
      * @param context     自动排程上下文
      * @param machineList 胎侧机台列表
@@ -830,14 +831,15 @@ public class TcAutoScheduleDataLoadService {
                 taskDraft.setShiftOrder(targetShiftOrder);
                 taskDraft.setNewSpecInfo(taskNewSpecInfo);
                 taskDraft.setSidewallLength(sidewallLength);
-            taskDraft.setTailFlag(TcCloseOutTipEnum.NEED.getCode().equals(row.getMarkCloseOutTip())
-                    ? TcYesNoEnum.YES.getCode() : TcYesNoEnum.NO.getCode());
+                taskDraft.setTailFlag(this.isCloseOutByPlanSurplus(row.getCxRemainQty(), formingQty)
+                        ? TcYesNoEnum.YES.getCode() : TcYesNoEnum.NO.getCode());
                 taskDraft.setTailBalanceQty(nvl(row.getCxRemainQty()));
                 taskDraft.setCurrentShiftDemandQty(demandQty);
                 taskDraft.setGuardDemandQty(calculateGuardDemand(classQtyArray, shiftOrder, guardShiftCount,
                         formingShiftOffset).multiply(sidewallLength));
                 taskDraft.setDemandQty(demandQty);
                 taskDraft.setGuardShiftCount(guardShiftCount);
+                this.fillGuardRangeHours(context, taskDraft, shiftOrder, guardShiftCount, formingShiftOffset);
                 taskDraft.setMinStartQty(minStartQty);
                 taskDraft.setDefaultCurlRollLength(defaultCurlLength);
                 if (toolTotalQty.compareTo(BigDecimal.ZERO) > 0) {
@@ -1061,14 +1063,15 @@ public class TcAutoScheduleDataLoadService {
                 taskDraft.setShiftOrder(targetShiftOrder);
                 taskDraft.setNewSpecInfo(taskNewSpecInfo);
                 taskDraft.setSidewallLength(sidewallLength);
-            taskDraft.setTailFlag(TcCloseOutTipEnum.NEED.getCode().equals(row.getMarkCloseOutTip())
-                    ? TcYesNoEnum.YES.getCode() : TcYesNoEnum.NO.getCode());
+                taskDraft.setTailFlag(this.isCloseOutByPlanSurplus(row.getCxRemainQty(), formingQty)
+                        ? TcYesNoEnum.YES.getCode() : TcYesNoEnum.NO.getCode());
                 taskDraft.setTailBalanceQty(nvl(row.getCxRemainQty()));
                 taskDraft.setCurrentShiftDemandQty(demandQty);
                 taskDraft.setGuardDemandQty(calculateGuardDemandByRecipe(classQtyArray, specByClass, shiftOrder,
                         guardShiftCount, formingShiftOffset));
                 taskDraft.setDemandQty(demandQty);
                 taskDraft.setGuardShiftCount(guardShiftCount);
+                this.fillGuardRangeHours(context, taskDraft, shiftOrder, guardShiftCount, formingShiftOffset);
                 taskDraft.setMinStartQty(minStartQty);
                 taskDraft.setDefaultCurlRollLength(defaultCurlLength);
                 if (toolTotalQty.compareTo(BigDecimal.ZERO) > 0) {
@@ -1107,9 +1110,11 @@ public class TcAutoScheduleDataLoadService {
         evidence.put("requestedVersion", requestedVersion);
         evidence.put("selectedVersion", selectedVersion);
         evidence.put("fallback", fallback);
+        // 版本未精确命中而回退取最新有效记录时，任务仍正常排产，统一记 PASS 并在 evidence 保留 fallback=true，
+        // 不再记 SKIP（SKIP 易误判为任务被跳过不排产，与实际行为不符）。
         context.getRuleTraceMap().computeIfAbsent(taskDraft.getBusinessKey(), key -> new TcRuleTrace())
                 .addRuleHit(TcScheduleRuleCodeEnum.VERSION_MATCH,
-                        fallback ? TcScheduleRuleResultEnum.SKIP : TcScheduleRuleResultEnum.PASS, evidence);
+                        TcScheduleRuleResultEnum.PASS, evidence);
     }
 
     /**
@@ -1473,8 +1478,10 @@ public class TcAutoScheduleDataLoadService {
      */
     private String buildSourceTaskBusinessKeySuffix(TcFormingDemandRowVo row, int sourceRowIndex, int shiftOrder) {
         String sourceOrderNo = row == null ? null : row.getOrderNo();
-        String sourceKey = StrUtil.blankToDefault(sourceOrderNo, "ROW" + sourceRowIndex);
-        return sourceKey + "-CLASS" + shiftOrder + "-ROW" + sourceRowIndex;
+        String sourceKey = row != null && row.getSourceRecordId() != null
+                ? "ID" + row.getSourceRecordId()
+                : StrUtil.blankToDefault(sourceOrderNo, "ROW" + sourceRowIndex);
+        return sourceKey + "-CLASS" + shiftOrder;
     }
 
     /**
@@ -1487,8 +1494,10 @@ public class TcAutoScheduleDataLoadService {
      */
     private String buildSourceTaskBusinessKeySuffix(TcFormingDemandRecipeRowVo row, int sourceRowIndex, int shiftOrder) {
         String sourceOrderNo = row == null ? null : row.getOrderNo();
-        String sourceKey = StrUtil.blankToDefault(sourceOrderNo, "ROW" + sourceRowIndex);
-        return sourceKey + "-CLASS" + shiftOrder + "-ROW" + sourceRowIndex;
+        String sourceKey = row != null && row.getSourceRecordId() != null
+                ? "ID" + row.getSourceRecordId()
+                : StrUtil.blankToDefault(sourceOrderNo, "ROW" + sourceRowIndex);
+        return sourceKey + "-CLASS" + shiftOrder;
     }
 
     /**
@@ -2332,6 +2341,70 @@ public class TcAutoScheduleDataLoadService {
     }
 
     /**
+     * 计算库存保证范围总时长，供需求量策略计算供应时长 supplyHours 与排序库存紧急度使用。
+     *
+     * <p>从需求起点班次起连续 guardShiftCount 个成型班次，按其映射后的胎侧班次配置时长累加；
+     * 班次时长缺失或非正时置 null 并记 SKIP，避免 supplyHours 误算。移植自胎面 TmAutoScheduleDataLoadService。</p>
+     *
+     * @param context 排程上下文
+     * @param taskDraft 任务草稿
+     * @param shiftOrder 胎侧排程班次
+     * @param guardShiftCount 库存保证班数
+     * @param formingShiftOffset 成型班次偏移量
+     */
+    private void fillGuardRangeHours(TcScheduleContext context, TcTaskDraft taskDraft, int shiftOrder,
+                                     int guardShiftCount, int formingShiftOffset) {
+        int logicalStartShiftOrder = this.resolveFormingStartIndex(shiftOrder, formingShiftOffset) + 1;
+        int count = Math.max(guardShiftCount, 1);
+        BigDecimal guardRangeHours = BigDecimal.ZERO;
+        List<Integer> mappedShiftOrders = new ArrayList<>();
+        List<BigDecimal> shiftHours = new ArrayList<>();
+        String skipReason = null;
+        for (int index = 0; index < count; index++) {
+            int logicalShiftOrder = logicalStartShiftOrder + index;
+            int mappedShiftOrder = this.mapGuardLogicalShiftOrder(logicalShiftOrder);
+            BigDecimal currentShiftHours = context.getShiftHoursMap().get(mappedShiftOrder);
+            mappedShiftOrders.add(mappedShiftOrder);
+            shiftHours.add(currentShiftHours);
+            if (currentShiftHours == null || currentShiftHours.compareTo(BigDecimal.ZERO) <= 0) {
+                skipReason = "SHIFT_HOURS_MISSING_OR_NON_POSITIVE";
+                break;
+            }
+            guardRangeHours = guardRangeHours.add(currentShiftHours);
+        }
+        Map<String, Object> evidence = new LinkedHashMap<>();
+        evidence.put("logicalStartShiftOrder", logicalStartShiftOrder);
+        evidence.put("guardShiftCount", count);
+        evidence.put("mappedShiftOrders", mappedShiftOrders);
+        evidence.put("shiftHours", shiftHours);
+        if (skipReason == null) {
+            taskDraft.setGuardRangeHours(guardRangeHours);
+            evidence.put("guardRangeHours", guardRangeHours);
+            context.getRuleTraceMap().computeIfAbsent(taskDraft.getBusinessKey(), key -> new TcRuleTrace())
+                    .addRuleHit(TcScheduleRuleCodeEnum.GUARD_RANGE_HOURS, TcScheduleRuleResultEnum.PASS, evidence);
+            return;
+        }
+        taskDraft.setGuardRangeHours(null);
+        evidence.put("guardRangeHours", null);
+        evidence.put("reason", skipReason);
+        context.getRuleTraceMap().computeIfAbsent(taskDraft.getBusinessKey(), key -> new TcRuleTrace())
+                .addRuleHit(TcScheduleRuleCodeEnum.GUARD_RANGE_HOURS, TcScheduleRuleResultEnum.SKIP, evidence);
+    }
+
+    /**
+     * 将超过六班的逻辑班次按三班日周期映射到实际班次配置。
+     *
+     * @param logicalShiftOrder 从一开始连续增长的逻辑班次
+     * @return 一至六范围内的实际班次顺序
+     */
+    private int mapGuardLogicalShiftOrder(int logicalShiftOrder) {
+        if (logicalShiftOrder <= TcScheduleConstants.TC_MAX_SHIFT_ORDER) {
+            return logicalShiftOrder;
+        }
+        return ((logicalShiftOrder - TcScheduleConstants.TC_MAX_SHIFT_ORDER - 1) % 3) + 1;
+    }
+
+    /**
      * 读取成型班次计划量，超过数组范围时按 0 处理。
      *
      * @param classQtyArray 成型班次计划量数组
@@ -2377,6 +2450,23 @@ public class TcAutoScheduleDataLoadService {
      */
     private BigDecimal nvl(BigDecimal value) {
         return value == null ? BigDecimal.ZERO : value;
+    }
+
+    /**
+     * 按斜裁相同口径判断单胎胚当前班次是否收尾。
+     * <p>月计划余量和成型计划量均为条数，必须直接比较，不能混入胎侧长度后的米数；
+     * 余量缺失或非法时保持非收尾，避免把数据缺失误判为可收尾。</p>
+     *
+     * @param planSurplusQty 胎胚月计划余量，单位条
+     * @param formingPlanQty 当前班次成型计划量，单位条
+     * @return true-月计划余量可由当前班次计划完成，false-仍按非收尾规格处理
+     */
+    private boolean isCloseOutByPlanSurplus(BigDecimal planSurplusQty, BigDecimal formingPlanQty) {
+        return planSurplusQty != null
+                && planSurplusQty.compareTo(BigDecimal.ZERO) >= 0
+                && formingPlanQty != null
+                && formingPlanQty.compareTo(BigDecimal.ZERO) > 0
+                && planSurplusQty.compareTo(formingPlanQty) <= 0;
     }
 
     /**

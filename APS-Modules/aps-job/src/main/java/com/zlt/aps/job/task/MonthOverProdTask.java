@@ -91,17 +91,17 @@ public class MonthOverProdTask {
 
     // ==================== 临时测试方法（指定月份模拟月底超欠产生成） ====================
     // 以下两个方法用于测试在非月底时间手动触发超欠产计算，逻辑同calcOverProdOnSecondLastDay/calcOverProdOnLastDay
-    // 当前指定2026年6月数据触发7月超欠产生成，测试完成后请删除
+    // 当前指定2026年7月数据触发8月超欠产生成，测试完成后请删除
 
     /**
-     * 临时测试方法-模拟倒数第2天触发超欠产计算（指定6月数据写入7月）
-     * 逻辑同calcOverProdOnSecondLastDay，但使用指定的年月(2026-06)替代当前月份
+     * 临时测试方法-模拟倒数第2天触发超欠产计算（指定7月数据写入8月）
+     * 逻辑同calcOverProdOnSecondLastDay，但使用指定的年月(2026-07)替代当前月份
      */
-    @ApiOperation("临时测试-模拟倒数第2天触发超欠产（指定6月数据写入7月）")
+    @ApiOperation("临时测试-模拟倒数第2天触发超欠产（指定7月数据写入8月）")
     public void testCalcOverProdOnSecondLastDay() {
-        // 临时指定2026年6月作为数据来源，写入7月月计划
+        // 临时指定2026年7月作为数据来源，写入8月月计划
         Integer year = 2026;
-        Integer month = 6;
+        Integer month = 7;
         log.info("临时测试-开始计算超欠产(模拟倒数第2天触发, 数据来源: {}-{})", year, month);
         try {
             FeignTokenHelper.runWithToken(() -> {
@@ -115,14 +115,14 @@ public class MonthOverProdTask {
     }
 
     /**
-     * 临时测试方法-模拟最后一天触发超欠产计算（指定6月数据写入7月）
-     * 逻辑同calcOverProdOnLastDay，但使用指定的年月(2026-06)替代当前月份
+     * 临时测试方法-模拟最后一天触发超欠产计算（指定7月数据写入8月）
+     * 逻辑同calcOverProdOnLastDay，但使用指定的年月(2026-07)替代当前月份
      */
-    @ApiOperation("临时测试-模拟最后一天触发超欠产（指定6月数据写入7月）")
+    @ApiOperation("临时测试-模拟最后一天触发超欠产（指定7月数据写入8月）")
     public void testCalcOverProdOnLastDay() {
-        // 临时指定2026年6月作为数据来源，写入7月月计划
+        // 临时指定2026年7月作为数据来源，写入8月月计划
         Integer year = 2026;
-        Integer month = 6;
+        Integer month = 7;
         log.info("临时测试-开始计算超欠产(模拟最后一天触发, 数据来源: {}-{})", year, month);
         try {
             FeignTokenHelper.runWithToken(() -> {

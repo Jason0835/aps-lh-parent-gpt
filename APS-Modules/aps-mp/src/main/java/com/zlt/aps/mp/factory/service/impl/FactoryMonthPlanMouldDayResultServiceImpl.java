@@ -331,6 +331,14 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
                     // 待调整量 = 净需求量 - 本月剩余量 - 上月剩余量
                     result.setPendingQty(intValue(result.getProdReqPlan()) - intValue(result.getProductSurplus()) - intValue(result.getLastMonthRemainQty()));
                 }
+                // 2.1.2.9、把计划量为0的都处理为空
+                for(int day = FactoryConstant.MONTH_START_DAY; day < FactoryConstant.MONTH_MAX_DAY; day ++) {
+                    String fieldName = String.format(DAY_FIELD_NAME_FORMAT, day);
+                    Integer fieldValue = (Integer)result.getFieldValueByFieldName(fieldName);
+                    if (fieldValue != null && fieldValue.intValue() == 0) {
+                        result.setFieldValueByFieldName(fieldName, null);
+                    }
+                }
             }
             // 2.1.2.6、设置对应的最大型腔数和最大活块数:重新对结构内的数据排序：主花纹分组，按型胎胚描述，最大腔数倒序、主花纹、最大活块数倒序，主花纹组内按型腔数倒序、活块数倒序排序
             structureList.stream().forEach(s -> {

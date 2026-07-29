@@ -20,12 +20,10 @@ import com.zlt.aps.tm.api.constant.TmScheduleConstants;
 import com.zlt.aps.tm.api.domain.dto.TmRollingRecalcRequestDTO;
 import com.zlt.aps.tm.api.domain.entity.TmDispatcherLog;
 import com.zlt.aps.tm.api.domain.entity.TmMachineInfo;
+import com.zlt.aps.tm.api.domain.entity.TmParams;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
 import com.zlt.aps.tm.api.domain.vo.*;
-import com.zlt.aps.tm.api.enums.TmAutoScheduleIssueCategoryEnum;
-import com.zlt.aps.tm.api.enums.TmAutoScheduleIssueLevelEnum;
-import com.zlt.aps.tm.api.enums.TmReleaseStatusTransition;
-import com.zlt.aps.tm.api.enums.TmScheduleStepEnum;
+import com.zlt.aps.tm.api.enums.*;
 import com.zlt.aps.tm.component.TmScheduleBatchNoGenerator;
 import com.zlt.aps.tm.domain.TmAutoScheduleTask;
 import com.zlt.aps.tm.engine.domain.TmPersistResult;
@@ -66,6 +64,9 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
 
     @Resource
     private TmMachineInfoMapper tmMachineInfoMapper;
+
+    @Resource
+    private TmParamsMapper tmParamsMapper;
 
     @Resource
     private TmScheduleResultExplainMapper tmScheduleResultExplainMapper;
@@ -496,6 +497,26 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
                         TmScheduleConstants.AUTO_PLAN_LOG_PREFIX, context.getFactoryCode(),
                         formatAutoPlanDate(context.getScheduleDate()),
                         context.getBatchNo(), context.getTraceId(), persistResult.getErrorCount(), persistResult.getLastErrorMsg());
+            } else if (CollUtil.isEmpty(context.getTaskDraftList())) {
+                response.setMessage(resolveTmMessage("ui.data.alert.tm.schedule.noTaskGenerated",
+                        "No schedulable forming demand was loaded"));
+                log.warn("{} step=NO_TASK_GENERATED factoryCode={}, scheduleDate={}, batchNo={}, traceId={}, reason=noSchedulableTask",
+                        TmScheduleConstants.AUTO_PLAN_LOG_PREFIX, context.getFactoryCode(),
+                        formatAutoPlanDate(context.getScheduleDate()), context.getBatchNo(), context.getTraceId());
+            } else if (persistResult.getResultCount() == 0 && persistResult.getUnplannedCount() == 0) {
+                response.setMessage(resolveTmMessage("ui.data.alert.tm.schedule.noProductionNeeded",
+                        "No production is needed because demand has been covered by inventory or scheduling rules"));
+                log.info("{} step=NO_PRODUCTION_NEEDED factoryCode={}, scheduleDate={}, batchNo={}, traceId={}, taskCount={}",
+                        TmScheduleConstants.AUTO_PLAN_LOG_PREFIX, context.getFactoryCode(),
+                        formatAutoPlanDate(context.getScheduleDate()), context.getBatchNo(), context.getTraceId(),
+                        context.getTaskDraftList().size());
+            } else if (persistResult.getResultCount() == 0) {
+                response.setMessage(resolveTmMessage("ui.data.alert.tm.schedule.allUnplanned",
+                        "No scheduled result was generated. Please review unplanned tasks and explanation details"));
+                log.warn("{} step=ALL_UNPLANNED factoryCode={}, scheduleDate={}, batchNo={}, traceId={}, unplannedCount={}",
+                        TmScheduleConstants.AUTO_PLAN_LOG_PREFIX, context.getFactoryCode(),
+                        formatAutoPlanDate(context.getScheduleDate()), context.getBatchNo(), context.getTraceId(),
+                        persistResult.getUnplannedCount());
             } else {
                 response.setMessage(resolveTmMessage("ui.data.alert.tm.schedule.executeFinished", "胎面自动排程执行完成"));
             }
@@ -947,20 +968,22 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
 
     /**
      * 获取胎面排程班次日期列表
-     * 根据排程日期构建6个班次的日期展示列表
-     * 胎面排程6个班次覆盖D日中班、D+1日夜早中、D+2日夜早（D=排程日期-2，即今天）：
+     * 根据工厂参数和排程日期构建6个班次的日期展示列表。
+     * 胎面排程6个班次覆盖D日中班、D+1日夜早中、D+2日夜早，
+     * D默认等于排程日期减2天，可通过TM_SHIFT_DATE_START_OFFSET按工厂维护：
      * 班次1：D日中班，班次2~4：D+1日夜早中，班次5~6：D+2日夜早
      *
+     * @param factoryCode 工厂编码
      * @param scheduleDate 排程日期
      * @return 班次日期列表
      */
     @Override
-    public List<TmScheduleShiftDateVO> listScheduleShiftDates(Date scheduleDate) {
+    public List<TmScheduleShiftDateVO> listScheduleShiftDates(String factoryCode, Date scheduleDate) {
         if (scheduleDate == null) {
             scheduleDate = DateUtil.offsetDay(new Date(), 2);
         }
-        // D = 排程日期 - 2（即今天）
-        Date dDay = DateUtil.offsetDay(scheduleDate, -2);
+        int shiftDateStartOffset = this.resolveShiftDateStartOffset(factoryCode);
+        Date dDay = DateUtil.offsetDay(scheduleDate, shiftDateStartOffset);
         Date dPlus1Day = DateUtil.offsetDay(dDay, 1);
         Date dPlus2Day = DateUtil.offsetDay(dDay, 2);
         String dDateStr = DateUtil.format(dDay, "MM/dd");
@@ -975,6 +998,39 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
         result.add(buildShiftDateVO(5, "night", dPlus2DateStr));      // D+2日夜班
         result.add(buildShiftDateVO(6, "morning", dPlus2DateStr));    // D+2日早班
         return result;
+    }
+
+    /**
+     * 读取一班相对排程日期的偏移天数。
+     * 参数未维护、未启用、为空或不是整数时使用兼容旧逻辑的默认值。
+     *
+     * @param factoryCode 工厂编码
+     * @return 一班相对排程日期的偏移天数
+     */
+    private int resolveShiftDateStartOffset(String factoryCode) {
+        if (StringUtils.isBlank(factoryCode)) {
+            return TmScheduleConstants.DEFAULT_SHIFT_DATE_START_OFFSET;
+        }
+        LambdaQueryWrapper<TmParams> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(TmParams::getFactoryCode, factoryCode);
+        wrapper.eq(TmParams::getParamCode, TmScheduleConstants.PARAM_SHIFT_DATE_START_OFFSET);
+        wrapper.eq(TmParams::getEnableStatus, TmYesNoEnum.YES.getCode());
+        TmParams params = this.tmParamsMapper.selectOne(wrapper);
+        if (params == null) {
+            return TmScheduleConstants.DEFAULT_SHIFT_DATE_START_OFFSET;
+        }
+        String effectiveValue = StringUtils.isNotBlank(params.getParamValue())
+                ? params.getParamValue() : params.getDefaultValue();
+        if (StringUtils.isBlank(effectiveValue)) {
+            return TmScheduleConstants.DEFAULT_SHIFT_DATE_START_OFFSET;
+        }
+        try {
+            return Integer.parseInt(effectiveValue.trim());
+        } catch (NumberFormatException exception) {
+            log.warn("胎面班次表头日期偏移参数格式错误，factoryCode={}, paramCode={}, paramValue={}",
+                    factoryCode, TmScheduleConstants.PARAM_SHIFT_DATE_START_OFFSET, effectiveValue);
+            return TmScheduleConstants.DEFAULT_SHIFT_DATE_START_OFFSET;
+        }
     }
 
     /**

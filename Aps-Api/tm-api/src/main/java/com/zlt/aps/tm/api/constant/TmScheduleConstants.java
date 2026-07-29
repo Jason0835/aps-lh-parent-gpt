@@ -46,6 +46,9 @@ public final class TmScheduleConstants {
     /** 成型需求偏移班次数参数键。 */
     public static final String PARAM_FORMING_SHIFT_OFFSET = "TM_FORMING_SHIFT_OFFSET";
 
+    /** 班次表头起始日期相对排程日期的偏移天数参数键。 */
+    public static final String PARAM_SHIFT_DATE_START_OFFSET = "TM_SHIFT_DATE_START_OFFSET";
+
     /** 小胶种编码参数键。 */
     public static final String PARAM_SMALL_GLUE_CODES = "TM_SMALL_GLUE_CODES";
 
@@ -169,6 +172,9 @@ public final class TmScheduleConstants {
 
     /** 成型需求偏移班次数默认值。 */
     public static final String DEFAULT_FORMING_SHIFT_OFFSET = "2";
+
+    /** 班次表头起始日期相对排程日期的默认偏移天数。 */
+    public static final int DEFAULT_SHIFT_DATE_START_OFFSET = -2;
 
     /** 小胶种编码默认值。 */
     public static final String DEFAULT_SMALL_GLUE_CODES = "";

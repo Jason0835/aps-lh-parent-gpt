@@ -794,8 +794,19 @@ public class DjScheduleResultController extends AbstractBillBizController<DjSche
         orderStr.append("ISNULL(CLASS3_SEQUENCE), CLASS3_SEQUENCE,");
         orderStr.append("ISNULL(CLASS4_SEQUENCE), CLASS4_SEQUENCE,");
         orderStr.append("ISNULL(CLASS5_SEQUENCE), CLASS5_SEQUENCE,");
-        orderStr.append("ISNULL(CLASS6_SEQUENCE), CLASS6_SEQUENCE");
+        orderStr.append("ISNULL(CLASS6_SEQUENCE), CLASS6_SEQUENCE,");
+        orderStr.append("ID"); // 兜底排序
         return orderStr.toString();
+    }
+    
+    @Override
+    protected void builderCondition(QueryWrapper<DjScheduleResult> queryWrapper, DjScheduleResult queryVO) {
+        queryWrapper.eq("FACTORY_CODE", queryVO.getFactoryCode());
+        queryWrapper.eq("SCHEDULE_DATE", queryVO.getScheduleDate());
+        queryWrapper.like(StringUtils.isNotEmpty(queryVO.getPaddingName()), "PADDING_NAME", queryVO.getPaddingName());
+        queryWrapper.like(StringUtils.isNotEmpty(queryVO.getGlueCode()), "GLUE_CODE", queryVO.getGlueCode());
+        queryWrapper.eq(StringUtils.isNotEmpty(queryVO.getReleaseStatus()), "RELEASE_STATUS", queryVO.getReleaseStatus());
+        queryWrapper.eq(StringUtils.isNotEmpty(queryVO.getMachineCode()), "MACHINE_CODE", queryVO.getMachineCode());
     }
 
     @Override

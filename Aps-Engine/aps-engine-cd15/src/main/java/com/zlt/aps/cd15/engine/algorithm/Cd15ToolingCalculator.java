@@ -33,7 +33,7 @@ public class Cd15ToolingCalculator {
             throw new IllegalArgumentException("工装总数和库排占用车数不能小于0");
         }
         if (vehiclePlanQuantity == null || vehiclePlanQuantity.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("单车斜裁排程米数必须大于0");
+            throw new IllegalArgumentException("单车钢带承载米数必须大于0");
         }
 
         int availableCount = Math.max(0, totalToolingCount - occupiedVehicleCount);
@@ -60,7 +60,7 @@ public class Cd15ToolingCalculator {
             throw new IllegalArgumentException("工装总数和库排占用车数不能小于0");
         }
         if (vehiclePlanQuantity == null || vehiclePlanQuantity.signum() <= 0) {
-            throw new IllegalArgumentException("单车斜裁排程米数必须大于0");
+            throw new IllegalArgumentException("单车钢带承载米数必须大于0");
         }
         int availableCount = Math.max(0,
                 totalToolingCount - occupiedVehicleCount);

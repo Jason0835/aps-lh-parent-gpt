@@ -32,9 +32,9 @@ public interface ITcScheduleResultRemoteService {
      * @return Excel 文件字节
      */
     @ApiOperation("按专用模板导出胎侧排程结果")
-    @PostMapping("/tcScheduleResult/exportDataScheduleResult/{fileName}")
+    @PostMapping("/tcScheduleResult/exportDataScheduleResult")
     byte[] exportDataScheduleResult(@RequestBody TcScheduleResult queryVO,
-                                    @PathVariable("fileName") String fileName);
+                                    @RequestParam("fileName") String fileName);
 
     /**
      * 按专用模板导入胎侧排程结果。
