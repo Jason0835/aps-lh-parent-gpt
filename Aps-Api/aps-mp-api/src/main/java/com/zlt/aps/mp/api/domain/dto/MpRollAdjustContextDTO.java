@@ -247,6 +247,9 @@ public class MpRollAdjustContextDTO implements Serializable {
     @ApiModelProperty(value = "需求计划列表")
     private List<DpDemandPlan> dpDemandPlanList;
 
+    @ApiModelProperty(value = "上次需求计划列表")
+    private List<DpDemandPlan> dpLastDemandPlanList;
+
     @ApiModelProperty(value = "日产能限制Map")
     private Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap;
 
