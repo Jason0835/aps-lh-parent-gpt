@@ -1190,7 +1190,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         Map<String, Integer> insertResults = new HashMap<>(0); // 活块可用量（按物料描述分组）
         List<DailyMouldAvailabilityResult> moldResult = moldCavityInsertMaxValueCalculator
                 .moldCavityInsertMaxValueCalculator(year, month, factoryCode,
-                        null, null, true);
+                        null, null, true,true);
         if (!CollectionUtils.isEmpty(moldResult)) {
             cavityResults = moldResult.get(0).getCavityResults();
             insertResults = moldResult.get(0).getInsertResults();

@@ -243,7 +243,7 @@ const offsetDate = offset => {
 }
 
 export default {
-  name: 'TcScheduleResult',
+  name: '/tc/tcScheduleResult',
   components: {
     AutoPlanDialog,
     ChangeMachineDialog,

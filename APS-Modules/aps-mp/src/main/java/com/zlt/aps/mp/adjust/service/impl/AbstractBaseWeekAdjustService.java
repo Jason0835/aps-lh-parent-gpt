@@ -1371,6 +1371,10 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         // 月计划统计结果列表
         List<MpMonthPlanStatistics> monthPlanStatisticsList = new ArrayList<>();
         StringBuilder sbError = new StringBuilder();
+
+        // 初始化每日型腔/活块数量
+        contextDTO.setCavity2BlockMap(mpAdjustStructureInService.getCavityAndBlockQtyMap(contextDTO,false));
+
         for (String structureName : structureNameSet) {
             contextDTO.setStructureName(structureName);
 
@@ -1388,9 +1392,6 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             setAdjustDate(contextDTO);
             // 初始锁定日
             contextDTO.setLockEndDay(getLockEndDay(contextDTO));
-            // 初始化每日型腔/活块数量
-            contextDTO.setCavity2BlockMap(mpAdjustStructureInService.getCavityAndBlockQtyMap(contextDTO));
-
             // 初始结构开始日\收尾日
             initStructureStartAndEndDay(contextDTO);
             // 检查排产日是否超出结构起产日-收尾日
@@ -4513,7 +4514,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
     protected List<DailyMouldAvailabilityResult> calculateMoldCavityInsertMaxValue(MpRollAdjustContextDTO contextDTO) throws Exception {
         LocalDate monthStart = LocalDate.of(contextDTO.getMpYear(), contextDTO.getMpMonth(), ProductionConstant.MONTH_START_DAY);
         return moldCavityInsertMaxValueCalculator.moldCavityInsertMaxValueCalculator(contextDTO.getMpYear(), contextDTO.getMpMonth(),
-                contextDTO.getFactoryCode(), com.zlt.aps.mp.engine.utils.DateUtils.getDate(monthStart.with(TemporalAdjusters.lastDayOfMonth())), contextDTO.getAdjustMonthPlanVersion());
+                contextDTO.getFactoryCode(), com.zlt.aps.mp.engine.utils.DateUtils.getDate(monthStart.with(TemporalAdjusters.lastDayOfMonth())), contextDTO.getAdjustMonthPlanVersion(),true);
     }
 
     /**

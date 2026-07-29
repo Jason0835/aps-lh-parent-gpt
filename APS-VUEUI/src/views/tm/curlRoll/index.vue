@@ -60,7 +60,7 @@ import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import infoDialog from "./components/infoDialog.vue";
 
 export default {
-  name: "TmCurlRoll",
+  name: "/tm/tmCurlRoll",
   components: {
     tltUpload,
     infoDialog,

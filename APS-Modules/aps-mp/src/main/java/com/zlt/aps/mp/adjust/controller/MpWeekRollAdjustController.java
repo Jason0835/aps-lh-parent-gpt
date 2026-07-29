@@ -379,7 +379,7 @@ public class MpWeekRollAdjustController extends BaseController {
                 () -> contextDTO.setCycleStructureMinLhMachinesMap(mpAdjustStructureInService.getCycleStructureMinMachinesMap(contextDTO)));
         // 2.7 型腔与活块数量
         CompletableFuture<Void> cavityBlockFuture = CompletableFuture.runAsync(
-                () -> contextDTO.setCavity2BlockMap(mpAdjustStructureInService.getCavityAndBlockQtyMap(contextDTO)));
+                () -> contextDTO.setCavity2BlockMap(mpAdjustStructureInService.getCavityAndBlockQtyMap(contextDTO,true)));
         // 2.8 总硫化机台数
         CompletableFuture<Void> lhMachineCountFuture = CompletableFuture.runAsync(
                 () -> contextDTO.setTotalLhMachines(mpAdjustStructureInService.getLhMachineCount(contextDTO)));
@@ -474,7 +474,7 @@ public class MpWeekRollAdjustController extends BaseController {
                 () -> contextDTO.setCycleStructureMinLhMachinesMap(mpAdjustStructureInService.getCycleStructureMinMachinesMap(contextDTO)));
         // 2.7 型腔与活块数量
         CompletableFuture<Void> cavityBlockFuture = CompletableFuture.runAsync(
-                () -> contextDTO.setCavity2BlockMap(mpAdjustStructureInService.getCavityAndBlockQtyMap(contextDTO)));
+                () -> contextDTO.setCavity2BlockMap(mpAdjustStructureInService.getCavityAndBlockQtyMap(contextDTO,true)));
         // 2.8 总硫化机台数
         CompletableFuture<Void> lhMachineCountFuture = CompletableFuture.runAsync(
                 () -> contextDTO.setTotalLhMachines(mpAdjustStructureInService.getLhMachineCount(contextDTO)));

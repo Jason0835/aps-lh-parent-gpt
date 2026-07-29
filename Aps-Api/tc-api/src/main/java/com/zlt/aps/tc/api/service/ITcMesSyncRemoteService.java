@@ -4,6 +4,7 @@ import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.tc.api.domain.entity.TcDayFinishQty;
 import com.zlt.aps.tc.api.domain.entity.TcScheFinishQty;
+import com.zlt.aps.tc.api.domain.entity.TcShiftStock;
 import com.zlt.aps.tc.api.domain.entity.TcStock;
 import com.zlt.aps.tc.api.domain.vo.TcReleaseFeedbackVo;
 import io.swagger.annotations.ApiOperation;
@@ -36,6 +37,24 @@ public interface ITcMesSyncRemoteService {
                                        @RequestParam("stockDate") String stockDate,
                                        @RequestParam("updateBy") String updateBy,
                                        @RequestBody List<TcStock> stockList);
+
+    /**
+     * 替换胎侧自动滚动班次库存快照。
+     *
+     * @param factoryCode 工厂编码
+     * @param stockDate MES库存物理日期
+     * @param shiftOrder 班次顺序
+     * @param updateBy 更新人
+     * @param stockList 班次库存列表，空集合表示清空
+     * @return 保存结果
+     */
+    @ApiOperation("替换胎侧自动滚动班次库存快照")
+    @PostMapping("/tcMesSync/replaceShiftStock")
+    AjaxResult replaceShiftStock(@RequestParam("factoryCode") String factoryCode,
+                                 @RequestParam("stockDate") String stockDate,
+                                 @RequestParam("shiftOrder") Integer shiftOrder,
+                                 @RequestParam("updateBy") String updateBy,
+                                 @RequestBody List<TcShiftStock> stockList);
 
     /**
      * 失效并保存胎侧班次完成量。

@@ -4,6 +4,7 @@ import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.tm.api.domain.entity.TmDayFinishQty;
 import com.zlt.aps.tm.api.domain.entity.TmScheFinishQty;
+import com.zlt.aps.tm.api.domain.entity.TmShiftStock;
 import com.zlt.aps.tm.api.domain.entity.TmStock;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
@@ -36,6 +37,24 @@ public interface ITmMesSyncRemoteService {
     AjaxResult logicDeleteAndSaveTmStockByStockDate(@RequestParam("stockDate") String stockDate,
                                                      @RequestParam("updateBy") String updateBy,
                                                      @RequestBody List<TmStock> list);
+
+    /**
+     * 替换胎面自动滚动班次库存快照。
+     *
+     * @param factoryCode 工厂编码
+     * @param stockDate MES库存物理日期
+     * @param shiftOrder 班次顺序
+     * @param updateBy 更新人
+     * @param stockList 班次库存列表，空集合表示清空
+     * @return 保存结果
+     */
+    @ApiOperation("替换胎面自动滚动班次库存快照")
+    @PostMapping("/tmMesSync/replaceShiftStock")
+    AjaxResult replaceShiftStock(@RequestParam("factoryCode") String factoryCode,
+                                 @RequestParam("stockDate") String stockDate,
+                                 @RequestParam("shiftOrder") Integer shiftOrder,
+                                 @RequestParam("updateBy") String updateBy,
+                                 @RequestBody List<TmShiftStock> stockList);
 
     /**
      * 逻辑删除并批量保存胎面排程完成量（事务性操作）

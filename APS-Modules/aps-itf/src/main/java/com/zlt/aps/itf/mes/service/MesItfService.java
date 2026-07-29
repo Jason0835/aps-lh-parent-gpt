@@ -5,6 +5,7 @@ import com.zlt.aps.cx.api.domain.entity.CxMachineOnlineInfo;
 import com.zlt.aps.cx.api.domain.entity.CxStock;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.aps.itf.vo.MesBrandDict;
+import com.zlt.aps.itf.vo.MesShiftStockSyncRequest;
 import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmMoldAlterPlan;
 import com.zlt.aps.mp.api.domain.entity.*;
@@ -240,6 +241,14 @@ public interface MesItfService {
      * @return 结果
      */
     AjaxResult syncTreadStock(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 同步胎面自动滚动班次库存。
+     *
+     * @param request 工厂、物理库存日和班序
+     * @return 同步结果
+     */
+    AjaxResult syncTreadShiftStock(MesShiftStockSyncRequest request);
 
     /**
      * 同步胎圈库存

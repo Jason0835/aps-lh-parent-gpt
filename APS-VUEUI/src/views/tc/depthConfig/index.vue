@@ -55,7 +55,7 @@ import {getConfigKey} from "@/api/system/config";
 import infoDialog from "./components/infoDialog.vue";
 
 export default {
-  name: "TcDepthConfig",
+  name: "/tc/tcDepthConfig",
   components: {
     infoDialog,
   },

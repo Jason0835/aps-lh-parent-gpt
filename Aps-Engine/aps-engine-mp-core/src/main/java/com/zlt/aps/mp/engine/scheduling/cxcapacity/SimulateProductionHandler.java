@@ -126,7 +126,7 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
      * @param productionContext
      */
     private void deliveryPriorityProduction(TbrProductionContext productionContext, Map<String, ProductionPlanGroupInfo> allGroupPlanMap, List<CxMachineAllocationPlanHelper> continueAllocationList, Map<String, CxContinueInfoHelper> allContinueMap) {
-        //1、按高优先级，获取预期排产的分组信息
+        //1、按高优先级，进行不指定预排：得到预期排产的分组信息
         productionContext.addStageLogBuilder(LogRecorderStageEnum.SIMULATE_DELIVERY_PRIORITY_PRODUCTION);
         Set<String> preSelectedGroupSet = Sets.newHashSet();
         Map<String, Set<CxMachineAllocationPlanHelper>> preSelectedGroupAllocationMap = Maps.newHashMap();
@@ -221,7 +221,7 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
     private void resetProduction(TbrProductionContext productionContext, Map<String, ProductionPlanGroupInfo> allGroupPlanMap, List<CxMachineAllocationPlanHelper> continueAllocationList, Map<String, CxContinueInfoHelper> allContinueMap) {
         //1、清空机台收尾设置
         productionContext.setReverseFindSet(new HashSet<>());
-        //2、还原设置(包涵在产机台对在产分配的续作分配)
+        //2、还原设置(包含在产机台对在产分配的续作分配)
         clearProductionInfoHandler.resetProductionBySimulateProductionHandler(productionContext, allGroupPlanMap, continueAllocationList, allContinueMap);
         TbrSimulateProductionLogRecorder.addDeliveryPriorityResetContinueLog(productionContext);
         KeyInformationLogRecorder.recorderContinueAllocationGroupInfoLog(productionContext, allGroupPlanMap, allContinueMap, continueAllocationList);
@@ -379,7 +379,7 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
         //20260429+ 存储前分组分配信息，用以前分组是否需要强制延长
         addHelper.setBeforeAllocationByChangeLimit(beforeGroupAllocation);
         //对成型机台进行模拟模具排产
-        cxMouldProductionHandler.noContinueGroupPlanMouldProduction(context, selectedCxMachine.getCxMachineCode(), addHelper, new HashSet<>());
+        cxMouldProductionHandler.noContinueGroupPlanMouldProduction(context, false, selectedCxMachine.getCxMachineCode(), addHelper, new HashSet<>(), true);
         //20260323 重新获取剩余天数：可能因提前收尾变化，导致计划实际没有排，下轮直接排除,不能比较分配完成
         Integer newNeedAllocationDaysByGroupPlan = addNewGroupPlan.getLeftOverNeedAllocationDays();
         if (newNeedAllocationDaysByGroupPlan.equals(originNeedAllocationDaysByGroupPlan)) {

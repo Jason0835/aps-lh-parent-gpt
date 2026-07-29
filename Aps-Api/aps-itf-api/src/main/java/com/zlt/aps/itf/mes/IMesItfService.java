@@ -8,6 +8,7 @@ import com.zlt.aps.cx.api.domain.entity.CxStock;
 import com.zlt.aps.gsq.api.domain.entity.GsqScheduleResultIssue;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.aps.itf.vo.MesBrandDict;
+import com.zlt.aps.itf.vo.MesShiftStockSyncRequest;
 import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmMoldAlterPlan;
 import com.zlt.aps.mp.api.domain.entity.*;
@@ -273,6 +274,16 @@ public interface IMesItfService {
     @ApiOperation("同步胎面库存")
     @PostMapping("/mesItf/syncTreadStock")
     public AjaxResult syncTreadStock(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 同步胎面自动滚动班次库存。
+     *
+     * @param request 工厂、物理库存日和班序
+     * @return 同步结果
+     */
+    @ApiOperation("同步胎面自动滚动班次库存")
+    @PostMapping("/mesItf/syncTreadShiftStock")
+    AjaxResult syncTreadShiftStock(@RequestBody MesShiftStockSyncRequest request);
 
     /**
      * 同步胎圈库存
@@ -587,6 +598,16 @@ public interface IMesItfService {
     @ApiOperation("同步胎侧库存")
     @PostMapping("/mesItf/syncSidewallStock")
     AjaxResult syncSidewallStock(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 同步胎侧自动滚动班次库存。
+     *
+     * @param request 工厂、物理库存日和班序
+     * @return 同步结果
+     */
+    @ApiOperation("同步胎侧自动滚动班次库存")
+    @PostMapping("/mesItf/syncSidewallShiftStock")
+    AjaxResult syncSidewallShiftStock(@RequestBody MesShiftStockSyncRequest request);
 
     /**
      * 同步胎侧班次完成量并回写排程结果。

@@ -16,6 +16,9 @@ public class TcRollingWindow {
     /** 六班结果归属排程日期。 */
     private Date scheduleDate;
 
+    /** MES库存物理日期。 */
+    private Date stockDate;
+
     /** 待调整班次顺序。 */
     private Integer targetShiftOrder;
 
