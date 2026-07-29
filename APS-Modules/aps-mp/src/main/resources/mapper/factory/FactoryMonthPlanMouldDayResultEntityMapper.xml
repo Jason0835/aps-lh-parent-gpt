@@ -37,7 +37,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             ifnull(d.ORI_MID_QTY, d.MID_QTY) MID_QTY,
 		    d.CYCLE_RESERVE_QTY CYCLE_RESERVE_QTY,
 		    d.POSTPONE_QTY POSTPONE_QTY,
-		    case when d.IS_SCHEDULE = '1' then d.CONVENTION_RESERVE_QTY else 0 end CONVENTION_RESERVE_QTY,
+		    d.CONVENTION_RESERVE_QTY,
 		    r.MOULD_CHANGE_INFO,
             r.TOTAL_QTY,
 		    r.HEIGHT_PRODUCTION_QTY,

@@ -4,20 +4,18 @@ import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.daylimit.GroupPlanCxLhCapacityLimitHelper;
 import com.zlt.aps.mp.engine.domain.Context;
-import com.zlt.aps.mp.engine.domain.dto.*;
+import com.zlt.aps.mp.engine.domain.dto.CxContinueInfoHelper;
+import com.zlt.aps.mp.engine.domain.dto.CxContinueSkuInfoHelper;
+import com.zlt.aps.mp.engine.domain.dto.ProductGroupCxCapacityInfo;
+import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
-import com.zlt.aps.mp.engine.enums.ProductionQtyModelEnum;
 import com.zlt.aps.mp.engine.enums.ProductionStageEnum;
 import com.zlt.aps.mp.engine.logrecorder.TbrProductionGroupLogRecorder;
-import com.zlt.aps.mp.engine.scheduling.cxcapacity.SkuNeedProductionInfo;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -60,6 +58,7 @@ public class ContinueSkuCalculator {
         //提取续作Sku计划
         Set<String> skuMaterialDescSet = continueSkuMouldNumberMap.keySet();
         List<MonthPlanProductionRequirePlanVo> continueSkuPlanList = groupPlanList.stream().filter(groupPlan -> groupPlan.hasProduction() && skuMaterialDescSet.contains(groupPlan.getMaterialDesc())).collect(Collectors.toList());
+        List<MonthPlanProductionRequirePlanVo> allContinueSkuPlanList = groupPlanList.stream().filter(groupPlan -> skuMaterialDescSet.contains(groupPlan.getMaterialDesc())).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(continueSkuPlanList)) {
             //记录日志
             TbrProductionGroupLogRecorder.addContinueGroupContinueSkuEmptyPlanLog(context, groupName);
@@ -67,6 +66,12 @@ public class ContinueSkuCalculator {
         }
         //分组合计续作Sku的计划量-高优先级
         Map<String, List<MonthPlanProductionRequirePlanVo>> continueSkuGroupMap = continueSkuPlanList.stream().collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getMaterialDesc));
+        Map<String, List<MonthPlanProductionRequirePlanVo>> continueSkuGroupInfoMap;
+        if (CollectionUtils.isEmpty(allContinueSkuPlanList)) {
+            continueSkuGroupInfoMap = Collections.emptyMap();
+        } else {
+            continueSkuGroupInfoMap = allContinueSkuPlanList.stream().collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getMaterialDesc));
+        }
         //设置续作Sku的高优级量及单模日硫化量
         continueSkuMouldNumberMap.forEach((materialDesc, cxContinueSkuInfo) -> {
             List<MonthPlanProductionRequirePlanVo> planList = continueSkuGroupMap.get(materialDesc);
@@ -76,6 +81,9 @@ public class ContinueSkuCalculator {
             cxContinueSkuInfo.setContinueSkuPlanList(planList);
             if (CollectionUtils.isEmpty(planList)) {
                 TbrProductionGroupLogRecorder.addContinueGroupContinueSkuNoPlanLog(context, groupName, materialDesc);
+                planList = continueSkuGroupInfoMap.get(materialDesc);
+            }
+            if (CollectionUtils.isEmpty(planList)) {
                 return;
             }
             MonthPlanProductionRequirePlanVo plan = planList.get(BigDecimal.ZERO.intValue());

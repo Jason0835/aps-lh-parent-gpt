@@ -205,7 +205,7 @@ public class TmScheduleResultUIController extends BaseUIController<TmScheduleRes
     @ApiOperation("查询胎面未排任务")
     @PostMapping("/unplanned/list")
     @ResponseBody
-    public TmScheduleUnplannedPageVo listUnplanned(@RequestBody TmScheduleUnplannedQueryVo queryVO) {
+    public TmScheduleUnplannedPageVo listUnplanned(TmScheduleUnplannedQueryVo queryVO) {
         return this.iTmScheduleResultService.listUnplanned(queryVO);
     }
 
