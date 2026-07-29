@@ -511,8 +511,8 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 }
             }
 
-            // 班次开始时间 = planStartTime - 30min（机器准备时间）
-            LocalDateTime shiftStart = lastShiftPlanStart.minusMinutes(DEFAULT_MACHINE_PREPARE_MINUTES);
+            // 班次开始时间 = planStartTime（已无准备时间偏移）
+            LocalDateTime shiftStart = lastShiftPlanStart;
             // 结束时间 = 班次开始时间 + 总生产耗时
             LocalDateTime machineEndTime = shiftStart.plusSeconds(totalProductionSeconds);
 
