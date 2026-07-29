@@ -1,14 +1,14 @@
-package com.zlt.aps.tc.domain.vo;
+package com.zlt.aps.tm.domain.vo;
 
 import lombok.Data;
 
 import java.util.Date;
 
 /**
- * 胎侧自动滚动命中的排程班次窗口。
+ * 胎面自动滚动命中的排程班次窗口。
  */
 @Data
-public class TcRollingWindow {
+public class TmRollingWindow {
 
     /** 工厂编码。 */
     private String factoryCode;

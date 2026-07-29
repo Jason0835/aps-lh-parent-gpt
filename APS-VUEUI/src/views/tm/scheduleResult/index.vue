@@ -266,7 +266,7 @@ const getOffsetDate = (offsetDay) => {
 };
 
 export default {
-  name: "TmScheduleResult",
+  name: "/tm/tmScheduleResult",
   components: {
     tltUpload,
     autoPlanDialog,

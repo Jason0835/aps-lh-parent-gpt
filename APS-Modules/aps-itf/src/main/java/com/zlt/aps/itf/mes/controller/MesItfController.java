@@ -10,6 +10,7 @@ import com.zlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.itf.mes.service.*;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.aps.itf.vo.MesBrandDict;
+import com.zlt.aps.itf.vo.MesShiftStockSyncRequest;
 import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmMoldAlterPlan;
 import com.zlt.aps.mp.api.domain.entity.*;
@@ -551,6 +552,19 @@ public class MesItfController {
     }
 
     /**
+     * 同步胎面自动滚动班次库存。
+     *
+     * @param request 工厂、物理库存日和班序
+     * @return 同步结果
+     */
+    @ApiOperation("同步胎面自动滚动班次库存")
+    @PostMapping("/syncTreadShiftStock")
+    @AutoLoginLog
+    public AjaxResult syncTreadShiftStock(@RequestBody MesShiftStockSyncRequest request) {
+        return this.mesItfService.syncTreadShiftStock(request);
+    }
+
+    /**
      * 同步胎圈库存
      * @param syncDataLogs 参数
      * @return 结果
@@ -825,6 +839,19 @@ public class MesItfController {
     @AutoLoginLog
     public AjaxResult syncSidewallStock(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
         return this.tcMesBridgeService.syncStock(syncDataLogs);
+    }
+
+    /**
+     * 同步胎侧自动滚动班次库存。
+     *
+     * @param request 工厂、物理库存日和班序
+     * @return 同步结果
+     */
+    @ApiOperation("同步胎侧自动滚动班次库存")
+    @PostMapping("/syncSidewallShiftStock")
+    @AutoLoginLog
+    public AjaxResult syncSidewallShiftStock(@RequestBody MesShiftStockSyncRequest request) {
+        return this.tcMesBridgeService.syncShiftStock(request);
     }
 
     /**
