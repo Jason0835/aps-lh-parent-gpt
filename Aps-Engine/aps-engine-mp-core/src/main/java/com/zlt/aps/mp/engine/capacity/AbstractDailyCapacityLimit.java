@@ -360,7 +360,7 @@ public abstract class AbstractDailyCapacityLimit {
                 // 计算主花纹向下的硫化机台数
                 if (mpFinalVo.getFieldValueByFieldName(getMainPatternField()) != null &&
                         mpFinalVo.getFieldValueByFieldName(getMainPatternField()).equals(mainPattern)){
-                    mpFullMachinesAddMould += dayPlanQty / dailyLhQty;
+                    mpFullMachinesAddMould += addFullMachines(mpFinalVo, day1Field, dailyLhQty, dayPlanQty);
                     mpOpenMachinesAddMould += addMouldArr[0];
                     mpBlockMachinesAddMould += addMouldArr[1];
                 }
