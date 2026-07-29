@@ -371,6 +371,9 @@ public abstract class AbstractDailyCapacityLimit {
                 if (mpFinalVo.getFieldValueByFieldName(getMainPatternField()) != null &&
                         mpFinalVo.getFieldValueByFieldName(getMainPatternField()).equals(mainPattern)){
                     mpFullMachinesAddMould += addFullMachines(mpFinalVo, day1Field, dailyLhQty, dayPlanQty);
+                    if (addMouldArr[3] > 0){
+                        mpFullMachinesAddMould -= addMouldArr[3];
+                    }
                     mpOpenMachinesAddMould += addMouldArr[0];
                     mpBlockMachinesAddMould += addMouldArr[1];
                 }

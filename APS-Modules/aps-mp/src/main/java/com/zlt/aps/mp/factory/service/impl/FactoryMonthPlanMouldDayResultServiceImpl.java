@@ -212,7 +212,7 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         Map<String, Integer> insertResults = new HashMap<>(0); // 活块可用量（按物料描述分组）
         List<DailyMouldAvailabilityResult> moldResult = moldCavityInsertMaxValueCalculator
                 .moldCavityInsertMaxValueCalculator(params.getYear(), params.getMonth(), params.getFactoryCode(),
-                        null, null, true);
+                        null, null, true,true);
         if (CollectionUtils.isNotEmpty(moldResult)) {
             cavityResults = moldResult.get(0).getCavityResults();
             insertResults = moldResult.get(0).getInsertResults();
