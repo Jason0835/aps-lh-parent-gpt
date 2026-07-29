@@ -26,7 +26,7 @@
           type="success"
           @click="handleRelease"
         >
-          {{ $t('ui.tc.schedule.button.publish') }}
+          {{ $t('ui.tc.schedule.publish') }}
         </el-button>
         <el-button v-hasPermi="['tc:tcScheduleResult:add']" :disabled="writeTaskRunning" type="warning" @click="handleAdd">
           {{ $t('ui.tc.schedule.insertTask') }}
@@ -37,7 +37,7 @@
           type="warning"
           @click="handleChangeQty"
         >
-          {{ $t('ui.tc.schedule.button.modify') }}
+          {{ $t('ui.tc.schedule.changeQty') }}
         </el-button>
         <el-button
           v-hasPermi="['tc:tcScheduleResult:changeMachine']"
@@ -45,7 +45,7 @@
           type="primary"
           @click="handleChangeMachine"
         >
-          {{ $t('ui.tc.schedule.button.changeMachine') }}
+          {{ $t('ui.tc.schedule.changeMachine') }}
         </el-button>
         <el-button
           v-hasPermi="['tc:tcScheduleResult:remove']"
@@ -76,11 +76,6 @@
       </template>
       <template slot="headerRight">
         <div class="summary-bar stat-info">
-          <span>{{ $t('ui.tc.schedule.totalStockQty') }}：<span class="stat-value">{{ summary.totalStockQty || 0 }}</span></span>
-          <span>{{ $t('ui.tc.schedule.totalPlanQty') }}：<span class="stat-value">{{ summary.totalPlanQty || 0 }}</span></span>
-          <span>{{ $t('ui.tc.schedule.totalFinishQty') }}：<span class="stat-value">{{ summary.totalFinishQty || 0 }}</span></span>
-          <span>{{ $t('ui.tc.schedule.resultCount') }}：<span class="stat-value">{{ summary.resultCount || 0 }}</span></span>
-          <span>{{ $t('ui.tc.schedule.unplannedCount') }}：<span class="stat-value">{{ unplannedCount || 0 }}</span></span>
           <span
             v-for="(planQty, index) in shiftPlanQtyList"
             :key="index"

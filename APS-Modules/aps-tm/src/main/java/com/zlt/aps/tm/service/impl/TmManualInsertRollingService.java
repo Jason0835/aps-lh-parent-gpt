@@ -678,9 +678,8 @@ public class TmManualInsertRollingService {
             throw new ServiceException(this.resolveTmMessage(
                     "ui.data.alert.tm.schedule.illegalReleaseTransition", "排程发布状态迁移不合法"));
         }
-        if (ApsConstant.IS_RELEASE.equals(result.getReleaseStatus())) {
-            result.setReleaseStatus(ApsConstant.WAIT_RELEASING);
-        }
+        // 仅已发布回退待发布，未发布/发布失败/待发布保持原状（对齐胎侧 TcReleaseStatusTransition）
+        result.setReleaseStatus(TmReleaseStatusTransition.resolveEditedStatus(result.getReleaseStatus()));
     }
 
     /**

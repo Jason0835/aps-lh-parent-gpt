@@ -31,7 +31,10 @@ public enum TmBackgroundTaskTypeEnum {
     MANUAL_DELETE("MANUAL_DELETE", true),
 
     /** 人工发布。 */
-    MANUAL_PUBLISH("MANUAL_PUBLISH", true);
+    MANUAL_PUBLISH("MANUAL_PUBLISH", true),
+
+    /** 异步发布到MES。 */
+    RELEASE("RELEASE", false);
 
     /** 类型编码。 */
     private final String code;

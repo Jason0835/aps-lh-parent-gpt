@@ -1,18 +1,19 @@
 package com.zlt.aps.itf.mes;
 
-import com.zlt.aps.cd15.api.domain.entity.Cd15ScheduleResultIssue;
 import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.zlt.aps.cd15.api.domain.entity.Cd15ScheduleResultIssue;
 import com.zlt.aps.cx.api.domain.entity.CxMachineOnlineInfo;
 import com.zlt.aps.cx.api.domain.entity.CxStock;
+import com.zlt.aps.gsq.api.domain.entity.GsqScheduleResultIssue;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.aps.itf.vo.MesBrandDict;
 import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmMoldAlterPlan;
 import com.zlt.aps.mp.api.domain.entity.*;
-import com.zlt.aps.gsq.api.domain.entity.GsqScheduleResultIssue;
 import com.zlt.aps.tc.api.domain.entity.TcScheduleResultIssue;
 import com.zlt.aps.tc.api.domain.vo.TcReleaseFeedbackVo;
+import com.zlt.aps.tm.api.domain.entity.TmScheduleResultIssue;
 import com.zlt.aps.tq.api.domain.entity.TqScheduleResultIssue;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
@@ -626,4 +627,14 @@ public interface IMesItfService {
     @ApiOperation("查询胎侧排程发布处理状态")
     @PostMapping("/mesItf/queryTcScheduleIssueStatus")
     TcReleaseFeedbackVo queryTcScheduleIssueStatus(@RequestParam("dataVersion") String dataVersion);
+
+    /**
+     * 下发胎面排程结果。
+     *
+     * @param issueList 已按MES业务日期拆分的结果
+     * @return 下发结果（含 feedbackStatus：SUCCESS/FAILED/TIMEOUT/PENDING）
+     */
+    @ApiOperation("胎面排程结果下发到MES")
+    @PostMapping("/mesItf/issueTmScheduleResult")
+    AjaxResult issueTmScheduleResult(@RequestBody List<TmScheduleResultIssue> issueList);
 }

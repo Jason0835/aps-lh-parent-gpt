@@ -87,6 +87,9 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
     private TmAutoScheduleAsyncExecutor tmAutoScheduleAsyncExecutor;
 
     @Resource
+    private com.zlt.aps.tm.service.TmReleaseApplicationService tmReleaseApplicationService;
+
+    @Resource
     private TmManualOperationFacade tmManualOperationFacade;
 
     @Resource
@@ -767,7 +770,26 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
      */
     @Override
     public int publish(List<Long> ids) {
-        return this.updateReleaseStatusesAtomically(this.normalizePublishIds(ids), ApsConstant.WAIT_RELEASING, true);
+        List<Long> normalizedIds = this.normalizePublishIds(ids);
+        List<TmScheduleResult> resultList = tmScheduleResultMapper.selectList(
+                new LambdaQueryWrapper<TmScheduleResult>().in(TmScheduleResult::getId, normalizedIds)
+                        .orderByAsc(TmScheduleResult::getId));
+        if (resultList.isEmpty()) {
+            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.schedule.resultNotFound"));
+        }
+        TmScheduleResult reference = resultList.get(0);
+        com.zlt.aps.tm.api.domain.vo.TmReleaseRequestVo request = new com.zlt.aps.tm.api.domain.vo.TmReleaseRequestVo();
+        request.setFactoryCode(reference.getFactoryCode());
+        request.setScheduleDate(reference.getScheduleDate());
+        request.setItems(normalizedIds.stream().map(resultId -> {
+            com.zlt.aps.tm.api.domain.vo.TmReleaseItemVo item = new com.zlt.aps.tm.api.domain.vo.TmReleaseItemVo();
+            item.setResultId(resultId);
+            item.setExpectedTaskVersion(0L);
+            return item;
+        }).collect(Collectors.toList()));
+        // 委托发布申请服务：建发布任务 + 置发布中 + 异步下发MES（对齐胎侧 TcReleaseApplicationService）
+        this.tmReleaseApplicationService.publish(request);
+        return normalizedIds.size();
     }
 
     /**
