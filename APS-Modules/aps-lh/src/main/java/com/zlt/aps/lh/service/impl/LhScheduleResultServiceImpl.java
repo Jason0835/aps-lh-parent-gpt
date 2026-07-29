@@ -789,7 +789,7 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
         //获取起始天
         YearMonth yearMonthKey = SkuMonthPlanCalculator.getFirstYearMonth(allProductionDate);
         Date startDate = monthStartDateMap.get(yearMonthKey);
-        if (null == startDate) {
+        if (null == startDate || startDate.after(tDay) || startDate.equals(tDay)) {
             startDate = SkuMonthPlanCalculator.getDate(yearMonthKey.atDay(BigDecimal.ONE.intValue()));
         }
         if (!factoryCodes.isEmpty() && !materialCodes.isEmpty()) {
