@@ -49,6 +49,16 @@
             }}</el-button
           >
           <el-button
+            type="primary"
+            plain
+            :loading="productAlignLoading"
+            v-hasPermi="['monthplan:mpWeekRollAdjust:productAlign']"
+            @click="handleProductAlign"
+            >{{
+              $t("ui.data.column.monthPlanFinalAdjustQuery.productAlign")
+            }}</el-button
+          >
+          <el-button
             v-hasPermi="['monthplan:mpAdjustResult:list']"
             @click="handleViewAdjustVersion"
             >{{
@@ -314,6 +324,7 @@ import {
   confirmAdjust,
   getAdjustDetailList,
   getAdjustsCxMachineFromRedis,
+  productAlign,
   recalculateWeekRollAdjust,
   saveAdjustResult,
   setAdjustsCxMachineFromRedis,
@@ -378,6 +389,7 @@ export default {
       currentAdjustMonthPlanVersion: "",
       confirmAdjustLoading: false,
       recalculateLoading: false,
+      productAlignLoading: false,
       getAdjustOrderLoading: false,
       syncLoading: false,
       /** 下发 SCM/MES 弹窗（与月度生产计划页「推送SCM/MES」同源接口与交互） */
@@ -707,6 +719,20 @@ export default {
           width: 120,
         },
         {
+          prop: "currentOverdueQty",
+          label: this.$t(
+            "ui.data.column.FactoryMonthPlanFinalResult.currentOverdueQty"
+          ),
+          width: 100,
+        },
+        {
+          prop: "orderAddDecQty",
+          label: this.$t(
+            "ui.data.column.FactoryMonthPlanFinalResult.orderAddDecQty"
+          ),
+          width: 110,
+        },
+        {
           prop: "isLockSchedule",
           label: this.$t(
             "ui.data.column.monthPlanFinalAdjustQuery.isLockSchedule"
@@ -753,6 +779,23 @@ export default {
           prop: "endDay",
           label: this.$t("common.endDate"),
           width: 90,
+        },
+        {
+          prop: "productAlignDate",
+          label: this.$t(
+            "ui.data.column.FactoryMonthPlanFinalResult.productAlignDate"
+          ),
+          width: 160,
+          formatter: (row, column, value) => {
+            return value ? this.parseTime(value) : "";
+          },
+        },
+        {
+          prop: "productOverdueQty",
+          label: this.$t(
+            "ui.data.column.FactoryMonthPlanFinalResult.productOverdueQty"
+          ),
+          width: 110,
         },
       ];
       for (let i = 1; i <= 31; i++) {
@@ -3227,6 +3270,68 @@ export default {
         console.error(e);
       } finally {
         this.recalculateLoading = false;
+      }
+    },
+    /**
+     * 生产对齐：POST /monthplan/mpWeekRollAdjust/productAlign
+     * 参数取当前查询区（searchColumns）工厂编码、年月、产品结构、生产版本。
+     * 年月拆分方式与 formatParamsForStructureVersionList（getVersionList）一致。
+     */
+    async handleProductAlign() {
+      let factoryCode = "";
+      let yearMonthRaw = "";
+      let structureName = "";
+      let productionVersion = "";
+      const pt = this.$refs.monthPlanPageTableRef;
+      const searchRef = pt && pt.$refs && pt.$refs.searchRef;
+      if (searchRef && typeof searchRef.getValues === "function") {
+        const form = searchRef.getValues() || {};
+        factoryCode = String(form.factoryCode || "").trim();
+        yearMonthRaw = form.yearMonth || "";
+        structureName = String(form.structureName || "").trim();
+        productionVersion = String(form.version || "").trim();
+      } else {
+        factoryCode = String(
+          this.query.factoryCode || this.search.factoryCode || ""
+        ).trim();
+        yearMonthRaw =
+          this.query.yearMonth || this.search.yearMonth || "";
+        structureName = String(
+          this.query.structureName || this.search.structureName || ""
+        ).trim();
+        productionVersion = String(
+          this.query.version || this.search.version || ""
+        ).trim();
+      }
+      if (!factoryCode || !yearMonthRaw) {
+        this.$modal.msgWarning(
+          this.$t(
+            "ui.data.column.monthPlanFinalAdjustQuery.pleaseSelectYearMonth"
+          )
+        );
+        return;
+      }
+      /** 与 getVersionList 入参一致：yearMonth 按 "-" 拆成 year、month */
+      const yearMonthParts = String(yearMonthRaw).split("-");
+      const payload = {
+        factoryCode,
+        year: yearMonthParts[0],
+        month: yearMonthParts[1],
+        structureName,
+        productionVersion,
+      };
+      this.productAlignLoading = true;
+      try {
+        const res = await productAlign(payload);
+        this.$modal.msgSuccess(
+          (res && res.msg) ||
+            this.$t("common.msg.ajax.operation.success")
+        );
+        await this.getList();
+      } catch (e) {
+        console.error(e);
+      } finally {
+        this.productAlignLoading = false;
       }
     },
   },

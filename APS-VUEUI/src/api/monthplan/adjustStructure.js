@@ -78,6 +78,18 @@ export function recalculateWeekRollAdjust(query) {
   })
 }
 
+/**
+ * 月计划调整查询-生产对齐
+ * POST /monthplan/mpWeekRollAdjust/productAlign
+ */
+export function productAlign(query) {
+  return request({
+    url: '/monthplan/mpWeekRollAdjust/productAlign',
+    method: 'post',
+    data: query
+  })
+}
+
 //新增结构
 export function addAdjust(query) {
   return request({
