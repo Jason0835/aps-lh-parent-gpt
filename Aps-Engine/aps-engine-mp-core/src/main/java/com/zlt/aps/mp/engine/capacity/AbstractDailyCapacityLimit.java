@@ -1,5 +1,6 @@
 package com.zlt.aps.mp.engine.capacity;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.ruoyi.common.text.Convert;
 import com.zlt.aps.constant.FactoryConstant;
@@ -11,10 +12,13 @@ import com.zlt.aps.mp.api.domain.dto.MpRollAdjustContextDTO;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import com.zlt.common.utils.PubUtil;
 import com.zlt.common.utils.StringUtil;
+import io.swagger.models.auth.In;
+import org.springframework.beans.BeanUtils;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -281,9 +285,11 @@ public abstract class AbstractDailyCapacityLimit {
         Integer changeMouldFirstQty = (Integer)paramMap.get(MonthPlanEnums.CHANGE_MOULD_FIRST_QTY.getCode());
         int dayPlanQty,dailyLhQty;
         // 当日字段-dayField，昨日字段-day1Field，次日字段-day2Field
+        int startDay = iDay -1 < FactoryConstant.MONTH_START_DAY ? FactoryConstant.MONTH_START_DAY:iDay -1;
+        int endDay = iDay +1 > FactoryConstant.MONTH_MAX_DAY ? FactoryConstant.MONTH_MAX_DAY:iDay +1;
         String dayField = FactoryConstant.DAY_FIELD + iDay;
-        String day1Field = FactoryConstant.DAY_FIELD + (iDay -1 < FactoryConstant.MONTH_START_DAY ? FactoryConstant.MONTH_START_DAY:iDay -1);
-        String day2Field = FactoryConstant.DAY_FIELD + (iDay +1 > FactoryConstant.MONTH_MAX_DAY ? FactoryConstant.MONTH_MAX_DAY:iDay +1);
+        String day1Field = FactoryConstant.DAY_FIELD + startDay;
+        String day2Field = FactoryConstant.DAY_FIELD + endDay;
         String embryoFieldValue;
         dailyCapacityLimitVo.getEmbryoCodes().clear();
         Map<String, Long> embryoCodePreDayCountMap = mpProdFinalList.stream()
@@ -293,7 +299,11 @@ public abstract class AbstractDailyCapacityLimit {
                         vo -> (String) vo.getFieldValueByFieldName(getEmbryoCodeField()),
                         Collectors.counting()
                 ));
-        for (BaseEntity mpFinalVo: mpProdFinalList){
+        Map<String,List<BaseEntity>> prodFinalMap = groupByMaterialCode(mpProdFinalList);
+        for (Map.Entry<String, List<BaseEntity>> entry : prodFinalMap.entrySet()) {
+            BaseEntity mpFinalVo = cloneBean(entry.getValue().get(0));
+            //将同物料的正式、量试合并
+            sumPlanQtyByDay(entry.getValue(),mpFinalVo,startDay,endDay);
             // 日硫化量 = 单模硫化量 * 2；
             dailyLhQty = getDayVulcanizationQty(mpFinalVo);
             if (mpFinalVo.getFieldValueByFieldName(dayField) == null ||
@@ -427,6 +437,59 @@ public abstract class AbstractDailyCapacityLimit {
         }
 
         return null;
+    }
+
+    private <T> T cloneBean(T source) {
+        try {
+            // 通过源对象获取类型
+            Class<?> clazz = source.getClass();
+            T target = (T) clazz.getDeclaredConstructor().newInstance();
+            BeanUtils.copyProperties(source, target);
+            return target;
+        } catch (Exception e) {
+            throw new RuntimeException("克隆对象失败", e);
+        }
+    }
+
+    /**
+     * 汇总每日计划量
+     * @param mpProdFinalList
+     * @param mpFinalVo
+     */
+    private void sumPlanQtyByDay(List<BaseEntity> mpProdFinalList, BaseEntity mpFinalVo, int startDay, int endDay){
+        if (mpProdFinalList != null && mpProdFinalList.size() <=1){
+            return;
+        }
+        for (int iDay = startDay; iDay <= endDay; iDay++) {
+            String dayField = FactoryConstant.DAY_FIELD + iDay;
+            int total = mpProdFinalList.stream()
+                    .filter(x->x.getFieldValueByFieldName(dayField) != null &&
+                            (Integer) x.getFieldValueByFieldName(dayField) != 0)
+                    .mapToInt(entity -> (Integer) entity.getFieldValueByFieldName(dayField))
+                    .sum();
+            if (total > 0){
+                mpFinalVo.setFieldValueByFieldName(dayField,total);
+            }
+        }
+    }
+    /**
+     * 按物料编码汇总
+     * @param mpProdFinalList
+     * @return
+     */
+    private Map<String, List<BaseEntity>> groupByMaterialCode(
+            List<? extends BaseEntity> mpProdFinalList) {
+
+        if (mpProdFinalList == null || mpProdFinalList.isEmpty()) {
+            return new HashMap<>();
+        }
+        //排除试制，不纳入统计
+        return mpProdFinalList.stream()
+                .filter(Objects::nonNull)
+                .filter(entity -> !ConstructionStageEnum.MEASUREMENT.getStage().equals(entity.getFieldValueByFieldName(CONSTRUCTION_STAGE_FIELD)))
+                .collect(Collectors.groupingBy(
+                        entity -> (String) entity.getFieldValueByFieldName(getMaterialCodeField())
+                ));
     }
 
     /**
@@ -935,4 +998,10 @@ public abstract class AbstractDailyCapacityLimit {
     public  String getMainPatternField(){
         return "mainPattern";
     }
+
+    /**
+     * 获取物料编码字段
+     * @return
+     */
+    public  String getMaterialCodeField() {return "materialCode"; }
 }
