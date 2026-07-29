@@ -9,6 +9,7 @@
       :data="data"
       :page="page"
       :search="search"
+      :isReset="true"
       :showSummary="false"
       :selectArea="false"
       @refresh="getList"
@@ -278,11 +279,12 @@ export default {
     },
     handleReset() {
       const scheduleDate = moment().add(1, 'days').format('YYYY-MM-DD')
-      this.search = { factoryCode: '116', scheduleDate }
+      this.search = { factoryCode: '116', scheduleDate, steelStripCode: '', bigRollCode: '', machineCode: '', releaseStatus: '' }
       this.query = { ...this.search }
       this.dateList = this.buildDateList(scheduleDate)
       this.page.current = 1
       this.getList()
+      this.loadMachineOptions()
     },
     handlePageChange(current, pageSize) {
       this.page.current = current
@@ -317,16 +319,26 @@ export default {
       }
     },
     pollAutoScheduleTask(taskId) {
+      this.pollScheduleTask(taskId, getAutoScheduleTask, {
+        titleKey: 'ui.data.column.cd15ScheduleResult.autoScheduleProgress',
+        hintKey: 'ui.data.column.cd15ScheduleResult.autoScheduleProgressHint',
+        successKey: 'ui.data.column.cd15ScheduleResult.autoScheduleSuccess',
+        failedKey: 'ui.data.column.cd15ScheduleResult.autoScheduleFailed'
+      })
+    },
+    pollScheduleTask(taskId, taskGetter, options = {}) {
       this.clearAutoScheduleTimer()
       this.autoSchedulePollTimes = 0
       this.autoScheduleProgressVisible = true
       this.autoScheduleProgressValue = 0
       this.autoScheduleProgressStage = ''
       this.autoScheduleProgressStatus = null
-      this.autoScheduleProgressHint = this.$t('ui.data.column.cd15ScheduleResult.autoScheduleProgressHint')
-      this.scheduleTaskTitle = this.$t('ui.data.column.cd15ScheduleResult.autoScheduleProgress')
+      this.autoScheduleProgressHint = this.$t(options.hintKey || 'ui.data.column.cd15ScheduleResult.autoScheduleProgressHint')
+      this.scheduleTaskTitle = this.$t(options.titleKey || 'ui.data.column.cd15ScheduleResult.autoScheduleProgress')
+      const successKey = options.successKey || 'ui.data.column.cd15ScheduleResult.autoScheduleSuccess'
+      const failedKey = options.failedKey || 'ui.data.column.cd15ScheduleResult.autoScheduleFailed'
       const poll = () => {
-        getAutoScheduleTask(taskId).then(res => {
+        taskGetter(taskId).then(res => {
           this.autoSchedulePollTimes += 1
           const task = (res && res.data) ? res.data : (res || {})
           if (task.progress != null) {
@@ -339,17 +351,20 @@ export default {
             this.clearAutoScheduleTimer()
             this.autoScheduleProgressValue = 100
             this.autoScheduleProgressStatus = 'success'
-            this.autoScheduleProgressStage = this.$t('ui.data.column.cd15ScheduleResult.autoScheduleSuccess')
+            this.autoScheduleProgressStage = this.$t(successKey)
             window.setTimeout(() => { this.closeAutoScheduleProgress() }, 600)
-            this.$modal.msgSuccess(this.$t('ui.data.column.cd15ScheduleResult.autoScheduleSuccess'))
+            this.$modal.msgSuccess(this.$t(successKey))
             this.getList()
+            if (this.unscheduleResultDialogVisible) {
+              this.getUnscheduleList()
+            }
             return
           }
           if (task.taskStatus === 'FAILED') {
             this.clearAutoScheduleTimer()
             this.autoScheduleProgressStatus = 'exception'
-            this.autoScheduleProgressStage = this.$t('ui.data.column.cd15ScheduleResult.autoScheduleFailed')
-            this.$modal.msgError(task.errorMessage || this.$t('ui.data.column.cd15ScheduleResult.autoScheduleFailed'))
+            this.autoScheduleProgressStage = this.$t(failedKey)
+            this.$modal.msgError(task.errorMessage || this.$t(failedKey))
             window.setTimeout(() => { this.closeAutoScheduleProgress() }, 3000)
             return
           }
@@ -461,7 +476,12 @@ export default {
       }
       const data = payload || {}
       if (data.taskId) {
-        this.handleTaskResult({ data }, getTransferMachineTask).then(() => this.getList())
+        this.pollScheduleTask(data.taskId, getTransferMachineTask, {
+          titleKey: 'ui.data.column.cd15ScheduleResult.changeMachineTitle',
+          hintKey: 'ui.data.column.cd15ScheduleResult.changeMachineProgressHint',
+          successKey: 'ui.data.column.cd15ScheduleResult.changeMachineSuccess',
+          failedKey: 'ui.data.column.cd15ScheduleResult.changeMachineFailed'
+        })
       } else {
         this.getList()
       }
@@ -477,7 +497,12 @@ export default {
       }
       const data = payload || {}
       if (data.taskId) {
-        this.handleTaskResult({ data }, getChangeQtyTask).then(() => this.getList())
+        this.pollScheduleTask(data.taskId, getChangeQtyTask, {
+          titleKey: 'ui.data.column.cd15ScheduleResult.changeQtyTitle',
+          hintKey: 'ui.data.column.cd15ScheduleResult.changeQtyProgressHint',
+          successKey: 'ui.data.column.cd15ScheduleResult.changeQtySuccess',
+          failedKey: 'ui.data.column.cd15ScheduleResult.changeQtyFailed'
+        })
       } else {
         this.getList()
       }

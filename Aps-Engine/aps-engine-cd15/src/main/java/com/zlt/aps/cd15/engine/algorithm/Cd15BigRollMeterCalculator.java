@@ -37,7 +37,7 @@ public class Cd15BigRollMeterCalculator {
      * 根据斜裁计划量换算GDYY大卷占用量。
      *
      * @param planQuantity 斜裁计划量，单位米
-     * @param unitConsumeMillimeter 单耗，单位毫米/条
+     * @param unitConsumeMillimeter 单条钢带长度，单位毫米/条；大卷幅宽缺失时作为有效幅宽
      * @param craftWidthMillimeter 斜裁宽度，单位毫米
      * @param cordWidthMillimeter 大卷幅宽，单位毫米
      * @return GDYY大卷占用量，单位米
@@ -55,7 +55,7 @@ public class Cd15BigRollMeterCalculator {
      * 根据斜裁计划量换算GDYY大卷占用量，并在非法计划量时输出材料上下文。
      *
      * @param planQuantity 斜裁计划量，单位米
-     * @param unitConsumeMillimeter 单耗，单位毫米/条
+     * @param unitConsumeMillimeter 单条钢带长度，单位毫米/条；大卷幅宽缺失时作为有效幅宽
      * @param craftWidthMillimeter 斜裁宽度，单位毫米
      * @param cordWidthMillimeter 大卷幅宽，单位毫米
      * @param steelStripCode 钢带代码
@@ -73,12 +73,10 @@ public class Cd15BigRollMeterCalculator {
                 cordWidthMillimeter, steelStripCode, bigRollCode);
         requirePositive(unitConsumeMillimeter, "单耗");
         requirePositive(craftWidthMillimeter, "斜裁宽度");
-        if (cordWidthMillimeter == null || cordWidthMillimeter.signum() <= 0) {
-            return normalize(planQuantity);
-        }
-        BigDecimal totalCutLength = planQuantity.multiply(unitConsumeMillimeter)
-                .divide(craftWidthMillimeter, 10, RoundingMode.HALF_UP);
-        return calculate(totalCutLength, craftWidthMillimeter, cordWidthMillimeter);
+        BigDecimal effectiveCordWidth = cordWidthMillimeter == null
+                || cordWidthMillimeter.signum() <= 0
+                ? unitConsumeMillimeter : cordWidthMillimeter;
+        return calculate(planQuantity, craftWidthMillimeter, effectiveCordWidth);
     }
 
     /** 非正计划量同时记录钢带、大卷和施工尺寸，便于定位上游归零原因。 */

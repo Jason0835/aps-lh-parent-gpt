@@ -1,7 +1,7 @@
 package com.zlt.aps.nc.engine.mapper;
 
-import java.util.List;
-import java.util.Map;
+import java.util.Date;
+import java.util.Set;
 
 import org.apache.ibatis.annotations.Param;
 
@@ -23,9 +23,13 @@ public interface NcEngineScheduleResultMapper extends CommBaseMapper<NcScheduleR
     /**
      * 查询各内衬代码最近一次有排产量的排产日期（联合主表和日志表）
      * @param factoryCode 工厂编码
-     * @param liningCodes 内衬代码列表
+     * @param thresholdDate 时间窗口下限（排产日 - 新规格天数阈值）
+     * @param scheduleDate 时间窗口上限（排产日）
+     * @param liningCodes 垫胶代码集合
      * @return 内衬代码 -> 最近排产日期 的映射列表
      */
-    List<Map<String, Object>> selectLastScheduleDate(@Param("factoryCode") String factoryCode,
-            @Param("liningCodes") List<String> liningCodes);
+    Set<String> selectLastScheduleDate(@Param("factoryCode") String factoryCode,
+            @Param("thresholdDate") Date thresholdDate,
+            @Param("scheduleDate") Date scheduleDate,
+            @Param("liningCodes") Set<String> liningCodes);
 }

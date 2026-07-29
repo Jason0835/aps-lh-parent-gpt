@@ -6,7 +6,9 @@ import org.junit.Test;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
@@ -38,10 +40,10 @@ public class Cd15ScheduleCandidateSorterTest {
     }
 
     /**
-     * 相同缺料优先级内，斜裁规格连续优先于大卷连续。
+     * 相同缺料优先级内，同大卷连续优先于跨大卷的同规格连续。
      */
     @Test
-    public void shouldSortBySpecThenRollContinuity() {
+    public void shouldSortByRollBeforeSpecContinuity() {
         LocalDateTime shortageTime = LocalDateTime.of(2026, 6, 13, 14, 0);
         Cd15MachineTailState tail = Cd15MachineTailState.builder()
                 .steelStripCode("C1").bigRollCode("R1").build();
@@ -54,8 +56,8 @@ public class Cd15ScheduleCandidateSorterTest {
         ), tail);
 
         assertEquals("R1/C1", key(result.get(0)));
-        assertEquals("R2/C1", key(result.get(1)));
-        assertEquals("R1/C2", key(result.get(2)));
+        assertEquals("R1/C2", key(result.get(1)));
+        assertEquals("R2/C1", key(result.get(2)));
         assertEquals("R2/C2", key(result.get(3)));
     }
 
@@ -78,6 +80,184 @@ public class Cd15ScheduleCandidateSorterTest {
 
         assertEquals("24", result.get(0).getCuttingAngle());
         assertEquals("15", result.get(1).getCuttingAngle());
+    }
+
+    /**
+     * 同大卷需要反向切换角度时，应从当前角度向最近的反方向角度连续切换。
+     */
+    @Test
+    public void shouldReverseAngleDirectionFromNearestAngleWithinSameRoll() {
+        LocalDateTime shortageTime = LocalDateTime.of(2026, 7, 24, 14, 0);
+        Cd15MachineTailState tail = Cd15MachineTailState.builder()
+                .steelStripCode("CURRENT")
+                .bigRollCode("CSS34524")
+                .cuttingAngle("51")
+                .build();
+
+        List<Cd15ScheduleCandidate> result = sorter.sort(Arrays.asList(
+                candidate("ANGLE15", "CSS34524", "15", shortageTime),
+                candidate("ANGLE18", "CSS34524", "18", shortageTime)
+        ), Arrays.asList(tail), "15");
+
+        assertEquals("18", result.get(0).getCuttingAngle());
+        assertEquals("15", result.get(1).getCuttingAngle());
+    }
+
+    /**
+     * 角度方向只能在相同连续等级内生效，不得改变同大卷优先级。
+     */
+    @Test
+    public void shouldKeepSameRollBeforeForwardAngleOnOtherRoll() {
+        LocalDateTime shortageTime = LocalDateTime.of(2026, 7, 24, 14, 0);
+        Cd15MachineTailState tail = Cd15MachineTailState.builder()
+                .steelStripCode("CURRENT")
+                .bigRollCode("CSS34524")
+                .cuttingAngle("51")
+                .build();
+
+        List<Cd15ScheduleCandidate> result = sorter.sort(Arrays.asList(
+                candidate("SAME_ROLL", "CSS34524", "15", shortageTime),
+                candidate("OTHER_ROLL", "CSS44524", "60", shortageTime)
+        ), Arrays.asList(tail), "15");
+
+        assertEquals("CSS34524", result.get(0).getBigRollCode());
+        assertEquals("CSS44524", result.get(1).getBigRollCode());
+    }
+
+    /**
+     * 当前成型班不缺料时，未来缺料较早的远端角度不能打断单方向角度路线。
+     */
+    @Test
+    public void shouldKeepFutureShortageBehindNonShortageAngleRoute() {
+        LocalDateTime currentShift = LocalDateTime.of(2026, 7, 24, 14, 0);
+        Cd15MachineTailState tail = Cd15MachineTailState.builder()
+                .steelStripCode("CURRENT")
+                .bigRollCode("CSS24524")
+                .cuttingAngle("15")
+                .build();
+
+        List<Cd15ScheduleCandidate> result = sorter.sort(Arrays.asList(
+                candidate("ANGLE51", "CSS24524", "51", currentShift.plusHours(8)),
+                candidate("ANGLE24", "CSS24524", "24", currentShift.plusHours(16))
+        ), Collections.singletonList(tail), "10");
+
+        assertEquals("24", result.get(0).getCuttingAngle());
+        assertEquals("51", result.get(1).getCuttingAngle());
+    }
+
+    /**
+     * 当前班不缺料时，班初机尾位于中间角度也必须从大卷边界形成单方向路线。
+     */
+    @Test
+    public void shouldStartNonShortageSingleDirectionFromRollBoundary() {
+        LocalDateTime futureShortage = LocalDateTime.of(2026, 7, 25, 6, 0);
+        Cd15MachineTailState tail = Cd15MachineTailState.builder()
+                .steelStripCode("CURRENT")
+                .bigRollCode("CST75523")
+                .cuttingAngle("18")
+                .build();
+        Cd15ScheduleCandidate angle18 = candidate(
+                "ANGLE18", "CST75523", "18", futureShortage);
+        angle18.setContinueFromPreviousShift(true);
+
+        List<Cd15ScheduleCandidate> result = sorter.sort(Arrays.asList(
+                angle18,
+                candidate("ANGLE15", "CST75523", "15", futureShortage),
+                candidate("ANGLE24", "CST75523", "24", futureShortage),
+                candidate("ANGLE51", "CST75523", "51", futureShortage)
+        ), Collections.singletonList(tail), null);
+
+        assertEquals("15", result.get(0).getCuttingAngle());
+        assertEquals("18", result.get(1).getCuttingAngle());
+        assertEquals("24", result.get(2).getCuttingAngle());
+        assertEquals("51", result.get(3).getCuttingAngle());
+    }
+
+    /** 非缺料续作不能越过当前角度，导致同一角度被拆成首尾两段。 */
+    @Test
+    public void shouldKeepCurrentAngleGroupBeforeNonShortageContinuation() {
+        LocalDateTime futureShortage = LocalDateTime.of(2026, 7, 25, 14, 0);
+        Cd15MachineTailState tail = Cd15MachineTailState.builder()
+                .steelStripCode("CURRENT")
+                .bigRollCode("CST75523")
+                .cuttingAngle("51")
+                .build();
+        Cd15ScheduleCandidate angle18 = candidate(
+                "ANGLE18", "CST75523", "18", futureShortage);
+        angle18.setContinueFromPreviousShift(true);
+
+        List<Cd15ScheduleCandidate> result = sorter.sort(Arrays.asList(
+                angle18,
+                candidate("ANGLE51-A", "CST75523", "51", futureShortage),
+                candidate("ANGLE51-B", "CST75523", "51", futureShortage),
+                candidate("ANGLE24", "CST75523", "24", futureShortage)
+        ), Collections.singletonList(tail), null);
+
+        assertEquals("51", result.get(0).getCuttingAngle());
+        assertEquals("51", result.get(1).getCuttingAngle());
+    }
+    /** 当前班真实缺料仍保持最高优先级，允许打断非缺料角度路线。 */
+    @Test
+    public void shouldAllowCurrentShortageToInterruptAngleRoute() {
+        LocalDateTime currentShift = LocalDateTime.of(2026, 7, 24, 22, 0);
+        Cd15MachineTailState tail = Cd15MachineTailState.builder()
+                .bigRollCode("CST75523")
+                .cuttingAngle("51")
+                .build();
+        Cd15ScheduleCandidate urgentAngle18 = candidate(
+                "URGENT18", "CST75523", "18", currentShift);
+        urgentAngle18.setShortageInCurrentShift(true);
+
+        List<Cd15ScheduleCandidate> result = sorter.sort(Arrays.asList(
+                candidate("NORMAL51", "CST75523", "51", currentShift.plusHours(8)),
+                urgentAngle18
+        ), Collections.singletonList(tail), null);
+
+        assertEquals("18", result.get(0).getCuttingAngle());
+    }
+    /**
+     * 非缺料大卷不得拆分，并应选择可衔接端点较多的起始卷以减少跨卷换角。
+     */
+    @Test
+    public void shouldMinimizeAngleChangesWithoutSplittingBigRoll() {
+        LocalDateTime futureShortage = LocalDateTime.of(2026, 7, 25, 6, 0);
+        List<Cd15ScheduleCandidate> remaining = new ArrayList<>(Arrays.asList(
+                candidate("A15", "CSS24524", "15", futureShortage),
+                candidate("A51", "CSS24524", "51", futureShortage),
+                candidate("B24", "CSS34524", "24", futureShortage),
+                candidate("B51", "CSS34524", "51", futureShortage),
+                candidate("C15", "CSSC6020", "15", futureShortage)
+        ));
+        List<String> route = new ArrayList<>();
+        Cd15MachineTailState tail = null;
+        String previousDifferentAngle = null;
+        String currentAngle = null;
+
+        while (!remaining.isEmpty()) {
+            List<Cd15ScheduleCandidate> sorted = sorter.sort(
+                    remaining,
+                    tail == null ? Collections.emptyList() : Collections.singletonList(tail),
+                    previousDifferentAngle);
+            Cd15ScheduleCandidate selected = sorted.get(0);
+            remaining.remove(selected);
+            route.add(selected.getBigRollCode() + "/" + selected.getCuttingAngle());
+            if (currentAngle != null && !currentAngle.equals(selected.getCuttingAngle())) {
+                previousDifferentAngle = currentAngle;
+            }
+            currentAngle = selected.getCuttingAngle();
+            tail = Cd15MachineTailState.builder()
+                    .steelStripCode(selected.getSteelStripCode())
+                    .bigRollCode(selected.getBigRollCode())
+                    .cuttingAngle(selected.getCuttingAngle())
+                    .build();
+        }
+
+        assertEquals(Arrays.asList(
+                "CSSC6020/15",
+                "CSS24524/15",
+                "CSS24524/51",
+                "CSS34524/51",
+                "CSS34524/24"), route);
     }
 
     /**

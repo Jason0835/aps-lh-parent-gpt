@@ -14,6 +14,14 @@ import java.util.List;
 public interface ICd90ScheduleResultService extends IDocService<Cd90ScheduleResult> {
 
     /**
+     * 删除排程结果，不触发滚动重排；删除后只压缩同工厂、日期、机台的 CLASS1 后续生产顺位。
+     *
+     * @param ids 待删除排程结果主键
+     * @return 删除结果
+     */
+    AjaxResult removeScheduleResults(List<Long> ids);
+
+    /**
      * 执行直裁自动排程。
      *
      * @param scheduleResult 自动排程条件，当前使用工厂编码和排程日期

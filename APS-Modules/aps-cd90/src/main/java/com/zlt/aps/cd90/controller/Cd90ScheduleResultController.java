@@ -9,7 +9,6 @@ import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.ServletUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
-import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleResult;
@@ -80,15 +79,8 @@ public class Cd90ScheduleResultController extends AbstractDocBizController<Cd90S
     @PostMapping("/remove")
     @Override
     public AjaxResult removeByIds(@RequestBody List<Long> ids) {
-        if (ids != null && !ids.isEmpty()) {
-            LambdaQueryWrapper<Cd90ScheduleResult> wrapper = new LambdaQueryWrapper<>();
-            wrapper.in(Cd90ScheduleResult::getId, ids);
-            wrapper.gt(Cd90ScheduleResult::getPublishSuccessCount, 0);
-            if (cd90ScheduleResultMapper.selectCount(wrapper) > 0) {
-                return AjaxResult.error(I18nUtil.getMessage("ui.data.column.cd90ScheduleResult.hasPublishedCanNotDelete"));
-            }
-        }
-        return super.removeByIds(ids);
+        // 删除校验、排程锁和 CLASS1 顺位压缩统一由 Service 事务处理。
+        return cd90ScheduleResultService.removeScheduleResults(ids);
     }
 
     /**

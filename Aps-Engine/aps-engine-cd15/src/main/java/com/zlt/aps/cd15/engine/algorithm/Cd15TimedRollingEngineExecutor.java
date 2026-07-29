@@ -96,6 +96,7 @@ public class Cd15TimedRollingEngineExecutor {
 
         List<Cd15ScheduleAttemptTrace> traces = new ArrayList<>();
         List<Cd15RollingPendingTask> carryOver = new ArrayList<>();
+        List<Cd15ConstructionMaterial> constructionMaterials = new ArrayList<>();
         Cd15RollingScheduleContext rolling = null;
         Cd15ScheduleProgressListener progress = listener == null
                 ? Cd15ScheduleProgressListener.NO_OP : listener;
@@ -105,6 +106,9 @@ public class Cd15TimedRollingEngineExecutor {
             progress.onProgress(20 + index * 60 / shiftCount, "ROLLING_SHIFT",
                     shiftStageName(shift, "滚动开始"), shift);
             Cd15AutoScheduleInput input = loadInput(context, shift);
+            if (input.getConstructionMaterials() != null) {
+                constructionMaterials.addAll(input.getConstructionMaterials());
+            }
             if (rolling == null) {
                 Cd15NewSpecAdvanceResult advance = newSpecAdvanceInputPreparer.prepare(context, input);
                 input.setPlanningDemandShifts(advance.getAdjustedDemandShifts());
@@ -153,7 +157,8 @@ public class Cd15TimedRollingEngineExecutor {
 
         ResultDiff diff = buildResultDiff(target, context, affectedShifts,
                 beforeById, workingById, rolling == null
-                        ? Collections.emptyList() : rolling.getCommittedTasks(), sourceLanes);
+                        ? Collections.emptyList() : rolling.getCommittedTasks(),
+                sourceLanes, constructionMaterials);
         List<Cd15UnscheduleResult> unscheduled = toUnscheduled(target,
                 unscheduledResultAggregator.aggregate(traces));
         return Cd15TimedRollingOutput.builder().batchNo(target.getBatchNo())
@@ -323,17 +328,24 @@ public class Cd15TimedRollingEngineExecutor {
                                        Map<Long, Cd15ScheduleResult> beforeById,
                                        Map<Long, Cd15ScheduleResult> workingById,
                                        List<Cd15ShiftScheduleTask> committedTasks,
-                                       Map<Long, List<Cd15ScheduleLaneAllocation>> sourceLanes) {
+                                       Map<Long, List<Cd15ScheduleLaneAllocation>> sourceLanes,
+                                       List<Cd15ConstructionMaterial> constructionMaterials) {
         Map<String, Cd15ScheduleResult> insertedByKey = new LinkedHashMap<>();
         List<Cd15ScheduleLaneAllocation> lanes = new ArrayList<>();
         committedTasks.stream().filter(task -> affectedShifts.stream().anyMatch(
                 shift -> Objects.equals(shift.getClassField(), task.getClassField())))
                 .forEach(task -> applyTask(target, workingById, insertedByKey, lanes, task));
+        workingById.values().forEach(
+                result -> this.fillMissingCordWidth(result, constructionMaterials));
+        insertedByKey.values().forEach(
+                result -> this.fillMissingCordWidth(result, constructionMaterials));
         workingById.values().forEach(this::recalculateBigRollConsumption);
         insertedByKey.values().forEach(this::recalculateBigRollConsumption);
         List<Cd15ScheduleResult> updated = workingById.values().stream()
-                .filter(item -> !affectedFingerprint(item, affectedShifts).equals(
-                        affectedFingerprint(beforeById.get(item.getId()), affectedShifts)))
+                .filter(item -> !Objects.equals(item.getCordWidth(),
+                                beforeById.get(item.getId()).getCordWidth())
+                        || !affectedFingerprint(item, affectedShifts).equals(
+                                affectedFingerprint(beforeById.get(item.getId()), affectedShifts)))
                 .collect(Collectors.toList());
         List<Cd15ScheduleResult> deleted = updated.stream()
                 .filter(item -> allPlansZero(item, context.getShifts()))
@@ -469,6 +481,43 @@ public class Cd15TimedRollingEngineExecutor {
                         totalQuantity, result.getUnitConsumeMillimeter(),
                         result.getCraftWidth(), result.getCordWidth(),
                         result.getSteelStripCode(), result.getBigRollCode()));
+    }
+
+    /**
+     * 历史排程结果未保存大卷幅宽时，从本次滚动施工材料中补齐有效幅宽。
+     */
+    private void fillMissingCordWidth(
+            Cd15ScheduleResult result,
+            List<Cd15ConstructionMaterial> constructionMaterials) {
+        if (result == null || (result.getCordWidth() != null
+                && result.getCordWidth().signum() > 0)) {
+            return;
+        }
+        Cd15ConstructionMaterial material = constructionMaterials.stream()
+                .filter(Objects::nonNull)
+                .filter(item -> Objects.equals(
+                        result.getSteelStripCode(), item.getSteelStripCode()))
+                .filter(item -> Objects.equals(
+                        result.getBigRollCode(), item.getBigRollCode()))
+                .filter(item -> Objects.equals(
+                        result.getCuttingAngle(), item.getCuttingAngle()))
+                .filter(item -> result.getCraftWidth() == null
+                        || this.sameDecimal(result.getCraftWidth(), item.getCraftWidth()))
+                .filter(item -> result.getUnitConsumeMillimeter() == null
+                        || this.sameDecimal(result.getUnitConsumeMillimeter(),
+                                item.getUnitConsumeMillimeter()))
+                .findFirst().orElseThrow(() -> new IllegalStateException(
+                        "滚动结果未匹配到施工大卷幅宽: " + result.getId()));
+        if (material.getCordWidth() == null
+                || material.getCordWidth().signum() <= 0) {
+            throw new IllegalStateException(
+                    "滚动施工数据缺少有效大卷幅宽: " + result.getId());
+        }
+        result.setCordWidth(material.getCordWidth());
+    }
+
+    private boolean sameDecimal(BigDecimal first, BigDecimal second) {
+        return first != null && second != null && first.compareTo(second) == 0;
     }
 
     private Cd15RollingPendingTask pending(Cd15ScheduleResult result,

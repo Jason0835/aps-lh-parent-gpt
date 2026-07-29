@@ -20,7 +20,7 @@ public class Cd15ConstructionMaterial {
     private String steelStripCode;
     /** 大卷代码，对应施工 ARTICLE_CROWN_SPEC。 */
     private String bigRollCode;
-    /** 大卷幅宽，对应施工 CORD_WIDTH，入口不做必填拦截。 */
+    /** 大卷幅宽，对应施工 CORD_WIDTH；为空时按单条钢带长度作为有效幅宽。 */
     private BigDecimal cordWidth;
     /** 裁断角度，对应施工 BELT_CUTTING_ANGLE。 */
     private String cuttingAngle;
