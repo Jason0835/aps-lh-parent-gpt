@@ -1,5 +1,6 @@
 package com.zlt.aps.tm.api.service;
 
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
@@ -7,10 +8,8 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.tm.api.domain.dto.TmRollingRecalcRequestDTO;
 import com.zlt.aps.tm.api.domain.dto.TmScheduleResultImportDTO;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
-import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleRequestVo;
-import com.zlt.aps.tm.api.domain.vo.TmInsertTaskRequestVo;
-import com.zlt.aps.tm.api.domain.vo.TmOperationTaskVo;
-import com.zlt.aps.tm.api.domain.vo.TmScheduleShiftDateVO;
+import com.zlt.aps.tm.api.domain.entity.TmScheduleUnplanned;
+import com.zlt.aps.tm.api.domain.vo.*;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
@@ -107,6 +106,16 @@ public interface ITmScheduleResultRemoteService {
     @ApiOperation("查询胎面排程结果合计")
     @PostMapping("/tmScheduleResult/summary")
     AjaxResult summary(@RequestBody TmScheduleResult queryVO);
+
+    /**
+     * 分页查询胎面未排任务。
+     *
+     * @param queryVO 工厂、排程日期、可选批次和分页条件
+     * @return 未排任务分页结果
+     */
+    @ApiOperation("查询胎面未排任务")
+    @PostMapping("/tmScheduleResult/unplanned/list")
+    Page<TmScheduleUnplanned> listUnplanned(@RequestBody TmScheduleUnplannedQueryVo queryVO);
 
     @ApiOperation("导出列表")
     @PostMapping("/tmScheduleResult/exportData/{fileName}")

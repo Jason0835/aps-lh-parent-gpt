@@ -80,7 +80,6 @@
       </template>
       <template slot="headerRight">
         <div class="summary-bar stat-info">
-          <span>{{ $t('ui.tm.schedule.totalStockQty') }}：<span class="stat-value">{{ summary.totalStockQty || 0 }}</span></span>
           <span
             v-for="(planQty, index) in shiftPlanQtyList"
             :key="index"
@@ -173,6 +172,42 @@
       </div>
     </el-dialog>
     <el-dialog
+      :close-on-click-modal="false"
+      :close-on-press-escape="false"
+      :show-close="false"
+      :title="$t('ui.tc.schedule.releaseProgress')"
+      :visible.sync="releaseProgressVisible"
+      append-to-body
+      width="420px"
+    >
+      <div style="text-align:center;margin-bottom:12px;color:#606266;font-size:14px;">
+        {{ releaseProgressStage }}
+      </div>
+      <el-progress
+        :percentage="releaseProgressValue"
+        :status="releaseProgressStatus"
+        :stroke-width="18"
+        :text-inside="true"
+        text-color="#fff"
+      />
+      <div style="margin-top:10px;color:#909399;font-size:12px;text-align:center;">
+        {{ $t("ui.tc.schedule.releaseProgressHint") }}
+      </div>
+    </el-dialog>
+    <el-dialog
+      :title="$t('ui.tc.schedule.releaseIssues')"
+      :visible.sync="releaseIssueVisible"
+      append-to-body
+      width="82%"
+    >
+      <el-table :data="releaseIssues" border max-height="520">
+        <el-table-column :label="$t('ui.tc.schedule.issueLevel')" prop="level" width="90" />
+        <el-table-column :label="$t('ui.tc.schedule.issueStage')" prop="stageName" width="150" />
+        <el-table-column :label="$t('ui.tc.schedule.issueCategory')" min-width="150" prop="category" />
+        <el-table-column :label="$t('ui.tc.schedule.issueMessage')" min-width="260" prop="message" show-overflow-tooltip />
+      </el-table>
+    </el-dialog>
+    <el-dialog
       :title="$t('ui.data.column.tm.scheduleResult.autoPlanIssues')"
       :visible.sync="autoPlanIssueVisible"
       append-to-body
@@ -200,13 +235,14 @@ import {
   getLatestAutoPlanTask,
   getLatestOperationTask,
   getOperationTask,
+  getReleaseTask,
   listScheduleShiftDates,
   listTmScheduleResult,
   listTmScheduleSummary,
   listTmScheduleUnplanned,
-  publishScheduleResult,
-  publishValidate,
+  releaseScheduleResult,
   removeTmScheduleResult,
+  validateRelease,
 } from "@/api/tm/scheduleResult";
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
@@ -302,6 +338,15 @@ export default {
       operationProgressValue: 0,
       operationProgressStage: "",
       operationProgressStatus: null,
+      releaseTimer: null,
+      releasePollTimes: 0,
+      maxReleasePollTimes: 240,
+      releaseProgressVisible: false,
+      releaseProgressValue: 0,
+      releaseProgressStage: "",
+      releaseProgressStatus: null,
+      releaseIssueVisible: false,
+      releaseIssues: [],
       dateList: [
         { shift: 1, shiftType: "night", shiftDate: "" },
         { shift: 2, shiftType: "morning", shiftDate: "" },
@@ -317,7 +362,7 @@ export default {
       machines: (state) => state.tm.machines,
     }),
     writeTaskRunning() {
-      return this.operationRunning || this.autoPlanRunning;
+      return this.operationRunning || this.autoPlanRunning || this.releaseProgressVisible;
     },
     // 各班次计划量合计列表，后端返回下标 0=1班，长度 6；为空时回退为空数组避免渲染异常
     shiftPlanQtyList() {
@@ -967,17 +1012,97 @@ export default {
         this.$refs.infoRef.show(this.selection[0]);
       }
     },
-    // 发布入口：先校验再标记待发布，真实 MES 发布由后续发布流程接入。
-    handlePublish() {
+    // 发布入口：校验同scope+发布状态，提交异步发布任务并轮询下发进度（对齐胎侧 handleRelease）。
+    async handlePublish() {
       if (this.writeTaskRunning) return;
-      const ids = this.selection.map((item) => item.id);
-      this.$confirm(this.$t("ui.biz.alter.makeSurePublish"), {
-        type: "warning",
-      }).then(() => {
-        publishValidate(ids).then(() => {
-          publishScheduleResult(ids).then(task => this.handleOperationTask(task));
+      const scopeKeySet = new Set(this.selection.map((item) => `${item.factoryCode}|${item.scheduleDate}|${item.batchNo}`));
+      if (scopeKeySet.size !== 1) {
+        this.$modal.msgWarning(this.$t("ui.tc.schedule.sameScopeRequired"));
+        return;
+      }
+      const invalidRow = this.selection.find((item) => !["0", "2", "4", "5"].includes(String(item.releaseStatus || "0")));
+      if (invalidRow) {
+        this.$modal.msgWarning(this.$t("ui.tc.schedule.releaseStatusInvalid"));
+        return;
+      }
+      const requestData = this.buildReleaseRequest();
+      const validateResult = await validateRelease(requestData);
+      if (!validateResult.allowed) {
+        const issues = Array.isArray(validateResult.issues) ? validateResult.issues : [];
+        this.showReleaseIssues(issues);
+        this.$modal.msgWarning(issues.length > 0 ? issues[0].message : this.$t("ui.tc.schedule.releaseValidateFailed"));
+        return;
+      }
+      await this.$confirm(this.$t("ui.biz.alter.makeSurePublish"), { type: "warning" });
+      const task = await releaseScheduleResult(requestData);
+      this.pollReleaseTask(task.taskId);
+    },
+    // 构造发布请求（工厂+日期+结果项）
+    buildReleaseRequest() {
+      const row = this.selection[0];
+      return {
+        factoryCode: row.factoryCode,
+        scheduleDate: row.scheduleDate,
+        items: this.selection.map((item) => ({ resultId: item.id, expectedTaskVersion: 0 }))
+      };
+    },
+    // 轮询发布任务进度（对齐胎侧 pollReleaseTask）
+    pollReleaseTask(taskId) {
+      this.clearReleaseTimer();
+      this.releasePollTimes = 0;
+      this.releaseProgressVisible = true;
+      this.releaseProgressValue = 0;
+      this.releaseProgressStatus = null;
+      const poll = () => {
+        getReleaseTask(taskId).then((task) => {
+          this.releasePollTimes += 1;
+          this.releaseProgressValue = Math.min(100, Math.max(0, Number(task.progress || 0)));
+          this.releaseProgressStage = task.currentStageName || task.currentStage || "";
+          if (task.taskStatus === "SUCCESS") {
+            this.clearReleaseTimer();
+            this.releaseProgressValue = 100;
+            this.releaseProgressStatus = "success";
+            this.releaseProgressStage = this.$t("ui.tc.schedule.releaseSuccess");
+            this.showReleaseIssues(task.issues);
+            window.setTimeout(() => { this.releaseProgressVisible = false; }, 600);
+            this.queryList();
+            return;
+          }
+          if (task.taskStatus === "FAILED") {
+            this.clearReleaseTimer();
+            this.releaseProgressStatus = "exception";
+            this.releaseProgressStage = this.$t("ui.tc.schedule.releaseFailed");
+            this.showReleaseIssues(task.issues);
+            this.$modal.msgError(task.message || this.$t("ui.tc.schedule.releaseFailed"));
+            window.setTimeout(() => { this.releaseProgressVisible = false; }, 3000);
+            this.queryList();
+            return;
+          }
+          if (this.releasePollTimes >= this.maxReleasePollTimes) {
+            this.clearReleaseTimer();
+            this.releaseProgressStatus = "exception";
+            this.$modal.msgWarning(this.$t("ui.tc.schedule.releasePollTimeout"));
+            window.setTimeout(() => { this.releaseProgressVisible = false; }, 3000);
+            return;
+          }
+          this.releaseTimer = window.setTimeout(poll, 3000);
+        }).catch(() => {
+          this.clearReleaseTimer();
+          this.releaseProgressStatus = "exception";
+          this.$modal.msgWarning(this.$t("ui.tc.schedule.releasePollTimeout"));
         });
-      });
+      };
+      poll();
+    },
+    showReleaseIssues(issues) {
+      this.releaseIssues = Array.isArray(issues) ? issues : [];
+      this.releaseIssueVisible = this.releaseIssues.length > 0;
+    },
+    clearReleaseTimer() {
+      if (this.releaseTimer) {
+        window.clearTimeout(this.releaseTimer);
+        this.releaseTimer = null;
+      }
     },
     handleEdit(row) {
       if (this.$refs.infoRef) {

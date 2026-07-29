@@ -152,3 +152,41 @@ export function changeReleaseStatus(data) {
     data: data
   })
 }
+
+export function validateRelease(data) {
+  return request({
+    url: '/tm/tmScheduleResult/release/validate',
+    method: 'post',
+    data: data
+  })
+}
+
+export function releaseScheduleResult(data) {
+  return request({
+    url: '/tm/tmScheduleResult/release',
+    method: 'post',
+    data: data
+  })
+}
+
+export function getReleaseTask(taskId) {
+  return request({
+    url: '/tm/tmScheduleResult/release/task/' + taskId,
+    method: 'get'
+  })
+}
+
+export function getLatestReleaseTask(query) {
+  return request({
+    url: '/tm/tmScheduleResult/release/task/latest',
+    method: 'get',
+    params: query
+  })
+}
+
+export function recoverReleaseTimeout() {
+  return request({
+    url: '/tm/tmScheduleResult/internal/recoverReleaseTimeout',
+    method: 'post'
+  })
+}

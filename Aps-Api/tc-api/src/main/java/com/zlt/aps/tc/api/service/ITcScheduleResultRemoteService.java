@@ -304,6 +304,17 @@ public interface ITcScheduleResultRemoteService {
     TcReleaseTaskVo getLatestReleaseTask(@RequestParam("factoryCode") String factoryCode,
                                          @RequestParam("scheduleDate") String scheduleDate);
 
+    /**
+     * 管理员直接调整胎侧排程结果发布状态。
+     *
+     * @param ids 排程结果 ID，多个 ID 使用英文逗号分隔
+     * @param isRelease 目标发布状态编码
+     * @return 修改成功的记录数
+     */
+    @ApiOperation("更改胎侧发布状态")
+    @PostMapping("/tcScheduleResult/changeReleaseStatus")
+    AjaxResult changeReleaseStatus(@RequestParam("ids") String ids, @RequestParam("isRelease") String isRelease);
+
     // ===== 定时任务内部接口 =====
 
     /**

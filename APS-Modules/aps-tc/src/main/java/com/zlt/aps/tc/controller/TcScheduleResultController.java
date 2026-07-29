@@ -147,6 +147,24 @@ public class TcScheduleResultController extends AbstractDocBizController<TcSched
     }
 
     /**
+     * 管理员直接调整胎侧排程结果发布状态。
+     *
+     * <p>该接口用于异常数据修复，状态迁移仍由服务层按统一迁移矩阵校验，
+     * 不替代正常的胎侧发布任务和 MES 回调链路。</p>
+     *
+     * @param ids 排程结果 ID，多个 ID 使用英文逗号分隔
+     * @param isRelease 目标发布状态编码
+     * @return 修改成功的记录数
+     */
+    @Log(title = "ui.tc.schedule.scheduleResult.modelName", businessType = BusinessType.UPDATE)
+    @ApiOperation("更改胎侧发布状态")
+    @PostMapping("/changeReleaseStatus")
+    public AjaxResult changeReleaseStatus(@RequestParam("ids") String ids,
+                                          @RequestParam("isRelease") String isRelease) {
+        return toAjax(this.tcScheduleResultService.changeReleaseStatus(ids, isRelease));
+    }
+
+    /**
      * 恢复超过超时时间仍处于发布中的任务，供定时任务调用。
      *
      * @return 恢复任务数量

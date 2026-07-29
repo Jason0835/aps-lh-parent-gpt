@@ -40,4 +40,12 @@ public interface TcScheduleResultMapper extends CommBaseMapper<TcScheduleResult>
     List<TcScheduleResult> selectScopeForUpdate(@Param("factoryCode") String factoryCode,
                                                 @Param("scheduleDate") Date scheduleDate,
                                                 @Param("batchNo") String batchNo);
+
+    /**
+     * 按主键锁定排程结果，用于管理员修改发布状态时防止并发覆盖。
+     *
+     * @param ids 已排序的排程结果 ID
+     * @return 加行锁后的排程结果
+     */
+    List<TcScheduleResult> selectBatchIdsForUpdate(@Param("ids") List<Long> ids);
 }
