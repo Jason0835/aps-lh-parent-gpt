@@ -74,6 +74,14 @@ export function listTmScheduleSummary(query) {
   })
 }
 
+export function listTmScheduleUnplanned(query) {
+  return request({
+    url: '/tm/tmScheduleResult/unplanned/list',
+    method: 'post',
+    data: query
+  })
+}
+
 export function insertTask(data) {
   return request({
     url: '/tm/tmScheduleResult/operation/insertTask',

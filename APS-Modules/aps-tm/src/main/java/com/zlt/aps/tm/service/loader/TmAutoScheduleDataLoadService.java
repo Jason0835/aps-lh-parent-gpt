@@ -809,8 +809,8 @@ public class TmAutoScheduleDataLoadService {
                 taskDraft.setSourceShiftOrder(shiftOrder);
                 taskDraft.setNewSpecInfo(taskNewSpecInfo);
                 taskDraft.setTreadShoulderLength(treadLength);
-            taskDraft.setTailFlag(TmCloseOutTipEnum.NEED.getCode().equals(row.getMarkCloseOutTip())
-                    ? TmYesNoEnum.YES.getCode() : TmYesNoEnum.NO.getCode());
+                taskDraft.setTailFlag(this.isCloseOutByPlanSurplus(row.getCxRemainQty(), formingQty)
+                        ? TmYesNoEnum.YES.getCode() : TmYesNoEnum.NO.getCode());
                 taskDraft.setTailBalanceQty(nvl(row.getCxRemainQty()));
                 taskDraft.setCurrentShiftDemandQty(demandQty);
                 taskDraft.setCurrentShiftFormingFinishQty(resolveFormingQty(classFinishQtyArray, shiftOrder,
@@ -1065,8 +1065,8 @@ public class TmAutoScheduleDataLoadService {
                 taskDraft.setSourceShiftOrder(shiftOrder);
                 taskDraft.setNewSpecInfo(taskNewSpecInfo);
                 taskDraft.setTreadShoulderLength(treadLength);
-            taskDraft.setTailFlag(TmCloseOutTipEnum.NEED.getCode().equals(row.getMarkCloseOutTip())
-                    ? TmYesNoEnum.YES.getCode() : TmYesNoEnum.NO.getCode());
+                taskDraft.setTailFlag(this.isCloseOutByPlanSurplus(row.getCxRemainQty(), formingQty)
+                        ? TmYesNoEnum.YES.getCode() : TmYesNoEnum.NO.getCode());
                 taskDraft.setTailBalanceQty(nvl(row.getCxRemainQty()));
                 taskDraft.setCurrentShiftDemandQty(demandQty);
                 taskDraft.setCurrentShiftFormingFinishQty(resolveFormingQty(classFinishQtyArray, shiftOrder,
@@ -2489,6 +2489,23 @@ public class TmAutoScheduleDataLoadService {
      */
     private BigDecimal nvl(BigDecimal value) {
         return value == null ? BigDecimal.ZERO : value;
+    }
+
+    /**
+     * 按斜裁相同口径判断单胎胚当前班次是否收尾。
+     * <p>月计划余量和成型计划量均为条数，必须直接比较，不能混入胎面长度后的米数；
+     * 余量缺失或非法时保持非收尾，避免把数据缺失误判为可收尾。</p>
+     *
+     * @param planSurplusQty 胎胚月计划余量，单位条
+     * @param formingPlanQty 当前班次成型计划量，单位条
+     * @return true-月计划余量可由当前班次计划完成，false-仍按非收尾规格处理
+     */
+    private boolean isCloseOutByPlanSurplus(BigDecimal planSurplusQty, BigDecimal formingPlanQty) {
+        return planSurplusQty != null
+                && planSurplusQty.compareTo(BigDecimal.ZERO) >= 0
+                && formingPlanQty != null
+                && formingPlanQty.compareTo(BigDecimal.ZERO) > 0
+                && planSurplusQty.compareTo(formingPlanQty) <= 0;
     }
 
     private String getParamValue(TmScheduleContext context, String paramCode, String defaultValue) {

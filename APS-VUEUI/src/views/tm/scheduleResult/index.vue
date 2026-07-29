@@ -35,13 +35,13 @@
           :disabled="writeTaskRunning || selection.length !== 1"
           type="warning"
           @click="handleChangeQty"
-        >{{ $t("ui.data.column.scheduleResult.changePlan") }}</el-button>
+        >{{ $t("ui.tm.schedule.button.modify") }}</el-button>
         <el-button
           v-hasPermi="['tm:tmScheduleResult:changeMachine']"
           :disabled="writeTaskRunning || selection.length === 0"
           type="primary"
           @click="handleChangeMachine"
-        >{{ $t("ui.data.column.scheduleResult.changeMachine") }}</el-button>
+        >{{ $t("ui.tm.schedule.button.changeMachine") }}</el-button>
         <el-button
           type="danger"
           v-hasPermi="['tm:tmScheduleResult:remove']"
@@ -64,13 +64,19 @@
           :disabled="writeTaskRunning || selection.length === 0"
           v-hasPermi="['tm:tmScheduleResult:publish']"
           @click="handlePublish"
-        >{{ $t("ui.data.column.scheduleResult.publish") }}</el-button>
+        >{{ $t("ui.tm.schedule.button.publish") }}</el-button>
         <el-button
           v-hasRole="['admin']"
           :disabled="writeTaskRunning || selection.length === 0"
           type="primary"
           @click="handleChangeReleaseStatus"
-        >{{ $t("ui.data.column.scheduleResult.changeReleaseStatus") }}</el-button>
+        >{{ $t("ui.tm.schedule.button.changeReleaseStatus") }}</el-button>
+        <el-button
+          v-hasPermi="['tm:tmScheduleResult:query']"
+          plain
+          type="info"
+          @click="handleUnplanned"
+        >{{ $t('ui.tm.schedule.unplannedTasks') }}（{{ unplannedCount || 0 }}）</el-button>
       </template>
       <template slot="headerRight">
         <div class="summary-bar stat-info">
@@ -82,6 +88,10 @@
         </div>
       </template>
     </page-table>
+    <div v-if="autoPlanRunning || autoPlanRecoveryVisible" class="auto-plan-task-banner">
+      <span>{{ autoPlanRecoveryVisible ? $t('ui.schedule.autoPlan.recoveryHint') : $t('ui.schedule.autoPlan.backgroundHint') }}</span>
+      <el-button type="text" @click="resumeAutoPlanTask">{{ $t('ui.schedule.autoPlan.viewTask') }}</el-button>
+    </div>
     <tlt-upload-form
       ref="tltUpload"
       :updateSupport="true"
@@ -97,6 +107,7 @@
     <infoDialog ref="infoRef" :machine-options="machines" @success="handleOperationTask" />
     <changeMachineDialog ref="changeMachineRef" @success="handleOperationTask" />
     <releaseStatusDialog ref="releaseStatusRef" @success="getList" />
+    <unplanned-dialog ref="unplannedRef" />
     <el-dialog
       :close-on-click-modal="false"
       :close-on-press-escape="false"
@@ -120,6 +131,23 @@
       <div style="margin-top:10px;color:#909399;font-size:12px;text-align:center;">
         {{ autoPlanProgressHint }}
       </div>
+      <template slot="footer">
+        <el-button v-if="autoPlanRunning" @click="hideAutoPlanProgressInBackground">{{ $t('ui.schedule.autoPlan.backgroundContinue') }}</el-button>
+      </template>
+    </el-dialog>
+    <el-dialog :title="$t('ui.schedule.autoPlan.resultSummary')" :visible.sync="autoPlanResultVisible" append-to-body width="460px">
+      <div class="auto-plan-result-message">{{ autoPlanResult.message || $t('ui.schedule.autoPlan.completed') }}</div>
+      <div class="auto-plan-result-summary">
+        <span>{{ $t('ui.schedule.autoPlan.scheduledCount') }}：{{ autoPlanResult.resultCount || 0 }}</span>
+        <span>{{ $t('ui.schedule.autoPlan.unplannedCount') }}：{{ autoPlanResult.unplannedCount || 0 }}</span>
+        <span>{{ $t('ui.schedule.autoPlan.issueCount') }}：{{ autoPlanIssues.length }}</span>
+        <span>{{ $t('ui.schedule.autoPlan.batchNo') }}：{{ autoPlanResult.batchNo || '-' }}</span>
+      </div>
+      <template slot="footer">
+        <el-button :disabled="autoPlanIssues.length === 0" @click="openAutoPlanIssues">{{ $t('ui.schedule.autoPlan.viewIssues') }}</el-button>
+        <el-button :disabled="Number(autoPlanResult.unplannedCount || 0) === 0" @click="openAutoPlanUnplanned">{{ $t('ui.schedule.autoPlan.viewUnplanned') }}</el-button>
+        <el-button type="primary" @click="refreshAutoPlanBoard">{{ $t('ui.schedule.autoPlan.refreshBoard') }}</el-button>
+      </template>
     </el-dialog>
     <el-dialog
       :close-on-click-modal="false"
@@ -175,6 +203,7 @@ import {
   listScheduleShiftDates,
   listTmScheduleResult,
   listTmScheduleSummary,
+  listTmScheduleUnplanned,
   publishScheduleResult,
   publishValidate,
   removeTmScheduleResult,
@@ -185,6 +214,7 @@ import autoPlanDialog from "./components/autoPlanDialog.vue";
 import infoDialog from "./components/infoDialog.vue";
 import changeMachineDialog from "./components/changeMachineDialog.vue";
 import releaseStatusDialog from "./components/releaseStatusDialog.vue";
+import UnplannedDialog from "./components/UnplannedDialog.vue";
 
 const formatDate = (date) => {
   const year = date.getFullYear();
@@ -208,6 +238,7 @@ export default {
     TltUploadForm,
     changeMachineDialog,
     releaseStatusDialog,
+    UnplannedDialog,
   },
   dicts: ["biz_factory_name", "biz_yes_no", "IS_RELEASE", "tm_data_source"],
   provide() {
@@ -221,6 +252,7 @@ export default {
       data: [],
       selection: [],
       summary: {},
+      unplannedCount: 0,
       page: {
         current: 1,
         pageSize: 20,
@@ -254,6 +286,12 @@ export default {
       autoPlanProgressStage: "",
       autoPlanProgressStatus: null,
       autoPlanProgressHint: "",
+      autoPlanRunning: false,
+      autoPlanTaskId: "",
+      autoPlanRecoveryVisible: false,
+      autoPlanResultVisible: false,
+      autoPlanResult: {},
+      autoPlanResultScope: {},
       autoPlanIssueVisible: false,
       autoPlanIssues: [],
       operationTimer: null,
@@ -279,7 +317,7 @@ export default {
       machines: (state) => state.tm.machines,
     }),
     writeTaskRunning() {
-      return this.operationRunning || this.autoPlanProgressVisible;
+      return this.operationRunning || this.autoPlanRunning;
     },
     // 各班次计划量合计列表，后端返回下标 0=1班，长度 6；为空时回退为空数组避免渲染异常
     shiftPlanQtyList() {
@@ -667,6 +705,7 @@ export default {
       }
       const result = payload || {};
       if (result.taskId) {
+        this.saveLatestAutoPlanScope(result.taskId, scheduleDate);
         this.pollAutoPlanTask(result.taskId);
         return;
       }
@@ -675,6 +714,9 @@ export default {
     pollAutoPlanTask(taskId) {
       this.clearAutoPlanTimer();
       this.autoPlanPollTimes = 0;
+      this.autoPlanRunning = true;
+      this.autoPlanTaskId = taskId;
+      this.autoPlanRecoveryVisible = false;
       this.autoPlanProgressVisible = true;
       this.autoPlanProgressValue = 0;
       this.autoPlanProgressStage = "";
@@ -692,16 +734,25 @@ export default {
           }
           if (task.taskStatus === "SUCCESS") {
             this.clearAutoPlanTimer();
+            this.autoPlanRunning = false;
             this.autoPlanProgressValue = 100;
-            this.autoPlanProgressStatus = "success";
-            this.autoPlanProgressStage = this.$t("ui.data.column.tm.scheduleResult.autoPlanSuccess");
-            window.setTimeout(() => { this.closeAutoPlanProgress(); }, 600);
-            this.showAutoPlanIssues(task.issues);
+            const noScheduleResult = Number(task.resultCount || 0) === 0 && task.message;
+            this.autoPlanProgressStatus = noScheduleResult ? "warning" : "success";
+            this.autoPlanProgressStage = noScheduleResult
+              ? task.message
+              : this.$t("ui.data.column.tm.scheduleResult.autoPlanSuccess");
+            if (noScheduleResult) {
+              this.$modal.msgWarning(task.message);
+            }
+            this.closeAutoPlanProgress();
+            this.setAutoPlanIssues(task.issues);
+            this.showAutoPlanResult(task);
             this.getList();
             return;
           }
           if (task.taskStatus === "FAILED") {
             this.clearAutoPlanTimer();
+            this.autoPlanRunning = false;
             this.autoPlanProgressStatus = "exception";
             this.autoPlanProgressStage = this.$t("ui.data.column.tm.scheduleResult.autoPlanFailed");
             this.showAutoPlanIssues(task.issues);
@@ -711,6 +762,8 @@ export default {
           }
           if (this.autoPlanPollTimes >= this.maxAutoPlanPollTimes) {
             this.clearAutoPlanTimer();
+            this.autoPlanRunning = false;
+            this.autoPlanRecoveryVisible = true;
             this.autoPlanProgressStatus = "exception";
             this.autoPlanProgressStage = this.$t("ui.data.column.tm.scheduleResult.autoPlanTimeout");
             this.$modal.msgWarning(this.$t("ui.data.column.tm.scheduleResult.autoPlanTimeout"));
@@ -720,6 +773,8 @@ export default {
           this.autoPlanTimer = window.setTimeout(poll, 3000);
         }).catch(() => {
           this.clearAutoPlanTimer();
+          this.autoPlanRunning = false;
+          this.autoPlanRecoveryVisible = true;
           this.autoPlanProgressStatus = "exception";
           this.autoPlanProgressStage = this.$t("ui.data.column.tm.scheduleResult.autoPlanTimeout");
           this.$modal.msgWarning(this.$t("ui.data.column.tm.scheduleResult.autoPlanTimeout"));
@@ -741,13 +796,66 @@ export default {
       this.autoPlanProgressStatus = null;
       this.autoPlanProgressHint = "";
     },
+    hideAutoPlanProgressInBackground() {
+      this.autoPlanProgressVisible = false;
+    },
+    saveLatestAutoPlanScope(taskId, scheduleDate) {
+      window.sessionStorage.setItem("tmAutoPlanLatestScope", JSON.stringify({
+        taskId,
+        factoryCode: this.query.factoryCode || this.search.factoryCode,
+        scheduleDate: scheduleDate || this.query.scheduleDate || this.search.scheduleDate,
+      }));
+    },
+    resumeAutoPlanTask() {
+      if (this.autoPlanTaskId) {
+        this.pollAutoPlanTask(this.autoPlanTaskId);
+      }
+    },
+    setAutoPlanIssues(issues) {
+      this.autoPlanIssues = Array.isArray(issues) ? issues : [];
+      this.autoPlanIssueVisible = false;
+    },
+    showAutoPlanResult(task) {
+      this.autoPlanResult = task || {};
+      this.autoPlanResultScope = {
+        factoryCode: this.query.factoryCode || this.search.factoryCode,
+        scheduleDate: this.query.scheduleDate || this.search.scheduleDate,
+        batchNo: task && task.batchNo,
+      };
+      this.autoPlanResultVisible = true;
+    },
+    openAutoPlanIssues() {
+      this.autoPlanIssueVisible = this.autoPlanIssues.length > 0;
+    },
+    openAutoPlanUnplanned() {
+      this.handleUnplanned(this.autoPlanResultScope);
+    },
+    handleUnplanned(scope) {
+      const query = scope || {
+        factoryCode: this.query.factoryCode || this.search.factoryCode,
+        scheduleDate: this.query.scheduleDate || this.search.scheduleDate,
+      };
+      this.$refs.unplannedRef.show(query);
+    },
+    refreshAutoPlanBoard() {
+      this.autoPlanResultVisible = false;
+      this.getList();
+    },
     showAutoPlanIssues(issues) {
       this.autoPlanIssues = Array.isArray(issues) ? issues : [];
       this.autoPlanIssueVisible = this.autoPlanIssues.length > 0;
     },
     restoreLatestAutoPlanTask() {
-      const factoryCode = this.query.factoryCode || this.search.factoryCode;
-      const scheduleDate = this.query.scheduleDate || this.search.scheduleDate;
+      let factoryCode = this.query.factoryCode || this.search.factoryCode;
+      let scheduleDate = this.query.scheduleDate || this.search.scheduleDate;
+      try {
+        const storedScope = JSON.parse(window.sessionStorage.getItem("tmAutoPlanLatestScope") || "{}");
+        factoryCode = storedScope.factoryCode || factoryCode;
+        scheduleDate = storedScope.scheduleDate || scheduleDate;
+        this.autoPlanTaskId = storedScope.taskId || this.autoPlanTaskId;
+      } catch (error) {
+        window.sessionStorage.removeItem("tmAutoPlanLatestScope");
+      }
       if (!factoryCode || !scheduleDate) {
         return;
       }
@@ -992,6 +1100,17 @@ export default {
         // 合计基于查询条件下全部匹配行，与列表同口径，单独调用合计接口
         const summary = await listTmScheduleSummary(this.formatParams(false));
         this.summary = summary || {};
+        if (this.query.factoryCode && this.query.scheduleDate) {
+          const unplannedPage = await listTmScheduleUnplanned({
+            factoryCode: this.query.factoryCode,
+            scheduleDate: this.query.scheduleDate,
+            pageNum: 1,
+            pageSize: 1,
+          });
+          this.unplannedCount = Number(unplannedPage.total || 0);
+        } else {
+          this.unplannedCount = 0;
+        }
       } catch (error) {
         console.error(error);
       } finally {
@@ -1029,6 +1148,28 @@ export default {
 .more-btn {
   margin: 2px 0;
   width: 100%;
+}
+.auto-plan-task-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  margin: 0 12px 10px;
+  color: #606266;
+  background: #fdf6ec;
+  border: 1px solid #faecd8;
+  border-radius: 4px;
+}
+.auto-plan-result-message {
+  margin-bottom: 14px;
+  color: #303133;
+  line-height: 22px;
+}
+.auto-plan-result-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  color: #606266;
 }
 .summary-bar {
   display: flex;

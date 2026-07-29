@@ -26,7 +26,7 @@
           type="success"
           @click="handleRelease"
         >
-          {{ $t('ui.tc.schedule.publish') }}
+          {{ $t('ui.tc.schedule.button.publish') }}
         </el-button>
         <el-button v-hasPermi="['tc:tcScheduleResult:add']" :disabled="writeTaskRunning" type="warning" @click="handleAdd">
           {{ $t('ui.tc.schedule.insertTask') }}
@@ -37,7 +37,7 @@
           type="warning"
           @click="handleChangeQty"
         >
-          {{ $t('ui.tc.schedule.changeQty') }}
+          {{ $t('ui.tc.schedule.button.modify') }}
         </el-button>
         <el-button
           v-hasPermi="['tc:tcScheduleResult:changeMachine']"
@@ -45,7 +45,7 @@
           type="primary"
           @click="handleChangeMachine"
         >
-          {{ $t('ui.tc.schedule.changeMachine') }}
+          {{ $t('ui.tc.schedule.button.changeMachine') }}
         </el-button>
         <el-button
           v-hasPermi="['tc:tcScheduleResult:remove']"
@@ -88,6 +88,10 @@
         </div>
       </template>
     </page-table>
+    <div v-if="autoPlanRunning || autoPlanRecoveryVisible" class="auto-plan-task-banner">
+      <span>{{ autoPlanRecoveryVisible ? $t('ui.schedule.autoPlan.recoveryHint') : $t('ui.schedule.autoPlan.backgroundHint') }}</span>
+      <el-button type="text" @click="resumeAutoPlanTask">{{ $t('ui.schedule.autoPlan.viewTask') }}</el-button>
+    </div>
 
     <tlt-upload-form
       ref="tltUpload"
@@ -125,6 +129,23 @@
         text-color="#fff"
       />
       <div class="progress-hint">{{ $t('ui.tc.schedule.autoPlanProgressHint') }}</div>
+      <template slot="footer">
+        <el-button v-if="autoPlanRunning" @click="hideAutoPlanProgressInBackground">{{ $t('ui.schedule.autoPlan.backgroundContinue') }}</el-button>
+      </template>
+    </el-dialog>
+    <el-dialog :title="$t('ui.schedule.autoPlan.resultSummary')" :visible.sync="autoPlanResultVisible" append-to-body width="460px">
+      <div class="auto-plan-result-message">{{ autoPlanResult.message || $t('ui.schedule.autoPlan.completed') }}</div>
+      <div class="auto-plan-result-summary">
+        <span>{{ $t('ui.schedule.autoPlan.scheduledCount') }}：{{ autoPlanResult.resultCount || 0 }}</span>
+        <span>{{ $t('ui.schedule.autoPlan.unplannedCount') }}：{{ autoPlanResult.unplannedCount || 0 }}</span>
+        <span>{{ $t('ui.schedule.autoPlan.issueCount') }}：{{ autoPlanIssues.length }}</span>
+        <span>{{ $t('ui.schedule.autoPlan.batchNo') }}：{{ autoPlanResult.batchNo || '-' }}</span>
+      </div>
+      <template slot="footer">
+        <el-button :disabled="autoPlanIssues.length === 0" @click="openAutoPlanIssues">{{ $t('ui.schedule.autoPlan.viewIssues') }}</el-button>
+        <el-button :disabled="Number(autoPlanResult.unplannedCount || 0) === 0" @click="openAutoPlanUnplanned">{{ $t('ui.schedule.autoPlan.viewUnplanned') }}</el-button>
+        <el-button type="primary" @click="refreshAutoPlanBoard">{{ $t('ui.schedule.autoPlan.refreshBoard') }}</el-button>
+      </template>
     </el-dialog>
 
     <el-dialog
@@ -265,6 +286,12 @@ export default {
       autoPlanProgressValue: 0,
       autoPlanProgressStage: '',
       autoPlanProgressStatus: null,
+      autoPlanRunning: false,
+      autoPlanTaskId: '',
+      autoPlanRecoveryVisible: false,
+      autoPlanResultVisible: false,
+      autoPlanResult: {},
+      autoPlanResultScope: {},
       autoPlanIssueVisible: false,
       autoPlanIssues: [],
       releaseTimer: null,
@@ -304,7 +331,7 @@ export default {
   },
   computed: {
     writeTaskRunning() {
-      return this.operationRunning || this.autoPlanProgressVisible || this.releaseProgressVisible
+      return this.operationRunning || this.autoPlanRunning || this.releaseProgressVisible
     },
     // 各班次计划量合计列表，后端返回下标 0=1班，长度 6；为空时回退为空数组避免渲染异常
     shiftPlanQtyList() {
@@ -568,6 +595,7 @@ export default {
         }))
       }
       if (task && task.taskId) {
+        this.saveLatestAutoPlanScope(task.taskId, scheduleDate)
         this.pollAutoPlanTask(task.taskId)
       } else {
         this.getList()
@@ -732,12 +760,18 @@ export default {
         }
       }).catch(() => {})
     },
-    handleUnplanned() {
-      this.$refs.unplannedRef.show(this.formatQuery(false))
+    handleUnplanned(scope) {
+      this.$refs.unplannedRef.show({
+        ...this.formatQuery(false),
+        ...(scope || {})
+      })
     },
     pollAutoPlanTask(taskId) {
       this.clearAutoPlanTimer()
       this.autoPlanPollTimes = 0
+      this.autoPlanRunning = true
+      this.autoPlanTaskId = taskId
+      this.autoPlanRecoveryVisible = false
       this.autoPlanProgressVisible = true
       this.autoPlanProgressValue = 0
       this.autoPlanProgressStatus = null
@@ -748,16 +782,25 @@ export default {
           this.autoPlanProgressStage = task.currentStageName || task.currentStage || ''
           if (task.taskStatus === 'SUCCESS') {
             this.clearAutoPlanTimer()
+            this.autoPlanRunning = false
             this.autoPlanProgressValue = 100
-            this.autoPlanProgressStatus = 'success'
-            this.autoPlanProgressStage = this.$t('ui.tc.schedule.autoPlanSuccess')
-            this.showAutoPlanIssues(task.issues)
-            window.setTimeout(() => { this.autoPlanProgressVisible = false }, 600)
+            const noScheduleResult = Number(task.resultCount || 0) === 0 && task.message
+            this.autoPlanProgressStatus = noScheduleResult ? 'warning' : 'success'
+            this.autoPlanProgressStage = noScheduleResult
+              ? task.message
+              : this.$t('ui.tc.schedule.autoPlanSuccess')
+            if (noScheduleResult) {
+              this.$modal.msgWarning(task.message)
+            }
+            this.autoPlanProgressVisible = false
+            this.setAutoPlanIssues(task.issues)
+            this.showAutoPlanResult(task)
             this.getList()
             return
           }
           if (task.taskStatus === 'FAILED') {
             this.clearAutoPlanTimer()
+            this.autoPlanRunning = false
             this.autoPlanProgressStatus = 'exception'
             this.autoPlanProgressStage = this.$t('ui.tc.schedule.autoPlanFailed')
             this.showAutoPlanIssues(task.issues)
@@ -767,6 +810,8 @@ export default {
           }
           if (this.autoPlanPollTimes >= this.maxAutoPlanPollTimes) {
             this.clearAutoPlanTimer()
+            this.autoPlanRunning = false
+            this.autoPlanRecoveryVisible = true
             this.autoPlanProgressStatus = 'exception'
             this.$modal.msgWarning(this.$t('ui.tc.schedule.autoPlanTimeout'))
             window.setTimeout(() => { this.autoPlanProgressVisible = false }, 3000)
@@ -775,6 +820,8 @@ export default {
           this.autoPlanTimer = window.setTimeout(poll, 3000)
         }).catch(() => {
           this.clearAutoPlanTimer()
+          this.autoPlanRunning = false
+          this.autoPlanRecoveryVisible = true
           this.autoPlanProgressStatus = 'exception'
           this.$modal.msgWarning(this.$t('ui.tc.schedule.autoPlanTimeout'))
         })
@@ -802,6 +849,45 @@ export default {
           this.pollAutoPlanTask(task.taskId)
         }
       }).catch(() => {})
+    },
+    hideAutoPlanProgressInBackground() {
+      this.autoPlanProgressVisible = false
+    },
+    saveLatestAutoPlanScope(taskId, scheduleDate) {
+      window.sessionStorage.setItem('tcAutoPlanLatestScope', JSON.stringify({
+        taskId,
+        factoryCode: this.query.factoryCode,
+        scheduleDate: scheduleDate || this.query.scheduleDate
+      }))
+    },
+    resumeAutoPlanTask() {
+      if (this.autoPlanTaskId) {
+        this.pollAutoPlanTask(this.autoPlanTaskId)
+      }
+    },
+    setAutoPlanIssues(issues) {
+      this.autoPlanIssues = Array.isArray(issues) ? issues : []
+      this.autoPlanIssueVisible = false
+    },
+    showAutoPlanResult(task) {
+      this.autoPlanResult = task || {}
+      this.autoPlanResultScope = {
+        factoryCode: this.query.factoryCode,
+        startDate: this.query.scheduleDate,
+        endDate: this.query.scheduleDate,
+        batchNo: task && task.batchNo
+      }
+      this.autoPlanResultVisible = true
+    },
+    openAutoPlanIssues() {
+      this.autoPlanIssueVisible = this.autoPlanIssues.length > 0
+    },
+    openAutoPlanUnplanned() {
+      this.handleUnplanned(this.autoPlanResultScope)
+    },
+    refreshAutoPlanBoard() {
+      this.autoPlanResultVisible = false
+      this.getList()
     },
     pollReleaseTask(taskId) {
       this.clearReleaseTimer()
@@ -916,6 +1002,28 @@ export default {
     margin-left: 5px;
     color: #0088cc;
   }
+}
+.auto-plan-task-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  margin: 0 12px 10px;
+  color: #606266;
+  background: #fdf6ec;
+  border: 1px solid #faecd8;
+  border-radius: 4px;
+}
+.auto-plan-result-message {
+  margin-bottom: 14px;
+  color: #303133;
+  line-height: 22px;
+}
+.auto-plan-result-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  color: #606266;
 }
 .progress-stage {
   margin-bottom: 12px;
