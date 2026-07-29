@@ -20,6 +20,7 @@ import com.zlt.aps.lh.context.LhScheduleConfig;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.IMachineMatchStrategy;
 import com.zlt.aps.lh.engine.strategy.IMouldChangeBalanceStrategy;
+import com.zlt.aps.lh.engine.strategy.support.NewSpecEmbryoAvailableTimeResolver;
 import com.zlt.aps.lh.util.CleaningScheduleRuleUtil;
 import com.zlt.aps.lh.util.FirstInspectionQtyUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
@@ -983,6 +984,48 @@ public class TargetScheduleQtyResolver {
     }
 
     /**
+     * 解析最终收尾判断使用的严格目标量。
+     * <p>成型胎胚库存收尾属于精确硬目标，直接使用已经完成单胎胚库存赋值或共用胎胚分摊后的SKU目标量，
+     * 不再按模台数向上归整；普通收尾继续沿用共用胎胚仅取硫化余量、单胎胚取MAX(余量,库存)并按模台数归整的口径。</p>
+     *
+     * @param context 排程上下文
+     * @param sku SKU排程DTO
+     * @return 最终收尾比较目标量
+     */
+    public int resolveFinalEndingTargetQty(LhScheduleContext context, SkuScheduleDTO sku) {
+        if (Objects.isNull(sku)) {
+            return 0;
+        }
+        int originalTargetQty = Math.max(0, sku.resolveTargetScheduleQty());
+        int mouldQty = ShiftCapacityResolverUtil.resolveMachineMouldQty(sku.getMouldQty());
+        if (isEmbryoStockEnding(context, sku)) {
+            log.info("最终收尾目标量解析, materialCode: {}, 胎胚编码: {}, 原始目标量: {}, "
+                            + "精确硬目标: {}, 模台数: {}, 最终比较目标: {}, rule: 胎胚库存硬目标不做模台数归整",
+                    sku.getMaterialCode(), sku.getEmbryoCode(), originalTargetQty,
+                    originalTargetQty, mouldQty, originalTargetQty);
+            return originalTargetQty;
+        }
+
+        int surplusQty = Math.max(0, sku.getSurplusQty());
+        int embryoStock = Math.max(0, sku.getEmbryoStock());
+        boolean sharedEmbryo = isSharedEmbryoInWindow(context, sku);
+        int baseTargetQty = sharedEmbryo ? surplusQty : Math.max(surplusQty, embryoStock);
+        int finalTargetQty = ShiftCapacityResolverUtil.roundUpQtyToMouldMultiple(baseTargetQty, mouldQty);
+        if (sharedEmbryo && embryoStock > surplusQty) {
+            log.debug("共用胎胚收尾判定比较量下调, materialCode: {}, 胎胚编码: {}, "
+                            + "原口径MAX(余量,库存): {}, 新口径仅余量: {}, 下调幅度: {}",
+                    sku.getMaterialCode(), sku.getEmbryoCode(),
+                    Math.max(surplusQty, embryoStock), surplusQty,
+                    Math.max(surplusQty, embryoStock) - surplusQty);
+        }
+        log.debug("最终收尾目标量解析, materialCode: {}, 胎胚编码: {}, 原始目标量: {}, "
+                        + "精确硬目标: 无, 基础比较量: {}, 模台数: {}, 最终比较目标: {}",
+                sku.getMaterialCode(), sku.getEmbryoCode(), originalTargetQty,
+                baseTargetQty, mouldQty, finalTargetQty);
+        return finalTargetQty;
+    }
+
+    /**
      * 解析账本裁剪后的班次保留量。
      * <p>成型胎胚库存收尾必须严格保留剩余胎胚库存数量，不按模台数向下裁成偶数。</p>
      *
@@ -1544,6 +1587,25 @@ public class TargetScheduleQtyResolver {
     public int calcMachineAvailableCapacityInWindow(LhScheduleContext context,
                                                     SkuScheduleDTO sku,
                                                     MachineScheduleDTO machine) {
+        return calcMachineAvailableCapacityInWindow(context, sku, machine, null);
+    }
+
+    /**
+     * 按指定生产时间下限计算单台机台在剩余窗口内的可排产能。
+     *
+     * <p>该重载供 S4.5 胎胚最早可供时间试算调用；生产时间下限只裁剪生产产能，
+     * 换模耗时仍按现有候选机台时间轴先行扣减。传 null 时保持原有行为。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 当前 SKU
+     * @param machine 候选机台
+     * @param productionNotBeforeTime 正式生产不得早于的时间
+     * @return 机台窗口可排量
+     */
+    public int calcMachineAvailableCapacityInWindow(LhScheduleContext context,
+                                                    SkuScheduleDTO sku,
+                                                    MachineScheduleDTO machine,
+                                                    Date productionNotBeforeTime) {
         if (Objects.isNull(context) || Objects.isNull(sku) || Objects.isNull(machine)) {
             return 0;
         }
@@ -1551,7 +1613,77 @@ public class TargetScheduleQtyResolver {
         if (CollectionUtils.isEmpty(shifts)) {
             return 0;
         }
-        return calculateMachineAvailableCapacityInWindow(context, sku, machine, shifts);
+        if (Objects.nonNull(productionNotBeforeTime)) {
+            /*
+             * 胎胚时间试算不仅裁剪可供前产能，还要使用与正式落班一致的首检占用口径。
+             * 首个仍有物理产能的班次即为候选首检班次；普通SKU首检计入该班总产能，
+             * 试制SKU继续扣除固定2小时。
+             */
+            LinkedHashMap<Integer, Integer> capacityByShift =
+                    calculateMachineAvailableCapacityByShiftInWindow(
+                            context, sku, machine, shifts, true, productionNotBeforeTime);
+            int runtimeShiftCapacity = ShiftCapacityResolverUtil.resolveRuntimeShiftCapacity(
+                    context, machine, sku.getShiftCapacity());
+            Map<Integer, Integer> adjustedCapacityMap = resolveEmbryoAvailableCapacityMap(
+                    context, sku, shifts, capacityByShift, runtimeShiftCapacity,
+                    sku.resolveTargetScheduleQty(), machine.getMachineCode());
+            return sumShiftCapacity(adjustedCapacityMap);
+        }
+        return calculateMachineAvailableCapacityInWindow(
+                context, sku, machine, shifts, productionNotBeforeTime);
+    }
+
+    /**
+     * 按胎胚时间和强制首检规则收口候选班次产能图。
+     *
+     * <p>首个部分班次不足完整首检时，该班及其之前班次不能保留常规生产量，必须把首检
+     * 与生产整体顺延到后续可完整承载的班次；否则候选试算会比最终落班虚高。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 当前 SKU
+     * @param shifts 排程班次
+     * @param physicalCapacityMap 已按胎胚时间裁剪的物理产能图
+     * @param runtimeShiftCapacity 运行态完整班产
+     * @param remainingQty 候选目标量
+     * @param machineCode 候选机台编码
+     * @return 首检和正常生产共同收口后的候选产能图
+     */
+    private Map<Integer, Integer> resolveEmbryoAvailableCapacityMap(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            List<LhShiftConfigVO> shifts,
+            Map<Integer, Integer> physicalCapacityMap,
+            int runtimeShiftCapacity,
+            int remainingQty,
+            String machineCode) {
+        Map<Integer, Integer> candidateCapacityMap = new LinkedHashMap<Integer, Integer>(
+                CollectionUtils.isEmpty(physicalCapacityMap) ? 0 : physicalCapacityMap.size());
+        if (!CollectionUtils.isEmpty(physicalCapacityMap)) {
+            candidateCapacityMap.putAll(physicalCapacityMap);
+        }
+        if (CollectionUtils.isEmpty(shifts)) {
+            return candidateCapacityMap;
+        }
+        for (LhShiftConfigVO shift : shifts) {
+            if (Objects.isNull(shift) || Objects.isNull(shift.getShiftIndex())
+                    || candidateCapacityMap.getOrDefault(shift.getShiftIndex(), 0) <= 0) {
+                continue;
+            }
+            Map<Integer, Integer> adjustedCapacityMap =
+                    FirstInspectionQtyUtil.applyEmbryoAvailableFirstInspectionCapacity(
+                            context, sku, shifts, shift, candidateCapacityMap,
+                            runtimeShiftCapacity, remainingQty,
+                            ScheduleTypeEnum.NEW_SPEC.getCode(), machineCode);
+            if (adjustedCapacityMap.getOrDefault(shift.getShiftIndex(), 0) > 0) {
+                return adjustedCapacityMap;
+            }
+            /*
+             * 当前班次无法完整容纳首检时，首检前不能排正常生产；将本班归零后继续用
+             * 下一可用班次重新预演，保持候选容量和最终落班的一致性。
+             */
+            candidateCapacityMap.put(shift.getShiftIndex(), 0);
+        }
+        return candidateCapacityMap;
     }
 
     /**
@@ -1719,8 +1851,26 @@ public class TargetScheduleQtyResolver {
                                                           SkuScheduleDTO sku,
                                                           MachineScheduleDTO machine,
                                                           List<LhShiftConfigVO> shifts) {
+        return calculateMachineAvailableCapacityInWindow(context, sku, machine, shifts, null);
+    }
+
+    /**
+     * 按生产时间下限计算单台机台窗口产能。
+     *
+     * @param context 排程上下文
+     * @param sku 当前 SKU
+     * @param machine 候选机台
+     * @param shifts 排程班次
+     * @param productionNotBeforeTime 正式生产不得早于的时间
+     * @return 窗口内可排产量
+     */
+    private int calculateMachineAvailableCapacityInWindow(LhScheduleContext context,
+                                                          SkuScheduleDTO sku,
+                                                          MachineScheduleDTO machine,
+                                                          List<LhShiftConfigVO> shifts,
+                                                          Date productionNotBeforeTime) {
         return sumMachineCapacityByDate(calculateMachineAvailableCapacityByDateInWindow(
-                context, sku, machine, shifts));
+                context, sku, machine, shifts, productionNotBeforeTime));
     }
 
     /**
@@ -1736,9 +1886,28 @@ public class TargetScheduleQtyResolver {
                                                                                                SkuScheduleDTO sku,
                                                                                                MachineScheduleDTO machine,
                                                                                                List<LhShiftConfigVO> shifts) {
+        return calculateMachineAvailableCapacityByDateInWindow(context, sku, machine, shifts, null);
+    }
+
+    /**
+     * 按生产时间下限拆分单台机台各业务日产能。
+     *
+     * @param context 排程上下文
+     * @param sku 当前 SKU
+     * @param machine 候选机台
+     * @param shifts 排程班次
+     * @param productionNotBeforeTime 正式生产不得早于的时间
+     * @return 按业务日汇总的可排量
+     */
+    private LinkedHashMap<LocalDate, Integer> calculateMachineAvailableCapacityByDateInWindow(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            MachineScheduleDTO machine,
+            List<LhShiftConfigVO> shifts,
+            Date productionNotBeforeTime) {
         LinkedHashMap<LocalDate, Integer> capacityByDate = initCapacityByDate(shifts);
         LinkedHashMap<Integer, Integer> capacityByShift = calculateMachineAvailableCapacityByShiftInWindow(
-                context, sku, machine, shifts, true);
+                context, sku, machine, shifts, true, productionNotBeforeTime);
         for (LhShiftConfigVO shift : shifts) {
             if (shift == null || shift.getShiftIndex() == null) {
                 continue;
@@ -1770,6 +1939,28 @@ public class TargetScheduleQtyResolver {
                                                                                               MachineScheduleDTO machine,
                                                                                               List<LhShiftConfigVO> shifts,
                                                                                               boolean deductChangeover) {
+        return calculateMachineAvailableCapacityByShiftInWindow(
+                context, sku, machine, shifts, deductChangeover, null);
+    }
+
+    /**
+     * 按指定生产时间下限计算各班次可排产能。
+     *
+     * @param context 排程上下文
+     * @param sku 当前 SKU
+     * @param machine 候选机台
+     * @param shifts 排程班次
+     * @param deductChangeover 是否扣减首次切换耗时
+     * @param productionNotBeforeTime 正式生产不得早于的时间
+     * @return 按班次索引拆分的产能
+     */
+    private LinkedHashMap<Integer, Integer> calculateMachineAvailableCapacityByShiftInWindow(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            MachineScheduleDTO machine,
+            List<LhShiftConfigVO> shifts,
+            boolean deductChangeover,
+            Date productionNotBeforeTime) {
         LinkedHashMap<Integer, Integer> capacityByShift = new LinkedHashMap<>(Math.max(16, shifts.size()));
         if (Objects.isNull(machine) || Objects.isNull(sku) || CollectionUtils.isEmpty(shifts)) {
             return capacityByShift;
@@ -1790,6 +1981,11 @@ public class TargetScheduleQtyResolver {
             if (mouldChangeHours > 0) {
                 cursorStartTime = LhScheduleTimeUtil.addHours(cursorStartTime, mouldChangeHours);
             }
+        }
+        if (Objects.nonNull(productionNotBeforeTime)
+                && productionNotBeforeTime.after(cursorStartTime)) {
+            // 胎胚时间只抬高正式生产起点，前面的换模耗时仍按现有时间轴独立计算。
+            cursorStartTime = productionNotBeforeTime;
         }
         int dryIceLossQty = context.getParamIntValue(
                 LhScheduleParamConstant.DRY_ICE_LOSS_QTY, LhScheduleConstant.DRY_ICE_LOSS_QTY);
@@ -1816,6 +2012,21 @@ public class TargetScheduleQtyResolver {
             }
             Date effectiveStartTime = control.getEffectiveStartTime();
             Date effectiveEndTime = control.getEffectiveEndTime();
+            long shiftDurationSeconds = ShiftCapacityResolverUtil.resolveShiftDurationSeconds(shift);
+            if (Objects.nonNull(productionNotBeforeTime)) {
+                /*
+                 * 胎胚约束只允许从实际生产起点之后折算首班产能。班次管控窗口可能仍从
+                 * 班次开始时刻生效，若直接使用其开始时间会把胎胚可供前的完整班产错误计入
+                 * 候选产能，导致候选排序和最终实际落班口径不一致。
+                 */
+                effectiveStartTime = NewSpecEmbryoAvailableTimeResolver.resolveEffectiveProductionWindowStart(
+                        effectiveStartTime, effectiveEndTime, cursorStartTime);
+                if (Objects.isNull(effectiveStartTime)) {
+                    continue;
+                }
+                shiftDurationSeconds = NewSpecEmbryoAvailableTimeResolver.resolveProductionWindowSeconds(
+                        effectiveStartTime, effectiveEndTime);
+            }
             int shiftMaxQty = ShiftCapacityResolverUtil.resolveShiftCapacityWithDowntime(
                     context.getDevicePlanShutList(),
                     machine.getCleaningWindowList(),
@@ -1828,7 +2039,7 @@ public class TargetScheduleQtyResolver {
                     shiftCapacity,
                     lhTimeSeconds,
                     mouldQty,
-                    ShiftCapacityResolverUtil.resolveShiftDurationSeconds(shift),
+                    shiftDurationSeconds,
                     dryIceLossQty,
                     dryIceDurationHours,
                 plannedRepairFixedQty);

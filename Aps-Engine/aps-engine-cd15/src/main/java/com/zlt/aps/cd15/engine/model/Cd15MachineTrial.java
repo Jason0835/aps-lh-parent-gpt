@@ -27,7 +27,7 @@ public class Cd15MachineTrial {
     private BigDecimal equalShareRemainderQuantity;
     /** 当前班该钢带扣除已排量后的剩余可排额度。 */
     private BigDecimal remainingSpecShiftQuantity;
-    /** 单车按胎体长度方向卷取后，对应的斜裁排程米数。 */
+    /** 单车按胎体长度方向卷取后，可承载的完整钢带米数。 */
     private BigDecimal vehiclePlanQuantity;
     /** 工装可排量。 */
     private BigDecimal toolingQuantity;

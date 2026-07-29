@@ -2,6 +2,7 @@ package com.zlt.aps.cd90.service.impl;
 
 import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -51,6 +52,8 @@ import org.redisson.api.RLock;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import javax.annotation.Resource;
 import java.io.InputStream;
@@ -84,6 +87,9 @@ import java.util.stream.IntStream;
  * 并对接排程任务、滚动重排引擎、批次级数据校验和任务状态查询能力。
  */
 public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90ScheduleResult> implements ICd90ScheduleResultService {
+
+    /** 删除完成量校验覆盖数据库保留的 CLASS1 至 CLASS8。 */
+    private static final int CLASS_COUNT = 8;
 
     /**
      * 服务内部依赖的 Mapper、校验器、异步执行器和引擎入口。
@@ -123,6 +129,241 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
     private Cd90EngineCxScheduleMapper cxScheduleMapper;
     @Resource
     private Cd90ScheduleResultExportAssembler exportAssembler;
+
+    /**
+     * 删除直裁排程结果，并在同一事务内压缩 CLASS1 后续生产顺位。
+     * 删除过程不调用滚动重排，其他班次顺位保持不变。
+     *
+     * @param ids 待删除排程结果主键
+     * @return 删除结果
+     */
+    @Override
+    public AjaxResult removeScheduleResults(List<Long> ids) {
+        // 过滤空主键并去重，避免重复 ID 影响删除数量校验。
+        List<Long> deleteIds = ids == null ? Collections.emptyList() : ids.stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .collect(Collectors.toList());
+        if (deleteIds.isEmpty()) {
+            return AjaxResult.error(I18nUtil.getMessage(
+                    "ui.message.parameter.error"));
+        }
+        // 首次查询用于确认记录存在，并提取需要加锁的工厂和排程日期范围。
+        List<Cd90ScheduleResult> selected = this.selectDeleteResults(deleteIds);
+        if (selected.size() != deleteIds.size()) {
+            return AjaxResult.error(I18nUtil.getMessage(
+                    "ui.message.parameter.error"));
+        }
+        // 多日期批量删除按固定顺序获取锁，避免并发请求交叉等待。
+        List<Cd90ScheduleResult> scopeSamples = new ArrayList<>(selected.stream()
+                .collect(Collectors.toMap(this::scheduleScopeKey,
+                        result -> result, (first, second) -> first,
+                        LinkedHashMap::new)).values());
+        scopeSamples.sort(Comparator
+                .comparing(Cd90ScheduleResult::getFactoryCode,
+                        Comparator.nullsFirst(String::compareTo))
+                .thenComparing(Cd90ScheduleResult::getScheduleDate,
+                        Comparator.nullsFirst(Date::compareTo)));
+
+        // 与自动排程共用“工厂 + 排程日期”锁，防止删除和排程写入并发执行。
+        List<RLock> acquiredLocks = new ArrayList<>();
+        boolean releaseAfterTransaction = false;
+        try {
+            for (Cd90ScheduleResult scope : scopeSamples) {
+                if (this.isBlank(scope.getFactoryCode())
+                        || scope.getScheduleDate() == null) {
+                    return AjaxResult.error(I18nUtil.getMessage(
+                            "ui.message.parameter.error"));
+                }
+                RLock lock = lockService.getLock(scope.getFactoryCode(),
+                        this.toLocalDate(scope.getScheduleDate()));
+                if (!lock.tryLock()) {
+                    return AjaxResult.error(I18nUtil.getMessage(
+                            "ui.cd90.schedule.taskActive"));
+                }
+                acquiredLocks.add(lock);
+            }
+            // 锁需覆盖事务提交或回滚，避免数据库尚未提交时其他排程任务进入。
+            releaseAfterTransaction = this.releaseLocksAfterTransaction(
+                    acquiredLocks);
+
+            // 加锁后重新查询，防止等待锁期间记录状态被其他事务修改。
+            selected = this.selectDeleteResults(deleteIds);
+            if (selected.size() != deleteIds.size()) {
+                return AjaxResult.error(I18nUtil.getMessage(
+                        "ui.message.parameter.error"));
+            }
+            // 锁内复核待执行或执行中的排程任务，避免删除正在被任务使用的数据。
+            for (Cd90ScheduleResult scope : scopeSamples) {
+                if (taskService.findActive(scope.getFactoryCode(),
+                        scope.getScheduleDate()) != null) {
+                    return AjaxResult.error(I18nUtil.getMessage(
+                            "ui.cd90.schedule.taskActive"));
+                }
+            }
+            // 已发布成功或任一班次已有完成量的记录均不允许删除。
+            AjaxResult validation = this.validateDeleteResults(selected);
+            if (validation != null) {
+                return validation;
+            }
+            // 主表使用框架逻辑删除；数量不一致时抛错并回滚整个事务。
+            int deletedCount = this.removeByIds(deleteIds);
+            if (deletedCount != deleteIds.size()) {
+                throw new IllegalStateException(I18nUtil.getMessage(
+                        "ui.message.operation.failed"));
+            }
+            // 删除成功后只压缩同机台 CLASS1 后续生产顺位，不触发滚动重排。
+            this.compactClass1ProduceOrders(selected);
+            return AjaxResult.success(I18nUtil.getMessage(
+                    "ui.message.operation.success"));
+        } finally {
+            if (!releaseAfterTransaction) {
+                // 事务回调尚未注册时，由当前线程兜底释放已获得的锁。
+                this.unlockDeleteLocks(acquiredLocks);
+            }
+        }
+    }
+
+    /** 查询待删除且尚未逻辑删除的排程结果。 */
+    private List<Cd90ScheduleResult> selectDeleteResults(List<Long> ids) {
+        return cd90ScheduleResultMapper.selectList(
+                new LambdaQueryWrapper<Cd90ScheduleResult>()
+                        .in(Cd90ScheduleResult::getId, ids));
+    }
+
+    /** 校验已发布成功和已有完成量两项删除限制。 */
+    private AjaxResult validateDeleteResults(List<Cd90ScheduleResult> selected) {
+        boolean published = selected.stream().anyMatch(result ->
+                result.getPublishSuccessCount() != null
+                        && result.getPublishSuccessCount() > 0);
+        if (published) {
+            return AjaxResult.error(I18nUtil.getMessage(
+                    "ui.data.column.cd90ScheduleResult.hasPublishedCanNotDelete"));
+        }
+        if (selected.stream().anyMatch(this::hasFinishQuantity)) {
+            return AjaxResult.error(I18nUtil.getMessage(
+                    "ui.cd90.scheduleResult.finishQtyCannotDelete"));
+        }
+        return null;
+    }
+
+    /** CLASS1 至 CLASS8 任一班次有正完成量时禁止删除。 */
+    private boolean hasFinishQuantity(Cd90ScheduleResult result) {
+        return IntStream.rangeClosed(1, CLASS_COUNT)
+                .mapToObj(classIndex -> result.getFieldValueByFieldName(
+                        String.format("class%dFinishQty", classIndex)))
+                .filter(Objects::nonNull)
+                .map(Number.class::cast)
+                .anyMatch(finishQuantity -> finishQuantity.doubleValue() > 0D);
+    }
+
+    /** 删除后仅压缩 CLASS1 后续生产顺位，其他班次不调整。 */
+    private void compactClass1ProduceOrders(
+            List<Cd90ScheduleResult> deletedResults) {
+        Map<String, List<Cd90ScheduleResult>> deletedByScope = deletedResults
+                .stream()
+                .filter(result -> result.getClass1ProduceOrder() != null
+                        && result.getClass1ProduceOrder() > 0)
+                .collect(Collectors.groupingBy(this::class1OrderScopeKey,
+                        LinkedHashMap::new, Collectors.toList()));
+        deletedByScope.values().forEach(this::compactClass1ScopeOrders);
+    }
+
+    /** 压缩单个工厂、日期、机台范围内被删除顺位之后的 CLASS1 顺位。 */
+    private void compactClass1ScopeOrders(
+            List<Cd90ScheduleResult> deletedScopeResults) {
+        Cd90ScheduleResult sample = deletedScopeResults.get(0);
+        LambdaQueryWrapper<Cd90ScheduleResult> queryWrapper =
+                new LambdaQueryWrapper<Cd90ScheduleResult>()
+                        .eq(Cd90ScheduleResult::getFactoryCode,
+                                sample.getFactoryCode())
+                        .eq(Cd90ScheduleResult::getScheduleDate,
+                                sample.getScheduleDate())
+                        .isNotNull(Cd90ScheduleResult::getClass1ProduceOrder)
+                        .gt(Cd90ScheduleResult::getClass1ProduceOrder, 0)
+                        .orderByAsc(Cd90ScheduleResult::getClass1ProduceOrder)
+                        .orderByAsc(Cd90ScheduleResult::getId);
+        if (sample.getMachineCode() == null) {
+            queryWrapper.isNull(Cd90ScheduleResult::getMachineCode);
+        } else {
+            queryWrapper.eq(Cd90ScheduleResult::getMachineCode,
+                    sample.getMachineCode());
+        }
+        List<Cd90ScheduleResult> remaining = cd90ScheduleResultMapper.selectList(
+                queryWrapper);
+        // 同一顺位仍有其他记录时保留该顺位，只移除已完全空缺的顺位值。
+        Set<Integer> removedOrders = deletedScopeResults.stream()
+                .map(Cd90ScheduleResult::getClass1ProduceOrder)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        Set<Integer> remainingOrders = remaining.stream()
+                .map(Cd90ScheduleResult::getClass1ProduceOrder)
+                .collect(Collectors.toSet());
+        removedOrders.removeAll(remainingOrders);
+        if (removedOrders.isEmpty()) {
+            return;
+        }
+        remaining.forEach(result -> {
+            Integer currentOrder = result.getClass1ProduceOrder();
+            long removedBefore = removedOrders.stream()
+                    .filter(removedOrder -> removedOrder < currentOrder)
+                    .count();
+            if (removedBefore <= 0) {
+                return;
+            }
+            int targetOrder = currentOrder - (int) removedBefore;
+            cd90ScheduleResultMapper.update(null,
+                    new LambdaUpdateWrapper<Cd90ScheduleResult>()
+                            .set(Cd90ScheduleResult::getClass1ProduceOrder,
+                                    targetOrder)
+                            .eq(Cd90ScheduleResult::getId,
+                                    result.getId()));
+        });
+    }
+
+    /** 在当前事务结束后释放删除持有的排程锁。 */
+    private boolean releaseLocksAfterTransaction(List<RLock> acquiredLocks) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            return false;
+        }
+        List<RLock> locksToRelease = new ArrayList<>(acquiredLocks);
+        TransactionSynchronizationManager.registerSynchronization(
+                new TransactionSynchronization() {
+                    @Override
+                    public void afterCompletion(int status) {
+                        Cd90ScheduleResultServiceImpl.this.unlockDeleteLocks(
+                                locksToRelease);
+                    }
+                });
+        return true;
+    }
+
+    /** 按获取逆序释放删除排程锁。 */
+    private void unlockDeleteLocks(List<RLock> acquiredLocks) {
+        for (int index = acquiredLocks.size() - 1; index >= 0; index--) {
+            RLock lock = acquiredLocks.get(index);
+            if (lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
+        }
+    }
+
+    /** 构造工厂和排程日期维度的锁排序键。 */
+    private String scheduleScopeKey(Cd90ScheduleResult result) {
+        return String.valueOf(result.getFactoryCode()) + "|"
+                + String.valueOf(result.getScheduleDate());
+    }
+
+    /** 构造 CLASS1 顺位压缩范围键。 */
+    private String class1OrderScopeKey(Cd90ScheduleResult result) {
+        return this.scheduleScopeKey(result) + "|"
+                + String.valueOf(result.getMachineCode());
+    }
+
+    /** 将数据库排程日期转换为分布式锁使用的本地日期。 */
+    private LocalDate toLocalDate(Date scheduleDate) {
+        return scheduleDate.toInstant().atZone(ZoneId.systemDefault())
+                .toLocalDate();
+    }
 
     /**
      * 使用固定模板导出直裁四班排程结果。
@@ -835,6 +1076,34 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
     */
     @Override
     public AjaxResult validateChangeQty(Cd90ChangeQtyRequest request) {
+        AjaxResult validation = this.validateChangeQtyBasic(request);
+        if (!Integer.valueOf(200).equals(validation.get("code"))) {
+            return validation;
+        }
+        LocalDate localScheduleDate = request.getScheduleDate().toInstant()
+                .atZone(ZoneId.systemDefault()).toLocalDate();
+        Cd90BatchDataCheckResult batchCheck = batchDataValidator.check(
+                request.getFactoryCode(), localScheduleDate);
+        if (batchCheck.isFailed()) {
+            Map<String, Object> data = new HashMap<>();
+            data.put("batchCheckFailed", true);
+            data.put("errors", toErrorList(batchCheck.getErrors()));
+            data.put("warnings", toErrorList(batchCheck.getWarnings()));
+            return AjaxResult.success(batchCheck.getPrimaryMessage(), data);
+        }
+        AjaxResult previewResult = this.previewChangeQty(request, localScheduleDate);
+        return previewResult != null
+                && !Integer.valueOf(200).equals(previewResult.get("code"))
+                ? previewResult : AjaxResult.success();
+    }
+
+    /**
+     * 校验调量请求的字段、目标记录、班次窗口及完成量。
+     *
+     * @param request 调量请求
+     * @return 基础校验结果
+     */
+    private AjaxResult validateChangeQtyBasic(Cd90ChangeQtyRequest request) {
         if (request == null || request.getScheduleDate() == null
                 || isBlank(request.getFactoryCode()) || isBlank(request.getMachineCode())
                 || isBlank(request.getClothCode())) {
@@ -893,7 +1162,7 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
     */
     @Override
     public AjaxResult changeQty(Cd90ChangeQtyRequest request) {
-        AjaxResult validation = this.validateChangeQty(request);
+        AjaxResult validation = this.validateChangeQtyBasic(request);
         if (!Integer.valueOf(200).equals(validation.get("code"))) {
             return validation;
         }

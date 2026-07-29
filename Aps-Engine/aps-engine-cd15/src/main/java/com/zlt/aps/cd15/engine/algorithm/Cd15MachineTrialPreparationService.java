@@ -47,8 +47,7 @@ public class Cd15MachineTrialPreparationService {
                         ? parameters.getEqualShareThreshold()
                         : request.getScheduleQuantityThreshold();
         BigDecimal vehiclePlanQuantity = vehiclePlanQuantityCalculator.calculate(
-                request.getUnitConsumeMillimeter(), request.getCraftWidth(),
-                request.getCurlLength());
+                request.getUnitConsumeMillimeter(), request.getCurlLength());
         // 先执行启用状态、大卷绑定、指定/禁止机台、检修和班次开放等硬约束过滤。
         BigDecimal machineMatchWidth = request.getMachineMatchWidth() == null
                 ? request.getCraftWidth() : request.getMachineMatchWidth();
@@ -89,8 +88,8 @@ public class Cd15MachineTrialPreparationService {
                         .machineCode(candidate.getMachineCode())
                         // 本次排程净需求量（已扣除已排量）
                         .netDemandQuantity(request.getNetDemandQuantity())
-                        // 是否为清尾：清尾时起排量门槛降低、允许跨机台合并
-                        .closeOut(request.isCloseOut())
+                        // 收尾或停产需求不补最小起排量和整车米数
+                        .closeOut(request.isCloseOut() || request.isStopAffected())
                         .singleSpecSplit(request.isSingleSpecSplit())
                         // 最小起排量、均分阈值
                         .minimumStartQuantity(parameters.getMinStartQty())
@@ -98,7 +97,7 @@ public class Cd15MachineTrialPreparationService {
                         .equalShareAlreadyApplied(request.isEqualShareAlreadyApplied())
                         .remainingSpecShiftQuantity(
                                 request.getRemainingSpecShiftQuantity())
-                        // 单车等价排程量，用于整车取整及工装数量试算
+                        // 单车钢带承载米数，用于整车取整及工装数量试算
                         .vehiclePlanQuantity(vehiclePlanQuantity)
                         .craftWidth(request.getCraftWidth())
                         .unitConsumeMillimeter(request.getUnitConsumeMillimeter())

@@ -3,14 +3,14 @@ package com.zlt.aps.nc.engine.service.impl;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.MessageFormat;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -27,7 +27,11 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
-import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
+import com.zlt.aps.cx.api.domain.entity.CxScheduleResult;
+import com.zlt.aps.cx.entity.config.CxShiftConfig;
+import com.zlt.aps.exception.BusinessException;
+import com.zlt.aps.mdm.api.domain.entity.MdmConstructionInfo;
+import com.zlt.aps.mp.api.domain.entity.MpMonthPlanMonitor;
 import com.zlt.aps.nc.api.domain.entity.NcCurlRoll;
 import com.zlt.aps.nc.api.domain.entity.NcDepthConfig;
 import com.zlt.aps.nc.api.domain.entity.NcGlueOrder;
@@ -36,17 +40,15 @@ import com.zlt.aps.nc.api.domain.entity.NcMachineInfo;
 import com.zlt.aps.nc.api.domain.entity.NcMachineMaintenance;
 import com.zlt.aps.nc.api.domain.entity.NcParams;
 import com.zlt.aps.nc.api.domain.entity.NcScheduleProcessLog;
+import com.zlt.aps.nc.api.domain.entity.NcScheduleResult;
 import com.zlt.aps.nc.api.domain.entity.NcShiftConfig;
 import com.zlt.aps.nc.api.domain.entity.NcSpecifyMachine;
 import com.zlt.aps.nc.api.domain.entity.NcStock;
-import com.zlt.aps.exception.BusinessException;
-import com.zlt.aps.mdm.api.domain.entity.MdmConstructionInfo;
-import com.zlt.aps.mp.api.domain.entity.MpMonthPlanMonitor;
-import com.zlt.aps.nc.api.domain.entity.NcScheduleResult;
 import com.zlt.aps.nc.engine.constant.NcEngineConstants;
 import com.zlt.aps.nc.engine.mapper.NcEngineConstructionInfoMapper;
 import com.zlt.aps.nc.engine.mapper.NcEngineCurlRollMapper;
 import com.zlt.aps.nc.engine.mapper.NcEngineCxScheduleResultMapper;
+import com.zlt.aps.nc.engine.mapper.NcEngineCxShiftConfigMapper;
 import com.zlt.aps.nc.engine.mapper.NcEngineDepthConfigMapper;
 import com.zlt.aps.nc.engine.mapper.NcEngineGlueMapper;
 import com.zlt.aps.nc.engine.mapper.NcEngineLossMapper;
@@ -59,8 +61,9 @@ import com.zlt.aps.nc.engine.mapper.NcEngineScheduleResultMapper;
 import com.zlt.aps.nc.engine.mapper.NcEngineShiftConfigMapper;
 import com.zlt.aps.nc.engine.mapper.NcEngineSpecifyMachineMapper;
 import com.zlt.aps.nc.engine.mapper.NcEngineStockMapper;
-import com.zlt.aps.nc.engine.model.NcPaddingDemand;
+import com.zlt.aps.nc.engine.model.NcLiningDemand;
 import com.zlt.aps.nc.engine.model.NcScheduleContext;
+import com.zlt.aps.nc.engine.model.SupplementaryResult;
 import com.zlt.aps.nc.engine.service.INcOrderGeneratorService;
 import com.zlt.aps.nc.engine.service.NcEngineNewService;
 import com.zlt.aps.nc.engine.util.NcEngineUtil;
@@ -129,6 +132,9 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
     @Autowired
     private NcEngineScheduleProcessLogMapper ncEngineScheduleProcessLogMapper;
 
+    @Autowired
+    private NcEngineCxShiftConfigMapper ncEngineCxShiftConfigMapper;
+
     // ==================== 主入口 ====================
 
     @Override
@@ -136,25 +142,72 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
     public List<NcScheduleResult> autoNcSchedule(String factoryCode, Date scheduleDate) {
         log.info("===== 内衬自动排程开始，工厂：{}，排产日期：{} =====", factoryCode, DateUtil.formatDate(scheduleDate));
 
-        // 初始化上下文
+        // 初始化上下文及缓存
+        NcScheduleContext context = this.initContext(factoryCode, scheduleDate);
+
+        // ==================== 步骤1：加载成型计划 ====================
+        List<CxScheduleResult> cxScheduleList = this.loadCxSchedule(factoryCode, scheduleDate);
+        if (CollectionUtils.isEmpty(cxScheduleList)) {
+            throw new BusinessException(I18nUtil.getMessage("ui.nc.engine.noCxSchedule"));
+        }
+        log.info("步骤1：加载成型计划 {} 条", cxScheduleList.size());
+
+        // ==================== 步骤2：解析成型计划，获取内衬施工清单 ====================
+        this.step2ParseConstruction(context, factoryCode, cxScheduleList);
+        this.step2InitShiftConfig(context, factoryCode);
+        this.step2InitSupplyDepth(context, factoryCode);
+
+        // ==================== 步骤3：计算内衬需求清单 ====================
+        List<NcLiningDemand> demandList = this.step3CalcDemandList(context, scheduleDate);
+
+        // ==================== 步骤4：选择机台 ====================
+        this.step4SelectMachine(context, factoryCode, demandList);
+
+        // ==================== 步骤5：排产 ====================
+        List<NcScheduleResult> scheduleResults = this.executeSchedule(demandList, context);
+        if (CollectionUtils.isEmpty(scheduleResults)) {
+            throw new BusinessException(I18nUtil.getMessage("ui.nc.engine.noScheduleResult"));
+        }
+        log.info("步骤5.1~5.4：排产完成，生成 {} 条排产结果", scheduleResults.size());
+
+        return this.step5ProcessResults(scheduleResults, context, factoryCode, scheduleDate);
+    }
+
+    /**
+     * 初始化排程上下文及缓存数据
+     *
+     * @param factoryCode  工厂编码
+     * @param scheduleDate 排产日期
+     * @return 已初始化的排程上下文
+     */
+    private NcScheduleContext initContext(String factoryCode, Date scheduleDate) {
         NcScheduleContext context = new NcScheduleContext();
         context.setFactoryCode(factoryCode);
         context.setScheduleDate(scheduleDate);
         context.setLastSpecOfPrevShift(new HashMap<>());
 
-        // ==================== 步骤1：加载成型计划 ====================
-        List<CxScheduleResult> cxScheduleList = this.loadCxSchedule(factoryCode, scheduleDate);
-        if (CollectionUtils.isEmpty(cxScheduleList)) {
-            throw new BusinessException(I18nUtil.getMessage("ui.dj.engine.noCxSchedule"));
-        }
-        log.info("步骤1：加载成型计划 {} 条", cxScheduleList.size());
+        // 加载前一日排产结果缓存（用于接班库存计算和首班最后生产规格判断）
+        Date prevDate = DateUtil.offsetDay(scheduleDate, -1);
+        List<NcScheduleResult> prevDayResults = ncEngineScheduleResultMapper.selectList(
+                new LambdaQueryWrapper<NcScheduleResult>()
+                        .eq(NcScheduleResult::getScheduleDate, prevDate));
+        context.setPrevDayScheduleResults(prevDayResults);
 
-        // ==================== 步骤2：解析成型计划，获取内衬施工清单 ====================
+        return context;
+    }
+
+    // ==================== 步骤2：解析成型计划，获取内衬施工清单 ====================
+
+    /**
+     * 步骤2.1~2.2：加载施工数据、校验、构建内衬机台映射
+     */
+    private void step2ParseConstruction(NcScheduleContext context, String factoryCode,
+            List<CxScheduleResult> cxScheduleList) {
         // 2.1 获取胎胚代码列表
         Set<String> constructionCodes = cxScheduleList.stream().map(CxScheduleResult::getEmbryoCode)
                 .filter(Objects::nonNull).collect(Collectors.toSet());
         if (constructionCodes.isEmpty()) {
-            throw new BusinessException(I18nUtil.getMessage("ui.dj.engine.noEmbryoCode"));
+            throw new BusinessException(I18nUtil.getMessage("ui.nc.engine.noEmbryoCode"));
         }
 
         // 加载施工数据
@@ -162,11 +215,11 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
                 new ArrayList<>(constructionCodes));
         if (CollectionUtils.isEmpty(constructionList)) {
             throw new BusinessException(MessageFormat.format(
-                    I18nUtil.getMessage("ui.dj.engine.noConstruction"), constructionCodes));
+                    I18nUtil.getMessage("ui.nc.engine.noConstruction"), constructionCodes));
         }
         log.info("步骤2.1：加载施工数据 {} 条", constructionList.size());
 
-        // 构建施工号 -> 施工信息列表 Map（同一施工号可能存在多个BOM版本）
+        // 构建施工号 -> 施工信息列表 Map
         Map<String, List<MdmConstructionInfo>> constructionMap = constructionList.stream()
                 .collect(Collectors.groupingBy(MdmConstructionInfo::getConstructionCode));
 
@@ -177,17 +230,16 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
         if (!unmatchedCodes.isEmpty()) {
             log.warn("步骤2：以下胎胚代码无对应施工数据：{}", unmatchedCodes);
             throw new BusinessException(MessageFormat.format(
-                    I18nUtil.getMessage("ui.dj.engine.noConstruction"), unmatchedCodes));
+                    I18nUtil.getMessage("ui.nc.engine.noConstruction"), unmatchedCodes));
         }
 
-        // 校验：施工数据中内衬代码和内衬长度必须有效（任一版本有效即可）
+        // 校验：施工数据中内衬代码和内衬长度必须有效
         List<String> invalidConstructionCodes = new ArrayList<>();
         for (Map.Entry<String, List<MdmConstructionInfo>> entry : constructionMap.entrySet()) {
             List<MdmConstructionInfo> constructions = entry.getValue();
             boolean hasValid = constructions.stream().anyMatch(c ->
                     StringUtils.isNotEmpty(c.getInsideCode())
-                            && c.getPaddingLength() != null
-                            && c.getPaddingLength().compareTo(BigDecimal.ZERO) > 0);
+                            && BigDecimalUtils.gtZero(c.getInsideLength()));
             if (!hasValid) {
                 invalidConstructionCodes.add(entry.getKey());
             }
@@ -195,20 +247,63 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
         if (!invalidConstructionCodes.isEmpty()) {
             log.warn("步骤2：以下胎胚代码施工数据中内衬代码或内衬长度无效：{}", invalidConstructionCodes);
             throw new BusinessException(MessageFormat.format(
-                    I18nUtil.getMessage("ui.dj.engine.invalidConstruction"), invalidConstructionCodes));
+                    I18nUtil.getMessage("ui.nc.engine.invalidConstruction"), invalidConstructionCodes));
         }
 
-        // 2.2 关联成型计划与施工数据，解析内衬消耗量
-        // 按内衬规格统计对应的成型机台数量
-        Map<String, Integer> paddingCxMachineCount = this.calcPaddingCxMachineCount(cxScheduleList, constructionMap);
-        context.setPaddingCxMachineCount(paddingCxMachineCount);
-        log.info("步骤2.2：内衬规格数：{}，各规格成型机台数：{}", paddingCxMachineCount.size(), paddingCxMachineCount);
+        // 存储成型计划和施工数据到上下文
+        context.setCxScheduleList(cxScheduleList);
+        context.setConstructionMap(constructionMap);
+        // 预填充施工缓存
+        this.initConstructionCache(context);
 
+        // 2.2 按内衬规格统计对应的成型机台数量
+        Map<String, Integer> liningCxMachineCount = this.calcLiningCxMachineCount(cxScheduleList, constructionMap);
+        context.setLiningCxMachineCount(liningCxMachineCount);
+
+        // 构建内衬规格→成型机台号集合映射
+        Map<String, Set<String>> paddingCxMachineSet = new HashMap<>();
+        for (CxScheduleResult cx : cxScheduleList) {
+            if (cx.getCxMachineCode() == null) {
+                continue;
+            }
+            for (int shiftIdx = 1; shiftIdx <= NcEngineConstants.CX_SHIFT_COUNT; shiftIdx++) {
+                MdmConstructionInfo construction = this.resolveConstructionForShift(cx, shiftIdx, context);
+                if (construction != null && construction.getInsideCode() != null) {
+                    paddingCxMachineSet.computeIfAbsent(construction.getInsideCode(), k -> new HashSet<>())
+                            .add(cx.getCxMachineCode());
+                }
+            }
+        }
+        context.setLiningCxMachineSet(paddingCxMachineSet);
+
+        // 构建内衬编码→物料名映射
+        Map<String, String> paddingCodeToNameMap = new HashMap<>();
+        for (List<MdmConstructionInfo> constructions : constructionMap.values()) {
+            for (MdmConstructionInfo c : constructions) {
+                if (StringUtils.isNotEmpty(c.getInsideCode()) && StringUtils.isNotEmpty(c.getInsideName())) {
+                    paddingCodeToNameMap.putIfAbsent(c.getInsideCode(), c.getInsideName());
+                }
+            }
+        }
+        context.setLiningCodeToNameMap(paddingCodeToNameMap);
+
+        // 日志输出
+        Map<String, Integer> paddingCxMachineCountByName = new LinkedHashMap<>();
+        for (Map.Entry<String, Integer> e : liningCxMachineCount.entrySet()) {
+            paddingCxMachineCountByName.put(context.getLiningNameByCode(e.getKey()), e.getValue());
+        }
+        log.info("步骤2.2：内衬规格数：{}，各规格成型机台数：{}", liningCxMachineCount.size(), paddingCxMachineCountByName);
+    }
+
+    /**
+     * 步骤2.2（续）：初始化班次配置、排产日映射、成型班次配置
+     */
+    private void step2InitShiftConfig(NcScheduleContext context, String factoryCode) {
         // 加载排产参数
         Map<String, NcParams> paramsMap = this.loadParamsMap(factoryCode);
         context.setParamsMap(paramsMap);
 
-        // 从班次配置中获取首班班次（openFlag="1"的班次为启用班次，即排程首班）
+        // 获取首班班次（openFlag="1"的班次为启用班次，即排程首班）
         NcShiftConfig startShiftConfig = ncEngineShiftConfigMapper.selectOne(
                 new LambdaQueryWrapper<NcShiftConfig>()
                         .eq(NcShiftConfig::getOpenFlag, "1")
@@ -216,174 +311,202 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
                         .last("LIMIT 1"));
         if (startShiftConfig == null || startShiftConfig.getShiftCode() == null) {
             throw new BusinessException(MessageFormat.format(
-                    I18nUtil.getMessage("ui.dj.engine.shiftConfigNotConfigured"),
+                    I18nUtil.getMessage("ui.nc.engine.shiftConfigNotConfigured"),
                     factoryCode));
         }
         String startShiftValue = startShiftConfig.getShiftCode();
         String[] shiftClassMap = NcEngineUtil.buildShiftClassMap(startShiftValue);
         context.setShiftClassMap(shiftClassMap);
-        // 成型班次偏移量：内衬首班班次与成型首班（早班=class1）的差值
+
+        // 构建各班次索引的排产日映射
+        List<NcShiftConfig> allEnabledShifts = ncEngineShiftConfigMapper.selectList(
+                new LambdaQueryWrapper<NcShiftConfig>()
+                        .eq(NcShiftConfig::getOpenFlag, "1")
+                        .orderByAsc(NcShiftConfig::getShiftOrder));
+        List<String> orderedShiftCodes = allEnabledShifts.stream()
+                .map(NcShiftConfig::getShiftCode)
+                .collect(Collectors.toList());
+        int[] scheduleDays = new int[NcEngineConstants.SHIFT_COUNT];
+        int lastIdx = orderedShiftCodes.size() - 1;
+        for (int i = 0; i < NcEngineConstants.SHIFT_COUNT; i++) {
+            if (i == 0) {
+                scheduleDays[i] = 1;
+            } else if (shiftClassMap[i - 1] != null
+                    && shiftClassMap[i - 1].equals(orderedShiftCodes.get(lastIdx))) {
+                scheduleDays[i] = scheduleDays[i - 1] + 1;
+            } else {
+                scheduleDays[i] = scheduleDays[i - 1];
+            }
+        }
+        context.setScheduleDays(scheduleDays);
+        context.setShiftCountPerDay(allEnabledShifts.size());
+        log.info("步骤2.2：启用的班次顺序={}，各内衬班次排产日={}，每日班次数={}",
+                String.join(",", orderedShiftCodes), java.util.Arrays.toString(scheduleDays),
+                allEnabledShifts.size());
+
+        // 成型班次偏移量
         int formingShiftOffset = Integer.parseInt(startShiftValue) - 1;
         log.info("步骤2.2：排程首班班次={}，班次映射={}，成型班次偏移量={}",
                 startShiftValue, String.join(",", shiftClassMap), formingShiftOffset);
         context.setFormingShiftOffset(formingShiftOffset);
 
-        // 按内衬规格分别解析供应窗口（不同规格排产深度可能不同）
+        // 加载成型班次配置映射
+        List<CxShiftConfig> cxShiftConfigs = ncEngineCxShiftConfigMapper.selectList(
+                new LambdaQueryWrapper<CxShiftConfig>()
+                        .eq(CxShiftConfig::getFactoryCode, factoryCode)
+                        .eq(CxShiftConfig::getIsActive, 1));
+        Map<String, Integer> cxShiftClassMap = new HashMap<>();
+        for (CxShiftConfig cfg : cxShiftConfigs) {
+            if (cfg.getScheduleDay() != null && cfg.getShiftName() != null && cfg.getClassField() != null) {
+                String classField = cfg.getClassField().replace("CLASS", "");
+                int cxShiftNum = Integer.parseInt(classField);
+                String key = cfg.getScheduleDay() + "|" + cfg.getShiftName();
+                cxShiftClassMap.put(key, cxShiftNum);
+            }
+        }
+        context.setCxShiftClassMap(cxShiftClassMap);
+        log.info("步骤2.2：加载成型班次配置 {} 条", cxShiftConfigs.size());
+    }
+
+    /**
+     * 步骤2.2（续）：解析各内衬规格的供应窗口（排产深度），预填充消耗量缓存
+     */
+    private void step2InitSupplyDepth(NcScheduleContext context, String factoryCode) {
+        Map<String, Set<String>> paddingCxMachineSet = context.getLiningCxMachineSet();
         Map<String, Integer> paddingSupplyDepth = new HashMap<>();
         int maxSupplyDepth = 0;
-        for (Map.Entry<String, Integer> entry : paddingCxMachineCount.entrySet()) {
-            int depth = this.parseSupplyDepth(factoryCode, entry.getValue());
-            paddingSupplyDepth.put(entry.getKey(), depth);
+        for (String paddingCode : paddingCxMachineSet.keySet()) {
+            Set<String> machineSet = paddingCxMachineSet.get(paddingCode);
+            int machineCount = machineSet != null ? machineSet.size() : 0;
+            int depth = this.parseSupplyDepth(factoryCode, machineCount);
+            paddingSupplyDepth.put(paddingCode, depth);
             if (depth > maxSupplyDepth) {
                 maxSupplyDepth = depth;
             }
         }
-        context.setPaddingSupplyDepth(paddingSupplyDepth);
+        context.setLiningSupplyDepth(paddingSupplyDepth);
         log.info("步骤2.2：排产深度（供应窗口），最大 {} 个班", maxSupplyDepth);
 
-        // 存储成型计划和施工数据到上下文（供班次循环中动态计算消耗量使用）
-        context.setCxScheduleList(cxScheduleList);
-        context.setConstructionMap(constructionMap);
+        // 预填充各班各规格消耗量缓存
+        this.initShiftConsumeCache(context, paddingSupplyDepth.keySet());
+    }
 
-        // 获取所有内衬代码（从排产深度Map中获取）
-        Set<String> liningCodes = paddingSupplyDepth.keySet();
+    // ==================== 步骤3：计算内衬需求清单 ====================
 
-        // ==================== 步骤3：计算内衬需求清单 ====================
-        // 3.1 加载库存
+    /**
+     * 步骤3.1~3.3：加载库存、判断新规格、加载月计划余量、构建需求清单、计算接班库存
+     */
+    private List<NcLiningDemand> step3CalcDemandList(NcScheduleContext context, Date scheduleDate) {
+        String factoryCode = context.getFactoryCode();
+        Set<String> liningCodes = context.getLiningSupplyDepth().keySet();
+        Map<String, List<MdmConstructionInfo>> constructionMap = context.getConstructionMap();
+
+        // 3.1 加载有效库存
         Map<String, BigDecimal> effectiveStockMap = this.loadEffectiveStock(factoryCode, new ArrayList<>(liningCodes),
                 context);
         context.setEffectiveStockMap(effectiveStockMap);
         log.info("步骤3.1：加载有效库存 {} 个规格", effectiveStockMap.size());
         context.appendLog("===== 步骤3.1：有效库存 =====");
         for (Map.Entry<String, BigDecimal> entry : effectiveStockMap.entrySet()) {
-            context.appendLog("  规格 {0}：有效库存 {1}", entry.getKey(), entry.getValue());
+            context.appendLog("  规格 {0}：有效库存 {1}", context.getLiningNameByCode(entry.getKey()), entry.getValue());
         }
 
-        // 判断新规格：连续N天未排产的规格（含从未排产过的）视为新规格
-        // 从排产结果表（含日志表）查询各内衬代码最近一次有排产量的排产日期
+        // 判断新规格：计算时间窗口阈值 = 排产日 - 新规格天数阈值，查询窗口内有排产记录的内衬代码
         int newSpecDaysThreshold = this.getParamAsDecimal(context, NcEngineConstants.PARAM_NEW_SPEC_DAYS_THRESHOLD).intValue();
-        List<Map<String, Object>> lastScheduleList = ncEngineScheduleResultMapper.selectLastScheduleDate(
-                factoryCode, new ArrayList<>(liningCodes));
-        Map<String, Date> lastScheduleMap = new HashMap<>();
-        if (lastScheduleList != null) {
-            for (Map<String, Object> row : lastScheduleList) {
-                String code = (String) row.get("LINLING_CODE");
-                Object lastDateObj = row.get("LAST_DATE");
-                Date lastDate = null;
-                if (lastDateObj instanceof LocalDateTime) {
-                    lastDate = Date.from(((LocalDateTime) lastDateObj).atZone(ZoneId.systemDefault()).toInstant());
-                } else if (lastDateObj instanceof Date) {
-                    lastDate = (Date) lastDateObj;
-                }
-                lastScheduleMap.put(code, lastDate);
-            }
-        }
-        Set<String> newSpecliningCodes = new HashSet<>();
-        for (String code : liningCodes) {
-            Date lastDate = lastScheduleMap.get(code);
-            if (lastDate == null) {
-                // 从未排产过 → 新规格
-                newSpecliningCodes.add(code);
-            } else {
-                // 计算间隔天数
-                long daysBetween = DateUtil.betweenDay(lastDate, scheduleDate, true);
-                if (daysBetween >= newSpecDaysThreshold) {
-                    newSpecliningCodes.add(code);
-                }
-            }
+        Date thresholdDate = DateUtil.offsetDay(scheduleDate, -newSpecDaysThreshold);
+        Set<String> scheduledliningCodes = ncEngineScheduleResultMapper.selectLastScheduleDate(
+                factoryCode, thresholdDate, scheduleDate, liningCodes);
+        Set<String> newSpecliningCodes = new HashSet<>(liningCodes);
+        if (scheduledliningCodes != null) {
+            scheduledliningCodes.forEach(newSpecliningCodes::remove);
         }
 
-        // 3.2 供应窗口超出成型范围时，加载月计划余量预估
-        // 筛选出排产深度超出成型班数的内衬规格
-        Map<String, Integer> exceedPaddingMap = new HashMap<>();
+        // 3.2 供应窗口超出成型范围时，加载月计划余量
+        Map<String, Integer> paddingSupplyDepth = context.getLiningSupplyDepth();
+        Map<String, Integer> exceedLiningMap = new HashMap<>();
         int maxExceedShifts = 0;
         for (Map.Entry<String, Integer> entry : paddingSupplyDepth.entrySet()) {
             int exceed = entry.getValue() - NcEngineConstants.CX_SHIFT_COUNT;
             if (exceed > 0) {
-                exceedPaddingMap.put(entry.getKey(), exceed);
+                exceedLiningMap.put(entry.getKey(), exceed);
                 if (exceed > maxExceedShifts) {
                     maxExceedShifts = exceed;
                 }
             }
         }
-        if (!exceedPaddingMap.isEmpty()) {
-            log.info("步骤3.2：{} 个内衬规格供应窗口超出成型计划 {} 班，最大超出 {} 个班", exceedPaddingMap.size(),
+        if (!exceedLiningMap.isEmpty()) {
+            log.info("步骤3.2：{} 个内衬规格供应窗口超出成型计划 {} 班，最大超出 {} 个班", exceedLiningMap.size(),
                     NcEngineConstants.CX_SHIFT_COUNT, maxExceedShifts);
-            // 获取成型计划最后一天的最大班需求量
-            Map<String, BigDecimal> maxShiftConsume = this.getMaxShiftConsume(cxScheduleList, constructionMap);
-            // 加载月计划余量
+            Map<String, BigDecimal> maxShiftConsume = this.getMaxShiftConsume(context);
             String yearMonth = DateUtil.format(scheduleDate, "yyyyMM");
             List<MpMonthPlanMonitor> monthPlanMonitors = this.loadMonthPlanMonitor(factoryCode, yearMonth);
-            // 按内衬代码整理月计划余量
-            Map<String, BigDecimal> paddingMonthSurplus = this.calcPaddingMonthSurplus(monthPlanMonitors,
-                    constructionMap, maxShiftConsume, maxExceedShifts);
-            // 超出范围的消耗量估算将在班次循环中的 checkDemandForShift 内按需计算
-            // 存储月度剩余量到上下文（用于净需求计算中 n>8 时的月计划约束）
-            Map<String, BigDecimal> rawPaddingRemaining = this.calcRawPaddingRemaining(monthPlanMonitors,
+            this.calcLiningMonthSurplus(monthPlanMonitors, constructionMap, maxShiftConsume, maxExceedShifts);
+            Map<String, BigDecimal> rawLiningRemaining = this.calcRawLiningRemaining(monthPlanMonitors,
                     constructionMap);
-            if (!rawPaddingRemaining.isEmpty()) {
-                context.setPaddingRemainingMap(rawPaddingRemaining);
+            if (!rawLiningRemaining.isEmpty()) {
+                context.setLiningRemainingMap(rawLiningRemaining);
             }
         }
 
         // 3.3 构建内衬需求清单
         BigDecimal standardCurlLength = this.getParamAsDecimal(context, NcEngineConstants.PARAM_STANDARD_CRIMP_LENGTH);
-        List<NcPaddingDemand> demandList = this.buildDemandList(liningCodes, cxScheduleList,
-                effectiveStockMap, constructionMap, newSpecliningCodes, standardCurlLength);
+        List<NcLiningDemand> demandList = this.buildDemandList(liningCodes,
+                context, effectiveStockMap, newSpecliningCodes, standardCurlLength);
         log.info("步骤3.3：生成内衬需求清单 {} 个规格", demandList.size());
 
-        // 第1班接班库存不等同于有效库存（早上6点快照），需预估6:00~14:00（早班）的库存变化
-        // 公式：接班库存 = 有效库存 + 前日早班内衬计划量 - 当日早班成型消耗量
-        // 前日早班内衬计划量：T-1日排产结果中 class3（早班 6:00~14:00）的计划量
-        // 当日早班成型消耗量：CX T日 class1 计划量按单耗换算
+        // 计算第1班接班库存
         Map<String, BigDecimal> handoverInventory = new HashMap<>();
-        Date prevDate = DateUtil.offsetDay(scheduleDate, -1);
-        List<NcScheduleResult> prevDayResults = ncEngineScheduleResultMapper.selectList(
-                new LambdaQueryWrapper<NcScheduleResult>()
-                        .eq(NcScheduleResult::getScheduleDate, prevDate));
         Map<String, BigDecimal> prevDayClass3Plan = new HashMap<>();
-        if (!CollectionUtils.isEmpty(prevDayResults)) {
-            for (NcScheduleResult r : prevDayResults) {
-                BigDecimal class3Plan = r.getClass3PlanQty();
-                if (class3Plan != null && class3Plan.compareTo(BigDecimal.ZERO) > 0) {
-                    prevDayClass3Plan.merge(r.getLiningCode(), class3Plan, BigDecimal::add);
-                }
+        List<NcScheduleResult> prevDayResults = context.getPrevDayScheduleResults();
+        for (NcScheduleResult r : prevDayResults) {
+            BigDecimal class3Plan = r.getClass3PlanQty();
+            if (BigDecimalUtils.gtZero(class3Plan)) {
+                prevDayClass3Plan.merge(r.getLiningCode(), class3Plan, BigDecimal::add);
             }
         }
-        for (NcPaddingDemand demand : demandList) {
-            String liningCode = demand.getLiningCode();
-            BigDecimal stock = effectiveStockMap.getOrDefault(liningCode, BigDecimal.ZERO);
-            BigDecimal addPlan = prevDayClass3Plan.getOrDefault(liningCode, BigDecimal.ZERO);
-            // CX class1（早班）消耗量（从成型计划动态计算）
-            BigDecimal cxConsume = this.calcShiftConsume(cxScheduleList, constructionMap, liningCode, 1);
+        for (NcLiningDemand demand : demandList) {
+            String paddingCode = demand.getLiningCode();
+            BigDecimal stock = effectiveStockMap.getOrDefault(paddingCode, BigDecimal.ZERO);
+            BigDecimal addPlan = prevDayClass3Plan.getOrDefault(paddingCode, BigDecimal.ZERO);
+            BigDecimal cxConsume = this.calcShiftConsume(context, paddingCode, 1);
             BigDecimal inventory = stock.add(addPlan).subtract(cxConsume);
-            if (inventory.compareTo(BigDecimal.ZERO) < 0) {
+            if (BigDecimalUtils.ltZero(inventory)) {
                 inventory = BigDecimal.ZERO;
             }
-            handoverInventory.put(liningCode, inventory);
+            handoverInventory.put(paddingCode, inventory);
         }
         context.setHandoverInventory(handoverInventory);
         context.appendLog("===== 接班库存（第1班） =====");
         for (Map.Entry<String, BigDecimal> entry : handoverInventory.entrySet()) {
             context.appendLog("  规格 {0}：接班库存 {1}（有效库存 {2} + 前日早班计划 {3} - 当日早班消耗 {4})",
-                    entry.getKey(), entry.getValue(),
+                    context.getLiningNameByCode(entry.getKey()), entry.getValue(),
                     effectiveStockMap.getOrDefault(entry.getKey(), BigDecimal.ZERO),
                     prevDayClass3Plan.getOrDefault(entry.getKey(), BigDecimal.ZERO),
-                    this.calcShiftConsume(cxScheduleList, constructionMap, entry.getKey(), 1));
+                    this.calcShiftConsume(context, entry.getKey(), 1));
         }
 
-        // ==================== 步骤4：选择机台 ====================
+        return demandList;
+    }
+
+    // ==================== 步骤4：选择机台 ====================
+
+    /**
+     * 步骤4.1~4.4：加载机台、定点机台、关联分配、辅助配置
+     */
+    private void step4SelectMachine(NcScheduleContext context, String factoryCode,
+            List<NcLiningDemand> demandList) {
         // 4.1 加载内衬机台
         List<NcMachineInfo> machineList = this.loadNcMachines(factoryCode);
         if (CollectionUtils.isEmpty(machineList)) {
-            throw new BusinessException(I18nUtil.getMessage("ui.dj.engine.noMachine"));
+            throw new BusinessException(I18nUtil.getMessage("ui.nc.engine.noMachine"));
         }
         Map<String, NcMachineInfo> machineMap = machineList.stream()
                 .collect(Collectors.toMap(NcMachineInfo::getMachineCode, m -> m));
         context.setMachineMap(machineMap);
-        log.info("步骤4：加载内衬机台 {} 台", machineList.size());
+        log.info("步骤4.1：加载内衬机台 {} 台", machineList.size());
 
-            // 4.2 加载定点机台
+        // 4.2 加载定点机台
+        Set<String> liningCodes = demandList.stream().map(NcLiningDemand::getLiningCode).collect(Collectors.toSet());
         List<NcSpecifyMachine> specifyMachineList = this.loadSpecifyMachines(factoryCode,
                 new ArrayList<>(liningCodes));
         log.info("步骤4.2：加载定点机台 {} 条", specifyMachineList.size());
@@ -396,22 +519,22 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
         log.info("步骤4.4：辅助配置数据加载完成");
 
         context.appendLog("===== 步骤4：机台分配 =====");
-        for (NcPaddingDemand demand : demandList) {
-            context.appendLog("  规格 {0}（{1}）：是否新规格={2}，是否已收尾={3}，机台={4}",
-                    demand.getLiningCode(), demand.getLiningName(),
-                    demand.isNewSpec(), demand.isTailFinished(),
+        for (NcLiningDemand demand : demandList) {
+            context.appendLog("  规格 {0}：是否新规格={1}，是否量试/试制={2}，机台={3}",
+                    NcScheduleContext.buildDisplayName(demand.getLiningName(), demand.getLiningCode()),
+                    demand.isNewSpec(),
+                    this.hasTrialConsumption(context, demand.getLiningCode()),
                     demand.getMachineCode());
         }
+    }
 
-        // ==================== 步骤5：排产 ====================
-        // 步骤5.1~5.4 核心排产循环
-        List<NcScheduleResult> scheduleResults = this.executeSchedule(demandList, context);
-        if (CollectionUtils.isEmpty(scheduleResults)) {
-            throw new BusinessException(I18nUtil.getMessage("ui.dj.engine.noScheduleResult"));
-        }
-        log.info("步骤5.1~5.4：排产完成，生成 {} 条排产结果", scheduleResults.size());
+    // ==================== 步骤5：排产结果处理 ====================
 
-        // 步骤5.5 结果输出
+    /**
+     * 步骤5.5：损耗率转换、日志汇总、批次号生成、归档、保存日志
+     */
+    private List<NcScheduleResult> step5ProcessResults(List<NcScheduleResult> scheduleResults,
+            NcScheduleContext context, String factoryCode, Date scheduleDate) {
         // 5.5.1 损耗率转换（未收尾规格）
         this.convertPlanQtyWithLoss(scheduleResults, context);
 
@@ -422,24 +545,27 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
             StringBuilder shiftsSb = new StringBuilder();
             for (int i = 1; i <= NcEngineConstants.SHIFT_COUNT; i++) {
                 BigDecimal qty = this.getClassPlanQtyFromResult(result, i);
-                if (qty != null && qty.compareTo(BigDecimal.ZERO) > 0) {
+                if (BigDecimalUtils.gtZero(qty)) {
                     totalQty = totalQty.add(qty);
                     shiftsSb.append(" 班").append(i).append("=").append(qty);
                 }
             }
-            context.appendLog("  机台={0}，规格={1}（{2}）：总产量={3}{4}",
-                    result.getMachineCode(), result.getLiningCode(),
-                    result.getLiningName(), totalQty, shiftsSb.toString());
+            context.appendLog("  机台={0}，规格={1}：总产量={2}{3}",
+                    result.getMachineCode(),
+                    NcScheduleContext.buildDisplayName(result.getLiningName(), result.getLiningCode()),
+                    totalQty, shiftsSb.toString());
         }
 
-        // 5.5.2 生成批次号并设置批次号和订单号
+        log.info(context.getProcessLog().toString());
+
+        // 5.5.2 生成批次号
         String batchNo = iNcOrderGeneratorService.fillOrderInfo(scheduleResults, factoryCode, scheduleDate);
         context.setCurrentBatchNo(batchNo);
 
         // 5.5.3 归档旧数据 + 写入新数据
         this.archiveAndSave(factoryCode, scheduleDate, scheduleResults);
 
-        // ===== 保存排程过程日志 =====
+        // 保存排程过程日志
         this.saveScheduleProcessLog(context, batchNo);
 
         log.info("===== 内衬自动排程结束，共生成 {} 条排产结果 =====", scheduleResults.size());
@@ -473,7 +599,7 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
     }
 
     /**
-     * 动态计算指定内衬规格在指定班次的成型消耗量
+     * 动态计算指定内衬规格在指定成型班次的消耗量
      * <p>
      * 遍历成型计划，找到匹配该内衬规格的胎胚，按单耗换算为该班的消耗量。
      * 每班循环中调用此方法，从当前排产班次开始往后计算，不再提前预计算所有班次。
@@ -481,30 +607,68 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
      *
      * @param cxScheduleList 成型计划列表
      * @param constructionMap 施工数据 Map
-     * @param liningCode 内衬代码
+     * @param paddingCode 内衬代码
      * @param formingClassIndex 成型班次索引（1~8），已由调用方完成内衬→成型班次的偏移映射
      * @return 该班次的消耗量（米）
      */
-    private BigDecimal calcShiftConsume(List<CxScheduleResult> cxScheduleList,
-            Map<String, List<MdmConstructionInfo>> constructionMap, String liningCode, int formingClassIndex) {
-        BigDecimal totalConsume = BigDecimal.ZERO;
-        for (CxScheduleResult cx : cxScheduleList) {
-            // 根据班次示方书编号匹配对应的施工版本
-            MdmConstructionInfo construction = this.resolveConstructionForShift(cx, formingClassIndex, constructionMap);
-            if (construction == null || !liningCode.equals(construction.getInsideCode())) {
-                continue;
-            }
-            // 内衬长度单位是毫米(mm)，需要换算成米(m)
-            BigDecimal unitConsume = construction.getPaddingLength() != null
-                    ? construction.getPaddingLength().divide(NcEngineConstants.MM_TO_M_DIVISOR, 6, RoundingMode.HALF_UP)
-                    : BigDecimal.ONE;
-            BigDecimal classPlanQty = this.getClassPlanQty(cx, formingClassIndex);
-            if (classPlanQty != null && classPlanQty.compareTo(BigDecimal.ZERO) > 0) {
-                totalConsume = totalConsume.add(classPlanQty.multiply(unitConsume)
-                        .setScale(2, RoundingMode.HALF_UP));
+    private BigDecimal calcShiftConsume(NcScheduleContext context,
+            String paddingCode, int formingClassIndex) {
+        // 优先从缓存读取
+        Map<Integer, BigDecimal> shiftCache = context.getShiftConsumeCache().get(paddingCode);
+        if (shiftCache != null && shiftCache.containsKey(formingClassIndex)) {
+            return shiftCache.get(formingClassIndex);
+        }
+        return BigDecimal.ZERO;
+    }
+
+    /**
+     * 获取该内衬在指定成型班次的量试/试制消耗量（从 trial 缓存读取）
+     * <p>
+     * 用于在 checkDemandForShift 中分拆量试需求与正式需求，量试需求按照参数提前 N 个班次排产。
+     * </p>
+     *
+     * @param context           排产上下文（含 trial 消耗缓存）
+     * @param paddingCode       内衬编码
+     * @param formingClassIndex 成型班次索引（1~8）
+     * @return 该班次的量试/试制消耗量（米）
+     */
+    private BigDecimal calcTrialShiftConsume(NcScheduleContext context,
+            String paddingCode, int formingClassIndex) {
+        Map<Integer, BigDecimal> trialCache = context.getShiftConsumeTrialCache().get(paddingCode);
+        if (trialCache != null && trialCache.containsKey(formingClassIndex)) {
+            return trialCache.get(formingClassIndex);
+        }
+        return BigDecimal.ZERO;
+    }
+
+    /**
+     * 获取实验量试提前排产班次数
+     *
+     * @param context 排产上下文
+     * @return 提前班次数，默认 3
+     */
+    private int getTrialAdvanceShifts(NcScheduleContext context) {
+        return this.getParamAsDecimal(context, NcEngineConstants.PARAM_TRIAL_ADVANCE_SHIFTS).intValue();
+    }
+
+    /**
+     * 判断指定内衬规格是否存在量试/试制消耗量
+     *
+     * @param context     排产上下文
+     * @param paddingCode 内衬编码
+     * @return true 存在量试/试制消耗
+     */
+    private boolean hasTrialConsumption(NcScheduleContext context, String paddingCode) {
+        Map<Integer, BigDecimal> trialCache = context.getShiftConsumeTrialCache().get(paddingCode);
+        if (trialCache == null) {
+            return false;
+        }
+        for (Map.Entry<Integer, BigDecimal> entry : trialCache.entrySet()) {
+            if (BigDecimalUtils.gtZero(entry.getValue())) {
+                return true;
             }
         }
-        return totalConsume;
+        return false;
     }
 
     /**
@@ -534,38 +698,148 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
     }
 
     /**
-     * 根据班次示方书编号匹配对应的施工版本数据
-     * <p>
-     * 匹配规则：
-     * 1. 从 class{N}RecipeNo 获取示方书编号（逗号分隔时取第一个）
-     * 2. 施工版本号格式 VTMCB20000380XA01，最后2位为小版本号
-     * 3. 先尝试精确匹配（RecipeNo = constructionVersion）
-     * 4. 若精确匹配失败，去掉施工版本号最后2位后进行前缀匹配
-     * 5. 前缀匹配到多个施工版本时，取小版本号最大的那个
+     * 
+     * 预填充施工信息缓存，遍历所有成型记录各班次，提前计算并缓存施工匹配结果。 匹配逻辑：<br/>
+     * 1. 获取成型计划的胎胚代码<br/>
+     * 2. 从施工数据 Map 中查找该胎胚代码对应的施工记录列表<br/>
+     * 3. 根据排程日期+班次获取成型示方书号（RecipeNo），尝试精确匹配施工版本<br/>
+     * 4. 若精确匹配失败，去掉施工版本号最后2位后进行前缀匹配<br/>
+     * 5. 前缀匹配到多个施工版本时，取小版本号最大的那个<br/>
      * 6. 若 RecipeNo 为空或无匹配，返回第一个施工记录（向后兼容）
      * </p>
-     *
-     * @param cx              成型计划结果
-     * @param shiftIndex       班次索引（1~8）
-     * @param constructionMap  施工数据 Map<constructionCode, List<MdmConstructionInfo>>
+     * 否则抛出异常终止排程。
+     * 
+     * @param context 排产上下文（含施工数据 Map 和施工信息缓存）
+     */
+    private void initConstructionCache(NcScheduleContext context) {
+        List<CxScheduleResult> cxScheduleList = context.getCxScheduleList();
+        Map<String, List<MdmConstructionInfo>> constructionMap = context.getConstructionMap();
+        Map<String, Map<Integer, MdmConstructionInfo>> constructionCache = context.getConstructionCache();
+        for (CxScheduleResult cx : cxScheduleList) {
+            String embryoCode = cx.getEmbryoCode();
+            if (embryoCode == null) {
+                continue;
+            }
+            for (int shiftIndex = 1; shiftIndex <= NcEngineConstants.CX_SHIFT_COUNT; shiftIndex++) {
+                BigDecimal planQty = this.getClassPlanQty(cx, shiftIndex);
+                if (BigDecimalUtils.leZero(planQty)) {
+                    // 无计划量不需要
+                    continue;
+                }
+                String recipeNo = this.getShiftRecipeNo(cx, shiftIndex);
+                if (StringUtils.isEmpty(recipeNo)) {
+                    continue;
+                }
+                // 获取示方书号匹配的施工记录
+                MdmConstructionInfo constructionInfo = this.matchConstructionByRecipe(constructionMap.get(embryoCode), recipeNo);
+                if (constructionInfo == null) {
+                    throw new BusinessException(MessageFormat.format(
+                            I18nUtil.getMessage("ui.nc.engine.recipeNoNotMatch"), recipeNo, embryoCode, shiftIndex));
+                }
+                // 写入缓存
+                constructionCache.computeIfAbsent(embryoCode, k -> new HashMap<>()).put(shiftIndex, constructionInfo);
+            }
+        }
+    }
+
+    /**
+     * 预填充各班各规格内衬消耗量缓存，遍历所有内衬规格各班次，提前计算消耗量
+     * <p>
+     * 按施工的生产阶段（productionStage）分拆为正式消耗缓存和量试/试制消耗缓存，
+     * 用于后续合并需求时分别应用不同的供应窗口偏移。
+     * </p>
+     */
+    private void initShiftConsumeCache(NcScheduleContext context, Set<String> liningCodes) {
+        Map<String, Map<Integer, BigDecimal>> cache = context.getShiftConsumeCache();
+        Map<String, Map<Integer, BigDecimal>> trialCache = context.getShiftConsumeTrialCache();
+        // 获取量试/试制生产阶段编码集合
+        Set<String> trialStages = this.getTrialProductionStages(context);
+        for (String paddingCode : liningCodes) {
+            Map<Integer, BigDecimal> shiftCache = cache.computeIfAbsent(paddingCode, k -> new HashMap<>());
+            Map<Integer, BigDecimal> trialShiftCache = trialCache.computeIfAbsent(paddingCode, k -> new HashMap<>());
+            for (int classIdx = 1; classIdx <= NcEngineConstants.CX_SHIFT_COUNT; classIdx++) {
+                BigDecimal totalConsume = shiftCache.get(classIdx);
+                BigDecimal trialConsume = trialShiftCache.get(classIdx);
+                if (totalConsume == null) {
+                    totalConsume = BigDecimal.ZERO;
+                    trialConsume = BigDecimal.ZERO;
+                    List<CxScheduleResult> cxScheduleList = context.getCxScheduleList();
+                    for (CxScheduleResult cx : cxScheduleList) {
+                        // 根据班次示方书编号匹配对应的施工版本
+                        MdmConstructionInfo construction = this.resolveConstructionForShift(cx, classIdx, context);
+                        if (construction == null || !paddingCode.equals(construction.getInsideCode())) {
+                            continue;
+                        }
+                        // 内衬长度单位是毫米(mm)，需要换算成米(m)
+                        BigDecimal unitConsume = construction.getInsideLength() != null
+                                ? construction.getInsideLength().divide(NcEngineConstants.MM_TO_M_DIVISOR, 6,
+                                        RoundingMode.HALF_UP)
+                                : BigDecimal.ONE;
+                        BigDecimal classPlanQty = this.getClassPlanQty(cx, classIdx);
+                        if (BigDecimalUtils.gtZero(classPlanQty)) {
+                            BigDecimal consume = classPlanQty.multiply(unitConsume).setScale(2, RoundingMode.HALF_UP);
+                            totalConsume = totalConsume.add(consume);
+                            // 判断是否量试/试制阶段
+                            if (trialStages.contains(construction.getProductionStage())) {
+                                trialConsume = trialConsume.add(consume);
+                            }
+                        }
+                    }
+                    shiftCache.put(classIdx, totalConsume);
+                    trialShiftCache.put(classIdx, trialConsume);
+                }
+            }
+        }
+    }
+
+    /**
+     * 获取量试/试制生产阶段编码集合
+     */
+    private Set<String> getTrialProductionStages(NcScheduleContext context) {
+        String stages = this.getParamValue(context, NcEngineConstants.PARAM_TRIAL_PRODUCTION_STAGES);
+        if (StringUtils.isEmpty(stages)) {
+            stages = "T,X"; // 默认量试(T)、试制(X)
+        }
+        return new HashSet<>(Arrays.asList(stages.split(",")));
+    }
+
+    /**
+     * 获取参数原始值
+     */
+    private String getParamValue(NcScheduleContext context, String paramCode) {
+        NcParams param = context.getParamsMap() != null
+                ? context.getParamsMap().get(paramCode)
+                : null;
+        return param != null ? param.getParamValue() : null;
+    }
+
+    /**
+     * 解析成型计划某班次对应的施工信息（从缓存读取）
+     * <p>
+     * @param cx         成型计划结果
+     * @param shiftIndex 班次索引（1~8）
+     * @param context    排产上下文（含施工数据 Map 和施工信息缓存）
      * @return 匹配到的施工数据，无匹配时返回第一个施工记录
      */
     private MdmConstructionInfo resolveConstructionForShift(CxScheduleResult cx, int shiftIndex,
-            Map<String, List<MdmConstructionInfo>> constructionMap) {
-        List<MdmConstructionInfo> constructions = constructionMap.get(cx.getEmbryoCode());
-        if (constructions == null || constructions.isEmpty()) {
+            NcScheduleContext context) {
+        // 优先从缓存读取
+        String embryoCode = cx.getEmbryoCode();
+        Map<String, Map<Integer, MdmConstructionInfo>> constructionCache = context.getConstructionCache();
+        Map<Integer, MdmConstructionInfo> shiftCache = constructionCache.get(embryoCode);
+        if (shiftCache != null && shiftCache.containsKey(shiftIndex)) {
+            return shiftCache.get(shiftIndex);
+        }
+        return null;
+    }
+
+    /**
+     * 在多个施工版本中按示方书编号匹配（精确匹配→前缀匹配取最大小版本）
+     */
+    private MdmConstructionInfo matchConstructionByRecipe(List<MdmConstructionInfo> constructions, String recipeNo) {
+        if (CollectionUtils.isEmpty(constructions)) {
             return null;
         }
-        if (constructions.size() == 1) {
-            return constructions.get(0);
-        }
-
-        // 获取本班示方书编号
-        String recipeNo = this.getShiftRecipeNo(cx, shiftIndex);
-        if (StringUtils.isEmpty(recipeNo)) {
-            return constructions.get(0);
-        }
-
         // 1. 精确匹配
         for (MdmConstructionInfo c : constructions) {
             if (recipeNo.equals(c.getConstructionVersion())) {
@@ -627,7 +901,7 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
     /**
      * 按内衬规格统计对应的成型机台数量
      */
-    private Map<String, Integer> calcPaddingCxMachineCount(List<CxScheduleResult> cxScheduleList,
+    private Map<String, Integer> calcLiningCxMachineCount(List<CxScheduleResult> cxScheduleList,
             Map<String, List<MdmConstructionInfo>> constructionMap) {
         Map<String, Set<String>> paddingMachines = new HashMap<>();
         for (CxScheduleResult cx : cxScheduleList) {
@@ -680,15 +954,17 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
                 return depth != null ? depth.intValue() : 1;
             }
         }
+        // 未匹配到任何配置，返回默认排产深度 1
         return 1;
     }
 
     /**
      * 获取成型计划最后一天的最大班需求量（用于预估超出部分）
      */
-    private Map<String, BigDecimal> getMaxShiftConsume(List<CxScheduleResult> cxScheduleList,
-            Map<String, List<MdmConstructionInfo>> constructionMap) {
+    private Map<String, BigDecimal> getMaxShiftConsume(NcScheduleContext context) {
         Map<String, BigDecimal> maxShiftConsume = new HashMap<>();
+        List<CxScheduleResult> cxScheduleList = context.getCxScheduleList();
+        Map<String, List<MdmConstructionInfo>> constructionMap = context.getConstructionMap();
         // 找到最后一天（取最大的日期）
         Date lastDay = null;
         for (CxScheduleResult cx : cxScheduleList) {
@@ -711,13 +987,13 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
             // 取第1班匹配的施工数据（各班次取最大版本）
             MdmConstructionInfo construction = null;
             for (int i = 1; i <= 3 && construction == null; i++) {
-                construction = this.resolveConstructionForShift(cx, i, constructionMap);
+                construction = this.resolveConstructionForShift(cx, i, context);
             }
             if (construction == null || construction.getInsideCode() == null) {
                 continue;
             }
-            String liningCode = construction.getInsideCode();
-            BigDecimal unitConsume = construction.getPaddingLength() != null ? construction.getPaddingLength()
+            String paddingCode = construction.getInsideCode();
+            BigDecimal unitConsume = construction.getInsideLength() != null ? construction.getInsideLength()
                     : BigDecimal.ONE;
 
             // 取三个班中的最大计划量
@@ -728,9 +1004,9 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
                     maxPlan = plan;
                 }
             }
-            if (maxPlan.compareTo(BigDecimal.ZERO) > 0) {
+            if (BigDecimalUtils.gtZero(maxPlan)) {
                 BigDecimal consume = maxPlan.multiply(unitConsume);
-                maxShiftConsume.merge(liningCode, consume, BigDecimal::max);
+                maxShiftConsume.merge(paddingCode, consume, BigDecimal::max);
             }
         }
         return maxShiftConsume;
@@ -756,10 +1032,10 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
      * 从施工数据列表中取第一个有效的施工记录（用于计算月计划余量等不需要按班次区分的场景）
      */
     private MdmConstructionInfo getFirstValidConstruction(
-            Map<String, List<MdmConstructionInfo>> constructionMap, String liningCode) {
+            Map<String, List<MdmConstructionInfo>> constructionMap, String paddingCode) {
         for (List<MdmConstructionInfo> constructions : constructionMap.values()) {
             for (MdmConstructionInfo c : constructions) {
-                if (liningCode.equals(c.getInsideCode())) {
+                if (paddingCode.equals(c.getInsideCode())) {
                     return c;
                 }
             }
@@ -767,7 +1043,7 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
         return null;
     }
 
-    private Map<String, BigDecimal> calcPaddingMonthSurplus(List<MpMonthPlanMonitor> monthPlanMonitors,
+    private Map<String, BigDecimal> calcLiningMonthSurplus(List<MpMonthPlanMonitor> monthPlanMonitors,
             Map<String, List<MdmConstructionInfo>> constructionMap, Map<String, BigDecimal> maxShiftConsume,
             int exceedShifts) {
         if (CollectionUtils.isEmpty(monthPlanMonitors)) {
@@ -784,24 +1060,24 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
                 if (construction == null) {
                     continue;
                 }
-                String liningCode = construction.getInsideCode();
-                if (result.containsKey(liningCode)) {
+                String paddingCode = construction.getInsideCode();
+                if (result.containsKey(paddingCode)) {
                     continue;
                 }
 
                 // 计算内衬月度剩余量 = 月剩余量 × 单耗
-                BigDecimal unitConsume = construction.getPaddingLength() != null ? construction.getPaddingLength()
+                BigDecimal unitConsume = construction.getInsideLength() != null ? construction.getInsideLength()
                         : BigDecimal.ONE;
                 BigDecimal paddingRemaining = BigDecimal
                         .valueOf(monitor.getLhMargin() != null ? monitor.getLhMargin() : 0).multiply(unitConsume);
 
                 // 预估值不得超过月剩余量
-                BigDecimal maxShift = maxShiftConsume.getOrDefault(liningCode, BigDecimal.ZERO);
+                BigDecimal maxShift = maxShiftConsume.getOrDefault(paddingCode, BigDecimal.ZERO);
                 BigDecimal estimatedTotal = maxShift.multiply(BigDecimal.valueOf(exceedShifts));
                 if (estimatedTotal.compareTo(paddingRemaining) > 0) {
                     estimatedTotal = paddingRemaining;
                 }
-                result.put(liningCode, estimatedTotal);
+                result.put(paddingCode, estimatedTotal);
                 break;
             }
         }
@@ -810,9 +1086,9 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
 
     /**
      * 计算内衬月度剩余量（原始值，不按超出班次截断）
-     * <p>返回 Map<liningCode, paddingRemaining>，paddingRemaining = lhMargin × unitConsume</p>
+     * <p>返回 Map<paddingCode, paddingRemaining>，paddingRemaining = lhMargin × unitConsume</p>
      */
-    private Map<String, BigDecimal> calcRawPaddingRemaining(List<MpMonthPlanMonitor> monthPlanMonitors,
+    private Map<String, BigDecimal> calcRawLiningRemaining(List<MpMonthPlanMonitor> monthPlanMonitors,
             Map<String, List<MdmConstructionInfo>> constructionMap) {
         if (CollectionUtils.isEmpty(monthPlanMonitors)) {
             return Collections.emptyMap();
@@ -826,15 +1102,15 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
                 if (construction == null) {
                     continue;
                 }
-                String liningCode = construction.getInsideCode();
-                if (result.containsKey(liningCode)) {
+                String paddingCode = construction.getInsideCode();
+                if (result.containsKey(paddingCode)) {
                     continue;
                 }
-                BigDecimal unitConsume = construction.getPaddingLength() != null ? construction.getPaddingLength()
+                BigDecimal unitConsume = construction.getInsideLength() != null ? construction.getInsideLength()
                         : BigDecimal.ONE;
                 BigDecimal paddingRemaining = BigDecimal
                         .valueOf(monitor.getLhMargin() != null ? monitor.getLhMargin() : 0).multiply(unitConsume);
-                result.put(liningCode, paddingRemaining);
+                result.put(paddingCode, paddingRemaining);
                 break;
             }
         }
@@ -844,54 +1120,129 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
     /**
      * 构建内衬需求清单
      */
-    private List<NcPaddingDemand> buildDemandList(Set<String> liningCodes,
-            List<CxScheduleResult> cxScheduleList, Map<String, BigDecimal> effectiveStockMap,
-            Map<String, List<MdmConstructionInfo>> constructionMap, Set<String> newSpecliningCodes,
+    private List<NcLiningDemand> buildDemandList(Set<String> liningCodes,
+            NcScheduleContext context, Map<String, BigDecimal> effectiveStockMap,
+            Set<String> newSpecliningCodes,
             BigDecimal standardCurlLength) {
-        List<NcPaddingDemand> demandList = new ArrayList<>();
+        List<NcLiningDemand> demandList = new ArrayList<>();
+
+        Map<String, List<MdmConstructionInfo>> constructionMap = context.getConstructionMap();
 
         // 收集各规格的总消耗量和最早需求时间
-        for (String liningCode : liningCodes) {
-            NcPaddingDemand demand = new NcPaddingDemand();
-            demand.setLiningCode(liningCode);
+        for (String paddingCode : liningCodes) {
+            NcLiningDemand demand = new NcLiningDemand();
+            demand.setLiningCode(paddingCode);
 
             // 从施工信息获取单耗、胶料、内衬物料名等（取第一个有效版本）
-            MdmConstructionInfo firstConstruction = this.getFirstValidConstruction(constructionMap, liningCode);
+            MdmConstructionInfo firstConstruction = this.getFirstValidConstruction(constructionMap, paddingCode);
             if (firstConstruction != null) {
-                demand.setUnitConsume(firstConstruction.getPaddingLength() != null
-                        ? firstConstruction.getPaddingLength() : BigDecimal.ONE);
+                demand.setUnitConsume(firstConstruction.getInsideLength() != null
+                        ? firstConstruction.getInsideLength() : BigDecimal.ONE);
                 demand.setConstructionCode(firstConstruction.getConstructionCode());
-                demand.setProductionStatus(firstConstruction.getProductionStage());
-                demand.setLiningName(firstConstruction.getInsideCode());
+                demand.setLiningName(firstConstruction.getInsideName());
                 demand.setGlueCode(firstConstruction.getInsideRubber());
             }
 
-            // 判断是否已收尾
-            demand.setTailFinished(
-                    NcEngineConstants.CX_PRODUCTION_STATUS_FINISHED.equals(demand.getProductionStatus()));
-
-            // 判断是否新规格
-            demand.setNewSpec(newSpecliningCodes.contains(liningCode));
+            // 判断是否新规格：15日内未排产且当前库存为0
+            // BigDecimal stock = effectiveStockMap.getOrDefault(paddingCode, BigDecimal.ZERO);
+            demand.setNewSpec(newSpecliningCodes.contains(paddingCode));
+                    // && stock.compareTo(BigDecimal.ZERO) <= 0);
 
             // 计算所有班次的总消耗量（从成型计划动态计算）
             BigDecimal totalConsume = BigDecimal.ZERO;
             for (int i = 1; i <= NcEngineConstants.CX_SHIFT_COUNT; i++) {
                 totalConsume = totalConsume.add(
-                        this.calcShiftConsume(cxScheduleList, constructionMap, liningCode, i));
+                        this.calcShiftConsume(context, paddingCode, i));
             }
-            BigDecimal effectiveStock = effectiveStockMap.getOrDefault(liningCode, BigDecimal.ZERO);
+            BigDecimal effectiveStock = effectiveStockMap.getOrDefault(paddingCode, BigDecimal.ZERO);
             BigDecimal netDemand = totalConsume.subtract(effectiveStock);
-            if (netDemand.compareTo(BigDecimal.ZERO) < 0) {
+            if (BigDecimalUtils.ltZero(netDemand)) {
                 netDemand = BigDecimal.ZERO;
             }
             demand.setRemainingDemand(netDemand);
             demand.setIncomingInventory(effectiveStock);
             demand.setTrolleyCapacity(standardCurlLength);
-            demand.setNeedProduce(netDemand.compareTo(BigDecimal.ZERO) > 0);
+            demand.setNeedProduce(BigDecimalUtils.gtZero(netDemand));
 
             demandList.add(demand);
         }
         return demandList;
+    }
+
+    /**
+     * 判断使用该内衬的所有成型计划是否都已收尾
+     * <p>
+     * 遍历成型计划列表，找到使用该内衬的所有成型计划，
+     * 检查每个成型计划 1 班到供应窗口结束班次（windowEndClass）之间的系统原因分析或手动原因分析是否包含收尾关键字，
+     * 任意一个班包含即表示该成型计划已收尾。
+     * 必须所有成型计划都收尾，该规格内衬才算收尾。
+     * </p>
+     *
+     * @param context     排产上下文（含成型计划列表及参数）
+     * @param paddingCode 内衬编码
+     * @param windowEndClass 供应窗口结束班次（含，1~8）
+     * @return true 表示所有使用该内衬的成型计划都已收尾
+     */
+    private boolean isAllFormingPlansFinished(NcScheduleContext context, String paddingCode, int windowEndClass) {
+        List<CxScheduleResult> cxScheduleList = context.getCxScheduleList();
+        if (CollectionUtils.isEmpty(cxScheduleList)) {
+            return false;
+        }
+        // 从参数中获取收尾关键字，默认"收尾"
+        NcParams param = context.getParamsMap() != null
+                ? context.getParamsMap().get(NcEngineConstants.PARAM_CX_ANALYSIS_CLOSEOUT_KEYWORD)
+                : null;
+        String keyword = (param != null && StringUtils.isNotEmpty(param.getParamValue()))
+                ? param.getParamValue()
+                : "收尾";
+
+        boolean hasMatched = false;
+        for (CxScheduleResult cx : cxScheduleList) {
+            // 遍历各班次检查是否使用了该内衬
+            for (int shiftIndex = 1; shiftIndex <= NcEngineConstants.CX_SHIFT_COUNT; shiftIndex++) {
+                MdmConstructionInfo construction = this.resolveConstructionForShift(cx, shiftIndex, context);
+                if (construction != null && paddingCode.equals(construction.getInsideCode())) {
+                    hasMatched = true;
+                    // 检查该成型计划 1~windowEndClass 班的原因分析是否包含收尾关键字
+                    if (!isCxPlanFinishedByAnalysis(cx, keyword, windowEndClass)) {
+                        return false;
+                    }
+                    break; // 该成型计划已匹配，无需继续检查其他班次
+                }
+            }
+        }
+        // 没有找到使用该内衬的成型计划，视为未收尾
+        return hasMatched;
+    }
+
+    /**
+     * 判断单个成型计划是否已收尾（根据各班原因分析字段判断）
+     * <p>
+     * 遍历 1 班到供应窗口结束班次（windowEndClass）的系统原因分析和手动原因分析字段，
+     * 任意一个班包含收尾关键字即视为收尾。
+     * </p>
+     *
+     * @param cx             成型计划
+     * @param keyword        收尾关键字
+     * @param windowEndClass 供应窗口结束班次（含，1~8）
+     * @return true 表示该成型计划已收尾
+     */
+    private boolean isCxPlanFinishedByAnalysis(CxScheduleResult cx, String keyword, int windowEndClass) {
+        for (int shiftIndex = 1; shiftIndex <= windowEndClass; shiftIndex++) {
+            // 检查系统原因分析
+            String sysAnalysisField = String.format(NcEngineConstants.CLASS_ANALYSIS_FIELD, shiftIndex);
+            String sysAnalysis = (String) cx.getFieldValueByFieldName(sysAnalysisField);
+            if (sysAnalysis != null && sysAnalysis.contains(keyword)) {
+                return true;
+            }
+            // 检查手动输入原因分析
+            String inputAnalysisField = String.format(NcEngineConstants.CLASS_ANALYSIS_INPUT_FIELD, shiftIndex);
+            String inputAnalysis = (String) cx.getFieldValueByFieldName(inputAnalysisField);
+            if (inputAnalysis != null && inputAnalysis.contains(keyword)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     // ==================== 步骤4：选择机台 ====================
@@ -915,14 +1266,14 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
     /**
      * 关联机台分配 策略：优先填满一个机台，产能不足再拆分
      */
-    private void assignMachine(List<NcPaddingDemand> demandList, Map<String, NcMachineInfo> machineMap,
+    private void assignMachine(List<NcLiningDemand> demandList, Map<String, NcMachineInfo> machineMap,
             List<NcSpecifyMachine> specifyMachineList) {
-        // 整理定点机台关系 Map<liningCode, List<定点机台>>
+        // 整理定点机台关系 Map<paddingCode, List<定点机台>>
         Map<String, List<NcSpecifyMachine>> specifyMap = specifyMachineList.stream()
                 .filter(s -> NcEngineConstants.JOB_TYPE_FORBIDDEN.equals(s.getJobType()))
                 .collect(Collectors.groupingBy(NcSpecifyMachine::getLiningCode));
 
-        for (NcPaddingDemand demand : demandList) {
+        for (NcLiningDemand demand : demandList) {
             List<NcSpecifyMachine> machines = specifyMap.get(demand.getLiningCode());
             if (machines == null || machines.isEmpty()) {
                 // 未配置定点机台，默认使用所有启用的机台
@@ -932,7 +1283,7 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
 
             // 按生产线优先，备用线其次
             List<NcSpecifyMachine> productionLines = machines.stream()
-                    .filter(s -> NcEngineConstants.LINE_TYPE_PRODUCTION.equals(s.getLineType()))
+                    .filter(m -> NcEngineConstants.LINE_TYPE_PRODUCTION.equals(m.getLineType()))
                     .collect(Collectors.toList());
             List<NcSpecifyMachine> backupLines = machines.stream()
                     .filter(m -> NcEngineConstants.LINE_TYPE_BACKUP.equals(m.getLineType()))
@@ -1006,28 +1357,45 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
     /**
      * 执行排产
      */
-    private List<NcScheduleResult> executeSchedule(List<NcPaddingDemand> demandList, NcScheduleContext context) {
-        List<NcScheduleResult> results = new ArrayList<>();
+    private List<NcScheduleResult> executeSchedule(List<NcLiningDemand> demandList, NcScheduleContext context) {
         Map<String, BigDecimal> handoverInventory = context.getHandoverInventory();
         Map<String, NcMachineInfo> machineMap = context.getMachineMap();
 
-        // 供应窗口班次对应的消耗量（成型计划班次消耗量）
-        // 用于检查库存是否满足供应窗口内需求
-
-        // 存储各机台每个班次的剩余产能
-        // Map<machineCode, Map<shiftIndex, remainingCapacity>>
+        // 有效产能矩阵 Map<machineCode, Map<shiftIndex, remainingCapacity>>
         Map<String, Map<Integer, BigDecimal>> capacityMatrix = calcEffectiveCapacity(machineMap, context);
 
-        // 计算每班的台车工装约束上限（班次总产量上限）
+        // 每班台车工装约束上限
         BigDecimal shiftTrolleyLimit = this.calcShiftTrolleyLimit(context);
         if (shiftTrolleyLimit != null) {
             log.info("班次台车约束上限：{} 米", shiftTrolleyLimit);
         }
 
-        // 存储各机台各班的最后生产规格
-        Map<String, String> lastSpecInShift = new HashMap<>();
+        // 卷曲参数
+        BigDecimal trolleyStdCurlLength = this.getParamAsDecimal(context, NcEngineConstants.PARAM_STANDARD_CRIMP_LENGTH);
+        BigDecimal trolleyFullRate = this.getParamAsDecimal(context, NcEngineConstants.PARAM_TROLLEY_FULL_RATE);
+        // 数据库存储百分比值（如 80），转换为小数（0.8）
+        trolleyFullRate = BigDecimalUtils.percentages2Decimals(trolleyFullRate);
+        if (BigDecimalUtils.leZero(trolleyFullRate)) {
+            trolleyFullRate = BigDecimal.ONE;
+        }
 
-        // 存储排产结果
+        // 各机台各班的最后生产规格
+        Map<String, String> lastSpecInShift = new HashMap<>();
+        // 首班（第1班）继承昨日内衬第3班最后生产的规格（用于规格续作判断，避免首班无上一规格导致切换损失异常）
+        List<NcScheduleResult> prevDayResults = context.getPrevDayScheduleResults();
+        Map<String, Integer> machineMaxSeq = new HashMap<>();
+        for (NcScheduleResult r : prevDayResults) {
+            String mc = r.getMachineCode();
+            if (StringUtils.isEmpty(mc)) continue;
+            Integer seq = r.getClass3Sequence();
+            if (seq == null || seq <= 0) continue;
+            Integer currentMax = machineMaxSeq.get(mc);
+            if (currentMax == null || seq > currentMax) {
+                machineMaxSeq.put(mc, seq);
+                lastSpecInShift.put(mc, r.getLiningCode());
+            }
+        }
+        // 排产结果
         Map<String, NcScheduleResult> resultMap = new HashMap<>();
 
         // 遍历6个班次
@@ -1036,209 +1404,450 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
             context.appendLog("");
             context.appendLog("===== 班次 {0} =====", shiftIndex);
 
-            // 班次开始前：记录各规格接班库存
-            context.appendLog("--- 班次 {0} 接班库存 ---", shiftIndex);
-            for (NcPaddingDemand spec : demandList) {
-                BigDecimal inv = handoverInventory.getOrDefault(spec.getLiningCode(), BigDecimal.ZERO);
-                context.appendLog("  规格 {0}：接班库存 {1}", spec.getLiningCode(), inv);
-            }
+            // 班次准备：重置标志、记录库存、需求判定
+            this.prepareShift(demandList, shiftIndex, context, handoverInventory);
 
-            // 班次开始前：检查各规格接班库存是否满足供应窗口内的成型消耗量
-            this.checkDemandForShift(demandList, shiftIndex, context);
-
-            // 记录 checkDemandForShift 后的需求判定结果
-            context.appendLog("--- 班次 {0} 需求判定结果 ---", shiftIndex);
-            for (NcPaddingDemand spec : demandList) {
-                String needProduceStr = spec.isNeedProduce() ? "需要排产" : "库存充足不排产";
-                if (spec.isNeedProduce()) {
-                    context.appendLog("  规格 {0}：可覆盖班次={1}，触发阈值≤{2}，剩余待排={3}",
-                            spec.getLiningCode(), spec.getCoverableShiftCount(),
-                            this.getParamAsDecimal(context, NcEngineConstants.PARAM_SCHEDULE_THRESHOLD).intValue(),
-                            spec.getRemainingDemand());
-                } else {
-                    context.appendLog("  规格 {0}：{1}，可覆盖班次={2}，触发阈值≤{3}",
-                            spec.getLiningCode(), needProduceStr, spec.getCoverableShiftCount(),
-                            this.getParamAsDecimal(context, NcEngineConstants.PARAM_SCHEDULE_THRESHOLD).intValue());
-                }
-            }
-
-            // 计算本班实际可用的产能上限 = min(班次总产量上限, 所有开机机台产能之和)
-            BigDecimal shiftTotalCapacity = this.calcShiftTotalCapacity(capacityMatrix, shiftIndex,
+            // 计算本班实际可用的产能上限
+            BigDecimal shiftRemainingCapacity = this.calcShiftTotalCapacity(capacityMatrix, shiftIndex,
                     shiftTrolleyLimit);
-            BigDecimal shiftRemainingCapacity = shiftTotalCapacity;
-            context.appendLog("班次 {0} 总产能上限：{1}", shiftIndex, shiftTotalCapacity);
+            BigDecimal shiftRemainingTrolleys = calcRemainingTrolleys(context, handoverInventory);
+            context.appendLog("班次 {0} 总产能上限：{1}，初始剩余台车数：{2}",
+                    shiftIndex, shiftRemainingCapacity, shiftRemainingTrolleys);
 
             // 遍历所有机台
             for (Map.Entry<String, NcMachineInfo> machineEntry : machineMap.entrySet()) {
-                String machineCode = machineEntry.getKey();
-                NcMachineInfo machine = machineEntry.getValue();
-
-                // 机台本班是否可用
-                if (!this.isMachineAvailable(machine, shiftIndex, context.getShiftClassMap())) {
-                    log.trace("机台 {} 班次 {} 不可用", machineCode, shiftIndex);
-                    continue;
-                }
-
-                // 获取本班该机台的剩余产能
-                Map<Integer, BigDecimal> machineCapacity = capacityMatrix.get(machineCode);
-                if (machineCapacity == null) {
-                    continue;
-                }
-                BigDecimal remainingCapacity = machineCapacity.get(shiftIndex);
-                if (remainingCapacity == null || remainingCapacity.compareTo(BigDecimal.ZERO) <= 0) {
-                    continue;
-                }
-
-                // 获取本机台本班待排产规格
-                List<NcPaddingDemand> pendingSpecs = getSpecsByMachine(machineCode, demandList);
-
-                // 获取上一班最后生产的规格
-                String lastSpecCode = lastSpecInShift.get(machineCode);
-
-                // 排序前记录待排产规格
-                context.appendLog("--- 机台 {0}（产能={1}，上一规格={2}）---",
-                        machineCode, remainingCapacity, lastSpecCode != null ? lastSpecCode : "无");
-
-                // 优先级排序
-                pendingSpecs.sort(buildPriorityComparator(demandList, lastSpecCode, context, shiftIndex));
-
-                // 记录排序后的待排产规格及原因
-                StringJoiner priorityJoiner = new StringJoiner(" → ");
-                for (NcPaddingDemand ps : pendingSpecs) {
-                    if (ps.isNeedProduce() && ps.getRemainingDemand() != null
-                            && ps.getRemainingDemand().compareTo(BigDecimal.ZERO) > 0) {
-                        priorityJoiner.add(ps.getLiningCode());
-                    }
-                }
-                String priorityOrderStr = priorityJoiner.toString();
-                if (!priorityOrderStr.isEmpty()) {
-                    context.appendLog("  优先级排序：{0}", priorityOrderStr);
-                }
-                // 记录各规格的库消比
-                for (NcPaddingDemand ps : pendingSpecs) {
-                    BigDecimal ratio = this.calcStockConsumeRatio(ps, context);
-                    context.appendLog("    规格 {0}：剩余需求={1}，库消比={2}，胶料={3}",
-                            ps.getLiningCode(),
-                            (ps.getRemainingDemand() != null ? ps.getRemainingDemand() : BigDecimal.ZERO),
-                            (ratio != null ? ratio : "N/A"),
-                            ps.getGlueCode() != null ? ps.getGlueCode() : "无");
-                }
-
-                // 机台剩余产能不能超过本班台车约束的剩余量
-                remainingCapacity = remainingCapacity.min(shiftRemainingCapacity);
-
-                // 逐个规格安排排产
-                for (NcPaddingDemand spec : pendingSpecs) {
-                    if (!spec.isNeedProduce() || spec.getRemainingDemand() == null
-                            || spec.getRemainingDemand().compareTo(BigDecimal.ZERO) <= 0) {
-                        continue;
-                    }
-                    if (remainingCapacity.compareTo(BigDecimal.ZERO) <= 0) {
-                        break; // 本班该机台产能已用完
-                    }
-
-                    // 计算机台切换损失
-                    BigDecimal mouthPlateSwitchTime = this.getParamAsDecimal(context, NcEngineConstants.PARAM_MOUTH_PLATE_SWITCH_TIME);
-                    BigDecimal switchLoss = this.calcSwitchLoss(machine, lastSpecCode, spec, mouthPlateSwitchTime);
-
-                    // 生产量计算
-                    BigDecimal produceQty = calcProduceQty(spec, remainingCapacity.subtract(switchLoss), context);
-                    if (produceQty == null || produceQty.compareTo(BigDecimal.ZERO) <= 0) {
-                        // 记录放不下的原因
-                        context.appendLog("    规格 {0}：剩余产能不足以生产至少1台车，跳过", spec.getLiningCode());
-                        continue; // 放不下此规格
-                    }
-
-                    // 记录规格选择和满足的条件
-                    StringJoiner conditionJoiner = new StringJoiner("、");
-                    conditionJoiner.add("有缺口");
-                    if (lastSpecCode != null) {
-                        boolean isContinue = spec.getLiningCode().equals(lastSpecCode);
-                        if (isContinue) {
-                            conditionJoiner.add("续做");
-                        }
-                        boolean glueMatch = spec.getGlueCode() != null && lastSpecCode != null
-                                && spec.getGlueCode().equals(findSpecByCode(demandList, lastSpecCode) != null
-                                        ? findSpecByCode(demandList, lastSpecCode).getGlueCode() : null);
-                        if (glueMatch) {
-                            conditionJoiner.add("胶料相同");
-                        }
-                    }
-
-                    context.appendLog("  选择规格 {0}：{1}，切换损失={2}，计划生产={3}",
-                            spec.getLiningCode(), conditionJoiner.toString(), switchLoss, produceQty);
-
-                    // 记录排产结果
-                    this.recordSchedule(resultMap, spec, shiftIndex, produceQty, machineCode, context);
-
-                    // 扣减剩余需求
-                    spec.setRemainingDemand(spec.getRemainingDemand().subtract(produceQty));
-
-                    // 更新最后规格
-                    lastSpecCode = spec.getLiningCode();
-                    lastSpecInShift.put(machineCode, lastSpecCode);
-
-                    // 扣减产能
-                    remainingCapacity = remainingCapacity.subtract(produceQty).subtract(switchLoss);
-                    machineCapacity.put(shiftIndex, remainingCapacity);
-
-                    // 扣减本班台车约束剩余量
-                    shiftRemainingCapacity = shiftRemainingCapacity.subtract(produceQty);
-                    if (shiftRemainingCapacity.compareTo(BigDecimal.ZERO) < 0) {
-                        shiftRemainingCapacity = BigDecimal.ZERO;
-                    }
-                }
-                context.appendLog("  机台 {0} 班次 {1} 剩余产能：{2}", machineCode, shiftIndex,
-                        remainingCapacity.max(BigDecimal.ZERO));
+                SupplementaryResult machineResult = this.processMachineInShift(
+                        machineEntry.getValue(), machineEntry.getKey(),
+                        shiftIndex, demandList, resultMap, capacityMatrix, lastSpecInShift,
+                        shiftRemainingCapacity, shiftRemainingTrolleys,
+                        trolleyStdCurlLength, trolleyFullRate, context);
+                shiftRemainingCapacity = machineResult.getShiftRemainingCapacity();
+                shiftRemainingTrolleys = machineResult.getShiftRemainingTrolleys();
             }
 
-            // 本班排产完毕后，计算各规格交班库存
-            // 先保存本班接班库存快照，用于日志显示（避免被后续 clamp 修改后无法反推准确值）
-            Map<String, BigDecimal> shiftStartInventory = new HashMap<>();
-            for (NcPaddingDemand spec : demandList) {
-                shiftStartInventory.put(spec.getLiningCode(),
-                        handoverInventory.getOrDefault(spec.getLiningCode(), BigDecimal.ZERO));
-            }
-            for (NcPaddingDemand spec : demandList) {
-                BigDecimal produceQtyThisShift = this.getScheduledQty(resultMap, spec.getLiningCode(), shiftIndex);
-                // 本班成型消耗量（从成型计划动态计算）
-                BigDecimal consumeQtyThisShift = this.calcShiftConsume(
-                        context.getCxScheduleList(), context.getConstructionMap(),
-                        spec.getLiningCode(), shiftIndex);
-                BigDecimal incomingInv = handoverInventory.getOrDefault(spec.getLiningCode(), BigDecimal.ZERO);
-                BigDecimal newInventory = incomingInv.add(produceQtyThisShift).subtract(consumeQtyThisShift);
-                if (newInventory.compareTo(BigDecimal.ZERO) < 0) {
-                    newInventory = BigDecimal.ZERO;
-                }
-                handoverInventory.put(spec.getLiningCode(), newInventory);
-            }
+            // 班次结束：计算各规格交班库存
+            this.calcEndOfShiftInventory(demandList, shiftIndex, context, resultMap, handoverInventory);
+        }
 
-            // 记录各班交班库存
-            context.appendLog("--- 班次 {0} 交班库存 ---", shiftIndex);
-            for (NcPaddingDemand spec : demandList) {
-                BigDecimal endInv = handoverInventory.getOrDefault(spec.getLiningCode(), BigDecimal.ZERO);
-                BigDecimal startInv = shiftStartInventory.getOrDefault(spec.getLiningCode(), BigDecimal.ZERO);
-                BigDecimal produced = this.getScheduledQty(resultMap, spec.getLiningCode(), shiftIndex);
-                BigDecimal consumed = this.calcShiftConsume(
-                        context.getCxScheduleList(), context.getConstructionMap(),
-                        spec.getLiningCode(), shiftIndex);
-                context.appendLog("  规格 {0}：接班={1} + 生产={2} - 消耗={3} = 交班={4}",
-                        spec.getLiningCode(),
-                        startInv, produced, consumed, endInv);
-            }
+        // 转换排产结果
+        return this.buildScheduleResults(demandList, resultMap, context);
+    }
 
-            // 检查终止条件：所有需求已排完
-            boolean allMet = demandList.stream().allMatch(
-                    d -> d.getRemainingDemand() == null || d.getRemainingDemand().compareTo(BigDecimal.ZERO) <= 0);
-            if (allMet) {
-                log.info("所有内衬需求已排完，提前终止排产（班次 {}/{}）", shiftIndex, NcEngineConstants.SHIFT_COUNT);
-                context.appendLog("所有内衬需求已排完，提前终止排产（班次 {0}/{1}）", shiftIndex, NcEngineConstants.SHIFT_COUNT);
+    // ===== 以下为 executeSchedule 的提取方法 =====
+
+    /**
+     * 记录 checkDemandForShift 后的需求判定结果日志
+     */
+    private void logDemandDecision(List<NcLiningDemand> demandList, NcScheduleContext context, int shiftIndex) {
+        context.appendLog("--- 班次 {0} 需求判定结果 ---", shiftIndex);
+        for (NcLiningDemand spec : demandList) {
+            String needProduceStr = spec.isNeedProduce() ? "需要排产" : "库存充足不排产";
+            String isTailStr = spec.isTailFinished() ? "，收尾" : "";
+            String tailNote = "";
+            if (spec.isTailFinished() && spec.getLossRatePercent() != null
+                    && BigDecimalUtils.gtZero(spec.getLossRatePercent())
+                    && spec.getPreLossRateDemand() != null) {
+                BigDecimal rateFactor = BigDecimal.ONE.add(
+                        BigDecimalUtils.percentages2Decimals(spec.getLossRatePercent()));
+                tailNote = MessageFormat.format(" (收尾，{0} × {1}%)",
+                        spec.getPreLossRateDemand().setScale(2, RoundingMode.HALF_UP),
+                        BigDecimalUtils.decimals2Percentages(rateFactor).setScale(0, RoundingMode.HALF_UP));
+            }
+            if (BigDecimalUtils.gtZero(spec.getRemainingDemand())) {
+                context.appendLog("  规格 {0}：{1}{2}，可覆盖班次={3}，触发阈值≤{4}，剩余待排={5}{6}",
+                        context.getLiningNameByCode(spec.getLiningCode()), needProduceStr, isTailStr, spec.getCoverableShiftCount(),
+                        this.getParamAsDecimal(context, NcEngineConstants.PARAM_SCHEDULE_THRESHOLD).intValue(),
+                        spec.getRemainingDemand(), tailNote);
+            } else {
+                context.appendLog("  规格 {0}：{1}{2}，可覆盖班次={3}，触发阈值≤{4}",
+                        context.getLiningNameByCode(spec.getLiningCode()), needProduceStr, isTailStr, spec.getCoverableShiftCount(),
+                        this.getParamAsDecimal(context, NcEngineConstants.PARAM_SCHEDULE_THRESHOLD).intValue());
+            }
+        }
+    }
+
+    /**
+     * 当班多规格接班库存不足时，前 n-1 个标记为供应缺口填补模式
+     * <p>补缺口模式：按供应缺口 + 安全水位(SYS1401005)排产，不补供应窗口净需求</p>
+     */
+    private void markMultiSpecGapMode(List<NcLiningDemand> demandList, NcScheduleContext context, int shiftIndex) {
+        List<NcLiningDemand> needProduceSpecs = demandList.stream()
+                .filter(s -> s.getIncomingInventory() != null && s.getRemainingDemand() != null
+                        && s.getIncomingInventory().compareTo(s.getRemainingDemand()) < 0)
+                .collect(Collectors.toList());
+        if (needProduceSpecs.size() >= 2) {
+            needProduceSpecs.sort(buildPriorityComparator(demandList, null, context, shiftIndex));
+            for (int i = 0; i < needProduceSpecs.size() - 1; i++) {
+                needProduceSpecs.get(i).setSupplyGapMode(true);
+            }
+            context.appendLog("当班多规格接班库存不足：共 {0} 个规格需补量，前 {1} 个按供应缺口+安全水位排产",
+                    needProduceSpecs.size(), needProduceSpecs.size() - 1);
+        }
+    }
+
+    /**
+     * 主循环排产后机台仍有剩余产能时，进行二次补量
+     * <p>第一轮：supplyGapMode 规格各补 SCHEDULE_THRESHOLD 班消耗量</p>
+     * <p>第二轮：所有规格补满供应窗口需求量</p>
+     *
+     * @return 补量后的班次状态（shiftRemainingCapacity + shiftRemainingTrolleys）
+     */
+    private SupplementaryResult executeSupplementaryProduction(
+            List<NcLiningDemand> pendingSpecs, int shiftIndex, String machineCode,
+            Map<String, NcScheduleResult> resultMap, Map<String, String> lastSpecInShift,
+            Map<Integer, BigDecimal> machineCapacity, BigDecimal shiftRemainingCapacity,
+            BigDecimal shiftRemainingTrolleys, BigDecimal trolleyStdCurlLength,
+            BigDecimal trolleyFullRate, NcScheduleContext context) {
+
+        BigDecimal remainingCapacity = machineCapacity.get(shiftIndex);
+        if (BigDecimalUtils.leZero(remainingCapacity)
+                || BigDecimalUtils.leZero(shiftRemainingTrolleys)) {
+            return new SupplementaryResult(shiftRemainingCapacity, shiftRemainingTrolleys);
+        }
+
+        int scheduleThreshold = this.getParamAsDecimal(context, NcEngineConstants.PARAM_SCHEDULE_THRESHOLD).intValue();
+
+        // 第一轮补量：对 supplyGapMode=true 的规格，各补 SCHEDULE_THRESHOLD 班消耗量
+        int firstFormingClass = this.getFormingClassByShiftIndex(shiftIndex, context);
+        if (firstFormingClass < 1) {
+            firstFormingClass = shiftIndex + (context.getFormingShiftOffset() != null ? context.getFormingShiftOffset() : 0);
+        }
+        context.appendLog("  --- 补量第一轮：供应缺口规格各补 {0} 班 ---", scheduleThreshold);
+        for (NcLiningDemand spec : pendingSpecs) {
+            if (BigDecimalUtils.leZero(remainingCapacity)
+                    || BigDecimalUtils.leZero(shiftRemainingTrolleys)) {
                 break;
+            }
+            if (!spec.isSupplyGapMode()) continue;
+            if (BigDecimalUtils.leZero(spec.getRemainingDemand())) continue;
+
+            // 计算 SCHEDULE_THRESHOLD 个成型班次的消耗量
+            BigDecimal thresholdConsume = BigDecimal.ZERO;
+            for (int fc = firstFormingClass + 1; fc <= firstFormingClass + scheduleThreshold; fc++) {
+                if (fc > NcEngineConstants.CX_SHIFT_COUNT) break;
+                thresholdConsume = thresholdConsume.add(this.calcShiftConsume(context, spec.getLiningCode(), fc));
+            }
+            // 补量上限 = min(阈值消耗量, 剩余需求, 剩余产能)
+            BigDecimal maxProduce = thresholdConsume.min(spec.getRemainingDemand()).min(remainingCapacity);
+            if (BigDecimalUtils.leZero(maxProduce)) continue;
+
+            // 向上取整到整台车
+            BigDecimal trolleyCapacity = spec.getTrolleyCapacity();
+            if (BigDecimalUtils.leZero(trolleyCapacity)) continue;
+            int maxTrolleys = remainingCapacity.divide(trolleyCapacity, 0, RoundingMode.FLOOR).intValue();
+            int needTrolleys = maxProduce.divide(trolleyCapacity, 0, RoundingMode.CEILING).intValue();
+            int actualTrolleys = Math.min(maxTrolleys, needTrolleys);
+            if (actualTrolleys <= 0) continue;
+
+            BigDecimal produceQty = BigDecimal.valueOf(actualTrolleys).multiply(trolleyCapacity);
+            if (BigDecimalUtils.leZero(produceQty)) continue;
+
+            // 扣减剩余需求
+            spec.setRemainingDemand(spec.getRemainingDemand().subtract(produceQty));
+
+            // 记录排产结果
+            this.recordSchedule(resultMap, spec, shiftIndex, produceQty, machineCode, context);
+            context.appendLog("  补量规格 {0}：生产 {1}，剩余待排={2}",
+                    context.getLiningNameByCode(spec.getLiningCode()), produceQty, spec.getRemainingDemand());
+
+            lastSpecInShift.put(machineCode, spec.getLiningCode());
+            remainingCapacity = remainingCapacity.subtract(produceQty);
+            machineCapacity.put(shiftIndex, remainingCapacity);
+            shiftRemainingCapacity = shiftRemainingCapacity.subtract(produceQty).max(BigDecimal.ZERO);
+
+            BigDecimal consumedTrolleys = produceQty.divide(trolleyStdCurlLength, 4, RoundingMode.HALF_UP)
+                    .divide(trolleyFullRate, 4, RoundingMode.HALF_UP)
+                    .setScale(0, RoundingMode.FLOOR);
+            shiftRemainingTrolleys = shiftRemainingTrolleys.subtract(consumedTrolleys).max(BigDecimal.ZERO);
+        }
+
+        // 第二轮补量：所有规格补满供应窗口需求量
+        context.appendLog("  --- 补量第二轮：所有规格补满供应窗口 ---");
+        for (NcLiningDemand spec : pendingSpecs) {
+            if (BigDecimalUtils.leZero(remainingCapacity)
+                    || BigDecimalUtils.leZero(shiftRemainingTrolleys)) {
+                break;
+            }
+            // 供应缺口模式规格已在第1轮补量，本轮跳过
+            if (spec.isSupplyGapMode()) continue;
+
+            // 计算供应窗口净需求量
+            BigDecimal windowDemand = this.calcWindowNetDemand(spec, shiftIndex, context);
+            if (BigDecimalUtils.leZero(windowDemand)) continue;
+
+            // 已排产量
+            BigDecimal scheduledQty = this.getScheduledQty(resultMap, spec.getLiningCode(), shiftIndex);
+            BigDecimal remainingWindowDemand = windowDemand.subtract(scheduledQty);
+            if (BigDecimalUtils.leZero(remainingWindowDemand)) continue;
+
+            // 临时设置 remainingDemand 以复用 calcProduceQty
+            BigDecimal oldRemainingDemand = spec.getRemainingDemand();
+            spec.setRemainingDemand(remainingWindowDemand);
+            boolean oldSupplyGapMode = spec.isSupplyGapMode();
+            spec.setSupplyGapMode(false);
+            BigDecimal produceQty = this.calcProduceQty(spec, remainingCapacity, shiftIndex, context);
+            spec.setSupplyGapMode(oldSupplyGapMode);
+            spec.setRemainingDemand(oldRemainingDemand);
+
+            if (BigDecimalUtils.leZero(produceQty)) continue;
+
+            // 记录排产结果
+            this.recordSchedule(resultMap, spec, shiftIndex, produceQty, machineCode, context);
+            context.appendLog("  补量规格 {0}：生产 {1}（窗口剩余={2}）",
+                    context.getLiningNameByCode(spec.getLiningCode()), produceQty, remainingWindowDemand);
+
+            lastSpecInShift.put(machineCode, spec.getLiningCode());
+            remainingCapacity = remainingCapacity.subtract(produceQty);
+            machineCapacity.put(shiftIndex, remainingCapacity);
+            shiftRemainingCapacity = shiftRemainingCapacity.subtract(produceQty).max(BigDecimal.ZERO);
+
+            BigDecimal consumedTrolleys = produceQty.divide(trolleyStdCurlLength, 4, RoundingMode.HALF_UP)
+                    .divide(trolleyFullRate, 4, RoundingMode.HALF_UP)
+                    .setScale(0, RoundingMode.FLOOR);
+            shiftRemainingTrolleys = shiftRemainingTrolleys.subtract(consumedTrolleys).max(BigDecimal.ZERO);
+        }
+
+        machineCapacity.put(shiftIndex, remainingCapacity);
+        return new SupplementaryResult(shiftRemainingCapacity, shiftRemainingTrolleys);
+    }
+
+    /**
+     * 班次准备：重置供应缺口标志、记录接班库存、执行需求判定
+     */
+    private void prepareShift(List<NcLiningDemand> demandList, int shiftIndex, NcScheduleContext context,
+            Map<String, BigDecimal> handoverInventory) {
+        // 重置各规格的供应缺口填补标志（避免跨班次残留）
+        for (NcLiningDemand spec : demandList) {
+            spec.setSupplyGapMode(false);
+        }
+
+        // 记录各规格接班库存
+        context.appendLog("--- 班次 {0} 接班库存 ---", shiftIndex);
+        for (NcLiningDemand spec : demandList) {
+            BigDecimal inv = handoverInventory.getOrDefault(spec.getLiningCode(), BigDecimal.ZERO);
+            context.appendLog("  规格 {0}：接班库存 {1}",
+                    NcScheduleContext.buildDisplayName(spec.getLiningName(), spec.getLiningCode()), inv);
+        }
+
+        // 检查各规格接班库存是否满足供应窗口内的成型消耗量
+        this.checkDemandForShift(demandList, shiftIndex, context);
+        // 记录需求判定结果
+        this.logDemandDecision(demandList, context, shiftIndex);
+        // 多规格不足场景标记
+        this.markMultiSpecGapMode(demandList, context, shiftIndex);
+    }
+
+    /**
+     * 处理单台机在单个班次的排产：可用性检查 → 规格优先级排序 → 逐个分配排产 → 补量
+     *
+     * @return 补后排班次剩余产能和剩余台车数
+     */
+    private SupplementaryResult processMachineInShift(NcMachineInfo machine, String machineCode,
+            int shiftIndex, List<NcLiningDemand> demandList, Map<String, NcScheduleResult> resultMap,
+            Map<String, Map<Integer, BigDecimal>> capacityMatrix, Map<String, String> lastSpecInShift,
+            BigDecimal shiftRemainingCapacity, BigDecimal shiftRemainingTrolleys,
+            BigDecimal trolleyStdCurlLength, BigDecimal trolleyFullRate, NcScheduleContext context) {
+
+        // 机台本班是否可用
+        if (!this.isMachineAvailable(machine, shiftIndex, context.getShiftClassMap())) {
+            log.trace("机台 {} 班次 {} 不可用", machineCode, shiftIndex);
+            return new SupplementaryResult(shiftRemainingCapacity, shiftRemainingTrolleys);
+        }
+
+        // 获取本班该机台的剩余产能
+        Map<Integer, BigDecimal> machineCapacity = capacityMatrix.get(machineCode);
+        if (machineCapacity == null) {
+            return new SupplementaryResult(shiftRemainingCapacity, shiftRemainingTrolleys);
+        }
+        BigDecimal remainingCapacity = machineCapacity.get(shiftIndex);
+        if (BigDecimalUtils.leZero(remainingCapacity)) {
+            return new SupplementaryResult(shiftRemainingCapacity, shiftRemainingTrolleys);
+        }
+
+        // 获取本机台本班待排产规格
+        List<NcLiningDemand> pendingSpecs = getSpecsByMachine(machineCode, demandList);
+        // 获取上一班最后生产的规格
+        String lastSpecCode = lastSpecInShift.get(machineCode);
+
+        // 日志：记录待排产规格
+        String lastSpecName = lastSpecCode != null ? context.getLiningNameByCode(lastSpecCode) : "无";
+        context.appendLog("--- 机台 {0}（产能={1}，上一规格={2}）---",
+                machineCode, remainingCapacity, lastSpecName);
+
+        // 优先级排序
+        pendingSpecs.sort(buildPriorityComparator(demandList, lastSpecCode, context, shiftIndex));
+
+        // 记录排序后的待排产规格
+        StringJoiner priorityJoiner = new StringJoiner(" → ");
+        for (NcLiningDemand ps : pendingSpecs) {
+            if (ps.isNeedProduce() && ps.getRemainingDemand() != null
+                    && BigDecimalUtils.gtZero(ps.getRemainingDemand())) {
+                priorityJoiner.add(context.getLiningNameByCode(ps.getLiningCode()));
+            }
+        }
+        String priorityOrderStr = priorityJoiner.toString();
+        if (!priorityOrderStr.isEmpty()) {
+            context.appendLog("  优先级排序：{0}", priorityOrderStr);
+        }
+        // 记录各规格的库消比
+        for (NcLiningDemand ps : pendingSpecs) {
+            if (!ps.isNeedProduce() || !BigDecimalUtils.gtZero(ps.getRemainingDemand())) {
+                continue;
+            }
+            BigDecimal ratio = this.calcStockConsumeRatio(ps, context);
+            context.appendLog("    规格 {0}：剩余需求={1}，库消比={2}，胶料={3}",
+                    context.getLiningNameByCode(ps.getLiningCode()),
+                    BigDecimalUtils.valueOf(ps.getRemainingDemand()),
+                    ratio != null ? ratio : "N/A",
+                    ps.getGlueCode() != null ? ps.getGlueCode() : "无");
+        }
+
+        // 机台剩余产能不能超过本班台车约束的剩余量
+        remainingCapacity = remainingCapacity.min(shiftRemainingCapacity);
+
+        // 平均（免费）切换次数，超过后才算损失
+        int avgSwitchCount = this.getParamAsInt(context, NcEngineConstants.PARAM_AVG_SWITCH_COUNT, 3);
+        int switchCount = 0;
+        BigDecimal totalSwitchLoss = BigDecimal.ZERO;
+        BigDecimal mouthPlateSwitchTime = this.getParamAsDecimal(context, NcEngineConstants.PARAM_MOUTH_PLATE_SWITCH_TIME);
+
+        // 逐个规格安排排产
+        for (NcLiningDemand spec : pendingSpecs) {
+            if (!spec.isNeedProduce() || spec.getRemainingDemand() == null
+                    || BigDecimalUtils.leZero(spec.getRemainingDemand())) {
+                continue;
+            }
+            if (BigDecimalUtils.leZero(remainingCapacity)) {
+                break;
+            }
+
+            // 计算机台切换损失
+            BigDecimal switchLoss = this.calcSwitchLoss(machine, lastSpecCode, spec, mouthPlateSwitchTime);
+            if (lastSpecCode != null && !lastSpecCode.equals(spec.getLiningCode())) {
+                switchCount++;
+                if (switchCount <= avgSwitchCount) {
+                    switchLoss = BigDecimal.ZERO;
+                }
+            }
+
+            // 生产量计算
+            BigDecimal produceQty = calcProduceQty(spec, remainingCapacity.subtract(switchLoss),
+                    shiftIndex, context);
+            if (BigDecimalUtils.leZero(produceQty)) {
+                context.appendLog("    规格 {0}：剩余产能不足以生产至少1台车，跳过",
+                        context.getLiningNameByCode(spec.getLiningCode()));
+                continue;
+            }
+
+            // 记录规格选择和满足的条件
+            StringJoiner conditionJoiner = new StringJoiner("、");
+            conditionJoiner.add("有缺口");
+            if (lastSpecCode != null) {
+                boolean isContinue = spec.getLiningCode().equals(lastSpecCode);
+                if (isContinue) {
+                    conditionJoiner.add("续做");
+                }
+                boolean glueMatch = spec.getGlueCode() != null && lastSpecCode != null
+                        && spec.getGlueCode().equals(findSpecByCode(demandList, lastSpecCode) != null
+                                ? findSpecByCode(demandList, lastSpecCode).getGlueCode() : null);
+                if (glueMatch) {
+                    conditionJoiner.add("胶料相同");
+                }
+            }
+            context.appendLog("  选择规格 {0}：{1}，切换损失={2}，计划生产={3}",
+                    context.getLiningNameByCode(spec.getLiningCode()), conditionJoiner.toString(),
+                    switchLoss, produceQty);
+            if (spec.isSupplyGapMode()) {
+                context.appendLog("    供应缺口模式：接班库存={0}，计划生产={1}（补本班供应缺口 + 安全水位）",
+                        spec.getIncomingInventory(), produceQty);
+            }
+
+            // 记录排产结果
+            this.recordSchedule(resultMap, spec, shiftIndex, produceQty, machineCode, context);
+
+            // 扣减剩余需求
+            spec.setRemainingDemand(spec.getRemainingDemand().subtract(produceQty));
+
+            // 更新最后规格
+            lastSpecCode = spec.getLiningCode();
+            lastSpecInShift.put(machineCode, lastSpecCode);
+
+            // 扣减产能
+            remainingCapacity = remainingCapacity.subtract(produceQty).subtract(switchLoss);
+            machineCapacity.put(shiftIndex, remainingCapacity);
+
+            // 累计规格切换损耗
+            totalSwitchLoss = totalSwitchLoss.add(switchLoss);
+
+            // 扣减本班台车约束剩余量
+            shiftRemainingCapacity = shiftRemainingCapacity.subtract(produceQty);
+            if (BigDecimalUtils.ltZero(shiftRemainingCapacity)) {
+                shiftRemainingCapacity = BigDecimal.ZERO;
+            }
+
+            // 扣减剩余台车数
+            BigDecimal consumedTrolleys = produceQty.divide(trolleyStdCurlLength, 4, RoundingMode.HALF_UP)
+                    .divide(trolleyFullRate, 4, RoundingMode.HALF_UP)
+                    .setScale(0, RoundingMode.FLOOR);
+            shiftRemainingTrolleys = shiftRemainingTrolleys.subtract(consumedTrolleys);
+            if (BigDecimalUtils.ltZero(shiftRemainingTrolleys)) {
+                shiftRemainingTrolleys = BigDecimal.ZERO;
             }
         }
 
-        // 转换结果为列表
-        for (NcPaddingDemand spec : demandList) {
+        // 补量阶段：主循环排产后机台仍有剩余产能，进行二次补量
+        SupplementaryResult supplResult = this.executeSupplementaryProduction(
+                pendingSpecs, shiftIndex, machineCode, resultMap, lastSpecInShift,
+                machineCapacity, shiftRemainingCapacity, shiftRemainingTrolleys,
+                trolleyStdCurlLength, trolleyFullRate, context);
+        shiftRemainingCapacity = supplResult.getShiftRemainingCapacity();
+        shiftRemainingTrolleys = supplResult.getShiftRemainingTrolleys();
+        remainingCapacity = machineCapacity.get(shiftIndex);
+
+        context.appendLog("  机台 {0} 班次 {1} 剩余产能：{2}，剩余台车数：{3}，规格切换损耗：{4}",
+                machineCode, shiftIndex,
+                remainingCapacity.max(BigDecimal.ZERO),
+                shiftRemainingTrolleys.max(BigDecimal.ZERO), totalSwitchLoss);
+
+        return new SupplementaryResult(shiftRemainingCapacity, shiftRemainingTrolleys);
+    }
+
+    /**
+     * 班次结束：计算各规格交班库存并记录日志
+     */
+    private void calcEndOfShiftInventory(List<NcLiningDemand> demandList, int shiftIndex,
+            NcScheduleContext context, Map<String, NcScheduleResult> resultMap,
+            Map<String, BigDecimal> handoverInventory) {
+        context.appendLog("--- 班次 {0} 交班库存 ---", shiftIndex);
+        for (NcLiningDemand spec : demandList) {
+            BigDecimal incomingInv = handoverInventory.getOrDefault(spec.getLiningCode(), BigDecimal.ZERO);
+            BigDecimal produceQtyThisShift = this.getScheduledQty(resultMap, spec.getLiningCode(), shiftIndex);
+            int formingClassForConsume = this.getFormingClassByShiftIndex(shiftIndex, context);
+            if (formingClassForConsume < 1) {
+                int formingShiftOffset = context.getFormingShiftOffset() != null
+                        ? context.getFormingShiftOffset() : 0;
+                formingClassForConsume = shiftIndex + formingShiftOffset;
+            }
+            BigDecimal consumeQtyThisShift = this.calcShiftConsume(
+                    context, spec.getLiningCode(), formingClassForConsume);
+            BigDecimal newInventory = incomingInv.add(produceQtyThisShift).subtract(consumeQtyThisShift);
+            if (BigDecimalUtils.ltZero(newInventory)) {
+                newInventory = BigDecimal.ZERO;
+            }
+            handoverInventory.put(spec.getLiningCode(), newInventory);
+            context.appendLog("  规格 {0}：接班={1} + 生产={2} - 消耗={3} = 交班={4}",
+                    context.getLiningNameByCode(spec.getLiningCode()),
+                    incomingInv, produceQtyThisShift, consumeQtyThisShift, newInventory);
+        }
+    }
+
+    /**
+     * 将排产结果 Map 转换为列表，填充工厂编码、排程日期等常量字段
+     */
+    private List<NcScheduleResult> buildScheduleResults(List<NcLiningDemand> demandList,
+            Map<String, NcScheduleResult> resultMap, NcScheduleContext context) {
+        List<NcScheduleResult> results = new ArrayList<>();
+        for (NcLiningDemand spec : demandList) {
             String key = spec.getMachineCode() + ":" + spec.getLiningCode();
             NcScheduleResult result = resultMap.get(key);
             if (result != null) {
@@ -1250,14 +1859,45 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
                         spec.isTailFinished() ? NcEngineConstants.TAIL_FLAG_YES : NcEngineConstants.TAIL_FLAG_NO);
                 result.setReleaseStatus(NcEngineConstants.RELEASE_STATUS_UNPUBLISHED);
                 result.setDataSource(NcEngineConstants.DATA_SOURCE_AUTO);
-                // 记录排程时使用的有效库存
                 result.setStockQty(
                         context.getEffectiveStockMap().getOrDefault(spec.getLiningCode(), BigDecimal.ZERO));
                 results.add(result);
             }
         }
-
         return results;
+    }
+
+    /**
+     * 根据内衬班次索引获取对应的成型班次序号
+     * <p>优先通过成型班次配置表(CxShiftConfig)的映射获取，回退使用偏移量计算</p>
+     *
+     * @param shiftIndex 内衬班次索引（1~6）
+     * @param context 排程上下文
+     * @return 成型班次序号（1~8），无法映射时返回 -1
+     */
+    private int getFormingClassByShiftIndex(int shiftIndex, NcScheduleContext context) {
+        Map<String, Integer> cxShiftClassMap = context.getCxShiftClassMap();
+        if (cxShiftClassMap != null && !cxShiftClassMap.isEmpty()) {
+            int scheduleDay = context.getScheduleDays() != null
+                    && shiftIndex - 1 < context.getScheduleDays().length
+                    ? context.getScheduleDays()[shiftIndex - 1] : 1;
+            String[] shiftClassMap = context.getShiftClassMap();
+            if (shiftClassMap != null && shiftIndex - 1 < shiftClassMap.length) {
+                String shiftName = shiftClassMap[shiftIndex - 1];
+                String key = scheduleDay + "|" + shiftName;
+                Integer cxShiftNum = cxShiftClassMap.get(key);
+                if (cxShiftNum != null) {
+                    return cxShiftNum;
+                }
+            }
+        }
+        // 回退：使用偏移量计算
+        int formingShiftOffset = context.getFormingShiftOffset() != null ? context.getFormingShiftOffset() : 0;
+        int formingClass = shiftIndex + formingShiftOffset;
+        if (formingClass >= 1 && formingClass <= NcEngineConstants.CX_SHIFT_COUNT) {
+            return formingClass;
+        }
+        return -1;
     }
 
     /**
@@ -1273,12 +1913,11 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
      * 4. 已收尾规格净需求含损耗率
      * </p>
      */
-    private void checkDemandForShift(List<NcPaddingDemand> demandList, int shiftIndex, NcScheduleContext context) {
+    private void checkDemandForShift(List<NcLiningDemand> demandList, int shiftIndex, NcScheduleContext context) {
+        context.appendLog("--- 班次 {0} 消耗量 ---", shiftIndex);
         Map<String, BigDecimal> handoverInventory = context.getHandoverInventory();
-        List<CxScheduleResult> cxScheduleList = context.getCxScheduleList();
-        Map<String, List<MdmConstructionInfo>> constructionMap = context.getConstructionMap();
-        Map<String, Integer> paddingSupplyDepth = context.getPaddingSupplyDepth();
-        Map<String, BigDecimal> paddingRemainingMap = context.getPaddingRemainingMap();
+        Map<String, Integer> paddingSupplyDepth = context.getLiningSupplyDepth();
+        Map<String, BigDecimal> paddingRemainingMap = context.getLiningRemainingMap();
 
         // 成型班次偏移量：内衬班次索引 → 成型班次索引 = 内衬班次索引 + formingShiftOffset
         int formingShiftOffset = context.getFormingShiftOffset() != null ? context.getFormingShiftOffset() : 0;
@@ -1286,7 +1925,7 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
         // 排产触发阈值：当前库存可覆盖班次数 ≤ 此值时触发排产
         int scheduleThreshold = this.getParamAsDecimal(context, NcEngineConstants.PARAM_SCHEDULE_THRESHOLD).intValue();
 
-        for (NcPaddingDemand spec : demandList) {
+        for (NcLiningDemand spec : demandList) {
             BigDecimal incomingInventory = handoverInventory.getOrDefault(spec.getLiningCode(), BigDecimal.ZERO);
             spec.setIncomingInventory(incomingInventory);
 
@@ -1294,36 +1933,95 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
             int specSupplyDepth = paddingSupplyDepth.getOrDefault(spec.getLiningCode(),
                     NcEngineConstants.CX_SHIFT_COUNT);
 
-            // ===== 步骤1：从当前班次开始，动态计算各班成型消耗量 =====
-            // 计算范围：当前班次 ~ 当前班次 + 排产深度 - 1（最多到 CX_SHIFT_COUNT - formingShiftOffset）
-            int checkEndShift = Math.min(shiftIndex + specSupplyDepth - 1,
-                    NcEngineConstants.CX_SHIFT_COUNT - formingShiftOffset);
+            // ===== 步骤1：计算成型供应窗口内各班消耗量 =====
+            // 窗口算法：内衬当前班 shiftIndex → firstFormingClass（成型班次序号）
+            // 窗口 = [firstFormingClass+1, firstFormingClass+depth]，跳过当前班（生产的内衬下一个班才可用）
+            // 所有计算在成型班次空间（class 1~8）内进行
+            int firstFormingClass = this.getFormingClassByShiftIndex(shiftIndex, context);
+            if (firstFormingClass < 1) {
+                firstFormingClass = shiftIndex + formingShiftOffset;
+            }
+
+            // ===== 步骤1a：检查当前成型班次（firstFormingClass）消耗是否可被接班库存覆盖 =====
+            // 内衬本班生产的产品下个成型班才可用，因此本班成型消耗必须由接班库存承担
+            BigDecimal currentShiftConsume = this.calcShiftConsume(
+                    context, spec.getLiningCode(), firstFormingClass);
+            boolean hasCurrentGap = BigDecimalUtils.gtZero(currentShiftConsume)
+                    && incomingInventory.compareTo(currentShiftConsume) < 0;
+
+            int windowStartClass = firstFormingClass + 1;
+            int windowEndClass = Math.min(firstFormingClass + specSupplyDepth,
+                    NcEngineConstants.CX_SHIFT_COUNT);
+
+            // 新规格特殊处理：窗口结束班次后移覆盖提前备料天数
+            // 窗口开始保持与正常逻辑一致（firstFormingClass + 1），结束班次至少到 开班班次 + advanceDays × shiftCountPerDay
+            if (spec.isNewSpec()) {
+                int advanceDays = this.getParamAsDecimal(context,
+                        NcEngineConstants.PARAM_NEW_SPEC_ADVANCE_DAYS).intValue();
+                if (advanceDays < 1) {
+                    advanceDays = 1;
+                } else if (advanceDays > 2) {
+                    advanceDays = 2;
+                }
+                int minWindowEnd = windowStartClass + advanceDays * context.getShiftCountPerDay();
+                windowEndClass = Math.min(Math.max(windowEndClass, minWindowEnd),
+                        NcEngineConstants.CX_SHIFT_COUNT);
+            }
+
+            // 按当前供应窗口重算是否收尾（供应窗口变化时重新判断，检查 1~windowEndClass 班次）
+            spec.setTailFinished(this.isAllFormingPlansFinished(context, spec.getLiningCode(), windowEndClass));
+
             Map<Integer, BigDecimal> shiftConsume = new HashMap<>();
-            for (int k = shiftIndex; k <= checkEndShift; k++) {
-                shiftConsume.put(k, this.calcShiftConsume(cxScheduleList, constructionMap,
-                        spec.getLiningCode(), k + formingShiftOffset));
+            BigDecimal windowDemandSum = BigDecimal.ZERO;
+            for (int fc = windowStartClass; fc <= windowEndClass; fc++) {
+                BigDecimal consume = this.calcShiftConsume(context,
+                        spec.getLiningCode(), fc);
+                shiftConsume.put(fc, consume);
+                windowDemandSum = windowDemandSum.add(consume);
+            }
+            // 供应窗口（当前班之后）是否有成型需求：非开产模式下若后续无需求，本班不生产则无补救机会
+            spec.setWindowHasDemand(BigDecimalUtils.gtZero(windowDemandSum));
+
+            // 供应窗口实际可用库存 = max(0, 接班库存 - 当前班成型消耗量)
+            BigDecimal windowEffectiveInventory = incomingInventory.subtract(currentShiftConsume);
+            if (BigDecimalUtils.ltZero(windowEffectiveInventory)) {
+                windowEffectiveInventory = BigDecimal.ZERO;
             }
 
             BigDecimal accumulateConsume = BigDecimal.ZERO;
             int coverableShiftCount = 0;
-            for (int k = shiftIndex; k <= checkEndShift; k++) {
-                BigDecimal consume = shiftConsume.getOrDefault(k, BigDecimal.ZERO);
-                if (consume.compareTo(BigDecimal.ZERO) <= 0) {
+            for (int fc = windowStartClass; fc <= windowEndClass; fc++) {
+                BigDecimal consume = shiftConsume.getOrDefault(fc, BigDecimal.ZERO);
+                if (BigDecimalUtils.leZero(consume)) {
                     coverableShiftCount++; // 无消耗的班次视为可覆盖
                     continue;
                 }
-                if (accumulateConsume.add(consume).compareTo(incomingInventory) <= 0) {
+                if (accumulateConsume.add(consume).compareTo(windowEffectiveInventory) <= 0) {
                     accumulateConsume = accumulateConsume.add(consume);
                     coverableShiftCount++;
                 } else {
                     break; // 当前班次的消耗量已无法完全覆盖
                 }
             }
+            // 若当前成型班次存在供应缺口，可覆盖班次应设为0（表示即时缺口）
+            if (hasCurrentGap) {
+                coverableShiftCount = 0;
+            }
             spec.setCoverableShiftCount(coverableShiftCount);
 
             // ===== 步骤2：判断是否触发排产 =====
-            if (coverableShiftCount > scheduleThreshold) {
+            // 触发条件：
+            //   a) 当前成型班次存在供应缺口（接班库存 < 本班成型消耗量），或
+            //   b) 供应窗口可覆盖班次数 ≤ 阈值
+            if (!hasCurrentGap && coverableShiftCount > scheduleThreshold) {
                 spec.setNeedProduce(false); // 库存充足，不排产
+                spec.setRemainingDemand(BigDecimal.ZERO); // 清空剩余需求，避免残留到后续班次
+                // 从成型班次配置表获取当班消耗量：通过(scheduleDay, shiftName)匹配成型班次序号
+                BigDecimal shiftConsumeQty = this.getShiftConsumeQty(shiftIndex, context, spec);
+                if (BigDecimalUtils.gtZero(shiftConsumeQty)) { // 如果本班消耗量大于0，则还是需要记录日志
+                    this.appendShiftConsumeLog(shiftIndex, context, spec, specSupplyDepth, firstFormingClass,
+                            windowStartClass, windowEndClass, shiftConsume, shiftConsumeQty);
+                }
                 continue;
             }
 
@@ -1331,27 +2029,52 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
             spec.setNeedProduce(true);
             BigDecimal netDemand;
 
-            if (shiftIndex + formingShiftOffset + specSupplyDepth - 1 <= NcEngineConstants.CX_SHIFT_COUNT) {
-                // 全部在成型计划范围内（n ≤ 8）
-                BigDecimal demandInWindow = BigDecimal.ZERO;
-                for (int i = shiftIndex; i < shiftIndex + specSupplyDepth; i++) {
-                    demandInWindow = demandInWindow.add(this.calcShiftConsume(
-                            cxScheduleList, constructionMap, spec.getLiningCode(), i + formingShiftOffset));
+            if (firstFormingClass + specSupplyDepth <= NcEngineConstants.CX_SHIFT_COUNT) {
+                // 供应窗口全部在成型计划范围内
+                // 如果有量试/试制需求，用量试合并窗口计算（量试需求提前 N 个班次排产）
+                BigDecimal demandInWindow;
+                int trialAdvanceShifts = this.getTrialAdvanceShifts(context);
+                if (trialAdvanceShifts > 0 && this.hasTrialConsumption(context, spec.getLiningCode())) {
+                    demandInWindow = this.calcCombinedWindowDemand(context, spec.getLiningCode(),
+                            firstFormingClass, specSupplyDepth, trialAdvanceShifts);
+                } else {
+                    demandInWindow = BigDecimal.ZERO;
+                    for (int fc = windowStartClass; fc <= windowEndClass; fc++) {
+                        demandInWindow = demandInWindow.add(this.calcShiftConsume(
+                                context, spec.getLiningCode(), fc));
+                    }
                 }
-                netDemand = demandInWindow.subtract(incomingInventory);
-                if (netDemand.compareTo(BigDecimal.ZERO) < 0) {
+                // 供应窗口实际可用库存 = max(0, 接班库存 - 本班成型消耗)
+                BigDecimal availableForWindow = incomingInventory.subtract(currentShiftConsume);
+                if (BigDecimalUtils.ltZero(availableForWindow)) {
+                    availableForWindow = BigDecimal.ZERO;
+                }
+                netDemand = demandInWindow.subtract(availableForWindow);
+                if (BigDecimalUtils.ltZero(netDemand)) {
                     netDemand = BigDecimal.ZERO;
                 }
             } else {
-                // 超出成型计划的8个班（n > 8）
-                // part1: 第 shiftIndex~(CX_SHIFT_COUNT - formingShiftOffset) 班部分
-                BigDecimal part1 = BigDecimal.ZERO;
-                for (int i = shiftIndex; i <= NcEngineConstants.CX_SHIFT_COUNT - formingShiftOffset; i++) {
-                    part1 = part1.add(this.calcShiftConsume(
-                            cxScheduleList, constructionMap, spec.getLiningCode(), i + formingShiftOffset));
+                // 供应窗口超出成型计划（firstFormingClass + depth > 8）
+                // part1: 窗口内可计算的成型班次部分（含量试合并窗口）
+                BigDecimal part1;
+                int trialAdvanceShifts = this.getTrialAdvanceShifts(context);
+                if (trialAdvanceShifts > 0 && this.hasTrialConsumption(context, spec.getLiningCode())) {
+                    part1 = this.calcCombinedWindowDemand(context, spec.getLiningCode(),
+                            firstFormingClass, specSupplyDepth, trialAdvanceShifts);
+                } else {
+                    part1 = BigDecimal.ZERO;
+                    for (int fc = windowStartClass; fc <= windowEndClass; fc++) {
+                        part1 = part1.add(this.calcShiftConsume(
+                                context, spec.getLiningCode(), fc));
+                    }
                 }
-                part1 = part1.subtract(incomingInventory);
-                if (part1.compareTo(BigDecimal.ZERO) < 0) {
+                // 供应窗口实际可用库存 = max(0, 接班库存 - 本班成型消耗)
+                BigDecimal availableForWindow = incomingInventory.subtract(currentShiftConsume);
+                if (BigDecimalUtils.ltZero(availableForWindow)) {
+                    availableForWindow = BigDecimal.ZERO;
+                }
+                part1 = part1.subtract(availableForWindow);
+                if (BigDecimalUtils.ltZero(part1)) {
                     part1 = BigDecimal.ZERO;
                 }
 
@@ -1359,70 +2082,208 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
                 BigDecimal last3Sum = BigDecimal.ZERO;
                 for (int i = 6; i <= NcEngineConstants.CX_SHIFT_COUNT; i++) {
                     last3Sum = last3Sum.add(this.calcShiftConsume(
-                            cxScheduleList, constructionMap, spec.getLiningCode(), i));
+                            context, spec.getLiningCode(), i));
                 }
-                // 如果最后3班无数据，用当前班次到第8班的消耗量总计兜底
-                if (last3Sum.compareTo(BigDecimal.ZERO) <= 0) {
-                    for (int i = shiftIndex + formingShiftOffset; i <= NcEngineConstants.CX_SHIFT_COUNT; i++) {
+                // 如果最后3班无数据，用窗口内可计算班次的消耗量总计兜底
+                if (BigDecimalUtils.leZero(last3Sum)) {
+                    for (int fc = windowStartClass; fc <= NcEngineConstants.CX_SHIFT_COUNT; fc++) {
                         last3Sum = last3Sum.add(this.calcShiftConsume(
-                                cxScheduleList, constructionMap, spec.getLiningCode(), i));
+                                context, spec.getLiningCode(), fc));
                     }
                 }
                 BigDecimal avgLast3Shifts = last3Sum.divide(BigDecimal.valueOf(3), 2, RoundingMode.HALF_UP);
 
                 // 超出部分班次数
-                int exceedShiftCount = specSupplyDepth - NcEngineConstants.CX_SHIFT_COUNT;
+                int exceedShiftCount = firstFormingClass + specSupplyDepth - NcEngineConstants.CX_SHIFT_COUNT;
                 BigDecimal estimatedExceed = avgLast3Shifts.multiply(BigDecimal.valueOf(exceedShiftCount));
 
-                // 月计划剩余量约束
+                // 月计划剩余量约束（仅当有月计划数据时约束预估，否则使用完整预估值）
                 BigDecimal paddingRemaining = paddingRemainingMap != null
                         ? paddingRemainingMap.getOrDefault(spec.getLiningCode(), BigDecimal.ZERO)
                         : BigDecimal.ZERO;
-                BigDecimal part2 = estimatedExceed;
-                BigDecimal part1PlusPart2 = part1.add(part2);
-                if (part1PlusPart2.compareTo(paddingRemaining) > 0) {
-                    part2 = paddingRemaining.subtract(part1);
-                    if (part2.compareTo(BigDecimal.ZERO) < 0) {
-                        part2 = BigDecimal.ZERO;
+                boolean hasLiningRemaining = paddingRemainingMap != null
+                        && paddingRemainingMap.containsKey(spec.getLiningCode())
+                        && BigDecimalUtils.gtZero(paddingRemaining);
+                BigDecimal part2 = BigDecimal.ZERO;
+                if (!spec.isTailFinished()) {
+                    part2 = estimatedExceed;
+                    if (hasLiningRemaining) {
+                        BigDecimal part1PlusPart2 = part1.add(part2);
+                        if (part1PlusPart2.compareTo(paddingRemaining) > 0) {
+                            part2 = paddingRemaining.subtract(part1);
+                            if (BigDecimalUtils.ltZero(part2)) {
+                                part2 = BigDecimal.ZERO;
+                            }
+                            spec.setConstrainedEstimatedPart2(part2);
+                        }
                     }
                 }
                 netDemand = part1.add(part2);
             }
 
+            // ===== 步骤3a：当前成型班次有供应缺口时，叠加本班消耗缺口 =====
+            // 本班成型消耗由接班库存承担，若库存不足则缺口（currentShiftConsume - incomingInventory）
+            // 需由本班生产填补。供应窗口实际可用库存已在上方扣除了本班消耗，此处只补缺口。
+            if (hasCurrentGap) {
+                netDemand = netDemand.add(currentShiftConsume.subtract(incomingInventory));
+            }
+
             // ===== 步骤4：已收尾规格净需求含损耗率 =====
             if (spec.isTailFinished()) {
                 BigDecimal lossRate = this.getLossRate(spec.getLiningCode(), spec.getMachineCode(), context);
-                netDemand = netDemand.multiply(BigDecimal.ONE.add(lossRate)).setScale(2, RoundingMode.HALF_UP);
+                // 存储收尾损耗信息（日志输出用）
+                spec.setPreLossRateDemand(netDemand);
+                spec.setLossRatePercent(lossRate);
+                // 损耗率存储为百分比值（如 2 表示 2%），需除以 100
+                BigDecimal lossRateDecimal = BigDecimalUtils.percentages2Decimals(lossRate);
+                netDemand = netDemand.multiply(BigDecimal.ONE.add(lossRateDecimal)).setScale(2, RoundingMode.HALF_UP);
             }
 
-            // 剩余待排产量初始=净需求
-            if (spec.getRemainingDemand() == null || spec.getRemainingDemand().compareTo(netDemand) < 0) {
-                spec.setRemainingDemand(netDemand);
-            }
+            // 每个班次重新计算剩余需求，基于当前接班库存和排产深度
+            spec.setRemainingDemand(netDemand);
 
-            // ===== 日志：输出该规格的详细计算信息 =====
-            // 遍历成型计划窗口期，按示方书版本匹配施工后取胎胚代码（与 calcShiftConsume 同口径）
-            Set<String> embryoSet = new HashSet<>();
-            for (CxScheduleResult cx : cxScheduleList) {
-                for (int k = shiftIndex; k <= checkEndShift; k++) {
-                    MdmConstructionInfo construction = this.resolveConstructionForShift(
-                            cx, k + formingShiftOffset, constructionMap);
+            // 从成型班次配置表获取当班消耗量：通过(scheduleDay, shiftName)匹配成型班次序号
+            BigDecimal shiftConsumeQty = this.getShiftConsumeQty(shiftIndex, context, spec);
+            this.appendShiftConsumeLog(shiftIndex, context, spec, specSupplyDepth, firstFormingClass,
+                    windowStartClass, windowEndClass, shiftConsume, shiftConsumeQty);
+        }
+    }
+    
+    /**
+     * 计算合并窗口需求量（含正式窗口 + 量试提前窗口）
+     * <p>
+     * 正式窗口 = [firstFormingClass+1, firstFormingClass+depth]<br>
+     * 量试窗口 = [max(1, firstFormingClass+1-trialAdvance), firstFormingClass-trialAdvance+depth]<br>
+     * 两个窗口取并集：属于正式窗口的班次取全部消耗量，仅属量试窗口的班次只取量试部分消耗量，
+     * 仅属正式窗口的班次取正式部分消耗量（总量 - 量试量）。
+     * </p>
+     *
+     * @param context              排产上下文
+     * @param paddingCode          内衬编码
+     * @param firstFormingClass    当前内衬班次对应的成型班次
+     * @param supplyDepth          供应窗口深度
+     * @param trialAdvanceShifts   量试提前班次数
+     * @return 合并窗口总需求量
+     */
+    private BigDecimal calcCombinedWindowDemand(NcScheduleContext context, String paddingCode,
+            int firstFormingClass, int supplyDepth, int trialAdvanceShifts) {
+        int normalStart = firstFormingClass + 1;
+        int normalEnd = Math.min(firstFormingClass + supplyDepth, NcEngineConstants.CX_SHIFT_COUNT);
+        int trialStart = Math.max(firstFormingClass + 1 - trialAdvanceShifts, 1);
+        int trialEnd = Math.min(firstFormingClass - trialAdvanceShifts + supplyDepth, NcEngineConstants.CX_SHIFT_COUNT);
+        int combinedStart = Math.min(normalStart, trialStart);
+        int combinedEnd = Math.max(normalEnd, trialEnd);
+        BigDecimal total = BigDecimal.ZERO;
+        for (int fc = combinedStart; fc <= combinedEnd; fc++) {
+            BigDecimal fcTotal = this.calcShiftConsume(context, paddingCode, fc);
+            BigDecimal fcTrial = this.calcTrialShiftConsume(context, paddingCode, fc);
+            boolean inNormal = fc >= normalStart && fc <= normalEnd;
+            boolean inTrial = fc >= trialStart && fc <= trialEnd;
+            if (inNormal && inTrial) {
+                total = total.add(fcTotal);
+            } else if (inTrial) {
+                total = total.add(fcTrial);
+            } else if (inNormal) {
+                total = total.add(fcTotal.subtract(fcTrial));
+            }
+        }
+        return total;
+    }
+    
+    /**
+     * 添加班次消耗量日志
+     * @param shiftIndex         内衬班次序号
+     * @param context            上下文
+     * @param spec               内衬需求
+     * @param specSupplyDepth    排产深度
+     * @param firstFormingClass  当前内衬班次对应的成型班次序号（用于判断是否超出8班）
+     * @param windowStartClass   供应窗口起始成型班次
+     * @param windowEndClass     供应窗口结束成型班次
+     * @param shiftConsume       供应窗口各成型班次消耗量 Map<formingClass, consumeQty>
+     * @param shiftConsumeQty    当班消耗量
+     */
+    private void appendShiftConsumeLog(int shiftIndex, NcScheduleContext context, NcLiningDemand spec,
+            int specSupplyDepth, int firstFormingClass, int windowStartClass, int windowEndClass,
+            Map<Integer, BigDecimal> shiftConsume, BigDecimal shiftConsumeQty) {
+        // 遍历成型窗口班次，按示方书版本匹配施工后取胎胚代码（与 calcShiftConsume 同口径）
+        StringBuilder shiftInfo = new StringBuilder();
+        if (windowStartClass <= windowEndClass) {
+            for (int fc = windowStartClass; fc <= windowEndClass; fc++) {
+                BigDecimal consume = shiftConsume.getOrDefault(fc, BigDecimal.ZERO);
+                shiftInfo.append("班").append(fc).append("=").append(consume).append(" ");
+            }
+        }
+        // 供应窗口超出成型8个班时，追加预估班次消耗信息（收尾规格无需预估）
+        if (firstFormingClass + specSupplyDepth > NcEngineConstants.CX_SHIFT_COUNT && !spec.isTailFinished()) {
+            BigDecimal last3Sum = BigDecimal.ZERO;
+            for (int i = 6; i <= NcEngineConstants.CX_SHIFT_COUNT; i++) {
+                last3Sum = last3Sum.add(this.calcShiftConsume(context, spec.getLiningCode(), i));
+            }
+            if (BigDecimalUtils.leZero(last3Sum)) {
+                for (int fc = windowStartClass; fc <= NcEngineConstants.CX_SHIFT_COUNT; fc++) {
+                    last3Sum = last3Sum.add(this.calcShiftConsume(context, spec.getLiningCode(), fc));
+                }
+            }
+            BigDecimal avgLast3Shifts = last3Sum.divide(BigDecimal.valueOf(3), 2, RoundingMode.HALF_UP);
+            int exceedShiftCount = firstFormingClass + specSupplyDepth - NcEngineConstants.CX_SHIFT_COUNT;
+            shiftInfo.append("(预估: 超出").append(exceedShiftCount).append("班×").append(avgLast3Shifts);
+            // 被月计划余量约束时追加限制说明
+            if (spec.getConstrainedEstimatedPart2() != null) {
+                shiftInfo.append("，月计划余量限制：").append(spec.getConstrainedEstimatedPart2().setScale(2, RoundingMode.HALF_UP));
+            }
+            shiftInfo.append(") ");
+        }
+        // 对应胎胚：遍历当班+窗口范围内所有成型班次，收集关联胎胚
+        // windowEndClass 在主流程中已根据新规格/普通规格做了相应调整
+        Set<String> embryoSet = new HashSet<>();
+        List<CxScheduleResult> cxScheduleList = context.getCxScheduleList();
+        if (firstFormingClass <= windowEndClass) {
+            for (int fc = firstFormingClass; fc <= windowEndClass; fc++) {
+                for (CxScheduleResult cx : cxScheduleList) {
+                    MdmConstructionInfo construction = this.resolveConstructionForShift(cx, fc, context);
                     if (construction != null && spec.getLiningCode().equals(construction.getInsideCode())) {
                         embryoSet.add(cx.getEmbryoCode());
-                        break;
                     }
                 }
             }
-            String embryoCodes = String.join("/", embryoSet);
-            StringBuilder shiftInfo = new StringBuilder();
-            for (int i = shiftIndex; i <= checkEndShift; i++) {
-                BigDecimal consume = shiftConsume.getOrDefault(i, BigDecimal.ZERO);
-                shiftInfo.append("班").append(i + formingShiftOffset).append("=").append(consume).append(" ");
-            }
-            context.appendLog("  规格 {0}({1})：胎胚={2}，深度={3}班，单耗={4}，成型窗口内计划：{5}",
-                    spec.getLiningCode(), spec.getLiningName(), embryoCodes,
-                    specSupplyDepth, spec.getUnitConsume(), shiftInfo.toString());
         }
+        String embryoCodes = String.join("/", embryoSet);
+        // 胎胚为空时不输出日志（对应内衬班次在该成型班次上无排产计划）
+        if (embryoCodes.isEmpty()) {
+            return;
+        }
+        // 对应成型机
+        Set<String> cxMachineSet = context.getLiningCxMachineSet().get(spec.getLiningCode());
+        String cxMachineCodes = cxMachineSet != null ? String.join("/", cxMachineSet) : "无";
+        context.appendLog("  规格 {0}：胎胚={1}，成型机={2}，深度={3}班，单耗={4}，当班消耗={5}，成型窗口内计划：{6}",
+                NcScheduleContext.buildDisplayName(spec.getLiningName(), spec.getLiningCode()), embryoCodes,
+                cxMachineCodes, specSupplyDepth, spec.getUnitConsume(), shiftConsumeQty, shiftInfo.toString());
+    }
+    
+    /**
+     * 从成型班次配置表获取当班消耗量
+     * @param shiftIndex
+     * @param context
+     * @param cxScheduleList
+     * @param constructionMap
+     * @param spec
+     * @return
+     */
+    private BigDecimal getShiftConsumeQty(int shiftIndex, NcScheduleContext context,
+            NcLiningDemand spec) {
+        BigDecimal shiftConsumeQty = BigDecimal.ZERO;
+        Map<String, Integer> cxShiftClassMap = context.getCxShiftClassMap();
+        int scheduleDay = context.getScheduleDays() != null
+                && shiftIndex - 1 < context.getScheduleDays().length
+                ? context.getScheduleDays()[shiftIndex - 1] : 1;
+        String shiftName = context.getShiftClassMap()[shiftIndex - 1];
+        String cxShiftKey = scheduleDay + "|" + shiftName;
+        Integer cxShiftNum = cxShiftClassMap != null ? cxShiftClassMap.get(cxShiftKey) : null;
+        if (cxShiftNum != null) {
+            return this.calcShiftConsume(context,
+                    spec.getLiningCode(), cxShiftNum);
+        }
+        return shiftConsumeQty;
     }
 
     /**
@@ -1438,7 +2299,7 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
             Map<Integer, BigDecimal> shiftCapacities = new HashMap<>();
 
             // 如果机台定额为空，跳过
-            if (machine.getQuata() == null || machine.getQuata().compareTo(BigDecimal.ZERO) <= 0) {
+            if (BigDecimalUtils.leZero(machine.getQuata())) {
                 capacityMatrix.put(machineCode, shiftCapacities);
                 continue;
             }
@@ -1472,7 +2333,7 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
                     }
                 }
 
-                if (effectiveCapacity.compareTo(BigDecimal.ZERO) < 0) {
+                if (BigDecimalUtils.ltZero(effectiveCapacity)) {
                     effectiveCapacity = BigDecimal.ZERO;
                 }
                 shiftCapacities.put(shiftIndex, effectiveCapacity.setScale(2, RoundingMode.HALF_UP));
@@ -1494,20 +2355,22 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
 
         // 工装（台车）总数
         BigDecimal toolTotalNum = this.getParamAsDecimal(paramsMap, NcEngineConstants.PARAM_TOOL_TOTAL_NUM);
-        if (toolTotalNum.compareTo(BigDecimal.ZERO) <= 0) {
+        if (BigDecimalUtils.leZero(toolTotalNum)) {
             return null; // 未配置台车总数，不限制
         }
 
         // 整车率
         BigDecimal trolleyFullRate = this.getParamAsDecimal(paramsMap, NcEngineConstants.PARAM_TROLLEY_FULL_RATE);
-        if (trolleyFullRate.compareTo(BigDecimal.ZERO) <= 0) {
+        // 数据库存储百分比值（如 80），转换为小数（0.8）
+        trolleyFullRate = BigDecimalUtils.percentages2Decimals(trolleyFullRate);
+        if (BigDecimalUtils.leZero(trolleyFullRate)) {
             trolleyFullRate = BigDecimal.ONE; // 默认整车率为100%
         }
 
         // 标准卷曲米数（台车容量）
         BigDecimal standardCurlLength = this.getParamAsDecimal(paramsMap,
                 NcEngineConstants.PARAM_STANDARD_CRIMP_LENGTH);
-        if (standardCurlLength.compareTo(BigDecimal.ZERO) <= 0) {
+        if (BigDecimalUtils.leZero(standardCurlLength)) {
             return null;
         }
 
@@ -1520,7 +2383,7 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
         BigDecimal stockTrolleys = totalEffectiveStock.divide(standardCurlLength, 4, RoundingMode.HALF_UP)
                 .multiply(trolleyFullRate);
         BigDecimal availableTrolleys = toolTotalNum.subtract(stockTrolleys);
-        if (availableTrolleys.compareTo(BigDecimal.ZERO) < 0) {
+        if (BigDecimalUtils.ltZero(availableTrolleys)) {
             availableTrolleys = BigDecimal.ZERO;
         }
 
@@ -1529,6 +2392,47 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
         log.debug("台车约束计算：工装总数={}, 有效库存={}, 整车率={}, 标准卷曲={}, 可用台车={}, 上限={}",
                 toolTotalNum, totalEffectiveStock, trolleyFullRate, standardCurlLength, availableTrolleys, limit);
         return limit;
+    }
+
+    /**
+     * 计算本班初始剩余台车数
+     * <p>公式：工装总数 - 交班库存 / 卷曲米数 / 整车率，结果向下取整</p>
+     *
+     * @param context           排产上下文
+     * @param handoverInventory 当前交班库存 Map<paddingCode, inventory>
+     * @return 剩余台车数（向下取整）
+     */
+    private BigDecimal calcRemainingTrolleys(NcScheduleContext context, Map<String, BigDecimal> handoverInventory) {
+        Map<String, NcParams> paramsMap = context.getParamsMap();
+
+        // 工装（台车）总数
+        BigDecimal toolTotalNum = this.getParamAsDecimal(paramsMap, NcEngineConstants.PARAM_TOOL_TOTAL_NUM);
+
+        // 标准卷曲米数
+        BigDecimal standardCurlLength = this.getParamAsDecimal(paramsMap,
+                NcEngineConstants.PARAM_STANDARD_CRIMP_LENGTH);
+
+        // 整车率
+        BigDecimal trolleyFullRate = this.getParamAsDecimal(paramsMap, NcEngineConstants.PARAM_TROLLEY_FULL_RATE);
+        // 数据库存储百分比值（如 80），转换为小数（0.8）
+        trolleyFullRate = BigDecimalUtils.percentages2Decimals(trolleyFullRate);
+        if (BigDecimalUtils.leZero(trolleyFullRate)) {
+            trolleyFullRate = BigDecimal.ONE;
+        }
+
+        // 交班库存总和
+        BigDecimal totalHandoverInv = handoverInventory.values().stream()
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        // 计算：工装总数 - 交班库存 / 卷曲米数 / 整车率
+        BigDecimal invTrolleys = totalHandoverInv.divide(standardCurlLength, 4, RoundingMode.HALF_UP)
+                .divide(trolleyFullRate, 4, RoundingMode.HALF_UP);
+        BigDecimal remaining = toolTotalNum.subtract(invTrolleys);
+        if (BigDecimalUtils.ltZero(remaining)) {
+            remaining = BigDecimal.ZERO;
+        }
+        // 向下取整
+        return remaining.setScale(0, RoundingMode.FLOOR);
     }
 
     /**
@@ -1547,7 +2451,7 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         // 取台车约束与机台产能之和的较小值
-        if (shiftTrolleyLimit != null && shiftTrolleyLimit.compareTo(BigDecimal.ZERO) > 0
+        if (BigDecimalUtils.gtZero(shiftTrolleyLimit)
                 && shiftTrolleyLimit.compareTo(totalMachineCapacity) < 0) {
             log.debug("班次 {} 台车约束({}) 小于机台总产能({}), 取台车约束值", shiftIndex, shiftTrolleyLimit, totalMachineCapacity);
             return shiftTrolleyLimit;
@@ -1598,32 +2502,47 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
     /**
      * 获取某机台在某班的待排产规格列表
      */
-    private List<NcPaddingDemand> getSpecsByMachine(String machineCode, List<NcPaddingDemand> demandList) {
+    private List<NcLiningDemand> getSpecsByMachine(String machineCode, List<NcLiningDemand> demandList) {
         return demandList.stream().filter(d -> machineCode.equals(d.getMachineCode())).collect(Collectors.toList());
     }
 
     /**
-     * 构建优先级比较器（7级规则）
+     * 构建优先级比较器（三层顺位结构）
+     * <p>
+     * 第一层顺位：有供应缺口 &gt; 无库存的新规格 &gt; 其他规格；第一层相同才比较第二层，以此类推。
+     * </p>
      */
-    private Comparator<NcPaddingDemand> buildPriorityComparator(List<NcPaddingDemand> demandList, String lastSpecCode,
+    private Comparator<NcLiningDemand> buildPriorityComparator(List<NcLiningDemand> demandList, String lastSpecCode,
             NcScheduleContext context, int shiftIndex) {
         return (a, b) -> {
-            // 1. 本班有缺口优先
-            if (a.isNeedProduce() != b.isNeedProduce()) {
-                return a.isNeedProduce() ? -1 : 1;
+            // ========== 第一层顺位：按规格紧急程度分层 ==========
+            // 有供应缺口 > 无库存的新规格 > 其他规格
+            int aLayer1 = this.getLayer1Order(a);
+            int bLayer1 = this.getLayer1Order(b);
+            if (aLayer1 != bLayer1) {
+                return Integer.compare(aLayer1, bLayer1);
             }
 
-            // 2. 规格续作优先
-            boolean aIsLast = a.getLiningCode() != null && a.getLiningCode().equals(lastSpecCode);
-            boolean bIsLast = b.getLiningCode() != null && b.getLiningCode().equals(lastSpecCode);
-            if (aIsLast != bIsLast) {
-                return aIsLast ? -1 : 1;
+            // ========== 第二层顺位：按规格状态分层 ==========
+            int aLayer2 = this.getLayer2Order(a, lastSpecCode);
+            int bLayer2 = this.getLayer2Order(b, lastSpecCode);
+            if (aLayer2 != bLayer2) {
+                return Integer.compare(aLayer2, bLayer2);
             }
 
-            // 4. 胶料相同优先
+            // ========== 第三层顺位：胶料/口型/序号/库消比/编码 ==========
+
+            // 1. 与上一个规格胶料相同、口型也相同优先
             if (lastSpecCode != null) {
-                NcPaddingDemand lastSpec = this.findSpecByCode(demandList, lastSpecCode);
+                NcLiningDemand lastSpec = this.findSpecByCode(demandList, lastSpecCode);
                 if (lastSpec != null) {
+                    boolean aMatchGlueAndMouth = this.isGlueAndMouthMatch(a, lastSpec);
+                    boolean bMatchGlueAndMouth = this.isGlueAndMouthMatch(b, lastSpec);
+                    if (aMatchGlueAndMouth != bMatchGlueAndMouth) {
+                        return aMatchGlueAndMouth ? -1 : 1;
+                    }
+
+                    // 2. 与上一个规格胶料相同优先
                     boolean aGlueMatch = a.getGlueCode() != null && a.getGlueCode().equals(lastSpec.getGlueCode());
                     boolean bGlueMatch = b.getGlueCode() != null && b.getGlueCode().equals(lastSpec.getGlueCode());
                     if (aGlueMatch != bGlueMatch) {
@@ -1632,7 +2551,7 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
                 }
             }
 
-            // 6. 胶料组相同优先
+            // 4. 胶料组相同优先
             Map<String, String> glueGroupMap = context.getGlueGroupMap();
             String aGroup = glueGroupMap != null ? glueGroupMap.get(a.getGlueCode()) : null;
             String bGroup = glueGroupMap != null ? glueGroupMap.get(b.getGlueCode()) : null;
@@ -1648,7 +2567,7 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
                 }
             }
 
-            // 7. 胶料序号升序
+            // 5. 胶料序号升序
             Map<String, Integer> glueOrderMap = context.getGlueOrderMap();
             Integer aSeq = glueOrderMap != null ? glueOrderMap.get(a.getGlueCode()) : null;
             Integer bSeq = glueOrderMap != null ? glueOrderMap.get(b.getGlueCode()) : null;
@@ -1656,7 +2575,7 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
                 return Integer.compare(aSeq, bSeq);
             }
 
-            // 8. 库消比升序
+            // 6. 库消比（库存:成型消耗量）的比值升序
             BigDecimal aRatio = this.calcStockConsumeRatio(a, context);
             BigDecimal bRatio = this.calcStockConsumeRatio(b, context);
             if (aRatio != null && bRatio != null) {
@@ -1666,7 +2585,7 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
                 }
             }
 
-            // 9. 内衬编码升序（兜底）
+            // 7. 内衬编码升序（兜底）
             if (a.getLiningCode() != null && b.getLiningCode() != null) {
                 return a.getLiningCode().compareTo(b.getLiningCode());
             }
@@ -1675,33 +2594,78 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
     }
 
     /**
+     * 获取规格的第一层顺位值
+     * <p>
+     * 有供应缺口（0）&lt; 无库存的新规格（1）&lt; 其他规格（2）
+     * </p>
+     */
+    private int getLayer1Order(NcLiningDemand spec) {
+        // 1. 有供应缺口
+        if (spec.isSupplyGapMode()) {
+            return 0;
+        }
+        // 2. 无库存的新规格（近期无排产记录且当前有效库存为 0）
+        if (spec.isNewSpec() && spec.getIncomingInventory() != null
+                && BigDecimalUtils.leZero(spec.getIncomingInventory())) {
+            return 1;
+        }
+        // 3. 其他规格
+        return 2;
+    }
+
+    /**
+     * 获取规格的第二层顺位值
+     * <p>
+     * 续作规格（0）&lt; 收尾规格（1）&lt; 本班有需求（2）&lt; 其他规格（3）
+     * </p>
+     *
+     * @param spec         规格
+     * @param lastSpecCode 上一班最后一个生产的规格编码
+     * @return 第二层顺位值（越小越优先）
+     */
+    private int getLayer2Order(NcLiningDemand spec, String lastSpecCode) {
+        // 1. 续作规格（当前机台上一班正在生产的规格，切换成本最低）
+        if (spec.getLiningCode() != null && spec.getLiningCode().equals(lastSpecCode)) {
+            return 0;
+        }
+        // 2. 收尾规格（已完成收尾确认，本班需完成剩余量）
+        if (spec.isTailFinished()) {
+            return 1;
+        }
+        // 3. 本班有需求（需本班安排生产）
+        if (spec.isNeedProduce()) {
+            return 2;
+        }
+        // 4. 其他规格
+        return 3;
+    }
+
+    /**
      * 按规格编码查找规格
      */
-    private NcPaddingDemand findSpecByCode(List<NcPaddingDemand> demandList, String liningCode) {
-        return demandList.stream().filter(d -> liningCode.equals(d.getLiningCode())).findFirst().orElse(null);
+    private NcLiningDemand findSpecByCode(List<NcLiningDemand> demandList, String paddingCode) {
+        return demandList.stream().filter(d -> paddingCode.equals(d.getLiningCode())).findFirst().orElse(null);
     }
 
     /**
      * 判断两个规格的胶料是否相同
      */
-    private boolean isGlueMatch(NcPaddingDemand a, NcPaddingDemand b) {
+    private boolean isGlueAndMouthMatch(NcLiningDemand a, NcLiningDemand b) {
         return Objects.equals(a.getGlueCode(), b.getGlueCode());
     }
 
     /**
      * 计算库消比
      */
-    private BigDecimal calcStockConsumeRatio(NcPaddingDemand spec, NcScheduleContext context) {
+    private BigDecimal calcStockConsumeRatio(NcLiningDemand spec, NcScheduleContext context) {
         // 从成型计划动态计算前3个班的日均消耗量
-        List<CxScheduleResult> cxScheduleList = context.getCxScheduleList();
-        Map<String, List<MdmConstructionInfo>> constructionMap = context.getConstructionMap();
-        String liningCode = spec.getLiningCode();
+        String paddingCode = spec.getLiningCode();
 
         BigDecimal avgDailyConsume = BigDecimal.ZERO;
         int count = 0;
         for (int i = 1; i <= 3; i++) {
-            BigDecimal consume = this.calcShiftConsume(cxScheduleList, constructionMap, liningCode, i);
-            if (consume.compareTo(BigDecimal.ZERO) > 0) {
+            BigDecimal consume = this.calcShiftConsume(context, paddingCode, i);
+            if (BigDecimalUtils.gtZero(consume)) {
                 avgDailyConsume = avgDailyConsume.add(consume);
                 count++;
             }
@@ -1709,7 +2673,7 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
         if (count > 0) {
             avgDailyConsume = avgDailyConsume.divide(BigDecimal.valueOf(count), 2, RoundingMode.HALF_UP);
         }
-        if (avgDailyConsume.compareTo(BigDecimal.ZERO) <= 0) {
+        if (BigDecimalUtils.leZero(avgDailyConsume)) {
             return null;
         }
         BigDecimal inventory = spec.getIncomingInventory() != null ? spec.getIncomingInventory() : BigDecimal.ZERO;
@@ -1719,9 +2683,9 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
     /**
      * 获取损耗率
      */
-    private BigDecimal getLossRate(String liningCode, String machineCode, NcScheduleContext context) {
+    private BigDecimal getLossRate(String paddingCode, String machineCode, NcScheduleContext context) {
         if (context.getLossRateMap() != null) {
-            String key1 = liningCode + "#" + machineCode;
+            String key1 = paddingCode + "#" + machineCode;
             BigDecimal rate = context.getLossRateMap().get(key1);
             if (rate != null) {
                 return rate;
@@ -1735,7 +2699,7 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
     /**
      * 计算机台切换损失
      */
-    private BigDecimal calcSwitchLoss(NcMachineInfo machine, String lastSpecCode, NcPaddingDemand currentSpec,
+    private BigDecimal calcSwitchLoss(NcMachineInfo machine, String lastSpecCode, NcLiningDemand currentSpec,
             BigDecimal mouthPlateSwitchTime) {
         // 本班第一个规格或续做同一规格，无切换损失
         if (lastSpecCode == null || lastSpecCode.equals(currentSpec.getLiningCode())) {
@@ -1757,33 +2721,96 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
      * 受 SYS1401013（单规格每班最大排产量）约束：
      * - 已收尾规格超过限制时直接截断；
      * - 未收尾规格截断后再向上取整台车，因取整车多出的部分允许超过限制。
+     * 供应缺口填补模式（supplyGapMode=true）时，补本班成型消耗缺口 + 安全水位(SYS1401005)，
+     * 生产量受缺口量约束，超出部分留待后续班次排产。
      * </p>
      *
      * @param spec              内衬需求规格
      * @param remainingCapacity 机台本班剩余产能
+     * @param shiftIndex        当前班次索引（用于计算成型消耗量）
      * @param context           排产上下文（用于读取参数）
      * @return 本班生产量（米）
      */
-    private BigDecimal calcProduceQty(NcPaddingDemand spec, BigDecimal remainingCapacity, NcScheduleContext context) {
-        if (remainingCapacity == null || remainingCapacity.compareTo(BigDecimal.ZERO) <= 0) {
+    private BigDecimal calcProduceQty(NcLiningDemand spec, BigDecimal remainingCapacity,
+            int shiftIndex, NcScheduleContext context) {
+        if (BigDecimalUtils.leZero(remainingCapacity)) {
             return BigDecimal.ZERO;
         }
 
         BigDecimal remainingDemand = spec.getRemainingDemand() != null ? spec.getRemainingDemand() : BigDecimal.ZERO;
-        if (remainingDemand.compareTo(BigDecimal.ZERO) <= 0) {
+        // 保存原始待排量（供应缺口模式 recalculation 后用于比较是否可一次排完）
+        BigDecimal originalRemainingDemand = remainingDemand;
+        if (BigDecimalUtils.leZero(remainingDemand)) {
             return BigDecimal.ZERO;
+        }
+
+        // 供应缺口填补模式：仅补本班成型消耗缺口，不补供应窗口净需求（收尾规格跳过，直接用含损耗率的原始待排量）
+        if (spec.isSupplyGapMode() && !spec.isTailFinished()) {
+            int firstFormingClass = this.getFormingClassByShiftIndex(shiftIndex, context);
+            if (firstFormingClass < 1) {
+                int formingShiftOffset = context.getFormingShiftOffset() != null ? context.getFormingShiftOffset() : 0;
+                firstFormingClass = shiftIndex + formingShiftOffset;
+            }
+            BigDecimal currentShiftConsume = this.calcShiftConsume(
+                    context, spec.getLiningCode(), firstFormingClass);
+            BigDecimal incomingInv = spec.getIncomingInventory() != null ? spec.getIncomingInventory() : BigDecimal.ZERO;
+            BigDecimal supplyGap = currentShiftConsume.subtract(incomingInv);
+            if (BigDecimalUtils.leZero(supplyGap)) {
+                return BigDecimal.ZERO; // 无供应缺口，不需要生产
+            }
+            // 供应缺口填补模式：补充缺口 + 安全水位库存
+            // 安全水位量 = nextFormingClass 开始连续 SAFETY_STOCK_LEVEL 个成型班次的消耗量之和
+            int safetyStockLevel = this.getParamAsDecimal(context, NcEngineConstants.PARAM_SAFETY_STOCK_LEVEL).intValue();
+            BigDecimal safetyStockQty = BigDecimal.ZERO;
+            for (int fc = firstFormingClass + 1; fc <= firstFormingClass + safetyStockLevel; fc++) {
+                if (fc <= NcEngineConstants.CX_SHIFT_COUNT) {
+                    safetyStockQty = safetyStockQty.add(
+                            this.calcShiftConsume(context, spec.getLiningCode(), fc));
+                }
+            }
+            remainingDemand = supplyGap.add(safetyStockQty);
         }
 
         // 计算基础排产量（暂不限制最大排产量）
         BigDecimal baseProduceQty;
 
-        // 已收尾规格：精确排产，不要求台车整倍数
+        // 已收尾规格
         if (spec.isTailFinished()) {
-            baseProduceQty = remainingDemand.min(remainingCapacity);
+            BigDecimal trolleyCapacity = spec.getTrolleyCapacity();
+            if (BigDecimalUtils.leZero(trolleyCapacity)) {
+                // 台车容量未配置，精确排产
+                baseProduceQty = remainingDemand.min(remainingCapacity);
+            } else if (spec.isSupplyGapMode()
+                    && remainingDemand.compareTo(originalRemainingDemand) < 0) {
+                // 收尾+供应缺口且应排产量（缺口+安全水位）< 原始待排量：无法一次排完，按整车取整
+                int maxTrolleys = remainingCapacity.divide(trolleyCapacity, 0, RoundingMode.FLOOR).intValue();
+                int needTrolleys = remainingDemand.divide(trolleyCapacity, 0, RoundingMode.CEILING).intValue();
+                int actualTrolleys = Math.min(maxTrolleys, needTrolleys);
+                if (actualTrolleys <= 0) {
+                    return BigDecimal.ZERO;
+                }
+                baseProduceQty = BigDecimal.valueOf(actualTrolleys).multiply(trolleyCapacity);
+            } else if (remainingDemand.compareTo(remainingCapacity) <= 0) {
+                // 可一次排完，无需后续排程，精确排产
+                baseProduceQty = remainingDemand;
+            } else {
+                // 无法一次排完，按整车取整
+                int maxTrolleys = remainingCapacity.divide(trolleyCapacity, 0, RoundingMode.FLOOR).intValue();
+                int needTrolleys = remainingDemand.divide(trolleyCapacity, 0, RoundingMode.CEILING).intValue();
+                int actualTrolleys = Math.min(maxTrolleys, needTrolleys);
+                if (actualTrolleys <= 0) {
+                    return BigDecimal.ZERO;
+                }
+                baseProduceQty = BigDecimal.valueOf(actualTrolleys).multiply(trolleyCapacity);
+                // 收尾规格：整车量不能超过剩余待排量
+                if (baseProduceQty.compareTo(remainingDemand) > 0) {
+                    baseProduceQty = remainingDemand;
+                }
+            }
         } else {
             // 未收尾规格：需台车容量整倍数
             BigDecimal trolleyCapacity = spec.getTrolleyCapacity();
-            if (trolleyCapacity == null || trolleyCapacity.compareTo(BigDecimal.ZERO) <= 0) {
+            if (BigDecimalUtils.leZero(trolleyCapacity)) {
                 return BigDecimal.ZERO;
             }
 
@@ -1795,7 +2822,7 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
             int actualTrolleys = Math.min(maxTrolleys, needTrolleys);
             if (actualTrolleys <= 0) {
                 // 连一台车都放不下，本班不生产此规格
-                if (remainingDemand.compareTo(BigDecimal.ZERO) > 0 && remainingCapacity.compareTo(trolleyCapacity) >= 0) {
+                if (BigDecimalUtils.gtZero(remainingDemand) && remainingCapacity.compareTo(trolleyCapacity) >= 0) {
                     // 剩余需求不足一台车但至少生产一台车
                     actualTrolleys = 1;
                 } else {
@@ -1807,17 +2834,17 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
 
         // ===== 单规格每班最大排产量限制 =====
         BigDecimal maxShiftProduceQty = this.getParamAsDecimal(context, NcEngineConstants.PARAM_MAX_SHIFT_PRODUCE_QTY);
-        if (maxShiftProduceQty != null && maxShiftProduceQty.compareTo(BigDecimal.ZERO) > 0
+        if (BigDecimalUtils.gtZero(maxShiftProduceQty)
                 && baseProduceQty.compareTo(maxShiftProduceQty) > 0) {
             if (spec.isTailFinished()) {
                 // 已收尾规格：直接截断至最大排产量
                 baseProduceQty = maxShiftProduceQty;
             } else {
-                // 未收尾规格：先按最大排产量截断，再向上取整台车
-                // 因取整车多出来的部分允许超过最大排产限制
+                // 未收尾规格：允许超出最大排产限制一台车以内的量
                 BigDecimal trolleyCapacity = spec.getTrolleyCapacity();
-                if (trolleyCapacity != null && trolleyCapacity.compareTo(BigDecimal.ZERO) > 0) {
-                    int trolleysWithinLimit = maxShiftProduceQty.divide(trolleyCapacity, 0, RoundingMode.FLOOR).intValue();
+                if (BigDecimalUtils.gtZero(trolleyCapacity)) {
+                    BigDecimal relaxedLimit = maxShiftProduceQty.add(trolleyCapacity);
+                    int trolleysWithinLimit = relaxedLimit.divide(trolleyCapacity, 0, RoundingMode.FLOOR).intValue();
                     if (trolleysWithinLimit >= 1) {
                         baseProduceQty = BigDecimal.valueOf(trolleysWithinLimit).multiply(trolleyCapacity);
                     }
@@ -1830,9 +2857,70 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
     }
 
     /**
+     * 计算规格在供应窗口内的净需求量（与 checkDemandForShift 步骤3同口径）
+     *
+     * @param spec      规格
+     * @param shiftIndex 当前内衬班次索引
+     * @param context   排程上下文
+     * @return 供应窗口净需求量
+     */
+    private BigDecimal calcWindowNetDemand(NcLiningDemand spec, int shiftIndex, NcScheduleContext context) {
+        Map<String, BigDecimal> handoverInventory = context.getHandoverInventory();
+        Map<String, Integer> paddingSupplyDepth = context.getLiningSupplyDepth();
+
+        BigDecimal incomingInventory = handoverInventory.getOrDefault(spec.getLiningCode(), BigDecimal.ZERO);
+        int specSupplyDepth = paddingSupplyDepth.getOrDefault(spec.getLiningCode(),
+                NcEngineConstants.CX_SHIFT_COUNT);
+
+        int formingShiftOffset = context.getFormingShiftOffset() != null ? context.getFormingShiftOffset() : 0;
+        int firstFormingClass = this.getFormingClassByShiftIndex(shiftIndex, context);
+        if (firstFormingClass < 1) {
+            firstFormingClass = shiftIndex + formingShiftOffset;
+        }
+
+        int windowStartClass = firstFormingClass + 1;
+        int windowEndClass = Math.min(firstFormingClass + specSupplyDepth,
+                NcEngineConstants.CX_SHIFT_COUNT);
+
+        BigDecimal demandInWindow;
+        int trialAdvanceShifts = this.getTrialAdvanceShifts(context);
+        if (trialAdvanceShifts > 0 && this.hasTrialConsumption(context, spec.getLiningCode())) {
+            demandInWindow = this.calcCombinedWindowDemand(context, spec.getLiningCode(),
+                    firstFormingClass, specSupplyDepth, trialAdvanceShifts);
+        } else {
+            demandInWindow = BigDecimal.ZERO;
+            for (int fc = windowStartClass; fc <= windowEndClass; fc++) {
+                demandInWindow = demandInWindow.add(this.calcShiftConsume(
+                        context, spec.getLiningCode(), fc));
+            }
+        }
+
+        // 本班成型消耗由接班库存承担，供应窗口实际可用库存 = max(0, 接班库存 - 本班消耗)
+        BigDecimal currentShiftConsume = this.calcShiftConsume(context, spec.getLiningCode(), firstFormingClass);
+        BigDecimal availableForWindow = incomingInventory.subtract(currentShiftConsume);
+        if (BigDecimalUtils.ltZero(availableForWindow)) {
+            availableForWindow = BigDecimal.ZERO;
+        }
+        BigDecimal netDemand = demandInWindow.subtract(availableForWindow);
+        if (BigDecimalUtils.ltZero(netDemand)) {
+            netDemand = BigDecimal.ZERO;
+        }
+
+        // 已收尾规格含损耗率
+        if (spec.isTailFinished()) {
+            BigDecimal lossRate = this.getLossRate(spec.getLiningCode(), spec.getMachineCode(), context);
+            // 损耗率存储为百分比值（如 2 表示 2%），需除以 100
+            BigDecimal lossRateDecimal = BigDecimalUtils.percentages2Decimals(lossRate);
+            netDemand = netDemand.multiply(BigDecimal.ONE.add(lossRateDecimal)).setScale(2, RoundingMode.HALF_UP);
+        }
+
+        return netDemand;
+    }
+
+    /**
      * 记录排产结果
      */
-    private void recordSchedule(Map<String, NcScheduleResult> resultMap, NcPaddingDemand spec, int shiftIndex,
+    private void recordSchedule(Map<String, NcScheduleResult> resultMap, NcLiningDemand spec, int shiftIndex,
             BigDecimal produceQty, String machineCode, NcScheduleContext context) {
         String key = machineCode + ":" + spec.getLiningCode();
         NcScheduleResult result = resultMap.computeIfAbsent(key, k -> {
@@ -1840,7 +2928,7 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
             r.setMachineCode(machineCode);
             r.setLiningCode(spec.getLiningCode());
             r.setGlueCode(spec.getGlueCode());
-            r.setLiningName(spec.getLiningName());
+            r.setLiningName(spec.getLiningName());  
             // 记录排程首班班次（class1 对应的班次）
             if (context.getShiftClassMap() != null) {
                 r.setScheduleShiftClass(context.getShiftClassMap()[0]);
@@ -1859,16 +2947,19 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
         machineShiftSeq.put(shiftIndex, seq);
 
         // 使用 setFieldValueByFieldName 动态设置对应班次的计划量和顺序
-        result.setFieldValueByFieldName(String.format(NcEngineConstants.CLASS_PLAN_QTY_FIELD, shiftIndex), produceQty);
+        // 需累加已有排产量（主循环和补量阶段可能多次记录同一规格同一班次）
+        String planQtyFieldName = String.format(NcEngineConstants.CLASS_PLAN_QTY_FIELD, shiftIndex);
+        BigDecimal currentQty = BigDecimalUtils.valueOf(result.getFieldValueByFieldName(planQtyFieldName));
+        result.setFieldValueByFieldName(planQtyFieldName, currentQty.add(produceQty));
         result.setFieldValueByFieldName(String.format(NcEngineConstants.CLASS_SEQUENCE_FIELD, shiftIndex), seq);
     }
 
     /**
      * 获取某规格在某班次的排产量
      */
-    private BigDecimal getScheduledQty(Map<String, NcScheduleResult> resultMap, String liningCode, int shiftIndex) {
+    private BigDecimal getScheduledQty(Map<String, NcScheduleResult> resultMap, String paddingCode, int shiftIndex) {
         for (NcScheduleResult result : resultMap.values()) {
-            if (liningCode.equals(result.getLiningCode())) {
+            if (paddingCode.equals(result.getLiningCode())) {
                 String fieldName = String.format(NcEngineConstants.CLASS_PLAN_QTY_FIELD, shiftIndex);
                 return BigDecimalUtils.valueOf(result.getFieldValueByFieldName(fieldName));
             }
@@ -1887,14 +2978,14 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
                 continue; // 已收尾规格跳过（已在步骤5.1含损耗率）
             }
             BigDecimal lossRate = this.getLossRate(result.getLiningCode(), result.getMachineCode(), context);
-            if (lossRate == null || lossRate.compareTo(BigDecimal.ZERO) <= 0) {
+            if (BigDecimalUtils.leZero(lossRate)) {
                 continue;
             }
 
             // 各班次计划量 × (1 + 损耗率)
             for (int i = 1; i <= 6; i++) {
                 BigDecimal planQty = this.getClassPlanQtyFromResult(result, i);
-                if (planQty != null && planQty.compareTo(BigDecimal.ZERO) > 0) {
+                if (BigDecimalUtils.gtZero(planQty)) {
                     BigDecimal finalPlanQty = planQty.multiply(BigDecimal.ONE.add(lossRate)).setScale(0,
                             RoundingMode.CEILING);
                     this.setClassPlanQtyToResult(result, i, finalPlanQty);
@@ -2000,14 +3091,14 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
         if (val == null) {
             String name = (param != null && param.getParamName() != null) ? param.getParamName() : key;
             throw new BusinessException(MessageFormat.format(
-                    I18nUtil.getMessage("ui.dj.engine.paramNotConfigured"), name, key));
+                    I18nUtil.getMessage("ui.nc.engine.paramNotConfigured"), name, key));
         }
         try {
             return Integer.parseInt(val);
         } catch (NumberFormatException e) {
             String name = param.getParamName() != null ? param.getParamName() : key;
             throw new BusinessException(MessageFormat.format(
-                    I18nUtil.getMessage("ui.dj.engine.paramNotConfigured"), name, key));
+                    I18nUtil.getMessage("ui.nc.engine.paramNotConfigured"), name, key));
         }
     }
 
@@ -2020,14 +3111,14 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
         if (val == null) {
             String name = (param != null && param.getParamName() != null) ? param.getParamName() : key;
             throw new BusinessException(MessageFormat.format(
-                    I18nUtil.getMessage("ui.dj.engine.paramNotConfigured"), name, key));
+                    I18nUtil.getMessage("ui.nc.engine.paramNotConfigured"), name, key));
         }
         try {
-            return new BigDecimal(val);
+            return new BigDecimal(val); 
         } catch (NumberFormatException e) {
             String name = param.getParamName() != null ? param.getParamName() : key;
             throw new BusinessException(MessageFormat.format(
-                    I18nUtil.getMessage("ui.dj.engine.paramNotConfigured"), name, key));
+                    I18nUtil.getMessage("ui.nc.engine.paramNotConfigured"), name, key));
         }
     }
 
@@ -2036,5 +3127,21 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
      */
     private BigDecimal getParamAsDecimal(NcScheduleContext context, String key) {
         return this.getParamAsDecimal(context.getParamsMap(), key);
+    }
+
+    /**
+     * 获取参数整型值（通过 context），参数不存在时返回默认值
+     */
+    private int getParamAsInt(NcScheduleContext context, String key, int defaultValue) {
+        NcParams param = (context.getParamsMap() != null) ? context.getParamsMap().get(key) : null;
+        String val = this.resolveParamValue(param);
+        if (val == null) {
+            return defaultValue;
+        }
+        try {
+            return Integer.parseInt(val.trim());
+        } catch (NumberFormatException e) {
+            return defaultValue;
+        }
     }
 }

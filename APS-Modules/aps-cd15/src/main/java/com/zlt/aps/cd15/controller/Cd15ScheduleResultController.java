@@ -1,6 +1,5 @@
 package com.zlt.aps.cd15.controller;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.web.domain.AjaxResult;
@@ -34,11 +33,7 @@ import org.springframework.web.bind.annotation.RestController;
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * 斜裁排程结果控制层。
@@ -79,11 +74,7 @@ public class Cd15ScheduleResultController extends AbstractDocBizController<Cd15S
     @PostMapping("/remove")
     @Override
     public AjaxResult removeByIds(@RequestBody List<Long> ids) {
-        AjaxResult validation = this.validateDelete(ids);
-        if (validation != null) {
-            return validation;
-        }
-        return super.removeByIds(ids);
+        return cd15ScheduleResultService.removeScheduleResults(ids);
     }
 
     @ApiOperation("斜裁自动排程")
@@ -233,78 +224,6 @@ public class Cd15ScheduleResultController extends AbstractDocBizController<Cd15S
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getReleaseStatus()), "RELEASE_STATUS", queryVO.getReleaseStatus());
     }
 
-    /**
-     * 已成功发布的结果不得删除；分裁组合必须两条一起删除。
-     *
-     * @param ids 待删除结果主键
-     * @return 校验失败结果；通过时返回 null
-     */
-    private AjaxResult validateDelete(List<Long> ids) {
-        if (ids == null || ids.isEmpty()) {
-            return null;
-        }
-        List<Cd15ScheduleResult> selected = cd15ScheduleResultMapper.selectList(
-                new LambdaQueryWrapper<Cd15ScheduleResult>()
-                        .in(Cd15ScheduleResult::getId, ids));
-        boolean published = selected.stream().anyMatch(result ->
-                result.getPublishSuccessCount() != null
-                        && result.getPublishSuccessCount() > 0);
-        if (published) {
-            return AjaxResult.error(I18nUtil.getMessage(
-                    "ui.cd15.scheduleResult.publishedCannotDelete"));
-        }
-        boolean missingGroupNo = selected.stream()
-                .filter(result -> "SPLIT".equalsIgnoreCase(result.getCutMode()))
-                .anyMatch(result -> result.getGroupNo() == null
-                        || result.getGroupNo().trim().isEmpty());
-        if (missingGroupNo) {
-            return AjaxResult.error(I18nUtil.getMessage(
-                    "ui.cd15.scheduleResult.splitDeleteTogether"));
-        }
-        Map<String, List<Cd15ScheduleResult>> splitGroups = selected.stream()
-                .filter(result -> "SPLIT".equalsIgnoreCase(result.getCutMode()))
-                .collect(Collectors.groupingBy(this::splitGroupKey,
-                        LinkedHashMap::new, Collectors.toList()));
-        for (List<Cd15ScheduleResult> selectedGroup : splitGroups.values()) {
-            Cd15ScheduleResult sample = selectedGroup.get(0);
-            List<Cd15ScheduleResult> completeGroup =
-                    cd15ScheduleResultMapper.selectList(
-                            new LambdaQueryWrapper<Cd15ScheduleResult>()
-                                    .eq(Cd15ScheduleResult::getFactoryCode,
-                                            sample.getFactoryCode())
-                                    .eq(Cd15ScheduleResult::getScheduleDate,
-                                            sample.getScheduleDate())
-                                    .eq(Cd15ScheduleResult::getGroupNo,
-                                            sample.getGroupNo())
-                                    .eq(Cd15ScheduleResult::getCutMode, "SPLIT"));
-            Set<Long> selectedIds = selectedGroup.stream()
-                    .map(Cd15ScheduleResult::getId)
-                    .collect(Collectors.toSet());
-            boolean selectedAll = completeGroup.size() == selectedGroup.size()
-                    && completeGroup.stream()
-                    .map(Cd15ScheduleResult::getId)
-                    .allMatch(selectedIds::contains)
-                    && (completeGroup.size() == 1
-                    || completeGroup.size() == 2
-                    && completeGroup.stream()
-                    .map(Cd15ScheduleResult::getSteelStripCode)
-                    .filter(code -> code != null && !code.trim().isEmpty())
-                    .distinct().count() == 2L);
-            if (!selectedAll) {
-                return AjaxResult.error(I18nUtil.getMessage(
-                        "ui.cd15.scheduleResult.splitDeleteTogether"));
-            }
-        }
-        return null;
-    }
-
-    /** 构造分裁组合删除校验键。 */
-    private String splitGroupKey(Cd15ScheduleResult result) {
-        return String.valueOf(result.getFactoryCode()) + "|"
-                + String.valueOf(result.getScheduleDate()) + "|"
-                + String.valueOf(result.getGroupNo());
-    }
-
     @Override
     protected String getTypeCode() {
         return "CD15_SCHEDULE_RESULT";
@@ -312,6 +231,7 @@ public class Cd15ScheduleResultController extends AbstractDocBizController<Cd15S
 
     @Override
     protected String getOrderBy() {
-        return " MACHINE_CODE ASC,BIG_ROLL_CODE ASC,CLASS1_PRODUCE_ORDER IS NULL ASC,CLASS1_PRODUCE_ORDER ASC";
+        return " MACHINE_CODE ASC,CLASS1_PRODUCE_ORDER IS NULL ASC,"
+                + "CLASS1_PRODUCE_ORDER ASC,BIG_ROLL_CODE ASC,ID ASC";
     }
 }
