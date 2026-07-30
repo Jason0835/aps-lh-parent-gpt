@@ -5,19 +5,21 @@ import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.engine.service.FactoryService;
 import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.tq.api.domain.dto.TqChangeMachineDTO;
 import com.zlt.aps.tq.api.domain.dto.TqInsertOrderDTO;
-import com.zlt.aps.tq.api.domain.entity.TqDispatcherLog;
-import com.zlt.aps.tq.api.domain.entity.TqMachineInfo;
-import com.zlt.aps.tq.api.domain.entity.TqScheduleResult;
-import com.zlt.aps.tq.api.domain.entity.TqScheduleResultIssue;
+import com.zlt.aps.tq.api.domain.entity.*;
 import com.zlt.aps.tq.engine.service.TqEngineService;
 import com.zlt.aps.tq.engine.vo.RollingUpdateResult;
 import com.zlt.aps.tq.engine.vo.TqScheduleBaseInfoVo;
+import com.zlt.aps.tq.mapper.TqMachineChuckMapper;
+import com.zlt.aps.tq.mapper.TqMachineMaintenancePlanMapper;
+import com.zlt.aps.tq.mapper.TqMouthPlateMapper;
 import com.zlt.aps.tq.mapper.TqScheduleResultMapper;
+import com.zlt.aps.tq.mapper.TqSpecifyMachineMapper;
 import com.zlt.aps.tq.service.ITqScheduleResultService;
 import com.zlt.aps.tq.service.ITqRollingUpdateService;
 import com.zlt.aps.tq.service.ITqMachineInfoService;
@@ -48,6 +50,15 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 public class TqScheduleResultServiceImpl extends AbstractDocService<TqScheduleResult> implements ITqScheduleResultService {
+
+    /**
+     * 班次字段名模板常量（遵循动态字段访问规范，配合 String.format 使用）。
+     * 用于动态访问 class1~6PlanQty/FinishQty/Sequence/Analysis 等批量字段。
+     */
+    private static final String CLASS_PLAN_QTY_FIELD_TEMPLATE = "class%dPlanQty";
+    private static final String CLASS_FINISH_QTY_FIELD_TEMPLATE = "class%dFinishQty";
+    private static final String CLASS_SEQUENCE_FIELD_TEMPLATE = "class%dSequence";
+    private static final String CLASS_ANALYSIS_FIELD_TEMPLATE = "class%dAnalysis";
 
     @Autowired
     private TqScheduleResultMapper tqScheduleResultMapper;
@@ -87,6 +98,22 @@ public class TqScheduleResultServiceImpl extends AbstractDocService<TqScheduleRe
      */
     @Autowired
     private RedissonClient redissonClient;
+
+    /** 定点机台Mapper（用于转机台校验：限制作业/不可作业） */
+    @Resource
+    private TqSpecifyMachineMapper tqSpecifyMachineMapper;
+
+    /** 口型板Mapper（用于转机台校验：口型板→机台映射） */
+    @Resource
+    private TqMouthPlateMapper tqMouthPlateMapper;
+
+    /** 机台寸口Mapper（用于转机台校验：机台-寸口绑定） */
+    @Resource
+    private TqMachineChuckMapper tqMachineChuckMapper;
+
+    /** 维修计划Mapper（用于转机台校验：维修中机台排除） */
+    @Resource
+    private TqMachineMaintenancePlanMapper tqMachineMaintenancePlanMapper;
 
     @Override
     public String getDocTypeCode() {
@@ -254,25 +281,33 @@ public class TqScheduleResultServiceImpl extends AbstractDocService<TqScheduleRe
         tqScheduleResultMapper.insert(entity);
 
         // 滚动更新：对每个有计划量的班次执行同班次内时间重算
-        triggerRollingUpdateForAllShifts("1", entity.getId(), entity);
+        this.triggerRollingUpdateForAllShifts("1", entity.getId(), entity);
 
         // 记录调度日志（6班次制，操作类型：2-插单，无操作前数据）
-        recordDispatcherLog(ApsConstant.DISPATCHER_OPER_INSERT_ORDER, entity, null, entity);
+        this.recordDispatcherLog(ApsConstant.DISPATCHER_OPER_INSERT_ORDER, entity, null, entity);
 
         log.info("胎圈排程插单成功，排程日期：{}，胎圈代码：{}，机台：{}",
                 dto.getScheduleDate(), dto.getBeadCode(), dto.getMachineCode());
 
-        return AjaxResult.success("插单成功");
+        return AjaxResult.success(I18nUtil.getMessage("ui.tq.scheduleResult.insertOrder.success"));
     }
 
     /**
      * 转机台前校验
+     * 校验规则（与自动排程策略链口径一致）：
+     * 1. 基础校验：ID、新机台编号、新旧机台不重复、排程记录存在
+     * 2. 机台启用校验：新机台必须在胎圈机台管理中存在且启用
+     * 3. 寸口校验：新机台的寸口列表必须包含该胎圈的寸口值（proSize→inchSize）
+     * 4. 口型板校验：胎圈的三角胶口型板必须在新机台可用的口型板列表中
+     * 5. 定点机台校验：限制作业→新机台必须在限制列表；不可作业→新机台不能在排除列表
+     * 6. 维修校验：新机台在排程日期的所有班次不能处于维修状态
      *
      * @param dto 转机台数据
      * @return 校验结果
      */
     @Override
     public AjaxResult validateChangeMachine(TqChangeMachineDTO dto) {
+        // ========== 1. 基础校验 ==========
         if (dto.getId() == null) {
             return AjaxResult.error("请选择需要转机台的记录");
         }
@@ -289,13 +324,113 @@ public class TqScheduleResultServiceImpl extends AbstractDocService<TqScheduleRe
             return AjaxResult.error("排程记录不存在或已删除");
         }
 
-        // 校验新机台是否在胎圈机台管理中存在且启用
+        String newMachineCode = dto.getNewMachineCode();
+        String beadCode = record.getBeadCode();
+        String triangleGlueCode = record.getTriangleGlueCode();
+        String proSize = record.getProSize();
+
+        // ========== 2. 机台启用校验 ==========
         TqMachineInfo queryMachine = new TqMachineInfo();
-        queryMachine.setMachineCode(dto.getNewMachineCode());
+        queryMachine.setMachineCode(newMachineCode);
         List<TqMachineInfo> machineList = tqMachineInfoService.listMachineInfo(queryMachine);
         if (CollectionUtils.isEmpty(machineList)) {
-            return AjaxResult.error("新机台不存在或已停用：" + dto.getNewMachineCode());
+            return AjaxResult.error("新机台不存在或已停用：" + newMachineCode);
         }
+
+        // ========== 3. 寸口校验 ==========
+        // 查询新机台的寸口列表（来自T_TQ_MACHINE_CHUCK表）
+        LambdaQueryWrapper<TqMachineChuck> chuckWrapper = new LambdaQueryWrapper<>();
+        chuckWrapper.eq(TqMachineChuck::getMachineCode, newMachineCode);
+        chuckWrapper.eq(TqMachineChuck::getIsDelete, 0);
+        List<TqMachineChuck> chuckList = tqMachineChuckMapper.selectList(chuckWrapper);
+        if (CollectionUtils.isNotEmpty(chuckList) && StringUtils.isNotEmpty(proSize)) {
+            // proSize是英寸尺寸字符串，转换为BigDecimal与inchSize比较
+            java.math.BigDecimal dimension;
+            try {
+                dimension = new java.math.BigDecimal(proSize);
+            } catch (NumberFormatException e) {
+                log.warn("[转机台校验] 胎圈{}的英寸尺寸{}无法转换为数字，跳过寸口校验", beadCode, proSize);
+                dimension = null;
+            }
+            if (dimension != null) {
+                java.math.BigDecimal finalDimension = dimension;
+                boolean inchMatch = chuckList.stream()
+                        .anyMatch(c -> c.getInchSize() != null && c.getInchSize().compareTo(finalDimension) == 0);
+                if (!inchMatch) {
+                    return AjaxResult.error("新机台" + newMachineCode + "的寸口范围不包含胎圈英寸尺寸" + proSize + "，无法转机台");
+                }
+            }
+        }
+
+        // ========== 4. 口型板校验 ==========
+        // 查询口型板→机台映射：三角胶口型板对应的机台列表
+        if (StringUtils.isNotEmpty(triangleGlueCode)) {
+            LambdaQueryWrapper<TqMouthPlate> mpWrapper = new LambdaQueryWrapper<>();
+            mpWrapper.eq(TqMouthPlate::getMouthPlateCode, triangleGlueCode);
+            mpWrapper.eq(TqMouthPlate::getIsDelete, 0);
+            List<TqMouthPlate> mouthPlateList = tqMouthPlateMapper.selectList(mpWrapper);
+            // 口型板绑定了机台时，校验新机台是否在口型板的机台列表中
+            if (CollectionUtils.isNotEmpty(mouthPlateList)) {
+                boolean mouthPlateMatch = mouthPlateList.stream()
+                        .anyMatch(mp -> newMachineCode.equals(mp.getMachineCode()));
+                if (!mouthPlateMatch) {
+                    return AjaxResult.error("口型板" + triangleGlueCode + "不在新机台" + newMachineCode + "的可用口型板中，无法转机台");
+                }
+            }
+        }
+
+        // ========== 5. 定点机台校验 ==========
+        LambdaQueryWrapper<TqSpecifyMachine> specifyWrapper = new LambdaQueryWrapper<>();
+        specifyWrapper.eq(TqSpecifyMachine::getBeadCode, beadCode);
+        specifyWrapper.eq(TqSpecifyMachine::getIsDelete, 0);
+        List<TqSpecifyMachine> specifyList = tqSpecifyMachineMapper.selectList(specifyWrapper);
+
+        // 5.1 限制作业（jobType=0）：新机台必须在限制列表中
+        List<TqSpecifyMachine> canList = specifyList.stream()
+                .filter(s -> "0".equals(s.getJobType()) && "0".equals(s.getLineType()))
+                .collect(Collectors.toList());
+        if (CollectionUtils.isNotEmpty(canList)) {
+            boolean canMatch = canList.stream()
+                    .anyMatch(s -> newMachineCode.equals(s.getMachineCode()));
+            if (!canMatch) {
+                return AjaxResult.error("胎圈" + beadCode + "有限制作业机台约束，新机台" + newMachineCode + "不在限制作业列表中，无法转机台");
+            }
+        }
+
+        // 5.2 不可作业（jobType=1）：新机台不能在排除列表中
+        List<TqSpecifyMachine> notList = specifyList.stream()
+                .filter(s -> "1".equals(s.getJobType()) && "1".equals(s.getLineType()))
+                .collect(Collectors.toList());
+        if (CollectionUtils.isNotEmpty(notList)) {
+            boolean notMatch = notList.stream()
+                    .anyMatch(s -> newMachineCode.equals(s.getMachineCode()));
+            if (notMatch) {
+                return AjaxResult.error("胎圈" + beadCode + "有不可作业机台约束，新机台" + newMachineCode + "在不可作业列表中，无法转机台");
+            }
+        }
+
+        // ========== 6. 维修校验 ==========
+        // 校验排程日期的所有班次中，新机台是否处于维修状态
+        if (record.getScheduleDate() != null) {
+            String scheduleDateStr = cn.hutool.core.date.DateUtil.formatDate(record.getScheduleDate());
+            LambdaQueryWrapper<TqMachineMaintenancePlan> maintWrapper = new LambdaQueryWrapper<>();
+            maintWrapper.eq(TqMachineMaintenancePlan::getMachineCode, newMachineCode);
+            maintWrapper.eq(TqMachineMaintenancePlan::getIsDelete, 0);
+            // 查询该机台在排程日期当天的维修计划
+            maintWrapper.ge(TqMachineMaintenancePlan::getDowntimeDate, record.getScheduleDate());
+            maintWrapper.apply("DATE(DOWNTIME_DATE) = DATE({0})", record.getScheduleDate());
+            List<TqMachineMaintenancePlan> maintList = tqMachineMaintenancePlanMapper.selectList(maintWrapper);
+            if (CollectionUtils.isNotEmpty(maintList)) {
+                String maintShifts = maintList.stream()
+                        .map(TqMachineMaintenancePlan::getDowntimeShift)
+                        .collect(Collectors.joining(","));
+                return AjaxResult.error("新机台" + newMachineCode + "在排程日期" + scheduleDateStr + "有维修计划（班次：" + maintShifts + "），无法转机台");
+            }
+        }
+
+        log.info("[转机台校验] 胎圈{}转机台{}校验通过，寸口={}, 口型板={}, 定点={}, 维修=无",
+                beadCode, newMachineCode, proSize, triangleGlueCode,
+                CollectionUtils.isEmpty(canList) ? "无限制" : "已校验");
 
         return AjaxResult.success("校验通过");
     }
@@ -333,15 +468,15 @@ public class TqScheduleResultServiceImpl extends AbstractDocService<TqScheduleRe
 
         // 滚动更新：原机台和新机台都需要重算（每个有计划量的班次）
         // 原机台：删除任务后重算
-        triggerRollingUpdateForAllShifts("2", dto.getId(), record);
+        this.triggerRollingUpdateForAllShifts("2", dto.getId(), record);
         // 新机台：从原 record 复制后修改机台号，避免手工 new 遗漏字段
         TqScheduleResult newMachineRecord = new TqScheduleResult();
         BeanUtil.copyProperties(record, newMachineRecord);
         newMachineRecord.setMachineCode(dto.getNewMachineCode());
-        triggerRollingUpdateForAllShifts("2", dto.getId(), newMachineRecord);
+        this.triggerRollingUpdateForAllShifts("2", dto.getId(), newMachineRecord);
 
         // 记录调度日志（6班次制，操作类型：0-转机台，操作前=原机台记录，操作后=新机台记录）
-        recordDispatcherLog(ApsConstant.DISPATCHER_OPER_MACHINE, record, record, newMachineRecord);
+        this.recordDispatcherLog(ApsConstant.DISPATCHER_OPER_MACHINE, record, record, newMachineRecord);
 
         log.info("胎圈排程转机台成功，id：{}，原机台：{}，新机台：{}",
                 dto.getId(), oldMachineCode, dto.getNewMachineCode());
@@ -364,12 +499,12 @@ public class TqScheduleResultServiceImpl extends AbstractDocService<TqScheduleRe
     @Override
     public AjaxResult validateChangeQty(TqScheduleResult entity) {
         if (entity == null || entity.getId() == null) {
-            return AjaxResult.error("请选择需要调量的排程记录");
+            return AjaxResult.error(I18nUtil.getMessage("ui.tq.scheduleResult.changeQty.selectRecord"));
         }
 
         TqScheduleResult record = tqScheduleResultMapper.selectById(entity.getId());
         if (record == null || Objects.equals(record.getIsDelete(), 1)) {
-            return AjaxResult.error("排程记录不存在或已删除");
+            return AjaxResult.error(I18nUtil.getMessage("ui.tq.scheduleResult.changeQty.recordNotExist"));
         }
 
         Date now = new Date();
@@ -377,8 +512,8 @@ public class TqScheduleResultServiceImpl extends AbstractDocService<TqScheduleRe
         List<String> errorMessages = new ArrayList<>();
 
         for (int shiftIndex = 1; shiftIndex <= 6; shiftIndex++) {
-            Integer newPlanQty = getPlanQtyByShiftIndex(entity, shiftIndex);
-            Integer oldPlanQty = getPlanQtyByShiftIndex(record, shiftIndex);
+            Integer newPlanQty = this.getPlanQtyByShiftIndex(entity, shiftIndex);
+            Integer oldPlanQty = this.getPlanQtyByShiftIndex(record, shiftIndex);
 
             // 只检查被修改的班次
             if (newPlanQty == null || Objects.equals(newPlanQty, oldPlanQty)) {
@@ -389,34 +524,34 @@ public class TqScheduleResultServiceImpl extends AbstractDocService<TqScheduleRe
 
             // 规则3：计划量不能小于0
             if (newPlanQty < 0) {
-                errorMessages.add(String.format("第%d班计划量不能小于0", shiftIndex));
+                errorMessages.add(String.format(I18nUtil.getMessage("ui.tq.scheduleResult.changeQty.planQtyLessThanZero"), shiftIndex));
                 continue;
             }
 
             // 判断是否为历史班次
-            boolean historyShift = isHistoryShift(record, shiftIndex, now);
+            boolean historyShift = this.isHistoryShift(record, shiftIndex, now);
 
             if (historyShift) {
                 // 规则4：历史班次不允许修改
-                errorMessages.add(String.format("不能修改历史班次（第%d班）的计划量", shiftIndex));
+                errorMessages.add(String.format(I18nUtil.getMessage("ui.tq.scheduleResult.changeQty.historyShiftForbidden"), shiftIndex));
             } else {
                 // 规则5：非历史班次计划量不能小于完成量
-                Integer finishQty = getFinishQtyByShiftIndex(record, shiftIndex);
+                Integer finishQty = this.getFinishQtyByShiftIndex(record, shiftIndex);
                 if (finishQty != null && finishQty > 0 && newPlanQty < finishQty) {
-                    errorMessages.add(String.format("第%d班计划量不能小于完成量%d", shiftIndex, finishQty));
+                    errorMessages.add(String.format(I18nUtil.getMessage("ui.tq.scheduleResult.changeQty.planQtyLessThanFinish"), shiftIndex, finishQty));
                 }
             }
         }
 
         if (!hasAdjustField) {
-            errorMessages.add("未检测到需要调整的计划量");
+            errorMessages.add(I18nUtil.getMessage("ui.tq.scheduleResult.changeQty.noAdjustField"));
         }
 
         if (!errorMessages.isEmpty()) {
-            return AjaxResult.error(String.join("；", errorMessages));
+            return AjaxResult.error(String.join(I18nUtil.getMessage("ui.tq.scheduleResult.changeQty.errorSeparator"), errorMessages));
         }
 
-        return AjaxResult.success("校验通过");
+        return AjaxResult.success(I18nUtil.getMessage("ui.tq.scheduleResult.changeQty.validatePass"));
     }
 
     /**
@@ -434,7 +569,7 @@ public class TqScheduleResultServiceImpl extends AbstractDocService<TqScheduleRe
     @Transactional(rollbackFor = Exception.class)
     public AjaxResult changeQty(TqScheduleResult entity) {
         // 1. 前置校验
-        AjaxResult validateResult = validateChangeQty(entity);
+        AjaxResult validateResult = this.validateChangeQty(entity);
         if (!validateResult.get(AjaxResult.CODE_TAG).equals(200)) {
             return validateResult;
         }
@@ -442,10 +577,13 @@ public class TqScheduleResultServiceImpl extends AbstractDocService<TqScheduleRe
         // 2. 查询原记录
         TqScheduleResult record = tqScheduleResultMapper.selectById(entity.getId());
         if (record == null) {
-            return AjaxResult.error("排程记录不存在或已删除");
+            return AjaxResult.error(I18nUtil.getMessage("ui.tq.scheduleResult.changeQty.recordNotExist"));
         }
 
-        // 3. 构建更新wrapper
+        // 3. 构建更新实体（携带需要 set 的非 null 字段）和更新条件 wrapper
+        // 遵循动态字段访问规范：班次字段通过 setFieldValueByFieldName 设置到 updateEntity，
+        // 由 MyBatis-Plus 自动生成 set 子句；公共字段（isRelease/remark）仍用 LambdaUpdateWrapper.set。
+        TqScheduleResult updateEntity = new TqScheduleResult();
         LambdaUpdateWrapper<TqScheduleResult> updateWrapper = new LambdaUpdateWrapper<>();
         updateWrapper.eq(TqScheduleResult::getId, entity.getId());
 
@@ -453,26 +591,26 @@ public class TqScheduleResultServiceImpl extends AbstractDocService<TqScheduleRe
 
         // 4. 更新各班次计划量和原因分析
         for (int shiftIndex = 1; shiftIndex <= 6; shiftIndex++) {
-            Integer newPlanQty = getPlanQtyByShiftIndex(entity, shiftIndex);
-            Integer oldPlanQty = getPlanQtyByShiftIndex(record, shiftIndex);
-            String newAnalysis = getAnalysisByShiftIndex(entity, shiftIndex);
-            String oldAnalysis = getAnalysisByShiftIndex(record, shiftIndex);
+            Integer newPlanQty = this.getPlanQtyByShiftIndex(entity, shiftIndex);
+            Integer oldPlanQty = this.getPlanQtyByShiftIndex(record, shiftIndex);
+            String newAnalysis = this.getAnalysisByShiftIndex(entity, shiftIndex);
+            String oldAnalysis = this.getAnalysisByShiftIndex(record, shiftIndex);
 
             // 更新被修改的计划量
             if (newPlanQty != null && !Objects.equals(newPlanQty, oldPlanQty)) {
-                setPlanQtyToUpdateWrapper(updateWrapper, shiftIndex, newPlanQty);
+                this.setPlanQtyToUpdateEntity(updateEntity, shiftIndex, newPlanQty);
                 hasChange = true;
             }
 
             // 更新原因分析（非空且与原值不同时更新）
             if (newAnalysis != null && !newAnalysis.equals(oldAnalysis)) {
-                setAnalysisToUpdateWrapper(updateWrapper, shiftIndex, newAnalysis);
+                this.setAnalysisToUpdateEntity(updateEntity, shiftIndex, newAnalysis);
                 hasChange = true;
             }
         }
 
         if (!hasChange) {
-            return AjaxResult.error("没有需要保存的修改内容");
+            return AjaxResult.error(I18nUtil.getMessage("ui.tq.scheduleResult.changeQty.noChange"));
         }
 
         // 5. 更新备注
@@ -485,20 +623,20 @@ public class TqScheduleResultServiceImpl extends AbstractDocService<TqScheduleRe
             updateWrapper.set(TqScheduleResult::getIsRelease, ApsConstant.WAIT_RELEASING);
         }
 
-        // 7. 执行更新
-        tqScheduleResultMapper.update(null, updateWrapper);
+        // 7. 执行更新（updateEntity 携带班次字段的 set 子句，wrapper 携带公共字段和 where 条件）
+        tqScheduleResultMapper.update(updateEntity, updateWrapper);
 
         log.info("胎圈排程调量成功，id：{}，胎圈代码：{}，机台：{}",
                 entity.getId(), record.getBeadCode(), record.getMachineCode());
 
-        // 8. 滚动更新：对每个被修改的班次执行同班次内时间重算
-        triggerRollingUpdateForAllShifts("3", entity.getId(), record);
+        // 8. 滚动更新：对每个被修改的班次执行同班次内时间重算（triggerType="3" 表示调量触发）
+        this.triggerRollingUpdateForAllShifts("3", entity.getId(), record);
 
         // 9. 记录调度日志（6班次制，操作类型：1-调量，操作前=原记录，操作后=更新后记录）
         TqScheduleResult afterRecord = tqScheduleResultMapper.selectById(entity.getId());
-        recordDispatcherLog(ApsConstant.DISPATCHER_OPER_PLAN, record, record, afterRecord);
+        this.recordDispatcherLog(ApsConstant.DISPATCHER_OPER_PLAN, record, record, afterRecord);
 
-        return AjaxResult.success("调量成功");
+        return AjaxResult.success(I18nUtil.getMessage("ui.tq.scheduleResult.changeQty.success"));
     }
 
     /**
@@ -512,7 +650,7 @@ public class TqScheduleResultServiceImpl extends AbstractDocService<TqScheduleRe
     @Transactional(rollbackFor = Exception.class)
     public AjaxResult logicDeleteByIds(List<Long> ids) {
         if (ids == null || ids.isEmpty()) {
-            return AjaxResult.error("请选择需要删除的记录");
+            return AjaxResult.error(I18nUtil.getMessage("ui.tq.scheduleResult.delete.selectRecord"));
         }
 
         for (Long id : ids) {
@@ -522,7 +660,7 @@ public class TqScheduleResultServiceImpl extends AbstractDocService<TqScheduleRe
             }
             // 校验：已发布成功的计划不允许删除
             if (ApsConstant.IS_RELEASE.equals(record.getIsRelease())) {
-                return AjaxResult.error("已发布成功的计划不允许删除，只能调量。胎圈代码：" + record.getBeadCode());
+                return AjaxResult.error(String.format(I18nUtil.getMessage("ui.tq.scheduleResult.delete.publishedForbidden"), record.getBeadCode()));
             }
 
             // 逻辑删除：更新 is_delete = 1
@@ -532,15 +670,15 @@ public class TqScheduleResultServiceImpl extends AbstractDocService<TqScheduleRe
             tqScheduleResultMapper.update(null, updateWrapper);
 
             // 滚动更新：删除后对每个有计划量的班次执行同班次内时间重算
-            triggerRollingUpdateForAllShifts("4", id, record);
+            this.triggerRollingUpdateForAllShifts("4", id, record);
 
             // 记录调度日志（6班次制，操作类型：3-删除，操作前=原记录，操作后=null）
-            recordDispatcherLog(ApsConstant.DISPATCHER_OPER_DELETE, record, record, null);
+            this.recordDispatcherLog(ApsConstant.DISPATCHER_OPER_DELETE, record, record, null);
 
             log.info("胎圈排程逻辑删除成功，id：{}，胎圈代码：{}", id, record.getBeadCode());
         }
 
-        return AjaxResult.success("删除成功");
+        return AjaxResult.success(I18nUtil.getMessage("ui.tq.scheduleResult.delete.success"));
     }
 
     /**
@@ -873,32 +1011,20 @@ public class TqScheduleResultServiceImpl extends AbstractDocService<TqScheduleRe
 
     /**
      * 根据班次索引获取DTO中的计划量
+     * 遵循动态字段访问规范：禁止使用 switch/case 硬编码访问班次字段。
      */
     private Integer getPlanQtyByClassIndex(TqInsertOrderDTO dto, int classIndex) {
-        switch (classIndex) {
-            case 1: return dto.getClass1PlanQty();
-            case 2: return dto.getClass2PlanQty();
-            case 3: return dto.getClass3PlanQty();
-            case 4: return dto.getClass4PlanQty();
-            case 5: return dto.getClass5PlanQty();
-            case 6: return dto.getClass6PlanQty();
-            default: return null;
-        }
+        String fieldName = String.format(CLASS_PLAN_QTY_FIELD_TEMPLATE, classIndex);
+        return (Integer) dto.getFieldValueByFieldName(fieldName);
     }
 
     /**
      * 根据班次索引获取DTO中的顺序
+     * 遵循动态字段访问规范：禁止使用 switch/case 硬编码访问班次字段。
      */
     private Integer getSequenceByClassIndex(TqInsertOrderDTO dto, int classIndex) {
-        switch (classIndex) {
-            case 1: return dto.getClass1Sequence();
-            case 2: return dto.getClass2Sequence();
-            case 3: return dto.getClass3Sequence();
-            case 4: return dto.getClass4Sequence();
-            case 5: return dto.getClass5Sequence();
-            case 6: return dto.getClass6Sequence();
-            default: return null;
-        }
+        String fieldName = String.format(CLASS_SEQUENCE_FIELD_TEMPLATE, classIndex);
+        return (Integer) dto.getFieldValueByFieldName(fieldName);
     }
 
     /**
@@ -1082,99 +1208,70 @@ public class TqScheduleResultServiceImpl extends AbstractDocService<TqScheduleRe
 
     /**
      * 根据班次索引获取实体中的计划量
+     * 遵循动态字段访问规范：禁止使用 switch/case 硬编码访问班次字段。
      *
      * @param entity     排程结果实体
      * @param shiftIndex 班次索引（1~6）
      * @return 计划量
      */
     private Integer getPlanQtyByShiftIndex(TqScheduleResult entity, int shiftIndex) {
-        switch (shiftIndex) {
-            case 1: return entity.getClass1PlanQty();
-            case 2: return entity.getClass2PlanQty();
-            case 3: return entity.getClass3PlanQty();
-            case 4: return entity.getClass4PlanQty();
-            case 5: return entity.getClass5PlanQty();
-            case 6: return entity.getClass6PlanQty();
-            default: return null;
-        }
+        String fieldName = String.format(CLASS_PLAN_QTY_FIELD_TEMPLATE, shiftIndex);
+        return (Integer) entity.getFieldValueByFieldName(fieldName);
     }
 
     /**
      * 根据班次索引获取实体中的完成量
+     * 遵循动态字段访问规范：禁止使用 switch/case 硬编码访问班次字段。
      *
      * @param entity     排程结果实体
      * @param shiftIndex 班次索引（1~6）
      * @return 完成量
      */
     private Integer getFinishQtyByShiftIndex(TqScheduleResult entity, int shiftIndex) {
-        switch (shiftIndex) {
-            case 1: return entity.getClass1FinishQty();
-            case 2: return entity.getClass2FinishQty();
-            case 3: return entity.getClass3FinishQty();
-            case 4: return entity.getClass4FinishQty();
-            case 5: return entity.getClass5FinishQty();
-            case 6: return entity.getClass6FinishQty();
-            default: return null;
-        }
+        String fieldName = String.format(CLASS_FINISH_QTY_FIELD_TEMPLATE, shiftIndex);
+        return (Integer) entity.getFieldValueByFieldName(fieldName);
     }
 
     /**
      * 根据班次索引获取实体中的原因分析
+     * 遵循动态字段访问规范：禁止使用 switch/case 硬编码访问班次字段。
      *
      * @param entity     排程结果实体
      * @param shiftIndex 班次索引（1~6）
      * @return 原因分析
      */
     private String getAnalysisByShiftIndex(TqScheduleResult entity, int shiftIndex) {
-        switch (shiftIndex) {
-            case 1: return entity.getClass1Analysis();
-            case 2: return entity.getClass2Analysis();
-            case 3: return entity.getClass3Analysis();
-            case 4: return entity.getClass4Analysis();
-            case 5: return entity.getClass5Analysis();
-            case 6: return entity.getClass6Analysis();
-            default: return null;
-        }
+        String fieldName = String.format(CLASS_ANALYSIS_FIELD_TEMPLATE, shiftIndex);
+        return (String) entity.getFieldValueByFieldName(fieldName);
     }
 
     /**
      * 设置指定班次计划量到UpdateWrapper
+     * 遵循动态字段访问规范：通过 setFieldValueByFieldName 设置到更新实体，
+     * 配合 mapper.update(updateEntity, wrapper) 实现动态 set 子句。
      *
-     * @param updateWrapper 更新条件
-     * @param shiftIndex    班次索引（1~6）
-     * @param planQty       计划量
+     * @param updateEntity 更新实体（用于携带 set 子句的非 null 字段）
+     * @param shiftIndex   班次索引（1~6）
+     * @param planQty      计划量
      */
-    private void setPlanQtyToUpdateWrapper(LambdaUpdateWrapper<TqScheduleResult> updateWrapper,
-                                           int shiftIndex, Integer planQty) {
-        switch (shiftIndex) {
-            case 1: updateWrapper.set(TqScheduleResult::getClass1PlanQty, planQty); break;
-            case 2: updateWrapper.set(TqScheduleResult::getClass2PlanQty, planQty); break;
-            case 3: updateWrapper.set(TqScheduleResult::getClass3PlanQty, planQty); break;
-            case 4: updateWrapper.set(TqScheduleResult::getClass4PlanQty, planQty); break;
-            case 5: updateWrapper.set(TqScheduleResult::getClass5PlanQty, planQty); break;
-            case 6: updateWrapper.set(TqScheduleResult::getClass6PlanQty, planQty); break;
-            default: break;
-        }
+    private void setPlanQtyToUpdateEntity(TqScheduleResult updateEntity,
+                                          int shiftIndex, Integer planQty) {
+        String fieldName = String.format(CLASS_PLAN_QTY_FIELD_TEMPLATE, shiftIndex);
+        updateEntity.setFieldValueByFieldName(fieldName, planQty);
     }
 
     /**
      * 设置指定班次原因分析到UpdateWrapper
+     * 遵循动态字段访问规范：通过 setFieldValueByFieldName 设置到更新实体。
      *
-     * @param updateWrapper 更新条件
-     * @param shiftIndex    班次索引（1~6）
-     * @param analysis      原因分析
+     * @param updateEntity 更新实体
+     * @param shiftIndex   班次索引（1~6）
+     * @param analysis     原因分析
      */
-    private void setAnalysisToUpdateWrapper(LambdaUpdateWrapper<TqScheduleResult> updateWrapper,
-                                            int shiftIndex, String analysis) {
-        switch (shiftIndex) {
-            case 1: updateWrapper.set(TqScheduleResult::getClass1Analysis, analysis); break;
-            case 2: updateWrapper.set(TqScheduleResult::getClass2Analysis, analysis); break;
-            case 3: updateWrapper.set(TqScheduleResult::getClass3Analysis, analysis); break;
-            case 4: updateWrapper.set(TqScheduleResult::getClass4Analysis, analysis); break;
-            case 5: updateWrapper.set(TqScheduleResult::getClass5Analysis, analysis); break;
-            case 6: updateWrapper.set(TqScheduleResult::getClass6Analysis, analysis); break;
-            default: break;
-        }
+    private void setAnalysisToUpdateEntity(TqScheduleResult updateEntity,
+                                           int shiftIndex, String analysis) {
+        String fieldName = String.format(CLASS_ANALYSIS_FIELD_TEMPLATE, shiftIndex);
+        updateEntity.setFieldValueByFieldName(fieldName, analysis);
     }
 
     /**

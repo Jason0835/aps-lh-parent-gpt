@@ -95,6 +95,14 @@ export function validateChangeMachine(data) {
   })
 }
 
+/** 获取转机台候选机台列表（按定点机台过滤） */
+export function listCandidateMachines(id) {
+  return request({
+    url: '/gsq/scheduleResult/listCandidateMachines/' + id,
+    method: 'post'
+  })
+}
+
 /** 调量前校验 */
 export function validateChangeQty(data) {
   return request({

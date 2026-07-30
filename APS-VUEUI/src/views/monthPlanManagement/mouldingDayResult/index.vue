@@ -50,33 +50,14 @@
           >{{ $t("ui.data.column.monthPlanFinalAdjustQuery.exportAllMaterial") }}</el-button
         >
       </template>
-      <!-- <template slot="headerRight">
+      <template slot="headerRight">
         <span class="stat-info">
-          <span
-            >排产SAP个数:
-            <span class="stat-value"> {{ stat.productionCount }} </span></span
-          >
-          <span
-            >未排SAP总量:
-            <span class="stat-value">{{ stat.noProductionCount }}</span></span
-          >
-          <span
-            >已排SAP总量:
-            <span class="stat-value">{{ stat.productionSum }}</span></span
-          >
-          <span
-            >提报的SAP个数:
-            <span class="stat-value">{{ stat.reportCount }}</span></span
-          >
-          <span
-            >提报的SAP总量:
-            <span class="stat-value">{{ stat.reportSum }}</span></span
-          >
-          <span
-            >备货量: <span class="stat-value">{{ stat.stockNum }}</span></span
-          >
+          <span>
+            {{ $t("ui.data.column.monthPlanFinalAdjustQuery.sumTotalQty") }}：
+            <span class="stat-value">{{ versionTotalQty }}</span>
+          </span>
         </span>
-      </template> -->
+      </template>
     </page-table>
     <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
     <tlt-upload
@@ -155,6 +136,8 @@ export default {
       stat: {},
       dayNum: 31,
       lastRouteLoadKey: "",
+      versionTotalQty: 0,
+      lastQueryKey: "",
     };
   },
   computed: {
@@ -610,7 +593,12 @@ export default {
     async getList() {
       try {
         this.loading = true;
-        const data = await listProductionPlan(this.formatParams());
+        const params = this.formatParams();
+        // 检测查询条件是否变化（分页变化不触发）
+        const currentQueryKey = JSON.stringify(this.query);
+        const isNewQuery = currentQueryKey !== this.lastQueryKey;
+
+        const data = await listProductionPlan(params);
         console.log(data);
         // this.data = data.rows;
         this.page.total = data.total;
@@ -619,11 +607,30 @@ export default {
         } else {
           this.data = [];
         }
+
+        // 查询条件变化时，重新计算该版本全部记录的总排产量
+        if (isNewQuery) {
+          this.lastQueryKey = currentQueryKey;
+          await this.refreshVersionTotalQty();
+        }
       } catch (error) {
         console.error(error);
       } finally {
         this.loading = false;
       }
+    },
+    /** 计算该版本全部记录的生产实际排产量合计 */
+    async refreshVersionTotalQty() {
+      const params = this.formatParams(false);
+      const data = await listProductionPlan(params);
+      let total = 0;
+      if (data.rows) {
+        for (const row of data.rows) {
+          const qty = parseFloat(row.totalQty);
+          total += isNaN(qty) ? 0 : qty;
+        }
+      }
+      this.versionTotalQty = total;
     },
     async statistics(params) {
       try {

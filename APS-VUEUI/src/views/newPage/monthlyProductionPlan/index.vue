@@ -2281,7 +2281,9 @@ export default {
     },
     /**
      * 结构内/结构调整版本号默认值：与 structureInnerAdjust（rollingCycle structureInner）一致；
-     * 列表首项为默认；isNewVersion 为 true 时强制首项；query.version 仍在列表中则保留。
+     * 列表首项为默认；isNewVersion 为 true 时强制首项；
+     * 当前 query.version 仍在接口返回列表中则保留，否则回落首项（不补旧版本进 options，避免切年月残留）。
+     * 路由/弹窗需强制写入不在列表中的版本时，走 syncProductionVersionToSearch 补全。
      */
     applyAdjustVersionDefault(list, isNewVersion = false) {
       if (!list || list.length === 0) {
@@ -2302,15 +2304,11 @@ export default {
         const hasVersion = list.some(
           (item) => String(item.value) === currentPv
         );
-        if (!hasVersion) {
-          this.versionOptions = [
-            ...list,
-            { label: currentPv, value: currentPv, adjustType: "" },
-          ];
+        if (hasVersion) {
+          this.search = { ...this.search, version: currentPv };
+          this.query = { ...this.query, version: currentPv };
+          return;
         }
-        this.search = { ...this.search, version: currentPv };
-        this.query = { ...this.query, version: currentPv };
-        return;
       }
       const defaultPv = list[0].value;
       this.search = { ...this.search, version: defaultPv };

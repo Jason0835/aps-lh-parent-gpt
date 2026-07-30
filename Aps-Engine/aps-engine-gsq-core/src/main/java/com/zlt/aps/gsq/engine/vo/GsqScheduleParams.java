@@ -63,6 +63,9 @@ public class GsqScheduleParams {
     /** 供应时长（默认12小时） */
     private Double supplyTime;
 
+    /** 供应时长警告阈值（单位：班次，默认3班，低于此值触发库存预测规则证据） */
+    private Double supplyTimeThreshold;
+
     /** 库消比高阈值（SYS1605001，默认2.0） */
     private BigDecimal stockConsumeRatioHigh;
 

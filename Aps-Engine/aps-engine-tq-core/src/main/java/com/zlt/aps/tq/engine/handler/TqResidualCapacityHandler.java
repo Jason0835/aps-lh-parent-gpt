@@ -7,20 +7,24 @@ import com.zlt.aps.common.engine.service.AutoScheduleLogService;
 import com.zlt.aps.common.engine.utils.CollectionUtil;
 import com.zlt.aps.tq.api.domain.entity.TqMachineInfo;
 import com.zlt.aps.tq.engine.context.TqScheduleContext;
+import com.zlt.aps.tq.engine.enums.TqScheduleRuleCodeEnum;
+import com.zlt.aps.tq.engine.enums.TqScheduleRuleResultEnum;
+import com.zlt.aps.tq.engine.strategy.TqDemandCalcHelper;
 import com.zlt.aps.tq.engine.vo.TqScheduleResultVo;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * S3.5: 剩余产能分配Handler。
+ * S5.6: 最终剩余产能回填Handler（原 S3.5）。
  *
- * <p>职责：S3机台分配完成后，回收每个机台每班的剩余产能（quota - 已排产量），
+ * <p>职责：在 S5.5 定额校验完成、所有计划量修改结束后，回收每个机台每班的剩余产能（quota - 已排产量），
  * 按三级优先级回填到该机台上的规格，避免产能浪费。</p>
  *
  * <p>触发场景：多规格机台上，备库胎圈因SYS1101029阈值初始只排了threshold量，
@@ -44,6 +48,10 @@ import java.util.stream.Collectors;
  *
  * <p>单一规格机台：S3阶段已按机台定额满排，无剩余产能，本Handler不会触发回填。</p>
  *
+ * <p>执行顺序说明（Phase 2 重构）：原 S3.5 位于 S3 之后，但 S4/S5/S5.5 会修改计划量导致回填结果被覆盖。
+ * 现移至 S5.5 之后执行（即 S5.6），确保回填结果为最终结果且不被覆盖。
+ * 执行前会重新计算 backupRemainingQty，基于实际已排产量修正（解决 S3 阶段 deferToNextClass 不扣减的问题）。</p>
+ *
  * @author APS
  */
 @Slf4j
@@ -55,7 +63,7 @@ public class TqResidualCapacityHandler extends AbsTqScheduleStepHandler {
 
     @Override
     protected String getStepName() {
-        return "S3.5-剩余产能分配";
+        return "S5.6-最终剩余产能回填";
     }
 
     @Override
@@ -64,6 +72,12 @@ public class TqResidualCapacityHandler extends AbsTqScheduleStepHandler {
         if (CollectionUtil.isEmpty(scheduleList)) {
             return;
         }
+
+        // Phase 2 重构新增：执行回填前，重新计算 backupRemainingQty
+        // 原因：S3 阶段 deferToNextClass 延后时不扣减 backupRemainingQty，导致该值偏大；
+        //       S4/S5/S5.5 也会修改计划量，需基于最终实际已排产量修正剩余备库量。
+        // 重算公式：backupRemainingQty = backupTotalPlanQty - 6班实际已排产量合计
+        recalcBackupRemainingQty(scheduleList);
 
         // 供应时长阈值（用于Priority-2/3判定）
         double supplyTimeThreshold = getSupplyTimeThreshold(context);
@@ -76,7 +90,7 @@ public class TqResidualCapacityHandler extends AbsTqScheduleStepHandler {
                 .collect(Collectors.groupingBy(TqScheduleResultVo::getMachineCode));
 
         if (machineSpecMap.isEmpty()) {
-            log.info("[S3.5] 无已分配机台的规格，跳过剩余产能分配");
+            log.info("[S5.6] 无已分配机台的规格，跳过剩余产能回填");
             return;
         }
 
@@ -101,7 +115,63 @@ public class TqResidualCapacityHandler extends AbsTqScheduleStepHandler {
             fillLastClassWithAllRemaining(machineCode, specList, machineQuota, context);
         }
 
-        log.info("[S3.5] 剩余产能分配完成, 机台数:{}", machineSpecMap.size());
+        log.info("[S5.6] 最终剩余产能回填完成, 机台数:{}", machineSpecMap.size());
+    }
+
+    /**
+     * 重新计算所有备库胎圈的 backupRemainingQty。
+     *
+     * <p>背景：S3 阶段 deferToNextClass 延后时未扣减 backupRemainingQty，S4/S5/S5.5 又修改了计划量，
+     * 导致 backupRemainingQty 与实际已排产量不一致。本方法在 S5.6 回填前统一修正：</p>
+     *
+     * <p>重算公式：backupRemainingQty = backupTotalPlanQty - 6班实际已排产量合计</p>
+     *
+     * <p>处理逻辑：</p>
+     * <ol>
+     *   <li>仅处理备库胎圈（backupTriggerClass > 0）</li>
+     *   <li>若 backupTotalPlanQty 为空（旧数据兼容），跳过重算保持原值</li>
+     *   <li>计算6班实际已排产量合计</li>
+     *   <li>剩余量 = 初始总需求 - 已排产量，若为负则置0（已超排）</li>
+     * </ol>
+     *
+     * @param scheduleList 排程列表
+     */
+    private void recalcBackupRemainingQty(List<TqScheduleResultVo> scheduleList) {
+        int recalcCount = 0;
+        for (TqScheduleResultVo scheduleVo : scheduleList) {
+            // 仅处理备库胎圈
+            if (scheduleVo.getBackupTriggerClass() == null || scheduleVo.getBackupTriggerClass() <= 0) {
+                continue;
+            }
+            // 若未保存初始总需求量（旧数据兼容），跳过重算
+            if (scheduleVo.getBackupTotalPlanQty() == null) {
+                continue;
+            }
+
+            // 计算6班实际已排产量合计
+            double actualTotalPlanQty = 0D;
+            for (int classNum = 1; classNum <= 6; classNum++) {
+                actualTotalPlanQty = BigDecimalUtil.add(actualTotalPlanQty, getClassPlanQty(scheduleVo, classNum));
+            }
+
+            // 重算剩余备库量 = 初始总需求 - 已排产量
+            double newRemaining = BigDecimalUtil.sub(scheduleVo.getBackupTotalPlanQty(), actualTotalPlanQty);
+            if (newRemaining < 0) {
+                // 已超排，剩余量置0
+                newRemaining = 0D;
+            }
+
+            double oldRemaining = scheduleVo.getBackupRemainingQty() == null ? 0D : scheduleVo.getBackupRemainingQty();
+            scheduleVo.setBackupRemainingQty(newRemaining);
+            recalcCount++;
+
+            log.info("[S5.6] 重算备库剩余量, 胎圈:{}, 初始总需求:{}, 已排产量:{}, 旧剩余量:{}, 新剩余量:{}",
+                    scheduleVo.getBeadCode(), scheduleVo.getBackupTotalPlanQty(),
+                    actualTotalPlanQty, oldRemaining, newRemaining);
+        }
+        if (recalcCount > 0) {
+            log.info("[S5.6] 备库剩余量重算完成, 重算规格数:{}", recalcCount);
+        }
     }
 
     /**
@@ -162,16 +232,33 @@ public class TqResidualCapacityHandler extends AbsTqScheduleStepHandler {
                 if (backupRemaining <= 0) {
                     continue;
                 }
+                // 备库触发班次 > 当前班次时，当前班次库存充足不需要排产，不回填
+                // 典型场景：023规格3班才触发备库，1/2班库存充足不应被回填备库量
+                Integer backupTriggerClass = spec.getBackupTriggerClass();
+                if (backupTriggerClass != null && backupTriggerClass > classNum) {
+                    continue;
+                }
                 double assignQty = Math.min(residualCapacity, backupRemaining);
                 assignQty = applyRoundingIfNeeded(assignQty);
                 addClassPlanQty(spec, classNum, assignQty);
                 spec.setBackupRemainingQty(BigDecimalUtil.sub(backupRemaining, assignQty));
 
                 autoScheduleLogService.insertTqScheduleLog(spec.getBatchNo(), spec.getOrderNo(),
-                        "S3.5-剩余产能回填备库胎圈",
+                        "S5.6-剩余产能回填备库胎圈",
                         "胎圈代码：" + spec.getBeadCode() + "，机台：" + machineCode
                                 + "，" + classNum + "班回填" + assignQty
                                 + "，剩余备库量：" + spec.getBackupRemainingQty());
+
+                // Phase 2 重构新增：埋点剩余产能回填证据
+                Map<String, Object> evidence = new HashMap<>();
+                evidence.put("machineCode", machineCode);
+                evidence.put("classNum", classNum);
+                evidence.put("assignQty", assignQty);
+                evidence.put("backupRemaining", spec.getBackupRemainingQty());
+                TqDemandCalcHelper.addRuleTrace(context, spec.getBeadCode(),
+                        TqScheduleRuleCodeEnum.RESIDUAL_CAPACITY_FILL,
+                        TqScheduleRuleResultEnum.ADJUST,
+                        evidence);
             } else {
                 // 非备库规格：仅当该班次已有排产量时才回填（避免随意新增班次排产）
                 // 业务规则：剩余产能优先补备库胎圈；非备库规格只在已排产的情况下补量
@@ -179,9 +266,28 @@ public class TqResidualCapacityHandler extends AbsTqScheduleStepHandler {
                 if (currentPlan <= 0) {
                     continue;
                 }
-                // 非备库规格回填量不受backupRemainingQty限制，但只补到当前班次（不主动扩量）
-                // 此处不回填非备库规格（保持S3排产结果），仅由备库胎圈消化剩余产能
-                // 如需扩展可在此处补充逻辑
+
+                // Phase 2 重构修复（方案C）：非备库规格也回填剩余产能，避免机台产能浪费
+                // 原逻辑仅由备库胎圈消化剩余产能，当机台上无备库胎圈或备库剩余量为0时，产能被浪费
+                // 现修改为：非备库规格在已有排产的班次上补充剩余产能（不新增班次，仅补量）
+                double assignQty = residualCapacity;
+                assignQty = applyRoundingIfNeeded(assignQty);
+                addClassPlanQty(spec, classNum, assignQty);
+
+                autoScheduleLogService.insertTqScheduleLog(spec.getBatchNo(), spec.getOrderNo(),
+                        "S5.6-剩余产能回填非备库规格",
+                        "胎圈代码：" + spec.getBeadCode() + "，机台：" + machineCode
+                                + "，" + classNum + "班回填" + assignQty);
+
+                // 埋点非备库规格回填证据
+                Map<String, Object> evidence = new HashMap<>();
+                evidence.put("machineCode", machineCode);
+                evidence.put("classNum", classNum);
+                evidence.put("assignQty", assignQty);
+                TqDemandCalcHelper.addRuleTrace(context, spec.getBeadCode(),
+                        TqScheduleRuleCodeEnum.RESIDUAL_CAPACITY_FILL,
+                        TqScheduleRuleResultEnum.ADJUST,
+                        evidence);
             }
         }
     }
@@ -214,8 +320,16 @@ public class TqResidualCapacityHandler extends AbsTqScheduleStepHandler {
             boolean isBackupSpec = spec.getBackupTriggerClass() != null && spec.getBackupTriggerClass() > 0;
             double backupRemaining = spec.getBackupRemainingQty() == null ? 0D : spec.getBackupRemainingQty();
 
-            if (!isBackupSpec || backupRemaining <= 0) {
+            // 备库胎圈：剩余备库量为0则跳过
+            // 非备库规格：第6班已有排产量时才允许回填（避免新增班次），与1~5班逻辑保持一致
+            if (isBackupSpec && backupRemaining <= 0) {
                 continue;
+            }
+            if (!isBackupSpec) {
+                double currentPlan = getClassPlanQty(spec, classNum);
+                if (currentPlan <= 0) {
+                    continue;
+                }
             }
 
             // 统计第6班已排产量
@@ -225,25 +339,45 @@ public class TqResidualCapacityHandler extends AbsTqScheduleStepHandler {
             }
             double residualCapacity = BigDecimalUtil.sub(machineQuota, usedCapacity);
             if (residualCapacity <= 0) {
-                // 第6班机台已排满，剩余备库量无法塞入，记录日志
+                // 第6班机台已排满，剩余量无法塞入，记录日志
                 autoScheduleLogService.insertTqScheduleLog(spec.getBatchNo(), spec.getOrderNo(),
-                        "S3.5-第6班塞入失败(机台已满)",
+                        "S5.6-第6班塞入失败(机台已满)",
                         "胎圈代码：" + spec.getBeadCode() + "，机台：" + machineCode
-                                + "，剩余备库量" + backupRemaining + "无法塞入第6班");
+                                + (isBackupSpec ? "，剩余备库量" + backupRemaining : "")
+                                + "无法塞入第6班");
                 continue;
             }
 
-            // 第6班塞入量 = min(剩余备库量, 机台剩余产能)
-            double assignQty = Math.min(backupRemaining, residualCapacity);
+            // 第6班塞入量 = min(剩余备库量, 机台剩余产能)  [备库胎圈]
+            //           或 = 机台剩余产能                      [非备库规格]
+            double assignQty;
+            if (isBackupSpec) {
+                assignQty = Math.min(backupRemaining, residualCapacity);
+            } else {
+                assignQty = residualCapacity;
+            }
             assignQty = applyRoundingIfNeeded(assignQty);
             addClassPlanQty(spec, classNum, assignQty);
-            spec.setBackupRemainingQty(BigDecimalUtil.sub(backupRemaining, assignQty));
+            if (isBackupSpec) {
+                spec.setBackupRemainingQty(BigDecimalUtil.sub(backupRemaining, assignQty));
+            }
 
             autoScheduleLogService.insertTqScheduleLog(spec.getBatchNo(), spec.getOrderNo(),
-                    "S3.5-第6班塞入剩余备库量",
+                    isBackupSpec ? "S5.6-第6班塞入剩余备库量" : "S5.6-第6班回填非备库规格",
                     "胎圈代码：" + spec.getBeadCode() + "，机台：" + machineCode
                             + "，第6班塞入" + assignQty
-                            + "，剩余备库量：" + spec.getBackupRemainingQty());
+                            + (isBackupSpec ? "，剩余备库量：" + spec.getBackupRemainingQty() : ""));
+
+            // Phase 2 重构新增：埋点第6班塞入剩余备库量证据
+            Map<String, Object> evidence = new HashMap<>();
+            evidence.put("machineCode", machineCode);
+            evidence.put("classNum", 6);
+            evidence.put("assignQty", assignQty);
+            evidence.put("backupRemaining", spec.getBackupRemainingQty());
+            TqDemandCalcHelper.addRuleTrace(context, spec.getBeadCode(),
+                    TqScheduleRuleCodeEnum.RESIDUAL_CAPACITY_FILL,
+                    TqScheduleRuleResultEnum.ADJUST,
+                    evidence);
         }
     }
 

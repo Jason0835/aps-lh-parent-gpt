@@ -678,8 +678,6 @@
         AND exist.MONTH = #{currentMonth}
         AND exist.IS_DELETE = 0
         WHERE exist.ID IS NULL
-        AND calc.OVERDUE_QTY IS NOT NULL
-        AND calc.OVERDUE_QTY &lt;&gt; 0
     </select>
 
     <!-- 查询当月定稿表 PRODUCTION_NO 工单号最大值（用于 Java 层递增生成新工单号）

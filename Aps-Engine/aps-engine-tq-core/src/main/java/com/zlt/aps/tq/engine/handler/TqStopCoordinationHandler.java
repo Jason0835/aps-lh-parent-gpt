@@ -3,12 +3,16 @@ package com.zlt.aps.tq.engine.handler;
 import com.zlt.aps.common.core.utils.BigDecimalUtil;
 import com.zlt.aps.common.engine.service.AutoScheduleLogService;
 import com.zlt.aps.tq.engine.context.TqScheduleContext;
+import com.zlt.aps.tq.engine.enums.TqScheduleRuleCodeEnum;
+import com.zlt.aps.tq.engine.enums.TqScheduleRuleResultEnum;
+import com.zlt.aps.tq.engine.strategy.TqDemandCalcHelper;
 import com.zlt.aps.tq.engine.vo.TqScheduleParams;
 import com.zlt.aps.tq.engine.vo.TqScheduleResultVo;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -133,6 +137,18 @@ public class TqStopCoordinationHandler extends AbsTqScheduleStepHandler {
                             "胎圈代码：" + scheduleVo.getBeadCode()
                                     + "，" + (classIdx + 1) + "班成型停产，胎圈保持排产，计划量=" + planQty
                                     + "，预排班数=" + preShiftCount);
+
+                    // Phase 2 重构新增：埋点成型停产场景证据（HIT，保持排产）
+                    Map<String, Object> evidence = new HashMap<>();
+                    evidence.put("classNum", classIdx + 1);
+                    evidence.put("stopDays", stopDays);
+                    evidence.put("preShiftCount", preShiftCount);
+                    evidence.put("planQty", planQty);
+                    evidence.put("action", "KEEP_PRODUCTION");
+                    TqDemandCalcHelper.addRuleTrace(context, scheduleVo.getBeadCode(),
+                            TqScheduleRuleCodeEnum.CX_STOP_COORDINATION,
+                            TqScheduleRuleResultEnum.HIT,
+                            evidence);
                 } else {
                     // 成型停产≥2天：触发开产逻辑
                     handleReopenProduction(scheduleVo, classIdx + 1, planQty, context);
@@ -156,6 +172,17 @@ public class TqStopCoordinationHandler extends AbsTqScheduleStepHandler {
             autoScheduleLogService.insertTqScheduleLog(scheduleVo.getBatchNo(), scheduleVo.getOrderNo(),
                     "成型停产-开产(无阈值)", "胎圈代码：" + scheduleVo.getBeadCode()
                             + "，" + classNum + "班开产，计划量=" + planQty);
+
+            // Phase 2 重构新增：埋点开产触发证据（MISS，无阈值配置）
+            Map<String, Object> evidence = new HashMap<>();
+            evidence.put("classNum", classNum);
+            evidence.put("planQty", planQty);
+            evidence.put("reopenThreshold", 0D);
+            evidence.put("action", "REOPEN_NO_THRESHOLD");
+            TqDemandCalcHelper.addRuleTrace(context, scheduleVo.getBeadCode(),
+                    TqScheduleRuleCodeEnum.CX_STOP_COORDINATION,
+                    TqScheduleRuleResultEnum.MISS,
+                    evidence);
             return;
         }
 
@@ -166,11 +193,33 @@ public class TqStopCoordinationHandler extends AbsTqScheduleStepHandler {
                     "成型停产-开产(达到阈值切换)", "胎圈代码：" + scheduleVo.getBeadCode()
                             + "，" + classNum + "班开产，计划量=" + planQty
                             + "，达到开产阈值=" + reopenThreshold + "，切换下一优先级规格");
+
+            // Phase 2 重构新增：埋点开产触发切换规格证据（TRIGGER，达到阈值切换）
+            Map<String, Object> evidence = new HashMap<>();
+            evidence.put("classNum", classNum);
+            evidence.put("planQty", planQty);
+            evidence.put("reopenThreshold", reopenThreshold);
+            evidence.put("action", "REOPEN_SWITCH_SPEC");
+            TqDemandCalcHelper.addRuleTrace(context, scheduleVo.getBeadCode(),
+                    TqScheduleRuleCodeEnum.CX_STOP_COORDINATION,
+                    TqScheduleRuleResultEnum.TRIGGER,
+                    evidence);
         } else {
             autoScheduleLogService.insertTqScheduleLog(scheduleVo.getBatchNo(), scheduleVo.getOrderNo(),
                     "成型停产-开产(未达阈值)", "胎圈代码：" + scheduleVo.getBeadCode()
                             + "，" + classNum + "班开产，计划量=" + planQty
                             + "，开产阈值=" + reopenThreshold);
+
+            // Phase 2 重构新增：埋点开产未达阈值证据（HIT，保持当前规格）
+            Map<String, Object> evidence = new HashMap<>();
+            evidence.put("classNum", classNum);
+            evidence.put("planQty", planQty);
+            evidence.put("reopenThreshold", reopenThreshold);
+            evidence.put("action", "REOPEN_KEEP_SPEC");
+            TqDemandCalcHelper.addRuleTrace(context, scheduleVo.getBeadCode(),
+                    TqScheduleRuleCodeEnum.CX_STOP_COORDINATION,
+                    TqScheduleRuleResultEnum.HIT,
+                    evidence);
         }
     }
 
@@ -223,12 +272,33 @@ public class TqStopCoordinationHandler extends AbsTqScheduleStepHandler {
                             "胎圈代码：" + scheduleVo.getBeadCode()
                                     + "，" + (classIdx + 1) + "班胎圈停产，计划量" + planQty
                                     + "前移到" + (targetClassIdx + 1) + "班");
+
+                    // Phase 2 重构新增：埋点胎圈停产前移证据（ADJUST）
+                    Map<String, Object> evidence = new HashMap<>();
+                    evidence.put("classNum", classIdx + 1);
+                    evidence.put("targetClassNum", targetClassIdx + 1);
+                    evidence.put("movedQty", planQty);
+                    evidence.put("action", "FORWARD_MOVE");
+                    TqDemandCalcHelper.addRuleTrace(context, scheduleVo.getBeadCode(),
+                            TqScheduleRuleCodeEnum.TQ_STOP_COORDINATION,
+                            TqScheduleRuleResultEnum.ADJUST,
+                            evidence);
                 } else {
                     autoScheduleLogService.insertTqScheduleLog(scheduleVo.getBatchNo(), scheduleVo.getOrderNo(),
                             "胎圈停产成型不停产-无可用班次",
                             "胎圈代码：" + scheduleVo.getBeadCode()
                                     + "，" + (classIdx + 1) + "班胎圈停产，计划量" + planQty
                                     + "无可用前序班次前移");
+
+                    // Phase 2 重构新增：埋点胎圈停产无可用班次证据（SKIP）
+                    Map<String, Object> evidence = new HashMap<>();
+                    evidence.put("classNum", classIdx + 1);
+                    evidence.put("planQty", planQty);
+                    evidence.put("action", "NO_AVAILABLE_CLASS");
+                    TqDemandCalcHelper.addRuleTrace(context, scheduleVo.getBeadCode(),
+                            TqScheduleRuleCodeEnum.TQ_STOP_COORDINATION,
+                            TqScheduleRuleResultEnum.SKIP,
+                            evidence);
                 }
             }
         }
@@ -360,6 +430,28 @@ public class TqStopCoordinationHandler extends AbsTqScheduleStepHandler {
                                 + "，总计划量=" + totalPlan
                                 + "，达到开产阈值=" + reopenThreshold
                                 + "，切换下一优先级规格");
+
+                // Phase 2 重构新增：埋点停产交集日开产切换证据（TRIGGER）
+                Map<String, Object> evidence = new HashMap<>();
+                evidence.put("intersectionDays", intersectionDays);
+                evidence.put("totalPlan", totalPlan);
+                evidence.put("reopenThreshold", reopenThreshold);
+                evidence.put("action", "REOPEN_SWITCH_SPEC");
+                TqDemandCalcHelper.addRuleTrace(context, scheduleVo.getBeadCode(),
+                        TqScheduleRuleCodeEnum.STOP_INTERSECTION_REOPEN,
+                        TqScheduleRuleResultEnum.TRIGGER,
+                        evidence);
+            } else {
+                // Phase 2 重构新增：埋点停产交集日未达开产阈值证据（HIT）
+                Map<String, Object> evidence = new HashMap<>();
+                evidence.put("intersectionDays", intersectionDays);
+                evidence.put("totalPlan", totalPlan);
+                evidence.put("reopenThreshold", reopenThreshold);
+                evidence.put("action", "KEEP_CURRENT_SPEC");
+                TqDemandCalcHelper.addRuleTrace(context, scheduleVo.getBeadCode(),
+                        TqScheduleRuleCodeEnum.STOP_INTERSECTION_REOPEN,
+                        TqScheduleRuleResultEnum.HIT,
+                        evidence);
             }
         }
     }

@@ -157,29 +157,12 @@ public class CxScheFinishQtyServiceImpl extends AbstractDocService<CxScheFinishQ
         log.info("成型排程完成量同步-逻辑删除完成，开始批量插入");
         if (CollectionUtils.isNotEmpty(insertList)) {
             int batchSize = 1000;
-            int totalBatch = (insertList.size() + batchSize - 1) / batchSize;
             for (int i = 0; i < insertList.size(); i += batchSize) {
                 int end = Math.min(i + batchSize, insertList.size());
                 List<CxScheFinishQty> subList = insertList.subList(i, end);
-                try {
-                    baseDao.saveBatch(subList);
-                    log.info("成型排程完成量同步-插入批次：{}/{}, 本批数量={}", (i / batchSize + 1), totalBatch, subList.size());
-                } catch (Exception e) {
-                    // 捕获并打印批量插入真实异常，避免被全局异常处理器吞掉后无法定位问题
-                    log.error("成型排程完成量同步-批量插入异常，分厂={}, 排程日期={}, 批次={}/{}, 本批数量={}, 异常类型={}, 消息={}",
-                            factoryCode, scheduleDate, (i / batchSize + 1), totalBatch, subList.size(),
-                            e.getClass().getName(), e.getMessage(), e);
-                    // 打印首条数据关键字段，便于定位字段超长/约束违反等问题
-                    if (!subList.isEmpty()) {
-                        CxScheFinishQty first = subList.get(0);
-                        log.error("成型排程完成量同步-异常批次首条数据：orderNo={}, cxMachineCode={}, embryoCode={}, "
-                                        + "class1CxNo={}, class1CxType={}, class2CxNo={}, class3CxNo={}, dataVersion={}, factoryCode={}",
-                                first.getOrderNo(), first.getCxMachineCode(), first.getEmbryoCode(),
-                                first.getClass1CxNo(), first.getClass1CxType(), first.getClass2CxNo(),
-                                first.getClass3CxNo(), first.getDataVersion(), first.getFactoryCode());
-                    }
-                    throw e;
-                }
+                baseDao.saveBatch(subList);
+                log.info("成型排程完成量同步-插入批次：{}/{}, 本批数量={}", (i / batchSize + 1),
+                        (insertList.size() + batchSize - 1) / batchSize, subList.size());
             }
         }
         log.info("成型排程完成量同步-事务完成：分厂{}，排程日期={}，插入数量={}", factoryCode, scheduleDate, CollectionUtils.size(insertList));

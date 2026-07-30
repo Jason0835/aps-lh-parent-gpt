@@ -1,7 +1,13 @@
 package com.zlt.aps.tq.engine.context;
 
+import com.zlt.aps.common.engine.schedule.MachineShiftTaskChain;
+import com.zlt.aps.common.engine.schedule.ScheduleTaskNode;
 import com.zlt.aps.tq.api.domain.entity.TqMachineInfo;
 import com.zlt.aps.tq.api.domain.entity.TqStockShiftConfig;
+import com.zlt.aps.tq.engine.domain.TqMachineCandidate;
+import com.zlt.aps.tq.engine.domain.TqPersistResult;
+import com.zlt.aps.tq.engine.domain.TqRuleTrace;
+import com.zlt.aps.tq.engine.domain.TqSnapshotBuildResult;
 import com.zlt.aps.tq.engine.vo.TqMonthSurplusVo;
 import com.zlt.aps.tq.engine.vo.TqScheduleParams;
 import com.zlt.aps.tq.engine.vo.TqScheduleResultVo;
@@ -11,7 +17,9 @@ import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -48,6 +56,14 @@ public class TqScheduleContext {
 
     /** 操作人 */
     private String operator;
+
+    /**
+     * 排程追踪标识。
+     *
+     * <p>Phase 5 重构新增：用于任务链操作日志串联，与 {@link MachineShiftTaskChain} 中
+     * 的 {@code ScheduleOperationContext.traceId} 共享，便于跨服务追踪同一次排程的任务链变更。</p>
+     */
+    private String traceId;
 
     // ========== S1写入 → S2/S3/S4消费 ==========
 
@@ -126,6 +142,32 @@ public class TqScheduleContext {
     /** 任务链，key=机台编号, value=该机台的任务链（按班次顺序排列） */
     private Map<String, java.util.LinkedList<TqTaskNode>> taskChainMap = new HashMap<>();
 
+    /**
+     * 机台班次任务链集合（结构化任务链）。
+     *
+     * <p>Phase 5 重构新增：对齐胎侧 {@code TcScheduleContext.taskChainGroup}，承载所有机台的任务链，
+     * 支持追加、前插、插单、删除、转机台、调量等结构化操作，替代 {@link #taskChainMap} 的简单链表场景。</p>
+     *
+     * <p>与胎侧的差异：胎圈按"机台+日期"分组链表（不按班次分链），链内通过
+     * {@link ScheduleTaskNode#getShiftOrder()} 区分班次顺序；胎侧按"机台+日期+班次"分组链表，
+     * 每个班次一条独立链表。</p>
+     *
+     * <p>兼容策略：保留 {@link #taskChainMap} 不删除，原有 {@code TqMachineAssignHandler.buildTaskChain}
+     * 继续使用旧字段；新代码（如人工插单门面、解释快照）使用本字段。后续可逐步迁移。</p>
+     */
+    private MachineShiftTaskChain<TqTaskNode> taskChainGroup = new MachineShiftTaskChain<>();
+
+    /**
+     * 任务链节点索引，key=任务标识（businessKey）。
+     *
+     * <p>Phase 5 重构新增：对齐胎侧 {@code TcScheduleContext.taskNodeIndex}，提供 O(1) 节点查找，
+     * 避免任务链操作时遍历所有机台链表。</p>
+     *
+     * <p>由 {@code TqTaskChainScheduleService} 在节点加入任务链时通过 {@link #registerTaskNode} 注册，
+     * 节点删除时通过 {@link #removeTaskNode} 注销。</p>
+     */
+    private Map<String, ScheduleTaskNode<TqTaskNode>> taskNodeIndex = new HashMap<>();
+
     // ========== S1+S2写入 → S3/S4消费 ==========
 
     /**
@@ -138,6 +180,53 @@ public class TqScheduleContext {
 
     /** 总计划量统计（中班/夜班/白班/次日中班） */
     private TqTotalPlanQtyVo totalPlanQtyVo = new TqTotalPlanQtyVo();
+
+    // ========== 结构化规则证据（贯穿 S2~S6，S6 持久化时写入解释 JSON 字段） ==========
+
+    /**
+     * 规则命中证据，key=胎圈编码（beadCode），value=该规格的规则证据集合。
+     *
+     * <p>由各 Handler 在关键决策点（备库触发、收尾判断、计划量计算、机台过滤命中、停产协调等）追加证据，
+     * S6 持久化阶段统一调用 {@link TqRuleTrace#toExplainJson()} 序列化为 JSON 文本写入排程结果表解释字段。</p>
+     */
+    private Map<String, TqRuleTrace> ruleTraceMap = new HashMap<>();
+
+    /**
+     * 候选机台追踪，key=胎圈编码（beadCode），value=该规格最后一次机台分配的候选机台列表（含被过滤机台）。
+     *
+     * <p>Phase 3 重构新增：由 {@code TqMachineAssignHandler.searchOptionalMachineList} 在 S3 阶段写入，
+     * 记录每个候选机台的过滤状态、过滤原因、剩余产能和选中评分，供 Phase 4 解释快照输出候选机台详情。</p>
+     *
+     * <p>注意：同一 beadCode 在不同班次可能多次调用 {@code searchOptionalMachineList}，
+     * 后一次写入会覆盖前一次。如需保留所有班次的候选机台历史，应在写入前复制快照。</p>
+     */
+    private Map<String, List<TqMachineCandidate>> candidateTraceMap = new HashMap<>();
+
+    // ========== Phase 4 重构新增：解释快照、质量汇总、持久化汇总 ==========
+
+    /**
+     * 解释快照，key=胎圈编码（beadCode），value=该规格的解释快照。
+     *
+     * <p>由 {@code TqSnapshotBuildService} 在 S6 阶段构建，包含规则命中、候选机台、未排证据、
+     * 异常等多元字段，序列化为 JSON 后写入 {@code T_TQ_SCHEDULE_RESULT.EXPLAIN_JSON} 字段。</p>
+     */
+    private Map<String, TqSnapshotBuildResult> snapshotMap = new HashMap<>();
+
+    /**
+     * 本次自动排程质量指标摘要。
+     *
+     * <p>由 {@code TqScheduleQualitySummaryService} 在 S6 阶段统一计算，包含 10 项核心指标：
+     * taskCount/resultCount/unplannedCount/coverageRate/unplannedRate/machineUtilizationRate/
+     * switchCount/stockGuaranteeRate/tailCompletionRate/shiftCapacityHitRate。</p>
+     */
+    private Map<String, Object> qualitySummary = new LinkedHashMap<>();
+
+    /**
+     * 本次落库汇总结果。
+     *
+     * <p>由 {@code TqResultPersistHandler} 在 S6 阶段填充，承载结果数、解释数、未排数和异常数等汇总信息。</p>
+     */
+    private TqPersistResult persistResult;
 
     // ========== S4写入 ==========
 
@@ -207,5 +296,110 @@ public class TqScheduleContext {
         if (StringUtils.isNotEmpty(message)) {
             this.validationErrors.add(message);
         }
+    }
+
+    /**
+     * 设置规则证据 Map（null 保护，避免外部传入 null 污染后续步骤）。
+     *
+     * @param ruleTraceMap 规则证据 Map
+     */
+    public void setRuleTraceMap(Map<String, TqRuleTrace> ruleTraceMap) {
+        this.ruleTraceMap = ruleTraceMap == null ? new HashMap<>() : ruleTraceMap;
+    }
+
+    /**
+     * 设置候选机台追踪 Map（null 保护，避免外部传入 null 污染后续步骤）。
+     *
+     * <p>Phase 3 重构新增。</p>
+     *
+     * @param candidateTraceMap 候选机台追踪 Map
+     */
+    public void setCandidateTraceMap(Map<String, List<TqMachineCandidate>> candidateTraceMap) {
+        this.candidateTraceMap = candidateTraceMap == null ? new HashMap<>() : candidateTraceMap;
+    }
+
+    /**
+     * 设置解释快照 Map（null 保护，避免外部传入 null 污染后续步骤）。
+     *
+     * <p>Phase 4 重构新增。</p>
+     *
+     * @param snapshotMap 解释快照 Map
+     */
+    public void setSnapshotMap(Map<String, TqSnapshotBuildResult> snapshotMap) {
+        this.snapshotMap = snapshotMap == null ? new HashMap<>() : snapshotMap;
+    }
+
+    /**
+     * 设置质量指标摘要 Map（null 保护，避免外部传入 null 污染后续步骤）。
+     *
+     * <p>Phase 4 重构新增。</p>
+     *
+     * @param qualitySummary 质量指标摘要 Map
+     */
+    public void setQualitySummary(Map<String, Object> qualitySummary) {
+        this.qualitySummary = qualitySummary == null ? new LinkedHashMap<>() : qualitySummary;
+    }
+
+    /**
+     * 获取指定胎圈规格的规则证据对象，不存在时自动创建并放入 Map。
+     *
+     * <p>使用方式：</p>
+     * <pre>
+     * TqRuleTrace trace = context.getRuleTrace(beadCode);
+     * trace.addRuleHit(TqScheduleRuleCodeEnum.BACKUP_TRIGGER, TqScheduleRuleResultEnum.TRIGGER, evidenceMap);
+     * </pre>
+     *
+     * @param beadCode 胎圈编码
+     * @return 规则证据对象（永不为 null）
+     */
+    public TqRuleTrace getRuleTrace(String beadCode) {
+        if (StringUtils.isBlank(beadCode)) {
+            // 无效 beadCode 时返回临时证据对象（不放入 Map，避免污染）
+            return new TqRuleTrace();
+        }
+        return ruleTraceMap.computeIfAbsent(beadCode, k -> new TqRuleTrace());
+    }
+
+    // ========== Phase 5 重构新增：任务链节点索引管理 ==========
+
+    /**
+     * 注册任务链节点到索引。
+     *
+     * <p>由 {@code TqTaskChainScheduleService} 在节点加入任务链时调用，
+     * 同一 taskId 重复注册时以最新节点覆盖旧节点引用。</p>
+     *
+     * @param taskId 任务标识（对应 {@link ScheduleTaskNode#getTaskId()}）
+     * @param node  任务链节点
+     */
+    public void registerTaskNode(String taskId, ScheduleTaskNode<TqTaskNode> node) {
+        if (StringUtils.isBlank(taskId) || node == null) {
+            return;
+        }
+        taskNodeIndex.put(taskId, node);
+    }
+
+    /**
+     * 从索引中注销任务链节点。
+     *
+     * @param taskId 任务标识
+     */
+    public void removeTaskNode(String taskId) {
+        if (StringUtils.isBlank(taskId)) {
+            return;
+        }
+        taskNodeIndex.remove(taskId);
+    }
+
+    /**
+     * 根据任务标识获取任务链节点。
+     *
+     * @param taskId 任务标识
+     * @return 任务链节点；未注册时返回 null
+     */
+    public ScheduleTaskNode<TqTaskNode> getTaskNode(String taskId) {
+        if (StringUtils.isBlank(taskId)) {
+            return null;
+        }
+        return taskNodeIndex.get(taskId);
     }
 }
