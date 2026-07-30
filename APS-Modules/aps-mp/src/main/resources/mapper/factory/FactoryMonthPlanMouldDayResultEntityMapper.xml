@@ -92,6 +92,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             </when>
             <otherwise>
             mc.NET_QTY UN_RESTRICTED_NET_QTY,
+            r.PLAN_TYPE,
             </otherwise>
         </choose>
 		    '1' DATA_TYPE,
