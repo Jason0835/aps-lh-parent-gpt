@@ -13,6 +13,7 @@ import com.zlt.aps.cd15.api.domain.vo.Cd15ChangeQtyRequest;
 import com.zlt.aps.cd15.api.domain.vo.Cd15InsertOrderRequest;
 import com.zlt.aps.cd15.api.domain.vo.Cd15RollingCheckRequest;
 import com.zlt.aps.cd15.api.domain.vo.Cd15TransferMachineRequest;
+import com.zlt.aps.cd15.api.domain.vo.Cd15ScheduleResultTemplateImportVO;
 import com.zlt.aps.cd15.component.Cd15ScheduleResultExportAssembler;
 import com.zlt.aps.cd15.engine.algorithm.Cd15ShiftWindowResolver;
 import com.zlt.aps.cd15.engine.constant.Cd15CutMode;
@@ -36,6 +37,7 @@ import com.zlt.aps.cd15.service.Cd15AutoScheduleAsyncExecutor;
 import com.zlt.aps.cd15.service.Cd15InsertOrderAsyncExecutor;
 import com.zlt.aps.cd15.service.Cd15ScheduleOverwriteValidator;
 import com.zlt.aps.cd15.service.Cd15TimedRollingCheckService;
+import com.zlt.aps.cd15.service.Cd15ScheduleNumberService;
 import com.zlt.aps.cd15.service.ICd15ScheduleResultService;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.ExcelUtils;
@@ -65,6 +67,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -74,6 +77,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 /**
  * 斜裁排程结果业务实现。
@@ -128,6 +132,119 @@ public class Cd15ScheduleResultServiceImpl extends AbstractDocService<Cd15Schedu
 
     @Resource
     private Cd15ScheduleResultExportAssembler exportAssembler;
+
+    @Resource
+    private Cd15ScheduleNumberService scheduleNumberService;
+
+    /**
+     * 按固定生产计划模板整体覆盖导入。
+     * 模板一行生成一条新排程结果；上一批和完成量列仅用于展示，不反写。
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public AjaxResult importScheduleTemplate(List<Cd15ScheduleResultTemplateImportVO> rows,
+                                             Cd15ScheduleResult condition,
+                                             boolean updateSupport) {
+        if (condition == null || !PubUtil.isNotEmpty(condition.getFactoryCode())
+                || condition.getScheduleDate() == null) {
+            return AjaxResult.error(I18nUtil.getMessage(
+                    "ui.data.column.cd15ScheduleResult.importRequired"));
+        }
+        if (rows == null || rows.isEmpty()) {
+            return AjaxResult.error(I18nUtil.getMessage(
+                    "ui.data.column.cd15ScheduleResult.importEmpty"));
+        }
+        String factoryCode = condition.getFactoryCode().trim();
+        Date scheduleDate = cn.hutool.core.date.DateUtil.beginOfDay(condition.getScheduleDate());
+        Set<String> uniqueKeys = new HashSet<>();
+        List<String> errors = new ArrayList<>();
+        List<Cd15ScheduleResultTemplateImportVO> validRows = new ArrayList<>();
+        for (int index = 0; index < rows.size(); index++) {
+            Cd15ScheduleResultTemplateImportVO row = rows.get(index);
+            int excelRow = index + 6;
+            if (row == null || !PubUtil.isNotEmpty(row.getMachineCode())
+                    || !PubUtil.isNotEmpty(row.getSteelStripCode())
+                    || !PubUtil.isNotEmpty(row.getBigRollCode())
+                    || !PubUtil.isNotEmpty(row.getCuttingAngle())) {
+                errors.add(MessageFormat.format(I18nUtil.getMessage(
+                        "ui.data.column.cd15ScheduleResult.importRowRequired"), excelRow));
+                continue;
+            }
+            boolean hasPlan = Stream.of(row.getClass1PlanQty(), row.getClass2PlanQty(), row.getClass3PlanQty())
+                    .filter(Objects::nonNull)
+                    .anyMatch(value -> value > 0D);
+            if (!hasPlan) {
+                errors.add(MessageFormat.format(I18nUtil.getMessage(
+                        "ui.data.column.cd15ScheduleResult.importPlanRequired"), excelRow));
+                continue;
+            }
+            String uniqueKey = String.join("|", row.getMachineCode().trim(),
+                    row.getSteelStripCode().trim(), row.getBigRollCode().trim(),
+                    row.getCuttingAngle().trim());
+            if (!uniqueKeys.add(uniqueKey)) {
+                errors.add(MessageFormat.format(I18nUtil.getMessage(
+                        "ui.data.column.cd15ScheduleResult.importDuplicate"), excelRow));
+                continue;
+            }
+            validRows.add(row);
+        }
+        if (!errors.isEmpty()) {
+            return AjaxResult.error(String.join("<br>", errors));
+        }
+
+        String batchNo = this.scheduleNumberService.nextBatchNo(
+                scheduleDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate());
+        Map<String, int[]> ordersByMachine = new HashMap<>();
+        List<Cd15ScheduleResult> insertList = validRows.stream().map(row -> {
+            Cd15ScheduleResult result = new Cd15ScheduleResult();
+            result.setFactoryCode(factoryCode);
+            result.setScheduleDate(scheduleDate);
+            result.setCd15BatchNo(batchNo);
+            result.setOrderNo(this.scheduleNumberService.nextOrderNo(batchNo));
+            result.setGroupNo(result.getOrderNo());
+            result.setReleaseStatus("0");
+            result.setPublishSuccessCount(0);
+            result.setSourceType("IMPORT");
+            result.setIsLocked("0");
+            result.setMachineCode(row.getMachineCode().trim());
+            result.setSteelStripCode(row.getSteelStripCode().trim());
+            result.setBigRollCode(row.getBigRollCode().trim());
+            result.setCuttingAngle(row.getCuttingAngle().trim());
+            result.setStorageLaneCode(row.getStorageLaneCode());
+            result.setCxMachineCodes(row.getCxMachineCodes());
+            result.setStockQty(row.getStockQty());
+            result.setPlanSurplusQty(row.getPlanSurplusQty());
+            result.setUnitConsumeMillimeter(row.getUnitConsume() == null
+                    ? null : row.getUnitConsume().multiply(BigDecimal.valueOf(1000)));
+            result.setMaterialKey(String.join("|", result.getSteelStripCode(),
+                    result.getBigRollCode(), result.getCuttingAngle()));
+            result.setClass1PlanQty(row.getClass1PlanQty());
+            result.setClass1FinishQty(row.getClass1FinishQty());
+            result.setClass2PlanQty(row.getClass2PlanQty());
+            result.setClass2FinishQty(row.getClass2FinishQty());
+            result.setClass3PlanQty(row.getClass3PlanQty());
+            result.setClass3FinishQty(row.getClass3FinishQty());
+            int[] orders = ordersByMachine.computeIfAbsent(result.getMachineCode(), key -> new int[3]);
+            if (row.getClass1PlanQty() != null && row.getClass1PlanQty() > 0D) {
+                result.setClass1ProduceOrder(++orders[0]);
+            }
+            if (row.getClass2PlanQty() != null && row.getClass2PlanQty() > 0D) {
+                result.setClass2ProduceOrder(++orders[1]);
+            }
+            if (row.getClass3PlanQty() != null && row.getClass3PlanQty() > 0D) {
+                result.setClass3ProduceOrder(++orders[2]);
+            }
+            return result;
+        }).collect(Collectors.toList());
+
+        this.resultMapper.update(null, new LambdaUpdateWrapper<Cd15ScheduleResult>()
+                .eq(Cd15ScheduleResult::getFactoryCode, factoryCode)
+                .eq(Cd15ScheduleResult::getScheduleDate, scheduleDate)
+                .set(Cd15ScheduleResult::getIsDelete, 1));
+        int successNum = this.baseDao.insertBatch(insertList);
+        return AjaxResult.success(MessageFormat.format(I18nUtil.getMessage(
+                "ui.data.column.cd15ScheduleResult.importSuccess"), successNum));
+    }
 
     /**
      * 删除排程结果，不触发滚动重排；删除后只压缩同工厂、日期、机台的 CLASS1 后续生产顺位。

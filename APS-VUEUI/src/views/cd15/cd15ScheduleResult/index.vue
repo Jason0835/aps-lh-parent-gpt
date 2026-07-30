@@ -38,6 +38,9 @@
         <el-button v-hasPermi="['cd15:cd15ScheduleResult:publish']" :disabled="selection.length === 0" @click="handlePublish">
           {{ $t("ui.data.column.scheduleResult.publish") }}
         </el-button>
+        <el-button v-hasPermi="['cd15:cd15ScheduleResult:import']" @click="$refs.tltUpload.handleImport()">
+          {{ $t("ui.frame.btn.import") }}
+        </el-button>
         <el-button v-hasPermi="['cd15:cd15ScheduleResult:export']" @click="handleExport">
           {{ $t("ui.frame.btn.export") }}
         </el-button>
@@ -46,6 +49,14 @@
         </el-button>
       </template>
     </page-table>
+    <tlt-upload
+      ref="tltUpload"
+      download-url="/cd15/cd15ScheduleResult/export"
+      :download-params="importParams"
+      upload-url="/cd15/cd15ScheduleResult/importDataByCust"
+      :upload-params="importParams"
+      @uploadSuccess="getList"
+    />
 
     <auto-schedule-dialog
       ref="autoScheduleRef"
@@ -127,6 +138,7 @@ import AutoScheduleDialog from './components/autoScheduleDialog.vue'
 import InsertOrderDialog from './components/insertOrderDialog.vue'
 import ChangeMachineDialog from './components/changeMachineDialog.vue'
 import ChangeQtyDialog from './components/changeQtyDialog.vue'
+import TltUpload from '@/components/tltUpload/tltUpload.vue'
 
 const SHIFT_CONFIG = [
   { classField: 'class1', shiftKey: 'middleShift', dayOffset: -1 },
@@ -139,7 +151,7 @@ const SHIFT_CONFIG = [
 
 export default {
   name: 'Cd15ScheduleResult',
-  components: { AutoScheduleDialog, InsertOrderDialog, ChangeMachineDialog, ChangeQtyDialog },
+  components: { AutoScheduleDialog, InsertOrderDialog, ChangeMachineDialog, ChangeQtyDialog, TltUpload },
   dicts: ['biz_factory_name', 'IS_RELEASE'],
   provide() {
     return {
@@ -176,6 +188,12 @@ export default {
     }
   },
   computed: {
+    importParams() {
+      return {
+        factoryCode: this.query.factoryCode || this.search.factoryCode,
+        scheduleDate: this.query.scheduleDate || this.search.scheduleDate
+      }
+    },
     columns() {
       return [
         { type: 'selection', fixed: 'left' },

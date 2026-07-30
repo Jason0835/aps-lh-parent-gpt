@@ -417,6 +417,7 @@ public class Cd15TimedRollingEngineExecutor {
         result.setFactoryCode(target.getFactoryCode());
         result.setScheduleDate(date(target));
         result.setCd15BatchNo(target.getBatchNo());
+        // SPLIT 切胶模式下按 (splitGroupKey|machineCode) 生成滚动单号，其余模式按 key 生成
         String rollingOrderNo = "SPLIT".equals(task.getCutMode())
                 && task.getSplitGroupKey() != null
                 ? "ROLLING-" + Integer.toHexString(
@@ -424,6 +425,7 @@ public class Cd15TimedRollingEngineExecutor {
                         .toUpperCase()
                 : "ROLLING-" + Integer.toHexString(key.hashCode()).toUpperCase();
         result.setOrderNo(rollingOrderNo);
+        // SPLIT 模式下 groupNo 与滚动单号一致，用于批次分组
         result.setGroupNo("SPLIT".equals(task.getCutMode()) ? rollingOrderNo : null);
         result.setSteelStripCode(task.getSteelStripCode());
         result.setBigRollCode(task.getBigRollCode());
@@ -436,9 +438,12 @@ public class Cd15TimedRollingEngineExecutor {
         result.setCuttingAngle(task.getCuttingAngle());
         result.setCutMode(task.getCutMode());
         result.setMachineCode(task.getMachineCode());
+        // 排程来源：AUTO 自动排程
         result.setSourceType("AUTO");
+        // 发布状态：0 未发布
         result.setReleaseStatus("0");
         result.setPublishSuccessCount(0);
+        // 锁定状态：0 未锁定
         result.setIsLocked("0");
         return result;
     }

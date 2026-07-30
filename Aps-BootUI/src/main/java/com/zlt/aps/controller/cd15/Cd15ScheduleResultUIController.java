@@ -2,21 +2,25 @@ package com.zlt.aps.controller.cd15;
 
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
+import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
 import com.zlt.aps.cd15.api.domain.entity.Cd15ScheduleResult;
+import com.zlt.aps.cd15.api.domain.dto.Cd15ScheduleImportDTO;
 import com.zlt.aps.cd15.api.domain.vo.Cd15ChangeQtyRequest;
 import com.zlt.aps.cd15.api.domain.vo.Cd15InsertOrderRequest;
 import com.zlt.aps.cd15.api.domain.vo.Cd15RollingCheckRequest;
 import com.zlt.aps.cd15.api.domain.vo.Cd15TransferMachineRequest;
+import com.zlt.aps.cd15.api.domain.vo.Cd15ScheduleResultTemplateImportVO;
 import com.zlt.aps.cd15.api.service.ICd15ScheduleResultRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -25,6 +29,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -206,7 +211,8 @@ public class Cd15ScheduleResultUIController extends BaseUIController<Cd15Schedul
     @Override
     public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
         String fileName = getExportTemplateFileName();
-        ExcelUtil<Cd15ScheduleResult> util = new ExcelUtil<>(Cd15ScheduleResult.class);
+        ExcelUtil<Cd15ScheduleResultTemplateImportVO> util =
+                new ExcelUtil<>(Cd15ScheduleResultTemplateImportVO.class);
         util.exportExcel(response, null, fileName, fileName);
         return AjaxResult.success();
     }
@@ -238,5 +244,29 @@ public class Cd15ScheduleResultUIController extends BaseUIController<Cd15Schedul
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
         return cd15ScheduleResultRemoteService.importData(context, updateSupport);
+    }
+
+    @ApiOperation("按固定模板导入斜裁排程结果")
+    @RequiresPermissions("cd15:cd15ScheduleResult:import")
+    @PostMapping("/importDataByCust")
+    @ResponseBody
+    public AjaxResult importDataByCust(@RequestPart("file") MultipartFile file,
+                                       @RequestParam("updateSupport") boolean updateSupport,
+                                       @RequestParam("factoryCode") String factoryCode,
+                                       @RequestParam("scheduleDate") String scheduleDate) throws Exception {
+        byte[] data = this.useFileEncrypt ? FileEncryptUtils.DecodeFile(file) : file.getBytes();
+        ImportContext context = new ImportContext();
+        context.setImportFilePath(this.importFilePath);
+        context.setFunctionName(this.getFunctionName());
+        context.setProcedureCode(this.getProcedureCode());
+        context.setOriFileName(file.getOriginalFilename());
+        context.setFileBytes(data);
+        Cd15ScheduleResult condition = new Cd15ScheduleResult();
+        condition.setFactoryCode(StringUtils.trim(factoryCode));
+        condition.setScheduleDate(DateUtils.parseDate(scheduleDate));
+        Cd15ScheduleImportDTO importDTO = new Cd15ScheduleImportDTO();
+        importDTO.setImportContext(context);
+        importDTO.setScheduleResult(condition);
+        return cd15ScheduleResultRemoteService.importDataByCust(updateSupport, importDTO);
     }
 }

@@ -90,6 +90,7 @@ public class Cd15ScheduleResultExportAssembler {
         Map<String, String> structureNameBySteelStrip =
                 this.aggregateStructureNames(constructions);
 
+
         return rowStates.values().stream()
                 .filter(this::hasDisplayedQuantity)
                 .map(rowState -> this.completeRow(
@@ -98,6 +99,8 @@ public class Cd15ScheduleResultExportAssembler {
                         formingResults,
                         constructionsByKey,
                         structureNameBySteelStrip))
+                .map(this::zeroToNull)
+                // 汇总行列表，供模板逐行填充
                 .collect(Collectors.toList());
     }
 
@@ -299,11 +302,17 @@ public class Cd15ScheduleResultExportAssembler {
                 .add(structureName.trim());
     }
 
-    /** 判断模板行是否包含至少一个计划量或完成量。 */
+    /** 判断模板行是否包含至少一个非零的计划量或完成量。 */
     private boolean hasDisplayedQuantity(RowState rowState) {
         return DISPLAY_QUANTITY_FIELDS.stream()
-                .anyMatch(fieldName ->
-                        rowState.values.get(fieldName) != null);
+                .anyMatch(fieldName -> {
+                    Object value = rowState.values.get(fieldName);
+                    if (value == null) {
+                        return false;
+                    }
+                    return !(value instanceof BigDecimal)
+                            || !BigDecimalUtils.eqZero((BigDecimal) value);
+                });
     }
 
     /** 补全库存、成型产量、四班计划量和施工物料名称。 */
@@ -395,6 +404,17 @@ public class Cd15ScheduleResultExportAssembler {
             }
         }
         return total;
+    }
+
+    /** 将零值 BigDecimal 转换为 null，避免模板输出 0。 */
+    private Map<String, Object> zeroToNull(Map<String, Object> values) {
+        for (Map.Entry<String, Object> entry : values.entrySet()) {
+            if (entry.getValue() instanceof BigDecimal
+                    && BigDecimalUtils.eqZero((BigDecimal) entry.getValue())) {
+                entry.setValue(null);
+            }
+        }
+        return values;
     }
 
     /** 将空集合统一转换为空列表。 */

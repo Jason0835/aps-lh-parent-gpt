@@ -6,12 +6,15 @@ import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.api.gateway.system.service.IExportLogService;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.ServletUtils;
+import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.cd15.api.domain.entity.Cd15ScheduleResult;
+import com.zlt.aps.cd15.api.domain.dto.Cd15ScheduleImportDTO;
+import com.zlt.aps.cd15.api.domain.vo.Cd15ScheduleResultTemplateImportVO;
 import com.zlt.aps.cd15.api.domain.vo.Cd15ChangeQtyRequest;
 import com.zlt.aps.cd15.api.domain.vo.Cd15InsertOrderRequest;
 import com.zlt.aps.cd15.api.domain.vo.Cd15RollingCheckRequest;
@@ -36,6 +39,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.Date;
 import java.util.List;
@@ -196,6 +200,21 @@ public class Cd15ScheduleResultController extends AbstractDocBizController<Cd15S
     @Override
     public AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport) throws Exception {
         return super.importData(importContext, updateSupport);
+    }
+
+    @Log(title = "ui.data.column.cd15ScheduleResult.modalName", businessType = BusinessType.IMPORT)
+    @ApiOperation("按固定模板导入斜裁排程结果")
+    @PostMapping("/importDataByCust/{updateSupport}")
+    public AjaxResult importDataByCust(@PathVariable("updateSupport") boolean updateSupport,
+                                       @RequestBody Cd15ScheduleImportDTO importDTO) throws Exception {
+        ImportContext importContext = importDTO.getImportContext();
+        ExcelUtil<Cd15ScheduleResultTemplateImportVO> excelUtil =
+                new ExcelUtil<>(Cd15ScheduleResultTemplateImportVO.class);
+        // 第1行按隐藏字段键匹配VO，第1至5行作为模板表头，第6行开始读取导入明细。
+        List<Cd15ScheduleResultTemplateImportVO> rows = excelUtil.importExcel(
+                new ByteArrayInputStream(importContext.getFileBytes()), 0, 5, -1);
+        return this.cd15ScheduleResultService.importScheduleTemplate(
+                rows, importDTO.getScheduleResult(), updateSupport);
     }
 
     @Log(title = "ui.data.column.cd15ScheduleResult.modalName", businessType = BusinessType.EXPORT)
