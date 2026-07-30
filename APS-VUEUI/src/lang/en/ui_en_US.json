@@ -1496,6 +1496,7 @@
   "ui.tc.schedule.unplannedTitle": "Unplanned Tasks in Current Batches",
   "ui.tc.schedule.viewExplain": "View Explanation",
   "ui.tc.schedule.publish": "Publish",
+  "ui.tc.schedule.changeReleaseStatus": "Change Release Status",
   "ui.tc.schedule.confirmPublish": "Publish the selected {count} sidewall schedule results?",
   "ui.tc.schedule.releaseProgress": "Sidewall Release Progress",
   "ui.tc.schedule.releaseProgressHint": "The task waits for MES feedback and can be restored after reopening the page",

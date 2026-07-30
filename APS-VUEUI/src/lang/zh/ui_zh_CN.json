@@ -4292,6 +4292,7 @@
   "ui.tc.schedule.unplannedTitle": "当前有效批次未排任务",
   "ui.tc.schedule.viewExplain": "查看解释",
   "ui.tc.schedule.publish": "发布",
+  "ui.tc.schedule.changeReleaseStatus": "更改发布状态",
   "ui.tc.schedule.confirmPublish": "确认发布选中的 {count} 条胎侧排程结果吗？",
   "ui.tc.schedule.releaseProgress": "胎侧排程发布进度",
   "ui.tc.schedule.releaseProgressHint": "排程发送后将等待MES反馈，关闭页面后可自动恢复进度",

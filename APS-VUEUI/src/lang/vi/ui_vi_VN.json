@@ -2420,6 +2420,7 @@
   "ui.tc.schedule.unplannedTitle": "Tác vụ chưa xếp lịch của lô hiện hành",
   "ui.tc.schedule.viewExplain": "Xem giải thích",
   "ui.tc.schedule.publish": "Phát hành",
+  "ui.tc.schedule.changeReleaseStatus": "Thay đổi trạng thái phát hành",
   "ui.tc.schedule.confirmPublish": "Phát hành {count} kết quả lập lịch hông lốp đã chọn?",
   "ui.tc.schedule.releaseProgress": "Tiến độ phát hành hông lốp",
   "ui.tc.schedule.releaseProgressHint": "Tác vụ sẽ chờ phản hồi MES và có thể khôi phục khi mở lại trang",

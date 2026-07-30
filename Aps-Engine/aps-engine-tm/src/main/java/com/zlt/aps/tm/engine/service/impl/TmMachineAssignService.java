@@ -820,7 +820,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
                 this.applyCapacitySplitResult(task, currentShiftPlanQty, assignedQty, remainCapacity, machineSpeed,
                         capacityOverflowQty.compareTo(BigDecimal.ZERO) > 0 ? "当前班产能受限" : "当前班选中机台承接");
                 if (originalToolOverflowQty.compareTo(BigDecimal.ZERO) > 0) {
-                    task.setPlanQty(assignedQty.setScale(0, java.math.RoundingMode.CEILING));
+                    task.setPlanQty(assignedQty);
                 }
                 this.settleAssignedTaskToolState(task, context);
                 this.addContextTask(context, task);
@@ -1204,8 +1204,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
                 BigDecimal overflowQty = remainingQty.subtract(assignedQty);
                 if (mergeTarget != null) {
                     BigDecimal beforeMergeQty = nvl(mergeTarget.getPlanQty());
-                    BigDecimal afterMergeQty = beforeMergeQty.add(assignedQty)
-                            .setScale(0, java.math.RoundingMode.CEILING);
+                    BigDecimal afterMergeQty = beforeMergeQty.add(assignedQty);
                     this.taskChainScheduleService.changeQty(mergeTarget.getBusinessKey(), afterMergeQty, shiftOrder, context);
                     mergeTarget.setPlanQty(afterMergeQty);
                     this.applyCarryoverMergeToolState(mergeTarget, assignedQty, context);
@@ -1246,7 +1245,8 @@ public class TmMachineAssignService implements ITmMachineAssignService {
                             this.resolveSmallGlueBoundMachine(overflowTask, context), null);
             this.addAssignTrace(context, overflowTask, TmScheduleRuleResultEnum.PASS,
                     runtimeCandidate.getMachineCode(), null, null);
-                    this.taskChainScheduleService.prependAutoTask(overflowTask, runtimeCandidate, context);
+                    // 顺延任务按来源任务的生成顺序追加，避免后生成任务反向插到目标班次链首。
+                    this.taskChainScheduleService.appendAutoTask(overflowTask, runtimeCandidate, context);
                 }
                 remainingQty = overflowQty;
                 overflowIndex++;
@@ -1256,7 +1256,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
             TmTaskDraft unplannedTask = this.copyOverflowTask(sourceTask,
                     TmScheduleConstants.TM_MAX_SHIFT_ORDER, remainingQty, sourceShiftOrder,
                     overflowIndex, TmMachineAssignStatusEnum.UNPLANNED.getCode());
-            unplannedTask.setPlanQty(remainingQty.setScale(0, java.math.RoundingMode.CEILING));
+            unplannedTask.setPlanQty(remainingQty);
             unplannedTask.setShiftOrder(TmScheduleConstants.TM_MAX_SHIFT_ORDER);
             unplannedTask.setMachineCode(null);
             TmUnplannedReasonEnum unplannedReason = this.resolveCarryoverUnplannedReason(capacityOverflowQty,
@@ -1850,7 +1850,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
      */
     private void applyCapacitySplitResult(TmTaskDraft task, BigDecimal beforeAssignQty, BigDecimal assignedQty,
                                           BigDecimal remainCapacity, BigDecimal machineSpeed, String splitDesc) {
-        BigDecimal normalizedAssignedQty = StrUtil.contains(splitDesc, "顺延") ? assignedQty.setScale(0, java.math.RoundingMode.CEILING) : assignedQty;
+        BigDecimal normalizedAssignedQty = assignedQty;
         task.setPlanQty(normalizedAssignedQty);
         task.setMachineRemainCapacity(remainCapacity);
         task.setMachineSpeed(machineSpeed);

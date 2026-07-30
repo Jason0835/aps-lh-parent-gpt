@@ -164,3 +164,11 @@ export function getLatestReleaseTask(query) {
     params: query
   })
 }
+
+export function changeReleaseStatus(data) {
+  return request({
+    url: '/tc/tcScheduleResult/changeReleaseStatus',
+    method: 'post',
+    data
+  })
+}

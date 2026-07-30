@@ -15,6 +15,7 @@ import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.io.IOUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
+import org.apache.shiro.authz.annotation.RequiresRoles;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.stereotype.Controller;
@@ -451,7 +452,23 @@ public class TcScheduleResultUIController extends BaseUIController<TcScheduleRes
     @RequiresPermissions("tc:tcScheduleResult:publish")
     @ResponseBody
     public TcReleaseTaskVo getLatestReleaseTask(@RequestParam("factoryCode") String factoryCode,
-                                                @RequestParam("scheduleDate") String scheduleDate) {
+                                                 @RequestParam("scheduleDate") String scheduleDate) {
         return iTcScheduleResultService.getLatestReleaseTask(factoryCode, scheduleDate);
+    }
+
+    /**
+     * 管理员批量更改胎侧排程结果发布状态。
+     *
+     * @param ids 排程结果 ID，多个 ID 使用英文逗号分隔
+     * @param isRelease 目标发布状态编码
+     * @return 状态变更结果
+     */
+    @RequiresRoles("admin")
+    @ApiOperation("更改胎侧排程结果发布状态")
+    @PostMapping("/changeReleaseStatus")
+    @ResponseBody
+    public AjaxResult changeReleaseStatus(@RequestParam("ids") String ids,
+                                          @RequestParam("isRelease") String isRelease) {
+        return this.iTcScheduleResultService.changeReleaseStatus(ids, isRelease);
     }
 }

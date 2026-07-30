@@ -30,7 +30,7 @@ public class TmScheduleUnplannedQueryService {
     /**
      * 分页查询胎面未排任务。
      *
-     * @param queryVo 查询条件，工厂和排程日期必填，批次号可选
+     * @param queryVo 查询条件，工厂和排程日期必填，批次号和胎面编码可选
      * @return 未排任务分页结果
      * @throws ServiceException 查询范围不完整时抛出
      */
@@ -42,6 +42,8 @@ public class TmScheduleUnplannedQueryService {
         wrapper.eq(TmScheduleUnplanned::getFactoryCode, queryVo.getFactoryCode());
         wrapper.eq(TmScheduleUnplanned::getScheduleDate, queryVo.getScheduleDate());
         wrapper.eq(StringUtils.isNotBlank(queryVo.getBatchNo()), TmScheduleUnplanned::getBatchNo, queryVo.getBatchNo());
+        wrapper.like(StringUtils.isNotBlank(queryVo.getTreadCode()), TmScheduleUnplanned::getTreadCode,
+                queryVo.getTreadCode());
         wrapper.orderByAsc(TmScheduleUnplanned::getScheduleDate, TmScheduleUnplanned::getBatchNo,
                 TmScheduleUnplanned::getTreadCode, TmScheduleUnplanned::getId);
         return this.tmScheduleUnplannedMapper.selectPage(new Page<>(pageNum, pageSize), wrapper);

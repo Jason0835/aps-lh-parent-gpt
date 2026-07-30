@@ -73,6 +73,7 @@ export default {
         })
         this.rows = page.records || page.rows || []
         this.total = Number(page.total || 0)
+        this.$emit('count-change', this.total)
       } finally {
         this.loading = false
       }
