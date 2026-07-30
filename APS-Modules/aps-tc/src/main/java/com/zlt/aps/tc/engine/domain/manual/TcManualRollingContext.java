@@ -28,6 +28,10 @@ public class TcManualRollingContext {
     private Map<String, BigDecimal> machineSpecSpeedMap = new LinkedHashMap<>();
     /** 当前批次人工重算前的全局可用工装数量。 */
     private BigDecimal initialAvailableToolQty;
+    /** 当前批次工装池上限。 */
+    private BigDecimal totalToolQty;
+    /** 本次人工命令结算后的全局可用工装数量。 */
+    private BigDecimal currentAvailableToolQty;
     /** 当前排程日一班开始前的同机台任务，key=机台编码。 */
     private Map<String, TcManualTaskDraft> predecessorTaskMap = new LinkedHashMap<>();
     /** 最终机台班次任务链。 */

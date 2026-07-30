@@ -1,6 +1,7 @@
 package com.zlt.aps.tm.service.impl;
 
 import com.alibaba.fastjson.JSON;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.tm.api.enums.TmBackgroundTaskTypeEnum;
 import com.zlt.aps.tm.domain.TmAutoScheduleTask;
@@ -49,6 +50,11 @@ public class TmOperationAsyncExecutorImpl implements TmOperationAsyncExecutor {
             this.operationTaskService.updateProgress(taskId, 60, "ROLLING",
                     I18nUtil.getMessage("ui.data.alert.tm.schedule.operationTaskRolling"));
             int affectedCount = this.executeOperation(task.getTaskType(), snapshot);
+            if (affectedCount <= 0
+                    && !TmBackgroundTaskTypeEnum.MANUAL_PUBLISH.getCode().equals(task.getTaskType())) {
+                throw new ServiceException(I18nUtil.getMessage(
+                        "ui.data.alert.tm.schedule.operationTaskZeroEffect"));
+            }
             this.operationTaskService.updateProgress(taskId, 90, "SAVING",
                     I18nUtil.getMessage("ui.data.alert.tm.schedule.operationTaskSaving"));
             this.operationTaskService.markSuccess(taskId, affectedCount);

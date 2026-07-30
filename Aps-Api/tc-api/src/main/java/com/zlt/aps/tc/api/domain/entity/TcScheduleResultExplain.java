@@ -131,6 +131,22 @@ public class TcScheduleResultExplain extends BaseEntity {
     @TableField("FINAL_PLAN_QTY")
     private BigDecimal finalPlanQty;
 
+    /** 全局工装账本结算顺序 */
+    @TableField("TOOL_LEDGER_ORDER")
+    private Integer toolLedgerOrder;
+
+    /** 工装账本结算前可用数量 */
+    @TableField("AVAILABLE_TOOL_QTY")
+    private BigDecimal availableToolQty;
+
+    /** 当前任务工装净占用数量 */
+    @TableField("TOOL_USED_QTY")
+    private BigDecimal toolUsedQty;
+
+    /** 工装账本结算后剩余数量 */
+    @TableField("REMAINING_TOOL_QTY")
+    private BigDecimal remainingToolQty;
+
     /** 计划量计算分解 JSON */
     @TableField("PLAN_QTY_BREAKDOWN_JSON")
     private String planQtyBreakdownJson;

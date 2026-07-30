@@ -8,6 +8,8 @@ import com.zlt.aps.common.engine.schedule.ScheduleRuleResult;
 import com.zlt.aps.common.engine.schedule.ScheduleScoreResult;
 import com.zlt.aps.common.engine.schedule.ScheduleTaskLinkedList;
 import com.zlt.aps.common.engine.schedule.ScheduleTaskNode;
+import com.zlt.aps.common.engine.schedule.constraint.ScheduleConstraintCalculator;
+import com.zlt.aps.common.engine.schedule.constraint.ScheduleToolLedgerResult;
 import com.zlt.aps.tm.api.constant.TmScheduleConstants;
 import com.zlt.aps.tm.api.enums.*;
 import com.zlt.aps.tm.engine.domain.*;
@@ -38,6 +40,9 @@ public class TmMachineAssignService implements ITmMachineAssignService {
 
     /** 损耗率四层匹配解析器 */
     private final TmLossRateResolver lossRateResolver = new TmLossRateResolver();
+
+    /** 胎面、胎侧共用工装账本纯计算器 */
+    private final ScheduleConstraintCalculator constraintCalculator = new ScheduleConstraintCalculator();
 
     /**
      * 创建默认机台分配步骤服务。
@@ -1606,23 +1611,19 @@ public class TmMachineAssignService implements ITmMachineAssignService {
             task.setToolUsedQty(BigDecimal.ZERO.setScale(TmScheduleConstants.DECIMAL_CALCULATION_SCALE,
                     java.math.RoundingMode.HALF_UP));
             task.setRemainingToolQty(currentAvailableToolQty);
+            task.setToolLedgerOrder(context.nextToolLedgerOrder());
             context.setCurrentAvailableToolQty(currentAvailableToolQty);
             return;
         }
-        BigDecimal toolUsedQty = nvl(task.getPlanQty()).subtract(nvl(task.getCurrentShiftDemandQty()))
-                .divide(curlLength, TmScheduleConstants.DECIMAL_CALCULATION_SCALE,
-                        java.math.RoundingMode.HALF_UP);
-        BigDecimal remainingToolQty = currentAvailableToolQty.subtract(toolUsedQty).max(BigDecimal.ZERO);
-        if (task.getTotalToolQty() != null) {
-            remainingToolQty = remainingToolQty.min(task.getTotalToolQty());
-        }
-        remainingToolQty = remainingToolQty.setScale(TmScheduleConstants.DECIMAL_CALCULATION_SCALE,
-                java.math.RoundingMode.HALF_UP);
-        task.setToolUsedQty(toolUsedQty);
-        task.setRemainingToolQty(remainingToolQty);
+        ScheduleToolLedgerResult ledgerResult = this.constraintCalculator.settleCommittedToolLedger(
+                task.getPlanQty(), task.getCurrentShiftDemandQty(), currentAvailableToolQty,
+                task.getTotalToolQty(), curlLength);
+        task.setToolUsedQty(ledgerResult.getToolUsedQty());
+        task.setRemainingToolQty(ledgerResult.getRemainingToolQty());
+        task.setToolLedgerOrder(context.nextToolLedgerOrder());
         task.setPlanStockQty(nvl(task.getRollingStockQty()).add(nvl(task.getPlanQty()))
                 .subtract(nvl(task.getCurrentShiftDemandQty())).max(BigDecimal.ZERO));
-        context.setCurrentAvailableToolQty(remainingToolQty);
+        context.setCurrentAvailableToolQty(ledgerResult.getRemainingToolQty());
     }
 
     /**
@@ -1640,22 +1641,19 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         BigDecimal curlLength = this.resolveCurlLength(mergeTarget);
         if (curlLength.compareTo(BigDecimal.ZERO) <= 0) {
             mergeTarget.setRemainingToolQty(currentAvailableToolQty);
+            mergeTarget.setToolLedgerOrder(context.nextToolLedgerOrder());
             context.setCurrentAvailableToolQty(currentAvailableToolQty);
             return;
         }
-        BigDecimal incrementalToolQty = nvl(carryoverQty).divide(curlLength,
-                TmScheduleConstants.DECIMAL_CALCULATION_SCALE, java.math.RoundingMode.HALF_UP);
-        BigDecimal remainingToolQty = currentAvailableToolQty.subtract(incrementalToolQty).max(BigDecimal.ZERO);
-        if (mergeTarget.getTotalToolQty() != null) {
-            remainingToolQty = remainingToolQty.min(mergeTarget.getTotalToolQty());
-        }
-        remainingToolQty = remainingToolQty.setScale(TmScheduleConstants.DECIMAL_CALCULATION_SCALE,
-                java.math.RoundingMode.HALF_UP);
+        ScheduleToolLedgerResult ledgerResult = this.constraintCalculator.settleCommittedToolLedger(
+                carryoverQty, BigDecimal.ZERO, currentAvailableToolQty,
+                mergeTarget.getTotalToolQty(), curlLength);
         mergeTarget.setAvailableToolQty(currentAvailableToolQty);
-        mergeTarget.setToolUsedQty(nvl(mergeTarget.getToolUsedQty()).add(incrementalToolQty));
-        mergeTarget.setRemainingToolQty(remainingToolQty);
+        mergeTarget.setToolUsedQty(nvl(mergeTarget.getToolUsedQty()).add(ledgerResult.getToolUsedQty()));
+        mergeTarget.setRemainingToolQty(ledgerResult.getRemainingToolQty());
+        mergeTarget.setToolLedgerOrder(context.nextToolLedgerOrder());
         mergeTarget.setPlanStockQty(nvl(mergeTarget.getPlanStockQty()).add(nvl(carryoverQty)));
-        context.setCurrentAvailableToolQty(remainingToolQty);
+        context.setCurrentAvailableToolQty(ledgerResult.getRemainingToolQty());
     }
 
     /**

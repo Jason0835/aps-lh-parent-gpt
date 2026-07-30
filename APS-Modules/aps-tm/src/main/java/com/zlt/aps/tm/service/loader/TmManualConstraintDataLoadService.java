@@ -4,14 +4,13 @@ import cn.hutool.core.date.DateUnit;
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.ruoyi.common.exception.ServiceException;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.common.engine.schedule.constraint.ScheduleConstraintConfig;
 import com.zlt.aps.tm.api.constant.TmScheduleConstants;
-import com.zlt.aps.tm.api.domain.entity.TmMachineMaintenance;
-import com.zlt.aps.tm.api.domain.entity.TmMachineSpeed;
-import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
-import com.zlt.aps.tm.api.domain.entity.TmShiftConfig;
+import com.zlt.aps.tm.api.domain.entity.*;
 import com.zlt.aps.tm.api.enums.TmYesNoEnum;
 import com.zlt.aps.tm.engine.domain.TmParamValue;
 import com.zlt.aps.tm.engine.domain.TmScheduleContext;
@@ -45,6 +44,7 @@ public class TmManualConstraintDataLoadService {
     private final TmMachineMaintenanceMapper tmMachineMaintenanceMapper;
     private final TmShiftConfigMapper tmShiftConfigMapper;
     private final TmScheduleResultMapper tmScheduleResultMapper;
+    private final TmScheduleResultExplainMapper tmScheduleResultExplainMapper;
     private final TmScheduleParamLoader tmScheduleParamLoader;
 
     /**
@@ -56,19 +56,22 @@ public class TmManualConstraintDataLoadService {
      * @param tmMachineMaintenanceMapper 机台维修 Mapper
      * @param tmShiftConfigMapper 班次配置 Mapper
      * @param tmScheduleResultMapper 排程结果 Mapper
+     * @param tmScheduleResultExplainMapper 排程解释 Mapper
      */
     public TmManualConstraintDataLoadService(TmParamsMapper tmParamsMapper,
                                              TmAutoScheduleRedisCacheService tmAutoScheduleRedisCacheService,
                                              TmMachineSpeedMapper tmMachineSpeedMapper,
                                              TmMachineMaintenanceMapper tmMachineMaintenanceMapper,
                                              TmShiftConfigMapper tmShiftConfigMapper,
-                                             TmScheduleResultMapper tmScheduleResultMapper) {
+                                             TmScheduleResultMapper tmScheduleResultMapper,
+                                             TmScheduleResultExplainMapper tmScheduleResultExplainMapper) {
         this.tmParamsMapper = tmParamsMapper;
         this.tmAutoScheduleRedisCacheService = tmAutoScheduleRedisCacheService;
         this.tmMachineSpeedMapper = tmMachineSpeedMapper;
         this.tmMachineMaintenanceMapper = tmMachineMaintenanceMapper;
         this.tmShiftConfigMapper = tmShiftConfigMapper;
         this.tmScheduleResultMapper = tmScheduleResultMapper;
+        this.tmScheduleResultExplainMapper = tmScheduleResultExplainMapper;
         this.tmScheduleParamLoader = new TmScheduleParamLoader();
     }
 
@@ -108,8 +111,8 @@ public class TmManualConstraintDataLoadService {
         context.setPredecessorTaskMap(this.loadPredecessorTaskMap(context, machineCodeSet));
         BigDecimal totalToolQty = this.getParamValue(paramMap, TmScheduleConstants.PARAM_TOOL_TOTAL_QTY);
         if (this.isPositive(totalToolQty)) {
-            context.setInitialAvailableToolQty(this.resolveAffectedMachineAvailableToolQty(
-                    context, machineCodeSet, totalToolQty, defaultCurlLength));
+            context.setTotalToolQty(totalToolQty);
+            context.setInitialAvailableToolQty(this.resolveFinalToolLedgerBalance(context));
         }
     }
 
@@ -393,42 +396,22 @@ public class TmManualConstraintDataLoadService {
      * @param defaultCurlLength 默认卷曲长度
      * @return 扣除其他机台占用后的可用工装
      */
-    private BigDecimal resolveAffectedMachineAvailableToolQty(TmManualRollingContext context,
-                                                               Set<String> affectedMachineCodeSet,
-                                                               BigDecimal totalToolQty,
-                                                               BigDecimal defaultCurlLength) {
-        LambdaQueryWrapper<TmScheduleResult> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(TmScheduleResult::getFactoryCode, context.getFactoryCode());
-        wrapper.eq(TmScheduleResult::getScheduleDate, context.getScheduleDate());
-        wrapper.eq(StringUtils.isNotBlank(context.getBatchNo()), TmScheduleResult::getBatchNo, context.getBatchNo());
-        wrapper.notIn(!affectedMachineCodeSet.isEmpty(), TmScheduleResult::getMachineCode, affectedMachineCodeSet);
-        List<TmScheduleResult> unaffectedResultList =
-                Optional.ofNullable(tmScheduleResultMapper.selectList(wrapper)).orElse(new ArrayList<>());
-        BigDecimal unaffectedToolUsage = unaffectedResultList.stream()
-                .map(result -> this.calculateResultToolUsage(result, defaultCurlLength))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        return totalToolQty.subtract(unaffectedToolUsage).max(BigDecimal.ZERO);
-    }
-
-    /**
-     * 计算一条横向结果六班计划量的工装占用。
-     *
-     * @param result 横向排程结果
-     * @param defaultCurlLength 默认卷曲长度
-     * @return 工装占用数量
-     */
-    private BigDecimal calculateResultToolUsage(TmScheduleResult result, BigDecimal defaultCurlLength) {
-        BigDecimal curlLength = this.isPositive(result.getCurlRollLength())
-                ? result.getCurlRollLength() : defaultCurlLength;
-        if (!this.isPositive(curlLength)) {
-            return BigDecimal.ZERO;
+    private BigDecimal resolveFinalToolLedgerBalance(TmManualRollingContext context) {
+        LambdaQueryWrapper<TmScheduleResultExplain> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(TmScheduleResultExplain::getFactoryCode, context.getFactoryCode());
+        wrapper.eq(StringUtils.isNotBlank(context.getBatchNo()),
+                TmScheduleResultExplain::getBatchNo, context.getBatchNo());
+        wrapper.isNotNull(TmScheduleResultExplain::getToolLedgerOrder);
+        wrapper.isNotNull(TmScheduleResultExplain::getRemainingToolQty);
+        wrapper.orderByDesc(TmScheduleResultExplain::getToolLedgerOrder);
+        wrapper.last("LIMIT 1");
+        TmScheduleResultExplain latestLedger =
+                tmScheduleResultExplainMapper.selectOne(wrapper);
+        if (latestLedger == null) {
+            throw new ServiceException(I18nUtil.getMessage(
+                    "ui.data.alert.tm.schedule.manualToolLedgerMissing"));
         }
-        BigDecimal planQty = BigDecimal.ZERO;
-        for (int shiftOrder = 1; shiftOrder <= TmScheduleConstants.TM_MAX_SHIFT_ORDER; shiftOrder++) {
-            planQty = planQty.add(BigDecimalUtils.valueOf(result.getFieldValueByFieldName(
-                    String.format(TmScheduleConstants.SHIFT_PLAN_QTY_FIELD_TEMPLATE, shiftOrder))));
-        }
-        return planQty.divide(curlLength, TmScheduleConstants.DECIMAL_CALCULATION_SCALE, RoundingMode.HALF_UP);
+        return latestLedger.getRemainingToolQty().max(BigDecimal.ZERO);
     }
 
     /**

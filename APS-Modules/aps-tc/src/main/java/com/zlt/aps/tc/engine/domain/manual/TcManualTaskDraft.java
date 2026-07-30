@@ -50,6 +50,14 @@ public class TcManualTaskDraft {
     private String dataSource;
     /** 原因分析。 */
     private String analysis;
+    /** 未排原因编码。 */
+    private String unplannedReasonCode;
+    /** 未排原因描述。 */
+    private String unplannedReasonDesc;
+    /** 工装结算前可用数量。 */
+    private BigDecimal availableToolQty;
+    /** 本任务所需工装数量。 */
+    private BigDecimal requiredToolQty;
     /** 来源开始时间。 */
     private Date sourceStartTime;
     /** 来源结束时间。 */
@@ -88,6 +96,10 @@ public class TcManualTaskDraft {
         target.setMouthPlateCode(this.mouthPlateCode);
         target.setDataSource(this.dataSource);
         target.setAnalysis(this.analysis);
+        target.setUnplannedReasonCode(this.unplannedReasonCode);
+        target.setUnplannedReasonDesc(this.unplannedReasonDesc);
+        target.setAvailableToolQty(this.availableToolQty);
+        target.setRequiredToolQty(this.requiredToolQty);
         target.setSourceStartTime(this.sourceStartTime);
         target.setSourceEndTime(this.sourceEndTime);
         target.setInsertTask(this.insertTask);

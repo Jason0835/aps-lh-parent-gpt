@@ -122,6 +122,10 @@ public class TmPersistService {
             explain.setCapacityAdjustQty(task.getCapacityAdjustQty());
             explain.setRequiredQty(resolveRequiredQty(task));
             explain.setFinalPlanQty(task.getPlanQty());
+            explain.setToolLedgerOrder(task.getToolLedgerOrder());
+            explain.setAvailableToolQty(task.getAvailableToolQty());
+            explain.setToolUsedQty(task.getToolUsedQty());
+            explain.setRemainingToolQty(task.getRemainingToolQty());
             explain.setCalcFormulaDesc(task.getCalcFormulaDesc());
             explain.setStockQty(task.getSixClockStockQty());
             explain.setPlanStockQty(task.getPlanStockQty());

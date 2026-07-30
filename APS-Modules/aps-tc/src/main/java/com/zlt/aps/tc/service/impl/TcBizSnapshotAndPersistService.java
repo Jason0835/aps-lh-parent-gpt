@@ -369,6 +369,12 @@ public class TcBizSnapshotAndPersistService implements ITcSnapshotAndPersistServ
             List<TcTaskDraft> assignedFragmentList = fragmentList.stream()
                     .filter(task -> !this.isUnplannedTask(task) && this.isPositiveQty(task.getPlanQty()))
                     .collect(java.util.stream.Collectors.toList());
+            TcTaskDraft finalLedgerFragment = fragmentList.stream()
+                    .filter(task -> task.getToolLedgerOrder() != null)
+                    .max(Comparator.comparing(TcTaskDraft::getToolLedgerOrder)).orElse(null);
+            String ledgerOwnerBusinessKey = taskGroup.getSourceTaskList().stream()
+                    .map(TcTaskDraft::getBusinessKey).filter(Objects::nonNull)
+                    .max(String::compareTo).orElse(null);
             boolean allUnplanned = CollUtil.isNotEmpty(fragmentList)
                     && assignedFragmentList.isEmpty() && groupFinalPlanQty.compareTo(BigDecimal.ZERO) > 0;
             for (TcTaskDraft sourceTask : taskGroup.getSourceTaskList()) {
@@ -387,6 +393,13 @@ public class TcBizSnapshotAndPersistService implements ITcSnapshotAndPersistServ
                 }
                 sourceTask.setMachineCode(assignedFragmentList.isEmpty()
                         ? null : assignedFragmentList.get(0).getMachineCode());
+                if (finalLedgerFragment != null
+                        && Objects.equals(ledgerOwnerBusinessKey, sourceTask.getBusinessKey())) {
+                    sourceTask.setToolLedgerOrder(finalLedgerFragment.getToolLedgerOrder());
+                    sourceTask.setAvailableToolQty(finalLedgerFragment.getAvailableToolQty());
+                    sourceTask.setToolUsedQty(finalLedgerFragment.getToolUsedQty());
+                    sourceTask.setRemainingToolQty(finalLedgerFragment.getRemainingToolQty());
+                }
                 if (allUnplanned) {
                     TcTaskDraft unplannedFragment = fragmentList.get(0);
                     sourceTask.setUnplannedReasonCode(unplannedFragment.getUnplannedReasonCode());

@@ -95,6 +95,9 @@ public class TcScheduleContext {
     /** 机台分配阶段正在滚动使用的全局可用工装数量 */
     private BigDecimal currentAvailableToolQty;
 
+    /** 本批次全局工装账本稳定序号 */
+    private Integer toolLedgerSequence = 0;
+
     /** 小胶种编码集合，来源于本次参数快照 */
     private Set<String> smallGlueCodeSet = new HashSet<>();
 
@@ -123,6 +126,16 @@ public class TcScheduleContext {
 
     /** 班次时间窗口映射，key=班次顺序(1~6)，来自 T_TC_SHIFT_CONFIG */
     private Map<Integer, TcShiftTimeWindow> shiftTimeWindowMap = new HashMap<>();
+
+    /**
+     * 获取下一个全局工装账本序号。
+     *
+     * @return 从 1 开始递增的账本序号
+     */
+    public int nextToolLedgerOrder() {
+        this.toolLedgerSequence = Optional.ofNullable(this.toolLedgerSequence).orElse(0) + 1;
+        return this.toolLedgerSequence;
+    }
 
     /**
      * 按参数编码读取本次排程参数快照。

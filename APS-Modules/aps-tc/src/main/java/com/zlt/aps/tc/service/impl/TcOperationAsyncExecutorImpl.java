@@ -1,6 +1,7 @@
 package com.zlt.aps.tc.service.impl;
 
 import com.alibaba.fastjson.JSON;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.tc.api.enums.TcBackgroundTaskTypeEnum;
 import com.zlt.aps.tc.domain.TcAutoScheduleTask;
@@ -44,6 +45,10 @@ public class TcOperationAsyncExecutorImpl implements TcOperationAsyncExecutor {
             this.backgroundTaskService.updateProgress(taskId, 60, "ROLLING",
                     I18nUtil.getMessage("ui.tc.schedule.operationTaskRolling"), null);
             int affectedCount = this.executeOperation(task.getTaskType(), snapshot);
+            if (affectedCount <= 0) {
+                throw new ServiceException(I18nUtil.getMessage(
+                        "ui.tc.schedule.operationTaskZeroEffect"));
+            }
             this.backgroundTaskService.updateProgress(taskId, 90, "SAVING",
                     I18nUtil.getMessage("ui.tc.schedule.operationTaskSaving"), null);
             this.backgroundTaskService.markOperationSuccess(taskId, affectedCount);
