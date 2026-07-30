@@ -1925,21 +1925,27 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         // 2. 查询余量表 STOCK_CAPTURE_DATE（仍按数据来源月/6月取，用于 LAST_MONTH_PLAN_VERSION 非 ADJ 前缀时的回退）
         List<StockCaptureDateDTO> surplusList = finalMapper.selectSurplusStockCaptureDateMap(lastYear, lastMonth);
         // 构建余量表映射：key = factoryCode|materialCode，value = STOCK_CAPTURE_DATE
-        // 同时对余量表日期做范围校验，不在 [startDate, endDate] 内的置 null
+        // 过滤掉库存抓取日为空或超出数据来源月范围的记录，下游 surplusMap.get() 返回 null 时自然走回退逻辑
         Map<String, Date> surplusMap = surplusList.stream()
+                .filter(dto -> {
+                    Date date = dto.getStockCaptureDate();
+                    if (date == null) {
+                        return false;
+                    }
+                    if (date.before(startDate) || date.after(endDate)) {
+                        log.warn("余量表库存抓取日超出数据来源月范围，分厂: {}, 物料: {}, 抓取日: {}, 有效范围: {} ~ {}, 将回退到月初",
+                                dto.getFactoryCode(), dto.getMaterialCode(), date, startDate, endDate);
+                        return false;
+                    }
+                    return true;
+                })
                 .collect(Collectors.toMap(
                         dto -> dto.getFactoryCode() + "|" + dto.getMaterialCode(),
-                        dto -> {
-                            Date date = dto.getStockCaptureDate();
-                            if (date != null && (date.before(startDate) || date.after(endDate))) {
-                                log.warn("余量表库存抓取日超出数据来源月范围，分厂: {}, 物料: {}, 抓取日: {}, 有效范围: {} ~ {}, 将回退到月初",
-                                        dto.getFactoryCode(), dto.getMaterialCode(), date, startDate, endDate);
-                                return null;
-                            }
-                            return date;
-                        },
-                        (v1, v2) -> v1  // 重复key取第一个
+                        StockCaptureDateDTO::getStockCaptureDate,
+                        // 当 Key 冲突时，比较两个日期，保留较晚的一个（即最新的日期）
+                        (v1, v2) -> v1.after(v2) ? v1 : v2
                 ));
+
 
         // 3. 构建当月（7月）定稿表的匹配键集合，用于识别数据来源月独有的记录
         Set<String> currentMonthKeys = currentVersionList.stream()
