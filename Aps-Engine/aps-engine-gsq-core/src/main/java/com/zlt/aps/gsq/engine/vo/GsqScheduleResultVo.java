@@ -235,6 +235,23 @@ public class GsqScheduleResultVo extends ApsBaseDto {
     @ApiModelProperty(value = "工艺参数Map，运行时传递，不持久化")
     private transient Map<String, Object> params = new HashMap<>();
 
+    // ========== Phase 2 重构新增：解释 JSON ==========
+
+    /**
+     * 排程解释 JSON（结构化规则证据）。
+     *
+     * <p>Phase 2 重构新增：由 S6 持久化阶段从 {@code context.getRuleTrace(steelRingCode).toExplainJson()}
+     * 填充，写入数据库 {@code T_GSQ_SCHEDULE_RESULT.EXPLAIN_JSON} 字段。</p>
+     *
+     * <p>JSON 结构包含：</p>
+     * <ul>
+     *   <li>schemaVersion: 版本号</li>
+     *   <li>hits: 规则命中列表，每项含 ruleCode/result/evidence</li>
+     * </ul>
+     */
+    @ApiModelProperty(value = "排程解释JSON（结构化规则证据）")
+    private String explainJson;
+
     /**
      * 获取次日总计划量（2班+3班），用于排序。
      */

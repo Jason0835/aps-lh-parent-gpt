@@ -3,15 +3,22 @@ package com.zlt.aps.gsq.controller;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.gsq.api.domain.dto.GsqChangeMachineDTO;
 import com.zlt.aps.gsq.api.domain.dto.GsqInsertOrderDTO;
+import com.zlt.aps.gsq.api.domain.entity.GsqMachineInfo;
 import com.zlt.aps.gsq.api.domain.entity.GsqScheduleResult;
+import com.zlt.aps.gsq.api.domain.entity.GsqSpecifyMachine;
 import com.zlt.aps.gsq.api.domain.vo.GsqScheduleShiftDateVO;
 import com.zlt.aps.gsq.engine.service.GsqEngineService;
 import com.zlt.aps.gsq.mapper.GsqScheduleResultMapper;
+import com.zlt.aps.gsq.service.GsqMachineInfoService;
+import com.zlt.aps.gsq.api.domain.vo.GsqRollingCheckRequestVo;
+import com.zlt.aps.gsq.api.domain.vo.GsqRollingTaskVo;
+import com.zlt.aps.gsq.service.GsqAutoRollingApplicationService;
 import com.zlt.aps.gsq.service.IGsqScheduleResultService;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
@@ -25,7 +32,9 @@ import org.springframework.web.bind.annotation.*;
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * 钢丝圈排程结果Controller
@@ -44,11 +53,26 @@ public class GsqScheduleResultController extends AbstractDocBizController<GsqSch
     @Autowired
     private IGsqScheduleResultService gsqScheduleResultService;
 
+    @Autowired
+    private GsqAutoRollingApplicationService gsqAutoRollingApplicationService;
+
     @Resource
     private GsqScheduleResultMapper gsqScheduleResultMapper;
 
     @Autowired
     private GsqEngineService gsqEngineService;
+
+    /**
+     * 钢丝圈机台信息服务（用于查询启用状态的机台）
+     */
+    @Autowired
+    private GsqMachineInfoService gsqMachineInfoService;
+
+    /**
+     * 钢丝圈定点机台Mapper（用于查询限定/不可作业机台）
+     */
+    @Resource
+    private com.zlt.aps.gsq.mapper.GsqSpecifyMachineMapper gsqSpecifyMachineMapper;
 
     /**
      * 查询钢丝圈排程结果列表
@@ -191,6 +215,84 @@ public class GsqScheduleResultController extends AbstractDocBizController<GsqSch
     }
 
     /**
+     * 获取转机台候选机台列表
+     *
+     * <p>过滤策略（参考自动排程的机台过滤优先级规则）：</p>
+     * <ol>
+     *   <li>寸口过滤：机台支持的英寸范围必须包含当前钢丝圈的英寸尺寸</li>
+     *   <li>定点机台过滤：限制作业仅保留限定列表中的机台，不可作业排除对应机台</li>
+     *   <li>排除原机台</li>
+     * </ol>
+     * <p>注意：维修过滤不在候选列表中做，而是在提交转机台时校验</p>
+     *
+     * @param id 排程记录ID
+     * @return 过滤后的候选机台列表
+     */
+    @ApiOperation("获取转机台候选机台列表")
+    @PostMapping("/listCandidateMachines/{id}")
+    public AjaxResult listCandidateMachines(@PathVariable("id") Long id) {
+        // 查询排程记录
+        GsqScheduleResult record = gsqScheduleResultMapper.selectById(id);
+        if (record == null || "1".equals(record.getIsDelete())) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.gsqScheduleResult.recordNotFound"));
+        }
+
+        String steelRingCode = record.getSteelRingCode();
+
+        // 1. 查询所有启用的机台
+        GsqMachineInfo queryMachine = new GsqMachineInfo();
+        queryMachine.setStatus("1");
+        List<GsqMachineInfo> allMachines = gsqMachineInfoService.listMachineInfo(queryMachine);
+        // 补充排序：按机台编码升序
+        allMachines.sort(java.util.Comparator.comparing(GsqMachineInfo::getMachineCode));
+
+        // 2. 定点机台过滤
+        LambdaQueryWrapper<GsqSpecifyMachine> specifyWrapper = new LambdaQueryWrapper<>();
+        specifyWrapper.eq(GsqSpecifyMachine::getSteelRingCode, steelRingCode);
+        specifyWrapper.eq(GsqSpecifyMachine::getIsDelete, 0);
+        List<GsqSpecifyMachine> specifyList = gsqSpecifyMachineMapper.selectList(specifyWrapper);
+
+        // 2.1 限制作业（jobType=0, lineType=0）：仅保留限制列表中的机台
+        List<GsqSpecifyMachine> canList = specifyList.stream()
+                .filter(s -> "0".equals(s.getJobType()) && "0".equals(s.getLineType()))
+                .collect(Collectors.toList());
+        if (!canList.isEmpty()) {
+            List<String> canMachineCodes = canList.stream()
+                    .map(GsqSpecifyMachine::getMachineCode)
+                    .collect(Collectors.toList());
+            List<GsqMachineInfo> filtered = allMachines.stream()
+                    .filter(m -> canMachineCodes.contains(m.getMachineCode()))
+                    .collect(Collectors.toList());
+            if (!filtered.isEmpty()) {
+                allMachines = filtered;
+            }
+        }
+
+        // 2.2 不可作业（jobType=1, lineType=1）：排除不可作业机台
+        List<GsqSpecifyMachine> notList = specifyList.stream()
+                .filter(s -> "1".equals(s.getJobType()) && "1".equals(s.getLineType()))
+                .collect(Collectors.toList());
+        if (!notList.isEmpty()) {
+            List<String> notMachineCodes = notList.stream()
+                    .map(GsqSpecifyMachine::getMachineCode)
+                    .collect(Collectors.toList());
+            allMachines = allMachines.stream()
+                    .filter(m -> !notMachineCodes.contains(m.getMachineCode()))
+                    .collect(Collectors.toList());
+        }
+
+        // 3. 排除原机台
+        allMachines = allMachines.stream()
+                .filter(m -> !m.getMachineCode().equals(record.getMachineCode()))
+                .collect(Collectors.toList());
+
+        log.info("[候选机台] 钢丝圈{}转机台候选机台数={}, 定点限制={}, 定点排除={}",
+                steelRingCode, allMachines.size(), canList.size(), notList.size());
+
+        return AjaxResult.success(allMachines);
+    }
+
+    /**
      * 转机台前校验
      */
     @ApiOperation("转机台前校验")
@@ -234,8 +336,19 @@ public class GsqScheduleResultController extends AbstractDocBizController<GsqSch
     }
 
     /**
+     * 逻辑删除前校验
+     * 校验规则：发布成功次数等于0 且 未发送给MES
+     * 用于前端删除按钮点击后、确认弹窗前的二次状态校验
+     */
+    @ApiOperation("逻辑删除前校验")
+    @PostMapping("/validateLogicDelete")
+    public AjaxResult validateLogicDelete(@RequestBody List<Long> ids) {
+        return gsqScheduleResultService.validateLogicDelete(ids);
+    }
+
+    /**
      * 逻辑删除排程记录
-     * 只能删除发布成功次数等于0的计划
+     * 只能删除发布成功次数等于0且未发送给MES的计划
      */
     @Log(title = "钢丝圈排程结果", businessType = BusinessType.DELETE)
     @ApiOperation("逻辑删除排程记录")
@@ -298,5 +411,21 @@ public class GsqScheduleResultController extends AbstractDocBizController<GsqSch
     @PostMapping("/listScheduleShiftDates")
     public List<GsqScheduleShiftDateVO> listScheduleShiftDates(@RequestBody GsqScheduleResult queryVO) {
         return gsqScheduleResultService.listScheduleShiftDates(queryVO);
+    }
+
+    /**
+     * 检查并提交钢丝圈自动滚动任务（内部接口，供 aps-job 通过 Feign 调用）
+     *
+     * <p>平台定时任务触发本接口，由 {@link GsqAutoRollingApplicationService} 完成窗口识别、
+     * 库存同步、幂等防重和异步派发，与胎侧模块的 /internal/checkTimedRolling 对齐。</p>
+     *
+     * @param request 检查请求（含 triggerTime 和可选 factoryCode）
+     * @return 已创建或复用的自动滚动任务列表
+     */
+    @ApiOperation("检查钢丝圈自动滚动窗口")
+    @PostMapping("/internal/checkTimedRolling")
+    public AjaxResult checkTimedRolling(@RequestBody GsqRollingCheckRequestVo request) {
+        List<GsqRollingTaskVo> taskList = gsqAutoRollingApplicationService.checkAndSubmit(request);
+        return AjaxResult.success(taskList);
     }
 }

@@ -18,9 +18,12 @@ import com.zlt.aps.gsq.api.domain.entity.GsqScheduleResult;
 import com.zlt.aps.gsq.api.domain.entity.GsqScheduleResultIssue;
 import com.zlt.aps.gsq.api.domain.vo.GsqScheduleShiftDateVO;
 import com.zlt.aps.gsq.engine.service.GsqEngineService;
+import com.zlt.aps.gsq.engine.vo.GsqScheduleBaseInfoVo;
 import com.zlt.aps.gsq.mapper.GsqScheduleResultMapper;
 import com.zlt.aps.gsq.service.GsqDispatcherLogService;
 import com.zlt.aps.gsq.service.GsqMachineInfoService;
+import com.zlt.aps.gsq.engine.vo.GsqRollingUpdateResult;
+import com.zlt.aps.gsq.service.IGsqRollingUpdateService;
 import com.zlt.aps.gsq.service.IGsqScheduleResultService;
 import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.tq.api.domain.entity.TqScheduleResult;
@@ -37,6 +40,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
+import java.text.MessageFormat;
 import java.time.ZoneId;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -63,6 +67,15 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqScheduleResult> implements IGsqScheduleResultService {
+
+    /**
+     * 班次字段名模板常量（遵循动态字段访问规范，配合 String.format 使用）。
+     * 用于动态访问 class1~6PlanQty/FinishQty/Sequence/Analysis 等批量字段。
+     */
+    private static final String CLASS_PLAN_QTY_FIELD_TEMPLATE = "class%dPlanQty";
+    private static final String CLASS_FINISH_QTY_FIELD_TEMPLATE = "class%dFinishQty";
+    private static final String CLASS_SEQUENCE_FIELD_TEMPLATE = "class%dSequence";
+    private static final String CLASS_ANALYSIS_FIELD_TEMPLATE = "class%dAnalysis";
 
     @Autowired
     private GsqScheduleResultMapper gsqScheduleResultMapper;
@@ -103,6 +116,12 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
     @Autowired
     private RedissonClient redissonClient;
 
+    /**
+     * 钢丝圈排程滚动更新服务（用于插单/调量/转机台/删除后触发同班次内时间重算）
+     */
+    @Resource
+    private IGsqRollingUpdateService gsqRollingUpdateService;
+
     @Override
     public String getDocTypeCode() {
         return "GSQ_SCHEDULE_RESULT";
@@ -119,7 +138,7 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
     @Transactional(rollbackFor = Exception.class)
     public AjaxResult autoPlan(GsqScheduleResult queryVO) {
         if (queryVO == null || queryVO.getScheduleDateQuery() == null) {
-            return AjaxResult.error("排程日期不能为空");
+            return AjaxResult.error(I18nUtil.getMessage("ui.gsq.schedule.scheduleDateEmpty"));
         }
         String scheduleDateStr = DateUtil.formatDate(queryVO.getScheduleDateQuery());
         String factoryCode = StringUtils.isBlank(queryVO.getFactoryCode()) ? factoryService.getFactoryCode() : queryVO.getFactoryCode();
@@ -127,10 +146,10 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
         try {
             gsqEngineService.autoGsqSchedule(scheduleDateStr, factoryCode);
             log.info("钢丝圈自动排程成功，排程日期：{}，分厂：{}", scheduleDateStr, factoryCode);
-            return AjaxResult.success("自动排程成功");
+            return AjaxResult.success(I18nUtil.getMessage("ui.data.column.gsqScheduleResult.autoPlanSuccess"));
         } catch (Exception e) {
             log.error("钢丝圈自动排程失败，排程日期：" + scheduleDateStr, e);
-            return AjaxResult.error("自动排程失败：" + e.getMessage());
+            return AjaxResult.error(MessageFormat.format(I18nUtil.getMessage("ui.gsq.schedule.autoPlanFail"), e.getMessage()));
         }
     }
 
@@ -139,13 +158,14 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
     /**
      * 插单前校验
      * 校验规则：
-     * 1. 排程日期不能为空
-     * 2. 钢丝圈代码不能为空
+     * 1. 排程日期不能为空，且需在生产周期内
+     * 2. 钢丝圈代码不能为空，施工必须存在（实时提示"钢丝圈规格有误"）
      * 3. 机台编号不能为空
-     * 4. 6个班次中至少有一个班次的计划量有值
-     * 5. 有计划量的班次，顺序也必须有值；反之亦然
-     * 6. 只能往当前班次或后续班次插单
+     * 4. 6个班次中至少有一个班次的计划量有值（夜班、中班、早班至少一个有效）
+     * 5. 有计划量的班次，顺序也必须有值；反之亦然（双向关联校验）
+     * 6. 只能往当前班次或后续班次插单，禁止向历史班次插单
      * 7. 插单只能加到第二个在产规格之后
+     * 8. 同一排程日期、机台、钢丝圈不允许重复插单（唯一性校验）
      *
      * @param dto 插单数据
      * @return 校验结果
@@ -154,20 +174,27 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
     public AjaxResult validateInsertOrder(GsqInsertOrderDTO dto) {
         // 1. 排程日期校验
         if (dto.getScheduleDate() == null) {
-            return AjaxResult.error("排程日期不能为空");
+            return AjaxResult.error(I18nUtil.getMessage("ui.gsq.schedule.scheduleDateEmpty"));
         }
 
         // 2. 钢丝圈代码校验
         if (ObjectUtils.isEmpty(dto.getSteelRingCode())) {
-            return AjaxResult.error("钢丝圈代码不能为空");
+            return AjaxResult.error(I18nUtil.getMessage("ui.gsq.schedule.steelRingCodeEmpty"));
+        }
+        // 校验施工是否存在（查询施工表 T_PRODUCT_CONSTRUCTION_INFO）
+        // 规格校验：若施工数据不存在，实时提示"钢丝圈规格有误"
+        List<GsqScheduleBaseInfoVo> baseInfoList = gsqEngineService.listGsqScheduleBaseInfo(
+                Collections.singletonList(dto.getSteelRingCode()));
+        if (CollectionUtils.isEmpty(baseInfoList)) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.gsq.schedule.constructionNotFound"));
         }
 
         // 3. 机台编号校验
         if (ObjectUtils.isEmpty(dto.getMachineCode())) {
-            return AjaxResult.error("机台编号不能为空");
+            return AjaxResult.error(I18nUtil.getMessage("ui.gsq.schedule.machineCodeEmpty"));
         }
 
-        // 4. 至少一个班次有计划量
+        // 4. 至少一个班次有计划量（夜班、中班、早班三个班次中至少有一个班次的计划量必须填写有效值）
         boolean hasAnyPlanQty = false;
         for (int i = 1; i <= 6; i++) {
             Integer planQty = getPlanQtyByClassIndex(dto, i);
@@ -177,29 +204,30 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
             }
         }
         if (!hasAnyPlanQty) {
-            return AjaxResult.error("至少一个班次的计划量必须有值");
+            return AjaxResult.error(I18nUtil.getMessage("ui.gsq.schedule.atLeastOneShiftPlan"));
         }
 
-        // 5. 有计划量的班次顺序必须有值，反之亦然
+        // 5. 有计划量的班次顺序必须有值，反之亦然（双向关联性校验）
         for (int i = 1; i <= 6; i++) {
             Integer planQty = getPlanQtyByClassIndex(dto, i);
             Integer sequence = getSequenceByClassIndex(dto, i);
             boolean hasPlanQty = planQty != null && planQty > 0;
             boolean hasSequence = sequence != null && sequence > 0;
             if (hasPlanQty && !hasSequence) {
-                return AjaxResult.error("第" + i + "班有计划量，顺序也必须有值");
+                return AjaxResult.error(MessageFormat.format(I18nUtil.getMessage("ui.gsq.schedule.shiftPlanAndSeqMismatch"), String.valueOf(i)));
             }
             if (hasSequence && !hasPlanQty) {
-                return AjaxResult.error("第" + i + "班有顺序，计划量也必须有值");
+                return AjaxResult.error(MessageFormat.format(I18nUtil.getMessage("ui.gsq.schedule.shiftSeqAndPlanMismatch"), String.valueOf(i)));
             }
         }
 
-        // 6. 只能往当前班次或后续班次插单
+        // 6. 只能往当前班次或后续班次插单，禁止向历史班次插单
+        // 示例：早上8点插单时，仅允许插入当天早班、中班以及明天之后的所有日期班次，禁止插入夜班之前的班次
         int currentShiftIndex = resolveCurrentShiftIndex(dto.getScheduleDate());
         for (int i = 1; i < currentShiftIndex; i++) {
             Integer planQty = getPlanQtyByClassIndex(dto, i);
             if (planQty != null && planQty > 0) {
-                return AjaxResult.error("不能往历史班次插单，当前班次为第" + currentShiftIndex + "班");
+                return AjaxResult.error(MessageFormat.format(I18nUtil.getMessage("ui.gsq.schedule.cannotInsertHistoryShift"), String.valueOf(currentShiftIndex)));
             }
         }
 
@@ -209,13 +237,14 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
         wrapper.eq(GsqScheduleResult::getMachineCode, dto.getMachineCode());
         wrapper.eq(GsqScheduleResult::getIsDelete, 0);
         List<GsqScheduleResult> existingList = gsqScheduleResultMapper.selectList(wrapper);
+        // 按各班次中最小顺序号升序排序
         existingList.sort(Comparator.comparingInt(this::getMinSequenceOfRecord));
         if (existingList.size() >= 2) {
             int secondSpecMinSeq = getMinSequenceFromSecondSpec(existingList);
             for (int i = 1; i <= 6; i++) {
                 Integer sequence = getSequenceByClassIndex(dto, i);
                 if (sequence != null && sequence < secondSpecMinSeq) {
-                    return AjaxResult.error("插单只能加到第二个在产规格之后，顺序号不能小于" + secondSpecMinSeq);
+                    return AjaxResult.error(MessageFormat.format(I18nUtil.getMessage("ui.gsq.schedule.insertAfterSecondSpec"), String.valueOf(secondSpecMinSeq)));
                 }
             }
         }
@@ -226,14 +255,24 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
         uniqueCheck.setSteelRingCode(dto.getSteelRingCode());
         uniqueCheck.setMachineCode(dto.getMachineCode());
         if (UserConstants.NOT_UNIQUE.equals(checkUnique(uniqueCheck))) {
-            return AjaxResult.error("同一排程日期、机台、钢丝圈已存在排程记录，不允许重复插单");
+            return AjaxResult.error(I18nUtil.getMessage("ui.gsq.schedule.duplicateRecord"));
         }
 
-        return AjaxResult.success("校验通过");
+        return AjaxResult.success(I18nUtil.getMessage("ui.data.column.gsqScheduleResult.validatePass"));
     }
 
     /**
      * 插单
+     * 业务流程：
+     * 1. 调用 validateInsertOrder 执行前置校验
+     * 2. 构建排程记录实体，填充6个班次字段（顺序/计划量/原因分析）
+     * 3. 数据来源固定为"插单"（DATA_SOURCE=1），发布状态默认"未发布"（IS_RELEASE=0）
+     * 4. 生成批次号、工单号（复用自动排程口径）
+     * 5. 回填施工字段（英寸 proSize、缠绕盘代码等），从施工表获取
+     * 6. 回填胎圈1~6班消耗量到 TQ_CLASS1~6_PLAN 字段
+     * 7. 插入数据库
+     * 8. 触发滚动更新（待 IGsqRollingUpdateService 实现后启用）
+     * 9. 记录调度员操作日志（6班次制）
      *
      * @param dto 插单数据
      * @return 结果
@@ -241,22 +280,24 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
     @Override
     @Transactional(rollbackFor = Exception.class)
     public AjaxResult insertOrder(GsqInsertOrderDTO dto) {
-        // 先执行校验
+        // 1. 先执行校验
         AjaxResult validateResult = validateInsertOrder(dto);
         if (!validateResult.get(AjaxResult.CODE_TAG).equals(200)) {
             return validateResult;
         }
 
-        // 构建排程记录实体
+        // 2. 构建排程记录实体
         GsqScheduleResult entity = new GsqScheduleResult();
         entity.setScheduleDate(dto.getScheduleDate());
         entity.setSteelRingCode(dto.getSteelRingCode());
         entity.setTwiningDiscCode(dto.getTwiningDiscCode());
         entity.setMachineCode(dto.getMachineCode());
-        entity.setDataSource("1"); // 插单
-        entity.setIsRelease("0"); // 未发布
+        // 数据来源：1-插单
+        entity.setDataSource("1");
+        // 发布状态：0-未发布
+        entity.setIsRelease("0");
 
-        // 填充6个班次字段
+        // 3. 填充6个班次字段（顺序/计划量/原因分析）
         entity.setClass1PlanQty(dto.getClass1PlanQty());
         entity.setClass1Sequence(dto.getClass1Sequence());
         entity.setClass1Analysis(dto.getClass1Analysis());
@@ -278,35 +319,44 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
 
         entity.setRemark(dto.getRemark());
 
-        // TODO 批次号、工单号生成逻辑待 GsqEngineService 提供 public 方法后补充
-        // 当前复用同日期已有排程的批次号，工单号留空
-        LambdaQueryWrapper<GsqScheduleResult> batchWrapper = new LambdaQueryWrapper<>();
-        batchWrapper.eq(GsqScheduleResult::getScheduleDate, dto.getScheduleDate());
-        batchWrapper.eq(GsqScheduleResult::getIsDelete, 0);
-        batchWrapper.isNotNull(GsqScheduleResult::getBatchNo);
-        batchWrapper.last("LIMIT 1");
-        GsqScheduleResult existingRecord = gsqScheduleResultMapper.selectOne(batchWrapper);
-        if (existingRecord != null) {
-            entity.setCxBatchNo(existingRecord.getCxBatchNo());
-            entity.setBatchNo(existingRecord.getBatchNo());
+        // 4. 生成批次号、工单号（复用自动排程口径，规则一致）
+        String scheduleDateStr = DateUtil.formatDate(dto.getScheduleDate());
+        String[] batchAndOrder = gsqEngineService.generateBatchNoAndOrderNo(scheduleDateStr);
+        entity.setBatchNo(batchAndOrder[0]);
+        entity.setOrderNo(batchAndOrder[1]);
+
+        // 5. 回填施工字段（英寸 proSize），从施工表 T_PRODUCT_CONSTRUCTION_INFO 获取
+        List<GsqScheduleBaseInfoVo> baseInfoList = gsqEngineService.listGsqScheduleBaseInfo(
+                Collections.singletonList(dto.getSteelRingCode()));
+        if (CollectionUtils.isNotEmpty(baseInfoList)) {
+            GsqScheduleBaseInfoVo baseInfo = baseInfoList.get(0);
+            // 英寸字段回填（用户输入规格时施工字段实时反显）
+            entity.setProSize(baseInfo.getProSize());
         }
 
-        // 回填胎圈排程结果数据到 TQ_CLASS1~6_PLAN
+        // 6. 回填胎圈排程结果数据到 TQ_CLASS1~6_PLAN 字段
         fillTqPlanQty(Collections.singletonList(entity));
 
-        // 插入数据库
+        // 7. 插入数据库
         gsqScheduleResultMapper.insert(entity);
 
-        // TODO 滚动更新：待 IGsqRollingUpdateService 实现后启用
-        // triggerRollingUpdateForAllShifts("1", entity.getId(), entity);
+        // 8. 滚动更新：调用标准化插单触发入口，自动处理新增任务后续节点顺序+1与时间重算
+        try {
+            gsqRollingUpdateService.triggerByInsertOrder(
+                    entity.getId(), entity.getScheduleDate(),
+                    entity.getMachineCode(), entity.getSteelRingCode());
+        } catch (Exception e) {
+            // 滚动更新失败不影响插单主操作，仅记录日志
+            log.error("钢丝圈插单后触发滚动更新异常，sourceId：{}，原因：{}", entity.getId(), e.getMessage(), e);
+        }
 
-        // 记录调度日志（6班次制，操作类型：2-插单，无操作前数据）
+        // 9. 记录调度日志（6班次制，操作类型：2-插单，无操作前数据）
         recordDispatcherLog(ApsConstant.DISPATCHER_OPER_INSERT_ORDER, entity, null, entity);
 
         log.info("钢丝圈排程插单成功，排程日期：{}，钢丝圈代码：{}，机台：{}",
                 dto.getScheduleDate(), dto.getSteelRingCode(), dto.getMachineCode());
 
-        return AjaxResult.success("插单成功");
+        return AjaxResult.success(I18nUtil.getMessage("ui.data.column.gsqScheduleResult.insertOrderSuccess"));
     }
 
     // ==================== 转机台 ====================
@@ -320,19 +370,19 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
     @Override
     public AjaxResult validateChangeMachine(GsqChangeMachineDTO dto) {
         if (dto.getId() == null) {
-            return AjaxResult.error("请选择需要转机台的记录");
+            return AjaxResult.error(MessageFormat.format(I18nUtil.getMessage("ui.gsq.schedule.pleaseSelectRecord"), I18nUtil.getMessage("ui.data.column.gsqScheduleResult.changeMachineTitle")));
         }
         if (ObjectUtils.isEmpty(dto.getNewMachineCode())) {
-            return AjaxResult.error("新机台编号不能为空");
+            return AjaxResult.error(I18nUtil.getMessage("ui.gsq.schedule.newMachineCannotBeEmpty"));
         }
         if (dto.getNewMachineCode().equals(dto.getOldMachineCode())) {
-            return AjaxResult.error("新机台与原机台不能相同");
+            return AjaxResult.error(I18nUtil.getMessage("ui.gsq.schedule.sameMachineNotAllowed"));
         }
 
         // 校验排程记录是否存在
         GsqScheduleResult record = gsqScheduleResultMapper.selectById(dto.getId());
         if (record == null || Objects.equals(record.getIsDelete(), 1)) {
-            return AjaxResult.error("排程记录不存在或已删除");
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.gsqScheduleResult.recordNotFound"));
         }
 
         // 校验新机台是否在钢丝圈机台管理中存在且启用
@@ -340,10 +390,10 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
         queryMachine.setMachineCode(dto.getNewMachineCode());
         List<GsqMachineInfo> machineList = gsqMachineInfoService.listMachineInfo(queryMachine);
         if (CollectionUtils.isEmpty(machineList)) {
-            return AjaxResult.error("新机台不存在或已停用：" + dto.getNewMachineCode());
+            return AjaxResult.error(MessageFormat.format(I18nUtil.getMessage("ui.gsq.schedule.newMachineNotFound"), dto.getNewMachineCode()));
         }
 
-        return AjaxResult.success("校验通过");
+        return AjaxResult.success(I18nUtil.getMessage("ui.data.column.gsqScheduleResult.validatePass"));
     }
 
     /**
@@ -377,23 +427,21 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
 
         gsqScheduleResultMapper.update(null, updateWrapper);
 
-        // TODO 滚动更新：待 IGsqRollingUpdateService 实现后启用
-        // triggerRollingUpdateForAllShifts("2", dto.getId(), record);
-        // TqScheduleResult newMachineRecord = new TqScheduleResult();
-        // BeanUtil.copyProperties(record, newMachineRecord);
-        // newMachineRecord.setMachineCode(dto.getNewMachineCode());
-        // triggerRollingUpdateForAllShifts("2", dto.getId(), newMachineRecord);
-
-        // 记录调度日志（6班次制，操作类型：0-转机台，操作前=原机台记录，操作后=新机台记录）
+        // 滚动更新：原机台和新机台都需要重新计算同班次内时间
+        triggerRollingUpdateForAllShifts("2", dto.getId(), record);
         GsqScheduleResult newMachineRecord = new GsqScheduleResult();
         BeanUtil.copyProperties(record, newMachineRecord);
         newMachineRecord.setMachineCode(dto.getNewMachineCode());
+        triggerRollingUpdateForAllShifts("2", dto.getId(), newMachineRecord);
+
+        // 记录调度日志（6班次制，操作类型：0-转机台，操作前=原机台记录，操作后=新机台记录）
+        // newMachineRecord已在上方构建
         recordDispatcherLog(ApsConstant.DISPATCHER_OPER_MACHINE, record, record, newMachineRecord);
 
         log.info("钢丝圈排程转机台成功，id：{}，原机台：{}，新机台：{}",
                 dto.getId(), oldMachineCode, dto.getNewMachineCode());
 
-        return AjaxResult.success("转机台成功");
+        return AjaxResult.success(I18nUtil.getMessage("ui.data.column.gsqScheduleResult.changeMachineSuccess"));
     }
 
     // ==================== 调量 ====================
@@ -404,7 +452,7 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
      * 1. 排程记录必须存在且未删除
      * 2. 至少有一个班次的计划量被修改
      * 3. 计划量不能小于0
-     * 4. 历史班次不允许修改计划量
+     * 4. 历史班次不允许修改计划量（根据当前时间和排程日期判断）
      * 5. 非历史班次的计划量不能小于完成量
      *
      * @param entity 调量数据
@@ -413,12 +461,12 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
     @Override
     public AjaxResult validateChangeQty(GsqScheduleResult entity) {
         if (entity == null || entity.getId() == null) {
-            return AjaxResult.error("请选择需要调量的排程记录");
+            return AjaxResult.error(MessageFormat.format(I18nUtil.getMessage("ui.gsq.schedule.pleaseSelectRecord"), I18nUtil.getMessage("ui.data.column.gsqScheduleResult.changeQtyTitle")));
         }
 
         GsqScheduleResult record = gsqScheduleResultMapper.selectById(entity.getId());
         if (record == null || Objects.equals(record.getIsDelete(), 1)) {
-            return AjaxResult.error("排程记录不存在或已删除");
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.gsqScheduleResult.recordNotFound"));
         }
 
         Date now = new Date();
@@ -426,8 +474,9 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
         List<String> errorMessages = new ArrayList<>();
 
         for (int shiftIndex = 1; shiftIndex <= 6; shiftIndex++) {
-            Integer newPlanQty = getPlanQtyByShiftIndex(entity, shiftIndex);
-            Integer oldPlanQty = getPlanQtyByShiftIndex(record, shiftIndex);
+            // 遵循动态字段访问规范：通过字段名模板动态读取班次计划量
+            Integer newPlanQty = this.getPlanQtyByShiftIndex(entity, shiftIndex);
+            Integer oldPlanQty = this.getPlanQtyByShiftIndex(record, shiftIndex);
 
             // 只检查被修改的班次
             if (newPlanQty == null || Objects.equals(newPlanQty, oldPlanQty)) {
@@ -438,34 +487,39 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
 
             // 规则3：计划量不能小于0
             if (newPlanQty < 0) {
-                errorMessages.add(String.format("第%d班计划量不能小于0", shiftIndex));
+                errorMessages.add(String.format(
+                        I18nUtil.getMessage("ui.gsq.scheduleResult.changeQty.planQtyLessThanZero"), shiftIndex));
                 continue;
             }
 
             // 判断是否为历史班次
-            boolean historyShift = isHistoryShift(record, shiftIndex, now);
+            boolean historyShift = this.isHistoryShift(record, shiftIndex, now);
 
             if (historyShift) {
                 // 规则4：历史班次不允许修改
-                errorMessages.add(String.format("不能修改历史班次（第%d班）的计划量", shiftIndex));
+                errorMessages.add(String.format(
+                        I18nUtil.getMessage("ui.gsq.scheduleResult.changeQty.historyShiftForbidden"), shiftIndex));
             } else {
                 // 规则5：非历史班次计划量不能小于完成量
-                Integer finishQty = getFinishQtyByShiftIndex(record, shiftIndex);
+                Integer finishQty = this.getFinishQtyByShiftIndex(record, shiftIndex);
                 if (finishQty != null && finishQty > 0 && newPlanQty < finishQty) {
-                    errorMessages.add(String.format("第%d班计划量不能小于完成量%d", shiftIndex, finishQty));
+                    errorMessages.add(String.format(
+                            I18nUtil.getMessage("ui.gsq.scheduleResult.changeQty.planQtyLessThanFinish"),
+                            shiftIndex, finishQty));
                 }
             }
         }
 
         if (!hasAdjustField) {
-            errorMessages.add("未检测到需要调整的计划量");
+            errorMessages.add(I18nUtil.getMessage("ui.gsq.scheduleResult.changeQty.noAdjustField"));
         }
 
         if (!errorMessages.isEmpty()) {
-            return AjaxResult.error(String.join("；", errorMessages));
+            return AjaxResult.error(String.join(
+                    I18nUtil.getMessage("ui.gsq.scheduleResult.changeQty.errorSeparator"), errorMessages));
         }
 
-        return AjaxResult.success("校验通过");
+        return AjaxResult.success(I18nUtil.getMessage("ui.data.column.gsqScheduleResult.validatePass"));
     }
 
     /**
@@ -473,8 +527,12 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
      * 业务逻辑：
      * 1. 前置校验
      * 2. 更新各班次计划量和原因分析
-     * 3. 如果原排程已发布成功，更新发布状态为待发布
-     * 4. 记录操作日志
+     * 3. 状态更新：检查原排程是否有成功发布给MES的记录
+     *    - 若有成功发布记录（IS_RELEASE=1），将发布状态更新为"待发布"（需重新下发MES）
+     *    - 若无发布记录或发布未成功，保持原状态不变
+     * 4. 保存操作添加事务处理，确保数据一致性
+     * 5. 调量保存成功后，触发滚动更新机制（更新当前调量排程及后续所有排产记录）
+     * 6. 记录调度员操作日志（6班次制）
      *
      * @param entity 调量数据
      * @return 结果
@@ -483,7 +541,7 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
     @Transactional(rollbackFor = Exception.class)
     public AjaxResult changeQty(GsqScheduleResult entity) {
         // 1. 前置校验
-        AjaxResult validateResult = validateChangeQty(entity);
+        AjaxResult validateResult = this.validateChangeQty(entity);
         if (!validateResult.get(AjaxResult.CODE_TAG).equals(200)) {
             return validateResult;
         }
@@ -491,37 +549,40 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
         // 2. 查询原记录
         GsqScheduleResult record = gsqScheduleResultMapper.selectById(entity.getId());
         if (record == null) {
-            return AjaxResult.error("排程记录不存在或已删除");
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.gsqScheduleResult.recordNotFound"));
         }
 
-        // 3. 构建更新wrapper
+        // 3. 构建更新实体（携带需要 set 的非 null 字段）和更新条件 wrapper
+        // 遵循动态字段访问规范：班次字段通过 setFieldValueByFieldName 设置到 updateEntity，
+        // 由 MyBatis-Plus 自动生成 set 子句；公共字段（isRelease/remark）仍用 LambdaUpdateWrapper.set。
+        GsqScheduleResult updateEntity = new GsqScheduleResult();
         LambdaUpdateWrapper<GsqScheduleResult> updateWrapper = new LambdaUpdateWrapper<>();
         updateWrapper.eq(GsqScheduleResult::getId, entity.getId());
 
         boolean hasChange = false;
 
-        // 4. 更新各班次计划量和原因分析
+        // 4. 更新各班次计划量和原因分析（动态字段访问）
         for (int shiftIndex = 1; shiftIndex <= 6; shiftIndex++) {
-            Integer newPlanQty = getPlanQtyByShiftIndex(entity, shiftIndex);
-            Integer oldPlanQty = getPlanQtyByShiftIndex(record, shiftIndex);
-            String newAnalysis = getAnalysisByShiftIndex(entity, shiftIndex);
-            String oldAnalysis = getAnalysisByShiftIndex(record, shiftIndex);
+            Integer newPlanQty = this.getPlanQtyByShiftIndex(entity, shiftIndex);
+            Integer oldPlanQty = this.getPlanQtyByShiftIndex(record, shiftIndex);
+            String newAnalysis = this.getAnalysisByShiftIndex(entity, shiftIndex);
+            String oldAnalysis = this.getAnalysisByShiftIndex(record, shiftIndex);
 
             // 更新被修改的计划量
             if (newPlanQty != null && !Objects.equals(newPlanQty, oldPlanQty)) {
-                setPlanQtyToUpdateWrapper(updateWrapper, shiftIndex, newPlanQty);
+                this.setPlanQtyToUpdateEntity(updateEntity, shiftIndex, newPlanQty);
                 hasChange = true;
             }
 
             // 更新原因分析（非空且与原值不同时更新）
             if (newAnalysis != null && !newAnalysis.equals(oldAnalysis)) {
-                setAnalysisToUpdateWrapper(updateWrapper, shiftIndex, newAnalysis);
+                this.setAnalysisToUpdateEntity(updateEntity, shiftIndex, newAnalysis);
                 hasChange = true;
             }
         }
 
         if (!hasChange) {
-            return AjaxResult.error("没有需要保存的修改内容");
+            return AjaxResult.error(I18nUtil.getMessage("ui.gsq.schedule.noChangesToSave"));
         }
 
         // 5. 更新备注
@@ -529,32 +590,78 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
             updateWrapper.set(GsqScheduleResult::getRemark, entity.getRemark());
         }
 
-        // 6. 状态更新：如果原排程已发布成功，更新为待发布（需重新下发MES）
+        // 6. 状态更新：如果原排程已发布成功（IS_RELEASE=1），更新为待发布（需重新下发MES）
+        //    若无发布记录或发布未成功，保持原状态不变
         if (ApsConstant.IS_RELEASE.equals(record.getIsRelease())) {
             updateWrapper.set(GsqScheduleResult::getIsRelease, ApsConstant.WAIT_RELEASING);
         }
 
-        // 7. 执行更新
-        gsqScheduleResultMapper.update(null, updateWrapper);
+        // 7. 执行更新（updateEntity 携带班次字段的 set 子句，wrapper 携带公共字段和 where 条件）
+        gsqScheduleResultMapper.update(updateEntity, updateWrapper);
 
         log.info("钢丝圈排程调量成功，id：{}，钢丝圈代码：{}，机台：{}",
                 entity.getId(), record.getSteelRingCode(), record.getMachineCode());
 
-        // TODO 滚动更新：待 IGsqRollingUpdateService 实现后启用
-        // triggerRollingUpdateForAllShifts("3", entity.getId(), record);
+        // 8. 滚动更新：对每个被修改的班次执行同班次内时间重算（triggerType="3" 表示调量触发）
+        //    严格按照【滚动更新后续排程】算法实现更新逻辑，确保更新过程中数据准确性和完整性
+        this.triggerRollingUpdateForAllShifts("3", entity.getId(), record);
 
-        // 8. 记录调度日志（6班次制，操作类型：1-调量，操作前=原记录，操作后=更新后记录）
+        // 9. 记录调度日志（6班次制，操作类型：1-调量，操作前=原记录，操作后=更新后记录）
         GsqScheduleResult afterRecord = gsqScheduleResultMapper.selectById(entity.getId());
-        recordDispatcherLog(ApsConstant.DISPATCHER_OPER_PLAN, record, record, afterRecord);
+        this.recordDispatcherLog(ApsConstant.DISPATCHER_OPER_PLAN, record, record, afterRecord);
 
-        return AjaxResult.success("调量成功");
+        return AjaxResult.success(I18nUtil.getMessage("ui.data.column.gsqScheduleResult.changeQtySuccess"));
     }
 
     // ==================== 逻辑删除 ====================
 
     /**
+     * 逻辑删除前校验
+     * 校验规则：
+     * 1. 记录必须存在且未删除
+     * 2. 发布成功次数必须等于0（已发布成功的计划不允许删除，只能调量）
+     * 3. 必须未发送给MES（mesId为空；已发送给MES的计划不允许删除，只能调量）
+     *
+     * @param ids 需要校验的记录ID列表
+     * @return 校验结果（通过返回success，失败返回error及不允许删除的原因）
+     */
+    @Override
+    public AjaxResult validateLogicDelete(List<Long> ids) {
+        if (CollectionUtils.isEmpty(ids)) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.gsqScheduleResult.noSelectRow"));
+        }
+
+        for (Long id : ids) {
+            GsqScheduleResult record = gsqScheduleResultMapper.selectById(id);
+            // 1. 记录必须存在且未删除（框架自动过滤已删除记录，selectById返回null视为不存在）
+            if (record == null) {
+                return AjaxResult.error(I18nUtil.getMessage("ui.data.column.gsqScheduleResult.recordNotFound"));
+            }
+            // 2. 发布成功次数必须等于0（兼容历史NULL数据：NULL视为0）
+            Integer publishSuccessCount = record.getPublishSuccessCount();
+            if (publishSuccessCount != null && publishSuccessCount > 0) {
+                return AjaxResult.error(MessageFormat.format(I18nUtil.getMessage(
+                                "ui.data.column.gsqScheduleResult.deleteFailedPublished"),
+                        record.getSteelRingCode()));
+            }
+            // 3. 必须未发送给MES（mesId为空）
+            if (record.getMesId() != null) {
+                return AjaxResult.error(MessageFormat.format(I18nUtil.getMessage(
+                                "ui.data.column.gsqScheduleResult.deleteFailedMesSent"),
+                        record.getSteelRingCode()));
+            }
+        }
+        return AjaxResult.success(I18nUtil.getMessage("ui.data.column.gsqScheduleResult.validatePass"));
+    }
+
+    /**
      * 逻辑删除排程记录
-     * 只能删除发布成功次数等于0的计划
+     * 只能删除发布成功次数等于0且未发送给MES的计划
+     * 业务流程：
+     * 1. 执行 validateLogicDelete 前置校验
+     * 2. 逻辑删除：更新 is_delete = 1
+     * 3. 记录调度员操作日志（6班次制，操作类型：3-删除）
+     * 4. 滚动更新：待 IGsqRollingUpdateService 实现后启用
      *
      * @param ids 需要删除的记录ID列表
      * @return 结果
@@ -562,8 +669,10 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
     @Override
     @Transactional(rollbackFor = Exception.class)
     public AjaxResult logicDeleteByIds(List<Long> ids) {
-        if (ids == null || ids.isEmpty()) {
-            return AjaxResult.error("请选择需要删除的记录");
+        // 1. 先执行前置校验（发布成功次数=0 且未发送给MES）
+        AjaxResult validateResult = validateLogicDelete(ids);
+        if (!validateResult.get(AjaxResult.CODE_TAG).equals(200)) {
+            return validateResult;
         }
 
         for (Long id : ids) {
@@ -571,27 +680,32 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
             if (record == null) {
                 continue;
             }
-            // 校验：已发布成功的计划不允许删除
-            if (ApsConstant.IS_RELEASE.equals(record.getIsRelease())) {
-                return AjaxResult.error("已发布成功的计划不允许删除，只能调量。钢丝圈代码：" + record.getSteelRingCode());
-            }
 
-            // 逻辑删除：更新 is_delete = 1
+            // 2. 逻辑删除：更新 is_delete = 1
             LambdaUpdateWrapper<GsqScheduleResult> updateWrapper = new LambdaUpdateWrapper<>();
             updateWrapper.eq(GsqScheduleResult::getId, id)
                     .set(GsqScheduleResult::getIsDelete, 1);
             gsqScheduleResultMapper.update(null, updateWrapper);
 
-            // TODO 滚动更新：待 IGsqRollingUpdateService 实现后启用
-            // triggerRollingUpdateForAllShifts("4", id, record);
+            // 3. 滚动更新：调用标准化删除触发入口，自动处理删除任务后续节点顺序-1与时间重算
+            try {
+                gsqRollingUpdateService.triggerByDelete(
+                        id, record.getScheduleDate(),
+                        record.getMachineCode(), record.getSteelRingCode());
+            } catch (Exception e) {
+                // 滚动更新失败不影响删除主操作，仅记录日志
+                log.error("钢丝圈删除后触发滚动更新异常，sourceId：{}，原因：{}", id, e.getMessage(), e);
+            }
 
-            // 记录调度日志（6班次制，操作类型：3-删除，操作前=原记录，操作后=null）
+            // 4. 记录调度日志（6班次制，操作类型：3-删除，操作前=原记录，操作后=null）
             recordDispatcherLog(ApsConstant.DISPATCHER_OPER_DELETE, record, record, null);
 
-            log.info("钢丝圈排程逻辑删除成功，id：{}，钢丝圈代码：{}", id, record.getSteelRingCode());
+            log.info("钢丝圈排程逻辑删除成功，id：{}，钢丝圈代码：{}，发布成功次数：{}，MES_ID：{}",
+                    id, record.getSteelRingCode(),
+                    record.getPublishSuccessCount(), record.getMesId());
         }
 
-        return AjaxResult.success("删除成功");
+        return AjaxResult.success(I18nUtil.getMessage("ui.data.column.gsqScheduleResult.deleteSuccess"));
     }
 
     // ==================== 发布 ====================
@@ -717,14 +831,36 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
         AjaxResult ajaxResult;
         try {
             ajaxResult = mesItfService.issueGsqScheduleResult(issueList);
-            // 根据返回结果更新发布状态：成功→已发布，失败→发布失败
-            String status = ajaxResult.get(AjaxResult.CODE_TAG).equals(200)
-                    ? ApsConstant.IS_RELEASE
-                    : ApsConstant.FAILURE_RELEASE;
-            LambdaUpdateWrapper<GsqScheduleResult> resultWrapper = new LambdaUpdateWrapper<>();
-            resultWrapper.in(GsqScheduleResult::getId, releaseIds);
-            resultWrapper.set(GsqScheduleResult::getIsRelease, status);
-            gsqScheduleResultMapper.update(null, resultWrapper);
+            // 根据MES反馈状态更新发布状态：三态区分（IS_RELEASE/FAILURE_RELEASE/TIMEOUT_FAILURE）
+            // itf 层将状态码放入 AjaxResult.DATA_TAG，doPublish 通过该字段区分三态
+            String mesStatus = ajaxResult.get(AjaxResult.DATA_TAG) == null
+                    ? ApsConstant.FAILURE_RELEASE
+                    : String.valueOf(ajaxResult.get(AjaxResult.DATA_TAG));
+            String status;
+            if (ApsConstant.IS_RELEASE.equals(mesStatus)) {
+                // 发布成功：状态置为已发布，发布成功次数累加1
+                status = ApsConstant.IS_RELEASE;
+                LambdaUpdateWrapper<GsqScheduleResult> successWrapper = new LambdaUpdateWrapper<>();
+                successWrapper.in(GsqScheduleResult::getId, releaseIds);
+                successWrapper.set(GsqScheduleResult::getIsRelease, status);
+                // publishSuccessCount + 1：原始值若为空按0处理
+                successWrapper.setSql("publish_success_count = COALESCE(publish_success_count, 0) + 1");
+                gsqScheduleResultMapper.update(null, successWrapper);
+            } else if (ApsConstant.TIMEOUT_FAILURE.equals(mesStatus)) {
+                // 超时失败：状态置为超时失败
+                status = ApsConstant.TIMEOUT_FAILURE;
+                LambdaUpdateWrapper<GsqScheduleResult> resultWrapper = new LambdaUpdateWrapper<>();
+                resultWrapper.in(GsqScheduleResult::getId, releaseIds);
+                resultWrapper.set(GsqScheduleResult::getIsRelease, status);
+                gsqScheduleResultMapper.update(null, resultWrapper);
+            } else {
+                // 发布失败：状态置为发布失败
+                status = ApsConstant.FAILURE_RELEASE;
+                LambdaUpdateWrapper<GsqScheduleResult> resultWrapper = new LambdaUpdateWrapper<>();
+                resultWrapper.in(GsqScheduleResult::getId, releaseIds);
+                resultWrapper.set(GsqScheduleResult::getIsRelease, status);
+                gsqScheduleResultMapper.update(null, resultWrapper);
+            }
         } catch (Exception e) {
             log.error("钢丝圈排程发布失败", e);
             // 发布失败，更新状态为"发布失败"
@@ -1187,29 +1323,19 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
 
     /**
      * 获取一条排程记录6个班次中最小的非空顺序号
+     * 遵循动态字段访问规范：通过字段名模板动态读取班次顺序，避免逐字段硬编码。
      *
      * @param record 排程记录
      * @return 最小顺序号，无顺序号时返回 Integer.MAX_VALUE
      */
     private int getMinSequenceOfRecord(GsqScheduleResult record) {
         int minSeq = Integer.MAX_VALUE;
-        if (record.getClass1Sequence() != null && record.getClass1Sequence() > 0) {
-            minSeq = Math.min(minSeq, record.getClass1Sequence());
-        }
-        if (record.getClass2Sequence() != null && record.getClass2Sequence() > 0) {
-            minSeq = Math.min(minSeq, record.getClass2Sequence());
-        }
-        if (record.getClass3Sequence() != null && record.getClass3Sequence() > 0) {
-            minSeq = Math.min(minSeq, record.getClass3Sequence());
-        }
-        if (record.getClass4Sequence() != null && record.getClass4Sequence() > 0) {
-            minSeq = Math.min(minSeq, record.getClass4Sequence());
-        }
-        if (record.getClass5Sequence() != null && record.getClass5Sequence() > 0) {
-            minSeq = Math.min(minSeq, record.getClass5Sequence());
-        }
-        if (record.getClass6Sequence() != null && record.getClass6Sequence() > 0) {
-            minSeq = Math.min(minSeq, record.getClass6Sequence());
+        for (int shiftIndex = 1; shiftIndex <= 6; shiftIndex++) {
+            String fieldName = String.format(CLASS_SEQUENCE_FIELD_TEMPLATE, shiftIndex);
+            Integer sequence = (Integer) record.getFieldValueByFieldName(fieldName);
+            if (sequence != null && sequence > 0) {
+                minSeq = Math.min(minSeq, sequence);
+            }
         }
         return minSeq;
     }
@@ -1217,6 +1343,7 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
     /**
      * 获取第二个在产规格的最小顺序号
      * 用于校验插单只能加到第二个在产规格之后
+     * 遵循动态字段访问规范：通过字段名模板动态读取班次顺序。
      *
      * @param existingList 已有排程记录列表（按顺序排序）
      * @return 第二个在产规格的最小顺序号
@@ -1228,122 +1355,81 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
         // 取第二条记录的顺序号（取所有班次顺序中最小的非空值）
         GsqScheduleResult secondRecord = existingList.get(1);
         int minSeq = Integer.MAX_VALUE;
-        if (secondRecord.getClass1Sequence() != null && secondRecord.getClass1Sequence() > 0) {
-            minSeq = Math.min(minSeq, secondRecord.getClass1Sequence());
-        }
-        if (secondRecord.getClass2Sequence() != null && secondRecord.getClass2Sequence() > 0) {
-            minSeq = Math.min(minSeq, secondRecord.getClass2Sequence());
-        }
-        if (secondRecord.getClass3Sequence() != null && secondRecord.getClass3Sequence() > 0) {
-            minSeq = Math.min(minSeq, secondRecord.getClass3Sequence());
-        }
-        if (secondRecord.getClass4Sequence() != null && secondRecord.getClass4Sequence() > 0) {
-            minSeq = Math.min(minSeq, secondRecord.getClass4Sequence());
-        }
-        if (secondRecord.getClass5Sequence() != null && secondRecord.getClass5Sequence() > 0) {
-            minSeq = Math.min(minSeq, secondRecord.getClass5Sequence());
-        }
-        if (secondRecord.getClass6Sequence() != null && secondRecord.getClass6Sequence() > 0) {
-            minSeq = Math.min(minSeq, secondRecord.getClass6Sequence());
+        for (int shiftIndex = 1; shiftIndex <= 6; shiftIndex++) {
+            String fieldName = String.format(CLASS_SEQUENCE_FIELD_TEMPLATE, shiftIndex);
+            Integer sequence = (Integer) secondRecord.getFieldValueByFieldName(fieldName);
+            if (sequence != null && sequence > 0) {
+                minSeq = Math.min(minSeq, sequence);
+            }
         }
         return minSeq == Integer.MAX_VALUE ? 1 : minSeq;
     }
 
     /**
      * 根据班次索引获取实体中的计划量
+     * 遵循动态字段访问规范：通过字段名模板动态读取，避免 switch/case 硬编码。
      *
      * @param entity     排程结果实体
      * @param shiftIndex 班次索引（1~6）
      * @return 计划量
      */
     private Integer getPlanQtyByShiftIndex(GsqScheduleResult entity, int shiftIndex) {
-        switch (shiftIndex) {
-            case 1: return entity.getClass1PlanQty();
-            case 2: return entity.getClass2PlanQty();
-            case 3: return entity.getClass3PlanQty();
-            case 4: return entity.getClass4PlanQty();
-            case 5: return entity.getClass5PlanQty();
-            case 6: return entity.getClass6PlanQty();
-            default: return null;
-        }
+        String fieldName = String.format(CLASS_PLAN_QTY_FIELD_TEMPLATE, shiftIndex);
+        return (Integer) entity.getFieldValueByFieldName(fieldName);
     }
 
     /**
      * 根据班次索引获取实体中的完成量
+     * 遵循动态字段访问规范：通过字段名模板动态读取，避免 switch/case 硬编码。
      *
      * @param entity     排程结果实体
      * @param shiftIndex 班次索引（1~6）
      * @return 完成量
      */
     private Integer getFinishQtyByShiftIndex(GsqScheduleResult entity, int shiftIndex) {
-        switch (shiftIndex) {
-            case 1: return entity.getClass1FinishQty();
-            case 2: return entity.getClass2FinishQty();
-            case 3: return entity.getClass3FinishQty();
-            case 4: return entity.getClass4FinishQty();
-            case 5: return entity.getClass5FinishQty();
-            case 6: return entity.getClass6FinishQty();
-            default: return null;
-        }
+        String fieldName = String.format(CLASS_FINISH_QTY_FIELD_TEMPLATE, shiftIndex);
+        return (Integer) entity.getFieldValueByFieldName(fieldName);
     }
 
     /**
      * 根据班次索引获取实体中的原因分析
+     * 遵循动态字段访问规范：通过字段名模板动态读取，避免 switch/case 硬编码。
      *
      * @param entity     排程结果实体
      * @param shiftIndex 班次索引（1~6）
      * @return 原因分析
      */
     private String getAnalysisByShiftIndex(GsqScheduleResult entity, int shiftIndex) {
-        switch (shiftIndex) {
-            case 1: return entity.getClass1Analysis();
-            case 2: return entity.getClass2Analysis();
-            case 3: return entity.getClass3Analysis();
-            case 4: return entity.getClass4Analysis();
-            case 5: return entity.getClass5Analysis();
-            case 6: return entity.getClass6Analysis();
-            default: return null;
-        }
+        String fieldName = String.format(CLASS_ANALYSIS_FIELD_TEMPLATE, shiftIndex);
+        return (String) entity.getFieldValueByFieldName(fieldName);
     }
 
     /**
-     * 设置指定班次计划量到UpdateWrapper
+     * 设置指定班次计划量到更新实体
+     * 遵循动态字段访问规范：通过 setFieldValueByFieldName 设置到更新实体。
      *
-     * @param updateWrapper 更新条件
-     * @param shiftIndex    班次索引（1~6）
-     * @param planQty       计划量
+     * @param updateEntity 更新实体
+     * @param shiftIndex   班次索引（1~6）
+     * @param planQty      计划量
      */
-    private void setPlanQtyToUpdateWrapper(LambdaUpdateWrapper<GsqScheduleResult> updateWrapper,
-                                           int shiftIndex, Integer planQty) {
-        switch (shiftIndex) {
-            case 1: updateWrapper.set(GsqScheduleResult::getClass1PlanQty, planQty); break;
-            case 2: updateWrapper.set(GsqScheduleResult::getClass2PlanQty, planQty); break;
-            case 3: updateWrapper.set(GsqScheduleResult::getClass3PlanQty, planQty); break;
-            case 4: updateWrapper.set(GsqScheduleResult::getClass4PlanQty, planQty); break;
-            case 5: updateWrapper.set(GsqScheduleResult::getClass5PlanQty, planQty); break;
-            case 6: updateWrapper.set(GsqScheduleResult::getClass6PlanQty, planQty); break;
-            default: break;
-        }
+    private void setPlanQtyToUpdateEntity(GsqScheduleResult updateEntity,
+                                          int shiftIndex, Integer planQty) {
+        String fieldName = String.format(CLASS_PLAN_QTY_FIELD_TEMPLATE, shiftIndex);
+        updateEntity.setFieldValueByFieldName(fieldName, planQty);
     }
 
     /**
-     * 设置指定班次原因分析到UpdateWrapper
+     * 设置指定班次原因分析到更新实体
+     * 遵循动态字段访问规范：通过 setFieldValueByFieldName 设置到更新实体。
      *
-     * @param updateWrapper 更新条件
-     * @param shiftIndex    班次索引（1~6）
-     * @param analysis      原因分析
+     * @param updateEntity 更新实体
+     * @param shiftIndex   班次索引（1~6）
+     * @param analysis     原因分析
      */
-    private void setAnalysisToUpdateWrapper(LambdaUpdateWrapper<GsqScheduleResult> updateWrapper,
-                                            int shiftIndex, String analysis) {
-        switch (shiftIndex) {
-            case 1: updateWrapper.set(GsqScheduleResult::getClass1Analysis, analysis); break;
-            case 2: updateWrapper.set(GsqScheduleResult::getClass2Analysis, analysis); break;
-            case 3: updateWrapper.set(GsqScheduleResult::getClass3Analysis, analysis); break;
-            case 4: updateWrapper.set(GsqScheduleResult::getClass4Analysis, analysis); break;
-            case 5: updateWrapper.set(GsqScheduleResult::getClass5Analysis, analysis); break;
-            case 6: updateWrapper.set(GsqScheduleResult::getClass6Analysis, analysis); break;
-            default: break;
-        }
+    private void setAnalysisToUpdateEntity(GsqScheduleResult updateEntity,
+                                           int shiftIndex, String analysis) {
+        String fieldName = String.format(CLASS_ANALYSIS_FIELD_TEMPLATE, shiftIndex);
+        updateEntity.setFieldValueByFieldName(fieldName, analysis);
     }
 
     /**
@@ -1404,6 +1490,41 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
                 return DateUtil.offsetHour(DateUtil.beginOfDay(DateUtil.offsetDay(dDay, 2)), 16);
             default:
                 return null;
+        }
+    }
+
+    /**
+     * 触发滚动更新：遍历6个班次，对有计划量的班次触发同班次内时间重算
+     *
+     * @param triggerType 触发类型：1-插单，2-转机台，3-调量，4-删除
+     * @param sourceId    触发源排程记录ID
+     * @param record      排程记录（含机台、钢丝圈代码、6班计划量）
+     */
+    private void triggerRollingUpdateForAllShifts(String triggerType, Long sourceId, GsqScheduleResult record) {
+        if (record == null || record.getScheduleDate() == null || StringUtils.isBlank(record.getMachineCode())) {
+            log.warn("触发滚动更新跳过：排程记录信息不完整，sourceId={}", sourceId);
+            return;
+        }
+
+        for (int shiftIndex = 1; shiftIndex <= 6; shiftIndex++) {
+            Integer planQty = getPlanQtyByShiftIndex(record, shiftIndex);
+            // 仅对有计划量的班次触发滚动更新
+            if (planQty == null || planQty <= 0) {
+                continue;
+            }
+            try {
+                GsqRollingUpdateResult result = gsqRollingUpdateService.manualRollingUpdate(
+                        triggerType, sourceId, record.getScheduleDate(),
+                        shiftIndex, record.getMachineCode(), record.getSteelRingCode());
+                if (result.isSuccess()) {
+                    log.info("钢丝圈滚动更新成功，班次：{}，影响记录数：{}", shiftIndex, result.getAffectedCount());
+                } else {
+                    log.warn("钢丝圈滚动更新失败，班次：{}，原因：{}", shiftIndex, result.getErrorMsg());
+                }
+            } catch (Exception e) {
+                // 滚动更新失败不影响主操作，仅记录日志
+                log.error("钢丝圈滚动更新异常，班次：{}，sourceId：{}，原因：{}", shiftIndex, sourceId, e.getMessage(), e);
+            }
         }
     }
 }

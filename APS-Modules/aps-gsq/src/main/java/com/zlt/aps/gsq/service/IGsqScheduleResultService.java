@@ -97,8 +97,21 @@ public interface IGsqScheduleResultService extends IDocService<GsqScheduleResult
     AjaxResult changeQty(GsqScheduleResult entity);
 
     /**
+     * 逻辑删除前校验
+     * 校验规则：
+     * 1. 记录必须存在且未删除
+     * 2. 发布成功次数必须等于0（已发布成功的计划不允许删除，只能调量）
+     * 3. 必须未发送给MES（mesId为空；已发送给MES的计划不允许删除，只能调量）
+     *
+     * @param ids 需要校验的记录ID列表
+     * @return 校验结果（通过返回success，失败返回error及不允许删除的原因）
+     */
+    AjaxResult validateLogicDelete(List<Long> ids);
+
+    /**
      * 逻辑删除排程记录
-     * 只能删除发布成功次数等于0的计划
+     * 只能删除发布成功次数等于0且未发送给MES的计划
+     * 删除前会执行 validateLogicDelete 校验，校验失败直接返回
      *
      * @param ids 需要删除的记录ID列表
      * @return 结果

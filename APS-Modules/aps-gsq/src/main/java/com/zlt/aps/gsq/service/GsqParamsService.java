@@ -1,49 +1,32 @@
 package com.zlt.aps.gsq.service;
 
-import com.baomidou.mybatisplus.extension.service.IService;
-import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.zlt.aps.gsq.api.domain.dto.GsqParamsDto;
 import com.zlt.aps.gsq.entity.GsqParams;
-import org.springframework.transaction.annotation.Transactional;
+import com.zlt.bill.common.service.IDocService;
 
-import java.util.List;
+import java.util.Map;
 
 /**
- * 钢丝圈参数信息Service接口
+ * 钢丝圈排程参数配置 Service接口
  *
  * @author zlt
  * @date 2021-05-25
  */
-public interface GsqParamsService extends IService<GsqParams> {
-    /**
-     * 查询钢丝圈参数信息
-     *
-     * @param id 钢丝圈参数信息ID
-     * @return 钢丝圈参数信息
-     */
-    public GsqParams selectParamsById(Long id);
+public interface GsqParamsService extends IDocService<GsqParams> {
 
     /**
-     * 查询钢丝圈参数信息列表
+     * 根据参数编码和工厂编号查询参数
      *
-     * @param params 钢丝圈参数信息     * @return 钢丝圈参数信息集合
+     * @param paramCode   参数编码
+     * @param factoryCode 工厂编号
+     * @return 参数实体
      */
-    public List<GsqParamsDto> selectParamsList(GsqParams params);
+    GsqParams selectOneByParamCode(String paramCode, String factoryCode);
 
     /**
-     * 修改钢丝圈参数信息
+     * 查询指定工厂的所有参数，返回参数编码到参数值的映射
      *
-     * @param params 钢丝圈参数信息
-     * @return 结果
+     * @param factoryCode 工厂编号
+     * @return 参数编码-参数值映射
      */
-    @Transactional
-    public AjaxResult updateParams(GsqParams params);
-
-    /**
-     * 校验钢丝圈参数代码唯一
-     *
-     * @param params 钢丝圈参数信息
-     * @return 是否唯一
-     */
-    public String checkParamsCodeUnique(GsqParams params);
+    Map<String, String> listGsqParams(String factoryCode);
 }

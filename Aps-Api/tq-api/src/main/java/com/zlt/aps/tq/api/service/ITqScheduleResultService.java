@@ -80,6 +80,10 @@ public interface ITqScheduleResultService {
     @ApiOperation("转机台")
     AjaxResult changeMachine(@RequestBody TqScheduleResult entity);
 
+    @PostMapping("/scheduleResult/listCandidateMachines/{id}")
+    @ApiOperation("获取转机台候选机台列表（按寸口/口型板/定点约束过滤）")
+    AjaxResult listCandidateMachines(@PathVariable("id") Long id);
+
     @PostMapping("/scheduleResult/changeQty")
     @ApiOperation("调量")
     AjaxResult changeQty(@RequestBody TqScheduleResult entity);
