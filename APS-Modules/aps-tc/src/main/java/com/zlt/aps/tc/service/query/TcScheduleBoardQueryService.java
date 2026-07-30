@@ -3,6 +3,8 @@ package com.zlt.aps.tc.service.query;
 import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.github.pagehelper.PageHelper;
+import com.github.pagehelper.PageInfo;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
@@ -80,8 +82,7 @@ public class TcScheduleBoardQueryService {
         int pageNum = queryVo.getPageNum() == null || queryVo.getPageNum() < 1 ? 1 : queryVo.getPageNum();
         int pageSize = queryVo.getPageSize() == null || queryVo.getPageSize() < 1 ? 20 : queryVo.getPageSize();
         Page<TcScheduleResult> resultPage = queryScheduled && !batchMap.isEmpty()
-                ? this.scheduleResultMapper.selectPage(
-                        new Page<>(pageNum, pageSize), this.buildResultWrapper(queryVo, batchMap))
+                ? this.queryScheduledPage(queryVo, batchMap, pageNum, pageSize)
                 : new Page<>(pageNum, pageSize);
 
         TcScheduleBoardVo boardVo = new TcScheduleBoardVo();
@@ -151,7 +152,61 @@ public class TcScheduleBoardQueryService {
         LambdaQueryWrapper<TcScheduleUnplanned> wrapper = this.buildUnplannedWrapper(queryVo, batchNoList);
         wrapper.orderByAsc(TcScheduleUnplanned::getScheduleDate, TcScheduleUnplanned::getShiftOrder,
                 TcScheduleUnplanned::getSidewallCode);
-        return this.scheduleUnplannedMapper.selectPage(new Page<>(pageNum, pageSize), wrapper);
+        return this.queryUnplannedPage(wrapper, pageNum, pageSize);
+    }
+
+    /**
+     * 分页查询胎侧已排结果。
+     *
+     * <p>与参数列表保持一致，使用 PageHelper 完成分页和总数统计，再转换为现有 Feign 分页契约。</p>
+     *
+     * @param queryVo 查询条件
+     * @param batchMap 排程日期与当前有效批次映射
+     * @param pageNum 当前页码
+     * @param pageSize 每页条数
+     * @return 已排结果分页
+     */
+    private Page<TcScheduleResult> queryScheduledPage(TcScheduleBoardQueryVo queryVo,
+                                                      Map<String, String> batchMap,
+                                                      int pageNum,
+                                                      int pageSize) {
+        PageHelper.startPage(pageNum, pageSize);
+        try {
+            List<TcScheduleResult> records = this.emptyIfNull(
+                    this.scheduleResultMapper.selectList(this.buildResultWrapper(queryVo, batchMap)));
+            PageInfo<TcScheduleResult> pageInfo = new PageInfo<>(records);
+            Page<TcScheduleResult> resultPage = new Page<>(pageNum, pageSize, pageInfo.getTotal());
+            resultPage.setRecords(records);
+            return resultPage;
+        } finally {
+            PageHelper.clearPage();
+        }
+    }
+
+    /**
+     * 分页查询胎侧未排任务。
+     *
+     * <p>使用 PageHelper 统计真实总数，避免重新打开未排任务页面时响应 records 有数据但 total 为 0。</p>
+     *
+     * @param wrapper 未排任务查询条件
+     * @param pageNum 当前页码
+     * @param pageSize 每页条数
+     * @return 未排任务分页
+     */
+    private Page<TcScheduleUnplanned> queryUnplannedPage(LambdaQueryWrapper<TcScheduleUnplanned> wrapper,
+                                                         int pageNum,
+                                                         int pageSize) {
+        PageHelper.startPage(pageNum, pageSize);
+        try {
+            List<TcScheduleUnplanned> records = this.emptyIfNull(
+                    this.scheduleUnplannedMapper.selectList(wrapper));
+            PageInfo<TcScheduleUnplanned> pageInfo = new PageInfo<>(records);
+            Page<TcScheduleUnplanned> resultPage = new Page<>(pageNum, pageSize, pageInfo.getTotal());
+            resultPage.setRecords(records);
+            return resultPage;
+        } finally {
+            PageHelper.clearPage();
+        }
     }
 
     /**
