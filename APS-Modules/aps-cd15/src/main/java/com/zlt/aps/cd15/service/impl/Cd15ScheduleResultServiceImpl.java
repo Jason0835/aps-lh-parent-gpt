@@ -40,12 +40,18 @@ import com.zlt.aps.cd15.service.Cd15TimedRollingCheckService;
 import com.zlt.aps.cd15.service.Cd15ScheduleNumberService;
 import com.zlt.aps.cd15.service.ICd15ScheduleResultService;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.cx.api.domain.entity.CxScheduleResult;
 import com.zlt.aps.mdm.api.domain.entity.MdmConstructionInfo;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.utils.PubUtil;
 import com.zlt.sysdef.domain.SysDocType;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.redisson.api.RLock;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -54,6 +60,8 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import javax.annotation.Resource;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.math.BigDecimal;
 import java.text.MessageFormat;
@@ -568,11 +576,48 @@ public class Cd15ScheduleResultServiceImpl extends AbstractDocService<Cd15Schedu
         Map<String, Object> tableMap = new HashMap<>(
                 this.exportAssembler.buildTableMap(
                         queryVO.getScheduleDate()));
-        return ExcelUtils.writeMultiList(
+        String[][] statisticFields = {
+                {"previousClass3PlanQty", "previousClass3PlanTotal"},
+                {"previousClass3FinishQty", "previousClass3FinishTotal"},
+                {"class1PlanQty", "class1PlanTotal"},
+                {"class1FinishQty", "class1FinishTotal"},
+                {"class2PlanQty", "class2PlanTotal"},
+                {"class2FinishQty", "class2FinishTotal"},
+                {"class3PlanQty", "class3PlanTotal"},
+                {"class3FinishQty", "class3FinishTotal"}
+        };
+        BigDecimal[] statisticTotals = new BigDecimal[statisticFields.length];
+        for (int statisticIndex = 0; statisticIndex < statisticFields.length; statisticIndex++) {
+            String[] statisticField = statisticFields[statisticIndex];
+            BigDecimal total = rows.stream()
+                    .map(row -> BigDecimalUtils.valueOf(row.get(statisticField[0])))
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            statisticTotals[statisticIndex] = total;
+            tableMap.put(statisticField[1], total);
+        }
+        byte[] exportBytes = ExcelUtils.writeMultiList(
                 inputStream,
                 0,
                 tableMap,
                 Collections.singletonList(rows));
+        try (Workbook workbook = WorkbookFactory.create(new ByteArrayInputStream(exportBytes));
+             ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+            Sheet sheet = workbook.getSheetAt(0);
+            Row statisticRow = sheet.getRow(2);
+            for (int statisticIndex = 0; statisticIndex < statisticTotals.length; statisticIndex++) {
+                Cell statisticCell = statisticRow.getCell(8 + statisticIndex);
+                if (statisticCell == null) {
+                    statisticCell = statisticRow.createCell(8 + statisticIndex);
+                }
+                statisticCell.setCellFormula(null);
+                statisticCell.setCellValue(statisticTotals[statisticIndex].doubleValue());
+            }
+            workbook.write(outputStream);
+            return outputStream.toByteArray();
+        } catch (Exception exception) {
+            throw new ServiceException(I18nUtil.getMessage(
+                    "ui.data.column.cd15ScheduleResult.exportTemplateNotFound"));
+        }
     }
 
     /** 加载上一排程日期结果并沿用页面过滤条件。 */
