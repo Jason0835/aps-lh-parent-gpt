@@ -11,13 +11,11 @@
         <result property="paramName" column="param_name"/>
         <result property="paramValue" column="param_value"/>
         <result property="defaultValue" column="default_value"/>
-        <result property="paramGroup" column="param_group"/>
-        <result property="valueType" column="value_type"/>
         <result property="enableStatus" column="enable_status"/>
         <result property="regularExpression" column="regular_expression"/>
         <result property="errorTips" column="error_tips"/>
         <result property="remark" column="remark"/>
-        <result property="isDelete" column="is_delete"/>
+        <result property="delFlag" column="del_flag"/>
         <result property="createBy" column="create_by"/>
         <result property="createTime" column="create_time"/>
         <result property="updateBy" column="update_by"/>
@@ -25,27 +23,22 @@
     </resultMap>
 
     <sql id="selectParamsVo">
-        select id, factory_code, param_code, param_name, param_value, default_value,
-               param_group, value_type, enable_status, regular_expression, error_tips,
-               remark, is_delete, create_by, create_time, update_by, update_time
+        select id, factory_code, param_code, param_name, param_value, default_value, enable_status, regular_expression, error_tips, remark, del_flag, create_by, create_time, update_by, update_time
         from t_gsq_params
     </sql>
 
     <select id="checkParamsCodeUnique" resultMap="paramsResult">
         <include refid="selectParamsVo"/>
-        where is_delete = 0 and param_code = #{paramCode} and id = #{id} limit 1
+        where del_flag = '0' and param_code = #{paramCode} and id = #{id} limit 1
     </select>
 
     <select id="listParams" parameterType="com.zlt.aps.gsq.entity.GsqParams"
             resultType="com.zlt.aps.gsq.api.domain.dto.GsqParamsDto">
         <include refid="selectParamsVo"/>
-        where is_delete = 0
-        <if test="factoryCode != null and factoryCode != ''">and factory_code = #{factoryCode}</if>
-        <if test="paramCode != null and paramCode != ''">and INSTR(param_code, #{paramCode}) > 0</if>
-        <if test="paramName != null and paramName != ''">and param_name like concat(concat('%', #{paramName}), '%')</if>
-        <if test="paramGroup != null and paramGroup != ''">and param_group = #{paramGroup}</if>
-        <if test="valueType != null and valueType != ''">and value_type = #{valueType}</if>
-        <if test="enableStatus != null and enableStatus != ''">and enable_status = #{enableStatus}</if>
+        where del_flag = 0
+        <if test="paramCode != null  and paramCode != ''">and INSTR(param_code, #{paramCode}) > 0</if>
+        <if test="paramName != null  and paramName != ''">and param_name like concat(concat('%', #{paramName}), '%')
+        </if>
         <if test="orderStr == null">
             order by CREATE_TIME desc
         </if>

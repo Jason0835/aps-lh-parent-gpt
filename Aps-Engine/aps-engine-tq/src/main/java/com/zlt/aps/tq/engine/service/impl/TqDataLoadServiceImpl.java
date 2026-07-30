@@ -4,6 +4,7 @@ import com.ruoyi.common.core.utils.SecurityUtils;
 import com.zlt.aps.common.engine.constants.EngineConstants;
 import com.zlt.aps.common.engine.service.AutoScheduleLogService;
 import com.zlt.aps.common.engine.service.impl.IncrementService;
+import com.zlt.aps.common.core.utils.BigDecimalUtil;
 import com.zlt.aps.tq.api.domain.entity.TqStockShiftConfig;
 import com.zlt.aps.tq.engine.context.TqScheduleContext;
 import com.zlt.aps.tq.engine.mapper.TqEngineMapper;
@@ -144,6 +145,8 @@ public class TqDataLoadServiceImpl implements ITqDataLoadService {
 
         // 7. 加载损耗率
         context.setLossRateMap(tqEngineLossService.getLossRateMap());
+        // 按胎圈代码聚合损耗率：S2阶段机台尚未分配，需按胎圈代码查询
+        context.setBeadLossRateMap(buildBeadLossRateMap(context.getLossRateMap()));
 
         // 8. 加载月度剩余
         context.setMonthSurplusMap(tqEngineMonthSurplusService.getMonthSurplus(scheduleDate));
@@ -259,6 +262,62 @@ public class TqDataLoadServiceImpl implements ITqDataLoadService {
         return tqEngineStockMapper.listTodayMorningPlan(scheduleDate, factoryCode).stream()
                 .filter(v -> StringUtils.isNotEmpty(v.getBeadCode()))
                 .collect(Collectors.toMap(TqStockConsumeVo::getBeadCode, TqStockConsumeVo::getConsume));
+    }
+
+    /**
+     * 按胎圈代码聚合损耗率映射。
+     *
+     * <p>lossRateMap 的key格式为 "机台#胎圈"（如 "TQM01#211100030"），S2阶段机台尚未分配无法精确查询。
+     * 本方法遍历lossRateMap，按胎圈代码聚合，得到 beadCode → lossRate 映射。</p>
+     *
+     * <p>聚合规则：同一胎圈在多机台损耗率一致时直接取该值；不一致时取平均值。
+     * 返回的损耗率为LOSS_RATE字段原值（如0.01表示1%），调用方使用时按 1 + lossRate 计算乘数。</p>
+     *
+     * @param lossRateMap 原始损耗率映射（key=机台#胎圈，value=LOSS_RATE字段原值）
+     * @return 按胎圈代码聚合的损耗率映射（key=胎圈代码，value=LOSS_RATE字段原值）
+     */
+    private Map<String, Double> buildBeadLossRateMap(Map<String, Double> lossRateMap) {
+        // 先按胎圈代码分组收集所有机台的损耗率
+        Map<String, List<Double>> beadLossRateListMap = new HashMap<>();
+        for (Map.Entry<String, Double> entry : lossRateMap.entrySet()) {
+            String key = entry.getKey();
+            // key格式：机台#胎圈 或 #胎圈（无机台）
+            int separatorIdx = key.indexOf('#');
+            if (separatorIdx < 0 || separatorIdx >= key.length() - 1) {
+                continue;
+            }
+            String beadCode = key.substring(separatorIdx + 1);
+            if (StringUtils.isBlank(beadCode)) {
+                continue;
+            }
+            Double lossRate = entry.getValue();
+            if (lossRate == null) {
+                continue;
+            }
+            beadLossRateListMap.computeIfAbsent(beadCode, k -> new ArrayList<>()).add(lossRate);
+        }
+
+        // 聚合：一致则直接取，不一致则取平均值
+        Map<String, Double> beadLossRateMap = new HashMap<>();
+        for (Map.Entry<String, List<Double>> entry : beadLossRateListMap.entrySet()) {
+            String beadCode = entry.getKey();
+            List<Double> rates = entry.getValue();
+            if (rates.isEmpty()) {
+                continue;
+            }
+            double firstRate = rates.get(0);
+            boolean allSame = rates.stream().allMatch(r -> Double.compare(r, firstRate) == 0);
+            if (allSame) {
+                beadLossRateMap.put(beadCode, firstRate);
+            } else {
+                double sum = rates.stream().mapToDouble(Double::doubleValue).sum();
+                double avg = BigDecimalUtil.div(sum, rates.size(), 4);
+                beadLossRateMap.put(beadCode, avg);
+            }
+        }
+
+        log.info("[数据加载] 按胎圈代码聚合损耗率完成, 规格数:{}", beadLossRateMap.size());
+        return beadLossRateMap;
     }
 
     /**

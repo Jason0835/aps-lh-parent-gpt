@@ -1,24 +1,24 @@
 package com.zlt.aps.gsq.entity;
 
-import com.baomidou.mybatisplus.annotation.TableField;
-import com.baomidou.mybatisplus.annotation.TableName;
-import com.ruoyi.common.core.annotation.Excel;
-import com.ruoyi.common.core.web.domain.BaseEntity;
-import com.zlt.aps.common.core.annotation.ImportValidated;
+import com.baomidou.mybatisplus.annotation.*;
+import com.zlt.aps.common.core.domain.ApsBaseEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
 /**
- * 钢丝圈排程参数配置 实体类
+ * <p>
+ * 钢丝圈参数信息
+ * </p>
  *
  * @author chenxueyuan
  * @since 2021-06-02
  */
-@ApiModel(value = "钢丝圈排程参数配置对象", description = "钢丝圈排程参数配置对象")
 @Data
-@TableName(value = "T_GSQ_PARAMS")
-public class GsqParams extends BaseEntity {
+@TableName("T_GSQ_PARAMS")
+@ApiModel(value = "GsqParams对象", description = "钢丝圈参数信息")
+//@KeySequence(value = "SEQ_PUBLIC",dbType = DbType.ORACLE)
+public class GsqParams extends ApsBaseEntity {
 
     private static final long serialVersionUID = 1110056585174675868L;
 
@@ -60,65 +60,39 @@ public class GsqParams extends BaseEntity {
     /** 默认值：自动滚动输入稳定时间（5分钟） */
     public static final String DEFAULT_ROLLING_STABLE_MINUTES = "5";
 
-    @Excel(name = "ui.data.column.gsq.params.factoryCode", dictType = "biz_factory_name")
-    @ImportValidated(required = true, isCode = true, maxLength = 50)
-    @ApiModelProperty(value = "工厂编号", name = "factoryCode")
-    @TableField(value = "FACTORY_CODE")
+    @ApiModelProperty(value = "主键ID，对应自增序列为：SEQ_PUBLIC")
+    @TableId(value = "ID", type = IdType.AUTO)
+    private Long id;
+
+    @ApiModelProperty(value = "分厂编号")
+    @TableField("FACTORY_CODE")
     private String factoryCode;
 
-    @Excel(name = "ui.data.column.gsq.params.paramCode")
-    @ImportValidated(required = true, isCode = true, maxLength = 50)
-    @ApiModelProperty(value = "参数编码", name = "paramCode")
-    @TableField(value = "PARAM_CODE")
+    @ApiModelProperty(value = "参数code")
+    @TableField("PARAM_CODE")
     private String paramCode;
 
-    @Excel(name = "ui.data.column.gsq.params.paramName")
-    @ImportValidated(required = true, maxLength = 50)
-    @ApiModelProperty(value = "参数名称", name = "paramName")
-    @TableField(value = "PARAM_NAME")
+    @ApiModelProperty(value = "参数名称")
+    @TableField("PARAM_NAME")
     private String paramName;
 
-    @Excel(name = "ui.data.column.gsq.params.paramValue")
-    @ImportValidated(maxLength = 200)
-    @ApiModelProperty(value = "参数值", name = "paramValue")
-    @TableField(value = "PARAM_VALUE")
+    @ApiModelProperty(value = "参数值")
+    @TableField("PARAM_VALUE")
     private String paramValue;
 
-    @Excel(name = "ui.data.column.gsq.params.defaultValue")
-    @ImportValidated(maxLength = 200)
-    @ApiModelProperty(value = "默认值", name = "defaultValue")
-    @TableField(value = "DEFAULT_VALUE")
+    @ApiModelProperty(value = "参数默认值")
+    @TableField("DEFAULT_VALUE")
     private String defaultValue;
 
-    @Excel(name = "ui.data.column.gsq.params.paramGroup")
-    @ImportValidated(maxLength = 50)
-    @ApiModelProperty(value = "参数分组", name = "paramGroup")
-    @TableField(value = "PARAM_GROUP")
-    private String paramGroup;
-
-    @Excel(name = "ui.data.column.gsq.params.valueType")
-    @ImportValidated(maxLength = 50)
-    @ApiModelProperty(value = "参数值类型", name = "valueType")
-    @TableField(value = "VALUE_TYPE")
-    private String valueType;
-
-    @ApiModelProperty(value = "校验正则", name = "regularExpression")
-    @TableField(value = "REGULAR_EXPRESSION")
-    private String regularExpression;
-
-    @ApiModelProperty(value = "错误提示", name = "errorTips")
-    @TableField(value = "ERROR_TIPS")
-    private String errorTips;
-
-    @Excel(name = "ui.data.column.gsq.params.enableStatus", dictType = "biz_yes_no")
-    @ImportValidated(required = true, dictType = "biz_yes_no", maxLength = 1)
-    @ApiModelProperty(value = "是否启用", name = "enableStatus")
-    @TableField(value = "ENABLE_STATUS")
+    @ApiModelProperty(value = "启用状态：1-启用，0-停用")
+    @TableField("ENABLE_STATUS")
     private String enableStatus;
 
-    @Excel(name = "ui.common.column.remark")
-    @ImportValidated(maxLength = 500)
-    @ApiModelProperty("备注")
-    @TableField("REMARK")
-    private String remark;
+    @ApiModelProperty(value = "参数值对应的正则表达式")
+    @TableField("REGULAR_EXPRESSION")
+    private String regularExpression;
+
+    @ApiModelProperty(value = "参数值根据正则表达式校验是失败后的错误提示")
+    @TableField("ERROR_TIPS")
+    private String errorTips;
 }

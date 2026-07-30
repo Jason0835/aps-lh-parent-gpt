@@ -103,8 +103,15 @@ public class TqScheduleContext {
     /** 当天早班(D日早班)计划量，key=胎圈代码，value=计划量（昨天已排的、属于今天早班的胎圈计划量） */
     private Map<String, Double> todayMorningPlanMap = new HashMap<>();
 
-    /** 损耗率映射，key=胎圈代码，value=损耗率 */
+    /** 损耗率映射，key=机台#胎圈代码，value=损耗率（LOSS_RATE字段原值，如0.01表示1%） */
     private Map<String, Double> lossRateMap = new HashMap<>();
+
+    /**
+     * 按胎圈代码聚合的损耗率映射，key=胎圈代码，value=损耗率（LOSS_RATE字段原值，如0.01表示1%）
+     * <p>S2阶段（计划量计算）机台尚未分配，无法按 机台#胎圈 精确查询，
+     * 需用此Map按胎圈代码查询。聚合规则：同一胎圈在多机台损耗率一致时直接取，不一致时取平均值。</p>
+     */
+    private Map<String, Double> beadLossRateMap = new HashMap<>();
 
     /** 月度剩余，key=胎圈代码 */
     private Map<String, TqMonthSurplusVo> monthSurplusMap = new HashMap<>();
