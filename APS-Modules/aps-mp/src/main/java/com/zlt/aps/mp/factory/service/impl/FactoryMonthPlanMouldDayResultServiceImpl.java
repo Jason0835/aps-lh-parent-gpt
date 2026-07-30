@@ -1082,6 +1082,7 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         LambdaQueryWrapper<SpecialMaterialResult> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(SpecialMaterialResult::getFactoryCode, queryResult.getFactoryCode());
         queryWrapper.eq(SpecialMaterialResult::getProductionVersion, queryResult.getProductionVersion());
+        queryWrapper.isNotNull(SpecialMaterialResult::getMaterialDesc);
         List<SpecialMaterialResult> specialMaterialResultList = specialMaterialResultEntityMapper.selectList(queryWrapper);
         Map<String, List<SpecialMaterialResult>> specialMaterialResultMap = specialMaterialResultList.stream().collect(Collectors.groupingBy(SpecialMaterialResult::getMaterialDesc));
         List<Map<String, Object>> listData = new ArrayList<>();
