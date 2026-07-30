@@ -52,7 +52,7 @@
   "ui.data.column.monthPlanFinalAdjustQuery.recalculate": "Recalculate",
   "ui.data.column.monthPlanFinalAdjustQuery.productAlign": "Product Align",
   "ui.data.column.FactoryMonthPlanFinalResult.currentOverdueQty": "Overdue Qty",
-  "ui.data.column.FactoryMonthPlanFinalResult.orderAddDecQty": "Order Add Qty",
+  "ui.data.column.FactoryMonthPlanFinalResult.orderAddDecQty": "Order Add/Dec Qty",
   "ui.data.column.FactoryMonthPlanFinalResult.productAlignDate": "Product Align Date",
   "ui.data.column.FactoryMonthPlanFinalResult.productOverdueQty": "Product Overdue Qty",
   "ui.data.column.monthPlanFinalAdjustQuery.structureType": "Structure Type",

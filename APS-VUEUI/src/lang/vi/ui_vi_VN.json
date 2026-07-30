@@ -63,7 +63,7 @@
   "ui.data.column.monthPlanFinalAdjustQuery.recalculate": "Tính lại",
   "ui.data.column.monthPlanFinalAdjustQuery.productAlign": "Căn chỉnh sản xuất",
   "ui.data.column.FactoryMonthPlanFinalResult.currentOverdueQty": "Sản lượng thừa/thiếu",
-  "ui.data.column.FactoryMonthPlanFinalResult.orderAddDecQty": "Sản lượng tăng đơn hàng",
+  "ui.data.column.FactoryMonthPlanFinalResult.orderAddDecQty": "Sản lượng tăng/giảm đơn hàng",
   "ui.data.column.FactoryMonthPlanFinalResult.productAlignDate": "Ngày căn chỉnh sản xuất",
   "ui.data.column.FactoryMonthPlanFinalResult.productOverdueQty": "Sản lượng thừa/thiếu sản xuất",
   "ui.data.column.monthPlanFinalAdjustQuery.structureType": "Loại cấu trúc",
