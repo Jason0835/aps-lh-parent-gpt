@@ -2,8 +2,10 @@ package com.zlt.aps.cd15.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.ExportLog;
+import com.ruoyi.api.gateway.system.domain.ImportLog;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.api.gateway.system.service.IExportLogService;
+import com.ruoyi.api.gateway.system.service.IImportLogService;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.ServletUtils;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
@@ -26,6 +28,7 @@ import com.zlt.aps.cd15.service.ICd15ScheduleResultService;
 import com.zlt.aps.utils.AppUtils;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
+import com.zlt.common.utils.ImportExcelUtils;
 import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -57,6 +60,9 @@ public class Cd15ScheduleResultController extends AbstractDocBizController<Cd15S
 
     @Resource
     private IExportLogService exportLogService;
+
+    @Resource
+    private IImportLogService importLogService;
 
     @Resource
     private Cd15ScheduleResultMapper cd15ScheduleResultMapper;
@@ -207,14 +213,28 @@ public class Cd15ScheduleResultController extends AbstractDocBizController<Cd15S
     @PostMapping("/importDataByCust/{updateSupport}")
     public AjaxResult importDataByCust(@PathVariable("updateSupport") boolean updateSupport,
                                        @RequestBody Cd15ScheduleImportDTO importDTO) throws Exception {
+        Date beginTime = DateUtils.getNowDate();
         ImportContext importContext = importDTO.getImportContext();
+        ImportLog importLog = ImportExcelUtils.getImportLogAndUploadFile(
+                importContext.getFileBytes(), importContext.getImportFilePath(),
+                importContext.getProcedureCode(), importContext.getFunctionName(),
+                importContext.getOriFileName(), 1);
+        importLog = this.importLogService.add(importLog);
         ExcelUtil<Cd15ScheduleResultTemplateImportVO> excelUtil =
                 new ExcelUtil<>(Cd15ScheduleResultTemplateImportVO.class);
         // 第1行按隐藏字段键匹配VO，第1至5行作为模板表头，第6行开始读取导入明细。
         List<Cd15ScheduleResultTemplateImportVO> rows = excelUtil.importExcel(
                 new ByteArrayInputStream(importContext.getFileBytes()), 0, 5, -1);
-        return this.cd15ScheduleResultService.importScheduleTemplate(
+        AjaxResult ajaxResult = this.cd15ScheduleResultService.importScheduleTemplate(
                 rows, importDTO.getScheduleResult(), updateSupport);
+        Date endTime = DateUtils.getNowDate();
+        importLog.setRowCount(rows.size());
+        importLog.setBeginTime(beginTime);
+        importLog.setEndTime(endTime);
+        importLog.setSpendTime(DateUtils.getDiffTime(endTime, beginTime));
+        ImportExcelUtils.updateImportLogAndFormatMsg(
+                importLog, ajaxResult, this.importLogService);
+        return ajaxResult;
     }
 
     @Log(title = "ui.data.column.cd15ScheduleResult.modalName", businessType = BusinessType.EXPORT)

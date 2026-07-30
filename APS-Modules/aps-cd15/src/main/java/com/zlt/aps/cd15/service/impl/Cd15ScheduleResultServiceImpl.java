@@ -1,5 +1,6 @@
 package com.zlt.aps.cd15.service.impl;
 
+import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
@@ -163,7 +164,7 @@ public class Cd15ScheduleResultServiceImpl extends AbstractDocService<Cd15Schedu
                     "ui.data.column.cd15ScheduleResult.importEmpty"));
         }
         String factoryCode = condition.getFactoryCode().trim();
-        Date scheduleDate = cn.hutool.core.date.DateUtil.beginOfDay(condition.getScheduleDate());
+        Date scheduleDate = DateUtil.beginOfDay(condition.getScheduleDate());
         Set<String> uniqueKeys = new HashSet<>();
         List<String> errors = new ArrayList<>();
         List<Cd15ScheduleResultTemplateImportVO> validRows = new ArrayList<>();
@@ -250,8 +251,7 @@ public class Cd15ScheduleResultServiceImpl extends AbstractDocService<Cd15Schedu
                 .eq(Cd15ScheduleResult::getScheduleDate, scheduleDate)
                 .set(Cd15ScheduleResult::getIsDelete, 1));
         int successNum = this.baseDao.insertBatch(insertList);
-        return AjaxResult.success(MessageFormat.format(I18nUtil.getMessage(
-                "ui.data.column.cd15ScheduleResult.importSuccess"), successNum));
+        return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + successNum);
     }
 
     /**

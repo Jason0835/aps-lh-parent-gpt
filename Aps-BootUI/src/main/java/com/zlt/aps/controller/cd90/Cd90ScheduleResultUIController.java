@@ -1,12 +1,14 @@
 package com.zlt.aps.controller.cd90;
 
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
+import com.zlt.aps.cd90.api.domain.dto.Cd90ScheduleImportDTO;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleResult;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleRollingAdjustLog;
 import com.zlt.aps.cd90.api.domain.vo.Cd90ChangeQtyRequest;
@@ -17,6 +19,7 @@ import com.zlt.file.encryptbyll.FileEncryptUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
@@ -236,5 +239,29 @@ public class Cd90ScheduleResultUIController extends BaseUIController<Cd90Schedul
         context.setProcedureCode(getProcedureCode()); context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
         return remoteService.importData(context, updateSupport);
+    }
+
+    @ApiOperation("按固定模板导入直裁排程结果")
+    @RequiresPermissions("cd90:scheduleResult:import")
+    @PostMapping("/importDataByCust")
+    @ResponseBody
+    public AjaxResult importDataByCust(@RequestPart("file") MultipartFile file,
+                                       @RequestParam("updateSupport") boolean updateSupport,
+                                       @RequestParam("factoryCode") String factoryCode,
+                                       @RequestParam("scheduleDate") String scheduleDate) throws Exception {
+        byte[] data = this.useFileEncrypt ? FileEncryptUtils.DecodeFile(file) : file.getBytes();
+        ImportContext context = new ImportContext();
+        context.setImportFilePath(this.importFilePath);
+        context.setFunctionName(this.getFunctionName());
+        context.setProcedureCode(this.getProcedureCode());
+        context.setOriFileName(file.getOriginalFilename());
+        context.setFileBytes(data);
+        Cd90ScheduleResult condition = new Cd90ScheduleResult();
+        condition.setFactoryCode(StringUtils.trim(factoryCode));
+        condition.setScheduleDate(DateUtils.parseDate(scheduleDate));
+        Cd90ScheduleImportDTO importDTO = new Cd90ScheduleImportDTO();
+        importDTO.setImportContext(context);
+        importDTO.setScheduleResult(condition);
+        return this.remoteService.importDataByCust(updateSupport, importDTO);
     }
 }

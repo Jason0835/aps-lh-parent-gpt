@@ -17,6 +17,7 @@ import com.zlt.aps.cd90.api.domain.entity.Cd90Stock;
 import com.zlt.aps.cd90.api.domain.vo.Cd90ChangeQtyRequest;
 import com.zlt.aps.cd90.api.domain.vo.Cd90InsertOrderRequest;
 import com.zlt.aps.cd90.api.domain.vo.Cd90RollingCheckRequest;
+import com.zlt.aps.cd90.api.domain.vo.Cd90ScheduleResultTemplateImportVO;
 import com.zlt.aps.cd90.api.domain.vo.Cd90TransferMachineRequest;
 import com.zlt.aps.cd90.component.Cd90ScheduleResultExportAssembler;
 import com.zlt.aps.cd90.engine.domain.Cd90ScheduleTask;
@@ -39,6 +40,7 @@ import com.zlt.aps.cd90.model.Cd90ScheduleOverwriteDecision;
 import com.zlt.aps.cd90.service.Cd90AutoScheduleAsyncExecutor;
 import com.zlt.aps.cd90.service.Cd90InsertOrderAsyncExecutor;
 import com.zlt.aps.cd90.service.Cd90ScheduleOverwriteValidator;
+import com.zlt.aps.cd90.service.Cd90ScheduleNumberService;
 import com.zlt.aps.cd90.service.Cd90TimedRollingCheckService;
 import com.zlt.aps.cd90.service.ICd90ScheduleResultService;
 import com.zlt.aps.common.core.constant.ApsConstant;
@@ -58,6 +60,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import javax.annotation.Resource;
 import java.io.InputStream;
 import java.math.BigDecimal;
+import java.text.MessageFormat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -68,6 +71,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -129,6 +133,125 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
     private Cd90EngineCxScheduleMapper cxScheduleMapper;
     @Resource
     private Cd90ScheduleResultExportAssembler exportAssembler;
+    @Resource
+    private Cd90ScheduleNumberService scheduleNumberService;
+
+    /**
+     * 按固定生产计划模板整体覆盖导入。
+     * 模板一行生成一条新排程结果，上一批、库存、成型计划和结构名称列仅用于展示。
+     *
+     * @param rows 导入明细
+     * @param condition 工厂和排程日期条件
+     * @param updateSupport 是否覆盖参数
+     * @return 导入结果
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public AjaxResult importScheduleTemplate(List<Cd90ScheduleResultTemplateImportVO> rows,
+                                             Cd90ScheduleResult condition,
+                                             boolean updateSupport) {
+        if (condition == null || !PubUtil.isNotEmpty(condition.getFactoryCode())
+                || condition.getScheduleDate() == null) {
+            return AjaxResult.error(I18nUtil.getMessage(
+                    "ui.data.column.cd90ScheduleResult.importRequired"));
+        }
+        if (rows == null || rows.isEmpty()) {
+            return AjaxResult.error(I18nUtil.getMessage(
+                    "ui.data.column.cd90ScheduleResult.importEmpty"));
+        }
+        String factoryCode = condition.getFactoryCode().trim();
+        Date scheduleDate = DateUtil.beginOfDay(condition.getScheduleDate());
+        Set<String> uniqueKeys = new HashSet<>();
+        List<String> errors = new ArrayList<>();
+        List<Cd90ScheduleResultTemplateImportVO> validRows = new ArrayList<>();
+        for (int index = 0; index < rows.size(); index++) {
+            Cd90ScheduleResultTemplateImportVO row = rows.get(index);
+            int excelRow = index + 5;
+            if (row == null || !PubUtil.isNotEmpty(row.getMachineCode())
+                    || !PubUtil.isNotEmpty(row.getClothCode())
+                    || !PubUtil.isNotEmpty(row.getBigRollCode())) {
+                errors.add(MessageFormat.format(I18nUtil.getMessage(
+                        "ui.data.column.cd90ScheduleResult.importRowRequired"), excelRow));
+                continue;
+            }
+            boolean hasPlan = IntStream.rangeClosed(1, 3)
+                    .mapToObj(classIndex -> (Double) row.getFieldValueByFieldName(
+                            String.format("class%dPlanQty", classIndex)))
+                    .filter(Objects::nonNull)
+                    .anyMatch(value -> value > 0D);
+            if (!hasPlan) {
+                errors.add(MessageFormat.format(I18nUtil.getMessage(
+                        "ui.data.column.cd90ScheduleResult.importPlanRequired"), excelRow));
+                continue;
+            }
+            String uniqueKey = String.join("|", row.getMachineCode().trim(),
+                    row.getClothCode().trim(), row.getBigRollCode().trim());
+            if (!uniqueKeys.add(uniqueKey)) {
+                errors.add(MessageFormat.format(I18nUtil.getMessage(
+                        "ui.data.column.cd90ScheduleResult.importDuplicate"), excelRow));
+                continue;
+            }
+            validRows.add(row);
+        }
+        if (!errors.isEmpty()) {
+            return AjaxResult.error(String.join("<br>", errors));
+        }
+
+        String batchNo = this.scheduleNumberService.nextBatchNo(
+                scheduleDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate());
+        Map<String, int[]> ordersByMachine = new HashMap<>();
+        List<Cd90ScheduleResult> insertList = validRows.stream().map(row -> {
+            Cd90ScheduleResult result = new Cd90ScheduleResult();
+            result.setFactoryCode(factoryCode);
+            result.setScheduleDate(scheduleDate);
+            result.setBatchNo(batchNo);
+            result.setOrderNo(this.scheduleNumberService.nextOrderNo(batchNo));
+            result.setIsRelease("0");
+            result.setProductionStatus("0");
+            result.setDataSource("2");
+            result.setIsLocked(0);
+            result.setPublishSuccessCount(0);
+            result.setMachineCode(row.getMachineCode().trim());
+            result.setClothCode(row.getClothCode().trim());
+            result.setBigRollCode(row.getBigRollCode().trim());
+            result.setStorageLaneCode(row.getStorageLaneCode());
+            result.setCxMachineCodes(row.getCxMachineCodes());
+            result.setPlanSurplusQty(row.getPlanSurplusQty());
+            result.setUnitConsume(row.getUnitConsume() == null ? null
+                    : row.getUnitConsume().multiply(BigDecimal.valueOf(1000)).doubleValue());
+            int[] orders = ordersByMachine.computeIfAbsent(
+                    result.getMachineCode(), key -> new int[3]);
+            for (int classIndex = 1; classIndex <= 3; classIndex++) {
+                Double planQty = (Double) row.getFieldValueByFieldName(
+                        String.format("class%dPlanQty", classIndex));
+                Double finishQty = (Double) row.getFieldValueByFieldName(
+                        String.format("class%dFinishQty", classIndex));
+                result.setFieldValueByFieldName(
+                        String.format("class%dPlanQty", classIndex), planQty);
+                result.setFieldValueByFieldName(
+                        String.format("class%dFinishQty", classIndex), finishQty);
+                if (planQty != null || finishQty != null) {
+                    result.setFieldValueByFieldName(
+                            String.format("class%dScheduleDate", classIndex),
+                            DateUtil.offsetDay(scheduleDate, classIndex == 1 ? -1 : 0));
+                }
+                if (planQty != null && planQty > 0D) {
+                    result.setFieldValueByFieldName(
+                            String.format("class%dProduceOrder", classIndex),
+                            ++orders[classIndex - 1]);
+                }
+            }
+            return result;
+        }).collect(Collectors.toList());
+
+        this.cd90ScheduleResultMapper.update(null,
+                new LambdaUpdateWrapper<Cd90ScheduleResult>()
+                        .eq(Cd90ScheduleResult::getFactoryCode, factoryCode)
+                        .eq(Cd90ScheduleResult::getScheduleDate, scheduleDate)
+                        .set(Cd90ScheduleResult::getIsDelete, 1));
+        int successNum = this.baseDao.saveBatch(insertList);
+        return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + successNum);
+    }
 
     /**
      * 删除直裁排程结果，并在同一事务内压缩 CLASS1 后续生产顺位。

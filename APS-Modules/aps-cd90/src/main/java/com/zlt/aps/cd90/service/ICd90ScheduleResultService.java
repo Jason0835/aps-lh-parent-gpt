@@ -5,6 +5,7 @@ import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleResult;
 import com.zlt.aps.cd90.api.domain.vo.Cd90ChangeQtyRequest;
 import com.zlt.aps.cd90.api.domain.vo.Cd90InsertOrderRequest;
 import com.zlt.aps.cd90.api.domain.vo.Cd90RollingCheckRequest;
+import com.zlt.aps.cd90.api.domain.vo.Cd90ScheduleResultTemplateImportVO;
 import com.zlt.aps.cd90.api.domain.vo.Cd90TransferMachineRequest;
 import com.zlt.bill.common.service.IDocService;
 
@@ -20,6 +21,18 @@ public interface ICd90ScheduleResultService extends IDocService<Cd90ScheduleResu
      * @return 删除结果
      */
     AjaxResult removeScheduleResults(List<Long> ids);
+
+    /**
+     * 按固定生产计划模板整体覆盖导入排程结果。
+     *
+     * @param rows 导入明细
+     * @param condition 工厂和排程日期条件
+     * @param updateSupport 是否覆盖参数
+     * @return 导入结果
+     */
+    AjaxResult importScheduleTemplate(List<Cd90ScheduleResultTemplateImportVO> rows,
+                                      Cd90ScheduleResult condition,
+                                      boolean updateSupport);
 
     /**
      * 执行直裁自动排程。
