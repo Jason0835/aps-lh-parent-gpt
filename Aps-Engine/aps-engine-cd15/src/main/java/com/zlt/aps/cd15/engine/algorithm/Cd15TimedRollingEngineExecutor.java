@@ -22,6 +22,7 @@ import com.zlt.aps.cd15.engine.model.Cd15ShiftExecutionResult;
 import com.zlt.aps.cd15.engine.model.Cd15ShiftResourceState;
 import com.zlt.aps.cd15.engine.model.Cd15ShiftScheduleTask;
 import com.zlt.aps.cd15.engine.model.Cd15StorageLaneAllocation;
+import com.zlt.aps.cd15.engine.model.Cd15StockSource;
 import com.zlt.aps.cd15.engine.model.Cd15TimedRollingOutput;
 import com.zlt.aps.cd15.engine.model.Cd15UnscheduledResultModel;
 import com.zlt.aps.cd15.engine.service.Cd15AutoScheduleEngineService;
@@ -29,6 +30,7 @@ import com.zlt.aps.cd15.engine.service.Cd15AutoScheduleInputService;
 import com.zlt.aps.cd15.engine.service.Cd15ScheduleCandidatePreparationService;
 import com.zlt.aps.cd15.engine.service.Cd15ScheduleProgressListener;
 import com.zlt.aps.cd15.engine.service.Cd15ShiftDemandProvider;
+import com.zlt.aps.cd15.engine.service.Cd15RollingShiftStockService;
 import com.zlt.aps.cd15.engine.service.impl.Cd15NewSpecAdvanceInputPreparer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.BeanUtils;
@@ -69,6 +71,7 @@ public class Cd15TimedRollingEngineExecutor {
     private final Cd15SingleShiftScheduleExecutor singleShiftExecutor;
     private final Cd15UnscheduledResultAggregator unscheduledResultAggregator;
     private final Cd15BigRollMeterCalculator bigRollMeterCalculator;
+    private final Cd15RollingShiftStockService rollingShiftStockService;
 
     /** 读取原批次，在内存副本上从目标班开始滚动并输出差异。 */
     public Cd15TimedRollingOutput execute(Cd15RollingTarget target, String inputVersion,
@@ -97,6 +100,8 @@ public class Cd15TimedRollingEngineExecutor {
         List<Cd15ScheduleAttemptTrace> traces = new ArrayList<>();
         List<Cd15RollingPendingTask> carryOver = new ArrayList<>();
         List<Cd15ConstructionMaterial> constructionMaterials = new ArrayList<>();
+        List<Cd15StockSource> targetShiftStocks =
+                rollingShiftStockService.loadRequired(target);
         Cd15RollingScheduleContext rolling = null;
         Cd15ScheduleProgressListener progress = listener == null
                 ? Cd15ScheduleProgressListener.NO_OP : listener;
@@ -106,6 +111,8 @@ public class Cd15TimedRollingEngineExecutor {
             progress.onProgress(20 + index * 60 / shiftCount, "ROLLING_SHIFT",
                     shiftStageName(shift, "滚动开始"), shift);
             Cd15AutoScheduleInput input = loadInput(context, shift);
+            // 定时滚动的全部后续班次统一从目标班次开始库存重新累计。
+            input.setStocksAtSix(targetShiftStocks);
             if (input.getConstructionMaterials() != null) {
                 constructionMaterials.addAll(input.getConstructionMaterials());
             }

@@ -57,6 +57,13 @@ public class Cd15ScheduleCandidateBuilder {
 
         // 6点库存按钢带形成唯一共享池，先统一扣除窗口前全部材料的成型消耗。
         Map<String, BigDecimal> stockBySteelStrip = aggregateStock(stocksAtSix);
+        Map<String, LocalDateTime> stockBaselineBySteelStrip = safe(stocksAtSix).stream()
+                .filter(item -> item != null && item.getSteelStripCode() != null)
+                .filter(item -> item.getSnapshotTime() != null)
+                .collect(Collectors.toMap(Cd15StockSource::getSteelStripCode,
+                        Cd15StockSource::getSnapshotTime,
+                        (left, right) -> left.isBefore(right) ? left : right,
+                        LinkedHashMap::new));
         Map<String, List<Cd15DemandShift>> shiftsByMaterial = safe(demandShifts).stream()
                 .filter(item -> item != null && StringUtils.hasText(item.getSteelStripCode()))
                 .filter(item -> StringUtils.hasText(item.getMaterialKey()))
@@ -67,6 +74,9 @@ public class Cd15ScheduleCandidateBuilder {
                 .filter(item -> item != null && StringUtils.hasText(item.getSteelStripCode()))
                 .filter(item -> item.getStartTime() != null
                         && item.getStartTime().isBefore(currentDemandStart))
+                .filter(item -> stockBaselineBySteelStrip.get(item.getSteelStripCode()) == null
+                        || !item.getStartTime().isBefore(
+                        stockBaselineBySteelStrip.get(item.getSteelStripCode())))
                 .collect(Collectors.groupingBy(Cd15DemandShift::getSteelStripCode,
                         Collectors.reducing(BigDecimal.ZERO,
                                 item -> value(item.getSteelStripDemandQuantity()),

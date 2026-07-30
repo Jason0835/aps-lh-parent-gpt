@@ -111,10 +111,19 @@ public class Cd15DefaultShiftDemandProvider implements Cd15ShiftDemandProvider {
                         && steelStripCode.equals(item.getSteelStripCode()))
                 .map(item -> this.value(item.getStockQuantity()))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+        LocalDateTime stockBaselineTime = this.safe(input.getStocksAtSix()).stream()
+                .filter(item -> item != null
+                        && steelStripCode.equals(item.getSteelStripCode()))
+                .map(Cd15StockSource::getSnapshotTime)
+                .filter(Objects::nonNull)
+                .min(LocalDateTime::compareTo)
+                .orElse(null);
         BigDecimal consumedBeforeWindow = this.planningDemands(input).stream()
                 .filter(item -> item != null
                         && steelStripCode.equals(item.getSteelStripCode()))
                 .filter(item -> item.getStartTime() != null
+                        && (stockBaselineTime == null
+                        || !item.getStartTime().isBefore(stockBaselineTime))
                         && item.getStartTime().isBefore(demandStart))
                 .map(item -> this.value(item.getSteelStripDemandQuantity()))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);

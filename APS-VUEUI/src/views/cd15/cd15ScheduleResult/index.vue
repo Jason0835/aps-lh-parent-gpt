@@ -291,8 +291,11 @@ export default {
       this.page.pageSize = pageSize
       this.getList()
     },
-    handleSortChange(sort) {
-      this.sort = sort || {}
+    handleSortChange({ prop, order }) {
+      this.sort = {
+        orderByColumn: prop,
+        isAsc: order === 'ascending' ? 'asc' : order === 'descending' ? 'desc' : undefined
+      }
       this.getList()
     },
     handleSelectionChange(selection) {
@@ -550,7 +553,11 @@ export default {
       exportScheduleResult(this.formatParams(false))
     },
     formatParams(hasPage = true) {
-      const params = { ...this.query, orderByColumn: this.sort.prop, isAsc: this.sort.order }
+      const params = {
+        ...this.query,
+        orderByColumn: this.sort.orderByColumn,
+        isAsc: this.sort.isAsc
+      }
       if (hasPage) {
         params.pageNum = this.page.current
         params.pageSize = this.page.pageSize

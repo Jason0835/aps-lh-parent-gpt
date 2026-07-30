@@ -25,7 +25,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
- * 基于逐班需求、6点库存和滚动入库的默认需求提供器。
+ * 基于逐班需求、当前库存基准和滚动入库的默认需求提供器。
  */
 @Slf4j
 @Component
@@ -75,9 +75,18 @@ public class Cd90DefaultShiftDemandProvider implements Cd90ShiftDemandProvider {
         List<Cd90DemandShift> window = demandWindowSelector.select(availableShifts, depthClassQty);
         BigDecimal demandQuantity = calculateWindowDemand(
                 window, context.getParameters().getDemandCalcMode(), depthClassQty);
-        // 窗口前成型消耗用于重算6点库存余额，不属于本次待排需求。
+        LocalDateTime stockBaselineTime = safe(input.getStocksAtSix()).stream()
+                .filter(item -> item != null
+                        && candidate.getClothCode().equals(item.getClothCode()))
+                .map(Cd90StockSource::getSnapshotTime)
+                .filter(Objects::nonNull)
+                .min(LocalDateTime::compareTo)
+                .orElse(null);
+        // 窗口前且不早于库存基准的成型消耗用于重算库存余额，不属于本次待排需求。
         BigDecimal consumedBeforeWindow = clothShifts.stream()
                 .filter(item -> item.getStartTime().isBefore(demandStart))
+                .filter(item -> stockBaselineTime == null
+                        || !item.getStartTime().isBefore(stockBaselineTime))
                 .map(item -> value(item.getClothDemandQuantity()))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal stockAtSix = safe(input.getStocksAtSix()).stream()

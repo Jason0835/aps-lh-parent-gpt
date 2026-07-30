@@ -1,7 +1,11 @@
 package com.zlt.aps.cd15.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.api.gateway.system.domain.ExportLog;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import com.ruoyi.api.gateway.system.service.IExportLogService;
+import com.ruoyi.common.core.utils.DateUtils;
+import com.ruoyi.common.core.utils.ServletUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
@@ -33,6 +37,7 @@ import org.springframework.web.bind.annotation.RestController;
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -45,6 +50,9 @@ public class Cd15ScheduleResultController extends AbstractDocBizController<Cd15S
 
     @Resource
     private ICd15ScheduleResultService cd15ScheduleResultService;
+
+    @Resource
+    private IExportLogService exportLogService;
 
     @Resource
     private Cd15ScheduleResultMapper cd15ScheduleResultMapper;
@@ -196,7 +204,27 @@ public class Cd15ScheduleResultController extends AbstractDocBizController<Cd15S
     @Override
     public byte[] exportData(@RequestBody Cd15ScheduleResult queryVO, @PathVariable("fileName") String fileName,
                              HttpServletResponse response) throws IOException {
-        return super.exportData(queryVO, fileName, response);
+        Date beginTime = DateUtils.getNowDate();
+        List<Cd15ScheduleResult> currentResults =
+                this.listExportData(queryVO);
+        byte[] exportBytes = this.cd15ScheduleResultService.exportData(
+                currentResults, queryVO);
+        Date endTime = DateUtils.getNowDate();
+
+        ExportLog exportLog = new ExportLog();
+        exportLog.setProcedureCode("0");
+        exportLog.setExportParams(queryVO.toString());
+        String uri = ServletUtils.getRequest().getRequestURI();
+        exportLog.setFunctionCode(uri.split("/")[1]);
+        exportLog.setFunctionName(fileName);
+        exportLog.setFileName(fileName + ".xlsx");
+        exportLog.setRowCount(currentResults.size());
+        exportLog.setBeginTime(beginTime);
+        exportLog.setEndTime(endTime);
+        exportLog.setSpendTime(
+                DateUtils.getDiffTime(endTime, beginTime));
+        this.exportLogService.add(exportLog);
+        return exportBytes;
     }
 
     @Override

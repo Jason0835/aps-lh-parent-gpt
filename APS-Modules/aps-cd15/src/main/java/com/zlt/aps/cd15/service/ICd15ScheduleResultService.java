@@ -19,6 +19,11 @@ public interface ICd15ScheduleResultService extends IDocService<Cd15ScheduleResu
     /** 删除排程结果并压缩同机台 CLASS1 后续生产顺位。 */
     AjaxResult removeScheduleResults(List<Long> ids);
 
+    /** 按固定生产计划模板导出四班排程结果。 */
+    byte[] exportData(
+            List<Cd15ScheduleResult> currentResults,
+            Cd15ScheduleResult queryVO);
+
     /** 自动排程入口 */
     AjaxResult autoSchedule(Cd15ScheduleResult scheduleResult);
 
