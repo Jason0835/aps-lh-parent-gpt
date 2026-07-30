@@ -110,8 +110,8 @@ public class GsqEngineServiceImpl implements GsqEngineService {
 
     /**
      * 创建批次号
-     * @param scheduleDate
-     * @return
+     * @param scheduleDate 排程日期，格式：yyyy-MM-dd
+     * @return 批次号
      */
     private String createBatchNo(String scheduleDate) {
         scheduleDate = scheduleDate.replace("-", "");
@@ -121,10 +121,43 @@ public class GsqEngineServiceImpl implements GsqEngineService {
     /**
      * 创建工单号
      * @param batchNo 批次号
-     * @return
+     * @return 工单号
      */
     private String createOrderNo(String batchNo) {
         return incrementService.getSequence4(batchNo);
+    }
+
+    /**
+     * 根据钢丝圈代码列表查询施工基础信息（用于插单前规格校验和施工字段回填）。
+     *
+     * <p>委派给 GsqEngineMapper.listGsqScheduleBaseInfo，productionStage 固定为 "1"
+     * （仅投产阶段规格），与自动排程口径保持一致。</p>
+     *
+     * @param steelRingCodes 钢丝圈代码列表
+     * @return 施工基础信息列表，空列表表示施工不存在
+     */
+    @Override
+    public List<GsqScheduleBaseInfoVo> listGsqScheduleBaseInfo(List<String> steelRingCodes) {
+        if (org.apache.commons.collections.CollectionUtils.isEmpty(steelRingCodes)) {
+            return java.util.Collections.emptyList();
+        }
+        // productionStage=1 表示仅投产阶段规格（与自动排程口径一致）
+        return gsqEngineMapper.listGsqScheduleBaseInfo(steelRingCodes, "1");
+    }
+
+    /**
+     * 生成钢丝圈插单的批次号和工单号。
+     *
+     * <p>规则与自动排程保持一致：批次号 = 前缀 + yyyyMMdd + 序号；工单号 = 批次号 + 序号。</p>
+     *
+     * @param scheduleDate 排程日期，格式：yyyy-MM-dd
+     * @return 长度为2的数组：[0]=批次号，[1]=工单号
+     */
+    @Override
+    public String[] generateBatchNoAndOrderNo(String scheduleDate) {
+        String batchNo = createBatchNo(scheduleDate);
+        String orderNo = createOrderNo(batchNo);
+        return new String[]{batchNo, orderNo};
     }
 
     /**

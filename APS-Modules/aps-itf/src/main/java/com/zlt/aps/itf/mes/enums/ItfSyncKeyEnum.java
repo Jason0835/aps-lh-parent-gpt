@@ -183,6 +183,11 @@ public enum ItfSyncKeyEnum {
      * 直裁排程结果下发
      */
     SYNC_CD90_SCHEDULE_RESULT("CUT90_SCHE_RST_FBK", "APS", "MES", "直裁排程结果下发接口"),
+
+    /**
+     * 钢丝圈排程结果下发
+     */
+    SYNC_GSQ_SCHEDULE_RESULT("STEEL_RING_SCHE_RST_FBK", "APS", "MES", "钢丝圈排程结果下发接口"),
     ;
 	/**
 	 * 接口码

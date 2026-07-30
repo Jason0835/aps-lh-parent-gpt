@@ -99,28 +99,28 @@ public class TqDataLoadServiceImpl implements ITqDataLoadService {
                     "自动排程失败，原因：成型排程数据为空，或没有在施工信息中找到对应的物料");
             throw new RuntimeException("成型排程数据为空，或没有在施工信息中找到对应的物料");
         }
-        
+
         int beforeFilterCount = scheduleList.size();
-        
+
         // 过滤掉成型3~8班计划量都为0的数据（胎圈6班供应成型3~8班，1~2班由库存直接供应）
         scheduleList = scheduleList.stream()
                 .filter(s -> (s.getCxClass3Plan() + s.getCxClass4Plan() + s.getCxClass5Plan()
                         + s.getCxClass6Plan() + s.getCxClass7Plan() + s.getCxClass8Plan()) > 0)
                 .collect(Collectors.toList());
-        
+
         int afterFilterCount = scheduleList.size();
-        
+
         if (afterFilterCount == 0) {
             autoScheduleLogService.insertTqScheduleLog(batchNo, "", "自动排程失败",
                     "自动排程失败，原因：成型3~8班计划量全部为0，共过滤掉" + beforeFilterCount + "条记录");
             throw new RuntimeException("成型3~8班计划量全部为0");
         }
-        
+
         if (beforeFilterCount > afterFilterCount) {
             autoScheduleLogService.insertTqScheduleLog(batchNo, "", "数据过滤警告",
                     "成型3~8班计划量为0的记录被过滤：总数=" + beforeFilterCount + "，过滤后=" + afterFilterCount);
         }
-        
+
         context.setScheduleList(scheduleList);
         autoScheduleLogService.insertTqScheduleLog(batchNo, "", "根据'成型排程记录'统计出胎圈胶排程记录基础数据",
                 "统计记录数：" + afterFilterCount);
@@ -203,6 +203,10 @@ public class TqDataLoadServiceImpl implements ITqDataLoadService {
         params.setMaxClassOutput(getDouble(paramsMap.getOrDefault(EngineConstants.TQ_MAX_CLASS_OUTPUT, "3000")));
         // 加载SYS1101029胎圈规格班次最大班产阈值（多规格模式下备库胎圈当班初始排产上限，默认1000）
         params.setBackupShiftThreshold(getDouble(paramsMap.getOrDefault(EngineConstants.TQ_BACKUP_SHIFT_THRESHOLD, "1000")));
+        // 加载SYS1101030取整合并阈值（备库分摊剩余量小于此值时合并到当前班次，不再新开一班向上取整，默认0不启用）
+        params.setRoundingMergeThreshold(getDouble(paramsMap.getOrDefault(EngineConstants.TQ_ROUNDING_MERGE_THRESHOLD, "0")));
+        // 加载SYS1101031机台定额超排容忍阈值（计划量超出机台剩余产能且超出部分≤此值时允许当班超排，默认0不启用）
+        params.setMachineOverAssignTolerance(getDouble(paramsMap.getOrDefault(EngineConstants.TQ_MACHINE_OVER_ASSIGN_TOLERANCE, "0")));
         params.setDemandCalcMode(getInt(paramsMap.getOrDefault(EngineConstants.TQ_DEMAND_CALC_MODE, "2")));
         params.setSupplyTimeThreshold(getDouble(paramsMap.getOrDefault(EngineConstants.TQ_SUPPLY_TIME_THRESHOLD, "24")));
         params.setSpecSwitchTime(getDouble(paramsMap.getOrDefault(EngineConstants.TQ_SPEC_SWITCH_TIME, "0.5")));

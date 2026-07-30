@@ -1,9 +1,13 @@
 package com.zlt.aps.tq.engine.handler;
 
+import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.utils.BigDecimalUtil;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.common.engine.service.AutoScheduleLogService;
 import com.zlt.aps.tq.engine.context.TqScheduleContext;
+import com.zlt.aps.tq.engine.enums.TqScheduleRuleCodeEnum;
+import com.zlt.aps.tq.engine.enums.TqScheduleRuleResultEnum;
+import com.zlt.aps.tq.engine.strategy.TqDemandCalcHelper;
 import com.zlt.aps.tq.engine.vo.TqScheduleParams;
 import com.zlt.aps.tq.engine.vo.TqScheduleResultVo;
 import com.zlt.aps.tq.engine.vo.TqTotalPlanQtyVo;
@@ -13,6 +17,7 @@ import org.springframework.stereotype.Component;
 import javax.annotation.Resource;
 import java.math.BigDecimal;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -79,6 +84,16 @@ public class TqBalanceHandler extends AbsTqScheduleStepHandler {
         machineAssignHandler.refreshTaskChain(context, null, 1);
 
         log.info("[S5] 班次均衡调整完成, 总计划量:{}", toJSONString(totalPlanQtyVo));
+
+        // Phase 2 重构新增：埋点按日均衡调整证据（每条排程记录都受影响）
+        for (TqScheduleResultVo scheduleVo : context.getScheduleList()) {
+            Map<String, Object> evidence = new HashMap<>();
+            evidence.put("totalPlanQtyVo", totalPlanQtyVo);
+            TqDemandCalcHelper.addRuleTrace(context, scheduleVo.getBeadCode(),
+                    TqScheduleRuleCodeEnum.DAILY_BALANCE_ADJUST,
+                    TqScheduleRuleResultEnum.ADJUST,
+                    evidence);
+        }
     }
 
     // ==================== 定额约束调整 ====================
@@ -95,6 +110,9 @@ public class TqBalanceHandler extends AbsTqScheduleStepHandler {
             return;
         }
 
+        // 超排容忍阈值（SYS1101031）：超出定额部分≤此值时允许超排，不截断延后
+        Double overAssignTolerance = context.getParams().getMachineOverAssignTolerance();
+
         for (TqScheduleResultVo scheduleVo : context.getScheduleList()) {
             String beadCode = scheduleVo.getBeadCode();
             Map<Integer, Double> classQuotaMap = specClassQuotaMap.get(beadCode);
@@ -109,8 +127,27 @@ public class TqBalanceHandler extends AbsTqScheduleStepHandler {
                 }
                 double planQty = getClassPlanQty(scheduleVo, classNum);
                 if (planQty > quota) {
-                    // 超出定额，截断并将超出部分延后
                     double overflow = BigDecimalUtil.sub(planQty, quota);
+                    if (TqDemandCalcHelper.canOverAssignInCurrentClass(overflow, overAssignTolerance)) {
+                        // 超排容忍（SYS1101031）：超出部分≤容忍阈值，不截断，保持planQty
+                        autoScheduleLogService.insertTqScheduleLog(scheduleVo.getBatchNo(), scheduleVo.getOrderNo(),
+                                "定额约束-超排容忍", "胎圈代码：" + beadCode + "，" + classNum + "班计划量" + planQty
+                                        + "超过定额" + quota + "，超出" + overflow
+                                        + " ≤ 超排容忍阈值(" + overAssignTolerance + ")，不截断");
+                        // Phase 2 重构新增：埋点定额约束超排容忍证据
+                        Map<String, Object> evidence = new HashMap<>();
+                        evidence.put("classNum", classNum);
+                        evidence.put("planQty", planQty);
+                        evidence.put("quota", quota);
+                        evidence.put("overflow", overflow);
+                        evidence.put("tolerance", overAssignTolerance);
+                        TqDemandCalcHelper.addRuleTrace(context, beadCode,
+                                TqScheduleRuleCodeEnum.QUOTA_CONSTRAINT_ADJUST,
+                                TqScheduleRuleResultEnum.SKIP,
+                                evidence);
+                        continue;
+                    }
+                    // 超出定额且超出容忍范围，截断并将超出部分延后
                     setClassPlanQty(scheduleVo, classNum, quota);
 
                     // 延后到下一班次
@@ -124,6 +161,18 @@ public class TqBalanceHandler extends AbsTqScheduleStepHandler {
                             "胎圈代码：" + beadCode + "，" + classNum + "班计划量" + planQty
                                     + "超过定额" + quota + "，截断为" + quota
                                     + (classNum < 6 ? "，超出" + overflow + "延后至" + (classNum + 1) + "班" : "，超出" + overflow + "无法延后"));
+
+                    // Phase 2 重构新增：埋点定额约束调整证据
+                    Map<String, Object> evidence = new HashMap<>();
+                    evidence.put("classNum", classNum);
+                    evidence.put("planQty", planQty);
+                    evidence.put("quota", quota);
+                    evidence.put("overflow", overflow);
+                    evidence.put("deferred", classNum < 6);
+                    TqDemandCalcHelper.addRuleTrace(context, beadCode,
+                            TqScheduleRuleCodeEnum.QUOTA_CONSTRAINT_ADJUST,
+                            TqScheduleRuleResultEnum.ADJUST,
+                            evidence);
                 }
             }
         }
@@ -137,6 +186,17 @@ public class TqBalanceHandler extends AbsTqScheduleStepHandler {
      * <p>基于交接班库存平衡基准值，调整1班的计划量。</p>
      */
     private void equilibriumDay1(List<TqScheduleResultVo> scheduleList, TqTotalPlanQtyVo totalPlanQtyVo, TqScheduleParams params) {
+        // 首次排程判断：若所有记录的当日早班计划量都为0，说明D-1日无排程数据
+        // 此时无法准确预测D日结束库存（缺少当日早班产出量），跳过均衡避免误判
+        boolean hasTodayMorningPlan = scheduleList.stream()
+                .anyMatch(vo -> vo.getTodayMorningPlanQty() != null && vo.getTodayMorningPlanQty() > 0);
+        if (!hasTodayMorningPlan) {
+            log.info("[S5] 跳过D日库存均衡：无前一日排程数据，无法准确预测D日结束库存");
+            autoScheduleLogService.insertTqScheduleLog(scheduleList.get(0).getBatchNo(), "",
+                    "跳过均衡D日计划(1班)", "无前一日排程数据，当日早班计划量均为0，跳过均衡");
+            return;
+        }
+
         BigDecimal toolCapacity = BigDecimalUtils.valueOf(params.getToolCapacity());
         double classStockReference = params.getClassStockReference();
         double coefficient = params.getDemandCoefficient() == null ? 2D : params.getDemandCoefficient();
@@ -144,13 +204,16 @@ public class TqBalanceHandler extends AbsTqScheduleStepHandler {
         // 计算D日结束时的库存结余（1班结束后的交接班库存）
         double totalClassStock = scheduleList.stream()
                 .mapToDouble(vo -> {
-                    // D日结束库存 = 初始库存 + 当天早班计划量 - 成型1班胎圈消耗 - 成型2班胎圈消耗 + 1班产出 - 成型3班胎圈消耗
-                    double stock = BigDecimalUtil.add(vo.getStockQty() == null ? 0D : vo.getStockQty(),
-                            vo.getTodayMorningPlanQty() == null ? 0D : vo.getTodayMorningPlanQty());
-                    stock = BigDecimalUtil.sub(stock, mulCxPlan(vo.getCxClass1Plan(), coefficient));
-                    stock = BigDecimalUtil.sub(stock, mulCxPlan(vo.getCxClass2Plan(), coefficient));
+                    // D日结束库存 = 14点预计库存 - 成型2班(D日中班)胎圈消耗 + 胎圈1班计划量(D日中班产出)
+                    // 14点预计库存(planStockQty) = 6点MES库存 + 早班胎圈排产 - 成型1班(D日早班)消耗
+                    // 说明：成型1班为D日早班消耗、成型2班为D日中班消耗、胎圈1班为D日中班产出
+                    //       成型3班对应D+1日夜班（属于D日结束后），不应计入D日结束库存消耗
+                    double planStock = vo.getPlanStockQty() == null
+                            ? BigDecimalUtil.add(vo.getStockQty() == null ? 0D : vo.getStockQty(),
+                            vo.getTodayMorningPlanQty() == null ? 0D : vo.getTodayMorningPlanQty())
+                            : vo.getPlanStockQty();
+                    double stock = BigDecimalUtil.sub(planStock, mulCxPlan(vo.getCxClass2Plan(), coefficient));
                     stock = BigDecimalUtil.add(stock, vo.getClass1PlanQty() == null ? 0D : vo.getClass1PlanQty());
-                    stock = BigDecimalUtil.sub(stock, mulCxPlan(vo.getCxClass3Plan(), coefficient));
                     return stock;
                 }).sum();
 
@@ -173,6 +236,18 @@ public class TqBalanceHandler extends AbsTqScheduleStepHandler {
         }).collect(Collectors.toList());
 
         for (TqScheduleResultVo scheduleVo : scheduleList) {
+            // 跳过未分配机台的记录，避免给空机台记录注入计划量
+            if (StringUtils.isEmpty(scheduleVo.getMachineCode())) {
+                continue;
+            }
+            // 跳过已触发备库的规格：备库规格因库存不足才触发备库排产，
+            // 若此处再扣减其1班计划量，会与S2.3备库触发逻辑产生矛盾（一边因库存低排产，一边因总库存高扣减），
+            // 导致备库排产被撤销。故库存过高时跳过备库规格，仅扣减非备库规格。
+            Integer backupTriggerClass = scheduleVo.getBackupTriggerClass();
+            boolean isBackupSpec = backupTriggerClass != null && backupTriggerClass > 0;
+            if (isOverStock && isBackupSpec) {
+                continue;
+            }
             double class1Plan = scheduleVo.getClass1PlanQty() == null ? 0D : scheduleVo.getClass1PlanQty();
 
             if (isOverStock && class1Plan > 0) {
@@ -234,6 +309,10 @@ public class TqBalanceHandler extends AbsTqScheduleStepHandler {
 
         double lastDifRate = actualDifRate;
         for (TqScheduleResultVo resultVo : scheduleList) {
+            // 跳过未分配机台的记录，避免给空机台记录注入计划量
+            if (StringUtils.isEmpty(resultVo.getMachineCode())) {
+                continue;
+            }
             double class2Plan = resultVo.getClass2PlanQty() == null ? 0D : resultVo.getClass2PlanQty();
             double class3Plan = resultVo.getClass3PlanQty() == null ? 0D : resultVo.getClass3PlanQty();
 
@@ -307,6 +386,10 @@ public class TqBalanceHandler extends AbsTqScheduleStepHandler {
 
         double lastDifRate = actualDifRate;
         for (TqScheduleResultVo resultVo : scheduleList) {
+            // 跳过未分配机台的记录，避免给空机台记录注入计划量
+            if (StringUtils.isEmpty(resultVo.getMachineCode())) {
+                continue;
+            }
             double class5Plan = resultVo.getClass5PlanQty() == null ? 0D : resultVo.getClass5PlanQty();
             double class6Plan = resultVo.getClass6PlanQty() == null ? 0D : resultVo.getClass6PlanQty();
 

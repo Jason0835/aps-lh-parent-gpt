@@ -8,7 +8,6 @@
         <result property="id" column="id"/>
         <result property="machineCode" column="machine_code"/>
         <result property="machineName" column="machine_name"/>
-        <result property="toolingInfo" column="TOOLING_INFO"/>
         <result property="quata" column="quata"/>
         <result property="classShift" column="class_shift"/>
         <result property="openMachineClass" column="open_machine_class"/>
@@ -22,7 +21,7 @@
     </resultMap>
 
     <sql id="selectMachineInfoVo">
-        select id, machine_code, machine_name, TOOLING_INFO, quata, class_shift, open_machine_class, status, remark, IS_DELETE, create_by, create_time, update_by, update_time from t_gsq_machine_info
+        select id, machine_code, machine_name, quata, class_shift, open_machine_class, status, remark, IS_DELETE, create_by, create_time, update_by, update_time from t_gsq_machine_info
     </sql>
 
     <select id="selectMachineInfoList" parameterType="com.zlt.aps.gsq.api.domain.entity.GsqMachineInfo"
@@ -75,7 +74,6 @@
             <if test="id != null">id,</if>
             <if test="machineCode != null">machine_code,</if>
             <if test="machineName != null">machine_name,</if>
-            <if test="toolingInfo != null">TOOLING_INFO,</if>
             <if test="quata != null">quata,</if>
             <if test="classShift != null">class_shift,</if>
             <if test="openMachineClass != null">open_machine_class,</if>
@@ -91,7 +89,6 @@
             <if test="id != null">#{id},</if>
             <if test="machineCode != null">#{machineCode},</if>
             <if test="machineName != null">#{machineName},</if>
-            <if test="toolingInfo != null">#{toolingInfo},</if>
             <if test="quata != null">#{quata},</if>
             <if test="classShift != null">#{classShift},</if>
             <if test="openMachineClass != null">#{openMachineClass},</if>
@@ -109,7 +106,6 @@
         update t_gsq_machine_info
         <trim prefix="SET" suffixOverrides=",">
             machine_name = #{machineName,jdbcType=VARCHAR},
-            TOOLING_INFO = #{toolingInfo,jdbcType=VARCHAR},
             quata = #{quata,jdbcType=DECIMAL},
             class_shift = #{classShift,jdbcType=VARCHAR},
             open_machine_class = #{openMachineClass,jdbcType=VARCHAR},
@@ -138,7 +134,7 @@
             select a.MACHINE_ID as ID,b.MACHINE_CODE,b.MACHINE_NAME
             from T_GSQ_SPECIFY_MACHINE a
             inner JOIN T_GSQ_MACHINE_INFO b
-            on a.MACHINE_ID=b.ID and b.STATUS = '0'
+            on a.MACHINE_ID=b.ID and b.STATUS = '1'
             where a.IS_DELETE='0'
             and a.JOB_TYPE='0'
             and a.STEEL_RING_CODE=#{machineCode,jdbcType=VARCHAR}
@@ -146,7 +142,7 @@
 
         <if test="id == 2">
             select a.ID,a.MACHINE_CODE,a.MACHINE_NAME from t_gsq_machine_info a
-            where a.IS_DELETE='0' and a.STATUS='0'
+            where a.IS_DELETE='0' and a.STATUS='1'
             and a.ID not in (
             select MACHINE_ID from T_GSQ_SPECIFY_MACHINE where IS_DELETE='0' and JOB_TYPE='0' and
             STEEL_RING_CODE=#{machineCode,jdbcType=VARCHAR}
@@ -157,7 +153,7 @@
 
     <insert id="mergeSql" parameterType="list">
         INSERT INTO t_gsq_machine_info (
-        machine_code, machine_name, tooling_info, quata,
+        machine_code, machine_name, quata,
         class_shift, open_machine_class, status,
         create_by, create_time, update_by, update_time, remark, IS_DELETE
         ) VALUES
@@ -165,7 +161,6 @@
             (
             #{MACHINE.machineCode,jdbcType=VARCHAR},
             #{MACHINE.machineName,jdbcType=VARCHAR},
-            #{MACHINE.toolingInfo,jdbcType=VARCHAR},
             #{MACHINE.quata,jdbcType=DOUBLE},
             #{MACHINE.classShift,jdbcType=VARCHAR},
             #{MACHINE.openMachineClass,jdbcType=VARCHAR},
@@ -180,7 +175,6 @@
         </foreach>
         ON DUPLICATE KEY UPDATE
         machine_name = VALUES(machine_name),
-        tooling_info = VALUES(tooling_info),
         quata = VALUES(quata),
         class_shift = VALUES(class_shift),
         open_machine_class = VALUES(open_machine_class),

@@ -30,6 +30,10 @@ public class TmScheduleUnplannedQueryVo implements Serializable {
     @ApiModelProperty(value = "自动排程批次号")
     private String batchNo;
 
+    /** 胎面编码，支持模糊查询。 */
+    @ApiModelProperty(value = "胎面编码")
+    private String treadCode;
+
     /** 当前页码。 */
     @ApiModelProperty(value = "当前页码", example = "1")
     private Integer pageNum = 1;

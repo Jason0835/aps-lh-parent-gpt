@@ -17,8 +17,10 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * 胎面排程落库转换服务。
@@ -120,6 +122,10 @@ public class TmPersistService {
             explain.setCapacityAdjustQty(task.getCapacityAdjustQty());
             explain.setRequiredQty(resolveRequiredQty(task));
             explain.setFinalPlanQty(task.getPlanQty());
+            explain.setToolLedgerOrder(task.getToolLedgerOrder());
+            explain.setAvailableToolQty(task.getAvailableToolQty());
+            explain.setToolUsedQty(task.getToolUsedQty());
+            explain.setRemainingToolQty(task.getRemainingToolQty());
             explain.setCalcFormulaDesc(task.getCalcFormulaDesc());
             explain.setStockQty(task.getSixClockStockQty());
             explain.setPlanStockQty(task.getPlanStockQty());
@@ -214,6 +220,7 @@ public class TmPersistService {
         result.setTreadCode(task.getTreadCode());
         result.setGlueCode(task.getGlueCode());
         result.setBaseGlueCode(task.getBaseGlueCode());
+        result.setWholeGlueCode(this.buildWholeGlueCode(task));
         result.setMouthPlateCode(task.getMouthPlateCode());
         result.setTreadShoulderLength(task.getTreadShoulderLength());
         result.setCxRemainQty(task.getTailBalanceQty());
@@ -226,8 +233,28 @@ public class TmPersistService {
         result.setCurlRollLength(this.resolveEffectiveCurlRollLength(task));
         result.setReleaseStatus(TmScheduleReleaseStatusEnum.NOT_RELEASED.getCode());
         result.setDataSource(TmScheduleConstants.AUTO_SCHEDULE_DATA_SOURCE);
+        result.setTailFlag(task.getTailFlag());
         applyShiftFields(result, node);
         return result;
+    }
+
+    /**
+     * 按主胶料、基部胶顺序生成整条胶料组合编码。
+     *
+     * @param task 待排任务草稿
+     * @return 去除空值和多余空格后的整条胶料组合编码；没有有效胶料时返回 null
+     */
+    private String buildWholeGlueCode(TmTaskDraft task) {
+        if (task == null) {
+            return null;
+        }
+        String wholeGlueCode = Arrays.asList(task.getGlueCode(), task.getBaseGlueCode()).stream()
+                .filter(StrUtil::isNotBlank)
+                .flatMap(glueCode -> Arrays.stream(glueCode.split(",")))
+                .map(String::trim)
+                .filter(StrUtil::isNotBlank)
+                .collect(Collectors.joining(","));
+        return StrUtil.blankToDefault(wholeGlueCode, null);
     }
 
     /**

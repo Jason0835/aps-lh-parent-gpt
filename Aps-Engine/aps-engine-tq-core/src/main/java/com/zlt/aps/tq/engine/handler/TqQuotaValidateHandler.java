@@ -6,11 +6,15 @@ import com.zlt.aps.common.engine.service.AutoScheduleLogService;
 import com.zlt.aps.common.engine.utils.CollectionUtil;
 import com.zlt.aps.tq.api.domain.entity.TqMachineInfo;
 import com.zlt.aps.tq.engine.context.TqScheduleContext;
+import com.zlt.aps.tq.engine.enums.TqScheduleRuleCodeEnum;
+import com.zlt.aps.tq.engine.enums.TqScheduleRuleResultEnum;
+import com.zlt.aps.tq.engine.strategy.TqDemandCalcHelper;
 import com.zlt.aps.tq.engine.vo.TqScheduleResultVo;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -77,14 +81,19 @@ public class TqQuotaValidateHandler extends AbsTqScheduleStepHandler {
                 : context.getParams().getMaxClassOutput();
 
         // 4. 逐机台处理定额校验
+        // 超排容忍阈值（SYS1101031）：S3阶段已允许当班超排，S5.5校验时需同步放宽定额上限，避免再次截断
+        double overAssignTolerance = context.getParams().getMachineOverAssignTolerance() == null ? 0D
+                : context.getParams().getMachineOverAssignTolerance();
         int totalOverflowCount = 0;
         for (Map.Entry<String, List<TqScheduleResultVo>> entry : machineSpecMap.entrySet()) {
             String machineCode = entry.getKey();
             List<TqScheduleResultVo> specList = entry.getValue();
             TqMachineInfo machine = machineInfoMap.get(machineCode);
             double machineQuota = getMachineQuota(machine, defaultQuota);
+            // 有效定额 = 机台定额 + 超排容忍阈值（与S3阶段calcEffectiveCapacityWithTolerance保持一致）
+            double effectiveQuota = BigDecimalUtil.add(machineQuota, overAssignTolerance);
 
-            totalOverflowCount += validateAndDeferOverflow(machineCode, specList, machineQuota);
+            totalOverflowCount += validateAndDeferOverflow(context, machineCode, specList, effectiveQuota);
         }
 
         log.info("[S5.5] 定额校验完成, 机台数:{}, 累计超量延后次数:{}", machineSpecMap.size(), totalOverflowCount);
@@ -92,6 +101,18 @@ public class TqQuotaValidateHandler extends AbsTqScheduleStepHandler {
         // 5. 所有计划量修改完成后，统一重置6个班次的生产顺序
         machineAssignHandler.setProduceOrder(scheduleList);
         log.info("[S5.5] 生产顺序重置完成");
+
+        // Phase 2 重构新增：埋点生产顺序重置证据（每条排程记录都受影响）
+        for (TqScheduleResultVo scheduleVo : scheduleList) {
+            if (StringUtils.isNotEmpty(scheduleVo.getMachineCode())) {
+                Map<String, Object> evidence = new HashMap<>();
+                evidence.put("totalOverflowCount", totalOverflowCount);
+                TqDemandCalcHelper.addRuleTrace(context, scheduleVo.getBeadCode(),
+                        TqScheduleRuleCodeEnum.PRODUCE_ORDER_RESET,
+                        TqScheduleRuleResultEnum.ADJUST,
+                        evidence);
+            }
+        }
     }
 
     /**
@@ -104,13 +125,14 @@ public class TqQuotaValidateHandler extends AbsTqScheduleStepHandler {
      *   <li>第6班超量无法延后，仅记录日志</li>
      * </ol>
      *
+     * @param context 排程上下文（用于规则证据埋点）
      * @param machineCode 机台编码
      * @param specList 该机台上所有规格的排程记录
      * @param machineQuota 机台定额
      * @return 累计超量延后次数
      */
-    private int validateAndDeferOverflow(String machineCode, List<TqScheduleResultVo> specList,
-                                         double machineQuota) {
+    private int validateAndDeferOverflow(TqScheduleContext context, String machineCode,
+                                         List<TqScheduleResultVo> specList, double machineQuota) {
         int overflowCount = 0;
 
         // 逐班次校验（1→6），延后时会累加到下一班，所以需要顺序处理
@@ -163,12 +185,36 @@ public class TqQuotaValidateHandler extends AbsTqScheduleStepHandler {
                             "胎圈代码：" + spec.getBeadCode() + "，机台：" + machineCode
                                     + "，" + classNum + "班超定额，扣减" + deductQty
                                     + "延后至" + (classNum + 1) + "班");
+
+                    // Phase 2 重构新增：埋点定额超出延后证据
+                    Map<String, Object> evidence = new HashMap<>();
+                    evidence.put("machineCode", machineCode);
+                    evidence.put("classNum", classNum);
+                    evidence.put("deductQty", deductQty);
+                    evidence.put("machineQuota", machineQuota);
+                    evidence.put("usedCapacity", usedCapacity);
+                    TqDemandCalcHelper.addRuleTrace(context, spec.getBeadCode(),
+                            TqScheduleRuleCodeEnum.QUOTA_EXCEED_DEFER,
+                            TqScheduleRuleResultEnum.ADJUST,
+                            evidence);
                 } else {
                     // 第6班无法延后，记录日志
                     autoScheduleLogService.insertTqScheduleLog(spec.getBatchNo(), spec.getOrderNo(),
                             "S5.5-第6班超定额无法延后",
                             "胎圈代码：" + spec.getBeadCode() + "，机台：" + machineCode
                                     + "，第6班超定额" + deductQty + "无法延后");
+
+                    // Phase 2 重构新增：埋点第6班超定额无法延后（SKIP）
+                    Map<String, Object> evidence = new HashMap<>();
+                    evidence.put("machineCode", machineCode);
+                    evidence.put("classNum", 6);
+                    evidence.put("deductQty", deductQty);
+                    evidence.put("machineQuota", machineQuota);
+                    evidence.put("usedCapacity", usedCapacity);
+                    TqDemandCalcHelper.addRuleTrace(context, spec.getBeadCode(),
+                            TqScheduleRuleCodeEnum.QUOTA_EXCEED_DEFER,
+                            TqScheduleRuleResultEnum.SKIP,
+                            evidence);
                 }
 
                 overflow = BigDecimalUtil.sub(overflow, deductQty);

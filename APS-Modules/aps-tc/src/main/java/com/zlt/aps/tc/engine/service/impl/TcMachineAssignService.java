@@ -8,6 +8,8 @@ import com.zlt.aps.common.engine.schedule.ScheduleRuleResult;
 import com.zlt.aps.common.engine.schedule.ScheduleScoreResult;
 import com.zlt.aps.common.engine.schedule.ScheduleTaskLinkedList;
 import com.zlt.aps.common.engine.schedule.ScheduleTaskNode;
+import com.zlt.aps.common.engine.schedule.constraint.ScheduleConstraintCalculator;
+import com.zlt.aps.common.engine.schedule.constraint.ScheduleToolLedgerResult;
 import com.zlt.aps.tc.api.constant.TcScheduleConstants;
 import com.zlt.aps.tc.api.enums.*;
 import com.zlt.aps.tc.engine.domain.*;
@@ -38,6 +40,9 @@ public class TcMachineAssignService implements ITcMachineAssignService {
 
     /** 损耗率四层匹配解析器 */
     private final TcLossRateResolver lossRateResolver = new TcLossRateResolver();
+
+    /** 胎面、胎侧共用工装账本纯计算器 */
+    private final ScheduleConstraintCalculator constraintCalculator = new ScheduleConstraintCalculator();
 
     /**
      * 创建默认机台分配步骤服务。
@@ -780,7 +785,7 @@ public class TcMachineAssignService implements ITcMachineAssignService {
                 this.applyCapacitySplitResult(task, currentShiftPlanQty, assignedQty, remainCapacity, machineSpeed,
                         capacityOverflowQty.compareTo(BigDecimal.ZERO) > 0 ? "当前班产能受限" : "当前班选中机台承接");
                 if (originalToolOverflowQty.compareTo(BigDecimal.ZERO) > 0) {
-                    task.setPlanQty(assignedQty.setScale(0, java.math.RoundingMode.CEILING));
+                    task.setPlanQty(assignedQty);
                 }
                 this.settleAssignedTaskToolState(task, context);
                 this.addContextTask(context, task);
@@ -1146,8 +1151,7 @@ public class TcMachineAssignService implements ITcMachineAssignService {
                 BigDecimal overflowQty = remainingQty.subtract(assignedQty);
                 if (mergeTarget != null) {
                     BigDecimal beforeMergeQty = nvl(mergeTarget.getPlanQty());
-                    BigDecimal afterMergeQty = beforeMergeQty.add(assignedQty)
-                            .setScale(0, java.math.RoundingMode.CEILING);
+                    BigDecimal afterMergeQty = beforeMergeQty.add(assignedQty);
                     this.taskChainScheduleService.changeQty(mergeTarget.getBusinessKey(), afterMergeQty, shiftOrder, context);
                     mergeTarget.setPlanQty(afterMergeQty);
                     this.applyCarryoverMergeToolState(mergeTarget, assignedQty, context);
@@ -1188,7 +1192,8 @@ public class TcMachineAssignService implements ITcMachineAssignService {
                             this.resolveSmallGlueBoundMachine(overflowTask, context), null);
             this.addAssignTrace(context, overflowTask, TcScheduleRuleResultEnum.PASS,
                     runtimeCandidate.getMachineCode(), null, null);
-                    this.taskChainScheduleService.prependAutoTask(overflowTask, runtimeCandidate, context);
+                    // 顺延任务按来源任务的生成顺序追加，避免后生成任务反向插到目标班次链首。
+                    this.taskChainScheduleService.appendAutoTask(overflowTask, runtimeCandidate, context);
                 }
                 remainingQty = overflowQty;
                 if (shiftOrder == sourceShiftOrder) {
@@ -1201,7 +1206,7 @@ public class TcMachineAssignService implements ITcMachineAssignService {
             TcTaskDraft unplannedTask = this.copyOverflowTask(sourceTask,
                     TcScheduleConstants.TC_MAX_SHIFT_ORDER, remainingQty, sourceShiftOrder,
                     overflowIndex, TcMachineAssignStatusEnum.UNPLANNED.getCode());
-            unplannedTask.setPlanQty(remainingQty.setScale(0, java.math.RoundingMode.CEILING));
+            unplannedTask.setPlanQty(remainingQty);
             unplannedTask.setShiftOrder(TcScheduleConstants.TC_MAX_SHIFT_ORDER);
             unplannedTask.setMachineCode(null);
             unplannedTask.setUnplannedReasonCode(TcUnplannedReasonEnum.CAPACITY_NOT_ENOUGH.getCode());
@@ -1619,23 +1624,19 @@ public class TcMachineAssignService implements ITcMachineAssignService {
             task.setToolUsedQty(BigDecimal.ZERO.setScale(TcScheduleConstants.DECIMAL_CALCULATION_SCALE,
                     java.math.RoundingMode.HALF_UP));
             task.setRemainingToolQty(currentAvailableToolQty);
+            task.setToolLedgerOrder(context.nextToolLedgerOrder());
             context.setCurrentAvailableToolQty(currentAvailableToolQty);
             return;
         }
-        BigDecimal toolUsedQty = nvl(task.getPlanQty()).subtract(nvl(task.getCurrentShiftDemandQty()))
-                .divide(curlLength, TcScheduleConstants.DECIMAL_CALCULATION_SCALE,
-                        java.math.RoundingMode.HALF_UP);
-        BigDecimal remainingToolQty = currentAvailableToolQty.subtract(toolUsedQty).max(BigDecimal.ZERO);
-        if (task.getTotalToolQty() != null) {
-            remainingToolQty = remainingToolQty.min(task.getTotalToolQty());
-        }
-        remainingToolQty = remainingToolQty.setScale(TcScheduleConstants.DECIMAL_CALCULATION_SCALE,
-                java.math.RoundingMode.HALF_UP);
-        task.setToolUsedQty(toolUsedQty);
-        task.setRemainingToolQty(remainingToolQty);
+        ScheduleToolLedgerResult ledgerResult = this.constraintCalculator.settleCommittedToolLedger(
+                task.getPlanQty(), task.getCurrentShiftDemandQty(), currentAvailableToolQty,
+                task.getTotalToolQty(), curlLength);
+        task.setToolUsedQty(ledgerResult.getToolUsedQty());
+        task.setRemainingToolQty(ledgerResult.getRemainingToolQty());
+        task.setToolLedgerOrder(context.nextToolLedgerOrder());
         task.setPlanStockQty(nvl(task.getRollingStockQty()).add(nvl(task.getPlanQty()))
                 .subtract(nvl(task.getCurrentShiftDemandQty())).max(BigDecimal.ZERO));
-        context.setCurrentAvailableToolQty(remainingToolQty);
+        context.setCurrentAvailableToolQty(ledgerResult.getRemainingToolQty());
     }
 
     /**
@@ -1653,22 +1654,19 @@ public class TcMachineAssignService implements ITcMachineAssignService {
         BigDecimal curlLength = this.resolveCurlLength(mergeTarget);
         if (curlLength.compareTo(BigDecimal.ZERO) <= 0) {
             mergeTarget.setRemainingToolQty(currentAvailableToolQty);
+            mergeTarget.setToolLedgerOrder(context.nextToolLedgerOrder());
             context.setCurrentAvailableToolQty(currentAvailableToolQty);
             return;
         }
-        BigDecimal incrementalToolQty = nvl(carryoverQty).divide(curlLength,
-                TcScheduleConstants.DECIMAL_CALCULATION_SCALE, java.math.RoundingMode.HALF_UP);
-        BigDecimal remainingToolQty = currentAvailableToolQty.subtract(incrementalToolQty).max(BigDecimal.ZERO);
-        if (mergeTarget.getTotalToolQty() != null) {
-            remainingToolQty = remainingToolQty.min(mergeTarget.getTotalToolQty());
-        }
-        remainingToolQty = remainingToolQty.setScale(TcScheduleConstants.DECIMAL_CALCULATION_SCALE,
-                java.math.RoundingMode.HALF_UP);
+        ScheduleToolLedgerResult ledgerResult = this.constraintCalculator.settleCommittedToolLedger(
+                carryoverQty, BigDecimal.ZERO, currentAvailableToolQty,
+                mergeTarget.getTotalToolQty(), curlLength);
         mergeTarget.setAvailableToolQty(currentAvailableToolQty);
-        mergeTarget.setToolUsedQty(nvl(mergeTarget.getToolUsedQty()).add(incrementalToolQty));
-        mergeTarget.setRemainingToolQty(remainingToolQty);
+        mergeTarget.setToolUsedQty(nvl(mergeTarget.getToolUsedQty()).add(ledgerResult.getToolUsedQty()));
+        mergeTarget.setRemainingToolQty(ledgerResult.getRemainingToolQty());
+        mergeTarget.setToolLedgerOrder(context.nextToolLedgerOrder());
         mergeTarget.setPlanStockQty(nvl(mergeTarget.getPlanStockQty()).add(nvl(carryoverQty)));
-        context.setCurrentAvailableToolQty(remainingToolQty);
+        context.setCurrentAvailableToolQty(ledgerResult.getRemainingToolQty());
     }
 
     /**
@@ -1863,7 +1861,7 @@ public class TcMachineAssignService implements ITcMachineAssignService {
      */
     private void applyCapacitySplitResult(TcTaskDraft task, BigDecimal beforeAssignQty, BigDecimal assignedQty,
                                           BigDecimal remainCapacity, BigDecimal machineSpeed, String splitDesc) {
-        BigDecimal normalizedAssignedQty = StrUtil.contains(splitDesc, "顺延") ? assignedQty.setScale(0, java.math.RoundingMode.CEILING) : assignedQty;
+        BigDecimal normalizedAssignedQty = assignedQty;
         task.setPlanQty(normalizedAssignedQty);
         task.setMachineRemainCapacity(remainCapacity);
         task.setMachineSpeed(machineSpeed);

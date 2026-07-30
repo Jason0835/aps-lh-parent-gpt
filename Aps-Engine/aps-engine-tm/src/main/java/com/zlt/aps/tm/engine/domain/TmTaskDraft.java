@@ -145,6 +145,9 @@ public class TmTaskDraft {
 
     /** 当前任务计算后全局剩余工装数量 */
     private BigDecimal remainingToolQty;
+
+    /** 当前任务最后一次全局工装账本结算序号 */
+    private Integer toolLedgerOrder;
     /** 最小起排调整量，单位米 */
     private BigDecimal minStartAdjustQty;
 

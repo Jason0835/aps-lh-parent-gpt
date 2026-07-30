@@ -139,16 +139,18 @@ public class GsqMachineInfoController extends AbstractDocBizController<GsqMachin
     }
 
     /**
-     * 获取所有启用的钢丝圈机台信息（status=0），供下拉框数据源使用
+     * 获取所有启用的钢丝圈机台信息（status=1），供下拉框数据源使用
+     * 返回AjaxResult，与Feign接口声明一致，避免经过Gateway后反序列化异常
      */
     @ApiOperation("获取所有启用的钢丝圈机台信息")
     @GetMapping("/listEnabledMachines")
-    public List<GsqMachineInfo> listEnabledMachines() {
+    public AjaxResult listEnabledMachines() {
         QueryWrapper<GsqMachineInfo> wrapper = new QueryWrapper<>();
-        wrapper.eq("DEL_FLAG", "0");
-        wrapper.eq("STATUS", "0");
+        wrapper.eq("IS_DELETE", "0");
+        wrapper.eq("STATUS", "1");
         wrapper.orderByAsc("MACHINE_CODE");
-        return machineInfoMapper.selectList(wrapper);
+        List<GsqMachineInfo> list = machineInfoMapper.selectList(wrapper);
+        return AjaxResult.success(list);
     }
 
     /**
@@ -221,11 +223,11 @@ public class GsqMachineInfoController extends AbstractDocBizController<GsqMachin
     }
 
     /**
-     * 构建查询条件（使用DEL_FLAG而非IS_DELETE，禁止手写IS_DELETE条件）
+     * 构建查询条件（使用IS_DELETE与数据库列名一致）
      */
     @Override
     protected void builderCondition(QueryWrapper<GsqMachineInfo> queryWrapper, GsqMachineInfo queryVO) {
-        queryWrapper.eq("DEL_FLAG", "0");
+        queryWrapper.eq("IS_DELETE", "0");
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getMachineCode()), "MACHINE_CODE", queryVO.getMachineCode());
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getMachineName()), "MACHINE_NAME", queryVO.getMachineName());
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getStatus()), "STATUS", queryVO.getStatus());

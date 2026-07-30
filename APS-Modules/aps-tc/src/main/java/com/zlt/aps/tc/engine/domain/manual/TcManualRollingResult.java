@@ -24,6 +24,12 @@ public class TcManualRollingResult {
     private Set<String> affectedResultGroupKeySet = new LinkedHashSet<>();
     /** 受影响既有结果 ID。 */
     private Set<Long> affectedResultIdSet = new LinkedHashSet<>();
+    /** 用户明确删除的既有结果 ID。 */
+    private Set<Long> explicitDeleteResultIdSet = new LinkedHashSet<>();
+    /** 经计算明确全部转入未排的既有结果 ID。 */
+    private Set<Long> moveToUnplannedResultIdSet = new LinkedHashSet<>();
+    /** 本批命令是否包含非删除操作。 */
+    private boolean containsNonDeleteOperation;
     /** 链表变化摘要。 */
     private List<String> chainChangeSummaryList = new ArrayList<>();
     /** 计算前总量。 */
@@ -34,4 +40,8 @@ public class TcManualRollingResult {
     private BigDecimal scheduledTotalQty = BigDecimal.ZERO;
     /** 计算后未排总量。 */
     private BigDecimal unplannedTotalQty = BigDecimal.ZERO;
+    /** 人工命令结算前全局可用工装。 */
+    private BigDecimal availableToolQtyBefore;
+    /** 人工命令结算后全局剩余工装。 */
+    private BigDecimal remainingToolQty;
 }

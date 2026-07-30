@@ -6,6 +6,7 @@ import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.BigDecimalUtil;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
+import com.zlt.aps.common.engine.constants.EngineConstants;
 import com.zlt.aps.common.engine.domain.EngineConstructionInfo;
 import com.zlt.aps.common.engine.service.AutoScheduleLogService;
 import com.zlt.aps.common.engine.service.impl.IncrementService;
@@ -174,9 +175,12 @@ public class TqPreValidationHandler extends AbsTqScheduleStepHandler {
             scheduleVo.setStockQty(rawStockQty);
 
             // 剩余量（月度剩余）
-            scheduleVo.setSurplusQty(Optional.ofNullable(context.getMonthSurplusMap().get(scheduleVo.getBeadCode()))
+            double remainQty = Optional.ofNullable(context.getMonthSurplusMap().get(scheduleVo.getBeadCode()))
                     .map(vo -> vo.getMonthRemainQty())
-                    .orElse(0D));
+                    .orElse(0D);
+            scheduleVo.setSurplusQty(remainQty);
+            // 同步写入月计划剩余量字段（供前端展示和持久化）
+            scheduleVo.setMonthSurplusQty((int) remainQty);
 
             // 当天早班(D日早班)计划量（昨天已排的、属于今天早班的胎圈计划量）
             scheduleVo.setTodayMorningPlanQty(context.getTodayMorningPlanMap().getOrDefault(scheduleVo.getBeadCode(), 0D));
@@ -192,7 +196,7 @@ public class TqPreValidationHandler extends AbsTqScheduleStepHandler {
             scheduleVo.setPlanStockQty(planStockQty);
 
             // 大尺寸规格阈值
-            scheduleVo.getParams().put(com.zlt.aps.common.engine.constants.EngineConstants.TQ_BIG_SIZE_SPEC,
+            scheduleVo.getParams().put(EngineConstants.TQ_BIG_SIZE_SPEC,
                     context.getParams().getBigSizeSpec());
 
             // 发布状态
