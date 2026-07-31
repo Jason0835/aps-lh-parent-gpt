@@ -78,7 +78,7 @@
       @uploadSuccess="getList"
     />
     <infoDialog ref="infoRef" @success="getList" />
-    <createDialog ref="createRef" @success="getList" />
+    <createDialog ref="createRef" @success="handleGenerateSuccess" />
   </basic-container>
 </template>
 <script>
@@ -488,6 +488,10 @@ export default {
       } finally {
         this.loading = false;
       }
+    },
+    // 生成成功后刷新版本下拉并重新加载列表
+    handleGenerateSuccess() {
+      this.getVersion(true);
     },
     async getVersion(isGet = false) {
       try {
