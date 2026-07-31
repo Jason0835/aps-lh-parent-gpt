@@ -24,7 +24,6 @@ import com.zlt.aps.lh.engine.strategy.IMachineMatchStrategy;
 import com.zlt.aps.lh.engine.strategy.support.MachinePriorityTraceSnapshot;
 import com.zlt.aps.lh.engine.strategy.support.MouldResourceAllocationResult;
 import com.zlt.aps.lh.engine.strategy.support.MouldResourceContext;
-import com.zlt.aps.lh.engine.strategy.support.NewSpecEmbryoAvailableTimeResolver;
 import com.zlt.aps.lh.engine.strategy.support.SpecifiedMachineMatchResult;
 import com.zlt.aps.lh.service.impl.LhMaintenanceScheduleService;
 import com.zlt.aps.lh.util.LhMachineHardMatchUtil;
@@ -1026,10 +1025,11 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
      * <ul>
      *   <li>当前窗口存在其它“物料编码 + 产品状态”的有效排程占用；</li>
      *   <li>定点、状态、寸口、模套、特殊材料、模具、停产保机和单控规则全部满足；</li>
-     *   <li>忽略其它 SKU 占用时间后，使用正式产能组件只读试算仍有可排产能。</li>
+     *   <li>机台物理成员（单控整机为 L/R 两侧）均存在于本批次机台运行态中。</li>
      * </ul>
      *
-     * <p>快照、试算和排序均不修改正式候选、机台时间、模具资源或排程结果；
+     * <p>占用机台只做轻量成员校验，不再对每台占用机台执行全窗口产能试算；
+     * 快照和排序均不修改正式候选、机台时间、模具资源或排程结果，
      * 因此日志观察范围扩大不会改变第一台实际试排机台。</p>
      *
      * @param context 排程上下文
@@ -1037,7 +1037,8 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
      * @param actualOrderedCandidates 正式选机主链本轮有序候选
      * @param actualSelectedMachine 正式选机主链本轮首选机台
      * @param currentDayEndTime 当前业务日结束时间
-     * @param targetScheduleQtyResolver 正式产能计算组件
+     * @param targetScheduleQtyResolver 保留接口签名兼容的产能计算组件；本实现不再执行产能试算，
+     *                                 仅用于空值保护（传 null 时退回仅包装正式候选的兼容快照）
      * @return 独立的只读日志快照
      */
     @Override
@@ -1068,7 +1069,6 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
         List<MachineScheduleDTO> occupiedOnlyCandidates =
                 resolveOccupiedOnlyTraceCandidates(
                         context, sku, actualMachineCodes, currentDayEndTime,
-                        targetScheduleQtyResolver,
                         displayMachineCodeMap, memberMachineCodeMap);
         List<MachineScheduleDTO> mergedCandidates =
                 mergeTraceCandidatesKeepingActualOrder(
@@ -1263,7 +1263,6 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
      * @param sku 当前 SKU
      * @param actualMachineCodes 正式可选机台编码
      * @param currentDayEndTime 当前业务日结束时间
-     * @param targetScheduleQtyResolver 正式产能计算组件
      * @param displayMachineCodeMap 展示编码输出映射
      * @param memberMachineCodeMap 物理成员输出映射
      * @return 已通过全部其它硬约束的占用机台
@@ -1273,7 +1272,6 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
             SkuScheduleDTO sku,
             Set<String> actualMachineCodes,
             Date currentDayEndTime,
-            TargetScheduleQtyResolver targetScheduleQtyResolver,
             Map<String, String> displayMachineCodeMap,
             Map<String, List<String>> memberMachineCodeMap) {
         Set<String> occupiedMachineCodes = resolveOtherSkuOccupiedMachineCodes(context, sku);
@@ -1340,8 +1338,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
             if (!containsAnyMachineCode(memberMachineCodes, occupiedMachineCodes)
                     || isTraceStructureRetentionBlocked(
                     context, sku, memberMachineCodes, currentDayEndTime)
-                    || !hasTraceCapacityIgnoringOtherSkuOccupation(
-                    context, sku, memberMachineCodes, targetScheduleQtyResolver)) {
+                    || !isTraceMemberMachineBasicEligible(context, memberMachineCodes)) {
                 continue;
             }
             occupiedOnlyCandidates.add(candidate);
@@ -1845,42 +1842,27 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
     }
 
     /**
-     * 忽略其它 SKU 占用时间后只读试算普通机台或单控整机各成员产能。
+     * 轻量校验日志候选机台成员是否具备基础可上机条件。
      *
-     * <p>机台可用时间覆盖为排程窗口首班开始，正式胎胚可供时间、停机/维护控制、
-     * 换模耗时、首检和班产计算仍由 {@link TargetScheduleQtyResolver} 原逻辑处理。
-     * 单控整机要求 L/R 两侧都存在产能，防止只验证代表侧。</p>
+     * <p>只要求代表机台的物理成员（单控整机为 L/R 两侧）都存在于本批次机台运行态中，
+     * 不再对每台占用机台执行全窗口产能试算。占用机台只用于选机日志的诊断展示，正式选机
+     * 与排程结果仍由主链按真实产能执行；模具、停机、特殊材料等硬约束继续由
+     * {@link #resolveMachineAvailabilityReason} 在占用候选主循环中统一校验。</p>
      *
      * @param context 排程上下文
-     * @param sku 当前 SKU
-     * @param memberMachineCodes 物理成员机台编码
-     * @param targetScheduleQtyResolver 正式产能计算组件
-     * @return true-忽略其它 SKU 占用后仍存在基础上机产能
+     * @param memberMachineCodes 物理成员机台编码（普通机台为自身，单控整机为 L/R 两侧）
+     * @return true-成员机台均存在，满足基础展示条件
      */
-    private boolean hasTraceCapacityIgnoringOtherSkuOccupation(
+    private boolean isTraceMemberMachineBasicEligible(
             LhScheduleContext context,
-            SkuScheduleDTO sku,
-            List<String> memberMachineCodes,
-            TargetScheduleQtyResolver targetScheduleQtyResolver) {
-        if (CollectionUtils.isEmpty(memberMachineCodes)
-                || CollectionUtils.isEmpty(context.getScheduleWindowShifts())) {
+            List<String> memberMachineCodes) {
+        if (CollectionUtils.isEmpty(memberMachineCodes)) {
             return false;
         }
-        Date windowStartTime =
-                context.getScheduleWindowShifts().get(0).getShiftStartDateTime();
-        Date embryoAvailableTime =
-                NewSpecEmbryoAvailableTimeResolver.resolveEarliestAvailableTime(context, sku);
         for (String machineCode : memberMachineCodes) {
-            MachineScheduleDTO memberMachine =
-                    context.getMachineScheduleMap().get(machineCode);
+            MachineScheduleDTO memberMachine = Objects.isNull(context)
+                    ? null : context.getMachineScheduleMap().get(machineCode);
             if (Objects.isNull(memberMachine)) {
-                return false;
-            }
-            int availableCapacity =
-                    targetScheduleQtyResolver.calcMachineAvailableCapacityInWindow(
-                            context, sku, memberMachine,
-                            embryoAvailableTime, windowStartTime);
-            if (availableCapacity <= 0) {
                 return false;
             }
         }

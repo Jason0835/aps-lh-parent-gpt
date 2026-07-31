@@ -2600,10 +2600,15 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             // 仅标记紧接着发生的同机台首检顺延重试，避免把时间后移重算误记为一次新的选机。
             String pendingFirstInspectionRetryMachineCode = null;
             /*
-             * 当前候选的完整实时日志快照。候选选择时只创建不落库；换模、首检、产能、dayN 和回裁
-             * 全部通过并提交排程结果后，才在成功分支补充实际命中机台并写入过程日志。
+             * 当前候选的完整实时日志快照。快照采用延迟构建：候选试排时只暂存选机输入，不逐轮构建；
+             * 实际命中（提交机台运行态前）或当日未排收口时才各构建一次，避免每轮失败试排都重建
+             * 完整快照（含全厂机台占用扫描）导致排程耗时劣化。日志写入仍等结果确认后统一执行。
              */
             MachinePriorityTraceSnapshot pendingCandidateTraceSnapshot = null;
+            // 延迟构建暂存的最近一次真实候选输入：有序候选列表、首选机台与当日结束时间（仅引用，零计算）。
+            List<MachineScheduleDTO> pendingTraceCandidates = null;
+            MachineScheduleDTO pendingTraceSelectedMachine = null;
+            Date pendingTraceDayEndTime = null;
             while (true) {
                 /*
                  * 基础硬约束或当前日尝试失败仍可能在后续业务日恢复，T、T+1 必须保留历史
@@ -2709,36 +2714,27 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                     if (sameMachineFirstInspectionRetry) {
                         /*
                          * 首检资源或班次总量限制只会后移同一机台的切换时间，候选选择并未发生变化。
-                         * 本轮不重复输出候选排序、不消耗选机次数，单独记录顺延重试原因供测试核对。
+                         * 本轮不重复输出候选排序、不消耗选机次数，单独记录顺延重试原因供测试核对；
+                         * 暂存输入保持首次尝试的快照输入，命中后沿用同一候选顺序。
                          */
                         traceFirstInspectionSameMachineRetry(
                                 context, sku, candidateMachine,
                                 firstInspectionRetryReadyTimeMap.get(candidateMachine.getMachineCode()));
                     } else {
                         /*
-                         * 调用处把正式候选和实际首选交给日志快照入口。快照只读实时占用结果，
-                         * 不复用跨 SKU 缓存，也不修改 orderedCandidates、模具或排程结果。
-                         * 此处只暂存，禁止在实际结果提交前写入选机优先级日志。
+                         * 延迟构建：这里只暂存本轮真实候选的选机输入（有序候选、首选机台、当日结束时间），
+                         * 不立即构建快照。快照只在实际命中提交前或当日未排收口时构建一次，
+                         * 避免每轮失败试排都重建完整快照并扫描全厂机台占用。
                          */
-                        pendingCandidateTraceSnapshot =
-                                machineMatch.buildMachinePriorityTraceSnapshot(
-                                        context, sku, orderedCandidates,
-                                        candidateMachine, dayContext.getDayEndTime(),
-                                        getTargetScheduleQtyResolver());
+                        pendingTraceCandidates = orderedCandidates;
+                        pendingTraceSelectedMachine = candidateMachine;
+                        pendingTraceDayEndTime = dayContext.getDayEndTime();
                     }
                 } else {
                     /*
-                     * 本轮没有实际机台可试排时，仅在尚无候选快照时保存占用诊断。
-                     * 已逐台失败后应保留最后一台真实候选的快照，不能用空快照覆盖；
-                     * 最终是否落日志由三天窗口收口统一决定。
+                     * 本轮没有实际机台可试排时，保留最近一次真实候选的暂存输入；
+                     * 全程无候选时由收口逻辑按空候选构建一次占用诊断快照。
                      */
-                    if (Objects.isNull(pendingCandidateTraceSnapshot)) {
-                        pendingCandidateTraceSnapshot =
-                                machineMatch.buildMachinePriorityTraceSnapshot(
-                                        context, sku, Collections.<MachineScheduleDTO>emptyList(),
-                                        null, dayContext.getDayEndTime(),
-                                        getTargetScheduleQtyResolver());
-                    }
                 }
                 // 当前轮已消费上一轮重试标记；本轮若再次需要顺延，会在对应失败分支重新写入。
                 pendingFirstInspectionRetryMachineCode = null;
@@ -3301,9 +3297,12 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                         scheduled = true;
                         /*
                          * 当前候选没有形成新增结果，只是既有同物料结果已满足 dayN。
-                         * 清理待写快照，禁止把“无需继续扩机”误记成一次未命中或实际命中选机。
+                         * 清理待写快照与暂存选机输入，禁止把“无需继续扩机”误记成一次未命中或实际命中选机。
                          */
                         pendingCandidateTraceSnapshot = null;
+                        pendingTraceCandidates = null;
+                        pendingTraceSelectedMachine = null;
+                        pendingTraceDayEndTime = null;
                         state.clearPendingMachinePriorityTrace(sku);
                         break;
                     }
@@ -3528,6 +3527,19 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 }
                 // 仅对通过既有资源约束且最终有有效计划量的新增结果追加提前生产审计备注。
                 appendEarlyProductionRemark(context, result, earlyProductionDecision, resultBusinessDate);
+                /*
+                 * 结果最终确认后、提交任何机台运行态与占用关系前，按暂存的选机输入构建一次
+                 * 日志快照并冻结选机时点占用/收尾时间。此时 machineAssignmentMap 与机台收尾
+                 * 时间尚未被本轮结果改写（updateMachineState/registerMachineAssignment 在其后），
+                 * 保证“首候选=实际命中机台”与延迟写不重读运行态的既有语义。
+                 */
+                pendingCandidateTraceSnapshot = buildConfirmedTraceSnapshot(
+                        context, sku, machineMatch,
+                        pendingTraceCandidates, pendingTraceSelectedMachine, pendingTraceDayEndTime,
+                        orderedCandidates, candidateMachine, dayContext.getDayEndTime());
+                pendingTraceCandidates = null;
+                pendingTraceSelectedMachine = null;
+                pendingTraceDayEndTime = null;
                 context.getScheduleResultList().add(result);
                 context.getScheduleResultSourceSkuMap().put(result, sku);
                 if (embryoAvailableTimeConstrained) {
@@ -3611,16 +3623,9 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 state.registerBinding(activeBinding);
                 state.markScheduledAndCarryOver(sku);
                 /*
-                 * 至此排程结果、主副机台占用和跨日在机绑定均已提交，才可以确认本轮实际命中。
-                 * 首检同机顺延沿用首次候选快照；若兼容策略未返回快照，则按当前正式候选补建。
+                 * 至此排程结果、主副机台占用和跨日在机绑定均已提交，才确认本轮实际命中并写日志。
+                 * 快照已在提交机台运行态前构建并冻结；首检同机顺延沿用首次尝试的暂存输入。
                  */
-                if (Objects.isNull(pendingCandidateTraceSnapshot)) {
-                    pendingCandidateTraceSnapshot =
-                            machineMatch.buildMachinePriorityTraceSnapshot(
-                                    context, sku, orderedCandidates,
-                                    candidateMachine, dayContext.getDayEndTime(),
-                                    getTargetScheduleQtyResolver());
-                }
                 machineMatch.traceMachinePriorityOrder(
                         context, sku,
                         pendingCandidateTraceSnapshot.withActualHit(machineCode));
@@ -3751,11 +3756,15 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             }
             if (!scheduled) {
                 /*
-                 * 当前业务日或阶段未形成结果时只保留最后一次实时快照，不立即写完整优先级日志。
-                 * 后续业务日成功会清理该快照；三天窗口最终仍未命中时只输出一次汇总。
+                 * 当前业务日或阶段未形成结果时，按最近一次真实候选输入构建一次快照并暂存，
+                 * 不立即写完整优先级日志。后续业务日成功会清理该快照；三天窗口最终仍未命中时
+                 * 只输出一次汇总。此时本 SKU 之后的机台状态尚未落库，占用/收尾时间与试排时点一致。
                  */
                 state.rememberPendingMachinePriorityTrace(
-                        sku, pendingCandidateTraceSnapshot);
+                        sku, buildUnscheduledTraceSnapshot(
+                                context, sku, machineMatch,
+                                pendingTraceCandidates, pendingTraceSelectedMachine,
+                                pendingTraceDayEndTime, dayContext.getDayEndTime()));
                 // 当前阶段所有候选机台都失败，只登记延期；T+2 仍需保留给同日后续阶段。
                 log.warn("新增SKU排产失败, materialCode: {}, 结构: {}, 规格: {}, 目标量: {}, 候选机台数: {}, 排除机台: {}, 原因: {}",
                         sku.getMaterialCode(), sku.getStructureName(), sku.getSpecCode(),
@@ -5305,6 +5314,84 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             return;
         }
         completeOrder.add(candidate);
+    }
+
+    /**
+     * 在结果最终确认后构建本次实际命中的选机日志快照。
+     *
+     * <p>优先使用本轮暂存的选机输入（延迟构建）；未暂存输入时（兼容策略等边界）按当前轮
+     * 正式候选补建，保证命中日志始终有快照可写。快照必须在本轮结果提交任何机台运行态与
+     * 占用关系之前构建，否则会把本轮新增结果误记成前序占用。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 当前待选机 SKU
+     * @param machineMatch 机台匹配策略
+     * @param pendingTraceCandidates 暂存的有序候选列表，可能为 null
+     * @param pendingTraceSelectedMachine 暂存的首选机台，可能为 null
+     * @param pendingTraceDayEndTime 暂存的当日结束时间，可能为 null
+     * @param currentOrderedCandidates 当前轮正式有序候选（暂存为空时的回退输入）
+     * @param currentCandidateMachine 当前轮首选机台（回退输入）
+     * @param currentDayEndTime 当前业务日结束时间（回退输入）
+     * @return 当前选机时点的只读日志快照
+     */
+    private MachinePriorityTraceSnapshot buildConfirmedTraceSnapshot(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            IMachineMatchStrategy machineMatch,
+            List<MachineScheduleDTO> pendingTraceCandidates,
+            MachineScheduleDTO pendingTraceSelectedMachine,
+            Date pendingTraceDayEndTime,
+            List<MachineScheduleDTO> currentOrderedCandidates,
+            MachineScheduleDTO currentCandidateMachine,
+            Date currentDayEndTime) {
+        List<MachineScheduleDTO> traceCandidates = pendingTraceCandidates;
+        MachineScheduleDTO traceSelectedMachine = pendingTraceSelectedMachine;
+        Date traceDayEndTime = pendingTraceDayEndTime;
+        if (Objects.isNull(traceCandidates) && Objects.isNull(traceSelectedMachine)) {
+            // 没有暂存输入时按当前轮正式候选补建，保持既有兼容行为。
+            traceCandidates = currentOrderedCandidates;
+            traceSelectedMachine = currentCandidateMachine;
+            traceDayEndTime = currentDayEndTime;
+        }
+        return machineMatch.buildMachinePriorityTraceSnapshot(
+                context, sku, traceCandidates, traceSelectedMachine,
+                traceDayEndTime, getTargetScheduleQtyResolver());
+    }
+
+    /**
+     * 当日未形成实际结果时，构建并暂存最后一次选机日志快照。
+     *
+     * <p>有暂存输入时按最近一次真实候选构建；全程无真实候选时按空候选构建一次占用诊断
+     * 快照（与旧逻辑一致），保证三天窗口收口未命中时仍能输出可对账的日志。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 当前待选机 SKU
+     * @param machineMatch 机台匹配策略
+     * @param pendingTraceCandidates 暂存的有序候选列表，可能为 null
+     * @param pendingTraceSelectedMachine 暂存的首选机台，可能为 null
+     * @param pendingTraceDayEndTime 暂存的当日结束时间，可能为 null
+     * @param currentDayEndTime 当前业务日结束时间
+     * @return 本次选机时点的只读日志快照
+     */
+    private MachinePriorityTraceSnapshot buildUnscheduledTraceSnapshot(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            IMachineMatchStrategy machineMatch,
+            List<MachineScheduleDTO> pendingTraceCandidates,
+            MachineScheduleDTO pendingTraceSelectedMachine,
+            Date pendingTraceDayEndTime,
+            Date currentDayEndTime) {
+        List<MachineScheduleDTO> traceCandidates = pendingTraceCandidates;
+        MachineScheduleDTO traceSelectedMachine = pendingTraceSelectedMachine;
+        Date traceDayEndTime = pendingTraceDayEndTime;
+        if (Objects.isNull(traceCandidates) && Objects.isNull(traceSelectedMachine)) {
+            // 全程无真实候选：按空候选构建，快照入口保持有值，便于未排原因诊断。
+            traceCandidates = Collections.<MachineScheduleDTO>emptyList();
+            traceDayEndTime = currentDayEndTime;
+        }
+        return machineMatch.buildMachinePriorityTraceSnapshot(
+                context, sku, traceCandidates, traceSelectedMachine,
+                traceDayEndTime, getTargetScheduleQtyResolver());
     }
 
     /**
