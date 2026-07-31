@@ -191,9 +191,8 @@
     -->
     <!-- 月初定时任务：用上月数据计算超欠产，写入当月定稿表
          数据来源月=lastMonth（如6月），写入目标月=currentMonth（如7月）
-         关键：surplus.REQUIRE_VERSION 必须匹配当月(7月)定稿版本号，而非上月(6月)版本号
-         数据流：7月定稿表 f → pv7 取7月定稿版本号 → surplus(6月) 按7月版本号匹配STOCK_CAPTURE_DATE
-                → f5(6月定稿表) 提供 DAY_x 计划量 → fin(6月完成量) → 超欠产 = 计划量 - 完成量
+         数据流：7月定稿表 f → f5(6月定稿表) 提供 DAY_x 计划量 → fin(6月完成量) → 超欠产 = 计划量 - 完成量
+         说明：T_MP_MONTH_PLAN_PROD_FINAL 本身就是定稿表，无需再关联 T_MP_PROC_VERSION 验证 IS_FINAL='1'
          防御：stockCaptureDate 若因任何原因超出 [startDate, endDate] 范围，
                SQL 层通过 CASE WHEN ... BETWEEN 夹紧到 startDate，避免 start > end 的非法区间
     -->
@@ -204,7 +203,7 @@
             f5.FACTORY_CODE,
             f5.MATERIAL_CODE,
             f5.PRODUCT_STATUS,
-            pv7.MONTH_PLAN_VERSION AS CURRENT_VERSION,
+            f5.MONTH_PLAN_VERSION AS CURRENT_VERSION,
             (
             -- 计划量：从库存抓取日日号到月底累加 DAY_x
             -- 库存抓取日由 Java 层根据 LAST_MONTH_PLAN_VERSION(ADJ前缀解析) 或余量表回退计算后传入
@@ -244,24 +243,6 @@
             IFNULL(SUM(fin.DAY_QTY), 0) AS FINISH_QTY,
             MAX(IFNULL(stockMap.FORCE_ZERO, 0)) AS FORCE_ZERO
             FROM T_MP_MONTH_PLAN_PROD_FINAL f5
-            INNER JOIN T_MP_PROC_VERSION pv
-                ON pv.FACTORY_CODE = f5.FACTORY_CODE
-                AND pv.MONTH_PLAN_VERSION = f5.MONTH_PLAN_VERSION
-                AND pv.YEAR = f5.YEAR
-                AND pv.MONTH = f5.MONTH
-                AND pv.IS_FINAL = '1'
-                AND pv.IS_DELETE = 0
-            -- 关联当月定稿版本表(IS_FINAL='1')，取当月版本号用于外层 f 表关联
-            -- 一个分厂当月可能有多个定稿版本，取任意一条用于关联，避免笛卡尔积
-            INNER JOIN (
-                SELECT FACTORY_CODE, ANY_VALUE(MONTH_PLAN_VERSION) AS MONTH_PLAN_VERSION
-                FROM T_MP_PROC_VERSION
-                WHERE IS_DELETE = 0
-                  AND IS_FINAL = '1'
-                  AND YEAR = #{currentYear}
-                  AND MONTH = #{currentMonth}
-                GROUP BY FACTORY_CODE
-            ) pv7 ON pv7.FACTORY_CODE = f5.FACTORY_CODE
             -- Java 层计算好的库存抓取日映射，替代原 surplus 关联
             LEFT JOIN (
                 <foreach collection="stockCaptureDateList" item="item" separator="UNION ALL">
@@ -294,7 +275,7 @@
             WHERE f5.IS_DELETE = 0
             AND f5.YEAR = #{lastYear}
             AND f5.MONTH = #{lastMonth}
-            GROUP BY f5.FACTORY_CODE, f5.MATERIAL_CODE, f5.PRODUCT_STATUS, pv7.MONTH_PLAN_VERSION,
+            GROUP BY f5.FACTORY_CODE, f5.MATERIAL_CODE, f5.PRODUCT_STATUS, f5.MONTH_PLAN_VERSION,
             stockMap.STOCK_CAPTURE_DATE, stockMap.FORCE_ZERO,
             f5.DAY_1, f5.DAY_2, f5.DAY_3, f5.DAY_4, f5.DAY_5, f5.DAY_6, f5.DAY_7, f5.DAY_8,
             f5.DAY_9, f5.DAY_10, f5.DAY_11, f5.DAY_12, f5.DAY_13, f5.DAY_14, f5.DAY_15, f5.DAY_16,
@@ -385,13 +366,6 @@
             IFNULL(SUM(fin.DAY_QTY), 0) AS FINISH_QTY,
             MAX(IFNULL(stockMap.FORCE_ZERO, 0)) AS FORCE_ZERO
             FROM T_MP_MONTH_PLAN_PROD_FINAL f5
-            INNER JOIN T_MP_PROC_VERSION pv
-                ON pv.FACTORY_CODE = f5.FACTORY_CODE
-                AND pv.MONTH_PLAN_VERSION = f5.MONTH_PLAN_VERSION
-                AND pv.YEAR = f5.YEAR
-                AND pv.MONTH = f5.MONTH
-                AND pv.IS_FINAL = '1'
-                AND pv.IS_DELETE = 0
             -- Java 层计算好的库存抓取日映射，替代原 surplus 关联
             LEFT JOIN (
                 <foreach collection="stockCaptureDateList" item="item" separator="UNION ALL">
@@ -591,13 +565,6 @@
         ) - IFNULL(SUM(fin.DAY_QTY), 0) AS OVERDUE_QTY,
         MAX(IFNULL(stockMap.FORCE_ZERO, 0)) AS FORCE_ZERO
         FROM T_MP_MONTH_PLAN_PROD_FINAL f5
-        INNER JOIN T_MP_PROC_VERSION pv
-            ON pv.FACTORY_CODE = f5.FACTORY_CODE
-            AND pv.MONTH_PLAN_VERSION = f5.MONTH_PLAN_VERSION
-            AND pv.YEAR = f5.YEAR
-            AND pv.MONTH = f5.MONTH
-            AND pv.IS_FINAL = '1'
-            AND pv.IS_DELETE = 0
         -- Java 层计算好的库存抓取日映射，替代原 surplus 关联
         LEFT JOIN (
             <foreach collection="stockCaptureDateList" item="item" separator="UNION ALL">
@@ -644,14 +611,8 @@
         AND f5.YEAR = #{lastYear}
         AND f5.MONTH = #{lastMonth}
         AND f5.IS_DELETE = 0
-        INNER JOIN T_MP_PROC_VERSION pv2
-            ON pv2.FACTORY_CODE = f5.FACTORY_CODE
-            AND pv2.MONTH_PLAN_VERSION = f5.MONTH_PLAN_VERSION
-            AND pv2.YEAR = f5.YEAR
-            AND pv2.MONTH = f5.MONTH
-            AND pv2.IS_FINAL = '1'
-            AND pv2.IS_DELETE = 0
-        -- 第三段：从排产版本表取当月定稿版本号（IS_FINAL='1'），可能有多个定稿版本，取任意一条
+        -- 第三段：从排产版本表取当月定稿版本号（IS_FINAL='1'），用于INSERT新记录的版本号字段
+        -- 这是唯一需要关联 T_MP_PROC_VERSION 的场景，因为INSERT需要取8月版本号
         INNER JOIN (
         SELECT
         FACTORY_CODE,
@@ -670,6 +631,7 @@
         AND fp.PARAM_CODE = #{overdueThresholdParamCode}
         AND fp.IS_DELETE = 0
         -- 防重：当月定稿表按相同维度已存在的不插入
+        -- 维度：分厂+物料+产品状态+年+月（T_MP_MONTH_PLAN_PROD_FINAL 本身就是定稿表，无需按版本号防重）
         LEFT JOIN T_MP_MONTH_PLAN_PROD_FINAL exist
         ON exist.FACTORY_CODE = calc.FACTORY_CODE
         AND exist.MATERIAL_CODE = calc.MATERIAL_CODE

@@ -149,6 +149,9 @@ public class CxContinueProductionHandler {
             //todo 记录日志
             return;
         }
+        if (isChangeTypeBlock(productionStage, continueType)) {
+            endDay = realEndDay;
+        }
         TbrMouldProductionLogRecorder.addContinueSkuEarliestConclusionLhGroupLog(context, productionStage, groupName, onLineMachineInfo, continueType, startDay, endDay);
         List<MonthPlanProductionRequirePlanVo> productionPlanList = productionPlanInfo.getGroupPlanData().stream().filter(groupPlan -> groupPlan.hasProduction()).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(productionPlanList)) {
@@ -346,6 +349,26 @@ public class CxContinueProductionHandler {
         boolean isAddChangeMouldCount = productionContext.getBaseDataContainer().getParamConfiguration().isAddChangeMoldCountBySameSpecificationsPattern();
         //同规格同花纹排产下，且参数配置：算换模次数
         if (ContinueTypeEnum.SAME_SPECIFICATIONS_PATTERN == continueType && isAddChangeMouldCount) {
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * 是否接活字块阶段
+     *
+     * @param productionStage 排产阶段
+     * @param continueType    续作类型
+     * @return
+     */
+    private static boolean isChangeTypeBlock(ProductionStageEnum productionStage, ContinueTypeEnum continueType) {
+        if (ProductionStageEnum.FORMAL_STAGE != productionStage) {
+            return false;
+        }
+        if (ContinueTypeEnum.SAME_SPECIFICATIONS_PATTERN == continueType) {
+            return true;
+        }
+        if (ContinueTypeEnum.SAME_EMBRYO_CODE_SHARE_MOULD == continueType) {
             return true;
         }
         return false;

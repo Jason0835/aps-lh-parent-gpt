@@ -30,26 +30,17 @@
 
 <script>
 import infoForm from "@/views/components/infoForm.vue";
-import {saveParams} from "@/api/gsq/params";
+import { editParams } from "@/api/gsq/params";
 
 export default {
   components: { infoForm },
-  inject: ["parentDict"],
   data() {
     return {
       loading: false,
       visible: false,
       isEdit: false,
-      editType: null,
       form: {},
       rules: {
-        factoryCode: [
-          {
-            required: true,
-            message: this.$t("common.rule.select"),
-            trigger: "change",
-          },
-        ],
         paramCode: [
           {
             required: true,
@@ -71,21 +62,38 @@ export default {
             trigger: "blur",
           },
         ],
-        paramGroup: [
-          {
-            required: true,
-            message: this.$t("common.rule.select"),
-            trigger: "change",
-          },
-        ],
-        valueType: [
-          {
-            required: true,
-            message: this.$t("common.rule.select"),
-            trigger: "change",
-          },
-        ],
       },
+      columns: [
+        {
+          label: this.$t("ui.data.column.paramsCode"),
+          prop: "paramCode",
+          span: 24,
+          maxlength: "100",
+          required: true,
+          disabled: true,
+        },
+        {
+          label: this.$t("ui.data.column.paramsName"),
+          prop: "paramName",
+          span: 24,
+          maxlength: "100",
+          required: true,
+          disabled: true,
+        },
+        {
+          label: this.$t("ui.data.column.paramsValue"),
+          prop: "paramValue",
+          span: 24,
+          required: false,
+        },
+        {
+          label: this.$t("ui.common.column.remark"),
+          prop: "remark",
+          span: 24,
+          type: "textarea",
+          maxlength: "300",
+        },
+      ],
     };
   },
   computed: {
@@ -97,130 +105,27 @@ export default {
         this.$t("ui.data.column.gsq.params.modelName")
       );
     },
-    columns() {
-      return [
-        {
-          prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
-          type: "select",
-          dictData: this.parentDict.type.biz_factory_name,
-          span: 12,
-          required: true,
-        },
-        {
-          prop: "paramCode",
-          label: this.$t("ui.data.column.gsq.params.paramCode"),
-          span: 12,
-          maxlength: 50,
-          required: true,
-          disabled: this.isEdit,
-        },
-        {
-          prop: "paramName",
-          label: this.$t("ui.data.column.gsq.params.paramName"),
-          span: 12,
-          maxlength: 50,
-          required: true,
-        },
-        {
-          prop: "paramValue",
-          label: this.$t("ui.data.column.gsq.params.paramValue"),
-          span: 12,
-          maxlength: 200,
-          required: true,
-        },
-        {
-          prop: "defaultValue",
-          label: this.$t("ui.data.column.gsq.params.defaultValue"),
-          span: 12,
-          maxlength: 200,
-        },
-        {
-          prop: "paramGroup",
-          label: this.$t("ui.data.column.gsq.params.paramGroup"),
-          type: "select",
-          span: 12,
-          required: true,
-          options: [
-            { label: "全局参数", value: "GLOBAL" },
-            { label: "班次参数", value: "SHIFT" },
-            { label: "机台参数", value: "MACHINE" },
-          ],
-        },
-        {
-          prop: "valueType",
-          label: this.$t("ui.data.column.gsq.params.valueType"),
-          type: "select",
-          span: 12,
-          required: true,
-          options: [
-            { label: "字符串", value: "STRING" },
-            { label: "数值", value: "NUMBER" },
-            { label: "布尔", value: "BOOLEAN" },
-            { label: "结构化对象", value: "JSON" },
-          ],
-        },
-        {
-          prop: "enableStatus",
-          label: this.$t("ui.data.column.gsq.params.enableStatus"),
-          type: "switch",
-          span: 12,
-          activeValue: "1",
-          inactiveValue: "0",
-        },
-        {
-          prop: "regularExpression",
-          label: this.$t("ui.data.column.gsq.params.regularExpression"),
-          span: 12,
-          maxlength: 200,
-        },
-        {
-          prop: "errorTips",
-          label: this.$t("ui.data.column.gsq.params.errorTips"),
-          span: 12,
-          maxlength: 200,
-        },
-        {
-          prop: "remark",
-          label: this.$t("ui.common.column.remark"),
-          span: 24,
-          type: "textarea",
-          maxlength: 900,
-        },
-      ];
-    },
   },
   methods: {
-    // api
     async save(params) {
       try {
         this.loading = true;
-        const res = await saveParams(params);
+        const res = await editParams(params);
         this.$modal.msgSuccess(res.msg);
         this.$emit("success");
         this.hide();
-        this.loading = false;
       } catch (error) {
         console.log(error);
+      } finally {
         this.loading = false;
       }
     },
-
-    //utils
     show(data) {
       this.visible = true;
       if (data) {
         this.isEdit = true;
         this.form = {
           ...data,
-          enableStatus: data.enableStatus || "0",
-        };
-      } else {
-        this.form = {
-          factoryCode: "116",
-          enableStatus: "1",
-          paramGroup: "GLOBAL",
-          valueType: "STRING",
         };
       }
     },
