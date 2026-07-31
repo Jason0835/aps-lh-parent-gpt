@@ -143,6 +143,70 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
     }
 
     @Override
+    public void doProductAlign(MpRollAdjustContextDTO contextDTO) {
+
+        String lastMonthPlanVersion = contextDTO.getVersion();
+        //2.按结构序列化分组
+        Map<String, List<FactoryMonthPlanFinalAdjustVo>> mpProdFinalMap =  convertToMap(contextDTO.getFactoryMonthPlanProdFinalList());
+        List<FactoryMonthPlanFinalAdjustVo> newMpFinalList = Collections.synchronizedList(new ArrayList<>());
+        List<FactoryMonthPlanFinalAdjustVo> newMpLogList = Collections.synchronizedList(new ArrayList<>());
+        List<MpMonthPlanStatistics> monthPlanStatisticsResultList = Collections.synchronizedList(new ArrayList<>());
+        MpWeekRollAdjustEngine weekRollAdjustEngine = new MpWeekRollAdjustEngine();
+        String structureCondi = contextDTO.getStructureName();
+        List<AdjustStructureOrderVo> structureOrderVoList = getAlignStructureOrderList(contextDTO.getFactoryMonthPlanProdFinalList());
+        for (AdjustStructureOrderVo structureVo : structureOrderVoList){
+            if (!StringUtil.isEmptyWithTrim(structureCondi)){
+                //若传进来的结构有称有值，则按此结构调整
+                if (!structureVo.getStructureName().equals(structureCondi)){
+                    continue;
+                }
+            }
+
+            final String currentStructureName = structureVo.getStructureName();
+            //2.1 初始结构上下文
+            MpRollAdjustContextDTO copyContextDTO = copyContext(contextDTO,currentStructureName);
+            List<FactoryMonthPlanFinalAdjustVo> oneStructMpFinalList = new ArrayList<>(mpProdFinalMap.get(copyContextDTO.getStructureName()) == null ? new ArrayList<>():mpProdFinalMap.get(currentStructureName));
+            // 初始OEM标识
+            initOemFlag(copyContextDTO,oneStructMpFinalList);
+            if (YesOrNoEnum.YES.getCode().equals(oneStructMpFinalList.get(0).getHasSpecialMaterial())){
+                //若是特殊结构,预存特殊结构的总实际排产量
+                setSpecStructureTotalQty(copyContextDTO,oneStructMpFinalList);
+            }
+            //2.2 执行结构内生产对齐
+            Date startTime = new Date();
+            copyContextDTO.getLogDetail().append(String.format("结构:%s,生产对齐,开始时间:%s",currentStructureName, DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,startTime))).append(ApsConstant.DIVISION);
+            weekRollAdjustEngine.doProductAlignForOne(copyContextDTO,oneStructMpFinalList);
+            Date endTime = new Date();
+            copyContextDTO.getLogDetail().append(String.format("结构:%s,生产对齐,结束时间:%s,总耗时:%s毫秒",currentStructureName, DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
+
+            //2.3.在搭配排产前，重算每日产能限制，包括硫化机台数、胎胚种类数
+            MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit();
+            reCalcAdjustDailyCapacityLimit(copyContextDTO, oneStructMpFinalList,adjustDailyCapacityLimitObj,null);
+
+            //2.7.设置模具变化信息
+            for (FactoryMonthPlanFinalAdjustVo mpFinalVo:oneStructMpFinalList){
+                weekRollAdjustEngine.setMouldChangeInfo(adjustDailyCapacityLimitObj,copyContextDTO.getParamMap(),copyContextDTO.getStructureStartDay(),mpFinalVo,copyContextDTO.getDailyCapacityLimitVoMap());
+            }
+
+            newMpFinalList.addAll(oneStructMpFinalList);
+            newMpLogList.addAll(copyContextDTO.getAdjustProcLogList());
+
+            //2.8 构建月计划统计结果
+            MpMonthPlanStatistics monthPlanStatisticsVo = buildMonthPlanStatistics(copyContextDTO, oneStructMpFinalList, YesOrNoEnum.YES.getCode());
+            if (monthPlanStatisticsVo != null) {
+                monthPlanStatisticsResultList.add(monthPlanStatisticsVo);
+            }
+
+            //2.9 保存调整日志
+            saveMpAdjustLog(copyContextDTO);
+        }
+        contextDTO.setSaveMpProdFinalList(newMpFinalList);
+        contextDTO.setSaveAdjustProcLogList(newMpLogList);
+        contextDTO.setMonthPlanStatisticsList(monthPlanStatisticsResultList);
+        contextDTO.setAdjustMonthPlanVersion(lastMonthPlanVersion);
+    }
+
+    @Override
     public void doAutoAdjust(MpRollAdjustContextDTO contextDTO) {
         //注：结构内自动调整列表：关单直接排除，同时取订单列表与月计划最大并集；
         //结构内调整记录
@@ -246,6 +310,43 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
         contextDTO.setSaveAdjustProcLogList(newMpLogList);
         contextDTO.setMonthPlanStatisticsList(monthPlanStatisticsResultList);
         contextDTO.setAdjustMonthPlanVersion(lastMonthPlanVersion);
+    }
+
+    /**
+     * 获取结构内生产对齐排序列表
+     * @param mpAdjustStructureInList
+     * @return
+     */
+    private List<AdjustStructureOrderVo> getAlignStructureOrderList(List<FactoryMonthPlanFinalAdjustVo> mpAdjustStructureInList){
+        if (PubUtil.isEmpty(mpAdjustStructureInList)){
+            return null;
+        }
+        AdjustStructureOrderVo structureOrderVo;
+        Map<String,AdjustStructureOrderVo> structureOrderMap = new HashMap<>();
+        for (FactoryMonthPlanFinalAdjustVo structureIn : mpAdjustStructureInList){
+            structureOrderVo = structureOrderMap.get(structureIn.getStructureName());
+            if (structureOrderVo == null){
+                structureOrderVo = new AdjustStructureOrderVo();
+                structureOrderVo.setStructureName(structureIn.getStructureName());
+                structureOrderVo.setHeightPriorityCount(0);
+                structureOrderVo.setMouldLimitCount(0);
+                structureOrderVo.setHasSpecialMaterial(YesOrNoEnum.NO.getCode());
+            }
+            // 统计高优先级的个数
+            if (structureIn.getHeightQty() > 0){
+                structureOrderVo.setHeightPriorityCount(structureOrderVo.getHeightPriorityCount() + 1);
+            }
+            // 统计模具受限的个数
+            if (structureIn.getTypeBlockQty().equals(FactoryConstant.MOULD_LIMIT_COUNT)){
+                structureOrderVo.setMouldLimitCount(structureOrderVo.getMouldLimitCount() + 1);
+            }
+            structureOrderVo.setHasSpecialMaterial(structureIn.getHasSpecialMaterial());
+            structureOrderMap.put(structureIn.getStructureName(),structureOrderVo);
+        }
+        List<AdjustStructureOrderVo> structureOrderVoList = structureOrderMap.values().stream().collect(Collectors.toList());
+        //排序：结构内的高优先级SKU个数多的优先 -> 模具受限的SKU个数多的优先
+        AdjustStructureOrderSorter.sort(structureOrderVoList);
+        return structureOrderVoList;
     }
 
     /**

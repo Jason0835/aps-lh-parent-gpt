@@ -302,6 +302,10 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         }
     }
 
+    @Override
+    public void doProductAlign(MpRollAdjustContextDTO contextDTO) {
+
+    }
 
     @Override
     public void doAutoAdjust(MpRollAdjustContextDTO contextDTO) {
