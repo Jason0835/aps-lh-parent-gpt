@@ -1891,14 +1891,8 @@ public class MesItfServiceImpl implements MesItfService {
             entity.setCreateTime(DateUtils.getNowDate());
             entity.setUpdateTime(DateUtils.getNowDate());
             entity.setIsDelete(0);
-            // 接收Feign返回值并校验，避免服务端异常被全局异常处理器吞掉返回HTTP 200+AjaxResult.error时，itf端误判为成功
-            AjaxResult saveResult = FeignTokenHelper.callWithToken(() ->
-                    tqMesSyncRemoteService.logicDeleteAndSaveScheFinishQty(factoryCode, scheduleDateStr, "MES", insertList));
-            if (AjaxResult.Type.SUCCESS.value() != (Integer) saveResult.get(AjaxResult.CODE_TAG)) {
-                log.error("胎圈排程完成量同步：同步失败，factoryCode={}, 返回code={}, 返回消息={}",
-                        factoryCode, saveResult.get(AjaxResult.CODE_TAG), saveResult.get(AjaxResult.MSG_TAG));
-                return AjaxResult.error("胎圈排程完成量同步失败：" + saveResult.get(AjaxResult.MSG_TAG));
-            }
+            insertList.add(entity);
+        }
         try {
             String factoryCode = syncDataLogs.getFactoryCode();
             Date scheduleDate = insertList.stream().map(TqScheFinishQty::getScheduleDate).filter(Objects::nonNull).findFirst().orElse(DateUtils.getNowDate());
@@ -2047,14 +2041,9 @@ public class MesItfServiceImpl implements MesItfService {
         for (CxScheFinishQty item : syncList) {
             CxScheFinishQty entity = new CxScheFinishQty();
             BeanUtils.copyProperties(item, entity);
-            // 接收Feign返回值并校验，避免服务端异常被全局异常处理器吞掉返回HTTP 200+AjaxResult.error时，itf端误判为成功
-            AjaxResult saveResult = FeignTokenHelper.callWithToken(() ->
-                    cxMesSyncRemoteService.logicDeleteAndSaveScheFinishQty(factoryCode, scheduleDateStr, "MES", insertList));
-            if (AjaxResult.Type.SUCCESS.value() != (Integer) saveResult.get(AjaxResult.CODE_TAG)) {
-                log.error("成型排程完成量同步：同步失败，factoryCode={}, 返回code={}, 返回消息={}",
-                        factoryCode, saveResult.get(AjaxResult.CODE_TAG), saveResult.get(AjaxResult.MSG_TAG));
-                return AjaxResult.error("成型排程完成量同步失败：" + saveResult.get(AjaxResult.MSG_TAG));
-            }
+            entity.setCreateBy("MES");
+            entity.setUpdateBy("MES");
+            entity.setCreateTime(DateUtils.getNowDate());
             entity.setUpdateTime(DateUtils.getNowDate());
             entity.setIsDelete(0);
             insertList.add(entity);
@@ -2107,14 +2096,9 @@ public class MesItfServiceImpl implements MesItfService {
             log.warn("硫化排程完成量同步：MES中间表查询结果为空，factoryCode={}", syncDataLogs.getFactoryCode());
             return AjaxResult.success("MES中间表无数据可同步");
         }
-            // 接收Feign返回值并校验，避免服务端异常被全局异常处理器吞掉返回HTTP 200+AjaxResult.error时，itf端误判为成功
-            AjaxResult saveResult = FeignTokenHelper.callWithToken(() ->
-                    lhMesSyncRemoteService.logicDeleteAndSaveScheFinishQty(factoryCode, scheduleDateStr, "MES", insertList));
-            if (AjaxResult.Type.SUCCESS.value() != (Integer) saveResult.get(AjaxResult.CODE_TAG)) {
-                log.error("硫化排程完成量同步：同步失败，factoryCode={}, 返回code={}, 返回消息={}",
-                        factoryCode, saveResult.get(AjaxResult.CODE_TAG), saveResult.get(AjaxResult.MSG_TAG));
-                return AjaxResult.error("硫化排程完成量同步失败：" + saveResult.get(AjaxResult.MSG_TAG));
-            }
+
+        List<LhScheFinishQty> insertList = new ArrayList<>();
+        for (LhScheFinishQty item : syncList) {
             LhScheFinishQty entity = new LhScheFinishQty();
             BeanUtils.copyProperties(item, entity);
             entity.setCreateBy("MES");
@@ -2170,16 +2154,6 @@ public class MesItfServiceImpl implements MesItfService {
         DynamicDataSourceContextHolder.push(DataSource.MES);
         List<LhScheFinishQty> syncList = mesItfMapper.selectLhClassShiftFinishQtyByYesterday(syncDataLogs);
         DynamicDataSourceContextHolder.poll();
-            // 接收Feign返回值并校验，避免服务端异常被全局异常处理器吞掉返回HTTP 200+AjaxResult.error时，itf端误判为成功
-            AjaxResult saveResult = FeignTokenHelper.callWithToken(() ->
-                    lhMesSyncRemoteService.logicDeleteAndSaveScheFinishQty(factoryCode, scheduleDateStr, "MES", insertList));
-            if (AjaxResult.Type.SUCCESS.value() != (Integer) saveResult.get(AjaxResult.CODE_TAG)) {
-                log.error("硫化排程完成量按上一天最新版本同步：同步失败，factoryCode={}, 返回code={}, 返回消息={}",
-                        factoryCode, saveResult.get(AjaxResult.CODE_TAG), saveResult.get(AjaxResult.MSG_TAG));
-                return AjaxResult.error("硫化排程完成量按上一天最新版本同步失败：" + saveResult.get(AjaxResult.MSG_TAG));
-            }
-            return AjaxResult.success("MES中间表无数据可同步");
-        }
 
         List<LhScheFinishQty> insertList = new ArrayList<>();
         for (LhScheFinishQty item : syncList) {
@@ -2247,14 +2221,9 @@ public class MesItfServiceImpl implements MesItfService {
             return AjaxResult.success("MES中间表无数据可同步");
         }
 
-                // 接收Feign返回值并校验，避免服务端异常被全局异常处理器吞掉返回HTTP 200+AjaxResult.error时，itf端误判为成功
-                AjaxResult saveResult = FeignTokenHelper.callWithToken(() ->
-                        lhMesSyncRemoteService.logicDeleteAndSaveScheFinishQty(finalFactoryCode, scheduleDateStr, "MES", groupList));
-                if (AjaxResult.Type.SUCCESS.value() != (Integer) saveResult.get(AjaxResult.CODE_TAG)) {
-                    log.error("硫化排程完成量按版本号同步：同步失败，dataVersion={}, factoryCode={}, scheduleDate={}, 返回code={}, 返回消息={}",
-                            dataVersion, factoryCode, scheduleDateStr, saveResult.get(AjaxResult.CODE_TAG), saveResult.get(AjaxResult.MSG_TAG));
-                    return AjaxResult.error("硫化排程完成量按版本号同步失败：" + saveResult.get(AjaxResult.MSG_TAG));
-                }
+        List<LhScheFinishQty> insertList = new ArrayList<>();
+        for (LhScheFinishQty item : syncList) {
+            LhScheFinishQty entity = new LhScheFinishQty();
             BeanUtils.copyProperties(item, entity);
             entity.setCreateBy("MES");
             entity.setUpdateBy("MES");
@@ -2868,7 +2837,7 @@ public class MesItfServiceImpl implements MesItfService {
      * @return 需要新增的正规充抵记录列表（lhType=S，完成量为 MES 原始值）
      */
     private List<LhDayFinishQty> buildMassTrialToFormalRecords(String factoryCode,
-                                                              List<LhDayFinishQty> syncList) {
+                                                               List<LhDayFinishQty> syncList) {
         if (CollectionUtils.isEmpty(syncList)) {
             return Collections.emptyList();
         }
@@ -3386,14 +3355,17 @@ public class MesItfServiceImpl implements MesItfService {
      * 从MES读取指定物理日的胎面库存，并替换自动滚动班次快照。
      *
      * <p>MES无数据时仍调用TM清空对应快照，防止自动滚动继续使用旧库存。
-            // 接收Feign返回值并校验，避免服务端异常被全局异常处理器吞掉返回HTTP 200+AjaxResult.error时，itf端误判为成功
-            AjaxResult saveResult = FeignTokenHelper.callWithToken(() ->
-                    tmMesSyncRemoteService.logicDeleteAndSaveScheFinishQty(factoryCode, scheduleDateStr, "MES", insertList));
-            if (AjaxResult.Type.SUCCESS.value() != (Integer) saveResult.get(AjaxResult.CODE_TAG)) {
-                log.error("胎面排程完成量同步：同步失败，factoryCode={}, 返回code={}, 返回消息={}",
-                        factoryCode, saveResult.get(AjaxResult.CODE_TAG), saveResult.get(AjaxResult.MSG_TAG));
-                return AjaxResult.error("胎面排程完成量同步失败：" + saveResult.get(AjaxResult.MSG_TAG));
-            }
+     * 动态数据源上下文始终在finally中恢复，避免查询异常污染后续线程调用。</p>
+     *
+     * @param request 工厂、物理库存日和班序
+    // 接收Feign返回值并校验，避免服务端异常被全局异常处理器吞掉返回HTTP 200+AjaxResult.error时，itf端误判为成功
+    AjaxResult saveResult = FeignTokenHelper.callWithToken(() ->
+    tmMesSyncRemoteService.logicDeleteAndSaveScheFinishQty(factoryCode, scheduleDateStr, "MES", insertList));
+    if (AjaxResult.Type.SUCCESS.value() != (Integer) saveResult.get(AjaxResult.CODE_TAG)) {
+    log.error("胎面排程完成量同步：同步失败，factoryCode={}, 返回code={}, 返回消息={}",
+    factoryCode, saveResult.get(AjaxResult.CODE_TAG), saveResult.get(AjaxResult.MSG_TAG));
+    return AjaxResult.error("胎面排程完成量同步失败：" + saveResult.get(AjaxResult.MSG_TAG));
+    }
      * @return 同步数量
      * @throws ServiceException 参数非法或远程保存失败时抛出
      */
@@ -3910,10 +3882,10 @@ public class MesItfServiceImpl implements MesItfService {
 
         LambdaQueryWrapper<MdmDevMaintenancePlan> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(MdmDevMaintenancePlan::getPrecisionType, "硫化精度")
-               .eq(MdmDevMaintenancePlan::getIsDelete, 0)
-               .eq(MdmDevMaintenancePlan::getDataVersion, maxVersion)
-               .isNotNull(MdmDevMaintenancePlan::getFirstWashTime)
-               .apply("YEAR(oper_time) = {0}", operYear);
+                .eq(MdmDevMaintenancePlan::getIsDelete, 0)
+                .eq(MdmDevMaintenancePlan::getDataVersion, maxVersion)
+                .isNotNull(MdmDevMaintenancePlan::getFirstWashTime)
+                .apply("YEAR(oper_time) = {0}", operYear);
 
         List<MdmDevMaintenancePlan> mesPlans = devMaintenancePlanEntityMapper.selectList(wrapper);
         if (mesPlans == null || mesPlans.isEmpty()) {
@@ -4908,3 +4880,4 @@ public class MesItfServiceImpl implements MesItfService {
         return AjaxResult.success();
     }
 }
+

@@ -8,6 +8,7 @@ import com.zlt.aps.itf.vo.MesBrandDict;
 import com.zlt.aps.itf.vo.MesShiftStockSyncRequest;
 import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmMoldAlterPlan;
+import com.zlt.aps.mp.api.domain.entity.*;
 //import com.zlt.aps.gsq.api.domain.entity.GsqScheduleResultIssue;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResultIssue;
 
@@ -243,14 +244,6 @@ public interface MesItfService {
     AjaxResult syncTreadStock(AuxReqSyncDataLogs syncDataLogs);
 
     /**
-     * 同步胎面自动滚动班次库存。
-     *
-     * @param request 工厂、物理库存日和班序
-     * @return 同步结果
-     */
-    AjaxResult syncTreadShiftStock(MesShiftStockSyncRequest request);
-
-    /**
      * 同步胎圈库存
      * T_TQ_STOCK：采用逻辑删除+插入方案
      *   步骤1：逻辑删除当天库存日期的所有数据（IS_DELETE置为1）
@@ -311,6 +304,19 @@ public interface MesItfService {
 
     /**
      * 胎面排程结果下发到MES
+     * 业务规则（与胎圈一致）：
+     * 1. D日（今天）：更新中班数据，夜班早班已过不下发
+     * 2. D+1日（明天）：更新夜早中3班数据
+     * 3. D+2日（后天）：先删后插夜早2班数据，中班尚未排产不下发
+     *
+     * @param tmScheduleResultIssueList 胎面排程结果下发列表（已按3天拆分）
+     * @return 结果
+     */
+    AjaxResult issueTmScheduleResult(List<TmScheduleResultIssue> tmScheduleResultIssueList);
+
+    /**
+     * 钢丝圈排程结果下发到MES
+     * 业务规则（与胎圈一致）：
      * 1. D日（今天）：更新中班数据（钢丝圈1班→MES中班），夜班早班已过不下发
      * 2. D+1日（明天）：更新夜早中3班数据（钢丝圈2/3/4班→MES夜/早/中班）
      * 3. D+2日（后天）：先删后插夜早2班数据（钢丝圈5/6班→MES夜/早班），中班尚未排产不下发
@@ -320,6 +326,14 @@ public interface MesItfService {
      * @return 下发结果（data 字段携带 mesStatus：IS_RELEASE/FAILURE_RELEASE/TIMEOUT_FAILURE）
      */
 //    AjaxResult issueGsqScheduleResult(List<GsqScheduleResultIssue> gsqScheduleResultIssueList);
+
+    /**
+     * 同步胎面自动滚动班次库存。
+     *
+     * @param request 工厂、物理库存日和班序
+     * @return 同步结果
+     */
+    AjaxResult syncTreadShiftStock(MesShiftStockSyncRequest request);
 
     /**
      * 同步成型排程完成量

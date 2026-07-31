@@ -338,7 +338,7 @@ public class MesItfController {
         syncDataLogs.setFactoryCode(factoryCode);
         syncDataLogs.setDataVersion(dataVersion);
         return mesBomItfService.syncConstructionInfo(syncDataLogs);
-
+    }
     
     /**
      * 同步BOM
@@ -754,14 +754,14 @@ public class MesItfController {
      * @param gsqScheduleResultIssueList 钢丝圈排程结果列表（已按3天拆分）
      * @return 下发结果（data 字段携带 mesStatus：IS_RELEASE/FAILURE_RELEASE/TIMEOUT_FAILURE）
      */
-    @ApiOperation("钢丝圈排程结果下发到MES")
-    @PostMapping("/issueGsqScheduleResult")
-    @AutoLoginLog
-    public AjaxResult issueGsqScheduleResult(@RequestBody List<GsqScheduleResultIssue> gsqScheduleResultIssueList) {
-        String factoryCode = FactoryConstant.DEFAULT_FACTORY_CODE;
-        String companyCode = factoryCode;
-        return gsqScheduleResultIssueService.issueGsqScheduleResult(gsqScheduleResultIssueList, factoryCode, companyCode);
-    }
+//    @ApiOperation("钢丝圈排程结果下发到MES")
+//    @PostMapping("/issueGsqScheduleResult")
+//    @AutoLoginLog
+//    public AjaxResult issueGsqScheduleResult(@RequestBody List<GsqScheduleResultIssue> gsqScheduleResultIssueList) {
+//        String factoryCode = FactoryConstant.DEFAULT_FACTORY_CODE;
+//        String companyCode = factoryCode;
+//        return gsqScheduleResultIssueService.issueGsqScheduleResult(gsqScheduleResultIssueList, factoryCode, companyCode);
+//    }
 
     /**
      * 同步胎面排程完成量
