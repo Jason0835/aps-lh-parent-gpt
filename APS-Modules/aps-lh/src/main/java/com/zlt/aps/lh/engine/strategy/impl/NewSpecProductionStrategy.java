@@ -60,6 +60,7 @@ import com.zlt.aps.lh.engine.strategy.support.EarlyProductionDecision;
 import com.zlt.aps.lh.engine.strategy.support.EarlyProductionRuntimePlan;
 import com.zlt.aps.lh.engine.strategy.support.HistoricalReverseSelectionDirective;
 import com.zlt.aps.lh.engine.strategy.support.MachineProductionSegment;
+import com.zlt.aps.lh.engine.strategy.support.MachinePriorityTraceSnapshot;
 import com.zlt.aps.lh.engine.strategy.support.MachineScheduleRole;
 import com.zlt.aps.lh.engine.strategy.support.MouldResourceAllocationResult;
 import com.zlt.aps.lh.engine.strategy.support.MouldResourceContext;
@@ -408,7 +409,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         }
 
         // 三个业务日全部完成后，才把仍未完成的临时延期任务转成窗口级最终未排。
-        finalizeWindowUnscheduled(context, state, unscheduledReasonCountMap);
+        finalizeWindowUnscheduled(
+                context, state, unscheduledReasonCountMap, machineMatch);
         context.getNewSpecSkuList().clear();
         context.getNewSpecSkuList().addAll(state.getPendingSkuListInOriginalOrder());
         // 新增主链结束后统一核查收尾机台，给出尾部产能是否被利用的可对账原因。
@@ -1922,10 +1924,12 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
      * @param context 排程上下文
      * @param state 日驱动状态
      * @param unscheduledReasonCountMap 未排原因统计
+     * @param machineMatch 机台匹配策略，用于写入最后一次未命中诊断快照
      */
     private void finalizeWindowUnscheduled(LhScheduleContext context,
                                            DayDrivenScheduleState state,
-                                           Map<String, Integer> unscheduledReasonCountMap) {
+                                           Map<String, Integer> unscheduledReasonCountMap,
+                                           IMachineMatchStrategy machineMatch) {
         List<SkuScheduleDTO> pendingSkuList =
                 new ArrayList<SkuScheduleDTO>(state.getPendingSkuListInOriginalOrder());
         for (SkuScheduleDTO sku : pendingSkuList) {
@@ -1961,6 +1965,17 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             String finalReason = StringUtils.equals(
                     NewSpecEmbryoAvailableTimeResolver.OUT_OF_SCHEDULE_WINDOW_REASON, detailReason)
                     ? detailReason : "排程窗口最后一日仍未完成，" + detailReason;
+            MachinePriorityTraceSnapshot pendingTraceSnapshot =
+                    state.getPendingMachinePriorityTrace(sku);
+            if (Objects.nonNull(pendingTraceSnapshot)) {
+                /*
+                 * 三天窗口已经确认当前 SKU 最终未形成任何实际命中时，只写最后一次实时诊断快照。
+                 * 中间候选的失败原因继续使用原短日志，避免按天、按阶段重复输出完整候选列表。
+                 */
+                machineMatch.traceMachinePriorityOrder(
+                        context, sku, pendingTraceSnapshot.withNoHit(finalReason));
+                state.clearPendingMachinePriorityTrace(sku);
+            }
             addUnscheduledResult(
                     context, sku, Math.max(0, remainingQty),
                     finalReason, unscheduledReasonCountMap);
@@ -2494,9 +2509,22 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             }
             logNewSpecMachineCandidateSnapshot(context, sku, candidates, EMPTY_STRING_SET, null);
             if (candidates.isEmpty()) {
-                // 初始候选为空时仍记录本次实际选机使用的空列表，便于按 SKU 对账失败原因。
-                machineMatch.traceMachinePriorityOrder(context, sku, Collections.<MachineScheduleDTO>emptyList());
+                /*
+                 * 初始正式候选为空时仍构建独立日志快照。生产默认策略会从当前实时分配结果中补充
+                 * “仅因其它 SKU 占用而暂不可选”的机台；快照不会写回 candidates，也不会改变未排结论。
+                 */
+                MachinePriorityTraceSnapshot emptyCandidateTraceSnapshot =
+                        machineMatch.buildMachinePriorityTraceSnapshot(
+                                context, sku, Collections.<MachineScheduleDTO>emptyList(),
+                                null, dayContext.getDayEndTime(),
+                                getTargetScheduleQtyResolver());
                 String noCandidateReason = resolveNoCandidateMachineReason(context, sku);
+                /*
+                 * 当前日、当前阶段无正式候选并不等于三天窗口最终未排。只把实时快照保存在日驱动状态，
+                 * 后续若实际命中会自动清理；只有窗口最终仍未命中才输出一次完整诊断日志。
+                 */
+                state.rememberPendingMachinePriorityTrace(
+                        sku, emptyCandidateTraceSnapshot);
                 log.warn("新增SKU无候选机台, materialCode: {}, 结构: {}, 规格: {}, 寸口: {}, 目标量: {}, 原因: {}",
                         sku.getMaterialCode(), sku.getStructureName(), sku.getSpecCode(),
                         sku.getProSize(), sku.resolveTargetScheduleQty(), noCandidateReason);
@@ -2571,6 +2599,11 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             Map<String, Date> firstInspectionRetryReadyTimeMap = new HashMap<String, Date>(8);
             // 仅标记紧接着发生的同机台首检顺延重试，避免把时间后移重算误记为一次新的选机。
             String pendingFirstInspectionRetryMachineCode = null;
+            /*
+             * 当前候选的完整实时日志快照。候选选择时只创建不落库；换模、首检、产能、dayN 和回裁
+             * 全部通过并提交排程结果后，才在成功分支补充实际命中机台并写入过程日志。
+             */
+            MachinePriorityTraceSnapshot pendingCandidateTraceSnapshot = null;
             while (true) {
                 /*
                  * 基础硬约束或当前日尝试失败仍可能在后续业务日恢复，T、T+1 必须保留历史
@@ -2584,7 +2617,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 logNewSpecMachineCandidateSnapshot(context, sku, candidates, excludedMachineCodes, excludedMachineReasonMap);
                 /*
                  * 在任何动态置顶、排序和日志输出前，先按正式窗口产能口径形成当前真实候选。
-                 * 后续选机与日志共同复用该列表，窗口剩余产能为0的机台不得仅出现在日志中。
+                 * 后续实际选机只读取该列表；日志观察集合由机台匹配策略另建只读快照，
+                 * 可以补充仅因其它 SKU 占用而无剩余产能的机台，但绝不写回正式候选。
                  */
                 List<MachineScheduleDTO> currentSelectableCandidates =
                         filterCurrentSelectableCandidates(
@@ -2660,8 +2694,14 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                             excludedMachineCodes, machineMatch,
                             preferredTrialMachine, quantityPolicy, orderedCandidates);
                 }
-                // 实际排产也直接读取该列表第一台，确保日志序号与后续选机使用的数据完全一致。
-                candidateMachine = CollectionUtils.isEmpty(orderedCandidates) ? null : orderedCandidates.get(0);
+                /*
+                 * 调用处补齐当前实际可选作用域：保持选中机台第一、原选机分组相对顺序不变，
+                 * 再追加本轮其它实际候选。该列表只为日志完整性补齐，第一台仍是原逻辑已经选中的机台。
+                 */
+                completeActualCandidateOrder(
+                        currentSelectableCandidates, candidateMachine,
+                        excludedMachineCodes, orderedCandidates);
+                // candidateMachine 保持原选机方法返回值，日志顺序补齐结果不得反向参与实际排产决策。
                 boolean sameMachineFirstInspectionRetry = Objects.nonNull(candidateMachine)
                         && StringUtils.equals(
                                 pendingFirstInspectionRetryMachineCode, candidateMachine.getMachineCode());
@@ -2675,8 +2715,29 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                                 context, sku, candidateMachine,
                                 firstInspectionRetryReadyTimeMap.get(candidateMachine.getMachineCode()));
                     } else {
-                        // 仅为实际进入试排的候选输出排序日志；全部候选已排除时不应虚增一次选机序号。
-                        machineMatch.traceMachinePriorityOrder(context, sku, orderedCandidates);
+                        /*
+                         * 调用处把正式候选和实际首选交给日志快照入口。快照只读实时占用结果，
+                         * 不复用跨 SKU 缓存，也不修改 orderedCandidates、模具或排程结果。
+                         * 此处只暂存，禁止在实际结果提交前写入选机优先级日志。
+                         */
+                        pendingCandidateTraceSnapshot =
+                                machineMatch.buildMachinePriorityTraceSnapshot(
+                                        context, sku, orderedCandidates,
+                                        candidateMachine, dayContext.getDayEndTime(),
+                                        getTargetScheduleQtyResolver());
+                    }
+                } else {
+                    /*
+                     * 本轮没有实际机台可试排时，仅在尚无候选快照时保存占用诊断。
+                     * 已逐台失败后应保留最后一台真实候选的快照，不能用空快照覆盖；
+                     * 最终是否落日志由三天窗口收口统一决定。
+                     */
+                    if (Objects.isNull(pendingCandidateTraceSnapshot)) {
+                        pendingCandidateTraceSnapshot =
+                                machineMatch.buildMachinePriorityTraceSnapshot(
+                                        context, sku, Collections.<MachineScheduleDTO>emptyList(),
+                                        null, dayContext.getDayEndTime(),
+                                        getTargetScheduleQtyResolver());
                     }
                 }
                 // 当前轮已消费上一轮重试标记；本轮若再次需要顺延，会在对应失败分支重新写入。
@@ -3238,6 +3299,12 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                         removeCurrentNewSpecSku(context, iterator, sku);
                         currentSkuRemoved = true;
                         scheduled = true;
+                        /*
+                         * 当前候选没有形成新增结果，只是既有同物料结果已满足 dayN。
+                         * 清理待写快照，禁止把“无需继续扩机”误记成一次未命中或实际命中选机。
+                         */
+                        pendingCandidateTraceSnapshot = null;
+                        state.clearPendingMachinePriorityTrace(sku);
                         break;
                     }
                     log.debug("新增SKU动态分配后本机台计划量为0, materialCode: {}, 机台: {}, 目标量: {}, 换模开始: {}, 开产时间: {}",
@@ -3543,6 +3610,22 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                         isEnding);
                 state.registerBinding(activeBinding);
                 state.markScheduledAndCarryOver(sku);
+                /*
+                 * 至此排程结果、主副机台占用和跨日在机绑定均已提交，才可以确认本轮实际命中。
+                 * 首检同机顺延沿用首次候选快照；若兼容策略未返回快照，则按当前正式候选补建。
+                 */
+                if (Objects.isNull(pendingCandidateTraceSnapshot)) {
+                    pendingCandidateTraceSnapshot =
+                            machineMatch.buildMachinePriorityTraceSnapshot(
+                                    context, sku, orderedCandidates,
+                                    candidateMachine, dayContext.getDayEndTime(),
+                                    getTargetScheduleQtyResolver());
+                }
+                machineMatch.traceMachinePriorityOrder(
+                        context, sku,
+                        pendingCandidateTraceSnapshot.withActualHit(machineCode));
+                state.markMachinePriorityTraceHit(sku);
+                pendingCandidateTraceSnapshot = null;
                 // 单边粒度SKU排上单控机台一侧后,尝试为配对侧反向匹配SKU
                 if (!wholeSingleControlUnit && isSingleControlMachine(context, machineCode)) {
                     tryReverseMatchPairSingleControlSku(
@@ -3667,6 +3750,12 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 rebuildScheduledMachineCountMap(context, shifts);
             }
             if (!scheduled) {
+                /*
+                 * 当前业务日或阶段未形成结果时只保留最后一次实时快照，不立即写完整优先级日志。
+                 * 后续业务日成功会清理该快照；三天窗口最终仍未命中时只输出一次汇总。
+                 */
+                state.rememberPendingMachinePriorityTrace(
+                        sku, pendingCandidateTraceSnapshot);
                 // 当前阶段所有候选机台都失败，只登记延期；T+2 仍需保留给同日后续阶段。
                 log.warn("新增SKU排产失败, materialCode: {}, 结构: {}, 规格: {}, 目标量: {}, 候选机台数: {}, 排除机台: {}, 原因: {}",
                         sku.getMaterialCode(), sku.getStructureName(), sku.getSpecCode(),
@@ -5151,6 +5240,71 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             }
             orderedCandidates.add(candidate);
         }
+    }
+
+    /**
+     * 在不改变实际首选的前提下补齐本轮正式可选机台顺序。
+     *
+     * <p>选机方法可能先在单控或普通机台子集合内确定首选。本方法保留“首选机台 + 原子集合顺序”，
+     * 再按 {@code currentSelectableCandidates} 的真实顺序追加未展示机台，使正规 SKU 的日志不会因
+     * 已经选中普通机台而遗漏符合规则的单控整机。方法只复制引用，不重新过滤、评分或选择。</p>
+     *
+     * @param currentSelectableCandidates 本轮正式可选候选
+     * @param selectedMachine 原选机逻辑确定的首选机台
+     * @param excludedMachineCodes 本轮动态排除机台编码
+     * @param orderedCandidates 原选机作用域顺序及补齐后的输出列表
+     */
+    private void completeActualCandidateOrder(
+            List<MachineScheduleDTO> currentSelectableCandidates,
+            MachineScheduleDTO selectedMachine,
+            Set<String> excludedMachineCodes,
+            List<MachineScheduleDTO> orderedCandidates) {
+        if (Objects.isNull(selectedMachine)) {
+            orderedCandidates.clear();
+            return;
+        }
+        List<MachineScheduleDTO> scopedOrder =
+                new ArrayList<MachineScheduleDTO>(orderedCandidates);
+        List<MachineScheduleDTO> completeOrder = new ArrayList<MachineScheduleDTO>(
+                Math.max(4, PriorityTraceLogHelper.sizeOf(currentSelectableCandidates)));
+        Set<String> addedMachineCodes = new LinkedHashSet<String>(
+                Math.max(8, PriorityTraceLogHelper.sizeOf(currentSelectableCandidates) * 2));
+        addActualTraceCandidate(
+                selectedMachine, excludedMachineCodes, addedMachineCodes, completeOrder);
+        for (MachineScheduleDTO candidate : scopedOrder) {
+            addActualTraceCandidate(
+                    candidate, excludedMachineCodes, addedMachineCodes, completeOrder);
+        }
+        if (!CollectionUtils.isEmpty(currentSelectableCandidates)) {
+            for (MachineScheduleDTO candidate : currentSelectableCandidates) {
+                addActualTraceCandidate(
+                        candidate, excludedMachineCodes, addedMachineCodes, completeOrder);
+            }
+        }
+        orderedCandidates.clear();
+        orderedCandidates.addAll(completeOrder);
+    }
+
+    /**
+     * 向正式候选日志顺序追加一台未重复且未动态排除的机台。
+     *
+     * @param candidate 待追加机台
+     * @param excludedMachineCodes 本轮动态排除机台编码
+     * @param addedMachineCodes 已追加机台编码
+     * @param completeOrder 完整正式候选顺序
+     */
+    private void addActualTraceCandidate(
+            MachineScheduleDTO candidate,
+            Set<String> excludedMachineCodes,
+            Set<String> addedMachineCodes,
+            List<MachineScheduleDTO> completeOrder) {
+        if (Objects.isNull(candidate) || StringUtils.isEmpty(candidate.getMachineCode())
+                || (!CollectionUtils.isEmpty(excludedMachineCodes)
+                && excludedMachineCodes.contains(candidate.getMachineCode()))
+                || !addedMachineCodes.add(candidate.getMachineCode())) {
+            return;
+        }
+        completeOrder.add(candidate);
     }
 
     /**

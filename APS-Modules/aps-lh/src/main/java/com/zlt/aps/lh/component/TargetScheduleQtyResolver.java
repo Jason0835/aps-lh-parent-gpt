@@ -1616,6 +1616,29 @@ public class TargetScheduleQtyResolver {
                                                     SkuScheduleDTO sku,
                                                     MachineScheduleDTO machine,
                                                     Date productionNotBeforeTime) {
+        return this.calcMachineAvailableCapacityInWindow(
+                context, sku, machine, productionNotBeforeTime, null);
+    }
+
+    /**
+     * 只读试算指定机台可用时间下的窗口产能。
+     *
+     * <p>该重载仅供选机日志诊断使用。调用方可以传入“不含其它 SKU 当前占用”的机台可用时间，
+     * 用于识别机台是否确实只因占用而暂不可选；方法不会修改 {@link MachineScheduleDTO}、
+     * 机台运行态、班次产能、模具资源或排程结果。正式选机继续调用原重载，因此实际产能和排产结果不变。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 当前 SKU
+     * @param machine 候选机台
+     * @param productionNotBeforeTime 正式生产不得早于的时间
+     * @param machineAvailableTimeOverride 只读试算使用的机台可用时间，传 null 时读取机台真实收尾时间
+     * @return 机台窗口可排量
+     */
+    public int calcMachineAvailableCapacityInWindow(LhScheduleContext context,
+                                                    SkuScheduleDTO sku,
+                                                    MachineScheduleDTO machine,
+                                                    Date productionNotBeforeTime,
+                                                    Date machineAvailableTimeOverride) {
         if (Objects.isNull(context) || Objects.isNull(sku) || Objects.isNull(machine)) {
             return 0;
         }
@@ -1631,7 +1654,8 @@ public class TargetScheduleQtyResolver {
              */
             LinkedHashMap<Integer, Integer> capacityByShift =
                     calculateMachineAvailableCapacityByShiftInWindow(
-                            context, sku, machine, shifts, true, productionNotBeforeTime);
+                            context, sku, machine, shifts, true, productionNotBeforeTime,
+                            machineAvailableTimeOverride);
             int runtimeShiftCapacity = ShiftCapacityResolverUtil.resolveRuntimeShiftCapacity(
                     context, machine, sku.getShiftCapacity());
             Map<Integer, Integer> adjustedCapacityMap = resolveEmbryoAvailableCapacityMap(
@@ -1640,7 +1664,8 @@ public class TargetScheduleQtyResolver {
             return sumShiftCapacity(adjustedCapacityMap);
         }
         return calculateMachineAvailableCapacityInWindow(
-                context, sku, machine, shifts, productionNotBeforeTime);
+                context, sku, machine, shifts, productionNotBeforeTime,
+                machineAvailableTimeOverride);
     }
 
     /**
@@ -1879,8 +1904,30 @@ public class TargetScheduleQtyResolver {
                                                           MachineScheduleDTO machine,
                                                           List<LhShiftConfigVO> shifts,
                                                           Date productionNotBeforeTime) {
+        return this.calculateMachineAvailableCapacityInWindow(
+                context, sku, machine, shifts, productionNotBeforeTime, null);
+    }
+
+    /**
+     * 按生产时间下限和只读机台可用时间计算窗口产能。
+     *
+     * @param context 排程上下文
+     * @param sku 当前 SKU
+     * @param machine 候选机台
+     * @param shifts 排程班次
+     * @param productionNotBeforeTime 正式生产不得早于的时间
+     * @param machineAvailableTimeOverride 只读试算机台可用时间
+     * @return 窗口内可排产量
+     */
+    private int calculateMachineAvailableCapacityInWindow(LhScheduleContext context,
+                                                          SkuScheduleDTO sku,
+                                                          MachineScheduleDTO machine,
+                                                          List<LhShiftConfigVO> shifts,
+                                                          Date productionNotBeforeTime,
+                                                          Date machineAvailableTimeOverride) {
         return sumMachineCapacityByDate(calculateMachineAvailableCapacityByDateInWindow(
-                context, sku, machine, shifts, productionNotBeforeTime));
+                context, sku, machine, shifts, productionNotBeforeTime,
+                machineAvailableTimeOverride));
     }
 
     /**
@@ -1915,9 +1962,32 @@ public class TargetScheduleQtyResolver {
             MachineScheduleDTO machine,
             List<LhShiftConfigVO> shifts,
             Date productionNotBeforeTime) {
+        return this.calculateMachineAvailableCapacityByDateInWindow(
+                context, sku, machine, shifts, productionNotBeforeTime, null);
+    }
+
+    /**
+     * 按生产下限和只读机台可用时间拆分单台机台各业务日产能。
+     *
+     * @param context 排程上下文
+     * @param sku 当前 SKU
+     * @param machine 候选机台
+     * @param shifts 排程班次
+     * @param productionNotBeforeTime 正式生产不得早于的时间
+     * @param machineAvailableTimeOverride 只读试算机台可用时间
+     * @return 按业务日汇总的可排量
+     */
+    private LinkedHashMap<LocalDate, Integer> calculateMachineAvailableCapacityByDateInWindow(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            MachineScheduleDTO machine,
+            List<LhShiftConfigVO> shifts,
+            Date productionNotBeforeTime,
+            Date machineAvailableTimeOverride) {
         LinkedHashMap<LocalDate, Integer> capacityByDate = initCapacityByDate(shifts);
         LinkedHashMap<Integer, Integer> capacityByShift = calculateMachineAvailableCapacityByShiftInWindow(
-                context, sku, machine, shifts, true, productionNotBeforeTime);
+                context, sku, machine, shifts, true, productionNotBeforeTime,
+                machineAvailableTimeOverride);
         for (LhShiftConfigVO shift : shifts) {
             if (shift == null || shift.getShiftIndex() == null) {
                 continue;
@@ -1971,6 +2041,30 @@ public class TargetScheduleQtyResolver {
             List<LhShiftConfigVO> shifts,
             boolean deductChangeover,
             Date productionNotBeforeTime) {
+        return this.calculateMachineAvailableCapacityByShiftInWindow(
+                context, sku, machine, shifts, deductChangeover, productionNotBeforeTime, null);
+    }
+
+    /**
+     * 按指定生产时间下限和只读机台可用时间计算各班次可排产能。
+     *
+     * @param context 排程上下文
+     * @param sku 当前 SKU
+     * @param machine 候选机台
+     * @param shifts 排程班次
+     * @param deductChangeover 是否扣减首次切换耗时
+     * @param productionNotBeforeTime 正式生产不得早于的时间
+     * @param machineAvailableTimeOverride 只读试算机台可用时间
+     * @return 按班次索引拆分的产能
+     */
+    private LinkedHashMap<Integer, Integer> calculateMachineAvailableCapacityByShiftInWindow(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            MachineScheduleDTO machine,
+            List<LhShiftConfigVO> shifts,
+            boolean deductChangeover,
+            Date productionNotBeforeTime,
+            Date machineAvailableTimeOverride) {
         LinkedHashMap<Integer, Integer> capacityByShift = new LinkedHashMap<>(Math.max(16, shifts.size()));
         if (Objects.isNull(machine) || Objects.isNull(sku) || CollectionUtils.isEmpty(shifts)) {
             return capacityByShift;
@@ -1982,7 +2076,8 @@ public class TargetScheduleQtyResolver {
             return capacityByShift;
         }
         int mouldQty = ShiftCapacityResolverUtil.resolveMachineMouldQty(machine);
-        Date machineAvailableTime = machine.getEstimatedEndTime();
+        Date machineAvailableTime = Objects.nonNull(machineAvailableTimeOverride)
+                ? machineAvailableTimeOverride : machine.getEstimatedEndTime();
         Date windowStartTime = shifts.get(0).getShiftStartDateTime();
         Date cursorStartTime = machineAvailableTime != null && machineAvailableTime.after(windowStartTime)
                 ? machineAvailableTime : windowStartTime;

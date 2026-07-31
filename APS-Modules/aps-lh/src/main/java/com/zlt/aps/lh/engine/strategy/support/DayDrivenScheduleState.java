@@ -42,6 +42,17 @@ public class DayDrivenScheduleState {
     /** 当前业务日各 SKU 的执行结果 */
     private final Map<SkuScheduleDTO, SkuDayScheduleOutcome> currentDayOutcomeMap =
             new IdentityHashMap<SkuScheduleDTO, SkuDayScheduleOutcome>();
+    /**
+     * 尚未形成实际命中的最后一次选机诊断快照。
+     *
+     * <p>快照跨业务日保留，只在三天窗口最终未排时写一次汇总日志；
+     * 中间的换模、首检、产能或 dayN 失败不会直接写选机优先级日志。</p>
+     */
+    private final Map<SkuScheduleDTO, MachinePriorityTraceSnapshot> pendingMachinePriorityTraceMap =
+            new IdentityHashMap<SkuScheduleDTO, MachinePriorityTraceSnapshot>();
+    /** 本窗口已经写过实际命中选机日志的 SKU，避免部分成功后再写“最终未命中”误导信息。 */
+    private final Set<SkuScheduleDTO> machinePriorityTraceHitSkuSet =
+            Collections.newSetFromMap(new IdentityHashMap<SkuScheduleDTO, Boolean>());
 
     /**
      * 使用已经完成现有业务排序的新增 SKU 列表初始化状态。
@@ -113,6 +124,7 @@ public class DayDrivenScheduleState {
         pendingSkuSet.remove(sku);
         completedSkuSet.add(sku);
         deferredTaskMap.remove(sku);
+        pendingMachinePriorityTraceMap.remove(sku);
         currentDayOutcomeMap.put(sku, SkuDayScheduleOutcome.COMPLETED);
     }
 
@@ -125,6 +137,7 @@ public class DayDrivenScheduleState {
         pendingSkuSet.remove(sku);
         finalUnscheduledSkuSet.add(sku);
         deferredTaskMap.remove(sku);
+        pendingMachinePriorityTraceMap.remove(sku);
         currentDayOutcomeMap.put(sku, SkuDayScheduleOutcome.FINAL_UNSCHEDULED);
     }
 
@@ -137,6 +150,60 @@ public class DayDrivenScheduleState {
         pendingSkuSet.add(sku);
         deferredTaskMap.remove(sku);
         currentDayOutcomeMap.put(sku, SkuDayScheduleOutcome.SCHEDULED_AND_CARRY_OVER);
+    }
+
+    /**
+     * 保存当前 SKU 最后一次尚未命中的选机诊断快照。
+     *
+     * <p>同一 SKU 已经形成过实际命中时，不再保留后续“无需继续扩机”或失败尝试，
+     * 防止窗口收口时把部分成功 SKU 错记成完全未命中。</p>
+     *
+     * @param sku 当前 SKU
+     * @param traceSnapshot 当前选机时点的只读诊断快照
+     */
+    public void rememberPendingMachinePriorityTrace(
+            SkuScheduleDTO sku,
+            MachinePriorityTraceSnapshot traceSnapshot) {
+        if (Objects.isNull(sku) || Objects.isNull(traceSnapshot)
+                || machinePriorityTraceHitSkuSet.contains(sku)) {
+            return;
+        }
+        pendingMachinePriorityTraceMap.put(sku, traceSnapshot);
+    }
+
+    /**
+     * 标记当前 SKU 已经写入实际命中选机日志。
+     *
+     * @param sku 当前 SKU
+     */
+    public void markMachinePriorityTraceHit(SkuScheduleDTO sku) {
+        if (Objects.isNull(sku)) {
+            return;
+        }
+        machinePriorityTraceHitSkuSet.add(sku);
+        pendingMachinePriorityTraceMap.remove(sku);
+    }
+
+    /**
+     * 获取三天窗口内最后一次尚未命中的选机诊断快照。
+     *
+     * @param sku 当前 SKU
+     * @return 最后一次诊断快照；没有进入选机或已经实际命中时为空
+     */
+    public MachinePriorityTraceSnapshot getPendingMachinePriorityTrace(SkuScheduleDTO sku) {
+        return pendingMachinePriorityTraceMap.get(sku);
+    }
+
+    /**
+     * 清理不会形成新增实际命中的中间诊断快照。
+     *
+     * <p>例如已有同物料结果已满足 dayN、当前新增候选无需再扩机时，
+     * 该候选既不是失败，也不是新增命中，不应在最终窗口写选机日志。</p>
+     *
+     * @param sku 当前 SKU
+     */
+    public void clearPendingMachinePriorityTrace(SkuScheduleDTO sku) {
+        pendingMachinePriorityTraceMap.remove(sku);
     }
 
     /**
