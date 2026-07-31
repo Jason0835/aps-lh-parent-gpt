@@ -1,7 +1,11 @@
 package com.zlt.aps.tm.engine.template;
 
 import cn.hutool.core.date.DateUtil;
+import cn.hutool.core.util.StrUtil;
+import com.ruoyi.common.exception.ServiceException;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.engine.schedule.IScheduleProcessLogger;
+import com.zlt.aps.tm.api.enums.TmAutoScheduleIssueCategoryEnum;
 import com.zlt.aps.tm.api.enums.TmScheduleStepEnum;
 import com.zlt.aps.tm.engine.domain.TmScheduleContext;
 import com.zlt.aps.tm.engine.domain.TmTaskDraft;
@@ -114,14 +118,40 @@ public class TmScheduleTemplateImpl extends AbsTmScheduleTemplate {
     }
 
     private void runStep(TmScheduleContext context, TmScheduleStepEnum stepEnum, Runnable runnable) {
-        if (processLogger != null) {
-            processLogger.logStepStart(context, stepEnum.getCode(), buildStepSummary(context, stepEnum, true));
+        try {
+            if (processLogger != null) {
+                processLogger.logStepStart(context, stepEnum.getCode(), buildStepSummary(context, stepEnum, true));
+            }
+            runnable.run();
+            this.updateProgress(context, stepEnum);
+            if (processLogger != null) {
+                processLogger.logStepEnd(context, stepEnum.getCode(), buildStepSummary(context, stepEnum, false));
+            }
+        } catch (RuntimeException exception) {
+            this.recordStepFailure(context, stepEnum, exception);
+            throw exception;
         }
-        runnable.run();
-        this.updateProgress(context, stepEnum);
-        if (processLogger != null) {
-            processLogger.logStepEnd(context, stepEnum.getCode(), buildStepSummary(context, stepEnum, false));
+    }
+
+    /**
+     * 记录当前排程步骤的阻断异常，已有结构化错误时不重复追加。
+     *
+     * @param context   排程上下文
+     * @param stepEnum 排程步骤
+     * @param exception 原始异常
+     */
+    private void recordStepFailure(TmScheduleContext context, TmScheduleStepEnum stepEnum,
+                                   RuntimeException exception) {
+        if (context == null || context.getIssueCollector() == null) {
+            return;
         }
+        boolean businessError = exception instanceof ServiceException;
+        TmAutoScheduleIssueCategoryEnum category = businessError
+                ? TmAutoScheduleIssueCategoryEnum.AUTO_SCHEDULE_BUSINESS_ERROR
+                : TmAutoScheduleIssueCategoryEnum.AUTO_SCHEDULE_SYSTEM_ERROR;
+        String message = StrUtil.blankToDefault(exception.getMessage(),
+                I18nUtil.getMessage("ui.data.alert.tm.schedule.taskExecuteFailed"));
+        context.getIssueCollector().addFailureIssueIfAbsent(stepEnum, category, message);
     }
 
     /**

@@ -911,7 +911,7 @@ export default {
       const treadCode = String(this.query.treadCode || this.search.treadCode || "").trim().toLowerCase();
       return issueList.filter((issue) => {
         const issueTreadCode = String(issue.treadCode || "").toLowerCase();
-        return !treadCode || issueTreadCode.includes(treadCode);
+        return !treadCode || !issueTreadCode || issueTreadCode.includes(treadCode);
       });
     },
     openAutoPlanUnplanned() {

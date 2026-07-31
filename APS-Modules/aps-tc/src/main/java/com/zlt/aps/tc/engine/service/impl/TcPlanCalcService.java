@@ -214,10 +214,18 @@ public class TcPlanCalcService implements ITcPlanCalcService {
                 .filter(Objects::nonNull)
                 .collect(Collectors.groupingBy(task -> this.buildPlanGroupKey(context, task),
                         LinkedHashMap::new, Collectors.toList()));
-        List<String> groupConflictMessageList = groupedTaskMap.entrySet().stream()
-                .map(entry -> this.buildGroupAttributeConflictMessage(entry.getKey(), entry.getValue()))
-                .filter(StrUtil::isNotBlank)
-                .collect(Collectors.toList());
+        List<String> groupConflictMessageList = new ArrayList<>();
+        groupedTaskMap.forEach((planGroupKey, sourceTaskList) -> {
+            String conflictMessage = this.buildGroupAttributeConflictMessage(planGroupKey, sourceTaskList);
+            if (StrUtil.isBlank(conflictMessage)) {
+                return;
+            }
+            // 每个冲突组单独写入问题明细，便于前端按胎侧编码和班次筛选定位。
+            TcTaskDraft referenceTask = sourceTaskList.get(0);
+            context.getIssueCollector().addPlanGroupAttributeConflictIssue(
+                    referenceTask.getSidewallCode(), referenceTask.getShiftOrder(), conflictMessage);
+            groupConflictMessageList.add(conflictMessage);
+        });
         if (CollUtil.isNotEmpty(groupConflictMessageList)) {
             throw new ServiceException(MessageFormat.format(
                     I18nUtil.getMessage("ui.tc.schedule.planGroupAttributeConflictSummary"),

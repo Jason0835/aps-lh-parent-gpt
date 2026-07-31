@@ -70,6 +70,66 @@ public class TmAutoScheduleIssueCollector {
     }
 
     /**
+     * 记录计划量汇总组生产属性冲突。
+     *
+     * @param treadCode   胎面编码
+     * @param shiftOrder  班次顺序
+     * @param message     包含汇总组和来源业务键的冲突说明
+     */
+    public void addPlanGroupAttributeConflictIssue(String treadCode, Integer shiftOrder, String message) {
+        TmAutoScheduleIssueVo issue = new TmAutoScheduleIssueVo();
+        issue.setLevel(TmAutoScheduleIssueLevelEnum.ERROR.getCode());
+        issue.setStageCode(TmScheduleStepEnum.PLAN_CALC.getCode());
+        issue.setStageName(TmScheduleStepEnum.PLAN_CALC.getDesc());
+        issue.setCategory(TmAutoScheduleIssueCategoryEnum.PLAN_GROUP_ATTRIBUTE_CONFLICT.getCode());
+        issue.setTreadCode(treadCode);
+        issue.setShiftOrder(shiftOrder);
+        issue.setFieldName("productionAttributes");
+        issue.setMessage(message);
+        issues.add(issue);
+    }
+
+    /**
+     * 指定阶段尚无阻断问题时记录失败明细。
+     *
+     * @param stepEnum 排程阶段
+     * @param category 失败类别
+     * @param message  前端可展示的失败消息
+     */
+    public void addFailureIssueIfAbsent(TmScheduleStepEnum stepEnum,
+                                        TmAutoScheduleIssueCategoryEnum category, String message) {
+        if (this.hasErrorIssue(stepEnum)) {
+            return;
+        }
+        this.addIssue(TmAutoScheduleIssueLevelEnum.ERROR, stepEnum, category, message);
+    }
+
+    /**
+     * 判断指定阶段是否已经存在阻断问题。
+     *
+     * @param stepEnum 排程阶段
+     * @return 存在 ERROR 级别问题时返回 true
+     */
+    public boolean hasErrorIssue(TmScheduleStepEnum stepEnum) {
+        if (stepEnum == null) {
+            return false;
+        }
+        return issues.stream().anyMatch(issue ->
+                TmAutoScheduleIssueLevelEnum.ERROR.getCode().equals(issue.getLevel())
+                        && stepEnum.getCode().equals(issue.getStageCode()));
+    }
+
+    /**
+     * 判断当前任务是否已经存在任一阻断问题。
+     *
+     * @return 存在 ERROR 级别问题时返回 true
+     */
+    public boolean hasErrorIssue() {
+        return issues.stream().anyMatch(issue ->
+                TmAutoScheduleIssueLevelEnum.ERROR.getCode().equals(issue.getLevel()));
+    }
+
+    /**
      * 记录缺库存快照告警。
      *
      * @param treadCode 胎面编码

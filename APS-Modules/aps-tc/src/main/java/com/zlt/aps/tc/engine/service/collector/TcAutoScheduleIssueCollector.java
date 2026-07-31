@@ -70,6 +70,66 @@ public class TcAutoScheduleIssueCollector {
     }
 
     /**
+     * 记录计划量汇总组生产属性冲突。
+     *
+     * @param sidewallCode 胎侧编码
+     * @param shiftOrder   班次顺序
+     * @param message      包含汇总组和来源业务键的冲突说明
+     */
+    public void addPlanGroupAttributeConflictIssue(String sidewallCode, Integer shiftOrder, String message) {
+        TcAutoScheduleIssueVo issue = new TcAutoScheduleIssueVo();
+        issue.setLevel(TcAutoScheduleIssueLevelEnum.ERROR.getCode());
+        issue.setStageCode(TcScheduleStepEnum.PLAN_CALC.getCode());
+        issue.setStageName(TcScheduleStepEnum.PLAN_CALC.getDesc());
+        issue.setCategory(TcAutoScheduleIssueCategoryEnum.PLAN_GROUP_ATTRIBUTE_CONFLICT.getCode());
+        issue.setSidewallCode(sidewallCode);
+        issue.setShiftOrder(shiftOrder);
+        issue.setFieldName("productionAttributes");
+        issue.setMessage(message);
+        issues.add(issue);
+    }
+
+    /**
+     * 指定阶段尚无阻断问题时记录失败明细。
+     *
+     * @param stepEnum 排程阶段
+     * @param category 失败类别
+     * @param message  前端可展示的失败消息
+     */
+    public void addFailureIssueIfAbsent(TcScheduleStepEnum stepEnum,
+                                        TcAutoScheduleIssueCategoryEnum category, String message) {
+        if (this.hasErrorIssue(stepEnum)) {
+            return;
+        }
+        this.addIssue(TcAutoScheduleIssueLevelEnum.ERROR, stepEnum, category, message);
+    }
+
+    /**
+     * 判断指定阶段是否已经存在阻断问题。
+     *
+     * @param stepEnum 排程阶段
+     * @return 存在 ERROR 级别问题时返回 true
+     */
+    public boolean hasErrorIssue(TcScheduleStepEnum stepEnum) {
+        if (stepEnum == null) {
+            return false;
+        }
+        return issues.stream().anyMatch(issue ->
+                TcAutoScheduleIssueLevelEnum.ERROR.getCode().equals(issue.getLevel())
+                        && stepEnum.getCode().equals(issue.getStageCode()));
+    }
+
+    /**
+     * 判断当前任务是否已经存在任一阻断问题。
+     *
+     * @return 存在 ERROR 级别问题时返回 true
+     */
+    public boolean hasErrorIssue() {
+        return issues.stream().anyMatch(issue ->
+                TcAutoScheduleIssueLevelEnum.ERROR.getCode().equals(issue.getLevel()));
+    }
+
+    /**
      * 记录缺库存快照告警。
      *
      * @param sidewallCode 胎侧编码

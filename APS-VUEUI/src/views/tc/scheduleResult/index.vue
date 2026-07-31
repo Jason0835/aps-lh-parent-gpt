@@ -958,7 +958,7 @@ export default {
       const sidewallCode = String(this.query.sidewallCode || '').trim().toLowerCase()
       return issueList.filter(issue => {
         const issueSidewallCode = String(issue.sidewallCode || '').toLowerCase()
-        return !sidewallCode || issueSidewallCode === sidewallCode
+        return !sidewallCode || !issueSidewallCode || issueSidewallCode === sidewallCode
       })
     },
     openAutoPlanUnplanned() {
