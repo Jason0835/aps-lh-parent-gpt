@@ -7,4 +7,7 @@ public interface Cd90AutoScheduleInputVersionService {
 
     /** 生成成型计划、6点库存和库排资源的统一版本指纹。 */
     String fingerprint(String factoryCode, LocalDate scheduleDate);
+
+    /** 生成不包含旧库存的基础输入指纹，供定时滚动叠加目标班次库存。 */
+    String fingerprintWithoutStock(String factoryCode, LocalDate scheduleDate);
 }

@@ -4,6 +4,7 @@ import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.zlt.aps.cd90.api.domain.dto.Cd90ScheduleImportDTO;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleResult;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleRollingAdjustLog;
 import com.zlt.aps.cd90.api.domain.vo.Cd90ChangeQtyRequest;
@@ -124,4 +125,9 @@ public interface ICd90ScheduleResultRemoteService {
     @ApiOperation("导入")
     @PostMapping("/cd90ScheduleResult/importData")
     AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport);
+
+    @ApiOperation("按固定模板导入直裁排程结果")
+    @PostMapping("/cd90ScheduleResult/importDataByCust/{updateSupport}")
+    AjaxResult importDataByCust(@PathVariable("updateSupport") boolean updateSupport,
+                                @RequestBody Cd90ScheduleImportDTO importDTO);
 }

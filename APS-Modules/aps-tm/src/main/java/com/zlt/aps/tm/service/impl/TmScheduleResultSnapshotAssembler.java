@@ -3,6 +3,7 @@ package com.zlt.aps.tm.service.impl;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
+import com.zlt.aps.tm.api.enums.TmYesNoEnum;
 import com.zlt.aps.tm.engine.domain.TmTaskDraft;
 import lombok.extern.slf4j.Slf4j;
 
@@ -50,6 +51,7 @@ public final class TmScheduleResultSnapshotAssembler {
         result.setTreadShoulderLength(selectStableNumber(result, sortedTaskList,
                 "treadShoulderLength", TmTaskDraft::getTreadShoulderLength));
         result.setCxRemainQty(sumRemainQtyBySourceOrder(result, sortedTaskList));
+        result.setWholeGlueCode(buildWholeGlueCode(sortedTaskList));
         result.setMaterialCode(joinStableText(sortedTaskList, TmTaskDraft::getMaterialCode));
         result.setMaterialDesc(joinStableText(sortedTaskList, TmTaskDraft::getMaterialDesc));
         result.setEmbryoCode(joinStableText(sortedTaskList, TmTaskDraft::getEmbryoCode));
@@ -59,6 +61,40 @@ public final class TmScheduleResultSnapshotAssembler {
                 "sixClockStockQty", TmTaskDraft::getSixClockStockQty));
         result.setCurlRollLength(selectStableNumber(result, sortedTaskList,
                 "curlRollLength", TmScheduleResultSnapshotAssembler::resolveEffectiveCurlRollLength));
+        result.setTailFlag(resolveTailFlag(sortedTaskList));
+    }
+
+    /**
+     * 按来源任务的主胶料、基部胶顺序生成整条胶料组合编码。
+     *
+     * @param sortedTaskList 已按来源工单和业务键排序的任务
+     * @return 稳定去重后的整条胶料组合编码；没有有效胶料时返回 null
+     */
+    private static String buildWholeGlueCode(List<TmTaskDraft> sortedTaskList) {
+        Set<String> glueCodeSet = sortedTaskList.stream()
+                .flatMap(task -> Arrays.asList(task.getGlueCode(), task.getBaseGlueCode()).stream())
+                .filter(StrUtil::isNotBlank)
+                .flatMap(glueCode -> Arrays.stream(glueCode.split(",")))
+                .map(String::trim)
+                .filter(StrUtil::isNotBlank)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        return CollUtil.isEmpty(glueCodeSet) ? null : String.join(",", glueCodeSet);
+    }
+
+    /**
+     * 汇总结果行的收尾标识。
+     *
+     * <p>同一结果行横向归并多个班次和来源任务，只要任一来源任务为收尾任务，
+     * 结果行即按收尾展示，避免首条非收尾任务覆盖后续收尾任务。</p>
+     *
+     * @param sortedTaskList 已按来源工单和业务键排序的任务
+     * @return 收尾返回 1，否则返回 0
+     */
+    private static String resolveTailFlag(List<TmTaskDraft> sortedTaskList) {
+        boolean tailTaskExists = sortedTaskList.stream()
+                .map(TmTaskDraft::getTailFlag)
+                .anyMatch(TmYesNoEnum.YES.getCode()::equals);
+        return tailTaskExists ? TmYesNoEnum.YES.getCode() : TmYesNoEnum.NO.getCode();
     }
 
     /**

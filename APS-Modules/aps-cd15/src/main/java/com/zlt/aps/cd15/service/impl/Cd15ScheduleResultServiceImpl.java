@@ -1,19 +1,26 @@
 package com.zlt.aps.cd15.service.impl;
 
+import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.cd15.api.domain.entity.Cd15ScheduleResult;
 import com.zlt.aps.cd15.api.domain.entity.Cd15ShiftConfig;
+import com.zlt.aps.cd15.api.domain.entity.Cd15Stock;
 import com.zlt.aps.cd15.api.domain.vo.Cd15ChangeQtyRequest;
 import com.zlt.aps.cd15.api.domain.vo.Cd15InsertOrderRequest;
 import com.zlt.aps.cd15.api.domain.vo.Cd15RollingCheckRequest;
 import com.zlt.aps.cd15.api.domain.vo.Cd15TransferMachineRequest;
+import com.zlt.aps.cd15.api.domain.vo.Cd15ScheduleResultTemplateImportVO;
+import com.zlt.aps.cd15.component.Cd15ScheduleResultExportAssembler;
 import com.zlt.aps.cd15.engine.algorithm.Cd15ShiftWindowResolver;
 import com.zlt.aps.cd15.engine.constant.Cd15CutMode;
 import com.zlt.aps.cd15.engine.constant.Cd15ScheduleTaskType;
+import com.zlt.aps.cd15.engine.mapper.Cd15EngineConstructionMapper;
+import com.zlt.aps.cd15.engine.mapper.Cd15EngineCxScheduleMapper;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineShiftConfigMapper;
 import com.zlt.aps.cd15.engine.domain.Cd15ScheduleTask;
 import com.zlt.aps.cd15.engine.model.Cd15BatchDataCheckResult;
@@ -25,15 +32,27 @@ import com.zlt.aps.cd15.engine.service.Cd15AutoScheduleLockService;
 import com.zlt.aps.cd15.engine.service.Cd15InsertRollingService;
 import com.zlt.aps.cd15.engine.service.Cd15ScheduleTaskService;
 import com.zlt.aps.cd15.mapper.Cd15ScheduleResultMapper;
+import com.zlt.aps.cd15.mapper.Cd15StockMapper;
 import com.zlt.aps.cd15.model.Cd15ScheduleOverwriteDecision;
 import com.zlt.aps.cd15.service.Cd15AutoScheduleAsyncExecutor;
 import com.zlt.aps.cd15.service.Cd15InsertOrderAsyncExecutor;
 import com.zlt.aps.cd15.service.Cd15ScheduleOverwriteValidator;
 import com.zlt.aps.cd15.service.Cd15TimedRollingCheckService;
+import com.zlt.aps.cd15.service.Cd15ScheduleNumberService;
 import com.zlt.aps.cd15.service.ICd15ScheduleResultService;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.common.core.utils.BigDecimalUtils;
+import com.zlt.aps.common.core.utils.ExcelUtils;
+import com.zlt.aps.cx.api.domain.entity.CxScheduleResult;
+import com.zlt.aps.mdm.api.domain.entity.MdmConstructionInfo;
 import com.zlt.bill.common.service.AbstractDocService;
+import com.zlt.common.utils.PubUtil;
 import com.zlt.sysdef.domain.SysDocType;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.redisson.api.RLock;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -42,6 +61,9 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import javax.annotation.Resource;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 import java.math.BigDecimal;
 import java.text.MessageFormat;
 import java.time.LocalDate;
@@ -49,9 +71,12 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -61,6 +86,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 /**
  * 斜裁排程结果业务实现。
@@ -103,6 +129,130 @@ public class Cd15ScheduleResultServiceImpl extends AbstractDocService<Cd15Schedu
 
     @Resource
     private Cd15TimedRollingCheckService timedRollingCheckService;
+
+    @Resource
+    private Cd15StockMapper stockMapper;
+
+    @Resource
+    private Cd15EngineCxScheduleMapper cxScheduleMapper;
+
+    @Resource
+    private Cd15EngineConstructionMapper constructionMapper;
+
+    @Resource
+    private Cd15ScheduleResultExportAssembler exportAssembler;
+
+    @Resource
+    private Cd15ScheduleNumberService scheduleNumberService;
+
+    /**
+     * 按固定生产计划模板整体覆盖导入。
+     * 模板一行生成一条新排程结果；上一批和完成量列仅用于展示，不反写。
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public AjaxResult importScheduleTemplate(List<Cd15ScheduleResultTemplateImportVO> rows,
+                                             Cd15ScheduleResult condition,
+                                             boolean updateSupport) {
+        if (condition == null || !PubUtil.isNotEmpty(condition.getFactoryCode())
+                || condition.getScheduleDate() == null) {
+            return AjaxResult.error(I18nUtil.getMessage(
+                    "ui.data.column.cd15ScheduleResult.importRequired"));
+        }
+        if (rows == null || rows.isEmpty()) {
+            return AjaxResult.error(I18nUtil.getMessage(
+                    "ui.data.column.cd15ScheduleResult.importEmpty"));
+        }
+        String factoryCode = condition.getFactoryCode().trim();
+        Date scheduleDate = DateUtil.beginOfDay(condition.getScheduleDate());
+        Set<String> uniqueKeys = new HashSet<>();
+        List<String> errors = new ArrayList<>();
+        List<Cd15ScheduleResultTemplateImportVO> validRows = new ArrayList<>();
+        for (int index = 0; index < rows.size(); index++) {
+            Cd15ScheduleResultTemplateImportVO row = rows.get(index);
+            int excelRow = index + 6;
+            if (row == null || !PubUtil.isNotEmpty(row.getMachineCode())
+                    || !PubUtil.isNotEmpty(row.getSteelStripCode())
+                    || !PubUtil.isNotEmpty(row.getBigRollCode())
+                    || !PubUtil.isNotEmpty(row.getCuttingAngle())) {
+                errors.add(MessageFormat.format(I18nUtil.getMessage(
+                        "ui.data.column.cd15ScheduleResult.importRowRequired"), excelRow));
+                continue;
+            }
+            boolean hasPlan = Stream.of(row.getClass1PlanQty(), row.getClass2PlanQty(), row.getClass3PlanQty())
+                    .filter(Objects::nonNull)
+                    .anyMatch(value -> value > 0D);
+            if (!hasPlan) {
+                errors.add(MessageFormat.format(I18nUtil.getMessage(
+                        "ui.data.column.cd15ScheduleResult.importPlanRequired"), excelRow));
+                continue;
+            }
+            String uniqueKey = String.join("|", row.getMachineCode().trim(),
+                    row.getSteelStripCode().trim(), row.getBigRollCode().trim(),
+                    row.getCuttingAngle().trim());
+            if (!uniqueKeys.add(uniqueKey)) {
+                errors.add(MessageFormat.format(I18nUtil.getMessage(
+                        "ui.data.column.cd15ScheduleResult.importDuplicate"), excelRow));
+                continue;
+            }
+            validRows.add(row);
+        }
+        if (!errors.isEmpty()) {
+            return AjaxResult.error(String.join("<br>", errors));
+        }
+
+        String batchNo = this.scheduleNumberService.nextBatchNo(
+                scheduleDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate());
+        Map<String, int[]> ordersByMachine = new HashMap<>();
+        List<Cd15ScheduleResult> insertList = validRows.stream().map(row -> {
+            Cd15ScheduleResult result = new Cd15ScheduleResult();
+            result.setFactoryCode(factoryCode);
+            result.setScheduleDate(scheduleDate);
+            result.setCd15BatchNo(batchNo);
+            result.setOrderNo(this.scheduleNumberService.nextOrderNo(batchNo));
+            result.setGroupNo(result.getOrderNo());
+            result.setReleaseStatus("0");
+            result.setPublishSuccessCount(0);
+            result.setSourceType("IMPORT");
+            result.setIsLocked("0");
+            result.setMachineCode(row.getMachineCode().trim());
+            result.setSteelStripCode(row.getSteelStripCode().trim());
+            result.setBigRollCode(row.getBigRollCode().trim());
+            result.setCuttingAngle(row.getCuttingAngle().trim());
+            result.setStorageLaneCode(row.getStorageLaneCode());
+            result.setCxMachineCodes(row.getCxMachineCodes());
+            result.setStockQty(row.getStockQty());
+            result.setPlanSurplusQty(row.getPlanSurplusQty());
+            result.setUnitConsumeMillimeter(row.getUnitConsume() == null
+                    ? null : row.getUnitConsume().multiply(BigDecimal.valueOf(1000)));
+            result.setMaterialKey(String.join("|", result.getSteelStripCode(),
+                    result.getBigRollCode(), result.getCuttingAngle()));
+            result.setClass1PlanQty(row.getClass1PlanQty());
+            result.setClass1FinishQty(row.getClass1FinishQty());
+            result.setClass2PlanQty(row.getClass2PlanQty());
+            result.setClass2FinishQty(row.getClass2FinishQty());
+            result.setClass3PlanQty(row.getClass3PlanQty());
+            result.setClass3FinishQty(row.getClass3FinishQty());
+            int[] orders = ordersByMachine.computeIfAbsent(result.getMachineCode(), key -> new int[3]);
+            if (row.getClass1PlanQty() != null && row.getClass1PlanQty() > 0D) {
+                result.setClass1ProduceOrder(++orders[0]);
+            }
+            if (row.getClass2PlanQty() != null && row.getClass2PlanQty() > 0D) {
+                result.setClass2ProduceOrder(++orders[1]);
+            }
+            if (row.getClass3PlanQty() != null && row.getClass3PlanQty() > 0D) {
+                result.setClass3ProduceOrder(++orders[2]);
+            }
+            return result;
+        }).collect(Collectors.toList());
+
+        this.resultMapper.update(null, new LambdaUpdateWrapper<Cd15ScheduleResult>()
+                .eq(Cd15ScheduleResult::getFactoryCode, factoryCode)
+                .eq(Cd15ScheduleResult::getScheduleDate, scheduleDate)
+                .set(Cd15ScheduleResult::getIsDelete, 1));
+        int successNum = this.baseDao.insertBatch(insertList);
+        return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + successNum);
+    }
 
     /**
      * 删除排程结果，不触发滚动重排；删除后只压缩同工厂、日期、机台的 CLASS1 后续生产顺位。
@@ -376,6 +526,188 @@ public class Cd15ScheduleResultServiceImpl extends AbstractDocService<Cd15Schedu
     private String splitGroupKey(Cd15ScheduleResult result) {
         return this.scheduleScopeKey(result) + "|"
                 + String.valueOf(result.getGroupNo());
+    }
+
+    /**
+     * 使用固定模板导出斜裁四班排程结果。
+     *
+     * @param currentResults 已按页面导出条件查询的本批排程结果
+     * @param queryVO 导出条件
+     * @return Excel 文件字节
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public byte[] exportData(
+            List<Cd15ScheduleResult> currentResults,
+            Cd15ScheduleResult queryVO) {
+        if (queryVO == null
+                || !PubUtil.isNotEmpty(queryVO.getFactoryCode())
+                || queryVO.getScheduleDate() == null) {
+            throw new ServiceException(I18nUtil.getMessage(
+                    "ui.data.column.cd15ScheduleResult.exportRequired"));
+        }
+        Date previousDate = cn.hutool.core.date.DateUtil.offsetDay(
+                queryVO.getScheduleDate(), -1);
+        List<Cd15ScheduleResult> previousResults =
+                this.loadPreviousResults(queryVO, previousDate);
+        List<Cd15Stock> stocks = this.loadStocks(
+                queryVO.getFactoryCode(), previousDate);
+        List<CxScheduleResult> formingResults = this.loadFormingResults(
+                queryVO.getFactoryCode(), queryVO.getScheduleDate());
+        List<MdmConstructionInfo> constructions =
+                this.loadConstructions(
+                        queryVO.getFactoryCode(), formingResults);
+        List<Map<String, Object>> rows =
+                this.exportAssembler.assembleRows(
+                        previousResults,
+                        currentResults,
+                        stocks,
+                        formingResults,
+                        constructions);
+
+        InputStream inputStream = this.getClass().getClassLoader()
+                .getResourceAsStream(
+                        "excelModel/cd15ScheduleResult.xlsx");
+        if (inputStream == null) {
+            throw new ServiceException(I18nUtil.getMessage(
+                    "ui.data.column.cd15ScheduleResult."
+                            + "exportTemplateNotFound"));
+        }
+        Map<String, Object> tableMap = new HashMap<>(
+                this.exportAssembler.buildTableMap(
+                        queryVO.getScheduleDate()));
+        String[][] statisticFields = {
+                {"previousClass3PlanQty", "previousClass3PlanTotal"},
+                {"previousClass3FinishQty", "previousClass3FinishTotal"},
+                {"class1PlanQty", "class1PlanTotal"},
+                {"class1FinishQty", "class1FinishTotal"},
+                {"class2PlanQty", "class2PlanTotal"},
+                {"class2FinishQty", "class2FinishTotal"},
+                {"class3PlanQty", "class3PlanTotal"},
+                {"class3FinishQty", "class3FinishTotal"}
+        };
+        BigDecimal[] statisticTotals = new BigDecimal[statisticFields.length];
+        for (int statisticIndex = 0; statisticIndex < statisticFields.length; statisticIndex++) {
+            String[] statisticField = statisticFields[statisticIndex];
+            BigDecimal total = rows.stream()
+                    .map(row -> BigDecimalUtils.valueOf(row.get(statisticField[0])))
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            statisticTotals[statisticIndex] = total;
+            tableMap.put(statisticField[1], total);
+        }
+        byte[] exportBytes = ExcelUtils.writeMultiList(
+                inputStream,
+                0,
+                tableMap,
+                Collections.singletonList(rows));
+        try (Workbook workbook = WorkbookFactory.create(new ByteArrayInputStream(exportBytes));
+             ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+            Sheet sheet = workbook.getSheetAt(0);
+            Row statisticRow = sheet.getRow(2);
+            for (int statisticIndex = 0; statisticIndex < statisticTotals.length; statisticIndex++) {
+                Cell statisticCell = statisticRow.getCell(8 + statisticIndex);
+                if (statisticCell == null) {
+                    statisticCell = statisticRow.createCell(8 + statisticIndex);
+                }
+                statisticCell.setCellFormula(null);
+                statisticCell.setCellValue(statisticTotals[statisticIndex].doubleValue());
+            }
+            workbook.write(outputStream);
+            return outputStream.toByteArray();
+        } catch (Exception exception) {
+            throw new ServiceException(I18nUtil.getMessage(
+                    "ui.data.column.cd15ScheduleResult.exportTemplateNotFound"));
+        }
+    }
+
+    /** 加载上一排程日期结果并沿用页面过滤条件。 */
+    private List<Cd15ScheduleResult> loadPreviousResults(
+            Cd15ScheduleResult queryVO, Date previousDate) {
+        LambdaQueryWrapper<Cd15ScheduleResult> wrapper =
+                Wrappers.lambdaQuery();
+        wrapper.eq(Cd15ScheduleResult::getFactoryCode,
+                queryVO.getFactoryCode());
+        wrapper.eq(Cd15ScheduleResult::getScheduleDate, previousDate);
+        wrapper.like(PubUtil.isNotEmpty(queryVO.getSteelStripCode()),
+                Cd15ScheduleResult::getSteelStripCode,
+                queryVO.getSteelStripCode());
+        wrapper.like(PubUtil.isNotEmpty(queryVO.getGroupNo()),
+                Cd15ScheduleResult::getGroupNo,
+                queryVO.getGroupNo());
+        wrapper.like(PubUtil.isNotEmpty(queryVO.getBigRollCode()),
+                Cd15ScheduleResult::getBigRollCode,
+                queryVO.getBigRollCode());
+        wrapper.eq(PubUtil.isNotEmpty(queryVO.getMachineCode()),
+                Cd15ScheduleResult::getMachineCode,
+                queryVO.getMachineCode());
+        wrapper.eq(PubUtil.isNotEmpty(queryVO.getReleaseStatus()),
+                Cd15ScheduleResult::getReleaseStatus,
+                queryVO.getReleaseStatus());
+        wrapper.orderByAsc(Cd15ScheduleResult::getMachineCode);
+        wrapper.orderByAsc(Cd15ScheduleResult::getBigRollCode);
+        wrapper.orderByAsc(Cd15ScheduleResult::getCuttingAngle);
+        wrapper.orderByAsc(Cd15ScheduleResult::getClass3ProduceOrder);
+        return this.resultMapper.selectList(wrapper);
+    }
+
+    /** 加载排程日期前一日的钢带库存。 */
+    private List<Cd15Stock> loadStocks(
+            String factoryCode, Date stockDate) {
+        return this.stockMapper.selectList(
+                Wrappers.<Cd15Stock>lambdaQuery()
+                        .eq(Cd15Stock::getFactoryCode, factoryCode)
+                        .eq(Cd15Stock::getStockDate, stockDate)
+                        .orderByAsc(Cd15Stock::getMaterialCode));
+    }
+
+    /** 加载本批排程日期的成型排程结果。 */
+    private List<CxScheduleResult> loadFormingResults(
+            String factoryCode, Date scheduleDate) {
+        return this.cxScheduleMapper.selectList(
+                Wrappers.<CxScheduleResult>lambdaQuery()
+                        .eq(CxScheduleResult::getFactoryCode,
+                                factoryCode)
+                        .eq(CxScheduleResult::getScheduleDate,
+                                scheduleDate)
+                        .orderByAsc(CxScheduleResult::getEmbryoCode)
+                        .orderByAsc(CxScheduleResult::getId));
+    }
+
+    /** 加载成型排程引用的施工编码和配方版本。 */
+    private List<MdmConstructionInfo> loadConstructions(
+            String factoryCode,
+            List<CxScheduleResult> formingResults) {
+        Set<String> constructionCodes = formingResults.stream()
+                .map(CxScheduleResult::getEmbryoCode)
+                .filter(PubUtil::isNotEmpty)
+                .collect(Collectors.toCollection(
+                        LinkedHashSet::new));
+        Set<String> constructionVersions = formingResults.stream()
+                .flatMap(result -> Arrays.asList(
+                        result.getClass1RecipeNo(),
+                        result.getClass2RecipeNo(),
+                        result.getClass3RecipeNo(),
+                        result.getClass4RecipeNo()).stream())
+                .filter(PubUtil::isNotEmpty)
+                .collect(Collectors.toCollection(
+                        LinkedHashSet::new));
+        if (constructionCodes.isEmpty()
+                || constructionVersions.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return this.constructionMapper.selectList(
+                Wrappers.<MdmConstructionInfo>lambdaQuery()
+                        .eq(MdmConstructionInfo::getFactoryCode,
+                                factoryCode)
+                        .in(MdmConstructionInfo::getConstructionCode,
+                                constructionCodes)
+                        .in(MdmConstructionInfo::getConstructionVersion,
+                                constructionVersions)
+                        .orderByAsc(
+                                MdmConstructionInfo::getConstructionCode)
+                        .orderByAsc(
+                                MdmConstructionInfo::
+                                        getConstructionVersion));
     }
 
     /**

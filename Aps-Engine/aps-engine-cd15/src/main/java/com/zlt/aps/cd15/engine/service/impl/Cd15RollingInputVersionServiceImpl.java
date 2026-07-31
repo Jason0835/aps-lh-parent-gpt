@@ -8,6 +8,7 @@ import com.zlt.aps.cd15.engine.mapper.Cd15EngineScheduleResultMapper;
 import com.zlt.aps.cd15.engine.model.Cd15RollingTarget;
 import com.zlt.aps.cd15.engine.service.Cd15AutoScheduleInputVersionService;
 import com.zlt.aps.cd15.engine.service.Cd15RollingInputVersionService;
+import com.zlt.aps.cd15.engine.service.Cd15RollingShiftStockService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -29,6 +30,7 @@ public class Cd15RollingInputVersionServiceImpl implements Cd15RollingInputVersi
     private final Cd15AutoScheduleInputVersionService baseVersionService;
     private final Cd15EngineScheduleResultMapper scheduleResultMapper;
     private final Cd15AutoScheduleParamsMapper paramsMapper;
+    private final Cd15RollingShiftStockService rollingShiftStockService;
 
     /** 生成确定性SHA-256版本，任一关键输入变化都会产生新版本。 */
     @Override
@@ -36,10 +38,11 @@ public class Cd15RollingInputVersionServiceImpl implements Cd15RollingInputVersi
         if (target == null || target.getScheduleDate() == null) {
             throw new IllegalArgumentException("滚动目标和排程日期不能为空");
         }
-        String base = baseVersionService.fingerprint(
+        String base = baseVersionService.fingerprintWithoutStock(
                 target.getFactoryCode(), target.getScheduleDate(),
                 target.getHandoverTime().toLocalDate(),
                 target.getTargetShiftCode());
+        String shiftStock = rollingShiftStockService.fingerprint(target);
         List<Cd15ScheduleResult> results = scheduleResultMapper.selectList(
                 new LambdaQueryWrapper<Cd15ScheduleResult>()
                         .eq(Cd15ScheduleResult::getFactoryCode, target.getFactoryCode())
@@ -58,7 +61,8 @@ public class Cd15RollingInputVersionServiceImpl implements Cd15RollingInputVersi
                 .stream().map(item -> item.getId() + ":" + item.getParamCode() + ":"
                         + item.getParamValue() + ":" + item.getUpdateTime())
                 .collect(Collectors.joining("|"));
-        return this.sha256(base + "#" + target.getTargetShiftCode() + "#"
+        return this.sha256(base + "#" + shiftStock + "#"
+                + target.getTargetShiftCode() + "#"
                 + target.getTargetClassField() + "#" + target.getBatchNo() + "#"
                 + currentSchedule + "#" + parameters);
     }

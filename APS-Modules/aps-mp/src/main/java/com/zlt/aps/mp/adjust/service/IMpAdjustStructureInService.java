@@ -92,7 +92,7 @@ public interface IMpAdjustStructureInService  extends IDocService<MpAdjustStruct
      * 获取每日型腔/活块数量
      * @param contextDTO 周程滚动调整上下文对象
      */
-    Map<Integer, DailyMouldAvailabilityResult> getCavityAndBlockQtyMap(MpRollAdjustContextDTO contextDTO);
+    Map<Integer, DailyMouldAvailabilityResult> getCavityAndBlockQtyMap(MpRollAdjustContextDTO contextDTO,Boolean isAllocLimit);
     
     /**
      * 获取结构硫化配比

@@ -47,9 +47,9 @@
         <el-button
           v-hasPermi="['gsq:scheduleResult:changeMachine']"
           type="primary"
-          class="multiple disabled"
-          :disabled="selection.length === 0"
-          @click="handleChangeMachine"
+          class="single disabled"
+          :disabled="selection.length !== 1"
+          @click="handleChangeMachine(selection[0])"
         >{{ $t("ui.data.column.scheduleResult.changeMachine") }}</el-button>
         <el-button
           v-hasPermi="['gsq:scheduleResult:changeQty']"
@@ -111,10 +111,8 @@
 
     <!-- 转机台弹窗 -->
     <change-machine-dialog
-      v-if="changeMachineVisible"
-      :visible.sync="changeMachineVisible"
-      :rows="selection"
-      @refresh="getList"
+      ref="changeMachineDialog"
+      @success="getList"
     />
 
     <!-- 调量弹窗 -->
@@ -190,7 +188,6 @@ export default {
       autoPlanVisible: false,
       insertOrderVisible: false,
       editVisible: false,
-      changeMachineVisible: false,
       changeQtyVisible: false,
       importDialogVisible: false,
       // 6班次日期展示（D日中班/D+1日夜早中/D+2日夜早）
@@ -491,10 +488,10 @@ export default {
         })
         .catch(() => {});
     },
-    /** 转机台 */
-    handleChangeMachine() {
-      if (this.selection.length === 0) return;
-      this.changeMachineVisible = true;
+    /** 转机台（单选模式） */
+    handleChangeMachine(row) {
+      if (!row) return;
+      this.$refs.changeMachineDialog.show(row);
     },
     /** 调量 */
     handleChangeQty(row) {

@@ -107,13 +107,18 @@ public class ConclusionLhMachineHandler {
                 //非续作第一天
                 return null;
             }
-            //20260728+ 如果通过排产信息获取不到前Sku余量，则通过续作Sku信息来获取
+            //20260728+ 第一天如果通过排产信息获取不到前Sku余量，则通过续作Sku信息来获取
             return buildBeforeSkuByContinueSku(addSkuInfo, continueType, conclusionContinueSkuInfo, productionDay);
         }
         //换活字块
         List<SkuDayProductionInfoHelper> conclusionSkuInfo = getConclusionSkuInfo(context, groupInfo, productionDay);
         if (CollectionUtils.isEmpty(conclusionSkuInfo)) {
-            return null;
+            if (!productionContext.isCycleFirstProductionDay(productionDay)) {
+                //非续作第一天
+                return null;
+            }
+            //20260728+ 第一天如果通过排产信息获取不到前Sku余量，则通过续作Sku信息来获取
+            return buildBeforeSkuByContinueSku(addSkuInfo, continueType, conclusionContinueSkuInfo, productionDay);
         }
         //20260521+ 续作换活字块，一定要有前Sku
         BeforeSkuProductionInfo beforeSku = findBeforeSkuProductionInfoByChangeTypeBlock(context, conclusionSkuInfo, productionDay, materialDesc);

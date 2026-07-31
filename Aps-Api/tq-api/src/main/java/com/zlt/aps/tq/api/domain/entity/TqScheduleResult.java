@@ -11,6 +11,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 import java.io.Serializable;
+import java.lang.reflect.Field;
 import java.util.Date;
 
 /**
@@ -407,4 +408,37 @@ public class TqScheduleResult extends BaseEntity implements Serializable {
     /** 分厂编码（查询参数，非数据库字段） */
     @TableField(exist = false)
     private String factoryCode;
+
+    /**
+     * 按班次字段模板动态读取字段值（用于 class1~6PlanQty/FinishQty/Analysis/Sequence 等批量字段访问）。
+     * 遵循项目规范：禁止使用 switch/case 硬编码访问班次字段。
+     *
+     * @param fieldName Java 字段名（如 "class1PlanQty"）
+     * @return 字段值
+     */
+    public Serializable getFieldValueByFieldName(String fieldName) {
+        try {
+            Field field = this.getClass().getDeclaredField(fieldName);
+            field.setAccessible(true);
+            return (Serializable) field.get(this);
+        } catch (ReflectiveOperationException exception) {
+            throw new IllegalArgumentException("胎圈排程结果字段不存在: " + fieldName, exception);
+        }
+    }
+
+    /**
+     * 按班次字段模板动态写入字段值。
+     *
+     * @param fieldName Java 字段名
+     * @param value     字段值
+     */
+    public void setFieldValueByFieldName(String fieldName, Object value) {
+        try {
+            Field field = this.getClass().getDeclaredField(fieldName);
+            field.setAccessible(true);
+            field.set(this, value);
+        } catch (ReflectiveOperationException exception) {
+            throw new IllegalArgumentException("胎圈排程结果字段不存在: " + fieldName, exception);
+        }
+    }
 }

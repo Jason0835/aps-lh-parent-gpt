@@ -120,6 +120,10 @@ public class TcPersistService {
             explain.setBaseDemandQty(task.getBaseDemandQty() == null ? task.getDemandQty() : task.getBaseDemandQty());
             explain.setStockDeductQty(task.getStockDeductQty());
             explain.setFinalPlanQty(task.getPlanQty());
+            explain.setToolLedgerOrder(task.getToolLedgerOrder());
+            explain.setAvailableToolQty(task.getAvailableToolQty());
+            explain.setToolUsedQty(task.getToolUsedQty());
+            explain.setRemainingToolQty(task.getRemainingToolQty());
             explain.setPlanQtyBreakdownJson(this.buildPlanQtyBreakdownJson(task));
             explain.setStockQty(task.getSixClockStockQty());
             explain.setPlanStockQty(task.getPlanStockQty());

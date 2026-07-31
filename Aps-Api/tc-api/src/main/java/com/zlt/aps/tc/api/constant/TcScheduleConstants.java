@@ -277,6 +277,9 @@ public final class TcScheduleConstants {
     /** 人工排程机台操作锁键前缀。 */
     public static final String MANUAL_OPERATION_LOCK_KEY_PREFIX = "TC_SCHEDULE:OPER_LOCK:";
 
+    /** 自动滚动窗口分布式锁前缀。 */
+    public static final String ROLLING_LOCK_KEY_PREFIX = "TC_SCHEDULE:ROLLING_LOCK:";
+
     /** 自动排程基础资料缓存有效分钟数。 */
     public static final long BASE_DATA_CACHE_TTL_MINUTES = 5L;
 

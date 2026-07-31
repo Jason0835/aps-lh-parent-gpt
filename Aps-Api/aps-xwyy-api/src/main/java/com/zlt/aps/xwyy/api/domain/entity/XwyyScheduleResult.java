@@ -13,6 +13,8 @@ import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+import java.io.Serializable;
+import java.lang.reflect.Field;
 import java.math.BigDecimal;
 import java.util.Date;
 
@@ -491,4 +493,36 @@ public class XwyyScheduleResult extends BaseEntity {
     @ApiModelProperty("是否强制重新生成")
     @TableField(exist = false)
     private Boolean forceRegenerate;
+
+    /**
+     * 按字段模板动态读取班次字段值。
+     *
+     * @param fieldName Java字段名
+     * @return 字段值
+     */
+    public Serializable getFieldValueByFieldName(String fieldName) {
+        try {
+            Field field = this.getClass().getDeclaredField(fieldName);
+            field.setAccessible(true);
+            return (Serializable) field.get(this);
+        } catch (ReflectiveOperationException exception) {
+            throw new IllegalArgumentException("XWYY排程结果字段不存在: " + fieldName, exception);
+        }
+    }
+
+    /**
+     * 按字段模板动态设置班次字段值。
+     *
+     * @param fieldName Java字段名
+     * @param value 字段值
+     */
+    public void setFieldValueByFieldName(String fieldName, Object value) {
+        try {
+            Field field = this.getClass().getDeclaredField(fieldName);
+            field.setAccessible(true);
+            field.set(this, value);
+        } catch (ReflectiveOperationException exception) {
+            throw new IllegalArgumentException("XWYY排程结果字段不存在: " + fieldName, exception);
+        }
+    }
 }

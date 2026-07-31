@@ -1,6 +1,7 @@
 package com.zlt.aps.cd15.api.service;
 
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import com.zlt.aps.cd15.api.domain.dto.Cd15ScheduleImportDTO;
 import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
@@ -111,4 +112,9 @@ public interface ICd15ScheduleResultRemoteService {
     @ApiOperation("导入斜裁排程结果")
     @PostMapping("/cd15ScheduleResult/importData")
     AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport);
+
+    @ApiOperation("按固定模板导入斜裁排程结果")
+    @PostMapping("/cd15ScheduleResult/importDataByCust/{updateSupport}")
+    AjaxResult importDataByCust(@PathVariable("updateSupport") boolean updateSupport,
+                                @RequestBody Cd15ScheduleImportDTO importDTO);
 }

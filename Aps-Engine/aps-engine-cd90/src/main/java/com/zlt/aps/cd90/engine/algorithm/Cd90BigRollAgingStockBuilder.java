@@ -154,10 +154,10 @@ public class Cd90BigRollAgingStockBuilder {
     }
 
     private PlanShift planShift(String sourceId, String bigRollCode, String classField,
-                                Date shiftDate, BigDecimal quantity, int startHour) {
+                                Date shiftDate, BigDecimal quantity, int endHour) {
         return new PlanShift(sourceId, bigRollCode, classField,
                 shiftDate == null ? null : toLocalDate(shiftDate),
-                value(quantity), startHour);
+                value(quantity), endHour);
     }
 
     /** 判断实际库存是否缺少成熟时间或单卷米数。 */
@@ -210,24 +210,24 @@ public class Cd90BigRollAgingStockBuilder {
         private final String classField;
         private final LocalDate shiftDate;
         private final BigDecimal quantity;
-        private final int startHour;
+        private final int endHour;
 
         private PlanShift(String sourceId, String bigRollCode, String classField,
-                          LocalDate shiftDate, BigDecimal quantity, int startHour) {
+                          LocalDate shiftDate, BigDecimal quantity, int endHour) {
             this.sourceId = sourceId;
             this.bigRollCode = bigRollCode;
             this.classField = classField;
             this.shiftDate = shiftDate;
             this.quantity = quantity;
-            this.startHour = startHour;
+            this.endHour = endHour;
         }
 
         private LocalDateTime startTime() {
-            return shiftDate.atTime(startHour, 0);
+            return endTime().minusHours(8);
         }
 
         private LocalDateTime endTime() {
-            return startTime().plusHours(8);
+            return shiftDate.atTime(endHour, 0);
         }
     }
 }

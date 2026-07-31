@@ -1,6 +1,7 @@
 package com.zlt.aps.cd15.engine.mapper;
 
 import com.zlt.aps.cd15.api.domain.entity.Cd15Stock;
+import com.zlt.aps.cd15.api.domain.entity.Cd15ShiftStock;
 import com.zlt.aps.cd15.api.domain.entity.Cd15StorageLaneLimit;
 import com.zlt.aps.cd15.engine.model.Cd15FormingScheduleSource;
 import com.zlt.aps.cd15.engine.model.Cd15StockSource;
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.sql.Date;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Arrays;
 
@@ -65,6 +67,22 @@ public class Cd15AutoScheduleSourceMapper {
                 .subtract(decimal(source.getBadNum()));
         return Cd15StockSource.builder()
                 .stockDate(toLocalDate(source.getStockDate()))
+                .snapshotTime(toLocalDate(source.getStockDate()).atTime(6, 0))
+                .steelStripCode(source.getMaterialCode())
+                .stockQuantity(quantity)
+                .build();
+    }
+
+    /**
+     * 转换班次开始库存，基准时间直接使用班次开始时间。
+     */
+    public Cd15StockSource mapShiftStock(Cd15ShiftStock source) {
+        BigDecimal quantity = decimal(source.getStockNum())
+                .add(decimal(source.getModifyNum()))
+                .subtract(decimal(source.getBadNum()));
+        return Cd15StockSource.builder()
+                .stockDate(toLocalDate(source.getStockDate()))
+                .snapshotTime(toLocalDateTime(source.getShiftStartTime()))
                 .steelStripCode(source.getMaterialCode())
                 .stockQuantity(quantity)
                 .build();
@@ -111,5 +129,10 @@ public class Cd15AutoScheduleSourceMapper {
             return ((Date) value).toLocalDate();
         }
         return value.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+    }
+
+    private LocalDateTime toLocalDateTime(java.util.Date value) {
+        return value == null ? null
+                : LocalDateTime.ofInstant(value.toInstant(), ZoneId.systemDefault());
     }
 }

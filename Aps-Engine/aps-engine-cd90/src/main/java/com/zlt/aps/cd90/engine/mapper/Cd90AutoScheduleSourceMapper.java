@@ -1,6 +1,7 @@
 package com.zlt.aps.cd90.engine.mapper;
 
 import com.zlt.aps.cd90.api.domain.entity.Cd90Stock;
+import com.zlt.aps.cd90.api.domain.entity.Cd90ShiftStock;
 import com.zlt.aps.cd90.api.domain.entity.Cd90StorageLaneLimit;
 import com.zlt.aps.cd90.engine.model.Cd90FormingScheduleSource;
 import com.zlt.aps.cd90.engine.model.Cd90StockSource;
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.sql.Date;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Arrays;
 
@@ -71,6 +73,24 @@ public class Cd90AutoScheduleSourceMapper {
     }
 
     /**
+     * 转换班次开始库存，基准时间直接使用班次开始时间。
+     *
+     * @param source 班次库存实体
+     * @return 库存窄模型
+     */
+    public Cd90StockSource mapShiftStock(Cd90ShiftStock source) {
+        BigDecimal quantity = decimal(source.getStockNum())
+                .add(decimal(source.getModifyNum()))
+                .subtract(decimal(source.getBadNum()));
+        return Cd90StockSource.builder()
+                .stockDate(toLocalDate(source.getStockDate()))
+                .snapshotTime(toLocalDateTime(source.getShiftStartTime()))
+                .clothCode(source.getMaterialCode())
+                .stockQuantity(quantity)
+                .build();
+    }
+
+    /**
      * 转换库排状态。即使车数为0,也保留MES同步的帘布代号,供库排严格按帘布匹配。
      * <p>
      * MAX_CAR_NUM 必填(2026/06/24 变更):不同库排可不同,不再兜底推算;为空或非正时直接抛异常,
@@ -111,5 +131,10 @@ public class Cd90AutoScheduleSourceMapper {
             return ((Date) value).toLocalDate();
         }
         return value.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+    }
+
+    private LocalDateTime toLocalDateTime(java.util.Date value) {
+        return value == null ? null
+                : LocalDateTime.ofInstant(value.toInstant(), ZoneId.systemDefault());
     }
 }

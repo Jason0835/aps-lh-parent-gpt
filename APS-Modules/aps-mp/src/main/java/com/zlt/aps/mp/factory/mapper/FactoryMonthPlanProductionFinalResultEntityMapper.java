@@ -131,32 +131,6 @@ public interface FactoryMonthPlanProductionFinalResultEntityMapper extends CommB
                                  @Param("currentMonth") Integer currentMonth);
 
     /**
-     * 定稿时补更新上月定稿记录的上月超欠产有效标识（只更新标识，不更新值）
-     * 计算逻辑同 {@link #updateLastMonthOverProd}，仅 SET 子句移除 LAST_MONTH_OVERDUE_QTY，
-     * 保留 LAST_MONTH_VALID_FLAG 的阈值判定，确保标识判定结果与定时任务一致。
-     * 匹配维度：按 (分厂+物料编码+产品状态) 三字段维度匹配回填。
-     * 场景：次月定稿时（如6.25定稿7月），用上月（6月）数据补更新上月（6月）定稿记录的标识，
-     * 用于覆盖月初定时任务（6.1用5月数据）写入的旧标识，使标识反映最新的上月完成情况。
-     *
-     * @param lastYear                 数据来源月份年份（与写入目标月相同，即定稿月的上月）
-     * @param lastMonth                数据来源月份月份
-     * @param currentYear              写入目标月份年份（与数据来源月相同）
-     * @param currentMonth             写入目标月份月份
-     * @param startDate                数据来源月开始日期（用于 STOCK_CAPTURE_DATE 为空时回退）
-     * @param endDate                  数据来源月结束日期（月底边界）
-     * @param overdueThresholdParamCode 超欠产有效标志判定阈值参数编码
-     * @return 更新记录数
-     */
-    int updateLastMonthOverProdFlag(@Param("lastYear") Integer lastYear,
-                                    @Param("lastMonth") Integer lastMonth,
-                                    @Param("currentYear") Integer currentYear,
-                                    @Param("currentMonth") Integer currentMonth,
-                                    @Param("startDate") Date startDate,
-                                    @Param("endDate") Date endDate,
-                                    @Param("overdueThresholdParamCode") String overdueThresholdParamCode,
-                                    @Param("stockCaptureDateList") List<StockCaptureDateDTO> stockCaptureDateList);
-
-    /**
      * 查询上月定稿表的版本号信息（用于 Java 层计算库存抓取日）
      * 仅查询必要字段：分厂、物料、产品状态、需求版本号、最新需求版本号
      *

@@ -108,7 +108,7 @@ public interface GsqEngineMapper {
      * @return 排程基础信息列表
      */
     List<GsqScheduleBaseInfoVo> listGsqScheduleBaseInfo(@Param("steelRingCodes") List<String> steelRingCodes,
-                                                         @Param("productionStage") String productionStage);
+                                                        @Param("productionStage") String productionStage);
 
     /**
      * 查询指定日期的排程数据。
@@ -131,7 +131,7 @@ public interface GsqEngineMapper {
      * @return 施工信息列表
      */
     List<EngineConstructionInfo> listGsqNeedConstruction(@Param("scheduleDate") String scheduleDate,
-                                                          @Param("productionStage") String productionStage);
+                                                         @Param("productionStage") String productionStage);
 
     /**
      * 获得外协规格列表。
@@ -177,5 +177,5 @@ public interface GsqEngineMapper {
      * @return 检修计划列表，包含 machineCode、shiftDate、shiftCode
      */
     List<Map<String, Object>> listMachineMaintenancePlan(@Param("startDate") String startDate,
-                                                          @Param("endDate") String endDate);
+                                                         @Param("endDate") String endDate);
 }

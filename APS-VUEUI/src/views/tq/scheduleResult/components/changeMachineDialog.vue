@@ -64,8 +64,7 @@
 
 <script>
 import PageTable from "@/components/Table/PageTable.vue";
-import { changeMachine, validateChangeMachine, listScheduleShiftDates } from "@/api/tq/scheduleResult";
-import { listEnabledMachines } from "@/api/tq/machine";
+import { changeMachine, validateChangeMachine, listScheduleShiftDates, listCandidateMachines } from "@/api/tq/scheduleResult";
 
 export default {
   components: { PageTable },
@@ -224,10 +223,10 @@ export default {
         { shift: 6, shiftType: "morning", shiftDate: "" },
       ];
     },
-    /** 加载可用机台列表 */
-    async getMachineOptions() {
+    /** 加载可用机台列表（按寸口/口型板/定点约束过滤） */
+    async getMachineOptions(recordId) {
       try {
-        const res = await listEnabledMachines();
+        const res = await listCandidateMachines(recordId);
         this.machineOptions = res || [];
       } catch (error) {
         console.error(error);
@@ -266,7 +265,7 @@ export default {
         this.tableData = [{ ...data }];
         await this.fetchScheduleShiftDates(data.scheduleDate);
       }
-      await this.getMachineOptions();
+      await this.getMachineOptions(data.id);
     },
     /** 关闭弹窗 */
     hide() {

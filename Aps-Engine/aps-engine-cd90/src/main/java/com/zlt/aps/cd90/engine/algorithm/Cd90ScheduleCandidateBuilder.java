@@ -21,7 +21,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * 根据逐班帘布需求和6点库存构建当前直裁班次的待排候选规格。
+ * 根据逐班帘布需求和当前库存基准构建当前直裁班次的待排候选规格。
  */
 @Slf4j
 @Component
@@ -37,7 +37,7 @@ public class Cd90ScheduleCandidateBuilder {
      * 构建并排序当前供应窗口的候选规格。
      *
      * @param demandShifts 帘布逐自然班次需求
-     * @param stocksAtSix 6点库存快照
+     * @param stocksAtSix 库存基准快照；字段名保留全量排程旧口径
      * @param currentDemandStart 当前直裁班次对应的首个成型供应班次
      * @param depthClassQtyByCloth 按帘布匹配的备库班数
      * @param cumulativeConsumptionByCloth 6点至本班开始前的累计成型消耗，按帘布代号分组；> 0 表示续作规格
@@ -55,8 +55,15 @@ public class Cd90ScheduleCandidateBuilder {
             throw new IllegalArgumentException("逐帘布备库深度不能为空");
         }
 
-        // 先将多条6点库存按帘布汇总，后续所有窗口投影都使用同一库存基准。
+        // 先将多条库存按帘布汇总，后续所有窗口投影都使用同一库存基准。
         Map<String, BigDecimal> stockByCloth = aggregateStock(stocksAtSix);
+        Map<String, LocalDateTime> stockBaselineByCloth = safe(stocksAtSix).stream()
+                .filter(item -> item != null && item.getClothCode() != null)
+                .filter(item -> item.getSnapshotTime() != null)
+                .collect(Collectors.toMap(Cd90StockSource::getClothCode,
+                        Cd90StockSource::getSnapshotTime,
+                        (left, right) -> left.isBefore(right) ? left : right,
+                        LinkedHashMap::new));
         Map<String, List<Cd90DemandShift>> shiftsByCloth = safe(demandShifts).stream()
                 .filter(item -> item != null && StringUtils.hasText(item.getClothCode()))
                 .filter(item -> item.getStartTime() != null)
@@ -69,9 +76,12 @@ public class Cd90ScheduleCandidateBuilder {
             List<Cd90DemandShift> allShifts = entry.getValue().stream()
                     .sorted(Comparator.comparing(Cd90DemandShift::getStartTime))
                     .collect(Collectors.toList());
-            // 当前供应窗口之前已经发生的成型消耗必须先从6点库存扣除。
+            // 当前供应窗口之前且不早于库存基准的成型消耗必须先从库存扣除。
             BigDecimal consumedBeforeWindow = allShifts.stream()
                     .filter(item -> item.getStartTime().isBefore(currentDemandStart))
+                    .filter(item -> stockBaselineByCloth.get(entry.getKey()) == null
+                            || !item.getStartTime().isBefore(
+                            stockBaselineByCloth.get(entry.getKey())))
                     .map(item -> value(item.getClothDemandQuantity()))
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
             List<Cd90DemandShift> availableShifts = allShifts.stream()
@@ -94,7 +104,7 @@ public class Cd90ScheduleCandidateBuilder {
                 continue;
             }
 
-            //取6点库存
+            // 读取当前库存基准。
             BigDecimal stockAtSix = stockByCloth.getOrDefault(entry.getKey(), BigDecimal.ZERO);
             // 投影库存用于同时计算可供应时长和最早缺料班次，两者共同决定候选优先级。
             Cd90InventoryProjection projection = inventoryCalculator.project(

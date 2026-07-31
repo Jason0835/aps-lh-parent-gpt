@@ -49,6 +49,12 @@ public class TmManualRollingContext {
     /** 当前批次人工重算前的全局可用工装数量 */
     private BigDecimal initialAvailableToolQty;
 
+    /** 当前批次工装池上限 */
+    private BigDecimal totalToolQty;
+
+    /** 本次人工命令结算后的全局可用工装数量 */
+    private BigDecimal currentAvailableToolQty;
+
     /** 当前全部任务片段 */
     private List<TmManualTaskDraft> taskList = new ArrayList<>();
 

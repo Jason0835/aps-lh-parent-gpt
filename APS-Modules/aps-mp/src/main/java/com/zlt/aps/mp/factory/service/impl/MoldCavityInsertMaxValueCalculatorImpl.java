@@ -71,8 +71,8 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
      */
     @Transactional(rollbackFor = Exception.class)
     public List<DailyMouldAvailabilityResult> moldCavityInsertMaxValueCalculator(Integer year, Integer month, String factoryCode,
-                                                                        Date targetDate, String monthPlanVersion){
-        return moldCavityInsertMaxValueCalculator(year, month, factoryCode, targetDate, monthPlanVersion, false);
+                                                                        Date targetDate, String monthPlanVersion, Boolean isAllocLimit){
+        return moldCavityInsertMaxValueCalculator(year, month, factoryCode, targetDate, monthPlanVersion, false, isAllocLimit);
     }
 
     /**
@@ -90,7 +90,7 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
      */
     @Transactional(rollbackFor = Exception.class)
     public List<DailyMouldAvailabilityResult> moldCavityInsertMaxValueCalculator(Integer year, Integer month, String factoryCode,
-                                                                        Date targetDate, String monthPlanVersion, Boolean isAllMaterial){
+                                                                        Date targetDate, String monthPlanVersion, Boolean isAllMaterial,Boolean isAllocLimit){
         // 参数校验
         validateParameters(year, month, factoryCode, targetDate);
 
@@ -114,10 +114,10 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
         // 4. 根据是否传入日期返回不同结果
         if (targetDate != null) {
             // 计算指定日期的可用量
-            return calculateForSpecificDate(year, month, factoryCode, targetDate, mouldInfoMap, materialToStructureMap, isAllMaterial);
+            return calculateForSpecificDate(year, month, factoryCode, targetDate, mouldInfoMap, materialToStructureMap, isAllMaterial,isAllocLimit);
         } else {
             // 计算整个月份的可用量
-            return calculateForMonth(year, month, factoryCode, mouldInfoMap, materialToStructureMap, isAllMaterial);
+            return calculateForMonth(year, month, factoryCode, mouldInfoMap, materialToStructureMap, isAllMaterial,isAllocLimit);
         }
     }
 
@@ -127,7 +127,7 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
     private List<DailyMouldAvailabilityResult> calculateForMonth(Integer year, Integer month, String factoryCode,
                                                                  Map<String, ProductionMouldInfoVo> mouldInfoMap,
                                                                  Map<String, String> materialToStructureMap,
-                                                                 Boolean isAllMaterial) {
+                                                                 Boolean isAllMaterial,Boolean isAllocLimit) {
         // 获取排产周期信息
         ProductionCycleInfo cycleInfo = getProductionCycleInfo(year, month, factoryCode);
         Date productionStartDate = cycleInfo.getStartDate();
@@ -194,7 +194,7 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
             // 转换为当天结果
             Map<String, Integer> cavityDayResults = new HashMap<>();
             for (Map.Entry<String, Set<String>> entry : cavityTempMap.entrySet()) {
-                cavityDayResults.put(entry.getKey(), applyLimitWithCache(allocationCache, entry.getKey(), entry.getValue().size()));
+                cavityDayResults.put(entry.getKey(), applyLimitWithCache(allocationCache, entry.getKey(), entry.getValue().size(),isAllocLimit));
                 // 如果是停产日，直接返回空结果
                 if (stopDays.contains(day)) {
                     cavityDayResults.put(entry.getKey(), 0);
@@ -205,7 +205,7 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
             for (Map.Entry<String, Set<String>> entry : insertTempMap.entrySet()) {
                 String structureKey = materialToStructureMap.get(entry.getKey());
                 if (StringUtils.isNotBlank(structureKey)) {
-                    insertDayResults.put(entry.getKey(), applyLimitWithCache(allocationCache, structureKey, entry.getValue().size()));
+                    insertDayResults.put(entry.getKey(), applyLimitWithCache(allocationCache, structureKey, entry.getValue().size(),isAllocLimit));
                 } else {
                     insertDayResults.put(entry.getKey(), entry.getValue().size());
                 }            // 如果是停产日，直接返回空结果
@@ -229,7 +229,7 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
     private List<DailyMouldAvailabilityResult> calculateForSpecificDate(Integer year, Integer month, String factoryCode,
                                                                   Date targetDate, Map<String, ProductionMouldInfoVo> mouldInfoMap,
                                                                   Map<String, String> materialToStructureMap,
-                                                                  Boolean isAllMaterial) {
+                                                                  Boolean isAllMaterial,Boolean isAllocLimit) {
         // 获取排产周期信息
         ProductionCycleInfo cycleInfo = getProductionCycleInfo(year, month, factoryCode);
 
@@ -301,7 +301,7 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
         // 转换为最终结果
         Map<String, Integer> cavityResults = new HashMap<>();
         for (Map.Entry<String, Set<String>> entry : cavityTempMap.entrySet()) {
-            cavityResults.put(entry.getKey(), applyLimitWithCache(allocationCache, entry.getKey(), entry.getValue().size()));
+            cavityResults.put(entry.getKey(), applyLimitWithCache(allocationCache, entry.getKey(), entry.getValue().size(),isAllocLimit));
             // 如果是停产日，直接返回空结果
             if (stopDays.contains(dayOfCycle)) {
                 cavityResults.put(entry.getKey(), 0);
@@ -312,7 +312,7 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
         for (Map.Entry<String, Set<String>> entry : insertTempMap.entrySet()) {
             String structureKey = materialToStructureMap.get(entry.getKey());
             if (StringUtils.isNotBlank(structureKey)) {
-                insertResults.put(entry.getKey(), applyLimitWithCache(allocationCache, structureKey, entry.getValue().size()));
+                insertResults.put(entry.getKey(), applyLimitWithCache(allocationCache, structureKey, entry.getValue().size(),isAllocLimit));
             } else {
                 insertResults.put(entry.getKey(), entry.getValue().size());
             }            // 如果是停产日，直接返回空结果
@@ -334,11 +334,14 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
      * @param rawSize 原始数量
      * @return 限制后的数量
      */
-    private int applyLimitWithCache(Map<String, Integer> cache, String structureKey, int rawSize) {
-        Integer allocationQty = cache.get(structureKey);
-        if (allocationQty != null && allocationQty >= 0) {
-            return Math.min(rawSize, allocationQty);
+    private int applyLimitWithCache(Map<String, Integer> cache, String structureKey, int rawSize,Boolean isAllocLimit) {
+        if (isAllocLimit){
+            Integer allocationQty = cache.get(structureKey);
+            if (allocationQty != null && allocationQty >= 0) {
+                return Math.min(rawSize, allocationQty);
+            }
         }
+
         return rawSize;
     }
 

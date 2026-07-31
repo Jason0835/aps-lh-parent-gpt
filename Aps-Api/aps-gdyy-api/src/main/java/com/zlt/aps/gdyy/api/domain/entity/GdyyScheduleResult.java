@@ -10,6 +10,7 @@ import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
 import java.io.Serializable;
+import java.lang.reflect.Field;
 import java.util.Date;
 
 /**
@@ -82,12 +83,14 @@ public class GdyyScheduleResult extends BaseEntity implements Serializable {
     @JsonFormat(pattern = "yyyy-MM-dd")
     private Date class1ScheduleDate;
     @TableField("CLASS1_PLAN_QTY")
+    @Excel(name = "ui.data.column.gdyyScheduleResult.class1PlanQty")
     private Double class1PlanQty;
     @TableField("CLASS1_CX_PLAN_QTY")
     private Double class1CxPlanQty;
     @TableField("CLASS1_FINISH_QTY")
     private Double class1FinishQty;
     @TableField("CLASS1_PRODUCE_ORDER")
+    @Excel(name = "ui.data.column.gdyyScheduleResult.class1ProduceOrder")
     private Double class1ProduceOrder;
     @TableField("CLASS1_FINISH_RATE")
     private Double class1FinishRate;
@@ -101,12 +104,14 @@ public class GdyyScheduleResult extends BaseEntity implements Serializable {
     @JsonFormat(pattern = "yyyy-MM-dd")
     private Date class2ScheduleDate;
     @TableField("CLASS2_PLAN_QTY")
+    @Excel(name = "ui.data.column.gdyyScheduleResult.class2PlanQty")
     private Double class2PlanQty;
     @TableField("CLASS2_CX_PLAN_QTY")
     private Double class2CxPlanQty;
     @TableField("CLASS2_FINISH_QTY")
     private Double class2FinishQty;
     @TableField("CLASS2_PRODUCE_ORDER")
+    @Excel(name = "ui.data.column.gdyyScheduleResult.class2ProduceOrder")
     private Double class2ProduceOrder;
     @TableField("CLASS2_FINISH_RATE")
     private Double class2FinishRate;
@@ -120,12 +125,14 @@ public class GdyyScheduleResult extends BaseEntity implements Serializable {
     @JsonFormat(pattern = "yyyy-MM-dd")
     private Date class3ScheduleDate;
     @TableField("CLASS3_PLAN_QTY")
+    @Excel(name = "ui.data.column.gdyyScheduleResult.class3PlanQty")
     private Double class3PlanQty;
     @TableField("CLASS3_CX_PLAN_QTY")
     private Double class3CxPlanQty;
     @TableField("CLASS3_FINISH_QTY")
     private Double class3FinishQty;
     @TableField("CLASS3_PRODUCE_ORDER")
+    @Excel(name = "ui.data.column.gdyyScheduleResult.class3ProduceOrder")
     private Double class3ProduceOrder;
     @TableField("CLASS3_FINISH_RATE")
     private Double class3FinishRate;
@@ -139,12 +146,14 @@ public class GdyyScheduleResult extends BaseEntity implements Serializable {
     @JsonFormat(pattern = "yyyy-MM-dd")
     private Date class4ScheduleDate;
     @TableField("CLASS4_PLAN_QTY")
+    @Excel(name = "ui.data.column.gdyyScheduleResult.class4PlanQty")
     private Double class4PlanQty;
     @TableField("CLASS4_CX_PLAN_QTY")
     private Double class4CxPlanQty;
     @TableField("CLASS4_FINISH_QTY")
     private Double class4FinishQty;
     @TableField("CLASS4_PRODUCE_ORDER")
+    @Excel(name = "ui.data.column.gdyyScheduleResult.class4ProduceOrder")
     private Double class4ProduceOrder;
     @TableField("CLASS4_FINISH_RATE")
     private Double class4FinishRate;
@@ -158,12 +167,14 @@ public class GdyyScheduleResult extends BaseEntity implements Serializable {
     @JsonFormat(pattern = "yyyy-MM-dd")
     private Date class5ScheduleDate;
     @TableField("CLASS5_PLAN_QTY")
+    @Excel(name = "ui.data.column.gdyyScheduleResult.class5PlanQty")
     private Double class5PlanQty;
     @TableField("CLASS5_CX_PLAN_QTY")
     private Double class5CxPlanQty;
     @TableField("CLASS5_FINISH_QTY")
     private Double class5FinishQty;
     @TableField("CLASS5_PRODUCE_ORDER")
+    @Excel(name = "ui.data.column.gdyyScheduleResult.class5ProduceOrder")
     private Double class5ProduceOrder;
     @TableField("CLASS5_FINISH_RATE")
     private Double class5FinishRate;
@@ -177,12 +188,14 @@ public class GdyyScheduleResult extends BaseEntity implements Serializable {
     @JsonFormat(pattern = "yyyy-MM-dd")
     private Date class6ScheduleDate;
     @TableField("CLASS6_PLAN_QTY")
+    @Excel(name = "ui.data.column.gdyyScheduleResult.class6PlanQty")
     private Double class6PlanQty;
     @TableField("CLASS6_CX_PLAN_QTY")
     private Double class6CxPlanQty;
     @TableField("CLASS6_FINISH_QTY")
     private Double class6FinishQty;
     @TableField("CLASS6_PRODUCE_ORDER")
+    @Excel(name = "ui.data.column.gdyyScheduleResult.class6ProduceOrder")
     private Double class6ProduceOrder;
     @TableField("CLASS6_FINISH_RATE")
     private Double class6FinishRate;
@@ -196,12 +209,14 @@ public class GdyyScheduleResult extends BaseEntity implements Serializable {
     @JsonFormat(pattern = "yyyy-MM-dd")
     private Date class7ScheduleDate;
     @TableField("CLASS7_PLAN_QTY")
+    @Excel(name = "ui.data.column.gdyyScheduleResult.class7PlanQty")
     private Double class7PlanQty;
     @TableField("CLASS7_CX_PLAN_QTY")
     private Double class7CxPlanQty;
     @TableField("CLASS7_FINISH_QTY")
     private Double class7FinishQty;
     @TableField("CLASS7_PRODUCE_ORDER")
+    @Excel(name = "ui.data.column.gdyyScheduleResult.class7ProduceOrder")
     private Double class7ProduceOrder;
     @TableField("CLASS7_FINISH_RATE")
     private Double class7FinishRate;
@@ -215,12 +230,14 @@ public class GdyyScheduleResult extends BaseEntity implements Serializable {
     @JsonFormat(pattern = "yyyy-MM-dd")
     private Date class8ScheduleDate;
     @TableField("CLASS8_PLAN_QTY")
+    @Excel(name = "ui.data.column.gdyyScheduleResult.class8PlanQty")
     private Double class8PlanQty;
     @TableField("CLASS8_CX_PLAN_QTY")
     private Double class8CxPlanQty;
     @TableField("CLASS8_FINISH_QTY")
     private Double class8FinishQty;
     @TableField("CLASS8_PRODUCE_ORDER")
+    @Excel(name = "ui.data.column.gdyyScheduleResult.class8ProduceOrder")
     private Double class8ProduceOrder;
     @TableField("CLASS8_FINISH_RATE")
     private Double class8FinishRate;
@@ -265,4 +282,36 @@ public class GdyyScheduleResult extends BaseEntity implements Serializable {
     @TableField("NEWEST_PUBLISH_TIME")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private Date newestPublishTime;
+
+    /**
+     * 按字段模板动态读取班次字段值。
+     *
+     * @param fieldName Java字段名
+     * @return 字段值
+     */
+    public Serializable getFieldValueByFieldName(String fieldName) {
+        try {
+            Field field = this.getClass().getDeclaredField(fieldName);
+            field.setAccessible(true);
+            return (Serializable) field.get(this);
+        } catch (ReflectiveOperationException exception) {
+            throw new IllegalArgumentException("GDYY排程结果字段不存在: " + fieldName, exception);
+        }
+    }
+
+    /**
+     * 按字段模板动态设置班次字段值。
+     *
+     * @param fieldName Java字段名
+     * @param value 字段值
+     */
+    public void setFieldValueByFieldName(String fieldName, Object value) {
+        try {
+            Field field = this.getClass().getDeclaredField(fieldName);
+            field.setAccessible(true);
+            field.set(this, value);
+        } catch (ReflectiveOperationException exception) {
+            throw new IllegalArgumentException("GDYY排程结果字段不存在: " + fieldName, exception);
+        }
+    }
 }

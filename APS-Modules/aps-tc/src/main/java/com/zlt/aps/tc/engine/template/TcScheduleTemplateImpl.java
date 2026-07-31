@@ -1,7 +1,11 @@
 package com.zlt.aps.tc.engine.template;
 
 import cn.hutool.core.date.DateUtil;
+import cn.hutool.core.util.StrUtil;
+import com.ruoyi.common.exception.ServiceException;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.engine.schedule.IScheduleProcessLogger;
+import com.zlt.aps.tc.api.enums.TcAutoScheduleIssueCategoryEnum;
 import com.zlt.aps.tc.api.enums.TcScheduleStepEnum;
 import com.zlt.aps.tc.engine.domain.TcScheduleContext;
 import com.zlt.aps.tc.engine.domain.TcTaskDraft;
@@ -114,20 +118,46 @@ public class TcScheduleTemplateImpl extends AbsTcScheduleTemplate {
     }
 
     private void runStep(TcScheduleContext context, TcScheduleStepEnum stepEnum, Runnable runnable) {
-        if (processLogger != null) {
-            processLogger.logStepStart(context, stepEnum.getCode(), buildStepSummary(context, stepEnum, true));
+        try {
+            if (processLogger != null) {
+                processLogger.logStepStart(context, stepEnum.getCode(), buildStepSummary(context, stepEnum, true));
+            }
+            // 快照与落库阶段开始前先上报 90%，核心短事务成功后再原子更新为 100%。
+            if (TcScheduleStepEnum.SNAPSHOT_BUILD == stepEnum) {
+                this.updateProgress(context, stepEnum);
+            }
+            runnable.run();
+            if (TcScheduleStepEnum.SNAPSHOT_BUILD != stepEnum) {
+                this.updateProgress(context, stepEnum);
+            }
+            if (processLogger != null) {
+                processLogger.logStepEnd(context, stepEnum.getCode(), buildStepSummary(context, stepEnum, false));
+            }
+        } catch (RuntimeException exception) {
+            this.recordStepFailure(context, stepEnum, exception);
+            throw exception;
         }
-        // 快照与落库阶段开始前先上报 90%，核心短事务成功后再原子更新为 100%。
-        if (TcScheduleStepEnum.SNAPSHOT_BUILD == stepEnum) {
-            this.updateProgress(context, stepEnum);
+    }
+
+    /**
+     * 记录当前排程步骤的阻断异常，已有结构化错误时不重复追加。
+     *
+     * @param context   排程上下文
+     * @param stepEnum 排程步骤
+     * @param exception 原始异常
+     */
+    private void recordStepFailure(TcScheduleContext context, TcScheduleStepEnum stepEnum,
+                                   RuntimeException exception) {
+        if (context == null || context.getIssueCollector() == null) {
+            return;
         }
-        runnable.run();
-        if (TcScheduleStepEnum.SNAPSHOT_BUILD != stepEnum) {
-            this.updateProgress(context, stepEnum);
-        }
-        if (processLogger != null) {
-            processLogger.logStepEnd(context, stepEnum.getCode(), buildStepSummary(context, stepEnum, false));
-        }
+        boolean businessError = exception instanceof ServiceException;
+        TcAutoScheduleIssueCategoryEnum category = businessError
+                ? TcAutoScheduleIssueCategoryEnum.AUTO_SCHEDULE_BUSINESS_ERROR
+                : TcAutoScheduleIssueCategoryEnum.AUTO_SCHEDULE_SYSTEM_ERROR;
+        String message = StrUtil.blankToDefault(exception.getMessage(),
+                I18nUtil.getMessage("ui.tc.schedule.taskExecuteFailed"));
+        context.getIssueCollector().addFailureIssueIfAbsent(stepEnum, category, message);
     }
 
     /**

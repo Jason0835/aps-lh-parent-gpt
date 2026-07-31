@@ -13,6 +13,7 @@ import com.zlt.aps.cd90.engine.model.Cd90RollingTarget;
 import com.zlt.aps.cd90.engine.service.Cd90RollingInputVersionService;
 import com.zlt.aps.cd90.engine.service.Cd90RollingParameterService;
 import com.zlt.aps.cd90.engine.service.Cd90RollingScheduleTaskService;
+import com.zlt.aps.cd90.engine.service.Cd90RollingShiftStockService;
 import com.zlt.aps.cd90.engine.service.Cd90RollingTargetResolver;
 import com.zlt.aps.cd90.engine.service.Cd90ScheduleTaskService;
 import com.zlt.aps.cd90.service.Cd90RollingStabilityService;
@@ -43,6 +44,7 @@ public class Cd90TimedRollingCheckServiceImpl implements Cd90TimedRollingCheckSe
     private final Cd90RollingInputVersionService rollingInputVersionService;
     private final Cd90RollingStabilityService rollingStabilityService;
     private final Cd90RollingScheduleTaskService rollingTaskService;
+    private final Cd90RollingShiftStockService rollingShiftStockService;
     private final Cd90ScheduleTaskService taskService;
     private final Cd90TimedRollingAsyncExecutor timedRollingAsyncExecutor;
     private final ObjectMapper objectMapper;
@@ -80,6 +82,10 @@ public class Cd90TimedRollingCheckServiceImpl implements Cd90TimedRollingCheckSe
             return;
         }
         Cd90RollingTarget target = optionalTarget.get();
+        if (!rollingShiftStockService.exists(target)) {
+            skippedFactories.add(skip(factoryCode, "SHIFT_STOCK_NOT_READY"));
+            return;
+        }
         Date scheduleDate = Date.from(target.getScheduleDate().atStartOfDay(
                 ZoneId.systemDefault()).toInstant());
         if (taskService.findActive(factoryCode, scheduleDate) != null) {

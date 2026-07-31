@@ -7,7 +7,9 @@ import com.zlt.aps.common.engine.schedule.ScheduleTaskLinkedList;
 import com.zlt.aps.common.engine.schedule.ScheduleTaskNode;
 import com.zlt.aps.common.engine.schedule.constraint.ScheduleConstraintCalculator;
 import com.zlt.aps.common.engine.schedule.constraint.ScheduleTaskConstraint;
+import com.zlt.aps.common.engine.schedule.constraint.ScheduleToolLedgerResult;
 import com.zlt.aps.tm.api.constant.TmScheduleConstants;
+import com.zlt.aps.tm.api.enums.TmUnplannedReasonEnum;
 import com.zlt.aps.tm.engine.domain.manual.*;
 import org.springframework.stereotype.Service;
 
@@ -57,9 +59,12 @@ public class TmManualRollingEngineService {
                 .collect(Collectors.toCollection(LinkedHashSet::new));
         TmManualRollingResult rollingResult = new TmManualRollingResult();
         rollingResult.setBeforeTotalQty(this.sumPlanQty(taskList));
+        rollingResult.setAvailableToolQtyBefore(context.getInitialAvailableToolQty());
+        List<TmManualTaskDraft> unplannedTaskList = new ArrayList<>();
 
         Map<String, TmManualRollingScope> scopeMap = new LinkedHashMap<>();
         BigDecimal commandDeltaQty = BigDecimal.ZERO;
+        BigDecimal currentAvailableToolQty = context.getInitialAvailableToolQty();
         List<TmManualRollingCommand> commandList = commandBatch.getCommandList();
         for (int commandIndex = 0; commandIndex < commandList.size(); commandIndex++) {
             TmManualRollingCommand command = commandList.get(commandIndex);
@@ -68,16 +73,21 @@ public class TmManualRollingEngineService {
             }
             command.setCommandOrder(command.getCommandOrder() == null ? commandIndex : command.getCommandOrder());
             BigDecimal beforeCommandQty = this.sumPlanQty(taskList);
+            ScheduleToolLedgerResult ledgerResult = this.applyCommandToolLimit(
+                    taskList, command, currentAvailableToolQty, context.getTotalToolQty(), unplannedTaskList);
             BigDecimal currentCommandDeltaQty = this.applyCommand(taskList, command, scopeMap,
                     rollingResult.getAffectedResultGroupKeySet());
             BigDecimal actualCommandDeltaQty = this.sumPlanQty(taskList).subtract(beforeCommandQty);
             if (currentCommandDeltaQty.compareTo(actualCommandDeltaQty) != 0) {
                 throw new IllegalStateException("人工滚动单命令数量不守恒:" + command.getOperationType());
             }
-            commandDeltaQty = commandDeltaQty.add(currentCommandDeltaQty);
+            commandDeltaQty = commandDeltaQty.add(currentCommandDeltaQty)
+                    .add(ledgerResult.getOverflowPlanQty());
+            currentAvailableToolQty = ledgerResult.getRemainingToolQty();
         }
 
-        List<TmManualTaskDraft> unplannedTaskList = new ArrayList<>();
+        taskList.removeIf(task -> this.nvl(task.getPlanQty()).compareTo(BigDecimal.ZERO) <= 0
+                && this.nvl(task.getFinishQty()).compareTo(BigDecimal.ZERO) <= 0);
         List<TmManualRollingScope> scopeList = scopeMap.values().stream()
                 .sorted(Comparator.comparing(TmManualRollingScope::getMachineCode))
                 .collect(Collectors.toList());
@@ -88,7 +98,6 @@ public class TmManualRollingEngineService {
         for (TmManualRollingScope scope : scopeList) {
             taskList = this.repackMachine(taskList, scope, context, unplannedTaskList);
         }
-        taskList = this.applyToolLimit(taskList, context, unplannedTaskList);
 
         MachineShiftTaskChain<TmManualTaskDraft> taskChainGroup = this.buildTaskChains(taskList, context);
         this.validateResult(taskList, unplannedTaskList, taskChainGroup, context,
@@ -100,12 +109,101 @@ public class TmManualRollingEngineService {
         rollingResult.setCommandDeltaQty(commandDeltaQty);
         rollingResult.setScheduledTotalQty(this.sumPlanQty(taskList));
         rollingResult.setUnplannedTotalQty(this.sumPlanQty(unplannedTaskList));
+        rollingResult.setRemainingToolQty(currentAvailableToolQty);
         rollingResult.setAffectedResultIdSet(rollingResult.getAffectedResultGroupKeySet().stream()
                 .map(this::parseResultId).filter(Objects::nonNull)
                 .collect(Collectors.toCollection(LinkedHashSet::new)));
+        Set<Long> scheduledSourceIdSet = taskList.stream().map(TmManualTaskDraft::getSourceResultId)
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        Set<Long> explicitDeleteResultIdSet = commandList.stream()
+                .filter(command -> command != null
+                        && TmManualRollingOperationEnum.DELETE == command.getOperationType())
+                .map(TmManualRollingCommand::getResultGroupKey).map(this::parseResultId)
+                .filter(Objects::nonNull).collect(Collectors.toCollection(LinkedHashSet::new));
+        commandList.stream()
+                .filter(command -> command != null
+                        && TmManualRollingOperationEnum.CHANGE_MACHINE == command.getOperationType())
+                .map(TmManualRollingCommand::getResultGroupKey).map(this::parseResultId)
+                .filter(Objects::nonNull).filter(resultId -> !scheduledSourceIdSet.contains(resultId))
+                .forEach(explicitDeleteResultIdSet::add);
+        rollingResult.setExplicitDeleteResultIdSet(explicitDeleteResultIdSet);
+        rollingResult.setContainsNonDeleteOperation(commandList.stream()
+                .filter(Objects::nonNull)
+                .anyMatch(command -> TmManualRollingOperationEnum.DELETE != command.getOperationType()));
+        Set<String> scheduledGroupKeySet = taskList.stream().map(TmManualTaskDraft::getResultGroupKey)
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        rollingResult.setMoveToUnplannedResultIdSet(unplannedTaskList.stream()
+                .filter(task -> !scheduledGroupKeySet.contains(task.getResultGroupKey()))
+                .map(TmManualTaskDraft::getSourceResultId).filter(Objects::nonNull)
+                .collect(Collectors.toCollection(LinkedHashSet::new)));
         context.setTaskList(taskList);
         context.setTaskChainGroup(taskChainGroup);
+        context.setCurrentAvailableToolQty(currentAvailableToolQty);
         return rollingResult;
+    }
+
+    /**
+     * 在业务命令应用前只结算命令计划增量，禁止对既有任务再次消费工装。
+     *
+     * @param taskList 当前任务
+     * @param command 当前命令
+     * @param availableToolQty 当前可用工装
+     * @param totalToolQty 工装池上限
+     * @param unplannedTaskList 工装不足未排任务收集器
+     * @return 本命令工装账本结算结果
+     */
+    private ScheduleToolLedgerResult applyCommandToolLimit(List<TmManualTaskDraft> taskList,
+                                                           TmManualRollingCommand command,
+                                                           BigDecimal availableToolQty,
+                                                           BigDecimal totalToolQty,
+                                                           List<TmManualTaskDraft> unplannedTaskList) {
+        if (availableToolQty == null) {
+            return this.constraintCalculator.settleToolLedger(
+                    BigDecimal.ZERO, BigDecimal.ZERO, null, totalToolQty, null);
+        }
+        TmManualTaskDraft referenceTask = null;
+        BigDecimal requestedProductionQty = BigDecimal.ZERO;
+        BigDecimal releasedDemandQty = BigDecimal.ZERO;
+        if (TmManualRollingOperationEnum.INSERT == command.getOperationType()) {
+            referenceTask = command.getInsertTask();
+            requestedProductionQty = referenceTask == null ? BigDecimal.ZERO : this.nvl(referenceTask.getPlanQty());
+        } else if (TmManualRollingOperationEnum.CHANGE_QTY == command.getOperationType()) {
+            referenceTask = this.findTask(taskList, command);
+            BigDecimal deltaQty = this.nvl(command.getPlanQty()).subtract(this.nvl(referenceTask.getPlanQty()));
+            requestedProductionQty = deltaQty.max(BigDecimal.ZERO);
+            releasedDemandQty = deltaQty.min(BigDecimal.ZERO).abs();
+        } else if (TmManualRollingOperationEnum.DELETE == command.getOperationType()) {
+            List<TmManualTaskDraft> deleteTaskList = taskList.stream()
+                    .filter(task -> Objects.equals(command.getResultGroupKey(), task.getResultGroupKey()))
+                    .collect(Collectors.toList());
+            referenceTask = deleteTaskList.isEmpty() ? null : deleteTaskList.get(0);
+            releasedDemandQty = deleteTaskList.stream().map(TmManualTaskDraft::getPlanQty)
+                    .map(this::nvl).reduce(BigDecimal.ZERO, BigDecimal::add);
+        }
+        BigDecimal curlLength = referenceTask == null ? null : referenceTask.getCurlRollLength();
+        ScheduleToolLedgerResult ledgerResult = this.constraintCalculator.settleToolLedger(
+                requestedProductionQty, releasedDemandQty, availableToolQty, totalToolQty, curlLength);
+        if (TmManualRollingOperationEnum.INSERT == command.getOperationType() && referenceTask != null) {
+            referenceTask.setPlanQty(ledgerResult.getAllowedPlanQty());
+        } else if (TmManualRollingOperationEnum.CHANGE_QTY == command.getOperationType() && referenceTask != null
+                && requestedProductionQty.compareTo(BigDecimal.ZERO) > 0) {
+            command.setPlanQty(this.nvl(referenceTask.getPlanQty()).add(ledgerResult.getAllowedPlanQty()));
+        }
+        if (ledgerResult.getOverflowPlanQty().compareTo(BigDecimal.ZERO) > 0 && referenceTask != null) {
+            TmManualTaskDraft overflowTask = referenceTask.copy();
+            overflowTask.setTaskId(StrUtil.blankToDefault(referenceTask.getTaskId(), "MANUAL") + ":TOOL");
+            overflowTask.setPlanQty(ledgerResult.getOverflowPlanQty());
+            overflowTask.setFinishQty(BigDecimal.ZERO);
+            overflowTask.setCarryoverTask(true);
+            overflowTask.setInsertTask(TmManualRollingOperationEnum.INSERT == command.getOperationType());
+            overflowTask.setUnplannedReasonCode(TmUnplannedReasonEnum.TOOL_NOT_ENOUGH.getCode());
+            overflowTask.setUnplannedReasonDesc(TmUnplannedReasonEnum.TOOL_NOT_ENOUGH.getDesc());
+            overflowTask.setAvailableToolQty(ledgerResult.getAvailableToolQty());
+            overflowTask.setRequiredToolQty(this.constraintCalculator.calculateToolUsedQty(
+                    requestedProductionQty, curlLength));
+            unplannedTaskList.add(overflowTask);
+        }
+        return ledgerResult;
     }
 
     /**
@@ -560,53 +658,6 @@ public class TmManualRollingEngineService {
      */
     private TmManualTaskDraft findLastTask(List<TmManualTaskDraft> taskList) {
         return taskList == null || taskList.isEmpty() ? null : taskList.get(taskList.size() - 1);
-    }
-
-    /**
-     * 按当前批次全局可用工装限制已排任务，并将工装溢出量转为未排。
-     *
-     * @param taskList 当前已排任务
-     * @param context 人工滚动上下文
-     * @param unplannedTaskList 未排任务收集器
-     * @return 应用工装限制后的已排任务
-     */
-    private List<TmManualTaskDraft> applyToolLimit(List<TmManualTaskDraft> taskList,
-                                                   TmManualRollingContext context,
-                                                   List<TmManualTaskDraft> unplannedTaskList) {
-        if (context.getInitialAvailableToolQty() == null) {
-            return taskList;
-        }
-        BigDecimal availableToolQty = context.getInitialAvailableToolQty().max(BigDecimal.ZERO);
-        List<TmManualTaskDraft> sortedTaskList = taskList.stream()
-                .sorted(Comparator.comparing(TmManualTaskDraft::getShiftOrder)
-                        .thenComparing(TmManualTaskDraft::getMachineCode)
-                        .thenComparing(task -> this.defaultSequence(task.getSequence())))
-                .collect(Collectors.toList());
-        List<TmManualTaskDraft> limitedTaskList = new ArrayList<>();
-        for (TmManualTaskDraft task : sortedTaskList) {
-            BigDecimal originalPlanQty = this.nvl(task.getPlanQty());
-            BigDecimal limitedPlanQty = this.constraintCalculator.limitPlanQtyByTool(
-                    originalPlanQty, availableToolQty, task.getCurlRollLength());
-            limitedPlanQty = limitedPlanQty.max(this.nvl(task.getFinishQty())).min(originalPlanQty);
-            if (limitedPlanQty.compareTo(BigDecimal.ZERO) > 0) {
-                TmManualTaskDraft limitedTask = task.copy();
-                limitedTask.setPlanQty(limitedPlanQty);
-                limitedTaskList.add(limitedTask);
-                availableToolQty = availableToolQty.subtract(
-                        this.constraintCalculator.calculateToolUsedQty(
-                                limitedPlanQty, task.getCurlRollLength())).max(BigDecimal.ZERO);
-            }
-            BigDecimal overflowQty = originalPlanQty.subtract(limitedPlanQty).max(BigDecimal.ZERO);
-            if (overflowQty.compareTo(BigDecimal.ZERO) > 0) {
-                TmManualTaskDraft overflowTask = task.copy();
-                overflowTask.setTaskId(task.getTaskId() + ":TOOL");
-                overflowTask.setPlanQty(overflowQty);
-                overflowTask.setFinishQty(BigDecimal.ZERO);
-                overflowTask.setCarryoverTask(true);
-                unplannedTaskList.add(overflowTask);
-            }
-        }
-        return limitedTaskList;
     }
 
     /**

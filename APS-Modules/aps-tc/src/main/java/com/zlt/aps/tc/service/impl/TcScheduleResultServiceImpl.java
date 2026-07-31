@@ -12,14 +12,18 @@ import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.tc.api.constant.TcScheduleConstants;
 import com.zlt.aps.tc.api.domain.entity.TcScheduleResult;
+import com.zlt.aps.tc.api.domain.vo.TcAutoScheduleIssueVo;
 import com.zlt.aps.tc.api.domain.vo.TcAutoScheduleRequestVo;
 import com.zlt.aps.tc.api.domain.vo.TcAutoScheduleResponseVo;
+import com.zlt.aps.tc.api.enums.TcAutoScheduleIssueCategoryEnum;
 import com.zlt.aps.tc.api.enums.TcAutoScheduleTaskStatusEnum;
 import com.zlt.aps.tc.api.enums.TcReleaseStatusTransition;
+import com.zlt.aps.tc.api.enums.TcScheduleStepEnum;
 import com.zlt.aps.tc.component.TcAutoScheduleExecutionGuard;
 import com.zlt.aps.tc.domain.TcAutoScheduleTask;
 import com.zlt.aps.tc.engine.domain.TcPersistResult;
 import com.zlt.aps.tc.engine.domain.TcScheduleContext;
+import com.zlt.aps.tc.engine.service.collector.TcAutoScheduleIssueCollector;
 import com.zlt.aps.tc.engine.template.TcScheduleTemplateImpl;
 import com.zlt.aps.tc.mapper.TcScheduleResultMapper;
 import com.zlt.aps.tc.service.ITcScheduleResultService;
@@ -243,12 +247,14 @@ public class TcScheduleResultServiceImpl extends AbstractDocService<TcScheduleRe
         if (task == null) {
             throw new ServiceException(I18nUtil.getMessage("ui.tc.schedule.taskNotFound"));
         }
-        TcAutoScheduleRequestVo request = JSON.parseObject(task.getRequestSnapshot(), TcAutoScheduleRequestVo.class);
-        this.validateRequest(request);
-        String lockToken = tcAutoScheduleExecutionGuard.acquire(request.getFactoryCode(), request.getScheduleDate());
+        TcAutoScheduleRequestVo request = null;
+        String lockToken = null;
         TcScheduleContext context = null;
         long startMillis = System.currentTimeMillis();
         try {
+            request = JSON.parseObject(task.getRequestSnapshot(), TcAutoScheduleRequestVo.class);
+            this.validateRequest(request);
+            lockToken = tcAutoScheduleExecutionGuard.acquire(request.getFactoryCode(), request.getScheduleDate());
             TcAutoScheduleResponseVo response = this.buildExecutionResponse(task);
             this.validateOverwrite(request, response, this.listForOverwriteCheck(request), true);
             context = this.buildScheduleContext(taskId, request, response);
@@ -295,11 +301,35 @@ public class TcScheduleResultServiceImpl extends AbstractDocService<TcScheduleRe
             return response;
         } catch (RuntimeException exception) {
             tcAutoScheduleTaskService.markFailed(taskId, exception.getMessage(),
-                    context == null ? Collections.emptyList() : context.getIssueCollector().getIssues());
+                    this.collectFailureIssues(context, exception));
             throw exception;
         } finally {
-            tcAutoScheduleExecutionGuard.release(request.getFactoryCode(), request.getScheduleDate(), lockToken);
+            if (request != null && lockToken != null) {
+                tcAutoScheduleExecutionGuard.release(request.getFactoryCode(), request.getScheduleDate(), lockToken);
+            }
         }
+    }
+
+    /**
+     * 汇总自动排程失败问题，模板执行前失败时补充初始化阶段问题。
+     *
+     * @param context   排程上下文
+     * @param exception 原始异常
+     * @return 待写入任务表的问题明细
+     */
+    private List<TcAutoScheduleIssueVo> collectFailureIssues(TcScheduleContext context,
+                                                             RuntimeException exception) {
+        TcAutoScheduleIssueCollector issueCollector = context == null
+                ? new TcAutoScheduleIssueCollector() : context.getIssueCollector();
+        if (!issueCollector.hasErrorIssue()) {
+            TcAutoScheduleIssueCategoryEnum category = exception instanceof ServiceException
+                    ? TcAutoScheduleIssueCategoryEnum.AUTO_SCHEDULE_BUSINESS_ERROR
+                    : TcAutoScheduleIssueCategoryEnum.AUTO_SCHEDULE_SYSTEM_ERROR;
+            String message = StrUtil.blankToDefault(exception.getMessage(),
+                    I18nUtil.getMessage("ui.tc.schedule.taskExecuteFailed"));
+            issueCollector.addFailureIssueIfAbsent(TcScheduleStepEnum.BOOTSTRAP, category, message);
+        }
+        return issueCollector.getIssues();
     }
 
     /**

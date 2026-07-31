@@ -1,27 +1,46 @@
 package com.zlt.aps.gdyy.controller;
 
+import cn.hutool.core.date.DateException;
+import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.api.gateway.system.domain.ImportLog;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import com.ruoyi.api.gateway.system.service.IImportLogService;
+import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
+import com.zlt.aps.gdyy.api.domain.dto.GdyyScheduleImportDTO;
 import com.zlt.aps.gdyy.api.domain.entity.GdyyScheduleResult;
+import com.zlt.aps.gdyy.domain.vo.GdyyScheduleResultTemplateImportVO;
 import com.zlt.aps.gdyy.mapper.GdyyScheduleResultMapper;
 import com.zlt.aps.gdyy.service.IGdyyScheduleResultService;
 import com.zlt.aps.utils.AppUtils;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
+import com.zlt.common.utils.ImportExcelUtils;
 import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellType;
+import org.apache.poi.ss.usermodel.DataFormatter;
+import org.apache.poi.ss.usermodel.FormulaEvaluator;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -38,6 +57,8 @@ public class GdyyScheduleResultController extends AbstractDocBizController<GdyyS
 
     @Resource
     private GdyyScheduleResultMapper gdyyScheduleResultMapper;
+    @Resource
+    private IImportLogService importLogService;
 
     @ApiOperation("查询钢带压延排程结果列表")
     @PostMapping("/list")
@@ -125,6 +146,91 @@ public class GdyyScheduleResultController extends AbstractDocBizController<GdyyS
     }
 
     @Log(title = "ui.data.column.gdyyScheduleResult.modelName", businessType = BusinessType.IMPORT)
+    @ApiOperation("按固定模板导入钢带压延排程结果")
+    @PostMapping("/importDataByCust/{updateSupport}")
+    public AjaxResult importDataByCust(@PathVariable("updateSupport") boolean updateSupport,
+                                       @RequestBody GdyyScheduleImportDTO importDTO) throws Exception {
+        Date beginTime = DateUtils.getNowDate();
+        ImportContext importContext = importDTO.getImportContext();
+        ImportLog importLog = ImportExcelUtils.getImportLogAndUploadFile(
+                importContext.getFileBytes(), importContext.getImportFilePath(),
+                importContext.getProcedureCode(), importContext.getFunctionName(),
+                importContext.getOriFileName(), 1);
+        importLog = this.importLogService.add(importLog);
+        List<GdyyScheduleResultTemplateImportVO> rows = new ArrayList<>();
+        AjaxResult ajaxResult;
+        try (Workbook workbook = WorkbookFactory.create(
+                new ByteArrayInputStream(importContext.getFileBytes()))) {
+            Sheet sheet = workbook.getSheetAt(0);
+            FormulaEvaluator evaluator = workbook.getCreationHelper().createFormulaEvaluator();
+            DataFormatter formatter = new DataFormatter();
+            Row dateRow = sheet.getRow(1);
+            Cell scheduleDateCell = dateRow == null ? null : dateRow.getCell(13);
+            Date scheduleDate = null;
+            if (scheduleDateCell != null && scheduleDateCell.getCellType() == CellType.NUMERIC) {
+                scheduleDate = org.apache.poi.ss.usermodel.DateUtil.getJavaDate(
+                        scheduleDateCell.getNumericCellValue());
+            } else if (scheduleDateCell != null) {
+                String dateText = formatter.formatCellValue(scheduleDateCell, evaluator).trim();
+                if (PubUtil.isNotEmpty(dateText)) {
+                    scheduleDate = DateUtil.parse(dateText);
+                }
+            }
+            if (scheduleDate == null) {
+                ajaxResult = AjaxResult.error(I18nUtil.getMessage(
+                        "ui.data.column.gdyyScheduleResult.importDateRequired"));
+            } else {
+                int[] planQuantityColumns = {10, 12, 14, 16, 18, 21, 23, 25};
+                for (int rowIndex = 3; rowIndex <= sheet.getLastRowNum(); rowIndex++) {
+                    Row row = sheet.getRow(rowIndex);
+                    if (row == null) {
+                        continue;
+                    }
+                    String bigRollCode = formatter.formatCellValue(
+                            row.getCell(0), evaluator).trim();
+                    if (!PubUtil.isNotEmpty(bigRollCode) || "合计".equals(bigRollCode)) {
+                        break;
+                    }
+                    GdyyScheduleResultTemplateImportVO item =
+                            new GdyyScheduleResultTemplateImportVO();
+                    item.setExcelRowNum(rowIndex + 1);
+                    item.setBigRollCode(bigRollCode);
+                    for (int classIndex = 1; classIndex <= 8; classIndex++) {
+                        String value = formatter.formatCellValue(
+                                        row.getCell(planQuantityColumns[classIndex - 1]), evaluator)
+                                .replace(",", "").trim();
+                        Double quantity = PubUtil.isNotEmpty(value)
+                                ? Double.valueOf(value) : null;
+                        item.setFieldValueByFieldName(
+                                String.format("class%dPlanQty", classIndex), quantity);
+                    }
+                    rows.add(item);
+                }
+                GdyyScheduleResult condition = importDTO.getScheduleResult();
+                if (condition != null) {
+                    condition.setScheduleDate(DateUtil.beginOfDay(scheduleDate));
+                }
+                ajaxResult = this.gdyyScheduleResultService.importScheduleTemplate(
+                        rows, condition, updateSupport);
+            }
+        } catch (DateException exception) {
+            ajaxResult = AjaxResult.error(I18nUtil.getMessage(
+                    "ui.data.column.gdyyScheduleResult.importDateRequired"));
+        } catch (NumberFormatException exception) {
+            ajaxResult = AjaxResult.error(I18nUtil.getMessage(
+                    "ui.data.column.gdyyScheduleResult.importNumberInvalid"));
+        }
+        Date endTime = DateUtils.getNowDate();
+        importLog.setRowCount(rows.size());
+        importLog.setBeginTime(beginTime);
+        importLog.setEndTime(endTime);
+        importLog.setSpendTime(DateUtils.getDiffTime(endTime, beginTime));
+        ImportExcelUtils.updateImportLogAndFormatMsg(
+                importLog, ajaxResult, this.importLogService);
+        return ajaxResult;
+    }
+
+    @Log(title = "ui.data.column.gdyyScheduleResult.modelName", businessType = BusinessType.IMPORT)
     @ApiOperation("导入完成量")
     @PostMapping("/importFinishQty")
     public AjaxResult importFinishQty(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport) throws Exception {
@@ -137,7 +243,8 @@ public class GdyyScheduleResultController extends AbstractDocBizController<GdyyS
     @Override
     public byte[] exportData(@RequestBody GdyyScheduleResult queryVO, @PathVariable("fileName") String fileName,
                              HttpServletResponse response) throws IOException {
-        return super.exportData(queryVO, fileName, response);
+        return this.gdyyScheduleResultService.exportData(
+                this.listExportData(queryVO), queryVO);
     }
 
     @Override

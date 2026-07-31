@@ -50,6 +50,16 @@ public class Cd90AutoScheduleInputVersionServiceImpl implements Cd90AutoSchedule
 
     @Override
     public String fingerprint(String factoryCode, LocalDate scheduleDate) {
+        return this.fingerprint(factoryCode, scheduleDate, true);
+    }
+
+    @Override
+    public String fingerprintWithoutStock(String factoryCode, LocalDate scheduleDate) {
+        return this.fingerprint(factoryCode, scheduleDate, false);
+    }
+
+    private String fingerprint(String factoryCode, LocalDate scheduleDate,
+                               boolean includeStock) {
         String forming = cxMapper.selectList(Wrappers.<CxScheduleResult>lambdaQuery()
                         // 版本指纹只依赖主键、批次和更新时间，不加载成型结果的其他业务字段。
                         .select(CxScheduleResult::getId,
@@ -75,7 +85,7 @@ public class Cd90AutoScheduleInputVersionServiceImpl implements Cd90AutoSchedule
                         + item.getMachineRange() + ":" + item.getDepthClassQty() + ":"
                         + item.getUpdateTime())
                 .collect(Collectors.joining("|"));
-        String stock = stockMapper.selectList(Wrappers.<Cd90Stock>lambdaQuery()
+        String stock = includeStock ? stockMapper.selectList(Wrappers.<Cd90Stock>lambdaQuery()
                         .select(Cd90Stock::getId,
                                 Cd90Stock::getShiftCode,
                                 Cd90Stock::getSnapshotTime,
@@ -85,7 +95,7 @@ public class Cd90AutoScheduleInputVersionServiceImpl implements Cd90AutoSchedule
                         .orderByAsc(Cd90Stock::getShiftCode)
                         .orderByAsc(Cd90Stock::getId))
                 .stream().map(item -> item.getId() + ":" + item.getShiftCode() + ":" + item.getSnapshotTime() + ":" + item.getUpdateTime())
-                .collect(Collectors.joining("|"));
+                .collect(Collectors.joining("|")) : "";
         String xwyyStock = xwyyStockMapper.selectList(Wrappers.<XwyyStock>lambdaQuery()
                         .select(XwyyStock::getId,
                                 XwyyStock::getBigRollCode,

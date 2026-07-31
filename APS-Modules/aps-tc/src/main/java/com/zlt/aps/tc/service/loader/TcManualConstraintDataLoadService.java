@@ -3,6 +3,8 @@ package com.zlt.aps.tc.service.loader;
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.ruoyi.common.exception.ServiceException;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.common.engine.schedule.constraint.ScheduleConstraintConfig;
@@ -10,21 +12,18 @@ import com.zlt.aps.tc.api.constant.TcScheduleConstants;
 import com.zlt.aps.tc.api.domain.entity.TcCurlRoll;
 import com.zlt.aps.tc.api.domain.entity.TcMachineSpeed;
 import com.zlt.aps.tc.api.domain.entity.TcScheduleResult;
+import com.zlt.aps.tc.api.domain.entity.TcScheduleResultExplain;
 import com.zlt.aps.tc.engine.domain.TcParamValue;
 import com.zlt.aps.tc.engine.domain.TcScheduleContext;
 import com.zlt.aps.tc.engine.domain.manual.TcManualRollingCommand;
 import com.zlt.aps.tc.engine.domain.manual.TcManualRollingCommandBatch;
 import com.zlt.aps.tc.engine.domain.manual.TcManualRollingContext;
 import com.zlt.aps.tc.engine.domain.manual.TcManualTaskDraft;
-import com.zlt.aps.tc.mapper.TcCurlRollMapper;
-import com.zlt.aps.tc.mapper.TcMachineSpeedMapper;
-import com.zlt.aps.tc.mapper.TcParamsMapper;
-import com.zlt.aps.tc.mapper.TcScheduleResultMapper;
+import com.zlt.aps.tc.mapper.*;
 import com.zlt.aps.tc.service.cache.TcAutoScheduleRedisCacheService;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -42,6 +41,7 @@ public class TcManualConstraintDataLoadService {
     private final TcMachineSpeedMapper tcMachineSpeedMapper;
     private final TcCurlRollMapper tcCurlRollMapper;
     private final TcScheduleResultMapper tcScheduleResultMapper;
+    private final TcScheduleResultExplainMapper tcScheduleResultExplainMapper;
     private final TcScheduleParamLoader tcScheduleParamLoader;
 
     /**
@@ -52,17 +52,20 @@ public class TcManualConstraintDataLoadService {
      * @param tcMachineSpeedMapper 机台速度 Mapper
      * @param tcCurlRollMapper 卷曲长度 Mapper
      * @param tcScheduleResultMapper 排程结果 Mapper
+     * @param tcScheduleResultExplainMapper 排程解释 Mapper
      */
     public TcManualConstraintDataLoadService(TcParamsMapper tcParamsMapper,
                                              TcAutoScheduleRedisCacheService tcAutoScheduleRedisCacheService,
                                              TcMachineSpeedMapper tcMachineSpeedMapper,
                                              TcCurlRollMapper tcCurlRollMapper,
-                                             TcScheduleResultMapper tcScheduleResultMapper) {
+                                             TcScheduleResultMapper tcScheduleResultMapper,
+                                             TcScheduleResultExplainMapper tcScheduleResultExplainMapper) {
         this.tcParamsMapper = tcParamsMapper;
         this.tcAutoScheduleRedisCacheService = tcAutoScheduleRedisCacheService;
         this.tcMachineSpeedMapper = tcMachineSpeedMapper;
         this.tcCurlRollMapper = tcCurlRollMapper;
         this.tcScheduleResultMapper = tcScheduleResultMapper;
+        this.tcScheduleResultExplainMapper = tcScheduleResultExplainMapper;
         this.tcScheduleParamLoader = new TcScheduleParamLoader();
     }
 
@@ -105,8 +108,8 @@ public class TcManualConstraintDataLoadService {
         BigDecimal effectiveToolQty = this.getParamValue(paramMap, TcScheduleConstants.PARAM_TOOL_TOTAL_QTY)
                 .multiply(this.getParamValue(paramMap, TcScheduleConstants.PARAM_VEHICLE_RATE));
         if (this.isPositive(effectiveToolQty)) {
-            context.setInitialAvailableToolQty(this.resolveAffectedMachineAvailableToolQty(
-                    context, machineCodeSet, effectiveToolQty, curlLengthMap, defaultCurlLength));
+            context.setTotalToolQty(effectiveToolQty);
+            context.setInitialAvailableToolQty(this.resolveFinalToolLedgerBalance(context));
         }
     }
 
@@ -310,54 +313,23 @@ public class TcManualConstraintDataLoadService {
      * @param defaultCurlLength 默认卷曲长度
      * @return 受影响机台可用工装
      */
-    private BigDecimal resolveAffectedMachineAvailableToolQty(TcManualRollingContext context,
-                                                               Set<String> affectedMachineCodeSet,
-                                                               BigDecimal effectiveToolQty,
-                                                               Map<String, BigDecimal> curlLengthMap,
-                                                               BigDecimal defaultCurlLength) {
-        LambdaQueryWrapper<TcScheduleResult> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(TcScheduleResult::getFactoryCode, context.getFactoryCode());
-        wrapper.eq(TcScheduleResult::getScheduleDate, context.getScheduleDate());
-        wrapper.eq(StringUtils.isNotBlank(context.getBatchNo()), TcScheduleResult::getBatchNo, context.getBatchNo());
-        wrapper.notIn(!affectedMachineCodeSet.isEmpty(), TcScheduleResult::getMachineCode, affectedMachineCodeSet);
-        List<TcScheduleResult> unaffectedResultList =
-                Optional.ofNullable(tcScheduleResultMapper.selectList(wrapper)).orElse(new ArrayList<>());
-        Set<String> missingCodeSet = unaffectedResultList.stream().map(TcScheduleResult::getSidewallCode)
-                .filter(StrUtil::isNotBlank).filter(code -> !curlLengthMap.containsKey(code))
-                .collect(Collectors.toCollection(LinkedHashSet::new));
-        if (!missingCodeSet.isEmpty()) {
-            LambdaQueryWrapper<TcCurlRoll> curlWrapper = new LambdaQueryWrapper<>();
-            curlWrapper.eq(TcCurlRoll::getFactoryCode, context.getFactoryCode());
-            curlWrapper.in(TcCurlRoll::getSidewallCode, missingCodeSet);
-            Optional.ofNullable(tcCurlRollMapper.selectList(curlWrapper)).orElse(new ArrayList<>()).stream()
-                    .filter(curlRoll -> this.isPositive(curlRoll.getCurlLength()))
-                    .forEach(curlRoll -> curlLengthMap.put(curlRoll.getSidewallCode(), curlRoll.getCurlLength()));
+    private BigDecimal resolveFinalToolLedgerBalance(TcManualRollingContext context) {
+        LambdaQueryWrapper<TcScheduleResultExplain> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(TcScheduleResultExplain::getFactoryCode, context.getFactoryCode());
+        wrapper.eq(StringUtils.isNotBlank(context.getBatchNo()),
+                TcScheduleResultExplain::getBatchNo, context.getBatchNo());
+        wrapper.eq(TcScheduleResultExplain::getScheduleDate, context.getScheduleDate());
+        wrapper.isNotNull(TcScheduleResultExplain::getToolLedgerOrder);
+        wrapper.isNotNull(TcScheduleResultExplain::getRemainingToolQty);
+        wrapper.orderByDesc(TcScheduleResultExplain::getToolLedgerOrder);
+        wrapper.last("LIMIT 1");
+        TcScheduleResultExplain latestLedger =
+                tcScheduleResultExplainMapper.selectOne(wrapper);
+        if (latestLedger == null) {
+            throw new ServiceException(I18nUtil.getMessage(
+                    "ui.tc.schedule.manual.toolLedgerMissing"));
         }
-        BigDecimal unaffectedToolUsage = unaffectedResultList.stream()
-                .map(result -> this.calculateResultToolUsage(result,
-                        curlLengthMap.getOrDefault(result.getSidewallCode(), defaultCurlLength)))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        return effectiveToolQty.subtract(unaffectedToolUsage).max(BigDecimal.ZERO);
-    }
-
-    /**
-     * 计算一条胎侧横向结果的工装占用。
-     *
-     * @param result 横向结果
-     * @param curlLength 卷曲长度
-     * @return 工装占用
-     */
-    private BigDecimal calculateResultToolUsage(TcScheduleResult result, BigDecimal curlLength) {
-        if (!this.isPositive(curlLength)) {
-            return BigDecimal.ZERO;
-        }
-        BigDecimal planQty = BigDecimal.ZERO;
-        for (int shiftOrder = 1; shiftOrder <= TcScheduleConstants.TC_MAX_SHIFT_ORDER; shiftOrder++) {
-            planQty = planQty.add(BigDecimalUtils.valueOf(result.getFieldValueByFieldName(
-                    String.format(TcScheduleConstants.SHIFT_PLAN_QTY_FIELD_TEMPLATE, shiftOrder))));
-        }
-        return planQty.divide(curlLength,
-                TcScheduleConstants.DECIMAL_CALCULATION_SCALE, RoundingMode.HALF_UP);
+        return latestLedger.getRemainingToolQty().max(BigDecimal.ZERO);
     }
 
     /**

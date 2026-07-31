@@ -4,6 +4,7 @@ import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.zlt.aps.xwyy.api.domain.dto.XwyyScheduleImportDTO;
 import com.zlt.aps.xwyy.api.domain.entity.XwyyScheduleResult;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
@@ -57,4 +58,9 @@ public interface IXwyyScheduleResultRemoteService {
     @ApiOperation("导入")
     @PostMapping("/xwyyScheduleResult/importData")
     AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport);
+
+    @ApiOperation("按固定模板导入纤维压延排程结果")
+    @PostMapping("/xwyyScheduleResult/importDataByCust/{updateSupport}")
+    AjaxResult importDataByCust(@PathVariable("updateSupport") boolean updateSupport,
+                                @RequestBody XwyyScheduleImportDTO importDTO);
 }

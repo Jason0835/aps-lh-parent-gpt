@@ -18,7 +18,6 @@ import java.sql.Date;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -70,11 +69,8 @@ public class Cd15RollingTargetResolverImpl implements Cd15RollingTargetResolver 
                 .flatMap(batch -> this.targets(factoryCode, batch, shifts, parameters).stream())
                 .filter(target -> !triggerTime.isBefore(target.getWindowStart())
                         && !triggerTime.isAfter(target.getWindowEnd()))
-                .sorted(Comparator
-                        .comparingLong((Cd15RollingTarget target) -> Math.abs(
-                                ChronoUnit.DAYS.between(triggerDate, target.getScheduleDate())))
-                        .thenComparing(Cd15RollingTarget::getScheduleDate,
-                                Comparator.reverseOrder()))
+                .sorted(Comparator.comparing(Cd15RollingTarget::getScheduleDate,
+                        Comparator.reverseOrder()))
                 .findFirst();
     }
 

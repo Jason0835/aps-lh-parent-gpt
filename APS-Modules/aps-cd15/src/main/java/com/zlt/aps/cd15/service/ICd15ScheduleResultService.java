@@ -6,6 +6,7 @@ import com.zlt.aps.cd15.api.domain.vo.Cd15ChangeQtyRequest;
 import com.zlt.aps.cd15.api.domain.vo.Cd15InsertOrderRequest;
 import com.zlt.aps.cd15.api.domain.vo.Cd15RollingCheckRequest;
 import com.zlt.aps.cd15.api.domain.vo.Cd15TransferMachineRequest;
+import com.zlt.aps.cd15.api.domain.vo.Cd15ScheduleResultTemplateImportVO;
 import com.zlt.bill.common.service.IDocService;
 
 import java.util.Date;
@@ -18,6 +19,16 @@ public interface ICd15ScheduleResultService extends IDocService<Cd15ScheduleResu
 
     /** 删除排程结果并压缩同机台 CLASS1 后续生产顺位。 */
     AjaxResult removeScheduleResults(List<Long> ids);
+
+    /** 按固定生产计划模板导出四班排程结果。 */
+    byte[] exportData(
+            List<Cd15ScheduleResult> currentResults,
+            Cd15ScheduleResult queryVO);
+
+    /** 按固定生产计划模板整体覆盖导入排程结果。 */
+    AjaxResult importScheduleTemplate(List<Cd15ScheduleResultTemplateImportVO> rows,
+                                      Cd15ScheduleResult condition,
+                                      boolean updateSupport);
 
     /** 自动排程入口 */
     AjaxResult autoSchedule(Cd15ScheduleResult scheduleResult);

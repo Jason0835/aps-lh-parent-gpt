@@ -11,6 +11,7 @@
       :search-columns="searchColumns"
       :show-summary="false"
       :select-area="false"
+      :is-reset="true"
       @search="handleSearch"
       @reset="handleReset"
       @refresh="getList"
@@ -63,13 +64,11 @@
         >{{ $t('ui.frame.btn.export') }}</el-button>
       </template>
     </page-table>
-    <tlt-upload-form
+    <tlt-upload
       ref="tltUpload"
       :update-support="true"
-      download-url="/xwyy/xwyyScheduleResult/importTemplate"
-      upload-url="/xwyy/xwyyScheduleResult/importData"
-      label-width="0"
-      :columns="importColumns"
+      upload-url="/xwyy/xwyyScheduleResult/importDataByCust"
+      :upload-params="importParams"
       @uploadSuccess="getList"
     />
     <auto-schedule-dialog
@@ -110,13 +109,12 @@
 import moment from 'moment'
 import { listScheduleResult, removeScheduleResult, exportScheduleResult, autoScheduleResult, getAutoScheduleTask } from '@/api/xwyy/xwyyScheduleResult'
 import { listShiftConfig } from '@/api/xwyy/xwyyShiftConfig'
-import TltUploadForm from '@/views/components/tltUploadForm.vue'
 import AutoScheduleDialog from './components/autoScheduleDialog.vue'
 import ReleaseStatusDialog from './components/releaseStatusDialog.vue'
 
 export default {
   name: 'XwyyScheduleResult',
-  components: { TltUploadForm, AutoScheduleDialog, ReleaseStatusDialog },
+  components: { AutoScheduleDialog, ReleaseStatusDialog },
   dicts: ['biz_factory_name', 'IS_RELEASE', 'PRODUCTION_STATUS', 'DATA_SOURCE'],
   provide() {
     return {
@@ -131,20 +129,6 @@ export default {
     }
 
     return {
-      importColumns: [
-        {
-          label: '',
-          prop: 'updateSupport',
-          render: form => (
-            <el-checkbox
-              label={this.$t('common.rule.updateSupport')}
-              v-model={form.updateSupport}
-            >
-              {this.$t('common.rule.updateSupport')}
-            </el-checkbox>
-          )
-        }
-      ],
       loading: false,
       data: [],
       selection: [],
@@ -170,6 +154,11 @@ export default {
     }
   },
   computed: {
+    importParams() {
+      return {
+        factoryCode: this.query.factoryCode || this.search.factoryCode
+      }
+    },
     columns() {
       return [
         { type: 'selection', width: 55, fixed: 'left' },
@@ -279,11 +268,6 @@ export default {
               minWidth: 110
             },
             {
-              label: this.$t('ui.data.column.scheduleResult.cxClass1Plan'),
-              prop: `${classField}CxPlanQty`,
-              minWidth: 130
-            },
-            {
               label: this.$t('ui.data.column.scheduleResult.finish'),
               prop: `${classField}FinishQty`,
               minWidth: 110
@@ -303,11 +287,6 @@ export default {
               prop: `${classField}Analysis`,
               minWidth: 140
             },
-            {
-              label: this.$t('ui.data.column.scheduleResult.class1AnalysisInput'),
-              prop: `${classField}AnalysisInput`,
-              minWidth: 140
-            }
           ]
         }
       })
@@ -344,7 +323,12 @@ export default {
     handleReset() {
       const defaultSearch = {
         factoryCode: '116',
-        scheduleDate: this.getDefaultScheduleDate()
+        scheduleDate: this.getDefaultScheduleDate(),
+        bigRollCode: '',
+        machineId: '',
+        isRelease: '',
+        batchNo: '',
+        orderNo: ''
       }
       this.search = { ...defaultSearch }
       this.query = { ...defaultSearch }

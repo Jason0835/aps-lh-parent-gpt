@@ -8,6 +8,7 @@ import com.zlt.aps.cd90.engine.mapper.Cd90EngineScheduleResultMapper;
 import com.zlt.aps.cd90.engine.model.Cd90RollingTarget;
 import com.zlt.aps.cd90.engine.service.Cd90AutoScheduleInputVersionService;
 import com.zlt.aps.cd90.engine.service.Cd90RollingInputVersionService;
+import com.zlt.aps.cd90.engine.service.Cd90RollingShiftStockService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -29,6 +30,7 @@ public class Cd90RollingInputVersionServiceImpl implements Cd90RollingInputVersi
     private final Cd90AutoScheduleInputVersionService baseVersionService;
     private final Cd90EngineScheduleResultMapper scheduleResultMapper;
     private final Cd90AutoScheduleParamsMapper paramsMapper;
+    private final Cd90RollingShiftStockService rollingShiftStockService;
 
     /** 生成确定性SHA-256版本，任一关键输入变化都会产生新版本。 */
     @Override
@@ -36,8 +38,9 @@ public class Cd90RollingInputVersionServiceImpl implements Cd90RollingInputVersi
         if (target == null || target.getScheduleDate() == null) {
             throw new IllegalArgumentException("滚动目标和排程日期不能为空");
         }
-        String base = baseVersionService.fingerprint(
+        String base = baseVersionService.fingerprintWithoutStock(
                 target.getFactoryCode(), target.getScheduleDate());
+        String shiftStock = rollingShiftStockService.fingerprint(target);
         List<Cd90ScheduleResult> results = scheduleResultMapper.selectList(
                 new LambdaQueryWrapper<Cd90ScheduleResult>()
                         .eq(Cd90ScheduleResult::getFactoryCode, target.getFactoryCode())
@@ -56,7 +59,8 @@ public class Cd90RollingInputVersionServiceImpl implements Cd90RollingInputVersi
                 .stream().map(item -> item.getId() + ":" + item.getParamCode() + ":"
                         + item.getParamValue() + ":" + item.getUpdateTime())
                 .collect(Collectors.joining("|"));
-        return this.sha256(base + "#" + target.getTargetShiftCode() + "#"
+        return this.sha256(base + "#" + shiftStock + "#"
+                + target.getTargetShiftCode() + "#"
                 + target.getTargetClassField() + "#" + target.getBatchNo() + "#"
                 + currentSchedule + "#" + parameters);
     }

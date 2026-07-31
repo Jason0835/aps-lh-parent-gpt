@@ -2,29 +2,27 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.tq.engine.mapper.TqEngineMonthSurplusMapper">
 
-    <!-- 查询胎圈月度计划剩余量，关联月计划最终生产结果，两表均使用IS_DELETE逻辑删除 -->
-    <!-- MATERIAL_CODE为胎胚编码（非胎圈编码），需关联施工信息表T_MDM_CONSTRUCTION_INFO -->
-    <!-- 通过CONSTRUCTION_CODE关联取TIRE_RING_CODE作为胎圈编码，按胎圈编码聚合汇总 -->
+    <!-- 查询胎圈月度计划剩余量，从t_mdm_month_surplus取PLAN_SURPLUS_QTY -->
+    <!-- 不再关联t_mp_month_plan_prod_final，月计划完成量由MES回报后写入t_tq_sche_finish_qty回填 -->
+    <!-- MATERIAL_CODE为物料编码（对应施工信息表T_MDM_CONSTRUCTION_INFO的MATERIAL_CODE），需关联施工信息表 -->
+    <!-- 通过MATERIAL_CODE关联取TIRE_RING_CODE作为胎圈编码，按胎圈编码聚合汇总 -->
+    <!-- PLAN_SURPLUS_QTY为成型胎胚余量，一个胎胚对应2个胎圈，因此需要乘以2转换为胎圈余量 -->
+    <!-- HAVING过滤TIRE_RING_CODE为NULL的分组，避免无效数据进入monthSurplusMap导致beadCode查不到 -->
     <select id="listTqMonthPlanSurplus" parameterType="string" resultType="com.zlt.aps.tq.engine.vo.TqMonthSurplusVo">
         SELECT
             ci.TIRE_RING_CODE as beadCode,
-            IFNULL(SUM(ms.PLAN_SURPLUS_QTY), 0) as monthRemainQty,
-            IFNULL(SUM(ppf.TOTAL_QTY), 0) as monthFinishQty
+            IFNULL(SUM(ms.PLAN_SURPLUS_QTY * 2), 0) as monthRemainQty
         FROM t_mdm_month_surplus ms
-        INNER JOIN t_mp_month_plan_prod_final ppf
-            ON ms.MATERIAL_CODE = ppf.MATERIAL_CODE
-            AND ms.YEAR = ppf.YEAR
-            AND ms.MONTH = ppf.MONTH
-            AND ppf.IS_DELETE = '0'
-        LEFT JOIN (
-            SELECT DISTINCT CONSTRUCTION_CODE, TIRE_RING_CODE
+                 LEFT JOIN (
+            SELECT DISTINCT MATERIAL_CODE, TIRE_RING_CODE
             FROM T_MDM_CONSTRUCTION_INFO
             WHERE IS_DELETE = 0
-        ) ci ON ms.MATERIAL_CODE = ci.CONSTRUCTION_CODE
+        ) ci ON ms.MATERIAL_CODE = ci.MATERIAL_CODE
         WHERE ms.IS_DELETE = 0
-        AND ms.YEAR = #{year}
-        AND ms.MONTH = #{month}
+          AND ms.YEAR = #{year}
+          AND ms.MONTH = #{month}
         GROUP BY ci.TIRE_RING_CODE
+        HAVING ci.TIRE_RING_CODE IS NOT NULL
     </select>
 
 </mapper>

@@ -29,6 +29,7 @@ import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
 import com.zlt.aps.lh.api.enums.FactoryCodeEnum;
 import com.zlt.aps.lh.api.enums.ReleaseStatusEnum;
+import com.zlt.aps.lh.api.enums.TrialStatusEnum;
 import com.zlt.aps.lh.component.LhScheduleConfigResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.controller.LhMouldChangePlanController;
@@ -1435,10 +1436,12 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         context.month = yearMonth[1];
 
         // 排程窗口覆盖 scheduleDate-1 到 scheduleDate+1。
-        // 当窗口结束日期与排程日期不在同一自然月时，需同时加载下个月的定稿月计划明细，
-        // 否则跨月物料会在"月计划中不存在SKU"校验中误报。
+        // SKU 可能根据提前生产参数将窗口结束日之后的计划量提前排入当前窗口，
+        // 因此导入月计划校验截止日还需叠加提前生产天数。
         Date windowEndDate = DateUtil.offsetDay(scheduleDate, LhScheduleConstant.SCHEDULE_DAYS - 2);
-        int[] endYearMonth = resolveImportPlanYearMonth(windowEndDate);
+        int earlyProductionDaysThreshold = resolveImportEarlyProductionDaysThreshold(factoryCode);
+        Date importPlanEndDate = DateUtil.offsetDay(windowEndDate, earlyProductionDaysThreshold);
+        int[] endYearMonth = resolveImportPlanYearMonth(importPlanEndDate);
         context.nextMonthYear = endYearMonth[0];
         context.nextMonthMonth = endYearMonth[1];
         context.crossMonth = (context.year != context.nextMonthYear) || (context.month != context.nextMonthMonth);
@@ -1534,6 +1537,22 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         context.constructionRefMap = loadImportConstructionRefMap(factoryCode, materialCodes);
         context.classCapacityMaterialSet = loadImportClassCapacityMaterialSet(factoryCode, materialCodes);
         return context;
+    }
+
+    /**
+     * 获取导入校验使用的 SKU 提前生产天数。
+     * <p>
+     * 复用自动排程参数解析口径，参数编码为 SYS0304028，缺失或非法时使用默认值 2。
+     * </p>
+     *
+     * @param factoryCode 工厂编码
+     * @return SKU 提前生产天数
+     */
+    private int resolveImportEarlyProductionDaysThreshold(String factoryCode) {
+        LhScheduleContext context = new LhScheduleContext();
+        context.setFactoryCode(factoryCode);
+        scheduleConfigResolver.resolveAndAttach(context);
+        return context.getScheduleConfig().getEarlyProductionDaysThreshold();
     }
 
     /**
@@ -2022,7 +2041,27 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                 row.getClass8IsEnd()
         ).filter(StringUtils::isNotBlank).findFirst().orElse(null);
         if (StringUtils.isNotBlank(changedTrialStatus)) {
-            row.setChangedTrialStatus(changedTrialStatus);
+            row.setChangedTrialStatus(this.resolveImportProductStatus(changedTrialStatus));
+        }
+    }
+
+    /**
+     * 将 Excel 班次类型转换为导入唯一性使用的产品状态。
+     *
+     * @param changedTrialStatus Excel 类型：0-正常、1-收尾、2-量试、3-试验/试制
+     * @return 产品状态：S-正规、T-量试、X-试制；未知类型返回空
+     */
+    private String resolveImportProductStatus(String changedTrialStatus) {
+        switch (changedTrialStatus) {
+            case "0":
+            case "1":
+                return TrialStatusEnum.FORMAL.getCode();
+            case "2":
+                return TrialStatusEnum.MASS_TRIAL.getCode();
+            case "3":
+                return TrialStatusEnum.TRIAL.getCode();
+            default:
+                return null;
         }
     }
 

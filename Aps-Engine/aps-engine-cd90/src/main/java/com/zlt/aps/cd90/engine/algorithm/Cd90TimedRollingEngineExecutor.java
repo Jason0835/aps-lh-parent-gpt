@@ -22,6 +22,7 @@ import com.zlt.aps.cd90.engine.model.Cd90ShiftExecutionResult;
 import com.zlt.aps.cd90.engine.model.Cd90ShiftResourceState;
 import com.zlt.aps.cd90.engine.model.Cd90ShiftScheduleTask;
 import com.zlt.aps.cd90.engine.model.Cd90StorageLaneAllocation;
+import com.zlt.aps.cd90.engine.model.Cd90StockSource;
 import com.zlt.aps.cd90.engine.model.Cd90TimedRollingOutput;
 import com.zlt.aps.cd90.engine.model.Cd90UnscheduledResultModel;
 import com.zlt.aps.cd90.engine.service.Cd90AutoScheduleEngineService;
@@ -29,6 +30,7 @@ import com.zlt.aps.cd90.engine.service.Cd90AutoScheduleInputService;
 import com.zlt.aps.cd90.engine.service.Cd90ScheduleCandidatePreparationService;
 import com.zlt.aps.cd90.engine.service.Cd90ScheduleProgressListener;
 import com.zlt.aps.cd90.engine.service.Cd90ShiftDemandProvider;
+import com.zlt.aps.cd90.engine.service.Cd90RollingShiftStockService;
 import com.zlt.aps.cd90.engine.service.impl.Cd90NewSpecAdvanceInputPreparer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.BeanUtils;
@@ -68,6 +70,7 @@ public class Cd90TimedRollingEngineExecutor {
     private final Cd90ExistingScheduleResourceReserver existingResourceReserver;
     private final Cd90SingleShiftScheduleExecutor singleShiftExecutor;
     private final Cd90UnscheduledResultAggregator unscheduledResultAggregator;
+    private final Cd90RollingShiftStockService rollingShiftStockService;
 
     /** 读取原批次，在内存副本上从目标班开始滚动并输出差异。 */
     public Cd90TimedRollingOutput execute(Cd90RollingTarget target, String inputVersion,
@@ -95,6 +98,8 @@ public class Cd90TimedRollingEngineExecutor {
 
         List<Cd90ScheduleAttemptTrace> traces = new ArrayList<>();
         List<Cd90RollingPendingTask> carryOver = new ArrayList<>();
+        List<Cd90StockSource> targetShiftStocks =
+                rollingShiftStockService.loadRequired(target);
         Cd90RollingScheduleContext rolling = null;
         Cd90ScheduleProgressListener progress = listener == null
                 ? Cd90ScheduleProgressListener.NO_OP : listener;
@@ -104,6 +109,8 @@ public class Cd90TimedRollingEngineExecutor {
             progress.onProgress(20 + index * 60 / shiftCount, "ROLLING_SHIFT",
                     shiftStageName(shift, "滚动开始"), shift);
             Cd90AutoScheduleInput input = loadInput(context, shift);
+            // 定时滚动的全部后续班次统一从目标班次开始库存重新累计。
+            input.setStocksAtSix(targetShiftStocks);
             if (rolling == null) {
                 Cd90NewSpecAdvanceResult advance = newSpecAdvanceInputPreparer.prepare(context, input);
                 input.setPlanningDemandShifts(advance.getAdjustedDemandShifts());

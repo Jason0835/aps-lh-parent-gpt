@@ -191,9 +191,8 @@
     -->
     <!-- 月初定时任务：用上月数据计算超欠产，写入当月定稿表
          数据来源月=lastMonth（如6月），写入目标月=currentMonth（如7月）
-         关键：surplus.REQUIRE_VERSION 必须匹配当月(7月)定稿版本号，而非上月(6月)版本号
-         数据流：7月定稿表 f → pv7 取7月定稿版本号 → surplus(6月) 按7月版本号匹配STOCK_CAPTURE_DATE
-                → f5(6月定稿表) 提供 DAY_x 计划量 → fin(6月完成量) → 超欠产 = 计划量 - 完成量
+         数据流：7月定稿表 f → f5(6月定稿表) 提供 DAY_x 计划量 → fin(6月完成量) → 超欠产 = 计划量 - 完成量
+         说明：T_MP_MONTH_PLAN_PROD_FINAL 本身就是定稿表，无需再关联 T_MP_PROC_VERSION 验证 IS_FINAL='1'
          防御：stockCaptureDate 若因任何原因超出 [startDate, endDate] 范围，
                SQL 层通过 CASE WHEN ... BETWEEN 夹紧到 startDate，避免 start > end 的非法区间
     -->
@@ -204,7 +203,6 @@
             f5.FACTORY_CODE,
             f5.MATERIAL_CODE,
             f5.PRODUCT_STATUS,
-            pv7.MONTH_PLAN_VERSION AS CURRENT_VERSION,
             (
             -- 计划量：从库存抓取日日号到月底累加 DAY_x
             -- 库存抓取日由 Java 层根据 LAST_MONTH_PLAN_VERSION(ADJ前缀解析) 或余量表回退计算后传入
@@ -244,24 +242,6 @@
             IFNULL(SUM(fin.DAY_QTY), 0) AS FINISH_QTY,
             MAX(IFNULL(stockMap.FORCE_ZERO, 0)) AS FORCE_ZERO
             FROM T_MP_MONTH_PLAN_PROD_FINAL f5
-            INNER JOIN T_MP_PROC_VERSION pv
-                ON pv.FACTORY_CODE = f5.FACTORY_CODE
-                AND pv.MONTH_PLAN_VERSION = f5.MONTH_PLAN_VERSION
-                AND pv.YEAR = f5.YEAR
-                AND pv.MONTH = f5.MONTH
-                AND pv.IS_FINAL = '1'
-                AND pv.IS_DELETE = 0
-            -- 关联当月定稿版本表(IS_FINAL='1')，取当月版本号用于外层 f 表关联
-            -- 一个分厂当月可能有多个定稿版本，取任意一条用于关联，避免笛卡尔积
-            INNER JOIN (
-                SELECT FACTORY_CODE, ANY_VALUE(MONTH_PLAN_VERSION) AS MONTH_PLAN_VERSION
-                FROM T_MP_PROC_VERSION
-                WHERE IS_DELETE = 0
-                  AND IS_FINAL = '1'
-                  AND YEAR = #{currentYear}
-                  AND MONTH = #{currentMonth}
-                GROUP BY FACTORY_CODE
-            ) pv7 ON pv7.FACTORY_CODE = f5.FACTORY_CODE
             -- Java 层计算好的库存抓取日映射，替代原 surplus 关联
             LEFT JOIN (
                 <foreach collection="stockCaptureDateList" item="item" separator="UNION ALL">
@@ -294,7 +274,7 @@
             WHERE f5.IS_DELETE = 0
             AND f5.YEAR = #{lastYear}
             AND f5.MONTH = #{lastMonth}
-            GROUP BY f5.FACTORY_CODE, f5.MATERIAL_CODE, f5.PRODUCT_STATUS, pv7.MONTH_PLAN_VERSION,
+            GROUP BY f5.FACTORY_CODE, f5.MATERIAL_CODE, f5.PRODUCT_STATUS,
             stockMap.STOCK_CAPTURE_DATE, stockMap.FORCE_ZERO,
             f5.DAY_1, f5.DAY_2, f5.DAY_3, f5.DAY_4, f5.DAY_5, f5.DAY_6, f5.DAY_7, f5.DAY_8,
             f5.DAY_9, f5.DAY_10, f5.DAY_11, f5.DAY_12, f5.DAY_13, f5.DAY_14, f5.DAY_15, f5.DAY_16,
@@ -302,8 +282,7 @@
             f5.DAY_25, f5.DAY_26, f5.DAY_27, f5.DAY_28, f5.DAY_29, f5.DAY_30, f5.DAY_31
             ) calc ON f.FACTORY_CODE = calc.FACTORY_CODE
             AND f.MATERIAL_CODE = calc.MATERIAL_CODE
-            AND f.PRODUCT_STATUS = calc.PRODUCT_STATUS
-            AND f.MONTH_PLAN_VERSION = calc.CURRENT_VERSION
+            AND IFNULL(f.PRODUCT_STATUS, '') = IFNULL(calc.PRODUCT_STATUS, '')
             LEFT JOIN T_MP_FACTORY_PARAM fp ON fp.FACTORY_CODE = f.FACTORY_CODE
             AND fp.PRODUCT_TYPE_CODE = f.PRODUCT_TYPE_CODE
             AND fp.PARAM_CODE = #{overdueThresholdParamCode}
@@ -313,130 +292,6 @@
                 ELSE IFNULL(calc.PLAN_QTY, 0) - IFNULL(calc.FINISH_QTY, 0)
             END,
                 f.LAST_MONTH_VALID_FLAG = CASE
-                WHEN IFNULL(calc.FORCE_ZERO, 0) = 1 THEN '1'
-                WHEN ABS(IFNULL(calc.PLAN_QTY, 0) - IFNULL(calc.FINISH_QTY, 0))
-                    &gt; IFNULL(CAST(IFNULL(fp.PARAM_VALUE, fp.DEFAULE_VALUE) AS SIGNED), 0) THEN '0'
-                ELSE '1'
-        END,
-            f.UPDATE_TIME = NOW()
-        WHERE f.IS_DELETE = 0
-          AND f.YEAR = #{currentYear}
-        AND f.MONTH = #{currentMonth}
-    </update>
-
-    <!-- 定稿时补更新上月定稿记录的上月超欠产有效标识（只更新标识，不更新值）
-         计算逻辑同 updateLastMonthOverProd，仅 SET 子句移除 LAST_MONTH_OVERDUE_QTY：
-         1. 计划量：按 (分厂+物料+年+月+需求版本号 MONTH_PLAN_VERSION=REQUIRE_VERSION) 取 STOCK_CAPTURE_DATE，
-            stockDay = DAYOFMONTH(IFNULL(STOCK_CAPTURE_DATE, 月初))，
-            累加 DAY_x (x >= stockDay)；STOCK_CAPTURE_DATE 为空时累加 DAY_1~DAY_31 全部
-         2. 已完成量：取自 T_LH_DAY_FINISH_QTY，按(分厂+物料+示方类型LH_TYPE)匹配月计划产品状态(PRODUCT_STATUS)，
-            日期范围 = IFNULL(STOCK_CAPTURE_DATE, 月初) ~ 月底
-         3. 超欠产 = 计划量 - 完成量（仅用于标识判定，不写回值字段）
-         4. 按 (分厂+物料编码+产品状态) 三字段维度匹配，回填到写入目标月定稿记录的 LAST_MONTH_VALID_FLAG
-         5. 有效标志判定：|超欠产值|(绝对值) > 阈值参数(overdueThresholdParamCode) → '0'(否)，否则 → '1'(是)
-         场景：次月定稿时（如6.25定稿7月），数据来源月=写入目标月=上月（6月），
-         用6月数据补更新6月定稿记录的标识，覆盖月初定时任务（6.1用5月数据）写入的旧标识。
-         防御：stockCaptureDate 若因任何原因超出 [startDate, endDate] 范围，
-               SQL 层通过 CASE WHEN ... BETWEEN 夹紧到 startDate，避免 start > end 的非法区间
-    -->
-    <update id="updateLastMonthOverProdFlag">
-        UPDATE T_MP_MONTH_PLAN_PROD_FINAL f
-            LEFT JOIN (
-            SELECT
-            f5.FACTORY_CODE,
-            f5.MATERIAL_CODE,
-            f5.PRODUCT_STATUS,
-            (
-            -- 计划量：从库存抓取日日号到月底累加 DAY_x
-            -- 库存抓取日由 Java 层根据 LAST_MONTH_PLAN_VERSION(ADJ前缀解析) 或余量表回退计算后传入
-            -- 防御：stockCaptureDate 若超出 [startDate, endDate] 则夹紧到 startDate
-            IFNULL(CASE WHEN DAYOFMONTH(CASE WHEN stockMap.STOCK_CAPTURE_DATE BETWEEN #{startDate} AND #{endDate} THEN stockMap.STOCK_CAPTURE_DATE ELSE #{startDate} END) &lt;= 1 THEN f5.DAY_1 ELSE 0 END, 0) +
-            IFNULL(CASE WHEN DAYOFMONTH(CASE WHEN stockMap.STOCK_CAPTURE_DATE BETWEEN #{startDate} AND #{endDate} THEN stockMap.STOCK_CAPTURE_DATE ELSE #{startDate} END) &lt;= 2 THEN f5.DAY_2 ELSE 0 END, 0) +
-            IFNULL(CASE WHEN DAYOFMONTH(CASE WHEN stockMap.STOCK_CAPTURE_DATE BETWEEN #{startDate} AND #{endDate} THEN stockMap.STOCK_CAPTURE_DATE ELSE #{startDate} END) &lt;= 3 THEN f5.DAY_3 ELSE 0 END, 0) +
-            IFNULL(CASE WHEN DAYOFMONTH(CASE WHEN stockMap.STOCK_CAPTURE_DATE BETWEEN #{startDate} AND #{endDate} THEN stockMap.STOCK_CAPTURE_DATE ELSE #{startDate} END) &lt;= 4 THEN f5.DAY_4 ELSE 0 END, 0) +
-            IFNULL(CASE WHEN DAYOFMONTH(CASE WHEN stockMap.STOCK_CAPTURE_DATE BETWEEN #{startDate} AND #{endDate} THEN stockMap.STOCK_CAPTURE_DATE ELSE #{startDate} END) &lt;= 5 THEN f5.DAY_5 ELSE 0 END, 0) +
-            IFNULL(CASE WHEN DAYOFMONTH(CASE WHEN stockMap.STOCK_CAPTURE_DATE BETWEEN #{startDate} AND #{endDate} THEN stockMap.STOCK_CAPTURE_DATE ELSE #{startDate} END) &lt;= 6 THEN f5.DAY_6 ELSE 0 END, 0) +
-            IFNULL(CASE WHEN DAYOFMONTH(CASE WHEN stockMap.STOCK_CAPTURE_DATE BETWEEN #{startDate} AND #{endDate} THEN stockMap.STOCK_CAPTURE_DATE ELSE #{startDate} END) &lt;= 7 THEN f5.DAY_7 ELSE 0 END, 0) +
-            IFNULL(CASE WHEN DAYOFMONTH(CASE WHEN stockMap.STOCK_CAPTURE_DATE BETWEEN #{startDate} AND #{endDate} THEN stockMap.STOCK_CAPTURE_DATE ELSE #{startDate} END) &lt;= 8 THEN f5.DAY_8 ELSE 0 END, 0) +
-            IFNULL(CASE WHEN DAYOFMONTH(CASE WHEN stockMap.STOCK_CAPTURE_DATE BETWEEN #{startDate} AND #{endDate} THEN stockMap.STOCK_CAPTURE_DATE ELSE #{startDate} END) &lt;= 9 THEN f5.DAY_9 ELSE 0 END, 0) +
-            IFNULL(CASE WHEN DAYOFMONTH(CASE WHEN stockMap.STOCK_CAPTURE_DATE BETWEEN #{startDate} AND #{endDate} THEN stockMap.STOCK_CAPTURE_DATE ELSE #{startDate} END) &lt;= 10 THEN f5.DAY_10 ELSE 0 END, 0) +
-            IFNULL(CASE WHEN DAYOFMONTH(CASE WHEN stockMap.STOCK_CAPTURE_DATE BETWEEN #{startDate} AND #{endDate} THEN stockMap.STOCK_CAPTURE_DATE ELSE #{startDate} END) &lt;= 11 THEN f5.DAY_11 ELSE 0 END, 0) +
-            IFNULL(CASE WHEN DAYOFMONTH(CASE WHEN stockMap.STOCK_CAPTURE_DATE BETWEEN #{startDate} AND #{endDate} THEN stockMap.STOCK_CAPTURE_DATE ELSE #{startDate} END) &lt;= 12 THEN f5.DAY_12 ELSE 0 END, 0) +
-            IFNULL(CASE WHEN DAYOFMONTH(CASE WHEN stockMap.STOCK_CAPTURE_DATE BETWEEN #{startDate} AND #{endDate} THEN stockMap.STOCK_CAPTURE_DATE ELSE #{startDate} END) &lt;= 13 THEN f5.DAY_13 ELSE 0 END, 0) +
-            IFNULL(CASE WHEN DAYOFMONTH(CASE WHEN stockMap.STOCK_CAPTURE_DATE BETWEEN #{startDate} AND #{endDate} THEN stockMap.STOCK_CAPTURE_DATE ELSE #{startDate} END) &lt;= 14 THEN f5.DAY_14 ELSE 0 END, 0) +
-            IFNULL(CASE WHEN DAYOFMONTH(CASE WHEN stockMap.STOCK_CAPTURE_DATE BETWEEN #{startDate} AND #{endDate} THEN stockMap.STOCK_CAPTURE_DATE ELSE #{startDate} END) &lt;= 15 THEN f5.DAY_15 ELSE 0 END, 0) +
-            IFNULL(CASE WHEN DAYOFMONTH(CASE WHEN stockMap.STOCK_CAPTURE_DATE BETWEEN #{startDate} AND #{endDate} THEN stockMap.STOCK_CAPTURE_DATE ELSE #{startDate} END) &lt;= 16 THEN f5.DAY_16 ELSE 0 END, 0) +
-            IFNULL(CASE WHEN DAYOFMONTH(CASE WHEN stockMap.STOCK_CAPTURE_DATE BETWEEN #{startDate} AND #{endDate} THEN stockMap.STOCK_CAPTURE_DATE ELSE #{startDate} END) &lt;= 17 THEN f5.DAY_17 ELSE 0 END, 0) +
-            IFNULL(CASE WHEN DAYOFMONTH(CASE WHEN stockMap.STOCK_CAPTURE_DATE BETWEEN #{startDate} AND #{endDate} THEN stockMap.STOCK_CAPTURE_DATE ELSE #{startDate} END) &lt;= 18 THEN f5.DAY_18 ELSE 0 END, 0) +
-            IFNULL(CASE WHEN DAYOFMONTH(CASE WHEN stockMap.STOCK_CAPTURE_DATE BETWEEN #{startDate} AND #{endDate} THEN stockMap.STOCK_CAPTURE_DATE ELSE #{startDate} END) &lt;= 19 THEN f5.DAY_19 ELSE 0 END, 0) +
-            IFNULL(CASE WHEN DAYOFMONTH(CASE WHEN stockMap.STOCK_CAPTURE_DATE BETWEEN #{startDate} AND #{endDate} THEN stockMap.STOCK_CAPTURE_DATE ELSE #{startDate} END) &lt;= 20 THEN f5.DAY_20 ELSE 0 END, 0) +
-            IFNULL(CASE WHEN DAYOFMONTH(CASE WHEN stockMap.STOCK_CAPTURE_DATE BETWEEN #{startDate} AND #{endDate} THEN stockMap.STOCK_CAPTURE_DATE ELSE #{startDate} END) &lt;= 21 THEN f5.DAY_21 ELSE 0 END, 0) +
-            IFNULL(CASE WHEN DAYOFMONTH(CASE WHEN stockMap.STOCK_CAPTURE_DATE BETWEEN #{startDate} AND #{endDate} THEN stockMap.STOCK_CAPTURE_DATE ELSE #{startDate} END) &lt;= 22 THEN f5.DAY_22 ELSE 0 END, 0) +
-            IFNULL(CASE WHEN DAYOFMONTH(CASE WHEN stockMap.STOCK_CAPTURE_DATE BETWEEN #{startDate} AND #{endDate} THEN stockMap.STOCK_CAPTURE_DATE ELSE #{startDate} END) &lt;= 23 THEN f5.DAY_23 ELSE 0 END, 0) +
-            IFNULL(CASE WHEN DAYOFMONTH(CASE WHEN stockMap.STOCK_CAPTURE_DATE BETWEEN #{startDate} AND #{endDate} THEN stockMap.STOCK_CAPTURE_DATE ELSE #{startDate} END) &lt;= 24 THEN f5.DAY_24 ELSE 0 END, 0) +
-            IFNULL(CASE WHEN DAYOFMONTH(CASE WHEN stockMap.STOCK_CAPTURE_DATE BETWEEN #{startDate} AND #{endDate} THEN stockMap.STOCK_CAPTURE_DATE ELSE #{startDate} END) &lt;= 25 THEN f5.DAY_25 ELSE 0 END, 0) +
-            IFNULL(CASE WHEN DAYOFMONTH(CASE WHEN stockMap.STOCK_CAPTURE_DATE BETWEEN #{startDate} AND #{endDate} THEN stockMap.STOCK_CAPTURE_DATE ELSE #{startDate} END) &lt;= 26 THEN f5.DAY_26 ELSE 0 END, 0) +
-            IFNULL(CASE WHEN DAYOFMONTH(CASE WHEN stockMap.STOCK_CAPTURE_DATE BETWEEN #{startDate} AND #{endDate} THEN stockMap.STOCK_CAPTURE_DATE ELSE #{startDate} END) &lt;= 27 THEN f5.DAY_27 ELSE 0 END, 0) +
-            IFNULL(CASE WHEN DAYOFMONTH(CASE WHEN stockMap.STOCK_CAPTURE_DATE BETWEEN #{startDate} AND #{endDate} THEN stockMap.STOCK_CAPTURE_DATE ELSE #{startDate} END) &lt;= 28 THEN f5.DAY_28 ELSE 0 END, 0) +
-            IFNULL(CASE WHEN DAYOFMONTH(CASE WHEN stockMap.STOCK_CAPTURE_DATE BETWEEN #{startDate} AND #{endDate} THEN stockMap.STOCK_CAPTURE_DATE ELSE #{startDate} END) &lt;= 29 THEN f5.DAY_29 ELSE 0 END, 0) +
-            IFNULL(CASE WHEN DAYOFMONTH(CASE WHEN stockMap.STOCK_CAPTURE_DATE BETWEEN #{startDate} AND #{endDate} THEN stockMap.STOCK_CAPTURE_DATE ELSE #{startDate} END) &lt;= 30 THEN f5.DAY_30 ELSE 0 END, 0) +
-            IFNULL(CASE WHEN DAYOFMONTH(CASE WHEN stockMap.STOCK_CAPTURE_DATE BETWEEN #{startDate} AND #{endDate} THEN stockMap.STOCK_CAPTURE_DATE ELSE #{startDate} END) &lt;= 31 THEN f5.DAY_31 ELSE 0 END, 0)
-            ) AS PLAN_QTY,
-            IFNULL(SUM(fin.DAY_QTY), 0) AS FINISH_QTY,
-            MAX(IFNULL(stockMap.FORCE_ZERO, 0)) AS FORCE_ZERO
-            FROM T_MP_MONTH_PLAN_PROD_FINAL f5
-            INNER JOIN T_MP_PROC_VERSION pv
-                ON pv.FACTORY_CODE = f5.FACTORY_CODE
-                AND pv.MONTH_PLAN_VERSION = f5.MONTH_PLAN_VERSION
-                AND pv.YEAR = f5.YEAR
-                AND pv.MONTH = f5.MONTH
-                AND pv.IS_FINAL = '1'
-                AND pv.IS_DELETE = 0
-            -- Java 层计算好的库存抓取日映射，替代原 surplus 关联
-            LEFT JOIN (
-                <foreach collection="stockCaptureDateList" item="item" separator="UNION ALL">
-                    SELECT
-                        #{item.factoryCode} AS FACTORY_CODE,
-                        #{item.materialCode} AS MATERIAL_CODE,
-                        #{item.productStatus} AS PRODUCT_STATUS,
-                        #{item.stockCaptureDate} AS STOCK_CAPTURE_DATE,
-                        #{item.forceZero} AS FORCE_ZERO
-                </foreach>
-            ) stockMap ON stockMap.FACTORY_CODE = f5.FACTORY_CODE
-                      AND stockMap.MATERIAL_CODE = f5.MATERIAL_CODE
-                      AND IFNULL(stockMap.PRODUCT_STATUS, '') = IFNULL(f5.PRODUCT_STATUS, '')
-            LEFT JOIN (
-                SELECT
-                    FACTORY_CODE,
-                    MATERIAL_CODE,
-                    LH_TYPE,
-                    FINISH_DATE,
-                    IFNULL(SUM(DAY_FINISH_QTY), 0) AS DAY_QTY
-                FROM T_LH_DAY_FINISH_QTY
-                WHERE IS_DELETE = 0
-                  AND FINISH_DATE BETWEEN #{startDate} AND #{endDate}
-                GROUP BY FACTORY_CODE, MATERIAL_CODE, LH_TYPE, FINISH_DATE
-            ) fin ON fin.FACTORY_CODE = f5.FACTORY_CODE
-                  AND fin.MATERIAL_CODE = f5.MATERIAL_CODE
-                  AND IFNULL(fin.LH_TYPE, '') = IFNULL(f5.PRODUCT_STATUS, '')
-                  AND fin.FINISH_DATE &gt;= IFNULL(CASE WHEN stockMap.STOCK_CAPTURE_DATE BETWEEN #{startDate} AND #{endDate} THEN stockMap.STOCK_CAPTURE_DATE ELSE #{startDate} END, #{startDate})
-                  AND fin.FINISH_DATE &lt;= #{endDate}
-            WHERE f5.IS_DELETE = 0
-            AND f5.YEAR = #{lastYear}
-            AND f5.MONTH = #{lastMonth}
-            GROUP BY f5.FACTORY_CODE, f5.MATERIAL_CODE, f5.PRODUCT_STATUS, stockMap.STOCK_CAPTURE_DATE, stockMap.FORCE_ZERO,
-            f5.DAY_1, f5.DAY_2, f5.DAY_3, f5.DAY_4, f5.DAY_5, f5.DAY_6, f5.DAY_7, f5.DAY_8,
-            f5.DAY_9, f5.DAY_10, f5.DAY_11, f5.DAY_12, f5.DAY_13, f5.DAY_14, f5.DAY_15, f5.DAY_16,
-            f5.DAY_17, f5.DAY_18, f5.DAY_19, f5.DAY_20, f5.DAY_21, f5.DAY_22, f5.DAY_23, f5.DAY_24,
-            f5.DAY_25, f5.DAY_26, f5.DAY_27, f5.DAY_28, f5.DAY_29, f5.DAY_30, f5.DAY_31
-            ) calc ON f.FACTORY_CODE = calc.FACTORY_CODE
-            AND f.MATERIAL_CODE = calc.MATERIAL_CODE
-            AND f.PRODUCT_STATUS = calc.PRODUCT_STATUS
-            LEFT JOIN T_MP_FACTORY_PARAM fp ON fp.FACTORY_CODE = f.FACTORY_CODE
-            AND fp.PRODUCT_TYPE_CODE = f.PRODUCT_TYPE_CODE
-            AND fp.PARAM_CODE = #{overdueThresholdParamCode}
-            AND fp.IS_DELETE = 0
-            SET f.LAST_MONTH_VALID_FLAG = CASE
                 WHEN IFNULL(calc.FORCE_ZERO, 0) = 1 THEN '1'
                 WHEN ABS(IFNULL(calc.PLAN_QTY, 0) - IFNULL(calc.FINISH_QTY, 0))
                     &gt; IFNULL(CAST(IFNULL(fp.PARAM_VALUE, fp.DEFAULE_VALUE) AS SIGNED), 0) THEN '0'
@@ -555,7 +410,6 @@
                 f5.FACTORY_CODE,
                 f5.MATERIAL_CODE,
                 f5.PRODUCT_STATUS,
-                f5.MONTH_PLAN_VERSION AS CURRENT_VERSION,
                 (
                     IFNULL(CASE WHEN DAYOFMONTH(CASE WHEN stockMap.STOCK_CAPTURE_DATE BETWEEN #{startDate} AND #{endDate} THEN stockMap.STOCK_CAPTURE_DATE ELSE #{startDate} END) &lt;= 1 THEN f5.DAY_1 ELSE 0 END, 0) +
         IFNULL(CASE WHEN DAYOFMONTH(CASE WHEN stockMap.STOCK_CAPTURE_DATE BETWEEN #{startDate} AND #{endDate} THEN stockMap.STOCK_CAPTURE_DATE ELSE #{startDate} END) &lt;= 2 THEN f5.DAY_2 ELSE 0 END, 0) +
@@ -591,13 +445,6 @@
         ) - IFNULL(SUM(fin.DAY_QTY), 0) AS OVERDUE_QTY,
         MAX(IFNULL(stockMap.FORCE_ZERO, 0)) AS FORCE_ZERO
         FROM T_MP_MONTH_PLAN_PROD_FINAL f5
-        INNER JOIN T_MP_PROC_VERSION pv
-            ON pv.FACTORY_CODE = f5.FACTORY_CODE
-            AND pv.MONTH_PLAN_VERSION = f5.MONTH_PLAN_VERSION
-            AND pv.YEAR = f5.YEAR
-            AND pv.MONTH = f5.MONTH
-            AND pv.IS_FINAL = '1'
-            AND pv.IS_DELETE = 0
         -- Java 层计算好的库存抓取日映射，替代原 surplus 关联
         LEFT JOIN (
             <foreach collection="stockCaptureDateList" item="item" separator="UNION ALL">
@@ -630,7 +477,7 @@
         WHERE f5.IS_DELETE = 0
         AND f5.YEAR = #{lastYear}
         AND f5.MONTH = #{lastMonth}
-        GROUP BY f5.FACTORY_CODE, f5.MATERIAL_CODE, f5.PRODUCT_STATUS, f5.MONTH_PLAN_VERSION, stockMap.STOCK_CAPTURE_DATE, stockMap.FORCE_ZERO,
+        GROUP BY f5.FACTORY_CODE, f5.MATERIAL_CODE, f5.PRODUCT_STATUS, stockMap.STOCK_CAPTURE_DATE, stockMap.FORCE_ZERO,
         f5.DAY_1, f5.DAY_2, f5.DAY_3, f5.DAY_4, f5.DAY_5, f5.DAY_6, f5.DAY_7, f5.DAY_8,
         f5.DAY_9, f5.DAY_10, f5.DAY_11, f5.DAY_12, f5.DAY_13, f5.DAY_14, f5.DAY_15, f5.DAY_16,
         f5.DAY_17, f5.DAY_18, f5.DAY_19, f5.DAY_20, f5.DAY_21, f5.DAY_22, f5.DAY_23, f5.DAY_24,
@@ -644,14 +491,8 @@
         AND f5.YEAR = #{lastYear}
         AND f5.MONTH = #{lastMonth}
         AND f5.IS_DELETE = 0
-        INNER JOIN T_MP_PROC_VERSION pv2
-            ON pv2.FACTORY_CODE = f5.FACTORY_CODE
-            AND pv2.MONTH_PLAN_VERSION = f5.MONTH_PLAN_VERSION
-            AND pv2.YEAR = f5.YEAR
-            AND pv2.MONTH = f5.MONTH
-            AND pv2.IS_FINAL = '1'
-            AND pv2.IS_DELETE = 0
-        -- 第三段：从排产版本表取当月定稿版本号（IS_FINAL='1'），可能有多个定稿版本，取任意一条
+        -- 第三段：从排产版本表取当月定稿版本号（IS_FINAL='1'），用于INSERT新记录的版本号字段
+        -- 这是唯一需要关联 T_MP_PROC_VERSION 的场景，因为INSERT需要取8月版本号
         INNER JOIN (
         SELECT
         FACTORY_CODE,
@@ -670,6 +511,7 @@
         AND fp.PARAM_CODE = #{overdueThresholdParamCode}
         AND fp.IS_DELETE = 0
         -- 防重：当月定稿表按相同维度已存在的不插入
+        -- 维度：分厂+物料+产品状态+年+月（T_MP_MONTH_PLAN_PROD_FINAL 本身就是定稿表，无需按版本号防重）
         LEFT JOIN T_MP_MONTH_PLAN_PROD_FINAL exist
         ON exist.FACTORY_CODE = calc.FACTORY_CODE
         AND exist.MATERIAL_CODE = calc.MATERIAL_CODE
@@ -678,8 +520,6 @@
         AND exist.MONTH = #{currentMonth}
         AND exist.IS_DELETE = 0
         WHERE exist.ID IS NULL
-        AND calc.OVERDUE_QTY IS NOT NULL
-        AND calc.OVERDUE_QTY &lt;&gt; 0
     </select>
 
     <!-- 查询当月定稿表 PRODUCTION_NO 工单号最大值（用于 Java 层递增生成新工单号）

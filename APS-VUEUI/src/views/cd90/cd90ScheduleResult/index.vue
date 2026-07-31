@@ -68,13 +68,12 @@
         >{{ $t('ui.data.column.scheduleResult.unscheduleResult') }}</el-button>
       </template>
     </page-table>
-    <tlt-upload-form
+    <tlt-upload
       ref="tltUpload"
-      :update-support="true"
-      download-url="/cd90/cd90ScheduleResult/importTemplate"
-      upload-url="/cd90/cd90ScheduleResult/importData"
-      label-width="0"
-      :columns="importColumns"
+      download-url="/cd90/cd90ScheduleResult/export"
+      :download-params="importParams"
+      upload-url="/cd90/cd90ScheduleResult/importDataByCust"
+      :upload-params="importParams"
       @uploadSuccess="getList"
     />
     <auto-schedule-dialog
@@ -145,7 +144,7 @@ import { getAutoScheduleTask, getInsertTask, getTransferMachineTask, getChangeQt
 import { listTireFabricCodes } from '@/api/cd90/specifyMachine'
 import { getCd90MachineEnableOptions } from '@/api/cd90/cd90MachineInfo'
 import { listUnscheduleResult } from '@/api/cd90/unscheduleResult'
-import TltUploadForm from '@/views/components/tltUploadForm.vue'
+import TltUpload from '@/components/tltUpload/tltUpload.vue'
 import AutoScheduleDialog from './components/autoScheduleDialog.vue'
 import InsertOrderDialog from './components/insertOrderDialog.vue'
 import ChangeMachineDialog from './components/changeMachineDialog.vue'
@@ -162,7 +161,7 @@ const SHIFT_CONFIG = [
 
 export default {
   name: 'Cd90ScheduleResult',
-  components: { TltUploadForm, AutoScheduleDialog, InsertOrderDialog, ChangeMachineDialog, ChangeQtyDialog },
+  components: { TltUpload, AutoScheduleDialog, InsertOrderDialog, ChangeMachineDialog, ChangeQtyDialog },
   dicts: ['biz_factory_name', 'IS_RELEASE'],
   provide() {
     return {
@@ -177,20 +176,6 @@ export default {
     }
 
     return {
-      importColumns: [
-        {
-          label: '',
-          prop: 'updateSupport',
-          render: form => (
-            <el-checkbox
-              label={this.$t('common.rule.updateSupport')}
-              v-model={form.updateSupport}
-            >
-              {this.$t('common.rule.updateSupport')}
-            </el-checkbox>
-          )
-        }
-      ],
       loading: false,
       data: [],
       selection: [],
@@ -229,6 +214,12 @@ export default {
     }
   },
   computed: {
+    importParams() {
+      return {
+        factoryCode: this.query.factoryCode || this.search.factoryCode,
+        scheduleDate: this.query.scheduleDate || this.search.scheduleDate
+      }
+    },
     columns() {
       return [
         { type: 'selection', width: 55, fixed: 'left' },

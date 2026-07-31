@@ -71,6 +71,18 @@ public class TmManualTaskDraft {
     /** 原因分析 */
     private String analysis;
 
+    /** 未排原因编码 */
+    private String unplannedReasonCode;
+
+    /** 未排原因描述 */
+    private String unplannedReasonDesc;
+
+    /** 工装结算前可用数量 */
+    private BigDecimal availableToolQty;
+
+    /** 本任务所需工装数量 */
+    private BigDecimal requiredToolQty;
+
     /** 来源班次开始时间，仅在任务未跨班时回写 */
     private Date sourceStartTime;
 
@@ -115,6 +127,10 @@ public class TmManualTaskDraft {
         target.setMouthPlateCode(this.mouthPlateCode);
         target.setDataSource(this.dataSource);
         target.setAnalysis(this.analysis);
+        target.setUnplannedReasonCode(this.unplannedReasonCode);
+        target.setUnplannedReasonDesc(this.unplannedReasonDesc);
+        target.setAvailableToolQty(this.availableToolQty);
+        target.setRequiredToolQty(this.requiredToolQty);
         target.setSourceStartTime(this.sourceStartTime);
         target.setSourceEndTime(this.sourceEndTime);
         target.setInsertTask(this.insertTask);

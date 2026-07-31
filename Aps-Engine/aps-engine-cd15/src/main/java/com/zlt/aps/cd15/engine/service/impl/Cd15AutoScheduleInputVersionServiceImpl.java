@@ -107,6 +107,22 @@ public class Cd15AutoScheduleInputVersionServiceImpl implements Cd15AutoSchedule
     public String fingerprint(String factoryCode, LocalDate scheduleDate,
                               LocalDate resourceBaselineDate,
                               String resourceBaselineShiftCode) {
+        return this.fingerprint(factoryCode, scheduleDate, resourceBaselineDate,
+                resourceBaselineShiftCode, true);
+    }
+
+    @Override
+    public String fingerprintWithoutStock(String factoryCode, LocalDate scheduleDate,
+                                          LocalDate resourceBaselineDate,
+                                          String resourceBaselineShiftCode) {
+        return this.fingerprint(factoryCode, scheduleDate, resourceBaselineDate,
+                resourceBaselineShiftCode, false);
+    }
+
+    private String fingerprint(String factoryCode, LocalDate scheduleDate,
+                               LocalDate resourceBaselineDate,
+                               String resourceBaselineShiftCode,
+                               boolean includeStock) {
         String forming = cxMapper.selectList(Wrappers.<CxScheduleResult>lambdaQuery()
                         .eq(CxScheduleResult::getFactoryCode, factoryCode)
                         .between(CxScheduleResult::getScheduleDate,
@@ -122,15 +138,16 @@ public class Cd15AutoScheduleInputVersionServiceImpl implements Cd15AutoSchedule
                 .stream()
                 .map(this::constructionFingerprint)
                 .collect(Collectors.joining("|"));
-        String stock = stockMapper.selectList(Wrappers.<Cd15Stock>lambdaQuery()
+        LocalDate stockDate = scheduleDate.minusDays(1);
+        String stock = includeStock ? stockMapper.selectList(Wrappers.<Cd15Stock>lambdaQuery()
                         .eq(Cd15Stock::getFactoryCode, factoryCode)
-                        .eq(Cd15Stock::getStockDate, Date.valueOf(scheduleDate))
+                        .eq(Cd15Stock::getStockDate, Date.valueOf(stockDate))
                         .orderByAsc(Cd15Stock::getId))
                 .stream()
                 .map(item -> item.getId() + ":" + item.getMaterialCode() + ":" + item.getStockDate()
                         + ":" + item.getStockNum() + ":" + item.getModifyNum() + ":" + item.getBadNum()
                         + ":" + item.getUpdateTime())
-                .collect(Collectors.joining("|"));
+                .collect(Collectors.joining("|")) : "";
         String curls = curlLengthMapper.selectList(Wrappers.<Cd15CurlLength>lambdaQuery()
                         .eq(Cd15CurlLength::getFactoryCode, factoryCode)
                         .orderByAsc(Cd15CurlLength::getId))

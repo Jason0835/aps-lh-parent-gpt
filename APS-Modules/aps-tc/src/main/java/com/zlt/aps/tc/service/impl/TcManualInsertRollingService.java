@@ -1,14 +1,18 @@
 package com.zlt.aps.tc.service.impl;
 
 import cn.hutool.core.util.IdUtil;
+import cn.hutool.core.util.StrUtil;
+import com.alibaba.fastjson.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
+import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.tc.api.constant.TcScheduleConstants;
 import com.zlt.aps.tc.api.domain.entity.TcScheduleResult;
 import com.zlt.aps.tc.api.domain.entity.TcScheduleResultExplain;
 import com.zlt.aps.tc.api.domain.entity.TcScheduleUnplanned;
+import com.zlt.aps.tc.api.enums.TcUnplannedReasonEnum;
 import com.zlt.aps.tc.engine.domain.manual.*;
 import com.zlt.aps.tc.engine.service.facade.TcScheduleOperationFacade;
 import com.zlt.aps.tc.engine.service.impl.TcManualRollingEngineService;
@@ -124,8 +128,9 @@ public class TcManualInsertRollingService {
         }
         Map<String, TcScheduleResult> templateMap = new LinkedHashMap<>();
         templateMap.put(resultGroupKey, insertResult);
-        return this.executeAndPersist(insertResult, Collections.singletonList(insertResult.getMachineCode()),
-                commandBatch, templateMap).getInsertCount();
+        TcManualRollingWriteResult writeResult = this.executeAndPersist(
+                insertResult, Collections.singletonList(insertResult.getMachineCode()), commandBatch, templateMap);
+        return writeResult.getInsertCount() + writeResult.getUnplannedCount();
     }
 
     /**
@@ -376,9 +381,28 @@ public class TcManualInsertRollingService {
             assembledMap.put(entry.getKey(), target);
         }
         TcManualRollingWriteResult writeResult = new TcManualRollingWriteResult();
+        Set<Long> allowedDeleteResultIdSet = new LinkedHashSet<>(rollingResult.getExplicitDeleteResultIdSet());
+        allowedDeleteResultIdSet.addAll(rollingResult.getMoveToUnplannedResultIdSet());
+        Set<Long> protectedSourceIdSet = snapshotList.stream().map(TcScheduleResult::getId)
+                .filter(Objects::nonNull)
+                .filter(resultId -> !rollingResult.getExplicitDeleteResultIdSet().contains(resultId))
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        boolean retainedProtectedResult = assembledMap.keySet().stream()
+                .filter(existingMap::containsKey).map(existingMap::get).map(TcScheduleResult::getId)
+                .filter(Objects::nonNull)
+                .anyMatch(protectedSourceIdSet::contains);
+        if (rollingResult.isContainsNonDeleteOperation() && !protectedSourceIdSet.isEmpty()
+                && !retainedProtectedResult) {
+            throw new ServiceException(I18nUtil.getMessage(
+                    "ui.tc.schedule.manual.wholeMachineClearBlocked"));
+        }
         for (Map.Entry<String, TcScheduleResult> entry : existingMap.entrySet()) {
             TcScheduleResult target = assembledMap.remove(entry.getKey());
             if (target == null) {
+                if (!allowedDeleteResultIdSet.contains(entry.getValue().getId())) {
+                    throw new ServiceException(I18nUtil.getMessage(
+                            "ui.tc.schedule.manual.implicitDeleteBlocked"));
+                }
                 if (this.scheduleResultMapper.deleteById(entry.getValue().getId()) != 1) {
                     throw new ServiceException(I18nUtil.getMessage("ui.tc.schedule.manual.concurrentChanged"));
                 }
@@ -405,7 +429,41 @@ public class TcManualInsertRollingService {
             writeResult.setInsertCount(writeResult.getInsertCount() + 1);
         }
         this.persistUnplanned(reference, rollingResult.getUnplannedTaskList(), snapshotList, newTemplateMap);
+        writeResult.setUnplannedCount(rollingResult.getUnplannedTaskList().size());
+        this.syncLatestToolLedger(reference, rollingResult);
         return writeResult;
+    }
+
+    /**
+     * 将本次人工命令结算后的余额同步到批次最终账本快照。
+     *
+     * @param reference 排程范围参考
+     * @param rollingResult 人工滚动结果
+     */
+    private void syncLatestToolLedger(TcScheduleResult reference, TcManualRollingResult rollingResult) {
+        if (this.scheduleResultExplainMapper == null || rollingResult.getRemainingToolQty() == null) {
+            return;
+        }
+        LambdaQueryWrapper<TcScheduleResultExplain> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(TcScheduleResultExplain::getFactoryCode, reference.getFactoryCode());
+        wrapper.eq(TcScheduleResultExplain::getScheduleDate, reference.getScheduleDate());
+        wrapper.eq(TcScheduleResultExplain::getBatchNo, reference.getBatchNo());
+        wrapper.isNotNull(TcScheduleResultExplain::getToolLedgerOrder);
+        wrapper.orderByDesc(TcScheduleResultExplain::getToolLedgerOrder);
+        wrapper.last("LIMIT 1");
+        TcScheduleResultExplain latestLedger = this.scheduleResultExplainMapper.selectOne(wrapper);
+        if (latestLedger == null) {
+            throw new ServiceException(I18nUtil.getMessage(
+                    "ui.tc.schedule.manual.toolLedgerMissing"));
+        }
+        latestLedger.setAvailableToolQty(rollingResult.getAvailableToolQtyBefore());
+        latestLedger.setToolUsedQty(BigDecimalUtils.valueOf(rollingResult.getAvailableToolQtyBefore())
+                .subtract(BigDecimalUtils.valueOf(rollingResult.getRemainingToolQty())));
+        latestLedger.setRemainingToolQty(rollingResult.getRemainingToolQty());
+        if (this.scheduleResultExplainMapper.updateById(latestLedger) != 1) {
+            throw new ServiceException(I18nUtil.getMessage(
+                    "ui.tc.schedule.manual.concurrentChanged"));
+        }
     }
 
     /** 将未排片段同步到未排表和解释表。 */
@@ -440,7 +498,9 @@ public class TcManualInsertRollingService {
         wrapper.eq(TcScheduleUnplanned::getFactoryCode, reference.getFactoryCode());
         wrapper.eq(TcScheduleUnplanned::getScheduleDate, reference.getScheduleDate());
         wrapper.eq(TcScheduleUnplanned::getBatchNo, reference.getBatchNo());
-        wrapper.eq(TcScheduleUnplanned::getUnplannedReasonCode, "CAPACITY_NOT_ENOUGH");
+        wrapper.in(TcScheduleUnplanned::getUnplannedReasonCode,
+                TcUnplannedReasonEnum.CAPACITY_NOT_ENOUGH.getCode(),
+                TcUnplannedReasonEnum.TOOL_NOT_ENOUGH.getCode());
         List<TcScheduleUnplanned> existingList = this.scheduleUnplannedMapper.selectList(wrapper);
         Map<String, TcScheduleUnplanned> existingMap = existingList == null ? new LinkedHashMap<>()
                 : existingList.stream().filter(item -> affectedTaskKeySet.contains(item.getTaskBusinessKey()))
@@ -481,6 +541,9 @@ public class TcManualInsertRollingService {
     /** 回填未排任务字段。 */
     private void fillUnplanned(TcScheduleResult reference, TcManualTaskDraft task,
                                String taskBusinessKey, TcScheduleUnplanned unplanned) {
+            TcUnplannedReasonEnum reason = StrUtil.equals(
+                    task.getUnplannedReasonCode(), TcUnplannedReasonEnum.TOOL_NOT_ENOUGH.getCode())
+                    ? TcUnplannedReasonEnum.TOOL_NOT_ENOUGH : TcUnplannedReasonEnum.CAPACITY_NOT_ENOUGH;
             unplanned.setFactoryCode(reference.getFactoryCode());
             unplanned.setBatchNo(reference.getBatchNo());
             unplanned.setScheduleDate(reference.getScheduleDate());
@@ -490,10 +553,17 @@ public class TcManualInsertRollingService {
             unplanned.setMouthPlateCode(task.getMouthPlateCode());
             unplanned.setShiftOrder(task.getSourceShiftOrder());
             unplanned.setPlanQty(task.getPlanQty());
-            unplanned.setUnplannedReasonCode("CAPACITY_NOT_ENOUGH");
-            unplanned.setUnplannedReasonDesc(I18nUtil.getMessage("ui.tc.schedule.unplanned.capacityNotEnough"));
-            unplanned.setUnplannedEvidenceJson(
-                    "{\"schemaVersion\":1,\"rule\":\"T_TC_MACHINE_INFO.MAX_CAPACITY\",\"source\":\"MANUAL_ROLLING\"}");
+            unplanned.setUnplannedReasonCode(reason.getCode());
+            unplanned.setUnplannedReasonDesc(reason.getDesc());
+            Map<String, Object> evidenceMap = new LinkedHashMap<>();
+            evidenceMap.put("schemaVersion", 1);
+            evidenceMap.put("source", "MANUAL_ROLLING");
+            evidenceMap.put("rule", reason == TcUnplannedReasonEnum.TOOL_NOT_ENOUGH
+                    ? TcScheduleConstants.PARAM_TOOL_TOTAL_QTY : "T_TC_MACHINE_INFO.MAX_CAPACITY");
+            evidenceMap.put("availableToolQty", task.getAvailableToolQty());
+            evidenceMap.put("requiredToolQty", task.getRequiredToolQty());
+            evidenceMap.put("unplannedQty", task.getPlanQty());
+            unplanned.setUnplannedEvidenceJson(JSON.toJSONString(evidenceMap));
     }
 
     /** 更新已有未排任务。 */
@@ -523,10 +593,13 @@ public class TcManualInsertRollingService {
         explain.setFinalPlanQty(resolved || task == null ? BigDecimal.ZERO : task.getPlanQty());
         explain.setAssignStatus(resolved ? "RESOLVED" : "UNPLANNED");
         explain.setTaskStatus(resolved ? "RESOLVED" : "UNPLANNED");
-        explain.setUnplannedReasonCode(resolved ? null : "CAPACITY_NOT_ENOUGH");
+        String reasonCode = task == null || StrUtil.isBlank(task.getUnplannedReasonCode())
+                ? TcUnplannedReasonEnum.CAPACITY_NOT_ENOUGH.getCode() : task.getUnplannedReasonCode();
+        explain.setUnplannedReasonCode(resolved ? null : reasonCode);
         explain.setUnplannedEvidenceJson(resolved
                 ? "{\"schemaVersion\":1,\"status\":\"RESOLVED_BY_MANUAL_ROLLING\"}"
-                : "{\"schemaVersion\":1,\"reasonCode\":\"CAPACITY_NOT_ENOUGH\",\"source\":\"MANUAL_ROLLING\"}");
+                : "{\"schemaVersion\":1,\"reasonCode\":\"" + reasonCode
+                + "\",\"source\":\"MANUAL_ROLLING\"}");
         int affectedCount = explain.getId() == null ? this.scheduleResultExplainMapper.insert(explain)
                 : this.scheduleResultExplainMapper.updateById(explain);
         if (affectedCount != 1) {

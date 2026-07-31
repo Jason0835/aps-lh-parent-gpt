@@ -28,6 +28,7 @@ import com.zlt.aps.tm.component.TmScheduleBatchNoGenerator;
 import com.zlt.aps.tm.domain.TmAutoScheduleTask;
 import com.zlt.aps.tm.engine.domain.TmPersistResult;
 import com.zlt.aps.tm.engine.domain.TmScheduleContext;
+import com.zlt.aps.tm.engine.service.collector.TmAutoScheduleIssueCollector;
 import com.zlt.aps.tm.engine.template.TmScheduleTemplateImpl;
 import com.zlt.aps.tm.mapper.*;
 import com.zlt.aps.tm.service.ITmRollingUpdateService;
@@ -419,16 +420,18 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
         if (autoScheduleTask == null) {
             throw new ServiceException(resolveTmMessage("ui.data.alert.tm.schedule.taskNotFound", "未找到胎面自动排程任务"));
         }
-        TmAutoScheduleRequestVo request = JSON.parseObject(autoScheduleTask.getRequestSnapshot(), TmAutoScheduleRequestVo.class);
+        TmAutoScheduleRequestVo request = null;
         long startMillis = System.currentTimeMillis();
         TmAutoScheduleResponseVo response = null;
         TmScheduleContext context = null;
-        log.info("{} step=REQUEST_RECEIVED factoryCode={}, scheduleDate={}, traceId={}, operator={}, dataSource={}, confirmOverwrite={}",
-                TmScheduleConstants.AUTO_PLAN_LOG_PREFIX, request == null ? null : request.getFactoryCode(),
-                formatAutoPlanDate(request == null ? null : request.getScheduleDate()), request == null ? null : request.getTraceId(),
-                request == null ? null : request.getOperator(), request == null ? null : request.getDataSource(),
-                request == null ? null : request.getConfirmOverwrite());
         try {
+            request = JSON.parseObject(autoScheduleTask.getRequestSnapshot(), TmAutoScheduleRequestVo.class);
+            log.info("{} step=REQUEST_RECEIVED factoryCode={}, scheduleDate={}, traceId={}, operator={}, dataSource={}, confirmOverwrite={}",
+                    TmScheduleConstants.AUTO_PLAN_LOG_PREFIX, request == null ? null : request.getFactoryCode(),
+                    formatAutoPlanDate(request == null ? null : request.getScheduleDate()),
+                    request == null ? null : request.getTraceId(),
+                    request == null ? null : request.getOperator(), request == null ? null : request.getDataSource(),
+                    request == null ? null : request.getConfirmOverwrite());
             validateAutoScheduleRequest(request);
             log.info("{} step=REQUEST_VALIDATED factoryCode={}, scheduleDate={}, traceId={}, operator={}, dataSource={}, confirmOverwrite={}",
                     TmScheduleConstants.AUTO_PLAN_LOG_PREFIX, request.getFactoryCode(),
@@ -538,7 +541,7 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
                     context == null ? response == null ? request == null ? null : request.getTraceId() : response.getTraceId() : context.getTraceId(),
                     System.currentTimeMillis() - startMillis, ex.getClass().getSimpleName(), ex.getMessage());
             tmAutoScheduleTaskService.markFailed(taskId, ex.getMessage(),
-                    context == null ? Collections.emptyList() : context.getIssueCollector().getIssues());
+                    this.collectFailureIssues(context, ex));
             throw ex;
         } catch (RuntimeException ex) {
             log.error("{} step=FAILED factoryCode={}, scheduleDate={}, batchNo={}, traceId={}, elapsedMs={}, exceptionType={}, message={}",
@@ -548,9 +551,31 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
                     context == null ? response == null ? request == null ? null : request.getTraceId() : response.getTraceId() : context.getTraceId(),
                     System.currentTimeMillis() - startMillis, ex.getClass().getSimpleName(), ex.getMessage(), ex);
             tmAutoScheduleTaskService.markFailed(taskId, ex.getMessage(),
-                    context == null ? Collections.emptyList() : context.getIssueCollector().getIssues());
+                    this.collectFailureIssues(context, ex));
             throw ex;
         }
+    }
+
+    /**
+     * 汇总自动排程失败问题，模板执行前失败时补充初始化阶段问题。
+     *
+     * @param context   排程上下文
+     * @param exception 原始异常
+     * @return 待写入任务表的问题明细
+     */
+    private List<TmAutoScheduleIssueVo> collectFailureIssues(TmScheduleContext context,
+                                                             RuntimeException exception) {
+        TmAutoScheduleIssueCollector issueCollector = context == null
+                ? new TmAutoScheduleIssueCollector() : context.getIssueCollector();
+        if (!issueCollector.hasErrorIssue()) {
+            TmAutoScheduleIssueCategoryEnum category = exception instanceof ServiceException
+                    ? TmAutoScheduleIssueCategoryEnum.AUTO_SCHEDULE_BUSINESS_ERROR
+                    : TmAutoScheduleIssueCategoryEnum.AUTO_SCHEDULE_SYSTEM_ERROR;
+            String message = StrUtil.blankToDefault(exception.getMessage(),
+                    I18nUtil.getMessage("ui.data.alert.tm.schedule.taskExecuteFailed"));
+            issueCollector.addFailureIssueIfAbsent(TmScheduleStepEnum.BOOTSTRAP, category, message);
+        }
+        return issueCollector.getIssues();
     }
 
     /**

@@ -40,7 +40,7 @@
 </template>
 
 <script>
-import { listUnplanned } from '@/api/tc/tcScheduleResult'
+import {listUnplanned} from '@/api/tc/tcScheduleResult'
 import ExplainDrawer from './ExplainDrawer.vue'
 
 export default {
@@ -74,6 +74,7 @@ export default {
         })
         this.rows = page.records || page.rows || []
         this.total = Number(page.total || 0)
+        this.$emit('count-change', this.total)
       } finally {
         this.loading = false
       }

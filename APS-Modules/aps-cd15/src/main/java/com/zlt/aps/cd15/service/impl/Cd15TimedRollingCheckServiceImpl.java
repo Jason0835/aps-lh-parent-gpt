@@ -13,6 +13,7 @@ import com.zlt.aps.cd15.engine.model.Cd15RollingTarget;
 import com.zlt.aps.cd15.engine.service.Cd15RollingInputVersionService;
 import com.zlt.aps.cd15.engine.service.Cd15RollingParameterService;
 import com.zlt.aps.cd15.engine.service.Cd15RollingScheduleTaskService;
+import com.zlt.aps.cd15.engine.service.Cd15RollingShiftStockService;
 import com.zlt.aps.cd15.engine.service.Cd15RollingTargetResolver;
 import com.zlt.aps.cd15.engine.service.Cd15ScheduleTaskService;
 import com.zlt.aps.cd15.service.Cd15RollingStabilityService;
@@ -43,6 +44,7 @@ public class Cd15TimedRollingCheckServiceImpl implements Cd15TimedRollingCheckSe
     private final Cd15RollingInputVersionService rollingInputVersionService;
     private final Cd15RollingStabilityService rollingStabilityService;
     private final Cd15RollingScheduleTaskService rollingTaskService;
+    private final Cd15RollingShiftStockService rollingShiftStockService;
     private final Cd15ScheduleTaskService taskService;
     private final Cd15TimedRollingAsyncExecutor timedRollingAsyncExecutor;
     private final ObjectMapper objectMapper;
@@ -80,6 +82,10 @@ public class Cd15TimedRollingCheckServiceImpl implements Cd15TimedRollingCheckSe
             return;
         }
         Cd15RollingTarget target = optionalTarget.get();
+        if (!rollingShiftStockService.exists(target)) {
+            skippedFactories.add(skip(factoryCode, "SHIFT_STOCK_NOT_READY"));
+            return;
+        }
         Date scheduleDate = Date.from(target.getScheduleDate().atStartOfDay(
                 ZoneId.systemDefault()).toInstant());
         if (taskService.findActive(factoryCode, scheduleDate) != null) {

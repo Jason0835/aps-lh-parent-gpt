@@ -212,7 +212,7 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         Map<String, Integer> insertResults = new HashMap<>(0); // 活块可用量（按物料描述分组）
         List<DailyMouldAvailabilityResult> moldResult = moldCavityInsertMaxValueCalculator
                 .moldCavityInsertMaxValueCalculator(params.getYear(), params.getMonth(), params.getFactoryCode(),
-                        null, null, true);
+                        null, null, true,true);
         if (CollectionUtils.isNotEmpty(moldResult)) {
             cavityResults = moldResult.get(0).getCavityResults();
             insertResults = moldResult.get(0).getInsertResults();
@@ -281,8 +281,8 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
                 Integer differenceQty = prodReqPlan - intValue(result.getTotalQty());
                 result.setDifferenceQty(differenceQty >= 0 ? differenceQty : 0);
                 result.setProdReqPlan(prodReqPlan);
-                //20260630+ 设置计划类型
-                result.setPlanType(params.getPlanType());
+                //20260630+ 设置计划类型，数据库能查到的情况下不需要从params取值
+                result.setPlanType(Optional.ofNullable(result.getPlanType()).orElse(params.getPlanType()));
                 // 2.1.2.3、实单未排产 = 高优先级 + 中优先级 - 高优先级实际 - 中优先级实际，如果为负数则设为0
                 Integer heightQty = intValue(result.getHeightQty());
                 Integer midQty = intValue(result.getMidQty());
@@ -1082,6 +1082,7 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         LambdaQueryWrapper<SpecialMaterialResult> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(SpecialMaterialResult::getFactoryCode, queryResult.getFactoryCode());
         queryWrapper.eq(SpecialMaterialResult::getProductionVersion, queryResult.getProductionVersion());
+        queryWrapper.isNotNull(SpecialMaterialResult::getMaterialDesc);
         List<SpecialMaterialResult> specialMaterialResultList = specialMaterialResultEntityMapper.selectList(queryWrapper);
         Map<String, List<SpecialMaterialResult>> specialMaterialResultMap = specialMaterialResultList.stream().collect(Collectors.groupingBy(SpecialMaterialResult::getMaterialDesc));
         List<Map<String, Object>> listData = new ArrayList<>();

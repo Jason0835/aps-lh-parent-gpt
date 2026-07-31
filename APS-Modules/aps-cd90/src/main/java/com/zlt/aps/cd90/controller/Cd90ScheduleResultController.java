@@ -3,19 +3,24 @@ package com.zlt.aps.cd90.controller;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.ExportLog;
+import com.ruoyi.api.gateway.system.domain.ImportLog;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.api.gateway.system.service.IExportLogService;
+import com.ruoyi.api.gateway.system.service.IImportLogService;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.ServletUtils;
+import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
+import com.zlt.aps.cd90.api.domain.dto.Cd90ScheduleImportDTO;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleResult;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleRollingAdjustLog;
 import com.zlt.aps.cd90.api.domain.vo.Cd90ChangeQtyRequest;
 import com.zlt.aps.cd90.api.domain.vo.Cd90InsertOrderRequest;
 import com.zlt.aps.cd90.api.domain.vo.Cd90RollingCheckRequest;
+import com.zlt.aps.cd90.api.domain.vo.Cd90ScheduleResultTemplateImportVO;
 import com.zlt.aps.cd90.api.domain.vo.Cd90TransferMachineRequest;
 import com.zlt.aps.cd90.engine.domain.Cd90ScheduleTask;
 import com.zlt.aps.cd90.engine.service.Cd90ScheduleTaskService;
@@ -27,6 +32,7 @@ import com.zlt.aps.cd90.service.Cd90ScheduleTaskRecoveryService;
 import com.zlt.aps.utils.AppUtils;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
+import com.zlt.common.utils.ImportExcelUtils;
 import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -35,6 +41,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.Date;
 import java.util.List;
@@ -48,6 +55,8 @@ public class Cd90ScheduleResultController extends AbstractDocBizController<Cd90S
     private ICd90ScheduleResultService cd90ScheduleResultService;
     @Resource
     private IExportLogService iExportLogService;
+    @Resource
+    private IImportLogService iImportLogService;
     @Resource
     private Cd90ScheduleResultMapper cd90ScheduleResultMapper;
     @Resource
@@ -307,6 +316,35 @@ public class Cd90ScheduleResultController extends AbstractDocBizController<Cd90S
     @Override
     public AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport) throws Exception {
         return super.importData(importContext, updateSupport);
+    }
+
+    @Log(title = "ui.data.column.scheduleResult.modelName", businessType = BusinessType.IMPORT)
+    @ApiOperation("按固定模板导入直裁排程结果")
+    @PostMapping("/importDataByCust/{updateSupport}")
+    public AjaxResult importDataByCust(@PathVariable("updateSupport") boolean updateSupport,
+                                       @RequestBody Cd90ScheduleImportDTO importDTO) throws Exception {
+        Date beginTime = DateUtils.getNowDate();
+        ImportContext importContext = importDTO.getImportContext();
+        ImportLog importLog = ImportExcelUtils.getImportLogAndUploadFile(
+                importContext.getFileBytes(), importContext.getImportFilePath(),
+                importContext.getProcedureCode(), importContext.getFunctionName(),
+                importContext.getOriFileName(), 1);
+        importLog = this.iImportLogService.add(importLog);
+        ExcelUtil<Cd90ScheduleResultTemplateImportVO> excelUtil =
+                new ExcelUtil<>(Cd90ScheduleResultTemplateImportVO.class);
+        // 第1行按隐藏字段键匹配VO，第2至4行是固定展示内容，从第5行开始读取导入明细。
+        List<Cd90ScheduleResultTemplateImportVO> rows = excelUtil.importExcel(
+                new ByteArrayInputStream(importContext.getFileBytes()), 0, 4, -1);
+        AjaxResult ajaxResult = this.cd90ScheduleResultService.importScheduleTemplate(
+                rows, importDTO.getScheduleResult(), updateSupport);
+        Date endTime = DateUtils.getNowDate();
+        importLog.setRowCount(rows.size());
+        importLog.setBeginTime(beginTime);
+        importLog.setEndTime(endTime);
+        importLog.setSpendTime(DateUtils.getDiffTime(endTime, beginTime));
+        ImportExcelUtils.updateImportLogAndFormatMsg(
+                importLog, ajaxResult, this.iImportLogService);
+        return ajaxResult;
     }
 
     @Log(title = "ui.data.column.scheduleResult.modelName", businessType = BusinessType.EXPORT)

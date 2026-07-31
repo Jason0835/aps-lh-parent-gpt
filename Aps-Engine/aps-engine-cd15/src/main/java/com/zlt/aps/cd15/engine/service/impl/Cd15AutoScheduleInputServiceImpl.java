@@ -142,9 +142,10 @@ public class Cd15AutoScheduleInputServiceImpl implements Cd15AutoScheduleInputSe
                 steelStripSourceTraceResolver.resolve(
                         formingSchedules, constructionMaterials, embryoPlanSurpluses);
 
+        LocalDate stockDate = scheduleDate.minusDays(1);
         List<Cd15StockSource> stocksAtSix = stockMapper.selectList(Wrappers.<Cd15Stock>lambdaQuery()
                         .eq(Cd15Stock::getFactoryCode, factoryCode)
-                        .eq(Cd15Stock::getStockDate, Date.valueOf(scheduleDate))
+                        .eq(Cd15Stock::getStockDate, Date.valueOf(stockDate))
                         .orderByAsc(Cd15Stock::getMaterialCode))
                 .stream()
                 .map(sourceMapper::mapStock)

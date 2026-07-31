@@ -60,7 +60,7 @@ public class TqScheduleParams {
      * 交接班库存基准值
      */
     private Double classStockReference;
-    
+
     /**
      * 最低排产量
      */
@@ -97,6 +97,22 @@ public class TqScheduleParams {
      * <p>单一规格机台不受此阈值限制，仅受机台定额（quota）限制</p>
      */
     private Double backupShiftThreshold;
+
+    /**
+     * 取整合并阈值（SYS1101030）
+     * <p>备库分摊时，当剩余排产量小于此阈值时，合并到当前班次排完，不再新开一班向上取整</p>
+     * <p>避免为少量尾数新开一班导致排产量虚增（如剩余9.6却向上取整到500）</p>
+     * <p>默认0表示不启用合并，保持原有向上取整逻辑</p>
+     */
+    private Double roundingMergeThreshold;
+
+    /**
+     * 机台定额超排容忍阈值（SYS1101031）
+     * <p>S3阶段机台分配时，当计划量超出机台剩余产能，且超出部分≤此值时，允许当班超排（突破机台定额），不延后到下一班</p>
+     * <p>避免尾数被延后到下一班单独排产，降低生产效率</p>
+     * <p>默认0表示不启用超排容忍，保持原有机台定额限制</p>
+     */
+    private Double machineOverAssignTolerance;
 
     /**
      * 规格切换时长（小时），默认0.5
@@ -142,4 +158,30 @@ public class TqScheduleParams {
      * 库消比低阈值，默认0.5
      */
     private Double stockConsumeRatioLow;
+
+    // ==================== 策略可插拔参数（Phase 1 新增） ====================
+
+    /**
+     * 供应时长策略编码。
+     *
+     * <p>可选值：BY_STOCK（算法1-线下手工排产）、BY_SHIFT（算法2-系统算法）。</p>
+     * <p>为空时按旧参数 {@code demandCalcMode} 兼容路由：demandCalcMode=1 → BY_STOCK，否则 → BY_SHIFT。</p>
+     */
+    private String supplyTimeStrategyCode;
+
+    /**
+     * 需求量策略编码。
+     *
+     * <p>可选值：DEFAULT（默认收尾判断算法）。</p>
+     * <p>为空时默认 DEFAULT。</p>
+     */
+    private String demandQtyStrategyCode;
+
+    /**
+     * 计划量策略编码。
+     *
+     * <p>可选值：DEFAULT（默认 6 班滚动计算+备库分摊）。</p>
+     * <p>为空时默认 DEFAULT。</p>
+     */
+    private String planQtyStrategyCode;
 }

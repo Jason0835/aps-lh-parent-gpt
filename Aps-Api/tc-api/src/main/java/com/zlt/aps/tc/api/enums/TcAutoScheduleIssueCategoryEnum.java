@@ -14,6 +14,15 @@ public enum TcAutoScheduleIssueCategoryEnum {
     /** 缺少库存快照，按配置决定继续或阻断。 */
     STOCK_MISSING("STOCK_MISSING", "缺少库存快照"),
 
+    /** 计划量汇总组生产属性冲突。 */
+    PLAN_GROUP_ATTRIBUTE_CONFLICT("PLAN_GROUP_ATTRIBUTE_CONFLICT", "计划量汇总组生产属性冲突"),
+
+    /** 自动排程业务异常。 */
+    AUTO_SCHEDULE_BUSINESS_ERROR("AUTO_SCHEDULE_BUSINESS_ERROR", "自动排程业务异常"),
+
+    /** 自动排程技术异常。 */
+    AUTO_SCHEDULE_SYSTEM_ERROR("AUTO_SCHEDULE_SYSTEM_ERROR", "自动排程技术异常"),
+
     /** 核心持久化失败。 */
     PERSIST_FAILED("PERSIST_FAILED", "核心持久化失败"),
 

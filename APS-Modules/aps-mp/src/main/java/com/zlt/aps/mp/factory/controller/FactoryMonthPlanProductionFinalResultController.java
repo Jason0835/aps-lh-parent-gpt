@@ -434,7 +434,7 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
      * 重新计算和校验
      * @param factoryMonthPlanProdFinal
      */
-    private void recalculateAndCheck(FactoryMonthPlanProductionFinalResult factoryMonthPlanProdFinal) {
+    /*private void recalculateAndCheck(FactoryMonthPlanProductionFinalResult factoryMonthPlanProdFinal) {
         // 构建上下文
         MpRollAdjustContextDTO contextDTO = new MpRollAdjustContextDTO();
         contextDTO.setFactoryCode(factoryMonthPlanProdFinal.getFactoryCode());
@@ -548,7 +548,7 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
         contextDTO.setMonthPlanStatisticsList(monthPlanStatisticsList);
         // 保存月计划统计结果
         mpAdjustStructureOutStrategy.saveMonthPlanStatisticsResult(contextDTO, YesOrNoEnum.YES.getCode());
-    }
+    }*/
 
     /**
      * 设置调整日

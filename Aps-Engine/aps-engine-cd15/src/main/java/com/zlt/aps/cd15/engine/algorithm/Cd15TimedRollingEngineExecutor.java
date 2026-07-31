@@ -22,6 +22,7 @@ import com.zlt.aps.cd15.engine.model.Cd15ShiftExecutionResult;
 import com.zlt.aps.cd15.engine.model.Cd15ShiftResourceState;
 import com.zlt.aps.cd15.engine.model.Cd15ShiftScheduleTask;
 import com.zlt.aps.cd15.engine.model.Cd15StorageLaneAllocation;
+import com.zlt.aps.cd15.engine.model.Cd15StockSource;
 import com.zlt.aps.cd15.engine.model.Cd15TimedRollingOutput;
 import com.zlt.aps.cd15.engine.model.Cd15UnscheduledResultModel;
 import com.zlt.aps.cd15.engine.service.Cd15AutoScheduleEngineService;
@@ -29,6 +30,7 @@ import com.zlt.aps.cd15.engine.service.Cd15AutoScheduleInputService;
 import com.zlt.aps.cd15.engine.service.Cd15ScheduleCandidatePreparationService;
 import com.zlt.aps.cd15.engine.service.Cd15ScheduleProgressListener;
 import com.zlt.aps.cd15.engine.service.Cd15ShiftDemandProvider;
+import com.zlt.aps.cd15.engine.service.Cd15RollingShiftStockService;
 import com.zlt.aps.cd15.engine.service.impl.Cd15NewSpecAdvanceInputPreparer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.BeanUtils;
@@ -69,6 +71,7 @@ public class Cd15TimedRollingEngineExecutor {
     private final Cd15SingleShiftScheduleExecutor singleShiftExecutor;
     private final Cd15UnscheduledResultAggregator unscheduledResultAggregator;
     private final Cd15BigRollMeterCalculator bigRollMeterCalculator;
+    private final Cd15RollingShiftStockService rollingShiftStockService;
 
     /** 读取原批次，在内存副本上从目标班开始滚动并输出差异。 */
     public Cd15TimedRollingOutput execute(Cd15RollingTarget target, String inputVersion,
@@ -97,6 +100,8 @@ public class Cd15TimedRollingEngineExecutor {
         List<Cd15ScheduleAttemptTrace> traces = new ArrayList<>();
         List<Cd15RollingPendingTask> carryOver = new ArrayList<>();
         List<Cd15ConstructionMaterial> constructionMaterials = new ArrayList<>();
+        List<Cd15StockSource> targetShiftStocks =
+                rollingShiftStockService.loadRequired(target);
         Cd15RollingScheduleContext rolling = null;
         Cd15ScheduleProgressListener progress = listener == null
                 ? Cd15ScheduleProgressListener.NO_OP : listener;
@@ -106,6 +111,8 @@ public class Cd15TimedRollingEngineExecutor {
             progress.onProgress(20 + index * 60 / shiftCount, "ROLLING_SHIFT",
                     shiftStageName(shift, "滚动开始"), shift);
             Cd15AutoScheduleInput input = loadInput(context, shift);
+            // 定时滚动的全部后续班次统一从目标班次开始库存重新累计。
+            input.setStocksAtSix(targetShiftStocks);
             if (input.getConstructionMaterials() != null) {
                 constructionMaterials.addAll(input.getConstructionMaterials());
             }
@@ -410,6 +417,7 @@ public class Cd15TimedRollingEngineExecutor {
         result.setFactoryCode(target.getFactoryCode());
         result.setScheduleDate(date(target));
         result.setCd15BatchNo(target.getBatchNo());
+        // SPLIT 切胶模式下按 (splitGroupKey|machineCode) 生成滚动单号，其余模式按 key 生成
         String rollingOrderNo = "SPLIT".equals(task.getCutMode())
                 && task.getSplitGroupKey() != null
                 ? "ROLLING-" + Integer.toHexString(
@@ -417,6 +425,7 @@ public class Cd15TimedRollingEngineExecutor {
                         .toUpperCase()
                 : "ROLLING-" + Integer.toHexString(key.hashCode()).toUpperCase();
         result.setOrderNo(rollingOrderNo);
+        // SPLIT 模式下 groupNo 与滚动单号一致，用于批次分组
         result.setGroupNo("SPLIT".equals(task.getCutMode()) ? rollingOrderNo : null);
         result.setSteelStripCode(task.getSteelStripCode());
         result.setBigRollCode(task.getBigRollCode());
@@ -429,9 +438,12 @@ public class Cd15TimedRollingEngineExecutor {
         result.setCuttingAngle(task.getCuttingAngle());
         result.setCutMode(task.getCutMode());
         result.setMachineCode(task.getMachineCode());
+        // 排程来源：AUTO 自动排程
         result.setSourceType("AUTO");
+        // 发布状态：0 未发布
         result.setReleaseStatus("0");
         result.setPublishSuccessCount(0);
+        // 锁定状态：0 未锁定
         result.setIsLocked("0");
         return result;
     }

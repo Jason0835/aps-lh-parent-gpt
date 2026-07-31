@@ -13,6 +13,7 @@ import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.tm.api.constant.TmScheduleConstants;
 import com.zlt.aps.tm.api.domain.entity.TmMachineInfo;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
+import com.zlt.aps.tm.api.domain.entity.TmScheduleResultExplain;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleUnplanned;
 import com.zlt.aps.tm.api.enums.TmReleaseStatusTransition;
 import com.zlt.aps.tm.api.enums.TmUnplannedReasonEnum;
@@ -21,6 +22,7 @@ import com.zlt.aps.tm.engine.domain.manual.*;
 import com.zlt.aps.tm.engine.service.facade.TmScheduleOperationFacade;
 import com.zlt.aps.tm.engine.validator.TmInsertPositionValidator;
 import com.zlt.aps.tm.mapper.TmMachineInfoMapper;
+import com.zlt.aps.tm.mapper.TmScheduleResultExplainMapper;
 import com.zlt.aps.tm.mapper.TmScheduleResultMapper;
 import com.zlt.aps.tm.mapper.TmScheduleUnplannedMapper;
 import com.zlt.aps.tm.service.loader.TmManualConstraintDataLoadService;
@@ -52,6 +54,8 @@ public class TmManualInsertRollingService {
 
     private final TmScheduleUnplannedMapper tmScheduleUnplannedMapper;
 
+    private final TmScheduleResultExplainMapper tmScheduleResultExplainMapper;
+
     private final TmScheduleOperationFacade tmScheduleOperationFacade;
 
     private final TmManualConstraintDataLoadService tmManualConstraintDataLoadService;
@@ -64,16 +68,19 @@ public class TmManualInsertRollingService {
      * @param tmScheduleUnplannedMapper 未排结果 Mapper
      * @param tmScheduleOperationFacade 排程纯计算门面
      * @param tmManualConstraintDataLoadService 人工约束数据装载服务
+     * @param tmScheduleResultExplainMapper 排程解释 Mapper
      */
     @Autowired
     public TmManualInsertRollingService(TmScheduleResultMapper tmScheduleResultMapper,
                                         TmMachineInfoMapper tmMachineInfoMapper,
                                         TmScheduleUnplannedMapper tmScheduleUnplannedMapper,
                                         TmScheduleOperationFacade tmScheduleOperationFacade,
-                                        TmManualConstraintDataLoadService tmManualConstraintDataLoadService) {
+                                        TmManualConstraintDataLoadService tmManualConstraintDataLoadService,
+                                        TmScheduleResultExplainMapper tmScheduleResultExplainMapper) {
         this.tmScheduleResultMapper = tmScheduleResultMapper;
         this.tmMachineInfoMapper = tmMachineInfoMapper;
         this.tmScheduleUnplannedMapper = tmScheduleUnplannedMapper;
+        this.tmScheduleResultExplainMapper = tmScheduleResultExplainMapper;
         this.tmScheduleOperationFacade = tmScheduleOperationFacade;
         this.tmManualConstraintDataLoadService = tmManualConstraintDataLoadService;
     }
@@ -90,7 +97,7 @@ public class TmManualInsertRollingService {
                                         TmScheduleUnplannedMapper tmScheduleUnplannedMapper) {
         this(tmScheduleResultMapper, tmMachineInfoMapper, tmScheduleUnplannedMapper,
                 new TmScheduleOperationFacade(new com.zlt.aps.tm.engine.service.impl.TmTaskChainScheduleService(),
-                        null, null, new com.zlt.aps.tm.engine.service.impl.TmManualRollingEngineService()), null);
+                        null, null, new com.zlt.aps.tm.engine.service.impl.TmManualRollingEngineService()), null, null);
     }
 
     /**
@@ -127,7 +134,7 @@ public class TmManualInsertRollingService {
         log.info("[TM_MANUAL_ROLL] operation=INSERT, factoryCode={}, scheduleDate={}, machineCode={}, insertCount={}, updateCount={}, unplannedQty={}",
                 insertResult.getFactoryCode(), insertResult.getScheduleDate(), insertResult.getMachineCode(),
                 writeResult.getInsertCount(), writeResult.getUpdateCount(), writeResult.getUnplannedQty());
-        return writeResult.getInsertCount();
+        return writeResult.getInsertCount() + writeResult.getUnplannedCount();
     }
 
     /**
@@ -396,8 +403,26 @@ public class TmManualInsertRollingService {
         }
 
         TmManualRollingWriteResult writeResult = new TmManualRollingWriteResult();
+        Set<Long> allowedDeleteResultIdSet = new LinkedHashSet<>(rollingResult.getExplicitDeleteResultIdSet());
+        allowedDeleteResultIdSet.addAll(rollingResult.getMoveToUnplannedResultIdSet());
+        Set<Long> protectedSourceIdSet = snapshotList.stream().map(TmScheduleResult::getId)
+                .filter(Objects::nonNull)
+                .filter(resultId -> !rollingResult.getExplicitDeleteResultIdSet().contains(resultId))
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        boolean retainedProtectedResult = retainedSourceIdSet.stream().anyMatch(protectedSourceIdSet::contains);
+        if (rollingResult.isContainsNonDeleteOperation() && !protectedSourceIdSet.isEmpty()
+                && !retainedProtectedResult) {
+            throw new ServiceException(this.resolveTmMessage(
+                    "ui.data.alert.tm.schedule.manualWholeMachineClearBlocked",
+                    "非删除操作不允许清空机台全部排程结果"));
+        }
         for (TmScheduleResult source : snapshotList) {
             if (!retainedSourceIdSet.contains(source.getId())) {
+                if (!allowedDeleteResultIdSet.contains(source.getId())) {
+                    throw new ServiceException(this.resolveTmMessage(
+                            "ui.data.alert.tm.schedule.manualImplicitDeleteBlocked",
+                            "人工滚动变更计划不完整，已阻止隐式删除"));
+                }
                 int deletedRows = tmScheduleResultMapper.deleteById(source.getId());
                 if (deletedRows != 1) {
                     throw new ServiceException(this.resolveTmMessage(
@@ -422,7 +447,40 @@ public class TmManualInsertRollingService {
             writeResult.setUnplannedCount(writeResult.getUnplannedCount() + 1);
             writeResult.setUnplannedQty(BigDecimalUtils.add(writeResult.getUnplannedQty(), unplannedTask.getPlanQty()));
         }
+        this.syncLatestToolLedger(reference, rollingResult);
         return writeResult;
+    }
+
+    /**
+     * 将本次人工命令结算后的余额同步到批次最终账本快照。
+     *
+     * @param reference 排程范围参考
+     * @param rollingResult 人工滚动结果
+     * @throws ServiceException 账本记录并发变化或更新失败时抛出
+     */
+    private void syncLatestToolLedger(TmScheduleResult reference, TmManualRollingResult rollingResult) {
+        if (tmScheduleResultExplainMapper == null || rollingResult.getRemainingToolQty() == null) {
+            return;
+        }
+        LambdaQueryWrapper<TmScheduleResultExplain> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(TmScheduleResultExplain::getFactoryCode, reference.getFactoryCode());
+        wrapper.eq(TmScheduleResultExplain::getBatchNo, reference.getBatchNo());
+        wrapper.isNotNull(TmScheduleResultExplain::getToolLedgerOrder);
+        wrapper.orderByDesc(TmScheduleResultExplain::getToolLedgerOrder);
+        wrapper.last("LIMIT 1");
+        TmScheduleResultExplain latestLedger = tmScheduleResultExplainMapper.selectOne(wrapper);
+        if (latestLedger == null) {
+            throw new ServiceException(I18nUtil.getMessage(
+                    "ui.data.alert.tm.schedule.manualToolLedgerMissing"));
+        }
+        latestLedger.setAvailableToolQty(rollingResult.getAvailableToolQtyBefore());
+        latestLedger.setToolUsedQty(BigDecimalUtils.valueOf(rollingResult.getAvailableToolQtyBefore())
+                .subtract(BigDecimalUtils.valueOf(rollingResult.getRemainingToolQty())));
+        latestLedger.setRemainingToolQty(rollingResult.getRemainingToolQty());
+        if (tmScheduleResultExplainMapper.updateById(latestLedger) != 1) {
+            throw new ServiceException(I18nUtil.getMessage(
+                    "ui.data.alert.tm.schedule.operationConcurrentChanged"));
+        }
     }
 
     /**
@@ -592,7 +650,9 @@ public class TmManualInsertRollingService {
      * @param task      未排任务
      */
     private void insertUnplanned(TmScheduleResult reference, TmManualTaskDraft task) {
-        TmUnplannedReasonEnum reason = TmUnplannedReasonEnum.CAPACITY_NOT_ENOUGH;
+        TmUnplannedReasonEnum reason = StrUtil.equals(
+                task.getUnplannedReasonCode(), TmUnplannedReasonEnum.TOOL_NOT_ENOUGH.getCode())
+                ? TmUnplannedReasonEnum.TOOL_NOT_ENOUGH : TmUnplannedReasonEnum.CAPACITY_NOT_ENOUGH;
         TmScheduleUnplanned unplanned = new TmScheduleUnplanned();
         unplanned.setFactoryCode(reference.getFactoryCode());
         unplanned.setBatchNo(reference.getBatchNo());
@@ -607,6 +667,8 @@ public class TmManualInsertRollingService {
         evidenceMap.put("machineCode", task.getMachineCode());
         evidenceMap.put("taskId", task.getTaskId());
         evidenceMap.put("unplannedQty", task.getPlanQty());
+        evidenceMap.put("availableToolQty", task.getAvailableToolQty());
+        evidenceMap.put("requiredToolQty", task.getRequiredToolQty());
         unplanned.setUnplannedEvidenceJson(JSON.toJSONString(evidenceMap));
         if (tmScheduleUnplannedMapper.insert(unplanned) != 1) {
             throw new ServiceException(this.resolveTmMessage(

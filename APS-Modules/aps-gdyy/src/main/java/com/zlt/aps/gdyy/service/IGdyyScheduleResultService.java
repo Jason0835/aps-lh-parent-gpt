@@ -2,6 +2,7 @@ package com.zlt.aps.gdyy.service;
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.gdyy.api.domain.entity.GdyyScheduleResult;
+import com.zlt.aps.gdyy.domain.vo.GdyyScheduleResultTemplateImportVO;
 import com.zlt.bill.common.service.IDocService;
 
 import java.util.List;
@@ -50,4 +51,26 @@ public interface IGdyyScheduleResultService extends IDocService<GdyyScheduleResu
      * 导入完成量。
      */
     AjaxResult importFinishQty(List<GdyyScheduleResult> list, boolean updateSupport, Long importLogId);
+
+    /**
+     * 按固定生产计划模板整体覆盖导入。
+     *
+     * @param rows 导入明细
+     * @param condition 导入范围
+     * @param updateSupport 是否更新
+     * @return 导入结果
+     */
+    AjaxResult importScheduleTemplate(List<GdyyScheduleResultTemplateImportVO> rows,
+                                      GdyyScheduleResult condition,
+                                      boolean updateSupport);
+
+    /**
+     * 使用固定生产计划模板导出。
+     *
+     * @param currentResults 当前查询结果
+     * @param queryVO 导出条件
+     * @return Excel文件字节
+     */
+    byte[] exportData(List<GdyyScheduleResult> currentResults,
+                      GdyyScheduleResult queryVO);
 }
