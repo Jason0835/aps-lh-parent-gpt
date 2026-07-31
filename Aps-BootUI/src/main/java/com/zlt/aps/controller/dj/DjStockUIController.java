@@ -96,10 +96,6 @@ public class DjStockUIController extends BaseUIController<DjStock> {
     @PostMapping("/save")
     @ResponseBody
     public AjaxResult save(DjStock djStock) {
-        if (UserConstants.NOT_UNIQUE.equals(iDjStockService.checkUnique(djStock))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.djStock.embryoCodeNotUnique"));
-        }
-
         return iDjStockService.save(djStock);
     }
 
