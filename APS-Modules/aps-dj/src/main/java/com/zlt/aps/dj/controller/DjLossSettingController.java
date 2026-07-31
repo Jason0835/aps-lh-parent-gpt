@@ -63,7 +63,7 @@ public class DjLossSettingController extends AbstractDocBizController<DjLossSett
      */
     @Log(title = "ui.dj.lossSetting.column.modalName", businessType = BusinessType.INSERT)
     @ApiOperation("新增信息（id不为空）")
-    @PostMapping
+    @Override
     public AjaxResult save(@RequestBody DjLossSetting stock) {
         if (UserConstants.NOT_UNIQUE.equals(lossSettingService.checkUnique(stock))) {
             return AjaxResult.error(I18nUtil.getMessage("ui.error.message.quota.unique"));

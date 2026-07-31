@@ -191,6 +191,8 @@ public class ScheduleServiceImpl implements ScheduleService {
     private final CxPrecisionPlanMapper precisionPlanMapper;
     private final LhFinishQtyMapper lhFinishQtyMapper;
     private final CxShiftMachineLoadMapper cxShiftMachineLoadMapper;
+    private final MpFactoryProductionVersionMapper mpFactoryProductionVersionMapper;
+    private final MdmMonthSurplusMapper mdmMonthSurplusMapper;
 
     // ==================== S5.1 对外接口 ====================
 
@@ -239,6 +241,13 @@ public class ScheduleServiceImpl implements ScheduleService {
                 result.setValidationWarnings(convertValidationDetails(validationResult,
                         ScheduleDataValidationResult.ValidationLevel.WARN));
                 return result;
+            }
+
+            // 2.1 过滤已收尾物料（校验通过后再过滤，确保校验能看到全部含缺失字段的记录）
+            try {
+                filterCompletedMaterials(context);
+            } catch (Exception e) {
+                log.warn("过滤已收尾物料失败，继续执行：{}", e.getMessage());
             }
 
             // 3. 执行核心排程算法 S5.2~S5.5（委托 CoreScheduleAlgorithmServiceImpl，按班次循环）
@@ -1215,18 +1224,29 @@ public class ScheduleServiceImpl implements ScheduleService {
         }
         List<String> factoryCodeList = Collections.singletonList(factoryCode);
 
+        // 解析次月定稿状态与计划量起始日（与硫化算法口径一致）
+        Date scheduleDateAsDate = Date.from(scheduleDate.atStartOfDay(ZoneId.systemDefault()).toInstant());
+        Date planStartDate = this.resolvePlanStartDate(factoryCode, crossMonth, nextYear, nextMonth, scheduleDateAsDate);
+        boolean isNextMonthFinal = planStartDate != null;
+        int startDay = isNextMonthFinal
+                ? cn.hutool.core.date.DateUtil.dayOfMonth(planStartDate)
+                : 1;
+        log.info("次月定稿状态: isNextMonthFinal={}, planStartDate={}, startDay={}",
+                isNextMonthFinal, planStartDate, startDay);
+
         // 3. 查询已完成量
-        // 当月：当月1日 ~ T-1日（不含T日）的月累计完成量 + T日班次完成量
+        // 当月月累计完成量：次月定稿时从库存抓取日开始，否则从当月1日开始（与硫化算法口径一致）
         Date prevMonthStart = Date.from(scheduleDate.withDayOfMonth(1).atStartOfDay(ZoneId.systemDefault()).toInstant());
+        Date finishQtyStartDate = isNextMonthFinal ? planStartDate : prevMonthStart;
         Date scheduleDateStart = Date.from(scheduleDate.atStartOfDay(ZoneId.systemDefault()).toInstant());
         Date nextDayStart = Date.from(scheduleDate.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant());
 
         Map<String, Integer> prevDayFinishedQtyMap = new HashMap<>();
         Map<String, Integer> prevScheFinishedQtyMap = new HashMap<>();
         if (!materialCodeList.isEmpty()) {
-            // 当月月累计完成量（当月1日 ~ T-1日）
+            // 当月月累计完成量（库存抓取日或当月1日 ~ T-1日）
             List<Map<String, Object>> dayFinishList = lhFinishQtyMapper.sumDayFinishQty(
-                    factoryCodeList, materialCodeList, prevMonthStart, scheduleDateStart);
+                    factoryCodeList, materialCodeList, finishQtyStartDate, scheduleDateStart);
             for (Map<String, Object> row : dayFinishList) {
                 String mc = (String) row.get("MATERIAL_CODE");
                 String productStatus = (String) row.get("LH_TYPE");
@@ -1308,7 +1328,8 @@ public class ScheduleServiceImpl implements ScheduleService {
 
             int surplusQty = this.calculateSurplusQtyBySharedCalculator(
                     prevPlans, nextPlans, scheduleDate, scheduleEndDate,
-                    prevDayFinishedQty, prevScheFinishedQty, nextDayFinishedQty, nextScheFinishedQty);
+                    prevDayFinishedQty, prevScheFinishedQty, nextDayFinishedQty, nextScheFinishedQty,
+                    isNextMonthFinal, startDay);
 
             MdmMonthSurplus surplus = new MdmMonthSurplus();
             surplus.setMaterialCode(materialCode);
@@ -1352,6 +1373,59 @@ public class ScheduleServiceImpl implements ScheduleService {
     }
 
     /**
+     * 解析次月定稿状态，获取计划量起始计算日（库存抓取日）。
+     * <p>
+     * 与硫化算法 {@code LhBaseDataServiceImpl.getStartDay} 口径一致：
+     * 1. 查询次月 {@link MpFactoryProductionVersion} 是否已定稿（isFinal="1"）
+     * 2. 若已定稿，从 {@link MdmMonthSurplus} 取库存抓取日（stockCapTureDate）
+     * 3. 仅当排程日期 ≥ 库存抓取日时才返回该日期，否则返回null（次月虽定稿但排程日早于抓取日，仍从1日开始）
+     * </p>
+     *
+     * @param factoryCode  工厂编码
+     * @param crossMonth   是否跨月
+     * @param nextYear     次月年份
+     * @param nextMonth    次月月份
+     * @param scheduleDate 排程日期（T日）
+     * @return 计划量起始计算日；次月未定稿或排程日早于抓取日时返回null
+     */
+    private Date resolvePlanStartDate(String factoryCode, boolean crossMonth,
+                                      int nextYear, int nextMonth, Date scheduleDate) {
+        if (!crossMonth) {
+            return null;
+        }
+        // 查询次月是否已定稿
+        MpFactoryProductionVersion finalVersion = mpFactoryProductionVersionMapper.selectOne(
+                new LambdaQueryWrapper<MpFactoryProductionVersion>()
+                        .eq(MpFactoryProductionVersion::getFactoryCode, factoryCode)
+                        .eq(MpFactoryProductionVersion::getYear, nextYear)
+                        .eq(MpFactoryProductionVersion::getMonth, nextMonth)
+                        .eq(MpFactoryProductionVersion::getIsFinal, "1")
+                        .orderByDesc(MpFactoryProductionVersion::getUpdateTime)
+                        .orderByDesc(MpFactoryProductionVersion::getId)
+                        .last("LIMIT 1"));
+        if (finalVersion == null) {
+            return null;
+        }
+        // 从月度余量表获取库存抓取日（按更新时间倒序取最新，确保多记录时确定性）
+        MdmMonthSurplus monthSurplus = mdmMonthSurplusMapper.selectOne(
+                new LambdaQueryWrapper<MdmMonthSurplus>()
+                        .eq(MdmMonthSurplus::getFactoryCode, factoryCode)
+                        .eq(MdmMonthSurplus::getRequireVersion, finalVersion.getMonthPlanVersion())
+                        .orderByDesc(MdmMonthSurplus::getUpdateTime)
+                        .orderByDesc(MdmMonthSurplus::getId)
+                        .last("LIMIT 1"));
+        if (monthSurplus == null || monthSurplus.getStockCapTureDate() == null) {
+            return null;
+        }
+        Date stockCapTureDate = monthSurplus.getStockCapTureDate();
+        // 仅当排程日期 ≥ 库存抓取日时才生效
+        if (scheduleDate.before(stockCapTureDate)) {
+            return null;
+        }
+        return stockCapTureDate;
+    }
+
+    /**
      * 计算单条月计划记录的有效计划量。
      *
      * <p>当"上月超欠产有效标志"({@code lastMonthValidFlag})为"1"时，
@@ -1386,6 +1460,8 @@ public class ScheduleServiceImpl implements ScheduleService {
      * @param prevScheFinishedQty 当月排程班次完成量
      * @param nextDayFinishedQty  次月月累计完成量
      * @param nextScheFinishedQty 次月排程班次完成量
+     * @param isNextMonthFinal    次月是否已定稿
+     * @param startDay            计划量起始计算日（次月定稿时为库存抓取日，否则为1）
      * @return 硫化余量
      */
     private int calculateSurplusQtyBySharedCalculator(
@@ -1393,7 +1469,8 @@ public class ScheduleServiceImpl implements ScheduleService {
             List<FactoryMonthPlanProductionFinalResult> nextPlans,
             LocalDate scheduleDate, LocalDate scheduleEndDate,
             int prevDayFinishedQty, int prevScheFinishedQty,
-            int nextDayFinishedQty, int nextScheFinishedQty) {
+            int nextDayFinishedQty, int nextScheFinishedQty,
+            boolean isNextMonthFinal, int startDay) {
         List<FactoryMonthPlanProductionFinalResult> allMonthPlans = Stream.concat(
                 prevPlans.stream(), nextPlans.stream()).collect(Collectors.toList());
         if (allMonthPlans.isEmpty()) {
@@ -1415,10 +1492,10 @@ public class ScheduleServiceImpl implements ScheduleService {
                         plan.getMaterialCode(), plan.getProductStatus());
         Map<YearMonth, Integer> monthOverdueQtyMap =
                 MonthPlanSurplusCalculator.getOverdueProduction(
-                        false, productionDates, allMonthPlans, plan);
+                        isNextMonthFinal, productionDates, allMonthPlans, plan);
         Map<YearMonth, Integer> monthPlanQtyMap =
                 MonthPlanSurplusCalculator.getPlanQty(
-                        productionDates, allMonthPlans, plan, 1);
+                        productionDates, allMonthPlans, plan, startDay);
         int finishedQty = prevDayFinishedQty + prevScheFinishedQty
                 + nextDayFinishedQty + nextScheFinishedQty;
         int surplusQty = MonthPlanSurplusCalculator.getSurplusQty(

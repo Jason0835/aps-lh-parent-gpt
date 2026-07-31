@@ -65,7 +65,7 @@ public class NcStockController extends AbstractDocBizController<NcStock> {
      */
     @Log(title = "ui.frame.page.stock.title", businessType = BusinessType.INSERT)
     @ApiOperation("新增信息（id不为空）")
-    @PostMapping
+    @Override
     public AjaxResult save(@RequestBody NcStock stock) {
         if (UserConstants.NOT_UNIQUE.equals(stockService.checkUnique(stock))) {
             return AjaxResult.error(I18nUtil.getMessage("ui.error.message.quota.unique"));
