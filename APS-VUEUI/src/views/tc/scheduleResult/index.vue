@@ -243,6 +243,7 @@ import {
   validateRelease
 } from '@/api/tc/tcScheduleResult'
 import {downloadLink} from '@/utils/request'
+import {resolveErrorMessage} from '@/utils/errorMessage'
 import TltUploadForm from '@/views/components/tltUploadForm.vue'
 import AutoPlanDialog from './components/AutoPlanDialog.vue'
 import ChangeMachineDialog from './components/ChangeMachineDialog.vue'
@@ -645,31 +646,48 @@ export default {
     async handleRelease() {
       const scopeKeySet = new Set(this.selection.map(item => `${item.factoryCode}|${item.scheduleDate}|${item.batchNo}`))
       if (scopeKeySet.size !== 1) {
-        this.$modal.msgWarning(this.$t('ui.tc.schedule.sameScopeRequired'))
+        this.$modal.alertWarning(this.$t('ui.tc.schedule.sameScopeRequired'))
         return
       }
       const invalidRow = this.selection.find(item => !['0', '2', '4', '5'].includes(String(item.releaseStatus || '0')))
       if (invalidRow) {
-        this.$modal.msgWarning(this.$t('ui.tc.schedule.releaseStatusInvalid'))
+        this.$modal.alertWarning(this.$t('ui.tc.schedule.releaseStatusInvalid'))
         return
       }
       const requestData = this.buildReleaseRequest()
-      const validateResult = await validateRelease(requestData)
+      let validateResult
+      try {
+        validateResult = await validateRelease(requestData)
+      } catch (error) {
+        this.$modal.alertError(resolveErrorMessage(
+          error,
+          this.$t('ui.tc.schedule.releaseValidateFailed')
+        ))
+        return
+      }
       if (!validateResult.allowed) {
         const issues = Array.isArray(validateResult.issues) ? validateResult.issues : []
-        this.showReleaseIssues(issues)
-        this.$modal.msgWarning(issues.length > 0
-          ? issues[0].message
-          : this.$t('ui.tc.schedule.releaseValidateFailed'))
+        if (issues.length > 0) {
+          this.showReleaseIssues(issues)
+        } else {
+          this.$modal.alertWarning(this.$t('ui.tc.schedule.releaseValidateFailed'))
+        }
         return
       }
       await this.$confirm(this.$t('ui.tc.schedule.confirmPublish', { count: this.selection.length }), { type: 'warning' })
-      const task = await releaseScheduleResult(requestData)
-      window.sessionStorage.setItem('tcReleaseLatestScope', JSON.stringify({
-        factoryCode: requestData.factoryCode,
-        scheduleDate: requestData.scheduleDate
-      }))
-      this.pollReleaseTask(task.taskId)
+      try {
+        const task = await releaseScheduleResult(requestData)
+        window.sessionStorage.setItem('tcReleaseLatestScope', JSON.stringify({
+          factoryCode: requestData.factoryCode,
+          scheduleDate: requestData.scheduleDate
+        }))
+        this.pollReleaseTask(task.taskId)
+      } catch (error) {
+        this.$modal.alertError(resolveErrorMessage(
+          error,
+          this.$t('ui.tc.schedule.releaseFailed')
+        ))
+      }
     },
     handleAdd() {
       if (this.writeTaskRunning) return
@@ -686,14 +704,14 @@ export default {
       if (this.selection.some(row => this.isManualBlocked(row))) return
       const scopeKeySet = new Set(this.selection.map(item => `${item.factoryCode}|${item.scheduleDate}|${item.batchNo}`))
       if (scopeKeySet.size !== 1) {
-        this.$modal.msgWarning(this.$t('ui.tc.schedule.sameScopeRequired'))
+        this.$modal.alertWarning(this.$t('ui.tc.schedule.sameScopeRequired'))
         return
       }
       this.$refs.changeMachineRef.show(this.selection)
     },
     isManualBlocked(row) {
       if (row && ['3', '4'].includes(String(row.releaseStatus))) {
-        this.$modal.msgWarning(this.$t('ui.tc.schedule.releaseBlocked'))
+        this.$modal.alertWarning(this.$t('ui.tc.schedule.releaseBlocked'))
         return true
       }
       return false
@@ -702,13 +720,20 @@ export default {
       if (this.writeTaskRunning) return
       const invalidRow = this.selection.find(item => !['0', '2', '5'].includes(String(item.releaseStatus)))
       if (invalidRow) {
-        this.$modal.msgWarning(this.$t('ui.tc.schedule.removeReleaseBlocked'))
+        this.$modal.alertWarning(this.$t('ui.tc.schedule.removeReleaseBlocked'))
         return
       }
       this.$confirm(this.$t('ui.tc.schedule.confirmRemoveWholeRow'), { type: 'warning' }).then(async() => {
-        const task = await removeScheduleResult(this.selection.map(item => item.id))
-        this.page.current = 1
-        this.handleOperationTask(task)
+        try {
+          const task = await removeScheduleResult(this.selection.map(item => item.id))
+          this.page.current = 1
+          this.handleOperationTask(task)
+        } catch (error) {
+          this.$modal.alertError(resolveErrorMessage(
+            error,
+            this.$t('ui.tc.schedule.operationFailed')
+          ))
+        }
       })
     },
     /**
@@ -757,24 +782,37 @@ export default {
             this.clearOperationTimer()
             this.operationRunning = false
             this.operationProgressStatus = 'exception'
-            this.$modal.msgError(task.message || this.$t('ui.tc.schedule.operationFailed'))
-            window.setTimeout(() => { this.operationProgressVisible = false }, 3000)
+            const errorMessage = task.message || this.$t('ui.tc.schedule.operationFailed')
+            window.setTimeout(() => {
+              this.operationProgressVisible = false
+              this.$modal.alertError(errorMessage)
+            }, 600)
             return
           }
           if (this.operationPollTimes >= this.maxOperationPollTimes) {
             this.clearOperationTimer()
             this.operationRunning = false
             this.operationProgressStatus = 'exception'
-            this.$modal.msgWarning(this.$t('ui.tc.schedule.operationTimeout'))
-            window.setTimeout(() => { this.operationProgressVisible = false }, 3000)
+            const timeoutMessage = this.$t('ui.tc.schedule.operationTimeout')
+            window.setTimeout(() => {
+              this.operationProgressVisible = false
+              this.$modal.alertWarning(timeoutMessage)
+            }, 600)
             return
           }
           this.operationTimer = window.setTimeout(poll, 3000)
-        }).catch(() => {
+        }).catch(error => {
           this.clearOperationTimer()
           this.operationRunning = false
           this.operationProgressStatus = 'exception'
-          this.$modal.msgWarning(this.$t('ui.tc.schedule.operationTimeout'))
+          const errorMessage = resolveErrorMessage(
+            error,
+            this.$t('ui.tc.schedule.operationTimeout')
+          )
+          window.setTimeout(() => {
+            this.operationProgressVisible = false
+            this.$modal.alertWarning(errorMessage)
+          }, 600)
         })
       }
       poll()
@@ -984,8 +1022,13 @@ export default {
             this.releaseProgressValue = 100
             this.releaseProgressStatus = 'success'
             this.releaseProgressStage = this.$t('ui.tc.schedule.releaseSuccess')
-            this.showReleaseIssues(task.issues)
-            window.setTimeout(() => { this.releaseProgressVisible = false }, 600)
+            const issues = Array.isArray(task.issues) ? task.issues : []
+            window.setTimeout(() => {
+              this.releaseProgressVisible = false
+              if (issues.length > 0) {
+                this.showReleaseIssues(issues)
+              }
+            }, 600)
             this.getList()
             return
           }
@@ -993,24 +1036,41 @@ export default {
             this.clearReleaseTimer()
             this.releaseProgressStatus = 'exception'
             this.releaseProgressStage = this.$t('ui.tc.schedule.releaseFailed')
-            this.showReleaseIssues(task.issues)
-            this.$modal.msgError(task.message || this.$t('ui.tc.schedule.releaseFailed'))
-            window.setTimeout(() => { this.releaseProgressVisible = false }, 3000)
+            const issues = Array.isArray(task.issues) ? task.issues : []
+            const errorMessage = task.message || this.$t('ui.tc.schedule.releaseFailed')
+            window.setTimeout(() => {
+              this.releaseProgressVisible = false
+              if (issues.length > 0) {
+                this.showReleaseIssues(issues)
+              } else {
+                this.$modal.alertError(errorMessage)
+              }
+            }, 600)
             this.getList()
             return
           }
           if (this.releasePollTimes >= this.maxReleasePollTimes) {
             this.clearReleaseTimer()
             this.releaseProgressStatus = 'exception'
-            this.$modal.msgWarning(this.$t('ui.tc.schedule.releasePollTimeout'))
-            window.setTimeout(() => { this.releaseProgressVisible = false }, 3000)
+            const timeoutMessage = this.$t('ui.tc.schedule.releasePollTimeout')
+            window.setTimeout(() => {
+              this.releaseProgressVisible = false
+              this.$modal.alertWarning(timeoutMessage)
+            }, 600)
             return
           }
           this.releaseTimer = window.setTimeout(poll, 3000)
-        }).catch(() => {
+        }).catch(error => {
           this.clearReleaseTimer()
           this.releaseProgressStatus = 'exception'
-          this.$modal.msgWarning(this.$t('ui.tc.schedule.releasePollTimeout'))
+          const errorMessage = resolveErrorMessage(
+            error,
+            this.$t('ui.tc.schedule.releasePollTimeout')
+          )
+          window.setTimeout(() => {
+            this.releaseProgressVisible = false
+            this.$modal.alertWarning(errorMessage)
+          }, 600)
         })
       }
       poll()
