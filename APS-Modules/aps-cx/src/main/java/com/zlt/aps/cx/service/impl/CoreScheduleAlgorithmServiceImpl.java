@@ -359,7 +359,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         Map<String, Integer> structureRemainderMap = buildStructureFormingRemainderMap(context, materialToStructureMap);
 
         // 3. 构建机台 -> 未来结构反查映射
-        Map<String, String> machineFutureStructureMap = buildMachineFutureStructureMap(context);
+        Map<String, List<MpCxCapacityConfiguration>> machineFutureStructureMap = buildMachineFutureStructureMap(context);
 
         // 4. 读取切换耗时参数
         int sameInchHours = getIntParamValue(context, ScheduleConstants.PARAM_SAME_INCH_SWITCH_HOURS, ScheduleConstants.DEFAULT_SAME_INCH_SWITCH_HOURS);
@@ -424,16 +424,27 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             }
         }
 
-        // 7. 先删除后插入
-        embryoLhTimeMapper.delete(new LambdaQueryWrapper<CxEmbryoLhTime>()
-                .eq(CxEmbryoLhTime::getFactoryCode, factoryCode));
+        // 7. 仅删除本次有新记录的结构（按 factoryCode + scheduleDate + structure 维度），
+        //    返回 null 的结构不进删除范围，保留旧值；其他排程日期的记录也不受影响
+        java.sql.Timestamp scheduleDateTs = java.sql.Timestamp.valueOf(context.getScheduleDate().atStartOfDay());
+        if (!records.isEmpty()) {
+            List<String> processedStructures = records.stream()
+                    .map(CxEmbryoLhTime::getStructureName)
+                    .collect(Collectors.toList());
+            embryoLhTimeMapper.delete(new LambdaQueryWrapper<CxEmbryoLhTime>()
+                    .eq(CxEmbryoLhTime::getFactoryCode, factoryCode)
+                    .eq(CxEmbryoLhTime::getScheduleDate, scheduleDateTs)
+                    .in(CxEmbryoLhTime::getStructureName, processedStructures));
+        }
+        int skipCount = structureMachineSprMap.size() - records.size();
         for (CxEmbryoLhTime record : records) {
             record.setFactoryCode(factoryCode);
-            record.setScheduleDate(java.sql.Timestamp.valueOf(context.getScheduleDate().atStartOfDay()));
+            record.setScheduleDate(scheduleDateTs);
             record.setCreateTime(new Date());
             embryoLhTimeMapper.insert(record);
         }
-        log.info("结构切换最早可供硫化时间处理完成，共 {} 条记录", records.size());
+        log.info("结构切换最早可供硫化时间处理完成，共 {} 条记录（跳过 {} 个 null 结构，保留旧值）",
+                records.size(), skipCount);
     }
 
     /**
@@ -476,7 +487,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             ScheduleContextVo context,
             Map<String, MdmMaterialInfo> materialByEmbryoMap,
             Map<String, MdmMaterialInfo> materialByCodeMap,
-            Map<String, String> machineFutureStructureMap,
+            Map<String, List<MpCxCapacityConfiguration>> machineFutureStructureMap,
             Map<String, List<String>> machineStructureTimelineMap,
             int sameInchHours, int diffInchHours,
             Integer structureRemainder, String factoryCode) {
@@ -530,7 +541,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         }
 
         // 2. 查找后结构：优先从排程结果中找（机台结构时间线中前结构后面的结构），回退到未来结构配置
-        String nextStructureName = findNextStructure(structureName, machineSprMap, machineStructureTimelineMap, machineFutureStructureMap, latestMachineCode);
+        String nextStructureName = findNextStructure(structureName, machineSprMap, machineStructureTimelineMap, machineFutureStructureMap, context, latestMachineCode);
 
         // 3. 计算切换耗时
         int switchHours = 0;
@@ -567,7 +578,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             ScheduleContextVo context,
             Map<String, MdmMaterialInfo> materialByEmbryoMap,
             Map<String, MdmMaterialInfo> materialByCodeMap,
-            Map<String, String> machineFutureStructureMap,
+            Map<String, List<MpCxCapacityConfiguration>> machineFutureStructureMap,
             int sameInchHours, int diffInchHours,
             Integer structureRemainder, String factoryCode,
             List<CxShiftConfig> sortedShiftConfigs,
@@ -621,7 +632,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         }
 
         // 7. 查找未来结构
-        String nextStructureName = findFutureStructureForStructure(structureName, machineFutureStructureMap, machineSprMap);
+        String nextStructureName = findFutureStructureForStructure(structureName, machineFutureStructureMap, machineSprMap, context);
 
         // 8. 计算切换耗时
         int switchHours = 0;
@@ -640,7 +651,9 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             if (recordMachineCode == null) {
                 recordMachineCode = mCode;
             }
-            if (nextStructureName != null && nextStructureName.equals(machineFutureStructureMap.get(mCode))) {
+            List<MpCxCapacityConfiguration> futures = machineFutureStructureMap.get(mCode);
+            if (nextStructureName != null && futures != null
+                    && futures.stream().anyMatch(f -> nextStructureName.equals(f.getStructureName()))) {
                 recordMachineCode = mCode;
                 break;
             }
@@ -667,14 +680,16 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
      * @param prevStructureName          前结构
      * @param machineSprMap             该结构下各机台的SPR列表
      * @param machineStructureTimelineMap 机台->结构时间线（按班次顺序去重）
-     * @param machineFutureStructureMap  机台->未来结构映射
+     * @param machineFutureStructureMap  机台->未来结构配置列表（按 BEGIN_DAY 升序）
+     * @param context                   排程上下文（用于查找前结构 END_DAY）
      * @param preferredMachineCode       优先查找的机台（最晚结束时间的机台）
      * @return 后结构名称，找不到返回null
      */
     private String findNextStructure(String prevStructureName,
                                      Map<String, List<ShiftProductionResult>> machineSprMap,
                                      Map<String, List<String>> machineStructureTimelineMap,
-                                     Map<String, String> machineFutureStructureMap,
+                                     Map<String, List<MpCxCapacityConfiguration>> machineFutureStructureMap,
+                                     ScheduleContextVo context,
                                      String preferredMachineCode) {
         // 1. 优先从排程结果中找：在机台结构时间线中，前结构后面的第一个不同结构就是后结构
         // 优先查最晚结束时间的机台，再遍历其他机台
@@ -700,11 +715,18 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             }
         }
 
-        // 2. 回退到未来结构配置
+        // 2. 回退到未来结构配置：选取 BEGIN_DAY 严格晚于前结构 END_DAY 的最早未来结构
+        //    （未来结构列表已按 year/month/beginDay 升序，避免依赖隐式顺序选错）
         for (String machineCode : orderedMachines) {
-            String futureStruct = machineFutureStructureMap.get(machineCode);
-            if (futureStruct != null && !futureStruct.equals(prevStructureName)) {
-                return futureStruct;
+            List<MpCxCapacityConfiguration> futures = machineFutureStructureMap.get(machineCode);
+            if (futures == null || futures.isEmpty()) continue;
+            MpCxCapacityConfiguration prevConfig = findStructureConfig(context, prevStructureName, machineCode);
+            int prevEndComposite = (prevConfig != null) ? endComposite(prevConfig) : -1;
+            for (MpCxCapacityConfiguration f : futures) {
+                if (f.getStructureName() == null || f.getStructureName().equals(prevStructureName)) continue;
+                if (prevEndComposite < 0 || beginComposite(f) > prevEndComposite) {
+                    return f.getStructureName();
+                }
             }
         }
         return null;
@@ -712,14 +734,22 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
 
     /**
      * 场景2专用：从未来结构配置中查找该结构的后结构。
+     * <p>选取 BEGIN_DAY 严格晚于前结构 END_DAY 的最早未来结构（列表已升序）。
      */
     private String findFutureStructureForStructure(String structureName,
-                                                   Map<String, String> machineFutureStructureMap,
-                                                   Map<String, List<ShiftProductionResult>> machineSprMap) {
+                                                   Map<String, List<MpCxCapacityConfiguration>> machineFutureStructureMap,
+                                                   Map<String, List<ShiftProductionResult>> machineSprMap,
+                                                   ScheduleContextVo context) {
         for (String machineCode : machineSprMap.keySet()) {
-            String futureStruct = machineFutureStructureMap.get(machineCode);
-            if (futureStruct != null && !futureStruct.equals(structureName)) {
-                return futureStruct;
+            List<MpCxCapacityConfiguration> futures = machineFutureStructureMap.get(machineCode);
+            if (futures == null || futures.isEmpty()) continue;
+            MpCxCapacityConfiguration prevConfig = findStructureConfig(context, structureName, machineCode);
+            int prevEndComposite = (prevConfig != null) ? endComposite(prevConfig) : -1;
+            for (MpCxCapacityConfiguration f : futures) {
+                if (f.getStructureName() == null || f.getStructureName().equals(structureName)) continue;
+                if (prevEndComposite < 0 || beginComposite(f) > prevEndComposite) {
+                    return f.getStructureName();
+                }
             }
         }
         return null;
@@ -783,24 +813,83 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
     }
 
     /**
-     * 构建机台 -> 未来结构反查映射。
-     * <p>从 futureStructureAllocationMap（structureName -> List<配置>）反查。
+     * 构建机台 -> 未来结构配置列表（按 BEGIN_DAY 升序）的反查映射。
+     * <p>从 futureStructureAllocationMap（structureName -> List<配置>）反查聚合，
+     * 同一机台的多个未来结构按 year/month/beginDay 升序排列，
+     * 供 findNextStructure 按"严格晚于前结构 END_DAY"选取真正的下一个结构，
+     * 避免依赖 DB 返回顺序或 HashMap 遍历顺序导致选错。
      */
-    private Map<String, String> buildMachineFutureStructureMap(ScheduleContextVo context) {
-        Map<String, String> result = new HashMap<>();
+    private Map<String, List<MpCxCapacityConfiguration>> buildMachineFutureStructureMap(ScheduleContextVo context) {
+        Map<String, List<MpCxCapacityConfiguration>> result = new LinkedHashMap<>();
         Map<String, List<MpCxCapacityConfiguration>> futureMap = context.getFutureStructureAllocationMap();
         if (futureMap == null) {
             return result;
         }
-        for (Map.Entry<String, List<MpCxCapacityConfiguration>> entry : futureMap.entrySet()) {
-            String structName = entry.getKey();
-            for (MpCxCapacityConfiguration config : entry.getValue()) {
+        for (List<MpCxCapacityConfiguration> configs : futureMap.values()) {
+            for (MpCxCapacityConfiguration config : configs) {
                 if (config.getCxMachineCode() != null) {
-                    result.putIfAbsent(config.getCxMachineCode(), structName);
+                    result.computeIfAbsent(config.getCxMachineCode(), k -> new ArrayList<>()).add(config);
                 }
             }
         }
+        // 显式排序：year -> month -> beginDay（不依赖 DB/HashMap 隐式顺序）
+        result.values().forEach(list -> list.sort((a, b) -> {
+            int cmp = Integer.compare(a.getYear(), b.getYear());
+            if (cmp != 0) return cmp;
+            cmp = Integer.compare(a.getMonth(), b.getMonth());
+            if (cmp != 0) return cmp;
+            return Integer.compare(a.getBeginDay(), b.getBeginDay());
+        }));
         return result;
+    }
+
+    /**
+     * 查找指定机台上某结构的排产配置（用于获取 END_DAY 等时间信息）。
+     * <p>优先从当月 structureAllocationMap 查找，回退到 futureStructureAllocationMap。
+     *
+     * @return 匹配的配置，找不到返回 null
+     */
+    private MpCxCapacityConfiguration findStructureConfig(ScheduleContextVo context,
+                                                          String structureName, String machineCode) {
+        MpCxCapacityConfiguration match = findConfigInStructureMap(context.getStructureAllocationMap(), structureName, machineCode);
+        if (match != null) {
+            return match;
+        }
+        return findConfigInStructureMap(context.getFutureStructureAllocationMap(), structureName, machineCode);
+    }
+
+    private MpCxCapacityConfiguration findConfigInStructureMap(Map<String, List<MpCxCapacityConfiguration>> map,
+                                                               String structureName, String machineCode) {
+        if (map == null || machineCode == null) {
+            return null;
+        }
+        List<MpCxCapacityConfiguration> configs = map.get(structureName);
+        if (configs == null) {
+            return null;
+        }
+        for (MpCxCapacityConfiguration c : configs) {
+            if (machineCode.equals(c.getCxMachineCode())) {
+                return c;
+            }
+        }
+        return null;
+    }
+
+    /** 配置的"开始序号" year*10000+month*100+beginDay，用于跨月先后比较。 */
+    private int beginComposite(MpCxCapacityConfiguration c) {
+        return composite(c.getYear(), c.getMonth(), c.getBeginDay());
+    }
+
+    /** 配置的"结束序号" year*10000+month*100+endDay，用于跨月先后比较。 */
+    private int endComposite(MpCxCapacityConfiguration c) {
+        return composite(c.getYear(), c.getMonth(), c.getEndDay());
+    }
+
+    private int composite(Integer year, Integer month, Integer day) {
+        if (year == null || month == null || day == null) {
+            return -1;
+        }
+        return year * 10000 + month * 100 + day;
     }
 
     /**
