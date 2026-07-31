@@ -8,12 +8,14 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.constant.UserConstants;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
+import com.zlt.aps.gdyy.api.domain.dto.GdyyScheduleImportDTO;
 import com.zlt.aps.gdyy.api.domain.entity.GdyyScheduleResult;
 import com.zlt.aps.gdyy.api.service.IGdyyScheduleResultRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
@@ -160,6 +162,28 @@ public class GdyyScheduleResultUIController extends BaseUIController<GdyySchedul
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
         return remote.importData(context, updateSupport);
+    }
+
+    @ApiOperation("按固定模板导入钢带压延排程结果")
+    @RequiresPermissions("gdyy:scheduleResult:import")
+    @PostMapping("/importDataByCust")
+    @ResponseBody
+    public AjaxResult importDataByCust(@RequestPart("file") MultipartFile file,
+                                       @RequestParam("updateSupport") boolean updateSupport,
+                                       @RequestParam("factoryCode") String factoryCode) throws Exception {
+        byte[] data = this.useFileEncrypt ? FileEncryptUtils.DecodeFile(file) : file.getBytes();
+        ImportContext context = new ImportContext();
+        context.setImportFilePath(this.importFilePath);
+        context.setFunctionName(this.getFunctionName());
+        context.setProcedureCode(this.getProcedureCode());
+        context.setOriFileName(file.getOriginalFilename());
+        context.setFileBytes(data);
+        GdyyScheduleResult condition = new GdyyScheduleResult();
+        condition.setFactoryCode(StringUtils.trim(factoryCode));
+        GdyyScheduleImportDTO importDTO = new GdyyScheduleImportDTO();
+        importDTO.setImportContext(context);
+        importDTO.setScheduleResult(condition);
+        return this.remote.importDataByCust(updateSupport, importDTO);
     }
 
     @ApiOperation("导入完成量")

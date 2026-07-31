@@ -1,14 +1,20 @@
 package com.zlt.aps.gdyy.service.impl;
 
+import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.domain.RowStateEnum;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.gdyy.api.domain.entity.GdyyScheduleResult;
+import com.zlt.aps.gdyy.api.domain.entity.GdyyShiftConfig;
+import com.zlt.aps.gdyy.domain.vo.GdyyScheduleResultTemplateImportVO;
 import com.zlt.aps.gdyy.mapper.GdyyScheduleResultMapper;
+import com.zlt.aps.gdyy.mapper.GdyyShiftConfigMapper;
 import com.zlt.aps.gdyy.service.IGdyyScheduleResultService;
+import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.enums.ImportErrorTypeEnums;
 import com.zlt.common.utils.ImportExcelValidatedUtils;
@@ -19,9 +25,18 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
+import java.io.InputStream;
+import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.IntStream;
 
 /**
  * 钢带压延排程结果 服务实现。
@@ -33,6 +48,8 @@ public class GdyyScheduleResultServiceImpl extends AbstractDocService<GdyySchedu
 
     @Resource
     private GdyyScheduleResultMapper gdyyScheduleResultMapper;
+    @Resource
+    private GdyyShiftConfigMapper gdyyShiftConfigMapper;
 
     @Override
     protected String getDocTypeCode() {
@@ -163,6 +180,155 @@ public class GdyyScheduleResultServiceImpl extends AbstractDocService<GdyySchedu
     public AjaxResult importFinishQty(List<GdyyScheduleResult> list, boolean updateSupport, Long importLogId) {
         // 导入完成量入口：只做框架入口，具体逻辑后续实现
         return AjaxResult.error("导入完成量功能待实现");
+    }
+
+    /**
+     * 按固定生产计划模板整体覆盖导入。
+     * Excel的N2作为结果主排程日期，各CLASS日期按当前工厂启用班次配置计算。
+     */
+    @Override
+    public AjaxResult importScheduleTemplate(List<GdyyScheduleResultTemplateImportVO> rows,
+                                             GdyyScheduleResult condition,
+                                             boolean updateSupport) {
+        if (condition == null || !PubUtil.isNotEmpty(condition.getFactoryCode())) {
+            return AjaxResult.error(I18nUtil.getMessage(
+                    "ui.data.column.gdyyScheduleResult.importFactoryRequired"));
+        }
+        if (condition.getScheduleDate() == null) {
+            return AjaxResult.error(I18nUtil.getMessage(
+                    "ui.data.column.gdyyScheduleResult.importDateRequired"));
+        }
+        if (rows == null || rows.isEmpty()) {
+            return AjaxResult.error(I18nUtil.getMessage(
+                    "ui.data.column.gdyyScheduleResult.importEmpty"));
+        }
+        String factoryCode = condition.getFactoryCode().trim();
+        java.util.Date scheduleDate = DateUtil.beginOfDay(condition.getScheduleDate());
+        List<GdyyShiftConfig> shiftConfigs = this.gdyyShiftConfigMapper.selectList(
+                new LambdaQueryWrapper<GdyyShiftConfig>()
+                        .eq(GdyyShiftConfig::getFactoryCode, factoryCode)
+                        .eq(GdyyShiftConfig::getIsActive, 1)
+                        .orderByAsc(GdyyShiftConfig::getShiftOrder));
+        Map<String, GdyyShiftConfig> shiftConfigMap = new HashMap<>();
+        for (GdyyShiftConfig shiftConfig : shiftConfigs) {
+            if (PubUtil.isNotEmpty(shiftConfig.getClassField())) {
+                shiftConfigMap.put(shiftConfig.getClassField().trim().toUpperCase(), shiftConfig);
+            }
+        }
+        boolean shiftConfigInvalid = IntStream.rangeClosed(1, 8)
+                .mapToObj(classIndex -> shiftConfigMap.get("CLASS" + classIndex))
+                .anyMatch(shiftConfig -> shiftConfig == null
+                        || shiftConfig.getScheduleDay() == null);
+        if (shiftConfigInvalid) {
+            return AjaxResult.error(MessageFormat.format(I18nUtil.getMessage(
+                    "ui.data.column.gdyyScheduleResult.importShiftConfigInvalid"), factoryCode));
+        }
+
+        Set<String> bigRollCodes = new HashSet<>();
+        List<String> errors = new ArrayList<>();
+        List<GdyyScheduleResultTemplateImportVO> validRows = new ArrayList<>();
+        for (GdyyScheduleResultTemplateImportVO row : rows) {
+            int excelRow = row == null || row.getExcelRowNum() == null
+                    ? 0 : row.getExcelRowNum();
+            if (row == null || !PubUtil.isNotEmpty(row.getBigRollCode())) {
+                errors.add(MessageFormat.format(I18nUtil.getMessage(
+                        "ui.data.column.gdyyScheduleResult.importRowRequired"), excelRow));
+                continue;
+            }
+            List<Double> quantities = IntStream.rangeClosed(1, 8)
+                    .mapToObj(classIndex -> (Double) row.getFieldValueByFieldName(
+                            String.format("class%dPlanQty", classIndex)))
+                    .filter(Objects::nonNull)
+                    .collect(java.util.stream.Collectors.toList());
+            if (quantities.stream().anyMatch(quantity -> quantity < 0D)) {
+                errors.add(MessageFormat.format(I18nUtil.getMessage(
+                        "ui.data.column.gdyyScheduleResult.importNegative"), excelRow));
+                continue;
+            }
+            if (quantities.stream().noneMatch(quantity -> quantity > 0D)) {
+                continue;
+            }
+            String bigRollCode = row.getBigRollCode().trim();
+            if (!bigRollCodes.add(bigRollCode)) {
+                errors.add(MessageFormat.format(I18nUtil.getMessage(
+                        "ui.data.column.gdyyScheduleResult.importDuplicate"), excelRow));
+                continue;
+            }
+            validRows.add(row);
+        }
+        if (!errors.isEmpty()) {
+            return AjaxResult.error(String.join("<br>", errors));
+        }
+        if (validRows.isEmpty()) {
+            return AjaxResult.error(I18nUtil.getMessage(
+                    "ui.data.column.gdyyScheduleResult.importEmpty"));
+        }
+
+        List<GdyyScheduleResult> insertList = new ArrayList<>();
+        for (GdyyScheduleResultTemplateImportVO row : validRows) {
+            GdyyScheduleResult result = new GdyyScheduleResult();
+            result.setFactoryCode(factoryCode);
+            result.setScheduleDate(scheduleDate);
+            result.setBigRollCode(row.getBigRollCode().trim());
+            result.setIsRelease("0");
+            result.setProductionStatus("0");
+            result.setDataSource("2");
+            result.setPublishSuccessCount(0);
+            for (int classIndex = 1; classIndex <= 8; classIndex++) {
+                GdyyShiftConfig shiftConfig = shiftConfigMap.get("CLASS" + classIndex);
+                result.setFieldValueByFieldName(
+                        String.format("class%dScheduleDate", classIndex),
+                        DateUtil.offsetDay(scheduleDate, shiftConfig.getScheduleDay() - 2));
+                result.setFieldValueByFieldName(
+                        String.format("class%dPlanQty", classIndex),
+                        row.getFieldValueByFieldName(
+                                String.format("class%dPlanQty", classIndex)));
+            }
+            insertList.add(result);
+        }
+
+        this.gdyyScheduleResultMapper.update(null,
+                new LambdaUpdateWrapper<GdyyScheduleResult>()
+                        .eq(GdyyScheduleResult::getFactoryCode, factoryCode)
+                        .eq(GdyyScheduleResult::getScheduleDate, scheduleDate)
+                        .set(GdyyScheduleResult::getIsDelete, 1));
+        int successNum = this.baseDao.saveBatch(insertList);
+        return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success")
+                + "," + successNum);
+    }
+
+    /** 使用与纤维压延一致的四天八班生产计划模板导出。 */
+    @Override
+    public byte[] exportData(List<GdyyScheduleResult> currentResults,
+                             GdyyScheduleResult queryVO) {
+        Map<String, Object> tableMap = new HashMap<>();
+        if (queryVO != null && queryVO.getScheduleDate() != null) {
+            tableMap.put("previousDate", DateUtil.offsetDay(queryVO.getScheduleDate(), -1));
+            tableMap.put("scheduleDate", queryVO.getScheduleDate());
+            tableMap.put("nextDate", DateUtil.offsetDay(queryVO.getScheduleDate(), 1));
+            tableMap.put("nextTwoDate", DateUtil.offsetDay(queryVO.getScheduleDate(), 2));
+        }
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (GdyyScheduleResult result : currentResults) {
+            Map<String, Object> row = new HashMap<>();
+            row.put("bigRollCode", result.getBigRollCode());
+            for (int classIndex = 1; classIndex <= 8; classIndex++) {
+                row.put(String.format("class%dProduceOrder", classIndex),
+                        result.getFieldValueByFieldName(
+                                String.format("class%dProduceOrder", classIndex)));
+                row.put(String.format("class%dPlanQty", classIndex),
+                        result.getFieldValueByFieldName(
+                                String.format("class%dPlanQty", classIndex)));
+            }
+            rows.add(row);
+        }
+        InputStream inputStream = this.getClass().getClassLoader()
+                .getResourceAsStream("excelModel/gdyyScheduleResult.xlsx");
+        if (inputStream == null) {
+            throw new IllegalStateException("gdyyScheduleResult.xlsx");
+        }
+        return ExcelUtils.writeMultiList(inputStream, 0, tableMap,
+                Collections.singletonList(rows));
     }
 
     private GdyyScheduleResult getExist(GdyyScheduleResult entity) {

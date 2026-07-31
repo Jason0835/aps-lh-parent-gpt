@@ -4,6 +4,7 @@ import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.zlt.aps.gdyy.api.domain.dto.GdyyScheduleImportDTO;
 import com.zlt.aps.gdyy.api.domain.entity.GdyyScheduleResult;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
@@ -44,6 +45,11 @@ public interface IGdyyScheduleResultRemoteService {
     @ApiOperation("导入钢带压延排程结果")
     @PostMapping("/gdyy/scheduleResult/importData")
     AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport);
+
+    @ApiOperation("按固定模板导入钢带压延排程结果")
+    @PostMapping("/gdyy/scheduleResult/importDataByCust/{updateSupport}")
+    AjaxResult importDataByCust(@PathVariable("updateSupport") boolean updateSupport,
+                                @RequestBody GdyyScheduleImportDTO importDTO);
 
     @ApiOperation("调量")
     @PostMapping("/gdyy/scheduleResult/changeQty")

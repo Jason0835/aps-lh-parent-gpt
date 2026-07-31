@@ -57,14 +57,12 @@
         >{{ $t("ui.frame.btn.export") }}</el-button>
       </template>
     </page-table>
-    <tlt-upload-form
+    <tlt-upload
       ref="tltUpload"
-      :updateSupport="true"
-      downloadUrl="/gdyy/scheduleResult/importTemplate"
-      uploadUrl="/gdyy/scheduleResult/importData"
+      :update-support="true"
+      upload-url="/gdyy/scheduleResult/importDataByCust"
+      :upload-params="importParams"
       @uploadSuccess="getList"
-      labelWidth="0"
-      :columns="importColumns"
     />
     <edit-dialog ref="editRef" @success="getList" />
     <change-machine-dialog ref="changeMachineRef" @success="getList" />
@@ -75,7 +73,6 @@
 
 <script>
 import { listGdyyScheduleResult, delGdyyScheduleResult, exportGdyyScheduleResult, publishGdyyScheduleResult } from "@/api/gdyy/gdyyScheduleResult";
-import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import EditDialog from "./components/editDialog.vue";
 import ChangeMachineDialog from "./components/changeMachineDialog.vue";
 import ChangePlanDialog from "./components/changePlanDialog.vue";
@@ -84,7 +81,6 @@ import PublishDialog from "./components/publishDialog.vue";
 export default {
   name: "GdyyScheduleResult",
   components: {
-    TltUploadForm,
     EditDialog,
     ChangeMachineDialog,
     ChangePlanDialog,
@@ -98,22 +94,6 @@ export default {
   },
   data() {
     return {
-      importColumns: [
-        {
-          label: "",
-          prop: "updateSupport",
-          render: (form) => {
-            return (
-              <el-checkbox
-                label={this.$t("common.rule.updateSupport")}
-                v-model={form.updateSupport}
-              >
-                {this.$t("common.rule.updateSupport")}
-              </el-checkbox>
-            );
-          },
-        },
-      ],
       loading: false,
       data: [],
       selection: [],
@@ -132,6 +112,11 @@ export default {
     };
   },
   computed: {
+    importParams() {
+      return {
+        factoryCode: this.search.factoryCode,
+      };
+    },
     searchColumns() {
       return [
         {

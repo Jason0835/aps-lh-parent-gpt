@@ -7,12 +7,14 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
+import com.zlt.aps.xwyy.api.domain.dto.XwyyScheduleImportDTO;
 import com.zlt.aps.xwyy.api.domain.entity.XwyyScheduleResult;
 import com.zlt.aps.xwyy.api.service.IXwyyScheduleResultRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
@@ -143,5 +145,27 @@ public class XwyyScheduleResultUIController extends BaseUIController<XwyySchedul
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(decodedBytes);
         return xwyyScheduleResultRemoteService.importData(context, updateSupport);
+    }
+
+    @ApiOperation("按固定模板导入纤维压延排程结果")
+    @RequiresPermissions("xwyy:scheduleResult:import")
+    @PostMapping("/importDataByCust")
+    @ResponseBody
+    public AjaxResult importDataByCust(@RequestPart("file") MultipartFile file,
+                                       @RequestParam("updateSupport") boolean updateSupport,
+                                       @RequestParam("factoryCode") String factoryCode) throws Exception {
+        byte[] data = this.useFileEncrypt ? FileEncryptUtils.DecodeFile(file) : file.getBytes();
+        ImportContext context = new ImportContext();
+        context.setImportFilePath(this.importFilePath);
+        context.setFunctionName(this.getFunctionName());
+        context.setProcedureCode(this.getProcedureCode());
+        context.setOriFileName(file.getOriginalFilename());
+        context.setFileBytes(data);
+        XwyyScheduleResult condition = new XwyyScheduleResult();
+        condition.setFactoryCode(StringUtils.trim(factoryCode));
+        XwyyScheduleImportDTO importDTO = new XwyyScheduleImportDTO();
+        importDTO.setImportContext(context);
+        importDTO.setScheduleResult(condition);
+        return this.xwyyScheduleResultRemoteService.importDataByCust(updateSupport, importDTO);
     }
 }
