@@ -44,7 +44,7 @@ public class TcOperationAsyncExecutorImpl implements TcOperationAsyncExecutor {
                     TcOperationRequestSnapshot.class);
             this.backgroundTaskService.updateProgress(taskId, 60, "ROLLING",
                     I18nUtil.getMessage("ui.tc.schedule.operationTaskRolling"), null);
-            int affectedCount = this.executeOperation(task.getTaskType(), snapshot);
+            int affectedCount = this.executeOperation(taskId, task.getTaskType(), snapshot);
             if (affectedCount <= 0) {
                 throw new ServiceException(I18nUtil.getMessage(
                         "ui.tc.schedule.operationTaskZeroEffect"));
@@ -63,22 +63,24 @@ public class TcOperationAsyncExecutorImpl implements TcOperationAsyncExecutor {
     /**
      * 根据任务类型委托现有人工业务服务。
      *
+     * @param taskId 当前异步任务ID
      * @param taskType 任务类型
      * @param snapshot 请求快照
      * @return 影响行数
      */
-    private int executeOperation(String taskType, TcOperationRequestSnapshot snapshot) {
+    private int executeOperation(String taskId, String taskType, TcOperationRequestSnapshot snapshot) {
         if (TcBackgroundTaskTypeEnum.MANUAL_INSERT.getCode().equals(taskType)) {
-            return this.manualScheduleApplicationService.insertTask(snapshot.getInsertRequest());
+            return this.manualScheduleApplicationService.insertTaskForAsync(snapshot.getInsertRequest(), taskId);
         }
         if (TcBackgroundTaskTypeEnum.MANUAL_CHANGE_QTY.getCode().equals(taskType)) {
-            return this.manualScheduleApplicationService.changeQty(snapshot.getChangeQtyRequest());
+            return this.manualScheduleApplicationService.changeQtyForAsync(snapshot.getChangeQtyRequest(), taskId);
         }
         if (TcBackgroundTaskTypeEnum.MANUAL_CHANGE_MACHINE.getCode().equals(taskType)) {
-            return this.manualScheduleApplicationService.changeMachine(snapshot.getChangeMachineRequest());
+            return this.manualScheduleApplicationService.changeMachineForAsync(
+                    snapshot.getChangeMachineRequest(), taskId);
         }
         if (TcBackgroundTaskTypeEnum.MANUAL_DELETE.getCode().equals(taskType)) {
-            return this.manualScheduleApplicationService.remove(snapshot.getResultIdList());
+            return this.manualScheduleApplicationService.removeForAsync(snapshot.getResultIdList(), taskId);
         }
         throw new IllegalArgumentException(I18nUtil.getMessage("ui.tc.schedule.operationTaskTypeUnsupported"));
     }

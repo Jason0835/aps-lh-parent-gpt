@@ -19,7 +19,7 @@ export function listMachine(query) {
  */
 export function editMachine(query) {
   return request({
-    url: 'dj/machine/edit',
+    url: 'dj/machine/save',
     method: 'post',
     data: query
   })

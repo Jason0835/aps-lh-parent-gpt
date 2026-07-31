@@ -8,6 +8,7 @@ import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.CxMachineAllocationPlanHelper;
 import com.zlt.aps.mp.engine.domain.dto.SkuDayProductionInfoHelper;
 import com.zlt.aps.mp.engine.domain.vo.CxMachineBaseInfoVo;
+import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanStructureLhRatioVo;
 import com.zlt.aps.mp.engine.enums.FormalRoundEnum;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
@@ -520,6 +521,39 @@ public class GroupPlanCxLhCapacityLimitHelper {
         clearSkuUsedMouldDetailInfo(clearUsedMouldInfoSet, materialDesc);
         //清除各Sku使用的模具信息
         clearSkuUsedMouldInfo(clearUsedMouldInfoSet, materialDesc);
+    }
+
+    /**
+     * 获取已排产Sku的成型编号信息
+     *
+     * @param productionContext
+     * @return
+     */
+    public Set<String> getProductionFormingNoSet(TbrProductionContext productionContext) {
+        if (CollectionUtils.isEmpty(productionSkuQtyInfo)) {
+            return Collections.emptySet();
+        }
+        Map<String, List<MonthPlanProductionRequirePlanVo>> allSkuProductionPlan = productionContext.getAllSkuProductionPlan();
+        if (CollectionUtils.isEmpty(allSkuProductionPlan)) {
+            return Collections.emptySet();
+        }
+        Set<String> skuKeySet = productionSkuQtyInfo.keySet();
+        Set<String> formingNoSet = Sets.newHashSet();
+        skuKeySet.forEach(materialDesc -> {
+            List<MonthPlanProductionRequirePlanVo> planList = allSkuProductionPlan.get(materialDesc);
+            if (CollectionUtils.isEmpty(planList)) {
+                return;
+            }
+            MonthPlanProductionRequirePlanVo plan = planList.get(BigDecimal.ZERO.intValue());
+            if (null == plan || StringUtils.isBlank(plan.getFormingNo())) {
+                return;
+            }
+            formingNoSet.add(plan.getFormingNo());
+        });
+        if (CollectionUtils.isEmpty(formingNoSet)) {
+            return Collections.emptySet();
+        }
+        return formingNoSet;
     }
 
     /**

@@ -503,6 +503,7 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
         //施工配置
         MonthPlanProductConstructionInfoVo constructionInfo = setConstructionStage(constructionConfigurationList, getProductTypeCode());
         setEmbryoCode(constructionInfo.getEmbryoCode());
+        setFormingNo(constructionInfo.getFormingNo());
         setProductStatus(constructionInfo.getProductStatus());
         setMainMaterialDesc(constructionInfo.getMainMaterialDesc());
         setMouldMethod(constructionInfo.getMouldMethod());

@@ -69,6 +69,28 @@ public class TcManualScheduleApplicationService {
      * @return 新增结果行数
      */
     public int insertTask(TcInsertTaskRequestVo requestVo) {
+        return this.insertTask(requestVo, null);
+    }
+
+    /**
+     * 执行异步多班次人工插单。
+     *
+     * @param requestVo 插单请求
+     * @param currentTaskId 当前异步任务ID
+     * @return 新增结果行数
+     */
+    public int insertTaskForAsync(TcInsertTaskRequestVo requestVo, String currentTaskId) {
+        return this.insertTask(requestVo, currentTaskId);
+    }
+
+    /**
+     * 执行多班次人工插单并传递当前异步任务范围。
+     *
+     * @param requestVo 插单请求
+     * @param ignoredTaskId 允许忽略的当前异步任务ID，同步调用传null
+     * @return 新增结果行数
+     */
+    private int insertTask(TcInsertTaskRequestVo requestVo, String ignoredTaskId) {
         this.validateInsertRequest(requestVo);
         List<TcManualShiftItemVo> shiftItemList = requestVo.getShiftList().stream()
                 .filter(Objects::nonNull).filter(item -> item.getPlanQty() != null
@@ -89,7 +111,7 @@ public class TcManualScheduleApplicationService {
             insertResult.setFieldValueByFieldName(String.format(TcScheduleConstants.SHIFT_SEQUENCE_FIELD_TEMPLATE,
                     item.getShiftOrder()), item.getSequence());
         });
-        return this.manualOperationFacade.insertTask(insertResult, requestVo.getReason().trim());
+        return this.manualOperationFacade.insertTask(insertResult, requestVo.getReason().trim(), ignoredTaskId);
     }
 
     /**
@@ -99,6 +121,28 @@ public class TcManualScheduleApplicationService {
      * @return 受影响行数
      */
     public int changeQty(TcChangeQtyRequestVo requestVo) {
+        return this.changeQty(requestVo, null);
+    }
+
+    /**
+     * 执行异步选中班次调量。
+     *
+     * @param requestVo 调量请求
+     * @param currentTaskId 当前异步任务ID
+     * @return 受影响行数
+     */
+    public int changeQtyForAsync(TcChangeQtyRequestVo requestVo, String currentTaskId) {
+        return this.changeQty(requestVo, currentTaskId);
+    }
+
+    /**
+     * 执行选中班次调量并传递当前异步任务范围。
+     *
+     * @param requestVo 调量请求
+     * @param ignoredTaskId 允许忽略的当前异步任务ID，同步调用传null
+     * @return 受影响行数
+     */
+    private int changeQty(TcChangeQtyRequestVo requestVo, String ignoredTaskId) {
         if (requestVo == null || requestVo.getResultId() == null || requestVo.getShiftOrder() == null
                 || requestVo.getShiftOrder() < 1
                 || requestVo.getShiftOrder() > TcScheduleConstants.TC_MAX_SHIFT_ORDER
@@ -117,7 +161,7 @@ public class TcManualScheduleApplicationService {
         this.validateShiftOrders(current.getFactoryCode(), current.getScheduleDate(),
                 Collections.singletonList(requestVo.getShiftOrder()));
         return this.manualOperationFacade.changeQty(changeResult, requestVo.getExpectedTaskVersion(),
-                requestVo.getReason().trim());
+                requestVo.getReason().trim(), ignoredTaskId);
     }
 
     /**
@@ -127,6 +171,28 @@ public class TcManualScheduleApplicationService {
      * @return 受影响行数
      */
     public int changeMachine(TcChangeMachineRequestVo requestVo) {
+        return this.changeMachine(requestVo, null);
+    }
+
+    /**
+     * 执行异步批量普通转机台。
+     *
+     * @param requestVo 转机请求
+     * @param currentTaskId 当前异步任务ID
+     * @return 受影响行数
+     */
+    public int changeMachineForAsync(TcChangeMachineRequestVo requestVo, String currentTaskId) {
+        return this.changeMachine(requestVo, currentTaskId);
+    }
+
+    /**
+     * 原子执行批量普通转机台并传递当前异步任务范围。
+     *
+     * @param requestVo 转机请求
+     * @param ignoredTaskId 允许忽略的当前异步任务ID，同步调用传null
+     * @return 受影响行数
+     */
+    private int changeMachine(TcChangeMachineRequestVo requestVo, String ignoredTaskId) {
         if (requestVo == null || requestVo.getTaskList() == null || requestVo.getTaskList().isEmpty()
                 || StringUtils.isBlank(requestVo.getTargetMachineCode()) || StringUtils.isBlank(requestVo.getReason())) {
             throw new ServiceException(I18nUtil.getMessage("ui.tc.schedule.changeMachine.invalidRequest"));
@@ -174,7 +240,7 @@ public class TcManualScheduleApplicationService {
         }
         this.validateShiftOrders(reference.getFactoryCode(), reference.getScheduleDate(), shiftOrderList);
         return this.manualOperationFacade.changeMachine(transferResultList, expectedVersionList,
-                requestVo.getReason().trim());
+                requestVo.getReason().trim(), ignoredTaskId);
     }
 
     /**
@@ -184,13 +250,35 @@ public class TcManualScheduleApplicationService {
      * @return 删除行数
      */
     public int remove(List<Long> resultIdList) {
+        return this.remove(resultIdList, null);
+    }
+
+    /**
+     * 执行异步整行删除。
+     *
+     * @param resultIdList 结果 ID
+     * @param currentTaskId 当前异步任务ID
+     * @return 删除行数
+     */
+    public int removeForAsync(List<Long> resultIdList, String currentTaskId) {
+        return this.remove(resultIdList, currentTaskId);
+    }
+
+    /**
+     * 按结果 ID 整行删除并传递当前异步任务范围。
+     *
+     * @param resultIdList 结果 ID
+     * @param ignoredTaskId 允许忽略的当前异步任务ID，同步调用传null
+     * @return 删除行数
+     */
+    private int remove(List<Long> resultIdList, String ignoredTaskId) {
         List<Long> normalizedIdList = resultIdList == null ? Collections.emptyList()
                 : resultIdList.stream().filter(Objects::nonNull).distinct().sorted().collect(Collectors.toList());
         if (normalizedIdList.isEmpty()) {
             throw new ServiceException(I18nUtil.getMessage("ui.tc.schedule.remove.idRequired"));
         }
         return this.manualOperationFacade.remove(normalizedIdList,
-                I18nUtil.getMessage("ui.tc.schedule.remove.defaultReason"));
+                I18nUtil.getMessage("ui.tc.schedule.remove.defaultReason"), ignoredTaskId);
     }
 
     /**

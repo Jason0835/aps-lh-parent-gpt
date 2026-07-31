@@ -91,8 +91,8 @@ public class SkuPrioritySelector {
         if (finalSelectedList.size() == BigDecimal.ONE.intValue()) {
             return finalSelectedList.get(BigDecimal.ZERO.intValue()).getMaterialDesc();
         }
-        //20260627+ 共用模具、共用胎胚优先
-        List<ProductionSkuPriorityVo> shareSelectedList = DayProductionControlHandler.getShareMoldOrShareEmbryo(productionContext, finalSelectedList, groupPlanInfo.getDayProductionLimitInfo(), startDay, endDay);
+        //20260627+ 共用模具、共用胎胚优先 20260731+ 增加在共用模具胎胚之后，成型编号优先
+        List<ProductionSkuPriorityVo> shareSelectedList = DayProductionControlHandler.getPriorityByShareInfo(productionContext, finalSelectedList, groupPlanInfo.getDayProductionLimitInfo(), startDay, endDay);
         if (shareSelectedList.size() == BigDecimal.ONE.intValue()) {
             return shareSelectedList.get(BigDecimal.ZERO.intValue()).getMaterialDesc();
         }
@@ -164,8 +164,8 @@ public class SkuPrioritySelector {
         if (finalSelectedList.size() == BigDecimal.ONE.intValue()) {
             return finalSelectedList.get(BigDecimal.ZERO.intValue()).getMaterialDesc();
         }
-        //20260627+ 共用模具、共用胎胚优先
-        List<ProductionSkuPriorityVo> shareSelectedList = DayProductionControlHandler.getShareMoldOrShareEmbryo(productionContext, finalSelectedList, cxMachineInfo.getDayProductionLimitInfo(), startDay, endDay);
+        //20260627+ 共用模具、共用胎胚优先 20260731+ 增加在共用模具胎胚之后，成型编号优先
+        List<ProductionSkuPriorityVo> shareSelectedList = DayProductionControlHandler.getPriorityByShareInfo(productionContext, finalSelectedList, cxMachineInfo.getDayProductionLimitInfo(), startDay, endDay);
         if (shareSelectedList.size() == BigDecimal.ONE.intValue()) {
             return shareSelectedList.get(BigDecimal.ZERO.intValue()).getMaterialDesc();
         }

@@ -29,7 +29,7 @@
 
 <script>
 import infoForm from "@/views/components/infoForm.vue";
-import { editMachine, checkMachineCodeUnique } from "@/api/dj/machine";
+import { editMachine } from "@/api/dj/machine";
 export default {
   components: { infoForm },
   inject: ["parentDict"],
@@ -166,6 +166,8 @@ export default {
           label: this.$t("ui.data.column.machine.status"),
           prop: "status",
           type: "switch",
+          activeValue: "0",
+          inactiveValue: "1",
         },
         {
           label: this.$t("ui.common.column.remark"),
@@ -217,49 +219,6 @@ export default {
       return this.isEmpty(val) ? undefined : val;
     },
 
-    checkMachineCode(rule, value, callback) {
-      return new Promise((resolve, reject) => {
-        checkMachineCodeUnique({
-          id: this.form.id,
-          machineCode: this.form.machineCode,
-        })
-          .then((res) => {
-            if (res === 0) {
-              resolve();
-            } else {
-              reject(new Error(this.$t("ui.data.column.cx.machine.message")));
-            }
-          })
-          .catch((error) => {
-            console.error(error);
-            reject(new Error("验证失败，请稍后再试"));
-          });
-      });
-    },
-    checkMachineName() {
-      return new Promise((resolve, reject) => {
-        setTimeout(() => {
-          checkMachineCodeUnique({
-            id: this.form.id,
-            machineName: this.form.machineName,
-          })
-            .then((res) => {
-              if (res === 0) {
-                resolve();
-              } else {
-                reject(
-                  new Error(this.$t("ui.data.column.cx.machineName.message"))
-                );
-              }
-            })
-            .catch((error) => {
-              console.error(error);
-              reject(new Error("验证失败，请稍后再试"));
-            });
-        }, 201);
-      });
-    },
-
     handleConfirm() {
       this.$refs.form.triggerConfirm(async (params) => {
         if (params.openMachineClass) {
@@ -273,8 +232,6 @@ export default {
 
         try {
           this.loading = true;
-          await this.checkMachineCode();
-          await this.checkMachineName();
           this.save(params);
         } catch (error) {
           console.error(error);

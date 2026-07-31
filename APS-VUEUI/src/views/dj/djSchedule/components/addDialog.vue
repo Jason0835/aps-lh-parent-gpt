@@ -34,7 +34,7 @@ import moment from "moment";
 import infoForm from "@/views/components/infoForm.vue";
 
 import { listMachine } from "@/api/dj/machine";
-import { validateAdd, editScheduleResult, getPaddingDistList, getCurrentShift } from "@/api/dj/djScheduleResult";
+import { validateAdd, editScheduleResult, getPaddingDistList, getCurrentShift, getWorkClass } from "@/api/dj/djScheduleResult";
 import { getConfigKey } from "@/api/system/config";
 
 export default {
@@ -50,6 +50,8 @@ export default {
       // 连续3个班次信息（来自 getCurrentShift API）
       currentShiftData: null,
       shiftList: [],
+      // 6个班的标题（来自 getWorkClass API），下标1~6对应 class1~class6
+      classHeaders: [],
       // 排产起始班次（首班班次），用于提交后端计算实际排程日期和班次
       startShiftClass: null,
       form: {
@@ -88,7 +90,6 @@ export default {
       const seqLabel = this.$t("ui.data.column.dj.scheduleResult.sequence");
       const analysisLabel = this.$t("ui.data.column.dj.scheduleResult.analysis");
       const planQtyLabel = this.$t("ui.data.column.dj.scheduleResult.planQty");
-      const shiftLabels = this.shiftList.map((s) => s.label || "");
       const colDefs = [
         {
           label: this.$t("ui.data.column.scheduleResult.scheduleDate"),
@@ -119,9 +120,9 @@ export default {
         },
       ];
 
-      // 动态生成连续3个班次的字段，每个班次前加标题区隔
-      for (let i = 0; i < 3; i++) {
-        const label = shiftLabels[i] || "class" + (i + 1);
+      // 生成全部6个班的字段，每个班次前加标题区隔
+      for (let i = 0; i < 6; i++) {
+        const label = this.classHeaders[i + 1] || "class" + (i + 1);
         const classIdx = i + 1;
 
         // 标题区隔：x班 mm/dd
@@ -278,12 +279,18 @@ export default {
           scheduleDate: moment().add(1, "days").format("yyyy-MM-DD"),
         };
       }
+      // 加载班次标题（与修改弹窗一致）
+      const scheduleDate = this.form.scheduleDate;
+      getWorkClass({ scheduleDate }).then((res) => {
+        this.classHeaders = res;
+      });
     },
     hide() {
       this.form = {};
       this.shiftList = [];
       this.currentShiftData = null;
       this.startShiftClass = null;
+      this.classHeaders = [];
       this.$refs.form.triggerResetForm();
       // this.resetForm("infoForm");
       this.isEdit = false;
@@ -313,6 +320,9 @@ export default {
           { qtyProp: "class1PlanQty", seqProp: "class1Sequence", label: groupLabels[0] },
           { qtyProp: "class2PlanQty", seqProp: "class2Sequence", label: groupLabels[1] },
           { qtyProp: "class3PlanQty", seqProp: "class3Sequence", label: groupLabels[2] },
+          { qtyProp: "class4PlanQty", seqProp: "class4Sequence", label: groupLabels[3] },
+          { qtyProp: "class5PlanQty", seqProp: "class5Sequence", label: groupLabels[4] },
+          { qtyProp: "class6PlanQty", seqProp: "class6Sequence", label: groupLabels[5] },
         ];
 
         const hasQty = shifts.filter((s) => params[s.qtyProp] != null && params[s.qtyProp] !== "");
