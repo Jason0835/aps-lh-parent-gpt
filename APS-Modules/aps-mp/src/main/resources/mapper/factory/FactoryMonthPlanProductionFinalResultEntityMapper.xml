@@ -203,7 +203,6 @@
             f5.FACTORY_CODE,
             f5.MATERIAL_CODE,
             f5.PRODUCT_STATUS,
-            f5.MONTH_PLAN_VERSION AS CURRENT_VERSION,
             (
             -- 计划量：从库存抓取日日号到月底累加 DAY_x
             -- 库存抓取日由 Java 层根据 LAST_MONTH_PLAN_VERSION(ADJ前缀解析) 或余量表回退计算后传入
@@ -275,7 +274,7 @@
             WHERE f5.IS_DELETE = 0
             AND f5.YEAR = #{lastYear}
             AND f5.MONTH = #{lastMonth}
-            GROUP BY f5.FACTORY_CODE, f5.MATERIAL_CODE, f5.PRODUCT_STATUS, f5.MONTH_PLAN_VERSION,
+            GROUP BY f5.FACTORY_CODE, f5.MATERIAL_CODE, f5.PRODUCT_STATUS,
             stockMap.STOCK_CAPTURE_DATE, stockMap.FORCE_ZERO,
             f5.DAY_1, f5.DAY_2, f5.DAY_3, f5.DAY_4, f5.DAY_5, f5.DAY_6, f5.DAY_7, f5.DAY_8,
             f5.DAY_9, f5.DAY_10, f5.DAY_11, f5.DAY_12, f5.DAY_13, f5.DAY_14, f5.DAY_15, f5.DAY_16,
@@ -283,8 +282,7 @@
             f5.DAY_25, f5.DAY_26, f5.DAY_27, f5.DAY_28, f5.DAY_29, f5.DAY_30, f5.DAY_31
             ) calc ON f.FACTORY_CODE = calc.FACTORY_CODE
             AND f.MATERIAL_CODE = calc.MATERIAL_CODE
-            AND f.PRODUCT_STATUS = calc.PRODUCT_STATUS
-            AND f.MONTH_PLAN_VERSION = calc.CURRENT_VERSION
+            AND IFNULL(f.PRODUCT_STATUS, '') = IFNULL(calc.PRODUCT_STATUS, '')
             LEFT JOIN T_MP_FACTORY_PARAM fp ON fp.FACTORY_CODE = f.FACTORY_CODE
             AND fp.PRODUCT_TYPE_CODE = f.PRODUCT_TYPE_CODE
             AND fp.PARAM_CODE = #{overdueThresholdParamCode}
@@ -529,7 +527,6 @@
                 f5.FACTORY_CODE,
                 f5.MATERIAL_CODE,
                 f5.PRODUCT_STATUS,
-                f5.MONTH_PLAN_VERSION AS CURRENT_VERSION,
                 (
                     IFNULL(CASE WHEN DAYOFMONTH(CASE WHEN stockMap.STOCK_CAPTURE_DATE BETWEEN #{startDate} AND #{endDate} THEN stockMap.STOCK_CAPTURE_DATE ELSE #{startDate} END) &lt;= 1 THEN f5.DAY_1 ELSE 0 END, 0) +
         IFNULL(CASE WHEN DAYOFMONTH(CASE WHEN stockMap.STOCK_CAPTURE_DATE BETWEEN #{startDate} AND #{endDate} THEN stockMap.STOCK_CAPTURE_DATE ELSE #{startDate} END) &lt;= 2 THEN f5.DAY_2 ELSE 0 END, 0) +
@@ -597,7 +594,7 @@
         WHERE f5.IS_DELETE = 0
         AND f5.YEAR = #{lastYear}
         AND f5.MONTH = #{lastMonth}
-        GROUP BY f5.FACTORY_CODE, f5.MATERIAL_CODE, f5.PRODUCT_STATUS, f5.MONTH_PLAN_VERSION, stockMap.STOCK_CAPTURE_DATE, stockMap.FORCE_ZERO,
+        GROUP BY f5.FACTORY_CODE, f5.MATERIAL_CODE, f5.PRODUCT_STATUS, stockMap.STOCK_CAPTURE_DATE, stockMap.FORCE_ZERO,
         f5.DAY_1, f5.DAY_2, f5.DAY_3, f5.DAY_4, f5.DAY_5, f5.DAY_6, f5.DAY_7, f5.DAY_8,
         f5.DAY_9, f5.DAY_10, f5.DAY_11, f5.DAY_12, f5.DAY_13, f5.DAY_14, f5.DAY_15, f5.DAY_16,
         f5.DAY_17, f5.DAY_18, f5.DAY_19, f5.DAY_20, f5.DAY_21, f5.DAY_22, f5.DAY_23, f5.DAY_24,
