@@ -30,6 +30,15 @@ public class TmManualRollingResult {
     /** 受影响既有结果ID */
     private Set<Long> affectedResultIdSet = new LinkedHashSet<>();
 
+    /** 用户明确删除的既有结果ID */
+    private Set<Long> explicitDeleteResultIdSet = new LinkedHashSet<>();
+
+    /** 经计算明确全部转入未排的既有结果ID */
+    private Set<Long> moveToUnplannedResultIdSet = new LinkedHashSet<>();
+
+    /** 本批命令是否包含非删除操作 */
+    private boolean containsNonDeleteOperation;
+
     /** 机台链表变化摘要 */
     private List<String> chainChangeSummaryList = new ArrayList<>();
 
@@ -44,4 +53,10 @@ public class TmManualRollingResult {
 
     /** 计算后新增未排总量 */
     private BigDecimal unplannedTotalQty = BigDecimal.ZERO;
+
+    /** 人工命令结算前全局可用工装 */
+    private BigDecimal availableToolQtyBefore;
+
+    /** 人工命令结算后全局剩余工装 */
+    private BigDecimal remainingToolQty;
 }

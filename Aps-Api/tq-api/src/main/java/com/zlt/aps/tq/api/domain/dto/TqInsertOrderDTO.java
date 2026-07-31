@@ -6,6 +6,7 @@ import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
 import java.io.Serializable;
+import java.lang.reflect.Field;
 import java.util.Date;
 
 /**
@@ -108,4 +109,21 @@ public class TqInsertOrderDTO implements Serializable {
     /** 备注 */
     @ApiModelProperty(value = "备注", name = "remark")
     private String remark;
+
+    /**
+     * 按班次字段模板动态读取字段值。
+     * 遵循项目规范：禁止使用 switch/case 硬编码访问 class1~6PlanQty/Sequence/Analysis 字段。
+     *
+     * @param fieldName Java 字段名
+     * @return 字段值
+     */
+    public Object getFieldValueByFieldName(String fieldName) {
+        try {
+            Field field = this.getClass().getDeclaredField(fieldName);
+            field.setAccessible(true);
+            return field.get(this);
+        } catch (ReflectiveOperationException exception) {
+            throw new IllegalArgumentException("胎圈插单DTO字段不存在: " + fieldName, exception);
+        }
+    }
 }

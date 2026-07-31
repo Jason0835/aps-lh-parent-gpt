@@ -11,6 +11,7 @@ import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.redissonLock.annotation.DistributedLock;
+import com.zlt.aps.tm.api.domain.dto.TmRollingCheckRequestDTO;
 import com.zlt.aps.tm.api.domain.dto.TmRollingRecalcRequestDTO;
 import com.zlt.aps.tm.api.domain.dto.TmScheduleResultImportDTO;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
@@ -18,10 +19,7 @@ import com.zlt.aps.tm.api.domain.entity.TmScheduleUnplanned;
 import com.zlt.aps.tm.api.domain.vo.*;
 import com.zlt.aps.tm.domain.TmAutoScheduleTask;
 import com.zlt.aps.tm.mapper.TmScheduleResultMapper;
-import com.zlt.aps.tm.service.ITmScheduleResultExcelService;
-import com.zlt.aps.tm.service.ITmScheduleResultService;
-import com.zlt.aps.tm.service.TmAutoScheduleTaskService;
-import com.zlt.aps.tm.service.TmOperationTaskApplicationService;
+import com.zlt.aps.tm.service.*;
 import com.zlt.aps.tm.service.query.TmScheduleUnplannedQueryService;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
@@ -59,6 +57,9 @@ public class TmScheduleResultController extends AbstractDocBizController<TmSched
     private TmAutoScheduleTaskService tmAutoScheduleTaskService;
 
     @Resource
+    private TmAutoRollingApplicationService tmAutoRollingApplicationService;
+
+    @Resource
     private TmOperationTaskApplicationService tmOperationTaskApplicationService;
 
     @Resource
@@ -66,6 +67,12 @@ public class TmScheduleResultController extends AbstractDocBizController<TmSched
 
     @Resource
     private TmScheduleUnplannedQueryService tmScheduleUnplannedQueryService;
+
+    @Resource
+    private com.zlt.aps.tm.service.TmReleaseApplicationService tmReleaseApplicationService;
+
+    @Resource
+    private com.zlt.aps.tm.service.TmReleaseRecoveryService tmReleaseRecoveryService;
 
     @ApiOperation("查询列表")
     @PostMapping("/list")
@@ -299,6 +306,18 @@ public class TmScheduleResultController extends AbstractDocBizController<TmSched
     }
 
     /**
+     * 供job服务检查当前分钟是否命中胎面自动滚动窗口。
+     *
+     * @param request 可选工厂和触发时间
+     * @return 本次命中的滚动结果
+     */
+    @ApiOperation("检查胎面自动滚动班次窗口")
+    @PostMapping("/internal/checkTimedRolling")
+    public AjaxResult checkTimedRolling(@RequestBody TmRollingCheckRequestDTO request) {
+        return AjaxResult.success(this.tmAutoRollingApplicationService.checkAndExecute(request));
+    }
+
+    /**
      * 校验胎面发布。
      *
      * @param ids 排程结果 ID 列表
@@ -316,11 +335,86 @@ public class TmScheduleResultController extends AbstractDocBizController<TmSched
      * @param ids 排程结果 ID 列表
      * @return 发布结果
      */
+    /**
+     * 发布胎面排程（已废弃，改用 /release 异步下发MES）。
+     *
+     * @param ids 排程结果 ID 列表
+     * @return 发布结果
+     */
+    @Deprecated
     @Log(title = "ui.data.column.tm.scheduleResult.modelName", businessType = BusinessType.UPDATE)
-    @ApiOperation("发布胎面排程")
+    @ApiOperation("发布胎面排程（已废弃，改用 /release）")
     @PostMapping("/publish")
     public AjaxResult publish(@RequestBody List<Long> ids) {
         return toAjax(tmScheduleResultService.publish(ids));
+    }
+
+    /**
+     * 校验胎面排程发布（异步发布前校验）。
+     *
+     * @param requestVo 发布请求
+     * @return 校验结果
+     */
+    @ApiOperation("校验胎面排程发布")
+    @PostMapping("/release/validate")
+    public com.zlt.aps.tm.api.domain.vo.TmReleaseValidateVo validateRelease(
+            @RequestBody com.zlt.aps.tm.api.domain.vo.TmReleaseRequestVo requestVo) {
+        return this.tmReleaseApplicationService.validate(requestVo);
+    }
+
+    /**
+     * 发布胎面排程结果（建发布任务+置发布中+异步下发MES）。
+     *
+     * @param requestVo 发布请求
+     * @return 发布任务
+     */
+    @Log(title = "ui.data.column.tm.scheduleResult.modelName", businessType = BusinessType.UPDATE)
+    @ApiOperation("发布胎面排程结果")
+    @PostMapping("/release")
+    public com.zlt.aps.tm.api.domain.vo.TmReleaseTaskVo release(
+            @RequestBody com.zlt.aps.tm.api.domain.vo.TmReleaseRequestVo requestVo) {
+        return this.tmReleaseApplicationService.publish(requestVo);
+    }
+
+    /**
+     * 查询胎面发布任务。
+     *
+     * @param taskId 任务ID
+     * @return 发布任务
+     */
+    @ApiOperation("查询胎面发布任务")
+    @GetMapping("/release/task/{taskId}")
+    public com.zlt.aps.tm.api.domain.vo.TmReleaseTaskVo getReleaseTask(@PathVariable("taskId") String taskId) {
+        return this.tmReleaseApplicationService.getTask(taskId);
+    }
+
+    /**
+     * 查询最近胎面发布任务。
+     *
+     * @param factoryCode 工厂编码
+     * @param scheduleDate 排程日期
+     * @return 最近发布任务
+     */
+    @ApiOperation("查询最近胎面发布任务")
+    @GetMapping("/release/task/latest")
+    public com.zlt.aps.tm.api.domain.vo.TmReleaseTaskVo getLatestReleaseTask(
+            @RequestParam("factoryCode") String factoryCode,
+            @RequestParam("scheduleDate") @org.springframework.format.annotation.DateTimeFormat(pattern = "yyyy-MM-dd") Date scheduleDate) {
+        return this.tmReleaseApplicationService.getLatestTask(factoryCode, scheduleDate);
+    }
+
+    /**
+     * 恢复胎面发布超时任务。
+     *
+     * @return 恢复任务数量
+     */
+    @ApiOperation("恢复胎面发布超时任务")
+    @PostMapping("/internal/recoverReleaseTimeout")
+    public AjaxResult recoverReleaseTimeout() {
+        int recoveredCount = this.tmReleaseRecoveryService.recoverTimeoutTasks();
+        return AjaxResult.success(
+                I18nUtil.getMessage("ui.tc.schedule.release.recoverSuccess"),
+                recoveredCount);
     }
 
     /**
@@ -391,7 +485,14 @@ public class TmScheduleResultController extends AbstractDocBizController<TmSched
      * @param ids 结果ID
      * @return 初始任务
      */
-    @ApiOperation("提交胎面发布异步任务")
+    /**
+     * 提交胎面发布异步任务（已废弃，改用 /release 异步下发MES）。
+     *
+     * @param ids 结果ID
+     * @return 初始任务
+     */
+    @Deprecated
+    @ApiOperation("提交胎面发布异步任务（已废弃，改用 /release）")
     @PostMapping("/operation/publish")
     public TmOperationTaskVo submitPublish(@RequestBody List<Long> ids) {
         return this.tmOperationTaskApplicationService.submitPublish(ids);

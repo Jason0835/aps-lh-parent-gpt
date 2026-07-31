@@ -94,6 +94,97 @@ public class ScheduleConstraintCalculator {
     }
 
     /**
+     * 按生产增量和成型消耗量结算一次全局工装账本。
+     *
+     * <p>生产增量受当前可用工装限制，成型消耗量用于释放已占用工装。人工滚动只传命令增量，
+     * 自动排程传当前任务实际生产量和当前班成型需求量，两条链路因此共用同一净占用公式。</p>
+     *
+     * @param requestedProductionQty 请求新增的生产量
+     * @param releasedDemandQty 当前结算释放的成型需求量
+     * @param availableToolQty 结算前可用工装；为空表示未启用工装限制
+     * @param totalToolQty 工装池上限；为空时不额外限制上限
+     * @param curlRollLength 单套工装可生产长度
+     * @return 工装账本结算结果
+     */
+    public ScheduleToolLedgerResult settleToolLedger(BigDecimal requestedProductionQty,
+                                                     BigDecimal releasedDemandQty,
+                                                     BigDecimal availableToolQty,
+                                                     BigDecimal totalToolQty,
+                                                     BigDecimal curlRollLength) {
+        ScheduleToolLedgerResult result = new ScheduleToolLedgerResult();
+        BigDecimal normalizedProductionQty = this.nonNegative(requestedProductionQty);
+        BigDecimal normalizedReleasedQty = this.nonNegative(releasedDemandQty);
+        result.setAvailableToolQty(availableToolQty);
+        if (availableToolQty == null || this.nonNegative(curlRollLength).compareTo(BigDecimal.ZERO) <= 0) {
+            result.setAllowedPlanQty(normalizedProductionQty);
+            result.setOverflowPlanQty(BigDecimal.ZERO);
+            result.setToolUsedQty(BigDecimal.ZERO.setScale(CALCULATION_SCALE, RoundingMode.HALF_UP));
+            result.setRemainingToolQty(availableToolQty);
+            return result;
+        }
+        BigDecimal releasedToolQty = this.calculateToolUsedQty(normalizedReleasedQty, curlRollLength);
+        BigDecimal balanceAfterRelease = this.nonNegative(availableToolQty).add(releasedToolQty);
+        if (totalToolQty != null) {
+            balanceAfterRelease = balanceAfterRelease.min(this.nonNegative(totalToolQty));
+        }
+        BigDecimal allowedPlanQty = this.limitPlanQtyByTool(
+                normalizedProductionQty, balanceAfterRelease, curlRollLength);
+        BigDecimal productionToolQty = this.calculateToolUsedQty(allowedPlanQty, curlRollLength);
+        BigDecimal toolUsedQty = productionToolQty.subtract(releasedToolQty)
+                .setScale(CALCULATION_SCALE, RoundingMode.HALF_UP);
+        BigDecimal remainingToolQty = balanceAfterRelease.subtract(productionToolQty).max(BigDecimal.ZERO);
+        if (totalToolQty != null) {
+            remainingToolQty = remainingToolQty.min(this.nonNegative(totalToolQty));
+        }
+        result.setAllowedPlanQty(allowedPlanQty);
+        result.setOverflowPlanQty(normalizedProductionQty.subtract(allowedPlanQty).max(BigDecimal.ZERO));
+        result.setToolUsedQty(toolUsedQty);
+        result.setRemainingToolQty(remainingToolQty.setScale(CALCULATION_SCALE, RoundingMode.HALF_UP));
+        return result;
+    }
+
+    /**
+     * 结算已经通过前置约束确认的生产量，不再次压缩计划量。
+     *
+     * @param committedProductionQty 已确认生产量
+     * @param releasedDemandQty 当前结算释放的成型需求量
+     * @param availableToolQty 结算前可用工装
+     * @param totalToolQty 工装池上限
+     * @param curlRollLength 单套工装可生产长度
+     * @return 工装账本结算结果
+     */
+    public ScheduleToolLedgerResult settleCommittedToolLedger(BigDecimal committedProductionQty,
+                                                              BigDecimal releasedDemandQty,
+                                                              BigDecimal availableToolQty,
+                                                              BigDecimal totalToolQty,
+                                                              BigDecimal curlRollLength) {
+        ScheduleToolLedgerResult result = new ScheduleToolLedgerResult();
+        BigDecimal normalizedProductionQty = this.nonNegative(committedProductionQty);
+        result.setAvailableToolQty(availableToolQty);
+        result.setAllowedPlanQty(normalizedProductionQty);
+        result.setOverflowPlanQty(BigDecimal.ZERO);
+        if (availableToolQty == null || this.nonNegative(curlRollLength).compareTo(BigDecimal.ZERO) <= 0) {
+            result.setToolUsedQty(BigDecimal.ZERO.setScale(CALCULATION_SCALE, RoundingMode.HALF_UP));
+            result.setRemainingToolQty(availableToolQty);
+            return result;
+        }
+        BigDecimal toolUsedQty = this.calculateToolUsedQty(
+                normalizedProductionQty.subtract(this.nonNegative(releasedDemandQty)), curlRollLength);
+        if (normalizedProductionQty.compareTo(this.nonNegative(releasedDemandQty)) < 0) {
+            toolUsedQty = this.nonNegative(releasedDemandQty).subtract(normalizedProductionQty)
+                    .divide(this.nonNegative(curlRollLength), CALCULATION_SCALE, RoundingMode.HALF_UP)
+                    .negate();
+        }
+        BigDecimal remainingToolQty = this.nonNegative(availableToolQty).subtract(toolUsedQty).max(BigDecimal.ZERO);
+        if (totalToolQty != null) {
+            remainingToolQty = remainingToolQty.min(this.nonNegative(totalToolQty));
+        }
+        result.setToolUsedQty(toolUsedQty.setScale(CALCULATION_SCALE, RoundingMode.HALF_UP));
+        result.setRemainingToolQty(remainingToolQty.setScale(CALCULATION_SCALE, RoundingMode.HALF_UP));
+        return result;
+    }
+
+    /**
      * 判断两个非空编码是否发生变化。
      *
      * @param previousCode 前置编码

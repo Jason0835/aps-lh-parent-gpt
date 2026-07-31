@@ -26,7 +26,7 @@
           type="success"
           @click="handleRelease"
         >
-          {{ $t('ui.tc.schedule.button.publish') }}
+          {{ $t('ui.tc.schedule.publish') }}
         </el-button>
         <el-button v-hasPermi="['tc:tcScheduleResult:add']" :disabled="writeTaskRunning" type="warning" @click="handleAdd">
           {{ $t('ui.tc.schedule.insertTask') }}
@@ -37,7 +37,7 @@
           type="warning"
           @click="handleChangeQty"
         >
-          {{ $t('ui.tc.schedule.button.modify') }}
+          {{ $t('ui.tc.schedule.changeQty') }}
         </el-button>
         <el-button
           v-hasPermi="['tc:tcScheduleResult:changeMachine']"
@@ -45,7 +45,7 @@
           type="primary"
           @click="handleChangeMachine"
         >
-          {{ $t('ui.tc.schedule.button.changeMachine') }}
+          {{ $t('ui.tc.schedule.changeMachine') }}
         </el-button>
         <el-button
           v-hasPermi="['tc:tcScheduleResult:remove']"
@@ -54,9 +54,6 @@
           @click="handleRemove"
         >
           {{ $t('ui.tc.schedule.delete') }}
-        </el-button>
-        <el-button v-hasPermi="['tc:tcScheduleResult:query']" plain type="info" @click="handleUnplanned">
-          {{ $t('ui.tc.schedule.unplannedTasks') }}（{{ unplannedCount || 0 }}）
         </el-button>
         <el-button
           v-hasPermi="['tc:tcScheduleResult:export']"
@@ -73,14 +70,33 @@
         >
           {{ $t('ui.frame.btn.import') }}
         </el-button>
+        <el-button
+          v-hasRole="['admin']"
+          :disabled="writeTaskRunning || selection.length === 0"
+          type="primary"
+          @click="handleChangeReleaseStatus"
+        >
+          {{ $t('ui.tc.schedule.changeReleaseStatus') }}
+        </el-button>
+        <el-button
+          v-hasPermi="['tc:tcScheduleResult:list']"
+          plain
+          type="primary"
+          @click="handleAutoPlanIssues"
+        >
+          {{ $t('ui.schedule.autoPlan.viewIssues') }}
+        </el-button>
+        <el-button
+          v-hasPermi="['tc:tcScheduleResult:list']"
+          plain
+          type="primary"
+          @click="handleUnplanned()"
+        >
+          {{ $t('ui.schedule.autoPlan.viewUnplanned') }}（{{ unplannedCount || 0 }}）
+        </el-button>
       </template>
       <template slot="headerRight">
         <div class="summary-bar stat-info">
-          <span>{{ $t('ui.tc.schedule.totalStockQty') }}：<span class="stat-value">{{ summary.totalStockQty || 0 }}</span></span>
-          <span>{{ $t('ui.tc.schedule.totalPlanQty') }}：<span class="stat-value">{{ summary.totalPlanQty || 0 }}</span></span>
-          <span>{{ $t('ui.tc.schedule.totalFinishQty') }}：<span class="stat-value">{{ summary.totalFinishQty || 0 }}</span></span>
-          <span>{{ $t('ui.tc.schedule.resultCount') }}：<span class="stat-value">{{ summary.resultCount || 0 }}</span></span>
-          <span>{{ $t('ui.tc.schedule.unplannedCount') }}：<span class="stat-value">{{ unplannedCount || 0 }}</span></span>
           <span
             v-for="(planQty, index) in shiftPlanQtyList"
             :key="index"
@@ -108,7 +124,8 @@
     <insert-task-dialog ref="insertTaskRef" @success="handleOperationTask" />
     <change-qty-dialog ref="changeQtyRef" @success="handleOperationTask" />
     <change-machine-dialog ref="changeMachineRef" @success="handleOperationTask" />
-    <unplanned-dialog ref="unplannedRef" />
+    <release-status-dialog ref="releaseStatusRef" @success="getList" />
+    <unplanned-dialog ref="unplannedRef" @count-change="handleUnplannedCountChange" />
     <explain-drawer ref="explainRef" />
 
     <el-dialog
@@ -232,6 +249,7 @@ import ChangeMachineDialog from './components/ChangeMachineDialog.vue'
 import ChangeQtyDialog from './components/ChangeQtyDialog.vue'
 import ExplainDrawer from './components/ExplainDrawer.vue'
 import InsertTaskDialog from './components/InsertTaskDialog.vue'
+import ReleaseStatusDialog from './components/ReleaseStatusDialog.vue'
 import UnplannedDialog from './components/UnplannedDialog.vue'
 
 const formatDate = date => {
@@ -248,13 +266,14 @@ const offsetDate = offset => {
 }
 
 export default {
-  name: 'TcScheduleResult',
+  name: '/tc/tcScheduleResult',
   components: {
     AutoPlanDialog,
     ChangeMachineDialog,
     ChangeQtyDialog,
     ExplainDrawer,
     InsertTaskDialog,
+    ReleaseStatusDialog,
     TltUploadForm,
     UnplannedDialog
   },
@@ -274,6 +293,7 @@ export default {
       page: { current: 1, pageSize: 20, total: 0 },
       search: { ...defaultQuery },
       query: { ...defaultQuery },
+      pageActivatedOnce: false,
       summary: {},
       unplannedCount: 0,
       batchMap: {},
@@ -475,6 +495,14 @@ export default {
     this.restoreLatestAutoPlanTask(true)
     this.restoreLatestReleaseTask(true)
     this.restoreLatestOperationTask(true)
+  },
+  activated() {
+    // keep-alive 首次激活不重复请求，后续重新进入页面时刷新列表及未排数量。
+    if (this.pageActivatedOnce) {
+      this.getList()
+      return
+    }
+    this.pageActivatedOnce = true
   },
   beforeDestroy() {
     this.clearAutoPlanTimer()
@@ -683,6 +711,16 @@ export default {
         this.handleOperationTask(task)
       })
     },
+    /**
+     * 打开管理员胎侧发布状态变更弹窗。
+     *
+     * @returns {void}
+     */
+    handleChangeReleaseStatus() {
+      if (this.$refs.releaseStatusRef) {
+        this.$refs.releaseStatusRef.show(this.selection)
+      }
+    },
     handleOperationTask(task) {
       if (!task || !task.taskId) return
       const scheduleDate = String(task.scheduleDate || '').substring(0, 10)
@@ -761,10 +799,20 @@ export default {
       }).catch(() => {})
     },
     handleUnplanned(scope) {
-      this.$refs.unplannedRef.show({
+      const query = {
         ...this.formatQuery(false),
         ...(scope || {})
-      })
+      }
+      this.$refs.unplannedRef.show(query)
+    },
+    /**
+     * 使用未排任务弹窗的实际查询总数刷新列表按钮数量。
+     *
+     * @param {number} total 当前查询条件下的未排任务总数
+     * @returns {void}
+     */
+    handleUnplannedCountChange(total) {
+      this.unplannedCount = Number(total || 0)
     },
     pollAutoPlanTask(taskId) {
       this.clearAutoPlanTimer()
@@ -866,7 +914,7 @@ export default {
       }
     },
     setAutoPlanIssues(issues) {
-      this.autoPlanIssues = Array.isArray(issues) ? issues : []
+      this.autoPlanIssues = this.filterAutoPlanIssues(issues)
       this.autoPlanIssueVisible = false
     },
     showAutoPlanResult(task) {
@@ -881,6 +929,37 @@ export default {
     },
     openAutoPlanIssues() {
       this.autoPlanIssueVisible = this.autoPlanIssues.length > 0
+    },
+    /**
+     * 按当前列表工厂和排程日期重新加载最近一次自动排程的问题明细。
+     *
+     * @returns {Promise<void>} 问题明细加载完成后打开已有弹窗
+     */
+    async handleAutoPlanIssues() {
+      const factoryCode = this.query.factoryCode
+      const scheduleDate = this.query.scheduleDate
+      try {
+        const response = await getLatestAutoPlanTask({ factoryCode, scheduleDate })
+        const task = response && response.data ? response.data : (response || {})
+        this.autoPlanIssues = this.filterAutoPlanIssues(task.issues)
+        this.autoPlanIssueVisible = true
+      } catch (error) {
+        console.error(error)
+      }
+    },
+    /**
+     * 按胎侧列表中可映射的问题字段过滤自动排程问题明细。
+     *
+     * @param {Array} issues 自动排程问题明细
+     * @returns {Array} 符合当前胎侧编码条件的问题明细
+     */
+    filterAutoPlanIssues(issues) {
+      const issueList = Array.isArray(issues) ? issues : []
+      const sidewallCode = String(this.query.sidewallCode || '').trim().toLowerCase()
+      return issueList.filter(issue => {
+        const issueSidewallCode = String(issue.sidewallCode || '').toLowerCase()
+        return !sidewallCode || !issueSidewallCode || issueSidewallCode === sidewallCode
+      })
     },
     openAutoPlanUnplanned() {
       this.handleUnplanned(this.autoPlanResultScope)
@@ -956,7 +1035,7 @@ export default {
       }).catch(() => {})
     },
     showAutoPlanIssues(issues) {
-      this.autoPlanIssues = Array.isArray(issues) ? issues : []
+      this.autoPlanIssues = this.filterAutoPlanIssues(issues)
       this.autoPlanIssueVisible = this.autoPlanIssues.length > 0
     },
     showReleaseIssues(issues) {

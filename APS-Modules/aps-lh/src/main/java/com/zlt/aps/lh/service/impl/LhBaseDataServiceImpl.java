@@ -15,10 +15,12 @@ import com.zlt.aps.lh.component.SkuDecrementChecker;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.exception.ScheduleDomainExceptionHelper;
 import com.zlt.aps.lh.exception.ScheduleErrorCode;
+import com.zlt.aps.lh.exception.ScheduleException;
 import com.zlt.aps.lh.handler.ScheduleAdjustHandler;
 import com.zlt.aps.lh.handler.SkuMonthPlanCalculator;
 import com.zlt.aps.lh.mapper.*;
 import com.zlt.aps.lh.service.ILhBaseDataService;
+import com.zlt.aps.lh.util.LhMouldCodeUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import com.zlt.aps.lh.util.MachineStatusUtil;
@@ -204,9 +206,14 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         Date startDate = LhScheduleTimeUtil.clearTime(scheduleDate);
         int scheduleDays = LhScheduleTimeUtil.getScheduleDays(context);
         Date endDate = LhScheduleTimeUtil.addDays(startDate, scheduleDays);
+        // 月计划归集发生在班次窗口初始化之前，因此必须直接使用本方法已计算出的窗口末日，
+        // 不能依赖此时尚未写入上下文的 windowEndDate。
+        Date scheduleWindowEndDate = LhScheduleTimeUtil.addDays(endDate, -1);
         int earlyProductionDaysThreshold = resolveEarlyProductionDaysThreshold(context);
         // SKU提前生产需要从窗口结束日继续向后观察N个自然日，月计划和结构机台数按真实年月批量加载。
         Date earlyProductionLookupEndDate = LhScheduleTimeUtil.addDays(endDate, earlyProductionDaysThreshold);
+        // requiredMonthMap 使用右开区间；月计划归集查找 dayN 时使用闭区间，需回退一天得到真实结束日。
+        Date earlyProductionRangeEndDate = LhScheduleTimeUtil.addDays(earlyProductionLookupEndDate, -1);
         Map<String, LocalDate> requiredMonthMap = resolveRequiredMonthMap(startDate, earlyProductionLookupEndDate);
         int continuousMouldOfflineCheckDays = context.getScheduleConfig().getContinuousMouldOfflineCheckDays();
         Date continuousMouldOfflineLookupEndDate =
@@ -214,7 +221,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         Date monthPlanLookupEndDate = continuousMouldOfflineLookupEndDate.after(earlyProductionLookupEndDate)
                 ? continuousMouldOfflineLookupEndDate : earlyProductionLookupEndDate;
         // 续作降模停产保机需读取窗口内每个业务日前后N天原始月计划；月初、月末及跨年时必须加载相邻月份。
-        // 该扩展范围只用于月计划链路，结构机台统计、月完成量等其他基础数据仍沿用原排程窗口月份范围。
+        // 月计划额外覆盖续作前看范围；结构机台统计和月完成量至少覆盖排程窗口结束日+提前生产阈值。
         Map<String, LocalDate> monthPlanRequiredMonthMap =
                 resolveMonthPlanRequiredMonthMap(startDate, monthPlanLookupEndDate,
                         continuousMouldOfflineCheckDays);
@@ -248,7 +255,9 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         //    - 干冰/喷砂清洗已统一并入设备停机计划，不再加载旧模具清洗表。
         //    - 机台信息与月计划无依赖关系，两者可并发加载。
         CompletableFuture<Void> monthPlanFuture = runDataInitTaskAsync("月生产计划",
-                () -> loadMonthPlan(context, factoryCode, monthPlanRequiredMonthMap),
+                // 显式传入当前排程窗口和提前观察范围，保证基础数据初始化阶段跨月归集口径稳定。
+                () -> loadMonthPlan(context, factoryCode, monthPlanRequiredMonthMap,
+                        scheduleWindowEndDate, earlyProductionRangeEndDate),
                 () -> sizeOf(context.getMonthPlanList()));
         CompletableFuture<Void> monthPlanStatisticsFuture = runDataInitTaskAsync("月计划结构机台统计",
                 () -> loadMonthPlanStatistics(context, factoryCode, requiredMonthMap, startDate,
@@ -583,7 +592,8 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
 
     /**
      * 加载月计划结构维度计划硫化机台数。
-     * <p>提前生产规则只需要 T～T+2 窗口内 dayN.lhMachines，按 structureName 聚合 SUM 后缓存到上下文。</p>
+     * <p>提前生产需要同时读取当前业务日和 futurePlanDate 的 dayN.lhMachines，
+     * 因此按“排程窗口开始日～窗口结束日+N”真实日期加载，并按 structureName 聚合 SUM 后缓存。</p>
      *
      * @param context          排程上下文
      * @param factoryCode      工厂编号
@@ -652,13 +662,20 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                 try {
                     lhMachines = MonthPlanStatisticsDayUtil.resolveLhMachines(row, productionDate);
                 } catch (IllegalArgumentException e) {
-                    // 月计划结构统计只用于提前生产机台数判断，非法JSON按0处理，不阻断排程主流程。
-                    lhMachines = 0;
-                    log.warn("月计划结构机台统计dayN解析失败，按0继续排程, factoryCode: {}, "
-                                    + "monthPlanVersion: {}, productionVersion: {}, structureName: {}, "
-                                    + "productionDate: {}, reason: {}",
-                            factoryCode, monthPlanVersion, productionVersion, row.getStructureName(), productionDate,
-                            e.getMessage());
+                    /*
+                     * dayN 非法 JSON 属于排程基础数据错误。静默按 0 会把结构计划误判为收尾，
+                     * 进而错误放行提前生产，必须在 S4.2 立即中断并保留完整定位字段。
+                     */
+                    String message = new StringBuilder(192)
+                            .append("月计划结构机台统计 dayN 非法, factoryCode: ").append(factoryCode)
+                            .append(", monthPlanVersion: ").append(monthPlanVersion)
+                            .append(", productionVersion: ").append(productionVersion)
+                            .append(", structureName: ").append(row.getStructureName())
+                            .append(", productionDate: ").append(productionDate)
+                            .append(", reason: ").append(e.getMessage())
+                            .toString();
+                    throw new ScheduleException(ScheduleStepEnum.S4_2_DATA_INIT,
+                            ScheduleErrorCode.DATA_INCOMPLETE, message, e);
                 }
                 context.addStructurePlanMachineCount(productionDate, row.getStructureName(), lhMachines);
             }
@@ -1020,7 +1037,10 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
      */
     private void loadMonthPlan(LhScheduleContext context,
                                String factoryCode,
-                               Map<String, LocalDate> requiredMonthMap) {
+                               Map<String, LocalDate> requiredMonthMap,
+                               Date scheduleWindowEndDate,
+                               Date earlyProductionRangeEndDate) {
+
         //20260707+ 补充计划量起始计算日
         List<Date> allProductionDate = Lists.newArrayList(context.getAllProductionDateInfo());
         YearMonth nextMonth = SkuMonthPlanCalculator.getNextMonth(allProductionDate);
@@ -1043,7 +1063,8 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         }
         context.setLoadedMonthPlanList(loadedPlanList);
         context.setMonthPlanByMaterialMonthMap(MonthPlanDateResolver.buildMaterialMonthPlanMap(loadedPlanList));
-        context.setMonthPlanList(selectSchedulingMonthPlanList(context, loadedPlanList));
+        context.setMonthPlanList(selectSchedulingMonthPlanList(
+                context, loadedPlanList, scheduleWindowEndDate, earlyProductionRangeEndDate));
         log.info("月生产计划加载完成, loadedCount: {}, scheduleSkuCount: {}, requiredMonths: {}",
                 loadedPlanList.size(), context.getMonthPlanList().size(),
                 CollectionUtils.isEmpty(requiredMonthMap) ? new ArrayList<String>(0) : requiredMonthMap.keySet());
@@ -1147,10 +1168,16 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
      *
      * @param context        排程上下文
      * @param loadedPlanList 多月月计划
+     * @param scheduleWindowEndDate 排程窗口结束日，闭区间
+     * @param earlyProductionRangeEndDate 提前生产观察结束日，闭区间
+     *
      * @return 去重后的归集月计划
      */
     private List<FactoryMonthPlanProductionFinalResult> selectSchedulingMonthPlanList(
-            LhScheduleContext context, List<FactoryMonthPlanProductionFinalResult> loadedPlanList) {
+            LhScheduleContext context,
+            List<FactoryMonthPlanProductionFinalResult> loadedPlanList,
+            Date scheduleWindowEndDate,
+            Date earlyProductionRangeEndDate) {
         Map<String, FactoryMonthPlanProductionFinalResult> selectedPlanMap =
                 new LinkedHashMap<String, FactoryMonthPlanProductionFinalResult>(128);
         if (CollectionUtils.isEmpty(loadedPlanList)) {
@@ -1163,7 +1190,9 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
             String materialStatusKey = MonthPlanDateResolver.buildMaterialStatusKey(
                     plan.getMaterialCode(), plan.getProductStatus());
             FactoryMonthPlanProductionFinalResult selectedPlan = selectedPlanMap.get(materialStatusKey);
-            if (Objects.isNull(selectedPlan) || shouldReplaceSchedulingPlan(context, selectedPlan, plan)) {
+            if (Objects.isNull(selectedPlan)
+                    || shouldReplaceSchedulingPlan(context, selectedPlan, plan,
+                    scheduleWindowEndDate, earlyProductionRangeEndDate)) {
                 selectedPlanMap.put(materialStatusKey, plan);
             }
         }
@@ -1173,21 +1202,74 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     /**
      * 判断候选月计划是否更适合作为本轮 SKU 归集基础计划。
      *
-     * @param context       排程上下文
-     * @param selectedPlan  已选计划
+     * @param context 排程上下文
+     * @param selectedPlan 已选计划
      * @param candidatePlan 候选计划
+     * @param scheduleWindowEndDate 排程窗口结束日，闭区间
+     * @param earlyProductionRangeEndDate 提前生产观察结束日，闭区间
      * @return true-替换
      */
     private boolean shouldReplaceSchedulingPlan(LhScheduleContext context,
                                                 FactoryMonthPlanProductionFinalResult selectedPlan,
-                                                FactoryMonthPlanProductionFinalResult candidatePlan) {
-        boolean selectedHasWindowPlan = hasWindowPlanQty(selectedPlan, context.getScheduleDate(), context.getWindowEndDate());
-        boolean candidateHasWindowPlan = hasWindowPlanQty(candidatePlan, context.getScheduleDate(), context.getWindowEndDate());
+                                                FactoryMonthPlanProductionFinalResult candidatePlan,
+                                                Date scheduleWindowEndDate,
+                                                Date earlyProductionRangeEndDate) {
+        boolean selectedHasWindowPlan = hasWindowPlanQty(
+                selectedPlan, context.getScheduleDate(), scheduleWindowEndDate);
+        boolean candidateHasWindowPlan = hasWindowPlanQty(
+                candidatePlan, context.getScheduleDate(), scheduleWindowEndDate);
         if (selectedHasWindowPlan != candidateHasWindowPlan) {
             return candidateHasWindowPlan;
         }
+        LocalDate startDate = toLocalDate(context.getScheduleDate());
+        LocalDate earlyRangeEndDate = toLocalDate(earlyProductionRangeEndDate);
+        LocalDate selectedFuturePlanDate = findFirstPositivePlanDate(
+                selectedPlan, startDate, earlyRangeEndDate);
+        LocalDate candidateFuturePlanDate = findFirstPositivePlanDate(
+                candidatePlan, startDate, earlyRangeEndDate);
+        if (!Objects.equals(selectedFuturePlanDate, candidateFuturePlanDate)) {
+            if (Objects.isNull(selectedFuturePlanDate)) {
+                return Objects.nonNull(candidateFuturePlanDate);
+            }
+            if (Objects.isNull(candidateFuturePlanDate)) {
+                return false;
+            }
+            return candidateFuturePlanDate.isBefore(selectedFuturePlanDate);
+        }
         return !isPlanInScheduleMonth(selectedPlan, context.getScheduleDate())
                 && isPlanInScheduleMonth(candidatePlan, context.getScheduleDate());
+    }
+
+    /**
+     * 在指定范围内查找当前月计划记录最早的正日计划日期。
+     *
+     * <p>只读取传入记录真实所属年月的 DAY_N，避免跨月时把 July day32 或其他月记录
+     * 误当成候选来源；该方法只参与同 SKU 多月基础记录选择，不执行数据库查询。</p>
+     *
+     * @param plan 单月月计划记录
+     * @param startDate 查找起始日
+     * @param endDate 查找结束日
+     * @return 最早正计划日期；范围内无计划返回 null
+     */
+    private LocalDate findFirstPositivePlanDate(FactoryMonthPlanProductionFinalResult plan,
+                                                LocalDate startDate,
+                                                LocalDate endDate) {
+        if (Objects.isNull(plan) || Objects.isNull(startDate) || Objects.isNull(endDate)
+                || Objects.isNull(plan.getYear()) || Objects.isNull(plan.getMonth())) {
+            return null;
+        }
+        for (LocalDate productionDate = startDate; !productionDate.isAfter(endDate);
+             productionDate = productionDate.plusDays(1)) {
+            if (productionDate.getYear() != plan.getYear()
+                    || productionDate.getMonthValue() != plan.getMonth()) {
+                continue;
+            }
+            if (MonthPlanDateResolver.hasPlanQty(
+                    MonthPlanDayQtyUtil.resolveDayQty(plan, productionDate.getDayOfMonth()))) {
+                return productionDate;
+            }
+        }
+        return null;
     }
 
     /**
@@ -1305,11 +1387,12 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                                              Date windowEndTime) {
         Map<String, Date> earliestTimeMap = new HashMap<String, Date>(16);
         context.setStructureEarliestLhTimeMap(earliestTimeMap);
+        // 查询范围固定从排程窗口前一天开始抓取，避免遗漏前一日已配置的胎胚可供硫化时间
+        Date queryStartDate = LhScheduleTimeUtil.addDays(windowStartTime, -1);
         List<CxEmbryoLhTime> configuredTimeList = cxEmbryoLhTimeMapper.selectList(
                 new LambdaQueryWrapper<CxEmbryoLhTime>()
                         .eq(CxEmbryoLhTime::getFactoryCode, factoryCode)
-                        .ge(CxEmbryoLhTime::getScheduleDate, windowStartTime)
-                        .lt(CxEmbryoLhTime::getScheduleDate, windowEndTime)
+                        .eq(CxEmbryoLhTime::getScheduleDate, queryStartDate)
                         // 已逻辑删除的成型配置不再代表有效胎胚供料承诺，禁止作为生产时间下限。
                         .eq(CxEmbryoLhTime::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
         int ignoredCount = 0;
@@ -1317,14 +1400,14 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         if (!CollectionUtils.isEmpty(configuredTimeList)) {
             for (CxEmbryoLhTime configuredTime : configuredTimeList) {
                 if (Objects.isNull(configuredTime)
-                        || StringUtils.isEmpty(configuredTime.getStructureName())
+                        || StringUtils.isEmpty(configuredTime.getNextStructureName())
                         || Objects.isNull(configuredTime.getEarliestLhTime())
                         || (Objects.nonNull(configuredTime.getIsDelete())
                         && !Objects.equals(DeleteFlagEnum.NORMAL.getCode(), configuredTime.getIsDelete()))) {
                     ignoredCount++;
                     continue;
                 }
-                String structureName = configuredTime.getStructureName();
+                String structureName = configuredTime.getNextStructureName();
                 Date currentEarliestTime = earliestTimeMap.get(structureName);
                 if (Objects.nonNull(currentEarliestTime)) {
                     duplicateCount++;
@@ -1335,10 +1418,10 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                 }
             }
         }
-        log.info("胎胚最早可供硫化时间加载完成, factoryCode: {}, windowStartTime: {}, windowEndTime: {}, "
+        log.info("胎胚最早可供硫化时间加载完成, factoryCode: {}, queryStartDate: {}, windowEndTime: {}, "
                         + "queryCount: {}, validStructureCount: {}, duplicateStructureCount: {}, ignoredCount: {}, "
                         + "finalEarliestTimeMap: {}",
-                factoryCode, LhScheduleTimeUtil.formatDateTime(windowStartTime),
+                factoryCode, LhScheduleTimeUtil.formatDateTime(queryStartDate),
                 LhScheduleTimeUtil.formatDateTime(windowEndTime),
                 CollectionUtils.isEmpty(configuredTimeList) ? 0 : configuredTimeList.size(),
                 earliestTimeMap.size(), duplicateCount, ignoredCount, earliestTimeMap);
@@ -2350,6 +2433,20 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
             }
             // 查询结果已按日期倒序排列，首条即为该机台在追溯窗口内距离T最近的记录。
             machineOnlineInfoMap.putIfAbsent(onlineInfo.getLhCode(), onlineInfo);
+        }
+        /*
+         * 调用统一模具归属解析，跨机台比较各自最近的 MES 记录。
+         * 这是基础数据进入续作、滚动衔接和共用模具置换前的唯一归属收口点：
+         * 若模具已由更新记录转移到其他机台，旧机台不能继续携带该模具进入运行态。
+         */
+        Map<String, List<String>> removedMouldCodeMap =
+                LhMouldCodeUtil.normalizeLatestInMachineMouldOwnership(machineOnlineInfoMap);
+        for (Map.Entry<String, List<String>> entry : removedMouldCodeMap.entrySet()) {
+            log.warn("MES在机模具归属按最新记录收敛, 工厂: {}, 排程T日: {}, 旧机台: {}, "
+                            + "移除模具: {}, 处理结果: {}",
+                    factoryCode, LhScheduleTimeUtil.formatDate(tDay), entry.getKey(), entry.getValue(),
+                    machineOnlineInfoMap.containsKey(entry.getKey())
+                            ? "保留该机台其余最新模具" : "该机台无剩余有效在机模具");
         }
         context.setMachineOnlineInfoMap(machineOnlineInfoMap);
         log.info("MES硫化在机信息加载完成, 回溯窗口: [{} ~ {}], 回溯天数: {}, 命中机台: {}",

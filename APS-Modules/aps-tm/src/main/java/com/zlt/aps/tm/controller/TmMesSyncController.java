@@ -4,10 +4,12 @@ import cn.hutool.core.date.DateUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.tm.api.domain.entity.TmDayFinishQty;
 import com.zlt.aps.tm.api.domain.entity.TmScheFinishQty;
+import com.zlt.aps.tm.api.domain.entity.TmShiftStock;
 import com.zlt.aps.tm.api.domain.entity.TmStock;
 import com.zlt.aps.tm.api.service.ITmMesSyncRemoteService;
 import com.zlt.aps.tm.service.ITmDayFinishQtyService;
 import com.zlt.aps.tm.service.ITmScheFinishQtyService;
+import com.zlt.aps.tm.service.ITmShiftStockService;
 import com.zlt.aps.tm.service.ITmStockService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -36,6 +38,9 @@ public class TmMesSyncController implements ITmMesSyncRemoteService {
     private ITmStockService tmStockService;
 
     @Autowired
+    private ITmShiftStockService tmShiftStockService;
+
+    @Autowired
     private ITmScheFinishQtyService tmScheFinishQtyService;
 
     @Autowired
@@ -60,6 +65,29 @@ public class TmMesSyncController implements ITmMesSyncRemoteService {
                                                             @RequestBody List<TmStock> list) {
         Date date = DateUtil.parse(stockDate);
         tmStockService.logicDeleteAndSaveBatch(date, updateBy, list);
+        return AjaxResult.success();
+    }
+
+    /**
+     * 替换胎面自动滚动班次库存快照。
+     *
+     * @param factoryCode 工厂编码
+     * @param stockDate MES库存物理日期
+     * @param shiftOrder 班次顺序
+     * @param updateBy 更新人
+     * @param stockList 班次库存列表
+     * @return 保存结果
+     */
+    @Override
+    @ApiOperation("替换胎面自动滚动班次库存快照")
+    @PostMapping("/tmMesSync/replaceShiftStock")
+    public AjaxResult replaceShiftStock(@RequestParam("factoryCode") String factoryCode,
+                                        @RequestParam("stockDate") String stockDate,
+                                        @RequestParam("shiftOrder") Integer shiftOrder,
+                                        @RequestParam("updateBy") String updateBy,
+                                        @RequestBody List<TmShiftStock> stockList) {
+        this.tmShiftStockService.replaceShiftStock(factoryCode, DateUtil.parseDate(stockDate),
+                shiftOrder, updateBy, stockList);
         return AjaxResult.success();
     }
 

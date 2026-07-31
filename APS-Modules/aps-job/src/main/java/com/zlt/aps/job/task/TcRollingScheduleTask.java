@@ -11,7 +11,7 @@ import javax.annotation.Resource;
 import java.util.Date;
 
 /**
- * 每五分钟检查一次胎侧自动滚动班次窗口。
+ * 每分钟检查胎侧自动滚动班次窗口。
  */
 @Slf4j
 @Component("tcRollingScheduleTask")

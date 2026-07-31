@@ -13,4 +13,6 @@ public class TcManualRollingWriteResult {
     private int updateCount;
     /** 逻辑删除行数。 */
     private int deleteCount;
+    /** 新增未排任务数量。 */
+    private int unplannedCount;
 }

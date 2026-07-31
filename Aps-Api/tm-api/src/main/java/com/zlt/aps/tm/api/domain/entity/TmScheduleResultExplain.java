@@ -158,6 +158,26 @@ public class TmScheduleResultExplain extends BaseEntity {
     @TableField(value = "FINAL_PLAN_QTY")
     private BigDecimal finalPlanQty;
 
+    /** 全局工装账本结算顺序 */
+    @ApiModelProperty(value = "全局工装账本结算顺序", name = "toolLedgerOrder")
+    @TableField(value = "TOOL_LEDGER_ORDER")
+    private Integer toolLedgerOrder;
+
+    /** 工装账本结算前可用数量 */
+    @ApiModelProperty(value = "工装账本结算前可用数量", name = "availableToolQty")
+    @TableField(value = "AVAILABLE_TOOL_QTY")
+    private BigDecimal availableToolQty;
+
+    /** 当前任务工装净占用数量 */
+    @ApiModelProperty(value = "当前任务工装净占用数量", name = "toolUsedQty")
+    @TableField(value = "TOOL_USED_QTY")
+    private BigDecimal toolUsedQty;
+
+    /** 工装账本结算后剩余数量 */
+    @ApiModelProperty(value = "工装账本结算后剩余数量", name = "remainingToolQty")
+    @TableField(value = "REMAINING_TOOL_QTY")
+    private BigDecimal remainingToolQty;
+
     /** 计算公式说明 */
     @ApiModelProperty(value = "计算公式说明", name = "calcFormulaDesc")
     @TableField(value = "CALC_FORMULA_DESC")

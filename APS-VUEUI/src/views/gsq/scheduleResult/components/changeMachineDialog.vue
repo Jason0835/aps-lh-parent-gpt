@@ -1,21 +1,58 @@
 <template>
   <el-dialog
     :title="title"
-    :visible.sync="dialogVisible"
-    width="500px"
+    :visible="visible"
+    width="1200px"
+    @close="hide"
     :close-on-click-modal="false"
     :close-on-press-escape="false"
-    append-to-body
   >
-    <info-form
-      ref="form"
-      :form="form"
-      :rules="rules"
-      :columns="columns"
-      label-position="right"
-      label-width="140px"
-      v-loading="loading"
-    />
+    <div v-loading="loading" class="change-machine-dialog">
+      <el-form
+        ref="formRef"
+        :model="form"
+        :rules="rules"
+        label-position="right"
+        label-width="120px"
+      >
+        <el-row :gutter="16">
+          <el-col :span="8">
+            <el-form-item :label="$t('ui.data.column.gsqScheduleResult.scheduleDate')">
+              <el-input v-model="form.scheduleDate" disabled />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item :label="$t('ui.data.column.gsqScheduleResult.oldMachine')">
+              <el-input v-model="form.oldMachineCode" disabled />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item :label="$t('ui.data.column.gsqScheduleResult.newMachine')" prop="newMachineCode">
+              <el-select
+                v-model="form.newMachineCode"
+                class="w100"
+                filterable
+                clearable
+              >
+                <el-option
+                  v-for="item in machineOptions"
+                  :key="item.machineCode"
+                  :label="item.machineCode + (item.machineName ? ' - ' + item.machineName : '')"
+                  :value="item.machineCode"
+                />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+      </el-form>
+      <page-table
+        tableRef="gsqChangeMachineResultTable"
+        :columns="tableColumns"
+        :data="tableData"
+        :showSummary="false"
+        :selectArea="false"
+      />
+    </div>
     <template slot="footer">
       <el-button @click="hide">{{ $t("ui.frame.btn.cancel") }}</el-button>
       <el-button type="primary" :loading="loading" @click="handleConfirm">
@@ -26,127 +63,259 @@
 </template>
 
 <script>
-import infoForm from "@/views/components/infoForm.vue";
+import PageTable from "@/components/Table/PageTable.vue";
 import {
   changeMachine,
   validateChangeMachine,
+  listScheduleShiftDates,
+  listCandidateMachines,
 } from "@/api/gsq/scheduleResult";
 
 export default {
   name: "GsqChangeMachineDialog",
-  components: { infoForm },
-  props: {
-    visible: {
-      type: Boolean,
-      default: false,
-    },
-    rows: {
-      type: Array,
-      default: () => [],
-    },
-  },
+  components: { PageTable },
+  inject: ["parentDict"],
   data() {
     return {
       loading: false,
+      visible: false,
       form: {},
+      tableData: [],
+      machineOptions: [],
+      dateList: [
+        { shift: 1, shiftType: "afternoon", shiftDate: "" },
+        { shift: 2, shiftType: "night", shiftDate: "" },
+        { shift: 3, shiftType: "morning", shiftDate: "" },
+        { shift: 4, shiftType: "afternoon", shiftDate: "" },
+        { shift: 5, shiftType: "night", shiftDate: "" },
+        { shift: 6, shiftType: "morning", shiftDate: "" },
+      ],
       rules: {
-        machineCode: [
+        newMachineCode: [
           {
             required: true,
-            message: this.$t("ui.data.column.gsqScheduleResult.machineCodeRequired"),
-            trigger: "blur",
+            message: this.$t("common.rule.select"),
+            trigger: "change",
           },
         ],
       },
     };
   },
   computed: {
-    dialogVisible: {
-      get() {
-        return this.visible;
-      },
-      set(val) {
-        this.$emit("update:visible", val);
-      },
-    },
     title() {
       return this.$t("ui.data.column.gsqScheduleResult.changeMachineTitle");
     },
-    columns() {
+    tableColumns() {
       return [
         {
           label: this.$t("ui.data.column.gsqScheduleResult.machineCode"),
           prop: "machineCode",
-          type: "input",
         },
         {
-          label: this.$t("ui.data.column.gsqScheduleResult.remark"),
+          label: this.$t("ui.data.column.gsqScheduleResult.steelRingCode"),
+          prop: "steelRingCode",
+        },
+        {
+          label: this.$t("ui.data.column.gsqScheduleResult.proSize"),
+          prop: "proSize",
+        },
+        {
+          label: this.$t("ui.data.column.gsqScheduleResult.isRelease"),
+          prop: "isRelease",
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.parentDict.type.IS_RELEASE, value);
+          },
+        },
+        // 动态6个班次列
+        ...this.buildShiftColumns(1),
+        ...this.buildShiftColumns(2),
+        ...this.buildShiftColumns(3),
+        ...this.buildShiftColumns(4),
+        ...this.buildShiftColumns(5),
+        ...this.buildShiftColumns(6),
+        {
           prop: "remark",
-          type: "input",
+          label: this.$t("ui.common.column.remark"),
         },
       ];
     },
   },
-  watch: {
-    visible(val) {
-      if (val) {
-        this.form = {
-          machineCode: "",
-          remark: "",
-        };
-      }
-    },
-  },
   methods: {
-    hide() {
-      this.dialogVisible = false;
+    /** 班次名称映射 */
+    shiftPeriodName(shiftType) {
+      const map = {
+        night: this.$t("ui.data.column.scheduleResult.nightShift"),
+        morning: this.$t("ui.data.column.scheduleResult.morningShift"),
+        afternoon: this.$t("ui.data.column.scheduleResult.middleShift"),
+      };
+      return map[shiftType] || "";
     },
-    handleConfirm() {
-      this.$refs.form.triggerConfirm(this.submit);
+    /** 构建单个班次的表格列组 */
+    buildShiftColumns(classIndex) {
+      const item = this.dateList[classIndex - 1];
+      const shiftName = this.shiftPeriodName(item?.shiftType || "");
+      const dateStr = item?.shiftDate || "";
+      const headerLabel = dateStr ? `${shiftName} ${dateStr}` : shiftName;
+
+      return [
+        {
+          label: headerLabel,
+          children: [
+            {
+              prop: `class${classIndex}Sequence`,
+              label: this.$t("ui.data.column.gsqScheduleResult.sequence"),
+              formatter: (row, column, value) => {
+                if (value == null || value === 0) return "";
+                return value;
+              },
+            },
+            {
+              prop: `class${classIndex}PlanQty`,
+              label: this.$t("ui.data.column.gsqScheduleResult.planQty"),
+              formatter: (row, column, value) => {
+                if (value == null || value === 0) return "";
+                return value;
+              },
+            },
+            {
+              prop: `class${classIndex}FinishQty`,
+              label: this.$t("ui.data.column.gsqScheduleResult.finishQty"),
+              formatter: (row, column, value) => {
+                if (value == null || value === 0) return "";
+                return value;
+              },
+            },
+            {
+              prop: `class${classIndex}Analysis`,
+              label: this.$t("ui.data.column.gsqScheduleResult.analysis"),
+              formatter: (row, column, value) => {
+                if (value != null && value !== "") return value;
+                return "";
+              },
+            },
+          ],
+        },
+      ];
     },
-    submit() {
-      if (this.rows.length === 0) {
-        this.$modal.msgError(
-          this.$t("ui.data.column.gsqScheduleResult.noSelectRow")
-        );
+    /** 获取班次日期列表 */
+    async fetchScheduleShiftDates(scheduleDate) {
+      if (!scheduleDate) {
+        this.dateList = this.getDefaultDateList();
         return;
       }
-      this.loading = true;
-      const ids = this.rows.map((r) => r.id);
-      const scheduleDate = this.rows[0].scheduleDate;
-      const factoryCode = this.rows[0].factoryCode;
-      const params = {
-        ids,
-        machineCode: this.form.machineCode,
-        scheduleDateQuery: scheduleDate,
-        factoryCode,
-        remark: this.form.remark,
-      };
-      validateChangeMachine(params)
-        .then((res) => {
-          if (res.code !== 200) {
-            this.$modal.msgError(res.msg);
-            return Promise.reject();
-          }
-          return changeMachine(params);
-        })
-        .then((res) => {
-          const tip = res.msg || res.message || "";
-          if (res.code != null && res.code !== 200) {
-            this.$modal.msgError(tip || this.$t("ui.common.message.operateFail"));
-            return;
-          }
-          this.$modal.msgSuccess(
-            tip || this.$t("ui.data.column.gsqScheduleResult.changeMachineSuccess")
-          );
-          this.$emit("refresh");
+      try {
+        const res = await listScheduleShiftDates({ scheduleDateQuery: scheduleDate });
+        if (Array.isArray(res) && res.length) {
+          this.dateList = res;
+        } else {
+          this.dateList = this.getDefaultDateList();
+        }
+      } catch (error) {
+        console.error(error);
+        this.dateList = this.getDefaultDateList();
+      }
+    },
+    getDefaultDateList() {
+      return [
+        { shift: 1, shiftType: "afternoon", shiftDate: "" },
+        { shift: 2, shiftType: "night", shiftDate: "" },
+        { shift: 3, shiftType: "morning", shiftDate: "" },
+        { shift: 4, shiftType: "afternoon", shiftDate: "" },
+        { shift: 5, shiftType: "night", shiftDate: "" },
+        { shift: 6, shiftType: "morning", shiftDate: "" },
+      ];
+    },
+    /** 加载候选机台列表（按定点机台过滤） */
+    async getMachineOptions(recordId) {
+      try {
+        const res = await listCandidateMachines(recordId);
+        this.machineOptions = res || [];
+      } catch (error) {
+        console.error(error);
+        this.machineOptions = [];
+      }
+    },
+    /** 执行转机台 */
+    async handleChangeMachine(params) {
+      try {
+        this.loading = true;
+        const validateRes = await validateChangeMachine(params);
+        if (validateRes.code === 200) {
+          const data = await changeMachine(params);
+          this.$modal.msgSuccess(data.msg);
+          this.$emit("success");
           this.hide();
-        })
-        .catch(() => {})
-        .finally(() => {
-          this.loading = false;
+        } else {
+          this.$modal.msgError(validateRes.msg || "校验失败");
+        }
+      } catch (error) {
+        console.log(error);
+      } finally {
+        this.loading = false;
+      }
+    },
+    /** 打开弹窗（单选模式，传入单条记录） */
+    async show(data) {
+      this.visible = true;
+      if (data) {
+        this.form = {
+          id: data.id,
+          scheduleDate: data.scheduleDate,
+          oldMachineCode: data.machineCode,
+          newMachineCode: "",
+        };
+        this.tableData = [{ ...data }];
+        await this.fetchScheduleShiftDates(data.scheduleDate);
+      }
+      if (data && data.id) {
+        await this.getMachineOptions(data.id);
+      }
+    },
+    /** 关闭弹窗 */
+    hide() {
+      this.form = {};
+      this.tableData = [];
+      this.machineOptions = [];
+      this.dateList = this.getDefaultDateList();
+      if (this.$refs.formRef) {
+        this.$refs.formRef.resetFields();
+      }
+      this.visible = false;
+    },
+    /** 确认按钮 */
+    handleConfirm() {
+      this.$refs.formRef.validate((valid) => {
+        if (!valid) {
+          return;
+        }
+        this.handleChangeMachine({
+          id: this.form.id,
+          oldMachineCode: this.form.oldMachineCode,
+          newMachineCode: this.form.newMachineCode,
+          scheduleDate: this.form.scheduleDate,
         });
+      });
     },
   },
 };
 </script>
+
+<style lang="scss" scoped>
+.change-machine-dialog {
+  .w100 {
+    width: 100%;
+  }
+
+  ::v-deep .el-table {
+    th.el-table__cell,
+    td.el-table__cell {
+      padding-top: 14px;
+      padding-bottom: 14px;
+    }
+    .cell {
+      line-height: 24px;
+      min-height: 24px;
+    }
+  }
+}
+</style>

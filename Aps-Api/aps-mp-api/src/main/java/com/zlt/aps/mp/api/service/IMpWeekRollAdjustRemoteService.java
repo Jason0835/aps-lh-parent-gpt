@@ -34,6 +34,13 @@ public interface IMpWeekRollAdjustRemoteService {
     TableDataInfo getAdjustDetailList(@RequestBody MpWeekRollAdjustDTO weekRollAdjustDTO);
 
     /**
+     * 生产对齐
+     */
+    @ApiOperation("生产对齐")
+    @PostMapping("/mpWeekRollAdjust/productAlign")
+    TableDataInfo productAlign(@RequestBody MpWeekRollAdjustDTO weekRollAdjustDTO);
+
+    /**
      * 自动调整
      */
     @ApiOperation("自动调整")

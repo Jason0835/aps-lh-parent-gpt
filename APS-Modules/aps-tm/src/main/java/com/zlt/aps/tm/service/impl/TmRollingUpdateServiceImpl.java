@@ -12,7 +12,7 @@ import com.zlt.aps.tm.api.domain.dto.TmRollingRecalcRequestDTO;
 import com.zlt.aps.tm.api.domain.entity.TmDispatcherLog;
 import com.zlt.aps.tm.api.domain.entity.TmParams;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
-import com.zlt.aps.tm.api.domain.entity.TmStock;
+import com.zlt.aps.tm.api.domain.entity.TmShiftStock;
 import com.zlt.aps.tm.api.domain.vo.TmRollingRecalcResponseVO;
 import com.zlt.aps.tm.api.enums.TmReleaseStatusTransition;
 import com.zlt.aps.tm.api.enums.TmScheduleEventTypeEnum;
@@ -24,8 +24,9 @@ import com.zlt.aps.tm.engine.event.TmScheduleEventPublisher;
 import com.zlt.aps.tm.mapper.TmDispatcherLogMapper;
 import com.zlt.aps.tm.mapper.TmParamsMapper;
 import com.zlt.aps.tm.mapper.TmScheduleResultMapper;
-import com.zlt.aps.tm.mapper.TmStockMapper;
+import com.zlt.aps.tm.mapper.TmShiftStockMapper;
 import com.zlt.aps.tm.service.ITmRollingUpdateService;
+import com.zlt.aps.tm.service.TmRollingWindowService;
 import com.zlt.aps.tm.service.loader.TmAutoScheduleDataLoadService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -74,7 +75,9 @@ public class TmRollingUpdateServiceImpl implements ITmRollingUpdateService {
 
     private final TmParamsMapper tmParamsMapper;
 
-    private final TmStockMapper tmStockMapper;
+    private final TmShiftStockMapper tmShiftStockMapper;
+
+    private final TmRollingWindowService tmRollingWindowService;
 
     private final TmScheduleResultMapper tmScheduleResultMapper;
 
@@ -121,10 +124,12 @@ public class TmRollingUpdateServiceImpl implements ITmRollingUpdateService {
         this.validateRequest(request);
         request.setFactoryCode(StrUtil.trim(request.getFactoryCode()));
         request.setScheduleDate(DateUtil.beginOfDay(request.getScheduleDate()));
+        this.resolveStockDate(request);
         request.setOperator(StrUtil.blankToDefault(StrUtil.trim(request.getOperator()), automatic ? "TM_ROLLING_JOB" : "TM_ROLLING_API"));
         if (automatic && !this.isRollingEnabled(request.getFactoryCode())) {
             return this.buildDisabledResponse(request);
         }
+        this.ensureShiftStockExists(request);
 
         String runKey = this.buildRunKey(request);
         String traceId = UUID.randomUUID().toString().replace("-", "");
@@ -234,7 +239,7 @@ public class TmRollingUpdateServiceImpl implements ITmRollingUpdateService {
         Map<String, List<TmScheduleResult>> resultMap = resultList.stream()
                 .filter(result -> StrUtil.isNotBlank(result.getTreadCode()))
                 .collect(Collectors.groupingBy(TmScheduleResult::getTreadCode, LinkedHashMap::new, Collectors.toList()));
-        Map<String, TmStock> stockMap = this.loadStockMap(request);
+        Map<String, TmShiftStock> stockMap = this.loadStockMap(request);
         Set<String> targetTreadCodes = taskMap.entrySet().stream()
                 .filter(entry -> this.sumDemand(entry.getValue(), request.getTargetShiftOrder()).compareTo(BigDecimal.ZERO) > 0)
                 .map(Map.Entry::getKey).collect(Collectors.toCollection(LinkedHashSet::new));
@@ -253,7 +258,7 @@ public class TmRollingUpdateServiceImpl implements ITmRollingUpdateService {
                 BigDecimal.valueOf(rollingShiftCount));
         List<TmRollingAdjustment> adjustmentList = new ArrayList<>();
         for (String treadCode : targetTreadCodes) {
-            TmStock stock = stockMap.get(treadCode);
+            TmShiftStock stock = stockMap.get(treadCode);
             if (stock == null) {
                 this.incrementSkip(context, treadCode, SKIP_STOCK_MISSING);
                 continue;
@@ -271,8 +276,7 @@ public class TmRollingUpdateServiceImpl implements ITmRollingUpdateService {
                 this.incrementSkip(context, treadCode, SKIP_DEMAND_MISSING);
                 continue;
             }
-            BigDecimal expectedStock = this.calculateExpectedStock(stock, treadTaskList, treadResultList,
-                    request.getTargetShiftOrder());
+            BigDecimal expectedStock = this.calculateExpectedStock(stock);
             BigDecimal availableQty = expectedStock.add(beforePlanQty);
             BigDecimal targetPlanQty = null;
             String direction = null;
@@ -411,26 +415,14 @@ public class TmRollingUpdateServiceImpl implements ITmRollingUpdateService {
     /**
      * 计算目标班前预计库存。
      *
-     * @param stock 当日库存
-     * @param taskList 同胎面成型任务
-     * @param resultList 同胎面胎面结果
-     * @param targetShiftOrder 目标班次
+     * @param stock 班次开始前同步的实时库存
      * @return 非负预计库存
      */
-    private BigDecimal calculateExpectedStock(TmStock stock, List<TmTaskDraft> taskList,
-                                              List<TmScheduleResult> resultList, int targetShiftOrder) {
-        BigDecimal netStock = BigDecimalUtils.valueOf(stock.getStockQty())
+    BigDecimal calculateExpectedStock(TmShiftStock stock) {
+        return BigDecimalUtils.valueOf(stock.getStockQty())
                 .subtract(BigDecimalUtils.valueOf(stock.getBadQty()))
-                .add(BigDecimalUtils.valueOf(stock.getAdjustQty()));
-        BigDecimal formingFinishQty = taskList.stream()
-                .filter(task -> task.getSourceShiftOrder() != null && task.getSourceShiftOrder() < targetShiftOrder)
-                .map(TmTaskDraft::getCurrentShiftFormingFinishQty).map(BigDecimalUtils::valueOf)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal treadFinishQty = BigDecimal.ZERO;
-        for (int shiftOrder = 1; shiftOrder < targetShiftOrder; shiftOrder++) {
-            treadFinishQty = treadFinishQty.add(this.sumResultQty(resultList, shiftOrder, true));
-        }
-        return netStock.subtract(formingFinishQty).add(treadFinishQty).max(BigDecimal.ZERO);
+                .add(BigDecimalUtils.valueOf(stock.getAdjustQty()))
+                .max(BigDecimal.ZERO);
     }
 
     /**
@@ -555,16 +547,54 @@ public class TmRollingUpdateServiceImpl implements ITmRollingUpdateService {
      * @param request 滚动请求
      * @return 胎面库存映射
      */
-    private Map<String, TmStock> loadStockMap(TmRollingRecalcRequestDTO request) {
-        LambdaQueryWrapper<TmStock> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(TmStock::getFactoryCode, request.getFactoryCode());
-        wrapper.eq(TmStock::getStockDate, request.getScheduleDate());
-        wrapper.orderByAsc(TmStock::getId);
-        List<TmStock> stockList = tmStockMapper.selectList(wrapper);
-        return (stockList == null ? Collections.<TmStock>emptyList() : stockList).stream()
+    private Map<String, TmShiftStock> loadStockMap(TmRollingRecalcRequestDTO request) {
+        LambdaQueryWrapper<TmShiftStock> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(TmShiftStock::getFactoryCode, request.getFactoryCode());
+        wrapper.eq(TmShiftStock::getStockDate, request.getStockDate());
+        wrapper.eq(TmShiftStock::getShiftOrder, request.getTargetShiftOrder());
+        wrapper.orderByAsc(TmShiftStock::getId);
+        List<TmShiftStock> stockList = tmShiftStockMapper.selectList(wrapper);
+        return (stockList == null ? Collections.<TmShiftStock>emptyList() : stockList).stream()
                 .filter(stock -> StrUtil.isNotBlank(stock.getTreadCode()))
-                .collect(Collectors.toMap(TmStock::getTreadCode, Function.identity(), (first, ignored) -> first,
+                .collect(Collectors.toMap(TmShiftStock::getTreadCode, Function.identity(), (first, ignored) -> first,
                         LinkedHashMap::new));
+    }
+
+    /**
+     * 补齐并规范化MES库存物理日期。
+     *
+     * @param request 滚动请求
+     * @throws ServiceException 班次配置无法解析时抛出
+     */
+    private void resolveStockDate(TmRollingRecalcRequestDTO request) {
+        if (request.getStockDate() != null) {
+            request.setStockDate(DateUtil.beginOfDay(request.getStockDate()));
+            return;
+        }
+        com.zlt.aps.tm.domain.vo.TmRollingWindow window = this.tmRollingWindowService.resolveWindow(
+                request.getFactoryCode(), request.getScheduleDate(), request.getTargetShiftOrder());
+        if (window == null || window.getStockDate() == null) {
+            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.schedule.rollingRequestInvalid"));
+        }
+        request.setStockDate(DateUtil.beginOfDay(window.getStockDate()));
+    }
+
+    /**
+     * 在幂等记录查询前校验整个班次库存快照存在。
+     *
+     * <p>库存为空时直接阻断，不写入SKIPPED日志，补齐库存后允许同一窗口重试。</p>
+     *
+     * @param request 滚动请求
+     * @throws ServiceException 班次库存为空时抛出
+     */
+    private void ensureShiftStockExists(TmRollingRecalcRequestDTO request) {
+        Long stockCount = this.tmShiftStockMapper.selectCount(new LambdaQueryWrapper<TmShiftStock>()
+                .eq(TmShiftStock::getFactoryCode, request.getFactoryCode())
+                .eq(TmShiftStock::getStockDate, request.getStockDate())
+                .eq(TmShiftStock::getShiftOrder, request.getTargetShiftOrder()));
+        if (stockCount == null || stockCount <= 0) {
+            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.schedule.shiftStockMissing"));
+        }
     }
 
     /**

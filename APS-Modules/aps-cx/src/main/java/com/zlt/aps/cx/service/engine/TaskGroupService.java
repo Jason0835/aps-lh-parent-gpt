@@ -107,6 +107,9 @@ public class TaskGroupService {
     /** 参数编码：可供硫化时长封顶开关（Y=开启，N=关闭） */
     private static final String PARAM_STOCK_HOURS_CAP_ENABLED = "SYS04080005";
 
+    /** 参数编码：可供硫化时长软退出阈值（小时），R2超此值退出到R3，未配置时回退到 SYS04080001 */
+    private static final String PARAM_STOCK_HOURS_SOFT_TRIGGER = "SYS04080003";
+
     /** 单个班次总秒数（8小时） */
     private static final int SECONDS_PER_SHIFT = 8 * 60 * 60;
 
@@ -372,8 +375,10 @@ public class TaskGroupService {
                 endingDiscardThreshold, endingUrgentFormingRemainder, endingDaysThreshold, urgentEndingDays);
 
         int stockHoursCap = getStockHoursCap(context);
+        int stockHoursSoftTrigger = getStockHoursSoftTrigger(context, stockHoursCap);
         boolean stockHoursCapEnabled = isStockHoursCapEnabled(context);
-        log.info("【立库管控参数】可供硫化时长封顶阈值={}h, 开关={}", stockHoursCap, stockHoursCapEnabled ? "开启" : "关闭");
+        log.info("【立库管控参数】可供硫化时长: 软退出阈值(R2)={}h, 硬上限(R3)={}h, 开关={}",
+                stockHoursSoftTrigger, stockHoursCap, stockHoursCapEnabled ? "开启" : "关闭");
 
         // 判断当前班次是否为开产班次（用于提前过滤关键产品）
         boolean isOpeningShift = false;
@@ -669,6 +674,7 @@ public class TaskGroupService {
         state.machineOnlineEmbryoMap = machineOnlineEmbryoMap;
         state.isOpeningShift = isOpeningShift;
         state.stockHoursCap = stockHoursCap;
+        state.stockHoursSoftTrigger = stockHoursSoftTrigger;
         state.stockHoursCapEnabled = stockHoursCapEnabled;
         state.priorityDescMap = priorityDescMap;
         state.allKeyProductStructures = allKeyProductStructures;
@@ -1122,7 +1128,7 @@ public class TaskGroupService {
                 // 维度二（时间6h封顶）已在R1移除：R1的职责是满足硫化需求，
                 // 6h封顶会导致硫化任务无法满足（封顶后不够一车→归零→硫化需求落空）。
                 // 立库空间维度（维度一）仍保留，防止立库溢出。
-                // 6h管控仅在R2中以"事前预估→退出到R3"方式生效，R3无6h限制。
+                // 6h管控仅在R2中以"事前预估→退出到R3"方式生效，R3以"事前预估->收尾移出"硬上限生效。
 
                 if (capped && maxAllowedProduction < originalProduction) {
                     // 同步whState运行总计（已包含本任务originalProduction），再执行封顶
@@ -1338,7 +1344,7 @@ public class TaskGroupService {
                         remaining.divide(BigDecimal.valueOf(ScheduleConstants.SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP));
             }
 
-            // 按结构独立处理：变更2c - 最小优先策略 + R2预处理 + 6h退出条件
+            // 按结构独立处理：变更2c - 最小优先策略 + R2预处理 + 软阈值退出条件
             for (Map.Entry<String, List<DailyEmbryoTask>> entry : structureDeferredMap.entrySet()) {
                 String structName = entry.getKey();
                 List<DailyEmbryoTask> structTasks = new ArrayList<>(entry.getValue());
@@ -1399,11 +1405,11 @@ public class TaskGroupService {
                             int preVulcConsumption = state.taskVulcConsumptionMap.getOrDefault(dt.getLhId(), 0);
                             int preProjectedStock = preAllocatedStock + preProduction - preVulcConsumption;
                             BigDecimal preStockHours = productionCalculator.calculateStockHours(preProjectedStock, preSingleLhCap, preTaskMoldQty);
-                            if (preStockHours.compareTo(BigDecimal.valueOf(state.stockHoursCap)) > 0) {
-                                log.info("  [R2-预处理-stockHours超限] 胎胚={}, 物料={}, 分配库存={}, 已排产量={}, 硫化消耗={}, 预计班后库存={}条, 可供硫化={}h > {}h, 移入R3退出队列",
+                            if (preStockHours.compareTo(BigDecimal.valueOf(state.stockHoursSoftTrigger)) > 0) {
+                                log.info("  [R2-预处理-stockHours超限] 胎胚={}, 物料={}, 分配库存={}, 已排产量={}, 硫化消耗={}, 预计班后库存={}条, 可供硫化={}h > {}h(软), 移入R3退出队列",
                                         dt.getEmbryoCode(), preMaterialCode, preAllocatedStock, preProduction,
                                         preVulcConsumption, preProjectedStock,
-                                        preStockHours.setScale(2, BigDecimal.ROUND_HALF_UP), state.stockHoursCap);
+                                        preStockHours.setScale(2, BigDecimal.ROUND_HALF_UP), state.stockHoursSoftTrigger);
                                 state.r2ExitedTasks.add(dt);
                                 preIter.remove();
                             }
@@ -1624,7 +1630,7 @@ public class TaskGroupService {
                         }
                     }
 
-                    // ==================== 变更2c: 维度二（时间）6h退出条件 ====================
+                    // ==================== 变更2c: 维度二（时间）软阈值退出条件 ====================
                     boolean exitToR3 = false;
                     if (state.stockHoursCapEnabled && dtEmbryoCode != null) {
                         int dtTaskMoldQty = minTask.getVulcanizeMoldCount();
@@ -1635,17 +1641,17 @@ public class TaskGroupService {
                             int taskVulcConsumption = state.taskVulcConsumptionMap.getOrDefault(minTask.getLhId(), 0);
                             int projectedAfterAdd = taskAllocatedStock + currentPP + fallbackProduction - taskVulcConsumption;
                             BigDecimal afterAddHours = productionCalculator.calculateStockHours(projectedAfterAdd, dtSingleLhCap, dtTaskMoldQty);
-                            if (afterAddHours.compareTo(BigDecimal.valueOf(state.stockHoursCap)) > 0) {
+                            if (afterAddHours.compareTo(BigDecimal.valueOf(state.stockHoursSoftTrigger)) > 0) {
                                 exitToR3 = true;
-                                log.info("  [R2-6h退出] 胎胚={}, 分配库存={}, 已排产量={}, 硫化消耗={}, +本轮{}条 = 预计库存{}条, 可供硫化={}h > {}h, 本轮分配后移入R3",
+                                log.info("  [R2-软阈值退出] 胎胚={}, 分配库存={}, 已排产量={}, 硫化消耗={}, +本轮{}条 = 预计库存{}条, 可供硫化={}h > {}h(软), 本轮分配后移入R3",
                                         dtEmbryoCode, taskAllocatedStock, currentPP, taskVulcConsumption,
                                         fallbackProduction, projectedAfterAdd,
-                                        afterAddHours.setScale(2, BigDecimal.ROUND_HALF_UP), state.stockHoursCap);
+                                        afterAddHours.setScale(2, BigDecimal.ROUND_HALF_UP), state.stockHoursSoftTrigger);
                             } else {
                                 log.info("  【可供硫化管控】胎胚={}, 分配库存={}, 已排产量={}, 硫化消耗={}, +本轮{}条 = 预计库存{}条, 可供硫化={}h, {}h上限, 未超限→通过",
                                         dtEmbryoCode, taskAllocatedStock, currentPP, taskVulcConsumption,
                                         fallbackProduction, projectedAfterAdd,
-                                        afterAddHours.setScale(2, BigDecimal.ROUND_HALF_UP), state.stockHoursCap);
+                                        afterAddHours.setScale(2, BigDecimal.ROUND_HALF_UP), state.stockHoursSoftTrigger);
                             }
                         }
                     }
@@ -1843,12 +1849,12 @@ public class TaskGroupService {
     }
 
     /**
-     * R3：R2 退出任务的无 6h 限制分配。
+     * R3：R2 退出任务的分配（含 6h 硬上限）。
      */
     private void processRound3(StructureProcessStateVo state, String currentStructure) {
-        // ==================== 变更2d: 第三轮（R3）— R2退出任务的无6h限制分配 ====================
+        // ==================== 变更2d: 第三轮（R3）- R2退出任务分配（6h硬上限，超限收尾移出） ====================
         if (!state.r2ExitedTasks.isEmpty()) {
-            log.info("【第三轮分配（R3）】开始处理 {} 个R2退出任务（无6h限制）", state.r2ExitedTasks.size());
+            log.info("【第三轮分配（R3）】开始处理 {} 个R2退出任务（6h硬上限）", state.r2ExitedTasks.size());
             int r3Allocated = 0;
             int r3SkippedCapacity = 0;
             int r3SkippedWarehouse = 0;
@@ -1893,7 +1899,7 @@ public class TaskGroupService {
                         remaining.divide(BigDecimal.valueOf(ScheduleConstants.SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP));
             }
 
-            // R3 核心逻辑：最小优先、逐车轮询、结构全局轮次，不检查6h限制
+            // R3 核心逻辑：最小优先、逐车轮询、结构全局轮次，6h硬上限（超限收尾移出）
             for (Map.Entry<String, List<DailyEmbryoTask>> entry : r3StructureMap.entrySet()) {
                 String structName = entry.getKey();
                 List<DailyEmbryoTask> structTasks = new ArrayList<>(entry.getValue());
@@ -2119,7 +2125,52 @@ public class TaskGroupService {
                         structDeferredTime = structDeferredTime.add(tripTime);
                     }
 
-                    // R3不检查6h限制，直接分配
+                    // ==================== 6h硬上限检查（R3）====================
+                    // 事前预估：分配本轮后可供硫化时长 > 阈值则不再分配，收尾移出（R3为最后一轮，无下一轮可退出）
+                    if (state.stockHoursCapEnabled && dtEmbryoCode != null) {
+                        int r3TaskMoldQty = minTask.getVulcanizeMoldCount();
+                        int r3SingleLhCap = productionCalculator.getSingleMoldDailyLhCapacity(dtMaterialCode, state.context);
+                        if (r3TaskMoldQty > 0 && r3SingleLhCap > 0) {
+                            int r3PrePP = minTask.getPlannedProduction() != null ? minTask.getPlannedProduction() : 0;
+                            int r3TaskStock = getCurrentStock(state.context, minTask.getLhId());
+                            int r3TaskVulcCons = state.taskVulcConsumptionMap.getOrDefault(minTask.getLhId(), 0);
+                            int r3ProjectedAfterAdd = r3TaskStock + r3PrePP + fallbackProduction - r3TaskVulcCons;
+                            BigDecimal r3AfterAddHours = productionCalculator.calculateStockHours(
+                                    r3ProjectedAfterAdd, r3SingleLhCap, r3TaskMoldQty);
+                            if (r3AfterAddHours.compareTo(BigDecimal.valueOf(state.stockHoursCap)) > 0) {
+                                log.info("  [R3-6h硬上限] 胎胚={}, 分配库存={}, 已排产量={}, 硫化消耗={}, +本轮{}条 = 预计{}条, 可供硫化={}h > {}h, 不再分配",
+                                        dtEmbryoCode, r3TaskStock, r3PrePP, r3TaskVulcCons,
+                                        fallbackProduction, r3ProjectedAfterAdd,
+                                        r3AfterAddHours.setScale(2, BigDecimal.ROUND_HALF_UP), state.stockHoursCap);
+                                if (r3PrePP > 0
+                                        && !isTaskAlreadyInResult(minTask, state.result)
+                                        && !state.r3AddedToResultGlobal.contains(minTask) && !state.r2AddedToResultGlobal.contains(minTask)) {
+                                    minTask.setEndingExtraInventory(r3PrePP);
+                                    Integer r3CapFormingRemainder = this.getFormingRemainder(
+                                            dtMaterialCode, minTask.getProductStatus(), state.context);
+                                    int r3CapUsedRemainder = state.materialUsedFormingRemainder.getOrDefault(dtMaterialStatusKey, 0);
+                                    int r3CapRemainingForming = r3CapFormingRemainder != null
+                                            ? Math.max(0, r3CapFormingRemainder - r3CapUsedRemainder) : 0;
+                                    minTask.setEndingSurplusQty(r3CapRemainingForming);
+                                    handleEndingRemainder(minTask, state.context);
+                                    boolean r3CapIsC = Boolean.TRUE.equals(minTask.getIsContinueTask());
+                                    boolean r3CapIsT = Boolean.TRUE.equals(minTask.getIsTrialTask());
+                                    if (r3CapIsC) {
+                                        state.result.getContinueTasks().add(minTask);
+                                    } else if (r3CapIsT) {
+                                        state.result.getTrialTasks().add(minTask);
+                                    } else {
+                                        state.result.getNewTasks().add(minTask);
+                                    }
+                                    state.r3AddedToResultGlobal.add(minTask);
+                                }
+                                structTasks.remove(minTask);
+                                continue;
+                            }
+                        }
+                    }
+
+                    // 分配
                     int currentPP = minTask.getPlannedProduction() != null ? minTask.getPlannedProduction() : 0;
                     minTask.setPlannedProduction(currentPP + fallbackProduction);
                     minTask.setRequiredCars(productionCalculator.calculateRequiredCars(minTask.getPlannedProduction(), tripCapacity));
@@ -3671,6 +3722,14 @@ public class TaskGroupService {
             }
         }
         return 6;
+    }
+
+    /**
+     * 获取可供硫化时长软退出阈值（小时）：R2超此值退出到R3
+     * 优先使用参数配置 SYS04080002，未配置时回退到 stockHoursCap（SYS04080001，向后兼容）
+     */
+    private int getStockHoursSoftTrigger(ScheduleContextVo context, int stockHoursCap) {
+        return getIntParamValue(context, PARAM_STOCK_HOURS_SOFT_TRIGGER, stockHoursCap);
     }
 
     /**

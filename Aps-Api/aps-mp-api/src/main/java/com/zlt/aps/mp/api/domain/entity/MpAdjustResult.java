@@ -2,6 +2,7 @@ package com.zlt.aps.mp.api.domain.entity;
 
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.zlt.aps.mp.api.IFinalAndAdjustResultInterface;
@@ -9,7 +10,9 @@ import com.zlt.common.utils.StringUtil;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
+import org.springframework.format.annotation.DateTimeFormat;
 
+import java.util.Date;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -581,6 +584,39 @@ public class MpAdjustResult extends BaseEntity implements IFinalAndAdjustResultI
     @ApiModelProperty(value = "LAST_MONTH_VALID_FLAG", name = "lastMonthValidFlag")
     @TableField(value = "LAST_MONTH_VALID_FLAG")
     private String lastMonthValidFlag;
+
+    /**
+     * 本次超欠产
+     */
+    @ApiModelProperty(value = "本次超欠产")
+    @TableField(value = "CURRENT_OVERDUE_QTY")
+    private Integer currentOverdueQty;
+
+    /**
+     * 生产超欠产
+     */
+    @ApiModelProperty(value = "生产超欠产")
+    @TableField(value = "PRODUCT_OVERDUE_QTY")
+    private Integer productOverdueQty;
+
+    /**
+     * 本次订单增减量
+     */
+    @ApiModelProperty(value = "本次订单增减量")
+    @TableField(value = "ORDER_ADD_DEC_QTY")
+    private Integer orderAddDecQty;
+
+    @ApiModelProperty(value = "生产对齐日")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @TableField("PRODUCT_ALIGN_DATE")
+    private Date productAlignDate;
+
+    @ApiModelProperty(value = "库存抓取日")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @TableField("STOCK_CAPTURE_DATE")
+    private Date stockCaptureDate;
 
     /**
      * 最大的型腔数，用于排序

@@ -2,12 +2,16 @@ package com.zlt.aps.mp.adjust.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.common.core.utils.PageUtils;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.enums.ConstructionStageEnum;
 import com.zlt.aps.mp.adjust.mapper.MpAdjustStructureInEntityMapper;
 import com.zlt.aps.mp.adjust.service.IMpAdjustStructureInService;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustStructureIn;
+import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.mp.factory.dto.FactoryMonthPlanMouldDayResultExportVo;
 import com.zlt.aps.mp.common.utils.CommaFieldSortUtil;
+import com.zlt.aps.mp.mdm.dto.DataDTO;
+import com.zlt.aps.mp.mdm.handler.DataManager;
 import com.zlt.common.utils.PubUtil;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +26,7 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -59,6 +64,9 @@ public class MpAdjustStructureInController extends AbstractDocBizController<MpAd
 
     @Autowired
     private MpAdjustStructureInEntityMapper entityMapper;
+
+    @Autowired
+    protected DataManager dataManager;
 
     /**
      * 查询调整-结构内调整记录列表
@@ -261,6 +269,23 @@ public class MpAdjustStructureInController extends AbstractDocBizController<MpAd
     public TableDataInfo getVersionList(@RequestBody MpAdjustStructureIn queryVO) {
         this.startPage();
         List<MpAdjustStructureIn> list = entityMapper.getVersionList(queryVO);
+        if (PubUtil.isEmpty(list)){
+            // 若找不到订单版本，则默认排产版本
+            MpFactoryProductionVersion version = new MpFactoryProductionVersion();
+            version.setFactoryCode(queryVO.getFactoryCode());
+            version.setYear(queryVO.getYear());
+            version.setMonth(queryVO.getMonth());
+            version.setPlanType("01");
+            version.setIsFinal(ApsConstant.TRUE);
+
+            DataDTO dataDTO = dataManager.buildDataDTO(version);
+            List<MpFactoryProductionVersion> versionList = dataManager.listVersions(dataDTO);
+            if (PubUtil.isNotEmpty(versionList)){
+                MpAdjustStructureIn finalVersion = new MpAdjustStructureIn();
+                finalVersion.setVersion(versionList.get(0).getProductionVersion());
+                list.add(finalVersion);
+            }
+        }
         this.clearPage();
         return this.getDataTable(list);
     }

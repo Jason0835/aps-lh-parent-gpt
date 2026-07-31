@@ -7,7 +7,11 @@ import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.BigDecimalUtil;
 import com.zlt.aps.common.engine.service.AutoScheduleLogService;
 import com.zlt.aps.tq.engine.context.TqScheduleContext;
+import com.zlt.aps.tq.engine.domain.TqPersistResult;
+import com.zlt.aps.tq.engine.domain.TqSnapshotBuildResult;
 import com.zlt.aps.tq.engine.mapper.TqEngineMapper;
+import com.zlt.aps.tq.engine.service.impl.TqScheduleQualitySummaryService;
+import com.zlt.aps.tq.engine.service.impl.TqSnapshotBuildService;
 import com.zlt.aps.tq.engine.vo.TqScheduleResultVo;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
@@ -49,6 +53,21 @@ public class TqResultPersistHandler extends AbsTqScheduleStepHandler {
     @Resource
     private AutoScheduleLogService autoScheduleLogService;
 
+    /**
+     * 解释快照构建服务。
+     * <p>Phase 4 重构新增：在 S6 阶段构建每个胎圈规格的解释快照（含规则命中、候选机台、未排证据等），
+     * 替代 Phase 2 仅序列化 {@code TqRuleTrace} 的简单逻辑。</p>
+     */
+    @Resource
+    private TqSnapshotBuildService tqSnapshotBuildService;
+
+    /**
+     * 质量指标汇总服务。
+     * <p>Phase 4 重构新增：在 S6 阶段统一计算 10 项核心指标，避免不同入口使用不同口径。</p>
+     */
+    @Resource
+    private TqScheduleQualitySummaryService tqScheduleQualitySummaryService;
+
     @Override
     protected String getStepName() {
         return "S4-结果校验与持久化";
@@ -67,19 +86,30 @@ public class TqResultPersistHandler extends AbsTqScheduleStepHandler {
         // 给所有排程结果设置分厂编码
         scheduleList.forEach(r -> r.setFactoryCode(factoryCode));
 
-        // 过滤掉6个班次都没排计划量的无效数据（避免无效数据落库）
+        // Phase 4 重构：初始化落库汇总对象，贯穿 S6 阶段统计
+        TqPersistResult persistResult = new TqPersistResult();
+        context.setPersistResult(persistResult);
+
+        // 1. 构建解释快照并填充 explainJson 字段（必须在过滤前构建，保留未排任务的快照）
+        // Phase 4 重构：从仅序列化 TqRuleTrace 升级为构建完整解释快照（含候选机台、未排证据、异常等）
+        buildSnapshotAndFillExplainJson(context, scheduleList);
+
+        // 2. 过滤掉无效数据（避免无效数据落库）
+        // 过滤条件：6个班次都没排计划量，或机台编码为空（未成功分配机台的记录不应落库）
+        // 这些数据作为未排任务计入 persistResult.unplannedCount
         int beforeFilterSize = scheduleList.size();
-        scheduleList.removeIf(this::isAllClassPlanEmpty);
+        scheduleList.removeIf(this::isInvalidSchedule);
         int filteredCount = beforeFilterSize - scheduleList.size();
+        persistResult.setUnplannedCount(filteredCount);
         if (filteredCount > 0) {
-            log.info("[S6] 过滤掉6个班次均无计划量的无效数据:{}条, 剩余有效数据:{}条",
+            log.info("[S6] 过滤掉无效数据(无计划量或机台编码为空):{}条, 剩余有效数据:{}条",
                     filteredCount, scheduleList.size());
             autoScheduleLogService.insertTqScheduleLog(batchNo, "",
-                    "S6-过滤无效数据", "6个班次均无计划量的记录数:" + filteredCount
+                    "S6-过滤无效数据", "无计划量或机台编码为空的记录数:" + filteredCount
                             + "，剩余有效数据:" + scheduleList.size() + "条");
         }
 
-        // 1. 分离外协排程数据（外协逻辑已废弃，所有数据统一作为非外协处理）
+        // 3. 分离外协排程数据（外协逻辑已废弃，所有数据统一作为非外协处理）
         // List<TqScheduleResultVo> assistScheduleList = scheduleList.stream()
         //         .filter(r -> assistSpecMap.containsKey(r.getBeadCode()))
         //         .collect(Collectors.toList());
@@ -93,33 +123,120 @@ public class TqResultPersistHandler extends AbsTqScheduleStepHandler {
         List<TqScheduleResultVo> normalScheduleList = scheduleList;
         log.info("[S4] 排程数据:{}条（外协分离逻辑已废弃，统一写入主表）", normalScheduleList.size());
 
-        // 2. 同步排程数据到日志表，删除历史数据
+        // 4. 同步排程数据到日志表，删除历史数据
         syncTqScheduleToLog(scheduleDate);
 
-        // 3. 创建自动排程记录
+        // 5. 创建自动排程记录
         createScheduleRecord(scheduleDate, cxBatchNo, batchNo);
 
-        // 4. 批量新增外协排程结果数据（外协逻辑已废弃，不再写入 T_TQ_ASSIST_SCHEDULE）
+        // 6. 批量新增外协排程结果数据（外协逻辑已废弃，不再写入 T_TQ_ASSIST_SCHEDULE）
         // if (CollectionUtils.isNotEmpty(assistScheduleList)) {
         //     tqEngineMapper.batchCreateAssistScheduleResult(assistScheduleList);
         //     log.info("[S4] 外协排程结果保存完成, 记录数:{}", assistScheduleList.size());
         // }
 
-        // 5. 查询已有排程记录并合并
+        // 7. 查询已有排程记录并合并
         List<TqScheduleResultVo> existScheduleList = tqEngineMapper.listTqEnginSchedule(scheduleDate);
         context.setExistScheduleList(existScheduleList);
         normalScheduleList = mergeExistSchedule(batchNo, normalScheduleList, existScheduleList);
 
-        // 6. 批量新增排程结果数据（统一写入主表）
+        // 8. 批量新增排程结果数据（统一写入主表）
         if (CollectionUtils.isNotEmpty(normalScheduleList)) {
             tqEngineMapper.batchCreateScheduleResult(normalScheduleList);
             context.setInsertedCount(normalScheduleList.size());
-            log.info("[S4] 排程结果保存完成, 记录数:{}", normalScheduleList.size());
+            persistResult.setResultCount(normalScheduleList.size());
+            // 统计填充了 explainJson 的记录数
+            long explainCount = normalScheduleList.stream()
+                    .filter(r -> StringUtils.isNotEmpty(r.getExplainJson()))
+                    .count();
+            persistResult.setExplainCount((int) explainCount);
+            log.info("[S4] 排程结果保存完成, 记录数:{}, 解释记录数:{}",
+                    normalScheduleList.size(), explainCount);
+        }
+
+        // 9. Phase 4 重构新增：构建质量指标摘要，写入 context 供后续日志和返回
+        try {
+            Map<String, Object> qualitySummary = tqScheduleQualitySummaryService.build(context, persistResult);
+            context.setQualitySummary(qualitySummary);
+            log.info("[S6] 质量指标摘要: {}", qualitySummary);
+            autoScheduleLogService.insertTqScheduleLog(batchNo, "",
+                    "S6-质量汇总", formatQualitySummary(qualitySummary));
+        } catch (Exception e) {
+            // 质量汇总失败不应阻断主流程，仅记录错误
+            String errorMsg = "质量指标汇总失败: " + e.getMessage();
+            persistResult.addErrorMsg(errorMsg);
+            log.warn("[S6] 质量指标汇总失败: {}", e.getMessage(), e);
         }
 
         autoScheduleLogService.insertTqScheduleLog(batchNo, "",
                 "自动排程完成", "排程记录数:" + scheduleList.size()
-                        + ", 保存记录数:" + normalScheduleList.size());
+                        + ", 保存记录数:" + normalScheduleList.size()
+                        + ", 未排数:" + persistResult.getUnplannedCount()
+                        + ", 解释数:" + persistResult.getExplainCount());
+    }
+
+    /**
+     * 构建解释快照并填充 explainJson 字段。
+     *
+     * <p>Phase 4 重构新增：替代原 {@code fillExplainJson} 方法，从仅序列化 {@code TqRuleTrace}
+     * 升级为构建完整解释快照（含规则命中、候选机台、未排证据、异常等多元字段）。</p>
+     *
+     * <p>处理逻辑：</p>
+     * <ul>
+     *   <li>遍历所有排程结果（包括将被过滤的未排任务），按 beadCode 构建解释快照</li>
+     *   <li>调用 {@link TqSnapshotBuildService#buildTaskExplain} 构建快照</li>
+     *   <li>调用 {@link TqSnapshotBuildService#toExplainJson} 序列化为 JSON 文本</li>
+     *   <li>快照写入 context.snapshotMap 供后续查询</li>
+     *   <li>JSON 文本写入 scheduleVo.explainJson 字段，落库到 T_TQ_SCHEDULE_RESULT.EXPLAIN_JSON</li>
+     * </ul>
+     *
+     * @param context      排程上下文
+     * @param scheduleList 排程结果列表（按引用写入 explainJson 字段）
+     */
+    private void buildSnapshotAndFillExplainJson(TqScheduleContext context, List<TqScheduleResultVo> scheduleList) {
+        if (scheduleList == null || scheduleList.isEmpty()) {
+            return;
+        }
+        Map<String, TqSnapshotBuildResult> snapshotMap = context.getSnapshotMap();
+        for (TqScheduleResultVo scheduleVo : scheduleList) {
+            String beadCode = scheduleVo.getBeadCode();
+            try {
+                // 构建解释快照
+                TqSnapshotBuildResult snapshot = tqSnapshotBuildService.buildTaskExplain(scheduleVo, context);
+                snapshotMap.put(beadCode, snapshot);
+                // 序列化为 JSON 文本，写入排程结果的 explainJson 字段
+                String explainJson = tqSnapshotBuildService.toExplainJson(snapshot);
+                scheduleVo.setExplainJson(explainJson);
+            } catch (Exception e) {
+                // 构建失败不应阻断主流程，仅记录日志并设置为 null
+                log.warn("[S6] 构建解释快照失败, beadCode:{}, 错误:{}", beadCode, e.getMessage());
+                scheduleVo.setExplainJson(null);
+                if (context.getPersistResult() != null) {
+                    context.getPersistResult().addErrorMsg(
+                            "构建解释快照失败, beadCode=" + beadCode + ": " + e.getMessage());
+                }
+            }
+        }
+    }
+
+    /**
+     * 格式化质量指标摘要为日志文本。
+     *
+     * @param qualitySummary 质量指标摘要
+     * @return 格式化后的文本
+     */
+    private String formatQualitySummary(Map<String, Object> qualitySummary) {
+        if (qualitySummary == null || qualitySummary.isEmpty()) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder();
+        qualitySummary.forEach((key, value) -> {
+            if (sb.length() > 0) {
+                sb.append(", ");
+            }
+            sb.append(key).append("=").append(value);
+        });
+        return sb.toString();
     }
 
     /**
@@ -154,7 +271,7 @@ public class TqResultPersistHandler extends AbsTqScheduleStepHandler {
      * </ul>
      */
     private List<TqScheduleResultVo> mergeExistSchedule(String batchNo, List<TqScheduleResultVo> autoScheduleList,
-                                                         List<TqScheduleResultVo> existScheduleList) {
+                                                        List<TqScheduleResultVo> existScheduleList) {
         if (CollectionUtils.isEmpty(existScheduleList)) {
             return autoScheduleList;
         }
@@ -223,6 +340,22 @@ public class TqResultPersistHandler extends AbsTqScheduleStepHandler {
     }
 
     /**
+     * 判断排程记录是否为无效数据（应过滤掉，不落库）。
+     *
+     * <p>过滤条件：</p>
+     * <ul>
+     *   <li>6个班次计划量均为空或0 → 无排产任务</li>
+     *   <li>机台编码为空 → 未成功分配机台，无法执行生产</li>
+     * </ul>
+     *
+     * @param scheduleVo 排程记录
+     * @return true表示应过滤掉；false表示有效数据，应保留
+     */
+    private boolean isInvalidSchedule(TqScheduleResultVo scheduleVo) {
+        return isAllClassPlanEmpty(scheduleVo) || StringUtils.isEmpty(scheduleVo.getMachineCode());
+    }
+
+    /**
      * 判断6个班次的计划量是否全部为空或0。
      *
      * <p>用于过滤无效排程数据：6个班次都没排计划量的记录不应落库。</p>
@@ -244,5 +377,41 @@ public class TqResultPersistHandler extends AbsTqScheduleStepHandler {
      */
     private boolean isPlanEmpty(Double planQty) {
         return planQty == null || planQty <= 0;
+    }
+
+    /**
+     * 填充规则解释JSON字段（explainJson）。
+     *
+     * <p>Phase 2 实现（已被 Phase 4 {@link #buildSnapshotAndFillExplainJson} 替代，仅保留方法签名避免外部引用断裂）。</p>
+     *
+     * <p>历史实现：把 Context 中按 beadCode 聚合的 {@link com.zlt.aps.tq.engine.domain.TqRuleTrace}
+     * 序列化为 JSON 文本，写入每条排程结果的 explainJson 字段。
+     * Phase 4 升级为构建完整解释快照（含规则命中、候选机台、未排证据、异常等多元字段）。</p>
+     *
+     * @param context      排程上下文（含 ruleTraceMap）
+     * @param scheduleList 排程结果列表（按引用写入 explainJson 字段）
+     * @deprecated Phase 4 重构后由 {@link #buildSnapshotAndFillExplainJson} 替代
+     */
+    @Deprecated
+    private void fillExplainJson(TqScheduleContext context, List<TqScheduleResultVo> scheduleList) {
+        if (scheduleList == null || scheduleList.isEmpty()) {
+            return;
+        }
+        for (TqScheduleResultVo scheduleVo : scheduleList) {
+            String beadCode = scheduleVo.getBeadCode();
+            com.zlt.aps.tq.engine.domain.TqRuleTrace trace = context.getRuleTrace(beadCode);
+            if (trace == null || trace.getRuleHits().isEmpty()) {
+                // 无证据时设置为 null，数据库存储 NULL
+                scheduleVo.setExplainJson(null);
+                continue;
+            }
+            try {
+                scheduleVo.setExplainJson(trace.toExplainJson());
+            } catch (Exception e) {
+                // 序列化失败不应阻断主流程，仅记录日志并设置为 null
+                log.warn("[S6] 序列化规则解释JSON失败, beadCode:{}, 错误:{}", beadCode, e.getMessage());
+                scheduleVo.setExplainJson(null);
+            }
+        }
     }
 }

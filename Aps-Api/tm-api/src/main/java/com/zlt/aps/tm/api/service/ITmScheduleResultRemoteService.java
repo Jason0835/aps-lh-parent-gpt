@@ -4,13 +4,11 @@ import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.zlt.aps.tm.api.domain.dto.TmRollingCheckRequestDTO;
 import com.zlt.aps.tm.api.domain.dto.TmRollingRecalcRequestDTO;
 import com.zlt.aps.tm.api.domain.dto.TmScheduleResultImportDTO;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
-import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleRequestVo;
-import com.zlt.aps.tm.api.domain.vo.TmInsertTaskRequestVo;
-import com.zlt.aps.tm.api.domain.vo.TmOperationTaskVo;
-import com.zlt.aps.tm.api.domain.vo.TmScheduleShiftDateVO;
+import com.zlt.aps.tm.api.domain.vo.*;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
@@ -108,6 +106,16 @@ public interface ITmScheduleResultRemoteService {
     @PostMapping("/tmScheduleResult/summary")
     AjaxResult summary(@RequestBody TmScheduleResult queryVO);
 
+    /**
+     * 分页查询胎面未排任务。
+     *
+     * @param queryVO 工厂、排程日期、可选批次和分页条件
+     * @return 未排任务分页结果
+     */
+    @ApiOperation("查询胎面未排任务")
+    @PostMapping("/tmScheduleResult/unplanned/list")
+    TmScheduleUnplannedPageVo listUnplanned(@RequestBody TmScheduleUnplannedQueryVo queryVO);
+
     @ApiOperation("导出列表")
     @PostMapping("/tmScheduleResult/exportData/{fileName}")
     byte[] exportData(@RequestBody TmScheduleResult queryVO, @PathVariable("fileName") String fileName);
@@ -165,6 +173,16 @@ public interface ITmScheduleResultRemoteService {
     @ApiOperation("胎面自动滚动重算")
     @PostMapping("/tmScheduleResult/rollingRecalc")
     AjaxResult rollingRecalc(@RequestBody TmRollingRecalcRequestDTO request);
+
+    /**
+     * 由job服务检查胎面自动滚动班次窗口。
+     *
+     * @param request 可选工厂和触发时间
+     * @return 本次命中的滚动结果
+     */
+    @ApiOperation("检查胎面自动滚动班次窗口")
+    @PostMapping("/tmScheduleResult/internal/checkTimedRolling")
+    AjaxResult checkTimedRolling(@RequestBody TmRollingCheckRequestDTO request);
 
     /**
      * 人工插入排程任务。

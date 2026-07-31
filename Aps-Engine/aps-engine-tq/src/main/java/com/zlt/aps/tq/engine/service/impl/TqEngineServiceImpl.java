@@ -836,7 +836,6 @@ public class TqEngineServiceImpl implements TqEngineService {
             log.error("月计划汇总数据为空，物料编号为：", scheduleResultVo.getBeadCode());
             return;
         }
-        Double monthFinishQty = monthSurplusVo.getMonthFinishQty();  //月度计划完成量
         Double monthRemainQty = monthSurplusVo.getMonthRemainQty();  //月度计划剩余量
         if(monthRemainQty < closeOutNum) {
             //剩余量小宇等于“临近收尾阈值”，设置收尾提示
@@ -847,19 +846,20 @@ public class TqEngineServiceImpl implements TqEngineService {
         autoScheduleLogService.insertTqScheduleLog(scheduleResultVo.getBatchNo(), scheduleResultVo.getOrderNo(), "设置收尾提示标识markCloseOutTip",
                 logSplit("剩余量小宇等于“临近收尾阈值”，设置收尾提示","月度计划剩余量：" + monthRemainQty + ",提示收尾阈值：" + closeOutNum, "最终的排程数据：" + toJSONString(scheduleResultVo)));  //添加日志
 
-        if(monthFinishQty == 0D) {
-            //没有完成量
-            scheduleResultVo.setProductionStatus(EngineConstants.PRODUCTION_STATUS_NOT);
-        } else if(monthFinishQty > 0D && monthRemainQty > 0) {
-            //完成量大于0，月度计划量也大于0，说明出于生产中
-            scheduleResultVo.setProductionStatus(EngineConstants.PRODUCTION_STATUS_ING);
-        } else if(monthRemainQty <= 0) {
-            //月度计划量小于等于0，说明出于生产完成
+        // 月计划完成量（monthFinishQty）不再从t_mp_month_plan_prod_final查询，
+        // 改为MES回报后通过t_tq_sche_finish_qty回填。自动排程阶段仅基于monthRemainQty判断生产状态。
+        if(monthRemainQty <= 0) {
+            //月度计划量小于等于0，说明生产完成
             scheduleResultVo.setProductionStatus(EngineConstants.PRODUCTION_STATUS_FINISH);
+        } else if(monthRemainQty < closeOutNum) {
+            //有剩余量且低于收尾阈值，视为生产中
+            scheduleResultVo.setProductionStatus(EngineConstants.PRODUCTION_STATUS_ING);
+        } else {
+            scheduleResultVo.setProductionStatus(EngineConstants.PRODUCTION_STATUS_NOT);
         }
         autoScheduleLogService.insertTqScheduleLog(scheduleResultVo.getBatchNo(), scheduleResultVo.getOrderNo(), "修改生产状态productionStatus",
-                logSplit("①完成量为0，对应生产状态：未生产;②完成量大于0，月度计划量也大于0，说明出于生产中;③月度计划量小于等于0，说明出于生产完成",
-                        "月度计划剩余量：" + monthRemainQty + ",月度计划完成量：" + monthFinishQty, "最终的排程数据：" + toJSONString(scheduleResultVo)));  //添加日志
+                logSplit("①月度计划剩余量<=0，生产完成;②月度计划剩余量<收尾阈值，生产中;③月度计划剩余量>=收尾阈值，未生产",
+                        "月度计划剩余量：" + monthRemainQty, "最终的排程数据：" + toJSONString(scheduleResultVo)));  //添加日志
     }
 
     /**

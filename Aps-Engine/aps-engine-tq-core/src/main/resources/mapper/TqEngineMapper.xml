@@ -5,68 +5,69 @@
     <!-- 查询成型排程基础数据，获取胎圈需求对应的成型各班次消耗量 -->
     <select id="statTqScheduleBase" resultType="com.zlt.aps.tq.engine.vo.TqScheduleResultVo" parameterType="string">
         select
-               max(cxr.SCHEDULE_DATE) SCHEDULE_DATE, /*排程日期*/
-               max(cxr.CX_BATCH_NO) CX_BATCH_NO, /*成型批次号*/
-               ci.TIRE_RING_CODE BEAD_CODE,   /*胎圈代码*/
-               max(ci.PRO_SIZE) DIMENSION,   /*寸口*/
-               max(ci.BEAD_CODE) STEEL_RING_CODE, /*钢丝圈代码*/
-               max(ci.APEX_CODE) TRIANGLE_GLUE_CODE,  /*三角胶代码*/
-               max(ci.HEXAGON_RUBBER_CODE) GLUE_CODE,  /*胶料代码*/
-               max(ci.HEXAGON_MOUTH_PLATE) MOUTH_PLATE_CODE,  /*口型板代码*/
-               min(ci.HEXAGON_RUBBER_DIMENSION) SPEC_SIZE,  /*尺寸*/
-               1 UNIT_CONSUME, /*单耗(胎圈长)*/
-               IFNULL(sum(cxr.CLASS1_PLAN_QTY),0) CX_CLASS1_PLAN,  /*对应成型1班(D日早班)的消耗量，库存直接供应*/
-               IFNULL(sum(cxr.CLASS2_PLAN_QTY),0) CX_CLASS2_PLAN,  /*对应成型2班(D日中班)的消耗量，库存+当天早班产出供应*/
-               IFNULL(sum(cxr.CLASS3_PLAN_QTY),0) CX_CLASS3_PLAN,  /*对应成型3班(D+1日夜班)的消耗量，胎圈1班供应*/
-               IFNULL(sum(cxr.CLASS4_PLAN_QTY),0) CX_CLASS4_PLAN,  /*对应成型4班(D+1日早班)的消耗量，胎圈2班供应*/
-               IFNULL(sum(cxr.CLASS5_PLAN_QTY),0) CX_CLASS5_PLAN,  /*对应成型5班(D+1日中班)的消耗量，胎圈3班供应*/
-               IFNULL(sum(cxr.CLASS6_PLAN_QTY),0) CX_CLASS6_PLAN,  /*对应成型6班(D+2日夜班)的消耗量，胎圈4班供应*/
-               IFNULL(sum(cxr.CLASS7_PLAN_QTY),0) CX_CLASS7_PLAN,  /*对应成型7班(D+2日早班)的消耗量，胎圈5班供应*/
-               IFNULL(sum(cxr.CLASS8_PLAN_QTY),0) CX_CLASS8_PLAN,  /*对应成型8班(D+2日中班)的消耗量，胎圈6班供应*/
-               /* quotaKeys 第三段使用施工表版本ci.CONSTRUCTION_VERSION而非cxr.BOM_DATA_VERSION：
-                  下游 CxEngineQuotaCommonService.getCxMachineQuota 严格按3段解析(机台$胎胚$版本)，
-                  并用 embryoCode+version 去 embryoCodeConstructionMap 匹配施工信息(该Map key=胎胚代码+施工表版本)。
-                  成型侧不再存BOM_DATA_VERSION，必须传施工表版本否则定额查不到导致供应时长为0。 */
-               GROUP_CONCAT(DISTINCT concat(cxr.CX_MACHINE_CODE,'$',cxr.EMBRYO_CODE,'$',ci.CONSTRUCTION_VERSION) order by cxr.CX_MACHINE_CODE,cxr.EMBRYO_CODE,ci.CONSTRUCTION_VERSION SEPARATOR ',') as quotaKeys, /*机台code$胎胚代码$施工表版本*/
-               /* 是否含试制/量试物料标记（1=是，0=否）
-                  关联SKU与示方书关系表，按物料编码取制造示方类型最新一条
-                  只要存在T(量试)或X(试制)的物料，标记为1，触发主动备库 */
-               IFNULL(MAX(trialFlag.HAS_TRIAL), 0) EMBRYO_TYPE_FLAG /*是否含试制/量试物料标记*/
+            max(cxr.SCHEDULE_DATE) SCHEDULE_DATE, /*排程日期*/
+            max(cxr.CX_BATCH_NO) CX_BATCH_NO, /*成型批次号*/
+            ci.TIRE_RING_CODE BEAD_CODE,   /*胎圈代码*/
+            max(ci.PRO_SIZE) DIMENSION,   /*寸口*/
+            max(ci.BEAD_CODE) STEEL_RING_CODE, /*钢丝圈代码*/
+            max(ci.APEX_CODE) TRIANGLE_GLUE_CODE,  /*三角胶代码*/
+            max(ci.HEXAGON_RUBBER_CODE) GLUE_CODE,  /*胶料代码*/
+            max(ci.HEXAGON_MOUTH_PLATE) MOUTH_PLATE_CODE,  /*口型板代码*/
+            min(ci.HEXAGON_RUBBER_DIMENSION) SPEC_SIZE,  /*尺寸*/
+            1 UNIT_CONSUME, /*单耗(胎圈长)*/
+            IFNULL(sum(cxr.CLASS1_PLAN_QTY),0) CX_CLASS1_PLAN,  /*对应成型1班(D日早班)的消耗量，库存直接供应*/
+            IFNULL(sum(cxr.CLASS2_PLAN_QTY),0) CX_CLASS2_PLAN,  /*对应成型2班(D日中班)的消耗量，库存+当天早班产出供应*/
+            IFNULL(sum(cxr.CLASS3_PLAN_QTY),0) CX_CLASS3_PLAN,  /*对应成型3班(D+1日夜班)的消耗量，胎圈1班供应*/
+            IFNULL(sum(cxr.CLASS4_PLAN_QTY),0) CX_CLASS4_PLAN,  /*对应成型4班(D+1日早班)的消耗量，胎圈2班供应*/
+            IFNULL(sum(cxr.CLASS5_PLAN_QTY),0) CX_CLASS5_PLAN,  /*对应成型5班(D+1日中班)的消耗量，胎圈3班供应*/
+            IFNULL(sum(cxr.CLASS6_PLAN_QTY),0) CX_CLASS6_PLAN,  /*对应成型6班(D+2日夜班)的消耗量，胎圈4班供应*/
+            IFNULL(sum(cxr.CLASS7_PLAN_QTY),0) CX_CLASS7_PLAN,  /*对应成型7班(D+2日早班)的消耗量，胎圈5班供应*/
+            IFNULL(sum(cxr.CLASS8_PLAN_QTY),0) CX_CLASS8_PLAN,  /*对应成型8班(D+2日中班)的消耗量，胎圈6班供应*/
+            /* quotaKeys 第三段使用施工表版本ci.CONSTRUCTION_VERSION而非cxr.BOM_DATA_VERSION：
+               下游 CxEngineQuotaCommonService.getCxMachineQuota 严格按3段解析(机台$胎胚$版本)，
+               并用 embryoCode+version 去 embryoCodeConstructionMap 匹配施工信息(该Map key=胎胚代码+施工表版本)。
+               成型侧不再存BOM_DATA_VERSION，必须传施工表版本否则定额查不到导致供应时长为0。 */
+            GROUP_CONCAT(DISTINCT concat(cxr.CX_MACHINE_CODE,'$',cxr.EMBRYO_CODE,'$',ci.CONSTRUCTION_VERSION) order by cxr.CX_MACHINE_CODE,cxr.EMBRYO_CODE,ci.CONSTRUCTION_VERSION SEPARATOR ',') as quotaKeys, /*机台code$胎胚代码$施工表版本*/
+            /* 是否含试制/量试物料标记（1=是，0=否）
+               关联SKU与示方书关系表，按物料编码取制造示方类型最新一条
+               只要存在T(量试)或X(试制)的物料，标记为1，触发主动备库 */
+            IFNULL(MAX(trialFlag.HAS_TRIAL), 0) EMBRYO_TYPE_FLAG /*是否含试制/量试物料标记*/
         from T_CX_SCHEDULE_RESULT cxr /*成型排程结果表*/
         /* 成型排程结果不再存储BOM_DATA_VERSION，无法按版本精确关联施工信息表。
            改为仅按胎胚代码关联，并取施工信息表中CREATE_TIME最新的一条记录（兼容多版本场景，MySQL 5.x子查询limit写法）。
            UPDATE_TIME插入时为NULL故改用CREATE_TIME排序；追加ID排序保证稳定性。
            使用inner join：找不到施工记录的胎胚自然过滤掉，避免计划量重复求和。 */
-        inner join T_MDM_CONSTRUCTION_INFO ci on ci.ID = (
+                 inner join T_MDM_CONSTRUCTION_INFO ci on ci.ID = (
             select ci2.ID
             from T_MDM_CONSTRUCTION_INFO ci2
             where ci2.CONSTRUCTION_CODE = cxr.EMBRYO_CODE
               and ci2.IS_DELETE = 0
             order by ci2.CREATE_TIME desc, ci2.ID desc
             limit 1
-        )
-        /* 关联SKU与示方书关系表预聚合：按胎胚代码分组，判断是否存在试制/量试物料的示方类型
-           触发主动备库：试制(X)/量试(T)规格在胎圈1班直接备库N个班的量
-           注：同一物料在SKU关系表中可能存在S/X/T多条记录（CREATE_TIME相同），
-           不能用LIMIT 1取最新一条（会漏判X/T），直接关联EMBRYO_TYPE IN ('T','X')即可。
-           注：MATERIAL_CODE可能为逗号分隔的多值字符串（如"3302001002,3302000750"），
-           使用FIND_IN_SET拆分匹配，避免精确匹配失败导致漏判。 */
-        left join (
-            select cxr3.EMBRYO_CODE,
-                   1 as HAS_TRIAL
-            from T_CX_SCHEDULE_RESULT cxr3
+            )
+            /* 关联SKU与示方书关系表预聚合：按胎胚代码分组，判断是否存在试制/量试物料的示方类型
+               触发主动备库：试制(X)/量试(T)规格在胎圈1班直接备库N个班的量
+               注：同一物料在SKU关系表中可能存在S/X/T多条记录（CREATE_TIME相同），
+               不能用LIMIT 1取最新一条（会漏判X/T），直接关联EMBRYO_TYPE IN ('T','X')即可。
+               注：MATERIAL_CODE可能为逗号分隔的多值字符串（如"3302001002,3302000750"），
+               使用FIND_IN_SET拆分匹配，避免精确匹配失败导致漏判。 */
+            left join (
+        select cxr3.EMBRYO_CODE,
+            1 as HAS_TRIAL
+        from T_CX_SCHEDULE_RESULT cxr3
             inner join T_MDM_SKU_CONSTRUCTION_REF sr
-                on sr.IS_DELETE = 0
-                and sr.EMBRYO_TYPE IN ('T', 'X')
-                and (
-                    FIND_IN_SET(sr.MATERIAL_CODE, cxr3.MATERIAL_CODE) > 0
-                    or sr.MATERIAL_CODE = cxr3.MATERIAL_CODE
-                )
-            where cxr3.SCHEDULE_DATE = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
-              and cxr3.IS_DELETE = 0
-            group by cxr3.EMBRYO_CODE
-        ) trialFlag on trialFlag.EMBRYO_CODE = cxr.EMBRYO_CODE
+        on sr.IS_DELETE = 0
+            and sr.EMBRYO_TYPE IN ('T', 'X')
+            and (
+            FIND_IN_SET(sr.MATERIAL_CODE, cxr3.MATERIAL_CODE) > 0
+            or sr.MATERIAL_CODE = cxr3.MATERIAL_CODE
+            )
+        where cxr3.SCHEDULE_DATE = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
+          and cxr3.IS_DELETE = 0
+        group by cxr3.EMBRYO_CODE
+            ) trialFlag on trialFlag.EMBRYO_CODE = cxr.EMBRYO_CODE
         where cxr.SCHEDULE_DATE = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
+          and cxr.IS_DELETE = 0
         group by ci.TIRE_RING_CODE
     </select>
 
@@ -119,34 +120,39 @@
     <!-- 批量插入胎圈排程结果（6班次，按主表T_TQ_SCHEDULE_RESULT真实字段） -->
     <insert id="batchCreateScheduleResult" parameterType="list">
         insert into T_TQ_SCHEDULE_RESULT (ID, SCHEDULE_DATE, CX_BATCH_NO, BATCH_NO, ORDER_NO, BEAD_CODE, STEEL_RING_CODE, TRIANGLE_GLUE_CODE,
-                                          MACHINE_CODE, STOCK_QTY,
-                                          CLASS1_PLAN_QTY, CLASS1_SEQUENCE, CLASS1_ANALYSIS,
-                                          CLASS2_PLAN_QTY, CLASS2_SEQUENCE, CLASS2_ANALYSIS,
-                                          CLASS3_PLAN_QTY, CLASS3_SEQUENCE, CLASS3_ANALYSIS,
-                                          CLASS4_PLAN_QTY, CLASS4_SEQUENCE, CLASS4_ANALYSIS,
-                                          CLASS5_PLAN_QTY, CLASS5_SEQUENCE, CLASS5_ANALYSIS,
-                                          CLASS6_PLAN_QTY, CLASS6_SEQUENCE, CLASS6_ANALYSIS,
-                                          CX_CLASS1_PLAN, CX_CLASS2_PLAN,
-                                          IS_RELEASE, REMARK, CREATE_BY, CREATE_TIME,
-                                          CLOSE_OUT_SPEC_FLAG, TODAY_MORNING_PLAN_QTY, FACTORY_CODE, DATA_SOURCE,
-                                          USE_BACKUP_CONFIG_FLAG, BACKUP_SHIFT_COUNT, BACKUP_TRIGGER_CLASS)
+        MACHINE_CODE, STOCK_QTY, MONTH_SURPLUS_QTY,
+        CLASS1_PLAN_QTY, CLASS1_SEQUENCE, CLASS1_ANALYSIS,
+        CLASS2_PLAN_QTY, CLASS2_SEQUENCE, CLASS2_ANALYSIS,
+        CLASS3_PLAN_QTY, CLASS3_SEQUENCE, CLASS3_ANALYSIS,
+        CLASS4_PLAN_QTY, CLASS4_SEQUENCE, CLASS4_ANALYSIS,
+        CLASS5_PLAN_QTY, CLASS5_SEQUENCE, CLASS5_ANALYSIS,
+        CLASS6_PLAN_QTY, CLASS6_SEQUENCE, CLASS6_ANALYSIS,
+        CX_CLASS1_PLAN, CX_CLASS2_PLAN, CX_CLASS3_PLAN, CX_CLASS4_PLAN, CX_CLASS5_PLAN, CX_CLASS6_PLAN, CX_CLASS7_PLAN, CX_CLASS8_PLAN,
+        IS_RELEASE, REMARK, CREATE_BY, CREATE_TIME,
+        CLOSE_OUT_SPEC_FLAG, TODAY_MORNING_PLAN_QTY, FACTORY_CODE, DATA_SOURCE,
+        USE_BACKUP_CONFIG_FLAG, BACKUP_SHIFT_COUNT, BACKUP_TRIGGER_CLASS,
+        EXPLAIN_JSON)
         values
-            <foreach collection="scheduleResultList" item="schedule" separator=",">
-                  (NULL,
-                          #{schedule.scheduleDate},#{schedule.cxBatchNo,jdbcType=VARCHAR},#{schedule.batchNo},#{schedule.orderNo},#{schedule.beadCode},#{schedule.steelRingCode,jdbcType=VARCHAR},#{schedule.triangleGlueCode,jdbcType=VARCHAR},
-                          #{schedule.machineCode,jdbcType=VARCHAR},#{schedule.stockQty,jdbcType=DOUBLE},
-                          #{schedule.class1PlanQty,jdbcType=DOUBLE},#{schedule.class1ProduceOrder,jdbcType=INTEGER},#{schedule.class1SysAnalysis,jdbcType=VARCHAR},
-                          #{schedule.class2PlanQty,jdbcType=DOUBLE},#{schedule.class2ProduceOrder,jdbcType=INTEGER},#{schedule.class2SysAnalysis,jdbcType=VARCHAR},
-                          #{schedule.class3PlanQty,jdbcType=DOUBLE},#{schedule.class3ProduceOrder,jdbcType=INTEGER},#{schedule.class3SysAnalysis,jdbcType=VARCHAR},
-                          #{schedule.class4PlanQty,jdbcType=DOUBLE},#{schedule.class4ProduceOrder,jdbcType=INTEGER},#{schedule.class4SysAnalysis,jdbcType=VARCHAR},
-                          #{schedule.class5PlanQty,jdbcType=DOUBLE},#{schedule.class5ProduceOrder,jdbcType=INTEGER},#{schedule.class5SysAnalysis,jdbcType=VARCHAR},
-                          #{schedule.class6PlanQty,jdbcType=DOUBLE},#{schedule.class6ProduceOrder,jdbcType=INTEGER},#{schedule.class6SysAnalysis,jdbcType=VARCHAR},
-                          #{schedule.cxClass1Plan,jdbcType=INTEGER},#{schedule.cxClass2Plan,jdbcType=INTEGER},
-                          #{schedule.isRelease,jdbcType=VARCHAR},#{schedule.remark,jdbcType=VARCHAR},#{schedule.createBy,jdbcType=VARCHAR},#{schedule.createTime},
-                          #{schedule.closeOutSpecFlag,jdbcType=VARCHAR}, #{schedule.todayMorningPlanQty,jdbcType=DOUBLE}, #{schedule.factoryCode,jdbcType=VARCHAR}, #{schedule.dataSource,jdbcType=VARCHAR},
-                          #{schedule.useBackupConfigFlag,jdbcType=VARCHAR}, #{schedule.backupShiftCount,jdbcType=INTEGER}, #{schedule.backupTriggerClass,jdbcType=INTEGER}
-                  )
-            </foreach>
+        <foreach collection="scheduleResultList" item="schedule" separator=",">
+            (NULL,
+            #{schedule.scheduleDate},#{schedule.cxBatchNo,jdbcType=VARCHAR},#{schedule.batchNo},#{schedule.orderNo},#{schedule.beadCode},#{schedule.steelRingCode,jdbcType=VARCHAR},#{schedule.triangleGlueCode,jdbcType=VARCHAR},
+            #{schedule.machineCode,jdbcType=VARCHAR},#{schedule.stockQty,jdbcType=DOUBLE},#{schedule.monthSurplusQty,jdbcType=INTEGER},
+            #{schedule.class1PlanQty,jdbcType=DOUBLE},#{schedule.class1ProduceOrder,jdbcType=INTEGER},#{schedule.class1SysAnalysis,jdbcType=VARCHAR},
+            #{schedule.class2PlanQty,jdbcType=DOUBLE},#{schedule.class2ProduceOrder,jdbcType=INTEGER},#{schedule.class2SysAnalysis,jdbcType=VARCHAR},
+            #{schedule.class3PlanQty,jdbcType=DOUBLE},#{schedule.class3ProduceOrder,jdbcType=INTEGER},#{schedule.class3SysAnalysis,jdbcType=VARCHAR},
+            #{schedule.class4PlanQty,jdbcType=DOUBLE},#{schedule.class4ProduceOrder,jdbcType=INTEGER},#{schedule.class4SysAnalysis,jdbcType=VARCHAR},
+            #{schedule.class5PlanQty,jdbcType=DOUBLE},#{schedule.class5ProduceOrder,jdbcType=INTEGER},#{schedule.class5SysAnalysis,jdbcType=VARCHAR},
+            #{schedule.class6PlanQty,jdbcType=DOUBLE},#{schedule.class6ProduceOrder,jdbcType=INTEGER},#{schedule.class6SysAnalysis,jdbcType=VARCHAR},
+            #{schedule.cxClass1Plan,jdbcType=INTEGER},#{schedule.cxClass2Plan,jdbcType=INTEGER},
+            #{schedule.cxClass3Plan,jdbcType=INTEGER},#{schedule.cxClass4Plan,jdbcType=INTEGER},
+            #{schedule.cxClass5Plan,jdbcType=INTEGER},#{schedule.cxClass6Plan,jdbcType=INTEGER},
+            #{schedule.cxClass7Plan,jdbcType=INTEGER},#{schedule.cxClass8Plan,jdbcType=INTEGER},
+            #{schedule.isRelease,jdbcType=VARCHAR},#{schedule.remark,jdbcType=VARCHAR},#{schedule.createBy,jdbcType=VARCHAR},#{schedule.createTime},
+            #{schedule.closeOutSpecFlag,jdbcType=VARCHAR}, #{schedule.todayMorningPlanQty,jdbcType=DOUBLE}, #{schedule.factoryCode,jdbcType=VARCHAR}, #{schedule.dataSource,jdbcType=VARCHAR},
+            #{schedule.useBackupConfigFlag,jdbcType=VARCHAR}, #{schedule.backupShiftCount,jdbcType=INTEGER}, #{schedule.backupTriggerClass,jdbcType=INTEGER},
+            #{schedule.explainJson,jdbcType=CLOB}
+            )
+        </foreach>
     </insert>
 
     <!-- 批量插入胎圈辅助排程结果（外协逻辑已废弃，6班次排程不再使用，SQL整体注释保留） -->
@@ -205,20 +211,21 @@
                CX_CLASS1_PLAN, CX_CLASS2_PLAN,
                IS_RELEASE, REMARK, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME,
                DATA_SOURCE, TODAY_MORNING_PLAN_QTY, CLOSE_OUT_SPEC_FLAG, FACTORY_CODE,
-               USE_BACKUP_CONFIG_FLAG, BACKUP_SHIFT_COUNT, BACKUP_TRIGGER_CLASS
+               USE_BACKUP_CONFIG_FLAG, BACKUP_SHIFT_COUNT, BACKUP_TRIGGER_CLASS,
+               EXPLAIN_JSON
         from t_tq_schedule_result r
         where schedule_date = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
-        and IS_DELETE = 0
+          and IS_DELETE = 0
     </select>
 
     <select id="listTqScheduleBaseInfo" parameterType="string" resultType="com.zlt.aps.tq.engine.vo.TqScheduleBaseInfoVo">
-         select
-               ci.TIRE_RING_CODE BEAD_CODE,   /*胎圈代码*/
-               max(ci.BEAD_CODE) STEEL_RING_CODE, /*钢丝圈代码*/
-               max(ci.APEX_CODE) TRIANGLE_GLUE_CODE,  /*三角胶代码*/
-               max(ci.HEXAGON_RUBBER_CODE) GLUE_CODE,  /*胶料代码*/
-               max(ci.HEXAGON_MOUTH_PLATE) MOUTH_PLATE_CODE,  /*口型板代码*/
-               max(ci.HEXAGON_RUBBER_DIMENSION) SPEC_SIZE  /*尺寸*/
+        select
+        ci.TIRE_RING_CODE BEAD_CODE,   /*胎圈代码*/
+        max(ci.BEAD_CODE) STEEL_RING_CODE, /*钢丝圈代码*/
+        max(ci.APEX_CODE) TRIANGLE_GLUE_CODE,  /*三角胶代码*/
+        max(ci.HEXAGON_RUBBER_CODE) GLUE_CODE,  /*胶料代码*/
+        max(ci.HEXAGON_MOUTH_PLATE) MOUTH_PLATE_CODE,  /*口型板代码*/
+        max(ci.HEXAGON_RUBBER_DIMENSION) SPEC_SIZE  /*尺寸*/
         from T_MDM_CONSTRUCTION_INFO ci
         where ci.IS_DELETE = 0
         and ci.TIRE_RING_CODE in <foreach collection="beadCodes" item="beadCode" open="(" close=")" separator=",">#{beadCode}</foreach>
@@ -338,20 +345,20 @@
         from (select EMBRYO_CODE, BOM_DATA_VERSION
               from T_CX_SCHEDULE_RESULT
               where IS_DELETE = 0
-              and schedule_date = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
+                and schedule_date = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
               group by EMBRYO_CODE, BOM_DATA_VERSION
-              ) cxr /*成型排程结果表*/
+             ) cxr /*成型排程结果表*/
         /* 成型排程结果不再存储BOM_DATA_VERSION，无法按版本精确关联施工信息表。
            改为仅按胎胚代码关联，并取施工信息表中CREATE_TIME最新的一条记录（兼容多版本场景，MySQL 5.x子查询limit写法）。
            UPDATE_TIME插入时为NULL故改用CREATE_TIME排序；追加ID排序保证稳定性。 */
-        left join T_MDM_CONSTRUCTION_INFO ci on ci.ID = (
+                 left join T_MDM_CONSTRUCTION_INFO ci on ci.ID = (
             select ci2.ID
             from T_MDM_CONSTRUCTION_INFO ci2
             where ci2.CONSTRUCTION_CODE = cxr.EMBRYO_CODE
               and ci2.IS_DELETE = 0
             order by ci2.CREATE_TIME desc, ci2.ID desc
             limit 1
-        )
+            )
     </select>
 
     <!-- 获得外协规格列表（外协逻辑已废弃，6班次排程不再使用，SQL整体注释保留） -->
@@ -386,7 +393,7 @@
     <!-- 查询胎圈机台检修计划，IS_DELETE为逻辑删除字段 -->
     <select id="listMaintenancePlan" resultType="map">
         select MACHINE_CODE as machineCode, DOWNTIME_DATE as downtimeDate,
-               DOWNTIME_SHIFT as downtimeShift, DOWNTIME_HOURS as downtimeHours
+        DOWNTIME_SHIFT as downtimeShift, DOWNTIME_HOURS as downtimeHours
         from T_TQ_MACHINE_MAINTENANCE_PLAN
         where IS_DELETE = '0'
         and DOWNTIME_DATE >= date_format(#{scheduleDate}, '%Y-%m-%d')
@@ -406,18 +413,18 @@
                DAY_FLAG as dayFlag
         from T_MDM_WORK_CALENDAR
         where IS_DELETE = '0'
-        and PROC_CODE = '08'
-        and PRODUCTION_DATE >= date_format(#{scheduleDate}, '%Y-%m-%d')
-        and PRODUCTION_DATE &lt; date_format(date_add(#{scheduleDate}, interval 3 day), '%Y-%m-%d')
+          and PROC_CODE = '08'
+          and PRODUCTION_DATE >= date_format(#{scheduleDate}, '%Y-%m-%d')
+          and PRODUCTION_DATE &lt; date_format(date_add(#{scheduleDate}, interval 3 day), '%Y-%m-%d')
     </select>
 
     <!-- 查询胎圈备库班数配置列表（按工厂过滤） -->
     <select id="listStockShiftConfig" resultType="com.zlt.aps.tq.api.domain.entity.TqStockShiftConfig">
         select ID,
-               FACTORY_CODE,
-               MACHINE_RANGE,
-               MACHINE_COUNT,
-               SHIFT_COUNT
+        FACTORY_CODE,
+        MACHINE_RANGE,
+        MACHINE_COUNT,
+        SHIFT_COUNT
         from T_TQ_STOCK_SHIFT_CONFIG
         where IS_DELETE = 0
         <if test="factoryCode != null and factoryCode != ''">
@@ -432,19 +439,20 @@
             ci.TIRE_RING_CODE as beadCode,
             count(DISTINCT cxr.CX_MACHINE_CODE) as machineCount
         from T_CX_SCHEDULE_RESULT cxr
-        /* 成型排程结果不再存储BOM_DATA_VERSION，改为仅按胎胚代码关联施工信息表并取CREATE_TIME最新一条。
-           UPDATE_TIME插入时为NULL故改用CREATE_TIME排序；追加ID排序保证稳定性。 */
-        inner join T_MDM_CONSTRUCTION_INFO ci on ci.ID = (
+                 /* 成型排程结果不再存储BOM_DATA_VERSION，改为仅按胎胚代码关联施工信息表并取CREATE_TIME最新一条。
+                    UPDATE_TIME插入时为NULL故改用CREATE_TIME排序；追加ID排序保证稳定性。 */
+                 inner join T_MDM_CONSTRUCTION_INFO ci on ci.ID = (
             select ci2.ID
             from T_MDM_CONSTRUCTION_INFO ci2
             where ci2.CONSTRUCTION_CODE = cxr.EMBRYO_CODE
               and ci2.IS_DELETE = 0
             order by ci2.CREATE_TIME desc, ci2.ID desc
             limit 1
-        )
+            )
         where cxr.SCHEDULE_DATE = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
-            and cxr.CX_MACHINE_CODE is not null
-            and cxr.CX_MACHINE_CODE != ''
+          and cxr.IS_DELETE = 0
+          and cxr.CX_MACHINE_CODE is not null
+          and cxr.CX_MACHINE_CODE != ''
         group by ci.TIRE_RING_CODE
     </select>
 

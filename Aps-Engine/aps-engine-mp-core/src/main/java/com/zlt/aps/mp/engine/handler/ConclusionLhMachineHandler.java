@@ -74,13 +74,20 @@ public class ConclusionLhMachineHandler {
     /**
      * 根据需要放入的Sku，获取与其换活字块的前Sku信息
      *
-     * @param context       排产上下文
-     * @param addSkuInfo    即将放入的Sku
-     * @param groupInfo     分组计划
-     * @param productionDay 排产日
+     * @param context                   排产上下文
+     * @param continueType              排产Sku阶段
+     * @param conclusionContinueSkuInfo 续作排产阶段信息
+     * @param addSkuInfo                即将放入的Sku
+     * @param groupInfo                 分组计划
+     * @param productionDay             排产日
      * @return
      */
-    public static BeforeSkuProductionInfo findChangeTypeBlockBeforeSkuByAddSku(Context context, MonthPlanProductionRequirePlanVo addSkuInfo, ProductionPlanGroupInfo groupInfo, Integer productionDay) {
+    public static BeforeSkuProductionInfo findChangeTypeBlockBeforeSkuByAddSku(Context context,
+                                                                               ContinueTypeEnum continueType,
+                                                                               Map<String, CxContinueSkuInfoHelper> conclusionContinueSkuInfo,
+                                                                               MonthPlanProductionRequirePlanVo addSkuInfo,
+                                                                               ProductionPlanGroupInfo groupInfo,
+                                                                               Integer productionDay) {
         if (null == addSkuInfo || null == productionDay) {
             return null;
         }
@@ -96,12 +103,22 @@ public class ConclusionLhMachineHandler {
         Integer changMouldFirstQty = paramConfiguration.getChangeMouldFirstQty();
         boolean isChangeMould = changMouldFirstQty.equals(firstQty);
         if (isChangeMould) {
-            return null;
+            if (!productionContext.isCycleFirstProductionDay(productionDay)) {
+                //非续作第一天
+                return null;
+            }
+            //20260728+ 第一天如果通过排产信息获取不到前Sku余量，则通过续作Sku信息来获取
+            return buildBeforeSkuByContinueSku(addSkuInfo, continueType, conclusionContinueSkuInfo, productionDay);
         }
         //换活字块
         List<SkuDayProductionInfoHelper> conclusionSkuInfo = getConclusionSkuInfo(context, groupInfo, productionDay);
         if (CollectionUtils.isEmpty(conclusionSkuInfo)) {
-            return null;
+            if (!productionContext.isCycleFirstProductionDay(productionDay)) {
+                //非续作第一天
+                return null;
+            }
+            //20260728+ 第一天如果通过排产信息获取不到前Sku余量，则通过续作Sku信息来获取
+            return buildBeforeSkuByContinueSku(addSkuInfo, continueType, conclusionContinueSkuInfo, productionDay);
         }
         //20260521+ 续作换活字块，一定要有前Sku
         BeforeSkuProductionInfo beforeSku = findBeforeSkuProductionInfoByChangeTypeBlock(context, conclusionSkuInfo, productionDay, materialDesc);
@@ -374,5 +391,42 @@ public class ConclusionLhMachineHandler {
         return usedLhMachineList.stream().mapToInt(Integer::intValue).sum();
     }
 
+
+    /**
+     * 场景：如果通过排产信息构建不了前Sku信息，则需要通过续作Sku信息构建
+     *
+     * @param addSkuInfo                选中的Sku信息
+     * @param continueType              续作阶段
+     * @param conclusionContinueSkuInfo 有余量的续作Sku信息集合
+     * @param conclusionDay             收尾日
+     * @return
+     */
+    private static BeforeSkuProductionInfo buildBeforeSkuByContinueSku(MonthPlanProductionRequirePlanVo addSkuInfo, ContinueTypeEnum continueType, Map<String, CxContinueSkuInfoHelper> conclusionContinueSkuInfo, Integer conclusionDay) {
+        if (CollectionUtils.isEmpty(conclusionContinueSkuInfo) || null == addSkuInfo) {
+            return null;
+        }
+        if (ContinueTypeEnum.SAME_SPECIFICATIONS_PATTERN == continueType) {
+            //同规格同花纹
+            for (Map.Entry<String, CxContinueSkuInfoHelper> continueSku : conclusionContinueSkuInfo.entrySet()) {
+                CxContinueSkuInfoHelper continueSkuInfo = continueSku.getValue();
+                String materialDesc = continueSkuInfo.getMaterialDesc();
+                if (continueSkuInfo.getMainPattern().equals(addSkuInfo.getMainPattern()) && addSkuInfo.isSameSpecificationsAndPattern(continueSkuInfo)) {
+                    Integer dayMaxQty = null != continueSkuInfo.getDayVulcanizationQty() ? continueSkuInfo.getMaxDaySingleLhMachineQty() : addSkuInfo.getMaxDaySingleLhMachineQty();
+                    return BeforeSkuProductionInfo.createBySku(materialDesc, continueSkuInfo.getMaterialCode(), conclusionDay, BigDecimal.ZERO.intValue(), dayMaxQty, Collections.emptySet());
+                }
+            }
+            return null;
+        }
+        //共生胎同模具
+        for (Map.Entry<String, CxContinueSkuInfoHelper> continueSku : conclusionContinueSkuInfo.entrySet()) {
+            CxContinueSkuInfoHelper continueSkuInfo = continueSku.getValue();
+            String materialDesc = continueSkuInfo.getMaterialDesc();
+            if (continueSkuInfo.getMainPattern().equals(addSkuInfo.getMainPattern())) {
+                Integer dayMaxQty = null != continueSkuInfo.getDayVulcanizationQty() ? continueSkuInfo.getMaxDaySingleLhMachineQty() : addSkuInfo.getMaxDaySingleLhMachineQty();
+                return BeforeSkuProductionInfo.createBySku(materialDesc, continueSkuInfo.getMaterialCode(), conclusionDay, BigDecimal.ZERO.intValue(), dayMaxQty, Collections.emptySet());
+            }
+        }
+        return null;
+    }
 
 }

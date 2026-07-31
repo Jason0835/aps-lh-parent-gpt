@@ -40,6 +40,20 @@ public class MachineShiftTaskChain<T> {
     }
 
     /**
+     * 获取或创建指定机台全天任务链（不按班次分组）。
+     *
+     * <p>用于胎圈等"一个机台一个链"的业务场景，链内按班次顺序串联。
+     * 与三参数版本的区别：用空 shiftOrder 作为键，避免和胎侧按班次分链冲突。</p>
+     *
+     * @param machineCode  机台编码
+     * @param scheduleDate 排程日期
+     * @return 指定机台的全天任务链
+     */
+    public ScheduleTaskLinkedList<T> getOrCreate(String machineCode, LocalDate scheduleDate) {
+        return getOrCreate(machineCode, scheduleDate, null);
+    }
+
+    /**
      * 读取已存在的指定机台班次链表。
      *
      * @param machineCode  机台编码
@@ -77,6 +91,25 @@ public class MachineShiftTaskChain<T> {
      */
     public java.util.Collection<ScheduleTaskLinkedList<T>> values() {
         return java.util.Collections.unmodifiableCollection(chainMap.values());
+    }
+
+    /**
+     * 清空所有机台班次任务链。
+     *
+     * <p>Phase 5 重构新增：用于胎圈自动排程重新构建任务链前清空旧数据，避免重复加载。
+     * 该方法只清空 {@link #chainMap}，不涉及节点索引（节点索引由调用方自己清空）。</p>
+     */
+    public void clear() {
+        chainMap.clear();
+    }
+
+    /**
+     * 返回已加载任务链数量。
+     *
+     * @return 任务链数量
+     */
+    public int size() {
+        return chainMap.size();
     }
 
     /**

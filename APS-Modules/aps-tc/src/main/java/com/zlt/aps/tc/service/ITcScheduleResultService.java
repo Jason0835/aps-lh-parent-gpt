@@ -75,4 +75,14 @@ public interface ITcScheduleResultService extends IDocService<TcScheduleResult> 
      * @return 排程结果列表
      */
     List<TcScheduleResult> listResult(TcScheduleResult query);
+
+    /**
+     * 管理员直接调整排程结果发布状态。
+     *
+     * @param ids 排程结果 ID，多个 ID 使用英文逗号分隔
+     * @param releaseStatus 目标发布状态编码
+     * @return 修改成功的记录数
+     * @throws com.ruoyi.common.exception.ServiceException 参数为空、状态非法或状态迁移非法时抛出
+     */
+    int changeReleaseStatus(String ids, String releaseStatus);
 }

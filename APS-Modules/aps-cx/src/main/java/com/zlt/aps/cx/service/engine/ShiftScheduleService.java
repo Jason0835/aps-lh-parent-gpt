@@ -287,7 +287,7 @@ public class ShiftScheduleService {
             double hourlyCapacity = getMachineHourlyCapacity(machineCode, task.getMaterialCode(), task.getStructureName(), context);
             double productionHours = shiftQty / hourlyCapacity;
             LocalDateTime startTime = calculateStartTime(machineCode, shiftConfig, scheduleDate, context);
-            LocalDateTime endTime = startTime.plusMinutes((long) (productionHours * 60));
+            LocalDateTime endTime = startTime.plusSeconds((long) (productionHours * 3600));
 
             // 班次结束时间检查
             LocalDateTime shiftEndTime = calculateShiftEndTime(shiftConfig, scheduleDate);
@@ -386,7 +386,7 @@ public class ShiftScheduleService {
             // 计算时间
             LocalDateTime startTime = calculateStartTime(machineCode, shiftConfig, scheduleDate, context);
             double productionHours = shiftQty / hourlyCapacity;
-            LocalDateTime endTime = startTime.plusMinutes((long) (productionHours * 60));
+            LocalDateTime endTime = startTime.plusSeconds((long) (productionHours * 3600));
 
             LocalDateTime shiftEndTime = calculateShiftEndTime(shiftConfig, scheduleDate);
             if (endTime.isAfter(shiftEndTime)) {
@@ -491,7 +491,7 @@ public class ShiftScheduleService {
             // 计算时间
             LocalDateTime startTime = calculateStartTime(machineCode, shiftConfig, scheduleDate, context);
             double productionHours = shiftQty / hourlyCapacity;
-            LocalDateTime endTime = startTime.plusMinutes((long) (productionHours * 60));
+            LocalDateTime endTime = startTime.plusSeconds((long) (productionHours * 3600));
 
             LocalDateTime shiftEndTime = calculateShiftEndTime(shiftConfig, scheduleDate);
             if (endTime.isAfter(shiftEndTime)) {
@@ -652,7 +652,7 @@ public class ShiftScheduleService {
             // 计算时间
             LocalDateTime startTime = calculateStartTime(machineCode, shiftConfig, scheduleDate, context);
             double productionHours = shiftQty / hourlyCapacity;
-            LocalDateTime endTime = startTime.plusMinutes((long) (productionHours * 60));
+            LocalDateTime endTime = startTime.plusSeconds((long) (productionHours * 3600));
 
             LocalDateTime shiftEndTime = calculateShiftEndTime(shiftConfig, scheduleDate);
             if (endTime.isAfter(shiftEndTime)) {
@@ -725,7 +725,7 @@ public class ShiftScheduleService {
             // 计算时间
             LocalDateTime startTime = calculateStartTime(machineCode, shiftConfig, scheduleDate, context);
             double productionHours = batchQty / hourlyCapacity;
-            LocalDateTime endTime = startTime.plusMinutes((long) (productionHours * 60));
+            LocalDateTime endTime = startTime.plusSeconds((long) (productionHours * 3600));
 
             // 班次结束时间检查
             LocalDateTime shiftEndTime = calculateShiftEndTime(shiftConfig, scheduleDate);
@@ -1115,7 +1115,7 @@ public class ShiftScheduleService {
 
     /** 机台班初准备时间（分钟），当前为全局常量 */
     private int getMachinePrepareMinutes(String machineCode, ScheduleContextVo context) {
-        return DEFAULT_MACHINE_PREPARE_MINUTES;
+        return 0;
     }
 
     /** 胎胚或物料编码命中 context.keyProductCodes 视为关键产品（开产首班不排） */

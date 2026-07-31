@@ -1,5 +1,6 @@
 package com.zlt.aps.itf.mes.service.impl;
 
+import cn.hutool.core.util.StrUtil;
 import com.alibaba.fastjson.JSONObject;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
@@ -162,7 +163,6 @@ public class TmScheduleResultIssueServiceImpl implements ITmScheduleResultIssueS
     private AjaxResult sendMqNotice(List<MesTmScheduleResult> allMesList, LocalDate today,
                                      LocalDate dayAfterTomorrow, String dataVersion,
                                      String factoryCode, String companyCode) {
-        AjaxResult ajaxResult;
         try {
             SyncParamsVO syncParamsVO = new SyncParamsVO();
             syncParamsVO.setSyncKey(ItfSyncKeyEnum.SYNC_TM_SCHEDULE_RESULT.getCode());
@@ -182,20 +182,43 @@ public class TmScheduleResultIssueServiceImpl implements ITmScheduleResultIssueS
             // 往消息队列发送消息
             syncDataHandle.syncNotice(syncParamsVO);
 
-            // 取回mes的反馈结果
+            // 取回mes的反馈结果，按同步日志状态映射 feedbackStatus（对齐胎侧 TcScheduleResultIssueServiceImpl）
             SyncDataLogs logs = syncDataLogsService.getSyncDataResult(dataVersion);
-            String status = logs.getStatus();
-            if (ApsConstant.IS_RELEASE.equals(status)) {
-                ajaxResult = AjaxResult.success(I18nUtil.getMessage("ui.data.column.scheduleResult.successPublish"));
-            } else {
-                ajaxResult = AjaxResult.error(logs.getMsg());
+            if (logs != null && ApsConstant.IS_RELEASE.equals(logs.getStatus())) {
+                return this.buildIssueResult(true, "SUCCESS",
+                        I18nUtil.getMessage("ui.tc.schedule.release.success"));
             }
+            if (logs != null && ApsConstant.TIMEOUT_FAILURE.equals(logs.getStatus())) {
+                return this.buildIssueResult(false, "TIMEOUT",
+                        StrUtil.blankToDefault(logs.getMsg(),
+                                I18nUtil.getMessage("ui.tc.schedule.release.timeout")));
+            }
+            if (logs != null && ApsConstant.FAILURE_RELEASE.equals(logs.getStatus())) {
+                return this.buildIssueResult(false, "FAILED",
+                        StrUtil.blankToDefault(logs.getMsg(),
+                                I18nUtil.getMessage("ui.tc.schedule.release.failed")));
+            }
+            // 同步日志尚未进入终态时保持发布中，由发布恢复任务继续查询，不能误判为失败。
+            return this.buildIssueResult(true, "PENDING",
+                    I18nUtil.getMessage("ui.tc.schedule.release.waitFeedbackStage"));
         } catch (Exception e) {
             log.error(e.getMessage(), e);
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.failedPublish"));
         }
+    }
 
-        return ajaxResult;
+    /**
+     * 构造携带MES反馈状态的发布调用结果。
+     *
+     * @param success 调用是否按成功码返回
+     * @param feedbackStatus MES反馈状态
+     * @param message 结果说明
+     * @return 发布调用结果
+     */
+    private AjaxResult buildIssueResult(boolean success, String feedbackStatus, String message) {
+        AjaxResult result = success ? AjaxResult.success(message) : AjaxResult.error(message);
+        result.put("feedbackStatus", feedbackStatus);
+        return result;
     }
 
     /**

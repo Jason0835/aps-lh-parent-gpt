@@ -109,4 +109,19 @@ public class TmAutoScheduleTask extends BaseEntity implements Serializable {
     @TableField("LAST_HEARTBEAT_TIME")
     @ApiModelProperty(value = "最后心跳时间", name = "lastHeartbeatTime")
     private Date lastHeartbeatTime;
+
+    /** MES数据版本 */
+    @TableField("MES_DATA_VERSION")
+    @ApiModelProperty(value = "MES数据版本", name = "mesDataVersion")
+    private String mesDataVersion;
+
+    /** 任务摘要JSON */
+    @TableField("SUMMARY_JSON")
+    @ApiModelProperty(value = "任务摘要JSON", name = "summaryJson")
+    private String summaryJson;
+
+    /** 错误摘要 */
+    @TableField("ERROR_SUMMARY")
+    @ApiModelProperty(value = "错误摘要", name = "errorSummary")
+    private String errorSummary;
 }

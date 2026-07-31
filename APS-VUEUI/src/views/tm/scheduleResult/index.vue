@@ -72,15 +72,20 @@
           @click="handleChangeReleaseStatus"
         >{{ $t("ui.tm.schedule.button.changeReleaseStatus") }}</el-button>
         <el-button
-          v-hasPermi="['tm:tmScheduleResult:query']"
+          v-hasPermi="['tm:tmScheduleResult:list']"
           plain
-          type="info"
-          @click="handleUnplanned"
-        >{{ $t('ui.tm.schedule.unplannedTasks') }}（{{ unplannedCount || 0 }}）</el-button>
+          type="primary"
+          @click="handleAutoPlanIssues"
+        >{{ $t('ui.schedule.autoPlan.viewIssues') }}</el-button>
+        <el-button
+          v-hasPermi="['tm:tmScheduleResult:list']"
+          plain
+          type="primary"
+          @click="handleUnplanned()"
+        >{{ $t('ui.schedule.autoPlan.viewUnplanned') }}（{{ unplannedCount || 0 }}）</el-button>
       </template>
       <template slot="headerRight">
         <div class="summary-bar stat-info">
-          <span>{{ $t('ui.tm.schedule.totalStockQty') }}：<span class="stat-value">{{ summary.totalStockQty || 0 }}</span></span>
           <span
             v-for="(planQty, index) in shiftPlanQtyList"
             :key="index"
@@ -107,7 +112,7 @@
     <infoDialog ref="infoRef" :machine-options="machines" @success="handleOperationTask" />
     <changeMachineDialog ref="changeMachineRef" @success="handleOperationTask" />
     <releaseStatusDialog ref="releaseStatusRef" @success="getList" />
-    <unplanned-dialog ref="unplannedRef" />
+    <unplanned-dialog ref="unplannedRef" @count-change="handleUnplannedCountChange" />
     <el-dialog
       :close-on-click-modal="false"
       :close-on-press-escape="false"
@@ -173,6 +178,42 @@
       </div>
     </el-dialog>
     <el-dialog
+      :close-on-click-modal="false"
+      :close-on-press-escape="false"
+      :show-close="false"
+      :title="$t('ui.tc.schedule.releaseProgress')"
+      :visible.sync="releaseProgressVisible"
+      append-to-body
+      width="420px"
+    >
+      <div style="text-align:center;margin-bottom:12px;color:#606266;font-size:14px;">
+        {{ releaseProgressStage }}
+      </div>
+      <el-progress
+        :percentage="releaseProgressValue"
+        :status="releaseProgressStatus"
+        :stroke-width="18"
+        :text-inside="true"
+        text-color="#fff"
+      />
+      <div style="margin-top:10px;color:#909399;font-size:12px;text-align:center;">
+        {{ $t("ui.tc.schedule.releaseProgressHint") }}
+      </div>
+    </el-dialog>
+    <el-dialog
+      :title="$t('ui.tc.schedule.releaseIssues')"
+      :visible.sync="releaseIssueVisible"
+      append-to-body
+      width="82%"
+    >
+      <el-table :data="releaseIssues" border max-height="520">
+        <el-table-column :label="$t('ui.tc.schedule.issueLevel')" prop="level" width="90" />
+        <el-table-column :label="$t('ui.tc.schedule.issueStage')" prop="stageName" width="150" />
+        <el-table-column :label="$t('ui.tc.schedule.issueCategory')" min-width="150" prop="category" />
+        <el-table-column :label="$t('ui.tc.schedule.issueMessage')" min-width="260" prop="message" show-overflow-tooltip />
+      </el-table>
+    </el-dialog>
+    <el-dialog
       :title="$t('ui.data.column.tm.scheduleResult.autoPlanIssues')"
       :visible.sync="autoPlanIssueVisible"
       append-to-body
@@ -184,6 +225,7 @@
         <el-table-column :label="$t('ui.data.column.tm.scheduleResult.issueCategory')" prop="category" width="170" />
         <el-table-column :label="$t('ui.data.column.tm.scheduleResult.issueSourceOrderNo')" prop="sourceOrderNo" width="160" />
         <el-table-column :label="$t('ui.data.column.tm.scheduleResult.issueEmbryoCode')" prop="embryoCode" width="150" />
+        <el-table-column :label="$t('ui.data.column.tm.scheduleResult.treadCode')" prop="treadCode" width="150" />
         <el-table-column :label="$t('ui.data.column.tm.scheduleResult.issueRecipeNo')" prop="recipeNo" width="150" />
         <el-table-column :label="$t('ui.data.column.tm.scheduleResult.issueShiftOrder')" prop="shiftOrder" width="90" />
         <el-table-column :label="$t('ui.data.column.tm.scheduleResult.issueFieldName')" prop="fieldName" width="150" />
@@ -200,13 +242,14 @@ import {
   getLatestAutoPlanTask,
   getLatestOperationTask,
   getOperationTask,
+  getReleaseTask,
   listScheduleShiftDates,
   listTmScheduleResult,
   listTmScheduleSummary,
   listTmScheduleUnplanned,
-  publishScheduleResult,
-  publishValidate,
+  releaseScheduleResult,
   removeTmScheduleResult,
+  validateRelease,
 } from "@/api/tm/scheduleResult";
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
@@ -230,7 +273,7 @@ const getOffsetDate = (offsetDay) => {
 };
 
 export default {
-  name: "TmScheduleResult",
+  name: "/tm/tmScheduleResult",
   components: {
     tltUpload,
     autoPlanDialog,
@@ -261,6 +304,7 @@ export default {
       sort: {},
       search: {},
       query: {},
+      pageActivatedOnce: false,
       importDefaultValue: {},
       importRules: {
         factoryCode: [
@@ -302,6 +346,15 @@ export default {
       operationProgressValue: 0,
       operationProgressStage: "",
       operationProgressStatus: null,
+      releaseTimer: null,
+      releasePollTimes: 0,
+      maxReleasePollTimes: 240,
+      releaseProgressVisible: false,
+      releaseProgressValue: 0,
+      releaseProgressStage: "",
+      releaseProgressStatus: null,
+      releaseIssueVisible: false,
+      releaseIssues: [],
       dateList: [
         { shift: 1, shiftType: "night", shiftDate: "" },
         { shift: 2, shiftType: "morning", shiftDate: "" },
@@ -317,7 +370,7 @@ export default {
       machines: (state) => state.tm.machines,
     }),
     writeTaskRunning() {
-      return this.operationRunning || this.autoPlanRunning;
+      return this.operationRunning || this.autoPlanRunning || this.releaseProgressVisible;
     },
     // 各班次计划量合计列表，后端返回下标 0=1班，长度 6；为空时回退为空数组避免渲染异常
     shiftPlanQtyList() {
@@ -812,7 +865,7 @@ export default {
       }
     },
     setAutoPlanIssues(issues) {
-      this.autoPlanIssues = Array.isArray(issues) ? issues : [];
+      this.autoPlanIssues = this.filterAutoPlanIssues(issues);
       this.autoPlanIssueVisible = false;
     },
     showAutoPlanResult(task) {
@@ -827,22 +880,68 @@ export default {
     openAutoPlanIssues() {
       this.autoPlanIssueVisible = this.autoPlanIssues.length > 0;
     },
+    /**
+     * 按当前列表工厂和排程日期重新加载最近一次自动排程的问题明细。
+     *
+     * @returns {Promise<void>} 问题明细加载完成后打开已有弹窗
+     */
+    async handleAutoPlanIssues() {
+      const factoryCode = this.query.factoryCode || this.search.factoryCode;
+      const scheduleDate = this.query.scheduleDate || this.search.scheduleDate;
+      try {
+        const response = await getLatestAutoPlanTask({ factoryCode, scheduleDate });
+        const task = response && response.data ? response.data : (response || {});
+        const batchNo = this.query.batchNo || this.search.batchNo;
+        this.autoPlanIssues = batchNo && task.batchNo !== batchNo
+          ? []
+          : this.filterAutoPlanIssues(task.issues);
+        this.autoPlanIssueVisible = true;
+      } catch (error) {
+        console.error(error);
+      }
+    },
+    /**
+     * 按胎面列表中可映射的问题字段过滤自动排程问题明细。
+     *
+     * @param {Array} issues 自动排程问题明细
+     * @returns {Array} 符合当前胎面编码条件的问题明细
+     */
+    filterAutoPlanIssues(issues) {
+      const issueList = Array.isArray(issues) ? issues : [];
+      const treadCode = String(this.query.treadCode || this.search.treadCode || "").trim().toLowerCase();
+      return issueList.filter((issue) => {
+        const issueTreadCode = String(issue.treadCode || "").toLowerCase();
+        return !treadCode || !issueTreadCode || issueTreadCode.includes(treadCode);
+      });
+    },
     openAutoPlanUnplanned() {
       this.handleUnplanned(this.autoPlanResultScope);
     },
     handleUnplanned(scope) {
-      const query = scope || {
+      const query = {
         factoryCode: this.query.factoryCode || this.search.factoryCode,
         scheduleDate: this.query.scheduleDate || this.search.scheduleDate,
+        batchNo: this.query.batchNo || this.search.batchNo,
+        treadCode: this.query.treadCode || this.search.treadCode,
+        ...(scope || {}),
       };
       this.$refs.unplannedRef.show(query);
+    },
+    /**
+     * 使用未排任务弹窗的实际查询总数刷新列表按钮数量。
+     *
+     * @param {number} total 当前查询条件下的未排任务总数
+     * @returns {void}
+     */
+    handleUnplannedCountChange(total) {
+      this.unplannedCount = Number(total || 0);
     },
     refreshAutoPlanBoard() {
       this.autoPlanResultVisible = false;
       this.getList();
     },
     showAutoPlanIssues(issues) {
-      this.autoPlanIssues = Array.isArray(issues) ? issues : [];
+      this.autoPlanIssues = this.filterAutoPlanIssues(issues);
       this.autoPlanIssueVisible = this.autoPlanIssues.length > 0;
     },
     restoreLatestAutoPlanTask() {
@@ -967,17 +1066,97 @@ export default {
         this.$refs.infoRef.show(this.selection[0]);
       }
     },
-    // 发布入口：先校验再标记待发布，真实 MES 发布由后续发布流程接入。
-    handlePublish() {
+    // 发布入口：校验同scope+发布状态，提交异步发布任务并轮询下发进度（对齐胎侧 handleRelease）。
+    async handlePublish() {
       if (this.writeTaskRunning) return;
-      const ids = this.selection.map((item) => item.id);
-      this.$confirm(this.$t("ui.biz.alter.makeSurePublish"), {
-        type: "warning",
-      }).then(() => {
-        publishValidate(ids).then(() => {
-          publishScheduleResult(ids).then(task => this.handleOperationTask(task));
+      const scopeKeySet = new Set(this.selection.map((item) => `${item.factoryCode}|${item.scheduleDate}|${item.batchNo}`));
+      if (scopeKeySet.size !== 1) {
+        this.$modal.msgWarning(this.$t("ui.tc.schedule.sameScopeRequired"));
+        return;
+      }
+      const invalidRow = this.selection.find((item) => !["0", "2", "4", "5"].includes(String(item.releaseStatus || "0")));
+      if (invalidRow) {
+        this.$modal.msgWarning(this.$t("ui.tc.schedule.releaseStatusInvalid"));
+        return;
+      }
+      const requestData = this.buildReleaseRequest();
+      const validateResult = await validateRelease(requestData);
+      if (!validateResult.allowed) {
+        const issues = Array.isArray(validateResult.issues) ? validateResult.issues : [];
+        this.showReleaseIssues(issues);
+        this.$modal.msgWarning(issues.length > 0 ? issues[0].message : this.$t("ui.tc.schedule.releaseValidateFailed"));
+        return;
+      }
+      await this.$confirm(this.$t("ui.biz.alter.makeSurePublish"), { type: "warning" });
+      const task = await releaseScheduleResult(requestData);
+      this.pollReleaseTask(task.taskId);
+    },
+    // 构造发布请求（工厂+日期+结果项）
+    buildReleaseRequest() {
+      const row = this.selection[0];
+      return {
+        factoryCode: row.factoryCode,
+        scheduleDate: row.scheduleDate,
+        items: this.selection.map((item) => ({ resultId: item.id, expectedTaskVersion: 0 }))
+      };
+    },
+    // 轮询发布任务进度（对齐胎侧 pollReleaseTask）
+    pollReleaseTask(taskId) {
+      this.clearReleaseTimer();
+      this.releasePollTimes = 0;
+      this.releaseProgressVisible = true;
+      this.releaseProgressValue = 0;
+      this.releaseProgressStatus = null;
+      const poll = () => {
+        getReleaseTask(taskId).then((task) => {
+          this.releasePollTimes += 1;
+          this.releaseProgressValue = Math.min(100, Math.max(0, Number(task.progress || 0)));
+          this.releaseProgressStage = task.currentStageName || task.currentStage || "";
+          if (task.taskStatus === "SUCCESS") {
+            this.clearReleaseTimer();
+            this.releaseProgressValue = 100;
+            this.releaseProgressStatus = "success";
+            this.releaseProgressStage = this.$t("ui.tc.schedule.releaseSuccess");
+            this.showReleaseIssues(task.issues);
+            window.setTimeout(() => { this.releaseProgressVisible = false; }, 600);
+            this.queryList();
+            return;
+          }
+          if (task.taskStatus === "FAILED") {
+            this.clearReleaseTimer();
+            this.releaseProgressStatus = "exception";
+            this.releaseProgressStage = this.$t("ui.tc.schedule.releaseFailed");
+            this.showReleaseIssues(task.issues);
+            this.$modal.msgError(task.message || this.$t("ui.tc.schedule.releaseFailed"));
+            window.setTimeout(() => { this.releaseProgressVisible = false; }, 3000);
+            this.queryList();
+            return;
+          }
+          if (this.releasePollTimes >= this.maxReleasePollTimes) {
+            this.clearReleaseTimer();
+            this.releaseProgressStatus = "exception";
+            this.$modal.msgWarning(this.$t("ui.tc.schedule.releasePollTimeout"));
+            window.setTimeout(() => { this.releaseProgressVisible = false; }, 3000);
+            return;
+          }
+          this.releaseTimer = window.setTimeout(poll, 3000);
+        }).catch(() => {
+          this.clearReleaseTimer();
+          this.releaseProgressStatus = "exception";
+          this.$modal.msgWarning(this.$t("ui.tc.schedule.releasePollTimeout"));
         });
-      });
+      };
+      poll();
+    },
+    showReleaseIssues(issues) {
+      this.releaseIssues = Array.isArray(issues) ? issues : [];
+      this.releaseIssueVisible = this.releaseIssues.length > 0;
+    },
+    clearReleaseTimer() {
+      if (this.releaseTimer) {
+        window.clearTimeout(this.releaseTimer);
+        this.releaseTimer = null;
+      }
     },
     handleEdit(row) {
       if (this.$refs.infoRef) {
@@ -1104,6 +1283,8 @@ export default {
           const unplannedPage = await listTmScheduleUnplanned({
             factoryCode: this.query.factoryCode,
             scheduleDate: this.query.scheduleDate,
+            batchNo: this.query.batchNo,
+            treadCode: this.query.treadCode,
             pageNum: 1,
             pageSize: 1,
           });
@@ -1136,7 +1317,12 @@ export default {
     this.restoreLatestOperationTask();
   },
   activated() {
-    // this.getList();
+    // keep-alive 首次激活不重复请求，后续重新进入页面时刷新列表及未排数量。
+    if (this.pageActivatedOnce) {
+      this.getList();
+      return;
+    }
+    this.pageActivatedOnce = true;
   },
   beforeDestroy() {
     this.clearAutoPlanTimer();

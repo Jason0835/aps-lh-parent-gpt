@@ -3,8 +3,8 @@ package com.zlt.aps.common.engine.constants;
 import com.zlt.aps.common.engine.enums.ClassNumThreePlanEnums;
 
 /**
-  * 引擎常量类
-**/
+ * 引擎常量类
+ **/
 public class EngineConstants {
 
     /**
@@ -253,17 +253,17 @@ public class EngineConstants {
      * 硫化机空闲天数
      */
     public static String LH_MACHINE_FREE_DAY = "LH_MACHINE_FREE_DAY";
-	/**
-	 * 钢带压延按大卷计算库存开关
-	 */
+    /**
+     * 钢带压延按大卷计算库存开关
+     */
     public final static String GDYY_STOCK_ROLL_SWITCH = "GDYY_STOCK_ROLL_SWITCH";
     /**
      * 预估库存开关
      */
     public final static String ESTIMATE_STOCK_SWITCH = "ESTIMATE_STOCK_SWITCH";
-	/**
-	 * 钢带压延按大卷计算库存开关：打开
-	 */
+    /**
+     * 钢带压延按大卷计算库存开关：打开
+     */
     public final static String GDYY_STOCK_ROLL_SWITCH_ON = "1";
 
     /**
@@ -554,4 +554,10 @@ public class EngineConstants {
 
     /** SYS1101029：胎圈规格班次最大班产阈值（多规格模式下，触发备库的胎圈当班初始排产上限），默认1000 */
     public static String TQ_BACKUP_SHIFT_THRESHOLD = "SYS1101029";
+
+    /** SYS1101030：取整合并阈值（备库分摊时剩余量小于此值则合并到当前班次，不再新开一班向上取整），默认0不启用 */
+    public static String TQ_ROUNDING_MERGE_THRESHOLD = "SYS1101030";
+
+    /** SYS1101031：机台定额超排容忍阈值（计划量超出机台剩余产能，且超出部分≤此值时允许当班超排，不延后到下一班），默认0不启用 */
+    public static String TQ_MACHINE_OVER_ASSIGN_TOLERANCE = "SYS1101031";
 }

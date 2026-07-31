@@ -42,7 +42,7 @@ export default {
       form: {
         classShift: "2",
         openMachineClass: [],
-        status: "0",
+        status: "1",
       },
       rules: {
         machineCode: [
@@ -196,7 +196,7 @@ export default {
       }
     },
     hide() {
-      this.form = { classShift: "2", openMachineClass: [], status: "0" };
+      this.form = { classShift: "2", openMachineClass: [], status: "1" };
       this.$refs.form.triggerResetForm();
       this.isEdit = false;
       this.visible = false;

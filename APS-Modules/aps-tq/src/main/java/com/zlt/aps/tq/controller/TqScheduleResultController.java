@@ -11,10 +11,18 @@ import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.tq.api.domain.dto.TqChangeMachineDTO;
 import com.zlt.aps.tq.api.domain.dto.TqInsertOrderDTO;
+import com.zlt.aps.tq.api.domain.entity.TqMachineChuck;
+import com.zlt.aps.tq.api.domain.entity.TqMachineInfo;
+import com.zlt.aps.tq.api.domain.entity.TqMouthPlate;
 import com.zlt.aps.tq.api.domain.entity.TqScheduleResult;
+import com.zlt.aps.tq.api.domain.entity.TqSpecifyMachine;
 import com.zlt.aps.tq.api.domain.vo.TqScheduleShiftDateVO;
 import com.zlt.aps.tq.engine.service.TqEngineService;
+import com.zlt.aps.tq.mapper.TqMachineChuckMapper;
+import com.zlt.aps.tq.mapper.TqMachineInfoMapper;
+import com.zlt.aps.tq.mapper.TqMouthPlateMapper;
 import com.zlt.aps.tq.mapper.TqScheduleResultMapper;
+import com.zlt.aps.tq.mapper.TqSpecifyMachineMapper;
 import com.zlt.aps.tq.service.ITqScheduleResultService;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
@@ -28,9 +36,12 @@ import org.springframework.web.bind.annotation.*;
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * 胎圈排程结果Controller
@@ -51,6 +62,22 @@ public class TqScheduleResultController extends AbstractDocBizController<TqSched
 
     @Autowired
     private TqEngineService tqEngineService;
+
+    /** 机台信息Mapper（用于查询启用的机台列表） */
+    @Resource
+    private TqMachineInfoMapper tqMachineInfoMapper;
+
+    /** 机台寸口Mapper（用于候选机台寸口过滤） */
+    @Resource
+    private TqMachineChuckMapper tqMachineChuckMapper;
+
+    /** 口型板Mapper（用于候选机台口型板过滤） */
+    @Resource
+    private TqMouthPlateMapper tqMouthPlateMapper;
+
+    /** 定点机台Mapper（用于候选机台定点/禁排过滤） */
+    @Resource
+    private TqSpecifyMachineMapper tqSpecifyMachineMapper;
 
     @ApiOperation("查询胎圈排程结果列表")
     @PostMapping("/list")
@@ -181,6 +208,138 @@ public class TqScheduleResultController extends AbstractDocBizController<TqSched
     @PostMapping("/validateChangeMachine")
     public AjaxResult validateChangeMachine(@RequestBody TqChangeMachineDTO dto) {
         return tqScheduleResultService.validateChangeMachine(dto);
+    }
+
+    /**
+     * 根据排程记录获取转机台候选机台列表（按寸口、口型板、定点约束过滤）
+     * 过滤规则与自动排程策略链口径一致：
+     * 1. 仅返回启用状态的机台
+     * 2. 寸口过滤：机台寸口列表必须包含胎圈的英寸尺寸(proSize)
+     * 3. 口型板过滤：机台必须在胎圈三角胶口型板的可用机台列表中
+     * 4. 定点机台过滤：限制作业→仅返回限制列表中的机台；不可作业→排除不可作业机台
+     * 注意：维修过滤不在候选列表中做，而是在提交转机台时校验
+     *
+     * @param id 排程记录ID
+     * @return 过滤后的候选机台列表
+     */
+    @ApiOperation("获取转机台候选机台列表")
+    @PostMapping("/listCandidateMachines/{id}")
+    public AjaxResult listCandidateMachines(@PathVariable("id") Long id) {
+        // 查询排程记录
+        TqScheduleResult record = tqScheduleResultMapper.selectById(id);
+        if (record == null || "1".equals(record.getIsDelete())) {
+            return AjaxResult.error("排程记录不存在或已删除");
+        }
+
+        String beadCode = record.getBeadCode();
+        String proSize = record.getProSize();
+        String triangleGlueCode = record.getTriangleGlueCode();
+
+        // 1. 查询所有启用的机台
+        LambdaQueryWrapper<TqMachineInfo> machineWrapper = new LambdaQueryWrapper<>();
+        machineWrapper.eq(TqMachineInfo::getIsDelete, 0);
+        machineWrapper.eq(TqMachineInfo::getStatus, "1");
+        machineWrapper.orderByAsc(TqMachineInfo::getMachineCode);
+        List<TqMachineInfo> allMachines = tqMachineInfoMapper.selectList(machineWrapper);
+
+        // 2. 寸口过滤：机台寸口列表必须包含胎圈的英寸尺寸
+        if (proSize != null && !proSize.isEmpty()) {
+            BigDecimal dimension;
+            try {
+                dimension = new BigDecimal(proSize);
+            } catch (NumberFormatException e) {
+                log.warn("[候选机台] 胎圈{}的英寸尺寸{}无法转换为数字，跳过寸口过滤", beadCode, proSize);
+                dimension = null;
+            }
+            if (dimension != null) {
+                // 查询所有机台的寸口映射
+                LambdaQueryWrapper<TqMachineChuck> chuckWrapper = new LambdaQueryWrapper<>();
+                chuckWrapper.eq(TqMachineChuck::getIsDelete, 0);
+                List<TqMachineChuck> allChuckList = tqMachineChuckMapper.selectList(chuckWrapper);
+                // 构建机台→寸口列表映射
+                java.util.Map<String, List<BigDecimal>> machineChuckMap = allChuckList.stream()
+                        .filter(c -> c.getMachineCode() != null && c.getInchSize() != null)
+                        .collect(Collectors.groupingBy(
+                                TqMachineChuck::getMachineCode,
+                                Collectors.mapping(TqMachineChuck::getInchSize, Collectors.toList())));
+                BigDecimal finalDimension = dimension;
+                allMachines = allMachines.stream().filter(m -> {
+                    List<BigDecimal> chuckSizes = machineChuckMap.get(m.getMachineCode());
+                    // 未配置寸口的机台默认保留（兼容未配置的情况）
+                    if (chuckSizes == null || chuckSizes.isEmpty()) {
+                        return true;
+                    }
+                    return chuckSizes.stream().anyMatch(c -> c.compareTo(finalDimension) == 0);
+                }).collect(Collectors.toList());
+            }
+        }
+
+        // 3. 口型板过滤：机台必须在口型板的可用机台列表中
+        if (triangleGlueCode != null && !triangleGlueCode.isEmpty()) {
+            LambdaQueryWrapper<TqMouthPlate> mpWrapper = new LambdaQueryWrapper<>();
+            mpWrapper.eq(TqMouthPlate::getMouthPlateCode, triangleGlueCode);
+            mpWrapper.eq(TqMouthPlate::getIsDelete, 0);
+            List<TqMouthPlate> mouthPlateList = tqMouthPlateMapper.selectList(mpWrapper);
+            if (!mouthPlateList.isEmpty()) {
+                // 口型板绑定了机台，需要过滤
+                List<String> mpMachineCodes = mouthPlateList.stream()
+                        .map(TqMouthPlate::getMachineCode)
+                        .collect(Collectors.toList());
+                List<TqMachineInfo> filtered = allMachines.stream()
+                        .filter(m -> mpMachineCodes.contains(m.getMachineCode()))
+                        .collect(Collectors.toList());
+                // 口型板过滤有结果时才使用过滤后的列表，否则保留原列表（兼容口型板未配置的情况）
+                if (!filtered.isEmpty()) {
+                    allMachines = filtered;
+                }
+            }
+        }
+
+        // 4. 定点机台过滤
+        LambdaQueryWrapper<TqSpecifyMachine> specifyWrapper = new LambdaQueryWrapper<>();
+        specifyWrapper.eq(TqSpecifyMachine::getBeadCode, beadCode);
+        specifyWrapper.eq(TqSpecifyMachine::getIsDelete, 0);
+        List<TqSpecifyMachine> specifyList = tqSpecifyMachineMapper.selectList(specifyWrapper);
+
+        // 4.1 限制作业（jobType=0, lineType=0）：仅保留限制列表中的机台
+        List<TqSpecifyMachine> canList = specifyList.stream()
+                .filter(s -> "0".equals(s.getJobType()) && "0".equals(s.getLineType()))
+                .collect(Collectors.toList());
+        if (!canList.isEmpty()) {
+            List<String> canMachineCodes = canList.stream()
+                    .map(TqSpecifyMachine::getMachineCode)
+                    .collect(Collectors.toList());
+            List<TqMachineInfo> filtered = allMachines.stream()
+                    .filter(m -> canMachineCodes.contains(m.getMachineCode()))
+                    .collect(Collectors.toList());
+            if (!filtered.isEmpty()) {
+                allMachines = filtered;
+            }
+        }
+
+        // 4.2 不可作业（jobType=1, lineType=1）：排除不可作业机台
+        List<TqSpecifyMachine> notList = specifyList.stream()
+                .filter(s -> "1".equals(s.getJobType()) && "1".equals(s.getLineType()))
+                .collect(Collectors.toList());
+        if (!notList.isEmpty()) {
+            List<String> notMachineCodes = notList.stream()
+                    .map(TqSpecifyMachine::getMachineCode)
+                    .collect(Collectors.toList());
+            allMachines = allMachines.stream()
+                    .filter(m -> !notMachineCodes.contains(m.getMachineCode()))
+                    .collect(Collectors.toList());
+        }
+
+        // 排除原机台
+        allMachines = allMachines.stream()
+                .filter(m -> !m.getMachineCode().equals(record.getMachineCode()))
+                .collect(Collectors.toList());
+
+        log.info("[候选机台] 胎圈{}转机台候选机台数={}, 寸口={}, 口型板={}, 定点限制={}, 定点排除={}",
+                beadCode, allMachines.size(), proSize, triangleGlueCode,
+                canList.size(), notList.size());
+
+        return AjaxResult.success(allMachines);
     }
 
     /**

@@ -115,10 +115,15 @@ public class GroupTimeExtensionHandler extends OnLineGroupOnLineMachineHandler {
      *
      * @param cxMouldProductionHandler 新增Sku排产处理器(因循环依赖，采用参数传递)
      * @param context                  排产上下文
+     * @param isIgnoreHighPriority     是否忽略高优先级机台数判断
      * @param allocationRange          当前分配段
      * @param handledDayInfo           已经延长过的日期信息(分组名|*|成型机编号|*|排产日)
      */
-    public void handlerTimeExtension(CxMouldProductionHandler cxMouldProductionHandler, Context context, CxMachineAllocationPlanHelper allocationRange, Set<String> handledDayInfo) {
+    public void handlerTimeExtension(CxMouldProductionHandler cxMouldProductionHandler,
+                                     Context context,
+                                     boolean isIgnoreHighPriority,
+                                     CxMachineAllocationPlanHelper allocationRange,
+                                     Set<String> handledDayInfo) {
         if (null == allocationRange) {
             return;
         }
@@ -151,6 +156,7 @@ public class GroupTimeExtensionHandler extends OnLineGroupOnLineMachineHandler {
             if (handledDayInfo.size() > BigDecimal.ONE.intValue()) {
                 handlerTimeExtensionDay(context, groupPlan, allocationRange, handledDayInfo, nextDay);
             }
+            stopTimeExtensionResetProduction(context, isIgnoreHighPriority, cxMouldProductionHandler, allocationRange, cxMachineInfo, handledDayInfo);
             return;
         }
         handledDayInfo.add(handlerKey);
@@ -162,7 +168,7 @@ public class GroupTimeExtensionHandler extends OnLineGroupOnLineMachineHandler {
         //创建新的收尾天数信息
         timeExtensionOneDayConclusionByNoOnLine(context, groupPlan, allocationRange, nextDay);
         //重新模拟排产
-        cxMouldProductionHandler.noContinueGroupPlanMouldProduction(context, cxMachineCodeInfo, allocationRange, handledDayInfo);
+        cxMouldProductionHandler.noContinueGroupPlanMouldProduction(context, isIgnoreHighPriority, cxMachineCodeInfo, allocationRange, handledDayInfo, true);
     }
 
     /**
@@ -204,7 +210,7 @@ public class GroupTimeExtensionHandler extends OnLineGroupOnLineMachineHandler {
      * @param endDay        当前收尾日
      * @return
      */
-    public boolean hasTimeExtension(Context context, ProductionPlanGroupInfo groupPlan, CxMachineBaseInfoVo cxMachineInfo, Integer endDay) {
+    private boolean hasTimeExtension(Context context, ProductionPlanGroupInfo groupPlan, CxMachineBaseInfoVo cxMachineInfo, Integer endDay) {
         //最后一天，不能延长
         if (null == groupPlan || null == endDay || context.getProductionEndDay().equals(endDay)) {
             return false;
@@ -233,7 +239,7 @@ public class GroupTimeExtensionHandler extends OnLineGroupOnLineMachineHandler {
         //成型工装可用
         GroupCapacityProductionLimitHelper limitResult = baseDataContainer.getLeftOverProductionDayInfo(context, groupPlan, cxMachineInfo);
         Set<Integer> productionDayInfo = limitResult.getProductionDaySet();
-        if (!productionDayInfo.contains(endDay)) {
+        if (!productionDayInfo.contains(nextDay)) {
             return false;
         }
         //判断模具是否还有剩余产能
@@ -588,6 +594,35 @@ public class GroupTimeExtensionHandler extends OnLineGroupOnLineMachineHandler {
             return false;
         }
         return true;
+    }
+
+    /**
+     * 探测结束后，重排，不再重新探测
+     *
+     * @param context                  排产上下文
+     * @param isIgnoreHighPriority     是否忽略高优先级机台数判断
+     * @param cxMouldProductionHandler 模拟排产处理器
+     * @param allocationRange          当前分配信息
+     * @param cxMachineInfo            成型产能信息对象
+     */
+    private void stopTimeExtensionResetProduction(Context context,
+                                                  boolean isIgnoreHighPriority,
+                                                  CxMouldProductionHandler cxMouldProductionHandler,
+                                                  CxMachineAllocationPlanHelper allocationRange,
+                                                  CxMachineBaseInfoVo cxMachineInfo,
+                                                  Set<String> handledDayInfo) {
+        if (null == cxMachineInfo || null == allocationRange || null == cxMouldProductionHandler) {
+            return;
+        }
+        String cxMachineCodeInfo = allocationRange.getCxMachineCode();
+        ProductionPlanGroupInfo groupPlan = allocationRange.getProductionPlanInfo();
+        String groupName = groupPlan.getGroupName();
+        GroupTimeExtensionConclusionLogRecorder.addNoTimeExtensionConclusionResetProductionLog(context, groupName, cxMachineCodeInfo);
+        Map<Integer, GroupPlanCxLhCapacityLimitHelper> dayProductionLimitInfo = cxMachineInfo.getDayProductionLimitInfo();
+        Set<Integer> deductionDaySet = cxMachineInfo.getAllocationDaySet(allocationRange);
+        groupPlanDeductionDayHandler.deductionMouldDayInfo(context, DeductionDayProductionTypeEnum.TIME_EXTENSION_REST, cxMachineInfo, groupPlan, allocationRange, dayProductionLimitInfo, deductionDaySet);
+        //重新模拟排产
+        cxMouldProductionHandler.noContinueGroupPlanMouldProduction(context, isIgnoreHighPriority, cxMachineCodeInfo, allocationRange, handledDayInfo, false);
     }
 
     @Override

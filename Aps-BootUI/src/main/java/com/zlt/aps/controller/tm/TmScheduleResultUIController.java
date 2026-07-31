@@ -11,10 +11,7 @@ import com.ruoyi.common4ui.core.controller.BaseUIController;
 import com.zlt.aps.tm.api.domain.dto.TmRollingRecalcRequestDTO;
 import com.zlt.aps.tm.api.domain.dto.TmScheduleResultImportDTO;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
-import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleRequestVo;
-import com.zlt.aps.tm.api.domain.vo.TmInsertTaskRequestVo;
-import com.zlt.aps.tm.api.domain.vo.TmOperationTaskVo;
-import com.zlt.aps.tm.api.domain.vo.TmScheduleShiftDateVO;
+import com.zlt.aps.tm.api.domain.vo.*;
 import com.zlt.aps.tm.api.service.ITmScheduleResultRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
 import com.zlt.framework.utils.AuthorizationUtils;
@@ -197,6 +194,19 @@ public class TmScheduleResultUIController extends BaseUIController<TmScheduleRes
     @ResponseBody
     public AjaxResult summary(TmScheduleResult query) {
         return iTmScheduleResultService.summary(query);
+    }
+
+    /**
+     * 分页查询胎面未排任务。
+     *
+     * @param queryVO 工厂、排程日期、可选批次和分页条件
+     * @return 未排任务分页结果
+     */
+    @ApiOperation("查询胎面未排任务")
+    @PostMapping("/unplanned/list")
+    @ResponseBody
+    public TmScheduleUnplannedPageVo listUnplanned(TmScheduleUnplannedQueryVo queryVO) {
+        return this.iTmScheduleResultService.listUnplanned(queryVO);
     }
 
     /**

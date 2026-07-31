@@ -6,18 +6,24 @@ import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.StrUtil;
 import com.alibaba.fastjson.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.tc.api.constant.TcScheduleConstants;
 import com.zlt.aps.tc.api.domain.entity.TcScheduleResult;
+import com.zlt.aps.tc.api.domain.vo.TcAutoScheduleIssueVo;
 import com.zlt.aps.tc.api.domain.vo.TcAutoScheduleRequestVo;
 import com.zlt.aps.tc.api.domain.vo.TcAutoScheduleResponseVo;
+import com.zlt.aps.tc.api.enums.TcAutoScheduleIssueCategoryEnum;
 import com.zlt.aps.tc.api.enums.TcAutoScheduleTaskStatusEnum;
+import com.zlt.aps.tc.api.enums.TcReleaseStatusTransition;
+import com.zlt.aps.tc.api.enums.TcScheduleStepEnum;
 import com.zlt.aps.tc.component.TcAutoScheduleExecutionGuard;
 import com.zlt.aps.tc.domain.TcAutoScheduleTask;
 import com.zlt.aps.tc.engine.domain.TcPersistResult;
 import com.zlt.aps.tc.engine.domain.TcScheduleContext;
+import com.zlt.aps.tc.engine.service.collector.TcAutoScheduleIssueCollector;
 import com.zlt.aps.tc.engine.template.TcScheduleTemplateImpl;
 import com.zlt.aps.tc.mapper.TcScheduleResultMapper;
 import com.zlt.aps.tc.service.ITcScheduleResultService;
@@ -29,6 +35,8 @@ import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import javax.annotation.Resource;
 import java.util.*;
@@ -72,6 +80,9 @@ public class TcScheduleResultServiceImpl extends AbstractDocService<TcScheduleRe
     @Resource
     private TcAutoScheduleExecutionGuard tcAutoScheduleExecutionGuard;
 
+    @Resource
+    private PlatformTransactionManager platformTransactionManager;
+
     /**
      * 获取单据类型编码。
      *
@@ -108,6 +119,56 @@ public class TcScheduleResultServiceImpl extends AbstractDocService<TcScheduleRe
             throw new ServiceException(I18nUtil.getMessage("ui.tc.schedule.resultNotUnique"));
         }
         return unique;
+    }
+
+    /**
+     * 管理员直接调整胎侧排程结果发布状态。
+     *
+     * <p>修改前在短事务中锁定全部目标记录，按当前数据库状态校验迁移矩阵，
+     * 确保不会覆盖正常发布任务或 MES 回调刚写入的状态。</p>
+     *
+     * @param ids 排程结果 ID，多个 ID 使用英文逗号分隔
+     * @param releaseStatus 目标发布状态编码
+     * @return 修改成功的记录数
+     * @throws ServiceException 参数为空、状态非法、记录不存在、并发变化或迁移非法时抛出
+     */
+    @Override
+    public int changeReleaseStatus(String ids, String releaseStatus) {
+        if (StrUtil.isBlank(ids)) {
+            throw new ServiceException(I18nUtil.getMessage("ui.tc.schedule.release.changeIdsEmpty"));
+        }
+        if (!TcReleaseStatusTransition.isValidCode(releaseStatus)) {
+            throw new ServiceException(I18nUtil.getMessage("ui.tc.schedule.release.illegalStatus"));
+        }
+        List<Long> resultIdList = Arrays.stream(com.ruoyi.common.text.Convert.toLongArray(ids))
+                .filter(Objects::nonNull).distinct().sorted().collect(java.util.stream.Collectors.toList());
+        if (resultIdList.isEmpty()) {
+            throw new ServiceException(I18nUtil.getMessage("ui.tc.schedule.release.changeIdsEmpty"));
+        }
+        TransactionTemplate transactionTemplate = new TransactionTemplate(this.platformTransactionManager);
+        Integer updatedRows = transactionTemplate.execute(transactionStatus -> {
+            List<TcScheduleResult> resultList = this.tcScheduleResultMapper.selectBatchIdsForUpdate(resultIdList);
+            if (resultList == null || resultList.size() != resultIdList.size()) {
+                throw new ServiceException(I18nUtil.getMessage("ui.tc.schedule.manual.concurrentChanged"));
+            }
+            boolean invalidTransition = resultList.stream().anyMatch(result ->
+                    !TcReleaseStatusTransition.canTransit(result.getReleaseStatus(), releaseStatus));
+            if (invalidTransition) {
+                throw new ServiceException(I18nUtil.getMessage("ui.tc.schedule.release.illegalTransition"));
+            }
+            LambdaUpdateWrapper<TcScheduleResult> updateWrapper = new LambdaUpdateWrapper<>();
+            updateWrapper.in(TcScheduleResult::getId, resultIdList);
+            updateWrapper.set(TcScheduleResult::getReleaseStatus, releaseStatus);
+            int affectedRows = this.tcScheduleResultMapper.update(null, updateWrapper);
+            if (affectedRows != resultIdList.size()) {
+                throw new ServiceException(I18nUtil.getMessage("ui.tc.schedule.manual.concurrentChanged"));
+            }
+            return affectedRows;
+        });
+        if (updatedRows == null) {
+            throw new ServiceException(I18nUtil.getMessage("ui.tc.schedule.release.changeFailed"));
+        }
+        return updatedRows;
     }
 
     /**
@@ -186,12 +247,14 @@ public class TcScheduleResultServiceImpl extends AbstractDocService<TcScheduleRe
         if (task == null) {
             throw new ServiceException(I18nUtil.getMessage("ui.tc.schedule.taskNotFound"));
         }
-        TcAutoScheduleRequestVo request = JSON.parseObject(task.getRequestSnapshot(), TcAutoScheduleRequestVo.class);
-        this.validateRequest(request);
-        String lockToken = tcAutoScheduleExecutionGuard.acquire(request.getFactoryCode(), request.getScheduleDate());
+        TcAutoScheduleRequestVo request = null;
+        String lockToken = null;
         TcScheduleContext context = null;
         long startMillis = System.currentTimeMillis();
         try {
+            request = JSON.parseObject(task.getRequestSnapshot(), TcAutoScheduleRequestVo.class);
+            this.validateRequest(request);
+            lockToken = tcAutoScheduleExecutionGuard.acquire(request.getFactoryCode(), request.getScheduleDate());
             TcAutoScheduleResponseVo response = this.buildExecutionResponse(task);
             this.validateOverwrite(request, response, this.listForOverwriteCheck(request), true);
             context = this.buildScheduleContext(taskId, request, response);
@@ -238,11 +301,35 @@ public class TcScheduleResultServiceImpl extends AbstractDocService<TcScheduleRe
             return response;
         } catch (RuntimeException exception) {
             tcAutoScheduleTaskService.markFailed(taskId, exception.getMessage(),
-                    context == null ? Collections.emptyList() : context.getIssueCollector().getIssues());
+                    this.collectFailureIssues(context, exception));
             throw exception;
         } finally {
-            tcAutoScheduleExecutionGuard.release(request.getFactoryCode(), request.getScheduleDate(), lockToken);
+            if (request != null && lockToken != null) {
+                tcAutoScheduleExecutionGuard.release(request.getFactoryCode(), request.getScheduleDate(), lockToken);
+            }
         }
+    }
+
+    /**
+     * 汇总自动排程失败问题，模板执行前失败时补充初始化阶段问题。
+     *
+     * @param context   排程上下文
+     * @param exception 原始异常
+     * @return 待写入任务表的问题明细
+     */
+    private List<TcAutoScheduleIssueVo> collectFailureIssues(TcScheduleContext context,
+                                                             RuntimeException exception) {
+        TcAutoScheduleIssueCollector issueCollector = context == null
+                ? new TcAutoScheduleIssueCollector() : context.getIssueCollector();
+        if (!issueCollector.hasErrorIssue()) {
+            TcAutoScheduleIssueCategoryEnum category = exception instanceof ServiceException
+                    ? TcAutoScheduleIssueCategoryEnum.AUTO_SCHEDULE_BUSINESS_ERROR
+                    : TcAutoScheduleIssueCategoryEnum.AUTO_SCHEDULE_SYSTEM_ERROR;
+            String message = StrUtil.blankToDefault(exception.getMessage(),
+                    I18nUtil.getMessage("ui.tc.schedule.taskExecuteFailed"));
+            issueCollector.addFailureIssueIfAbsent(TcScheduleStepEnum.BOOTSTRAP, category, message);
+        }
+        return issueCollector.getIssues();
     }
 
     /**

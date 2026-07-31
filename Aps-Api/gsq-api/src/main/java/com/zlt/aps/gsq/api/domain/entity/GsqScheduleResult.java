@@ -11,6 +11,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 import java.io.Serializable;
+import java.lang.reflect.Field;
 import java.util.Date;
 
 /**
@@ -235,6 +236,17 @@ public class GsqScheduleResult extends BaseEntity implements Serializable {
     @TableField(value = "IS_RELEASE")
     private String isRelease;
 
+    /** 发布成功次数（每点击一次发布并成功的话，计数器累加；删除前校验：必须等于0才允许删除） */
+    @Excel(name = "ui.data.column.gsqScheduleResult.publishSuccessCount")
+    @ApiModelProperty(value = "发布成功次数", name = "publishSuccessCount")
+    @TableField(value = "PUBLISH_SUCCESS_COUNT")
+    private Integer publishSuccessCount;
+
+    /** MES计划ID（下发MES成功后回写的MES侧计划ID；非空表示已发送给MES，不允许删除，只能调量） */
+    @ApiModelProperty(value = "MES计划ID", name = "mesId")
+    @TableField(value = "MES_ID")
+    private Long mesId;
+
     /** 库存量 */
     @Excel(name = "ui.data.column.gsqScheduleResult.stockQty")
     @ApiModelProperty(value = "库存量", name = "stockQty")
@@ -258,6 +270,11 @@ public class GsqScheduleResult extends BaseEntity implements Serializable {
     @ApiModelProperty(value = "分厂", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
+
+    /** 排程解释JSON（结构化规则证据），Phase 2 重构新增 */
+    @ApiModelProperty(value = "排程解释JSON（结构化规则证据）", name = "explainJson")
+    @TableField(value = "EXPLAIN_JSON")
+    private String explainJson;
 
     // ==================== 对应胎圈1~6班消耗量（回填自胎圈排程结果） ====================
 
@@ -411,4 +428,37 @@ public class GsqScheduleResult extends BaseEntity implements Serializable {
     /** 选中的记录ID列表（逗号分隔，非数据库字段，用于发布时按勾选记录过滤） */
     @TableField(exist = false)
     private String ids;
+
+    /**
+     * 按班次字段模板动态读取字段值（用于 class1~6PlanQty/FinishQty/Analysis/Sequence 等批量字段访问）。
+     * 遵循项目规范：禁止使用 switch/case 硬编码访问班次字段。
+     *
+     * @param fieldName Java 字段名（如 "class1PlanQty"）
+     * @return 字段值
+     */
+    public Serializable getFieldValueByFieldName(String fieldName) {
+        try {
+            Field field = this.getClass().getDeclaredField(fieldName);
+            field.setAccessible(true);
+            return (Serializable) field.get(this);
+        } catch (ReflectiveOperationException exception) {
+            throw new IllegalArgumentException("钢丝圈排程结果字段不存在: " + fieldName, exception);
+        }
+    }
+
+    /**
+     * 按班次字段模板动态写入字段值。
+     *
+     * @param fieldName Java 字段名
+     * @param value     字段值
+     */
+    public void setFieldValueByFieldName(String fieldName, Object value) {
+        try {
+            Field field = this.getClass().getDeclaredField(fieldName);
+            field.setAccessible(true);
+            field.set(this, value);
+        } catch (ReflectiveOperationException exception) {
+            throw new IllegalArgumentException("钢丝圈排程结果字段不存在: " + fieldName, exception);
+        }
+    }
 }

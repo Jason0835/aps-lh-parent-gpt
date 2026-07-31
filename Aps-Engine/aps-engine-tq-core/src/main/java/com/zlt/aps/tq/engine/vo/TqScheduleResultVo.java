@@ -178,6 +178,12 @@ public class TqScheduleResultVo extends ApsBaseDto {
     // ==================== 其他业务字段 ====================
 
     /**
+     * 月计划剩余量（用于前端展示和持久化）
+     */
+    @ApiModelProperty(value = "月计划剩余量", name = "monthSurplusQty")
+    private Integer monthSurplusQty;
+
+    /**
      * 剩余量
      */
     private double surplusQty;
@@ -258,8 +264,26 @@ public class TqScheduleResultVo extends ApsBaseDto {
      * 触发备库后尚未排完的剩余备库量
      * <p>由 S2 阶段按阈值分摊后初始化，S3/S3.5 阶段每班排产后扣减，直至为0</p>
      * <p>用于 S3.5 阶段判断是否还有备库量需要回填到剩余产能</p>
+     * <p>注意（Phase 2 重构）：S5.6 执行前会基于 backupTotalPlanQty 和实际已排产量重新计算此字段，
+     * 修正 S3 阶段 deferToNextClass 不扣减导致的不一致问题</p>
      */
     private Double backupRemainingQty;
+
+    /**
+     * 触发备库时的初始备库总需求量（不含损耗率的纯需求量 × 损耗率乘数）
+     * <p>由 S2 阶段 triggerBackupAndAllocate 初始化，用于 S5.6 重算 backupRemainingQty</p>
+     * <p>重算公式：backupRemainingQty = backupTotalPlanQty - 6班实际已排产量合计</p>
+     */
+    private Double backupTotalPlanQty;
+
+    /**
+     * 备库分摊尾数合并的目标班次号（1-6）
+     * <p>由 S2 阶段 triggerBackupAndAllocate 在触发取整合并时设置，
+     * 标识该班次为尾数合并班次（计划量 = 阈值 + 尾数，如 500+9.6=509.6→510）</p>
+     * <p>S3 阶段 getBackupInitAssignLimit 识别到该班次时放宽阈值限制，
+     * 避免尾数合并后的计划量（如510）被 SYS1101029 阈值（如500）再次截断延后</p>
+     */
+    private Integer mergedTailClass;
 
     /**
      * 是否含试制/量试物料标记（1=是，0=否）
@@ -279,5 +303,14 @@ public class TqScheduleResultVo extends ApsBaseDto {
 
     @ApiModelProperty(value = "分厂编码")
     private String factoryCode;
+
+    /**
+     * 规则解释JSON（TqRuleTrace.toExplainJson() 序列化结果）。
+     *
+     * <p>Phase 2 重构新增字段，用于持久化结构化证据，包含命中规则编码、结果和证据对象。</p>
+     * <p>由 S6 {@code TqResultPersistHandler} 在批量落库前从 {@code context.getRuleTrace(beadCode)} 序列化填充。</p>
+     */
+    @ApiModelProperty(value = "规则解释JSON（命中规则编码、结果和证据，TqRuleTrace序列化结果）")
+    private String explainJson;
 
 }

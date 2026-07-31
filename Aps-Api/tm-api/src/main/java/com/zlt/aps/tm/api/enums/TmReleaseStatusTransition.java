@@ -11,24 +11,24 @@ import java.util.Set;
  * <p>集中管理 {@link TmScheduleReleaseStatusEnum} 各状态间的合法迁移路径，作为自动迁移（人工编辑触发、
  * 滚动重排触发等）的统一权威，避免状态流转散落硬编码与非法迁移（如 RELEASE_FAILED 被编辑后误转为 WAIT_RELEASE）。</p>
  *
- * <p>合法迁移矩阵：</p>
+ * <p>合法迁移矩阵（与胎侧 TcReleaseStatusTransition 对齐）：</p>
  * <ul>
- *   <li>NOT_RELEASED(0) -&gt; WAIT_RELEASE(5)（人工发布）</li>
- *   <li>WAIT_RELEASE(5) -&gt; RELEASING(3)（开始下发）、WAIT_RELEASE(5)（再次编辑）</li>
+ *   <li>NOT_RELEASED(0)/RELEASE_FAILED(2)/TIMEOUT_FAILED(4)/WAIT_RELEASE(5)
+ *   -&gt; RELEASING(3)（开始下发）</li>
  *   <li>RELEASING(3) -&gt; RELEASED(1)/RELEASE_FAILED(2)/TIMEOUT_FAILED(4)（下发结果）</li>
- *   <li>RELEASED(1) -&gt; WAIT_RELEASE(5)（已发布被编辑后回退待发布）</li>
- *   <li>RELEASE_FAILED(2) -&gt; WAIT_RELEASE(5)（重试）、NOT_RELEASED(0)（重置）</li>
- *   <li>TIMEOUT_FAILED(4) -&gt; NOT_RELEASED(0)（重置；重试需先重置再发布）</li>
+ *   <li>RELEASED(1) -&gt; WAIT_RELEASE(5)（已发布被编辑后回退待发布，唯一进入待发布的路径）</li>
+ *   <li>NOT_RELEASED(0)/RELEASE_FAILED(2)/WAIT_RELEASE(5) 人工编辑后保持原状态</li>
  * </ul>
  *
  * <p>所有发布状态写入口均以数据库旧状态为准调用本工具校验，批量更新需先完成全部记录校验。</p>
  */
 public final class TmReleaseStatusTransition {
 
-    /** 允许人工编辑的状态集合（编辑后可回退为待发布/未发布）；null/空视为未发布，可编辑 */
+    /** 允许人工编辑的状态集合（编辑后仅已发布回退待发布，其余保持原状）；null/空视为未发布，可编辑 */
     private static final Set<TmScheduleReleaseStatusEnum> EDITABLE_STATUSES = EnumSet.of(
             TmScheduleReleaseStatusEnum.NOT_RELEASED,
             TmScheduleReleaseStatusEnum.RELEASED,
+            TmScheduleReleaseStatusEnum.RELEASE_FAILED,
             TmScheduleReleaseStatusEnum.WAIT_RELEASE
     );
 
@@ -36,12 +36,17 @@ public final class TmReleaseStatusTransition {
     private static final Map<TmScheduleReleaseStatusEnum, Set<TmScheduleReleaseStatusEnum>> TRANSITIONS = new EnumMap<>(TmScheduleReleaseStatusEnum.class);
 
     static {
-        TRANSITIONS.put(TmScheduleReleaseStatusEnum.NOT_RELEASED, EnumSet.of(TmScheduleReleaseStatusEnum.WAIT_RELEASE));
-        TRANSITIONS.put(TmScheduleReleaseStatusEnum.WAIT_RELEASE, EnumSet.of(TmScheduleReleaseStatusEnum.RELEASING, TmScheduleReleaseStatusEnum.WAIT_RELEASE));
-        TRANSITIONS.put(TmScheduleReleaseStatusEnum.RELEASING, EnumSet.of(TmScheduleReleaseStatusEnum.RELEASED, TmScheduleReleaseStatusEnum.RELEASE_FAILED, TmScheduleReleaseStatusEnum.TIMEOUT_FAILED));
+        TRANSITIONS.put(TmScheduleReleaseStatusEnum.NOT_RELEASED,
+                EnumSet.of(TmScheduleReleaseStatusEnum.RELEASING));
+        TRANSITIONS.put(TmScheduleReleaseStatusEnum.WAIT_RELEASE,
+                EnumSet.of(TmScheduleReleaseStatusEnum.RELEASING));
+        TRANSITIONS.put(TmScheduleReleaseStatusEnum.RELEASING, EnumSet.of(TmScheduleReleaseStatusEnum.RELEASED,
+                TmScheduleReleaseStatusEnum.RELEASE_FAILED, TmScheduleReleaseStatusEnum.TIMEOUT_FAILED));
         TRANSITIONS.put(TmScheduleReleaseStatusEnum.RELEASED, EnumSet.of(TmScheduleReleaseStatusEnum.WAIT_RELEASE));
-        TRANSITIONS.put(TmScheduleReleaseStatusEnum.RELEASE_FAILED, EnumSet.of(TmScheduleReleaseStatusEnum.WAIT_RELEASE, TmScheduleReleaseStatusEnum.NOT_RELEASED));
-        TRANSITIONS.put(TmScheduleReleaseStatusEnum.TIMEOUT_FAILED, EnumSet.of(TmScheduleReleaseStatusEnum.NOT_RELEASED));
+        TRANSITIONS.put(TmScheduleReleaseStatusEnum.RELEASE_FAILED,
+                EnumSet.of(TmScheduleReleaseStatusEnum.RELEASING));
+        TRANSITIONS.put(TmScheduleReleaseStatusEnum.TIMEOUT_FAILED,
+                EnumSet.of(TmScheduleReleaseStatusEnum.RELEASING));
     }
 
     private TmReleaseStatusTransition() {
@@ -81,17 +86,20 @@ public final class TmReleaseStatusTransition {
     /**
      * 人工编辑后应回退到的状态。
      *
-     * <p>原状态为 null/空回退 NOT_RELEASED(0)（从未发布），其余回退 WAIT_RELEASE(5)（需重新发布）。
-     * 与历史 updateTmScheduleResult 行为一致。</p>
+     * <p>仅已发布状态回退 WAIT_RELEASE(5)，未发布、发布失败和待发布状态保持不变。</p>
      *
      * @param originalStatus 原状态编码
      * @return 回退后的状态编码
      */
     public static String resolveEditedStatus(String originalStatus) {
-        if (originalStatus == null || originalStatus.trim().isEmpty()) {
+        TmScheduleReleaseStatusEnum statusEnum = normalize(originalStatus);
+        if (statusEnum == null) {
             return TmScheduleReleaseStatusEnum.NOT_RELEASED.getCode();
         }
-        return TmScheduleReleaseStatusEnum.WAIT_RELEASE.getCode();
+        if (TmScheduleReleaseStatusEnum.RELEASED == statusEnum) {
+            return TmScheduleReleaseStatusEnum.WAIT_RELEASE.getCode();
+        }
+        return statusEnum.getCode();
     }
 
     /**

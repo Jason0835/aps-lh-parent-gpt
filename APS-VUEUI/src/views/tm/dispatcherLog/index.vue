@@ -35,7 +35,7 @@ import {listDispatcherLog} from "@/api/tm/dispatcherLog";
 import {listTmMachineInfo} from "@/api/tm/machineInfo";
 
 export default {
-  name: "TmDispatcherLog",
+  name: "/tm/tmDispatcherLog",
   dicts: ["DISPATCHER_OPER_TYPE"],
   provide() {
     return {

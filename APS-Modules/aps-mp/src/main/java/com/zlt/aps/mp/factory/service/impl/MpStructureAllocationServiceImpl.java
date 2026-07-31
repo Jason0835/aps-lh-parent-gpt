@@ -74,6 +74,7 @@ import com.zlt.aps.mp.factory.mapper.*;
 import com.zlt.aps.mp.factory.service.IFactoryMonthPlanMouldDayResultService;
 import com.zlt.aps.mp.factory.service.IMpMonthPlanStatisticsService;
 import com.zlt.aps.mp.factory.service.IMpStructureAllocationService;
+import com.zlt.aps.mp.factory.service.ISpecialMaterialResultService;
 import com.zlt.aps.mp.mdm.dto.DataDTO;
 import com.zlt.aps.mp.mdm.handler.DataManager;
 import com.zlt.aps.utils.BeanCopyUtils;
@@ -173,6 +174,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
     private final IRawSpecialMaterialRecordService rawSpecialMaterialRecordService;
     private final IFactoryMonthPlanMouldDayResultService iFactoryMonthPlanMouldDayResultService;
     private final IMdmSkuScheduleCategoryService mdmSkuScheduleCategoryService;
+    private final ISpecialMaterialResultService iSpecialMaterialResultService;
     private final Map<Long, Map<String, String>> importMachineMapCache = new ConcurrentHashMap<>();
     @Autowired
     @Lazy
@@ -3632,7 +3634,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         Map<String, Integer> insertResults = new HashMap<>(0); // 活块可用量（按物料描述分组）
         List<DailyMouldAvailabilityResult> moldResult = moldCavityInsertMaxValueCalculator
                 .moldCavityInsertMaxValueCalculator(year, month, factoryCode,
-                        null, null, true);
+                        null, null, true,true);
         if (!CollectionUtils.isEmpty(moldResult)) {
             cavityResults = moldResult.get(0).getCavityResults();
             insertResults = moldResult.get(0).getInsertResults();
@@ -3871,6 +3873,8 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         }
         // 3、生成统计信息（handleMonthPlanStatistics）
         mpMonthPlanStaticService.handleMonthPlanStatistics(finalImportList, isAdjust);
+        // 4、生成特殊材料排产记录
+        iSpecialMaterialResultService.buildSecialMaterialResult(finalImportList);
         return finalImportList;
     }
 

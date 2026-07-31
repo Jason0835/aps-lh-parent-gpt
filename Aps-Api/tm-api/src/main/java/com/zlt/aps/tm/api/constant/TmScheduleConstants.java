@@ -419,6 +419,24 @@ public final class TmScheduleConstants {
     /** 班次分析字段名模板。 */
     public static final String SHIFT_ANALYSIS_FIELD_TEMPLATE = "class%dAnalysis";
 
+    /** 发布异步任务编号前缀。 */
+    public static final String RELEASE_TASK_ID_PREFIX = "TM-REL-";
+
+    /** 发布超时分钟数参数键。 */
+    public static final String PARAM_RELEASE_TIMEOUT_MINUTES = "TM_RELEASE_TIMEOUT_MINUTES";
+
+    /** 默认发布超时分钟数。 */
+    public static final String DEFAULT_RELEASE_TIMEOUT_MINUTES = "10";
+
+    /** 发布阶段：装配。 */
+    public static final String RELEASE_STAGE_ASSEMBLE = "RELEASE_ASSEMBLE";
+
+    /** 发布阶段：下发。 */
+    public static final String RELEASE_STAGE_ISSUE = "RELEASE_ISSUE";
+
+    /** 发布阶段：等待反馈。 */
+    public static final String RELEASE_STAGE_WAIT_FEEDBACK = "RELEASE_WAIT_FEEDBACK";
+
     /**
      * 工具类不允许实例化。
      */

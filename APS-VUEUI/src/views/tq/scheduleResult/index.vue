@@ -245,6 +245,13 @@ export default {
           minWidth: 110,
         },
         {
+          prop: "stockQty",
+          align: "center",
+          halign: "center",
+          label: this.$t("ui.data.column.tqScheduleResult.stockQty"),
+          minWidth: 80,
+        },
+        {
           label: this.getShiftLabel(1),
           children: [
             {
@@ -427,13 +434,6 @@ export default {
           formatter: (row, column, value, index) => {
             return this.selectDictLabel(this.dict.type.IS_RELEASE, value);
           },
-        },
-        {
-          prop: "stockQty",
-          align: "center",
-          halign: "center",
-          label: this.$t("ui.data.column.tqScheduleResult.stockQty"),
-          minWidth: 80,
         },
         {
           prop: "remark",
