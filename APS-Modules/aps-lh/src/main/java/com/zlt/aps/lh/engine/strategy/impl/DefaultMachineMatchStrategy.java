@@ -14,12 +14,17 @@ import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.enums.ConstructionStageEnum;
 import com.zlt.aps.lh.api.enums.LhSpecialMaterialCategoryEnum;
+import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
 import com.zlt.aps.lh.api.enums.SkuTagEnum;
+import com.zlt.aps.lh.api.enums.TrialStatusEnum;
 import com.zlt.aps.lh.component.StructureMinMachineRetentionService;
+import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.IMachineMatchStrategy;
+import com.zlt.aps.lh.engine.strategy.support.MachinePriorityTraceSnapshot;
 import com.zlt.aps.lh.engine.strategy.support.MouldResourceAllocationResult;
 import com.zlt.aps.lh.engine.strategy.support.MouldResourceContext;
+import com.zlt.aps.lh.engine.strategy.support.NewSpecEmbryoAvailableTimeResolver;
 import com.zlt.aps.lh.engine.strategy.support.SpecifiedMachineMatchResult;
 import com.zlt.aps.lh.service.impl.LhMaintenanceScheduleService;
 import com.zlt.aps.lh.util.LhMachineHardMatchUtil;
@@ -30,6 +35,7 @@ import com.zlt.aps.lh.util.LhSpecifyMachineUtil;
 import com.zlt.aps.lh.util.MachineStatusUtil;
 import com.zlt.aps.lh.util.PriorityTraceLogHelper;
 import com.zlt.aps.lh.util.ShiftProductionControlUtil;
+import com.zlt.aps.lh.util.ShiftFieldUtil;
 import com.zlt.aps.mdm.api.domain.entity.MdmDevicePlanShut;
 import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmModelInfo;
@@ -44,10 +50,13 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -512,6 +521,28 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
     private List<MachineScheduleDTO> resolveWholeSingleControlCandidates(LhScheduleContext context,
                                                                          SkuScheduleDTO sku,
                                                                          List<MachineScheduleDTO> singleControlCandidates) {
+        return this.resolveWholeSingleControlCandidates(
+                context, sku, singleControlCandidates, false);
+    }
+
+    /**
+     * 将单控 L/R 候选收敛为物理整机代表。
+     *
+     * <p>正式选机传 {@code ignoreOtherSkuOccupation=false}，完整保留原有其它 SKU 未释放占用过滤；
+     * 日志诊断传 {@code true} 时只跳过这一项占用条件，其余 L/R 硬约束、SKU 单控粒度和
+     * 后续无副作用产能试算仍全部生效。该参数只服务日志快照，不得用于正式候选。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 当前待排 SKU
+     * @param singleControlCandidates 已通过单边硬约束的候选
+     * @param ignoreOtherSkuOccupation 是否仅在日志诊断中忽略其它 SKU 占用
+     * @return 每个物理单控机台最多一个左侧代表
+     */
+    private List<MachineScheduleDTO> resolveWholeSingleControlCandidates(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            List<MachineScheduleDTO> singleControlCandidates,
+            boolean ignoreOtherSkuOccupation) {
         if (CollectionUtils.isEmpty(singleControlCandidates)) {
             return singleControlCandidates;
         }
@@ -545,8 +576,9 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
             // 双模候选检查：L/R任一侧存在未结束的其它SKU占用时才过滤。
             // 如果已登记结果有specEndTime，说明机台有明确释放时间，
             // 下游resolveMachineOccupationEndTime会取L/R两侧较晚的specEndTime作为新SKU开工基准。
-            if (hasUnfinishedOtherSkuAssignment(context, sku, leftMachineCode)
-                    || hasUnfinishedOtherSkuAssignment(context, sku, rightMachineCode)) {
+            if (!ignoreOtherSkuOccupation
+                    && (hasUnfinishedOtherSkuAssignment(context, sku, leftMachineCode)
+                    || hasUnfinishedOtherSkuAssignment(context, sku, rightMachineCode))) {
                 log.info("双模SKU单控整机候选过滤, materialCode: {}, physicalMachine: {}, leftMachine: {}, rightMachine: {}, reason: {}",
                         sku.getMaterialCode(), physicalMachineCode, leftMachineCode, rightMachineCode,
                         "L/R任一侧存在未结束的其它SKU占用");
@@ -987,6 +1019,958 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
     }
 
     /**
+     * 构建当前选机时点的日志观察快照。
+     *
+     * <p>调用处传入的正式候选及首选机台保持原顺序。本方法只从当前
+     * {@link LhScheduleContext#getMachineAssignmentMap()} 读取实时占用，补充同时满足以下条件的机台：</p>
+     * <ul>
+     *   <li>当前窗口存在其它“物料编码 + 产品状态”的有效排程占用；</li>
+     *   <li>定点、状态、寸口、模套、特殊材料、模具、停产保机和单控规则全部满足；</li>
+     *   <li>忽略其它 SKU 占用时间后，使用正式产能组件只读试算仍有可排产能。</li>
+     * </ul>
+     *
+     * <p>快照、试算和排序均不修改正式候选、机台时间、模具资源或排程结果；
+     * 因此日志观察范围扩大不会改变第一台实际试排机台。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 当前待选机 SKU
+     * @param actualOrderedCandidates 正式选机主链本轮有序候选
+     * @param actualSelectedMachine 正式选机主链本轮首选机台
+     * @param currentDayEndTime 当前业务日结束时间
+     * @param targetScheduleQtyResolver 正式产能计算组件
+     * @return 独立的只读日志快照
+     */
+    @Override
+    public MachinePriorityTraceSnapshot buildMachinePriorityTraceSnapshot(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            List<MachineScheduleDTO> actualOrderedCandidates,
+            MachineScheduleDTO actualSelectedMachine,
+            Date currentDayEndTime,
+            TargetScheduleQtyResolver targetScheduleQtyResolver) {
+        MachinePriorityTraceSnapshot actualOnlySnapshot =
+                MachinePriorityTraceSnapshot.fromActualCandidates(
+                        actualOrderedCandidates, actualSelectedMachine);
+        if (!PriorityTraceLogHelper.isEnabled(context) || Objects.isNull(context)
+                || Objects.isNull(sku) || Objects.isNull(targetScheduleQtyResolver)) {
+            return actualOnlySnapshot;
+        }
+
+        Set<String> actualMachineCodes = resolveActualTraceMachineCodes(actualOrderedCandidates);
+        Map<String, String> displayMachineCodeMap =
+                new LinkedHashMap<String, String>(Math.max(8, actualMachineCodes.size() * 2));
+        Map<String, List<String>> memberMachineCodeMap =
+                new LinkedHashMap<String, List<String>>(Math.max(8, actualMachineCodes.size() * 2));
+        registerTraceMachineDisplayMetadata(
+                context, sku, actualOrderedCandidates,
+                displayMachineCodeMap, memberMachineCodeMap);
+
+        List<MachineScheduleDTO> occupiedOnlyCandidates =
+                resolveOccupiedOnlyTraceCandidates(
+                        context, sku, actualMachineCodes, currentDayEndTime,
+                        targetScheduleQtyResolver,
+                        displayMachineCodeMap, memberMachineCodeMap);
+        List<MachineScheduleDTO> mergedCandidates =
+                mergeTraceCandidatesKeepingActualOrder(
+                        context, sku, actualOrderedCandidates,
+                        actualSelectedMachine, occupiedOnlyCandidates);
+        /*
+         * 完整候选确定后立即冻结每台机台的占用明细。日志会等到实际命中或窗口最终未命中后才写入，
+         * 禁止届时重新读取 machineAssignmentMap，以免把本轮刚提交的当前 SKU 误记成前序占用。
+         */
+        Map<String, String> occupationTextMap =
+                captureMachineOccupationText(
+                        context, mergedCandidates, memberMachineCodeMap);
+        /*
+         * 收尾时间同样必须在选机时点冻结。实际命中后 updateMachineState 会把 estimatedEndTime
+         * 推进到本轮新增结果完工时间；若延迟写日志时重新解析，会把“选机前释放时间”误写为
+         * “本轮排完时间”，造成 K1613 这类续作释放机台的日志与真实排序依据不一致。
+         */
+        Map<String, Date> priorityTraceEndingTimeMap =
+                capturePriorityTraceEndingTime(
+                        context, sku, mergedCandidates, occupationTextMap);
+        return new MachinePriorityTraceSnapshot(
+                mergedCandidates,
+                actualMachineCodes,
+                Objects.isNull(actualSelectedMachine)
+                        ? null : actualSelectedMachine.getMachineCode(),
+                displayMachineCodeMap,
+                memberMachineCodeMap,
+                occupationTextMap,
+                priorityTraceEndingTimeMap);
+    }
+
+    /**
+     * 冻结本次选机时点每台日志候选的实时占用明细。
+     *
+     * <p>单控整机按代表侧编码保存，内容聚合 L/R 两侧；普通机台按自身编码保存。
+     * 占用 SKU 去重、区间聚合和稳定排序继续复用现有格式化方法，不维护第二套口径。</p>
+     *
+     * @param context 排程上下文
+     * @param traceCandidates 完整日志候选
+     * @param memberMachineCodeMap 代表机台到物理成员编码映射
+     * @return 代表机台到选机时点占用文本的稳定映射
+     */
+    private Map<String, String> captureMachineOccupationText(
+            LhScheduleContext context,
+            List<MachineScheduleDTO> traceCandidates,
+            Map<String, List<String>> memberMachineCodeMap) {
+        Map<String, String> occupationTextMap = new LinkedHashMap<String, String>(
+                Math.max(8, PriorityTraceLogHelper.sizeOf(traceCandidates) * 2));
+        if (CollectionUtils.isEmpty(traceCandidates)) {
+            return occupationTextMap;
+        }
+        for (MachineScheduleDTO traceCandidate : traceCandidates) {
+            if (Objects.isNull(traceCandidate)
+                    || StringUtils.isEmpty(traceCandidate.getMachineCode())) {
+                continue;
+            }
+            String representativeMachineCode = traceCandidate.getMachineCode();
+            List<String> memberMachineCodes =
+                    memberMachineCodeMap.get(representativeMachineCode);
+            if (CollectionUtils.isEmpty(memberMachineCodes)) {
+                memberMachineCodes =
+                        Collections.singletonList(representativeMachineCode);
+            }
+            occupationTextMap.put(
+                    representativeMachineCode,
+                    this.resolveMachineOccupationText(context, memberMachineCodes));
+        }
+        return occupationTextMap;
+    }
+
+    /**
+     * 冻结本次选机时点每台日志候选使用的收尾时间。
+     *
+     * <p>本方法复用正式候选画像的参考时间，并继续沿用现有“无有效占用时展示窗口首班开始时间”
+     * 规则，只把最终展示时间复制进快照。它不会修改候选列表、机台状态或排序结果。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 当前待选机 SKU
+     * @param traceCandidates 完整日志候选
+     * @param occupationTextMap 已冻结的选机时点占用明细
+     * @return 代表机台编码到选机时点日志收尾时间的映射
+     */
+    private Map<String, Date> capturePriorityTraceEndingTime(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            List<MachineScheduleDTO> traceCandidates,
+            Map<String, String> occupationTextMap) {
+        Map<String, Date> priorityTraceEndingTimeMap =
+                new LinkedHashMap<String, Date>(
+                        Math.max(8, PriorityTraceLogHelper.sizeOf(traceCandidates) * 2));
+        if (CollectionUtils.isEmpty(traceCandidates)) {
+            return priorityTraceEndingTimeMap;
+        }
+        Map<String, CandidateWindowProfile> profileCache =
+                new HashMap<String, CandidateWindowProfile>(
+                        Math.max(8, traceCandidates.size() * 2));
+        for (MachineScheduleDTO traceCandidate : traceCandidates) {
+            if (Objects.isNull(traceCandidate)
+                    || StringUtils.isEmpty(traceCandidate.getMachineCode())) {
+                continue;
+            }
+            String representativeMachineCode = traceCandidate.getMachineCode();
+            CandidateWindowProfile profile =
+                    this.resolveCandidateWindowProfile(
+                            context, sku, traceCandidate, profileCache);
+            String occupationText =
+                    occupationTextMap.getOrDefault(
+                            representativeMachineCode, "无");
+            Date traceEndingTime =
+                    this.resolvePriorityTraceEndingTime(
+                            context, profile.getReferenceTime(), occupationText);
+            priorityTraceEndingTimeMap.put(
+                    representativeMachineCode,
+                    Objects.isNull(traceEndingTime)
+                            ? null : new Date(traceEndingTime.getTime()));
+        }
+        return priorityTraceEndingTimeMap;
+    }
+
+    /**
+     * 提取正式可选机台编码。
+     *
+     * @param actualOrderedCandidates 正式候选
+     * @return 保持正式候选顺序的机台编码集合
+     */
+    private Set<String> resolveActualTraceMachineCodes(
+            List<MachineScheduleDTO> actualOrderedCandidates) {
+        Set<String> machineCodes = new LinkedHashSet<String>(
+                Math.max(8, PriorityTraceLogHelper.sizeOf(actualOrderedCandidates) * 2));
+        if (CollectionUtils.isEmpty(actualOrderedCandidates)) {
+            return machineCodes;
+        }
+        for (MachineScheduleDTO candidate : actualOrderedCandidates) {
+            if (Objects.nonNull(candidate) && StringUtils.isNotEmpty(candidate.getMachineCode())) {
+                machineCodes.add(candidate.getMachineCode());
+            }
+        }
+        return machineCodes;
+    }
+
+    /**
+     * 注册普通、单控单边和单控整机的日志展示元数据。
+     *
+     * @param context 排程上下文
+     * @param sku 当前 SKU
+     * @param candidates 候选机台
+     * @param displayMachineCodeMap 展示编码输出映射
+     * @param memberMachineCodeMap 物理成员输出映射
+     */
+    private void registerTraceMachineDisplayMetadata(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            List<MachineScheduleDTO> candidates,
+            Map<String, String> displayMachineCodeMap,
+            Map<String, List<String>> memberMachineCodeMap) {
+        if (CollectionUtils.isEmpty(candidates)) {
+            return;
+        }
+        boolean wholeMachineGranularity =
+                LhSingleControlMachineUtil.isWholeMachineGranularitySku(context, sku);
+        for (MachineScheduleDTO candidate : candidates) {
+            if (Objects.isNull(candidate) || StringUtils.isEmpty(candidate.getMachineCode())) {
+                continue;
+            }
+            String representativeMachineCode = candidate.getMachineCode();
+            if (!wholeMachineGranularity
+                    || !isSingleControlMachine(context, representativeMachineCode)) {
+                displayMachineCodeMap.put(representativeMachineCode, representativeMachineCode);
+                memberMachineCodeMap.put(
+                        representativeMachineCode,
+                        Collections.singletonList(representativeMachineCode));
+                continue;
+            }
+            String leftMachineCode =
+                    LhSingleControlMachineUtil.resolveLeftMachineCode(representativeMachineCode);
+            String rightMachineCode =
+                    LhSingleControlMachineUtil.resolveRightMachineCode(representativeMachineCode);
+            List<String> memberMachineCodes = new ArrayList<String>(2);
+            memberMachineCodes.add(leftMachineCode);
+            memberMachineCodes.add(rightMachineCode);
+            displayMachineCodeMap.put(
+                    representativeMachineCode,
+                    leftMachineCode + "/" + rightMachineCode);
+            memberMachineCodeMap.put(representativeMachineCode, memberMachineCodes);
+        }
+    }
+
+    /**
+     * 筛选仅因其它 SKU 占用而暂不可选的日志候选。
+     *
+     * @param context 排程上下文
+     * @param sku 当前 SKU
+     * @param actualMachineCodes 正式可选机台编码
+     * @param currentDayEndTime 当前业务日结束时间
+     * @param targetScheduleQtyResolver 正式产能计算组件
+     * @param displayMachineCodeMap 展示编码输出映射
+     * @param memberMachineCodeMap 物理成员输出映射
+     * @return 已通过全部其它硬约束的占用机台
+     */
+    private List<MachineScheduleDTO> resolveOccupiedOnlyTraceCandidates(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            Set<String> actualMachineCodes,
+            Date currentDayEndTime,
+            TargetScheduleQtyResolver targetScheduleQtyResolver,
+            Map<String, String> displayMachineCodeMap,
+            Map<String, List<String>> memberMachineCodeMap) {
+        Set<String> occupiedMachineCodes = resolveOtherSkuOccupiedMachineCodes(context, sku);
+        if (CollectionUtils.isEmpty(occupiedMachineCodes)) {
+            return Collections.emptyList();
+        }
+        Set<String> notAllowedMachineCodes = LhSpecifyMachineUtil.resolveNotAllowedMachineCodes(
+                context, sku.getMaterialCode());
+        MouldResourceContext mouldResourceContext = resolveMouldResourceContext(context);
+        BigDecimal skuInch = parseInch(sku.getProSize());
+        SpecialMaterialMatchResult matchResult = LhSpecialMaterialUtil.resolveMatchResult(context, sku);
+
+        List<MachineScheduleDTO> hardMatchedCandidates =
+                new ArrayList<MachineScheduleDTO>(occupiedMachineCodes.size() + 2);
+        List<MachineScheduleDTO> stopTimeoutCandidates =
+                new ArrayList<MachineScheduleDTO>(occupiedMachineCodes.size());
+        for (MachineScheduleDTO machine : context.getMachineScheduleMap().values()) {
+            if (!shouldInspectOccupiedTraceMachine(
+                    context, sku, machine, occupiedMachineCodes)) {
+                continue;
+            }
+            if (isHistoricalReverseSelectedMachine(
+                    context, sku, machine.getMachineCode())
+                    || isNotAllowedMachine(notAllowedMachineCodes, machine)) {
+                continue;
+            }
+            MachineAvailabilityReason availabilityReason =
+                    resolveMachineAvailabilityReason(
+                            context, sku, mouldResourceContext, skuInch, matchResult, machine);
+            if (MachineAvailabilityReason.AVAILABLE != availabilityReason) {
+                continue;
+            }
+            if (hasPlanStopExceededTimeout(context, sku, machine)) {
+                stopTimeoutCandidates.add(machine);
+            } else {
+                hardMatchedCandidates.add(machine);
+            }
+        }
+        // 完整复用正式选机“只有超时停机候选时才回落”的既有边界，日志不额外放宽停机约束。
+        if (CollectionUtils.isEmpty(hardMatchedCandidates)) {
+            hardMatchedCandidates.addAll(stopTimeoutCandidates);
+        }
+        List<MachineScheduleDTO> typeMatchedCandidates =
+                applyTraceSingleControlRule(context, sku, hardMatchedCandidates);
+        if (CollectionUtils.isEmpty(typeMatchedCandidates)) {
+            return Collections.emptyList();
+        }
+
+        List<MachineScheduleDTO> occupiedOnlyCandidates =
+                new ArrayList<MachineScheduleDTO>(typeMatchedCandidates.size());
+        Set<String> addedRepresentativeCodes =
+                new LinkedHashSet<String>(Math.max(8, typeMatchedCandidates.size() * 2));
+        for (MachineScheduleDTO candidate : typeMatchedCandidates) {
+            if (Objects.isNull(candidate) || StringUtils.isEmpty(candidate.getMachineCode())
+                    || actualMachineCodes.contains(candidate.getMachineCode())
+                    || !addedRepresentativeCodes.add(candidate.getMachineCode())) {
+                continue;
+            }
+            registerTraceMachineDisplayMetadata(
+                    context, sku, Collections.singletonList(candidate),
+                    displayMachineCodeMap, memberMachineCodeMap);
+            List<String> memberMachineCodes =
+                    memberMachineCodeMap.get(candidate.getMachineCode());
+            if (!containsAnyMachineCode(memberMachineCodes, occupiedMachineCodes)
+                    || isTraceStructureRetentionBlocked(
+                    context, sku, memberMachineCodes, currentDayEndTime)
+                    || !hasTraceCapacityIgnoringOtherSkuOccupation(
+                    context, sku, memberMachineCodes, targetScheduleQtyResolver)) {
+                continue;
+            }
+            occupiedOnlyCandidates.add(candidate);
+        }
+        occupiedOnlyCandidates.sort(buildDiagnosticMachineComparator(context, sku));
+        return occupiedOnlyCandidates;
+    }
+
+    /**
+     * 判断机台是否属于本次占用日志检查范围。
+     *
+     * <p>普通机台只检查自身是否被其它 SKU 占用；单控整机粒度下，只要 L/R 任一侧被占用，
+     * 两侧都必须进入硬约束校验，保证整机候选不会因只检查已占用侧而放宽配对侧。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 当前 SKU
+     * @param machine 当前机台
+     * @param occupiedMachineCodes 被其它 SKU 占用的机台编码
+     * @return true-需要参与日志硬约束检查
+     */
+    private boolean shouldInspectOccupiedTraceMachine(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            MachineScheduleDTO machine,
+            Set<String> occupiedMachineCodes) {
+        if (Objects.isNull(machine) || StringUtils.isEmpty(machine.getMachineCode())) {
+            return false;
+        }
+        if (occupiedMachineCodes.contains(machine.getMachineCode())) {
+            return true;
+        }
+        if (!isSingleControlMachine(context, machine.getMachineCode())
+                || !LhSingleControlMachineUtil.isWholeMachineGranularitySku(context, sku)) {
+            return false;
+        }
+        String leftMachineCode =
+                LhSingleControlMachineUtil.resolveLeftMachineCode(machine.getMachineCode());
+        String rightMachineCode =
+                LhSingleControlMachineUtil.resolveRightMachineCode(machine.getMachineCode());
+        return occupiedMachineCodes.contains(leftMachineCode)
+                || occupiedMachineCodes.contains(rightMachineCode);
+    }
+
+    /**
+     * 对日志诊断候选复用现有 SKU 类型和单控粒度规则。
+     *
+     * @param context 排程上下文
+     * @param sku 当前 SKU
+     * @param hardMatchedCandidates 已通过其它硬约束的候选
+     * @return 符合现有单控规则的候选
+     */
+    private List<MachineScheduleDTO> applyTraceSingleControlRule(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            List<MachineScheduleDTO> hardMatchedCandidates) {
+        List<MachineScheduleDTO> singleControlCandidates =
+                new ArrayList<MachineScheduleDTO>(hardMatchedCandidates.size());
+        List<MachineScheduleDTO> normalCandidates =
+                new ArrayList<MachineScheduleDTO>(hardMatchedCandidates.size());
+        for (MachineScheduleDTO candidate : hardMatchedCandidates) {
+            if (Objects.isNull(candidate)) {
+                continue;
+            }
+            if (isSingleControlMachine(context, candidate.getMachineCode())) {
+                singleControlCandidates.add(candidate);
+            } else {
+                normalCandidates.add(candidate);
+            }
+        }
+        List<MachineScheduleDTO> effectiveSingleControlCandidates =
+                !CollectionUtils.isEmpty(singleControlCandidates)
+                        && LhSingleControlMachineUtil.isWholeMachineGranularitySku(context, sku)
+                ? resolveWholeSingleControlCandidates(
+                context, sku, singleControlCandidates, true)
+                : singleControlCandidates;
+        return resolveCandidatesBySkuType(
+                context, sku, effectiveSingleControlCandidates, normalCandidates);
+    }
+
+    /**
+     * 解析当前窗口内被其它 SKU 实际占用的机台编码。
+     *
+     * @param context 排程上下文
+     * @param sku 当前 SKU
+     * @return 被其它物料或其它产品状态占用的机台编码
+     */
+    private Set<String> resolveOtherSkuOccupiedMachineCodes(
+            LhScheduleContext context,
+            SkuScheduleDTO sku) {
+        if (Objects.isNull(context)
+                || CollectionUtils.isEmpty(context.getMachineAssignmentMap())) {
+            return Collections.emptySet();
+        }
+        Set<String> occupiedMachineCodes = new LinkedHashSet<String>(
+                Math.max(8, context.getMachineAssignmentMap().size() * 2));
+        for (Map.Entry<String, List<LhScheduleResult>> entry
+                : context.getMachineAssignmentMap().entrySet()) {
+            if (StringUtils.isEmpty(entry.getKey())
+                    || CollectionUtils.isEmpty(entry.getValue())) {
+                continue;
+            }
+            for (LhScheduleResult result : entry.getValue()) {
+                if (isValidOtherSkuOccupation(context, sku, result)) {
+                    occupiedMachineCodes.add(entry.getKey());
+                    break;
+                }
+            }
+        }
+        return occupiedMachineCodes;
+    }
+
+    /**
+     * 判断排程结果是否是当前窗口内有效的其它 SKU 占用。
+     *
+     * @param context 排程上下文
+     * @param sku 当前 SKU
+     * @param result 已分配结果
+     * @return true-物料或产品状态不同，且至少一个有量班次与窗口相交
+     */
+    private boolean isValidOtherSkuOccupation(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            LhScheduleResult result) {
+        if (shouldIgnoreReleasedContinuousPlaceholder(context, result)
+                || Objects.isNull(result)
+                || StringUtils.isEmpty(normalizeToken(result.getMaterialCode()))
+                || isSameMaterialAndProductStatus(sku, result)
+                || CollectionUtils.isEmpty(resolveOccupationIntervals(context, result))) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * 按“物料编码 + 产品状态”判断是否属于当前 SKU。
+     *
+     * @param sku 当前 SKU
+     * @param result 已分配结果
+     * @return true-物料和产品状态都相同
+     */
+    private boolean isSameMaterialAndProductStatus(
+            SkuScheduleDTO sku,
+            LhScheduleResult result) {
+        return Objects.nonNull(sku) && Objects.nonNull(result)
+                && StringUtils.equals(
+                normalizeToken(sku.getMaterialCode()),
+                normalizeToken(result.getMaterialCode()))
+                && StringUtils.equals(
+                normalizeToken(sku.getProductStatus()),
+                normalizeToken(result.getProductStatus()));
+    }
+
+    /**
+     * 解析一条排程结果在当前完整八班窗口内的有效占用区间。
+     *
+     * <p>只有计划量大于零且时间区间与本次排程窗口相交的班次才构成占用。
+     * 班次起止时间优先取结果行的实际生产时间；历史结果缺少明细时间时，
+     * 使用同一 {@code shiftIndex} 的窗口班次时间补齐，避免把只有空字段的结果误判为占用。</p>
+     *
+     * @param context 排程上下文
+     * @param result 当前机台上的排程结果
+     * @return 按开始时间稳定排序的有效占用区间
+     */
+    private List<MachineOccupationInterval> resolveOccupationIntervals(
+            LhScheduleContext context,
+            LhScheduleResult result) {
+        if (Objects.isNull(context) || Objects.isNull(result)
+                || CollectionUtils.isEmpty(context.getScheduleWindowShifts())) {
+            return Collections.emptyList();
+        }
+        Date windowStartTime = this.resolveScheduleWindowStartTime(context);
+        Date windowEndTime = this.resolveScheduleWindowEndTime(context);
+        if (Objects.isNull(windowStartTime) || Objects.isNull(windowEndTime)
+                || !windowStartTime.before(windowEndTime)) {
+            return Collections.emptyList();
+        }
+
+        List<MachineOccupationInterval> occupationIntervals =
+                new ArrayList<MachineOccupationInterval>(LhScheduleConstant.MAX_SHIFT_SLOT_COUNT);
+        for (int shiftIndex = 1;
+                shiftIndex <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT;
+                shiftIndex++) {
+            Integer planQty = ShiftFieldUtil.getShiftPlanQty(result, shiftIndex);
+            if (Objects.isNull(planQty) || planQty <= 0) {
+                continue;
+            }
+            LhShiftConfigVO windowShift = this.resolveWindowShift(context, shiftIndex);
+            Date occupationStartTime = ShiftFieldUtil.getShiftStartTime(result, shiftIndex);
+            Date occupationEndTime = ShiftFieldUtil.getShiftEndTime(result, shiftIndex);
+            if (Objects.isNull(occupationStartTime) && Objects.nonNull(windowShift)) {
+                occupationStartTime = windowShift.getShiftStartDateTime();
+            }
+            if (Objects.isNull(occupationEndTime) && Objects.nonNull(windowShift)) {
+                occupationEndTime = windowShift.getShiftEndDateTime();
+            }
+            if (Objects.isNull(occupationStartTime) || Objects.isNull(occupationEndTime)
+                    || !occupationStartTime.before(occupationEndTime)
+                    || !occupationStartTime.before(windowEndTime)
+                    || !occupationEndTime.after(windowStartTime)) {
+                continue;
+            }
+
+            // 区间裁剪到本次八班窗口，确保日志不混入窗口外历史排程。
+            Date effectiveStartTime = occupationStartTime.before(windowStartTime)
+                    ? windowStartTime : occupationStartTime;
+            Date effectiveEndTime = occupationEndTime.after(windowEndTime)
+                    ? windowEndTime : occupationEndTime;
+            if (!effectiveStartTime.before(effectiveEndTime)) {
+                continue;
+            }
+            String shiftName = Objects.nonNull(windowShift)
+                    ? windowShift.getShiftName() : null;
+            occupationIntervals.add(new MachineOccupationInterval(
+                    shiftIndex,
+                    StringUtils.isEmpty(shiftName) ? "未知班次" : shiftName,
+                    effectiveStartTime,
+                    effectiveEndTime));
+        }
+        occupationIntervals.sort(
+                Comparator.comparing(
+                        MachineOccupationInterval::getStartTime,
+                        Comparator.nullsLast(Date::compareTo))
+                        .thenComparing(
+                                MachineOccupationInterval::getEndTime,
+                                Comparator.nullsLast(Date::compareTo))
+                        .thenComparingInt(MachineOccupationInterval::getShiftIndex));
+        return occupationIntervals;
+    }
+
+    /**
+     * 解析排程窗口最早开始时间。
+     *
+     * @param context 排程上下文
+     * @return 第一个有效班次的开始时间
+     */
+    private Date resolveScheduleWindowStartTime(LhScheduleContext context) {
+        Date windowStartTime = null;
+        for (LhShiftConfigVO shift : context.getScheduleWindowShifts()) {
+            if (Objects.nonNull(shift) && Objects.nonNull(shift.getShiftStartDateTime())
+                    && (Objects.isNull(windowStartTime)
+                    || shift.getShiftStartDateTime().before(windowStartTime))) {
+                windowStartTime = shift.getShiftStartDateTime();
+            }
+        }
+        return windowStartTime;
+    }
+
+    /**
+     * 按班次槽位索引读取当前八班窗口配置。
+     *
+     * @param context 排程上下文
+     * @param shiftIndex 班次槽位索引
+     * @return 对应窗口班次，未配置时返回 null
+     */
+    private LhShiftConfigVO resolveWindowShift(
+            LhScheduleContext context,
+            int shiftIndex) {
+        for (LhShiftConfigVO shift : context.getScheduleWindowShifts()) {
+            if (Objects.nonNull(shift) && Objects.nonNull(shift.getShiftIndex())
+                    && shift.getShiftIndex() == shiftIndex) {
+                return shift;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 汇总普通机台自身或单控整机 L/R 两侧的全部实时占用 SKU。
+     *
+     * <p>占用按“物料编码 + 产品状态 + 排程阶段”去重，同一 SKU 在同一阶段的全部班次和时间段都会保留。
+     * 分组先按最早占用时间，再按物料编码、产品状态、排程阶段稳定排序；同一输入下日志顺序固定。
+     * 单控整机两侧出现相同 SKU、相同阶段、相同时间段时只展示一次。</p>
+     *
+     * @param context 排程上下文
+     * @param memberMachineCodes 普通机台自身编码或单控 L/R 两侧编码
+     * @return 全部占用 SKU 的稳定展示文本，无占用时返回“无”
+     */
+    private String resolveMachineOccupationText(
+            LhScheduleContext context,
+            List<String> memberMachineCodes) {
+        if (Objects.isNull(context) || CollectionUtils.isEmpty(memberMachineCodes)
+                || CollectionUtils.isEmpty(context.getMachineAssignmentMap())) {
+            return "无";
+        }
+        Map<String, MachineOccupationGroup> groupMap =
+                new LinkedHashMap<String, MachineOccupationGroup>(8);
+        for (String machineCode : memberMachineCodes) {
+            if (StringUtils.isEmpty(machineCode)) {
+                continue;
+            }
+            List<LhScheduleResult> assignedResults =
+                    context.getMachineAssignmentMap().get(machineCode);
+            if (CollectionUtils.isEmpty(assignedResults)) {
+                continue;
+            }
+            for (LhScheduleResult assignedResult : assignedResults) {
+                if (this.shouldIgnoreReleasedContinuousPlaceholder(context, assignedResult)
+                        || Objects.isNull(assignedResult)
+                        || StringUtils.isEmpty(
+                        this.normalizeToken(assignedResult.getMaterialCode()))) {
+                    continue;
+                }
+                List<MachineOccupationInterval> occupationIntervals =
+                        this.resolveOccupationIntervals(context, assignedResult);
+                if (CollectionUtils.isEmpty(occupationIntervals)) {
+                    continue;
+                }
+                String materialCode =
+                        this.normalizeToken(assignedResult.getMaterialCode());
+                String productStatus =
+                        this.normalizeToken(assignedResult.getProductStatus());
+                String scheduleType =
+                        this.normalizeToken(assignedResult.getScheduleType());
+                String groupKey = materialCode + '\u0001'
+                        + (StringUtils.isEmpty(productStatus) ? "" : productStatus)
+                        + '\u0001'
+                        + (StringUtils.isEmpty(scheduleType) ? "" : scheduleType);
+                MachineOccupationGroup occupationGroup = groupMap.get(groupKey);
+                if (Objects.isNull(occupationGroup)) {
+                    occupationGroup =
+                            new MachineOccupationGroup(
+                                    materialCode, productStatus, scheduleType);
+                    groupMap.put(groupKey, occupationGroup);
+                }
+                occupationGroup.addIntervals(occupationIntervals);
+            }
+        }
+        if (CollectionUtils.isEmpty(groupMap)) {
+            return "无";
+        }
+
+        List<MachineOccupationGroup> occupationGroups =
+                new ArrayList<MachineOccupationGroup>(groupMap.values());
+        occupationGroups.sort(
+                Comparator.comparing(
+                        MachineOccupationGroup::getEarliestStartTime,
+                        Comparator.nullsLast(Date::compareTo))
+                        .thenComparing(
+                                MachineOccupationGroup::getMaterialCode,
+                                Comparator.nullsLast(String::compareTo))
+                        .thenComparing(
+                                MachineOccupationGroup::getProductStatus,
+                                Comparator.nullsLast(String::compareTo))
+                        .thenComparingInt(group ->
+                                this.resolveOccupationStageSortOrder(
+                                        group.getScheduleType()))
+                        .thenComparing(
+                                MachineOccupationGroup::getScheduleType,
+                                Comparator.nullsLast(String::compareTo)));
+        return occupationGroups.stream()
+                .map(this::formatMachineOccupationGroup)
+                .collect(Collectors.joining("、"));
+    }
+
+    /**
+     * 格式化一个占用 SKU 及其全部时间区间。
+     *
+     * @param occupationGroup 已聚合的占用 SKU
+     * @return “物料（状态，占用阶段，班次 时间范围）”格式文本
+     */
+    private String formatMachineOccupationGroup(
+            MachineOccupationGroup occupationGroup) {
+        String statusText =
+                this.resolveOccupationProductStatusText(
+                        occupationGroup.getProductStatus());
+        String intervalsText = occupationGroup.getIntervals().stream()
+                .map(interval -> interval.getShiftName()
+                        + " "
+                        + PriorityTraceLogHelper.formatDateTime(interval.getStartTime())
+                        + "至"
+                        + PriorityTraceLogHelper.formatDateTime(interval.getEndTime()))
+                .collect(Collectors.joining("；"));
+        StringBuilder groupBuilder = new StringBuilder(96);
+        groupBuilder.append(occupationGroup.getMaterialCode()).append('（');
+        if (StringUtils.isNotEmpty(statusText)) {
+            groupBuilder.append(statusText).append("，");
+        }
+        groupBuilder.append("占用阶段：")
+                .append(this.resolveOccupationStageText(
+                        occupationGroup.getScheduleType()))
+                .append("，");
+        groupBuilder.append(intervalsText).append('）');
+        return groupBuilder.toString();
+    }
+
+    /**
+     * 解析占用结果所属排程阶段。
+     *
+     * <p>阶段直接取占用结果的 {@code SCHEDULE_TYPE}，不根据时间或物料状态推断：
+     * 01 对应续作阶段，03 对应换活字块阶段，02 对应新增选机后的换模排产阶段。</p>
+     *
+     * @param scheduleType 排程类型编码
+     * @return 日志使用的占用阶段说明
+     */
+    private String resolveOccupationStageText(String scheduleType) {
+        if (StringUtils.equals(
+                ScheduleTypeEnum.CONTINUOUS.getCode(), scheduleType)) {
+            return "续作阶段";
+        }
+        if (StringUtils.equals(
+                ScheduleTypeEnum.TYPE_BLOCK.getCode(), scheduleType)) {
+            return "换活字块阶段";
+        }
+        if (StringUtils.equals(
+                ScheduleTypeEnum.NEW_SPEC.getCode(), scheduleType)) {
+            return "新增换模阶段";
+        }
+        return StringUtils.isEmpty(scheduleType)
+                ? "未知阶段" : "未知阶段（" + scheduleType + "）";
+    }
+
+    /**
+     * 解析占用阶段的稳定排序值。
+     *
+     * <p>排序按实际排程阶段顺序：续作、换活字块、新增换模、未知阶段。
+     * 该排序只用于同一最早占用时间下稳定输出日志，不参与机台选择。</p>
+     *
+     * @param scheduleType 排程类型编码
+     * @return 阶段稳定排序值
+     */
+    private int resolveOccupationStageSortOrder(String scheduleType) {
+        if (StringUtils.equals(
+                ScheduleTypeEnum.CONTINUOUS.getCode(), scheduleType)) {
+            return 1;
+        }
+        if (StringUtils.equals(
+                ScheduleTypeEnum.TYPE_BLOCK.getCode(), scheduleType)) {
+            return 2;
+        }
+        if (StringUtils.equals(
+                ScheduleTypeEnum.NEW_SPEC.getCode(), scheduleType)) {
+            return 3;
+        }
+        return 4;
+    }
+
+    /**
+     * 解析占用结果的产品状态展示值。
+     *
+     * <p>已知状态展示“编码-描述”；未知状态保留原值；空值不补默认状态，
+     * 防止历史脏数据被错误解释为正规 SKU。</p>
+     *
+     * @param productStatus 产品状态编码
+     * @return 状态展示文本
+     */
+    private String resolveOccupationProductStatusText(String productStatus) {
+        if (StringUtils.isEmpty(productStatus)) {
+            return "";
+        }
+        TrialStatusEnum trialStatus = TrialStatusEnum.getByCode(productStatus);
+        return Objects.isNull(trialStatus)
+                ? productStatus
+                : trialStatus.getCode() + "-" + trialStatus.getDescription();
+    }
+
+    /**
+     * 判断单控整机成员中是否至少一侧命中占用集合。
+     *
+     * @param memberMachineCodes 物理成员机台编码
+     * @param occupiedMachineCodes 占用机台编码
+     * @return true-至少一侧命中
+     */
+    private boolean containsAnyMachineCode(
+            List<String> memberMachineCodes,
+            Set<String> occupiedMachineCodes) {
+        if (CollectionUtils.isEmpty(memberMachineCodes)
+                || CollectionUtils.isEmpty(occupiedMachineCodes)) {
+            return false;
+        }
+        for (String machineCode : memberMachineCodes) {
+            if (occupiedMachineCodes.contains(machineCode)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 复用停产保机服务校验日志候选的全部物理成员。
+     *
+     * @param context 排程上下文
+     * @param sku 当前 SKU
+     * @param memberMachineCodes 普通机台自身或单控 L/R 两侧
+     * @param currentDayEndTime 当前业务日结束时间
+     * @return true-至少一个成员被结构停产保机约束阻止
+     */
+    private boolean isTraceStructureRetentionBlocked(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            List<String> memberMachineCodes,
+            Date currentDayEndTime) {
+        Date effectiveDayEndTime = Objects.nonNull(currentDayEndTime)
+                ? currentDayEndTime : resolveScheduleWindowEndTime(context);
+        for (String machineCode : memberMachineCodes) {
+            if (structureMinMachineRetentionService.isDifferentStructureRetentionBlocked(
+                    context, sku, machineCode, effectiveDayEndTime)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 忽略其它 SKU 占用时间后只读试算普通机台或单控整机各成员产能。
+     *
+     * <p>机台可用时间覆盖为排程窗口首班开始，正式胎胚可供时间、停机/维护控制、
+     * 换模耗时、首检和班产计算仍由 {@link TargetScheduleQtyResolver} 原逻辑处理。
+     * 单控整机要求 L/R 两侧都存在产能，防止只验证代表侧。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 当前 SKU
+     * @param memberMachineCodes 物理成员机台编码
+     * @param targetScheduleQtyResolver 正式产能计算组件
+     * @return true-忽略其它 SKU 占用后仍存在基础上机产能
+     */
+    private boolean hasTraceCapacityIgnoringOtherSkuOccupation(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            List<String> memberMachineCodes,
+            TargetScheduleQtyResolver targetScheduleQtyResolver) {
+        if (CollectionUtils.isEmpty(memberMachineCodes)
+                || CollectionUtils.isEmpty(context.getScheduleWindowShifts())) {
+            return false;
+        }
+        Date windowStartTime =
+                context.getScheduleWindowShifts().get(0).getShiftStartDateTime();
+        Date embryoAvailableTime =
+                NewSpecEmbryoAvailableTimeResolver.resolveEarliestAvailableTime(context, sku);
+        for (String machineCode : memberMachineCodes) {
+            MachineScheduleDTO memberMachine =
+                    context.getMachineScheduleMap().get(machineCode);
+            if (Objects.isNull(memberMachine)) {
+                return false;
+            }
+            int availableCapacity =
+                    targetScheduleQtyResolver.calcMachineAvailableCapacityInWindow(
+                            context, sku, memberMachine,
+                            embryoAvailableTime, windowStartTime);
+            if (availableCapacity <= 0) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * 构建占用日志候选比较器。
+     *
+     * <p>正规 SKU 先复用正式单控得分，保证普通机台始终排在单控整机之前；
+     * 其余 SKU 先比较现有最早收尾班次。随后统一复用正式选机比较器的单控、胎胚、模壳、
+     * 规格、胶囊、英寸和机台编码层级。该比较器只排序并插入新增日志候选，
+     * 不交换正式可选机台之间的相对顺序。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 当前 SKU
+     * @return 日志候选比较器
+     */
+    private Comparator<MachineScheduleDTO> buildDiagnosticMachineComparator(
+            LhScheduleContext context,
+            SkuScheduleDTO sku) {
+        final Comparator<MachineScheduleDTO> businessComparator =
+                buildMachineComparator(context, sku);
+        final Map<String, CandidateWindowProfile> profileCache =
+                new HashMap<String, CandidateWindowProfile>(16);
+        return (left, right) -> {
+            if (isFormalSku(sku)) {
+                int formalSingleControlCompareResult =
+                        compareSingleControlPriority(context, sku, left, right);
+                if (formalSingleControlCompareResult != 0) {
+                    return formalSingleControlCompareResult;
+                }
+            }
+            CandidateWindowProfile leftProfile =
+                    resolveCandidateWindowProfile(context, sku, left, profileCache);
+            CandidateWindowProfile rightProfile =
+                    resolveCandidateWindowProfile(context, sku, right, profileCache);
+            int compareResult = Integer.compare(
+                    resolveShiftIndex(context, leftProfile.getEndingWindowReferenceTime()),
+                    resolveShiftIndex(context, rightProfile.getEndingWindowReferenceTime()));
+            return compareResult != 0
+                    ? compareResult : businessComparator.compare(left, right);
+        };
+    }
+
+    /**
+     * 将占用日志候选稳定插入正式候选顺序。
+     *
+     * <p>正式候选之间绝不交换相对位置；实际首选存在时固定保留为第一台。
+     * 其它位置按诊断比较器插入，使新增占用机台尽量贴近现有业务排序。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 当前 SKU
+     * @param actualOrderedCandidates 正式候选顺序
+     * @param actualSelectedMachine 实际首选机台
+     * @param occupiedOnlyCandidates 仅日志展示候选
+     * @return 合并后的日志顺序
+     */
+    private List<MachineScheduleDTO> mergeTraceCandidatesKeepingActualOrder(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            List<MachineScheduleDTO> actualOrderedCandidates,
+            MachineScheduleDTO actualSelectedMachine,
+            List<MachineScheduleDTO> occupiedOnlyCandidates) {
+        List<MachineScheduleDTO> mergedCandidates =
+                new ArrayList<MachineScheduleDTO>(
+                        PriorityTraceLogHelper.sizeOf(actualOrderedCandidates)
+                                + PriorityTraceLogHelper.sizeOf(occupiedOnlyCandidates));
+        if (!CollectionUtils.isEmpty(actualOrderedCandidates)) {
+            mergedCandidates.addAll(actualOrderedCandidates);
+        }
+        if (CollectionUtils.isEmpty(occupiedOnlyCandidates)) {
+            return mergedCandidates;
+        }
+        Comparator<MachineScheduleDTO> comparator =
+                buildDiagnosticMachineComparator(context, sku);
+        int minimumInsertIndex = Objects.isNull(actualSelectedMachine) ? 0 : 1;
+        for (MachineScheduleDTO occupiedCandidate : occupiedOnlyCandidates) {
+            int insertIndex = Math.min(minimumInsertIndex, mergedCandidates.size());
+            while (insertIndex < mergedCandidates.size()
+                    && comparator.compare(
+                    occupiedCandidate, mergedCandidates.get(insertIndex)) >= 0) {
+                insertIndex++;
+            }
+            mergedCandidates.add(insertIndex, occupiedCandidate);
+        }
+        return mergedCandidates;
+    }
+
+    /**
      * 记录当前新增 SKU 实际使用的候选机台优先级顺序。
      * <p>候选列表由新增排产主链完成动态过滤和选机顺序调整，本方法只复用现有排序得分与
      * 收尾窗口画像生成日志，禁止重新执行候选过滤或排序。</p>
@@ -999,22 +1983,79 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
     public void traceMachinePriorityOrder(LhScheduleContext context,
                                           SkuScheduleDTO sku,
                                           List<MachineScheduleDTO> orderedCandidates) {
-        if (!PriorityTraceLogHelper.isEnabled(context) || Objects.isNull(sku)) {
+        // 兼容直接调用旧入口的测试和非主链调用；完整主链通过快照重载输出占用观察范围。
+        MachineScheduleDTO legacySelectedMachine =
+                CollectionUtils.isEmpty(orderedCandidates)
+                        ? null : orderedCandidates.get(0);
+        MachinePriorityTraceSnapshot legacySnapshot =
+                MachinePriorityTraceSnapshot.fromActualCandidates(
+                        orderedCandidates, legacySelectedMachine);
+        /*
+         * 旧入口没有“候选后续是否真正提交”的结果参数，只能保持原调用语义：
+         * 非空列表视为调用方已经确认首台命中，空列表视为最终无候选。
+         * 新增排产主链必须调用带结果的快照入口，不再使用该兼容推断。
+         */
+        legacySnapshot = Objects.isNull(legacySelectedMachine)
+                ? legacySnapshot.withNoHit("无日志候选机台")
+                : legacySnapshot.withActualHit(legacySelectedMachine.getMachineCode());
+        this.traceMachinePriorityOrder(context, sku, legacySnapshot);
+    }
+
+    /**
+     * 输出当前选机时点的完整优先级日志。
+     *
+     * <p>排序后的快照已由调用处和诊断构建入口共同确定，本方法只格式化并写过程日志。
+     * 实际可选机台显示“可用”；仅因其它 SKU 占用而补入的机台显示“已被占用、仅日志展示”。
+     * 部分占用后仍可接续的正式候选继续显示“可用”，同时完整展示前序占用明细。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 当前待选机 SKU
+     * @param traceSnapshot 当前选机时点日志快照
+     */
+    @Override
+    public void traceMachinePriorityOrder(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            MachinePriorityTraceSnapshot traceSnapshot) {
+        if (!PriorityTraceLogHelper.isEnabled(context) || Objects.isNull(sku)
+                || Objects.isNull(traceSnapshot)) {
+            return;
+        }
+        if (!traceSnapshot.isSelectionOutcomeResolved()) {
+            /*
+             * 候选选择时点的快照只用于保留实时占用和排序信息。结果尚未确认时禁止落库，
+             * 否则 dayN 停止扩机、换模失败、首检顺延等中间尝试会再次产生重复日志。
+             */
+            log.debug("选机优先级快照尚未确认结果，暂不写入过程日志, materialCode: {}, productStatus: {}",
+                    sku.getMaterialCode(), sku.getProductStatus());
             return;
         }
         // 只有真正写入选机顺序日志时才累加，局部搜索静默分支不会消耗序号。
         int selectionCount = context.nextNewSpecMachineSelectionCount(sku);
         String title = "【" + resolvePriorityTraceTitleValue(sku.getMaterialCode())
                 + "】【" + resolvePriorityTraceTitleValue(sku.getProductStatus())
-                + "】选机优先级顺序 【" + selectionCount + "】";
+                + "】选机优先级顺序【" + selectionCount + "】";
+        List<MachineScheduleDTO> orderedCandidates = Objects.isNull(traceSnapshot)
+                ? Collections.<MachineScheduleDTO>emptyList()
+                : traceSnapshot.getOrderedCandidates();
+        String selectedDisplayMachineCode =
+                resolveSelectedDisplayMachineCode(traceSnapshot);
+        String actualHitDisplayMachineCode =
+                resolveActualHitDisplayMachineCode(traceSnapshot);
+        String traceHeader = buildMachinePriorityTraceHeader(
+                traceSnapshot, selectedDisplayMachineCode, actualHitDisplayMachineCode);
         if (CollectionUtils.isEmpty(orderedCandidates)) {
-            PriorityTraceLogHelper.logSortSummary(log, context, title, "无可用候选机台");
+            PriorityTraceLogHelper.logSortSummary(
+                    log, context, title,
+                    traceHeader + "\n无日志候选机台");
             return;
         }
 
         Map<String, CandidateWindowProfile> profileCache =
                 new HashMap<>(Math.max(4, orderedCandidates.size() * 2));
-        StringBuilder detailBuilder = new StringBuilder(Math.max(256, orderedCandidates.size() * 180));
+        StringBuilder detailBuilder =
+                new StringBuilder(Math.max(512, orderedCandidates.size() * 360));
+        detailBuilder.append(traceHeader).append('\n');
         for (int i = 0; i < orderedCandidates.size(); i++) {
             MachineScheduleDTO machine = orderedCandidates.get(i);
             if (Objects.isNull(machine)) {
@@ -1033,12 +2074,50 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
             String mouldShellMatchedValue = resolveMouldShellMatchedValue(context, sku, machine);
             String specMatchedValue = resolveSpecMatchedValue(sku, machine);
             String proSizeMatchedValue = resolveProSizeMatchedValue(sku, machine);
+            boolean singleControlMachine =
+                    isSingleControlMachine(context, machine.getMachineCode());
+            boolean actualSelectable =
+                    traceSnapshot.isActualSelectable(machine.getMachineCode());
+            boolean actualSelected =
+                    traceSnapshot.isActualSelected(machine.getMachineCode());
+            boolean actualHit =
+                    traceSnapshot.isActualHit(machine.getMachineCode());
+            String displayMachineCode =
+                    traceSnapshot.resolveDisplayMachineCode(machine.getMachineCode());
+            /*
+             * 占用明细取候选构建时已经冻结的快照，不能在延迟写入时读取刚被本轮结果更新的运行态。
+             */
+            String occupationText =
+                    traceSnapshot.resolveOccupationText(machine.getMachineCode());
 
+            /*
+             * 正式新增主链优先读取选机时点冻结的收尾时间，避免结果提交后机台 estimatedEndTime
+             * 已被推进而污染延迟日志。旧日志入口未携带冻结值时，继续回落到原有实时解析逻辑，
+             * 保持非默认策略和历史测试替身兼容。
+             */
+            Date traceEndingTime =
+                    traceSnapshot.hasPriorityTraceEndingTime(machine.getMachineCode())
+                            ? traceSnapshot.resolvePriorityTraceEndingTime(
+                            machine.getMachineCode())
+                            : this.resolvePriorityTraceEndingTime(
+                            context, profile.getReferenceTime(), occupationText);
             detailBuilder.append(i + 1).append(". ")
-                    .append(resolvePriorityTraceTitleValue(machine.getMachineCode()))
-                    .append("｜收尾时间：").append(resolveEndingTimeShiftText(context, profile.getReferenceTime()))
-                    .append("｜单控拆分：").append(resolveYesNo(isSingleControlMachine(context, machine.getMachineCode())))
-                    .append("（排序值：").append(singleControlScore).append("）")
+                    .append(resolvePriorityTraceTitleValue(displayMachineCode))
+                    .append("｜机台类型：")
+                    .append(singleControlMachine ? "单控机台" : "普通机台")
+                    .append("｜状态：").append(actualSelectable ? "可用" : "已被占用")
+                    .append("｜实际范围：").append(actualSelectable ? "实际可选" : "仅日志展示")
+                    .append("｜本轮首选候选：").append(resolveYesNo(actualSelected))
+                    .append("｜实际命中：").append(resolveYesNo(actualHit))
+                    .append("｜收尾时间：")
+                    .append(resolveEndingTimeShiftText(context, traceEndingTime))
+                    .append("｜占用SKU：").append(occupationText)
+                    .append("｜单控匹配：")
+                    .append(singleControlMachine ? "满足" : "不适用")
+                    .append("｜单控排序值：").append(singleControlScore)
+                    .append("｜排序说明：")
+                    .append(resolveSingleControlSortDescription(
+                            sku, singleControlMachine, singleControlScore))
                     .append("｜同胎胚：").append(resolveMatchedValueText(embryoMatchScore == 0, embryoMatchedValue))
                     .append("｜同模壳：").append(resolveMatchedValueText(mouldShellMatchScore == 0, mouldShellMatchedValue))
                     .append("｜同规格：").append(resolveMatchedValueText(specMatchScore == 0, specMatchedValue))
@@ -1051,6 +2130,92 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
             }
         }
         PriorityTraceLogHelper.logSortSummary(log, context, title, detailBuilder.toString());
+    }
+
+    /**
+     * 构建选机日志顶部的结果摘要。
+     *
+     * @param traceSnapshot 已确认命中或未命中的日志快照
+     * @param selectedDisplayMachineCode 首选候选展示编码
+     * @param actualHitDisplayMachineCode 实际命中展示编码
+     * @return 包含首选候选、实际命中、结果及终止原因的多行摘要
+     */
+    private String buildMachinePriorityTraceHeader(
+            MachinePriorityTraceSnapshot traceSnapshot,
+            String selectedDisplayMachineCode,
+            String actualHitDisplayMachineCode) {
+        StringBuilder headerBuilder = new StringBuilder(192);
+        headerBuilder.append("本轮首选候选机台：")
+                .append(StringUtils.isEmpty(selectedDisplayMachineCode)
+                        ? "无" : selectedDisplayMachineCode)
+                .append('\n')
+                .append("本轮实际命中机台：")
+                .append(StringUtils.isEmpty(actualHitDisplayMachineCode)
+                        ? "无" : actualHitDisplayMachineCode)
+                .append('\n')
+                .append("本轮选机结果：")
+                .append(traceSnapshot.isSelectionSucceeded() ? "命中" : "未命中");
+        if (!traceSnapshot.isSelectionSucceeded()
+                && StringUtils.isNotEmpty(traceSnapshot.getNoHitReason())) {
+            headerBuilder.append('\n')
+                    .append("终止原因：")
+                    .append(traceSnapshot.getNoHitReason());
+        }
+        return headerBuilder.toString();
+    }
+
+    /**
+     * 解析日志顶部的实际首选展示编码。
+     *
+     * @param traceSnapshot 日志快照
+     * @return 普通机台编码、单控整机组合编码或 null
+     */
+    private String resolveSelectedDisplayMachineCode(
+            MachinePriorityTraceSnapshot traceSnapshot) {
+        if (Objects.isNull(traceSnapshot)
+                || StringUtils.isEmpty(traceSnapshot.getActualSelectedMachineCode())) {
+            return null;
+        }
+        return traceSnapshot.resolveDisplayMachineCode(
+                traceSnapshot.getActualSelectedMachineCode());
+    }
+
+    /**
+     * 解析日志顶部的实际命中展示编码。
+     *
+     * @param traceSnapshot 已确认结果的日志快照
+     * @return 普通机台编码、单控整机组合编码或 null
+     */
+    private String resolveActualHitDisplayMachineCode(
+            MachinePriorityTraceSnapshot traceSnapshot) {
+        if (Objects.isNull(traceSnapshot)
+                || StringUtils.isEmpty(traceSnapshot.getActualHitMachineCode())) {
+            return null;
+        }
+        return traceSnapshot.resolveDisplayMachineCode(
+                traceSnapshot.getActualHitMachineCode());
+    }
+
+    /**
+     * 解析单控机台在当前 SKU 类型下的排序说明。
+     *
+     * @param sku 当前 SKU
+     * @param singleControlMachine 是否单控机台
+     * @param singleControlScore 现有单控排序值
+     * @return 与实际业务排序口径一致的说明
+     */
+    private String resolveSingleControlSortDescription(
+            SkuScheduleDTO sku,
+            boolean singleControlMachine,
+            int singleControlScore) {
+        if (isFormalSku(sku)) {
+            return singleControlMachine
+                    ? "正规SKU，单控整机排在普通机台之后"
+                    : "正规SKU，普通机台优先于单控整机";
+        }
+        return resolveSkuTypeDesc(sku)
+                + "SKU，按现有单控使用及争抢规则排序（排序值："
+                + singleControlScore + "）";
     }
 
     /**
@@ -1097,6 +2262,31 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
         String shiftName = Objects.nonNull(shift) && StringUtils.isNotEmpty(shift.getShiftName())
                 ? shift.getShiftName() : "未知班次";
         return PriorityTraceLogHelper.formatDateTime(referenceTime) + "（" + shiftName + "）";
+    }
+
+    /**
+     * 解析选机优先级日志展示的收尾时间。
+     *
+     * <p>日志占用快照为“无”时，说明该机台在本次选机时点没有有效生产占用，
+     * 收尾时间按本次八班窗口首班开始时间展示；其余机台继续使用实际候选画像参考时间。
+     * 本方法只影响日志文本，不修改机台运行态、候选排序或正式产能计算。</p>
+     *
+     * @param context 排程上下文
+     * @param candidateReferenceTime 实际候选画像参考时间
+     * @param occupationText 选机时点冻结的占用明细
+     * @return 日志展示收尾时间
+     */
+    private Date resolvePriorityTraceEndingTime(
+            LhScheduleContext context,
+            Date candidateReferenceTime,
+            String occupationText) {
+        if (!StringUtils.equals("无", occupationText)) {
+            return candidateReferenceTime;
+        }
+        Date windowStartTime = Objects.isNull(context)
+                ? null : this.resolveScheduleWindowStartTime(context);
+        return Objects.nonNull(windowStartTime)
+                ? windowStartTime : candidateReferenceTime;
     }
 
     /**
@@ -3421,6 +4611,147 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
 
         private void setHitNoMouldChange(boolean hitNoMouldChange) {
             this.hitNoMouldChange = hitNoMouldChange;
+        }
+    }
+
+    /**
+     * 单个有量班次在当前排程窗口内形成的机台占用区间。
+     */
+    private static class MachineOccupationInterval {
+        /** 班次槽位索引。 */
+        private final int shiftIndex;
+        /** 当前窗口的业务班次名称。 */
+        private final String shiftName;
+        /** 裁剪到当前八班窗口后的占用开始时间。 */
+        private final Date startTime;
+        /** 裁剪到当前八班窗口后的占用结束时间。 */
+        private final Date endTime;
+
+        /**
+         * 创建机台占用区间。
+         *
+         * @param shiftIndex 班次槽位索引
+         * @param shiftName 业务班次名称
+         * @param startTime 占用开始时间
+         * @param endTime 占用结束时间
+         */
+        private MachineOccupationInterval(
+                int shiftIndex,
+                String shiftName,
+                Date startTime,
+                Date endTime) {
+            this.shiftIndex = shiftIndex;
+            this.shiftName = shiftName;
+            this.startTime = startTime;
+            this.endTime = endTime;
+        }
+
+        private int getShiftIndex() {
+            return shiftIndex;
+        }
+
+        private String getShiftName() {
+            return shiftName;
+        }
+
+        private Date getStartTime() {
+            return startTime;
+        }
+
+        private Date getEndTime() {
+            return endTime;
+        }
+
+        /**
+         * 构建占用区间去重键。
+         *
+         * @return 班次、开始时间、结束时间组成的稳定键
+         */
+        private String resolveUniqueKey() {
+            return shiftIndex + "\u0001" + startTime.getTime()
+                    + "\u0001" + endTime.getTime();
+        }
+    }
+
+    /**
+     * 同一“物料编码 + 产品状态 + 排程阶段”的机台占用聚合。
+     */
+    private static class MachineOccupationGroup {
+        /** 占用物料编码。 */
+        private final String materialCode;
+        /** 占用产品状态；允许为空。 */
+        private final String productStatus;
+        /** 占用结果排程类型，用于区分续作、换活字块和新增换模阶段。 */
+        private final String scheduleType;
+        /** 使用稳定键去重后的全部占用区间。 */
+        private final Map<String, MachineOccupationInterval> intervalMap =
+                new LinkedHashMap<String, MachineOccupationInterval>(8);
+
+        /**
+         * 创建占用 SKU 聚合。
+         *
+         * @param materialCode 物料编码
+         * @param productStatus 产品状态
+         * @param scheduleType 排程类型
+         */
+        private MachineOccupationGroup(
+                String materialCode,
+                String productStatus,
+                String scheduleType) {
+            this.materialCode = materialCode;
+            this.productStatus = productStatus;
+            this.scheduleType = scheduleType;
+        }
+
+        /**
+         * 合并并去重占用区间。
+         *
+         * @param occupationIntervals 待合并区间
+         */
+        private void addIntervals(
+                List<MachineOccupationInterval> occupationIntervals) {
+            for (MachineOccupationInterval interval : occupationIntervals) {
+                intervalMap.putIfAbsent(interval.resolveUniqueKey(), interval);
+            }
+        }
+
+        private String getMaterialCode() {
+            return materialCode;
+        }
+
+        private String getProductStatus() {
+            return productStatus;
+        }
+
+        private String getScheduleType() {
+            return scheduleType;
+        }
+
+        private Date getEarliestStartTime() {
+            return intervalMap.values().stream()
+                    .map(MachineOccupationInterval::getStartTime)
+                    .min(Date::compareTo)
+                    .orElse(null);
+        }
+
+        /**
+         * 获取稳定排序后的全部占用区间。
+         *
+         * @return 开始时间、结束时间、班次索引有序区间
+         */
+        private List<MachineOccupationInterval> getIntervals() {
+            List<MachineOccupationInterval> intervals =
+                    new ArrayList<MachineOccupationInterval>(intervalMap.values());
+            intervals.sort(
+                    Comparator.comparing(
+                            MachineOccupationInterval::getStartTime,
+                            Comparator.nullsLast(Date::compareTo))
+                            .thenComparing(
+                                    MachineOccupationInterval::getEndTime,
+                                    Comparator.nullsLast(Date::compareTo))
+                            .thenComparingInt(
+                                    MachineOccupationInterval::getShiftIndex));
+            return intervals;
         }
     }
 
