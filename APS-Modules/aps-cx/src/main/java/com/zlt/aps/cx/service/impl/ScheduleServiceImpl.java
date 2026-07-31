@@ -243,6 +243,13 @@ public class ScheduleServiceImpl implements ScheduleService {
                 return result;
             }
 
+            // 2.1 过滤已收尾物料（校验通过后再过滤，确保校验能看到全部含缺失字段的记录）
+            try {
+                filterCompletedMaterials(context);
+            } catch (Exception e) {
+                log.warn("过滤已收尾物料失败，继续执行：{}", e.getMessage());
+            }
+
             // 3. 执行核心排程算法 S5.2~S5.5（委托 CoreScheduleAlgorithmServiceImpl，按班次循环）
             List<CxScheduleResult> scheduleResults = coreScheduleAlgorithmService.executeSchedule(context);
 
@@ -1217,18 +1224,29 @@ public class ScheduleServiceImpl implements ScheduleService {
         }
         List<String> factoryCodeList = Collections.singletonList(factoryCode);
 
+        // 解析次月定稿状态与计划量起始日（与硫化算法口径一致）
+        Date scheduleDateAsDate = Date.from(scheduleDate.atStartOfDay(ZoneId.systemDefault()).toInstant());
+        Date planStartDate = this.resolvePlanStartDate(factoryCode, crossMonth, nextYear, nextMonth, scheduleDateAsDate);
+        boolean isNextMonthFinal = planStartDate != null;
+        int startDay = isNextMonthFinal
+                ? cn.hutool.core.date.DateUtil.dayOfMonth(planStartDate)
+                : 1;
+        log.info("次月定稿状态: isNextMonthFinal={}, planStartDate={}, startDay={}",
+                isNextMonthFinal, planStartDate, startDay);
+
         // 3. 查询已完成量
-        // 当月：当月1日 ~ T-1日（不含T日）的月累计完成量 + T日班次完成量
+        // 当月月累计完成量：次月定稿时从库存抓取日开始，否则从当月1日开始（与硫化算法口径一致）
         Date prevMonthStart = Date.from(scheduleDate.withDayOfMonth(1).atStartOfDay(ZoneId.systemDefault()).toInstant());
+        Date finishQtyStartDate = isNextMonthFinal ? planStartDate : prevMonthStart;
         Date scheduleDateStart = Date.from(scheduleDate.atStartOfDay(ZoneId.systemDefault()).toInstant());
         Date nextDayStart = Date.from(scheduleDate.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant());
 
         Map<String, Integer> prevDayFinishedQtyMap = new HashMap<>();
         Map<String, Integer> prevScheFinishedQtyMap = new HashMap<>();
         if (!materialCodeList.isEmpty()) {
-            // 当月月累计完成量（当月1日 ~ T-1日）
+            // 当月月累计完成量（库存抓取日或当月1日 ~ T-1日）
             List<Map<String, Object>> dayFinishList = lhFinishQtyMapper.sumDayFinishQty(
-                    factoryCodeList, materialCodeList, prevMonthStart, scheduleDateStart);
+                    factoryCodeList, materialCodeList, finishQtyStartDate, scheduleDateStart);
             for (Map<String, Object> row : dayFinishList) {
                 String mc = (String) row.get("MATERIAL_CODE");
                 String productStatus = (String) row.get("LH_TYPE");
@@ -1274,16 +1292,6 @@ public class ScheduleServiceImpl implements ScheduleService {
         log.info("硫化余量计算：跨月={}, 当月={}-{}, 次月={}, T日在次月={}, 物料数={}",
                 crossMonth, prevYear, prevMonth, crossMonth ? nextYear + "-" + nextMonth : "无",
                 tInNextMonth, materialCodeList.size());
-
-        // 解析次月定稿状态与计划量起始日（与硫化算法口径一致）
-        Date scheduleDateAsDate = Date.from(scheduleDate.atStartOfDay(ZoneId.systemDefault()).toInstant());
-        Date planStartDate = this.resolvePlanStartDate(factoryCode, crossMonth, nextYear, nextMonth, scheduleDateAsDate);
-        boolean isNextMonthFinal = planStartDate != null;
-        int startDay = isNextMonthFinal
-                ? cn.hutool.core.date.DateUtil.dayOfMonth(planStartDate)
-                : 1;
-        log.info("次月定稿状态: isNextMonthFinal={}, planStartDate={}, startDay={}",
-                isNextMonthFinal, planStartDate, startDay);
 
         // 4. 计算每个物料的硫化余量（按断点日累加计划量，支持跨月）
         List<MdmMonthSurplus> monthSurplusList = new ArrayList<>();
@@ -1398,11 +1406,13 @@ public class ScheduleServiceImpl implements ScheduleService {
         if (finalVersion == null) {
             return null;
         }
-        // 从月度余量表获取库存抓取日
+        // 从月度余量表获取库存抓取日（按更新时间倒序取最新，确保多记录时确定性）
         MdmMonthSurplus monthSurplus = mdmMonthSurplusMapper.selectOne(
                 new LambdaQueryWrapper<MdmMonthSurplus>()
                         .eq(MdmMonthSurplus::getFactoryCode, factoryCode)
                         .eq(MdmMonthSurplus::getRequireVersion, finalVersion.getMonthPlanVersion())
+                        .orderByDesc(MdmMonthSurplus::getUpdateTime)
+                        .orderByDesc(MdmMonthSurplus::getId)
                         .last("LIMIT 1"));
         if (monthSurplus == null || monthSurplus.getStockCapTureDate() == null) {
             return null;
