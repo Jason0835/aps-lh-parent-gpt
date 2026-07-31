@@ -247,7 +247,7 @@ public class Cd15ShiftResourceCommitter {
             BigDecimal branchCommittedQuantity = branchTrialQuantity.min(
                     vehiclePlanQuantity.multiply(
                             BigDecimal.valueOf(pairVehicleCount)));
-            BigDecimal committedQuantity = this.normalize(
+            BigDecimal committedQuantity = this.normalizeCommittedQuantity(
                     branchCommittedQuantity.multiply(new BigDecimal("2")));
             Cd15ShiftResourceState working = this.copy(originalState);
             Cd15StorageLaneAllocationResult firstAllocation =

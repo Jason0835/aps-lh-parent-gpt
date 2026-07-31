@@ -3279,7 +3279,7 @@ export default {
       let factoryCode = "";
       let yearMonthRaw = "";
       let structureName = "";
-      let productionVersion = "";
+      let version = "";
       const pt = this.$refs.monthPlanPageTableRef;
       const searchRef = pt && pt.$refs && pt.$refs.searchRef;
       if (searchRef && typeof searchRef.getValues === "function") {
@@ -3287,7 +3287,7 @@ export default {
         factoryCode = String(form.factoryCode || "").trim();
         yearMonthRaw = form.yearMonth || "";
         structureName = String(form.structureName || "").trim();
-        productionVersion = String(form.version || "").trim();
+        version = String(form.version || "").trim();
       } else {
         factoryCode = String(
           this.query.factoryCode || this.search.factoryCode || ""
@@ -3297,7 +3297,7 @@ export default {
         structureName = String(
           this.query.structureName || this.search.structureName || ""
         ).trim();
-        productionVersion = String(
+        version = String(
           this.query.version || this.search.version || ""
         ).trim();
       }
@@ -3309,14 +3309,14 @@ export default {
         );
         return;
       }
-      /** 与 getVersionList 入参一致：yearMonth 按 "-" 拆成 year、month */
+      /** yearMonth 按 "-" 拆成 mpYear、mpMonth，与 MpWeekRollAdjustDTO 字段对齐 */
       const yearMonthParts = String(yearMonthRaw).split("-");
       const payload = {
         factoryCode,
-        year: yearMonthParts[0],
-        month: yearMonthParts[1],
+        mpYear: yearMonthParts[0],
+        mpMonth: yearMonthParts[1],
         structureName,
-        productionVersion,
+        version,
       };
       this.productAlignLoading = true;
       try {
