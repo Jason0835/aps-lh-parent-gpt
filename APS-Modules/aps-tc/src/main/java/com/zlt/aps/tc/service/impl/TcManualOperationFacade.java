@@ -98,8 +98,21 @@ public class TcManualOperationFacade {
      * @return 新增结果行数
      */
     public int insertTask(TcScheduleResult insertResult, String reason) {
+        return this.insertTask(insertResult, reason, null);
+    }
+
+    /**
+     * 执行人工插单，并允许异步执行器忽略自身活跃任务记录。
+     *
+     * @param insertResult 后端已解析施工信息的插单结果
+     * @param reason 操作原因
+     * @param ignoredTaskId 允许忽略的当前异步任务ID，同步调用传null
+     * @return 新增结果行数
+     */
+    public int insertTask(TcScheduleResult insertResult, String reason, String ignoredTaskId) {
         return this.executeWithMachineLocks(insertResult.getFactoryCode(), insertResult.getScheduleDate(),
-                Collections.singletonList(insertResult.getMachineCode()), () -> this.executeInTransaction(() -> {
+                Collections.singletonList(insertResult.getMachineCode()), ignoredTaskId,
+                () -> this.executeInTransaction(() -> {
                     List<TcScheduleResult> beforeList = this.lockAndLoadSnapshot(insertResult,
                             Collections.singletonList(insertResult.getMachineCode()));
                     this.validateInsertAfterSecondProduction(insertResult, beforeList);
@@ -129,9 +142,24 @@ public class TcManualOperationFacade {
      * @return 受影响行数
      */
     public int changeQty(TcScheduleResult changeResult, Long expectedTaskVersion, String reason) {
+        return this.changeQty(changeResult, expectedTaskVersion, reason, null);
+    }
+
+    /**
+     * 执行选中班次调量，并允许异步执行器忽略自身活跃任务记录。
+     *
+     * @param changeResult 调量请求转换后的结果
+     * @param expectedTaskVersion 期望任务版本
+     * @param reason 操作原因
+     * @param ignoredTaskId 允许忽略的当前异步任务ID，同步调用传null
+     * @return 受影响行数
+     */
+    public int changeQty(TcScheduleResult changeResult, Long expectedTaskVersion, String reason,
+                         String ignoredTaskId) {
         TcScheduleResult initial = this.requireResult(changeResult.getId());
         return this.executeWithMachineLocks(initial.getFactoryCode(), initial.getScheduleDate(),
-                Collections.singletonList(initial.getMachineCode()), () -> this.executeInTransaction(() -> {
+                Collections.singletonList(initial.getMachineCode()), ignoredTaskId,
+                () -> this.executeInTransaction(() -> {
                     List<TcScheduleResult> beforeList = this.lockAndLoadSnapshot(initial,
                             Collections.singletonList(initial.getMachineCode()));
                     TcScheduleResult current = beforeList.stream()
@@ -231,6 +259,20 @@ public class TcManualOperationFacade {
      */
     public int changeMachine(List<TcScheduleResult> transferResultList, List<Long> expectedVersionList,
                              String reason) {
+        return this.changeMachine(transferResultList, expectedVersionList, reason, null);
+    }
+
+    /**
+     * 原子执行一组普通转机台操作，并允许异步执行器忽略自身活跃任务记录。
+     *
+     * @param transferResultList 转机请求结果，每条只包含一个待转班次
+     * @param expectedVersionList 与任务列表同顺序的期望版本
+     * @param reason 操作原因
+     * @param ignoredTaskId 允许忽略的当前异步任务ID，同步调用传null
+     * @return 受影响行数
+     */
+    public int changeMachine(List<TcScheduleResult> transferResultList, List<Long> expectedVersionList,
+                             String reason, String ignoredTaskId) {
         if (transferResultList == null || transferResultList.isEmpty()
                 || expectedVersionList == null || expectedVersionList.size() != transferResultList.size()) {
             throw new ServiceException(I18nUtil.getMessage("ui.tc.schedule.changeMachine.invalidRequest"));
@@ -244,7 +286,7 @@ public class TcManualOperationFacade {
         machineCodeList.addAll(transferResultList.stream().map(TcScheduleResult::getMachineCode)
                 .collect(Collectors.toList()));
         return this.executeWithMachineLocks(reference.getFactoryCode(), reference.getScheduleDate(), machineCodeList,
-                () -> this.executeInTransaction(() -> {
+                ignoredTaskId, () -> this.executeInTransaction(() -> {
                     List<TcScheduleResult> beforeList = this.lockAndLoadSnapshot(reference, machineCodeList);
                     List<Long> resultIdList = initialList.stream().map(TcScheduleResult::getId).distinct().sorted()
                             .collect(Collectors.toList());
@@ -280,6 +322,18 @@ public class TcManualOperationFacade {
      * @return 删除行数
      */
     public int remove(List<Long> resultIdList, String reason) {
+        return this.remove(resultIdList, reason, null);
+    }
+
+    /**
+     * 按结果 ID 整行删除，并允许异步执行器忽略自身活跃任务记录。
+     *
+     * @param resultIdList 结果 ID
+     * @param reason 删除原因
+     * @param ignoredTaskId 允许忽略的当前异步任务ID，同步调用传null
+     * @return 删除行数
+     */
+    public int remove(List<Long> resultIdList, String reason, String ignoredTaskId) {
         if (resultIdList == null || resultIdList.isEmpty()) {
             return 0;
         }
@@ -290,7 +344,7 @@ public class TcManualOperationFacade {
         List<String> machineCodeList = initialList.stream().map(TcScheduleResult::getMachineCode).distinct()
                 .collect(Collectors.toList());
         return this.executeWithMachineLocks(reference.getFactoryCode(), reference.getScheduleDate(), machineCodeList,
-                () -> this.executeInTransaction(() -> {
+                ignoredTaskId, () -> this.executeInTransaction(() -> {
                     List<TcScheduleResult> beforeList = this.lockAndLoadSnapshot(reference, machineCodeList);
                     Set<Long> initialIdSet = initialList.stream().map(TcScheduleResult::getId)
                             .collect(Collectors.toCollection(LinkedHashSet::new));
