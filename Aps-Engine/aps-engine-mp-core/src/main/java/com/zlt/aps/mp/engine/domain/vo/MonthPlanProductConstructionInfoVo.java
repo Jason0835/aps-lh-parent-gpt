@@ -69,6 +69,11 @@ public class MonthPlanProductConstructionInfoVo implements Serializable {
     private String embryoCode;
 
     /**
+     * 成型编号
+     */
+    @ApiModelProperty(value = "成型编号", name = "formingNo")
+    private String formingNo;
+    /**
      * 主物料(胎胚描述)
      */
     @ApiModelProperty(value = "胎胚描述", name = "mainMaterialDesc")

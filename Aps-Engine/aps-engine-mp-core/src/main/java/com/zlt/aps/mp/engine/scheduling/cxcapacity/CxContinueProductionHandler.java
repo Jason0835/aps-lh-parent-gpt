@@ -184,7 +184,7 @@ public class CxContinueProductionHandler {
         List<ProductionMouldInfoVo> selectedMouldList = selectSkuInfo.getSelectedMouldList();
         BeforeSkuProductionInfo beforeSkuInfo = selectSkuInfo.getLhBeforeSkuInfo();
         earliestConclusionLhGroup.updateBeforeSkuInfo(beforeSkuInfo);
-        log.info(TbrMouldProductionLogRecorder.addContinueSkuStartSameInfoMouldLog(context, groupName, beforeSkuInfo.getMaterialDesc(), continueType, selectedMaterialDesc));
+        TbrMouldProductionLogRecorder.addContinueSkuStartSameInfoMouldLog(context, groupName, beforeSkuInfo.getMaterialDesc(), continueType, selectedMaterialDesc);
         List<MonthPlanProductionRequirePlanVo> selectedProductionPlanList = matchList.stream().filter(selectedPlan -> selectedPlan.hasSelectedProduction(selectedMaterialDesc)).collect(Collectors.toList());
         //总排产量
         Integer sumProductionQty = ContinueSkuCalculator.getContinueSkuSummaryQty(productionStage, selectedProductionPlanList);

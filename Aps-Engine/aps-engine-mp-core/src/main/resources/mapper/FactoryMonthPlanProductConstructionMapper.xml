@@ -17,6 +17,7 @@
                mpc.MOULD_CAVITY,
                mpc.MOULD_CLAMPING_PRESSURE,
                mpc.EMBRYO_NO,
+               mpc.FORMING_NO,
                mpc.LH_NO,
                mpc.TEXT_NO
           FROM t_dp_demand_plan prp

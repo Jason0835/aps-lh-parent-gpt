@@ -195,6 +195,13 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity implements
     private String embryoCode;
 
     /**
+     * 成型编号
+     */
+    @ApiModelProperty(value = "成型编号", name = "formingNo")
+    @TableField(value = "FORMING_NO")
+    private String formingNo;
+
+    /**
      * 主物料(胎胚号)
      */
     @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.mainMaterialDesc")

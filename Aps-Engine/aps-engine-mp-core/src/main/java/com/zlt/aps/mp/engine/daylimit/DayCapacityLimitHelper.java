@@ -366,7 +366,7 @@ public class DayCapacityLimitHelper implements Serializable {
     }
 
     /**
-     * 增加切换分组使用数
+     * 强制收尾或是重排时，减少切换分组使用数
      *
      * @param cxMachineCode 成型机台
      * @param groupName     分组计划名
@@ -430,7 +430,7 @@ public class DayCapacityLimitHelper implements Serializable {
     }
 
     /**
-     * 增加换模使用量
+     * 强制收尾或是重排时，减少换模使用量
      *
      * @param context      排产上下文
      * @param materialDesc Sku
