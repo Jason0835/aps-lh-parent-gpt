@@ -329,8 +329,7 @@ public class Cd90AutoScheduleOutputDraftBuilder {
     }
 
     private String plain(BigDecimal value) {
-        BigDecimal normalized = value.stripTrailingZeros();
-        return (normalized.scale() < 0 ? normalized.setScale(0) : normalized).toPlainString();
+        return value.setScale(0, RoundingMode.CEILING).toPlainString();
     }
 
     private BigDecimal proportional(BigDecimal total, int vehicles, int totalVehicles) {

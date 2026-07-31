@@ -10,7 +10,7 @@ export function listStock(query) {
 }
 export function editStock(query) {
   return request({
-    url: '/dj/stock/edit',
+    url: '/dj/stock/save',
     method: 'post',
     data: query
   })

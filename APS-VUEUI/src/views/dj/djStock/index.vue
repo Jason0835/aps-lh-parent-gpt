@@ -175,7 +175,7 @@ export default {
             return (
               <div>
                 <el-button
-                  v-hasPermi={["nc:stock:stockRevise"]}
+                  v-hasPermi={["dj:stock:edit"]}
                   class="minus"
                   type="success"
                   onClick={() => this.handleModifyStock(row)}
@@ -183,7 +183,7 @@ export default {
                   {this.$t("ui.frame.btn.stock.modify2")}
                 </el-button>
                 <el-button
-                  v-hasPermi={["nc:stock:remove"]}
+                  v-hasPermi={["dj:stock:remove"]}
                   class="minus"
                   type="danger"
                   onClick={() => this.handleDelete(row)}

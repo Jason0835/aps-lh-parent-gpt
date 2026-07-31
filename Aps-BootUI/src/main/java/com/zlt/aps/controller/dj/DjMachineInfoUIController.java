@@ -96,10 +96,6 @@ public class DjMachineInfoUIController extends BaseUIController<DjMachineInfo> {
     @PostMapping("/save")
     @ResponseBody
     public AjaxResult save(DjMachineInfo djMachine) {
-        if (UserConstants.NOT_UNIQUE.equals(iDjMachineInfoService.checkUnique(djMachine))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.djMachine.embryoCodeNotUnique"));
-        }
-
         return iDjMachineInfoService.save(djMachine);
     }
 
