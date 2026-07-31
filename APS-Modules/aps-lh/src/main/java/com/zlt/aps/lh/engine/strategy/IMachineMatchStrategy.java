@@ -5,10 +5,14 @@ package com.zlt.aps.lh.engine.strategy;
 
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
+import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.engine.strategy.support.MachinePriorityTraceSnapshot;
 import com.zlt.aps.lh.engine.strategy.support.SpecifiedMachineMatchResult;
 
+import java.util.Date;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -105,6 +109,56 @@ public interface IMachineMatchStrategy {
                                            SkuScheduleDTO sku,
                                            List<MachineScheduleDTO> orderedCandidates) {
         // 测试替身和非默认策略不具备完整排序指标，保持空实现；生产默认策略负责写入明细日志。
+    }
+
+    /**
+     * 构建当前选机时点的优先级日志快照。
+     *
+     * <p>默认实现只包装正式可选集合，保证非默认策略和既有测试替身继续兼容。
+     * 生产默认策略会额外读取实时机台占用结果，补充“仅因其它 SKU 占用而暂不可选”的机台；
+     * 快照不得写回正式候选集合，也不得触发模具、产能或结果资源扣减。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 当前待选机 SKU
+     * @param actualOrderedCandidates 正式选机主链本轮使用的有序候选
+     * @param actualSelectedMachine 正式选机主链确定的本轮首选机台
+     * @param currentDayEndTime 当前业务日结束时间，用于复用停产保机约束
+     * @param targetScheduleQtyResolver 正式产能计算组件，仅允许调用只读试算入口
+     * @return 当前选机时点的只读日志快照
+     */
+    default MachinePriorityTraceSnapshot buildMachinePriorityTraceSnapshot(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            List<MachineScheduleDTO> actualOrderedCandidates,
+            MachineScheduleDTO actualSelectedMachine,
+            Date currentDayEndTime,
+            TargetScheduleQtyResolver targetScheduleQtyResolver) {
+        // 调用处明确传入正式候选和实际首选；默认策略外不扩展观察范围，避免改变未知策略语义。
+        return MachinePriorityTraceSnapshot.fromActualCandidates(
+                actualOrderedCandidates, actualSelectedMachine);
+    }
+
+    /**
+     * 记录当前新增 SKU 已确认结果的完整选机优先级日志快照。
+     *
+     * <p>调用方必须先完成排程结果、机台占用和跨日在机绑定提交，再传入已标记实际命中的快照；
+     * 三天窗口最终未排时，传入已标记未命中的最后一次快照。仅在候选选择时创建、尚未确认结果的
+     * 快照不得调用本方法落库，避免 dayN 停止扩机及其它中间失败产生重复日志。</p>
+     *
+     * <p>默认实现回落到原有列表日志入口，使既有测试替身无需同步实现新接口。
+     * 生产默认策略覆盖本方法后，会输出机台类型、实时占用、实际范围、实际命中及完整排序依据。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 当前待选机 SKU
+     * @param traceSnapshot 已确认命中或最终未命中的日志快照
+     */
+    default void traceMachinePriorityOrder(LhScheduleContext context,
+                                           SkuScheduleDTO sku,
+                                           MachinePriorityTraceSnapshot traceSnapshot) {
+        List<MachineScheduleDTO> orderedCandidates = Objects.isNull(traceSnapshot)
+                ? null : traceSnapshot.getOrderedCandidates();
+        // 调用旧入口是兼容既有测试替身的必要边界，不重新过滤、排序或修改候选集合。
+        this.traceMachinePriorityOrder(context, sku, orderedCandidates);
     }
 
     /**

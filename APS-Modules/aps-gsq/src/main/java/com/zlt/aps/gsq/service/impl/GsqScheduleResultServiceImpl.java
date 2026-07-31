@@ -67,15 +67,6 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqScheduleResult> implements IGsqScheduleResultService {
-    /**
-     * 班次字段名模板常量（遵循动态字段访问规范，配合 String.format 使用）。
-     * 用于动态访问 class1~6PlanQty/FinishQty/Sequence/Analysis 等批量字段。
-     */
-    private static final String CLASS_PLAN_QTY_FIELD_TEMPLATE = "class%dPlanQty";
-    private static final String CLASS_FINISH_QTY_FIELD_TEMPLATE = "class%dFinishQty";
-    private static final String CLASS_SEQUENCE_FIELD_TEMPLATE = "class%dSequence";
-    private static final String CLASS_ANALYSIS_FIELD_TEMPLATE = "class%dAnalysis";
-
 
     /**
      * 班次字段名模板常量（遵循动态字段访问规范，配合 String.format 使用）。
@@ -445,7 +436,7 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
 
         // 记录调度日志（6班次制，操作类型：0-转机台，操作前=原机台记录，操作后=新机台记录）
         // newMachineRecord已在上方构建
-     * 4. 历史班次不允许修改计划量（根据当前时间和排程日期判断）
+        recordDispatcherLog(ApsConstant.DISPATCHER_OPER_MACHINE, record, record, newMachineRecord);
 
         log.info("钢丝圈排程转机台成功，id：{}，原机台：{}，新机台：{}",
                 dto.getId(), oldMachineCode, dto.getNewMachineCode());
@@ -467,9 +458,8 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
      * @param entity 调量数据
      * @return 校验结果
      */
-            // 遵循动态字段访问规范：通过字段名模板动态读取班次计划量
-            Integer newPlanQty = this.getPlanQtyByShiftIndex(entity, shiftIndex);
-            Integer oldPlanQty = this.getPlanQtyByShiftIndex(record, shiftIndex);
+    @Override
+    public AjaxResult validateChangeQty(GsqScheduleResult entity) {
         if (entity == null || entity.getId() == null) {
             return AjaxResult.error(MessageFormat.format(I18nUtil.getMessage("ui.gsq.schedule.pleaseSelectRecord"), I18nUtil.getMessage("ui.data.column.gsqScheduleResult.changeQtyTitle")));
         }
@@ -480,36 +470,31 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
         }
 
         Date now = new Date();
-                errorMessages.add(String.format(
-                        I18nUtil.getMessage("ui.gsq.scheduleResult.changeQty.planQtyLessThanZero"), shiftIndex));
+        boolean hasAdjustField = false;
         List<String> errorMessages = new ArrayList<>();
 
         for (int shiftIndex = 1; shiftIndex <= 6; shiftIndex++) {
             // 遵循动态字段访问规范：通过字段名模板动态读取班次计划量
-            boolean historyShift = this.isHistoryShift(record, shiftIndex, now);
+            Integer newPlanQty = this.getPlanQtyByShiftIndex(entity, shiftIndex);
             Integer oldPlanQty = this.getPlanQtyByShiftIndex(record, shiftIndex);
 
             // 只检查被修改的班次
-                errorMessages.add(String.format(
-                        I18nUtil.getMessage("ui.gsq.scheduleResult.changeQty.historyShiftForbidden"), shiftIndex));
+            if (newPlanQty == null || Objects.equals(newPlanQty, oldPlanQty)) {
                 continue;
             }
-                Integer finishQty = this.getFinishQtyByShiftIndex(record, shiftIndex);
+
             hasAdjustField = true;
-                    errorMessages.add(String.format(
-                            I18nUtil.getMessage("ui.gsq.scheduleResult.changeQty.planQtyLessThanFinish"),
-                            shiftIndex, finishQty));
+
             // 规则3：计划量不能小于0
             if (newPlanQty < 0) {
                 errorMessages.add(String.format(
                         I18nUtil.getMessage("ui.gsq.scheduleResult.changeQty.planQtyLessThanZero"), shiftIndex));
                 continue;
-            errorMessages.add(I18nUtil.getMessage("ui.gsq.scheduleResult.changeQty.noAdjustField"));
+            }
 
             // 判断是否为历史班次
             boolean historyShift = this.isHistoryShift(record, shiftIndex, now);
-            return AjaxResult.error(String.join(
-                    I18nUtil.getMessage("ui.gsq.scheduleResult.changeQty.errorSeparator"), errorMessages));
+
             if (historyShift) {
                 // 规则4：历史班次不允许修改
                 errorMessages.add(String.format(
@@ -520,12 +505,8 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
                 if (finishQty != null && finishQty > 0 && newPlanQty < finishQty) {
                     errorMessages.add(String.format(
                             I18nUtil.getMessage("ui.gsq.scheduleResult.changeQty.planQtyLessThanFinish"),
-     * 3. 状态更新：检查原排程是否有成功发布给MES的记录
-     *    - 若有成功发布记录（IS_RELEASE=1），将发布状态更新为"待发布"（需重新下发MES）
-     *    - 若无发布记录或发布未成功，保持原状态不变
-     * 4. 保存操作添加事务处理，确保数据一致性
-     * 5. 调量保存成功后，触发滚动更新机制（更新当前调量排程及后续所有排产记录）
-     * 6. 记录调度员操作日志（6班次制）
+                            shiftIndex, finishQty));
+                }
             }
         }
 
@@ -534,7 +515,7 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
         }
 
         if (!errorMessages.isEmpty()) {
-        AjaxResult validateResult = this.validateChangeQty(entity);
+            return AjaxResult.error(String.join(
                     I18nUtil.getMessage("ui.gsq.scheduleResult.changeQty.errorSeparator"), errorMessages));
         }
 
@@ -545,31 +526,28 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
      * 调量
      * 业务逻辑：
      * 1. 前置校验
-        // 3. 构建更新实体（携带需要 set 的非 null 字段）和更新条件 wrapper
-        // 遵循动态字段访问规范：班次字段通过 setFieldValueByFieldName 设置到 updateEntity，
-        // 由 MyBatis-Plus 自动生成 set 子句；公共字段（isRelease/remark）仍用 LambdaUpdateWrapper.set。
-        GsqScheduleResult updateEntity = new GsqScheduleResult();
+     * 2. 更新各班次计划量和原因分析
      * 3. 状态更新：检查原排程是否有成功发布给MES的记录
      *    - 若有成功发布记录（IS_RELEASE=1），将发布状态更新为"待发布"（需重新下发MES）
      *    - 若无发布记录或发布未成功，保持原状态不变
      * 4. 保存操作添加事务处理，确保数据一致性
      * 5. 调量保存成功后，触发滚动更新机制（更新当前调量排程及后续所有排产记录）
-        // 4. 更新各班次计划量和原因分析（动态字段访问）
+     * 6. 记录调度员操作日志（6班次制）
      *
-            Integer newPlanQty = this.getPlanQtyByShiftIndex(entity, shiftIndex);
-            Integer oldPlanQty = this.getPlanQtyByShiftIndex(record, shiftIndex);
-            String newAnalysis = this.getAnalysisByShiftIndex(entity, shiftIndex);
-            String oldAnalysis = this.getAnalysisByShiftIndex(record, shiftIndex);
+     * @param entity 调量数据
+     * @return 结果
+     */
+    @Override
     @Transactional(rollbackFor = Exception.class)
     public AjaxResult changeQty(GsqScheduleResult entity) {
         // 1. 前置校验
-                this.setPlanQtyToUpdateEntity(updateEntity, shiftIndex, newPlanQty);
+        AjaxResult validateResult = this.validateChangeQty(entity);
         if (!validateResult.get(AjaxResult.CODE_TAG).equals(200)) {
             return validateResult;
         }
 
         // 2. 查询原记录
-                this.setAnalysisToUpdateEntity(updateEntity, shiftIndex, newAnalysis);
+        GsqScheduleResult record = gsqScheduleResultMapper.selectById(entity.getId());
         if (record == null) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.gsqScheduleResult.recordNotFound"));
         }
@@ -583,25 +561,23 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
 
         boolean hasChange = false;
 
-        // 6. 状态更新：如果原排程已发布成功（IS_RELEASE=1），更新为待发布（需重新下发MES）
-        //    若无发布记录或发布未成功，保持原状态不变
+        // 4. 更新各班次计划量和原因分析（动态字段访问）
         for (int shiftIndex = 1; shiftIndex <= 6; shiftIndex++) {
             Integer newPlanQty = this.getPlanQtyByShiftIndex(entity, shiftIndex);
             Integer oldPlanQty = this.getPlanQtyByShiftIndex(record, shiftIndex);
             String newAnalysis = this.getAnalysisByShiftIndex(entity, shiftIndex);
-        // 7. 执行更新（updateEntity 携带班次字段的 set 子句，wrapper 携带公共字段和 where 条件）
-        gsqScheduleResultMapper.update(updateEntity, updateWrapper);
+            String oldAnalysis = this.getAnalysisByShiftIndex(record, shiftIndex);
+
             // 更新被修改的计划量
             if (newPlanQty != null && !Objects.equals(newPlanQty, oldPlanQty)) {
                 this.setPlanQtyToUpdateEntity(updateEntity, shiftIndex, newPlanQty);
                 hasChange = true;
-        // 8. 滚动更新：对每个被修改的班次执行同班次内时间重算（triggerType="3" 表示调量触发）
-        //    严格按照【滚动更新后续排程】算法实现更新逻辑，确保更新过程中数据准确性和完整性
-        this.triggerRollingUpdateForAllShifts("3", entity.getId(), record);
+            }
+
             // 更新原因分析（非空且与原值不同时更新）
-        // 9. 记录调度日志（6班次制，操作类型：1-调量，操作前=原记录，操作后=更新后记录）
+            if (newAnalysis != null && !newAnalysis.equals(oldAnalysis)) {
                 this.setAnalysisToUpdateEntity(updateEntity, shiftIndex, newAnalysis);
-        this.recordDispatcherLog(ApsConstant.DISPATCHER_OPER_PLAN, record, record, afterRecord);
+                hasChange = true;
             }
         }
 
@@ -1287,19 +1263,29 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
      * 3班：D+1日早班(08:00-16:00)
      * 4班：D+1日中班(16:00-24:00)
      * 5班：D+2日夜班(00:00-08:00)
-     * 遵循动态字段访问规范：通过字段名模板动态读取班次顺序，避免逐字段硬编码。
      * 6班：D+2日早班(08:00-16:00)
      * D = 排程日期 - 2
      *
      * @param scheduleDate 排程日期
      * @return 当前班次索引
      */
-        for (int shiftIndex = 1; shiftIndex <= 6; shiftIndex++) {
-            String fieldName = String.format(CLASS_SEQUENCE_FIELD_TEMPLATE, shiftIndex);
-            Integer sequence = (Integer) record.getFieldValueByFieldName(fieldName);
-            if (sequence != null && sequence > 0) {
-                minSeq = Math.min(minSeq, sequence);
+    private int resolveCurrentShiftIndex(Date scheduleDate) {
+        if (scheduleDate == null) {
+            // 无排程日期时按小时回退判断
+            int hour = DateUtil.hour(new Date(), true);
+            if (hour >= 16) {
+                return 1;
+            } else if (hour >= 8) {
+                return 3;
+            } else {
+                return 2;
             }
+        }
+        Date now = new Date();
+        // D日 = 排程日期 - 2
+        Date dDay = DateUtil.beginOfDay(DateUtil.offsetDay(scheduleDate, -2));
+        Date dPlus1Day = DateUtil.beginOfDay(DateUtil.offsetDay(scheduleDate, -1));
+        Date dPlus2Day = DateUtil.beginOfDay(scheduleDate);
         // 各班次时间窗口
         Date shift1Start = DateUtil.offsetHour(dDay, 16);
         Date shift1End = DateUtil.offsetHour(dDay, 24);
@@ -1307,7 +1293,6 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
         Date shift2End = DateUtil.offsetHour(dPlus1Day, 8);
         Date shift3Start = DateUtil.offsetHour(dPlus1Day, 8);
         Date shift3End = DateUtil.offsetHour(dPlus1Day, 16);
-     * 遵循动态字段访问规范：通过字段名模板动态读取班次顺序。
         Date shift4Start = DateUtil.offsetHour(dPlus1Day, 16);
         Date shift4End = DateUtil.offsetHour(dPlus1Day, 24);
         Date shift5Start = dPlus2Day;
@@ -1319,81 +1304,122 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
         }
         if (!now.before(shift2Start) && now.before(shift2End)) {
             return 2;
-        for (int shiftIndex = 1; shiftIndex <= 6; shiftIndex++) {
-            String fieldName = String.format(CLASS_SEQUENCE_FIELD_TEMPLATE, shiftIndex);
-            Integer sequence = (Integer) secondRecord.getFieldValueByFieldName(fieldName);
-            if (sequence != null && sequence > 0) {
-                minSeq = Math.min(minSeq, sequence);
-            }
+        }
+        if (!now.before(shift3Start) && now.before(shift3End)) {
+            return 3;
+        }
+        if (!now.before(shift4Start) && now.before(shift4End)) {
+            return 4;
+        }
+        if (!now.before(shift5Start) && now.before(shift5End)) {
+            return 5;
+        }
+        if (!now.before(shift6Start) && now.before(shift6End)) {
+            return 6;
+        }
+        // 不在任何班次窗口内（排程尚未开始或已结束），默认返回1
+        return 1;
+    }
+
     /**
      * 获取一条排程记录6个班次中最小的非空顺序号
      * 遵循动态字段访问规范：通过字段名模板动态读取班次顺序，避免逐字段硬编码。
      *
      * @param record 排程记录
      * @return 最小顺序号，无顺序号时返回 Integer.MAX_VALUE
-     * 遵循动态字段访问规范：通过字段名模板动态读取，避免 switch/case 硬编码。
      */
     private int getMinSequenceOfRecord(GsqScheduleResult record) {
         int minSeq = Integer.MAX_VALUE;
         for (int shiftIndex = 1; shiftIndex <= 6; shiftIndex++) {
             String fieldName = String.format(CLASS_SEQUENCE_FIELD_TEMPLATE, shiftIndex);
             Integer sequence = (Integer) record.getFieldValueByFieldName(fieldName);
-        String fieldName = String.format(CLASS_PLAN_QTY_FIELD_TEMPLATE, shiftIndex);
-        return (Integer) entity.getFieldValueByFieldName(fieldName);
+            if (sequence != null && sequence > 0) {
+                minSeq = Math.min(minSeq, sequence);
+            }
+        }
+        return minSeq;
+    }
+
+    /**
+     * 获取第二个在产规格的最小顺序号
      * 用于校验插单只能加到第二个在产规格之后
      * 遵循动态字段访问规范：通过字段名模板动态读取班次顺序。
      *
      * @param existingList 已有排程记录列表（按顺序排序）
-     * 遵循动态字段访问规范：通过字段名模板动态读取，避免 switch/case 硬编码。
      * @return 第二个在产规格的最小顺序号
      */
     private int getMinSequenceFromSecondSpec(List<GsqScheduleResult> existingList) {
         if (existingList.size() < 2) {
             return 1;
         }
-        String fieldName = String.format(CLASS_FINISH_QTY_FIELD_TEMPLATE, shiftIndex);
-        return (Integer) entity.getFieldValueByFieldName(fieldName);
+        // 取第二条记录的顺序号（取所有班次顺序中最小的非空值）
+        GsqScheduleResult secondRecord = existingList.get(1);
+        int minSeq = Integer.MAX_VALUE;
+        for (int shiftIndex = 1; shiftIndex <= 6; shiftIndex++) {
+            String fieldName = String.format(CLASS_SEQUENCE_FIELD_TEMPLATE, shiftIndex);
+            Integer sequence = (Integer) secondRecord.getFieldValueByFieldName(fieldName);
+            if (sequence != null && sequence > 0) {
+                minSeq = Math.min(minSeq, sequence);
+            }
         }
         return minSeq == Integer.MAX_VALUE ? 1 : minSeq;
     }
 
-     * 遵循动态字段访问规范：通过字段名模板动态读取，避免 switch/case 硬编码。
     /**
      * 根据班次索引获取实体中的计划量
      * 遵循动态字段访问规范：通过字段名模板动态读取，避免 switch/case 硬编码。
      *
      * @param entity     排程结果实体
      * @param shiftIndex 班次索引（1~6）
-        String fieldName = String.format(CLASS_ANALYSIS_FIELD_TEMPLATE, shiftIndex);
-        return (String) entity.getFieldValueByFieldName(fieldName);
+     * @return 计划量
+     */
+    private Integer getPlanQtyByShiftIndex(GsqScheduleResult entity, int shiftIndex) {
+        String fieldName = String.format(CLASS_PLAN_QTY_FIELD_TEMPLATE, shiftIndex);
+        return (Integer) entity.getFieldValueByFieldName(fieldName);
+    }
+
+    /**
+     * 根据班次索引获取实体中的完成量
      * 遵循动态字段访问规范：通过字段名模板动态读取，避免 switch/case 硬编码。
      *
      * @param entity     排程结果实体
+     * @param shiftIndex 班次索引（1~6）
+     * @return 完成量
+     */
+    private Integer getFinishQtyByShiftIndex(GsqScheduleResult entity, int shiftIndex) {
+        String fieldName = String.format(CLASS_FINISH_QTY_FIELD_TEMPLATE, shiftIndex);
+        return (Integer) entity.getFieldValueByFieldName(fieldName);
+    }
+
+    /**
+     * 根据班次索引获取实体中的原因分析
+     * 遵循动态字段访问规范：通过字段名模板动态读取，避免 switch/case 硬编码。
+     *
+     * @param entity     排程结果实体
+     * @param shiftIndex 班次索引（1~6）
+     * @return 原因分析
+     */
+    private String getAnalysisByShiftIndex(GsqScheduleResult entity, int shiftIndex) {
+        String fieldName = String.format(CLASS_ANALYSIS_FIELD_TEMPLATE, shiftIndex);
+        return (String) entity.getFieldValueByFieldName(fieldName);
+    }
+
+    /**
      * 设置指定班次计划量到更新实体
      * 遵循动态字段访问规范：通过 setFieldValueByFieldName 设置到更新实体。
-     * @return 完成量
+     *
      * @param updateEntity 更新实体
      * @param shiftIndex   班次索引（1~6）
      * @param planQty      计划量
-        return (Integer) entity.getFieldValueByFieldName(fieldName);
+     */
     private void setPlanQtyToUpdateEntity(GsqScheduleResult updateEntity,
                                           int shiftIndex, Integer planQty) {
         String fieldName = String.format(CLASS_PLAN_QTY_FIELD_TEMPLATE, shiftIndex);
         updateEntity.setFieldValueByFieldName(fieldName, planQty);
-        String fieldName = String.format(CLASS_ANALYSIS_FIELD_TEMPLATE, shiftIndex);
-        return (String) entity.getFieldValueByFieldName(fieldName);
     }
-     * 设置指定班次原因分析到更新实体
-     * 遵循动态字段访问规范：通过 setFieldValueByFieldName 设置到更新实体。
+
     /**
-     * @param updateEntity 更新实体
-     * @param shiftIndex   班次索引（1~6）
-     * @param analysis     原因分析
-     * @param updateEntity 更新实体
-    private void setAnalysisToUpdateEntity(GsqScheduleResult updateEntity,
-                                           int shiftIndex, String analysis) {
-        String fieldName = String.format(CLASS_ANALYSIS_FIELD_TEMPLATE, shiftIndex);
-        updateEntity.setFieldValueByFieldName(fieldName, analysis);
+     * 设置指定班次原因分析到更新实体
      * 遵循动态字段访问规范：通过 setFieldValueByFieldName 设置到更新实体。
      *
      * @param updateEntity 更新实体
