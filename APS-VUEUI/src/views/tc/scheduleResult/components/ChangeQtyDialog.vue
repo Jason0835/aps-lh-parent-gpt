@@ -48,6 +48,7 @@
 
 <script>
 import {changeQty, getManualOptions} from '@/api/tc/tcScheduleResult'
+import {resolveErrorMessage} from '@/utils/errorMessage'
 
 export default {
   name: 'TcChangeQtyDialog',
@@ -99,6 +100,11 @@ export default {
       try {
         const data = await getManualOptions({ factoryCode: row.factoryCode, scheduleDate: row.scheduleDate })
         this.shiftOptions = data.shiftList || []
+      } catch (error) {
+        this.$modal.alertError(resolveErrorMessage(
+          error,
+          this.$t('ui.tc.schedule.operationFailed')
+        ))
       } finally {
         this.$nextTick(() => this.$refs.form && this.$refs.form.clearValidate())
       }
@@ -110,7 +116,7 @@ export default {
       this.$refs.form.validate(async valid => {
         if (!valid) return
         if (Number(this.form.newPlanQty) < this.currentFinishQty) {
-          this.$modal.msgWarning(this.$t('ui.tc.schedule.qtyBelowFinish'))
+          this.$modal.alertWarning(this.$t('ui.tc.schedule.qtyBelowFinish'))
           return
         }
         this.submitting = true
@@ -124,6 +130,11 @@ export default {
           })
           this.visible = false
           this.$emit('success', task)
+        } catch (error) {
+          this.$modal.alertError(resolveErrorMessage(
+            error,
+            this.$t('ui.tc.schedule.operationFailed')
+          ))
         } finally {
           this.submitting = false
         }

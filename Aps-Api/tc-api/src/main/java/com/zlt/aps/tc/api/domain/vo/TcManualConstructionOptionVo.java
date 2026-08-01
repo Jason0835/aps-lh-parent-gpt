@@ -16,6 +16,14 @@ public class TcManualConstructionOptionVo implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
+    /** 来源施工号。 */
+    @ApiModelProperty(value = "来源施工号")
+    private String sourceConstructionCode;
+
+    /** 来源施工版本。 */
+    @ApiModelProperty(value = "来源施工版本")
+    private String sourceConstructionVersion;
+
     /** 胎侧编码。 */
     @ApiModelProperty(value = "胎侧编码")
     private String sidewallCode;

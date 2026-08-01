@@ -33,6 +33,7 @@
 
 <script>
 import {changeReleaseStatus} from "@/api/tm/scheduleResult";
+import {resolveErrorMessage} from "@/utils/errorMessage";
 
 export default {
   components: {},
@@ -60,7 +61,10 @@ export default {
         this.$emit("success");
         this.hide();
       } catch (error) {
-        console.error(error);
+        this.$modal.alertError(resolveErrorMessage(
+          error,
+          this.$t("ui.data.column.tm.scheduleResult.operationFailed")
+        ));
         this.loading = false;
       }
     },

@@ -237,6 +237,7 @@
 <script>
 import {mapState} from "vuex";
 import {downloadLink} from "@/utils/request";
+import {resolveErrorMessage} from "@/utils/errorMessage";
 import {
   getAutoPlanTask,
   getLatestAutoPlanTask,
@@ -1006,25 +1007,37 @@ export default {
             this.clearOperationTimer();
             this.operationRunning = false;
             this.operationProgressStatus = "exception";
-            this.$modal.msgError(task.message || this.$t("ui.data.column.tm.scheduleResult.operationFailed"));
-            window.setTimeout(() => { this.closeOperationProgress(); }, 3000);
+            const errorMessage = task.message || this.$t("ui.data.column.tm.scheduleResult.operationFailed");
+            window.setTimeout(() => {
+              this.closeOperationProgress();
+              this.$modal.alertError(errorMessage);
+            }, 600);
             return;
           }
           if (this.operationPollTimes >= this.maxOperationPollTimes) {
             this.clearOperationTimer();
             this.operationRunning = false;
             this.operationProgressStatus = "exception";
-            this.$modal.msgWarning(this.$t("ui.data.column.tm.scheduleResult.operationTimeout"));
-            window.setTimeout(() => { this.closeOperationProgress(); }, 3000);
+            const timeoutMessage = this.$t("ui.data.column.tm.scheduleResult.operationTimeout");
+            window.setTimeout(() => {
+              this.closeOperationProgress();
+              this.$modal.alertWarning(timeoutMessage);
+            }, 600);
             return;
           }
           this.operationTimer = window.setTimeout(poll, 3000);
-        }).catch(() => {
+        }).catch((error) => {
           this.clearOperationTimer();
           this.operationRunning = false;
           this.operationProgressStatus = "exception";
-          this.$modal.msgWarning(this.$t("ui.data.column.tm.scheduleResult.operationTimeout"));
-          window.setTimeout(() => { this.closeOperationProgress(); }, 3000);
+          const errorMessage = resolveErrorMessage(
+            error,
+            this.$t("ui.data.column.tm.scheduleResult.operationTimeout")
+          );
+          window.setTimeout(() => {
+            this.closeOperationProgress();
+            this.$modal.alertWarning(errorMessage);
+          }, 600);
         });
       };
       poll();
@@ -1071,25 +1084,44 @@ export default {
       if (this.writeTaskRunning) return;
       const scopeKeySet = new Set(this.selection.map((item) => `${item.factoryCode}|${item.scheduleDate}|${item.batchNo}`));
       if (scopeKeySet.size !== 1) {
-        this.$modal.msgWarning(this.$t("ui.tc.schedule.sameScopeRequired"));
+        this.$modal.alertWarning(this.$t("ui.tc.schedule.sameScopeRequired"));
         return;
       }
       const invalidRow = this.selection.find((item) => !["0", "2", "4", "5"].includes(String(item.releaseStatus || "0")));
       if (invalidRow) {
-        this.$modal.msgWarning(this.$t("ui.tc.schedule.releaseStatusInvalid"));
+        this.$modal.alertWarning(this.$t("ui.tc.schedule.releaseStatusInvalid"));
         return;
       }
       const requestData = this.buildReleaseRequest();
-      const validateResult = await validateRelease(requestData);
+      let validateResult;
+      try {
+        validateResult = await validateRelease(requestData);
+      } catch (error) {
+        this.$modal.alertError(resolveErrorMessage(
+          error,
+          this.$t("ui.tc.schedule.releaseValidateFailed")
+        ));
+        return;
+      }
       if (!validateResult.allowed) {
         const issues = Array.isArray(validateResult.issues) ? validateResult.issues : [];
-        this.showReleaseIssues(issues);
-        this.$modal.msgWarning(issues.length > 0 ? issues[0].message : this.$t("ui.tc.schedule.releaseValidateFailed"));
+        if (issues.length > 0) {
+          this.showReleaseIssues(issues);
+        } else {
+          this.$modal.alertWarning(this.$t("ui.tc.schedule.releaseValidateFailed"));
+        }
         return;
       }
       await this.$confirm(this.$t("ui.biz.alter.makeSurePublish"), { type: "warning" });
-      const task = await releaseScheduleResult(requestData);
-      this.pollReleaseTask(task.taskId);
+      try {
+        const task = await releaseScheduleResult(requestData);
+        this.pollReleaseTask(task.taskId);
+      } catch (error) {
+        this.$modal.alertError(resolveErrorMessage(
+          error,
+          this.$t("ui.tc.schedule.releaseFailed")
+        ));
+      }
     },
     // 构造发布请求（工厂+日期+结果项）
     buildReleaseRequest() {
@@ -1117,8 +1149,13 @@ export default {
             this.releaseProgressValue = 100;
             this.releaseProgressStatus = "success";
             this.releaseProgressStage = this.$t("ui.tc.schedule.releaseSuccess");
-            this.showReleaseIssues(task.issues);
-            window.setTimeout(() => { this.releaseProgressVisible = false; }, 600);
+            const issues = Array.isArray(task.issues) ? task.issues : [];
+            window.setTimeout(() => {
+              this.releaseProgressVisible = false;
+              if (issues.length > 0) {
+                this.showReleaseIssues(issues);
+              }
+            }, 600);
             this.queryList();
             return;
           }
@@ -1126,24 +1163,41 @@ export default {
             this.clearReleaseTimer();
             this.releaseProgressStatus = "exception";
             this.releaseProgressStage = this.$t("ui.tc.schedule.releaseFailed");
-            this.showReleaseIssues(task.issues);
-            this.$modal.msgError(task.message || this.$t("ui.tc.schedule.releaseFailed"));
-            window.setTimeout(() => { this.releaseProgressVisible = false; }, 3000);
+            const issues = Array.isArray(task.issues) ? task.issues : [];
+            const errorMessage = task.message || this.$t("ui.tc.schedule.releaseFailed");
+            window.setTimeout(() => {
+              this.releaseProgressVisible = false;
+              if (issues.length > 0) {
+                this.showReleaseIssues(issues);
+              } else {
+                this.$modal.alertError(errorMessage);
+              }
+            }, 600);
             this.queryList();
             return;
           }
           if (this.releasePollTimes >= this.maxReleasePollTimes) {
             this.clearReleaseTimer();
             this.releaseProgressStatus = "exception";
-            this.$modal.msgWarning(this.$t("ui.tc.schedule.releasePollTimeout"));
-            window.setTimeout(() => { this.releaseProgressVisible = false; }, 3000);
+            const timeoutMessage = this.$t("ui.tc.schedule.releasePollTimeout");
+            window.setTimeout(() => {
+              this.releaseProgressVisible = false;
+              this.$modal.alertWarning(timeoutMessage);
+            }, 600);
             return;
           }
           this.releaseTimer = window.setTimeout(poll, 3000);
-        }).catch(() => {
+        }).catch((error) => {
           this.clearReleaseTimer();
           this.releaseProgressStatus = "exception";
-          this.$modal.msgWarning(this.$t("ui.tc.schedule.releasePollTimeout"));
+          const errorMessage = resolveErrorMessage(
+            error,
+            this.$t("ui.tc.schedule.releasePollTimeout")
+          );
+          window.setTimeout(() => {
+            this.releaseProgressVisible = false;
+            this.$modal.alertWarning(errorMessage);
+          }, 600);
         });
       };
       poll();
@@ -1167,12 +1221,18 @@ export default {
       if (this.writeTaskRunning) return;
       this.$confirm(this.$t("common.confirm.delete"), {
         type: "warning",
-      }).then(() => {
-        const ids = row.id;
-        removeTmScheduleResult({ ids }).then((task) => {
+      }).then(async() => {
+        try {
+          const ids = row.id;
+          const task = await removeTmScheduleResult({ ids });
           this.$set(this.page, "current", 1);
           this.handleOperationTask(task);
-        });
+        } catch (error) {
+          this.$modal.alertError(resolveErrorMessage(
+            error,
+            this.$t("ui.data.column.tm.scheduleResult.operationFailed")
+          ));
+        }
       });
     },
     handleDeleteAll() {
@@ -1187,11 +1247,17 @@ export default {
       }
       this.$confirm(this.$t("common.confirm.delete"), {
         type: "warning",
-      }).then(() => {
-        removeTmScheduleResult({ ids }).then((task) => {
+      }).then(async() => {
+        try {
+          const task = await removeTmScheduleResult({ ids });
           this.$set(this.page, "current", 1);
           this.handleOperationTask(task);
-        });
+        } catch (error) {
+          this.$modal.alertError(resolveErrorMessage(
+            error,
+            this.$t("ui.data.column.tm.scheduleResult.operationFailed")
+          ));
+        }
       });
     },
     handleSearch(data) {

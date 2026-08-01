@@ -102,6 +102,7 @@
 
 <script>
 import {getManualOptions, insertTask} from '@/api/tc/tcScheduleResult'
+import {resolveErrorMessage} from '@/utils/errorMessage'
 
 const formatDate = date => {
   const year = date.getFullYear()
@@ -181,6 +182,11 @@ export default {
         this.constructionList = data.constructionList || []
         this.machineList = data.machineList || []
         this.shiftOptions = data.shiftList || []
+      } catch (error) {
+        this.$modal.alertError(resolveErrorMessage(
+          error,
+          this.$t('ui.tc.schedule.operationFailed')
+        ))
       } finally {
         this.loading = false
       }
@@ -212,12 +218,12 @@ export default {
           (Number(item.planQty) > 0) !== (item.sequence !== undefined && item.sequence !== null)
         )
         if (pairInvalid) {
-          this.$modal.msgWarning(this.$t('ui.tc.schedule.planSequencePair'))
+          this.$modal.alertWarning(this.$t('ui.tc.schedule.planSequencePair'))
           return
         }
         const shiftList = this.form.shiftList.filter(item => Number(item.planQty) > 0)
         if (shiftList.length === 0) {
-          this.$modal.msgWarning(this.$t('ui.tc.schedule.planRequired'))
+          this.$modal.alertWarning(this.$t('ui.tc.schedule.planRequired'))
           return
         }
         this.submitting = true
@@ -233,6 +239,11 @@ export default {
           })
           this.visible = false
           this.$emit('success', task)
+        } catch (error) {
+          this.$modal.alertError(resolveErrorMessage(
+            error,
+            this.$t('ui.tc.schedule.operationFailed')
+          ))
         } finally {
           this.submitting = false
         }

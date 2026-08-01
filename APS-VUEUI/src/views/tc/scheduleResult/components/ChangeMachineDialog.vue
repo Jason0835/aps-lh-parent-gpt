@@ -47,6 +47,7 @@
 
 <script>
 import {changeMachine, getManualOptions} from '@/api/tc/tcScheduleResult'
+import {resolveErrorMessage} from '@/utils/errorMessage'
 
 export default {
   name: 'TcChangeMachineDialog',
@@ -85,6 +86,11 @@ export default {
         })
         this.machineList = data.machineList || []
         this.shiftOptions = data.shiftList || []
+      } catch (error) {
+        this.$modal.alertError(resolveErrorMessage(
+          error,
+          this.$t('ui.tc.schedule.operationFailed')
+        ))
       } finally {
         this.loading = false
         this.$nextTick(() => this.$refs.form && this.$refs.form.clearValidate())
@@ -112,11 +118,11 @@ export default {
       this.$refs.form.validate(async valid => {
         if (!valid) return
         if (this.form.taskList.some(item => !item.shiftOrder)) {
-          this.$modal.msgWarning(this.$t('ui.tc.schedule.shiftRequiredForEach'))
+          this.$modal.alertWarning(this.$t('ui.tc.schedule.shiftRequiredForEach'))
           return
         }
         if (this.form.taskList.some(item => item.machineCode === this.form.targetMachineCode)) {
-          this.$modal.msgWarning(this.$t('ui.tc.schedule.targetSameAsSource'))
+          this.$modal.alertWarning(this.$t('ui.tc.schedule.targetSameAsSource'))
           return
         }
         this.submitting = true
@@ -132,6 +138,11 @@ export default {
           })
           this.visible = false
           this.$emit('success', task)
+        } catch (error) {
+          this.$modal.alertError(resolveErrorMessage(
+            error,
+            this.$t('ui.tc.schedule.operationFailed')
+          ))
         } finally {
           this.submitting = false
         }

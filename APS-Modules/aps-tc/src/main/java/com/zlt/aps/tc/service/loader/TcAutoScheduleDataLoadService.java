@@ -835,10 +835,15 @@ public class TcAutoScheduleDataLoadService {
                         ? TcYesNoEnum.YES.getCode() : TcYesNoEnum.NO.getCode());
                 taskDraft.setTailBalanceQty(nvl(row.getCxRemainQty()));
                 taskDraft.setCurrentShiftDemandQty(demandQty);
-                taskDraft.setGuardDemandQty(calculateGuardDemand(classQtyArray, shiftOrder, guardShiftCount,
-                        formingShiftOffset).multiply(sidewallLength));
+                BigDecimal rawGuardFormingQty = this.calculateGuardFormingQty(classQtyArray, shiftOrder,
+                        guardShiftCount, formingShiftOffset);
+                BigDecimal cappedGuardFormingQty = this.capGuardFormingQty(rawGuardFormingQty,
+                        row.getLhRemainQty());
+                taskDraft.setGuardDemandQty(cappedGuardFormingQty.multiply(sidewallLength));
                 taskDraft.setDemandQty(demandQty);
                 taskDraft.setGuardShiftCount(guardShiftCount);
+                this.addGuardDemandEstimateTrace(context, taskDraft, classQtyArray, shiftOrder, guardShiftCount,
+                        formingShiftOffset, row.getLhRemainQty(), rawGuardFormingQty, cappedGuardFormingQty, "BOM");
                 this.fillGuardRangeHours(context, taskDraft, shiftOrder, guardShiftCount, formingShiftOffset);
                 taskDraft.setMinStartQty(minStartQty);
                 taskDraft.setDefaultCurlRollLength(defaultCurlLength);
@@ -1067,10 +1072,16 @@ public class TcAutoScheduleDataLoadService {
                         ? TcYesNoEnum.YES.getCode() : TcYesNoEnum.NO.getCode());
                 taskDraft.setTailBalanceQty(nvl(row.getCxRemainQty()));
                 taskDraft.setCurrentShiftDemandQty(demandQty);
-                taskDraft.setGuardDemandQty(calculateGuardDemandByRecipe(classQtyArray, specByClass, shiftOrder,
-                        guardShiftCount, formingShiftOffset));
+                BigDecimal rawGuardFormingQty = this.calculateGuardFormingQty(classQtyArray, shiftOrder,
+                        guardShiftCount, formingShiftOffset);
+                BigDecimal cappedGuardFormingQty = this.capGuardFormingQty(rawGuardFormingQty,
+                        row.getLhRemainQty());
+                taskDraft.setGuardDemandQty(this.calculateGuardDemandByRecipe(classQtyArray, specByClass, shiftOrder,
+                        guardShiftCount, formingShiftOffset, sidewallLength, cappedGuardFormingQty));
                 taskDraft.setDemandQty(demandQty);
                 taskDraft.setGuardShiftCount(guardShiftCount);
+                this.addGuardDemandEstimateTrace(context, taskDraft, classQtyArray, shiftOrder, guardShiftCount,
+                        formingShiftOffset, row.getLhRemainQty(), rawGuardFormingQty, cappedGuardFormingQty, "RECIPE");
                 this.fillGuardRangeHours(context, taskDraft, shiftOrder, guardShiftCount, formingShiftOffset);
                 taskDraft.setMinStartQty(minStartQty);
                 taskDraft.setDefaultCurlRollLength(defaultCurlLength);
@@ -1120,29 +1131,39 @@ public class TcAutoScheduleDataLoadService {
     /**
      * RECIPE 模式库存保证范围内的成型需求米数：按各班次实际单耗加权求和。
      *
-     * <p>窗口内每个成型班次乘以该班次示方书命中的胎侧肩长（未命中按 0），替代原 BOM 模式
-     * {@code Σ qty × 单一 sidewallLength}，当窗口内各班次施工版本不同时更精确。</p>
+     * <p>窗口内 CLASS1~8 乘以各班次示方书命中的胎侧长度；超过 CLASS8 的估算量使用当前任务长度。
+     * 按硫化余量封顶后的条数依班次顺序消耗，确保不同施工长度下仍先按条数封顶。</p>
      *
      * @param classQtyArray   成型班次计划量数组
      * @param specByClass     各班次命中的施工胎侧属性，未命中为 null
      * @param shiftOrder      胎侧排程班次，从 1 开始
      * @param guardShiftCount 库存最低保证班数
      * @param formingShiftOffset 胎侧班次到成型班次的偏移量
+     * @param currentSidewallLength 当前任务胎侧长度，供超过 CLASS8 的班次换算
+     * @param guardFormingQtyLimit 按硫化余量封顶后的保证需求条数
      * @return 库存保证范围内的成型需求米数合计
      */
     private BigDecimal calculateGuardDemandByRecipe(BigDecimal[] classQtyArray, TcConstructionSidewallRowVo[] specByClass,
-                                                    int shiftOrder, int guardShiftCount, int formingShiftOffset) {
+                                                    int shiftOrder, int guardShiftCount, int formingShiftOffset,
+                                                    BigDecimal currentSidewallLength,
+                                                    BigDecimal guardFormingQtyLimit) {
         BigDecimal total = BigDecimal.ZERO;
-        int startIndex = resolveFormingStartIndex(shiftOrder, formingShiftOffset);
+        BigDecimal remainingGuardFormingQty = this.nvl(guardFormingQtyLimit).max(BigDecimal.ZERO);
+        int startIndex = this.resolveFormingStartIndex(shiftOrder, formingShiftOffset);
         int count = Math.max(guardShiftCount, 1);
         for (int index = startIndex; index < startIndex + count; index++) {
-            BigDecimal formingQty = readClassQty(classQtyArray, index);
-            if (formingQty.compareTo(BigDecimal.ZERO) <= 0) {
+            if (remainingGuardFormingQty.compareTo(BigDecimal.ZERO) <= 0) {
+                break;
+            }
+            BigDecimal formingQty = this.resolveGuardClassQty(classQtyArray, index);
+            BigDecimal appliedFormingQty = formingQty.min(remainingGuardFormingQty);
+            if (appliedFormingQty.compareTo(BigDecimal.ZERO) <= 0) {
                 continue;
             }
             BigDecimal sidewallLength = (index >= 0 && index < 8 && specByClass != null && specByClass[index] != null)
-                    ? nvl(specByClass[index].getSidewallLength()) : BigDecimal.ZERO;
-            total = total.add(formingQty.multiply(sidewallLength));
+                    ? this.nvl(specByClass[index].getSidewallLength()) : this.nvl(currentSidewallLength);
+            total = total.add(appliedFormingQty.multiply(sidewallLength));
+            remainingGuardFormingQty = remainingGuardFormingQty.subtract(appliedFormingQty);
         }
         return total;
     }
@@ -2318,15 +2339,104 @@ public class TcAutoScheduleDataLoadService {
      * @param formingShiftOffset 胎侧班次到成型班次的偏移量
      * @return 库存保证范围内的成型计划量合计
      */
-    private BigDecimal calculateGuardDemand(BigDecimal[] classQtyArray, int shiftOrder, int guardShiftCount,
-            int formingShiftOffset) {
+    private BigDecimal calculateGuardFormingQty(BigDecimal[] classQtyArray, int shiftOrder, int guardShiftCount,
+                                                int formingShiftOffset) {
         BigDecimal total = BigDecimal.ZERO;
-        int startIndex = resolveFormingStartIndex(shiftOrder, formingShiftOffset);
+        int startIndex = this.resolveFormingStartIndex(shiftOrder, formingShiftOffset);
         int count = Math.max(guardShiftCount, 1);
         for (int index = startIndex; index < startIndex + count; index++) {
-            total = total.add(readClassQty(classQtyArray, index));
+            total = total.add(this.resolveGuardClassQty(classQtyArray, index));
         }
         return total;
+    }
+
+    /**
+     * 读取保证窗口中指定成型班次的计划量，超过 CLASS8 时使用最后三班平均量。
+     *
+     * @param classQtyArray 成型班次计划量数组
+     * @param classIndex 成型班次数组下标，下标 0 对应 CLASS1
+     * @return 指定班次成型计划量
+     */
+    private BigDecimal resolveGuardClassQty(BigDecimal[] classQtyArray, int classIndex) {
+        if (classIndex < 8) {
+            return this.readClassQty(classQtyArray, classIndex);
+        }
+        return this.calculateLastThreeClassAverageQty(classQtyArray);
+    }
+
+    /**
+     * 按 CLASS6、CLASS7、CLASS8 固定三班计算平均计划量，空值或零仍计入除数。
+     *
+     * @param classQtyArray 成型班次计划量数组
+     * @return 最后三班平均计划量，保留六位小数并四舍五入
+     */
+    private BigDecimal calculateLastThreeClassAverageQty(BigDecimal[] classQtyArray) {
+        return this.readClassQty(classQtyArray, 5)
+                .add(this.readClassQty(classQtyArray, 6))
+                .add(this.readClassQty(classQtyArray, 7))
+                .divide(BigDecimal.valueOf(3), TcScheduleConstants.DECIMAL_CALCULATION_SCALE,
+                        RoundingMode.HALF_UP);
+    }
+
+    /**
+     * 使用成型硫化余量封顶保证窗口需求条数。
+     *
+     * @param rawGuardFormingQty 封顶前保证需求条数
+     * @param lhRemainQty 硫化余量；为空时兼容旧数据不封顶
+     * @return 封顶后保证需求条数
+     */
+    private BigDecimal capGuardFormingQty(BigDecimal rawGuardFormingQty, BigDecimal lhRemainQty) {
+        BigDecimal nonNegativeGuardFormingQty = this.nvl(rawGuardFormingQty).max(BigDecimal.ZERO);
+        if (lhRemainQty == null) {
+            return nonNegativeGuardFormingQty;
+        }
+        return nonNegativeGuardFormingQty.min(lhRemainQty.max(BigDecimal.ZERO));
+    }
+
+    /**
+     * 写入保证需求超八班估算及硫化余量封顶证据。
+     *
+     * @param context 排程上下文
+     * @param taskDraft 任务草稿
+     * @param classQtyArray 成型班次计划量数组
+     * @param shiftOrder 胎侧排程班次
+     * @param guardShiftCount 保证班数
+     * @param formingShiftOffset 成型班次偏移量
+     * @param lhRemainQty 硫化余量
+     * @param rawGuardFormingQty 封顶前保证需求条数
+     * @param cappedGuardFormingQty 封顶后保证需求条数
+     * @param mode 施工版本匹配模式
+     */
+    private void addGuardDemandEstimateTrace(TcScheduleContext context, TcTaskDraft taskDraft,
+                                             BigDecimal[] classQtyArray, int shiftOrder, int guardShiftCount,
+                                             int formingShiftOffset, BigDecimal lhRemainQty,
+                                             BigDecimal rawGuardFormingQty, BigDecimal cappedGuardFormingQty,
+                                             String mode) {
+        int startIndex = this.resolveFormingStartIndex(shiftOrder, formingShiftOffset);
+        int count = Math.max(guardShiftCount, 1);
+        int exceedShiftCount = Math.max(startIndex + count - 8, 0);
+        if (exceedShiftCount <= 0 && lhRemainQty == null) {
+            return;
+        }
+        Map<String, Object> evidence = new LinkedHashMap<>();
+        evidence.put("mode", mode);
+        evidence.put("startFormingClass", startIndex + 1);
+        evidence.put("guardShiftCount", count);
+        evidence.put("exceedShiftCount", exceedShiftCount);
+        evidence.put("class6PlanQty", this.readClassQty(classQtyArray, 5));
+        evidence.put("class7PlanQty", this.readClassQty(classQtyArray, 6));
+        evidence.put("class8PlanQty", this.readClassQty(classQtyArray, 7));
+        evidence.put("lastThreeAverageQty", this.calculateLastThreeClassAverageQty(classQtyArray));
+        evidence.put("lhRemainQty", lhRemainQty);
+        evidence.put("rawGuardFormingQty", rawGuardFormingQty);
+        evidence.put("cappedGuardFormingQty", cappedGuardFormingQty);
+        evidence.put("capApplied", lhRemainQty != null
+                && this.nvl(rawGuardFormingQty).compareTo(this.nvl(cappedGuardFormingQty)) > 0);
+        context.getRuleTraceMap().computeIfAbsent(taskDraft.getBusinessKey(), key -> new TcRuleTrace())
+                .addRuleHit(TcScheduleRuleCodeEnum.GUARD_DEMAND_ESTIMATE,
+                        TcScheduleRuleResultEnum.PASS, evidence);
+        log.info("[TC_GUARD_DEMAND_ESTIMATE] batchNo={}, orderNo={}, evidence={}",
+                context.getBatchNo(), taskDraft.getOrderNo(), evidence);
     }
 
     /**

@@ -21,10 +21,8 @@ import com.zlt.aps.tm.mapper.TmScheduleUnplannedMapper;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Objects;
+import java.text.MessageFormat;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -218,7 +216,7 @@ public class TmManualScheduleApplicationService {
         if (construction.getTreadShoulderLength() == null
                 || construction.getTreadShoulderLength().compareTo(BigDecimal.ZERO) <= 0
                 || StrUtil.isBlank(construction.getTreadMouthPlate()) || glueCodeList.isEmpty()) {
-            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.schedule.insertConstructionInvalid"));
+            throw new ServiceException(this.buildConstructionInvalidMessage(construction));
         }
         scheduleResult.setTreadShoulderLength(construction.getTreadShoulderLength());
         scheduleResult.setMouthPlateCode(StrUtil.trim(construction.getTreadMouthPlate()));
@@ -226,6 +224,35 @@ public class TmManualScheduleApplicationService {
         scheduleResult.setBaseGlueCode(glueCodeList.size() > 1
                 ? String.join(",", glueCodeList.subList(1, glueCodeList.size())) : null);
         scheduleResult.setWholeGlueCode(String.join(",", glueCodeList));
+    }
+
+    /**
+     * 构造包含施工定位信息和缺失字段的错误提示。
+     *
+     * @param construction 最新胎面施工资料
+     * @return 已完成国际化参数替换的错误提示
+     */
+    private String buildConstructionInvalidMessage(TmConstructionTreadRowVo construction) {
+        List<String> missingFieldList = new ArrayList<>();
+        if (construction.getTreadShoulderLength() == null
+                || construction.getTreadShoulderLength().compareTo(BigDecimal.ZERO) <= 0) {
+            missingFieldList.add(I18nUtil.getMessage(
+                    "ui.data.alert.tm.schedule.constructionFieldShoulderLength"));
+        }
+        if (StrUtil.isBlank(construction.getTreadMouthPlate())) {
+            missingFieldList.add(I18nUtil.getMessage(
+                    "ui.data.alert.tm.schedule.constructionFieldMouthPlate"));
+        }
+        if (StrUtil.isBlank(construction.getTreadRubberCategory())) {
+            missingFieldList.add(I18nUtil.getMessage(
+                    "ui.data.alert.tm.schedule.constructionFieldRubber"));
+        }
+        return MessageFormat.format(I18nUtil.getMessage(
+                        "ui.data.alert.tm.schedule.insertConstructionInvalid"),
+                StrUtil.blankToDefault(construction.getConstructionCode(), "-"),
+                StrUtil.blankToDefault(construction.getConstructionVersion(), "-"),
+                StrUtil.blankToDefault(construction.getTreadCode(), "-"),
+                String.join(", ", missingFieldList));
     }
 
     /**

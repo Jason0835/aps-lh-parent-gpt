@@ -32,6 +32,7 @@
 
 <script>
 import {changeReleaseStatus} from '@/api/tc/tcScheduleResult'
+import {resolveErrorMessage} from '@/utils/errorMessage'
 
 export default {
   inject: ['parentDict'],
@@ -103,7 +104,10 @@ export default {
           this.$emit('success')
           this.hide()
         } catch (error) {
-          console.error(error)
+          this.$modal.alertError(resolveErrorMessage(
+            error,
+            this.$t('ui.tc.schedule.operationFailed')
+          ))
         } finally {
           this.loading = false
         }

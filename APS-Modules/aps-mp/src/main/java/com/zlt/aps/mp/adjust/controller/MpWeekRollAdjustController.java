@@ -455,8 +455,8 @@ public class MpWeekRollAdjustController extends BaseController {
 
         // ===== 阶段2（并行）：各独立查询并发执行，互不依赖 =====
         // 2.1 月定稿数据
-        CompletableFuture<Void> finalListFuture = CompletableFuture.runAsync(
-                () -> contextDTO.setFactoryMonthPlanProdFinalList(mpAdjustStructureInService.selectMpFinalList(contextDTO)));
+        /*CompletableFuture<Void> finalListFuture = CompletableFuture.runAsync(
+                () -> contextDTO.setFactoryMonthPlanProdFinalList(mpAdjustStructureInService.selectMpFinalList(contextDTO)));*/
         // 2.2 结构转产列表
         CompletableFuture<Void> structureAllocationFuture = CompletableFuture.runAsync(
                 () -> contextDTO.setStructureAllocationList(mpAdjustStructureInService.selectMpStructureAllocationList(contextDTO)));
@@ -493,7 +493,7 @@ public class MpWeekRollAdjustController extends BaseController {
 
         try {
             CompletableFuture.allOf(
-                    finalListFuture, structureAllocationFuture, paramMapFuture,
+                    structureAllocationFuture, paramMapFuture,
                     structureLhRatioFuture, workCalendarFuture, cycleStructureMinFuture,
                     cavityBlockFuture, lhMachineCountFuture, structureStatisticFuture,
                     factoryNameFuture
