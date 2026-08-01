@@ -569,6 +569,13 @@ public class LhScheduleContext {
      */
     private Set<String> reducedContinuationGroupKeySet = new LinkedHashSet<>();
     /**
+     * 续作逐日降模分组最后释放机台的业务日，key=物料+产品状态复合键，value=最后一次真正下机的业务日。
+     * <p>补偿增机判断必须从该业务日起重新评估保留机台的 dayN 节奏，不能把释放日前的高计划日
+     * 继续按最终机台数计算，避免“先降模释放、再补偿加回”的机台回流重叠。</p>
+     */
+    private Map<String, LocalDate> reducedContinuationGroupLastReleaseDateMap =
+            new LinkedHashMap<String, LocalDate>(4);
+    /**
      * 续作降模下机机台对应的前物料 SKU 快照。
      * <p>第一层 key=机台编码，第二层 key=降模前物料编码，value=实际触发降模的来源 SKU。
      * 该快照只记录续作降模规则实际选出的下机机台，不包含窗口无计划、首日无计划、收尾小余量跳过等
@@ -1602,6 +1609,34 @@ public class LhScheduleContext {
             return null;
         }
         return continuousReducedMachineReleaseBoundaryShiftIndexMap.get(machineCode);
+    }
+
+    /**
+     * 登记续作降模分组最后释放机台的业务日。
+     * <p>同分组后续业务日再次降模时直接覆盖为更晚的业务日，保证取值始终是最后一次释放日。</p>
+     *
+     * @param groupKey 物料+产品状态复合键
+     * @param productionDate 本次释放机台的业务日
+     */
+    public void registerReducedContinuationGroupLastReleaseDate(String groupKey, LocalDate productionDate) {
+        if (StringUtils.isEmpty(groupKey) || Objects.isNull(productionDate)) {
+            return;
+        }
+        reducedContinuationGroupLastReleaseDateMap.put(groupKey, productionDate);
+    }
+
+    /**
+     * 获取续作降模分组最后释放机台的业务日。
+     *
+     * @param groupKey 物料+产品状态复合键
+     * @return 最后一次真正下机的业务日；未发生逐日降模释放时返回null
+     */
+    public LocalDate getReducedContinuationGroupLastReleaseDate(String groupKey) {
+        if (StringUtils.isEmpty(groupKey)
+                || CollectionUtils.isEmpty(reducedContinuationGroupLastReleaseDateMap)) {
+            return null;
+        }
+        return reducedContinuationGroupLastReleaseDateMap.get(groupKey);
     }
 
     /**
