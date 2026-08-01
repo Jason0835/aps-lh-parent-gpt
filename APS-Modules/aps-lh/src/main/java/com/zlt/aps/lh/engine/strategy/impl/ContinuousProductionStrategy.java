@@ -9331,9 +9331,11 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             int requiredMachineCount = resolveContinuationDayMinimumMachineCount(
                     context, sourceSku, addMachineDayPlanQty, continuousMachineResults);
             int shortageMachineCount = Math.max(0, requiredMachineCount - activeMachineCount);
-            // 小欠产场景下，正式日硫化标准计算出的最小机台数已被续作机台满足时，禁止再生成新增补偿。
-            // 该一致性拦截只约束增机决策，不影响历史欠产超阈值时的强制增机台规则。
-            if (isContinuationMachineCountSatisfiedWithoutForcedShortage(
+            // dayN 理论机台数已被续作机台满足时（含无需增机、requiredMachineCount<=activeMachineCount），
+            // 任何模式（含历史欠产超阈值的强制增机模式）都禁止再生成新增补偿：
+            // 历史欠产只影响目标量/账本，不得突破 dayN 理论机台数（如 3302002563 dayN=66,66,66
+            // 一台 K1303 已满足，却因欠产 470>阈值 100 仍多开 K1201）。
+            if (isContinuationDayMachineCountSatisfied(
                     context, sourceSku, activeMachineCount, requiredMachineCount)) {
                 log.info("续作加机台需求跳过，已有续作机台满足正式日硫化标准最小机台数, materialCode: {}, "
                                 + "当前续作机台数: {}, dayN最小机台数: {}, 缺口机台数: {}, 首次增机日: {}",
@@ -9377,8 +9379,10 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
     }
 
     /**
-     * 判断小欠产场景下已有续作机台是否已满足正式日硫化标准最小机台数。
-     * <p>仅用于阻止加机台判断口径与补偿生成口径发生分歧；历史欠产超过阈值时继续由强制增机台规则处理。</p>
+     * 判断已有续作机台是否已满足 dayN 理论机台数（所有模式生效）。
+     * <p>requiredMachineCount 为 0 表示原始 dayN 无增机业务日（无需增机），同样视为已满足；
+     * 该拦截只约束增机决策，历史欠产超阈值只影响目标量/账本，不得突破 dayN 理论机台数。
+     * 窗口内无原始 dayN 计划的收尾清量/仅欠产场景不适用本拦截，仍走既有补偿规则。</p>
      *
      * @param context 排程上下文
      * @param sourceSku 来源续作 SKU
@@ -9386,18 +9390,38 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
      * @param requiredMachineCount 正式日硫化标准计算出的 dayN 最小机台数
      * @return true-已有续作机台满足且不得生成新增补偿；false-继续原补偿判断
      */
-    private boolean isContinuationMachineCountSatisfiedWithoutForcedShortage(LhScheduleContext context,
-                                                                               SkuScheduleDTO sourceSku,
-                                                                               int activeMachineCount,
-                                                                               int requiredMachineCount) {
-        if (Objects.isNull(context) || Objects.isNull(sourceSku)
-                || activeMachineCount <= 0 || requiredMachineCount <= 0) {
+    private boolean isContinuationDayMachineCountSatisfied(LhScheduleContext context,
+                                                           SkuScheduleDTO sourceSku,
+                                                           int activeMachineCount,
+                                                           int requiredMachineCount) {
+        if (Objects.isNull(context) || Objects.isNull(sourceSku) || activeMachineCount <= 0) {
             return false;
         }
-        int threshold = Math.max(0, DailyMachineExpansionPlanner.resolveShortageAddMachineThreshold(context));
-        int historyShortageQty = Math.max(0, sourceSku.getMonthlyHistoryShortageQty());
-        return threshold > 0 && historyShortageQty <= threshold
-                && requiredMachineCount <= activeMachineCount;
+        // 窗口内无原始 dayN 计划时，dayN 理论机台数约束不适用，避免阻断收尾清量/仅欠产补偿路径。
+        if (!hasWindowOriginalDayPlan(sourceSku)) {
+            return false;
+        }
+        // requiredMachineCount <= 0 表示原始 dayN 逐日判断无增机业务日，已有续作机台即已满足。
+        return requiredMachineCount <= activeMachineCount;
+    }
+
+    /**
+     * 判断续作来源 SKU 窗口内是否存在原始 dayN 计划量。
+     * <p>窗口无日计划时 dayN 理论机台数无法推导（0），收尾清量/仅历史欠产补偿不按本规则拦截。</p>
+     *
+     * @param sourceSku 来源续作 SKU
+     * @return true-窗口内存在正日计划；false-窗口内全部为 0
+     */
+    private boolean hasWindowOriginalDayPlan(SkuScheduleDTO sourceSku) {
+        if (Objects.isNull(sourceSku) || CollectionUtils.isEmpty(sourceSku.getDailyPlanQuotaMap())) {
+            return false;
+        }
+        for (SkuDailyPlanQuotaDTO quota : sourceSku.getDailyPlanQuotaMap().values()) {
+            if (Objects.nonNull(quota) && Math.max(0, quota.getDayPlanQty()) > 0) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

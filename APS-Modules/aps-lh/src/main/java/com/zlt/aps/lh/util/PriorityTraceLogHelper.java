@@ -200,8 +200,10 @@ public final class PriorityTraceLogHelper {
     }
 
     /**
-     * 输出排序汇总日志（同时写应用日志和过程日志）。
-     * <p>调用方需显式传入自身的 SLF4J Logger 对象（如 {@code log}），因为静态工具方法无法自动获取调用类的 Logger。</p>
+     * 输出排序汇总日志（选机日志系列默认只写过程日志库表，控制台降级为 debug 级别）。
+     * <p>选机日志的完整明细必须保留在排程过程日志（{@link LhScheduleProcessLog}）中供审计与排查；
+     * 控制台输出改为 debug 级别，避免每条候选排序日志都向控制台刷出大段文本导致排程耗时劣化。
+     * 需要现场排查时，把对应 Logger 级别调整到 debug 即可恢复控制台输出。</p>
      *
      * @param log SLF4J日志对象
      * @param context 排程上下文（可能为null，为null时只写应用日志）
@@ -212,7 +214,7 @@ public final class PriorityTraceLogHelper {
         if (StringUtils.isEmpty(detail)) {
             return;
         }
-        log.info("{}\n{}", title, detail);
+        log.debug("{}\n{}", title, detail);
         if (context != null) {
             appendProcessLog(context, title, detail);
         }
