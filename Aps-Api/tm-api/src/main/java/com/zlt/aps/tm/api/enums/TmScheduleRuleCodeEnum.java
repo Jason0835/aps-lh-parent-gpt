@@ -68,6 +68,9 @@ public enum TmScheduleRuleCodeEnum {
     /** 库存保证范围时长计算。 */
     GUARD_RANGE_HOURS("GUARD_RANGE_HOURS", "库存保证范围时长计算"),
 
+    /** 库存保证需求估算。 */
+    GUARD_DEMAND_ESTIMATE("GUARD_DEMAND_ESTIMATE", "库存保证需求估算"),
+
     /** 计划量计算。 */
     PLAN_QTY_CALC("PLAN_QTY_CALC", "计划量计算"),
 

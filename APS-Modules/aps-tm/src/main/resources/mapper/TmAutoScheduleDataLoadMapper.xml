@@ -32,6 +32,7 @@
         <result column="CLASS8_FINISH_QTY" property="class8FinishQty"/>
         <result column="MARK_CLOSE_OUT_TIP" property="markCloseOutTip"/>
         <result column="CX_REMAIN_QTY" property="cxRemainQty"/>
+        <result column="LH_REMAIN_QTY" property="lhRemainQty"/>
         <result column="TREAD_CODE" property="treadCode"/>
         <result column="TREAD_SHOULDER_LENGTH" property="treadShoulderLength"/>
         <result column="TREAD_MOUTH_PLATE" property="treadMouthPlate"/>
@@ -87,6 +88,7 @@
                cx.CLASS8_FINISH_QTY,
                cx.MARK_CLOSE_OUT_TIP,
                cx.CX_REMAIN_QTY,
+               cx.LH_REMAIN_QTY,
                ci.TREAD_CODE,
                ci.TREAD_SHOULDER_LENGTH,
                ci.TREAD_MOUTH_PLATE,
@@ -211,6 +213,7 @@
         <result column="CLASS8_RECIPE_NO" property="class8RecipeNo"/>
         <result column="MARK_CLOSE_OUT_TIP" property="markCloseOutTip"/>
         <result column="CX_REMAIN_QTY" property="cxRemainQty"/>
+        <result column="LH_REMAIN_QTY" property="lhRemainQty"/>
     </resultMap>
 
     <resultMap id="TmConstructionTreadRowResult" type="com.zlt.aps.tm.domain.vo.TmConstructionTreadRowVo">
@@ -257,7 +260,8 @@
                cx.CLASS7_RECIPE_NO,
                cx.CLASS8_RECIPE_NO,
                cx.MARK_CLOSE_OUT_TIP,
-               cx.CX_REMAIN_QTY
+               cx.CX_REMAIN_QTY,
+               cx.LH_REMAIN_QTY
         FROM T_CX_SCHEDULE_RESULT cx
         WHERE cx.IS_DELETE = 0
           AND cx.FACTORY_CODE = #{factoryCode}

@@ -17,6 +17,9 @@ public enum TcScheduleRuleCodeEnum {
     /** 库存保证范围时长(用于库存供应时长 supplyHours 与排序库存紧急度)。 */
     GUARD_RANGE_HOURS("GUARD_RANGE_HOURS", "库存保证范围时长"),
 
+    /** 库存保证需求估算。 */
+    GUARD_DEMAND_ESTIMATE("GUARD_DEMAND_ESTIMATE", "库存保证需求估算"),
+
     /** 开机阈值调整。 */
     STARTUP_THRESHOLD_ADJUST("STARTUP_THRESHOLD_ADJUST", "开机阈值调整"),
 
