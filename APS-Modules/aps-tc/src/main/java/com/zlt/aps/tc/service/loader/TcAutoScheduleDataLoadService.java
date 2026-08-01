@@ -814,6 +814,8 @@ public class TcAutoScheduleDataLoadService {
                     continue;
                 }
                 TcNewSpecInfo taskNewSpecInfo = buildTaskNewSpecInfo(newSpecInfoMap.get(sidewallCode), shiftOrder, demandQty);
+                int effectiveGuardShiftCount = this.resolveEffectiveGuardShiftCount(taskNewSpecInfo,
+                        guardShiftCount, shiftOrder, formingShiftOffset);
                 int targetShiftOrder = resolveTargetShiftOrder(taskNewSpecInfo, shiftOrder);
                 TcTaskDraft taskDraft = new TcTaskDraft();
                 taskDraft.setOrderNo(row.getOrderNo() + "-CLASS" + shiftOrder);
@@ -836,15 +838,16 @@ public class TcAutoScheduleDataLoadService {
                 taskDraft.setTailBalanceQty(nvl(row.getCxRemainQty()));
                 taskDraft.setCurrentShiftDemandQty(demandQty);
                 BigDecimal rawGuardFormingQty = this.calculateGuardFormingQty(classQtyArray, shiftOrder,
-                        guardShiftCount, formingShiftOffset);
+                        effectiveGuardShiftCount, formingShiftOffset);
                 BigDecimal cappedGuardFormingQty = this.capGuardFormingQty(rawGuardFormingQty,
                         row.getLhRemainQty());
                 taskDraft.setGuardDemandQty(cappedGuardFormingQty.multiply(sidewallLength));
                 taskDraft.setDemandQty(demandQty);
-                taskDraft.setGuardShiftCount(guardShiftCount);
-                this.addGuardDemandEstimateTrace(context, taskDraft, classQtyArray, shiftOrder, guardShiftCount,
+                taskDraft.setGuardShiftCount(effectiveGuardShiftCount);
+                this.addGuardDemandEstimateTrace(context, taskDraft, classQtyArray, shiftOrder,
+                        effectiveGuardShiftCount,
                         formingShiftOffset, row.getLhRemainQty(), rawGuardFormingQty, cappedGuardFormingQty, "BOM");
-                this.fillGuardRangeHours(context, taskDraft, shiftOrder, guardShiftCount, formingShiftOffset);
+                this.fillGuardRangeHours(context, taskDraft, shiftOrder, effectiveGuardShiftCount, formingShiftOffset);
                 taskDraft.setMinStartQty(minStartQty);
                 taskDraft.setDefaultCurlRollLength(defaultCurlLength);
                 if (toolTotalQty.compareTo(BigDecimal.ZERO) > 0) {
@@ -1051,6 +1054,8 @@ public class TcAutoScheduleDataLoadService {
                     continue;
                 }
                 TcNewSpecInfo taskNewSpecInfo = buildTaskNewSpecInfo(newSpecInfoMap.get(sidewallCode), shiftOrder, demandQty);
+                int effectiveGuardShiftCount = this.resolveEffectiveGuardShiftCount(taskNewSpecInfo,
+                        guardShiftCount, shiftOrder, formingShiftOffset);
                 int targetShiftOrder = resolveTargetShiftOrder(taskNewSpecInfo, shiftOrder);
                 TcTaskDraft taskDraft = new TcTaskDraft();
                 taskDraft.setOrderNo(row.getOrderNo() + "-CLASS" + shiftOrder);
@@ -1073,16 +1078,17 @@ public class TcAutoScheduleDataLoadService {
                 taskDraft.setTailBalanceQty(nvl(row.getCxRemainQty()));
                 taskDraft.setCurrentShiftDemandQty(demandQty);
                 BigDecimal rawGuardFormingQty = this.calculateGuardFormingQty(classQtyArray, shiftOrder,
-                        guardShiftCount, formingShiftOffset);
+                        effectiveGuardShiftCount, formingShiftOffset);
                 BigDecimal cappedGuardFormingQty = this.capGuardFormingQty(rawGuardFormingQty,
                         row.getLhRemainQty());
                 taskDraft.setGuardDemandQty(this.calculateGuardDemandByRecipe(classQtyArray, specByClass, shiftOrder,
-                        guardShiftCount, formingShiftOffset, sidewallLength, cappedGuardFormingQty));
+                        effectiveGuardShiftCount, formingShiftOffset, sidewallLength, cappedGuardFormingQty));
                 taskDraft.setDemandQty(demandQty);
-                taskDraft.setGuardShiftCount(guardShiftCount);
-                this.addGuardDemandEstimateTrace(context, taskDraft, classQtyArray, shiftOrder, guardShiftCount,
+                taskDraft.setGuardShiftCount(effectiveGuardShiftCount);
+                this.addGuardDemandEstimateTrace(context, taskDraft, classQtyArray, shiftOrder,
+                        effectiveGuardShiftCount,
                         formingShiftOffset, row.getLhRemainQty(), rawGuardFormingQty, cappedGuardFormingQty, "RECIPE");
-                this.fillGuardRangeHours(context, taskDraft, shiftOrder, guardShiftCount, formingShiftOffset);
+                this.fillGuardRangeHours(context, taskDraft, shiftOrder, effectiveGuardShiftCount, formingShiftOffset);
                 taskDraft.setMinStartQty(minStartQty);
                 taskDraft.setDefaultCurlRollLength(defaultCurlLength);
                 if (toolTotalQty.compareTo(BigDecimal.ZERO) > 0) {
@@ -1682,6 +1688,39 @@ public class TcAutoScheduleDataLoadService {
             return normalShiftOrder;
         }
         return Math.max(1, normalShiftOrder - Math.max(newSpecInfo.getAdvanceShiftCount(), 1));
+    }
+
+    /**
+     * 解析任务实际使用的库存保证班数，并补充新规格成型需求窗口证据。
+     *
+     * <p>普通规格保持基础保证班数；新规格至少扩展到提前班数，但不会缩短深度配置或
+     * {@code TC_MIN_STOCK_CLASS} 已给出的更深窗口。窗口超过成型 CLASS8 的部分仍由现有末三班平均量规则估算。</p>
+     *
+     * @param newSpecInfo 新规格判断与窗口证据
+     * @param baseGuardShiftCount 深度配置或参数解析出的基础保证班数
+     * @param shiftOrder 胎侧排程来源班次
+     * @param formingShiftOffset 胎侧班次到成型班次的偏移量
+     * @return 当前任务实际使用的库存保证班数
+     */
+    private int resolveEffectiveGuardShiftCount(TcNewSpecInfo newSpecInfo, int baseGuardShiftCount,
+                                                int shiftOrder, int formingShiftOffset) {
+        int normalizedBaseGuardShiftCount = Math.max(baseGuardShiftCount, 1);
+        int effectiveGuardShiftCount = normalizedBaseGuardShiftCount;
+        if (newSpecInfo != null && newSpecInfo.isNewSpecHit()) {
+            int advanceShiftCount = newSpecInfo.getAdvanceShiftCount() == null
+                    ? 1 : Math.max(newSpecInfo.getAdvanceShiftCount(), 1);
+            effectiveGuardShiftCount = Math.max(normalizedBaseGuardShiftCount, advanceShiftCount);
+        }
+        if (newSpecInfo != null) {
+            int formingWindowStartClass = this.resolveFormingStartIndex(shiftOrder, formingShiftOffset) + 1;
+            int formingWindowEndClass = formingWindowStartClass + effectiveGuardShiftCount - 1;
+            newSpecInfo.setBaseGuardShiftCount(normalizedBaseGuardShiftCount);
+            newSpecInfo.setEffectiveGuardShiftCount(effectiveGuardShiftCount);
+            newSpecInfo.setFormingWindowStartClass(formingWindowStartClass);
+            newSpecInfo.setFormingWindowEndClass(formingWindowEndClass);
+            newSpecInfo.setFormingWindowEstimatedShiftCount(Math.max(formingWindowEndClass - 8, 0));
+        }
+        return effectiveGuardShiftCount;
     }
 
     /**
@@ -2415,7 +2454,9 @@ public class TcAutoScheduleDataLoadService {
         int startIndex = this.resolveFormingStartIndex(shiftOrder, formingShiftOffset);
         int count = Math.max(guardShiftCount, 1);
         int exceedShiftCount = Math.max(startIndex + count - 8, 0);
-        if (exceedShiftCount <= 0 && lhRemainQty == null) {
+        TcNewSpecInfo newSpecInfo = taskDraft.getNewSpecInfo();
+        boolean newSpecWindow = newSpecInfo != null && newSpecInfo.isNewSpecHit();
+        if (exceedShiftCount <= 0 && lhRemainQty == null && !newSpecWindow) {
             return;
         }
         Map<String, Object> evidence = new LinkedHashMap<>();
@@ -2423,6 +2464,13 @@ public class TcAutoScheduleDataLoadService {
         evidence.put("startFormingClass", startIndex + 1);
         evidence.put("guardShiftCount", count);
         evidence.put("exceedShiftCount", exceedShiftCount);
+        if (newSpecWindow) {
+            evidence.put("baseGuardShiftCount", newSpecInfo.getBaseGuardShiftCount());
+            evidence.put("effectiveGuardShiftCount", newSpecInfo.getEffectiveGuardShiftCount());
+            evidence.put("formingWindowStartClass", newSpecInfo.getFormingWindowStartClass());
+            evidence.put("formingWindowEndClass", newSpecInfo.getFormingWindowEndClass());
+            evidence.put("formingWindowEstimatedShiftCount", newSpecInfo.getFormingWindowEstimatedShiftCount());
+        }
         evidence.put("class6PlanQty", this.readClassQty(classQtyArray, 5));
         evidence.put("class7PlanQty", this.readClassQty(classQtyArray, 6));
         evidence.put("class8PlanQty", this.readClassQty(classQtyArray, 7));
