@@ -52,6 +52,11 @@ public final class DailyMachineCapacitySimulationUtil {
         // activeMachines 表示已启用机台数，从当前实际已排/当前候选起步，每次只增加 1 台验证是否足够。
         int activeMachines = Math.max(1, request.getInitialActiveMachines());
         int maxMachineCount = request.getMachineDailyCapacityList().size();
+        // dayN 理论机台数硬上限：历史欠产只影响目标量/账本，不得突破该上限。
+        int dayNMachineCountCap = Math.max(0, request.getMachineCountCap());
+        if (dayNMachineCountCap > 0) {
+            maxMachineCount = Math.min(maxMachineCount, dayNMachineCountCap);
+        }
         // carryShortage 是模拟滚动欠产，T 日取账本初始缺口，后续日期沿用上一日模拟后的欠产。
         int carryShortage = resolveInitialCarryShortage(request);
         LocalDate firstProductionDate = resolveFirstProductionDate(request);
@@ -79,12 +84,12 @@ public final class DailyMachineCapacitySimulationUtil {
             carryShortage = decision.getDayShortageQty();
             totalUnmetQty = Math.max(totalUnmetQty, decision.getUnmetQty());
             forcedShortageWindowTriggered = forcedShortageWindowTriggered || decision.isShortageThresholdExceeded();
-            // 当前日已满足且未增机台时，不再后看下一日
-            // （spec: 当前日已满足时，当前日不加机台，且不再后看下一日）
-            if (decision.getUnmetQty() <= 0 && decision.getAddedMachineCount() == 0
-                    && MODE_CURRENT_DAY_PLAN_SATISFIED.equals(decision.getDecisionMode())) {
-                break;
-            }
+            /*
+             * 当前日已满足只表示“当前日不加机台”，必须继续逐日推进判断后续业务日，
+             * 避免首日小计划满足后吞掉后续高计划日的增机需求（如 dayN=16,108,108 首日 16
+             * 满足却看不到次日 108 需要第 2 台；与主规格 8,60,60 场景同构）。
+             * 停止只发生在全部业务日判断完成、或达到 dayN 理论机台数上限/候选耗尽时。
+             */
         }
         result.setFinalActiveMachines(activeMachines);
         int totalAdded = 0;

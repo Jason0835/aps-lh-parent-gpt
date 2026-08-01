@@ -1420,7 +1420,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         log.info("胎胚最早可供硫化时间加载完成, factoryCode: {}, queryStartDate: {}, windowEndTime: {}, "
                         + "queryCount: {}, validStructureCount: {}, duplicateStructureCount: {}, ignoredCount: {}, "
                         + "finalEarliestTimeMap: {}",
-                factoryCode, LhScheduleTimeUtil.formatDateTime(queryStartDate),
+                factoryCode, LhScheduleTimeUtil.formatDateTime(windowStartTime),
                 LhScheduleTimeUtil.formatDateTime(windowEndTime),
                 CollectionUtils.isEmpty(configuredTimeList) ? 0 : configuredTimeList.size(),
                 earliestTimeMap.size(), duplicateCount, ignoredCount, earliestTimeMap);

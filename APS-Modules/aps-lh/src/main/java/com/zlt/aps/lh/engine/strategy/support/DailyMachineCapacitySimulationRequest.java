@@ -61,6 +61,13 @@ public class DailyMachineCapacitySimulationRequest implements Serializable {
     /** 是否强制使用欠产阈值窗口回落模式 */
     private boolean forceShortageWindowMode;
 
+    /**
+     * dayN 理论机台数硬上限（0 表示不限制）。
+     * <p>所有模式（含强制欠产窗口模式）扩机台都不能突破该上限：
+     * 历史欠产只影响目标量/账本，不得反向突破 dayN 节奏推导出的总机台数。</p>
+     */
+    private int machineCountCap;
+
     /** 场景类型 */
     private String sceneType;
 }
