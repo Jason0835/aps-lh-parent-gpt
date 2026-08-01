@@ -39,4 +39,8 @@ public abstract class AbstractBaseWeekAdjustServiceMonthAdapter extends Abstract
 
     }
 
+    @Override
+    public void doProductAlign(MpRollAdjustContextDTO contextDTO) {
+
+    }
 }
