@@ -249,9 +249,8 @@ public class TcPlanCalcService implements ITcPlanCalcService {
             BigDecimal currentShiftDemandQty = groupSourceList.stream()
                     .map(TcTaskDraft::getCurrentShiftDemandQty).map(this::nvl)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
-            BigDecimal guardDemandQty = groupSourceList.stream()
-                    .map(TcTaskDraft::getGuardDemandQty).map(this::nvl)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal guardDemandQty = this.resolveGroupGuardDemandQty(groupSourceList,
+                    currentShiftDemandQty);
             aggregateTask.setPlanGroupKey(planGroupKey);
             aggregateTask.setSourceTaskBusinessKeyList(sourceSnapshotList.stream()
                     .map(TcTaskDraft::getBusinessKey).collect(Collectors.toList()));
@@ -287,6 +286,36 @@ public class TcPlanCalcService implements ITcPlanCalcService {
         context.setPlanTaskGroupMap(planTaskGroupMap);
         context.setSourceTaskDraftList(sourceTaskList);
         context.setTaskDraftList(aggregateTaskList);
+    }
+
+    /**
+     * 计算计划组的库存保证窗口需求量。
+     *
+     * <p>普通规格沿用来源任务逐项累加口径。新规格的多个来源班次提前到同一目标班次后，
+     * 各来源任务的保证窗口会相互重叠；此时以最早正常目标班次的窗口为锚点，并与组内当前班
+     * 需求合计取较大值，避免重复累计重叠的成型需求。</p>
+     *
+     * @param groupSourceList       计划组来源任务
+     * @param currentShiftDemandQty 计划组当前班需求合计
+     * @return 计划组库存保证窗口需求量
+     */
+    private BigDecimal resolveGroupGuardDemandQty(List<TcTaskDraft> groupSourceList,
+                                                   BigDecimal currentShiftDemandQty) {
+        boolean allNewSpec = groupSourceList.stream()
+                .allMatch(task -> task.getNewSpecInfo() != null && task.getNewSpecInfo().isNewSpecHit());
+        if (!allNewSpec) {
+            return groupSourceList.stream()
+                    .map(TcTaskDraft::getGuardDemandQty)
+                    .map(this::nvl)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+        }
+        BigDecimal anchorGuardDemandQty = groupSourceList.stream()
+                .min(Comparator.comparing(task -> Optional.ofNullable(task.getNewSpecInfo().getNormalTargetShift())
+                        .orElse(Integer.MAX_VALUE)))
+                .map(TcTaskDraft::getGuardDemandQty)
+                .map(this::nvl)
+                .orElse(BigDecimal.ZERO);
+        return anchorGuardDemandQty.max(this.nvl(currentShiftDemandQty));
     }
 
     /**
@@ -742,6 +771,11 @@ public class TcPlanCalcService implements ITcPlanCalcService {
         Map<String, Object> windowEvidence = new LinkedHashMap<>();
         windowEvidence.put("advanceShiftCount", info.getAdvanceShiftCount());
         windowEvidence.put("advanceShiftCountSource", info.getAdvanceShiftCountSource());
+        windowEvidence.put("baseGuardShiftCount", info.getBaseGuardShiftCount());
+        windowEvidence.put("effectiveGuardShiftCount", info.getEffectiveGuardShiftCount());
+        windowEvidence.put("formingWindowStartClass", info.getFormingWindowStartClass());
+        windowEvidence.put("formingWindowEndClass", info.getFormingWindowEndClass());
+        windowEvidence.put("formingWindowEstimatedShiftCount", info.getFormingWindowEstimatedShiftCount());
         windowEvidence.put("normalTargetShift", info.getNormalTargetShift());
         windowEvidence.put("adjustedTargetShift", info.getAdjustedTargetShift());
         windowEvidence.put("adjustedTargetWindow", info.getAdjustedTargetWindow());

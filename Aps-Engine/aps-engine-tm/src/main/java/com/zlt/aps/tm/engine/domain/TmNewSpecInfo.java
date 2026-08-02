@@ -29,6 +29,21 @@ public class TmNewSpecInfo {
     /** 提前生产班次数参数来源 */
     private String advanceShiftCountSource;
 
+    /** 新规格扩窗前的库存保证班数 */
+    private Integer baseGuardShiftCount;
+
+    /** 新规格扩窗后的有效库存保证班数 */
+    private Integer effectiveGuardShiftCount;
+
+    /** 成型需求窗口起始班次 */
+    private Integer formingWindowStartClass;
+
+    /** 成型需求窗口结束班次，允许大于成型已加载的 CLASS8 */
+    private Integer formingWindowEndClass;
+
+    /** 成型需求窗口中超过 CLASS8、需要估算的班次数 */
+    private Integer formingWindowEstimatedShiftCount;
+
     /** 前一天库存日期 */
     private Date previousStockDate;
 
