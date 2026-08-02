@@ -123,6 +123,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
     private static final String REGULAR_PRODUCTION_TYPE = "02";
     private static final int EMBRYO_ON_MACHINE_ENDING_FLAG = 0;
     private static final LocalTime ENDING_FILL_THRESHOLD_TIME = LocalTime.of(20, 0);
+    /** 收尾补满班次原因分析备注，标识该班次因收尾补满规则新增计划量。 */
+    private static final String ENDING_FILL_ANALYSIS = "补量";
     private static final String WHOLE_SINGLE_CONTROL_CONTINUATION_UNSCHEDULED_REASON =
             "双模SKU单控机台L/R整机续作条件不满足，禁止单边续作";
     private static final int SAME_MATERIAL_STATUS_FORMAL_RESERVED_QTY = 4;
@@ -6331,6 +6333,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                 || CollectionUtils.isEmpty(shifts) || !hasEndingResult(skuResults)) {
             return;
         }
+        // 先按当前最终量重算收尾补满允许超量，避免多机台补满新增量漏记或置零后残留登记影响收口
+        this.recomputeEndingFillAllowedOverQty(context, sourceSku, skuResults);
         ProductionQuantityPolicy policy = ProductionQuantityPolicy.from(sourceSku, true);
         if (!policy.isStrictUpperLimit()) {
             return;
@@ -6356,6 +6360,9 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             capResultShiftQtyToTarget(context, result, shifts, nextQty);
             overQty -= currentQty - ShiftFieldUtil.resolveScheduledQty(result);
         }
+        // 回裁后再次重算，确保允许超量与最终落库量一致
+        this.recomputeEndingFillAllowedOverQty(context, sourceSku, skuResults);
+        allowedOverQty = resolveEndingAllowedOverQty(context, skuResults);
         log.info("续作严格收尾最终收口, materialCode: {}, 目标量: {}, 收尾规则允许超量: {}, 原总量: {}, "
                         + "收口后总量: {}, 机台列表: {}",
                 sourceSku.getMaterialCode(), targetQty, allowedOverQty, totalPlanQty,
@@ -8323,17 +8330,68 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                 continue;
             }
             setShiftPlanQty(result, shift.getShiftIndex(), 0, null, null);
+            // 停产保机/释放边界置零后，清理此前收尾补满写入的“补量”备注，只保留保机原因。
+            ShiftFieldUtil.removeShiftAnalysis(result, shift.getShiftIndex(), ENDING_FILL_ANALYSIS);
             if (stopHold) {
                 ShiftFieldUtil.appendShiftAnalysis(result, shift.getShiftIndex(), "停产保机");
             }
             adjusted = true;
+            // 该业务日结果已无正计划班次时，回滚补满登记的机台统计，避免后续收尾补满被结构机台数误拦
+            if (!isMachineStillScheduledOnWorkDate(context, shifts, result, workDate)) {
+                context.removeScheduledMachine(workDate, result.getStructureName(), result.getMaterialCode(),
+                        result.getProductStatus(), result.getLhMachineCode());
+            }
         }
         if (adjusted) {
+            // 置零后先移除残留的收尾补满允许超量登记，最终由组级重算按最终量统一恢复
+            context.getEndingFillAllowedOverQtyMap().remove(result);
             refreshResultSummary(context, result, shifts);
         }
         if (context.isContinuousStopHoldMachine(result.getLhMachineCode())) {
             extendContinuousStopHoldOccupancyToWindowEnd(context, result, shifts);
         }
+    }
+
+    /**
+     * 判断指定机台在该业务日是否仍存在正计划班次。
+     * <p>用于停产保机/释放边界置零后判断是否回滚已排机台统计，
+     * 同机台同结构的其他结果仍有量时不允许回滚，避免机台数统计漏计。</p>
+     *
+     * @param context 排程上下文
+     * @param shifts 排程窗口班次
+     * @param zeroedResult 被置零的续作结果
+     * @param workDate 业务日期
+     * @return true-该机台该业务日仍有正计划班次；false-已无正计划班次
+     */
+    private boolean isMachineStillScheduledOnWorkDate(LhScheduleContext context,
+                                                      List<LhShiftConfigVO> shifts,
+                                                      LhScheduleResult zeroedResult,
+                                                      LocalDate workDate) {
+        if (Objects.isNull(context) || Objects.isNull(zeroedResult)
+                || StringUtils.isEmpty(zeroedResult.getLhMachineCode())
+                || Objects.isNull(workDate)
+                || CollectionUtils.isEmpty(context.getScheduleResultList())
+                || CollectionUtils.isEmpty(shifts)) {
+            return false;
+        }
+        for (LhScheduleResult result : context.getScheduleResultList()) {
+            if (Objects.isNull(result)
+                    || !StringUtils.equals(zeroedResult.getLhMachineCode(), result.getLhMachineCode())
+                    || !StringUtils.equals(StringUtils.trimToEmpty(zeroedResult.getStructureName()),
+                    StringUtils.trimToEmpty(result.getStructureName()))) {
+                continue;
+            }
+            for (LhShiftConfigVO shift : shifts) {
+                if (Objects.isNull(shift) || !workDate.equals(resolveShiftWorkDate(shift))) {
+                    continue;
+                }
+                Integer planQty = ShiftFieldUtil.getShiftPlanQty(result, shift.getShiftIndex());
+                if (Objects.nonNull(planQty) && planQty > 0) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /**
@@ -8454,13 +8512,17 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                     result.getMaterialCode(), result.getLhMachineCode(), businessDate, nextShift.getShiftIndex());
             return;
         }
+        // 记录补满前该机台结果量（同一结果只保留首次基准），供多机台组级允许超量重算识别本次补满新增量
+        context.getEndingFillBeforeQtyMap().putIfAbsent(result, ShiftFieldUtil.resolveScheduledQty(result));
         context.getEndingFillAllowedOverQtyMap().remove(result);
         int filledQty = fillEndingShifts(context, result, currentShift, nextShift);
         context.recordScheduledMachine(businessDate, sku.getStructureName(), sku.getMaterialCode(),
                 sku.getProductStatus(),
                 result.getLhMachineCode());
         refreshResultSummary(context, result, shifts);
-        int allowedOverQty = recordEndingFillAllowedOverQty(context, result, sku);
+        // 补满后同步机台收尾时间，避免后续错峰后延、换模预演和换活字块开产判断读到未后延的旧收尾时间
+        syncMachineEstimatedEndTime(context, result);
+        int allowedOverQty = recordEndingFillAllowedOverQty(context, result, filledQty);
         if (filledQty <= 0 && allowedOverQty <= 0) {
             return;
         }
@@ -8476,24 +8538,137 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
 
     /**
      * 登记SKU收尾补满允许超目标量。
-     * <p>允许超量必须按最终结果量覆盖计算，不能按本次补量累加；同一结果重复收敛时旧值会先被清理，避免账本少扣。</p>
+     * <p>先按本次实际补满新增量登记，后续由组级重算统一收敛：多机台同SKU场景下
+     * 单条机台结果量通常小于SKU总目标量，不能再按“结果量-目标量”登记，否则补满新增量会漏记；
+     * 同一结果重复收敛时旧值先被清理，避免账本少扣或重复累加。</p>
      *
      * @param context 排程上下文
      * @param result 续作结果
-     * @param sku 来源SKU
+     * @param filledQty 本次实际补满新增量
      * @return 本次登记的允许超目标量
      */
-    private int recordEndingFillAllowedOverQty(LhScheduleContext context, LhScheduleResult result, SkuScheduleDTO sku) {
-        if (Objects.isNull(context) || Objects.isNull(result) || Objects.isNull(sku)) {
+    private int recordEndingFillAllowedOverQty(LhScheduleContext context,
+                                               LhScheduleResult result,
+                                               int filledQty) {
+        if (Objects.isNull(context) || Objects.isNull(result)) {
             return 0;
         }
-        int allowedOverQty = Math.max(0, ShiftFieldUtil.resolveScheduledQty(result) - sku.resolveTargetScheduleQty());
-        if (allowedOverQty <= 0) {
+        if (filledQty <= 0) {
             context.getEndingFillAllowedOverQtyMap().remove(result);
             return 0;
         }
-        context.getEndingFillAllowedOverQtyMap().put(result, allowedOverQty);
-        return allowedOverQty;
+        context.getEndingFillAllowedOverQtyMap().put(result, filledQty);
+        return filledQty;
+    }
+
+    /**
+     * 按同SKU结果组重算主销/常规SKU收尾补满允许超量。
+     * <p>收尾补满允许超量必须与组级最终量口径一致：先汇总各机台本次实际保留的补满新增量，
+     * 再与“组最终总量-收尾目标量-共用胎胚错峰后延已豁免量”取小。
+     * 这样既能避免多机台场景补满新增量漏记，也能避免目标内补量或错峰后延额度已覆盖时重复豁免账本。</p>
+     *
+     * @param context 排程上下文
+     * @param sourceSku 来源SKU
+     * @param skuResults 同SKU续作结果集合
+     */
+    private void recomputeEndingFillAllowedOverQty(LhScheduleContext context,
+                                                   SkuScheduleDTO sourceSku,
+                                                   List<LhScheduleResult> skuResults) {
+        if (Objects.isNull(context) || Objects.isNull(sourceSku) || CollectionUtils.isEmpty(skuResults)) {
+            return;
+        }
+        Map<LhScheduleResult, Integer> beforeQtyMap = context.getEndingFillBeforeQtyMap();
+        Map<LhScheduleResult, Integer> staggerAllowedOverQtyMap =
+                context.getSharedEmbryoEndingStaggerAllowedOverQtyMap();
+        int totalFinalQty = 0;
+        int totalFillDelta = 0;
+        int totalStaggerAllowedQty = 0;
+        Map<LhScheduleResult, Integer> fillDeltaMap =
+                new IdentityHashMap<LhScheduleResult, Integer>(skuResults.size());
+        for (LhScheduleResult result : skuResults) {
+            if (Objects.isNull(result)) {
+                continue;
+            }
+            int finalQty = ShiftFieldUtil.resolveScheduledQty(result);
+            // 无补满基准量的机台按最终量处理，补满新增量为0
+            int beforeQty = Objects.isNull(beforeQtyMap) ? finalQty : beforeQtyMap.getOrDefault(result, finalQty);
+            int fillDelta = Math.max(0, finalQty - beforeQty);
+            totalFinalQty += finalQty;
+            totalFillDelta += fillDelta;
+            fillDeltaMap.put(result, fillDelta);
+            if (!CollectionUtils.isEmpty(staggerAllowedOverQtyMap)) {
+                Integer staggerAllowedQty = staggerAllowedOverQtyMap.get(result);
+                if (Objects.nonNull(staggerAllowedQty) && staggerAllowedQty > 0) {
+                    totalStaggerAllowedQty += staggerAllowedQty;
+                }
+            }
+        }
+        if (totalFillDelta <= 0) {
+            clearEndingFillAllowedOverQty(context, skuResults);
+            return;
+        }
+        int targetQty = Math.max(0, sourceSku.resolveTargetScheduleQty());
+        // 允许超量=min(本次补满新增量, 组最终总量-收尾目标量-错峰后延已豁免量)
+        int allowedOverQty = Math.min(totalFillDelta,
+                Math.max(0, totalFinalQty - targetQty - totalStaggerAllowedQty));
+        if (allowedOverQty <= 0) {
+            clearEndingFillAllowedOverQty(context, skuResults);
+            return;
+        }
+        // 按各机台本次补满新增量占比分摊组级允许超量，余数按顺序补齐，保证总额与组级口径一致
+        Map<LhScheduleResult, Integer> shareMap =
+                new IdentityHashMap<LhScheduleResult, Integer>(skuResults.size());
+        int shareSum = 0;
+        for (Map.Entry<LhScheduleResult, Integer> entry : fillDeltaMap.entrySet()) {
+            int fillDelta = entry.getValue();
+            if (fillDelta <= 0) {
+                continue;
+            }
+            int share = (int) ((long) allowedOverQty * fillDelta / totalFillDelta);
+            shareMap.put(entry.getKey(), share);
+            shareSum += share;
+        }
+        int remainder = allowedOverQty - shareSum;
+        for (Map.Entry<LhScheduleResult, Integer> entry : fillDeltaMap.entrySet()) {
+            if (remainder <= 0) {
+                break;
+            }
+            if (entry.getValue() <= 0) {
+                continue;
+            }
+            shareMap.put(entry.getKey(), shareMap.get(entry.getKey()) + 1);
+            remainder--;
+        }
+        for (LhScheduleResult result : skuResults) {
+            Integer share = shareMap.get(result);
+            if (Objects.isNull(share) || share <= 0) {
+                context.getEndingFillAllowedOverQtyMap().remove(result);
+            } else {
+                context.getEndingFillAllowedOverQtyMap().put(result, share);
+            }
+        }
+        log.info("SKU收尾补满允许超量组级重算, materialCode: {}, 目标量: {}, 组最终总量: {}, "
+                        + "本次补满新增量: {}, 错峰后延已豁免量: {}, 重算后允许超量: {}",
+                sourceSku.getMaterialCode(), targetQty, totalFinalQty, totalFillDelta,
+                totalStaggerAllowedQty, allowedOverQty);
+    }
+
+    /**
+     * 清理同SKU结果组的收尾补满允许超量登记。
+     *
+     * @param context 排程上下文
+     * @param skuResults 同SKU续作结果集合
+     */
+    private void clearEndingFillAllowedOverQty(LhScheduleContext context,
+                                               List<LhScheduleResult> skuResults) {
+        if (Objects.isNull(context) || CollectionUtils.isEmpty(skuResults)) {
+            return;
+        }
+        for (LhScheduleResult result : skuResults) {
+            if (Objects.nonNull(result)) {
+                context.getEndingFillAllowedOverQtyMap().remove(result);
+            }
+        }
     }
 
     /**
@@ -8664,6 +8839,11 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             setShiftPlanQty(result, currentShift.getShiftIndex(), currentBeforeQty + currentFillQty,
                     Objects.isNull(currentStartTime) ? currentShift.getShiftStartDateTime() : currentStartTime,
                     currentShift.getShiftEndDateTime());
+            if (currentFillQty > 0) {
+                // 中班实际补量成功后，班次原因分析追加“补量”，便于结果对账。
+                ShiftFieldUtil.appendShiftAnalysis(
+                        result, currentShift.getShiftIndex(), ENDING_FILL_ANALYSIS);
+            }
             filledQty += currentFillQty;
         }
         if (nextShiftCapacity > nextBeforeQty) {
@@ -8672,6 +8852,11 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                     "续作收尾下一班补满");
             setShiftPlanQty(result, nextShift.getShiftIndex(), nextBeforeQty + nextFillQty,
                     nextShift.getShiftStartDateTime(), nextShift.getShiftEndDateTime());
+            if (nextFillQty > 0) {
+                // 夜班实际补量成功后，班次原因分析追加“补量”，便于结果对账。
+                ShiftFieldUtil.appendShiftAnalysis(
+                        result, nextShift.getShiftIndex(), ENDING_FILL_ANALYSIS);
+            }
             filledQty += nextFillQty;
         }
         log.info("SKU收尾补满判断, materialCode: {}, machineCode: {}, currentShift: {}, nextShift: {}, "

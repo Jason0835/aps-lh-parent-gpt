@@ -515,6 +515,13 @@ public class LhScheduleContext {
     private Map<LhScheduleResult, Integer> endingFillAllowedOverQtyMap =
             new IdentityHashMap<LhScheduleResult, Integer>();
     /**
+     * SKU收尾补满动作前的机台结果基准量，用于多机台同SKU组级允许超量重算。
+     * <p>键为结果对象身份，值是该机台结果在本次收尾补满前的计划总量；
+     * 组级重算时按“最终量-补满前量”识别各机台实际保留的补满新增量。</p>
+     */
+    private Map<LhScheduleResult, Integer> endingFillBeforeQtyMap =
+            new IdentityHashMap<LhScheduleResult, Integer>();
+    /**
      * S4.5当前待排正规新增SKU数量，供选机阶段判断普通机台让位规则
      */
     private int pendingFormalNewSpecSkuCount;
@@ -1157,6 +1164,37 @@ public class LhScheduleContext {
     }
 
     /**
+     * 移除指定业务日已登记的已排硫化机台。
+     * <p>用于续作结果被停产保机或释放边界置零后回滚补满登记的结构/SKU机台统计，
+     * 避免后续同结构机台收尾补满被“结构机台数已达标”误拦。</p>
+     *
+     * @param productionDate 业务日期
+     * @param structureName 产品结构
+     * @param materialCode SKU物料编码
+     * @param productStatus 产品状态
+     * @param machineCode 机台编码
+     */
+    public void removeScheduledMachine(LocalDate productionDate,
+                                       String structureName,
+                                       String materialCode,
+                                       String productStatus,
+                                       String machineCode) {
+        if (Objects.isNull(productionDate) || StringUtils.isEmpty(machineCode)) {
+            return;
+        }
+        if (StringUtils.isNotEmpty(structureName)) {
+            removeMachine(structureScheduledMachineCodeMap, productionDate, structureName, machineCode);
+        }
+        if (StringUtils.isNotEmpty(materialCode)) {
+            // 与登记口径保持一致：空状态统一按正规 S 归一化后再移除
+            String normalizedProductStatus = StringUtils.isEmpty(productStatus)
+                    ? FORMAL_PRODUCT_STATUS : productStatus;
+            String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(materialCode, normalizedProductStatus);
+            removeMachine(skuScheduledMachineCodeMap, productionDate, skuKey, machineCode);
+        }
+    }
+
+    /**
      * 获取指定业务日的动态历史欠产量。
      *
      * @param productionDate 当前业务日期
@@ -1415,6 +1453,35 @@ public class LhScheduleContext {
         Set<String> machineCodeSet = dateMap.computeIfAbsent(
                 dimensionKey, key -> new LinkedHashSet<String>(4));
         machineCodeSet.add(machineCode);
+    }
+
+    /**
+     * 从已排机台统计中移除指定维度的机台，并清理空集合。
+     *
+     * @param targetMap 结构或SKU已排机台统计Map
+     * @param productionDate 业务日期
+     * @param dimensionKey 结构或SKU编码
+     * @param machineCode 机台编码
+     */
+    private void removeMachine(Map<LocalDate, Map<String, Set<String>>> targetMap,
+                               LocalDate productionDate,
+                               String dimensionKey,
+                               String machineCode) {
+        Map<String, Set<String>> dateMap = targetMap.get(productionDate);
+        if (CollectionUtils.isEmpty(dateMap)) {
+            return;
+        }
+        Set<String> machineCodeSet = dateMap.get(dimensionKey);
+        if (CollectionUtils.isEmpty(machineCodeSet)) {
+            return;
+        }
+        machineCodeSet.remove(machineCode);
+        if (machineCodeSet.isEmpty()) {
+            dateMap.remove(dimensionKey);
+        }
+        if (dateMap.isEmpty()) {
+            targetMap.remove(productionDate);
+        }
     }
 
     /**
