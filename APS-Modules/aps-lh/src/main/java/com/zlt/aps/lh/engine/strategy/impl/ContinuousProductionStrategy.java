@@ -5923,8 +5923,17 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                         capsuleReplacementCapacitySnapshot);
                 return false;
             }
-            setShiftPlanQty(result, nextShift.getShiftIndex(), actualNextShiftQty,
-                    nextShift.getShiftStartDateTime(), nextShift.getShiftEndDateTime());
+            // 原收尾班次，用于错峰后延后的班次摊平
+            LhShiftConfigVO endingShift = findShiftByIndex(shifts, endingShiftIndex);
+            // 优先按“满班在前、余量在后”重新摊平原收尾班次与后延班次的合计计划量；
+            // 无法摊平（合计量不足一满班或超出两班产能）时保持原整班追加逻辑。
+            boolean rebalanced = Objects.nonNull(endingShift)
+                    && rebalanceSharedEmbryoEndingStaggerShifts(
+                            context, result, endingShift, nextShift, actualNextShiftQty);
+            if (!rebalanced) {
+                setShiftPlanQty(result, nextShift.getShiftIndex(), actualNextShiftQty,
+                        nextShift.getShiftStartDateTime(), nextShift.getShiftEndDateTime());
+            }
             result.setIsEnd("1");
             refreshResultSummary(context, result, shifts);
             syncMachineEstimatedEndTime(context, result);
@@ -5953,6 +5962,99 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                     endingShiftIndex, nextShift.getShiftIndex(), ex);
             throw ex;
         }
+    }
+
+    /**
+     * 按“满班在前、余量在后”重新摊平错峰后延涉及的原收尾班次与后延班次计划量。
+     * <p>错峰后延若直接把补量整班追加到后延班次，而原收尾班次只剩少量尾量时，
+     * 会出现“原班次少量碎片 + 后延班次满班”（如 4+18）的形态，与收尾余量拆分口径不符。
+     * 本方法先把“原收尾班次 + 后延班次”的合计计划量填满原收尾班次（不超过班产），
+     * 再把余量放入后延班次（如 18+4），总量、允许超量和收尾目标量均不改变。</p>
+     * <p>仅当合计计划量超过原收尾班次产能、且余量不超过后延班次产能时才执行摊平；
+     * 合计量不足一满班时保持原追加逻辑，保证收尾时间仍然真实后延到后延班次。</p>
+     *
+     * @param context 排程上下文
+     * @param result 后延结果
+     * @param endingShift 原收尾班次
+     * @param nextShift 后延班次
+     * @param actualNextShiftQty 后延班次原始追加量
+     * @return true-已执行摊平；false-未执行，由调用方保持原追加逻辑
+     */
+    private boolean rebalanceSharedEmbryoEndingStaggerShifts(LhScheduleContext context,
+                                                             LhScheduleResult result,
+                                                             LhShiftConfigVO endingShift,
+                                                             LhShiftConfigVO nextShift,
+                                                             int actualNextShiftQty) {
+        if (Objects.isNull(context) || Objects.isNull(result) || Objects.isNull(endingShift)
+                || Objects.isNull(nextShift) || actualNextShiftQty <= 0) {
+            return false;
+        }
+        int endingBeforeQty = resolveShiftPlanQty(result, endingShift.getShiftIndex());
+        int endingShiftCapacity = calculateResultShiftCapacity(context, result, endingShift);
+        int nextShiftCapacity = calculateResultShiftCapacity(context, result, nextShift);
+        if (endingBeforeQty <= 0 || endingShiftCapacity <= 0 || nextShiftCapacity <= 0) {
+            return false;
+        }
+        // 原收尾班次与后延班次的合计计划量
+        int totalShiftQty = endingBeforeQty + actualNextShiftQty;
+        // 先填满原收尾班次，余量放入后延班次
+        int endingAfterQty = Math.min(totalShiftQty, endingShiftCapacity);
+        int nextAfterQty = totalShiftQty - endingAfterQty;
+        // 合计量未超过原班次产能（余量为0）或余量超过后延班次产能时，保持原追加逻辑
+        if (nextAfterQty <= 0 || nextAfterQty > nextShiftCapacity) {
+            log.info("共用胎胚收尾错峰班次摊平跳过, scheduleDate: {}, materialCode: {}, machineCode: {}, "
+                            + "原收尾班次: {}, 后延班次: {}, 原班次量: {}, 追加量: {}, 原班次产能: {}, "
+                            + "后延班次产能: {}, 原因: 合计量无法按满班在前拆分",
+                    context.getScheduleDate(), result.getMaterialCode(), result.getLhMachineCode(),
+                    endingShift.getShiftIndex(), nextShift.getShiftIndex(), endingBeforeQty,
+                    actualNextShiftQty, endingShiftCapacity, nextShiftCapacity);
+            return false;
+        }
+        if (endingAfterQty == endingBeforeQty && nextAfterQty == actualNextShiftQty) {
+            return false;
+        }
+        // 原收尾班次起始时间沿用已有计划起始时间，缺失时使用班次标准开始时间
+        Date endingStartTime = ShiftFieldUtil.getShiftStartTime(result, endingShift.getShiftIndex());
+        if (Objects.isNull(endingStartTime)) {
+            endingStartTime = endingShift.getShiftStartDateTime();
+        }
+        List<MachineCleaningWindowDTO> cleaningWindowList =
+                resolveEffectiveCleaningWindowList(context, result, endingStartTime);
+        List<MachineMaintenanceWindowDTO> maintenanceWindowList =
+                resolveMachineMaintenanceWindowList(context, result.getLhMachineCode());
+        // 按摊平后的数量重新推导两个班次的实际完工时刻
+        Date endingEndTime = ShiftCapacityResolverUtil.resolveShiftPlanEndTime(
+                context.getDevicePlanShutList(), cleaningWindowList, maintenanceWindowList,
+                result.getLhMachineCode(), endingStartTime, endingShift.getShiftEndDateTime(),
+                endingAfterQty, endingShiftCapacity);
+        Date nextEndTime = ShiftCapacityResolverUtil.resolveShiftPlanEndTime(
+                context.getDevicePlanShutList(), cleaningWindowList, maintenanceWindowList,
+                result.getLhMachineCode(), nextShift.getShiftStartDateTime(),
+                nextShift.getShiftEndDateTime(), nextAfterQty, nextShiftCapacity);
+        setShiftPlanQty(result, endingShift.getShiftIndex(), endingAfterQty, endingStartTime,
+                Objects.isNull(endingEndTime) ? endingShift.getShiftEndDateTime() : endingEndTime);
+        setShiftPlanQty(result, nextShift.getShiftIndex(), nextAfterQty,
+                nextShift.getShiftStartDateTime(),
+                Objects.isNull(nextEndTime) ? nextShift.getShiftEndDateTime() : nextEndTime);
+        StringBuilder detail = new StringBuilder(256);
+        detail.append("scheduleDate=").append(context.getScheduleDate())
+                .append(", materialCode=").append(result.getMaterialCode())
+                .append(", machineCode=").append(result.getLhMachineCode())
+                .append(", 原收尾班次=").append(endingShift.getShiftIndex())
+                .append(", 后延班次=").append(nextShift.getShiftIndex())
+                .append(", 摊平前=[班次").append(endingShift.getShiftIndex())
+                .append("=").append(endingBeforeQty)
+                .append(", 班次").append(nextShift.getShiftIndex())
+                .append("=").append(actualNextShiftQty).append("]")
+                .append(", 摊平后=[班次").append(endingShift.getShiftIndex())
+                .append("=").append(endingAfterQty)
+                .append(", 班次").append(nextShift.getShiftIndex())
+                .append("=").append(nextAfterQty).append("]")
+                .append(", 合计计划量=").append(totalShiftQty)
+                .append(", 原因: 满班在前、余量在后");
+        PriorityTraceLogHelper.appendProcessLog(context, "共用胎胚收尾错峰班次摊平", detail.toString());
+        log.info("共用胎胚收尾错峰班次摊平完成, {}", detail);
+        return true;
     }
 
     /**
