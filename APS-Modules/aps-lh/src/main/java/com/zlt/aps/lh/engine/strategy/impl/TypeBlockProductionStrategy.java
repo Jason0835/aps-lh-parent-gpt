@@ -1641,6 +1641,25 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
             Date pairProductionStartTime = resolveTypeBlockProductionStartTime(
                     context, pairMachine, sku, pairMachine.getEstimatedEndTime(), switchStartTime, shifts);
             startTime = resolveLaterDate(startTime, pairProductionStartTime);
+            log.info("双模换活字块等待配对侧释放, primaryMachine: {}, pairMachine: {}, materialCode: {}, "
+                            + "primaryReleaseTime: {}, pairReleaseTime: {}, switchStartTime: {}, productionStartTime: {}",
+                    machine.getMachineCode(), pairMachine.getMachineCode(), sku.getMaterialCode(),
+                    LhScheduleTimeUtil.formatDateTime(machine.getEstimatedEndTime()),
+                    LhScheduleTimeUtil.formatDateTime(pairMachine.getEstimatedEndTime()),
+                    LhScheduleTimeUtil.formatDateTime(switchStartTime),
+                    LhScheduleTimeUtil.formatDateTime(startTime));
+            // 配对侧占用判定必须与等待释放后的真实切换窗口对齐：
+            // 配对侧在机/续作物料以及切换开始前已结束的其他物料结果都不构成占用，
+            // 只有仍占用到切换窗口内的其他物料才阻断双模换活字块。
+            if (hasPairSideConflictingAssignment(context, pairMachine, sku, switchStartTime)) {
+                recordTypeBlockAppendFailure(failureReason, "双模换活字块配对侧已被其他SKU占用");
+                log.info("双模换活字块配对侧在切换窗口内仍被其他SKU占用, primaryMachine: {}, pairMachine: {}, "
+                                + "materialCode: {}, switchStartTime: {}, productionStartTime: {}",
+                        machine.getMachineCode(), pairMachine.getMachineCode(), sku.getMaterialCode(),
+                        LhScheduleTimeUtil.formatDateTime(switchStartTime),
+                        LhScheduleTimeUtil.formatDateTime(startTime));
+                return false;
+            }
         }
         // 成型胎胚库存收尾优先按胎胚库存严格控量，避免被零目标或共用胎胚零余量规则提前拦截。
         boolean embryoStockEndingTargetApplied = getTargetScheduleQtyResolver()
@@ -2139,6 +2158,10 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
     /**
      * 解析双模换活字块配对侧机台。
      *
+     * <p>本方法只负责“配对侧是否存在且满足静态硬约束”；配对侧是否被其他SKU占用
+     * 由 appendFollowUpResult 在计算等待释放后的切换时间后，按时间窗重叠口径统一判定，
+     * 避免把配对侧本次窗口的在机/续作物料误判为占用。</p>
+     *
      * @param context 排程上下文
      * @param machine 当前侧机台
      * @param sku 当前SKU
@@ -2165,18 +2188,61 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
             recordTypeBlockAppendFailure(failureReason, "双模换活字块配对侧未通过机台、模具、胶囊或窗口约束");
             return null;
         }
-        List<LhScheduleResult> pairAssignments = context.getMachineAssignmentMap().get(pairMachine.getMachineCode());
-        if (!CollectionUtils.isEmpty(pairAssignments)) {
-            for (LhScheduleResult assignment : pairAssignments) {
-                if (Objects.nonNull(assignment) && Objects.nonNull(assignment.getDailyPlanQty())
-                        && assignment.getDailyPlanQty() > 0
-                        && !StringUtils.equals(sku.getMaterialCode(), assignment.getMaterialCode())) {
-                    recordTypeBlockAppendFailure(failureReason, "双模换活字块配对侧已被其他SKU占用");
-                    return null;
-                }
-            }
-        }
         return pairMachine;
+    }
+
+    /**
+     * 判断双模换活字块配对侧在切换窗口内是否仍被其他SKU占用。
+     *
+     * <p>双模换活字块会等待 L/R 两侧都释放后再同步切换，因此判定必须以等待后的
+     * 实际切换开始时间为基准：</p>
+     * <ul>
+     *   <li>与候选物料相同的结果不构成占用；</li>
+     *   <li>其它物料结果在切换开始前已结束的不构成占用；</li>
+     *   <li>缺少结束时间的配对侧在机结果，以机台释放时间（收尾时间）作为等待基准，
+     *       释放时间不晚于切换开始时同样不构成占用；</li>
+     *   <li>其余仍占用到切换窗口内的其他物料结果才真正阻断双模换活字块。</li>
+     * </ul>
+     *
+     * @param context 排程上下文
+     * @param pairMachine 配对侧机台
+     * @param sku 当前换活字块候选SKU
+     * @param switchStartTime 等待配对侧释放后的实际切换开始时间
+     * @return true-存在冲突占用；false-可以同步切换
+     */
+    private boolean hasPairSideConflictingAssignment(LhScheduleContext context,
+                                                     MachineScheduleDTO pairMachine,
+                                                     SkuScheduleDTO sku,
+                                                     Date switchStartTime) {
+        if (Objects.isNull(context) || Objects.isNull(pairMachine) || Objects.isNull(sku)) {
+            return false;
+        }
+        List<LhScheduleResult> pairAssignments =
+                context.getMachineAssignmentMap().get(pairMachine.getMachineCode());
+        if (CollectionUtils.isEmpty(pairAssignments)) {
+            return false;
+        }
+        for (LhScheduleResult assignment : pairAssignments) {
+            if (Objects.isNull(assignment) || Objects.isNull(assignment.getDailyPlanQty())
+                    || assignment.getDailyPlanQty() <= 0
+                    || StringUtils.equals(sku.getMaterialCode(), assignment.getMaterialCode())) {
+                continue;
+            }
+            Date assignmentEndTime = assignment.getSpecEndTime();
+            if (Objects.nonNull(assignmentEndTime) && !assignmentEndTime.after(switchStartTime)) {
+                // 该结果在切换开始前已结束，不占用切换窗口，放行等待同步切换。
+                continue;
+            }
+            if (Objects.isNull(assignmentEndTime)
+                    && StringUtils.equals(pairMachine.getCurrentMaterialCode(), assignment.getMaterialCode())
+                    && Objects.nonNull(pairMachine.getEstimatedEndTime())
+                    && !pairMachine.getEstimatedEndTime().after(switchStartTime)) {
+                // 配对侧在机结果缺少结束时间时，以机台释放时间作为等待基准，释放后同样放行。
+                continue;
+            }
+            return true;
+        }
+        return false;
     }
 
     /**
