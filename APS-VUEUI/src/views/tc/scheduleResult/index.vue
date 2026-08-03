@@ -448,14 +448,20 @@ export default {
           label: this.$t('ui.tc.schedule.factoryCode'),
           type: 'select',
           dictData: this.dict.type.biz_factory_name,
-          filterable: true
+          filterable: true,
+          listeners: {
+            change: this.handleFactoryCodeChange
+          }
         },
         {
           prop: 'scheduleDate',
           label: this.$t('ui.tc.schedule.scheduleDate'),
           type: 'date',
           dateType: 'date',
-          valueFormat: 'yyyy-MM-dd'
+          valueFormat: 'yyyy-MM-dd',
+          listeners: {
+            change: this.handleScheduleDateChange
+          }
         },
         {
           prop: 'machineCode',
@@ -490,6 +496,7 @@ export default {
     }
   },
   created() {
+    this.loadMachineOptions(this.search.factoryCode, this.search.scheduleDate)
     if (this.query.factoryCode) {
       this.getList()
     }
@@ -511,6 +518,35 @@ export default {
     this.clearOperationTimer()
   },
   methods: {
+    /**
+     * 切换查询工厂后清空旧机台编码，并按新工厂立即刷新机台选项。
+     *
+     * @param {String} factoryCode 当前选择的工厂编码
+     * @returns {Promise<void>} 机台选项加载完成后返回
+     */
+    async handleFactoryCodeChange(factoryCode) {
+      const scheduleDate = this.search.scheduleDate
+      this.search = {
+        ...this.search,
+        factoryCode,
+        machineCode: undefined
+      }
+      await this.loadMachineOptions(factoryCode, scheduleDate)
+    },
+    /**
+     * 变更排程日期后刷新机台选项；日期为空时清空选项且不请求接口。
+     *
+     * @param {String} scheduleDate 当前选择的排程日期
+     * @returns {Promise<void>} 机台选项加载完成后返回
+     */
+    async handleScheduleDateChange(scheduleDate) {
+      const factoryCode = this.search.factoryCode
+      this.search = {
+        ...this.search,
+        scheduleDate
+      }
+      await this.loadMachineOptions(factoryCode, scheduleDate)
+    },
     shiftLabel(shiftOrder) {
       const option = this.dateColumns.find(item => item.shiftOrder === shiftOrder)
       const shiftName = option
@@ -558,12 +594,19 @@ export default {
       }
     },
     async loadMachineOptions(factoryCode, scheduleDate) {
-      if (!factoryCode || !scheduleDate) return
+      if (!factoryCode || !scheduleDate) {
+        this.machineOptions = []
+        return
+      }
       try {
         const options = await getManualOptions({ factoryCode, scheduleDate })
-        this.machineOptions = options.machineList || []
+        if (this.search.factoryCode === factoryCode) {
+          this.machineOptions = options.machineList || []
+        }
       } catch (error) {
-        this.machineOptions = []
+        if (this.search.factoryCode === factoryCode) {
+          this.machineOptions = []
+        }
       }
     },
     handleSearch(query) {
