@@ -130,6 +130,8 @@ final class ScheduleSubstitutionAttemptSnapshot {
     private Map<LhScheduleResult, Integer> sharedEmbryoReleaseShiftQtyMap;
     private Map<LhScheduleResult, Integer> sharedEmbryoAllowedOverQtyMap;
     private Map<LhScheduleResult, Integer> endingFillAllowedOverQtyMap;
+    /** 置换前SKU收尾补满动作基准量，用于组级允许超量重算回滚 */
+    private Map<LhScheduleResult, Integer> endingFillBeforeQtyMap;
     private Set<LhScheduleResult> precisionPreInsertResultSet;
     private Map<LhScheduleResult, Date> precisionPreInsertInspectionTimeMap;
     private Map<LhScheduleResult, Date> precisionPreInsertMouldChangeTimeMap;
@@ -287,6 +289,9 @@ final class ScheduleSubstitutionAttemptSnapshot {
         snapshot.endingFillAllowedOverQtyMap =
                 new IdentityHashMap<LhScheduleResult, Integer>(
                         context.getEndingFillAllowedOverQtyMap());
+        snapshot.endingFillBeforeQtyMap =
+                new IdentityHashMap<LhScheduleResult, Integer>(
+                        context.getEndingFillBeforeQtyMap());
         snapshot.precisionPreInsertResultSet =
                 java.util.Collections.newSetFromMap(
                         new IdentityHashMap<LhScheduleResult, Boolean>());
@@ -419,6 +424,9 @@ final class ScheduleSubstitutionAttemptSnapshot {
         context.setEndingFillAllowedOverQtyMap(
                 new IdentityHashMap<LhScheduleResult, Integer>(
                         endingFillAllowedOverQtyMap));
+        context.setEndingFillBeforeQtyMap(
+                new IdentityHashMap<LhScheduleResult, Integer>(
+                        endingFillBeforeQtyMap));
         Set<LhScheduleResult> restoredPrecisionResultSet =
                 java.util.Collections.newSetFromMap(
                         new IdentityHashMap<LhScheduleResult, Boolean>());

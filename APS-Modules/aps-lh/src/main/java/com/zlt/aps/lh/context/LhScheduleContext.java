@@ -515,6 +515,13 @@ public class LhScheduleContext {
     private Map<LhScheduleResult, Integer> endingFillAllowedOverQtyMap =
             new IdentityHashMap<LhScheduleResult, Integer>();
     /**
+     * SKU收尾补满动作前的机台结果基准量，用于多机台同SKU组级允许超量重算。
+     * <p>键为结果对象身份，值是该机台结果在本次收尾补满前的计划总量；
+     * 组级重算时按“最终量-补满前量”识别各机台实际保留的补满新增量。</p>
+     */
+    private Map<LhScheduleResult, Integer> endingFillBeforeQtyMap =
+            new IdentityHashMap<LhScheduleResult, Integer>();
+    /**
      * S4.5当前待排正规新增SKU数量，供选机阶段判断普通机台让位规则
      */
     private int pendingFormalNewSpecSkuCount;
@@ -568,6 +575,13 @@ public class LhScheduleContext {
      * 已按降模规则释放过续作机台的物料集合，避免后续补偿链路把降模机台重新补回
      */
     private Set<String> reducedContinuationGroupKeySet = new LinkedHashSet<>();
+    /**
+     * 续作逐日降模分组最后释放机台的业务日，key=物料+产品状态复合键，value=最后一次真正下机的业务日。
+     * <p>补偿增机判断必须从该业务日起重新评估保留机台的 dayN 节奏，不能把释放日前的高计划日
+     * 继续按最终机台数计算，避免“先降模释放、再补偿加回”的机台回流重叠。</p>
+     */
+    private Map<String, LocalDate> reducedContinuationGroupLastReleaseDateMap =
+            new LinkedHashMap<String, LocalDate>(4);
     /**
      * 续作降模下机机台对应的前物料 SKU 快照。
      * <p>第一层 key=机台编码，第二层 key=降模前物料编码，value=实际触发降模的来源 SKU。
@@ -1150,6 +1164,37 @@ public class LhScheduleContext {
     }
 
     /**
+     * 移除指定业务日已登记的已排硫化机台。
+     * <p>用于续作结果被停产保机或释放边界置零后回滚补满登记的结构/SKU机台统计，
+     * 避免后续同结构机台收尾补满被“结构机台数已达标”误拦。</p>
+     *
+     * @param productionDate 业务日期
+     * @param structureName 产品结构
+     * @param materialCode SKU物料编码
+     * @param productStatus 产品状态
+     * @param machineCode 机台编码
+     */
+    public void removeScheduledMachine(LocalDate productionDate,
+                                       String structureName,
+                                       String materialCode,
+                                       String productStatus,
+                                       String machineCode) {
+        if (Objects.isNull(productionDate) || StringUtils.isEmpty(machineCode)) {
+            return;
+        }
+        if (StringUtils.isNotEmpty(structureName)) {
+            removeMachine(structureScheduledMachineCodeMap, productionDate, structureName, machineCode);
+        }
+        if (StringUtils.isNotEmpty(materialCode)) {
+            // 与登记口径保持一致：空状态统一按正规 S 归一化后再移除
+            String normalizedProductStatus = StringUtils.isEmpty(productStatus)
+                    ? FORMAL_PRODUCT_STATUS : productStatus;
+            String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(materialCode, normalizedProductStatus);
+            removeMachine(skuScheduledMachineCodeMap, productionDate, skuKey, machineCode);
+        }
+    }
+
+    /**
      * 获取指定业务日的动态历史欠产量。
      *
      * @param productionDate 当前业务日期
@@ -1411,6 +1456,35 @@ public class LhScheduleContext {
     }
 
     /**
+     * 从已排机台统计中移除指定维度的机台，并清理空集合。
+     *
+     * @param targetMap 结构或SKU已排机台统计Map
+     * @param productionDate 业务日期
+     * @param dimensionKey 结构或SKU编码
+     * @param machineCode 机台编码
+     */
+    private void removeMachine(Map<LocalDate, Map<String, Set<String>>> targetMap,
+                               LocalDate productionDate,
+                               String dimensionKey,
+                               String machineCode) {
+        Map<String, Set<String>> dateMap = targetMap.get(productionDate);
+        if (CollectionUtils.isEmpty(dateMap)) {
+            return;
+        }
+        Set<String> machineCodeSet = dateMap.get(dimensionKey);
+        if (CollectionUtils.isEmpty(machineCodeSet)) {
+            return;
+        }
+        machineCodeSet.remove(machineCode);
+        if (machineCodeSet.isEmpty()) {
+            dateMap.remove(dimensionKey);
+        }
+        if (dateMap.isEmpty()) {
+            targetMap.remove(productionDate);
+        }
+    }
+
+    /**
      * 获取指定维度已排机台数。
      *
      * @param sourceMap      来源统计Map
@@ -1602,6 +1676,34 @@ public class LhScheduleContext {
             return null;
         }
         return continuousReducedMachineReleaseBoundaryShiftIndexMap.get(machineCode);
+    }
+
+    /**
+     * 登记续作降模分组最后释放机台的业务日。
+     * <p>同分组后续业务日再次降模时直接覆盖为更晚的业务日，保证取值始终是最后一次释放日。</p>
+     *
+     * @param groupKey 物料+产品状态复合键
+     * @param productionDate 本次释放机台的业务日
+     */
+    public void registerReducedContinuationGroupLastReleaseDate(String groupKey, LocalDate productionDate) {
+        if (StringUtils.isEmpty(groupKey) || Objects.isNull(productionDate)) {
+            return;
+        }
+        reducedContinuationGroupLastReleaseDateMap.put(groupKey, productionDate);
+    }
+
+    /**
+     * 获取续作降模分组最后释放机台的业务日。
+     *
+     * @param groupKey 物料+产品状态复合键
+     * @return 最后一次真正下机的业务日；未发生逐日降模释放时返回null
+     */
+    public LocalDate getReducedContinuationGroupLastReleaseDate(String groupKey) {
+        if (StringUtils.isEmpty(groupKey)
+                || CollectionUtils.isEmpty(reducedContinuationGroupLastReleaseDateMap)) {
+            return null;
+        }
+        return reducedContinuationGroupLastReleaseDateMap.get(groupKey);
     }
 
     /**
