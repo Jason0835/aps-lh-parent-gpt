@@ -28,22 +28,21 @@ public class Cd90DepthConfig extends BaseEntity implements Serializable {
     private String factoryCode;
 
     /**
-     * 供成型机台数（成型工序生产某直裁胎体规格所使用的机台数量）
+     * 区间起始机台数（含）
      */
-    @ApiModelProperty("供成型机台数")
+    @ApiModelProperty("区间起始机台数（含）")
     @ImportExcelValidated(required = true)
-    @TableField("MACHINE_QTY")
-    @Excel(name = "ui.data.column.cd90DepthConfig.machineQty")
-    private Integer machineQty;
+    @TableField("MIN_MACHINE_QTY")
+    @Excel(name = "ui.data.column.cd90DepthConfig.minMachineQty")
+    private Integer minMachineQty;
 
     /**
-     * 机台范围（数据字典machine_range，选项：LT-小于、LE-小于等于、EQ-等于、GE-大于等于、GT-大于）
+     * 区间结束机台数（含），空表示无上限
      */
-    @ApiModelProperty("机台范围")
-    @ImportExcelValidated(required = true, maxLength = 10)
-    @TableField("MACHINE_RANGE")
-    @Excel(name = "ui.data.column.cd90DepthConfig.machineRange", dictType = "machine_range")
-    private String machineRange;
+    @ApiModelProperty("区间结束机台数（含），空表示无上限")
+    @TableField("MAX_MACHINE_QTY")
+    @Excel(name = "ui.data.column.cd90DepthConfig.maxMachineQty")
+    private Integer maxMachineQty;
 
     /**
      * 备库班数（该机台数范围对应的排产深度/供应窗口班次数）

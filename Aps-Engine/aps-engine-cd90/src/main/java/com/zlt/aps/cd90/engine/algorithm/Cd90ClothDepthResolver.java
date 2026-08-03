@@ -1,16 +1,16 @@
 package com.zlt.aps.cd90.engine.algorithm;
 
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.cd90.api.domain.entity.Cd90DepthConfig;
 import com.zlt.aps.cd90.engine.model.Cd90ConstructionMaterial;
 import com.zlt.aps.cd90.engine.model.Cd90FormingScheduleSource;
-import com.zlt.aps.common.engine.enums.MachineRangeEnum;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
+import java.text.MessageFormat;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -48,7 +48,9 @@ public class Cd90ClothDepthResolver {
                 .forEach(schedule -> this.collectScheduleMachines(schedule, clothsByConstruction,
                         machinesByCloth, missingMachineCloths));
         if (!missingMachineCloths.isEmpty()) {
-            throw new IllegalArgumentException("存在正需求但成型机台代码为空的帘布: " + missingMachineCloths);
+            throw new IllegalArgumentException(MessageFormat.format(
+                    I18nUtil.getMessage("ui.data.column.cd90DepthConfig.missingMachine"),
+                    missingMachineCloths));
         }
 
         List<Cd90DepthConfig> validConfigs = this.validateAndSortConfigs(configs);
@@ -105,29 +107,38 @@ public class Cd90ClothDepthResolver {
     private List<Cd90DepthConfig> validateAndSortConfigs(List<Cd90DepthConfig> configs) {
         List<Cd90DepthConfig> values = this.safe(configs);
         values.stream().forEach(config -> {
-            if (config == null || config.getMachineQty() == null
-                    || MachineRangeEnum.getByCode(config.getMachineRange()) == null
+            if (config == null || config.getMinMachineQty() == null
+                    || config.getMinMachineQty() <= 0
+                    || (config.getMaxMachineQty() != null
+                    && config.getMaxMachineQty() < config.getMinMachineQty())
                     || config.getDepthClassQty() == null || config.getDepthClassQty().signum() <= 0) {
-                throw new IllegalArgumentException("直裁备库深度配置存在无效机台范围、机台数或备库班数");
+                throw new IllegalArgumentException(
+                        I18nUtil.getMessage("ui.data.column.cd90DepthConfig.invalidRange"));
             }
         });
         return values.stream()
-                .sorted(Comparator.comparing(Cd90DepthConfig::getMachineQty).reversed()
-                        .thenComparing(Cd90DepthConfig::getMachineRange))
+                .sorted(java.util.Comparator.comparing(Cd90DepthConfig::getMinMachineQty))
                 .collect(Collectors.toList());
     }
 
     /** 每个帘布必须且只能命中一条配置，禁止默认深度掩盖基础数据问题。 */
     private BigDecimal matchDepth(String clothCode, int machineCount, List<Cd90DepthConfig> configs) {
         List<Cd90DepthConfig> matches = configs.stream()
-                .filter(config -> MachineRangeEnum.getByCode(config.getMachineRange())
-                        .matches(machineCount, config.getMachineQty()))
+                .filter(config -> this.matches(config, machineCount))
                 .collect(Collectors.toList());
         if (matches.size() != 1) {
-            throw new IllegalArgumentException("帘布备库深度必须唯一匹配, clothCode=" + clothCode
-                    + ", formingMachineCount=" + machineCount + ", matchCount=" + matches.size());
+            throw new IllegalArgumentException(MessageFormat.format(
+                    I18nUtil.getMessage("ui.data.column.cd90DepthConfig.matchCount"),
+                    clothCode, machineCount, matches.size()));
         }
         return matches.get(0).getDepthClassQty();
+    }
+
+    /** 判断成型机台数是否落在配置闭区间内，上限为空表示无上限。 */
+    private boolean matches(Cd90DepthConfig config, int machineCount) {
+        return machineCount >= config.getMinMachineQty()
+                && (config.getMaxMachineQty() == null
+                || machineCount <= config.getMaxMachineQty());
     }
 
     private String constructionKey(String constructionCode, String constructionVersion) {
