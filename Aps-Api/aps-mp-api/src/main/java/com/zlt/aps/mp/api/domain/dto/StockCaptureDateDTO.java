@@ -16,6 +16,8 @@ public class StockCaptureDateDTO {
     private String materialCode;
     /** 产品状态 */
     private String productStatus;
+    /** 需求版本号（来自余量表 REQUIRE_VERSION，用于 Java 层按版本精确匹配库存抓取日） */
+    private String requireVersion;
     /** 库存抓取日（Java 层根据 LAST_MONTH_PLAN_VERSION 解析或回退到余量表） */
     private Date stockCaptureDate;
     /** 是否强制置零（当月定稿表的 LAST_MONTH_PLAN_VERSION 为当月ADJ版本时，超欠产直接为0，跳过计划量/完成量累加） */
