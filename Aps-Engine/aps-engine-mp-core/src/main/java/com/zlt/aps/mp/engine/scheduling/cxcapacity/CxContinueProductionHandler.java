@@ -139,7 +139,7 @@ public class CxContinueProductionHandler {
         EarliestConclusionLhGroupHelper earliestConclusionLhGroup = productionPlanInfo.getEarliestConclusionLhInfo(context, null, excludeDaySet);
         if (null == earliestConclusionLhGroup) {
             //记录日志
-            log.info(TbrMouldProductionLogRecorder.addContinueGroupContinueSkuNoLhGroupLog(context, productionStage, groupName, onLineMachineInfo, continueType));
+            TbrMouldProductionLogRecorder.addContinueGroupContinueSkuNoLhGroupLog(context, productionStage, groupName, onLineMachineInfo, continueType);
             return;
         }
         Integer startDay = earliestConclusionLhGroup.getClosingDay();
@@ -206,7 +206,10 @@ public class CxContinueProductionHandler {
             if (isAddChangeMoldCountByChangeMold(context, continueType)) {
                 CxLhMouldProductionCalculator.addChangeMouldInfo(productionContext, addSkuInfo, startDay, beforeSkuInfo, selectedMouldList);
             }
-            excludeDaySet = new HashSet<>();
+            //20260803+ 换活字块可一直往后看
+            if (!continueType.isContinueChangeTypeBlock()) {
+                excludeDaySet = new HashSet<>();
+            }
         }
         //迭代下一个硫化组
         productionContinueByType(productionContext, productionStage, productionPlanInfo, continueType, endDay, continueSkuMap, excludeDaySet, excludeSkuSet);

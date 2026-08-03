@@ -2,6 +2,7 @@ package com.zlt.aps.mp.engine.utils;
 
 import com.zlt.aps.mp.engine.domain.dto.ProductGroupCxCapacityInfo;
 import com.zlt.aps.mp.engine.domain.vo.CxMachineBaseInfoVo;
+import com.zlt.aps.mp.engine.domain.vo.ProductionMouldInfoVo;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.Comparator;
@@ -84,6 +85,31 @@ public class ProductionComparatorUtils {
             return getProductionDayLongSort();
         }
         return getPrioritySort();
+    }
+
+    /**
+     * 续作Sku模具选择排序
+     * 模具共用性 -> 剩余模具产能 -> 模壳标准 -> 模具编号降序
+     *
+     * @return
+     */
+    public static Comparator getContinueSkuMoldSelectSort() {
+        return Comparator.comparing(ProductionMouldInfoVo::getCommonalityValue)
+                .thenComparing(ProductionMouldInfoVo::getLeftOverCapacity)
+                .thenComparing(ProductionMouldInfoVo::getMouldSetCode)
+                .thenComparing(ProductionMouldInfoVo::getMouldCode, Comparator.reverseOrder());
+    }
+
+    /**
+     * 模具选择排序
+     * 模具共用性 -> 模壳标准 -> 模具编号降序
+     *
+     * @return
+     */
+    public static Comparator getMoldSelectSort() {
+        return Comparator.comparing(ProductionMouldInfoVo::getCommonalityValue)
+                .thenComparing(ProductionMouldInfoVo::getMouldSetCode)
+                .thenComparing(ProductionMouldInfoVo::getMouldCode, Comparator.reverseOrder());
     }
 
     /**

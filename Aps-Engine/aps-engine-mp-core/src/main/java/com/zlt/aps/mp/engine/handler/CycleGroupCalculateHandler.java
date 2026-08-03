@@ -10,7 +10,6 @@ import com.zlt.aps.mp.engine.domain.dto.CxContinueSkuInfoHelper;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.mp.engine.domain.dto.SkuDayProductionInfoHelper;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
-import com.zlt.aps.mp.engine.enums.CycleProductionModeEnum;
 import com.zlt.aps.mp.engine.logrecorder.TbrMouldProductionLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
 import com.zlt.aps.mp.engine.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
@@ -99,7 +98,7 @@ public class CycleGroupCalculateHandler {
             return null;
         }
         List<MonthPlanProductionRequirePlanVo> allSkuRequirePlanList = allSkuPlanList.stream().filter(single -> !YesOrNoEnum.NO.getCode().equals(single.getIsProduction())).collect(Collectors.toList());
-        if (CollectionUtils.isEmpty(allSkuPlanList)) {
+        if (CollectionUtils.isEmpty(allSkuRequirePlanList)) {
             return null;
         }
         //非周期结构
@@ -129,6 +128,51 @@ public class CycleGroupCalculateHandler {
             planCycleQty = BigDecimal.ZERO.intValue();
         }
         return sumActualQuantity + Math.min(planCycleQty, leftOverCycleQty);
+    }
+
+    /**
+     * 20260731+
+     * 场景：不在月周期结构清单中的在机结构因结构切换日导致的延长
+     * 获取续作Sku最大可排产量，用于判断是在机结构续作延长还是后结构提前生产
+     *
+     * @param context            排产上下文
+     * @param continueSkuInfo    续作Sku信息
+     * @param productionPlanInfo 分组计划
+     * @return
+     */
+    public static Integer getContinueSkuPlannedQty(Context context, CxContinueSkuInfoHelper continueSkuInfo, ProductionPlanGroupInfo productionPlanInfo) {
+        if (null == productionPlanInfo || null == continueSkuInfo) {
+            return BigDecimal.ZERO.intValue();
+        }
+        List<MonthPlanProductionRequirePlanVo> allSkuPlanList = productionPlanInfo.getGroupPlanData();
+        if (CollectionUtils.isEmpty(allSkuPlanList)) {
+            return continueSkuInfo.getPlanDemandQty();
+        }
+        List<MonthPlanProductionRequirePlanVo> skuRequirePlanList = allSkuPlanList.stream().filter(single -> {
+            if (YesOrNoEnum.NO.getCode().equals(single.getIsProduction())) {
+                return false;
+            }
+            if (!continueSkuInfo.getMaterialDesc().equals(single.getMaterialDesc())) {
+                return false;
+            }
+            return true;
+        }).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(skuRequirePlanList)) {
+            return continueSkuInfo.getPlanDemandQty();
+        }
+        //非周期结构
+        if (!productionPlanInfo.isCycleType()) {
+            return continueSkuInfo.getPlanDemandQty();
+        }
+        Integer sumPlanDemandQty = skuRequirePlanList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getNetQty).sum();
+        //可排产周期储备量
+        Integer maxCycleQty = productionPlanInfo.getMaxCycleQty();
+        Integer sumActualQuantity = getCycleActualQuantity(context, allSkuPlanList, continueSkuInfo.getMaterialDesc());
+        Integer planCycleQty = sumPlanDemandQty - sumActualQuantity;
+        if (planCycleQty <= BigDecimal.ZERO.intValue()) {
+            planCycleQty = BigDecimal.ZERO.intValue();
+        }
+        return sumActualQuantity + Math.min(planCycleQty, maxCycleQty);
     }
 
     /**
