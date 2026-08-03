@@ -216,19 +216,20 @@ public class MonthPlanSurplusCalculator {
         }
         Map<YearMonth, Integer> result = Maps.newHashMap();
         YearMonth firstMonth = getFirstYearMonth(allProductionList);
-        //如果跨月，只看后面的
+        Integer firstMonthOverdueQty = getOverdueProduction(allMonthPlanList, skuInfo, firstMonth);
+        //如果跨月，还要看后面的
         if (isCrossMonthByProductionDateInfo(allProductionList)) {
-            result.put(firstMonth, BigDecimal.ZERO.intValue());
+            result.put(firstMonth, firstMonthOverdueQty);
             YearMonth lastMonth = getLastYearMonth(allProductionList);
             result.put(lastMonth, getOverdueProduction(allMonthPlanList, skuInfo, lastMonth));
             return result;
         }
-        //当月
+        //不跨月，且下个月定稿
         if (isNextMonthFinal) {
             result.put(firstMonth, BigDecimal.ZERO.intValue());
             return result;
         }
-        result.put(firstMonth, getOverdueProduction(allMonthPlanList, skuInfo, firstMonth));
+        result.put(firstMonth, firstMonthOverdueQty);
         return result;
     }
 
@@ -255,38 +256,30 @@ public class MonthPlanSurplusCalculator {
         }
         YearMonth firstMonth = getFirstYearMonth(allProductionDate);
         boolean isCrossMonth = isCrossMonthByProductionDateInfo(allProductionDate);
+        //当前排产日所在年月的上月超欠产
+        Integer overdueQty = monthOverdueQtyMap.get(productionYearMonth);
+        if (null == overdueQty) {
+            overdueQty = BigDecimal.ZERO.intValue();
+        }
         //排产周期内有计划量，不跨月
         if (!CollectionUtils.isEmpty(hasProductionPlanMap) && !isCrossMonth) {
-            Integer overdueQty = monthOverdueQtyMap.get(productionYearMonth);
-            if (null == overdueQty) {
-                overdueQty = BigDecimal.ZERO.intValue();
-            }
             Integer planQty = yearMonthPlanQtyMap.get(productionYearMonth);
             if (null == planQty) {
                 planQty = BigDecimal.ZERO.intValue();
             }
             return planQty - finishedQty + overdueQty;
         }
-        //排产周期内有计划量，跨月
+        //排产周期内有计划量，且排产周期跨月
         if (!CollectionUtils.isEmpty(hasProductionPlanMap) && isCrossMonth) {
-            YearMonth lastMonth = getLastYearMonth(allProductionDate);
-            boolean isCrossMonthPlanQty = hasProductionPlanMap.containsKey(lastMonth);
-            if (isCrossMonthPlanQty) {
-                FactoryMonthPlanProductionFinalResult lastYearPlan = hasProductionPlanMap.get(lastMonth);
-                Integer sumPlanQty = getSumPlanQty(yearMonthPlanQtyMap);
-                Integer overdueQty = BigDecimal.ZERO.intValue();
-                if (NO_CODE.equals(lastYearPlan.getLastMonthValidFlag())
-                        && null != lastYearPlan.getLastMonthOverdueQty()) {
-                    overdueQty = -lastYearPlan.getLastMonthOverdueQty();
-                }
-                return sumPlanQty - finishedQty + overdueQty;
-            }
-            //没有跨月计划量
-            Integer planQty = yearMonthPlanQtyMap.get(firstMonth);
-            if (null == planQty) {
-                planQty = BigDecimal.ZERO.intValue();
-            }
-            return planQty - finishedQty;
+//            boolean isCrossMonthPlanQty = isCrossMonthByCycleRange(productionYearMonth, hasProductionPlanMap);
+            Integer sumPlanQty = sumQty(yearMonthPlanQtyMap);
+//            //计划量跨月
+//            if (isCrossMonthPlanQty) {
+//                overdueQty = sumQty(monthOverdueQtyMap);
+//                return sumPlanQty - finishedQty + overdueQty;
+//            }
+//            //计划量没有跨月
+            return sumPlanQty - finishedQty + overdueQty;
         }
         //排产周期内没有计划量
         Integer productionYearMonthPlanQty;
@@ -298,7 +291,6 @@ public class MonthPlanSurplusCalculator {
         if (null == productionYearMonthPlanQty) {
             productionYearMonthPlanQty = BigDecimal.ZERO.intValue();
         }
-        Integer overdueQty;
         int surplus;
         if (isCrossMonth) {
             overdueQty = monthOverdueQtyMap.get(productionYearMonth);
@@ -426,6 +418,24 @@ public class MonthPlanSurplusCalculator {
     }
 
     // ==================== 以下为内部计算方法 ====================
+
+    /**
+     * 在排产周期内，计划是否跨月
+     *
+     * @param productionYearMonth  当前排产日所处年月
+     * @param hasProductionPlanMap 周期内有计划的年月计划
+     * @return
+     */
+    private static boolean isCrossMonthByCycleRange(YearMonth productionYearMonth, Map<YearMonth, FactoryMonthPlanProductionFinalResult> hasProductionPlanMap) {
+        if (null == productionYearMonth || CollectionUtils.isEmpty(hasProductionPlanMap)) {
+            return false;
+        }
+        Set<YearMonth> yearMonthSet = hasProductionPlanMap.keySet();
+        if (yearMonthSet.size() <= BigDecimal.ONE.intValue()) {
+            return false;
+        }
+        return hasProductionPlanMap.containsKey(productionYearMonth);
+    }
 
     /**
      * 根据Sku日排产周期内的月计划安排情况，获取Sku对应的计划量
@@ -779,25 +789,5 @@ public class MonthPlanSurplusCalculator {
             return BigDecimal.ZERO.intValue();
         }
         return lastMonthPlan.getLastMonthOverdueQty();
-    }
-
-    /**
-     * 获取所有计划计划量
-     *
-     * @param yearMonthPlanQtyMap
-     * @return
-     */
-    private static Integer getSumPlanQty(Map<YearMonth, Integer> yearMonthPlanQtyMap) {
-        if (CollectionUtils.isEmpty(yearMonthPlanQtyMap)) {
-            return BigDecimal.ZERO.intValue();
-        }
-        Integer planQty = BigDecimal.ZERO.intValue();
-        for (Map.Entry<YearMonth, Integer> entry : yearMonthPlanQtyMap.entrySet()) {
-            Integer monthPlanQty = entry.getValue();
-            if (null != monthPlanQty) {
-                planQty = planQty + monthPlanQty;
-            }
-        }
-        return planQty;
     }
 }
