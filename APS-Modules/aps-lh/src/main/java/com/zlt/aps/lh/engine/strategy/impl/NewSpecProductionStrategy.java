@@ -984,11 +984,21 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             EarlyProductionQuantityCalculator.populateFutureMonthQuantityView(
                     context, sku, windowStartDate, runtimePlan);
         }
-        // 准入失败同样冻结判定和原因，供窗口末最终未排使用最后一次硬约束原因。
-        context.registerEarlyProductionRuntimePlan(sku, runtimePlan);
+        /*
+         * 准入失败时只返回本次判定对象，不注册未激活运行视图：
+         * 若注册，后续业务日严格收尾会误读 effectiveTargetQty=0，把真实硫化余量错误收敛为0，
+         * 造成当日有日计划、机台空闲却整班不排产。最终未排原因已由调用处延期任务冻结，
+         * 不依赖这里的注册动作。
+         */
         if (!decision.isAllowed()) {
+            log.info("提前生产准入未通过，不注册中心运行视图, materialCode: {}, currentDate: {}, "
+                            + "futurePlanDate: {}, structureName: {}, reason: {}",
+                    sku.getMaterialCode(), currentDate, futurePlanDate,
+                    sku.getStructureName(), decision.getReason());
             return runtimePlan;
         }
+        // 准入通过后才允许注册运行视图；激活态与目标量在下方完成初始化后再次注册覆盖。
+        context.registerEarlyProductionRuntimePlan(sku, runtimePlan);
 
         Map<LocalDate, SkuDailyPlanQuotaDTO> sourceQuotaMap =
                 buildEarlyProductionSourceQuotaMap(
@@ -15544,9 +15554,29 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
          */
         EarlyProductionRuntimePlan runtimePlan = Objects.isNull(context)
                 ? null : context.getEarlyProductionRuntimePlan(sku);
-        int strictTargetQty = Objects.nonNull(runtimePlan)
-                ? Math.max(0, runtimePlan.getEffectiveTargetQty())
-                : Math.max(0, sku.getSurplusQty());
+        int strictTargetQty;
+        if (Objects.nonNull(runtimePlan) && runtimePlan.isActive()
+                && Objects.nonNull(runtimePlan.getDecision())
+                && runtimePlan.getDecision().isAllowed()) {
+            /*
+             * 只有已通过准入并完成临时账本初始化的激活运行视图才使用冻结目标；
+             * 未激活视图（准入失败或尚未进入提前阈值）不得覆盖 SKU 真实硫化余量，
+             * 否则会把严格收尾目标错误收敛为0。
+             */
+            strictTargetQty = Math.max(0, runtimePlan.getEffectiveTargetQty());
+            log.info("严格收尾目标量使用提前生产运行视图, materialCode: {}, productStatus: {}, "
+                            + "effectiveTargetQty: {}, surplusQty: {}",
+                    sku.getMaterialCode(), sku.getProductStatus(),
+                    runtimePlan.getEffectiveTargetQty(), Math.max(0, sku.getSurplusQty()));
+        } else {
+            if (Objects.nonNull(runtimePlan)) {
+                log.info("提前生产运行视图未激活，严格收尾目标量回退SKU硫化余量, materialCode: {}, "
+                                + "productStatus: {}, active: {}, effectiveTargetQty: {}, surplusQty: {}",
+                        sku.getMaterialCode(), sku.getProductStatus(), runtimePlan.isActive(),
+                        runtimePlan.getEffectiveTargetQty(), Math.max(0, sku.getSurplusQty()));
+            }
+            strictTargetQty = Math.max(0, sku.getSurplusQty());
+        }
         if (Objects.isNull(context) || CollectionUtils.isEmpty(context.getScheduleResultList())) {
             return strictTargetQty;
         }
