@@ -49,24 +49,26 @@ export default {
             trigger: "blur",
           },
         ],
-        machineQty: [
+        minMachineQty: [
           {
             required: true,
             message: this.$t("common.rule.input"),
             trigger: "blur",
           },
-        ],
-        machineRange: [
           {
-            required: true,
-            message: this.$t("common.rule.select"),
-            trigger: "change",
+            validator: this.validatePositiveInteger,
+            trigger: "blur",
+          },
+        ],
+        maxMachineQty: [
+          {
+            validator: this.validateMaxMachineQty,
+            trigger: "blur",
           },
         ],
         depthClassQty: [
           {
-            required: true,
-            message: this.$t("common.rule.input"),
+            validator: this.validatePositiveInteger,
             trigger: "blur",
           },
         ],
@@ -82,23 +84,28 @@ export default {
           required: true,
         },
         {
-          label: this.$t("ui.tm.depthConfig.column.machineQty"),
-          prop: "machineQty",
+          label: this.$t("ui.tm.depthConfig.column.minMachineQty"),
+          prop: "minMachineQty",
           span: 12,
+          type: "number",
+          min: 1,
           required: true,
         },
         {
-          label: this.$t("ui.tm.depthConfig.column.machineRange"),
-          prop: "machineRange",
+          label: this.$t("ui.tm.depthConfig.column.maxMachineQty"),
+          prop: "maxMachineQty",
           span: 12,
-          type: "select",
-          dictData: this.parentDict.type.machine_range,
-          required: true,
+          type: "number",
+          min: 1,
+          tips: this.$t("ui.tm.depthConfig.maxMachineQtyTip"),
         },
         {
           label: this.$t("ui.tm.depthConfig.column.depthClassQty"),
           prop: "depthClassQty",
           span: 12,
+          type: "number",
+          min: 1,
+          precision: 0,
           required: true,
         },
         {
@@ -122,9 +129,38 @@ export default {
     },
   },
   methods: {
+    validatePositiveInteger(rule, value, callback) {
+      if (value === "" || value === null || value === undefined) {
+        callback(new Error(this.$t("common.rule.input")));
+        return;
+      }
+      if (!Number.isInteger(Number(value)) || Number(value) <= 0) {
+        callback(new Error(this.$t("ui.tm.depthConfig.positiveInteger")));
+        return;
+      }
+      callback();
+    },
+    validateMaxMachineQty(rule, value, callback) {
+      if (value === "" || value === null || value === undefined) {
+        callback();
+        return;
+      }
+      if (!Number.isInteger(Number(value)) || Number(value) <= 0) {
+        callback(new Error(this.$t("ui.tm.depthConfig.positiveInteger")));
+        return;
+      }
+      if (this.form.minMachineQty && Number(value) < Number(this.form.minMachineQty)) {
+        callback(new Error(this.$t("ui.tm.depthConfig.maxLessThanMin")));
+        return;
+      }
+      callback();
+    },
     async save(params) {
       try {
         this.loading = true;
+        if (params.maxMachineQty === "") {
+          params.maxMachineQty = null;
+        }
         let res;
         res = await saveDepthConfig(params);
         this.$modal.msgSuccess(res.msg);
@@ -142,12 +178,12 @@ export default {
         this.isEdit = true;
         this.form = {
           ...data,
+          maxMachineQty: data.maxMachineQty != null ? data.maxMachineQty : "",
         };
       } else {
         this.isEdit = false;
         this.form = {
           factoryCode: defaultFactoryCode || '',
-          machineRange: 'EQ',
         };
       }
     },

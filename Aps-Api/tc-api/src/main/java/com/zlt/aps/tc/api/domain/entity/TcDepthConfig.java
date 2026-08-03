@@ -4,7 +4,6 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
-import com.zlt.aps.common.core.annotation.ImportValidated;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -35,20 +34,20 @@ public class TcDepthConfig extends BaseEntity implements Serializable {
     private String factoryCode;
 
     /**
-     * 硫化机数量
+     * 区间起始硫化机数量（包含），同一工厂首段必须从 1 开始
      */
-    @Excel(name = "ui.tc.depthConfig.column.machineQty")
-    @ApiModelProperty(value = "硫化机数量")
-    @TableField("MACHINE_QTY")
-    private Integer machineQty;
+    @Excel(name = "ui.tc.depthConfig.column.minMachineQty")
+    @ApiModelProperty(value = "区间起始硫化机数量（包含）")
+    @TableField("MIN_MACHINE_QTY")
+    private Integer minMachineQty;
 
     /**
-     * 机台范围（数据字典 machine_range，选项：小于、小于等于、等于、大于等于、大于）
+     * 区间结束硫化机数量（包含），为空表示无上限且只允许用于末段
      */
-    @Excel(name = "ui.tc.depthConfig.column.machineRange", dictType = "machine_range")
-    @ApiModelProperty(value = "机台范围，数据字典 machine_range")
-    @TableField("MACHINE_RANGE")
-    private String machineRange;
+    @Excel(name = "ui.tc.depthConfig.column.maxMachineQty")
+    @ApiModelProperty(value = "区间结束硫化机数量（包含），为空表示无上限")
+    @TableField("MAX_MACHINE_QTY")
+    private Integer maxMachineQty;
 
     /**
      * 保证班数
@@ -58,9 +57,4 @@ public class TcDepthConfig extends BaseEntity implements Serializable {
     @TableField("DEPTH_CLASS_QTY")
     private BigDecimal depthClassQty;
 
-    @Excel(name = "ui.common.column.remark")
-    @ImportValidated(maxLength = 500)
-    @ApiModelProperty("备注")
-    @TableField("REMARK")
-    private String remark;
 }

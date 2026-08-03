@@ -87,10 +87,7 @@ public class TmDepthConfigUIController extends BaseUIController<TmDepthConfig> {
     @PostMapping("/save")
     @ResponseBody
     public AjaxResult save(TmDepthConfig tmDepthConfig) {
-        if (UserConstants.NOT_UNIQUE.equals(iTmDepthConfigService.checkUnique(tmDepthConfig))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.tm.depthConfig.notUnique"));
-        }
-        // 校验范围交叉
+        // 统一校验区间字段、连续性和完整性
         if (UserConstants.NOT_UNIQUE.equals(iTmDepthConfigService.checkRangeCross(tmDepthConfig))) {
             return AjaxResult.error(I18nUtil.getMessage("ui.tm.depthConfig.rangeCross"));
         }
@@ -110,13 +107,13 @@ public class TmDepthConfigUIController extends BaseUIController<TmDepthConfig> {
     }
 
     /**
-     * 校验唯一性
+     * 兼容旧调用路径，执行连续区间校验。
      */
-    @ApiOperation("校验唯一性")
+    @ApiOperation("兼容旧调用路径校验连续区间")
     @PostMapping("/checkUnique")
     @ResponseBody
     public String checkUnique(TmDepthConfig tmDepthConfig) {
-        return iTmDepthConfigService.checkUnique(tmDepthConfig);
+        return iTmDepthConfigService.checkRangeCross(tmDepthConfig);
     }
 
     @Override

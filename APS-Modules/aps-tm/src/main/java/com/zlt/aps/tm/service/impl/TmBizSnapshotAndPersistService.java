@@ -38,6 +38,7 @@ import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.text.MessageFormat;
 import java.util.*;
 import java.util.function.BiFunction;
@@ -932,7 +933,8 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
      * 归一化结果表班次字段。
      *
      * <p>结果表只表示已经安排到机台产能的任务。机台为空或班次计划量为空/小于等于 0 时，
-     * 对应班次顺序和起止时间必须清空，避免看板展示无产能承接的顺序。</p>
+     * 对应班次顺序和起止时间必须清空，避免看板展示无产能承接的顺序；正计划量在结果归并完成后
+     * 统一向上取整，避免拆分片段分别取整造成计划量重复放大。</p>
      *
      * @param result 排程结果
      */
@@ -945,11 +947,25 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
             BigDecimal planQty = this.getShiftPlanQty(result, shiftOrder);
             if (StrUtil.isBlank(result.getMachineCode())) {
                 result.setFieldValueByFieldName(planQtyField, BigDecimal.ZERO);
-            }
-            if (StrUtil.isBlank(result.getMachineCode()) || !this.isPositiveQty(planQty)) {
                 this.clearShiftFields(result, shiftOrder);
+                continue;
             }
+            if (!this.isPositiveQty(planQty)) {
+                this.clearShiftFields(result, shiftOrder);
+                continue;
+            }
+            result.setFieldValueByFieldName(planQtyField, this.roundUpResultPlanQty(planQty));
         }
+    }
+
+    /**
+     * 将最终结果表的正计划量向上取整到整数。
+     *
+     * @param planQty 已完成结果归并的班次计划量
+     * @return 向上取整后的结果计划量
+     */
+    private BigDecimal roundUpResultPlanQty(BigDecimal planQty) {
+        return planQty.setScale(0, RoundingMode.CEILING);
     }
 
     /**

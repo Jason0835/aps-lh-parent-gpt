@@ -9,7 +9,6 @@ import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
-import com.zlt.aps.common.engine.utils.DepthConfigResolver;
 import com.zlt.aps.tc.api.constant.TcScheduleConstants;
 import com.zlt.aps.tc.api.domain.entity.*;
 import com.zlt.aps.tc.api.enums.*;
@@ -1759,7 +1758,7 @@ public class TcAutoScheduleDataLoadService {
      * 避免配置调整后仍使用旧库存保证班数。</p>
      *
      * @param context 自动排程上下文
-     * @return 按机台数量降序排列的库存保证班数配置；未配置或查询失败时返回空集合
+     * @return 按区间起始机台数升序排列的库存保证班数配置；未配置或查询失败时返回空集合
      */
     private List<TcDepthConfig> loadDepthConfigs(TcScheduleContext context) {
         if (tmDepthConfigMapper == null) {
@@ -1768,10 +1767,10 @@ public class TcAutoScheduleDataLoadService {
         try {
             LambdaQueryWrapper<TcDepthConfig> wrapper = new LambdaQueryWrapper<>();
             wrapper.eq(TcDepthConfig::getFactoryCode, context.getFactoryCode());
-            wrapper.orderByDesc(TcDepthConfig::getMachineQty);
+            wrapper.orderByAsc(TcDepthConfig::getMinMachineQty);
             return Optional.ofNullable(tmDepthConfigMapper.selectList(wrapper)).orElse(Collections.emptyList()).stream()
-                    .sorted(Comparator.comparing((TcDepthConfig config) -> config.getMachineQty() == null
-                            ? Integer.MIN_VALUE : config.getMachineQty()).reversed())
+                    .sorted(Comparator.comparing((TcDepthConfig config) -> config.getMinMachineQty() == null
+                            ? Integer.MAX_VALUE : config.getMinMachineQty()))
                     .collect(Collectors.toList());
         } catch (RuntimeException ex) {
             log.warn("[TC_DEPTH_CONFIG_LOAD] factoryCode={} 加载库存保证班数配置失败，原因={}，将回退参数 {}",
@@ -1808,23 +1807,15 @@ public class TcAutoScheduleDataLoadService {
                     fallbackGuardShiftCount);
             return fallbackGuardShiftCount;
         }
-        Optional<TcDepthConfig> exactConfigOptional = depthConfigList.stream()
-                .filter(depthConfig -> "EQ".equals(depthConfig.getMachineRange())
-                        && Objects.equals(depthConfig.getMachineQty(), lhMachineQty))
+        Optional<TcDepthConfig> matchedConfigOptional = depthConfigList.stream()
+                .filter(depthConfig -> depthConfig.getMinMachineQty() != null
+                        && lhMachineQty >= depthConfig.getMinMachineQty()
+                        && (depthConfig.getMaxMachineQty() == null
+                        || lhMachineQty <= depthConfig.getMaxMachineQty()))
                 .findFirst();
-        if (exactConfigOptional.isPresent()) {
-            return this.resolveMatchedGuardShiftCount(context, orderNo, lhMachineQty, exactConfigOptional.get(),
+        if (matchedConfigOptional.isPresent()) {
+            return this.resolveMatchedGuardShiftCount(context, orderNo, lhMachineQty, matchedConfigOptional.get(),
                     fallbackGuardShiftCount);
-        }
-        for (TcDepthConfig depthConfig : depthConfigList) {
-            DepthConfigResolver.DepthConfigVo configVo = new DepthConfigResolver.DepthConfigVo(
-                    depthConfig.getMachineQty(), depthConfig.getMachineRange(), depthConfig.getDepthClassQty());
-            BigDecimal matchedDepthClassQty = DepthConfigResolver.resolveDepthClassQty(lhMachineQty,
-                    Collections.singletonList(configVo));
-            if (matchedDepthClassQty == null) {
-                continue;
-            }
-            return this.resolveMatchedGuardShiftCount(context, orderNo, lhMachineQty, depthConfig, fallbackGuardShiftCount);
         }
         log.warn("[TC_DEPTH_CONFIG_MATCH] factoryCode={}, orderNo={}, lhMachineQty={} 未命中库存保证班数配置，回退参数 {}={}",
                     context.getFactoryCode(), orderNo, lhMachineQty, TcScheduleConstants.PARAM_MIN_STOCK_CLASS,
@@ -1849,9 +1840,9 @@ public class TcAutoScheduleDataLoadService {
         if (guardShiftCount != null) {
             return guardShiftCount;
         }
-        log.warn("[TC_DEPTH_CONFIG_MATCH] factoryCode={}, orderNo={}, lhMachineQty={}, machineRange={}, machineQty={}, depthClassQty={} 不是正整数，回退参数 {}={}",
-                context.getFactoryCode(), orderNo, lhMachineQty, depthConfig.getMachineRange(),
-                    depthConfig.getMachineQty(), depthConfig.getDepthClassQty(),
+        log.warn("[TC_DEPTH_CONFIG_MATCH] factoryCode={}, orderNo={}, lhMachineQty={}, minMachineQty={}, maxMachineQty={}, depthClassQty={} 不是正整数，回退参数 {}={}",
+                context.getFactoryCode(), orderNo, lhMachineQty, depthConfig.getMinMachineQty(),
+                    depthConfig.getMaxMachineQty(), depthConfig.getDepthClassQty(),
                     TcScheduleConstants.PARAM_MIN_STOCK_CLASS, fallbackGuardShiftCount);
         return fallbackGuardShiftCount;
     }
