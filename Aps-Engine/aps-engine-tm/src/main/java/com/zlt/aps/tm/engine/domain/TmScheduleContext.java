@@ -12,6 +12,7 @@ import com.zlt.aps.tm.engine.service.collector.TmAutoScheduleIssueCollector;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.text.MessageFormat;
 import java.util.*;
 
 /**
@@ -31,6 +32,9 @@ public class TmScheduleContext {
 
     /** 追踪标识 */
     private String traceId;
+
+    /** 本次自动排程中文过程日志缓冲。 */
+    private StringBuilder processLogBuffer = new StringBuilder(4096);
 
     /** 排程日期 */
     private Date scheduleDate;
@@ -123,6 +127,40 @@ public class TmScheduleContext {
 
     /** 班次时间窗口映射，key=班次顺序(1~6)，来自 T_TM_SHIFT_CONFIG */
     private Map<Integer, TmShiftTimeWindow> shiftTimeWindowMap = new HashMap<>();
+
+    /**
+     * 追加一条中文自动排程过程日志。
+     *
+     * @param format 日志格式，使用 MessageFormat 占位符
+     * @param args   日志参数
+     */
+    public void appendProcessLog(String format, Object... args) {
+        if (StrUtil.isBlank(format)) {
+            return;
+        }
+        if (processLogBuffer == null) {
+            processLogBuffer = new StringBuilder(4096);
+        }
+        Object[] plainArgs = args == null ? new Object[0] : args;
+        for (int index = 0; index < plainArgs.length; index++) {
+            if (plainArgs[index] instanceof BigDecimal) {
+                if (plainArgs == args) {
+                    plainArgs = args.clone();
+                }
+                plainArgs[index] = ((BigDecimal) plainArgs[index]).toPlainString();
+            }
+        }
+        processLogBuffer.append(MessageFormat.format(format, plainArgs)).append(System.lineSeparator());
+    }
+
+    /**
+     * 获取本次自动排程已收集的中文过程日志。
+     *
+     * @return 中文过程日志文本
+     */
+    public String getProcessLogText() {
+        return processLogBuffer == null ? "" : processLogBuffer.toString();
+    }
 
     /**
      * 获取下一个全局工装账本序号。

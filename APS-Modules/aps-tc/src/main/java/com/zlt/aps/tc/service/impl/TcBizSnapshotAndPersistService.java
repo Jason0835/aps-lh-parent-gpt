@@ -14,10 +14,7 @@ import com.zlt.aps.common.engine.quantity.PlanQuantityAllocationUtils;
 import com.zlt.aps.common.engine.schedule.ScheduleTaskLinkedList;
 import com.zlt.aps.common.engine.schedule.ScheduleTaskNode;
 import com.zlt.aps.tc.api.constant.TcScheduleConstants;
-import com.zlt.aps.tc.api.domain.entity.TcScheduleExplainTargetRel;
-import com.zlt.aps.tc.api.domain.entity.TcScheduleResult;
-import com.zlt.aps.tc.api.domain.entity.TcScheduleResultExplain;
-import com.zlt.aps.tc.api.domain.entity.TcScheduleUnplanned;
+import com.zlt.aps.tc.api.domain.entity.*;
 import com.zlt.aps.tc.api.domain.vo.TcAutoScheduleResponseVo;
 import com.zlt.aps.tc.api.enums.TcAutoScheduleTaskStatusEnum;
 import com.zlt.aps.tc.api.enums.TcMachineAssignStatusEnum;
@@ -66,6 +63,9 @@ public class TcBizSnapshotAndPersistService implements ITcSnapshotAndPersistServ
 
     private final TcScheduleExplainTargetRelMapper scheduleExplainTargetRelMapper;
 
+    /** 胎侧自动排程过程日志 Mapper。 */
+    private final TcScheduleProcessLogMapper scheduleProcessLogMapper;
+
     private final TcAutoScheduleTaskMapper autoScheduleTaskMapper;
 
     /** 排程质量指标统一汇总服务。 */
@@ -86,6 +86,7 @@ public class TcBizSnapshotAndPersistService implements ITcSnapshotAndPersistServ
      * @param scheduleResultExplainMapper 胎侧排程解释 Mapper
      * @param scheduleUnplannedMapper     胎侧未排任务 Mapper
      * @param scheduleExplainTargetRelMapper 胎侧来源解释目标关联 Mapper
+     * @param scheduleProcessLogMapper    胎侧过程日志 Mapper
      * @param baseDao                     通用批量写入服务
      * @param transactionManager          事务管理器
      */
@@ -96,6 +97,7 @@ public class TcBizSnapshotAndPersistService implements ITcSnapshotAndPersistServ
                                           TcScheduleResultExplainMapper scheduleResultExplainMapper,
                                           TcScheduleUnplannedMapper scheduleUnplannedMapper,
                                           TcScheduleExplainTargetRelMapper scheduleExplainTargetRelMapper,
+                                          TcScheduleProcessLogMapper scheduleProcessLogMapper,
                                           TcAutoScheduleTaskMapper autoScheduleTaskMapper,
                                           TcScheduleQualitySummaryService qualitySummaryService,
                                           BaseDao baseDao,
@@ -106,6 +108,7 @@ public class TcBizSnapshotAndPersistService implements ITcSnapshotAndPersistServ
         this.scheduleResultExplainMapper = scheduleResultExplainMapper;
         this.scheduleUnplannedMapper = scheduleUnplannedMapper;
         this.scheduleExplainTargetRelMapper = scheduleExplainTargetRelMapper;
+        this.scheduleProcessLogMapper = scheduleProcessLogMapper;
         this.autoScheduleTaskMapper = autoScheduleTaskMapper;
         this.qualitySummaryService = qualitySummaryService;
         this.baseDao = baseDao;
@@ -135,7 +138,7 @@ public class TcBizSnapshotAndPersistService implements ITcSnapshotAndPersistServ
                                           BaseDao baseDao,
                                           PlatformTransactionManager transactionManager) {
         this(snapshotBuildService, persistService, scheduleResultMapper, scheduleResultExplainMapper,
-                scheduleUnplannedMapper, null, autoScheduleTaskMapper, qualitySummaryService,
+                scheduleUnplannedMapper, null, null, autoScheduleTaskMapper, qualitySummaryService,
                 baseDao, transactionManager);
     }
 
@@ -155,6 +158,7 @@ public class TcBizSnapshotAndPersistService implements ITcSnapshotAndPersistServ
         TcPersistResult persistResult = transactionTemplate.execute(transactionStatus -> {
             this.logicDeleteOldSchedule(context);
             TcPersistResult result = this.persistScheduleContext(context, transactionStatus);
+            this.saveScheduleProcessLog(context, result);
             this.markCoreTaskSuccess(context, result);
             return result;
         });
@@ -162,6 +166,29 @@ public class TcBizSnapshotAndPersistService implements ITcSnapshotAndPersistServ
             throw new ServiceException(I18nUtil.getMessage("ui.tc.schedule.persistFailed"));
         }
         context.setPersistResult(persistResult);
+    }
+
+    /**
+     * 在结果、未排和解释数据的同一事务内保存本批次中文过程日志。
+     *
+     * @param context       自动排程上下文
+     * @param persistResult 排程结果汇总
+     */
+    private void saveScheduleProcessLog(TcScheduleContext context, TcPersistResult persistResult) {
+        if (scheduleProcessLogMapper == null || context == null || StrUtil.isBlank(context.getProcessLogText())) {
+            return;
+        }
+        context.appendProcessLog("快照与落库完成：结果数量={0}，未排数量={1}，解释数量={2}，异常数量={3}",
+                persistResult == null ? 0 : persistResult.getResultCount(),
+                persistResult == null ? 0 : persistResult.getUnplannedCount(),
+                persistResult == null ? 0 : persistResult.getExplainCount(),
+                persistResult == null ? 0 : persistResult.getErrorCount());
+        TcScheduleProcessLog processLog = new TcScheduleProcessLog();
+        processLog.setBatchNo(context.getBatchNo());
+        processLog.setLogDetail(context.getProcessLogText());
+        scheduleProcessLogMapper.insert(processLog);
+        log.info("胎侧自动排程过程日志已保存，批次号={}，日志长度={}", context.getBatchNo(),
+                processLog.getLogDetail().length());
     }
 
     /**
