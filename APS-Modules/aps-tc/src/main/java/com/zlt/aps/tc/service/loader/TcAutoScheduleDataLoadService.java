@@ -2034,7 +2034,12 @@ public class TcAutoScheduleDataLoadService {
             if (this.isShutdownDay(previousCalendar) && !this.isShutdownDay(currentCalendar)) {
                 for (int calendarShift = 1; calendarShift <= 3; calendarShift++) {
                     if (this.isShiftOpen(currentCalendar, calendarShift)) {
-                        startupShiftOrders.add(dayOffset * 3 + calendarShift);
+                        int startupShiftOrder = dayOffset * 3 + calendarShift;
+                        startupShiftOrders.add(startupShiftOrder);
+                        log.info("[TC_STARTUP_SHIFT] batchNo={}, traceId={}, factoryCode={}, previousDate={}, currentDate={}, startupShiftOrder={}, calendarShift={}, detectionScope=PREVIOUS_FULL_DAY_SHUTDOWN",
+                                context.getBatchNo(), context.getTraceId(), context.getFactoryCode(),
+                                DateUtil.formatDate(previousDate), DateUtil.formatDate(currentDate),
+                                startupShiftOrder, calendarShift);
                         break;
                     }
                 }
@@ -2042,6 +2047,9 @@ public class TcAutoScheduleDataLoadService {
             previousDate = currentDate;
         }
         context.setStartupShiftOrderSet(startupShiftOrders);
+        log.info("[TC_STARTUP_SHIFT_SUMMARY] batchNo={}, traceId={}, factoryCode={}, scheduleDate={}, startupShiftOrders={}",
+                context.getBatchNo(), context.getTraceId(), context.getFactoryCode(),
+                DateUtil.formatDate(context.getScheduleDate()), startupShiftOrders);
     }
 
     /**

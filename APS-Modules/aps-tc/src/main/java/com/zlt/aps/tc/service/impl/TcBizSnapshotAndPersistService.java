@@ -8,6 +8,7 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.common.engine.quantity.PlanQuantityAllocationItem;
 import com.zlt.aps.common.engine.quantity.PlanQuantityAllocationUtils;
 import com.zlt.aps.common.engine.schedule.ScheduleTaskLinkedList;
@@ -282,6 +283,11 @@ public class TcBizSnapshotAndPersistService implements ITcSnapshotAndPersistServ
         for (TcScheduleResult result : visibleResultList) {
             this.registerInsertedResultId(result, mergedResultBusinessKeyMap, resultIdMap);
         }
+        Map<Long, TcScheduleResult> finalResultMap = visibleResultList.stream()
+                .filter(Objects::nonNull)
+                .filter(result -> result.getId() != null)
+                .collect(java.util.stream.Collectors.toMap(TcScheduleResult::getId, result -> result,
+                        (first, second) -> first, LinkedHashMap::new));
         persistResult.setResultCount(visibleResultList.size());
         // 未排表落库统一批量写入，批量失败时回滚保存点并逐行定位失败对象。
         Map<String, TcScheduleUnplanned> unplannedMap = this.buildMergedUnplannedMap(unplannedTaskList, context);
@@ -308,6 +314,8 @@ public class TcBizSnapshotAndPersistService implements ITcSnapshotAndPersistServ
             if (resultId != null) {
                 explain.setResultId(resultId);
             }
+            explain.setFinalAssignmentJson(this.buildFinalAssignmentJson(
+                    taskDraft, context, resultIdMap, unplannedIdMap, finalResultMap));
             explainList.add(explain);
         }
         if (CollUtil.isNotEmpty(explainList)) {
@@ -365,7 +373,51 @@ public class TcBizSnapshotAndPersistService implements ITcSnapshotAndPersistServ
             }
             BigDecimal groupFinalPlanQty = fragmentList.stream().map(TcTaskDraft::getPlanQty)
                     .filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
+            TcTaskDraft aggregateTask = taskGroup.getAggregateTask();
+            Map<String, BigDecimal> sourcePreLossPlanQtyMap = this.allocateByWeight(
+                    aggregateTask == null ? BigDecimal.ZERO : aggregateTask.getPreLossPlanQty(),
+                    taskGroup.getSourceWeightMap());
+            Map<String, BigDecimal> sourceLossAddQtyMap = this.allocateByWeight(
+                    aggregateTask == null ? BigDecimal.ZERO : aggregateTask.getLossAddQty(),
+                    taskGroup.getSourceWeightMap());
+            Map<String, BigDecimal> sourceMinStartAdjustQtyMap = this.allocateByWeight(
+                    aggregateTask == null ? BigDecimal.ZERO : aggregateTask.getMinStartAdjustQty(),
+                    taskGroup.getSourceWeightMap());
+            Map<String, BigDecimal> sourceRoundAdjustQtyMap = this.allocateByWeight(
+                    aggregateTask == null ? BigDecimal.ZERO : aggregateTask.getTailRoundAdjustQty(),
+                    taskGroup.getSourceWeightMap());
+            Map<String, BigDecimal> sourcePlanQtyBeforeToolLimitMap = this.allocateByWeight(
+                    aggregateTask == null ? BigDecimal.ZERO : aggregateTask.getPlanQtyBeforeToolLimit(),
+                    taskGroup.getSourceWeightMap());
+            Map<String, BigDecimal> sourceToolLimitAdjustQtyMap = this.allocateByWeight(
+                    aggregateTask == null ? BigDecimal.ZERO : aggregateTask.getToolLimitAdjustQty(),
+                    taskGroup.getSourceWeightMap());
             taskGroup.setGroupFinalPlanQty(groupFinalPlanQty);
+            if (aggregateTask != null) {
+                taskGroup.setGroupMinStartAdjustQty(aggregateTask.getMinStartAdjustQty());
+                taskGroup.setGroupRoundAdjustQty(aggregateTask.getTailRoundAdjustQty());
+                aggregateTask.setGroupMinStartAdjustQty(aggregateTask.getMinStartAdjustQty());
+                aggregateTask.setGroupRoundAdjustQty(aggregateTask.getTailRoundAdjustQty());
+                aggregateTask.setGroupFinalPlanQty(groupFinalPlanQty);
+                // PLAN_CALC 记录的是派机前估算证据，快照阶段必须覆盖为机台确认后的最终结算分量。
+                if (context.getRuleTraceMap().get(aggregateTask.getBusinessKey()) != null) {
+                    context.getRuleTraceMap().get(aggregateTask.getBusinessKey()).getRuleHits().stream()
+                            .filter(item -> TcScheduleRuleCodeEnum.PLAN_QTY_AGGREGATE.getCode()
+                                    .equals(item.getRuleCode()))
+                            .filter(item -> item.getEvidence() instanceof Map)
+                            .forEach(item -> {
+                                Map<String, Object> evidence = (Map<String, Object>) item.getEvidence();
+                                evidence.put("preLossPlanQty", aggregateTask.getPreLossPlanQty());
+                                evidence.put("lossAddQty", aggregateTask.getLossAddQty());
+                                evidence.put("groupMinStartAdjustQty", taskGroup.getGroupMinStartAdjustQty());
+                                evidence.put("groupRoundAdjustQty", taskGroup.getGroupRoundAdjustQty());
+                                evidence.put("planQtyBeforeToolLimit", aggregateTask.getPlanQtyBeforeToolLimit());
+                                evidence.put("groupFinalPlanQty", groupFinalPlanQty);
+                                evidence.put("calcFormulaDesc", aggregateTask.getCalcFormulaDesc());
+                                evidence.put("allocationStage", "SNAPSHOT");
+                            });
+                }
+            }
             List<TcTaskDraft> assignedFragmentList = fragmentList.stream()
                     .filter(task -> !this.isUnplannedTask(task) && this.isPositiveQty(task.getPlanQty()))
                     .collect(java.util.stream.Collectors.toList());
@@ -378,9 +430,25 @@ public class TcBizSnapshotAndPersistService implements ITcSnapshotAndPersistServ
             boolean allUnplanned = CollUtil.isNotEmpty(fragmentList)
                     && assignedFragmentList.isEmpty() && groupFinalPlanQty.compareTo(BigDecimal.ZERO) > 0;
             for (TcTaskDraft sourceTask : taskGroup.getSourceTaskList()) {
-                sourceTask.setPlanQty(sourceFinalQtyMap.getOrDefault(sourceTask.getBusinessKey(), BigDecimal.ZERO));
+                String sourceBusinessKey = sourceTask.getBusinessKey();
+                sourceTask.setPlanQty(sourceFinalQtyMap.getOrDefault(sourceBusinessKey, BigDecimal.ZERO));
+                sourceTask.setPreLossPlanQty(sourcePreLossPlanQtyMap.getOrDefault(sourceBusinessKey, BigDecimal.ZERO));
+                sourceTask.setLossAddQty(sourceLossAddQtyMap.getOrDefault(sourceBusinessKey, BigDecimal.ZERO));
+                sourceTask.setMinStartAdjustQty(sourceMinStartAdjustQtyMap.getOrDefault(sourceBusinessKey, BigDecimal.ZERO));
+                sourceTask.setTailRoundAdjustQty(sourceRoundAdjustQtyMap.getOrDefault(sourceBusinessKey, BigDecimal.ZERO));
+                sourceTask.setPlanQtyBeforeToolLimit(sourcePlanQtyBeforeToolLimitMap.getOrDefault(sourceBusinessKey, BigDecimal.ZERO));
+                sourceTask.setToolLimitAdjustQty(sourceToolLimitAdjustQtyMap.getOrDefault(sourceBusinessKey, BigDecimal.ZERO));
+                sourceTask.setGroupMinStartAdjustQty(taskGroup.getGroupMinStartAdjustQty());
+                sourceTask.setGroupRoundAdjustQty(taskGroup.getGroupRoundAdjustQty());
                 sourceTask.setGroupFinalPlanQty(groupFinalPlanQty);
+                if (aggregateTask != null) {
+                    sourceTask.setResolvedLossRate(aggregateTask.getResolvedLossRate());
+                    sourceTask.setLossMatchLevel(aggregateTask.getLossMatchLevel());
+                    sourceTask.setLossMatchSource(aggregateTask.getLossMatchSource());
+                    sourceTask.setCalcFormulaDesc(aggregateTask.getCalcFormulaDesc());
+                }
                 if (context.getRuleTraceMap().get(sourceTask.getBusinessKey()) != null) {
+                    // 来源分摊证据与来源解释字段使用同一份最终分量，避免继续展示派机前估算值。
                     context.getRuleTraceMap().get(sourceTask.getBusinessKey()).getRuleHits().stream()
                             .filter(item -> TcScheduleRuleCodeEnum.PLAN_QTY_SOURCE_ALLOCATE.getCode()
                                     .equals(item.getRuleCode()))
@@ -388,6 +456,12 @@ public class TcBizSnapshotAndPersistService implements ITcSnapshotAndPersistServ
                             .forEach(item -> {
                                 Map<String, Object> evidence = (Map<String, Object>) item.getEvidence();
                                 evidence.put("allocatedPlanQty", sourceTask.getPlanQty());
+                                evidence.put("allocatedPreLossPlanQty", sourceTask.getPreLossPlanQty());
+                                evidence.put("allocatedLossAddQty", sourceTask.getLossAddQty());
+                                evidence.put("allocatedMinStartAdjustQty", sourceTask.getMinStartAdjustQty());
+                                evidence.put("allocatedRoundAdjustQty", sourceTask.getTailRoundAdjustQty());
+                                evidence.put("allocatedPlanQtyBeforeToolLimit", sourceTask.getPlanQtyBeforeToolLimit());
+                                evidence.put("calcFormulaDesc", sourceTask.getCalcFormulaDesc());
                                 evidence.put("allocationStage", "SNAPSHOT");
                             });
                 }
@@ -495,6 +569,147 @@ public class TcBizSnapshotAndPersistService implements ITcSnapshotAndPersistServ
             }
         }
         return relationList;
+    }
+
+    /**
+     * 构建来源解释对应的最终分配证据。
+     *
+     * <p>该证据在结果归并、零计划过滤、最终班内顺序重排和主键回填后生成，
+     * 因此其中的机台与顺序代表最终可见结果，而不是派机前基础排序。</p>
+     *
+     * @param sourceTask 来源解释任务
+     * @param context 排程上下文
+     * @param resultIdMap 实际片段业务键与结果主键映射
+     * @param unplannedIdMap 实际片段业务键与未排主键映射
+     * @param finalResultMap 结果主键与最终可见结果映射
+     * @return 带版本号的最终分配JSON
+     * @throws ServiceException 正计划量片段无法定位最终目标时抛出
+     */
+    private String buildFinalAssignmentJson(TcTaskDraft sourceTask, TcScheduleContext context,
+                                            Map<String, Long> resultIdMap,
+                                            Map<String, Long> unplannedIdMap,
+                                            Map<Long, TcScheduleResult> finalResultMap) {
+        Map<String, Object> root = new LinkedHashMap<>();
+        root.put("schemaVersion", "1");
+        List<Map<String, Object>> assignmentList = new ArrayList<>();
+        if (sourceTask == null || context == null || StrUtil.isBlank(sourceTask.getBusinessKey())) {
+            root.put("assignments", assignmentList);
+            return JSON.toJSONString(root);
+        }
+        TcPlanTaskGroup taskGroup = context.getPlanTaskGroupMap() == null
+                ? null : context.getPlanTaskGroupMap().get(sourceTask.getPlanGroupKey());
+        List<TcTaskDraft> fragmentList = taskGroup == null
+                ? Collections.singletonList(sourceTask)
+                : context.getTaskDraftList().stream()
+                .filter(Objects::nonNull)
+                .filter(fragment -> Objects.equals(taskGroup.getPlanGroupKey(), fragment.getPlanGroupKey()))
+                .filter(fragment -> this.isPositiveQty(fragment.getPlanQty()))
+                .collect(java.util.stream.Collectors.toList());
+        Map<String, BigDecimal> sourceWeightMap = taskGroup == null
+                ? Collections.singletonMap(sourceTask.getBusinessKey(), BigDecimal.ONE)
+                : taskGroup.getSourceWeightMap();
+        for (TcTaskDraft fragment : fragmentList) {
+            if (!this.isPositiveQty(fragment.getPlanQty())) {
+                continue;
+            }
+            BigDecimal allocatedQty = this.allocateByWeight(fragment.getPlanQty(), sourceWeightMap)
+                    .get(sourceTask.getBusinessKey());
+            if (!this.isPositiveQty(allocatedQty)) {
+                continue;
+            }
+            boolean unplanned = this.isUnplannedTask(fragment);
+            Long targetId = unplanned
+                    ? unplannedIdMap.get(fragment.getBusinessKey())
+                    : resultIdMap.get(fragment.getBusinessKey());
+            if (targetId == null) {
+                throw new ServiceException(MessageFormat.format(
+                        I18nUtil.getMessage("ui.tc.schedule.explainTargetMissing"),
+                        fragment.getBusinessKey()));
+            }
+            TcScheduleResult finalResult = unplanned ? null : finalResultMap.get(targetId);
+            Map<String, Object> assignment = new LinkedHashMap<>();
+            assignment.put("targetType", unplanned ? "UNPLANNED" : "RESULT");
+            assignment.put("targetId", targetId);
+            assignment.put("targetBusinessKey", fragment.getBusinessKey());
+            assignment.put("machineCode", unplanned ? null : fragment.getMachineCode());
+            assignment.put("shiftOrder", fragment.getShiftOrder());
+            assignment.put("sequence", unplanned ? null
+                    : this.resolveFinalSequence(finalResult, fragment.getShiftOrder()));
+            assignment.put("allocatedQty", allocatedQty);
+            assignment.put("selectedMachineScore", unplanned ? null
+                    : this.resolveSelectedMachineScore(fragment, context));
+            assignmentList.add(assignment);
+        }
+        BigDecimal assignmentTotal = assignmentList.stream()
+                .map(assignment -> (BigDecimal) assignment.get("allocatedQty"))
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal sourceFinalPlanQty = BigDecimalUtils.valueOf(sourceTask.getPlanQty());
+        if (CollUtil.isNotEmpty(assignmentList) && assignmentTotal.compareTo(sourceFinalPlanQty) != 0) {
+            Map<String, Object> lastAssignment = assignmentList.get(assignmentList.size() - 1);
+            BigDecimal lastAllocatedQty = BigDecimalUtils.valueOf(lastAssignment.get("allocatedQty"));
+            lastAssignment.put("allocatedQty", lastAllocatedQty.add(sourceFinalPlanQty.subtract(assignmentTotal)));
+        }
+        this.sortFinalAssignmentList(assignmentList);
+        root.put("assignments", assignmentList);
+        return JSON.toJSONString(root);
+    }
+
+    /**
+     * 读取实际片段选中机台的最终评分。
+     *
+     * @param fragment 实际排程片段
+     * @param context 排程上下文
+     * @return 选中机台评分；没有候选证据时返回null
+     */
+    private BigDecimal resolveSelectedMachineScore(TcTaskDraft fragment, TcScheduleContext context) {
+        if (fragment == null || context == null || context.getCandidateTraceMap() == null) {
+            return null;
+        }
+        List<TcMachineCandidate> candidateList = context.getCandidateTraceMap().get(fragment.getBusinessKey());
+        if (CollUtil.isEmpty(candidateList)) {
+            return null;
+        }
+        return candidateList.stream()
+                .filter(Objects::nonNull)
+                .filter(candidate -> Objects.equals(fragment.getMachineCode(), candidate.getMachineCode()))
+                .map(TcMachineCandidate::getScore)
+                .filter(Objects::nonNull)
+                .findFirst().orElse(null);
+    }
+
+    /**
+     * 读取最终结果指定班次的可见顺序。
+     *
+     * @param result 最终可见结果
+     * @param shiftOrder 班次顺序
+     * @return 最终班内顺序；无结果或班次无效时返回null
+     */
+    private Integer resolveFinalSequence(TcScheduleResult result, Integer shiftOrder) {
+        if (result == null || shiftOrder == null || shiftOrder < 1
+                || shiftOrder > TcScheduleConstants.TC_MAX_SHIFT_ORDER) {
+            return null;
+        }
+        Object sequence = result.getFieldValueByFieldName(
+                String.format(TcScheduleConstants.SHIFT_SEQUENCE_FIELD_TEMPLATE, shiftOrder));
+        return sequence instanceof Number ? ((Number) sequence).intValue() : null;
+    }
+
+    /**
+     * 按目标类型、班次、机台、顺序和目标业务键稳定排列最终分配证据。
+     *
+     * @param assignmentList 最终分配证据列表
+     */
+    private void sortFinalAssignmentList(List<Map<String, Object>> assignmentList) {
+        assignmentList.sort(Comparator
+                .comparing((Map<String, Object> assignment) -> String.valueOf(assignment.get("targetType")))
+                .thenComparing(assignment -> (Integer) assignment.get("shiftOrder"),
+                        Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(assignment -> Objects.toString(assignment.get("machineCode"), ""))
+                .thenComparing(assignment -> (Integer) assignment.get("sequence"),
+                        Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(assignment -> Objects.toString(
+                        assignment.get("targetBusinessKey"), "")));
     }
 
     /**

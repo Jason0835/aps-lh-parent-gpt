@@ -9,6 +9,7 @@ import com.zlt.aps.common.engine.schedule.ScheduleScoreResult;
 import com.zlt.aps.common.engine.schedule.ScheduleTaskLinkedList;
 import com.zlt.aps.common.engine.schedule.ScheduleTaskNode;
 import com.zlt.aps.common.engine.schedule.constraint.ScheduleConstraintCalculator;
+import com.zlt.aps.common.engine.schedule.constraint.SchedulePlanQtyAdjustmentResult;
 import com.zlt.aps.common.engine.schedule.constraint.ScheduleToolLedgerResult;
 import com.zlt.aps.tc.api.constant.TcScheduleConstants;
 import com.zlt.aps.tc.api.enums.*;
@@ -41,7 +42,7 @@ public class TcMachineAssignService implements ITcMachineAssignService {
     /** 损耗率四层匹配解析器 */
     private final TcLossRateResolver lossRateResolver = new TcLossRateResolver();
 
-    /** 胎面、胎侧共用工装账本纯计算器 */
+    /** 胎面、胎侧共用排程约束纯计算器 */
     private final ScheduleConstraintCalculator constraintCalculator = new ScheduleConstraintCalculator();
 
     /**
@@ -299,13 +300,72 @@ public class TcMachineAssignService implements ITcMachineAssignService {
             scoreMap.put(task.getBusinessKey(), this.calculateBestChainSortScore(task, context));
         }
         ITcChainTaskPriorityStrategy priorityStrategy = this.resolveChainTaskPriorityStrategy(context);
-        TcTaskDraft selectedTask = priorityStrategy.select(remainingTaskList, context, scoreMap);
+        boolean startupShift = this.isStartupShift(context, remainingTaskList.get(0));
+        TcTaskDraft selectedTask = startupShift
+                ? this.selectStartupSupplyFirstTask(remainingTaskList, scoreMap)
+                : priorityStrategy.select(remainingTaskList, context, scoreMap);
+        String appliedStrategyCode = startupShift ? "STARTUP_SUPPLY_FIRST" : priorityStrategy.getStrategyCode();
+        if (startupShift) {
+            Map<String, Object> sortEvidence = new LinkedHashMap<>();
+            sortEvidence.put("phase", "MACHINE_ASSIGN");
+            sortEvidence.put("strategyCode", appliedStrategyCode);
+            sortEvidence.put("shiftOrder", selectedTask.getShiftOrder());
+            sortEvidence.put("supplyHours", selectedTask.getSupplyHours());
+            sortEvidence.put("latestStartTime", selectedTask.getLatestStartTime());
+            sortEvidence.put("presetMachine", !selectedTask.isUnassigned());
+            sortEvidence.put("chainSortScore", scoreMap.get(selectedTask.getBusinessKey()));
+            traceOf(context, selectedTask).addRuleHit(TcScheduleRuleCodeEnum.TASK_SORT,
+                    TcScheduleRuleResultEnum.PASS, sortEvidence);
+        }
         log.info("[TC_CHAIN_TASK_ORDER] batchNo={}, traceId={}, factoryCode={}, scheduleDate={}, shiftOrder={}, predecessorSnapshot={}, selectedBusinessKey={}, selectedSidewallCode={}, selectedGlueCode={}, strategyCode={}, chainSortScores={}",
                 context.getBatchNo(), context.getTraceId(), context.getFactoryCode(), this.formatScheduleDate(context),
                 this.normalizeShiftOrder(selectedTask.getShiftOrder()), this.summarizeMachinePredecessors(context,
                         this.normalizeShiftOrder(selectedTask.getShiftOrder())), selectedTask.getBusinessKey(),
-                selectedTask.getSidewallCode(), selectedTask.getGlueCode(), priorityStrategy.getStrategyCode(), scoreMap);
+                selectedTask.getSidewallCode(), selectedTask.getGlueCode(), appliedStrategyCode, scoreMap);
         return selectedTask;
+    }
+
+    /**
+     * 在开产班次内按库存供应成型时长严格选择下一个规格。
+     *
+     * <p>预置机台任务仍作为硬约束优先；其余任务先按供应时长升序，再按最晚开始时间、
+     * 连续性得分、基础顺序和业务键稳定兜底。</p>
+     *
+     * @param remainingTaskList 当前班次剩余任务
+     * @param chainScoreMap     任务连续性得分
+     * @return 本轮开产班次优先任务
+     */
+    TcTaskDraft selectStartupSupplyFirstTask(List<TcTaskDraft> remainingTaskList,
+                                             Map<String, TcChainSortScore> chainScoreMap) {
+        List<TcTaskDraft> presetTaskList = remainingTaskList.stream()
+                .filter(task -> !task.isUnassigned())
+                .collect(Collectors.toList());
+        List<TcTaskDraft> candidateTaskList = CollUtil.isEmpty(presetTaskList)
+                ? new ArrayList<>(remainingTaskList) : presetTaskList;
+        candidateTaskList.sort(Comparator
+                .comparing((TcTaskDraft task) -> task.getSupplyHours() == null)
+                .thenComparing(task -> task.getSupplyHours() == null ? BigDecimal.ZERO : task.getSupplyHours())
+                .thenComparing(TcTaskDraft::getLatestStartTime,
+                        Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing((TcTaskDraft task) -> chainScoreMap.getOrDefault(
+                                task.getBusinessKey(), TcChainSortScore.ZERO),
+                        Comparator.reverseOrder())
+                .thenComparing(TcTaskDraft::getBaseSortIndex,
+                        Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(task -> StrUtil.blankToDefault(task.getBusinessKey(), "")));
+        return candidateTaskList.get(0);
+    }
+
+    /**
+     * 判断任务是否属于整日停产后的首个开放班次。
+     *
+     * @param context 排程上下文
+     * @param task    任务草稿
+     * @return 属于开产班次返回true
+     */
+    private boolean isStartupShift(TcScheduleContext context, TcTaskDraft task) {
+        return context != null && task != null && context.getStartupShiftOrderSet() != null
+                && context.getStartupShiftOrderSet().contains(task.getShiftOrder());
     }
 
     /**
@@ -1513,7 +1573,7 @@ public class TcMachineAssignService implements ITcMachineAssignService {
     }
 
     /**
-     * 在机台确认后结算最终损耗率、工装限制和最终计划量。
+     * 在机台确认后按损耗率、最小起排、卷曲取整和工装限制结算最终计划量。
      *
      * @param task 当前任务
      * @param selectedCandidate 已选中机台
@@ -1522,30 +1582,36 @@ public class TcMachineAssignService implements ITcMachineAssignService {
     private void finalizeSelectedTaskPlan(TcTaskDraft task, TcMachineCandidate selectedCandidate,
                                           TcScheduleContext context) {
         BigDecimal preLossPlanQty = task.getPreLossPlanQty() == null ? nvl(task.getPlanQty()) : nvl(task.getPreLossPlanQty());
-        preLossPlanQty = preLossPlanQty.setScale(TcScheduleConstants.DECIMAL_CALCULATION_SCALE,
-                java.math.RoundingMode.HALF_UP);
         TcLossRuleMatchResult matchResult = this.lossRateResolver.resolve(context.getLossRuleList(), task.getSidewallCode(), selectedCandidate == null ? task.getMachineCode() : selectedCandidate.getMachineCode());
         BigDecimal resolvedLossRate = matchResult == null || matchResult.getLossRate() == null
                 ? nvl(task.getLossRate()) : nvl(matchResult.getLossRate());
-        BigDecimal lossAddQty = this.calculateLossAddQty(preLossPlanQty, resolvedLossRate);
-        BigDecimal planQtyBeforeToolLimit = preLossPlanQty.add(lossAddQty);
+        boolean tailTask = this.isTailTask(task);
+        BigDecimal originalTailAdjustQty = nvl(task.getTailRoundAdjustQty());
+        BigDecimal curlLength = this.resolveCurlLength(task);
+        SchedulePlanQtyAdjustmentResult planQtyAdjustmentResult = this.constraintCalculator.calculatePlanQtyAfterLoss(
+                preLossPlanQty, resolvedLossRate, task.getMinStartQty(), curlLength, tailTask,
+                TcScheduleConstants.DECIMAL_CALCULATION_SCALE);
+        BigDecimal planQtyAfterStandardRules = planQtyAdjustmentResult.getFinalPlanQty();
+        BigDecimal startupPlanQtyLimit = this.resolveStartupPlanQtyLimit(context, task);
+        BigDecimal planQtyBeforeToolLimit = this.applyStartupFinalPlanQtyLimit(
+                context, task, planQtyAfterStandardRules);
+        boolean startupThresholdAdjusted = planQtyBeforeToolLimit.compareTo(planQtyAfterStandardRules) < 0;
         BigDecimal currentAvailableToolQty = this.resolveCurrentAvailableToolQty(context, task);
         BigDecimal originalToolLimitAdjustQty = nvl(task.getToolLimitAdjustQty());
         BigDecimal originalToolOverflowQty = nvl(task.getToolOverflowQty());
         BigDecimal finalPlanQty = planQtyBeforeToolLimit;
         BigDecimal toolLimitAdjustQty = BigDecimal.ZERO;
         BigDecimal toolOverflowQty = BigDecimal.ZERO;
-        BigDecimal curlLength = this.resolveCurlLength(task);
         if (currentAvailableToolQty != null && curlLength.compareTo(BigDecimal.ZERO) > 0) {
             BigDecimal maxPlanQty = currentAvailableToolQty.multiply(curlLength);
             if (finalPlanQty.compareTo(maxPlanQty) > 0) {
                 finalPlanQty = maxPlanQty.max(BigDecimal.ZERO);
-        toolLimitAdjustQty = finalPlanQty.subtract(planQtyBeforeToolLimit)
-                .setScale(TcScheduleConstants.DECIMAL_CALCULATION_SCALE,
-                        java.math.RoundingMode.HALF_UP);
+                toolLimitAdjustQty = finalPlanQty.subtract(planQtyBeforeToolLimit)
+                        .setScale(TcScheduleConstants.DECIMAL_CALCULATION_SCALE,
+                                java.math.RoundingMode.HALF_UP);
                 toolOverflowQty = planQtyBeforeToolLimit.subtract(finalPlanQty).max(BigDecimal.ZERO)
-                .setScale(TcScheduleConstants.DECIMAL_CALCULATION_SCALE,
-                        java.math.RoundingMode.HALF_UP);
+                        .setScale(TcScheduleConstants.DECIMAL_CALCULATION_SCALE,
+                                java.math.RoundingMode.HALF_UP);
             }
         } else if (originalToolOverflowQty.compareTo(BigDecimal.ZERO) > 0) {
             toolLimitAdjustQty = originalToolLimitAdjustQty;
@@ -1558,17 +1624,117 @@ public class TcMachineAssignService implements ITcMachineAssignService {
                 ? TcLossMatchLevelEnum.NONE.getCode() : TcLossMatchLevelEnum.LEGACY_TASK.getCode())
                 : matchResult.getMatchLevel());
         task.setLossMatchSource(this.buildLossMatchSource(task, selectedCandidate, matchResult));
-        task.setPreLossPlanQty(preLossPlanQty);
-        task.setLossAddQty(lossAddQty);
+        task.setPreLossPlanQty(planQtyAdjustmentResult.getPreLossPlanQty());
+        task.setLossAddQty(planQtyAdjustmentResult.getLossAddQty());
+        task.setMinStartAdjustQty(startupThresholdAdjusted
+                ? BigDecimal.ZERO : planQtyAdjustmentResult.getMinStartAdjustQty());
+        task.setTailRoundAdjustQty(startupThresholdAdjusted
+                ? planQtyBeforeToolLimit.subtract(nvl(task.getBaseDemandQty()))
+                .subtract(planQtyAdjustmentResult.getLossAddQty())
+                : (tailTask ? originalTailAdjustQty : planQtyAdjustmentResult.getRoundAdjustQty()));
         task.setPlanQtyBeforeToolLimit(planQtyBeforeToolLimit);
         task.setToolLimitAdjustQty(toolLimitAdjustQty);
         task.setToolOverflowQty(toolOverflowQty);
         task.setPlanQty(finalPlanQty);
         task.setPlanStockQty(nvl(task.getRollingStockQty()).add(finalPlanQty).subtract(nvl(task.getCurrentShiftDemandQty())).max(BigDecimal.ZERO));
-        task.setCalcFormulaDesc(this.appendFormulaDesc(task.getCalcFormulaDesc(), "机台确认损耗"));
+        task.setCalcFormulaDesc(this.buildFinalPlanCalcFormulaDesc(task.getCalcFormulaDesc(), tailTask));
+        if (startupPlanQtyLimit != null) {
+            task.setCalcFormulaDesc(this.appendFormulaDesc(task.getCalcFormulaDesc(), "开产阈值封顶"));
+            Map<String, Object> startupEvidence = new LinkedHashMap<>();
+            startupEvidence.put("phase", "MACHINE_FINALIZE");
+            startupEvidence.put("shiftOrder", task.getShiftOrder());
+            startupEvidence.put("currentShiftDemandQty", task.getCurrentShiftDemandQty());
+            startupEvidence.put("rollingStockQty", task.getRollingStockQty());
+            startupEvidence.put("supplyHours", task.getSupplyHours());
+            startupEvidence.put("threshold", this.resolveStartupThreshold(context));
+            startupEvidence.put("planQtyAfterStandardRules", planQtyAfterStandardRules);
+            startupEvidence.put("planQtyLimit", startupPlanQtyLimit);
+            startupEvidence.put("finalPlanQtyBeforeToolLimit", planQtyBeforeToolLimit);
+            traceOf(context, task).addRuleHit(TcScheduleRuleCodeEnum.STARTUP_THRESHOLD_ADJUST,
+                    startupThresholdAdjusted ? TcScheduleRuleResultEnum.PASS : TcScheduleRuleResultEnum.SKIP,
+                    startupEvidence);
+        }
         if (toolOverflowQty.compareTo(BigDecimal.ZERO) > 0) {
             task.setCalcFormulaDesc(this.appendFormulaDesc(task.getCalcFormulaDesc(), "工装限制"));
         }
+    }
+
+    /**
+     * 计算开产班次最终计划量上限。
+     *
+     * @param context 排程上下文
+     * @param task    当前任务
+     * @return 开产上限；非开产班次或当班需求量非正数时返回null
+     */
+    private BigDecimal resolveStartupPlanQtyLimit(TcScheduleContext context, TcTaskDraft task) {
+        if (!this.isStartupShift(context, task)
+                || nvl(task.getCurrentShiftDemandQty()).compareTo(BigDecimal.ZERO) <= 0) {
+            return null;
+        }
+        return nvl(task.getCurrentShiftDemandQty()).multiply(this.resolveStartupThreshold(context))
+                .subtract(nvl(task.getRollingStockQty())).max(BigDecimal.ZERO);
+    }
+
+    /**
+     * 对机台确认后的标准计划量应用开产硬上限。
+     *
+     * @param context                   排程上下文
+     * @param task                      当前任务
+     * @param planQtyAfterStandardRules 损耗、最小起排和卷曲取整后的数量
+     * @return 开产封顶后的数量；不满足开产条件时返回原数量
+     */
+    BigDecimal applyStartupFinalPlanQtyLimit(TcScheduleContext context, TcTaskDraft task,
+                                             BigDecimal planQtyAfterStandardRules) {
+        BigDecimal startupPlanQtyLimit = this.resolveStartupPlanQtyLimit(context, task);
+        return startupPlanQtyLimit == null ? nvl(planQtyAfterStandardRules)
+                : nvl(planQtyAfterStandardRules).min(startupPlanQtyLimit);
+    }
+
+    /**
+     * 读取有效开产阈值，缺失、非法或非正数时回退默认值1。
+     *
+     * @param context 排程上下文
+     * @return 有效开产阈值
+     */
+    private BigDecimal resolveStartupThreshold(TcScheduleContext context) {
+        String value = this.resolveParamValue(context, TcScheduleConstants.PARAM_OPEN_SHIFT_THRESHOLD,
+                TcScheduleConstants.DEFAULT_OPEN_SHIFT_THRESHOLD);
+        try {
+            BigDecimal threshold = new BigDecimal(value);
+            return threshold.compareTo(BigDecimal.ZERO) > 0 ? threshold : BigDecimal.ONE;
+        } catch (NumberFormatException exception) {
+            return BigDecimal.ONE;
+        }
+    }
+
+    /**
+     * 判断当前任务是否按收尾计划量口径结算。
+     *
+     * @param task 当前任务
+     * @return 收尾标识、收尾余量和标准长度均有效时返回true
+     */
+    private boolean isTailTask(TcTaskDraft task) {
+        return task != null
+                && TcYesNoEnum.YES.getCode().equals(task.getTailFlag())
+                && this.nvl(task.getTailBalanceQty()).compareTo(BigDecimal.ZERO) > 0
+                && this.nvl(task.getSidewallLength()).compareTo(BigDecimal.ZERO) > 0;
+    }
+
+    /**
+     * 构建机台确认后的最终计划量公式说明。
+     *
+     * @param currentFormulaDesc 派机前公式说明
+     * @param tailTask 是否收尾任务
+     * @return 最终计划量公式说明
+     */
+    private String buildFinalPlanCalcFormulaDesc(String currentFormulaDesc, boolean tailTask) {
+        if (tailTask) {
+            return this.appendFormulaDesc(currentFormulaDesc, "机台确认损耗");
+        }
+        if ("基础需求->库存抵扣->派机前最小起排与卷数取整估算".equals(currentFormulaDesc)) {
+            return "基础需求->库存抵扣->机台确认损耗->最小起排->卷数取整";
+        }
+        return this.appendFormulaDesc(currentFormulaDesc, "机台确认损耗->最小起排->卷数取整");
     }
 
     /**
@@ -1588,23 +1754,6 @@ public class TcMachineAssignService implements ITcMachineAssignService {
                     java.math.RoundingMode.HALF_UP);
         }
         return null;
-    }
-
-
-    /**
-     * 计算损耗补偿量。
-     *
-     * @param preLossPlanQty 损耗前计划量
-     * @param resolvedLossRate 最终损耗率
-     * @return 损耗补偿量
-     */
-    private BigDecimal calculateLossAddQty(BigDecimal preLossPlanQty, BigDecimal resolvedLossRate) {
-        if (nvl(preLossPlanQty).compareTo(BigDecimal.ZERO) <= 0 || nvl(resolvedLossRate).compareTo(BigDecimal.ZERO) <= 0) {
-            return BigDecimal.ZERO;
-        }
-        return nvl(preLossPlanQty).multiply(nvl(resolvedLossRate))
-                .divide(BigDecimal.valueOf(100), TcScheduleConstants.DECIMAL_CALCULATION_SCALE,
-                        java.math.RoundingMode.HALF_UP);
     }
 
     /**

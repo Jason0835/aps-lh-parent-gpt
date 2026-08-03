@@ -179,6 +179,10 @@ public class TcScheduleResultExplain extends BaseEntity {
     @TableField("CANDIDATE_MACHINE_JSON")
     private String candidateMachineJson;
 
+    /** 最终分配结果JSON，记录来源任务实际落到的结果或未排片段、机台、班次和最终顺序 */
+    @TableField("FINAL_ASSIGNMENT_JSON")
+    private String finalAssignmentJson;
+
     /** 规则命中 JSON */
     @TableField("RULE_HIT_JSON")
     private String ruleHitJson;
