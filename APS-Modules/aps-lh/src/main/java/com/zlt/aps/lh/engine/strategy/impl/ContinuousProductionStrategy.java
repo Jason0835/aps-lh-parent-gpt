@@ -6320,9 +6320,14 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             LhScheduleResult result = keptResults.get(resultIndex);
             int machineCapacity = Math.max(0, capacityMap.getOrDefault(result, ShiftFieldUtil.resolveScheduledQty(result)));
             // 整窗入口与逐日入口统一复用保留机台分配规则，避免dayN剩余额度再次截断非收尾实际排量。
+            // 收尾/严格目标多保留机台时按保留机台分摊目标量，避免小余量全部落在首台
+            // 导致其余 dayN 保留机台零排量、被下游当成已释放机台提前换模。
+            boolean spreadEndingTargetAcrossKeptMachines = !fillKeptMachineCapacity
+                    && keptResults.size() > 1;
             int allocation = resolveKeptContinuationAllocation(
                     fillKeptMachineCapacity, false, demandQty, remainingDemandQty,
-                    machineCapacity, keptResults.size() - resultIndex);
+                    machineCapacity, keptResults.size() - resultIndex,
+                    spreadEndingTargetAcrossKeptMachines);
             redistributeShiftQty(context, result, shifts, allocation);
             if (ending && policy.isStrictUpperLimit()) {
                 capResultShiftQtyToTarget(context, result, shifts, allocation);
@@ -6375,6 +6380,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
      * @param remainingDemandQty 当前尚未分配的目标量
      * @param machineCapacity 当前机台真实有效产能
      * @param remainingMachineCount 当前机台及后续待分配机台数量
+     * @param spreadEndingTargetAcrossKeptMachines true-收尾目标量按保留机台数量均摊，
+     *                                            避免首台吃完全部目标导致其余保留机台零排量
      * @return 当前机台实际分配量
      */
     private int resolveKeptContinuationAllocation(boolean fillKeptMachineCapacity,
@@ -6382,7 +6389,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                                                    int effectiveDemandQty,
                                                    int remainingDemandQty,
                                                    int machineCapacity,
-                                                   int remainingMachineCount) {
+                                                   int remainingMachineCount,
+                                                   boolean spreadEndingTargetAcrossKeptMachines) {
         int safeMachineCapacity = Math.max(0, machineCapacity);
         if (fillKeptMachineCapacity) {
             // 非收尾保留机台以硫化余量和真实有效产能为实际消费口径，dayN 不再截断排量。
@@ -6392,8 +6400,9 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             return 0;
         }
         int safeRemainingDemandQty = Math.max(0, remainingDemandQty);
-        if (keepAllActiveMachinesForCurrentDay && remainingMachineCount > 0) {
-            // 严格目标场景在全部受保护机台间均衡分配，避免后序在线机台被分配为零。
+        if ((keepAllActiveMachinesForCurrentDay || spreadEndingTargetAcrossKeptMachines)
+                && remainingMachineCount > 0) {
+            // 严格目标场景在全部受保护/保留机台间均衡分配，避免后序机台被分配为零。
             int averageAllocation = (safeRemainingDemandQty + remainingMachineCount - 1)
                     / remainingMachineCount;
             return Math.min(safeRemainingDemandQty, Math.min(safeMachineCapacity, averageAllocation));
@@ -6603,10 +6612,14 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             context.markContinuousStopHoldMachineProductionResumed(result.getLhMachineCode());
             int machineCapacity = Math.max(0, capacityMap.getOrDefault(result, 0));
             // 逐日入口复用统一分配规则，生产保留机台不得因运行态dayN剩余额度为0而被提前清空。
+            // 日标准机台数决策或收尾多保留机台时，目标量必须在保留机台间分摊，
+            // 保证每台保留机台都有真实排产量，释放时间按实际收尾班次后移。
+            boolean spreadEndingTargetAcrossKeptMachines = !fillKeptMachineCapacity
+                    && keptResults.size() > 1;
             int allocation = resolveKeptContinuationAllocation(
                     fillKeptMachineCapacity, keepAllActiveMachinesForCurrentDay,
                     effectiveDemandQty, remainingDemandQty, machineCapacity,
-                    keptResults.size() - resultIndex);
+                    keptResults.size() - resultIndex, spreadEndingTargetAcrossKeptMachines);
             redistributeShiftQty(context, result, dayShifts, allocation);
             remainingDemandQty = Math.max(0, remainingDemandQty - allocation);
             if (fillKeptMachineCapacity && effectiveDemandQty <= 0 && allocation > 0) {
