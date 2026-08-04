@@ -504,8 +504,12 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
                         formatAutoPlanDate(context.getScheduleDate()),
                         context.getBatchNo(), context.getTraceId(), persistResult.getErrorCount(), persistResult.getLastErrorMsg());
             } else if (CollUtil.isEmpty(context.getTaskDraftList())) {
-                response.setMessage(resolveTmMessage("ui.data.alert.tm.schedule.noTaskGenerated",
-                        "No schedulable forming demand was loaded"));
+                String emptyTaskMessage = context.getEmptyFormingTaskMessage();
+                if (StrUtil.isBlank(emptyTaskMessage)) {
+                    emptyTaskMessage = resolveTmMessage("ui.data.alert.tm.schedule.noTaskGenerated",
+                            "No schedulable forming demand was loaded");
+                }
+                response.setMessage(emptyTaskMessage);
                 log.warn("{} step=NO_TASK_GENERATED factoryCode={}, scheduleDate={}, batchNo={}, traceId={}, reason=noSchedulableTask",
                         TmScheduleConstants.AUTO_PLAN_LOG_PREFIX, context.getFactoryCode(),
                         formatAutoPlanDate(context.getScheduleDate()), context.getBatchNo(), context.getTraceId());

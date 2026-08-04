@@ -131,6 +131,9 @@ public class TcScheduleContext {
     /** 班次时间窗口映射，key=班次顺序(1~6)，来自 T_TC_SHIFT_CONFIG */
     private Map<Integer, TcShiftTimeWindow> shiftTimeWindowMap = new HashMap<>();
 
+    /** 成型计划已加载但按 TC_FORMING_SHIFT_OFFSET 偏移后无可排程班次时的细化提示，供响应阶段直接使用；为空表示未触发 */
+    private String emptyFormingTaskMessage;
+
     /**
      * 追加一条中文自动排程过程日志。
      *
