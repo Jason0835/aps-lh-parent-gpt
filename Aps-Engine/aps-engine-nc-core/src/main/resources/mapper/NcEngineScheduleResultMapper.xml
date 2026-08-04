@@ -8,11 +8,12 @@
         WHERE SCHEDULE_DATE = #{scheduleDate}
     </delete>
 
-    <!-- 查询各垫胶代码最近一次有排产量的排产日期（联合主表和日志表） -->
-    <select id="selectLastScheduleDate" resultType="java.util.Map">
+    <!-- 查询窗口期内（thresholdDate ~ scheduleDate）有排产量的内衬代码（联合主表和日志表） -->
+    <select id="selectLastScheduleDate" resultType="java.lang.String">
         SELECT DISTINCT LINING_CODE
           FROM T_NC_SCHEDULE_RESULT
         WHERE FACTORY_CODE = #{factoryCode}
+          AND SCHEDULE_DATE BETWEEN #{thresholdDate} AND #{scheduleDate}
           AND LINING_CODE IN
           <foreach collection="liningCodes" item="code" open="(" separator="," close=")">
               #{code}
