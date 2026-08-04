@@ -35,6 +35,7 @@ import com.zlt.aps.maindata.service.IRawSpecialMaterialRecordService;
 import com.zlt.aps.mp.adjust.mapper.MpAdjustResultEntityMapper;
 import com.zlt.aps.mp.adjust.mapper.MpAdjustStructureInEntityMapper;
 import com.zlt.aps.mp.api.IFinalAndAdjustResultInterface;
+import com.zlt.aps.mp.api.domain.dto.CalcOverProdDTO;
 import com.zlt.aps.mp.api.domain.dto.MonthPlanFinalizedEventDto;
 import com.zlt.aps.mp.api.domain.dto.StockCaptureDateDTO;
 import com.zlt.aps.mp.api.domain.entity.*;
@@ -86,6 +87,7 @@ import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static com.zlt.aps.common.core.utils.ApsNumberUtils.intValue;
 
@@ -1663,26 +1665,46 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         Integer currentMonthValue = currentMonth.getMonthValue();
 
         // 数据来源月份的日期范围（startDate 用于 STOCK_CAPTURE_DATE 为空时回退，endDate 为月底边界）
+        // 注意：传给SQL的日期必须用字符串格式，避免Date类型经JDBC时区转换导致日期偏移（如2026-07-01 00:00:00 UTC+8被MySQL转换为2026-06-30 23:00:00）
         Date startDate = cn.hutool.core.date.DateUtil.beginOfMonth(cn.hutool.core.date.DateUtil.parse(lastMonth.toString() + "-01"));
         Date endDate = cn.hutool.core.date.DateUtil.endOfMonth(startDate);
+        String startDateStr = cn.hutool.core.date.DateUtil.format(startDate, "yyyy-MM-dd");
+        String endDateStr = cn.hutool.core.date.DateUtil.format(endDate, "yyyy-MM-dd");
 
         // 超欠产有效标志判定阈值参数编码（SYS0206009）
         String overdueThresholdParamCode = MonthPlanEnums.LAST_MONTH_OVERDUE_THRESHOLD.getCode();
 
         log.info("开始计算超欠产, 数据来源: {}-{}, 写入目标: {}-{}, 日期范围: {} ~ {}, 有效标志阈值参数: {}",
-                lastYear, lastMonthValue, currentYear, currentMonthValue, startDate, endDate, overdueThresholdParamCode);
+                lastYear, lastMonthValue, currentYear, currentMonthValue, startDateStr, endDateStr, overdueThresholdParamCode);
 
         // Java 层计算库存抓取日列表（根据当月定稿表 LAST_MONTH_PLAN_VERSION 判定当月ADJ版本置0，或ADJ前缀解析或余量表回退，含日期范围校验）
         List<StockCaptureDateDTO> stockCaptureDateList = this.getStockCaptureDateList(lastYear, lastMonthValue, currentYear, currentMonthValue, startDate, endDate);
         log.info("库存抓取日计算完成, 记录数: {}", stockCaptureDateList.size());
 
-        // 1. UPDATE：更新当月定稿表中按 (分厂+物料+产品状态) 维度能匹配上的记录（分批处理，每批1000条）
+        // 1. UPDATE：更新当月定稿表中按 (分厂+物料+产品状态) 维度能匹配上的记录
+        //    先独立SELECT出calc结果（计划量/完成量/强制置零），再按结果UPDATE，避免MySQL在UPDATE...JOIN(SELECT FROM same_table)时行为异常
         int updateCount = 0;
         List<List<StockCaptureDateDTO>> stockBatches = Lists.partition(stockCaptureDateList, 1000);
+        List<CalcOverProdDTO> calcList = new ArrayList<>();
         for (List<StockCaptureDateDTO> batch : stockBatches) {
-            updateCount += finalMapper.updateLastMonthOverProd(lastYear, lastMonthValue, currentYear, currentMonthValue,
-                    startDate, endDate, overdueThresholdParamCode, batch);
+            if (CollectionUtils.isEmpty(batch)) {
+                continue;
+            }
+            // 1.1 独立SELECT查询calc结果（不在UPDATE语句中子查询同一张表）
+            List<CalcOverProdDTO> batchCalcList = finalMapper.selectCalcOverProd(lastYear, lastMonthValue, startDateStr, endDateStr, batch);
+            if (CollectionUtils.isNotEmpty(batchCalcList)) {
+                calcList.addAll(batchCalcList);
+            }
         }
+        // 1.2 按calc结果分批UPDATE（每批1000条，避免UNION ALL过多导致SQL过长）
+        if (CollectionUtils.isNotEmpty(calcList)) {
+            List<List<CalcOverProdDTO>> calcBatches = Lists.partition(calcList, 1000);
+            for (List<CalcOverProdDTO> calcBatch : calcBatches) {
+                updateCount += finalMapper.updateLastMonthOverProd(currentYear, currentMonthValue, overdueThresholdParamCode, calcBatch);
+            }
+        }
+        log.info("calc结果SELECT完成, 记录数: {}, UPDATE更新记录数: {}", calcList.size(), updateCount);
+
 
         // 2. INSERT：补齐上月定稿有、当月定稿按相同维度匹配不上的记录（分批处理，每批1000条）
         //    步骤：分批查询待插入记录 → 按分厂分组 → 查询当月各分厂最大工单号 → Java层递增生成工单号 → 批量插入
@@ -1690,7 +1712,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         for (List<StockCaptureDateDTO> batch : stockBatches) {
             List<FactoryMonthPlanProductionFinalResult> batchMissing = finalMapper.selectMissingLastMonthOverProd(
                     lastYear, lastMonthValue, currentYear, currentMonthValue,
-                    startDate, endDate, overdueThresholdParamCode, batch);
+                    startDateStr, endDateStr, overdueThresholdParamCode, batch);
             if (CollectionUtils.isNotEmpty(batchMissing)) {
                 missingList.addAll(batchMissing);
             }
@@ -1761,45 +1783,89 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
     }
 
     /**
-     * 定稿时将上月定稿记录的超欠产有效标识全部置为'0'（否）
+     * 定稿时补更新上月定稿记录的上月超欠产有效标识（只更新标识，不更新值）
      * <p>
-     * 场景：7月定稿生成8月定稿时，7月定稿记录的 LAST_MONTH_VALID_FLAG 全部置'0'，
-     * 不再重新计算，直接批量更新。
-     * 同步更新调整结果表中上月记录的超欠产有效标识。
+     * 场景：月初定时任务（每月1号，{@link #calcLastMonthOverProd()}）用上上月数据
+     * 写入上月定稿记录的"上月超欠产"标识+值。但月初时上月完成数据通常不完整，
+     * 因此在次月定稿时（如6.25定稿7月）补更新一次上月（6月）定稿记录的标识，
+     * 使标识反映上月（6月）最新的完成情况。本方法仅更新 LAST_MONTH_VALID_FLAG，
+     * 不更新 LAST_MONTH_OVERDUE_QTY，值字段保持月初定时任务写入的原值不动。
+     * </p>
+     * <p>
+     * 数据来源月 = 写入目标月 = 定稿月的上月。例如7月定稿时：
+     * 数据来源月=6月（取6月月底余量+6月硫化日完成量），写入目标月=6月（更新6月定稿记录标识）。
+     * 公式同定时任务：超欠产 = 月底余量 - (库存抓取日~月底)的硫化日完成量，
+     * 标识判定逻辑与 MonthOverProdTask 定时任务完全一致：
+     * |超欠产值| > 阈值参数(SYS0206009) → '0'（否），否则 → '1'（是）；月底余量为空时按0处理，统一走阈值判定。
      * </p>
      *
      * @param finalizedYear  定稿年份（如 2026）
-     * @param finalizedMonth 定稿月份（如 8）
+     * @param finalizedMonth 定稿月份（如 7）
      */
     @Transactional(rollbackFor = Exception.class)
     private void updateLastMonthOverProdFlagOnFinalized(Integer finalizedYear, Integer finalizedMonth) {
-        // 写入目标月 = 定稿月的上月（如8月定稿 → 7月）
+        // 写入目标月 = 定稿月的上月（如 7月定稿 → 6月）；数据来源月 = 写入目标月（如 6月）
         YearMonth currentMonth = YearMonth.of(finalizedYear, finalizedMonth).minusMonths(1);
+        YearMonth lastMonth = currentMonth;
+
+        Integer lastYear = lastMonth.getYear();
+        Integer lastMonthValue = lastMonth.getMonthValue();
         Integer currentYear = currentMonth.getYear();
         Integer currentMonthValue = currentMonth.getMonthValue();
 
-        // 1. 定稿表：上月所有记录的超欠产有效标识置'0'
-        LambdaUpdateWrapper<FactoryMonthPlanProductionFinalResult> updateWrapper = Wrappers.lambdaUpdate();
-        updateWrapper.eq(FactoryMonthPlanProductionFinalResult::getYear, currentYear)
-                .eq(FactoryMonthPlanProductionFinalResult::getMonth, currentMonthValue)
-                .set(FactoryMonthPlanProductionFinalResult::getLastMonthValidFlag, "0");
-        int count = finalMapper.update(null, updateWrapper);
+        // 数据来源月份的日期范围（startDate 用于 STOCK_CAPTURE_DATE 为空时回退，endDate 为月底边界）
+        // 注意：传给SQL的日期必须用字符串格式，避免Date类型经JDBC时区转换导致日期偏移（如2026-06-01 00:00:00 UTC+8被MySQL转换为2026-05-31 23:00:00）
+        Date startDate = cn.hutool.core.date.DateUtil.beginOfMonth(cn.hutool.core.date.DateUtil.parse(lastMonth.toString() + "-01"));
+        Date endDate = cn.hutool.core.date.DateUtil.endOfMonth(startDate);
+        String startDateStr = cn.hutool.core.date.DateUtil.format(startDate, "yyyy-MM-dd");
+        String endDateStr = cn.hutool.core.date.DateUtil.format(endDate, "yyyy-MM-dd");
 
-        log.info("定稿将上月超欠产有效标识全部置'0'(定稿表), 定稿月: {}-{}, 目标: {}-{}, 更新记录数: {}",
-                finalizedYear, finalizedMonth, currentYear, currentMonthValue, count);
+        // 超欠产有效标志判定阈值参数编码（SYS0206009）
+        String overdueThresholdParamCode = MonthPlanEnums.LAST_MONTH_OVERDUE_THRESHOLD.getCode();
 
-        // 2. 调整结果表：同步将上月记录的超欠产有效标识置'0'（仅当上月存在ADJ版本时）
-        Boolean hasAdjVersion = mpAdjustResultEntityMapper.existsAdjVersionResult(currentYear, currentMonthValue);
+        log.info("定稿补更新上月超欠产标识开始, 定稿月: {}-{}, 数据来源/写入目标: {}-{}, 日期范围: {} ~ {}, 有效标志阈值参数: {}",
+                finalizedYear, finalizedMonth, lastYear, lastMonthValue, startDateStr, endDateStr, overdueThresholdParamCode);
+
+        // Java 层计算库存抓取日列表（根据当月定稿表 LAST_MONTH_PLAN_VERSION 判定当月ADJ版本置0，或ADJ前缀解析或余量表回退，含日期范围校验）
+        List<StockCaptureDateDTO> stockCaptureDateList = this.getStockCaptureDateList(lastYear, lastMonthValue, currentYear, currentMonthValue, startDate, endDate);
+        log.info("库存抓取日计算完成, 记录数: {}", stockCaptureDateList.size());
+
+        // 先独立SELECT出calc结果（计划量/完成量/强制置零），再按结果UPDATE，避免MySQL在UPDATE...JOIN(SELECT FROM same_table)时行为异常
+        // 使用 selectCalcOverProdForFinalized（INNER JOIN T_MP_PROC_VERSION 过滤已定稿版本）
+        List<List<StockCaptureDateDTO>> stockBatches = Lists.partition(stockCaptureDateList, 1000);
+        List<CalcOverProdDTO> calcList = new ArrayList<>();
+        for (List<StockCaptureDateDTO> batch : stockBatches) {
+            if (CollectionUtils.isEmpty(batch)) {
+                continue;
+            }
+            List<CalcOverProdDTO> batchCalcList = finalMapper.selectCalcOverProdForFinalized(lastYear, lastMonthValue, startDateStr, endDateStr, batch);
+            if (CollectionUtils.isNotEmpty(batchCalcList)) {
+                calcList.addAll(batchCalcList);
+            }
+        }
+        // 按calc结果分批UPDATE
+        int count = 0;
+        if (CollectionUtils.isNotEmpty(calcList)) {
+            List<List<CalcOverProdDTO>> calcBatches = Lists.partition(calcList, 1000);
+            for (List<CalcOverProdDTO> calcBatch : calcBatches) {
+                count += finalMapper.updateLastMonthOverProdFlag(currentYear, currentMonthValue, overdueThresholdParamCode, calcBatch);
+            }
+        }
+
+        log.info("定稿补更新上月超欠产标识完成(定稿表), calc结果记录数: {}, UPDATE更新记录数: {}", calcList.size(), count);
+
+        // 调整结果表同步：仅当数据来源月存在 ADJ 前缀版本号时，也补更新调整结果表的有效标识
+        Boolean hasAdjVersion = mpAdjustResultEntityMapper.existsAdjVersionResult(lastYear, lastMonthValue);
         if (Boolean.TRUE.equals(hasAdjVersion)) {
-            LambdaUpdateWrapper<MpAdjustResult> adjUpdateWrapper = Wrappers.lambdaUpdate();
-            adjUpdateWrapper.eq(MpAdjustResult::getYear, currentYear)
-                    .eq(MpAdjustResult::getMonth, currentMonthValue)
-                    .set(MpAdjustResult::getLastMonthValidFlag, "0");
-            int adjCount = mpAdjustResultEntityMapper.update(null, adjUpdateWrapper);
-            log.info("定稿将上月超欠产有效标识全部置'0'(调整结果表), 目标: {}-{}, 更新记录数: {}",
-                    currentYear, currentMonthValue, adjCount);
+            int adjFlagCount = 0;
+            for (List<StockCaptureDateDTO> batch : stockBatches) {
+                adjFlagCount += mpAdjustResultEntityMapper.updateLastMonthOverProdFlagForAdjust(
+                        lastYear, lastMonthValue, currentYear, currentMonthValue,
+                        startDate, endDate, overdueThresholdParamCode, batch);
+            }
+            log.info("定稿补更新上月超欠产标识完成(调整结果表), 更新记录数: {}", adjFlagCount);
         } else {
-            log.info("上月不存在 ADJ 调整版本，跳过调整结果表标识同步, 目标: {}-{}", currentYear, currentMonthValue);
+            log.info("数据来源月不存在 ADJ 调整版本，跳过调整结果表标识同步");
         }
     }
 
@@ -1870,8 +1936,10 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
      *      a. 若 LAST_MONTH_PLAN_VERSION 为当月ADJ版本（如7月的ADJ202607xx）→ forceZero=true，超欠产置0
      *      b. 若 LAST_MONTH_PLAN_VERSION 为数据来源月ADJ版本（如6月的ADJ202606xx）→ 正常解析为库存抓取日
      *      c. 若 LAST_MONTH_PLAN_VERSION 非 ADJ 前缀（REQ等），回退到余量表取 STOCK_CAPTURE_DATE
-     *   2. 余量表日期同样必须落在 [startDate, endDate] 范围内，否则也忽略
-     *   3. 对于数据来源月（6月）存在但当月（7月）不存在的记录，从数据来源月定稿表补充查询，
+     *   2. 余量表查询按 (数据来源月 YEAR/MONTH + REQUIRE_VERSION IN 定稿表 LAST_MONTH_PLAN_VERSION 集合) 过滤，
+     *      并按 (分厂+物料+REQUIRE_VERSION) 三字段精确匹配回退，避免取到其他版本的库存抓取日
+     *   3. 余量表日期同样必须落在 [startDate, endDate] 范围内，否则也忽略
+     *   4. 对于数据来源月（6月）存在但当月（7月）不存在的记录，从数据来源月定稿表补充查询，
      *      这些记录按原逻辑处理（6月ADJ解析或余量表回退），不触发 forceZero
      * 维度：(分厂+物料+产品状态)
      *
@@ -1895,9 +1963,30 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         List<FactoryMonthPlanProductionFinalResult> currentVersionList = finalMapper.selectVersionInfoForStockCapture(
                 currentYear, currentMonth);
 
-        // 2. 查询余量表 STOCK_CAPTURE_DATE（仍按数据来源月/6月取，用于 LAST_MONTH_PLAN_VERSION 非 ADJ 前缀时的回退）
-        List<StockCaptureDateDTO> surplusList = finalMapper.selectSurplusStockCaptureDateMap(lastYear, lastMonth);
-        // 构建余量表映射：key = factoryCode|materialCode，value = STOCK_CAPTURE_DATE
+        // 2. 构建当月（7月）定稿表的匹配键集合，用于识别数据来源月独有的记录
+        Set<String> currentMonthKeys = currentVersionList.stream()
+                .map(item -> item.getFactoryCode() + "|" + item.getMaterialCode() + "|" + item.getProductStatus())
+                .collect(Collectors.toSet());
+
+        // 3. 查询数据来源月（6月）定稿表的版本号信息，用于补充当月不存在的记录
+        List<FactoryMonthPlanProductionFinalResult> lastVersionList = finalMapper.selectVersionInfoForStockCapture(
+                lastYear, lastMonth);
+
+        // 4. 只收集当月（8月）定稿表中非空的 LAST_MONTH_PLAN_VERSION（去重），作为余量表 REQUIRE_VERSION 过滤条件
+        //    原因：7月余量表的 REQUIRE_VERSION 是8月生成需求计划时写入的（版本号=8月需求计划版本号），
+        //    与7月定稿表的 LAST_MONTH_PLAN_VERSION（7月需求计划版本号）对不上，无需收集；
+        //    数据来源月（7月）独有记录的版本号不在集合中，余量表查不到，自然回退到月初整月统计
+        Set<String> requireVersionSet = currentVersionList.stream()
+                .map(FactoryMonthPlanProductionFinalResult::getLastMonthPlanVersion)
+                .filter(StringUtils::isNotBlank)
+                .collect(Collectors.toSet());
+
+        // 5. 查询余量表 STOCK_CAPTURE_DATE（按数据来源月/6月 + REQUIRE_VERSION 集合过滤，
+        //    用于 LAST_MONTH_PLAN_VERSION 非 ADJ 前缀时的回退）
+        List<StockCaptureDateDTO> surplusList = requireVersionSet.isEmpty()
+                ? Collections.emptyList()
+                : finalMapper.selectSurplusStockCaptureDateMap(lastYear, lastMonth, requireVersionSet);
+        // 构建余量表映射：key = factoryCode|materialCode|requireVersion，value = STOCK_CAPTURE_DATE
         // 过滤掉库存抓取日为空或超出数据来源月范围的记录，下游 surplusMap.get() 返回 null 时自然走回退逻辑
         Map<String, Date> surplusMap = surplusList.stream()
                 .filter(dto -> {
@@ -1906,30 +1995,20 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
                         return false;
                     }
                     if (date.before(startDate) || date.after(endDate)) {
-                        log.warn("余量表库存抓取日超出数据来源月范围，分厂: {}, 物料: {}, 抓取日: {}, 有效范围: {} ~ {}, 将回退到月初",
-                                dto.getFactoryCode(), dto.getMaterialCode(), date, startDate, endDate);
+                        log.warn("余量表库存抓取日超出数据来源月范围，分厂: {}, 物料: {}, 版本: {}, 抓取日: {}, 有效范围: {} ~ {}, 将回退到月初",
+                                dto.getFactoryCode(), dto.getMaterialCode(), dto.getRequireVersion(), date, startDate, endDate);
                         return false;
                     }
                     return true;
                 })
                 .collect(Collectors.toMap(
-                        dto -> dto.getFactoryCode() + "|" + dto.getMaterialCode(),
+                        dto -> dto.getFactoryCode() + "|" + dto.getMaterialCode() + "|" + dto.getRequireVersion(),
                         StockCaptureDateDTO::getStockCaptureDate,
                         // 当 Key 冲突时，比较两个日期，保留较晚的一个（即最新的日期）
                         (v1, v2) -> v1.after(v2) ? v1 : v2
                 ));
 
-
-        // 3. 构建当月（7月）定稿表的匹配键集合，用于识别数据来源月独有的记录
-        Set<String> currentMonthKeys = currentVersionList.stream()
-                .map(item -> item.getFactoryCode() + "|" + item.getMaterialCode() + "|" + item.getProductStatus())
-                .collect(Collectors.toSet());
-
-        // 4. 查询数据来源月（6月）定稿表的版本号信息，用于补充当月不存在的记录
-        List<FactoryMonthPlanProductionFinalResult> lastVersionList = finalMapper.selectVersionInfoForStockCapture(
-                lastYear, lastMonth);
-
-        // 5. 计算每条当月（7月）记录的库存抓取日 + forceZero 判定
+        // 6. 计算每条当月（7月）记录的库存抓取日 + forceZero 判定
         List<StockCaptureDateDTO> result = new ArrayList<>();
 
         for (FactoryMonthPlanProductionFinalResult item : currentVersionList) {
@@ -1937,7 +2016,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
             boolean forceZero = false;
 
             if (StringUtils.isNotBlank(item.getLastMonthPlanVersion())) {
-                // 5a. 先检查是否为当月（7月）ADJ版本 → 超欠产置0
+                // 6a. 先检查是否为当月（7月）ADJ版本 → 超欠产置0
                 Date currentMonthAdjDate = this.parseStockCaptureDateFromVersion(
                         item.getLastMonthPlanVersion(), currentStartDate, currentEndDate);
                 if (currentMonthAdjDate != null) {
@@ -1946,15 +2025,15 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
                     log.info("检测到当月ADJ版本，超欠产将置0，分厂: {}, 物料: {}, 版本号: {}",
                             item.getFactoryCode(), item.getMaterialCode(), item.getLastMonthPlanVersion());
                 } else {
-                    // 5b. 非当月ADJ版本，尝试按数据来源月（6月）范围解析
+                    // 6b. 非当月ADJ版本，尝试按数据来源月（6月）范围解析
                     stockCaptureDate = this.parseStockCaptureDateFromVersion(
                             item.getLastMonthPlanVersion(), startDate, endDate);
                 }
             }
 
-            // 5c. 非 ADJ 前缀、解析失败或日期超出范围，回退到余量表
+            // 6c. 非 ADJ 前缀、解析失败或日期超出范围，回退到余量表（按 LAST_MONTH_PLAN_VERSION 精确匹配 REQUIRE_VERSION）
             if (!forceZero && stockCaptureDate == null) {
-                String key = item.getFactoryCode() + "|" + item.getMaterialCode();
+                String key = item.getFactoryCode() + "|" + item.getMaterialCode() + "|" + item.getLastMonthPlanVersion();
                 stockCaptureDate = surplusMap.get(key);
             }
 
@@ -1967,7 +2046,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
             result.add(dto);
         }
 
-        // 6. 补充数据来源月（6月）独有的记录（当月7月不存在的物料），按原逻辑处理，不触发 forceZero
+        // 7. 补充数据来源月（6月）独有的记录（当月7月不存在的物料），按原逻辑处理，不触发 forceZero
         for (FactoryMonthPlanProductionFinalResult item : lastVersionList) {
             String key = item.getFactoryCode() + "|" + item.getMaterialCode() + "|" + item.getProductStatus();
             if (!currentMonthKeys.contains(key)) {
@@ -1977,9 +2056,9 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
                     stockCaptureDate = this.parseStockCaptureDateFromVersion(
                             item.getLastMonthPlanVersion(), startDate, endDate);
                 }
-                // 非 ADJ 前缀、解析失败或日期超出范围，回退到余量表
+                // 非 ADJ 前缀、解析失败或日期超出范围，回退到余量表（按 LAST_MONTH_PLAN_VERSION 精确匹配 REQUIRE_VERSION）
                 if (stockCaptureDate == null) {
-                    String surplusKey = item.getFactoryCode() + "|" + item.getMaterialCode();
+                    String surplusKey = item.getFactoryCode() + "|" + item.getMaterialCode() + "|" + item.getLastMonthPlanVersion();
                     stockCaptureDate = surplusMap.get(surplusKey);
                 }
 

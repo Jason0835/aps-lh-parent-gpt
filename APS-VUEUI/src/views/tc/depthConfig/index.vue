@@ -43,8 +43,19 @@
           @click="handleExport"
           >{{ $t("ui.frame.btn.export") }}</el-button
         >
+        <el-button
+          v-hasPermi="['tc:depthConfig:import']"
+          @click="$refs.tltUpload.handleImport()"
+          >{{ $t("ui.frame.btn.import") }}</el-button
+        >
       </template>
     </page-table>
+    <tlt-upload-form
+      ref="tltUpload"
+      downloadUrl="/tc/depthConfig/importTemplate"
+      uploadUrl="/tc/depthConfig/importData"
+      @uploadSuccess="getList"
+    />
     <infoDialog ref="infoRef" @success="getList" />
   </basic-container>
 </template>
@@ -52,14 +63,16 @@
 import {downloadLink} from "@/utils/request";
 import {listDepthConfig, removeDepthConfig} from "@/api/tc/depthConfig";
 import {getConfigKey} from "@/api/system/config";
+import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import infoDialog from "./components/infoDialog.vue";
 
 export default {
   name: "/tc/tcDepthConfig",
   components: {
     infoDialog,
+    TltUploadForm,
   },
-  dicts: ["biz_factory_name", "machine_range"],
+  dicts: ["biz_factory_name"],
   provide() {
     return {
       parentDict: this.dict,
@@ -95,9 +108,9 @@ export default {
           filterable: true,
         },
         {
-          label: this.$t("ui.tc.depthConfig.column.machineQty"),
-          prop: "machineQty",
-          type: "input",
+          label: this.$t("ui.tc.depthConfig.column.minMachineQty"),
+          prop: "minMachineQty",
+          type: "number",
         },
       ];
     },
@@ -108,17 +121,18 @@ export default {
           prop: "factoryCode",
           halign: "center",
           label: this.$t("ui.data.column.factoryCode"),
+          formatter: (row, column, value) => this.selectDictLabel(this.dict.type.biz_factory_name, value),
         },
         {
-          prop: "machineQty",
+          prop: "minMachineQty",
           halign: "center",
-          label: this.$t("ui.tc.depthConfig.column.machineQty"),
+          label: this.$t("ui.tc.depthConfig.column.minMachineQty"),
         },
         {
-          prop: "machineRange",
+          prop: "maxMachineQty",
           halign: "center",
-          label: this.$t("ui.tc.depthConfig.column.machineRange"),
-          dictData: this.dict.type.machine_range,
+          label: this.$t("ui.tc.depthConfig.column.maxMachineQty"),
+          formatter: (row, column, value) => value !== null && value !== undefined ? value : "∞",
         },
         {
           prop: "depthClassQty",

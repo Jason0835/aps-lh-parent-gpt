@@ -5,7 +5,6 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.tc.api.domain.entity.TcDepthConfig;
-import com.zlt.aps.tc.mapper.TcDepthConfigMapper;
 import com.zlt.aps.tc.service.ITcDepthConfigService;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
@@ -16,8 +15,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
-import javax.annotation.Resource;
 
 /**
  * 胎侧备库班数配置Controller
@@ -31,9 +28,6 @@ public class TcDepthConfigController extends AbstractDocBizController<TcDepthCon
 
     @Autowired
     private ITcDepthConfigService depthConfigService;
-
-    @Resource
-    private TcDepthConfigMapper depthConfigMapper;
 
     /**
      * 查询信息列表
@@ -50,11 +44,7 @@ public class TcDepthConfigController extends AbstractDocBizController<TcDepthCon
     @ApiOperation("保存信息（id为空新增，id不为空修改）")
     @PostMapping("/save")
     public AjaxResult save(@RequestBody TcDepthConfig entity) {
-        // 校验业务唯一约束（同一工厂下同台数同范围条件只能有一条）
-        if (UserConstants.NOT_UNIQUE.equals(depthConfigService.checkUnique(entity))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.tc.depthConfig.notUnique"));
-        }
-        // 校验范围交叉（新增/修改的规则不能与现有规则有交集）
+        // 统一校验区间字段、连续性和完整性
         if (UserConstants.NOT_UNIQUE.equals(depthConfigService.checkRangeCross(entity))) {
             return AjaxResult.error(I18nUtil.getMessage("ui.tc.depthConfig.rangeCross"));
         }
@@ -62,12 +52,12 @@ public class TcDepthConfigController extends AbstractDocBizController<TcDepthCon
     }
 
     /**
-     * 校验唯一性
+     * 兼容旧调用路径，执行连续区间校验。
      */
-    @ApiOperation("校验唯一性")
+    @ApiOperation("兼容旧调用路径校验连续区间")
     @PostMapping("/checkUnique")
     public String checkUnique(@RequestBody TcDepthConfig entity) {
-        return depthConfigService.checkUnique(entity);
+        return depthConfigService.checkRangeCross(entity);
     }
 
     /**
@@ -92,6 +82,6 @@ public class TcDepthConfigController extends AbstractDocBizController<TcDepthCon
 
     @Override
     protected String getOrderBy() {
-        return "MACHINE_QTY desc";
+        return "MIN_MACHINE_QTY";
     }
 }

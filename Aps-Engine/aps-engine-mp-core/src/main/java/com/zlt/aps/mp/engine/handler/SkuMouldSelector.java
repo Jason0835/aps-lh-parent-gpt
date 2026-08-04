@@ -14,6 +14,7 @@ import com.zlt.aps.mp.engine.enums.ProductionStageEnum;
 import com.zlt.aps.mp.engine.logrecorder.TbrMouldProductionLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.BaseDataContainer;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
+import com.zlt.aps.mp.engine.utils.ProductionComparatorUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
@@ -101,9 +102,7 @@ public class SkuMouldSelector {
         if (usedMouldCount < ProductionConstant.DOUBLE_MOULD_PRODUCTION) {
             return Collections.emptyList();
         }
-        effectiveList.sort(Comparator.comparing(ProductionMouldInfoVo::getCommonalityValue)
-                .thenComparing(ProductionMouldInfoVo::getLeftOverCapacity)
-                .thenComparing(ProductionMouldInfoVo::getMouldCode, Comparator.reverseOrder()));
+        effectiveList.sort(ProductionComparatorUtils.getContinueSkuMoldSelectSort());
         if (usedMouldCount <= effectiveList.size()) {
             return effectiveList.subList(BigDecimal.ZERO.intValue(), usedMouldCount);
         }
@@ -138,7 +137,7 @@ public class SkuMouldSelector {
         if (CollectionUtils.isEmpty(enableSelectedList) || enableSelectedList.size() < ProductionConstant.DOUBLE_MOULD_PRODUCTION) {
             return Collections.emptyList();
         }
-        enableSelectedList.sort(Comparator.comparing(ProductionMouldInfoVo::getCommonalityValue).thenComparing(ProductionMouldInfoVo::getMouldCode, Comparator.reverseOrder()));
+        enableSelectedList.sort(ProductionComparatorUtils.getMoldSelectSort());
         return enableSelectedList.subList(BigDecimal.ZERO.intValue(), ProductionConstant.DOUBLE_MOULD_PRODUCTION);
     }
 

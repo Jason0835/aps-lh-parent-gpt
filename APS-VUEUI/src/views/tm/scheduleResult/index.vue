@@ -238,6 +238,7 @@
 import {mapState} from "vuex";
 import {downloadLink} from "@/utils/request";
 import {resolveErrorMessage} from "@/utils/errorMessage";
+import {listTmMachineInfo} from "@/api/tm/machineInfo";
 import {
   getAutoPlanTask,
   getLatestAutoPlanTask,
@@ -305,6 +306,7 @@ export default {
       sort: {},
       search: {},
       query: {},
+      machineOptions: [],
       pageActivatedOnce: false,
       importDefaultValue: {},
       importRules: {
@@ -660,6 +662,9 @@ export default {
           type: "select",
           dictData: this.dict.type.biz_factory_name,
           filterable: true,
+          listeners: {
+            change: this.handleFactoryCodeChange,
+          },
         },
         {
           prop: "batchNo",
@@ -686,7 +691,7 @@ export default {
           prop: "machineCode",
           label: this.$t("ui.data.column.tm.scheduleResult.machineCode"),
           type: "select",
-          dictData: this.machines,
+          dictData: this.machineOptions,
           labelKey: "machineCode",
           valueKey: "machineCode",
           filterable: true,
@@ -702,6 +707,43 @@ export default {
     },
   },
   methods: {
+    /**
+     * 切换查询工厂后清空旧机台编码，并加载新工厂的机台选项。
+     *
+     * @param {String} factoryCode 当前选择的工厂编码
+     * @returns {Promise<void>} 机台选项加载完成后返回
+     */
+    async handleFactoryCodeChange(factoryCode) {
+      this.search = {
+        ...this.search,
+        factoryCode,
+        machineCode: undefined,
+      };
+      await this.loadMachineOptions(factoryCode);
+    },
+    /**
+     * 按工厂查询胎面结果页使用的机台选项，避免使用跨页面共享机台列表。
+     *
+     * @param {String} factoryCode 工厂编码
+     * @returns {Promise<void>} 机台选项加载完成后返回
+     */
+    async loadMachineOptions(factoryCode) {
+      if (!factoryCode) {
+        this.machineOptions = [];
+        return;
+      }
+      try {
+        const response = await listTmMachineInfo({factoryCode});
+        if (this.search.factoryCode === factoryCode) {
+          this.machineOptions = response.rows || [];
+        }
+      } catch (error) {
+        if (this.search.factoryCode === factoryCode) {
+          this.machineOptions = [];
+        }
+        console.error(error);
+      }
+    },
     getShiftLabel(shiftIndex) {
       const item = this.dateList[shiftIndex - 1];
       if (!item) return "";
@@ -1378,6 +1420,7 @@ export default {
       ...defaultParams,
       scheduleDate: getOffsetDate(2),
     };
+    this.loadMachineOptions(defaultParams.factoryCode);
     this.getList();
     this.restoreLatestAutoPlanTask();
     this.restoreLatestOperationTask();

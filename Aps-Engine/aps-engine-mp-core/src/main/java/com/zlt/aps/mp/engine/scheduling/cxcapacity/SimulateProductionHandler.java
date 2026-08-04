@@ -55,6 +55,8 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
 
     private final ClearProductionInfoHandler clearProductionInfoHandler;
 
+    private final CycleGroupProductionHandler cycleGroupProductionHandler;
+
     private final CxCapacityAllocationHandler cxCapacityAllocationHandler;
 
     private final SpecialMaterialScheduleHandler specialMaterialScheduleHandler;
@@ -101,6 +103,8 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
         //6、对成型剩余不满足最短上机天数的机台进行分配结构处理
         productionContext.addStageLogBuilder(LogRecorderStageEnum.SIMULATE_SUPPLEMENT_PRODUCTION);
         supplementCxMachineDistributionHandler.handlerTailCapacity(productionContext, allGroupPlanMap);
+        //7、20260731+ 对不在月周期结构清单的在产周期结构延长进行调整处理
+        cycleGroupProductionHandler.handlerNoMonthRangeCycleGroupByTimeExtension(productionContext, allContinueMap);
     }
 
     @Override

@@ -796,17 +796,9 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
 
         inputStream = new ByteArrayInputStream(exportBytes);
         exportBytes = ExcelUtils.writeMultiList(inputStream, 1, mouldChangePlanTableMap, mouldChangePlanExcelDataList);
-        // 模具交替计划sheet名称
-        try (ByteArrayInputStream bais = new ByteArrayInputStream(exportBytes);
-             XSSFWorkbook workbook = new XSSFWorkbook(bais);
-             ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-            workbook.setSheetName(1, I18nUtil.getMessage("ui.data.column.lhMouldChangePlan.import.modelName"));
-            workbook.write(baos);
-            exportBytes = baos.toByteArray();
-        } catch (IOException e) {
-            log.error("重命名导入模板Sheet失败", e);
-            throw new ServiceException("生成导入模板失败");
-        }
+        // 重命名 Sheet 0（硫化日计划）和 Sheet 1（硫化换模计划）为国际化名称，
+        // 使导入时能按 i18n sheetName 匹配模板中的工作表
+        exportBytes = renameImportSheets(exportBytes);
 
         // 排产小结已迁移至成型日计划导出（aps-cx 通过 Feign 调用 buildScheduleSummaryExportData），
         // 硫化日计划导出不再写入排产小结 sheet。

@@ -12,18 +12,8 @@ import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.entity.LhUnscheduledResult;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
-import com.zlt.aps.lh.api.enums.ConstructionStageEnum;
-import com.zlt.aps.lh.api.enums.ScheduleStepEnum;
-import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
-import com.zlt.aps.lh.api.enums.SkuTagEnum;
-import com.zlt.aps.lh.api.enums.TrialStatusEnum;
-import com.zlt.aps.lh.component.CuringMonthPlanTotalCalculator;
-import com.zlt.aps.lh.component.EarlyProductionQuantityCalculator;
-import com.zlt.aps.lh.component.MonthPlanDateResolver;
-import com.zlt.aps.lh.component.SingleControlModeSnapshotInitializer;
-import com.zlt.aps.lh.component.SkuDecrementChecker;
-import com.zlt.aps.lh.component.StructureMinMachineRetentionService;
-import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
+import com.zlt.aps.lh.api.enums.*;
+import com.zlt.aps.lh.component.*;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.IEndingJudgmentStrategy;
 import com.zlt.aps.lh.engine.strategy.support.EarlyProductionChecker;
@@ -438,7 +428,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * 判断是否为共用胎胚零余量SKU。
      *
      * @param context 排程上下文
-     * @param sku SKU排程DTO
+     * @param sku     SKU排程DTO
      * @return true-命中共用胎胚零余量；false-未命中
      */
     private boolean isSharedEmbryoZeroSurplusSku(LhScheduleContext context, SkuScheduleDTO sku) {
@@ -465,7 +455,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * 是消纳胎胚库存的自然生产者，应在预剔除阶段保留，由动态转单胎胚归一化转为单胎胚按胎胚库存排产。</p>
      *
      * @param context 排程上下文
-     * @param sku 当前SKU
+     * @param sku     当前SKU
      * @return true-生产者候选，应保留不预剔除；false-非生产者，可预剔除
      */
     private boolean isEmbryoStockEndingProducerCandidate(LhScheduleContext context, SkuScheduleDTO sku) {
@@ -593,7 +583,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * 统计同胎胚原始SKU数量。
      *
      * @param context 排程上下文
-     * @param sku SKU排程DTO
+     * @param sku     SKU排程DTO
      * @return 同胎胚SKU数量
      */
     private int resolveOriginalSharedEmbryoSkuCount(LhScheduleContext context, SkuScheduleDTO sku) {
@@ -697,7 +687,11 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
 //                    monthPlanTotalResult.getCalculateScene());
 //        }
         //超欠产信息 由resolveEffectiveLastMonthOverdueQty(plan)改为monthOverdueQtyMap直接获取
-        int lastMonthOverdueQty = monthOverdueQtyMap.values().stream().mapToInt(Integer::intValue).sum();
+        int lastMonthOverdueQty = BigDecimal.ZERO.intValue();
+        Integer currentOverdueQty = monthOverdueQtyMap.get(productionYearMonth);
+        if (null != currentOverdueQty) {
+            lastMonthOverdueQty = currentOverdueQty;
+        }
         //月计划总量
         Map<YearMonth, Integer> monthTotalMap = context.getSumPlanQty(plan);
         int monthPlanTotalQty = MonthPlanSurplusCalculator.sumQty(monthTotalMap);
@@ -710,7 +704,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
                     isCrossMonth, monthPlanTotalQty);
         }
         return new SurplusCalculation(remainingDemandQty, actualFinishedQty, ignoredOverProductionQty,
-                lastMonthOverdueQty, totalPlanQty, monthPlanTotalQty);
+                lastMonthOverdueQty, totalPlanQty, monthPlanTotalQty, monthOverdueQtyMap);
     }
 
 
@@ -2030,8 +2024,8 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * 换活字块、空闲产能补排或胎胚动态分配入口。</p>
      *
      * @param context 排程上下文
-     * @param sku 被拦截的SKU
-     * @param reason 未排原因，用于胎胚活跃集合清理日志
+     * @param sku     被拦截的SKU
+     * @param reason  未排原因，用于胎胚活跃集合清理日志
      */
     private void cleanupBlockedSku(LhScheduleContext context, SkuScheduleDTO sku, String reason) {
         if (Objects.isNull(context) || Objects.isNull(sku)) {
@@ -2050,7 +2044,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * <p>同一物料和产品状态可能因多台续作机台形成多个SKU副本，本方法只评估
      * 和写入一次未排，再按复合键移除全部副本，避免重复未排和残留续作入口。</p>
      *
-     * @param context 排程上下文
+     * @param context           排程上下文
      * @param continuousSkuList 续作SKU列表
      */
     private void filterContinuousTrialDailyPlanAdmission(LhScheduleContext context,
@@ -2110,7 +2104,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * <p>准入拦截是当前SKU最终不进入排产主链的原因，若前置阶段已生成同键未排，
      * 则保持列表位置并替换为本次准入结果，避免同一SKU重复落库。</p>
      *
-     * @param context 排程上下文
+     * @param context           排程上下文
      * @param unscheduledResult 未排结果
      */
     private void appendOrReplaceUnscheduledResult(LhScheduleContext context,
@@ -2132,14 +2126,13 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     }
 
 
-
     /**
      * 按精确优先、降级在后的顺序分配MES与滚动续作SKU。
      *
-     * @param context 排程上下文
-     * @param skuByMaterialMap 物料编码到待匹配SKU列表
+     * @param context               排程上下文
+     * @param skuByMaterialMap      物料编码到待匹配SKU列表
      * @param continuousTemplateMap 已命中产品状态的续作模板
-     * @param continuousSkuList 续作SKU结果列表
+     * @param continuousSkuList     续作SKU结果列表
      * @param allowMaterialFallback 是否允许产品状态未命中时按物料降级
      */
     private void assignContinuousSkus(LhScheduleContext context,
@@ -2187,9 +2180,9 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * <p>专用X/T结果会在每个有效班次写入持久化标记。下一滚动窗口即使最新结果仍是X/T，
      * 也必须把同物料正规SKU继续识别为该机台的续作，并把剩余X/T锁回同一机台。</p>
      *
-     * @param context 排程上下文
-     * @param machineCode 滚动继承机台编码
-     * @param rollingResult 最新滚动继承结果
+     * @param context          排程上下文
+     * @param machineCode      滚动继承机台编码
+     * @param rollingResult    最新滚动继承结果
      * @param skuByMaterialMap 当前待匹配SKU集合
      * @return 续作匹配应使用的产品状态
      */
@@ -2259,7 +2252,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * 将SKU登记到物料状态复合索引。
      *
      * @param context 排程上下文
-     * @param sku SKU排程信息
+     * @param sku     SKU排程信息
      */
     private void registerAllSkuScheduleDto(LhScheduleContext context, SkuScheduleDTO sku) {
         if (Objects.isNull(context) || Objects.isNull(sku) || StringUtils.isEmpty(sku.getMaterialCode())) {
@@ -2277,7 +2270,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * 列入未排等），该机台不应被在机物料的规格结束时间锚定，而应从窗口首班开始
      * 即可参与新增排产选机和换模。</p>
      *
-     * @param context 排程上下文
+     * @param context           排程上下文
      * @param continuousSkuList 已匹配的续作SKU列表
      */
     private void resetIdleMachineEndingTimeToWindowStart(LhScheduleContext context,
@@ -2342,9 +2335,9 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * 继承结果只用于保留前规格识别，不再代表本窗口内的真实占用，因此仅修正结束时间，
      * 不删除继承结果。</p>
      *
-     * @param context 排程上下文
-     * @param machineCode 机台编码
-     * @param materialCode 当前在机物料编码
+     * @param context         排程上下文
+     * @param machineCode     机台编码
+     * @param materialCode    当前在机物料编码
      * @param windowStartTime 排程窗口首班开始时间
      */
     private void alignInheritedMachineAssignmentEndTime(LhScheduleContext context,
@@ -2466,12 +2459,12 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * 按机台最近在机记录匹配续作SKU。
      * <p>先按物料编码与产品状态精确匹配；精确匹配失败后，再降级按物料编码匹配。</p>
      *
-     * @param machineCode 机台编码
-     * @param materialCode 在机物料编码
-     * @param productStatus 在机产品状态
-     * @param skuByMaterialMap 物料编码 -> 待匹配SKU列表
+     * @param machineCode           机台编码
+     * @param materialCode          在机物料编码
+     * @param productStatus         在机产品状态
+     * @param skuByMaterialMap      物料编码 -> 待匹配SKU列表
      * @param continuousTemplateMap 已精确匹配的物料状态续作模板
-     * @param continuousSkuList 续作SKU列表
+     * @param continuousSkuList     续作SKU列表
      * @param allowMaterialFallback 是否允许按物料编码降级
      */
     private void assignContinuousSku(String machineCode,
@@ -2545,7 +2538,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * 查找同物料SKU列表中产品状态一致的候选位置。
      *
      * @param matchedSkuList 同物料待匹配SKU列表
-     * @param productStatus MES在机或滚动继承产品状态
+     * @param productStatus  MES在机或滚动继承产品状态
      * @return 状态一致的SKU位置；未匹配返回-1
      */
     private int resolveProductStatusMatchedSkuIndex(List<SkuScheduleDTO> matchedSkuList, String productStatus) {
@@ -2661,9 +2654,9 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     /**
      * 解析滚动衔接后机台应继续承接的最新未收尾结果。
      *
-     * @param context 排程上下文
+     * @param context     排程上下文
      * @param machineCode 机台编码
-     * @param machine 机台状态
+     * @param machine     机台状态
      * @return 最新未收尾继承结果；不存在时返回null
      */
     private LhScheduleResult resolveRollingContinuousResult(LhScheduleContext context,
@@ -2741,15 +2734,18 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         private final int lastMonthOverdueQty;
         private final int monthPlanTotal;
         private final int monthPlanSumTotal;
+        private final Map<YearMonth, Integer> monthOverdueQtyMap;
 
         private SurplusCalculation(int surplusQty, int actualFinishedQty, int ignoredOverProductionQty,
-                                   int lastMonthOverdueQty, int monthPlanTotal, int monthPlanSumTotal) {
+                                   int lastMonthOverdueQty, int monthPlanTotal, int monthPlanSumTotal,
+                                   Map<YearMonth, Integer> monthOverdueQtyMap) {
             this.surplusQty = surplusQty;
             this.actualFinishedQty = Math.max(0, actualFinishedQty);
             this.ignoredOverProductionQty = Math.max(0, ignoredOverProductionQty);
             this.lastMonthOverdueQty = lastMonthOverdueQty;
             this.monthPlanTotal = Math.max(0, monthPlanTotal);
             this.monthPlanSumTotal = Math.max(BigDecimal.ZERO.intValue(), monthPlanSumTotal);
+            this.monthOverdueQtyMap = monthOverdueQtyMap;
         }
 
         public int getSurplusQty() {

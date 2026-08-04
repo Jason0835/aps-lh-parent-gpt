@@ -164,26 +164,42 @@ public class TcPersistService {
         JSONArray itemArray = new JSONArray();
         BigDecimal requiredQty = this.resolveRequiredQty(task);
         BigDecimal baseDemandQty = nvl(task.getBaseDemandQty());
+        BigDecimal preLossPlanQty = this.nvl(task.getPreLossPlanQty());
+        BigDecimal afterLossQty = preLossPlanQty.add(this.nvl(task.getLossAddQty()));
+        BigDecimal afterMinStartQty = afterLossQty.add(this.nvl(task.getMinStartAdjustQty()));
+        BigDecimal afterRoundQty = afterMinStartQty.add(this.nvl(task.getTailRoundAdjustQty()));
         this.addBreakdownItem(itemArray, "REQUIRED", "基础需求与库存抵扣",
                 requiredQty, baseDemandQty, baseDemandQty.subtract(nvl(requiredQty)),
                 "INVENTORY", "max(当前班需求,保证范围需求)-滚动库存");
-        this.addBreakdownItem(itemArray, "LOSS_ADD", "损耗补偿",
-                baseDemandQty, baseDemandQty.add(nvl(task.getLossAddQty())), nvl(task.getLossAddQty()),
-                task.getLossMatchSource(), "基础需求×损耗率");
         this.addBreakdownItem(itemArray, "LAST_SHIFT_SUPPLY", "上班供应抵扣",
                 null, null, BigDecimal.ZERO, "SHIFT_CHAIN", "当前版本无独立分量");
         this.addBreakdownItem(itemArray, "MONTH_SURPLUS_DEDUCT", "月结余抵扣",
                 null, null, BigDecimal.ZERO, "MONTH_PLAN", "当前版本无独立分量");
+        if (this.isTailTask(task)) {
+            this.addBreakdownItem(itemArray, "TAIL_ROUND", "收尾基础量调整",
+                    baseDemandQty, preLossPlanQty, this.nvl(task.getTailRoundAdjustQty()),
+                    "SIDEWALL_LENGTH", task.getCalcFormulaDesc());
+            this.addBreakdownItem(itemArray, "LOSS_ADD", "损耗补偿",
+                    preLossPlanQty, afterLossQty, this.nvl(task.getLossAddQty()),
+                    task.getLossMatchSource(), "损耗前计划量×损耗率");
+            this.addBreakdownItem(itemArray, "MIN_START", "收尾跳过最小起排",
+                    afterLossQty, afterLossQty, this.nvl(task.getMinStartAdjustQty()),
+                    TcScheduleConstants.PARAM_MIN_START_QTY, "收尾任务不执行最小起排");
+        } else {
+            this.addBreakdownItem(itemArray, "LOSS_ADD", "损耗补偿",
+                    preLossPlanQty, afterLossQty, this.nvl(task.getLossAddQty()),
+                    task.getLossMatchSource(), "损耗前计划量×损耗率");
+            this.addBreakdownItem(itemArray, "MIN_START", "最小起排调整",
+                    afterLossQty, afterMinStartQty, this.nvl(task.getMinStartAdjustQty()),
+                    TcScheduleConstants.PARAM_MIN_START_QTY, "损耗后正计划量不足最小起排时补齐");
+            this.addBreakdownItem(itemArray, "TAIL_ROUND", "卷曲取整",
+                    afterMinStartQty, afterRoundQty, this.nvl(task.getTailRoundAdjustQty()),
+                    "CURL_LENGTH", task.getCalcFormulaDesc());
+        }
         this.addBreakdownItem(itemArray, "TOOL_LIMIT", "工装限制",
                 task.getPlanQtyBeforeToolLimit(), nvl(task.getPlanQtyBeforeToolLimit())
                         .add(nvl(task.getToolLimitAdjustQty())), nvl(task.getToolLimitAdjustQty()),
                 TcScheduleConstants.PARAM_TOOL_TOTAL_QTY, "工厂级可用工装池限制");
-        this.addBreakdownItem(itemArray, "MIN_START", "最小起排调整",
-                null, null, nvl(task.getMinStartAdjustQty()),
-                TcScheduleConstants.PARAM_MIN_START_QTY, "正计划量不足最小起排时补齐");
-        this.addBreakdownItem(itemArray, "TAIL_ROUND", "收尾或卷曲取整",
-                null, null, nvl(task.getTailRoundAdjustQty()),
-                "SIDEWALL_LENGTH/CURL_LENGTH", task.getCalcFormulaDesc());
         this.addBreakdownItem(itemArray, "CAPACITY", "机台产能调整",
                 null, task.getPlanQty(), nvl(task.getCapacityAdjustQty()),
                 "T_TC_MACHINE_INFO.MAX_CAPACITY", "机台最大班产限制与顺延");
@@ -281,6 +297,19 @@ public class TcPersistService {
      */
     private BigDecimal nvl(BigDecimal value) {
         return value == null ? BigDecimal.ZERO : value;
+    }
+
+    /**
+     * 判断任务是否使用收尾基础量口径。
+     *
+     * @param task 待排任务
+     * @return 收尾标识、收尾余量和胎侧长度均有效时返回true
+     */
+    private boolean isTailTask(TcTaskDraft task) {
+        return task != null
+                && TcYesNoEnum.YES.getCode().equals(task.getTailFlag())
+                && this.nvl(task.getTailBalanceQty()).compareTo(BigDecimal.ZERO) > 0
+                && this.nvl(task.getSidewallLength()).compareTo(BigDecimal.ZERO) > 0;
     }
 
     private TcScheduleResult convertNodeToResult(ScheduleTaskNode<TcTaskDraft> node, TcScheduleContext context) {

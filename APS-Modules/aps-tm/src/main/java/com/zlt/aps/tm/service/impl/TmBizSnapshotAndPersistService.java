@@ -7,15 +7,13 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.common.engine.quantity.PlanQuantityAllocationItem;
 import com.zlt.aps.common.engine.quantity.PlanQuantityAllocationUtils;
 import com.zlt.aps.common.engine.schedule.ScheduleTaskLinkedList;
 import com.zlt.aps.common.engine.schedule.ScheduleTaskNode;
 import com.zlt.aps.tm.api.constant.TmScheduleConstants;
-import com.zlt.aps.tm.api.domain.entity.TmScheduleExplainTargetRel;
-import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
-import com.zlt.aps.tm.api.domain.entity.TmScheduleResultExplain;
-import com.zlt.aps.tm.api.domain.entity.TmScheduleUnplanned;
+import com.zlt.aps.tm.api.domain.entity.*;
 import com.zlt.aps.tm.api.enums.TmMachineAssignStatusEnum;
 import com.zlt.aps.tm.api.enums.TmScheduleRuleCodeEnum;
 import com.zlt.aps.tm.engine.domain.*;
@@ -23,10 +21,7 @@ import com.zlt.aps.tm.engine.service.ITmSnapshotAndPersistService;
 import com.zlt.aps.tm.engine.service.impl.TmPersistService;
 import com.zlt.aps.tm.engine.service.impl.TmScheduleQualitySummaryService;
 import com.zlt.aps.tm.engine.service.impl.TmSnapshotBuildService;
-import com.zlt.aps.tm.mapper.TmScheduleExplainTargetRelMapper;
-import com.zlt.aps.tm.mapper.TmScheduleResultExplainMapper;
-import com.zlt.aps.tm.mapper.TmScheduleResultMapper;
-import com.zlt.aps.tm.mapper.TmScheduleUnplannedMapper;
+import com.zlt.aps.tm.mapper.*;
 import com.zlt.core.dao.basedao.BaseDao;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,6 +32,7 @@ import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.text.MessageFormat;
 import java.util.*;
 import java.util.function.BiFunction;
@@ -63,6 +59,9 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
 
     private final TmScheduleExplainTargetRelMapper scheduleExplainTargetRelMapper;
 
+    /** 胎面自动排程过程日志 Mapper。 */
+    private final TmScheduleProcessLogMapper scheduleProcessLogMapper;
+
     /** 通用批量写入服务。 */
     private final BaseDao baseDao;
 
@@ -82,6 +81,7 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
      * @param scheduleResultExplainMapper 胎面排程解释 Mapper
      * @param scheduleUnplannedMapper     胎面未排任务 Mapper
      * @param scheduleExplainTargetRelMapper 胎面来源解释目标关联 Mapper
+     * @param scheduleProcessLogMapper    胎面过程日志 Mapper
      * @param baseDao                     通用批量写入服务
      * @param transactionManager          事务管理器
      */
@@ -92,6 +92,7 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
                                           TmScheduleResultExplainMapper scheduleResultExplainMapper,
                                           TmScheduleUnplannedMapper scheduleUnplannedMapper,
                                           TmScheduleExplainTargetRelMapper scheduleExplainTargetRelMapper,
+                                          TmScheduleProcessLogMapper scheduleProcessLogMapper,
                                           BaseDao baseDao,
                                           PlatformTransactionManager transactionManager) {
         this.snapshotBuildService = snapshotBuildService;
@@ -100,6 +101,7 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
         this.scheduleResultExplainMapper = scheduleResultExplainMapper;
         this.scheduleUnplannedMapper = scheduleUnplannedMapper;
         this.scheduleExplainTargetRelMapper = scheduleExplainTargetRelMapper;
+        this.scheduleProcessLogMapper = scheduleProcessLogMapper;
         this.baseDao = baseDao;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
@@ -123,7 +125,7 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
                                           BaseDao baseDao,
                                           PlatformTransactionManager transactionManager) {
         this(snapshotBuildService, persistService, scheduleResultMapper, scheduleResultExplainMapper,
-                scheduleUnplannedMapper, null, baseDao, transactionManager);
+                scheduleUnplannedMapper, null, null, baseDao, transactionManager);
     }
 
     /**
@@ -141,13 +143,38 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
         this.buildSnapshot(context);
         TmPersistResult persistResult = transactionTemplate.execute(transactionStatus -> {
             this.logicDeleteOldSchedule(context);
-            return this.persistScheduleContext(context, transactionStatus);
+            TmPersistResult result = this.persistScheduleContext(context, transactionStatus);
+            this.saveScheduleProcessLog(context, result);
+            return result;
         });
         if (persistResult == null) {
             throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.schedule.persistFailed"));
         }
         context.setPersistResult(persistResult);
         context.setQualitySummary(this.qualitySummaryService.build(context, persistResult));
+    }
+
+    /**
+     * 在结果、未排和解释数据的同一事务内保存本批次中文过程日志。
+     *
+     * @param context       自动排程上下文
+     * @param persistResult 排程结果汇总
+     */
+    private void saveScheduleProcessLog(TmScheduleContext context, TmPersistResult persistResult) {
+        if (scheduleProcessLogMapper == null || context == null || StrUtil.isBlank(context.getProcessLogText())) {
+            return;
+        }
+        context.appendProcessLog("快照与落库完成：结果数量={0}，未排数量={1}，解释数量={2}，异常数量={3}",
+                persistResult == null ? 0 : persistResult.getResultCount(),
+                persistResult == null ? 0 : persistResult.getUnplannedCount(),
+                persistResult == null ? 0 : persistResult.getExplainCount(),
+                persistResult == null ? 0 : persistResult.getErrorCount());
+        TmScheduleProcessLog processLog = new TmScheduleProcessLog();
+        processLog.setBatchNo(context.getBatchNo());
+        processLog.setLogDetail(context.getProcessLogText());
+        scheduleProcessLogMapper.insert(processLog);
+        log.info("胎面自动排程过程日志已保存，批次号={}，日志长度={}", context.getBatchNo(),
+                processLog.getLogDetail().length());
     }
 
     /**
@@ -221,6 +248,11 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
         for (TmScheduleResult result : visibleResultList) {
             this.registerInsertedResultId(result, mergedResultBusinessKeyMap, resultIdMap);
         }
+        Map<Long, TmScheduleResult> finalResultMap = visibleResultList.stream()
+                .filter(Objects::nonNull)
+                .filter(result -> result.getId() != null)
+                .collect(java.util.stream.Collectors.toMap(TmScheduleResult::getId, result -> result,
+                        (first, second) -> first, LinkedHashMap::new));
         persistResult.setResultCount(visibleResultList.size());
         // 未排表落库统一批量写入，批量失败时回滚保存点并逐行定位失败对象。
         Map<String, TmScheduleUnplanned> unplannedMap = this.buildMergedUnplannedMap(unplannedTaskList, context);
@@ -247,6 +279,8 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
             if (resultId != null) {
                 explain.setResultId(resultId);
             }
+            explain.setFinalAssignmentJson(this.buildFinalAssignmentJson(
+                    taskDraft, context, resultIdMap, unplannedIdMap, finalResultMap));
             explainList.add(explain);
         }
         if (CollUtil.isNotEmpty(explainList)) {
@@ -304,7 +338,51 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
             }
             BigDecimal groupFinalPlanQty = fragmentList.stream().map(TmTaskDraft::getPlanQty)
                     .filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
+            TmTaskDraft aggregateTask = taskGroup.getAggregateTask();
+            Map<String, BigDecimal> sourcePreLossPlanQtyMap = this.allocateByWeight(
+                    aggregateTask == null ? BigDecimal.ZERO : aggregateTask.getPreLossPlanQty(),
+                    taskGroup.getSourceWeightMap());
+            Map<String, BigDecimal> sourceLossAddQtyMap = this.allocateByWeight(
+                    aggregateTask == null ? BigDecimal.ZERO : aggregateTask.getLossAddQty(),
+                    taskGroup.getSourceWeightMap());
+            Map<String, BigDecimal> sourceMinStartAdjustQtyMap = this.allocateByWeight(
+                    aggregateTask == null ? BigDecimal.ZERO : aggregateTask.getMinStartAdjustQty(),
+                    taskGroup.getSourceWeightMap());
+            Map<String, BigDecimal> sourceRoundAdjustQtyMap = this.allocateByWeight(
+                    aggregateTask == null ? BigDecimal.ZERO : aggregateTask.getTailRoundAdjustQty(),
+                    taskGroup.getSourceWeightMap());
+            Map<String, BigDecimal> sourcePlanQtyBeforeToolLimitMap = this.allocateByWeight(
+                    aggregateTask == null ? BigDecimal.ZERO : aggregateTask.getPlanQtyBeforeToolLimit(),
+                    taskGroup.getSourceWeightMap());
+            Map<String, BigDecimal> sourceToolLimitAdjustQtyMap = this.allocateByWeight(
+                    aggregateTask == null ? BigDecimal.ZERO : aggregateTask.getToolLimitAdjustQty(),
+                    taskGroup.getSourceWeightMap());
             taskGroup.setGroupFinalPlanQty(groupFinalPlanQty);
+            if (aggregateTask != null) {
+                taskGroup.setGroupMinStartAdjustQty(aggregateTask.getMinStartAdjustQty());
+                taskGroup.setGroupRoundAdjustQty(aggregateTask.getTailRoundAdjustQty());
+                aggregateTask.setGroupMinStartAdjustQty(aggregateTask.getMinStartAdjustQty());
+                aggregateTask.setGroupRoundAdjustQty(aggregateTask.getTailRoundAdjustQty());
+                aggregateTask.setGroupFinalPlanQty(groupFinalPlanQty);
+                // PLAN_CALC 记录的是派机前估算证据，快照阶段必须覆盖为机台确认后的最终结算分量。
+                if (context.getRuleTraceMap().get(aggregateTask.getBusinessKey()) != null) {
+                    context.getRuleTraceMap().get(aggregateTask.getBusinessKey()).getRuleHits().stream()
+                            .filter(item -> TmScheduleRuleCodeEnum.PLAN_QTY_AGGREGATE.getCode()
+                                    .equals(item.getRuleCode()))
+                            .filter(item -> item.getEvidence() instanceof Map)
+                            .forEach(item -> {
+                                Map<String, Object> evidence = (Map<String, Object>) item.getEvidence();
+                                evidence.put("preLossPlanQty", aggregateTask.getPreLossPlanQty());
+                                evidence.put("lossAddQty", aggregateTask.getLossAddQty());
+                                evidence.put("groupMinStartAdjustQty", taskGroup.getGroupMinStartAdjustQty());
+                                evidence.put("groupRoundAdjustQty", taskGroup.getGroupRoundAdjustQty());
+                                evidence.put("planQtyBeforeToolLimit", aggregateTask.getPlanQtyBeforeToolLimit());
+                                evidence.put("groupFinalPlanQty", groupFinalPlanQty);
+                                evidence.put("calcFormulaDesc", aggregateTask.getCalcFormulaDesc());
+                                evidence.put("allocationStage", "SNAPSHOT");
+                            });
+                }
+            }
             List<TmTaskDraft> assignedFragmentList = fragmentList.stream()
                     .filter(task -> !this.isUnplannedTask(task) && this.isPositiveQty(task.getPlanQty()))
                     .collect(java.util.stream.Collectors.toList());
@@ -317,9 +395,25 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
             boolean allUnplanned = CollUtil.isNotEmpty(fragmentList)
                     && assignedFragmentList.isEmpty() && groupFinalPlanQty.compareTo(BigDecimal.ZERO) > 0;
             for (TmTaskDraft sourceTask : taskGroup.getSourceTaskList()) {
-                sourceTask.setPlanQty(sourceFinalQtyMap.getOrDefault(sourceTask.getBusinessKey(), BigDecimal.ZERO));
+                String sourceBusinessKey = sourceTask.getBusinessKey();
+                sourceTask.setPlanQty(sourceFinalQtyMap.getOrDefault(sourceBusinessKey, BigDecimal.ZERO));
+                sourceTask.setPreLossPlanQty(sourcePreLossPlanQtyMap.getOrDefault(sourceBusinessKey, BigDecimal.ZERO));
+                sourceTask.setLossAddQty(sourceLossAddQtyMap.getOrDefault(sourceBusinessKey, BigDecimal.ZERO));
+                sourceTask.setMinStartAdjustQty(sourceMinStartAdjustQtyMap.getOrDefault(sourceBusinessKey, BigDecimal.ZERO));
+                sourceTask.setTailRoundAdjustQty(sourceRoundAdjustQtyMap.getOrDefault(sourceBusinessKey, BigDecimal.ZERO));
+                sourceTask.setPlanQtyBeforeToolLimit(sourcePlanQtyBeforeToolLimitMap.getOrDefault(sourceBusinessKey, BigDecimal.ZERO));
+                sourceTask.setToolLimitAdjustQty(sourceToolLimitAdjustQtyMap.getOrDefault(sourceBusinessKey, BigDecimal.ZERO));
+                sourceTask.setGroupMinStartAdjustQty(taskGroup.getGroupMinStartAdjustQty());
+                sourceTask.setGroupRoundAdjustQty(taskGroup.getGroupRoundAdjustQty());
                 sourceTask.setGroupFinalPlanQty(groupFinalPlanQty);
+                if (aggregateTask != null) {
+                    sourceTask.setResolvedLossRate(aggregateTask.getResolvedLossRate());
+                    sourceTask.setLossMatchLevel(aggregateTask.getLossMatchLevel());
+                    sourceTask.setLossMatchSource(aggregateTask.getLossMatchSource());
+                    sourceTask.setCalcFormulaDesc(aggregateTask.getCalcFormulaDesc());
+                }
                 if (context.getRuleTraceMap().get(sourceTask.getBusinessKey()) != null) {
+                    // 来源分摊证据与来源解释字段使用同一份最终分量，避免继续展示派机前估算值。
                     context.getRuleTraceMap().get(sourceTask.getBusinessKey()).getRuleHits().stream()
                             .filter(item -> TmScheduleRuleCodeEnum.PLAN_QTY_SOURCE_ALLOCATE.getCode()
                                     .equals(item.getRuleCode()))
@@ -327,6 +421,12 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
                             .forEach(item -> {
                                 Map<String, Object> evidence = (Map<String, Object>) item.getEvidence();
                                 evidence.put("allocatedPlanQty", sourceTask.getPlanQty());
+                                evidence.put("allocatedPreLossPlanQty", sourceTask.getPreLossPlanQty());
+                                evidence.put("allocatedLossAddQty", sourceTask.getLossAddQty());
+                                evidence.put("allocatedMinStartAdjustQty", sourceTask.getMinStartAdjustQty());
+                                evidence.put("allocatedRoundAdjustQty", sourceTask.getTailRoundAdjustQty());
+                                evidence.put("allocatedPlanQtyBeforeToolLimit", sourceTask.getPlanQtyBeforeToolLimit());
+                                evidence.put("calcFormulaDesc", sourceTask.getCalcFormulaDesc());
                                 evidence.put("allocationStage", "SNAPSHOT");
                             });
                 }
@@ -435,6 +535,147 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
             }
         }
         return relationList;
+    }
+
+    /**
+     * 构建来源解释对应的最终分配证据。
+     *
+     * <p>该证据在结果归并、零计划过滤、最终班内顺序重排和主键回填后生成，
+     * 因此其中的机台与顺序代表最终可见结果，而不是派机前基础排序。</p>
+     *
+     * @param sourceTask 来源解释任务
+     * @param context 排程上下文
+     * @param resultIdMap 实际片段业务键与结果主键映射
+     * @param unplannedIdMap 实际片段业务键与未排主键映射
+     * @param finalResultMap 结果主键与最终可见结果映射
+     * @return 带版本号的最终分配JSON
+     * @throws ServiceException 正计划量片段无法定位最终目标时抛出
+     */
+    private String buildFinalAssignmentJson(TmTaskDraft sourceTask, TmScheduleContext context,
+                                            Map<String, Long> resultIdMap,
+                                            Map<String, Long> unplannedIdMap,
+                                            Map<Long, TmScheduleResult> finalResultMap) {
+        Map<String, Object> root = new LinkedHashMap<>();
+        root.put("schemaVersion", "1");
+        List<Map<String, Object>> assignmentList = new ArrayList<>();
+        if (sourceTask == null || context == null || StrUtil.isBlank(sourceTask.getBusinessKey())) {
+            root.put("assignments", assignmentList);
+            return JSONUtil.toJsonPrettyStr(root);
+        }
+        TmPlanTaskGroup taskGroup = context.getPlanTaskGroupMap() == null
+                ? null : context.getPlanTaskGroupMap().get(sourceTask.getPlanGroupKey());
+        List<TmTaskDraft> fragmentList = taskGroup == null
+                ? Collections.singletonList(sourceTask)
+                : context.getTaskDraftList().stream()
+                .filter(Objects::nonNull)
+                .filter(fragment -> Objects.equals(taskGroup.getPlanGroupKey(), fragment.getPlanGroupKey()))
+                .filter(fragment -> this.isPositiveQty(fragment.getPlanQty()))
+                .collect(java.util.stream.Collectors.toList());
+        Map<String, BigDecimal> sourceWeightMap = taskGroup == null
+                ? Collections.singletonMap(sourceTask.getBusinessKey(), BigDecimal.ONE)
+                : taskGroup.getSourceWeightMap();
+        for (TmTaskDraft fragment : fragmentList) {
+            if (!this.isPositiveQty(fragment.getPlanQty())) {
+                continue;
+            }
+            BigDecimal allocatedQty = this.allocateByWeight(fragment.getPlanQty(), sourceWeightMap)
+                    .get(sourceTask.getBusinessKey());
+            if (!this.isPositiveQty(allocatedQty)) {
+                continue;
+            }
+            boolean unplanned = this.isUnplannedTask(fragment);
+            Long targetId = unplanned
+                    ? unplannedIdMap.get(fragment.getBusinessKey())
+                    : resultIdMap.get(fragment.getBusinessKey());
+            if (targetId == null) {
+                throw new ServiceException(MessageFormat.format(
+                        I18nUtil.getMessage("ui.tm.schedule.explainTargetMissing"),
+                        fragment.getBusinessKey()));
+            }
+            TmScheduleResult finalResult = unplanned ? null : finalResultMap.get(targetId);
+            Map<String, Object> assignment = new LinkedHashMap<>();
+            assignment.put("targetType", unplanned ? "UNPLANNED" : "RESULT");
+            assignment.put("targetId", targetId);
+            assignment.put("targetBusinessKey", fragment.getBusinessKey());
+            assignment.put("machineCode", unplanned ? null : fragment.getMachineCode());
+            assignment.put("shiftOrder", fragment.getShiftOrder());
+            assignment.put("sequence", unplanned ? null
+                    : this.resolveFinalSequence(finalResult, fragment.getShiftOrder()));
+            assignment.put("allocatedQty", allocatedQty);
+            assignment.put("selectedMachineScore", unplanned ? null
+                    : this.resolveSelectedMachineScore(fragment, context));
+            assignmentList.add(assignment);
+        }
+        BigDecimal assignmentTotal = assignmentList.stream()
+                .map(assignment -> (BigDecimal) assignment.get("allocatedQty"))
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal sourceFinalPlanQty = BigDecimalUtils.valueOf(sourceTask.getPlanQty());
+        if (CollUtil.isNotEmpty(assignmentList) && assignmentTotal.compareTo(sourceFinalPlanQty) != 0) {
+            Map<String, Object> lastAssignment = assignmentList.get(assignmentList.size() - 1);
+            BigDecimal lastAllocatedQty = BigDecimalUtils.valueOf(lastAssignment.get("allocatedQty"));
+            lastAssignment.put("allocatedQty", lastAllocatedQty.add(sourceFinalPlanQty.subtract(assignmentTotal)));
+        }
+        this.sortFinalAssignmentList(assignmentList);
+        root.put("assignments", assignmentList);
+        return JSONUtil.toJsonPrettyStr(root);
+    }
+
+    /**
+     * 读取实际片段选中机台的最终评分。
+     *
+     * @param fragment 实际排程片段
+     * @param context 排程上下文
+     * @return 选中机台评分；没有候选证据时返回null
+     */
+    private BigDecimal resolveSelectedMachineScore(TmTaskDraft fragment, TmScheduleContext context) {
+        if (fragment == null || context == null || context.getCandidateTraceMap() == null) {
+            return null;
+        }
+        List<TmMachineCandidate> candidateList = context.getCandidateTraceMap().get(fragment.getBusinessKey());
+        if (CollUtil.isEmpty(candidateList)) {
+            return null;
+        }
+        return candidateList.stream()
+                .filter(Objects::nonNull)
+                .filter(candidate -> Objects.equals(fragment.getMachineCode(), candidate.getMachineCode()))
+                .map(TmMachineCandidate::getScore)
+                .filter(Objects::nonNull)
+                .findFirst().orElse(null);
+    }
+
+    /**
+     * 读取最终结果指定班次的可见顺序。
+     *
+     * @param result 最终可见结果
+     * @param shiftOrder 班次顺序
+     * @return 最终班内顺序；无结果或班次无效时返回null
+     */
+    private Integer resolveFinalSequence(TmScheduleResult result, Integer shiftOrder) {
+        if (result == null || shiftOrder == null || shiftOrder < 1
+                || shiftOrder > TmScheduleConstants.TM_MAX_SHIFT_ORDER) {
+            return null;
+        }
+        Object sequence = result.getFieldValueByFieldName(
+                String.format(TmScheduleConstants.SHIFT_SEQUENCE_FIELD_TEMPLATE, shiftOrder));
+        return sequence instanceof Number ? ((Number) sequence).intValue() : null;
+    }
+
+    /**
+     * 按目标类型、班次、机台、顺序和目标业务键稳定排列最终分配证据。
+     *
+     * @param assignmentList 最终分配证据列表
+     */
+    private void sortFinalAssignmentList(List<Map<String, Object>> assignmentList) {
+        assignmentList.sort(Comparator
+                .comparing((Map<String, Object> assignment) -> String.valueOf(assignment.get("targetType")))
+                .thenComparing(assignment -> (Integer) assignment.get("shiftOrder"),
+                        Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(assignment -> Objects.toString(assignment.get("machineCode"), ""))
+                .thenComparing(assignment -> (Integer) assignment.get("sequence"),
+                        Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(assignment -> Objects.toString(
+                        assignment.get("targetBusinessKey"), "")));
     }
 
     /**
@@ -717,7 +958,8 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
      * 归一化结果表班次字段。
      *
      * <p>结果表只表示已经安排到机台产能的任务。机台为空或班次计划量为空/小于等于 0 时，
-     * 对应班次顺序和起止时间必须清空，避免看板展示无产能承接的顺序。</p>
+     * 对应班次顺序和起止时间必须清空，避免看板展示无产能承接的顺序；正计划量在结果归并完成后
+     * 统一向上取整，避免拆分片段分别取整造成计划量重复放大。</p>
      *
      * @param result 排程结果
      */
@@ -730,11 +972,25 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
             BigDecimal planQty = this.getShiftPlanQty(result, shiftOrder);
             if (StrUtil.isBlank(result.getMachineCode())) {
                 result.setFieldValueByFieldName(planQtyField, BigDecimal.ZERO);
-            }
-            if (StrUtil.isBlank(result.getMachineCode()) || !this.isPositiveQty(planQty)) {
                 this.clearShiftFields(result, shiftOrder);
+                continue;
             }
+            if (!this.isPositiveQty(planQty)) {
+                this.clearShiftFields(result, shiftOrder);
+                continue;
+            }
+            result.setFieldValueByFieldName(planQtyField, this.roundUpResultPlanQty(planQty));
         }
+    }
+
+    /**
+     * 将最终结果表的正计划量向上取整到整数。
+     *
+     * @param planQty 已完成结果归并的班次计划量
+     * @return 向上取整后的结果计划量
+     */
+    private BigDecimal roundUpResultPlanQty(BigDecimal planQty) {
+        return planQty.setScale(0, RoundingMode.CEILING);
     }
 
     /**

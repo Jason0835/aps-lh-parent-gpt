@@ -8,7 +8,6 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
-import com.zlt.aps.common.engine.utils.DepthConfigResolver;
 import com.zlt.aps.tm.api.constant.TmScheduleConstants;
 import com.zlt.aps.tm.api.domain.entity.*;
 import com.zlt.aps.tm.api.enums.*;
@@ -1778,7 +1777,7 @@ public class TmAutoScheduleDataLoadService {
      * 避免配置调整后仍使用旧库存保证班数。</p>
      *
      * @param context 自动排程上下文
-     * @return 按机台数量降序排列的库存保证班数配置；未配置或查询失败时返回空集合
+     * @return 按区间起始机台数升序排列的库存保证班数配置；未配置或查询失败时返回空集合
      */
     private List<TmDepthConfig> loadDepthConfigs(TmScheduleContext context) {
         if (tmDepthConfigMapper == null) {
@@ -1787,10 +1786,10 @@ public class TmAutoScheduleDataLoadService {
         try {
             LambdaQueryWrapper<TmDepthConfig> wrapper = new LambdaQueryWrapper<>();
             wrapper.eq(TmDepthConfig::getFactoryCode, context.getFactoryCode());
-            wrapper.orderByDesc(TmDepthConfig::getMachineQty);
+            wrapper.orderByAsc(TmDepthConfig::getMinMachineQty);
             return Optional.ofNullable(tmDepthConfigMapper.selectList(wrapper)).orElse(Collections.emptyList()).stream()
-                    .sorted(Comparator.comparing((TmDepthConfig config) -> config.getMachineQty() == null
-                            ? Integer.MIN_VALUE : config.getMachineQty()).reversed())
+                    .sorted(Comparator.comparing((TmDepthConfig config) -> config.getMinMachineQty() == null
+                            ? Integer.MAX_VALUE : config.getMinMachineQty()))
                     .collect(Collectors.toList());
         } catch (RuntimeException ex) {
             log.warn("[TM_DEPTH_CONFIG_LOAD] factoryCode={} 加载库存保证班数配置失败，原因={}，将回退参数 {}",
@@ -1827,23 +1826,15 @@ public class TmAutoScheduleDataLoadService {
                     fallbackGuardShiftCount);
             return fallbackGuardShiftCount;
         }
-        Optional<TmDepthConfig> exactConfigOptional = depthConfigList.stream()
-                .filter(depthConfig -> "EQ".equals(depthConfig.getMachineRange())
-                        && Objects.equals(depthConfig.getMachineQty(), lhMachineQty))
+        Optional<TmDepthConfig> matchedConfigOptional = depthConfigList.stream()
+                .filter(depthConfig -> depthConfig.getMinMachineQty() != null
+                        && lhMachineQty >= depthConfig.getMinMachineQty()
+                        && (depthConfig.getMaxMachineQty() == null
+                        || lhMachineQty <= depthConfig.getMaxMachineQty()))
                 .findFirst();
-        if (exactConfigOptional.isPresent()) {
-            return this.resolveMatchedGuardShiftCount(context, orderNo, lhMachineQty, exactConfigOptional.get(),
+        if (matchedConfigOptional.isPresent()) {
+            return this.resolveMatchedGuardShiftCount(context, orderNo, lhMachineQty, matchedConfigOptional.get(),
                     fallbackGuardShiftCount);
-        }
-        for (TmDepthConfig depthConfig : depthConfigList) {
-            DepthConfigResolver.DepthConfigVo configVo = new DepthConfigResolver.DepthConfigVo(
-                    depthConfig.getMachineQty(), depthConfig.getMachineRange(), depthConfig.getDepthClassQty());
-            BigDecimal matchedDepthClassQty = DepthConfigResolver.resolveDepthClassQty(lhMachineQty,
-                    Collections.singletonList(configVo));
-            if (matchedDepthClassQty == null) {
-                continue;
-            }
-            return this.resolveMatchedGuardShiftCount(context, orderNo, lhMachineQty, depthConfig, fallbackGuardShiftCount);
         }
         log.warn("[TM_DEPTH_CONFIG_MATCH] factoryCode={}, orderNo={}, lhMachineQty={} 未命中库存保证班数配置，回退参数 {}={}",
                     context.getFactoryCode(), orderNo, lhMachineQty, TmScheduleConstants.PARAM_MIN_STOCK_CLASS,
@@ -1868,9 +1859,9 @@ public class TmAutoScheduleDataLoadService {
         if (guardShiftCount != null) {
             return guardShiftCount;
         }
-        log.warn("[TM_DEPTH_CONFIG_MATCH] factoryCode={}, orderNo={}, lhMachineQty={}, machineRange={}, machineQty={}, depthClassQty={} 不是正整数，回退参数 {}={}",
-                context.getFactoryCode(), orderNo, lhMachineQty, depthConfig.getMachineRange(),
-                    depthConfig.getMachineQty(), depthConfig.getDepthClassQty(),
+        log.warn("[TM_DEPTH_CONFIG_MATCH] factoryCode={}, orderNo={}, lhMachineQty={}, minMachineQty={}, maxMachineQty={}, depthClassQty={} 不是正整数，回退参数 {}={}",
+                context.getFactoryCode(), orderNo, lhMachineQty, depthConfig.getMinMachineQty(),
+                    depthConfig.getMaxMachineQty(), depthConfig.getDepthClassQty(),
                     TmScheduleConstants.PARAM_MIN_STOCK_CLASS, fallbackGuardShiftCount);
         return fallbackGuardShiftCount;
     }
@@ -2053,7 +2044,12 @@ public class TmAutoScheduleDataLoadService {
             if (this.isShutdownDay(previousCalendar) && !this.isShutdownDay(currentCalendar)) {
                 for (int calendarShift = 1; calendarShift <= 3; calendarShift++) {
                     if (this.isShiftOpen(currentCalendar, calendarShift)) {
-                        startupShiftOrders.add(dayOffset * 3 + calendarShift);
+                        int startupShiftOrder = dayOffset * 3 + calendarShift;
+                        startupShiftOrders.add(startupShiftOrder);
+                        log.info("[TM_STARTUP_SHIFT] batchNo={}, traceId={}, factoryCode={}, previousDate={}, currentDate={}, startupShiftOrder={}, calendarShift={}, detectionScope=PREVIOUS_FULL_DAY_SHUTDOWN",
+                                context.getBatchNo(), context.getTraceId(), context.getFactoryCode(),
+                                DateUtil.formatDate(previousDate), DateUtil.formatDate(currentDate),
+                                startupShiftOrder, calendarShift);
                         break;
                     }
                 }
@@ -2061,6 +2057,9 @@ public class TmAutoScheduleDataLoadService {
             previousDate = currentDate;
         }
         context.setStartupShiftOrderSet(startupShiftOrders);
+        log.info("[TM_STARTUP_SHIFT_SUMMARY] batchNo={}, traceId={}, factoryCode={}, scheduleDate={}, startupShiftOrders={}",
+                context.getBatchNo(), context.getTraceId(), context.getFactoryCode(),
+                DateUtil.formatDate(context.getScheduleDate()), startupShiftOrders);
     }
 
     /**

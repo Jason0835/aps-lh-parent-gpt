@@ -213,11 +213,11 @@ public abstract class OnLineGroupOnLineMachineHandler {
      */
     private void recordStartProductionLog(TbrProductionContext productionContext, String structureName, ProductionStageEnum productionStage, ContinueTypeEnum continueType) {
         if (ProductionStageEnum.FORMAL_STAGE == productionStage) {
-            log.info(TbrMouldFormalProductionLogRecorder.addProductionContinueGroupSingleGroupLog(productionContext, structureName, continueType));
+            TbrMouldFormalProductionLogRecorder.addProductionContinueGroupSingleGroupLog(productionContext, structureName, continueType);
             return;
         }
         if (ProductionStageEnum.SIMULATE_STAGE == productionStage) {
-            log.info(TbrSimulateProductionLogRecorder.addProductionContinueGroupSingleGroupLog(productionContext, structureName, continueType));
+            TbrSimulateProductionLogRecorder.addProductionContinueGroupSingleGroupLog(productionContext, structureName, continueType);
             return;
         }
     }

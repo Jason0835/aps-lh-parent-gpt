@@ -227,8 +227,11 @@ public class TcPlanCalcService implements ITcPlanCalcService {
             groupConflictMessageList.add(conflictMessage);
         });
         if (CollUtil.isNotEmpty(groupConflictMessageList)) {
+            String summaryTemplate = this.resolveI18nTemplate(
+                    "ui.tc.schedule.planGroupAttributeConflictSummary",
+                    "ui.tc.schedule.planGroupAttributeConflictSummary: {0}");
             throw new ServiceException(MessageFormat.format(
-                    I18nUtil.getMessage("ui.tc.schedule.planGroupAttributeConflictSummary"),
+                    summaryTemplate,
                     String.join("；", groupConflictMessageList)));
         }
         List<TcTaskDraft> aggregateTaskList = new ArrayList<>();
@@ -401,8 +404,26 @@ public class TcPlanCalcService implements ITcPlanCalcService {
      */
     private String formatPlanGroupAttributeConflictItem(String planGroupKey,
                                                          List<String> sourceBusinessKeyList) {
-        return MessageFormat.format(I18nUtil.getMessage("ui.tc.schedule.planGroupAttributeConflictItem"),
+        String itemTemplate = this.resolveI18nTemplate(
+                "ui.tc.schedule.planGroupAttributeConflictItem",
+                "ui.tc.schedule.planGroupAttributeConflictItem: {0} ({1})");
+        return MessageFormat.format(itemTemplate,
                 planGroupKey, String.join(",", sourceBusinessKeyList));
+    }
+
+    /**
+     * 解析国际化消息模板，在脱离 Spring 国际化上下文的单元测试中保留业务参数。
+     *
+     * @param messageKey       国际化键
+     * @param fallbackTemplate 国际化组件未解析时使用的参数化模板
+     * @return 可供 {@link MessageFormat} 格式化的消息模板
+     */
+    private String resolveI18nTemplate(String messageKey, String fallbackTemplate) {
+        String messageTemplate = I18nUtil.getMessage(messageKey);
+        if (StrUtil.isBlank(messageTemplate) || messageKey.equals(messageTemplate)) {
+            return fallbackTemplate;
+        }
+        return messageTemplate;
     }
 
     /**
@@ -559,31 +580,48 @@ public class TcPlanCalcService implements ITcPlanCalcService {
                 || !context.getStartupShiftOrderSet().contains(task.getShiftOrder())) {
             return;
         }
-        BigDecimal threshold = this.readDecimalParam(context,
-                TcScheduleConstants.PARAM_OPEN_SHIFT_THRESHOLD, BigDecimal.ONE);
+        BigDecimal threshold = this.resolveStartupThreshold(context);
+        BigDecimal currentShiftDemandQty = nvl(task.getCurrentShiftDemandQty());
         BigDecimal originalPlanQty = nvl(task.getPlanQty());
-        BigDecimal planQtyLimit = nvl(task.getCurrentShiftDemandQty()).multiply(threshold)
+        Map<String, Object> evidence = new LinkedHashMap<>();
+        evidence.put("ruleCode", TcScheduleRuleCodeEnum.STARTUP_THRESHOLD_ADJUST.getCode());
+        evidence.put("phase", "PLAN_CALC");
+        evidence.put("detectionScope", "PREVIOUS_FULL_DAY_SHUTDOWN");
+        evidence.put("date", this.formatScheduleDate(context));
+        evidence.put("sourceShiftOrder", task.getShiftOrder());
+        evidence.put("targetShiftOrder", task.getShiftOrder());
+        evidence.put("shiftOrder", task.getShiftOrder());
+        evidence.put("currentShiftDemandQty", currentShiftDemandQty);
+        evidence.put("rollingStockQty", task.getRollingStockQty());
+        evidence.put("supplyHours", task.getSupplyHours());
+        evidence.put("threshold", threshold);
+        evidence.put("thresholdSource", this.resolveStartupThresholdSource(context));
+        evidence.put("originalPlanQty", originalPlanQty);
+        if (currentShiftDemandQty.compareTo(BigDecimal.ZERO) <= 0) {
+            evidence.put("skipReason", "CURRENT_SHIFT_DEMAND_NOT_POSITIVE");
+            evidence.put("finalPlanQty", originalPlanQty);
+            traceOf(context, task).addRuleHit(TcScheduleRuleCodeEnum.STARTUP_THRESHOLD_ADJUST,
+                    TcScheduleRuleResultEnum.SKIP, evidence);
+            return;
+        }
+        BigDecimal planQtyLimit = currentShiftDemandQty.multiply(threshold)
                 .subtract(nvl(task.getRollingStockQty())).max(BigDecimal.ZERO);
         BigDecimal finalPlanQty = originalPlanQty.min(planQtyLimit);
+        BigDecimal originalPreLossPlanQty = task.getPreLossPlanQty() == null
+                ? originalPlanQty : nvl(task.getPreLossPlanQty());
+        BigDecimal originalPlanQtyBeforeToolLimit = task.getPlanQtyBeforeToolLimit() == null
+                ? originalPlanQty : nvl(task.getPlanQtyBeforeToolLimit());
         task.setPlanQty(finalPlanQty);
+        task.setPreLossPlanQty(originalPreLossPlanQty.min(planQtyLimit));
+        task.setPlanQtyBeforeToolLimit(originalPlanQtyBeforeToolLimit.min(planQtyLimit));
         task.setPlanStockQty(nvl(task.getRollingStockQty()).add(finalPlanQty)
-                .subtract(nvl(task.getCurrentShiftDemandQty())).max(BigDecimal.ZERO));
+                .subtract(currentShiftDemandQty).max(BigDecimal.ZERO));
         // 开产阈值截断计划量后，同步最小起排与卷曲取整分量，使 baseDemand + 分量 = finalPlanQty 保持闭合，
         // 避免 applyPlanGroupResult 用未更新的分量分摊导致 plan_qty_breakdown 不闭合。
         if (finalPlanQty.compareTo(originalPlanQty) < 0) {
             task.setMinStartAdjustQty(BigDecimal.ZERO);
             task.setTailRoundAdjustQty(finalPlanQty.subtract(nvl(task.getBaseDemandQty())));
         }
-        Map<String, Object> evidence = new LinkedHashMap<>();
-        evidence.put("ruleCode", TcScheduleRuleCodeEnum.STARTUP_THRESHOLD_ADJUST.getCode());
-        evidence.put("date", this.formatScheduleDate(context));
-        evidence.put("sourceShiftOrder", task.getShiftOrder());
-        evidence.put("targetShiftOrder", task.getShiftOrder());
-        evidence.put("shiftOrder", task.getShiftOrder());
-        evidence.put("currentShiftDemandQty", task.getCurrentShiftDemandQty());
-        evidence.put("rollingStockQty", task.getRollingStockQty());
-        evidence.put("threshold", threshold);
-        evidence.put("originalPlanQty", originalPlanQty);
         evidence.put("planQtyLimit", planQtyLimit);
         evidence.put("adjustedQty", finalPlanQty.subtract(originalPlanQty));
         evidence.put("finalPlanQty", finalPlanQty);
@@ -591,6 +629,44 @@ public class TcPlanCalcService implements ITcPlanCalcService {
                 finalPlanQty.compareTo(originalPlanQty) < 0
                         ? TcScheduleRuleResultEnum.PASS : TcScheduleRuleResultEnum.SKIP,
                 evidence);
+    }
+
+    /**
+     * 读取开产库存覆盖阈值，非正数统一回退默认值1。
+     *
+     * @param context 排程上下文
+     * @return 有效开产阈值
+     */
+    private BigDecimal resolveStartupThreshold(TcScheduleContext context) {
+        BigDecimal threshold = this.readDecimalParam(context,
+                TcScheduleConstants.PARAM_OPEN_SHIFT_THRESHOLD, BigDecimal.ONE);
+        if (threshold.compareTo(BigDecimal.ZERO) > 0) {
+            return threshold;
+        }
+        log.warn("[TC_PARAM_PARSE] batchNo={}, traceId={}, paramCode={}, paramValue={}, reason=NOT_POSITIVE, fallback=1",
+                context.getBatchNo(), context.getTraceId(), TcScheduleConstants.PARAM_OPEN_SHIFT_THRESHOLD, threshold);
+        return BigDecimal.ONE;
+    }
+
+    /**
+     * 解析开产阈值来源，非法配置统一标记为默认回退。
+     *
+     * @param context 排程上下文
+     * @return 参数来源说明
+     */
+    private String resolveStartupThresholdSource(TcScheduleContext context) {
+        TcParamValue paramValue = context.getParamMap().get(TcScheduleConstants.PARAM_OPEN_SHIFT_THRESHOLD);
+        if (paramValue == null || StrUtil.isBlank(paramValue.getEffectiveValue())) {
+            return "DEFAULT";
+        }
+        try {
+            if (new BigDecimal(paramValue.getEffectiveValue().trim()).compareTo(BigDecimal.ZERO) <= 0) {
+                return "DEFAULT_INVALID";
+            }
+        } catch (NumberFormatException exception) {
+            return "DEFAULT_INVALID";
+        }
+        return StrUtil.blankToDefault(paramValue.getSource(), "CONFIG");
     }
     /**
      * 计算库存不足时间、预计生产时长和最晚开始时间，并写入排序规则证据。
