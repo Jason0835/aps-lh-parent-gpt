@@ -1,16 +1,16 @@
 package com.zlt.aps.cd15.engine.algorithm;
 
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.cd15.api.domain.entity.Cd15DepthConfig;
 import com.zlt.aps.cd15.engine.model.Cd15ConstructionMaterial;
 import com.zlt.aps.cd15.engine.model.Cd15FormingScheduleSource;
-import com.zlt.aps.common.engine.enums.MachineRangeEnum;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
+import java.text.MessageFormat;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -48,7 +48,9 @@ public class Cd15SteelStripDepthResolver {
                 .forEach(schedule -> this.collectScheduleMachines(schedule, steelStripsByConstruction,
                         machinesBySteelStrip, missingMachineSteelStrips));
         if (!missingMachineSteelStrips.isEmpty()) {
-            throw new IllegalArgumentException("存在正需求但成型机台代码为空的钢带: " + missingMachineSteelStrips);
+            throw new IllegalArgumentException(MessageFormat.format(
+                    I18nUtil.getMessage("ui.data.column.cd15DepthConfig.missingMachine"),
+                    missingMachineSteelStrips));
         }
 
         List<Cd15DepthConfig> validConfigs = this.validateAndSortConfigs(configs);
@@ -105,29 +107,38 @@ public class Cd15SteelStripDepthResolver {
     private List<Cd15DepthConfig> validateAndSortConfigs(List<Cd15DepthConfig> configs) {
         List<Cd15DepthConfig> values = this.safe(configs);
         values.stream().forEach(config -> {
-            if (config == null || config.getMachineQty() == null
-                    || MachineRangeEnum.getByCode(config.getMachineRange()) == null
+            if (config == null || config.getMinMachineQty() == null
+                    || config.getMinMachineQty() <= 0
+                    || (config.getMaxMachineQty() != null
+                    && config.getMaxMachineQty() < config.getMinMachineQty())
                     || config.getDepthClassQty() == null || config.getDepthClassQty().signum() <= 0) {
-                throw new IllegalArgumentException("斜裁备库深度配置存在无效机台范围、机台数或备库班数");
+                throw new IllegalArgumentException(
+                        I18nUtil.getMessage("ui.data.column.cd15DepthConfig.invalidRange"));
             }
         });
         return values.stream()
-                .sorted(Comparator.comparing(Cd15DepthConfig::getMachineQty).reversed()
-                        .thenComparing(Cd15DepthConfig::getMachineRange))
+                .sorted(java.util.Comparator.comparing(Cd15DepthConfig::getMinMachineQty))
                 .collect(Collectors.toList());
     }
 
     /** 每个钢带必须且只能命中一条配置，禁止默认深度掩盖基础数据问题。 */
     private BigDecimal matchDepth(String steelStripCode, int machineCount, List<Cd15DepthConfig> configs) {
         List<Cd15DepthConfig> matches = configs.stream()
-                .filter(config -> MachineRangeEnum.getByCode(config.getMachineRange())
-                        .matches(machineCount, config.getMachineQty()))
+                .filter(config -> this.matches(config, machineCount))
                 .collect(Collectors.toList());
         if (matches.size() != 1) {
-            throw new IllegalArgumentException("钢带备库深度必须唯一匹配, steelStripCode=" + steelStripCode
-                    + ", formingMachineCount=" + machineCount + ", matchCount=" + matches.size());
+            throw new IllegalArgumentException(MessageFormat.format(
+                    I18nUtil.getMessage("ui.data.column.cd15DepthConfig.matchCount"),
+                    steelStripCode, machineCount, matches.size()));
         }
         return matches.get(0).getDepthClassQty();
+    }
+
+    /** 判断成型机台数是否落在配置闭区间内，上限为空表示无上限。 */
+    private boolean matches(Cd15DepthConfig config, int machineCount) {
+        return machineCount >= config.getMinMachineQty()
+                && (config.getMaxMachineQty() == null
+                || machineCount <= config.getMaxMachineQty());
     }
 
     private String constructionKey(String constructionCode, String constructionVersion) {

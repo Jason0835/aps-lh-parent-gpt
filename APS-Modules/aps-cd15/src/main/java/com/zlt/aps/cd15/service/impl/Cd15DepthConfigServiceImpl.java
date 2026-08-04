@@ -19,9 +19,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
-import java.math.BigDecimal;
+import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -41,69 +42,69 @@ public class Cd15DepthConfigServiceImpl extends AbstractDocService<Cd15DepthConf
 
     @Override
     public String checkUnique(Cd15DepthConfig entity) {
-        validateBusiness(entity);
+        this.validateBusiness(entity);
         LambdaQueryWrapper<Cd15DepthConfig> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(Cd15DepthConfig::getFactoryCode, entity.getFactoryCode());
-        queryWrapper.eq(Cd15DepthConfig::getMachineQty, entity.getMachineQty());
-        queryWrapper.eq(Cd15DepthConfig::getMachineRange, entity.getMachineRange());
+        queryWrapper.eq(Cd15DepthConfig::getMinMachineQty, entity.getMinMachineQty());
         queryWrapper.ne(entity.getId() != null, Cd15DepthConfig::getId, entity.getId());
         return mapper.selectCount(queryWrapper) > 0 ? UserConstants.NOT_UNIQUE : UserConstants.UNIQUE;
     }
 
     /**
-     * 校验配置规则的交叉情况。
-     * 不同规则的范围不允许有交集，确保任意台数值最多只命中一条规则。
+     * 校验同一工厂的有效区间从1开始、相邻连续且互不重叠。
+     * 上限为空表示无上限，因此只允许出现在最后一行。
      */
     @Override
     public String checkRangeCross(Cd15DepthConfig entity) {
+        if (!this.isValidRange(entity)) {
+            return UserConstants.NOT_UNIQUE;
+        }
         LambdaQueryWrapper<Cd15DepthConfig> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(Cd15DepthConfig::getFactoryCode, entity.getFactoryCode());
         queryWrapper.ne(entity.getId() != null, Cd15DepthConfig::getId, entity.getId());
-        List<Cd15DepthConfig> existingList = mapper.selectList(queryWrapper);
+        List<Cd15DepthConfig> configs = new ArrayList<>(mapper.selectList(queryWrapper));
+        configs.add(entity);
+        configs.sort(Comparator.comparing(Cd15DepthConfig::getMinMachineQty));
+        return this.isContinuous(configs) ? UserConstants.UNIQUE : UserConstants.NOT_UNIQUE;
+    }
 
-        if (existingList.isEmpty()) {
-            return UserConstants.UNIQUE;
+    /** 校验排序后的整组区间。 */
+    private boolean isContinuous(List<Cd15DepthConfig> configs) {
+        if (CollectionUtils.isEmpty(configs)
+                || !Integer.valueOf(1).equals(configs.get(0).getMinMachineQty())) {
+            return false;
         }
-
-        boolean newIsEq = "EQ".equals(entity.getMachineRange());
-        long[] newRange = calculateRange(entity.getMachineRange(), entity.getMachineQty());
-
-        for (Cd15DepthConfig existing : existingList) {
-            boolean existIsEq = "EQ".equals(existing.getMachineRange());
-            long[] existingRange = calculateRange(existing.getMachineRange(), existing.getMachineQty());
-
-            if (newRange[0] <= existingRange[1] && existingRange[0] <= newRange[1]) {
-                if (newIsEq && existIsEq) {
-                    if (entity.getMachineQty().equals(existing.getMachineQty())) {
-                        return UserConstants.NOT_UNIQUE;
-                    }
-                    continue;
-                }
-                if (!newIsEq && !existIsEq) {
-                    continue;
-                }
-                if (newIsEq) {
-                    return UserConstants.NOT_UNIQUE;
+        for (int index = 0; index < configs.size(); index++) {
+            Cd15DepthConfig current = configs.get(index);
+            if (!this.isValidRange(current)) {
+                return false;
+            }
+            if (index < configs.size() - 1) {
+                Cd15DepthConfig next = configs.get(index + 1);
+                if (current.getMaxMachineQty() == null
+                        || current.getMaxMachineQty() + 1 != next.getMinMachineQty()) {
+                    return false;
                 }
             }
         }
-
-        return UserConstants.UNIQUE;
+        return true;
     }
 
-    /**
-     * 将规则转换为整数范围区间 [start, end]，EQ 视为零宽度点 [qty, qty]。
-     */
-    private long[] calculateRange(String machineRange, Integer machineQty) {
-        int qty = machineQty != null ? machineQty : 0;
-        switch (machineRange) {
-            case "LT": return new long[]{0, qty - 1L};
-            case "LE": return new long[]{0, qty};
-            case "EQ": return new long[]{qty, qty};
-            case "GE": return new long[]{qty, Integer.MAX_VALUE};
-            case "GT": return new long[]{qty + 1L, Integer.MAX_VALUE};
-            default: return new long[]{0, 0};
+    /** 校验单个区间和备库班数的基础值。 */
+    private boolean isValidRange(Cd15DepthConfig entity) {
+        if (entity == null || entity.getFactoryCode() == null
+                || entity.getFactoryCode().trim().isEmpty()
+                || entity.getMinMachineQty() == null
+                || entity.getMinMachineQty() <= 0) {
+            return false;
         }
+        if (entity.getMaxMachineQty() != null
+                && entity.getMaxMachineQty() < entity.getMinMachineQty()) {
+            return false;
+        }
+        return entity.getDepthClassQty() != null
+                && entity.getDepthClassQty().signum() > 0
+                && entity.getDepthClassQty().stripTrailingZeros().scale() <= 2;
     }
 
     @Override
@@ -119,7 +120,7 @@ public class Cd15DepthConfigServiceImpl extends AbstractDocService<Cd15DepthConf
             List<ImportErrorLog> errors = ImportExcelValidatedUtils.validated(importLogId, rowNum, item);
             ImportExcelValidatedUtils.validatedRepeat(list, item, i, 2, importLogId, errors);
             try {
-                validateBusiness(item);
+                this.validateBusiness(item);
             } catch (IllegalArgumentException ex) {
                 ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(), rowNum, ex.getMessage(), errors);
             }
@@ -133,36 +134,43 @@ public class Cd15DepthConfigServiceImpl extends AbstractDocService<Cd15DepthConf
         for (int i = 0; i < list.size(); i++) {
             int rowNum = i + 2;
             Cd15DepthConfig item = list.get(i);
-            if (item.getId() != null && item.getId() == -999L) continue;
-            Cd15DepthConfig exist = getExist(item);
+            if (Long.valueOf(-999L).equals(item.getId())) {
+                continue;
+            }
+            Cd15DepthConfig exist = this.getExist(item);
             if (exist == null) {
                 item.setRowState(RowStateEnum.ADDED);
                 insertList.add(item);
             } else if (updateSupport) {
-                exist.setMachineQty(item.getMachineQty());
-                exist.setMachineRange(item.getMachineRange());
+                exist.setMinMachineQty(item.getMinMachineQty());
+                exist.setMaxMachineQty(item.getMaxMachineQty());
                 exist.setDepthClassQty(item.getDepthClassQty());
                 exist.setRemark(item.getRemark());
                 mapper.updateById(exist);
                 successNum++;
             } else {
                 failNum++;
-                ImportExcelValidatedUtils.addImportErrorLog(importLogId, rowNum, String.format(uniqueMsg, rowNum), errorList);
+                ImportExcelValidatedUtils.addImportErrorLog(importLogId, rowNum,
+                        MessageFormat.format(uniqueMsg, rowNum), errorList);
             }
         }
 
-        if (PubUtil.isEmpty(insertList) && successNum == 0)
+        if (PubUtil.isEmpty(insertList) && successNum == 0) {
             return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failNum, errorList);
-        if (CollectionUtils.isNotEmpty(insertList)) successNum += baseDao.saveBatch(insertList);
-        if (failNum > 0) return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failNum, errorList);
+        }
+        if (CollectionUtils.isNotEmpty(insertList)) {
+            successNum += baseDao.saveBatch(insertList);
+        }
+        if (failNum > 0) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failNum, errorList);
+        }
         return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + successNum);
     }
 
     private Cd15DepthConfig getExist(Cd15DepthConfig entity) {
         LambdaQueryWrapper<Cd15DepthConfig> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(Cd15DepthConfig::getFactoryCode, entity.getFactoryCode());
-        queryWrapper.eq(Cd15DepthConfig::getMachineQty, entity.getMachineQty());
-        queryWrapper.eq(Cd15DepthConfig::getMachineRange, entity.getMachineRange());
+        queryWrapper.eq(Cd15DepthConfig::getMinMachineQty, entity.getMinMachineQty());
         return mapper.selectOne(queryWrapper);
     }
 
@@ -175,25 +183,14 @@ public class Cd15DepthConfigServiceImpl extends AbstractDocService<Cd15DepthConf
 
     @Override
     protected List<String> getCheckUniqueFields() {
-        return Arrays.asList("factoryCode", "machineQty", "machineRange");
+        return Arrays.asList("factoryCode", "minMachineQty");
     }
 
-    /**
-     * 业务校验：机台数 >= 0；备库班数 > 0；机台范围不能为空
-     */
+    /** 保存和导入时校验单条业务数据。 */
     private void validateBusiness(Cd15DepthConfig entity) {
-        if (entity == null) {
-            return;
-        }
-        Integer machineQty = entity.getMachineQty();
-        if (machineQty == null || machineQty < 0) {
-            throw new IllegalArgumentException("供成型机台数必须为大于等于0的整数");
-        }
-        if (entity.getDepthClassQty() == null || entity.getDepthClassQty().compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("备库班数必须为大于0的数字");
-        }
-        if (entity.getMachineRange() == null || entity.getMachineRange().trim().isEmpty()) {
-            throw new IllegalArgumentException("机台范围不能为空");
+        if (!this.isValidRange(entity)) {
+            throw new IllegalArgumentException(
+                    I18nUtil.getMessage("ui.data.column.cd15DepthConfig.invalidRange"));
         }
     }
 }
