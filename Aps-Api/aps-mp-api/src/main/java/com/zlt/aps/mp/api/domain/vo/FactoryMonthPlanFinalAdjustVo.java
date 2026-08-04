@@ -227,6 +227,48 @@ public class FactoryMonthPlanFinalAdjustVo extends FactoryMonthPlanProductionFin
     @ApiModelProperty(value = "当前调整版本", name = "currentAdjustVersion")
     @TableField(exist = false)
     private String currentAdjustVersion;
+    /**
+     * 模壳标准,
+     */
+    @ApiModelProperty(value = "模壳标准", name = "mouldShell")
+    @TableField(exist = false)
+    private String mouldShell;
+    /**
+     * 每日模具数
+     */
+    private Integer mouldQtyDay1;
+    private Integer mouldQtyDay2;
+    private Integer mouldQtyDay3;
+    private Integer mouldQtyDay4;
+    private Integer mouldQtyDay5;
+    private Integer mouldQtyDay6;
+    private Integer mouldQtyDay7;
+    private Integer mouldQtyDay8;
+    private Integer mouldQtyDay9;
+    private Integer mouldQtyDay10;
+    private Integer mouldQtyDay11;
+    private Integer mouldQtyDay12;
+    private Integer mouldQtyDay13;
+    private Integer mouldQtyDay14;
+    private Integer mouldQtyDay15;
+    private Integer mouldQtyDay16;
+    private Integer mouldQtyDay17;
+    private Integer mouldQtyDay18;
+    private Integer mouldQtyDay19;
+    private Integer mouldQtyDay20;
+    private Integer mouldQtyDay21;
+    private Integer mouldQtyDay22;
+    private Integer mouldQtyDay23;
+    private Integer mouldQtyDay24;
+    private Integer mouldQtyDay25;
+    private Integer mouldQtyDay26;
+    private Integer mouldQtyDay27;
+    private Integer mouldQtyDay28;
+    private Integer mouldQtyDay29;
+    private Integer mouldQtyDay30;
+    private Integer mouldQtyDay31;
+
+
 
     /**
      * 获取待调整量的key
