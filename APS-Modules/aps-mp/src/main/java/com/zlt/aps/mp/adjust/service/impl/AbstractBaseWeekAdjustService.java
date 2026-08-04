@@ -1181,19 +1181,11 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         //1、根据规格+主花纹，初始模壳标准
         List<FactoryMonthPlanFinalAdjustVo> factoryMonthPlanProdFinalList = contextDTO.getFactoryMonthPlanProdFinalList();
         String key,mouldShell;
-        List<String> mouldShellCombineList = new ArrayList<>();
         for (FactoryMonthPlanFinalAdjustVo adjustVo:factoryMonthPlanProdFinalList){
             key = getSpecAndMainPatternKey(adjustVo.getSpecifications(),adjustVo.getMainPattern());
             mouldShell = contextDTO.getMdmMouldInfoMap().get(key);
             if (StringUtils.isNotBlank(mouldShell)){
                 adjustVo.setMouldShell(mouldShell);
-                String[] mouldShellArr = mouldShell.split(BusiConstant.WeekRollAdjust.SPLIT_COMMA);
-                if (mouldShellArr!=null && mouldShellArr.length>1){
-                    //模壳有组合时，初始计划量0
-                    for (String shell:mouldShellArr){
-                        mouldShellCombineList.add(shell);
-                    }
-                }
             }
         }
         //2、检查模壳标准
