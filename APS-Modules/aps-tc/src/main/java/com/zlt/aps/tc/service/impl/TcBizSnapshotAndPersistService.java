@@ -178,7 +178,8 @@ public class TcBizSnapshotAndPersistService implements ITcSnapshotAndPersistServ
         if (scheduleProcessLogMapper == null || context == null || StrUtil.isBlank(context.getProcessLogText())) {
             return;
         }
-        context.appendProcessLog("快照与落库完成：结果数量={0}，未排数量={1}，解释数量={2}，异常数量={3}",
+        this.appendFinalScheduleSummary(context);
+        context.appendProcessLog("落库完成：结果数量={0}，未排数量={1}，解释数量={2}，异常数量={3}",
                 persistResult == null ? 0 : persistResult.getResultCount(),
                 persistResult == null ? 0 : persistResult.getUnplannedCount(),
                 persistResult == null ? 0 : persistResult.getExplainCount(),
@@ -189,6 +190,50 @@ public class TcBizSnapshotAndPersistService implements ITcSnapshotAndPersistServ
         scheduleProcessLogMapper.insert(processLog);
         log.info("胎侧自动排程过程日志已保存，批次号={}，日志长度={}", context.getBatchNo(),
                 processLog.getLogDetail().length());
+    }
+
+    /**
+     * 按最终机台、胎侧和胎胚汇总各班次已排量，供过程日志追溯最终排程结果。
+     *
+     * @param context 自动排程上下文
+     */
+    private void appendFinalScheduleSummary(TcScheduleContext context) {
+        Map<String, BigDecimal[]> quantityMap = new TreeMap<>();
+        Map<String, String[]> groupInfoMap = new HashMap<>();
+        context.getTaskDraftList().stream()
+                .filter(task -> !this.isUnplannedTask(task) && this.isPositiveQty(task.getPlanQty()))
+                .filter(task -> StrUtil.isNotBlank(task.getMachineCode()))
+                .forEach(task -> {
+                    String embryoCode = StrUtil.blankToDefault(task.getEmbryoCode(), "未提供");
+                    String groupKey = task.getMachineCode() + "\u0001" + task.getSidewallCode() + "\u0001" + embryoCode;
+                    BigDecimal[] classQtyArray = quantityMap.computeIfAbsent(groupKey, key -> new BigDecimal[6]);
+                    groupInfoMap.putIfAbsent(groupKey, new String[]{task.getMachineCode(), task.getSidewallCode(), embryoCode});
+                    Integer shiftOrder = task.getShiftOrder();
+                    if (shiftOrder != null && shiftOrder >= 1 && shiftOrder <= 6) {
+                        int arrayIndex = shiftOrder - 1;
+                        classQtyArray[arrayIndex] = this.nvl(classQtyArray[arrayIndex]).add(this.nvl(task.getPlanQty()));
+                    }
+                });
+        context.appendProcessLog("排程结果汇总：已排分组数量={0}", quantityMap.size());
+        quantityMap.forEach((groupKey, classQtyArray) -> {
+            String[] groupInfo = groupInfoMap.get(groupKey);
+            BigDecimal totalQty = Arrays.stream(classQtyArray).filter(Objects::nonNull)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            context.appendProcessLog("机台={0}，胎侧代码={1}（{2}）：总产量={3} 班1={4} 班2={5} 班3={6} 班4={7} 班5={8} 班6={9}",
+                    groupInfo[0], groupInfo[1], groupInfo[2], totalQty,
+                    this.nvl(classQtyArray[0]), this.nvl(classQtyArray[1]), this.nvl(classQtyArray[2]),
+                    this.nvl(classQtyArray[3]), this.nvl(classQtyArray[4]), this.nvl(classQtyArray[5]));
+        });
+    }
+
+    /**
+     * 空数值按零处理，避免日志汇总因缺失班次中断。
+     *
+     * @param value 数值
+     * @return 非空数值
+     */
+    private BigDecimal nvl(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO : value;
     }
 
     /**

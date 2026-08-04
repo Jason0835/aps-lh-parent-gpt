@@ -20,6 +20,9 @@ public class TcTaskDraft {
     /** 来源成型工单号集合，仅用于解释追踪，不写入胎侧排程结果工单号 */
     private String sourceOrderNos;
 
+    /** 成型胎胚号，仅用于自动排程过程日志与解释追溯。 */
+    private String embryoCode;
+
     /** 胎侧规格编码 */
     private String sidewallCode;
 

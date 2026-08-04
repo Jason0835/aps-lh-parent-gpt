@@ -7,14 +7,18 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.engine.schedule.IScheduleProcessLogger;
 import com.zlt.aps.tc.api.enums.TcAutoScheduleIssueCategoryEnum;
 import com.zlt.aps.tc.api.enums.TcScheduleStepEnum;
+import com.zlt.aps.tc.engine.domain.TcMachineCandidate;
 import com.zlt.aps.tc.engine.domain.TcScheduleContext;
+import com.zlt.aps.tc.engine.domain.TcStockForecast;
 import com.zlt.aps.tc.engine.domain.TcTaskDraft;
 import com.zlt.aps.tc.engine.service.*;
+import com.zlt.aps.tc.engine.util.TcGlueSimilarityUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 
-import java.util.Collections;
+import java.math.BigDecimal;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -229,13 +233,11 @@ public class TcScheduleTemplateImpl extends AbsTcScheduleTemplate {
                                 && task.getUnplannedReasonCode().trim().length() > 0)).count();
             case TASK_SORT:
                 return input ? "任务数量=" + context.getTaskDraftList().size()
-                        : "任务排序=" + context.getTaskDraftList().stream().limit(10)
-                        .map(TcTaskDraft::getBusinessKey).collect(Collectors.joining(","));
+                        : "已排序任务数量=" + context.getTaskDraftList().size();
             case MACHINE_ASSIGN:
                 return input ? "任务数量=" + context.getTaskDraftList().size()
                         : "已分配任务数量=" + context.getTaskDraftList().stream().filter(task -> !task.isUnassigned()).count()
-                        + "，未排任务数量=" + context.getTaskDraftList().stream().filter(TcTaskDraft::isUnassigned).count()
-                        + "，任务链数量=" + context.getTaskChainGroup().values().size();
+                        + "，未排任务数量=" + context.getTaskDraftList().stream().filter(TcTaskDraft::isUnassigned).count();
             case SNAPSHOT_BUILD:
                 return input ? "任务数量=" + context.getTaskDraftList().size()
                         : "解释快照数量=" + context.getSnapshotMap().size()
@@ -258,54 +260,159 @@ public class TcScheduleTemplateImpl extends AbsTcScheduleTemplate {
             return;
         }
         switch (stepEnum) {
-            case BOOTSTRAP:
-                context.appendProcessLog("初始化完成：工厂编号={0}，排程日期={1}，批次号={2}，参数数量={3}，来源任务数量={4}，候选机台数量={5}",
-                        context.getFactoryCode(), this.formatScheduleDate(context), context.getBatchNo(),
-                        context.getParamMap().size(), context.getSourceTaskDraftList().size(), context.getMachineCandidateList().size());
-                context.getTaskDraftList().forEach(task -> context.appendProcessLog(
-                        "初始化任务：任务标识={0}，胎侧编码={1}，来源工单={2}，本班需求量={3}",
-                        task.getBusinessKey(), task.getSidewallCode(), task.getSourceOrderNos(), task.getCurrentShiftDemandQty()));
-                break;
             case INVENTORY_PREDICT:
-                context.getStockForecastMap().values().forEach(stock -> context.appendProcessLog(
-                        "库存预测：胎侧编码={0}，六点库存={1}，首班需求量={2}，首班计划量={3}，滚动库存={4}",
-                        stock.getSidewallCode(), stock.getSixClockStockQty(), stock.getFirstShiftDemandQty(),
-                        stock.getFirstShiftPlanQty(), stock.getRollingStockQty()));
-                break;
-            case PLAN_CALC:
-                context.getTaskDraftList().forEach(task -> context.appendProcessLog(
-                        "计划量计算：任务标识={0}，胎侧编码={1}，需求量={2}，滚动库存={3}，库存缺口={4}，损耗前计划量={5}，工装限额前计划量={6}，可用工装量={7}，已用工装量={8}，剩余工装量={9}，最终计划量={10}，计算说明={11}",
-                        task.getBusinessKey(), task.getSidewallCode(), task.getDemandQty(), task.getRollingStockQty(),
-                        task.getStockGapQty(), task.getPreLossPlanQty(), task.getPlanQtyBeforeToolLimit(),
-                        task.getAvailableToolQty(), task.getToolUsedQty(), task.getRemainingToolQty(), task.getPlanQty(),
-                        task.getCalcFormulaDesc()));
-                break;
-            case TASK_SORT:
-                context.getTaskDraftList().forEach(task -> context.appendProcessLog(
-                        "任务排序：任务标识={0}，胎侧编码={1}，排序序号={2}，班次={3}，计划量={4}",
-                        task.getBusinessKey(), task.getSidewallCode(), task.getBaseSortIndex(), task.getShiftOrder(), task.getPlanQty()));
+                context.getStockForecastMap().values().forEach(stock ->
+                        context.appendProcessLog(this.buildInventoryFormula(stock)));
                 break;
             case MACHINE_ASSIGN:
                 context.getTaskDraftList().forEach(task -> {
-                    context.appendProcessLog("机台分配：任务标识={0}，胎侧编码={1}，计划量={2}，最终机台={3}，班次={4}，剩余产能={5}，未排原因={6}",
-                            task.getBusinessKey(), task.getSidewallCode(), task.getPlanQty(), task.getMachineCode(),
-                            task.getShiftOrder(), task.getMachineRemainCapacity(), task.getUnplannedReasonDesc());
-                    context.getCandidateTraceMap().getOrDefault(task.getBusinessKey(), Collections.emptyList())
-                            .forEach(candidate -> context.appendProcessLog(
-                                    "候选机台：任务标识={0}，机台编码={1}，是否过滤={2}，过滤原因={3}，剩余产能={4}，评分={5}",
-                                    task.getBusinessKey(), candidate.getMachineCode(), candidate.isFiltered() ? "是" : "否",
-                                    candidate.getFilterReasonDesc(), candidate.getRemainCapacity(), candidate.getScore()));
+                    context.appendProcessLog(this.buildPlanFormula(task));
+                    this.appendMachineCandidateDetail(context, task);
+                    if (task.isUnassigned()) {
+                        context.appendProcessLog("未排任务：胎侧代码={0}（胎胚号={1}），班次={2}，计划量={3}，未排原因={4}",
+                                task.getSidewallCode(), this.displayEmbryoCode(task.getEmbryoCode()), task.getShiftOrder(),
+                                task.getPlanQty(), task.getUnplannedReasonDesc());
+                    }
                 });
-                break;
-            case SNAPSHOT_BUILD:
-                context.appendProcessLog("快照构建完成：解释快照数量={0}，结果数量={1}，未排数量={2}，解释数量={3}",
-                        context.getSnapshotMap().size(), context.getPersistResult() == null ? 0 : context.getPersistResult().getResultCount(),
-                        context.getPersistResult() == null ? 0 : context.getPersistResult().getUnplannedCount(),
-                        context.getPersistResult() == null ? 0 : context.getPersistResult().getExplainCount());
                 break;
             default:
                 break;
         }
+    }
+
+    /**
+     * 构建库存预测的实际计算公式。
+     *
+     * @param stock 库存预测结果
+     * @return 中文公式文本
+     */
+    private String buildInventoryFormula(TcStockForecast stock) {
+        BigDecimal rawRollingStock = this.nvl(stock.getSixClockStockQty())
+                .add(this.nvl(stock.getFirstShiftPlanQty()))
+                .subtract(this.nvl(stock.getFirstShiftDemandQty()));
+        String formula = "库存预测：胎侧代码=" + stock.getSidewallCode() + "，滚动库存=六点库存"
+                + this.nvl(stock.getSixClockStockQty()).toPlainString() + "+前日早班计划量"
+                + this.nvl(stock.getFirstShiftPlanQty()).toPlainString() + "-首班消耗量"
+                + this.nvl(stock.getFirstShiftDemandQty()).toPlainString() + "="
+                + rawRollingStock.toPlainString();
+        return rawRollingStock.compareTo(BigDecimal.ZERO) < 0
+                ? formula + "，按零取值后滚动库存=" + this.nvl(stock.getRollingStockQty()).toPlainString()
+                : formula;
+    }
+
+    /**
+     * 构建任务在机台分配完成后的实际计划量公式。
+     *
+     * @param task 排程任务
+     * @return 中文公式文本
+     */
+    private String buildPlanFormula(TcTaskDraft task) {
+        List<String> adjustmentTerms = new ArrayList<>();
+        this.appendSignedTerm(adjustmentTerms, "损耗率补量", task.getLossAddQty());
+        this.appendSignedTerm(adjustmentTerms, "最小起排补量", task.getMinStartAdjustQty());
+        this.appendSignedTerm(adjustmentTerms, "卷长取整调整", task.getTailRoundAdjustQty());
+        this.appendSignedTerm(adjustmentTerms, "工装限额调整", task.getToolLimitAdjustQty());
+        this.appendSignedTerm(adjustmentTerms, "机台产能调整", task.getCapacityAdjustQty());
+        String baseFormula = "基础应排量" + this.nvl(task.getBaseDemandQty()).toPlainString();
+        if (task.getSourceRequiredQty() != null || task.getStockDeductQty() != null) {
+            baseFormula = "需求量" + this.nvl(task.getSourceRequiredQty()).toPlainString()
+                    + "-库存抵扣" + this.nvl(task.getStockDeductQty()).toPlainString()
+                    + "=" + baseFormula;
+        }
+        return "计划量计算：胎侧代码=" + task.getSidewallCode() + "（胎胚号="
+                + this.displayEmbryoCode(task.getEmbryoCode()) + "），计划量=" + baseFormula
+                + String.join("", adjustmentTerms) + "=" + this.nvl(task.getPlanQty()).toPlainString();
+    }
+
+    /**
+     * 追加实际参与的计划量调整项。
+     *
+     * @param terms 调整项文本集合
+     * @param name 调整项名称
+     * @param value 调整值
+     */
+    private void appendSignedTerm(List<String> terms, String name, BigDecimal value) {
+        if (value == null || value.compareTo(BigDecimal.ZERO) == 0) {
+            return;
+        }
+        terms.add((value.compareTo(BigDecimal.ZERO) > 0 ? "+" : "-") + name
+                + value.abs().toPlainString());
+    }
+
+    /**
+     * 追加候选机台的筛选汇总和实际评分明细。
+     *
+     * @param context 排程上下文
+     * @param task 排程任务
+     */
+    private void appendMachineCandidateDetail(TcScheduleContext context, TcTaskDraft task) {
+        List<TcMachineCandidate> candidateList = context.getCandidateTraceMap()
+                .getOrDefault(task.getBusinessKey(), Collections.emptyList());
+        Map<String, List<String>> filteredMachineMap = candidateList.stream()
+                .filter(TcMachineCandidate::isFiltered)
+                .collect(Collectors.groupingBy(candidate -> StrUtil.blankToDefault(candidate.getFilterReasonDesc(), "未提供原因"),
+                        LinkedHashMap::new, Collectors.mapping(TcMachineCandidate::getMachineCode, Collectors.toList())));
+        if (!filteredMachineMap.isEmpty()) {
+            context.appendProcessLog("机台筛选：胎侧代码={0}，已过滤机台={1}", task.getSidewallCode(), filteredMachineMap);
+        }
+        candidateList.stream().filter(candidate -> !candidate.isFiltered())
+                .forEach(candidate -> context.appendProcessLog(this.buildScoreDetail(task, candidate)));
+    }
+
+    /**
+     * 构建候选机台的中文评分明细。
+     *
+     * @param task 排程任务
+     * @param candidate 候选机台
+     * @return 中文评分文本
+     */
+    private String buildScoreDetail(TcTaskDraft task, TcMachineCandidate candidate) {
+        Map<String, BigDecimal> scoreItems = candidate.getScoreResult() == null
+                ? Collections.emptyMap() : candidate.getScoreResult().getScoreItems();
+        int baseGlueCount = TcGlueSimilarityUtils.calculateIntersectionCount(
+                TcGlueSimilarityUtils.parseCodeSet(task.getBaseGlueCode()),
+                TcGlueSimilarityUtils.parseCodeSet(candidate.getTailBaseGlueCode()));
+        return "机台评分：胎侧代码=" + task.getSidewallCode() + "，机台=" + candidate.getMachineCode()
+                + "，剩余产能适配（计划量=" + this.nvl(task.getPlanQty()).toPlainString() + "，剩余产能="
+                + this.nvl(candidate.getRemainCapacity()).toPlainString() + "）得分=" + this.scoreValue(scoreItems, "capacityScore")
+                + "，主胶料连续（当前=" + StrUtil.blankToDefault(task.getGlueCode(), "无") + "，链尾="
+                + StrUtil.blankToDefault(candidate.getTailMainGlueCode(), "无") + "）得分=" + this.scoreValue(scoreItems, "mainGlueScore")
+                + "，基部胶相同个数=" + baseGlueCount + "，得分=" + this.scoreValue(scoreItems, "baseGlueScore")
+                + "，口型连续得分=" + this.scoreValue(scoreItems, "mouthPlateScore")
+                + "，切换成本（小时=" + this.nvl(candidate.getSwitchCostHours()).toPlainString() + "）得分="
+                + this.scoreValue(scoreItems, "switchCostScore") + "，定点生产得分=" + this.scoreValue(scoreItems, "fixedScore")
+                + "，总分=" + this.nvl(candidate.getScore()).toPlainString();
+    }
+
+    /**
+     * 获取评分项值并转为普通数字文本。
+     *
+     * @param scoreItems 评分项集合
+     * @param scoreKey 评分项键
+     * @return 普通数字文本
+     */
+    private String scoreValue(Map<String, BigDecimal> scoreItems, String scoreKey) {
+        return this.nvl(scoreItems.get(scoreKey)).toPlainString();
+    }
+
+    /**
+     * 将空胎胚号转换为可追溯的中文占位文本。
+     *
+     * @param embryoCode 胎胚号
+     * @return 可展示胎胚号
+     */
+    private String displayEmbryoCode(String embryoCode) {
+        return StrUtil.blankToDefault(embryoCode, "未提供");
+    }
+
+    /**
+     * 空数值按零处理。
+     *
+     * @param value 数值
+     * @return 非空数值
+     */
+    private BigDecimal nvl(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO : value;
     }
 
     /**

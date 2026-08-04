@@ -23,8 +23,8 @@ import java.util.stream.Collectors;
 /**
  * 胎面排程过程日志实现。
  *
- * <p>同时输出运行日志并向本次排程上下文追加中文过程记录；最终由业务落库步骤统一写入
- * 专用过程日志表，不在引擎层直接依赖数据库 Mapper。</p>
+ * <p>运行日志保留完整的规则与任务链追踪；过程日志表仅保留步骤边界和关键计算结论，
+ * 最终由业务落库步骤统一写入专用过程日志表，不在引擎层直接依赖数据库 Mapper。</p>
  */
 @Component
 public class TmScheduleProcessLogger implements IScheduleProcessLogger<TmScheduleContext> {
@@ -50,11 +50,9 @@ public class TmScheduleProcessLogger implements IScheduleProcessLogger<TmSchedul
         if (result != null && !result.isPassed()) {
             log.warn("[胎面排程-规则未通过] 批次号={}，追踪号={}，原因={}",
                     this.batchNo(context), this.traceId(context), result.getReasonDesc());
-            this.append(context, "规则校验未通过：原因={0}", result.getReasonDesc());
             return;
         }
         log.debug("[胎面排程-规则通过] 批次号={}，追踪号={}", this.batchNo(context), this.traceId(context));
-        this.append(context, "规则校验通过");
     }
 
     @Override
@@ -62,7 +60,6 @@ public class TmScheduleProcessLogger implements IScheduleProcessLogger<TmSchedul
         log.info("[胎面排程-任务链变化] 批次号={}，追踪号={}，受影响任务数={}",
                 this.batchNo(context), this.traceId(context),
                 result == null ? 0 : result.getAffectedNodes().size());
-        this.append(context, "任务链变化：受影响任务数={0}", result == null ? 0 : result.getAffectedNodes().size());
     }
 
     /**
@@ -81,10 +78,6 @@ public class TmScheduleProcessLogger implements IScheduleProcessLogger<TmSchedul
                 task == null ? null : task.getMouthPlateCode(),
                 task == null ? null : task.getShiftOrder(), task == null ? null : task.getPlanQty(),
                 task == null ? null : task.getUnplannedReasonDesc(), this.summarizeCandidateRejects(context, task));
-        this.append(context, "未排任务：任务标识={0}，胎面编码={1}，班次={2}，计划量={3}，未排原因={4}，候选机台拒绝汇总={5}",
-                task == null ? null : task.getBusinessKey(), task == null ? null : task.getTreadCode(),
-                task == null ? null : task.getShiftOrder(), task == null ? null : task.getPlanQty(),
-                task == null ? null : task.getUnplannedReasonDesc(), this.summarizeCandidateRejects(context, task));
     }
 
     /**
@@ -98,9 +91,6 @@ public class TmScheduleProcessLogger implements IScheduleProcessLogger<TmSchedul
                 this.batchNo(context), this.traceId(context), this.factoryCode(context), this.scheduleDate(context), result == null ? 0 : result.getResultCount(),
                 result == null ? 0 : result.getExplainCount(), result == null ? 0 : result.getUnplannedCount(),
                 result == null ? 0 : result.getErrorCount());
-        this.append(context, "落库汇总：结果数量={0}，解释数量={1}，未排数量={2}，异常数量={3}",
-                result == null ? 0 : result.getResultCount(), result == null ? 0 : result.getExplainCount(),
-                result == null ? 0 : result.getUnplannedCount(), result == null ? 0 : result.getErrorCount());
     }
 
     /**

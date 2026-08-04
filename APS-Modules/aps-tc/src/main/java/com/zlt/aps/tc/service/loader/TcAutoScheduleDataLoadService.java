@@ -819,6 +819,7 @@ public class TcAutoScheduleDataLoadService {
                 TcTaskDraft taskDraft = new TcTaskDraft();
                 taskDraft.setOrderNo(row.getOrderNo() + "-CLASS" + shiftOrder);
                 taskDraft.setSourceOrderNos(row.getOrderNo());
+                taskDraft.setEmbryoCode(row.getEmbryoCode());
                 taskDraft.setBusinessKeySuffix(buildSourceTaskBusinessKeySuffix(row, sourceRowIndex, shiftOrder));
                 taskDraft.setSidewallCode(sidewallCode);
                 taskDraft.setConstructionVersion(row.getConstructionVersion());
@@ -1059,6 +1060,7 @@ public class TcAutoScheduleDataLoadService {
                 TcTaskDraft taskDraft = new TcTaskDraft();
                 taskDraft.setOrderNo(row.getOrderNo() + "-CLASS" + shiftOrder);
                 taskDraft.setSourceOrderNos(row.getOrderNo());
+                taskDraft.setEmbryoCode(row.getEmbryoCode());
                 taskDraft.setBusinessKeySuffix(buildSourceTaskBusinessKeySuffix(row, sourceRowIndex, shiftOrder));
                 taskDraft.setSidewallCode(sidewallCode);
                 taskDraft.setConstructionVersion(primarySpec.getSidewallVersion());
@@ -1434,6 +1436,8 @@ public class TcAutoScheduleDataLoadService {
         taskDraft.setOrderNo("EXP-" + StrUtil.blankToDefault(row.getProductionNo(), String.valueOf(row.getMonthPlanId()))
                 + "-CLASS" + TcScheduleConstants.EXPERIMENT_SPEC_SHIFT_ORDER);
         taskDraft.setSourceOrderNos(appendSourceOrderNos(null, experimentSpecInfo.getProductionNos()));
+        taskDraft.setEmbryoCode(CollUtil.isEmpty(experimentSpecInfo.getEmbryoCodes()) ? null
+                : String.join(",", experimentSpecInfo.getEmbryoCodes()));
         taskDraft.setBusinessKeySuffix("EXP-" + StrUtil.blankToDefault(row.getProductionNo(), String.valueOf(row.getMonthPlanId()))
                 + "-CLASS" + TcScheduleConstants.EXPERIMENT_SPEC_SHIFT_ORDER);
         taskDraft.setSidewallCode(row.getSidewallCode());
@@ -2161,6 +2165,7 @@ public class TcAutoScheduleDataLoadService {
         TcTaskDraft targetTask = new TcTaskDraft();
         targetTask.setOrderNo(sourceTask.getOrderNo());
         targetTask.setSourceOrderNos(sourceTask.getSourceOrderNos());
+        targetTask.setEmbryoCode(sourceTask.getEmbryoCode());
         targetTask.setBusinessKeySuffix("FUTURE_SHUTDOWN_" + DateUtil.format(sourceDate, "yyyyMMdd")
                 + "_CLASS" + sourceShiftCode + "_TO_CLASS" + targetShift);
         targetTask.setSidewallCode(sourceTask.getSidewallCode());
