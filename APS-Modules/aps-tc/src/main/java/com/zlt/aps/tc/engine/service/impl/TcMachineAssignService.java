@@ -1895,6 +1895,7 @@ public class TcMachineAssignService implements ITcMachineAssignService {
         TcTaskDraft target = new TcTaskDraft();
         target.setOrderNo(source.getOrderNo());
         target.setSourceOrderNos(source.getSourceOrderNos());
+        target.setEmbryoCode(source.getEmbryoCode());
         target.setSidewallCode(source.getSidewallCode());
         target.setConstructionVersion(source.getConstructionVersion());
         target.setSidewallCraft(source.getSidewallCraft());

@@ -42,6 +42,7 @@ import com.zlt.aps.lh.engine.strategy.support.SpecifiedMachineScheduleResult;
 import com.zlt.aps.lh.service.impl.LhMaintenanceScheduleService;
 import com.zlt.aps.lh.util.CleaningScheduleRuleUtil;
 import com.zlt.aps.lh.util.FirstInspectionQtyUtil;
+import com.zlt.aps.lh.util.TypeBlockRelationUtil;
 import com.zlt.aps.lh.util.LeftRightMouldUtil;
 import com.zlt.aps.lh.util.LhMachineHardMatchUtil;
 import com.zlt.aps.lh.util.LhMouldCodeUtil;
@@ -160,7 +161,7 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
         // 基于续作收尾回写后的真实收尾时间，按机台收尾先后衔接换活字块。
         // 只有已标记收尾且有预计完工时刻的机台，才代表当前活字块可切换到下一规格。
         List<MachineScheduleDTO> endingMachines = context.getMachineScheduleMap().values().stream()
-                .filter(m -> m.isEnding() && m.getEstimatedEndTime() != null
+                .filter(m -> isTypeBlockEligibleMachine(context, m)
                         && !context.isContinuousStopHoldMachine(m.getMachineCode()))
                 .collect(Collectors.toList());
         endingMachines.sort(Comparator.comparing(MachineScheduleDTO::getEstimatedEndTime));
@@ -713,14 +714,28 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                         LhScheduleTimeUtil.formatDateTime(resolveScheduleWindowEndTime(context)));
                 continue;
             }
-            String triggerSource = machineTriggerSourceMap.get(machineCode);
-            if (StringUtils.equals(TYPE_BLOCK_TRIGGER_ENDING, triggerSource) && !machine.isEnding()) {
-                completedMachineMap.put(machineCode, true);
-                continue;
-            }
             activeMachines.add(machine);
         }
         return activeMachines;
+    }
+
+    /**
+     * 判断机台是否允许进入换活字块衔接候选。
+     *
+     * <p>机台当前规格本次排程窗口内运行结束即允许衔接下一规格，不要求前物料在
+     * SKU 级收尾（结果行 IS_END=1）。避免同胎胚同模具切换因前物料月计划未收尾
+     * 被挡在 S4.4 之外，最终由 S4.5 按正规换模（01）误落库。</p>
+     *
+     * @param context 排程上下文
+     * @param machine 当前机台
+     * @return true-机台当前规格运行在窗口内结束，允许进入换活字块衔接
+     */
+    private boolean isTypeBlockEligibleMachine(LhScheduleContext context, MachineScheduleDTO machine) {
+        if (Objects.isNull(machine) || Objects.isNull(machine.getEstimatedEndTime())) {
+            return false;
+        }
+        // SKU 级收尾机台直接放行；非 SKU 级收尾但机台当前规格在窗口内运行结束的机台同样放行。
+        return machine.isEnding() || hasTypeBlockProductionTimeInWindow(context, machine);
     }
 
     /**
@@ -1142,7 +1157,8 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                 }
             }
         }
-        boolean matched = sameCarcass && sameMold;
+        // 换活字块关系判定统一走共享工具，保证 S4.4 与 S4.5 使用同一口径。
+        boolean matched = TypeBlockRelationUtil.isSameEmbryoAndSameMould(context, machine, sku);
         if (writeDecisionLog) {
             log.info("[换活字块匹配判断] 机台编码: {}, 在机SKU: {}, 候选SKU: {}, 在机胎胚代码: {}, 候选胎胚代码: {}, "
                             + "在机胎胚描述: {}, 候选胎胚描述: {}, 同胎胚: {}, 在机模具号集合: {}, 候选模具号集合: {}, "
