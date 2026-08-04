@@ -15,8 +15,8 @@ import java.math.RoundingMode;
 /**
  * 胎侧默认计划量策略。
  *
- * <p>默认策略只负责计算与机台无关的基础计划量：库存抵扣、最小起排、卷数取整、收尾基础量。
- * 损耗率解析、工装限制和产能压缩统一在机台分配阶段处理，避免机台维度规则提前固化。</p>
+ * <p>默认策略负责计算与机台无关的基础计划量和派机前估算量。非收尾任务按最小起排、卷数取整形成估算量，
+ * 供现有机台评分保持兼容；损耗率解析及“损耗、最小起排、卷数取整”的最终重算统一在机台分配阶段处理。</p>
  */
 @Component
 public class TcDefaultPlanQtyStrategy implements ITcPlanQtyStrategy {
@@ -50,6 +50,7 @@ public class TcDefaultPlanQtyStrategy implements ITcPlanQtyStrategy {
         result.setToolOverflowQty(BigDecimal.ZERO);
         result.setCapacityAdjustQty(BigDecimal.ZERO);
 
+        BigDecimal preLossPlanQty = planQty;
         boolean tailTask = isTailTask(taskDraft, planQty);
         if (tailTask) {
             // 详设 §14.3 Step11：收尾规格实际排产 = min(需排产量, 月计划余量)，不执行最小起排和卷曲取整。
@@ -57,6 +58,7 @@ public class TcDefaultPlanQtyStrategy implements ITcPlanQtyStrategy {
             BigDecimal beforeTail = planQty;
             BigDecimal tailBaseQty = nvl(taskDraft.getTailBalanceQty()).multiply(nvl(taskDraft.getSidewallLength()));
             planQty = planQty.min(tailBaseQty);
+            preLossPlanQty = planQty;
             result.setTailRoundAdjustQty(planQty.subtract(beforeTail));
         } else {
             BigDecimal beforeMinStart = planQty;
@@ -68,11 +70,12 @@ public class TcDefaultPlanQtyStrategy implements ITcPlanQtyStrategy {
             result.setTailRoundAdjustQty(planQty.subtract(beforeRound));
         }
 
-        result.setPreLossPlanQty(planQty);
+        // preLossPlanQty 必须保留损耗计算前的真实基础量，不能使用已补最小起排或已取整的派机估算量。
+        result.setPreLossPlanQty(preLossPlanQty);
         result.setPlanQtyBeforeToolLimit(planQty);
         result.setFinalPlanQty(planQty);
         taskDraft.setPlanStockQty(calculateHandoverStock(stock, currentDemand, planQty));
-        result.setCalcFormulaDesc(tailTask ? "收尾余量" : "基础需求->库存抵扣->最小起排->卷数取整");
+        result.setCalcFormulaDesc(tailTask ? "收尾余量" : "基础需求->库存抵扣->派机前最小起排与卷数取整估算");
         taskDraft.setPlanQty(planQty);
         return result;
     }

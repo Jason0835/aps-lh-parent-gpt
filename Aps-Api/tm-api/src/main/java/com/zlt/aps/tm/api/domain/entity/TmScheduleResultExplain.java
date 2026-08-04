@@ -243,6 +243,11 @@ public class TmScheduleResultExplain extends BaseEntity {
     @TableField(value = "MACHINE_SELECT_REASON")
     private String machineSelectReason;
 
+    /** 最终分配结果JSON，记录来源任务实际落到的结果或未排片段、机台、班次和最终顺序 */
+    @ApiModelProperty(value = "最终分配结果JSON", name = "finalAssignmentJson")
+    @TableField(value = "FINAL_ASSIGNMENT_JSON")
+    private String finalAssignmentJson;
+
     /** 分配状态 */
     @ApiModelProperty(value = "分配状态", name = "assignStatus")
     @TableField(value = "ASSIGN_STATUS")

@@ -5,12 +5,14 @@ import com.zlt.aps.lh.api.domain.dto.SkuDailyPlanQuotaDTO;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
 import com.zlt.aps.lh.api.enums.SkuTagEnum;
+import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.context.LhScheduleConfig;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.ShiftCapacityResolverUtil;
 import com.zlt.aps.lh.util.SkuDailyPlanQuotaUtil;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
 
 import java.time.LocalDate;
@@ -98,26 +100,32 @@ public final class DailyMachineExpansionPlanner {
              * 1. 月底仍有计划，说明当前窗口只是临时无 dayN，不能把后续计划提前消耗；
              *    本轮只允许补本月 T 日前已真实发生的历史欠产，目标量必须严格等于 historyShortageQty。
              * 2. 月底也无计划，说明本月后续没有日计划承接，可以交给已有收尾目标量口径清量。
+             * “月底仍有计划”按业务口径只统计当前自然月窗口结束后到月末，不得把下月计划视为月底计划，
+             * 避免下月计划提前消耗或把本月收尾清量误判为仅补欠产。
              */
             int strictTargetQty = historyShortageQty;
             plan.setStrictTargetQty(strictTargetQty);
-            if (Math.max(0, sku.getFutureMonthPlanQtyAfterWindow()) > 0) {
+            int currentMonthPlanQtyAfterWindow = resolveCurrentMonthPlanQtyAfterWindow(context, sku);
+            if (currentMonthPlanQtyAfterWindow > 0) {
                 sku.setStrictNewSpecShortageOnly(true);
                 sku.setTargetScheduleQty(strictTargetQty);
                 sku.setWindowPlanQty(strictTargetQty);
                 // 仅补欠产不能沿用已被放大的账本剩余额度，否则会提前消耗 T+3 到月底后续计划。
                 capDailyQuotaRemainingToTarget(sku, quotaMap, strictTargetQty);
                 sku.setWindowRemainingPlanQty(strictTargetQty);
-                log.info("{}窗口无日计划但月底仍有计划，仅补本月欠产, materialCode: {}, "
-                                + "historyShortageQty: {}, futurePlanQtyAfterWindow: {}, strictTargetQty: {}",
+                log.info("{}窗口无日计划但本月月底仍有计划，仅补本月欠产, materialCode: {}, "
+                                + "historyShortageQty: {}, currentMonthPlanQtyAfterWindow: {}, "
+                                + "futurePlanQtyAfterWindow: {}, strictTargetQty: {}",
                         sceneName, sku.getMaterialCode(), historyShortageQty,
-                        sku.getFutureMonthPlanQtyAfterWindow(), strictTargetQty);
+                        currentMonthPlanQtyAfterWindow, sku.getFutureMonthPlanQtyAfterWindow(), strictTargetQty);
                 return plan;
             }
             plan.setForceEndingByNoFuturePlan(true);
-            log.info("{}窗口及月底均无日计划，按收尾清量处理, materialCode: {}, "
-                            + "historyShortageQty: {}, targetQty: {}",
-                    sceneName, sku.getMaterialCode(), historyShortageQty, sku.resolveTargetScheduleQty());
+            log.info("{}窗口及本月月底均无日计划，按收尾清量处理, materialCode: {}, "
+                            + "historyShortageQty: {}, currentMonthPlanQtyAfterWindow: {}, "
+                            + "futurePlanQtyAfterWindow: {}, targetQty: {}",
+                    sceneName, sku.getMaterialCode(), historyShortageQty, currentMonthPlanQtyAfterWindow,
+                    sku.getFutureMonthPlanQtyAfterWindow(), sku.resolveTargetScheduleQty());
             return plan;
         }
         boolean strictEnding = sku.isStrictTargetQty()
@@ -143,6 +151,35 @@ public final class DailyMachineExpansionPlanner {
                 historyShortageQty, plan.getShortageAddMachineThreshold(), sku.getScheduleDayFinishQty(),
                 sku.getWindowPlanQty(), sku.getWindowRemainingPlanQty(), sku.getFutureMonthPlanQtyAfterWindow());
         return plan;
+    }
+
+    /**
+     * 汇总当前排程窗口结束后到本月末的原始定稿月计划量。
+     * <p>“月底仍有计划”的业务口径仅指当前自然月 T+3～月末，不得把下月计划视为月底计划：
+     * 若把下月计划计入，窗口无计划的续作/新增 SKU 会误判为“仅补本月欠产”，
+     * 导致本月已无日计划承接的硫化余量不能按收尾清量排产。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 待判断 SKU
+     * @return 当前月窗口结束次日到月末的原始日计划量汇总；无计划或无法解析时返回 0
+     */
+    private static int resolveCurrentMonthPlanQtyAfterWindow(LhScheduleContext context, SkuScheduleDTO sku) {
+        if (Objects.isNull(context) || Objects.isNull(sku)
+                || Objects.isNull(context.getWindowEndDate())
+                || StringUtils.isEmpty(sku.getMaterialCode())) {
+            return 0;
+        }
+        LocalDate windowEndDate = context.getWindowEndDate().toInstant()
+                .atZone(ZoneId.systemDefault()).toLocalDate();
+        LocalDate cursor = windowEndDate.plusDays(1);
+        LocalDate monthEndDate = windowEndDate.withDayOfMonth(windowEndDate.lengthOfMonth());
+        int planQty = 0;
+        while (!cursor.isAfter(monthEndDate)) {
+            planQty += MonthPlanDateResolver.resolveDayQty(
+                    context, sku.getMaterialCode(), sku.getProductStatus(), cursor);
+            cursor = cursor.plusDays(1);
+        }
+        return Math.max(0, planQty);
     }
 
     /**
@@ -367,6 +404,25 @@ public final class DailyMachineExpansionPlanner {
                                                                      SkuScheduleDTO sku,
                                                                      int activeMachineCount,
                                                                      String scheduleType) {
+        return resolveFirstDailyLookAheadAddMachineDate(
+                context, sku, activeMachineCount, scheduleType, null);
+    }
+
+    /**
+     * 解析欠产未超阈值时首次需要加机台的业务日期（支持从指定业务日起判断）。
+     *
+     * @param context 排程上下文
+     * @param sku SKU
+     * @param activeMachineCount 当前已承接机台数
+     * @param scheduleType 排程类型
+     * @param startDate 最早参与判断的业务日；为 null 时从窗口首日判断
+     * @return 首次需要加机台的业务日期；null 表示从 startDate 起已满足逐日后看规则
+     */
+    public static LocalDate resolveFirstDailyLookAheadAddMachineDate(LhScheduleContext context,
+                                                                     SkuScheduleDTO sku,
+                                                                     int activeMachineCount,
+                                                                     String scheduleType,
+                                                                     LocalDate startDate) {
         Map<LocalDate, SkuDailyPlanQuotaDTO> quotaMap =
                 resolveEffectiveQuotaMap(context, sku);
         if (Objects.isNull(sku) || sku.isStrictNewSpecShortageOnly()
@@ -381,7 +437,8 @@ public final class DailyMachineExpansionPlanner {
         if (threshold <= 0 || historyShortageQty > threshold) {
             return null;
         }
-        return resolveFirstOriginalDayPlanAddMachineDate(context, sku, activeMachineCount, scheduleType);
+        return resolveFirstOriginalDayPlanAddMachineDate(
+                context, sku, activeMachineCount, scheduleType, startDate);
     }
 
     /**
@@ -400,6 +457,25 @@ public final class DailyMachineExpansionPlanner {
                                                                        SkuScheduleDTO sku,
                                                                        int activeMachineCount,
                                                                        String scheduleType) {
+        return resolveFirstOriginalDayPlanAddMachineDate(
+                context, sku, activeMachineCount, scheduleType, null);
+    }
+
+    /**
+     * 按原始 dayN 解析首次需要增加机台的业务日期（支持从指定业务日起判断）。
+     *
+     * @param context 排程上下文
+     * @param sku SKU
+     * @param activeMachineCount 当前已承接机台数
+     * @param scheduleType 排程类型
+     * @param startDate 最早参与判断的业务日；为 null 时从窗口首日判断
+     * @return 首次需要加机台的业务日期；null 表示从 startDate 起原始 dayN 暂不要求增加机台
+     */
+    public static LocalDate resolveFirstOriginalDayPlanAddMachineDate(LhScheduleContext context,
+                                                                       SkuScheduleDTO sku,
+                                                                       int activeMachineCount,
+                                                                       String scheduleType,
+                                                                       LocalDate startDate) {
         Map<LocalDate, SkuDailyPlanQuotaDTO> quotaMap =
                 resolveEffectiveQuotaMap(context, sku);
         if (Objects.isNull(sku) || sku.isStrictNewSpecShortageOnly()
@@ -415,6 +491,10 @@ public final class DailyMachineExpansionPlanner {
         // 新增与续作均逐日推进；当前日满足只表示当日不增机，后续业务日滚动到该日后仍需重新判断。
         boolean continuationLookAhead = ScheduleTypeEnum.CONTINUOUS.getCode().equals(scheduleType);
         for (LocalDate productionDate : quotaMap.keySet()) {
+            // 续作降模释放后补偿判断只能从最后释放日重新评估，释放日前的高计划日已由更多机台覆盖。
+            if (Objects.nonNull(startDate) && productionDate.isBefore(startDate)) {
+                continue;
+            }
             SkuDailyPlanQuotaDTO quota = quotaMap.get(productionDate);
             int dayPlanQty = quota == null ? 0 : Math.max(0, quota.getDayPlanQty());
             // 增机节奏判断必须使用原始日计划；T 日已完成量只参与实际目标量和账本扣减。

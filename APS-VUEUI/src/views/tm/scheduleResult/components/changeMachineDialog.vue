@@ -47,6 +47,7 @@
 import {mapState} from "vuex";
 
 import {batchChangeMachine} from "@/api/tm/tmScheduleResult.js";
+import {resolveErrorMessage} from "@/utils/errorMessage";
 
 export default {
   data() {
@@ -89,7 +90,10 @@ export default {
 
         this.loading = false;
       } catch (error) {
-        console.error(error);
+        this.$modal.alertError(resolveErrorMessage(
+          error,
+          this.$t("ui.data.column.tm.scheduleResult.operationFailed")
+        ));
         this.loading = false;
       }
     },

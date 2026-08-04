@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 
+import java.util.Collections;
 import java.util.stream.Collectors;
 
 /**
@@ -120,18 +121,19 @@ public class TcScheduleTemplateImpl extends AbsTcScheduleTemplate {
     private void runStep(TcScheduleContext context, TcScheduleStepEnum stepEnum, Runnable runnable) {
         try {
             if (processLogger != null) {
-                processLogger.logStepStart(context, stepEnum.getCode(), buildStepSummary(context, stepEnum, true));
+                processLogger.logStepStart(context, stepEnum.getDesc(), buildStepSummary(context, stepEnum, true));
             }
             // 快照与落库阶段开始前先上报 90%，核心短事务成功后再原子更新为 100%。
             if (TcScheduleStepEnum.SNAPSHOT_BUILD == stepEnum) {
                 this.updateProgress(context, stepEnum);
             }
             runnable.run();
+            this.appendStepCalculationDetail(context, stepEnum);
             if (TcScheduleStepEnum.SNAPSHOT_BUILD != stepEnum) {
                 this.updateProgress(context, stepEnum);
             }
             if (processLogger != null) {
-                processLogger.logStepEnd(context, stepEnum.getCode(), buildStepSummary(context, stepEnum, false));
+                processLogger.logStepEnd(context, stepEnum.getDesc(), buildStepSummary(context, stepEnum, false));
             }
         } catch (RuntimeException exception) {
             this.recordStepFailure(context, stepEnum, exception);
@@ -206,42 +208,113 @@ public class TcScheduleTemplateImpl extends AbsTcScheduleTemplate {
      */
     private String buildStepSummary(TcScheduleContext context, TcScheduleStepEnum stepEnum, boolean input) {
         if (context == null) {
-            return "context=null";
+            return "排程上下文为空";
         }
         switch (stepEnum) {
             case BOOTSTRAP:
-                return input ? "factoryCode=" + context.getFactoryCode() + ",scheduleDate="
+                return input ? "工厂编号=" + context.getFactoryCode() + "，排程日期="
                         + (context.getScheduleDate() == null ? null : DateUtil.formatDate(context.getScheduleDate()))
-                        : "taskCount=" + context.getTaskDraftList().size() + ",machineCount="
-                        + context.getMachineCandidateList().size() + ",paramCount=" + context.getParamMap().size();
+                        : "任务数量=" + context.getTaskDraftList().size() + "，机台数量="
+                        + context.getMachineCandidateList().size() + "，参数数量=" + context.getParamMap().size();
             case INVENTORY_PREDICT:
-                return input ? "sidewallCount=" + context.getTaskDraftList().stream()
+                return input ? "胎侧数量=" + context.getTaskDraftList().stream()
                         .map(TcTaskDraft::getSidewallCode).filter(code -> code != null && code.trim().length() > 0)
                         .collect(Collectors.toSet()).size()
-                        : "stockForecastCount=" + context.getStockForecastMap().size();
+                        : "库存预测数量=" + context.getStockForecastMap().size();
             case PLAN_CALC:
-                return input ? "taskCount=" + context.getTaskDraftList().size()
-                        : "calculatedPlanTaskCount=" + context.getTaskDraftList().stream()
-                        .filter(task -> task.getPlanQty() != null).count() + ",unplannedCount=" + context.getTaskDraftList().stream()
+                return input ? "任务数量=" + context.getTaskDraftList().size()
+                        : "已计算计划量任务数量=" + context.getTaskDraftList().stream()
+                        .filter(task -> task.getPlanQty() != null).count() + "，未排任务数量=" + context.getTaskDraftList().stream()
                         .filter(task -> task.isUnassigned() || (task.getUnplannedReasonCode() != null
                                 && task.getUnplannedReasonCode().trim().length() > 0)).count();
             case TASK_SORT:
-                return input ? "taskCount=" + context.getTaskDraftList().size()
-                        : "taskOrder=" + context.getTaskDraftList().stream().limit(10)
+                return input ? "任务数量=" + context.getTaskDraftList().size()
+                        : "任务排序=" + context.getTaskDraftList().stream().limit(10)
                         .map(TcTaskDraft::getBusinessKey).collect(Collectors.joining(","));
             case MACHINE_ASSIGN:
-                return input ? "taskCount=" + context.getTaskDraftList().size()
-                        : "assignedTaskCount=" + context.getTaskDraftList().stream().filter(task -> !task.isUnassigned()).count()
-                        + ",unplannedCount=" + context.getTaskDraftList().stream().filter(TcTaskDraft::isUnassigned).count()
-                        + ",chainCount=" + context.getTaskChainGroup().values().size();
+                return input ? "任务数量=" + context.getTaskDraftList().size()
+                        : "已分配任务数量=" + context.getTaskDraftList().stream().filter(task -> !task.isUnassigned()).count()
+                        + "，未排任务数量=" + context.getTaskDraftList().stream().filter(TcTaskDraft::isUnassigned).count()
+                        + "，任务链数量=" + context.getTaskChainGroup().values().size();
             case SNAPSHOT_BUILD:
-                return input ? "taskCount=" + context.getTaskDraftList().size()
-                        : "snapshotCount=" + context.getSnapshotMap().size()
-                        + ",persistResultCount=" + (context.getPersistResult() == null ? 0 : context.getPersistResult().getResultCount())
-                        + ",unplannedCount=" + (context.getPersistResult() == null ? 0 : context.getPersistResult().getUnplannedCount())
-                        + ",errorCount=" + (context.getPersistResult() == null ? 0 : context.getPersistResult().getErrorCount());
+                return input ? "任务数量=" + context.getTaskDraftList().size()
+                        : "解释快照数量=" + context.getSnapshotMap().size()
+                        + "，结果数量=" + (context.getPersistResult() == null ? 0 : context.getPersistResult().getResultCount())
+                        + "，未排数量=" + (context.getPersistResult() == null ? 0 : context.getPersistResult().getUnplannedCount())
+                        + "，异常数量=" + (context.getPersistResult() == null ? 0 : context.getPersistResult().getErrorCount());
             default:
                 return stepEnum.getDesc();
         }
+    }
+
+    /**
+     * 按阶段将已产生的关键计算结果写入中文过程日志。
+     *
+     * @param context  排程上下文
+     * @param stepEnum 已完成的排程阶段
+     */
+    private void appendStepCalculationDetail(TcScheduleContext context, TcScheduleStepEnum stepEnum) {
+        if (context == null) {
+            return;
+        }
+        switch (stepEnum) {
+            case BOOTSTRAP:
+                context.appendProcessLog("初始化完成：工厂编号={0}，排程日期={1}，批次号={2}，参数数量={3}，来源任务数量={4}，候选机台数量={5}",
+                        context.getFactoryCode(), this.formatScheduleDate(context), context.getBatchNo(),
+                        context.getParamMap().size(), context.getSourceTaskDraftList().size(), context.getMachineCandidateList().size());
+                context.getTaskDraftList().forEach(task -> context.appendProcessLog(
+                        "初始化任务：任务标识={0}，胎侧编码={1}，来源工单={2}，本班需求量={3}",
+                        task.getBusinessKey(), task.getSidewallCode(), task.getSourceOrderNos(), task.getCurrentShiftDemandQty()));
+                break;
+            case INVENTORY_PREDICT:
+                context.getStockForecastMap().values().forEach(stock -> context.appendProcessLog(
+                        "库存预测：胎侧编码={0}，六点库存={1}，首班需求量={2}，首班计划量={3}，滚动库存={4}",
+                        stock.getSidewallCode(), stock.getSixClockStockQty(), stock.getFirstShiftDemandQty(),
+                        stock.getFirstShiftPlanQty(), stock.getRollingStockQty()));
+                break;
+            case PLAN_CALC:
+                context.getTaskDraftList().forEach(task -> context.appendProcessLog(
+                        "计划量计算：任务标识={0}，胎侧编码={1}，需求量={2}，滚动库存={3}，库存缺口={4}，损耗前计划量={5}，工装限额前计划量={6}，可用工装量={7}，已用工装量={8}，剩余工装量={9}，最终计划量={10}，计算说明={11}",
+                        task.getBusinessKey(), task.getSidewallCode(), task.getDemandQty(), task.getRollingStockQty(),
+                        task.getStockGapQty(), task.getPreLossPlanQty(), task.getPlanQtyBeforeToolLimit(),
+                        task.getAvailableToolQty(), task.getToolUsedQty(), task.getRemainingToolQty(), task.getPlanQty(),
+                        task.getCalcFormulaDesc()));
+                break;
+            case TASK_SORT:
+                context.getTaskDraftList().forEach(task -> context.appendProcessLog(
+                        "任务排序：任务标识={0}，胎侧编码={1}，排序序号={2}，班次={3}，计划量={4}",
+                        task.getBusinessKey(), task.getSidewallCode(), task.getBaseSortIndex(), task.getShiftOrder(), task.getPlanQty()));
+                break;
+            case MACHINE_ASSIGN:
+                context.getTaskDraftList().forEach(task -> {
+                    context.appendProcessLog("机台分配：任务标识={0}，胎侧编码={1}，计划量={2}，最终机台={3}，班次={4}，剩余产能={5}，未排原因={6}",
+                            task.getBusinessKey(), task.getSidewallCode(), task.getPlanQty(), task.getMachineCode(),
+                            task.getShiftOrder(), task.getMachineRemainCapacity(), task.getUnplannedReasonDesc());
+                    context.getCandidateTraceMap().getOrDefault(task.getBusinessKey(), Collections.emptyList())
+                            .forEach(candidate -> context.appendProcessLog(
+                                    "候选机台：任务标识={0}，机台编码={1}，是否过滤={2}，过滤原因={3}，剩余产能={4}，评分={5}",
+                                    task.getBusinessKey(), candidate.getMachineCode(), candidate.isFiltered() ? "是" : "否",
+                                    candidate.getFilterReasonDesc(), candidate.getRemainCapacity(), candidate.getScore()));
+                });
+                break;
+            case SNAPSHOT_BUILD:
+                context.appendProcessLog("快照构建完成：解释快照数量={0}，结果数量={1}，未排数量={2}，解释数量={3}",
+                        context.getSnapshotMap().size(), context.getPersistResult() == null ? 0 : context.getPersistResult().getResultCount(),
+                        context.getPersistResult() == null ? 0 : context.getPersistResult().getUnplannedCount(),
+                        context.getPersistResult() == null ? 0 : context.getPersistResult().getExplainCount());
+                break;
+            default:
+                break;
+        }
+    }
+
+    /**
+     * 格式化排程日期，避免测试或异常上下文未提供日期时中断过程日志记录。
+     *
+     * @param context 排程上下文
+     * @return 格式化后的排程日期
+     */
+    private String formatScheduleDate(TcScheduleContext context) {
+        return context == null || context.getScheduleDate() == null ? null : DateUtil.formatDate(context.getScheduleDate());
     }
 }

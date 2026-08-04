@@ -63,6 +63,9 @@ public class TcFormingDemandRowVo {
     /** 成型余量，单位条 */
     private BigDecimal cxRemainQty;
 
+    /** 硫化余量，单位条 */
+    private BigDecimal lhRemainQty;
+
     /** 胎侧编码 */
     private String sidewallCode;
 

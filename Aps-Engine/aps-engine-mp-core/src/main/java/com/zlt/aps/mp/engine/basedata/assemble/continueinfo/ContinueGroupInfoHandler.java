@@ -9,7 +9,6 @@ import com.zlt.aps.mp.engine.domain.dto.CxContinueSkuInfoHelper;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
-import com.zlt.common.utils.PubUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
@@ -108,7 +107,7 @@ public class ContinueGroupInfoHandler {
      */
     private Map<String, String> getContinueStructureMap(Map<String, CxContinueInfoHelper> cxContinueInfoMap) {
         Map<String, String> machineStructureMap = Maps.newHashMap();
-        if (PubUtil.isEmpty(cxContinueInfoMap)) {
+        if (CollectionUtils.isEmpty(cxContinueInfoMap)) {
             return machineStructureMap;
         }
         // 从续作信息中解析出成型机台对应的续作结构

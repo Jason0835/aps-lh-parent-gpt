@@ -43,7 +43,7 @@ public interface ITcDepthConfigRemoteService {
     String checkUnique(@RequestBody TcDepthConfig depthConfig);
 
     /**
-     * 校验配置规则交叉（确保新增/修改的规则不与现有规则有范围交叉）
+     * 校验配置区间的字段合法性、连续性和完整性
      */
     @PostMapping("/depthConfig/checkRangeCross")
     String checkRangeCross(@RequestBody TcDepthConfig depthConfig);

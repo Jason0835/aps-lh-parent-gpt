@@ -1388,11 +1388,10 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         Map<String, Date> earliestTimeMap = new HashMap<String, Date>(16);
         context.setStructureEarliestLhTimeMap(earliestTimeMap);
         // 查询范围固定从排程窗口前一天开始抓取，避免遗漏前一日已配置的胎胚可供硫化时间
-        Date queryStartDate = LhScheduleTimeUtil.addDays(windowStartTime, -1);
         List<CxEmbryoLhTime> configuredTimeList = cxEmbryoLhTimeMapper.selectList(
                 new LambdaQueryWrapper<CxEmbryoLhTime>()
                         .eq(CxEmbryoLhTime::getFactoryCode, factoryCode)
-                        .eq(CxEmbryoLhTime::getScheduleDate, queryStartDate)
+                        .eq(CxEmbryoLhTime::getScheduleDate, windowStartTime)
                         // 已逻辑删除的成型配置不再代表有效胎胚供料承诺，禁止作为生产时间下限。
                         .eq(CxEmbryoLhTime::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
         int ignoredCount = 0;
@@ -1421,7 +1420,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         log.info("胎胚最早可供硫化时间加载完成, factoryCode: {}, queryStartDate: {}, windowEndTime: {}, "
                         + "queryCount: {}, validStructureCount: {}, duplicateStructureCount: {}, ignoredCount: {}, "
                         + "finalEarliestTimeMap: {}",
-                factoryCode, LhScheduleTimeUtil.formatDateTime(queryStartDate),
+                factoryCode, LhScheduleTimeUtil.formatDateTime(windowStartTime),
                 LhScheduleTimeUtil.formatDateTime(windowEndTime),
                 CollectionUtils.isEmpty(configuredTimeList) ? 0 : configuredTimeList.size(),
                 earliestTimeMap.size(), duplicateCount, ignoredCount, earliestTimeMap);

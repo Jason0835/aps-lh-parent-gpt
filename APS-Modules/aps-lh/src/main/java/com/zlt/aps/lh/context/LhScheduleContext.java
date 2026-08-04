@@ -8,12 +8,7 @@ import com.zlt.aps.lh.api.domain.entity.*;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.enums.SingleControlMachineModeEnum;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
-import com.zlt.aps.lh.engine.strategy.support.EarlyProductionRuntimePlan;
-import com.zlt.aps.lh.engine.strategy.support.HistoricalReverseSelectionDirective;
-import com.zlt.aps.lh.engine.strategy.support.MouldResourceContext;
-import com.zlt.aps.lh.engine.strategy.support.ScheduleSubstitutionDirective;
-import com.zlt.aps.lh.engine.strategy.support.SharedMouldSubstitutionRecord;
-import com.zlt.aps.lh.engine.strategy.support.SpecialMaterialSubstitutionRecord;
+import com.zlt.aps.lh.engine.strategy.support.*;
 import com.zlt.aps.lh.handler.SkuMonthPlanCalculator;
 import com.zlt.aps.lh.util.SkuConstructionRefResolverUtil;
 import com.zlt.aps.mdm.api.domain.entity.*;
@@ -405,7 +400,9 @@ public class LhScheduleContext {
      * 解析结构归属；S4.5选机继续使用同一快照比较待排SKU与保机前物料的结构。</p>
      */
     private Map<String, List<SkuScheduleDTO>> structureMinMachineSkuSnapshotMap = new LinkedHashMap<>();
-    /** 结构最低硫化机台数，key=结构名称，value=周期结构配置或常规结构工厂参数解析值 */
+    /**
+     * 结构最低硫化机台数，key=结构名称，value=周期结构配置或常规结构工厂参数解析值
+     */
     private Map<String, Integer> structureMinVulcanizingMachineMap = new LinkedHashMap<>();
     /**
      * 尚未完成全部SKU排产的收尾结构临时保护机台，key=运行态机台编码，value=结构名称。
@@ -421,9 +418,13 @@ public class LhScheduleContext {
      * 因此这些结构无需继续临时锁住提前收尾机台，避免影响正常换活字块、历史反选和新增选机。</p>
      */
     private Set<String> structureMinMachineConfirmedNonRetainedStructureSet = new LinkedHashSet<>();
-    /** 命中结构最低机台数保留规则的结构名称集合 */
+    /**
+     * 命中结构最低机台数保留规则的结构名称集合
+     */
     private Set<String> structureMinMachineRetainedStructureSet = new LinkedHashSet<>();
-    /** 命中规则后的机台统一释放时间，key=运行态机台编码，value=结构最晚有量班次结束时间 */
+    /**
+     * 命中规则后的机台统一释放时间，key=运行态机台编码，value=结构最晚有量班次结束时间
+     */
     private Map<String, Date> structureMinMachineRetentionEndTimeMap = new LinkedHashMap<>();
     /**
      * 结构停产保机机台的前物料编码，key=运行态机台编码。
@@ -479,7 +480,7 @@ public class LhScheduleContext {
      */
     private Map<String, Integer> skuShiftFillOverQtyMap = new LinkedHashMap<>();
     /**
-     *  SKU实际排产剩余账本，key=materialCode_productStatus；不同产品状态独立扣减
+     * SKU实际排产剩余账本，key=materialCode_productStatus；不同产品状态独立扣减
      */
     private Map<String, Integer> skuProductionRemainingQtyMap = new LinkedHashMap<>();
     /**
@@ -515,6 +516,13 @@ public class LhScheduleContext {
     private Map<LhScheduleResult, Integer> endingFillAllowedOverQtyMap =
             new IdentityHashMap<LhScheduleResult, Integer>();
     /**
+     * SKU收尾补满动作前的机台结果基准量，用于多机台同SKU组级允许超量重算。
+     * <p>键为结果对象身份，值是该机台结果在本次收尾补满前的计划总量；
+     * 组级重算时按“最终量-补满前量”识别各机台实际保留的补满新增量。</p>
+     */
+    private Map<LhScheduleResult, Integer> endingFillBeforeQtyMap =
+            new IdentityHashMap<LhScheduleResult, Integer>();
+    /**
      * S4.5当前待排正规新增SKU数量，供选机阶段判断普通机台让位规则
      */
     private int pendingFormalNewSpecSkuCount;
@@ -548,13 +556,21 @@ public class LhScheduleContext {
      * 新增SKU进入S4.5时是否命中结构五天内收尾层级快照，使用对象身份避免SKU出队后判定漂移
      */
     private Map<SkuScheduleDTO, Boolean> newSpecSingleControlStructureEndingLayerMap = new IdentityHashMap<>();
-    /** 单控模式初始目标量快照，key=materialCode_productStatus；S4.3结束时冻结，后续禁止随剩余量变化 */
+    /**
+     * 单控模式初始目标量快照，key=materialCode_productStatus；S4.3结束时冻结，后续禁止随剩余量变化
+     */
     private Map<String, Integer> singleControlInitialTargetQtyMap = new LinkedHashMap<>();
-    /** 单控模式快照，key=materialCode_productStatus；统一供新增、续作、换活字块、降模和校验消费 */
+    /**
+     * 单控模式快照，key=materialCode_productStatus；统一供新增、续作、换活字块、降模和校验消费
+     */
     private Map<String, SingleControlMachineModeEnum> singleControlModeSnapshotMap = new LinkedHashMap<>();
-    /** 冻结时满足单控静态准入且初始待排量大于0的不同试制SKU键集合 */
+    /**
+     * 冻结时满足单控静态准入且初始待排量大于0的不同试制SKU键集合
+     */
     private Set<String> singleControlEligibleTrialSkuKeySet = new LinkedHashSet<>();
-    /** 单控模式快照是否已完成初始化；完成后禁止再次按动态运行态覆盖 */
+    /**
+     * 单控模式快照是否已完成初始化；完成后禁止再次按动态运行态覆盖
+     */
     private boolean singleControlModeSnapshotInitialized;
     /**
      * 续作结果日额度账本是否已完成最终同步，防止同一上下文重复扣账
@@ -568,6 +584,13 @@ public class LhScheduleContext {
      * 已按降模规则释放过续作机台的物料集合，避免后续补偿链路把降模机台重新补回
      */
     private Set<String> reducedContinuationGroupKeySet = new LinkedHashSet<>();
+    /**
+     * 续作逐日降模分组最后释放机台的业务日，key=物料+产品状态复合键，value=最后一次真正下机的业务日。
+     * <p>补偿增机判断必须从该业务日起重新评估保留机台的 dayN 节奏，不能把释放日前的高计划日
+     * 继续按最终机台数计算，避免“先降模释放、再补偿加回”的机台回流重叠。</p>
+     */
+    private Map<String, LocalDate> reducedContinuationGroupLastReleaseDateMap =
+            new LinkedHashMap<String, LocalDate>(4);
     /**
      * 续作降模下机机台对应的前物料 SKU 快照。
      * <p>第一层 key=机台编码，第二层 key=降模前物料编码，value=实际触发降模的来源 SKU。
@@ -760,9 +783,13 @@ public class LhScheduleContext {
      * 提交完成或失败后必须立即清空，禁止影响普通 S4.5 新增排产。</p>
      */
     private String specialMaterialSpecifiedMachineCode;
-    /** 特殊材料指定机台排产指令中的“物料+产品状态”复合键 */
+    /**
+     * 特殊材料指定机台排产指令中的“物料+产品状态”复合键
+     */
     private String specialMaterialSpecifiedSkuKey;
-    /** 特殊材料指定机台排产允许的最早换模时间 */
+    /**
+     * 特殊材料指定机台排产允许的最早换模时间
+     */
     private Date specialMaterialEarliestSwitchTime;
     /**
      * 特殊材料置换成功记录。
@@ -788,9 +815,13 @@ public class LhScheduleContext {
      * 全量SKU排程信息索引Map，key=materialCode_productStatus，供后置阶段精确查找来源SKU
      */
     private Map<String, SkuScheduleDTO> allSkuScheduleDtoMap = new LinkedHashMap<>();
-    /** SKU减量清单索引集合，key=year+SEP+month+SEP+materialCode+SEP+productStatus（归一化）。S4.2批量加载，S4.3归集后统一过滤命中SKU */
+    /**
+     * SKU减量清单索引集合，key=year+SEP+month+SEP+materialCode+SEP+productStatus（归一化）。S4.2批量加载，S4.3归集后统一过滤命中SKU
+     */
     private Set<String> skuDecrementKeySet = new HashSet<>();
-    /** 已处理减量命中SKU去重集合，key=materialCode+SEP+productStatus+SEP+yearMonth，保证同一SKU多入口只写一次未排结果 */
+    /**
+     * 已处理减量命中SKU去重集合，key=materialCode+SEP+productStatus+SEP+yearMonth，保证同一SKU多入口只写一次未排结果
+     */
     private Set<String> decrementHandledSkuKeySet = new HashSet<>();
 
 
@@ -1070,6 +1101,21 @@ public class LhScheduleContext {
         if (null != windowEndDate) {
             allProductionDateSet.add(windowEndDate);
         }
+        //20260803+ 提前生产阀值
+        LhScheduleConfig scheduleConfig = getScheduleConfig();
+        if (null == scheduleConfig) {
+            return allProductionDateSet;
+        }
+        int value = scheduleConfig.getEarlyProductionDaysThreshold();
+        if (value <= BigDecimal.ZERO.intValue()) {
+            return allProductionDateSet;
+        }
+        LocalDate extraStartDate = SkuMonthPlanCalculator.getDate(windowEndDate);
+        for (int index = BigDecimal.ONE.intValue(); index <= value; index++) {
+            LocalDate addOneDate = extraStartDate.plusDays(index);
+            Date addDate = SkuMonthPlanCalculator.getDate(addOneDate);
+            allProductionDateSet.add(addDate);
+        }
         return allProductionDateSet;
     }
 
@@ -1124,10 +1170,10 @@ public class LhScheduleContext {
      * <p>结构与 SKU 均按“业务日 + 机台编码”去重，避免同一机台多个班次重复计数。</p>
      *
      * @param productionDate 业务日期
-     * @param structureName 产品结构
-     * @param materialCode SKU物料编码
-     * @param productStatus 产品状态
-     * @param machineCode 机台编码
+     * @param structureName  产品结构
+     * @param materialCode   SKU物料编码
+     * @param productStatus  产品状态
+     * @param machineCode    机台编码
      */
     public void recordScheduledMachine(LocalDate productionDate,
                                        String structureName,
@@ -1150,11 +1196,42 @@ public class LhScheduleContext {
     }
 
     /**
+     * 移除指定业务日已登记的已排硫化机台。
+     * <p>用于续作结果被停产保机或释放边界置零后回滚补满登记的结构/SKU机台统计，
+     * 避免后续同结构机台收尾补满被“结构机台数已达标”误拦。</p>
+     *
+     * @param productionDate 业务日期
+     * @param structureName  产品结构
+     * @param materialCode   SKU物料编码
+     * @param productStatus  产品状态
+     * @param machineCode    机台编码
+     */
+    public void removeScheduledMachine(LocalDate productionDate,
+                                       String structureName,
+                                       String materialCode,
+                                       String productStatus,
+                                       String machineCode) {
+        if (Objects.isNull(productionDate) || StringUtils.isEmpty(machineCode)) {
+            return;
+        }
+        if (StringUtils.isNotEmpty(structureName)) {
+            removeMachine(structureScheduledMachineCodeMap, productionDate, structureName, machineCode);
+        }
+        if (StringUtils.isNotEmpty(materialCode)) {
+            // 与登记口径保持一致：空状态统一按正规 S 归一化后再移除
+            String normalizedProductStatus = StringUtils.isEmpty(productStatus)
+                    ? FORMAL_PRODUCT_STATUS : productStatus;
+            String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(materialCode, normalizedProductStatus);
+            removeMachine(skuScheduledMachineCodeMap, productionDate, skuKey, machineCode);
+        }
+    }
+
+    /**
      * 获取指定业务日的动态历史欠产量。
      *
      * @param productionDate 当前业务日期
-     * @param materialCode 物料编码
-     * @param productStatus 产品状态
+     * @param materialCode   物料编码
+     * @param productStatus  产品状态
      * @return 当前月月初至业务日前一日的累计欠产量
      */
     public int getMonthlyHistoryShortageQty(LocalDate productionDate,
@@ -1180,7 +1257,7 @@ public class LhScheduleContext {
     /**
      * 登记当前提前生产阶段的中心化运行视图。
      *
-     * @param sku 提前生产 SKU
+     * @param sku         提前生产 SKU
      * @param runtimePlan 运行视图
      */
     public void registerEarlyProductionRuntimePlan(SkuScheduleDTO sku,
@@ -1277,8 +1354,8 @@ public class LhScheduleContext {
      * 获取指定业务日、指定 SKU 的已排机台数。
      *
      * @param productionDate 业务日期
-     * @param materialCode SKU物料编码
-     * @param productStatus 产品状态
+     * @param materialCode   SKU物料编码
+     * @param productStatus  产品状态
      * @return 已排机台数
      */
     public int getSkuScheduledMachineCount(LocalDate productionDate,
@@ -1295,9 +1372,9 @@ public class LhScheduleContext {
     /**
      * 登记前日交替计划反选成功的机台。
      *
-     * @param materialCode 物料编码
+     * @param materialCode  物料编码
      * @param productStatus 产品状态
-     * @param machineCode 机台编码
+     * @param machineCode   机台编码
      */
     public void registerHistoricalReverseSelectedMachine(String materialCode,
                                                          String productStatus,
@@ -1317,7 +1394,7 @@ public class LhScheduleContext {
     /**
      * 获取前日交替计划已为指定SKU反选成功的机台。
      *
-     * @param materialCode 物料编码
+     * @param materialCode  物料编码
      * @param productStatus 产品状态
      * @return 已成功机台编码集合；没有时返回空集合
      */
@@ -1335,9 +1412,9 @@ public class LhScheduleContext {
     /**
      * 撤销后置资源裁剪后已经失效的反选机台登记。
      *
-     * @param materialCode 物料编码
+     * @param materialCode  物料编码
      * @param productStatus 产品状态
-     * @param machineCode 历史指定机台编码
+     * @param machineCode   历史指定机台编码
      */
     public void unregisterHistoricalReverseSelectedMachine(String materialCode,
                                                            String productStatus,
@@ -1408,6 +1485,35 @@ public class LhScheduleContext {
         Set<String> machineCodeSet = dateMap.computeIfAbsent(
                 dimensionKey, key -> new LinkedHashSet<String>(4));
         machineCodeSet.add(machineCode);
+    }
+
+    /**
+     * 从已排机台统计中移除指定维度的机台，并清理空集合。
+     *
+     * @param targetMap      结构或SKU已排机台统计Map
+     * @param productionDate 业务日期
+     * @param dimensionKey   结构或SKU编码
+     * @param machineCode    机台编码
+     */
+    private void removeMachine(Map<LocalDate, Map<String, Set<String>>> targetMap,
+                               LocalDate productionDate,
+                               String dimensionKey,
+                               String machineCode) {
+        Map<String, Set<String>> dateMap = targetMap.get(productionDate);
+        if (CollectionUtils.isEmpty(dateMap)) {
+            return;
+        }
+        Set<String> machineCodeSet = dateMap.get(dimensionKey);
+        if (CollectionUtils.isEmpty(machineCodeSet)) {
+            return;
+        }
+        machineCodeSet.remove(machineCode);
+        if (machineCodeSet.isEmpty()) {
+            dateMap.remove(dimensionKey);
+        }
+        if (dateMap.isEmpty()) {
+            targetMap.remove(productionDate);
+        }
     }
 
     /**
@@ -1507,7 +1613,7 @@ public class LhScheduleContext {
     /**
      * 登记续作停产保机业务日。
      *
-     * @param machineCode 机台编码
+     * @param machineCode    机台编码
      * @param productionDate 业务日期
      */
     public void registerContinuousStopHoldDate(String machineCode, LocalDate productionDate) {
@@ -1524,7 +1630,7 @@ public class LhScheduleContext {
     /**
      * 判断机台在指定业务日是否处于停产保机状态。
      *
-     * @param machineCode 机台编码
+     * @param machineCode    机台编码
      * @param productionDate 业务日期
      * @return true-该日停产保机；false-不是
      */
@@ -1581,7 +1687,7 @@ public class LhScheduleContext {
      * 登记真正降模机台最后允许生产的班次序号。
      *
      * @param machineCode 机台编码
-     * @param shiftIndex 最后允许生产班次序号；0表示本窗口全部班次均已释放
+     * @param shiftIndex  最后允许生产班次序号；0表示本窗口全部班次均已释放
      */
     public void registerContinuousReducedMachineReleaseBoundary(String machineCode, int shiftIndex) {
         if (StringUtils.isEmpty(machineCode)) {
@@ -1602,6 +1708,34 @@ public class LhScheduleContext {
             return null;
         }
         return continuousReducedMachineReleaseBoundaryShiftIndexMap.get(machineCode);
+    }
+
+    /**
+     * 登记续作降模分组最后释放机台的业务日。
+     * <p>同分组后续业务日再次降模时直接覆盖为更晚的业务日，保证取值始终是最后一次释放日。</p>
+     *
+     * @param groupKey       物料+产品状态复合键
+     * @param productionDate 本次释放机台的业务日
+     */
+    public void registerReducedContinuationGroupLastReleaseDate(String groupKey, LocalDate productionDate) {
+        if (StringUtils.isEmpty(groupKey) || Objects.isNull(productionDate)) {
+            return;
+        }
+        reducedContinuationGroupLastReleaseDateMap.put(groupKey, productionDate);
+    }
+
+    /**
+     * 获取续作降模分组最后释放机台的业务日。
+     *
+     * @param groupKey 物料+产品状态复合键
+     * @return 最后一次真正下机的业务日；未发生逐日降模释放时返回null
+     */
+    public LocalDate getReducedContinuationGroupLastReleaseDate(String groupKey) {
+        if (StringUtils.isEmpty(groupKey)
+                || CollectionUtils.isEmpty(reducedContinuationGroupLastReleaseDateMap)) {
+            return null;
+        }
+        return reducedContinuationGroupLastReleaseDateMap.get(groupKey);
     }
 
     /**

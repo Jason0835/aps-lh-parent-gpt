@@ -58,7 +58,8 @@ public class TcTaskSortService implements ITcTaskSortService {
         String strategyCode = readParam(context, TcScheduleConstants.PARAM_TASK_SORT_STRATEGY,
                 TcScheduleStrategyEnum.DEFAULT.getCode());
         ITcTaskSortStrategy sortStrategy = strategyRegistry.getTaskSortStrategy(strategyCode);
-        Comparator<TcTaskDraft> comparator = sortStrategy.buildComparator(context);
+        Comparator<TcTaskDraft> comparator = this.buildStartupAwareComparator(context,
+                sortStrategy.buildComparator(context));
         String beforeOrder = summarizeTaskOrder(context);
         context.getTaskDraftList().sort(comparator);
         String afterOrder = summarizeTaskOrder(context);
@@ -72,6 +73,9 @@ public class TcTaskSortService implements ITcTaskSortService {
             evidence.put("strategyCode", strategyCode);
             evidence.put("sortIndex", i + 1);
             evidence.put("supplyHours", task.getSupplyHours());
+            evidence.put("startupShift", this.isStartupShift(context, task));
+            evidence.put("startupSortPriority", this.isStartupShift(context, task)
+                    ? "SUPPLY_HOURS_ASC" : "ORIGINAL_STRATEGY");
             evidence.put("glueCode", task.getGlueCode());
             evidence.put("baseGlueCode", task.getBaseGlueCode());
             evidence.put("mouthPlateCode", task.getMouthPlateCode());
@@ -83,6 +87,37 @@ public class TcTaskSortService implements ITcTaskSortService {
                     task.getSupplyHours(), task.getGlueCode(), task.getBaseGlueCode(), task.getMouthPlateCode(),
                     task.getPlanQty(), task.getDemandQty());
         }
+    }
+
+    /**
+     * 构建开产班次库存紧急度严格优先的任务比较器。
+     *
+     * <p>班次顺序保持第一优先级；仅在整日停产后的首个开放班次内，库存供应成型时长
+     * 优先于原排序策略，时长为空的任务排在有值任务之后。非开产班次完全委托原策略。</p>
+     *
+     * @param context            排程上下文
+     * @param originalComparator 原任务排序比较器
+     * @return 开产班次增强后的比较器
+     */
+    private Comparator<TcTaskDraft> buildStartupAwareComparator(TcScheduleContext context,
+                                                                 Comparator<TcTaskDraft> originalComparator) {
+        return Comparator
+                .comparing(TcTaskDraft::getShiftOrder, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(task -> this.isStartupShift(context, task) ? task.getSupplyHours() : null,
+                        Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(originalComparator);
+    }
+
+    /**
+     * 判断任务是否属于整日停产后的首个开放班次。
+     *
+     * @param context 排程上下文
+     * @param task    任务草稿
+     * @return 属于开产班次返回true
+     */
+    private boolean isStartupShift(TcScheduleContext context, TcTaskDraft task) {
+        return context != null && task != null && context.getStartupShiftOrderSet() != null
+                && context.getStartupShiftOrderSet().contains(task.getShiftOrder());
     }
 
     /**

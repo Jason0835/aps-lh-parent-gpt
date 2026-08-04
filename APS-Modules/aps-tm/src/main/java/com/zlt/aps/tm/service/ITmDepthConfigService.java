@@ -11,11 +11,10 @@ import com.zlt.bill.common.service.IDocService;
 public interface ITmDepthConfigService extends IDocService<TmDepthConfig> {
 
     /**
-     * 校验配置规则的交叉情况
-     * 校验新增/修改的规则是否与现有规则存在范围交叉
+     * 校验配置区间的字段合法性、连续性和完整性
      *
      * @param entity 备库班数配置实体
-     * @return UserConstants.UNIQUE 表示无交叉（校验通过），UserConstants.NOT_UNIQUE 表示存在交叉
+     * @return UserConstants.UNIQUE 表示校验通过，UserConstants.NOT_UNIQUE 表示校验失败
      */
     String checkRangeCross(TmDepthConfig entity);
 }

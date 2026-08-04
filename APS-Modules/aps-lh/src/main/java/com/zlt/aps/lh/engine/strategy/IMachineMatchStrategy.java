@@ -123,7 +123,7 @@ public interface IMachineMatchStrategy {
      * @param actualOrderedCandidates 正式选机主链本轮使用的有序候选
      * @param actualSelectedMachine 正式选机主链确定的本轮首选机台
      * @param currentDayEndTime 当前业务日结束时间，用于复用停产保机约束
-     * @param targetScheduleQtyResolver 正式产能计算组件，仅允许调用只读试算入口
+     * @param targetScheduleQtyResolver 正式产能计算组件（保留接口签名兼容；默认策略已不再使用产能试算）
      * @return 当前选机时点的只读日志快照
      */
     default MachinePriorityTraceSnapshot buildMachinePriorityTraceSnapshot(

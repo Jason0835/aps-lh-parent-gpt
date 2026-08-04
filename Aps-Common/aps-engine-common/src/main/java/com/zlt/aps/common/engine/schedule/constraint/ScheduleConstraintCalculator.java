@@ -15,6 +15,75 @@ public class ScheduleConstraintCalculator {
 
     private static final int CALCULATION_SCALE = 8;
 
+    private static final BigDecimal ONE_HUNDRED = new BigDecimal("100");
+
+    /**
+     * 按损耗率、最小起排量和卷曲长度依次结算计划量。
+     *
+     * <p>损耗率使用百分比口径。收尾任务可通过 {@code skipMinStartAndRound} 跳过最小起排和卷曲取整，
+     * 但仍会计算损耗补偿量。</p>
+     *
+     * @param preLossPlanQty 损耗计算前计划量
+     * @param lossRatePercent 损耗率百分比
+     * @param minStartQty 最小起排量
+     * @param curlRollLength 卷曲长度
+     * @param skipMinStartAndRound 是否跳过最小起排和卷曲取整
+     * @param calculationScale 小数计算精度；负数按0处理
+     * @return 计划量各阶段结算结果
+     */
+    public SchedulePlanQtyAdjustmentResult calculatePlanQtyAfterLoss(BigDecimal preLossPlanQty,
+                                                                      BigDecimal lossRatePercent,
+                                                                      BigDecimal minStartQty,
+                                                                      BigDecimal curlRollLength,
+                                                                      boolean skipMinStartAndRound,
+                                                                      int calculationScale) {
+        int normalizedScale = Math.max(calculationScale, 0);
+        BigDecimal normalizedPreLossPlanQty = this.nonNegative(preLossPlanQty)
+                .setScale(normalizedScale, RoundingMode.HALF_UP);
+        BigDecimal normalizedLossRate = this.nonNegative(lossRatePercent);
+        BigDecimal lossAddQty = BigDecimal.ZERO.setScale(normalizedScale, RoundingMode.HALF_UP);
+        if (normalizedPreLossPlanQty.compareTo(BigDecimal.ZERO) > 0
+                && normalizedLossRate.compareTo(BigDecimal.ZERO) > 0) {
+            lossAddQty = normalizedPreLossPlanQty.multiply(normalizedLossRate)
+                    .divide(ONE_HUNDRED, normalizedScale, RoundingMode.HALF_UP);
+        }
+        BigDecimal planQtyAfterLoss = normalizedPreLossPlanQty.add(lossAddQty)
+                .setScale(normalizedScale, RoundingMode.HALF_UP);
+        BigDecimal planQtyAfterMinStart = planQtyAfterLoss;
+        BigDecimal normalizedMinStartQty = this.nonNegative(minStartQty)
+                .setScale(normalizedScale, RoundingMode.HALF_UP);
+        if (!skipMinStartAndRound
+                && planQtyAfterLoss.compareTo(BigDecimal.ZERO) > 0
+                && normalizedMinStartQty.compareTo(BigDecimal.ZERO) > 0
+                && planQtyAfterLoss.compareTo(normalizedMinStartQty) < 0) {
+            planQtyAfterMinStart = normalizedMinStartQty;
+        }
+        BigDecimal minStartAdjustQty = planQtyAfterMinStart.subtract(planQtyAfterLoss)
+                .setScale(normalizedScale, RoundingMode.HALF_UP);
+        BigDecimal finalPlanQty = planQtyAfterMinStart;
+        BigDecimal normalizedCurlRollLength = this.nonNegative(curlRollLength)
+                .setScale(normalizedScale, RoundingMode.HALF_UP);
+        if (!skipMinStartAndRound
+                && planQtyAfterMinStart.compareTo(BigDecimal.ZERO) > 0
+                && normalizedCurlRollLength.compareTo(BigDecimal.ZERO) > 0) {
+            finalPlanQty = planQtyAfterMinStart.divide(normalizedCurlRollLength, 0, RoundingMode.CEILING)
+                    .multiply(normalizedCurlRollLength)
+                    .setScale(normalizedScale, RoundingMode.HALF_UP);
+        }
+        BigDecimal roundAdjustQty = finalPlanQty.subtract(planQtyAfterMinStart)
+                .setScale(normalizedScale, RoundingMode.HALF_UP);
+
+        SchedulePlanQtyAdjustmentResult result = new SchedulePlanQtyAdjustmentResult();
+        result.setPreLossPlanQty(normalizedPreLossPlanQty);
+        result.setLossAddQty(lossAddQty);
+        result.setPlanQtyAfterLoss(planQtyAfterLoss);
+        result.setMinStartAdjustQty(minStartAdjustQty);
+        result.setPlanQtyAfterMinStart(planQtyAfterMinStart);
+        result.setRoundAdjustQty(roundAdjustQty);
+        result.setFinalPlanQty(finalPlanQty);
+        return result;
+    }
+
     /**
      * 计算两个相邻任务之间的切换产能。
      *

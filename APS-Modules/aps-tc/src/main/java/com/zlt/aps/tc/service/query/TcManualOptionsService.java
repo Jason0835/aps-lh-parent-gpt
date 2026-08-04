@@ -82,8 +82,9 @@ public class TcManualOptionsService {
                 .filter(item -> Objects.equals(item.getConstructionVersion(), constructionVersion))
                 .findFirst().orElseThrow(() -> new ServiceException(
                         I18nUtil.getMessage("ui.tc.schedule.insert.constructionNotFound")));
-        if (StringUtils.isBlank(optionVo.getGlueCode()) || StringUtils.isBlank(optionVo.getMouthPlateCode())) {
-            throw new ServiceException(I18nUtil.getMessage("ui.tc.schedule.insert.constructionInvalid"));
+        List<String> missingFieldList = this.resolveConstructionMissingFieldList(optionVo);
+        if (!missingFieldList.isEmpty()) {
+            throw new ServiceException(this.buildConstructionInvalidMessage(optionVo, missingFieldList));
         }
         TcScheduleResult result = new TcScheduleResult();
         result.setFactoryCode(factoryCode);
@@ -171,6 +172,8 @@ public class TcManualOptionsService {
                 ? Collections.emptyList() : Arrays.stream(row.getSidewallRubber().split(","))
                 .map(String::trim).filter(StringUtils::isNotBlank).collect(Collectors.toList());
         TcManualConstructionOptionVo optionVo = new TcManualConstructionOptionVo();
+        optionVo.setSourceConstructionCode(row.getConstructionCode());
+        optionVo.setSourceConstructionVersion(row.getConstructionVersion());
         optionVo.setSidewallCode(row.getSidewallCode());
         optionVo.setConstructionVersion(row.getSidewallVersion());
         optionVo.setSidewallCraft(row.getSidewallCraft());
@@ -183,6 +186,50 @@ public class TcManualOptionsService {
         optionVo.setSidewallWeight(row.getSidewallWeight());
         optionVo.setSidewallWearpRubberWeight(row.getSidewallWearpRubberWeight());
         return optionVo;
+    }
+
+    /**
+     * 收集胎侧人工施工快照缺失的关键字段。
+     *
+     * @param optionVo 胎侧施工选项
+     * @return 已国际化的缺失字段名称
+     */
+    private List<String> resolveConstructionMissingFieldList(TcManualConstructionOptionVo optionVo) {
+        List<String> missingFieldList = new ArrayList<>();
+        if (StringUtils.isBlank(optionVo.getGlueCode())) {
+            missingFieldList.add(I18nUtil.getMessage("ui.tc.schedule.insert.constructionFieldRubber"));
+        }
+        if (StringUtils.isBlank(optionVo.getMouthPlateCode())) {
+            missingFieldList.add(I18nUtil.getMessage("ui.tc.schedule.insert.constructionFieldMouthPlate"));
+        }
+        return missingFieldList;
+    }
+
+    /**
+     * 构造包含来源施工定位信息和缺失字段的胎侧错误提示。
+     *
+     * @param optionVo 胎侧施工选项
+     * @param missingFieldList 已国际化的缺失字段名称
+     * @return 已完成国际化参数替换的错误提示
+     */
+    private String buildConstructionInvalidMessage(TcManualConstructionOptionVo optionVo,
+                                                   List<String> missingFieldList) {
+        return MessageFormat.format(I18nUtil.getMessage("ui.tc.schedule.insert.constructionInvalid"),
+                this.displayValue(optionVo.getSourceConstructionCode()),
+                this.displayValue(optionVo.getSourceConstructionVersion()),
+                this.displayValue(optionVo.getSidewallCode()),
+                this.displayValue(optionVo.getConstructionVersion()),
+                String.join(", ", missingFieldList));
+    }
+
+    /**
+     * 将空白定位字段转换为统一占位符。
+     *
+     * @param value 原始字段值
+     * @return 可直接展示的字段值
+     */
+    private String displayValue(String value) {
+        return StringUtils.isBlank(value) ? "-" : value;
     }
 
     /**

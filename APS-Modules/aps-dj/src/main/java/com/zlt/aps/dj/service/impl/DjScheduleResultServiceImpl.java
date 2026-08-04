@@ -114,7 +114,14 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
      */
     @Override
     public List<DjScheduleResult> selectDjScheduleResultList(DjScheduleResult djScheduleResult) {
+        // 处理垫胶和胶料过滤条件
+        String paddingName = djScheduleResult.getPaddingName();
+        String glueCode = djScheduleResult.getGlueCode();
+        djScheduleResult.setPaddingName(null);
+        djScheduleResult.setGlueCode(glueCode);
         QueryWrapper<DjScheduleResult> queryWrapper = ApsBeanUtils.builderCondition(djScheduleResult);
+        queryWrapper.like(StringUtils.isNotEmpty(paddingName), "PADDING_NAME", paddingName);
+        queryWrapper.like(StringUtils.isNotEmpty(glueCode), "GLUE_CODE", glueCode);
         List<DjScheduleResult> list = djScheduleResultMapper.selectList(queryWrapper);
         if (CollectionUtils.isEmpty(list)) {
             return new ArrayList<>();

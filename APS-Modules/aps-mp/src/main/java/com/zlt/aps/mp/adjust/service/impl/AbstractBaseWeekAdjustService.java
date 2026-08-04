@@ -70,6 +70,7 @@ import com.zlt.common.utils.PubUtil;
 import com.zlt.core.dao.basedao.BaseDao;
 import com.zlt.msg.message.domain.vo.MessageContext;
 import com.zlt.msg.message.enums.MsgTypeEnums;
+import io.swagger.models.auth.In;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.ObjectUtils;
@@ -515,7 +516,109 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
 
     @Override
     public void productAlign(MpRollAdjustContextDTO contextDTO) {
-        System.out.println("生产对齐");
+        if (StringUtil.isEmptyWithTrim(contextDTO.getVersion())) {
+            throw new BusinessException(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.versionEmpty"));
+        }
+        //1、查询月计划定稿数据
+        FactoryMonthPlanProductionFinalResult params = new FactoryMonthPlanProductionFinalResult();
+        params.setFactoryCode(contextDTO.getFactoryCode());
+        params.setYear(contextDTO.getMpYear());
+        params.setMonth(contextDTO.getMpMonth());
+        params.setVersion(contextDTO.getVersion());
+        params.setStructureName(contextDTO.getStructureName());
+        List<FactoryMonthPlanFinalAdjustVo> adjustVos = finalResultService.list4Adjust(params);
+        contextDTO.setFactoryMonthPlanProdFinalList(adjustVos);
+        //2、计算本次超欠产 = 累计已排产量 - 已生产量, 以及 待调整量
+        setCurrentOverdueQtyAndPendingQty(contextDTO);
+        //3、针对待调整量，尝试自动生产对齐
+        doProductAlign(contextDTO);
+        //4、设置0日生产超欠产
+        setZeroProductOverdueQty(contextDTO);
+        //5、保存调整结果
+        saveMpAdjustResult(contextDTO);
+        //6、保存调整过程日志
+        saveMpAdjustProcLog(contextDTO);
+        //7、保存月计划统计结果
+        saveMonthPlanStatisticsResult(contextDTO, YesOrNoEnum.YES.getCode());
+    }
+
+    /**
+     * 计算本次超欠产、待调整量
+     * @param contextDTO
+     */
+    private void setCurrentOverdueQtyAndPendingQty(MpRollAdjustContextDTO contextDTO) {
+        List<MpMonthPlanMonitor> monitorList = contextDTO.getMpMonthPlanMonitorList();
+        List<FactoryMonthPlanFinalAdjustVo> finalAdjustList = contextDTO.getFactoryMonthPlanProdFinalList();
+        // 转分组Map
+        Map<String, List<FactoryMonthPlanFinalAdjustVo>> planGroupMap = convertToPlanGroupMap(contextDTO.getFactoryMonthPlanProdFinalList());
+        Map<String, List<MpMonthPlanMonitor>> monitorGroupMap = convertToMonitorGroupMap(monitorList);
+        Date currentDate = DateUtils.getNowDate();
+        int currentDay = DateUtils.getDay(currentDate);
+        // 遍历目标列表，计算赋值
+        for (FactoryMonthPlanFinalAdjustVo finalAdjustVo : finalAdjustList) {
+            finalAdjustVo.setProductAlignDate(currentDate);
+
+            if (StringUtils.isEmpty(finalAdjustVo.getMaterialCode())) {
+                continue;
+            }
+            if (!ConstructionStageEnum.FORMAL_PRODUCTION.getStage().equals(finalAdjustVo.getConstructionStage())){
+                // 非正式忽略
+                continue;
+            }
+            // 计算：day1~targetDay的累计值
+            Integer totalScheduledQty = calculateQty(planGroupMap, finalAdjustVo.getMaterialCode(), currentDay - 1);
+            // 获取已生产量（空值按0处理）
+            List<MpMonthPlanMonitor> monthPlanMonitorList = MapUtils.getObject(monitorGroupMap, finalAdjustVo.getMaterialCode(), new ArrayList<>());
+            Integer productionQty = Convert.toInt(monthPlanMonitorList.stream()
+                    .filter(e -> e.getProductionQty() != null)
+                    .mapToInt(MpMonthPlanMonitor::getProductionQty)
+                    .sum(), 0);
+            // 1、超欠产 = 累计已排产量 - 已生产量
+            Integer overdueQty = totalScheduledQty - productionQty;
+            finalAdjustVo.setCurrentOverdueQty(overdueQty);
+
+            //2、待调整量 = 订单增减量（0） - 本次超欠产
+            Integer pendingQty = - overdueQty;
+            finalAdjustVo.setPendingQty(pendingQty);
+        }
+    }
+
+    /**
+     * 设置0日 生产超欠产
+     * @param contextDTO
+     */
+    private void setZeroProductOverdueQty(MpRollAdjustContextDTO contextDTO) {
+        List<FactoryMonthPlanFinalAdjustVo> finalAdjustList = contextDTO.getFactoryMonthPlanProdFinalList();
+        // 转分组Map
+        Map<String, List<FactoryMonthPlanFinalAdjustVo>> planGroupMap = convertToPlanGroupMap(contextDTO.getFactoryMonthPlanProdFinalList());
+        Date currentDate = DateUtils.getNowDate();
+        int currentDay = DateUtils.getDay(currentDate);
+        // 遍历目标列表，计算赋值
+        for (FactoryMonthPlanFinalAdjustVo finalAdjustVo : finalAdjustList) {
+
+            if (StringUtils.isEmpty(finalAdjustVo.getMaterialCode())) {
+                continue;
+            }
+            if (!ConstructionStageEnum.FORMAL_PRODUCTION.getStage().equals(finalAdjustVo.getConstructionStage())){
+                // 非正式忽略
+                continue;
+            }
+            //1、if(abs(计划差值) >= abs(欠产值) 0日超欠产值 = 旧有0日超欠产值 + 真实欠产值
+            //2、if(计划差值 = 0 ) 0日超欠产值 = 旧有0日超欠产值
+            //3、0日超欠产值 = 旧有0日超欠产值 - 计划差值
+            Integer productOverdueQty = Convert.toInt(finalAdjustVo.getProductOverdueQty(),0);
+            Integer actualAdjustQty = Convert.toInt(finalAdjustVo.getActualAdjustQty(),0);
+            Integer currentOverdueQty = Convert.toInt(finalAdjustVo.getCurrentOverdueQty(),0);
+            if (Math.abs(actualAdjustQty) >= Math.abs(currentOverdueQty)){
+                productOverdueQty += currentOverdueQty;
+            }else if (actualAdjustQty == 0){
+                //productOverdueQty = finalAdjustVo.getProductOverdueQty();
+            }else{
+                productOverdueQty -= currentOverdueQty;
+            }
+
+            finalAdjustVo.setProductOverdueQty(productOverdueQty);
+        }
     }
 
     @Override
@@ -786,7 +889,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         if (PubUtil.isEmpty(mpFinalList)) {
             return;
         }
-        Integer specStructureTotalQty = mpFinalList.stream().mapToInt(FactoryMonthPlanFinalAdjustVo::getTotalQty).sum();
+        Integer specStructureTotalQty = mpFinalList.stream().filter(x->x.getTotalQty() != null).mapToInt(FactoryMonthPlanFinalAdjustVo::getTotalQty).sum();
         contextDTO.setSpecStructureTotalQty(specStructureTotalQty);
     }
 
@@ -3194,6 +3297,11 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      * 自动调整(业务逻辑处理)
      */
     public abstract void doAutoAdjust(MpRollAdjustContextDTO contextDTO);
+
+    /**
+     * 生产对齐(业务逻辑处理)
+     */
+    public abstract void doProductAlign(MpRollAdjustContextDTO contextDTO);
 
     /**
      * 筛选：|净需求 - 计划剩余排产量| > 0的数据

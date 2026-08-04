@@ -31,6 +31,7 @@
 <script>
 import infoForm from "@/views/components/infoForm.vue";
 import {changeQty, insertTask} from "@/api/tm/scheduleResult";
+import {resolveErrorMessage} from "@/utils/errorMessage";
 
 const CHANGE_QTY_EDITABLE_FIELDS = [
   "class1PlanQty",
@@ -637,7 +638,10 @@ export default {
         this.hide();
         this.loading = false;
       } catch (error) {
-        console.log(error);
+        this.$modal.alertError(resolveErrorMessage(
+          error,
+          this.$t("ui.data.column.tm.scheduleResult.operationFailed")
+        ));
         this.loading = false;
       }
     },
@@ -680,19 +684,19 @@ export default {
         const hasAnalysis = typeof analysis === "string" && analysis.trim().length > 0;
         if (!hasPlanValue) {
           if (hasSequence || hasAnalysis) {
-            this.$modal.msgWarning(this.$t("ui.tm.schedule.insert.shiftPairRequired"));
+            this.$modal.alertWarning(this.$t("ui.tm.schedule.insert.shiftPairRequired"));
             return false;
           }
           continue;
         }
         if (Number(planQty) <= 0 || !hasSequence || Number(sequence) < 1 || !Number.isInteger(Number(sequence))) {
-          this.$modal.msgWarning(this.$t("ui.tm.schedule.insert.shiftPairRequired"));
+          this.$modal.alertWarning(this.$t("ui.tm.schedule.insert.shiftPairRequired"));
           return false;
         }
         hasPlanQty = true;
       }
       if (!hasPlanQty) {
-        this.$modal.msgWarning(this.$t("ui.tm.schedule.insert.planQtyRequired"));
+        this.$modal.alertWarning(this.$t("ui.tm.schedule.insert.planQtyRequired"));
         return false;
       }
       return true;
