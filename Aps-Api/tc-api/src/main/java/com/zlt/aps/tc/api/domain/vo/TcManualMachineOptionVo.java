@@ -27,4 +27,8 @@ public class TcManualMachineOptionVo implements Serializable {
     /** 单班最大产能。 */
     @ApiModelProperty(value = "单班最大产能")
     private BigDecimal maxCapacity;
+
+    /** 机台开机班次编码，多个编码以逗号分隔。 */
+    @ApiModelProperty(value = "机台开机班次编码")
+    private String openShiftCode;
 }

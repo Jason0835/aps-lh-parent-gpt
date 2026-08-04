@@ -1121,7 +1121,7 @@
   "ui.data.column.tc.stock.curlLengthNotExist": "Sidewall code corresponding curl length configuration not found!",
   "ui.data.column.tc.MachineInfo.modelName": "Sidewall Machine Info",
   "ui.data.column.tc.machineInfo.modelName": "Sidewall Machine Info",
-  "ui.data.column.tc.machineInfo.factoryCode": "Factory Code",
+  "ui.data.column.tc.machineInfo.factoryCode": "Factory",
   "ui.data.column.tc.machineInfo.machineCode": "Machine Code",
   "ui.data.column.tc.machineInfo.machineName": "Machine Name",
   "ui.data.column.tc.machineInfo.maxCapacity": "Max Capacity",

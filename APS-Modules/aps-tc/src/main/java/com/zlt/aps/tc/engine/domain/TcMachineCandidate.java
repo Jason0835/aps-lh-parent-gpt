@@ -23,6 +23,9 @@ public class TcMachineCandidate {
     /** 是否启用 */
     private Boolean enabled;
 
+    /** 机台允许开机的班次编码集合，空集合表示全部停班 */
+    private Set<String> openShiftCodes;
+
     /** 最大产能，单位米 */
     private BigDecimal maxCapacity;
 

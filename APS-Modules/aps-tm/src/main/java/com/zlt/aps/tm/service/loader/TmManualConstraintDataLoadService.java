@@ -261,7 +261,6 @@ public class TmManualConstraintDataLoadService {
     private Map<String, Date[]> buildShiftWindowMap(TmManualRollingContext context) {
         LambdaQueryWrapper<TmShiftConfig> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(TmShiftConfig::getFactoryCode, context.getFactoryCode());
-        wrapper.eq(TmShiftConfig::getOpenFlag, TmYesNoEnum.YES.getCode());
         List<TmShiftConfig> configList = Optional.ofNullable(tmShiftConfigMapper.selectList(wrapper))
                 .orElse(new ArrayList<>()).stream()
                 .filter(config -> config != null && config.getShiftOrder() != null)

@@ -4045,7 +4045,7 @@
   "ui.data.column.tc.stock.curlLengthNotExist": "未找到胎侧代码对应的卷曲长度配置！",
   "ui.data.column.tc.MachineInfo.modelName": "胎侧机台基础信息",
   "ui.data.column.tc.machineInfo.modelName": "胎侧机台基础信息",
-  "ui.data.column.tc.machineInfo.factoryCode": "工厂编号",
+  "ui.data.column.tc.machineInfo.factoryCode": "工厂",
   "ui.data.column.tc.machineInfo.machineCode": "机台编码",
   "ui.data.column.tc.machineInfo.machineName": "机台名称",
   "ui.data.column.tc.machineInfo.maxCapacity": "最大班产",

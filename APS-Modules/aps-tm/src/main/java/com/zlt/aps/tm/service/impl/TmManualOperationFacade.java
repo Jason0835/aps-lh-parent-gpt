@@ -28,6 +28,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import javax.annotation.Resource;
 import java.math.BigDecimal;
 import java.text.MessageFormat;
 import java.util.*;
@@ -66,6 +67,10 @@ public class TmManualOperationFacade {
 
     private final TmScheduleResultExplainMapper tmScheduleResultExplainMapper;
 
+    /** 胎面机台开机班次校验器；字段注入用于兼容既有非 Spring 单元测试构造方式。 */
+    @Resource
+    private TmMachineOpenShiftValidator machineOpenShiftValidator;
+
     /**
      * 执行人工插单。
      *
@@ -78,6 +83,7 @@ public class TmManualOperationFacade {
         List<String> machineCodes = Collections.singletonList(scheduleResult.getMachineCode());
         return this.executeWithMachineLocks(scheduleResult.getFactoryCode(), scheduleResult.getScheduleDate(), machineCodes,
                 () -> this.executeInTransaction(() -> {
+                    this.validateInsertMachineOpenShift(scheduleResult);
                     this.validateInsertAfterSecondSequence(scheduleResult);
                     List<TmScheduleResult> beforeList = this.lockAndValidateManualOpSnapshot(scheduleResult, machineCodes);
                     int changedCount = tmManualInsertRollingService.insertAndRoll(scheduleResult);
@@ -108,6 +114,7 @@ public class TmManualOperationFacade {
                             "ui.data.alert.tm.schedule.changeQtyResultNotFound", "调量排程结果不存在或已失效");
                     this.validateLockedSourceMachine(persisted, current);
                     this.normalizeExistingOperationRequest(scheduleResult, current, false);
+                    this.validatePlanIncreaseMachineOpenShift(current, scheduleResult);
                     List<TmScheduleResult> beforeList = this.lockAndValidateManualOpSnapshot(current, machineCodes);
                     int changedCount = tmManualInsertRollingService.changeQtyAndRoll(scheduleResult);
                     List<TmScheduleResult> afterList = this.loadManualOpSnapshot(current, machineCodes);
@@ -182,6 +189,7 @@ public class TmManualOperationFacade {
                 this.validateLockedSourceMachine(initialResultList.get(index), current);
                 this.normalizeExistingOperationRequest(requestList.get(index), current, true);
                 requestList.get(index).setMachineCode(targetMachineCode);
+                this.validateTransferMachineOpenShift(current, targetMachineCode);
                 currentList.add(current);
             }
             List<String> machineCodes = currentList.stream().map(TmScheduleResult::getMachineCode)
@@ -216,6 +224,7 @@ public class TmManualOperationFacade {
         this.validateLockedSourceMachine(persisted, current);
         this.normalizeExistingOperationRequest(scheduleResult, current, true);
         scheduleResult.setMachineCode(targetMachineCode);
+        this.validateTransferMachineOpenShift(current, targetMachineCode);
         List<String> machineCodes = Arrays.asList(current.getMachineCode(), targetMachineCode);
         List<TmScheduleResult> beforeList = this.lockAndValidateManualOpSnapshot(current, machineCodes);
         int changedCount = tmManualInsertRollingService.changeMachineAndRoll(scheduleResult);
@@ -223,6 +232,42 @@ public class TmManualOperationFacade {
         scheduleResult.setBaseVale(scheduleResult.getId());
         this.recordDispatcherLog(ApsConstant.DISPATCHER_OPER_MACHINE, scheduleResult, beforeList, afterList);
         return changedCount;
+    }
+
+    /**
+     * 校验人工插单目标机台的开机班次。
+     *
+     * @param scheduleResult 插单结果
+     */
+    private void validateInsertMachineOpenShift(TmScheduleResult scheduleResult) {
+        if (this.machineOpenShiftValidator != null) {
+            this.machineOpenShiftValidator.validateInsert(scheduleResult);
+        }
+    }
+
+    /**
+     * 校验人工调量中新增的计划量班次。
+     *
+     * @param currentResult 当前数据库结果
+     * @param requestResult 调量请求
+     */
+    private void validatePlanIncreaseMachineOpenShift(TmScheduleResult currentResult,
+                                                       TmScheduleResult requestResult) {
+        if (this.machineOpenShiftValidator != null) {
+            this.machineOpenShiftValidator.validateIncrease(currentResult, requestResult);
+        }
+    }
+
+    /**
+     * 校验人工转入目标机台的全部正计划量班次。
+     *
+     * @param currentResult 当前数据库结果
+     * @param targetMachineCode 目标机台编码
+     */
+    private void validateTransferMachineOpenShift(TmScheduleResult currentResult, String targetMachineCode) {
+        if (this.machineOpenShiftValidator != null) {
+            this.machineOpenShiftValidator.validateTransfer(currentResult, targetMachineCode);
+        }
     }
 
     /**

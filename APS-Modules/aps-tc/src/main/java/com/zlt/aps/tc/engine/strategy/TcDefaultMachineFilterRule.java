@@ -7,10 +7,7 @@ import com.zlt.aps.tc.api.constant.TcScheduleConstants;
 import com.zlt.aps.tc.api.enums.TcMachineFilterReasonEnum;
 import com.zlt.aps.tc.api.enums.TcScheduleErrorCodeEnum;
 import com.zlt.aps.tc.api.enums.TcScheduleStrategyEnum;
-import com.zlt.aps.tc.engine.domain.TcMachineCandidate;
-import com.zlt.aps.tc.engine.domain.TcMachineRuleContext;
-import com.zlt.aps.tc.engine.domain.TcParamValue;
-import com.zlt.aps.tc.engine.domain.TcTaskDraft;
+import com.zlt.aps.tc.engine.domain.*;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -21,7 +18,7 @@ import java.util.stream.Collectors;
 /**
  * 胎侧默认机台过滤规则链。
  *
- * <p>按启用、剩余产能、口型板、胶料机台关系、定点生产、定点不可生产顺序执行，
+ * <p>按启用、机台开机班次、剩余产能、口型板、胶料机台关系、共用机台错班、定点生产、定点不可生产顺序执行，
  * 任一否决即过滤。方法会修改候选机台的过滤状态和证据，不修改任务链。
  * 通过 {@link Component} 注册为 Spring Bean，由 {@link TcStrategyRegistry}
  * 按 {@link TcScheduleStrategyEnum#DEFAULT} 编码收集。</p>
@@ -30,6 +27,7 @@ import java.util.stream.Collectors;
 public class TcDefaultMachineFilterRule implements ITcMachineFilterRule {
 
     private static final String RULE_MACHINE_STATUS = "MACHINE_STATUS";
+    private static final String RULE_MACHINE_OPEN_SHIFT = "MACHINE_OPEN_SHIFT";
     private static final String RULE_REMAIN_CAPACITY = "REMAIN_CAPACITY";
     private static final String RULE_MOUTH_PLATE = "MOUTH_PLATE";
     private static final String RULE_GLUE_MACHINE = "GLUE_MACHINE";
@@ -124,6 +122,9 @@ public class TcDefaultMachineFilterRule implements ITcMachineFilterRule {
         if (RULE_MACHINE_STATUS.equals(ruleCode) && Boolean.FALSE.equals(candidate.getEnabled())) {
             return TcMachineFilterReasonEnum.MACHINE_DISABLED;
         }
+        if (RULE_MACHINE_OPEN_SHIFT.equals(ruleCode) && this.hasMachineOpenShiftConflict(candidate, context)) {
+            return TcMachineFilterReasonEnum.MACHINE_SHIFT_NOT_OPEN;
+        }
         if (RULE_REMAIN_CAPACITY.equals(ruleCode) && (candidate.getRemainCapacity() == null
                 || candidate.getRemainCapacity().compareTo(BigDecimal.ZERO) <= 0)) {
             return TcMachineFilterReasonEnum.NO_REMAIN_CAPACITY;
@@ -189,7 +190,24 @@ public class TcDefaultMachineFilterRule implements ITcMachineFilterRule {
         defaultRuleOrder.stream()
                 .filter(ruleCode -> !configuredRuleSet.contains(ruleCode))
                 .forEach(resolvedRuleOrder::add);
-        return resolvedRuleOrder;
+        return this.normalizeHardRuleOrder(resolvedRuleOrder);
+    }
+
+    /**
+     * 固定机台状态、开机班次和剩余产能三项硬约束的先后关系。
+     *
+     * @param resolvedRuleOrder 已合并默认项的规则顺序
+     * @return 状态在前、开机班次居中、产能在后的规则顺序
+     */
+    private List<String> normalizeHardRuleOrder(List<String> resolvedRuleOrder) {
+        List<String> normalizedRuleOrder = new ArrayList<>(resolvedRuleOrder);
+        normalizedRuleOrder.remove(RULE_MACHINE_STATUS);
+        normalizedRuleOrder.remove(RULE_MACHINE_OPEN_SHIFT);
+        int remainCapacityIndex = normalizedRuleOrder.indexOf(RULE_REMAIN_CAPACITY);
+        int insertIndex = remainCapacityIndex < 0 ? 0 : remainCapacityIndex;
+        normalizedRuleOrder.add(insertIndex, RULE_MACHINE_STATUS);
+        normalizedRuleOrder.add(insertIndex + 1, RULE_MACHINE_OPEN_SHIFT);
+        return normalizedRuleOrder;
     }
 
     /**
@@ -200,6 +218,9 @@ public class TcDefaultMachineFilterRule implements ITcMachineFilterRule {
      * @return true 表示执行该规则
      */
     private boolean isRuleEnabled(TcMachineRuleContext context, String ruleCode) {
+        if (RULE_MACHINE_OPEN_SHIFT.equals(ruleCode)) {
+            return true;
+        }
         if (context.getScheduleContext() == null) {
             return true;
         }
@@ -217,12 +238,34 @@ public class TcDefaultMachineFilterRule implements ITcMachineFilterRule {
      */
     private boolean isKnownRule(String ruleCode) {
         return RULE_MACHINE_STATUS.equals(ruleCode)
+                || RULE_MACHINE_OPEN_SHIFT.equals(ruleCode)
                 || RULE_REMAIN_CAPACITY.equals(ruleCode)
                 || RULE_MOUTH_PLATE.equals(ruleCode)
                 || RULE_GLUE_MACHINE.equals(ruleCode)
                 || RULE_SHARED_MACHINE.equals(ruleCode)
                 || RULE_FIXED_MACHINE.equals(ruleCode)
                 || RULE_EXCLUDE_FIXED.equals(ruleCode);
+    }
+
+    /**
+     * 判断候选机台是否未开放当前任务班次。
+     *
+     * @param candidate 候选机台
+     * @param context 机台规则上下文
+     * @return true 表示机台当前班次未开机
+     */
+    private boolean hasMachineOpenShiftConflict(TcMachineCandidate candidate, TcMachineRuleContext context) {
+        TcTaskDraft taskDraft = context.getTaskDraft();
+        TcShiftTimeWindow shiftTimeWindow = taskDraft == null || context.getScheduleContext() == null
+                ? null : context.getScheduleContext().getShiftTimeWindowMap().get(taskDraft.getShiftOrder());
+        String currentShiftCode = shiftTimeWindow == null ? null : shiftTimeWindow.getShiftCode();
+        Set<String> openShiftCodes = candidate.getOpenShiftCodes();
+        candidate.getEvidence().put("shiftOrder", taskDraft == null ? null : taskDraft.getShiftOrder());
+        candidate.getEvidence().put("shiftCode", currentShiftCode);
+        candidate.getEvidence().put("machineOpenShiftCodes",
+                openShiftCodes == null ? Collections.emptySet() : openShiftCodes);
+        return currentShiftCode == null || openShiftCodes == null
+                || !openShiftCodes.contains(currentShiftCode.trim());
     }
 
     /**
