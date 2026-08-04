@@ -242,7 +242,7 @@ public final class TmScheduleConstants {
 
     /** 默认机台过滤规则链顺序。 */
     public static final String DEFAULT_FILTER_RULE_ORDER =
-            "MACHINE_STATUS,REMAIN_CAPACITY,MOUTH_PLATE,GLUE_MACHINE,FIXED_MACHINE,EXCLUDE_FIXED";
+            "MACHINE_STATUS,MACHINE_OPEN_SHIFT,REMAIN_CAPACITY,MOUTH_PLATE,GLUE_MACHINE,FIXED_MACHINE,EXCLUDE_FIXED";
 
     /** 默认启用单项机台过滤规则。 */
     public static final String DEFAULT_FILTER_RULE_ENABLED = "1";

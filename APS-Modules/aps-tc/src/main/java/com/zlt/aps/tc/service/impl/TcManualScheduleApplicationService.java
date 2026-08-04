@@ -347,7 +347,7 @@ public class TcManualScheduleApplicationService {
         for (Integer shiftOrder : shiftOrderList.stream().filter(Objects::nonNull).distinct()
                 .collect(Collectors.toList())) {
             TcShiftConfig shiftConfig = shiftConfigMap.get(shiftOrder);
-            if (shiftConfig == null || !"1".equals(shiftConfig.getOpenFlag())) {
+            if (shiftConfig == null) {
                 throw new ServiceException(I18nUtil.getMessage("ui.tc.schedule.manual.shiftClosed"));
             }
             if (targetDate.equals(today) && this.resolveShiftEndTime(shiftConfig, scheduleDate).before(new Date())) {

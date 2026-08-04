@@ -35,6 +35,9 @@ public class TmTaskDraft {
     /** 成型机台编号 */
     private String cxMachineCode;
 
+    /** 硫化机台编号，多个编码使用英文逗号分隔，仅用于过程日志追溯。 */
+    private String lhMachineCode;
+
     /** 胎面规格编码 */
     private String treadCode;
 

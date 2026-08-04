@@ -26,7 +26,7 @@
           filterable
         >
           <el-option
-            v-for="item in machines"
+            v-for="item in availableMachines"
             :key="item.machineCode"
             :value="item.machineCode"
             :label="item.machineName"
@@ -47,6 +47,7 @@
 import {mapState} from "vuex";
 
 import {batchChangeMachine} from "@/api/tm/tmScheduleResult.js";
+import {listTmShiftConfig} from "@/api/tm/shiftConfig";
 import {resolveErrorMessage} from "@/utils/errorMessage";
 
 export default {
@@ -65,6 +66,7 @@ export default {
         ],
       },
       tableRows: [],
+      shiftConfigs: [],
     };
   },
   computed: {
@@ -73,6 +75,19 @@ export default {
     }),
     title: function () {
       return this.$t("ui.data.column.tm.scheduleResult.modelName");
+    },
+    availableMachines() {
+      const requiredShiftOrders = [...new Set(this.tableRows.flatMap(row =>
+        Array.from({length: 6}, (item, index) => index + 1)
+          .filter(shiftOrder => Number(row[`class${shiftOrder}PlanQty`] || 0) > 0)
+      ))];
+      return this.machines.filter(machine => {
+        const openShiftCodes = this.machineOpenShiftCodes(machine);
+        return requiredShiftOrders.every(shiftOrder => {
+          const shiftConfig = this.shiftConfigs.find(item => Number(item.shiftOrder) === shiftOrder);
+          return shiftConfig && openShiftCodes.includes(String(shiftConfig.shiftCode || "").trim());
+        });
+      });
     },
   },
   methods: {
@@ -98,13 +113,29 @@ export default {
       }
     },
 
-    show(data) {
+    async show(data) {
       this.visible = true;
       this.tableRows = data;
+      this.shiftConfigs = [];
+      const firstRow = data[0] || {};
+      try {
+        const response = await listTmShiftConfig({
+          factoryCode: firstRow.factoryCode,
+          pageNum: 1,
+          pageSize: 100,
+        });
+        this.shiftConfigs = response.rows || [];
+      } catch (error) {
+        this.$modal.alertError(resolveErrorMessage(
+          error,
+          this.$t("ui.data.column.tm.scheduleResult.operationFailed")
+        ));
+      }
     },
     hide() {
       this.form = {};
       this.tableRows = [];
+      this.shiftConfigs = [];
       this.$refs.form.resetForm();
       this.visible = false;
     },
@@ -124,6 +155,10 @@ export default {
           });
         }
       });
+    },
+    machineOpenShiftCodes(machine) {
+      if (!machine || !machine.openShiftCode) return [];
+      return [...new Set(String(machine.openShiftCode).split(",").map(item => item.trim()).filter(Boolean))];
     },
   },
 };

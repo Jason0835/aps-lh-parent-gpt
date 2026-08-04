@@ -313,9 +313,47 @@ public class TmScheduleTemplateImpl extends AbsTmScheduleTemplate {
                     + "-库存抵扣" + this.nvl(task.getStockDeductQty()).toPlainString()
                     + "=" + baseFormula;
         }
-        return "计划量计算：胎面代码=" + task.getTreadCode() + "（胎胚号="
-                + this.displayEmbryoCode(task.getEmbryoCode()) + "），计划量=" + baseFormula
+        return "计划量计算：胎面代码=" + task.getTreadCode()
+                + "，成型代码=" + this.displayEmbryoCode(task.getEmbryoCode())
+                + "，是否新规格=" + this.isNewSpec(task)
+                + "，是否量试/试制=" + this.isExperimentSpec(task)
+                + "，硫化机台=" + StrUtil.blankToDefault(task.getLhMachineCode(), "未提供")
+                + "，深度（备库班数）=" + this.displayGuardShiftCount(task.getGuardShiftCount())
+                + "，胎面长=" + this.nvl(task.getTreadShoulderLength()).toPlainString()
+                + "，当班成型消耗=" + this.nvl(task.getCurrentShiftDemandQty()).toPlainString()
+                + "，成型备库窗口内计划量=" + this.nvl(task.getGuardDemandQty()).toPlainString()
+                + "，计划量=" + baseFormula
                 + String.join("", adjustmentTerms) + "=" + this.nvl(task.getPlanQty()).toPlainString();
+    }
+
+    /**
+     * 判断任务是否命中新规格规则。
+     *
+     * @param task 排程任务
+     * @return true 表示新规格
+     */
+    private boolean isNewSpec(TmTaskDraft task) {
+        return task != null && task.getNewSpecInfo() != null && task.getNewSpecInfo().isNewSpecHit();
+    }
+
+    /**
+     * 判断任务是否命中量试/试制对应的实验规格规则。
+     *
+     * @param task 排程任务
+     * @return true 表示量试/试制
+     */
+    private boolean isExperimentSpec(TmTaskDraft task) {
+        return task != null && task.getExperimentSpecInfo() != null && task.getExperimentSpecInfo().isExperimentSpecHit();
+    }
+
+    /**
+     * 展示库存保证班数，避免日志中出现空值。
+     *
+     * @param guardShiftCount 库存保证班数
+     * @return 可展示的库存保证班数
+     */
+    private String displayGuardShiftCount(Integer guardShiftCount) {
+        return guardShiftCount == null ? "未提供" : String.valueOf(guardShiftCount);
     }
 
     /**

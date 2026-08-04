@@ -1,7 +1,6 @@
 package com.zlt.aps.tm.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.ruoyi.common.exception.ServiceException;
@@ -112,9 +111,7 @@ public class TmMachineMaintenanceServiceImpl extends AbstractDocService<TmMachin
         }
 
         List<TmShiftConfig> shiftConfigs = tmShiftConfigMapper.selectList(
-                new QueryWrapper<TmShiftConfig>()
-                        .eq("OPEN_FLAG", "1")
-        );
+                new LambdaQueryWrapper<TmShiftConfig>());
 
         if (shiftConfigs == null || shiftConfigs.isEmpty()) {
             return null;

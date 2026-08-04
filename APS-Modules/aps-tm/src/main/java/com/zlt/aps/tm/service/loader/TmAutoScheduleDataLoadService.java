@@ -137,6 +137,7 @@ public class TmAutoScheduleDataLoadService {
             TmMachineCandidate candidate = new TmMachineCandidate();
             candidate.setMachineCode(machineInfo.getMachineCode());
             candidate.setEnabled(isMachineEnabled(machineInfo));
+            candidate.setOpenShiftCodes(this.parseOpenShiftCodes(machineInfo.getOpenShiftCode()));
             candidate.setMaxCapacity(nvl(machineInfo.getMaxCapacity()));
             candidate.setRemainCapacity(nvl(machineInfo.getMaxCapacity()));
             candidate.setMaintenanceHours(BigDecimal.ZERO);
@@ -509,12 +510,27 @@ public class TmAutoScheduleDataLoadService {
         }
         List<TmShiftConfig> configs = tmShiftConfigMapper.selectList(
                 new LambdaQueryWrapper<TmShiftConfig>()
-                        .eq(TmShiftConfig::getFactoryCode, context.getFactoryCode())
-                .eq(TmShiftConfig::getOpenFlag, TmYesNoEnum.YES.getCode()));
+                        .eq(TmShiftConfig::getFactoryCode, context.getFactoryCode()));
         return nullToEmpty(configs).stream()
                 .filter(config -> config.getShiftOrder() != null)
                 .sorted(Comparator.comparing(TmShiftConfig::getShiftOrder))
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * 解析机台维护的开机班次编码。
+     *
+     * @param openShiftCode 逗号分隔的开机班次编码
+     * @return 去空、去重后的班次编码集合；未维护时返回空集合
+     */
+    private Set<String> parseOpenShiftCodes(String openShiftCode) {
+        if (StrUtil.isBlank(openShiftCode)) {
+            return new LinkedHashSet<>();
+        }
+        return Arrays.stream(openShiftCode.split(","))
+                .map(StrUtil::trim)
+                .filter(StrUtil::isNotBlank)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
     /**
@@ -817,6 +833,7 @@ public class TmAutoScheduleDataLoadService {
                 taskDraft.setEmbryoCode(row.getEmbryoCode());
                 taskDraft.setMainMaterialDesc(row.getMainMaterialDesc());
                 taskDraft.setCxMachineCode(row.getCxMachineCode());
+                taskDraft.setLhMachineCode(row.getLhMachineCode());
                 taskDraft.setBusinessKeySuffix(buildSourceTaskBusinessKeySuffix(row, sourceRowIndex, shiftOrder));
                 taskDraft.setTreadCode(treadCode);
                 // 拆分胶料类别：第一个值为主胶料编码，其余值为基部胶编码
@@ -1089,6 +1106,7 @@ public class TmAutoScheduleDataLoadService {
                 taskDraft.setEmbryoCode(row.getEmbryoCode());
                 taskDraft.setMainMaterialDesc(row.getMainMaterialDesc());
                 taskDraft.setCxMachineCode(row.getCxMachineCode());
+                taskDraft.setLhMachineCode(row.getLhMachineCode());
                 taskDraft.setBusinessKeySuffix(buildSourceTaskBusinessKeySuffix(row, sourceRowIndex, shiftOrder));
                 taskDraft.setTreadCode(treadCode);
                 // 拆分胶料类别：第一个值为主胶料编码，其余值为基部胶编码
@@ -2224,6 +2242,7 @@ public class TmAutoScheduleDataLoadService {
         targetTask.setEmbryoCode(sourceTask.getEmbryoCode());
         targetTask.setMainMaterialDesc(sourceTask.getMainMaterialDesc());
         targetTask.setCxMachineCode(sourceTask.getCxMachineCode());
+        targetTask.setLhMachineCode(sourceTask.getLhMachineCode());
         targetTask.setBusinessKeySuffix("FUTURE_SHUTDOWN_" + DateUtil.format(sourceDate, "yyyyMMdd")
                 + "_CLASS" + sourceShiftCode + "_TO_CLASS" + targetShift);
         targetTask.setTreadCode(sourceTask.getTreadCode());

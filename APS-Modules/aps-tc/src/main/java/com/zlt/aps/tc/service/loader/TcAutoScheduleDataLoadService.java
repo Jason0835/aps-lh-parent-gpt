@@ -141,6 +141,7 @@ public class TcAutoScheduleDataLoadService {
             TcMachineCandidate candidate = new TcMachineCandidate();
             candidate.setMachineCode(machineInfo.getMachineCode());
             candidate.setEnabled(isMachineEnabled(machineInfo));
+            candidate.setOpenShiftCodes(this.parseOpenShiftCodes(machineInfo.getOpenShiftCode()));
             BigDecimal machineMaxCapacity = this.resolveMachineMaxCapacity(machineInfo.getMaxCapacity());
             candidate.setMaxCapacity(machineMaxCapacity);
             candidate.setRemainCapacity(machineMaxCapacity);
@@ -553,12 +554,27 @@ public class TcAutoScheduleDataLoadService {
         }
         List<TcShiftConfig> configs = tmShiftConfigMapper.selectList(
                 new LambdaQueryWrapper<TcShiftConfig>()
-                        .eq(TcShiftConfig::getFactoryCode, context.getFactoryCode())
-                        .eq(TcShiftConfig::getOpenFlag, TcYesNoEnum.YES.getCode()));
+                        .eq(TcShiftConfig::getFactoryCode, context.getFactoryCode()));
         return nullToEmpty(configs).stream()
                 .filter(config -> config.getShiftOrder() != null)
                 .sorted(Comparator.comparing(TcShiftConfig::getShiftOrder))
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * 解析机台维护的开机班次编码。
+     *
+     * @param openShiftCode 逗号分隔的开机班次编码
+     * @return 去空、去重后的班次编码集合；未维护时返回空集合
+     */
+    private Set<String> parseOpenShiftCodes(String openShiftCode) {
+        if (StrUtil.isBlank(openShiftCode)) {
+            return new LinkedHashSet<>();
+        }
+        return Arrays.stream(openShiftCode.split(","))
+                .map(StrUtil::trim)
+                .filter(StrUtil::isNotBlank)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
     /**
@@ -847,6 +863,7 @@ public class TcAutoScheduleDataLoadService {
                 taskDraft.setOrderNo(row.getOrderNo() + "-CLASS" + shiftOrder);
                 taskDraft.setSourceOrderNos(row.getOrderNo());
                 taskDraft.setEmbryoCode(row.getEmbryoCode());
+                taskDraft.setCxMachineCode(row.getCxMachineCode());
                 taskDraft.setBusinessKeySuffix(buildSourceTaskBusinessKeySuffix(row, sourceRowIndex, shiftOrder));
                 taskDraft.setSidewallCode(sidewallCode);
                 taskDraft.setConstructionVersion(row.getConstructionVersion());
@@ -1094,6 +1111,7 @@ public class TcAutoScheduleDataLoadService {
                 taskDraft.setOrderNo(row.getOrderNo() + "-CLASS" + shiftOrder);
                 taskDraft.setSourceOrderNos(row.getOrderNo());
                 taskDraft.setEmbryoCode(row.getEmbryoCode());
+                taskDraft.setCxMachineCode(row.getCxMachineCode());
                 taskDraft.setBusinessKeySuffix(buildSourceTaskBusinessKeySuffix(row, sourceRowIndex, shiftOrder));
                 taskDraft.setSidewallCode(sidewallCode);
                 taskDraft.setConstructionVersion(primarySpec.getSidewallVersion());
@@ -2202,6 +2220,7 @@ public class TcAutoScheduleDataLoadService {
         targetTask.setOrderNo(sourceTask.getOrderNo());
         targetTask.setSourceOrderNos(sourceTask.getSourceOrderNos());
         targetTask.setEmbryoCode(sourceTask.getEmbryoCode());
+        targetTask.setCxMachineCode(sourceTask.getCxMachineCode());
         targetTask.setBusinessKeySuffix("FUTURE_SHUTDOWN_" + DateUtil.format(sourceDate, "yyyyMMdd")
                 + "_CLASS" + sourceShiftCode + "_TO_CLASS" + targetShift);
         targetTask.setSidewallCode(sourceTask.getSidewallCode());

@@ -97,7 +97,7 @@ public class TcManualMachineRuleValidator {
             throw new ServiceException(I18nUtil.getMessage("ui.tc.schedule.changeMachine.machineDisabled"));
         }
         TcMachineInfo machineInfo = machineInfoList.get(0);
-        TcShiftConfig shiftConfig = this.requireOpenShift(sourceResult, shiftOrder);
+        TcShiftConfig shiftConfig = this.requireShiftConfig(sourceResult, shiftOrder);
         this.validateMachineOpenShift(machineInfo, shiftConfig);
         this.validateMouthPlate(sourceResult, targetMachineCode);
         this.validateGlueMachine(sourceResult, targetMachineCode, shiftConfig.getShiftCode());
@@ -107,19 +107,46 @@ public class TcManualMachineRuleValidator {
     }
 
     /**
+     * 校验人工调量新增计划量所在班次已由当前机台开放。
+     *
+     * <p>减量和清零不阻断，便于修复历史未开班计划；产能由后续滚动引擎统一校验。</p>
+     *
+     * @param currentResult 当前数据库结果
+     * @param requestResult 调量请求
+     * @param shiftOrder 调整班次
+     * @throws ServiceException 加量班次未开放时抛出
+     */
+    public void validateIncreaseOpenShift(TcScheduleResult currentResult,
+                                          TcScheduleResult requestResult,
+                                          Integer shiftOrder) {
+        if (this.readPlanQty(requestResult, shiftOrder).compareTo(this.readPlanQty(currentResult, shiftOrder)) <= 0) {
+            return;
+        }
+        LambdaQueryWrapper<TcMachineInfo> machineWrapper = new LambdaQueryWrapper<>();
+        machineWrapper.eq(TcMachineInfo::getFactoryCode, currentResult.getFactoryCode());
+        machineWrapper.eq(TcMachineInfo::getMachineCode, currentResult.getMachineCode());
+        List<TcMachineInfo> machineInfoList = this.machineInfoMapper.selectList(machineWrapper);
+        TcShiftConfig shiftConfig = this.requireShiftConfig(currentResult, shiftOrder);
+        if (machineInfoList == null || machineInfoList.isEmpty()
+                || !"1".equals(machineInfoList.get(0).getMachineStatus())
+                || !this.isMachineShiftOpen(machineInfoList.get(0), shiftConfig)) {
+            throw new ServiceException(I18nUtil.getMessage("ui.tc.schedule.changeMachine.machineShiftClosed"));
+        }
+    }
+
+    /**
      * 查询并校验排程班次已开班。
      *
      * @param sourceResult 源结果
      * @param shiftOrder 班次顺序
      * @return 班次配置
      */
-    private TcShiftConfig requireOpenShift(TcScheduleResult sourceResult, Integer shiftOrder) {
+    private TcShiftConfig requireShiftConfig(TcScheduleResult sourceResult, Integer shiftOrder) {
         LambdaQueryWrapper<TcShiftConfig> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(TcShiftConfig::getFactoryCode, sourceResult.getFactoryCode());
         wrapper.eq(TcShiftConfig::getShiftOrder, shiftOrder);
         List<TcShiftConfig> shiftConfigList = this.shiftConfigMapper.selectList(wrapper);
-        if (shiftConfigList == null || shiftConfigList.isEmpty()
-                || !"1".equals(shiftConfigList.get(0).getOpenFlag())) {
+        if (shiftConfigList == null || shiftConfigList.isEmpty()) {
             throw new ServiceException(I18nUtil.getMessage("ui.tc.schedule.manual.shiftClosed"));
         }
         return shiftConfigList.get(0);
@@ -145,8 +172,8 @@ public class TcManualMachineRuleValidator {
      * @return true 表示机台允许该班次
      */
     private boolean isMachineShiftOpen(TcMachineInfo machineInfo, TcShiftConfig shiftConfig) {
-        if (StringUtils.isBlank(machineInfo.getOpenShiftCode())) {
-            return true;
+        if (StringUtils.isBlank(machineInfo.getOpenShiftCode()) || StringUtils.isBlank(shiftConfig.getShiftCode())) {
+            return false;
         }
         Set<String> openShiftCodeSet = java.util.Arrays.stream(machineInfo.getOpenShiftCode().split(","))
                 .map(String::trim).filter(StringUtils::isNotBlank).collect(Collectors.toSet());
@@ -308,7 +335,6 @@ public class TcManualMachineRuleValidator {
         shiftWrapper.eq(TcShiftConfig::getShiftOrder, shiftOrder);
         List<TcShiftConfig> shiftConfigList = this.shiftConfigMapper.selectList(shiftWrapper);
         if (shiftConfigList == null || shiftConfigList.isEmpty()
-                || !"1".equals(shiftConfigList.get(0).getOpenFlag())
                 || !this.isMachineShiftOpen(machineInfoList.get(0), shiftConfigList.get(0))) {
             return BigDecimal.ZERO;
         }

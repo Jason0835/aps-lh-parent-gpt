@@ -2,9 +2,11 @@ package com.zlt.aps.mp.api.domain.dto;
 
 import com.zlt.aps.mp.api.domain.capacity.MpDailyCapacityLimitVo;
 import com.zlt.aps.mp.api.domain.entity.DpDemandPlan;
+import com.zlt.aps.mp.api.domain.entity.MdmCapsuleChuck;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialConsumeDetail;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mp.api.domain.entity.MdmMonthSurplus;
+import com.zlt.aps.mp.api.domain.entity.MdmMouldShellInfo;
 import com.zlt.aps.mp.api.domain.entity.MdmProductStock;
 import com.zlt.aps.mp.api.domain.entity.MdmSkuConstructionRef;
 import com.zlt.aps.mp.api.domain.entity.MdmSkuLhCapacity;
@@ -201,6 +203,15 @@ public class MpRollAdjustContextDTO implements Serializable {
 
     @ApiModelProperty(value = "物料信息Map")
     private Map<String, MdmMaterialInfo> mdmMaterialInfoMap;
+
+    @ApiModelProperty(value = "模具模壳标准Map")
+    private Map<String, String> mdmMouldInfoMap;
+
+    @ApiModelProperty(value = "模壳台账List")
+    private List<MdmMouldShellInfo> mdmMouldShellInfoList;
+
+    @ApiModelProperty(value = "胶囊卡盘List")
+    private List<MdmCapsuleChuck> mdmCapsuleChuckList;
 
     @ApiModelProperty(value = "SKU日硫化产能Map")
     private Map<String, MdmSkuLhCapacity> mdmSkuLhCapacityMap;

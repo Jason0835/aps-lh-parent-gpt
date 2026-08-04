@@ -74,10 +74,8 @@ export default {
     availableShifts() {
       return Array.from({ length: 6 }, (item, index) => index + 1)
         .filter(shiftOrder => Number(this.row[`class${shiftOrder}PlanQty`] || 0) > 0)
-        .filter(shiftOrder => {
-          const option = this.shiftOptions.find(item => item.shiftOrder === shiftOrder)
-          return option && String(option.openFlag) === '1'
-        })
+        // 历史未开班次仍允许减量或清零，是否加量由后端按机台开机班次最终校验。
+        .filter(shiftOrder => this.shiftOptions.some(item => item.shiftOrder === shiftOrder))
         .map(shiftOrder => {
           const option = this.shiftOptions.find(item => item.shiftOrder === shiftOrder)
           return {

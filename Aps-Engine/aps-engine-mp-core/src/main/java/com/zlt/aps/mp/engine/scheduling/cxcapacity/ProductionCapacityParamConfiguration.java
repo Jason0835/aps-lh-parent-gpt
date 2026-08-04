@@ -29,9 +29,13 @@ public class ProductionCapacityParamConfiguration {
      */
     private Integer minProductionDays;
     /**
-     * 结构最低上机天数
+     * 同英寸切换，后结构最低上机天数
      */
     private Integer minAllocationDays;
+    /**
+     * 切换英寸，后结构最低上机天数
+     */
+    private Integer changeProSizeMinAllocationDays;
     /**
      * 非周期结构最低硫化配比则收尾
      */

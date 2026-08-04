@@ -1200,6 +1200,21 @@ public class CxMachineBaseInfoVo implements Serializable {
     }
 
     /**
+     * 是否切换英寸
+     *
+     * @param context         排产上下文
+     * @param addNewGroupPlan 后结构
+     * @return
+     */
+    public boolean isChangeProSize(Context context, ProductionPlanGroupInfo addNewGroupPlan) {
+        if (null == addNewGroupPlan) {
+            return false;
+        }
+        CxMachineAllocationPlanHelper lastAllocationInfo = getLastAllocationInfo();
+        return isChangeProSize(context, lastAllocationInfo, addNewGroupPlan.getGroupName());
+    }
+
+    /**
      * 获取前结构是否需要延长
      * 因每日结构切换限制导致延长
      *
@@ -1558,6 +1573,42 @@ public class CxMachineBaseInfoVo implements Serializable {
         }
         //分组名是否相同
         return !beforeAllocation.getAllocationGroup().equals(changeGroupName);
+    }
+
+    /**
+     * 是否切换英寸
+     *
+     * @param context          排产上下文
+     * @param beforeAllocation 前结构
+     * @param changeGroupName  后结构
+     * @return
+     */
+    private boolean isChangeProSize(Context context, CxMachineAllocationPlanHelper beforeAllocation, String changeGroupName) {
+        if (StringUtils.isBlank(changeGroupName)) {
+            return false;
+        }
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        Map<String, ProductionPlanGroupInfo> allGroupInfo = productionContext.getGroupProductionInfo();
+        ProductionPlanGroupInfo beforeGroupInfo;
+        //没有分配信息，看续作
+        if (null == beforeAllocation) {
+            Map<String, String> continueGroupInfoMap = productionContext.getContinueStructureMap();
+            if (CollectionUtils.isEmpty(continueGroupInfoMap)) {
+                return false;
+            }
+            String continueGroupName = continueGroupInfoMap.get(cxMachineCode);
+            beforeGroupInfo = allGroupInfo.get(continueGroupName);
+        } else {
+            beforeGroupInfo = beforeAllocation.getProductionPlanInfo();
+        }
+        if (null == beforeGroupInfo) {
+            return true;
+        }
+        ProductionPlanGroupInfo afterGroupInfo = allGroupInfo.get(changeGroupName);
+        if (null == afterGroupInfo) {
+            return true;
+        }
+        return !beforeGroupInfo.getProSizeInfo().equals(afterGroupInfo.getProSizeInfo());
     }
 
     /**
