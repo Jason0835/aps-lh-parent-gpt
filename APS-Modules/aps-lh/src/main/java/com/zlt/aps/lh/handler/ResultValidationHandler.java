@@ -2406,13 +2406,15 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
 
     /**
      * 解析模具交替计划下机类型。
-     * <p>只要交替计划前物料排程前硫化余量大于0、且经本次排程全部入口扣减后仍有剩余量，
+     * <p>只要交替计划前物料排程前硫化余量大于0、且本次排程后的真实剩余量仍大于0，
      * 即属于按时间下机（1）；只有前物料余量已全部排完时才属于按余量收尾下机（0）。
      * 交替类型不参与 END_TYPE 判断；判断按“机台+前物料+产品状态”精确匹配，
      * 避免后物料满足条件时反向污染本条交替计划。</p>
      * <p>续作降模快照只是前物料来源之一，未命中时退回全量 SKU 索引按“物料+产品状态”匹配，
      * 保证普通换模、清洗等非降模机台在前物料未排完时也能正确标记按时间下机。
-     * 账本缺失时不重新计算、不使用初始余量兜底，按不满足时间下机条件保守返回0。</p>
+     * 真实剩余量直接由“前物料硫化余量 - 本次排程该物料+产品状态全部结果计划量”计算，
+     * 不读取运行期共享的 SKU 实际消费账本，避免收尾目标量、胎胚库存、日标准收敛等上游规则
+     * 改写账本后把“余量未排完按时间下机”误判为“按余量收尾下机”。</p>
      *
      * @param context 排程上下文
      * @param machineCode 交替计划机台编码
@@ -2429,8 +2431,9 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
         Integer beforeSurplusQty = Objects.isNull(beforeSku) ? null : beforeSku.getSurplusQty();
         int beforeMaterialSurplusQty = Objects.isNull(beforeSurplusQty)
                 ? 0 : Math.max(0, beforeSurplusQty);
-        Integer beforeMaterialRemainingQty = resolveBeforeMaterialRemainingQty(context, beforeSku);
-        // 前物料排程后仍有剩余量即按时间下机，只有余量排完才按余量收尾下机。
+        Integer beforeMaterialRemainingQty = resolveBeforeMaterialRemainingQty(
+                context, beforeSku, machineCode);
+        // 前物料排程后仍有真实剩余量即按时间下机，只有余量排完才按余量收尾下机。
         boolean beforeMaterialCannotFinish = beforeMaterialSurplusQty > 0
                 && Objects.nonNull(beforeMaterialRemainingQty)
                 && beforeMaterialRemainingQty > 0;
@@ -2480,24 +2483,72 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
     }
 
     /**
-     * 读取前物料 SKU 在本次排程全部入口消费后的剩余量。
-     * <p>续作、换活字块、续作补偿新增等入口统一扣减 SKU 实际消费账本，账本 key 为“物料+产品状态”。
-     * S4.6 位于排程结果保存前，此时读取到的是本次排程最终剩余量：大于0表示本次不能收尾，等于0表示
-     * 本次可以排完。账本缺失时不重新计算、不使用初始余量兜底，按不满足时间下机条件处理，避免误标。</p>
+     * 计算前物料 SKU 在本次排程后的真实剩余量。
+     * <p>真实剩余量 = 前物料排程前硫化余量 - 本次排程该“物料+产品状态”全部结果的计划量合计。
+     * S4.6 位于排程结果保存前，此时结果列表即为本次排程最终落地量：真实剩余量大于0表示
+     * 本次不能收尾（按时间下机），等于0表示余量已全部排完（按余量收尾下机）。</p>
+     * <p>运行期共享的 SKU 实际消费账本会被收尾目标量同步、胎胚库存分摊、日标准收敛和
+     * 特殊材料置换快照恢复等规则改写，不能作为 END_TYPE 的判定依据；账本值仅保留在日志中
+     * 用于对账。无法取得前物料来源或结果列表时返回 null。</p>
      *
      * @param context 排程上下文
-     * @param beforeSku 续作降模时登记的前物料来源 SKU
-     * @return 本次排程后的 SKU 剩余量；无法取得准确运行态账本时返回 null
+     * @param beforeSku 交替计划前物料来源 SKU
+     * @param machineCode 交替计划机台编码（仅用于日志）
+     * @return 本次排程后的真实剩余量；无法取得准确数据时返回 null
      */
-    private Integer resolveBeforeMaterialRemainingQty(LhScheduleContext context, SkuScheduleDTO beforeSku) {
+    private Integer resolveBeforeMaterialRemainingQty(LhScheduleContext context,
+                                                      SkuScheduleDTO beforeSku,
+                                                      String machineCode) {
         if (Objects.isNull(context) || Objects.isNull(beforeSku)
                 || StringUtils.isEmpty(beforeSku.getMaterialCode())) {
             return null;
         }
         String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(
                 beforeSku.getMaterialCode(), beforeSku.getProductStatus());
-        Integer remainingQty = context.getSkuProductionRemainingQtyMap().get(skuKey);
-        return Objects.isNull(remainingQty) ? null : Math.max(0, remainingQty);
+        int surplusQty = Math.max(0, beforeSku.getSurplusQty());
+        int scheduledQty = resolveScheduledQtyByMaterialStatus(
+                context, beforeSku.getMaterialCode(), beforeSku.getProductStatus());
+        int realRemainingQty = Math.max(0, surplusQty - scheduledQty);
+        // 运行期账本仅用于对账，不参与 END_TYPE 判定。
+        Integer ledgerRemainingQty = context.getSkuProductionRemainingQtyMap().get(skuKey);
+        log.info("模具交替计划END_TYPE真实剩余量计算, machineCode: {}, beforeMaterialCode: {}, "
+                        + "beforeProductStatus: {}, surplusQty: {}, scheduledQty: {}, "
+                        + "ledgerRemainingQty: {}, realRemainingQty: {}",
+                machineCode, beforeSku.getMaterialCode(), beforeSku.getProductStatus(),
+                surplusQty, scheduledQty, ledgerRemainingQty, realRemainingQty);
+        return realRemainingQty;
+    }
+
+    /**
+     * 汇总本次排程指定“物料+产品状态”的全部结果计划量。
+     * <p>同一物料在多个机台或多次换活字块上生产时均计入，确保与“SKU 硫化余量”同一口径
+     * 核算本次排程后的真实剩余量；结果行日计划量为空时回退到 8 班班次量之和。</p>
+     *
+     * @param context 排程上下文
+     * @param materialCode 物料编码
+     * @param productStatus 产品状态
+     * @return 计划量合计
+     */
+    private int resolveScheduledQtyByMaterialStatus(LhScheduleContext context,
+                                                    String materialCode,
+                                                    String productStatus) {
+        if (Objects.isNull(context) || StringUtils.isEmpty(materialCode)
+                || CollectionUtils.isEmpty(context.getScheduleResultList())) {
+            return 0;
+        }
+        String targetSkuKey = MonthPlanDateResolver.buildMaterialStatusKey(materialCode, productStatus);
+        return context.getScheduleResultList().stream()
+                .filter(Objects::nonNull)
+                .filter(result -> StringUtils.equals(materialCode, result.getMaterialCode()))
+                .filter(result -> StringUtils.equals(targetSkuKey,
+                        MonthPlanDateResolver.buildMaterialStatusKey(
+                                result.getMaterialCode(), result.getProductStatus())))
+                .mapToInt(result -> {
+                    Integer planQty = result.getDailyPlanQty();
+                    return Math.max(0, Objects.isNull(planQty)
+                            ? ShiftFieldUtil.resolveScheduledQty(result) : planQty);
+                })
+                .sum();
     }
 
     /**
