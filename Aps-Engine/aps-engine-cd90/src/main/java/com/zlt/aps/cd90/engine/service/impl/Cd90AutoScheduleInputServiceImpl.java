@@ -117,8 +117,7 @@ public class Cd90AutoScheduleInputServiceImpl implements Cd90AutoScheduleInputSe
         List<Cd90DepthConfig> depthConfigs = depthConfigMapper.selectList(
                 Wrappers.<Cd90DepthConfig>lambdaQuery()
                         .eq(Cd90DepthConfig::getFactoryCode, factoryCode)
-                        .orderByDesc(Cd90DepthConfig::getMachineQty)
-                        .orderByAsc(Cd90DepthConfig::getMachineRange));
+                        .orderByAsc(Cd90DepthConfig::getMinMachineQty));
         Map<String, BigDecimal> depthClassQtyByCloth = clothDepthResolver.resolve(
                 formingSchedules, constructionMaterials, depthConfigs);
         List<Cd90DemandShift> demandShifts = formingDemandExpander.expand(

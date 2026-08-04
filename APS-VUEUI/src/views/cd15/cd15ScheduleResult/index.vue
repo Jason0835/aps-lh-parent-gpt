@@ -204,6 +204,7 @@ export default {
           formatter: (row, column, value) => this.selectDictLabel(this.dict.type.biz_factory_name, value)
         },
         { label: this.$t('ui.data.column.cd15ScheduleResult.scheduleDate'), prop: 'scheduleDate', minWidth: 120, sortable: 'custom' },
+        { label: this.$t('ui.data.column.cd15ScheduleResult.cd15BatchNo'), prop: 'cd15BatchNo', minWidth: 160, align: 'left', showOverflowTooltip: true },
         {
           label: this.$t('ui.data.column.cd15ScheduleResult.releaseStatus'),
           prop: 'releaseStatus',

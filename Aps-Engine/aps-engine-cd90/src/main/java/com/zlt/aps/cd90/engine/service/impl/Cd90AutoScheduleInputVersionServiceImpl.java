@@ -75,14 +75,14 @@ public class Cd90AutoScheduleInputVersionServiceImpl implements Cd90AutoSchedule
                 .collect(Collectors.joining("|"));
         String depthConfig = depthConfigMapper.selectList(Wrappers.<Cd90DepthConfig>lambdaQuery()
                         .select(Cd90DepthConfig::getId,
-                                Cd90DepthConfig::getMachineQty,
-                                Cd90DepthConfig::getMachineRange,
+                                Cd90DepthConfig::getMinMachineQty,
+                                Cd90DepthConfig::getMaxMachineQty,
                                 Cd90DepthConfig::getDepthClassQty,
                                 Cd90DepthConfig::getUpdateTime)
                         .eq(Cd90DepthConfig::getFactoryCode, factoryCode)
                         .orderByAsc(Cd90DepthConfig::getId))
-                .stream().map(item -> item.getId() + ":" + item.getMachineQty() + ":"
-                        + item.getMachineRange() + ":" + item.getDepthClassQty() + ":"
+                .stream().map(item -> item.getId() + ":" + item.getMinMachineQty() + ":"
+                        + item.getMaxMachineQty() + ":" + item.getDepthClassQty() + ":"
                         + item.getUpdateTime())
                 .collect(Collectors.joining("|"));
         String stock = includeStock ? stockMapper.selectList(Wrappers.<Cd90Stock>lambdaQuery()

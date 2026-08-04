@@ -133,8 +133,8 @@ public class Cd90DepthConfigController extends AbstractDocBizController<Cd90Dept
     @Override
     protected void builderCondition(QueryWrapper<Cd90DepthConfig> qw, Cd90DepthConfig vo) {
         qw.eq(PubUtil.isNotEmpty(vo.getFactoryCode()), "FACTORY_CODE", vo.getFactoryCode());
-        qw.eq(vo.getMachineQty() != null, "MACHINE_QTY", vo.getMachineQty());
-        qw.eq(PubUtil.isNotEmpty(vo.getMachineRange()), "MACHINE_RANGE", vo.getMachineRange());
+        qw.eq(vo.getMinMachineQty() != null, "MIN_MACHINE_QTY", vo.getMinMachineQty());
+        qw.eq(vo.getMaxMachineQty() != null, "MAX_MACHINE_QTY", vo.getMaxMachineQty());
     }
 
     @Override
@@ -144,6 +144,6 @@ public class Cd90DepthConfigController extends AbstractDocBizController<Cd90Dept
 
     @Override
     protected String getOrderBy() {
-        return "MACHINE_QTY ASC";
+        return "MIN_MACHINE_QTY ASC";
     }
 }

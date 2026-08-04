@@ -28,19 +28,18 @@ public class Cd15DepthConfig extends BaseEntity implements Serializable {
     @Excel(name = "ui.data.column.cd15DepthConfig.factoryCode", dictType = "biz_factory_name")
     private String factoryCode;
 
-    /** 供成型机台数 */
-    @ApiModelProperty("供成型机台数")
+    /** 区间起始机台数（含） */
+    @ApiModelProperty("区间起始机台数（含）")
     @ImportExcelValidated(required = true)
-    @TableField("MACHINE_QTY")
-    @Excel(name = "ui.data.column.cd15DepthConfig.machineQty")
-    private Integer machineQty;
+    @TableField("MIN_MACHINE_QTY")
+    @Excel(name = "ui.data.column.cd15DepthConfig.minMachineQty")
+    private Integer minMachineQty;
 
-    /** 机台范围 */
-    @ApiModelProperty("机台范围")
-    @ImportExcelValidated(required = true, maxLength = 10)
-    @TableField("MACHINE_RANGE")
-    @Excel(name = "ui.data.column.cd15DepthConfig.machineRange", dictType = "machine_range")
-    private String machineRange;
+    /** 区间结束机台数（含，空表示无上限） */
+    @ApiModelProperty("区间结束机台数（含，空表示无上限）")
+    @TableField("MAX_MACHINE_QTY")
+    @Excel(name = "ui.data.column.cd15DepthConfig.maxMachineQty")
+    private Integer maxMachineQty;
 
     /** 备库班数 */
     @ApiModelProperty("备库班数")

@@ -246,10 +246,11 @@ export default {
     },
     buildDateList(scheduleDate) {
       const baseDate = scheduleDate || this.getDefaultScheduleDate()
+      // 与后端一致：班次日期 = 排程日 + (scheduleDay - 2)，scheduleDay=1 归属排程日前一天
       return this.shiftConfig.map(item => ({
         ...item,
-        dayOffset: (item.scheduleDay || 1) - 1,
-        shiftDate: moment(baseDate).add((item.scheduleDay || 1) - 1, 'days').format('MM/DD')
+        dayOffset: (item.scheduleDay || 2) - 2,
+        shiftDate: moment(baseDate).add((item.scheduleDay || 2) - 2, 'days').format('MM/DD')
       }))
     },
     buildShiftColumns() {

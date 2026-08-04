@@ -130,8 +130,7 @@ public class Cd15AutoScheduleInputServiceImpl implements Cd15AutoScheduleInputSe
         List<Cd15DepthConfig> depthConfigs = depthConfigMapper.selectList(
                 Wrappers.<Cd15DepthConfig>lambdaQuery()
                         .eq(Cd15DepthConfig::getFactoryCode, factoryCode)
-                        .orderByDesc(Cd15DepthConfig::getMachineQty)
-                        .orderByAsc(Cd15DepthConfig::getMachineRange));
+                        .orderByAsc(Cd15DepthConfig::getMinMachineQty));
         Map<String, BigDecimal> depthClassQtyBySteelStrip = steelStripDepthResolver.resolve(
                 formingSchedules, constructionMaterials, depthConfigs);
         List<Cd15DemandShift> demandShifts = formingDemandExpander.expand(

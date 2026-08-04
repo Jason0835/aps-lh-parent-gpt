@@ -19,7 +19,7 @@ import infoDialog from "./components/infoDialog.vue";
 export default {
   name: "DepthConfig",
   components: { infoDialog },
-  dicts: ["biz_factory_name", "machine_range"],
+  dicts: ["biz_factory_name"],
   provide() { return { parentDict: this.dict }; },
   data() {
     return {
@@ -33,8 +33,8 @@ export default {
       return [
         { type: "selection", fixed: "left" },
         { prop: "factoryCode", align: "center", halign: "center", label: this.$t("ui.data.column.cd90DepthConfig.factoryCode"), minWidth: 120, formatter: (row, column, value) => this.selectDictLabel(this.dict.type.biz_factory_name, value) },
-        { prop: "machineQty", align: "center", halign: "center", label: this.$t("ui.data.column.cd90DepthConfig.machineQty"), minWidth: 120 },
-        { prop: "machineRange", align: "center", halign: "center", label: this.$t("ui.data.column.cd90DepthConfig.machineRange"), minWidth: 100, formatter: (row, column, value) => this.selectDictLabel(this.dict.type.machine_range, value) },
+        { prop: "minMachineQty", align: "center", halign: "center", label: this.$t("ui.data.column.cd90DepthConfig.minMachineQty"), minWidth: 120 },
+        { prop: "maxMachineQty", align: "center", halign: "center", label: this.$t("ui.data.column.cd90DepthConfig.maxMachineQty"), minWidth: 120, formatter: (row, column, value) => value !== null && value !== undefined ? value : "∞" },
         { prop: "depthClassQty", align: "center", halign: "center", label: this.$t("ui.data.column.cd90DepthConfig.depthClassQty"), minWidth: 100 },
         { prop: "remark", halign: "center", label: this.$t("ui.common.column.remark"), minWidth: 120 },
         { prop: "updateTime", align: "center", halign: "center", label: this.$t("common.updateTime"), minWidth: 160 },
@@ -45,13 +45,12 @@ export default {
     searchColumns() {
       return [
         { label: this.$t("ui.data.column.cd90DepthConfig.factoryCode"), prop: "factoryCode", type: "select", dictData: this.dict.type.biz_factory_name, filterable: true },
-        { label: this.$t("ui.data.column.cd90DepthConfig.machineQty"), prop: "machineQty", type: "number" },
-        { label: this.$t("ui.data.column.cd90DepthConfig.machineRange"), prop: "machineRange", type: "select", dictData: this.dict.type.machine_range, filterable: true },
+        { label: this.$t("ui.data.column.cd90DepthConfig.minMachineQty"), prop: "minMachineQty", type: "number" },
       ];
     },
   },
   methods: {
-    handleAdd() { this.$refs.infoRef && this.$refs.infoRef.show(); },
+    handleAdd() { this.$refs.infoRef && this.$refs.infoRef.show(null, this.query.factoryCode); },
     handleEdit(row) { this.$refs.infoRef && this.$refs.infoRef.show(row); },
     handleBatchEdit() { if (this.selection.length === 1) this.handleEdit(this.selection[0]); },
     handleDelete(row) { this.$confirm(this.$t("common.confirm.delete"), { type: "warning" }).then(() => { delDepthConfig({ ids: row.id }).then((data) => { this.$modal.msgSuccess(data.msg); this.$set(this.page, "current", 1); this.getList(); }); }); },

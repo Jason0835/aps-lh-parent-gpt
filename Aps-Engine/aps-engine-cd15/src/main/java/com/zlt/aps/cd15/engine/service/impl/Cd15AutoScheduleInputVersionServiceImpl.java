@@ -215,7 +215,7 @@ public class Cd15AutoScheduleInputVersionServiceImpl implements Cd15AutoSchedule
                         .eq(Cd15DepthConfig::getFactoryCode, factoryCode)
                         .orderByAsc(Cd15DepthConfig::getId))
                 .stream()
-                .map(item -> item.getId() + ":" + item.getMachineQty() + ":" + item.getMachineRange()
+                .map(item -> item.getId() + ":" + item.getMinMachineQty() + ":" + item.getMaxMachineQty()
                         + ":" + item.getDepthClassQty() + ":" + item.getUpdateTime())
                 .collect(Collectors.joining("|"));
         String lossSettings = lossSettingMapper.selectList(Wrappers.<Cd15LossSetting>lambdaQuery()
