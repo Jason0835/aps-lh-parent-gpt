@@ -26,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import java.io.InputStream;
+import java.math.BigDecimal;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -184,7 +185,7 @@ public class GdyyScheduleResultServiceImpl extends AbstractDocService<GdyySchedu
 
     /**
      * 按固定生产计划模板整体覆盖导入。
-     * Excel的N2作为结果主排程日期，各CLASS日期按当前工厂启用班次配置计算。
+     * 各CLASS日期按当前工厂启用班次配置计算。
      */
     @Override
     public AjaxResult importScheduleTemplate(List<GdyyScheduleResultTemplateImportVO> rows,
@@ -227,25 +228,26 @@ public class GdyyScheduleResultServiceImpl extends AbstractDocService<GdyySchedu
         Set<String> bigRollCodes = new HashSet<>();
         List<String> errors = new ArrayList<>();
         List<GdyyScheduleResultTemplateImportVO> validRows = new ArrayList<>();
-        for (GdyyScheduleResultTemplateImportVO row : rows) {
-            int excelRow = row == null || row.getExcelRowNum() == null
-                    ? 0 : row.getExcelRowNum();
+        for (int index = 0; index < rows.size(); index++) {
+            GdyyScheduleResultTemplateImportVO row = rows.get(index);
+            // 模板第1行是隐藏字段键，第2至4行是标题和表头，明细从第5行开始
+            int excelRow = index + 5;
             if (row == null || !PubUtil.isNotEmpty(row.getBigRollCode())) {
                 errors.add(MessageFormat.format(I18nUtil.getMessage(
                         "ui.data.column.gdyyScheduleResult.importRowRequired"), excelRow));
                 continue;
             }
-            List<Double> quantities = IntStream.rangeClosed(1, 8)
-                    .mapToObj(classIndex -> (Double) row.getFieldValueByFieldName(
+            List<BigDecimal> quantities = IntStream.rangeClosed(1, 8)
+                    .mapToObj(classIndex -> (BigDecimal) row.getFieldValueByFieldName(
                             String.format("class%dPlanQty", classIndex)))
                     .filter(Objects::nonNull)
                     .collect(java.util.stream.Collectors.toList());
-            if (quantities.stream().anyMatch(quantity -> quantity < 0D)) {
+            if (quantities.stream().anyMatch(quantity -> quantity.signum() < 0)) {
                 errors.add(MessageFormat.format(I18nUtil.getMessage(
                         "ui.data.column.gdyyScheduleResult.importNegative"), excelRow));
                 continue;
             }
-            if (quantities.stream().noneMatch(quantity -> quantity > 0D)) {
+            if (quantities.stream().noneMatch(quantity -> quantity.signum() > 0)) {
                 continue;
             }
             String bigRollCode = row.getBigRollCode().trim();
@@ -264,11 +266,18 @@ public class GdyyScheduleResultServiceImpl extends AbstractDocService<GdyySchedu
                     "ui.data.column.gdyyScheduleResult.importEmpty"));
         }
 
+        // 批次号：GDYY + 年月日 + 3位定长自增序号（每重新导入一次递增）；工单号：批次号 + 4位定长自增序号
+        String batchPrefix = "GDYY" + DateUtil.format(scheduleDate, "yyyyMMdd");
+        String batchNo = this.nextBatchNo(factoryCode, batchPrefix);
+        int[] classOrders = new int[8];
+        int orderSeq = 0;
         List<GdyyScheduleResult> insertList = new ArrayList<>();
         for (GdyyScheduleResultTemplateImportVO row : validRows) {
             GdyyScheduleResult result = new GdyyScheduleResult();
             result.setFactoryCode(factoryCode);
             result.setScheduleDate(scheduleDate);
+            result.setBatchNo(batchNo);
+            result.setOrderNo(batchNo + String.format("%04d", ++orderSeq));
             result.setBigRollCode(row.getBigRollCode().trim());
             result.setIsRelease("0");
             result.setProductionStatus("0");
@@ -279,10 +288,22 @@ public class GdyyScheduleResultServiceImpl extends AbstractDocService<GdyySchedu
                 result.setFieldValueByFieldName(
                         String.format("class%dScheduleDate", classIndex),
                         DateUtil.offsetDay(scheduleDate, shiftConfig.getScheduleDay() - 2));
+                BigDecimal planQty = (BigDecimal) row.getFieldValueByFieldName(
+                        String.format("class%dPlanQty", classIndex));
                 result.setFieldValueByFieldName(
                         String.format("class%dPlanQty", classIndex),
-                        row.getFieldValueByFieldName(
-                                String.format("class%dPlanQty", classIndex)));
+                        planQty == null ? null : planQty.doubleValue());
+                // 生产顺位：Excel 已填则按导入值，未填则按文件行序逐班从 1 递增；仅对计划量大于 0 的班次生成
+                if (planQty != null && planQty.signum() > 0) {
+                    BigDecimal produceOrder = (BigDecimal) row.getFieldValueByFieldName(
+                            String.format("class%dProduceOrder", classIndex));
+                    if (produceOrder == null) {
+                        produceOrder = BigDecimal.valueOf(++classOrders[classIndex - 1]);
+                    }
+                    result.setFieldValueByFieldName(
+                            String.format("class%dProduceOrder", classIndex),
+                            produceOrder.doubleValue());
+                }
             }
             insertList.add(result);
         }
@@ -292,9 +313,33 @@ public class GdyyScheduleResultServiceImpl extends AbstractDocService<GdyySchedu
                         .eq(GdyyScheduleResult::getFactoryCode, factoryCode)
                         .eq(GdyyScheduleResult::getScheduleDate, scheduleDate)
                         .set(GdyyScheduleResult::getIsDelete, 1));
-        int successNum = this.baseDao.saveBatch(insertList);
+        int successNum = this.baseDao.insertBatch(insertList);
         return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success")
                 + "," + successNum);
+    }
+
+    /**
+     * 生成新批次号：按前缀取当前工厂未删除记录的最大序号并 +1。
+     * 规则：GDYY + yyyyMMdd + 3位定长自增序号（每重新导入一次递增）。
+     *
+     * @param factoryCode 工厂编码
+     * @param prefix      批次号前缀，如 GDYY20260804
+     * @return 新批次号
+     */
+    private String nextBatchNo(String factoryCode, String prefix) {
+        int maxSeq = this.gdyyScheduleResultMapper.selectList(
+                        new LambdaQueryWrapper<GdyyScheduleResult>()
+                                .eq(GdyyScheduleResult::getFactoryCode, factoryCode)
+                                .likeRight(GdyyScheduleResult::getBatchNo, prefix))
+                .stream()
+                .map(GdyyScheduleResult::getBatchNo)
+                .filter(Objects::nonNull)
+                .map(batchNo -> batchNo.substring(prefix.length()))
+                .filter(suffix -> suffix.matches("\\d+"))
+                .mapToInt(Integer::parseInt)
+                .max()
+                .orElse(0);
+        return prefix + String.format("%03d", maxSeq + 1);
     }
 
     /** 使用与纤维压延一致的四天八班生产计划模板导出。 */

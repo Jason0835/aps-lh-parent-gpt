@@ -60,6 +60,8 @@
     <tlt-upload
       ref="tltUpload"
       :update-support="true"
+      download-url="/gdyy/scheduleResult/export"
+      :download-params="importParams"
       upload-url="/gdyy/scheduleResult/importDataByCust"
       :upload-params="importParams"
       @uploadSuccess="getList"
@@ -113,8 +115,10 @@ export default {
   },
   computed: {
     importParams() {
+      // 复杂生产计划模板导入/下载共用：携带当前查询的工厂和排程日期
       return {
         factoryCode: this.search.factoryCode,
+        scheduleDate: this.search.scheduleDate,
       };
     },
     searchColumns() {
