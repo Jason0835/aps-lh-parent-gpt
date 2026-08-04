@@ -334,6 +334,27 @@ public class CxMachineAllocationPlanHelper implements Serializable {
     }
 
     /**
+     * 20260731+
+     * 因前结构达不到最低实单要求，后结构自动提前1天
+     *
+     * @param newStartDay      新的起始日
+     * @param addAllocationDay 增加的分配天数
+     */
+    public void autoAdvanceProduction(Integer newStartDay, Integer addAllocationDay) {
+        if (null == newStartDay || null == addAllocationDay) {
+            return;
+        }
+        if (newStartDay < BigDecimal.ONE.intValue() || addAllocationDay < BigDecimal.ZERO.intValue()) {
+            return;
+        }
+        if (newStartDay >= startDay) {
+            return;
+        }
+        startDay = newStartDay;
+        allocationDay = allocationDay + addAllocationDay;
+    }
+
+    /**
      * 分配的分组名
      *
      * @return

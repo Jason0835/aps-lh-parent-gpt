@@ -28,7 +28,7 @@ public enum ContinueTypeEnum {
     /**
      * 非续作SKU
      */
-    NO_CONTINUE("NO_CONTINUE","非续作SKU");
+    NO_CONTINUE("NO_CONTINUE", "非续作SKU");
 
     private String continueType;
 
@@ -37,5 +37,20 @@ public enum ContinueTypeEnum {
     ContinueTypeEnum(String continueType, String desc) {
         this.continueType = continueType;
         this.desc = desc;
+    }
+
+    /**
+     * 是否续作换活字块阶段
+     *
+     * @return
+     */
+    public boolean isContinueChangeTypeBlock() {
+        if (SAME_SPECIFICATIONS_PATTERN == this) {
+            return true;
+        }
+        if (SAME_EMBRYO_CODE_SHARE_MOULD == this) {
+            return true;
+        }
+        return false;
     }
 }
