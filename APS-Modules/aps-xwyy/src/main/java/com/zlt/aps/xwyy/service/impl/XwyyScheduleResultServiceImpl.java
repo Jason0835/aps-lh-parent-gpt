@@ -130,9 +130,10 @@ public class XwyyScheduleResultServiceImpl extends AbstractDocService<XwyySchedu
         Set<String> bigRollCodes = new HashSet<>();
         List<String> errors = new ArrayList<>();
         List<XwyyScheduleResultTemplateImportVO> validRows = new ArrayList<>();
-        for (XwyyScheduleResultTemplateImportVO row : rows) {
-            int excelRow = row == null || row.getExcelRowNum() == null
-                    ? 0 : row.getExcelRowNum();
+        for (int index = 0; index < rows.size(); index++) {
+            XwyyScheduleResultTemplateImportVO row = rows.get(index);
+            // 模板第1行是隐藏字段键，第2至4行是标题和表头，明细从第5行开始
+            int excelRow = index + 5;
             if (row == null || !PubUtil.isNotEmpty(row.getBigRollCode())) {
                 errors.add(MessageFormat.format(I18nUtil.getMessage(
                         "ui.data.column.xwyyScheduleResult.importRowRequired"), excelRow));
@@ -167,11 +168,18 @@ public class XwyyScheduleResultServiceImpl extends AbstractDocService<XwyySchedu
                     "ui.data.column.xwyyScheduleResult.importEmpty"));
         }
 
+        // 批次号：XWYY + 年月日 + 3位定长自增序号（每重新导入一次递增）；工单号：批次号 + 4位定长自增序号
+        String batchPrefix = "XWYY" + DateUtil.format(scheduleDate, "yyyyMMdd");
+        String batchNo = this.nextBatchNo(factoryCode, batchPrefix);
+        int[] classOrders = new int[8];
+        int orderSeq = 0;
         List<XwyyScheduleResult> insertList = new ArrayList<>();
         for (XwyyScheduleResultTemplateImportVO row : validRows) {
             XwyyScheduleResult result = new XwyyScheduleResult();
             result.setFactoryCode(factoryCode);
             result.setScheduleDate(scheduleDate);
+            result.setBatchNo(batchNo);
+            result.setOrderNo(batchNo + String.format("%04d", ++orderSeq));
             result.setBigRollCode(row.getBigRollCode().trim());
             result.setIsRelease("0");
             result.setProductionStatus("0");
@@ -183,10 +191,20 @@ public class XwyyScheduleResultServiceImpl extends AbstractDocService<XwyySchedu
                 result.setFieldValueByFieldName(
                         String.format("class%dScheduleDate", classIndex),
                         DateUtil.offsetDay(scheduleDate, shiftConfig.getScheduleDay() - 2));
+                BigDecimal planQty = (BigDecimal) row.getFieldValueByFieldName(
+                        String.format("class%dPlanQty", classIndex));
                 result.setFieldValueByFieldName(
-                        String.format("class%dPlanQty", classIndex),
-                        row.getFieldValueByFieldName(
-                                String.format("class%dPlanQty", classIndex)));
+                        String.format("class%dPlanQty", classIndex), planQty);
+                // 生产顺位：Excel 已填则按导入值，未填则按文件行序逐班从 1 递增；仅对计划量大于 0 的班次生成
+                if (planQty != null && planQty.signum() > 0) {
+                    BigDecimal produceOrder = (BigDecimal) row.getFieldValueByFieldName(
+                            String.format("class%dProduceOrder", classIndex));
+                    if (produceOrder == null) {
+                        produceOrder = BigDecimal.valueOf(++classOrders[classIndex - 1]);
+                    }
+                    result.setFieldValueByFieldName(
+                            String.format("class%dProduceOrder", classIndex), produceOrder);
+                }
             }
             insertList.add(result);
         }
@@ -196,9 +214,33 @@ public class XwyyScheduleResultServiceImpl extends AbstractDocService<XwyySchedu
                         .eq(XwyyScheduleResult::getFactoryCode, factoryCode)
                         .eq(XwyyScheduleResult::getScheduleDate, scheduleDate)
                         .set(XwyyScheduleResult::getIsDelete, 1));
-        int successNum = this.baseDao.saveBatch(insertList);
+        int successNum = this.baseDao.insertBatch(insertList);
         return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success")
                 + "," + successNum);
+    }
+
+    /**
+     * 生成新批次号：按前缀取当前工厂未删除记录的最大序号并 +1。
+     * 规则：XWYY + yyyyMMdd + 3位定长自增序号（每重新导入一次递增）。
+     *
+     * @param factoryCode 工厂编码
+     * @param prefix      批次号前缀，如 XWYY20260804
+     * @return 新批次号
+     */
+    private String nextBatchNo(String factoryCode, String prefix) {
+        int maxSeq = this.xwyyScheduleResultMapper.selectList(
+                        new LambdaQueryWrapper<XwyyScheduleResult>()
+                                .eq(XwyyScheduleResult::getFactoryCode, factoryCode)
+                                .likeRight(XwyyScheduleResult::getBatchNo, prefix))
+                .stream()
+                .map(XwyyScheduleResult::getBatchNo)
+                .filter(Objects::nonNull)
+                .map(batchNo -> batchNo.substring(prefix.length()))
+                .filter(suffix -> suffix.matches("\\d+"))
+                .mapToInt(Integer::parseInt)
+                .max()
+                .orElse(0);
+        return prefix + String.format("%03d", maxSeq + 1);
     }
 
     @Override
