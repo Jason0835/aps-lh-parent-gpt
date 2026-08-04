@@ -58,6 +58,8 @@ public class SkuScheduleDTO {
     private int surplusQty;
     /** 排程窗口计划量（窗口内各日计划量之和） */
     private int windowPlanQty;
+    /** 排程窗口原始日计划量（S4.3归集时固化的月计划DAY_N汇总；收尾目标量同步会抬高windowPlanQty，本字段保持原始口径，供试制、量试日计划准入判断使用） */
+    private int originalWindowPlanQty;
     /** T日计划量 */
     private int dailyPlanQty;
     /** 待排产量(排程过程中动态递减) */
