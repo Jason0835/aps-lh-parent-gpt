@@ -23,6 +23,9 @@ public class TcTaskDraft {
     /** 成型胎胚号，仅用于自动排程过程日志与解释追溯。 */
     private String embryoCode;
 
+    /** 成型机台编号，仅用于自动排程过程日志与解释追溯。 */
+    private String cxMachineCode;
+
     /** 胎侧规格编码 */
     private String sidewallCode;
 

@@ -252,6 +252,8 @@ public class TcMachineAssignService implements ITcMachineAssignService {
         this.bindSmallGlueMachine(context, task, task.getMachineCode(), null,
                 TcScheduleConstants.PRESET_MACHINE_BIND_SOURCE);
         this.taskChainScheduleService.appendAutoTask(task, candidate, context);
+        this.appendCapacityDeductProcessLog(context, task, candidate, task.getPlanQty(), task.getPlanQty(),
+                BigDecimal.ZERO, "预置机台承接");
     }
 
     /**
@@ -935,6 +937,9 @@ public class TcMachineAssignService implements ITcMachineAssignService {
                 this.addAssignTrace(context, task, TcScheduleRuleResultEnum.PASS,
                         runtimeCandidate.getMachineCode(), null, null);
                 this.taskChainScheduleService.appendAutoTask(task, runtimeCandidate, context);
+                this.appendCapacityDeductProcessLog(context, task, runtimeCandidate, currentShiftPlanQty, assignedQty,
+                        capacityOverflowQty, capacityOverflowQty.compareTo(BigDecimal.ZERO) > 0
+                                ? "当前班产能受限拆分" : "当前班选中机台承接");
             }
         }
 
@@ -1000,6 +1005,8 @@ public class TcMachineAssignService implements ITcMachineAssignService {
             this.addAssignTrace(context, earlyFillTask, TcScheduleRuleResultEnum.PASS,
                     runtimeCandidate.getMachineCode(), null, null);
                 this.taskChainScheduleService.appendAutoTask(earlyFillTask, runtimeCandidate, context);
+                this.appendCapacityDeductProcessLog(context, earlyFillTask, runtimeCandidate, sourcePlanQty, assignedQty,
+                        sourcePlanQty.subtract(assignedQty), "后续班次提前补产");
                 this.deductFutureTaskPlan(sourceTask, assignedQty, shiftTaskMap, context);
                 log.info("[TC_FUTURE_SHIFT_EARLY_FILL] batchNo={}, traceId={}, factoryCode={}, scheduleDate={}, sourceBusinessKey={}, targetBusinessKey={}, sourceShiftOrder={}, targetShiftOrder={}, machineCode={}, assignedQty={}, sourceRemainQty={}",
                         context.getBatchNo(), context.getTraceId(), context.getFactoryCode(), this.formatScheduleDate(context),
@@ -1309,6 +1316,8 @@ public class TcMachineAssignService implements ITcMachineAssignService {
                             candidate.getMachineCode(), beforeMergeQty, afterMergeQty, beforeAssignQty, true);
                 this.addAssignTrace(context, mergeTarget, TcScheduleRuleResultEnum.PASS,
                         candidate.getMachineCode(), null, null);
+                    this.appendCapacityDeductProcessLog(context, mergeTarget, runtimeCandidate, beforeAssignQty, assignedQty,
+                            overflowQty, "顺延量合并承接");
                 } else {
                     TcTaskDraft overflowTask = this.copyOverflowTask(sourceTask, shiftOrder, assignedQty,
                             sourceShiftOrder, overflowIndex, candidate.getMachineCode());
@@ -1334,6 +1343,8 @@ public class TcMachineAssignService implements ITcMachineAssignService {
                     runtimeCandidate.getMachineCode(), null, null);
                     // 顺延任务按来源任务的生成顺序追加，避免后生成任务反向插到目标班次链首。
                     this.taskChainScheduleService.appendAutoTask(overflowTask, runtimeCandidate, context);
+                    this.appendCapacityDeductProcessLog(context, overflowTask, runtimeCandidate, beforeAssignQty, assignedQty,
+                            overflowQty, "顺延量承接");
                 }
                 remainingQty = overflowQty;
                 if (shiftOrder == sourceShiftOrder) {
@@ -2201,6 +2212,50 @@ public class TcMachineAssignService implements ITcMachineAssignService {
     }
 
     /**
+     * 在任务进入机台任务链后立即记录实际产能扣减，确保过程日志顺序与机台承接顺序一致。
+     *
+     * @param context         胎侧排程上下文
+     * @param task            已承接任务
+     * @param candidate       承接机台运行态
+     * @param beforeAssignQty 分配前待承接量
+     * @param assignedQty     本次实际承接量
+     * @param overflowQty     本次未承接的溢出量
+     * @param splitDesc       承接或拆分说明
+     */
+    private void appendCapacityDeductProcessLog(TcScheduleContext context, TcTaskDraft task,
+                                                TcMachineCandidate candidate, BigDecimal beforeAssignQty,
+                                                BigDecimal assignedQty, BigDecimal overflowQty, String splitDesc) {
+        Map<String, Object> evidence = candidate == null || candidate.getEvidence() == null
+                ? Collections.emptyMap() : candidate.getEvidence();
+        BigDecimal beforeRemainCapacity = candidate == null ? BigDecimal.ZERO : this.nvl(candidate.getRemainCapacity());
+        BigDecimal afterRemainCapacity = beforeRemainCapacity.subtract(this.nvl(assignedQty)).max(BigDecimal.ZERO);
+        BigDecimal currentSpecSwitchDeduct = this.nvl(task.getPreviousSpecSwitchHours())
+                .multiply(this.nvl(task.getMachineSpeed()));
+        BigDecimal currentGlueSwitchDeduct = this.nvl(task.getPreviousGlueSwitchCapacityDeduct());
+        context.appendProcessLog("产能扣减：胎侧代码={0}，机台={1}，班次={2}，最大产能={3}，检修扣减={4}，已排计划量扣减={5}，已发生切换扣减={6}，重排切换扣减={7}，本次规格切换扣减={8}，本次胶料切换扣减={9}，分配前待承接量={10}，分配前剩余产能={11}，本次分配量={12}，分配后剩余产能={13}，溢出量={14}，拆分原因={15}",
+                task.getSidewallCode(), candidate == null ? "未提供" : candidate.getMachineCode(), task.getShiftOrder(),
+                this.getCandidateEvidenceDecimal(evidence, "maxCapacity"),
+                this.getCandidateEvidenceDecimal(evidence, "maintenanceCapacityDeduct"),
+                this.getCandidateEvidenceDecimal(evidence, "assignedPlanQty"),
+                this.getCandidateEvidenceDecimal(evidence, "existingSwitchCapacityDeduct"),
+                this.getCandidateEvidenceDecimal(evidence, "reorderedTotalSwitchCapacityDeduct"),
+                currentSpecSwitchDeduct, currentGlueSwitchDeduct, this.nvl(beforeAssignQty), beforeRemainCapacity,
+                this.nvl(assignedQty), afterRemainCapacity, this.nvl(overflowQty), splitDesc);
+    }
+
+    /**
+     * 获取候选机台证据中的数值，缺失时按零展示。
+     *
+     * @param evidence 机台证据
+     * @param key      证据键
+     * @return 非空数值
+     */
+    private BigDecimal getCandidateEvidenceDecimal(Map<String, Object> evidence, String key) {
+        Object value = evidence.get(key);
+        return value instanceof BigDecimal ? (BigDecimal) value : BigDecimal.ZERO;
+    }
+
+    /**
      * 写入产能拆分证据。
      *
      * @param context         排程上下文
@@ -2775,6 +2830,9 @@ public class TcMachineAssignService implements ITcMachineAssignService {
         task.setPreviousSpecSwitchHours(BigDecimal.ZERO);
         task.setPreviousGlueSwitchHours(BigDecimal.ZERO);
         task.setPreviousGlueSwitchCapacityDeduct(BigDecimal.ZERO);
+        candidate.getEvidence().put("maxCapacity", this.nvl(maxCapacity));
+        candidate.getEvidence().put("maintenanceCapacityDeduct", maintenanceDeduct);
+        candidate.getEvidence().put("assignedPlanQty", assignedPlanQty);
         candidate.getEvidence().put("specSwitchHours", BigDecimal.ZERO);
         candidate.getEvidence().put("glueSwitchHours", BigDecimal.ZERO);
         candidate.getEvidence().put("glueSwitchCapacityDeduct", BigDecimal.ZERO);
@@ -2846,6 +2904,9 @@ public class TcMachineAssignService implements ITcMachineAssignService {
             predecessor = this.buildPredecessorFromTask(candidate.getMachineCode(), task.getShiftOrder(), currentTask);
         }
         candidate.getEvidence().put("accumulatedSwitchHours", totalSwitchHours);
+        candidate.getEvidence().put("maxCapacity", this.nvl(maxCapacity));
+        candidate.getEvidence().put("maintenanceCapacityDeduct", maintenanceDeduct);
+        candidate.getEvidence().put("assignedPlanQty", assignedPlanQty);
         candidate.getEvidence().put("existingSwitchCapacityDeduct",
                 this.resolveExistingSwitchDeduct(context, candidate.getMachineCode(), task.getShiftOrder()));
         candidate.getEvidence().put("currentSwitchCapacityDeduct",
@@ -2895,6 +2956,9 @@ public class TcMachineAssignService implements ITcMachineAssignService {
         BigDecimal currentSwitchDeduct = this.nvl(task.getPreviousSpecSwitchHours()).multiply(this.nvl(machineSpeed))
                 .add(this.nvl(task.getPreviousGlueSwitchCapacityDeduct()));
         candidate.setSwitchCostHours(currentSwitchHours);
+        candidate.getEvidence().put("maxCapacity", this.nvl(maxCapacity));
+        candidate.getEvidence().put("maintenanceCapacityDeduct", maintenanceDeduct);
+        candidate.getEvidence().put("assignedPlanQty", assignedPlanQty);
         candidate.getEvidence().put("specSwitchHours", this.nvl(task.getPreviousSpecSwitchHours()));
         candidate.getEvidence().put("glueSwitchHours", this.nvl(task.getPreviousGlueSwitchHours()));
         candidate.getEvidence().put("glueSwitchCapacityDeduct",

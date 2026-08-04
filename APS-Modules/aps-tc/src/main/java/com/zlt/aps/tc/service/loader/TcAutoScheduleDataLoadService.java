@@ -863,6 +863,7 @@ public class TcAutoScheduleDataLoadService {
                 taskDraft.setOrderNo(row.getOrderNo() + "-CLASS" + shiftOrder);
                 taskDraft.setSourceOrderNos(row.getOrderNo());
                 taskDraft.setEmbryoCode(row.getEmbryoCode());
+                taskDraft.setCxMachineCode(row.getCxMachineCode());
                 taskDraft.setBusinessKeySuffix(buildSourceTaskBusinessKeySuffix(row, sourceRowIndex, shiftOrder));
                 taskDraft.setSidewallCode(sidewallCode);
                 taskDraft.setConstructionVersion(row.getConstructionVersion());
@@ -1110,6 +1111,7 @@ public class TcAutoScheduleDataLoadService {
                 taskDraft.setOrderNo(row.getOrderNo() + "-CLASS" + shiftOrder);
                 taskDraft.setSourceOrderNos(row.getOrderNo());
                 taskDraft.setEmbryoCode(row.getEmbryoCode());
+                taskDraft.setCxMachineCode(row.getCxMachineCode());
                 taskDraft.setBusinessKeySuffix(buildSourceTaskBusinessKeySuffix(row, sourceRowIndex, shiftOrder));
                 taskDraft.setSidewallCode(sidewallCode);
                 taskDraft.setConstructionVersion(primarySpec.getSidewallVersion());
@@ -2218,6 +2220,7 @@ public class TcAutoScheduleDataLoadService {
         targetTask.setOrderNo(sourceTask.getOrderNo());
         targetTask.setSourceOrderNos(sourceTask.getSourceOrderNos());
         targetTask.setEmbryoCode(sourceTask.getEmbryoCode());
+        targetTask.setCxMachineCode(sourceTask.getCxMachineCode());
         targetTask.setBusinessKeySuffix("FUTURE_SHUTDOWN_" + DateUtil.format(sourceDate, "yyyyMMdd")
                 + "_CLASS" + sourceShiftCode + "_TO_CLASS" + targetShift);
         targetTask.setSidewallCode(sourceTask.getSidewallCode());

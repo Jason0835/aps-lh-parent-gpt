@@ -833,6 +833,7 @@ public class TmAutoScheduleDataLoadService {
                 taskDraft.setEmbryoCode(row.getEmbryoCode());
                 taskDraft.setMainMaterialDesc(row.getMainMaterialDesc());
                 taskDraft.setCxMachineCode(row.getCxMachineCode());
+                taskDraft.setLhMachineCode(row.getLhMachineCode());
                 taskDraft.setBusinessKeySuffix(buildSourceTaskBusinessKeySuffix(row, sourceRowIndex, shiftOrder));
                 taskDraft.setTreadCode(treadCode);
                 // 拆分胶料类别：第一个值为主胶料编码，其余值为基部胶编码
@@ -1105,6 +1106,7 @@ public class TmAutoScheduleDataLoadService {
                 taskDraft.setEmbryoCode(row.getEmbryoCode());
                 taskDraft.setMainMaterialDesc(row.getMainMaterialDesc());
                 taskDraft.setCxMachineCode(row.getCxMachineCode());
+                taskDraft.setLhMachineCode(row.getLhMachineCode());
                 taskDraft.setBusinessKeySuffix(buildSourceTaskBusinessKeySuffix(row, sourceRowIndex, shiftOrder));
                 taskDraft.setTreadCode(treadCode);
                 // 拆分胶料类别：第一个值为主胶料编码，其余值为基部胶编码
@@ -2240,6 +2242,7 @@ public class TmAutoScheduleDataLoadService {
         targetTask.setEmbryoCode(sourceTask.getEmbryoCode());
         targetTask.setMainMaterialDesc(sourceTask.getMainMaterialDesc());
         targetTask.setCxMachineCode(sourceTask.getCxMachineCode());
+        targetTask.setLhMachineCode(sourceTask.getLhMachineCode());
         targetTask.setBusinessKeySuffix("FUTURE_SHUTDOWN_" + DateUtil.format(sourceDate, "yyyyMMdd")
                 + "_CLASS" + sourceShiftCode + "_TO_CLASS" + targetShift);
         targetTask.setTreadCode(sourceTask.getTreadCode());
