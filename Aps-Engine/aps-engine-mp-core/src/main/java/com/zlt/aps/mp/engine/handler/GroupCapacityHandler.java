@@ -127,7 +127,8 @@ public class GroupCapacityHandler {
                 groupInfo.setMinLhMachineCount(minLhRatioMap.get(structureName).getLhMachineMaxQty());
                 groupInfo.setNeedCxCapacityMachineCount(calculateCxMachineNumber(groupInfo, productionContext));
             }
-            Integer minAllocationDays = groupInfo.getMinAllocationDays(productionContext);
+            //20260803 需求天数修正，因加入切换英寸有不同值，故而分开
+            Integer minRequireDays = groupInfo.getRequireMinDays(productionContext);
             //估算的机台数为零，则设置分配完成
             if (BigDecimal.ZERO.equals(groupInfo.getNeedCxCapacityMachineCount())) {
                 setAllocationZero(groupInfo);
@@ -141,11 +142,11 @@ public class GroupCapacityHandler {
                 return;
             }
             // 特殊材料结构理论分配天数低于5天时，不能强制拉到5天。
-            if (null != minAllocationDays && groupInfo.getTheoryDays() < minAllocationDays) {
-                groupInfo.setTheoryDays(minAllocationDays);
-                groupInfo.setLeftOverNeedAllocationDays(minAllocationDays);
+            if (null != minRequireDays && groupInfo.getTheoryDays() < minRequireDays) {
+                groupInfo.setTheoryDays(minRequireDays);
+                groupInfo.setLeftOverNeedAllocationDays(minRequireDays);
                 //重新计算估算的机台数
-                BigDecimal newNeedCxCapacityMachineCount = BigDecimal.valueOf(minAllocationDays).divide(BigDecimal.valueOf(productionContext.getMonthDays()), 1, RoundingMode.UP);
+                BigDecimal newNeedCxCapacityMachineCount = BigDecimal.valueOf(minRequireDays).divide(BigDecimal.valueOf(productionContext.getMonthDays()), 1, RoundingMode.UP);
                 groupInfo.setNeedCxCapacityMachineCount(newNeedCxCapacityMachineCount);
                 TbrProductionGroupLogRecorder.addGroupCalculateCxMachineCountLog(productionContext, groupInfo);
             }
