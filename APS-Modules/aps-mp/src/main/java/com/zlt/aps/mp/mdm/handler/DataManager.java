@@ -3,6 +3,12 @@ package com.zlt.aps.mp.mdm.handler;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.maindata.mapper.MdmCapsuleChuckEntityMapper;
+import com.zlt.aps.maindata.mapper.MdmModelInfoEntityMapper;
+import com.zlt.aps.maindata.mapper.MdmMouldShellInfoEntityMapper;
+import com.zlt.aps.mp.api.domain.entity.MdmCapsuleChuck;
+import com.zlt.aps.mp.api.domain.entity.MdmModelInfo;
+import com.zlt.aps.mp.api.domain.entity.MdmMouldShellInfo;
 import com.zlt.aps.mp.demand.mapper.SalesOrderPoolEntityMapper;
 import com.zlt.aps.mp.engine.mapper.FactoryEngineProductionVersionMapper;
 import com.zlt.aps.maindata.mapper.MdmMaterialConsumeDetailMapper;
@@ -57,6 +63,9 @@ public class DataManager {
     protected final MpStructureAllocationEntityMapper mpStructureAllocationEntityMapper;
     protected final MpMonthPlanMonitorEntityMapper mpMonthPlanMonitorEntityMapper;
     protected final MdmMaterialInfoEntityMapper mdmMaterialInfoEntityMapper;
+    protected final MdmModelInfoEntityMapper mdmModelInfoEntityMapper;
+    protected final MdmMouldShellInfoEntityMapper mdmMouldShellInfoEntityMapper;
+    protected final MdmCapsuleChuckEntityMapper mdmCapsuleChuckEntityMapper;
     protected final RawSpecialMaterialRecordEntityMapper rawSpecialMaterialRecordMapper;
     protected final MdmMaterialConsumeDetailMapper mdmMaterialConsumeDetailMapper;
 
@@ -346,6 +355,50 @@ public class DataManager {
         return mdmMaterialInfoEntityMapper.selectList(wrapper);
     }
 
+    /**
+     * 获取模具信息列表
+     * @param dataDTO
+     */
+    @Cacheable(
+            cacheNames = "mould:info",
+            key = "#dataDTO.cacheKey",
+            condition = "#dataDTO.isQueryCache and @caffeineCacheProperties.cacheEnabled"
+    )
+    public List<MdmModelInfo> listMouldInfos(DataDTO<MdmModelInfo> dataDTO) {
+        LambdaQueryWrapper<MdmModelInfo> wrapper = new LambdaQueryWrapper<>();
+        buildMouldInfoCondition(wrapper, dataDTO.getQueryObject());
+        return mdmModelInfoEntityMapper.selectList(wrapper);
+    }
+
+    /**
+     * 获取模壳台账列表
+     * @param dataDTO
+     */
+    @Cacheable(
+            cacheNames = "mouldShell:info",
+            key = "#dataDTO.cacheKey",
+            condition = "#dataDTO.isQueryCache and @caffeineCacheProperties.cacheEnabled"
+    )
+    public List<MdmMouldShellInfo> listMouldShellInfos(DataDTO<MdmMouldShellInfo> dataDTO) {
+        LambdaQueryWrapper<MdmMouldShellInfo> wrapper = new LambdaQueryWrapper<>();
+        buildMouldShellInfoCondition(wrapper, dataDTO.getQueryObject());
+        return mdmMouldShellInfoEntityMapper.selectList(wrapper);
+    }
+
+    /**
+     * 获取胶囊卡盘台账台账列表
+     * @param dataDTO
+     */
+    @Cacheable(
+            cacheNames = "capsuleChuck:info",
+            key = "#dataDTO.cacheKey",
+            condition = "#dataDTO.isQueryCache and @caffeineCacheProperties.cacheEnabled"
+    )
+    public List<MdmCapsuleChuck> listCapsuleChuckInfos(DataDTO<MdmCapsuleChuck> dataDTO) {
+        LambdaQueryWrapper<MdmCapsuleChuck> wrapper = new LambdaQueryWrapper<>();
+        buildCapsuleChuckCondition(wrapper, dataDTO.getQueryObject());
+        return mdmCapsuleChuckEntityMapper.selectList(wrapper);
+    }
 
     /**
      * 构建物料信息条件
@@ -357,6 +410,40 @@ public class DataManager {
         queryWrapper.eq(MdmMaterialInfo::getFactoryCode, queryVO.getFactoryCode());
         queryWrapper.eq(MdmMaterialInfo::getIsDelete, YesOrNoEnum.NO.getValue());
     }
+
+    /**
+     * 构建模具台账条件
+     *
+     * @param queryWrapper
+     * @param queryVO
+     */
+    public void buildMouldInfoCondition(LambdaQueryWrapper<MdmModelInfo> queryWrapper, MdmModelInfo queryVO) {
+        queryWrapper.eq(MdmModelInfo::getFactoryCode, queryVO.getFactoryCode());
+        queryWrapper.eq(MdmModelInfo::getIsDelete, YesOrNoEnum.NO.getValue());
+    }
+
+    /**
+     * 构建模壳台账条件
+     *
+     * @param queryWrapper
+     * @param queryVO
+     */
+    public void buildMouldShellInfoCondition(LambdaQueryWrapper<MdmMouldShellInfo> queryWrapper, MdmMouldShellInfo queryVO) {
+        queryWrapper.eq(MdmMouldShellInfo::getFactoryCode, queryVO.getFactoryCode());
+        queryWrapper.eq(MdmMouldShellInfo::getIsDelete, YesOrNoEnum.NO.getValue());
+    }
+
+    /**
+     * 构建胶囊卡盘台账条件
+     *
+     * @param queryWrapper
+     * @param queryVO
+     */
+    public void buildCapsuleChuckCondition(LambdaQueryWrapper<MdmCapsuleChuck> queryWrapper, MdmCapsuleChuck queryVO) {
+        queryWrapper.eq(MdmCapsuleChuck::getFactoryCode, queryVO.getFactoryCode());
+        queryWrapper.eq(MdmCapsuleChuck::getIsDelete, YesOrNoEnum.NO.getValue());
+    }
+
 
     /**
      * 获取特殊材料列表
