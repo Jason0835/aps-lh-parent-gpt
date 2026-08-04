@@ -1279,17 +1279,16 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             if (StringUtils.isNotBlank(capsuleChuck.getSpecifications())){
                 //1.1 按规格
                 String[] specArr = capsuleChuck.getSpecifications().split(BusiConstant.WeekRollAdjust.SPLIT_COMMA);
-                for (String spec:specArr){
-                    mpProdFinalList = factoryMonthPlanProdFinalList.stream().filter(x->StringUtils.isNotBlank(spec) && spec.equals(x.getSpecifications())).collect(Collectors.toList());
-                    checkOneCapsuleChuck(mpProdFinalList, maxDays, chuckTotalQty, sbError,spec);
-                }
+                // 将specArr转换为List，便于contains判断
+                List<String> specList = Arrays.asList(specArr);
+                mpProdFinalList = factoryMonthPlanProdFinalList.stream().filter(x->specList.contains(x.getSpecifications())).collect(Collectors.toList());
+                checkOneCapsuleChuck(mpProdFinalList, maxDays, chuckTotalQty, sbError,capsuleChuck.getSpecifications());
             }else if (StringUtils.isNotBlank(capsuleChuck.getProSize())){
                 //1.2 按英寸
                 String[] proSizeArr = capsuleChuck.getProSize().split(BusiConstant.WeekRollAdjust.SPLIT_COMMA);
-                for (String oneProSize:proSizeArr){
-                    mpProdFinalList = factoryMonthPlanProdFinalList.stream().filter(x->StringUtils.isNotBlank(oneProSize) && oneProSize.equals(x.getProSize())).collect(Collectors.toList());
-                    checkOneCapsuleChuck(mpProdFinalList, maxDays, chuckTotalQty, sbError,oneProSize);
-                }
+                List<String> proSizeList = Arrays.asList(proSizeArr);
+                mpProdFinalList = factoryMonthPlanProdFinalList.stream().filter(x->proSizeList.contains(x.getProSize())).collect(Collectors.toList());
+                checkOneCapsuleChuck(mpProdFinalList, maxDays, chuckTotalQty, sbError,capsuleChuck.getProSize());
             }
         }
 
