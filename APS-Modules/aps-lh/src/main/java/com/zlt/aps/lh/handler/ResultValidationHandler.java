@@ -85,9 +85,9 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
     private static final AtomicInteger CHG_SEQ = new AtomicInteger(0);
     private static final int ENABLED = 1;
     private static final String CLEANING_DATA_SOURCE_MANUAL = "0";
-    /** 按余量收尾下机：除续作降模且前物料本次不能收尾的场景外统一使用该值。 */
+    /** 按余量收尾下机：前物料余量已全部排完时的下机方式。 */
     private static final String END_TYPE_BY_REMAINING_QTY = "0";
-    /** 按时间下机：用于续作降模且前物料本次排程不能收尾的场景，与交替类型无关。 */
+    /** 按时间下机：前物料余量未排完、机台按固定时间下机时的下机方式，与交替类型无关。 */
     private static final String END_TYPE_BY_TIME = "1";
     /** 干冰清洗因三天内收尾跳过时的固定原因 */
     private static final String DRY_ICE_ENDING_ANALYSIS = "干冰清洗+收尾";
@@ -1921,9 +1921,10 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             plan.setIsRelease("0");
             plan.setMouldStatus("0");
             plan.setIsDelete(0);
-            // END_TYPE 必须描述换模前物料的下机方式，不得读取当前准备上机的后物料 isEnd。
+            // END_TYPE 必须描述换模前物料的下机方式，不得读取当前准备上机的后物料 isEnd；
+            // 同时传入前物料产品状态，供非降模机台按“物料+产品状态”索引精确匹配。
             plan.setEndType(resolveMouldChangePlanEndType(context, result.getLhMachineCode(),
-                    state.getCurrentMaterialCode()));
+                    state.getCurrentMaterialCode(), state.getCurrentProductStatus()));
             plan.setChangeTime(resolvePlanChangeTime(result, state));
 
             // 判断交替类型：普通换模、换活字块、干冰清洗、喷砂清洗在这里统一落数据字典值。
@@ -2169,7 +2170,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             plan.setIsDelete(0);
             // 清洗计划同样按清洗发生时点的前物料判断，不能读取排程结束后的机台 ending 状态。
             plan.setEndType(resolveMouldChangePlanEndType(context, machineCode,
-                    cleaningState.getCurrentMaterialCode()));
+                    cleaningState.getCurrentMaterialCode(), cleaningState.getCurrentProductStatus()));
             plans.add(plan);
         }
         return planOrder;
@@ -2405,40 +2406,77 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
 
     /**
      * 解析模具交替计划下机类型。
-     * <p>只有同时满足以下条件才返回1（按时间下机）：交替计划前物料所在机台由续作降模规则选中下机、
-     * 前物料排程前硫化余量大于0、本次排程全部入口扣减后仍有剩余量。交替类型不参与 END_TYPE 判断；
-     * 若本次排程可将前物料SKU余量排完，则属于正常收尾，统一返回0。</p>
-     * <p>收尾小余量阈值跳过虽然也会释放续作机台，但不会写入续作降模快照，因此会稳定返回0；
-     * 同时以“机台+前物料”精确匹配，避免后物料满足条件时反向污染本条交替计划。</p>
+     * <p>只要交替计划前物料排程前硫化余量大于0、且经本次排程全部入口扣减后仍有剩余量，
+     * 即属于按时间下机（1）；只有前物料余量已全部排完时才属于按余量收尾下机（0）。
+     * 交替类型不参与 END_TYPE 判断；判断按“机台+前物料+产品状态”精确匹配，
+     * 避免后物料满足条件时反向污染本条交替计划。</p>
+     * <p>续作降模快照只是前物料来源之一，未命中时退回全量 SKU 索引按“物料+产品状态”匹配，
+     * 保证普通换模、清洗等非降模机台在前物料未排完时也能正确标记按时间下机。
+     * 账本缺失时不重新计算、不使用初始余量兜底，按不满足时间下机条件保守返回0。</p>
      *
      * @param context 排程上下文
      * @param machineCode 交替计划机台编码
      * @param beforeMaterialCode 交替计划前物料编码
+     * @param beforeProductStatus 交替计划前物料产品状态
      * @return 1-按时间下机；0-按余量收尾下机
      */
     private String resolveMouldChangePlanEndType(LhScheduleContext context,
                                                  String machineCode,
-                                                 String beforeMaterialCode) {
-        Map<String, SkuScheduleDTO> beforeSkuMap = Objects.isNull(context)
-                || CollectionUtils.isEmpty(context.getReducedContinuationMachineBeforeSkuMap())
-                ? null : context.getReducedContinuationMachineBeforeSkuMap().get(machineCode);
-        SkuScheduleDTO beforeSku = CollectionUtils.isEmpty(beforeSkuMap)
-                || StringUtils.isEmpty(beforeMaterialCode) ? null : beforeSkuMap.get(beforeMaterialCode);
-        boolean reducedContinuationMachine = Objects.nonNull(beforeSku);
-        int beforeMaterialSurplusQty = reducedContinuationMachine ? Math.max(0, beforeSku.getSurplusQty()) : 0;
+                                                 String beforeMaterialCode,
+                                                 String beforeProductStatus) {
+        SkuScheduleDTO beforeSku = resolveBeforeSkuForEndType(
+                context, machineCode, beforeMaterialCode, beforeProductStatus);
+        Integer beforeSurplusQty = Objects.isNull(beforeSku) ? null : beforeSku.getSurplusQty();
+        int beforeMaterialSurplusQty = Objects.isNull(beforeSurplusQty)
+                ? 0 : Math.max(0, beforeSurplusQty);
         Integer beforeMaterialRemainingQty = resolveBeforeMaterialRemainingQty(context, beforeSku);
-        boolean beforeMaterialCannotFinish = reducedContinuationMachine
-                && beforeMaterialSurplusQty > 0
+        // 前物料排程后仍有剩余量即按时间下机，只有余量排完才按余量收尾下机。
+        boolean beforeMaterialCannotFinish = beforeMaterialSurplusQty > 0
                 && Objects.nonNull(beforeMaterialRemainingQty)
                 && beforeMaterialRemainingQty > 0;
         String endType = beforeMaterialCannotFinish
                 ? END_TYPE_BY_TIME : END_TYPE_BY_REMAINING_QTY;
-        log.info("模具交替计划END_TYPE判断, machineCode: {}, beforeMaterialCode: {}, "
-                        + "reducedContinuationMachine: {}, beforeMaterialSurplusQty: {}, "
+        log.info("模具交替计划END_TYPE判断, machineCode: {}, beforeMaterialCode: {}, beforeProductStatus: {}, "
+                        + "beforeMaterialSurplusQty: {}, "
                         + "beforeMaterialRemainingQty: {}, beforeMaterialCannotFinish: {}, endType: {}",
-                machineCode, beforeMaterialCode, reducedContinuationMachine, beforeMaterialSurplusQty,
+                machineCode, beforeMaterialCode, beforeProductStatus, beforeMaterialSurplusQty,
                 beforeMaterialRemainingQty, beforeMaterialCannotFinish, endType);
         return endType;
+    }
+
+    /**
+     * 解析交替计划前物料对应的来源 SKU。
+     * <p>优先使用续作降模快照（机台+前物料精确匹配，保持原高置信来源）；
+     * 未命中时退回全量 SKU 索引，按“物料+产品状态”精确匹配，
+     * 保证非降模机台按时间下机也能被正确识别。</p>
+     *
+     * @param context 排程上下文
+     * @param machineCode 交替计划机台编码
+     * @param beforeMaterialCode 交替计划前物料编码
+     * @param beforeProductStatus 交替计划前物料产品状态
+     * @return 前物料来源 SKU；无法匹配时返回 null
+     */
+    private SkuScheduleDTO resolveBeforeSkuForEndType(LhScheduleContext context,
+                                                      String machineCode,
+                                                      String beforeMaterialCode,
+                                                      String beforeProductStatus) {
+        if (Objects.isNull(context) || StringUtils.isEmpty(beforeMaterialCode)) {
+            return null;
+        }
+        SkuScheduleDTO beforeSku = null;
+        if (!CollectionUtils.isEmpty(context.getReducedContinuationMachineBeforeSkuMap())) {
+            Map<String, SkuScheduleDTO> beforeSkuMap =
+                    context.getReducedContinuationMachineBeforeSkuMap().get(machineCode);
+            if (!CollectionUtils.isEmpty(beforeSkuMap)) {
+                beforeSku = beforeSkuMap.get(beforeMaterialCode);
+            }
+        }
+        if (Objects.isNull(beforeSku) && !CollectionUtils.isEmpty(context.getAllSkuScheduleDtoMap())) {
+            String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(
+                    beforeMaterialCode, normalizeProductStatus(beforeProductStatus));
+            beforeSku = context.getAllSkuScheduleDtoMap().get(skuKey);
+        }
+        return beforeSku;
     }
 
     /**

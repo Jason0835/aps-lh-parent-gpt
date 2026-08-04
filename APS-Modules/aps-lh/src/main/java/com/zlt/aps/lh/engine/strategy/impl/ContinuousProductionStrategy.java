@@ -125,6 +125,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
     private static final LocalTime ENDING_FILL_THRESHOLD_TIME = LocalTime.of(20, 0);
     /** 收尾补满班次原因分析备注，标识该班次因收尾补满规则新增计划量。 */
     private static final String ENDING_FILL_ANALYSIS = "补量";
+    /** 共用胎胚收尾错峰后延班次原因分析备注，标识该班次因错峰后延规则新增计划量。 */
+    private static final String ENDING_STAGGER_FILL_ANALYSIS = "错峰后延补量";
     private static final String WHOLE_SINGLE_CONTROL_CONTINUATION_UNSCHEDULED_REASON =
             "双模SKU单控机台L/R整机续作条件不满足，禁止单边续作";
     private static final int SAME_MATERIAL_STATUS_FORMAL_RESERVED_QTY = 4;
@@ -5823,6 +5825,15 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         if (Objects.isNull(nextShift)) {
             return -1;
         }
+        // 收尾补满与错峰后延共用“当晚夜班”边界：夜班收尾不得再后延到次日早班，避免跨业务日占班。
+        LhShiftConfigVO endingShift = findShiftByIndex(shifts, endingShiftIndex);
+        if (Objects.nonNull(endingShift) && endingShift.isNightShift()) {
+            log.info("共用胎胚收尾错峰跳过, scheduleDate: {}, materialCode: {}, machineCode: {}, "
+                            + "原收尾班次: {}, 原因: 当晚夜班为错峰边界，不再后延到次日早班",
+                    context.getScheduleDate(), sourceSku.getMaterialCode(), result.getLhMachineCode(),
+                    endingShiftIndex);
+            return -1;
+        }
         if (isMachineShiftOccupiedByOtherSku(context, sourceSku, result, nextShift)) {
             log.info("共用胎胚收尾错峰跳过, scheduleDate: {}, materialCode: {}, machineCode: {}, "
                             + "原收尾班次: {}, 下一班次: {}, 原因: 下一班次已被其他SKU占用",
@@ -5934,6 +5945,9 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                 setShiftPlanQty(result, nextShift.getShiftIndex(), actualNextShiftQty,
                         nextShift.getShiftStartDateTime(), nextShift.getShiftEndDateTime());
             }
+            // 错峰后延实际新增计划量的后延班次，原因分析追加“错峰后延补量”，便于结果对账。
+            ShiftFieldUtil.appendShiftAnalysis(
+                    result, nextShift.getShiftIndex(), ENDING_STAGGER_FILL_ANALYSIS);
             result.setIsEnd("1");
             refreshResultSummary(context, result, shifts);
             syncMachineEstimatedEndTime(context, result);
@@ -8434,6 +8448,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             setShiftPlanQty(result, shift.getShiftIndex(), 0, null, null);
             // 停产保机/释放边界置零后，清理此前收尾补满写入的“补量”备注，只保留保机原因。
             ShiftFieldUtil.removeShiftAnalysis(result, shift.getShiftIndex(), ENDING_FILL_ANALYSIS);
+            // 错峰后延写入的“错峰后延补量”备注同样在置零时清理，避免残留对账信息。
+            ShiftFieldUtil.removeShiftAnalysis(result, shift.getShiftIndex(), ENDING_STAGGER_FILL_ANALYSIS);
             if (stopHold) {
                 ShiftFieldUtil.appendShiftAnalysis(result, shift.getShiftIndex(), "停产保机");
             }
