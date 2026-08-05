@@ -4,11 +4,11 @@ import com.alibaba.fastjson.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.zlt.aps.maindata.enums.MsgTemplateEnums;
 import com.zlt.aps.maindata.utils.MessageServiceUtils;
+import com.zlt.aps.tq.api.domain.entity.TqParams;
 import com.zlt.aps.tq.api.domain.entity.TqScheduleResult;
 import com.zlt.aps.tq.api.domain.entity.TqScheFinishQty;
 import com.zlt.aps.tq.api.domain.entity.TqStock;
 import com.zlt.aps.tq.api.domain.entity.TqWarningRecord;
-import com.zlt.aps.tq.entity.TqParams;
 import com.zlt.aps.tq.mapper.TqScheduleResultMapper;
 import com.zlt.aps.tq.mapper.TqScheFinishQtyMapper;
 import com.zlt.aps.tq.mapper.TqStockMapper;
@@ -408,10 +408,7 @@ public class TqWarningServiceImpl implements ITqWarningService {
      */
     private double getParamValue(String paramCode, double defaultValue) {
         try {
-            LambdaQueryWrapper<TqParams> wrapper = new LambdaQueryWrapper<>();
-            wrapper.eq(TqParams::getParamCode, paramCode)
-                   .eq(TqParams::getIsDelete, 0);
-            TqParams param = tqParamsService.getOne(wrapper, false);
+            TqParams param = tqParamsService.selectOneByParamCode(paramCode, null);
             if (param != null && StringUtils.isNotBlank(param.getParamValue())) {
                 return Double.parseDouble(param.getParamValue());
             }

@@ -30,8 +30,7 @@
 import moment from "moment";
 import infoForm from "@/views/components/infoForm.vue";
 import {
-  insertOrder,
-  validateInsertOrder,
+  insertTask,
   listScheduleShiftDates,
 } from "@/api/gsq/scheduleResult";
 import { listEnabledMachines } from "@/api/gsq/machine";
@@ -181,6 +180,13 @@ export default {
           }
         );
       }
+
+      columns.push({
+        label: this.$t("ui.data.column.gsqScheduleResult.anchorTaskId"),
+        prop: "anchorTaskId",
+        span: 24,
+        placeholder: this.$t("ui.data.column.gsqScheduleResult.anchorTaskIdPlaceholder"),
+      });
 
       columns.push({
         label: this.$t("ui.data.column.gsqScheduleResult.remark"),
@@ -345,17 +351,10 @@ export default {
         }
       }
 
-      // 后端校验 + 插单（服务端校验规则：规格校验、生产周期、当前班次限制、插单位置限制等）
+      // 调用新接口 insertTask（走任务链路径，支持锚点插入、resequence 重排，内置校验）
       this.loading = true;
       const params = this.buildSubmitParams();
-      validateInsertOrder(params)
-        .then((res) => {
-          if (res.code !== 200) {
-            this.$modal.msgError(res.msg || this.$t("ui.common.message.operateFail"));
-            return Promise.reject();
-          }
-          return insertOrder(params);
-        })
+      insertTask(params)
         .then((res) => {
           const tip = res.msg || res.message || "";
           if (res.code != null && res.code !== 200) {

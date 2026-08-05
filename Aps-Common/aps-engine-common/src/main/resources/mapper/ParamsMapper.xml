@@ -25,7 +25,7 @@
     <select id="listTqParams" resultType="com.zlt.aps.common.engine.domain.ParamsVo">
         select param_code, param_value
         from T_TQ_PARAMS
-        where DEL_FLAG = '0'
+        where IS_DELETE = 0
     </select>
 
     <select id="listTcParams" resultType="com.zlt.aps.common.engine.domain.ParamsVo">

@@ -95,11 +95,6 @@ export default {
           precision: 0,
         },
         {
-          label: this.$t("ui.data.column.machine.toolingInfo"),
-          prop: "toolingInfo",
-          maxlength: "50",
-        },
-        {
           label: this.$t("ui.data.column.machine.quata"),
           prop: "quota",
           type: "number",

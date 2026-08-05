@@ -1,49 +1,33 @@
 package com.zlt.aps.tq.service;
 
-import com.baomidou.mybatisplus.extension.service.IService;
-import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.zlt.aps.tq.api.domain.dto.TqParamsDto;
-import com.zlt.aps.tq.entity.TqParams;
-import org.springframework.transaction.annotation.Transactional;
+import com.zlt.aps.tq.api.domain.entity.TqParams;
+import com.zlt.bill.common.service.IDocService;
 
-import java.util.List;
+import java.util.Map;
 
 /**
- * 胎圈参数信息Service接口
+ * 胎圈排程参数配置 Service接口（对齐胎面 ITmParamsService）
  *
  * @author zlt
- * @date 2021-05-25
+ * @version 1.0
+ * @date 2025-12-12
  */
-public interface TqParamsService extends IService<TqParams> {
-    /**
-     * 查询胎圈参数信息
-     *
-     * @param id 胎圈参数信息ID
-     * @return 胎圈参数信息
-     */
-    public TqParams selectParamsById(Long id);
+public interface TqParamsService extends IDocService<TqParams> {
 
     /**
-     * 查询胎圈参数信息列表
+     * 按参数编码+工厂编码查询参数（工厂编码为空时忽略）
      *
-     * @param params 胎圈参数信息     * @return 胎圈参数信息集合
+     * @param paramCode   参数编码
+     * @param factoryCode 工厂编码
+     * @return 参数
      */
-    public List<TqParamsDto> selectParamsList(TqParams params);
+    TqParams selectOneByParamCode(String paramCode, String factoryCode);
 
     /**
-     * 修改胎圈参数信息
+     * 查询某工厂的全部参数映射（paramCode -> paramValue）
      *
-     * @param params 胎圈参数信息
-     * @return 结果
+     * @param factoryCode 工厂编码
+     * @return 参数映射
      */
-    @Transactional
-    public AjaxResult updateParams(TqParams params);
-
-    /**
-     * 校验胎圈参数代码唯一
-     *
-     * @param params 胎圈参数信息
-     * @return 是否唯一
-     */
-    public String checkParamsCodeUnique(TqParams params);
+    Map<String, String> listTqParams(String factoryCode);
 }

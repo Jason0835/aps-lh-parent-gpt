@@ -8,11 +8,11 @@ export function listParams(query) {
     data: query
   })
 }
-export function editParams(query) {
+export function saveParams(data) {
   return request({
-    url: '/tq/params/edit',
+    url: '/tq/params/save',
     method: 'post',
-    data: query
+    data: data
   })
 }
 export function removeParams(query) {
@@ -22,5 +22,9 @@ export function removeParams(query) {
     data: query
   })
 }
-
-
+export function getInfo(id) {
+  return request({
+    url: '/tq/params/' + id,
+    method: 'get'
+  })
+}

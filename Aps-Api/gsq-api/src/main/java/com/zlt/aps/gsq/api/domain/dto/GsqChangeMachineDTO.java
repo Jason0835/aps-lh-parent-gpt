@@ -32,4 +32,16 @@ public class GsqChangeMachineDTO implements Serializable {
     /** 新机台编号 */
     @ApiModelProperty(value = "新机台编号", name = "newMachineCode")
     private String newMachineCode;
+
+    /** 目标班次（1~6，为空时保持原班次） */
+    @ApiModelProperty(value = "目标班次（1~6，为空时保持原班次）", name = "targetShiftOrder")
+    private Integer targetShiftOrder;
+
+    /** 目标顺序（锚点之后的 sequence；为空时追加链尾） */
+    @ApiModelProperty(value = "目标顺序（锚点之后的 sequence；为空时追加链尾）", name = "targetSequence")
+    private Integer targetSequence;
+
+    /** 锚点任务ID（与 targetSequence 二选一，锚点优先） */
+    @ApiModelProperty(value = "锚点任务ID（与 targetSequence 二选一，锚点优先）", name = "anchorTaskId")
+    private String anchorTaskId;
 }

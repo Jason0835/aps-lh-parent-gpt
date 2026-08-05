@@ -185,6 +185,17 @@ public interface MesItfMapper {
     List<TqMesStock> selectMesTqStockList(AuxReqSyncDataLogs syncDataLogs);
 
     /**
+     * 查询胎圈自动滚动指定物理日的最新库存。
+     *
+     * <p>对齐胎面 selectTreadShiftStockList，按工厂+公司+物理日+DATA_VERSION（取最新）
+     * 从 MES_TQ_STOCK 查询胎圈班次库存快照。</p>
+     *
+     * @param request 工厂、物理库存日和可选版本
+     * @return 库存列表
+     */
+    List<TqMesStock> selectBeadShiftStockList(MesShiftStockSyncRequest request);
+
+    /**
      * 查询成型排程完成量同步数据
      *
      * @param syncDataLogs 参数

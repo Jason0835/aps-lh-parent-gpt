@@ -58,6 +58,20 @@
           @click="handleChangeQty(selection[0])"
         >{{ $t("ui.data.column.scheduleResult.changePlan") }}</el-button>
         <el-button
+          v-hasPermi="['gsq:scheduleResult:changeMachine']"
+          type="primary"
+          plain
+          :disabled="selection.length < 2"
+          @click="handleBatchChangeMachine"
+        >{{ $t("ui.data.btn.gsqScheduleResult.batchChangeMachine") }}</el-button>
+        <el-button
+          v-hasPermi="['gsq:scheduleResult:changeQty']"
+          type="primary"
+          plain
+          :disabled="selection.length < 2"
+          @click="handleBatchChangeQty"
+        >{{ $t("ui.data.btn.gsqScheduleResult.batchChangeQty") }}</el-button>
+        <el-button
           v-hasPermi="['gsq:scheduleResult:publish']"
           type="primary"
           :disabled="selection.length === 0"
@@ -69,7 +83,7 @@
           </el-button>
           <el-dropdown-menu slot="dropdown">
             <el-dropdown-item>
-              <el-button type="primary" class="more-btn" @click="handleExportUiExcel">
+              <el-button type="primary" class="more-btn" @click="handleExport">
                 {{ $t("ui.frame.btn.export") }}
               </el-button>
             </el-dropdown-item>
@@ -91,6 +105,8 @@
     <auto-plan-dialog
       v-if="autoPlanVisible"
       :visible.sync="autoPlanVisible"
+      :default-factory-code="search.factoryCode"
+      :default-schedule-date="search.scheduleDate"
       @refresh="getList"
     />
 
@@ -123,15 +139,17 @@
       @refresh="getList"
     />
 
-    <!-- 导入弹窗 -->
+    <!-- 导入弹窗（按专用模板导入） -->
     <tlt-upload-form
       ref="tltUploadForm"
       :importDialogVisible.sync="importDialogVisible"
-      uploadUrl="/gsq/scheduleResult/importData"
-      downloadUrl="/gsq/scheduleResult/importTemplate"
+      :updateSupport="true"
+      :download-url-formatter="(form) => handleTemplateDownload('/gsq/scheduleResult/importTemplateCust', form)"
+      downloadUrl="/gsq/scheduleResult/importTemplateCust"
+      uploadUrl="/gsq/scheduleResult/importDataCust"
+      @uploadSuccess="getList"
       :columns="importColumns"
       :rules="importRules"
-      @refresh="getList"
     />
   </basic-container>
 </template>
@@ -144,7 +162,9 @@ import {
   listScheduleResult,
   removeScheduleResult,
   logicDeleteScheduleResult,
-  exportScheduleResult,
+  batchDelete,
+  batchChangeMachine,
+  batchChangeQty,
   publishSchedule,
   listScheduleShiftDates,
 } from "@/api/gsq/scheduleResult";
@@ -177,7 +197,7 @@ export default {
       },
       search: {
         scheduleDate: moment().add(2, "days").format("YYYY-MM-DD"),
-        factoryCode: "",
+        factoryCode: "116",
         steelRingCode: "",
         isRelease: "",
         machineCode: "",
@@ -202,40 +222,75 @@ export default {
       ],
       // 导入默认值
       importDefaultValue: {
+        factoryCode: "",
         scheduleDate: moment().add(2, "days").format("YYYY-MM-DD"),
       },
-      // 导入列配置
-      importColumns: [
+      };
+  },
+  computed: {
+    ...mapGetters(["permissions"]),
+    /** 导入弹窗列配置（放在 computed 中，确保 this.dict 已初始化；data() 执行时字典 mixin 尚未注入 dict） */
+    importColumns() {
+      return [
+        {
+          label: this.$t("ui.data.column.gsqScheduleResult.factoryCode"),
+          prop: "factoryCode",
+          type: "select",
+          dictData: this.dict.type.biz_factory_name,
+          filterable: true,
+          clearable: false,
+        },
         {
           label: this.$t("ui.data.column.gsqScheduleResult.scheduleDate"),
           prop: "scheduleDate",
           type: "date",
+          dateType: "date",
+          valueFormat: "yyyy-MM-dd",
+          clearable: false,
         },
-      ],
-      // 导入校验规则
-      importRules: {
-        scheduleDate: [
+        {
+          label: "",
+          prop: "updateSupport",
+          render: (form) => {
+            return (
+              <el-checkbox
+                label={this.$t("common.rule.updateSupport")}
+                v-model={form.updateSupport}
+              >
+                {this.$t("common.rule.updateSupport")}
+              </el-checkbox>
+            );
+          },
+        },
+      ];
+    },
+    /** 导入校验规则 */
+    importRules() {
+      return {
+        factoryCode: [
           {
             required: true,
-            message: this.$t("ui.data.column.scheduleResult.chooseScheduleDate"),
+            message: this.$t("ui.data.alert.gsq.schedule.excel.factoryRequired"),
             trigger: "blur",
           },
         ],
-      },
-    };
-  },
-  computed: {
-    ...mapGetters(["permissions"]),
+        scheduleDate: [
+          {
+            required: true,
+            message: this.$t("ui.data.alert.gsq.schedule.excel.dateRequired"),
+            trigger: "blur",
+          },
+        ],
+      };
+    },
     searchColumns() {
       return [
         {
           label: this.$t("ui.data.column.gsqScheduleResult.factoryCode"),
           prop: "factoryCode",
-          component: "el-select",
+          type: "select",
+          dictData: this.dict.type.biz_factory_name,
           filterable: true,
-          options: this.dict.type.biz_factory_name,
-          valueKey: "value",
-          labelKey: "label",
         },
         {
           label: this.$t("ui.data.column.gsqScheduleResult.scheduleDate"),
@@ -473,20 +528,30 @@ export default {
       this.currentRow = row;
       this.editVisible = true;
     },
-    /** 删除（逻辑删除） */
+    /** 删除（走任务链路径，删除后resequence重排） */
     handleDelete() {
       if (this.selection.length === 0) return;
-      const ids = this.selection.map((item) => item.id).join(",");
+      const ids = this.selection.map((item) => item.id);
       this.$modal
         .confirm(this.$t("ui.data.column.gsqScheduleResult.confirmDelete"))
         .then(() => {
-          return logicDeleteScheduleResult(ids);
+          return batchDelete(ids);
         })
         .then(() => {
           this.$modal.msgSuccess(this.$t("ui.common.message.deleteSuccess"));
           this.getList();
         })
         .catch(() => {});
+    },
+    /** 批量转机台（走任务链路径，支持锚点、目标班次） */
+    handleBatchChangeMachine() {
+      if (this.selection.length < 2) return;
+      this.$refs.changeMachineDialog.show(this.selection[0], this.selection);
+    },
+    /** 批量调量（走任务链路径） */
+    handleBatchChangeQty() {
+      if (this.selection.length < 2) return;
+      this.$refs.changeQtyDialog.show(this.selection[0], this.selection);
     },
     /** 转机台（单选模式） */
     handleChangeMachine(row) {
@@ -524,13 +589,29 @@ export default {
         }
       });
     },
-    /** 导出 */
-    handleExportUiExcel() {
-      this.download(
-        "/gsq/scheduleResult/exportData/钢丝圈排程结果",
-        { ...this.search },
-        `钢丝圈排程结果_${moment().format("YYYYMMDDHHmmss")}.xlsx`
-      );
+    /** 导出（按专用模板导出钢丝圈排程结果） */
+    handleExport() {
+      if (!this.search.factoryCode || !this.search.scheduleDate) {
+        this.$modal.msgWarning(this.$t("ui.data.alert.gsq.schedule.excel.factoryDateRequired"));
+        return;
+      }
+      downloadLink("/gsq/scheduleResult/export", {
+        factoryCode: this.search.factoryCode,
+        scheduleDate: this.search.scheduleDate,
+        steelRingCode: this.search.steelRingCode,
+        machineCode: this.search.machineCode,
+      });
+    },
+    /** 按专用模板下载导入模板（拼接查询参数） */
+    handleTemplateDownload(url, formValues) {
+      const params = {
+        ...formValues,
+      };
+      const paramsStr = Object.keys(params)
+        .filter(key => params[key] !== undefined && params[key] !== null && params[key] !== "")
+        .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(params[key])}`)
+        .join("&");
+      return `${url}${paramsStr ? "?" + paramsStr : ""}`;
     },
     /** 行样式：发布中标记 */
     rowStyle({ row }) {

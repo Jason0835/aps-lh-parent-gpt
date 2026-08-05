@@ -658,4 +658,17 @@ public interface IMesItfService {
     @ApiOperation("胎面排程结果下发到MES")
     @PostMapping("/mesItf/issueTmScheduleResult")
     AjaxResult issueTmScheduleResult(@RequestBody List<TmScheduleResultIssue> issueList);
+
+    /**
+     * 同步胎圈自动滚动班次库存。
+     *
+     * <p>对齐胎面 syncTreadShiftStock 和胎侧 syncSidewallShiftStock，
+     * 在胎圈自动滚动调量前调用，从 MES 中间表同步胎圈班次库存到 T_TQ_SHIFT_STOCK。</p>
+     *
+     * @param request 工厂、物理库存日和班序
+     * @return 同步结果
+     */
+    @ApiOperation("同步胎圈自动滚动班次库存")
+    @PostMapping("/mesItf/syncBeadShiftStock")
+    AjaxResult syncBeadShiftStock(@RequestBody MesShiftStockSyncRequest request);
 }

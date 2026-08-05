@@ -297,6 +297,15 @@ public class TqBalanceHandler extends AbsTqScheduleStepHandler {
         }
 
         boolean isClass2Over = (difNum > 0);
+        log.info("[S5-DIAG] equilibriumDay2 触发! totalClass2={} totalClass3={} difRate={}% isClass2Over={}",
+                totalClass2, totalClass3, actualDifRate, isClass2Over);
+        for (TqScheduleResultVo vo : scheduleList) {
+            if (StringUtils.isNotEmpty(vo.getMachineCode())) {
+                log.info("[S5-DIAG]   {} class2={} class3={} triggerClass={}",
+                        vo.getBeadCode(),
+                        vo.getClass2PlanQty(), vo.getClass3PlanQty(), vo.getBackupTriggerClass());
+            }
+        }
         if (isClass2Over) {
             scheduleList = scheduleList.stream()
                     .sorted(Comparator.comparing(vo -> vo.getClass2PlanQty() == null ? 0D : vo.getClass2PlanQty()))
@@ -318,6 +327,11 @@ public class TqBalanceHandler extends AbsTqScheduleStepHandler {
 
             if (isClass2Over) {
                 if (class2Plan == 0) continue;
+                // 跳过所有备库规格：备库规格的计划量由S2精确分摊（按阈值分摊+尾数合并），
+                // 各班次量有明确语义，均衡调整会打乱分摊结果导致超排或备库不足
+                if (resultVo.getBackupTriggerClass() != null && resultVo.getBackupTriggerClass() > 0) {
+                    continue;
+                }
                 double decreasePlanQty = class2Plan > toolCapacity.doubleValue() ? toolCapacity.doubleValue() : class2Plan;
                 double newTotalClass2 = BigDecimalUtil.sub(totalPlanQtyVo.getTotalClass2PlanQty(), decreasePlanQty);
                 double newTotalClass3 = BigDecimalUtil.add(totalPlanQtyVo.getTotalClass3PlanQty(), decreasePlanQty);
@@ -332,6 +346,11 @@ public class TqBalanceHandler extends AbsTqScheduleStepHandler {
                 lastDifRate = newDifRate;
             } else {
                 if (class3Plan == 0) continue;
+                // 跳过所有备库规格：备库规格的计划量由S2精确分摊（按阈值分摊+尾数合并），
+                // 各班次量有明确语义，均衡调整会打乱分摊结果导致超排或备库不足
+                if (resultVo.getBackupTriggerClass() != null && resultVo.getBackupTriggerClass() > 0) {
+                    continue;
+                }
                 double decreasePlanQty = class3Plan > toolCapacity.doubleValue() ? toolCapacity.doubleValue() : class3Plan;
                 double newTotalClass2 = BigDecimalUtil.add(totalPlanQtyVo.getTotalClass2PlanQty(), decreasePlanQty);
                 double newTotalClass3 = BigDecimalUtil.sub(totalPlanQtyVo.getTotalClass3PlanQty(), decreasePlanQty);
@@ -395,6 +414,11 @@ public class TqBalanceHandler extends AbsTqScheduleStepHandler {
 
             if (isClass5Over) {
                 if (class5Plan == 0) continue;
+                // 跳过所有备库规格：备库规格的计划量由S2精确分摊（按阈值分摊+尾数合并），
+                // 各班次量有明确语义，均衡调整会打乱分摊结果导致超排或备库不足
+                if (resultVo.getBackupTriggerClass() != null && resultVo.getBackupTriggerClass() > 0) {
+                    continue;
+                }
                 double decreasePlanQty = class5Plan > toolCapacity.doubleValue() ? toolCapacity.doubleValue() : class5Plan;
                 double newTotalClass5 = BigDecimalUtil.sub(totalPlanQtyVo.getTotalClass5PlanQty(), decreasePlanQty);
                 double newTotalClass6 = BigDecimalUtil.add(totalPlanQtyVo.getTotalClass6PlanQty(), decreasePlanQty);
@@ -409,6 +433,11 @@ public class TqBalanceHandler extends AbsTqScheduleStepHandler {
                 lastDifRate = newDifRate;
             } else {
                 if (class6Plan == 0) continue;
+                // 跳过所有备库规格：备库规格的计划量由S2精确分摊（按阈值分摊+尾数合并），
+                // 各班次量有明确语义，均衡调整会打乱分摊结果导致超排或备库不足
+                if (resultVo.getBackupTriggerClass() != null && resultVo.getBackupTriggerClass() > 0) {
+                    continue;
+                }
                 double decreasePlanQty = class6Plan > toolCapacity.doubleValue() ? toolCapacity.doubleValue() : class6Plan;
                 double newTotalClass5 = BigDecimalUtil.add(totalPlanQtyVo.getTotalClass5PlanQty(), decreasePlanQty);
                 double newTotalClass6 = BigDecimalUtil.sub(totalPlanQtyVo.getTotalClass6PlanQty(), decreasePlanQty);

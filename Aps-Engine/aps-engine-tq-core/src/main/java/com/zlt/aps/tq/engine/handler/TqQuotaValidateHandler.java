@@ -149,6 +149,17 @@ public class TqQuotaValidateHandler extends AbsTqScheduleStepHandler {
                 continue;
             }
 
+            // 诊断日志：定额超量详情
+            log.info("[S5.5-DIAG] 机台:{} {}班 超定额! usedCapacity={} quota={} overflow={}",
+                    machineCode, classNum, usedCapacity, machineQuota, overflow);
+            for (TqScheduleResultVo spec : specList) {
+                double planQty = getClassPlanQty(spec, classNum);
+                if (planQty > 0) {
+                    log.info("[S5.5-DIAG]   {} planQty={} triggerClass={} supplyTime={}",
+                            spec.getBeadCode(), planQty, spec.getBackupTriggerClass(), spec.getSupplyTime());
+                }
+            }
+
             // 超量：按供应时长降序排序规格（供应时长大的先延后，保留供应时长小的优先排产）
             int finalClassNum = classNum;
             List<TqScheduleResultVo> sortedSpecs = specList.stream()
@@ -167,6 +178,13 @@ public class TqQuotaValidateHandler extends AbsTqScheduleStepHandler {
                 }
                 double currentPlan = getClassPlanQty(spec, classNum);
                 if (currentPlan <= 0) {
+                    continue;
+                }
+                // 跳过备库触发班次的规格：备库触发班次是规格的关键排产班次，
+                // 削减触发班次计划量会导致备库排产不足，与S2备库触发逻辑矛盾
+                if (spec.getBackupTriggerClass() != null && spec.getBackupTriggerClass() == classNum) {
+                    log.info("[S5.5] 跳过备库触发班次延后: {} {}班 triggerClass={}",
+                            spec.getBeadCode(), classNum, spec.getBackupTriggerClass());
                     continue;
                 }
 

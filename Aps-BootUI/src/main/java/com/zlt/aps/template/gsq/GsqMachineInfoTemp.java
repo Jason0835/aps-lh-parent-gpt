@@ -22,10 +22,6 @@ public class GsqMachineInfoTemp extends BaseEntity {
     @Excel(name = "ui.data.column.machine.machineName")
     private String machineName;
 
-    @ApiModelProperty(value = "工装信息", position = 40)
-    @Excel(name = "ui.data.column.machine.toolingInfo")
-    private String toolingInfo;
-
     @ApiModelProperty(value = "生产定额", position = 75)
     @Excel(name = "ui.data.column.machine.quata")
     private BigDecimal quata;
