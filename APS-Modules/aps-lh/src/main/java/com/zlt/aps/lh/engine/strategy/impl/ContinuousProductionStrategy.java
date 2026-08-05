@@ -29,6 +29,7 @@ import com.zlt.aps.lh.component.OrderNoGenerator;
 import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.ICapacityCalculateStrategy;
+import com.zlt.aps.lh.engine.strategy.IEmbryoEndingBalanceStrategy;
 import com.zlt.aps.lh.engine.strategy.IEndingJudgmentStrategy;
 import com.zlt.aps.lh.engine.strategy.IFirstInspectionBalanceStrategy;
 import com.zlt.aps.lh.engine.strategy.IMachineMatchStrategy;
@@ -153,6 +154,12 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
      */
     @Resource
     private IMouldChangeBalanceStrategy mouldChangeBalanceStrategy;
+
+    /**
+     * 共用胎胚/同SKU多机台收尾均衡策略，在续作降模收口后、日计划账本扣减前执行。
+     */
+    @Resource
+    private IEmbryoEndingBalanceStrategy embryoEndingBalanceStrategy;
 
     @Resource
     private IFirstInspectionBalanceStrategy firstInspectionBalanceStrategy;
@@ -1023,12 +1030,9 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         // 日标准产量公式可能把收尾残班向上补足，扣账前必须复用严格收尾目标再次收口。
         capStrictEndingContinuationGroupsToTarget(
                 context, sourceSkuMap, skuResultMap, skuOrder, shifts);
-        // 共用胎胚 SKU 收尾错峰必须在日额度账本扣减和后续换活字块选机前完成，确保机台释放时间按后延后的运行态计算。
-        applySharedEmbryoEndingStaggerPostpone(context, shifts);
-        // 共用胎胚收尾错峰可能移动班次量，扣账前再次恢复停产保机零产量和真正降模释放边界。
+        // 共用胎胚收尾均衡可能移动班次量，扣账前再次恢复停产保机零产量和真正降模释放边界。
         enforceContinuousStopHoldAndReleaseBoundaries(context, shifts);
-        // 普通续作的尾量归集、日标准和严格目标必须先全部稳定，后续专用状态链才是最后一次数量修改。
-        this.adjustContinuousSameSkuMultiMachineEndingStagger(context, shifts);
+        // 均衡后的尾量分摊、日标准和严格目标必须先全部稳定，后续专用状态链才是最后一次数量修改。
         this.applyDailyStandardPlanQtyToContinuousResults(context, shifts);
         this.capStrictEndingContinuationGroupsToTarget(
                 context, sourceSkuMap, skuResultMap, skuOrder, shifts);
@@ -1045,6 +1049,25 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
          * 再做一次幂等收口，只撤销后置逻辑补回的损失量，不执行新的换胶囊判断或二次扣量。
          */
         this.enforceRecordedCapsuleReplacementCapacityLimits(context, shifts);
+        /*
+         * 共用胎胚/同SKU多机台收尾均衡：
+         * 1. 位于最后一次日标准收敛和严格收口之后、日计划账本扣减之前，作为续作阶段最后一个
+         *    班次量修改器，避免日标准公式再次覆盖均衡结果；
+         * 2. 跨物料互转通过 TargetScheduleQtyResolver.reallocateEmbryoStockSkuQuota 把互转量
+         *    重新归属到接收方SKU内部额度，组级胎胚库存账本仍按互转后的结果全量扣减；
+         * 3. 按时间下机后延补量登记到 sharedEmbryoEndingStaggerAllowedOverQtyMap，供严格收口
+         *    和账本裁剪放行，避免补量被SKU普通额度回裁；
+         * 4. 只做模拟换模计数和过程日志，不预占真实换模次数，后续换活字块和新增排产仍通过主链登记。
+         */
+        if (Objects.nonNull(embryoEndingBalanceStrategy)) {
+            embryoEndingBalanceStrategy.balanceSharedEmbryoEnding(context, shifts);
+        } else {
+            log.warn("共用胎胚收尾均衡策略未注入，跳过均衡, scheduleDate: {}",
+                    context.getScheduleDate());
+        }
+        // 均衡后按“严格目标量+允许超量”口径做最终收口，只回裁真实超量，不回裁均衡豁免量。
+        this.capStrictEndingContinuationGroupsToTarget(
+                context, sourceSkuMap, skuResultMap, skuOrder, shifts);
         // 最终账本同步是本阶段唯一一次扣账；其内部若按中心账本回裁，后续只重新汇总元数据，不再改班次量。
         this.syncContinuousDailyPlanQuota(context, shifts);
         /*

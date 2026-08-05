@@ -3908,7 +3908,10 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 }
             }
             if (scheduled) {
-                adjustSameSkuMultiMachineAllocation(context, sku, shifts, quantityPolicy, isEnding);
+                /*
+                 * 同SKU多机台收尾的班次分散/尾量归集已由续作阶段共用胎胚收尾均衡统一处理，
+                 * 此处不再执行新增侧后置搬量，避免与均衡结果冲突；原方法逻辑保留供排查。
+                 */
                 rebuildScheduledMachineCountMap(context, shifts);
             }
             if (!scheduled) {

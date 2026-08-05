@@ -39,8 +39,10 @@ import javax.annotation.Resource;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -197,6 +199,227 @@ public class TargetScheduleQtyResolver {
         log.info("SKU实际消费账本同步, materialCode: {}, productStatus: {}, reason: {}, 原账本剩余: {}, 同步后剩余: {}",
                 sku.getMaterialCode(), sku.getProductStatus(), reason, oldQty, resolvedTargetQty);
         return resolvedTargetQty;
+    }
+
+    /**
+     * 胎胚收尾同组跨物料互转后，把互转量在SKU内部额度之间重新分配。
+     * <p>互转只是同组胎胚库存的再分配，组级总量不变：转出方SKU额度、实际消费账本和日计划
+     * 剩余同步减少，接收方同步增加，保证后续严格收口、账本裁剪和组级胎胚账本扣减都按
+     * 互转后的真实归属执行，避免接收方结果被回裁或组级库存少扣。</p>
+     *
+     * @param context 排程上下文
+     * @param donorSku 转出方SKU
+     * @param receiverSku 接收方SKU
+     * @param transferQty 互转数量（组级口径，单控整机需传入L/R两侧合计）
+     * @param scene 调用场景
+     * @return true-重分配成功；false-SKU不在胎胚库存硬目标集合或互转量不合法
+     */
+    public boolean reallocateEmbryoStockSkuQuota(LhScheduleContext context,
+                                                 SkuScheduleDTO donorSku,
+                                                 SkuScheduleDTO receiverSku,
+                                                 int transferQty,
+                                                 String scene) {
+        if (transferQty <= 0 || Objects.isNull(context) || Objects.isNull(donorSku)
+                || Objects.isNull(receiverSku) || StringUtils.isEmpty(donorSku.getMaterialCode())
+                || StringUtils.isEmpty(receiverSku.getMaterialCode())) {
+            return false;
+        }
+        String donorKey = buildSkuKey(donorSku);
+        String receiverKey = buildSkuKey(receiverSku);
+        // 只有双方都命中胎胚库存硬目标时，互转才允许改变SKU内部额度归属。
+        if (!context.getEmbryoStockHardTargetMaterialSet().contains(donorKey)
+                || !context.getEmbryoStockHardTargetMaterialSet().contains(receiverKey)) {
+            log.warn("胎胚收尾跨物料互转额度重分配跳过, scene: {}, 转出物料: {}, 接收物料: {}, 互转量: {}, "
+                            + "原因: 存在未命中胎胚库存硬目标的SKU",
+                    scene, donorSku.getMaterialCode(), receiverSku.getMaterialCode(), transferQty);
+            return false;
+        }
+        Map<String, Integer> quotaMap = context.getEmbryoStockSkuQuotaMap();
+        int donorQuota = Math.max(0, Objects.isNull(quotaMap.get(donorKey)) ? 0 : quotaMap.get(donorKey));
+        int receiverQuota = Math.max(0, Objects.isNull(quotaMap.get(receiverKey)) ? 0 : quotaMap.get(receiverKey));
+        Map<String, Integer> remainingMap = context.getSkuProductionRemainingQtyMap();
+        int donorRemaining = Math.max(0, Objects.isNull(remainingMap.get(donorKey))
+                ? donorQuota : remainingMap.get(donorKey));
+        int receiverRemaining = Math.max(0, Objects.isNull(remainingMap.get(receiverKey))
+                ? receiverQuota : remainingMap.get(receiverKey));
+        Set<SkuScheduleDTO> donorAliasSet = collectSkuAliases(context, donorSku, donorKey);
+        Set<SkuScheduleDTO> receiverAliasSet = collectSkuAliases(context, receiverSku, receiverKey);
+        int donorDailyRemaining = resolveMinimumDailyRemainingQty(donorAliasSet);
+        long receiverQuotaAfterTransfer = (long) receiverQuota + transferQty;
+        long receiverRemainingAfterTransfer = (long) receiverRemaining + transferQty;
+        // 先完整校验所有中心账本和运行态副本，再一次性落账；禁止部分转移后返回成功或中途失败留下脏数据。
+        if (transferQty > donorQuota || transferQty > donorRemaining
+                || (donorDailyRemaining >= 0 && transferQty > donorDailyRemaining)
+                || receiverQuotaAfterTransfer > Integer.MAX_VALUE
+                || receiverRemainingAfterTransfer > Integer.MAX_VALUE) {
+            log.warn("胎胚收尾跨物料互转额度重分配跳过, scene: {}, 转出物料: {}, 接收物料: {}, "
+                            + "互转量: {}, 转出额度: {}, 转出账本剩余: {}, 转出日计划最小剩余: {}, "
+                            + "原因: 中心账本或运行态日计划不足以完成整笔互转",
+                    scene, donorSku.getMaterialCode(), receiverSku.getMaterialCode(), transferQty,
+                    donorQuota, donorRemaining, donorDailyRemaining);
+            return false;
+        }
+        int newDonorQuota = donorQuota - transferQty;
+        int newReceiverQuota = (int) receiverQuotaAfterTransfer;
+        int newDonorRemaining = donorRemaining - transferQty;
+        int newReceiverRemaining = (int) receiverRemainingAfterTransfer;
+        quotaMap.put(donorKey, newDonorQuota);
+        quotaMap.put(receiverKey, newReceiverQuota);
+        remainingMap.put(donorKey, newDonorRemaining);
+        remainingMap.put(receiverKey, newReceiverRemaining);
+        // 同一物料多机台会持有独立SKU副本；日计划Map可能共享也可能独立，按对象身份去重后同步一次。
+        adjustEndingDailyQuotaDelta(donorAliasSet, -transferQty);
+        adjustEndingDailyQuotaDelta(receiverAliasSet, transferQty);
+        int donorLedgerRemaining = resolveEmbryoStockLedgerRemainingQty(context, donorSku);
+        int receiverLedgerRemaining = resolveEmbryoStockLedgerRemainingQty(context, receiverSku);
+        syncSkuAliases(donorAliasSet, newDonorQuota, newDonorRemaining, donorLedgerRemaining);
+        syncSkuAliases(receiverAliasSet, newReceiverQuota, newReceiverRemaining, receiverLedgerRemaining);
+        log.info("胎胚收尾跨物料互转额度重分配完成, scene: {}, 互转量: {}, 转出物料: {}, "
+                        + "转出额度: {}->{}, 转出账本剩余: {}->{}, 接收物料: {}, 接收额度: {}->{}, "
+                        + "接收账本剩余: {}->{}",
+                scene, transferQty, donorSku.getMaterialCode(), donorQuota, newDonorQuota,
+                donorRemaining, newDonorRemaining, receiverSku.getMaterialCode(), receiverQuota,
+                newReceiverQuota, receiverRemaining, newReceiverRemaining);
+        return true;
+    }
+
+    /**
+     * 收集同一物料状态在排程上下文中的全部运行态SKU副本。
+     * <p>续作多机台会复制SKU对象，严格收口、结果校验和日计划消费可能读取不同副本，
+     * 因此跨物料互转不能只修改当前结果关联的一个对象。</p>
+     *
+     * @param context 排程上下文
+     * @param sourceSku 当前结果来源SKU
+     * @param skuKey 物料状态键
+     * @return 按对象身份去重的SKU副本集合
+     */
+    private Set<SkuScheduleDTO> collectSkuAliases(LhScheduleContext context,
+                                                  SkuScheduleDTO sourceSku,
+                                                  String skuKey) {
+        Set<SkuScheduleDTO> aliasSet = Collections.newSetFromMap(
+                new IdentityHashMap<SkuScheduleDTO, Boolean>(8));
+        addSkuAlias(aliasSet, sourceSku, skuKey);
+        if (!CollectionUtils.isEmpty(context.getContinuousSkuList())) {
+            context.getContinuousSkuList().forEach(sku -> addSkuAlias(aliasSet, sku, skuKey));
+        }
+        if (!CollectionUtils.isEmpty(context.getNewSpecSkuList())) {
+            context.getNewSpecSkuList().forEach(sku -> addSkuAlias(aliasSet, sku, skuKey));
+        }
+        if (!CollectionUtils.isEmpty(context.getAllSkuScheduleDtoMap())) {
+            context.getAllSkuScheduleDtoMap().values()
+                    .forEach(sku -> addSkuAlias(aliasSet, sku, skuKey));
+        }
+        if (!CollectionUtils.isEmpty(context.getScheduleResultSourceSkuMap())) {
+            context.getScheduleResultSourceSkuMap().values()
+                    .forEach(sku -> addSkuAlias(aliasSet, sku, skuKey));
+        }
+        if (!CollectionUtils.isEmpty(context.getStructureSkuMap())) {
+            context.getStructureSkuMap().values().stream()
+                    .filter(list -> !CollectionUtils.isEmpty(list))
+                    .flatMap(List::stream)
+                    .forEach(sku -> addSkuAlias(aliasSet, sku, skuKey));
+        }
+        return aliasSet;
+    }
+
+    /**
+     * 当前SKU与目标物料状态一致时加入副本集合。
+     *
+     * @param aliasSet 副本集合
+     * @param sku 待检查SKU
+     * @param skuKey 目标物料状态键
+     */
+    private void addSkuAlias(Set<SkuScheduleDTO> aliasSet, SkuScheduleDTO sku, String skuKey) {
+        if (Objects.nonNull(sku) && StringUtils.equals(skuKey, buildSkuKey(sku))) {
+            aliasSet.add(sku);
+        }
+    }
+
+    /**
+     * 解析全部非空日计划副本中的最小剩余额度，用于整笔互转预校验。
+     *
+     * @param aliasSet SKU运行态副本集合
+     * @return 最小剩余额度；全部副本都没有日计划账本时返回-1
+     */
+    private int resolveMinimumDailyRemainingQty(Set<SkuScheduleDTO> aliasSet) {
+        Set<Map<LocalDate, SkuDailyPlanQuotaDTO>> quotaMapSet = Collections.newSetFromMap(
+                new IdentityHashMap<Map<LocalDate, SkuDailyPlanQuotaDTO>, Boolean>(4));
+        int minimumRemainingQty = Integer.MAX_VALUE;
+        for (SkuScheduleDTO alias : aliasSet) {
+            if (Objects.nonNull(alias) && !CollectionUtils.isEmpty(alias.getDailyPlanQuotaMap())
+                    && quotaMapSet.add(alias.getDailyPlanQuotaMap())) {
+                minimumRemainingQty = Math.min(minimumRemainingQty,
+                        SkuDailyPlanQuotaUtil.sumRemainingQty(alias.getDailyPlanQuotaMap()));
+            }
+        }
+        return minimumRemainingQty == Integer.MAX_VALUE ? -1 : minimumRemainingQty;
+    }
+
+    /**
+     * 按互转量调整全部SKU副本的日计划运行态剩余额度。
+     * <p>接收方增加互转量，转出方减少互转量；减少时从首个仍有剩余额度的日计划条目开始扣减，
+     * 避免单个条目出现负数。共享同一个日计划Map的多机台副本只调整一次。</p>
+     *
+     * @param aliasSet SKU运行态副本集合
+     * @param deltaQty 互转调整量（正数增加、负数减少）
+     */
+    private void adjustEndingDailyQuotaDelta(Set<SkuScheduleDTO> aliasSet, int deltaQty) {
+        if (CollectionUtils.isEmpty(aliasSet) || deltaQty == 0) {
+            return;
+        }
+        Set<Map<LocalDate, SkuDailyPlanQuotaDTO>> adjustedMapSet = Collections.newSetFromMap(
+                new IdentityHashMap<Map<LocalDate, SkuDailyPlanQuotaDTO>, Boolean>(4));
+        for (SkuScheduleDTO alias : aliasSet) {
+            Map<LocalDate, SkuDailyPlanQuotaDTO> dailyQuotaMap = Objects.isNull(alias)
+                    ? null : alias.getDailyPlanQuotaMap();
+            if (CollectionUtils.isEmpty(dailyQuotaMap) || !adjustedMapSet.add(dailyQuotaMap)) {
+                continue;
+            }
+            int remainingDelta = deltaQty;
+            for (SkuDailyPlanQuotaDTO quota : dailyQuotaMap.values()) {
+                if (Objects.isNull(quota) || remainingDelta == 0) {
+                    continue;
+                }
+                int currentRemaining = Math.max(0, quota.getRemainingQty());
+                if (remainingDelta > 0) {
+                    quota.setRemainingQty(currentRemaining + remainingDelta);
+                    remainingDelta = 0;
+                } else {
+                    int reducedQty = Math.min(currentRemaining, -remainingDelta);
+                    quota.setRemainingQty(currentRemaining - reducedQty);
+                    remainingDelta += reducedQty;
+                }
+                quota.setCompleted(false);
+            }
+            SkuDailyPlanQuotaUtil.refreshRollingFields(dailyQuotaMap);
+        }
+    }
+
+    /**
+     * 同步全部运行态SKU副本的目标量、实际剩余量和窗口日计划剩余量。
+     *
+     * @param aliasSet SKU运行态副本集合
+     * @param targetQty 互转后的SKU目标量
+     * @param productionRemainingQty 互转后的实际消费账本剩余量
+     * @param embryoLedgerRemainingQty 组级胎胚库存账本剩余量；-1表示不限制
+     */
+    private void syncSkuAliases(Set<SkuScheduleDTO> aliasSet,
+                                int targetQty,
+                                int productionRemainingQty,
+                                int embryoLedgerRemainingQty) {
+        int resolvedRemainingQty = embryoLedgerRemainingQty < 0
+                ? productionRemainingQty : Math.min(productionRemainingQty, embryoLedgerRemainingQty);
+        for (SkuScheduleDTO alias : aliasSet) {
+            if (Objects.isNull(alias)) {
+                continue;
+            }
+            alias.setTargetScheduleQty(targetQty);
+            alias.setRemainingScheduleQty(resolvedRemainingQty);
+            if (!CollectionUtils.isEmpty(alias.getDailyPlanQuotaMap())) {
+                alias.setWindowRemainingPlanQty(
+                        SkuDailyPlanQuotaUtil.sumRemainingQty(alias.getDailyPlanQuotaMap()));
+            }
+        }
     }
 
     /**
