@@ -111,7 +111,7 @@
     <!-- 示方书工艺信息同步 -->
     <select id="selectConstructionProcessInfo" resultType="com.zlt.aps.mdm.api.domain.entity.MdmConstructionProcess">
         SELECT
-            MATERIAL_CODE,
+            MES_MATERIAL_CODE MATERIAL_CODE,
             MATERIAL_VERSION,
             MATERIAL_DESC,
             PROCESS_CODE,
