@@ -33,7 +33,7 @@ public class TmMouthPlate extends BaseEntity {
     @TableField(value = "MACHINE_CODE")
     private String machineCode;
 
-    @Excel(name = "ui.data.column.tm.mouthPlate.plateStatus", dictType = "biz_yes_no")
+    @Excel(name = "ui.data.column.tm.mouthPlate.plateStatus", dictType = "STATUS")
     @ImportValidated(maxLength = 1)
     @ApiModelProperty(value = "口型板状态", name = "plateStatus")
     @TableField(value = "PLATE_STATUS")

@@ -52,8 +52,7 @@ public class TmRollingWindowService {
                 LocalDate scheduleDate = triggerMinute.toLocalDate().plusDays(offset);
                 this.resolveShiftStarts(scheduleDate, configList).forEach((shiftOrder, shiftStart) -> {
                     TmShiftConfig config = this.findConfig(configList, shiftOrder);
-                    if (config == null || !"1".equals(config.getOpenFlag())
-                            || !shiftStart.minusMinutes(ROLLING_LEAD_MINUTES)
+                    if (config == null || !shiftStart.minusMinutes(ROLLING_LEAD_MINUTES)
                             .truncatedTo(ChronoUnit.MINUTES).equals(triggerMinute)) {
                         return;
                     }
@@ -72,7 +71,7 @@ public class TmRollingWindowService {
      * @param factoryCode 工厂编码
      * @param scheduleDate 六班结果归属排程日期
      * @param shiftOrder 班次顺序
-     * @return 对应窗口，配置不存在或未开班时返回null
+     * @return 对应窗口，配置不存在时返回null
      */
     public TmRollingWindow resolveWindow(String factoryCode, Date scheduleDate, Integer shiftOrder) {
         if (StrUtil.isBlank(factoryCode) || scheduleDate == null || shiftOrder == null) {
@@ -81,7 +80,7 @@ public class TmRollingWindowService {
         List<TmShiftConfig> configList = this.loadShiftConfigs(factoryCode)
                 .getOrDefault(StrUtil.trim(factoryCode), new ArrayList<>());
         TmShiftConfig targetConfig = this.findConfig(configList, shiftOrder);
-        if (targetConfig == null || !"1".equals(targetConfig.getOpenFlag())) {
+        if (targetConfig == null) {
             return null;
         }
         LocalDate localScheduleDate = this.toLocalDateTime(scheduleDate).toLocalDate();

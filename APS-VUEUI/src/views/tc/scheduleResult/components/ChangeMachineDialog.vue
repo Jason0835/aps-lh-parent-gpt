@@ -104,7 +104,8 @@ export default {
         .filter(shiftOrder => Number(row[`class${shiftOrder}PlanQty`] || 0) > 0)
         .filter(shiftOrder => {
           const option = this.shiftOptions.find(item => item.shiftOrder === shiftOrder)
-          return option && String(option.openFlag) === '1'
+          const targetMachine = this.machineList.find(item => item.machineCode === this.form.targetMachineCode)
+          return option && this.machineOpenShiftCodes(targetMachine).includes(String(option.shiftCode || '').trim())
         })
         .map(shiftOrder => {
           const option = this.shiftOptions.find(item => item.shiftOrder === shiftOrder)
@@ -113,6 +114,10 @@ export default {
             label: option ? `${shiftOrder}. ${option.shiftName || option.shiftCode || ''}` : `${this.$t('ui.tc.schedule.shift')} ${shiftOrder}`
           }
         })
+    },
+    machineOpenShiftCodes(machine) {
+      if (!machine || !machine.openShiftCode) return []
+      return [...new Set(String(machine.openShiftCode).split(',').map(item => item.trim()).filter(Boolean))]
     },
     submit() {
       this.$refs.form.validate(async valid => {

@@ -14,6 +14,8 @@ import lombok.Data;
 import java.math.BigDecimal;
 import java.text.MessageFormat;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * 胎面排程上下文。
@@ -23,6 +25,9 @@ import java.util.*;
  */
 @Data
 public class TmScheduleContext {
+
+    /** 过程日志中独立小数文本的匹配规则。 */
+    private static final Pattern PROCESS_LOG_DECIMAL_PATTERN = Pattern.compile("(?<![\\d.])(-?\\d+\\.\\d+)(?![\\d.])");
 
     /** 工厂编号 */
     private String factoryCode;
@@ -162,7 +167,24 @@ public class TmScheduleContext {
      * @return 中文过程日志文本
      */
     public String getProcessLogText() {
-        return processLogBuffer == null ? "" : processLogBuffer.toString();
+        return processLogBuffer == null ? "" : this.normalizeProcessLogNumbers(processLogBuffer.toString());
+    }
+
+    /**
+     * 规范过程日志中的小数展示，移除无业务意义的末尾零。
+     *
+     * @param processLogText 原始过程日志
+     * @return 数值展示规范后的过程日志
+     */
+    private String normalizeProcessLogNumbers(String processLogText) {
+        Matcher matcher = PROCESS_LOG_DECIMAL_PATTERN.matcher(processLogText);
+        StringBuffer resultBuffer = new StringBuffer();
+        while (matcher.find()) {
+            String normalizedNumber = new BigDecimal(matcher.group(1)).stripTrailingZeros().toPlainString();
+            matcher.appendReplacement(resultBuffer, Matcher.quoteReplacement(normalizedNumber));
+        }
+        matcher.appendTail(resultBuffer);
+        return resultBuffer.toString();
     }
 
     /**

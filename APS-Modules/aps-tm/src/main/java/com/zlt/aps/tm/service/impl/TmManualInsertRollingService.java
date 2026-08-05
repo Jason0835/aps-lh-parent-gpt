@@ -60,6 +60,10 @@ public class TmManualInsertRollingService {
 
     private final TmManualConstraintDataLoadService tmManualConstraintDataLoadService;
 
+    /** 机台开机班次校验器；兼容既有非 Spring 测试时允许为空。 */
+    @Autowired(required = false)
+    private TmMachineOpenShiftValidator machineOpenShiftValidator;
+
     /**
      * 构造人工滚动应用服务。
      *
@@ -324,6 +328,15 @@ public class TmManualInsertRollingService {
         context.setTraceId(IdUtil.fastSimpleUUID());
         context.setOperator("TM_MANUAL_OPERATION");
         context.setMachineCapacityMap(this.loadMachineCapacityMap(reference.getFactoryCode(), machineCodes));
+        if (this.machineOpenShiftValidator != null) {
+            for (String machineCode : machineCodes) {
+                for (int shiftOrder = 1; shiftOrder <= TmScheduleConstants.TM_MAX_SHIFT_ORDER; shiftOrder++) {
+                    context.getShiftCapacityMap().put(machineCode + "|" + shiftOrder,
+                            this.machineOpenShiftValidator.resolveRollingCapacity(
+                                    reference, machineCode, shiftOrder));
+                }
+            }
+        }
         List<TmManualTaskDraft> taskList = new ArrayList<>();
         for (TmScheduleResult result : snapshotList) {
             for (int shiftOrder = 1; shiftOrder <= TmScheduleConstants.TM_MAX_SHIFT_ORDER; shiftOrder++) {

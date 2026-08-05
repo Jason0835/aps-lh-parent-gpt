@@ -7,10 +7,7 @@ import com.zlt.aps.tm.api.constant.TmScheduleConstants;
 import com.zlt.aps.tm.api.enums.TmMachineFilterReasonEnum;
 import com.zlt.aps.tm.api.enums.TmScheduleErrorCodeEnum;
 import com.zlt.aps.tm.api.enums.TmScheduleStrategyEnum;
-import com.zlt.aps.tm.engine.domain.TmMachineCandidate;
-import com.zlt.aps.tm.engine.domain.TmMachineRuleContext;
-import com.zlt.aps.tm.engine.domain.TmParamValue;
-import com.zlt.aps.tm.engine.domain.TmTaskDraft;
+import com.zlt.aps.tm.engine.domain.*;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -21,7 +18,7 @@ import java.util.stream.Collectors;
 /**
  * 胎面默认机台过滤规则链。
  *
- * <p>按启用、剩余产能、口型板、胶料机台关系、定点生产、定点不可生产顺序执行，
+ * <p>按启用、机台开机班次、剩余产能、口型板、胶料机台关系、定点生产、定点不可生产顺序执行，
  * 任一否决即过滤。方法会修改候选机台的过滤状态和证据，不修改任务链。
  * 通过 {@link Component} 注册为 Spring Bean，由 {@link TmStrategyRegistry}
  * 按 {@link TmScheduleStrategyEnum#DEFAULT} 编码收集。</p>
@@ -30,6 +27,7 @@ import java.util.stream.Collectors;
 public class TmDefaultMachineFilterRule implements ITmMachineFilterRule {
 
     private static final String RULE_MACHINE_STATUS = "MACHINE_STATUS";
+    private static final String RULE_MACHINE_OPEN_SHIFT = "MACHINE_OPEN_SHIFT";
     private static final String RULE_REMAIN_CAPACITY = "REMAIN_CAPACITY";
     private static final String RULE_MOUTH_PLATE = "MOUTH_PLATE";
     private static final String RULE_GLUE_MACHINE = "GLUE_MACHINE";
@@ -96,7 +94,7 @@ public class TmDefaultMachineFilterRule implements ITmMachineFilterRule {
                 candidate.getEvidence().put("filterRuleDisabled:" + ruleCode, Boolean.TRUE);
                 continue;
             }
-            TmMachineFilterReasonEnum rejectReason = this.evaluateRule(ruleCode, candidate);
+            TmMachineFilterReasonEnum rejectReason = this.evaluateRule(ruleCode, candidate, context);
             if (rejectReason != null) {
                 return this.reject(candidate, rejectReason);
             }
@@ -115,11 +113,16 @@ public class TmDefaultMachineFilterRule implements ITmMachineFilterRule {
      *
      * @param ruleCode 过滤规则编码
      * @param candidate 候选机台
+     * @param context 机台规则上下文
      * @return 不通过时返回未排原因，通过或未知规则返回 null
      */
-    private TmMachineFilterReasonEnum evaluateRule(String ruleCode, TmMachineCandidate candidate) {
+    private TmMachineFilterReasonEnum evaluateRule(String ruleCode, TmMachineCandidate candidate,
+                                                    TmMachineRuleContext context) {
         if (RULE_MACHINE_STATUS.equals(ruleCode) && Boolean.FALSE.equals(candidate.getEnabled())) {
             return TmMachineFilterReasonEnum.MACHINE_DISABLED;
+        }
+        if (RULE_MACHINE_OPEN_SHIFT.equals(ruleCode) && this.hasMachineShiftConflict(candidate, context)) {
+            return TmMachineFilterReasonEnum.MACHINE_SHIFT_NOT_OPEN;
         }
         if (RULE_REMAIN_CAPACITY.equals(ruleCode) && (candidate.getRemainCapacity() == null
                 || candidate.getRemainCapacity().compareTo(BigDecimal.ZERO) <= 0)) {
@@ -183,7 +186,24 @@ public class TmDefaultMachineFilterRule implements ITmMachineFilterRule {
         defaultRuleOrder.stream()
                 .filter(ruleCode -> !configuredRuleSet.contains(ruleCode))
                 .forEach(resolvedRuleOrder::add);
-        return resolvedRuleOrder;
+        return this.normalizeHardRuleOrder(resolvedRuleOrder);
+    }
+
+    /**
+     * 固定机台状态、开机班次和剩余产能三项硬约束的先后关系。
+     *
+     * @param resolvedRuleOrder 已合并默认项的规则顺序
+     * @return 状态在前、开机班次居中、产能在后的规则顺序
+     */
+    private List<String> normalizeHardRuleOrder(List<String> resolvedRuleOrder) {
+        List<String> normalizedRuleOrder = new ArrayList<>(resolvedRuleOrder);
+        normalizedRuleOrder.remove(RULE_MACHINE_STATUS);
+        normalizedRuleOrder.remove(RULE_MACHINE_OPEN_SHIFT);
+        int remainCapacityIndex = normalizedRuleOrder.indexOf(RULE_REMAIN_CAPACITY);
+        int insertIndex = remainCapacityIndex < 0 ? 0 : remainCapacityIndex;
+        normalizedRuleOrder.add(insertIndex, RULE_MACHINE_STATUS);
+        normalizedRuleOrder.add(insertIndex + 1, RULE_MACHINE_OPEN_SHIFT);
+        return normalizedRuleOrder;
     }
 
     /**
@@ -194,6 +214,9 @@ public class TmDefaultMachineFilterRule implements ITmMachineFilterRule {
      * @return true 表示执行该规则
      */
     private boolean isRuleEnabled(TmMachineRuleContext context, String ruleCode) {
+        if (RULE_MACHINE_OPEN_SHIFT.equals(ruleCode)) {
+            return true;
+        }
         if (context.getScheduleContext() == null) {
             return true;
         }
@@ -211,11 +234,33 @@ public class TmDefaultMachineFilterRule implements ITmMachineFilterRule {
      */
     private boolean isKnownRule(String ruleCode) {
         return RULE_MACHINE_STATUS.equals(ruleCode)
+                || RULE_MACHINE_OPEN_SHIFT.equals(ruleCode)
                 || RULE_REMAIN_CAPACITY.equals(ruleCode)
                 || RULE_MOUTH_PLATE.equals(ruleCode)
                 || RULE_GLUE_MACHINE.equals(ruleCode)
                 || RULE_FIXED_MACHINE.equals(ruleCode)
                 || RULE_EXCLUDE_FIXED.equals(ruleCode);
+    }
+
+    /**
+     * 判断候选机台是否未开放当前任务班次。
+     *
+     * @param candidate 候选机台
+     * @param context 机台规则上下文
+     * @return true 表示机台当前班次未开机
+     */
+    private boolean hasMachineShiftConflict(TmMachineCandidate candidate, TmMachineRuleContext context) {
+        TmTaskDraft taskDraft = context.getTaskDraft();
+        TmShiftTimeWindow shiftTimeWindow = taskDraft == null || context.getScheduleContext() == null
+                ? null : context.getScheduleContext().getShiftTimeWindowMap().get(taskDraft.getShiftOrder());
+        String currentShiftCode = shiftTimeWindow == null ? null : shiftTimeWindow.getShiftCode();
+        Set<String> openShiftCodes = candidate.getOpenShiftCodes();
+        candidate.getEvidence().put("shiftOrder", taskDraft == null ? null : taskDraft.getShiftOrder());
+        candidate.getEvidence().put("shiftCode", currentShiftCode);
+        candidate.getEvidence().put("machineOpenShiftCodes",
+                openShiftCodes == null ? Collections.emptySet() : openShiftCodes);
+        return currentShiftCode == null || openShiftCodes == null
+                || !openShiftCodes.contains(currentShiftCode.trim());
     }
 
     /**

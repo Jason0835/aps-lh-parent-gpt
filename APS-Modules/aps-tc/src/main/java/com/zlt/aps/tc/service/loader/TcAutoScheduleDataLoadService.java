@@ -141,6 +141,7 @@ public class TcAutoScheduleDataLoadService {
             TcMachineCandidate candidate = new TcMachineCandidate();
             candidate.setMachineCode(machineInfo.getMachineCode());
             candidate.setEnabled(isMachineEnabled(machineInfo));
+            candidate.setOpenShiftCodes(this.parseOpenShiftCodes(machineInfo.getOpenShiftCode()));
             BigDecimal machineMaxCapacity = this.resolveMachineMaxCapacity(machineInfo.getMaxCapacity());
             candidate.setMaxCapacity(machineMaxCapacity);
             candidate.setRemainCapacity(machineMaxCapacity);
@@ -553,12 +554,27 @@ public class TcAutoScheduleDataLoadService {
         }
         List<TcShiftConfig> configs = tmShiftConfigMapper.selectList(
                 new LambdaQueryWrapper<TcShiftConfig>()
-                        .eq(TcShiftConfig::getFactoryCode, context.getFactoryCode())
-                        .eq(TcShiftConfig::getOpenFlag, TcYesNoEnum.YES.getCode()));
+                        .eq(TcShiftConfig::getFactoryCode, context.getFactoryCode()));
         return nullToEmpty(configs).stream()
                 .filter(config -> config.getShiftOrder() != null)
                 .sorted(Comparator.comparing(TcShiftConfig::getShiftOrder))
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * 解析机台维护的开机班次编码。
+     *
+     * @param openShiftCode 逗号分隔的开机班次编码
+     * @return 去空、去重后的班次编码集合；未维护时返回空集合
+     */
+    private Set<String> parseOpenShiftCodes(String openShiftCode) {
+        if (StrUtil.isBlank(openShiftCode)) {
+            return new LinkedHashSet<>();
+        }
+        return Arrays.stream(openShiftCode.split(","))
+                .map(StrUtil::trim)
+                .filter(StrUtil::isNotBlank)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
     /**
@@ -847,6 +863,7 @@ public class TcAutoScheduleDataLoadService {
                 taskDraft.setOrderNo(row.getOrderNo() + "-CLASS" + shiftOrder);
                 taskDraft.setSourceOrderNos(row.getOrderNo());
                 taskDraft.setEmbryoCode(row.getEmbryoCode());
+                taskDraft.setCxMachineCode(row.getCxMachineCode());
                 taskDraft.setBusinessKeySuffix(buildSourceTaskBusinessKeySuffix(row, sourceRowIndex, shiftOrder));
                 taskDraft.setSidewallCode(sidewallCode);
                 taskDraft.setConstructionVersion(row.getConstructionVersion());
@@ -869,6 +886,8 @@ public class TcAutoScheduleDataLoadService {
                 BigDecimal cappedGuardFormingQty = this.capGuardFormingQty(rawGuardFormingQty,
                         row.getLhRemainQty());
                 taskDraft.setGuardDemandQty(cappedGuardFormingQty.multiply(sidewallLength));
+                taskDraft.setFormingGuardWindowQtyMap(this.buildGuardWindowByBom(classQtyArray, shiftOrder,
+                        effectiveGuardShiftCount, formingShiftOffset, sidewallLength, cappedGuardFormingQty));
                 taskDraft.setDemandQty(demandQty);
                 taskDraft.setGuardShiftCount(effectiveGuardShiftCount);
                 this.addGuardDemandEstimateTrace(context, taskDraft, classQtyArray, shiftOrder,
@@ -1094,6 +1113,7 @@ public class TcAutoScheduleDataLoadService {
                 taskDraft.setOrderNo(row.getOrderNo() + "-CLASS" + shiftOrder);
                 taskDraft.setSourceOrderNos(row.getOrderNo());
                 taskDraft.setEmbryoCode(row.getEmbryoCode());
+                taskDraft.setCxMachineCode(row.getCxMachineCode());
                 taskDraft.setBusinessKeySuffix(buildSourceTaskBusinessKeySuffix(row, sourceRowIndex, shiftOrder));
                 taskDraft.setSidewallCode(sidewallCode);
                 taskDraft.setConstructionVersion(primarySpec.getSidewallVersion());
@@ -1115,8 +1135,12 @@ public class TcAutoScheduleDataLoadService {
                         effectiveGuardShiftCount, formingShiftOffset);
                 BigDecimal cappedGuardFormingQty = this.capGuardFormingQty(rawGuardFormingQty,
                         row.getLhRemainQty());
-                taskDraft.setGuardDemandQty(this.calculateGuardDemandByRecipe(classQtyArray, specByClass, shiftOrder,
-                        effectiveGuardShiftCount, formingShiftOffset, sidewallLength, cappedGuardFormingQty));
+                Map<Integer, BigDecimal> formingGuardWindowQtyMap = this.buildGuardWindowByRecipe(classQtyArray,
+                        specByClass, shiftOrder, effectiveGuardShiftCount, formingShiftOffset, sidewallLength,
+                        cappedGuardFormingQty);
+                taskDraft.setFormingGuardWindowQtyMap(formingGuardWindowQtyMap);
+                taskDraft.setGuardDemandQty(formingGuardWindowQtyMap.values().stream()
+                        .filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add));
                 taskDraft.setDemandQty(demandQty);
                 taskDraft.setGuardShiftCount(effectiveGuardShiftCount);
                 this.addGuardDemandEstimateTrace(context, taskDraft, classQtyArray, shiftOrder,
@@ -1190,7 +1214,63 @@ public class TcAutoScheduleDataLoadService {
                                                     int shiftOrder, int guardShiftCount, int formingShiftOffset,
                                                     BigDecimal currentSidewallLength,
                                                     BigDecimal guardFormingQtyLimit) {
-        BigDecimal total = BigDecimal.ZERO;
+        return this.buildGuardWindowByRecipe(classQtyArray, specByClass, shiftOrder, guardShiftCount,
+                formingShiftOffset, currentSidewallLength, guardFormingQtyLimit).values().stream()
+                .filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    /**
+     * 构建 BOM 模式成型备库窗口明细，按成型班次顺序执行硫化余量封顶。
+     *
+     * @param classQtyArray 成型班次计划条数
+     * @param shiftOrder 胎侧排程班次
+     * @param guardShiftCount 备库班数
+     * @param formingShiftOffset 成型班次偏移
+     * @param sidewallLength 当前胎侧长度
+     * @param guardFormingQtyLimit 封顶后的保证条数
+     * @return 班次到换算后长度的窗口明细
+     */
+    private Map<Integer, BigDecimal> buildGuardWindowByBom(BigDecimal[] classQtyArray, int shiftOrder,
+                                                            int guardShiftCount, int formingShiftOffset,
+                                                            BigDecimal sidewallLength,
+                                                            BigDecimal guardFormingQtyLimit) {
+        Map<Integer, BigDecimal> windowQtyMap = new LinkedHashMap<>();
+        BigDecimal remainingGuardFormingQty = this.nvl(guardFormingQtyLimit).max(BigDecimal.ZERO);
+        int startIndex = this.resolveFormingStartIndex(shiftOrder, formingShiftOffset);
+        int count = Math.max(guardShiftCount, 1);
+        for (int index = startIndex; index < startIndex + count; index++) {
+            if (remainingGuardFormingQty.compareTo(BigDecimal.ZERO) <= 0) {
+                break;
+            }
+            BigDecimal formingQty = this.resolveGuardClassQty(classQtyArray, index);
+            BigDecimal appliedFormingQty = formingQty.min(remainingGuardFormingQty);
+            if (appliedFormingQty.compareTo(BigDecimal.ZERO) <= 0) {
+                continue;
+            }
+            windowQtyMap.put(index + 1, appliedFormingQty.multiply(this.nvl(sidewallLength)));
+            remainingGuardFormingQty = remainingGuardFormingQty.subtract(appliedFormingQty);
+        }
+        return windowQtyMap;
+    }
+
+    /**
+     * 构建 RECIPE 模式成型备库窗口明细，按班次施工长度并按硫化余量顺序封顶。
+     *
+     * @param classQtyArray 成型班次计划条数
+     * @param specByClass 各成型班次施工属性
+     * @param shiftOrder 胎侧排程班次
+     * @param guardShiftCount 备库班数
+     * @param formingShiftOffset 成型班次偏移
+     * @param currentSidewallLength 当前胎侧长度
+     * @param guardFormingQtyLimit 封顶后的保证条数
+     * @return 班次到换算后长度的窗口明细
+     */
+    private Map<Integer, BigDecimal> buildGuardWindowByRecipe(BigDecimal[] classQtyArray,
+                                                                TcConstructionSidewallRowVo[] specByClass,
+                                                                int shiftOrder, int guardShiftCount,
+                                                                int formingShiftOffset, BigDecimal currentSidewallLength,
+                                                                BigDecimal guardFormingQtyLimit) {
+        Map<Integer, BigDecimal> windowQtyMap = new LinkedHashMap<>();
         BigDecimal remainingGuardFormingQty = this.nvl(guardFormingQtyLimit).max(BigDecimal.ZERO);
         int startIndex = this.resolveFormingStartIndex(shiftOrder, formingShiftOffset);
         int count = Math.max(guardShiftCount, 1);
@@ -1205,10 +1285,10 @@ public class TcAutoScheduleDataLoadService {
             }
             BigDecimal sidewallLength = (index >= 0 && index < 8 && specByClass != null && specByClass[index] != null)
                     ? this.nvl(specByClass[index].getSidewallLength()) : this.nvl(currentSidewallLength);
-            total = total.add(appliedFormingQty.multiply(sidewallLength));
+            windowQtyMap.put(index + 1, appliedFormingQty.multiply(sidewallLength));
             remainingGuardFormingQty = remainingGuardFormingQty.subtract(appliedFormingQty);
         }
-        return total;
+        return windowQtyMap;
     }
 
     /**
@@ -2202,6 +2282,7 @@ public class TcAutoScheduleDataLoadService {
         targetTask.setOrderNo(sourceTask.getOrderNo());
         targetTask.setSourceOrderNos(sourceTask.getSourceOrderNos());
         targetTask.setEmbryoCode(sourceTask.getEmbryoCode());
+        targetTask.setCxMachineCode(sourceTask.getCxMachineCode());
         targetTask.setBusinessKeySuffix("FUTURE_SHUTDOWN_" + DateUtil.format(sourceDate, "yyyyMMdd")
                 + "_CLASS" + sourceShiftCode + "_TO_CLASS" + targetShift);
         targetTask.setSidewallCode(sourceTask.getSidewallCode());
@@ -2219,8 +2300,11 @@ public class TcAutoScheduleDataLoadService {
         targetTask.setTailBalanceQty(sourceTask.getTailBalanceQty());
         targetTask.setCurrentShiftDemandQty(allocatedQty);
         targetTask.setGuardDemandQty(allocatedQty);
+        targetTask.setFormingGuardWindowQtyMap(sourceTask.getFormingGuardWindowQtyMap());
         targetTask.setDemandQty(allocatedQty);
         targetTask.setGuardShiftCount(sourceTask.getGuardShiftCount());
+        targetTask.setGuardRangeHours(sourceTask.getGuardRangeHours());
+        targetTask.setSupplyHours(sourceTask.getSupplyHours());
         targetTask.setMinStartQty(sourceTask.getMinStartQty());
         targetTask.setDefaultCurlRollLength(sourceTask.getDefaultCurlRollLength());
         targetTask.setTotalToolQty(sourceTask.getTotalToolQty());

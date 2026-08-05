@@ -111,6 +111,8 @@ public class TcMachineInfoController extends AbstractDocBizController<TcMachineI
     protected List<TcMachineInfo> listExportData(TcMachineInfo obj) {
         QueryWrapper<TcMachineInfo> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
+        // 与列表页排序保持一致，避免导出数据顺序与页面不一致
+        wrapper.last("ORDER BY " + getOrderBy());
         return tcMachineInfoMapper.selectList(wrapper);
     }
 

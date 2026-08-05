@@ -25,7 +25,7 @@ public class TmLossSetting extends BaseEntity {
     private String factoryCode;
 
     @Excel(name = "ui.data.column.tm.lossSetting.treadCode")
-    @ImportValidated(required = false, isCode = true, maxLength = 20)
+    @ImportValidated(required = true, isCode = true, maxLength = 20)
     @ApiModelProperty(value = "胎面编码", name = "treadCode")
     @TableField(value = "TREAD_CODE")
     private String treadCode;

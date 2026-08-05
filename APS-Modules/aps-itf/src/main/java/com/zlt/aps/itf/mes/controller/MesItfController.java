@@ -341,6 +341,20 @@ public class MesItfController {
     }
     
     /**
+     * 成品原材料折算接口
+     *
+     * @return 结果
+     */
+    @ApiOperation("成品原材料折算接口")
+    @PostMapping("/syncRawMaterialConversion")
+    public AjaxResult syncRawMaterialConversion(String factoryCode, String dataVersion) {
+        AuxReqSyncDataLogs syncDataLogs = new AuxReqSyncDataLogs();
+        syncDataLogs.setFactoryCode(factoryCode);
+        syncDataLogs.setDataVersion(dataVersion);
+        return mesBomItfService.syncRawMaterialConversion(syncDataLogs);
+    }
+    
+    /**
      * 同步BOM
      *
      * @return 结果
@@ -352,6 +366,21 @@ public class MesItfController {
         syncDataLogs.setFactoryCode(factoryCode);
         syncDataLogs.setDataVersion(dataVersion);
         return mesBomItfService.syncBomInfo(syncDataLogs);
+    }
+    
+    
+    /**
+     * 示方书工艺信息同步
+     *
+     * @return 结果
+     */
+    @ApiOperation("示方书工艺信息同步")
+    @PostMapping("/syncConstructionProcessInfo")
+    public AjaxResult syncConstructionProcessInfo(String factoryCode, String dataVersion) {
+        AuxReqSyncDataLogs syncDataLogs = new AuxReqSyncDataLogs();
+        syncDataLogs.setFactoryCode(factoryCode);
+        syncDataLogs.setDataVersion(dataVersion);
+        return mesBomItfService.syncConstructionProcessInfo(syncDataLogs);
     }
 
     /**

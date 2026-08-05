@@ -397,8 +397,11 @@ public class TcManualRollingEngineService {
                 break;
             }
             BigDecimal capacity = context.getShiftCapacityMap().get(this.capacityKey(machineCode, shiftOrder));
-            if (capacity == null || capacity.signum() <= 0) {
+            if (capacity == null) {
                 throw new IllegalStateException("胎侧机台班次有效产能未维护:" + machineCode + ":" + shiftOrder);
+            }
+            if (capacity.signum() <= 0) {
+                continue;
             }
             final int currentShiftOrder = shiftOrder;
             List<TcManualTaskDraft> currentShiftTaskList = retainedList.stream()
