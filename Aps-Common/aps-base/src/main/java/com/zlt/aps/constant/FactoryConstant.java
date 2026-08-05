@@ -78,6 +78,10 @@ public class FactoryConstant {
      * 搭配日期前缀
      */
     public static final String MATCH_DAY_FIELD = "matchQtyDay";
+    /**
+     * 模具数量前缀
+     */
+    public static final String MOULD_QTY_DAY_FIELD = "mouldQtyDay";
 
     /**
      * Y 值

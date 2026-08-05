@@ -908,6 +908,9 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         // 继承量已由滚动衔接占用，需从窗口待排量中扣减，防止重复排产
         int inheritedPlanQty = Math.max(0, context.getInheritedPlanQtyMap().getOrDefault(materialStatusKey, 0));
         dto.setWindowPlanQty(windowPlanQty);
+        // 固化排程窗口原始DAY_N汇总：收尾/胎胚库存目标量同步只抬高windowPlanQty，
+        // 本字段保持月计划原始口径，供试制、量试日计划准入按原始DAY_N判断。
+        dto.setOriginalWindowPlanQty(windowPlanQty);
         dto.setMonthlyHistoryShortageQty(Math.max(0, rawCarryForwardQty));
         dto.setEffectiveLastMonthOverdueQty(surplus.getLastMonthOverdueQty());
         dto.setEffectiveCarryForwardQty(Math.max(0, carryForwardQty));
@@ -2585,6 +2588,8 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         copy.setFinishedQty(source.getFinishedQty());
         copy.setSurplusQty(source.getSurplusQty());
         copy.setWindowPlanQty(source.getWindowPlanQty());
+        // 续作副本沿用S4.3固化的原始窗口DAY_N，确保试制、量试续作准入不受收尾目标量抬高影响。
+        copy.setOriginalWindowPlanQty(source.getOriginalWindowPlanQty());
         copy.setDailyPlanQty(source.getDailyPlanQty());
         copy.setPendingQty(source.getPendingQty());
         copy.setTargetScheduleQty(source.getTargetScheduleQty());

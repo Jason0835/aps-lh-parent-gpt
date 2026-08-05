@@ -2846,7 +2846,7 @@ public class MpWeekRollAdjustEngine {
      * @param dailyCapacityLimitVo 日产能限制Vo
      * @return 日模具数
      */
-    private int getMouldByDay(MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj,Map<String,Object> paramMap,Integer iDay, FactoryMonthPlanFinalAdjustVo mpFinalVo,MpDailyCapacityLimitVo dailyCapacityLimitVo){
+    public int getMouldByDay(MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj,Map<String,Object> paramMap,Integer iDay, FactoryMonthPlanFinalAdjustVo mpFinalVo,MpDailyCapacityLimitVo dailyCapacityLimitVo){
         String dayField = FactoryConstant.DAY_FIELD + iDay;
         String day1Field = FactoryConstant.DAY_FIELD + (iDay -1 < FactoryConstant.MONTH_START_DAY ? FactoryConstant.MONTH_START_DAY:iDay -1);
         String day2Field = FactoryConstant.DAY_FIELD + (iDay +1 > FactoryConstant.MONTH_MAX_DAY ? FactoryConstant.MONTH_MAX_DAY:iDay +1);
@@ -2856,7 +2856,11 @@ public class MpWeekRollAdjustEngine {
             dailyLhQty = adjustDailyCapacityLimitObj.getProportionalDeductQty(dailyCapacityLimitVo,dailyLhQty);
         }
         Integer dayPlanQty = Convert.toInt(mpFinalVo.getFieldValueByFieldName(dayField),0);
-        int fullMachines = dayPlanQty / dailyLhQty;
+        if (dayPlanQty == 0 || dailyLhQty == 0){
+            return 0;
+        }
+
+        int fullMachines = adjustDailyCapacityLimitObj.addFullMachines(mpFinalVo,day1Field,dailyLhQty,dayPlanQty);;
         int otherMachines;
         if (adjustDailyCapacityLimitObj.isDecMould(mpFinalVo,dayField,day1Field,day2Field,iDay)){
             // 统计有余数的SKU个数

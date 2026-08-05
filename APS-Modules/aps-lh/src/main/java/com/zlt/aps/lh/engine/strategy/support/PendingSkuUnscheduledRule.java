@@ -101,17 +101,20 @@ public final class PendingSkuUnscheduledRule {
         // 试制量试跳过T+1检查，日志如实标注检查方式，避免误读为"检查过且未命中"。
         String t1CheckDesc = isTrialSku ? "跳过（试制量试）" : "否";
         String detail = String.format("工厂: %s, 批次: %s, 物料: %s, 产品状态: %s, 施工阶段: %s, "
-                        + "排程窗口: %s～%s, 提前生产天数: %d, 准入截止日: %s, T+1交替计划命中: %s, 原因: %s",
+                        + "排程窗口: %s～%s, 窗口原始计划量: %d, 提前生产天数: %d, 准入截止日: %s, "
+                        + "T+1交替计划命中: %s, 原因: %s",
                 context.getFactoryCode(), context.getBatchNo(), sku.getMaterialCode(), sku.getProductStatus(),
-                sku.getConstructionStage(), windowStartDate, windowEndDate, earlyProductionDaysThreshold,
-                admissionEndDate, t1CheckDesc, DAILY_PLAN_ADMISSION_UNSCHEDULED_REASON);
+                sku.getConstructionStage(), windowStartDate, windowEndDate, sku.getOriginalWindowPlanQty(),
+                earlyProductionDaysThreshold, admissionEndDate, t1CheckDesc,
+                DAILY_PLAN_ADMISSION_UNSCHEDULED_REASON);
         log.info("非续作SKU日计划准入拦截, factoryCode: {}, batchNo: {}, materialCode: {}, "
                         + "productStatus: {}, constructionStage: {}, windowStartDate: {}, windowEndDate: {}, "
-                        + "earlyProductionDaysThreshold: {}, admissionEndDate: {}, previousT1ChangeoverMatched: {}, "
-                        + "reason: {}",
+                        + "originalWindowPlanQty: {}, earlyProductionDaysThreshold: {}, admissionEndDate: {}, "
+                        + "previousT1ChangeoverMatched: {}, reason: {}",
                 context.getFactoryCode(), context.getBatchNo(), sku.getMaterialCode(), sku.getProductStatus(),
-                sku.getConstructionStage(), windowStartDate, windowEndDate, earlyProductionDaysThreshold,
-                admissionEndDate, t1CheckDesc, DAILY_PLAN_ADMISSION_UNSCHEDULED_REASON);
+                sku.getConstructionStage(), windowStartDate, windowEndDate, sku.getOriginalWindowPlanQty(),
+                earlyProductionDaysThreshold, admissionEndDate, t1CheckDesc,
+                DAILY_PLAN_ADMISSION_UNSCHEDULED_REASON);
         PriorityTraceLogHelper.appendProcessLog(context, "SKU无计划量不排产", detail);
         LhUnscheduledResult unscheduledResult = buildUnscheduledResult(
                 context, sku, 0, DAILY_PLAN_ADMISSION_UNSCHEDULED_REASON);
@@ -151,17 +154,19 @@ public final class PendingSkuUnscheduledRule {
         int earlyProductionDaysThreshold = 0;
         LocalDate admissionEndDate = windowEndDate;
         String detail = String.format("工厂: %s, 批次: %s, 物料: %s, 产品状态: %s, 施工阶段: %s, "
-                        + "续作机台: %s, 排程窗口: %s～%s, 提前生产天数: %d, 准入截止日: %s, 原因: %s",
+                        + "续作机台: %s, 排程窗口: %s～%s, 窗口原始计划量: %d, 提前生产天数: %d, "
+                        + "准入截止日: %s, 原因: %s",
                 context.getFactoryCode(), context.getBatchNo(), sku.getMaterialCode(), sku.getProductStatus(),
                 sku.getConstructionStage(), sku.getContinuousMachineCode(), windowStartDate, windowEndDate,
-                earlyProductionDaysThreshold, admissionEndDate,
+                sku.getOriginalWindowPlanQty(), earlyProductionDaysThreshold, admissionEndDate,
                 CONTINUOUS_TRIAL_DAILY_PLAN_ADMISSION_UNSCHEDULED_REASON);
         log.info("续作试制量试SKU日计划准入拦截, factoryCode: {}, batchNo: {}, materialCode: {}, "
                         + "productStatus: {}, constructionStage: {}, continuousMachineCode: {}, windowStartDate: {}, "
-                        + "windowEndDate: {}, earlyProductionDaysThreshold: {}, admissionEndDate: {}, reason: {}",
+                        + "windowEndDate: {}, originalWindowPlanQty: {}, earlyProductionDaysThreshold: {}, "
+                        + "admissionEndDate: {}, reason: {}",
                 context.getFactoryCode(), context.getBatchNo(), sku.getMaterialCode(), sku.getProductStatus(),
                 sku.getConstructionStage(), sku.getContinuousMachineCode(), windowStartDate, windowEndDate,
-                earlyProductionDaysThreshold, admissionEndDate,
+                sku.getOriginalWindowPlanQty(), earlyProductionDaysThreshold, admissionEndDate,
                 CONTINUOUS_TRIAL_DAILY_PLAN_ADMISSION_UNSCHEDULED_REASON);
         PriorityTraceLogHelper.appendProcessLog(context, "续作试制量试无计划量不排产", detail);
         LhUnscheduledResult unscheduledResult = buildUnscheduledResult(
@@ -195,13 +200,14 @@ public final class PendingSkuUnscheduledRule {
     /**
      * 判断排程窗口内（排程首日~窗口末日）是否存在正日计划量。
      * <p>仅用于试制、量试SKU的准入判断：不向后叠加提前生产天数阈值，严格以排程窗口为判断边界。
-     * 月计划口径与 {@link #hasPositiveDailyPlanInAdmissionRange} 一致，按物料编码和产品状态精确读取。</p>
+     * 读取S4.3归集时固化的原始DAY_N汇总（originalWindowPlanQty），不读取可能被收尾目标量
+     * 同步抬高的windowPlanQty，确保只用月计划原始日计划量放行。</p>
      *
      * @param sku 待判断SKU
      * @return true-窗口内至少一天有正日计划量；false-窗口内全为0或无SKU
      */
     private static boolean hasPositiveDailyPlanInWindow(SkuScheduleDTO sku) {
-        return Objects.nonNull(sku) && sku.getWindowPlanQty() > 0;
+        return Objects.nonNull(sku) && sku.getOriginalWindowPlanQty() > 0;
     }
 
     /**

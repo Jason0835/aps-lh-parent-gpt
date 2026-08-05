@@ -561,6 +561,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         paramCodeList.add(MonthPlanEnums.SKU_SHORTEST_PRODUCTION_DAYS.getCode());
         paramCodeList.add(MonthPlanEnums.MIN_PRODUCTION_DAYS.getCode());
         paramCodeList.add(MonthPlanEnums.MIN_ALLOCATION_DAYS.getCode());
+        paramCodeList.add(MonthPlanEnums.MIN_CHANGE_PRO_SIZE_DAYS.getCode());
         paramCodeList.add(MonthPlanEnums.NO_CYCLE_PRODUCTION_MIN_LH_MACHINE_NUMBER.getCode());
         paramCodeList.add(MonthPlanEnums.OEM_BRAND_CONFIG.getCode());
         paramCodeList.add(MonthPlanEnums.OEM_BRAND_CAPACITY.getCode());
@@ -607,7 +608,9 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         } else {
             configuration.setMinProductionDays((Integer) minProductionDaysValue);
         }
+        //20260803+ 最短上机天数
         configuration.setMinAllocationDays((Integer) paramConfigurationMap.get(MonthPlanEnums.MIN_ALLOCATION_DAYS.getCode()));
+        configuration.setChangeProSizeMinAllocationDays((Integer) paramConfigurationMap.get(MonthPlanEnums.MIN_CHANGE_PRO_SIZE_DAYS.getCode()));
         configuration.setNoCycleProductionMinLhMachineNumber((Integer) paramConfigurationMap.get(MonthPlanEnums.NO_CYCLE_PRODUCTION_MIN_LH_MACHINE_NUMBER.getCode()));
         String boostProductionTypeValue = (String) paramConfigurationMap.get(MonthPlanEnums.BOOST_PRODUCTION_TYPE_VALUE.getCode());
         if (StringUtils.isBlank(boostProductionTypeValue)) {

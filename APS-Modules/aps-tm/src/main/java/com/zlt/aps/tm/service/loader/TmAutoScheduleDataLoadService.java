@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 import javax.annotation.Resource;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.text.MessageFormat;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -136,6 +137,7 @@ public class TmAutoScheduleDataLoadService {
             TmMachineCandidate candidate = new TmMachineCandidate();
             candidate.setMachineCode(machineInfo.getMachineCode());
             candidate.setEnabled(isMachineEnabled(machineInfo));
+            candidate.setOpenShiftCodes(this.parseOpenShiftCodes(machineInfo.getOpenShiftCode()));
             candidate.setMaxCapacity(nvl(machineInfo.getMaxCapacity()));
             candidate.setRemainCapacity(nvl(machineInfo.getMaxCapacity()));
             candidate.setMaintenanceHours(BigDecimal.ZERO);
@@ -508,12 +510,27 @@ public class TmAutoScheduleDataLoadService {
         }
         List<TmShiftConfig> configs = tmShiftConfigMapper.selectList(
                 new LambdaQueryWrapper<TmShiftConfig>()
-                        .eq(TmShiftConfig::getFactoryCode, context.getFactoryCode())
-                .eq(TmShiftConfig::getOpenFlag, TmYesNoEnum.YES.getCode()));
+                        .eq(TmShiftConfig::getFactoryCode, context.getFactoryCode()));
         return nullToEmpty(configs).stream()
                 .filter(config -> config.getShiftOrder() != null)
                 .sorted(Comparator.comparing(TmShiftConfig::getShiftOrder))
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * 解析机台维护的开机班次编码。
+     *
+     * @param openShiftCode 逗号分隔的开机班次编码
+     * @return 去空、去重后的班次编码集合；未维护时返回空集合
+     */
+    private Set<String> parseOpenShiftCodes(String openShiftCode) {
+        if (StrUtil.isBlank(openShiftCode)) {
+            return new LinkedHashSet<>();
+        }
+        return Arrays.stream(openShiftCode.split(","))
+                .map(StrUtil::trim)
+                .filter(StrUtil::isNotBlank)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
     /**
@@ -640,6 +657,33 @@ public class TmAutoScheduleDataLoadService {
             }
         }
         return null;
+    }
+
+    /**
+     * 成型计划已加载但按 TM_FORMING_SHIFT_OFFSET 偏移后无可排程班次时，记录细化提示到上下文。
+     *
+     * <p>偏移后胎面班次 N 读取成型 CLASS(N+offset)，6 班覆盖 class(offset+1)~class(6+offset)，
+     * 统一夹到 CLASS1~CLASS8 区间；仅当成型行数大于 0 且区间有效时写入，供响应阶段优先展示。</p>
+     *
+     * @param context            自动排程上下文
+     * @param formingRowCount    已加载的成型计划行数
+     * @param formingShiftOffset 成型班次偏移量
+     */
+    private void recordEmptyFormingTaskMessage(TmScheduleContext context, int formingRowCount, int formingShiftOffset) {
+        if (formingRowCount <= 0) {
+            return;
+        }
+        // CLASS1~CLASS8 共 8 个班次，偏移后区间夹到 [1,8]
+        int clampedFirst = Math.max(1, Math.min(formingShiftOffset + 1, 8));
+        int clampedLast = Math.max(1, Math.min(TmScheduleConstants.TM_MAX_SHIFT_ORDER + formingShiftOffset, 8));
+        if (clampedFirst > clampedLast) {
+            return;
+        }
+        String template = I18nUtil.getMessage("ui.data.alert.tm.schedule.noTaskGeneratedWithOffset");
+        if (StrUtil.isBlank(template) || "ui.data.alert.tm.schedule.noTaskGeneratedWithOffset".equals(template)) {
+            template = "胎面自动排程未生成结果：成型计划已加载 {0} 行，但按当前 TM_FORMING_SHIFT_OFFSET 偏移后无可排程班次，偏移后班次：class{1}-class{2}，请确认成型排程班次与 TM_FORMING_SHIFT_OFFSET 配置是否配套";
+        }
+        context.setEmptyFormingTaskMessage(MessageFormat.format(template, formingRowCount, clampedFirst, clampedLast));
     }
 
     /**
@@ -771,7 +815,8 @@ public class TmAutoScheduleDataLoadService {
                     depthConfigList, fallbackGuardShiftCount);
             boolean noShutdownAvailableShift = redistributeShutdownDemand(context, classQtyArray, tmCalendar, cxCalendar);
             for (int shiftOrder = 1; shiftOrder <= TmScheduleConstants.TM_MAX_SHIFT_ORDER; shiftOrder++) {
-                BigDecimal formingQty = resolveFormingQty(classQtyArray, shiftOrder, algorithmCode, formingShiftOffset);
+                BigDecimal formingQty = this.resolveCurrentShiftFormingQty(classQtyArray, shiftOrder, algorithmCode,
+                        formingShiftOffset);
                 BigDecimal demandQty = formingQty.multiply(treadLength);
                 if (demandQty.compareTo(BigDecimal.ZERO) <= 0) {
                     continue;
@@ -788,6 +833,7 @@ public class TmAutoScheduleDataLoadService {
                 taskDraft.setEmbryoCode(row.getEmbryoCode());
                 taskDraft.setMainMaterialDesc(row.getMainMaterialDesc());
                 taskDraft.setCxMachineCode(row.getCxMachineCode());
+                taskDraft.setLhMachineCode(row.getLhMachineCode());
                 taskDraft.setBusinessKeySuffix(buildSourceTaskBusinessKeySuffix(row, sourceRowIndex, shiftOrder));
                 taskDraft.setTreadCode(treadCode);
                 // 拆分胶料类别：第一个值为主胶料编码，其余值为基部胶编码
@@ -843,6 +889,9 @@ public class TmAutoScheduleDataLoadService {
         log.info("[TM_BOOTSTRAP_DETAIL] factoryCode={}, scheduleDate={} BOM模式任务生成汇总：成型行数={}，生成任务={}",
                 context.getFactoryCode(), DateUtil.formatDate(context.getScheduleDate()),
                 rowList.size(), taskDraftList.size());
+        if (taskDraftList.isEmpty()) {
+            this.recordEmptyFormingTaskMessage(context, rowList.size(), formingShiftOffset);
+        }
         return taskDraftList;
     }
 
@@ -1013,17 +1062,21 @@ public class TmAutoScheduleDataLoadService {
                     depthConfigList, fallbackGuardShiftCount);
             boolean noShutdownAvailableShift = redistributeShutdownDemand(context, classQtyArray, tmCalendar, cxCalendar);
             for (int shiftOrder = 1; shiftOrder <= TmScheduleConstants.TM_MAX_SHIFT_ORDER; shiftOrder++) {
-                BigDecimal formingQty = resolveFormingQty(classQtyArray, shiftOrder, algorithmCode, formingShiftOffset);
+                BigDecimal formingQty = this.resolveCurrentShiftFormingQty(classQtyArray, shiftOrder, algorithmCode,
+                        formingShiftOffset);
                 if (formingQty.compareTo(BigDecimal.ZERO) <= 0) {
                     skippedShiftNoFormingQty++;
                     continue;
                 }
                 int startIndex = resolveFormingStartIndex(shiftOrder, formingShiftOffset);
                 String[] taskRecipeNoByClass = buildRecipeNoArray(row);
-                TmConstructionTreadRowVo primarySpec = (startIndex >= 0 && startIndex < 8) ? specByClass[startIndex] : null;
+                int primarySpecIndex = Math.min(startIndex, 7);
+                TmConstructionTreadRowVo primarySpec = (primarySpecIndex >= 0 && primarySpecIndex < 8)
+                        ? specByClass[primarySpecIndex] : null;
                 if (primarySpec == null || StrUtil.isBlank(primarySpec.getTreadCode())
                         || nvl(primarySpec.getTreadShoulderLength()).compareTo(BigDecimal.ZERO) <= 0) {
-                    String missingRecipeNo = (startIndex >= 0 && startIndex < taskRecipeNoByClass.length) ? taskRecipeNoByClass[startIndex] : null;
+                    String missingRecipeNo = (primarySpecIndex >= 0 && primarySpecIndex < taskRecipeNoByClass.length)
+                            ? taskRecipeNoByClass[primarySpecIndex] : null;
                     String missingReason = primarySpec == null ? "示方书为空或未命中施工" : "施工胎面编码或肩长无效";
                     log.warn("[TM_RECIPE_MATCH] 跳过班次：factoryCode={}, orderNo={}, embryoCode={}, shiftOrder={}, startIndex={}, formingQty={}, 原因={}",
                             context.getFactoryCode(), row.getOrderNo(), row.getEmbryoCode(), shiftOrder, startIndex, formingQty,
@@ -1053,6 +1106,7 @@ public class TmAutoScheduleDataLoadService {
                 taskDraft.setEmbryoCode(row.getEmbryoCode());
                 taskDraft.setMainMaterialDesc(row.getMainMaterialDesc());
                 taskDraft.setCxMachineCode(row.getCxMachineCode());
+                taskDraft.setLhMachineCode(row.getLhMachineCode());
                 taskDraft.setBusinessKeySuffix(buildSourceTaskBusinessKeySuffix(row, sourceRowIndex, shiftOrder));
                 taskDraft.setTreadCode(treadCode);
                 // 拆分胶料类别：第一个值为主胶料编码，其余值为基部胶编码
@@ -1108,6 +1162,9 @@ public class TmAutoScheduleDataLoadService {
         log.info("[TM_BOOTSTRAP_DETAIL] factoryCode={}, scheduleDate={} RECIPE模式任务生成汇总：成型行数={}，跳过(成型量=0)={}班次，跳过(示方书/施工不匹配)={}班次，生成任务={}",
                 context.getFactoryCode(), DateUtil.formatDate(context.getScheduleDate()),
                 rowList.size(), skippedShiftNoFormingQty, skippedShiftNoSpec, taskDraftList.size());
+        if (taskDraftList.isEmpty()) {
+            this.recordEmptyFormingTaskMessage(context, rowList.size(), formingShiftOffset);
+        }
         return taskDraftList;
     }
 
@@ -2185,6 +2242,7 @@ public class TmAutoScheduleDataLoadService {
         targetTask.setEmbryoCode(sourceTask.getEmbryoCode());
         targetTask.setMainMaterialDesc(sourceTask.getMainMaterialDesc());
         targetTask.setCxMachineCode(sourceTask.getCxMachineCode());
+        targetTask.setLhMachineCode(sourceTask.getLhMachineCode());
         targetTask.setBusinessKeySuffix("FUTURE_SHUTDOWN_" + DateUtil.format(sourceDate, "yyyyMMdd")
                 + "_CLASS" + sourceShiftCode + "_TO_CLASS" + targetShift);
         targetTask.setTreadCode(sourceTask.getTreadCode());
@@ -2386,6 +2444,27 @@ public class TmAutoScheduleDataLoadService {
             maxQty = maxQty.max(readClassQty(classQtyArray, index));
         }
         return maxQty;
+    }
+
+    /**
+     * 解析胎面当前班需求对应的成型计划量。
+     *
+     * <p>需求起点超过成型 CLASS8 时，使用 CLASS6、CLASS7、CLASS8 的固定三班平均量估算未来需求；
+     * 成型完成量等非需求场景仍调用 {@link #resolveFormingQty(BigDecimal[], int, String, int)}，保持越界按零处理。</p>
+     *
+     * @param classQtyArray 成型班次计划量数组，下标 0 对应成型 CLASS1
+     * @param shiftOrder 胎面排程班次，从 1 开始
+     * @param algorithmCode 需求量算法编码
+     * @param formingShiftOffset 胎面班次到成型班次的偏移量，0 表示同序号班次
+     * @return 当前班需求对应的成型计划量
+     */
+    private BigDecimal resolveCurrentShiftFormingQty(BigDecimal[] classQtyArray, int shiftOrder, String algorithmCode,
+                                                      int formingShiftOffset) {
+        int startIndex = this.resolveFormingStartIndex(shiftOrder, formingShiftOffset);
+        if (startIndex >= 8) {
+            return this.calculateLastThreeClassAverageQty(classQtyArray);
+        }
+        return this.resolveFormingQty(classQtyArray, shiftOrder, algorithmCode, formingShiftOffset);
     }
 
     /**

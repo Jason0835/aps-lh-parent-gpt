@@ -62,7 +62,7 @@ public class TcMachineInfo extends BaseEntity {
     @TableField(value = "OPEN_SHIFT_CODE")
     private String openShiftCode;
 
-    @Excel(name = "ui.data.column.tc.machineInfo.machineStatus")
+    @Excel(name = "ui.data.column.tc.machineInfo.machineStatus", dictType = "STATUS")
     @ImportValidated(maxLength = 50)
     @ApiModelProperty(value = "机台状态", name = "machineStatus")
     @TableField(value = "MACHINE_STATUS")

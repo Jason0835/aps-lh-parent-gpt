@@ -78,12 +78,6 @@ public class NcScheduleResult extends BaseEntity {
     @TableField("GLUE_CODE")
     private String glueCode;
 
-    /** 口型板编码 */
-    @Excel(name = "ui.data.column.nc.scheduleResult.mouthPlateCode")
-    @ApiModelProperty(value = "口型板编码", name = "mouthPlateCode")
-    @TableField(value = "MOUTH_PLATE_CODE")
-    private String mouthPlateCode;
-
     /** 1班顺序 */
     @Excel(name = "ui.data.column.nc.scheduleResult.class1Sequence")
     @ApiModelProperty(value = "1班顺序", name = "class1Sequence")

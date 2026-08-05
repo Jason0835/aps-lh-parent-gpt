@@ -270,7 +270,11 @@ public class TcScheduleResultServiceImpl extends AbstractDocService<TcScheduleRe
             response.setIssueCount(response.getIssues().size());
             response.setSummary(new LinkedHashMap<>(finalContext.getQualitySummary()));
             if (CollUtil.isEmpty(context.getTaskDraftList())) {
-                response.setMessage(I18nUtil.getMessage("ui.tc.schedule.noTaskGenerated"));
+                String emptyTaskMessage = context.getEmptyFormingTaskMessage();
+                if (StrUtil.isBlank(emptyTaskMessage)) {
+                    emptyTaskMessage = I18nUtil.getMessage("ui.tc.schedule.noTaskGenerated");
+                }
+                response.setMessage(emptyTaskMessage);
                 log.warn("{} step=NO_TASK_GENERATED factoryCode={}, scheduleDate={}, batchNo={}, traceId={}, reason=noSchedulableTask",
                         TcScheduleConstants.AUTO_PLAN_LOG_PREFIX, request.getFactoryCode(),
                         DateUtil.formatDate(request.getScheduleDate()), response.getBatchNo(), response.getTraceId());

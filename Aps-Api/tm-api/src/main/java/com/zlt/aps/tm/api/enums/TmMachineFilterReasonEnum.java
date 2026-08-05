@@ -8,6 +8,9 @@ public enum TmMachineFilterReasonEnum {
     /** 机台未启用。 */
     MACHINE_DISABLED("MACHINE_DISABLED", "机台未启用"),
 
+    /** 机台当前班次未开机。 */
+    MACHINE_SHIFT_NOT_OPEN("MACHINE_SHIFT_NOT_OPEN", "机台当前班次未开机"),
+
     /** 无剩余产能。 */
     NO_REMAIN_CAPACITY("NO_REMAIN_CAPACITY", "机台剩余产能不足"),
 

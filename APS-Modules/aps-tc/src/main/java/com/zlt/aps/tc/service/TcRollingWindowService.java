@@ -52,8 +52,7 @@ public class TcRollingWindowService {
                 LocalDate scheduleDate = triggerMinute.toLocalDate().plusDays(offset);
                 this.resolveShiftStarts(scheduleDate, configList).forEach((shiftOrder, shiftStart) -> {
                     TcShiftConfig config = this.findConfig(configList, shiftOrder);
-                    if (config == null || !"1".equals(config.getOpenFlag())
-                            || !shiftStart.minusMinutes(ROLLING_LEAD_MINUTES)
+                    if (config == null || !shiftStart.minusMinutes(ROLLING_LEAD_MINUTES)
                             .truncatedTo(ChronoUnit.MINUTES).equals(triggerMinute)) {
                         return;
                     }

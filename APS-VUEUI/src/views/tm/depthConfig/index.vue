@@ -110,7 +110,7 @@ export default {
         {
           label: this.$t("ui.tm.depthConfig.column.minMachineQty"),
           prop: "minMachineQty",
-          type: "number",
+          type: "input",
         },
       ];
     },

@@ -141,6 +141,7 @@ public class TcAutoScheduleDataLoadService {
             TcMachineCandidate candidate = new TcMachineCandidate();
             candidate.setMachineCode(machineInfo.getMachineCode());
             candidate.setEnabled(isMachineEnabled(machineInfo));
+            candidate.setOpenShiftCodes(this.parseOpenShiftCodes(machineInfo.getOpenShiftCode()));
             BigDecimal machineMaxCapacity = this.resolveMachineMaxCapacity(machineInfo.getMaxCapacity());
             candidate.setMaxCapacity(machineMaxCapacity);
             candidate.setRemainCapacity(machineMaxCapacity);
@@ -553,12 +554,27 @@ public class TcAutoScheduleDataLoadService {
         }
         List<TcShiftConfig> configs = tmShiftConfigMapper.selectList(
                 new LambdaQueryWrapper<TcShiftConfig>()
-                        .eq(TcShiftConfig::getFactoryCode, context.getFactoryCode())
-                        .eq(TcShiftConfig::getOpenFlag, TcYesNoEnum.YES.getCode()));
+                        .eq(TcShiftConfig::getFactoryCode, context.getFactoryCode()));
         return nullToEmpty(configs).stream()
                 .filter(config -> config.getShiftOrder() != null)
                 .sorted(Comparator.comparing(TcShiftConfig::getShiftOrder))
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * 解析机台维护的开机班次编码。
+     *
+     * @param openShiftCode 逗号分隔的开机班次编码
+     * @return 去空、去重后的班次编码集合；未维护时返回空集合
+     */
+    private Set<String> parseOpenShiftCodes(String openShiftCode) {
+        if (StrUtil.isBlank(openShiftCode)) {
+            return new LinkedHashSet<>();
+        }
+        return Arrays.stream(openShiftCode.split(","))
+                .map(StrUtil::trim)
+                .filter(StrUtil::isNotBlank)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
     /**
@@ -688,10 +704,37 @@ public class TcAutoScheduleDataLoadService {
     }
 
     /**
+     * 成型计划已加载但按 TC_FORMING_SHIFT_OFFSET 偏移后无可排程班次时，记录细化提示到上下文。
+     *
+     * <p>偏移后胎侧班次 N 读取成型 CLASS(N+offset)，6 班覆盖 class(offset+1)~class(6+offset)，
+     * 统一夹到 CLASS1~CLASS8 区间；仅当成型行数大于 0 且区间有效时写入，供响应阶段优先展示。</p>
+     *
+     * @param context            自动排程上下文
+     * @param formingRowCount    已加载的成型计划行数
+     * @param formingShiftOffset 成型班次偏移量
+     */
+    private void recordEmptyFormingTaskMessage(TcScheduleContext context, int formingRowCount, int formingShiftOffset) {
+        if (formingRowCount <= 0) {
+            return;
+        }
+        // CLASS1~CLASS8 共 8 个班次，偏移后区间夹到 [1,8]
+        int clampedFirst = Math.max(1, Math.min(formingShiftOffset + 1, 8));
+        int clampedLast = Math.max(1, Math.min(TcScheduleConstants.TC_MAX_SHIFT_ORDER + formingShiftOffset, 8));
+        if (clampedFirst > clampedLast) {
+            return;
+        }
+        String template = I18nUtil.getMessage("ui.tc.schedule.noTaskGeneratedWithOffset");
+        if (StrUtil.isBlank(template) || "ui.tc.schedule.noTaskGeneratedWithOffset".equals(template)) {
+            template = "胎侧自动排程未生成结果：成型计划已加载 {0} 行，但按当前 TC_FORMING_SHIFT_OFFSET 偏移后无可排程班次，偏移后班次：class{1}-class{2}，请确认成型排程班次与 TC_FORMING_SHIFT_OFFSET 配置是否配套";
+        }
+        context.setEmptyFormingTaskMessage(MessageFormat.format(template, formingRowCount, clampedFirst, clampedLast));
+    }
+
+    /**
      * 从成型计划和施工信息构造胎侧待排任务。
      *
      * <p>按参数 {@code TC_VERSION_MATCH_MODE} 分流：{@code RECIPE}（默认）走逐班示方书版本解析，
-     * {@code BOM} 走 {@code BOM_DATA_VERSION} 关联逻辑。仅识别 {@code RECIPE}/{@code BOM}，
+     * {@code BOM} 走 {@code BOM_DATA_VERSION} 关联逻辑。仅识别 {@code RECIPE}/{@code BOM},
      * 其他值(含早期内部 {@code B})由 {@link TcVersionMatchModeEnum#resolve} 回退为 {@code RECIPE}。</p>
      *
      * @param context     自动排程上下文
@@ -806,7 +849,7 @@ public class TcAutoScheduleDataLoadService {
                     depthConfigList, fallbackGuardShiftCount);
             boolean noShutdownAvailableShift = redistributeShutdownDemand(context, classQtyArray, tmCalendar, cxCalendar);
             for (int shiftOrder = 1; shiftOrder <= TcScheduleConstants.TC_MAX_SHIFT_ORDER; shiftOrder++) {
-                BigDecimal formingQty = this.resolveFormingQty(classQtyArray, shiftOrder, algorithmCode,
+                BigDecimal formingQty = this.resolveCurrentShiftFormingQty(classQtyArray, shiftOrder, algorithmCode,
                         formingShiftOffset, alg1LookbackShifts);
                 BigDecimal demandQty = formingQty.multiply(sidewallLength);
                 if (demandQty.compareTo(BigDecimal.ZERO) <= 0) {
@@ -820,6 +863,7 @@ public class TcAutoScheduleDataLoadService {
                 taskDraft.setOrderNo(row.getOrderNo() + "-CLASS" + shiftOrder);
                 taskDraft.setSourceOrderNos(row.getOrderNo());
                 taskDraft.setEmbryoCode(row.getEmbryoCode());
+                taskDraft.setCxMachineCode(row.getCxMachineCode());
                 taskDraft.setBusinessKeySuffix(buildSourceTaskBusinessKeySuffix(row, sourceRowIndex, shiftOrder));
                 taskDraft.setSidewallCode(sidewallCode);
                 taskDraft.setConstructionVersion(row.getConstructionVersion());
@@ -866,6 +910,9 @@ public class TcAutoScheduleDataLoadService {
         log.info("[TC_BOOTSTRAP_DETAIL] factoryCode={}, scheduleDate={} BOM模式任务生成汇总：成型行数={}，生成任务={}",
                 context.getFactoryCode(), DateUtil.formatDate(context.getScheduleDate()),
                 rowList.size(), taskDraftList.size());
+        if (taskDraftList.isEmpty()) {
+            this.recordEmptyFormingTaskMessage(context, rowList.size(), formingShiftOffset);
+        }
         return taskDraftList;
     }
 
@@ -1024,7 +1071,7 @@ public class TcAutoScheduleDataLoadService {
                     depthConfigList, fallbackGuardShiftCount);
             boolean noShutdownAvailableShift = redistributeShutdownDemand(context, classQtyArray, tmCalendar, cxCalendar);
             for (int shiftOrder = 1; shiftOrder <= TcScheduleConstants.TC_MAX_SHIFT_ORDER; shiftOrder++) {
-                BigDecimal formingQty = this.resolveFormingQty(classQtyArray, shiftOrder, algorithmCode,
+                BigDecimal formingQty = this.resolveCurrentShiftFormingQty(classQtyArray, shiftOrder, algorithmCode,
                         formingShiftOffset, alg1LookbackShifts);
                 if (formingQty.compareTo(BigDecimal.ZERO) <= 0) {
                     skippedShiftNoFormingQty++;
@@ -1032,10 +1079,13 @@ public class TcAutoScheduleDataLoadService {
                 }
                 int startIndex = resolveFormingStartIndex(shiftOrder, formingShiftOffset);
                 String[] taskRecipeNoByClass = buildRecipeNoArray(row);
-                TcConstructionSidewallRowVo primarySpec = (startIndex >= 0 && startIndex < 8) ? specByClass[startIndex] : null;
+                int primarySpecIndex = Math.min(startIndex, 7);
+                TcConstructionSidewallRowVo primarySpec = (primarySpecIndex >= 0 && primarySpecIndex < 8)
+                        ? specByClass[primarySpecIndex] : null;
                 if (primarySpec == null || StrUtil.isBlank(primarySpec.getSidewallCode())
                         || nvl(primarySpec.getSidewallLength()).compareTo(BigDecimal.ZERO) <= 0) {
-                    String missingRecipeNo = (startIndex >= 0 && startIndex < taskRecipeNoByClass.length) ? taskRecipeNoByClass[startIndex] : null;
+                    String missingRecipeNo = (primarySpecIndex >= 0 && primarySpecIndex < taskRecipeNoByClass.length)
+                            ? taskRecipeNoByClass[primarySpecIndex] : null;
                     String missingReason = primarySpec == null ? "示方书为空或未命中施工" : "施工胎侧编码或肩长无效";
                     log.warn("[TC_RECIPE_MATCH] 跳过班次：factoryCode={}, orderNo={}, embryoCode={}, shiftOrder={}, startIndex={}, formingQty={}, 原因={}",
                             context.getFactoryCode(), row.getOrderNo(), row.getEmbryoCode(), shiftOrder, startIndex, formingQty,
@@ -1061,6 +1111,7 @@ public class TcAutoScheduleDataLoadService {
                 taskDraft.setOrderNo(row.getOrderNo() + "-CLASS" + shiftOrder);
                 taskDraft.setSourceOrderNos(row.getOrderNo());
                 taskDraft.setEmbryoCode(row.getEmbryoCode());
+                taskDraft.setCxMachineCode(row.getCxMachineCode());
                 taskDraft.setBusinessKeySuffix(buildSourceTaskBusinessKeySuffix(row, sourceRowIndex, shiftOrder));
                 taskDraft.setSidewallCode(sidewallCode);
                 taskDraft.setConstructionVersion(primarySpec.getSidewallVersion());
@@ -1108,6 +1159,9 @@ public class TcAutoScheduleDataLoadService {
         log.info("[TC_BOOTSTRAP_DETAIL] factoryCode={}, scheduleDate={} RECIPE模式任务生成汇总：成型行数={}，跳过(成型量=0)={}班次，跳过(示方书/施工不匹配)={}班次，生成任务={}",
                 context.getFactoryCode(), DateUtil.formatDate(context.getScheduleDate()),
                 rowList.size(), skippedShiftNoFormingQty, skippedShiftNoSpec, taskDraftList.size());
+        if (taskDraftList.isEmpty()) {
+            this.recordEmptyFormingTaskMessage(context, rowList.size(), formingShiftOffset);
+        }
         return taskDraftList;
     }
 
@@ -2166,6 +2220,7 @@ public class TcAutoScheduleDataLoadService {
         targetTask.setOrderNo(sourceTask.getOrderNo());
         targetTask.setSourceOrderNos(sourceTask.getSourceOrderNos());
         targetTask.setEmbryoCode(sourceTask.getEmbryoCode());
+        targetTask.setCxMachineCode(sourceTask.getCxMachineCode());
         targetTask.setBusinessKeySuffix("FUTURE_SHUTDOWN_" + DateUtil.format(sourceDate, "yyyyMMdd")
                 + "_CLASS" + sourceShiftCode + "_TO_CLASS" + targetShift);
         targetTask.setSidewallCode(sourceTask.getSidewallCode());
@@ -2371,6 +2426,28 @@ public class TcAutoScheduleDataLoadService {
             maxQty = maxQty.max(readClassQty(classQtyArray, index));
         }
         return maxQty;
+    }
+
+    /**
+     * 解析胎侧当前班需求对应的成型计划量。
+     *
+     * <p>需求起点超过成型 CLASS8 时，使用 CLASS6、CLASS7、CLASS8 的固定三班平均量估算未来需求；
+     * 其他场景仍调用 {@link #resolveFormingQty(BigDecimal[], int, String, int, int)}，保持越界按零处理。</p>
+     *
+     * @param classQtyArray 成型班次计划量数组，下标 0 对应成型 CLASS1
+     * @param shiftOrder 胎侧排程班次，从 1 开始
+     * @param algorithmCode 需求量算法编码
+     * @param formingShiftOffset 胎侧班次到成型班次的偏移量，0 表示同序号班次
+     * @param alg1LookbackShifts 算法1连续回看的成型班次数
+     * @return 当前班需求对应的成型计划量
+     */
+    private BigDecimal resolveCurrentShiftFormingQty(BigDecimal[] classQtyArray, int shiftOrder, String algorithmCode,
+                                                      int formingShiftOffset, int alg1LookbackShifts) {
+        int startIndex = this.resolveFormingStartIndex(shiftOrder, formingShiftOffset);
+        if (startIndex >= 8) {
+            return this.calculateLastThreeClassAverageQty(classQtyArray);
+        }
+        return this.resolveFormingQty(classQtyArray, shiftOrder, algorithmCode, formingShiftOffset, alg1LookbackShifts);
     }
 
     /**

@@ -1922,9 +1922,10 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             plan.setMouldStatus("0");
             plan.setIsDelete(0);
             // END_TYPE 必须描述换模前物料的下机方式，不得读取当前准备上机的后物料 isEnd；
-            // 同时传入前物料产品状态，供非降模机台按“物料+产品状态”索引精确匹配。
+            // 同时传入前物料产品状态和换模开始时间，供按“物料+产品状态”精确匹配并判断换模班次。
             plan.setEndType(resolveMouldChangePlanEndType(context, result.getLhMachineCode(),
-                    state.getCurrentMaterialCode(), state.getCurrentProductStatus()));
+                    state.getCurrentMaterialCode(), state.getCurrentProductStatus(),
+                    plannedMouldChangeStartTime));
             plan.setChangeTime(resolvePlanChangeTime(result, state));
 
             // 判断交替类型：普通换模、换活字块、干冰清洗、喷砂清洗在这里统一落数据字典值。
@@ -2170,7 +2171,8 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             plan.setIsDelete(0);
             // 清洗计划同样按清洗发生时点的前物料判断，不能读取排程结束后的机台 ending 状态。
             plan.setEndType(resolveMouldChangePlanEndType(context, machineCode,
-                    cleaningState.getCurrentMaterialCode(), cleaningState.getCurrentProductStatus()));
+                    cleaningState.getCurrentMaterialCode(), cleaningState.getCurrentProductStatus(),
+                    cleaningWindow.getCleanStartTime()));
             plans.add(plan);
         }
         return planOrder;
@@ -2406,42 +2408,182 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
 
     /**
      * 解析模具交替计划下机类型。
-     * <p>只要交替计划前物料排程前硫化余量大于0、且经本次排程全部入口扣减后仍有剩余量，
-     * 即属于按时间下机（1）；只有前物料余量已全部排完时才属于按余量收尾下机（0）。
-     * 交替类型不参与 END_TYPE 判断；判断按“机台+前物料+产品状态”精确匹配，
-     * 避免后物料满足条件时反向污染本条交替计划。</p>
-     * <p>续作降模快照只是前物料来源之一，未命中时退回全量 SKU 索引按“物料+产品状态”匹配，
-     * 保证普通换模、清洗等非降模机台在前物料未排完时也能正确标记按时间下机。
-     * 账本缺失时不重新计算、不使用初始余量兜底，按不满足时间下机条件保守返回0。</p>
+     * <p>END_TYPE 描述换模前物料的下机方式，本质是“换模时刻 vs 前物料真实收尾时刻”的时间关系：
+     * 换模班次在前物料跨机台最后正量班次之前，说明换模时前物料尚未收尾，属于按时间下机（1）；
+     * 换模班次在收尾班次或之后，说明前物料已收尾后才下机，属于按余量收尾下机（0）。
+     * 判断按“物料+产品状态”跨机台汇总，避免只看本机台结果而漏掉前物料在其他机台仍在生产。</p>
+     * <p>边界口径：前物料硫化余量小于等于0时按余量下机；余量大于0但本次窗口完全没有排产量时
+     * 按时间下机；无法解析换模班次时回退到“硫化余量-本次排产量”的真实剩余量口径，
+     * 不读取运行期共享的 SKU 实际消费账本，避免账本被上游规则改写后误判。
+     * 交替类型（换模/换活字块/清洗）统一使用同一规则，保持现有生成逻辑。</p>
      *
      * @param context 排程上下文
      * @param machineCode 交替计划机台编码
      * @param beforeMaterialCode 交替计划前物料编码
      * @param beforeProductStatus 交替计划前物料产品状态
+     * @param changeTime 交替计划换模（清洗）开始时间，用于定位换模班次
      * @return 1-按时间下机；0-按余量收尾下机
      */
     private String resolveMouldChangePlanEndType(LhScheduleContext context,
                                                  String machineCode,
                                                  String beforeMaterialCode,
-                                                 String beforeProductStatus) {
+                                                 String beforeProductStatus,
+                                                 Date changeTime) {
         SkuScheduleDTO beforeSku = resolveBeforeSkuForEndType(
                 context, machineCode, beforeMaterialCode, beforeProductStatus);
         Integer beforeSurplusQty = Objects.isNull(beforeSku) ? null : beforeSku.getSurplusQty();
         int beforeMaterialSurplusQty = Objects.isNull(beforeSurplusQty)
                 ? 0 : Math.max(0, beforeSurplusQty);
-        Integer beforeMaterialRemainingQty = resolveBeforeMaterialRemainingQty(context, beforeSku);
-        // 前物料排程后仍有剩余量即按时间下机，只有余量排完才按余量收尾下机。
-        boolean beforeMaterialCannotFinish = beforeMaterialSurplusQty > 0
-                && Objects.nonNull(beforeMaterialRemainingQty)
-                && beforeMaterialRemainingQty > 0;
+        // 真实剩余量仅用于对账与换模班次缺失时的兜底，不参与正常时间口径判定。
+        Integer beforeMaterialRemainingQty = resolveBeforeMaterialRemainingQty(
+                context, beforeSku, machineCode);
+        // 前物料排程前无硫化余量，机台不存在“按余量收尾”之外的下机方式。
+        if (beforeMaterialSurplusQty <= 0) {
+            log.info("模具交替计划END_TYPE判断, machineCode: {}, beforeMaterialCode: {}, beforeProductStatus: {}, "
+                            + "beforeMaterialSurplusQty: {}, lastPositiveShiftPosition: {}, changeShiftPosition: {}, "
+                            + "beforeMaterialCannotFinish: false, endType: 0, reason: 前物料无硫化余量",
+                    machineCode, beforeMaterialCode, beforeProductStatus, beforeMaterialSurplusQty, 0, 0);
+            return END_TYPE_BY_REMAINING_QTY;
+        }
+        // 前物料跨机台最后有正量的班次位置（1-8），0 表示本次窗口内没有班次级正量。
+        boolean hasBeforeMaterialResult = hasBeforeMaterialScheduleResult(
+                context, beforeMaterialCode, beforeProductStatus);
+        int lastPositiveShiftPosition = resolveBeforeMaterialLastPositiveShiftPosition(
+                context, beforeMaterialCode, beforeProductStatus);
+        if (lastPositiveShiftPosition <= 0) {
+            if (hasBeforeMaterialResult) {
+                // 有结果行但无班次级正量（测试或异常数据只维护日计划量）：回退真实剩余量口径。
+                boolean beforeMaterialCannotFinish = Objects.nonNull(beforeMaterialRemainingQty)
+                        && beforeMaterialRemainingQty > 0;
+                log.info("模具交替计划END_TYPE判断, machineCode: {}, beforeMaterialCode: {}, "
+                                + "beforeProductStatus: {}, beforeMaterialSurplusQty: {}, "
+                                + "lastPositiveShiftPosition: 0, changeShiftPosition: 0, "
+                                + "beforeMaterialCannotFinish: {}, endType: {}, "
+                                + "reason: 无班次级正量，回退真实剩余量口径",
+                        machineCode, beforeMaterialCode, beforeProductStatus, beforeMaterialSurplusQty,
+                        beforeMaterialCannotFinish,
+                        beforeMaterialCannotFinish ? END_TYPE_BY_TIME : END_TYPE_BY_REMAINING_QTY);
+                return beforeMaterialCannotFinish
+                        ? END_TYPE_BY_TIME : END_TYPE_BY_REMAINING_QTY;
+            }
+            log.info("模具交替计划END_TYPE判断, machineCode: {}, beforeMaterialCode: {}, beforeProductStatus: {}, "
+                            + "beforeMaterialSurplusQty: {}, lastPositiveShiftPosition: {}, changeShiftPosition: {}, "
+                            + "beforeMaterialCannotFinish: true, endType: 1, reason: 前物料余量>0但窗口内无排产量",
+                    machineCode, beforeMaterialCode, beforeProductStatus, beforeMaterialSurplusQty, 0, 0);
+            return END_TYPE_BY_TIME;
+        }
+        int changeShiftPosition = resolveChangeShiftPosition(context, changeTime);
+        // 换模班次早于前物料收尾班次 => 换模时前物料尚未收尾，按时间下机；否则按余量收尾下机。
+        boolean beforeMaterialCannotFinish = changeShiftPosition > 0
+                && changeShiftPosition < lastPositiveShiftPosition;
+        if (changeShiftPosition <= 0) {
+            // 无法定位换模班次时，回退到“真实剩余量>0”的数量口径，避免误判。
+            beforeMaterialCannotFinish = Objects.nonNull(beforeMaterialRemainingQty)
+                    && beforeMaterialRemainingQty > 0;
+            log.info("模具交替计划END_TYPE换模班次缺失回退, machineCode: {}, beforeMaterialCode: {}, "
+                            + "changeTime: {}, lastPositiveShiftPosition: {}, fallbackRemainingQty: {}, "
+                            + "beforeMaterialCannotFinish: {}",
+                    machineCode, beforeMaterialCode, changeTime, lastPositiveShiftPosition,
+                    beforeMaterialRemainingQty, beforeMaterialCannotFinish);
+        }
         String endType = beforeMaterialCannotFinish
                 ? END_TYPE_BY_TIME : END_TYPE_BY_REMAINING_QTY;
         log.info("模具交替计划END_TYPE判断, machineCode: {}, beforeMaterialCode: {}, beforeProductStatus: {}, "
-                        + "beforeMaterialSurplusQty: {}, "
-                        + "beforeMaterialRemainingQty: {}, beforeMaterialCannotFinish: {}, endType: {}",
+                        + "beforeMaterialSurplusQty: {}, beforeMaterialRemainingQty: {}, "
+                        + "lastPositiveShiftPosition: {}, changeShiftPosition: {}, "
+                        + "beforeMaterialCannotFinish: {}, endType: {}",
                 machineCode, beforeMaterialCode, beforeProductStatus, beforeMaterialSurplusQty,
-                beforeMaterialRemainingQty, beforeMaterialCannotFinish, endType);
+                beforeMaterialRemainingQty, lastPositiveShiftPosition, changeShiftPosition,
+                beforeMaterialCannotFinish, endType);
         return endType;
+    }
+
+    /**
+     * 解析前物料在本次排程跨机台的最后正量班次位置。
+     * <p>按“物料+产品状态”汇总全部结果行，取任意机台最后有正计划量的班次位置（1-8）；
+     * 前物料余量虽未排完但后续滚动窗口才承接时，本次窗口无正量班次，返回0。</p>
+     *
+     * @param context 排程上下文
+     * @param materialCode 前物料编码
+     * @param productStatus 前物料产品状态
+     * @return 最后正量班次位置；窗口内无正量时返回0
+     */
+    private int resolveBeforeMaterialLastPositiveShiftPosition(LhScheduleContext context,
+                                                               String materialCode,
+                                                               String productStatus) {
+        if (Objects.isNull(context) || StringUtils.isEmpty(materialCode)
+                || CollectionUtils.isEmpty(context.getScheduleResultList())) {
+            return 0;
+        }
+        String targetSkuKey = MonthPlanDateResolver.buildMaterialStatusKey(
+                materialCode, normalizeProductStatus(productStatus));
+        int lastPositiveShiftPosition = 0;
+        for (LhScheduleResult result : context.getScheduleResultList()) {
+            if (Objects.isNull(result) || !StringUtils.equals(materialCode, result.getMaterialCode())) {
+                continue;
+            }
+            if (!StringUtils.equals(targetSkuKey, MonthPlanDateResolver.buildMaterialStatusKey(
+                    result.getMaterialCode(), result.getProductStatus()))) {
+                continue;
+            }
+            for (int shiftPosition = 1;
+                 shiftPosition <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shiftPosition++) {
+                Integer planQty = ShiftFieldUtil.getShiftPlanQty(result, shiftPosition);
+                if (Objects.nonNull(planQty) && planQty > 0) {
+                    lastPositiveShiftPosition = Math.max(lastPositiveShiftPosition, shiftPosition);
+                }
+            }
+        }
+        return lastPositiveShiftPosition;
+    }
+
+    /**
+     * 判断前物料在本次排程结果列表中是否存在结果行（不限是否有班次级正量）。
+     *
+     * @param context 排程上下文
+     * @param materialCode 前物料编码
+     * @param productStatus 前物料产品状态
+     * @return true-存在结果行；false-本次窗口完全没有该物料结果
+     */
+    private boolean hasBeforeMaterialScheduleResult(LhScheduleContext context,
+                                                    String materialCode,
+                                                    String productStatus) {
+        if (Objects.isNull(context) || StringUtils.isEmpty(materialCode)
+                || CollectionUtils.isEmpty(context.getScheduleResultList())) {
+            return false;
+        }
+        String targetSkuKey = MonthPlanDateResolver.buildMaterialStatusKey(
+                materialCode, normalizeProductStatus(productStatus));
+        for (LhScheduleResult result : context.getScheduleResultList()) {
+            if (Objects.isNull(result) || !StringUtils.equals(materialCode, result.getMaterialCode())) {
+                continue;
+            }
+            if (StringUtils.equals(targetSkuKey, MonthPlanDateResolver.buildMaterialStatusKey(
+                    result.getMaterialCode(), result.getProductStatus()))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 解析换模开始时间所在的窗口班次位置。
+     * <p>与换模计划 CLASS_INDEX 解析共用窗口班次切片口径，保证“换模班次”与
+     * “结果行 CLASS1~CLASS8 正量班次”在同一个绝对班次坐标系内比较。</p>
+     *
+     * @param context 排程上下文
+     * @param changeTime 换模（清洗）开始时间
+     * @return 班次位置（1-8）；无法解析时返回 -1
+     */
+    private int resolveChangeShiftPosition(LhScheduleContext context, Date changeTime) {
+        if (Objects.isNull(context) || Objects.isNull(changeTime)) {
+            return -1;
+        }
+        if (Objects.isNull(context.getWindowEndDate())
+                && CollectionUtils.isEmpty(context.getScheduleWindowShifts())) {
+            return -1;
+        }
+        return LhScheduleTimeUtil.getShiftIndex(context, context.getWindowEndDate(), changeTime);
     }
 
     /**
@@ -2480,24 +2622,72 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
     }
 
     /**
-     * 读取前物料 SKU 在本次排程全部入口消费后的剩余量。
-     * <p>续作、换活字块、续作补偿新增等入口统一扣减 SKU 实际消费账本，账本 key 为“物料+产品状态”。
-     * S4.6 位于排程结果保存前，此时读取到的是本次排程最终剩余量：大于0表示本次不能收尾，等于0表示
-     * 本次可以排完。账本缺失时不重新计算、不使用初始余量兜底，按不满足时间下机条件处理，避免误标。</p>
+     * 计算前物料 SKU 在本次排程后的真实剩余量。
+     * <p>真实剩余量 = 前物料排程前硫化余量 - 本次排程该“物料+产品状态”全部结果的计划量合计。
+     * S4.6 位于排程结果保存前，此时结果列表即为本次排程最终落地量：真实剩余量大于0表示
+     * 本次不能收尾（按时间下机），等于0表示余量已全部排完（按余量收尾下机）。</p>
+     * <p>运行期共享的 SKU 实际消费账本会被收尾目标量同步、胎胚库存分摊、日标准收敛和
+     * 特殊材料置换快照恢复等规则改写，不能作为 END_TYPE 的判定依据；账本值仅保留在日志中
+     * 用于对账。无法取得前物料来源或结果列表时返回 null。</p>
      *
      * @param context 排程上下文
-     * @param beforeSku 续作降模时登记的前物料来源 SKU
-     * @return 本次排程后的 SKU 剩余量；无法取得准确运行态账本时返回 null
+     * @param beforeSku 交替计划前物料来源 SKU
+     * @param machineCode 交替计划机台编码（仅用于日志）
+     * @return 本次排程后的真实剩余量；无法取得准确数据时返回 null
      */
-    private Integer resolveBeforeMaterialRemainingQty(LhScheduleContext context, SkuScheduleDTO beforeSku) {
+    private Integer resolveBeforeMaterialRemainingQty(LhScheduleContext context,
+                                                      SkuScheduleDTO beforeSku,
+                                                      String machineCode) {
         if (Objects.isNull(context) || Objects.isNull(beforeSku)
                 || StringUtils.isEmpty(beforeSku.getMaterialCode())) {
             return null;
         }
         String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(
                 beforeSku.getMaterialCode(), beforeSku.getProductStatus());
-        Integer remainingQty = context.getSkuProductionRemainingQtyMap().get(skuKey);
-        return Objects.isNull(remainingQty) ? null : Math.max(0, remainingQty);
+        int surplusQty = Math.max(0, beforeSku.getSurplusQty());
+        int scheduledQty = resolveScheduledQtyByMaterialStatus(
+                context, beforeSku.getMaterialCode(), beforeSku.getProductStatus());
+        int realRemainingQty = Math.max(0, surplusQty - scheduledQty);
+        // 运行期账本仅用于对账，不参与 END_TYPE 判定。
+        Integer ledgerRemainingQty = context.getSkuProductionRemainingQtyMap().get(skuKey);
+        log.info("模具交替计划END_TYPE真实剩余量计算, machineCode: {}, beforeMaterialCode: {}, "
+                        + "beforeProductStatus: {}, surplusQty: {}, scheduledQty: {}, "
+                        + "ledgerRemainingQty: {}, realRemainingQty: {}",
+                machineCode, beforeSku.getMaterialCode(), beforeSku.getProductStatus(),
+                surplusQty, scheduledQty, ledgerRemainingQty, realRemainingQty);
+        return realRemainingQty;
+    }
+
+    /**
+     * 汇总本次排程指定“物料+产品状态”的全部结果计划量。
+     * <p>同一物料在多个机台或多次换活字块上生产时均计入，确保与“SKU 硫化余量”同一口径
+     * 核算本次排程后的真实剩余量；结果行日计划量为空时回退到 8 班班次量之和。</p>
+     *
+     * @param context 排程上下文
+     * @param materialCode 物料编码
+     * @param productStatus 产品状态
+     * @return 计划量合计
+     */
+    private int resolveScheduledQtyByMaterialStatus(LhScheduleContext context,
+                                                    String materialCode,
+                                                    String productStatus) {
+        if (Objects.isNull(context) || StringUtils.isEmpty(materialCode)
+                || CollectionUtils.isEmpty(context.getScheduleResultList())) {
+            return 0;
+        }
+        String targetSkuKey = MonthPlanDateResolver.buildMaterialStatusKey(materialCode, productStatus);
+        return context.getScheduleResultList().stream()
+                .filter(Objects::nonNull)
+                .filter(result -> StringUtils.equals(materialCode, result.getMaterialCode()))
+                .filter(result -> StringUtils.equals(targetSkuKey,
+                        MonthPlanDateResolver.buildMaterialStatusKey(
+                                result.getMaterialCode(), result.getProductStatus())))
+                .mapToInt(result -> {
+                    Integer planQty = result.getDailyPlanQty();
+                    return Math.max(0, Objects.isNull(planQty)
+                            ? ShiftFieldUtil.resolveScheduledQty(result) : planQty);
+                })
+                .sum();
     }
 
     /**

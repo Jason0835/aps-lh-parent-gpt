@@ -25,6 +25,7 @@ import com.zlt.aps.mp.engine.handler.ContinuousProductionDayHandler;
 import com.zlt.aps.mp.engine.handler.SkuProductionSnapshot;
 import com.zlt.aps.mp.engine.logrecorder.TbrMouldProductionLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
+import com.zlt.aps.mp.engine.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
 import com.zlt.aps.mp.engine.utils.NoProductionReasonUtils;
 import com.zlt.aps.utils.ProductSpecificationsUtils;
 import com.zlt.common.utils.PubUtil;
@@ -428,9 +429,34 @@ public class ProductionPlanGroupInfo {
      * 特殊材料结构的上机天数为1
      *
      * @param productionContext 排产上下文
+     * @param isChangeProSize   是否切换英寸
      * @return
      */
-    public Integer getMinAllocationDays(TbrProductionContext productionContext) {
+    public Integer getMinAllocationDays(TbrProductionContext productionContext, boolean isChangeProSize) {
+        if (isSpecialMaterial()) {
+            return BigDecimal.ONE.intValue();
+        }
+        ProductionCapacityParamConfiguration paramConfiguration = productionContext.getBaseDataContainer().getParamConfiguration();
+        Integer sameProSizeDays = paramConfiguration.getMinAllocationDays();
+        if (!isChangeProSize) {
+            return sameProSizeDays;
+        }
+        Integer changeProSize = paramConfiguration.getChangeProSizeMinAllocationDays();
+        if (null == changeProSize) {
+            return sameProSizeDays;
+        }
+        return changeProSize;
+    }
+
+    /**
+     * 需求估算时，小于最小天数，提升到最小天数
+     * 如果不是特殊材料的结构则为参数SYS0204010
+     * 特殊材料结构的上机天数为1
+     *
+     * @param productionContext 排产上下文
+     * @return
+     */
+    public Integer getRequireMinDays(TbrProductionContext productionContext) {
         if (isSpecialMaterial()) {
             return BigDecimal.ONE.intValue();
         }
@@ -1136,13 +1162,14 @@ public class ProductionPlanGroupInfo {
      * 非特殊材料结构，需要判断剩余可分配天数要 >= 参数SYS0204010
      *
      * @param productionContext 排产上下文
+     * @param isChangeProSize   是否切换英寸
      * @return
      */
-    public boolean isNextAllocation(Integer leftOverDays, TbrProductionContext productionContext) {
+    public boolean isNextAllocation(Integer leftOverDays, TbrProductionContext productionContext, boolean isChangeProSize) {
         if (leftOverDays <= BigDecimal.ZERO.intValue()) {
             return false;
         }
-        return leftOverDays >= getMinAllocationDays(productionContext);
+        return leftOverDays >= getMinAllocationDays(productionContext, isChangeProSize);
     }
 
     /**

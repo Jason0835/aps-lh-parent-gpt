@@ -1314,7 +1314,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 continue;
             }
             SkuScheduleDTO sku = binding.getSku();
-            if (!isBusinessDayAdmissionAllowed(context, dayContext, sku)) {
+            if (!isBusinessDayAdmissionAllowed(
+                    context, dayContext, sku, isEndingBinding(binding))) {
                 deferSkuToNextDay(context, dayContext, state, sku,
                         "当前业务日日计划为0且未命中合法提前生产");
                 log.info("新增在机SKU跨日续排未通过业务日准入, batchNo: {}, scheduleDate: {}, "
@@ -1357,16 +1358,33 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
      * 统一判断SKU是否允许在当前业务日形成新增排产量。
      *
      * <p>当天日计划余额大于0时直接准入；否则必须命中现有提前生产规则。
-     * 历史反选、换活字块锁机台、延期任务和在机绑定均不构成额外日期准入资格。</p>
+     * 历史反选、换活字块锁机台、延期任务不构成额外日期准入资格。
+     * 唯一例外：收尾 SKU 前一业务日已经真实上机（在机收尾绑定）且仍有生产剩余量时，
+     * 允许跨日续排——dayN 只限制新增机台数量，不截断已在机机台的有效产能，
+     * 避免“已上机收尾物料只排一天就提前下机、机台空置”的问题。</p>
      *
      * @param context 排程上下文
      * @param dayContext 当前业务日
      * @param sku SKU
+     * @param endingInMachineBinding true-当前 SKU 存在已上机收尾绑定（仅由延续阶段传入）
      * @return true-当前业务日允许排产；false-必须延期
      */
     private boolean isBusinessDayAdmissionAllowed(LhScheduleContext context,
                                                   DayScheduleContext dayContext,
-                                                  SkuScheduleDTO sku) {
+                                                  SkuScheduleDTO sku,
+                                                  boolean endingInMachineBinding) {
+        if (endingInMachineBinding) {
+            int productionRemainingQty =
+                    getTargetScheduleQtyResolver().resolveProductionRemainingQty(context, sku);
+            if (productionRemainingQty > 0) {
+                log.info("新增收尾SKU在机跨日续排准入, scheduleDate: {}, materialCode: {}, "
+                                + "productStatus: {}, productionRemainingQty: {}, "
+                                + "原因: 已在机收尾绑定按目标量续排，dayN只限制新增机台数",
+                        dayContext.getScheduleDate(), sku.getMaterialCode(), sku.getProductStatus(),
+                        productionRemainingQty);
+                return true;
+            }
+        }
         EarlyProductionRuntimePlan runtimePlan =
                 Objects.isNull(context) ? null : context.getEarlyProductionRuntimePlan(sku);
         if (Objects.nonNull(runtimePlan)) {
