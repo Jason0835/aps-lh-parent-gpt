@@ -92,6 +92,22 @@ public class TcMouthPlateServiceImpl extends AbstractDocService<TcMouthPlate> im
     @Override
     protected Boolean serviceCheckAndDataHandle(TcMouthPlate importDocEntity, List<ImportErrorLog> importErrorLogs,
                                                 Long importLogId, int errorRowNum, Map<Object, Object> serviceCheckParams) {
+        // 必填项校验：工厂编号、口型板编码、机台编码
+        if (StringUtils.isBlank(importDocEntity.getFactoryCode())
+                || StringUtils.isBlank(importDocEntity.getMouthPlateCode())
+                || StringUtils.isBlank(importDocEntity.getMachineCode())) {
+            String blankField;
+            if (StringUtils.isBlank(importDocEntity.getFactoryCode())) {
+                blankField = I18nUtil.getMessage("ui.data.column.tc.mouthPlate.factoryCode");
+            } else if (StringUtils.isBlank(importDocEntity.getMouthPlateCode())) {
+                blankField = I18nUtil.getMessage("ui.data.column.tc.mouthPlate.mouthPlateCode");
+            } else {
+                blankField = I18nUtil.getMessage("ui.data.column.tc.mouthPlate.machineCode");
+            }
+            String message = String.format(I18nUtil.getMessage("import.validated.required"), errorRowNum, blankField);
+            ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(), errorRowNum, message, importErrorLogs);
+            return Boolean.FALSE;
+        }
         // 校验机台编码是否存在
         if (serviceCheckParams.containsKey("tcMachineCodeList")) {
             List<String> machineCodeList = (List<String>) serviceCheckParams.get("tcMachineCodeList");

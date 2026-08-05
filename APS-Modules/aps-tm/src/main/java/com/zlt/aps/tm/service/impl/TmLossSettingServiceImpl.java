@@ -101,8 +101,15 @@ public class TmLossSettingServiceImpl extends AbstractDocService<TmLossSetting> 
     @Override
     protected Boolean serviceCheckAndDataHandle(TmLossSetting importDocEntity, List<ImportErrorLog> importErrorLogs,
                                                 Long importLogId, int errorRowNum, Map<Object, Object> serviceCheckParams) {
-        // 校验机台编码是否存在（为空时跳过）
+        // 校验胎面编码与机台编码不能同时为空
+        String treadCode = importDocEntity.getTreadCode();
         String machineCode = importDocEntity.getMachineCode();
+        if (StringUtils.isBlank(treadCode) && StringUtils.isBlank(machineCode)) {
+            String message = I18nUtil.getMessage("ui.data.alert.tm.lossSetting.bothEmpty");
+            ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(), errorRowNum, message, importErrorLogs);
+            return Boolean.FALSE;
+        }
+        // 校验机台编码是否存在（为空时跳过）
         if (StringUtils.isNotBlank(machineCode) && serviceCheckParams.containsKey("tmMachineCodeList")) {
             List<String> machineCodeList = (List<String>) serviceCheckParams.get("tmMachineCodeList");
             if (!machineCodeList.contains(machineCode)) {

@@ -100,7 +100,7 @@ public class TcManualMachineRuleValidator {
         TcShiftConfig shiftConfig = this.requireShiftConfig(sourceResult, shiftOrder);
         this.validateMachineOpenShift(machineInfo, shiftConfig);
         this.validateMouthPlate(sourceResult, targetMachineCode);
-        this.validateGlueMachine(sourceResult, targetMachineCode, shiftConfig.getShiftCode());
+        this.validateGlueMachine(sourceResult, targetMachineCode);
         this.validateSpecifyMachine(sourceResult, targetMachineCode);
         this.validateSharedMachine(sourceResult, targetMachineCode, shiftConfig.getShiftCode());
         this.validateCapacity(sourceResult, targetMachineCode, shiftOrder, shiftConfig, machineInfo);
@@ -212,9 +212,8 @@ public class TcManualMachineRuleValidator {
      *
      * @param sourceResult 源排程结果
      * @param targetMachineCode 目标机台
-     * @param shiftCode 班次编码
      */
-    private void validateGlueMachine(TcScheduleResult sourceResult, String targetMachineCode, String shiftCode) {
+    private void validateGlueMachine(TcScheduleResult sourceResult, String targetMachineCode) {
         LambdaQueryWrapper<TcGlueMachineReal> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(TcGlueMachineReal::getFactoryCode, sourceResult.getFactoryCode());
         wrapper.eq(TcGlueMachineReal::getEnableStatus, "1");
@@ -224,8 +223,7 @@ public class TcManualMachineRuleValidator {
                 .filter(item -> "0".equals(item.getAllowFlag()) || "1".equals(item.getAllowFlag()))
                 .filter(item -> StringUtils.isBlank(item.getBaseGlueCode())
                         || Objects.equals(item.getBaseGlueCode(), sourceResult.getBaseGlueCode()))
-                .filter(item -> StringUtils.isBlank(item.getShiftCode())
-                        || Objects.equals(item.getShiftCode(), shiftCode)).collect(Collectors.toList());
+                .collect(Collectors.toList());
         if (relevantRuleList.isEmpty()) {
             return;
         }

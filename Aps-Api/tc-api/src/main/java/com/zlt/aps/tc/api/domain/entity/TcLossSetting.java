@@ -25,7 +25,7 @@ public class TcLossSetting extends BaseEntity {
     private String factoryCode;
 
     @Excel(name = "ui.data.column.tc.lossSetting.sidewallCode")
-    @ImportValidated(required = false, isCode = true, maxLength = 20)
+    @ImportValidated(required = true, isCode = true, maxLength = 20)
     @ApiModelProperty(value = "胎侧编码", name = "sidewallCode")
     @TableField(value = "SIDEWALL_CODE")
     private String sidewallCode;

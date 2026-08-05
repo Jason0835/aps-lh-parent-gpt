@@ -40,12 +40,6 @@ public class TmGlueMachineReal extends BaseEntity {
     @TableField(value = "MACHINE_CODE")
     private String machineCode;
 
-    @Excel(name = "ui.data.column.tm.glueMachineReal.shiftCode", dictType = "class_num_three_plan")
-    @ImportValidated(maxLength = 10)
-    @ApiModelProperty(value = "机台班次编码", name = "shiftCode")
-    @TableField(value = "SHIFT_CODE")
-    private String shiftCode;
-
     @Excel(name = "ui.data.column.tm.glueMachineReal.priority")
     @ImportValidated(digits = true, min = 0, max = 999)
     @ApiModelProperty(value = "优先级", name = "priority")
@@ -73,8 +67,4 @@ public class TmGlueMachineReal extends BaseEntity {
     @ApiModelProperty(value = "机台名称", name = "machineName")
     @TableField(exist = false)
     private String machineName;
-
-    @ApiModelProperty(value = "机台班次名称", name = "machineClassName")
-    @TableField(exist = false)
-    private String machineClassName;
 }
