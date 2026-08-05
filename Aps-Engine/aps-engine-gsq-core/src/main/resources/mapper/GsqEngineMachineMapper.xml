@@ -6,7 +6,6 @@
         select ID,
                MACHINE_CODE,
                MACHINE_NAME,
-               TOOLING_INFO,
                QUATA,
                CLASS_SHIFT,
                OPEN_MACHINE_CLASS,

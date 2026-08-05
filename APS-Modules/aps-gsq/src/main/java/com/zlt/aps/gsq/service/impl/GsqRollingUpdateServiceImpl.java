@@ -38,7 +38,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-import com.zlt.aps.gsq.entity.GsqParams;
+import com.zlt.aps.gsq.api.domain.entity.GsqParams;
 import com.zlt.aps.gsq.mapper.GsqParamsMapper;
 
 /**

@@ -104,11 +104,17 @@ public interface MpAdjustResultEntityMapper extends CommBaseMapper<MpAdjustResul
             @Param("stockCaptureDateList") List<StockCaptureDateDTO> stockCaptureDateList);
 
     /**
-     * 定稿时补更新当月调整结果表的上月超欠产有效标识（只更新标识，不更新值）
-     * 逻辑同定稿表 updateLastMonthOverProdFlag，区别：
-     *   1. 写入目标表为 T_MP_ADJUST_RESULT
-     *   2. 数据来源取上月调整结果表
-     *   3. 当月版本号从 T_MP_ADJUST_RESULT 取 MAX(VERSION)（ADJ前缀）
+     * 计算上月超欠产并回填有效标识到当月调整结果表（仅更新标识，不更新超欠产值）
+     * <p>
+     * 与 updateLastMonthOverProdForAdjust 的区别：本方法只更新 LAST_MONTH_VALID_FLAG，不更新 LAST_MONTH_OVERDUE_QTY。
+     * 用于定稿场景下重算调整结果表的有效标识，支持以下判定规则：
+     *   - 强制置零（FORCE_ZERO=1）→ '1'（是）
+     *   - 库存抓取日缺失（STOCK_CAPTURE_DATE_MISSING=1）→ NULL（放空）
+     *   - |超欠产值|(绝对值) > 阈值参数 → '0'（否）
+     *   - 否则 → '1'（是）
+     * </p>
+     * 过滤规则：排除试制(X)、量试(T)产品状态的数据（PRODUCT_STATUS NOT IN ('X','T')）
+     * 匹配维度：按 (分厂+物料+VERSION=当月ADJ版本号) 维度匹配更新（调整结果表无 PRODUCT_STATUS 字段）
      *
      * @param lastYear                 数据来源月年份
      * @param lastMonth                数据来源月月份

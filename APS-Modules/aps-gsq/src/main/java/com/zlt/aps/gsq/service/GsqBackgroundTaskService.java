@@ -1,13 +1,18 @@
 package com.zlt.aps.gsq.service;
 
+import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.StrUtil;
 import com.alibaba.fastjson.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.ruoyi.common.exception.ServiceException;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.gsq.constant.GsqScheduleConstants;
 import com.zlt.aps.gsq.domain.GsqAutoScheduleTask;
 import com.zlt.aps.gsq.mapper.GsqAutoScheduleTaskMapper;
 import com.zlt.aps.gsq.enums.GsqAutoScheduleTaskStatusEnum;
+import com.zlt.aps.gsq.enums.GsqBackgroundTaskTypeEnum;
+import com.zlt.aps.gsq.api.domain.vo.GsqOperationTaskVo;
 import com.zlt.aps.gsq.api.domain.vo.GsqRollingTaskVo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -17,10 +22,20 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.*;
 
 /**
- * 钢丝圈自动滚动后台任务状态服务。
+ * 钢丝圈自动滚动与人工操作后台任务状态服务。
  *
  * <p>负责维护 {@link GsqAutoScheduleTask} 任务记录的状态机：
  * 等待执行 -> 执行中 -> 成功/失败。所有状态更新使用独立短事务，避免被外部大事务回滚。</p>
+ *
+ * <p>对齐胎侧 {@code TcBackgroundTaskService}，同时支持：</p>
+ * <ul>
+ *   <li>自动滚动：{@link #create(GsqAutoScheduleTask)}、{@link #start(String, String, String)}、
+ *       {@link #markSuccess(String, Object, Map, List)}、{@link #markFailed(String, String, Map, List)}；</li>
+ *   <li>人工操作：{@link #createOperationPending(String, String, Date, Object, String)}、
+ *       {@link #startOperation(String)}、{@link #markOperationSuccess(String, int)}、
+ *       {@link #markOperationFailed(String, String)}、{@link #findLatestOperation(String, Date)}、
+ *       {@link #toOperationTaskVo(GsqAutoScheduleTask)}。</li>
+ * </ul>
  *
  * @author APS
  */
@@ -29,6 +44,173 @@ import java.util.*;
 public class GsqBackgroundTaskService {
 
     private final GsqAutoScheduleTaskMapper taskMapper;
+
+    /**
+     * 创建等待执行的人工操作任务。
+     *
+     * <p>对齐胎侧 {@code TcBackgroundTaskService.createOperationPending}，用于4类人工操作
+     * （插单/调量/转机台/删除）异步任务入口。请求快照序列化为 JSON 存入
+     * {@link GsqAutoScheduleTask#getRequestSnapshot()}，由异步执行器反序列化后执行。</p>
+     *
+     * @param taskType        任务类型编码，见 {@link GsqBackgroundTaskTypeEnum}
+     * @param factoryCode     工厂编码
+     * @param scheduleDate    排程日期
+     * @param requestSnapshot 请求快照对象（将被 JSON 序列化）
+     * @param operator        操作人，空时填充为 system
+     * @return 新建任务
+     * @throws ServiceException 已有同工厂日期活跃任务或入库失败时抛出
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
+    public GsqAutoScheduleTask createOperationPending(String taskType, String factoryCode, Date scheduleDate,
+                                                     Object requestSnapshot, String operator) {
+        if (this.findActive(factoryCode, scheduleDate) != null) {
+            throw new ServiceException(I18nUtil.getMessage("ui.gsq.schedule.concurrentTask"));
+        }
+        GsqAutoScheduleTask task = new GsqAutoScheduleTask();
+        task.setTaskId(GsqScheduleConstants.OPERATION_TASK_ID_PREFIX + IdUtil.fastSimpleUUID().toUpperCase());
+        task.setTaskType(taskType);
+        task.setFactoryCode(factoryCode);
+        task.setScheduleDate(scheduleDate);
+        task.setTaskStatus(GsqAutoScheduleTaskStatusEnum.PENDING.getCode());
+        task.setProgress(0);
+        task.setCurrentStage(GsqAutoScheduleTaskStatusEnum.PENDING.getCode());
+        task.setCurrentStageName(I18nUtil.getMessage("ui.gsq.schedule.operationTaskPending"));
+        task.setRequestSnapshot(JSON.toJSONString(requestSnapshot));
+        task.setCreateBy(StrUtil.blankToDefault(operator, "system"));
+        if (this.taskMapper.insert(task) != 1) {
+            throw new ServiceException(I18nUtil.getMessage("ui.gsq.schedule.operationTaskCreateFailed"));
+        }
+        return task;
+    }
+
+    /**
+     * 启动人工操作任务（PENDING -> RUNNING）。
+     *
+     * <p>对齐胎侧 {@code TcBackgroundTaskService.startOperation}，使用 VALIDATING 阶段作为初始阶段，
+     * 与自动滚动的 CALCULATING 阶段区分。</p>
+     *
+     * @param taskId 任务编号
+     * @return 是否启动成功；任务已不在 PENDING 状态时返回 false
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
+    public boolean startOperation(String taskId) {
+        Date now = new Date();
+        return this.taskMapper.update(null, new LambdaUpdateWrapper<GsqAutoScheduleTask>()
+                .eq(GsqAutoScheduleTask::getTaskId, taskId)
+                .eq(GsqAutoScheduleTask::getTaskStatus, GsqAutoScheduleTaskStatusEnum.PENDING.getCode())
+                .set(GsqAutoScheduleTask::getTaskStatus, GsqAutoScheduleTaskStatusEnum.RUNNING.getCode())
+                .set(GsqAutoScheduleTask::getProgress, 20)
+                .set(GsqAutoScheduleTask::getCurrentStage, "VALIDATING")
+                .set(GsqAutoScheduleTask::getCurrentStageName,
+                        I18nUtil.getMessage("ui.gsq.schedule.operationTaskValidating"))
+                .set(GsqAutoScheduleTask::getStartTime, now)
+                .set(GsqAutoScheduleTask::getLastHeartbeatTime, now)) == 1;
+    }
+
+    /**
+     * 标记人工操作任务成功。
+     *
+     * <p>对齐胎侧 {@code TcBackgroundTaskService.markOperationSuccess}，将受影响行数写入
+     * {@code resultJson} 的 {@code affectedCount} 字段，供前端轮询读取。</p>
+     *
+     * @param taskId        任务编号
+     * @param affectedCount 受影响行数
+     * @return 是否更新成功；任务已不在 RUNNING 状态时返回 false
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
+    public boolean markOperationSuccess(String taskId, int affectedCount) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("affectedCount", affectedCount);
+        Date now = new Date();
+        return this.taskMapper.update(null, new LambdaUpdateWrapper<GsqAutoScheduleTask>()
+                .eq(GsqAutoScheduleTask::getTaskId, taskId)
+                .eq(GsqAutoScheduleTask::getTaskStatus, GsqAutoScheduleTaskStatusEnum.RUNNING.getCode())
+                .set(GsqAutoScheduleTask::getTaskStatus, GsqAutoScheduleTaskStatusEnum.SUCCESS.getCode())
+                .set(GsqAutoScheduleTask::getProgress, 100)
+                .set(GsqAutoScheduleTask::getCurrentStage, "SUCCESS")
+                .set(GsqAutoScheduleTask::getCurrentStageName,
+                        I18nUtil.getMessage("ui.gsq.schedule.operationTaskSuccess"))
+                .set(GsqAutoScheduleTask::getResultJson, JSON.toJSONString(result))
+                .set(GsqAutoScheduleTask::getEndTime, now)
+                .set(GsqAutoScheduleTask::getLastHeartbeatTime, now)) == 1;
+    }
+
+    /**
+     * 标记人工操作任务失败。
+     *
+     * <p>对齐胎侧 {@code TcBackgroundTaskService.markOperationFailed}，允许 PENDING/RUNNING 状态迁移到 FAILED，
+     * 并通过 {@link #truncateError(String)} 截断错误信息后写入数据库。</p>
+     *
+     * @param taskId       任务编号
+     * @param errorMessage 错误摘要
+     * @return 是否更新成功
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
+    public boolean markOperationFailed(String taskId, String errorMessage) {
+        Date now = new Date();
+        String normalizedError = this.truncateError(errorMessage);
+        return this.taskMapper.update(null, new LambdaUpdateWrapper<GsqAutoScheduleTask>()
+                .eq(GsqAutoScheduleTask::getTaskId, taskId)
+                .in(GsqAutoScheduleTask::getTaskStatus, Arrays.asList(
+                        GsqAutoScheduleTaskStatusEnum.PENDING.getCode(),
+                        GsqAutoScheduleTaskStatusEnum.RUNNING.getCode()))
+                .set(GsqAutoScheduleTask::getTaskStatus, GsqAutoScheduleTaskStatusEnum.FAILED.getCode())
+                .set(GsqAutoScheduleTask::getCurrentStage, "FAILED")
+                .set(GsqAutoScheduleTask::getCurrentStageName,
+                        I18nUtil.getMessage("ui.gsq.schedule.operationTaskFailed"))
+                .set(GsqAutoScheduleTask::getErrorMessage, normalizedError)
+                .set(GsqAutoScheduleTask::getErrorSummary, normalizedError)
+                .set(GsqAutoScheduleTask::getEndTime, now)
+                .set(GsqAutoScheduleTask::getLastHeartbeatTime, now)) == 1;
+    }
+
+    /**
+     * 查询最近一次人工操作任务。
+     *
+     * <p>对齐胎侧 {@code TcBackgroundTaskService.findLatestOperation}，按 taskType IN
+     * {@link GsqBackgroundTaskTypeEnum#manualOperationCodes()} 过滤，用于前端"最近任务"轮询查询。</p>
+     *
+     * @param factoryCode  工厂编码
+     * @param scheduleDate 排程日期
+     * @return 最近任务，不存在返回 null
+     */
+    public GsqAutoScheduleTask findLatestOperation(String factoryCode, Date scheduleDate) {
+        return this.taskMapper.selectOne(new LambdaQueryWrapper<GsqAutoScheduleTask>()
+                .eq(GsqAutoScheduleTask::getFactoryCode, factoryCode)
+                .eq(GsqAutoScheduleTask::getScheduleDate, scheduleDate)
+                .in(GsqAutoScheduleTask::getTaskType, GsqBackgroundTaskTypeEnum.manualOperationCodes())
+                .orderByDesc(GsqAutoScheduleTask::getCreateTime)
+                .last("limit 1"));
+    }
+
+    /**
+     * 将任务转换为人工操作轮询响应。
+     *
+     * <p>对齐胎侧 {@code TcBackgroundTaskService.toOperationTaskVo}，从 {@code resultJson} 解析
+     * {@code affectedCount} 供前端展示。</p>
+     *
+     * @param task 任务实体
+     * @return 人工操作任务响应；入参为 null 时返回 null
+     */
+    public GsqOperationTaskVo toOperationTaskVo(GsqAutoScheduleTask task) {
+        if (task == null) {
+            return null;
+        }
+        GsqOperationTaskVo response = new GsqOperationTaskVo();
+        response.setTaskId(task.getTaskId());
+        response.setTaskType(task.getTaskType());
+        response.setTaskStatus(task.getTaskStatus());
+        response.setProgress(task.getProgress());
+        response.setCurrentStage(task.getCurrentStage());
+        response.setCurrentStageName(task.getCurrentStageName());
+        response.setMessage(task.getErrorMessage());
+        response.setFactoryCode(task.getFactoryCode());
+        response.setScheduleDate(task.getScheduleDate());
+        if (StrUtil.isNotBlank(task.getResultJson())) {
+            response.setAffectedCount(JSON.parseObject(task.getResultJson()).getInteger("affectedCount"));
+        }
+        return response;
+    }
 
     /**
      * 按任务ID查询后台任务。

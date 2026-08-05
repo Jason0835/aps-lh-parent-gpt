@@ -514,4 +514,6 @@ public interface MesItfService {
      * @return 结果
      */
     AjaxResult syncDevPlanClose(AuxReqSyncDataLogs syncDataLogs);
+
+    public AjaxResult syncBeadShiftStock(MesShiftStockSyncRequest request);
 }

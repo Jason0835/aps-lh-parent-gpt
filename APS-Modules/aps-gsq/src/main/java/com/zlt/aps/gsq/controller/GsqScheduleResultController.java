@@ -9,9 +9,12 @@ import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.gsq.api.domain.dto.GsqChangeMachineDTO;
 import com.zlt.aps.gsq.api.domain.dto.GsqInsertOrderDTO;
+import com.zlt.aps.gsq.api.domain.dto.GsqScheduleResultImportDTO;
 import com.zlt.aps.gsq.api.domain.entity.GsqMachineInfo;
 import com.zlt.aps.gsq.api.domain.entity.GsqScheduleResult;
 import com.zlt.aps.gsq.api.domain.entity.GsqSpecifyMachine;
+import com.zlt.aps.gsq.api.domain.vo.GsqInsertTaskRequestVo;
+import com.zlt.aps.gsq.api.domain.vo.GsqOperationTaskVo;
 import com.zlt.aps.gsq.api.domain.vo.GsqScheduleShiftDateVO;
 import com.zlt.aps.gsq.engine.service.GsqEngineService;
 import com.zlt.aps.gsq.mapper.GsqScheduleResultMapper;
@@ -19,6 +22,8 @@ import com.zlt.aps.gsq.service.GsqMachineInfoService;
 import com.zlt.aps.gsq.api.domain.vo.GsqRollingCheckRequestVo;
 import com.zlt.aps.gsq.api.domain.vo.GsqRollingTaskVo;
 import com.zlt.aps.gsq.service.GsqAutoRollingApplicationService;
+import com.zlt.aps.gsq.service.GsqOperationTaskApplicationService;
+import com.zlt.aps.gsq.service.IGsqScheduleResultExcelService;
 import com.zlt.aps.gsq.service.IGsqScheduleResultService;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
@@ -27,12 +32,14 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -53,8 +60,18 @@ public class GsqScheduleResultController extends AbstractDocBizController<GsqSch
     @Autowired
     private IGsqScheduleResultService gsqScheduleResultService;
 
+    /** 钢丝圈排程结果专用模板导入导出服务 */
+    @Resource
+    private IGsqScheduleResultExcelService gsqScheduleResultExcelService;
+
     @Autowired
     private GsqAutoRollingApplicationService gsqAutoRollingApplicationService;
+
+    /**
+     * 钢丝圈人工操作任务应用服务（4 类 /operation/* 端点的异步入口）
+     */
+    @Autowired
+    private GsqOperationTaskApplicationService gsqOperationTaskApplicationService;
 
     @Resource
     private GsqScheduleResultMapper gsqScheduleResultMapper;
@@ -142,6 +159,38 @@ public class GsqScheduleResultController extends AbstractDocBizController<GsqSch
     public byte[] exportData(@RequestBody GsqScheduleResult queryVO, @PathVariable("fileName") String fileName,
                              HttpServletResponse response) throws IOException {
         return super.exportData(queryVO, fileName, response);
+    }
+
+    /**
+     * 按专用模板导出钢丝圈排程结果。
+     *
+     * @param queryVO 工厂和单日排程条件
+     * @param fileName 文件名称
+     * @return Excel 文件字节
+     */
+    @Log(title = "钢丝圈排程结果", businessType = BusinessType.EXPORT)
+    @ApiOperation("按专用模板导出钢丝圈排程结果")
+    @PostMapping("/exportDataScheduleResult")
+    public byte[] exportDataScheduleResult(@RequestBody GsqScheduleResult queryVO,
+                                            @RequestParam("fileName") String fileName) {
+        return this.gsqScheduleResultExcelService.exportDataScheduleResult(queryVO, fileName);
+    }
+
+    /**
+     * 按专用模板导入钢丝圈排程结果。
+     *
+     * @param importDTO 文件和工厂日期上下文
+     * @param updateSupport 是否允许覆盖更新
+     * @return 导入结果和行级错误
+     * @throws Exception 文件解析或日志处理失败时抛出
+     */
+    @Log(title = "钢丝圈排程结果", businessType = BusinessType.IMPORT)
+    @ApiOperation("按专用模板导入钢丝圈排程结果")
+    @PostMapping("/importDataScheduleResult")
+    public AjaxResult importDataScheduleResult(@RequestBody GsqScheduleResultImportDTO importDTO,
+                                                @RequestParam("updateSupport") boolean updateSupport)
+            throws Exception {
+        return this.gsqScheduleResultExcelService.importDataScheduleResult(importDTO, updateSupport);
     }
 
     @Override
@@ -357,6 +406,51 @@ public class GsqScheduleResultController extends AbstractDocBizController<GsqSch
         return gsqScheduleResultService.logicDeleteByIds(ids);
     }
 
+    // ==================== 新人工操作接口（走任务链路径） ====================
+
+    /**
+     * 人工插单（新接口，支持锚点插入、resequence 重排）。
+     *
+     * <p>当 anchorTaskId 不为空时，在锚点任务之后插入，锚点之后任务 sequence +1；
+     * 否则按 class1Sequence 等顺序字段插入，顺序为空时追加链尾。</p>
+     */
+    @Log(title = "钢丝圈排程结果", businessType = BusinessType.INSERT_OR_UPDATE)
+    @ApiOperation("人工插单（新接口，支持锚点）")
+    @PostMapping("/insertTask")
+    public AjaxResult insertTask(@RequestBody GsqInsertTaskRequestVo vo) {
+        return gsqScheduleResultService.insertTask(vo);
+    }
+
+    /**
+     * 批量转机台（走任务链路径，支持锚点、目标班次）。
+     */
+    @Log(title = "钢丝圈排程结果", businessType = BusinessType.CHANGE_MACHINE)
+    @ApiOperation("批量转机台")
+    @PostMapping("/batchChangeMachine")
+    public AjaxResult batchChangeMachine(@RequestBody List<GsqScheduleResult> list) {
+        return gsqScheduleResultService.batchChangeMachine(list);
+    }
+
+    /**
+     * 批量调量（走任务链路径）。
+     */
+    @Log(title = "钢丝圈排程结果", businessType = BusinessType.CHANGE_QTY)
+    @ApiOperation("批量调量")
+    @PostMapping("/batchChangeQty")
+    public AjaxResult batchChangeQty(@RequestBody List<GsqScheduleResult> list) {
+        return gsqScheduleResultService.batchChangeQty(list);
+    }
+
+    /**
+     * 批量删除（走任务链路径，删除后 resequence 重排）。
+     */
+    @Log(title = "钢丝圈排程结果", businessType = BusinessType.DELETE)
+    @ApiOperation("批量删除")
+    @PostMapping("/batchDelete")
+    public AjaxResult batchDelete(@RequestBody List<Long> ids) {
+        return gsqScheduleResultService.batchDelete(ids);
+    }
+
     /**
      * 发布排程到MES
      * 前端传入选中记录ID列表（ids），后端按发布状态过滤可发布记录：
@@ -411,6 +505,86 @@ public class GsqScheduleResultController extends AbstractDocBizController<GsqSch
     @PostMapping("/listScheduleShiftDates")
     public List<GsqScheduleShiftDateVO> listScheduleShiftDates(@RequestBody GsqScheduleResult queryVO) {
         return gsqScheduleResultService.listScheduleShiftDates(queryVO);
+    }
+
+    // ==================== 异步人工操作端点（对齐胎侧 /operation/* 路径，返回任务VO供前端轮询） ====================
+
+    /**
+     * 提交钢丝圈人工插单异步任务。
+     *
+     * <p>对齐胎侧 {@code /operation/insertTask}，由应用服务创建 PENDING 任务并触发 @Async 执行，
+     * 前端按 {@code taskId} 轮询 {@link #getOperationTask(String)} 获取进度与结果。</p>
+     *
+     * @param vo 插单请求
+     * @return 初始任务
+     */
+    @ApiOperation("提交钢丝圈人工插单异步任务")
+    @PostMapping("/operation/insertTask")
+    public GsqOperationTaskVo submitInsertTask(@RequestBody GsqInsertTaskRequestVo vo) {
+        return this.gsqOperationTaskApplicationService.submitInsert(vo);
+    }
+
+    /**
+     * 提交钢丝圈批量调量异步任务。
+     *
+     * @param list 调量请求列表
+     * @return 初始任务
+     */
+    @ApiOperation("提交钢丝圈批量调量异步任务")
+    @PostMapping("/operation/changeQty")
+    public GsqOperationTaskVo submitChangeQty(@RequestBody List<GsqScheduleResult> list) {
+        return this.gsqOperationTaskApplicationService.submitChangeQty(list);
+    }
+
+    /**
+     * 提交钢丝圈批量转机台异步任务。
+     *
+     * @param list 转机台请求列表
+     * @return 初始任务
+     */
+    @ApiOperation("提交钢丝圈批量转机台异步任务")
+    @PostMapping("/operation/changeMachine")
+    public GsqOperationTaskVo submitChangeMachine(@RequestBody List<GsqScheduleResult> list) {
+        return this.gsqOperationTaskApplicationService.submitChangeMachine(list);
+    }
+
+    /**
+     * 提交钢丝圈批量删除异步任务。
+     *
+     * @param resultIdList 排程结果 ID 列表
+     * @return 初始任务
+     */
+    @ApiOperation("提交钢丝圈批量删除异步任务")
+    @DeleteMapping("/operation/remove")
+    public GsqOperationTaskVo submitRemove(@RequestBody List<Long> resultIdList) {
+        return this.gsqOperationTaskApplicationService.submitDelete(resultIdList);
+    }
+
+    /**
+     * 查询钢丝圈人工操作任务状态。
+     *
+     * @param taskId 任务编号
+     * @return 任务状态
+     */
+    @ApiOperation("查询钢丝圈人工操作任务状态")
+    @GetMapping("/operation/task/{taskId}")
+    public GsqOperationTaskVo getOperationTask(@PathVariable("taskId") String taskId) {
+        return this.gsqOperationTaskApplicationService.getTask(taskId);
+    }
+
+    /**
+     * 查询最近一次钢丝圈人工操作任务。
+     *
+     * @param factoryCode  工厂编码
+     * @param scheduleDate 排程日期
+     * @return 最近任务
+     */
+    @ApiOperation("查询最近钢丝圈人工操作任务")
+    @GetMapping("/operation/task/latest")
+    public GsqOperationTaskVo getLatestOperationTask(
+            @RequestParam("factoryCode") String factoryCode,
+            @RequestParam("scheduleDate") @DateTimeFormat(pattern = "yyyy-MM-dd") Date scheduleDate) {
+        return this.gsqOperationTaskApplicationService.getLatestTask(factoryCode, scheduleDate);
     }
 
     /**

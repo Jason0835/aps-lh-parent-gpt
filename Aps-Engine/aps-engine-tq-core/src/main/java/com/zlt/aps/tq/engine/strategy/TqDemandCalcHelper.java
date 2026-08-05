@@ -11,7 +11,6 @@ import com.zlt.aps.tq.engine.enums.TqScheduleRuleResultEnum;
 import com.zlt.aps.tq.engine.vo.TqMonthSurplusVo;
 import com.zlt.aps.tq.engine.vo.TqScheduleParams;
 import com.zlt.aps.tq.engine.vo.TqScheduleResultVo;
-import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
@@ -104,8 +103,10 @@ public final class TqDemandCalcHelper {
     /**
      * 根据成型机台数匹配胎圈备库班数配置规则，得到需备库班数 N。
      *
-     * <p>规则匹配逻辑：遍历配置列表，按 MACHINE_COUNT 和 MACHINE_RANGE（LT/LE/EQ/GE/GT）判断是否命中。
-     * 配置列表已按 MACHINE_COUNT 升序排列，匹配到第一条即返回。</p>
+     * <p>规则匹配逻辑：遍历配置列表，按连续区间 {@code [minMachineQty, maxMachineQty]} 判断是否命中。
+     * 配置列表已按 {@code MIN_MACHINE_QTY} 升序排列，命中第一个满足
+     * {@code minMachineQty ≤ machineCount ≤ maxMachineQty} 的配置行即返回。
+     * {@code maxMachineQty} 为 {@code null} 表示无上限（仅末行允许）。</p>
      *
      * @param machineCount 成型机台数（null 则不匹配）
      * @param configList   备库班数配置列表
@@ -116,38 +117,16 @@ public final class TqDemandCalcHelper {
             return null;
         }
         for (TqStockShiftConfig config : configList) {
-            if (matchMachineRange(machineCount, config.getMachineRange(), config.getMachineCount())) {
-                return config.getShiftCount();
+            Integer minQty = config.getMinMachineQty();
+            if (minQty == null) {
+                continue;
+            }
+            Integer maxQty = config.getMaxMachineQty();
+            if (machineCount >= minQty && (maxQty == null || machineCount <= maxQty)) {
+                return config.getDepthClassQty() == null ? null : config.getDepthClassQty().intValue();
             }
         }
         return null;
-    }
-
-    /**
-     * 判断成型机台数是否命中配置规则的机台范围。
-     *
-     * <p>支持 5 种范围操作符：LT(小于)、LE(小于等于)、EQ(等于)、GE(大于等于)、GT(大于)</p>
-     *
-     * @param machineCount 实际机台数
-     * @param machineRange 范围操作符
-     * @param configCount  配置的机台数
-     * @return true=命中 false=不命中
-     */
-    public static boolean matchMachineRange(Integer machineCount, String machineRange, Integer configCount) {
-        if (machineCount == null || configCount == null) {
-            return false;
-        }
-        if (StringUtils.isBlank(machineRange)) {
-            return false;
-        }
-        switch (machineRange.toUpperCase()) {
-            case "LT": return machineCount < configCount;
-            case "LE": return machineCount <= configCount;
-            case "EQ": return machineCount.equals(configCount);
-            case "GE": return machineCount >= configCount;
-            case "GT": return machineCount > configCount;
-            default: return false;
-        }
     }
 
     /**

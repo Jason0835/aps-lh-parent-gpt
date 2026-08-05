@@ -15,20 +15,21 @@ import java.util.List;
 public interface ITqStockShiftConfigService extends IDocService<TqStockShiftConfig> {
 
     /**
-     * 校验唯一性
+     * 校验唯一性（分厂 + 区间起始机台数）
      * @param config 配置对象
      * @return UserConstants.UNIQUE 唯一 / UserConstants.NOT_UNIQUE 不唯一
      */
     String checkUnique(TqStockShiftConfig config);
 
     /**
-     * 校验配置规则的交叉情况
-     * 校验新增/修改的规则是否与现有规则存在范围交叉
+     * 校验配置区间的连续性和完整性
      * <p>
      * 规则说明：
-     * - MACHINE_RANGE 与 MACHINE_COUNT 组合构成范围条件
-     * - 不同规则的范围不允许有交集，确保任意台数值最多只命中一条规则
-     * - 例如：已有「GE 3」(≥3)，不允许再新增「LE 5」(≤5)，因为台数4同时满足两条规则
+     * - 所有区间段必须连续且不重叠
+     * - 第1条 MIN_MACHINE_QTY 必须为 1
+     * - 后续行 MIN_MACHINE_QTY = 上一行 MAX_MACHINE_QTY + 1
+     * - 只有末行允许 MAX_MACHINE_QTY 为 NULL（无上限）
+     * - 若有缺口（未被覆盖的正整数）或重叠，校验失败
      * </p>
      *
      * @param config 配置实体

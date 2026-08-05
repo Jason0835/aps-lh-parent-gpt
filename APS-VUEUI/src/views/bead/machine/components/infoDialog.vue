@@ -99,11 +99,6 @@ export default {
           max: 999999,
           precision: 0,
         },
-        {
-          label: this.$t("ui.data.column.machine.toolingInfo"),
-          prop: "toolingInfo",
-          maxlength: "50",
-        },
 
         {
           label: this.$t("ui.data.column.machine.quata"),

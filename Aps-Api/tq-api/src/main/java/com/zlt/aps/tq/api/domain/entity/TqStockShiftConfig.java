@@ -1,9 +1,8 @@
 package com.zlt.aps.tq.api.domain.entity;
 
-import com.baomidou.mybatisplus.annotation.IdType;
+import java.math.BigDecimal;
+
 import com.baomidou.mybatisplus.annotation.TableField;
-import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
@@ -15,6 +14,12 @@ import lombok.EqualsAndHashCode;
 
 /**
  * 胎圈备库班数配置对象 t_tq_stock_shift_config
+ * <p>
+ * 以「供成型机数连续区间」方式配置备库班数，与垫胶/胎侧 DepthConfig 风格一致：
+ * - MIN_MACHINE_QTY：区间起始机台数（含），同一分厂第 1 条必须为 1
+ * - MAX_MACHINE_QTY：区间结束机台数（含），NULL 表示无上限（仅末行允许）
+ * - DEPTH_CLASS_QTY：该区间对应的备库班数
+ * </p>
  *
  * @author zlt
  * @date 2026-06-25
@@ -25,10 +30,6 @@ import lombok.EqualsAndHashCode;
 @ApiModel(value = "胎圈备库班数配置对象", description = "胎圈备库班数配置对象")
 public class TqStockShiftConfig extends BaseEntity {
     private static final long serialVersionUID = 1L;
-//
-//    @ApiModelProperty(value = "主键ID")
-//    @TableId(value = "ID", type = IdType.AUTO)
-//    private Long id;
 
     @Excel(name = "ui.data.column.factoryCode", dictType = "biz_factory_name", sort = 10)
     @ApiModelProperty(value = "分厂编码", position = 20)
@@ -36,32 +37,21 @@ public class TqStockShiftConfig extends BaseEntity {
     @ImportValidated(required = true, maxLength = 50)
     private String factoryCode;
 
-    @Excel(name = "ui.data.column.stockShiftConfig.machineRange", dictType = "machine_range", sort = 20)
-    @ApiModelProperty(value = "机台范围（字典 machine_range：LT/LE/EQ/GE/GT）", position = 30)
-    @TableField("MACHINE_RANGE")
-    @ImportValidated(required = true, maxLength = 10)
-    private String machineRange;
-
-    @Excel(name = "ui.data.column.stockShiftConfig.machineCount", sort = 30)
-    @ApiModelProperty(value = "成型机台数", position = 40)
-    @TableField("MACHINE_COUNT")
+    @Excel(name = "ui.tq.depthConfig.column.minMachineQty", sort = 20)
+    @ApiModelProperty(value = "区间起始供成型机数（含），第1条必须为1", position = 30)
+    @TableField("MIN_MACHINE_QTY")
     @ImportValidated(required = true, number = true, min = 1, max = 999)
-    private Integer machineCount;
+    private Integer minMachineQty;
 
-    @Excel(name = "ui.data.column.stockShiftConfig.shiftCount", sort = 40)
-    @ApiModelProperty(value = "备库班次数", position = 50)
-    @TableField("SHIFT_COUNT")
+    @Excel(name = "ui.tq.depthConfig.column.maxMachineQty", sort = 30)
+    @ApiModelProperty(value = "区间结束供成型机数（含），NULL表示无上限（仅末行允许）", position = 40)
+    @TableField("MAX_MACHINE_QTY")
+    @ImportValidated(number = true, min = 1, max = 999)
+    private Integer maxMachineQty;
+
+    @Excel(name = "ui.tq.depthConfig.column.depthClassQty", sort = 40)
+    @ApiModelProperty(value = "备库班数", position = 50)
+    @TableField("DEPTH_CLASS_QTY")
     @ImportValidated(required = true, number = true, min = 1, max = 99)
-    private Integer shiftCount;
-
-//    @Excel(name = "ui.common.column.remark", sort = 50)
-//    @ApiModelProperty(value = "备注", position = 500)
-//    @TableField("REMARK")
-//    @ImportValidated(maxLength = 500)
-//    private String remark;
-//
-//    @ApiModelProperty(value = "删除标识", position = 600)
-//    @TableLogic(value = "0", delval = "1")
-//    @TableField("IS_DELETE")
-//    private Integer isDelete;
+    private BigDecimal depthClassQty;
 }

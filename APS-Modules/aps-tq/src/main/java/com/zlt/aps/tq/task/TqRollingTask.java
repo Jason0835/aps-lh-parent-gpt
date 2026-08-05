@@ -4,10 +4,13 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
+import com.zlt.aps.tq.api.domain.dto.TqRollingCheckRequestDTO;
 import com.zlt.aps.tq.api.domain.entity.TqScheduleResult;
+import com.zlt.aps.tq.api.domain.vo.TqRollingRecalcResponseVO;
 import com.zlt.aps.tq.engine.vo.RollingUpdateResult;
 import com.zlt.aps.tq.mapper.TqScheduleResultMapper;
 import com.zlt.aps.tq.service.ITqRollingUpdateService;
+import com.zlt.aps.tq.service.TqAutoRollingApplicationService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -20,14 +23,19 @@ import java.util.stream.Collectors;
 /**
  * 胎圈排程滚动更新定时任务
  *
- * <p>定时自动触发滚动更新，扫描当天所有有机台排程数据的记录，逐机台执行滚动更新。</p>
+ * <p>对齐胎面 TmRollingTask，提供两类入口：</p>
+ * <ul>
+ *   <li>{@link #checkTimedRolling()} 班前 30 分钟窗口触发（推荐，对齐胎面）：
+ *       调用 TqAutoRollingApplicationService.checkAndExecute 完成 MES 同步、库存校验、调量算法</li>
+ *   <li>{@link #autoRollingUpdate()} 旧版全机台扫描触发（保留兼容，将逐步下线）：
+ *       扫描当天所有机台排程数据，逐机台执行 manualRollingUpdate</li>
+ * </ul>
  *
  * <p>使用说明：</p>
  * <ol>
- *   <li>在定时任务管理界面配置任务，调用目标示例：tqRollingTask.autoRollingUpdate()</li>
- *   <li>预警频率通过系统定时任务的cron表达式配置</li>
- *   <li>建议在班次开始前一段时间执行，以便提前发现排程冲突</li>
- *   <li>执行滚动更新前会先调用MES接口同步胎圈库存，保证库存基准为准实时数据</li>
+ *   <li>在定时任务管理界面配置任务，调用目标示例：tqRollingTask.checkTimedRolling()</li>
+ *   <li>建议每分钟执行一次，由 TqRollingWindowService 内部判断是否命中窗口</li>
+ *   <li>命中窗口时执行 MES 库存同步 + 库存校验 + 滚动调量算法</li>
  * </ol>
  *
  * @author APS
@@ -39,6 +47,9 @@ public class TqRollingTask {
     @Autowired
     private ITqRollingUpdateService tqRollingUpdateService;
 
+    @Autowired
+    private TqAutoRollingApplicationService tqAutoRollingApplicationService;
+
     @Resource
     private TqScheduleResultMapper tqScheduleResultMapper;
 
@@ -49,7 +60,50 @@ public class TqRollingTask {
     private IMesItfService mesItfService;
 
     /**
-     * 自动滚动更新（当天所有机台）
+     * 班次窗口触发的自动滚动（对齐胎面 TmRollingTask.checkTimedRolling）。
+     *
+     * <p>由 TqRollingWindowService 内部判断当前分钟是否命中班前 30 分钟窗口，
+     * 命中时调用 TqAutoRollingApplicationService.checkAndExecute 完成：
+     * <ol>
+     *   <li>MES 班次库存同步（IMesItfService.syncBeadShiftStock）</li>
+     *   <li>班次库存校验（ensureShiftStockExists）</li>
+     *   <li>调量算法（rollingRecalcAutomatically）</li>
+     * </ol>
+     * </p>
+     *
+     * <p>调用目标：tqRollingTask.checkTimedRolling()</p>
+     */
+    public void checkTimedRolling() {
+        log.info("胎圈自动滚动窗口检查任务开始执行");
+        long startTime = System.currentTimeMillis();
+        try {
+            TqRollingCheckRequestDTO request = new TqRollingCheckRequestDTO();
+            request.setTriggerTime(new Date());
+            List<TqRollingRecalcResponseVO> responseList = this.tqAutoRollingApplicationService.checkAndExecute(request);
+            if (responseList == null || responseList.isEmpty()) {
+                log.info("胎圈自动滚动窗口检查：当前分钟未命中任何班次窗口，跳过");
+                return;
+            }
+            int successCount = 0;
+            int skippedCount = 0;
+            for (TqRollingRecalcResponseVO response : responseList) {
+                if ("SUCCESS".equals(response.getStatus())) {
+                    successCount++;
+                } else {
+                    skippedCount++;
+                }
+            }
+            log.info("胎圈自动滚动窗口检查任务执行结束：成功{}个，跳过{}个，耗时{}ms",
+                    successCount, skippedCount, System.currentTimeMillis() - startTime);
+        } catch (Exception e) {
+            log.error("胎圈自动滚动窗口检查任务执行失败", e);
+        }
+    }
+
+    /**
+     * 自动滚动更新（当天所有机台）—— 旧版兼容入口，将逐步下线。
+     *
+     * <p>推荐使用 {@link #checkTimedRolling()} 班次窗口触发入口。</p>
      *
      * <p>扫描当天所有机台的排程数据，逐机台执行滚动更新。</p>
      * <p>执行前会先同步一次MES胎圈库存，避免使用滞后的库存快照做推算。</p>

@@ -29,11 +29,7 @@
 
 <script>
 import infoForm from "@/views/components/infoForm.vue";
-import {
-  saveStockShiftConfig,
-  checkStockShiftConfigUnique,
-  checkStockShiftConfigRangeCross,
-} from "@/api/tq/stockShiftConfig";
+import { saveStockShiftConfig } from "@/api/tq/stockShiftConfig";
 
 export default {
   components: { infoForm },
@@ -52,25 +48,50 @@ export default {
             trigger: "change",
           },
         ],
-        machineRange: [
-          {
-            required: true,
-            message: this.$t("common.rule.input"),
-            trigger: "change",
-          },
-        ],
-        machineCount: [
+        minMachineQty: [
           {
             required: true,
             message: this.$t("common.rule.input"),
             trigger: "blur",
           },
+          {
+            validator: (rule, value, callback) => {
+              if (value !== '' && value !== null && value !== undefined && Number(value) <= 0) {
+                callback(new Error(this.$t("ui.tq.depthConfig.positiveInteger")));
+              } else {
+                callback();
+              }
+            },
+            trigger: 'blur',
+          },
         ],
-        shiftCount: [
+        maxMachineQty: [
+          {
+            validator: (rule, value, callback) => {
+              if (value !== '' && value !== null && value !== undefined && Number(value) <= 0) {
+                callback(new Error(this.$t("ui.tq.depthConfig.positiveInteger")));
+              } else {
+                callback();
+              }
+            },
+            trigger: 'blur',
+          },
+        ],
+        depthClassQty: [
           {
             required: true,
             message: this.$t("common.rule.input"),
             trigger: "blur",
+          },
+          {
+            validator: (rule, value, callback) => {
+              if (value !== '' && value !== null && value !== undefined && Number(value) <= 0) {
+                callback(new Error(this.$t("ui.tq.depthConfig.positiveInteger")));
+              } else {
+                callback();
+              }
+            },
+            trigger: 'blur',
           },
         ],
       },
@@ -82,7 +103,7 @@ export default {
         (this.isEdit
           ? this.$t("common.button.edit")
           : this.$t("common.button.add")) +
-        this.$t("ui.data.column.tq.stockShiftConfig.modelName")
+        this.$t("ui.tq.depthConfig.column.modalName")
       );
     },
     columns() {
@@ -98,33 +119,27 @@ export default {
           disabled: this.isEdit,
         },
         {
-          label: this.$t("ui.data.column.stockShiftConfig.machineRange"),
-          prop: "machineRange",
-          span: 24,
-          type: "select",
-          dictData: this.parentDict.type.machine_range,
-          filterable: true,
-          required: true,
-          disabled: this.isEdit,
-        },
-        {
-          label: this.$t("ui.data.column.stockShiftConfig.machineCount"),
-          prop: "machineCount",
+          label: this.$t("ui.tq.depthConfig.column.minMachineQty"),
+          prop: "minMachineQty",
           span: 24,
           type: "number",
           min: 1,
-          max: 999,
           precision: 0,
           required: true,
-          disabled: this.isEdit,
         },
         {
-          label: this.$t("ui.data.column.stockShiftConfig.shiftCount"),
-          prop: "shiftCount",
+          label: this.$t("ui.tq.depthConfig.column.maxMachineQty"),
+          prop: "maxMachineQty",
+          span: 24,
+          type: "input",
+          tips: this.$t("ui.tq.depthConfig.maxMachineQtyTip"),
+        },
+        {
+          label: this.$t("ui.tq.depthConfig.column.depthClassQty"),
+          prop: "depthClassQty",
           span: 24,
           type: "number",
           min: 1,
-          max: 99,
           precision: 0,
           required: true,
         },
@@ -145,6 +160,10 @@ export default {
     async save(params) {
       try {
         this.loading = true;
+        // 将空字符串的 maxMachineQty 转为 null 提交
+        if (params.maxMachineQty === '') {
+          params.maxMachineQty = null;
+        }
         const res = await saveStockShiftConfig(params);
         this.$modal.msgSuccess(res.msg);
         this.$emit("success");
@@ -155,23 +174,23 @@ export default {
         this.loading = false;
       }
     },
-
     /**
      * 显示弹窗
      * @param {Object} data 编辑数据，不传为新增
+     * @param {String} defaultFactoryCode 默认分厂编码
      */
-    show(data) {
+    show(data, defaultFactoryCode) {
       this.visible = true;
       if (data) {
         this.isEdit = true;
         this.form = {
           ...data,
+          maxMachineQty: data.maxMachineQty != null ? data.maxMachineQty : '',
         };
       } else {
         this.isEdit = false;
         this.form = {
-          factoryCode: "116", // 工厂默认值为"越南"
-          machineRange: "EQ", // 机台范围默认值为"等于"
+          factoryCode: defaultFactoryCode || "",
         };
       }
     },
@@ -185,90 +204,10 @@ export default {
       this.visible = false;
     },
     /**
-     * 校验唯一性
-     */
-    checkUnique() {
-      return new Promise((resolve, reject) => {
-        checkStockShiftConfigUnique({
-          id: this.form.id,
-          factoryCode: this.form.factoryCode,
-          machineRange: this.form.machineRange,
-          machineCount: this.form.machineCount,
-        })
-          .then((res) => {
-            // 后端返回 UserConstants.UNIQUE=0（唯一）/ NOT_UNIQUE=1（不唯一）
-            // 响应拦截器返回的是数字类型，使用 === 0 严格比较
-            if (res === 0) {
-              resolve();
-            } else {
-              reject(
-                new Error(
-                  this.$t("ui.error.message.stockShiftConfig.unique") ||
-                    "该分厂下此机台数已存在配置"
-                )
-              );
-            }
-          })
-          .catch((error) => {
-            console.error(error);
-            reject(new Error(this.$t("验证失败，请稍后再试")));
-          });
-      });
-    },
-    /**
-     * 校验配置规则交叉
-     */
-    checkRangeCross() {
-      return new Promise((resolve, reject) => {
-        checkStockShiftConfigRangeCross({
-          id: this.form.id,
-          factoryCode: this.form.factoryCode,
-          machineRange: this.form.machineRange,
-          machineCount: this.form.machineCount,
-        })
-          .then((res) => {
-            // 后端返回 UserConstants.UNIQUE=0（无交叉）/ NOT_UNIQUE=1（存在交叉）
-            // 响应拦截器返回的是数字类型，使用 === 0 严格比较
-            console.log(res);
-            if (res === 0) {
-              resolve();
-            } else {
-              reject(
-                new Error(
-                  this.$t("ui.data.column.tq.stockShiftConfig.rangeCross") ||
-                    "配置规则存在交叉"
-                )
-              );
-            }
-          })
-          .catch((error) => {
-            console.error(error);
-            reject(new Error(this.$t("验证失败，请稍后再试")));
-          });
-      });
-    },
-    /**
-     * 确认保存
+     * 确认保存（区间连续性校验由后端 save 时统一校验）
      */
     handleConfirm() {
-      this.$refs.form.triggerConfirm(async (params) => {
-        Object.keys(params).forEach((key) => {
-          if (this.isEmpty(params[key])) {
-            params[key] = "";
-          }
-        });
-
-        try {
-          this.loading = true;
-          await this.checkUnique();
-          await this.checkRangeCross();
-          this.save(params);
-        } catch (error) {
-          console.error(error);
-          this.$modal.msgError(error.message);
-          this.loading = false;
-        }
-      });
+      this.$refs.form.triggerConfirm(this.save);
     },
   },
 };

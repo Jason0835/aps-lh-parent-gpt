@@ -3,10 +3,12 @@ package com.zlt.aps.tq.controller;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.tq.api.domain.entity.TqDayFinishQty;
 import com.zlt.aps.tq.api.domain.entity.TqScheFinishQty;
+import com.zlt.aps.tq.api.domain.entity.TqShiftStock;
 import com.zlt.aps.tq.api.domain.entity.TqStock;
 import com.zlt.aps.tq.api.service.ITqMesSyncRemoteService;
 import com.zlt.aps.tq.service.ITqDayFinishQtyService;
 import com.zlt.aps.tq.service.ITqScheFinishQtyService;
+import com.zlt.aps.tq.service.ITqShiftStockService;
 import com.zlt.aps.tq.service.ITqStockService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -37,6 +39,9 @@ public class TqMesSyncController implements ITqMesSyncRemoteService {
     private ITqStockService tqStockService;
 
     @Autowired
+    private ITqShiftStockService tqShiftStockService;
+
+    @Autowired
     private ITqScheFinishQtyService tqScheFinishQtyService;
 
     @Autowired
@@ -61,6 +66,33 @@ public class TqMesSyncController implements ITqMesSyncRemoteService {
                                                             @RequestBody List<TqStock> list) {
         Date date = DateUtil.parse(stockDate);
         tqStockService.logicDeleteAndSaveBatch(date, updateBy, list);
+        return AjaxResult.success();
+    }
+
+    /**
+     * 替换胎圈自动滚动班次库存快照。
+     *
+     * <p>对齐胎面 TmMesSyncController.replaceShiftStock，
+     * 实现 ITqMesSyncRemoteService.replaceShiftStock Feign 接口，
+     * 委托 ITqShiftStockService 完成先逻辑删除旧快照、再批量插入新快照的事务性操作。</p>
+     *
+     * @param factoryCode 工厂编码
+     * @param stockDate MES库存物理日期，格式：yyyy-MM-dd
+     * @param shiftOrder 班次顺序（1~6）
+     * @param updateBy 更新人
+     * @param stockList 班次库存列表，空集合表示清空快照
+     * @return 保存结果
+     */
+    @Override
+    @ApiOperation("替换胎圈自动滚动班次库存快照")
+    @PostMapping("/tqMesSync/replaceShiftStock")
+    public AjaxResult replaceShiftStock(@RequestParam("factoryCode") String factoryCode,
+                                         @RequestParam("stockDate") String stockDate,
+                                         @RequestParam("shiftOrder") Integer shiftOrder,
+                                         @RequestParam("updateBy") String updateBy,
+                                         @RequestBody List<TqShiftStock> stockList) {
+        this.tqShiftStockService.replaceShiftStock(factoryCode, DateUtil.parseDate(stockDate),
+                shiftOrder, updateBy, stockList);
         return AjaxResult.success();
     }
 

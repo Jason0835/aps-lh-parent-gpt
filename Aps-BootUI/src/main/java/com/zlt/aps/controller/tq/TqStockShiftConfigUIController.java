@@ -78,13 +78,13 @@ public class TqStockShiftConfigUIController extends BaseUIController<TqStockShif
     @ResponseBody
     @ApiOperation("保存胎圈备库班数配置（id为空则新增，id不为空则修改）")
     public AjaxResult save(TqStockShiftConfig entity) {
-        // 校验业务唯一约束（同一工厂下同机台范围同机台数只能有一条）
+        // 校验业务唯一约束（同一工厂下同区间起始机台数只能有一条）
         if (UserConstants.NOT_UNIQUE.equals(iTqStockShiftConfigService.checkUnique(entity))) {
             return AjaxResult.error(I18nUtil.getMessage("ui.error.message.stockShiftConfig.unique"));
         }
-        // 校验范围交叉（新增/修改的规则不能与现有规则有交集）
+        // 校验区间连续性（从1开始、连续不重叠、无上限仅末段）
         if (UserConstants.NOT_UNIQUE.equals(iTqStockShiftConfigService.checkRangeCross(entity))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.tq.stockShiftConfig.rangeCross"));
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.tq.depthConfig.rangeCross"));
         }
         return iTqStockShiftConfigService.save(entity);
     }
