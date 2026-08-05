@@ -34,6 +34,9 @@ public final class TcScheduleConstants {
     /** 任务排序策略参数键。 */
     public static final String PARAM_TASK_SORT_STRATEGY = "TC_TASK_SORT_STRATEGY";
 
+    /** 自动排程中文过程日志级别参数键。 */
+    public static final String PARAM_PROCESS_LOG_LEVEL = "TC_PROCESS_LOG_LEVEL";
+
     /** 新规格回看天数参数键。 */
     public static final String PARAM_NEW_SPEC_LOOKBACK_DAYS = "TC_NEW_SPEC_LOOKBACK_DAYS";
 
@@ -163,6 +166,9 @@ public final class TcScheduleConstants {
 
     /** 通用排程策略默认编码。 */
     public static final String DEFAULT_SCHEDULE_STRATEGY = "DEFAULT";
+
+    /** 自动排程中文过程日志默认级别。 */
+    public static final String DEFAULT_PROCESS_LOG_LEVEL = "SUMMARY";
 
     /** 新规格回看天数默认值。 */
     public static final String DEFAULT_NEW_SPEC_LOOKBACK_DAYS = "7";

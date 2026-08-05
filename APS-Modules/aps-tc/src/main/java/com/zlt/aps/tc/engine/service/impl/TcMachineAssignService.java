@@ -4,10 +4,7 @@ import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.StrUtil;
 import com.ruoyi.common.exception.ServiceException;
-import com.zlt.aps.common.engine.schedule.ScheduleRuleResult;
-import com.zlt.aps.common.engine.schedule.ScheduleScoreResult;
-import com.zlt.aps.common.engine.schedule.ScheduleTaskLinkedList;
-import com.zlt.aps.common.engine.schedule.ScheduleTaskNode;
+import com.zlt.aps.common.engine.schedule.*;
 import com.zlt.aps.common.engine.schedule.constraint.ScheduleConstraintCalculator;
 import com.zlt.aps.common.engine.schedule.constraint.SchedulePlanQtyAdjustmentResult;
 import com.zlt.aps.common.engine.schedule.constraint.ScheduleToolLedgerResult;
@@ -2243,6 +2240,21 @@ public class TcMachineAssignService implements ITcMachineAssignService {
                 this.getCandidateEvidenceDecimal(evidence, "reorderedTotalSwitchCapacityDeduct"),
                 currentSpecSwitchDeduct, currentGlueSwitchDeduct, this.nvl(beforeAssignQty), beforeRemainCapacity,
                 this.nvl(assignedQty), afterRemainCapacity, this.nvl(overflowQty), splitDesc);
+        context.appendFullProcessTrace(new ScheduleProcessTraceEvent(
+                "机台分配", task.getBusinessKey(), "机台产能即时扣减与拆分",
+                "选中机台的班次容量账本、检修计划、已排任务、胎侧/垫胶共用机台约束和切换扣减。",
+                "机台=" + (candidate == null ? "未提供" : candidate.getMachineCode()) + "，班次="
+                        + task.getShiftOrder() + "，分配前待承接量=" + this.nvl(beforeAssignQty)
+                        + "米，分配前剩余产能=" + beforeRemainCapacity + "米。",
+                "本次分配量=min(分配前待承接量,扣除检修、已排、共用机台和切换后的剩余产能)；机台容量无效时按5500米回退。",
+                "规格切换扣减=" + currentSpecSwitchDeduct + "米，胶料切换扣减=" + currentGlueSwitchDeduct
+                        + "米；" + splitDesc + "。",
+                "本次分配=" + this.nvl(assignedQty) + "米，分配后剩余产能=" + afterRemainCapacity
+                        + "米，溢出=" + this.nvl(overflowQty) + "米。",
+                this.nvl(overflowQty).compareTo(BigDecimal.ZERO) > 0
+                        ? "已分配片段进入机台任务链，溢出量进入同班其他机台或后续班次。"
+                        : "已分配数量进入机台任务链并参与最终落库。"
+        ));
     }
 
     /**

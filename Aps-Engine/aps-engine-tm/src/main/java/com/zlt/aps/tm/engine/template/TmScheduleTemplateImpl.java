@@ -5,12 +5,14 @@ import cn.hutool.core.util.StrUtil;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.engine.schedule.IScheduleProcessLogger;
+import com.zlt.aps.common.engine.schedule.ScheduleProcessEvidenceFormatter;
+import com.zlt.aps.common.engine.schedule.ScheduleProcessLogLevel;
+import com.zlt.aps.common.engine.schedule.ScheduleProcessTraceEvent;
 import com.zlt.aps.tm.api.enums.TmAutoScheduleIssueCategoryEnum;
+import com.zlt.aps.tm.api.enums.TmScheduleRuleCodeEnum;
+import com.zlt.aps.tm.api.enums.TmScheduleRuleResultEnum;
 import com.zlt.aps.tm.api.enums.TmScheduleStepEnum;
-import com.zlt.aps.tm.engine.domain.TmMachineCandidate;
-import com.zlt.aps.tm.engine.domain.TmScheduleContext;
-import com.zlt.aps.tm.engine.domain.TmStockForecast;
-import com.zlt.aps.tm.engine.domain.TmTaskDraft;
+import com.zlt.aps.tm.engine.domain.*;
 import com.zlt.aps.tm.engine.service.*;
 import com.zlt.aps.tm.engine.util.TmGlueSimilarityUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -124,14 +126,21 @@ public class TmScheduleTemplateImpl extends AbsTmScheduleTemplate {
 
     private void runStep(TmScheduleContext context, TmScheduleStepEnum stepEnum, Runnable runnable) {
         try {
+            context.setCurrentProcessStep(stepEnum.getDesc());
             if (processLogger != null) {
                 processLogger.logStepStart(context, stepEnum.getDesc(), buildStepSummary(context, stepEnum, true));
             }
             runnable.run();
-            this.appendStepCalculationDetail(context, stepEnum);
-            this.updateProgress(context, stepEnum);
-            if (processLogger != null) {
-                processLogger.logStepEnd(context, stepEnum.getDesc(), buildStepSummary(context, stepEnum, false));
+            boolean completedInsideService = TmScheduleStepEnum.SNAPSHOT_BUILD == stepEnum
+                    && context.getCompletedProcessSteps().contains(stepEnum.getDesc());
+            if (!completedInsideService) {
+                this.appendStepCalculationDetail(context, stepEnum);
+                this.updateProgress(context, stepEnum);
+                context.getCompletedProcessSteps().add(stepEnum.getDesc());
+                if (processLogger != null) {
+                    processLogger.logStepEnd(context, stepEnum.getDesc(), buildStepSummary(context, stepEnum, false));
+                }
+                context.setCurrentProcessStep(null);
             }
         } catch (RuntimeException exception) {
             this.recordStepFailure(context, stepEnum, exception);
@@ -253,6 +262,7 @@ public class TmScheduleTemplateImpl extends AbsTmScheduleTemplate {
         if (context == null) {
             return;
         }
+        this.appendFullStepDetail(context, stepEnum);
         switch (stepEnum) {
             case INVENTORY_PREDICT:
                 context.getStockForecastMap().values().forEach(stock ->
@@ -271,6 +281,171 @@ public class TmScheduleTemplateImpl extends AbsTmScheduleTemplate {
                 break;
             default:
                 break;
+        }
+    }
+
+    /**
+     * 将当前步骤即时产生的结构化证据转换为中文 FULL 事件。
+     *
+     * @param context  排程上下文
+     * @param stepEnum 已完成步骤
+     */
+    private void appendFullStepDetail(TmScheduleContext context, TmScheduleStepEnum stepEnum) {
+        if (TmScheduleStepEnum.BOOTSTRAP == stepEnum) {
+            this.appendBootstrapFullDetail(context);
+        }
+        if (TmScheduleStepEnum.INVENTORY_PREDICT == stepEnum) {
+            context.getStockForecastMap().values().stream()
+                    .sorted(Comparator.comparing(stock -> StrUtil.blankToDefault(stock.getTreadCode(), "")))
+                    .forEach(stock -> context.appendFullProcessTrace(new ScheduleProcessTraceEvent(
+                            stepEnum.getDesc(), StrUtil.blankToDefault(stock.getTreadCode(), "未知胎面"), "滚动库存预测",
+                            "排程日前库存快照、前日首班计划和成型首班需求。",
+                            "六点库存=" + this.nvl(stock.getSixClockStockQty()) + "米，前日早班计划量="
+                                    + this.nvl(stock.getFirstShiftPlanQty()) + "米，首班消耗量="
+                                    + this.nvl(stock.getFirstShiftDemandQty()) + "米。",
+                            "滚动库存=max(六点库存+前日早班计划量-首班消耗量,0)。",
+                            this.buildInventoryFormula(stock),
+                            "滚动库存=" + this.nvl(stock.getRollingStockQty()) + "米。",
+                            "作为该胎面首个待排任务的班初库存，并随任务逐班滚动。"
+                    )));
+        }
+        this.appendUnrenderedRuleTrace(context, stepEnum);
+        if (TmScheduleStepEnum.PLAN_CALC == stepEnum || TmScheduleStepEnum.MACHINE_ASSIGN == stepEnum) {
+            context.getTaskDraftList().forEach(task -> context.appendFullProcessTrace(new ScheduleProcessTraceEvent(
+                    stepEnum.getDesc(), task.getBusinessKey(),
+                    TmScheduleStepEnum.PLAN_CALC == stepEnum ? "库存抵扣与计划量计算" : "选机后计划量定稿",
+                    "成型来源任务、滚动库存、施工资料、本批次参数和即时规则证据。",
+                    "胎面=" + task.getTreadCode() + "，班次=" + task.getShiftOrder()
+                            + "，来源需求=" + this.nvl(task.getSourceRequiredQty()) + "米，库存抵扣="
+                            + this.nvl(task.getStockDeductQty()) + "米。",
+                    "依次执行需求汇总、库存抵扣、新规格/实验规格、损耗、最小起排、卷长取整、工装和产能约束。",
+                    this.buildPlanFormula(task),
+                    "当前最终计划量=" + this.nvl(task.getPlanQty()) + "米，未排标记="
+                            + (task.isUnassigned() ? "是" : "否") + "。",
+                    TmScheduleStepEnum.PLAN_CALC == stepEnum
+                            ? "进入任务排序和机台候选计算。" : "进入结果、未排和解释记录的数量分摊。"
+            )));
+        }
+        if (TmScheduleStepEnum.TASK_SORT == stepEnum) {
+            for (int index = 0; index < context.getTaskDraftList().size(); index++) {
+                TmTaskDraft task = context.getTaskDraftList().get(index);
+                context.appendFullProcessTrace(new ScheduleProcessTraceEvent(
+                        stepEnum.getDesc(), task.getBusinessKey(), "任务排序最终名次",
+                        "任务排序策略和任务结构化规则证据。",
+                        "库存供应时长=" + this.displaySupplyHours(task.getSupplyHours()) + "，班次="
+                                + task.getShiftOrder() + "，胎面=" + task.getTreadCode() + "。",
+                        "按配置的排序策略比较库存紧急度、开班优先级、胶料和口型连续性；空值按规则证据中的缺省口径处理。",
+                        "当前任务与前序任务逐项比较后位于第" + (index + 1) + "名。",
+                        "最终排序名次=" + (index + 1) + "。",
+                        "按此顺序依次进入机台过滤和评分。"
+                ));
+            }
+        }
+        if (TmScheduleStepEnum.MACHINE_ASSIGN == stepEnum) {
+            context.getTaskDraftList().stream().filter(TmTaskDraft::isUnassigned).forEach(task ->
+                    context.appendFullProcessTrace(new ScheduleProcessTraceEvent(
+                            stepEnum.getDesc(), task.getBusinessKey(), "未排判定",
+                            "机台过滤、评分、产能拆分和顺延后的任务状态。",
+                            "计划量=" + this.nvl(task.getPlanQty()) + "米，未排原因编码="
+                                    + StrUtil.blankToDefault(task.getUnplannedReasonCode(), "未提供") + "。",
+                            "没有满足全部硬约束且具备可用产能的目标时，保存剩余计划量为未排任务。",
+                            "候选机台逐项处理后仍有剩余量=" + this.nvl(task.getPlanQty()) + "米。",
+                            "未排原因=" + StrUtil.blankToDefault(task.getUnplannedReasonDesc(), "未提供具体原因") + "。",
+                            "写入未排记录和解释记录，不写入已排结果。"
+                    )));
+        }
+    }
+
+    /**
+     * 记录批次初始化、有效参数及基础资料装载来源。
+     *
+     * @param context 排程上下文
+     */
+    private void appendBootstrapFullDetail(TmScheduleContext context) {
+        context.appendFullProcessTrace(new ScheduleProcessTraceEvent(
+                TmScheduleStepEnum.BOOTSTRAP.getDesc(), "批次级", "批次初始化",
+                "自动排程请求和胎面基础资料加载服务。",
+                "批次=" + context.getBatchNo() + "，工厂=" + context.getFactoryCode() + "，排程日期="
+                        + (context.getScheduleDate() == null ? "未提供" : DateUtil.formatDate(context.getScheduleDate())) + "。",
+                "按工厂和排程日期装载有效参数、成型需求、施工资料、库存、班次和可用机台。",
+                "来源任务=" + context.getSourceTaskDraftList().size() + "条，待排任务="
+                        + context.getTaskDraftList().size() + "条，可用机台=" + context.getMachineCandidateList().size() + "台。",
+                "初始化完成，参数=" + context.getParamMap().size() + "项，日志级别=" + context.getProcessLogLevel() + "。",
+                "进入库存预测；所有后续事件沿用本批次和任务业务键。"
+        ));
+        context.getParamMap().entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(entry -> {
+            TmParamValue value = entry.getValue();
+            context.appendFullProcessTrace(new ScheduleProcessTraceEvent(
+                    TmScheduleStepEnum.BOOTSTRAP.getDesc(), "批次级", "有效参数快照",
+                    "胎面参数表或代码缺省值（" + entry.getKey() + "）。",
+                    "配置值=" + StrUtil.blankToDefault(value.getParamValue(), "未配置") + "，默认值="
+                            + StrUtil.blankToDefault(value.getDefaultValue(), "未配置") + "。",
+                    "参数表有有效值时优先使用参数表，否则使用默认值。",
+                    "有效值=" + StrUtil.blankToDefault(value.getEffectiveValue(), "未提供") + "，来源="
+                            + StrUtil.blankToDefault(value.getSource(), "未提供") + "。",
+                    "本批次固定使用有效值=" + StrUtil.blankToDefault(value.getEffectiveValue(), "未提供") + "。",
+                    "供后续对应业务规则计算使用，批次运行中不再重新读取。"
+            ));
+        });
+    }
+
+    /**
+     * 消费当前步骤新增的规则证据，保证同一证据只写入一次 FULL 日志。
+     *
+     * @param context  排程上下文
+     * @param stepEnum 当前步骤
+     */
+    private void appendUnrenderedRuleTrace(TmScheduleContext context, TmScheduleStepEnum stepEnum) {
+        context.getRuleTraceMap().entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(entry -> {
+            TmRuleTrace trace = entry.getValue();
+            if (trace == null) {
+                return;
+            }
+            int startIndex = context.getProcessRuleTraceCursorMap().getOrDefault(entry.getKey(), 0);
+            List<TmRuleTraceItem> ruleHits = trace.getRuleHits();
+            for (int index = startIndex; index < ruleHits.size(); index++) {
+                TmRuleTraceItem item = ruleHits.get(index);
+                String ruleName = Arrays.stream(TmScheduleRuleCodeEnum.values())
+                        .filter(rule -> rule.getCode().equals(item.getRuleCode()))
+                        .map(TmScheduleRuleCodeEnum::getDesc).findFirst().orElse("补充业务规则");
+                String resultName = Arrays.stream(TmScheduleRuleResultEnum.values())
+                        .filter(result -> result.getCode().equals(item.getResult()))
+                        .map(TmScheduleRuleResultEnum::getDesc).findFirst().orElse("未说明结果");
+                String evidenceText = ScheduleProcessEvidenceFormatter.format(item.getEvidence());
+                context.appendFullProcessTrace(new ScheduleProcessTraceEvent(
+                        stepEnum.getDesc(), entry.getKey(), ruleName,
+                        "当前计算位置即时写入的结构化规则证据（" + item.getRuleCode() + "）。",
+                        evidenceText,
+                        "执行“" + ruleName + "”并保留调整前值、规则参数和业务条件。",
+                        "按证据字段代入本规则：" + evidenceText,
+                        "规则结果=" + resultName + "（" + item.getResult() + "）。",
+                        this.resolveRuleDestination(stepEnum)
+                ));
+            }
+            context.getProcessRuleTraceCursorMap().put(entry.getKey(), ruleHits.size());
+        });
+    }
+
+    /**
+     * 获取规则证据在各步骤之后的结果去向。
+     *
+     * @param stepEnum 当前步骤
+     * @return 中文结果去向
+     */
+    private String resolveRuleDestination(TmScheduleStepEnum stepEnum) {
+        switch (stepEnum) {
+            case BOOTSTRAP:
+                return "进入库存预测和计划量计算。";
+            case INVENTORY_PREDICT:
+                return "回写任务滚动库存并进入计划量计算。";
+            case PLAN_CALC:
+                return "回写当前计划量分量并进入任务排序。";
+            case TASK_SORT:
+                return "确定基础排序名次并进入机台分配。";
+            case MACHINE_ASSIGN:
+                return "更新机台、班次、数量或未排状态并进入落库。";
+            default:
+                return "写入结果和解释证据。";
         }
     }
 
@@ -426,6 +601,38 @@ public class TmScheduleTemplateImpl extends AbsTmScheduleTemplate {
     private void appendMachineCandidateDetail(TmScheduleContext context, TmTaskDraft task) {
         List<TmMachineCandidate> candidateList = context.getCandidateTraceMap()
                 .getOrDefault(task.getBusinessKey(), Collections.emptyList());
+        if (ScheduleProcessLogLevel.FULL == context.getProcessLogLevel()) {
+            candidateList.forEach(candidate -> {
+                String evidenceText = ScheduleProcessEvidenceFormatter.format(candidate.getFilterEvidence());
+                context.appendFullProcessTrace(new ScheduleProcessTraceEvent(
+                    TmScheduleStepEnum.MACHINE_ASSIGN.getDesc(), task.getBusinessKey(), "候选机台逐项过滤",
+                    "机台候选清单、过滤规则顺序、规则开关和候选结构化证据。",
+                    "机台=" + StrUtil.blankToDefault(candidate.getMachineCode(), "未提供") + "，计划量="
+                            + this.nvl(task.getPlanQty()) + "米，过滤证据=" + evidenceText + "。",
+                    "按配置顺序执行启用的硬约束；关闭的规则跳过，任一启用规则拒绝后停止该机台后续过滤。",
+                    "逐项检查结果由过滤策略现场写入候选证据，本日志直接翻译该证据，不重新计算：" + evidenceText,
+                    candidate.isFiltered() ? "机台被拒绝；原因="
+                            + StrUtil.blankToDefault(candidate.getFilterReasonDesc(), "未提供具体原因") + "。"
+                            : "机台通过全部启用的过滤规则。",
+                    candidate.isFiltered() ? "保留为拒绝证据，不参与后续评分。" : "进入逐评分项计算和机台优选。"
+                ));
+                if (!candidate.isFiltered() && candidate.getScoreResult() != null) {
+                    candidate.getScoreResult().getScoreItems().forEach((scoreCode, scoreValue) ->
+                        context.appendFullProcessTrace(new ScheduleProcessTraceEvent(
+                                TmScheduleStepEnum.MACHINE_ASSIGN.getDesc(), task.getBusinessKey(),
+                                this.resolveScoreItemName(scoreCode),
+                                "机台评分策略、任务输入、候选机台状态和参数权重（评分项编码=" + scoreCode + "）。",
+                                "机台=" + candidate.getMachineCode() + "，计划量=" + this.nvl(task.getPlanQty())
+                                        + "米，剩余产能=" + this.nvl(candidate.getRemainCapacity()) + "米。",
+                                "评分值由当前评分策略按本批次权重和候选输入现场计算，并写入结构化评分结果。",
+                                "评分项=" + scoreCode + "，现场计算得分=" + this.nvl(scoreValue) + "。",
+                                "本评分项得分=" + this.nvl(scoreValue) + "；候选总分="
+                                        + this.nvl(candidate.getScoreResult().getTotalScore()) + "。",
+                                "与该机台其他评分项求和后参加最终机台比较。"
+                            )));
+                }
+            });
+        }
         Map<String, List<String>> filteredMachineMap = candidateList.stream()
                 .filter(TmMachineCandidate::isFiltered)
                 .collect(Collectors.groupingBy(candidate -> StrUtil.blankToDefault(candidate.getFilterReasonDesc(), "未提供原因"),
@@ -435,6 +642,37 @@ public class TmScheduleTemplateImpl extends AbsTmScheduleTemplate {
         }
         candidateList.stream().filter(candidate -> !candidate.isFiltered())
                 .forEach(candidate -> context.appendProcessLog(this.buildScoreDetail(task, candidate)));
+        if (ScheduleProcessLogLevel.FULL == context.getProcessLogLevel()) {
+            context.appendFullProcessTrace(new ScheduleProcessTraceEvent(
+                    TmScheduleStepEnum.MACHINE_ASSIGN.getDesc(), task.getBusinessKey(), "最终机台选择",
+                    "通过过滤的候选机台、各项评分、总分以及当前机台和班次状态。",
+                    "通过候选=" + candidateList.stream().filter(candidate -> !candidate.isFiltered())
+                            .map(candidate -> candidate.getMachineCode() + "=" + this.nvl(candidate.getScore()))
+                            .collect(Collectors.joining("，", "[", "]")) + "。",
+                    "优先选择总分最优机台；总分并列时沿用既有策略的稳定顺序和连续生产决胜口径。",
+                    "比较候选总分与并列决胜条件后，回写任务机台。",
+                    "最终机台=" + StrUtil.blankToDefault(task.getMachineCode(), "未选中") + "，班次="
+                            + task.getShiftOrder() + "。",
+                    StrUtil.isBlank(task.getMachineCode()) ? "进入顺延或未排处理。" : "进入产能扣减、拆分、合并和落库映射。"
+            ));
+        }
+    }
+
+    /**
+     * 获取评分项中文名称。
+     *
+     * @param scoreCode 评分项编码
+     * @return 评分项中文名称
+     */
+    private String resolveScoreItemName(String scoreCode) {
+        Map<String, String> scoreNameMap = new LinkedHashMap<>();
+        scoreNameMap.put("capacityScore", "剩余产能适配评分");
+        scoreNameMap.put("mainGlueScore", "主胶料连续评分");
+        scoreNameMap.put("baseGlueScore", "基部胶连续评分");
+        scoreNameMap.put("mouthPlateScore", "口型连续评分");
+        scoreNameMap.put("switchCostScore", "切换成本评分");
+        scoreNameMap.put("fixedScore", "定点生产评分");
+        return scoreNameMap.getOrDefault(scoreCode, "补充评分项（" + scoreCode + "）");
     }
 
     /**

@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
+import com.zlt.aps.common.core.utils.MachineOpenShiftCodeUtil;
 import com.zlt.aps.tc.api.constant.TcScheduleConstants;
 import com.zlt.aps.tc.api.domain.entity.*;
 import com.zlt.aps.tc.api.enums.TcSpecifyMachineJobTypeEnum;
@@ -177,7 +178,7 @@ public class TcManualMachineRuleValidator {
         }
         Set<String> openShiftCodeSet = java.util.Arrays.stream(machineInfo.getOpenShiftCode().split(","))
                 .map(String::trim).filter(StringUtils::isNotBlank).collect(Collectors.toSet());
-        return openShiftCodeSet.contains(shiftConfig.getShiftCode());
+        return MachineOpenShiftCodeUtil.isMachineShiftOpen(openShiftCodeSet, shiftConfig.getShiftCode());
     }
 
     /**
