@@ -1978,6 +1978,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         target.setEmbryoCode(source.getEmbryoCode());
         target.setMainMaterialDesc(source.getMainMaterialDesc());
         target.setCxMachineCode(source.getCxMachineCode());
+        target.setLhMachineCode(source.getLhMachineCode());
         target.setTreadCode(source.getTreadCode());
         target.setGlueCode(source.getGlueCode());
         target.setBaseGlueCode(source.getBaseGlueCode());
@@ -1990,6 +1991,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         target.setGuardShiftCount(source.getGuardShiftCount());
         target.setGuardRangeHours(source.getGuardRangeHours());
         target.setSupplyHours(source.getSupplyHours());
+        target.setFormingGuardWindowQtyMap(source.getFormingGuardWindowQtyMap());
         target.setCurrentShiftStockGapQty(BigDecimal.ZERO);
         target.setStockGapQty(BigDecimal.ZERO);
         target.setStockDeductQty(BigDecimal.ZERO);

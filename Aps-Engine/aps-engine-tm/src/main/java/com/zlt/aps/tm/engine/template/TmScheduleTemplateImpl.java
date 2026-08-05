@@ -317,11 +317,12 @@ public class TmScheduleTemplateImpl extends AbsTmScheduleTemplate {
                 + "，成型代码=" + this.displayEmbryoCode(task.getEmbryoCode())
                 + "，是否新规格=" + this.isNewSpec(task)
                 + "，是否量试/试制=" + this.isExperimentSpec(task)
-                + "，硫化机台=" + StrUtil.blankToDefault(task.getLhMachineCode(), "未提供")
+                + "，" + this.displayMachineSummary(task.getLhMachineCode(), "硫化机")
                 + "，深度（备库班数）=" + this.displayGuardShiftCount(task.getGuardShiftCount())
                 + "，胎面长=" + this.nvl(task.getTreadShoulderLength()).toPlainString()
                 + "，当班成型消耗=" + this.nvl(task.getCurrentShiftDemandQty()).toPlainString()
-                + "，成型备库窗口内计划量=" + this.nvl(task.getGuardDemandQty()).toPlainString()
+                + "，库存供应时长=" + this.displaySupplyHours(task.getSupplyHours())
+                + "，" + this.displayGuardWindow(task.getFormingGuardWindowQtyMap())
                 + "，计划量=" + baseFormula
                 + String.join("", adjustmentTerms) + "=" + this.nvl(task.getPlanQty()).toPlainString();
     }
@@ -354,6 +355,51 @@ public class TmScheduleTemplateImpl extends AbsTmScheduleTemplate {
      */
     private String displayGuardShiftCount(Integer guardShiftCount) {
         return guardShiftCount == null ? "未提供" : String.valueOf(guardShiftCount);
+    }
+
+    /** 格式化成型来源机台数量和去重后的编码列表。
+     *
+     * @param machineText 来源机台编码，使用英文逗号分隔
+     * @param machineLabel 日志中的机台名称
+     * @return 机台数量及编码展示文本
+     */
+    private String displayMachineSummary(String machineText, String machineLabel) {
+        List<String> machineCodes = StrUtil.isBlank(machineText) ? Collections.emptyList()
+                : Arrays.stream(machineText.split("[,，]"))
+                .map(String::trim)
+                .filter(StrUtil::isNotBlank)
+                .distinct()
+                .collect(Collectors.toList());
+        return machineLabel + " " + machineCodes.size() + "台="
+                + (machineCodes.isEmpty() ? "未提供" : String.join("，", machineCodes));
+    }
+
+    /** 格式化库存供应时长并追加小时单位。
+     *
+     * @param supplyHours 库存供应时长
+     * @return 去除无意义末尾零后的时长文本
+     */
+    private String displaySupplyHours(BigDecimal supplyHours) {
+        return supplyHours == null ? "未提供" : supplyHours.stripTrailingZeros().toPlainString() + "H";
+    }
+
+    /** 格式化成型备库窗口班次明细；明细值由加载路径按有效需求和 LH_REMAIN_QTY 封顶后写入。
+     *
+     * @param windowQtyMap 窗口班次到换算后长度的映射
+     * @return 合计及按班次顺序排列的明细
+     */
+    private String displayGuardWindow(Map<Integer, BigDecimal> windowQtyMap) {
+        if (windowQtyMap == null || windowQtyMap.isEmpty()) {
+            return "成型窗口内计划合计=0";
+        }
+        BigDecimal total = windowQtyMap.values().stream()
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        String detail = windowQtyMap.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(entry -> "班" + entry.getKey() + "=" + this.nvl(entry.getValue()).stripTrailingZeros().toPlainString())
+                .collect(Collectors.joining(" "));
+        return "成型窗口内计划合计=" + total.stripTrailingZeros().toPlainString() + "：" + detail;
     }
 
     /**

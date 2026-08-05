@@ -1987,6 +1987,7 @@ public class TcMachineAssignService implements ITcMachineAssignService {
         target.setOrderNo(source.getOrderNo());
         target.setSourceOrderNos(source.getSourceOrderNos());
         target.setEmbryoCode(source.getEmbryoCode());
+        target.setCxMachineCode(source.getCxMachineCode());
         target.setSidewallCode(source.getSidewallCode());
         target.setConstructionVersion(source.getConstructionVersion());
         target.setSidewallCraft(source.getSidewallCraft());
@@ -2004,6 +2005,7 @@ public class TcMachineAssignService implements ITcMachineAssignService {
         target.setGuardShiftCount(source.getGuardShiftCount());
         target.setGuardRangeHours(source.getGuardRangeHours());
         target.setSupplyHours(source.getSupplyHours());
+        target.setFormingGuardWindowQtyMap(source.getFormingGuardWindowQtyMap());
         target.setCurrentShiftStockGapQty(BigDecimal.ZERO);
         target.setStockGapQty(BigDecimal.ZERO);
         target.setStockDeductQty(BigDecimal.ZERO);
