@@ -186,16 +186,6 @@ public class CxCapacityAllocationHandler {
             selectedGroupPlanByCxMachine(context, estimateGroupCxAllocationMap, cxMachineInfo, excludeGroupPlan);
             return;
         }
-        leftOverDays = confirmNeedAllocationDays;
-        //20260206 结构剩余需分配天数小于最短上机天数，则标记分配完成，查找下一个
-        boolean isChangeProSize = cxMachineInfo.isChangeProSize(productionContext, allocationGroupPlan);
-        Integer minAllocationDays = allocationGroupPlan.getMinAllocationDays(productionContext, isChangeProSize);
-        if (!allocationGroupPlan.isNextAllocation(leftOverDays, productionContext, isChangeProSize)) {
-            TbrProductionGroupLogRecorder.addGroupLeftOverNoReachMinAllocationDayLog(productionContext, groupName, false, leftOverDays, minAllocationDays);
-            allocationGroupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
-            selectedGroupPlanByCxMachine(context, estimateGroupCxAllocationMap, cxMachineInfo, excludeGroupPlan);
-            return;
-        }
         TbrProductionGroupLogRecorder.addReverseCxMachineSelectedGroupPlanLog(context, cxMachineInfo, allocationGroupPlan);
         //重新计算分配的起始时间
         Set<Integer> hasProductionDaySet = cxMachineInfo.confirmProductionRange(context, allocationGroupPlan);
@@ -213,6 +203,16 @@ public class CxCapacityAllocationHandler {
         startDay = realChangeDay;
         //20260209 采用新的分配天数
         Integer needAllocationDays = confirmNeedAllocationDays;
+        //20260206 结构剩余需分配天数小于最短上机天数，则标记分配完成，查找下一个
+        leftOverDays = needAllocationDays;
+        boolean isChangeProSize = cxMachineInfo.isChangeProSize(productionContext, allocationGroupPlan);
+        Integer minAllocationDays = allocationGroupPlan.getMinAllocationDays(productionContext, isChangeProSize);
+        if (!allocationGroupPlan.isNextAllocation(leftOverDays, productionContext, isChangeProSize)) {
+            TbrProductionGroupLogRecorder.addGroupLeftOverNoReachMinAllocationDayLog(productionContext, groupName, false, leftOverDays, minAllocationDays);
+            allocationGroupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
+            selectedGroupPlanByCxMachine(context, estimateGroupCxAllocationMap, cxMachineInfo, excludeGroupPlan);
+            return;
+        }
         CxMachineAllocationPlanHelper addHelper = createAllocationPlanHelper(cxMachineInfo, lhRatioInfo, allocationGroupPlan, null, needAllocationDays, startDay, context.getMonthDays());
         addHelper.setChangeProSize(isChangeProSize);
         CxMachineAllocationPlanHelper beforeGroupAllocation = cxMachineInfo.addAllocationPlanInfo(context, addHelper);

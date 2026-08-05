@@ -331,18 +331,7 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
         boolean isChangeProSize = selectedCxMachine.isChangeProSize(productionContext, addNewGroupPlan);
         Set<Integer> hasProductionDaySet = selectedCxMachine.getSelectedProductionDaySet();
         Integer startDay = hasProductionDaySet.stream().mapToInt(Integer::intValue).min().getAsInt();
-        //最小分配天数
-        Integer minAllocationDays = addNewGroupPlan.getMinAllocationDays(productionContext, isChangeProSize);
         Integer leftOverDays = addNewGroupPlan.getLeftOverNeedAllocationDays();
-        //20260206 小于最短上机天数，则不进行分配
-        if (!addNewGroupPlan.isNextAllocation(leftOverDays, productionContext, isChangeProSize)) {
-            if (leftOverDays > BigDecimal.ZERO.intValue()) {
-                log.info(TbrProductionGroupLogRecorder.addGroupLeftOverNoReachMinAllocationDayLog(productionContext, groupName, true, leftOverDays, minAllocationDays));
-            }
-            addNewGroupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
-            addNewGroupPlanHandler(context, allGroupPlanMap, new HashSet<>());
-            return;
-        }
         //20260121 切换结构控制
         DayCapacityLimitVo dayCapacityLimitVo = productionContext.getBaseDataContainer().getDayCapacityLimit();
         Integer realChangeDay = dayCapacityLimitVo.confirmStartDayByChangeGroup(productionContext, startDay, groupName, selectedCxMachine, hasProductionDaySet);
@@ -376,6 +365,17 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
         }
         needAllocationDays = Math.max(needAllocationDays, confirmNeedAllocationDays);
         Integer realAllocationDays = Math.min(remainingDays, needAllocationDays);
+        //20260206 小于最短上机天数，则不进行分配
+        if (!addNewGroupPlan.isNextAllocation(realAllocationDays, productionContext, isChangeProSize)) {
+            //最小分配天数
+            Integer minAllocationDays = addNewGroupPlan.getMinAllocationDays(productionContext, isChangeProSize);
+            if (realAllocationDays > BigDecimal.ZERO.intValue()) {
+                log.info(TbrProductionGroupLogRecorder.addGroupLeftOverNoReachMinAllocationDayLog(productionContext, groupName, true, realAllocationDays, minAllocationDays));
+            }
+            addNewGroupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
+            addNewGroupPlanHandler(context, allGroupPlanMap, new HashSet<>());
+            return;
+        }
         Integer originNeedAllocationDaysByGroupPlan = addNewGroupPlan.getLeftOverNeedAllocationDays();
         Integer originLeftOverByCxMachine = selectedCxMachine.getRemainingDays();
         //更新剩余天数：分组的剩余天数、成型机台剩余可分配天数
