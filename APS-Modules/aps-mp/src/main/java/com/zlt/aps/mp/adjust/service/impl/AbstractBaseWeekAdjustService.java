@@ -1239,7 +1239,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                     if (sumMouldQty > 0){
                         //还有剩，表示超标，提示
                         //提示： 模壳标准:[%s]，[%s]日，模壳数:[%s]，超出剩余模壳数:[%s]！
-                        sbError.append(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.confirm.mouldShellLimit"), mouldShellArr.toString(), iDay, oriSumMouldQty ,oriShellRemainQty)).append(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE);
+                        sbError.append(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.confirm.mouldShellLimit"), String.join(BusiConstant.WeekRollAdjust.SPLIT_COMMA, mouldShellArr), iDay, oriSumMouldQty ,oriShellRemainQty)).append(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE);
                     }
                 }
             }
