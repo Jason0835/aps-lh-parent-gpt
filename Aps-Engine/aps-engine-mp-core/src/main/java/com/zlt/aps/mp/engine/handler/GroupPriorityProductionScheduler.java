@@ -591,7 +591,17 @@ public class GroupPriorityProductionScheduler {
         }
         needAllocationDays = Math.max(needAllocationDays, confirmNeedAllocationDays);
         Integer realAllocationDays = Math.min(remainingDays, needAllocationDays);
+        //20260805+ 再次确认，最短上机天数
+        boolean isChangeProSize = selectedCxMachine.isChangeProSize(productionContext, addNewGroupPlan);
+        Integer minAllocationDays = addNewGroupPlan.getMinAllocationDays(productionContext, isChangeProSize);
+        if (realAllocationDays < minAllocationDays) {
+            if (realAllocationDays > BigDecimal.ZERO.intValue()) {
+                TbrProductionGroupLogRecorder.addGroupLeftOverNoReachMinAllocationDayLog(productionContext, groupName, true, realAllocationDays, minAllocationDays);
+            }
+            return null;
+        }
         CxMachineAllocationPlanHelper addHelper = CxCapacityAllocationHandler.createAllocationPlanHelper(selectedCxMachine, lhRatioInfo, addNewGroupPlan, null, realAllocationDays, startDay, monthMaxDays);
+        addHelper.setChangeProSize(isChangeProSize);
         return addHelper;
     }
 
