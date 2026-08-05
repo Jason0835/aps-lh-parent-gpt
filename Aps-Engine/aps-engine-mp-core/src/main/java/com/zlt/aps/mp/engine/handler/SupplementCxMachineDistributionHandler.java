@@ -361,7 +361,8 @@ public class SupplementCxMachineDistributionHandler {
     private CxMachineAllocationPlanHelper changeHandler(TbrProductionContext productionContext, ProductionPlanGroupInfo addPlanGroup, CxMachineBaseInfoVo selectCxMachine) {
         Integer needDays = addPlanGroup.getLeftOverNeedAllocationDays();
         Integer remainDays = selectCxMachine.getLeftOverDaysByLastAllocation(productionContext);
-        Integer groupMinAllocationDays = addPlanGroup.getMinAllocationDays(productionContext);
+        boolean isChangeProSize = selectCxMachine.isChangeProSize(productionContext, addPlanGroup);
+        Integer groupMinAllocationDays = addPlanGroup.getMinAllocationDays(productionContext, isChangeProSize);
         //先空出来
         if (remainDays >= groupMinAllocationDays && needDays < groupMinAllocationDays) {
             return null;

@@ -188,8 +188,9 @@ public class CxCapacityAllocationHandler {
         }
         leftOverDays = confirmNeedAllocationDays;
         //20260206 结构剩余需分配天数小于最短上机天数，则标记分配完成，查找下一个
-        Integer minAllocationDays = allocationGroupPlan.getMinAllocationDays(productionContext);
-        if (!allocationGroupPlan.isNextAllocation(leftOverDays, productionContext)) {
+        boolean isChangeProSize = cxMachineInfo.isChangeProSize(productionContext, allocationGroupPlan);
+        Integer minAllocationDays = allocationGroupPlan.getMinAllocationDays(productionContext, isChangeProSize);
+        if (!allocationGroupPlan.isNextAllocation(leftOverDays, productionContext, isChangeProSize)) {
             TbrProductionGroupLogRecorder.addGroupLeftOverNoReachMinAllocationDayLog(productionContext, groupName, false, leftOverDays, minAllocationDays);
             allocationGroupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
             selectedGroupPlanByCxMachine(context, estimateGroupCxAllocationMap, cxMachineInfo, excludeGroupPlan);
@@ -213,6 +214,7 @@ public class CxCapacityAllocationHandler {
         //20260209 采用新的分配天数
         Integer needAllocationDays = confirmNeedAllocationDays;
         CxMachineAllocationPlanHelper addHelper = createAllocationPlanHelper(cxMachineInfo, lhRatioInfo, allocationGroupPlan, null, needAllocationDays, startDay, context.getMonthDays());
+        addHelper.setChangeProSize(isChangeProSize);
         CxMachineAllocationPlanHelper beforeGroupAllocation = cxMachineInfo.addAllocationPlanInfo(context, addHelper);
         //20260429+ 记录前分组分配信息，用以判断前分组是否需要强制延长
         addHelper.setBeforeAllocationByChangeLimit(beforeGroupAllocation);
@@ -488,9 +490,17 @@ public class CxCapacityAllocationHandler {
     public boolean selectEnableMachineAndSetInfo(TbrProductionContext productionContext, ProductionPlanGroupInfo addNewGroupPlan, CxMachineBaseInfoVo singleMachine) {
         BaseDataContainer baseDataContainer = productionContext.getBaseDataContainer();
         //最小分配天数 20260209 特殊材料结构，将最小分配天数置为1
-        Integer minAllocationDays = addNewGroupPlan.getMinAllocationDays(productionContext);
+        boolean isChangeProSize = singleMachine.isChangeProSize(productionContext, addNewGroupPlan);
+        Integer minAllocationDays = addNewGroupPlan.getMinAllocationDays(productionContext, isChangeProSize);
         Integer needDays = addNewGroupPlan.getLeftOverNeedAllocationDays();
         String groupName = addNewGroupPlan.getGroupName();
+        //20260803+ 因同英寸切换与不同英寸切换的最短上机天数不一致，导致校验需滞后判断
+        if (!addNewGroupPlan.isNextAllocation(needDays, productionContext, isChangeProSize)) {
+            if (needDays > BigDecimal.ZERO.intValue()) {
+                TbrProductionGroupLogRecorder.addGroupLeftOverNoReachMinAllocationDayLog(productionContext, groupName, true, needDays, minAllocationDays);
+            }
+            return false;
+        }
         /**
          * 20260120 判断成型鼓是否符合条件
          * 20260125 分配产能限制控制 1、成型工装数量 2、日产能上限

@@ -17,6 +17,7 @@ import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
 import com.zlt.aps.mp.engine.scheduling.cxcapacity.CxCapacityAllocationHandler;
 import com.zlt.aps.mp.engine.scheduling.cxcapacity.CxMouldProductionHandler;
 import com.zlt.aps.mp.engine.scheduling.cxcapacity.SpecialMaterialScheduleHandler;
+import com.zlt.aps.mp.engine.utils.ProductionComparatorUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -296,16 +297,8 @@ public class GroupPriorityProductionScheduler {
             return Collections.emptyList();
         }
         Set<String> needExcludeGroupMap = Optional.ofNullable(excludeGroupPlan).orElse(Collections.emptySet());
-        Map<String, ProductionPlanGroupInfo> effectiveMap = Maps.newHashMap();
-        Set<String> preSelectedSet = Sets.newHashSet();
-        allGroupPlanMap.forEach((groupName, groupInfo) -> {
-            if (needExcludeGroupMap.contains(groupName)) {
-                return;
-            }
-            preSelectedSet.add(groupName);
-            effectiveMap.put(groupName, groupInfo);
-        });
-        TbrSimulateProductionLogRecorder.addPreSelectedTopGroupLog(productionContext, preSelectedSet);
+        Map<String, ProductionPlanGroupInfo> effectiveMap = getEffectiveGroupInfo(allGroupPlanMap, excludeGroupPlan);
+        TbrSimulateProductionLogRecorder.addPreSelectedTopGroupLog(productionContext, effectiveMap.keySet());
         if (CollectionUtils.isEmpty(effectiveMap)) {
             return Collections.emptyList();
         }
@@ -326,11 +319,11 @@ public class GroupPriorityProductionScheduler {
                 break;
             }
             String groupName = selectedGroup.getGroupName();
-            //最小分配天数
-            Integer minAllocationDays = selectedGroup.getMinAllocationDays(productionContext);
+            //20260803+ 因最短上机天数拆分同英寸切换和换英寸切换，故而先默认为同英寸切换-最短上机天数
             Integer leftOverDays = selectedGroup.getLeftOverNeedAllocationDays();
             //20260206 小于最短上机天数，则不进行分配
-            if (!selectedGroup.isNextAllocation(leftOverDays, productionContext)) {
+            if (!selectedGroup.isNextAllocation(leftOverDays, productionContext, false)) {
+                Integer minAllocationDays = selectedGroup.getMinAllocationDays(productionContext, false);
                 if (leftOverDays > BigDecimal.ZERO.intValue()) {
                     log.info(TbrProductionGroupLogRecorder.addGroupLeftOverNoReachMinAllocationDayLog(productionContext, groupName, true, leftOverDays, minAllocationDays));
                 }
@@ -390,11 +383,11 @@ public class GroupPriorityProductionScheduler {
                 break;
             }
             String groupName = selectedGroup.getGroupName();
-            //最小分配天数
-            Integer minAllocationDays = selectedGroup.getMinAllocationDays(productionContext);
+            //20260803+ 因最短上机天数拆分同英寸切换和换英寸切换，故而先默认为同英寸切换-最短上机天数
             Integer leftOverDays = selectedGroup.getLeftOverNeedAllocationDays();
             //20260206 小于最短上机天数，则不进行分配
-            if (!selectedGroup.isNextAllocation(leftOverDays, productionContext)) {
+            if (!selectedGroup.isNextAllocation(leftOverDays, productionContext, false)) {
+                Integer minAllocationDays = selectedGroup.getMinAllocationDays(productionContext, false);
                 if (leftOverDays > BigDecimal.ZERO.intValue()) {
                     log.info(TbrProductionGroupLogRecorder.addGroupLeftOverNoReachMinAllocationDayLog(productionContext, groupName, true, leftOverDays, minAllocationDays));
                 }
@@ -530,8 +523,7 @@ public class GroupPriorityProductionScheduler {
             return topPreProductionList.get(BigDecimal.ZERO.intValue());
         }
         //排序：优先级级别(值越低越在前)->差值小的
-        Comparator sortComparator = Comparator.comparing(GroupPrioritySchedulerResultHelper::getSelectedPriorityValue)
-                .thenComparing(GroupPrioritySchedulerResultHelper::getSelectedPriorityDiffValue);
+        Comparator sortComparator = ProductionComparatorUtils.getGroupPrioritySchedulerSort();
         topPreProductionList.sort(sortComparator);
         return topPreProductionList.get(BigDecimal.ZERO.intValue());
     }
@@ -603,4 +595,25 @@ public class GroupPriorityProductionScheduler {
         return addHelper;
     }
 
+    /**
+     * 从allGroupPlanMap所有分组计划中，排除指定excludeGroupPlan的分组，得到剩下所需要的分组计划信息
+     *
+     * @param allGroupPlanMap  所有分组计划对象集合
+     * @param excludeGroupPlan 需要排产的计划信息集合
+     * @return
+     */
+    private Map<String, ProductionPlanGroupInfo> getEffectiveGroupInfo(Map<String, ProductionPlanGroupInfo> allGroupPlanMap, Set<String> excludeGroupPlan) {
+        Set<String> needExcludeGroupMap = Optional.ofNullable(excludeGroupPlan).orElse(Collections.emptySet());
+        Map<String, ProductionPlanGroupInfo> effectiveMap = Maps.newHashMap();
+        allGroupPlanMap.forEach((groupName, groupInfo) -> {
+            if (needExcludeGroupMap.contains(groupName)) {
+                return;
+            }
+            effectiveMap.put(groupName, groupInfo);
+        });
+        if (CollectionUtils.isEmpty(effectiveMap)) {
+            return Collections.emptyMap();
+        }
+        return effectiveMap;
+    }
 }

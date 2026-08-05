@@ -3,6 +3,7 @@ package com.zlt.aps.mp.engine.utils;
 import com.zlt.aps.mp.engine.domain.dto.ProductGroupCxCapacityInfo;
 import com.zlt.aps.mp.engine.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.mp.engine.domain.vo.ProductionMouldInfoVo;
+import com.zlt.aps.mp.engine.handler.GroupPrioritySchedulerResultHelper;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.Comparator;
@@ -112,6 +113,16 @@ public class ProductionComparatorUtils {
                 .thenComparing(ProductionMouldInfoVo::getMouldCode, Comparator.reverseOrder());
     }
 
+    /**
+     * 场景：分组计划找到多台成型机时，对成型机选择的排序(交付优先)
+     * 优先级级别(12个等级-值越低越在前)->差值小的
+     *
+     * @return
+     */
+    public static Comparator getGroupPrioritySchedulerSort(){
+        return Comparator.comparing(GroupPrioritySchedulerResultHelper::getSelectedPriorityValue)
+                .thenComparing(GroupPrioritySchedulerResultHelper::getSelectedPriorityDiffValue);
+    }
     /**
      * 前提条件：分组计划已经找出可生产的成型机台
      * 挑选可生产匹配机台，按匹配优先级优先规则

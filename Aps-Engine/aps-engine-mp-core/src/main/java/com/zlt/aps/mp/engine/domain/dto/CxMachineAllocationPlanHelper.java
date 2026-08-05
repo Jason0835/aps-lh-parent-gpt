@@ -95,6 +95,10 @@ public class CxMachineAllocationPlanHelper implements Serializable {
      * 分组切换日，前分组分配信息，记录是否需要延长处理
      */
     private CxMachineAllocationPlanHelper beforeAllocation;
+    /**
+     * 是否为切换英寸
+     */
+    private boolean isChangeProSize;
 
     /**
      * 构造函数
@@ -163,6 +167,15 @@ public class CxMachineAllocationPlanHelper implements Serializable {
     public String getDuplicateKey() {
         String keyFormat = "%s|*|%s|*|%s";
         return String.format(keyFormat, cxMachineCode, startDay, endDay);
+    }
+
+    /**
+     * 结构切换是否为切换英寸
+     *
+     * @param isChangeProSize
+     */
+    public void setChangeProSize(boolean isChangeProSize) {
+        this.isChangeProSize = isChangeProSize;
     }
 
     /**
