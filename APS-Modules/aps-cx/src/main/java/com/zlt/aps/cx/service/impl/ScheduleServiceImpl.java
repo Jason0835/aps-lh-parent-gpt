@@ -18,6 +18,8 @@ import com.zlt.aps.cx.entity.schedule.LhScheduleResult;
 import com.zlt.aps.cx.api.domain.entity.CxPrecisionPlan;
 import com.zlt.aps.cx.enums.DayVulcanizationModeEnum;
 import com.zlt.aps.cx.mapper.*;
+import com.zlt.aps.lh.api.constant.LhScheduleConstant;
+import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
 import com.zlt.aps.lh.api.domain.entity.LhParams;
 import com.zlt.aps.cx.mapper.LhParamsMapper;
 import com.zlt.aps.maindata.mapper.FactoryParamMapper;
@@ -1293,6 +1295,9 @@ public class ScheduleServiceImpl implements ScheduleService {
                 crossMonth, prevYear, prevMonth, crossMonth ? nextYear + "-" + nextMonth : "无",
                 tInNextMonth, materialCodeList.size());
 
+        // 提前生产天数（与硫化 getAllProductionDateInfo 口径一致）
+        int advanceDays = this.getAdvanceDays(factoryCode);
+
         // 4. 计算每个物料的硫化余量（按断点日累加计划量，支持跨月）
         List<MdmMonthSurplus> monthSurplusList = new ArrayList<>();
         for (String statusKey : allStatusKeys) {
@@ -1329,7 +1334,7 @@ public class ScheduleServiceImpl implements ScheduleService {
             int surplusQty = this.calculateSurplusQtyBySharedCalculator(
                     prevPlans, nextPlans, scheduleDate, scheduleEndDate,
                     prevDayFinishedQty, prevScheFinishedQty, nextDayFinishedQty, nextScheFinishedQty,
-                    isNextMonthFinal, startDay);
+                    isNextMonthFinal, startDay, advanceDays);
 
             MdmMonthSurplus surplus = new MdmMonthSurplus();
             surplus.setMaterialCode(materialCode);
@@ -1426,6 +1431,43 @@ public class ScheduleServiceImpl implements ScheduleService {
     }
 
     /**
+     * 获取提前生产天数（与硫化 getAdvanceDays 口径一致）。
+     * <p>
+     * 从 LhParams 表查询参数 SYS0304028（EARLY_PRODUCTION_DAYS_THRESHOLD），
+     * 默认值2，最大值31。用于扩展排产日期窗口，使提前生产物料的硫化余量能覆盖未来计划。
+     * </p>
+     *
+     * @param factoryCode 工厂编码
+     * @return 提前生产天数
+     */
+    private int getAdvanceDays(String factoryCode) {
+        if (factoryCode == null || factoryCode.trim().isEmpty()) {
+            return LhScheduleConstant.DEFAULT_EARLY_PRODUCTION_DAYS_THRESHOLD;
+        }
+        String paramValue = this.loadLhParamValue(lhParamsMapper, factoryCode,
+                LhScheduleParamConstant.EARLY_PRODUCTION_DAYS_THRESHOLD);
+        int defaultValue = LhScheduleConstant.DEFAULT_EARLY_PRODUCTION_DAYS_THRESHOLD;
+        if (paramValue == null || paramValue.trim().isEmpty()) {
+            return defaultValue;
+        }
+        int resolvedValue;
+        try {
+            resolvedValue = Integer.parseInt(paramValue.trim());
+        } catch (NumberFormatException e) {
+            log.warn("硫化参数解析失败, paramCode={}, value={}, 使用默认值: {}",
+                    LhScheduleParamConstant.EARLY_PRODUCTION_DAYS_THRESHOLD, paramValue, defaultValue);
+            return defaultValue;
+        }
+        if (resolvedValue <= 0) {
+            return defaultValue;
+        }
+        if (resolvedValue > LhScheduleConstant.MAX_EARLY_PRODUCTION_DAYS_THRESHOLD) {
+            return LhScheduleConstant.MAX_EARLY_PRODUCTION_DAYS_THRESHOLD;
+        }
+        return resolvedValue;
+    }
+
+    /**
      * 计算单条月计划记录的有效计划量。
      *
      * <p>当"上月超欠产有效标志"({@code lastMonthValidFlag})为"1"时，
@@ -1462,6 +1504,7 @@ public class ScheduleServiceImpl implements ScheduleService {
      * @param nextScheFinishedQty 次月排程班次完成量
      * @param isNextMonthFinal    次月是否已定稿
      * @param startDay            计划量起始计算日（次月定稿时为库存抓取日，否则为1）
+     * @param advanceDays         提前生产天数（扩展排产窗口，与硫化 getAllProductionDateInfo 口径一致）
      * @return 硫化余量
      */
     private int calculateSurplusQtyBySharedCalculator(
@@ -1470,7 +1513,7 @@ public class ScheduleServiceImpl implements ScheduleService {
             LocalDate scheduleDate, LocalDate scheduleEndDate,
             int prevDayFinishedQty, int prevScheFinishedQty,
             int nextDayFinishedQty, int nextScheFinishedQty,
-            boolean isNextMonthFinal, int startDay) {
+            boolean isNextMonthFinal, int startDay, int advanceDays) {
         List<FactoryMonthPlanProductionFinalResult> allMonthPlans = Stream.concat(
                 prevPlans.stream(), nextPlans.stream()).collect(Collectors.toList());
         if (allMonthPlans.isEmpty()) {
@@ -1478,12 +1521,19 @@ public class ScheduleServiceImpl implements ScheduleService {
         }
 
         FactoryMonthPlanProductionFinalResult plan = allMonthPlans.get(0);
-        List<Date> productionDates = new ArrayList<>();
-        for (LocalDate productionDate = scheduleDate;
-             !productionDate.isAfter(scheduleEndDate);
-             productionDate = productionDate.plusDays(1)) {
-            productionDates.add(MonthPlanSurplusCalculator.getDate(productionDate));
+        // 排产日期窗口（与硫化 getAllProductionDateInfo 口径一致）：
+        // {T-1, T, T+1, T+2, ..., T+1+advanceDays}
+        Set<Date> productionDateSet = new HashSet<>();
+        productionDateSet.add(MonthPlanSurplusCalculator.getDate(scheduleDate.minusDays(1)));
+        productionDateSet.add(MonthPlanSurplusCalculator.getDate(scheduleDate));
+        LocalDate afterDay = scheduleDate.plusDays(1);
+        productionDateSet.add(MonthPlanSurplusCalculator.getDate(afterDay));
+        if (advanceDays > 0) {
+            for (int i = 1; i <= advanceDays; i++) {
+                productionDateSet.add(MonthPlanSurplusCalculator.getDate(afterDay.plusDays(i)));
+            }
         }
+        List<Date> productionDates = new ArrayList<>(productionDateSet);
 
         YearMonth productionYearMonth = YearMonth.from(scheduleDate);
         Map<YearMonth, FactoryMonthPlanProductionFinalResult> hasProductionPlanMap =
