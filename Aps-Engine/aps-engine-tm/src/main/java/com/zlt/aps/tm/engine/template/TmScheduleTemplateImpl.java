@@ -328,14 +328,14 @@ public class TmScheduleTemplateImpl extends AbsTmScheduleTemplate {
         }
         if (TmScheduleStepEnum.PLAN_CALC == stepEnum) {
             context.getTaskDraftList().forEach(task -> context.appendFullProcessTrace(new ScheduleProcessTraceEvent(
-                    stepEnum.getDesc(), task.getBusinessKey(), "成型供应时长计算",
+                    stepEnum.getDesc(), task.getBusinessKey(), "库存供应时长计算",
                     "当前班班初滚动库存、保证范围内成型需求和保证范围总小时数。",
                     "滚动库存=" + this.nvl(task.getRollingStockQty()) + "米，保证范围需求="
                             + this.nvl(task.getGuardDemandQty()) + "米，保证范围总时长="
                             + this.nvl(task.getGuardRangeHours()) + "小时。",
-                    "先按保证范围需求计算平均每小时消耗，再计算现有库存可支撑的小时数；供应时长越小，库存越紧急。",
+                    "先按保证范围需求计算平均每小时成型消耗，再计算现有库存可支撑的小时数；库存供应时长越小，库存越紧急。",
                     this.buildSupplyHoursFormula(task),
-                    "成型供应时长=" + this.displaySupplyHours(task.getSupplyHours()) + "。",
+                    "库存供应时长=" + this.displaySupplyHours(task.getSupplyHours()) + "。",
                     "作为任务排序的库存紧急度指标，并用于后续缺料时点推算。"
             )));
         }
@@ -516,7 +516,7 @@ public class TmScheduleTemplateImpl extends AbsTmScheduleTemplate {
     }
 
     /**
-     * 构建成型供应时长的实际代入公式。
+     * 构建库存供应时长的实际代入公式。
      *
      * @param task 排程任务
      * @return 中文公式文本
@@ -528,7 +528,7 @@ public class TmScheduleTemplateImpl extends AbsTmScheduleTemplate {
             return "保证范围需求量或保证范围总时长小于等于0，无法计算平均消耗率，供应时长按未提供处理。";
         }
         return "平均每小时成型消耗=保证范围需求" + guardDemandQty.toPlainString() + "÷保证范围总时长"
-                + guardRangeHours.toPlainString() + "；供应时长=滚动库存"
+                + guardRangeHours.toPlainString() + "；库存供应时长=滚动库存"
                 + this.nvl(task.getRollingStockQty()).toPlainString() + "÷平均每小时成型消耗="
                 + this.displaySupplyHours(task.getSupplyHours()) + "。";
     }
