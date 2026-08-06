@@ -2,10 +2,15 @@ package com.zlt.aps.gsq.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.date.DateUtil;
+import cn.hutool.core.util.IdUtil;
+import cn.hutool.core.util.StrUtil;
+import com.alibaba.fastjson.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.common.core.constant.ApsConstant;
@@ -16,12 +21,20 @@ import com.zlt.aps.gsq.api.domain.entity.GsqDispatcherLog;
 import com.zlt.aps.gsq.api.domain.entity.GsqMachineInfo;
 import com.zlt.aps.gsq.api.domain.entity.GsqScheduleResult;
 import com.zlt.aps.gsq.api.domain.entity.GsqScheduleResultIssue;
+import com.zlt.aps.gsq.api.domain.vo.GsqInsertTaskRequestVo;
+import com.zlt.aps.gsq.api.domain.vo.GsqOperationRequestSnapshot;
 import com.zlt.aps.gsq.api.domain.vo.GsqScheduleShiftDateVO;
+import com.zlt.aps.gsq.constant.GsqScheduleConstants;
+import com.zlt.aps.gsq.domain.GsqAutoScheduleTask;
 import com.zlt.aps.gsq.engine.service.GsqEngineService;
 import com.zlt.aps.gsq.engine.vo.GsqScheduleBaseInfoVo;
+import com.zlt.aps.gsq.enums.GsqAutoScheduleTaskStatusEnum;
+import com.zlt.aps.gsq.enums.GsqBackgroundTaskTypeEnum;
 import com.zlt.aps.gsq.mapper.GsqScheduleResultMapper;
+import com.zlt.aps.gsq.service.GsqBackgroundTaskService;
 import com.zlt.aps.gsq.service.GsqDispatcherLogService;
 import com.zlt.aps.gsq.service.GsqMachineInfoService;
+import com.zlt.aps.gsq.service.GsqOperationAsyncExecutor;
 import com.zlt.aps.gsq.engine.vo.GsqRollingUpdateResult;
 import com.zlt.aps.gsq.service.IGsqRollingUpdateService;
 import com.zlt.aps.gsq.service.IGsqScheduleResultService;
@@ -121,6 +134,12 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
      */
     @Resource
     private IGsqRollingUpdateService gsqRollingUpdateService;
+
+    /**
+     * 钢丝圈人工滚动应用服务（走任务链路径的插单/调量/转机台/删除统一入口）
+     */
+    @Autowired
+    private GsqManualInsertRollingService gsqManualInsertRollingService;
 
     @Override
     public String getDocTypeCode() {
@@ -277,6 +296,7 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
      * @param dto 插单数据
      * @return 结果
      */
+    @Deprecated
     @Override
     @Transactional(rollbackFor = Exception.class)
     public AjaxResult insertOrder(GsqInsertOrderDTO dto) {
@@ -666,6 +686,7 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
      * @param ids 需要删除的记录ID列表
      * @return 结果
      */
+    @Deprecated
     @Override
     @Transactional(rollbackFor = Exception.class)
     public AjaxResult logicDeleteByIds(List<Long> ids) {
@@ -1111,6 +1132,176 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
         return vo;
     }
 
+    // ==================== 新人工操作入口（走任务链路径） ====================
+
+    /**
+     * 人工插单（走任务链路径，支持锚点插入、resequence 重排）。
+     *
+     * <p>统一走 {@link GsqManualInsertRollingService#insertAndRoll}，由底层服务负责
+     * 数据库快照加载、引擎执行和一次性持久化。</p>
+     *
+     * <p>与旧 insertOrder 的差异：</p>
+     * <ul>
+     *   <li>支持锚点插入：anchorTaskId 不为空时在锚点之后插入，锚点之后任务 sequence +1</li>
+     *   <li>自动重排顺位：resequence 保证同机台同班次 sequence 从1连续递增</li>
+     *   <li>滚动重装箱：超额任务自动顺延到下一班次</li>
+     * </ul>
+     *
+     * @param vo 插单请求
+     * @return 结果
+     */
+    @Override
+    public AjaxResult insertTask(GsqInsertTaskRequestVo vo) {
+        if (vo == null) {
+            return AjaxResult.error("插单请求不能为空");
+        }
+        if (vo.getScheduleDate() == null) {
+            return AjaxResult.error("排程日期不能为空");
+        }
+        if (StringUtils.isBlank(vo.getSteelRingCode())) {
+            return AjaxResult.error("钢丝圈代码不能为空");
+        }
+        if (StringUtils.isBlank(vo.getMachineCode())) {
+            return AjaxResult.error("机台编号不能为空");
+        }
+        // 校验施工是否存在
+        List<GsqScheduleBaseInfoVo> baseInfoList = gsqEngineService.listGsqScheduleBaseInfo(
+                Collections.singletonList(vo.getSteelRingCode()));
+        if (CollectionUtils.isEmpty(baseInfoList)) {
+            return AjaxResult.error("钢丝圈规格有误，施工不存在");
+        }
+        // 构建 GsqScheduleResult 模板
+        GsqScheduleResult template = new GsqScheduleResult();
+        template.setFactoryCode(vo.getFactoryCode());
+        template.setScheduleDate(vo.getScheduleDate());
+        template.setSteelRingCode(vo.getSteelRingCode());
+        template.setProSize(vo.getProSize());
+        template.setMachineCode(vo.getMachineCode());
+        template.setClass1PlanQty(vo.getClass1PlanQty());
+        template.setClass1Sequence(vo.getClass1Sequence());
+        template.setClass1Analysis(vo.getClass1Analysis());
+        template.setClass2PlanQty(vo.getClass2PlanQty());
+        template.setClass2Sequence(vo.getClass2Sequence());
+        template.setClass2Analysis(vo.getClass2Analysis());
+        template.setClass3PlanQty(vo.getClass3PlanQty());
+        template.setClass3Sequence(vo.getClass3Sequence());
+        template.setClass3Analysis(vo.getClass3Analysis());
+        template.setClass4PlanQty(vo.getClass4PlanQty());
+        template.setClass4Sequence(vo.getClass4Sequence());
+        template.setClass4Analysis(vo.getClass4Analysis());
+        template.setClass5PlanQty(vo.getClass5PlanQty());
+        template.setClass5Sequence(vo.getClass5Sequence());
+        template.setClass5Analysis(vo.getClass5Analysis());
+        template.setClass6PlanQty(vo.getClass6PlanQty());
+        template.setClass6Sequence(vo.getClass6Sequence());
+        template.setClass6Analysis(vo.getClass6Analysis());
+        template.setRemark(vo.getRemark());
+        template.setDataSource("1");
+        template.setIsRelease(ApsConstant.NO_RELEASE);
+        // 生成批次号、工单号（复用当前排程日期已有批次号，不影响其他记录）
+        String scheduleDateStr = DateUtil.formatDate(vo.getScheduleDate());
+        String[] batchAndOrder = gsqEngineService.generateBatchNoAndOrderNo(scheduleDateStr);
+        template.setBatchNo(batchAndOrder[0]);
+        template.setOrderNo(batchAndOrder[1]);
+        // 回显施工字段（英寸尺寸），从施工表获取
+        GsqScheduleBaseInfoVo baseInfo = baseInfoList.get(0);
+        if (StringUtils.isBlank(template.getProSize())) {
+            template.setProSize(baseInfo.getProSize());
+        }
+        // 走人工滚动应用服务统一入口
+        try {
+            gsqManualInsertRollingService.insertAndRoll(template);
+        } catch (ServiceException e) {
+            return AjaxResult.error(e.getMessage());
+        }
+        return AjaxResult.success("钢丝圈人工插单成功");
+    }
+
+    /**
+     * 批量转机台（走任务链路径，支持锚点、目标班次）。
+     *
+     * <p>批量转机台仅支持同一目标机台。每条请求的 machineCode 即目标机台编码，
+     * 源机台由底层服务按 id 从数据库读取并校验，避免请求携带的机台被篡改。</p>
+     *
+     * @param list 转机台请求列表（每条携带 id 与同一目标 machineCode）
+     * @return 结果
+     */
+    @Override
+    public AjaxResult batchChangeMachine(List<GsqScheduleResult> list) {
+        if (CollectionUtils.isEmpty(list)) {
+            return AjaxResult.error("转机台请求不能为空");
+        }
+        // 批量转机台仅支持同一目标机台，避免异构目标静默覆盖为单一目标
+        String targetMachineCode = StringUtils.trimToEmpty(list.get(0).getMachineCode());
+        if (StringUtils.isBlank(targetMachineCode)) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.gsq.schedule.machineCodeEmpty"));
+        }
+        for (GsqScheduleResult request : list) {
+            if (!targetMachineCode.equals(StringUtils.trimToEmpty(request.getMachineCode()))) {
+                return AjaxResult.error("批量转机台仅支持同一目标机台");
+            }
+        }
+        try {
+            gsqManualInsertRollingService.changeMachineAndRollBatch(list);
+        } catch (ServiceException e) {
+            return AjaxResult.error(e.getMessage());
+        }
+        return AjaxResult.success("钢丝圈批量转机台成功");
+    }
+
+    /**
+     * 批量调量（走任务链路径）。
+     *
+     * @param list 调量请求列表
+     * @return 结果
+     */
+    @Override
+    public AjaxResult batchChangeQty(List<GsqScheduleResult> list) {
+        if (CollectionUtils.isEmpty(list)) {
+            return AjaxResult.error("调量请求不能为空");
+        }
+        try {
+            gsqManualInsertRollingService.changeQtyAndRollBatch(list);
+        } catch (ServiceException e) {
+            return AjaxResult.error(e.getMessage());
+        }
+        return AjaxResult.success("钢丝圈批量调量成功");
+    }
+
+    /**
+     * 批量删除（走任务链路径，删除后 resequence 重排）。
+     *
+     * <p>底层服务负责：加载待删除记录、行锁、释放状态校验、
+     * 局部滚动、逻辑删除和调度日志，任一步失败整批回滚。</p>
+     *
+     * @param ids 排程记录ID列表
+     * @return 结果
+     */
+    @Override
+    public AjaxResult batchDelete(List<Long> ids) {
+        if (CollectionUtils.isEmpty(ids)) {
+            return AjaxResult.error("删除请求不能为空");
+        }
+        // 通过 ids 查询出待删除的排程记录列表
+        List<GsqScheduleResult> deleteList = new ArrayList<>();
+        for (Long id : ids) {
+            GsqScheduleResult record = gsqScheduleResultMapper.selectById(id);
+            if (record == null || Objects.equals(record.getIsDelete(), 1)) {
+                continue;
+            }
+            deleteList.add(record);
+        }
+        if (CollectionUtils.isEmpty(deleteList)) {
+            return AjaxResult.error("待删除的排程记录不存在或已删除");
+        }
+        try {
+            gsqManualInsertRollingService.deleteAndRollBatch(deleteList);
+        } catch (ServiceException e) {
+            return AjaxResult.error(e.getMessage());
+        }
+        return AjaxResult.success("钢丝圈批量删除成功");
+    }
+
     // ==================== 私有方法 ====================
 
     /**
@@ -1145,8 +1336,17 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
             if (tqResult == null || CollectionUtils.isEmpty(tqResult.getRows())) {
                 continue;
             }
-            @SuppressWarnings("unchecked")
-            List<TqScheduleResult> tqList = (List<TqScheduleResult>) tqResult.getRows();
+            // 远程Feign返回的rows为LinkedHashMap，需转换为TqScheduleResult实体
+            List<TqScheduleResult> tqList = new ArrayList<>();
+            if (tqResult.getRows() != null) {
+                for (Object row : tqResult.getRows()) {
+                    if (row instanceof TqScheduleResult) {
+                        tqList.add((TqScheduleResult) row);
+                    } else if (row instanceof Map) {
+                        tqList.add(BeanUtil.toBean((Map<String, Object>) row, TqScheduleResult.class));
+                    }
+                }
+            }
             // 按钢丝圈代码分组
             Map<String, List<TqScheduleResult>> tqCodeMap = tqList.stream()
                     .filter(t -> StringUtils.isNotBlank(t.getSteelRingCode()))

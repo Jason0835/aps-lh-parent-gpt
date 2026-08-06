@@ -133,7 +133,11 @@ export default {
           label: this.$t("ui.data.column.dj.machineMaintenance.stopShift"),
           sortable: true,
           formatter: (row) => {
-            return this.dict.label('CLASS_NUM', row.stopShift);
+            let value = row.stopShift;
+            if (this.isEmpty(value)) {
+              return "";
+            }
+            return this.selectDictLabels(this.dict.type.CLASS_NUM, value);
           },
         },
         {

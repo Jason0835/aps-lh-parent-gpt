@@ -51,8 +51,22 @@
           :disabled="selection.length == 0"
         >{{ $t("ui.data.btn.tqScheduleResult.adjustQty") }}</el-button>
         <el-button
+          type="primary"
+          plain
+          v-hasPermi="['tq:scheduleResult:changeMachine']"
+          @click="handleBatchChangeMachine"
+          :disabled="selection.length < 2"
+        >{{ $t("ui.data.btn.tqScheduleResult.batchChangeMachine") }}</el-button>
+        <el-button
+          type="primary"
+          plain
+          v-hasPermi="['tq:scheduleResult:adjustQty']"
+          @click="handleBatchChangeQty"
+          :disabled="selection.length < 2"
+        >{{ $t("ui.data.btn.tqScheduleResult.batchChangeQty") }}</el-button>
+        <el-button
           v-hasPermi="['tq:scheduleResult:import']"
-          @click="$refs.tltUpload.handleImport()"
+          @click="handleImport"
         >{{ $t("ui.frame.btn.import") }}</el-button>
         <el-button
           @click="handleExport"
@@ -70,8 +84,9 @@
     <tlt-upload-form
       ref="tltUpload"
       :updateSupport="true"
-      downloadUrl="/tq/scheduleResult/importTemplate"
-      uploadUrl="/tq/scheduleResult/importData"
+      :download-url-formatter="(form) => handleTemplateDownload('/tq/scheduleResult/importTemplateCust', form)"
+      downloadUrl="/tq/scheduleResult/importTemplateCust"
+      uploadUrl="/tq/scheduleResult/importDataCust"
       @uploadSuccess="getList"
       labelWidth="0"
       :columns="importColumns"
@@ -88,7 +103,7 @@
 </template>
 <script>
 import { downloadLink } from "@/utils/request";
-import { listScheduleResult, logicDeleteScheduleResult, listScheduleShiftDates, autoPlan, insertOrder, changeMachine, changeQty, publishSchedule } from "@/api/tq/scheduleResult";
+import { listScheduleResult, logicDeleteScheduleResult, batchDelete, batchChangeMachine, batchChangeQty, listScheduleShiftDates, autoPlan, insertOrder, changeMachine, changeQty, publishSchedule } from "@/api/tq/scheduleResult";
 import { mapState } from "vuex";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import InsertOrderDialog from "./components/insertOrderDialog.vue";
@@ -126,22 +141,6 @@ export default {
   },
   data() {
     return {
-      importColumns: [
-        {
-          label: "",
-          prop: "updateSupport",
-          render: (form) => {
-            return (
-              <el-checkbox
-                label={this.$t("common.rule.updateSupport")}
-                v-model={form.updateSupport}
-              >
-                {this.$t("common.rule.updateSupport")}
-              </el-checkbox>
-            );
-          },
-        },
-      ],
       loading: false,
       data: [],
       selection: [],
@@ -153,9 +152,11 @@ export default {
       sort: {},
       search: {
         scheduleDateQuery: getOffsetDate(1),
+        factoryCode: "116",
       },
       query: {
         scheduleDateQuery: getOffsetDate(1),
+        factoryCode: "116",
       },
       dateList: [
         { shift: 1, shiftType: "afternoon", shiftDate: "" },
@@ -171,9 +172,39 @@ export default {
     ...mapState({
       tqMachines: (state) => state.tqBead.machines,
     }),
+    // 导入弹窗列配置放在 computed 中，确保 this.dict 已初始化（data() 执行时字典 mixin 尚未注入 dict）
+    // 工厂与排程日期不在弹窗中选择，由列表页查询条件带入（见 handleImport 方法）
+    importColumns() {
+      return [
+        {
+          label: "",
+          prop: "updateSupport",
+          render: (form) => {
+            return (
+              <el-checkbox
+                label={this.$t("common.rule.updateSupport")}
+                v-model={form.updateSupport}
+              >
+                {this.$t("common.rule.updateSupport")}
+              </el-checkbox>
+            );
+          },
+        },
+      ];
+    },
     columns() {
       return [
         { type: "selection", fixed: "left" },
+        {
+          prop: "factoryCode",
+          align: "center",
+          halign: "center",
+          label: this.$t("ui.data.column.tqScheduleResult.factoryCode"),
+          minWidth: 100,
+          formatter: (row, column, value, index) => {
+            return this.selectDictLabel(this.dict.type.biz_factory_name, value);
+          },
+        },
         {
           prop: "scheduleDate",
           align: "center",
@@ -426,10 +457,10 @@ export default {
           ],
         },
         {
-          prop: "isRelease",
+          prop: "releaseStatus",
           align: "center",
           halign: "center",
-          label: this.$t("ui.data.column.tqScheduleResult.isRelease"),
+          label: this.$t("ui.data.column.tqScheduleResult.releaseStatus"),
           minWidth: 100,
           formatter: (row, column, value, index) => {
             return this.selectDictLabel(this.dict.type.IS_RELEASE, value);
@@ -446,6 +477,13 @@ export default {
     },
     searchColumns() {
       return [
+        {
+          label: this.$t("ui.data.column.tqScheduleResult.factoryCode"),
+          prop: "factoryCode",
+          type: "select",
+          dictData: this.dict.type.biz_factory_name,
+          filterable: true,
+        },
         {
           label: this.$t("ui.data.column.tqScheduleResult.scheduleDate"),
           prop: "scheduleDateQuery",
@@ -468,8 +506,8 @@ export default {
           prop: "triangleGlueCode",
         },
         {
-          label: this.$t("ui.data.column.tqScheduleResult.isRelease"),
-          prop: "isRelease",
+          label: this.$t("ui.data.column.tqScheduleResult.releaseStatus"),
+          prop: "releaseStatus",
           type: "select",
           dictData: this.dict.type.IS_RELEASE,
           filterable: true,
@@ -559,19 +597,65 @@ export default {
         this.$modal.msgWarning(this.$t("common.tip.selectOne"));
         return;
       }
-      const ids = this.selection.map(item => item.id).join(",");
+      const ids = this.selection.map(item => item.id);
       this.$confirm(this.$t("common.confirm.delete"), {
         type: "warning",
       }).then(() => {
-        logicDeleteScheduleResult(ids).then((data) => {
+        batchDelete(ids).then((data) => {
           this.$modal.msgSuccess(data.msg);
           this.$set(this.page, "current", 1);
           this.getList();
         });
       });
     },
+    /** 批量转机台（走任务链路径，支持锚点、目标班次） */
+    handleBatchChangeMachine() {
+      if (!this.selection || this.selection.length === 0) {
+        this.$modal.msgWarning(this.$t("common.tip.selectOne"));
+        return;
+      }
+      // 复用现有转机台对话框，传入选中列表的第一条作为模板
+      // 批量提交时在对话框确认后调用 batchChangeMachine
+      this.$refs.changeMachineDialog.show(this.selection[0], this.selection);
+    },
+    /** 批量调量（走任务链路径） */
+    handleBatchChangeQty() {
+      if (!this.selection || this.selection.length === 0) {
+        this.$modal.msgWarning(this.$t("common.tip.selectOne"));
+        return;
+      }
+      this.$refs.adjustQtyDialog.show(this.selection[0], this.selection);
+    },
+    /** 打开导入弹窗：工厂与排程日期由列表页查询条件带入，无需在弹窗中重复选择 */
+    handleImport() {
+      this.$refs.tltUpload.handleImport({
+        factoryCode: this.query.factoryCode,
+        scheduleDate: this.query.scheduleDateQuery,
+        updateSupport: false,
+      });
+    },
     handleExport() {
-      downloadLink("/tq/scheduleResult/export", this.formatParams(false));
+      if (!this.query.factoryCode || !this.query.scheduleDateQuery) {
+        this.$modal.msgWarning(this.$t("ui.data.alert.tq.schedule.excel.factoryDateRequired"));
+        return;
+      }
+      downloadLink("/tq/scheduleResult/export", {
+        factoryCode: this.query.factoryCode,
+        scheduleDate: this.query.scheduleDateQuery,
+        machineCode: this.query.machineCode,
+        beadCode: this.query.beadCode,
+      });
+    },
+    handleTemplateDownload(url, formValues) {
+      const params = {
+        ...formValues,
+        exportTemplate: true,
+      };
+      const paramsStr = Object.keys(params)
+        .filter(key => params[key] !== undefined && params[key] !== null && params[key] !== "")
+        .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(params[key])}`)
+        .join("&");
+      return `${url}${paramsStr ? "?" + paramsStr : ""}`;
     },
     handleSearch(data) {
       this.query = { ...data };

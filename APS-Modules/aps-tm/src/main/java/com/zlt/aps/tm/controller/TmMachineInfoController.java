@@ -111,6 +111,8 @@ public class TmMachineInfoController extends AbstractDocBizController<TmMachineI
     protected List<TmMachineInfo> listExportData(TmMachineInfo obj) {
         QueryWrapper<TmMachineInfo> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
+        // 与列表页排序保持一致，避免导出数据顺序与页面不一致
+        wrapper.last("ORDER BY " + getOrderBy());
         return tmMachineInfoMapper.selectList(wrapper);
     }
 

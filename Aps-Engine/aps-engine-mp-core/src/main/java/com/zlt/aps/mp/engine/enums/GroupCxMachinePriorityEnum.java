@@ -34,7 +34,7 @@ public enum GroupCxMachinePriorityEnum {
      */
     SAME_SPECIFICATIONS_BEYOND_COVERED(3, "SameSpecificationsBeyondCovered", "同规格超出覆盖"),
     /**
-     * 4 sameProSizeBeyondCovered 成型产能不剩余：同英寸完全覆盖 1<需求天数-成型剩余产能天数
+     * 4 sameProSizeBeyondCovered 成型产能不剩余：同英寸超出覆盖 1<需求天数-成型剩余产能天数
      */
     SAME_PRO_SIZE_BEYOND_COVERED(4, "sameProSizeBeyondCovered", "同英寸超出覆盖"),
     /**
@@ -42,7 +42,7 @@ public enum GroupCxMachinePriorityEnum {
      */
     SAME_SPECIFICATIONS_NO_COVERED(5, "SameSpecificationsNoCovered", "同规格不能覆盖"),
     /**
-     * 6 sameProSizeNoCovered 成型产能不剩余：同英寸完全覆盖 需求天数-成型剩余产能天数<0
+     * 6 sameProSizeNoCovered 成型产能剩余：同英寸不覆盖 需求天数-成型剩余产能天数<0
      */
     SAME_PRO_SIZE_NO_COVERED(6, "sameProSizeNoCovered", "同英寸不能覆盖"),
     /**
@@ -50,11 +50,11 @@ public enum GroupCxMachinePriorityEnum {
      */
     SECTION_WIDTH_FULLY_COVERED(7, "sectionWidthFullyCovered", "断面宽完全覆盖"),
     /**
-     * 8 sectionWidthBeyondCovered 成型产能不剩余：同英寸完全覆盖 1<需求天数-成型剩余产能天数
+     * 8 sectionWidthBeyondCovered 成型产能不剩余：断面宽超出覆盖 1<需求天数-成型剩余产能天数
      */
     SECTION_WIDTH_BEYOND_COVERED(8, "sectionWidthBeyondCovered", "断面宽超出覆盖"),
     /**
-     * 9 sectionWidthNoCovered 成型产能剩余：同规格不覆盖 需求天数-成型剩余产能天数<0
+     * 9 sectionWidthNoCovered 成型产能剩余：断面宽不覆盖 需求天数-成型剩余产能天数<0
      */
     SECTION_WIDTH_NO_COVERED(9, "sectionWidthNoCovered", "断面宽不能覆盖"),
     /**
@@ -62,7 +62,7 @@ public enum GroupCxMachinePriorityEnum {
      */
     OTHER_FULLY_COVERED(10, "otherFullyCovered", "历史生产过完全覆盖"),
     /**
-     * 11 otherBeyondCovered 成型产能不剩余：历史生产过完全覆盖 1<需求天数-成型剩余产能天数
+     * 11 otherBeyondCovered 成型产能不剩余：历史生产过超出覆盖 1<需求天数-成型剩余产能天数
      */
     OTHER_BEYOND_COVERED(11, "otherBeyondCovered", "历史生产过超出覆盖"),
     /**

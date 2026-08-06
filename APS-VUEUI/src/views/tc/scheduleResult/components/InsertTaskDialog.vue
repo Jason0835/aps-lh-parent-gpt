@@ -209,7 +209,12 @@ export default {
     },
     isShiftEnabled(shiftOrder) {
       const option = this.shiftOptions.find(item => item.shiftOrder === shiftOrder)
-      return option && String(option.openFlag) === '1'
+      const machine = this.machineList.find(item => item.machineCode === this.form.machineCode)
+      return option && this.machineOpenShiftCodes(machine).includes(String(option.shiftCode || '').trim())
+    },
+    machineOpenShiftCodes(machine) {
+      if (!machine || !machine.openShiftCode) return []
+      return [...new Set(String(machine.openShiftCode).split(',').map(item => item.trim()).filter(Boolean))]
     },
     submit() {
       this.$refs.form.validate(async valid => {

@@ -503,7 +503,7 @@ public abstract class AbstractDailyCapacityLimit {
      * @param dayPlanQty 当前计划量
      * @return 增模完整的机台
      */
-    private static Integer addFullMachines(BaseEntity mpFinalVo, String day1Field, int dailyLhQty, int dayPlanQty) {
+    public Integer addFullMachines(BaseEntity mpFinalVo, String day1Field, int dailyLhQty, int dayPlanQty) {
         if ((dayPlanQty % dailyLhQty != 0) && mpFinalVo.getFieldValueByFieldName(day1Field) != null){
             //当日计划量有余量 且 前日有计划量，则完整模数 = 前日模数
             int prePlanQty = (Integer) mpFinalVo.getFieldValueByFieldName(day1Field);

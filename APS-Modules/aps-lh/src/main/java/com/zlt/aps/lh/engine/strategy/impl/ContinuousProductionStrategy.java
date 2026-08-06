@@ -29,6 +29,7 @@ import com.zlt.aps.lh.component.OrderNoGenerator;
 import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.ICapacityCalculateStrategy;
+import com.zlt.aps.lh.engine.strategy.IEmbryoEndingBalanceStrategy;
 import com.zlt.aps.lh.engine.strategy.IEndingJudgmentStrategy;
 import com.zlt.aps.lh.engine.strategy.IFirstInspectionBalanceStrategy;
 import com.zlt.aps.lh.engine.strategy.IMachineMatchStrategy;
@@ -125,6 +126,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
     private static final LocalTime ENDING_FILL_THRESHOLD_TIME = LocalTime.of(20, 0);
     /** 收尾补满班次原因分析备注，标识该班次因收尾补满规则新增计划量。 */
     private static final String ENDING_FILL_ANALYSIS = "补量";
+    /** 共用胎胚收尾错峰后延班次原因分析备注，标识该班次因错峰后延规则新增计划量。 */
+    private static final String ENDING_STAGGER_FILL_ANALYSIS = "错峰后延补量";
     private static final String WHOLE_SINGLE_CONTROL_CONTINUATION_UNSCHEDULED_REASON =
             "双模SKU单控机台L/R整机续作条件不满足，禁止单边续作";
     private static final int SAME_MATERIAL_STATUS_FORMAL_RESERVED_QTY = 4;
@@ -151,6 +154,12 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
      */
     @Resource
     private IMouldChangeBalanceStrategy mouldChangeBalanceStrategy;
+
+    /**
+     * 共用胎胚/同SKU多机台收尾均衡策略，在续作降模收口后、日计划账本扣减前执行。
+     */
+    @Resource
+    private IEmbryoEndingBalanceStrategy embryoEndingBalanceStrategy;
 
     @Resource
     private IFirstInspectionBalanceStrategy firstInspectionBalanceStrategy;
@@ -943,6 +952,10 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             applyMultiMachineEndingTargetRule(context, sourceSku, skuResults);
             log.info("续作同SKU多机台识别, materialCode: {}, 机台列表: {}, 是否多机台: {}",
                     sourceSku.getMaterialCode(), joinMachineCodes(skuResults), true);
+            // 多机台续作必须先抬高SKU目标量下限：满排模式下S4.3可能把目标量初始化为单台机台窗口产能，
+            // 多机台共用该目标量会在账本裁剪阶段把应保留的机台误裁为0（如 3302000467/3302001761/3302001508）。
+            // 收尾SKU按下限口径 MAX(硫化余量,胎胚库存)，非收尾按窗口剩余日计划与保留机台合计产能取大。
+            raiseMultiMachineContinuationTargetFloor(context, sourceSku, skuResults, shifts);
             // 降模排序规则只在当前续作 SKU 分组内生效，提前记录启用条件和清洗候选，便于对账最终下机顺序。
             logContinuationReduceSortRule(context, sourceSku, skuResults);
             // T 日原始月计划量与 T-1 相等时，必须先阻断所有首日快捷降模分支，并统一进入逐日降模链路。
@@ -1021,12 +1034,9 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         // 日标准产量公式可能把收尾残班向上补足，扣账前必须复用严格收尾目标再次收口。
         capStrictEndingContinuationGroupsToTarget(
                 context, sourceSkuMap, skuResultMap, skuOrder, shifts);
-        // 共用胎胚 SKU 收尾错峰必须在日额度账本扣减和后续换活字块选机前完成，确保机台释放时间按后延后的运行态计算。
-        applySharedEmbryoEndingStaggerPostpone(context, shifts);
-        // 共用胎胚收尾错峰可能移动班次量，扣账前再次恢复停产保机零产量和真正降模释放边界。
+        // 共用胎胚收尾均衡可能移动班次量，扣账前再次恢复停产保机零产量和真正降模释放边界。
         enforceContinuousStopHoldAndReleaseBoundaries(context, shifts);
-        // 普通续作的尾量归集、日标准和严格目标必须先全部稳定，后续专用状态链才是最后一次数量修改。
-        this.adjustContinuousSameSkuMultiMachineEndingStagger(context, shifts);
+        // 均衡后的尾量分摊、日标准和严格目标必须先全部稳定，后续专用状态链才是最后一次数量修改。
         this.applyDailyStandardPlanQtyToContinuousResults(context, shifts);
         this.capStrictEndingContinuationGroupsToTarget(
                 context, sourceSkuMap, skuResultMap, skuOrder, shifts);
@@ -1043,6 +1053,25 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
          * 再做一次幂等收口，只撤销后置逻辑补回的损失量，不执行新的换胶囊判断或二次扣量。
          */
         this.enforceRecordedCapsuleReplacementCapacityLimits(context, shifts);
+        /*
+         * 共用胎胚/同SKU多机台收尾均衡：
+         * 1. 位于最后一次日标准收敛和严格收口之后、日计划账本扣减之前，作为续作阶段最后一个
+         *    班次量修改器，避免日标准公式再次覆盖均衡结果；
+         * 2. 跨物料互转通过 TargetScheduleQtyResolver.reallocateEmbryoStockSkuQuota 把互转量
+         *    重新归属到接收方SKU内部额度，组级胎胚库存账本仍按互转后的结果全量扣减；
+         * 3. 按时间下机后延补量登记到 sharedEmbryoEndingStaggerAllowedOverQtyMap，供严格收口
+         *    和账本裁剪放行，避免补量被SKU普通额度回裁；
+         * 4. 只做模拟换模计数和过程日志，不预占真实换模次数，后续换活字块和新增排产仍通过主链登记。
+         */
+        if (Objects.nonNull(embryoEndingBalanceStrategy)) {
+            embryoEndingBalanceStrategy.balanceSharedEmbryoEnding(context, shifts);
+        } else {
+            log.warn("共用胎胚收尾均衡策略未注入，跳过均衡, scheduleDate: {}",
+                    context.getScheduleDate());
+        }
+        // 均衡后按“严格目标量+允许超量”口径做最终收口，只回裁真实超量，不回裁均衡豁免量。
+        this.capStrictEndingContinuationGroupsToTarget(
+                context, sourceSkuMap, skuResultMap, skuOrder, shifts);
         // 最终账本同步是本阶段唯一一次扣账；其内部若按中心账本回裁，后续只重新汇总元数据，不再改班次量。
         this.syncContinuousDailyPlanQuota(context, shifts);
         /*
@@ -2878,7 +2907,10 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
      * 判断续作 SKU 是否因 T 日与 T-1 日原始月计划量相等而跳过 T 日降模。
      * <p>该判断位于续作 SKU 降模计算入口，用于同时阻断收尾单机降模、首日收口等快捷分支；
      * 命中后统一进入逐日降模链路，并仅在 T 日保留全部 MES 在线续作机台，T+1、T+2
-     * 仍按既有最小机台数、后看欠产、收尾和资源约束重新判断。</p>
+     * 仍按既有最小机台数、后看欠产、收尾和资源约束重新判断。
+     * T 日经 MES 新加入的续作机台（T 日在机机台数超过 T-1 日在机机台数）不受该保护：
+     * 新增机台没有“昨日已在机、今日计划持平不折腾”的业务前提，必须回到 T 日降模链路，
+     * 按 dayN 最小机台数释放冗余机台，避免“不该增机台增机台”的 T 日多排。</p>
      *
      * @param context 排程上下文，提供按年月加载的原始月计划
      * @param sourceSku 来源续作 SKU
@@ -2914,11 +2946,60 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         int previousDayPlanQty = MonthPlanDateResolver.resolveDayQty(
                 context, sourceSku.getMaterialCode(), sourceSku.getProductStatus(), previousProductionDate);
         boolean skipReduceMachineForCurrentDay = currentDayPlanQty == previousDayPlanQty;
+        // T-1 日在机机台数是“计划持平不降模”保护的业务前提：只有昨日已在机且今日机台集合
+        // 未扩大的续作机台才属于稳定集合。T 日新增的 MES 在机机台（如 K2202 在 2026-07-29
+        // 才经 MES 加入 3302002060）没有昨日在机依据，必须取消跳过，回到 dayN 最小机台数降模。
+        int previousDayMachineCount = resolvePreviousDayContinuationMachineCount(context, sourceSku);
+        if (skipReduceMachineForCurrentDay && activeResults.size() > previousDayMachineCount) {
+            log.info("续作T日降模计划量相等前置判断取消跳过, materialCode: {}, T日: {}, T-1日: {}, "
+                            + "T日原始月计划量: {}, T-1日原始月计划量: {}, 当前续作机台: {}, "
+                            + "T-1日在机机台数: {}, 原因: T日新增MES在机机台，需按dayN最小机台数释放冗余",
+                    sourceSku.getMaterialCode(), productionDate, previousProductionDate, currentDayPlanQty,
+                    previousDayPlanQty, joinMachineCodes(activeResults), previousDayMachineCount);
+            skipReduceMachineForCurrentDay = false;
+        }
         log.info("续作T日降模计划量相等前置判断, materialCode: {}, T日: {}, T-1日: {}, T日原始月计划量: {}, "
                         + "T-1日原始月计划量: {}, 当前续作机台: {}, 是否跳过T日降模: {}",
                 sourceSku.getMaterialCode(), productionDate, previousProductionDate, currentDayPlanQty,
                 previousDayPlanQty, joinMachineCodes(activeResults), skipReduceMachineForCurrentDay);
         return skipReduceMachineForCurrentDay;
+    }
+
+    /**
+     * 统计 T-1 日（前一日排程窗口）同物料同产品状态的在机续作机台数。
+     * <p>以 T-1 日排程结果为准：只有仍处于生产状态（specEndTime 非空）的机台才算在机，
+     * 已释放/零量结果不参与计数，避免把昨日已下机机台误当成稳定在机集合的一部分。</p>
+     *
+     * @param context 排程上下文，提供前一日排程结果
+     * @param sourceSku 来源续作 SKU
+     * @return T-1 日在机续作机台数；无前日数据时返回 0
+     */
+    private int resolvePreviousDayContinuationMachineCount(LhScheduleContext context,
+                                                           SkuScheduleDTO sourceSku) {
+        if (Objects.isNull(context) || Objects.isNull(sourceSku)
+                || StringUtils.isEmpty(sourceSku.getMaterialCode())
+                || CollectionUtils.isEmpty(context.getPreviousScheduleResultList())) {
+            return 0;
+        }
+        Set<String> machineCodeSet = new LinkedHashSet<String>(4);
+        String normalizedProductStatus = StringUtils.trimToEmpty(sourceSku.getProductStatus());
+        for (LhScheduleResult result : context.getPreviousScheduleResultList()) {
+            if (Objects.isNull(result)
+                    || StringUtils.isEmpty(result.getLhMachineCode())
+                    || !StringUtils.equals(sourceSku.getMaterialCode(), result.getMaterialCode())
+                    || !StringUtils.equals(normalizedProductStatus,
+                    StringUtils.trimToEmpty(result.getProductStatus()))) {
+                continue;
+            }
+            // 前日在机判定不能只依赖 specEndTime：历史批次结果可能未回填收尾时间（如 8/4 批次
+            // SPEC_END_TIME 为 NULL），导致 T日==T-1日计划量相等保护被误判为“T日新增MES机台”而取消，
+            // 进而造成 3302000467 这类“不该降模却降模”问题。只要前日结果存在正计划量班次即视为在机。
+            if (Objects.isNull(result.getSpecEndTime()) && ShiftFieldUtil.resolveScheduledQty(result) <= 0) {
+                continue;
+            }
+            machineCodeSet.add(result.getLhMachineCode());
+        }
+        return machineCodeSet.size();
     }
 
     /**
@@ -3341,6 +3422,65 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                 ? resolveEndingDemandQty(context, skuResults.get(0))
                 : Math.max(Math.max(0, sourceSku.getSurplusQty()), Math.max(0, sourceSku.getEmbryoStock()));
         return ShiftCapacityResolverUtil.roundUpQtyToMouldMultiple(endingDemandQty, sourceSku.getMouldQty());
+    }
+
+    /**
+     * 抬高续作多机台 SKU 目标量下限，防止满排模式单台机台窗口产能被误当成整组 SKU 目标量。
+     * <p>满排模式下 S4.3 的 {@code resolveInitialTargetQty} 会把目标量初始化为单台机台
+     * 理论窗口产能（如 128/144）。同一 SKU 由多台机台续作时，该目标量作为整组共享账本会
+     * 在扣账阶段把应保留的机台按结果列表顺序裁剪为 0，导致“该续作没有续作/该降模没降模/
+     * 减机台班次不对”等反复出现的问题。</p>
+     * <p>本方法在降模决策前统一收口：</p>
+     * <ul>
+     *   <li>收尾（严格上限）SKU：目标量按 MAX(硫化余量, 胎胚库存) 口径抬高，与主规格一致；</li>
+     *   <li>非收尾多机台：目标量取“窗口剩余日计划”和“保留机台合计窗口产能”的较大值，
+     *   保证 dayN 计划可以排完、保留机台不会被账本提前清零。</li>
+     * </ul>
+     *
+     * @param context 排程上下文
+     * @param sourceSku 来源续作SKU
+     * @param skuResults 同SKU续作机台结果
+     * @param shifts 排程窗口班次
+     */
+    private void raiseMultiMachineContinuationTargetFloor(LhScheduleContext context,
+                                                          SkuScheduleDTO sourceSku,
+                                                          List<LhScheduleResult> skuResults,
+                                                          List<LhShiftConfigVO> shifts) {
+        if (Objects.isNull(context) || Objects.isNull(sourceSku) || CollectionUtils.isEmpty(skuResults)) {
+            return;
+        }
+        int currentTargetQty = Math.max(0, sourceSku.resolveTargetScheduleQty());
+        int floorTargetQty = currentTargetQty;
+        String ruleName;
+        ProductionQuantityPolicy policy = ProductionQuantityPolicy.from(sourceSku, hasEndingResult(skuResults));
+        if (policy.isStrictUpperLimit()) {
+            // 收尾多机台目标量必须以 MAX(硫化余量,胎胚库存) 为准，不能停留在满排模式单机台产能。
+            floorTargetQty = Math.max(floorTargetQty,
+                    resolveMultiMachineEndingTargetQty(context, sourceSku, skuResults));
+            ruleName = "收尾多机台MAX(余量,胎胚库存)";
+        } else {
+            // 非收尾多机台：窗口剩余日计划决定本轮要排完的量，保留机台合计窗口产能决定满排上限，
+            // 两者取大后作为账本下限，保证按 dayN 保留的生产机台不会被后续裁剪清成 0。
+            int windowRemainingPlanQty = SkuDailyPlanQuotaUtil.sumRemainingQty(sourceSku.getDailyPlanQuotaMap());
+            int machineWindowCapacitySum = 0;
+            for (LhScheduleResult result : skuResults) {
+                machineWindowCapacitySum += calculateMachineWindowCapacity(context, result, shifts);
+            }
+            floorTargetQty = Math.max(floorTargetQty, Math.max(windowRemainingPlanQty, machineWindowCapacitySum));
+            ruleName = "非收尾多机台满排窗口产能";
+        }
+        if (floorTargetQty > currentTargetQty) {
+            // 抬高目标量必须同步覆盖实际消费账本，否则后续 capResultByProductionRemainingQty 仍按旧账本裁剪。
+            sourceSku.setTargetScheduleQty(floorTargetQty);
+            sourceSku.setRemainingScheduleQty(floorTargetQty);
+            getTargetScheduleQtyResolver().syncProductionRemainingQtyToTarget(
+                    context, sourceSku, floorTargetQty, "续作多机台目标量下限");
+        }
+        log.info("续作多机台目标量下限同步, materialCode: {}, productStatus: {}, 原目标量: {}, 下限目标量: {}, "
+                        + "窗口剩余日计划: {}, 机台数: {}, rule: {}",
+                sourceSku.getMaterialCode(), sourceSku.getProductStatus(), currentTargetQty, floorTargetQty,
+                SkuDailyPlanQuotaUtil.sumRemainingQty(sourceSku.getDailyPlanQuotaMap()),
+                skuResults.size(), ruleName);
     }
 
     /**
@@ -5823,6 +5963,15 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         if (Objects.isNull(nextShift)) {
             return -1;
         }
+        // 收尾补满与错峰后延共用“当晚夜班”边界：夜班收尾不得再后延到次日早班，避免跨业务日占班。
+        LhShiftConfigVO endingShift = findShiftByIndex(shifts, endingShiftIndex);
+        if (Objects.nonNull(endingShift) && endingShift.isNightShift()) {
+            log.info("共用胎胚收尾错峰跳过, scheduleDate: {}, materialCode: {}, machineCode: {}, "
+                            + "原收尾班次: {}, 原因: 当晚夜班为错峰边界，不再后延到次日早班",
+                    context.getScheduleDate(), sourceSku.getMaterialCode(), result.getLhMachineCode(),
+                    endingShiftIndex);
+            return -1;
+        }
         if (isMachineShiftOccupiedByOtherSku(context, sourceSku, result, nextShift)) {
             log.info("共用胎胚收尾错峰跳过, scheduleDate: {}, materialCode: {}, machineCode: {}, "
                             + "原收尾班次: {}, 下一班次: {}, 原因: 下一班次已被其他SKU占用",
@@ -5934,6 +6083,9 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                 setShiftPlanQty(result, nextShift.getShiftIndex(), actualNextShiftQty,
                         nextShift.getShiftStartDateTime(), nextShift.getShiftEndDateTime());
             }
+            // 错峰后延实际新增计划量的后延班次，原因分析追加“错峰后延补量”，便于结果对账。
+            ShiftFieldUtil.appendShiftAnalysis(
+                    result, nextShift.getShiftIndex(), ENDING_STAGGER_FILL_ANALYSIS);
             result.setIsEnd("1");
             refreshResultSummary(context, result, shifts);
             syncMachineEstimatedEndTime(context, result);
@@ -6306,9 +6458,14 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             LhScheduleResult result = keptResults.get(resultIndex);
             int machineCapacity = Math.max(0, capacityMap.getOrDefault(result, ShiftFieldUtil.resolveScheduledQty(result)));
             // 整窗入口与逐日入口统一复用保留机台分配规则，避免dayN剩余额度再次截断非收尾实际排量。
+            // 收尾/严格目标多保留机台时按保留机台分摊目标量，避免小余量全部落在首台
+            // 导致其余 dayN 保留机台零排量、被下游当成已释放机台提前换模。
+            boolean spreadEndingTargetAcrossKeptMachines = !fillKeptMachineCapacity
+                    && keptResults.size() > 1;
             int allocation = resolveKeptContinuationAllocation(
                     fillKeptMachineCapacity, false, demandQty, remainingDemandQty,
-                    machineCapacity, keptResults.size() - resultIndex);
+                    machineCapacity, keptResults.size() - resultIndex,
+                    spreadEndingTargetAcrossKeptMachines);
             redistributeShiftQty(context, result, shifts, allocation);
             if (ending && policy.isStrictUpperLimit()) {
                 capResultShiftQtyToTarget(context, result, shifts, allocation);
@@ -6361,6 +6518,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
      * @param remainingDemandQty 当前尚未分配的目标量
      * @param machineCapacity 当前机台真实有效产能
      * @param remainingMachineCount 当前机台及后续待分配机台数量
+     * @param spreadEndingTargetAcrossKeptMachines true-收尾目标量按保留机台数量均摊，
+     *                                            避免首台吃完全部目标导致其余保留机台零排量
      * @return 当前机台实际分配量
      */
     private int resolveKeptContinuationAllocation(boolean fillKeptMachineCapacity,
@@ -6368,7 +6527,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                                                    int effectiveDemandQty,
                                                    int remainingDemandQty,
                                                    int machineCapacity,
-                                                   int remainingMachineCount) {
+                                                   int remainingMachineCount,
+                                                   boolean spreadEndingTargetAcrossKeptMachines) {
         int safeMachineCapacity = Math.max(0, machineCapacity);
         if (fillKeptMachineCapacity) {
             // 非收尾保留机台以硫化余量和真实有效产能为实际消费口径，dayN 不再截断排量。
@@ -6378,8 +6538,9 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             return 0;
         }
         int safeRemainingDemandQty = Math.max(0, remainingDemandQty);
-        if (keepAllActiveMachinesForCurrentDay && remainingMachineCount > 0) {
-            // 严格目标场景在全部受保护机台间均衡分配，避免后序在线机台被分配为零。
+        if ((keepAllActiveMachinesForCurrentDay || spreadEndingTargetAcrossKeptMachines)
+                && remainingMachineCount > 0) {
+            // 严格目标场景在全部受保护/保留机台间均衡分配，避免后序机台被分配为零。
             int averageAllocation = (safeRemainingDemandQty + remainingMachineCount - 1)
                     / remainingMachineCount;
             return Math.min(safeRemainingDemandQty, Math.min(safeMachineCapacity, averageAllocation));
@@ -6589,10 +6750,14 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             context.markContinuousStopHoldMachineProductionResumed(result.getLhMachineCode());
             int machineCapacity = Math.max(0, capacityMap.getOrDefault(result, 0));
             // 逐日入口复用统一分配规则，生产保留机台不得因运行态dayN剩余额度为0而被提前清空。
+            // 日标准机台数决策或收尾多保留机台时，目标量必须在保留机台间分摊，
+            // 保证每台保留机台都有真实排产量，释放时间按实际收尾班次后移。
+            boolean spreadEndingTargetAcrossKeptMachines = !fillKeptMachineCapacity
+                    && keptResults.size() > 1;
             int allocation = resolveKeptContinuationAllocation(
                     fillKeptMachineCapacity, keepAllActiveMachinesForCurrentDay,
                     effectiveDemandQty, remainingDemandQty, machineCapacity,
-                    keptResults.size() - resultIndex);
+                    keptResults.size() - resultIndex, spreadEndingTargetAcrossKeptMachines);
             redistributeShiftQty(context, result, dayShifts, allocation);
             remainingDemandQty = Math.max(0, remainingDemandQty - allocation);
             if (fillKeptMachineCapacity && effectiveDemandQty <= 0 && allocation > 0) {
@@ -8434,6 +8599,12 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             setShiftPlanQty(result, shift.getShiftIndex(), 0, null, null);
             // 停产保机/释放边界置零后，清理此前收尾补满写入的“补量”备注，只保留保机原因。
             ShiftFieldUtil.removeShiftAnalysis(result, shift.getShiftIndex(), ENDING_FILL_ANALYSIS);
+            // 错峰后延写入的“错峰后延补量”备注同样在置零时清理，避免残留对账信息。
+            ShiftFieldUtil.removeShiftAnalysis(result, shift.getShiftIndex(), ENDING_STAGGER_FILL_ANALYSIS);
+            // 班次被降模/释放置零后，“换胶囊”备注已不代表真实换胶囊班次，必须一并清理，
+            // 避免出现“零量班次仍备注换胶囊”的虚假记录（如 3302001761/K2016 class7）。
+            ShiftFieldUtil.removeShiftAnalysis(
+                    result, shift.getShiftIndex(), CapsuleReplacementRuleService.CAPSULE_REPLACEMENT_ANALYSIS);
             if (stopHold) {
                 ShiftFieldUtil.appendShiftAnalysis(result, shift.getShiftIndex(), "停产保机");
             }
@@ -8586,19 +8757,43 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             return;
         }
         int lastShiftIndex = resolveLastPlannedShiftIndex(result);
-        LhShiftConfigVO currentShift = findShiftByIndex(shifts, lastShiftIndex);
+        LhShiftConfigVO endingShift = findShiftByIndex(shifts, lastShiftIndex);
         LhShiftConfigVO nextShift = findShiftByIndex(shifts, lastShiftIndex + 1);
-        if (!isAfternoonToNightShift(currentShift, nextShift)) {
+        // 补满目标班次：前一中班（可空）+ 夜班；夜班可能是下一班次，也可能是收尾本身所在班次。
+        LhShiftConfigVO fillAfternoonShift = null;
+        LhShiftConfigVO fillNightShift = null;
+        Date endingTime = null;
+        if (isAfternoonToNightShift(endingShift, nextShift)) {
+            // 场景一：最后有量班次为中班，且下一班为夜班；收尾时间需严格晚于20:00，补满中班与下一夜班。
+            fillAfternoonShift = endingShift;
+            fillNightShift = nextShift;
+            endingTime = result.getSpecEndTime();
+            if (Objects.isNull(endingTime)) {
+                endingTime = ShiftFieldUtil.getShiftEndTime(result, fillAfternoonShift.getShiftIndex());
+            }
+            if (!isAfterEndingFillThreshold(endingTime)) {
+                return;
+            }
+        } else if (Objects.nonNull(endingShift) && endingShift.isNightShift()) {
+            // 场景二：收尾已落在夜班内（夜班为最后有量班次且未满）。
+            // 夜班期间本身就处于“中班20:00之后至晚班期间”，无需再按具体结束时刻判断；
+            // 补满前一中班（若未满）与当前夜班，使收尾在当晚夜班内拉满。
+            fillNightShift = endingShift;
+            LhShiftConfigVO previousShift = findShiftByIndex(shifts, lastShiftIndex - 1);
+            if (Objects.nonNull(previousShift)
+                    && StringUtils.equals(ShiftEnum.AFTERNOON_SHIFT.getCode(), previousShift.getShiftType())) {
+                fillAfternoonShift = previousShift;
+            }
+            endingTime = result.getSpecEndTime();
+            if (Objects.isNull(endingTime)) {
+                endingTime = ShiftFieldUtil.getShiftEndTime(result, endingShift.getShiftIndex());
+            }
+        } else {
             return;
         }
-        Date endingTime = result.getSpecEndTime();
-        if (Objects.isNull(endingTime)) {
-            endingTime = ShiftFieldUtil.getShiftEndTime(result, currentShift.getShiftIndex());
-        }
-        if (!isAfterEndingFillThreshold(endingTime)) {
-            return;
-        }
-        LocalDate businessDate = resolveShiftWorkDate(currentShift);
+        // 结构机台数按补满动作的中班业务日统计；无中班可补时按夜班业务日统计。
+        LocalDate businessDate = resolveShiftWorkDate(
+                Objects.nonNull(fillAfternoonShift) ? fillAfternoonShift : fillNightShift);
         int planMachineCount = context.getStructurePlanMachineCount(businessDate, sku.getStructureName());
         int scheduledMachineCount = context.getStructureScheduledMachineCount(businessDate, sku.getStructureName());
         if (planMachineCount <= 0 || scheduledMachineCount >= planMachineCount) {
@@ -8608,16 +8803,25 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                     planMachineCount, scheduledMachineCount, LhScheduleTimeUtil.formatDateTime(endingTime));
             return;
         }
-        if (isMachineShiftOccupiedByOtherSku(context, sku, result, nextShift)) {
-            log.info("SKU收尾补满跳过, materialCode: {}, machineCode: {}, businessDate: {}, nextShift: {}, "
-                            + "原因: 下一晚班已被其他SKU占用",
-                    result.getMaterialCode(), result.getLhMachineCode(), businessDate, nextShift.getShiftIndex());
+        if (Objects.nonNull(fillAfternoonShift)
+                && isMachineShiftOccupiedByOtherSku(context, sku, result, fillAfternoonShift)) {
+            log.info("SKU收尾补满跳过, materialCode: {}, machineCode: {}, businessDate: {}, afternoonShift: {}, "
+                            + "原因: 中班已被其他SKU占用",
+                    result.getMaterialCode(), result.getLhMachineCode(), businessDate,
+                    fillAfternoonShift.getShiftIndex());
+            return;
+        }
+        if (isMachineShiftOccupiedByOtherSku(context, sku, result, fillNightShift)) {
+            log.info("SKU收尾补满跳过, materialCode: {}, machineCode: {}, businessDate: {}, nightShift: {}, "
+                            + "原因: 夜班已被其他SKU占用",
+                    result.getMaterialCode(), result.getLhMachineCode(), businessDate,
+                    fillNightShift.getShiftIndex());
             return;
         }
         // 记录补满前该机台结果量（同一结果只保留首次基准），供多机台组级允许超量重算识别本次补满新增量
         context.getEndingFillBeforeQtyMap().putIfAbsent(result, ShiftFieldUtil.resolveScheduledQty(result));
         context.getEndingFillAllowedOverQtyMap().remove(result);
-        int filledQty = fillEndingShifts(context, result, currentShift, nextShift);
+        int filledQty = fillEndingShifts(context, result, fillAfternoonShift, fillNightShift);
         context.recordScheduledMachine(businessDate, sku.getStructureName(), sku.getMaterialCode(),
                 sku.getProductStatus(),
                 result.getLhMachineCode());
@@ -8917,23 +9121,26 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
 
     /**
      * 补满SKU收尾当前中班和下一晚班。
+     * <p>中班可空：收尾已落在夜班内时只补当前夜班（无前一中班或前一班非中班）。</p>
      *
      * @param context 排程上下文
      * @param result 续作结果
-     * @param currentShift 当前中班
-     * @param nextShift 下一晚班
+     * @param currentShift 前一中班，可空
+     * @param nextShift 夜班（收尾所在班次或下一班次）
      * @return 本次补满新增计划量；0-无可补产能
      */
     private int fillEndingShifts(LhScheduleContext context,
                                  LhScheduleResult result,
                                  LhShiftConfigVO currentShift,
                                  LhShiftConfigVO nextShift) {
-        int currentBeforeQty = resolveShiftPlanQty(result, currentShift.getShiftIndex());
-        int currentShiftCapacity = calculateResultShiftCapacity(context, result, currentShift);
+        int currentBeforeQty = Objects.isNull(currentShift)
+                ? 0 : resolveShiftPlanQty(result, currentShift.getShiftIndex());
+        int currentShiftCapacity = Objects.isNull(currentShift)
+                ? 0 : calculateResultShiftCapacity(context, result, currentShift);
         int nextBeforeQty = resolveShiftPlanQty(result, nextShift.getShiftIndex());
         int nextShiftCapacity = calculateResultShiftCapacity(context, result, nextShift);
         int filledQty = 0;
-        if (currentShiftCapacity > currentBeforeQty) {
+        if (Objects.nonNull(currentShift) && currentShiftCapacity > currentBeforeQty) {
             int currentFillQty = capsuleReplacementRuleService.resolveActualPlanQty(
                     context, result, currentShift, currentShiftCapacity - currentBeforeQty,
                     "续作收尾当前班补满");
@@ -8963,7 +9170,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         }
         log.info("SKU收尾补满判断, materialCode: {}, machineCode: {}, currentShift: {}, nextShift: {}, "
                         + "currentBeforeQty: {}, currentCapacity: {}, nextBeforeQty: {}, nextCapacity: {}, 本次补量: {}",
-                result.getMaterialCode(), result.getLhMachineCode(), currentShift.getShiftIndex(),
+                result.getMaterialCode(), result.getLhMachineCode(),
+                Objects.isNull(currentShift) ? null : currentShift.getShiftIndex(),
                 nextShift.getShiftIndex(), currentBeforeQty, currentShiftCapacity, nextBeforeQty,
                 nextShiftCapacity, filledQty);
         return filledQty;
@@ -9550,7 +9758,11 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             return;
         }
         Date rollingAppendStartTime = resolveRollingAppendStartTime(context, shifts);
-        for (LhScheduleResult result : context.getScheduleResultList()) {
+        // 多机台续作扣账必须按“保留机台优先”的顺序处理：共享账本不足时，先让降模规则选中的
+        // 保留机台（模具共用性/清洗/胶囊/机台编码排序靠前）拿到剩余量，再裁剪应下机机台，
+        // 避免按结果列表原始顺序裁剪导致应保留机台被清零、应下机机台反而满载（如 3302001761）。
+        List<LhScheduleResult> orderedResults = buildContinuousQuotaDeductOrder(context);
+        for (LhScheduleResult result : orderedResults) {
             if (!isPureContinuousResult(result) || StringUtils.isEmpty(result.getMaterialCode())) {
                 continue;
             }
@@ -9561,6 +9773,45 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             applyContinuousBlockToDailyQuota(context, sku, result, shifts, rollingAppendStartTime);
         }
         context.setContinuousDailyQuotaSynced(true);
+    }
+
+    /**
+     * 构建续作日计划账本扣减顺序：同SKU多机台组内按保留排序优先，组间保持原结果顺序。
+     *
+     * @param context 排程上下文
+     * @return 按扣账顺序排列的续作结果列表
+     */
+    private List<LhScheduleResult> buildContinuousQuotaDeductOrder(LhScheduleContext context) {
+        List<LhScheduleResult> orderedResults = new ArrayList<LhScheduleResult>(
+                context.getScheduleResultList().size());
+        // 先按原结果顺序收集同SKU多机台分组，保证SKU间处理顺序不变。
+        Map<String, List<LhScheduleResult>> groupResultMap = new LinkedHashMap<String, List<LhScheduleResult>>(8);
+        Map<String, SkuScheduleDTO> groupSkuMap = new LinkedHashMap<String, SkuScheduleDTO>(8);
+        for (LhScheduleResult result : context.getScheduleResultList()) {
+            if (!isPureContinuousResult(result) || StringUtils.isEmpty(result.getMaterialCode())) {
+                orderedResults.add(result);
+                continue;
+            }
+            SkuScheduleDTO sku = resolveResultSourceSku(context, result);
+            if (sku == null) {
+                orderedResults.add(result);
+                continue;
+            }
+            String groupKey = buildReduceMouldGroupKey(result, sku);
+            groupResultMap.computeIfAbsent(groupKey, key -> new ArrayList<LhScheduleResult>(4)).add(result);
+            groupSkuMap.putIfAbsent(groupKey, sku);
+        }
+        for (Map.Entry<String, List<LhScheduleResult>> entry : groupResultMap.entrySet()) {
+            List<LhScheduleResult> groupResults = entry.getValue();
+            SkuScheduleDTO sku = groupSkuMap.get(entry.getKey());
+            if (groupResults.size() > 1 && Objects.nonNull(sku)) {
+                // 多机台组内按保留排序（共享数升序、无清洗优先、胶囊次数降序、机台编码升序），
+                // 保证账本不足时优先保留降模规则选中的机台。
+                groupResults.sort(buildContinuationReduceKeepComparator(context, sku));
+            }
+            orderedResults.addAll(groupResults);
+        }
+        return orderedResults;
     }
 
     /**

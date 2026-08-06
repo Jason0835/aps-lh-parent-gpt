@@ -153,6 +153,8 @@ public class SupplementCxMachineDistributionHandler {
         List<ProductionPlanGroupInfo> selectGroupList = realLeftOverGroupList.subList(BigDecimal.ZERO.intValue(), selectSize);
         List<CxMachineAllocationPlanHelper> handlerResult = new ArrayList<>();
         Set<String> rejectGroupPlan = new HashSet<>();
+        String roundGroupInfo = selectGroupList.stream().map(ProductionPlanGroupInfo::getGroupName).collect(Collectors.joining(StringConstant.COMMA));
+        SupplementCxMachineDistributionLogRecorder.addHasLeftOverRequireGroupInfoLog(productionContext, roundGroupInfo);
         selectGroupList.forEach(singleGroupPlan -> {
             String structureName = singleGroupPlan.getGroupName();
             CxMachineAllocationPlanHelper allocationResult = selectedCxMachineAndHandlerAllocation(productionContext, realLeftOverCxMachineList, singleGroupPlan);
@@ -166,7 +168,7 @@ public class SupplementCxMachineDistributionHandler {
         if (!CollectionUtils.isEmpty(rejectGroupPlan)) {
             realLeftOverGroupList.removeIf(singleGroup -> rejectGroupPlan.contains(singleGroup.getGroupName()));
         }
-        if (CollectionUtils.isEmpty(handlerResult)) {
+        if (CollectionUtils.isEmpty(handlerResult) && CollectionUtils.isEmpty(rejectGroupPlan)) {
             return false;
         }
         return productionTailCapacity(productionContext, realLeftOverCxMachineList, realLeftOverGroupList);
@@ -359,7 +361,8 @@ public class SupplementCxMachineDistributionHandler {
     private CxMachineAllocationPlanHelper changeHandler(TbrProductionContext productionContext, ProductionPlanGroupInfo addPlanGroup, CxMachineBaseInfoVo selectCxMachine) {
         Integer needDays = addPlanGroup.getLeftOverNeedAllocationDays();
         Integer remainDays = selectCxMachine.getLeftOverDaysByLastAllocation(productionContext);
-        Integer groupMinAllocationDays = addPlanGroup.getMinAllocationDays(productionContext);
+        boolean isChangeProSize = selectCxMachine.isChangeProSize(productionContext, addPlanGroup);
+        Integer groupMinAllocationDays = addPlanGroup.getMinAllocationDays(productionContext, isChangeProSize);
         //先空出来
         if (remainDays >= groupMinAllocationDays && needDays < groupMinAllocationDays) {
             return null;

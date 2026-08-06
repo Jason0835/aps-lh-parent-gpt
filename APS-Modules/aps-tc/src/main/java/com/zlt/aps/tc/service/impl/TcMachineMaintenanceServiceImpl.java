@@ -108,9 +108,7 @@ public class TcMachineMaintenanceServiceImpl extends AbstractDocService<TcMachin
         }
 
         List<TcShiftConfig> shiftConfigs = tcShiftConfigMapper.selectList(
-                new LambdaQueryWrapper<TcShiftConfig>()
-                        .eq(TcShiftConfig::getOpenFlag, "1")
-        );
+                new LambdaQueryWrapper<TcShiftConfig>());
 
         if (shiftConfigs == null || shiftConfigs.isEmpty()) {
             return null;

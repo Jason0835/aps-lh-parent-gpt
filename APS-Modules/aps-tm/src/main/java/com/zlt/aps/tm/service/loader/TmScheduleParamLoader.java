@@ -61,6 +61,7 @@ public class TmScheduleParamLoader {
         this.fillDefaultParams(paramMap);
         this.validateFilterRuleOrder(paramMap.get(TmScheduleConstants.PARAM_FILTER_RULE_ORDER));
         context.setParamMap(paramMap);
+        context.configureProcessLogLevel(paramMap.get(TmScheduleConstants.PARAM_PROCESS_LOG_LEVEL).getEffectiveValue());
         context.setSmallGlueCodeSet(this.parseSmallGlueCodes(
                 paramMap.get(TmScheduleConstants.PARAM_SMALL_GLUE_CODES)));
     }
@@ -129,6 +130,8 @@ public class TmScheduleParamLoader {
                 TmScheduleStrategyEnum.DEFAULT.getCode());
         this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_TASK_SORT_STRATEGY,
                 TmScheduleStrategyEnum.DEFAULT.getCode());
+        this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_PROCESS_LOG_LEVEL,
+                TmScheduleConstants.DEFAULT_PROCESS_LOG_LEVEL);
         this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_NEW_SPEC_LOOKBACK_DAYS,
                 TmScheduleConstants.DEFAULT_NEW_SPEC_LOOKBACK_DAYS);
         this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_NEW_SPEC_ADVANCE_SHIFT_COUNT,

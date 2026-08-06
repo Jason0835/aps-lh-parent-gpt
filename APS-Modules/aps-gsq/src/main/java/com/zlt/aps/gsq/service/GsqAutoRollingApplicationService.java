@@ -16,7 +16,7 @@ import com.zlt.aps.gsq.api.domain.vo.GsqRollingTaskVo;
 import com.zlt.aps.gsq.constant.GsqScheduleConstants;
 import com.zlt.aps.gsq.domain.GsqAutoScheduleTask;
 import com.zlt.aps.gsq.domain.vo.GsqRollingWindow;
-import com.zlt.aps.gsq.entity.GsqParams;
+import com.zlt.aps.gsq.api.domain.entity.GsqParams;
 import com.zlt.aps.gsq.entity.GsqShiftConfig;
 import com.zlt.aps.gsq.enums.GsqAutoScheduleTaskStatusEnum;
 import com.zlt.aps.gsq.enums.GsqBackgroundTaskTypeEnum;

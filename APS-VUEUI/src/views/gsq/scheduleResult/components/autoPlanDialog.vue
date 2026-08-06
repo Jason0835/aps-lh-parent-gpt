@@ -39,6 +39,16 @@ export default {
       type: Boolean,
       default: false,
     },
+    // 默认工厂，由列表页查询条件带入（默认越南 116）
+    defaultFactoryCode: {
+      type: String,
+      default: "",
+    },
+    // 默认排程日期，由列表页查询条件带入
+    defaultScheduleDate: {
+      type: String,
+      default: "",
+    },
   },
   data() {
     return {
@@ -96,10 +106,11 @@ export default {
     },
   },
   created() {
-    // 排程日期默认 D+1（钢丝圈排程日期对应D+1）
+    // 排程日期默认取列表页查询条件，未传时默认 D+1（钢丝圈排程日期对应D+1）
     this.form = {
-      factoryCode: "",
-      scheduleDateQuery: moment().add(1, "days").format("YYYY-MM-DD"),
+      factoryCode: this.defaultFactoryCode || "",
+      scheduleDateQuery:
+        this.defaultScheduleDate || moment().add(1, "days").format("YYYY-MM-DD"),
     };
   },
   methods: {

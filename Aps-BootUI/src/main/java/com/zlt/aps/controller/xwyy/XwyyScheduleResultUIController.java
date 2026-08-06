@@ -1,6 +1,7 @@
 package com.zlt.aps.controller.xwyy;
 
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
@@ -153,7 +154,8 @@ public class XwyyScheduleResultUIController extends BaseUIController<XwyySchedul
     @ResponseBody
     public AjaxResult importDataByCust(@RequestPart("file") MultipartFile file,
                                        @RequestParam("updateSupport") boolean updateSupport,
-                                       @RequestParam("factoryCode") String factoryCode) throws Exception {
+                                       @RequestParam("factoryCode") String factoryCode,
+                                       @RequestParam("scheduleDate") String scheduleDate) throws Exception {
         byte[] data = this.useFileEncrypt ? FileEncryptUtils.DecodeFile(file) : file.getBytes();
         ImportContext context = new ImportContext();
         context.setImportFilePath(this.importFilePath);
@@ -163,6 +165,7 @@ public class XwyyScheduleResultUIController extends BaseUIController<XwyySchedul
         context.setFileBytes(data);
         XwyyScheduleResult condition = new XwyyScheduleResult();
         condition.setFactoryCode(StringUtils.trim(factoryCode));
+        condition.setScheduleDate(DateUtils.parseDate(scheduleDate));
         XwyyScheduleImportDTO importDTO = new XwyyScheduleImportDTO();
         importDTO.setImportContext(context);
         importDTO.setScheduleResult(condition);

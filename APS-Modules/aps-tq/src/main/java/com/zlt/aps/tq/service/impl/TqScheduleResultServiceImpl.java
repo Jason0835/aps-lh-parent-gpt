@@ -5,6 +5,7 @@ import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.engine.service.FactoryService;
@@ -12,6 +13,7 @@ import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.tq.api.domain.dto.TqChangeMachineDTO;
 import com.zlt.aps.tq.api.domain.dto.TqInsertOrderDTO;
 import com.zlt.aps.tq.api.domain.entity.*;
+import com.zlt.aps.tq.api.domain.vo.TqInsertTaskRequestVo;
 import com.zlt.aps.tq.engine.service.TqEngineService;
 import com.zlt.aps.tq.engine.vo.RollingUpdateResult;
 import com.zlt.aps.tq.engine.vo.TqScheduleBaseInfoVo;
@@ -114,6 +116,15 @@ public class TqScheduleResultServiceImpl extends AbstractDocService<TqScheduleRe
     /** 维修计划Mapper（用于转机台校验：维修中机台排除） */
     @Resource
     private TqMachineMaintenancePlanMapper tqMachineMaintenancePlanMapper;
+
+    /**
+     * 胎圈人工排程操作统一门面（对齐胎面 TmManualOperationFacade）
+     *
+     * <p>统一插单/调量/转机台/删除四类业务触发的分布式锁、短事务、行锁、
+     * 释放状态校验和调度日志，避免不同入口绕过同一组安全约束。</p>
+     */
+    @Autowired
+    private TqManualOperationFacade tqManualOperationFacade;
 
     @Override
     public String getDocTypeCode() {
@@ -222,6 +233,7 @@ public class TqScheduleResultServiceImpl extends AbstractDocService<TqScheduleRe
      * @param dto 插单数据
      * @return 结果
      */
+    @Deprecated
     @Override
     @Transactional(rollbackFor = Exception.class)
     public AjaxResult insertOrder(TqInsertOrderDTO dto) {
@@ -237,7 +249,7 @@ public class TqScheduleResultServiceImpl extends AbstractDocService<TqScheduleRe
         entity.setBeadCode(dto.getBeadCode());
         entity.setMachineCode(dto.getMachineCode());
         entity.setDataSource("1"); // 插单
-        entity.setIsRelease("0"); // 未发布
+        entity.setReleaseStatus("0"); // 未发布
 
         // 填充6个班次字段
         entity.setClass1PlanQty(dto.getClass1PlanQty());
@@ -460,8 +472,8 @@ public class TqScheduleResultServiceImpl extends AbstractDocService<TqScheduleRe
                 .set(TqScheduleResult::getMachineCode, dto.getNewMachineCode());
 
         // 如果原排程已发布成功，更新发布状态为待发布
-        if (ApsConstant.IS_RELEASE.equals(record.getIsRelease())) {
-            updateWrapper.set(TqScheduleResult::getIsRelease, ApsConstant.WAIT_RELEASING);
+        if (ApsConstant.IS_RELEASE.equals(record.getReleaseStatus())) {
+            updateWrapper.set(TqScheduleResult::getReleaseStatus, ApsConstant.WAIT_RELEASING);
         }
 
         tqScheduleResultMapper.update(null, updateWrapper);
@@ -582,7 +594,7 @@ public class TqScheduleResultServiceImpl extends AbstractDocService<TqScheduleRe
 
         // 3. 构建更新实体（携带需要 set 的非 null 字段）和更新条件 wrapper
         // 遵循动态字段访问规范：班次字段通过 setFieldValueByFieldName 设置到 updateEntity，
-        // 由 MyBatis-Plus 自动生成 set 子句；公共字段（isRelease/remark）仍用 LambdaUpdateWrapper.set。
+        // 由 MyBatis-Plus 自动生成 set 子句；公共字段（releaseStatus/remark）仍用 LambdaUpdateWrapper.set。
         TqScheduleResult updateEntity = new TqScheduleResult();
         LambdaUpdateWrapper<TqScheduleResult> updateWrapper = new LambdaUpdateWrapper<>();
         updateWrapper.eq(TqScheduleResult::getId, entity.getId());
@@ -619,8 +631,8 @@ public class TqScheduleResultServiceImpl extends AbstractDocService<TqScheduleRe
         }
 
         // 6. 状态更新：如果原排程已发布成功，更新为待发布（需重新下发MES）
-        if (ApsConstant.IS_RELEASE.equals(record.getIsRelease())) {
-            updateWrapper.set(TqScheduleResult::getIsRelease, ApsConstant.WAIT_RELEASING);
+        if (ApsConstant.IS_RELEASE.equals(record.getReleaseStatus())) {
+            updateWrapper.set(TqScheduleResult::getReleaseStatus, ApsConstant.WAIT_RELEASING);
         }
 
         // 7. 执行更新（updateEntity 携带班次字段的 set 子句，wrapper 携带公共字段和 where 条件）
@@ -646,6 +658,7 @@ public class TqScheduleResultServiceImpl extends AbstractDocService<TqScheduleRe
      * @param ids 需要删除的记录ID列表
      * @return 结果
      */
+    @Deprecated
     @Override
     @Transactional(rollbackFor = Exception.class)
     public AjaxResult logicDeleteByIds(List<Long> ids) {
@@ -659,7 +672,7 @@ public class TqScheduleResultServiceImpl extends AbstractDocService<TqScheduleRe
                 continue;
             }
             // 校验：已发布成功的计划不允许删除
-            if (ApsConstant.IS_RELEASE.equals(record.getIsRelease())) {
+            if (ApsConstant.IS_RELEASE.equals(record.getReleaseStatus())) {
                 return AjaxResult.error(String.format(I18nUtil.getMessage("ui.tq.scheduleResult.delete.publishedForbidden"), record.getBeadCode()));
             }
 
@@ -741,7 +754,7 @@ public class TqScheduleResultServiceImpl extends AbstractDocService<TqScheduleRe
         LambdaQueryWrapper<TqScheduleResult> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(TqScheduleResult::getIsDelete, 0);
         wrapper.eq(TqScheduleResult::getScheduleDate, scheduleDate);
-        wrapper.in(TqScheduleResult::getIsRelease,
+        wrapper.in(TqScheduleResult::getReleaseStatus,
                 ApsConstant.NO_RELEASE, ApsConstant.FAILURE_RELEASE, ApsConstant.WAIT_RELEASING);
         List<TqScheduleResult> scheduleList = tqScheduleResultMapper.selectList(wrapper);
 
@@ -782,7 +795,7 @@ public class TqScheduleResultServiceImpl extends AbstractDocService<TqScheduleRe
         List<Long> ids = scheduleList.stream().map(TqScheduleResult::getId).collect(Collectors.toList());
         LambdaUpdateWrapper<TqScheduleResult> updateWrapper = new LambdaUpdateWrapper<>();
         updateWrapper.in(TqScheduleResult::getId, ids);
-        updateWrapper.set(TqScheduleResult::getIsRelease, ApsConstant.RELEASING);
+        updateWrapper.set(TqScheduleResult::getReleaseStatus, ApsConstant.RELEASING);
         tqScheduleResultMapper.update(null, updateWrapper);
 
         // 5. 通过Feign调用itf服务下发到MES
@@ -795,14 +808,14 @@ public class TqScheduleResultServiceImpl extends AbstractDocService<TqScheduleRe
                     : ApsConstant.FAILURE_RELEASE;
             LambdaUpdateWrapper<TqScheduleResult> resultWrapper = new LambdaUpdateWrapper<>();
             resultWrapper.in(TqScheduleResult::getId, ids);
-            resultWrapper.set(TqScheduleResult::getIsRelease, status);
+            resultWrapper.set(TqScheduleResult::getReleaseStatus, status);
             tqScheduleResultMapper.update(null, resultWrapper);
         } catch (Exception e) {
             log.error("胎圈排程发布失败", e);
             // 发布失败，更新状态
             LambdaUpdateWrapper<TqScheduleResult> errorWrapper = new LambdaUpdateWrapper<>();
             errorWrapper.in(TqScheduleResult::getId, ids);
-            errorWrapper.set(TqScheduleResult::getIsRelease, ApsConstant.FAILURE_RELEASE);
+            errorWrapper.set(TqScheduleResult::getReleaseStatus, ApsConstant.FAILURE_RELEASE);
             tqScheduleResultMapper.update(null, errorWrapper);
             return AjaxResult.error("胎圈排程发布失败：" + e.getMessage());
         }
@@ -947,8 +960,176 @@ public class TqScheduleResultServiceImpl extends AbstractDocService<TqScheduleRe
             // 无记录视为未发布
             return false;
         }
-        // 所有记录都已发布（IS_RELEASE=1）才返回 true
-        return list.stream().allMatch(r -> ApsConstant.IS_RELEASE.equals(r.getIsRelease()));
+        // 所有记录都已发布（RELEASE_STATUS=1）才返回 true
+        return list.stream().allMatch(r -> ApsConstant.IS_RELEASE.equals(r.getReleaseStatus()));
+    }
+
+    // ==================== 新人工操作入口（走任务链路径） ====================
+
+    /**
+     * 人工插单（走任务链路径，支持锚点插入、resequence 重排）。
+     *
+     * <p>统一走 {@link TqManualOperationFacade#insertTask}，由门面负责多机台分布式锁、
+     * 短事务、行锁、释放状态校验和调度日志，避免绕过安全约束。</p>
+     *
+     * <p>与旧 insertOrder 的差异：</p>
+     * <ul>
+     *   <li>支持锚点插入：anchorTaskId 不为空时在锚点之后插入，锚点之后任务 sequence +1</li>
+     *   <li>自动重排顺位：resequence 保证同机台同班次 sequence 从1连续递增</li>
+     *   <li>滚动重装箱：超额任务自动顺延到下一班次</li>
+     * </ul>
+     *
+     * @param vo 插单请求
+     * @return 结果
+     */
+    @Override
+    public AjaxResult insertTask(TqInsertTaskRequestVo vo) {
+        if (vo == null) {
+            return AjaxResult.error("插单请求不能为空");
+        }
+        if (vo.getScheduleDate() == null) {
+            return AjaxResult.error("排程日期不能为空");
+        }
+        if (StringUtils.isBlank(vo.getBeadCode())) {
+            return AjaxResult.error("胎圈代码不能为空");
+        }
+        if (StringUtils.isBlank(vo.getMachineCode())) {
+            return AjaxResult.error("机台编号不能为空");
+        }
+        // 校验施工是否存在
+        List<TqScheduleBaseInfoVo> baseInfoList = tqEngineService.listTqScheduleBaseInfo(
+                Collections.singletonList(vo.getBeadCode()));
+        if (CollectionUtils.isEmpty(baseInfoList)) {
+            return AjaxResult.error("胎圈规格有误，施工不存在");
+        }
+        // 构建 TqScheduleResult 模板
+        TqScheduleResult template = new TqScheduleResult();
+        template.setFactoryCode(vo.getFactoryCode());
+        template.setScheduleDate(vo.getScheduleDate());
+        template.setBeadCode(vo.getBeadCode());
+        template.setTriangleGlueCode(vo.getTriangleGlueCode());
+        template.setProSize(vo.getProSize());
+        template.setMachineCode(vo.getMachineCode());
+        template.setClass1PlanQty(vo.getClass1PlanQty());
+        template.setClass1Sequence(vo.getClass1Sequence());
+        template.setClass1Analysis(vo.getClass1Analysis());
+        template.setClass2PlanQty(vo.getClass2PlanQty());
+        template.setClass2Sequence(vo.getClass2Sequence());
+        template.setClass2Analysis(vo.getClass2Analysis());
+        template.setClass3PlanQty(vo.getClass3PlanQty());
+        template.setClass3Sequence(vo.getClass3Sequence());
+        template.setClass3Analysis(vo.getClass3Analysis());
+        template.setClass4PlanQty(vo.getClass4PlanQty());
+        template.setClass4Sequence(vo.getClass4Sequence());
+        template.setClass4Analysis(vo.getClass4Analysis());
+        template.setClass5PlanQty(vo.getClass5PlanQty());
+        template.setClass5Sequence(vo.getClass5Sequence());
+        template.setClass5Analysis(vo.getClass5Analysis());
+        template.setClass6PlanQty(vo.getClass6PlanQty());
+        template.setClass6Sequence(vo.getClass6Sequence());
+        template.setClass6Analysis(vo.getClass6Analysis());
+        template.setRemark(vo.getRemark());
+        template.setDataSource("1");
+        template.setReleaseStatus(ApsConstant.NO_RELEASE);
+        // 生成批次号、工单号（复用当前排程日期已有批次号，不影响其他记录）
+        String scheduleDateStr = DateUtil.formatDate(vo.getScheduleDate());
+        String[] batchAndOrder = tqEngineService.generateBatchNoAndOrderNo(scheduleDateStr);
+        template.setBatchNo(batchAndOrder[0]);
+        template.setOrderNo(batchAndOrder[1]);
+        // 回显施工字段（钢丝圈、三角胶、尺寸），从施工表获取
+        TqScheduleBaseInfoVo baseInfo = baseInfoList.get(0);
+        template.setSteelRingCode(baseInfo.getSteelRingCode());
+        if (StringUtils.isBlank(template.getTriangleGlueCode())) {
+            template.setTriangleGlueCode(baseInfo.getTriangleGlueCode());
+        }
+        if (StringUtils.isBlank(template.getProSize())) {
+            template.setProSize(baseInfo.getSpecSize());
+        }
+        // 走门面统一入口：门面负责分布式锁、短事务、行锁、释放状态校验和调度日志
+        try {
+            tqManualOperationFacade.insertTask(template);
+        } catch (ServiceException e) {
+            return AjaxResult.error(e.getMessage());
+        }
+        return AjaxResult.success("胎圈人工插单成功");
+    }
+
+    /**
+     * 批量转机台（走门面统一入口，支持锚点、目标班次）。
+     *
+     * <p>对齐胎面 TmScheduleResultServiceImpl.batchChangeMachine：
+     * 批量转机台仅支持同一目标机台。每条请求的 machineCode 即目标机台编码，
+     * 源机台由门面按 id 从数据库读取并加行锁，避免请求携带的机台被篡改。</p>
+     *
+     * <p>门面负责：多机台分布式锁、短事务、行锁、释放状态校验、调度日志。</p>
+     *
+     * @param list 转机台请求列表（每条携带 id 与同一目标 machineCode）
+     * @return 结果
+     */
+    @Override
+    public AjaxResult batchChangeMachine(List<TqScheduleResult> list) {
+        if (CollectionUtils.isEmpty(list)) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.tq.schedule.changeMachine.batchEmpty"));
+        }
+        // 对齐胎面：批量转机台仅支持同一目标机台，避免门面将异构目标静默覆盖为单一目标
+        String targetMachineCode = StringUtils.trimToEmpty(list.get(0).getMachineCode());
+        if (StringUtils.isBlank(targetMachineCode)) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.tq.schedule.machineCode.empty"));
+        }
+        for (TqScheduleResult request : list) {
+            if (!targetMachineCode.equals(StringUtils.trimToEmpty(request.getMachineCode()))) {
+                return AjaxResult.error(I18nUtil.getMessage("ui.tq.schedule.changeMachine.batchTargetNotSame"));
+            }
+        }
+        try {
+            tqManualOperationFacade.batchChangeMachine(targetMachineCode, list);
+        } catch (ServiceException e) {
+            return AjaxResult.error(e.getMessage());
+        }
+        return AjaxResult.success("胎圈批量转机台成功");
+    }
+
+    /**
+     * 批量调量（走门面统一入口）。
+     *
+     * <p>门面负责：多机台分布式锁、短事务、行锁、释放状态校验、调度日志。</p>
+     *
+     * @param list 调量请求列表
+     * @return 结果
+     */
+    @Override
+    public AjaxResult batchChangeQty(List<TqScheduleResult> list) {
+        if (CollectionUtils.isEmpty(list)) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.tq.schedule.changeQty.batchEmpty"));
+        }
+        try {
+            tqManualOperationFacade.batchChangeQty(list);
+        } catch (ServiceException e) {
+            return AjaxResult.error(e.getMessage());
+        }
+        return AjaxResult.success("胎圈批量调量成功");
+    }
+
+    /**
+     * 批量删除（走门面统一入口，删除后 resequence 重排）。
+     *
+     * <p>门面负责：加载待删除记录、多机台分布式锁、短事务、行锁、释放状态校验、
+     * 局部滚动、逻辑删除和调度日志，任一步失败整批回滚。</p>
+     *
+     * @param ids 排程记录ID列表
+     * @return 结果
+     */
+    @Override
+    public AjaxResult batchDelete(List<Long> ids) {
+        if (CollectionUtils.isEmpty(ids)) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.tq.schedule.delete.idsEmpty"));
+        }
+        try {
+            tqManualOperationFacade.deleteTasks(ids);
+        } catch (ServiceException e) {
+            return AjaxResult.error(e.getMessage());
+        }
+        return AjaxResult.success("胎圈批量删除成功");
     }
 
     // ==================== 私有方法 ====================

@@ -249,7 +249,7 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
                         .eq(Cd90ScheduleResult::getFactoryCode, factoryCode)
                         .eq(Cd90ScheduleResult::getScheduleDate, scheduleDate)
                         .set(Cd90ScheduleResult::getIsDelete, 1));
-        int successNum = this.baseDao.saveBatch(insertList);
+        int successNum = this.baseDao.insertBatch(insertList);
         return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + successNum);
     }
 

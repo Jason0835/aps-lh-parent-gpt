@@ -18,6 +18,41 @@ export default {
   data() {
     const requiredSelect = { required: true, message: this.$t("common.rule.select"), trigger: "change" };
     const requiredInput = { required: true, message: this.$t("common.rule.input"), trigger: "blur" };
+    const positiveInteger = (rule, value, callback) => {
+      if (value === "" || value === null || value === undefined) {
+        callback();
+        return;
+      }
+      const numberValue = Number(value);
+      if (!Number.isInteger(numberValue) || numberValue <= 0) {
+        callback(new Error(this.$t("ui.data.column.cd15DepthConfig.invalidRange")));
+        return;
+      }
+      callback();
+    };
+    const validMax = (rule, value, callback) => {
+      if (value === "" || value === null || value === undefined) {
+        callback();
+        return;
+      }
+      const numberValue = Number(value);
+      if (!Number.isInteger(numberValue) || numberValue <= 0
+        || numberValue < Number(this.form.minMachineQty)) {
+        callback(new Error(this.$t("ui.data.column.cd15DepthConfig.invalidRange")));
+        return;
+      }
+      callback();
+    };
+    const positiveDepth = (rule, value, callback) => {
+      const numberValue = Number(value);
+      if (value === "" || value === null || value === undefined
+        || !Number.isFinite(numberValue) || numberValue <= 0
+        || Number(numberValue.toFixed(2)) !== numberValue) {
+        callback(new Error(this.$t("ui.data.column.cd15DepthConfig.invalidRange")));
+        return;
+      }
+      callback();
+    };
     return {
       loading: false,
       visible: false,
@@ -25,9 +60,9 @@ export default {
       form: {},
       rules: {
         factoryCode: [requiredSelect],
-        machineQty: [requiredInput],
-        machineRange: [requiredSelect],
-        depthClassQty: [requiredInput],
+        minMachineQty: [requiredInput, { validator: positiveInteger, trigger: "blur" }],
+        maxMachineQty: [{ validator: validMax, trigger: "blur" }],
+        depthClassQty: [requiredInput, { validator: positiveDepth, trigger: "blur" }],
       },
     };
   },
@@ -36,8 +71,8 @@ export default {
     columns() {
       return [
         { prop: "factoryCode", label: this.$t("ui.data.column.cd15DepthConfig.factoryCode"), type: "select", dictData: this.parentDict.type.biz_factory_name, filterable: true },
-        { prop: "machineQty", label: this.$t("ui.data.column.cd15DepthConfig.machineQty"), type: "number", required: true },
-        { prop: "machineRange", label: this.$t("ui.data.column.cd15DepthConfig.machineRange"), type: "select", dictData: this.parentDict.type.machine_range, filterable: true },
+        { prop: "minMachineQty", label: this.$t("ui.data.column.cd15DepthConfig.minMachineQty"), type: "number", min: 1, required: true },
+        { prop: "maxMachineQty", label: this.$t("ui.data.column.cd15DepthConfig.maxMachineQty"), type: "input" },
         { prop: "depthClassQty", label: this.$t("ui.data.column.cd15DepthConfig.depthClassQty"), type: "number", required: true, precision: 2 },
         { prop: "remark", label: this.$t("ui.common.column.remark"), type: "textarea", rows: 3, maxlength: 900 },
       ];
@@ -47,7 +82,8 @@ export default {
     async save(params) {
       this.loading = true;
       try {
-        const res = this.isEdit ? await updateDepthConfig(params) : await addDepthConfig(params);
+        const payload = { ...params, maxMachineQty: params.maxMachineQty === "" ? null : params.maxMachineQty };
+        const res = this.isEdit ? await updateDepthConfig(payload) : await addDepthConfig(payload);
         this.$modal.msgSuccess(res.msg);
         this.$emit("success");
         this.hide();
@@ -55,13 +91,13 @@ export default {
         this.loading = false;
       }
     },
-    show(data) {
+    show(data, defaultFactoryCode) {
       this.visible = true;
       if (data) {
         this.isEdit = true;
-        this.form = { ...data };
+        this.form = { ...data, maxMachineQty: data.maxMachineQty == null ? "" : data.maxMachineQty };
       } else {
-        this.form = { factoryCode: "116" };
+        this.form = { factoryCode: defaultFactoryCode || "116" };
       }
     },
     hide() {
@@ -74,4 +110,3 @@ export default {
   },
 };
 </script>
-

@@ -52,11 +52,11 @@
 
           <el-col :span="12">
             <el-form-item
-              :label="$t('ui.data.column.tqScheduleResult.isRelease')"
-              prop="isRelease"
+              :label="$t('ui.data.column.tqScheduleResult.releaseStatus')"
+              prop="releaseStatus"
             >
               <dict-select
-                v-model="form.isRelease"
+                v-model="form.releaseStatus"
                 :options="parentDict.type.IS_RELEASE"
                 disabled
               />

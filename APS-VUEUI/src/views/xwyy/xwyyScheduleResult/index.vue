@@ -67,6 +67,8 @@
     <tlt-upload
       ref="tltUpload"
       :update-support="true"
+      download-url="/xwyy/xwyyScheduleResult/export"
+      :download-params="importParams"
       upload-url="/xwyy/xwyyScheduleResult/importDataByCust"
       :upload-params="importParams"
       @uploadSuccess="getList"
@@ -111,10 +113,11 @@ import { listScheduleResult, removeScheduleResult, exportScheduleResult, autoSch
 import { listShiftConfig } from '@/api/xwyy/xwyyShiftConfig'
 import AutoScheduleDialog from './components/autoScheduleDialog.vue'
 import ReleaseStatusDialog from './components/releaseStatusDialog.vue'
+import tltUpload from '@/components/tltUpload/tltUpload.vue'
 
 export default {
   name: 'XwyyScheduleResult',
-  components: { AutoScheduleDialog, ReleaseStatusDialog },
+  components: { AutoScheduleDialog, ReleaseStatusDialog, tltUpload },
   dicts: ['biz_factory_name', 'IS_RELEASE', 'PRODUCTION_STATUS', 'DATA_SOURCE'],
   provide() {
     return {
@@ -155,8 +158,10 @@ export default {
   },
   computed: {
     importParams() {
+      // 复杂生产计划模板导入/下载共用：携带当前查询的工厂和排程日期
       return {
-        factoryCode: this.query.factoryCode || this.search.factoryCode
+        factoryCode: this.query.factoryCode || this.search.factoryCode,
+        scheduleDate: this.query.scheduleDate || this.search.scheduleDate
       }
     },
     columns() {
@@ -246,17 +251,20 @@ export default {
     },
     buildDateList(scheduleDate) {
       const baseDate = scheduleDate || this.getDefaultScheduleDate()
+      // 与后端一致：班次日期 = 排程日 + (scheduleDay - 2)，scheduleDay=1 归属排程日前一天
       return this.shiftConfig.map(item => ({
         ...item,
-        dayOffset: (item.scheduleDay || 1) - 1,
-        shiftDate: moment(baseDate).add((item.scheduleDay || 1) - 1, 'days').format('MM/DD')
+        dayOffset: (item.scheduleDay || 2) - 2,
+        shiftDate: moment(baseDate).add((item.scheduleDay || 2) - 2, 'days').format('MM/DD')
       }))
     },
     buildShiftColumns() {
       return this.shiftConfig.map((item, index) => {
         const dateItem = this.dateList[index] || {}
         const label = `${item.shiftName} ${dateItem.shiftDate || ''}`
-        const classField = item.classField
+        // CLASS_FIELD 存储为大写（如 CLASS1），后端 JSON 字段为驼峰小写（class1PlanQty），
+        // 必须转小写才能与表格数据 prop 匹配
+        const classField = item.classField.toLowerCase()
 
         return {
           label,

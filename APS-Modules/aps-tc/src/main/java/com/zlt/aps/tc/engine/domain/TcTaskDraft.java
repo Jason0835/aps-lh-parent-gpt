@@ -4,6 +4,8 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 import java.util.Date;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * 胎侧待排任务草稿。
@@ -19,6 +21,12 @@ public class TcTaskDraft {
 
     /** 来源成型工单号集合，仅用于解释追踪，不写入胎侧排程结果工单号 */
     private String sourceOrderNos;
+
+    /** 成型胎胚号，仅用于自动排程过程日志与解释追溯。 */
+    private String embryoCode;
+
+    /** 成型机台编号，仅用于自动排程过程日志与解释追溯。 */
+    private String cxMachineCode;
 
     /** 胎侧规格编码 */
     private String sidewallCode;
@@ -52,6 +60,18 @@ public class TcTaskDraft {
 
     /** 保证范围内成型胎侧需求量，单位米 */
     private BigDecimal guardDemandQty;
+
+    /** 成型备库窗口内按实际成型班次记录的有效计划长度，已按 LH_REMAIN_QTY 顺序封顶。 */
+    private Map<Integer, BigDecimal> formingGuardWindowQtyMap = new LinkedHashMap<>();
+
+    /** 设置成型备库窗口明细并复制容器，避免顺延任务与来源任务共享可变映射。
+     *
+     * @param formingGuardWindowQtyMap 窗口班次明细
+     */
+    public void setFormingGuardWindowQtyMap(Map<Integer, BigDecimal> formingGuardWindowQtyMap) {
+        this.formingGuardWindowQtyMap = formingGuardWindowQtyMap == null
+                ? new LinkedHashMap<>() : new LinkedHashMap<>(formingGuardWindowQtyMap);
+    }
 
     /** 当前班开始滚动库存，单位米 */
     private BigDecimal rollingStockQty;

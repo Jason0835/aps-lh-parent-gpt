@@ -1,96 +1,136 @@
 package com.zlt.aps.tq.controller;
 
-import com.ruoyi.common.constant.UserConstants;
-import com.ruoyi.common.core.web.controller.BaseController;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
-import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-import com.zlt.aps.tq.api.domain.dto.TqParamsDto;
-import com.zlt.aps.tq.entity.TqParams;
+import com.zlt.aps.constant.FactoryConstant;
+import com.zlt.aps.tq.api.domain.entity.TqParams;
+import com.zlt.aps.tq.mapper.TqParamsMapper;
 import com.zlt.aps.tq.service.TqParamsService;
+import com.zlt.bill.common.controller.AbstractDocBizController;
+import com.zlt.bill.common.service.IDocService;
+import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
-import org.springframework.beans.BeanUtils;
+import jodd.util.StringUtil;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.cloud.openfeign.SpringQueryMap;
-import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import java.util.List;
 
 /**
- * 胎圈参数信息Controller
+ * Copyright (c) 2022, All rights reserved。
+ * 文件名称：TqParamsController.java
+ * 描    述：胎圈排程参数配置 控制层类（对齐胎面 TmParamsController）
  *
  * @author zlt
- * @date 2021-05-25
+ * @version 1.0
+ * @date 2025-12-12
  */
+@Slf4j
+@Api(tags = "胎圈排程参数配置")
 @RestController
-@RequestMapping("/tq/params")
-@Api(tags = {"胎圈参数信息维护接口"})
-public class TqParamsController extends BaseController {
+@RequestMapping("/tqParams")
+public class TqParamsController extends AbstractDocBizController<TqParams> {
+
     @Autowired
     private TqParamsService tqParamsService;
 
-    /**
-     * 查询胎圈参数信息列表
-     *
-     * @return
-     */
-    @ApiOperation("查询胎圈参数信息列表")
+    @Resource
+    private TqParamsMapper tqParamsMapper;
+
+    @ApiOperation("查询列表")
     @PostMapping("/list")
-    public TableDataInfo list(@RequestBody TqParamsDto dto) {
-        startPage();
-        dto.setOrderStr(orderStr());
-        TqParams params = new TqParams();
-        BeanUtils.copyProperties(dto, params);
-        List<TqParamsDto> list = tqParamsService.selectParamsList(params);
-        return getDataTable(list);
+    @Override
+    public TableDataInfo list(@RequestBody TqParams queryVO) {
+        return super.list(queryVO);
     }
 
-    /**
-     * 获取胎圈参数信息详细信息
-     *
-     * @return 结果
-     */
-    @ApiOperation("获取胎圈参数信息详细信息")
-    @GetMapping(value = "/{id}")
-    public TqParams getInfo(@PathVariable("id") Long id) {
-        return tqParamsService.selectParamsById(id);
-    }
-
-    /**
-     * 修改胎圈参数信息
-     *
-     * @return 结果
-     */
-    @Log(title = "ui.data.column.tq.params.modelName", businessType = BusinessType.UPDATE)
-    @ApiOperation("修改胎圈参数信息")
-    @PostMapping("/edit")
-    public AjaxResult edit(@Validated @RequestBody TqParamsDto dto) {
-        TqParams params = new TqParams();
-        BeanUtils.copyProperties(dto, params);
-        if (UserConstants.NOT_UNIQUE.equals(tqParamsService.checkParamsCodeUnique(params))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.params.message.unique"));
+    @Log(title = "ui.data.column.tq.params.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
+    @ApiOperation("保存")
+    @PostMapping("/save")
+    @Override
+    public AjaxResult save(@RequestBody TqParams billVO) {
+        if (StringUtil.isBlank(billVO.getFactoryCode())) {
+            billVO.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
         }
-        return tqParamsService.updateParams(params);
+        return super.save(billVO);
     }
 
-    /**
-     * 导出胎圈参数信息
-     *
-     * @param dto 查询条件
-     * @return 查询到的集合
-     */
+    @Log(title = "ui.data.column.tq.params.modelName", businessType = BusinessType.DELETE)
+    @ApiOperation("删除")
+    @DeleteMapping("/remove")
+    @Override
+    public AjaxResult removeByIds(@RequestBody List<Long> ids) {
+        return super.removeByIds(ids);
+    }
+
+    @ApiOperation("获取详细信息")
+    @GetMapping(value = "/{id}")
+    @Override
+    public TqParams getInfo(@PathVariable("id") Long id) {
+        return super.getInfo(id);
+    }
+
+    @ApiOperation("校验唯一性")
+    @PostMapping("/checkUnique")
+    public String checkUnique(@RequestBody TqParams query) {
+        return tqParamsService.checkUnique(query);
+    }
+
+    @Log(title = "ui.data.column.tq.params.modelName", businessType = BusinessType.IMPORT)
+    @ApiOperation("导入数据")
+    @PostMapping("/importData")
+    @Override
+    public AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport) throws Exception {
+        return super.importData(importContext, updateSupport);
+    }
+
     @Log(title = "ui.data.column.tq.params.modelName", businessType = BusinessType.EXPORT)
-    @ApiOperation("导出胎圈参数信息")
-    @PostMapping("/exportData")
-    public List<TqParamsDto> export(@RequestBody TqParamsDto dto) {
-        startPage();
-        dto.setOrderStr(orderStr());
-        TqParams params = new TqParams();
-        BeanUtils.copyProperties(dto, params);
-        return tqParamsService.selectParamsList(params);
+    @ApiOperation("导出数据")
+    @PostMapping("/exportData/{fileName}")
+    @Override
+    public byte[] exportData(@RequestBody TqParams queryVO, @PathVariable("fileName") String fileName,
+                             HttpServletResponse response) throws IOException {
+        return super.exportData(queryVO, fileName, response);
+    }
+
+    @Override
+    protected List<TqParams> listExportData(TqParams obj) {
+        QueryWrapper<TqParams> wrapper = new QueryWrapper<>();
+        this.builderCondition(wrapper, obj);
+        return tqParamsMapper.selectList(wrapper);
+    }
+
+    @Override
+    protected IDocService getDocService() {
+        return tqParamsService;
+    }
+
+    @Override
+    protected void builderCondition(QueryWrapper<TqParams> queryWrapper, TqParams queryVO) {
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("paramCode")), "PARAM_CODE", queryVO.getFieldValueByFieldName("paramCode"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("paramName")), "PARAM_NAME", queryVO.getFieldValueByFieldName("paramName"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("paramGroup")), "PARAM_GROUP", queryVO.getFieldValueByFieldName("paramGroup"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("valueType")), "VALUE_TYPE", queryVO.getFieldValueByFieldName("valueType"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("enableStatus")), "ENABLE_STATUS", queryVO.getFieldValueByFieldName("enableStatus"));
+    }
+
+    @Override
+    protected String getTypeCode() {
+        return "TQ0801";
+    }
+
+    @Override
+    protected String getOrderBy() {
+        return "create_time desc";
     }
 }

@@ -70,6 +70,10 @@ public class TcScheduleResultServiceImpl extends AbstractDocService<TcScheduleRe
     @Resource
     private TcAutoScheduleTaskService tcAutoScheduleTaskService;
 
+    /** 失败批次过程日志独立保存服务。 */
+    @Resource
+    private TcFailedProcessLogService tcFailedProcessLogService;
+
     @Lazy
     @Resource
     private TcAutoScheduleAsyncExecutor tcAutoScheduleAsyncExecutor;
@@ -270,7 +274,11 @@ public class TcScheduleResultServiceImpl extends AbstractDocService<TcScheduleRe
             response.setIssueCount(response.getIssues().size());
             response.setSummary(new LinkedHashMap<>(finalContext.getQualitySummary()));
             if (CollUtil.isEmpty(context.getTaskDraftList())) {
-                response.setMessage(I18nUtil.getMessage("ui.tc.schedule.noTaskGenerated"));
+                String emptyTaskMessage = context.getEmptyFormingTaskMessage();
+                if (StrUtil.isBlank(emptyTaskMessage)) {
+                    emptyTaskMessage = I18nUtil.getMessage("ui.tc.schedule.noTaskGenerated");
+                }
+                response.setMessage(emptyTaskMessage);
                 log.warn("{} step=NO_TASK_GENERATED factoryCode={}, scheduleDate={}, batchNo={}, traceId={}, reason=noSchedulableTask",
                         TcScheduleConstants.AUTO_PLAN_LOG_PREFIX, request.getFactoryCode(),
                         DateUtil.formatDate(request.getScheduleDate()), response.getBatchNo(), response.getTraceId());
@@ -300,6 +308,7 @@ public class TcScheduleResultServiceImpl extends AbstractDocService<TcScheduleRe
                     response.getResultCount(), response.getUnplannedCount(), System.currentTimeMillis() - startMillis);
             return response;
         } catch (RuntimeException exception) {
+            this.saveFailedProcessLogSafely(context, task, request, exception);
             tcAutoScheduleTaskService.markFailed(taskId, exception.getMessage(),
                     this.collectFailureIssues(context, exception));
             throw exception;
@@ -307,6 +316,31 @@ public class TcScheduleResultServiceImpl extends AbstractDocService<TcScheduleRe
             if (request != null && lockToken != null) {
                 tcAutoScheduleExecutionGuard.release(request.getFactoryCode(), request.getScheduleDate(), lockToken);
             }
+        }
+    }
+
+    /**
+     * 保存失败过程日志，保存异常只记录运行日志，不替换原排程异常。
+     *
+     * @param context           排程上下文，允许为空
+     * @param task              自动排程任务
+     * @param request           自动排程请求，允许为空
+     * @param originalException 原始排程异常
+     */
+    private void saveFailedProcessLogSafely(TcScheduleContext context, TcAutoScheduleTask task,
+                                            TcAutoScheduleRequestVo request,
+                                            RuntimeException originalException) {
+        try {
+            tcFailedProcessLogService.saveFailure(context,
+                    context == null ? task.getBatchNo() : context.getBatchNo(),
+                    request == null ? null : request.getFactoryCode(),
+                    request == null ? null : request.getScheduleDate(), originalException);
+        } catch (RuntimeException processLogException) {
+            log.error("{} step=FAILED_PROCESS_LOG_SAVE_ERROR batchNo={}, originalExceptionType={}, saveExceptionType={}, saveMessage={}",
+                    TcScheduleConstants.AUTO_PLAN_LOG_PREFIX,
+                    context == null ? task.getBatchNo() : context.getBatchNo(),
+                    originalException.getClass().getSimpleName(), processLogException.getClass().getSimpleName(),
+                    processLogException.getMessage(), processLogException);
         }
     }
 

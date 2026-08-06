@@ -1,42 +1,65 @@
 package com.zlt.aps.tq.service.impl;
 
 import cn.hutool.core.date.DateUtil;
+import cn.hutool.core.util.StrUtil;
+import com.alibaba.fastjson.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ruoyi.common.core.utils.SecurityUtils;
+import com.ruoyi.common.exception.ServiceException;
+import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.redissonLock.annotation.DistributedLock;
+import com.zlt.aps.tq.api.constant.TqScheduleConstants;
+import com.zlt.aps.tq.api.domain.entity.TqRollingAdjustment;
+import com.zlt.aps.tq.api.domain.dto.TqRollingRecalcRequestDTO;
+import com.zlt.aps.tq.api.domain.entity.TqDispatcherLog;
 import com.zlt.aps.tq.api.domain.entity.TqMachineSpecSpeed;
-import com.zlt.aps.tq.api.domain.entity.TqScheduleResult;
 import com.zlt.aps.tq.api.domain.entity.TqRollingLog;
 import com.zlt.aps.tq.api.domain.entity.TqRollingLogDetail;
+import com.zlt.aps.tq.api.domain.entity.TqScheduleResult;
+import com.zlt.aps.tq.api.domain.entity.TqShiftStock;
 import com.zlt.aps.tq.api.domain.entity.TqStock;
+import com.zlt.aps.tq.api.domain.entity.TqParams;
+import com.zlt.aps.tq.api.domain.vo.TqRollingRecalcResponseVO;
+import com.zlt.aps.tq.engine.event.TqScheduleEventPublisher;
 import com.zlt.aps.tq.engine.vo.RollingUpdateResult;
 import com.zlt.aps.tq.engine.vo.TqRollingContext;
 import com.zlt.aps.tq.engine.vo.TqRollingTaskNode;
-import com.zlt.aps.tq.mapper.TqMachineSpecSpeedMapper;
-import com.zlt.aps.tq.mapper.TqScheduleResultMapper;
-import com.zlt.aps.tq.mapper.TqRollingLogDetailMapper;
-import com.zlt.aps.tq.mapper.TqRollingLogMapper;
-import com.zlt.aps.tq.mapper.TqStockMapper;
+import com.zlt.aps.tq.mapper.*;
 import com.zlt.aps.tq.service.ITqRollingLogDetailService;
 import com.zlt.aps.tq.service.ITqRollingLogService;
 import com.zlt.aps.tq.service.ITqRollingUpdateService;
+import com.zlt.aps.tq.service.TqRollingWindowService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import javax.annotation.Resource;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.ListIterator;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -85,6 +108,32 @@ public class TqRollingUpdateServiceImpl implements ITqRollingUpdateService {
     @Resource
     private TqStockMapper tqStockMapper;
 
+    // ==================== 自动滚动相关依赖（对齐胎面 TmRollingUpdateServiceImpl） ====================
+
+    @Resource
+    private RedissonClient redissonClient;
+
+    @Resource
+    private PlatformTransactionManager platformTransactionManager;
+
+    @Resource
+    private TqParamsMapper tqParamsMapper;
+
+    @Resource
+    private TqShiftStockMapper tqShiftStockMapper;
+
+    @Resource
+    private TqDispatcherLogMapper tqDispatcherLogMapper;
+
+    @Resource
+    private TqManualInsertRollingService tqManualInsertRollingService;
+
+    @Resource
+    private TqScheduleEventPublisher tqScheduleEventPublisher;
+
+    @Resource
+    private TqRollingWindowService tqRollingWindowService;
+
     /** 任务状态：正常 */
     private static final String TASK_STATUS_NORMAL = "0";
     /** 任务状态：已取消 */
@@ -109,6 +158,25 @@ public class TqRollingUpdateServiceImpl implements ITqRollingUpdateService {
 
     /** 默认规格切换时长（小时） */
     private static final double DEFAULT_SWITCH_TIME = 0.5;
+
+    // ==================== 自动滚动状态常量（对齐胎面 TmRollingUpdateServiceImpl） ====================
+
+    /** 自动滚动执行状态：成功 */
+    private static final String STATUS_SUCCESS = "SUCCESS";
+    /** 自动滚动执行状态：跳过 */
+    private static final String STATUS_SKIPPED = "SKIPPED";
+    /** 审计日志摘要前缀 */
+    private static final String SUMMARY_PREFIX = "ROLLING_SUMMARY=";
+    /** 跳过原因：库存缺失 */
+    private static final String SKIP_STOCK_MISSING = "STOCK_MISSING";
+    /** 跳过原因：目标结果缺失 */
+    private static final String SKIP_TARGET_RESULT_MISSING = "TARGET_RESULT_MISSING";
+    /** 跳过原因：需求缺失 */
+    private static final String SKIP_DEMAND_MISSING = "DEMAND_MISSING";
+    /** 跳过原因：需求窗口不足 */
+    private static final String SKIP_WINDOW_INSUFFICIENT = "DEMAND_WINDOW_INSUFFICIENT";
+    /** 跳过原因：阈值未达到 */
+    private static final String SKIP_THRESHOLD_NOT_REACHED = "THRESHOLD_NOT_REACHED";
 
     /**
      * 手动触发滚动更新
@@ -934,5 +1002,757 @@ public class TqRollingUpdateServiceImpl implements ITqRollingUpdateService {
             case 6: return entity.getClass6TaskStatus();
             default: return null;
         }
+    }
+
+    // ==================== 自动滚动重算（对齐胎面 TmRollingUpdateServiceImpl） ====================
+
+    /**
+     * 自动滚动重算入口（对齐胎面 TmRollingUpdateServiceImpl.rollingRecalcAutomatically）。
+     *
+     * <p>由 TqAutoRollingApplicationService 在窗口锁内调用，
+     * 执行库存上下界调量算法、行锁、释放状态校验、审计日志和事件发布。</p>
+     *
+     * @param request 重算请求（工厂、排程日期、库存日期、目标班次、操作人）
+     * @return 滚动重算响应（含幂等键、调整统计、跳过摘要）
+     */
+    @Override
+    public TqRollingRecalcResponseVO rollingRecalcAutomatically(TqRollingRecalcRequestDTO request) {
+        return this.executeAutoRolling(request, true);
+    }
+
+    /**
+     * 在分布式锁范围内执行幂等检查、数据加载和事务写入。
+     *
+     * @param request   滚动请求
+     * @param automatic  true 表示定时触发
+     * @return 滚动结果
+     */
+    private TqRollingRecalcResponseVO executeAutoRolling(TqRollingRecalcRequestDTO request, boolean automatic) {
+        this.validateAutoRequest(request);
+        request.setFactoryCode(StrUtil.trim(request.getFactoryCode()));
+        request.setScheduleDate(DateUtil.beginOfDay(request.getScheduleDate()));
+        this.resolveStockDate(request);
+        request.setOperator(StrUtil.blankToDefault(StrUtil.trim(request.getOperator()),
+                automatic ? TqScheduleConstants.ROLLING_OPERATOR_AUTO : "TQ_ROLLING_API"));
+        if (automatic && !this.isRollingEnabled(request.getFactoryCode())) {
+            return this.buildDisabledResponse(request);
+        }
+        this.ensureShiftStockExists(request);
+
+        String runKey = this.buildRunKey(request);
+        String traceId = UUID.randomUUID().toString().replace("-", "");
+        String lockKey = TqScheduleConstants.ROLLING_LOCK_KEY_PREFIX + request.getFactoryCode() + ":"
+                + DateUtil.formatDate(request.getScheduleDate()) + ":" + request.getTargetShiftOrder();
+        RLock rollingLock = redissonClient.getLock(lockKey);
+        if (!rollingLock.tryLock()) {
+            throw new ServiceException(I18nUtil.getMessage("ui.tq.rolling.locked"));
+        }
+        try {
+            TqRollingRecalcResponseVO existingResponse = this.loadExistingResponse(request, runKey, traceId);
+            if (existingResponse != null) {
+                return existingResponse;
+            }
+            Map<String, Object> skipEvidenceMap = new LinkedHashMap<>();
+            TransactionTemplate transactionTemplate = new TransactionTemplate(platformTransactionManager);
+            TqRollingRecalcResponseVO response = transactionTemplate.execute(status ->
+                    this.executeInsideTransaction(request, runKey, traceId, skipEvidenceMap));
+            if (response == null) {
+                throw new ServiceException(I18nUtil.getMessage("ui.tq.rolling.failed"));
+            }
+            this.publishRollingEvent(request, response);
+            return response;
+        } finally {
+            if (rollingLock.isHeldByCurrentThread()) {
+                rollingLock.unlock();
+            }
+        }
+    }
+
+    /**
+     * 执行数据库事务内的行锁、计算、滚动写入和审计。
+     *
+     * @param request       滚动请求
+     * @param runKey        运行键
+     * @param traceId       追踪号
+     * @param skipEvidenceMap 跳过证据收集器
+     * @return 滚动响应
+     */
+    private TqRollingRecalcResponseVO executeInsideTransaction(TqRollingRecalcRequestDTO request,
+                                                                 String runKey, String traceId,
+                                                                 Map<String, Object> skipEvidenceMap) {
+        TqRollingRecalcResponseVO existingResponse = this.loadExistingResponse(request, runKey, traceId);
+        if (existingResponse != null) {
+            return existingResponse;
+        }
+        List<TqScheduleResult> initialResultList = this.loadAutoScheduleResults(request);
+        List<Long> resultIds = initialResultList.stream().map(TqScheduleResult::getId)
+                .filter(Objects::nonNull).distinct().sorted().collect(Collectors.toList());
+        if (!resultIds.isEmpty()) {
+            List<TqScheduleResult> lockedResultList = tqScheduleResultMapper.selectBatchIdsForUpdate(resultIds);
+            if (lockedResultList == null || lockedResultList.size() != resultIds.size()) {
+                throw new ServiceException(I18nUtil.getMessage("ui.tq.rolling.concurrentChanged"));
+            }
+        }
+        List<TqScheduleResult> beforeList = this.loadAutoScheduleResults(request);
+        List<TqRollingAdjustment> adjustmentList = this.calculateAdjustments(request, beforeList, skipEvidenceMap);
+        this.validateAffectedReleaseStatuses(beforeList, adjustmentList, request.getTargetShiftOrder());
+
+        List<TqScheduleResult> changeRequestList = new ArrayList<>();
+        for (TqRollingAdjustment adjustment : adjustmentList) {
+            this.appendAdjustmentRequests(request, adjustment, changeRequestList);
+        }
+        int updateCount = changeRequestList.isEmpty() ? 0
+                : tqManualInsertRollingService.changeQtyAndRollBatch(changeRequestList);
+        List<TqScheduleResult> afterList = this.loadAutoScheduleResults(request);
+        TqRollingRecalcResponseVO response = this.buildAutoResponse(request, runKey, traceId,
+                beforeList, afterList, adjustmentList, updateCount, skipEvidenceMap);
+        this.recordRollingLog(request, runKey, beforeList, afterList, response);
+        return response;
+    }
+
+    /**
+     * 按胎圈计算上修或下修目标。
+     *
+     * <p>需求口径：胎圈无独立的班次需求草稿，使用月计划剩余量（monthSurplusQty）
+     * 按剩余班次数均摊为每班需求，再乘以阈值班数得到窗口需求。</p>
+     *
+     * @param request       滚动请求
+     * @param resultList    当前排程结果
+     * @param skipEvidenceMap 跳过证据收集器
+     * @return 需要实际修改的胎圈调整指令
+     */
+    private List<TqRollingAdjustment> calculateAdjustments(TqRollingRecalcRequestDTO request,
+                                                             List<TqScheduleResult> resultList,
+                                                             Map<String, Object> skipEvidenceMap) {
+        Map<String, List<TqScheduleResult>> resultMap = resultList.stream()
+                .filter(result -> StrUtil.isNotBlank(result.getBeadCode()))
+                .collect(Collectors.groupingBy(TqScheduleResult::getBeadCode,
+                        LinkedHashMap::new, Collectors.toList()));
+        Map<String, TqShiftStock> stockMap = this.loadStockMap(request);
+
+        BigDecimal upThreshold = this.readPositiveDecimalParam(request.getFactoryCode(),
+                TqScheduleConstants.PARAM_ROLLING_UP_THRESHOLD,
+                new BigDecimal(TqScheduleConstants.DEFAULT_ROLLING_UP_THRESHOLD));
+        BigDecimal downThreshold = this.readPositiveDecimalParam(request.getFactoryCode(),
+                TqScheduleConstants.PARAM_ROLLING_DOWN_THRESHOLD,
+                new BigDecimal(TqScheduleConstants.DEFAULT_ROLLING_DOWN_THRESHOLD));
+        int rollingShiftCount = this.readPositiveIntegerParam(request.getFactoryCode(),
+                TqScheduleConstants.PARAM_ROLLING_SHIFT_COUNT,
+                TqScheduleConstants.DEFAULT_ROLLING_SHIFT_COUNT);
+        BigDecimal downTarget = this.readPositiveDecimalParam(request.getFactoryCode(),
+                TqScheduleConstants.PARAM_ROLLING_DOWN_TARGET,
+                new BigDecimal(TqScheduleConstants.DEFAULT_ROLLING_DOWN_TARGET));
+
+        int targetShiftOrder = request.getTargetShiftOrder();
+        int remainingShifts = TqScheduleConstants.TQ_MAX_SHIFT_ORDER - targetShiftOrder + 1;
+        List<TqRollingAdjustment> adjustmentList = new ArrayList<>();
+        for (Map.Entry<String, List<TqScheduleResult>> entry : resultMap.entrySet()) {
+            String beadCode = entry.getKey();
+            List<TqScheduleResult> beadResultList = entry.getValue();
+
+            TqShiftStock stock = stockMap.get(beadCode);
+            if (stock == null) {
+                this.incrementSkip(skipEvidenceMap, request, beadCode, SKIP_STOCK_MISSING);
+                continue;
+            }
+            BigDecimal beforePlanQty = this.sumResultQty(beadResultList, targetShiftOrder, false);
+            if (beadResultList.isEmpty() || beforePlanQty.compareTo(BigDecimal.ZERO) <= 0) {
+                this.incrementSkip(skipEvidenceMap, request, beadCode, SKIP_TARGET_RESULT_MISSING);
+                continue;
+            }
+            BigDecimal monthSurplus = beadResultList.stream()
+                    .map(TqScheduleResult::getMonthSurplusQty)
+                    .filter(Objects::nonNull)
+                    .map(BigDecimalUtils::valueOf)
+                    .max(Comparator.naturalOrder())
+                    .orElse(BigDecimal.ZERO);
+            if (monthSurplus.compareTo(BigDecimal.ZERO) <= 0) {
+                this.incrementSkip(skipEvidenceMap, request, beadCode, SKIP_DEMAND_MISSING);
+                continue;
+            }
+            BigDecimal perShiftDemand = monthSurplus.divide(BigDecimal.valueOf(remainingShifts),
+                    TqScheduleConstants.DECIMAL_CALCULATION_SCALE, RoundingMode.HALF_UP);
+            BigDecimal upDemand = perShiftDemand.multiply(upThreshold);
+            BigDecimal downDemand = perShiftDemand.multiply(downThreshold);
+            BigDecimal downTargetDemand = perShiftDemand.multiply(downTarget);
+
+            BigDecimal expectedStock = this.calculateExpectedStock(stock);
+            BigDecimal availableQty = expectedStock.add(beforePlanQty);
+            BigDecimal targetPlanQty = null;
+            String direction = null;
+            boolean downWindowEnough = this.hasDemandWindow(targetShiftOrder, downThreshold);
+            if (availableQty.compareTo(upDemand) < 0) {
+                targetPlanQty = upDemand.subtract(expectedStock).max(BigDecimal.ZERO);
+                direction = "UP";
+            } else if (downWindowEnough) {
+                if (availableQty.compareTo(downDemand) > 0) {
+                    targetPlanQty = downTargetDemand.subtract(expectedStock).max(BigDecimal.ZERO);
+                    direction = "DOWN";
+                }
+            } else {
+                this.incrementSkip(skipEvidenceMap, request, beadCode, SKIP_WINDOW_INSUFFICIENT);
+            }
+            if (targetPlanQty == null || targetPlanQty.compareTo(beforePlanQty) == 0) {
+                if (targetPlanQty == null && downWindowEnough) {
+                    this.incrementSkip(skipEvidenceMap, request, beadCode, SKIP_THRESHOLD_NOT_REACHED);
+                }
+                continue;
+            }
+            BigDecimal targetFinishQty = this.sumResultQty(beadResultList, targetShiftOrder, true);
+            targetPlanQty = targetPlanQty.max(targetFinishQty);
+            if (targetPlanQty.compareTo(beforePlanQty) == 0) {
+                this.incrementSkip(skipEvidenceMap, request, beadCode, SKIP_THRESHOLD_NOT_REACHED);
+                continue;
+            }
+            TqRollingAdjustment adjustment = new TqRollingAdjustment();
+            adjustment.setBeadCode(beadCode);
+            adjustment.setBeforePlanQty(beforePlanQty);
+            adjustment.setTargetPlanQty(targetPlanQty);
+            adjustment.setDirection(direction);
+            adjustment.getEvidence().put("expectedStock", expectedStock);
+            adjustment.getEvidence().put("beforePlanQty", beforePlanQty);
+            adjustment.getEvidence().put("availableQty", availableQty);
+            adjustment.getEvidence().put("upDemand", upDemand);
+            adjustment.getEvidence().put("downDemand", downDemand);
+            adjustment.getEvidence().put("downWindowEnough", downWindowEnough);
+            adjustment.getEvidence().put("rollingShiftCount", rollingShiftCount);
+            adjustment.getEvidence().put("monthSurplus", monthSurplus);
+            adjustment.getEvidence().put("targetPlanQty", targetPlanQty);
+            adjustmentList.add(adjustment);
+        }
+        return adjustmentList;
+    }
+
+    /**
+     * 按目标胎圈和班次生成调量命令，全部调整在同一运行态上下文计算。
+     *
+     * @param request           滚动请求
+     * @param adjustment         调整指令
+     * @param changeRequestList  调量请求收集器
+     */
+    private void appendAdjustmentRequests(TqRollingRecalcRequestDTO request,
+                                            TqRollingAdjustment adjustment,
+                                            List<TqScheduleResult> changeRequestList) {
+        List<TqScheduleResult> currentList = this.loadBeadResults(request, adjustment.getBeadCode());
+        Comparator<TqScheduleResult> comparator = Comparator
+                .comparing((TqScheduleResult result) -> this.readShiftSequence(result, request.getTargetShiftOrder()),
+                        Comparator.nullsLast(Integer::compareTo))
+                .thenComparing(TqScheduleResult::getId, Comparator.nullsLast(Long::compareTo));
+        currentList.sort(comparator);
+        BigDecimal currentTotal = this.sumResultQty(currentList, request.getTargetShiftOrder(), false);
+        BigDecimal delta = adjustment.getTargetPlanQty().subtract(currentTotal);
+        if (delta.compareTo(BigDecimal.ZERO) > 0) {
+            TqScheduleResult target = currentList.get(currentList.size() - 1);
+            BigDecimal currentQty = this.readShiftQty(target, request.getTargetShiftOrder(), false);
+            changeRequestList.add(this.buildChangeRequest(target, request.getTargetShiftOrder(),
+                    currentQty.add(delta)));
+            return;
+        }
+        BigDecimal remainingReduceQty = delta.abs();
+        ListIterator<TqScheduleResult> iterator = currentList.listIterator(currentList.size());
+        while (iterator.hasPrevious() && remainingReduceQty.compareTo(BigDecimal.ZERO) > 0) {
+            TqScheduleResult target = iterator.previous();
+            BigDecimal currentQty = this.readShiftQty(target, request.getTargetShiftOrder(), false);
+            BigDecimal finishQty = this.readShiftQty(target, request.getTargetShiftOrder(), true);
+            BigDecimal reducibleQty = currentQty.subtract(finishQty).max(BigDecimal.ZERO);
+            BigDecimal reduceQty = reducibleQty.min(remainingReduceQty);
+            if (reduceQty.compareTo(BigDecimal.ZERO) <= 0) {
+                continue;
+            }
+            changeRequestList.add(this.buildChangeRequest(target, request.getTargetShiftOrder(),
+                    currentQty.subtract(reduceQty)));
+            remainingReduceQty = remainingReduceQty.subtract(reduceQty);
+        }
+        if (remainingReduceQty.compareTo(BigDecimal.ZERO) > 0) {
+            throw new ServiceException(I18nUtil.getMessage("ui.tq.rolling.finishLimit"));
+        }
+    }
+
+    /**
+     * 构建自动滚动调量请求。
+     *
+     * @param current   当前结果
+     * @param shiftOrder 目标班次
+     * @param planQty   新计划量
+     * @return 调量请求
+     */
+    private TqScheduleResult buildChangeRequest(TqScheduleResult current, int shiftOrder, BigDecimal planQty) {
+        TqScheduleResult changeRequest = new TqScheduleResult();
+        changeRequest.setId(current.getId());
+        changeRequest.setFieldValueByFieldName(
+                String.format(TqScheduleConstants.SHIFT_PLAN_QTY_FIELD_TEMPLATE, shiftOrder), planQty.intValue());
+        changeRequest.setFieldValueByFieldName(
+                String.format(TqScheduleConstants.SHIFT_ANALYSIS_FIELD_TEMPLATE, shiftOrder), "ROLLING_RECALC");
+        return changeRequest;
+    }
+
+    /**
+     * 校验所有可能被滚动影响的机台结果均处于可编辑状态。
+     *
+     * @param resultList     当前日期结果
+     * @param adjustmentList 调整指令
+     * @param shiftOrder     目标班次
+     */
+    private void validateAffectedReleaseStatuses(List<TqScheduleResult> resultList,
+                                                   List<TqRollingAdjustment> adjustmentList,
+                                                   int shiftOrder) {
+        Set<String> beadCodes = adjustmentList.stream().map(TqRollingAdjustment::getBeadCode)
+                .collect(Collectors.toSet());
+        Set<String> machineCodes = resultList.stream()
+                .filter(result -> beadCodes.contains(result.getBeadCode()))
+                .filter(result -> this.readShiftQty(result, shiftOrder, false).compareTo(BigDecimal.ZERO) > 0)
+                .map(TqScheduleResult::getMachineCode).filter(StrUtil::isNotBlank)
+                .collect(Collectors.toSet());
+        boolean containsInvalidStatus = resultList.stream()
+                .filter(result -> machineCodes.contains(result.getMachineCode()))
+                .anyMatch(result -> !this.isEditableReleaseStatus(result.getReleaseStatus()));
+        if (containsInvalidStatus) {
+            throw new ServiceException(I18nUtil.getMessage("ui.tq.rolling.releaseStatusInvalid"));
+        }
+    }
+
+    /**
+     * 计算目标班前预计库存。
+     *
+     * @param stock 班次开始前同步的实时库存
+     * @return 非负预计库存
+     */
+    private BigDecimal calculateExpectedStock(TqShiftStock stock) {
+        return BigDecimalUtils.valueOf(stock.getStockQty())
+                .subtract(BigDecimalUtils.valueOf(stock.getBadQty()))
+                .add(BigDecimalUtils.valueOf(stock.getAdjustQty()))
+                .max(BigDecimal.ZERO);
+    }
+
+    /**
+     * 判断未来需求窗口是否完整。
+     *
+     * @param startShiftOrder 起始班次
+     * @param shiftCount      所需班次数（可含小数）
+     * @return true 表示所需最后班次仍在六班窗口内
+     */
+    private boolean hasDemandWindow(int startShiftOrder, BigDecimal shiftCount) {
+        int requiredShiftCount = shiftCount.setScale(0, RoundingMode.CEILING).intValue();
+        int lastShiftOrder = startShiftOrder + requiredShiftCount - 1;
+        return lastShiftOrder <= TqScheduleConstants.TQ_MAX_SHIFT_ORDER;
+    }
+
+    /**
+     * 汇总排程结果指定班次计划量或完成量。
+     *
+     * @param resultList 排程结果
+     * @param shiftOrder  班次
+     * @param finish     true 读取完成量，false 读取计划量
+     * @return 汇总数量
+     */
+    private BigDecimal sumResultQty(List<TqScheduleResult> resultList, int shiftOrder, boolean finish) {
+        return resultList.stream().map(result -> this.readShiftQty(result, shiftOrder, finish))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    /**
+     * 动态读取班次计划量或完成量。
+     *
+     * @param result    排程结果
+     * @param shiftOrder 班次
+     * @param finish    true 读取完成量，false 读取计划量
+     * @return 数量，空值按零处理
+     */
+    private BigDecimal readShiftQty(TqScheduleResult result, int shiftOrder, boolean finish) {
+        String fieldTemplate = finish ? TqScheduleConstants.SHIFT_FINISH_QTY_FIELD_TEMPLATE
+                : TqScheduleConstants.SHIFT_PLAN_QTY_FIELD_TEMPLATE;
+        return result == null ? BigDecimal.ZERO : BigDecimalUtils.valueOf(
+                result.getFieldValueByFieldName(String.format(fieldTemplate, shiftOrder)));
+    }
+
+    /**
+     * 动态读取班次顺序。
+     *
+     * @param result    排程结果
+     * @param shiftOrder 班次
+     * @return 顺序，空值返回 null
+     */
+    private Integer readShiftSequence(TqScheduleResult result, int shiftOrder) {
+        Object value = result == null ? null : result.getFieldValueByFieldName(
+                String.format(TqScheduleConstants.SHIFT_SEQUENCE_FIELD_TEMPLATE, shiftOrder));
+        return value instanceof Number ? ((Number) value).intValue() : null;
+    }
+
+    /**
+     * 查询当前工厂和日期的有效结果。
+     *
+     * @param request 滚动请求
+     * @return 排程结果
+     */
+    private List<TqScheduleResult> loadAutoScheduleResults(TqRollingRecalcRequestDTO request) {
+        LambdaQueryWrapper<TqScheduleResult> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(TqScheduleResult::getFactoryCode, request.getFactoryCode());
+        wrapper.eq(TqScheduleResult::getScheduleDate, request.getScheduleDate());
+        wrapper.orderByAsc(TqScheduleResult::getMachineCode, TqScheduleResult::getId);
+        List<TqScheduleResult> resultList = tqScheduleResultMapper.selectList(wrapper);
+        return resultList == null ? Collections.emptyList() : resultList;
+    }
+
+    /**
+     * 查询同一胎圈的当前结果。
+     *
+     * @param request  滚动请求
+     * @param beadCode 胎圈编码
+     * @return 同胎圈结果
+     */
+    private List<TqScheduleResult> loadBeadResults(TqRollingRecalcRequestDTO request, String beadCode) {
+        return this.loadAutoScheduleResults(request).stream()
+                .filter(result -> beadCode.equals(result.getBeadCode()))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 加载库存并保留同胎圈首条记录。
+     *
+     * @param request 滚动请求
+     * @return 胎圈库存映射
+     */
+    private Map<String, TqShiftStock> loadStockMap(TqRollingRecalcRequestDTO request) {
+        LambdaQueryWrapper<TqShiftStock> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(TqShiftStock::getFactoryCode, request.getFactoryCode());
+        wrapper.eq(TqShiftStock::getStockDate, request.getStockDate());
+        wrapper.eq(TqShiftStock::getShiftOrder, request.getTargetShiftOrder());
+        wrapper.orderByAsc(TqShiftStock::getId);
+        List<TqShiftStock> stockList = tqShiftStockMapper.selectList(wrapper);
+        return (stockList == null ? Collections.<TqShiftStock>emptyList() : stockList).stream()
+                .filter(stock -> StrUtil.isNotBlank(stock.getBeadCode()))
+                .collect(Collectors.toMap(TqShiftStock::getBeadCode, Function.identity(),
+                        (first, ignored) -> first, LinkedHashMap::new));
+    }
+
+    /**
+     * 补齐并规范化MES库存物理日期。
+     *
+     * @param request 滚动请求
+     */
+    private void resolveStockDate(TqRollingRecalcRequestDTO request) {
+        if (request.getStockDate() != null) {
+            request.setStockDate(DateUtil.beginOfDay(request.getStockDate()));
+            return;
+        }
+        com.zlt.aps.tq.domain.vo.TqRollingWindow window = this.tqRollingWindowService.resolveWindow(
+                request.getFactoryCode(), request.getScheduleDate(), request.getTargetShiftOrder());
+        if (window == null || window.getStockDate() == null) {
+            throw new ServiceException(I18nUtil.getMessage("ui.tq.rolling.requestInvalid"));
+        }
+        request.setStockDate(DateUtil.beginOfDay(window.getStockDate()));
+    }
+
+    /**
+     * 在幂等记录查询前校验整个班次库存快照存在。
+     *
+     * @param request 滚动请求
+     */
+    private void ensureShiftStockExists(TqRollingRecalcRequestDTO request) {
+        Long stockCount = this.tqShiftStockMapper.selectCount(new LambdaQueryWrapper<TqShiftStock>()
+                .eq(TqShiftStock::getFactoryCode, request.getFactoryCode())
+                .eq(TqShiftStock::getStockDate, request.getStockDate())
+                .eq(TqShiftStock::getShiftOrder, request.getTargetShiftOrder()));
+        if (stockCount == null || stockCount <= 0) {
+            throw new ServiceException(I18nUtil.getMessage("ui.tq.rolling.shiftStockMissing"));
+        }
+    }
+
+    /**
+     * 查询滚动参数，空值或非法值使用默认值。
+     *
+     * @param factoryCode  工厂编号
+     * @param paramCode    参数编码
+     * @param defaultValue 默认值
+     * @return 正数参数值
+     */
+    private BigDecimal readPositiveDecimalParam(String factoryCode, String paramCode, BigDecimal defaultValue) {
+        String value = this.readParamValue(factoryCode, paramCode, defaultValue.toPlainString());
+        try {
+            BigDecimal parsedValue = new BigDecimal(value);
+            return parsedValue.compareTo(BigDecimal.ZERO) > 0 ? parsedValue : defaultValue;
+        } catch (NumberFormatException ex) {
+            return defaultValue;
+        }
+    }
+
+    /**
+     * 查询正整数滚动参数，空值、零值或非法值使用默认值。
+     *
+     * @param factoryCode  工厂编号
+     * @param paramCode    参数编码
+     * @param defaultValue 默认值
+     * @return 正整数参数值
+     */
+    private int readPositiveIntegerParam(String factoryCode, String paramCode, int defaultValue) {
+        String value = this.readParamValue(factoryCode, paramCode, String.valueOf(defaultValue));
+        try {
+            int parsedValue = Integer.parseInt(value);
+            return parsedValue > 0 ? parsedValue : defaultValue;
+        } catch (NumberFormatException ex) {
+            return defaultValue;
+        }
+    }
+
+    /**
+     * 查询单个工厂参数。
+     *
+     * @param factoryCode  工厂编号
+     * @param paramCode    参数编码
+     * @param defaultValue 默认值
+     * @return 生效参数值
+     */
+    private String readParamValue(String factoryCode, String paramCode, String defaultValue) {
+        LambdaQueryWrapper<TqParams> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(TqParams::getFactoryCode, factoryCode);
+        wrapper.eq(TqParams::getParamCode, paramCode);
+        wrapper.eq(TqParams::getEnableStatus, "1");
+        wrapper.orderByDesc(TqParams::getId);
+        List<TqParams> paramsList = tqParamsMapper.selectList(wrapper);
+        if (paramsList == null || paramsList.isEmpty()) {
+            return defaultValue;
+        }
+        TqParams params = paramsList.get(0);
+        return StrUtil.blankToDefault(StrUtil.trim(params.getParamValue()),
+                StrUtil.blankToDefault(StrUtil.trim(params.getDefaultValue()), defaultValue));
+    }
+
+    /**
+     * 判断工厂自动滚动开关是否开启。
+     *
+     * @param factoryCode 工厂编号
+     * @return true 表示开启
+     */
+    private boolean isRollingEnabled(String factoryCode) {
+        return "1".equals(this.readParamValue(factoryCode, TqScheduleConstants.PARAM_ROLLING_ENABLED,
+                TqScheduleConstants.DEFAULT_ROLLING_ENABLED));
+    }
+
+    /**
+     * 记录单胎圈跳过证据。
+     *
+     * @param skipEvidenceMap 跳过证据收集器
+     * @param request         滚动请求
+     * @param beadCode        胎圈编码
+     * @param reasonCode      跳过原因
+     */
+    private void incrementSkip(Map<String, Object> skipEvidenceMap, TqRollingRecalcRequestDTO request,
+                                String beadCode, String reasonCode) {
+        skipEvidenceMap.put(beadCode, reasonCode);
+        log.warn("[TQ_ROLLING_SKIP] factoryCode={}, scheduleDate={}, beadCode={}, reasonCode={}",
+                request.getFactoryCode(), DateUtil.formatDate(request.getScheduleDate()), beadCode, reasonCode);
+    }
+
+    /**
+     * 构建响应并统计真正变化的结果行。
+     *
+     * @param request       滚动请求
+     * @param runKey        运行键
+     * @param traceId       追踪号
+     * @param beforeList    操作前结果
+     * @param afterList     操作后结果
+     * @param adjustmentList 调整指令
+     * @param updateCount   滚动更新次数
+     * @param skipEvidenceMap 跳过证据
+     * @return 滚动响应
+     */
+    private TqRollingRecalcResponseVO buildAutoResponse(TqRollingRecalcRequestDTO request, String runKey,
+                                                           String traceId, List<TqScheduleResult> beforeList,
+                                                           List<TqScheduleResult> afterList,
+                                                           List<TqRollingAdjustment> adjustmentList,
+                                                           int updateCount,
+                                                           Map<String, Object> skipEvidenceMap) {
+        TqRollingRecalcResponseVO response = new TqRollingRecalcResponseVO();
+        response.setRunKey(runKey);
+        response.setStatus(adjustmentList.isEmpty() ? STATUS_SKIPPED : STATUS_SUCCESS);
+        response.setScheduleDate(request.getScheduleDate());
+        response.setTargetShiftOrder(request.getTargetShiftOrder());
+        response.setAdjustedBeadCount(adjustmentList.size());
+        response.setAffectedResultCount(this.countChangedRows(beforeList, afterList));
+        response.setBeforePlanQty(this.sumResultQty(beforeList, request.getTargetShiftOrder(), false));
+        response.setAfterPlanQty(this.sumResultQty(afterList, request.getTargetShiftOrder(), false));
+        response.setTraceId(traceId);
+        Map<String, Integer> skipSummary = skipEvidenceMap.values().stream().map(String::valueOf)
+                .collect(Collectors.toMap(Function.identity(), ignored -> 1, Integer::sum, LinkedHashMap::new));
+        response.setSkippedBeadCount(skipEvidenceMap.size());
+        response.setSkippedReasonSummary(skipSummary);
+        log.info("[TQ_ROLLING] runKey={}, adjustedBeadCount={}, updateCount={}, affectedResultCount={}, skippedBeadCount={}",
+                runKey, adjustmentList.size(), updateCount, response.getAffectedResultCount(),
+                response.getSkippedBeadCount());
+        return response;
+    }
+
+    /**
+     * 统计操作前后任一班次计划量发生变化的结果行。
+     *
+     * @param beforeList 操作前结果
+     * @param afterList  操作后结果
+     * @return 变化结果行数量
+     */
+    private int countChangedRows(List<TqScheduleResult> beforeList, List<TqScheduleResult> afterList) {
+        Map<Long, TqScheduleResult> beforeMap = beforeList.stream()
+                .filter(result -> result.getId() != null)
+                .collect(Collectors.toMap(TqScheduleResult::getId, Function.identity(),
+                        (first, ignored) -> first));
+        Map<Long, TqScheduleResult> afterMap = afterList.stream()
+                .filter(result -> result.getId() != null)
+                .collect(Collectors.toMap(TqScheduleResult::getId, Function.identity(),
+                        (first, ignored) -> first));
+        Set<Long> allIds = new HashSet<>(beforeMap.keySet());
+        allIds.addAll(afterMap.keySet());
+        int changedCount = 0;
+        for (Long id : allIds) {
+            TqScheduleResult before = beforeMap.get(id);
+            TqScheduleResult after = afterMap.get(id);
+            if (before == null || after == null || !this.hasSamePlan(before, after)) {
+                changedCount++;
+            }
+        }
+        return changedCount;
+    }
+
+    /**
+     * 比较六班计划量是否一致。
+     *
+     * @param before 操作前结果
+     * @param after  操作后结果
+     * @return true 表示一致
+     */
+    private boolean hasSamePlan(TqScheduleResult before, TqScheduleResult after) {
+        for (int shiftOrder = 1; shiftOrder <= TqScheduleConstants.TQ_MAX_SHIFT_ORDER; shiftOrder++) {
+            if (this.readShiftQty(before, shiftOrder, false)
+                    .compareTo(this.readShiftQty(after, shiftOrder, false)) != 0) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * 写入不可撤销的自动滚动审计日志。
+     *
+     * @param request  滚动请求
+     * @param runKey   运行键
+     * @param beforeList 操作前结果
+     * @param afterList  操作后结果
+     * @param response 滚动响应
+     */
+    private void recordRollingLog(TqRollingRecalcRequestDTO request, String runKey,
+                                   List<TqScheduleResult> beforeList, List<TqScheduleResult> afterList,
+                                   TqRollingRecalcResponseVO response) {
+        TqDispatcherLog dispatcherLog = new TqDispatcherLog();
+        dispatcherLog.setScheduleDate(request.getScheduleDate());
+        dispatcherLog.setOperType(TqScheduleConstants.DISPATCHER_OPER_ROLLING);
+        dispatcherLog.setCreateBy(request.getOperator());
+        dispatcherLog.setRemark(SUMMARY_PREFIX + JSON.toJSONString(response));
+        if (tqDispatcherLogMapper.insertTqDispatcherLog(dispatcherLog) != 1) {
+            throw new ServiceException(I18nUtil.getMessage("ui.tq.rolling.auditFailed"));
+        }
+    }
+
+    /**
+     * 读取相同运行键的成功或跳过摘要，实现定时与手动入口幂等。
+     *
+     * @param request 滚动请求
+     * @param runKey  运行键
+     * @param traceId 本次追踪号
+     * @return 已执行响应；不存在返回 null
+     */
+    private TqRollingRecalcResponseVO loadExistingResponse(TqRollingRecalcRequestDTO request,
+                                                             String runKey, String traceId) {
+        TqDispatcherLog queryLog = new TqDispatcherLog();
+        queryLog.setScheduleDate(request.getScheduleDate());
+        queryLog.setOperType(TqScheduleConstants.DISPATCHER_OPER_ROLLING);
+        List<TqDispatcherLog> logList = tqDispatcherLogMapper.selectTqDispatcherLogList(queryLog);
+        if (logList == null || logList.isEmpty()) {
+            return null;
+        }
+        for (TqDispatcherLog logEntry : logList) {
+            String remark = logEntry.getRemark();
+            if (StrUtil.isNotBlank(remark) && remark.startsWith(SUMMARY_PREFIX)) {
+                try {
+                    TqRollingRecalcResponseVO existing = JSON.parseObject(
+                            remark.substring(SUMMARY_PREFIX.length()), TqRollingRecalcResponseVO.class);
+                    if (existing != null && runKey.equals(existing.getRunKey())) {
+                        existing.setTraceId(traceId);
+                        return existing;
+                    }
+                } catch (RuntimeException ex) {
+                    log.warn("[TQ_ROLLING] 解析历史运行摘要失败，runKey={}，原因={}", runKey, ex.getMessage());
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 发布低敏滚动事件摘要。
+     *
+     * @param request  滚动请求
+     * @param response 滚动响应
+     */
+    private void publishRollingEvent(TqRollingRecalcRequestDTO request, TqRollingRecalcResponseVO response) {
+        tqScheduleEventPublisher.publishRollingEvent(request, response);
+    }
+
+    /**
+     * 生成固定运行键。
+     *
+     * @param request 滚动请求
+     * @return 运行键
+     */
+    private String buildRunKey(TqRollingRecalcRequestDTO request) {
+        return TqScheduleConstants.ROLLING_RUN_KEY_PREFIX + request.getFactoryCode() + ":"
+                + DateUtil.format(request.getScheduleDate(), "yyyyMMdd") + ":" + request.getTargetShiftOrder();
+    }
+
+    /**
+     * 构建自动开关关闭时的跳过响应，不写数据库幂等日志。
+     *
+     * @param request 滚动请求
+     * @return 跳过响应
+     */
+    private TqRollingRecalcResponseVO buildDisabledResponse(TqRollingRecalcRequestDTO request) {
+        TqRollingRecalcResponseVO response = new TqRollingRecalcResponseVO();
+        response.setRunKey(this.buildRunKey(request));
+        response.setStatus(STATUS_SKIPPED);
+        response.setScheduleDate(request.getScheduleDate());
+        response.setTargetShiftOrder(request.getTargetShiftOrder());
+        response.getSkippedReasonSummary().put("ROLLING_DISABLED", 1);
+        response.setSkippedBeadCount(1);
+        response.setTraceId(UUID.randomUUID().toString().replace("-", ""));
+        return response;
+    }
+
+    /**
+     * 校验请求必填字段和班次范围。
+     *
+     * @param request 滚动请求
+     */
+    private void validateAutoRequest(TqRollingRecalcRequestDTO request) {
+        if (request == null || StrUtil.isBlank(request.getFactoryCode()) || request.getScheduleDate() == null
+                || request.getTargetShiftOrder() == null
+                || request.getTargetShiftOrder() < 1
+                || request.getTargetShiftOrder() > TqScheduleConstants.TQ_MAX_SHIFT_ORDER) {
+            throw new ServiceException(I18nUtil.getMessage("ui.tq.rolling.requestInvalid"));
+        }
+    }
+
+    /**
+     * 判断释放状态是否可编辑。
+     *
+     * <p>对齐胎面 TmReleaseStatusTransition.isEditable，
+     * 仅未发布(0)、待发布(1)、已撤销(5)允许滚动调量。</p>
+     *
+     * @param releaseStatus 释放状态
+     * @return true 表示可编辑
+     */
+    private boolean isEditableReleaseStatus(String releaseStatus) {
+        if (StrUtil.isBlank(releaseStatus)) {
+            return true;
+        }
+        return TqScheduleConstants.RELEASE_STATUS_NOT_PUBLISHED.equals(releaseStatus)
+                || TqScheduleConstants.RELEASE_STATUS_PENDING.equals(releaseStatus)
+                || TqScheduleConstants.RELEASE_STATUS_REVOKED.equals(releaseStatus);
     }
 }

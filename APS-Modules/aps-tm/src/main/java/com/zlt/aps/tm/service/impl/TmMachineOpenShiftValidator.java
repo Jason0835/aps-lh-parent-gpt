@@ -1,0 +1,199 @@
+package com.zlt.aps.tm.service.impl;
+
+import cn.hutool.core.util.StrUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.ruoyi.common.exception.ServiceException;
+import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.common.core.utils.MachineOpenShiftCodeUtil;
+import com.zlt.aps.tm.api.constant.TmScheduleConstants;
+import com.zlt.aps.tm.api.domain.entity.TmMachineInfo;
+import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
+import com.zlt.aps.tm.api.domain.entity.TmShiftConfig;
+import com.zlt.aps.tm.mapper.TmMachineInfoMapper;
+import com.zlt.aps.tm.mapper.TmShiftConfigMapper;
+import org.springframework.stereotype.Service;
+
+import java.math.BigDecimal;
+import java.util.*;
+import java.util.stream.Collectors;
+
+/**
+ * 胎面人工排程机台开机班次校验器。
+ *
+ * <p>统一校验插单、加量和转入目标机台时的开机班次，并为人工滚动提供班次基础产能。
+ * 减量、清零、删除和转出不在本类阻断，便于修复历史未开班计划。</p>
+ */
+@Service
+public class TmMachineOpenShiftValidator {
+
+    private final TmMachineInfoMapper machineInfoMapper;
+
+    private final TmShiftConfigMapper shiftConfigMapper;
+
+    /**
+     * 创建机台开机班次校验器。
+     *
+     * @param machineInfoMapper 机台资料 Mapper
+     * @param shiftConfigMapper 班次配置 Mapper
+     */
+    public TmMachineOpenShiftValidator(TmMachineInfoMapper machineInfoMapper,
+                                       TmShiftConfigMapper shiftConfigMapper) {
+        this.machineInfoMapper = machineInfoMapper;
+        this.shiftConfigMapper = shiftConfigMapper;
+    }
+
+    /**
+     * 校验插单中全部正计划量班次均为目标机台开机班次。
+     *
+     * @param scheduleResult 插单结果
+     * @throws ServiceException 机台或班次不存在、当前班次未开机时抛出
+     */
+    public void validateInsert(TmScheduleResult scheduleResult) {
+        this.validatePositivePlanShifts(scheduleResult, scheduleResult.getMachineCode());
+    }
+
+    /**
+     * 校验转入目标机台的全部正计划量班次。
+     *
+     * @param sourceResult 当前数据库结果
+     * @param targetMachineCode 目标机台编码
+     * @throws ServiceException 目标机台对应班次未开机时抛出
+     */
+    public void validateTransfer(TmScheduleResult sourceResult, String targetMachineCode) {
+        this.validatePositivePlanShifts(sourceResult, targetMachineCode);
+    }
+
+    /**
+     * 仅校验人工调量中增加的计划量班次。
+     *
+     * @param currentResult 当前数据库结果
+     * @param requestResult 调量请求
+     * @throws ServiceException 加量班次未开机时抛出
+     */
+    public void validateIncrease(TmScheduleResult currentResult, TmScheduleResult requestResult) {
+        for (int shiftOrder = 1; shiftOrder <= TmScheduleConstants.TM_MAX_SHIFT_ORDER; shiftOrder++) {
+            BigDecimal currentQty = this.readPlanQty(currentResult, shiftOrder);
+            BigDecimal requestQty = this.readPlanQty(requestResult, shiftOrder);
+            if (requestQty.compareTo(currentQty) > 0) {
+                this.requireMachineShiftOpen(currentResult.getFactoryCode(), currentResult.getMachineCode(), shiftOrder);
+            }
+        }
+    }
+
+    /**
+     * 解析人工滚动指定机台班次的基础产能。
+     *
+     * @param reference 排程范围参考
+     * @param machineCode 机台编码
+     * @param shiftOrder 班次顺序
+     * @return 已开班返回机台最大班产，未开班或资料缺失返回零
+     */
+    public BigDecimal resolveRollingCapacity(TmScheduleResult reference, String machineCode, Integer shiftOrder) {
+        if (reference == null || StrUtil.isBlank(machineCode) || shiftOrder == null) {
+            return BigDecimal.ZERO;
+        }
+        TmMachineInfo machineInfo = this.loadMachine(reference.getFactoryCode(), machineCode);
+        TmShiftConfig shiftConfig = this.loadShiftConfig(reference.getFactoryCode(), shiftOrder);
+        if (machineInfo == null || shiftConfig == null || !"1".equals(machineInfo.getMachineStatus())
+                || !this.isMachineShiftOpen(machineInfo, shiftConfig)) {
+            return BigDecimal.ZERO;
+        }
+        return machineInfo.getMaxCapacity() == null ? BigDecimal.ZERO : machineInfo.getMaxCapacity();
+    }
+
+    /**
+     * 校验结果中的正计划量班次。
+     *
+     * @param scheduleResult 排程结果
+     * @param machineCode 待承接机台编码
+     */
+    private void validatePositivePlanShifts(TmScheduleResult scheduleResult, String machineCode) {
+        for (int shiftOrder = 1; shiftOrder <= TmScheduleConstants.TM_MAX_SHIFT_ORDER; shiftOrder++) {
+            if (this.readPlanQty(scheduleResult, shiftOrder).compareTo(BigDecimal.ZERO) > 0) {
+                this.requireMachineShiftOpen(scheduleResult.getFactoryCode(), machineCode, shiftOrder);
+            }
+        }
+    }
+
+    /**
+     * 要求机台开放指定班次。
+     *
+     * @param factoryCode 工厂编码
+     * @param machineCode 机台编码
+     * @param shiftOrder 班次顺序
+     * @throws ServiceException 机台或班次不存在、班次未开放时抛出
+     */
+    private void requireMachineShiftOpen(String factoryCode, String machineCode, Integer shiftOrder) {
+        TmMachineInfo machineInfo = this.loadMachine(factoryCode, machineCode);
+        TmShiftConfig shiftConfig = this.loadShiftConfig(factoryCode, shiftOrder);
+        if (machineInfo == null || shiftConfig == null || !"1".equals(machineInfo.getMachineStatus())
+                || !this.isMachineShiftOpen(machineInfo, shiftConfig)) {
+            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.schedule.machineShiftClosed"));
+        }
+    }
+
+    /**
+     * 查询机台资料。
+     *
+     * @param factoryCode 工厂编码
+     * @param machineCode 机台编码
+     * @return 机台资料，不存在时返回 null
+     */
+    private TmMachineInfo loadMachine(String factoryCode, String machineCode) {
+        List<TmMachineInfo> machineInfoList = this.machineInfoMapper.selectList(
+                new LambdaQueryWrapper<TmMachineInfo>()
+                        .eq(TmMachineInfo::getFactoryCode, factoryCode)
+                        .eq(TmMachineInfo::getMachineCode, StrUtil.trim(machineCode)));
+        return machineInfoList == null || machineInfoList.isEmpty() ? null : machineInfoList.get(0);
+    }
+
+    /**
+     * 查询班次配置。
+     *
+     * @param factoryCode 工厂编码
+     * @param shiftOrder 班次顺序
+     * @return 班次配置，不存在时返回 null
+     */
+    private TmShiftConfig loadShiftConfig(String factoryCode, Integer shiftOrder) {
+        List<TmShiftConfig> shiftConfigList = this.shiftConfigMapper.selectList(
+                new LambdaQueryWrapper<TmShiftConfig>()
+                        .eq(TmShiftConfig::getFactoryCode, factoryCode)
+                        .eq(TmShiftConfig::getShiftOrder, shiftOrder));
+        return shiftConfigList == null || shiftConfigList.isEmpty() ? null : shiftConfigList.get(0);
+    }
+
+    /**
+     * 判断机台是否开放指定班次编码。
+     *
+     * @param machineInfo 机台资料
+     * @param shiftConfig 班次配置
+     * @return true 表示机台允许当前班次
+     */
+    private boolean isMachineShiftOpen(TmMachineInfo machineInfo, TmShiftConfig shiftConfig) {
+        if (machineInfo == null || shiftConfig == null || StrUtil.isBlank(shiftConfig.getShiftCode())) {
+            return false;
+        }
+        Set<String> openShiftCodes = StrUtil.isBlank(machineInfo.getOpenShiftCode())
+                ? Collections.emptySet() : Arrays.stream(machineInfo.getOpenShiftCode().split(","))
+                .map(StrUtil::trim)
+                .filter(StrUtil::isNotBlank)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        return MachineOpenShiftCodeUtil.isMachineShiftOpen(openShiftCodes, shiftConfig.getShiftCode());
+    }
+
+    /**
+     * 读取指定班次计划量。
+     *
+     * @param scheduleResult 排程结果
+     * @param shiftOrder 班次顺序
+     * @return 非空计划量
+     */
+    private BigDecimal readPlanQty(TmScheduleResult scheduleResult, int shiftOrder) {
+        if (scheduleResult == null) {
+            return BigDecimal.ZERO;
+        }
+        Object value = scheduleResult.getFieldValueByFieldName(
+                String.format(TmScheduleConstants.SHIFT_PLAN_QTY_FIELD_TEMPLATE, shiftOrder));
+        return value instanceof BigDecimal ? (BigDecimal) value : BigDecimal.ZERO;
+    }
+}

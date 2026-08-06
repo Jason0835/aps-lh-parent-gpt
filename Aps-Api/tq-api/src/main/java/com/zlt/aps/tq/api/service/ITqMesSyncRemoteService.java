@@ -4,6 +4,7 @@ import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.tq.api.domain.entity.TqDayFinishQty;
 import com.zlt.aps.tq.api.domain.entity.TqScheFinishQty;
+import com.zlt.aps.tq.api.domain.entity.TqShiftStock;
 import com.zlt.aps.tq.api.domain.entity.TqStock;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
@@ -36,6 +37,28 @@ public interface ITqMesSyncRemoteService {
     AjaxResult logicDeleteAndSaveTqStockByStockDate(@RequestParam("stockDate") String stockDate,
                                                      @RequestParam("updateBy") String updateBy,
                                                      @RequestBody List<TqStock> list);
+
+    /**
+     * 替换胎圈自动滚动班次库存快照。
+     *
+     * <p>对齐胎面 ITmMesSyncRemoteService.replaceShiftStock，
+     * 由 aps-itf 的 syncBeadShiftStock 远程调用，先逻辑删除指定工厂+物理日+班序的旧快照，
+     * 再批量插入新快照。</p>
+     *
+     * @param factoryCode 工厂编码
+     * @param stockDate MES库存物理日期，格式：yyyy-MM-dd
+     * @param shiftOrder 班次顺序（1~6）
+     * @param updateBy 更新人
+     * @param stockList 班次库存列表，空集合表示清空快照
+     * @return 保存结果
+     */
+    @ApiOperation("替换胎圈自动滚动班次库存快照")
+    @PostMapping("/tqMesSync/replaceShiftStock")
+    AjaxResult replaceShiftStock(@RequestParam("factoryCode") String factoryCode,
+                                  @RequestParam("stockDate") String stockDate,
+                                  @RequestParam("shiftOrder") Integer shiftOrder,
+                                  @RequestParam("updateBy") String updateBy,
+                                  @RequestBody List<TqShiftStock> stockList);
 
     /**
      * 逻辑删除并批量保存胎圈排程完成量（事务性操作）

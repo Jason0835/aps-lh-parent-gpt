@@ -34,6 +34,9 @@ public final class TcScheduleConstants {
     /** 任务排序策略参数键。 */
     public static final String PARAM_TASK_SORT_STRATEGY = "TC_TASK_SORT_STRATEGY";
 
+    /** 自动排程中文过程日志级别参数键。 */
+    public static final String PARAM_PROCESS_LOG_LEVEL = "TC_PROCESS_LOG_LEVEL";
+
     /** 新规格回看天数参数键。 */
     public static final String PARAM_NEW_SPEC_LOOKBACK_DAYS = "TC_NEW_SPEC_LOOKBACK_DAYS";
 
@@ -164,6 +167,9 @@ public final class TcScheduleConstants {
     /** 通用排程策略默认编码。 */
     public static final String DEFAULT_SCHEDULE_STRATEGY = "DEFAULT";
 
+    /** 自动排程中文过程日志默认级别。 */
+    public static final String DEFAULT_PROCESS_LOG_LEVEL = "SUMMARY";
+
     /** 新规格回看天数默认值。 */
     public static final String DEFAULT_NEW_SPEC_LOOKBACK_DAYS = "7";
 
@@ -245,7 +251,7 @@ public final class TcScheduleConstants {
 
     /** 默认机台过滤规则链顺序。 */
     public static final String DEFAULT_FILTER_RULE_ORDER =
-            "MACHINE_STATUS,REMAIN_CAPACITY,MOUTH_PLATE,GLUE_MACHINE,SHARED_MACHINE,FIXED_MACHINE,EXCLUDE_FIXED";
+            "MACHINE_STATUS,MACHINE_OPEN_SHIFT,REMAIN_CAPACITY,MOUTH_PLATE,GLUE_MACHINE,SHARED_MACHINE,FIXED_MACHINE,EXCLUDE_FIXED";
 
     /** 默认启用单项机台过滤规则。 */
     public static final String DEFAULT_FILTER_RULE_ENABLED = "1";

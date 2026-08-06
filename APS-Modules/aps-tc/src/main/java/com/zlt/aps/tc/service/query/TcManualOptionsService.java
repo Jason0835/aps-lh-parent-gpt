@@ -252,6 +252,7 @@ public class TcManualOptionsService {
             optionVo.setMachineCode(machineInfo.getMachineCode());
             optionVo.setMachineName(machineInfo.getMachineName());
             optionVo.setMaxCapacity(machineInfo.getMaxCapacity());
+            optionVo.setOpenShiftCode(machineInfo.getOpenShiftCode());
             return optionVo;
         }).collect(Collectors.toList());
     }

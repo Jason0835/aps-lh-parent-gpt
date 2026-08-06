@@ -1,12 +1,11 @@
 package com.zlt.aps.xwyy.controller;
 
-import cn.hutool.core.date.DateException;
-import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.ImportLog;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.api.gateway.system.service.IImportLogService;
 import com.ruoyi.common.core.utils.DateUtils;
+import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
@@ -24,22 +23,12 @@ import com.zlt.common.utils.ImportExcelUtils;
 import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
-import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.CellType;
-import org.apache.poi.ss.usermodel.DataFormatter;
-import org.apache.poi.ss.usermodel.FormulaEvaluator;
-import org.apache.poi.ss.usermodel.Row;
-import org.apache.poi.ss.usermodel.Sheet;
-import org.apache.poi.ss.usermodel.Workbook;
-import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.math.BigDecimal;
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
@@ -131,69 +120,13 @@ public class XwyyScheduleResultController extends AbstractDocBizController<XwyyS
                 importContext.getProcedureCode(), importContext.getFunctionName(),
                 importContext.getOriFileName(), 1);
         importLog = this.iImportLogService.add(importLog);
-        List<XwyyScheduleResultTemplateImportVO> rows = new ArrayList<>();
-        AjaxResult ajaxResult;
-        try (Workbook workbook = WorkbookFactory.create(
-                new ByteArrayInputStream(importContext.getFileBytes()))) {
-            Sheet sheet = workbook.getSheetAt(0);
-            FormulaEvaluator evaluator = workbook.getCreationHelper().createFormulaEvaluator();
-            DataFormatter formatter = new DataFormatter();
-            Row dateRow = sheet.getRow(1);
-            Cell scheduleDateCell = dateRow == null ? null : dateRow.getCell(13);
-            Date scheduleDate = null;
-            if (scheduleDateCell != null && scheduleDateCell.getCellType() == CellType.NUMERIC) {
-                scheduleDate = org.apache.poi.ss.usermodel.DateUtil.getJavaDate(
-                        scheduleDateCell.getNumericCellValue());
-            } else if (scheduleDateCell != null) {
-                String dateText = formatter.formatCellValue(scheduleDateCell, evaluator).trim();
-                if (PubUtil.isNotEmpty(dateText)) {
-                    scheduleDate = DateUtil.parse(dateText);
-                }
-            }
-            if (scheduleDate == null) {
-                ajaxResult = AjaxResult.error(I18nUtil.getMessage(
-                        "ui.data.column.xwyyScheduleResult.importDateRequired"));
-            } else {
-                int[] planQuantityColumns = {10, 12, 14, 16, 18, 21, 23, 25};
-                for (int rowIndex = 3; rowIndex <= sheet.getLastRowNum(); rowIndex++) {
-                    Row row = sheet.getRow(rowIndex);
-                    if (row == null) {
-                        continue;
-                    }
-                    String bigRollCode = formatter.formatCellValue(
-                            row.getCell(0), evaluator).trim();
-                    if (!PubUtil.isNotEmpty(bigRollCode) || "合计".equals(bigRollCode)) {
-                        break;
-                    }
-                    XwyyScheduleResultTemplateImportVO item =
-                            new XwyyScheduleResultTemplateImportVO();
-                    item.setExcelRowNum(rowIndex + 1);
-                    item.setBigRollCode(bigRollCode);
-                    for (int classIndex = 1; classIndex <= 8; classIndex++) {
-                        String value = formatter.formatCellValue(
-                                row.getCell(planQuantityColumns[classIndex - 1]), evaluator)
-                                .replace(",", "").trim();
-                        BigDecimal quantity = PubUtil.isNotEmpty(value)
-                                ? new BigDecimal(value) : null;
-                        item.setFieldValueByFieldName(
-                                String.format("class%dPlanQty", classIndex), quantity);
-                    }
-                    rows.add(item);
-                }
-                XwyyScheduleResult condition = importDTO.getScheduleResult();
-                if (condition != null) {
-                    condition.setScheduleDate(DateUtil.beginOfDay(scheduleDate));
-                }
-                ajaxResult = this.service.importScheduleTemplate(
-                        rows, condition, updateSupport);
-            }
-        } catch (DateException exception) {
-            ajaxResult = AjaxResult.error(I18nUtil.getMessage(
-                    "ui.data.column.xwyyScheduleResult.importDateRequired"));
-        } catch (NumberFormatException exception) {
-            ajaxResult = AjaxResult.error(I18nUtil.getMessage(
-                    "ui.data.column.xwyyScheduleResult.importNumberInvalid"));
-        }
+        // 第1行按隐藏字段键匹配VO，第2至4行是标题和表头，从第5行开始读取导入明细
+        ExcelUtil<XwyyScheduleResultTemplateImportVO> excelUtil =
+                new ExcelUtil<>(XwyyScheduleResultTemplateImportVO.class);
+        List<XwyyScheduleResultTemplateImportVO> rows = excelUtil.importExcel(
+                new ByteArrayInputStream(importContext.getFileBytes()), 0, 4, -1);
+        AjaxResult ajaxResult = this.service.importScheduleTemplate(
+                rows, importDTO.getScheduleResult(), updateSupport);
         Date endTime = DateUtils.getNowDate();
         importLog.setRowCount(rows.size());
         importLog.setBeginTime(beginTime);

@@ -3,9 +3,7 @@ package com.zlt.aps.tm.engine.domain;
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.StrUtil;
 import com.ruoyi.common.exception.ServiceException;
-import com.zlt.aps.common.engine.schedule.MachineShiftTaskChain;
-import com.zlt.aps.common.engine.schedule.ScheduleTaskLinkedList;
-import com.zlt.aps.common.engine.schedule.ScheduleTaskNode;
+import com.zlt.aps.common.engine.schedule.*;
 import com.zlt.aps.tm.api.enums.TmScheduleErrorCodeEnum;
 import com.zlt.aps.tm.engine.service.TmAutoScheduleProgressListener;
 import com.zlt.aps.tm.engine.service.collector.TmAutoScheduleIssueCollector;
@@ -31,6 +29,9 @@ public class TmScheduleContext {
 
     /** 追踪标识 */
     private String traceId;
+
+    /** 本次自动排程中文过程日志缓冲。 */
+    private ScheduleProcessTraceBuffer processTraceBuffer = new ScheduleProcessTraceBuffer();
 
     /** 排程日期 */
     private Date scheduleDate;
@@ -61,6 +62,15 @@ public class TmScheduleContext {
 
     /** 规则证据，key=任务业务键 */
     private Map<String, TmRuleTrace> ruleTraceMap = new HashMap<>();
+
+    /** FULL 日志已消费的规则证据游标，key=任务业务键，value=已写入条数。 */
+    private Map<String, Integer> processRuleTraceCursorMap = new HashMap<>();
+
+    /** 当前正在执行的中文步骤名，失败日志用于指出中断位置。 */
+    private String currentProcessStep;
+
+    /** 已成功完成的中文步骤名。 */
+    private List<String> completedProcessSteps = new ArrayList<>();
 
     /** 本次落库转换汇总 */
     private TmPersistResult persistResult;
@@ -123,6 +133,76 @@ public class TmScheduleContext {
 
     /** 班次时间窗口映射，key=班次顺序(1~6)，来自 T_TM_SHIFT_CONFIG */
     private Map<Integer, TmShiftTimeWindow> shiftTimeWindowMap = new HashMap<>();
+
+    /** 成型计划已加载但按 TM_FORMING_SHIFT_OFFSET 偏移后无可排程班次时的细化提示，供响应阶段直接使用；为空表示未触发 */
+    private String emptyFormingTaskMessage;
+
+    /**
+     * 追加一条中文自动排程过程日志。
+     *
+     * @param format 日志格式，使用 MessageFormat 占位符
+     * @param args   日志参数
+     */
+    public void appendProcessLog(String format, Object... args) {
+        this.getOrCreateProcessTraceBuffer().appendSummary(format, args);
+    }
+
+    /**
+     * 追加一条完整中文过程事件。
+     *
+     * @param event 完整过程事件
+     */
+    public void appendFullProcessTrace(ScheduleProcessTraceEvent event) {
+        this.getOrCreateProcessTraceBuffer().appendFull(event);
+    }
+
+    /**
+     * 按参数配置过程日志级别。
+     *
+     * @param configuredValue 日志级别参数值
+     */
+    public void configureProcessLogLevel(String configuredValue) {
+        this.getOrCreateProcessTraceBuffer().configure(configuredValue);
+    }
+
+    /**
+     * 获取当前有效过程日志级别。
+     *
+     * @return 有效日志级别
+     */
+    public ScheduleProcessLogLevel getProcessLogLevel() {
+        return this.getOrCreateProcessTraceBuffer().getLevel();
+    }
+
+    /**
+     * 获取当前已收集的有效过程事件数量。
+     *
+     * @return 过程事件数量
+     */
+    public int getProcessLogEventCount() {
+        return this.getOrCreateProcessTraceBuffer().getEventCount();
+    }
+
+    /**
+     * 获取本次自动排程已收集的中文过程日志。
+     *
+     * @return 中文过程日志文本
+     */
+    public String getProcessLogText() {
+        return this.getOrCreateProcessTraceBuffer().render();
+    }
+
+    /**
+     * 获取过程日志缓冲器，避免反序列化或测试注入后出现空引用。
+     *
+     * @return 过程日志缓冲器
+     */
+    private ScheduleProcessTraceBuffer getOrCreateProcessTraceBuffer() {
+        if (this.processTraceBuffer == null) {
+            this.processTraceBuffer = new ScheduleProcessTraceBuffer();
+        }
+        return this.processTraceBuffer;
+    }
 
     /**
      * 获取下一个全局工装账本序号。

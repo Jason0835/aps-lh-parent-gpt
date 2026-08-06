@@ -168,6 +168,8 @@ public class TcManualOperationFacade {
                                     I18nUtil.getMessage("ui.tc.schedule.manual.concurrentChanged")));
                     this.validateExpectedVersion(expectedTaskVersion, current);
                     this.copyOperationBaseFields(current, changeResult);
+                    int shiftOrder = TcInsertPositionValidator.resolveShiftOrder(changeResult);
+                    this.machineRuleValidator.validateIncreaseOpenShift(current, changeResult, shiftOrder);
                     int affectedCount = this.rollingService.changeQtyAndRoll(changeResult);
                     List<TcScheduleResult> afterList = this.loadSnapshot(current,
                             Collections.singletonList(current.getMachineCode()));

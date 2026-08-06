@@ -11,17 +11,16 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.common.engine.quantity.PlanQuantityAllocationItem;
 import com.zlt.aps.common.engine.quantity.PlanQuantityAllocationUtils;
+import com.zlt.aps.common.engine.schedule.ScheduleProcessTraceEvent;
 import com.zlt.aps.common.engine.schedule.ScheduleTaskLinkedList;
 import com.zlt.aps.common.engine.schedule.ScheduleTaskNode;
 import com.zlt.aps.tc.api.constant.TcScheduleConstants;
-import com.zlt.aps.tc.api.domain.entity.TcScheduleExplainTargetRel;
-import com.zlt.aps.tc.api.domain.entity.TcScheduleResult;
-import com.zlt.aps.tc.api.domain.entity.TcScheduleResultExplain;
-import com.zlt.aps.tc.api.domain.entity.TcScheduleUnplanned;
+import com.zlt.aps.tc.api.domain.entity.*;
 import com.zlt.aps.tc.api.domain.vo.TcAutoScheduleResponseVo;
 import com.zlt.aps.tc.api.enums.TcAutoScheduleTaskStatusEnum;
 import com.zlt.aps.tc.api.enums.TcMachineAssignStatusEnum;
 import com.zlt.aps.tc.api.enums.TcScheduleRuleCodeEnum;
+import com.zlt.aps.tc.api.enums.TcScheduleStepEnum;
 import com.zlt.aps.tc.domain.TcAutoScheduleTask;
 import com.zlt.aps.tc.engine.domain.*;
 import com.zlt.aps.tc.engine.service.ITcSnapshotAndPersistService;
@@ -66,6 +65,9 @@ public class TcBizSnapshotAndPersistService implements ITcSnapshotAndPersistServ
 
     private final TcScheduleExplainTargetRelMapper scheduleExplainTargetRelMapper;
 
+    /** 胎侧自动排程过程日志 Mapper。 */
+    private final TcScheduleProcessLogMapper scheduleProcessLogMapper;
+
     private final TcAutoScheduleTaskMapper autoScheduleTaskMapper;
 
     /** 排程质量指标统一汇总服务。 */
@@ -86,6 +88,7 @@ public class TcBizSnapshotAndPersistService implements ITcSnapshotAndPersistServ
      * @param scheduleResultExplainMapper 胎侧排程解释 Mapper
      * @param scheduleUnplannedMapper     胎侧未排任务 Mapper
      * @param scheduleExplainTargetRelMapper 胎侧来源解释目标关联 Mapper
+     * @param scheduleProcessLogMapper    胎侧过程日志 Mapper
      * @param baseDao                     通用批量写入服务
      * @param transactionManager          事务管理器
      */
@@ -96,6 +99,7 @@ public class TcBizSnapshotAndPersistService implements ITcSnapshotAndPersistServ
                                           TcScheduleResultExplainMapper scheduleResultExplainMapper,
                                           TcScheduleUnplannedMapper scheduleUnplannedMapper,
                                           TcScheduleExplainTargetRelMapper scheduleExplainTargetRelMapper,
+                                          TcScheduleProcessLogMapper scheduleProcessLogMapper,
                                           TcAutoScheduleTaskMapper autoScheduleTaskMapper,
                                           TcScheduleQualitySummaryService qualitySummaryService,
                                           BaseDao baseDao,
@@ -106,6 +110,7 @@ public class TcBizSnapshotAndPersistService implements ITcSnapshotAndPersistServ
         this.scheduleResultExplainMapper = scheduleResultExplainMapper;
         this.scheduleUnplannedMapper = scheduleUnplannedMapper;
         this.scheduleExplainTargetRelMapper = scheduleExplainTargetRelMapper;
+        this.scheduleProcessLogMapper = scheduleProcessLogMapper;
         this.autoScheduleTaskMapper = autoScheduleTaskMapper;
         this.qualitySummaryService = qualitySummaryService;
         this.baseDao = baseDao;
@@ -135,7 +140,7 @@ public class TcBizSnapshotAndPersistService implements ITcSnapshotAndPersistServ
                                           BaseDao baseDao,
                                           PlatformTransactionManager transactionManager) {
         this(snapshotBuildService, persistService, scheduleResultMapper, scheduleResultExplainMapper,
-                scheduleUnplannedMapper, null, autoScheduleTaskMapper, qualitySummaryService,
+                scheduleUnplannedMapper, null, null, autoScheduleTaskMapper, qualitySummaryService,
                 baseDao, transactionManager);
     }
 
@@ -155,6 +160,7 @@ public class TcBizSnapshotAndPersistService implements ITcSnapshotAndPersistServ
         TcPersistResult persistResult = transactionTemplate.execute(transactionStatus -> {
             this.logicDeleteOldSchedule(context);
             TcPersistResult result = this.persistScheduleContext(context, transactionStatus);
+            this.saveScheduleProcessLog(context, result);
             this.markCoreTaskSuccess(context, result);
             return result;
         });
@@ -162,6 +168,139 @@ public class TcBizSnapshotAndPersistService implements ITcSnapshotAndPersistServ
             throw new ServiceException(I18nUtil.getMessage("ui.tc.schedule.persistFailed"));
         }
         context.setPersistResult(persistResult);
+    }
+
+    /**
+     * 在结果、未排和解释数据的同一事务内保存本批次中文过程日志。
+     *
+     * @param context       自动排程上下文
+     * @param persistResult 排程结果汇总
+     */
+    private void saveScheduleProcessLog(TcScheduleContext context, TcPersistResult persistResult) {
+        if (context == null) {
+            return;
+        }
+        this.appendFinalScheduleSummary(context);
+        this.appendPersistMappingAndConservation(context, persistResult);
+        context.appendProcessLog("落库完成：结果数量={0}，未排数量={1}，解释数量={2}，异常数量={3}",
+                persistResult == null ? 0 : persistResult.getResultCount(),
+                persistResult == null ? 0 : persistResult.getUnplannedCount(),
+                persistResult == null ? 0 : persistResult.getExplainCount(),
+                persistResult == null ? 0 : persistResult.getErrorCount());
+        context.getCompletedProcessSteps().add(TcScheduleStepEnum.SNAPSHOT_BUILD.getDesc());
+        context.setCurrentProcessStep(null);
+        context.appendProcessLog("步骤完成：快照与落库；自动排程批次成功完成，批次号={0}", context.getBatchNo());
+        context.appendFullProcessTrace(new ScheduleProcessTraceEvent(
+                "快照与落库", "批次级", "批次成功完成",
+                "结果表、未排表、解释表和本批次过程事件。",
+                "结果数量=" + (persistResult == null ? 0 : persistResult.getResultCount()) + "，未排数量="
+                        + (persistResult == null ? 0 : persistResult.getUnplannedCount()) + "，解释数量="
+                        + (persistResult == null ? 0 : persistResult.getExplainCount()) + "。",
+                "结果、未排、解释和过程日志必须在同一最终事务内完成。",
+                "已完成数量守恒校验，并在写过程日志前追加成功尾部。",
+                "批次=" + context.getBatchNo() + "，状态=成功，完整事件数="
+                        + (context.getProcessLogEventCount() + 1) + "。",
+                "本事件随结果、未排和解释数据一并提交，供测试人员按任务业务键追溯。"
+        ));
+        if (scheduleProcessLogMapper == null || StrUtil.isBlank(context.getProcessLogText())) {
+            return;
+        }
+        TcScheduleProcessLog processLog = new TcScheduleProcessLog();
+        processLog.setBatchNo(context.getBatchNo());
+        processLog.setLogDetail(context.getProcessLogText());
+        scheduleProcessLogMapper.insert(processLog);
+        log.info("胎侧自动排程过程日志已保存，批次号={}，日志长度={}", context.getBatchNo(),
+                processLog.getLogDetail().length());
+    }
+
+    /**
+     * 记录任务落库流向并校验来源最终计划量守恒。
+     *
+     * @param context       自动排程上下文
+     * @param persistResult 落库汇总
+     */
+    private void appendPersistMappingAndConservation(TcScheduleContext context, TcPersistResult persistResult) {
+        context.getTaskDraftList().forEach(task -> {
+            boolean unplanned = this.isUnplannedTask(task);
+            context.appendFullProcessTrace(new ScheduleProcessTraceEvent(
+                    "快照与落库", task.getBusinessKey(), unplanned ? "未排任务落库映射" : "已排结果落库映射",
+                    "机台分配后的任务片段、来源解释快照和最终班内顺序。",
+                    "胎侧=" + task.getSidewallCode() + "，机台="
+                            + StrUtil.blankToDefault(task.getMachineCode(), "未分配") + "，班次="
+                            + task.getShiftOrder() + "，计划量=" + this.nvl(task.getPlanQty()) + "米。",
+                    unplanned ? "未分配机台的剩余量写入未排表，并保留解释记录。"
+                            : "已分配机台的数量写入结果表，并按来源权重生成解释和目标关联。",
+                    "任务状态=" + (unplanned ? "未排" : "已排") + "，解释快照="
+                            + (context.getSnapshotMap().containsKey(task.getBusinessKey()) ? "已生成" : "由来源解释关联") + "。",
+                    "数量=" + this.nvl(task.getPlanQty()) + "米，流向=" + (unplanned ? "未排记录" : "排程结果") + "。",
+                    "与批次号、任务业务键、机台、班次和解释记录共同保存。"
+            ));
+        });
+        BigDecimal sourceFinalPlanQty = context.getSourceTaskDraftList().isEmpty()
+                ? context.getTaskDraftList().stream().map(TcTaskDraft::getPlanQty).map(this::nvl)
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                : context.getSourceTaskDraftList().stream().map(TcTaskDraft::getPlanQty).map(this::nvl)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal assignedQty = context.getTaskDraftList().stream().filter(task -> !this.isUnplannedTask(task))
+                .map(TcTaskDraft::getPlanQty).map(this::nvl).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal unplannedQty = context.getTaskDraftList().stream().filter(this::isUnplannedTask)
+                .map(TcTaskDraft::getPlanQty).map(this::nvl).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal difference = sourceFinalPlanQty.subtract(assignedQty.add(unplannedQty));
+        context.appendFullProcessTrace(new ScheduleProcessTraceEvent(
+                "快照与落库", "批次级", "最终计划量数量守恒校验",
+                "来源任务最终计划量、已排任务片段和未排任务片段。",
+                "来源最终计划量=" + sourceFinalPlanQty + "米，已排量=" + assignedQty + "米，未排量="
+                        + unplannedQty + "米。",
+                "来源最终计划量应等于已排量与未排量之和。",
+                sourceFinalPlanQty + "-（" + assignedQty + "+" + unplannedQty + "）=" + difference + "米。",
+                "守恒校验=" + (difference.compareTo(BigDecimal.ZERO) == 0 ? "通过" : "不通过")
+                        + "；落库汇总结果=" + (persistResult == null ? "未提供" : "已生成") + "。",
+                "随批次成功尾部写入过程日志，供测试验收。"
+        ));
+    }
+
+    /**
+     * 按最终机台、胎侧和胎胚汇总各班次已排量，供过程日志追溯最终排程结果。
+     *
+     * @param context 自动排程上下文
+     */
+    private void appendFinalScheduleSummary(TcScheduleContext context) {
+        Map<String, BigDecimal[]> quantityMap = new TreeMap<>();
+        Map<String, String[]> groupInfoMap = new HashMap<>();
+        context.getTaskDraftList().stream()
+                .filter(task -> !this.isUnplannedTask(task) && this.isPositiveQty(task.getPlanQty()))
+                .filter(task -> StrUtil.isNotBlank(task.getMachineCode()))
+                .forEach(task -> {
+                    String embryoCode = StrUtil.blankToDefault(task.getEmbryoCode(), "未提供");
+                    String groupKey = task.getMachineCode() + "\u0001" + task.getSidewallCode() + "\u0001" + embryoCode;
+                    BigDecimal[] classQtyArray = quantityMap.computeIfAbsent(groupKey, key -> new BigDecimal[6]);
+                    groupInfoMap.putIfAbsent(groupKey, new String[]{task.getMachineCode(), task.getSidewallCode(), embryoCode});
+                    Integer shiftOrder = task.getShiftOrder();
+                    if (shiftOrder != null && shiftOrder >= 1 && shiftOrder <= 6) {
+                        int arrayIndex = shiftOrder - 1;
+                        classQtyArray[arrayIndex] = this.nvl(classQtyArray[arrayIndex]).add(this.nvl(task.getPlanQty()));
+                    }
+                });
+        context.appendProcessLog("排程结果汇总：已排分组数量={0}", quantityMap.size());
+        quantityMap.forEach((groupKey, classQtyArray) -> {
+            String[] groupInfo = groupInfoMap.get(groupKey);
+            BigDecimal totalQty = Arrays.stream(classQtyArray).filter(Objects::nonNull)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            context.appendProcessLog("机台={0}，胎侧代码={1}（{2}）：总产量={3} 班1={4} 班2={5} 班3={6} 班4={7} 班5={8} 班6={9}",
+                    groupInfo[0], groupInfo[1], groupInfo[2], totalQty,
+                    this.nvl(classQtyArray[0]), this.nvl(classQtyArray[1]), this.nvl(classQtyArray[2]),
+                    this.nvl(classQtyArray[3]), this.nvl(classQtyArray[4]), this.nvl(classQtyArray[5]));
+        });
+    }
+
+    /**
+     * 空数值按零处理，避免日志汇总因缺失班次中断。
+     *
+     * @param value 数值
+     * @return 非空数值
+     */
+    private BigDecimal nvl(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO : value;
     }
 
     /**

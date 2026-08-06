@@ -84,6 +84,10 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
     @Resource
     private TmAutoScheduleTaskService tmAutoScheduleTaskService;
 
+    /** 失败批次过程日志独立保存服务。 */
+    @Resource
+    private TmFailedProcessLogService tmFailedProcessLogService;
+
     @Resource
     private TmAutoScheduleAsyncExecutor tmAutoScheduleAsyncExecutor;
 
@@ -504,8 +508,12 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
                         formatAutoPlanDate(context.getScheduleDate()),
                         context.getBatchNo(), context.getTraceId(), persistResult.getErrorCount(), persistResult.getLastErrorMsg());
             } else if (CollUtil.isEmpty(context.getTaskDraftList())) {
-                response.setMessage(resolveTmMessage("ui.data.alert.tm.schedule.noTaskGenerated",
-                        "No schedulable forming demand was loaded"));
+                String emptyTaskMessage = context.getEmptyFormingTaskMessage();
+                if (StrUtil.isBlank(emptyTaskMessage)) {
+                    emptyTaskMessage = resolveTmMessage("ui.data.alert.tm.schedule.noTaskGenerated",
+                            "No schedulable forming demand was loaded");
+                }
+                response.setMessage(emptyTaskMessage);
                 log.warn("{} step=NO_TASK_GENERATED factoryCode={}, scheduleDate={}, batchNo={}, traceId={}, reason=noSchedulableTask",
                         TmScheduleConstants.AUTO_PLAN_LOG_PREFIX, context.getFactoryCode(),
                         formatAutoPlanDate(context.getScheduleDate()), context.getBatchNo(), context.getTraceId());
@@ -540,6 +548,7 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
                     context == null ? response == null ? null : response.getBatchNo() : context.getBatchNo(),
                     context == null ? response == null ? request == null ? null : request.getTraceId() : response.getTraceId() : context.getTraceId(),
                     System.currentTimeMillis() - startMillis, ex.getClass().getSimpleName(), ex.getMessage());
+            this.saveFailedProcessLogSafely(context, autoScheduleTask, request, ex);
             tmAutoScheduleTaskService.markFailed(taskId, ex.getMessage(),
                     this.collectFailureIssues(context, ex));
             throw ex;
@@ -550,9 +559,35 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
                     context == null ? response == null ? null : response.getBatchNo() : context.getBatchNo(),
                     context == null ? response == null ? request == null ? null : request.getTraceId() : response.getTraceId() : context.getTraceId(),
                     System.currentTimeMillis() - startMillis, ex.getClass().getSimpleName(), ex.getMessage(), ex);
+            this.saveFailedProcessLogSafely(context, autoScheduleTask, request, ex);
             tmAutoScheduleTaskService.markFailed(taskId, ex.getMessage(),
                     this.collectFailureIssues(context, ex));
             throw ex;
+        }
+    }
+
+    /**
+     * 保存失败过程日志，保存异常只记录运行日志，不替换原排程异常。
+     *
+     * @param context          排程上下文，允许为空
+     * @param autoScheduleTask 自动排程任务
+     * @param request          自动排程请求，允许为空
+     * @param originalException 原始排程异常
+     */
+    private void saveFailedProcessLogSafely(TmScheduleContext context, TmAutoScheduleTask autoScheduleTask,
+                                            TmAutoScheduleRequestVo request,
+                                            RuntimeException originalException) {
+        try {
+            tmFailedProcessLogService.saveFailure(context,
+                    context == null ? autoScheduleTask.getBatchNo() : context.getBatchNo(),
+                    request == null ? null : request.getFactoryCode(),
+                    request == null ? null : request.getScheduleDate(), originalException);
+        } catch (RuntimeException processLogException) {
+            log.error("{} step=FAILED_PROCESS_LOG_SAVE_ERROR batchNo={}, originalExceptionType={}, saveExceptionType={}, saveMessage={}",
+                    TmScheduleConstants.AUTO_PLAN_LOG_PREFIX,
+                    context == null ? autoScheduleTask.getBatchNo() : context.getBatchNo(),
+                    originalException.getClass().getSimpleName(), processLogException.getClass().getSimpleName(),
+                    processLogException.getMessage(), processLogException);
         }
     }
 

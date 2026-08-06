@@ -95,8 +95,7 @@ export default {
           label: this.$t("ui.tm.depthConfig.column.maxMachineQty"),
           prop: "maxMachineQty",
           span: 12,
-          type: "number",
-          min: 1,
+          type: "input",
           tips: this.$t("ui.tm.depthConfig.maxMachineQtyTip"),
         },
         {
