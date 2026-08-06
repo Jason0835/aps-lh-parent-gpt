@@ -1006,6 +1006,9 @@ public class TargetScheduleQtyResolver {
             Date originalShiftEndTime = ShiftFieldUtil.getShiftEndTime(result, shift.getShiftIndex());
             if (currentShiftQty <= 0) {
                 ShiftFieldUtil.setShiftPlanQty(result, shift.getShiftIndex(), 0, null, null);
+                // 账本裁剪把班次清零后，必须同步清理“换胶囊”备注，保证备注只落在真实正量换胶囊班次上。
+                ShiftFieldUtil.removeShiftAnalysis(
+                        result, shift.getShiftIndex(), CapsuleReplacementRuleService.CAPSULE_REPLACEMENT_ANALYSIS);
             } else {
                 Date retainedShiftEndTime = currentShiftQty == planQty
                         ? originalShiftEndTime

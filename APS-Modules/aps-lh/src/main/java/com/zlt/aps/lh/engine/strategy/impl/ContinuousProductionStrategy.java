@@ -952,6 +952,10 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             applyMultiMachineEndingTargetRule(context, sourceSku, skuResults);
             log.info("续作同SKU多机台识别, materialCode: {}, 机台列表: {}, 是否多机台: {}",
                     sourceSku.getMaterialCode(), joinMachineCodes(skuResults), true);
+            // 多机台续作必须先抬高SKU目标量下限：满排模式下S4.3可能把目标量初始化为单台机台窗口产能，
+            // 多机台共用该目标量会在账本裁剪阶段把应保留的机台误裁为0（如 3302000467/3302001761/3302001508）。
+            // 收尾SKU按下限口径 MAX(硫化余量,胎胚库存)，非收尾按窗口剩余日计划与保留机台合计产能取大。
+            raiseMultiMachineContinuationTargetFloor(context, sourceSku, skuResults, shifts);
             // 降模排序规则只在当前续作 SKU 分组内生效，提前记录启用条件和清洗候选，便于对账最终下机顺序。
             logContinuationReduceSortRule(context, sourceSku, skuResults);
             // T 日原始月计划量与 T-1 相等时，必须先阻断所有首日快捷降模分支，并统一进入逐日降模链路。
@@ -2980,11 +2984,17 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         Set<String> machineCodeSet = new LinkedHashSet<String>(4);
         String normalizedProductStatus = StringUtils.trimToEmpty(sourceSku.getProductStatus());
         for (LhScheduleResult result : context.getPreviousScheduleResultList()) {
-            if (Objects.isNull(result) || Objects.isNull(result.getSpecEndTime())
+            if (Objects.isNull(result)
                     || StringUtils.isEmpty(result.getLhMachineCode())
                     || !StringUtils.equals(sourceSku.getMaterialCode(), result.getMaterialCode())
                     || !StringUtils.equals(normalizedProductStatus,
                     StringUtils.trimToEmpty(result.getProductStatus()))) {
+                continue;
+            }
+            // 前日在机判定不能只依赖 specEndTime：历史批次结果可能未回填收尾时间（如 8/4 批次
+            // SPEC_END_TIME 为 NULL），导致 T日==T-1日计划量相等保护被误判为“T日新增MES机台”而取消，
+            // 进而造成 3302000467 这类“不该降模却降模”问题。只要前日结果存在正计划量班次即视为在机。
+            if (Objects.isNull(result.getSpecEndTime()) && ShiftFieldUtil.resolveScheduledQty(result) <= 0) {
                 continue;
             }
             machineCodeSet.add(result.getLhMachineCode());
@@ -3412,6 +3422,65 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                 ? resolveEndingDemandQty(context, skuResults.get(0))
                 : Math.max(Math.max(0, sourceSku.getSurplusQty()), Math.max(0, sourceSku.getEmbryoStock()));
         return ShiftCapacityResolverUtil.roundUpQtyToMouldMultiple(endingDemandQty, sourceSku.getMouldQty());
+    }
+
+    /**
+     * 抬高续作多机台 SKU 目标量下限，防止满排模式单台机台窗口产能被误当成整组 SKU 目标量。
+     * <p>满排模式下 S4.3 的 {@code resolveInitialTargetQty} 会把目标量初始化为单台机台
+     * 理论窗口产能（如 128/144）。同一 SKU 由多台机台续作时，该目标量作为整组共享账本会
+     * 在扣账阶段把应保留的机台按结果列表顺序裁剪为 0，导致“该续作没有续作/该降模没降模/
+     * 减机台班次不对”等反复出现的问题。</p>
+     * <p>本方法在降模决策前统一收口：</p>
+     * <ul>
+     *   <li>收尾（严格上限）SKU：目标量按 MAX(硫化余量, 胎胚库存) 口径抬高，与主规格一致；</li>
+     *   <li>非收尾多机台：目标量取“窗口剩余日计划”和“保留机台合计窗口产能”的较大值，
+     *   保证 dayN 计划可以排完、保留机台不会被账本提前清零。</li>
+     * </ul>
+     *
+     * @param context 排程上下文
+     * @param sourceSku 来源续作SKU
+     * @param skuResults 同SKU续作机台结果
+     * @param shifts 排程窗口班次
+     */
+    private void raiseMultiMachineContinuationTargetFloor(LhScheduleContext context,
+                                                          SkuScheduleDTO sourceSku,
+                                                          List<LhScheduleResult> skuResults,
+                                                          List<LhShiftConfigVO> shifts) {
+        if (Objects.isNull(context) || Objects.isNull(sourceSku) || CollectionUtils.isEmpty(skuResults)) {
+            return;
+        }
+        int currentTargetQty = Math.max(0, sourceSku.resolveTargetScheduleQty());
+        int floorTargetQty = currentTargetQty;
+        String ruleName;
+        ProductionQuantityPolicy policy = ProductionQuantityPolicy.from(sourceSku, hasEndingResult(skuResults));
+        if (policy.isStrictUpperLimit()) {
+            // 收尾多机台目标量必须以 MAX(硫化余量,胎胚库存) 为准，不能停留在满排模式单机台产能。
+            floorTargetQty = Math.max(floorTargetQty,
+                    resolveMultiMachineEndingTargetQty(context, sourceSku, skuResults));
+            ruleName = "收尾多机台MAX(余量,胎胚库存)";
+        } else {
+            // 非收尾多机台：窗口剩余日计划决定本轮要排完的量，保留机台合计窗口产能决定满排上限，
+            // 两者取大后作为账本下限，保证按 dayN 保留的生产机台不会被后续裁剪清成 0。
+            int windowRemainingPlanQty = SkuDailyPlanQuotaUtil.sumRemainingQty(sourceSku.getDailyPlanQuotaMap());
+            int machineWindowCapacitySum = 0;
+            for (LhScheduleResult result : skuResults) {
+                machineWindowCapacitySum += calculateMachineWindowCapacity(context, result, shifts);
+            }
+            floorTargetQty = Math.max(floorTargetQty, Math.max(windowRemainingPlanQty, machineWindowCapacitySum));
+            ruleName = "非收尾多机台满排窗口产能";
+        }
+        if (floorTargetQty > currentTargetQty) {
+            // 抬高目标量必须同步覆盖实际消费账本，否则后续 capResultByProductionRemainingQty 仍按旧账本裁剪。
+            sourceSku.setTargetScheduleQty(floorTargetQty);
+            sourceSku.setRemainingScheduleQty(floorTargetQty);
+            getTargetScheduleQtyResolver().syncProductionRemainingQtyToTarget(
+                    context, sourceSku, floorTargetQty, "续作多机台目标量下限");
+        }
+        log.info("续作多机台目标量下限同步, materialCode: {}, productStatus: {}, 原目标量: {}, 下限目标量: {}, "
+                        + "窗口剩余日计划: {}, 机台数: {}, rule: {}",
+                sourceSku.getMaterialCode(), sourceSku.getProductStatus(), currentTargetQty, floorTargetQty,
+                SkuDailyPlanQuotaUtil.sumRemainingQty(sourceSku.getDailyPlanQuotaMap()),
+                skuResults.size(), ruleName);
     }
 
     /**
@@ -8532,6 +8601,10 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             ShiftFieldUtil.removeShiftAnalysis(result, shift.getShiftIndex(), ENDING_FILL_ANALYSIS);
             // 错峰后延写入的“错峰后延补量”备注同样在置零时清理，避免残留对账信息。
             ShiftFieldUtil.removeShiftAnalysis(result, shift.getShiftIndex(), ENDING_STAGGER_FILL_ANALYSIS);
+            // 班次被降模/释放置零后，“换胶囊”备注已不代表真实换胶囊班次，必须一并清理，
+            // 避免出现“零量班次仍备注换胶囊”的虚假记录（如 3302001761/K2016 class7）。
+            ShiftFieldUtil.removeShiftAnalysis(
+                    result, shift.getShiftIndex(), CapsuleReplacementRuleService.CAPSULE_REPLACEMENT_ANALYSIS);
             if (stopHold) {
                 ShiftFieldUtil.appendShiftAnalysis(result, shift.getShiftIndex(), "停产保机");
             }
@@ -9685,7 +9758,11 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             return;
         }
         Date rollingAppendStartTime = resolveRollingAppendStartTime(context, shifts);
-        for (LhScheduleResult result : context.getScheduleResultList()) {
+        // 多机台续作扣账必须按“保留机台优先”的顺序处理：共享账本不足时，先让降模规则选中的
+        // 保留机台（模具共用性/清洗/胶囊/机台编码排序靠前）拿到剩余量，再裁剪应下机机台，
+        // 避免按结果列表原始顺序裁剪导致应保留机台被清零、应下机机台反而满载（如 3302001761）。
+        List<LhScheduleResult> orderedResults = buildContinuousQuotaDeductOrder(context);
+        for (LhScheduleResult result : orderedResults) {
             if (!isPureContinuousResult(result) || StringUtils.isEmpty(result.getMaterialCode())) {
                 continue;
             }
@@ -9696,6 +9773,45 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             applyContinuousBlockToDailyQuota(context, sku, result, shifts, rollingAppendStartTime);
         }
         context.setContinuousDailyQuotaSynced(true);
+    }
+
+    /**
+     * 构建续作日计划账本扣减顺序：同SKU多机台组内按保留排序优先，组间保持原结果顺序。
+     *
+     * @param context 排程上下文
+     * @return 按扣账顺序排列的续作结果列表
+     */
+    private List<LhScheduleResult> buildContinuousQuotaDeductOrder(LhScheduleContext context) {
+        List<LhScheduleResult> orderedResults = new ArrayList<LhScheduleResult>(
+                context.getScheduleResultList().size());
+        // 先按原结果顺序收集同SKU多机台分组，保证SKU间处理顺序不变。
+        Map<String, List<LhScheduleResult>> groupResultMap = new LinkedHashMap<String, List<LhScheduleResult>>(8);
+        Map<String, SkuScheduleDTO> groupSkuMap = new LinkedHashMap<String, SkuScheduleDTO>(8);
+        for (LhScheduleResult result : context.getScheduleResultList()) {
+            if (!isPureContinuousResult(result) || StringUtils.isEmpty(result.getMaterialCode())) {
+                orderedResults.add(result);
+                continue;
+            }
+            SkuScheduleDTO sku = resolveResultSourceSku(context, result);
+            if (sku == null) {
+                orderedResults.add(result);
+                continue;
+            }
+            String groupKey = buildReduceMouldGroupKey(result, sku);
+            groupResultMap.computeIfAbsent(groupKey, key -> new ArrayList<LhScheduleResult>(4)).add(result);
+            groupSkuMap.putIfAbsent(groupKey, sku);
+        }
+        for (Map.Entry<String, List<LhScheduleResult>> entry : groupResultMap.entrySet()) {
+            List<LhScheduleResult> groupResults = entry.getValue();
+            SkuScheduleDTO sku = groupSkuMap.get(entry.getKey());
+            if (groupResults.size() > 1 && Objects.nonNull(sku)) {
+                // 多机台组内按保留排序（共享数升序、无清洗优先、胶囊次数降序、机台编码升序），
+                // 保证账本不足时优先保留降模规则选中的机台。
+                groupResults.sort(buildContinuationReduceKeepComparator(context, sku));
+            }
+            orderedResults.addAll(groupResults);
+        }
+        return orderedResults;
     }
 
     /**
