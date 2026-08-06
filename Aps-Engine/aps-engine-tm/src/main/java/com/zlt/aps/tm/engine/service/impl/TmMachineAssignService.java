@@ -2231,10 +2231,14 @@ public class TmMachineAssignService implements ITmMachineAssignService {
                 "选中机台的班次容量账本、检修计划、已排任务和切换扣减。",
                 "机台=" + (candidate == null ? "未提供" : candidate.getMachineCode()) + "，班次="
                         + task.getShiftOrder() + "，分配前待承接量=" + this.nvl(beforeAssignQty)
-                        + "米，分配前剩余产能=" + beforeRemainCapacity + "米。",
-                "本次分配量=min(分配前待承接量,扣除检修、已排、切换后的剩余产能)；超出部分按拆分规则处理。",
-                "规格切换扣减=" + currentSpecSwitchDeduct + "米，胶料切换扣减=" + currentGlueSwitchDeduct
-                        + "米；" + splitDesc + "。",
+                        + "米（本轮之前该任务尚未被机台承接的余量），分配前剩余产能=" + beforeRemainCapacity + "米。",
+                "分配前待承接量不是机台产能，而是本轮分配前该任务尚未被任何机台承接的计划量；首次承接取当前任务计划量，拆分、合并或顺延后取上一次分配后的剩余量。"
+                        + "本次分配量取任务待承接量与本轮可用机台产能中的较小值，超出部分按拆分规则处理。",
+                "本轮待承接量=" + this.nvl(beforeAssignQty) + "米；本次分配量=min("
+                        + this.nvl(beforeAssignQty) + ",本轮可用机台产能)=" + this.nvl(assignedQty)
+                        + "米；溢出量=max(" + this.nvl(beforeAssignQty) + "-" + this.nvl(assignedQty)
+                        + ",0)=" + this.nvl(overflowQty) + "米；规格切换扣减=" + currentSpecSwitchDeduct
+                        + "米，胶料切换扣减=" + currentGlueSwitchDeduct + "米；" + splitDesc + "。",
                 "本次分配=" + this.nvl(assignedQty) + "米，分配后剩余产能=" + afterRemainCapacity
                         + "米，溢出=" + this.nvl(overflowQty) + "米。",
                 this.nvl(overflowQty).compareTo(BigDecimal.ZERO) > 0

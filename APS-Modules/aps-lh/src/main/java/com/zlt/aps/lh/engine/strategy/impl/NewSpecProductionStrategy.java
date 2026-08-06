@@ -3908,7 +3908,10 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 }
             }
             if (scheduled) {
-                adjustSameSkuMultiMachineAllocation(context, sku, shifts, quantityPolicy, isEnding);
+                /*
+                 * 同SKU多机台收尾的班次分散/尾量归集已由续作阶段共用胎胚收尾均衡统一处理，
+                 * 此处不再执行新增侧后置搬量，避免与均衡结果冲突；原方法逻辑保留供排查。
+                 */
                 rebuildScheduledMachineCountMap(context, shifts);
             }
             if (!scheduled) {
@@ -8949,6 +8952,22 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         } else if (existingMachineCount <= 0) {
             // 普通新增首台（已落地同物料机台数为 0）无增机日：首个生产日应尽早开产，不推迟。
             return null;
+        }
+        /*
+         * 普通新增第 2+ 台：优先按原始 dayN 逐日推导“该机台真正被需要的业务日”，
+         * 避免扩机模拟日期列表偏移导致提前一天换模开产（如 3302001581 在 8/6 才需要第 2、3 台，
+         * 不应在 8/5 提前换模）。只有 dayN 推导为空（如强制欠产模式）时才回退模拟日期列表。
+         */
+        if (!isContinuationAddMachineCandidate(sku)) {
+            LocalDate dayNDerivedDate = DailyMachineExpansionPlanner.resolveFirstOriginalDayPlanAddMachineDate(
+                    context, sku, Math.max(1, existingMachineCount),
+                    ScheduleTypeEnum.NEW_SPEC.getCode());
+            if (Objects.nonNull(dayNDerivedDate)) {
+                log.info("新增SKU按dayN逐日推导增机生效日, materialCode: {}, existingMachineCount: {}, "
+                                + "dayNDerivedDate: {}, 原因: 普通新增第2+台以原始dayN节奏为准",
+                        sku.getMaterialCode(), existingMachineCount, dayNDerivedDate);
+                return dayNDerivedDate;
+            }
         }
         // 第 N 台（含补偿后续台、普通新增第 2+ 台、跨轮次）：优先使用本轮 dayN 模拟的
         // 增量生效日列表；列表为空（跨轮首台）时用公共 dayN 逐日判断按“已有同物料机台数”推导。

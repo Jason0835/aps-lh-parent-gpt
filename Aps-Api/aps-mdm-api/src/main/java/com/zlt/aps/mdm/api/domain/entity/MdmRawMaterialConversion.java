@@ -82,4 +82,10 @@ public class MdmRawMaterialConversion extends BaseEntity {
     @ApiModelProperty(value = "厂别", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
+
+    /** 示方类型，T 量试、X 试制、S 正式 */
+    @Excel(name = "ui.data.column.mdmRawMaterialConversion.constructionStage")
+    @ApiModelProperty(value = "示方类型", name = "constructionStage")
+    @TableField(value = "CONSTRUCTION_STAGE")
+    private String constructionStage;
 }
