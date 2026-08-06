@@ -533,7 +533,6 @@
   "ui.data.column.cd90MachineInfo.factoryCode": "Factory",
   "ui.data.column.cd90MachineInfo.machineCode": "Machine Code",
   "ui.data.column.cd90MachineInfo.machineName": "Machine Name",
-  "ui.data.column.cd90MachineInfo.isStickFilm": "Supports Film",
   "ui.data.column.cd90MachineInfo.clothWidthMax": "Cloth Width Max",
   "ui.data.column.cd90MachineInfo.clothWidthMin": "Cloth Width Min",
   "ui.data.column.cd90MachineInfo.quota": "Quota (m/shift)",

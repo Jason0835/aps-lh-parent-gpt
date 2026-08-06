@@ -1657,7 +1657,6 @@
   "ui.data.column.cd90MachineInfo.factoryCode": "Nhà máy",
   "ui.data.column.cd90MachineInfo.machineCode": "Mã máy",
   "ui.data.column.cd90MachineInfo.machineName": "Tên máy",
-  "ui.data.column.cd90MachineInfo.isStickFilm": "Hỗ trợ dán film",
   "ui.data.column.cd90MachineInfo.clothWidthMax": "Khổ vải tối đa",
   "ui.data.column.cd90MachineInfo.clothWidthMin": "Khổ vải tối thiểu",
   "ui.data.column.cd90MachineInfo.quota": "Định mức (m/ca)",

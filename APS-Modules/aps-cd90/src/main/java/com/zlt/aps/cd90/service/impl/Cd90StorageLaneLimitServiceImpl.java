@@ -23,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 import javax.annotation.Resource;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -142,6 +143,20 @@ public class Cd90StorageLaneLimitServiceImpl extends AbstractDocService<Cd90Stor
     protected List<String> getCheckUniqueFields() {
         // 唯一键去掉 MATERIAL_CODE:同库排同班次唯一(空库排或有帘布库排均唯一)
         return Arrays.asList("factoryCode", "laneDate", "shiftCode", "storageLaneCode");
+    }
+
+    @Override
+    public void logicDeleteAndSaveBatch(String factoryCode, Date laneDate, String shiftCode,
+                                        String updateBy, List<Cd90StorageLaneLimit> list) {
+        Date updateTime = new Date();
+        this.mapper.logicDeleteByScope(factoryCode, laneDate, shiftCode, updateBy, updateTime);
+        if (CollectionUtils.isNotEmpty(list)) {
+            int batchSize = 1000;
+            for (int startIndex = 0; startIndex < list.size(); startIndex += batchSize) {
+                int endIndex = Math.min(startIndex + batchSize, list.size());
+                baseDao.saveBatch(list.subList(startIndex, endIndex));
+            }
+        }
     }
 
     private boolean isTireFabricCodeExists(Cd90StorageLaneLimit entity, Set<String> tireFabricCodes) {

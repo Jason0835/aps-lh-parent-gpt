@@ -90,13 +90,13 @@ spring:
     nacos:
       discovery:
         # 服务注册地址
-        server-addr: 192.168.10.123:8848
+        server-addr: 192.168.10.145:8848
         group: APS_TEST_GROUP
         namespace: "jytest"
 #        ip: 192.168.2.7
       config:
         # 配置中心地址
-        server-addr: 192.168.10.123:8848
+        server-addr: 192.168.10.145:8848
         group: APS_TEST_GROUP
         namespace: "jytest"
         # 配置文件格式
@@ -226,9 +226,9 @@ spring:
         - prod
         - Special
   redis:
-    host: 192.168.2.93
+    host: 192.168.10.145
     port: 6379
-    password:
+    password: 123456
     database: 5
 
 

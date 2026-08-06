@@ -66,7 +66,7 @@ public class TokenUtils {
                 if (data instanceof Map) {
                     Map<?, ?> map = (Map<?, ?>) data;
                     String token = String.valueOf(map.get("access_token"));
-                    // 缓存30分钟
+                    // 缓存60分钟
                     redisService.setCacheObject(SYNC_TOKEN_KEY, token, 60L, TimeUnit.MINUTES);
                     log.info("同步用户登录成功");
                     return token;

@@ -145,14 +145,6 @@ public interface MesItfMapper {
     List<CxMesStock> selectMesEmbryoStockSixList(AuxReqSyncDataLogs syncDataLogs);
 
     /**
-     * 查询直裁库存同步数据（MES 中间表 T_MES_CD90_STOCK）
-     *
-     * @param syncDataLogs 参数（可传 dataVersion 过滤）
-     * @return 列表
-     */
-    List<Cd90MesStock> selectMesCd90StockList(AuxReqSyncDataLogs syncDataLogs);
-
-    /**
      * 实时查询MES生胎库存，直接映射为CxStock返回（不经过CxMesStock中间表）
      *
      * @param syncDataLogs 参数（可传factoryCode过滤分厂）

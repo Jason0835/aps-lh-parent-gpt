@@ -288,20 +288,6 @@
         <if test="queryParams.stockDate != null and queryParams.stockDate != ''">AND CONVERT(DATE, STOCK_DATE) = CONVERT(DATE, #{queryParams.stockDate})</if>
     </select>
 
-    <!-- 查询直裁库存同步数据（MES 中间表 T_MES_CD90_STOCK） -->
-    <select id="selectMesCd90StockList" resultType="com.zlt.aps.mp.api.domain.entity.Cd90MesStock">
-        SELECT
-        STOCK_DATE,
-        MATERIAL_CODE,
-        STOCK_NUM,
-        AVAILABLE_STOCK,
-        DATA_VERSION
-        FROM T_MES_CD90_STOCK
-        WHERE IS_DELETE = 0
-        AND MATERIAL_CODE IS NOT NULL
-        <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
-    </select>
-
     <!-- 实时查询MES生胎库存，直接映射为CxStock -->
     <select id="selectCxStockFromMes" resultType="com.zlt.aps.cx.api.domain.entity.CxStock">
         SELECT

@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.itf.mes.mapper.Cd90MesItfMapper">
+
+    <!-- 查询直裁库存同步数据 -->
+    <select id="selectStockList" resultType="com.zlt.aps.mp.api.domain.entity.Cd90MesStock">
+        SELECT
+        STOCK_DATE,
+        MATERIAL_CODE,
+        STOCK_NUM,
+        AVAILABLE_STOCK,
+        DATA_VERSION
+        FROM T_MES_CD90_STOCK
+        WHERE IS_DELETE = 0
+        AND STOCK_DATE IS NOT NULL
+        AND MATERIAL_CODE IS NOT NULL
+        <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
+    </select>
+
+    <!-- 查询直裁自动滚动目标班次库存；同一物理日取MES最新版本 -->
+    <select id="selectShiftStockList" resultType="com.zlt.aps.mp.api.domain.entity.Cd90MesStock">
+        SELECT
+        STOCK_DATE,
+        MATERIAL_CODE,
+        STOCK_NUM,
+        AVAILABLE_STOCK,
+        DATA_VERSION
+        FROM T_MES_CD90_STOCK
+        WHERE IS_DELETE = 0
+        AND CONVERT(DATE, STOCK_DATE) = CONVERT(DATE, #{stockDate})
+        <choose>
+            <when test="dataVersion != null and dataVersion != ''">
+                AND DATA_VERSION = #{dataVersion}
+            </when>
+            <otherwise>
+                AND DATA_VERSION = (
+                    SELECT MAX(DATA_VERSION)
+                    FROM T_MES_CD90_STOCK
+                    WHERE IS_DELETE = 0
+                    AND CONVERT(DATE, STOCK_DATE) = CONVERT(DATE, #{stockDate})
+                )
+            </otherwise>
+        </choose>
+    </select>
+
+    <!-- 查询直裁库排状态最新快照；MES实际表名或列名变化时仅调整本SQL -->
+    <select id="selectStorageLaneLimitList"
+            resultType="com.zlt.aps.cd90.api.domain.entity.Cd90StorageLaneLimit">
+        SELECT
+        FACTORY_CODE,
+        LANE_DATE,
+        SHIFT_CODE,
+        STORAGE_LANE_CODE,
+        MATERIAL_CODE,
+        CAR_NUM,
+        MAX_CAR_NUM,
+        AVAILABLE_CAR_NUM
+        FROM T_MES_CD90_STORAGE_LANE_LIMIT
+        WHERE IS_DELETE = 0
+        AND LANE_DATE IS NOT NULL
+        AND SHIFT_CODE IS NOT NULL
+        AND STORAGE_LANE_CODE IS NOT NULL
+        <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
+        <choose>
+            <when test="dataVersion != null and dataVersion != ''">
+                AND DATA_VERSION = #{dataVersion}
+            </when>
+            <otherwise>
+                AND DATA_VERSION = (
+                    SELECT MAX(DATA_VERSION)
+                    FROM T_MES_CD90_STORAGE_LANE_LIMIT
+                    WHERE IS_DELETE = 0
+                    <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
+                )
+            </otherwise>
+        </choose>
+    </select>
+
+    <!-- 查询直裁每日三班完成量同步数据（取业务键当天最新版本） -->
+    <select id="selectClassShiftFinishQtyList"
+            resultType="com.zlt.aps.cd90.api.domain.entity.Cd90ScheFinishQty">
+        SELECT
+        t.ORDER_NO,
+        t.SCHEDULE_DATE,
+        t.MACHINE_CODE,
+        t.BIG_ROLL_CODE,
+        t.CLOTH_CODE,
+        t.MATERIAL_CODE,
+        t.MES_MATERIAL_CODE,
+        t.CLASS1_FINISH_QTY,
+        t.CLASS2_FINISH_QTY,
+        t.CLASS3_FINISH_QTY,
+        t.CLASS1_UN_REASON,
+        t.CLASS2_UN_REASON,
+        t.CLASS3_UN_REASON,
+        t.CLASS1_PERSON,
+        t.CLASS2_PERSON,
+        t.CLASS3_PERSON,
+        t.DATA_VERSION,
+        t.COMPANY_CODE,
+        t.FACTORY_CODE
+        FROM MES_CD90_CLASS_SHIFT_FINISH_QTY t
+        INNER JOIN (
+            SELECT FACTORY_CODE, SCHEDULE_DATE, MACHINE_CODE, ORDER_NO, MAX(DATA_VERSION) AS MAX_VERSION
+            FROM MES_CD90_CLASS_SHIFT_FINISH_QTY
+            WHERE 1 = 1
+            <choose>
+                <when test="queryParams != null and queryParams.scheduleDate != null">
+                    AND CONVERT(DATE, SCHEDULE_DATE) = CONVERT(DATE, #{queryParams.scheduleDate})
+                </when>
+                <otherwise>
+                    AND CONVERT(DATE, SCHEDULE_DATE) = CONVERT(DATE, GETDATE())
+                </otherwise>
+            </choose>
+            <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
+            <if test="companyCode != null and companyCode != ''">AND COMPANY_CODE = #{companyCode}</if>
+            GROUP BY FACTORY_CODE, SCHEDULE_DATE, MACHINE_CODE, ORDER_NO
+        ) latest ON t.FACTORY_CODE = latest.FACTORY_CODE
+            AND t.SCHEDULE_DATE = latest.SCHEDULE_DATE
+            AND t.MACHINE_CODE = latest.MACHINE_CODE
+            AND t.ORDER_NO = latest.ORDER_NO
+            AND t.DATA_VERSION = latest.MAX_VERSION
+        WHERE 1 = 1
+        <choose>
+            <when test="queryParams != null and queryParams.scheduleDate != null">
+                AND CONVERT(DATE, t.SCHEDULE_DATE) = CONVERT(DATE, #{queryParams.scheduleDate})
+            </when>
+            <otherwise>
+                AND CONVERT(DATE, t.SCHEDULE_DATE) = CONVERT(DATE, GETDATE())
+            </otherwise>
+        </choose>
+        <if test="factoryCode != null and factoryCode != ''">AND t.FACTORY_CODE = #{factoryCode}</if>
+        <if test="companyCode != null and companyCode != ''">AND t.COMPANY_CODE = #{companyCode}</if>
+    </select>
+
+</mapper>

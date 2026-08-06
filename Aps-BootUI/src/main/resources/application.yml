@@ -33,7 +33,7 @@ ruoyi:
 
 #nacos服务器
 nacos:
-  server-addr: 192.168.10.123:8848
+  server-addr: 192.168.10.145:8848
 
 # 日志配置
 logging:
@@ -116,12 +116,12 @@ spring:
         refresh-enabled: true
   #这个不能用共享，它比nacos前注入
   redis:
-    host: 192.168.2.93
+    host: 192.168.10.145
     port: 6379
     password:
     database: 5
   zipkin:
-    baseUrl: "http://192.168.2.93:9411/"
+    baseUrl: "http://192.168.10.145:9411/"
     flushInterval: 3
     compression:
       enabled: true
