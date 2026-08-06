@@ -77,26 +77,30 @@ public class ContinuousProductionHandler extends AbsScheduleStepHandler {
         log.info("续作胎胚库存调整完成, 排程结果数: {}, 未排产数: {}",
                 context.getScheduleResultList().size(), context.getUnscheduledResultList().size());
 
-        // S4.4.4 降模排产：对同 SKU 多机台续作按 dayN 保障量和收尾规则释放冗余机台。
+        /*
+         * S4.4.4 续作降模、结构停产保机和共用胎胚收尾均衡：
+         * 1. 降模及其他续作数量修改先全部稳定；
+         * 2. 在续作日计划账本一次性扣减前，先判断结构停产保机，再执行共用胎胚多机台均衡；
+         * 3. 命中结构保机的机台在均衡中保持数量、收尾时间和收尾班次不变。
+         * 三个动作必须在同一续作策略内连续完成，避免先扣账后搬量产生二次账本调整。
+         */
         strategy.scheduleReduceMould(context);
-        log.info("续作降模排产完成, 排程结果数: {}, 未排产数: {}",
+        log.info("续作降模、结构停产保机及共用胎胚收尾均衡完成, 排程结果数: {}, 未排产数: {}",
                 context.getScheduleResultList().size(), context.getUnscheduledResultList().size());
 
-        // S4.4.5 收尾后换活字块衔接排产：必须放在降模之后，读取续作最终收口后的真实机台可用时间。
+        // S4.4.5 收尾后换活字块衔接排产：只读取结构保机和均衡后的最终机台可用时间，不得重新判断保机。
         typeBlockProductionStrategy.scheduleTypeBlockChange(context);
+        /*
+         * 换活字块可能由同结构SKU接管保机机台。这里只幂等同步接管后的占位和标识，
+         * 不重新统计结构机台数，保证已经进入停产保机状态的机台不会被后续阶段反向改判。
+         */
+        structureMinMachineRetentionService.synchronizeRetainedState(context);
         // 换活字块可能移出或回写待新增SKU，需重新构建结构视图供 S4.5 新增排序使用。
         context.rebuildStructureSkuMapFromPending(context.getNewSpecSkuList());
         log.info("换活字块衔接排产完成, 排程结果数: {}, 待新增SKU: {}",
                 context.getScheduleResultList().size(), context.getNewSpecSkuList().size());
 
-        /*
-         * S4.4.6 结构停产保机阶段判断：
-         * 必须等续作、降模和换活字块结果全部稳定后执行，并且必须早于S4.5新增SKU选机。
-         * 判断只使用当前结构最晚正量班次及该班次真实在机关系，不再在逐台下机时实时决策。
-         */
-        structureMinMachineRetentionService.applyRetentionAfterContinuousAndTypeBlock(context);
-
-        // S4.4.7 续作后全量启用机台排序日志：排序逻辑不变，只展示阶段判断后的真实机台状态。
+        // S4.4.6 续作后全量启用机台排序日志：排序逻辑不变，只展示均衡和换活字块后的真实机台状态。
         strategyFactory.getMachineMatchStrategy().traceEnabledMachineSort(context);
     }
 

@@ -7,9 +7,9 @@ import com.zlt.aps.lh.exception.ScheduleException;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.util.CollectionUtils;
 
 import java.util.ArrayList;
-import java.util.List;
 
 /**
  * 硫化排程模板方法抽象类。
@@ -167,10 +167,7 @@ public abstract class AbsLhScheduleTemplate {
         log.warn("排程在步骤[{}]被中断, 原因: {}", context.getCurrentStep(), context.getInterruptReason());
         String message = "排程中断[" + context.getCurrentStep() + "]: " + context.getInterruptReason();
         LhScheduleResponseDTO response = LhScheduleResponseDTO.fail(context.getBatchNo(), message);
-        List<String> validationErrors = context.getValidationErrorList();
-        if (validationErrors != null && !validationErrors.isEmpty()) {
-            response.setValidationErrors(new ArrayList<>(validationErrors));
-        }
+        this.fillValidationProblems(context, response);
         return response;
     }
 
@@ -185,7 +182,31 @@ public abstract class AbsLhScheduleTemplate {
         response.setScheduleResultCount(context.getScheduleResultList().size());
         response.setUnscheduledCount(context.getUnscheduledResultList().size());
         response.setMouldChangePlanCount(context.getMouldChangePlanList().size());
+        /*
+         * 收尾均衡等最终校验属于“记录问题但不中断排程”的后置检查。
+         * 因此成功响应也必须返回这些问题，不能只在中断响应中回传，否则调用方会误认为最终结果已全部满足约束。
+         */
+        this.fillValidationProblems(context, response);
         return response;
+    }
+
+    /**
+     * 将本次排程已发现的非阻断校验问题复制到响应对象。
+     *
+     * <p>上下文集合仍会继续用于过程日志及结果持久化，响应侧创建新集合，避免序列化或调用方修改响应时
+     * 污染排程上下文中的共享对象。</p>
+     *
+     * @param context 排程上下文
+     * @param response 排程响应对象
+     * @return void
+     */
+    private void fillValidationProblems(LhScheduleContext context, LhScheduleResponseDTO response) {
+        if (!CollectionUtils.isEmpty(context.getValidationErrorList())) {
+            response.setValidationErrors(new ArrayList<>(context.getValidationErrorList()));
+        }
+        if (!CollectionUtils.isEmpty(context.getValidationErrorDetailList())) {
+            response.setValidationErrorDetails(new ArrayList<>(context.getValidationErrorDetailList()));
+        }
     }
 
     /**

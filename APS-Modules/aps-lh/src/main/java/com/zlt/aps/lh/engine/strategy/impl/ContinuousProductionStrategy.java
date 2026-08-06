@@ -26,6 +26,7 @@ import com.zlt.aps.lh.api.enums.TrialStatusEnum;
 import com.zlt.aps.lh.component.CapsuleReplacementRuleService;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.component.OrderNoGenerator;
+import com.zlt.aps.lh.component.StructureMinMachineRetentionService;
 import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.ICapacityCalculateStrategy;
@@ -160,6 +161,12 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
      */
     @Resource
     private IEmbryoEndingBalanceStrategy embryoEndingBalanceStrategy;
+
+    /**
+     * 结构停产保机统一判断入口。必须在共用胎胚均衡前执行，命中机台由均衡策略直接排除。
+     */
+    @Resource
+    private StructureMinMachineRetentionService structureMinMachineRetentionService;
 
     @Resource
     private IFirstInspectionBalanceStrategy firstInspectionBalanceStrategy;
@@ -1034,9 +1041,9 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         // 日标准产量公式可能把收尾残班向上补足，扣账前必须复用严格收尾目标再次收口。
         capStrictEndingContinuationGroupsToTarget(
                 context, sourceSkuMap, skuResultMap, skuOrder, shifts);
-        // 共用胎胚收尾均衡可能移动班次量，扣账前再次恢复停产保机零产量和真正降模释放边界。
+        // 日标准和严格收口可能触碰零量保机班次，保机判断前再次恢复停产保机零量和降模释放边界。
         enforceContinuousStopHoldAndReleaseBoundaries(context, shifts);
-        // 均衡后的尾量分摊、日标准和严格目标必须先全部稳定，后续专用状态链才是最后一次数量修改。
+        // 普通续作的日标准与严格目标先稳定，后续同物料多状态专用链才作为保机判断前的最后数量修改器。
         this.applyDailyStandardPlanQtyToContinuousResults(context, shifts);
         this.capStrictEndingContinuationGroupsToTarget(
                 context, sourceSkuMap, skuResultMap, skuOrder, shifts);
@@ -1054,7 +1061,15 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
          */
         this.enforceRecordedCapsuleReplacementCapacityLimits(context, shifts);
         /*
-         * 共用胎胚/同SKU多机台收尾均衡：
+         * 结构停产保机必须先于共用胎胚收尾均衡执行。判断位于续作全部普通数量修改完成后，
+         * 但仍处于日计划账本一次性扣减之前，因此保机结论可以读取真实续作尾量，均衡也不会
+         * 形成扣账后的二次搬量。该服务是主链必需依赖，不允许因接线缺失而跳过，
+         * 否则停产保机机台可能被均衡错误改量。
+         */
+        this.structureMinMachineRetentionService
+                .applyRetentionAfterContinuousBeforeEndingBalance(context);
+        /*
+         * 共用胎胚多机台收尾均衡：
          * 1. 位于最后一次日标准收敛和严格收口之后、日计划账本扣减之前，作为续作阶段最后一个
          *    班次量修改器，避免日标准公式再次覆盖均衡结果；
          * 2. 跨物料互转通过 TargetScheduleQtyResolver.reallocateEmbryoStockSkuQuota 把互转量
@@ -1063,12 +1078,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
          *    和账本裁剪放行，避免补量被SKU普通额度回裁；
          * 4. 只做模拟换模计数和过程日志，不预占真实换模次数，后续换活字块和新增排产仍通过主链登记。
          */
-        if (Objects.nonNull(embryoEndingBalanceStrategy)) {
-            embryoEndingBalanceStrategy.balanceSharedEmbryoEnding(context, shifts);
-        } else {
-            log.warn("共用胎胚收尾均衡策略未注入，跳过均衡, scheduleDate: {}",
-                    context.getScheduleDate());
-        }
+        this.embryoEndingBalanceStrategy.balanceSharedEmbryoEnding(context, shifts);
         // 均衡后按“严格目标量+允许超量”口径做最终收口，只回裁真实超量，不回裁均衡豁免量。
         this.capStrictEndingContinuationGroupsToTarget(
                 context, sourceSkuMap, skuResultMap, skuOrder, shifts);

@@ -36,7 +36,7 @@ import java.util.Set;
 /**
  * 结构最低硫化机台数保留服务。
  *
- * <p>本服务在S4.4续作与换活字块全部完成后、S4.5新增排产开始前执行一次结构级判断。
+ * <p>本服务在S4.4续作数量全部稳定后、共用胎胚收尾均衡和换活字块排产之前执行一次结构级判断。
  * 判断不再使用“结构3天内收尾”条件，只读取当前真实排程结果、机台物料关系、业务停机窗口和
  * 结构最低机台配置，避免续作逐台下机顺序改变同一结构的最终判断口径。</p>
  *
@@ -169,7 +169,7 @@ public class StructureMinMachineRetentionService {
     }
 
     /**
-     * 在续作和换活字块排产完成后，按结构统一执行停产保机判断。
+     * 在续作数量稳定后、共用胎胚收尾均衡之前，按结构统一执行停产保机判断。
      *
      * <p>结构最晚生产班次只允许由计划量大于0的班次确定。清洗、精度、计划性维修及既有保机
      * 零量班次只参与该最晚班次的“是否仍在机”统计，不得把结构最晚生产班次向后推迟。</p>
@@ -177,9 +177,13 @@ public class StructureMinMachineRetentionService {
      * <p>命中后会复用各机台原结构结果行补零，并冻结前物料、前物料结构和最后实际生产时间。
      * 新增排产必须通过这些快照判断同结构放行或不同结构拦截，禁止读取已变化的机台当前物料。</p>
      *
+     * <p>本方法一旦命中保机，会冻结机台前物料、前结构、最后实际生产时间和统一释放时间。
+     * 后续共用胎胚均衡只允许读取这些状态并排除命中机台；换活字块、新增排产只能调用
+     * {@link #synchronizeRetainedState(LhScheduleContext)} 同步接管结果，不得重新执行本判断。</p>
+     *
      * @param context 排程上下文
      */
-    public void applyRetentionAfterContinuousAndTypeBlock(LhScheduleContext context) {
+    public void applyRetentionAfterContinuousBeforeEndingBalance(LhScheduleContext context) {
         if (Objects.isNull(context)) {
             return;
         }
