@@ -150,3 +150,41 @@ export function logicDeleteScheduleResult(ids) {
     params: { ids: ids }
   })
 }
+
+// ==================== 新人工操作接口（走任务链路径，支持锚点插入、resequence 重排、批量操作） ====================
+
+/** 人工插单（新接口，支持锚点插入） */
+export function insertTask(data) {
+  return request({
+    url: '/tq/scheduleResult/insertTask',
+    method: 'post',
+    data: data
+  })
+}
+
+/** 批量转机台（支持锚点、目标班次） */
+export function batchChangeMachine(data) {
+  return request({
+    url: '/tq/scheduleResult/batchChangeMachine',
+    method: 'post',
+    data: data
+  })
+}
+
+/** 批量调量 */
+export function batchChangeQty(data) {
+  return request({
+    url: '/tq/scheduleResult/batchChangeQty',
+    method: 'post',
+    data: data
+  })
+}
+
+/** 批量删除（删除后 resequence 重排） */
+export function batchDelete(ids) {
+  return request({
+    url: '/tq/scheduleResult/batchDelete',
+    method: 'post',
+    data: ids
+  })
+}

@@ -174,13 +174,6 @@ export default {
           // sortable: "custom",
         },
         {
-          label: this.$t("ui.data.column.machine.toolingInfo"),
-          prop: "toolingInfo",
-          minWidth: 100,
-          // sortable: "custom",
-          type: "number",
-        },
-        {
           label: this.$t("ui.data.column.machine.quata"),
           prop: "quata",
           minWidth: 100,

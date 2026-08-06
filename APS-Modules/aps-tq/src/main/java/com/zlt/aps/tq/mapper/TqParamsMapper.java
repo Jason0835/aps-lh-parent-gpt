@@ -1,33 +1,17 @@
 package com.zlt.aps.tq.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.zlt.aps.tq.api.domain.dto.TqParamsDto;
-import com.zlt.aps.tq.entity.TqParams;
-import org.apache.ibatis.annotations.Param;
-
-import java.util.List;
+import com.zlt.aps.tq.api.domain.entity.TqParams;
+import org.apache.ibatis.annotations.Mapper;
 
 /**
- * 胎圈参数信息Mapper接口
+ * 胎圈参数信息 Mapper接口（对齐胎面 TmParamsMapper）
  *
  * @author zlt
- * @date 2021-05-25
+ * @version 1.0
+ * @date 2025-12-12
  */
+@Mapper
 public interface TqParamsMapper extends BaseMapper<TqParams> {
-    /**
-     * 查询参数集合
-     *
-     * @param params 查询条件
-     * @return 查询到的结果
-     */
-    public List<TqParamsDto> listParams(TqParams params);
 
-    /**
-     * 检查胎圈参数代码唯一
-     *
-     * @param paramCode 参数代码
-     * @param id        胎圈参数信息 id
-     * @return 查询到的结果
-     */
-    public TqParams checkParamsCodeUnique(@Param("paramCode") String paramCode, @Param("id") Long id);
 }

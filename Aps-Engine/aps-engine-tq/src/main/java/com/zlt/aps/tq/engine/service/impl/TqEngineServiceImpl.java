@@ -291,7 +291,7 @@ public class TqEngineServiceImpl implements TqEngineService {
             this.newComputeSupplyTime(schedule, schedule.getStockQty());  //库存供应时长
             this.setStatusAndCloseTip(schedule, monthSurplus.get(schedule.getBeadCode()), params.getCloseOutNum());  //设置收尾提示标识 和 生产状态字段
             schedule.setUnitConsume(1D);  //单耗：1条胎对应2个钢丝圈
-            schedule.setIsRelease(ApsConstant.NO_RELEASE);
+            schedule.setReleaseStatus(ApsConstant.NO_RELEASE);
             schedule.setDelFlag(ApsConstant.DEL_FLAG_NORMAL);
             schedule.setCreateTime(new Date());
             schedule.setCreateBy(SecurityUtils.getUsername());
@@ -887,7 +887,7 @@ public class TqEngineServiceImpl implements TqEngineService {
                 autoSchedule.setOrderNo(existSchedule.getOrderNo());  //订单号
                 autoSchedule.setPublishSuccessCount(existSchedule.getPublishSuccessCount());
                 autoSchedule.setNewestPublishTime(existSchedule.getNewestPublishTime());
-                autoSchedule.setIsRelease(ApsConstant.WAIT_RELEASING);  //发布状态修改
+                autoSchedule.setReleaseStatus(ApsConstant.WAIT_RELEASING);  //发布状态修改
                 autoSchedule.setMachineCode(existSchedule.getMachineCode());  //机台沿用重排前的机台
                 mergeList.add(autoSchedule);
             } else if(existScheduleGroupList != null && existScheduleGroupList.size() > 1) {

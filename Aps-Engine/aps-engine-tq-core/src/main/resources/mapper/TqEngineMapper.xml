@@ -72,6 +72,7 @@
     </select>
 
     <!-- 同步胎圈排程结果到日志表（仅同步主表与日志表共有的字段，主表用IS_DELETE日志表用DEL_FLAG故不同步） -->
+    <!-- 注意：主表已将 IS_RELEASE 列统一迁移为 RELEASE_STATUS，日志表仍保留 IS_RELEASE 列名，故 select 时用别名对齐 -->
     <insert id="syncTqScheduleToLog">
         insert into T_TQ_SCHEDULE_RESULT_LOG (
             ID, SCHEDULE_DATE, CX_BATCH_NO, BATCH_NO, ORDER_NO, BEAD_CODE, STEEL_RING_CODE, TRIANGLE_GLUE_CODE, MACHINE_CODE, STOCK_QTY,
@@ -94,7 +95,7 @@
             CLASS5_PLAN_QTY, CLASS5_FINISH_QTY, CLASS5_SEQUENCE, CLASS5_ANALYSIS,
             CLASS6_PLAN_QTY, CLASS6_FINISH_QTY, CLASS6_SEQUENCE, CLASS6_ANALYSIS,
             CX_CLASS1_PLAN, CX_CLASS2_PLAN,
-            IS_RELEASE, REMARK, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME,
+            RELEASE_STATUS AS IS_RELEASE, REMARK, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME,
             DATA_SOURCE, TODAY_MORNING_PLAN_QTY, CLOSE_OUT_SPEC_FLAG, FACTORY_CODE,
             USE_BACKUP_CONFIG_FLAG, BACKUP_SHIFT_COUNT, BACKUP_TRIGGER_CLASS
         from T_TQ_SCHEDULE_RESULT
@@ -128,7 +129,7 @@
         CLASS5_PLAN_QTY, CLASS5_SEQUENCE, CLASS5_ANALYSIS,
         CLASS6_PLAN_QTY, CLASS6_SEQUENCE, CLASS6_ANALYSIS,
         CX_CLASS1_PLAN, CX_CLASS2_PLAN, CX_CLASS3_PLAN, CX_CLASS4_PLAN, CX_CLASS5_PLAN, CX_CLASS6_PLAN, CX_CLASS7_PLAN, CX_CLASS8_PLAN,
-        IS_RELEASE, REMARK, CREATE_BY, CREATE_TIME,
+        RELEASE_STATUS, REMARK, CREATE_BY, CREATE_TIME,
         CLOSE_OUT_SPEC_FLAG, TODAY_MORNING_PLAN_QTY, FACTORY_CODE, DATA_SOURCE,
         USE_BACKUP_CONFIG_FLAG, BACKUP_SHIFT_COUNT, BACKUP_TRIGGER_CLASS,
         EXPLAIN_JSON)
@@ -147,7 +148,7 @@
             #{schedule.cxClass3Plan,jdbcType=INTEGER},#{schedule.cxClass4Plan,jdbcType=INTEGER},
             #{schedule.cxClass5Plan,jdbcType=INTEGER},#{schedule.cxClass6Plan,jdbcType=INTEGER},
             #{schedule.cxClass7Plan,jdbcType=INTEGER},#{schedule.cxClass8Plan,jdbcType=INTEGER},
-            #{schedule.isRelease,jdbcType=VARCHAR},#{schedule.remark,jdbcType=VARCHAR},#{schedule.createBy,jdbcType=VARCHAR},#{schedule.createTime},
+            #{schedule.releaseStatus,jdbcType=VARCHAR},#{schedule.remark,jdbcType=VARCHAR},#{schedule.createBy,jdbcType=VARCHAR},#{schedule.createTime},
             #{schedule.closeOutSpecFlag,jdbcType=VARCHAR}, #{schedule.todayMorningPlanQty,jdbcType=DOUBLE}, #{schedule.factoryCode,jdbcType=VARCHAR}, #{schedule.dataSource,jdbcType=VARCHAR},
             #{schedule.useBackupConfigFlag,jdbcType=VARCHAR}, #{schedule.backupShiftCount,jdbcType=INTEGER}, #{schedule.backupTriggerClass,jdbcType=INTEGER},
             #{schedule.explainJson,jdbcType=CLOB}
@@ -189,7 +190,7 @@
     <select id="listTqParams" resultType="com.zlt.aps.tq.engine.vo.TqParamsVo">
         select param_code, param_value
         from T_TQ_PARAMS
-        where DEL_FLAG = '0'
+        where IS_DELETE = 0
     </select>
 
     <select id="getTqCurrentBatchNo" resultType="string" parameterType="string">
@@ -209,7 +210,7 @@
                IFNULL(CLASS5_PLAN_QTY,0) CLASS5_PLAN_QTY, CLASS5_FINISH_QTY, CLASS5_SEQUENCE, CLASS5_ANALYSIS,
                IFNULL(CLASS6_PLAN_QTY,0) CLASS6_PLAN_QTY, CLASS6_FINISH_QTY, CLASS6_SEQUENCE, CLASS6_ANALYSIS,
                CX_CLASS1_PLAN, CX_CLASS2_PLAN,
-               IS_RELEASE, REMARK, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME,
+               RELEASE_STATUS, REMARK, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME,
                DATA_SOURCE, TODAY_MORNING_PLAN_QTY, CLOSE_OUT_SPEC_FLAG, FACTORY_CODE,
                USE_BACKUP_CONFIG_FLAG, BACKUP_SHIFT_COUNT, BACKUP_TRIGGER_CLASS,
                EXPLAIN_JSON
@@ -243,7 +244,7 @@
         class5_plan_qty, class5_sequence, class5_analysis,
         class6_plan_qty, class6_sequence, class6_analysis,
         cx_class1_plan, cx_class2_plan, cx_class3_plan, cx_class4_plan, cx_class5_plan, cx_class6_plan, cx_class7_plan, cx_class8_plan,
-        is_release, mark_close_out_tip, production_status, remark, del_flag, create_by, create_time, data_Source, CLOSE_OUT_SPEC_FLAG,
+        release_status, mark_close_out_tip, production_status, remark, del_flag, create_by, create_time, data_Source, CLOSE_OUT_SPEC_FLAG,
         USE_BACKUP_CONFIG_FLAG, BACKUP_SHIFT_COUNT, BACKUP_TRIGGER_CLASS
         )
         VALUES
@@ -289,7 +290,7 @@
             #{schedule.cxClass6Plan,jdbcType=INTEGER},
             #{schedule.cxClass7Plan,jdbcType=INTEGER},
             #{schedule.cxClass8Plan,jdbcType=INTEGER},
-            #{schedule.isRelease,jdbcType=VARCHAR},
+            #{schedule.releaseStatus,jdbcType=VARCHAR},
             #{schedule.markCloseOutTip,jdbcType=VARCHAR},
             #{schedule.productionStatus,jdbcType=VARCHAR},
             #{schedule.remark,jdbcType=VARCHAR},

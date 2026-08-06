@@ -11,11 +11,13 @@ import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.tq.api.domain.dto.TqChangeMachineDTO;
 import com.zlt.aps.tq.api.domain.dto.TqInsertOrderDTO;
+import com.zlt.aps.tq.api.domain.dto.TqScheduleResultImportDTO;
 import com.zlt.aps.tq.api.domain.entity.TqMachineChuck;
 import com.zlt.aps.tq.api.domain.entity.TqMachineInfo;
 import com.zlt.aps.tq.api.domain.entity.TqMouthPlate;
 import com.zlt.aps.tq.api.domain.entity.TqScheduleResult;
 import com.zlt.aps.tq.api.domain.entity.TqSpecifyMachine;
+import com.zlt.aps.tq.api.domain.vo.TqInsertTaskRequestVo;
 import com.zlt.aps.tq.api.domain.vo.TqScheduleShiftDateVO;
 import com.zlt.aps.tq.engine.service.TqEngineService;
 import com.zlt.aps.tq.mapper.TqMachineChuckMapper;
@@ -24,6 +26,7 @@ import com.zlt.aps.tq.mapper.TqMouthPlateMapper;
 import com.zlt.aps.tq.mapper.TqScheduleResultMapper;
 import com.zlt.aps.tq.mapper.TqSpecifyMachineMapper;
 import com.zlt.aps.tq.service.ITqScheduleResultService;
+import com.zlt.aps.tq.service.ITqScheduleResultExcelService;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.PubUtil;
@@ -51,11 +54,15 @@ import java.util.stream.Collectors;
 @Slf4j
 @Api(tags = "胎圈排程结果")
 @RestController
-@RequestMapping("/scheduleResult")
+@RequestMapping("/tq/scheduleResult")
 public class TqScheduleResultController extends AbstractDocBizController<TqScheduleResult> {
 
     @Autowired
     private ITqScheduleResultService tqScheduleResultService;
+
+    /** 胎圈排程结果专用模板导入导出服务 */
+    @Resource
+    private ITqScheduleResultExcelService tqScheduleResultExcelService;
 
     @Resource
     private TqScheduleResultMapper tqScheduleResultMapper;
@@ -128,6 +135,50 @@ public class TqScheduleResultController extends AbstractDocBizController<TqSched
         return super.exportData(queryVO, fileName, response);
     }
 
+    /**
+     * 按专用模板导出胎圈排程结果。
+     *
+     * @param queryVO 工厂和单日排程条件
+     * @param fileName 文件名称
+     * @return Excel 文件字节
+     */
+    @Log(title = "胎圈排程结果", businessType = BusinessType.EXPORT)
+    @ApiOperation("按专用模板导出胎圈排程结果")
+    @PostMapping("/exportDataScheduleResult")
+    public byte[] exportDataScheduleResult(@RequestBody TqScheduleResult queryVO,
+                                            @RequestParam("fileName") String fileName) {
+        return this.tqScheduleResultExcelService.exportDataScheduleResult(queryVO, fileName);
+    }
+
+    /**
+     * 按专用模板导入胎圈排程结果。
+     *
+     * @param importDTO 文件和工厂日期上下文
+     * @param updateSupport 是否允许覆盖更新
+     * @return 导入结果和行级错误
+     * @throws Exception 文件解析或日志处理失败时抛出
+     */
+    @Log(title = "胎圈排程结果", businessType = BusinessType.IMPORT)
+    @ApiOperation("按专用模板导入胎圈排程结果")
+    @PostMapping("/importDataScheduleResult")
+    public AjaxResult importDataScheduleResult(@RequestBody TqScheduleResultImportDTO importDTO,
+                                                @RequestParam("updateSupport") boolean updateSupport)
+            throws Exception {
+        return this.tqScheduleResultExcelService.importDataScheduleResult(importDTO, updateSupport);
+    }
+
+    /**
+     * 下载胎圈排程结果空白导入模板。
+     *
+     * @param queryVO 查询条件（用于填充模板标题日期）
+     * @return 空白模板文件字节
+     */
+    @ApiOperation("下载胎圈排程结果空白导入模板")
+    @PostMapping("/downloadTemplate")
+    public byte[] downloadTemplate(@RequestBody TqScheduleResult queryVO) {
+        return this.tqScheduleResultExcelService.downloadTemplate(queryVO);
+    }
+
     @Override
     protected IDocService getDocService() {
         return tqScheduleResultService;
@@ -145,6 +196,19 @@ public class TqScheduleResultController extends AbstractDocBizController<TqSched
     }
 
     /**
+     * 导出数据查询（框架默认导出逻辑调用）。
+     * 注意：isDelete 已由框架通过注解自动过滤，禁止手动追加条件
+     *
+     * @param obj 导出查询条件
+     * @return 导出数据列表
+     */
+    @Override
+    protected List<TqScheduleResult> listExportData(TqScheduleResult obj) {
+        LambdaQueryWrapper<TqScheduleResult> wrapper = this.buildQueryWrapper(obj);
+        return tqScheduleResultMapper.selectList(wrapper);
+    }
+
+    /**
      * 构建查询条件
      * 注意：isDelete 已由框架通过注解自动过滤，禁止手动追加条件
      */
@@ -154,8 +218,10 @@ public class TqScheduleResultController extends AbstractDocBizController<TqSched
         wrapper.like(PubUtil.isNotEmpty(queryVO.getBeadCode()), TqScheduleResult::getBeadCode, queryVO.getBeadCode());
         wrapper.like(PubUtil.isNotEmpty(queryVO.getProSize()), TqScheduleResult::getProSize, queryVO.getProSize());
         wrapper.like(PubUtil.isNotEmpty(queryVO.getTriangleGlueCode()), TqScheduleResult::getTriangleGlueCode, queryVO.getTriangleGlueCode());
-        wrapper.eq(PubUtil.isNotEmpty(queryVO.getIsRelease()), TqScheduleResult::getIsRelease, queryVO.getIsRelease());
+        wrapper.eq(PubUtil.isNotEmpty(queryVO.getReleaseStatus()), TqScheduleResult::getReleaseStatus, queryVO.getReleaseStatus());
         wrapper.eq(PubUtil.isNotEmpty(queryVO.getMachineCode()), TqScheduleResult::getMachineCode, queryVO.getMachineCode());
+        // 分厂条件：按工厂过滤排程结果
+        wrapper.eq(PubUtil.isNotEmpty(queryVO.getFactoryCode()), TqScheduleResult::getFactoryCode, queryVO.getFactoryCode());
         // 默认排序：排程日期倒序、机台号正序、一班次顺序正序
         wrapper.orderByDesc(TqScheduleResult::getScheduleDate);
         wrapper.orderByAsc(TqScheduleResult::getMachineCode);
@@ -385,6 +451,51 @@ public class TqScheduleResultController extends AbstractDocBizController<TqSched
     @PostMapping("/logicDelete")
     public AjaxResult logicDelete(@RequestBody List<Long> ids) {
         return tqScheduleResultService.logicDeleteByIds(ids);
+    }
+
+    // ==================== 新人工操作接口（走任务链路径） ====================
+
+    /**
+     * 人工插单（新接口，支持锚点插入、resequence 重排）。
+     *
+     * <p>当 anchorTaskId 不为空时，在锚点任务之后插入，锚点之后任务 sequence +1；
+     * 否则按 class1Sequence 等顺序字段插入，顺序为空时追加链尾。</p>
+     */
+    @Log(title = "胎圈排程结果", businessType = BusinessType.INSERT_OR_UPDATE)
+    @ApiOperation("人工插单（新接口，支持锚点）")
+    @PostMapping("/insertTask")
+    public AjaxResult insertTask(@RequestBody TqInsertTaskRequestVo vo) {
+        return tqScheduleResultService.insertTask(vo);
+    }
+
+    /**
+     * 批量转机台（走任务链路径，支持锚点、目标班次）。
+     */
+    @Log(title = "胎圈排程结果", businessType = BusinessType.CHANGE_MACHINE)
+    @ApiOperation("批量转机台")
+    @PostMapping("/batchChangeMachine")
+    public AjaxResult batchChangeMachine(@RequestBody List<TqScheduleResult> list) {
+        return tqScheduleResultService.batchChangeMachine(list);
+    }
+
+    /**
+     * 批量调量（走任务链路径）。
+     */
+    @Log(title = "胎圈排程结果", businessType = BusinessType.CHANGE_QTY)
+    @ApiOperation("批量调量")
+    @PostMapping("/batchChangeQty")
+    public AjaxResult batchChangeQty(@RequestBody List<TqScheduleResult> list) {
+        return tqScheduleResultService.batchChangeQty(list);
+    }
+
+    /**
+     * 批量删除（走任务链路径，删除后 resequence 重排）。
+     */
+    @Log(title = "胎圈排程结果", businessType = BusinessType.DELETE)
+    @ApiOperation("批量删除")
+    @PostMapping("/batchDelete")
+    public AjaxResult batchDelete(@RequestBody List<Long> ids) {
+        return tqScheduleResultService.batchDelete(ids);
     }
 
     /**

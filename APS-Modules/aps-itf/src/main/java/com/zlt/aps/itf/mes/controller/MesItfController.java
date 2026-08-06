@@ -580,6 +580,21 @@ public class MesItfController {
     }
 
     /**
+     * 同步胎圈自动滚动班次库存。
+     *
+     * <p>对齐胎面 syncTreadShiftStock，按工厂+物理日+班序从 MES 同步最新胎圈库存快照。</p>
+     *
+     * @param request 工厂、物理库存日和班序
+     * @return 同步结果
+     */
+    @ApiOperation("同步胎圈自动滚动班次库存")
+    @PostMapping("/syncBeadShiftStock")
+    @AutoLoginLog
+    public AjaxResult syncBeadShiftStock(@RequestBody MesShiftStockSyncRequest request) {
+        return this.mesItfService.syncBeadShiftStock(request);
+    }
+
+    /**
      * 同步胎圈库存
      * @param syncDataLogs 参数
      * @return 结果

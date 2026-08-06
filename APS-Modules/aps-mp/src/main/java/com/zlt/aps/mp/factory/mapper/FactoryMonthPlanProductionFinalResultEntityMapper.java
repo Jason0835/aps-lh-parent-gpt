@@ -71,7 +71,9 @@ public interface FactoryMonthPlanProductionFinalResultEntityMapper extends CommB
     /**
      * 独立SELECT查询calc结果（定稿场景）：与 selectCalcOverProd 的区别是多了 INNER JOIN T_MP_PROC_VERSION 过滤已定稿版本
      * <p>
-     * 用于 updateLastMonthOverProdFlagOnFinalized 场景，只计算已定稿(IS_FINAL='1')的上月定稿记录。
+     * 用于 updateLastMonthOverProdFlagOnFinalized 场景，只计算已定稿（IS_FINAL='1'）的上月定稿记录，
+     * 避免把未定稿版本的数据也纳入有效标识重算范围。
+     * 计算逻辑同 selectCalcOverProd，返回 (分厂+物料+产品状态) 维度的计划量、完成量、强制置零标识、库存抓取日缺失标识。
      * </p>
      *
      * @param lastYear              数据来源月年份
@@ -79,7 +81,7 @@ public interface FactoryMonthPlanProductionFinalResultEntityMapper extends CommB
      * @param startDate             数据来源月开始日期（用于 STOCK_CAPTURE_DATE 为空时回退）
      * @param endDate               数据来源月结束日期（月底边界）
      * @param stockCaptureDateList  Java层计算好的库存抓取日映射列表
-     * @return calc结果列表（含计划量、完成量、强制置零标识）
+     * @return calc结果列表（含计划量、完成量、强制置零标识、库存抓取日缺失标识）
      */
     List<CalcOverProdDTO> selectCalcOverProdForFinalized(@Param("lastYear") Integer lastYear,
                                                          @Param("lastMonth") Integer lastMonth,
@@ -107,6 +109,30 @@ public interface FactoryMonthPlanProductionFinalResultEntityMapper extends CommB
                                 @Param("currentMonth") Integer currentMonth,
                                 @Param("overdueThresholdParamCode") String overdueThresholdParamCode,
                                 @Param("calcList") List<CalcOverProdDTO> calcList);
+
+    /**
+     * 按Java层传入的calc结果直接更新当月定稿表的上月超欠产有效标识（仅更新标识，不更新超欠产值）
+     * <p>
+     * 与 updateLastMonthOverProd 的区别：本方法只更新 LAST_MONTH_VALID_FLAG，不更新 LAST_MONTH_OVERDUE_QTY。
+     * 用于定稿场景下重算有效标识，calc结果应来自 selectCalcOverProdForFinalized（仅含已定稿版本）。
+     * </p>
+     * 匹配维度：按 (分厂+物料编码+产品状态) 三字段维度匹配回填
+     * 有效标志判定规则：
+     *   - 强制置零（FORCE_ZERO=1）→ '1'（是）
+     *   - 库存抓取日缺失（STOCK_CAPTURE_DATE_MISSING=1）→ NULL（放空）
+     *   - |超欠产值|(绝对值) > 阈值参数 → '0'（否）
+     *   - 否则 → '1'（是）
+     *
+     * @param currentYear              当月年份
+     * @param currentMonth             当月月份
+     * @param overdueThresholdParamCode 超欠产有效标志判定阈值参数编码
+     * @param calcList                 Java层先SELECT出的calc结果列表（建议来自 selectCalcOverProdForFinalized）
+     * @return 更新记录数
+     */
+    int updateLastMonthOverProdFlag(@Param("currentYear") Integer currentYear,
+                                    @Param("currentMonth") Integer currentMonth,
+                                    @Param("overdueThresholdParamCode") String overdueThresholdParamCode,
+                                    @Param("calcList") List<CalcOverProdDTO> calcList);
 
     /**
      * 查询上月定稿存在但当月定稿缺失的超欠产记录（用于 Java 层补充工单号后批量插入）
@@ -151,29 +177,6 @@ public interface FactoryMonthPlanProductionFinalResultEntityMapper extends CommB
                                                                                @Param("endDate") String endDate,
                                                                                @Param("overdueThresholdParamCode") String overdueThresholdParamCode,
                                                                                @Param("stockCaptureDateList") List<StockCaptureDateDTO> stockCaptureDateList);
-
-    /**
-     * 按Java层传入的calc结果直接更新当月定稿记录的上月超欠产有效标识（只更新标识，不更新值）
-     * <p>
-     * 不再在UPDATE语句中子查询T_MP_MONTH_PLAN_PROD_FINAL，避免MySQL对同一张表UPDATE+SELECT的行为异常。
-     * calc结果由Java层先调用 selectCalcOverProdForFinalized 查出，再传入本方法UPDATE。
-     * </p>
-     * 计算逻辑同 {@link #updateLastMonthOverProd}，仅 SET 子句移除 LAST_MONTH_OVERDUE_QTY，
-     * 保留 LAST_MONTH_VALID_FLAG 的阈值判定，确保标识判定结果与定时任务一致。
-     * 匹配维度：按 (分厂+物料编码+产品状态) 三字段维度匹配回填。
-     * 场景：次月定稿时（如6.25定稿7月），用上月（6月）数据补更新上月（6月）定稿记录的标识，
-     * 用于覆盖月初定时任务（6.1用5月数据）写入的旧标识，使标识反映最新的上月完成情况。
-     *
-     * @param currentYear              写入目标月份年份（与数据来源月相同）
-     * @param currentMonth             写入目标月份月份
-     * @param overdueThresholdParamCode 超欠产有效标志判定阈值参数编码
-     * @param calcList                 Java层先SELECT出的calc结果列表（通过 selectCalcOverProdForFinalized 查出）
-     * @return 更新记录数
-     */
-    int updateLastMonthOverProdFlag(@Param("currentYear") Integer currentYear,
-                                    @Param("currentMonth") Integer currentMonth,
-                                    @Param("overdueThresholdParamCode") String overdueThresholdParamCode,
-                                    @Param("calcList") List<CalcOverProdDTO> calcList);
 
     /**
      * 查询当月定稿表 PRODUCTION_NO 工单号最大值（用于 Java 层递增生成新工单号）

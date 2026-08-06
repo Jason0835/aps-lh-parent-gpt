@@ -1,47 +1,51 @@
 package com.zlt.aps.gsq.api.service;
 
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
-import com.zlt.aps.gsq.api.domain.dto.GsqParamsDto;
+import com.zlt.aps.gsq.api.domain.entity.GsqParams;
+import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 /**
- * 钢丝圈参数对外暴露接口
- * @author 89875
+ * 钢丝圈参数信息对外暴露接口（对齐胎圈 ITqParamsService）
+ *
+ * @author zlt
+ * @version 1.0
+ * @date 2025-12-12
  */
-@FeignClient(contextId = "IGsqParamsService", value = ServiceNameConstants.GATEWAY_SERVICE, path="${api.path.gsq:gsq}")
-public interface IGsqParamsService
-{
+@FeignClient(contextId = "IGsqParamsService", value = ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.gsq:gsq}")
+public interface IGsqParamsService {
 
-    /**
-     * 查询钢丝圈参数信息列表
-     */
-    @PostMapping("/gsq/params/list")
-    public TableDataInfo list(@RequestBody GsqParamsDto dto);
+    @ApiOperation("查询列表")
+    @PostMapping("/gsqParams/list")
+    TableDataInfo list(@RequestBody GsqParams queryVO);
 
-    /**
-     * 获取钢丝圈参数信息详细信息
-     */
-    @GetMapping("/gsq/params/{id}")
-    public GsqParamsDto getInfo(@PathVariable("id") Long id);
+    @ApiOperation("保存")
+    @PostMapping("/gsqParams/save")
+    AjaxResult save(GsqParams gsqParams);
 
-    /**
-     * 修改钢丝圈参数信息
-     */
-    @PostMapping("/gsq/params/edit")
-    public AjaxResult edit(@RequestBody GsqParamsDto dto);
+    @ApiOperation("删除")
+    @DeleteMapping("/gsqParams/remove")
+    AjaxResult removeByIds(@RequestBody List<Long> ids);
 
-    /**
-     * 导出接口
-     * @param dto
-     */
-    @PostMapping("/gsq/params/exportData")
-    List<GsqParamsDto> exportData(@RequestBody GsqParamsDto dto);
+    @ApiOperation("根据ID获取详细信息")
+    @GetMapping(value = "/gsqParams/{id}")
+    GsqParams getInfo(@PathVariable("id") Long id);
+
+    @ApiOperation("校验唯一性")
+    @PostMapping("/gsqParams/checkUnique")
+    String checkUnique(@RequestBody GsqParams gsqParamsVO);
+
+    @ApiOperation("导出列表")
+    @PostMapping("/gsqParams/exportData/{fileName}")
+    byte[] exportData(@RequestBody GsqParams queryVO, @PathVariable("fileName") String fileName);
+
+    @ApiOperation("导入数据")
+    @PostMapping("/gsqParams/importData")
+    AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport);
 }

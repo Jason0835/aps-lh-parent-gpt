@@ -1,5 +1,7 @@
 package com.zlt.aps.tq.service;
 
+import com.zlt.aps.tq.api.domain.dto.TqRollingRecalcRequestDTO;
+import com.zlt.aps.tq.api.domain.vo.TqRollingRecalcResponseVO;
 import com.zlt.aps.tq.engine.vo.RollingUpdateResult;
 
 import java.util.Date;
@@ -7,12 +9,10 @@ import java.util.Date;
 /**
  * 胎圈排程滚动更新Service接口
  *
- * <p>MVP阶段范围：</p>
+ * <p>对齐胎面 ITmRollingUpdateService，提供两类入口：</p>
  * <ul>
- *   <li>仅手动触发（插单/调量/转机台/删除后）</li>
- *   <li>仅同班次内的时间重算和顺序调整</li>
- *   <li>不实现跨班次推迟</li>
- *   <li>日志仅记录主表</li>
+ *   <li>{@link #manualRollingUpdate} 手动触发（插单/调量/转机台/删除后），仅同班次内的时间重算和顺序调整</li>
+ *   <li>{@link #rollingRecalcAutomatically} 自动触发（定时任务窗口命中），执行库存上下界调量算法</li>
  * </ul>
  *
  * @author APS
@@ -35,4 +35,23 @@ public interface ITqRollingUpdateService {
     RollingUpdateResult manualRollingUpdate(String triggerType, Long triggerSourceId,
                                             Date scheduleDate, int shiftIndex,
                                             String machineCode, String beadCode);
+
+    /**
+     * 自动滚动重算入口。
+     *
+     * <p>对齐胎面 TmRollingUpdateServiceImpl.rollingRecalcAutomatically，
+     * 由 TqAutoRollingApplicationService 在窗口锁内调用。</p>
+     *
+     * <p>执行步骤：</p>
+     * <ol>
+     *   <li>loadRollingContext 加载滚动上下文（复用 TqAutoScheduleDataLoadService 保证与自动排程同口径）</li>
+     *   <li>TransactionTemplate.execute 行锁 + 调量算法 + 持久化 + 审计</li>
+     *   <li>calculateAdjustments 库存上下界调量算法（参数化阈值）</li>
+     *   <li>validateAffectedReleaseStatuses 释放状态校验</li>
+     * </ol>
+     *
+     * @param request 重算请求（工厂、排程日期、库存日期、目标班次、操作人）
+     * @return 滚动重算响应（含幂等键、调整统计、跳过摘要）
+     */
+    TqRollingRecalcResponseVO rollingRecalcAutomatically(TqRollingRecalcRequestDTO request);
 }

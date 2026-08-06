@@ -348,11 +348,36 @@ public class TqScheduleResult extends BaseEntity implements Serializable {
     @TableField(value = "DATA_SOURCE")
     private String dataSource;
 
-    /** 是否发布 */
-    @Excel(name = "ui.data.column.tqScheduleResult.isRelease", dictType = "IS_RELEASE")
-    @ApiModelProperty(value = "是否发布", name = "isRelease")
-    @TableField(value = "IS_RELEASE")
-    private String isRelease;
+    /**
+     * 任务版本号（乐观锁）。
+     *
+     * <p>对齐胎面 TmScheduleResult.taskVersion，自动/人工滚动调量时自增，
+     * 防止并发覆盖。0表示未参与版本控制。</p>
+     */
+    @ApiModelProperty(value = "任务版本号（乐观锁，0表示未参与版本控制）", name = "taskVersion")
+    @TableField(value = "TASK_VERSION")
+    private Long taskVersion;
+
+    /**
+     * 发布状态（对齐胎面 TmScheduleResult.releaseStatus）。
+     *
+     * <p>值域与 ApsConstant 中常量保持一致，复用 IS_RELEASE 字典反显：</p>
+     * <ul>
+     *   <li>0-未发布（NO_RELEASE）</li>
+     *   <li>1-已发布（IS_RELEASE）</li>
+     *   <li>2-发布失败（FAILURE_RELEASE）</li>
+     *   <li>3-发布中（RELEASING）</li>
+     *   <li>4-超时失败（TIMEOUT_FAILURE）</li>
+     *   <li>5-待发布（WAIT_RELEASING）</li>
+     * </ul>
+     *
+     * <p>自动滚动调量前会校验影响范围内的结果是否处于可编辑状态，
+     * 非可编辑状态（已发布、发布中）会阻断本次调整。</p>
+     */
+    @Excel(name = "ui.data.column.tqScheduleResult.releaseStatus", dictType = "IS_RELEASE")
+    @ApiModelProperty(value = "发布状态（0-未发布 1-已发布 2-发布失败 3-发布中 4-超时失败 5-待发布）", name = "releaseStatus")
+    @TableField(value = "RELEASE_STATUS")
+    private String releaseStatus;
 
     /** 库存量 */
     @Excel(name = "ui.data.column.tqScheduleResult.stockQty")
@@ -405,8 +430,8 @@ public class TqScheduleResult extends BaseEntity implements Serializable {
     @TableField(exist = false)
     private Date scheduleDateQuery;
 
-    /** 分厂编码（查询参数，非数据库字段） */
-    @TableField(exist = false)
+    /** 分厂编码 */
+    @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 
     /**

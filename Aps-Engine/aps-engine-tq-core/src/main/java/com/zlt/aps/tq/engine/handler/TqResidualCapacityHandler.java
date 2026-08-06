@@ -116,6 +116,65 @@ public class TqResidualCapacityHandler extends AbsTqScheduleStepHandler {
         }
 
         log.info("[S5.6] 最终剩余产能回填完成, 机台数:{}", machineSpecMap.size());
+
+        // 总量截断保护：确保每个备库规格6班总排产不超过 backupTotalPlanQty
+        // 各阶段（S3.2回填+forwardDigest不完全消化、S5均衡调整、S5.5定额延后等）
+        // 可能导致总排产量超过备库总量上限，此处从最后一班开始逐班削减超排量
+        capBackupTotalPlanQty(scheduleList);
+    }
+
+    /**
+     * 总量截断保护：确保每个备库规格6班总排产不超过 backupTotalPlanQty。
+     *
+     * <p>背景：S2阶段 triggerBackupAndAllocate 计算出备库总量（backupTotalPlanQty）并分摊到各班次，
+     * 但后续阶段（S3.2回填+forwardDigest不完全消化、S5均衡调整、S5.5定额延后等）
+     * 可能导致6班总排产量超过备库总量上限。本方法从最后一班开始逐班削减超排量，
+     * 确保总量不超。</p>
+     *
+     * <p>削减策略：从第6班倒序削减，优先削减尾部班次，保持前序班次排产稳定。</p>
+     *
+     * @param scheduleList 排程列表
+     */
+    private void capBackupTotalPlanQty(List<TqScheduleResultVo> scheduleList) {
+        for (TqScheduleResultVo scheduleVo : scheduleList) {
+            // 仅处理备库胎圈
+            if (scheduleVo.getBackupTriggerClass() == null || scheduleVo.getBackupTriggerClass() <= 0) {
+                continue;
+            }
+            Double backupTotalPlanQty = scheduleVo.getBackupTotalPlanQty();
+            if (backupTotalPlanQty == null || backupTotalPlanQty <= 0) {
+                continue;
+            }
+
+            double totalScheduled = sumClassPlanQty(scheduleVo);
+            double overflow = BigDecimalUtil.sub(totalScheduled, backupTotalPlanQty);
+            if (overflow <= 0) {
+                continue;
+            }
+
+            // 从最后一班开始削减超排量
+            for (int classNum = 6; classNum >= 1 && overflow > 0; classNum--) {
+                double classPlan = getClassPlanQty(scheduleVo, classNum);
+                if (classPlan <= 0) {
+                    continue;
+                }
+                double deduct = Math.min(classPlan, overflow);
+                double newPlan = BigDecimalUtil.sub(classPlan, deduct);
+                setClassPlanQtyDirect(scheduleVo, classNum, newPlan);
+                overflow = BigDecimalUtil.sub(overflow, deduct);
+
+                log.info("[S5.6] 总量截断, 胎圈:{}, {}班削减{}, 剩余超排:{}",
+                        scheduleVo.getBeadCode(), classNum, deduct, overflow);
+            }
+
+            if (overflow > 0) {
+                log.warn("[S5.6] 总量截断后仍有超排, 胎圈:{}, 剩余超排:{}",
+                        scheduleVo.getBeadCode(), overflow);
+            }
+
+            // 截断后重算backupRemainingQty
+            scheduleVo.setBackupRemainingQty(0D);
+        }
     }
 
     /**
@@ -232,13 +291,22 @@ public class TqResidualCapacityHandler extends AbsTqScheduleStepHandler {
                 if (backupRemaining <= 0) {
                     continue;
                 }
+                // 总量上限保护：如果6班已排产量已达到备库总量，不再回填
+                // 防止S5均衡调整削减计划量后，S5.6 recalcBackupRemainingQty 误判为未排满而重复回填
+                double totalScheduled = sumClassPlanQty(spec);
+                double backupTotal = spec.getBackupTotalPlanQty() == null ? 0D : spec.getBackupTotalPlanQty();
+                if (totalScheduled >= backupTotal) {
+                    continue;
+                }
                 // 备库触发班次 > 当前班次时，当前班次库存充足不需要排产，不回填
                 // 典型场景：023规格3班才触发备库，1/2班库存充足不应被回填备库量
                 Integer backupTriggerClass = spec.getBackupTriggerClass();
                 if (backupTriggerClass != null && backupTriggerClass > classNum) {
                     continue;
                 }
-                double assignQty = Math.min(residualCapacity, backupRemaining);
+                // 回填量不超过备库总量与已排产量的差值，防止超排
+                double maxAssignable = BigDecimalUtil.sub(backupTotal, totalScheduled);
+                double assignQty = Math.min(Math.min(residualCapacity, backupRemaining), maxAssignable);
                 assignQty = applyRoundingIfNeeded(assignQty);
                 addClassPlanQty(spec, classNum, assignQty);
                 spec.setBackupRemainingQty(BigDecimalUtil.sub(backupRemaining, assignQty));
@@ -325,6 +393,14 @@ public class TqResidualCapacityHandler extends AbsTqScheduleStepHandler {
             if (isBackupSpec && backupRemaining <= 0) {
                 continue;
             }
+            // 总量上限保护：备库胎圈6班已排产量已达到备库总量时，不再回填
+            if (isBackupSpec) {
+                double totalScheduled = sumClassPlanQty(spec);
+                double backupTotal = spec.getBackupTotalPlanQty() == null ? 0D : spec.getBackupTotalPlanQty();
+                if (totalScheduled >= backupTotal) {
+                    continue;
+                }
+            }
             if (!isBackupSpec) {
                 double currentPlan = getClassPlanQty(spec, classNum);
                 if (currentPlan <= 0) {
@@ -348,11 +424,17 @@ public class TqResidualCapacityHandler extends AbsTqScheduleStepHandler {
                 continue;
             }
 
-            // 第6班塞入量 = min(剩余备库量, 机台剩余产能)  [备库胎圈]
-            //           或 = 机台剩余产能                      [非备库规格]
+            // 第6班塞入量 = min(剩余备库量, 机台剩余产能, 备库总量与已排产量差值)  [备库胎圈]
+            //           或 = 机台剩余产能                                            [非备库规格]
             double assignQty;
             if (isBackupSpec) {
-                assignQty = Math.min(backupRemaining, residualCapacity);
+                double totalScheduled = sumClassPlanQty(spec);
+                double backupTotal = spec.getBackupTotalPlanQty() == null ? 0D : spec.getBackupTotalPlanQty();
+                double maxAssignable = BigDecimalUtil.sub(backupTotal, totalScheduled);
+                if (maxAssignable <= 0) {
+                    continue;
+                }
+                assignQty = Math.min(Math.min(backupRemaining, residualCapacity), maxAssignable);
             } else {
                 assignQty = residualCapacity;
             }
@@ -452,13 +534,33 @@ public class TqResidualCapacityHandler extends AbsTqScheduleStepHandler {
     private void addClassPlanQty(TqScheduleResultVo scheduleVo, int classNum, double addQty) {
         double current = getClassPlanQty(scheduleVo, classNum);
         double newValue = BigDecimalUtil.add(current, addQty);
-        switch (classNum) {
-            case 1: scheduleVo.setClass1PlanQty(newValue); break;
-            case 2: scheduleVo.setClass2PlanQty(newValue); break;
-            case 3: scheduleVo.setClass3PlanQty(newValue); break;
-            case 4: scheduleVo.setClass4PlanQty(newValue); break;
-            case 5: scheduleVo.setClass5PlanQty(newValue); break;
-            case 6: scheduleVo.setClass6PlanQty(newValue); break;
+        setClassPlanQtyDirect(scheduleVo, classNum, newValue);
+    }
+
+    /**
+     * 直接设置指定班次的计划量（非累加）。
+     * 当计划量为0或负数时，清空计划量、生产顺序和排程分析字段，保持数据干净。
+     */
+    private void setClassPlanQtyDirect(TqScheduleResultVo scheduleVo, int classNum, double value) {
+        if (value <= 0) {
+            // 无排产量时清空所有字段，避免入库时留下0值或残留顺序值
+            switch (classNum) {
+                case 1: scheduleVo.setClass1PlanQty(null); scheduleVo.setClass1ProduceOrder(null); scheduleVo.setClass1SysAnalysis(null); break;
+                case 2: scheduleVo.setClass2PlanQty(null); scheduleVo.setClass2ProduceOrder(null); scheduleVo.setClass2SysAnalysis(null); break;
+                case 3: scheduleVo.setClass3PlanQty(null); scheduleVo.setClass3ProduceOrder(null); scheduleVo.setClass3SysAnalysis(null); break;
+                case 4: scheduleVo.setClass4PlanQty(null); scheduleVo.setClass4ProduceOrder(null); scheduleVo.setClass4SysAnalysis(null); break;
+                case 5: scheduleVo.setClass5PlanQty(null); scheduleVo.setClass5ProduceOrder(null); scheduleVo.setClass5SysAnalysis(null); break;
+                case 6: scheduleVo.setClass6PlanQty(null); scheduleVo.setClass6ProduceOrder(null); scheduleVo.setClass6SysAnalysis(null); break;
+            }
+        } else {
+            switch (classNum) {
+                case 1: scheduleVo.setClass1PlanQty(value); break;
+                case 2: scheduleVo.setClass2PlanQty(value); break;
+                case 3: scheduleVo.setClass3PlanQty(value); break;
+                case 4: scheduleVo.setClass4PlanQty(value); break;
+                case 5: scheduleVo.setClass5PlanQty(value); break;
+                case 6: scheduleVo.setClass6PlanQty(value); break;
+            }
         }
     }
 
@@ -467,6 +569,20 @@ public class TqResidualCapacityHandler extends AbsTqScheduleStepHandler {
      */
     private double applyRoundingIfNeeded(double value) {
         return BigDecimalUtils.valueOf(value).doubleValue();
+    }
+
+    /**
+     * 计算规格6班已排产量合计。
+     *
+     * @param spec 排程记录
+     * @return 6班已排产量合计
+     */
+    private double sumClassPlanQty(TqScheduleResultVo spec) {
+        double total = 0D;
+        for (int i = 1; i <= 6; i++) {
+            total = BigDecimalUtil.add(total, getClassPlanQty(spec, i));
+        }
+        return total;
     }
 
     /**

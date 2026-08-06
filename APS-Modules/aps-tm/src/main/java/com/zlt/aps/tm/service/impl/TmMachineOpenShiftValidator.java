@@ -4,6 +4,7 @@ import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.common.core.utils.MachineOpenShiftCodeUtil;
 import com.zlt.aps.tm.api.constant.TmScheduleConstants;
 import com.zlt.aps.tm.api.domain.entity.TmMachineInfo;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
@@ -177,7 +178,7 @@ public class TmMachineOpenShiftValidator {
                 .map(StrUtil::trim)
                 .filter(StrUtil::isNotBlank)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
-        return openShiftCodes.contains(StrUtil.trim(shiftConfig.getShiftCode()));
+        return MachineOpenShiftCodeUtil.isMachineShiftOpen(openShiftCodes, shiftConfig.getShiftCode());
     }
 
     /**

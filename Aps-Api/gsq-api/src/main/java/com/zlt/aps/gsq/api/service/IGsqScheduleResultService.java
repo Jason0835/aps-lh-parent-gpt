@@ -6,6 +6,7 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.gsq.api.domain.dto.GsqChangeMachineDTO;
 import com.zlt.aps.gsq.api.domain.dto.GsqInsertOrderDTO;
+import com.zlt.aps.gsq.api.domain.dto.GsqScheduleResultImportDTO;
 import com.zlt.aps.gsq.api.domain.entity.GsqScheduleResult;
 import com.zlt.aps.gsq.api.domain.vo.GsqScheduleShiftDateVO;
 import io.swagger.annotations.ApiOperation;
@@ -222,6 +223,29 @@ public interface IGsqScheduleResultService {
     @PostMapping("/scheduleResult/listScheduleShiftDates")
     @ApiOperation("获取钢丝圈排程班次日期列表")
     List<GsqScheduleShiftDateVO> listScheduleShiftDates(@RequestBody GsqScheduleResult queryVO);
+
+    /**
+     * 按专用模板导出钢丝圈排程结果
+     *
+     * @param entity   查询条件（含工厂、排程日期）
+     * @param fileName 文件名
+     * @return 导出字节流
+     */
+    @PostMapping("/scheduleResult/exportDataScheduleResult")
+    @ApiOperation("按专用模板导出钢丝圈排程结果")
+    byte[] exportDataScheduleResult(@RequestBody GsqScheduleResult entity, @RequestParam("fileName") String fileName);
+
+    /**
+     * 按专用模板导入钢丝圈排程结果
+     *
+     * @param importDTO      导入请求（含文件上下文、工厂、排程日期）
+     * @param updateSupport  是否允许覆盖更新
+     * @return 导入结果
+     */
+    @PostMapping("/scheduleResult/importDataScheduleResult")
+    @ApiOperation("按专用模板导入钢丝圈排程结果")
+    AjaxResult importDataScheduleResult(@RequestBody GsqScheduleResultImportDTO importDTO,
+                                        @RequestParam("updateSupport") boolean updateSupport);
 
     /**
      * 根据排程日期查询发布中或超时失败的记录数

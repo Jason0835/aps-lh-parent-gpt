@@ -201,8 +201,8 @@ public class TqScheduleResultVo extends ApsBaseDto {
     @ApiModelProperty(value = "收尾提示标识(0:提示收尾；1:不需要提示)")
     private String markCloseOutTip;
 
-    @ApiModelProperty(value = "是否发布，0--未发布，1--已发布。对应数据字典为：IS_RELEASE")
-    private String isRelease;
+    @ApiModelProperty(value = "发布状态，0-未发布 1-已发布 2-发布失败 3-发布中 4-超时失败 5-待发布。对应数据字典为：IS_RELEASE")
+    private String releaseStatus;
 
     @ApiModelProperty(value = "生产状态")
     private String productionStatus;

@@ -22,4 +22,6 @@ public class CalcOverProdDTO {
     private Long finishQty;
     /** 是否强制置零（当月定稿表的 LAST_MONTH_PLAN_VERSION 为当月ADJ版本时，超欠产直接为0） */
     private Integer forceZero;
+    /** 库存抓取日是否缺失（1=缺失，超欠产值/有效标识置空；0=正常）。版本非ADJ【含空值】且余量表匹配不到时为1 */
+    private Integer stockCaptureDateMissing;
 }
