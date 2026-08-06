@@ -231,6 +231,23 @@ public class GsqScheduleResultVo extends ApsBaseDto {
     /** 库存供需比例，交接班库存/胎圈一天需求量 */
     private Double supplyDemandRatio;
 
+    // ==================== 备库模型字段（Phase 2 新增，运行时字段，非持久化） ====================
+
+    /** 备库触发班次（1~6），0=未触发（对齐胎圈 backupTriggerClass） */
+    private Integer backupTriggerClass;
+
+    /** 备库总量（N个胎圈班次消耗 × 需求系数） */
+    private Double backupTotalQty;
+
+    /** 命中的备库班数 N（对齐胎圈 matchBackupShiftCount） */
+    private Integer backupShiftCount;
+
+    /** 是否命中备库配置（true=有备库配置且需备库） */
+    private Boolean hasBackupConfig;
+
+    /** 备库剩余待排量（S5.6 重算剩余产能时使用） */
+    private Double backupRemainingQty;
+
     /** 工艺参数（运行时辅助参数传递，不持久化） */
     @ApiModelProperty(value = "工艺参数Map，运行时传递，不持久化")
     private transient Map<String, Object> params = new HashMap<>();

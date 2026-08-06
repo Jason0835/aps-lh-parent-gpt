@@ -196,7 +196,7 @@ export default {
         total: 0,
       },
       search: {
-        scheduleDate: moment().add(2, "days").format("YYYY-MM-DD"),
+        scheduleDate: moment().add(1, "days").format("YYYY-MM-DD"),
         factoryCode: "116",
         steelRingCode: "",
         isRelease: "",
@@ -223,7 +223,7 @@ export default {
       // 导入默认值
       importDefaultValue: {
         factoryCode: "",
-        scheduleDate: moment().add(2, "days").format("YYYY-MM-DD"),
+        scheduleDate: moment().add(1, "days").format("YYYY-MM-DD"),
       },
       };
   },
@@ -366,6 +366,11 @@ export default {
           label: this.$t("ui.data.column.gsqScheduleResult.monthSurplusQty"),
           prop: "monthSurplusQty",
           width: 100,
+        },
+        {
+          label: this.$t("ui.data.column.gsqScheduleResult.stockQty"),
+          prop: "stockQty",
+          width: 90,
         },
         // ===== 6班次动态列（含日期头，与 tq 写法对齐） =====
         {

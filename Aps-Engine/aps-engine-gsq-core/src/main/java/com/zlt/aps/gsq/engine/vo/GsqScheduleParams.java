@@ -57,6 +57,9 @@ public class GsqScheduleParams {
     /** 备库班数（SYS1601003，默认1） */
     private Double stockShiftCount;
 
+    /** 备库班次单班排产阈值（SYS1603004，默认1000，备库总量分摊到各班时单班上限） */
+    private Double backupShiftThreshold;
+
     /** 需求系数（SYS1601001，钢丝圈:胎圈=1:1，默认1） */
     private Double demandCoefficient;
 
