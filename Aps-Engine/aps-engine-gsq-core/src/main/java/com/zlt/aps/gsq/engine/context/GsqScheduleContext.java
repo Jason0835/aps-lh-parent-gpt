@@ -4,6 +4,7 @@ import com.zlt.aps.common.engine.domain.EngineConstructionInfo;
 import com.zlt.aps.common.engine.schedule.MachineShiftTaskChain;
 import com.zlt.aps.common.engine.schedule.ScheduleTaskNode;
 import com.zlt.aps.gsq.api.domain.entity.GsqMachineInfo;
+import com.zlt.aps.gsq.api.domain.entity.GsqStockShiftConfig;
 import com.zlt.aps.gsq.engine.domain.GsqMachineCandidate;
 import com.zlt.aps.gsq.engine.domain.GsqRuleTrace;
 import com.zlt.aps.gsq.engine.domain.GsqSnapshotBuildResult;
@@ -148,6 +149,9 @@ public class GsqScheduleContext {
 
     /** 各规格各班次机台定额总产能，key=钢丝圈编码, value=Map<班次号(1~6), 定额总产能> */
     private Map<String, Map<Integer, Double>> specClassQuotaMap = new HashMap<>();
+
+    /** 钢丝圈备库班数配置列表（S2.3 备库模型使用，按 MIN_MACHINE_QTY 升序） */
+    private List<GsqStockShiftConfig> stockShiftConfigList = new ArrayList<>();
 
     // ========== 结构化规则证据（贯穿 S2~S6，S6 持久化时写入解释 JSON 字段） ==========
 

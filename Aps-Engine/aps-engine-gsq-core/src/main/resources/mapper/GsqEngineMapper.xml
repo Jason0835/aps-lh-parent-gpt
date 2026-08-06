@@ -17,30 +17,30 @@
         ci.BEAD_CODE                                             as steelRingCode,
         max(ci.BEAD_TYPE)                                        as steelType,
         max(ci.BEAD_ARRANGE)                                     as `rank`,
-        max(ci.DIMENSION)                                        as dimension,
+        max(ci.PRO_SIZE)                                         as dimension,
         max(ci.PRO_SIZE)                                         as proSize,
         1                                                         as unitConsume,
         /* 胎圈1班消耗量 */
-        sum(IFNULL(tqr.CLASS1_PLAN_QTY, 0) * IFNULL(ci.BOM_QTY, 1)) as tqClass1Plan,
+        sum(IFNULL(tqr.CLASS1_PLAN_QTY, 0) * 1) as tqClass1Plan,
         /* 胎圈2班消耗量 = 钢丝圈1班需求 */
-        sum(IFNULL(tqr.CLASS2_PLAN_QTY, 0) * IFNULL(ci.BOM_QTY, 1)) as tqClass2Plan,
+        sum(IFNULL(tqr.CLASS2_PLAN_QTY, 0) * 1) as tqClass2Plan,
         /* 胎圈3班消耗量 = 钢丝圈2班需求 */
-        sum(IFNULL(tqr.CLASS3_PLAN_QTY, 0) * IFNULL(ci.BOM_QTY, 1)) as tqClass3Plan,
+        sum(IFNULL(tqr.CLASS3_PLAN_QTY, 0) * 1) as tqClass3Plan,
         /* 胎圈4班消耗量 = 钢丝圈3班需求 */
-        sum(IFNULL(tqr.CLASS4_PLAN_QTY, 0) * IFNULL(ci.BOM_QTY, 1)) as tqClass4Plan,
+        sum(IFNULL(tqr.CLASS4_PLAN_QTY, 0) * 1) as tqClass4Plan,
         /* 胎圈5班消耗量 = 钢丝圈4班需求 */
-        sum(IFNULL(tqr.CLASS5_PLAN_QTY, 0) * IFNULL(ci.BOM_QTY, 1)) as tqClass5Plan,
+        sum(IFNULL(tqr.CLASS5_PLAN_QTY, 0) * 1) as tqClass5Plan,
         /* 胎圈6班消耗量 = 钢丝圈5班需求 */
-        sum(IFNULL(tqr.CLASS6_PLAN_QTY, 0) * IFNULL(ci.BOM_QTY, 1)) as tqClass6Plan,
+        sum(IFNULL(tqr.CLASS6_PLAN_QTY, 0) * 1) as tqClass6Plan,
         max(tqr.CLOSE_OUT_SPEC_FLAG)                             as closeOutSpecFlag,
         /* 上一天胎圈夜班（昨日2班）剩余库存来源 */
         IFNULL(sum(prevTqr.CLASS2_PLAN_QTY), 0)                  as lastMidPlanQty,
         /* 钢丝圈1班计划量初始值 = 胎圈2班消耗量 */
-        sum(IFNULL(tqr.CLASS2_PLAN_QTY, 0) * IFNULL(ci.BOM_QTY, 1)) as class1PlanQty,
-        sum(IFNULL(tqr.CLASS3_PLAN_QTY, 0) * IFNULL(ci.BOM_QTY, 1)) as class2PlanQty,
-        sum(IFNULL(tqr.CLASS4_PLAN_QTY, 0) * IFNULL(ci.BOM_QTY, 1)) as class3PlanQty,
-        sum(IFNULL(tqr.CLASS5_PLAN_QTY, 0) * IFNULL(ci.BOM_QTY, 1)) as class4PlanQty,
-        sum(IFNULL(tqr.CLASS6_PLAN_QTY, 0) * IFNULL(ci.BOM_QTY, 1)) as class5PlanQty,
+        sum(IFNULL(tqr.CLASS2_PLAN_QTY, 0) * 1) as class1PlanQty,
+        sum(IFNULL(tqr.CLASS3_PLAN_QTY, 0) * 1) as class2PlanQty,
+        sum(IFNULL(tqr.CLASS4_PLAN_QTY, 0) * 1) as class3PlanQty,
+        sum(IFNULL(tqr.CLASS5_PLAN_QTY, 0) * 1) as class4PlanQty,
+        sum(IFNULL(tqr.CLASS6_PLAN_QTY, 0) * 1) as class5PlanQty,
         0                                                          as class6PlanQty
         from T_TQ_SCHEDULE_RESULT tqr
         inner join (
@@ -49,11 +49,10 @@
         MAX(BEAD_CODE)    BEAD_CODE,
         MAX(BEAD_ARRANGE) BEAD_ARRANGE,
         MAX(BEAD_TYPE)    BEAD_TYPE,
-        MAX(Dimension)    DIMENSION,
-        MAX(PRO_SIZE)     PRO_SIZE,
-        MAX(IFNULL(BOM_QTY, 1)) BOM_QTY
-        FROM T_PRODUCT_CONSTRUCTION_INFO
-        WHERE DEL_FLAG = 0
+        MAX(PRO_SIZE)     DIMENSION,
+        MAX(PRO_SIZE)     PRO_SIZE
+        FROM T_MDM_CONSTRUCTION_INFO
+        WHERE IS_DELETE = 0
         <if test="productionStage == '1'.toString()">
             and PRODUCTION_STAGE = '0'
         </if>
@@ -65,11 +64,11 @@
         IFNULL(sum(CLASS2_PLAN_QTY), 0) CLASS2_PLAN_QTY
         FROM T_TQ_SCHEDULE_RESULT
         WHERE SCHEDULE_DATE = DATE_ADD(STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d'), INTERVAL -1 DAY)
-        AND DEL_FLAG = 0
+        AND IS_DELETE = 0
         GROUP BY BEAD_CODE
         ) prevTqr ON prevTqr.BEAD_CODE = tqr.BEAD_CODE
         where tqr.SCHEDULE_DATE = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
-        and tqr.DEL_FLAG = 0
+        and tqr.IS_DELETE = 0
         group by ci.BEAD_CODE
         having sum(IFNULL(tqr.CLASS1_PLAN_QTY, 0) + IFNULL(tqr.CLASS2_PLAN_QTY, 0)
         + IFNULL(tqr.CLASS3_PLAN_QTY, 0) + IFNULL(tqr.CLASS4_PLAN_QTY, 0)
@@ -150,8 +149,8 @@
     <!-- 6班次批量新增排程结果 -->
     <insert id="batchCreateScheduleResult" parameterType="java.util.List">
         insert into T_GSQ_SCHEDULE_RESULT (
-        SCHEDULE_DATE, TQ_BATCH_NO, BATCH_NO, ORDER_NO, STEEL_TYPE, STEEL_RING_CODE,
-        TWINING_DISC_CODE, PRO_SIZE, `RANK`, DIMENSION, MACHINE_CODE, UNIT_CONSUME, STOCK_QTY, SUPPLY_TIME,
+        SCHEDULE_DATE, CX_BATCH_NO, BATCH_NO, ORDER_NO, STEEL_RING_CODE,
+        TWINING_DISC_CODE, PRO_SIZE, MACHINE_CODE, STOCK_QTY,
         CLASS1_SEQUENCE, CLASS1_PLAN_QTY, CLASS1_ANALYSIS,
         CLASS2_SEQUENCE, CLASS2_PLAN_QTY, CLASS2_ANALYSIS,
         CLASS3_SEQUENCE, CLASS3_PLAN_QTY, CLASS3_ANALYSIS,
@@ -159,14 +158,14 @@
         CLASS5_SEQUENCE, CLASS5_PLAN_QTY, CLASS5_ANALYSIS,
         CLASS6_SEQUENCE, CLASS6_PLAN_QTY, CLASS6_ANALYSIS,
         TQ_CLASS1_PLAN, TQ_CLASS2_PLAN, TQ_CLASS3_PLAN, TQ_CLASS4_PLAN, TQ_CLASS5_PLAN, TQ_CLASS6_PLAN,
-        IS_RELEASE, MARK_CLOSE_OUT_TIP, PRODUCTION_STATUS, CLOSE_OUT_SPEC_FLAG,
-        UNSCHEDULED_FLAG, FRESH_EXPIRED_FLAG, DATA_SOURCE, FACTORY_CODE, EXPLAIN_JSON,
-        DEL_FLAG, CREATE_BY, CREATE_TIME
+        IS_RELEASE, CLOSE_OUT_SPEC_FLAG,
+        DATA_SOURCE, FACTORY_CODE, EXPLAIN_JSON,
+        IS_DELETE, CREATE_BY, CREATE_TIME
         ) values
         <foreach collection="scheduleResultList" item="item" separator=",">
             (
-            #{item.scheduleDate}, #{item.tqBatchNo}, #{item.batchNo}, #{item.orderNo}, #{item.steelType}, #{item.steelRingCode},
-            #{item.twiningDiscCode}, #{item.proSize}, #{item.rank}, #{item.dimension}, #{item.machineCode}, #{item.unitConsume}, #{item.stockQty}, #{item.supplyTime},
+            #{item.scheduleDate}, #{item.tqBatchNo}, #{item.batchNo}, #{item.orderNo}, #{item.steelRingCode},
+            #{item.twiningDiscCode}, #{item.proSize}, #{item.machineCode}, #{item.stockQty},
             #{item.class1Sequence}, #{item.class1PlanQty}, #{item.class1Analysis},
             #{item.class2Sequence}, #{item.class2PlanQty}, #{item.class2Analysis},
             #{item.class3Sequence}, #{item.class3PlanQty}, #{item.class3Analysis},
@@ -174,8 +173,8 @@
             #{item.class5Sequence}, #{item.class5PlanQty}, #{item.class5Analysis},
             #{item.class6Sequence}, #{item.class6PlanQty}, #{item.class6Analysis},
             #{item.tqClass1Plan}, #{item.tqClass2Plan}, #{item.tqClass3Plan}, #{item.tqClass4Plan}, #{item.tqClass5Plan}, #{item.tqClass6Plan},
-            #{item.isRelease}, #{item.markCloseOutTip}, #{item.productionStatus}, #{item.closeOutSpecFlag},
-            #{item.unscheduledFlag}, #{item.freshExpiredFlag}, #{item.dataSource}, #{item.factoryCode}, #{item.explainJson},
+            #{item.isRelease}, #{item.closeOutSpecFlag},
+            #{item.dataSource}, #{item.factoryCode}, #{item.explainJson},
             0, #{item.createBy}, now()
             )
         </foreach>
@@ -216,10 +215,10 @@
         max(ci.BEAD_TYPE)    as steelType,
         max(ci.BEAD_ARRANGE) as `rank`,
         1                     as unitConsume,
-        max(ci.DIMENSION)    as dimension,
+        max(ci.PRO_SIZE)     as dimension,
         max(ci.PRO_SIZE)     as proSize,
-        max(IFNULL(ci.BOM_QTY, 1)) as bomQty,
-        max(ci.WIRE_DIAMETER) as wireDiameter,
+        1                    as bomQty,
+        null                 as wireDiameter,
         null                 as tireRingCodeList,
         null                 as embryoCodeList,
         null                 as cxClass1Plan,
@@ -228,8 +227,8 @@
         null                 as cxClass4Plan,
         null                 as cxClass5Plan,
         null                 as quotaKeys
-        from T_PRODUCT_CONSTRUCTION_INFO ci
-        where ci.DEL_FLAG = 0
+        from T_MDM_CONSTRUCTION_INFO ci
+        where ci.IS_DELETE = 0
         <if test="productionStage == '1'.toString()">
             and ci.PRODUCTION_STAGE = '0'
         </if>
@@ -241,7 +240,7 @@
     </select>
 
     <select id="listGsqEnginSchedule" parameterType="string" resultType="com.zlt.aps.gsq.engine.vo.GsqScheduleResultVo">
-        select * from T_GSQ_SCHEDULE_RESULT where SCHEDULE_DATE = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d') and DEL_FLAG = 0
+        select * from T_GSQ_SCHEDULE_RESULT where SCHEDULE_DATE = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d') and IS_DELETE = 0
     </select>
 
     <insert id="mergeGsqScheduleResult" parameterType="java.util.List">
@@ -281,19 +280,18 @@
         ci.BEAD_TYPE    as beadType,
         ci.BEAD_ARRANGE as beadArrange,
         ci.TIRE_RING_CODE as tireRingCode,
-        ci.EMBRYO_CODE  as embryoCode,
-        ci.EMBRYO_VERSION as bomDataVersion,
-        ci.DIMENSION    as dimension,
-        ci.PRO_SIZE     as proSize,
-        ci.WIRE_DIAMETER as wireDiameter
-        from T_PRODUCT_CONSTRUCTION_INFO ci
+        ci.CONSTRUCTION_CODE as embryoCode,
+        ci.CONSTRUCTION_VERSION as bomDataVersion,
+        ci.PRO_SIZE     as dimension,
+        ci.PRO_SIZE     as proSize
+        from T_MDM_CONSTRUCTION_INFO ci
         inner join (
         select distinct BEAD_CODE
         from T_TQ_SCHEDULE_RESULT
         where SCHEDULE_DATE = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
-        and DEL_FLAG = 0
+        and IS_DELETE = 0
         ) tqr on ci.BEAD_CODE = tqr.BEAD_CODE
-        where ci.DEL_FLAG = 0
+        where ci.IS_DELETE = 0
         <if test="productionStage == '1'.toString()">
             and ci.PRODUCTION_STAGE = '0'
         </if>
@@ -323,37 +321,83 @@
             sum(IFNULL(tqr.CLASS6_PLAN_QTY, 0)) as class6PlanQty
         from T_TQ_SCHEDULE_RESULT tqr
         where tqr.SCHEDULE_DATE = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
-          and tqr.DEL_FLAG = 0
+          and tqr.IS_DELETE = 0
         group by tqr.BEAD_CODE
     </select>
 
-    <!-- 读取胎圈停产班次配置（工作日历） -->
+    <!-- 读取胎圈停产班次配置（工作日历，胎圈工序 PROC_CODE='08'），仅返回停产班次 -->
     <select id="listTqStopShiftConfig" resultType="java.util.Map">
-        select SHIFT_DATE as shiftDate, SHIFT_CODE as shiftCode, STOP_FLAG as stopFlag
-        from T_TQ_STOP_SHIFT_CONFIG
-        where SHIFT_DATE between DATE_ADD(STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d'), INTERVAL -1 DAY)
-            and DATE_ADD(STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d'), INTERVAL 1 DAY)
-          and DEL_FLAG = 0
+        select shiftDate, shiftCode from (
+            select date_format(PRODUCTION_DATE, '%Y-%m-%d') as shiftDate, '01' as shiftCode
+            from T_MDM_WORK_CALENDAR
+            where IS_DELETE = '0' and PROC_CODE = '08'
+              and PRODUCTION_DATE between DATE_ADD(STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d'), INTERVAL -1 DAY)
+                                      and DATE_ADD(STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d'), INTERVAL 1 DAY)
+              and ONE_SHIFT_FLAG = '0'
+            union all
+            select date_format(PRODUCTION_DATE, '%Y-%m-%d') as shiftDate, '02' as shiftCode
+            from T_MDM_WORK_CALENDAR
+            where IS_DELETE = '0' and PROC_CODE = '08'
+              and PRODUCTION_DATE between DATE_ADD(STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d'), INTERVAL -1 DAY)
+                                      and DATE_ADD(STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d'), INTERVAL 1 DAY)
+              and TWO_SHIFT_FLAG = '0'
+            union all
+            select date_format(PRODUCTION_DATE, '%Y-%m-%d') as shiftDate, '03' as shiftCode
+            from T_MDM_WORK_CALENDAR
+            where IS_DELETE = '0' and PROC_CODE = '08'
+              and PRODUCTION_DATE between DATE_ADD(STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d'), INTERVAL -1 DAY)
+                                      and DATE_ADD(STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d'), INTERVAL 1 DAY)
+              and THREE_SHIFT_FLAG = '0'
+        ) t
     </select>
 
-    <!-- 读取钢丝圈停产班次配置 -->
+    <!-- 读取钢丝圈停产班次配置（工作日历，钢丝圈工序 PROC_CODE='09'），仅返回停产班次 -->
     <select id="listGsqStopShiftConfig" resultType="java.util.Map">
-        select SHIFT_DATE as shiftDate, SHIFT_CODE as shiftCode, STOP_FLAG as stopFlag
-        from T_GSQ_STOP_SHIFT_CONFIG
-        where SHIFT_DATE between DATE_ADD(STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d'), INTERVAL -1 DAY)
-            and DATE_ADD(STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d'), INTERVAL 1 DAY)
-          and DEL_FLAG = 0
+        select shiftDate, shiftCode from (
+            select date_format(PRODUCTION_DATE, '%Y-%m-%d') as shiftDate, '01' as shiftCode
+            from T_MDM_WORK_CALENDAR
+            where IS_DELETE = '0' and PROC_CODE = '09'
+              and PRODUCTION_DATE between DATE_ADD(STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d'), INTERVAL -1 DAY)
+                                      and DATE_ADD(STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d'), INTERVAL 1 DAY)
+              and ONE_SHIFT_FLAG = '0'
+            union all
+            select date_format(PRODUCTION_DATE, '%Y-%m-%d') as shiftDate, '02' as shiftCode
+            from T_MDM_WORK_CALENDAR
+            where IS_DELETE = '0' and PROC_CODE = '09'
+              and PRODUCTION_DATE between DATE_ADD(STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d'), INTERVAL -1 DAY)
+                                      and DATE_ADD(STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d'), INTERVAL 1 DAY)
+              and TWO_SHIFT_FLAG = '0'
+            union all
+            select date_format(PRODUCTION_DATE, '%Y-%m-%d') as shiftDate, '03' as shiftCode
+            from T_MDM_WORK_CALENDAR
+            where IS_DELETE = '0' and PROC_CODE = '09'
+              and PRODUCTION_DATE between DATE_ADD(STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d'), INTERVAL -1 DAY)
+                                      and DATE_ADD(STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d'), INTERVAL 1 DAY)
+              and THREE_SHIFT_FLAG = '0'
+        ) t
     </select>
 
-    <!-- 读取机台检修计划 -->
+    <!-- 读取机台检修计划，IS_DELETE为逻辑删除字段，班次字段原始返回（对齐胎圈TQ） -->
     <select id="listMachineMaintenancePlan" resultType="java.util.Map">
-        select
-            MACHINE_CODE as machineCode,
-            MAINTENANCE_DATE as maintenanceDate,
-            SHIFT_CODE as shiftCode
+        select MACHINE_CODE as machineCode, DOWNTIME_DATE as downtimeDate,
+        DOWNTIME_SHIFT as downtimeShift
         from T_GSQ_MACHINE_MAINTENANCE_PLAN
-        where MAINTENANCE_DATE between STR_TO_DATE(#{startDate}, '%Y-%m-%d')
-            and STR_TO_DATE(#{endDate}, '%Y-%m-%d')
-          and DEL_FLAG = 0
+        where IS_DELETE = '0'
+        and DOWNTIME_DATE >= date_format(#{scheduleDate}, '%Y-%m-%d')
+        and DOWNTIME_DATE &lt; date_format(date_add(#{scheduleDate}, interval 3 day), '%Y-%m-%d')
+    </select>
+
+    <!-- 读取钢丝圈备库班数配置，按 MIN_MACHINE_QTY 升序（对齐胎圈TqStockShiftConfig DepthConfig 区间方式） -->
+    <select id="listGsqStockShiftConfig" resultType="com.zlt.aps.gsq.api.domain.entity.GsqStockShiftConfig">
+        select FACTORY_CODE as factoryCode,
+               MIN_MACHINE_QTY as minMachineQty,
+               MAX_MACHINE_QTY as maxMachineQty,
+               DEPTH_CLASS_QTY as depthClassQty
+        from T_GSQ_STOCK_SHIFT_CONFIG
+        where IS_DELETE = '0'
+        <if test="factoryCode != null and factoryCode != ''">
+            and FACTORY_CODE = #{factoryCode}
+        </if>
+        order by MIN_MACHINE_QTY
     </select>
 </mapper>

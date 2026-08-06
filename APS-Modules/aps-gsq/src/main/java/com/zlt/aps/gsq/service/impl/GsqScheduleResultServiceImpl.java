@@ -1336,8 +1336,17 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
             if (tqResult == null || CollectionUtils.isEmpty(tqResult.getRows())) {
                 continue;
             }
-            @SuppressWarnings("unchecked")
-            List<TqScheduleResult> tqList = (List<TqScheduleResult>) tqResult.getRows();
+            // 远程Feign返回的rows为LinkedHashMap，需转换为TqScheduleResult实体
+            List<TqScheduleResult> tqList = new ArrayList<>();
+            if (tqResult.getRows() != null) {
+                for (Object row : tqResult.getRows()) {
+                    if (row instanceof TqScheduleResult) {
+                        tqList.add((TqScheduleResult) row);
+                    } else if (row instanceof Map) {
+                        tqList.add(BeanUtil.toBean((Map<String, Object>) row, TqScheduleResult.class));
+                    }
+                }
+            }
             // 按钢丝圈代码分组
             Map<String, List<TqScheduleResult>> tqCodeMap = tqList.stream()
                     .filter(t -> StringUtils.isNotBlank(t.getSteelRingCode()))

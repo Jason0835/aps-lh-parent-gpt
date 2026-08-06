@@ -18,7 +18,7 @@ import javax.annotation.Resource;
 /**
  * 钢丝圈排程模板方法实现。
  *
- * <p>绑定8个Handler，按顺序执行 S1 → S2 → S3 → S3.5 → S4 → S5 → S5.5 → S6。</p>
+ * <p>绑定8个Handler，按顺序执行 S1 → S2 → S3 → S4 → S5 → S5.5 → S5.6 → S6。</p>
  *
  * @author APS
  */

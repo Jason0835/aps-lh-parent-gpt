@@ -1366,6 +1366,7 @@
   "ui.data.column.gsqScheduleResult.proSize": "Product Size",
   "ui.data.column.gsqScheduleResult.machineCode": "Machine Code",
   "ui.data.column.gsqScheduleResult.monthSurplusQty": "Month Surplus Qty",
+  "ui.data.column.gsqScheduleResult.stockQty": "Stock",
   "ui.data.column.gsqScheduleResult.planQty": "Plan Qty",
   "ui.data.column.gsqScheduleResult.finishQty": "Finish Qty",
   "ui.data.column.gsqScheduleResult.sequence": "Sequence",

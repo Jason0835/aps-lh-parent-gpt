@@ -20,18 +20,18 @@
     </select>
 
     <select id="listGsqStock" parameterType="string" resultType="com.zlt.aps.gsq.engine.vo.GsqStockVo">
-        select MATERIAL_CODE steelRingCode, (IFNULL(STOCK_NUM,0)+IFNULL(MODIFY_NUM,0)-IFNULL(BAD_NUM,0)) STOCK_NUM
+        select STEEL_RING_CODE steelRingCode, (IFNULL(STOCK_NUM,0)+IFNULL(MODIFY_NUM,0)-IFNULL(BAD_NUM,0)) STOCK_NUM
         from T_GSQ_STOCK
         where STOCK_DATE = DATE_ADD(#{stockDate}, INTERVAL -1 day) /*排程日期 要减1天，才是对应库存日期*/
-        and DEL_FLAG = '0'
+        and IS_DELETE = 0 /*逻辑删除字段 IS_DELETE，0=未删除*/
     </select>
 
     <select id="listLastDayMidPlan" resultType="com.zlt.aps.gsq.engine.vo.GsqStockConsumeVo">
-        SELECT steel_ring_code, IFNULL(SUM(night_plan_qty), 0) consume
+        SELECT STEEL_RING_CODE, IFNULL(SUM(CLASS1_PLAN_QTY), 0) consume /*昨日早班半制品生产量=昨日排程的CLASS1计划量*/
         FROM T_GSQ_SCHEDULE_RESULT
         WHERE SCHEDULE_DATE = DATE_ADD(#{scheduleDate}, INTERVAL -1 day)
-          AND DEL_FLAG = '0'
-        GROUP BY steel_ring_code
+          AND IS_DELETE = 0 /*逻辑删除字段 IS_DELETE，0=未删除*/
+        GROUP BY STEEL_RING_CODE
     </select>
 
     <select id="listReserveStock" resultType="com.zlt.aps.gsq.api.domain.dto.GsqReserveStockDto">

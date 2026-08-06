@@ -1238,6 +1238,7 @@
   "ui.data.column.gsqScheduleResult.proSize": "产品尺寸",
   "ui.data.column.gsqScheduleResult.machineCode": "机台编号",
   "ui.data.column.gsqScheduleResult.monthSurplusQty": "月计划剩余量",
+  "ui.data.column.gsqScheduleResult.stockQty": "库存",
   "ui.data.column.gsqScheduleResult.planQty": "计划量",
   "ui.data.column.gsqScheduleResult.finishQty": "完成量",
   "ui.data.column.gsqScheduleResult.sequence": "顺序",
