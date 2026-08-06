@@ -1,7 +1,7 @@
 <template>
   <basic-container>
     <page-table
-      tableRef="djMachineMaintenanceMainTable"
+      tableRef="ncMachineMaintenanceMainTable"
       :calcHeight="true"
       v-loading="loading"
       :columns="columns"
@@ -20,24 +20,24 @@
       <template slot="header">
         <el-button
           type="primary"
-          v-hasPermi="['dj:machineMaintenance:add']"
+          v-hasPermi="['nc:machineMaintenance:add']"
           @click="handleAdd"
           >{{ $t("ui.frame.btn.add") }}</el-button
         >
         <el-button
-          v-hasPermi="['dj:machineMaintenance:import']"
+          v-hasPermi="['nc:machineMaintenance:import']"
           @click="$refs.tltUpload.handleImport()"
           >{{ $t("ui.frame.btn.import") }}</el-button
         >
-        <el-button @click="handleExport" v-hasPermi="['dj:machineMaintenance:export']">{{
+        <el-button @click="handleExport" v-hasPermi="['nc:machineMaintenance:export']">{{
           $t("ui.frame.btn.export")
         }}</el-button>
       </template>
     </page-table>
     <tlt-upload
       ref="tltUpload"
-      downloadUrl="/dj/machineMaintenance/importTemplate"
-      uploadUrl="/dj/machineMaintenance/importData"
+      downloadUrl="/nc/machineMaintenance/importTemplate"
+      uploadUrl="/nc/machineMaintenance/importData"
       @uploadSuccess="getList"
     />
     <infoDialog ref="infoRef" @success="getList" />
@@ -49,7 +49,7 @@ import { mapState } from "vuex";
 //utils
 import { downloadLink } from "@/utils/request";
 //interface
-import { listMachineMaintenance, delMachineMaintenance } from "@/api/dj/machineMaintenance";
+import { listMachineMaintenance, delMachineMaintenance } from "@/api/nc/machineMaintenance";
 import { getConfigKey } from "@/api/system/config";
 //components
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
@@ -57,12 +57,12 @@ import tltUpload from "@/components/tltUpload/tltUpload.vue";
 import infoDialog from "./components/infoDialog.vue";
 
 export default {
- name: "DjMachineMaintenance",
+  name: "NcMachineMaintenance",
   components: {
     tltUpload,
     infoDialog,
   },
-  dicts: ['CLASS_NUM', 'biz_factory_name'],
+  dicts: ["biz_factory_name"],
   provide() {
     return {
       parentDict: this.dict,
@@ -80,11 +80,11 @@ export default {
       },
       sort: {},
       search: {
-        factoryCode: '',
+        factoryCode: "",
         machineCode: "",
       },
       query: {
-        factoryCode: '',
+        factoryCode: "",
         machineCode: "",
       },
       importDefaultValue: {},
@@ -93,7 +93,7 @@ export default {
   },
   computed: {
     ...mapState({
-      machines: (state) => state.dj.machines,
+      machines: (state) => state.insideLiner.machines,
     }),
     columns() {
       let columns = [
@@ -102,43 +102,29 @@ export default {
           prop: "machineCode",
           align: "center",
           halign: "center",
-          label: this.$t("ui.data.column.dj.machineMaintenance.machineCode"),
+          label: this.$t("ui.data.column.nc.machineMaintenance.machineCode"),
           sortable: true,
         },
         {
           prop: "machineName",
           align: "center",
           halign: "center",
-          label: this.$t("ui.data.column.dj.machineMaintenance.machineName"),
+          label: this.$t("ui.data.column.nc.machineMaintenance.machineName"),
           sortable: true,
         },
         {
           prop: "stopStartTime",
           align: "center",
           halign: "center",
-          label: this.$t("ui.data.column.dj.machineMaintenance.stopStartTime"),
+          label: this.$t("ui.data.column.nc.machineMaintenance.stopStartTime"),
           sortable: true,
         },
         {
           prop: "stopEndTime",
           align: "center",
           halign: "center",
-          label: this.$t("ui.data.column.dj.machineMaintenance.stopEndTime"),
+          label: this.$t("ui.data.column.nc.machineMaintenance.stopEndTime"),
           sortable: true,
-        },
-        {
-          prop: "stopShift",
-          align: "center",
-          halign: "center",
-          label: this.$t("ui.data.column.dj.machineMaintenance.stopShift"),
-          sortable: true,
-          formatter: (row) => {
-            let value = row.stopShift;
-            if (this.isEmpty(value)) {
-              return "";
-            }
-            return this.selectDictLabels(this.dict.type.CLASS_NUM, value);
-          },
         },
         {
           prop: "remark",
@@ -189,7 +175,7 @@ export default {
           filterable: true,
         },
         {
-          label: this.$t("ui.data.column.dj.machineMaintenance.machineCode"),
+          label: this.$t("ui.data.column.nc.machineMaintenance.machineCode"),
           prop: "machineCode",
           type: "select",
           dictData: this.machines,
@@ -257,7 +243,7 @@ export default {
       this.selection = rows;
     },
     handleExport() {
-      downloadLink("/dj/machineMaintenance/export", this.formatParams(false));
+      downloadLink("/nc/machineMaintenance/export", this.formatParams(false));
     },
 
     formatParams(hasPage = true) {
@@ -293,7 +279,8 @@ export default {
     },
   },
   created() {
-    getConfigKey("sys.factory.code").then(response => {
+    this.$store.dispatch("insideLiner/getMachineList");
+    getConfigKey("sys.factory.code").then((response) => {
       this.search.factoryCode = response.msg;
       this.query.factoryCode = response.msg;
       this.getList();
