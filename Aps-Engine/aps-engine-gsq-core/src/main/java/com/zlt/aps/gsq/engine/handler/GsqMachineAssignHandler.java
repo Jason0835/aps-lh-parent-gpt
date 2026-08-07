@@ -35,6 +35,10 @@ public class GsqMachineAssignHandler extends AbsGsqScheduleStepHandler {
     @Resource
     private IGsqMachineFilterChainService machineFilterChainService;
 
+    /** S2.3 计划量计算 Handler：机台分配确定后按实际机台精确损耗率重算备库计划量 */
+    @Resource
+    private GsqPlanQtyCalcHandler planQtyCalcHandler;
+
     /** 默认备库规格班次最大班产阈值（多规格机台上备库规格当班初始排产上限，SYS1603005） */
     private static final double DEFAULT_BACKUP_MULTI_SPEC_THRESHOLD = 1000D;
 
@@ -115,6 +119,9 @@ public class GsqMachineAssignHandler extends AbsGsqScheduleStepHandler {
                     setShiftQuota(scheduleVo, classIndex, quota);
                 }
             }
+
+            // 机台确定后，按该机台精确损耗率重算备库规格计划量（S2.3 用的是按钢丝圈聚合的平均损耗率，可能失真）
+            planQtyCalcHandler.recalcPlanQtyByMachineLossRate(scheduleVo, context);
 
             log.info("[S3] 规格[{}] 规格级分配机台[{}] 定额[{}]", scheduleVo.getSteelRingCode(), machineCode, quota);
         }

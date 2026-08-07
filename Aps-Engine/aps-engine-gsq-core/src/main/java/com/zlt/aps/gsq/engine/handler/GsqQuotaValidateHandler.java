@@ -149,6 +149,35 @@ public class GsqQuotaValidateHandler extends AbsGsqScheduleStepHandler {
 
             // 逐班次按优先级顺序填产能：availableCapacity 从机台有效定额开始逐规格扣减
             double availableCapacity = effectiveQuota;
+
+            // 单规格满排：该班次只剩一个备库规格时，若剩余需求仍大于机台定额，则直接按机台定额满排该班，
+            // 避免该规格每班只排分摊量（如500）导致备库量排产过慢、产能浪费；多出的剩余需求自然地延后到下一班
+            if (sortedSpecs.size() == 1) {
+                GsqScheduleResultVo onlySpec = sortedSpecs.get(0);
+                double onlyPlan = getClassPlanQty(onlySpec, classNum);
+                if (onlyPlan > 0 && isBackupSpec(onlySpec)) {
+                    double backupTarget = getBackupAllocatedQty(onlySpec);
+                    // 前序班次已排总量 = 1 ~ classNum-1 班计划量之和（不含当前班及后续班）
+                    double scheduledBefore = 0D;
+                    for (int c = 1; c < classNum; c++) {
+                        scheduledBefore = BigDecimalUtil.add(scheduledBefore, getClassPlanQty(onlySpec, c));
+                    }
+                    double remainingNeed = BigDecimalUtil.sub(backupTarget, scheduledBefore);
+                    double assignQty = Math.min(effectiveQuota, remainingNeed);
+                    if (assignQty > 0) {
+                        setClassPlanQty(onlySpec, classNum, assignQty);
+                        availableCapacity = BigDecimalUtil.sub(effectiveQuota, assignQty);
+                        // 剩余需求仍大于定额：多出的剩余需求延后到下一班（总量守恒，不超产）
+                        if (remainingNeed > effectiveQuota) {
+                            overflowCount += this.deferQty(context, onlySpec, machineCode, classNum,
+                                    BigDecimalUtil.sub(remainingNeed, assignQty), machineQuota);
+                        }
+                        // 单规格满排已处理完成，进入下一班次
+                        continue;
+                    }
+                }
+            }
+
             for (GsqScheduleResultVo spec : sortedSpecs) {
                 double plan = getClassPlanQty(spec, classNum);
                 if (plan <= 0) {
@@ -381,6 +410,22 @@ public class GsqQuotaValidateHandler extends AbsGsqScheduleStepHandler {
      */
     private void setClassPlanQty(GsqScheduleResultVo scheduleVo, int classNum, double value) {
         scheduleVo.setFieldValueByFieldName("class" + classNum + "PlanQty", value);
+    }
+
+    /**
+     * 获取备库分摊后的实际总计划量（S2.3/S3 写入，作为单规格满排的备库目标），
+     * 为空时回退到理论备库量 backupTotalQty。
+     *
+     * @param scheduleVo 排程记录
+     * @return 备库排产目标总量
+     */
+    private double getBackupAllocatedQty(GsqScheduleResultVo scheduleVo) {
+        Double allocatedQty = scheduleVo.getBackupAllocatedQty();
+        if (allocatedQty != null && allocatedQty > 0) {
+            return allocatedQty;
+        }
+        Double backupTotalQty = scheduleVo.getBackupTotalQty();
+        return backupTotalQty == null ? 0D : backupTotalQty;
     }
 
     /**

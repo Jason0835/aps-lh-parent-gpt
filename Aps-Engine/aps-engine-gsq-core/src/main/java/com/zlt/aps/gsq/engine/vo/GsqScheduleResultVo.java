@@ -251,6 +251,9 @@ public class GsqScheduleResultVo extends ApsBaseDto {
     /** 备库剩余待排量（S5.6 重算剩余产能时使用） */
     private Double backupRemainingQty;
 
+    /** 备库分摊后的实际总计划量（按损耗率乘数计算并分摊，S2.3/S3写入；S5.6 总量截断上限使用） */
+    private Double backupAllocatedQty;
+
     /** 工艺参数（运行时辅助参数传递，不持久化） */
     @ApiModelProperty(value = "工艺参数Map，运行时传递，不持久化")
     private transient Map<String, Object> params = new HashMap<>();

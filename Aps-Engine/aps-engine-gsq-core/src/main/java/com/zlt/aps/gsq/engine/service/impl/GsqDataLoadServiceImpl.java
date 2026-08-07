@@ -149,8 +149,12 @@ public class GsqDataLoadServiceImpl implements IGsqDataLoadService {
         log.info("[数据加载] 库存加载完成, 规格数: {}", stockMap.size());
 
         // 11. 加载损耗率（对齐胎圈TQ：从 T_GSQ_LOSS_SETTING 表读取并按钢丝圈代码聚合，供 S2.3 计算计划量使用）
-        context.setLossRateMap(buildSteelRingLossRateMap(gsqEngineLossMapper.listLossRate()));
-        log.info("[数据加载] 损耗率加载完成, 规格数: {}", context.getLossRateMap().size());
+        List<GsqLossVo> lossVoList = gsqEngineLossMapper.listLossRate();
+        context.setLossRateMap(buildSteelRingLossRateMap(lossVoList));
+        // 同时构建机台维度损耗率映射（key=机台代码#钢丝圈代码），供 S3 机台分配后按实际机台精确取损耗率
+        context.setMachineLossRateMap(buildMachineLossRateMap(lossVoList));
+        log.info("[数据加载] 损耗率加载完成, 规格数: {}, 机台维度条目数: {}",
+                context.getLossRateMap().size(), context.getMachineLossRateMap().size());
 
         log.info("[数据加载] 完成, 排程记录数: {}, 施工信息数: {}, 胎圈6班次记录数: {}",
                 scheduleList.size(), constructionInfoList.size(), tq6ShiftResultMap.size());
@@ -218,6 +222,34 @@ public class GsqDataLoadServiceImpl implements IGsqDataLoadService {
                 }
                 result.put(entry.getKey(), BigDecimalUtil.div(sum, rates.size(), 4));
             }
+        }
+        return result;
+    }
+
+    /**
+     * 构建机台维度损耗率映射（key=机台代码#钢丝圈代码，value=LOSS_RATE 字段小数原值）。
+     *
+     * <p>供 S3 机台分配确定后按实际机台精确取损耗率，解决按钢丝圈聚合取平均导致的失真问题
+     * （如 023 在 GSQM03 配置0.02、其它机台配置0.0826，聚合平均会得到0.0513）。</p>
+     *
+     * @param lossVoList 原始损耗率列表（key=机台#钢丝圈代码，value=LOSS_RATE 字段原值）
+     * @return 机台维度损耗率映射（key=机台代码#钢丝圈代码，value=LOSS_RATE 字段小数原值）
+     */
+    private Map<String, Double> buildMachineLossRateMap(List<GsqLossVo> lossVoList) {
+        Map<String, Double> result = new HashMap<>();
+        if (lossVoList == null || lossVoList.isEmpty()) {
+            return result;
+        }
+        for (GsqLossVo lossVo : lossVoList) {
+            String lossKey = lossVo.getLossKey();
+            if (lossKey == null || lossKey.trim().isEmpty() || lossVo.getLossRate() == null) {
+                continue;
+            }
+            // 仅保留有机台维度的 key（格式：机台代码#钢丝圈代码），纯 "#钢丝圈代码" 无机台条目略过
+            if (lossKey.startsWith("#")) {
+                continue;
+            }
+            result.put(lossKey, lossVo.getLossRate());
         }
         return result;
     }
