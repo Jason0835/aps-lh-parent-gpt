@@ -219,14 +219,6 @@ public interface MesItfService {
     AjaxResult syncMesCxStock(AuxReqSyncDataLogs syncDataLogs);
 
     /**
-     * 同步直裁库存（从 MES 中间表 T_MES_CD90_STOCK 同步到 t_cd90_stock）
-     *
-     * @param syncDataLogs 同步参数（可传 factoryCode、queryParams.shiftCode 覆盖自动推断班次）
-     * @return 结果
-     */
-    AjaxResult syncMesCd90Stock(AuxReqSyncDataLogs syncDataLogs);
-
-    /**
      * 实时查询MES生胎库存（不写入APS本地表，仅供成型排程实时调用）
      *
      * @param syncDataLogs 查询参数（可传factoryCode过滤分厂）

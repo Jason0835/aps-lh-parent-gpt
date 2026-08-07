@@ -820,6 +820,20 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
         // 3. 回填胎圈排程结果数据
         this.fillTqPlanQty(scheduleList);
 
+        // 3.1 批量查询施工信息（物料编码、钢丝类型、胎胚描述、单耗）
+        List<String> steelRingCodes = scheduleList.stream()
+                .map(GsqScheduleResult::getSteelRingCode)
+                .filter(StringUtils::isNotBlank)
+                .distinct()
+                .collect(Collectors.toList());
+        List<GsqScheduleBaseInfoVo> baseInfoList = gsqEngineService.listGsqScheduleBaseInfo(steelRingCodes);
+        Map<String, GsqScheduleBaseInfoVo> baseInfoMap = CollectionUtils.isEmpty(baseInfoList)
+                ? Collections.emptyMap()
+                : baseInfoList.stream().collect(Collectors.toMap(
+                        GsqScheduleBaseInfoVo::getSteelRingCode,
+                        vo -> vo,
+                        (v1, v2) -> v1));
+
         // 4. 将6班数据拆分为3天的下发列表
         List<GsqScheduleResultIssue> issueList = new ArrayList<>();
         for (GsqScheduleResult source : scheduleList) {
@@ -829,15 +843,15 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
             Date dPlus2Day = scheduleDate;
 
             // Day1(D日)：钢丝圈1班→MES中班
-            GsqScheduleResultIssue day1Issue = this.buildDay1Issue(source, dDay);
+            GsqScheduleResultIssue day1Issue = this.buildDay1Issue(source, dDay, baseInfoMap);
             issueList.add(day1Issue);
 
             // Day2(D+1日)：钢丝圈2班→MES夜班, 钢丝圈3班→MES早班, 钢丝圈4班→MES中班
-            GsqScheduleResultIssue day2Issue = this.buildDay2Issue(source, dPlus1Day);
+            GsqScheduleResultIssue day2Issue = this.buildDay2Issue(source, dPlus1Day, baseInfoMap);
             issueList.add(day2Issue);
 
             // Day3(D+2日)：钢丝圈5班→MES夜班, 钢丝圈6班→MES早班
-            GsqScheduleResultIssue day3Issue = this.buildDay3Issue(source, dPlus2Day);
+            GsqScheduleResultIssue day3Issue = this.buildDay3Issue(source, dPlus2Day, baseInfoMap);
             issueList.add(day3Issue);
         }
 
@@ -900,12 +914,14 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
      * 钢丝圈1班(D日中班) → MES中班(MID_PLAN_QTY)
      * 夜班、早班已过不下发，NEXT_MID不下发
      *
-     * @param source 钢丝圈排程结果
-     * @param dDay   D日日期
+     * @param source      钢丝圈排程结果
+     * @param dDay        D日日期
+     * @param baseInfoMap 施工信息Map
      * @return D日下发对象
      */
-    private GsqScheduleResultIssue buildDay1Issue(GsqScheduleResult source, Date dDay) {
-        GsqScheduleResultIssue issue = buildBaseIssue(source, dDay);
+    private GsqScheduleResultIssue buildDay1Issue(GsqScheduleResult source, Date dDay,
+                                                   Map<String, GsqScheduleBaseInfoVo> baseInfoMap) {
+        GsqScheduleResultIssue issue = buildBaseIssue(source, dDay, baseInfoMap);
         // 钢丝圈1班→MES中班
         issue.setMidPlanQty(source.getClass1PlanQty() != null ? source.getClass1PlanQty().doubleValue() : null);
         issue.setMidProduceOrder(source.getClass1Sequence());
@@ -926,12 +942,14 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
      * 钢丝圈4班(D+1日中班) → MES中班(MID_PLAN_QTY)
      * NEXT_MID不下发
      *
-     * @param source    钢丝圈排程结果
-     * @param dPlus1Day D+1日日期
+     * @param source      钢丝圈排程结果
+     * @param dPlus1Day   D+1日日期
+     * @param baseInfoMap 施工信息Map
      * @return D+1日下发对象
      */
-    private GsqScheduleResultIssue buildDay2Issue(GsqScheduleResult source, Date dPlus1Day) {
-        GsqScheduleResultIssue issue = buildBaseIssue(source, dPlus1Day);
+    private GsqScheduleResultIssue buildDay2Issue(GsqScheduleResult source, Date dPlus1Day,
+                                                   Map<String, GsqScheduleBaseInfoVo> baseInfoMap) {
+        GsqScheduleResultIssue issue = buildBaseIssue(source, dPlus1Day, baseInfoMap);
         // 钢丝圈2班→MES夜班
         issue.setNightPlanQty(source.getClass2PlanQty() != null ? source.getClass2PlanQty().doubleValue() : null);
         issue.setNightProduceOrder(source.getClass2Sequence());
@@ -953,12 +971,14 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
      * 钢丝圈6班(D+2日早班) → MES早班(DAY_PLAN_QTY)
      * 中班尚未排产不下发，NEXT_MID不下发
      *
-     * @param source    钢丝圈排程结果
-     * @param dPlus2Day D+2日日期
+     * @param source      钢丝圈排程结果
+     * @param dPlus2Day   D+2日日期
+     * @param baseInfoMap 施工信息Map
      * @return D+2日下发对象
      */
-    private GsqScheduleResultIssue buildDay3Issue(GsqScheduleResult source, Date dPlus2Day) {
-        GsqScheduleResultIssue issue = buildBaseIssue(source, dPlus2Day);
+    private GsqScheduleResultIssue buildDay3Issue(GsqScheduleResult source, Date dPlus2Day,
+                                                   Map<String, GsqScheduleBaseInfoVo> baseInfoMap) {
+        GsqScheduleResultIssue issue = buildBaseIssue(source, dPlus2Day, baseInfoMap);
         // 钢丝圈5班→MES夜班
         issue.setNightPlanQty(source.getClass5PlanQty() != null ? source.getClass5PlanQty().doubleValue() : null);
         issue.setNightProduceOrder(source.getClass5Sequence());
@@ -978,9 +998,11 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
      *
      * @param source       钢丝圈排程结果
      * @param scheduleDate MES目标日期
+     * @param baseInfoMap  施工信息Map（key=钢丝圈代码）
      * @return 基础下发对象
      */
-    private GsqScheduleResultIssue buildBaseIssue(GsqScheduleResult source, Date scheduleDate) {
+    private GsqScheduleResultIssue buildBaseIssue(GsqScheduleResult source, Date scheduleDate,
+                                                   Map<String, GsqScheduleBaseInfoVo> baseInfoMap) {
         GsqScheduleResultIssue issue = new GsqScheduleResultIssue();
         // 日期转换：Date → LocalDate
         issue.setScheduleDate(scheduleDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate());
@@ -988,8 +1010,19 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
         issue.setCxBatchNo(source.getCxBatchNo());
         issue.setBatchNo(source.getBatchNo());
         issue.setOrderNo(source.getOrderNo());
-        // 物料信息
+        // 物料信息（从施工信息表关联获取）
         issue.setSteelRingCode(source.getSteelRingCode());
+        GsqScheduleBaseInfoVo baseInfo = baseInfoMap.get(source.getSteelRingCode());
+        if (baseInfo != null) {
+            issue.setMaterialCode(baseInfo.getMaterialCode());
+            issue.setSteelType(baseInfo.getSteelType());
+            issue.setEmbryoSpecDesc(baseInfo.getEmbryoSpecDesc());
+            // 单耗：SQL中已硬编码为1，暂时使用默认值
+            issue.setUnitConsume(baseInfo.getUnitConsume() != null ? baseInfo.getUnitConsume() : 1.0);
+        } else {
+            // 施工信息查不到时，单耗默认设为1
+            issue.setUnitConsume(1.0);
+        }
         issue.setTwiningDiscCode(source.getTwiningDiscCode());
         issue.setProSize(source.getProSize());
         issue.setMachineCode(source.getMachineCode());

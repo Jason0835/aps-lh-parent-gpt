@@ -103,7 +103,6 @@ public class Cd90MachineInfoServiceImpl extends AbstractDocService<Cd90MachineIn
                 importList.add(docEntity);
             } else if (updateSupport) {
                 exist.setMachineName(docEntity.getMachineName());
-                exist.setIsStickFilm(docEntity.getIsStickFilm());
                 exist.setClothWidthMax(docEntity.getClothWidthMax());
                 exist.setClothWidthMin(docEntity.getClothWidthMin());
                 exist.setQuota(docEntity.getQuota());

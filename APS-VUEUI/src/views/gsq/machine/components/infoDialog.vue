@@ -100,7 +100,7 @@ export default {
           render: (form) => {
             return (
               <el-radio-group v-model={form.classShift}>
-                {this.parentDict.type.CLASS_SHIFT.map((row) => {
+                {this.parentDict.type.LH_CLASS_SHIFT.map((row) => {
                   return (
                     <el-radio key={row.value} label={row.value}>
                       {row.label}
@@ -115,37 +115,20 @@ export default {
           label: this.$t("ui.data.column.machine.openMachineClass"),
           prop: "openMachineClass",
           render: (form) => {
-            if (form.classShift == "2") {
-              return (
-                <el-checkbox-group v-model={form.openMachineClass}>
-                  {this.parentDict.type.CLASS_NUM.map((row) => {
-                    return (
-                      <el-checkbox
-                        key={`CLASS_NUM_${row.value}`}
-                        label={row.value}
-                      >
-                        {row.label}
-                      </el-checkbox>
-                    );
-                  })}
-                </el-checkbox-group>
-              );
-            } else {
-              return (
-                <el-checkbox-group v-model={form.openMachineClass}>
-                  {this.parentDict.type.CLASS_NUM_THREE.map((row) => {
-                    return (
-                      <el-checkbox
-                        key={`CLASS_NUM_THREE_${row.value}`}
-                        label={row.value}
-                      >
-                        {row.label}
-                      </el-checkbox>
-                    );
-                  })}
-                </el-checkbox-group>
-              );
-            }
+            return (
+              <el-checkbox-group v-model={form.openMachineClass}>
+                {this.parentDict.type.class_num_three_plan.map((row) => {
+                  return (
+                    <el-checkbox
+                      key={`class_num_three_plan_${row.value}`}
+                      label={row.value}
+                    >
+                      {row.label}
+                    </el-checkbox>
+                  );
+                })}
+              </el-checkbox-group>
+            );
           },
         },
         {

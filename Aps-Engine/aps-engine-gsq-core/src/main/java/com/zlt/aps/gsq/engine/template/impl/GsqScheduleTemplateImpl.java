@@ -4,10 +4,12 @@ import com.zlt.aps.gsq.engine.context.GsqScheduleContext;
 import com.zlt.aps.gsq.engine.handler.GsqBalanceHandler;
 import com.zlt.aps.gsq.engine.handler.GsqDemandCalcHandler;
 import com.zlt.aps.gsq.engine.handler.GsqMachineAssignHandler;
+import com.zlt.aps.gsq.engine.handler.GsqPlanQtyCalcHandler;
 import com.zlt.aps.gsq.engine.handler.GsqPreValidationHandler;
 import com.zlt.aps.gsq.engine.handler.GsqQuotaValidateHandler;
 import com.zlt.aps.gsq.engine.handler.GsqResidualCapacityHandler;
 import com.zlt.aps.gsq.engine.handler.GsqResultValidationHandler;
+import com.zlt.aps.gsq.engine.handler.GsqStockPredictHandler;
 import com.zlt.aps.gsq.engine.handler.GsqStopCoordinationHandler;
 import com.zlt.aps.gsq.engine.template.AbsGsqScheduleTemplate;
 import lombok.extern.slf4j.Slf4j;
@@ -18,7 +20,7 @@ import javax.annotation.Resource;
 /**
  * 钢丝圈排程模板方法实现。
  *
- * <p>绑定8个Handler，按顺序执行 S1 → S2 → S3 → S4 → S5 → S5.5 → S5.6 → S6。</p>
+ * <p>绑定10个Handler，按顺序执行 S1 → S2.1 → S2.2 → S2.3 → S3 → S4 → S5 → S5.5 → S5.6 → S6。</p>
  *
  * @author APS
  */
@@ -30,7 +32,13 @@ public class GsqScheduleTemplateImpl extends AbsGsqScheduleTemplate {
     private GsqPreValidationHandler preValidationHandler;
 
     @Resource
-    private GsqDemandCalcHandler demandCalcHandler;
+    private GsqStockPredictHandler stockPredictHandler;
+
+    @Resource
+    private GsqDemandCalcHandler demandQtyHandler;
+
+    @Resource
+    private GsqPlanQtyCalcHandler planQtyCalcHandler;
 
     @Resource
     private GsqMachineAssignHandler machineAssignHandler;
@@ -56,8 +64,18 @@ public class GsqScheduleTemplateImpl extends AbsGsqScheduleTemplate {
     }
 
     @Override
-    protected void doDemandCalc(GsqScheduleContext context) {
-        demandCalcHandler.handle(context);
+    protected void doStockPredict(GsqScheduleContext context) {
+        stockPredictHandler.handle(context);
+    }
+
+    @Override
+    protected void doDemandQty(GsqScheduleContext context) {
+        demandQtyHandler.handle(context);
+    }
+
+    @Override
+    protected void doPlanQty(GsqScheduleContext context) {
+        planQtyCalcHandler.handle(context);
     }
 
     @Override

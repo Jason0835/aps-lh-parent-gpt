@@ -231,12 +231,12 @@ public class Cd15AutoScheduleInputVersionServiceImpl implements Cd15AutoSchedule
                                 Date.valueOf(resourceBaselineDate))
                         .eq(Cd15StorageLaneLimit::getShiftCode,
                                 resourceBaselineShiftCode)
-                        .orderByAsc(Cd15StorageLaneLimit::getId))
+                        .orderByAsc(Cd15StorageLaneLimit::getStorageLaneCode))
                 .stream()
-                .map(item -> this.row(item.getId(), item.getLaneDate(), item.getMaterialCode(),
+                .map(item -> this.row(item.getFactoryCode(), item.getLaneDate(), item.getMaterialCode(),
                         item.getShiftCode(), item.getStorageLaneCode(), item.getCarNum(),
-                        item.getMaxCarNum(), item.getDataSource(), item.getMesSyncTime(),
-                        item.getUpdateTime()))
+                        item.getMaxCarNum(), item.getAvailableCarNum(), item.getDataSource(),
+                        item.getMesSyncTime()))
                 .collect(Collectors.joining("|"));
         String parameters = paramsMapper.selectList(Wrappers.<Cd15Params>lambdaQuery()
                         .eq(Cd15Params::getFactoryCode, factoryCode)

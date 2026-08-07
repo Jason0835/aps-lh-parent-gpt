@@ -37,5 +37,5 @@ public interface GsqEngineMachineService {
      * @param scheduleDate
      * @return
      */
-    Map<String, Long> getLastDayPlanMachine(Date scheduleDate);
+    Map<String, String> getLastDayPlanMachine(Date scheduleDate);
 }

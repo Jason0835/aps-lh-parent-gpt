@@ -8,6 +8,7 @@ import com.zlt.aps.gsq.engine.vo.GsqRollingUpdateResult;
 import com.zlt.aps.gsq.service.GsqAutoRollingAsyncExecutor;
 import com.zlt.aps.gsq.service.GsqBackgroundTaskService;
 import com.zlt.aps.gsq.service.IGsqRollingUpdateService;
+import com.zlt.aps.gsq.engine.event.GsqScheduleEventPublisher;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -39,6 +40,7 @@ public class GsqAutoRollingAsyncExecutorImpl implements GsqAutoRollingAsyncExecu
 
     private final GsqBackgroundTaskService backgroundTaskService;
     private final IGsqRollingUpdateService gsqRollingUpdateService;
+    private final GsqScheduleEventPublisher scheduleEventPublisher;
 
     /**
      * 异步执行自动滚动任务。
@@ -81,6 +83,13 @@ public class GsqAutoRollingAsyncExecutorImpl implements GsqAutoRollingAsyncExecu
 
         GsqRollingUpdateResult updateResult = this.gsqRollingUpdateService.autoRollingUpdate(
                 task.getScheduleDate(), task.getTargetShiftOrder(), task.getFactoryCode());
+
+        // 发布自动滚动完成事件（供下游监听器消费，解耦通知/审计/下游排程）
+        this.scheduleEventPublisher.publishAutoRollingEvent(
+                task.getFactoryCode(), task.getScheduleDate(), task.getTargetShiftOrder(),
+                updateResult.getBatchNo(), updateResult.isSuccess() ? "SUCCESS" : "FAILED",
+                updateResult.getAffectedCount(), updateResult.getBeforeStockQty(),
+                updateResult.getAfterStockQty());
 
         this.backgroundTaskService.updateProgress(task.getTaskId(), 90,
                 GsqScheduleConstants.ROLLING_STAGE_PERSISTING,

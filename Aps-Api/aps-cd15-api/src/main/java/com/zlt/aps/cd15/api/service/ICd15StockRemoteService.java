@@ -56,4 +56,12 @@ public interface ICd15StockRemoteService {
     @ApiOperation("导入斜裁库存")
     @PostMapping("/cd15Stock/importData")
     AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport);
+
+    /** 按工厂和库存日期替换MES库存快照。 */
+    @ApiOperation("替换斜裁MES库存快照")
+    @PostMapping("/cd15Stock/logicDeleteAndSaveMesBatch")
+    AjaxResult logicDeleteAndSaveMesBatch(@RequestParam("factoryCode") String factoryCode,
+                                          @RequestParam("stockDate") String stockDate,
+                                          @RequestParam("updateBy") String updateBy,
+                                          @RequestBody List<Cd15Stock> stockList);
 }

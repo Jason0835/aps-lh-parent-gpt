@@ -9,7 +9,7 @@ import com.zlt.aps.gsq.engine.vo.GsqTwiningDiscVo;
 import lombok.extern.slf4j.Slf4j;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.math.NumberUtils;
+
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
@@ -93,9 +93,9 @@ public class GsqEngineMachineServiceImpl implements GsqEngineMachineService {
      * @return
      */
     @Override
-    public Map<String, Long> getLastDayPlanMachine(Date scheduleDate) {
+    public Map<String, String> getLastDayPlanMachine(Date scheduleDate) {
         return gsqEngineMachineMapper.listLastDayPlanMachine(scheduleDate).stream()
-                .filter(r -> NumberUtils.isDigits(r.getMachineIds()) && StringUtils.isNotEmpty(r.getSteelRingCode()))
-                .collect(Collectors.toMap(GsqSpecifyMachineVo::getSteelRingCode, r -> new Long(r.getMachineIds())));
+                .filter(r -> StringUtils.isNotEmpty(r.getMachineIds()) && StringUtils.isNotEmpty(r.getSteelRingCode()))
+                .collect(Collectors.toMap(GsqSpecifyMachineVo::getSteelRingCode, GsqSpecifyMachineVo::getMachineIds));
     }
 }

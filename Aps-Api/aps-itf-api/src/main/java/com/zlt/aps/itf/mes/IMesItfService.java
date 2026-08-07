@@ -258,6 +258,51 @@ public interface IMesItfService {
     public AjaxResult syncMesCd90Stock(@RequestBody AuxReqSyncDataLogs syncDataLogs);
 
     /**
+     * 同步直裁库排状态。
+     *
+     * @param syncDataLogs 同步参数
+     * @return 同步结果
+     */
+    @ApiOperation("同步直裁库排状态")
+    @PostMapping("/mesItf/syncCd90StorageLaneLimit")
+    AjaxResult syncCd90StorageLaneLimit(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 同步直裁自动滚动目标班次库存。
+     *
+     * @param request 工厂、库存日期、班次编码和班次开始时间
+     * @return 同步结果
+     */
+    @ApiOperation("同步直裁自动滚动班次库存")
+    @PostMapping("/mesItf/syncCd90ShiftStock")
+    AjaxResult syncCd90ShiftStock(@RequestBody MesShiftStockSyncRequest request);
+
+    /** 同步斜裁库存。 */
+    @ApiOperation("同步斜裁库存")
+    @PostMapping("/mesItf/syncMesCd15Stock")
+    AjaxResult syncMesCd15Stock(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /** 同步斜裁库排状态。 */
+    @ApiOperation("同步斜裁库排状态")
+    @PostMapping("/mesItf/syncCd15StorageLaneLimit")
+    AjaxResult syncCd15StorageLaneLimit(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /** 同步斜裁自动滚动目标班次库存。 */
+    @ApiOperation("同步斜裁自动滚动班次库存")
+    @PostMapping("/mesItf/syncCd15ShiftStock")
+    AjaxResult syncCd15ShiftStock(@RequestBody MesShiftStockSyncRequest request);
+
+    /**
+     * 同步直裁每日三班完成量
+     *
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    @ApiOperation("同步直裁每日三班完成量")
+    @PostMapping("/mesItf/syncCd90ClassShiftFinishQty")
+    public AjaxResult syncCd90ClassShiftFinishQty(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /**
      * 实时查询MES生胎库存（不写入APS本地表，仅供成型排程实时调用）
      * @param syncDataLogs 参数（可传factoryCode过滤分厂）
      * @return 生胎库存列表

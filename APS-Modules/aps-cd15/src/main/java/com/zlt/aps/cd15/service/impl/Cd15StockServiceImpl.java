@@ -1,5 +1,6 @@
 package com.zlt.aps.cd15.service.impl;
 
+import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
@@ -16,17 +17,22 @@ import com.zlt.sysdef.domain.SysDocType;
 import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import lombok.extern.slf4j.Slf4j;
 
 import javax.annotation.Resource;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
+import java.util.Date;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * 斜裁库存管理 Service 实现。
  */
 @Service
+@Slf4j
 @Transactional(rollbackFor = Exception.class)
 public class Cd15StockServiceImpl extends AbstractDocService<Cd15Stock> implements ICd15StockService {
 
@@ -100,6 +106,59 @@ public class Cd15StockServiceImpl extends AbstractDocService<Cd15Stock> implemen
             return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum, errorList);
         }
         return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + successNum);
+    }
+
+    @Override
+    public void logicDeleteAndSaveBatch(String factoryCode, Date stockDate,
+                                        String updateBy, List<Cd15Stock> stockList) {
+        Date normalizedStockDate = DateUtil.beginOfDay(stockDate);
+        List<Cd15Stock> normalizedList = stockList == null
+                ? new ArrayList<>() : new ArrayList<>(stockList);
+        normalizedList.sort(Comparator.comparing(Cd15Stock::getMaterialCode));
+        List<Cd15Stock> existingList = cd15StockMapper.selectList(
+                new LambdaQueryWrapper<Cd15Stock>()
+                        .eq(Cd15Stock::getFactoryCode, factoryCode)
+                        .eq(Cd15Stock::getStockDate, normalizedStockDate)
+                        .orderByAsc(Cd15Stock::getMaterialCode));
+        if (isSameMesSnapshot(existingList, normalizedList)) {
+            log.info("斜裁MES库存快照未变化，跳过替换：factoryCode={}，stockDate={}，数量={}",
+                    factoryCode, DateUtil.formatDate(normalizedStockDate), normalizedList.size());
+            return;
+        }
+        Date now = new Date();
+        cd15StockMapper.logicDeleteByScope(factoryCode, normalizedStockDate, updateBy, now);
+        normalizedList.forEach(stock -> {
+            stock.setFactoryCode(factoryCode);
+            stock.setStockDate(normalizedStockDate);
+            stock.setCreateBy(updateBy);
+            stock.setUpdateBy(updateBy);
+            stock.setCreateTime(now);
+            stock.setUpdateTime(now);
+            stock.setIsDelete(0);
+        });
+        if (CollectionUtils.isNotEmpty(normalizedList)) {
+            baseDao.saveBatch(normalizedList);
+        }
+    }
+
+    private boolean isSameMesSnapshot(List<Cd15Stock> existingList, List<Cd15Stock> incomingList) {
+        if (existingList == null || existingList.size() != incomingList.size()) {
+            return false;
+        }
+        for (int index = 0; index < existingList.size(); index++) {
+            Cd15Stock existing = existingList.get(index);
+            Cd15Stock incoming = incomingList.get(index);
+            if (!Objects.equals(existing.getMaterialCode(), incoming.getMaterialCode())
+                    || !Objects.equals(existing.getStockNum(), incoming.getStockNum())
+                    || !Objects.equals(existing.getModifyNum(), incoming.getModifyNum())
+                    || !Objects.equals(existing.getBadNum(), incoming.getBadNum())
+                    || !Objects.equals(existing.getRollStockNum(), incoming.getRollStockNum())
+                    || !Objects.equals(existing.getRollModifyNum(), incoming.getRollModifyNum())
+                    || !Objects.equals(existing.getRollBadNum(), incoming.getRollBadNum())) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**

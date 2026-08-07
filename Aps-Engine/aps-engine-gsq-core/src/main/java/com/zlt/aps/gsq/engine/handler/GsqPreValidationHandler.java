@@ -18,6 +18,7 @@ import javax.annotation.Resource;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * S1: 钢丝圈前置校验与数据加载Handler。
@@ -133,6 +134,13 @@ public class GsqPreValidationHandler extends AbsGsqScheduleStepHandler {
             scheduleVo.setOrderNo(generateOrderNo(batchNo, orderSeq[0]++));
             // 库存
             scheduleVo.setStockQty(context.getStockMap().getOrDefault(scheduleVo.getSteelRingCode(), 0D));
+            // 缠绕盘代码（从钢丝圈-缠绕盘绑定映射回填）
+            scheduleVo.setTwiningDiscCode(context.getTwiningDiscCodeMap().get(scheduleVo.getSteelRingCode()));
+            // 月计划剩余量（对齐胎圈TQ：从月计划剩余量映射按钢丝圈代码取值）
+            double remainQty = Optional.ofNullable(context.getMonthSurplusMap().get(scheduleVo.getSteelRingCode()))
+                    .map(vo -> vo.getMonthRemainQty())
+                    .orElse(0D);
+            scheduleVo.setMonthSurplusQty((int) remainQty);
             // 前日早班计划量
             scheduleVo.setLastMidPlanQty(context.getLastMidPlanMap().getOrDefault(scheduleVo.getSteelRingCode(), 0D));
             // 预计库存 = 当前库存 + 前日早班计划量 - 胎圈1班消耗量
