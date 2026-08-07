@@ -74,6 +74,7 @@
         NULL AS BOARDING_DATE,
         mmi.MOULD_CODE AS BASE_MOULD_CODE,
         mmi.MOULD_TYPE,
+        mmi.SPECIFICATIONS,
         mmi.MOULD_STATUS,
         mmi.SHELL_STANDARD,
         mmi.LOGISTICS_STATUS,
