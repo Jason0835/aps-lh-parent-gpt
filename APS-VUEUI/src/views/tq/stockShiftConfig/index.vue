@@ -21,23 +21,21 @@
         <el-button
           v-hasPermi="['tq:stockShiftConfig:add']"
           type="primary"
-          plain
           @click="handleAdd"
           >{{ $t("ui.frame.btn.add") }}</el-button
         >
         <el-button
           v-hasPermi="['tq:stockShiftConfig:edit']"
-          type="primary"
-          plain
+          type="warning"
           @click="() => handleEdit(selection[0])"
           :disabled="selection.length != 1"
           >{{ $t("ui.frame.btn.modify") }}</el-button
         >
         <el-button
           type="danger"
-          plain
           v-hasPermi="['tq:stockShiftConfig:remove']"
           @click="handleBatchDelete"
+          :disabled="selection.length === 0"
           >{{ $t("ui.frame.btn.delete") }}</el-button
         >
         <el-button
@@ -73,11 +71,12 @@ import {
 } from "@/api/tq/stockShiftConfig";
 import InfoDialog from "./components/infoDialog.vue";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
+import { getConfigKey } from "@/api/system/config";
 
 export default {
   name: "TqStockShiftConfig",
   components: { InfoDialog, TltUploadForm },
-  dicts: ["biz_factory_name", "machine_range"],
+  dicts: ["biz_factory_name"],
   provide() {
     return {
       parentDict: this.dict,
@@ -131,15 +130,8 @@ export default {
           filterable: true,
         },
         {
-          label: this.$t("ui.data.column.stockShiftConfig.machineRange"),
-          prop: "machineRange",
-          type: "select",
-          dictData: this.dict.type.machine_range,
-          filterable: true,
-        },
-        {
-          label: this.$t("ui.data.column.stockShiftConfig.machineCount"),
-          prop: "machineCount",
+          label: this.$t("ui.tq.depthConfig.column.minMachineQty"),
+          prop: "minMachineQty",
           type: "number",
         },
       ];
@@ -161,26 +153,23 @@ export default {
           },
         },
         {
-          label: this.$t("ui.data.column.stockShiftConfig.machineRange"),
-          prop: "machineRange",
+          label: this.$t("ui.tq.depthConfig.column.minMachineQty"),
+          prop: "minMachineQty",
+          minWidth: 120,
+        },
+        {
+          label: this.$t("ui.tq.depthConfig.column.maxMachineQty"),
+          prop: "maxMachineQty",
           minWidth: 120,
           formatter: (row) => {
-            return (
-              this.selectDictLabel(
-                this.dict.type.machine_range,
-                row.machineRange
-              ) || "-"
-            );
+            return row.maxMachineQty != null && row.maxMachineQty !== undefined
+              ? row.maxMachineQty
+              : "∞";
           },
         },
         {
-          label: this.$t("ui.data.column.stockShiftConfig.machineCount"),
-          prop: "machineCount",
-          minWidth: 120,
-        },
-        {
-          label: this.$t("ui.data.column.stockShiftConfig.shiftCount"),
-          prop: "shiftCount",
+          label: this.$t("ui.tq.depthConfig.column.depthClassQty"),
+          prop: "depthClassQty",
           minWidth: 120,
         },
         {
@@ -206,7 +195,7 @@ export default {
                 <el-button
                   v-hasPermi={["tq:stockShiftConfig:edit"]}
                   class="minus"
-                  type="primary"
+                  type="success"
                   onClick={() => this.handleEdit(row)}
                 >
                   {this.$t("ui.frame.btn.modify")}
@@ -229,7 +218,7 @@ export default {
   methods: {
     handleAdd() {
       if (this.$refs.infoDialogRef) {
-        this.$refs.infoDialogRef.show();
+        this.$refs.infoDialogRef.show(null, this.query.factoryCode);
       }
     },
     handleEdit(row) {
@@ -355,7 +344,13 @@ export default {
       }
     },
   },
-  created() {},
+  created() {
+    getConfigKey("sys.factory.code")
+      .then((response) => {
+        this.query.factoryCode = response.msg;
+      })
+      .catch(() => {});
+  },
   activated() {
     this.getList();
   },

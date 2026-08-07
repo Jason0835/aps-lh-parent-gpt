@@ -125,13 +125,6 @@ export default {
           },
         },
         {
-          prop: "shiftCode",
-          label: this.$t("ui.data.column.tmGlueMachineReal.shiftCode"),
-          type: "select",
-          span: 12,
-          dictData: this.parentDict.type.class_num_three_plan,
-        },
-        {
           prop: "priority",
           label: this.$t("ui.data.column.tmGlueMachineReal.priority"),
           span: 12,

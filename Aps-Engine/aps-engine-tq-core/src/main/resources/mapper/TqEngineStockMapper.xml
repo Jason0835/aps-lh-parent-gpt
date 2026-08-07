@@ -29,13 +29,14 @@
         group by cxr.TIRE_RING_CODE
     </select>
 
-    <!-- 查询胎圈库存（直接取排程当日库存），IS_DELETE为逻辑删除字段 -->
-    <!-- 业务背景：MES库存系统生成的库存记录STOCK_DATE为当天日期，
-         故直接按排程日期取当天库存，不再减1天 -->
+    <!-- 查询胎圈库存（取排程日期前一天的库存），IS_DELETE为逻辑删除字段 -->
+    <!-- 业务背景：排程日期 scheduleDate 对应的"当天"（排程执行日）为 scheduleDate-1，
+         胎圈6班次覆盖 D 日中班~D+2 日早班，排程基准应取当天（D日）的6点库存，
+         故按排程日期减1天取库存（listTqStock 取 scheduleDate-1 的库存）。 -->
     <select id="listTqStock" resultType="com.zlt.aps.tq.engine.vo.TqStockVo">
         select BEAD_CODE, SUM(IFNULL(STOCK_NUM,0)+IFNULL(MODIFY_NUM,0)-IFNULL(BAD_NUM,0)) STOCK_NUM
         from T_TQ_STOCK
-        where STOCK_DATE = STR_TO_DATE(#{stockDate}, '%Y-%m-%d') /*直接取排程当日库存*/
+        where STOCK_DATE = DATE_ADD(STR_TO_DATE(#{stockDate}, '%Y-%m-%d'), INTERVAL -1 DAY) /*取排程日期前一天库存*/
         and IS_DELETE = '0'
         <if test="factoryCode != null and factoryCode != ''">
             and FACTORY_CODE = #{factoryCode}

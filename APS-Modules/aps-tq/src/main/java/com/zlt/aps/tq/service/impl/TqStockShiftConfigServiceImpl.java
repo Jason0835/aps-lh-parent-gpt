@@ -43,20 +43,19 @@ public class TqStockShiftConfigServiceImpl extends AbstractDocService<TqStockShi
 
     @Override
     protected List<String> getCheckUniqueFields() {
-        // 唯一性字段：分厂编码 + 机台范围 + 机台数
-        return Arrays.asList("factoryCode", "machineRange", "machineCount");
+        // 唯一性字段：分厂编码 + 区间起始机台数
+        return Arrays.asList("factoryCode", "minMachineQty");
     }
 
     /**
-     * 校验唯一性：分厂编码 + 机台范围 + 机台数
+     * 校验唯一性：分厂编码 + 区间起始机台数
      */
     @Override
     public String checkUnique(TqStockShiftConfig config) {
         LambdaQueryWrapper<TqStockShiftConfig> wrapper = new LambdaQueryWrapper<>();
         wrapper.ne(config.getId() != null, TqStockShiftConfig::getId, config.getId());
         wrapper.eq(TqStockShiftConfig::getFactoryCode, config.getFactoryCode());
-        wrapper.eq(TqStockShiftConfig::getMachineRange, config.getMachineRange());
-        wrapper.eq(TqStockShiftConfig::getMachineCount, config.getMachineCount());
+        wrapper.eq(TqStockShiftConfig::getMinMachineQty, config.getMinMachineQty());
         if (tqStockShiftConfigMapper.selectCount(wrapper) > 0) {
             return UserConstants.NOT_UNIQUE;
         }
@@ -64,71 +63,98 @@ public class TqStockShiftConfigServiceImpl extends AbstractDocService<TqStockShi
     }
 
     /**
-     * 校验配置规则的交叉情况
+     * 校验配置区间的连续性和完整性
      * <p>
      * 规则说明：
-     * - MACHINE_RANGE 与 MACHINE_COUNT 组合构成范围条件
-     * - 不同规则的范围不允许有交集，确保任意台数值最多只命中一条规则
-     * - 例如：已有「GE 3」(≥3)，不允许再新增「LE 5」(≤5)，因为台数4同时满足两条规则
+     * - 所有区间段必须连续且不重叠
+     * - 第1条 MIN_MACHINE_QTY 必须为 1
+     * - 后续行 MIN_MACHINE_QTY = 上一行 MAX_MACHINE_QTY + 1
+     * - 只有末行允许 MAX_MACHINE_QTY 为 NULL（无上限）
+     * - 若有缺口（未被覆盖的正整数）或重叠，校验失败
      * </p>
      */
     @Override
     public String checkRangeCross(TqStockShiftConfig config) {
+        if (config.getMinMachineQty() == null) {
+            return UserConstants.NOT_UNIQUE;
+        }
         // 查询同一工厂下的所有配置（排除自身）
         LambdaQueryWrapper<TqStockShiftConfig> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(TqStockShiftConfig::getFactoryCode, config.getFactoryCode());
         queryWrapper.ne(config.getId() != null, TqStockShiftConfig::getId, config.getId());
         List<TqStockShiftConfig> existingList = tqStockShiftConfigMapper.selectList(queryWrapper);
 
-        if (existingList.isEmpty()) {
-            return UserConstants.UNIQUE;
-        }
-
-        // 计算新规则的范围区间 [start, end]
-        long[] newRange = calculateRange(config.getMachineRange(), config.getMachineCount());
-
-        for (TqStockShiftConfig existing : existingList) {
-            long[] existingRange = calculateRange(existing.getMachineRange(), existing.getMachineCount());
-            // 两个区间有交集则视为交叉
-            if (newRange[0] <= existingRange[1] && existingRange[0] <= newRange[1]) {
-                return UserConstants.NOT_UNIQUE;
+        if (config.getId() == null) {
+            // 新增：将新增行并入列表，统一做整表连续性校验
+            existingList.add(config);
+        } else {
+            // 修改：用新数据替换原行（找不到则追加），再统一做整表连续性校验
+            boolean replaced = false;
+            for (int i = 0; i < existingList.size(); i++) {
+                if (existingList.get(i).getId() != null && existingList.get(i).getId().equals(config.getId())) {
+                    existingList.set(i, config);
+                    replaced = true;
+                    break;
+                }
+            }
+            if (!replaced) {
+                existingList.add(config);
             }
         }
 
-        return UserConstants.UNIQUE;
+        // 按 minMachineQty 升序排列
+        existingList.sort((a, b) -> {
+            int minA = a.getMinMachineQty() != null ? a.getMinMachineQty() : Integer.MAX_VALUE;
+            int minB = b.getMinMachineQty() != null ? b.getMinMachineQty() : Integer.MAX_VALUE;
+            return Integer.compare(minA, minB);
+        });
+
+        return validateContinuity(existingList);
     }
 
     /**
-     * 将规则转换为整数范围区间 [start, end]
+     * 校验整表区间连续性
      * <p>
-     * 各范围对应的区间（MACHINE_COUNT 为非负整数）：
-     * - LT(N): [0, N-1]      小于
-     * - LE(N): [0, N]        小于等于
-     * - EQ(N): [N, N]        等于
-     * - GE(N): [N, +∞) 用 [N, Integer.MAX_VALUE] 表示
-     * - GT(N): [N+1, +∞) 用 [N+1, Integer.MAX_VALUE] 表示
+     * 第1条 MIN 必须为 1；区间必须连续；只能有 1 条无上限且必须位于末行。
      * </p>
      *
-     * @param machineRange 范围条件（LT/LE/EQ/GE/GT）
-     * @param machineCount 台数值
-     * @return 长度2的数组，[start, end]
+     * @param list 按 minMachineQty 升序排序的配置列表
+     * @return UserConstants.UNIQUE 合法 / UserConstants.NOT_UNIQUE 不合法
      */
-    private long[] calculateRange(String machineRange, Integer machineCount) {
-        int qty = machineCount != null ? machineCount : 0;
-        switch (machineRange) {
-            case "LT": // 小于 N
-                return new long[]{0, qty - 1L};
-            case "LE": // 小于等于 N
-                return new long[]{0, qty};
-            case "EQ": // 等于 N
-                return new long[]{qty, qty};
-            case "GE": // 大于等于 N
-                return new long[]{qty, Integer.MAX_VALUE};
-            case "GT": // 大于 N
-                return new long[]{qty + 1L, Integer.MAX_VALUE};
-            default:
-                return new long[]{0, 0};
+    private String validateContinuity(List<TqStockShiftConfig> list) {
+        if (list.isEmpty()) {
+            return UserConstants.UNIQUE;
         }
+        // 第1条 MIN 必须为 1
+        TqStockShiftConfig first = list.get(0);
+        if (first.getMinMachineQty() == null || first.getMinMachineQty() != 1) {
+            return UserConstants.NOT_UNIQUE;
+        }
+        boolean hasUnbounded = false;
+        for (int i = 0; i < list.size(); i++) {
+            TqStockShiftConfig current = list.get(i);
+            if (current.getMinMachineQty() == null || current.getDepthClassQty() == null) {
+                return UserConstants.NOT_UNIQUE;
+            }
+            if (current.getMaxMachineQty() == null) {
+                if (hasUnbounded) {
+                    return UserConstants.NOT_UNIQUE; // 多个无上限
+                }
+                hasUnbounded = true;
+                if (i != list.size() - 1) {
+                    return UserConstants.NOT_UNIQUE; // 非末行无上限
+                }
+            }
+            if (!hasUnbounded && i < list.size() - 1) {
+                // 检查与下一行连续性
+                TqStockShiftConfig next = list.get(i + 1);
+                int expectedNextMin = current.getMaxMachineQty() + 1;
+                if (next.getMinMachineQty() == null || next.getMinMachineQty() != expectedNextMin) {
+                    return UserConstants.NOT_UNIQUE;
+                }
+            }
+        }
+        return UserConstants.UNIQUE;
     }
 
     @Override
@@ -162,29 +188,26 @@ public class TqStockShiftConfigServiceImpl extends AbstractDocService<TqStockShi
         List<ImportErrorLog> importErrorLogs = new ArrayList<>();
         List<TqStockShiftConfig> importList = new ArrayList<>();
 
-        // 按分厂+机台范围+机台数分组，校验导入数据内部重复
+        // 按分厂+区间起始机台数分组，校验导入数据内部重复
         Map<String, Long> groupMap = list.stream()
                 .collect(Collectors.groupingBy(
                         a -> (a.getFactoryCode() == null ? "" : a.getFactoryCode())
-                                + "_" + (a.getMachineRange() == null ? "" : a.getMachineRange())
-                                + "_" + a.getMachineCount(),
+                                + "_" + a.getMinMachineQty(),
                         Collectors.counting()));
 
         for (int i = 0; i < list.size(); i++) {
             TqStockShiftConfig config = list.get(i);
 
             String groupKey = (config.getFactoryCode() == null ? "" : config.getFactoryCode())
-                    + "_" + (config.getMachineRange() == null ? "" : config.getMachineRange())
-                    + "_" + config.getMachineCount();
+                    + "_" + config.getMinMachineQty();
             Long hasValue = groupMap.get(groupKey);
             if (hasValue != null && hasValue > 1) {
                 failureNum++;
                 config.setId(-999L);
                 String message = I18nUtil.getMessage("ui.data.column.all.conflictRecord");
                 String columnName = I18nUtil.getMessage("ui.data.column.factoryCode");
-                String columnName2 = I18nUtil.getMessage("ui.data.column.stockShiftConfig.machineRange");
-                String columnName3 = I18nUtil.getMessage("ui.data.column.stockShiftConfig.machineCount");
-                message = String.format(message, columnName + "+" + columnName2 + "+" + columnName3);
+                String columnName2 = I18nUtil.getMessage("ui.tq.depthConfig.column.minMachineQty");
+                message = String.format(message, columnName + "+" + columnName2);
                 addImportErrorLog(importLogId, i + 2, message, importErrorLogs);
                 continue;
             }
@@ -221,8 +244,7 @@ public class TqStockShiftConfigServiceImpl extends AbstractDocService<TqStockShi
                     }
                     LambdaQueryWrapper<TqStockShiftConfig> wrapper = new LambdaQueryWrapper<>();
                     wrapper.eq(TqStockShiftConfig::getFactoryCode, excelItem.getFactoryCode());
-                    wrapper.eq(TqStockShiftConfig::getMachineRange, excelItem.getMachineRange());
-                    wrapper.eq(TqStockShiftConfig::getMachineCount, excelItem.getMachineCount());
+                    wrapper.eq(TqStockShiftConfig::getMinMachineQty, excelItem.getMinMachineQty());
                     // IS_DELETE=0 已由 @TableLogic 自动处理，无需手动添加
                     Long unique = tqStockShiftConfigMapper.selectCount(wrapper);
                     if (unique == 0) {

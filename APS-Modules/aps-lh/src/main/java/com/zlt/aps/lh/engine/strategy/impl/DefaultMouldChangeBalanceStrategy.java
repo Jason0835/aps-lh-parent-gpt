@@ -123,22 +123,13 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
                 continue;
             }
 
-            boolean sharedEmbryo = isSharedEmbryo(context, sku)
-                    && !StringUtils.equals(actionType, ACTION_EARLY_PRODUCTION_NEW_SPEC_MOULD_CHANGE);
-            Date balancedTime = sharedEmbryo
-                    ? resolveSharedEmbryoBalancedTime(context, adjustedTime, counts) : adjustedTime;
-            if (balancedTime != null && balancedTime.after(adjustedTime)) {
-                adjustedTime = balancedTime;
-                continue;
-            }
-
             if (registerMouldChangeCount(context, adjustedTime)) {
                 int[] updatedCounts = context.getDailyMouldChangeCountMap().get(dateKey);
                 log.info("换模/换活字块班次落点完成, materialCode: {}, embryoCode: {}, 是否共用胎胚: {}, "
                                 + "actionType: {}, 日期: {}, 当天总次数: {}/{}, 早班次数: {}, 中班次数: {}, 最终换模班次: {}",
                         sku == null ? null : sku.getMaterialCode(),
                         sku == null ? null : sku.getEmbryoCode(),
-                        sharedEmbryo,
+                        isSharedEmbryo(context, sku),
                         StringUtils.defaultIfEmpty(actionType, ACTION_CHANGEOVER),
                         dateKey, getTotalUsed(updatedCounts), dailyLimit,
                         updatedCounts[IDX_MORNING], updatedCounts[IDX_AFTERNOON],
@@ -251,35 +242,82 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
         if (context == null || switchReadyTime == null || simulatedCountMap == null) {
             return null;
         }
-        Date earliestTime = resolveEndingStaggerPreviewStartTime(
-                context, machineCode, switchReadyTime, switchDurationHours);
-        if (earliestTime == null) {
-            return null;
+        Date adjustedTime = switchReadyTime;
+        // 预演必须与正式allocateMouldChange使用同一落点规则：停机/禁换模避让后取最早合法班次，
+        // 只有当天达到每日硬上限时才跨天，不能仅为早8中7软目标把早班动作虚拟挪到中班。
+        for (int attempt = 0; attempt < MAX_ALLOCATION_ATTEMPTS; attempt++) {
+            Date earliestTime = resolveEndingStaggerPreviewStartTime(
+                    context, machineCode, adjustedTime, switchDurationHours);
+            if (earliestTime == null) {
+                return null;
+            }
+            String dateKey = formatDateKey(earliestTime);
+            int[] counts = simulatedCountMap.computeIfAbsent(dateKey, key -> new int[]{0, 0});
+            int dailyLimit = getDailyLimit(context);
+            if (getTotalUsed(counts) >= dailyLimit) {
+                // 与正式分配一致：T+2达到上限直接拒绝；之前日期达到上限才顺延到次日早班。
+                if (isOnOrAfterScheduleTargetDate(context, earliestTime)) {
+                    return null;
+                }
+                adjustedTime = getNextCalendarDayMorningStart(context, earliestTime);
+                continue;
+            }
+            if (LhScheduleTimeUtil.isMorningShift(context, earliestTime)) {
+                counts[IDX_MORNING]++;
+            } else if (LhScheduleTimeUtil.isAfternoonShift(context, earliestTime)) {
+                counts[IDX_AFTERNOON]++;
+            } else {
+                adjustedTime = getNextCalendarDayMorningStart(context, earliestTime);
+                continue;
+            }
+            log.debug("共用胎胚收尾错峰换模预演完成, materialCode: {}, machineCode: {}, 换模日期: {}, "
+                            + "早班模拟次数: {}, 中班模拟次数: {}, 每日上限: {}, 早班目标: {}, 中班目标: {}",
+                    sku == null ? null : sku.getMaterialCode(), machineCode, dateKey,
+                    counts[IDX_MORNING], counts[IDX_AFTERNOON], dailyLimit,
+                    getMorningLimit(context), getAfternoonLimit(context));
+            return earliestTime;
         }
+        return null;
+    }
 
-        /*
-         * 错峰预演可以在机台已可换模的早班继续换模，也可主动等待到当日中班。
-         * 但不允许把本次切换倒排到机台释放时间之前；因此原始落点已在中班时，
-         * 只评估当前中班落点。
-         */
+    /**
+     * 在早班/中班候选中选择最有利于早8/中7软目标均衡的换模时间。
+     *
+     * @param context 排程上下文
+     * @param machineCode 机台编码
+     * @param earliestTime 最早可用换模时间
+     * @param switchDurationHours 切换时长（小时）
+     * @param countMap 用于评分的每日早/中班模拟计数
+     * @return 选中的换模时间；无合法候选时返回null
+     */
+    private Date selectEndingStaggerBalancedTime(LhScheduleContext context,
+                                                 String machineCode,
+                                                 Date earliestTime,
+                                                 int switchDurationHours,
+                                                 Map<String, int[]> countMap) {
         List<Date> candidateTimeList = new ArrayList<Date>(2);
         candidateTimeList.add(earliestTime);
+        // 最早落点在中班时只评估当前中班落点；落早班时同时评估“等待到当日中班”是否更均衡。
+        // 中班候选经过停机/禁换模避让后若落到其他自然日或非中班，说明当日中班不可用，
+        // 不能为了软目标提前跨天，跨天只能由每日15次硬限制触发。
         if (LhScheduleTimeUtil.isMorningShift(context, earliestTime)) {
             Date afternoonProbeTime = LhScheduleTimeUtil.getAfternoonShiftStart(context, earliestTime);
             Date afternoonTime = resolveEndingStaggerPreviewStartTime(
                     context, machineCode, afternoonProbeTime, switchDurationHours);
-            if (afternoonTime != null && !afternoonTime.equals(earliestTime)) {
+            if (afternoonTime != null
+                    && !afternoonTime.equals(earliestTime)
+                    && LhScheduleTimeUtil.isAfternoonShift(context, afternoonTime)
+                    && StringUtils.equals(formatDateKey(afternoonTime), formatDateKey(earliestTime))) {
                 candidateTimeList.add(afternoonTime);
             }
         }
-
         Date selectedTime = null;
         int selectedExceededShiftCount = Integer.MAX_VALUE;
         int selectedOverflowQty = Integer.MAX_VALUE;
         long selectedBalanceDeviation = Long.MAX_VALUE;
         for (Date candidateTime : candidateTimeList) {
             String dateKey = formatDateKey(candidateTime);
-            int[] currentCounts = simulatedCountMap.getOrDefault(dateKey, new int[]{0, 0});
+            int[] currentCounts = countMap.getOrDefault(dateKey, new int[]{0, 0});
             int morningCount = currentCounts.length > IDX_MORNING ? currentCounts[IDX_MORNING] : 0;
             int afternoonCount = currentCounts.length > IDX_AFTERNOON ? currentCounts[IDX_AFTERNOON] : 0;
             if (morningCount + afternoonCount >= getDailyLimit(context)) {
@@ -307,22 +345,6 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
                 selectedBalanceDeviation = balanceDeviation;
             }
         }
-        if (selectedTime == null) {
-            return null;
-        }
-
-        String selectedDateKey = formatDateKey(selectedTime);
-        int[] selectedCounts = simulatedCountMap.computeIfAbsent(selectedDateKey, key -> new int[]{0, 0});
-        if (LhScheduleTimeUtil.isMorningShift(context, selectedTime)) {
-            selectedCounts[IDX_MORNING]++;
-        } else if (LhScheduleTimeUtil.isAfternoonShift(context, selectedTime)) {
-            selectedCounts[IDX_AFTERNOON]++;
-        }
-        log.debug("共用胎胚收尾错峰换模预演完成, materialCode: {}, machineCode: {}, 换模日期: {}, "
-                        + "早班模拟次数: {}, 中班模拟次数: {}, 每日上限: {}, 早班目标: {}, 中班目标: {}",
-                sku == null ? null : sku.getMaterialCode(), machineCode, selectedDateKey,
-                selectedCounts[IDX_MORNING], selectedCounts[IDX_AFTERNOON], getDailyLimit(context),
-                getMorningLimit(context), getAfternoonLimit(context));
         return selectedTime;
     }
 

@@ -3,6 +3,7 @@ package com.zlt.aps.mp.api.domain.vo;
 import lombok.Data;
 
 import java.io.Serializable;
+import java.util.List;
 
 /**
  * 日排产统计明细
@@ -45,4 +46,9 @@ public class MpDayProductionStatisticsDetailVo implements Serializable {
      * 贴牌计划量
      */
     private Integer oemQty;
+
+    /**
+     * 模壳换活块机台数
+     */
+    private List<MpDayProductionStatisticsShellVo> mouldShellList;
 }

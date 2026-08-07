@@ -1,11 +1,14 @@
 package com.zlt.aps.gsq.engine.service.impl;
 
 import com.zlt.aps.common.engine.domain.EngineConstructionInfo;
+import com.zlt.aps.gsq.api.domain.entity.GsqStockShiftConfig;
 import com.zlt.aps.gsq.engine.context.GsqScheduleContext;
 import com.zlt.aps.gsq.engine.mapper.GsqEngineMapper;
+import com.zlt.aps.gsq.engine.mapper.GsqEngineStockMapper;
 import com.zlt.aps.gsq.engine.service.IGsqDataLoadService;
 import com.zlt.aps.gsq.engine.vo.GsqScheduleParams;
 import com.zlt.aps.gsq.engine.vo.GsqScheduleResultVo;
+import com.zlt.aps.gsq.engine.vo.GsqStockVo;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -30,6 +33,9 @@ public class GsqDataLoadServiceImpl implements IGsqDataLoadService {
     @Resource
     private GsqEngineMapper gsqEngineMapper;
 
+    @Resource
+    private GsqEngineStockMapper gsqEngineStockMapper;
+
     @Override
     public void loadAllData(GsqScheduleContext context) {
         String scheduleDate = context.getScheduleDate();
@@ -40,6 +46,11 @@ public class GsqDataLoadServiceImpl implements IGsqDataLoadService {
         // 1. 加载排程参数
         GsqScheduleParams params = loadScheduleParams(factoryCode);
         context.setParams(params);
+
+        // 1.1 加载钢丝圈备库班数配置（S2.3 备库模型使用）
+        List<GsqStockShiftConfig> stockShiftConfigList = gsqEngineMapper.listGsqStockShiftConfig(factoryCode);
+        context.setStockShiftConfigList(stockShiftConfigList);
+        log.info("[数据加载] 备库班数配置加载完成, 配置数: {}", stockShiftConfigList == null ? 0 : stockShiftConfigList.size());
 
         // 2. 加载胎圈6班次排程结果，并按BOM分解计算钢丝圈6班次计划量
         List<GsqScheduleResultVo> scheduleList = gsqEngineMapper.statGsqScheduleBase(scheduleDate, params.getProductionStage());
@@ -86,13 +97,24 @@ public class GsqDataLoadServiceImpl implements IGsqDataLoadService {
         Map<String, Boolean> gsqStopShiftMap = convertToStopShiftMap(gsqStopList);
         context.setGsqStopShiftMap(gsqStopShiftMap);
 
-        // 7. 加载机台检修计划
-        List<Map<String, Object>> maintenanceList = gsqEngineMapper.listMachineMaintenancePlan(scheduleDate, scheduleDate);
+        // 7. 加载机台检修计划（对齐胎圈TQ：key=日期|班次编码，value=检修机台列表）
+        List<Map<String, Object>> maintenanceList = gsqEngineMapper.listMachineMaintenancePlan(scheduleDate);
         Map<String, List<String>> maintenanceMap = convertToMaintenanceMap(maintenanceList);
         context.setMaintenanceMachineMap(maintenanceMap);
 
-        // 8. TODO: 加载6点MES库存、机台寸口/钢丝直径/产线规则、限定/不可作业机台、损耗率等
-        // 这些数据源需要扩展mapper方法，当前先用空Map占位，避免NPE
+        // 8. 加载钢丝圈库存（排程日期前一天库存，listGsqStock 内部已按 STOCK_DATE=排程日期-1 查询）
+        List<GsqStockVo> stockList = gsqEngineStockMapper.listGsqStock(scheduleDate);
+        Map<String, Double> stockMap = new HashMap<>();
+        if (stockList != null) {
+            for (GsqStockVo stock : stockList) {
+                if (stock.getSteelRingCode() != null) {
+                    stockMap.put(stock.getSteelRingCode(), stock.getStockNum() == null ? 0D : stock.getStockNum());
+                }
+            }
+        }
+        context.setStockMap(stockMap);
+        log.info("[数据加载] 库存加载完成, 规格数: {}", stockMap.size());
+
         log.info("[数据加载] 完成, 排程记录数: {}, 施工信息数: {}, 胎圈6班次记录数: {}",
                 scheduleList.size(), constructionInfoList.size(), tq6ShiftResultMap.size());
     }
@@ -137,7 +159,7 @@ public class GsqDataLoadServiceImpl implements IGsqDataLoadService {
     }
 
     /**
-     * 将检修计划List转为Map。
+     * 将检修计划List转为Map（对齐胎圈TQ）。
      *
      * <p>Map key格式：日期|班次编码，value=该班次检修中的机台编号列表</p>
      */
@@ -147,11 +169,18 @@ public class GsqDataLoadServiceImpl implements IGsqDataLoadService {
             return result;
         }
         for (Map<String, Object> row : list) {
-            Object shiftDate = row.get("shiftDate");
-            Object shiftCode = row.get("shiftCode");
             Object machineCode = row.get("machineCode");
-            if (shiftDate != null && shiftCode != null && machineCode != null) {
-                String key = shiftDate.toString() + "|" + shiftCode.toString();
+            if (machineCode == null) {
+                continue;
+            }
+            String downtimeDate = String.valueOf(row.get("downtimeDate"));
+            // 截取日期部分（格式可能为 yyyy-MM-dd HH:mm:ss）
+            if (downtimeDate.length() > 10) {
+                downtimeDate = downtimeDate.substring(0, 10);
+            }
+            Object shiftCode = row.get("downtimeShift");
+            if (shiftCode != null) {
+                String key = downtimeDate + "|" + shiftCode.toString();
                 result.computeIfAbsent(key, k -> new ArrayList<>()).add(machineCode.toString());
             }
         }

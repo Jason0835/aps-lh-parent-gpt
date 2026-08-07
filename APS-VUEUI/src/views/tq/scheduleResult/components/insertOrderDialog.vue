@@ -30,7 +30,7 @@
 <script>
 import moment from "moment";
 import infoForm from "@/views/components/infoForm.vue";
-import { insertOrder, validateInsertOrder, listScheduleShiftDates } from "@/api/tq/scheduleResult";
+import { insertTask, listScheduleShiftDates } from "@/api/tq/scheduleResult";
 import { listEnabledMachines } from "@/api/tq/machine";
 
 export default {
@@ -145,6 +145,13 @@ export default {
       }
 
       columns.push({
+        label: this.$t("ui.data.column.tqScheduleResult.anchorTaskId"),
+        prop: "anchorTaskId",
+        span: 24,
+        placeholder: this.$t("ui.data.column.tqScheduleResult.anchorTaskIdPlaceholder"),
+      });
+
+      columns.push({
         label: this.$t("ui.common.column.remark"),
         prop: "remark",
         type: "textarea",
@@ -215,21 +222,15 @@ export default {
     handleScheduleDateChange() {
       this.fetchScheduleShiftDates(this.form.scheduleDate);
     },
-    /** 提交插单 */
+    /** 提交插单（走任务链路径，支持锚点插入、resequence 重排） */
     async save(params) {
       try {
         this.loading = true;
-        // 先校验
-        const validateRes = await validateInsertOrder(params);
-        if (validateRes.code === 200) {
-          // 校验通过，执行插单
-          const res = await insertOrder(params);
-          this.$modal.msgSuccess(res.msg);
-          this.$emit("success");
-          this.hide();
-        } else {
-          this.$modal.msgError(validateRes.msg || "校验失败");
-        }
+        // 新接口内置校验，直接调用 insertTask
+        const res = await insertTask(params);
+        this.$modal.msgSuccess(res.msg);
+        this.$emit("success");
+        this.hide();
       } catch (error) {
         console.log(error);
       } finally {

@@ -4,6 +4,7 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.gsq.api.domain.dto.GsqChangeMachineDTO;
 import com.zlt.aps.gsq.api.domain.dto.GsqInsertOrderDTO;
 import com.zlt.aps.gsq.api.domain.entity.GsqScheduleResult;
+import com.zlt.aps.gsq.api.domain.vo.GsqInsertTaskRequestVo;
 import com.zlt.aps.gsq.api.domain.vo.GsqScheduleShiftDateVO;
 import com.zlt.bill.common.service.IDocService;
 
@@ -51,11 +52,13 @@ public interface IGsqScheduleResultService extends IDocService<GsqScheduleResult
     AjaxResult validateInsertOrder(GsqInsertOrderDTO dto);
 
     /**
-     * 插单
+     * 插单（旧接口，直接操作数据库，不支持锚点插入和resequence重排）
      *
      * @param dto 插单数据
      * @return 结果
+     * @deprecated 已被 {@link #insertTask(GsqInsertTaskRequestVo)} 替代，新接口走任务链路径，支持锚点插入、resequence重排
      */
+    @Deprecated
     AjaxResult insertOrder(GsqInsertOrderDTO dto);
 
     /**
@@ -67,11 +70,13 @@ public interface IGsqScheduleResultService extends IDocService<GsqScheduleResult
     AjaxResult validateChangeMachine(GsqChangeMachineDTO dto);
 
     /**
-     * 转机台
+     * 转机台（旧接口，直接操作数据库，不支持锚点和resequence重排）
      *
      * @param dto 转机台数据
      * @return 结果
+     * @deprecated 已被 {@link #batchChangeMachine(List)} 替代，新接口走任务链路径，支持锚点、目标班次、批量操作
      */
+    @Deprecated
     AjaxResult changeMachine(GsqChangeMachineDTO dto);
 
     /**
@@ -89,11 +94,13 @@ public interface IGsqScheduleResultService extends IDocService<GsqScheduleResult
     AjaxResult validateChangeQty(GsqScheduleResult entity);
 
     /**
-     * 调量
+     * 调量（旧接口，直接操作数据库，不支持resequence重排）
      *
      * @param entity 调量数据
      * @return 结果
+     * @deprecated 已被 {@link #batchChangeQty(List)} 替代，新接口走任务链路径，支持批量操作
      */
+    @Deprecated
     AjaxResult changeQty(GsqScheduleResult entity);
 
     /**
@@ -109,13 +116,15 @@ public interface IGsqScheduleResultService extends IDocService<GsqScheduleResult
     AjaxResult validateLogicDelete(List<Long> ids);
 
     /**
-     * 逻辑删除排程记录
+     * 逻辑删除排程记录（旧接口，直接操作数据库，不支持resequence重排）
      * 只能删除发布成功次数等于0且未发送给MES的计划
      * 删除前会执行 validateLogicDelete 校验，校验失败直接返回
      *
      * @param ids 需要删除的记录ID列表
      * @return 结果
+     * @deprecated 已被 {@link #batchDelete(List)} 替代，新接口走任务链路径，删除后resequence重排
      */
+    @Deprecated
     AjaxResult logicDeleteByIds(List<Long> ids);
 
     /**
@@ -166,4 +175,36 @@ public interface IGsqScheduleResultService extends IDocService<GsqScheduleResult
      * @return 班次日期列表
      */
     List<GsqScheduleShiftDateVO> listScheduleShiftDates(GsqScheduleResult queryVO);
+
+    /**
+     * 人工插单（新接口，走任务链路径，支持锚点插入、resequence 重排）。
+     *
+     * @param vo 插单请求
+     * @return 结果
+     */
+    AjaxResult insertTask(GsqInsertTaskRequestVo vo);
+
+    /**
+     * 批量转机台（走任务链路径，支持锚点、目标班次）。
+     *
+     * @param list 转机台请求列表
+     * @return 结果
+     */
+    AjaxResult batchChangeMachine(List<GsqScheduleResult> list);
+
+    /**
+     * 批量调量（走任务链路径）。
+     *
+     * @param list 调量请求列表
+     * @return 结果
+     */
+    AjaxResult batchChangeQty(List<GsqScheduleResult> list);
+
+    /**
+     * 批量删除（走任务链路径，删除后 resequence 重排）。
+     *
+     * @param ids 排程记录ID列表
+     * @return 结果
+     */
+    AjaxResult batchDelete(List<Long> ids);
 }

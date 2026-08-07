@@ -44,15 +44,6 @@ public class GsqMachineInfo extends BaseEntity {
     private String machineName;
 
     /**
-     * 工装信息
-     */
-    @ApiModelProperty(value = "工装信息", position = 40)
-    @Excel(name = "ui.data.column.machine.toolingInfo")
-    @TableField("TOOLING_INFO")
-    @ImportValidated(maxLength = 50)
-    private String toolingInfo;
-
-    /**
      * 生产定额，是指单班一次能生产的量，单位：吨/班
      */
     @ApiModelProperty(value = "生产定额", position = 75)

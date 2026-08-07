@@ -1,12 +1,16 @@
 package com.zlt.aps.tm.service.impl;
 
+import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.tm.api.domain.entity.TmMachineInfo;
 import com.zlt.aps.tm.mapper.TmMachineInfoMapper;
 import com.zlt.aps.tm.service.ITmMachineInfoService;
 import com.zlt.bill.common.service.AbstractDocService;
+import com.zlt.common.enums.ImportErrorTypeEnums;
+import com.zlt.common.utils.ImportExcelValidatedUtils;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -16,6 +20,7 @@ import javax.annotation.Resource;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -63,5 +68,27 @@ public class TmMachineInfoServiceImpl extends AbstractDocService<TmMachineInfo> 
     @Override
     protected List<String> getCheckUniqueFields() {
         return new ArrayList<>(Arrays.asList("factoryCode", "machineCode"));
+    }
+
+    @Override
+    protected Boolean serviceCheckAndDataHandle(TmMachineInfo importDocEntity, List<ImportErrorLog> importErrorLogs,
+                                                Long importLogId, int errorRowNum, Map<Object, Object> serviceCheckParams) {
+        // 必填项校验：工厂编号、机台编码、机台名称
+        if (StringUtils.isBlank(importDocEntity.getFactoryCode())
+                || StringUtils.isBlank(importDocEntity.getMachineCode())
+                || StringUtils.isBlank(importDocEntity.getMachineName())) {
+            String blankField;
+            if (StringUtils.isBlank(importDocEntity.getFactoryCode())) {
+                blankField = I18nUtil.getMessage("ui.data.column.tm.machineInfo.factoryCode");
+            } else if (StringUtils.isBlank(importDocEntity.getMachineCode())) {
+                blankField = I18nUtil.getMessage("ui.data.column.tm.machineInfo.machineCode");
+            } else {
+                blankField = I18nUtil.getMessage("ui.data.column.tm.machineInfo.machineName");
+            }
+            String message = String.format(I18nUtil.getMessage("import.validated.required"), errorRowNum, blankField);
+            ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(), errorRowNum, message, importErrorLogs);
+            return Boolean.FALSE;
+        }
+        return super.serviceCheckAndDataHandle(importDocEntity, importErrorLogs, importLogId, errorRowNum, serviceCheckParams);
     }
 }

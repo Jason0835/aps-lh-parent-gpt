@@ -13,6 +13,7 @@ import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanMouldDayResult;
 import com.zlt.aps.mp.api.domain.entity.MpMonthPlanStatistics;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.mp.api.domain.vo.MpDayProductionStatisticsDetailVo;
+import com.zlt.aps.mp.api.domain.vo.MpDayProductionStatisticsShellVo;
 import com.zlt.aps.mp.engine.adjust.MpWeekRollAdjustEngine;
 import com.zlt.aps.mp.engine.capacity.MpMonthPlanDailyCapacityLimit;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
@@ -211,6 +212,16 @@ public class MpMonthPlanStaticService extends AbstractBaseWeekAdjustServiceMonth
                                 : capacityVo.getUsedChangeMould());
                 dayProductionStatisticsDetailVo.setTotalQty(totalQty);
                 dayProductionStatisticsDetailVo.setOemQty(oemQty);
+                if (PubUtil.isNotEmpty(capacityVo.getMouldShellBlockMachinesMap())){
+                    List<MpDayProductionStatisticsShellVo> mouldShellList = new ArrayList<>();
+                    for (Map.Entry<String, Integer> entry : capacityVo.getMouldShellBlockMachinesMap().entrySet()) {
+                        MpDayProductionStatisticsShellVo shellVo = new MpDayProductionStatisticsShellVo();
+                        shellVo.setMouldShell(entry.getKey());
+                        shellVo.setBlockMachines(entry.getValue());
+                        mouldShellList.add(shellVo);
+                    }
+                    dayProductionStatisticsDetailVo.setMouldShellList(mouldShellList);
+                }
                 statistics.setFieldValueByFieldName(BusiConstant.WeekRollAdjust.FIELD_PREFIX_DAY + day,
                         JSONObject.toJSONString(dayProductionStatisticsDetailVo));
             }

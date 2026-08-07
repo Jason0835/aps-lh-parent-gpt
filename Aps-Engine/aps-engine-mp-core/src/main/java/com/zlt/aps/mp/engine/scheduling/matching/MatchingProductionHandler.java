@@ -13,6 +13,7 @@ import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.api.domain.capacity.MpDailyCapacityLimitVo;
 import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.mp.api.domain.vo.MpDayProductionStatisticsDetailVo;
+import com.zlt.aps.mp.api.domain.vo.MpDayProductionStatisticsShellVo;
 import com.zlt.aps.mp.engine.basedata.assemble.appoint.GroupAppointHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.cyclegroup.CycleGroupDataHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.datalist.GroupListHandler;
@@ -2126,6 +2127,16 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
                 }
                 statisticsDetailVo.setTotalQty(totalQty);
                 statisticsDetailVo.setOemQty(totalOemQty);
+                if (PubUtil.isNotEmpty(daylyCapacityLimit.getMouldShellBlockMachinesMap())){
+                    List<MpDayProductionStatisticsShellVo> mouldShellList = new ArrayList<>();
+                    for (Map.Entry<String, Integer> entry2 : daylyCapacityLimit.getMouldShellBlockMachinesMap().entrySet()) {
+                        MpDayProductionStatisticsShellVo shellVo = new MpDayProductionStatisticsShellVo();
+                        shellVo.setMouldShell(entry2.getKey());
+                        shellVo.setBlockMachines(entry2.getValue());
+                        mouldShellList.add(shellVo);
+                    }
+                    statisticsDetailVo.setMouldShellList(mouldShellList);
+                }
                 statistics.setFieldValueByFieldName(FactoryConstant.DAY_FIELD + day, JSON.toJSONString(statisticsDetailVo));
             }
             productionStatisticsList.add(statistics);

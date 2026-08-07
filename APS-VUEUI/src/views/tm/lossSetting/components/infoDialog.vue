@@ -31,13 +31,14 @@
 <script>
 import infoForm from "@/views/components/infoForm.vue";
 import {saveTmLossSetting} from "@/api/tm/lossSetting";
+import {listTmMachineInfo} from "@/api/tm/machineInfo";
 
 export default {
   components: { infoForm },
   inject: ["parentDict"],
   computed: {
     machines() {
-      return this.$store.state.tm.machines;
+      return this.machineList;
     },
     title: function () {
       return (
@@ -55,35 +56,31 @@ export default {
           type: "select",
           span: 12,
           required: true,
-          disabled: true,
           dictData: this.parentDict.type.biz_factory_name,
+          listeners: {
+            change: (value) => {
+              this.form.machineCode = "";
+              this.loadMachines(value);
+            },
+          },
         },
         {
           prop: "treadCode",
           label: this.$t("ui.data.column.tm.lossSetting.treadCode"),
           span: 12,
           maxlength: 60,
-          disabled: this.isEdit,
+          required: true,
+          disabled: false,
         },
         {
           prop: "machineCode",
           label: this.$t("ui.data.column.tm.lossSetting.machineCode"),
           span: 12,
-          disabled: this.isEdit,
+          disabled: false,
           type: "select",
           dictData: this.machines,
           props: { label: "machineCode", value: "machineCode" },
           filterable: true,
-          listeners: {
-            change: (value) => {
-              if (value) {
-                const machine = this.machines.find(m => m.machineCode === value);
-                if (machine) {
-                  this.form.factoryCode = machine.factoryCode;
-                }
-              }
-            },
-          },
         },
         {
           prop: "lossRate",
@@ -116,6 +113,7 @@ export default {
       visible: false,
       isEdit: false,
       form: {},
+      machineList: [],
       rules: {
         factoryCode: [
           {
@@ -124,7 +122,13 @@ export default {
             trigger: "change",
           },
         ],
-        treadCode: [],
+        treadCode: [
+          {
+            required: true,
+            message: this.$t("common.rule.input"),
+            trigger: "blur",
+          },
+        ],
         machineCode: [],
         lossRate: [
           {
@@ -164,6 +168,16 @@ export default {
           factoryCode: "116",
           enableStatus: "1",
         };
+      }
+      this.loadMachines(this.form.factoryCode);
+    },
+    async loadMachines(factoryCode) {
+      try {
+        const res = await listTmMachineInfo({ factoryCode, pageSize: 9999 });
+        this.machineList = res.rows || [];
+      } catch (error) {
+        console.log(error);
+        this.machineList = [];
       }
     },
     hide() {

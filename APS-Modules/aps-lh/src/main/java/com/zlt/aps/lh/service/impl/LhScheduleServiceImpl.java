@@ -2060,6 +2060,9 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     private void copyImportRowToEntity(LhScheduleResultTemplateImportVO source, LhScheduleResult target) {
         target.setLhMachineName(source.getLhMachineName());
         // 模板按 8 个班次分别维护示方类型，导入时取第一个非空的 classXLhType 作为主业务口径。
+        // 兜底顺序：CLASSx_LH_TYPE（硫化示方书类型）→ CLASSx_IS_END（类型栏位，0/1/2/3 由
+        // fillImportChangedTrialStatus 转成产品状态 S/T/X 存入 CHANGED_TRIAL_STATUS）。
+        // 当示方类型栏位全空时，用类型栏位推导产品状态，避免 PRODUCT_STATUS 缺失。
         String scheduleType = Stream.of(
                 source.getClass1LhType(),
                 source.getClass2LhType(),
@@ -2069,7 +2072,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                 source.getClass6LhType(),
                 source.getClass7LhType(),
                 source.getClass8LhType(),
-                source.getTrialStatus()
+                source.getChangedTrialStatus()
         ).filter(StringUtils::isNotBlank).findFirst().orElse(null);
         target.setProductStatus(scheduleType);
 

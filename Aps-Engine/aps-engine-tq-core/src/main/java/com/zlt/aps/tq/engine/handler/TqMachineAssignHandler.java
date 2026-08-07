@@ -239,7 +239,20 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
             final Integer currentClassNum = classIdx + 1;
             List<TqScheduleResultVo> classSortedScheduleList = sortedScheduleList.stream()
                     .sorted((o1, o2) -> {
-                        // 已分配机台的规格优先处理（避免机台分配不稳定）
+                        // P-0: 当前班次新触发备库规格最高优先级
+                        // 典型场景：TQM03机台2班，211100022在2班触发备库，但1班未排产未分配机台，
+                        // 如果排在已分配机台规格之后，等排到它时TQM03已满排0延后到3班
+                        boolean currentTrigger1 = o1.getBackupTriggerClass() != null
+                                && o1.getBackupTriggerClass() > 0
+                                && o1.getBackupTriggerClass().equals(currentClassNum);
+                        boolean currentTrigger2 = o2.getBackupTriggerClass() != null
+                                && o2.getBackupTriggerClass() > 0
+                                && o2.getBackupTriggerClass().equals(currentClassNum);
+                        if (currentTrigger1 != currentTrigger2) {
+                            return currentTrigger1 ? -1 : 1;
+                        }
+
+                        // P-1: 已分配机台的规格优先处理（避免机台分配不稳定）
                         boolean planned1 = plannedMachineMap.containsKey(o1.getBeadCode());
                         boolean planned2 = plannedMachineMap.containsKey(o2.getBeadCode());
                         if (planned1 != planned2) {
@@ -595,7 +608,7 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
             // S3.2 剩余产能二次分配（集中排产）：当班逐规格阈值排产后，
             // 回收机台剩余产能，按缺口从大到小回填给备库胎圈，避免缺口最大的规格被分散到多班排产
             redistributeResidualCapacity(classIdx, capacityMaps, sortedScheduleList,
-                    machineSpecCountMap, specifyMachineSpecCountMap, allMachineList, context);
+                    machineSpecCountMap, specifyMachineSpecCountMap, allMachineList, plannedMachineMap, context);
         }
     }
 
@@ -658,6 +671,7 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
      * @param machineSpecCountMap         机台规格数映射
      * @param specifyMachineSpecCountMap  限制作业机台规格数映射
      * @param allMachineList              所有机台列表
+     * @param plannedMachineMap           已分配机台映射（胎圈代码→机台编码）
      * @param context                     排程上下文
      */
     private void redistributeResidualCapacity(int classIdx, Map<String, BigDecimal>[] capacityMaps,
@@ -665,6 +679,7 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
                                               Map<String, Integer> machineSpecCountMap,
                                               Map<String, Integer> specifyMachineSpecCountMap,
                                               List<TqMachineInfo> allMachineList,
+                                              Map<String, String> plannedMachineMap,
                                               TqScheduleContext context) {
         int classNum = classIdx + 1;
         double defaultQuota = context.getParams().getMaxClassOutput() == null ? 3000D
@@ -753,6 +768,16 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
             }
         }
 
+        // ========== 第1.5步：备库触发班次产能保障 ==========
+        // 多规格机台上，如果某规格在当前班次是备库触发班次（backupTriggerClass == classNum），
+        // 但因S3.1排产时机台满排导致planQty=0（延后到后续班次），需要从其他规格让渡产能，
+        // 确保备库触发班次有足够的排产量。
+        // 典型场景：TQM03机台2班，211100022在2班触发备库，但3个1班触发的规格已占满1500定额，
+        // 导致211100022排0延后到3班。此时应从其他1班触发规格（如211100024）让渡500产能给211100022。
+        guaranteeBackupTriggerClassCapacity(scheduleList, classNum, classIdx, capacityMaps,
+                machineSpecCountMap, specifyMachineSpecCountMap, allMachineList, machineInfoMap,
+                defaultQuota, plannedMachineMap, context);
+
         // ========== 第二步：备库胎圈剩余产能回填 ==========
         // 按机台分组当班有排产且仍有备库剩余量的胎圈规格
         Map<String, List<TqScheduleResultVo>> machineBackupSpecMap = scheduleList.stream()
@@ -822,6 +847,233 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
                                 + "，备库剩余" + spec.getBackupRemainingQty());
             }
         }
+    }
+
+    /**
+     * 备库触发班次产能保障：确保备库触发班次（backupTriggerClass == classNum）的规格
+     * 在当前班次有足够的排产量。
+     *
+     * <p>背景：多规格机台上，某规格在当前班次是备库触发班次（backupTriggerClass == classNum），
+     * 但S3.1排产时机台已被其他规格占满，导致该规格排0延后到后续班次。
+     * 此时需要从同机台其他规格让渡产能，确保备库触发班次有排产量。</p>
+     *
+     * <p>让渡策略：</p>
+     * <ol>
+     *   <li>找出当前班次是备库触发班次但planQty=0的规格（"需要保障的规格"）</li>
+     *   <li>按机台分组，在同机台其他规格中寻找可让渡的产能</li>
+     *   <li>让渡优先级：非备库规格 > 备库触发班次 != 当前班次的规格 > 备库触发班次 == 当前班次的规格</li>
+     *   <li>同优先级内按backupRemainingQty升序（缺口小的先让渡）</li>
+     *   <li>让渡量上限 = 该规格当班planQty - 阈值（保障每个规格至少排到阈值量）</li>
+     *   <li>让渡后，从被让渡规格的当班planQty扣减，加到需要保障规格的当班planQty</li>
+     *   <li>被让渡规格的扣减量累加到其后续班次（与第一步让渡逻辑一致）</li>
+     * </ol>
+     *
+     * @param scheduleList 排程列表
+     * @param classNum 当前班次号（1~6）
+     * @param classIdx 当前班次索引（classNum-1）
+     * @param capacityMaps 产能追踪Map
+     * @param machineSpecCountMap 机台规格数映射
+     * @param specifyMachineSpecCountMap 指定机台规格数映射
+     * @param allMachineList 所有机台列表
+     * @param machineInfoMap 机台信息映射
+     * @param defaultQuota 默认机台定额
+     * @param plannedMachineMap 已分配机台映射（胎圈代码→机台编码）
+     * @param context 排程上下文
+     */
+    private void guaranteeBackupTriggerClassCapacity(List<TqScheduleResultVo> scheduleList, int classNum,
+                                                      int classIdx, Map<String, BigDecimal>[] capacityMaps,
+                                                      Map<String, Integer> machineSpecCountMap,
+                                                      Map<String, Integer> specifyMachineSpecCountMap,
+                                                      List<TqMachineInfo> allMachineList,
+                                                      Map<String, TqMachineInfo> machineInfoMap,
+                                                      double defaultQuota,
+                                                      Map<String, String> plannedMachineMap,
+                                                      TqScheduleContext context) {
+        double backupThreshold = context.getParams().getBackupShiftThreshold() == null ? 1000D
+                : context.getParams().getBackupShiftThreshold();
+
+        // 1. 找出当前班次是备库触发班次但planQty=0的规格（需要保障的规格）
+        // 注意：此时规格可能尚未分配机台（1班未排产导致machineCode为空），
+        // 需通过plannedMachineMap查找其他同组规格的机台来推断应分配的机台
+        List<TqScheduleResultVo> needGuaranteeSpecs = scheduleList.stream()
+                .filter(s -> s.getBackupTriggerClass() != null && s.getBackupTriggerClass() == classNum)
+                .filter(s -> getClassPlanQty(s, classNum) <= 0)
+                .collect(Collectors.toList());
+
+        log.info("[S3.2-触发班次产能保障] 班次:{}, 需保障规格数:{}", classNum, needGuaranteeSpecs.size());
+        for (TqScheduleResultVo s : needGuaranteeSpecs) {
+            log.info("[S3.2-触发班次产能保障] 需保障规格:{}, 当班planQty:{}, backupTriggerClass:{}, backupRemainingQty:{}, machineCode:{}",
+                    s.getBeadCode(), getClassPlanQty(s, classNum), s.getBackupTriggerClass(), s.getBackupRemainingQty(), s.getMachineCode());
+        }
+
+        if (needGuaranteeSpecs.isEmpty()) {
+            return;
+        }
+
+        // 2. 按机台分组需要保障的规格（兼容machineCode为空的情况，通过plannedMachineMap推断）
+        Map<String, List<TqScheduleResultVo>> machineGuaranteeMap = new HashMap<>();
+        for (TqScheduleResultVo spec : needGuaranteeSpecs) {
+            String machineCode = spec.getMachineCode();
+            if (StringUtils.isEmpty(machineCode)) {
+                // 通过plannedMachineMap查找：找到同组规格已分配的机台
+                machineCode = plannedMachineMap.get(spec.getBeadCode());
+            }
+            if (StringUtils.isEmpty(machineCode)) {
+                // 仍未找到机台：遍历其他备库规格的机台，找同机台定额最匹配的
+                // 取第一个可用的机台（简化处理，实际场景中同一组规格通常在同一机台）
+                for (TqScheduleResultVo otherSpec : scheduleList) {
+                    if (!otherSpec.getBeadCode().equals(spec.getBeadCode())
+                            && StringUtils.isNotEmpty(otherSpec.getMachineCode())) {
+                        machineCode = otherSpec.getMachineCode();
+                        break;
+                    }
+                }
+            }
+            if (StringUtils.isNotEmpty(machineCode)) {
+                machineGuaranteeMap.computeIfAbsent(machineCode, k -> new ArrayList<>()).add(spec);
+                // 如果规格尚未分配机台，先设置机台
+                if (StringUtils.isEmpty(spec.getMachineCode())) {
+                    spec.setMachineCode(machineCode);
+                }
+            }
+        }
+
+        for (Map.Entry<String, List<TqScheduleResultVo>> entry : machineGuaranteeMap.entrySet()) {
+            String machineCode = entry.getKey();
+            List<TqScheduleResultVo> guaranteeSpecs = entry.getValue();
+
+            // 仅处理多规格机台
+            if (isSingleSpecMachine(machineCode, machineSpecCountMap, specifyMachineSpecCountMap)) {
+                continue;
+            }
+
+            TqMachineInfo machine = machineInfoMap.get(machineCode);
+            double machineQuota = getMachineQuota(machine, defaultQuota);
+
+            // 3. 找出同机台上可以让渡产能的规格
+            List<TqScheduleResultVo> allSpecsOnMachine = scheduleList.stream()
+                    .filter(s -> machineCode.equals(s.getMachineCode()))
+                    .filter(s -> getClassPlanQty(s, classNum) > 0)
+                    .collect(Collectors.toList());
+
+            for (TqScheduleResultVo guaranteeSpec : guaranteeSpecs) {
+                // 需要保障的排产量 = 阈值（与S3.1初始排产上限一致）
+                double neededQty = Math.min(backupThreshold,
+                        guaranteeSpec.getBackupRemainingQty() == null ? 0D : guaranteeSpec.getBackupRemainingQty());
+                if (neededQty <= 0) {
+                    continue;
+                }
+
+                // 按让渡优先级排序可让渡规格：
+                // 优先让渡非备库规格，其次让渡触发班次 != 当前班次的备库规格
+                // 同优先级内按backupRemainingQty升序（缺口小的先让渡）
+                List<TqScheduleResultVo> donorCandidates = allSpecsOnMachine.stream()
+                        .filter(s -> !s.getBeadCode().equals(guaranteeSpec.getBeadCode()))
+                        .filter(s -> getClassPlanQty(s, classNum) > 0)
+                        .sorted((o1, o2) -> {
+                            // 让渡优先级：非备库(0) > 备库触发班次!=当前(1) > 备库触发班次==当前(2)
+                            int priority1 = getDonorPriority(o1, classNum);
+                            int priority2 = getDonorPriority(o2, classNum);
+                            if (priority1 != priority2) {
+                                return Integer.compare(priority1, priority2);
+                            }
+                            // 同优先级按backupRemainingQty升序（缺口小的先让渡）
+                            double rem1 = o1.getBackupRemainingQty() == null ? 0D : o1.getBackupRemainingQty();
+                            double rem2 = o2.getBackupRemainingQty() == null ? 0D : o2.getBackupRemainingQty();
+                            return Double.compare(rem1, rem2);
+                        })
+                        .collect(Collectors.toList());
+
+                double remainingNeeded = neededQty;
+                for (TqScheduleResultVo donorSpec : donorCandidates) {
+                    if (remainingNeeded <= 0) {
+                        break;
+                    }
+
+                    double donorPlanQty = getClassPlanQty(donorSpec, classNum);
+                    if (donorPlanQty <= 0) {
+                        continue;
+                    }
+
+                    // 让渡量上限：该规格当班planQty中超出阈值的剩余部分
+                    // 非备库规格可以全部让渡；备库规格保留阈值量以确保本班最低排产
+                    // 但如果让渡后该规格本班仍有排产（planQty > 0），即使不足阈值也可接受，
+                    // 因为产能保障的目标是确保备库触发班次有排产量，优先级高于非触发班次的满排
+                    Integer donorTriggerClass = donorSpec.getBackupTriggerClass();
+                    double maxDonation;
+                    if (donorTriggerClass == null || donorTriggerClass <= 0) {
+                        // 非备库规格：可以全部让渡
+                        maxDonation = donorPlanQty;
+                    } else if (donorTriggerClass != classNum) {
+                        // 备库但触发班次≠当前班次：可以全部让渡，本班不是它的关键班次
+                        maxDonation = donorPlanQty;
+                    } else {
+                        // 备库且触发班次==当前班次：优先保障自身，不让渡
+                        maxDonation = 0D;
+                    }
+                    if (maxDonation <= 0) {
+                        continue;
+                    }
+
+                    double donateQty = Math.min(remainingNeeded, maxDonation);
+
+                    // 让渡：扣减被让渡规格当班计划量
+                    double newDonorPlan = BigDecimalUtil.sub(donorPlanQty, donateQty);
+                    setClassPlanQty(donorSpec, classNum, newDonorPlan);
+                    capacityMaps[classIdx].put(machineCode,
+                            capacityMaps[classIdx].getOrDefault(machineCode, BigDecimal.ZERO)
+                                    .subtract(BigDecimalUtils.valueOf(donateQty)));
+
+                    // 被让渡规格的扣减量累加到后续班次
+                    int targetClassNum;
+                    if (donorTriggerClass != null && donorTriggerClass > 0 && donorTriggerClass > classNum) {
+                        targetClassNum = donorTriggerClass;
+                    } else {
+                        targetClassNum = Math.min(classNum + 1, 6);
+                    }
+                    double targetPlan = getClassPlanQty(donorSpec, targetClassNum);
+                    setClassPlanQty(donorSpec, targetClassNum, BigDecimalUtil.add(targetPlan, donateQty));
+
+                    // 保障规格获得产能：设置当班计划量
+                    setClassPlanQty(guaranteeSpec, classNum, donateQty);
+                    capacityMaps[classIdx].put(machineCode,
+                            capacityMaps[classIdx].getOrDefault(machineCode, BigDecimal.ZERO)
+                                    .add(BigDecimalUtils.valueOf(donateQty)));
+
+                    // 从后续班次扣减保障规格等额的延后量（避免总量超排）
+                    forwardDigestRemainingQty(guaranteeSpec, classNum, donateQty);
+
+                    remainingNeeded = BigDecimalUtil.sub(remainingNeeded, donateQty);
+
+                    autoScheduleLogService.insertTqScheduleLog(donorSpec.getBatchNo(), donorSpec.getOrderNo(),
+                            "S3.2-触发班次产能保障-让渡", "胎圈代码：" + donorSpec.getBeadCode()
+                                    + "，" + classNum + "班让渡" + donateQty + "→" + guaranteeSpec.getBeadCode()
+                                    + "，扣减量延后至" + targetClassNum + "班"
+                                    + "，释放机台" + machineCode + "产能" + donateQty);
+                    autoScheduleLogService.insertTqScheduleLog(guaranteeSpec.getBatchNo(), guaranteeSpec.getOrderNo(),
+                            "S3.2-触发班次产能保障-获得", "胎圈代码：" + guaranteeSpec.getBeadCode()
+                                    + "，" + classNum + "班获得" + donateQty + "产能（备库触发班次保障）");
+                }
+            }
+        }
+    }
+
+    /**
+     * 获取规格的让渡优先级（数值越小越优先让渡）。
+     *
+     * @param spec 排程记录
+     * @param classNum 当前班次号
+     * @return 优先级：0=非备库，1=备库触发班次!=当前班次，2=备库触发班次==当前班次
+     */
+    private int getDonorPriority(TqScheduleResultVo spec, int classNum) {
+        Integer triggerClass = spec.getBackupTriggerClass();
+        if (triggerClass == null || triggerClass <= 0) {
+            return 0;  // 非备库规格，最优先让渡
+        }
+        if (triggerClass != classNum) {
+            return 1;  // 备库但触发班次不是当前班次
+        }
+        return 2;  // 备库且触发班次是当前班次，最低优先级让渡
     }
 
     /**

@@ -213,6 +213,24 @@ public class MpRollAdjustContextDTO implements Serializable {
     @ApiModelProperty(value = "胶囊卡盘List")
     private List<MdmCapsuleChuck> mdmCapsuleChuckList;
 
+    /**
+     * Map<模壳+日，换活块机台数>
+     */
+    @ApiModelProperty(value = "模壳换活块机台数Map")
+    private Map<String, Integer> mouldShellBlockMachinesMap;
+
+    /**
+     * Map<结构+日，硫化机台数>
+     */
+    @ApiModelProperty(value = "结构硫化机台数Map")
+    private Map<String, Integer> structureMachinesMap;
+
+    /**
+     * Map<英寸+日，硫化机台数>
+     */
+    @ApiModelProperty(value = "英寸硫化机台数Map")
+    private Map<String, Integer> inchMachinesMap;
+
     @ApiModelProperty(value = "SKU日硫化产能Map")
     private Map<String, MdmSkuLhCapacity> mdmSkuLhCapacityMap;
 

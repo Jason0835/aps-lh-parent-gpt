@@ -292,7 +292,7 @@ public class TqResultPersistHandler extends AbsTqScheduleStepHandler {
                 autoSchedule.setOrderNo(existSchedule.getOrderNo());
                 autoSchedule.setPublishSuccessCount(existSchedule.getPublishSuccessCount());
                 autoSchedule.setNewestPublishTime(existSchedule.getNewestPublishTime());
-                autoSchedule.setIsRelease(ApsConstant.WAIT_RELEASING);
+                autoSchedule.setReleaseStatus(ApsConstant.WAIT_RELEASING);
                 autoSchedule.setMachineCode(existSchedule.getMachineCode());
                 mergeList.add(autoSchedule);
             } else if (existScheduleGroupList != null && existScheduleGroupList.size() > 1) {

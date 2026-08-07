@@ -4,10 +4,7 @@ import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.StrUtil;
 import com.ruoyi.common.exception.ServiceException;
-import com.zlt.aps.common.engine.schedule.ScheduleRuleResult;
-import com.zlt.aps.common.engine.schedule.ScheduleScoreResult;
-import com.zlt.aps.common.engine.schedule.ScheduleTaskLinkedList;
-import com.zlt.aps.common.engine.schedule.ScheduleTaskNode;
+import com.zlt.aps.common.engine.schedule.*;
 import com.zlt.aps.common.engine.schedule.constraint.ScheduleConstraintCalculator;
 import com.zlt.aps.common.engine.schedule.constraint.SchedulePlanQtyAdjustmentResult;
 import com.zlt.aps.common.engine.schedule.constraint.ScheduleToolLedgerResult;
@@ -1978,6 +1975,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         target.setEmbryoCode(source.getEmbryoCode());
         target.setMainMaterialDesc(source.getMainMaterialDesc());
         target.setCxMachineCode(source.getCxMachineCode());
+        target.setLhMachineCode(source.getLhMachineCode());
         target.setTreadCode(source.getTreadCode());
         target.setGlueCode(source.getGlueCode());
         target.setBaseGlueCode(source.getBaseGlueCode());
@@ -1990,6 +1988,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         target.setGuardShiftCount(source.getGuardShiftCount());
         target.setGuardRangeHours(source.getGuardRangeHours());
         target.setSupplyHours(source.getSupplyHours());
+        target.setFormingGuardWindowQtyMap(source.getFormingGuardWindowQtyMap());
         target.setCurrentShiftStockGapQty(BigDecimal.ZERO);
         target.setStockGapQty(BigDecimal.ZERO);
         target.setStockDeductQty(BigDecimal.ZERO);
@@ -2227,6 +2226,25 @@ public class TmMachineAssignService implements ITmMachineAssignService {
                 this.getCandidateEvidenceDecimal(evidence, "reorderedTotalSwitchCapacityDeduct"),
                 currentSpecSwitchDeduct, currentGlueSwitchDeduct, this.nvl(beforeAssignQty), beforeRemainCapacity,
                 this.nvl(assignedQty), afterRemainCapacity, this.nvl(overflowQty), splitDesc);
+        context.appendFullProcessTrace(new ScheduleProcessTraceEvent(
+                "机台分配", task.getBusinessKey(), "机台产能即时扣减与拆分",
+                "选中机台的班次容量账本、检修计划、已排任务和切换扣减。",
+                "机台=" + (candidate == null ? "未提供" : candidate.getMachineCode()) + "，班次="
+                        + task.getShiftOrder() + "，分配前待承接量=" + this.nvl(beforeAssignQty)
+                        + "米（本轮之前该任务尚未被机台承接的余量），分配前剩余产能=" + beforeRemainCapacity + "米。",
+                "分配前待承接量不是机台产能，而是本轮分配前该任务尚未被任何机台承接的计划量；首次承接取当前任务计划量，拆分、合并或顺延后取上一次分配后的剩余量。"
+                        + "本次分配量取任务待承接量与本轮可用机台产能中的较小值，超出部分按拆分规则处理。",
+                "本轮待承接量=" + this.nvl(beforeAssignQty) + "米；本次分配量=min("
+                        + this.nvl(beforeAssignQty) + ",本轮可用机台产能)=" + this.nvl(assignedQty)
+                        + "米；溢出量=max(" + this.nvl(beforeAssignQty) + "-" + this.nvl(assignedQty)
+                        + ",0)=" + this.nvl(overflowQty) + "米；规格切换扣减=" + currentSpecSwitchDeduct
+                        + "米，胶料切换扣减=" + currentGlueSwitchDeduct + "米；" + splitDesc + "。",
+                "本次分配=" + this.nvl(assignedQty) + "米，分配后剩余产能=" + afterRemainCapacity
+                        + "米，溢出=" + this.nvl(overflowQty) + "米。",
+                this.nvl(overflowQty).compareTo(BigDecimal.ZERO) > 0
+                        ? "已分配片段进入机台任务链，溢出量进入同班其他机台或后续班次。"
+                        : "已分配数量进入机台任务链并参与最终落库。"
+        ));
     }
 
     /**

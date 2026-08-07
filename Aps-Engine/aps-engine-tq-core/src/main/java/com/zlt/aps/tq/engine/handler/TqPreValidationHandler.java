@@ -200,7 +200,7 @@ public class TqPreValidationHandler extends AbsTqScheduleStepHandler {
                     context.getParams().getBigSizeSpec());
 
             // 发布状态
-            scheduleVo.setIsRelease(ApsConstant.NO_RELEASE);
+            scheduleVo.setReleaseStatus(ApsConstant.NO_RELEASE);
             scheduleVo.setDelFlag(ApsConstant.DEL_FLAG_NORMAL);
             scheduleVo.setCreateTime(new Date());
             scheduleVo.setCreateBy(username);

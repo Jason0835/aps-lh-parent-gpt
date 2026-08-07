@@ -834,7 +834,10 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
             FactoryMonthPlanProductionFinalResult skuInfo = new FactoryMonthPlanProductionFinalResult();
             skuInfo.setFactoryCode(fc);
             skuInfo.setMaterialCode(matCode);
-            skuInfo.setProductStatus(result.getLhType());
+            // 产品状态优先用已推导出的 PRODUCT_STATUS（导入时可由 CLASSx_LH_TYPE 硫化示方书类型
+            // 或 CLASSx_IS_END 类型列 0/1/2/3 推导，与自动排程从月计划取产品状态的匹配口径一致），
+            // 为空时回退取班次硫化示方类型，保证月计划匹配（物料+产品状态）能命中。
+            skuInfo.setProductStatus(StringUtils.defaultIfBlank(result.getProductStatus(), result.getLhType()));
             // 月计划对象（用于获取 productStatus、totalQty、constructionStage、monthPlanVersion）
             FactoryMonthPlanProductionFinalResult monthPlan = SkuMonthPlanCalculator.getSkuYearMonthFinal(allMonthPlanList, skuInfo, productionYearMonth);
             //20260724 补充当前月没有，下个月有时
@@ -914,6 +917,15 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
             }
             if (lhTime != null && lhTime > 0) {
                 result.setLhTime(lhTime);
+            }
+
+            // ---------- SINGLE_MOULD_SHIFT_QTY：单班硫化量 ----------
+            // 模板导入未提供单班硫化量时，从 SKU 硫化产能主数据班产回填，与自动排程口径保持一致，
+            // 避免导入结果缺失该字段（自动排程由 SingleMouldShiftQtyUtil 优先取班产）。
+            if ((result.getSingleMouldShiftQty() == null || result.getSingleMouldShiftQty() <= 0)
+                    && Objects.nonNull(capacity) && Objects.nonNull(capacity.getClassCapacity())
+                    && capacity.getClassCapacity() > 0) {
+                result.setSingleMouldShiftQty(capacity.getClassCapacity());
             }
 
             // ---------- DAILY_PLAN_QTY：日计划量 ----------

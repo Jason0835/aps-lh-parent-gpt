@@ -109,37 +109,6 @@ public interface IFactoryConsoleRemoteService {
     AjaxResult confirmProductionRequireVersion(@RequestBody FactoryProductionPlanVo confirmParam);
 
     /**
-     * 按工厂 + 年月 + 需求版本的方式进行工厂一键排产
-     * 初始化->排结构->排模具
-     *
-     * @param factoryProductionParam 工厂排产参数
-     * @return
-     */
-    @ApiOperation("按工厂 + 年月 + 需求版本的方式进行工厂一键排产 初始化->排结构->排模具")
-    @PostMapping("/factoryConsole/oneClickProductionProcess")
-    AjaxResult oneClickProductionProcess(@RequestBody FactoryProductionParamVo factoryProductionParam);
-
-    /**
-     * 按工厂 + 年月 + 需求版本 + 排产版本的方式进行排产数据的重新初始化
-     *
-     * @param factoryProductionParam 分厂排产参数
-     * @return
-     */
-    @ApiOperation("按工厂 + 年月 + 需求版本 + 排产版本的方式进行排产数据的重新初始化")
-    @PostMapping("/factoryConsole/resetConfigurationInitProduction")
-    AjaxResult resetConfigurationInitProduction(@RequestBody FactoryProductionParamVo factoryProductionParam);
-
-    /**
-     * 按工厂 + 年月 + 需求版本 + 排产版本的方式进行分组计划产能分配重新排产
-     *
-     * @param factoryProductionParam
-     * @return
-     */
-    @PostMapping("/factoryConsole/resetGroupAllocationCapacityProduction")
-    @ApiOperation("按工厂 + 年月 + 需求版本 + 排产版本的方式进行分组计划产能分配重新排产")
-    AjaxResult resetGroupAllocationCapacityProduction(@RequestBody FactoryProductionParamVo factoryProductionParam);
-
-    /**
      * 创建导入模板的版本信息，主要获取版本周期
      *
      * @param param 分厂编码、年份、月份
@@ -158,16 +127,6 @@ public interface IFactoryConsoleRemoteService {
     @ApiOperation("按工厂+ 日期获取分厂的定稿排产版本信息")
     @PostMapping("/factoryConsole/getFinalVersionInfo")
     AjaxResult getFinalVersion(@RequestBody FactoryFinalVersionQueryDto queryCondition);
-
-    /**
-     * 按工厂 + 年月 + 排产版本的方式进行分厂排产
-     *
-     * @param factoryProductionParam 分厂排产参数
-     * @return
-     */
-    @ApiOperation("按工厂 + 年月 + 排产版本的方式分厂排产模具")
-    @PostMapping("/factoryConsole/rescheduleMouldingProduction")
-    AjaxResult rescheduleMouldingProduction(@RequestBody FactoryProductionParamVo factoryProductionParam);
 
     /**
      * 按工厂 + 年月 + 需求版本的方式删除需求计划版本及对应的排产版本
@@ -204,14 +163,14 @@ public interface IFactoryConsoleRemoteService {
      */
     @PostMapping("/factoryConsole/versionList")
     @ApiOperation("查询对应年月+分厂的需求计划版本")
-    public AjaxResult versionList(@RequestBody MpFactoryProductionVersion query);
+    AjaxResult versionList(@RequestBody MpFactoryProductionVersion query);
 
     /**
      * 查询对应年月+分厂+需求计划版本的分厂月计划版本
      */
     @PostMapping("/factoryConsole/getProductionVersionList")
     @ApiOperation("查询对应年月+分厂+需求计划版本的分厂月计划版本")
-    public AjaxResult getProductionVersionList(@RequestBody MpFactoryProductionVersion query);
+    AjaxResult getProductionVersionList(@RequestBody MpFactoryProductionVersion query);
 
     /**
      * 获取月份排产模式--Date 不为空则表示非自然月排产，Date为空表示自然月排产
@@ -225,5 +184,5 @@ public interface IFactoryConsoleRemoteService {
 
     @ApiOperation("检测需求月计划排产")
     @PostMapping("/factoryConsole/checkProductionDemandPlan")
-    public AjaxResult checkProductionDemandPlan(@RequestBody FactoryProductionParamVo factoryProductionParam);
+    AjaxResult checkProductionDemandPlan(@RequestBody FactoryProductionParamVo factoryProductionParam);
 }

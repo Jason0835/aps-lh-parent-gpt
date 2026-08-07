@@ -14,6 +14,7 @@ import com.zlt.aps.nc.api.domain.entity.NcMachineInfo;
 import com.zlt.aps.nc.api.domain.entity.NcMachineMaintenance;
 import com.zlt.aps.nc.api.domain.entity.NcParams;
 import com.zlt.aps.nc.api.domain.entity.NcScheduleResult;
+import com.zlt.aps.nc.api.domain.entity.NcShiftConfig;
 
 import lombok.Data;
 
@@ -70,6 +71,9 @@ public class NcScheduleContext {
 
     /** 机台维修计划 Map<machineCode, List<NcMachineMaintenance>> */
     private Map<String, List<NcMachineMaintenance>> maintenanceMap;
+
+    /** 启用的班次配置列表（按班次顺序排列），用于按班次时间窗匹配维修计划 */
+    private List<NcShiftConfig> shiftConfigList;
 
     /** 工作日历（内衬 + 成型）Map<procCode, List<MdmWorkCalendar>> */
     private Map<String, List<MdmWorkCalendar>> workCalendarMap;

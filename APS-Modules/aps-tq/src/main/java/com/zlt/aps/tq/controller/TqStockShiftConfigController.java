@@ -60,13 +60,13 @@ public class TqStockShiftConfigController extends AbstractDocBizController<TqSto
     @PostMapping("/save")
     @Override
     public AjaxResult save(@RequestBody TqStockShiftConfig billVO) {
-        // 校验业务唯一约束（同一工厂下同机台范围同机台数只能有一条）
+        // 校验业务唯一约束（同一工厂下同区间起始机台数只能有一条）
         if (UserConstants.NOT_UNIQUE.equals(tqStockShiftConfigService.checkUnique(billVO))) {
             return AjaxResult.error(I18nUtil.getMessage("ui.error.message.stockShiftConfig.unique"));
         }
-        // 校验范围交叉（新增/修改的规则不能与现有规则有交集）
+        // 校验区间连续性（从1开始、连续不重叠、无上限仅末段）
         if (UserConstants.NOT_UNIQUE.equals(tqStockShiftConfigService.checkRangeCross(billVO))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.tq.stockShiftConfig.rangeCross"));
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.tq.depthConfig.rangeCross"));
         }
         return super.save(billVO);
     }
@@ -167,7 +167,6 @@ public class TqStockShiftConfigController extends AbstractDocBizController<TqSto
     @Override
     protected void builderCondition(QueryWrapper<TqStockShiftConfig> queryWrapper, TqStockShiftConfig queryVO) {
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFactoryCode()), "FACTORY_CODE", queryVO.getFactoryCode());
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getMachineRange()), "MACHINE_RANGE", queryVO.getMachineRange());
-        queryWrapper.eq(queryVO.getMachineCount() != null, "MACHINE_COUNT", queryVO.getMachineCount());
+        queryWrapper.eq(queryVO.getMinMachineQty() != null, "MIN_MACHINE_QTY", queryVO.getMinMachineQty());
     }
 }

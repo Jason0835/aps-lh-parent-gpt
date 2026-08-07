@@ -9,10 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
-import java.util.Comparator;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -52,7 +49,50 @@ public class GsqMachineAssignHandler extends AbsGsqScheduleStepHandler {
         // 1. 按库存供应时长排序（供应时长短 = 紧急 = 优先排）
         List<GsqScheduleResultVo> sortedList = sortBySupplyDuration(scheduleList, context);
 
-        // 2. 6班次顺序排产
+        // 2. 规格级机台分配（对齐胎圈TQ）：为每个规格选定一台机台，6班次沿用该机台
+        //    使用第一班次上下文执行策略链过滤，按"已分配规格数"负载均衡选择机台，
+        //    确保 machineCode（数据库/页面展示）及 class1~6MachineCode（任务链/质量等消费）均有值
+        Map<String, Integer> machineAssignCount = new HashMap<>();
+        for (GsqScheduleResultVo scheduleVo : sortedList) {
+            if (!hasAnyShiftPlan(scheduleVo)) {
+                continue;
+            }
+
+            // 使用第一班次上下文过滤可用机台
+            context.setCurrentClassIndex(1);
+            context.setCurrentClassCode(getClassCode(1));
+            List<GsqMachineInfo> availableMachines = machineFilterChainService.filter(
+                    context.getAllMachineList(), scheduleVo, context);
+
+            if (availableMachines.isEmpty()) {
+                log.warn("[S3] 规格[{}]无可用机台, 标记未排", scheduleVo.getSteelRingCode());
+                markUnscheduled(scheduleVo);
+                continue;
+            }
+
+            // 选择已分配规格数最少（负载最轻）的机台，避免负载不均
+            GsqMachineInfo targetMachine = availableMachines.stream()
+                    .min(Comparator.comparingInt(m -> machineAssignCount.getOrDefault(m.getMachineCode(), 0)))
+                    .orElse(availableMachines.get(0));
+
+            String machineCode = targetMachine.getMachineCode();
+            // 机台定额来自 QUATA 字段（BigDecimal类型）
+            Double quota = targetMachine.getQuata() == null ? 0D : targetMachine.getQuata().doubleValue();
+            machineAssignCount.merge(machineCode, 1, Integer::sum);
+
+            // 设置规格级单机台：machineCode 及各班次机台/定额均填该机台
+            scheduleVo.setMachineCode(machineCode);
+            for (int classIndex = 1; classIndex <= 6; classIndex++) {
+                if (hasShiftPlan(scheduleVo, classIndex)) {
+                    setShiftMachine(scheduleVo, classIndex, machineCode);
+                    setShiftQuota(scheduleVo, classIndex, quota);
+                }
+            }
+
+            log.info("[S3] 规格[{}] 规格级分配机台[{}] 定额[{}]", scheduleVo.getSteelRingCode(), machineCode, quota);
+        }
+
+        // 3. 6班次顺序构建任务链（沿用规格级已分配机台）
         for (int classIndex = 1; classIndex <= 6; classIndex++) {
             context.setCurrentClassIndex(classIndex);
             // 设置班次编码（01=夜班, 02=早班, 03=中班）
@@ -64,19 +104,24 @@ public class GsqMachineAssignHandler extends AbsGsqScheduleStepHandler {
                 if (!hasShiftPlan(scheduleVo, classIndex)) {
                     continue;
                 }
-
-                // 调用策略链过滤可用机台
-                List<GsqMachineInfo> availableMachines = machineFilterChainService.filter(
-                        context.getAllMachineList(), scheduleVo, context);
-
-                if (availableMachines.isEmpty()) {
-                    log.warn("[S3] 规格[{}]在班次[{}]无可用机台, 标记未排", scheduleVo.getSteelRingCode(), classIndex);
-                    markUnscheduled(scheduleVo, classIndex);
+                String machineCode = scheduleVo.getMachineCode();
+                if (machineCode == null || machineCode.isEmpty()) {
                     continue;
                 }
 
-                // 分配机台并更新任务链
-                assignMachine(scheduleVo, availableMachines, classIndex, context);
+                // 创建任务链节点
+                GsqTaskNode node = new GsqTaskNode();
+                node.setClassIndex(classIndex);
+                node.setMachineCode(machineCode);
+                node.setPlanQty(getShiftPlan(scheduleVo, classIndex));
+                node.setStartStockQty(scheduleVo.getPlanStockQty() == null ? 0 : scheduleVo.getPlanStockQty());
+                double endStock = node.getStartStockQty() + node.getPlanQty() - getTqConsume(scheduleVo, classIndex);
+                node.setEndStockQty(endStock);
+
+                // 加入任务链
+                Map<String, LinkedList<GsqTaskNode>> taskChainMap = context.getTaskChainMap();
+                LinkedList<GsqTaskNode> chain = taskChainMap.computeIfAbsent(machineCode, k -> new LinkedList<>());
+                chain.addLast(node);
             }
         }
     }
@@ -110,6 +155,18 @@ public class GsqMachineAssignHandler extends AbsGsqScheduleStepHandler {
     private boolean hasShiftPlan(GsqScheduleResultVo vo, int classIndex) {
         Double planQty = getShiftPlan(vo, classIndex);
         return planQty != null && planQty > 0;
+    }
+
+    /**
+     * 判断规格是否在任意班次有计划量。
+     */
+    private boolean hasAnyShiftPlan(GsqScheduleResultVo vo) {
+        for (int classIndex = 1; classIndex <= 6; classIndex++) {
+            if (hasShiftPlan(vo, classIndex)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -170,13 +227,16 @@ public class GsqMachineAssignHandler extends AbsGsqScheduleStepHandler {
     }
 
     /**
-     * 标记为未排产。
+     * 标记为未排产（该规格所有有计划量的班次均标记无可用机台）。
      */
-    private void markUnscheduled(GsqScheduleResultVo vo, int classIndex) {
+    private void markUnscheduled(GsqScheduleResultVo vo) {
         vo.setUnscheduledFlag("1");
-        // 分析信息写入未排原因
-        String analysis = "班次" + classIndex + "无可用机台";
-        appendAnalysis(vo, classIndex, analysis);
+        for (int classIndex = 1; classIndex <= 6; classIndex++) {
+            if (hasShiftPlan(vo, classIndex)) {
+                // 分析信息写入未排原因
+                appendAnalysis(vo, classIndex, "班次" + classIndex + "无可用机台");
+            }
+        }
     }
 
     /**
@@ -213,52 +273,6 @@ public class GsqMachineAssignHandler extends AbsGsqScheduleStepHandler {
     }
 
     /**
-     * 分配机台并更新任务链。
-     *
-     * <p>策略：选择任务链最短的机台作为目标机台，避免机台负载不均。</p>
-     */
-    private void assignMachine(GsqScheduleResultVo scheduleVo, List<GsqMachineInfo> machines,
-                                int classIndex, GsqScheduleContext context) {
-        // 选择任务链最短（即负载最轻）的机台
-        GsqMachineInfo targetMachine = machines.stream()
-                .min(Comparator.comparingInt(m -> getTaskChainSize(context, m.getMachineCode())))
-                .orElse(machines.get(0));
-
-        String machineCode = targetMachine.getMachineCode();
-        // 机台定额来自 QUATA 字段（BigDecimal类型）
-        Double quota = targetMachine.getQuata() == null ? 0D : targetMachine.getQuata().doubleValue();
-
-        // 更新排程记录
-        setShiftMachine(scheduleVo, classIndex, machineCode);
-        setShiftQuota(scheduleVo, classIndex, quota);
-
-        // 创建任务链节点
-        GsqTaskNode node = new GsqTaskNode();
-        node.setClassIndex(classIndex);
-        node.setMachineCode(machineCode);
-        node.setPlanQty(getShiftPlan(scheduleVo, classIndex));
-        node.setStartStockQty(scheduleVo.getPlanStockQty() == null ? 0 : scheduleVo.getPlanStockQty());
-        double endStock = node.getStartStockQty() + node.getPlanQty() - getTqConsume(scheduleVo, classIndex);
-        node.setEndStockQty(endStock);
-
-        // 加入任务链
-        Map<String, LinkedList<GsqTaskNode>> taskChainMap = context.getTaskChainMap();
-        LinkedList<GsqTaskNode> chain = taskChainMap.computeIfAbsent(machineCode, k -> new LinkedList<>());
-        chain.addLast(node);
-
-        log.info("[S3] 规格[{}] 班次[{}] 分配机台[{}] 定额[{}] 计划量[{}]",
-                scheduleVo.getSteelRingCode(), classIndex, machineCode, quota, node.getPlanQty());
-    }
-
-    /**
-     * 获取任务链长度。
-     */
-    private int getTaskChainSize(GsqScheduleContext context, String machineCode) {
-        LinkedList<GsqTaskNode> chain = context.getTaskChainMap().get(machineCode);
-        return chain == null ? 0 : chain.size();
-    }
-
-    /**
      * 获取对应胎圈班次的消耗量。
      */
     private double getTqConsume(GsqScheduleResultVo vo, int classIndex) {
@@ -272,6 +286,71 @@ public class GsqMachineAssignHandler extends AbsGsqScheduleStepHandler {
             case 6: return vo.getTqClass6Plan() == null ? 0 : vo.getTqClass6Plan();
             case 7: return vo.getTqClass7Plan() == null ? 0 : vo.getTqClass7Plan();
             default: return 0;
+        }
+    }
+
+    /**
+     * 设置6个班次的生产顺序（对齐胎圈TQ）。
+     *
+     * <p>由 {@code GsqQuotaValidateHandler} 在 S5.5 定额校验完成后调用，统一重置生产顺序。</p>
+     *
+     * <p>排序规则：1.相同英寸连续生产 2.同英寸内按库存供应时长升序排序。
+     * 顺序值按机台独立编号（同一机台同一班次内的规格顺序1,2,3...），而非全局编号，
+     * 避免"机台只有2个规格但顺序值=4"的问题。</p>
+     *
+     * <p>写入每个班次的 CLASSX_SEQUENCE 字段（class1Sequence~class6Sequence）。</p>
+     *
+     * @param scheduleList 排程记录列表
+     */
+    public void setProduceOrder(List<GsqScheduleResultVo> scheduleList) {
+        // 按机台分组：顺序值应按机台独立编号
+        Map<String, List<GsqScheduleResultVo>> machineGroupMap = scheduleList.stream()
+                .filter(vo -> vo.getMachineCode() != null && !vo.getMachineCode().isEmpty())
+                .collect(Collectors.groupingBy(GsqScheduleResultVo::getMachineCode));
+
+        for (int classIndex = 1; classIndex <= 6; classIndex++) {
+            // 每个机台内独立设置顺序值
+            for (Map.Entry<String, List<GsqScheduleResultVo>> entry : machineGroupMap.entrySet()) {
+                List<GsqScheduleResultVo> machineSpecs = entry.getValue();
+                // 排序：1.相同英寸连续 2.同英寸内按供应时长升序
+                int finalClassIndex = classIndex;
+                List<GsqScheduleResultVo> sortedList = machineSpecs.stream()
+                        .filter(vo -> hasShiftPlan(vo, finalClassIndex))
+                        .sorted((o1, o2) -> {
+                            java.math.BigDecimal dim1 = o1.getDimension() == null
+                                    ? java.math.BigDecimal.ZERO : o1.getDimension();
+                            java.math.BigDecimal dim2 = o2.getDimension() == null
+                                    ? java.math.BigDecimal.ZERO : o2.getDimension();
+                            int cmp = dim1.compareTo(dim2);
+                            if (cmp != 0) {
+                                return cmp;
+                            }
+                            double st1 = o1.getSupplyTime() == null ? 0D : o1.getSupplyTime();
+                            double st2 = o2.getSupplyTime() == null ? 0D : o2.getSupplyTime();
+                            return Double.compare(st1, st2);
+                        })
+                        .collect(Collectors.toList());
+
+                int order = 1;
+                for (GsqScheduleResultVo vo : sortedList) {
+                    setClassSequence(vo, classIndex, order++);
+                }
+            }
+        }
+    }
+
+    /**
+     * 设置指定班次的生产顺序值（classXSequence）。
+     */
+    private void setClassSequence(GsqScheduleResultVo vo, int classIndex, int sequence) {
+        switch (classIndex) {
+            case 1: vo.setClass1Sequence(sequence); break;
+            case 2: vo.setClass2Sequence(sequence); break;
+            case 3: vo.setClass3Sequence(sequence); break;
+            case 4: vo.setClass4Sequence(sequence); break;
+            case 5: vo.setClass5Sequence(sequence); break;
+            case 6: vo.setClass6Sequence(sequence); break;
+            default: break;
         }
     }
 }

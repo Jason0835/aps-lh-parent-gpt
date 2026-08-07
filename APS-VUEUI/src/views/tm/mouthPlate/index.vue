@@ -71,7 +71,7 @@ export default {
     infoDialog,
     TltUploadForm,
   },
-  dicts: ["biz_factory_name"],
+  dicts: ["biz_factory_name", "STATUS"],
   provide() {
     return {
       parentDict: this.dict,
@@ -240,6 +240,8 @@ export default {
         {
           prop: "plateStatus",
           label: this.$t("ui.data.column.tm.mouthPlate.plateStatus"),
+          type: "select",
+          dictData: this.dict.type.STATUS,
         },
       ];
     },

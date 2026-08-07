@@ -17,6 +17,7 @@ import com.zlt.aps.mp.api.domain.vo.FactoryProductionParamVo;
 import com.zlt.aps.mp.api.domain.vo.FactoryProductionPlanVo;
 import com.zlt.aps.mp.api.domain.vo.MpProductionModeInfoVo;
 import com.zlt.aps.mp.api.service.IFactoryConsoleRemoteService;
+import com.zlt.aps.mp.api.service.IFactoryMonthProductionRemoteService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.RequiredArgsConstructor;
@@ -45,6 +46,8 @@ import java.util.List;
 public class FactoryConsoleUIController extends BaseController {
 
     private final IFactoryConsoleRemoteService factoryConsoleService;
+
+    private final IFactoryMonthProductionRemoteService factoryMonthProductionService;
 
     private final ISysDictDataCacheService iSysDictDataCacheService;
 
@@ -169,7 +172,7 @@ public class FactoryConsoleUIController extends BaseController {
             return checkParamResult;
         }
         setFactoryName(factoryProductionParam);
-        return factoryConsoleService.oneClickProductionProcess(factoryProductionParam);
+        return factoryMonthProductionService.oneClickProductionProcess(factoryProductionParam);
     }
 
     /**
@@ -188,7 +191,7 @@ public class FactoryConsoleUIController extends BaseController {
             return checkParamResult;
         }
         setFactoryName(factoryProductionParam);
-        return factoryConsoleService.resetConfigurationInitProduction(factoryProductionParam);
+        return factoryMonthProductionService.resetConfigurationInitProduction(factoryProductionParam);
     }
 
     /**
@@ -207,7 +210,7 @@ public class FactoryConsoleUIController extends BaseController {
             return checkParamResult;
         }
         setFactoryName(factoryProductionParam);
-        return factoryConsoleService.resetGroupAllocationCapacityProduction(factoryProductionParam);
+        return factoryMonthProductionService.resetGroupAllocationCapacityProduction(factoryProductionParam);
     }
 
     /**
@@ -226,7 +229,7 @@ public class FactoryConsoleUIController extends BaseController {
             return checkParamResult;
         }
         setFactoryName(factoryProductionParam);
-        return factoryConsoleService.rescheduleMouldingProduction(factoryProductionParam);
+        return factoryMonthProductionService.rescheduleMouldingProduction(factoryProductionParam);
     }
 
     /**

@@ -270,6 +270,9 @@ public abstract class AbstractDailyCapacityLimit {
         //前日有计划量的同胎胚数
         int preSameEmbryoCount = 0;
 
+        //初始模壳换活块机台数
+        dailyCapacityLimitVo.setMouldShellBlockMachinesMap(new HashMap<>());
+
         //Map<主花纹,减模机台数>
         Map<String,Integer> patternDecMouldMap = new HashMap<>();
         //Map<主花纹,增模机台数>
@@ -362,6 +365,10 @@ public abstract class AbstractDailyCapacityLimit {
                 int[]addMouldArr = getAddMouldMachines(mpFinalVo,dailyLhQty,paramMap,dayField,day1Field,day2Field,embryoCodePreDayCountMap);
                 openMachinesAddMould += addMouldArr[0];
                 blockMachinesAddMould += addMouldArr[1];
+                //累计模壳数量
+                if (addMouldArr[1] > 0){
+                    ascMouldShellMachines(dailyCapacityLimitVo, mpFinalVo, addMouldArr[1]);
+                }
                 // 统计换模次数(区别于addMouldArr[0]，主要是将收尾的排除)
                 iChangeMouldCount += addMouldArr[2];
                 if (addMouldArr[3] > 0){
@@ -440,6 +447,23 @@ public abstract class AbstractDailyCapacityLimit {
         }
 
         return null;
+    }
+
+    /**
+     * 累计统计模壳机台数
+     * @param dailyCapacityLimitVo
+     * @param mpFinalVo
+     * @param blockMachines
+     */
+    private void ascMouldShellMachines(MpDailyCapacityLimitVo dailyCapacityLimitVo, BaseEntity mpFinalVo, int blockMachines) {
+        String mouldShell = (String) mpFinalVo.getFieldValueByFieldName(getMouldShellField());
+        if (StringUtil.isEmptyWithTrim(mouldShell)){
+            return;
+        }
+        //若模壳有值，按<模壳，换活块数>存储，用于统计模壳总量（换活块模壳共用，不重复统计）
+        Integer mouldShellMachines = Convert.toInt(dailyCapacityLimitVo.getMouldShellBlockMachinesMap().get(mouldShell),0);
+        mouldShellMachines += blockMachines;
+        dailyCapacityLimitVo.getMouldShellBlockMachinesMap().put(mouldShell,mouldShellMachines);
     }
 
     private <T> T cloneBean(T source) {
@@ -1000,6 +1024,15 @@ public abstract class AbstractDailyCapacityLimit {
      */
     public  String getMainPatternField(){
         return "mainPattern";
+    }
+
+
+    /**
+     * 获取模壳字段
+     * @return
+     */
+    public  String getMouldShellField(){
+        return "mouldShell";
     }
 
     /**

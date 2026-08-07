@@ -118,8 +118,8 @@ export default {
           prop: "proSize",
         },
         {
-          label: this.$t("ui.data.column.tqScheduleResult.isRelease"),
-          prop: "isRelease",
+          label: this.$t("ui.data.column.tqScheduleResult.releaseStatus"),
+          prop: "releaseStatus",
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.parentDict.type.IS_RELEASE, value);
           },

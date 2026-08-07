@@ -3,19 +3,14 @@ package com.zlt.aps.tm.engine.domain;
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.StrUtil;
 import com.ruoyi.common.exception.ServiceException;
-import com.zlt.aps.common.engine.schedule.MachineShiftTaskChain;
-import com.zlt.aps.common.engine.schedule.ScheduleTaskLinkedList;
-import com.zlt.aps.common.engine.schedule.ScheduleTaskNode;
+import com.zlt.aps.common.engine.schedule.*;
 import com.zlt.aps.tm.api.enums.TmScheduleErrorCodeEnum;
 import com.zlt.aps.tm.engine.service.TmAutoScheduleProgressListener;
 import com.zlt.aps.tm.engine.service.collector.TmAutoScheduleIssueCollector;
 import lombok.Data;
 
 import java.math.BigDecimal;
-import java.text.MessageFormat;
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * 胎面排程上下文。
@@ -25,9 +20,6 @@ import java.util.regex.Pattern;
  */
 @Data
 public class TmScheduleContext {
-
-    /** 过程日志中独立小数文本的匹配规则。 */
-    private static final Pattern PROCESS_LOG_DECIMAL_PATTERN = Pattern.compile("(?<![\\d.])(-?\\d+\\.\\d+)(?![\\d.])");
 
     /** 工厂编号 */
     private String factoryCode;
@@ -39,7 +31,7 @@ public class TmScheduleContext {
     private String traceId;
 
     /** 本次自动排程中文过程日志缓冲。 */
-    private StringBuilder processLogBuffer = new StringBuilder(4096);
+    private ScheduleProcessTraceBuffer processTraceBuffer = new ScheduleProcessTraceBuffer();
 
     /** 排程日期 */
     private Date scheduleDate;
@@ -70,6 +62,15 @@ public class TmScheduleContext {
 
     /** 规则证据，key=任务业务键 */
     private Map<String, TmRuleTrace> ruleTraceMap = new HashMap<>();
+
+    /** FULL 日志已消费的规则证据游标，key=任务业务键，value=已写入条数。 */
+    private Map<String, Integer> processRuleTraceCursorMap = new HashMap<>();
+
+    /** 当前正在执行的中文步骤名，失败日志用于指出中断位置。 */
+    private String currentProcessStep;
+
+    /** 已成功完成的中文步骤名。 */
+    private List<String> completedProcessSteps = new ArrayList<>();
 
     /** 本次落库转换汇总 */
     private TmPersistResult persistResult;
@@ -143,22 +144,43 @@ public class TmScheduleContext {
      * @param args   日志参数
      */
     public void appendProcessLog(String format, Object... args) {
-        if (StrUtil.isBlank(format)) {
-            return;
-        }
-        if (processLogBuffer == null) {
-            processLogBuffer = new StringBuilder(4096);
-        }
-        Object[] plainArgs = args == null ? new Object[0] : args;
-        for (int index = 0; index < plainArgs.length; index++) {
-            if (plainArgs[index] instanceof BigDecimal) {
-                if (plainArgs == args) {
-                    plainArgs = args.clone();
-                }
-                plainArgs[index] = ((BigDecimal) plainArgs[index]).toPlainString();
-            }
-        }
-        processLogBuffer.append(MessageFormat.format(format, plainArgs)).append(System.lineSeparator());
+        this.getOrCreateProcessTraceBuffer().appendSummary(format, args);
+    }
+
+    /**
+     * 追加一条完整中文过程事件。
+     *
+     * @param event 完整过程事件
+     */
+    public void appendFullProcessTrace(ScheduleProcessTraceEvent event) {
+        this.getOrCreateProcessTraceBuffer().appendFull(event);
+    }
+
+    /**
+     * 按参数配置过程日志级别。
+     *
+     * @param configuredValue 日志级别参数值
+     */
+    public void configureProcessLogLevel(String configuredValue) {
+        this.getOrCreateProcessTraceBuffer().configure(configuredValue);
+    }
+
+    /**
+     * 获取当前有效过程日志级别。
+     *
+     * @return 有效日志级别
+     */
+    public ScheduleProcessLogLevel getProcessLogLevel() {
+        return this.getOrCreateProcessTraceBuffer().getLevel();
+    }
+
+    /**
+     * 获取当前已收集的有效过程事件数量。
+     *
+     * @return 过程事件数量
+     */
+    public int getProcessLogEventCount() {
+        return this.getOrCreateProcessTraceBuffer().getEventCount();
     }
 
     /**
@@ -167,24 +189,19 @@ public class TmScheduleContext {
      * @return 中文过程日志文本
      */
     public String getProcessLogText() {
-        return processLogBuffer == null ? "" : this.normalizeProcessLogNumbers(processLogBuffer.toString());
+        return this.getOrCreateProcessTraceBuffer().render();
     }
 
     /**
-     * 规范过程日志中的小数展示，移除无业务意义的末尾零。
+     * 获取过程日志缓冲器，避免反序列化或测试注入后出现空引用。
      *
-     * @param processLogText 原始过程日志
-     * @return 数值展示规范后的过程日志
+     * @return 过程日志缓冲器
      */
-    private String normalizeProcessLogNumbers(String processLogText) {
-        Matcher matcher = PROCESS_LOG_DECIMAL_PATTERN.matcher(processLogText);
-        StringBuffer resultBuffer = new StringBuffer();
-        while (matcher.find()) {
-            String normalizedNumber = new BigDecimal(matcher.group(1)).stripTrailingZeros().toPlainString();
-            matcher.appendReplacement(resultBuffer, Matcher.quoteReplacement(normalizedNumber));
+    private ScheduleProcessTraceBuffer getOrCreateProcessTraceBuffer() {
+        if (this.processTraceBuffer == null) {
+            this.processTraceBuffer = new ScheduleProcessTraceBuffer();
         }
-        matcher.appendTail(resultBuffer);
-        return resultBuffer.toString();
+        return this.processTraceBuffer;
     }
 
     /**

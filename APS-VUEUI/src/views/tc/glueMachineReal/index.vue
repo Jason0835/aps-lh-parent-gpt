@@ -67,7 +67,7 @@ export default {
     infoDialog,
     TltUploadForm,
   },
-  dicts: ["biz_factory_name", "biz_yes_no", "class_num_three_plan"],
+  dicts: ["biz_factory_name", "biz_yes_no"],
   provide() {
     return {
       parentDict: this.dict,
@@ -135,14 +135,6 @@ export default {
           prop: "machineCode",
           halign: "center",
           label: this.$t("ui.data.column.tcGlueMachineReal.machineCode"),
-        },
-        {
-          prop: "shiftCode",
-          halign: "center",
-          label: this.$t("ui.data.column.tcGlueMachineReal.machineClass"),
-          formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.class_num_three_plan, value);
-          },
         },
         {
           prop: "priority",
@@ -286,12 +278,6 @@ export default {
           labelKey: "machineCode",
           valueKey: "machineCode",
           filterable: true,
-        },
-        {
-          prop: "shiftCode",
-          label: this.$t("ui.data.column.tcGlueMachineReal.shiftCode"),
-          type: "select",
-          dictData: this.dict.type.class_num_three_plan,
         },
         {
           prop: "enableStatus",

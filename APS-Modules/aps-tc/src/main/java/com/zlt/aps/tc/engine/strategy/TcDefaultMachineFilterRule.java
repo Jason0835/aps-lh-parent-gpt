@@ -2,6 +2,7 @@ package com.zlt.aps.tc.engine.strategy;
 
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.common.core.utils.MachineOpenShiftCodeUtil;
 import com.zlt.aps.common.engine.schedule.ScheduleRuleResult;
 import com.zlt.aps.tc.api.constant.TcScheduleConstants;
 import com.zlt.aps.tc.api.enums.TcMachineFilterReasonEnum;
@@ -264,8 +265,9 @@ public class TcDefaultMachineFilterRule implements ITcMachineFilterRule {
         candidate.getEvidence().put("shiftCode", currentShiftCode);
         candidate.getEvidence().put("machineOpenShiftCodes",
                 openShiftCodes == null ? Collections.emptySet() : openShiftCodes);
-        return currentShiftCode == null || openShiftCodes == null
-                || !openShiftCodes.contains(currentShiftCode.trim());
+        candidate.getEvidence().put("legacyOpenShiftCode",
+                MachineOpenShiftCodeUtil.resolveLegacyOpenShiftCode(currentShiftCode));
+        return !MachineOpenShiftCodeUtil.isMachineShiftOpen(openShiftCodes, currentShiftCode);
     }
 
     /**

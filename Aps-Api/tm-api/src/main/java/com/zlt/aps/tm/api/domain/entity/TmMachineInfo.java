@@ -39,13 +39,13 @@ public class TmMachineInfo extends BaseEntity {
     private String factoryCode;
 
     @Excel(name = "ui.data.column.tm.machineInfo.machineCode")
-    @ImportValidated(isCode = true, maxLength = 30)
+    @ImportValidated(required = true, isCode = true, maxLength = 30)
     @ApiModelProperty(value = "机台编码", name = "machineCode")
     @TableField(value = "MACHINE_CODE")
     private String machineCode;
 
     @Excel(name = "ui.data.column.tm.machineInfo.machineName")
-    @ImportValidated(maxLength = 50)
+    @ImportValidated(required = true, maxLength = 50)
     @ApiModelProperty(value = "机台名称", name = "machineName")
     @TableField(value = "MACHINE_NAME")
     private String machineName;
@@ -62,7 +62,7 @@ public class TmMachineInfo extends BaseEntity {
     @TableField(value = "OPEN_SHIFT_CODE")
     private String openShiftCode;
 
-    @Excel(name = "ui.data.column.tm.machineInfo.machineStatus", dictType = "STATUS")
+    @Excel(name = "ui.data.column.tm.machineInfo.machineStatus", dictType = "biz_available_status")
     @ImportValidated(maxLength = 50)
     @ApiModelProperty(value = "机台状态", name = "machineStatus")
     @TableField(value = "MACHINE_STATUS")

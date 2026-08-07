@@ -361,16 +361,70 @@ public class CapsuleReplacementRuleService {
      * @param context 排程上下文
      */
     public void verifyFinalState(LhScheduleContext context) {
+        int zeroQtyRemarkCleanedCount = removeReplacementAnalysisOnZeroQtyShifts(context);
         int duplicateAnalysisCount = removeDuplicateReplacementAnalysis(context);
         rebuildRuntimeState(context, null);
         if (Objects.isNull(context)) {
             return;
         }
         log.info("换胶囊规则最终核对完成, batchNo: {}, scheduleDate: {}, 换胶囊班次数: {}, "
-                        + "清理重复备注数: {}, 胶囊运行态: {}",
+                        + "清理重复备注数: {}, 清理零量班次备注数: {}, 胶囊运行态: {}",
                 context.getBatchNo(), LhScheduleTimeUtil.formatDate(context.getScheduleDate()),
                 context.getCapsuleReplacementShiftKeySet().size(), duplicateAnalysisCount,
-                context.getCapsuleRuntimeUsageMap());
+                zeroQtyRemarkCleanedCount, context.getCapsuleRuntimeUsageMap());
+    }
+
+    /**
+     * 清理最终结果中“计划量为 0 但残留换胶囊备注”的班次。
+     * <p>降模、收尾裁剪、停产保机等后置逻辑可能把已写备注的班次清零，备注必须随清零一并移除，
+     * 否则会出现“零量班次仍备注换胶囊”的虚假对账信息（如 3302001761/K2016 class7）。</p>
+     *
+     * @param context 排程上下文
+     * @return 清理的零量班次备注数量
+     */
+    private int removeReplacementAnalysisOnZeroQtyShifts(LhScheduleContext context) {
+        if (Objects.isNull(context) || CollectionUtils.isEmpty(context.getScheduleResultList())) {
+            return 0;
+        }
+        List<LhShiftConfigVO> shifts = resolveScheduleShifts(context);
+        if (CollectionUtils.isEmpty(shifts)) {
+            return 0;
+        }
+        int cleanedCount = 0;
+        for (LhScheduleResult result : context.getScheduleResultList()) {
+            if (Objects.isNull(result) || StringUtils.isEmpty(result.getLhMachineCode())) {
+                continue;
+            }
+            String physicalMachineCode = LhSingleControlMachineUtil.resolvePhysicalMachineCode(
+                    result.getLhMachineCode());
+            for (LhShiftConfigVO shift : shifts) {
+                if (Objects.isNull(shift) || Objects.isNull(shift.getShiftIndex())) {
+                    continue;
+                }
+                Integer planQty = ShiftFieldUtil.getShiftPlanQty(result, shift.getShiftIndex());
+                if (Objects.nonNull(planQty) && planQty > 0) {
+                    continue;
+                }
+                String analysis = ShiftFieldUtil.getShiftAnalysis(result, shift.getShiftIndex());
+                if (StringUtils.isEmpty(analysis)
+                        || !analysis.contains(CAPSULE_REPLACEMENT_ANALYSIS)) {
+                    continue;
+                }
+                // 清零班次不属于真实换胶囊班次：移除备注并同步移除本批换胶囊班次登记。
+                ShiftFieldUtil.removeShiftAnalysis(
+                        result, shift.getShiftIndex(), CAPSULE_REPLACEMENT_ANALYSIS);
+                String shiftKey = buildShiftKey(physicalMachineCode, shift);
+                if (StringUtils.isNotEmpty(shiftKey)) {
+                    context.getCapsuleReplacementShiftKeySet().remove(shiftKey);
+                }
+                cleanedCount++;
+            }
+        }
+        if (cleanedCount > 0) {
+            log.info("换胶囊零量班次备注清理, batchNo: {}, 清理数量: {}, reason: 班次计划量为0不保留换胶囊备注",
+                    context.getBatchNo(), cleanedCount);
+        }
+        return cleanedCount;
     }
 
     /**

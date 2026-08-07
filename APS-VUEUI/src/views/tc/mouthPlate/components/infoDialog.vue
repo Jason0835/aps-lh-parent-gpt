@@ -31,6 +31,7 @@
 <script>
 import infoForm from "@/views/components/infoForm.vue";
 import {saveTcMouthPlate} from "@/api/tc/mouthPlate";
+import {listTcMachineInfo} from "@/api/tc/machineInfo";
 
 export default {
   components: { infoForm },
@@ -42,6 +43,7 @@ export default {
       isEdit: false,
       editType: null,
       form: {},
+      machineList: [],
       rules: {
         factoryCode: [
           {
@@ -69,7 +71,7 @@ export default {
   },
   computed: {
     machines() {
-      return this.$store.state.tc.machines;
+      return this.machineList;
     },
     title: function () {
       return (
@@ -89,6 +91,7 @@ export default {
           span: 12,
           required: true,
           disabled: true,
+          placeholder: this.$t("ui.data.placeholder.tc.mouthPlate.factoryCode"),
         },
         {
           prop: "mouthPlateCode",
@@ -163,9 +166,18 @@ export default {
         };
       } else {
         this.form = {
-          factoryCode: "116",
           plateStatus: "1",
         };
+      }
+      this.loadMachines();
+    },
+    async loadMachines() {
+      try {
+        const res = await listTcMachineInfo({ pageSize: 9999 });
+        this.machineList = res.rows || [];
+      } catch (error) {
+        console.log(error);
+        this.machineList = [];
       }
     },
     hide() {

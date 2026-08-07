@@ -779,6 +779,51 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
     }
 
     /**
+     * 重算每日产能限制，包括硫化机台数、胎胚种类数、换模次数以及统计硫化机台数
+     *
+     * @param contextDTO      周程滚动上下文
+     * @param mpProdFinalList 定稿记录列表
+     */
+    private void reCalcAdjustDailyCapacityLimitWithStaticMachines(MpRollAdjustContextDTO contextDTO, List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList, MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj) {
+        if (PubUtil.isEmpty(mpProdFinalList)){
+            return;
+        }
+        String proSize = mpProdFinalList.get(0).getProSize();
+        Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = contextDTO.getDailyCapacityLimitVoMap();
+        for (int i = contextDTO.getStructureStartDay(); i <= contextDTO.getStructureDeadLine(); i++) {
+            if (dailyCapacityLimitVoMap.get(i) == null) {
+                continue;
+            }
+            adjustDailyCapacityLimitObj.calcLhMachinesWithEmbryoTypes(mpProdFinalList, i, dailyCapacityLimitVoMap.get(i), contextDTO.getParamMap(), null, null);
+
+            //补充当前结构的硫化机台数
+            Map<String, Integer> mouldShellBlockMachinesMap = dailyCapacityLimitVoMap.get(i).getMouldShellBlockMachinesMap();
+            if (mouldShellBlockMachinesMap != null && contextDTO.getMouldShellBlockMachinesMap() != null){
+                for (Map.Entry<String, Integer> entry : mouldShellBlockMachinesMap.entrySet()) {
+                    String key = entry.getKey() + BusiConstant.WeekRollAdjust.SPLIT_GROUP_KEY + i;
+                    Integer blockMachines = Convert.toInt(contextDTO.getMouldShellBlockMachinesMap().get(key),0);
+                    blockMachines += Convert.toInt(entry.getValue(),0);
+                    contextDTO.getMouldShellBlockMachinesMap().put(key,blockMachines);
+                }
+            }
+            if (contextDTO.getInchMachinesMap() != null && StringUtils.isNotBlank(proSize)){
+                //英寸+日，硫化机台数
+                String proSizeKey = proSize + BusiConstant.WeekRollAdjust.SPLIT_GROUP_KEY+ i;
+                Integer lhMachines = Convert.toInt(contextDTO.getInchMachinesMap().get(proSizeKey),0);
+                lhMachines += Convert.toInt(dailyCapacityLimitVoMap.get(i).getUsedLhMachines(),0);
+                contextDTO.getInchMachinesMap().put(proSizeKey, lhMachines);
+            }
+
+            if (contextDTO.getStructureMachinesMap() != null){
+                //结构+日，硫化机台数
+                String structureKey = contextDTO.getStructureName() + BusiConstant.WeekRollAdjust.SPLIT_GROUP_KEY+ i;
+                Integer lhMachines = Convert.toInt(contextDTO.getStructureMachinesMap().get(structureKey),0);
+                lhMachines += Convert.toInt(dailyCapacityLimitVoMap.get(i).getUsedLhMachines(),0);
+                contextDTO.getStructureMachinesMap().put(structureKey, lhMachines);
+            }
+        }
+    }
+    /**
      * 构建月计划统计结果
      *
      * @param mpProdFinalList 月计划定稿列表
@@ -862,7 +907,20 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         dayProductionStatisticsDetailVo.setChangeMould(Convert.toInt(capacityVo.getUsedChangeMould(), 0).equals(0) ? null : capacityVo.getUsedChangeMould());
         dayProductionStatisticsDetailVo.setTotalQty(totalQty);
         dayProductionStatisticsDetailVo.setOemQty(oemQty);
-
+        if (PubUtil.isNotEmpty(capacityVo.getMouldShellBlockMachinesMap())){
+            List<MpDayProductionStatisticsShellVo> mouldShellList = new ArrayList<>();
+            for (Map.Entry<String, Integer> entry : capacityVo.getMouldShellBlockMachinesMap().entrySet()) {
+                if (entry.getValue() >0){
+                    MpDayProductionStatisticsShellVo shellVo = new MpDayProductionStatisticsShellVo();
+                    shellVo.setMouldShell(entry.getKey());
+                    shellVo.setBlockMachines(entry.getValue());
+                    mouldShellList.add(shellVo);
+                }
+            }
+            if (PubUtil.isNotEmpty(mouldShellList)){
+                dayProductionStatisticsDetailVo.setMouldShellList(mouldShellList);
+            }
+        }
         statistics.setFieldValueByFieldName(BusiConstant.WeekRollAdjust.FIELD_PREFIX_DAY + day, JSONObject.toJSONString(dayProductionStatisticsDetailVo));
     }
 
@@ -1145,6 +1203,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         insertMonthPlanList(contextDTO);
         // 8、更新结构转产
         updateStructureAllocationList(contextDTO);
+        // 初始模壳值
+        initMouldShellValue(contextDTO, contextDTO.getFactoryMonthPlanProdFinalList());
         // 9、处理月计划统计结果
         String bakStructureName = contextDTO.getStructureName();
         handleMonthPlanStatistics(contextDTO, null);
@@ -1180,20 +1240,14 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         }
         //1、根据规格+主花纹，初始模壳标准
         List<FactoryMonthPlanFinalAdjustVo> factoryMonthPlanProdFinalList = contextDTO.getFactoryMonthPlanProdFinalList();
-        String key,mouldShell;
-        for (FactoryMonthPlanFinalAdjustVo adjustVo:factoryMonthPlanProdFinalList){
-            key = getSpecAndMainPatternKey(adjustVo.getSpecifications(),adjustVo.getMainPattern());
-            mouldShell = contextDTO.getMdmMouldInfoMap().get(key);
-            if (StringUtils.isNotBlank(mouldShell)){
-                adjustVo.setMouldShell(mouldShell);
-            }
-        }
+
         //2、检查模壳标准
         StringBuilder sbError = new StringBuilder();
         int maxDays = com.zlt.aps.mp.engine.utils.DateUtils.getDaysByYearMonth(contextDTO.getMpYear(), contextDTO.getMpMonth());
         List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList;
         Integer sumMouldQty,oriSumMouldQty,remainMouldQty;
         Map<String,Integer> mouldShellCombineRemainQtyMap = new HashMap<>();
+        List<String> deductBlockFlag = new ArrayList<>();
         //2.1 先检查没有组合的模壳标准
         for (MdmMouldShellInfo shellInfo:contextDTO.getMdmMouldShellInfoList()){
             mpProdFinalList = factoryMonthPlanProdFinalList.stream().filter(x->shellInfo.getMouldSetCode().equals(x.getMouldShell())).collect(Collectors.toList());
@@ -1202,6 +1256,14 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             }
             for (int iDay = FactoryConstant.MONTH_START_DAY; iDay <= maxDays; iDay++) {
                 sumMouldQty = getMouldQtyByShellAndDay(mpProdFinalList, iDay);
+                //扣除 换活块的机台数(注：这里机台数不*2)
+                //注：换模的机台要分开计算视2个模壳；换活块的机台视1个模壳，一定相同；
+                if (contextDTO.getMouldShellBlockMachinesMap() != null){
+                    String key = shellInfo.getMouldSetCode() + BusiConstant.WeekRollAdjust.SPLIT_GROUP_KEY + iDay;
+                    Integer blockMachines = Convert.toInt(contextDTO.getMouldShellBlockMachinesMap().get(key),0);
+                    sumMouldQty -= blockMachines;
+                    deductBlockFlag.add(shellInfo.getMouldSetCode());
+                }
                 if (sumMouldQty > shellInfo.getTotalQty()){
                     //提示： 模壳标准:[%s]，[%s]日，模壳数:[%s]，超出剩余模壳数:[%s]！
                     sbError.append(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.confirm.mouldShellLimit"), shellInfo.getMouldSetCode(), iDay, sumMouldQty ,shellInfo.getTotalQty())).append(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE);
@@ -1218,9 +1280,19 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         if (mpCombineProdFinalMap != null &&  mpCombineProdFinalMap.size() > 0){
             for (Map.Entry<String, List<FactoryMonthPlanFinalAdjustVo>> entry1 : mpCombineProdFinalMap.entrySet()) {
                 for (int iDay = FactoryConstant.MONTH_START_DAY; iDay <= maxDays; iDay++) {
+
                     sumMouldQty = getMouldQtyByShellAndDay(entry1.getValue(), iDay);
-                    oriSumMouldQty = sumMouldQty;
+
                     String[] mouldShellArr = entry1.getKey().split(BusiConstant.WeekRollAdjust.SPLIT_COMMA);
+                    for (String shell : mouldShellArr){
+                        //扣除 换活块的机台数(注：这里机台数不*2)
+                        if (contextDTO.getMouldShellBlockMachinesMap() != null && deductBlockFlag.indexOf(shell) < 0){
+                            String key = shell + BusiConstant.WeekRollAdjust.SPLIT_GROUP_KEY + iDay;
+                            Integer blockMachines = Convert.toInt(contextDTO.getMouldShellBlockMachinesMap().get(key),0);
+                            sumMouldQty -= blockMachines;
+                        }
+                    }
+                    oriSumMouldQty = sumMouldQty;
                     Integer shellRemainQty;
                     Integer oriShellRemainQty = 0;
                     for (String shell : mouldShellArr){
@@ -1239,7 +1311,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                     if (sumMouldQty > 0){
                         //还有剩，表示超标，提示
                         //提示： 模壳标准:[%s]，[%s]日，模壳数:[%s]，超出剩余模壳数:[%s]！
-                        sbError.append(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.confirm.mouldShellLimit"), mouldShellArr.toString(), iDay, oriSumMouldQty ,oriShellRemainQty)).append(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE);
+                        sbError.append(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.confirm.mouldShellLimit"), String.join(BusiConstant.WeekRollAdjust.SPLIT_COMMA, mouldShellArr), iDay, oriSumMouldQty ,oriShellRemainQty)).append(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE);
                     }
                 }
             }
@@ -1247,6 +1319,22 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
 
         if (!StringUtil.isEmptyWithTrim(sbError.toString())) {
             throw new BusinessException(sbError.toString());
+        }
+    }
+
+    /**
+     * 初始化模壳数据
+     * @param contextDTO
+     * @param factoryMonthPlanProdFinalList
+     */
+    private void initMouldShellValue(MpRollAdjustContextDTO contextDTO, List<FactoryMonthPlanFinalAdjustVo> factoryMonthPlanProdFinalList) {
+        String key,mouldShell;
+        for (FactoryMonthPlanFinalAdjustVo adjustVo: factoryMonthPlanProdFinalList){
+            key = getSpecAndMainPatternKey(adjustVo.getSpecifications(),adjustVo.getMainPattern());
+            mouldShell = contextDTO.getMdmMouldInfoMap().get(key);
+            if (StringUtils.isNotBlank(mouldShell)){
+                adjustVo.setMouldShell(mouldShell);
+            }
         }
     }
 
@@ -1259,7 +1347,6 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         if (PubUtil.isEmpty(contextDTO.getMdmCapsuleChuckList())){
             return;
         }
-        List<FactoryMonthPlanFinalAdjustVo> factoryMonthPlanProdFinalList = contextDTO.getFactoryMonthPlanProdFinalList();
 
         //1、检查胶囊卡盘
         StringBuilder sbError = new StringBuilder();
@@ -1269,18 +1356,11 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         for (MdmCapsuleChuck capsuleChuck:contextDTO.getMdmCapsuleChuckList()){
             chuckTotalQty = Convert.toInt(capsuleChuck.getNewChuckQty()) + Convert.toInt(capsuleChuck.getInternalQty());
             if (StringUtils.isNotBlank(capsuleChuck.getSpecifications())){
-                //1.1 按规格
-                String[] specArr = capsuleChuck.getSpecifications().split(BusiConstant.WeekRollAdjust.SPLIT_COMMA);
-                // 将specArr转换为List，便于contains判断
-                List<String> specList = Arrays.asList(specArr);
-                mpProdFinalList = factoryMonthPlanProdFinalList.stream().filter(x->specList.contains(x.getSpecifications())).collect(Collectors.toList());
-                checkOneCapsuleChuck(mpProdFinalList, maxDays, chuckTotalQty, sbError,capsuleChuck.getSpecifications());
+                //1.1 按规格(其实是结构)
+                checkOneCapsuleChuck(contextDTO, maxDays, chuckTotalQty, sbError,capsuleChuck.getSpecifications(),contextDTO.getStructureMachinesMap());
             }else if (StringUtils.isNotBlank(capsuleChuck.getProSize())){
                 //1.2 按英寸
-                String[] proSizeArr = capsuleChuck.getProSize().split(BusiConstant.WeekRollAdjust.SPLIT_COMMA);
-                List<String> proSizeList = Arrays.asList(proSizeArr);
-                mpProdFinalList = factoryMonthPlanProdFinalList.stream().filter(x->proSizeList.contains(x.getProSize())).collect(Collectors.toList());
-                checkOneCapsuleChuck(mpProdFinalList, maxDays, chuckTotalQty, sbError,capsuleChuck.getProSize());
+                checkOneCapsuleChuck(contextDTO, maxDays, chuckTotalQty, sbError,capsuleChuck.getProSize(),contextDTO.getInchMachinesMap());
             }
         }
 
@@ -1291,18 +1371,25 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
 
     /**
      * 检查 一个维度的胶囊卡盘
-     * @param mpProdFinalList
+     * @param contextDTO
      * @param maxDays
      * @param chuckTotalQty
      * @param sbError
      */
-    private void checkOneCapsuleChuck(List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList, int maxDays, Integer chuckTotalQty, StringBuilder sbError, String spec2ProSize) {
-        Integer sumMouldQty;
-        if (PubUtil.isEmpty(mpProdFinalList)){
+    private void checkOneCapsuleChuck(MpRollAdjustContextDTO contextDTO, int maxDays, Integer chuckTotalQty, StringBuilder sbError, String spec2ProSize, Map<String, Integer> machinesMap) {
+        if (PubUtil.isEmpty(machinesMap)){
             return;
-         }
+        }
+        String[] specArr = spec2ProSize.split(BusiConstant.WeekRollAdjust.SPLIT_COMMA);
+        Integer sumMouldQty;
         for (int iDay = FactoryConstant.MONTH_START_DAY; iDay <= maxDays; iDay++) {
-            sumMouldQty = getMouldQtyByShellAndDay(mpProdFinalList, iDay);
+            sumMouldQty = 0;
+            for (String spec: specArr){
+                String key = spec + BusiConstant.WeekRollAdjust.SPLIT_COMMA + iDay;
+                sumMouldQty += Convert.toInt(machinesMap.get(key),0);
+            }
+            //硫化机台数 转 模数
+            sumMouldQty = sumMouldQty * 2;
             if (sumMouldQty > chuckTotalQty){
                 //提示： 胶囊卡盘:[%s]，[%s]日，统计数:[%s]，超出最大卡盘数:[%s]！
                 sbError.append(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.confirm.capsuleChuckLimit"), spec2ProSize, iDay, sumMouldQty ,chuckTotalQty)).append(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE);
@@ -1655,6 +1742,10 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
 
         for (String structureName : structureNameSet) {
             contextDTO.setStructureName(structureName);
+            //每个结构都得先清一下（可能只有一个结构）
+            contextDTO.setMouldShellBlockMachinesMap(new HashMap<>());
+            contextDTO.setStructureMachinesMap(new HashMap<>());
+            contextDTO.setInchMachinesMap(new HashMap<>());
 
             List<MpStructureAllocation> targetStructureAllocationList = oneStructureAllocationList.stream()
                     .filter(vo -> structureName.equals(vo.getStructureName()))
@@ -1683,8 +1774,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             // 假设 targetMonthPlanList 已有数据
             checkMouldSatisfyByMainPattern(contextDTO,targetMonthPlanList,sbError);
 
-            // 重算每日产能限制，包括硫化机台数、胎胚种类数、换模次数
-            reCalcAdjustDailyCapacityLimit(contextDTO, targetMonthPlanList, adjustDailyCapacityLimitObj,null);
+            // 重算每日产能限制，包括硫化机台数、胎胚种类数、换模次数以及统计硫化机台数
+            reCalcAdjustDailyCapacityLimitWithStaticMachines(contextDTO, targetMonthPlanList, adjustDailyCapacityLimitObj);
 
             //9.设置模具变化信息
             for (FactoryMonthPlanFinalAdjustVo mpFinalVo : targetMonthPlanList) {
@@ -3284,11 +3375,11 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             /*if (Boolean.TRUE.equals(contextDTO.getFrontScheduledMachinesFlag())) {
                 resultList = WeekRollAdjustMachineCrossChecker.filterAdjustResultByMachine(resultList, contextDTO.getScheduledMachines());
             }*/
-            Set<String> structureNameSet = resultList.stream().map(x -> x.getStructureName()).collect(Collectors.toSet());
+           /* Set<String> structureNameSet = resultList.stream().map(x -> x.getStructureName()).collect(Collectors.toSet());
             if (StringUtil.isEmptyWithTrim(contextDTO.getStructureName()) && structureNameSet != null && structureNameSet.size() == 1) {
                 //若调整结果只有一个结果，直接设置为当前结构
                 contextDTO.setStructureName(structureNameSet.iterator().next());
-            }
+            }*/
             contextDTO.setAdjustResultList(resultList);
         } catch (Exception e) {
             log.error("查询周程调整结果异常，年份：{}，月份：{}，版本：{}", year, month, version, e);
