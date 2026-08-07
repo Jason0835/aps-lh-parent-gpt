@@ -1437,7 +1437,6 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
             return;
         }
         ShiftFieldUtil.syncDailyPlanQty(result);
-        result.setTotalDailyPlanQty(result.getDailyPlanQty());
         if (Objects.isNull(result.getDailyPlanQty()) || result.getDailyPlanQty() <= 0) {
             result.setSpecEndTime(null);
             result.setTdaySpecEndTime(null);

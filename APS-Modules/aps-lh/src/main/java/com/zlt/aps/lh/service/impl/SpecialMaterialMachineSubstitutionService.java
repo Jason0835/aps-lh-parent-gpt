@@ -1336,7 +1336,6 @@ public class SpecialMaterialMachineSubstitutionService {
             LhScheduleResult result,
             int removedQty) {
         ShiftFieldUtil.syncDailyPlanQty(result);
-        result.setTotalDailyPlanQty(result.getDailyPlanQty());
         ShiftFieldUtil.clearUnplannedShiftCureFormulaFields(result);
         int lastShiftIndex = ShiftFieldUtil.applyLastPlannedShiftEndMark(result, true);
         Date lastEndTime = lastShiftIndex > 0

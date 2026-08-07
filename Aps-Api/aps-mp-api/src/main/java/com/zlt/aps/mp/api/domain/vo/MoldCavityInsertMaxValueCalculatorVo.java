@@ -28,6 +28,12 @@ public class MoldCavityInsertMaxValueCalculatorVo {
     private String materialDesc;
 
     /**
+     * 规格
+     */
+    @ApiModelProperty(value = "规格", name = "specifications")
+    private String specifications;
+
+    /**
      * 型腔模号
      */
     @ApiModelProperty(value = "型腔模号", name = "mouldCode")
