@@ -172,13 +172,10 @@ export default {
             if (this.isEmpty(value)) {
               return "";
             }
-            if (row.classShift === "3") {
-              return this.selectDictLabels(
-                this.dict.type.class_num_three_plan,
-                value
-              );
-            }
-            return this.selectDictLabels(this.dict.type.class_num_three_plan, value);
+            return this.selectDictLabels(
+              this.dict.type.class_num_three_plan,
+              value
+            );
           },
         },
         {

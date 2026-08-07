@@ -30,9 +30,18 @@ public class MesShiftStockSyncRequest implements Serializable {
     @ApiModelProperty(value = "MES库存物理日期", required = true)
     private Date stockDate;
 
-    /** 班次顺序，取值一至六。 */
-    @ApiModelProperty(value = "班次顺序", required = true)
+    /** 班次顺序，TM/TC取值一至六。 */
+    @ApiModelProperty(value = "班次顺序，TM/TC取值一至六")
     private Integer shiftOrder;
+
+    /** 物理班次编码，CD15/CD90使用。 */
+    @ApiModelProperty(value = "物理班次编码")
+    private String shiftCode;
+
+    /** 班次开始时间，CD15/CD90用于精确定位交班快照。 */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @ApiModelProperty(value = "班次开始时间")
+    private Date shiftStartTime;
 
     /** 可选MES数据版本。 */
     @ApiModelProperty(value = "MES数据版本")

@@ -27,11 +27,11 @@ public class GsqMachineInfoTemp extends BaseEntity {
     private BigDecimal quata;
 
     @ApiModelProperty(value = "班制", position = 80)
-    @Excel(name = "ui.data.column.machine.classShift", dictType = "CLASS_SHIFT")
+    @Excel(name = "ui.data.column.machine.classShift", dictType = "LH_CLASS_SHIFT")
     private String classShift;
 
     @ApiModelProperty(value = "开机班次", position = 85)
-    @Excel(name = "ui.data.column.machine.openMachineClass", dictType = "CLASS_NUM_THREE",dictTypeToExcelEnable = false)
+    @Excel(name = "ui.data.column.machine.openMachineClass", dictType = "class_num_three_plan",dictTypeToExcelEnable = false)
     private String openMachineClass;
 
     @ApiModelProperty(value = "机台状态", position = 90)

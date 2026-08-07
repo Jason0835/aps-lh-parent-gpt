@@ -307,8 +307,7 @@ export default {
       }
     },
   },
-  mounted() {
-    this.getList();
+  created() {
     this.loadMachineList();
   },
   activated() {

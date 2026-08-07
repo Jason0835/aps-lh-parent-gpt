@@ -64,6 +64,9 @@ public class MesItfController {
     private com.zlt.aps.itf.mes.service.ITqScheduleResultIssueService tqScheduleResultIssueService;
 
     @Autowired
+    private com.zlt.aps.itf.mes.service.IGsqScheduleResultIssueService gsqScheduleResultIssueService;
+
+    @Autowired
     private com.zlt.aps.itf.mes.service.ICd90ScheduleResultIssueService cd90ScheduleResultIssueService;
 
     @Autowired
@@ -519,22 +522,6 @@ public class MesItfController {
     }
 
     /**
-     * 同步直裁库存（从 MES 中间表 T_MES_CD90_STOCK 同步到 t_cd90_stock）
-     * @param syncDataLogs 参数（可传 factoryCode；queryParams.shiftCode 可覆盖自动推断班次）
-     * @return 结果
-     */
-    @ApiOperation("同步直裁库存")
-    @PostMapping("/syncMesCd90Stock")
-    @AutoLoginLog
-    public AjaxResult syncMesCd90Stock(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
-        String factoryCode = syncDataLogs.getFactoryCode();
-        if (StringUtils.isBlank(factoryCode)) {
-            syncDataLogs.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
-        }
-        return mesItfService.syncMesCd90Stock(syncDataLogs);
-    }
-
-    /**
      * 实时查询MES生胎库存（不写入APS本地表，仅供成型排程实时调用）
      * @param syncDataLogs 参数（可传factoryCode过滤分厂）
      * @return 生胎库存列表
@@ -791,21 +778,41 @@ public class MesItfController {
      * 胎圈排程结果下发到MES
      * 业务规则：
      * 1. D日（今天）：更新中班数据（胎圈1班→MES中班），夜班早班已过不下发
+     * 2. D+1日（明天）：更新夜早中3班数据（胎圈2/3/4班→MES夜/早/中班）
+     * 3. D+2日（后天）：先删后插夜早2班数据（胎圈5/6班→MES夜/早班），中班尚未排产不下发
+     * CX_CLASS3~8_PLAN全量传递到每条记录
+     *
+     * @param tqScheduleResultIssueList 胎圈排程结果列表（已按3天拆分）
+     * @return 下发结果
+     */
+    @ApiOperation("胎圈排程结果下发到MES")
+    @PostMapping("/issueTqScheduleResult")
+    @AutoLoginLog
+    public AjaxResult issueTqScheduleResult(@RequestBody List<com.zlt.aps.tq.api.domain.entity.TqScheduleResultIssue> tqScheduleResultIssueList) {
+        String factoryCode = FactoryConstant.DEFAULT_FACTORY_CODE;
+        String companyCode = factoryCode;
+        return tqScheduleResultIssueService.issueTqScheduleResult(tqScheduleResultIssueList, factoryCode, companyCode);
+    }
+
+    /**
+     * 钢丝圈排程结果下发到MES
+     * 业务规则：
+     * 1. D日（今天）：更新中班数据（钢丝圈1班→MES中班），夜班早班已过不下发
      * 2. D+1日（明天）：更新夜早中3班数据（钢丝圈2/3/4班→MES夜/早/中班）
      * 3. D+2日（后天）：先删后插夜早2班数据（钢丝圈5/6班→MES夜/早班），中班尚未排产不下发
-     * TQ_CLASS1~6_PLAN 全量传递到每条记录
+     * TQ_CLASS1~6_PLAN全量传递到每条记录
      *
      * @param gsqScheduleResultIssueList 钢丝圈排程结果列表（已按3天拆分）
-     * @return 下发结果（data 字段携带 mesStatus：IS_RELEASE/FAILURE_RELEASE/TIMEOUT_FAILURE）
+     * @return 下发结果
      */
-//    @ApiOperation("钢丝圈排程结果下发到MES")
-//    @PostMapping("/issueGsqScheduleResult")
-//    @AutoLoginLog
-//    public AjaxResult issueGsqScheduleResult(@RequestBody List<GsqScheduleResultIssue> gsqScheduleResultIssueList) {
-//        String factoryCode = FactoryConstant.DEFAULT_FACTORY_CODE;
-//        String companyCode = factoryCode;
-//        return gsqScheduleResultIssueService.issueGsqScheduleResult(gsqScheduleResultIssueList, factoryCode, companyCode);
-//    }
+    @ApiOperation("钢丝圈排程结果下发到MES")
+    @PostMapping("/issueGsqScheduleResult")
+    @AutoLoginLog
+    public AjaxResult issueGsqScheduleResult(@RequestBody List<com.zlt.aps.gsq.api.domain.entity.GsqScheduleResultIssue> gsqScheduleResultIssueList) {
+        String factoryCode = FactoryConstant.DEFAULT_FACTORY_CODE;
+        String companyCode = factoryCode;
+        return gsqScheduleResultIssueService.issueGsqScheduleResult(gsqScheduleResultIssueList, factoryCode, companyCode);
+    }
 
     /**
      * 同步胎面排程完成量

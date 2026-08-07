@@ -129,8 +129,13 @@ public class Cd90AutoScheduleInputVersionServiceImpl implements Cd90AutoSchedule
         String lanes = laneMapper.selectList(Wrappers.<Cd90StorageLaneLimit>lambdaQuery()
                         .eq(Cd90StorageLaneLimit::getFactoryCode, factoryCode)
                         .eq(Cd90StorageLaneLimit::getLaneDate, Date.valueOf(scheduleDate))
-                        .orderByAsc(Cd90StorageLaneLimit::getId))
-                .stream().map(item -> item.getId() + ":" + item.getShiftCode() + ":" + item.getUpdateTime())
+                        .orderByAsc(Cd90StorageLaneLimit::getShiftCode)
+                        .orderByAsc(Cd90StorageLaneLimit::getStorageLaneCode))
+                .stream().map(item -> item.getFactoryCode() + ":" + item.getLaneDate() + ":"
+                        + item.getShiftCode() + ":" + item.getStorageLaneCode() + ":"
+                        + item.getMaterialCode() + ":" + item.getCarNum() + ":"
+                        + item.getMaxCarNum() + ":" + item.getAvailableCarNum() + ":"
+                        + item.getDataSource() + ":" + item.getMesSyncTime())
                 .collect(Collectors.joining("|"));
         return sha256(forming + "#" + depthConfig + "#" + stock + "#" + lanes
                 + "#" + xwyyStock + "#" + xwyyPlan);

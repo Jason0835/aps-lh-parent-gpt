@@ -27,8 +27,8 @@ import java.util.stream.Collectors;
 /**
  * 斜裁排程结果下发 MES 实现。
  *
- * <p>当前中间表写入协议与 CD90 保持一致：生成版本号、记录下发范围，
- * 通过同步通知发送给 MES，并根据同步日志反馈发布结果。</p>
+ * <p>生成数据版本后先按业务键覆盖 MES 中间表，事务提交成功后再发送
+ * MQ 通知，最后根据同步日志反馈发布结果。</p>
  */
 @Slf4j
 @Service
@@ -41,6 +41,7 @@ public class Cd15ScheduleResultIssueServiceImpl
 
     private final SyncDataHandle syncDataHandle;
     private final SyncDataLogsService syncDataLogsService;
+    private final Cd15ScheduleResultIssueWriter issueWriter;
 
     @Override
     public AjaxResult issueCd15ScheduleResult(
@@ -67,13 +68,22 @@ public class Cd15ScheduleResultIssueServiceImpl
         }
         LocalDate startDate = scheduleDates.get(0);
         LocalDate endDate = scheduleDates.get(scheduleDates.size() - 1);
-        log.info("斜裁排程下发 MES, traceId={}, dataVersion={}, factoryCode={}, "
-                        + "rowCount={}, dateRange={}~{}",
-                traceId, dataVersion, factoryCode, issueList.size(),
-                startDate.format(DATE_FORMATTER),
-                endDate.format(DATE_FORMATTER));
-        return this.sendMqNotice(issueList.size(), startDate, endDate,
-                dataVersion, factoryCode, companyCode, traceId);
+        try {
+            int rowCount = this.issueWriter.replace(issueList, dataVersion,
+                    companyCode, factoryCode);
+            log.info("斜裁排程下发 MES, traceId={}, dataVersion={}, "
+                            + "factoryCode={}, rowCount={}, dateRange={}~{}",
+                    traceId, dataVersion, factoryCode, rowCount,
+                    startDate.format(DATE_FORMATTER),
+                    endDate.format(DATE_FORMATTER));
+            return this.sendMqNotice(rowCount, startDate, endDate,
+                    dataVersion, factoryCode, companyCode, traceId);
+        } catch (Exception exception) {
+            log.error("斜裁排程写入 MES 中间表失败, traceId={}, dataVersion={}",
+                    traceId, dataVersion, exception);
+            return AjaxResult.error(I18nUtil.getMessage(
+                    "ui.cd15.publish.failed"));
+        }
     }
 
     /** 发送同步通知并读取 MES 反馈。 */

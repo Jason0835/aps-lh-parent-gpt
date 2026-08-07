@@ -3,10 +3,12 @@ package com.zlt.aps.gsq.engine.enums;
 /**
  * 钢丝圈排程步骤枚举。
  *
- * <p>对应模板方法的8个阶段：</p>
+ * <p>对应模板方法的10个阶段：</p>
  * <ul>
  *   <li>S1: 前置校验与数据加载</li>
- *   <li>S2: 需求计算与机台分配</li>
+ *   <li>S2.1: 库存预测</li>
+ *   <li>S2.2: 需求量计算</li>
+ *   <li>S2.3: 计划量计算</li>
  *   <li>S3: 班次排产分配</li>
  *   <li>S4: 胎圈/钢丝圈停产协调</li>
  *   <li>S5: 班次均衡调整</li>
@@ -20,7 +22,9 @@ package com.zlt.aps.gsq.engine.enums;
 public enum GsqScheduleStepEnum {
 
     S1_PRE_VALIDATION("S1", "前置校验与数据加载"),
-    S2_DEMAND_CALC("S2", "需求计算与机台分配"),
+    S2_1_STOCK_PREDICT("S2.1", "库存预测"),
+    S2_2_DEMAND_QTY("S2.2", "需求量计算"),
+    S2_3_PLAN_QTY("S2.3", "计划量计算"),
     S3_MACHINE_ASSIGN("S3", "班次排产分配"),
     S4_STOP_COORDINATION("S4", "胎圈/钢丝圈停产协调"),
     S5_BALANCE("S5", "班次均衡调整"),

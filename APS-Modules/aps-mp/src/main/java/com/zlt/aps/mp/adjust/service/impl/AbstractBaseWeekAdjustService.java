@@ -807,7 +807,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 }
             }
             if (contextDTO.getInchMachinesMap() != null && StringUtils.isNotBlank(proSize)){
-                //英寸日，硫化机台数
+                //英寸+日，硫化机台数
                 String proSizeKey = proSize + BusiConstant.WeekRollAdjust.SPLIT_GROUP_KEY+ i;
                 Integer lhMachines = Convert.toInt(contextDTO.getInchMachinesMap().get(proSizeKey),0);
                 lhMachines += Convert.toInt(dailyCapacityLimitVoMap.get(i).getUsedLhMachines(),0);
@@ -815,7 +815,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             }
 
             if (contextDTO.getStructureMachinesMap() != null){
-                //结构日，硫化机台数
+                //结构+日，硫化机台数
                 String structureKey = contextDTO.getStructureName() + BusiConstant.WeekRollAdjust.SPLIT_GROUP_KEY+ i;
                 Integer lhMachines = Convert.toInt(contextDTO.getStructureMachinesMap().get(structureKey),0);
                 lhMachines += Convert.toInt(dailyCapacityLimitVoMap.get(i).getUsedLhMachines(),0);
@@ -1257,6 +1257,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             for (int iDay = FactoryConstant.MONTH_START_DAY; iDay <= maxDays; iDay++) {
                 sumMouldQty = getMouldQtyByShellAndDay(mpProdFinalList, iDay);
                 //扣除 换活块的机台数(注：这里机台数不*2)
+                //注：换模的机台要分开计算视2个模壳；换活块的机台视1个模壳，一定相同；
                 if (contextDTO.getMouldShellBlockMachinesMap() != null){
                     String key = shellInfo.getMouldSetCode() + BusiConstant.WeekRollAdjust.SPLIT_GROUP_KEY + iDay;
                     Integer blockMachines = Convert.toInt(contextDTO.getMouldShellBlockMachinesMap().get(key),0);

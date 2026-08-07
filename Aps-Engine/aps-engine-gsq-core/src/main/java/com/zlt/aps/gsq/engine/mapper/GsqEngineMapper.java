@@ -1,7 +1,6 @@
 package com.zlt.aps.gsq.engine.mapper;
 
 import com.zlt.aps.common.engine.domain.EngineConstructionInfo;
-import com.zlt.aps.gsq.api.domain.entity.GsqStockShiftConfig;
 import com.zlt.aps.gsq.engine.vo.GsqParamsVo;
 import com.zlt.aps.gsq.engine.vo.GsqQuotaParam;
 import com.zlt.aps.gsq.engine.vo.GsqScheduleBaseInfoVo;
@@ -171,20 +170,18 @@ public interface GsqEngineMapper {
     List<Map<String, Object>> listGsqStopShiftConfig(@Param("scheduleDate") String scheduleDate);
 
     /**
-     * 读取钢丝圈备库班数配置（T_GSQ_STOCK_SHIFT_CONFIG，按 MIN_MACHINE_QTY 升序）。
-     *
-     * <p>对齐胎圈 {TqStockShiftConfig} 的 DepthConfig 区间方式，按分厂过滤。</p>
-     *
-     * @param factoryCode 分厂编码
-     * @return 备库班数配置列表
-     */
-    List<GsqStockShiftConfig> listGsqStockShiftConfig(@Param("factoryCode") String factoryCode);
-
-    /**
      * 读取机台检修计划（对齐胎圈TQ：DOWNTIME_DATE 从排程日期起 +3 天范围）。
      *
      * @param scheduleDate 排程日期
      * @return 检修计划列表，包含 machineCode、downtimeDate、downtimeShift
      */
     List<Map<String, Object>> listMachineMaintenancePlan(@Param("scheduleDate") String scheduleDate);
+
+    /**
+     * 读取钢丝圈排程参数（T_GSQ_PARAMS），按分厂过滤且仅取启用项。
+     *
+     * @param factoryCode 分厂编码
+     * @return 启用的参数列表（paramCode、paramValue）
+     */
+    List<GsqParamsVo> listGsqParams(@Param("factoryCode") String factoryCode);
 }

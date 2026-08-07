@@ -56,4 +56,13 @@ public interface ICd15StorageLaneLimitRemoteService {
     @ApiOperation("导入斜裁库排限制")
     @PostMapping("/cd15StorageLaneLimit/importData")
     AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport);
+
+    /** 按工厂、日期和班次替换MES库排快照。 */
+    @ApiOperation("替换斜裁MES库排快照")
+    @PostMapping("/cd15StorageLaneLimit/logicDeleteAndSaveMesBatch")
+    AjaxResult logicDeleteAndSaveMesBatch(@RequestParam("factoryCode") String factoryCode,
+                                          @RequestParam("laneDate") String laneDate,
+                                          @RequestParam("shiftCode") String shiftCode,
+                                          @RequestParam("updateBy") String updateBy,
+                                          @RequestBody List<Cd15StorageLaneLimit> list);
 }

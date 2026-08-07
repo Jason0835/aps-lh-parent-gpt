@@ -21,6 +21,12 @@ public class GsqScheduleBaseInfoVo {
     @ApiModelProperty(value = "钢丝类型")
     private String steelType;
 
+    @ApiModelProperty(value = "物料编码")
+    private String materialCode;
+
+    @ApiModelProperty(value = "胎胚描述")
+    private String embryoSpecDesc;
+
     @ApiModelProperty(value = "排列")
     private String rank;
 

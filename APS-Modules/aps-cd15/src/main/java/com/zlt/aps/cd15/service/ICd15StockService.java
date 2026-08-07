@@ -5,6 +5,7 @@ import com.zlt.aps.cd15.api.domain.entity.Cd15Stock;
 import com.zlt.bill.common.service.IDocService;
 
 import java.util.List;
+import java.util.Date;
 
 /**
  * 斜裁库存管理 Service。
@@ -28,4 +29,8 @@ public interface ICd15StockService extends IDocService<Cd15Stock> {
      * @return 导入结果
      */
     AjaxResult importData(List<Cd15Stock> list, boolean updateSupport, Long importLogId);
+
+    /** 替换指定工厂和库存日期的MES快照。 */
+    void logicDeleteAndSaveBatch(String factoryCode, Date stockDate,
+                                 String updateBy, List<Cd15Stock> stockList);
 }

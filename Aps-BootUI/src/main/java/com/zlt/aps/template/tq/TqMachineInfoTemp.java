@@ -25,13 +25,13 @@ public class TqMachineInfoTemp extends ApsBaseEntity {
 
     /** 班制，如：三班制，两班制；对应数据字典CLASS_SHIFT */
     @ApiModelProperty(value = "班制", position = 40)
-    @Excel(name = "ui.data.column.machine.classShift", dictType = "CLASS_SHIFT")
+    @Excel(name = "ui.data.column.machine.classShift", dictType = "LH_CLASS_SHIFT")
     @ImportValidated(maxLength = 20, required = true)
     private String classShift;
 
     /** 开机班次，如：中班、夜班；对应数据字典CLASS_NUM */
     @ApiModelProperty(value = "开机班次", position = 50)
-    @Excel(name = "ui.data.column.machine.openMachineClass", dictType = "CLASS_NUM_THREE", dictTypeToExcelEnable = false)
+    @Excel(name = "ui.data.column.machine.openMachineClass", dictType = "class_num_three_plan", dictTypeToExcelEnable = false)
     @ImportValidated(maxLength = 20)
     private String openMachineClass;
 

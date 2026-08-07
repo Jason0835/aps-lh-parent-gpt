@@ -13,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -115,107 +116,70 @@ public class GsqQuotaValidateHandler extends AbsGsqScheduleStepHandler {
      *
      * <p>处理流程：</p>
      * <ol>
-     *   <li>逐班次（1→6）统计该机台该班次已排产量</li>
-     *   <li>若超过定额：按供应时长降序排序规格（供应时长大的先延后），逐规格扣减并延后到下一班</li>
+     *   <li>逐班次（1→6）按业务优先级顺序填产能</li>
+     *   <li>高优先级规格优先占用机台产能，超出定额部分延后到下一班，当班严格不超机台定额</li>
      *   <li>第6班超量无法延后，仅记录日志</li>
      * </ol>
      *
-     * @param context      排程上下文（用于规则证据埋点）
-     * @param machineCode  机台编码
-     * @param specList     该机台上所有规格的排程记录
-     * @param machineQuota 机台定额
+     * @param context               排程上下文（用于规则证据埋点）
+     * @param machineCode           机台编码
+     * @param specList              该机台上所有规格的排程记录
+     * @param machineQuota          机台定额
      * @return 累计超量延后次数
      */
     private int validateAndDeferOverflow(GsqScheduleContext context, String machineCode,
                                          List<GsqScheduleResultVo> specList, double machineQuota) {
         int overflowCount = 0;
 
-        // 逐班次校验（1→6），延后时会累加到下一班，所以需要顺序处理
+        // 有效定额：严格按机台定额封顶（不叠加超排容忍阈值，满足按机台定额排满剩余产能的需求）
+        double effectiveQuota = machineQuota;
+
+        // 尾量合并阈值：单班剩余很小且下一班该规格无排产时，合并到当前班排完，避免单独开一只剩尾量的小班次
+        double tailThreshold = getTailThreshold(context);
+
+        // 逐班次处理（1→6），延后时会累加到下一班，所以需要顺序处理
         for (int classNum = 1; classNum <= 6; classNum++) {
-            // 统计该机台该班次已排产量
-            double usedCapacity = 0D;
-            for (GsqScheduleResultVo spec : specList) {
-                usedCapacity = BigDecimalUtil.add(usedCapacity, getClassPlanQty(spec, classNum));
-            }
-
-            double overflow = BigDecimalUtil.sub(usedCapacity, machineQuota);
-            if (overflow <= 0) {
-                // 未超量，跳过
-                continue;
-            }
-
-            // 诊断日志：定额超量详情
-            log.info("[S5.5-DIAG] 机台:{} {}班 超定额! usedCapacity={} quota={} overflow={}",
-                    machineCode, classNum, usedCapacity, machineQuota, overflow);
-
-            // 超量：按供应时长降序排序规格（供应时长大的先延后，保留供应时长小的优先排产）
-            // 对齐胎圈：跳过备库触发班次规格（backupTriggerClass == classNum），不削减备库触发计划量
+            // 按业务优先级排序该机台规格：①胎圈不消耗备库 → ②当班触发备库 → ③备库(供应时长升序) → ④非备库(供应时长升序)
+            // 高优先级规格优先占用机台产能，低优先级规格的超出部分顺延到下一班
             int finalClassNum = classNum;
             List<GsqScheduleResultVo> sortedSpecs = specList.stream()
                     .filter(s -> getClassPlanQty(s, finalClassNum) > 0)
-                    .filter(s -> !isBackupTriggeredClass(s, finalClassNum))
-                    .sorted((o1, o2) -> {
-                        double st1 = o1.getSupplyTime() == null ? 0D : o1.getSupplyTime();
-                        double st2 = o2.getSupplyTime() == null ? 0D : o2.getSupplyTime();
-                        return Double.compare(st2, st1);
-                    })
+                    .sorted(buildCapacityPriorityComparator(finalClassNum))
                     .collect(Collectors.toList());
 
-            // 逐规格扣减并延后，直到超量清零
+            // 逐班次按优先级顺序填产能：availableCapacity 从机台有效定额开始逐规格扣减
+            double availableCapacity = effectiveQuota;
             for (GsqScheduleResultVo spec : sortedSpecs) {
-                if (overflow <= 0) {
-                    break;
-                }
-                double currentPlan = getClassPlanQty(spec, classNum);
-                if (currentPlan <= 0) {
+                double plan = getClassPlanQty(spec, classNum);
+                if (plan <= 0) {
                     continue;
                 }
 
-                // 该规格可扣减的量 = min(当前班次计划量, 剩余超量)
-                double deductQty = Math.min(currentPlan, overflow);
-                setClassPlanQty(spec, classNum, BigDecimalUtil.sub(currentPlan, deductQty));
-
-                if (classNum < 6) {
-                    // 延后到下一班
-                    deferToNextClass(spec, classNum, deductQty);
-                    overflowCount++;
-
-                    autoScheduleLogService.insertGsqScheduleLog(spec.getBatchNo(), spec.getOrderNo(),
-                            "S5.5-定额校验超量延后",
-                            "钢丝圈代码：" + spec.getSteelRingCode() + "，机台：" + machineCode
-                                    + "，" + classNum + "班超定额，扣减" + deductQty
-                                    + "延后至" + (classNum + 1) + "班");
-
-                    // 埋点定额超出延后证据
-                    Map<String, Object> evidence = new HashMap<>();
-                    evidence.put("machineCode", machineCode);
-                    evidence.put("classNum", classNum);
-                    evidence.put("deductQty", deductQty);
-                    evidence.put("machineQuota", machineQuota);
-                    evidence.put("usedCapacity", usedCapacity);
-                    context.getRuleTrace(spec.getSteelRingCode()).addRuleHit(
-                            GsqScheduleRuleCodeEnum.QUOTA_EXCEED_DEFER,
-                            GsqScheduleRuleResultEnum.ADJUST, evidence);
-                } else {
-                    // 第6班无法延后，记录日志
-                    autoScheduleLogService.insertGsqScheduleLog(spec.getBatchNo(), spec.getOrderNo(),
-                            "S5.5-第6班超定额无法延后",
-                            "钢丝圈代码：" + spec.getSteelRingCode() + "，机台：" + machineCode
-                                    + "，第6班超定额" + deductQty + "无法延后");
-
-                    // 埋点第6班超定额无法延后（SKIP）
-                    Map<String, Object> evidence = new HashMap<>();
-                    evidence.put("machineCode", machineCode);
-                    evidence.put("classNum", 6);
-                    evidence.put("deductQty", deductQty);
-                    evidence.put("machineQuota", machineQuota);
-                    evidence.put("usedCapacity", usedCapacity);
-                    context.getRuleTrace(spec.getSteelRingCode()).addRuleHit(
-                            GsqScheduleRuleCodeEnum.QUOTA_EXCEED_DEFER,
-                            GsqScheduleRuleResultEnum.SKIP, evidence);
+                // 产能已耗尽：当前班级该规格计划量清零，全部延后到下一班，确保当班严格不超机台定额
+                if (availableCapacity <= 0) {
+                    setClassPlanQty(spec, classNum, 0D);
+                    overflowCount += this.deferQty(context, spec, machineCode, classNum, plan, machineQuota);
+                    continue;
                 }
 
-                overflow = BigDecimalUtil.sub(overflow, deductQty);
+                // 实际可排量 = min(该规格当前班计划量, 机台剩余产能)
+                double assignQty = Math.min(plan, availableCapacity);
+                double remainder = BigDecimalUtil.sub(plan, assignQty);
+
+                // 尾量合并：剩余量很小、下一班该规格无排产且合并后不超机台定额时，合并到当前班排完，
+                // 避免单独开一只剩尾量的小班次；合并会超定额则放弃合并，改为延后到下一班
+                if (remainder > 0 && this.shouldMergeTail(spec, classNum, plan, remainder, availableCapacity, tailThreshold)) {
+                    assignQty = plan;
+                    remainder = 0D;
+                }
+
+                setClassPlanQty(spec, classNum, assignQty);
+                availableCapacity = BigDecimalUtil.sub(availableCapacity, assignQty);
+
+                // 仍有剩余量：延后到下一班（或第6班无法延后仅记录日志）
+                if (remainder > 0) {
+                    overflowCount += this.deferQty(context, spec, machineCode, classNum, remainder, machineQuota);
+                }
             }
         }
 
@@ -235,33 +199,188 @@ public class GsqQuotaValidateHandler extends AbsGsqScheduleStepHandler {
     }
 
     /**
+     * 将指定规格当前班次的超出/剩余计划量延后到下一班次累加（第6班无法延后仅记录日志）。
+     *
+     * @param context       排程上下文（用于日志与规则证据埋点）
+     * @param spec          待延后规格
+     * @param machineCode   机台编码
+     * @param classNum      当前班次（1~6）
+     * @param qty           延后量
+     * @param machineQuota  机台定额（证据埋点用）
+     * @return 1 表示实际延后到下一班；0 表示第6班无法延后仅记录日志
+     */
+    private int deferQty(GsqScheduleContext context, GsqScheduleResultVo spec,
+                         String machineCode, int classNum, double qty, double machineQuota) {
+        if (qty <= 0) {
+            return 0;
+        }
+
+        if (classNum < 6) {
+            // 延后到下一班
+            deferToNextClass(spec, classNum, qty);
+
+            autoScheduleLogService.insertGsqScheduleLog(spec.getBatchNo(), spec.getOrderNo(),
+                    "S5.5-定额校验超量延后",
+                    "钢丝圈代码：" + spec.getSteelRingCode() + "，机台：" + machineCode
+                            + "，" + classNum + "班超定额，扣减" + qty
+                            + "延后至" + (classNum + 1) + "班");
+
+            // 埋点定额超出延后证据
+            Map<String, Object> evidence = new HashMap<>();
+            evidence.put("machineCode", machineCode);
+            evidence.put("classNum", classNum);
+            evidence.put("deductQty", qty);
+            evidence.put("machineQuota", machineQuota);
+            context.getRuleTrace(spec.getSteelRingCode()).addRuleHit(
+                    GsqScheduleRuleCodeEnum.QUOTA_EXCEED_DEFER,
+                    GsqScheduleRuleResultEnum.ADJUST, evidence);
+            return 1;
+        }
+
+        // 第6班无法延后，记录日志
+        autoScheduleLogService.insertGsqScheduleLog(spec.getBatchNo(), spec.getOrderNo(),
+                "S5.5-第6班超定额无法延后",
+                "钢丝圈代码：" + spec.getSteelRingCode() + "，机台：" + machineCode
+                        + "，第6班超定额" + qty + "无法延后");
+
+        // 埋点第6班超定额无法延后（SKIP）
+        Map<String, Object> evidence = new HashMap<>();
+        evidence.put("machineCode", machineCode);
+        evidence.put("classNum", 6);
+        evidence.put("deductQty", qty);
+        evidence.put("machineQuota", machineQuota);
+        context.getRuleTrace(spec.getSteelRingCode()).addRuleHit(
+                GsqScheduleRuleCodeEnum.QUOTA_EXCEED_DEFER,
+                GsqScheduleRuleResultEnum.SKIP, evidence);
+        return 0;
+    }
+
+    /**
+     * 判断剩余量是否应合并到当前班次排完（尾量合并）。
+     *
+     * <p>规则：剩余量 ≤ 尾量合并阈值，且（第6班 或 下一班该规格无排产）时可考虑合并，
+     * 但必须满足「合并后不超出机台定额」（当前剩余产能 ≥ 完整计划量），否则放弃合并改为延后。</p>
+     *
+     * @param spec             待判断规格
+     * @param classNum         当前班次（1~6）
+     * @param plan             该规格当前班次完整计划量
+     * @param remainder        剩余量
+     * @param availableCapacity 当前班次剩余可用产能
+     * @param tailThreshold    尾量合并阈值
+     * @return true 表示合并到当前班排完
+     */
+    private boolean shouldMergeTail(GsqScheduleResultVo spec, int classNum, double plan,
+                                    double remainder, double availableCapacity, double tailThreshold) {
+        if (remainder <= 0 || remainder > tailThreshold) {
+            return false;
+        }
+        // 合并后不得导致当班超出机台定额：当前剩余产能需足够容纳完整计划量
+        if (availableCapacity < plan) {
+            return false;
+        }
+        if (classNum >= 6) {
+            // 第6班无后续班次，小尾量直接合并排完，避免丢弃
+            return true;
+        }
+        // 中间班次：仅当下一班该规格无排产时才合并，避免把可并入下一班正常生产的量强行叠加
+        double nextClassPlan = getClassPlanQty(spec, classNum + 1);
+        return nextClassPlan <= 0;
+    }
+
+    /**
+     * 获取尾量合并阈值（复用工装车整车容量参数，默认120）。
+     *
+     * @param context 排程上下文
+     * @return 尾量合并阈值
+     */
+    private double getTailThreshold(GsqScheduleContext context) {
+        Double toolCapacity = context.getParams().getToolCapacity();
+        return toolCapacity == null || toolCapacity <= 0 ? 120D : toolCapacity;
+    }
+
+    /**
+     * 构建该机台规格的产能分配优先级排序器（顺序填产能使用）。
+     *
+     * <p>排序规则：</p>
+     * <ol>
+     *   <li>P-0: 胎圈不消耗但触发备库的规格最高优先（库存完全不足、纯靠备库，最紧急）</li>
+     *   <li>P-1: 当班触发备库（backupTriggerClass == 当前班次）</li>
+     *   <li>P-2: 备库规格优先于非备库规格</li>
+     *   <li>P-3: 组内按供应时长升序（供应时长短的先排，越高优先占用产能）</li>
+     * </ol>
+     *
+     * @param classNum 当前班次
+     * @return 产能分配优先级排序器
+     */
+    private Comparator<GsqScheduleResultVo> buildCapacityPriorityComparator(int classNum) {
+        return (o1, o2) -> {
+            // P-0: 胎圈每班消耗为0（supplyTime=MAX）但触发备库的规格最高优先，
+            //      此类规格库存完全不足、纯靠备库，业务上最紧急，不受除法口径影响
+            boolean special1 = isTireBeadNotConsumedBackup(o1);
+            boolean special2 = isTireBeadNotConsumedBackup(o2);
+            if (special1 != special2) {
+                return special1 ? -1 : 1;
+            }
+
+            // P-1: 当班触发备库最高优先
+            boolean currentTrigger1 = isBackupTriggeredClass(o1, classNum);
+            boolean currentTrigger2 = isBackupTriggeredClass(o2, classNum);
+            if (currentTrigger1 != currentTrigger2) {
+                return currentTrigger1 ? -1 : 1;
+            }
+
+            // P-2: 备库规格优先于非备库规格
+            boolean backup1 = isBackupSpec(o1);
+            boolean backup2 = isBackupSpec(o2);
+            if (backup1 != backup2) {
+                return backup1 ? -1 : 1;
+            }
+
+            // P-3: 组内按供应时长升序（供应时长短的先排）
+            double st1 = o1.getSupplyTime() == null ? 0D : o1.getSupplyTime();
+            double st2 = o2.getSupplyTime() == null ? 0D : o2.getSupplyTime();
+            return Double.compare(st1, st2);
+        };
+    }
+
+    /**
+     * 判断是否为「胎圈每班消耗为0但触发备库」的规格（最高优先）。
+     *
+     * <p>胎圈每班消耗≤0 时供应时长被计为 Double.MAX_VALUE（见 GsqStockPredictHandler），
+     * 但该规格仍触发备库说明库存完全不足、纯靠备库，业务上最紧急。</p>
+     *
+     * @param vo 规格
+     * @return true 表示胎圈不消耗但触发备库
+     */
+    private boolean isTireBeadNotConsumedBackup(GsqScheduleResultVo vo) {
+        return isBackupSpec(vo)
+                && vo.getSupplyTime() != null
+                && vo.getSupplyTime() == Double.MAX_VALUE;
+    }
+
+    /**
+     * 判断是否为备库规格（backupTriggerClass > 0）。
+     *
+     * @param vo 规格
+     * @return true 表示备库规格
+     */
+    private boolean isBackupSpec(GsqScheduleResultVo vo) {
+        return vo.getBackupTriggerClass() != null && vo.getBackupTriggerClass() > 0;
+    }
+
+    /**
      * 获取指定班次的计划量
      */
     private double getClassPlanQty(GsqScheduleResultVo scheduleVo, int classNum) {
-        switch (classNum) {
-            case 1: return scheduleVo.getClass1PlanQty() == null ? 0D : scheduleVo.getClass1PlanQty();
-            case 2: return scheduleVo.getClass2PlanQty() == null ? 0D : scheduleVo.getClass2PlanQty();
-            case 3: return scheduleVo.getClass3PlanQty() == null ? 0D : scheduleVo.getClass3PlanQty();
-            case 4: return scheduleVo.getClass4PlanQty() == null ? 0D : scheduleVo.getClass4PlanQty();
-            case 5: return scheduleVo.getClass5PlanQty() == null ? 0D : scheduleVo.getClass5PlanQty();
-            case 6: return scheduleVo.getClass6PlanQty() == null ? 0D : scheduleVo.getClass6PlanQty();
-            default: return 0D;
-        }
+        Object value = scheduleVo.getFieldValueByFieldName("class" + classNum + "PlanQty");
+        return value == null ? 0D : ((Number) value).doubleValue();
     }
 
     /**
      * 设置指定班次的计划量
      */
     private void setClassPlanQty(GsqScheduleResultVo scheduleVo, int classNum, double value) {
-        switch (classNum) {
-            case 1: scheduleVo.setClass1PlanQty(value); break;
-            case 2: scheduleVo.setClass2PlanQty(value); break;
-            case 3: scheduleVo.setClass3PlanQty(value); break;
-            case 4: scheduleVo.setClass4PlanQty(value); break;
-            case 5: scheduleVo.setClass5PlanQty(value); break;
-            case 6: scheduleVo.setClass6PlanQty(value); break;
-            default: break;
-        }
+        scheduleVo.setFieldValueByFieldName("class" + classNum + "PlanQty", value);
     }
 
     /**
