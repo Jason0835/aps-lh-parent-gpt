@@ -165,7 +165,7 @@ public class GsqResidualCapacityHandler extends AbsGsqScheduleStepHandler {
                 }
                 // 总量上限保护：6班已排产量已达到备库总量时不再回填
                 double totalScheduled = sumClassPlanQty(spec);
-                double backupTotal = spec.getBackupTotalQty() == null ? 0D : spec.getBackupTotalQty();
+                double backupTotal = getBackupTargetQty(spec);
                 if (totalScheduled >= backupTotal) {
                     continue;
                 }
@@ -267,7 +267,7 @@ public class GsqResidualCapacityHandler extends AbsGsqScheduleStepHandler {
             double assignQty;
             if (isBackupSpec) {
                 double totalScheduled = sumClassPlanQty(spec);
-                double backupTotal = spec.getBackupTotalQty() == null ? 0D : spec.getBackupTotalQty();
+                double backupTotal = getBackupTargetQty(spec);
                 double maxAssignable = BigDecimalUtil.sub(backupTotal, totalScheduled);
                 if (maxAssignable <= 0) {
                     continue;
@@ -421,8 +421,10 @@ public class GsqResidualCapacityHandler extends AbsGsqScheduleStepHandler {
             // 计算6班实际已排产量合计
             double actualTotalPlanQty = sumClassPlanQty(scheduleVo);
 
-            // 重算剩余备库量 = 初始备库总量 - 已排产量
-            double newRemaining = BigDecimalUtil.sub(scheduleVo.getBackupTotalQty(), actualTotalPlanQty);
+            // 重算剩余备库量 = 备库分摊后的实际总量 - 已排产量
+            // 使用 backupAllocatedQty（S3 机台精确重算的分摊量）而非理论 backupTotalQty，
+            // 避免库存为负时把规格回填超排到理论胎圈消耗量
+            double newRemaining = BigDecimalUtil.sub(getBackupTargetQty(scheduleVo), actualTotalPlanQty);
             if (newRemaining < 0) {
                 // 已超排，剩余量置0
                 newRemaining = 0D;
@@ -433,6 +435,25 @@ public class GsqResidualCapacityHandler extends AbsGsqScheduleStepHandler {
         if (recalcCount > 0) {
             log.info("[S5.6] 备库剩余量重算完成, 重算规格数:{}", recalcCount);
         }
+    }
+
+    /**
+     * 获取备库排产目标总量：优先使用分摊后的实际总计划量 backupAllocatedQty（S2.3/S3 机台精确重算写入），
+     * 为空或非法时回退到理论备库量 backupTotalQty。
+     *
+     * <p>统一以分摊量作为备库基准，避免：库存为负时分摊量大于理论量的误砍（cap 场景），
+     * 以及理论量大于分摊量时把规格回填超排（S5.6 回填/剩余量场景）。</p>
+     *
+     * @param scheduleVo 排程记录
+     * @return 备库排产目标总量
+     */
+    private double getBackupTargetQty(GsqScheduleResultVo scheduleVo) {
+        Double allocatedQty = scheduleVo.getBackupAllocatedQty();
+        if (allocatedQty != null && allocatedQty > 0) {
+            return allocatedQty;
+        }
+        Double backupTotalQty = scheduleVo.getBackupTotalQty();
+        return backupTotalQty == null ? 0D : backupTotalQty;
     }
 
     /**
@@ -454,9 +475,15 @@ public class GsqResidualCapacityHandler extends AbsGsqScheduleStepHandler {
             if (backupTotalQty == null || backupTotalQty <= 0) {
                 continue;
             }
+            // 截断上限使用分摊后的实际总计划量 backupAllocatedQty（S2.3/S3 写入），
+            // 而非理论 backupTotalQty：库存为负时分摊量会大于理论量，用理论量做上限会误砍合理排产
+            Double capLimit = scheduleVo.getBackupAllocatedQty();
+            if (capLimit == null || capLimit <= 0) {
+                capLimit = backupTotalQty;
+            }
 
             double totalScheduled = sumClassPlanQty(scheduleVo);
-            double overflow = BigDecimalUtil.sub(totalScheduled, backupTotalQty);
+            double overflow = BigDecimalUtil.sub(totalScheduled, capLimit);
             if (overflow <= 0) {
                 continue;
             }

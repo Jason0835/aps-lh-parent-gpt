@@ -95,8 +95,15 @@ public class GsqScheduleContext {
     /** 前日早班计划量，key=钢丝圈代码，value=前日2班计划量（昨日2班剩余库存来源） */
     private Map<String, Double> lastMidPlanMap = new HashMap<>();
 
-    /** 损耗率映射，key=钢丝圈代码，value=损耗率 */
+    /** 损耗率映射，key=钢丝圈代码，value=损耗率（S2.3按钢丝圈聚合，S3分配机台前临时使用） */
     private Map<String, Double> lossRateMap = new HashMap<>();
+
+    /**
+     * 机台维度损耗率映射，key=机台代码#钢丝圈代码（如 "GSQM03#211000023"），value=损耗率。
+     *
+     * <p>S3 机台分配确定后，按该规格实际机台精确取损耗率，避免按钢丝圈聚合取平均导致失真。</p>
+     */
+    private Map<String, Double> machineLossRateMap = new HashMap<>();
 
     /** 月度剩余，key=钢丝圈代码 */
     private Map<String, GsqMonthSurplusVo> monthSurplusMap = new HashMap<>();

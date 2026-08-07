@@ -69,6 +69,16 @@ public class GsqPlanQtyCalcHandler extends AbsGsqScheduleStepHandler {
         // 2. 聚合6班次总计划量统计
         aggregateTotalPlanQty(context);
 
+        // 诊断日志：打印每个规格的分摊明细（定位备库量是否被库存抵扣，确认后可移除）
+        for (GsqScheduleResultVo vo : context.getScheduleList()) {
+            log.info("[S2.3-DIAG] 规格:{} 触发库存planStock={} backupTriggerClass={} backupTotalQty={} "
+                            + "分摊各班=[1:{} 2:{} 3:{} 4:{} 5:{} 6:{}]",
+                    vo.getSteelRingCode(), vo.getPlanStockQty(),
+                    vo.getBackupTriggerClass(), vo.getBackupTotalQty(),
+                    getClassPlanQty(vo, 1), getClassPlanQty(vo, 2), getClassPlanQty(vo, 3),
+                    getClassPlanQty(vo, 4), getClassPlanQty(vo, 5), getClassPlanQty(vo, 6));
+        }
+
         log.info("[S2.3] 计划量计算完成, 排程记录数: {}", context.getScheduleList().size());
     }
 
@@ -233,6 +243,30 @@ public class GsqPlanQtyCalcHandler extends AbsGsqScheduleStepHandler {
         // 备库总量做小数向上取整（如509.04 → 510）
         totalPlanQty = Math.ceil(totalPlanQty);
 
+        double actualTotalPlan = allocatePlanQty(vo, triggerClass, totalPlanQty, context);
+        // 记录分摊后的实际总计划量，供 S5.6 总量截断上限使用（而非理论 backupTotalQty）
+        vo.setBackupAllocatedQty(actualTotalPlan);
+        return actualTotalPlan;
+    }
+
+    /**
+     * 将备库总量按阈值分摊到触发班次及后续班次。
+     *
+     * <p>分摊规则（对齐胎圈 triggerBackupAndAllocate）：</p>
+     * <ul>
+     *   <li>每个班次初始排产上限为 threshold（SYS1603004，默认1000）</li>
+     *   <li>尾数合并：当某班次排产后剩余量 ≤ mergeThreshold（SYS1603006，默认0不启用）时，将剩余量全部合并到当前班次</li>
+     *   <li>第6班直接全排剩余量</li>
+     * </ul>
+     *
+     * @param vo           排程结果 VO
+     * @param triggerClass 触发班次
+     * @param totalPlanQty 备库分摊总量（已含损耗率乘数）
+     * @param context      排程上下文
+     * @return 实际分摊后的总计划量（触发班次及后续班次之和）
+     */
+    private double allocatePlanQty(GsqScheduleResultVo vo, int triggerClass, double totalPlanQty,
+                                   GsqScheduleContext context) {
         GsqScheduleParams params = context.getParams();
         double threshold = params.getBackupShiftThreshold() == null
                 ? DEFAULT_BACKUP_SHIFT_THRESHOLD : params.getBackupShiftThreshold();
@@ -266,6 +300,45 @@ public class GsqPlanQtyCalcHandler extends AbsGsqScheduleStepHandler {
             actualTotalPlan = BigDecimalUtil.add(actualTotalPlan, getClassPlanQty(vo, classNum));
         }
         return actualTotalPlan;
+    }
+
+    /**
+     * S3 机台分配确定后，按该规格实际机台精确取损耗率，重算备库总计划量并重新分摊。
+     *
+     * <p>背景：S2.3 阶段机台尚未分配，只能按钢丝圈代码聚合损耗率（多机台不一致时取平均，可能失真）。
+     * S3 分配确定 machineCode 后，用 {@code machineCode#steelRingCode} 精确取损耗率重算；
+     * 机台未配置损耗率时回退到全局参数损耗率（兼容旧逻辑）。</p>
+     *
+     * @param vo      排程结果 VO（需已设置 machineCode）
+     * @param context 排程上下文
+     */
+    public void recalcPlanQtyByMachineLossRate(GsqScheduleResultVo vo, GsqScheduleContext context) {
+        Integer triggerClass = vo.getBackupTriggerClass();
+        if (triggerClass == null || triggerClass <= 0) {
+            // 非备库触发规格不参与备库损耗率重算
+            return;
+        }
+        double backupTotalQty = vo.getBackupTotalQty() == null ? 0D : vo.getBackupTotalQty();
+        double availableStock = vo.getPlanStockQty() == null ? 0D : vo.getPlanStockQty();
+        double pureDemand = Math.max(0, BigDecimalUtil.sub(backupTotalQty, availableStock));
+
+        // 按实际机台精确取损耗率，未配置时回退全局参数损耗率
+        String machineCode = vo.getMachineCode();
+        Double machineLossRate = null;
+        if (machineCode != null) {
+            machineLossRate = context.getMachineLossRateMap().get(machineCode + "#" + vo.getSteelRingCode());
+        }
+        double paramLossRate = context.getParams().getLossRate() == null ? 0D : context.getParams().getLossRate();
+        double multiplier = machineLossRate != null
+                ? BigDecimalUtil.add(1D, machineLossRate)
+                : BigDecimalUtil.add(1D, paramLossRate);
+
+        double totalPlanQty = Math.ceil(BigDecimalUtil.mul(pureDemand, multiplier));
+        double actualTotalPlan = allocatePlanQty(vo, triggerClass, totalPlanQty, context);
+        vo.setBackupAllocatedQty(actualTotalPlan);
+        log.info("[S3] 规格[{}] 机台[{}] 损耗率[{}] 重算分摊后总量[{}]",
+                vo.getSteelRingCode(), machineCode,
+                machineLossRate != null ? machineLossRate : ("全局:" + paramLossRate), actualTotalPlan);
     }
 
     /**
