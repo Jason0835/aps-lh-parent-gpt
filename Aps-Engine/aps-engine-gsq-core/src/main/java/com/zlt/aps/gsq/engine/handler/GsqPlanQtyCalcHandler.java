@@ -122,6 +122,18 @@ public class GsqPlanQtyCalcHandler extends AbsGsqScheduleStepHandler {
                 double stockAfterCurrent = BigDecimalUtil.sub(availableStock, getTqPlan(vo, classNum));
                 // 下一胎圈班消耗（钢丝圈N班供应胎圈N+1班）
                 double nextTqConsume = getTqPlan(vo, classNum + 1);
+                // 胎圈X+1班没排产（消耗<=0）时，本班不触发备库，仅处理库存缺口
+                if (nextTqConsume <= 0) {
+                    // 库存不足（可用库存为负）时，当前班常规供应补足缺口
+                    if (availableStock < 0) {
+                        double gap = Math.ceil(BigDecimalUtil.sub(0D, availableStock));
+                        setClassPlanQty(vo, classNum, gap);
+                        availableStock = 0D;
+                    } else {
+                        availableStock = stockAfterCurrent;
+                    }
+                    continue;
+                }
                 if (stockAfterCurrent < BigDecimalUtil.mul(nextTqConsume, triggerThreshold)) {
                     // 触发备库
                     backupTriggerClass = classNum;
@@ -141,6 +153,13 @@ public class GsqPlanQtyCalcHandler extends AbsGsqScheduleStepHandler {
 
             vo.setBackupTriggerClass(backupTriggerClass);
             vo.setBackupTotalQty(backupTotalQty);
+
+            // 备库未触发且库存充足（有剩余）时，库存已覆盖需求，无需排产，清零初始计划量
+            if (backupTriggerClass == 0 && availableStock > 0) {
+                for (int classNum = 1; classNum <= 6; classNum++) {
+                    setClassPlanQty(vo, classNum, 0D);
+                }
+            }
 
             if (backupTriggerClass > 0) {
                 recordBackupTriggerEvidence(context, vo, backupTriggerClass, null,
@@ -274,11 +293,20 @@ public class GsqPlanQtyCalcHandler extends AbsGsqScheduleStepHandler {
         double mergeThreshold = params.getRoundingMergeThreshold() == null
                 ? DEFAULT_ROUNDING_MERGE_THRESHOLD : params.getRoundingMergeThreshold();
 
+        // 备库窗口末班 = 触发班次 + 备库班数 - 1。
+        // 备库量只分配到窗口内班次，不向窗口外班次溢出，避免把胎圈未排/常规续供班次误写入备库排量；
+        // 窗口外班次保持其初始值（胎圈已排则为常规续供量，未排则为0）。
+        int windowEnd = 6;
+        Integer backupShiftCount = vo.getBackupShiftCount();
+        if (backupShiftCount != null && backupShiftCount > 0) {
+            windowEnd = Math.min(6, triggerClass + backupShiftCount - 1);
+        }
+
         double remainingQty = totalPlanQty;
-        for (int classNum = triggerClass; classNum <= 6 && remainingQty > 0; classNum++) {
+        for (int classNum = triggerClass; classNum <= windowEnd && remainingQty > 0; classNum++) {
             double classPlan;
-            if (classNum == 6) {
-                // 最后一班直接全排
+            if (classNum == windowEnd) {
+                // 窗口末班直接全排
                 classPlan = remainingQty;
             } else {
                 double planForThisClass = Math.min(remainingQty, threshold);
@@ -296,7 +324,7 @@ public class GsqPlanQtyCalcHandler extends AbsGsqScheduleStepHandler {
         }
 
         double actualTotalPlan = 0;
-        for (int classNum = triggerClass; classNum <= 6; classNum++) {
+        for (int classNum = triggerClass; classNum <= windowEnd; classNum++) {
             actualTotalPlan = BigDecimalUtil.add(actualTotalPlan, getClassPlanQty(vo, classNum));
         }
         return actualTotalPlan;

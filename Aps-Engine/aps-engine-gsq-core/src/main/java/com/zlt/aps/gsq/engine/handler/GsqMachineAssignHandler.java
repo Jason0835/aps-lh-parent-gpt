@@ -354,7 +354,16 @@ public class GsqMachineAssignHandler extends AbsGsqScheduleStepHandler {
             double quota = (machine != null && machine.getQuata() != null) ? machine.getQuata().doubleValue() : 0D;
             double limit = quota > 0 ? Math.min(quota, threshold) : threshold;
 
-            // 逐班次限制当班初始排产，超出部分延后到下一班
+            // 备库窗口末班：触发班 ~ 触发班+备库班数-1。备库量不得延后到窗口外班次，
+            // 否则会泄漏到窗口外（如007的3=235），窗口末班允许超多规格阈值（上限由S5.5机台定额兜底）
+            Integer triggerClass = scheduleVo.getBackupTriggerClass();
+            Integer backupShiftCount = scheduleVo.getBackupShiftCount();
+            int windowEnd = 6;
+            if (triggerClass != null && backupShiftCount != null && backupShiftCount > 0) {
+                windowEnd = Math.min(6, triggerClass + backupShiftCount - 1);
+            }
+
+            // 逐班次限制当班初始排产，超出部分延后到下一班（但不得推出备库窗口）
             for (int classIndex = 1; classIndex <= 6; classIndex++) {
                 double plan = getShiftPlan(scheduleVo, classIndex);
                 if (plan <= 0) {
@@ -363,12 +372,14 @@ public class GsqMachineAssignHandler extends AbsGsqScheduleStepHandler {
                 if (plan <= limit) {
                     continue;
                 }
+                // 窗口末班：不往窗口外延后，保持当前班排产（总量由 S5.5/S5.6 兜底）
+                if (classIndex >= windowEnd) {
+                    continue;
+                }
                 double overflow = BigDecimalUtil.sub(plan, limit);
                 setShiftPlan(scheduleVo, classIndex, limit);
-                if (classIndex < 6) {
-                    double next = getShiftPlan(scheduleVo, classIndex + 1);
-                    setShiftPlan(scheduleVo, classIndex + 1, BigDecimalUtil.add(next, overflow));
-                }
+                double next = getShiftPlan(scheduleVo, classIndex + 1);
+                setShiftPlan(scheduleVo, classIndex + 1, BigDecimalUtil.add(next, overflow));
                 limitedCount++;
                 log.info("[S3-备库多规格限制] 规格[{}]机台[{}]{}班 初始排产超阈值, 限[{}]延后[{}]至{}班",
                         scheduleVo.getSteelRingCode(), machineCode, classIndex, limit, overflow, classIndex + 1);

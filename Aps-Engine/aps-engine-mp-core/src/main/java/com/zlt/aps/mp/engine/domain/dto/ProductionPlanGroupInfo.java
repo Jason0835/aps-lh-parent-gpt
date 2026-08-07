@@ -2026,6 +2026,7 @@ public class ProductionPlanGroupInfo {
             // 组装模具日排产结果
             productionSkuQtyMap.forEach((materialDesc, skuProductionInfo) -> {
                 String materialCode = skuProductionInfo.getMaterialCode();
+                MonthPlanProductionRequirePlanVo baseInfo = productionContext.getBaseSkuInfoByPlan(materialDesc);
                 FactoryMonthPlanMouldDayResult mpMouldDayResult = mpProdFinalMap.get(materialCode);
                 if (mpMouldDayResult == null) {
                     String mainPattern = skuProductionInfo.getMainPattern();
@@ -2037,8 +2038,11 @@ public class ProductionPlanGroupInfo {
                     mpMouldDayResult.setMainMaterialDesc(skuProductionInfo.getMainMaterialDesc());
                     mpMouldDayResult.setMainPattern(mainPattern);
                     mpMouldDayResult.setDayVulcanizationQty(skuProductionInfo.getDayVulcanizationQty());
-                    //20260807+ 增加模壳标准赋值
+                    //20260807+ 增加模壳标准及规格属性 赋值
                     mpMouldDayResult.setMouldShell(baseDataContainer.getSkuShellStandardByMainPattern(materialDesc, mainPattern));
+                    if(null != baseInfo){
+                        mpMouldDayResult.setSpecifications(baseInfo.getSpecifications());
+                    }
                 }
                 mpMouldDayResult.setFieldValueByFieldName(dayField, skuProductionInfo.getSumProductionQty());
                 mpProdFinalMap.put(skuProductionInfo.getMaterialCode(), mpMouldDayResult);
