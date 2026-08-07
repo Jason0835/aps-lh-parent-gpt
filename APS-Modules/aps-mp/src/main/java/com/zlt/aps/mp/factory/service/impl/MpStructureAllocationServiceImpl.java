@@ -27,6 +27,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.redis.service.RedisService;
 import com.zlt.aps.baseVo.excelVo.CellStyle;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.common.core.constant.BusiConstant;
 import com.zlt.aps.common.core.enums.DataSourceEnum;
 import com.zlt.aps.common.core.utils.AjaxResultUtils;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
@@ -3691,6 +3692,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         // 1.10、加载SKU与模具关系
         List<MoldCavityInsertMaxValueCalculatorVo> moldList = factoryMonthPlanProductMouldMapper
                 .getEnableProductionMouldInfoByNetDemand(factoryCode, year, yearMonth, monthPlanVersion, true);
+        Map<String, String> mdmMouldInfoMap = convertToMouldInfoMap(moldList);
         // 1.10.1、加载模具到货计划
         LocalDate monthStart = LocalDate.of(year, month, ProductionConstant.MONTH_START_DAY);
         Date productionStartDate = DateUtils.getDate(LocalDate.of(year, month, ProductionConstant.MONTH_START_DAY));
@@ -3850,6 +3852,12 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             // 2.8、各排产量倒推，高优先级排产数量 = min(高优先级，剩余排产量) ->中优先级排产数量 = min(中优先级，剩余排产量) ->周期排产储备排产 = min(周期储备量，剩余排产量) -> 常规储备排产 = 剩余排产量；
             insertItem.allocateProductionByPriority();
 
+            // 填充模壳标准，用于 统计表可以存储
+            String key = getSpecAndMainPatternKey(insertItem.getSpecifications(),insertItem.getMainPattern());
+            if (StringUtils.isNotBlank(mdmMouldInfoMap.get(key))){
+                insertItem.setMouldShell(mdmMouldInfoMap.get(key));
+            }
+
             // 2.9、模具变化信息
             FactoryMonthPlanFinalAdjustVo mpFinalVo = new FactoryMonthPlanFinalAdjustVo();
             mpFinalVo.setMaterialCode(materialCode);
@@ -3876,6 +3884,41 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         // 4、生成特殊材料排产记录
         iSpecialMaterialResultService.buildSecialMaterialResult(finalImportList);
         return finalImportList;
+    }
+
+    /**
+     * MdmModelInfo转Map
+     */
+    private Map<String, String> convertToMouldInfoMap(List<MoldCavityInsertMaxValueCalculatorVo> mouldInfoList) {
+        if (PubUtil.isEmpty(mouldInfoList)) {
+            return Collections.emptyMap();
+        }
+
+        return mouldInfoList.stream()
+                .filter(info -> info != null
+                        && info.getSpecifications() != null
+                        && info.getMainPattern() != null
+                        && info.getShellStandard() != null)
+                .collect(Collectors.groupingBy(
+                        info -> getSpecAndMainPatternKey(info.getSpecifications(),info.getMainPattern()),
+                        Collectors.mapping(
+                                MoldCavityInsertMaxValueCalculatorVo::getShellStandard,
+                                Collectors.collectingAndThen(
+                                        Collectors.toSet(),
+                                        set -> String.join(BusiConstant.WeekRollAdjust.SPLIT_COMMA, set)
+                                )
+                        )
+                ));
+    }
+
+    /**
+     * 获取规格+主花纹Key
+     * @param spec
+     * @param mainPattern
+     * @return
+     */
+    private String getSpecAndMainPatternKey(String spec, String mainPattern){
+        return spec + BusiConstant.WeekRollAdjust.SPLIT_GROUP_KEY + mainPattern;
     }
 
     /**
