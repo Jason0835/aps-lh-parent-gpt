@@ -61,13 +61,13 @@ public class MesItfController {
     private ILhScheduleResultIssueService lhScheduleResultIssueService;
 
     @Autowired
-    private com.zlt.aps.itf.mes.service.ITqScheduleResultIssueService tqScheduleResultIssueService;
+    private ITqScheduleResultIssueService tqScheduleResultIssueService;
 
     @Autowired
-    private com.zlt.aps.itf.mes.service.IGsqScheduleResultIssueService gsqScheduleResultIssueService;
+    private IGsqScheduleResultIssueService gsqScheduleResultIssueService;
 
     @Autowired
-    private com.zlt.aps.itf.mes.service.ICd90ScheduleResultIssueService cd90ScheduleResultIssueService;
+    private ICd90ScheduleResultIssueService cd90ScheduleResultIssueService;
 
     @Autowired
     private ICd15ScheduleResultIssueService cd15ScheduleResultIssueService;

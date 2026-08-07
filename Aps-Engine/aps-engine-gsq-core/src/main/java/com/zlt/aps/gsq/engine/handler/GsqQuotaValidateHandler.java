@@ -244,6 +244,12 @@ public class GsqQuotaValidateHandler extends AbsGsqScheduleStepHandler {
             return 0;
         }
 
+        // 备库规格：延后目标班次不得超出备库窗口，否则剩余量保留在当前班（窗口末班），
+        // 总量由 S5.6 capBackupTotalQty 兜底，避免备库量被推送到窗口外班次。
+        if (isBackupSpec(spec) && classNum < 6 && classNum + 1 > getBackupWindowEnd(spec)) {
+            return 0;
+        }
+
         if (classNum < 6) {
             // 延后到下一班
             deferToNextClass(spec, classNum, qty);
@@ -433,6 +439,21 @@ public class GsqQuotaValidateHandler extends AbsGsqScheduleStepHandler {
      */
     private boolean isBackupTriggeredClass(GsqScheduleResultVo spec, int classNum) {
         return spec.getBackupTriggerClass() != null && spec.getBackupTriggerClass() == classNum;
+    }
+
+    /**
+     * 计算备库窗口末班：触发班 ~ 触发班+备库班数-1，用于限制备库量不延后到窗口外。
+     *
+     * @param spec 排程记录
+     * @return 备库窗口末班（1~6）
+     */
+    private int getBackupWindowEnd(GsqScheduleResultVo spec) {
+        Integer triggerClass = spec.getBackupTriggerClass();
+        Integer shiftCount = spec.getBackupShiftCount();
+        if (triggerClass != null && shiftCount != null && shiftCount > 0) {
+            return Math.min(6, triggerClass + shiftCount - 1);
+        }
+        return 6;
     }
 
     /**
