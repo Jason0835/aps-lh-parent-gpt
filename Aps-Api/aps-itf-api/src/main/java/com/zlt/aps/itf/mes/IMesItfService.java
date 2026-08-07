@@ -277,6 +277,21 @@ public interface IMesItfService {
     @PostMapping("/mesItf/syncCd90ShiftStock")
     AjaxResult syncCd90ShiftStock(@RequestBody MesShiftStockSyncRequest request);
 
+    /** 同步斜裁库存。 */
+    @ApiOperation("同步斜裁库存")
+    @PostMapping("/mesItf/syncMesCd15Stock")
+    AjaxResult syncMesCd15Stock(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /** 同步斜裁库排状态。 */
+    @ApiOperation("同步斜裁库排状态")
+    @PostMapping("/mesItf/syncCd15StorageLaneLimit")
+    AjaxResult syncCd15StorageLaneLimit(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /** 同步斜裁自动滚动目标班次库存。 */
+    @ApiOperation("同步斜裁自动滚动班次库存")
+    @PostMapping("/mesItf/syncCd15ShiftStock")
+    AjaxResult syncCd15ShiftStock(@RequestBody MesShiftStockSyncRequest request);
+
     /**
      * 同步直裁每日三班完成量
      *

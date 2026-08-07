@@ -1,6 +1,7 @@
 package com.zlt.aps.cd15.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import cn.hutool.core.date.DateUtil;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
@@ -101,6 +102,19 @@ public class Cd15StorageLaneLimitController extends AbstractDocBizController<Cd1
     @Override
     public AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport) throws Exception {
         return super.importData(importContext, updateSupport);
+    }
+
+    /** 替换斜裁MES库排快照。 */
+    @ApiOperation("替换斜裁MES库排快照")
+    @PostMapping("/logicDeleteAndSaveMesBatch")
+    public AjaxResult logicDeleteAndSaveMesBatch(@RequestParam("factoryCode") String factoryCode,
+                                                  @RequestParam("laneDate") String laneDate,
+                                                  @RequestParam("shiftCode") String shiftCode,
+                                                  @RequestParam("updateBy") String updateBy,
+                                                  @RequestBody List<Cd15StorageLaneLimit> list) {
+        this.cd15StorageLaneLimitService.logicDeleteAndSaveBatch(factoryCode,
+                DateUtil.parseDate(laneDate), shiftCode, updateBy, list);
+        return AjaxResult.success();
     }
 
     /** 导出斜裁库排限制 */

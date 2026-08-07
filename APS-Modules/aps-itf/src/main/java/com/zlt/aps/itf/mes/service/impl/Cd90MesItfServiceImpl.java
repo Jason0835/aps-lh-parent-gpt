@@ -257,6 +257,10 @@ public class Cd90MesItfServiceImpl implements ICd90MesItfService {
         String factoryCode = StringUtils.isBlank(syncDataLogs.getFactoryCode())
                 ? FactoryConstant.DEFAULT_FACTORY_CODE : syncDataLogs.getFactoryCode();
         syncDataLogs.setFactoryCode(factoryCode);
+        String targetLaneDate = syncDataLogs.getQueryParams() == null ? null
+                : Objects.toString(syncDataLogs.getQueryParams().get("laneDate"), null);
+        String targetShiftCode = syncDataLogs.getQueryParams() == null ? null
+                : Objects.toString(syncDataLogs.getQueryParams().get("shiftCode"), null);
 
         List<Cd90StorageLaneLimit> sourceList;
         DynamicDataSourceContextHolder.push(DataSource.MES);
@@ -267,6 +271,26 @@ public class Cd90MesItfServiceImpl implements ICd90MesItfService {
         }
         if (CollectionUtils.isEmpty(sourceList)) {
             log.warn("直裁库排同步：MES中间表查询结果为空，factoryCode={}", factoryCode);
+            if (StringUtils.isNotBlank(targetLaneDate) && StringUtils.isNotBlank(targetShiftCode)) {
+                try {
+                    AjaxResult clearResult = FeignTokenHelper.callWithToken(() ->
+                            this.cd90StorageLaneLimitRemoteService.logicDeleteAndSaveMesBatch(
+                                    factoryCode, targetLaneDate, targetShiftCode, "MES",
+                                    Collections.emptyList()));
+                    if (clearResult == null || !Objects.equals(AjaxResult.Type.SUCCESS.value(),
+                            clearResult.get(AjaxResult.CODE_TAG))) {
+                        Object resultMessage = clearResult == null ? "" : clearResult.get(AjaxResult.MSG_TAG);
+                        return AjaxResult.error(MessageFormat.format(
+                                I18nUtil.getMessage("ui.cd90.storageLaneLimit.syncFailed"), resultMessage));
+                    }
+                } catch (Exception exception) {
+                    log.error("直裁库排空快照清理失败：factoryCode={}，laneDate={}，shiftCode={}",
+                            factoryCode, targetLaneDate, targetShiftCode, exception);
+                    return AjaxResult.error(MessageFormat.format(
+                            I18nUtil.getMessage("ui.cd90.storageLaneLimit.syncFailed"),
+                            exception.getMessage()));
+                }
+            }
             return AjaxResult.success(I18nUtil.getMessage("ui.cd90.storageLaneLimit.syncNoData"));
         }
 

@@ -7,6 +7,7 @@ import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -32,7 +33,20 @@ public class Cd90MesTask {
     @ApiOperation("同步直裁库存")
     @AutoLoginLog
     public void syncMesCd90Stock() {
-        FeignTokenHelper.runWithToken(() -> iMesItfService.syncMesCd90Stock(new AuxReqSyncDataLogs()));
+        this.syncMesCd90Stock(null);
+    }
+
+    /**
+     * 按指定日期同步直裁库存。
+     *
+     * @param stockDate 指定库存日期，格式yyyy-MM-dd；为空时走原默认流程
+     */
+    @ApiOperation("按指定日期同步直裁库存")
+    @AutoLoginLog
+    public void syncMesCd90Stock(String stockDate) {
+        FeignTokenHelper.runWithToken(() ->
+                this.iMesItfService.syncMesCd90Stock(
+                        this.buildDateRequest("stockDate", stockDate)));
     }
 
     /**
@@ -41,8 +55,20 @@ public class Cd90MesTask {
     @ApiOperation("同步直裁库排状态")
     @AutoLoginLog
     public void syncStorageLaneLimit() {
+        this.syncStorageLaneLimit(null);
+    }
+
+    /**
+     * 按指定日期同步直裁库排状态。
+     *
+     * @param laneDate 指定库排日期，格式yyyy-MM-dd；为空时走原默认流程
+     */
+    @ApiOperation("按指定日期同步直裁库排状态")
+    @AutoLoginLog
+    public void syncStorageLaneLimit(String laneDate) {
         FeignTokenHelper.runWithToken(() ->
-                iMesItfService.syncCd90StorageLaneLimit(new AuxReqSyncDataLogs()));
+                this.iMesItfService.syncCd90StorageLaneLimit(
+                        this.buildDateRequest("laneDate", laneDate)));
     }
 
     /**
@@ -52,12 +78,44 @@ public class Cd90MesTask {
     @ApiOperation("同步直裁每日三班完成量")
     @AutoLoginLog
     public void syncCd90ClassShiftFinishQty() {
+        this.syncCd90ClassShiftFinishQty(null);
+    }
+
+    /**
+     * 同步直裁每日三班完成量。
+     *
+     * @param scheduleDate 指定同步日期，格式yyyy-MM-dd；为空时默认同步上一天
+     */
+    @ApiOperation("按指定日期同步直裁每日三班完成量")
+    @AutoLoginLog
+    public void syncCd90ClassShiftFinishQty(String scheduleDate) {
         FeignTokenHelper.runWithToken(() -> {
             AuxReqSyncDataLogs syncDataLogs = new AuxReqSyncDataLogs();
             HashMap<String, Object> queryParams = new HashMap<>();
-            queryParams.put("scheduleDate", DateUtil.format(DateUtil.offsetDay(new Date(), -1), "yyyy-MM-dd"));
+            String targetScheduleDate = StringUtils.isBlank(scheduleDate)
+                    ? DateUtil.format(DateUtil.offsetDay(new Date(), -1), "yyyy-MM-dd")
+                    : scheduleDate.trim();
+            queryParams.put("scheduleDate", targetScheduleDate);
             syncDataLogs.setQueryParams(queryParams);
-            iMesItfService.syncCd90ClassShiftFinishQty(syncDataLogs);
+            this.iMesItfService.syncCd90ClassShiftFinishQty(syncDataLogs);
         });
+    }
+
+    /**
+     * 构造可选日期同步请求；未指定日期时保持原空请求。
+     *
+     * @param parameterName 日期参数名
+     * @param parameterValue 日期参数值
+     * @return MES同步请求
+     */
+    private AuxReqSyncDataLogs buildDateRequest(
+            String parameterName, String parameterValue) {
+        AuxReqSyncDataLogs syncDataLogs = new AuxReqSyncDataLogs();
+        if (StringUtils.isNotBlank(parameterValue)) {
+            HashMap<String, Object> queryParams = new HashMap<>();
+            queryParams.put(parameterName, parameterValue.trim());
+            syncDataLogs.setQueryParams(queryParams);
+        }
+        return syncDataLogs;
     }
 }
