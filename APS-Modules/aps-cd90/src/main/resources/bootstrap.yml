@@ -2,7 +2,7 @@ server:
   port: 9976
 
 nacos:
-  server-addr: 192.168.10.145:8848
+  server-addr: 192.168.10.123:8848
 
 # Spring
 spring:
