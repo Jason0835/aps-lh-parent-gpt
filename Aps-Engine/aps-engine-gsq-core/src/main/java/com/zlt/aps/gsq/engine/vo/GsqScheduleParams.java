@@ -57,8 +57,20 @@ public class GsqScheduleParams {
     /** 备库班数（SYS1601003，默认1） */
     private Double stockShiftCount;
 
+    /** 备库触发阈值（班，默认0.7）：扣掉当前胎圈班消耗后的剩余库存低于 0.7 × 下一胎圈班消耗时触发生成备库 */
+    private Double backupTriggerThresholdClass;
+
     /** 备库班次单班排产阈值（SYS1603004，默认1000，备库总量分摊到各班时单班上限） */
     private Double backupShiftThreshold;
+
+    /** 备库规格班次最大班产阈值（SYS1603005，默认1000，多规格机台上备库规格当班初始排产上限） */
+    private Double backupMultiSpecThreshold;
+
+    /** 取整合并阈值（SYS1603006，默认0不启用）：备库分摊时当班排产后剩余量≤此值则合并到当前班次排完，不再新开一班向上取整 */
+    private Double roundingMergeThreshold;
+
+    /** 机台定额超排容忍阈值（SYS1603007，默认0不启用）：计划量超出机台定额/剩余产能且超出部分≤此值时允许当班超排，不延后到下一班 */
+    private Double machineOverAssignTolerance;
 
     /** 需求系数（SYS1601001，钢丝圈:胎圈=1:1，默认1） */
     private Double demandCoefficient;

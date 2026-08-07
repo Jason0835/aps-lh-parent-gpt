@@ -138,14 +138,7 @@ public class GsqResultValidationHandler extends AbsGsqScheduleStepHandler {
      * 获取指定班次的计划量。
      */
     private Double getShiftPlan(GsqScheduleResultVo vo, int classIndex) {
-        switch (classIndex) {
-            case 1: return vo.getClass1PlanQty();
-            case 2: return vo.getClass2PlanQty();
-            case 3: return vo.getClass3PlanQty();
-            case 4: return vo.getClass4PlanQty();
-            case 5: return vo.getClass5PlanQty();
-            case 6: return vo.getClass6PlanQty();
-            default: return null;
-        }
+        Object value = vo.getFieldValueByFieldName("class" + classIndex + "PlanQty");
+        return value == null ? null : ((Number) value).doubleValue();
     }
 }

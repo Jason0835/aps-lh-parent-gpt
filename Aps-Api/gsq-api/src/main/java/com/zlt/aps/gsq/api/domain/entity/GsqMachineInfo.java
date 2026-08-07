@@ -53,19 +53,19 @@ public class GsqMachineInfo extends BaseEntity {
     private BigDecimal quata;
 
     /**
-     * 班制，如：三班制，两班制；对应数据字典CLASS_SHIFT
+     * 班制，如：三班制，两班制；对应数据字典LH_CLASS_SHIFT
      */
     @ApiModelProperty(value = "班制", position = 80)
-    @Excel(name = "ui.data.column.machine.classShift", dictType = "CLASS_SHIFT")
+    @Excel(name = "ui.data.column.machine.classShift", dictType = "LH_CLASS_SHIFT")
     @TableField("CLASS_SHIFT")
     @ImportValidated(maxLength = 20, required = true)
     private String classShift;
 
     /**
-     * 开机班次，如：中班、夜班；对应数据字典CLASS_NUM
+     * 开机班次，如：中班、夜班；对应数据字典class_num_three_plan
      */
     @ApiModelProperty(value = "开机班次", position = 85)
-    @Excel(name = "ui.data.column.machine.openMachineClass", dictType = "CLASS_NUM_THREE", dictTypeToExcelEnable = false)
+    @Excel(name = "ui.data.column.machine.openMachineClass", dictType = "class_num_three_plan", dictTypeToExcelEnable = false)
     @TableField("OPEN_MACHINE_CLASS")
     @ImportValidated(maxLength = 20)
     private String openMachineClass;

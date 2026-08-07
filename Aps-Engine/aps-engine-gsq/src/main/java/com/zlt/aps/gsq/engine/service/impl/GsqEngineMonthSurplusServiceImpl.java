@@ -35,7 +35,7 @@ public class GsqEngineMonthSurplusServiceImpl implements GsqEngineMonthSurplusSe
             return monthSurplusMap;
         }
         for(GsqMonthSurplusVo monthSurplusVo : list) {
-            monthSurplusMap.put(monthSurplusVo.getMaterialCode(), monthSurplusVo);
+            monthSurplusMap.put(monthSurplusVo.getSteelRingCode(), monthSurplusVo);
         }
         return monthSurplusMap;
     }

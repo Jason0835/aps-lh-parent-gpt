@@ -423,15 +423,15 @@
     <select id="listStockShiftConfig" resultType="com.zlt.aps.tq.api.domain.entity.TqStockShiftConfig">
         select ID,
         FACTORY_CODE,
-        MACHINE_RANGE,
-        MACHINE_COUNT,
-        SHIFT_COUNT
+        MIN_MACHINE_QTY,
+        MAX_MACHINE_QTY,
+        DEPTH_CLASS_QTY
         from T_TQ_STOCK_SHIFT_CONFIG
         where IS_DELETE = 0
         <if test="factoryCode != null and factoryCode != ''">
             and FACTORY_CODE = #{factoryCode}
         </if>
-        order by MACHINE_COUNT
+        order by MIN_MACHINE_QTY
     </select>
 
     <!-- 统计胎圈规格对应的成型机台数 -->

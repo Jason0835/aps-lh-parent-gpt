@@ -94,6 +94,10 @@ public class GsqEngineServiceImpl implements GsqEngineService {
         context.setFactoryCode(factoryCode);
         context.setOperator(SecurityUtils.getUsername());
 
+        // 1.1 加载月计划剩余量（对齐胎圈TQ：从 t_mdm_month_surplus 取 PLAN_SURPLUS_QTY×2，
+        //     key=钢丝圈代码，供 S1 预校验阶段回填每条的 monthSurplusQty）
+        context.setMonthSurplusMap(gsqEngineMonthSurplusService.getMonthSurplus(scheduleDate));
+
         // 2. 执行模板方法（S1~S6八阶段）
         gsqScheduleTemplate.execute(context);
 

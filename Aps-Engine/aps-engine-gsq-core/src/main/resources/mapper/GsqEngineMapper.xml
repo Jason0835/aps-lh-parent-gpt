@@ -150,7 +150,7 @@
     <insert id="batchCreateScheduleResult" parameterType="java.util.List">
         insert into T_GSQ_SCHEDULE_RESULT (
         SCHEDULE_DATE, CX_BATCH_NO, BATCH_NO, ORDER_NO, STEEL_RING_CODE,
-        TWINING_DISC_CODE, PRO_SIZE, MACHINE_CODE, STOCK_QTY,
+        TWINING_DISC_CODE, PRO_SIZE, MACHINE_CODE, STOCK_QTY, MONTH_SURPLUS_QTY,
         CLASS1_SEQUENCE, CLASS1_PLAN_QTY, CLASS1_ANALYSIS,
         CLASS2_SEQUENCE, CLASS2_PLAN_QTY, CLASS2_ANALYSIS,
         CLASS3_SEQUENCE, CLASS3_PLAN_QTY, CLASS3_ANALYSIS,
@@ -165,7 +165,7 @@
         <foreach collection="scheduleResultList" item="item" separator=",">
             (
             #{item.scheduleDate}, #{item.tqBatchNo}, #{item.batchNo}, #{item.orderNo}, #{item.steelRingCode},
-            #{item.twiningDiscCode}, #{item.proSize}, #{item.machineCode}, #{item.stockQty},
+            #{item.twiningDiscCode}, #{item.proSize}, #{item.machineCode}, #{item.stockQty}, #{item.monthSurplusQty},
             #{item.class1Sequence}, #{item.class1PlanQty}, #{item.class1Analysis},
             #{item.class2Sequence}, #{item.class2PlanQty}, #{item.class2Analysis},
             #{item.class3Sequence}, #{item.class3PlanQty}, #{item.class3Analysis},
@@ -213,6 +213,8 @@
         select
         ci.BEAD_CODE    as steelRingCode,
         max(ci.BEAD_TYPE)    as steelType,
+        max(ci.MATERIAL_CODE) as materialCode,
+        max(ci.EMBRYO_DESC)   as embryoSpecDesc,
         max(ci.BEAD_ARRANGE) as `rank`,
         1                     as unitConsume,
         max(ci.PRO_SIZE)     as dimension,
@@ -387,17 +389,13 @@
         and DOWNTIME_DATE &lt; date_format(date_add(#{scheduleDate}, interval 3 day), '%Y-%m-%d')
     </select>
 
-    <!-- 读取钢丝圈备库班数配置，按 MIN_MACHINE_QTY 升序（对齐胎圈TqStockShiftConfig DepthConfig 区间方式） -->
-    <select id="listGsqStockShiftConfig" resultType="com.zlt.aps.gsq.api.domain.entity.GsqStockShiftConfig">
-        select FACTORY_CODE as factoryCode,
-               MIN_MACHINE_QTY as minMachineQty,
-               MAX_MACHINE_QTY as maxMachineQty,
-               DEPTH_CLASS_QTY as depthClassQty
-        from T_GSQ_STOCK_SHIFT_CONFIG
+    <!-- 读取钢丝圈排程参数，仅取启用项（ENABLE_STATUS='1'），兼容分厂参数与全局参数（FACTORY_CODE为空） -->
+    <select id="listGsqParams" resultType="com.zlt.aps.gsq.engine.vo.GsqParamsVo">
+        select PARAM_CODE as paramCode, PARAM_VALUE as paramValue
+        from T_GSQ_PARAMS
         where IS_DELETE = '0'
-        <if test="factoryCode != null and factoryCode != ''">
-            and FACTORY_CODE = #{factoryCode}
-        </if>
-        order by MIN_MACHINE_QTY
+          and ENABLE_STATUS = '1'
+          and (FACTORY_CODE = #{factoryCode} or FACTORY_CODE is null or FACTORY_CODE = '')
+        order by PARAM_CODE
     </select>
 </mapper>
