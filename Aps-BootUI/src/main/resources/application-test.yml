@@ -22,7 +22,7 @@ spring:
     password:
     database: 5
   zipkin:
-    baseUrl: "http://192.168.10.123:9411/"
+    baseUrl: "http://192.168.2.93:9411/"
   cloud:
     nacos:
       discovery:
@@ -44,14 +44,14 @@ shiro:
   sso:
     #是否需要走单点
     enable: false
-    cas: http://192.168.10.123:8899/cas
+    cas: http://192.168.2.93:8899/cas
     clientName: casClient
     currentCas: http://192.168.2.94:9066
 
 #网关配置,只用来取验证码，feignClient使用的是注册中心的网关信息。
 gateway:
   url: http://192.168.2.94:9512/
-  casUrl: http://192.168.10.123:8899/cas
+  casUrl: http://192.168.2.93:8899/cas
 
 aes:
   password:

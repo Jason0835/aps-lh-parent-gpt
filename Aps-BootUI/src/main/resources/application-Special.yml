@@ -42,8 +42,8 @@ redis-addr: 192.168.2.93
 redis-port: 6379
 redis-password:
 redis-database: 5
-#redis-password: 123456
-zipkin-addr: "http://192.168.10.123:9411/"
+#redis-password:
+zipkin-addr: "http://192.168.2.93:9411/"
 
 shiro-sso-enable: false
 shiro:
@@ -66,7 +66,7 @@ shiro:
     kickoutAfter: false
 #===============================================================
 sso:
-  cas-addr: http://192.168.10.123:8899/cas
+  cas-addr: http://192.168.2.93:8899/cas
   #cas-addr: https://casserverpac4j.herokuapp.com
 #网关配置,只用来取验证码，feignClient使用的是注册中心的网关信息。
 gateway-addr: http://192.168.2.14:8080/
