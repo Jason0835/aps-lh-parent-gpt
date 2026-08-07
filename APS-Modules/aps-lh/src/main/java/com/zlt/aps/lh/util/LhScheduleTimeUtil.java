@@ -553,6 +553,35 @@ public final class LhScheduleTimeUtil {
     }
 
     /**
+     * 解析指定时间命中的班次序号。
+     *
+     * <p>班次命中区间为半开区间[班次开始时间, 班次结束时间)，与新增选机候选画像
+     * 的班次判定保持一致；未命中窗口内任何班次时返回窗口外默认值。</p>
+     *
+     * @param context 排程上下文
+     * @param date 目标时间
+     * @return 命中班次序号；上下文、时间为空或未命中时返回窗口外默认值
+     */
+    public static int resolveShiftIndexByTime(LhScheduleContext context, Date date) {
+        if (Objects.isNull(context) || Objects.isNull(date)
+                || CollectionUtils.isEmpty(context.getScheduleWindowShifts())) {
+            return LhScheduleConstant.MAX_SHIFT_SLOT_COUNT + 1;
+        }
+        for (LhShiftConfigVO shift : context.getScheduleWindowShifts()) {
+            if (Objects.isNull(shift) || Objects.isNull(shift.getShiftIndex())
+                    || Objects.isNull(shift.getShiftStartDateTime())
+                    || Objects.isNull(shift.getShiftEndDateTime())) {
+                continue;
+            }
+            if (!date.before(shift.getShiftStartDateTime())
+                    && date.before(shift.getShiftEndDateTime())) {
+                return shift.getShiftIndex();
+            }
+        }
+        return LhScheduleConstant.MAX_SHIFT_SLOT_COUNT + 1;
+    }
+
+    /**
      * 判断指定时间是否在禁止换模时段（20:00 - 次日6:00）
      *
      * @param context 排程上下文

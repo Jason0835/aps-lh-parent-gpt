@@ -1122,13 +1122,15 @@ public class LhScheduleResult extends BaseEntity implements Serializable {
     private String isEmbryoEnding;
 
     /**
-     * 结构最低机台数保留标识：0-未命中，1-命中。
-     * <p>当同结构全部SKU可在当前3天、8班窗口内收尾，且结构最晚有量班次的去重物理机台数
-     * 小于结构最低硫化机台数时，该结构本窗口内的全部结果均标记为1。计划量为0的班次仅表示
-     * 原SKU继续占用机台，不参与产量、余量、胎胚库存、最晚班次或生产机台数统计。</p>
+     * 结构收尾对齐标识：0-未命中，1-命中（复用原“结构最低机台数保留”字段）。
+     * <p>新增排产物料选机时，若统计班次内同结构在机物理机台数小于结构最低硫化机台数-1，
+     * 则触发结构收尾对齐约束；最终在候选机台前物料与待排SKU同结构的前提下选中该机台时，
+     * 该结果行标记为1，并在首个生产班次原因分析追加“结构收尾对齐”。
+     * 原“续作排产后结构停产保机”阶段判断、补零占位已废弃，历史数据中的旧标识仅表示
+     * 历史批次曾命中停产保机，不再参与任何排程判断。</p>
      */
     @Excel(name = "ui.data.column.lhScheduleResult.isStructureMinMachineRetained", dictType = "biz_yes_no")
-    @ApiModelProperty(value = "结构最低机台数保留标识 0-否 1-是", name = "isStructureMinMachineRetained")
+    @ApiModelProperty(value = "结构收尾对齐标识 0-否 1-是", name = "isStructureMinMachineRetained")
     @TableField(value = "IS_STRUCTURE_MIN_MACHINE_RETAINED")
     private String isStructureMinMachineRetained = "0";
 

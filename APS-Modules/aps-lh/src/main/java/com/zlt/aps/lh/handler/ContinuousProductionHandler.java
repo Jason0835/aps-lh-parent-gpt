@@ -2,7 +2,6 @@ package com.zlt.aps.lh.handler;
 
 import com.zlt.aps.lh.api.enums.ScheduleStepEnum;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
-import com.zlt.aps.lh.component.StructureMinMachineRetentionService;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.factory.ScheduleStrategyFactory;
 import com.zlt.aps.lh.engine.strategy.IProductionStrategy;
@@ -38,8 +37,6 @@ public class ContinuousProductionHandler extends AbsScheduleStepHandler {
     private ScheduleStrategyFactory strategyFactory;
     @Resource
     private ITypeBlockProductionStrategy typeBlockProductionStrategy;
-    @Resource
-    private StructureMinMachineRetentionService structureMinMachineRetentionService;
     @Resource
     private LhMaintenanceScheduleService maintenanceScheduleService;
 
@@ -78,23 +75,18 @@ public class ContinuousProductionHandler extends AbsScheduleStepHandler {
                 context.getScheduleResultList().size(), context.getUnscheduledResultList().size());
 
         /*
-         * S4.4.4 续作降模、结构停产保机和共用胎胚收尾均衡：
+         * S4.4.4 续作降模和共用胎胚收尾均衡：
          * 1. 降模及其他续作数量修改先全部稳定；
-         * 2. 在续作日计划账本一次性扣减前，先判断结构停产保机，再执行共用胎胚多机台均衡；
-         * 3. 命中结构保机的机台在均衡中保持数量、收尾时间和收尾班次不变。
-         * 三个动作必须在同一续作策略内连续完成，避免先扣账后搬量产生二次账本调整。
+         * 2. 在续作日计划账本一次性扣减前，执行共用胎胚多机台均衡。
+         * 两个动作必须在同一续作策略内连续完成，避免先扣账后搬量产生二次账本调整。
+         * 原“结构停产保机”阶段判断已废弃，结构收尾对齐改为S4.5新增选机时实时判断。
          */
         strategy.scheduleReduceMould(context);
-        log.info("续作降模、结构停产保机及共用胎胚收尾均衡完成, 排程结果数: {}, 未排产数: {}",
+        log.info("续作降模及共用胎胚收尾均衡完成, 排程结果数: {}, 未排产数: {}",
                 context.getScheduleResultList().size(), context.getUnscheduledResultList().size());
 
-        // S4.4.5 收尾后换活字块衔接排产：只读取结构保机和均衡后的最终机台可用时间，不得重新判断保机。
+        // S4.4.5 收尾后换活字块衔接排产：只读取均衡后的最终机台可用时间。
         typeBlockProductionStrategy.scheduleTypeBlockChange(context);
-        /*
-         * 换活字块可能由同结构SKU接管保机机台。这里只幂等同步接管后的占位和标识，
-         * 不重新统计结构机台数，保证已经进入停产保机状态的机台不会被后续阶段反向改判。
-         */
-        structureMinMachineRetentionService.synchronizeRetainedState(context);
         // 换活字块可能移出或回写待新增SKU，需重新构建结构视图供 S4.5 新增排序使用。
         context.rebuildStructureSkuMapFromPending(context.getNewSpecSkuList());
         log.info("换活字块衔接排产完成, 排程结果数: {}, 待新增SKU: {}",

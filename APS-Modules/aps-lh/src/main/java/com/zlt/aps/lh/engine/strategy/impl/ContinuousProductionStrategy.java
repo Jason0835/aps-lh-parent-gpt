@@ -26,7 +26,6 @@ import com.zlt.aps.lh.api.enums.TrialStatusEnum;
 import com.zlt.aps.lh.component.CapsuleReplacementRuleService;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.component.OrderNoGenerator;
-import com.zlt.aps.lh.component.StructureMinMachineRetentionService;
 import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.ICapacityCalculateStrategy;
@@ -161,12 +160,6 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
      */
     @Resource
     private IEmbryoEndingBalanceStrategy embryoEndingBalanceStrategy;
-
-    /**
-     * 结构停产保机统一判断入口。必须在共用胎胚均衡前执行，命中机台由均衡策略直接排除。
-     */
-    @Resource
-    private StructureMinMachineRetentionService structureMinMachineRetentionService;
 
     @Resource
     private IFirstInspectionBalanceStrategy firstInspectionBalanceStrategy;
@@ -1061,14 +1054,6 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
          */
         this.enforceRecordedCapsuleReplacementCapacityLimits(context, shifts);
         /*
-         * 结构停产保机必须先于共用胎胚收尾均衡执行。判断位于续作全部普通数量修改完成后，
-         * 但仍处于日计划账本一次性扣减之前，因此保机结论可以读取真实续作尾量，均衡也不会
-         * 形成扣账后的二次搬量。该服务是主链必需依赖，不允许因接线缺失而跳过，
-         * 否则保机机台冻结状态缺失会导致均衡后的快照同步无法执行。
-         */
-        this.structureMinMachineRetentionService
-                .applyRetentionAfterContinuousBeforeEndingBalance(context);
-        /*
          * 共用胎胚多机台收尾均衡：
          * 1. 位于最后一次日标准收敛和严格收口之后、日计划账本扣减之前，作为续作阶段最后一个
          *    班次量修改器，避免日标准公式再次覆盖均衡结果；
@@ -1077,8 +1062,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
          * 3. 按时间下机后延补量登记到 sharedEmbryoEndingStaggerAllowedOverQtyMap，供严格收口
          *    和账本裁剪放行，避免补量被SKU普通额度回裁；
          * 4. 同物料多机台优先于共用胎胚组，共用胎胚组按机台数降序、胎胚编码升序；
-         * 5. 停产保机机台仍参与均衡，调整后通过 StructureMinMachineRetentionService
-         *    同步冻结快照与占用边界；
+         * 5. 续作停产保机机台仍参与均衡，续作停产保机占用边界由既有主链统一维护；
          * 6. 只做模拟换模计数和过程日志，不预占真实换模次数，后续换活字块和新增排产仍通过主链登记。
          */
         this.embryoEndingBalanceStrategy.balanceSharedEmbryoEnding(context, shifts);
@@ -9637,14 +9621,10 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                 retainContinuousStopHoldZeroResult(context, result, context.getScheduleWindowShifts());
                 continue;
             }
-            if (context.isStructureMinMachineRetained(result.getLhMachineCode())) {
-                // 结构保机零结果由统一下机入口补齐结束时间和占用状态，必须保留为资源占位载体。
-                continue;
-            }
             SkuScheduleDTO sourceSku = requireContinuousPhaseSourceSku(context, result);
             int firstOccupiedShiftIndex = resolveFirstOccupiedShiftIndex(result);
             int lastOccupiedShiftIndex = resolveLastOccupiedShiftIndex(result);
-            // 零结果先按续作原规则释放；阶段级结构判断只处理仍有实际生产结果的结构机台。
+            // 零结果先按续作原规则释放。
             completeContinuousMachineOfflineDecision(
                     context, sourceSku, result, firstOccupiedShiftIndex,
                     lastOccupiedShiftIndex, "续作零结果收口");
@@ -11122,8 +11102,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
     private boolean isEffectiveContinuousResult(LhScheduleContext context, LhScheduleResult result) {
         return isContinuousPhaseResult(result)
                 && ((result.getDailyPlanQty() != null && result.getDailyPlanQty() > 0)
-                || context.isContinuousStopHoldMachine(result.getLhMachineCode())
-                || context.isStructureMinMachineRetained(result.getLhMachineCode()))
+                || context.isContinuousStopHoldMachine(result.getLhMachineCode()))
                 && result.getSpecEndTime() != null
                 && !isReleasedFirstDayNoPlanPlaceholderResult(context, result)
                 && StringUtils.isNotEmpty(result.getLhMachineCode());
@@ -11205,31 +11184,6 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         machine.setPreviousProSize(resolveMaterialProSize(context, result.getMaterialCode()));
         machine.setEstimatedEndTime(result.getSpecEndTime());
         machine.setEnding("1".equals(result.getIsEnd()) && result.getSpecEndTime() != null);
-        applyStructureRetentionMachineState(context, machine);
-    }
-
-    /**
-     * 使用结构保机结束时间校正机台终态，防止普通续作状态同步提前释放机台。
-     *
-     * @param context 排程上下文
-     * @param machine 当前机台
-     */
-    private void applyStructureRetentionMachineState(LhScheduleContext context,
-                                                     MachineScheduleDTO machine) {
-        if (Objects.isNull(context) || Objects.isNull(machine)
-                || StringUtils.isEmpty(machine.getMachineCode())) {
-            return;
-        }
-        Date retentionEndTime = context.getStructureMinMachineRetentionEndTimeMap()
-                .get(machine.getMachineCode());
-        if (Objects.isNull(retentionEndTime)) {
-            return;
-        }
-        if (Objects.isNull(machine.getEstimatedEndTime())
-                || machine.getEstimatedEndTime().before(retentionEndTime)) {
-            machine.setEstimatedEndTime(retentionEndTime);
-        }
-        machine.setEnding(true);
     }
 
     /**
@@ -11241,14 +11195,6 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
      */
     private void restoreMachineStateFromInitial(LhScheduleContext context, String machineCode, MachineScheduleDTO machine) {
         if (context == null || machine == null || StringUtils.isEmpty(machineCode)) {
-            return;
-        }
-        if (context.isStructureMinMachineRetained(machineCode)) {
-            /*
-             * 统一下机入口已经把机台恢复为当前结构物料并登记保留时间；不得先回退初始化快照，
-             * 否则会短暂或最终把占用物料改回前批状态。
-             */
-            applyStructureRetentionMachineState(context, machine);
             return;
         }
         MachineScheduleDTO initialMachine = context.getInitialMachineScheduleMap().get(machineCode);

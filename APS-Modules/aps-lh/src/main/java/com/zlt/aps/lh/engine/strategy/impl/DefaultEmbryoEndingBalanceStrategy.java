@@ -17,7 +17,6 @@ import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
 import com.zlt.aps.lh.api.enums.SkuTagEnum;
 import com.zlt.aps.lh.component.CapsuleReplacementRuleService;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
-import com.zlt.aps.lh.component.StructureMinMachineRetentionService;
 import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.IEmbryoEndingBalanceStrategy;
@@ -125,9 +124,6 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
 
     @Resource
     private TargetScheduleQtyResolver targetScheduleQtyResolver;
-
-    @Resource
-    private StructureMinMachineRetentionService structureMinMachineRetentionService;
 
     @Resource
     private CapsuleReplacementRuleService capsuleReplacementRuleService = new CapsuleReplacementRuleService();
@@ -599,9 +595,8 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
     /**
      * 解析均衡预演使用的真实生产收尾时间。
      *
-     * <p>停产保机机台的 {@code specEndTime} 可能已被占用边界后移（结构保机统一释放时间、
-     * 续作停产保机窗口末班占用），换模/换活字块预演必须使用实际生产结束时间：
-     * 结构保机优先取冻结的实际生产结束时间快照，否则取最后有量班次结束时间。</p>
+     * <p>续作停产保机机台的 {@code specEndTime} 可能已被占用边界后移（续作停产保机窗口末班占用），
+     * 换模/换活字块预演必须使用实际生产结束时间：直接取最后有量班次结束时间。</p>
      *
      * @param context 排程上下文
      * @param result 排程结果
@@ -613,15 +608,6 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
                                           int endingShiftIndex) {
         if (Objects.isNull(result)) {
             return null;
-        }
-        String machineCode = result.getLhMachineCode();
-        if (Objects.nonNull(context) && context.isStructureMinMachineRetained(machineCode)) {
-            // 结构停产保机机台优先读取冻结的实际生产结束时间，与保机快照保持一致。
-            Date actualEndTime = context.getStructureMinMachineRetentionActualEndTimeMap()
-                    .get(machineCode);
-            if (Objects.nonNull(actualEndTime)) {
-                return actualEndTime;
-            }
         }
         // 普通机台直接取最后有量班次的结束时间，不依赖可能被占用边界后移的specEndTime。
         Date shiftEndTime = endingShiftIndex > 0
@@ -2209,10 +2195,6 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
                         context.getSharedEmbryoEndingStaggerAllowedOverQtyMap()));
         snapshot.setEndingFillAllowedOverQtyMap(
                 new IdentityHashMap<LhScheduleResult, Integer>(context.getEndingFillAllowedOverQtyMap()));
-        // 结构停产保机机台参与均衡后，其冻结的实际生产结束时间快照也会变化，必须一并快照回滚。
-        snapshot.setRetentionActualEndTimeMap(
-                new LinkedHashMap<String, Date>(
-                        context.getStructureMinMachineRetentionActualEndTimeMap()));
         return snapshot;
     }
 
@@ -2274,9 +2256,6 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
                 snapshot.getSharedEmbryoEndingAllowedOverQtyMap());
         context.getEndingFillAllowedOverQtyMap().clear();
         context.getEndingFillAllowedOverQtyMap().putAll(snapshot.getEndingFillAllowedOverQtyMap());
-        context.getStructureMinMachineRetentionActualEndTimeMap().clear();
-        context.getStructureMinMachineRetentionActualEndTimeMap().putAll(
-                snapshot.getRetentionActualEndTimeMap());
     }
 
     /**
@@ -2348,9 +2327,7 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
     /**
      * 均衡调整后同步停产保机机台的占用边界与冻结快照。
      *
-     * <p>结构停产保机：更新冻结的实际生产结束时间快照，并把结果/运行态机台的占用结束
-     * 时间按 max(实际生产结束时间, 统一释放时间) 回延，保机决策本身不重算，后续不同结构
-     * SKU上机拦截仍读取统一释放时间。续作停产保机：恢复“占用延续到窗口末班”的边界语义，
+     * <p>续作停产保机：恢复“占用延续到窗口末班”的边界语义，
      * 与续作主链 {@code extendContinuousStopHoldOccupancyToWindowEnd} 保持同一口径。</p>
      *
      * @param context 排程上下文
@@ -2365,12 +2342,6 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
             return;
         }
         String machineCode = result.getLhMachineCode();
-        if (context.isStructureMinMachineRetained(machineCode)) {
-            // 快照同步必须在 refreshResultSummary 之后、占用边界回延之前执行，
-            // 此时 result.specEndTime 即为实际生产结束时间。
-            structureMinMachineRetentionService.synchronizeRetainedMachineAfterEndingBalance(
-                    context, machineCode, result.getSpecEndTime());
-        }
         if (context.isContinuousStopHoldMachine(machineCode)
                 && Objects.nonNull(result.getDailyPlanQty()) && result.getDailyPlanQty() > 0) {
             // 有量停产保机结果只延长机台/模具占用结束时间，不改变班次计划量。
@@ -2384,7 +2355,7 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
     }
 
     /**
-     * 判断机台是否处于停产保机状态（结构停产保机或续作停产保机）。
+     * 判断机台是否处于续作停产保机状态。
      *
      * @param context 排程上下文
      * @param machineCode 机台编码
@@ -2392,8 +2363,7 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
      */
     private boolean isStopHoldMachine(LhScheduleContext context, String machineCode) {
         return Objects.nonNull(context) && StringUtils.isNotEmpty(machineCode)
-                && (context.isStructureMinMachineRetained(machineCode)
-                || context.isContinuousStopHoldMachine(machineCode));
+                && context.isContinuousStopHoldMachine(machineCode);
     }
 
     /**
@@ -3300,9 +3270,6 @@ class BalanceSnapshot {
     private Map<LhScheduleResult, Integer> endingFillAllowedOverQtyMap =
             new IdentityHashMap<LhScheduleResult, Integer>(4);
 
-    /** 结构停产保机机台冻结的实际生产结束时间快照 */
-    private Map<String, Date> retentionActualEndTimeMap = new LinkedHashMap<String, Date>(4);
-
     public LhScheduleContext getContext() {
         return context;
     }
@@ -3334,14 +3301,6 @@ class BalanceSnapshot {
 
     public void setEndingFillAllowedOverQtyMap(Map<LhScheduleResult, Integer> endingFillAllowedOverQtyMap) {
         this.endingFillAllowedOverQtyMap = endingFillAllowedOverQtyMap;
-    }
-
-    public Map<String, Date> getRetentionActualEndTimeMap() {
-        return retentionActualEndTimeMap;
-    }
-
-    public void setRetentionActualEndTimeMap(Map<String, Date> retentionActualEndTimeMap) {
-        this.retentionActualEndTimeMap = retentionActualEndTimeMap;
     }
 
     public Map<LhScheduleResult, LhScheduleResult> getResultCopyMap() {

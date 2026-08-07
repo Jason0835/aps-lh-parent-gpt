@@ -8,6 +8,7 @@ import com.zlt.aps.lh.api.domain.entity.*;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.enums.SingleControlMachineModeEnum;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
+import com.zlt.aps.lh.component.StructureShiftInMachineIndex;
 import com.zlt.aps.lh.engine.strategy.support.*;
 import com.zlt.aps.lh.handler.SkuMonthPlanCalculator;
 import com.zlt.aps.lh.util.SkuConstructionRefResolverUtil;
@@ -395,9 +396,8 @@ public class LhScheduleContext {
     private Map<String, List<SkuScheduleDTO>> structureSkuMap = new LinkedHashMap<>();
     /**
      * 结构最低机台规则使用的全量结构SKU快照。
-     * <p>该快照在S4.3按现有结构分组一次性冻结，不受后续待排结构视图出队影响；规则不再以
-     * “当前3天内可收尾”为准入条件。S4.4续作和换活字块全部完成后，结构停产保机统一从该快照
-     * 解析结构归属；S4.5选机继续使用同一快照比较待排SKU与保机前物料的结构。</p>
+     * <p>该快照在S4.3按现有结构分组一次性冻结，不受后续待排结构视图出队影响；
+     * 结构收尾对齐规则统一从该快照解析结构归属，并比较待排SKU与候选机台前物料的结构。</p>
      */
     private Map<String, List<SkuScheduleDTO>> structureMinMachineSkuSnapshotMap = new LinkedHashMap<>();
     /**
@@ -405,49 +405,17 @@ public class LhScheduleContext {
      */
     private Map<String, Integer> structureMinVulcanizingMachineMap = new LinkedHashMap<>();
     /**
-     * 尚未完成全部SKU排产的收尾结构临时保护机台，key=运行态机台编码，value=结构名称。
-     * <p>临时保护阻止后续SKU提前选走已占用机台；结构完成后按最终判断清除或转为统一释放时间，
-     * 窗口末班机台数已达到最低值时可提前确认不命中并清除。</p>
-     */
-    private Map<String, String> endingStructureProtectedMachineMap = new LinkedHashMap<>();
-    /**
-     * 已可提前确认不命中最低机台保留规则的结构集合。
-     *
-     * <p>仅当结构当前已有量的最晚班次已经是排程窗口最后一班，且该班有量物理机台数
-     * 已达到最低配置时登记。后续待排SKU只能增加窗口末班机台数，不能把最晚班次继续后移，
-     * 因此这些结构无需继续临时锁住提前收尾机台，避免影响正常换活字块、历史反选和新增选机。</p>
-     */
-    private Set<String> structureMinMachineConfirmedNonRetainedStructureSet = new LinkedHashSet<>();
-    /**
-     * 命中结构最低机台数保留规则的结构名称集合
-     */
-    private Set<String> structureMinMachineRetainedStructureSet = new LinkedHashSet<>();
-    /**
-     * 命中规则后的机台统一释放时间，key=运行态机台编码，value=结构最晚有量班次结束时间
-     */
-    private Map<String, Date> structureMinMachineRetentionEndTimeMap = new LinkedHashMap<>();
-    /**
-     * 结构停产保机机台的前物料编码，key=运行态机台编码。
-     * <p>该快照在S4.4阶段级判断命中时写入，新增选机不得通过机台后续可变的当前物料反推结构，
-     * 必须固定使用真正触发保机的前物料进行同结构放行或不同结构拦截。</p>
-     */
-    private Map<String, String> structureMinMachineRetentionPreMaterialMap = new LinkedHashMap<>();
-    /**
-     * 结构停产保机机台的前物料结构，key=运行态机台编码。
-     * <p>同结构SKU允许在保机零量班次换模或换活字块；不同结构SKU只能在统一释放时间后使用机台。</p>
-     */
-    private Map<String, String> structureMinMachineRetentionPreStructureMap = new LinkedHashMap<>();
-    /**
      * S4.4 共用胎胚收尾均衡可调整物理机台快照，用于过程对账和最终未均衡原因分类。
      * <p>只登记仍满足均衡适用范围的机台，不含非共用胎胚或不足两台组内的机台。</p>
      */
     private Set<String> sharedEmbryoEndingBalanceEligibleMachineCodeSet =
             new LinkedHashSet<String>(8);
     /**
-     * 结构停产保机前物料最后实际生产结束时间，key=运行态机台编码。
-     * <p>同结构接管时以该时间作为最早切换基准，不使用为了保机而顺延后的机台预计结束时间。</p>
+     * 结构收尾对齐在机机台统计缓存（内存态，不落库）。
+     * <p>S4.5新增选机开始前由{@link com.zlt.aps.lh.component.StructureEndingAlignmentService}
+     * 基于续作+换活字块完成后的实时排程结果构建，选机过程中随结果提交增量更新。</p>
      */
-    private Map<String, Date> structureMinMachineRetentionActualEndTimeMap = new LinkedHashMap<>();
+    private StructureShiftInMachineIndex structureShiftInMachineIndex;
     /**
      * 业务日期 -> 产品结构 -> 计划硫化机台数，来源于月计划统计表 dayN.lhMachines
      */
@@ -1203,7 +1171,7 @@ public class LhScheduleContext {
 
     /**
      * 移除指定业务日已登记的已排硫化机台。
-     * <p>用于续作结果被停产保机或释放边界置零后回滚补满登记的结构/SKU机台统计，
+     * <p>用于续作结果被释放边界置零后回滚补满登记的结构/SKU机台统计，
      * 避免后续同结构机台收尾补满被“结构机台数已达标”误拦。</p>
      *
      * @param productionDate 业务日期
@@ -1874,34 +1842,6 @@ public class LhScheduleContext {
             rebuiltStructureSkuMap.computeIfAbsent(sku.getStructureName(), key -> new ArrayList<>()).add(sku);
         }
         structureSkuMap = rebuiltStructureSkuMap;
-    }
-
-    /**
-     * 判断机台是否正被尚未完成排产的三天内收尾结构临时保护。
-     * <p>一旦进入临时保护，任何后续SKU均不得提前选择该机台；待结构全部SKU处理完成后，
-     * 再由最终最低机台数判断决定清除保护或延迟至结构最晚班次结束。若窗口末班生产机台数
-     * 已达到最低值，则提前确认不命中并清除保护，保持原机台释放逻辑。</p>
-     *
-     * @param machineCode 运行态机台编码
-     * @return true-机台处于临时保护，当前SKU不得选择；false-不受临时保护限制
-     */
-    public boolean isEndingStructureProtectedMachine(String machineCode) {
-        if (StringUtils.isEmpty(machineCode) || CollectionUtils.isEmpty(endingStructureProtectedMachineMap)) {
-            return false;
-        }
-        return StringUtils.isNotEmpty(endingStructureProtectedMachineMap.get(machineCode));
-    }
-
-    /**
-     * 判断机台是否已命中结构最低机台数保留规则。
-     *
-     * @param machineCode 运行态机台编码
-     * @return true-命中规则并已登记统一释放时间；false-未命中
-     */
-    public boolean isStructureMinMachineRetained(String machineCode) {
-        return StringUtils.isNotEmpty(machineCode)
-                && !CollectionUtils.isEmpty(structureMinMachineRetentionEndTimeMap)
-                && structureMinMachineRetentionEndTimeMap.containsKey(machineCode);
     }
 
     /**

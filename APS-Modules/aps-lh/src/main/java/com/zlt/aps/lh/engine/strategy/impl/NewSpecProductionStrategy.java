@@ -31,7 +31,8 @@ import com.zlt.aps.lh.component.EarlyProductionQuantityCalculator;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.component.OrderNoGenerator;
 import com.zlt.aps.lh.component.SkuDecrementChecker;
-import com.zlt.aps.lh.component.StructureMinMachineRetentionService;
+import com.zlt.aps.lh.component.StructureEndingAlignmentDecision;
+import com.zlt.aps.lh.component.StructureEndingAlignmentService;
 import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.context.LhScheduleConfig;
 import com.zlt.aps.lh.context.LhScheduleContext;
@@ -206,9 +207,9 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
     private SkuDecrementChecker skuDecrementChecker;
     @Resource
     private LhMaintenanceScheduleService maintenanceScheduleService;
+    /** 结构收尾对齐实时判断入口，新增选机候选校验、命中标识与在机缓存增量更新共用。 */
     @Resource
-    private StructureMinMachineRetentionService structureMinMachineRetentionService =
-            new StructureMinMachineRetentionService();
+    private StructureEndingAlignmentService structureEndingAlignmentService;
     @Resource
     private ITrialProductionStrategy trialProductionStrategy;
     /** 胶囊次数累计与换胶囊班次扣减统一入口 */
@@ -3741,7 +3742,22 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 // 指定机台真正生成有效结果后才登记成功和保护；失败候选不会污染后续普通新增排产。
                 markHistoricalReverseDirectiveSucceeded(
                         context, historicalDirective, sku, result);
+                /*
+                 * 结构收尾对齐实时复核：必须在 updateMachineState 之前判断，
+                 * 此时机台当前物料仍为候选前物料，可正确比较前物料结构与待排SKU结构。
+                 * 命中且同结构放行时写结果行标识、首个生产班次分析与机台运行态标识；
+                 * 结果提交后再增量刷新【结构×班次】在机统计缓存。
+                 */
+                StructureEndingAlignmentDecision structureEndingAlignmentDecision =
+                        structureEndingAlignmentService.evaluateCandidate(
+                                context, sku, candidateMachine);
                 updateMachineState(context, candidateMachine, sku, result);
+                if (structureEndingAlignmentDecision.isTriggered()
+                        && structureEndingAlignmentDecision.isAllowed()) {
+                    structureEndingAlignmentService.markStructureEndingAligned(
+                            candidateMachine, result);
+                }
+                structureEndingAlignmentService.onResultCommitted(context, result);
                 registerMachineAssignment(context, machineCode, result);
                 recordScheduledMachineForResult(context, result, shifts);
                 clearSpecifyReservation(context, machineCode, sku.getMaterialCode());
@@ -3749,7 +3765,17 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                     // 冻结为双模的SKU必须同时写入配对侧，配对侧沿用主侧整组裁剪后的班次数量。
                     context.getScheduleResultList().add(pairResult);
                     context.getScheduleResultSourceSkuMap().put(pairResult, sku);
+                    // 配对侧同样执行结构收尾对齐复核、标识与缓存增量更新。
+                    StructureEndingAlignmentDecision pairStructureEndingAlignmentDecision =
+                            structureEndingAlignmentService.evaluateCandidate(
+                                    context, sku, pairSingleControlMachine);
                     updateMachineState(context, pairSingleControlMachine, sku, pairResult);
+                    if (pairStructureEndingAlignmentDecision.isTriggered()
+                            && pairStructureEndingAlignmentDecision.isAllowed()) {
+                        structureEndingAlignmentService.markStructureEndingAligned(
+                                pairSingleControlMachine, pairResult);
+                    }
+                    structureEndingAlignmentService.onResultCommitted(context, pairResult);
                     registerMachineAssignment(context, pairSingleControlMachine.getMachineCode(), pairResult);
                     recordScheduledMachineForResult(context, pairResult, shifts);
                     clearSpecifyReservation(context, pairSingleControlMachine.getMachineCode(), sku.getMaterialCode());
@@ -5612,11 +5638,11 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 continue;
             }
             /*
-             * 结构停产保机只改变机台可用性，不改变候选顺序：同结构SKU直接放行；
-             * 不同结构SKU在统一保机结束时间覆盖当前业务日时，当前日暂不进入候选。
+             * 结构收尾对齐只改变机台可用性，不改变候选顺序：
+             * 触发时仅同结构放行，不同结构及空机台排除；未触发时保持原选机逻辑。
              */
-            if (structureMinMachineRetentionService.isDifferentStructureRetentionBlocked(
-                    context, sku, candidate.getMachineCode(), dayEndTime)) {
+            if (!structureEndingAlignmentService.evaluateCandidate(
+                    context, sku, candidate).isAllowed()) {
                 continue;
             }
             int availableCapacity = resolveCachedMachineAvailableCapacityInWindow(
@@ -13995,13 +14021,6 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             if (result.getDailyPlanQty() != null && result.getDailyPlanQty() > 0) {
                 continue;
             }
-            if (context.isStructureMinMachineRetained(result.getLhMachineCode())
-                    && StringUtils.equals(result.getMaterialCode(),
-                    context.getStructureMinMachineRetentionPreMaterialMap()
-                            .get(result.getLhMachineCode()))) {
-                // 阶段级保机前物料结果是零量占位载体，必须保留；同机台其他零结果仍按原规则收口。
-                continue;
-            }
             SkuScheduleDTO sku = findSkuDto(
                     context, result.getMaterialCode(), result.getProductStatus());
             invalidateHistoricalReverseResultAfterPostAdjust(context, result);
@@ -14921,15 +14940,6 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                                                  List<LhShiftConfigVO> shifts) {
         Date currentSideEndTime = resolveMachineOccupationEndTime(
                 context, machine, shifts);
-        if (Objects.nonNull(machine)) {
-            /*
-             * 同结构SKU忽略纯保机占位顺延时间，使用前物料最后实际生产结束时间；
-             * 不同结构SKU继续以结构统一释放时间作为不可提前突破的接管边界。
-             */
-            currentSideEndTime =
-                    structureMinMachineRetentionService.resolveRetentionAwareOccupationEndTime(
-                            context, sku, machine.getMachineCode(), currentSideEndTime);
-        }
         if (!LhSingleControlMachineUtil.isWholeMachineGranularitySku(context, sku)
                 || Objects.isNull(machine)
                 || !isSingleControlMachine(context, machine.getMachineCode())) {
@@ -14938,11 +14948,6 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         MachineScheduleDTO pairMachine = LhSingleControlMachineUtil.resolvePairMachine(context, machine.getMachineCode());
         Date pairSideEndTime = resolveMachineOccupationEndTime(
                 context, pairMachine, shifts);
-        if (Objects.nonNull(pairMachine)) {
-            pairSideEndTime =
-                    structureMinMachineRetentionService.resolveRetentionAwareOccupationEndTime(
-                            context, sku, pairMachine.getMachineCode(), pairSideEndTime);
-        }
         return resolveLaterTime(currentSideEndTime, pairSideEndTime);
     }
 
@@ -14983,6 +14988,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         cacheInitialMachineState(context, machine);
         machine.setPreviousMaterialCode(machine.getCurrentMaterialCode());
         machine.setPreviousMaterialDesc(machine.getCurrentMaterialDesc());
+        // 机台切换到新物料时清除旧物料的结构收尾对齐运行态标识，避免污染后续判断与审计。
+        machine.setStructureEndingAligned(false);
         machine.setCurrentMaterialCode(sku.getMaterialCode());
         machine.setCurrentMaterialDesc(sku.getMaterialDesc());
         machine.setPreviousSpecCode(sku.getSpecCode());
@@ -16128,8 +16135,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         }
         return assignedResults.stream()
                 .filter(result -> result != null
-                        && ((result.getDailyPlanQty() != null && result.getDailyPlanQty() > 0)
-                        || context.isStructureMinMachineRetained(result.getLhMachineCode()))
+                        && (result.getDailyPlanQty() != null && result.getDailyPlanQty() > 0)
                         && result.getSpecEndTime() != null)
                 .max(Comparator.comparing(LhScheduleResult::getSpecEndTime))
                 .orElse(null);
@@ -16191,31 +16197,9 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         machine.setPreviousSpecCode(result.getSpecCode());
         machine.setPreviousProSize(sku != null ? sku.getProSize() : null);
         machine.setEstimatedEndTime(result.getSpecEndTime());
-        applyStructureRetentionMachineState(context, machine);
-    }
-
-    /**
-     * 使用结构保机结束时间校正新增机台终态，避免普通结果同步覆盖统一占用时间。
-     *
-     * @param context 排程上下文
-     * @param machine 当前机台
-     */
-    private void applyStructureRetentionMachineState(LhScheduleContext context,
-                                                     MachineScheduleDTO machine) {
-        if (Objects.isNull(context) || Objects.isNull(machine)
-                || StringUtils.isEmpty(machine.getMachineCode())) {
-            return;
-        }
-        Date retentionEndTime = context.getStructureMinMachineRetentionEndTimeMap()
-                .get(machine.getMachineCode());
-        if (Objects.isNull(retentionEndTime)) {
-            return;
-        }
-        if (Objects.isNull(machine.getEstimatedEndTime())
-                || machine.getEstimatedEndTime().before(retentionEndTime)) {
-            machine.setEstimatedEndTime(retentionEndTime);
-        }
-        machine.setEnding(true);
+        // 按结果行标识同步机台运行态的结构收尾对齐标识。
+        machine.setStructureEndingAligned(
+                "1".equals(result.getIsStructureMinMachineRetained()));
     }
 
     /**
@@ -16229,11 +16213,6 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         if (context == null || machine == null || StringUtils.isEmpty(machineCode)) {
             return;
         }
-        if (context.isStructureMinMachineRetained(machineCode)) {
-            // 结构保机已恢复当前SKU物料关系并登记统一结束时间，禁止再用初始快照覆盖占用状态。
-            applyStructureRetentionMachineState(context, machine);
-            return;
-        }
         MachineScheduleDTO initialMachine = context.getInitialMachineScheduleMap().get(machineCode);
         if (initialMachine == null) {
             return;
@@ -16245,5 +16224,6 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         machine.setPreviousSpecCode(initialMachine.getPreviousSpecCode());
         machine.setPreviousProSize(initialMachine.getPreviousProSize());
         machine.setEstimatedEndTime(initialMachine.getEstimatedEndTime());
+        machine.setStructureEndingAligned(false);
     }
 }

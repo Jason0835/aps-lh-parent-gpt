@@ -17,7 +17,6 @@ import com.zlt.aps.lh.api.enums.LhSpecialMaterialCategoryEnum;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
 import com.zlt.aps.lh.api.enums.SkuTagEnum;
 import com.zlt.aps.lh.api.enums.TrialStatusEnum;
-import com.zlt.aps.lh.component.StructureMinMachineRetentionService;
 import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.IMachineMatchStrategy;
@@ -80,11 +79,6 @@ import java.util.stream.Collectors;
 @Slf4j
 @Component
 public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
-
-    /** 结构停产保机机台可接管时间统一解析入口。 */
-    @Resource
-    private StructureMinMachineRetentionService structureMinMachineRetentionService =
-            new StructureMinMachineRetentionService();
 
     /** 精度计划时间轴服务，用于在候选分层前取得机台真实可接续时间。 */
     @Resource
@@ -1336,8 +1330,6 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
             List<String> memberMachineCodes =
                     memberMachineCodeMap.get(candidate.getMachineCode());
             if (!containsAnyMachineCode(memberMachineCodes, occupiedMachineCodes)
-                    || isTraceStructureRetentionBlocked(
-                    context, sku, memberMachineCodes, currentDayEndTime)
                     || !isTraceMemberMachineBasicEligible(context, memberMachineCodes)) {
                 continue;
             }
@@ -1810,31 +1802,6 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
         }
         for (String machineCode : memberMachineCodes) {
             if (occupiedMachineCodes.contains(machineCode)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * 复用停产保机服务校验日志候选的全部物理成员。
-     *
-     * @param context 排程上下文
-     * @param sku 当前 SKU
-     * @param memberMachineCodes 普通机台自身或单控 L/R 两侧
-     * @param currentDayEndTime 当前业务日结束时间
-     * @return true-至少一个成员被结构停产保机约束阻止
-     */
-    private boolean isTraceStructureRetentionBlocked(
-            LhScheduleContext context,
-            SkuScheduleDTO sku,
-            List<String> memberMachineCodes,
-            Date currentDayEndTime) {
-        Date effectiveDayEndTime = Objects.nonNull(currentDayEndTime)
-                ? currentDayEndTime : resolveScheduleWindowEndTime(context);
-        for (String machineCode : memberMachineCodes) {
-            if (structureMinMachineRetentionService.isDifferentStructureRetentionBlocked(
-                    context, sku, machineCode, effectiveDayEndTime)) {
                 return true;
             }
         }
@@ -2441,16 +2408,6 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
             candidateReferenceTime = Objects.nonNull(context.getScheduleDate())
                     ? context.getScheduleDate() : context.getScheduleTargetDate();
         }
-        /*
-         * 首日无计划释放等既有路径可能给出更早的候选起点；命中结构保留后必须统一取结构最晚班次
-         * 结束时间的较晚值，确保机台只在占位结束后进入后续换模或新增排产时间轴。
-         */
-        Date retentionEndTime = Objects.nonNull(machine)
-                ? context.getStructureMinMachineRetentionEndTimeMap().get(machine.getMachineCode()) : null;
-        if (Objects.nonNull(retentionEndTime)
-                && (Objects.isNull(candidateReferenceTime) || retentionEndTime.after(candidateReferenceTime))) {
-            candidateReferenceTime = retentionEndTime;
-        }
         return candidateReferenceTime;
     }
 
@@ -2544,40 +2501,14 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
                 && isSingleControlMachine(context, machine.getMachineCode())
                 && LhSingleControlMachineUtil.isWholeMachineGranularitySku(context, sku)) {
             MachineScheduleDTO pairMachine = LhSingleControlMachineUtil.resolvePairMachine(context, machine.getMachineCode());
-            Date currentSideReferenceTime = resolveRetentionAwareAlignedReferenceTime(
-                    context, sku, machine);
-            Date pairSideReferenceTime = resolveRetentionAwareAlignedReferenceTime(
-                    context, sku, pairMachine);
+            Date currentSideReferenceTime = resolveAlignedCandidateReferenceTime(
+                    context, machine);
+            Date pairSideReferenceTime = resolveAlignedCandidateReferenceTime(
+                    context, pairMachine);
             // 正规SKU按整机占用单控机台，最早换模起点必须等L/R两边都释放。
             return resolveLaterTime(currentSideReferenceTime, pairSideReferenceTime);
         }
-        return resolveRetentionAwareAlignedReferenceTime(context, sku, machine);
-    }
-
-    /**
-     * 解析结构停产保机约束下的候选参考时间。
-     *
-     * <p>保持现有候选排序器和排序键不变，只替换机台可用时间来源：同结构使用前物料最后实际
-     * 生产时间，不同结构不得早于结构统一释放时间。</p>
-     *
-     * @param context 排程上下文
-     * @param sku 当前待排SKU
-     * @param machine 候选机台
-     * @return 与排程窗口首班对齐后的参考时间
-     */
-    private Date resolveRetentionAwareAlignedReferenceTime(
-            LhScheduleContext context,
-            SkuScheduleDTO sku,
-            MachineScheduleDTO machine) {
-        if (Objects.isNull(machine)) {
-            return null;
-        }
-        Date normalReferenceTime = resolveCandidateReferenceTime(context, machine);
-        Date retentionAwareReferenceTime =
-                structureMinMachineRetentionService.resolveRetentionAwareOccupationEndTime(
-                        context, sku, machine.getMachineCode(), normalReferenceTime);
-        return alignCandidateReferenceTimeToWindowStart(
-                context, retentionAwareReferenceTime);
+        return resolveAlignedCandidateReferenceTime(context, machine);
     }
 
     /**
