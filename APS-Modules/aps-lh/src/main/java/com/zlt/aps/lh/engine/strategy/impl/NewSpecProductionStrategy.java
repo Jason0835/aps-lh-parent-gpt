@@ -2936,7 +2936,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                     // B 迁移及普通新增继续调用原换模分配器，晚班禁换模、20:00 后顺延和换模上限保持不变。
                     mouldChangeStartTime = allocateNewSpecMouldChangeStartTime(
                             context, sku, machineCode, switchReadyTime, switchDurationHours,
-                            mouldChangeBalance, dayContext.getCurrentPhase(), isTypeBlockRelation);
+                            mouldChangeBalance, dayContext.getCurrentPhase(), isTypeBlockRelation,
+                            dayContext.getDayEndTime());
                 boolean historicalMouldChangeInMappedShift =
                         isHistoricalReverseMouldChangeInMappedShift(
                                 context, historicalDirective, mouldChangeStartTime);
@@ -14574,7 +14575,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                                                      int switchDurationHours,
                                                      IMouldChangeBalanceStrategy mouldChangeBalance,
                                                      DailySchedulePhase phase,
-                                                     boolean isTypeBlock) {
+                                                     boolean isTypeBlock,
+                                                     Date businessDayEndTime) {
         if (isChangeoverBalanceEnabled(context)) {
             String actionType;
             if (isTypeBlock) {
@@ -14588,7 +14590,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             }
             return mouldChangeBalance.allocateMouldChange(
                     context, machineCode, switchReadyTime, switchDurationHours,
-                    sku, actionType);
+                    sku, actionType, businessDayEndTime);
         }
         return allocateBasicMouldChangeStartTime(context, machineCode, switchReadyTime, switchDurationHours);
     }

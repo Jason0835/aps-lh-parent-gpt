@@ -17,6 +17,7 @@ import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
 import com.zlt.aps.lh.api.enums.SkuTagEnum;
 import com.zlt.aps.lh.component.CapsuleReplacementRuleService;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
+import com.zlt.aps.lh.component.StructureMinMachineRetentionService;
 import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.IEmbryoEndingBalanceStrategy;
@@ -57,6 +58,11 @@ import java.util.Set;
  * <ul>
  *   <li>只处理运行态共用胎胚，且同胎胚组当前仍有两台及以上可调整续作收尾机台；</li>
  *   <li>按日期升序、早班后中班检查班次次数，只有超过早8/中7参考上限或日15硬上限风险时才调整；</li>
+ *   <li>可调整对象按业务优先级选择：同物料（物料编码+产品状态）多机台第一优先级，
+ *       三种收尾类型（胎胚收尾/余量收尾/按时间下机）均参与；共用胎胚组第二优先级，
+ *       组间按机台数量降序、胎胚编码升序，组内按机台编码升序；</li>
+ *   <li>结构停产保机与续作停产保机机台仍参与收尾均衡，保机只拦截后续不同结构SKU上机，
+ *       不影响当前收尾时间与换模次数均衡；调整后同步保机冻结快照和占用边界；</li>
  *   <li>同一SKU多机台与同一胎胚多SKU统一纳入全局预演，候选始终按机台编码升序；</li>
  *   <li>胎胚收尾以组级胎胚库存账本为唯一硬约束，
  *       允许同组跨物料互转尾量，互转成功后通过 SKU 内部额度重分配落地归属；</li>
@@ -119,6 +125,9 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
 
     @Resource
     private TargetScheduleQtyResolver targetScheduleQtyResolver;
+
+    @Resource
+    private StructureMinMachineRetentionService structureMinMachineRetentionService;
 
     @Resource
     private CapsuleReplacementRuleService capsuleReplacementRuleService = new CapsuleReplacementRuleService();
@@ -218,8 +227,10 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
 
     /**
      * 收集续作收尾均衡候选机台。
-     * <p>排除：非续作结果、换活字块结果、零计划结果、结构停产保机机台、
-     * 同物料多产品状态续作切换结果。候选保留结果行的收尾班次、收尾班次计划量和来源SKU。</p>
+     * <p>排除：非续作结果、换活字块结果、零计划结果、同物料多产品状态续作切换结果。
+     * 候选保留结果行的收尾班次、收尾班次计划量和来源SKU。</p>
+     * <p>结构停产保机与续作停产保机机台不再排除：保机仅拦截后续不同结构SKU上机，
+     * 不影响该机台参与当前收尾时间与换模次数均衡。</p>
      *
      * @param context 排程上下文
      * @param candidateList 候选结果列表
@@ -292,7 +303,8 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
 
     /**
      * 重新收集当前仍可调整的共用胎胚多机台组。
-     * <p>先复用统一候选判断排除保机、零量等不产生可统计收尾事件的结果，再按胎胚编码预分组。
+     * <p>先复用统一候选判断排除零量等不产生可统计收尾事件的结果，再按胎胚编码预分组；
+     * 停产保机机台只要仍有正量收尾班次，同样进入候选。
      * 运行态非共用胎胚或不足两台的组只进入固定计数，不进入调整集合。该方法在首轮和每次
      * 成功提交后调用，保证收尾类型、SKU额度、固定计数和分组判断始终来自最新排程结果。</p>
      *
@@ -331,6 +343,16 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
                 adjustableResultList.addAll(groupResultList);
             }
         }
+        // 登记本轮仍满足均衡适用范围的物理机台快照（单控整机按物理机台去重），
+        // 供过程对账和最终未均衡原因分类使用。
+        for (LhScheduleResult adjustableResult : adjustableResultList) {
+            if (Objects.nonNull(adjustableResult)
+                    && StringUtils.isNotEmpty(adjustableResult.getLhMachineCode())) {
+                context.getSharedEmbryoEndingBalanceEligibleMachineCodeSet()
+                        .add(LhSingleControlMachineUtil.resolvePhysicalMachineCode(
+                                adjustableResult.getLhMachineCode()));
+            }
+        }
         Set<LhScheduleResult> adjustableResultSet =
                 Collections.newSetFromMap(new IdentityHashMap<LhScheduleResult, Boolean>(
                         Math.max(1, adjustableResultList.size())));
@@ -345,9 +367,9 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
 
     /**
      * 将不可调整的续作收尾事件预演到统计基线。
-     * <p>结构保机结果在统一候选入口已经排除，不产生新的后物料切换；非共用胎胚、
-     * 共用胎胚单机台组等结果虽然不能搬量，仍须按项目现有预演口径占用一次
-     * 换模/换活字块次数，保证可调整组看到的是完整的早/中/日负荷。</p>
+     * <p>非共用胎胚、共用胎胚单机台组等结果虽然不能搬量，仍须按项目现有预演口径占用一次
+     * 换模/换活字块次数，保证可调整组看到的是完整的早/中/日负荷。
+     * 停产保机机台即使未进入调整组，也按实际生产结束时间参与固定计数。</p>
      *
      * @param context 排程上下文
      * @param fixedCountResultList 不可调整但需要计数的结果
@@ -370,11 +392,15 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
         sortedFixedResultList.sort(Comparator.comparing(
                 result -> StringUtils.defaultString(result.getLhMachineCode())));
         for (LhScheduleResult result : sortedFixedResultList) {
-            if (Objects.isNull(result.getSpecEndTime())) {
+            int endingShiftIndex = ShiftFieldUtil.resolveLastPlannedShiftIndex(result);
+            // 固定计数使用实际生产结束时间，避免停产保机机台被占用边界（统一释放时间/窗口末班）后移的结束时间
+            // 把后物料换模错误预测到窗口末班之后。
+            Date endingTime = this.resolveBalanceEndingTime(context, result, endingShiftIndex);
+            if (Objects.isNull(endingTime)) {
                 continue;
             }
             this.mouldChangeBalanceStrategy.previewEndingStaggerMouldChange(
-                    context, result.getLhMachineCode(), result.getSpecEndTime(),
+                    context, result.getLhMachineCode(), endingTime,
                     LhScheduleTimeUtil.getMouldChangeTotalHours(context),
                     sourceSkuMap.get(result), fixedSimulationCountMap);
         }
@@ -433,14 +459,11 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
                 || StringUtils.isEmpty(result.getLhMachineCode())) {
             return false;
         }
-        // 结构停产保机结果保持原样，不参与收尾均衡。
-        if (context.isStructureMinMachineRetained(result.getLhMachineCode())) {
-            return false;
-        }
-        // 停产保机零产量/占用结果保持原样，不参与收尾均衡。
-        if (context.isContinuousStopHoldMachine(result.getLhMachineCode())) {
-            return false;
-        }
+        /*
+         * 结构停产保机与续作停产保机机台必须参与收尾均衡：保机只影响后续不同结构SKU
+         * 能否上机，不影响该机台当前收尾时间和换模次数的均衡调整。零计划量占位结果
+         * 仍由下方正量检查自然排除。
+         */
         // 同物料多产品状态续作切换保持专用链精确尾量，不参与收尾均衡。
         if (isSameMaterialMultiStatusSwitchResult(result)) {
             return false;
@@ -574,6 +597,39 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
     }
 
     /**
+     * 解析均衡预演使用的真实生产收尾时间。
+     *
+     * <p>停产保机机台的 {@code specEndTime} 可能已被占用边界后移（结构保机统一释放时间、
+     * 续作停产保机窗口末班占用），换模/换活字块预演必须使用实际生产结束时间：
+     * 结构保机优先取冻结的实际生产结束时间快照，否则取最后有量班次结束时间。</p>
+     *
+     * @param context 排程上下文
+     * @param result 排程结果
+     * @param endingShiftIndex 最后有量班次序号
+     * @return 实际生产结束时间；无法解析时返回null
+     */
+    private Date resolveBalanceEndingTime(LhScheduleContext context,
+                                          LhScheduleResult result,
+                                          int endingShiftIndex) {
+        if (Objects.isNull(result)) {
+            return null;
+        }
+        String machineCode = result.getLhMachineCode();
+        if (Objects.nonNull(context) && context.isStructureMinMachineRetained(machineCode)) {
+            // 结构停产保机机台优先读取冻结的实际生产结束时间，与保机快照保持一致。
+            Date actualEndTime = context.getStructureMinMachineRetentionActualEndTimeMap()
+                    .get(machineCode);
+            if (Objects.nonNull(actualEndTime)) {
+                return actualEndTime;
+            }
+        }
+        // 普通机台直接取最后有量班次的结束时间，不依赖可能被占用边界后移的specEndTime。
+        Date shiftEndTime = endingShiftIndex > 0
+                ? ShiftFieldUtil.getShiftEndTime(result, endingShiftIndex) : null;
+        return Objects.nonNull(shiftEndTime) ? shiftEndTime : result.getSpecEndTime();
+    }
+
+    /**
      * 按胎胚编码对候选机台分组。
      *
      * @param candidateList 候选结果列表
@@ -633,6 +689,8 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
                     context, affectedResultSet, pairResultMap);
             boolean applied = executeMove(context, shifts, move, state);
             if (!applied) {
+                this.appendRejectedMoveProcessLog(context, shifts, move, state, null,
+                        "执行失败：班次产能、其他SKU占用、降模边界、胶囊或单控配对校验未通过");
                 restoreGroupState(snapshot);
                 continue;
             }
@@ -640,19 +698,39 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
                     context, shifts, new ArrayList<LhScheduleResult>(state.getSourceSkuMap().keySet()),
                     state.getSourceSkuMap(), state.getEndingTypeMap(), pairResultMap,
                     baseSimulationCountMap);
-            if (compareScore(nextState, state) < 0
-                    && this.isOverflowBucketImproved(state, nextState, overflowBucket)
-                    && this.doesNotCreateNewShiftOverflow(context, state, nextState)
-                    && this.isCrossDayProductionCompleted(context, state, nextState, move)) {
-                // 评分严格变优后才落地跨物料互转的SKU额度重分配，避免失败尝试污染账本。
-                if (!commitMoveQuotaChanges(context, move, state)) {
-                    restoreGroupState(snapshot);
-                    continue;
-                }
-                appendMoveProcessLog(context, shifts, move, state, nextState);
-                return move;
+            if (compareScore(nextState, state) >= 0) {
+                this.appendRejectedMoveProcessLog(context, shifts, move, state, nextState,
+                        "评分未严格变优（目标班次次数未下降或产生其他超限）");
+                restoreGroupState(snapshot);
+                continue;
             }
-            restoreGroupState(snapshot);
+            if (!this.isOverflowBucketImproved(state, nextState, overflowBucket)) {
+                this.appendRejectedMoveProcessLog(context, shifts, move, state, nextState,
+                        "目标班次次数没有下降");
+                restoreGroupState(snapshot);
+                continue;
+            }
+            if (!this.doesNotCreateNewShiftOverflow(context, state, nextState)) {
+                this.appendRejectedMoveProcessLog(context, shifts, move, state, nextState,
+                        "制造另一班次超限");
+                restoreGroupState(snapshot);
+                continue;
+            }
+            if (!this.isCrossDayProductionCompleted(context, state, nextState, move)) {
+                this.appendRejectedMoveProcessLog(context, shifts, move, state, nextState,
+                        "跨天未连续生产到目标06:00");
+                restoreGroupState(snapshot);
+                continue;
+            }
+            // 评分严格变优后才落地跨物料互转的SKU额度重分配，避免失败尝试污染账本。
+            if (!commitMoveQuotaChanges(context, move, state)) {
+                this.appendRejectedMoveProcessLog(context, shifts, move, state, nextState,
+                        "总量/额度账本不守恒");
+                restoreGroupState(snapshot);
+                continue;
+            }
+            appendMoveProcessLog(context, shifts, move, state, nextState);
+            return move;
         }
         return null;
     }
@@ -903,7 +981,8 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
             if (Objects.isNull(endingShift)) {
                 continue;
             }
-            Date endingTime = result.getSpecEndTime();
+            // 停产保机机台的specEndTime可能已被占用边界后移，预演统一使用实际生产结束时间。
+            Date endingTime = this.resolveBalanceEndingTime(context, result, endingShiftIndex);
             if (Objects.isNull(endingTime)) {
                 endingTime = endingShift.getShiftEndDateTime();
             }
@@ -1031,6 +1110,9 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
 
     /**
      * 构建候选移动列表，顺序：尾量分摊 -> 后延补量 -> 提前减量，组内按机台编码升序。
+     * <p>对象优先级：同物料多机台（第一优先级）优先于共用胎胚组（第二优先级）；
+     * 共用胎胚组间按机台数量降序、胎胚编码升序；同一对象组内按机台编码升序，
+     * 同一机台再按 分摊->补量->减量 尝试，承接机台编码作为最后稳定键。</p>
      *
      * @param context 排程上下文
      * @param shifts 排程窗口班次
@@ -1048,11 +1130,23 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
         buildPostponeMoves(context, shifts, state, sortedResults, moveList);
         buildAdvanceMoves(context, shifts, state, sortedResults, moveList);
         /*
-         * 业务规则要求候选机台全局按编码升序，不能因为分摊/补量/减量三类候选
-         * 分别构建而让后面编码的分摊机台抢在前面编码的补量机台之前。
+         * 每轮从当前可调整候选重算同物料多机台分组和共用胎胚组排行，保证对象优先级
+         * 不依赖集合原始遍历顺序：
+         * 阶段（同物料多机台=0，共用胎胚组=1）-> 对象组排行 -> 组内机台编码升序 ->
+         * 同一机台的移动类型顺序（分摊<补量<减量）-> 承接机台编码升序。
          */
+        Map<LhScheduleResult, String> sameMaterialGroupKeyMap =
+                this.resolveSameMaterialGroupKeyMap(state.getSourceSkuMap());
+        Map<String, Integer> embryoRankMap =
+                this.resolveEmbryoGroupRankMap(state.getSourceSkuMap());
         moveList.sort(Comparator
-                .comparing((EmbryoEndingBalanceMove move) ->
+                .comparingInt((EmbryoEndingBalanceMove move) ->
+                        this.resolveMovePhase(move, sameMaterialGroupKeyMap))
+                .thenComparingInt(move -> this.resolveMoveGroupRank(
+                        move, sameMaterialGroupKeyMap, state.getSourceSkuMap(), embryoRankMap))
+                .thenComparing(move -> this.resolveMoveGroupKey(
+                        move, sameMaterialGroupKeyMap, state.getSourceSkuMap()))
+                .thenComparing(move ->
                         StringUtils.defaultString(move.getDonor().getLhMachineCode()))
                 .thenComparingInt(move -> this.resolveMoveTypeOrder(move.getMoveType()))
                 .thenComparing(move -> Objects.isNull(move.getReceiver()) ? ""
@@ -1074,6 +1168,142 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
             return 1;
         }
         return 2;
+    }
+
+    /**
+     * 计算当前可调整候选中的同物料多机台分组键。
+     *
+     * <p>同物料口径为“物料编码+产品状态”（即SKU）。同一SKU存在两台及以上可调整
+     * 收尾机台时，组内所有机台进入第一优先级，且不因收尾类型（胎胚收尾/余量收尾/
+     * 按时间下机）不同而排除。</p>
+     *
+     * @param sourceSkuMap 当前可调整结果到来源SKU的映射
+     * @return 结果到同物料分组键（SKU key）的映射；不在同物料多机台组中的结果不包含
+     */
+    private Map<LhScheduleResult, String> resolveSameMaterialGroupKeyMap(
+            Map<LhScheduleResult, SkuScheduleDTO> sourceSkuMap) {
+        Map<LhScheduleResult, String> groupKeyMap =
+                new IdentityHashMap<LhScheduleResult, String>(16);
+        if (CollectionUtils.isEmpty(sourceSkuMap)) {
+            return groupKeyMap;
+        }
+        Map<String, Integer> skuMachineCountMap = new LinkedHashMap<String, Integer>(8);
+        for (SkuScheduleDTO sourceSku : sourceSkuMap.values()) {
+            if (Objects.isNull(sourceSku)) {
+                continue;
+            }
+            skuMachineCountMap.merge(this.resolveSkuKey(sourceSku), 1, Integer::sum);
+        }
+        for (Map.Entry<LhScheduleResult, SkuScheduleDTO> entry : sourceSkuMap.entrySet()) {
+            SkuScheduleDTO sourceSku = entry.getValue();
+            String skuKey = Objects.isNull(sourceSku) ? null : this.resolveSkuKey(sourceSku);
+            if (Objects.nonNull(skuKey)
+                    && skuMachineCountMap.getOrDefault(skuKey, 0) >= MIN_GROUP_MACHINE_COUNT) {
+                groupKeyMap.put(entry.getKey(), skuKey);
+            }
+        }
+        return groupKeyMap;
+    }
+
+    /**
+     * 计算共用胎胚组的优先级排行：机台数量降序，数量相同时胎胚编码升序。
+     *
+     * @param sourceSkuMap 当前可调整结果到来源SKU的映射
+     * @return 胎胚编码到优先级序号（0最高）的映射
+     */
+    private Map<String, Integer> resolveEmbryoGroupRankMap(
+            Map<LhScheduleResult, SkuScheduleDTO> sourceSkuMap) {
+        Map<String, Integer> machineCountMap = new LinkedHashMap<String, Integer>(8);
+        if (CollectionUtils.isEmpty(sourceSkuMap)) {
+            return machineCountMap;
+        }
+        for (SkuScheduleDTO sourceSku : sourceSkuMap.values()) {
+            if (Objects.isNull(sourceSku) || StringUtils.isEmpty(sourceSku.getEmbryoCode())) {
+                continue;
+            }
+            machineCountMap.merge(sourceSku.getEmbryoCode(), 1, Integer::sum);
+        }
+        List<String> embryoCodeList = new ArrayList<String>(machineCountMap.keySet());
+        embryoCodeList.sort(Comparator
+                .comparingInt((String embryoCode) -> machineCountMap.getOrDefault(embryoCode, 0))
+                .reversed()
+                .thenComparing(String::compareTo));
+        Map<String, Integer> rankMap = new LinkedHashMap<String, Integer>(embryoCodeList.size());
+        for (int rank = 0; rank < embryoCodeList.size(); rank++) {
+            rankMap.put(embryoCodeList.get(rank), rank);
+        }
+        return rankMap;
+    }
+
+    /**
+     * 解析移动所属的对象优先级阶段。
+     *
+     * <p>阶段0：同物料多机台移动（同SKU尾量分摊、同物料组内机台的补量/减量）；
+     * 阶段1：共用胎胚组移动（跨SKU胎胚收尾互转、非同物料组机台的补量/减量）。
+     * 同物料多机台必须优先于共用胎胚补量、减量、分摊。</p>
+     *
+     * @param move 候选移动
+     * @param sameMaterialGroupKeyMap 同物料多机台分组键映射
+     * @return 0-同物料多机台；1-共用胎胚组
+     */
+    private int resolveMovePhase(EmbryoEndingBalanceMove move,
+                                 Map<LhScheduleResult, String> sameMaterialGroupKeyMap) {
+        if (Objects.isNull(move) || Objects.isNull(move.getDonor())) {
+            return 1;
+        }
+        if (MOVE_TYPE_TRANSFER.equals(move.getMoveType())) {
+            // 同SKU分摊属于同物料多机台；跨SKU胎胚收尾互转属于共用胎胚组。
+            String donorSkuKey = sameMaterialGroupKeyMap.get(move.getDonor());
+            if (Objects.nonNull(move.getReceiver()) && StringUtils.isNotEmpty(donorSkuKey)
+                    && StringUtils.equals(donorSkuKey,
+                    sameMaterialGroupKeyMap.get(move.getReceiver()))) {
+                return 0;
+            }
+            return 1;
+        }
+        // 后延补量/提前减量：机台本身属于同物料多机台组时进入第一优先级。
+        return sameMaterialGroupKeyMap.containsKey(move.getDonor()) ? 0 : 1;
+    }
+
+    /**
+     * 解析移动所属对象组的优先级序号。
+     *
+     * @param move 候选移动
+     * @param sameMaterialGroupKeyMap 同物料多机台分组键映射
+     * @param sourceSkuMap 当前可调整结果到来源SKU的映射
+     * @param embryoRankMap 共用胎胚组优先级序号映射
+     * @return 同物料组固定为0；共用胎胚组返回组排行（0最高）
+     */
+    private int resolveMoveGroupRank(EmbryoEndingBalanceMove move,
+                                     Map<LhScheduleResult, String> sameMaterialGroupKeyMap,
+                                     Map<LhScheduleResult, SkuScheduleDTO> sourceSkuMap,
+                                     Map<String, Integer> embryoRankMap) {
+        if (this.resolveMovePhase(move, sameMaterialGroupKeyMap) == 0) {
+            return 0;
+        }
+        SkuScheduleDTO sourceSku = sourceSkuMap.get(move.getDonor());
+        String embryoCode = Objects.isNull(sourceSku) ? null : sourceSku.getEmbryoCode();
+        return Objects.isNull(embryoCode) ? Integer.MAX_VALUE
+                : embryoRankMap.getOrDefault(embryoCode, Integer.MAX_VALUE);
+    }
+
+    /**
+     * 解析移动所属对象组的组内稳定键。
+     *
+     * @param move 候选移动
+     * @param sameMaterialGroupKeyMap 同物料多机台分组键映射
+     * @param sourceSkuMap 当前可调整结果到来源SKU的映射
+     * @return 同物料组返回SKU key；共用胎胚组返回胎胚编码
+     */
+    private String resolveMoveGroupKey(EmbryoEndingBalanceMove move,
+                                       Map<LhScheduleResult, String> sameMaterialGroupKeyMap,
+                                       Map<LhScheduleResult, SkuScheduleDTO> sourceSkuMap) {
+        if (this.resolveMovePhase(move, sameMaterialGroupKeyMap) == 0) {
+            return sameMaterialGroupKeyMap.get(move.getDonor());
+        }
+        SkuScheduleDTO sourceSku = sourceSkuMap.get(move.getDonor());
+        return Objects.isNull(sourceSku) ? ""
+                : StringUtils.defaultString(sourceSku.getEmbryoCode());
     }
 
     /**
@@ -1403,15 +1633,19 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
             return false;
         }
         refreshResultSummary(context, donor, shifts);
+        syncStopHoldBoundaryAfterBalance(context, donor, shifts);
         refreshResultSummary(context, receiver, shifts);
+        syncStopHoldBoundaryAfterBalance(context, receiver, shifts);
         syncMachineEstimatedEndTime(context, donor);
         syncMachineEstimatedEndTime(context, receiver);
         if (donorPairUnit) {
             refreshResultSummary(context, donorPair, shifts);
+            syncStopHoldBoundaryAfterBalance(context, donorPair, shifts);
             syncMachineEstimatedEndTime(context, donorPair);
         }
         if (receiverPairUnit) {
             refreshResultSummary(context, receiverPair, shifts);
+            syncStopHoldBoundaryAfterBalance(context, receiverPair, shifts);
             syncMachineEstimatedEndTime(context, receiverPair);
         }
         // 记录实际落地的组级互转量，供提交阶段重分配SKU内部额度。
@@ -1628,9 +1862,11 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
                     pairResult, actualAddQty, Integer::sum);
         }
         refreshResultSummary(context, result, shifts);
+        syncStopHoldBoundaryAfterBalance(context, result, shifts);
         syncMachineEstimatedEndTime(context, result);
         if (pairUnit) {
             refreshResultSummary(context, pairResult, shifts);
+            syncStopHoldBoundaryAfterBalance(context, pairResult, shifts);
             syncMachineEstimatedEndTime(context, pairResult);
         }
         move.setAppliedQty(actualAddQty * (pairUnit ? 2 : 1));
@@ -1750,6 +1986,7 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
         }
         context.getSharedEmbryoEndingStaggerAllowedOverQtyMap().merge(
                 result, totalAddedPerSideQty, Integer::sum);
+        this.syncStopHoldBoundaryAfterBalance(context, result, shifts);
         this.syncMachineEstimatedEndTime(context, result);
         if (pairUnit) {
             this.refreshResultSummary(context, pairResult, shifts);
@@ -1758,6 +1995,7 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
             }
             context.getSharedEmbryoEndingStaggerAllowedOverQtyMap().merge(
                     pairResult, totalAddedPerSideQty, Integer::sum);
+            this.syncStopHoldBoundaryAfterBalance(context, pairResult, shifts);
             this.syncMachineEstimatedEndTime(context, pairResult);
         }
         move.setAppliedQty(totalAddedPerSideQty * (pairUnit ? 2 : 1));
@@ -1893,9 +2131,11 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
             }
         }
         refreshResultSummary(context, result, shifts);
+        syncStopHoldBoundaryAfterBalance(context, result, shifts);
         syncMachineEstimatedEndTime(context, result);
         if (pairUnit) {
             refreshResultSummary(context, pairResult, shifts);
+            syncStopHoldBoundaryAfterBalance(context, pairResult, shifts);
             syncMachineEstimatedEndTime(context, pairResult);
         }
         move.setAppliedQty(currentQty * (pairUnit ? 2 : 1));
@@ -1969,6 +2209,10 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
                         context.getSharedEmbryoEndingStaggerAllowedOverQtyMap()));
         snapshot.setEndingFillAllowedOverQtyMap(
                 new IdentityHashMap<LhScheduleResult, Integer>(context.getEndingFillAllowedOverQtyMap()));
+        // 结构停产保机机台参与均衡后，其冻结的实际生产结束时间快照也会变化，必须一并快照回滚。
+        snapshot.setRetentionActualEndTimeMap(
+                new LinkedHashMap<String, Date>(
+                        context.getStructureMinMachineRetentionActualEndTimeMap()));
         return snapshot;
     }
 
@@ -2030,6 +2274,9 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
                 snapshot.getSharedEmbryoEndingAllowedOverQtyMap());
         context.getEndingFillAllowedOverQtyMap().clear();
         context.getEndingFillAllowedOverQtyMap().putAll(snapshot.getEndingFillAllowedOverQtyMap());
+        context.getStructureMinMachineRetentionActualEndTimeMap().clear();
+        context.getStructureMinMachineRetentionActualEndTimeMap().putAll(
+                snapshot.getRetentionActualEndTimeMap());
     }
 
     /**
@@ -2097,6 +2344,57 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
         if (Objects.nonNull(machine)) {
             machine.setEstimatedEndTime(result.getSpecEndTime());
         }
+    }
+
+    /**
+     * 均衡调整后同步停产保机机台的占用边界与冻结快照。
+     *
+     * <p>结构停产保机：更新冻结的实际生产结束时间快照，并把结果/运行态机台的占用结束
+     * 时间按 max(实际生产结束时间, 统一释放时间) 回延，保机决策本身不重算，后续不同结构
+     * SKU上机拦截仍读取统一释放时间。续作停产保机：恢复“占用延续到窗口末班”的边界语义，
+     * 与续作主链 {@code extendContinuousStopHoldOccupancyToWindowEnd} 保持同一口径。</p>
+     *
+     * @param context 排程上下文
+     * @param result 刚被均衡调整的结果
+     * @param shifts 排程窗口班次
+     */
+    private void syncStopHoldBoundaryAfterBalance(LhScheduleContext context,
+                                                  LhScheduleResult result,
+                                                  List<LhShiftConfigVO> shifts) {
+        if (Objects.isNull(context) || Objects.isNull(result)
+                || StringUtils.isEmpty(result.getLhMachineCode())) {
+            return;
+        }
+        String machineCode = result.getLhMachineCode();
+        if (context.isStructureMinMachineRetained(machineCode)) {
+            // 快照同步必须在 refreshResultSummary 之后、占用边界回延之前执行，
+            // 此时 result.specEndTime 即为实际生产结束时间。
+            structureMinMachineRetentionService.synchronizeRetainedMachineAfterEndingBalance(
+                    context, machineCode, result.getSpecEndTime());
+        }
+        if (context.isContinuousStopHoldMachine(machineCode)
+                && Objects.nonNull(result.getDailyPlanQty()) && result.getDailyPlanQty() > 0) {
+            // 有量停产保机结果只延长机台/模具占用结束时间，不改变班次计划量。
+            Date occupiedEndTime = CollectionUtils.isEmpty(shifts)
+                    ? context.getWindowEndDate() : shifts.get(shifts.size() - 1).getShiftEndDateTime();
+            if (Objects.nonNull(occupiedEndTime)) {
+                result.setSpecEndTime(occupiedEndTime);
+                result.setTdaySpecEndTime(occupiedEndTime);
+            }
+        }
+    }
+
+    /**
+     * 判断机台是否处于停产保机状态（结构停产保机或续作停产保机）。
+     *
+     * @param context 排程上下文
+     * @param machineCode 机台编码
+     * @return true-处于停产保机；false-未处于停产保机
+     */
+    private boolean isStopHoldMachine(LhScheduleContext context, String machineCode) {
+        return Objects.nonNull(context) && StringUtils.isNotEmpty(machineCode)
+                && (context.isStructureMinMachineRetained(machineCode)
+                || context.isContinuousStopHoldMachine(machineCode));
     }
 
     /**
@@ -2601,7 +2899,8 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
                 .append(", 转出机台=").append(donor.getLhMachineCode())
                 .append(", 转出物料=").append(donor.getMaterialCode())
                 .append(", 转出收尾类型=").append(beforeState.getEndingTypeMap().get(donor))
-                .append(", 是否停产保机=false")
+                .append(", 是否停产保机=").append(
+                        this.isStopHoldMachine(context, donor.getLhMachineCode()))
                 .append(", 转出调整前=[班次").append(beforeState.getEndingShiftMap().get(donor))
                 .append("=").append(beforeState.getEndingQtyMap().get(donor))
                 .append(", 收尾时间=").append(LhScheduleTimeUtil.formatDateTime(
@@ -2613,6 +2912,8 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
             detail.append(", 承接机台=").append(receiver.getLhMachineCode())
                     .append(", 承接物料=").append(receiver.getMaterialCode())
                     .append(", 承接收尾类型=").append(beforeState.getEndingTypeMap().get(receiver))
+                    .append(", 承接是否停产保机=").append(
+                            this.isStopHoldMachine(context, receiver.getLhMachineCode()))
                     .append(", 承接调整前=[班次").append(beforeState.getEndingShiftMap().get(receiver))
                     .append("=").append(beforeState.getEndingQtyMap().get(receiver))
                     .append(", 收尾时间=").append(LhScheduleTimeUtil.formatDateTime(
@@ -2631,6 +2932,68 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
                 .append(", 调整后预测换模分布=").append(buildStateSummary(context, afterState));
         PriorityTraceLogHelper.appendProcessLog(context, "共用胎胚收尾均衡", detail.toString());
         log.info("共用胎胚收尾均衡移动提交, {}", detail);
+    }
+
+    /**
+     * 追加候选被拒绝并完整回滚的过程日志。
+     *
+     * <p>按 spec 要求逐台记录日期、班次、胎胚、SKU、机台、收尾类型、是否停产保机、
+     * 尝试策略、承接机台、调整前后收尾信息、调整前后早/中/日次数和具体拒绝原因。
+     * 失败候选已完整恢复快照，不会残留班次备注。</p>
+     *
+     * @param context 排程上下文
+     * @param shifts 排程窗口班次
+     * @param move 被拒绝的移动
+     * @param beforeState 调整前状态
+     * @param afterState 调整后状态；执行阶段失败时为null
+     * @param rejectReason 具体拒绝原因
+     */
+    private void appendRejectedMoveProcessLog(LhScheduleContext context,
+                                              List<LhShiftConfigVO> shifts,
+                                              EmbryoEndingBalanceMove move,
+                                              EmbryoEndingBalanceState beforeState,
+                                              EmbryoEndingBalanceState afterState,
+                                              String rejectReason) {
+        if (Objects.isNull(context) || Objects.isNull(move) || Objects.isNull(move.getDonor())) {
+            return;
+        }
+        LhScheduleResult donor = move.getDonor();
+        SkuScheduleDTO donorSku = beforeState.getSourceSkuMap().get(donor);
+        StringBuilder detail = new StringBuilder(256);
+        detail.append("scheduleDate=").append(context.getScheduleDate())
+                .append(", embryoCode=").append(
+                        Objects.isNull(donorSku) ? null : donorSku.getEmbryoCode())
+                .append(", materialCode=").append(donor.getMaterialCode())
+                .append(", 机台=").append(donor.getLhMachineCode())
+                .append(", 收尾类型=").append(beforeState.getEndingTypeMap().get(donor))
+                .append(", 是否停产保机=").append(
+                        this.isStopHoldMachine(context, donor.getLhMachineCode()))
+                .append(", 尝试策略=").append(move.isCrossDay()
+                        ? MOVE_TYPE_POSTPONE + "（跨天）" : move.getMoveType())
+                .append(", 承接机台=").append(Objects.isNull(move.getReceiver()) ? "无"
+                        : move.getReceiver().getLhMachineCode())
+                .append(", 调整前=[班次").append(beforeState.getEndingShiftMap().get(donor))
+                .append("=").append(beforeState.getEndingQtyMap().get(donor))
+                .append(", 收尾时间=").append(LhScheduleTimeUtil.formatDateTime(
+                        beforeState.getEndingTimeMap().get(donor)))
+                .append(", 预测换模=").append(formatDateTimeSafe(
+                        beforeState.getChangeTimeMap().get(donor))).append("]")
+                .append(", 调整前换模分布=").append(
+                        this.buildCountSummary(beforeState.getSimulatedCountMap()));
+        if (Objects.nonNull(afterState)) {
+            detail.append(", 调整后=[班次").append(afterState.getEndingShiftMap().get(donor))
+                    .append("=").append(afterState.getEndingQtyMap().get(donor))
+                    .append(", 收尾时间=").append(LhScheduleTimeUtil.formatDateTime(
+                            afterState.getEndingTimeMap().get(donor)))
+                    .append(", 预测换模=").append(formatDateTimeSafe(
+                            afterState.getChangeTimeMap().get(donor))).append("]")
+                    .append(", 调整后换模分布=").append(
+                            this.buildCountSummary(afterState.getSimulatedCountMap()));
+        }
+        detail.append(", 结果=已拒绝并回滚")
+                .append(", 原因=").append(StringUtils.defaultString(rejectReason));
+        PriorityTraceLogHelper.appendProcessLog(context, "共用胎胚收尾均衡候选拒绝", detail.toString());
+        log.info("共用胎胚收尾均衡候选拒绝, {}", detail);
     }
 
     /**
@@ -2938,6 +3301,9 @@ class BalanceSnapshot {
     private Map<LhScheduleResult, Integer> endingFillAllowedOverQtyMap =
             new IdentityHashMap<LhScheduleResult, Integer>(4);
 
+    /** 结构停产保机机台冻结的实际生产结束时间快照 */
+    private Map<String, Date> retentionActualEndTimeMap = new LinkedHashMap<String, Date>(4);
+
     public LhScheduleContext getContext() {
         return context;
     }
@@ -2969,6 +3335,14 @@ class BalanceSnapshot {
 
     public void setEndingFillAllowedOverQtyMap(Map<LhScheduleResult, Integer> endingFillAllowedOverQtyMap) {
         this.endingFillAllowedOverQtyMap = endingFillAllowedOverQtyMap;
+    }
+
+    public Map<String, Date> getRetentionActualEndTimeMap() {
+        return retentionActualEndTimeMap;
+    }
+
+    public void setRetentionActualEndTimeMap(Map<String, Date> retentionActualEndTimeMap) {
+        this.retentionActualEndTimeMap = retentionActualEndTimeMap;
     }
 
     public Map<LhScheduleResult, LhScheduleResult> getResultCopyMap() {

@@ -438,6 +438,12 @@ public class LhScheduleContext {
      */
     private Map<String, String> structureMinMachineRetentionPreStructureMap = new LinkedHashMap<>();
     /**
+     * S4.4 共用胎胚收尾均衡可调整物理机台快照，用于过程对账和最终未均衡原因分类。
+     * <p>只登记仍满足均衡适用范围的机台，不含非共用胎胚或不足两台组内的机台。</p>
+     */
+    private Set<String> sharedEmbryoEndingBalanceEligibleMachineCodeSet =
+            new LinkedHashSet<String>(8);
+    /**
      * 结构停产保机前物料最后实际生产结束时间，key=运行态机台编码。
      * <p>同结构接管时以该时间作为最早切换基准，不使用为了保机而顺延后的机台预计结束时间。</p>
      */
@@ -1896,6 +1902,15 @@ public class LhScheduleContext {
         return StringUtils.isNotEmpty(machineCode)
                 && !CollectionUtils.isEmpty(structureMinMachineRetentionEndTimeMap)
                 && structureMinMachineRetentionEndTimeMap.containsKey(machineCode);
+    }
+
+    /**
+     * 获取S4.4共用胎胚收尾均衡可调整物理机台快照。
+     *
+     * @return 可调整物理机台编码集合（单控整机已按物理机台去重）
+     */
+    public Set<String> getSharedEmbryoEndingBalanceEligibleMachineCodeSet() {
+        return sharedEmbryoEndingBalanceEligibleMachineCodeSet;
     }
 
     /**

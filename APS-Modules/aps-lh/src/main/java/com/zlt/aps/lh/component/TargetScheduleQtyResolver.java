@@ -82,6 +82,9 @@ public class TargetScheduleQtyResolver {
     @Resource
     private IMouldChangeBalanceStrategy mouldChangeBalanceStrategy;
 
+    @Resource
+    private StructureMinMachineRetentionService structureMinMachineRetentionService;
+
     /**
      * 解析 SKU 的初始目标排产量。
      * <p>非满排模式（按需求排产）：目标量 = 待排量；窗口总量封顶交由日计划账本消费链路约束。</p>
@@ -2209,6 +2212,15 @@ public class TargetScheduleQtyResolver {
         }
         int mouldQty = ShiftCapacityResolverUtil.resolveMachineMouldQty(machine);
         Date machineAvailableTime = machine.getEstimatedEndTime();
+        /*
+         * 结构停产保机机台必须与选机参考时间、实际落机起点保持同一口径：
+         * 同结构SKU按前物料最后实际生产结束时间接产，不同结构SKU按保机统一释放时间接产，
+         * 避免同结构SKU把停产保机机台误算为窗口内0产能（如 K1913 对 3302002343）。
+         */
+        if (Objects.nonNull(machineAvailableTime)) {
+            machineAvailableTime = structureMinMachineRetentionService.resolveRetentionAwareOccupationEndTime(
+                    context, sku, machine.getMachineCode(), machineAvailableTime);
+        }
         Date windowStartTime = shifts.get(0).getShiftStartDateTime();
         Date cursorStartTime = machineAvailableTime != null && machineAvailableTime.after(windowStartTime)
                 ? machineAvailableTime : windowStartTime;

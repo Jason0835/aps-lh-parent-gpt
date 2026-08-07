@@ -1064,7 +1064,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
          * 结构停产保机必须先于共用胎胚收尾均衡执行。判断位于续作全部普通数量修改完成后，
          * 但仍处于日计划账本一次性扣减之前，因此保机结论可以读取真实续作尾量，均衡也不会
          * 形成扣账后的二次搬量。该服务是主链必需依赖，不允许因接线缺失而跳过，
-         * 否则停产保机机台可能被均衡错误改量。
+         * 否则保机机台冻结状态缺失会导致均衡后的快照同步无法执行。
          */
         this.structureMinMachineRetentionService
                 .applyRetentionAfterContinuousBeforeEndingBalance(context);
@@ -1076,7 +1076,10 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
          *    重新归属到接收方SKU内部额度，组级胎胚库存账本仍按互转后的结果全量扣减；
          * 3. 按时间下机后延补量登记到 sharedEmbryoEndingStaggerAllowedOverQtyMap，供严格收口
          *    和账本裁剪放行，避免补量被SKU普通额度回裁；
-         * 4. 只做模拟换模计数和过程日志，不预占真实换模次数，后续换活字块和新增排产仍通过主链登记。
+         * 4. 同物料多机台优先于共用胎胚组，共用胎胚组按机台数降序、胎胚编码升序；
+         * 5. 停产保机机台仍参与均衡，调整后通过 StructureMinMachineRetentionService
+         *    同步冻结快照与占用边界；
+         * 6. 只做模拟换模计数和过程日志，不预占真实换模次数，后续换活字块和新增排产仍通过主链登记。
          */
         this.embryoEndingBalanceStrategy.balanceSharedEmbryoEnding(context, shifts);
         // 均衡后按“严格目标量+允许超量”口径做最终收口，只回裁真实超量，不回裁均衡豁免量。

@@ -178,7 +178,9 @@ public class StructureMinMachineRetentionService {
      * 新增排产必须通过这些快照判断同结构放行或不同结构拦截，禁止读取已变化的机台当前物料。</p>
      *
      * <p>本方法一旦命中保机，会冻结机台前物料、前结构、最后实际生产时间和统一释放时间。
-     * 后续共用胎胚均衡只允许读取这些状态并排除命中机台；换活字块、新增排产只能调用
+     * 后续共用胎胚收尾均衡允许调整保机机台的收尾时间与班次量，但必须通过
+     * {@link #synchronizeRetainedMachineAfterEndingBalance(LhScheduleContext, String, Date)}
+     * 同步冻结的实际生产结束时间快照和占用边界；换活字块、新增排产只能调用
      * {@link #synchronizeRetainedState(LhScheduleContext)} 同步接管结果，不得重新执行本判断。</p>
      *
      * @param context 排程上下文
@@ -315,10 +317,42 @@ public class StructureMinMachineRetentionService {
             if (Objects.nonNull(normalEndTime) && normalEndTime.after(retentionEndTime)) {
                 return normalEndTime;
             }
+            /*
+             * 机台仍处于停产保机占位（当前物料仍是保机前物料）时，才允许同结构SKU按保机前
+             * 实际生产收尾时间接产；若已被本窗口内其它同结构SKU接管，必须按真实占用结束时间
+             * 继续排产，避免同一机台多个物料班次重叠（如 K1913 被 3302002343 接管后，
+             * 3302000193 又按保机前 07:08 提前开产）。
+             */
+            if (!isRetainedPlaceholderMachine(context, machineCode)) {
+                return normalEndTime;
+            }
             return Objects.nonNull(actualEndTime) ? actualEndTime : normalEndTime;
         }
         return Objects.isNull(normalEndTime) || normalEndTime.before(retentionEndTime)
                 ? retentionEndTime : normalEndTime;
+    }
+
+    /**
+     * 判断机台当前是否仍处于结构停产保机占位状态。
+     *
+     * <p>停产保机登记时会把机台当前物料回写为保机前物料；一旦同结构SKU在窗口内接管该机台，
+     * 机台当前物料会切换为接管SKU，此时机台已进入正常生产，不能再按保机前实际收尾时间提前接产。</p>
+     *
+     * @param context 排程上下文
+     * @param machineCode 机台编码
+     * @return true-机台仍处于停产保机占位；false-已被接管或状态缺失
+     */
+    private boolean isRetainedPlaceholderMachine(LhScheduleContext context, String machineCode) {
+        if (Objects.isNull(context) || StringUtils.isEmpty(machineCode)) {
+            return false;
+        }
+        String preMaterial = context.getStructureMinMachineRetentionPreMaterialMap().get(machineCode);
+        if (StringUtils.isEmpty(preMaterial)) {
+            return false;
+        }
+        MachineScheduleDTO machine = context.getMachineScheduleMap().get(machineCode);
+        return Objects.nonNull(machine)
+                && StringUtils.equals(preMaterial, machine.getCurrentMaterialCode());
     }
 
     /**
@@ -709,6 +743,50 @@ public class StructureMinMachineRetentionService {
                 delayMachineRelease(context, result.getLhMachineCode(), retentionEndTime);
             }
         }
+    }
+
+    /**
+     * 共用胎胚收尾均衡调整后，同步单台结构停产保机机台的冻结快照与占用边界。
+     *
+     * <p>停产保机机台参与收尾均衡后，其收尾班次量和实际生产结束时间可能变化。
+     * 本方法只更新冻结的“实际生产结束时间”，并把保机机台结果与运行态机台的占用
+     * 结束时间按 max(实际生产结束时间, 统一释放时间) 回延（复用既有
+     * {@code delayResultRelease}/{@code delayMachineRelease} 只延后不回裁语义）。
+     * 保机决策本身不重算，前物料、前结构和统一释放时间快照不变，
+     * 后续不同结构SKU上机拦截仍读取统一释放时间。</p>
+     *
+     * @param context 排程上下文
+     * @param machineCode 结构停产保机机台编码
+     * @param actualEndTime 均衡调整后的实际生产结束时间
+     */
+    public void synchronizeRetainedMachineAfterEndingBalance(LhScheduleContext context,
+                                                             String machineCode,
+                                                             Date actualEndTime) {
+        if (Objects.isNull(context) || StringUtils.isEmpty(machineCode)
+                || Objects.isNull(actualEndTime)
+                || !context.isStructureMinMachineRetained(machineCode)) {
+            return;
+        }
+        Date retentionEndTime = context.getStructureMinMachineRetentionEndTimeMap()
+                .get(machineCode);
+        if (Objects.isNull(retentionEndTime)) {
+            return;
+        }
+        // 更新冻结的实际生产结束时间，供同结构接管与不同结构拦截读取调整后的真实时间轴。
+        context.getStructureMinMachineRetentionActualEndTimeMap()
+                .put(machineCode, actualEndTime);
+        String retainedMaterial = context.getStructureMinMachineRetentionPreMaterialMap()
+                .get(machineCode);
+        // 只回延保机前物料对应的结果行，避免把后续同结构接管结果也错误回延。
+        for (LhScheduleResult result : context.getScheduleResultList()) {
+            if (Objects.isNull(result)
+                    || !StringUtils.equals(machineCode, result.getLhMachineCode())
+                    || !StringUtils.equals(retainedMaterial, result.getMaterialCode())) {
+                continue;
+            }
+            delayResultRelease(result, retentionEndTime);
+        }
+        delayMachineRelease(context, machineCode, retentionEndTime);
     }
 
     /**
