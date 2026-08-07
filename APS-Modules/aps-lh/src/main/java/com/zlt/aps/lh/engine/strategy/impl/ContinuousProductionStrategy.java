@@ -11730,7 +11730,6 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             return 0;
         }
         ShiftFieldUtil.syncDailyPlanQty(result);
-        result.setTotalDailyPlanQty(result.getDailyPlanQty());
         ShiftFieldUtil.clearUnplannedShiftCureFormulaFields(result);
         int lastShiftIndex = ShiftFieldUtil.applyLastPlannedShiftEndMark(result, false);
         Date lastEndTime = lastShiftIndex > 0
