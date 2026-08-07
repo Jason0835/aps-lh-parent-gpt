@@ -220,6 +220,35 @@ public class BaseDataContainer implements Serializable {
     }
 
     /**
+     * 获取Sku对应的模壳标准信息
+     *
+     * @param materialDesc 物料描述
+     * @param mainPattern  主花纹
+     * @return
+     */
+    public String getSkuShellStandardByMainPattern(String materialDesc, String mainPattern) {
+        if (StringUtils.isBlank(mainPattern) || StringUtils.isBlank(materialDesc)) {
+            return StringUtils.EMPTY;
+        }
+        if (CollectionUtils.isEmpty(skuMouldRelationMap)) {
+            return StringUtils.EMPTY;
+        }
+        List<MonthPlanProductMouldInfoVo> allUsedMoldList = skuMouldRelationMap.get(materialDesc);
+        if (CollectionUtils.isEmpty(allUsedMoldList)) {
+            return StringUtils.EMPTY;
+        }
+        List<MonthPlanProductMouldInfoVo> mainPatternUsedList = allUsedMoldList.stream().filter(singleMold -> mainPattern.equals(singleMold.getMainPattern())).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(mainPatternUsedList)) {
+            return StringUtils.EMPTY;
+        }
+        Set<String> shellStandardSet = mainPatternUsedList.stream().map(MonthPlanProductMouldInfoVo::getShellStandard).collect(Collectors.toSet());
+        if (CollectionUtils.isEmpty(shellStandardSet)) {
+            return StringUtils.EMPTY;
+        }
+        return String.join(StringConstant.COMMA, shellStandardSet);
+    }
+
+    /**
      * 获取Sku当前已排产量
      *
      * @param materialDesc Sku物料描述
