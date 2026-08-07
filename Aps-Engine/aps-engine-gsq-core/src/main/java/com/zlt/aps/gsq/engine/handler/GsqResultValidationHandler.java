@@ -11,6 +11,7 @@ import javax.annotation.Resource;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * S6: 钢丝圈结果校验与持久化Handler。
@@ -56,18 +57,37 @@ public class GsqResultValidationHandler extends AbsGsqScheduleStepHandler {
         gsqEngineMapper.syncGsqScheduleToLog(context.getScheduleDate());
         gsqEngineMapper.deleteGsqSchedule(context.getScheduleDate());
 
-        // 4. 批量插入新排程记录
+        // 4. 批量插入新排程记录（过滤掉6班次计划量全为0的规格，无需排产不入库）
         String username = SecurityUtils.getUsername();
         Date now = new Date();
-        scheduleList.forEach(vo -> {
+        List<GsqScheduleResultVo> toInsert = scheduleList.stream()
+                .filter(this::hasAnyPlanQty)
+                .collect(Collectors.toList());
+        toInsert.forEach(vo -> {
             vo.setUpdateBy(username);
             vo.setUpdateTime(now);
         });
 
-        gsqEngineMapper.batchCreateScheduleResult(scheduleList);
-        context.setInsertedCount(scheduleList.size());
+        gsqEngineMapper.batchCreateScheduleResult(toInsert);
+        context.setInsertedCount(toInsert.size());
 
-        log.info("[S6] 排程结果持久化完成, 插入记录数: {}", scheduleList.size());
+        log.info("[S6] 排程结果持久化完成, 插入记录数: {}", toInsert.size());
+    }
+
+    /**
+     * 判断该规格6个班次是否至少有一个班次有计划量（无计划量则无需排产，不入库）。
+     *
+     * @param vo 排程结果记录
+     * @return true=存在计划量，false=6班次全为0
+     */
+    private boolean hasAnyPlanQty(GsqScheduleResultVo vo) {
+        for (int classIndex = 1; classIndex <= 6; classIndex++) {
+            Double planQty = getShiftPlan(vo, classIndex);
+            if (planQty != null && planQty > 0) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

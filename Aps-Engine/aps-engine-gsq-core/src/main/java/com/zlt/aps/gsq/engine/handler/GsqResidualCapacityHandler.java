@@ -154,40 +154,57 @@ public class GsqResidualCapacityHandler extends AbsGsqScheduleStepHandler {
             }
 
             boolean isBackupSpec = spec.getBackupTriggerClass() != null && spec.getBackupTriggerClass() > 0;
-            double backupRemaining = spec.getBackupRemainingQty() == null ? 0D : spec.getBackupRemainingQty();
             // 回填量在分支内赋值，此处统一声明，供分支外埋点使用
             double assignQty = 0D;
 
             if (isBackupSpec) {
-                // 备库规格：受 backupRemainingQty 限制（剩余备库量才能回填）
-                if (backupRemaining <= 0) {
-                    continue;
-                }
-                // 总量上限保护：6班已排产量已达到备库总量时不再回填
-                double totalScheduled = sumClassPlanQty(spec);
-                double backupTotal = getBackupTargetQty(spec);
-                if (totalScheduled >= backupTotal) {
-                    continue;
-                }
                 // 备库触发班次 > 当前班次时，当前班次库存充足不需要排产，不回填
                 Integer backupTriggerClass = spec.getBackupTriggerClass();
                 if (backupTriggerClass != null && backupTriggerClass > classNum) {
                     continue;
                 }
-                // 回填量不超过备库总量与已排产量的差值，防止超排
-                double maxAssignable = BigDecimalUtil.sub(backupTotal, totalScheduled);
-                assignQty = Math.min(Math.min(residualCapacity, backupRemaining), maxAssignable);
-                assignQty = applyRoundingIfNeeded(assignQty);
+                // 备库规格：窗口内重排——更早窗口班次优先吃满剩余产能，从更晚窗口班次前拉，总量守恒。
+                // 仅允许在备库窗口 [triggerClass, windowEnd] 内前拉，绝不动窗口外常规续供班次。
+                int windowEnd = getBackupWindowEnd(spec);
+                double windowScheduled = sumBackupWindowPlan(spec, backupTriggerClass);
+                double backupTarget = getBackupTargetQty(spec);
+                double remainToBackup = BigDecimalUtil.sub(backupTarget, windowScheduled);
+                // 当前班之后（窗口内更晚班次）已排量，是当前班可前拉的来源
+                double laterWindowScheduled = sumWindowRangePlan(spec, classNum + 1, windowEnd);
+                // 【临时诊断】定位备库回填未吃满剩余产能的原因
+                log.info("[S5.6备库诊断] 钢丝圈:{} 触发班:{} 备库班数:{} 备库目标:{} 窗口已排:{} 缺口:{} 后续窗口已排:{} 当前班:{} 剩余产能:{} 分配量:{} | 各班计划 1={} 2={} 3={} 4={} 5={} 6={}",
+                        spec.getSteelRingCode(), backupTriggerClass, spec.getBackupShiftCount(),
+                        backupTarget, windowScheduled, remainToBackup, laterWindowScheduled,
+                        classNum, residualCapacity,
+                        Math.min(residualCapacity, BigDecimalUtil.add(laterWindowScheduled, Math.max(0, remainToBackup))),
+                        getClassPlanQty(spec, 1), getClassPlanQty(spec, 2), getClassPlanQty(spec, 3),
+                        getClassPlanQty(spec, 4), getClassPlanQty(spec, 5), getClassPlanQty(spec, 6));
+                // 可增量 = min(剩余产能, 后续窗口已排 + 当前窗口缺口)，用剩余产能把更早班次填满
+                double maxPull = BigDecimalUtil.add(laterWindowScheduled, Math.max(0, remainToBackup));
+                if (maxPull <= 0) {
+                    continue;
+                }
+                double assignable = Math.min(residualCapacity, maxPull);
+                assignQty = applyRoundingIfNeeded(assignable);
                 if (assignQty <= 0) {
                     continue;
                 }
+                // 回填当前班
                 addClassPlanQty(spec, classNum, assignQty);
-                spec.setBackupRemainingQty(BigDecimalUtil.sub(backupRemaining, assignQty));
+                // 超出"补缺口"部分需从更晚窗口班次等量前拉，保证窗口内总量 = 备库目标（不超排）
+                double pullFromLater = BigDecimalUtil.sub(assignQty, Math.max(0, remainToBackup));
+                if (pullFromLater > 0) {
+                    deductFromLaterWindowClasses(spec, classNum + 1, windowEnd, pullFromLater);
+                }
+                // 更新剩余备库量 = 备库目标 - 重排后窗口已排
+                double newWindowScheduled = sumBackupWindowPlan(spec, backupTriggerClass);
+                spec.setBackupRemainingQty(Math.max(0, BigDecimalUtil.sub(backupTarget, newWindowScheduled)));
 
                 autoScheduleLogService.insertGsqScheduleLog(spec.getBatchNo(), spec.getOrderNo(),
                         "S5.6-剩余产能回填备库钢丝圈",
                         "钢丝圈代码：" + spec.getSteelRingCode() + "，机台：" + machineCode
                                 + "，" + classNum + "班回填" + assignQty
+                                + "，前拉" + pullFromLater
                                 + "，剩余备库量：" + spec.getBackupRemainingQty());
             } else {
                 // 非备库规格：仅当该班次已有排产量时才回填（避免随意新增班次排产）
@@ -332,6 +349,97 @@ public class GsqResidualCapacityHandler extends AbsGsqScheduleStepHandler {
     }
 
     /**
+     * 统计备库窗口内所有班次的计划量之和。
+     *
+     * <p>用于重算剩余备库量：仅统计备库窗口内已排量，不包含窗口外常规续供班次，
+     * 避免把常规续供量误算进备库剩余量。</p>
+     *
+     * @param spec         排程记录
+     * @param triggerClass 备库触发班次
+     * @return 备库窗口内计划量之和
+     */
+    private double sumBackupWindowPlan(GsqScheduleResultVo spec, Integer triggerClass) {
+        int windowEnd = 6;
+        Integer shiftCount = spec.getBackupShiftCount();
+        if (triggerClass != null && shiftCount != null && shiftCount > 0) {
+            windowEnd = triggerClass + shiftCount - 1;
+        }
+        int start = triggerClass == null ? 1 : triggerClass;
+        double sum = 0D;
+        for (int c = start; c <= windowEnd; c++) {
+            sum = BigDecimalUtil.add(sum, getClassPlanQty(spec, c));
+        }
+        return sum;
+    }
+
+    /**
+     * 计算备库窗口末班：触发班 ~ 触发班+备库班数-1，用于限定备库量只在窗口内重排。
+     *
+     * @param spec 排程记录
+     * @return 备库窗口末班（1~6）
+     */
+    private int getBackupWindowEnd(GsqScheduleResultVo spec) {
+        Integer triggerClass = spec.getBackupTriggerClass();
+        Integer shiftCount = spec.getBackupShiftCount();
+        if (triggerClass != null && shiftCount != null && shiftCount > 0) {
+            return Math.min(6, triggerClass + shiftCount - 1);
+        }
+        return 6;
+    }
+
+    /**
+     * 统计指定班次区间 [start, end] 内该规格的计划量之和（用于计算窗口内更晚班次已排量）。
+     *
+     * @param spec  排程记录
+     * @param start 起始班次
+     * @param end   结束班次
+     * @return 区间内计划量之和
+     */
+    private double sumWindowRangePlan(GsqScheduleResultVo spec, int start, int end) {
+        double sum = 0D;
+        for (int c = Math.max(1, start); c <= Math.min(6, end); c++) {
+            sum = BigDecimalUtil.add(sum, getClassPlanQty(spec, c));
+        }
+        return sum;
+    }
+
+    /**
+     * 从更晚窗口班次（从 windowEnd 往前）等量扣减指定量，实现"前拉"重排。
+     *
+     * <p>仅对备库窗口 [startClass, windowEnd] 内的班次扣减，绝不触碰窗口外常规续供班次。
+     * 用于把更早窗口班次的剩余产能前拉到位的同时，保持窗口内总量=备库目标。</p>
+     *
+     * @param spec       排程记录
+     * @param startClass 扣减起始班次（当前班+1）
+     * @param windowEnd  窗口末班
+     * @param amount     需扣减总量
+     */
+    private void deductFromLaterWindowClasses(GsqScheduleResultVo spec, int startClass, int windowEnd, double amount) {
+        double remaining = amount;
+        for (int c = windowEnd; c >= startClass && remaining > 0; c--) {
+            double plan = getClassPlanQty(spec, c);
+            if (plan <= 0) {
+                continue;
+            }
+            double deduct = Math.min(plan, remaining);
+            setClassPlanQtyDirect(spec, c, BigDecimalUtil.sub(plan, deduct));
+            remaining = BigDecimalUtil.sub(remaining, deduct);
+        }
+    }
+
+    /**
+     * 获取胎圈指定班次的消耗量（tqClass1~7）。钢丝圈 c 班供应胎圈 c+1 班。
+     *
+     * @param vo         排程记录
+     * @param tqClassNum 胎圈班次（1~7）
+     * @return 胎圈班次消耗量（null 视为 0）
+     */
+    private double getTqPlan(GsqScheduleResultVo vo, int tqClassNum) {
+        Object value = vo.getFieldValueByFieldName("tqClass" + tqClassNum + "Plan");
+        return value == null ? 0D : ((Number) value).doubleValue();
+    }
+
+    /**
      * 简单取整处理（避免浮点精度问题，保留2位小数）。
      */
     private double applyRoundingIfNeeded(double value) {
@@ -418,10 +526,10 @@ public class GsqResidualCapacityHandler extends AbsGsqScheduleStepHandler {
                 continue;
             }
 
-            // 计算6班实际已排产量合计
-            double actualTotalPlanQty = sumClassPlanQty(scheduleVo);
+            // 计算备库窗口内已排产量合计（不包含窗口外常规续供班次，避免把常规量误算进备库剩余量）
+            double actualTotalPlanQty = sumBackupWindowPlan(scheduleVo, scheduleVo.getBackupTriggerClass());
 
-            // 重算剩余备库量 = 备库分摊后的实际总量 - 已排产量
+            // 重算剩余备库量 = 备库分摊后的实际总量 - 备库窗口内已排产量
             // 使用 backupAllocatedQty（S3 机台精确重算的分摊量）而非理论 backupTotalQty，
             // 避免库存为负时把规格回填超排到理论胎圈消耗量
             double newRemaining = BigDecimalUtil.sub(getBackupTargetQty(scheduleVo), actualTotalPlanQty);
@@ -480,6 +588,17 @@ public class GsqResidualCapacityHandler extends AbsGsqScheduleStepHandler {
             Double capLimit = scheduleVo.getBackupAllocatedQty();
             if (capLimit == null || capLimit <= 0) {
                 capLimit = backupTotalQty;
+            }
+
+            // 备库窗口之后仍有胎圈生产消耗（常规续供班次），总量上限必须包含这部分常规量，
+            // 否则会从第6班往前把后续常规班次清零，导致"只排备库N班、后续不再排产"。
+            // 备库窗口 = GSQ triggerClass ~ (triggerClass + backupShiftCount - 1) 班（供应胎圈 +1~+N 班）
+            Integer triggerClass = scheduleVo.getBackupTriggerClass();
+            Integer backupShiftCount = scheduleVo.getBackupShiftCount();
+            if (triggerClass != null && backupShiftCount != null && backupShiftCount > 0) {
+                for (int classNum = triggerClass + backupShiftCount; classNum <= 6; classNum++) {
+                    capLimit = BigDecimalUtil.add(capLimit, getTqPlan(scheduleVo, classNum + 1));
+                }
             }
 
             double totalScheduled = sumClassPlanQty(scheduleVo);
