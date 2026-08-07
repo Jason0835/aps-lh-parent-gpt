@@ -56,16 +56,15 @@
             <groupId>com.ruoyi</groupId>
             <artifactId>ruoyi-common-log</artifactId>
         </dependency>
-        <!-- 钢带压延 -->
-        <dependency>
-            <groupId>com.zlt.aps.gdyy</groupId>
-            <artifactId>aps-gdyy</artifactId>
-            <version>1.0.3-SNAPSHOT</version>
-        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.zlt.aps</groupId>
+            <artifactId>aps-base</artifactId>
         </dependency>
     </dependencies>
 
