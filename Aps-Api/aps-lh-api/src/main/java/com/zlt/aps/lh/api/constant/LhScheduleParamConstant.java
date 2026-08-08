@@ -146,8 +146,6 @@ public final class LhScheduleParamConstant {
     public static final String ENABLE_FULL_CAPACITY_SCHEDULING = "SYS0304005";
     /** 满排模式是否按余量命中收尾规则2 */
     public static final String ENABLE_ENDING_BY_SURPLUS_IN_FULL_MODE = "SYS0304006";
-    /** 是否强制重排（0-否，1-是） */
-    public static final String FORCE_RESCHEDULE = "SYS0304007";
     /** MES在机信息往前追溯天数 */
     public static final String MACHINE_ONLINE_LOOKBACK_DAYS = "SYS0304008";
     /** 停机超时阈值（小时） */

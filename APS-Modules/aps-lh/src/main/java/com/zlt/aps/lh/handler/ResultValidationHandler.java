@@ -55,7 +55,7 @@ import java.util.stream.Collectors;
  * <p>主要职责：</p>
  * <ul>
  *   <li>对 S4.4/S4.5 生成的排程结果做必填字段、数量口径和换模约束校验；</li>
- *   <li>根据换模结果、滚动继承状态和清洗计划生成模具交替计划；</li>
+ *   <li>根据换模结果和清洗计划生成模具交替计划；</li>
  *   <li>补全工单号、排程顺序、汇总日志和日计划滚动账本日志；</li>
  *   <li>执行硫化示方历史班次保护，防止已执行班次被重排结果覆盖；</li>
  *   <li>委托持久化服务以事务方式替换目标日结果，并发布排程完成事件。</li>
@@ -1090,7 +1090,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
         }
         /*
          * 调用保存前模具时间轴强校验。置换协调器和各排产主链虽然都会维护模具占用账本，
-         * 但最终结果仍必须独立验证，禁止历史在机快照或滚动继承把同一实体模具并发落到不同机台。
+         * 但最终结果仍必须独立验证，禁止历史在机快照把同一实体模具并发落到不同机台。
          */
         validateConcurrentMouldOccupation(context);
         // 双模 SKU 的 L/R 已在新增、续作及换活字块链路按物理组同步生成。
@@ -1866,7 +1866,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
      * 生成模具交替计划。
      * <p>
      * 收集排程结果中换模的机台，生成对应的模具交替计划记录。<br/>
-     * 计划顺序按机台和真实换模开始时间稳定排序，滚动继承结果不重复生成换模计划。
+     * 计划顺序按机台和真实换模开始时间稳定排序。
      * </p>
      *
      * @param context 排程上下文
@@ -1874,8 +1874,6 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
     private void generateMouldChangePlan(LhScheduleContext context) {
         List<LhScheduleResult> changeResults = context.getScheduleResultList().stream()
                 .filter(r -> "1".equals(r.getIsChangeMould())
-                        // 继承结果的换模信息已在滚动衔接中处理，跳过避免重复生成
-                        && !r.isRollingInherited()
                         && r.getDailyPlanQty() != null
                         && r.getDailyPlanQty() > 0)
                 .sorted(Comparator.comparing(LhScheduleResult::getLhMachineCode, Comparator.nullsLast(String::compareTo))
@@ -1885,7 +1883,6 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
         log.info("生成模具交替计划, 换模排程结果数: {}", changeResults.size());
 
         List<LhMouldChangePlan> plans = context.getMouldChangePlanList();
-        // 不清空列表，保留滚动衔接中已继承的换模计划，新计划从尾部追加。
         // rollingStateMap 用于在同一机台连续换模时逐条推进前规格。
         Map<String, RollingMachineState> rollingStateMap = new HashMap<>();
         int planOrder = plans.size() + 1;
@@ -2483,7 +2480,6 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
         return context.getScheduleResultList().stream()
                 .filter(Objects::nonNull)
                 .filter(result -> "1".equals(result.getIsChangeMould()))
-                .filter(result -> !result.isRollingInherited())
                 .filter(result -> Objects.nonNull(result.getDailyPlanQty()) && result.getDailyPlanQty() > 0)
                 .sorted(Comparator.comparing(LhScheduleResult::getLhMachineCode,
                                 Comparator.nullsLast(String::compareTo))
@@ -3311,9 +3307,6 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
         }
         if (result.getMouldChangeStartTime() != null) {
             return result.getMouldChangeStartTime();
-        }
-        if (result.isRollingInherited()) {
-            return null;
         }
         return resolveProductionStartTime(result);
     }

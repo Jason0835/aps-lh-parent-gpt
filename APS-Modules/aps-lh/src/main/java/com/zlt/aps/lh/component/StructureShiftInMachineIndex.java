@@ -45,7 +45,7 @@ public class StructureShiftInMachineIndex {
     /**
      * 基于当前实时排程结果与机台运行态一次性构建在机统计缓存。
      *
-     * <p>构建前会清空旧数据，滚动排程复用同一上下文时保证只统计本次窗口的最新结果。</p>
+     * <p>构建前会清空旧数据，复用同一上下文时保证只统计本次窗口的最新结果。</p>
      *
      * @param context 排程上下文
      * @param retentionService 结构在机统计工具

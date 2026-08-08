@@ -22,7 +22,6 @@ import com.zlt.aps.lh.service.ILhBaseDataService;
 import com.zlt.aps.lh.service.ILhShiftConfigService;
 import com.zlt.aps.lh.service.impl.LhCleaningScheduleService;
 import com.zlt.aps.lh.service.impl.LhMaintenanceScheduleService;
-import com.zlt.aps.lh.service.impl.RollingScheduleHandoffService;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import com.zlt.aps.mdm.api.domain.entity.MdmDevicePlanShut;
@@ -67,9 +66,6 @@ public class DataInitHandler extends AbsScheduleStepHandler {
 
     @Resource
     private ILhShiftConfigService lhShiftConfigService;
-
-    @Resource
-    private RollingScheduleHandoffService rollingScheduleHandoffService;
 
     @Resource
     private LhCleaningScheduleService cleaningScheduleService;
@@ -134,16 +130,7 @@ public class DataInitHandler extends AbsScheduleStepHandler {
 
         List<LhShiftConfigVO> windowShifts = context.getScheduleWindowShifts();
         LhScheduleTimeUtil.initShiftRuntimeStateMap(context, windowShifts);
-        // 强制重排时保留窗口基础数据，跳过前批次继承，从窗口起点重新计算。
-        if (context.getScheduleConfig().isForceRescheduleEnabled()) {
-            log.info("启用强制重排模式，跳过滚动排程衔接");
-        } else {
-            // 滚动排程衔接：将前批次重叠班次继承到本次，推进机台状态
-            rollingScheduleHandoffService.apply(context);
-            if (context.isInterrupted()) {
-                return;
-            }
-        }
+        // 保留窗口基础数据，不做前批次结果继承，统一从窗口起点重新计算。
         log.info("基础数据初始化完成, 机台数量: {}, 月计划SKU数: {}",
                 context.getMachineInfoMap().size(), context.getMonthPlanList().size());
     }
@@ -389,11 +376,11 @@ public class DataInitHandler extends AbsScheduleStepHandler {
         Date latestSpecEndTime = null;
         LhMachineOnlineInfo onlineInfo = resolveRuntimeOnlineInfo(context, machineCode);
         /*
-         * 强制重排只认可当前 MES 在机状态，不继承历史批次的计划占用。
+         * 只认可当前 MES 在机状态，不继承历史批次的计划占用。
          * 无有效在机物料说明机台当前空闲；若继续读取前批次结束时间，会把历史计划的晚班结束时间
          * 误当成真实占用，导致空闲机台被同班次窗口过滤。
          */
-        Date idleMachineStartTime = resolveForceRescheduleIdleMachineStartTime(context, machineCode, onlineInfo);
+        Date idleMachineStartTime = resolveIdleMachineStartTime(context, machineCode, onlineInfo);
         if (Objects.nonNull(idleMachineStartTime)) {
             return idleMachineStartTime;
         }
@@ -409,7 +396,7 @@ public class DataInitHandler extends AbsScheduleStepHandler {
             }
         }
         if (latestSpecEndTime != null) {
-            Date alignedEndTime = alignForceRescheduleEndTimeToWindowStart(
+            Date alignedEndTime = alignPreviousEndTimeToWindowStart(
                     context, machineCode, latestSpecEndTime);
             log.debug("机台初始结束时间取前批次规格结束时间, 机台: {}, 结束时间: {}",
                     machineCode, LhScheduleTimeUtil.formatDateTime(alignedEndTime));
@@ -435,22 +422,20 @@ public class DataInitHandler extends AbsScheduleStepHandler {
     }
 
     /**
-     * 强制重排时解析无有效 MES 在机物料机台的初始可用时间。
+     * 解析无有效 MES 在机物料机台的初始可用时间。
      *
-     * <p>强制重排会跳过滚动排程结果继承，因此历史批次结果只能作为前规格参考，
-     * 不能继续占用本次排程时间轴。机台没有有效 MES 在机物料时，从排程窗口首班开始参与选机。</p>
+     * <p>历史批次结果只能作为前规格参考，不能继续占用本次排程时间轴。
+     * 机台没有有效 MES 在机物料时，从排程窗口首班开始参与选机。</p>
      *
      * @param context 排程上下文
      * @param machineCode 机台编码
      * @param onlineInfo 当前机台有效 MES 在机信息
      * @return 窗口首班开始时间；不满足归一化条件时返回 null
      */
-    private Date resolveForceRescheduleIdleMachineStartTime(LhScheduleContext context,
-                                                            String machineCode,
-                                                            LhMachineOnlineInfo onlineInfo) {
-        if (context.getParamIntValue(LhScheduleParamConstant.FORCE_RESCHEDULE,
-                LhScheduleConstant.FORCE_RESCHEDULE) != LhScheduleConstant.FORCE_RESCHEDULE_ENABLED
-                || (Objects.nonNull(onlineInfo) && StringUtils.isNotEmpty(onlineInfo.getMaterialCode()))
+    private Date resolveIdleMachineStartTime(LhScheduleContext context,
+                                             String machineCode,
+                                             LhMachineOnlineInfo onlineInfo) {
+        if ((Objects.nonNull(onlineInfo) && StringUtils.isNotEmpty(onlineInfo.getMaterialCode()))
                 || CollectionUtils.isEmpty(context.getScheduleWindowShifts())) {
             return null;
         }
@@ -462,26 +447,24 @@ public class DataInitHandler extends AbsScheduleStepHandler {
         if (Objects.isNull(windowStartTime)) {
             return null;
         }
-        log.info("强制重排机台无有效MES在机物料，忽略前批次计划结束时间并按窗口首班释放, "
+        log.info("机台无有效MES在机物料，忽略前批次计划结束时间并按窗口首班释放, "
                         + "工厂: {}, 机台: {}, 窗口首班: {}",
                 context.getFactoryCode(), machineCode, LhScheduleTimeUtil.formatDateTime(windowStartTime));
         return windowStartTime;
     }
 
     /**
-     * 强制重排时将窗口外的前批次结束时间对齐到本次排程窗口首班。
+     * 将窗口外的前批次结束时间对齐到本次排程窗口首班。
      *
      * @param context 排程上下文
      * @param machineCode 机台编码
      * @param previousEndTime 前批次规格结束时间
      * @return 对齐后的机台初始结束时间
      */
-    private Date alignForceRescheduleEndTimeToWindowStart(LhScheduleContext context,
-                                                          String machineCode,
-                                                          Date previousEndTime) {
-        if (context.getParamIntValue(LhScheduleParamConstant.FORCE_RESCHEDULE,
-                LhScheduleConstant.FORCE_RESCHEDULE) != LhScheduleConstant.FORCE_RESCHEDULE_ENABLED
-                || CollectionUtils.isEmpty(context.getScheduleWindowShifts())) {
+    private Date alignPreviousEndTimeToWindowStart(LhScheduleContext context,
+                                                   String machineCode,
+                                                   Date previousEndTime) {
+        if (CollectionUtils.isEmpty(context.getScheduleWindowShifts())) {
             return previousEndTime;
         }
         Date windowStartTime = context.getScheduleWindowShifts().stream()
@@ -492,7 +475,7 @@ public class DataInitHandler extends AbsScheduleStepHandler {
         if (Objects.isNull(windowStartTime) || !previousEndTime.before(windowStartTime)) {
             return previousEndTime;
         }
-        log.info("强制重排机台结束时间早于窗口起点，按首班开始时间归一化, 工厂: {}, 机台: {}, "
+        log.info("机台结束时间早于窗口起点，按首班开始时间归一化, 工厂: {}, 机台: {}, "
                         + "原结束时间: {}, 窗口起点: {}",
                 context.getFactoryCode(), machineCode,
                 LhScheduleTimeUtil.formatDateTime(previousEndTime),

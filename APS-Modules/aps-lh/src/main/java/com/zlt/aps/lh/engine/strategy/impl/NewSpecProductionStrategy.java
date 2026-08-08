@@ -11526,7 +11526,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 int groupShiftCapacity = resolveWholeSingleControlShiftCapacity(
                         context, result, pairResult, endingShift);
                 int groupTargetQty = Math.min(Math.max(0, groupShiftCapacity), Math.max(0, remainingToAllocate));
-                // 双模组总量必须可均分到 L/R，奇数尾量留给其他独立机台或后续滚动排程。
+                // 双模组总量必须可均分到 L/R，奇数尾量留给其他独立机台或后续排程。
                 groupTargetQty -= groupTargetQty % 2;
                 int sideTargetQty = groupTargetQty / 2;
                 targetShiftQtyMap.put(result, sideTargetQty);
@@ -14414,7 +14414,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                     context, machineCode, switchReadyTime, switchDurationHours,
                     sku, IMouldChangeBalanceStrategy.ACTION_NEW_SPEC_MOULD_CHANGE);
         }
-        // 先把已有结果和滚动继承结果里的同胎胚换模班次回填到占用表，避免新增规格只感知本轮登记的占用。
+        // 先把已有结果里的同胎胚换模班次回填到占用表，避免新增规格只感知本轮登记的占用。
         preloadGreenTireChangeoverOccupancy(context);
         Date cursorTime = switchReadyTime;
         for (int attempt = 0; attempt < LhScheduleConstant.MAX_SHIFT_SLOT_COUNT * 2; attempt++) {
@@ -14511,9 +14511,6 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         if (result.getMouldChangeStartTime() != null) {
             return result.getMouldChangeStartTime();
         }
-        if (result.isRollingInherited()) {
-            return null;
-        }
         Date productionStartTime = resolveExistingProductionStartTime(result);
         if (productionStartTime != null) {
             return productionStartTime;
@@ -14522,7 +14519,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
     }
 
     /**
-     * 解析已有结果的首个开产时间，供缺少真实换模时间的继承结果复用。
+     * 解析已有结果的首个开产时间，供缺少真实换模时间的结果复用。
      *
      * @param result 排程结果
      * @return 首个开产时间
@@ -15328,7 +15325,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
      * 将单控整机组结果统一收敛为可均分到 L/R 两侧的偶数数量。
      *
      * <p>该方法只处理 SKU 实际消费账本已裁剪后的奇数尾量，不改变排程班次顺序。
-     * 奇数尾量保留在 SKU 实际剩余账本中，供后续班次、未排或滚动排程继续处理。</p>
+     * 奇数尾量保留在 SKU 实际剩余账本中，供后续班次、未排或后续排程继续处理。</p>
      *
      * @param groupResult 单控整机组结果
      * @return 收敛后的整机组总排产量

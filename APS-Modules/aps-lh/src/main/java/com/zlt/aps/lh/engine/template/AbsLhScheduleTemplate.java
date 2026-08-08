@@ -77,7 +77,7 @@ public abstract class AbsLhScheduleTemplate {
                 return buildInterruptResponse(context);
             }
 
-            // S4.4 续作规格排产：优先消费 MES 在机和滚动继承状态，必要时产生换活字块衔接结果。
+            // S4.4 续作规格排产：优先消费 MES 在机状态，必要时产生换活字块衔接结果。
             context.setCurrentStep(ScheduleStepEnum.S4_4_CONTINUOUS_PRODUCTION.getCode());
             log.info(">>> 步骤 S4.4: {}", ScheduleStepEnum.S4_4_CONTINUOUS_PRODUCTION.getDescription());
             doContinuousProduction(context);

@@ -74,14 +74,12 @@ public class LhScheduleContext {
     /**
      * 排程窗口结束日期 T+2 日：由 {@link #scheduleDate} + 2 得到，
      * 用于 day1/day2/day3 月计划映射、产能计算、加机台、收尾、欠产追补、换模日上限、
-     * 跨月检测、滚动续作追加起点、班次日期反推等排程核心逻辑，
+     * 跨月检测、班次日期反推等排程核心逻辑，
      * 与仅用于业务保存/查询的 {@link #scheduleTargetDate}（T+1）分离。
      */
     private Date windowEndDate;
 
-    /**
-     * 当前排程日期，滚动变化
-     */
+    /** 当前排程日期 */
     private Date currentScheduleDate;
     /**
      * 批次号
@@ -362,13 +360,9 @@ public class LhScheduleContext {
      */
     private List<LhScheduleResult> previousCureFormulaResultList = new ArrayList<>();
     /**
-     * 前日模具交替计划列表，供滚动衔接继承到本批次
-     */
-    private List<LhMouldChangePlan> previousMouldChangePlanList = new ArrayList<>();
-    /**
      * 业务目标日前一日模具交替计划列表，仅供“前日交替计划机台反选SKU”使用。
-     * <p>该列表固定按 {@link #scheduleTargetDate} 前一日查询，不复用滚动排程的
-     * {@link #previousMouldChangePlanList}，避免强制重排时两种历史日期口径互相污染。</p>
+     * <p>该列表固定按 {@link #scheduleTargetDate} 前一日查询，与前日排程结果加载的
+     * 窗口起点口径互相隔离。</p>
      */
     private List<LhMouldChangePlan> historicalReverseMouldChangePlanList = new ArrayList<>();
     /**
@@ -378,18 +372,6 @@ public class LhScheduleContext {
      */
     private List<HistoricalReverseSelectionDirective> historicalReverseSelectionDirectiveList =
             new ArrayList<HistoricalReverseSelectionDirective>();
-    /**
-     * 滚动排程继承结果列表，仅存放本批次继承的排程结果
-     */
-    private List<LhScheduleResult> rollingInheritedScheduleResultList = new ArrayList<>();
-    /**
-     * 滚动排程继承计划量Map，key=materialCode_productStatus；ScheduleAdjustHandler据此从同状态待排量中扣减
-     */
-    private Map<String, Integer> inheritedPlanQtyMap = new HashMap<>();
-    /**
-     * 是否已执行滚动排程衔接，影响结转口径和前日日期解析
-     */
-    private boolean rollingScheduleHandoff;
     /**
      * SKU按结构归集, key=structureName, value=SKU排程DTO列表
      */
