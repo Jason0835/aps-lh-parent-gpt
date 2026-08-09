@@ -2561,7 +2561,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 traceNewSpecMachineDecision(context, sku, candidates, null, null,
                         EMPTY_STRING_SET, EMPTY_STRING_MAP,
                         NewSpecFailReasonEnum.MACHINE_SELECTION_FAILED,
-                        false, noCandidateReason);
+                        false, noCandidateReason, null);
                 /*
                  * T+2 的当天计划或加机台阶段之后仍有提前生产阶段，资源失败不能提前写最终未排。
                  * 统一登记延期原因，全部阶段结束后由 finalizeWindowUnscheduled 一次性结算。
@@ -2635,6 +2635,12 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
              * 完整快照（含全厂机台占用扫描）导致排程耗时劣化。日志写入仍等结果确认后统一执行。
              */
             MachinePriorityTraceSnapshot pendingCandidateTraceSnapshot = null;
+            /*
+             * 最近一次已确认命中的选机时点快照。TOP5 日志延迟到整轮结束后才写入，
+             * 此时机台运行态可能已被本轮结果推进；使用冻结快照中的收尾时间，保证与
+             * “选机优先级顺序”日志、正式选机画像读取同一份时间源。
+             */
+            MachinePriorityTraceSnapshot lastConfirmedTraceSnapshot = null;
             // 延迟构建暂存的最近一次真实候选输入：有序候选列表、首选机台与当日结束时间（仅引用，零计算）。
             List<MachineScheduleDTO> pendingTraceCandidates = null;
             MachineScheduleDTO pendingTraceSelectedMachine = null;
@@ -3687,6 +3693,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                         context, sku, machineMatch,
                         pendingTraceCandidates, pendingTraceSelectedMachine, pendingTraceDayEndTime,
                         orderedCandidates, candidateMachine, dayContext.getDayEndTime());
+                lastConfirmedTraceSnapshot = pendingCandidateTraceSnapshot;
                 pendingTraceCandidates = null;
                 pendingTraceSelectedMachine = null;
                 pendingTraceDayEndTime = null;
@@ -3958,7 +3965,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                         sku.resolveTargetScheduleQty(), candidates.size(), excludedMachineCodes,
                         failReason.getDescription());
                 traceNewSpecMachineDecision(context, sku, candidates, localSearchSuggestedMachine, null,
-                        excludedMachineCodes, excludedMachineReasonMap, failReason, false, null);
+                        excludedMachineCodes, excludedMachineReasonMap, failReason, false, null, null);
                 String failureReason = StringUtils.isNotEmpty(dailyDeferredReason)
                         ? dailyDeferredReason : resolveScheduleFailureReason(context, sku, failReason);
                 deferCurrentDailyCandidate(
@@ -3985,7 +3992,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 }
                 traceNewSpecMachineDecision(context, sku, candidates, localSearchSuggestedMachine, finalMachine,
                         excludedMachineCodes, excludedMachineReasonMap, null, true,
-                        PriorityTraceLogHelper.formatDateTime(finalProductionStartTime));
+                        PriorityTraceLogHelper.formatDateTime(finalProductionStartTime),
+                        lastConfirmedTraceSnapshot);
                 if (!CollectionUtils.isEmpty(deferredCompensationSkuList)) {
                     return scheduledCount;
                 }
@@ -10477,6 +10485,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
      * @param failReason 失败原因
      * @param success 是否成功
      * @param startTimeText 开产时间文本或附加说明
+     * @param confirmedSnapshot 选机时点冻结的日志快照；为空时回落到机台实时收尾时间
      */
     private void traceNewSpecMachineDecision(LhScheduleContext context, SkuScheduleDTO sku,
                                              List<MachineScheduleDTO> candidates,
@@ -10486,7 +10495,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                                              Map<String, String> excludedMachineReasonMap,
                                              NewSpecFailReasonEnum failReason,
                                              boolean success,
-                                             String startTimeText) {
+                                             String startTimeText,
+                                             MachinePriorityTraceSnapshot confirmedSnapshot) {
         if (!PriorityTraceLogHelper.isEnabled(context)) {
             return;
         }
@@ -10521,12 +10531,20 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 String reasonSuffix = (i == 0 && success && finalMachine != null
                         && StringUtils.equals(machine.getMachineCode(), finalMachine.getMachineCode()))
                         ? "最优候选" : ("候选" + (i + 1));
+                /*
+                 * 优先输出选机时点冻结的收尾时间，避免整轮结束后机台 estimatedEndTime
+                 * 已被本轮结果推进，导致 TOP5 日志与正式选机画像口径不一致。
+                 */
+                Date traceEndingTime = Objects.nonNull(confirmedSnapshot)
+                        && confirmedSnapshot.hasPriorityTraceEndingTime(machine.getMachineCode())
+                        ? confirmedSnapshot.resolvePriorityTraceEndingTime(machine.getMachineCode())
+                        : machine.getEstimatedEndTime();
                 PriorityTraceLogHelper.appendLine(detailBuilder,
                         (i + 1)
                                 + ". " + PriorityTraceLogHelper.kv("机台", machine.getMachineCode())
                                 + ", " + PriorityTraceLogHelper.kv("名称", machine.getMachineName())
                                 + ", " + PriorityTraceLogHelper.kv("单控", PriorityTraceLogHelper.oneZero(isSingleCtrl))
-                                + ", " + PriorityTraceLogHelper.kv("收尾时间", PriorityTraceLogHelper.formatDateTime(machine.getEstimatedEndTime()))
+                                + ", " + PriorityTraceLogHelper.kv("收尾时间", PriorityTraceLogHelper.formatDateTime(traceEndingTime))
                                 + ", " + PriorityTraceLogHelper.kv("当前在机", machine.getPreviousMaterialCode())
                                 + ", " + PriorityTraceLogHelper.kv("前规格", machine.getPreviousSpecCode())
                                 + ", " + PriorityTraceLogHelper.kv("机台顺序", machine.getMachineOrder())
