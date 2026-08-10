@@ -15,8 +15,10 @@ public class StructureEndingAlignmentDecision {
 
     /** 是否触发结构收尾对齐约束（同结构在机机台数 &lt; 最低机台数 - 1） */
     private boolean triggered;
-    /** 当前候选机台是否允许选择（触发时仅同结构放行，未触发时始终放行） */
+    /** 当前候选机台是否允许选择（触发时同结构或真实空机放行，未触发时始终放行） */
     private boolean allowed = true;
+    /** 候选机台是否为无机台运行态、无实时排程归属的真实空机 */
+    private boolean realIdleMachine;
     /** 当前待排SKU的结构名称 */
     private String structureName;
     /** 候选机台当前在产物料编码（前物料） */
