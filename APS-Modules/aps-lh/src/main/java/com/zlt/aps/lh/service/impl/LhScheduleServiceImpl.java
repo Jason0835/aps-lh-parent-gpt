@@ -765,6 +765,10 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         // 明细区域则保持为空，避免空指针影响模板导出。
         List<LhScheduleResult> exportList = Objects.isNull(list) ? Collections.emptyList() : list;
 
+        // 明细行统一按导出顺序排序（机台升序 → 同机台收尾班次序号升序 → 物料编码升序）。
+        // 该顺序同时用于 buildExportDataList 填充明细和 fillExportSummaryFormulas 按行匹配收尾标识。
+        List<LhScheduleResult> sortedExportList = sortExportList(exportList);
+
         // 节点3：模板表头数据只负责替换普通占位符，例如排程日期、版本、批次号、
         // 以及 8 个班次标题里的 shiftDate1 ~ shiftDate8。
         Map<String, Object> tableMap = buildExportTableMap(exportList, result.getScheduleDate());
@@ -779,7 +783,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         // 当前只有一个明细列表，因此只放入一个 List<Map<String,Object>>。
         List<List<Map<String, Object>>> excelDataList = new ArrayList<>();
         List<Map<String, Object>> exportDataList = buildExportDataList(
-                exportList, result.getScheduleDate(), mouldChangePlanList);
+                sortedExportList, result.getScheduleDate(), mouldChangePlanList);
         excelDataList.add(exportDataList);
 
         // 节点5：硫化计划数据位于模板第 0 个 sheet（下标 0）的“硫化计划”页。
@@ -802,7 +806,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
 
         // 排产小结已迁移至成型日计划导出（aps-cx 通过 Feign 调用 buildScheduleSummaryExportData），
         // 硫化日计划导出不再写入排产小结 sheet。
-        return fillExportSummaryFormulas(exportBytes, exportDataList.size(), placeholderMap);
+        return fillExportSummaryFormulas(exportBytes, exportDataList.size(), placeholderMap, sortedExportList);
     }
 
     /**
@@ -982,9 +986,11 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      * @param exportBytes    Excel 导出字节
      * @param dataRowCount   明细数据行数
      * @param placeholderMap 占位符名称→列索引（0起始）的映射，由 exportData 在模板扫描阶段生成
+     * @param exportList     按导出顺序排列的排程结果列表，用于按行匹配收尾标识（淡橙标记）
      * @return 已回填公式的 Excel 导出字节
      */
-    private byte[] fillExportSummaryFormulas(byte[] exportBytes, int dataRowCount, Map<String, Integer> placeholderMap) {
+    private byte[] fillExportSummaryFormulas(byte[] exportBytes, int dataRowCount, Map<String, Integer> placeholderMap,
+                                             List<LhScheduleResult> exportList) {
         if (Objects.isNull(exportBytes) || exportBytes.length == 0 || dataRowCount <= 0) {
             return exportBytes;
         }
@@ -1024,8 +1030,11 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                     BigDecimal dailyPlanValue = readNumericCell(row.getCell(todayNightFinishQtyCol))
                             .subtract(readNumericCell(row.getCell(totalDailyPlanQtyCol)));
                     setNumericCell(row, dailyPlanQtyCol, dailyPlanValue);
-                    // 日计划量 ≤ 400：该单元格标淡橙提示产量偏低
-                    if (dailyPlanValue.abs().compareTo(BigDecimal.valueOf(400)) <= 0) {
+                    // 20260810+ 淡橙标识规则调整：8 个班次内存在收尾标识（classXIsEnd ∈ 1/2/3）的行才标淡橙，
+                    // 不再按 |合计余量| ≤ 400 判断。
+                    LhScheduleResult rowResult = rowIndex - startRowIndex < exportList.size()
+                            ? exportList.get(rowIndex - startRowIndex) : null;
+                    if (Objects.nonNull(rowResult) && isCloseOutSku(rowResult)) {
                         XSSFColor orange = new XSSFColor(new byte[]{(byte) 0xFC, (byte) 0xD5, (byte) 0xB4}, null);
                         Cell cell = row.getCell(dailyPlanQtyCol);
                         if (cell != null) {
@@ -2485,9 +2494,26 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     }
 
     /**
+     * 按导出顺序排序排程结果。
+     * <p>先按硫化机台升序（忽略大小写），再按同机台不同物料的收尾班次序号升序（先收尾下机的物料排前面），
+     * 最后按物料编码升序。导出明细填充与收尾标识匹配均基于该顺序。</p>
+     *
+     * @param list 排程结果列表
+     * @return 排序后的列表
+     */
+    private List<LhScheduleResult> sortExportList(List<LhScheduleResult> list) {
+        return list.stream()
+                .sorted(Comparator
+                        .comparing((LhScheduleResult r) -> StringUtils.defaultString(r.getLhMachineCode()), String.CASE_INSENSITIVE_ORDER)
+                        .thenComparingInt(r -> findLastPlannedShift(r))
+                        .thenComparing(r -> StringUtils.defaultString(r.getMaterialCode())))
+                .collect(Collectors.toList());
+    }
+
+    /**
      * 构建模板列表数据
      *
-     * @param list         排程结果列表
+     * @param list         排程结果列表（已按导出顺序排序）
      * @param scheduleDate        导出入口传入的排程日期，用于固定 T 日完成量查询口径
      * @param mouldChangePlanList 模具交替计划，用于按同批次、同排程日、同机台修正一班顺序
      * @return 模板列表数据
@@ -2501,13 +2527,9 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         Map<String, String> recipeTypeMap = loadLhTrialStatusDictMap();
         Map<String, String> endTypeMap = loadBizEndTypeDictMap();
 
-        // 先按硫化机台升序（忽略大小写），再按同机台不同物料的收尾班次序号升序排（先收尾下机的物料排前面）
-        List<LhScheduleResult> sortedList = list.stream()
-                .sorted(Comparator
-                        .comparing((LhScheduleResult r) -> StringUtils.defaultString(r.getLhMachineCode()), String.CASE_INSENSITIVE_ORDER)
-                        .thenComparingInt(r -> findLastPlannedShift(r))
-                        .thenComparing(r -> StringUtils.defaultString(r.getMaterialCode())))
-                .collect(Collectors.toList());
+        // 导出顺序由 sortExportList 统一排序（机台升序 → 同机台收尾班次序号升序 → 物料编码升序），
+        // 此处直接按传入顺序遍历。
+        List<LhScheduleResult> sortedList = list;
 
         // 构建8班顺序值映射：同一物料按班次1~8遍历，每个班次内有计划量的记录按机台编码升序，顺序值从1~n连续编排
         Map<String, Map<Integer, Integer>> shiftOrderMap = buildContinuousShiftOrderMap(sortedList);
@@ -3260,7 +3282,8 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      *
      * <p>规则：同一机台发生收尾后，后续再次排产的规格视为收尾后的新开规格或再生产，
      * 机台/物料号/物料描述列涂灰；同时把对应收尾行的机台列涂灰。</p>
-     * <p>规则 3（已移至 exportData 方法）：日计划量 ≤ 400，dailyPlanQty 列涂淡橙。</p>
+     * <p>规则 3（已移至 exportData 方法）：8 个班次内存在收尾标识（classXIsEnd ∈ 1/2/3）的行，
+     * dailyPlanQty（合计余量）列涂淡橙；不再按 |合计余量| ≤ 400 判断。</p>
      *
      * @param row       导出行数据
      * @param styleFlag 导出行样式标记
