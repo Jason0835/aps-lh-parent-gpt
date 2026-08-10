@@ -2694,6 +2694,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             NewSpecFailReasonEnum failReason = NewSpecFailReasonEnum.MACHINE_SELECTION_FAILED;
             Set<String> excludedMachineCodes = new HashSet<>(candidates.size());
             Map<String, String> excludedMachineReasonMap = new LinkedHashMap<>(candidates.size());
+            Map<String, String> structureAlignmentExcludedReasonMap =
+                    new LinkedHashMap<>(candidates.size());
             // originalTargetScheduleQty 是进入本 SKU 前的业务目标量，用于所有候选失败后恢复原口径。
             Integer originalTargetScheduleQty = sku.getTargetScheduleQty();
             int minimumTargetScheduleQty = resolveFormalNonEndingMinimumTargetQty(context, sku, quantityPolicy);
@@ -2813,7 +2815,22 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 List<MachineScheduleDTO> currentSelectableCandidates =
                         filterCurrentSelectableCandidates(
                                 context, sku, candidates, excludedMachineCodes,
-                                candidateCache, dayContext.getDayEndTime());
+                                candidateCache, dayContext.getDayEndTime(),
+                                structureAlignmentExcludedReasonMap);
+                int candidateCountBeforeStructureAlignment =
+                        countAvailableCandidateMachines(candidates, excludedMachineCodes);
+                if (CollectionUtils.isEmpty(currentSelectableCandidates)
+                        && candidateCountBeforeStructureAlignment > 0
+                        && structureAlignmentExcludedReasonMap.size()
+                        == candidateCountBeforeStructureAlignment) {
+                    /*
+                     * 全部候选均被结构收尾对齐排除时，记录本次实时判断明细并写入延期原因。
+                     * 不把机台加入永久排除集合，后续业务日仍会按最新在机缓存重新判断。
+                     */
+                    excludedMachineReasonMap.putAll(structureAlignmentExcludedReasonMap);
+                    dailyDeferredReason = "结构收尾对齐未找到可承接的同结构机台，当前排除"
+                            + structureAlignmentExcludedReasonMap.size() + "台候选机台";
+                }
                 /*
                  * 指定机台虽然通过基础硬过滤，但若被正式窗口产能计算排除，说明本批整个窗口均无法生产。
                  * 当前轮必须立即把对应反选指令结算失败；否则指令会永久保持未尝试并触发无限下一轮。
@@ -5777,6 +5794,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
      * @param excludedMachineCodes 当前SKU已排除或已使用机台编码
      * @param candidateCache 当前SKU候选缓存
      * @param dayEndTime 当前业务日结束时间
+     * @param structureAlignmentExcludedReasonMap 当前实时结构收尾对齐排除原因
      * @return 当前真实可选候选机台列表
      */
     private List<MachineScheduleDTO> filterCurrentSelectableCandidates(
@@ -5785,9 +5803,13 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             List<MachineScheduleDTO> candidates,
             Set<String> excludedMachineCodes,
             NewSpecCandidateCache candidateCache,
-            Date dayEndTime) {
+            Date dayEndTime,
+            Map<String, String> structureAlignmentExcludedReasonMap) {
         if (CollectionUtils.isEmpty(candidates)) {
             return Collections.emptyList();
+        }
+        if (Objects.nonNull(structureAlignmentExcludedReasonMap)) {
+            structureAlignmentExcludedReasonMap.clear();
         }
         List<MachineScheduleDTO> selectableCandidates =
                 new ArrayList<MachineScheduleDTO>(candidates.size());
@@ -5800,10 +5822,18 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             }
             /*
              * 结构收尾对齐只改变机台可用性，不改变候选顺序：
-             * 触发时仅同结构放行，不同结构及空机台排除；未触发时保持原选机逻辑。
+             * 触发时同结构与确认无实时排程归属的真实空机放行，不同结构及运行态数据异常机台排除；
+             * 未触发时保持原选机逻辑。
              */
-            if (!structureEndingAlignmentService.evaluateCandidate(
-                    context, sku, candidate).isAllowed()) {
+            StructureEndingAlignmentDecision structureEndingAlignmentDecision =
+                    structureEndingAlignmentService.evaluateCandidate(context, sku, candidate);
+            if (!structureEndingAlignmentDecision.isAllowed()) {
+                if (Objects.nonNull(structureAlignmentExcludedReasonMap)) {
+                    structureAlignmentExcludedReasonMap.put(
+                            candidate.getMachineCode(),
+                            this.buildStructureEndingAlignmentExcludedReason(
+                                    structureEndingAlignmentDecision));
+                }
                 continue;
             }
             int availableCapacity = resolveCachedMachineAvailableCapacityInWindow(
@@ -5831,6 +5861,31 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             }
         }
         return selectableCandidates;
+    }
+
+    /**
+     * 构建结构收尾对齐候选排除原因。
+     *
+     * @param decision 结构收尾对齐判断结果
+     * @return 可用于选机日志和最终未排原因定位的排除说明
+     */
+    private String buildStructureEndingAlignmentExcludedReason(
+            StructureEndingAlignmentDecision decision) {
+        if (Objects.isNull(decision)) {
+            return "结构收尾对齐排除";
+        }
+        StringBuilder reasonBuilder = new StringBuilder(160);
+        reasonBuilder.append("排除原因=结构收尾对齐：")
+                .append(PriorityTraceLogHelper.safeText(decision.getExcludedReason()))
+                .append(", 前物料=")
+                .append(PriorityTraceLogHelper.safeText(decision.getPreviousMaterialCode()))
+                .append(", 前物料结构=")
+                .append(PriorityTraceLogHelper.safeText(decision.getPreviousStructureName()))
+                .append(", 同结构在机数=")
+                .append(decision.getInMachineCount())
+                .append(", 最低机台数=")
+                .append(decision.getMinimumMachineCount());
+        return reasonBuilder.toString();
     }
 
     /**
