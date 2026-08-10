@@ -142,9 +142,6 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
     private static final int SAME_MATERIAL_STATUS_FORMAL_RESERVED_QTY = 4;
     private static final String SAME_MATERIAL_STATUS_CONTINUATION_REASON =
             "同物料多状态续作跨窗口延续，锁定原机台";
-    /** 结构最低机台规则未命中标识，余量收尾冗余机台正常放行时显式清除保机标记。 */
-    private static final String STRUCTURE_MIN_MACHINE_NOT_RETAINED = "0";
-
     @Resource
     private OrderNoGenerator orderNoGenerator;
 
@@ -6418,8 +6415,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                 recordSharedEmbryoEndingStaggerReleaseCandidate(context, sourceSku, result);
                 redistributeShiftQty(context, result, shifts, 0);
                 /*
-                 * 整窗降模清零后立即登记续作释放边界；阶段级结构判断稍后会撤销需要保机机台的
-                 * 提前释放状态。不可换模晚班仍有正量时不进入本分支。
+                 * 整窗降模清零后立即登记续作释放边界。原“续作完成后结构收尾停产保机”已废弃，
+                 * 此处不再等待阶段级结构判断回退释放状态；不可换模晚班仍有正量时不进入本分支。
                  */
                 completeContinuousMachineOfflineDecision(context, sourceSku, result,
                         firstPositiveShiftIndex, lastPositiveShiftIndex, "续作整窗降模");
@@ -6789,7 +6786,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                 clearContinuationShiftsAfterDate(
                         context, result, allShifts, productionDate, !recoverable);
             }
-            // 当前机台完成逐日降模后先登记原释放边界，供阶段级结构判断识别真实下机状态。
+            // 当前机台完成逐日降模后立即登记真实释放边界；后续仅保留独立的续作停机占机与 S4.5 对齐规则。
             completeContinuousMachineOfflineDecision(
                     context, sourceSku, result,
                     firstPositiveShiftBeforeOfflineMap.getOrDefault(result, -1),
@@ -11882,8 +11879,9 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
     /**
      * 统一完成续作机台的正常释放状态登记。
      *
-     * <p>结构停产保机已经调整为续作与换活字块全部完成后的阶段级判断。本方法只维护续作原有
-     * 释放边界和停产保机解除状态，不再在逐台下机时改变结构判断结果。</p>
+     * <p>原“续作排产完成后进行结构收尾停产保机”规则已整体废弃。本方法只维护续作原有
+     * 降模释放边界和独立续作停产保机解除状态，不再判断结构最低机台、不再写结构保机标识，
+     * 也不产生结构占机衍生状态；S4.5结构收尾对齐由新增选机链独立实时判断。</p>
      *
      * <p>若机台已经登记的释放边界不晚于本次最新边界，说明前序下机状态已经生效，不再重复判断；
      * 若旧边界晚于本次最新边界，则必须重新判断并向前刷新边界。该处理用于逐日降模连续收口，
@@ -11920,94 +11918,18 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             return;
         }
 
-        boolean endingRedundantMachine = isSkuEndingRedundantZeroMachine(context, sourceSku, result);
-
         // 正常放行后立即登记最后允许生产班次；全窗为零时登记0，明确本批首班前已释放。
         int releaseBoundaryShiftIndex = Math.max(0, currentLastPositiveShiftIndex);
         context.registerContinuousReducedMachineReleaseBoundary(
                 result.getLhMachineCode(), releaseBoundaryShiftIndex);
         // 每日独立判断可能使前一日停产保机机台在本日真正下机，此处同步解除后续资源硬占用。
         context.markContinuousStopHoldMachineReleased(result.getLhMachineCode());
-        if (endingRedundantMachine) {
-            result.setIsStructureMinMachineRetained(STRUCTURE_MIN_MACHINE_NOT_RETAINED);
-            log.info("SKU余量收尾冗余机台正常释放, scheduleDate: {}, materialCode: {}, productStatus: {}, "
-                            + "offlineMachine: {}, offlineReason: {}, releaseBoundaryShift: {}, "
-                            + "structureMinMachineRetentionSkipped: true, reason: 同SKU已有正量机台承载收尾计划",
-                    context.getScheduleDate(), sourceSku.getMaterialCode(), sourceSku.getProductStatus(),
-                    result.getLhMachineCode(), StringUtils.defaultString(offlineReason), releaseBoundaryShiftIndex);
-        } else {
-            log.info("续作机台正常释放状态登记, scheduleDate: {}, materialCode: {}, productStatus: {}, "
-                            + "offlineMachine: {}, offlineReason: {}, previousReleaseBoundaryShift: {}, "
-                            + "releaseBoundaryShift: {}",
-                    context.getScheduleDate(), sourceSku.getMaterialCode(), sourceSku.getProductStatus(),
-                    result.getLhMachineCode(), StringUtils.defaultString(offlineReason),
-                    registeredReleaseBoundary, releaseBoundaryShiftIndex);
-        }
-    }
-
-    /**
-     * 判断当前全零结果是否为SKU余量收尾归集后的冗余机台。
-     *
-     * <p>该规则按业务状态通用判断，不允许硬编码物料。只有来源SKU已按既有口径判定为收尾，且
-     * 同物料、同产品状态仍存在正计划量结果时才放行当前全零机台。若同SKU全部结果均为零，说明
-     * 可能发生库存或账本后置裁剪，必须继续执行结构最低机台判断。</p>
-     *
-     * @param context 排程上下文
-     * @param sourceSku 续作来源SKU
-     * @param offlineResult 当前待下机的全零结果
-     * @return true-属于收尾归集冗余机台，可跳过结构保机；false-继续执行结构保机判断
-     */
-    private boolean isSkuEndingRedundantZeroMachine(LhScheduleContext context,
-                                                     SkuScheduleDTO sourceSku,
-                                                     LhScheduleResult offlineResult) {
-        if (Objects.isNull(context) || Objects.isNull(sourceSku) || Objects.isNull(offlineResult)
-                || ShiftFieldUtil.resolveScheduledQty(offlineResult) > 0
-                || sourceSku.isStrictNewSpecShortageOnly()) {
-            return false;
-        }
-        boolean endingSku = StringUtils.equals(SkuTagEnum.ENDING.getCode(), sourceSku.getSkuTag())
-                || sourceSku.isStrictTargetQty()
-                || hasSameSkuEndingResult(context, offlineResult);
-        if (!endingSku || CollectionUtils.isEmpty(context.getScheduleResultList())) {
-            return false;
-        }
-        for (LhScheduleResult candidate : context.getScheduleResultList()) {
-            if (Objects.isNull(candidate) || candidate == offlineResult
-                    || !isContinuousPhaseResult(candidate)
-                    || ShiftFieldUtil.resolveScheduledQty(candidate) <= 0) {
-                continue;
-            }
-            if (StringUtils.equals(offlineResult.getMaterialCode(), candidate.getMaterialCode())
-                    && StringUtils.equals(offlineResult.getProductStatus(), candidate.getProductStatus())) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * 判断同物料、同产品状态续作结果中是否仍保留既有收尾标识。
-     *
-     * @param context 排程上下文
-     * @param sourceResult 当前待下机结果
-     * @return true-同SKU至少一条结果标记为收尾；false-不存在收尾结果
-     */
-    private boolean hasSameSkuEndingResult(LhScheduleContext context, LhScheduleResult sourceResult) {
-        if (Objects.isNull(context) || Objects.isNull(sourceResult)
-                || CollectionUtils.isEmpty(context.getScheduleResultList())) {
-            return false;
-        }
-        for (LhScheduleResult candidate : context.getScheduleResultList()) {
-            if (Objects.isNull(candidate) || !isContinuousPhaseResult(candidate)
-                    || !"1".equals(candidate.getIsEnd())) {
-                continue;
-            }
-            if (StringUtils.equals(sourceResult.getMaterialCode(), candidate.getMaterialCode())
-                    && StringUtils.equals(sourceResult.getProductStatus(), candidate.getProductStatus())) {
-                return true;
-            }
-        }
-        return false;
+        log.info("续作机台正常释放状态登记, scheduleDate: {}, materialCode: {}, productStatus: {}, "
+                        + "offlineMachine: {}, offlineReason: {}, previousReleaseBoundaryShift: {}, "
+                        + "releaseBoundaryShift: {}",
+                context.getScheduleDate(), sourceSku.getMaterialCode(), sourceSku.getProductStatus(),
+                result.getLhMachineCode(), StringUtils.defaultString(offlineReason),
+                registeredReleaseBoundary, releaseBoundaryShiftIndex);
     }
 
     /**
