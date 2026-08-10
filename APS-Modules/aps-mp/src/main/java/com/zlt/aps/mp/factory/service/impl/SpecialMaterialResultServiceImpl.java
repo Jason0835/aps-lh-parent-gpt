@@ -1,6 +1,7 @@
 package com.zlt.aps.mp.factory.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.FactoryParamMapper;
 import com.zlt.aps.maindata.mapper.MdmBomInfoEntityMapper;
@@ -280,6 +281,13 @@ public class SpecialMaterialResultServiceImpl extends AbstractDocService<Special
         for (Map.Entry<String, List<MdmConstructionProcess>> entry : processGroupMap.entrySet()) {
             Map<String, String> valueMap = new HashMap<>(3);
             for (MdmConstructionProcess proc : entry.getValue()) {
+                // 校验数据的合法性，非法数据全部过滤掉
+                if (StringUtils.isEmpty(proc.getProcessValue())) {
+                    continue;
+                }
+                if (BigDecimalUtils.leZero(BigDecimalUtils.valueOf(proc.getProcessValue()))) {
+                    continue;
+                }
                 valueMap.put(proc.getProcessCode(), proc.getProcessValue());
             }
             if (!valueMap.containsKey(ProcessCodeEnum.LENGTH.getCode())
