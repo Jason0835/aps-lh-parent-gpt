@@ -1544,7 +1544,7 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                 maintenanceTimeRange, productionStartTime);
 
         String machineStr = String.join("、", machineCodes);
-        return machineStr + maintenanceTimeRange + " 维保," + productionStartTime + "开产";
+        return machineStr + " " + maintenanceTimeRange + " 维保," + productionStartTime + "开产";
     }
 
     /**
