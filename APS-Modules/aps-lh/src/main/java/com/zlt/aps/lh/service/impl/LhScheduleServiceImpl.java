@@ -1029,7 +1029,12 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                 if (dailyPlanQtyCol >= 0 && todayNightFinishQtyCol >= 0 && totalDailyPlanQtyCol >= 0) {
                     BigDecimal dailyPlanValue = readNumericCell(row.getCell(todayNightFinishQtyCol))
                             .subtract(readNumericCell(row.getCell(totalDailyPlanQtyCol)));
-                    setNumericCell(row, dailyPlanQtyCol, dailyPlanValue);
+                    // 20260810+ 合计余量为 0 时导出为空，不为 0 时写静态数值（后续需要参与导入，不能保留公式）。
+                    if (dailyPlanValue.compareTo(BigDecimal.ZERO) == 0) {
+                        setEmptyCell(row, dailyPlanQtyCol);
+                    } else {
+                        setNumericCell(row, dailyPlanQtyCol, dailyPlanValue);
+                    }
                     // 20260810+ 淡橙标识规则调整：8 个班次内存在收尾标识（classXIsEnd ∈ 1/2/3）的行才标淡橙，
                     // 不再按 |合计余量| ≤ 400 判断。
                     LhScheduleResult rowResult = rowIndex - startRowIndex < exportList.size()
@@ -1223,6 +1228,26 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             cell.setCellStyle(cellStyle);
         }
         cell.setCellValue(Objects.nonNull(value) ? value.doubleValue() : BigDecimal.ZERO.doubleValue());
+    }
+
+    /**
+     * 将单元格写为空字符串（保留原样式）。
+     * <p>用于合计余量为 0 时导出为空，避免明细行出现无意义的 0。</p>
+     *
+     * @param row         当前数据行
+     * @param columnIndex 列下标，POI 从 0 开始计数
+     */
+    private void setEmptyCell(Row row, int columnIndex) {
+        Cell cell = row.getCell(columnIndex);
+        CellStyle cellStyle = Objects.nonNull(cell) ? cell.getCellStyle() : null;
+        if (Objects.nonNull(cell)) {
+            row.removeCell(cell);
+        }
+        cell = row.createCell(columnIndex);
+        if (Objects.nonNull(cellStyle)) {
+            cell.setCellStyle(cellStyle);
+        }
+        cell.setCellValue("");
     }
 
     /**
@@ -2494,6 +2519,17 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     }
 
     /**
+     * 值为 0 时导出为空字符串，避免明细行出现无意义的 0。
+     * <p>应用于合计余量、胎胚库存、硫化班产、各班计划量/完成量等导出列。</p>
+     *
+     * @param value 数值
+     * @return value 为 0 时返回空字符串，否则原样返回
+     */
+    private static Object zeroToEmpty(Integer value) {
+        return Objects.nonNull(value) && value.intValue() == 0 ? "" : value;
+    }
+
+    /**
      * 按导出顺序排序排程结果。
      * <p>先按硫化机台升序（忽略大小写），再按同机台不同物料的收尾班次序号升序（先收尾下机的物料排前面），
      * 最后按物料编码升序。导出明细填充与收尾标识匹配均基于该顺序。</p>
@@ -2557,8 +2593,8 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             row.put("cxMachineCode", cxMachineCodeMap.get(result.getId()));
             row.put("todayNightFinishQty", result.getTotalFinishQty());
             row.put("mouldSurplusQty", result.getMouldSurplusQty());
-            row.put("embryoStock", result.getEmbryoStock());
-            row.put("singleMouldShiftQty", result.getSingleMouldShiftQty());
+            row.put("embryoStock", zeroToEmpty(result.getEmbryoStock()));
+            row.put("singleMouldShiftQty", zeroToEmpty(result.getSingleMouldShiftQty()));
             row.put("leftRightMould", result.getLeftRightMould());
             row.put("mouldMethod", result.getMouldMethod());
             row.put("structureName", result.getStructureName());
@@ -2569,7 +2605,10 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             // 明细行的 dailyPlanQty 已按需求从 totalDailyPlanQty 改为 dailyPlanQty。
             // totalPlanQty 只是模板“总计”占位符，为了明细行保持同一日计划量展示，
             // 当前同步写入 dailyPlanQty；首行汇总会在 buildSummaryRow 中单独计算。
-            row.put("dailyPlanQty", (Objects.isNull(result.getTotalFinishQty()) ? 0 : result.getTotalFinishQty()) - (Objects.isNull(result.getTotalDailyPlanQty()) ? 0 : result.getTotalDailyPlanQty()));
+            // 20260810+ 合计余量为 0 时导出为空。
+            int dailyPlanQty = (Objects.isNull(result.getTotalFinishQty()) ? 0 : result.getTotalFinishQty())
+                    - (Objects.isNull(result.getTotalDailyPlanQty()) ? 0 : result.getTotalDailyPlanQty());
+            row.put("dailyPlanQty", dailyPlanQty == 0 ? "" : dailyPlanQty);
             row.put("totalPlanQty", result.getDailyPlanQty());
             row.put("totalDailyPlanQty", result.getTotalDailyPlanQty());
             row.put("monthPlanSumTotal", result.getMonthPlanSumTotal());
@@ -2588,8 +2627,8 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                 row.put("class" + shift + "LeftRightMould", buildShiftLeftRightMould(result, shift));
                 row.put("class" + shift + "Order", resolveExportShiftOrder(
                         shiftOrderMap, class1MouldChangeOrderMap, result, shift));
-                row.put("class" + shift + "PlanQty", getClassPlanQty(result, shift));
-                row.put("class" + shift + "FinishQty", getClassFinishQty(result, shift));
+                row.put("class" + shift + "PlanQty", zeroToEmpty(getClassPlanQty(result, shift)));
+                row.put("class" + shift + "FinishQty", zeroToEmpty(getClassFinishQty(result, shift)));
                 Object shiftType = buildShiftType(result, shift, endTypeMap);
                 Object shiftLhType = buildShiftMouldMethod(result, shift, recipeTypeMap);
                 Object shiftProductStatus = buildShiftProductStatus(result, shift, recipeTypeMap);
