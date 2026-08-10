@@ -4,7 +4,6 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.zlt.aps.constant.StringConstant;
-import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.engine.daylimit.DayCapacityLimitVo;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.CxMachineAllocationPlanHelper;
@@ -101,7 +100,7 @@ public class GroupPriorityProductionScheduler {
             allocationCxMachine(context, excludeGroupPlan, preSelectedGroupSet, preSelectedGroupAllocationMap, discontinueGroupSet);
             return;
         }
-        //3、如果Top中有没有挑到适机台的分组，则将没有机台的剔除，进入下一轮Top选择
+        //3、如果Top中出现没有找到机台的分组，则将没有机台的剔除，进入下一轮Top选择
         TbrProductionContext productionContext = (TbrProductionContext) context;
         Map<ProductionPlanGroupInfo, GroupPrioritySchedulerResultHelper> selectedCxMachineMap = topSelectedCxMachineList.stream().collect(Collectors.toMap(GroupPrioritySchedulerResultHelper::getSelectedGroup, Function.identity()));
         topList.forEach(preSelectedGroup -> {
@@ -140,12 +139,7 @@ public class GroupPriorityProductionScheduler {
             excludeGroupPlan.add(groupName);
         } else {
             preSelectedGroupSet.add(groupName);
-            Set<CxMachineAllocationPlanHelper> preAllocationSet = preSelectedGroupAllocationMap.get(groupName);
-            if (null == preAllocationSet) {
-                preAllocationSet = Sets.newHashSet();
-                preSelectedGroupAllocationMap.put(groupName, preAllocationSet);
-            }
-            preAllocationSet.add(addHelper);
+            addResultByStorage(addHelper, preSelectedGroupAllocationMap);
             excludeGroupPlan.clear();
         }
         //20260429+ 前分组分配是否需要延长处理
@@ -162,9 +156,10 @@ public class GroupPriorityProductionScheduler {
      * @param appointPriorityGroupList 指定的优先级分组对象集合
      * @param discontinueGroupSet      有间断排产的分组对象集合
      * @param isFixed                  是否固定选机台
+     * @param resultStorage            分配结果存储器
      * @return
      */
-    public void productionAppointGroupCxMachine(Context context, Set<String> excludeGroupPlan, List<ProductionPlanGroupInfo> appointPriorityGroupList, Set<String> discontinueGroupSet, boolean isFixed) {
+    public void productionAppointGroupCxMachine(Context context, Set<String> excludeGroupPlan, List<ProductionPlanGroupInfo> appointPriorityGroupList, Set<String> discontinueGroupSet, boolean isFixed, Map<String, Set<CxMachineAllocationPlanHelper>> resultStorage) {
         if (CollectionUtils.isEmpty(appointPriorityGroupList)) {
             return;
         }
@@ -177,7 +172,7 @@ public class GroupPriorityProductionScheduler {
         List<GroupPrioritySchedulerResultHelper> topSelectedCxMachineList = getGroupSelectedCxMachine(context, topFixedCxMachineList, isFixed, discontinueGroupSet);
         if (CollectionUtils.isEmpty(topSelectedCxMachineList)) {
             excludeGroupPlan.addAll(topFixedCxMachineList.stream().map(ProductionPlanGroupInfo::getGroupName).collect(Collectors.toSet()));
-            productionAppointGroupCxMachine(context, excludeGroupPlan, appointPriorityGroupList, discontinueGroupSet, isFixed);
+            productionAppointGroupCxMachine(context, excludeGroupPlan, appointPriorityGroupList, discontinueGroupSet, isFixed, resultStorage);
             return;
         }
         Map<ProductionPlanGroupInfo, GroupPrioritySchedulerResultHelper> selectedCxMachineMap = topSelectedCxMachineList.stream().collect(Collectors.toMap(GroupPrioritySchedulerResultHelper::getSelectedGroup, Function.identity()));
@@ -200,7 +195,7 @@ public class GroupPriorityProductionScheduler {
         CxMachineAllocationPlanHelper addHelper = buildAllocationDetailInfo(productionContext, finalSelected);
         if (null == addHelper) {
             excludeGroupPlan.add(groupName);
-            productionAppointGroupCxMachine(context, excludeGroupPlan, appointPriorityGroupList, discontinueGroupSet, isFixed);
+            productionAppointGroupCxMachine(context, excludeGroupPlan, appointPriorityGroupList, discontinueGroupSet, isFixed, resultStorage);
             return;
         }
         //20260727+ 多段分配忽略高优先级判断
@@ -212,12 +207,13 @@ public class GroupPriorityProductionScheduler {
         if (newNeedAllocationDaysByGroupPlan.equals(originNeedAllocationDaysByGroupPlan)) {
             excludeGroupPlan.add(groupName);
         } else {
+            addResultByStorage(addHelper, resultStorage);
             excludeGroupPlan.clear();
         }
         //20260429+ 前分组分配是否需要延长处理
         cxMouldProductionHandler.handlerTimeExtensionDayConclusionByBeforeGroup(productionContext, addHelper);
         //下一批
-        productionAppointGroupCxMachine(context, excludeGroupPlan, appointPriorityGroupList, discontinueGroupSet, isFixed);
+        productionAppointGroupCxMachine(context, excludeGroupPlan, appointPriorityGroupList, discontinueGroupSet, isFixed, resultStorage);
     }
 
     /**
@@ -230,9 +226,10 @@ public class GroupPriorityProductionScheduler {
      * @param excludeGroupPlan         需要剔除的分组信息
      * @param appointPriorityGroupList 指定的固定分组信息
      * @param discontinueGroupSet      有间断的分组
+     * @param resultStorage            分配结果存储器
      * @return
      */
-    public void allocationFixedGroupSameCxMachineEarlyGroup(Context context, Set<String> excludeGroupPlan, List<ProductionPlanGroupInfo> appointPriorityGroupList, Set<String> discontinueGroupSet) {
+    public void allocationFixedGroupSameCxMachineEarlyGroup(Context context, Set<String> excludeGroupPlan, List<ProductionPlanGroupInfo> appointPriorityGroupList, Set<String> discontinueGroupSet, Map<String, Set<CxMachineAllocationPlanHelper>> resultStorage) {
         if (CollectionUtils.isEmpty(appointPriorityGroupList)) {
             return;
         }
@@ -272,11 +269,12 @@ public class GroupPriorityProductionScheduler {
             if (newNeedAllocationDaysByGroupPlan.equals(originNeedAllocationDaysByGroupPlan)) {
                 excludeGroupPlan.add(groupName);
             } else {
+                addResultByStorage(addHelper, resultStorage);
                 excludeGroupPlan.remove(groupName);
             }
         });
         //重新分配
-        allocationFixedGroupSameCxMachineEarlyGroup(context, excludeGroupPlan, appointPriorityGroupList, discontinueGroupSet);
+        allocationFixedGroupSameCxMachineEarlyGroup(context, excludeGroupPlan, appointPriorityGroupList, discontinueGroupSet, resultStorage);
     }
 
     /**
@@ -318,17 +316,10 @@ public class GroupPriorityProductionScheduler {
             if (null == selectedGroup) {
                 break;
             }
-            String groupName = selectedGroup.getGroupName();
-            //20260803+ 因最短上机天数拆分同英寸切换和换英寸切换，故而先默认为同英寸切换-最短上机天数
-            Integer leftOverDays = selectedGroup.getLeftOverNeedAllocationDays();
-            //20260206 小于最短上机天数，则不进行分配
-            if (!selectedGroup.isNextAllocation(leftOverDays, productionContext, false)) {
-                Integer minAllocationDays = selectedGroup.getMinAllocationDays(productionContext, false);
-                if (leftOverDays > BigDecimal.ZERO.intValue()) {
-                    log.info(TbrProductionGroupLogRecorder.addGroupLeftOverNoReachMinAllocationDayLog(productionContext, groupName, true, leftOverDays, minAllocationDays));
-                }
-                selectedGroup.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
-                excludeSelectTopMap.add(groupName);
+            //20260803+ 因最短上机天数拆分同英寸切换和换英寸切换，故而先默认为同英寸切换-最短上机天数, 小于最短上机天数，跳过本次分配，但不能标记分配完成
+            boolean isReachMinAllocationDays = isReachMinAllocationDaysAndRecordLog(productionContext, selectedGroup);
+            if (!isReachMinAllocationDays) {
+                excludeSelectTopMap.add(selectedGroup.getGroupName());
                 continue;
             }
             topList.add(selectedGroup);
@@ -382,17 +373,10 @@ public class GroupPriorityProductionScheduler {
             if (null == selectedGroup) {
                 break;
             }
-            String groupName = selectedGroup.getGroupName();
-            //20260803+ 因最短上机天数拆分同英寸切换和换英寸切换，故而先默认为同英寸切换-最短上机天数
-            Integer leftOverDays = selectedGroup.getLeftOverNeedAllocationDays();
-            //20260206 小于最短上机天数，则不进行分配
-            if (!selectedGroup.isNextAllocation(leftOverDays, productionContext, false)) {
-                Integer minAllocationDays = selectedGroup.getMinAllocationDays(productionContext, false);
-                if (leftOverDays > BigDecimal.ZERO.intValue()) {
-                    log.info(TbrProductionGroupLogRecorder.addGroupLeftOverNoReachMinAllocationDayLog(productionContext, groupName, true, leftOverDays, minAllocationDays));
-                }
-                selectedGroup.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
-                excludeSelectTopMap.add(groupName);
+            //20260803+ 因最短上机天数拆分同英寸切换和换英寸切换，故而先默认为同英寸切换-最短上机天数，小于最短上机天数，则跳过本次分配，但不能比较分配完成
+            boolean isReachMinAllocationDays = isReachMinAllocationDaysAndRecordLog(productionContext, selectedGroup);
+            if (!isReachMinAllocationDays) {
+                excludeSelectTopMap.add(selectedGroup.getGroupName());
                 continue;
             }
             topList.add(selectedGroup);
@@ -603,6 +587,48 @@ public class GroupPriorityProductionScheduler {
         CxMachineAllocationPlanHelper addHelper = CxCapacityAllocationHandler.createAllocationPlanHelper(selectedCxMachine, lhRatioInfo, addNewGroupPlan, null, realAllocationDays, startDay, monthMaxDays);
         addHelper.setChangeProSize(isChangeProSize);
         return addHelper;
+    }
+
+    /**
+     * 是否达到最短上机天数的处理，分组优先级阶段先按默认的同英寸切换处理
+     * 因最短上机天数拆分同英寸切换和换英寸切换，故而先默认为同英寸切换-最短上机天数
+     *
+     * @param productionContext
+     * @param selectedGroup
+     * @return
+     */
+    private boolean isReachMinAllocationDaysAndRecordLog(TbrProductionContext productionContext, ProductionPlanGroupInfo selectedGroup) {
+        String groupName = selectedGroup.getGroupName();
+        //20260803+ 因最短上机天数拆分同英寸切换和换英寸切换，故而先默认为同英寸切换-最短上机天数, 小于最短上机天数，跳过本次分配，但不能标记分配完成
+        Integer leftOverDays = selectedGroup.getLeftOverNeedAllocationDays();
+        if (selectedGroup.isNextAllocation(leftOverDays, productionContext, false)) {
+            return true;
+        }
+        //记录日志
+        Integer minAllocationDays = selectedGroup.getMinAllocationDays(productionContext, false);
+        if (leftOverDays > BigDecimal.ZERO.intValue()) {
+            TbrProductionGroupLogRecorder.addGroupLeftOverNoReachMinAllocationDayLog(productionContext, groupName, true, leftOverDays, minAllocationDays);
+        }
+        return false;
+    }
+
+    /**
+     * 将排产结果加入到结果存储器中
+     *
+     * @param addHelper     分配信息
+     * @param resultStorage 结果存储器
+     */
+    private void addResultByStorage(CxMachineAllocationPlanHelper addHelper, Map<String, Set<CxMachineAllocationPlanHelper>> resultStorage) {
+        if (null == addHelper || null == resultStorage) {
+            return;
+        }
+        String groupName = addHelper.getAllocationGroup();
+        Set<CxMachineAllocationPlanHelper> preAllocationSet = resultStorage.get(groupName);
+        if (null == preAllocationSet) {
+            preAllocationSet = Sets.newHashSet();
+            resultStorage.put(groupName, preAllocationSet);
+        }
+        preAllocationSet.add(addHelper);
     }
 
     /**

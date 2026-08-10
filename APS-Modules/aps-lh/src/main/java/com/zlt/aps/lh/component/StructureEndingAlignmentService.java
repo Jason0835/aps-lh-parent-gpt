@@ -28,8 +28,8 @@ import java.util.Objects;
  *   <li>从{@link StructureShiftInMachineIndex}读取该班次内待排SKU所属结构的在机物理机台数
  *       （包含该SKU当前已在机的机台，单控L/R已按物理整机去重）；</li>
  *   <li>当 {@code 同结构在机机台数 < 最低硫化机台数 - 1} 时触发约束；</li>
- *   <li>触发后仅允许选择前物料（机台当前在产物料）与待排SKU同结构的候选机台，
- *       不同结构及无前物料的空机台直接排除；</li>
+ *   <li>触发后允许选择前物料与待排SKU同结构的候选机台；机台当前物料为空时，
+ *       先结合实时排程结果区分真实空机与运行态数据缺失，真实空机允许继续选机；</li>
  *   <li>命中且最终选中时，结果行复用 {@code IS_STRUCTURE_MIN_MACHINE_RETAINED}=1、
  *       机台运行态打结构收尾对齐标识，并在首个生产班次原因分析追加“结构收尾对齐”。</li>
  * </ol>
@@ -132,16 +132,41 @@ public class StructureEndingAlignmentService {
                     minimumMachineCount);
             return decision;
         }
-        // 触发后按“候选机台前物料（机台当前在产物料）结构”比较，禁止使用后物料或其他当前排程物料。
+        /*
+         * 触发后按候选机台有效前物料结构比较，禁止使用后物料或其他当前排程物料。
+         * 机台运行态当前物料为空时，必须先读取实时排程归属：存在归属表示运行态数据缺失，
+         * 仍按有效前物料比较；不存在任何归属才是真实空机，允许继续参与原有选机流程。
+         */
         String previousMaterialCode = machine.getCurrentMaterialCode();
+        String previousMaterialSource = "机台运行态";
+        if (StringUtils.isEmpty(previousMaterialCode)) {
+            LhScheduleResult activeOwnerResult = structureMinMachineRetentionService
+                    .resolveActiveOwnerResultAtShift(
+                            context, machine.getMachineCode(), countingShiftIndex);
+            if (Objects.isNull(activeOwnerResult)) {
+                decision.setRealIdleMachine(true);
+                log.info("结构收尾对齐真实空机放行, batchNo: {}, materialCode: {}, structureName: {}, "
+                                + "machineCode: {}, previousMaterialCode: null, previousStructureName: null, "
+                                + "countingShift: {}, inMachineCount: {}, minimumMachineCount: {}, "
+                                + "triggered: true, reason: 机台无运行态物料且无实时排程归属",
+                        context.getBatchNo(), sku.getMaterialCode(), structureName,
+                        machine.getMachineCode(), countingShiftIndex, inMachineCount,
+                        minimumMachineCount);
+                return decision;
+            }
+            previousMaterialCode = activeOwnerResult.getMaterialCode();
+            previousMaterialSource = "实时排程结果";
+        }
         decision.setPreviousMaterialCode(previousMaterialCode);
         if (StringUtils.isEmpty(previousMaterialCode)) {
             decision.setAllowed(false);
-            decision.setExcludedReason("候选机台当前无在产物料，无法同结构匹配");
-            log.info("结构收尾对齐空机台排除, batchNo: {}, materialCode: {}, structureName: {}, "
-                            + "machineCode: {}, countingShift: {}, inMachineCount: {}, minimumMachineCount: {}",
+            decision.setExcludedReason("候选机台存在实时排程归属，但有效前物料为空");
+            log.warn("结构收尾对齐运行态数据异常排除, batchNo: {}, materialCode: {}, structureName: {}, "
+                            + "machineCode: {}, previousMaterialSource: {}, countingShift: {}, "
+                            + "inMachineCount: {}, minimumMachineCount: {}, triggered: true, "
+                            + "reason: 存在实时排程归属但有效前物料为空",
                     context.getBatchNo(), sku.getMaterialCode(), structureName,
-                    machine.getMachineCode(), countingShiftIndex, inMachineCount,
+                    machine.getMachineCode(), previousMaterialSource, countingShiftIndex, inMachineCount,
                     minimumMachineCount);
             return decision;
         }
@@ -152,35 +177,35 @@ public class StructureEndingAlignmentService {
             decision.setAllowed(false);
             decision.setExcludedReason("候选机台前物料无法归属结构，按不同结构排除");
             log.info("结构收尾对齐前物料无结构排除, batchNo: {}, materialCode: {}, structureName: {}, "
-                            + "machineCode: {}, previousMaterialCode: {}, countingShift: {}, "
+                            + "machineCode: {}, previousMaterialCode: {}, previousMaterialSource: {}, countingShift: {}, "
                             + "inMachineCount: {}, minimumMachineCount: {}",
                     context.getBatchNo(), sku.getMaterialCode(), structureName,
-                    machine.getMachineCode(), previousMaterialCode, countingShiftIndex,
+                    machine.getMachineCode(), previousMaterialCode, previousMaterialSource, countingShiftIndex,
                     inMachineCount, minimumMachineCount);
             return decision;
         }
         if (StringUtils.equals(previousStructureName, structureName)) {
             log.info("结构收尾对齐同结构放行, batchNo: {}, materialCode: {}, structureName: {}, "
-                            + "machineCode: {}, previousMaterialCode: {}, previousStructureName: {}, "
+                            + "machineCode: {}, previousMaterialCode: {}, previousMaterialSource: {}, previousStructureName: {}, "
                             + "countingShift: {}, inMachineCount: {}, minimumMachineCount: {}, reason: 同结构",
                     context.getBatchNo(), sku.getMaterialCode(), structureName,
-                    machine.getMachineCode(), previousMaterialCode, previousStructureName,
+                    machine.getMachineCode(), previousMaterialCode, previousMaterialSource, previousStructureName,
                     countingShiftIndex, inMachineCount, minimumMachineCount);
             return decision;
         }
         decision.setAllowed(false);
         decision.setExcludedReason("候选机台前物料结构与待排SKU不同结构");
         log.info("结构收尾对齐不同结构排除, batchNo: {}, materialCode: {}, structureName: {}, "
-                        + "machineCode: {}, previousMaterialCode: {}, previousStructureName: {}, "
+                        + "machineCode: {}, previousMaterialCode: {}, previousMaterialSource: {}, previousStructureName: {}, "
                         + "countingShift: {}, inMachineCount: {}, minimumMachineCount: {}, reason: 不同结构",
                 context.getBatchNo(), sku.getMaterialCode(), structureName,
-                machine.getMachineCode(), previousMaterialCode, previousStructureName,
+                machine.getMachineCode(), previousMaterialCode, previousMaterialSource, previousStructureName,
                 countingShiftIndex, inMachineCount, minimumMachineCount);
         return decision;
     }
 
     /**
-     * 结构收尾对齐命中且同结构选中后，对结果行和机台运行态打标识。
+     * 结构收尾对齐命中且候选机台放行选中后，对结果行和机台运行态打标识。
      *
      * <p>结果行复用 {@code IS_STRUCTURE_MIN_MACHINE_RETAINED}=1，并在首个生产班次的
      * 原因分析追加“结构收尾对齐”；机台运行态内存标识用于审计与后续场景快速读取。</p>

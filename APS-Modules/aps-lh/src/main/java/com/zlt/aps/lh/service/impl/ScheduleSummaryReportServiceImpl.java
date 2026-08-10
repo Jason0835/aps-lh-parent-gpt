@@ -10,11 +10,9 @@ import com.zlt.aps.common.core.domain.ExcelCellRangeAddress;
 import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.cx.entity.config.CxParamConfig;
-import com.zlt.aps.cx.entity.schedule.CxPrecisionPlan;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
 import com.zlt.aps.enums.ConstructionStageEnum;
 import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
-import com.zlt.aps.lh.api.domain.entity.LhPrecisionPlan;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.entity.LhShiftConfig;
 import com.zlt.aps.lh.api.domain.vo.ScheduleSummaryReportVO;
@@ -109,12 +107,6 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
 
     @Resource
     private LhMouldChangePlanEntityMapper lhMouldChangePlanEntityMapper;
-
-    @Resource
-    private CxPrecisionPlanMapper cxPrecisionPlanMapper;
-
-    @Resource
-    private LhPrecisionPlanMapper lhPrecisionPlanMapper;
 
     @Resource
     private FactoryParamMapper factoryParamMapper;
@@ -215,6 +207,14 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         Map<String, Object> mouldChangeAndCleanMap = this.buildMouldChangeAndCleanInfo(
                 scheduleDate, scheduleDateT2, factoryCode);
         tableMap.putAll(mouldChangeAndCleanMap);
+
+        // 精度计划备注：从排程结果表取数，按班次分析原因含"精度"标记分组
+        // class3/4/5（排程日期当天，T+1）→ T+1报表栏位
+        // class6/7/8（排程日期+1天，T+2）→ T+2报表栏位
+        // class1/2（排程日期前一天，T）不在报表展示范围内，忽略
+        Map<String, Object> precisionRemarkMap = this.buildPrecisionRemarkInfo(
+                cxResults, lhResults, factoryCode);
+        tableMap.putAll(precisionRemarkMap);
 
         // 小胶种列表：T+1 和 T+2 从同一份排程结果中按不同班次过滤，按胶种做 full outer join
         List<Map<String, Object>> smallRubberList = this.buildMergedSmallRubberList(
@@ -451,14 +451,8 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         // 模具交替/清洗信息已由外层 buildMouldChangeAndCleanInfo 统一查询并按 planDate 分组注入，
         // 不再在此处逐个日期查询，避免 T+2 栏位因 scheduleDate 过滤条件错误导致查不到数据
 
-        // 精度备注：T+1按排程日期查精度计划，T+2按排程日期查精度计划后筛出planDate为T+2的数据
-        if ("".equals(keySuffix)) {
-            map.put("cxRemark" + keySuffix, this.buildCxRemark(reportDate, factoryCode));
-            map.put("lhRemark" + keySuffix, this.buildLhRemark(reportDate, factoryCode));
-        } else {
-            map.put("cxRemark" + keySuffix, this.buildCxRemarkForT2(actualScheduleDate, scheduleDateT2, factoryCode));
-            map.put("lhRemark" + keySuffix, this.buildLhRemarkForT2(actualScheduleDate, scheduleDateT2, factoryCode));
-        }
+        // 精度计划备注已由外层 buildPrecisionRemarkInfo 统一查询并按 planDate 分组注入，
+        // 不再在此处逐个日期查询，避免 T+1 报表误含 planDate=T+2 的数据
 
         return map;
     }
@@ -821,27 +815,34 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                     continue;
                 }
 
-                // 按规格+花纹去重（同一胎胚下多条物料记录的规格花纹相同，去重后保留唯一值）
-                Set<String> specPatternSet = new LinkedHashSet<>();
+                // 从胎胚描述(embryoDesc)解析规格和花纹，按规格分组收集花纹列表
+                // 输出格式：规格1 花纹1/花纹2，规格2 花纹3（同规格多花纹用"/"隔开，不同规格用"，"隔开）
+                Map<String, LinkedHashSet<String>> specPatternsMap = new LinkedHashMap<>();
                 for (MdmMaterialInfo materialInfo : materialsForType) {
-                    String specifications = StringUtils.defaultString(materialInfo.getSpecifications()).trim();
-                    String pattern = StringUtils.defaultString(materialInfo.getPattern()).trim();
-                    if (StringUtils.isBlank(specifications)) {
+                    String embryoDesc = StringUtils.defaultString(materialInfo.getEmbryoDesc()).trim();
+                    String[] specPattern = this.parseSpecAndPatternFromEmbryoDesc(embryoDesc);
+                    if (specPattern == null) {
                         continue;
                     }
-                    String specPattern = specifications;
-                    if (StringUtils.isNotBlank(pattern)) {
-                        specPattern = specifications + " " + pattern;
-                    }
-                    specPatternSet.add(specPattern);
+                    String specifications = specPattern[0];
+                    String pattern = specPattern[1];
+                    specPatternsMap.computeIfAbsent(specifications, k -> new LinkedHashSet<>()).add(pattern);
                 }
 
-                if (specPatternSet.isEmpty()) {
+                if (specPatternsMap.isEmpty()) {
                     continue;
                 }
 
+                // 格式化：规格 花纹1/花纹2，不同规格用"，"隔开
+                List<String> specPatternParts = new ArrayList<>();
+                for (Map.Entry<String, LinkedHashSet<String>> entry : specPatternsMap.entrySet()) {
+                    String spec = entry.getKey();
+                    String patterns = String.join("/", entry.getValue());
+                    specPatternParts.add(spec + " " + patterns);
+                }
+
                 String title = this.getRecipeTypeTitle(recipeType);
-                groupParts.add(title + String.join(",", specPatternSet));
+                groupParts.add(title + String.join("，", specPatternParts));
             }
 
             Map<String, Object> item = new HashMap<>();
@@ -1015,6 +1016,36 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
             case "X": return "试制 Thử sản xuất：";
             default: return "正规 Chinh quy：";
         }
+    }
+
+    /**
+     * 从胎胚描述中解析规格和花纹。
+     *
+     * <p>胎胚描述格式样例：{@code 295/80R22.5 152/149L 18PR BA267 BL4HBL}</p>
+     * <ul>
+     *   <li>规格：按空格分割后的第1段（如 295/80R22.5）</li>
+     *   <li>花纹：按空格分割后的第4段（如 BA267）</li>
+     * </ul>
+     *
+     * @param embryoDesc 胎胚描述
+     * @return 包含规格和花纹的数组，[0]=规格，[1]=花纹；解析失败返回null
+     */
+    private String[] parseSpecAndPatternFromEmbryoDesc(String embryoDesc) {
+        if (StringUtils.isBlank(embryoDesc)) {
+            return null;
+        }
+        // 按空格分割胎胚描述
+        String[] parts = embryoDesc.trim().split("\\s+");
+        // 胎胚描述至少需要4段才能解析出规格（第1段）和花纹（第4段）
+        if (parts.length < 4) {
+            return null;
+        }
+        String specifications = parts[0];
+        String pattern = parts[3];
+        if (StringUtils.isBlank(specifications) || StringUtils.isBlank(pattern)) {
+            return null;
+        }
+        return new String[]{specifications, pattern};
     }
 
     /**
@@ -1230,7 +1261,17 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
     }
 
     /**
-     * 判断某台机器在指定班次类型和班次序号范围内是否有计划产量
+     * 判断某台机器在指定班次类型和班次序号范围内是否有排程记录（含计划量为0的机台）。
+     *
+     * <p>统计口径：只要机台在该班次序号范围内有排程记录（classNPlanQty 不为 null，即使为0），
+     * 即视为该班次开动，计入开动机台数。</p>
+     *
+     * @param result           硫化排程结果
+     * @param classShiftTypeMap 班次类型映射
+     * @param shiftType        班次类型（01-夜，02-早，03-中）
+     * @param shiftIndexMin    班次序号下限（含）
+     * @param shiftIndexMax    班次序号上限（含）
+     * @return true=该机台在该班次类型和范围内有排程记录，false=无排程记录
      */
     private boolean hasNonZeroQtyForShiftTypeInRange(LhScheduleResult result,
                                                       Map<Integer, String> classShiftTypeMap,
@@ -1241,36 +1282,37 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                 continue;
             }
             if (shiftType.equals(entry.getValue())) {
-                BigDecimal qty = BigDecimal.ZERO;
+                Integer qty = null;
                 switch (shiftIndex) {
                     case 1:
-                        qty = nvlInt(result.getClass1PlanQty());
+                        qty = result.getClass1PlanQty();
                         break;
                     case 2:
-                        qty = nvlInt(result.getClass2PlanQty());
+                        qty = result.getClass2PlanQty();
                         break;
                     case 3:
-                        qty = nvlInt(result.getClass3PlanQty());
+                        qty = result.getClass3PlanQty();
                         break;
                     case 4:
-                        qty = nvlInt(result.getClass4PlanQty());
+                        qty = result.getClass4PlanQty();
                         break;
                     case 5:
-                        qty = nvlInt(result.getClass5PlanQty());
+                        qty = result.getClass5PlanQty();
                         break;
                     case 6:
-                        qty = nvlInt(result.getClass6PlanQty());
+                        qty = result.getClass6PlanQty();
                         break;
                     case 7:
-                        qty = nvlInt(result.getClass7PlanQty());
+                        qty = result.getClass7PlanQty();
                         break;
                     case 8:
-                        qty = nvlInt(result.getClass8PlanQty());
+                        qty = result.getClass8PlanQty();
                         break;
                     default:
                         break;
                 }
-                if (qty.compareTo(BigDecimal.ZERO) > 0) {
+                // 计划量不为null（即使为0）即表示该机台在该班次有排程记录，计入开动机台数
+                if (qty != null) {
                     return true;
                 }
             }
@@ -1332,50 +1374,115 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
     }
 
     /**
-     * 构建成型备注信息
+     * 一次性构建 T+1 和 T+2 的精度计划备注信息。
      *
-     * <p>取成型精度计划的排程日期在报告日期时间范围内要做的机台，
-     * 成型精度做的时间固定在6:00~14:00</p>
+     * <p>取数口径：直接从排程结果表（T_CX_SCHEDULE_RESULT / T_LH_SCHEDULE_RESULT）取数，
+     * 不再查询精度计划表。一条排程结果记录包含8个班次数据，覆盖3天（T、T+1、T+2）。</p>
      *
-     * @param reportDate  报告日期（即排程日期）
+     * <p>班次与报表栏位映射（以排程日期=8月7日为例，覆盖6/7/8日3天）：</p>
+     * <ul>
+     *   <li>class1/2 → 8月6日（T），不在报表展示范围内，忽略</li>
+     *   <li>class3/4/5 → 8月7日（T+1），对应 T+1 报表栏位</li>
+     *   <li>class6/7/8 → 8月8日（T+2），对应 T+2 报表栏位</li>
+     * </ul>
+     *
+     * <p>精度标记判定规则：</p>
+     * <ul>
+     *   <li>硫化侧：精度保养结束班次由 {@code ResultDowntimeSummaryUtil} 写入固定原因"精度计划"</li>
+     *   <li>成型侧：精度扣减班次由 {@code buildTaskAnalysis} 写入原因"精度"（可能与其他原因组合，如"试制,精度"）</li>
+     *   <li>统一用 {@code contains("精度")} 匹配两种写法</li>
+     * </ul>
+     *
+     * @param cxResults  成型排程结果列表（已按 scheduleDate + factoryCode 过滤）
+     * @param lhResults  硫化排程结果列表（已按 scheduleDate + factoryCode 过滤）
      * @param factoryCode 分厂编码
-     * @return 成型备注字符串，格式如："机台A、机台B 做精度 6:00-14:00"
+     * @return 包含 cxRemark/cxRemark2/lhRemark/lhRemark2 的Map
      */
-    private String buildCxRemark(Date reportDate, String factoryCode) {
-        Date dayStart = LhScheduleTimeUtil.clearTime(reportDate);
-        Date dayEnd = LhScheduleTimeUtil.getEndTime(reportDate);
+    private Map<String, Object> buildPrecisionRemarkInfo(List<CxScheduleResult> cxResults,
+                                                         List<LhScheduleResult> lhResults,
+                                                         String factoryCode) {
+        Map<String, Object> map = new HashMap<>(8);
 
-        List<CxPrecisionPlan> precisionPlans = cxPrecisionPlanMapper.selectList(
-                new LambdaQueryWrapper<CxPrecisionPlan>()
-                        .eq(CxPrecisionPlan::getFactoryCode, factoryCode)
-                        .ge(CxPrecisionPlan::getScheduleDate, dayStart)
-                        .le(CxPrecisionPlan::getScheduleDate, dayEnd));
-        log.info("成型精度计划查询完成, 报告日期(前一天): {}, 分厂: {}, 数量: {}",
-                DateUtil.formatDate(reportDate), factoryCode, precisionPlans.size());
-
-        if (precisionPlans.isEmpty()) {
-            return "";
-        }
-
-        List<String> machineCodes = precisionPlans.stream()
-                .map(CxPrecisionPlan::getMachineCode)
+        // 成型精度机台：按班次分析原因含"精度"标记分组
+        // T+1（class3/4/5）和 T+2（class6/7/8）从同一份排程结果中取数
+        List<String> cxMachineCodesT1 = cxResults.stream()
+                .filter(r -> containsPrecisionKeyword(
+                        r.getClass3Analysis(), r.getClass4Analysis(), r.getClass5Analysis()))
+                .map(CxScheduleResult::getCxMachineCode)
                 .filter(StringUtils::isNotBlank)
                 .distinct()
                 .collect(Collectors.toList());
 
-        if (machineCodes.isEmpty()) {
-            return "";
-        }
+        List<String> cxMachineCodesT2 = cxResults.stream()
+                .filter(r -> containsPrecisionKeyword(
+                        r.getClass6Analysis(), r.getClass7Analysis(), r.getClass8Analysis()))
+                .map(CxScheduleResult::getCxMachineCode)
+                .filter(StringUtils::isNotBlank)
+                .distinct()
+                .collect(Collectors.toList());
 
-        String machineStr = String.join("、", machineCodes);
-        return machineStr + " 6:00-14:00精度校验";
+        // 成型备注格式："机台A、机台B 6:00-14:00精度校验"
+        String cxRemarkT1 = cxMachineCodesT1.isEmpty() ? ""
+                : String.join("、", cxMachineCodesT1) + " 6:00-14:00精度校验";
+        String cxRemarkT2 = cxMachineCodesT2.isEmpty() ? ""
+                : String.join("、", cxMachineCodesT2) + " 6:00-14:00精度校验";
+
+        // 硫化精度机台：按班次分析原因含"精度计划"标记分组
+        List<String> lhMachineCodesT1 = lhResults.stream()
+                .filter(r -> containsPrecisionKeyword(
+                        r.getClass3Analysis(), r.getClass4Analysis(), r.getClass5Analysis()))
+                .map(LhScheduleResult::getLhMachineCode)
+                .filter(StringUtils::isNotBlank)
+                .distinct()
+                .collect(Collectors.toList());
+
+        List<String> lhMachineCodesT2 = lhResults.stream()
+                .filter(r -> containsPrecisionKeyword(
+                        r.getClass6Analysis(), r.getClass7Analysis(), r.getClass8Analysis()))
+                .map(LhScheduleResult::getLhMachineCode)
+                .filter(StringUtils::isNotBlank)
+                .distinct()
+                .collect(Collectors.toList());
+
+        // 硫化备注需要计算保养时段和开产时间
+        String lhRemarkT1 = this.buildLhRemarkText(lhMachineCodesT1, factoryCode, "");
+        String lhRemarkT2 = this.buildLhRemarkText(lhMachineCodesT2, factoryCode, "(T+2)");
+
+        log.info("精度计划备注分组结果 - T+1成型: [{}], T+2成型: [{}], T+1硫化: [{}], T+2硫化: [{}]",
+                cxRemarkT1, cxRemarkT2, lhRemarkT1, lhRemarkT2);
+
+        map.put("cxRemark", cxRemarkT1);
+        map.put("cxRemark2", cxRemarkT2);
+        map.put("lhRemark", lhRemarkT1);
+        map.put("lhRemark2", lhRemarkT2);
+        return map;
     }
 
     /**
-     * 构建硫化备注信息
+     * 判断班次分析原因中是否包含"精度"关键字。
      *
-     * <p>取硫化精度计划的排程日期在报告日期（前一天）时间范围内要做的机台，
-     * 硫化精度做的时间及开产时间根据以下三个参数来定：</p>
+     * <p>硫化侧写入"精度计划"，成型侧写入"精度"（可能与其他原因组合，如"试制,精度"），
+     * 统一用 {@code contains("精度")} 匹配两种写法。</p>
+     *
+     * @param analyses 待检查的班次分析原因文本（可变参数，任一非空且包含"精度"即返回true）
+     * @return true-任一班次分析原因包含"精度"；false-全部不包含
+     */
+    private boolean containsPrecisionKeyword(String... analyses) {
+        if (analyses == null || analyses.length == 0) {
+            return false;
+        }
+        for (String analysis : analyses) {
+            if (StringUtils.isNotBlank(analysis) && analysis.contains("精度")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 构建硫化备注文本。
+     *
+     * <p>硫化精度做的时间及开产时间根据以下三个参数来定：</p>
      * <ul>
      *   <li>胶囊预热时间（小时）SYS0307009，如：2.5</li>
      *   <li>保养开始小时 SYS0307002，如：8</li>
@@ -1384,39 +1491,19 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
      * <p>开产为保养完后胶囊预热完后开产。
      * 例如：保养8:00开始，保养7小时到15:00结束，胶囊预热2.5小时，开产时间17:30</p>
      *
-     * @param reportDate  报告日期（即排程日期）
-     * @param factoryCode 分厂编码
-     * @return 硫化备注字符串，格式如："机台A、机台B 做精度 8:00-15:00，开产17:30"
+     * @param machineCodes 机台编号列表
+     * @param factoryCode  分厂编码
+     * @param logSuffix    日志后缀（用于区分T+1/T+2）
+     * @return 硫化备注字符串，格式如："机台A、机台B 8:00-15:00 维保,17:30开产"；无机台返回空字符串
      */
-    private String buildLhRemark(Date reportDate, String factoryCode) {
-        Date dayStart = LhScheduleTimeUtil.clearTime(reportDate);
-        Date dayEnd = LhScheduleTimeUtil.getEndTime(reportDate);
-
-        List<LhPrecisionPlan> precisionPlans = lhPrecisionPlanMapper.selectList(
-                new LambdaQueryWrapper<LhPrecisionPlan>()
-                        .eq(LhPrecisionPlan::getFactoryCode, factoryCode)
-                        .ge(LhPrecisionPlan::getScheduleDate, dayStart)
-                        .le(LhPrecisionPlan::getScheduleDate, dayEnd));
-        log.info("硫化精度计划查询完成, 报告日期(前一天): {}, 分厂: {}, 数量: {}",
-                DateUtil.formatDate(reportDate), factoryCode, precisionPlans.size());
-
-        if (precisionPlans.isEmpty()) {
+    private String buildLhRemarkText(List<String> machineCodes, String factoryCode, String logSuffix) {
+        if (machineCodes == null || machineCodes.isEmpty()) {
             return "";
         }
 
-        List<String> machineCodes = precisionPlans.stream()
-                .map(LhPrecisionPlan::getMachineCode)
-                .filter(StringUtils::isNotBlank)
-                .distinct()
-                .collect(Collectors.toList());
-
-        if (machineCodes.isEmpty()) {
-            return "";
-        }
-
-        String maintenanceStartHourStr = loadFactoryParamValue(factoryCode, null, "SYS0307002");
-        String maintenanceDurationStr = loadFactoryParamValue(factoryCode, null, "SYS0307001");
-        String capsulePreheatStr = loadFactoryParamValue(factoryCode, null, "SYS0307009");
+        String maintenanceStartHourStr = this.loadFactoryParamValue(factoryCode, null, "SYS0307002");
+        String maintenanceDurationStr = this.loadFactoryParamValue(factoryCode, null, "SYS0307001");
+        String capsulePreheatStr = this.loadFactoryParamValue(factoryCode, null, "SYS0307009");
 
         int maintenanceStartHour = 8;
         int maintenanceDuration = 7;
@@ -1452,140 +1539,12 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         int productionStartMinute = (int) Math.round((productionStartTotalHours - productionStartHour) * 60);
         String productionStartTime = String.format("%d:%02d", productionStartHour, productionStartMinute);
 
-        log.info("硫化备注时间计算 - 保养开始: {}小时, 保养耗时: {}小时, 胶囊预热: {}小时, 保养时段: {}, 开产时间: {}",
-                maintenanceStartHour, maintenanceDuration, capsulePreheatHours,
+        log.info("硫化备注时间计算{} - 保养开始: {}小时, 保养耗时: {}小时, 胶囊预热: {}小时, 保养时段: {}, 开产时间: {}",
+                logSuffix, maintenanceStartHour, maintenanceDuration, capsulePreheatHours,
                 maintenanceTimeRange, productionStartTime);
 
         String machineStr = String.join("、", machineCodes);
-        return machineStr + maintenanceTimeRange + " 维保," + productionStartTime + "开产";
-    }
-
-    /**
-     * 构建成型备注信息（T+2版本）
-     *
-     * <p>按T+1排程日期查成型精度计划的scheduleDate，再筛出planDate为T+2的数据。
-     * 成型精度做的时间固定在6:00~14:00</p>
-     *
-     * @param scheduleDateT1 T+1排程日期（查询精度计划的scheduleDate范围）
-     * @param scheduleDateT2 T+2日期（筛选精度计划的planDate范围）
-     * @param factoryCode    分厂编码
-     * @return 成型备注字符串
-     */
-    private String buildCxRemarkForT2(Date scheduleDateT1, Date scheduleDateT2, String factoryCode) {
-        Date t1Start = LhScheduleTimeUtil.clearTime(scheduleDateT1);
-        Date t1End = LhScheduleTimeUtil.getEndTime(scheduleDateT1);
-        Date t2Start = LhScheduleTimeUtil.clearTime(scheduleDateT2);
-        Date t2End = LhScheduleTimeUtil.getEndTime(scheduleDateT2);
-
-        // 按T+1排程日期查精度计划的scheduleDate
-        List<CxPrecisionPlan> precisionPlans = cxPrecisionPlanMapper.selectList(
-                new LambdaQueryWrapper<CxPrecisionPlan>()
-                        .eq(CxPrecisionPlan::getFactoryCode, factoryCode)
-                        .ge(CxPrecisionPlan::getScheduleDate, t1Start)
-                        .le(CxPrecisionPlan::getScheduleDate, t1End));
-        log.info("成型精度计划查询完成(T+2筛选), 排程日期: {}, 分厂: {}, 查询数量: {}",
-                DateUtil.formatDate(scheduleDateT1), factoryCode, precisionPlans.size());
-
-        // 从查到的数据中筛出planDate在T+2范围内的记录
-        List<String> machineCodes = precisionPlans.stream()
-                .filter(p -> p.getPlanDate() != null
-                        && !p.getPlanDate().before(t2Start) && !p.getPlanDate().after(t2End))
-                .map(CxPrecisionPlan::getMachineCode)
-                .filter(StringUtils::isNotBlank)
-                .distinct()
-                .collect(Collectors.toList());
-
-        if (machineCodes.isEmpty()) {
-            return "";
-        }
-
-        String machineStr = String.join("、", machineCodes);
-        return machineStr + " 6:00-14:00精度校验";
-    }
-
-    /**
-     * 构建硫化备注信息（T+2版本）
-     *
-     * <p>按T+1排程日期查硫化精度计划的scheduleDate，再筛出planDate为T+2的数据。
-     * 硫化精度做的时间及开产时间根据参数计算</p>
-     *
-     * @param scheduleDateT1 T+1排程日期（查询精度计划的scheduleDate范围）
-     * @param scheduleDateT2 T+2日期（筛选精度计划的planDate范围）
-     * @param factoryCode    分厂编码
-     * @return 硫化备注字符串
-     */
-    private String buildLhRemarkForT2(Date scheduleDateT1, Date scheduleDateT2, String factoryCode) {
-        Date t1Start = LhScheduleTimeUtil.clearTime(scheduleDateT1);
-        Date t1End = LhScheduleTimeUtil.getEndTime(scheduleDateT1);
-        Date t2Start = LhScheduleTimeUtil.clearTime(scheduleDateT2);
-        Date t2End = LhScheduleTimeUtil.getEndTime(scheduleDateT2);
-
-        // 按T+1排程日期查精度计划的scheduleDate
-        List<LhPrecisionPlan> precisionPlans = lhPrecisionPlanMapper.selectList(
-                new LambdaQueryWrapper<LhPrecisionPlan>()
-                        .eq(LhPrecisionPlan::getFactoryCode, factoryCode)
-                        .ge(LhPrecisionPlan::getScheduleDate, t1Start)
-                        .le(LhPrecisionPlan::getScheduleDate, t1End));
-        log.info("硫化精度计划查询完成(T+2筛选), 排程日期: {}, 分厂: {}, 查询数量: {}",
-                DateUtil.formatDate(scheduleDateT1), factoryCode, precisionPlans.size());
-
-        // 从查到的数据中筛出planDate在T+2范围内的记录
-        List<String> machineCodes = precisionPlans.stream()
-                .filter(p -> p.getPlanDate() != null
-                        && !p.getPlanDate().before(t2Start) && !p.getPlanDate().after(t2End))
-                .map(LhPrecisionPlan::getMachineCode)
-                .filter(StringUtils::isNotBlank)
-                .distinct()
-                .collect(Collectors.toList());
-
-        if (machineCodes.isEmpty()) {
-            return "";
-        }
-
-        String maintenanceStartHourStr = loadFactoryParamValue(factoryCode, null, "SYS0307002");
-        String maintenanceDurationStr = loadFactoryParamValue(factoryCode, null, "SYS0307001");
-        String capsulePreheatStr = loadFactoryParamValue(factoryCode, null, "SYS0307009");
-
-        int maintenanceStartHour = 8;
-        int maintenanceDuration = 7;
-        double capsulePreheatHours = 2.5;
-
-        try {
-            if (StringUtils.isNotBlank(maintenanceStartHourStr)) {
-                maintenanceStartHour = Integer.parseInt(maintenanceStartHourStr.trim());
-            }
-        } catch (NumberFormatException e) {
-            log.warn("解析保养开始小时参数（SYS0307002）失败: {}, 使用默认值8", maintenanceStartHourStr);
-        }
-        try {
-            if (StringUtils.isNotBlank(maintenanceDurationStr)) {
-                maintenanceDuration = Integer.parseInt(maintenanceDurationStr.trim());
-            }
-        } catch (NumberFormatException e) {
-            log.warn("解析保养耗时参数（SYS0307001）失败: {}, 使用默认值7", maintenanceDurationStr);
-        }
-        try {
-            if (StringUtils.isNotBlank(capsulePreheatStr)) {
-                capsulePreheatHours = Double.parseDouble(capsulePreheatStr.trim());
-            }
-        } catch (NumberFormatException e) {
-            log.warn("解析胶囊预热时间参数（SYS0307009）失败: {}, 使用默认值2.5", capsulePreheatStr);
-        }
-
-        int maintenanceEndHour = maintenanceStartHour + maintenanceDuration;
-        String maintenanceTimeRange = maintenanceStartHour + ":00-" + maintenanceEndHour + ":00";
-
-        double productionStartTotalHours = maintenanceEndHour + capsulePreheatHours;
-        int productionStartHour = (int) productionStartTotalHours;
-        int productionStartMinute = (int) Math.round((productionStartTotalHours - productionStartHour) * 60);
-        String productionStartTime = String.format("%d:%02d", productionStartHour, productionStartMinute);
-
-        log.info("硫化备注时间计算(T+2) - 保养开始: {}小时, 保养耗时: {}小时, 胶囊预热: {}小时, 保养时段: {}, 开产时间: {}",
-                maintenanceStartHour, maintenanceDuration, capsulePreheatHours,
-                maintenanceTimeRange, productionStartTime);
-
-        String machineStr = String.join("、", machineCodes);
-        return machineStr + maintenanceTimeRange + " 维保," + productionStartTime + "开产";
+        return machineStr + " " + maintenanceTimeRange + " 维保," + productionStartTime + "开产";
     }
 
     /**

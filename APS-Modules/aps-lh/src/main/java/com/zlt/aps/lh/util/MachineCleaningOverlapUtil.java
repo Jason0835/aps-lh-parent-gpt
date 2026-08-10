@@ -205,6 +205,49 @@ public final class MachineCleaningOverlapUtil {
     }
 
     /**
+     * 解析窗口起点约束下机台最早可开产时间。
+     *
+     * <p>仅当清洗或计划停机在窗口起点或之前已经开始且尚未结束时，机台初始收尾/释放时间
+     * 顺延到清洗可开产时间或停机结束时间；约束晚于窗口起点时保持原时间，由排产主链按
+     * 实际生产窗口继续处理，避免把未来约束误当成窗口起点已占用来推迟机台。</p>
+     *
+     * @param baseTime 窗口起点等基础可用时间
+     * @param cleaningWindowList 清洗窗口列表
+     * @param planStopStartTime 计划停机开始时间
+     * @param planStopEndTime 计划停机结束时间
+     * @return 考虑窗口起点已占用约束后的最早可开产时间；基础时间为空时返回 null
+     */
+    public static Date resolveEarliestAvailableTime(Date baseTime,
+                                                    List<MachineCleaningWindowDTO> cleaningWindowList,
+                                                    Date planStopStartTime,
+                                                    Date planStopEndTime) {
+        if (Objects.isNull(baseTime)) {
+            return null;
+        }
+        Date availableTime = baseTime;
+        if (!CollectionUtils.isEmpty(cleaningWindowList)) {
+            for (MachineCleaningWindowDTO cleaningWindow : cleaningWindowList) {
+                if (Objects.isNull(cleaningWindow)
+                        || Objects.isNull(cleaningWindow.getCleanStartTime())
+                        || cleaningWindow.getCleanStartTime().after(baseTime)) {
+                    continue;
+                }
+                Date cleanReadyTime = resolveEffectiveCleanEndTime(cleaningWindow);
+                if (Objects.nonNull(cleanReadyTime) && cleanReadyTime.after(availableTime)) {
+                    availableTime = cleanReadyTime;
+                }
+            }
+        }
+        if (Objects.nonNull(planStopStartTime)
+                && !planStopStartTime.after(baseTime)
+                && Objects.nonNull(planStopEndTime)
+                && planStopEndTime.after(availableTime)) {
+            availableTime = planStopEndTime;
+        }
+        return availableTime;
+    }
+
+    /**
      * 过滤掉与切换窗口严格相交的清洗窗口。
      *
      * @param cleaningWindowList 清洗窗口列表

@@ -135,9 +135,8 @@ public class BaseDataContainer implements Serializable {
     private Map<String, Integer> groupMachineLimitMap;
     /**
      * 20260713+ 当月特殊的指定生产信息
-     * key=分组名 : value=指定生产信息(成型机台/生产天数)
      */
-    private Map<String, GroupAppointProductionInfoVo> appointMap;
+    private List<GroupAppointProductionInfoVo> appointConfiguration;
 
     /**
      * 判断同结构下前后两个Sku是否共用模具

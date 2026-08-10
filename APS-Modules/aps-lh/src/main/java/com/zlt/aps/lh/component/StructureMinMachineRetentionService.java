@@ -16,6 +16,7 @@ import com.zlt.aps.lh.util.ShiftCapacityResolverUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
 import com.zlt.aps.maindata.mapper.FactoryParamMapper;
 import com.zlt.aps.maindata.mapper.MdmMonCycleSchStruConfEntityMapper;
+import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mp.api.domain.entity.FactoryParam;
 import com.zlt.aps.mp.api.domain.entity.MdmMonCycleSchStruConf;
 import lombok.extern.slf4j.Slf4j;
@@ -192,8 +193,14 @@ public class StructureMinMachineRetentionService {
     /**
      * 解析物料编码所属的结构名称。
      *
-     * <p>优先按S4.3冻结的结构SKU快照归属；快照未命中时回退扫描当前排程结果中的结构名称，
-     * 保证机台实时当前物料也能映射到结构。</p>
+     * <p>结构归属统一按以下顺序解析：</p>
+     * <ol>
+     *   <li>S4.3冻结的结构SKU快照，保持当前批次月计划结构口径优先；</li>
+     *   <li>当前批次排程结果，识别排程过程中已经生成或接管的实时物料；</li>
+     *   <li>数据初始化阶段已加载的有效物料主数据，识别不在本批月计划中的MES在机前物料。</li>
+     * </ol>
+     * <p>全部结构判断必须复用本方法，避免在机缓存与候选机台比较使用不同的数据源，
+     * 导致主数据结构完整的MES前物料被误判为“无法归属结构”。</p>
      *
      * @param context 排程上下文
      * @param materialCode 物料编码
@@ -215,6 +222,14 @@ public class StructureMinMachineRetentionService {
                     && StringUtils.isNotEmpty(result.getStructureName())) {
                 return result.getStructureName();
             }
+        }
+        /*
+         * MES在机物料可能没有进入当前月计划和待排SKU快照，但数据初始化已经按工厂加载全部
+         * 有效物料主数据。这里直接复用上下文主数据，不新增查询，也不改变结构配置来源。
+         */
+        MdmMaterialInfo materialInfo = context.getMaterialInfoMap().get(materialCode);
+        if (Objects.nonNull(materialInfo) && StringUtils.isNotEmpty(materialInfo.getStructureName())) {
+            return materialInfo.getStructureName();
         }
         return null;
     }
@@ -346,6 +361,101 @@ public class StructureMinMachineRetentionService {
     }
 
     /**
+     * 解析候选机台在目标班次仍有效的实时排程归属。
+     *
+     * <p>本方法只在机台运行态当前物料为空时用于区分“真实空机”和“运行态数据缺失”：
+     * 优先读取目标班次前最后一个正量结果；若该机台已在目标班次前登记释放，则返回空；
+     * 若没有正量结果但当前批次仍存在未释放结果，则保守返回最新结果，避免清洗、精度或
+     * 计划性维修形成的零量结果被误判为真实空机。</p>
+     *
+     * @param context 排程上下文
+     * @param machineCode 候选机台编码
+     * @param shiftIndex 结构收尾对齐统计班次
+     * @return 目标班次仍有效的实时排程结果；无任何实时归属时返回null
+     */
+    public LhScheduleResult resolveActiveOwnerResultAtShift(LhScheduleContext context,
+                                                            String machineCode,
+                                                            int shiftIndex) {
+        if (Objects.isNull(context) || StringUtils.isEmpty(machineCode) || shiftIndex < 1) {
+            return null;
+        }
+        LhScheduleResult latestOwner = this.resolveLatestOwnerResult(context, machineCode, shiftIndex);
+        if (Objects.nonNull(latestOwner)) {
+            Integer currentShiftPlanQty = ShiftFieldUtil.getShiftPlanQty(latestOwner, shiftIndex);
+            if (Objects.nonNull(currentShiftPlanQty) && currentShiftPlanQty > 0) {
+                return latestOwner;
+            }
+        }
+        Integer releaseBoundary =
+                context.getContinuousReducedMachineReleaseBoundaryShiftIndex(machineCode);
+        if (Objects.nonNull(releaseBoundary) && releaseBoundary < shiftIndex) {
+            return null;
+        }
+        if (Objects.nonNull(latestOwner)) {
+            return latestOwner;
+        }
+        return this.resolveLatestMachineResult(context, machineCode);
+    }
+
+    /**
+     * 查询当前批次中机台最后一条排程结果。
+     *
+     * <p>只有机台当前物料为空且没有正量归属时才调用，用于识别全零业务停机结果。
+     * 同时读取实时结果列表和新增排产机台分配记录，结果按规格结束时间取最新；结束时间
+     * 同时为空时沿用对应集合中的最后一条。</p>
+     *
+     * @param context 排程上下文
+     * @param machineCode 机台编码
+     * @return 最后一条机台排程结果；不存在返回null
+     */
+    private LhScheduleResult resolveLatestMachineResult(LhScheduleContext context,
+                                                        String machineCode) {
+        if (Objects.isNull(context)) {
+            return null;
+        }
+        LhScheduleResult latestResult = null;
+        if (!CollectionUtils.isEmpty(context.getScheduleResultList())) {
+            latestResult = this.resolveLatestMachineResult(
+                    context.getScheduleResultList(), machineCode, latestResult);
+        }
+        if (!CollectionUtils.isEmpty(context.getMachineAssignmentMap())) {
+            latestResult = this.resolveLatestMachineResult(
+                    context.getMachineAssignmentMap().get(machineCode), machineCode, latestResult);
+        }
+        return latestResult;
+    }
+
+    /**
+     * 从指定结果集合中选择机台最后一条排程结果。
+     *
+     * @param resultList 待检查结果集合
+     * @param machineCode 机台编码
+     * @param currentLatestResult 当前已找到的最新结果
+     * @return 合并比较后的最新结果
+     */
+    private LhScheduleResult resolveLatestMachineResult(List<LhScheduleResult> resultList,
+                                                        String machineCode,
+                                                        LhScheduleResult currentLatestResult) {
+        LhScheduleResult latestResult = currentLatestResult;
+        if (CollectionUtils.isEmpty(resultList)) {
+            return latestResult;
+        }
+        for (LhScheduleResult result : resultList) {
+            if (Objects.isNull(result)
+                    || !StringUtils.equals(machineCode, result.getLhMachineCode())) {
+                continue;
+            }
+            if (Objects.isNull(latestResult)
+                    || Objects.isNull(latestResult.getSpecEndTime())
+                    || (Objects.nonNull(result.getSpecEndTime())
+                    && result.getSpecEndTime().after(latestResult.getSpecEndTime()))) {
+                latestResult = result;
+            }
+        }
+        return latestResult;
+    }
+
+    /**
      * 判断业务停机是否与目标班次重叠。
      *
      * @param context 排程上下文
@@ -409,18 +519,10 @@ public class StructureMinMachineRetentionService {
     private boolean isStructureMaterial(LhScheduleContext context,
                                         String structureName,
                                         String materialCode) {
-        if (StringUtils.isEmpty(materialCode)) {
-            return false;
-        }
-        if (isSnapshotStructureMaterial(context, structureName, materialCode)) {
-            return true;
-        }
-        for (LhScheduleResult result : collectStructureResults(context, structureName)) {
-            if (StringUtils.equals(materialCode, result.getMaterialCode())) {
-                return true;
-            }
-        }
-        return false;
+        // 在机统计与候选选机统一复用同一结构归属入口，禁止分别维护结构数据源。
+        return StringUtils.isNotEmpty(structureName)
+                && StringUtils.equals(structureName,
+                        this.resolveStructureNameByMaterial(context, materialCode));
     }
 
     /**

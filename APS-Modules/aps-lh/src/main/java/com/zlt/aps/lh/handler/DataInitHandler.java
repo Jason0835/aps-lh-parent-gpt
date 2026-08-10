@@ -24,6 +24,7 @@ import com.zlt.aps.lh.service.impl.LhCleaningScheduleService;
 import com.zlt.aps.lh.service.impl.LhMaintenanceScheduleService;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
+import com.zlt.aps.lh.util.MachineCleaningOverlapUtil;
 import com.zlt.aps.mdm.api.domain.entity.MdmDevicePlanShut;
 import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
 import lombok.extern.slf4j.Slf4j;
@@ -264,7 +265,7 @@ public class DataInitHandler extends AbsScheduleStepHandler {
             // 初始化各班次可用状态（默认全部可用）
             Arrays.fill(dto.getShiftAvailable(), true);
             applyShiftProductionControl(context, dto);
-            dto.setEstimatedEndTime(resolveInitialEstimatedEndTime(context, machineCode));
+            dto.setEstimatedEndTime(this.resolveInitialEstimatedEndTime(context, machineCode, dto));
 
             machineScheduleMap.put(machineCode, dto);
         }
@@ -357,7 +358,7 @@ public class DataInitHandler extends AbsScheduleStepHandler {
 
         Arrays.fill(dto.getShiftAvailable(), true);
         applyShiftProductionControl(context, dto);
-        dto.setEstimatedEndTime(resolveInitialEstimatedEndTime(context, machineCode));
+        dto.setEstimatedEndTime(this.resolveInitialEstimatedEndTime(context, machineCode, dto));
     }
 
     private LhCleaningScheduleService getCleaningScheduleService() {
@@ -372,130 +373,50 @@ public class DataInitHandler extends AbsScheduleStepHandler {
                 : new LhMaintenanceScheduleService();
     }
 
-    private Date resolveInitialEstimatedEndTime(LhScheduleContext context, String machineCode) {
-        Date latestSpecEndTime = null;
-        LhMachineOnlineInfo onlineInfo = resolveRuntimeOnlineInfo(context, machineCode);
+    /**
+     * 解析机台初始收尾时间。
+     *
+     * <p>统一以排程窗口首班开始时间为基准，不再继承前批次 SPEC_END_TIME；
+     * 若窗口起点前已开始的清洗或计划停机尚未结束，按实际可开产时间顺延。</p>
+     *
+     * @param context 排程上下文
+     * @param machineCode 机台编码
+     * @param dto 机台运行态，用于读取清洗窗口与计划停机
+     * @return 机台初始收尾时间
+     */
+    private Date resolveInitialEstimatedEndTime(LhScheduleContext context,
+                                                String machineCode,
+                                                MachineScheduleDTO dto) {
         /*
-         * 只认可当前 MES 在机状态，不继承历史批次的计划占用。
-         * 无有效在机物料说明机台当前空闲；若继续读取前批次结束时间，会把历史计划的晚班结束时间
-         * 误当成真实占用，导致空闲机台被同班次窗口过滤。
+         * 统一以排程窗口首班开始时间作为机台初始收尾时间，不再继承前批次 SPEC_END_TIME。
+         * 前批次收尾时间可能与其班次量不一致、或晚于窗口首班，直接继承会把历史污染时间
+         * 带入本批次候选分层与换活字块衔接。机台真实占用统一由 S4.4 续作结果、S4.5 新增
+         * 结果在各自阶段提交后回写，保证 filter、选机日志、换活字块衔接读取同一份时间源。
          */
-        Date idleMachineStartTime = resolveIdleMachineStartTime(context, machineCode, onlineInfo);
-        if (Objects.nonNull(idleMachineStartTime)) {
-            return idleMachineStartTime;
-        }
-        for (com.zlt.aps.lh.api.domain.entity.LhScheduleResult result : context.getPreviousScheduleResultList()) {
-            if (!StringUtils.equals(machineCode, result.getLhMachineCode())
-                    || isDifferentOnlineMaterial(onlineInfo, result)
-                    || !LhSingleControlMachineUtil.isLeftRightCompatible(machineCode, result.getLeftRightMould())
-                    || result.getSpecEndTime() == null) {
-                continue;
-            }
-            if (latestSpecEndTime == null || result.getSpecEndTime().after(latestSpecEndTime)) {
-                latestSpecEndTime = result.getSpecEndTime();
-            }
-        }
-        if (latestSpecEndTime != null) {
-            Date alignedEndTime = alignPreviousEndTimeToWindowStart(
-                    context, machineCode, latestSpecEndTime);
-            log.debug("机台初始结束时间取前批次规格结束时间, 机台: {}, 结束时间: {}",
-                    machineCode, LhScheduleTimeUtil.formatDateTime(alignedEndTime));
-            return alignedEndTime;
-        }
-        if (Objects.nonNull(onlineInfo)) {
-            List<LhShiftConfigVO> shifts = context.getScheduleWindowShifts();
-            if (!shifts.isEmpty() && shifts.get(0).getShiftStartDateTime() != null) {
-                log.debug("机台初始结束时间取窗口首班开始, 机台: {}, 原因: MES在机无前批次结束时间, 时间: {}",
-                        machineCode, LhScheduleTimeUtil.formatDateTime(shifts.get(0).getShiftStartDateTime()));
-                return shifts.get(0).getShiftStartDateTime();
-            }
-        }
         List<LhShiftConfigVO> shifts = context.getScheduleWindowShifts();
-        if (!shifts.isEmpty() && shifts.get(0).getShiftStartDateTime() != null) {
-            log.debug("机台初始结束时间取窗口首班开始, 机台: {}, 时间: {}",
-                    machineCode, LhScheduleTimeUtil.formatDateTime(shifts.get(0).getShiftStartDateTime()));
-            return shifts.get(0).getShiftStartDateTime();
+        if (CollectionUtils.isEmpty(shifts)
+                || Objects.isNull(shifts.get(0))
+                || Objects.isNull(shifts.get(0).getShiftStartDateTime())) {
+            log.warn("机台初始结束时间未匹配班次窗口, 机台: {}, 使用T日: {}",
+                    machineCode, LhScheduleTimeUtil.formatDate(context.getScheduleDate()));
+            return context.getScheduleDate();
         }
-        log.warn("机台初始结束时间未匹配班次窗口, 机台: {}, 使用T日: {}",
-                machineCode, LhScheduleTimeUtil.formatDate(context.getScheduleDate()));
-        return context.getScheduleDate();
-    }
-
-    /**
-     * 解析无有效 MES 在机物料机台的初始可用时间。
-     *
-     * <p>历史批次结果只能作为前规格参考，不能继续占用本次排程时间轴。
-     * 机台没有有效 MES 在机物料时，从排程窗口首班开始参与选机。</p>
-     *
-     * @param context 排程上下文
-     * @param machineCode 机台编码
-     * @param onlineInfo 当前机台有效 MES 在机信息
-     * @return 窗口首班开始时间；不满足归一化条件时返回 null
-     */
-    private Date resolveIdleMachineStartTime(LhScheduleContext context,
-                                             String machineCode,
-                                             LhMachineOnlineInfo onlineInfo) {
-        if ((Objects.nonNull(onlineInfo) && StringUtils.isNotEmpty(onlineInfo.getMaterialCode()))
-                || CollectionUtils.isEmpty(context.getScheduleWindowShifts())) {
-            return null;
+        Date windowStartTime = shifts.get(0).getShiftStartDateTime();
+        // 窗口起点前已开始的清洗/停机未结束时，初始收尾时间按实际可开产时间顺延，不再一律取首班。
+        Date availableTime = MachineCleaningOverlapUtil.resolveEarliestAvailableTime(
+                windowStartTime,
+                Objects.nonNull(dto) ? dto.getCleaningWindowList() : null,
+                Objects.nonNull(dto) ? dto.getPlanStopStartTime() : null,
+                Objects.nonNull(dto) ? dto.getPlanStopEndTime() : null);
+        if (availableTime.after(windowStartTime)) {
+            log.debug("机台初始结束时间按窗口首班起点已占用约束顺延, 机台: {}, 窗口首班: {}, 初始收尾时间: {}",
+                    machineCode, LhScheduleTimeUtil.formatDateTime(windowStartTime),
+                    LhScheduleTimeUtil.formatDateTime(availableTime));
+        } else {
+            log.debug("机台初始结束时间统一取窗口首班开始, 机台: {}, 时间: {}",
+                    machineCode, LhScheduleTimeUtil.formatDateTime(windowStartTime));
         }
-        Date windowStartTime = context.getScheduleWindowShifts().stream()
-                .map(LhShiftConfigVO::getShiftStartDateTime)
-                .filter(Objects::nonNull)
-                .min(Date::compareTo)
-                .orElse(null);
-        if (Objects.isNull(windowStartTime)) {
-            return null;
-        }
-        log.info("机台无有效MES在机物料，忽略前批次计划结束时间并按窗口首班释放, "
-                        + "工厂: {}, 机台: {}, 窗口首班: {}",
-                context.getFactoryCode(), machineCode, LhScheduleTimeUtil.formatDateTime(windowStartTime));
-        return windowStartTime;
-    }
-
-    /**
-     * 将窗口外的前批次结束时间对齐到本次排程窗口首班。
-     *
-     * @param context 排程上下文
-     * @param machineCode 机台编码
-     * @param previousEndTime 前批次规格结束时间
-     * @return 对齐后的机台初始结束时间
-     */
-    private Date alignPreviousEndTimeToWindowStart(LhScheduleContext context,
-                                                   String machineCode,
-                                                   Date previousEndTime) {
-        if (CollectionUtils.isEmpty(context.getScheduleWindowShifts())) {
-            return previousEndTime;
-        }
-        Date windowStartTime = context.getScheduleWindowShifts().stream()
-                .map(LhShiftConfigVO::getShiftStartDateTime)
-                .filter(Objects::nonNull)
-                .min(Date::compareTo)
-                .orElse(null);
-        if (Objects.isNull(windowStartTime) || !previousEndTime.before(windowStartTime)) {
-            return previousEndTime;
-        }
-        log.info("机台结束时间早于窗口起点，按首班开始时间归一化, 工厂: {}, 机台: {}, "
-                        + "原结束时间: {}, 窗口起点: {}",
-                context.getFactoryCode(), machineCode,
-                LhScheduleTimeUtil.formatDateTime(previousEndTime),
-                LhScheduleTimeUtil.formatDateTime(windowStartTime));
-        return windowStartTime;
-    }
-
-    /**
-     * 判断前批次结果是否与当前 MES 在机物料不一致。
-     *
-     * @param onlineInfo MES 在机信息
-     * @param result 前批次结果
-     * @return true-物料不一致
-     */
-    private boolean isDifferentOnlineMaterial(LhMachineOnlineInfo onlineInfo,
-                                              com.zlt.aps.lh.api.domain.entity.LhScheduleResult result) {
-        return Objects.nonNull(onlineInfo)
-                && StringUtils.isNotEmpty(onlineInfo.getMaterialCode())
-                && Objects.nonNull(result)
-                && !StringUtils.equals(onlineInfo.getMaterialCode(), result.getMaterialCode());
+        return availableTime;
     }
 
     /**

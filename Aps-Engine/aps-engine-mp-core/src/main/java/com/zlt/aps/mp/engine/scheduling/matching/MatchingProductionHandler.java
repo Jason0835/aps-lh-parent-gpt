@@ -14,7 +14,7 @@ import com.zlt.aps.mp.api.domain.capacity.MpDailyCapacityLimitVo;
 import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.mp.api.domain.vo.MpDayProductionStatisticsDetailVo;
 import com.zlt.aps.mp.api.domain.vo.MpDayProductionStatisticsShellVo;
-import com.zlt.aps.mp.engine.basedata.assemble.appoint.GroupAppointHandler;
+import com.zlt.aps.mp.engine.basedata.assemble.appoint.GroupAppointDataHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.cyclegroup.CycleGroupDataHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.datalist.GroupListHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.history.ProductionHistoryHandler;
@@ -77,7 +77,7 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
 
     public MatchingProductionHandler(GroupListHandler groupListHandler,
                                      ProductionMdmDataService dataService,
-                                     GroupAppointHandler groupAppointHandler,
+                                     GroupAppointDataHandler groupAppointHandler,
                                      DpRequireDataService dpRequireDataService,
                                      CycleGroupDataHandler cycleGroupDataHandler,
                                      ProductionHistoryHandler productionHistoryHandler,

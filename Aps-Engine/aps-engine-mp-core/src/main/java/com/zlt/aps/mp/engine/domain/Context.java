@@ -347,7 +347,7 @@ public class Context {
      * @return
      */
     public Integer getMaxProductionDays() {
-        Integer monthDays = com.zlt.aps.mp.engine.utils.DateUtils.getIntervalDays(productionStartDate, productionEndDate);
+        Integer monthDays = getMonthDays();
         if (CollectionUtils.isEmpty(stopDays)) {
             return monthDays;
         }
@@ -361,7 +361,7 @@ public class Context {
      * @return
      */
     public Set<Integer> getProductionDay() {
-        Integer monthDays = com.zlt.aps.mp.engine.utils.DateUtils.getIntervalDays(productionStartDate, productionEndDate);
+        Integer monthDays = getMonthDays();
         if (monthDays < BigDecimal.ONE.intValue()) {
             return Collections.emptySet();
         }

@@ -110,6 +110,8 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
             "续作首日无计划释放触发";
     private static final String TYPE_BLOCK_TRIGGER_SMALL_ENDING_SURPLUS_RELEASE =
             "续作收尾小余量释放触发";
+    private static final String TYPE_BLOCK_TRIGGER_CONTINUOUS_RELEASE =
+            "续作释放触发";
     private static final String TYPE_BLOCK_TRIGGER_FALLBACK = "在机前规格兜底触发";
     private static final String TYPE_BLOCK_SKIP_REASON_T1_NOT_END =
             "T-1 最新记录未收尾，跳过兜底反查";
@@ -194,7 +196,8 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
         for (MachineScheduleDTO candidateMachine : candidateMachines) {
             String triggerSource = machineTriggerSourceMap.get(candidateMachine.getMachineCode());
             if (StringUtils.equals(TYPE_BLOCK_TRIGGER_FIRST_DAY_NO_PLAN_RELEASE, triggerSource)
-                    || StringUtils.equals(TYPE_BLOCK_TRIGGER_SMALL_ENDING_SURPLUS_RELEASE, triggerSource)) {
+                    || StringUtils.equals(TYPE_BLOCK_TRIGGER_SMALL_ENDING_SURPLUS_RELEASE, triggerSource)
+                    || StringUtils.equals(TYPE_BLOCK_TRIGGER_CONTINUOUS_RELEASE, triggerSource)) {
                 log.info("续作释放机台进入换活字块匹配, machineCode: {}, currentMaterialCode: {}, triggerSource: {}",
                         candidateMachine.getMachineCode(), candidateMachine.getCurrentMaterialCode(), triggerSource);
             }
@@ -818,6 +821,9 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
             return 0;
         }
         if (StringUtils.equals(TYPE_BLOCK_TRIGGER_FIRST_DAY_NO_PLAN_RELEASE, triggerSource)) {
+            return 1;
+        }
+        if (StringUtils.equals(TYPE_BLOCK_TRIGGER_CONTINUOUS_RELEASE, triggerSource)) {
             return 1;
         }
         if (StringUtils.equals(TYPE_BLOCK_TRIGGER_FALLBACK, triggerSource)) {
@@ -3036,8 +3042,9 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
     /**
      * 识别释放后可优先参与换活字块的续作机台。
      *
-     * <p>包括首日无计划释放机台和续作收尾小余量且前日 T+1 夜班未排满不排产释放机台。该入口只扩展 S4.4
-     * 换活字块候选机台来源，不改变 S4.5 新增排序和机台筛选规则。</p>
+     * <p>包括首日无计划释放机台、续作收尾小余量释放机台，以及窗口内无日计划、续作未形成
+     * 有效结果等统一登记的续作释放机台。该入口只扩展 S4.4 换活字块候选机台来源，
+     * 不改变 S4.5 新增排序和机台筛选规则。</p>
      *
      * @param context 排程上下文
      * @return 释放机台列表
@@ -3054,6 +3061,9 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
         }
         if (!CollectionUtils.isEmpty(context.getTypeBlockReleasedContinuousMachineCodeSet())) {
             releasedMachineCodeSet.addAll(context.getTypeBlockReleasedContinuousMachineCodeSet());
+        }
+        if (!CollectionUtils.isEmpty(context.getReleasedContinuousMachineCodeSet())) {
+            releasedMachineCodeSet.addAll(context.getReleasedContinuousMachineCodeSet());
         }
         for (String machineCode : releasedMachineCodeSet) {
             if (StringUtils.isEmpty(machineCode)) {
@@ -3092,6 +3102,16 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                 && !CollectionUtils.isEmpty(context.getTypeBlockReleasedContinuousMachineCodeSet())
                 && context.getTypeBlockReleasedContinuousMachineCodeSet().contains(machineCode)) {
             return TYPE_BLOCK_TRIGGER_SMALL_ENDING_SURPLUS_RELEASE;
+        }
+        if (context != null && StringUtils.isNotEmpty(machineCode)
+                && !CollectionUtils.isEmpty(context.getFirstDayNoPlanReleasedContinuousMachineCodeSet())
+                && context.getFirstDayNoPlanReleasedContinuousMachineCodeSet().contains(machineCode)) {
+            return TYPE_BLOCK_TRIGGER_FIRST_DAY_NO_PLAN_RELEASE;
+        }
+        if (context != null && StringUtils.isNotEmpty(machineCode)
+                && !CollectionUtils.isEmpty(context.getReleasedContinuousMachineCodeSet())
+                && context.getReleasedContinuousMachineCodeSet().contains(machineCode)) {
+            return TYPE_BLOCK_TRIGGER_CONTINUOUS_RELEASE;
         }
         return TYPE_BLOCK_TRIGGER_FIRST_DAY_NO_PLAN_RELEASE;
     }
