@@ -1038,8 +1038,19 @@ export default {
       const issueList = Array.isArray(issues) ? issues : []
       const sidewallCode = String(this.query.sidewallCode || '').trim().toLowerCase()
       return issueList.filter(issue => {
+        // 阻断错误必须完整展示，不能因结果列表的胎侧编码筛选条件而被隐藏。
+        if (String(issue.level || '').toUpperCase() === 'ERROR') {
+          return true
+        }
         const issueSidewallCode = String(issue.sidewallCode || '').toLowerCase()
         return !sidewallCode || !issueSidewallCode || issueSidewallCode === sidewallCode
+      }).sort((firstIssue, secondIssue) => {
+        const firstIsError = String(firstIssue.level || '').toUpperCase() === 'ERROR'
+        const secondIsError = String(secondIssue.level || '').toUpperCase() === 'ERROR'
+        if (firstIsError === secondIsError) {
+          return 0
+        }
+        return firstIsError ? -1 : 1
       })
     },
     openAutoPlanUnplanned() {
