@@ -560,20 +560,21 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
                 mouldCodeList.add(item.getMouldCode());
             } else {
                 row.put("isReplaceBlock", "");
-            }
 
-            if (lhSharedMouldPatMap.containsKey(afterMaterialDesc)) {
-                List<LhSharedMouldPat> sharedMouldPatList = lhSharedMouldPatMap.get(afterMaterialDesc);
-                for (LhSharedMouldPat lhSharedMouldPat : sharedMouldPatList) {
-                    String mouldNo = StringUtils.defaultIfBlank(lhSharedMouldPat.getMouldNo(), "");
-                    String patternBlock = StringUtils.defaultIfBlank(lhSharedMouldPat.getPatternBlock(), "");
-                    String mouldCode = mouldNo + "/" + patternBlock;
-                    mouldCodeList.add(mouldCode);
+                // 不是换活字块的，从共用模具花纹配置取
+                if (lhSharedMouldPatMap.containsKey(afterMaterialDesc)) {
+                    List<LhSharedMouldPat> sharedMouldPatList = lhSharedMouldPatMap.get(afterMaterialDesc);
+                    for (LhSharedMouldPat lhSharedMouldPat : sharedMouldPatList) {
+                        String mouldNo = StringUtils.defaultIfBlank(lhSharedMouldPat.getMouldNo(), "");
+                        String patternBlock = StringUtils.defaultIfBlank(lhSharedMouldPat.getPatternBlock(), "");
+                        String mouldCode = mouldNo + "/" + patternBlock;
+                        mouldCodeList.add(mouldCode);
+                    }
+
+                    ExcelStyleVo excelStyleVo = new ExcelStyleVo();
+                    excelStyleVo.setRgbColor(new ExcelStyleVo.RgbColor(230, 184, 183));
+                    row.put("style", excelStyleVo);
                 }
-
-                ExcelStyleVo excelStyleVo = new ExcelStyleVo();
-                excelStyleVo.setRgbColor(new ExcelStyleVo.RgbColor(230, 184, 183));
-                row.put("style", excelStyleVo);
             }
 
             row.put("mouldCode", CollUtil.isNotEmpty(mouldCodeList) ? String.join(",\n", mouldCodeList) : "");
