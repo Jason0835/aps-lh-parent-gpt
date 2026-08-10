@@ -832,8 +832,15 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
             return new HashMap<>();
         }
 
-        Map<String, MpMonthPlanStatistics> statisticsMap = statisticsList.stream().collect(
-                Collectors.toMap(MpMonthPlanStatistics::getStructureName, Function.identity(), (s1, s2) -> s1));
+        Map<String, MpMonthPlanStatistics> statisticsMap = statisticsList.stream()
+                .collect(Collectors.toMap(MpMonthPlanStatistics::getStructureName, Function.identity(), (s1, s2) -> {
+                    String tempFlag1 = s1.getTempFlag();
+                    String tempFlag2 = s2.getTempFlag();
+                    if (!Objects.equals(tempFlag1, tempFlag2) && tempFlag2.equals(YesOrNoEnum.NO.getCode())) {
+                        return s2;
+                    }
+                    return s1;
+                }));
         return statisticsMap;
     }
 
