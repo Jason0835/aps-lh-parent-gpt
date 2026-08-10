@@ -85,6 +85,13 @@ public class MesItfServiceImpl implements MesItfService {
      */
     private static final int BATCH_SIZE = 50;
 
+    /**
+     * Feign调用成功的业务码。
+     * 框架bug：AjaxResult.success()硬编码返回code=200，但AjaxResult.Type.SUCCESS.value()=0，两者不一致。
+     * 因此判断Feign返回是否成功时，必须用AJAX_SUCCESS_CODE(200)比较，不能用Type.SUCCESS.value()(0)，否则永远误判为失败。
+     */
+    private static final int AJAX_SUCCESS_CODE = 200;
+
     @Autowired
     private MesItfMapper mesItfMapper;
     @Autowired
@@ -988,7 +995,7 @@ public class MesItfServiceImpl implements MesItfService {
             log.info("硫化在机同步：开始同步，factoryCode={}, onlineDate={}, 待插入数量={}", factoryCode, onlineDateStr, insertList.size());
             AjaxResult saveResult = FeignTokenHelper.callWithToken(() ->
                     lhMesSyncRemoteService.logicDeleteAndSaveMachineOnlineInfo(factoryCode, onlineDateStr, "MES", insertList));
-            if (AjaxResult.Type.SUCCESS.value() != (Integer) saveResult.get(AjaxResult.CODE_TAG)) {
+            if (AJAX_SUCCESS_CODE != (Integer) saveResult.get(AjaxResult.CODE_TAG)) {
                 log.error("硫化在机同步：同步失败，factoryCode={}, 返回code={}, 返回消息={}",
                         factoryCode, saveResult.get(AjaxResult.CODE_TAG), saveResult.get(AjaxResult.MSG_TAG));
                 return AjaxResult.error("硫化在机同步失败：" + saveResult.get(AjaxResult.MSG_TAG));
@@ -1772,7 +1779,7 @@ public class MesItfServiceImpl implements MesItfService {
         AjaxResult saveResult = FeignTokenHelper.callWithToken(() ->
                 this.tqMesSyncRemoteService.replaceShiftStock(request.getFactoryCode(),
                         DateUtil.formatDate(request.getStockDate()), request.getShiftOrder(), "MES", stockList));
-        if (saveResult == null || !Objects.equals(AjaxResult.Type.SUCCESS.value(),
+        if (saveResult == null || !Objects.equals(AJAX_SUCCESS_CODE,
                 saveResult.get(AjaxResult.CODE_TAG))) {
             throw new ServiceException(I18nUtil.getMessage("ui.itf.mes.shiftStockRemoteFailed"));
         }
@@ -1818,7 +1825,7 @@ public class MesItfServiceImpl implements MesItfService {
             // 接收Feign返回值并校验，避免服务端异常被全局异常处理器吞掉返回HTTP 200+AjaxResult.error时，itf端误判为成功
             AjaxResult saveResult = FeignTokenHelper.callWithToken(() ->
                     tqMesSyncRemoteService.logicDeleteAndSaveScheFinishQty(factoryCode, scheduleDateStr, "MES", insertList));
-            if (AjaxResult.Type.SUCCESS.value() != (Integer) saveResult.get(AjaxResult.CODE_TAG)) {
+            if (AJAX_SUCCESS_CODE != (Integer) saveResult.get(AjaxResult.CODE_TAG)) {
                 log.error("胎圈排程完成量同步：同步失败，factoryCode={}, 返回code={}, 返回消息={}",
                         factoryCode, saveResult.get(AjaxResult.CODE_TAG), saveResult.get(AjaxResult.MSG_TAG));
                 return AjaxResult.error("胎圈排程完成量同步失败：" + saveResult.get(AjaxResult.MSG_TAG));
@@ -1974,7 +1981,7 @@ public class MesItfServiceImpl implements MesItfService {
             // 接收Feign返回值并校验，避免服务端异常被全局异常处理器吞掉返回HTTP 200+AjaxResult.error时，itf端误判为成功
             AjaxResult saveResult = FeignTokenHelper.callWithToken(() ->
                     cxMesSyncRemoteService.logicDeleteAndSaveScheFinishQty(factoryCode, scheduleDateStr, "MES", insertList));
-            if (AjaxResult.Type.SUCCESS.value() != (Integer) saveResult.get(AjaxResult.CODE_TAG)) {
+            if (AJAX_SUCCESS_CODE != (Integer) saveResult.get(AjaxResult.CODE_TAG)) {
                 log.error("成型排程完成量同步：同步失败，factoryCode={}, 返回code={}, 返回消息={}",
                         factoryCode, saveResult.get(AjaxResult.CODE_TAG), saveResult.get(AjaxResult.MSG_TAG));
                 return AjaxResult.error("成型排程完成量同步失败：" + saveResult.get(AjaxResult.MSG_TAG));
@@ -2034,7 +2041,7 @@ public class MesItfServiceImpl implements MesItfService {
             // 接收Feign返回值并校验，避免服务端异常被全局异常处理器吞掉返回HTTP 200+AjaxResult.error时，itf端误判为成功
             AjaxResult saveResult = FeignTokenHelper.callWithToken(() ->
                     lhMesSyncRemoteService.logicDeleteAndSaveScheFinishQty(factoryCode, scheduleDateStr, "MES", insertList));
-            if (AjaxResult.Type.SUCCESS.value() != (Integer) saveResult.get(AjaxResult.CODE_TAG)) {
+            if (AJAX_SUCCESS_CODE != (Integer) saveResult.get(AjaxResult.CODE_TAG)) {
                 log.error("硫化排程完成量同步：同步失败，factoryCode={}, 返回code={}, 返回消息={}",
                         factoryCode, saveResult.get(AjaxResult.CODE_TAG), saveResult.get(AjaxResult.MSG_TAG));
                 return AjaxResult.error("硫化排程完成量同步失败：" + saveResult.get(AjaxResult.MSG_TAG));
@@ -2050,7 +2057,7 @@ public class MesItfServiceImpl implements MesItfService {
         try {
             AjaxResult writeBackResult = FeignTokenHelper.callWithToken(() ->
                     lhMesSyncRemoteService.writeBackScheduleResultFinishQty(insertList));
-            if (AjaxResult.Type.SUCCESS.value() != (Integer) writeBackResult.get(AjaxResult.CODE_TAG)) {
+            if (AJAX_SUCCESS_CODE != (Integer) writeBackResult.get(AjaxResult.CODE_TAG)) {
                 log.error("硫化排程完成量回写失败：factoryCode={}, 返回code={}, 返回消息={}",
                         syncDataLogs.getFactoryCode(), writeBackResult.get(AjaxResult.CODE_TAG), writeBackResult.get(AjaxResult.MSG_TAG));
                 return AjaxResult.error("硫化排程完成量回写失败：" + writeBackResult.get(AjaxResult.MSG_TAG));
@@ -2100,7 +2107,7 @@ public class MesItfServiceImpl implements MesItfService {
             // 接收Feign返回值并校验，避免服务端异常被全局异常处理器吞掉返回HTTP 200+AjaxResult.error时，itf端误判为成功
             AjaxResult saveResult = FeignTokenHelper.callWithToken(() ->
                     lhMesSyncRemoteService.logicDeleteAndSaveScheFinishQty(factoryCode, scheduleDateStr, "MES", insertList));
-            if (AjaxResult.Type.SUCCESS.value() != (Integer) saveResult.get(AjaxResult.CODE_TAG)) {
+            if (AJAX_SUCCESS_CODE != (Integer) saveResult.get(AjaxResult.CODE_TAG)) {
                 log.error("硫化排程完成量按上一天最新版本同步：同步失败，factoryCode={}, 返回code={}, 返回消息={}",
                         factoryCode, saveResult.get(AjaxResult.CODE_TAG), saveResult.get(AjaxResult.MSG_TAG));
                 return AjaxResult.error("硫化排程完成量按上一天最新版本同步失败：" + saveResult.get(AjaxResult.MSG_TAG));
@@ -2116,7 +2123,7 @@ public class MesItfServiceImpl implements MesItfService {
         try {
             AjaxResult writeBackResult = FeignTokenHelper.callWithToken(() ->
                     lhMesSyncRemoteService.writeBackScheduleResultFinishQty(insertList));
-            if (AjaxResult.Type.SUCCESS.value() != (Integer) writeBackResult.get(AjaxResult.CODE_TAG)) {
+            if (AJAX_SUCCESS_CODE != (Integer) writeBackResult.get(AjaxResult.CODE_TAG)) {
                 log.error("硫化排程完成量按上一天最新版本回写失败：factoryCode={}, 返回code={}, 返回消息={}",
                         syncDataLogs.getFactoryCode(), writeBackResult.get(AjaxResult.CODE_TAG), writeBackResult.get(AjaxResult.MSG_TAG));
                 return AjaxResult.error("硫化排程完成量按上一天最新版本回写失败：" + writeBackResult.get(AjaxResult.MSG_TAG));
@@ -2186,7 +2193,7 @@ public class MesItfServiceImpl implements MesItfService {
                 // 接收Feign返回值并校验，避免服务端异常被全局异常处理器吞掉返回HTTP 200+AjaxResult.error时，itf端误判为成功
                 AjaxResult saveResult = FeignTokenHelper.callWithToken(() ->
                         lhMesSyncRemoteService.logicDeleteAndSaveScheFinishQty(finalFactoryCode, scheduleDateStr, "MES", groupList));
-                if (AjaxResult.Type.SUCCESS.value() != (Integer) saveResult.get(AjaxResult.CODE_TAG)) {
+                if (AJAX_SUCCESS_CODE != (Integer) saveResult.get(AjaxResult.CODE_TAG)) {
                     log.error("硫化排程完成量按版本号同步：同步失败，dataVersion={}, factoryCode={}, scheduleDate={}, 返回code={}, 返回消息={}",
                             dataVersion, factoryCode, scheduleDateStr, saveResult.get(AjaxResult.CODE_TAG), saveResult.get(AjaxResult.MSG_TAG));
                     return AjaxResult.error("硫化排程完成量按版本号同步失败：" + saveResult.get(AjaxResult.MSG_TAG));
@@ -2205,7 +2212,7 @@ public class MesItfServiceImpl implements MesItfService {
         try {
             AjaxResult writeBackResult = FeignTokenHelper.callWithToken(() ->
                     lhMesSyncRemoteService.writeBackScheduleResultFinishQty(insertList));
-            if (AjaxResult.Type.SUCCESS.value() != (Integer) writeBackResult.get(AjaxResult.CODE_TAG)) {
+            if (AJAX_SUCCESS_CODE != (Integer) writeBackResult.get(AjaxResult.CODE_TAG)) {
                 log.error("硫化排程完成量按版本号回写失败：dataVersion={}, 返回code={}, 返回消息={}",
                         dataVersion, writeBackResult.get(AjaxResult.CODE_TAG), writeBackResult.get(AjaxResult.MSG_TAG));
                 return AjaxResult.error("硫化排程完成量按版本号回写失败：" + writeBackResult.get(AjaxResult.MSG_TAG));
@@ -3301,7 +3308,7 @@ public class MesItfServiceImpl implements MesItfService {
     // 接收Feign返回值并校验，避免服务端异常被全局异常处理器吞掉返回HTTP 200+AjaxResult.error时，itf端误判为成功
     AjaxResult saveResult = FeignTokenHelper.callWithToken(() ->
     tmMesSyncRemoteService.logicDeleteAndSaveScheFinishQty(factoryCode, scheduleDateStr, "MES", insertList));
-    if (AjaxResult.Type.SUCCESS.value() != (Integer) saveResult.get(AjaxResult.CODE_TAG)) {
+    if (AJAX_SUCCESS_CODE != (Integer) saveResult.get(AjaxResult.CODE_TAG)) {
     log.error("胎面排程完成量同步：同步失败，factoryCode={}, 返回code={}, 返回消息={}",
     factoryCode, saveResult.get(AjaxResult.CODE_TAG), saveResult.get(AjaxResult.MSG_TAG));
     return AjaxResult.error("胎面排程完成量同步失败：" + saveResult.get(AjaxResult.MSG_TAG));
@@ -3344,7 +3351,7 @@ public class MesItfServiceImpl implements MesItfService {
         AjaxResult saveResult = FeignTokenHelper.callWithToken(() ->
                 this.tmMesSyncRemoteService.replaceShiftStock(request.getFactoryCode(),
                         DateUtil.formatDate(request.getStockDate()), request.getShiftOrder(), "MES", stockList));
-        if (saveResult == null || !Objects.equals(AjaxResult.Type.SUCCESS.value(),
+        if (saveResult == null || !Objects.equals(AJAX_SUCCESS_CODE,
                 saveResult.get(AjaxResult.CODE_TAG))) {
             throw new ServiceException(I18nUtil.getMessage("ui.itf.mes.shiftStockRemoteFailed"));
         }
@@ -3391,7 +3398,7 @@ public class MesItfServiceImpl implements MesItfService {
             // 接收Feign返回值并校验，避免服务端异常被全局异常处理器吞掉返回HTTP 200+AjaxResult.error时，itf端误判为成功
             AjaxResult saveResult = FeignTokenHelper.callWithToken(() ->
                     tmMesSyncRemoteService.logicDeleteAndSaveScheFinishQty(factoryCode, scheduleDateStr, "MES", insertList));
-            if (AjaxResult.Type.SUCCESS.value() != (Integer) saveResult.get(AjaxResult.CODE_TAG)) {
+            if (AJAX_SUCCESS_CODE != (Integer) saveResult.get(AjaxResult.CODE_TAG)) {
                 log.error("胎面排程完成量同步：同步失败，factoryCode={}, 返回code={}, 返回消息={}",
                         factoryCode, saveResult.get(AjaxResult.CODE_TAG), saveResult.get(AjaxResult.MSG_TAG));
                 return AjaxResult.error("胎面排程完成量同步失败：" + saveResult.get(AjaxResult.MSG_TAG));
