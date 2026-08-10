@@ -144,17 +144,6 @@ public class CxCapacityAllocationHandler {
     }
 
     /**
-     * 判断机台是否包含特殊结构
-     *
-     * @param machine
-     * @return
-     */
-    private Boolean hasSpecialStructure(CxMachineBaseInfoVo machine) {
-        return machine.getAllocationList().stream()
-                .anyMatch(allocation -> allocation.getProductionPlanInfo().isSpecialMaterial());
-    }
-
-    /**
      * 成型产能机台反向挑选合适的结构
      * 剩余产能要能覆盖计划排产净需求
      *
@@ -341,7 +330,7 @@ public class CxCapacityAllocationHandler {
             return null;
         }
         //20260120 挑选排产日有交集的，结合成型工装数量-成型鼓，日产能上限
-        List<CxMachineBaseInfoVo> hasProductionDayList = enableCxMachineList.stream().filter(singleMachine -> selectEnableMachineAndSetInfo(productionContext, addNewGroupPlan, singleMachine)
+        List<CxMachineBaseInfoVo> hasProductionDayList = enableCxMachineList.stream().filter(singleMachine -> selectEnableMachineAndSetInfo(productionContext, addNewGroupPlan, singleMachine, false)
         ).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(hasProductionDayList)) {
             return null;
@@ -403,7 +392,7 @@ public class CxCapacityAllocationHandler {
             return null;
         }
         //挑选排产日有交集的，结合成型工装数量-成型鼓，日产能上限
-        List<CxMachineBaseInfoVo> hasProductionDayList = enableCxMachineList.stream().filter(singleMachine -> selectEnableMachineAndSetInfo(productionContext, selectedGroup, singleMachine)
+        List<CxMachineBaseInfoVo> hasProductionDayList = enableCxMachineList.stream().filter(singleMachine -> selectEnableMachineAndSetInfo(productionContext, selectedGroup, singleMachine, false)
         ).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(hasProductionDayList)) {
             return null;
@@ -449,7 +438,7 @@ public class CxCapacityAllocationHandler {
         String structureName = productionGroupInfo.getGroupName();
         String isZeroRack = productionGroupInfo.getIsZero();
         //挑选排产日有交集的，结合成型工装数量-成型鼓，日产能上限
-        List<CxMachineBaseInfoVo> hasProductionDayList = canSelectedList.stream().filter(singleMachine -> selectEnableMachineAndSetInfo(productionContext, productionGroupInfo, singleMachine)).collect(Collectors.toList());
+        List<CxMachineBaseInfoVo> hasProductionDayList = canSelectedList.stream().filter(singleMachine -> selectEnableMachineAndSetInfo(productionContext, productionGroupInfo, singleMachine, true)).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(hasProductionDayList)) {
             return null;
         }
@@ -482,12 +471,13 @@ public class CxCapacityAllocationHandler {
      * 1、历史生产信息
      * 2、产能
      *
-     * @param productionContext 排产上下文
-     * @param addNewGroupPlan   结构
-     * @param singleMachine     预选机台
+     * @param productionContext        排产上下文
+     * @param addNewGroupPlan          结构
+     * @param singleMachine            预选机台
+     * @param isIgnoreChangeGroupLimit 是否忽略结构切换限制导致的最短上机日 true 忽略 false 不忽略
      * @return
      */
-    public boolean selectEnableMachineAndSetInfo(TbrProductionContext productionContext, ProductionPlanGroupInfo addNewGroupPlan, CxMachineBaseInfoVo singleMachine) {
+    public boolean selectEnableMachineAndSetInfo(TbrProductionContext productionContext, ProductionPlanGroupInfo addNewGroupPlan, CxMachineBaseInfoVo singleMachine, boolean isIgnoreChangeGroupLimit) {
         BaseDataContainer baseDataContainer = productionContext.getBaseDataContainer();
         //最小分配天数 20260209 特殊材料结构，将最小分配天数置为1
         boolean isChangeProSize = singleMachine.isChangeProSize(productionContext, addNewGroupPlan);
@@ -515,6 +505,15 @@ public class CxCapacityAllocationHandler {
             return false;
         }
         Set<Integer> hasProductionDaySet = singleMachine.confirmProductionRange(productionContext, productionDayInfo);
+//        //20260805+ 最短上机天数需考虑日结构切换限制导致的延后(在不忽略时使用-即非月底补量环节)
+//        if (!isIgnoreChangeGroupLimit) {
+//            //不忽略日结构切换限制
+//            Set<Integer> realProductionDaySet = getChangeGroupLimitProductionDays(productionContext, hasProductionDaySet, addNewGroupPlan, singleMachine);
+//            Integer realCapacityDays = realProductionDaySet.size();
+//            if (realCapacityDays < minAllocationDays) {
+//                return false;
+//            }
+//        }
         if (CollectionUtils.isEmpty(hasProductionDaySet)) {
             return false;
         }
@@ -534,6 +533,17 @@ public class CxCapacityAllocationHandler {
         Integer diffValue = capacityDays - needDays;
         singleMachine.setCapacityDiffValue(diffValue);
         return true;
+    }
+
+    /**
+     * 判断机台是否包含特殊结构
+     *
+     * @param machine
+     * @return
+     */
+    private Boolean hasSpecialStructure(CxMachineBaseInfoVo machine) {
+        return machine.getAllocationList().stream()
+                .anyMatch(allocation -> allocation.getProductionPlanInfo().isSpecialMaterial());
     }
 
     /**
@@ -599,13 +609,13 @@ public class CxCapacityAllocationHandler {
         Map<String, ProductionPlanGroupInfo> capacityCoverageMap = new HashMap<>(estimateGroupCxAllocationMap.size());
         estimateGroupCxAllocationMap.forEach((structureName, groupPlan) -> {
             if (CollectionUtils.isEmpty(excludeGroupPlan)) {
-                calcDiffCapacityAndAddMap(context, capacityCoverageMap, structureName, groupPlan, cxMachineInfo);
+                calculateDiffCapacityAndAddMap(context, capacityCoverageMap, structureName, groupPlan, cxMachineInfo);
                 return;
             }
             if (excludeGroupPlan.contains(structureName)) {
                 return;
             }
-            calcDiffCapacityAndAddMap(context, capacityCoverageMap, structureName, groupPlan, cxMachineInfo);
+            calculateDiffCapacityAndAddMap(context, capacityCoverageMap, structureName, groupPlan, cxMachineInfo);
         });
         return capacityCoverageMap;
     }
@@ -644,7 +654,7 @@ public class CxCapacityAllocationHandler {
      * @param groupPlan           分组计划信息
      * @param cxMachineInfo       成型机台
      */
-    private void calcDiffCapacityAndAddMap(Context context, Map<String, ProductionPlanGroupInfo> capacityCoverageMap, String structureName, ProductionPlanGroupInfo groupPlan, CxMachineBaseInfoVo cxMachineInfo) {
+    private void calculateDiffCapacityAndAddMap(Context context, Map<String, ProductionPlanGroupInfo> capacityCoverageMap, String structureName, ProductionPlanGroupInfo groupPlan, CxMachineBaseInfoVo cxMachineInfo) {
         Integer minLhDayCapacityQty = groupPlan.getMinLhDayCapacityQty();
         if (null == minLhDayCapacityQty || minLhDayCapacityQty <= BigDecimal.ZERO.longValue()) {
             //todo 记录日志
@@ -712,5 +722,35 @@ public class CxCapacityAllocationHandler {
         return productionDayInfo.size() >= minAllocationDays;
     }
 
+    /**
+     * 场景：不是月底补量分配阶段
+     * 结合日结构切换限制后的排产日信息
+     *
+     * @param productionContext       排产上下文
+     * @param originProductionDayInfo 原始排产日信息
+     * @param addNewGroupPlan         预排分组信息对象
+     * @param selectedCxMachine       选中的成型机信息对象
+     * @return
+     */
+    private Set<Integer> getChangeGroupLimitProductionDays(TbrProductionContext productionContext, Set<Integer> originProductionDayInfo, ProductionPlanGroupInfo addNewGroupPlan, CxMachineBaseInfoVo selectedCxMachine) {
+        if (CollectionUtils.isEmpty(originProductionDayInfo) || null == addNewGroupPlan || null == selectedCxMachine) {
+            return Collections.emptySet();
+        }
+        String groupName = addNewGroupPlan.getGroupName();
+        //理论起始排产日
+        Integer startDay = originProductionDayInfo.stream().mapToInt(Integer::intValue).min().getAsInt();
+        //切换结构控制对象
+        DayCapacityLimitVo dayCapacityLimitVo = productionContext.getBaseDataContainer().getDayCapacityLimit();
+        //符合结构切换限制后的起始排产日
+        Integer realChangeDay = dayCapacityLimitVo.confirmStartDayByChangeGroup(productionContext, startDay, groupName, selectedCxMachine, originProductionDayInfo);
+        if (null == realChangeDay) {
+            return Collections.emptySet();
+        }
+        Set<Integer> realProductionDaySet = originProductionDayInfo.stream().filter(singleDay -> singleDay >= realChangeDay).collect(Collectors.toSet());
+        if (CollectionUtils.isEmpty(realProductionDaySet)) {
+            return Collections.emptySet();
+        }
+        return realProductionDaySet;
+    }
 
 }
