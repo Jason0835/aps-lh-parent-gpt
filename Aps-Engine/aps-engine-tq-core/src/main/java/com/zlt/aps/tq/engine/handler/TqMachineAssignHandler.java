@@ -269,16 +269,7 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
                             return backup1 ? -1 : 1;
                         }
 
-                        // P-2: 同为备库规格：按剩余需求缺口从大到小排序（缺口越大越优先）
-                        if (backup1 && backup2) {
-                            double rem1 = o1.getBackupRemainingQty() == null ? 0D : o1.getBackupRemainingQty();
-                            double rem2 = o2.getBackupRemainingQty() == null ? 0D : o2.getBackupRemainingQty();
-                            if (rem1 != rem2) {
-                                return Double.compare(rem2, rem1);  // 降序
-                            }
-                        }
-
-                        // P-3: 非备库规格按供应时长升序
+                        // P-2: 备库规格与非备库规格均按供应时长升序排序（供应时长短=紧急=优先排）
                         double st1 = o1.getSupplyTime() == null ? 0D : o1.getSupplyTime();
                         double st2 = o2.getSupplyTime() == null ? 0D : o2.getSupplyTime();
                         return Double.compare(st1, st2);

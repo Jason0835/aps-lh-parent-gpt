@@ -27,7 +27,7 @@ public class SkuDailyPlanQuotaDTO implements Serializable {
     /** 月计划中 dayN 对应的日计划量 */
     private int dayPlanQty;
 
-    /** 滚动衔接、已锁定结果、已排结果中已经占用的数量，参与后续剩余额度计算 */
+    /** 已锁定结果、已排结果中已经占用的数量，参与后续剩余额度计算 */
     private int scheduledQty;
 
     /** 当前日期在窗口账本中的剩余额度（已扣减继承量、历史欠产入账、滚动封顶和后续借用） */

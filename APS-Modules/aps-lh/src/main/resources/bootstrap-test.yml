@@ -48,3 +48,8 @@ spring:
           group: ${nacos.cfg-group}
         refresh-enabled: true
 
+mq:
+  scheduleLog:
+    queue: test.lh.schedule.log.queue
+    exchange: test.lh.schedule.log.exchange
+    rutekey: test.lh.schedule.log.rutekey

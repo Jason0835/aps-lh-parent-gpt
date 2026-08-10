@@ -50,6 +50,22 @@ public class GsqScheduleResultIssue extends BaseEntity {
     @ApiModelProperty(value = "钢丝圈代码", name = "steelRingCode")
     private String steelRingCode;
 
+    /** 物料编码 */
+    @ApiModelProperty(value = "物料编码", name = "materialCode")
+    private String materialCode;
+
+    /** 钢丝圈类型 */
+    @ApiModelProperty(value = "钢丝圈类型", name = "steelType")
+    private String steelType;
+
+    /** 胎胚描述 */
+    @ApiModelProperty(value = "胎胚描述", name = "embryoSpecDesc")
+    private String embryoSpecDesc;
+
+    /** 单耗 */
+    @ApiModelProperty(value = "单耗", name = "unitConsume")
+    private Double unitConsume;
+
     /** 钢丝缠绕盘代码 */
     @ApiModelProperty(value = "钢丝缠绕盘代码", name = "twiningDiscCode")
     private String twiningDiscCode;

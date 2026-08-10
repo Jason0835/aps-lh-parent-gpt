@@ -24,6 +24,7 @@ import com.zlt.aps.mp.engine.handler.ConclusionLhMachineHandler;
 import com.zlt.aps.mp.engine.handler.ContinuousProductionDayHandler;
 import com.zlt.aps.mp.engine.handler.SkuProductionSnapshot;
 import com.zlt.aps.mp.engine.logrecorder.TbrMouldProductionLogRecorder;
+import com.zlt.aps.mp.engine.scheduling.BaseDataContainer;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
 import com.zlt.aps.mp.engine.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
 import com.zlt.aps.mp.engine.utils.NoProductionReasonUtils;
@@ -1954,7 +1955,7 @@ public class ProductionPlanGroupInfo {
         TbrProductionContext productionContext = (TbrProductionContext) context;
         Integer endDay = productionContext.getMonthDays();
         //1. 转换模具排产结果
-        List<FactoryMonthPlanMouldDayResult> mouldDayResultList = convertMouldDayResult(endDay);
+        List<FactoryMonthPlanMouldDayResult> mouldDayResultList = convertMouldDayResult(productionContext, endDay);
         //2. 组装参数Map
         Map<String, Object> paramMap = composeDailyCapacityParamMap(productionContext);
         //3. 循环计算日产能
@@ -1979,7 +1980,7 @@ public class ProductionPlanGroupInfo {
         TbrProductionContext productionContext = (TbrProductionContext) context;
         Integer endDay = productionContext.getMonthDays();
         //1. 转换模具排产结果
-        List<FactoryMonthPlanMouldDayResult> mouldDayResultList = convertMouldDayResult(endDay);
+        List<FactoryMonthPlanMouldDayResult> mouldDayResultList = convertMouldDayResult(productionContext, endDay);
         //2. 组装参数Map
         Map<String, Object> paramMap = composeDailyCapacityParamMap(productionContext);
         //3. 计算日产能
@@ -2004,12 +2005,14 @@ public class ProductionPlanGroupInfo {
     /**
      * 转换模具排产结果
      *
-     * @param endDay 结束日
+     * @param productionContext 排产上下文
+     * @param endDay            结束日
      * @return 模具排产结果列表
      */
-    public List<FactoryMonthPlanMouldDayResult> convertMouldDayResult(Integer endDay) {
+    public List<FactoryMonthPlanMouldDayResult> convertMouldDayResult(TbrProductionContext productionContext, Integer endDay) {
         GroupPlanCxLhCapacityLimitHelper capacityLimitHelper;
         Map<String, FactoryMonthPlanMouldDayResult> mpProdFinalMap = new HashMap<>();
+        BaseDataContainer baseDataContainer = productionContext.getBaseDataContainer();
         for (int i = ProductionConstant.MONTH_START_DAY; i <= endDay; i++) {
             String dayField = FactoryConstant.DAY_FIELD + i;
             capacityLimitHelper = dayProductionLimitInfo.get(i);
@@ -2020,19 +2023,26 @@ public class ProductionPlanGroupInfo {
             if (PubUtil.isEmpty(productionSkuQtyMap)) {
                 continue;
             }
-
             // 组装模具日排产结果
             productionSkuQtyMap.forEach((materialDesc, skuProductionInfo) -> {
-                FactoryMonthPlanMouldDayResult mpMouldDayResult = mpProdFinalMap.get(skuProductionInfo.getMaterialCode());
+                String materialCode = skuProductionInfo.getMaterialCode();
+                MonthPlanProductionRequirePlanVo baseInfo = productionContext.getBaseSkuInfoByPlan(materialDesc);
+                FactoryMonthPlanMouldDayResult mpMouldDayResult = mpProdFinalMap.get(materialCode);
                 if (mpMouldDayResult == null) {
+                    String mainPattern = skuProductionInfo.getMainPattern();
                     mpMouldDayResult = new FactoryMonthPlanMouldDayResult();
                     mpMouldDayResult.setStructureName(groupName);
-                    mpMouldDayResult.setMaterialCode(skuProductionInfo.getMaterialCode());
-                    mpMouldDayResult.setMaterialDesc(skuProductionInfo.getMaterialDesc());
+                    mpMouldDayResult.setMaterialCode(materialCode);
+                    mpMouldDayResult.setMaterialDesc(materialDesc);
                     mpMouldDayResult.setEmbryoCode(skuProductionInfo.getEmbryoCode());
                     mpMouldDayResult.setMainMaterialDesc(skuProductionInfo.getMainMaterialDesc());
-                    mpMouldDayResult.setMainPattern(skuProductionInfo.getMainPattern());
+                    mpMouldDayResult.setMainPattern(mainPattern);
                     mpMouldDayResult.setDayVulcanizationQty(skuProductionInfo.getDayVulcanizationQty());
+                    //20260807+ 增加模壳标准及规格属性 赋值
+                    mpMouldDayResult.setMouldShell(baseDataContainer.getSkuShellStandardByMainPattern(materialDesc, mainPattern));
+                    if(null != baseInfo){
+                        mpMouldDayResult.setSpecifications(baseInfo.getSpecifications());
+                    }
                 }
                 mpMouldDayResult.setFieldValueByFieldName(dayField, skuProductionInfo.getSumProductionQty());
                 mpProdFinalMap.put(skuProductionInfo.getMaterialCode(), mpMouldDayResult);

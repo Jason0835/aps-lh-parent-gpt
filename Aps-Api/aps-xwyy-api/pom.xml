@@ -11,7 +11,7 @@
 
     <groupId>com.zlt.aps.xwyy</groupId>
     <artifactId>aps-xwyy-api</artifactId>
-        <version>1.0.3-SNAPSHOT</version>
+    <version>1.0.3-SNAPSHOT</version>
     <name>xwyy-api</name>
     <description>纤维压延工序api</description>
 

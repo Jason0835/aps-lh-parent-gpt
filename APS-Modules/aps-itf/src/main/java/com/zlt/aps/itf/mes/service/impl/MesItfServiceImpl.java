@@ -9,9 +9,6 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.autoLogin.feign.FeignTokenHelper;
-import com.zlt.aps.cd90.api.domain.entity.Cd90ShiftConfig;
-import com.zlt.aps.cd90.api.domain.entity.Cd90Stock;
-import com.zlt.aps.cd90.api.service.ICd90StockRemoteService;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.enums.MouldFinishStatusEnum;
 import com.zlt.aps.common.core.utils.AjaxResultUtils;
@@ -119,12 +116,6 @@ public class MesItfServiceImpl implements MesItfService {
 
     @Autowired
     private ICxMesSyncRemoteService cxMesSyncRemoteService;
-
-    @Autowired
-    private ICd90StockRemoteService cd90StockRemoteService;
-
-    @Autowired
-    private Cd90ShiftQueryMapper cd90ShiftQueryMapper;
 
     @Autowired
     private ITqMesSyncRemoteService tqMesSyncRemoteService;
@@ -1667,137 +1658,6 @@ public class MesItfServiceImpl implements MesItfService {
     }
 
     /**
-     * 同步直裁库存（从 MES 中间表 T_MES_CD90_STOCK 同步到 t_cd90_stock）。
-     * <p>采用逻辑删除+插入方案，按 DATA_SOURCE=MES 隔离，不动人工维护数据。</p>
-     * <p>班次来源：按同步执行时间从 t_cd90_shift_config 启用项自动推断；queryParams.shiftCode 可覆盖。</p>
-     *
-     * @param syncDataLogs 同步参数
-     * @return 结果
-     */
-    @Override
-    public AjaxResult syncMesCd90Stock(AuxReqSyncDataLogs syncDataLogs) {
-        String factoryCode = StringUtils.isBlank(syncDataLogs.getFactoryCode())
-                ? FactoryConstant.DEFAULT_FACTORY_CODE : syncDataLogs.getFactoryCode();
-
-        // 1. 切 MES 数据源查询中间表
-        DynamicDataSourceContextHolder.push(DataSource.MES);
-        List<Cd90MesStock> syncList = mesItfMapper.selectMesCd90StockList(syncDataLogs);
-        DynamicDataSourceContextHolder.poll();
-
-        if (CollectionUtils.isEmpty(syncList)) {
-            log.warn("直裁库存同步：MES中间表查询结果为空，factoryCode={}", factoryCode);
-            return AjaxResult.success("MES中间表无数据可同步");
-        }
-
-        // 2. 按 STOCK_DATE + MATERIAL_CODE 去重，累加可用库存（参考 buildBaseCdStockList 口径）
-        Map<String, Cd90MesStock> groupMap = syncList.stream()
-                .collect(Collectors.toMap(
-                        item -> DateUtil.formatDate(item.getStockDate()) + "|" + item.getMaterialCode(),
-                        Function.identity(),
-                        (v1, v2) -> {
-                            BigDecimal merged = (v1.getAvailableStock() == null ? BigDecimal.ZERO : v1.getAvailableStock())
-                                    .add(v2.getAvailableStock() == null ? BigDecimal.ZERO : v2.getAvailableStock());
-                            v1.setAvailableStock(merged);
-                            return v1;
-                        }
-                ));
-        syncList = new ArrayList<>(groupMap.values());
-
-        // 3. 推断当前班次（queryParams.shiftCode 可覆盖）
-        String shiftCode = resolveShiftCode(syncDataLogs, factoryCode);
-        if (StringUtils.isBlank(shiftCode)) {
-            log.error("直裁库存同步：无法推断当前班次，factoryCode={}, 请检查 t_cd90_shift_config 启用配置", factoryCode);
-            return AjaxResult.error("直裁库存同步失败：无法推断当前班次，请在 t_cd90_shift_config 配置启用班次或通过 queryParams.shiftCode 指定");
-        }
-
-        // 4. 转换为 Cd90Stock
-        Date now = DateUtils.getNowDate();
-        List<Cd90Stock> insertList = syncList.stream().map(item -> {
-            Cd90Stock stock = new Cd90Stock();
-            stock.setFactoryCode(factoryCode);
-            stock.setStockDate(item.getStockDate());
-            stock.setShiftCode(shiftCode);
-            stock.setSnapshotTime(now);
-            stock.setMaterialCode(item.getMaterialCode());
-            stock.setStockNum(item.getAvailableStock() != null ? item.getAvailableStock().doubleValue() : 0d);
-            stock.setDataSource(ApsConstant.DATA_SOURCE_MES);
-            stock.setCreateBy("MES");
-            stock.setUpdateBy("MES");
-            stock.setCreateTime(now);
-            stock.setUpdateTime(now);
-            return stock;
-        }).collect(Collectors.toList());
-
-        // 5. Feign 调用 aps-cd90 逻辑删除+批量插入
-        try {
-            Date stockDate = insertList.stream().map(Cd90Stock::getStockDate).filter(Objects::nonNull)
-                    .findFirst().orElse(now);
-            String stockDateStr = DateUtil.formatDate(stockDate);
-            log.info("直裁库存同步：开始同步，factoryCode={}, shiftCode={}, stockDate={}, 待插入数量={}",
-                    factoryCode, shiftCode, stockDateStr, insertList.size());
-
-            FeignTokenHelper.runWithToken(() -> {
-                cd90StockRemoteService.logicDeleteAndSaveCd90StockByDataSource(
-                        factoryCode, ApsConstant.DATA_SOURCE_MES, stockDateStr, shiftCode, "MES", insertList);
-            });
-
-            log.info("直裁库存同步：同步完成，factoryCode={}, shiftCode={}, 插入数量={}", factoryCode, shiftCode, insertList.size());
-        } catch (Exception e) {
-            log.error("直裁库存同步：Feign调用异常，factoryCode={}, shiftCode={}, 待插入数量={}",
-                    factoryCode, shiftCode, insertList.size(), e);
-            return AjaxResult.error("直裁库存同步失败：" + e.getMessage());
-        }
-        return AjaxResult.success();
-    }
-
-    /**
-     * 推断直裁当前班次：优先取 queryParams.shiftCode，否则按当前系统时间从 t_cd90_shift_config 启用项匹配。
-     *
-     * @param syncDataLogs 同步参数
-     * @param factoryCode  工厂编码
-     * @return 班次编码，推断不出返回 null
-     */
-    private String resolveShiftCode(AuxReqSyncDataLogs syncDataLogs, String factoryCode) {
-        // 优先取 queryParams.shiftCode 显式覆盖
-        Map<String, Object> queryParams = syncDataLogs.getQueryParams();
-        if (queryParams != null && queryParams.get("shiftCode") != null
-                && StringUtils.isNotBlank(String.valueOf(queryParams.get("shiftCode")))) {
-            return String.valueOf(queryParams.get("shiftCode"));
-        }
-        // 按当前时间从 t_cd90_shift_config 启用项推断
-        DynamicDataSourceContextHolder.push(DataSource.APS);
-        List<Cd90ShiftConfig> activeShifts = cd90ShiftQueryMapper.listActiveShiftConfigs(factoryCode);
-        DynamicDataSourceContextHolder.poll();
-        if (CollectionUtils.isEmpty(activeShifts)) {
-            return null;
-        }
-        String nowTime = DateUtil.format(new Date(), "HH:mm:ss");
-        for (Cd90ShiftConfig config : activeShifts) {
-            if (matchShiftByTime(config, nowTime)) {
-                return config.getShiftCode();
-            }
-        }
-        return null;
-    }
-
-    /**
-     * 按当前时间 HH:mm:ss 匹配班次配置。
-     * 非跨天：START_TIME <= now < END_TIME；跨天：now >= START_TIME 或 now < END_TIME。
-     */
-    private boolean matchShiftByTime(Cd90ShiftConfig config, String nowTime) {
-        String start = config.getStartTime();
-        String end = config.getEndTime();
-        if (StringUtils.isBlank(start) || StringUtils.isBlank(end)) {
-            return false;
-        }
-        boolean crossDay = config.getIsCrossDay() != null && config.getIsCrossDay() == 1;
-        if (crossDay) {
-            return nowTime.compareTo(start) >= 0 || nowTime.compareTo(end) < 0;
-        }
-        return nowTime.compareTo(start) >= 0 && nowTime.compareTo(end) < 0;
-    }
-
-    /**
      * 同步胎圈库存
      * T_TQ_STOCK：采用逻辑删除+插入方案
      *   步骤1：逻辑删除当天库存日期的所有数据（IS_DELETE置为1）
@@ -2186,12 +2046,20 @@ public class MesItfServiceImpl implements MesItfService {
             return AjaxResult.error("硫化排程完成量同步失败：" + e.getMessage());
         }
 
+        // 回写硫化排程结果表：接收Feign返回值并校验，避免回写失败被吞导致接口误判成功
         try {
-            FeignTokenHelper.runWithToken(() -> {
-                lhMesSyncRemoteService.writeBackScheduleResultFinishQty(insertList);
-            });
+            AjaxResult writeBackResult = FeignTokenHelper.callWithToken(() ->
+                    lhMesSyncRemoteService.writeBackScheduleResultFinishQty(insertList));
+            if (AjaxResult.Type.SUCCESS.value() != (Integer) writeBackResult.get(AjaxResult.CODE_TAG)) {
+                log.error("硫化排程完成量回写失败：factoryCode={}, 返回code={}, 返回消息={}",
+                        syncDataLogs.getFactoryCode(), writeBackResult.get(AjaxResult.CODE_TAG), writeBackResult.get(AjaxResult.MSG_TAG));
+                return AjaxResult.error("硫化排程完成量回写失败：" + writeBackResult.get(AjaxResult.MSG_TAG));
+            }
+            log.info("硫化排程完成量回写完成：factoryCode={}, 回写数据条数={}", syncDataLogs.getFactoryCode(), insertList.size());
         } catch (Exception e) {
-            log.error("【硫化排程完成量回写】回写硫化排程结果表完成量异常", e);
+            log.error("硫化排程完成量回写Feign调用异常：factoryCode={}, 待回写数据条数={}",
+                    syncDataLogs.getFactoryCode(), insertList.size(), e);
+            return AjaxResult.error("硫化排程完成量回写失败：" + e.getMessage());
         }
         return AjaxResult.success();
     }
@@ -2244,12 +2112,21 @@ public class MesItfServiceImpl implements MesItfService {
             return AjaxResult.error("硫化排程完成量按上一天最新版本同步失败：" + e.getMessage());
         }
 
+        // 回写硫化排程结果表：接收Feign返回值并校验，避免回写失败被吞导致接口误判成功
         try {
-            FeignTokenHelper.runWithToken(() -> {
-                lhMesSyncRemoteService.writeBackScheduleResultFinishQty(insertList);
-            });
+            AjaxResult writeBackResult = FeignTokenHelper.callWithToken(() ->
+                    lhMesSyncRemoteService.writeBackScheduleResultFinishQty(insertList));
+            if (AjaxResult.Type.SUCCESS.value() != (Integer) writeBackResult.get(AjaxResult.CODE_TAG)) {
+                log.error("硫化排程完成量按上一天最新版本回写失败：factoryCode={}, 返回code={}, 返回消息={}",
+                        syncDataLogs.getFactoryCode(), writeBackResult.get(AjaxResult.CODE_TAG), writeBackResult.get(AjaxResult.MSG_TAG));
+                return AjaxResult.error("硫化排程完成量按上一天最新版本回写失败：" + writeBackResult.get(AjaxResult.MSG_TAG));
+            }
+            log.info("硫化排程完成量按上一天最新版本回写完成：factoryCode={}, 回写数据条数={}",
+                    syncDataLogs.getFactoryCode(), insertList.size());
         } catch (Exception e) {
-            log.error("【硫化排程完成量按上一天最新版本回写】回写硫化排程结果表完成量异常", e);
+            log.error("硫化排程完成量按上一天最新版本回写Feign调用异常：factoryCode={}, 待回写数据条数={}",
+                    syncDataLogs.getFactoryCode(), insertList.size(), e);
+            return AjaxResult.error("硫化排程完成量按上一天最新版本回写失败：" + e.getMessage());
         }
         return AjaxResult.success();
     }
@@ -2324,13 +2201,20 @@ public class MesItfServiceImpl implements MesItfService {
             }
         }
 
-        // 回填排程结果
+        // 回写硫化排程结果表：接收Feign返回值并校验，避免回写失败被吞导致接口误判成功
         try {
-            FeignTokenHelper.runWithToken(() -> {
-                lhMesSyncRemoteService.writeBackScheduleResultFinishQty(insertList);
-            });
+            AjaxResult writeBackResult = FeignTokenHelper.callWithToken(() ->
+                    lhMesSyncRemoteService.writeBackScheduleResultFinishQty(insertList));
+            if (AjaxResult.Type.SUCCESS.value() != (Integer) writeBackResult.get(AjaxResult.CODE_TAG)) {
+                log.error("硫化排程完成量按版本号回写失败：dataVersion={}, 返回code={}, 返回消息={}",
+                        dataVersion, writeBackResult.get(AjaxResult.CODE_TAG), writeBackResult.get(AjaxResult.MSG_TAG));
+                return AjaxResult.error("硫化排程完成量按版本号回写失败：" + writeBackResult.get(AjaxResult.MSG_TAG));
+            }
+            log.info("硫化排程完成量按版本号回写完成：dataVersion={}, 回写数据条数={}", dataVersion, insertList.size());
         } catch (Exception e) {
-            log.error("【硫化排程完成量按版本号回写】回写硫化排程结果表完成量异常，dataVersion={}", dataVersion, e);
+            log.error("硫化排程完成量按版本号回写Feign调用异常：dataVersion={}, 待回写数据条数={}",
+                    dataVersion, insertList.size(), e);
+            return AjaxResult.error("硫化排程完成量按版本号回写失败：" + e.getMessage());
         }
         return AjaxResult.success();
     }

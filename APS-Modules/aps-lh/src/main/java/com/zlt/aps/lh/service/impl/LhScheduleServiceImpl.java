@@ -274,13 +274,12 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         context.setScheduleDate(LhScheduleTimeUtil.addDays(target, -offsetDays));
         // 排程窗口结束日期 = T + 2，用于产能计算、加机台、收尾等核心逻辑
         context.setWindowEndDate(LhScheduleTimeUtil.addDays(context.getScheduleDate(), scheduleDays - 1));
-        log.info("排程上下文构建完成, 工厂: {}, 工厂名称: {}, 目标日(业务): {}, T日: {}, 窗口结束日: {}, 排程天数: {}, 强制重排: {}, 局部搜索: {}, 定点机台规则: {}",
+        log.info("排程上下文构建完成, 工厂: {}, 工厂名称: {}, 目标日(业务): {}, T日: {}, 窗口结束日: {}, 排程天数: {}, 局部搜索: {}, 定点机台规则: {}",
                 context.getFactoryCode(), context.getFactoryDisplayName(),
                 LhScheduleTimeUtil.formatDate(context.getScheduleTargetDate()),
                 LhScheduleTimeUtil.formatDate(context.getScheduleDate()),
                 LhScheduleTimeUtil.formatDate(context.getWindowEndDate()),
                 scheduleDays,
-                context.getScheduleConfig().isForceRescheduleEnabled(),
                 context.getScheduleConfig().isLocalSearchEnabled(),
                 context.getScheduleConfig().isSpecifyMachineRuleEnabled());
         return context;
@@ -2060,6 +2059,9 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     private void copyImportRowToEntity(LhScheduleResultTemplateImportVO source, LhScheduleResult target) {
         target.setLhMachineName(source.getLhMachineName());
         // 模板按 8 个班次分别维护示方类型，导入时取第一个非空的 classXLhType 作为主业务口径。
+        // 兜底顺序：CLASSx_LH_TYPE（硫化示方书类型）→ CLASSx_IS_END（类型栏位，0/1/2/3 由
+        // fillImportChangedTrialStatus 转成产品状态 S/T/X 存入 CHANGED_TRIAL_STATUS）。
+        // 当示方类型栏位全空时，用类型栏位推导产品状态，避免 PRODUCT_STATUS 缺失。
         String scheduleType = Stream.of(
                 source.getClass1LhType(),
                 source.getClass2LhType(),
@@ -2069,7 +2071,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                 source.getClass6LhType(),
                 source.getClass7LhType(),
                 source.getClass8LhType(),
-                source.getTrialStatus()
+                source.getChangedTrialStatus()
         ).filter(StringUtils::isNotBlank).findFirst().orElse(null);
         target.setProductStatus(scheduleType);
 

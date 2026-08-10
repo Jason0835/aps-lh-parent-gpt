@@ -41,6 +41,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
 import javax.annotation.Resource;
+import java.text.MessageFormat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -54,7 +55,7 @@ import java.util.stream.Collectors;
  * <p>主要职责：</p>
  * <ul>
  *   <li>对 S4.4/S4.5 生成的排程结果做必填字段、数量口径和换模约束校验；</li>
- *   <li>根据换模结果、滚动继承状态和清洗计划生成模具交替计划；</li>
+ *   <li>根据换模结果和清洗计划生成模具交替计划；</li>
  *   <li>补全工单号、排程顺序、汇总日志和日计划滚动账本日志；</li>
  *   <li>执行硫化示方历史班次保护，防止已执行班次被重排结果覆盖；</li>
  *   <li>委托持久化服务以事务方式替换目标日结果，并发布排程完成事件。</li>
@@ -121,7 +122,12 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
 
             // S4.6.2 生成模具交替计划：基于结果真实换模开始时间和机台滚动状态生成前后规格。
             generateMouldChangePlan(context);
-//            validateMouldChangePlanQuota(context);
+            /*
+             * 换模/换活字块均已全部落定，此处按最终实际生效计划复核早8/中7/日15。
+             * 班次参考上限可能因总量守恒或产能硬约束无法完全消除，因此校验只记录问题，
+             * 不抛异常、不中断保存；每日15次硬限同样显式记录，便于结果审计。
+             */
+            validateMouldChangePlanQuota(context);
             validateManualSundaySandBlastThreshold(context);
 
             // S4.6.3 补全工单号和发布状态
@@ -1084,7 +1090,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
         }
         /*
          * 调用保存前模具时间轴强校验。置换协调器和各排产主链虽然都会维护模具占用账本，
-         * 但最终结果仍必须独立验证，禁止历史在机快照或滚动继承把同一实体模具并发落到不同机台。
+         * 但最终结果仍必须独立验证，禁止历史在机快照把同一实体模具并发落到不同机台。
          */
         validateConcurrentMouldOccupation(context);
         // 双模 SKU 的 L/R 已在新增、续作及换活字块链路按物理组同步生成。
@@ -1860,7 +1866,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
      * 生成模具交替计划。
      * <p>
      * 收集排程结果中换模的机台，生成对应的模具交替计划记录。<br/>
-     * 计划顺序按机台和真实换模开始时间稳定排序，滚动继承结果不重复生成换模计划。
+     * 计划顺序按机台和真实换模开始时间稳定排序。
      * </p>
      *
      * @param context 排程上下文
@@ -1868,8 +1874,6 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
     private void generateMouldChangePlan(LhScheduleContext context) {
         List<LhScheduleResult> changeResults = context.getScheduleResultList().stream()
                 .filter(r -> "1".equals(r.getIsChangeMould())
-                        // 继承结果的换模信息已在滚动衔接中处理，跳过避免重复生成
-                        && !r.isRollingInherited()
                         && r.getDailyPlanQty() != null
                         && r.getDailyPlanQty() > 0)
                 .sorted(Comparator.comparing(LhScheduleResult::getLhMachineCode, Comparator.nullsLast(String::compareTo))
@@ -1879,7 +1883,6 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
         log.info("生成模具交替计划, 换模排程结果数: {}", changeResults.size());
 
         List<LhMouldChangePlan> plans = context.getMouldChangePlanList();
-        // 不清空列表，保留滚动衔接中已继承的换模计划，新计划从尾部追加。
         // rollingStateMap 用于在同一机台连续换模时逐条推进前规格。
         Map<String, RollingMachineState> rollingStateMap = new HashMap<>();
         int planOrder = plans.size() + 1;
@@ -2054,54 +2057,148 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
     }
 
     /**
-     * 对最终换模计划执行早中班配额校验，避免超限结果落库。
+     * 对最终实际生效的换模/换活字块计划执行非阻断次数复核。
      *
      * @param context 排程上下文
      */
     private void validateMouldChangePlanQuota(LhScheduleContext context) {
-        if (context == null || CollectionUtils.isEmpty(context.getMouldChangePlanList())) {
+        if (Objects.isNull(context) || CollectionUtils.isEmpty(context.getMouldChangePlanList())) {
             return;
         }
-        Map<String, List<String>> morningMachineMap = new LinkedHashMap<>();
-        Map<String, List<String>> afternoonMachineMap = new LinkedHashMap<>();
+        Map<String, List<String>> morningMachineMap = new TreeMap<>();
+        Map<String, List<String>> afternoonMachineMap = new TreeMap<>();
+        Map<String, List<String>> dailyMachineMap = new TreeMap<>();
+        /*
+         * 单控整机的同一次换模会按 L/R 运行态各生成一条交替计划，但现场只发生一次物理换模。
+         * 这里按“物理机台+计划时间+实际换模时间+交替类型+前后物料”一一配对 L/R 事件；
+         * 同一物理机台在同一天发生时间或前后物料不同的第二次真实换模仍必须独立计数。
+         */
+        Map<String, int[]> singleControlEventSideCountMap = new HashMap<>();
         for (LhMouldChangePlan plan : context.getMouldChangePlanList()) {
-            if (!shouldCountMouldChangePlan(plan) || plan.getPlanDate() == null) {
+            if (!shouldCountMouldChangePlan(plan) || Objects.isNull(plan.getPlanDate())) {
+                continue;
+            }
+            String physicalMachineCode = this.resolvePhysicalMouldChangeMachineCode(
+                    plan, singleControlEventSideCountMap);
+            if (StringUtils.isEmpty(physicalMachineCode)) {
+                // 当前 L/R 计划已与同一物理事件的配对侧合并，不再重复进入早/中/日复核。
                 continue;
             }
             String dateKey = LhScheduleTimeUtil.formatDate(plan.getPlanDate());
+            dailyMachineMap.computeIfAbsent(dateKey, key -> new ArrayList<>()).add(physicalMachineCode);
             if (LhScheduleTimeUtil.isMorningShift(context, plan.getPlanDate())) {
-                morningMachineMap.computeIfAbsent(dateKey, key -> new ArrayList<>()).add(plan.getLhMachineCode());
+                morningMachineMap.computeIfAbsent(dateKey, key -> new ArrayList<>()).add(physicalMachineCode);
                 continue;
             }
             if (LhScheduleTimeUtil.isAfternoonShift(context, plan.getPlanDate())) {
-                afternoonMachineMap.computeIfAbsent(dateKey, key -> new ArrayList<>()).add(plan.getLhMachineCode());
+                afternoonMachineMap.computeIfAbsent(dateKey, key -> new ArrayList<>()).add(physicalMachineCode);
             }
         }
-        validateMouldChangeShiftLimit(context, morningMachineMap,
-                LhScheduleTimeUtil.getMorningMouldChangeLimit(context), "早班");
-        validateMouldChangeShiftLimit(context, afternoonMachineMap,
-                LhScheduleTimeUtil.getAfternoonMouldChangeLimit(context), "中班");
+        /*
+         * 最终问题输出沿用均衡阶段的确定性顺序：日期升序，同日早班、中班、全日。
+         * 机台清单在记录前再按编码排序，避免换模计划生成顺序影响接口和过程日志内容。
+         */
+        Set<String> dateKeySet = new TreeSet<>(dailyMachineMap.keySet());
+        for (String dateKey : dateKeySet) {
+            this.validateMouldChangeShiftLimit(
+                    context, dateKey, morningMachineMap.get(dateKey),
+                    LhScheduleTimeUtil.getMorningMouldChangeLimit(context), "早班");
+            this.validateMouldChangeShiftLimit(
+                    context, dateKey, afternoonMachineMap.get(dateKey),
+                    LhScheduleTimeUtil.getAfternoonMouldChangeLimit(context), "中班");
+            this.validateMouldChangeShiftLimit(
+                    context, dateKey, dailyMachineMap.get(dateKey),
+                    LhScheduleTimeUtil.getDailyMouldChangeLimit(context), "全日");
+        }
     }
 
+    /**
+     * 解析最终复核使用的物理换模机台，并对内容一致的单控 L/R 配对事件执行一次计数。
+     * <p>不能只按“日期+物理机台”去重，因为同一物理机台一天内可能发生两次真实换模；
+     * 也不能直接对事件键做集合去重，否则异常重复的同侧计划会被错误少计。因此按事件键分别累计
+     * L、R 条数，仅将可一一配对的左右侧合并，未配对的单侧计划仍各自计数。</p>
+     *
+     * @param plan 当前最终模具交替计划
+     * @param singleControlEventSideCountMap 单控物理事件左右侧累计数，value[0]为L侧、value[1]为R侧
+     * @return 应计数的物理机台编码；当前计划已与配对侧合并时返回空字符串
+     */
+    private String resolvePhysicalMouldChangeMachineCode(
+            LhMouldChangePlan plan,
+            Map<String, int[]> singleControlEventSideCountMap) {
+        String machineCode = plan.getLhMachineCode();
+        if (!LhSingleControlMachineUtil.isSingleMouldMachine(machineCode)) {
+            return machineCode;
+        }
+        String eventKey = this.buildPhysicalMouldChangeEventKey(plan);
+        int[] sideCounts = singleControlEventSideCountMap.computeIfAbsent(
+                eventKey, key -> new int[]{0, 0});
+        int currentSideIndex = LhSingleControlMachineUtil.isLeftSide(machineCode) ? 0 : 1;
+        int pairSideIndex = currentSideIndex == 0 ? 1 : 0;
+        sideCounts[currentSideIndex]++;
+        if (sideCounts[currentSideIndex] <= sideCounts[pairSideIndex]) {
+            return StringUtils.EMPTY;
+        }
+        return LhSingleControlMachineUtil.resolvePhysicalMachineCode(machineCode);
+    }
+
+    /**
+     * 构建单控 L/R 物理换模事件键。
+     * <p>事件键只描述实际换模业务事实，不包含左右侧编码、计划主键和顺位，确保同一整机的
+     * L/R 配对计划可以合并；计划时间、实际换模时间、交替类型或前后物料任一不同，均视为
+     * 同一物理机台发生的另一条真实换模事件。</p>
+     *
+     * @param plan 模具交替计划
+     * @return 单控物理换模事件键
+     */
+    private String buildPhysicalMouldChangeEventKey(LhMouldChangePlan plan) {
+        StringBuilder eventKeyBuilder = new StringBuilder(128);
+        eventKeyBuilder.append(StringUtils.defaultString(
+                        LhSingleControlMachineUtil.resolvePhysicalMachineCode(plan.getLhMachineCode())))
+                .append('|').append(Objects.isNull(plan.getPlanDate()) ? 0L : plan.getPlanDate().getTime())
+                .append('|').append(Objects.isNull(plan.getChangeTime()) ? 0L : plan.getChangeTime().getTime())
+                .append('|').append(StringUtils.defaultString(plan.getChangeMouldType()))
+                .append('|').append(StringUtils.defaultString(plan.getBeforeMaterialCode()))
+                .append('|').append(StringUtils.defaultString(plan.getAfterMaterialCode()));
+        return eventKeyBuilder.toString();
+    }
+
+    /**
+     * 检查指定班次/全日的最终换模数，超限时只追加响应问题和过程日志。
+     *
+     * @param context 排程上下文
+     * @param dateKey 换模日期
+     * @param machineCodeList 当前日期、当前班次的实际计数机台列表
+     * @param limit 参考上限或每日硬上限
+     * @param shiftName 班次名称
+     * @return void
+     */
     private void validateMouldChangeShiftLimit(LhScheduleContext context,
-                                               Map<String, List<String>> machineMap,
+                                               String dateKey,
+                                               List<String> machineCodeList,
                                                int limit,
                                                String shiftName) {
-        for (Map.Entry<String, List<String>> entry : machineMap.entrySet()) {
-            if (CollectionUtils.isEmpty(entry.getValue()) || entry.getValue().size() <= limit) {
-                continue;
-            }
-            throw new ScheduleException(ScheduleStepEnum.S4_6_RESULT_VALIDATION,
-                    ScheduleErrorCode.RESULT_VALIDATION_FAILED,
-                    context.getFactoryCode(), context.getBatchNo(),
-                    String.format("模具交替计划超限：日期[%s]班次[%s]数量[%d]超出上限[%d]，机台=%s",
-                            entry.getKey(), shiftName, entry.getValue().size(), limit,
-                            String.join(",", entry.getValue())));
+        if (CollectionUtils.isEmpty(machineCodeList) || machineCodeList.size() <= limit) {
+            return;
         }
+        List<String> sortedMachineCodeList = new ArrayList<>(machineCodeList);
+        sortedMachineCodeList.sort(StringUtils::compare);
+        String detail = MessageFormat.format(I18nUtil.getMessage(
+                        "ui.lh.schedule.sharedEmbryoEndingBalance.unresolvedChangeover"),
+                dateKey, shiftName, sortedMachineCodeList.size(), limit,
+                String.join(",", sortedMachineCodeList));
+        context.addValidationError(detail);
+        PriorityTraceLogHelper.appendProcessLog(context, "共用胎胚收尾均衡结果复核", detail);
+        log.warn("{}", detail);
     }
 
+    /**
+     * 判断模具交替计划是否属于共用胎胚均衡要求统计的正常换模或换活字块。
+     *
+     * @param plan 模具交替计划
+     * @return true-需要计入最终早班、中班和全日次数；false-清洗等其他交替类型不计入
+     */
     private boolean shouldCountMouldChangePlan(LhMouldChangePlan plan) {
-        if (plan == null || !Objects.equals(plan.getIsDelete(), 0)) {
+        if (Objects.isNull(plan) || !Objects.equals(plan.getIsDelete(), 0)) {
             return false;
         }
         return MouldChangeTypeEnum.containsAnyCode(plan.getChangeMouldType(),
@@ -2383,7 +2480,6 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
         return context.getScheduleResultList().stream()
                 .filter(Objects::nonNull)
                 .filter(result -> "1".equals(result.getIsChangeMould()))
-                .filter(result -> !result.isRollingInherited())
                 .filter(result -> Objects.nonNull(result.getDailyPlanQty()) && result.getDailyPlanQty() > 0)
                 .sorted(Comparator.comparing(LhScheduleResult::getLhMachineCode,
                                 Comparator.nullsLast(String::compareTo))
@@ -3211,9 +3307,6 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
         }
         if (result.getMouldChangeStartTime() != null) {
             return result.getMouldChangeStartTime();
-        }
-        if (result.isRollingInherited()) {
-            return null;
         }
         return resolveProductionStartTime(result);
     }

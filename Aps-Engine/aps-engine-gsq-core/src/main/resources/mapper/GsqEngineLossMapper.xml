@@ -3,9 +3,9 @@
 <mapper namespace="com.zlt.aps.gsq.engine.mapper.GsqEngineLossMapper">
 
     <select id="listLossRate" parameterType="string" resultType="com.zlt.aps.gsq.engine.vo.GsqLossVo">
-        select concat(IFNULL(machine_id,'') , '#' , IFNULL(STEEL_RING_CODE,'')) LOSS_KEY, LOSS_RATE
+        select concat(IFNULL(machine_code,'') , '#' , IFNULL(STEEL_RING_CODE,'')) LOSS_KEY, LOSS_RATE
         from T_GSQ_LOSS_SETTING
-        where DEL_FLAG = 0
+        where IS_DELETE = 0
     </select>
 
 </mapper>

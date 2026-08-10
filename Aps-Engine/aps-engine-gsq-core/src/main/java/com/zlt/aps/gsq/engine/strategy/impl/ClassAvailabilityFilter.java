@@ -63,10 +63,12 @@ public class ClassAvailabilityFilter implements IMachineFilterStrategy {
 
     /**
      * 判断机台是否启用。
+     *
+     * <p>钢丝圈机台表 T_GSQ_MACHINE_INFO.STATUS：仅 STATUS='1' 视为启用，其他值一律排除。</p>
      */
     private boolean isMachineActive(GsqMachineInfo machine) {
         String status = machine.getStatus();
-        return "0".equals(status) || "1".equals(status) || "active".equalsIgnoreCase(status);
+        return "1".equals(status);
     }
 
     /**

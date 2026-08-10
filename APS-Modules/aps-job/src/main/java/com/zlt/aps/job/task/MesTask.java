@@ -146,14 +146,6 @@ public class MesTask {
     }
 
     /**
-     * 同步直裁库存（从 MES 中间表 T_MES_CD90_STOCK 同步到 t_cd90_stock）
-     */
-    @ApiOperation("同步直裁库存")
-    public void syncMesCd90Stock() {
-        FeignTokenHelper.runWithToken(() -> iMesItfService.syncMesCd90Stock(new AuxReqSyncDataLogs()));
-    }
-
-    /**
      * 同步胎圈库存
      */
     @ApiOperation("同步胎圈库存")

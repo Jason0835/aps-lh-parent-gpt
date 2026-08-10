@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.itf.mes.mapper.GsqScheduleResultIssueMapper">
+
+    <!-- 批量新增钢丝圈排程结果到MES中间表 -->
+    <insert id="batchInsertGsqScheduleResult" parameterType="list">
+        INSERT INTO MES_GSQ_SCHEDULE_RESULT (
+            SCHEDULE_DATE, CX_BATCH_NO, BATCH_NO, ORDER_NO,
+            STEEL_RING_CODE, MATERIAL_CODE, STEEL_TYPE, EMBRYO_SPEC_DESC,
+            UNIT_CONSUME, TWINING_DISC_CODE, PRO_SIZE, MACHINE_CODE,
+            STOCK_QTY,
+            MID_PLAN_QTY, MID_PRODUCE_ORDER, MID_SYS_ANALYSIS, MID_HAND_ANALYSIS,
+            NIGHT_PLAN_QTY, NIGHT_PRODUCE_ORDER, NIGHT_SYS_ANALYSIS, NIGHT_HAND_ANALYSIS,
+            DAY_PLAN_QTY, DAY_PRODUCE_ORDER, DAY_SYS_ANALYSIS, DAY_HAND_ANALYSIS,
+            NEXT_MID_PLAN_QTY, NEXT_MID_PRODUCE_ORDER, NEXT_MID_SYS_ANALYSIS, NEXT_MID_HAND_ANALYSIS,
+            TQ_CLASS1_PLAN, TQ_CLASS2_PLAN, TQ_CLASS3_PLAN, TQ_CLASS4_PLAN, TQ_CLASS5_PLAN, TQ_CLASS6_PLAN,
+            IS_RELEASE, CLOSE_OUT_SPEC_FLAG, PRODUCTION_STATUS, REMARK,
+            DATA_VERSION, COMPANY_CODE, FACTORY_CODE
+        )
+        SELECT * FROM (
+        <foreach collection="list" item="item" separator=" UNION ALL ">
+            SELECT
+            #{item.scheduleDate} AS SCHEDULE_DATE,
+            #{item.cxBatchNo} AS CX_BATCH_NO,
+            #{item.batchNo} AS BATCH_NO,
+            #{item.orderNo} AS ORDER_NO,
+            #{item.steelRingCode} AS STEEL_RING_CODE,
+            #{item.materialCode} AS MATERIAL_CODE,
+            #{item.steelType} AS STEEL_TYPE,
+            #{item.embryoSpecDesc} AS EMBRYO_SPEC_DESC,
+            #{item.unitConsume} AS UNIT_CONSUME,
+            #{item.twiningDiscCode} AS TWINING_DISC_CODE,
+            #{item.proSize} AS PRO_SIZE,
+            #{item.machineCode} AS MACHINE_CODE,
+            #{item.stockQty} AS STOCK_QTY,
+            #{item.midPlanQty} AS MID_PLAN_QTY,
+            #{item.midProduceOrder} AS MID_PRODUCE_ORDER,
+            #{item.midSysAnalysis} AS MID_SYS_ANALYSIS,
+            #{item.midHandAnalysis} AS MID_HAND_ANALYSIS,
+            #{item.nightPlanQty} AS NIGHT_PLAN_QTY,
+            #{item.nightProduceOrder} AS NIGHT_PRODUCE_ORDER,
+            #{item.nightSysAnalysis} AS NIGHT_SYS_ANALYSIS,
+            #{item.nightHandAnalysis} AS NIGHT_HAND_ANALYSIS,
+            #{item.dayPlanQty} AS DAY_PLAN_QTY,
+            #{item.dayProduceOrder} AS DAY_PRODUCE_ORDER,
+            #{item.daySysAnalysis} AS DAY_SYS_ANALYSIS,
+            #{item.dayHandAnalysis} AS DAY_HAND_ANALYSIS,
+            #{item.nextMidPlanQty} AS NEXT_MID_PLAN_QTY,
+            #{item.nextMidProduceOrder} AS NEXT_MID_PRODUCE_ORDER,
+            #{item.nextMidSysAnalysis} AS NEXT_MID_SYS_ANALYSIS,
+            #{item.nextMidHandAnalysis} AS NEXT_MID_HAND_ANALYSIS,
+            #{item.tqClass1Plan} AS TQ_CLASS1_PLAN,
+            #{item.tqClass2Plan} AS TQ_CLASS2_PLAN,
+            #{item.tqClass3Plan} AS TQ_CLASS3_PLAN,
+            #{item.tqClass4Plan} AS TQ_CLASS4_PLAN,
+            #{item.tqClass5Plan} AS TQ_CLASS5_PLAN,
+            #{item.tqClass6Plan} AS TQ_CLASS6_PLAN,
+            '1' AS IS_RELEASE,
+            #{item.closeOutSpecFlag} AS CLOSE_OUT_SPEC_FLAG,
+            #{item.productionStatus} AS PRODUCTION_STATUS,
+            #{item.remark} AS REMARK,
+            #{item.dataVersion} AS DATA_VERSION,
+            #{item.companyCode} AS COMPANY_CODE,
+            #{item.factoryCode} AS FACTORY_CODE
+        </foreach>
+        ) AS t
+        WHERE NOT EXISTS (
+            SELECT 1 FROM MES_GSQ_SCHEDULE_RESULT
+            WHERE SCHEDULE_DATE = t.SCHEDULE_DATE
+            AND MACHINE_CODE = t.MACHINE_CODE
+            AND STEEL_RING_CODE = t.STEEL_RING_CODE
+        )
+    </insert>
+
+    <!-- 根据排程日期删除数据 -->
+    <delete id="deleteByScheduleDate">
+        DELETE FROM MES_GSQ_SCHEDULE_RESULT
+        WHERE SCHEDULE_DATE = #{scheduleDate}
+        AND DATA_VERSION = #{dataVersion}
+    </delete>
+
+    <!-- 批量查询中间表中已存在的记录（按排程日期+机台编码+钢丝圈编码匹配，不含版本号） -->
+    <select id="selectExistingByScheduleDateAndMachine" resultType="com.zlt.aps.itf.vo.MesGsqScheduleResult">
+        SELECT SCHEDULE_DATE, MACHINE_CODE, STEEL_RING_CODE
+        FROM MES_GSQ_SCHEDULE_RESULT
+        WHERE
+        <foreach collection="list" item="item" separator=" OR ">
+            (SCHEDULE_DATE = #{item.scheduleDate}
+             AND MACHINE_CODE = #{item.machineCode}
+             AND STEEL_RING_CODE = #{item.steelRingCode})
+        </foreach>
+    </select>
+
+    <!-- 批量删除中间表中已存在的记录（按排程日期+机台编码+钢丝圈编码匹配，删除该键的所有版本） -->
+    <delete id="batchDeleteByScheduleDateAndMachine">
+        DELETE FROM MES_GSQ_SCHEDULE_RESULT WHERE
+        <foreach collection="list" item="item" separator=" OR ">
+            (SCHEDULE_DATE = #{item.scheduleDate}
+             AND MACHINE_CODE = #{item.machineCode}
+             AND STEEL_RING_CODE = #{item.steelRingCode})
+        </foreach>
+    </delete>
+
+</mapper>

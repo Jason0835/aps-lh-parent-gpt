@@ -4,7 +4,6 @@ import com.zlt.aps.common.engine.domain.EngineConstructionInfo;
 import com.zlt.aps.common.engine.schedule.MachineShiftTaskChain;
 import com.zlt.aps.common.engine.schedule.ScheduleTaskNode;
 import com.zlt.aps.gsq.api.domain.entity.GsqMachineInfo;
-import com.zlt.aps.gsq.api.domain.entity.GsqStockShiftConfig;
 import com.zlt.aps.gsq.engine.domain.GsqMachineCandidate;
 import com.zlt.aps.gsq.engine.domain.GsqRuleTrace;
 import com.zlt.aps.gsq.engine.domain.GsqSnapshotBuildResult;
@@ -96,14 +95,24 @@ public class GsqScheduleContext {
     /** 前日早班计划量，key=钢丝圈代码，value=前日2班计划量（昨日2班剩余库存来源） */
     private Map<String, Double> lastMidPlanMap = new HashMap<>();
 
-    /** 损耗率映射，key=钢丝圈代码，value=损耗率 */
+    /** 损耗率映射，key=钢丝圈代码，value=损耗率（S2.3按钢丝圈聚合，S3分配机台前临时使用） */
     private Map<String, Double> lossRateMap = new HashMap<>();
+
+    /**
+     * 机台维度损耗率映射，key=机台代码#钢丝圈代码（如 "GSQM03#211000023"），value=损耗率。
+     *
+     * <p>S3 机台分配确定后，按该规格实际机台精确取损耗率，避免按钢丝圈聚合取平均导致失真。</p>
+     */
+    private Map<String, Double> machineLossRateMap = new HashMap<>();
 
     /** 月度剩余，key=钢丝圈代码 */
     private Map<String, GsqMonthSurplusVo> monthSurplusMap = new HashMap<>();
 
     /** 全部机台列表 */
     private List<GsqMachineInfo> allMachineList = new ArrayList<>();
+
+    /** 钢丝圈-缠绕盘代码映射，key=钢丝圈代码(steelRingCode), value=缠绕盘代码(twiningDiscCode) */
+    private Map<String, String> twiningDiscCodeMap = new HashMap<>();
 
     /** 机台寸口映射，key=机台编号，value=该机台可做的寸口值列表 */
     private Map<String, List<java.math.BigDecimal>> machineChuckMap = new HashMap<>();
@@ -149,9 +158,6 @@ public class GsqScheduleContext {
 
     /** 各规格各班次机台定额总产能，key=钢丝圈编码, value=Map<班次号(1~6), 定额总产能> */
     private Map<String, Map<Integer, Double>> specClassQuotaMap = new HashMap<>();
-
-    /** 钢丝圈备库班数配置列表（S2.3 备库模型使用，按 MIN_MACHINE_QTY 升序） */
-    private List<GsqStockShiftConfig> stockShiftConfigList = new ArrayList<>();
 
     // ========== 结构化规则证据（贯穿 S2~S6，S6 持久化时写入解释 JSON 字段） ==========
 

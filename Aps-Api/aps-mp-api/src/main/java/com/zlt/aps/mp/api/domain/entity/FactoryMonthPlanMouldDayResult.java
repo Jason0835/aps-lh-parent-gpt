@@ -783,6 +783,13 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     private String lastMonthValidFlag;
 
     /**
+     * 模壳标准
+     */
+    @ApiModelProperty(value = "模壳标准", name = "mouldShell")
+    @TableField(exist = false)
+    private String mouldShell;
+
+    /**
      * 是否增模又降膜又增模
      *
      * @return

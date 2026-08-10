@@ -236,44 +236,44 @@ public class RequestMesTask {
 		if (!isMpsAvailable()) return;
 		iRequestMesService.gsqSyncStock(startTime, endTime);
 	}
-
-	/**
-	 * 15度裁断每日库存同步
-	 */
-	public void cd15SyncStock() {
-		String time = DateUtils.getDate();
-		cd15SyncStock(time, time);
-	}
-
-	/**
-	 * 15度裁断每日库存同步
-	 * 
-	 * @param startTime 开始时间 yyyy-MM-dd
-	 * @param endTime   结束时间 yyyy-MM-dd
-	 */
-	public void cd15SyncStock(String startTime, String endTime) {
-		if (!isMpsAvailable()) return;
-		iRequestMesService.cd15SyncStock(startTime, endTime);
-	}
-
-	/**
-	 * 90度裁断每日库存同步
-	 */
-	public void cd90SyncStock() {
-		String time = DateUtils.getDate();
-		cd90SyncStock(time, time);
-	}
-
-	/**
-	 * 90度裁断每日库存同步
-	 * 
-	 * @param startTime 开始时间 yyyy-MM-dd
-	 * @param endTime   结束时间 yyyy-MM-dd
-	 */
-	public void cd90SyncStock(String startTime, String endTime) {
-		if (!isMpsAvailable()) return;
-		iRequestMesService.cd90SyncStock(startTime, endTime);
-	}
+//
+//	/**
+//	 * 15度裁断每日库存同步
+//	 */
+//	public void cd15SyncStock() {
+//		String time = DateUtils.getDate();
+//		cd15SyncStock(time, time);
+//	}
+//
+//	/**
+//	 * 15度裁断每日库存同步
+//	 *
+//	 * @param startTime 开始时间 yyyy-MM-dd
+//	 * @param endTime   结束时间 yyyy-MM-dd
+//	 */
+//	public void cd15SyncStock(String startTime, String endTime) {
+//		if (!isMpsAvailable()) return;
+//		iRequestMesService.cd15SyncStock(startTime, endTime);
+//	}
+//
+//	/**
+//	 * 90度裁断每日库存同步
+//	 */
+//	public void cd90SyncStock() {
+//		String time = DateUtils.getDate();
+//		cd90SyncStock(time, time);
+//	}
+//
+//	/**
+//	 * 90度裁断每日库存同步
+//	 *
+//	 * @param startTime 开始时间 yyyy-MM-dd
+//	 * @param endTime   结束时间 yyyy-MM-dd
+//	 */
+//	public void cd90SyncStock(String startTime, String endTime) {
+//		if (!isMpsAvailable()) return;
+//		iRequestMesService.cd90SyncStock(startTime, endTime);
+//	}
 
 	/**
 	 * 钢带压延每日库存同步

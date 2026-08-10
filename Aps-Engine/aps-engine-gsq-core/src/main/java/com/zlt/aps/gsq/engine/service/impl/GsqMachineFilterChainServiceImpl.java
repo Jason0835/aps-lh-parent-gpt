@@ -26,7 +26,8 @@ import java.util.stream.Collectors;
 @Service
 public class GsqMachineFilterChainServiceImpl implements IGsqMachineFilterChainService {
 
-    /** 策略列表（按order排序） */
+    /** 策略列表（由Spring注入所有IMachineFilterStrategy实现，按order排序） */
+    @Resource
     private List<IMachineFilterStrategy> strategies = new ArrayList<>();
 
     /**

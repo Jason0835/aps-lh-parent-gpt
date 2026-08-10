@@ -2,7 +2,6 @@ package com.zlt.aps.lh.handler;
 
 import com.zlt.aps.lh.api.enums.ScheduleStepEnum;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
-import com.zlt.aps.lh.component.StructureMinMachineRetentionService;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.factory.ScheduleStrategyFactory;
 import com.zlt.aps.lh.engine.strategy.IProductionStrategy;
@@ -20,7 +19,7 @@ import javax.annotation.Resource;
  *
  * <p>业务定位：</p>
  * <ul>
- *   <li>承接 S4.3 分类出的续作 SKU，优先处理 MES 在机/滚动继承规格；</li>
+ *   <li>承接 S4.3 分类出的续作 SKU，优先处理 MES 在机规格；</li>
  *   <li>组织续作收尾、换活字块衔接、班次计划量分配、胎胚库存调整和降模排产；</li>
  *   <li>执行顺序早于 S4.5 新增排产，避免新增规格抢占本应续作收尾的机台窗口。</li>
  * </ul>
@@ -38,8 +37,6 @@ public class ContinuousProductionHandler extends AbsScheduleStepHandler {
     private ScheduleStrategyFactory strategyFactory;
     @Resource
     private ITypeBlockProductionStrategy typeBlockProductionStrategy;
-    @Resource
-    private StructureMinMachineRetentionService structureMinMachineRetentionService;
     @Resource
     private LhMaintenanceScheduleService maintenanceScheduleService;
 
@@ -77,26 +74,25 @@ public class ContinuousProductionHandler extends AbsScheduleStepHandler {
         log.info("续作胎胚库存调整完成, 排程结果数: {}, 未排产数: {}",
                 context.getScheduleResultList().size(), context.getUnscheduledResultList().size());
 
-        // S4.4.4 降模排产：对同 SKU 多机台续作按 dayN 保障量和收尾规则释放冗余机台。
+        /*
+         * S4.4.4 续作降模和共用胎胚收尾均衡：
+         * 1. 降模及其他续作数量修改先全部稳定；
+         * 2. 在续作日计划账本一次性扣减前，执行共用胎胚多机台均衡。
+         * 两个动作必须在同一续作策略内连续完成，避免先扣账后搬量产生二次账本调整。
+         * 原“结构停产保机”阶段判断已废弃，结构收尾对齐改为S4.5新增选机时实时判断。
+         */
         strategy.scheduleReduceMould(context);
-        log.info("续作降模排产完成, 排程结果数: {}, 未排产数: {}",
+        log.info("续作降模及共用胎胚收尾均衡完成, 排程结果数: {}, 未排产数: {}",
                 context.getScheduleResultList().size(), context.getUnscheduledResultList().size());
 
-        // S4.4.5 收尾后换活字块衔接排产：必须放在降模之后，读取续作最终收口后的真实机台可用时间。
+        // S4.4.5 收尾后换活字块衔接排产：只读取均衡后的最终机台可用时间。
         typeBlockProductionStrategy.scheduleTypeBlockChange(context);
         // 换活字块可能移出或回写待新增SKU，需重新构建结构视图供 S4.5 新增排序使用。
         context.rebuildStructureSkuMapFromPending(context.getNewSpecSkuList());
         log.info("换活字块衔接排产完成, 排程结果数: {}, 待新增SKU: {}",
                 context.getScheduleResultList().size(), context.getNewSpecSkuList().size());
 
-        /*
-         * S4.4.6 结构停产保机阶段判断：
-         * 必须等续作、降模和换活字块结果全部稳定后执行，并且必须早于S4.5新增SKU选机。
-         * 判断只使用当前结构最晚正量班次及该班次真实在机关系，不再在逐台下机时实时决策。
-         */
-        structureMinMachineRetentionService.applyRetentionAfterContinuousAndTypeBlock(context);
-
-        // S4.4.7 续作后全量启用机台排序日志：排序逻辑不变，只展示阶段判断后的真实机台状态。
+        // S4.4.6 续作后全量启用机台排序日志：排序逻辑不变，只展示均衡和换活字块后的真实机台状态。
         strategyFactory.getMachineMatchStrategy().traceEnabledMachineSort(context);
     }
 

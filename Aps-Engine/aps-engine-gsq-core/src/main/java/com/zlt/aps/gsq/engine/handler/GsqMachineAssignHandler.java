@@ -4,7 +4,9 @@ import com.zlt.aps.gsq.api.domain.entity.GsqMachineInfo;
 import com.zlt.aps.gsq.engine.context.GsqScheduleContext;
 import com.zlt.aps.gsq.engine.service.IGsqMachineFilterChainService;
 import com.zlt.aps.gsq.engine.vo.GsqScheduleResultVo;
+import com.zlt.aps.gsq.engine.vo.GsqScheduleParams;
 import com.zlt.aps.gsq.engine.vo.GsqTaskNode;
+import com.zlt.aps.common.core.utils.BigDecimalUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -17,7 +19,7 @@ import java.util.stream.Collectors;
  *
  * <p>核心逻辑：</p>
  * <ol>
- *   <li>按"库存供应时长"对排程记录排序（供应时长越短，优先级越高）</li>
+ *   <li>按优先级排序排程记录（P-0当前班次触发备库 → P-1已分配机台 → P-2备库缺口 → P-3供应时长，对齐胎圈TQ）</li>
  *   <li>遍历6个班次（1→6）</li>
  *   <li>对每个班次，按规格分组后，调用策略链过滤可用机台</li>
  *   <li>选择最优机台分配计划量（单机台定额）</li>
@@ -33,6 +35,13 @@ public class GsqMachineAssignHandler extends AbsGsqScheduleStepHandler {
     @Resource
     private IGsqMachineFilterChainService machineFilterChainService;
 
+    /** S2.3 计划量计算 Handler：机台分配确定后按实际机台精确损耗率重算备库计划量 */
+    @Resource
+    private GsqPlanQtyCalcHandler planQtyCalcHandler;
+
+    /** 默认备库规格班次最大班产阈值（多规格机台上备库规格当班初始排产上限，SYS1603005） */
+    private static final double DEFAULT_BACKUP_MULTI_SPEC_THRESHOLD = 1000D;
+
     @Override
     protected String getStepName() {
         return "S3-班次排产分配";
@@ -46,13 +55,17 @@ public class GsqMachineAssignHandler extends AbsGsqScheduleStepHandler {
             return;
         }
 
-        // 1. 按库存供应时长排序（供应时长短 = 紧急 = 优先排）
-        List<GsqScheduleResultVo> sortedList = sortBySupplyDuration(scheduleList, context);
+        // 1. 按优先级排序（对齐胎圈TQ P-0~P-3）：
+        //    P-0 当前班次新触发备库规格 > P-1 已分配机台规格 > P-2 备库规格(缺口大优先) > P-3 非备库按供应时长升序
+        List<GsqScheduleResultVo> sortedList = sortByPriority(scheduleList, context);
 
         // 2. 规格级机台分配（对齐胎圈TQ）：为每个规格选定一台机台，6班次沿用该机台
-        //    使用第一班次上下文执行策略链过滤，按"已分配规格数"负载均衡选择机台，
+        //    使用第一班次上下文执行策略链过滤，选择机台时：
+        //    ① 缠绕盘连续优先（机台末规格缠绕盘与当前规格相同者优先，减少换盘）
+        //    ② 剩余产能较小优先（剩余产能=QUATA×班次数-已分配量，先把一台机台排满）
         //    确保 machineCode（数据库/页面展示）及 class1~6MachineCode（任务链/质量等消费）均有值
-        Map<String, Integer> machineAssignCount = new HashMap<>();
+        Map<String, String> machineLastTwiningDisc = new HashMap<>();
+        Map<String, Double> machineAssignedQty = new HashMap<>();
         for (GsqScheduleResultVo scheduleVo : sortedList) {
             if (!hasAnyShiftPlan(scheduleVo)) {
                 continue;
@@ -70,15 +83,33 @@ public class GsqMachineAssignHandler extends AbsGsqScheduleStepHandler {
                 continue;
             }
 
-            // 选择已分配规格数最少（负载最轻）的机台，避免负载不均
+            final String currentTwiningDisc = scheduleVo.getTwiningDiscCode();
+            // 选择机台：①缠绕盘连续优先 ②剩余产能较小优先（优先排满一台）
             GsqMachineInfo targetMachine = availableMachines.stream()
-                    .min(Comparator.comparingInt(m -> machineAssignCount.getOrDefault(m.getMachineCode(), 0)))
+                    .min((m1, m2) -> {
+                        // ① 缠绕盘连续优先：机台末规格缠绕盘与当前规格相同者优先
+                        String disc1 = machineLastTwiningDisc.get(m1.getMachineCode());
+                        String disc2 = machineLastTwiningDisc.get(m2.getMachineCode());
+                        boolean same1 = currentTwiningDisc != null && currentTwiningDisc.equals(disc1);
+                        boolean same2 = currentTwiningDisc != null && currentTwiningDisc.equals(disc2);
+                        if (same1 != same2) {
+                            return same1 ? -1 : 1;
+                        }
+                        // ② 剩余产能较小优先：剩余产能=QUATA×班次数-已分配量，越小越接近排满=优先
+                        double remain1 = calcRemainCapacity(m1, machineAssignedQty.getOrDefault(m1.getMachineCode(), 0D));
+                        double remain2 = calcRemainCapacity(m2, machineAssignedQty.getOrDefault(m2.getMachineCode(), 0D));
+                        return Double.compare(remain1, remain2);
+                    })
                     .orElse(availableMachines.get(0));
 
             String machineCode = targetMachine.getMachineCode();
             // 机台定额来自 QUATA 字段（BigDecimal类型）
             Double quota = targetMachine.getQuata() == null ? 0D : targetMachine.getQuata().doubleValue();
-            machineAssignCount.merge(machineCode, 1, Integer::sum);
+            // 记录该机台末规格缠绕盘及已分配量（供后续规格按缠绕盘连续优先选择）
+            if (currentTwiningDisc != null) {
+                machineLastTwiningDisc.put(machineCode, currentTwiningDisc);
+            }
+            machineAssignedQty.merge(machineCode, getTotalPlanQty(scheduleVo), Double::sum);
 
             // 设置规格级单机台：machineCode 及各班次机台/定额均填该机台
             scheduleVo.setMachineCode(machineCode);
@@ -89,8 +120,15 @@ public class GsqMachineAssignHandler extends AbsGsqScheduleStepHandler {
                 }
             }
 
+            // 机台确定后，按该机台精确损耗率重算备库规格计划量（S2.3 用的是按钢丝圈聚合的平均损耗率，可能失真）
+            planQtyCalcHandler.recalcPlanQtyByMachineLossRate(scheduleVo, context);
+
             log.info("[S3] 规格[{}] 规格级分配机台[{}] 定额[{}]", scheduleVo.getSteelRingCode(), machineCode, quota);
         }
+
+        // 2.5 备库多规格机台当班初始排产限制（对齐胎圈 TQ SYS1101029）
+        // 需在所有规格机台分配完成后，统计各机台规格数，才能判断单/多规格机台
+        applyBackupMultiSpecLimit(context);
 
         // 3. 6班次顺序构建任务链（沿用规格级已分配机台）
         for (int classIndex = 1; classIndex <= 6; classIndex++) {
@@ -127,12 +165,60 @@ public class GsqMachineAssignHandler extends AbsGsqScheduleStepHandler {
     }
 
     /**
-     * 按库存供应时长升序排序，供应时长短=紧急=优先排产。
+     * 按优先级排序（对齐胎圈TQ P-0~P-3）。
+     *
+     * <p>排序规则：</p>
+     * <ul>
+     *   <li>P-0: 当前班次（第一班次）新触发备库的规格最高优先级</li>
+     *   <li>P-1: 已分配机台的规格优先（保证机台分配稳定）</li>
+     *   <li>P-2: 备库规格优先于非备库规格；同为备库规格按剩余需求缺口从大到小（缺口越大越紧急）</li>
+     *   <li>P-3: 非备库规格按库存供应时长升序（供应时长短=紧急=优先排）</li>
+     * </ul>
      */
-    private List<GsqScheduleResultVo> sortBySupplyDuration(List<GsqScheduleResultVo> list,
-                                                            GsqScheduleContext context) {
+    private List<GsqScheduleResultVo> sortByPriority(List<GsqScheduleResultVo> list,
+                                                      GsqScheduleContext context) {
         return list.stream()
-                .sorted(Comparator.comparingDouble(vo -> calcSupplyDuration(vo, context)))
+                .sorted((o1, o2) -> {
+                    // P-0: 当前班次（第一班次）新触发备库规格最高优先级
+                    boolean currentTrigger1 = o1.getBackupTriggerClass() != null
+                            && o1.getBackupTriggerClass() > 0
+                            && o1.getBackupTriggerClass() == 1;
+                    boolean currentTrigger2 = o2.getBackupTriggerClass() != null
+                            && o2.getBackupTriggerClass() > 0
+                            && o2.getBackupTriggerClass() == 1;
+                    if (currentTrigger1 != currentTrigger2) {
+                        return currentTrigger1 ? -1 : 1;
+                    }
+
+                    // P-1: 已分配机台的规格优先（避免机台分配不稳定）
+                    boolean planned1 = o1.getMachineCode() != null && !o1.getMachineCode().isEmpty();
+                    boolean planned2 = o2.getMachineCode() != null && !o2.getMachineCode().isEmpty();
+                    if (planned1 != planned2) {
+                        return planned1 ? -1 : 1;
+                    }
+
+                    boolean backup1 = o1.getBackupTriggerClass() != null && o1.getBackupTriggerClass() > 0;
+                    boolean backup2 = o2.getBackupTriggerClass() != null && o2.getBackupTriggerClass() > 0;
+
+                    // P-2: 备库规格优先于非备库规格
+                    if (backup1 != backup2) {
+                        return backup1 ? -1 : 1;
+                    }
+
+                    // P-2: 同为备库规格：按剩余需求缺口从大到小（缺口越大越优先）
+                    if (backup1 && backup2) {
+                        double rem1 = o1.getBackupRemainingQty() == null ? 0D : o1.getBackupRemainingQty();
+                        double rem2 = o2.getBackupRemainingQty() == null ? 0D : o2.getBackupRemainingQty();
+                        if (rem1 != rem2) {
+                            return Double.compare(rem2, rem1);  // 降序
+                        }
+                    }
+
+                    // P-3: 非备库规格按供应时长升序
+                    double st1 = calcSupplyDuration(o1, context);
+                    double st2 = calcSupplyDuration(o2, context);
+                    return Double.compare(st1, st2);
+                })
                 .collect(Collectors.toList());
     }
 
@@ -173,14 +259,134 @@ public class GsqMachineAssignHandler extends AbsGsqScheduleStepHandler {
      * 获取指定班次的计划量。
      */
     private Double getShiftPlan(GsqScheduleResultVo vo, int classIndex) {
-        switch (classIndex) {
-            case 1: return vo.getClass1PlanQty();
-            case 2: return vo.getClass2PlanQty();
-            case 3: return vo.getClass3PlanQty();
-            case 4: return vo.getClass4PlanQty();
-            case 5: return vo.getClass5PlanQty();
-            case 6: return vo.getClass6PlanQty();
-            default: return null;
+        Object value = vo.getFieldValueByFieldName("class" + classIndex + "PlanQty");
+        return value == null ? null : ((Number) value).doubleValue();
+    }
+
+    /**
+     * 计算机台剩余产能：QUATA × 班次数 - 已分配量。
+     *
+     * @param machine     机台
+     * @param assignedQty 已分配计划量
+     * @return 剩余产能
+     */
+    private double calcRemainCapacity(GsqMachineInfo machine, double assignedQty) {
+        Double quota = machine.getQuata() == null ? 0D : machine.getQuata().doubleValue();
+        double totalCapacity = quota * getMachineShiftCount(machine);
+        return totalCapacity - assignedQty;
+    }
+
+    /**
+     * 计算机台在6班次窗口内的运行班次数（按班制折算）。
+     *
+     * <p>6班次窗口=2天×3班。按 CLASS_SHIFT 班制折算每日班次数再×2天：
+     * 三班制=3班/日→6班，两班制=2班/日→4班，其他/为空默认按三班制=6班。</p>
+     */
+    private int getMachineShiftCount(GsqMachineInfo machine) {
+        String classShift = machine.getClassShift();
+        if (classShift != null && classShift.contains("两")) {
+            return 4;
+        }
+        return 6;
+    }
+
+    /**
+     * 获取规格6班次总计划量（用于机台已分配量累计，判断剩余产能）。
+     */
+    private double getTotalPlanQty(GsqScheduleResultVo vo) {
+        double total = 0D;
+        for (int classIndex = 1; classIndex <= 6; classIndex++) {
+            Double plan = getShiftPlan(vo, classIndex);
+            if (plan != null) {
+                total += plan;
+            }
+        }
+        return total;
+    }
+
+    /**
+     * 备库多规格机台当班初始排产限制（对齐胎圈 TQ SYS1101029）。
+     *
+     * <p>业务规则：</p>
+     * <ul>
+     *   <li>单一规格机台：备库钢丝圈只受机台定额(quota)限制，可满排，不受本阈值限制</li>
+     *   <li>多规格机台：备库钢丝圈当班初始排产不超过 min(机台定额, SYS1603005阈值)，
+     *       超出部分延后到下一班次，避免单个备库规格占满机台而挤占同机台其他规格的排产</li>
+     * </ul>
+     *
+     * <p>说明：需在规格级机台分配完成后执行，此时才能统计各机台的规格数，判断单/多规格机台。</p>
+     *
+     * @param context 排程上下文
+     */
+    private void applyBackupMultiSpecLimit(GsqScheduleContext context) {
+        List<GsqScheduleResultVo> scheduleList = context.getScheduleList();
+
+        // 1. 机台→规格数统计，用于判断多规格机台
+        Map<String, Long> machineSpecCountMap = scheduleList.stream()
+                .filter(vo -> vo.getMachineCode() != null && !vo.getMachineCode().isEmpty())
+                .collect(Collectors.groupingBy(GsqScheduleResultVo::getMachineCode, Collectors.counting()));
+
+        // 2. 机台信息Map，便于取机台定额
+        Map<String, GsqMachineInfo> machineInfoMap = context.getAllMachineList().stream()
+                .collect(Collectors.toMap(GsqMachineInfo::getMachineCode, m -> m, (a, b) -> a));
+
+        // 3. 备库规格班次最大班产阈值（SYS1603005）
+        GsqScheduleParams params = context.getParams();
+        double threshold = params.getBackupMultiSpecThreshold() == null
+                ? DEFAULT_BACKUP_MULTI_SPEC_THRESHOLD : params.getBackupMultiSpecThreshold();
+
+        int limitedCount = 0;
+        for (GsqScheduleResultVo scheduleVo : scheduleList) {
+            // 仅处理备库规格
+            if (scheduleVo.getBackupTriggerClass() == null || scheduleVo.getBackupTriggerClass() <= 0) {
+                continue;
+            }
+            String machineCode = scheduleVo.getMachineCode();
+            if (machineCode == null || machineCode.isEmpty()) {
+                continue;
+            }
+            // 单一规格机台不限制（只受机台定额限制）
+            if (machineSpecCountMap.getOrDefault(machineCode, 0L) <= 1) {
+                continue;
+            }
+            // 多规格机台：当班初始排产上限 = min(机台定额, 阈值)
+            GsqMachineInfo machine = machineInfoMap.get(machineCode);
+            double quota = (machine != null && machine.getQuata() != null) ? machine.getQuata().doubleValue() : 0D;
+            double limit = quota > 0 ? Math.min(quota, threshold) : threshold;
+
+            // 备库窗口末班：触发班 ~ 触发班+备库班数-1。备库量不得延后到窗口外班次，
+            // 否则会泄漏到窗口外（如007的3=235），窗口末班允许超多规格阈值（上限由S5.5机台定额兜底）
+            Integer triggerClass = scheduleVo.getBackupTriggerClass();
+            Integer backupShiftCount = scheduleVo.getBackupShiftCount();
+            int windowEnd = 6;
+            if (triggerClass != null && backupShiftCount != null && backupShiftCount > 0) {
+                windowEnd = Math.min(6, triggerClass + backupShiftCount - 1);
+            }
+
+            // 逐班次限制当班初始排产，超出部分延后到下一班（但不得推出备库窗口）
+            for (int classIndex = 1; classIndex <= 6; classIndex++) {
+                double plan = getShiftPlan(scheduleVo, classIndex);
+                if (plan <= 0) {
+                    continue;
+                }
+                if (plan <= limit) {
+                    continue;
+                }
+                // 窗口末班：不往窗口外延后，保持当前班排产（总量由 S5.5/S5.6 兜底）
+                if (classIndex >= windowEnd) {
+                    continue;
+                }
+                double overflow = BigDecimalUtil.sub(plan, limit);
+                setShiftPlan(scheduleVo, classIndex, limit);
+                double next = getShiftPlan(scheduleVo, classIndex + 1);
+                setShiftPlan(scheduleVo, classIndex + 1, BigDecimalUtil.add(next, overflow));
+                limitedCount++;
+                log.info("[S3-备库多规格限制] 规格[{}]机台[{}]{}班 初始排产超阈值, 限[{}]延后[{}]至{}班",
+                        scheduleVo.getSteelRingCode(), machineCode, classIndex, limit, overflow, classIndex + 1);
+            }
+        }
+        if (limitedCount > 0) {
+            log.info("[S3] 备库多规格机台初始排产限制完成, 限制延后次数:{}", limitedCount);
         }
     }
 
@@ -188,30 +394,21 @@ public class GsqMachineAssignHandler extends AbsGsqScheduleStepHandler {
      * 设置指定班次的已分配机台编号。
      */
     private void setShiftMachine(GsqScheduleResultVo vo, int classIndex, String machineCode) {
-        switch (classIndex) {
-            case 1: vo.setClass1MachineCode(machineCode); break;
-            case 2: vo.setClass2MachineCode(machineCode); break;
-            case 3: vo.setClass3MachineCode(machineCode); break;
-            case 4: vo.setClass4MachineCode(machineCode); break;
-            case 5: vo.setClass5MachineCode(machineCode); break;
-            case 6: vo.setClass6MachineCode(machineCode); break;
-            default: break;
-        }
+        vo.setFieldValueByFieldName("class" + classIndex + "MachineCode", machineCode);
     }
 
     /**
      * 设置指定班次的机台定额。
      */
     private void setShiftQuota(GsqScheduleResultVo vo, int classIndex, Double quota) {
-        switch (classIndex) {
-            case 1: vo.setClass1MachineQuota(quota); break;
-            case 2: vo.setClass2MachineQuota(quota); break;
-            case 3: vo.setClass3MachineQuota(quota); break;
-            case 4: vo.setClass4MachineQuota(quota); break;
-            case 5: vo.setClass5MachineQuota(quota); break;
-            case 6: vo.setClass6MachineQuota(quota); break;
-            default: break;
-        }
+        vo.setFieldValueByFieldName("class" + classIndex + "MachineQuota", quota);
+    }
+
+    /**
+     * 设置指定班次的计划量。
+     */
+    private void setShiftPlan(GsqScheduleResultVo vo, int classIndex, double value) {
+        vo.setFieldValueByFieldName("class" + classIndex + "PlanQty", value);
     }
 
     /**
@@ -249,27 +446,12 @@ public class GsqMachineAssignHandler extends AbsGsqScheduleStepHandler {
     }
 
     private String getShiftAnalysis(GsqScheduleResultVo vo, int classIndex) {
-        switch (classIndex) {
-            case 1: return vo.getClass1Analysis();
-            case 2: return vo.getClass2Analysis();
-            case 3: return vo.getClass3Analysis();
-            case 4: return vo.getClass4Analysis();
-            case 5: return vo.getClass5Analysis();
-            case 6: return vo.getClass6Analysis();
-            default: return "";
-        }
+        Object value = vo.getFieldValueByFieldName("class" + classIndex + "Analysis");
+        return value == null ? "" : value.toString();
     }
 
     private void setShiftAnalysis(GsqScheduleResultVo vo, int classIndex, String analysis) {
-        switch (classIndex) {
-            case 1: vo.setClass1Analysis(analysis); break;
-            case 2: vo.setClass2Analysis(analysis); break;
-            case 3: vo.setClass3Analysis(analysis); break;
-            case 4: vo.setClass4Analysis(analysis); break;
-            case 5: vo.setClass5Analysis(analysis); break;
-            case 6: vo.setClass6Analysis(analysis); break;
-            default: break;
-        }
+        vo.setFieldValueByFieldName("class" + classIndex + "Analysis", analysis);
     }
 
     /**
@@ -278,15 +460,8 @@ public class GsqMachineAssignHandler extends AbsGsqScheduleStepHandler {
     private double getTqConsume(GsqScheduleResultVo vo, int classIndex) {
         // 钢丝圈N班供应胎圈N+1班
         int tqClassIndex = classIndex + 1;
-        switch (tqClassIndex) {
-            case 2: return vo.getTqClass2Plan() == null ? 0 : vo.getTqClass2Plan();
-            case 3: return vo.getTqClass3Plan() == null ? 0 : vo.getTqClass3Plan();
-            case 4: return vo.getTqClass4Plan() == null ? 0 : vo.getTqClass4Plan();
-            case 5: return vo.getTqClass5Plan() == null ? 0 : vo.getTqClass5Plan();
-            case 6: return vo.getTqClass6Plan() == null ? 0 : vo.getTqClass6Plan();
-            case 7: return vo.getTqClass7Plan() == null ? 0 : vo.getTqClass7Plan();
-            default: return 0;
-        }
+        Object value = vo.getFieldValueByFieldName("tqClass" + tqClassIndex + "Plan");
+        return value == null ? 0 : ((Number) value).doubleValue();
     }
 
     /**
@@ -343,14 +518,6 @@ public class GsqMachineAssignHandler extends AbsGsqScheduleStepHandler {
      * 设置指定班次的生产顺序值（classXSequence）。
      */
     private void setClassSequence(GsqScheduleResultVo vo, int classIndex, int sequence) {
-        switch (classIndex) {
-            case 1: vo.setClass1Sequence(sequence); break;
-            case 2: vo.setClass2Sequence(sequence); break;
-            case 3: vo.setClass3Sequence(sequence); break;
-            case 4: vo.setClass4Sequence(sequence); break;
-            case 5: vo.setClass5Sequence(sequence); break;
-            case 6: vo.setClass6Sequence(sequence); break;
-            default: break;
-        }
+        vo.setFieldValueByFieldName("class" + classIndex + "Sequence", sequence);
     }
 }

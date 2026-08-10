@@ -12,22 +12,22 @@
                STATUS,
                REMARK
          from T_GSQ_MACHINE_INFO
-        where STATUS = '0'
-          and DEL_FLAG = '0'
+        where STATUS = '1'
+          and IS_DELETE = '0'
     </select>
     
     <select id="listGsqSpecifyMachine" resultType="com.zlt.aps.gsq.engine.vo.GsqSpecifyMachineVo" >
-        select STEEL_RING_CODE,
-               GROUP_CONCAT(sm.MACHINE_ID ORDER BY sm.MACHINE_ID SEPARATOR ',') as machine_ids
+        select sm.STEEL_RING_CODE,
+               GROUP_CONCAT(sm.MACHINE_CODE ORDER BY sm.MACHINE_CODE SEPARATOR ',') as machine_ids
         from T_GSQ_SPECIFY_MACHINE sm
-        inner join T_GSQ_MACHINE_INFO m on sm.machine_id = m.id
-        where sm.DEL_FLAG = '0'
+        inner join T_GSQ_MACHINE_INFO m on sm.MACHINE_CODE = m.MACHINE_CODE
+        where sm.IS_DELETE = '0'
         <if test="jobType != null and jobType != ''">
             and sm.JOB_TYPE = #{jobType}  /*限制作业 类型*/
         </if>
-        and m.STATUS = '0'
-        and m.DEL_FLAG = '0'
-        group by STEEL_RING_CODE
+        and m.STATUS = '1'
+        and m.IS_DELETE = '0'
+        group by sm.STEEL_RING_CODE
     </select>
 
     <!--
@@ -48,11 +48,22 @@
     </select>
     
     <select id="listLastDayPlanMachine" resultType="com.zlt.aps.gsq.engine.vo.GsqSpecifyMachineVo">
-        SELECT STEEL_RING_CODE, max(MACHINE_ID) machine_ids
+        SELECT STEEL_RING_CODE, max(MACHINE_CODE) machine_ids
         FROM T_GSQ_SCHEDULE_RESULT
         WHERE SCHEDULE_DATE = DATE_ADD(#{scheduleDate}, INTERVAL -1 DAY)
-          AND DEL_FLAG = '0'
+          AND IS_DELETE = '0'
           AND NIGHT_PLAN_QTY > 0
         GROUP BY STEEL_RING_CODE
+    </select>
+
+    <!-- 查询钢丝圈-缠绕盘代码映射（缠绕盘子表关联主表，仅取启用分支盘 STATUS='0'） -->
+    <select id="listGsqTwiningDiscCode" resultType="java.util.Map">
+        SELECT sub.STEEL_RING_CODE AS steelRingCode,
+               d.TWINING_DISC_CODE AS twiningDiscCode
+        FROM T_GSQ_TWINING_DISC_SUB sub
+        INNER JOIN T_GSQ_TWINING_DISC d ON sub.DISC_ID = d.ID
+        WHERE d.STATUS = '0'
+          AND d.IS_DELETE = '0'
+          AND sub.IS_DELETE = '0'
     </select>
 </mapper>

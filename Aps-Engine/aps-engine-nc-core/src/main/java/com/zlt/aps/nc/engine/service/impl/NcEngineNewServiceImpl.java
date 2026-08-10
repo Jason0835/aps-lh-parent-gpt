@@ -52,6 +52,7 @@ import com.zlt.aps.nc.engine.mapper.NcEngineCxShiftConfigMapper;
 import com.zlt.aps.nc.engine.mapper.NcEngineDepthConfigMapper;
 import com.zlt.aps.nc.engine.mapper.NcEngineGlueMapper;
 import com.zlt.aps.nc.engine.mapper.NcEngineLossMapper;
+import com.zlt.aps.nc.engine.mapper.NcEngineMachineMaintenanceMapper;
 import com.zlt.aps.nc.engine.mapper.NcEngineMachineMapper;
 import com.zlt.aps.nc.engine.mapper.NcEngineMonthPlanMonitorMapper;
 import com.zlt.aps.nc.engine.mapper.NcEngineParamsMapper;
@@ -92,6 +93,9 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
 
     @Autowired
     private NcEngineMachineMapper ncEngineMachineMapper;
+
+    @Autowired
+    private NcEngineMachineMaintenanceMapper ncEngineMachineMaintenanceMapper;
 
     @Autowired
     private NcEngineStockMapper ncEngineStockMapper;
@@ -340,6 +344,8 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
         }
         context.setScheduleDays(scheduleDays);
         context.setShiftCountPerDay(allEnabledShifts.size());
+        // 保存启用的班次配置列表，供维修计划按班次时间窗匹配使用
+        context.setShiftConfigList(allEnabledShifts);
         log.info("步骤2.2：启用的班次顺序={}，各内衬班次排产日={}，每日班次数={}",
                 String.join(",", orderedShiftCodes), java.util.Arrays.toString(scheduleDays),
                 allEnabledShifts.size());
@@ -504,6 +510,9 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
                 .collect(Collectors.toMap(NcMachineInfo::getMachineCode, m -> m));
         context.setMachineMap(machineMap);
         log.info("步骤4.1：加载内衬机台 {} 台", machineList.size());
+
+        // 4.1.1 加载机台维修计划（按停机时间与排产日时间窗有交集过滤）
+        this.loadMachineMaintenance(context, factoryCode, machineMap.keySet());
 
         // 4.2 加载定点机台
         Set<String> liningCodes = demandList.stream().map(NcLiningDemand::getLiningCode).collect(Collectors.toSet());
@@ -1253,6 +1262,56 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
     private List<NcMachineInfo> loadNcMachines(String factoryCode) {
         return ncEngineMachineMapper
                 .selectList(new LambdaQueryWrapper<NcMachineInfo>().eq(NcMachineInfo::getFactoryCode, factoryCode));
+    }
+
+    /**
+     * 加载机台维修计划并按机台分组写入上下文
+     * <p>
+     * 停机班次字段已弃用，查询条件改为停机时间范围（stopStartTime ~ stopEndTime）
+     * 与排产日时间窗有交集，具体落在哪个班次由 isMaintenanceInShift 按班次时间窗匹配。
+     *
+     * @param context      排产上下文
+     * @param factoryCode  工厂编码
+     * @param machineCodes 机台编码集合
+     */
+    private void loadMachineMaintenance(NcScheduleContext context, String factoryCode, Set<String> machineCodes) {
+        if (CollectionUtils.isEmpty(machineCodes)) {
+            log.warn("步骤4.1.1：机台编码集合为空，跳过维修计划加载");
+            return;
+        }
+        // 排产日时间窗：前一天零点 ~ 排产日末（覆盖跨天夜班在排产日前一天开班的情况）
+        Date dayStart = DateUtil.offsetDay(DateUtil.beginOfDay(context.getScheduleDate()), -1);
+        Date dayEnd = DateUtil.endOfDay(context.getScheduleDate());
+        log.info("步骤4.1.1：开始加载机台维修计划，factoryCode={}，候选机台 {} 台，查询时间窗 {} ~ {}",
+                factoryCode, machineCodes.size(),
+                DateUtil.formatDateTime(dayStart), DateUtil.formatDateTime(dayEnd));
+        List<NcMachineMaintenance> maintenanceList = ncEngineMachineMaintenanceMapper.selectList(
+                new LambdaQueryWrapper<NcMachineMaintenance>()
+                        .eq(NcMachineMaintenance::getFactoryCode, factoryCode)
+                        .in(NcMachineMaintenance::getMachineCode, machineCodes)
+                        .le(NcMachineMaintenance::getStopStartTime, dayEnd)
+                        .ge(NcMachineMaintenance::getStopEndTime, dayStart));
+        log.info("步骤4.1.1：维修计划查询返回 {} 条", maintenanceList.size());
+        // 按机台分组，过滤机台编码为空的数据
+        Map<String, List<NcMachineMaintenance>> maintenanceMap = maintenanceList.stream()
+                .filter(m -> StringUtils.isNotBlank(m.getMachineCode()))
+                .collect(Collectors.groupingBy(NcMachineMaintenance::getMachineCode));
+        // 逐条打印维修记录，确认分组结果，并同步到排程过程日志
+        for (Map.Entry<String, List<NcMachineMaintenance>> entry : maintenanceMap.entrySet()) {
+            for (NcMachineMaintenance maintenance : entry.getValue()) {
+                String timeRange = DateUtil.formatDateTime(maintenance.getStopStartTime()) + " ~ "
+                        + DateUtil.formatDateTime(maintenance.getStopEndTime());
+                log.info("步骤4.1.1：机台 {} 维修计划 [{}]，id={}",
+                        entry.getKey(), timeRange, maintenance.getId());
+                context.appendLog("步骤4.1.1：机台 {0} 维修计划 [{1}]，id={2}",
+                        entry.getKey(), timeRange, maintenance.getId());
+            }
+        }
+        context.setMaintenanceMap(maintenanceMap);
+        log.info("步骤4.1.1：加载机台维修计划完成，共 {} 条，覆盖机台 {} 台，context.getMaintenanceMap().size()={}",
+                maintenanceList.size(), maintenanceMap.size(), context.getMaintenanceMap().size());
+        context.appendLog("步骤4.1.1：加载机台维修计划 {0} 条，覆盖机台 {1} 台",
+                maintenanceList.size(), maintenanceMap.size());
     }
 
     /**
@@ -2321,8 +2380,15 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
                     List<NcMachineMaintenance> maintenanceList = context.getMaintenanceMap().get(machineCode);
                     if (maintenanceList != null) {
                         for (NcMachineMaintenance maintenance : maintenanceList) {
-                            if (this.isMaintenanceInShift(maintenance, shiftIndex, context.getScheduleDate(),
-                                    context.getShiftClassMap())) {
+                            boolean inShift = this.isMaintenanceInShift(maintenance, shiftIndex,
+                                    context.getShiftClassMap(), context.getShiftConfigList());
+                            log.debug("机台 {} 班次 {}：维修计划 [{} ~ {}] 命中={}，班次编码={}，班次配置列表 {} 条",
+                                    machineCode, shiftIndex,
+                                    DateUtil.formatDateTime(maintenance.getStopStartTime()),
+                                    DateUtil.formatDateTime(maintenance.getStopEndTime()),
+                                    inShift, context.getShiftClassMap()[shiftIndex - 1],
+                                    context.getShiftConfigList() == null ? -1 : context.getShiftConfigList().size());
+                            if (inShift) {
                                 BigDecimal stopHours = this.calcStopHours(maintenance);
                                 BigDecimal lossQty = stopHours
                                         .divide(NcEngineConstants.SHIFT_HOURS, 4, RoundingMode.HALF_UP)
@@ -2461,18 +2527,101 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
 
     /**
      * 判断检修计划是否落在某班次内
+     * <p>
+     * 停机班次字段已弃用，改为通过检修停机时间范围（stopStartTime ~ stopEndTime）
+     * 与班次配置的计划时间窗（planStartTime ~ planEndTime，支持跨天）做交集判断。
+     *
+     * @param maintenance     检修计划
+     * @param shiftIndex      班次索引（从1开始）
+     * @param shiftClassMap   班次索引→班次编码映射数组
+     * @param shiftConfigList 启用的班次配置列表
+     * @return 检修计划是否落在该班次时间窗内
      */
-    private boolean isMaintenanceInShift(NcMachineMaintenance maintenance, int shiftIndex, Date scheduleDate,
-            String[] shiftClassMap) {
+    private boolean isMaintenanceInShift(NcMachineMaintenance maintenance, int shiftIndex,
+            String[] shiftClassMap, List<NcShiftConfig> shiftConfigList) {
         if (maintenance.getStopStartTime() == null || maintenance.getStopEndTime() == null) {
             return false;
         }
-        // 通过停机班次字段匹配
-        if (maintenance.getStopShift() != null) {
-            String shiftClass = shiftClassMap[shiftIndex - 1];
-            return shiftClass.equals(maintenance.getStopShift());
+        if (shiftIndex < 1 || shiftClassMap == null || shiftIndex > shiftClassMap.length
+                || shiftClassMap[shiftIndex - 1] == null) {
+            return false;
         }
+        // 根据班次编码找到对应的班次配置
+        String shiftCode = shiftClassMap[shiftIndex - 1];
+        NcShiftConfig shiftConfig = shiftConfigList == null ? null : shiftConfigList.stream()
+                .filter(cfg -> shiftCode.equals(cfg.getShiftCode()))
+                .findFirst().orElse(null);
+        if (shiftConfig == null) {
+            log.debug("维修计划匹配失败：班次 {} 编码 {} 未在班次配置列表中找到（列表 {} 条）",
+                    shiftIndex, shiftCode, shiftConfigList == null ? -1 : shiftConfigList.size());
+            return false;
+        }
+        // 解析班次计划开始/结束时间（分钟），跨天班次（结束≤开始）结束时间加 1440 分钟
+        int startMin = this.parseTimeToMinutes(shiftConfig.getPlanStartTime());
+        int endMin = this.parseTimeToMinutes(shiftConfig.getPlanEndTime());
+        if (startMin < 0 || endMin < 0) {
+            log.debug("维修计划匹配失败：班次 {} 编码 {} 计划时间非法（start={}, end={}）",
+                    shiftIndex, shiftCode, shiftConfig.getPlanStartTime(), shiftConfig.getPlanEndTime());
+            return false;
+        }
+        boolean crossDay = endMin <= startMin;
+        if (crossDay) {
+            endMin += 24 * 60;
+        }
+        // 检修停机时间范围（毫秒）
+        long stopStartMillis = maintenance.getStopStartTime().getTime();
+        long stopEndMillis = maintenance.getStopEndTime().getTime();
+        // 以检修开始时间的当天零点为基准构建班次时间窗
+        long dayStartMillis = DateUtil.beginOfDay(maintenance.getStopStartTime()).getTime();
+        long windowStart = dayStartMillis + startMin * 60000L;
+        long windowEnd = dayStartMillis + endMin * 60000L;
+        // 检修时间与班次时间窗有交集即命中
+        if (stopStartMillis < windowEnd && stopEndMillis > windowStart) {
+            return true;
+        }
+        // 跨天班次：检修若在凌晨，可能归属于前一天开班的班次时间窗
+        if (crossDay) {
+            long dayMillis = 24 * 60 * 60 * 1000L;
+            long prevWindowStart = windowStart - dayMillis;
+            long prevWindowEnd = windowEnd - dayMillis;
+            if (stopStartMillis < prevWindowEnd && stopEndMillis > prevWindowStart) {
+                return true;
+            }
+            log.debug("维修计划匹配失败：班次 {} 编码 {} 跨天窗口无交集，窗口 [{} ~ {}]（含前一日 [{} ~ {}]），维修 [{} ~ {}]",
+                    shiftIndex, shiftCode,
+                    DateUtil.formatDateTime(new Date(windowStart)), DateUtil.formatDateTime(new Date(windowEnd)),
+                    DateUtil.formatDateTime(new Date(prevWindowStart)), DateUtil.formatDateTime(new Date(prevWindowEnd)),
+                    DateUtil.formatDateTime(maintenance.getStopStartTime()), DateUtil.formatDateTime(maintenance.getStopEndTime()));
+            return false;
+        }
+        log.debug("维修计划匹配失败：班次 {} 编码 {} 窗口无交集，窗口 [{} ~ {}]，维修 [{} ~ {}]",
+                shiftIndex, shiftCode,
+                DateUtil.formatDateTime(new Date(windowStart)), DateUtil.formatDateTime(new Date(windowEnd)),
+                DateUtil.formatDateTime(maintenance.getStopStartTime()), DateUtil.formatDateTime(maintenance.getStopEndTime()));
         return false;
+    }
+
+    /**
+     * 解析 "HH:mm:ss" 时间字符串为当天分钟数
+     *
+     * @param time 时间字符串，如 "20:00:00"
+     * @return 当天分钟数，解析失败返回 -1
+     */
+    private int parseTimeToMinutes(String time) {
+        if (StringUtils.isBlank(time)) {
+            return -1;
+        }
+        String[] parts = time.split(":");
+        if (parts.length < 2) {
+            return -1;
+        }
+        try {
+            int hour = Integer.parseInt(parts[0].trim());
+            int minute = Integer.parseInt(parts[1].trim());
+            return hour * 60 + minute;
+        } catch (NumberFormatException e) {
+            return -1;
+        }
     }
 
     /**

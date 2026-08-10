@@ -1,5 +1,6 @@
 package com.zlt.aps.cd90.controller;
 
+import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.ImportLog;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
@@ -91,6 +92,20 @@ public class Cd90StorageLaneLimitController extends AbstractDocBizController<Cd9
     @Override
     public AjaxResult importData(@RequestBody ImportContext c, @RequestParam("updateSupport") boolean u) throws Exception {
         return super.importData(c, u);
+    }
+
+    /**
+     * MES按工厂、日期和班次全量覆盖库排状态。
+     */
+    @ApiOperation("MES全量覆盖直裁库排状态")
+    @PostMapping("/logicDeleteAndSaveMesBatch")
+    public AjaxResult logicDeleteAndSaveMesBatch(@RequestParam("factoryCode") String factoryCode,
+                                                  @RequestParam("laneDate") String laneDate,
+                                                  @RequestParam("shiftCode") String shiftCode,
+                                                  @RequestParam("updateBy") String updateBy,
+                                                  @RequestBody List<Cd90StorageLaneLimit> list) {
+        this.service.logicDeleteAndSaveBatch(factoryCode, DateUtil.parseDate(laneDate), shiftCode, updateBy, list);
+        return AjaxResult.success();
     }
 
     @Log(title = "ui.data.column.storageLaneLimit.modelName", businessType = BusinessType.EXPORT)

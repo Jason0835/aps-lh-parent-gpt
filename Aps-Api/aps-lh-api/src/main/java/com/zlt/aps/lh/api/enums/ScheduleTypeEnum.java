@@ -17,7 +17,7 @@ import lombok.Getter;
 @AllArgsConstructor
 public enum ScheduleTypeEnum {
 
-    /** 01-续作，S4.4 对 MES 在机/滚动继承规格继续排产 */
+    /** 01-续作，S4.4 对 MES 在机规格继续排产 */
     CONTINUOUS("01", "续作"),
     /** 02-新增，S4.5 对新增待排 SKU 执行选机、换模、首检和班次分配 */
     NEW_SPEC("02", "新增"),

@@ -1,6 +1,7 @@
 package com.zlt.aps.cd15.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import cn.hutool.core.date.DateUtil;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
@@ -91,6 +92,18 @@ public class Cd15StockController extends AbstractDocBizController<Cd15Stock> {
     @Override
     public AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport) throws Exception {
         return super.importData(importContext, updateSupport);
+    }
+
+    /** 替换斜裁MES库存快照。 */
+    @ApiOperation("替换斜裁MES库存快照")
+    @PostMapping("/logicDeleteAndSaveMesBatch")
+    public AjaxResult logicDeleteAndSaveMesBatch(@RequestParam("factoryCode") String factoryCode,
+                                                  @RequestParam("stockDate") String stockDate,
+                                                  @RequestParam("updateBy") String updateBy,
+                                                  @RequestBody List<Cd15Stock> stockList) {
+        this.cd15StockService.logicDeleteAndSaveBatch(factoryCode,
+                DateUtil.parseDate(stockDate), updateBy, stockList);
+        return AjaxResult.success();
     }
 
     /** 导出斜裁库存 */

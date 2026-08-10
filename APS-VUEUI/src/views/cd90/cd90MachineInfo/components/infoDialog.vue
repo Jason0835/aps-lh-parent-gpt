@@ -101,13 +101,6 @@ export default {
           maxlength: 30,
         },
         {
-          prop: "isStickFilm",
-          label: this.$t("ui.data.column.cd90MachineInfo.isStickFilm"),
-          type: "select",
-          dictData: this.parentDict.type.biz_yes_no,
-          filterable: true,
-        },
-        {
           prop: "clothWidthMax",
           label: this.$t("ui.data.column.cd90MachineInfo.clothWidthMax"),
           type: "number",
@@ -186,7 +179,6 @@ export default {
       } else {
         this.form = {
           factoryCode: "116",
-          isStickFilm: "0",
           status: "1",
           openMachineClass: [],
         };

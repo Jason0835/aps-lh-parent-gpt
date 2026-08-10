@@ -16,7 +16,7 @@ import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.mp.api.domain.vo.MpCheckItemVo;
-import com.zlt.aps.mp.engine.basedata.assemble.appoint.GroupAppointHandler;
+import com.zlt.aps.mp.engine.basedata.assemble.appoint.GroupAppointDataHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.cyclegroup.CycleGroupDataHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.datalist.GroupListHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.history.CxMachineProductionHistoryInfo;
@@ -63,14 +63,14 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
 
     private final GroupListHandler groupListHandler;
 
-    private final GroupAppointHandler groupAppointHandler;
+    private final GroupAppointDataHandler groupAppointHandler;
 
     private final ProductionHistoryHandler productionHistoryHandler;
 
 
     public AbstractDataLoaderService(GroupListHandler groupListHandler,
                                      ProductionMdmDataService dataService,
-                                     GroupAppointHandler groupAppointHandler,
+                                     GroupAppointDataHandler groupAppointHandler,
                                      DpRequireDataService dpRequireDataService,
                                      CycleGroupDataHandler cycleGroupDataHandler,
                                      ProductionHistoryHandler productionHistoryHandler,

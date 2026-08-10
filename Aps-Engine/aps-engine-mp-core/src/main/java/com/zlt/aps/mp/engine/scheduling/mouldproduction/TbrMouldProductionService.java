@@ -9,7 +9,7 @@ import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.mp.api.enums.ProductionProcessStage;
-import com.zlt.aps.mp.engine.basedata.assemble.appoint.GroupAppointHandler;
+import com.zlt.aps.mp.engine.basedata.assemble.appoint.GroupAppointDataHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.continueinfo.ContinueGroupInfoHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.cyclegroup.CycleGroupDataHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.datalist.GroupListHandler;
@@ -85,7 +85,7 @@ public class TbrMouldProductionService extends AbstractDataLoaderService {
 
     public TbrMouldProductionService(GroupListHandler groupListHandler,
                                      ProductionMdmDataService dataService,
-                                     GroupAppointHandler groupAppointHandler,
+                                     GroupAppointDataHandler groupAppointHandler,
                                      DpRequireDataService dpRequireDataService,
                                      CycleGroupDataHandler cycleGroupDataHandler,
                                      ProductionHistoryHandler productionHistoryHandler,
