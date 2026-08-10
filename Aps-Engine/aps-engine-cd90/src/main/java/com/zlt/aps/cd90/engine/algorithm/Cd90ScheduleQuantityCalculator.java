@@ -22,7 +22,7 @@ public class Cd90ScheduleQuantityCalculator {
      * @param closeOut 是否收尾规格
      * @param lossRatePercent 损耗率百分数，5表示5%
      * @param minimumStartQuantity 最小起排量
-     * @param vehiclePlanQuantity 单车对应的直裁排程米数
+     * @param standardCurlLength 标准卷曲长度，直接作为一车工装卷的排程容量
      * @param equalShareThreshold 各班计划量均分阈值，按加损耗前的净需求量判断
      * @return 实际排产量
      */
@@ -30,12 +30,12 @@ public class Cd90ScheduleQuantityCalculator {
                                               boolean closeOut,
                                               BigDecimal lossRatePercent,
                                               BigDecimal minimumStartQuantity,
-                                              BigDecimal vehiclePlanQuantity,
+                                               BigDecimal standardCurlLength,
                                               BigDecimal equalShareThreshold) {
         requireNonNegative(netDemandQuantity, "净需求量");
         requireNonNegative(lossRatePercent, "损耗率");
         requirePositive(minimumStartQuantity, "最小起排量");
-        requirePositive(vehiclePlanQuantity, "单车直裁排程米数");
+        requirePositive(standardCurlLength, "标准卷曲长度");
         requirePositive(equalShareThreshold, "各班计划量均分阈值");
 
         BigDecimal baseDemandQuantity = adjustDemandForEqualShare(netDemandQuantity, closeOut, equalShareThreshold);
@@ -46,8 +46,8 @@ public class Cd90ScheduleQuantityCalculator {
         }
 
         BigDecimal startQuantity = quantityWithLoss.max(minimumStartQuantity);
-        BigDecimal vehicleCount = startQuantity.divide(vehiclePlanQuantity, 0, RoundingMode.CEILING);
-        return normalize(vehicleCount.multiply(vehiclePlanQuantity));
+        BigDecimal vehicleCount = startQuantity.divide(standardCurlLength, 0, RoundingMode.CEILING);
+        return normalize(vehicleCount.multiply(standardCurlLength));
     }
 
 

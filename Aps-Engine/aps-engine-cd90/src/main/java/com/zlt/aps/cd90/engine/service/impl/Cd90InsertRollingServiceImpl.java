@@ -11,7 +11,6 @@ import com.zlt.aps.cd90.api.domain.vo.Cd90TransferMachineRequest;
 import com.zlt.aps.cd90.engine.algorithm.Cd90MachineCapacityCalculator;
 import com.zlt.aps.cd90.engine.algorithm.Cd90RollingScheduleContextManager;
 import com.zlt.aps.cd90.engine.algorithm.Cd90StorageLaneAllocator;
-import com.zlt.aps.cd90.engine.algorithm.Cd90VehiclePlanQuantityCalculator;
 import com.zlt.aps.cd90.engine.mapper.Cd90EngineMachineInfoMapper;
 import com.zlt.aps.cd90.engine.mapper.Cd90EngineScheduleResultMapper;
 import com.zlt.aps.cd90.engine.mapper.Cd90EngineScheduleLaneAllocationMapper;
@@ -77,7 +76,6 @@ public class Cd90InsertRollingServiceImpl implements Cd90InsertRollingService {
     private final Cd90ShiftDemandProvider demandProvider;
     private final Cd90RollingScheduleContextManager rollingContextManager;
     private final Cd90StorageLaneAllocator laneAllocator;
-    private final Cd90VehiclePlanQuantityCalculator vehiclePlanQuantityCalculator;
 
     @Override
     public Cd90InsertRollingOutput execute(Cd90InsertOrderRequest request) {
@@ -821,8 +819,7 @@ public class Cd90InsertRollingServiceImpl implements Cd90InsertRollingService {
             return LaneCommit.empty();
         }
         Cd90ConstructionMaterial material = findMaterial(input, segment.result.getClothCode());
-        if (material == null || material.getCraftWidth() == null
-                || material.getUnitConsumeMillimeter() == null) {
+        if (material == null) {
             return new LaneCommit(BigDecimal.ZERO, Collections.emptyList(), 0,
                     "CONSTRUCTION_MISSING");
         }
@@ -833,25 +830,23 @@ public class Cd90InsertRollingServiceImpl implements Cd90InsertRollingService {
         }
         BigDecimal fallback = context == null ? BigDecimal.valueOf(1000)
                 : context.getParameters().getRollCoilMeter();
-        BigDecimal curlLength = material.getCurlLength() == null
+        BigDecimal standardCurlLength = material.getCurlLength() == null
                 || material.getCurlLength().signum() <= 0 ? fallback : material.getCurlLength();
-        BigDecimal vehicleQuantity = vehiclePlanQuantityCalculator.calculate(
-                material.getUnitConsumeMillimeter(), material.getCraftWidth(), curlLength);
         int availableTooling = Math.max(0,
                 state.getTotalToolingCount() - state.getOccupiedToolingCount());
         if (availableTooling <= 0) {
             return new LaneCommit(BigDecimal.ZERO, Collections.emptyList(), 0, "ROLL_TOOL_LIMIT");
         }
-        BigDecimal toolingQuantity = vehicleQuantity.multiply(BigDecimal.valueOf(availableTooling));
+        BigDecimal toolingQuantity = standardCurlLength.multiply(BigDecimal.valueOf(availableTooling));
         BigDecimal trialQuantity = requestedQuantity.min(toolingQuantity);
         Cd90StorageLaneAllocationResult allocation = laneAllocator.allocate(
-                segment.result.getClothCode(), trialQuantity, vehicleQuantity,
+                segment.result.getClothCode(), trialQuantity, standardCurlLength,
                 state.getLanes(), segment.hardInsert);
         if (!allocation.isSuccess() || allocation.getAllocatedVehicleCount() <= 0) {
             return new LaneCommit(BigDecimal.ZERO, Collections.emptyList(), 0,
                     allocation.getFailureReason());
         }
-        BigDecimal laneQuantity = vehicleQuantity
+        BigDecimal laneQuantity = standardCurlLength
                 .multiply(BigDecimal.valueOf(allocation.getAllocatedVehicleCount()));
         BigDecimal committed = requestedQuantity.min(laneQuantity);
         state.setLanes(allocation.getLanes());
