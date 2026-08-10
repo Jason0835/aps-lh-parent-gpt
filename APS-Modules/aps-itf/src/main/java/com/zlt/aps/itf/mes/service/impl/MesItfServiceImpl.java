@@ -2046,12 +2046,20 @@ public class MesItfServiceImpl implements MesItfService {
             return AjaxResult.error("硫化排程完成量同步失败：" + e.getMessage());
         }
 
+        // 回写硫化排程结果表：接收Feign返回值并校验，避免回写失败被吞导致接口误判成功
         try {
-            FeignTokenHelper.runWithToken(() -> {
-                lhMesSyncRemoteService.writeBackScheduleResultFinishQty(insertList);
-            });
+            AjaxResult writeBackResult = FeignTokenHelper.callWithToken(() ->
+                    lhMesSyncRemoteService.writeBackScheduleResultFinishQty(insertList));
+            if (AjaxResult.Type.SUCCESS.value() != (Integer) writeBackResult.get(AjaxResult.CODE_TAG)) {
+                log.error("硫化排程完成量回写失败：factoryCode={}, 返回code={}, 返回消息={}",
+                        syncDataLogs.getFactoryCode(), writeBackResult.get(AjaxResult.CODE_TAG), writeBackResult.get(AjaxResult.MSG_TAG));
+                return AjaxResult.error("硫化排程完成量回写失败：" + writeBackResult.get(AjaxResult.MSG_TAG));
+            }
+            log.info("硫化排程完成量回写完成：factoryCode={}, 回写数据条数={}", syncDataLogs.getFactoryCode(), insertList.size());
         } catch (Exception e) {
-            log.error("【硫化排程完成量回写】回写硫化排程结果表完成量异常", e);
+            log.error("硫化排程完成量回写Feign调用异常：factoryCode={}, 待回写数据条数={}",
+                    syncDataLogs.getFactoryCode(), insertList.size(), e);
+            return AjaxResult.error("硫化排程完成量回写失败：" + e.getMessage());
         }
         return AjaxResult.success();
     }
@@ -2104,12 +2112,21 @@ public class MesItfServiceImpl implements MesItfService {
             return AjaxResult.error("硫化排程完成量按上一天最新版本同步失败：" + e.getMessage());
         }
 
+        // 回写硫化排程结果表：接收Feign返回值并校验，避免回写失败被吞导致接口误判成功
         try {
-            FeignTokenHelper.runWithToken(() -> {
-                lhMesSyncRemoteService.writeBackScheduleResultFinishQty(insertList);
-            });
+            AjaxResult writeBackResult = FeignTokenHelper.callWithToken(() ->
+                    lhMesSyncRemoteService.writeBackScheduleResultFinishQty(insertList));
+            if (AjaxResult.Type.SUCCESS.value() != (Integer) writeBackResult.get(AjaxResult.CODE_TAG)) {
+                log.error("硫化排程完成量按上一天最新版本回写失败：factoryCode={}, 返回code={}, 返回消息={}",
+                        syncDataLogs.getFactoryCode(), writeBackResult.get(AjaxResult.CODE_TAG), writeBackResult.get(AjaxResult.MSG_TAG));
+                return AjaxResult.error("硫化排程完成量按上一天最新版本回写失败：" + writeBackResult.get(AjaxResult.MSG_TAG));
+            }
+            log.info("硫化排程完成量按上一天最新版本回写完成：factoryCode={}, 回写数据条数={}",
+                    syncDataLogs.getFactoryCode(), insertList.size());
         } catch (Exception e) {
-            log.error("【硫化排程完成量按上一天最新版本回写】回写硫化排程结果表完成量异常", e);
+            log.error("硫化排程完成量按上一天最新版本回写Feign调用异常：factoryCode={}, 待回写数据条数={}",
+                    syncDataLogs.getFactoryCode(), insertList.size(), e);
+            return AjaxResult.error("硫化排程完成量按上一天最新版本回写失败：" + e.getMessage());
         }
         return AjaxResult.success();
     }
@@ -2184,13 +2201,20 @@ public class MesItfServiceImpl implements MesItfService {
             }
         }
 
-        // 回填排程结果
+        // 回写硫化排程结果表：接收Feign返回值并校验，避免回写失败被吞导致接口误判成功
         try {
-            FeignTokenHelper.runWithToken(() -> {
-                lhMesSyncRemoteService.writeBackScheduleResultFinishQty(insertList);
-            });
+            AjaxResult writeBackResult = FeignTokenHelper.callWithToken(() ->
+                    lhMesSyncRemoteService.writeBackScheduleResultFinishQty(insertList));
+            if (AjaxResult.Type.SUCCESS.value() != (Integer) writeBackResult.get(AjaxResult.CODE_TAG)) {
+                log.error("硫化排程完成量按版本号回写失败：dataVersion={}, 返回code={}, 返回消息={}",
+                        dataVersion, writeBackResult.get(AjaxResult.CODE_TAG), writeBackResult.get(AjaxResult.MSG_TAG));
+                return AjaxResult.error("硫化排程完成量按版本号回写失败：" + writeBackResult.get(AjaxResult.MSG_TAG));
+            }
+            log.info("硫化排程完成量按版本号回写完成：dataVersion={}, 回写数据条数={}", dataVersion, insertList.size());
         } catch (Exception e) {
-            log.error("【硫化排程完成量按版本号回写】回写硫化排程结果表完成量异常，dataVersion={}", dataVersion, e);
+            log.error("硫化排程完成量按版本号回写Feign调用异常：dataVersion={}, 待回写数据条数={}",
+                    dataVersion, insertList.size(), e);
+            return AjaxResult.error("硫化排程完成量按版本号回写失败：" + e.getMessage());
         }
         return AjaxResult.success();
     }
