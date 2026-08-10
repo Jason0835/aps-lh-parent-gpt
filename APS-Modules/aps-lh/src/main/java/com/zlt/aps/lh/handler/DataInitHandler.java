@@ -138,7 +138,7 @@ public class DataInitHandler extends AbsScheduleStepHandler {
 
     /**
      * 从数据库加载所有排程所需基础数据
-     * <p>包括排产版本、月生产计划、工作日历、SKU日硫化产能、设备停机计划、SKU与模具关系、
+     * <p>包括排产版本、月生产计划、结构转产收尾配置、工作日历、SKU日硫化产能、设备停机计划、SKU与模具关系、
      * 硫化机台信息、月底计划余量、各班次完成量、物料信息、
      * MES硫化在机信息、硫化定点机台、硫化机胶囊已使用次数、设备保养计划、前日硫化排程结果</p>
      *
@@ -146,8 +146,10 @@ public class DataInitHandler extends AbsScheduleStepHandler {
      */
     private void loadBaseData(LhScheduleContext context) {
         baseDataService.loadAllBaseData(context);
-        log.info("基础数据加载完成, 月计划: {}, 机台: {}, SKU产能: {}, SKU模具关系: {}, MES在机: {}, 前批次结果: {}, 停机计划: {}",
-                context.getMonthPlanList().size(), context.getMachineInfoMap().size(),
+        log.info("基础数据加载完成, 月计划: {}, 结构收尾配置: {}, 机台: {}, SKU产能: {}, "
+                        + "SKU模具关系: {}, MES在机: {}, 前批次结果: {}, 停机计划: {}",
+                context.getMonthPlanList().size(), context.getStructureMaxEndingDateMap().size(),
+                context.getMachineInfoMap().size(),
                 context.getSkuLhCapacityMap().size(), context.getSkuMouldRelMap().size(),
                 context.getMachineOnlineInfoMap().size(), context.getPreviousScheduleResultList().size(),
                 context.getDevicePlanShutList().size());

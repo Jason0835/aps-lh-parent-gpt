@@ -164,6 +164,13 @@ public class LhScheduleContext {
      */
     private Map<String, String> productionVersionByYearMonthMap = new LinkedHashMap<>();
     /**
+     * 结构名称 -> 结构转产配置中的最大收尾自然日。
+     * <p>S4.2在月计划加载完成后，按排程窗口[T,T+2]覆盖的每个自然月及该月排产版本查询
+     * {@code T_MP_STRUCTURE_ALLOCATION}，将非空END_DAY还原为完整自然日后按结构取最大值。
+     * S4.5新增SKU选机只读该快照，最大日期不在窗口内或结构无记录时不触发结构收尾对齐。</p>
+     */
+    private Map<String, LocalDate> structureMaxEndingDateMap = new LinkedHashMap<>(16);
+    /**
      * 物料+产品状态+年月 -> 月累计完成量，避免同一物料不同产品状态或跨月时完成量串月
      */
     private Map<String, Integer> materialMonthFinishedQtyByMonthMap = new HashMap<>();
