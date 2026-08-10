@@ -10,11 +10,9 @@ import com.zlt.aps.common.core.domain.ExcelCellRangeAddress;
 import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.cx.entity.config.CxParamConfig;
-import com.zlt.aps.cx.entity.schedule.CxPrecisionPlan;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
 import com.zlt.aps.enums.ConstructionStageEnum;
 import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
-import com.zlt.aps.lh.api.domain.entity.LhPrecisionPlan;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.entity.LhShiftConfig;
 import com.zlt.aps.lh.api.domain.vo.ScheduleSummaryReportVO;
@@ -109,12 +107,6 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
 
     @Resource
     private LhMouldChangePlanEntityMapper lhMouldChangePlanEntityMapper;
-
-    @Resource
-    private CxPrecisionPlanMapper cxPrecisionPlanMapper;
-
-    @Resource
-    private LhPrecisionPlanMapper lhPrecisionPlanMapper;
 
     @Resource
     private FactoryParamMapper factoryParamMapper;
@@ -216,10 +208,12 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                 scheduleDate, scheduleDateT2, factoryCode);
         tableMap.putAll(mouldChangeAndCleanMap);
 
-        // 精度计划备注：一次性查询 scheduleDate=T+1 的精度计划，按 planDate 分组到 T+1/T+2 栏位
-        // 查询口径与模具清洗计划一致，T+1报表筛planDate=T+1，T+2报表筛planDate=T+2
+        // 精度计划备注：从排程结果表取数，按班次分析原因含"精度"标记分组
+        // class3/4/5（排程日期当天，T+1）→ T+1报表栏位
+        // class6/7/8（排程日期+1天，T+2）→ T+2报表栏位
+        // class1/2（排程日期前一天，T）不在报表展示范围内，忽略
         Map<String, Object> precisionRemarkMap = this.buildPrecisionRemarkInfo(
-                scheduleDate, scheduleDateT2, factoryCode);
+                cxResults, lhResults, factoryCode);
         tableMap.putAll(precisionRemarkMap);
 
         // 小胶种列表：T+1 和 T+2 从同一份排程结果中按不同班次过滤，按胶种做 full outer join
@@ -1382,64 +1376,47 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
     /**
      * 一次性构建 T+1 和 T+2 的精度计划备注信息。
      *
-     * <p>查询口径与模具清洗计划（{@link #buildMouldChangeAndCleanInfo}）一致：
-     * 一次查出 SCHEDULE_DATE = T+1 的所有精度计划，再按 PLAN_DATE 落地日期分组到 T+1/T+2 栏位。</p>
+     * <p>取数口径：直接从排程结果表（T_CX_SCHEDULE_RESULT / T_LH_SCHEDULE_RESULT）取数，
+     * 不再查询精度计划表。一条排程结果记录包含8个班次数据，覆盖3天（T、T+1、T+2）。</p>
      *
-     * <p>数据库字段语义：</p>
+     * <p>班次与报表栏位映射（以排程日期=8月7日为例，覆盖6/7/8日3天）：</p>
      * <ul>
-     *   <li>SCHEDULE_DATE：排程目标日(T+1)，同一次排程生成的所有精度计划该字段相同</li>
-     *   <li>PLAN_DATE：真实精度校验/保养执行时间，按排程窗口分布在 T+1、T+2 两天</li>
+     *   <li>class1/2 → 8月6日（T），不在报表展示范围内，忽略</li>
+     *   <li>class3/4/5 → 8月7日（T+1），对应 T+1 报表栏位</li>
+     *   <li>class6/7/8 → 8月8日（T+2），对应 T+2 报表栏位</li>
      * </ul>
      *
-     * <p>调整前：T+1报表查 scheduleDate=T+1（不按planDate过滤，会误含planDate=T+2的数据），
-     * T+2报表查 scheduleDate=T+1 再筛 planDate=T+2。</p>
-     * <p>调整后：T+1和T+2报表都从 scheduleDate=T+1 的一次查询中获取，T+1报表筛 planDate=T+1，
-     * T+2报表筛 planDate=T+2。</p>
+     * <p>精度标记判定规则：</p>
+     * <ul>
+     *   <li>硫化侧：精度保养结束班次由 {@code ResultDowntimeSummaryUtil} 写入固定原因"精度计划"</li>
+     *   <li>成型侧：精度扣减班次由 {@code buildTaskAnalysis} 写入原因"精度"（可能与其他原因组合，如"试制,精度"）</li>
+     *   <li>统一用 {@code contains("精度")} 匹配两种写法</li>
+     * </ul>
      *
-     * @param scheduleDateT1 排程目标日 T+1
-     * @param scheduleDateT2 T+2（排程日期+1天）
-     * @param factoryCode    分厂编码
+     * @param cxResults  成型排程结果列表（已按 scheduleDate + factoryCode 过滤）
+     * @param lhResults  硫化排程结果列表（已按 scheduleDate + factoryCode 过滤）
+     * @param factoryCode 分厂编码
      * @return 包含 cxRemark/cxRemark2/lhRemark/lhRemark2 的Map
      */
-    private Map<String, Object> buildPrecisionRemarkInfo(Date scheduleDateT1, Date scheduleDateT2, String factoryCode) {
+    private Map<String, Object> buildPrecisionRemarkInfo(List<CxScheduleResult> cxResults,
+                                                         List<LhScheduleResult> lhResults,
+                                                         String factoryCode) {
         Map<String, Object> map = new HashMap<>(8);
 
-        Date t1Start = LhScheduleTimeUtil.clearTime(scheduleDateT1);
-        Date t1End = LhScheduleTimeUtil.getEndTime(scheduleDateT1);
-        Date t2Start = LhScheduleTimeUtil.clearTime(scheduleDateT2);
-        Date t2End = LhScheduleTimeUtil.getEndTime(scheduleDateT2);
-
-        // 一次查出该排程批次所有成型精度计划（scheduleDate=T+1）
-        List<CxPrecisionPlan> allCxPlans = cxPrecisionPlanMapper.selectList(
-                new LambdaQueryWrapper<CxPrecisionPlan>()
-                        .eq(CxPrecisionPlan::getFactoryCode, factoryCode)
-                        .ge(CxPrecisionPlan::getScheduleDate, t1Start)
-                        .le(CxPrecisionPlan::getScheduleDate, t1End));
-        log.info("成型精度计划查询完成, 排程目标日(T+1): {}, 分厂: {}, 总数量: {}",
-                DateUtil.formatDate(scheduleDateT1), factoryCode, allCxPlans.size());
-
-        // 一次查出该排程批次所有硫化精度计划（scheduleDate=T+1）
-        List<LhPrecisionPlan> allLhPlans = lhPrecisionPlanMapper.selectList(
-                new LambdaQueryWrapper<LhPrecisionPlan>()
-                        .eq(LhPrecisionPlan::getFactoryCode, factoryCode)
-                        .ge(LhPrecisionPlan::getScheduleDate, t1Start)
-                        .le(LhPrecisionPlan::getScheduleDate, t1End));
-        log.info("硫化精度计划查询完成, 排程目标日(T+1): {}, 分厂: {}, 总数量: {}",
-                DateUtil.formatDate(scheduleDateT1), factoryCode, allLhPlans.size());
-
-        // 成型精度计划按 planDate 分组：T+1 报表筛 planDate=T+1，T+2 报表筛 planDate=T+2
-        List<String> cxMachineCodesT1 = allCxPlans.stream()
-                .filter(p -> p.getPlanDate() != null
-                        && !p.getPlanDate().before(t1Start) && !p.getPlanDate().after(t1End))
-                .map(CxPrecisionPlan::getMachineCode)
+        // 成型精度机台：按班次分析原因含"精度"标记分组
+        // T+1（class3/4/5）和 T+2（class6/7/8）从同一份排程结果中取数
+        List<String> cxMachineCodesT1 = cxResults.stream()
+                .filter(r -> containsPrecisionKeyword(
+                        r.getClass3Analysis(), r.getClass4Analysis(), r.getClass5Analysis()))
+                .map(CxScheduleResult::getCxMachineCode)
                 .filter(StringUtils::isNotBlank)
                 .distinct()
                 .collect(Collectors.toList());
 
-        List<String> cxMachineCodesT2 = allCxPlans.stream()
-                .filter(p -> p.getPlanDate() != null
-                        && !p.getPlanDate().before(t2Start) && !p.getPlanDate().after(t2End))
-                .map(CxPrecisionPlan::getMachineCode)
+        List<String> cxMachineCodesT2 = cxResults.stream()
+                .filter(r -> containsPrecisionKeyword(
+                        r.getClass6Analysis(), r.getClass7Analysis(), r.getClass8Analysis()))
+                .map(CxScheduleResult::getCxMachineCode)
                 .filter(StringUtils::isNotBlank)
                 .distinct()
                 .collect(Collectors.toList());
@@ -1450,19 +1427,19 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         String cxRemarkT2 = cxMachineCodesT2.isEmpty() ? ""
                 : String.join("、", cxMachineCodesT2) + " 6:00-14:00精度校验";
 
-        // 硫化精度计划按 planDate 分组：T+1 报表筛 planDate=T+1，T+2 报表筛 planDate=T+2
-        List<String> lhMachineCodesT1 = allLhPlans.stream()
-                .filter(p -> p.getPlanDate() != null
-                        && !p.getPlanDate().before(t1Start) && !p.getPlanDate().after(t1End))
-                .map(LhPrecisionPlan::getMachineCode)
+        // 硫化精度机台：按班次分析原因含"精度计划"标记分组
+        List<String> lhMachineCodesT1 = lhResults.stream()
+                .filter(r -> containsPrecisionKeyword(
+                        r.getClass3Analysis(), r.getClass4Analysis(), r.getClass5Analysis()))
+                .map(LhScheduleResult::getLhMachineCode)
                 .filter(StringUtils::isNotBlank)
                 .distinct()
                 .collect(Collectors.toList());
 
-        List<String> lhMachineCodesT2 = allLhPlans.stream()
-                .filter(p -> p.getPlanDate() != null
-                        && !p.getPlanDate().before(t2Start) && !p.getPlanDate().after(t2End))
-                .map(LhPrecisionPlan::getMachineCode)
+        List<String> lhMachineCodesT2 = lhResults.stream()
+                .filter(r -> containsPrecisionKeyword(
+                        r.getClass6Analysis(), r.getClass7Analysis(), r.getClass8Analysis()))
+                .map(LhScheduleResult::getLhMachineCode)
                 .filter(StringUtils::isNotBlank)
                 .distinct()
                 .collect(Collectors.toList());
@@ -1479,6 +1456,27 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         map.put("lhRemark", lhRemarkT1);
         map.put("lhRemark2", lhRemarkT2);
         return map;
+    }
+
+    /**
+     * 判断班次分析原因中是否包含"精度"关键字。
+     *
+     * <p>硫化侧写入"精度计划"，成型侧写入"精度"（可能与其他原因组合，如"试制,精度"），
+     * 统一用 {@code contains("精度")} 匹配两种写法。</p>
+     *
+     * @param analyses 待检查的班次分析原因文本（可变参数，任一非空且包含"精度"即返回true）
+     * @return true-任一班次分析原因包含"精度"；false-全部不包含
+     */
+    private boolean containsPrecisionKeyword(String... analyses) {
+        if (analyses == null || analyses.length == 0) {
+            return false;
+        }
+        for (String analysis : analyses) {
+            if (StringUtils.isNotBlank(analysis) && analysis.contains("精度")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
