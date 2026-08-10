@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.zlt.aps.utils.AppUtils;
 import com.zlt.aps.autoLogin.feign.FeignTokenHelper;
 import com.zlt.aps.cd15.api.domain.entity.Cd15ShiftConfig;
 import com.zlt.aps.cd15.api.domain.entity.Cd15StorageLaneLimit;
@@ -161,7 +162,7 @@ public class Cd15TimedRollingCheckServiceImpl implements Cd15TimedRollingCheckSe
             AjaxResult result = FeignTokenHelper.callWithToken(
                     () -> this.mesItfService.syncCd15ShiftStock(syncRequest));
             return result != null
-                    && Objects.equals(AjaxResult.Type.SUCCESS.value(), result.get(AjaxResult.CODE_TAG));
+                    && Objects.equals(AppUtils.AJAX_RESULT_SUCCESS, result.get(AjaxResult.CODE_TAG));
         } catch (Exception exception) {
             log.error("斜裁定时滚动前班次库存同步失败，factoryCode={}，shiftCode={}，shiftStartTime={}",
                     target.getFactoryCode(), target.getTargetShiftCode(),
@@ -182,7 +183,7 @@ public class Cd15TimedRollingCheckServiceImpl implements Cd15TimedRollingCheckSe
             AjaxResult result = FeignTokenHelper.callWithToken(
                     () -> this.mesItfService.syncCd15StorageLaneLimit(syncRequest));
             return result != null
-                    && Objects.equals(AjaxResult.Type.SUCCESS.value(), result.get(AjaxResult.CODE_TAG));
+                    && Objects.equals(AppUtils.AJAX_RESULT_SUCCESS, result.get(AjaxResult.CODE_TAG));
         } catch (Exception exception) {
             log.error("斜裁定时滚动前库排同步失败，factoryCode={}，laneDate={}，shiftCode={}",
                     target.getFactoryCode(), target.getHandoverTime().toLocalDate(),

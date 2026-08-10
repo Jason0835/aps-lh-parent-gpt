@@ -23,6 +23,7 @@ import com.zlt.aps.itf.mes.service.ICd90MesItfService;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.aps.itf.vo.MesShiftStockSyncRequest;
 import com.zlt.aps.mp.api.domain.entity.Cd90MesStock;
+import com.zlt.aps.utils.AppUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
@@ -139,17 +140,21 @@ public class Cd90MesItfServiceImpl implements ICd90MesItfService {
                     AjaxResult stockDateResult = this.cd90StockRemoteService.logicDeleteAndSaveCd90StockByDataSource(
                             factoryCode, ApsConstant.DATA_SOURCE_MES, stockDateText, shiftCode, "MES", stockDateList);
                     if (stockDateResult == null
-                            || !Objects.equals(AjaxResult.Type.SUCCESS.value(), stockDateResult.get(AjaxResult.CODE_TAG))) {
+                            || !Objects.equals(AppUtils.AJAX_RESULT_SUCCESS, stockDateResult.get(AjaxResult.CODE_TAG))) {
                         return stockDateResult;
                     }
                 }
                 return AjaxResult.success();
             });
             if (saveResult == null
-                    || !Objects.equals(AjaxResult.Type.SUCCESS.value(), saveResult.get(AjaxResult.CODE_TAG))) {
+                    || !Objects.equals(AppUtils.AJAX_RESULT_SUCCESS, saveResult.get(AjaxResult.CODE_TAG))) {
                 Object resultMessage = saveResult == null ? "" : saveResult.get(AjaxResult.MSG_TAG);
-                log.error("直裁库存同步：同步失败，factoryCode={}，shiftCode={}，返回消息={}",
-                        factoryCode, shiftCode, resultMessage);
+                Object resultCode = saveResult == null ? null : saveResult.get(AjaxResult.CODE_TAG);
+                log.error("直裁库存同步：同步失败，factoryCode={}，shiftCode={}，返回消息={}，"
+                                + "code原始值={}，code类型={}，saveResult完整内容={}",
+                        factoryCode, shiftCode, resultMessage, resultCode,
+                        resultCode == null ? "null" : resultCode.getClass().getName(),
+                        saveResult == null ? "null" : saveResult);
                 return AjaxResult.error(MessageFormat.format(
                         I18nUtil.getMessage("ui.cd90.stock.syncFailed"), resultMessage));
             }
@@ -232,7 +237,7 @@ public class Cd90MesItfServiceImpl implements ICd90MesItfService {
                             DateUtil.formatDate(request.getStockDate()), request.getShiftCode(),
                             DateUtil.formatDateTime(request.getShiftStartTime()), "MES", stockList));
             if (saveResult == null
-                    || !Objects.equals(AjaxResult.Type.SUCCESS.value(), saveResult.get(AjaxResult.CODE_TAG))) {
+                    || !Objects.equals(AppUtils.AJAX_RESULT_SUCCESS, saveResult.get(AjaxResult.CODE_TAG))) {
                 return AjaxResult.error(I18nUtil.getMessage("ui.itf.mes.shiftStockRemoteFailed"));
             }
         } catch (Exception exception) {
@@ -277,7 +282,7 @@ public class Cd90MesItfServiceImpl implements ICd90MesItfService {
                             this.cd90StorageLaneLimitRemoteService.logicDeleteAndSaveMesBatch(
                                     factoryCode, targetLaneDate, targetShiftCode, "MES",
                                     Collections.emptyList()));
-                    if (clearResult == null || !Objects.equals(AjaxResult.Type.SUCCESS.value(),
+                    if (clearResult == null || !Objects.equals(AppUtils.AJAX_RESULT_SUCCESS,
                             clearResult.get(AjaxResult.CODE_TAG))) {
                         Object resultMessage = clearResult == null ? "" : clearResult.get(AjaxResult.MSG_TAG);
                         return AjaxResult.error(MessageFormat.format(
@@ -347,14 +352,14 @@ public class Cd90MesItfServiceImpl implements ICd90MesItfService {
                     AjaxResult scopeResult = this.cd90StorageLaneLimitRemoteService.logicDeleteAndSaveMesBatch(
                             factoryCode, laneDateText, scope.getShiftCode(), "MES", scopeList);
                     if (scopeResult == null
-                            || !Objects.equals(AjaxResult.Type.SUCCESS.value(), scopeResult.get(AjaxResult.CODE_TAG))) {
+                            || !Objects.equals(AppUtils.AJAX_RESULT_SUCCESS, scopeResult.get(AjaxResult.CODE_TAG))) {
                         return scopeResult;
                     }
                 }
                 return AjaxResult.success();
             });
             if (saveResult == null
-                    || !Objects.equals(AjaxResult.Type.SUCCESS.value(), saveResult.get(AjaxResult.CODE_TAG))) {
+                    || !Objects.equals(AppUtils.AJAX_RESULT_SUCCESS, saveResult.get(AjaxResult.CODE_TAG))) {
                 Object resultMessage = saveResult == null ? "" : saveResult.get(AjaxResult.MSG_TAG);
                 return AjaxResult.error(MessageFormat.format(
                         I18nUtil.getMessage("ui.cd90.storageLaneLimit.syncFailed"), resultMessage));
@@ -467,7 +472,7 @@ public class Cd90MesItfServiceImpl implements ICd90MesItfService {
                     this.cd90MesSyncRemoteService.logicDeleteAndSaveScheFinishQty(factoryCode,
                             scheduleDateText, "MES", insertList));
             if (saveResult == null
-                    || !Objects.equals(AjaxResult.Type.SUCCESS.value(), saveResult.get(AjaxResult.CODE_TAG))) {
+                    || !Objects.equals(AppUtils.AJAX_RESULT_SUCCESS, saveResult.get(AjaxResult.CODE_TAG))) {
                 String message = MessageFormat.format(
                         I18nUtil.getMessage("ui.cd90.scheFinishQty.syncFailed"),
                         saveResult == null ? "" : saveResult.get(AjaxResult.MSG_TAG));
@@ -478,7 +483,7 @@ public class Cd90MesItfServiceImpl implements ICd90MesItfService {
             AjaxResult writeBackResult = FeignTokenHelper.callWithToken(() ->
                     this.cd90MesSyncRemoteService.writeBackScheduleResultFinishQty(insertList));
             if (writeBackResult == null
-                    || !Objects.equals(AjaxResult.Type.SUCCESS.value(), writeBackResult.get(AjaxResult.CODE_TAG))) {
+                    || !Objects.equals(AppUtils.AJAX_RESULT_SUCCESS, writeBackResult.get(AjaxResult.CODE_TAG))) {
                 String message = MessageFormat.format(
                         I18nUtil.getMessage("ui.cd90.scheFinishQty.writeBackFailed"),
                         writeBackResult == null ? "" : writeBackResult.get(AjaxResult.MSG_TAG));

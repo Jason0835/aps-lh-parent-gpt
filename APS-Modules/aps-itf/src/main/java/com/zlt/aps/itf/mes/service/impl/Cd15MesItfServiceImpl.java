@@ -18,6 +18,7 @@ import com.zlt.aps.itf.mes.domain.Cd15MesStock;
 import com.zlt.aps.itf.mes.mapper.Cd15MesItfMapper;
 import com.zlt.aps.itf.mes.service.ICd15MesItfService;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
+import com.zlt.aps.utils.AppUtils;
 import com.zlt.aps.itf.vo.MesShiftStockSyncRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -104,14 +105,14 @@ public class Cd15MesItfServiceImpl implements ICd15MesItfService {
                 for (Map.Entry<String, List<Cd15Stock>> entry : listByDate.entrySet()) {
                     AjaxResult scopeResult = this.cd15StockRemoteService.logicDeleteAndSaveMesBatch(
                             factoryCode, entry.getKey(), "MES", entry.getValue());
-                    if (scopeResult == null || !Objects.equals(AjaxResult.Type.SUCCESS.value(),
+                    if (scopeResult == null || !Objects.equals(AppUtils.AJAX_RESULT_SUCCESS,
                             scopeResult.get(AjaxResult.CODE_TAG))) {
                         return scopeResult;
                     }
                 }
                 return AjaxResult.success();
             });
-            if (result == null || !Objects.equals(AjaxResult.Type.SUCCESS.value(),
+            if (result == null || !Objects.equals(AppUtils.AJAX_RESULT_SUCCESS,
                     result.get(AjaxResult.CODE_TAG))) {
                 Object message = result == null ? "" : result.get(AjaxResult.MSG_TAG);
                 return AjaxResult.error(MessageFormat.format(
@@ -177,7 +178,7 @@ public class Cd15MesItfServiceImpl implements ICd15MesItfService {
                     this.cd15MesSyncRemoteService.replaceShiftStock(request.getFactoryCode(),
                             DateUtil.formatDate(request.getStockDate()), request.getShiftCode(),
                             DateUtil.formatDateTime(request.getShiftStartTime()), "MES", stockList));
-            if (result == null || !Objects.equals(AjaxResult.Type.SUCCESS.value(),
+            if (result == null || !Objects.equals(AppUtils.AJAX_RESULT_SUCCESS,
                     result.get(AjaxResult.CODE_TAG))) {
                 return AjaxResult.error(I18nUtil.getMessage("ui.itf.mes.shiftStockRemoteFailed"));
             }
@@ -211,7 +212,7 @@ public class Cd15MesItfServiceImpl implements ICd15MesItfService {
                     AjaxResult result = FeignTokenHelper.callWithToken(() ->
                             this.cd15StorageLaneLimitRemoteService.logicDeleteAndSaveMesBatch(
                                     factoryCode, targetLaneDate, targetShiftCode, "MES", Collections.emptyList()));
-                    if (result == null || !Objects.equals(AjaxResult.Type.SUCCESS.value(),
+                    if (result == null || !Objects.equals(AppUtils.AJAX_RESULT_SUCCESS,
                             result.get(AjaxResult.CODE_TAG))) {
                         return AjaxResult.error(I18nUtil.getMessage("ui.cd15.storageLaneLimit.syncFailed"));
                     }
@@ -264,14 +265,14 @@ public class Cd15MesItfServiceImpl implements ICd15MesItfService {
                     AjaxResult scopeResult = this.cd15StorageLaneLimitRemoteService.logicDeleteAndSaveMesBatch(
                             factoryCode, DateUtil.formatDate(scope.getLaneDate()),
                             scope.getShiftCode(), "MES", scopeList);
-                    if (scopeResult == null || !Objects.equals(AjaxResult.Type.SUCCESS.value(),
+                    if (scopeResult == null || !Objects.equals(AppUtils.AJAX_RESULT_SUCCESS,
                             scopeResult.get(AjaxResult.CODE_TAG))) {
                         return scopeResult;
                     }
                 }
                 return AjaxResult.success();
             });
-            if (result == null || !Objects.equals(AjaxResult.Type.SUCCESS.value(),
+            if (result == null || !Objects.equals(AppUtils.AJAX_RESULT_SUCCESS,
                     result.get(AjaxResult.CODE_TAG))) {
                 return AjaxResult.error(I18nUtil.getMessage("ui.cd15.storageLaneLimit.syncFailed"));
             }
