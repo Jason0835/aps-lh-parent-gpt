@@ -1341,7 +1341,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
                 TmTaskDraft mergeTarget = this.findMergeTarget(context, candidate.getMachineCode(), shiftOrder,
                         sourceTask);
                 runtimeCandidate.setRemainCapacity(mergeTarget == null
-                        ? this.resolvePrependRemainCapacity(capacityProbeTask, context, runtimeCandidate, machineSpeed)
+                        ? this.resolveRemainCapacity(capacityProbeTask, context, runtimeCandidate, machineSpeed)
                         : this.resolveRemainCapacityWithoutNewSwitch(capacityProbeTask, context, runtimeCandidate,
                                 machineSpeed));
                 BigDecimal remainCapacity = nvl(runtimeCandidate.getRemainCapacity());
@@ -2217,13 +2217,12 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         BigDecimal currentSpecSwitchDeduct = this.nvl(task.getPreviousSpecSwitchHours())
                 .multiply(this.nvl(task.getMachineSpeed()));
         BigDecimal currentGlueSwitchDeduct = this.nvl(task.getPreviousGlueSwitchCapacityDeduct());
-        context.appendProcessLog("产能扣减：胎面代码={0}，机台={1}，班次={2}，最大产能={3}，检修扣减={4}，已排计划量扣减={5}，已发生切换扣减={6}，重排切换扣减={7}，本次规格切换扣减={8}，本次胶料切换扣减={9}，分配前待承接量={10}，分配前剩余产能={11}，本次分配量={12}，分配后剩余产能={13}，溢出量={14}，拆分原因={15}",
+        context.appendProcessLog("产能扣减：胎面代码={0}，机台={1}，班次={2}，最大产能={3}，检修扣减={4}，已排计划量扣减={5}，已发生切换扣减={6}，本次规格切换扣减={7}，本次胶料切换扣减={8}，分配前待承接量={9}，分配前剩余产能={10}，本次分配量={11}，分配后剩余产能={12}，溢出量={13}，拆分原因={14}",
                 task.getTreadCode(), candidate == null ? "未提供" : candidate.getMachineCode(), task.getShiftOrder(),
                 this.getCandidateEvidenceDecimal(evidence, "maxCapacity"),
                 this.getCandidateEvidenceDecimal(evidence, "maintenanceCapacityDeduct"),
                 this.getCandidateEvidenceDecimal(evidence, "assignedPlanQty"),
                 this.getCandidateEvidenceDecimal(evidence, "existingSwitchCapacityDeduct"),
-                this.getCandidateEvidenceDecimal(evidence, "reorderedTotalSwitchCapacityDeduct"),
                 currentSpecSwitchDeduct, currentGlueSwitchDeduct, this.nvl(beforeAssignQty), beforeRemainCapacity,
                 this.nvl(assignedQty), afterRemainCapacity, this.nvl(overflowQty), splitDesc);
         context.appendFullProcessTrace(new ScheduleProcessTraceEvent(

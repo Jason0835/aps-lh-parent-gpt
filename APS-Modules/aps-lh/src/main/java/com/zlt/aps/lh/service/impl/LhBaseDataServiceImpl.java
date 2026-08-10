@@ -225,7 +225,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         Map<String, LocalDate> monthPlanRequiredMonthMap =
                 resolveMonthPlanRequiredMonthMap(startDate, monthPlanLookupEndDate,
                         continuousMouldOfflineCheckDays);
-        // 设备停机、工作日历沿用 T-1 覆盖范围，保证滚动继承和跨日停机判断可复用同一窗口。
+        // 设备停机、工作日历沿用 T-1 覆盖范围，保证跨日停机判断可复用同一窗口。
         Date calendarControlStartDate = LhScheduleTimeUtil.addDays(startDate, -1);
 
         // 获取年月信息（按排程目标日取月计划所属年月）
@@ -343,9 +343,6 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                 runDataInitTaskAsync("目标日前一日硫化排程结果",
                         () -> loadTargetPreviousScheduleResults(context, factoryCode, targetDate),
                         () -> sizeOf(context.getTargetPreviousScheduleResultList())),
-                runDataInitTaskAsync("前日模具交替计划",
-                        () -> loadPreviousMouldChangePlans(context, factoryCode, targetDate),
-                        () -> sizeOf(context.getPreviousMouldChangePlanList())),
                 runDataInitTaskAsync("反选历史模具交替计划",
                         () -> loadHistoricalReverseMouldChangePlans(context, factoryCode, targetDate),
                         () -> sizeOf(context.getHistoricalReverseMouldChangePlanList())),
@@ -753,7 +750,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
 
     /**
      * 加载业务目标日前一日硫化排程结果。
-     * <p>强制重排下 {@code previousScheduleResultList} 服务于窗口T日前一日滚动衔接；
+     * <p>{@code previousScheduleResultList} 固定按窗口起点T日前一日加载，
      * 新增历史欠产兜底判断需要按接口目标日前一日判断是否已排过，两者日期口径不能混用。</p>
      *
      * @param context     排程上下文
@@ -773,29 +770,11 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     }
 
     /**
-     * 加载前日模具交替计划。
-     *
-     * @param context     排程上下文
-     * @param factoryCode 分厂编号
-     * @param targetDate  排程目标日
-     */
-    private void loadPreviousMouldChangePlans(LhScheduleContext context, String factoryCode, Date targetDate) {
-        Date previousDate = resolvePreviousDataDate(context, targetDate);
-        List<LhMouldChangePlan> list = lhMouldChangePlanMapper.selectList(new LambdaQueryWrapper<LhMouldChangePlan>()
-                .eq(LhMouldChangePlan::getFactoryCode, factoryCode)
-                .eq(LhMouldChangePlan::getScheduleDate, previousDate)
-                .eq(LhMouldChangePlan::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
-        context.setPreviousMouldChangePlanList(list != null ? list : new ArrayList<>());
-        log.info("前日模具交替计划加载完成, 数量: {}, 日期: {}",
-                context.getPreviousMouldChangePlanList().size(), LhScheduleTimeUtil.formatDate(previousDate));
-    }
-
-    /**
      * 加载前日交替计划机台反选使用的历史计划。
      *
      * <p>反选关系必须严格继承“业务目标日前一日”的换模、换活字块计划，因此这里直接使用
-     * {@code targetDate - 1}，不得复用滚动排程的前日日期解析。强制重排时，滚动衔接可能从
-     * 窗口起点回看历史结果，而反选业务仍只认目标日前一日，两种口径必须隔离。</p>
+     * {@code targetDate - 1}，不得复用窗口起点前一日的前日日期解析。
+     * 反选业务固定只认目标日前一日，两种口径必须隔离。</p>
      *
      * @param context 排程上下文
      * @param factoryCode 分厂编号
@@ -831,12 +810,8 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
      * @return 前日基础数据日期
      */
     private Date resolvePreviousDataDate(LhScheduleContext context, Date targetDate) {
-        // 强制重排从窗口起点T日重新计算，前日排程/换模基线需取T日前一日。
-        if (context.getParamIntValue(LhScheduleParamConstant.FORCE_RESCHEDULE,
-                LhScheduleConstant.FORCE_RESCHEDULE) == LhScheduleConstant.FORCE_RESCHEDULE_ENABLED) {
-            return LhScheduleTimeUtil.clearTime(LhScheduleTimeUtil.addDays(context.getScheduleDate(), -1));
-        }
-        return LhScheduleTimeUtil.clearTime(LhScheduleTimeUtil.addDays(targetDate, -1));
+        // 排程从窗口起点T日重新计算，前日排程结果基线固定取T日前一日。
+        return LhScheduleTimeUtil.clearTime(LhScheduleTimeUtil.addDays(context.getScheduleDate(), -1));
     }
 
     /**
@@ -1670,7 +1645,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
      * <p>普通维修、精度等停机仍按排程窗口交集加载；干冰/喷砂清洗需要额外按计划开始时间加载
      * T 日及之后的未来候选，后续由清洗排程服务按班次和每日上限重新安排实际执行时间。
      * 两类查询均只加载排程日期为空的记录；排程日期非空代表该停机计划已被上一轮硫化排程回填、
-     * 已安排执行时间，滚动排程时不得再重复加载参与产能扣减、机台阻断或清洗重排。</p>
+     * 已安排执行时间，排程时不得再重复加载参与产能扣减、机台阻断或清洗重排。</p>
      *
      * @param context     排程上下文
      * @param factoryCode 分厂编号
@@ -2435,7 +2410,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         }
         /*
          * 调用统一模具归属解析，跨机台比较各自最近的 MES 记录。
-         * 这是基础数据进入续作、滚动衔接和共用模具置换前的唯一归属收口点：
+         * 这是基础数据进入续作和共用模具置换前的唯一归属收口点：
          * 若模具已由更新记录转移到其他机台，旧机台不能继续携带该模具进入运行态。
          */
         Map<String, List<String>> removedMouldCodeMap =
@@ -2531,7 +2506,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
      * <p>年度完整性审计读取全年原始计划；运行态只加载计划日期不早于排程T日、DAYS_TO_DUE进入
      * 预警范围、完成状态为未完成且实际执行日期为空的计划。精度允许在计划日前提前执行，但禁止把
      * 计划日期已经早于T日的历史计划延后到当前窗口执行。
-     * 已安排但设备侧未执行的计划不再按排程日期排除，允许在滚动排程中基于最新数据重新评估。</p>
+     * 已安排但设备侧未执行的计划不再按排程日期排除，允许在后续排程中基于最新数据重新评估。</p>
      *
      * @param context     排程上下文
      * @param factoryCode 分厂编号

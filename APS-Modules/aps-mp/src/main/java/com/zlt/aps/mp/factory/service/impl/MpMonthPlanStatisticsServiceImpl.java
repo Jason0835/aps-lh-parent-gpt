@@ -24,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -108,7 +109,14 @@ public class MpMonthPlanStatisticsServiceImpl extends AbstractDocService<MpMonth
         if (CollectionUtils.isEmpty(data)) {
             return Collections.emptyMap();
         }
-        return data.stream().collect(Collectors.toMap(MpMonthPlanStatistics::getStructureName, Function.identity(), (s1, s2) -> s1));
+        return data.stream().collect(Collectors.toMap(MpMonthPlanStatistics::getStructureName, Function.identity(), (s1, s2) -> {
+            String tempFlag1 = s1.getTempFlag();
+            String tempFlag2 = s2.getTempFlag();
+            if (!Objects.equals(tempFlag1, tempFlag2) && tempFlag2.equals(YesOrNoEnum.YES.getCode())) {
+                return s2;
+            }
+            return s1;
+        }));
     }
 
     /**

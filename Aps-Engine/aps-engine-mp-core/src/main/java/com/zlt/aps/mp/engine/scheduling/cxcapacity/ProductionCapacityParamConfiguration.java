@@ -274,6 +274,10 @@ public class ProductionCapacityParamConfiguration {
      */
     private Integer continueSkuProductionHeightRequire;
     /**
+     * SYS0209014 在机分组下机晚于指定下机日可容许的偏差范围
+     */
+    private Integer appointForceOfflineDays;
+    /**
      * SYS0103001 最小投产量
      */
     private Integer minProductionQty;

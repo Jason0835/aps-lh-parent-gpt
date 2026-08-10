@@ -25,7 +25,6 @@ import com.zlt.aps.lh.api.enums.SkuScheduleSourceTypeEnum;
 import com.zlt.aps.lh.component.CapsuleReplacementRuleService;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.component.OrderNoGenerator;
-import com.zlt.aps.lh.component.StructureMinMachineRetentionService;
 import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.ICapacityCalculateStrategy;
@@ -111,6 +110,8 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
             "续作首日无计划释放触发";
     private static final String TYPE_BLOCK_TRIGGER_SMALL_ENDING_SURPLUS_RELEASE =
             "续作收尾小余量释放触发";
+    private static final String TYPE_BLOCK_TRIGGER_CONTINUOUS_RELEASE =
+            "续作释放触发";
     private static final String TYPE_BLOCK_TRIGGER_FALLBACK = "在机前规格兜底触发";
     private static final String TYPE_BLOCK_SKIP_REASON_T1_NOT_END =
             "T-1 最新记录未收尾，跳过兜底反查";
@@ -139,10 +140,6 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
     private ICapacityCalculateStrategy capacityCalculateStrategy;
     @Resource
     private IMachineMatchStrategy machineMatchStrategy;
-    /** 历史反选和特殊材料指定机台共用的结构停产保机约束。 */
-    @Resource
-    private StructureMinMachineRetentionService structureMinMachineRetentionService =
-            new StructureMinMachineRetentionService();
     /** 胶囊次数累计与换胶囊班次扣减统一入口 */
     @Resource
     private CapsuleReplacementRuleService capsuleReplacementRuleService = new CapsuleReplacementRuleService();
@@ -199,7 +196,8 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
         for (MachineScheduleDTO candidateMachine : candidateMachines) {
             String triggerSource = machineTriggerSourceMap.get(candidateMachine.getMachineCode());
             if (StringUtils.equals(TYPE_BLOCK_TRIGGER_FIRST_DAY_NO_PLAN_RELEASE, triggerSource)
-                    || StringUtils.equals(TYPE_BLOCK_TRIGGER_SMALL_ENDING_SURPLUS_RELEASE, triggerSource)) {
+                    || StringUtils.equals(TYPE_BLOCK_TRIGGER_SMALL_ENDING_SURPLUS_RELEASE, triggerSource)
+                    || StringUtils.equals(TYPE_BLOCK_TRIGGER_CONTINUOUS_RELEASE, triggerSource)) {
                 log.info("续作释放机台进入换活字块匹配, machineCode: {}, currentMaterialCode: {}, triggerSource: {}",
                         candidateMachine.getMachineCode(), candidateMachine.getCurrentMaterialCode(), triggerSource);
             }
@@ -391,20 +389,7 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                     MouldChangeTypeEnum.TYPE_BLOCK.getCode(),
                     "历史班次无法映射到本批次有效班次");
         }
-        /*
-         * 历史指定机台绕过普通候选排序，因此必须在该入口单独执行相同的结构保机可用性判断。
-         * 同结构直接放行；不同结构若整个历史映射班次都未越过统一释放时间，则当前指令不可执行。
-         */
-        if (structureMinMachineRetentionService.isDifferentStructureRetentionBlocked(
-                context, sku, machine.getMachineCode(),
-                mappedShift.getShiftEndDateTime())) {
-            return SpecifiedMachineScheduleResult.failed(
-                    MouldChangeTypeEnum.TYPE_BLOCK.getCode(),
-                    "历史指定机台在映射班次内仍被不同结构停产保机占用");
-        }
-        Date machineEndTime =
-                structureMinMachineRetentionService.resolveRetentionAwareOccupationEndTime(
-                        context, sku, machine.getMachineCode(), machine.getEstimatedEndTime());
+        Date machineEndTime = machine.getEstimatedEndTime();
         if (Objects.isNull(machineEndTime)) {
             return SpecifiedMachineScheduleResult.failed(
                     MouldChangeTypeEnum.TYPE_BLOCK.getCode(),
@@ -467,8 +452,6 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                     MouldChangeTypeEnum.TYPE_BLOCK.getCode(),
                     "换活字块主链返回成功但未找到对应排程结果");
         }
-        // 指定机台同结构接管成功后立即清理旧保机占位，避免后续历史指令重复看到同班次占用。
-        structureMinMachineRetentionService.synchronizeRetainedState(context);
         return SpecifiedMachineScheduleResult.success(
                 result, MouldChangeTypeEnum.TYPE_BLOCK.getCode());
     }
@@ -522,9 +505,7 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
             return SpecifiedMachineScheduleResult.notApplicable(
                     "当前机台物料与特殊材料SKU不满足换活字块条件");
         }
-        Date machineEndTime =
-                structureMinMachineRetentionService.resolveRetentionAwareOccupationEndTime(
-                        context, sku, machine.getMachineCode(), machine.getEstimatedEndTime());
+        Date machineEndTime = machine.getEstimatedEndTime();
         if (Objects.isNull(machineEndTime)) {
             return SpecifiedMachineScheduleResult.failed(
                     MouldChangeTypeEnum.TYPE_BLOCK.getCode(),
@@ -574,8 +555,6 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                     MouldChangeTypeEnum.TYPE_BLOCK.getCode(),
                     "换活字块主链返回成功但未找到特殊材料置换结果");
         }
-        // 特殊材料指定机台成功后同步同结构接管及剩余保机占位，保持结果和机台运行态一致。
-        structureMinMachineRetentionService.synchronizeRetainedState(context);
         return SpecifiedMachineScheduleResult.success(
                 result, MouldChangeTypeEnum.TYPE_BLOCK.getCode());
     }
@@ -842,6 +821,9 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
             return 0;
         }
         if (StringUtils.equals(TYPE_BLOCK_TRIGGER_FIRST_DAY_NO_PLAN_RELEASE, triggerSource)) {
+            return 1;
+        }
+        if (StringUtils.equals(TYPE_BLOCK_TRIGGER_CONTINUOUS_RELEASE, triggerSource)) {
             return 1;
         }
         if (StringUtils.equals(TYPE_BLOCK_TRIGGER_FALLBACK, triggerSource)) {
@@ -3060,8 +3042,9 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
     /**
      * 识别释放后可优先参与换活字块的续作机台。
      *
-     * <p>包括首日无计划释放机台和续作收尾小余量且前日 T+1 夜班未排满不排产释放机台。该入口只扩展 S4.4
-     * 换活字块候选机台来源，不改变 S4.5 新增排序和机台筛选规则。</p>
+     * <p>包括首日无计划释放机台、续作收尾小余量释放机台，以及窗口内无日计划、续作未形成
+     * 有效结果等统一登记的续作释放机台。该入口只扩展 S4.4 换活字块候选机台来源，
+     * 不改变 S4.5 新增排序和机台筛选规则。</p>
      *
      * @param context 排程上下文
      * @return 释放机台列表
@@ -3078,6 +3061,9 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
         }
         if (!CollectionUtils.isEmpty(context.getTypeBlockReleasedContinuousMachineCodeSet())) {
             releasedMachineCodeSet.addAll(context.getTypeBlockReleasedContinuousMachineCodeSet());
+        }
+        if (!CollectionUtils.isEmpty(context.getReleasedContinuousMachineCodeSet())) {
+            releasedMachineCodeSet.addAll(context.getReleasedContinuousMachineCodeSet());
         }
         for (String machineCode : releasedMachineCodeSet) {
             if (StringUtils.isEmpty(machineCode)) {
@@ -3116,6 +3102,16 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                 && !CollectionUtils.isEmpty(context.getTypeBlockReleasedContinuousMachineCodeSet())
                 && context.getTypeBlockReleasedContinuousMachineCodeSet().contains(machineCode)) {
             return TYPE_BLOCK_TRIGGER_SMALL_ENDING_SURPLUS_RELEASE;
+        }
+        if (context != null && StringUtils.isNotEmpty(machineCode)
+                && !CollectionUtils.isEmpty(context.getFirstDayNoPlanReleasedContinuousMachineCodeSet())
+                && context.getFirstDayNoPlanReleasedContinuousMachineCodeSet().contains(machineCode)) {
+            return TYPE_BLOCK_TRIGGER_FIRST_DAY_NO_PLAN_RELEASE;
+        }
+        if (context != null && StringUtils.isNotEmpty(machineCode)
+                && !CollectionUtils.isEmpty(context.getReleasedContinuousMachineCodeSet())
+                && context.getReleasedContinuousMachineCodeSet().contains(machineCode)) {
+            return TYPE_BLOCK_TRIGGER_CONTINUOUS_RELEASE;
         }
         return TYPE_BLOCK_TRIGGER_FIRST_DAY_NO_PLAN_RELEASE;
     }

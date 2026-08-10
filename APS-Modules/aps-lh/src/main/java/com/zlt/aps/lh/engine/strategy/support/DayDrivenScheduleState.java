@@ -4,6 +4,7 @@ import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -21,6 +22,15 @@ import java.util.Set;
  * @author APS
  */
 public class DayDrivenScheduleState {
+
+    /**
+     * 动态候选使用的 S4.5 全局顺序比较器。
+     *
+     * <p>存在有效 sortRank 的候选按名次升序；没有全局名次的运行时补偿候选稳定追加在
+     * 全部有名次候选之后。相同名次返回相等，依赖 Java 稳定排序保留原登记顺序。</p>
+     */
+    private static final Comparator<SkuScheduleDTO> GLOBAL_ORDER_COMPARATOR =
+            (leftSku, rightSku) -> compareByGlobalOrder(leftSku, rightSku);
 
     /** S4.5 既有排序完成后的稳定 SKU 顺序 */
     private final List<SkuScheduleDTO> orderedSkuList;
@@ -69,8 +79,8 @@ public class DayDrivenScheduleState {
     /**
      * 登记排程过程中动态生成的补偿 SKU。
      *
-     * <p>动态补偿 SKU 追加在现有稳定排序之后，不获得额外排序优先权；后续业务日仍按登记顺序
-     * 进入对应阶段，保持与现有“本轮结束后追加队尾”的行为一致。</p>
+     * <p>动态补偿 SKU 若携带 S4.5 sortRank，则插入对应全局名次；没有有效名次时稳定追加队尾。
+     * 已经完成资源分配的候选不会回滚，本方法只调整尚未执行候选及后续业务日的顺序。</p>
      *
      * @param sku 动态补偿 SKU
      */
@@ -79,9 +89,43 @@ public class DayDrivenScheduleState {
             return;
         }
         if (!containsSkuByIdentity(orderedSkuList, sku)) {
-            orderedSkuList.add(sku);
+            int insertIndex = orderedSkuList.size();
+            for (int index = 0; index < orderedSkuList.size(); index++) {
+                if (GLOBAL_ORDER_COMPARATOR.compare(sku, orderedSkuList.get(index)) < 0) {
+                    insertIndex = index;
+                    break;
+                }
+            }
+            orderedSkuList.add(insertIndex, sku);
         }
         pendingSkuSet.add(sku);
+    }
+
+    /**
+     * 将运行中生成的补偿 SKU 按 S4.5 全局顺序稳定合并到当前剩余工作队列。
+     *
+     * <p>该方法只处理“下一轮尚未执行”的队列：有名次补偿按 sortRank 与剩余候选竞争，
+     * 无名次补偿排在全部有名次候选之后；相同名次和多个无名次候选均保持生成顺序。</p>
+     *
+     * @param pendingSkuList 当前轮尚未执行的工作队列
+     * @param additionalSkuList 本轮动态生成的补偿 SKU
+     */
+    public void mergePendingSkuListByGlobalOrder(List<SkuScheduleDTO> pendingSkuList,
+                                                 List<SkuScheduleDTO> additionalSkuList) {
+        if (Objects.isNull(pendingSkuList) || Objects.isNull(additionalSkuList)
+                || additionalSkuList.isEmpty()) {
+            return;
+        }
+        for (SkuScheduleDTO additionalSku : additionalSkuList) {
+            if (Objects.isNull(additionalSku)) {
+                continue;
+            }
+            this.registerPendingSku(additionalSku);
+            if (!containsSkuByIdentity(pendingSkuList, additionalSku)) {
+                pendingSkuList.add(additionalSku);
+            }
+        }
+        Collections.sort(pendingSkuList, GLOBAL_ORDER_COMPARATOR);
     }
 
     /**
@@ -413,5 +457,38 @@ public class DayDrivenScheduleState {
             }
         }
         return false;
+    }
+
+    /**
+     * 比较两个候选的 S4.5 全局名次。
+     *
+     * @param leftSku 左侧候选
+     * @param rightSku 右侧候选
+     * @return 负数-左侧优先；正数-右侧优先；0-保持原相对顺序
+     */
+    private static int compareByGlobalOrder(SkuScheduleDTO leftSku, SkuScheduleDTO rightSku) {
+        if (leftSku == rightSku) {
+            return 0;
+        }
+        if (Objects.isNull(leftSku)) {
+            return 1;
+        }
+        if (Objects.isNull(rightSku)) {
+            return -1;
+        }
+        int leftRank = leftSku.getSortRank();
+        int rightRank = rightSku.getSortRank();
+        boolean leftRanked = leftRank > 0;
+        boolean rightRanked = rightRank > 0;
+        if (leftRanked && rightRanked) {
+            return Integer.compare(leftRank, rightRank);
+        }
+        if (leftRanked) {
+            return -1;
+        }
+        if (rightRanked) {
+            return 1;
+        }
+        return 0;
     }
 }

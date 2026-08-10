@@ -1351,7 +1351,6 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         //1、检查胶囊卡盘
         StringBuilder sbError = new StringBuilder();
         int maxDays = com.zlt.aps.mp.engine.utils.DateUtils.getDaysByYearMonth(contextDTO.getMpYear(), contextDTO.getMpMonth());
-        List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList;
         Integer chuckTotalQty;
         for (MdmCapsuleChuck capsuleChuck:contextDTO.getMdmCapsuleChuckList()){
             chuckTotalQty = Convert.toInt(capsuleChuck.getNewChuckQty()) + Convert.toInt(capsuleChuck.getInternalQty());
@@ -1385,7 +1384,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         for (int iDay = FactoryConstant.MONTH_START_DAY; iDay <= maxDays; iDay++) {
             sumMouldQty = 0;
             for (String spec: specArr){
-                String key = spec + BusiConstant.WeekRollAdjust.SPLIT_COMMA + iDay;
+                String key = spec + BusiConstant.WeekRollAdjust.SPLIT_GROUP_KEY + iDay;
                 sumMouldQty += Convert.toInt(machinesMap.get(key),0);
             }
             //硫化机台数 转 模数

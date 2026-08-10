@@ -87,6 +87,31 @@ public interface IMouldChangeBalanceStrategy {
     }
 
     /**
+     * 指定SKU、动作类型和业务日日终约束的分配入口。
+     * <p>业务日日终约束用于“首台当日必须开产”场景：早班满8后，只有中班换模能在业务日日终前
+     * 完成时才承接中班；否则顺延次日早班并记录过程日志，避免换模完成后当日剩余生产产能为0。</p>
+     *
+     * @param context 排程上下文
+     * @param machineCode 机台编码
+     * @param endingTime 前SKU收尾时间
+     * @param switchDurationHours 切换时长（小时）
+     * @param sku 当前待排SKU
+     * @param actionType 切换动作类型
+     * @param businessDayEndTime 当前业务日日终时间；null表示不限制中班完成时刻
+     * @return 换模分配的班次和时间
+     */
+    default Date allocateMouldChange(LhScheduleContext context,
+                                     String machineCode,
+                                     Date endingTime,
+                                     int switchDurationHours,
+                                     SkuScheduleDTO sku,
+                                     String actionType,
+                                     Date businessDayEndTime) {
+        return allocateMouldChange(context, machineCode, endingTime, switchDurationHours,
+                sku, actionType);
+    }
+
+    /**
      * 兼容旧调用方的默认入口。
      *
      * @param context 排程上下文

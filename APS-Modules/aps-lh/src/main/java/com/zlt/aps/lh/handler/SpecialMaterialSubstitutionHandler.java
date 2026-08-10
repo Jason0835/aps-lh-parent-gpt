@@ -1,7 +1,6 @@
 package com.zlt.aps.lh.handler;
 
 import com.zlt.aps.lh.api.enums.ScheduleStepEnum;
-import com.zlt.aps.lh.component.StructureMinMachineRetentionService;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.service.impl.SharedMouldSubstitutionCoordinator;
 import com.zlt.aps.lh.service.impl.SpecialMaterialMachineSubstitutionService;
@@ -37,8 +36,6 @@ public class SpecialMaterialSubstitutionHandler extends AbsScheduleStepHandler {
     /** 所有 SKU 共用模具联动置换协调器，优先于原特殊材料机台置换兜底执行。 */
     @Resource
     private SharedMouldSubstitutionCoordinator sharedMouldSubstitutionCoordinator;
-    @Resource
-    private StructureMinMachineRetentionService structureMinMachineRetentionService;
 
     /**
      * 执行共用模具联动置换及特殊材料硫化机兜底置换。
@@ -71,8 +68,6 @@ public class SpecialMaterialSubstitutionHandler extends AbsScheduleStepHandler {
          * 保持本需求之外的特殊材料业务语义不变。
          */
         substitutionService.substitute(context);
-        // 特殊材料同结构接管成功后，统一清理旧保机占位并把剩余保机区间转移到新结果。
-        structureMinMachineRetentionService.synchronizeRetainedState(context);
 
         log.info("S4.5.1 后置联动置换处理完成, 排程结果数: {}, 未排产数: {}",
                 context.getScheduleResultList().size(), context.getUnscheduledResultList().size());

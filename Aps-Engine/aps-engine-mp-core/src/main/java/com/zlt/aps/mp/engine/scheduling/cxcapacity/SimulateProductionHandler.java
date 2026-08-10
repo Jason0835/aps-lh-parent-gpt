@@ -149,11 +149,12 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
         //3、开始重排在产分组在产机台续作
         productionContext.addStageLogBuilder(LogRecorderStageEnum.SIMULATE_RESET_CONTINUE_PRODUCTION);
         resetProduction(productionContext, allGroupPlanMap, continueAllocationList, allContinueMap);
-        //4、对固定分组进行排产
+        //4、对固定、多段、间断分组进行优先排产
         productionContext.addStageLogBuilder(LogRecorderStageEnum.SIMULATE_FIXED_PRODUCTION);
         TbrSimulateProductionLogRecorder.addDeliveryPriorityFixedCxMachineGroupLog(productionContext);
+        Map<String, Set<CxMachineAllocationPlanHelper>> specialPriorityResultMap = Maps.newHashMap();
         //4.1、多固定同一成型机台，时间在前的先排
-        groupPriorityProductionScheduler.allocationFixedGroupSameCxMachineEarlyGroup(productionContext, Sets.newHashSet(), hasFixedPriorityCxMachineList, discontinueGroupSet);
+        groupPriorityProductionScheduler.allocationFixedGroupSameCxMachineEarlyGroup(productionContext, Sets.newHashSet(), hasFixedPriorityCxMachineList, discontinueGroupSet, specialPriorityResultMap);
         //4.2、对有多段的固定最先排
         List<ProductionPlanGroupInfo> multipleRangeFixedPriorityCxMachineList = hasFixedPriorityCxMachineList.stream().filter(singleGroup -> multipleRangeGroupSet.contains(singleGroup.getGroupName())).collect(Collectors.toList());
         if (!CollectionUtils.isEmpty(multipleRangeFixedPriorityCxMachineList)) {
@@ -162,7 +163,7 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
             TbrSimulateProductionLogRecorder.addDeliveryPriorityTypeLog(productionContext, groupInfo, typeText);
             Set<String> multipleDiscontinueGroupSet = Sets.newHashSet();
             multipleRangeFixedPriorityCxMachineList.forEach((singleGroup -> multipleDiscontinueGroupSet.add(singleGroup.getGroupName())));
-            groupPriorityProductionScheduler.productionAppointGroupCxMachine(productionContext, Sets.newHashSet(), multipleRangeFixedPriorityCxMachineList, multipleDiscontinueGroupSet, true);
+            groupPriorityProductionScheduler.productionAppointGroupCxMachine(productionContext, Sets.newHashSet(), multipleRangeFixedPriorityCxMachineList, multipleDiscontinueGroupSet, true, specialPriorityResultMap);
         }
         //4.3 对有多段的非固定优先排产
         List<ProductionPlanGroupInfo> multipleRangeNoFixedList = getMultipleNoFixedGroup(productionContext, hasFixedPriorityCxMachineList, multipleRangeGroupSet);
@@ -172,7 +173,7 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
             TbrSimulateProductionLogRecorder.addDeliveryPriorityTypeLog(productionContext, groupInfo, typeText);
             Set<String> multipleDiscontinueGroupSet = Sets.newHashSet();
             multipleRangeNoFixedList.forEach((singleGroup -> multipleDiscontinueGroupSet.add(singleGroup.getGroupName())));
-            groupPriorityProductionScheduler.productionAppointGroupCxMachine(productionContext, Sets.newHashSet(), multipleRangeNoFixedList, multipleDiscontinueGroupSet, false);
+            groupPriorityProductionScheduler.productionAppointGroupCxMachine(productionContext, Sets.newHashSet(), multipleRangeNoFixedList, multipleDiscontinueGroupSet, false, specialPriorityResultMap);
         }
         //4.4、对其它固定先排
         List<ProductionPlanGroupInfo> otherFixedPriorityCxMachineList = hasFixedPriorityCxMachineList.stream().filter(singleGroup -> !multipleRangeGroupSet.contains(singleGroup.getGroupName())).collect(Collectors.toList());
@@ -180,13 +181,16 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
             String groupInfo = otherFixedPriorityCxMachineList.stream().map(ProductionPlanGroupInfo::getGroupName).collect(Collectors.joining(StringConstant.COMMA));
             String typeText = "其它指定分组优先排产";
             TbrSimulateProductionLogRecorder.addDeliveryPriorityTypeLog(productionContext, groupInfo, typeText);
-            groupPriorityProductionScheduler.productionAppointGroupCxMachine(productionContext, Sets.newHashSet(), otherFixedPriorityCxMachineList, discontinueGroupSet, true);
+            groupPriorityProductionScheduler.productionAppointGroupCxMachine(productionContext, Sets.newHashSet(), otherFixedPriorityCxMachineList, discontinueGroupSet, true, specialPriorityResultMap);
         }
+        KeyInformationLogRecorder.recorderInsertAllocationGroupInfoLog(productionContext, specialPriorityResultMap);
         //5、在对剩余的进行Top3排产
         productionContext.addStageLogBuilder(LogRecorderStageEnum.SIMULATE_LAST_PRODUCTION);
         TbrSimulateProductionLogRecorder.addDeliveryPriorityLeftOverGroupLog(productionContext);
         //5.2 剩余排产
-        groupPriorityProductionScheduler.allocationCxMachine(productionContext, Sets.newHashSet(), Sets.newHashSet(), Maps.newHashMap(), discontinueGroupSet);
+        Map<String, Set<CxMachineAllocationPlanHelper>> finalAddResultMap = Maps.newHashMap();
+        groupPriorityProductionScheduler.allocationCxMachine(productionContext, Sets.newHashSet(), Sets.newHashSet(), finalAddResultMap, discontinueGroupSet);
+        KeyInformationLogRecorder.recorderInsertAllocationGroupInfoLog(productionContext, finalAddResultMap);
     }
 
     /**

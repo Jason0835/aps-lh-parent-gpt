@@ -4,7 +4,7 @@ import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.enums.ScheduleStepEnum;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
-import com.zlt.aps.lh.component.StructureMinMachineRetentionService;
+import com.zlt.aps.lh.component.StructureEndingAlignmentService;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.factory.ScheduleStrategyFactory;
 import com.zlt.aps.lh.engine.strategy.ICapacityCalculateStrategy;
@@ -46,8 +46,7 @@ public class NewProductionHandler extends AbsScheduleStepHandler {
     @Resource
     private IHistoricalMouldChangeReverseSelectionStrategy historicalReverseSelectionStrategy;
     @Resource
-    private StructureMinMachineRetentionService structureMinMachineRetentionService =
-            new StructureMinMachineRetentionService();
+    private StructureEndingAlignmentService structureEndingAlignmentService;
 
     @Override
     protected void doHandle(LhScheduleContext context) {
@@ -85,6 +84,13 @@ public class NewProductionHandler extends AbsScheduleStepHandler {
                     context.getScheduleResultList().size(), context.getNewSpecSkuList().size(),
                     context.getHistoricalReverseSelectionDirectiveList().size());
 
+            /*
+             * S4.5.3.1 结构收尾对齐在机统计缓存构建：
+             * 基于续作+换活字块排产完成后的实时排程结果构建【结构×班次】在机统计，
+             * 后续每次新增选机只读缓存并按结果提交增量更新，避免反复全表扫描。
+             */
+            structureEndingAlignmentService.prepareStructureEndingAlignmentIndex(context);
+
             // S4.5.4 遍历新增SKU, 匹配机台
             IMachineMatchStrategy machineMatchStrategy = strategyFactory.getMachineMatchStrategy();
 
@@ -119,12 +125,6 @@ public class NewProductionHandler extends AbsScheduleStepHandler {
                     context.getScheduleResultList().size(), context.getNewSpecSkuList().size(),
                     context.getUnscheduledResultList().size());
             strategy.scheduleReduceMould(context);
-            /*
-             * S4.5结束后只同步阶段级判断已经命中的结构状态，不重新计算是否触发保机。
-             * 同结构SKU若已接管保机机台，此处负责清理旧结果中的纯保机占位、转移剩余保机区间，
-             * 并把命中标识同步到本阶段新增的同结构结果。
-             */
-            structureMinMachineRetentionService.synchronizeRetainedState(context);
             log.info("新增规格排产处理完成, 排程结果数: {}, 未排产数: {}",
                     context.getScheduleResultList().size(), context.getUnscheduledResultList().size());
         } finally {
