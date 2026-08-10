@@ -320,6 +320,8 @@ public final class LhScheduleConstant {
 
     /** 排程天数（默认值；运行期以硫化参数 SCHEDULE_DAYS 为准） */
     public static final int SCHEDULE_DAYS = 3;
+    /** 结构收尾对齐固定观察窗口天数：T、T+1、T+2三个自然日 */
+    public static final int STRUCTURE_ENDING_ALIGNMENT_WINDOW_DAYS = 3;
     /** 是否按产能满排默认值（0-按需求排产，1-按产能满排） */
     public static final int ENABLE_FULL_CAPACITY_SCHEDULING = 1;
     /** 满排模式是否按余量命中收尾规则2默认值（0-关闭，1-开启） */
