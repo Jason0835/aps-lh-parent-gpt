@@ -6,22 +6,27 @@ import java.math.BigDecimal;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
  * 自动排程中文过程日志格式化缓冲器。
  *
- * <p>缓冲器按追加顺序保存摘要和完整事件，最终根据日志级别统一渲染。FULL 模式下摘要也会被转换为
- * 具备六个中文必填段落的连续编号事件，避免同一正文混入无法追溯的散行文本。</p>
+ * <p>缓冲器分别保存批次级和班次级摘要、完整事件，最终根据日志级别统一渲染。班次级日志按班次顺序
+ * 输出固定分段标题；FULL 模式下摘要会被转换为具备六个中文必填段落的连续编号事件，班次标题不参与编号。</p>
  */
 public class ScheduleProcessTraceBuffer {
 
     /** 过程日志中独立小数文本的匹配规则。 */
     private static final Pattern DECIMAL_PATTERN = Pattern.compile("(?<![\\d.])(-?\\d+\\.\\d+)(?![\\d.])");
 
-    /** 按发生顺序保存的摘要文本或完整事件。 */
+    /** 按发生顺序保存的批次级摘要文本或完整事件。 */
     private final List<Object> entries = new ArrayList<>();
+
+    /** 按班次顺序保存的班次级摘要文本或完整事件。 */
+    private final Map<Integer, List<Object>> shiftEntryMap = new TreeMap<>();
 
     /** 当前有效日志级别。 */
     private ScheduleProcessLogLevel level = ScheduleProcessLogLevel.DEFAULT_LEVEL;
@@ -43,6 +48,7 @@ public class ScheduleProcessTraceBuffer {
         this.fallback = StrUtil.isNotBlank(value) && !ScheduleProcessLogLevel.isSupported(value);
         if (ScheduleProcessLogLevel.OFF == this.level) {
             this.entries.clear();
+            this.shiftEntryMap.clear();
             return;
         }
         if (this.fallback) {
@@ -65,6 +71,21 @@ public class ScheduleProcessTraceBuffer {
     }
 
     /**
+     * 追加指定班次的摘要日志。
+     *
+     * @param shiftOrder 班次顺序
+     * @param format     日志格式，使用 MessageFormat 占位符
+     * @param args       日志参数
+     */
+    public void appendShiftSummary(Integer shiftOrder, String format, Object... args) {
+        if (ScheduleProcessLogLevel.OFF == this.level || StrUtil.isBlank(format)) {
+            return;
+        }
+        Object[] plainArgs = this.toPlainArgs(args);
+        this.getEntryList(shiftOrder).add(MessageFormat.format(format, plainArgs));
+    }
+
+    /**
      * 追加完整中文过程事件。
      *
      * @param event 完整过程事件
@@ -72,6 +93,18 @@ public class ScheduleProcessTraceBuffer {
     public void appendFull(ScheduleProcessTraceEvent event) {
         if (ScheduleProcessLogLevel.FULL == this.level && event != null) {
             this.entries.add(event);
+        }
+    }
+
+    /**
+     * 追加指定班次的完整中文过程事件。
+     *
+     * @param shiftOrder 班次顺序
+     * @param event      完整过程事件
+     */
+    public void appendShiftFull(Integer shiftOrder, ScheduleProcessTraceEvent event) {
+        if (ScheduleProcessLogLevel.FULL == this.level && event != null) {
+            this.getEntryList(shiftOrder).add(event);
         }
     }
 
@@ -112,9 +145,10 @@ public class ScheduleProcessTraceBuffer {
             return 0;
         }
         if (ScheduleProcessLogLevel.SUMMARY == this.level) {
-            return (int) this.entries.stream().filter(String.class::isInstance).count();
+            return this.countSummaryEntries(this.entries) + this.shiftEntryMap.values().stream()
+                    .mapToInt(this::countSummaryEntries).sum();
         }
-        return this.entries.size();
+        return this.entries.size() + this.shiftEntryMap.values().stream().mapToInt(List::size).sum();
     }
 
     /**
@@ -128,20 +162,91 @@ public class ScheduleProcessTraceBuffer {
         }
         StringBuilder resultBuffer = new StringBuilder(4096);
         if (ScheduleProcessLogLevel.SUMMARY == this.level) {
-            this.entries.stream()
-                    .filter(String.class::isInstance)
-                    .map(String.class::cast)
-                    .forEach(summary -> resultBuffer.append(summary).append(System.lineSeparator()));
+            this.appendSummaryEntries(resultBuffer, this.entries);
+            this.shiftEntryMap.forEach((shiftOrder, shiftEntries) -> {
+                if (this.countSummaryEntries(shiftEntries) > 0) {
+                    resultBuffer.append(this.buildShiftTitle(shiftOrder)).append(System.lineSeparator());
+                    this.appendSummaryEntries(resultBuffer, shiftEntries);
+                }
+            });
             return this.normalizeText(resultBuffer.toString());
         }
         int sequence = 0;
         for (Object entry : this.entries) {
-            sequence++;
-            ScheduleProcessTraceEvent event = entry instanceof ScheduleProcessTraceEvent
-                    ? (ScheduleProcessTraceEvent) entry : this.buildSummaryEvent(String.valueOf(entry));
-            this.appendEvent(resultBuffer, sequence, event);
+            sequence = this.appendFullEntry(resultBuffer, sequence, entry);
+        }
+        for (Map.Entry<Integer, List<Object>> shiftEntry : this.shiftEntryMap.entrySet()) {
+            if (shiftEntry.getValue().isEmpty()) {
+                continue;
+            }
+            resultBuffer.append(this.buildShiftTitle(shiftEntry.getKey())).append(System.lineSeparator());
+            for (Object entry : shiftEntry.getValue()) {
+                sequence = this.appendFullEntry(resultBuffer, sequence, entry);
+            }
         }
         return this.normalizeText(resultBuffer.toString());
+    }
+
+    /**
+     * 获取指定班次的日志容器；无有效班次时降级为批次级日志，确保异常日志不丢失。
+     *
+     * @param shiftOrder 班次顺序
+     * @return 对应的日志容器
+     */
+    private List<Object> getEntryList(Integer shiftOrder) {
+        if (shiftOrder == null || shiftOrder <= 0) {
+            return this.entries;
+        }
+        return this.shiftEntryMap.computeIfAbsent(shiftOrder, key -> new ArrayList<>());
+    }
+
+    /**
+     * 追加摘要级日志条目。
+     *
+     * @param resultBuffer 输出缓冲器
+     * @param sourceEntries 待输出条目
+     */
+    private void appendSummaryEntries(StringBuilder resultBuffer, List<Object> sourceEntries) {
+        sourceEntries.stream()
+                .filter(String.class::isInstance)
+                .map(String.class::cast)
+                .forEach(summary -> resultBuffer.append(summary).append(System.lineSeparator()));
+    }
+
+    /**
+     * 统计摘要级会输出的日志数量。
+     *
+     * @param sourceEntries 待统计条目
+     * @return 摘要日志数量
+     */
+    private int countSummaryEntries(List<Object> sourceEntries) {
+        return (int) sourceEntries.stream().filter(String.class::isInstance).count();
+    }
+
+    /**
+     * 输出一条 FULL 级日志并返回更新后的事件序号。
+     *
+     * @param resultBuffer 输出缓冲器
+     * @param sequence     当前事件序号
+     * @param entry        待输出条目
+     * @return 更新后的事件序号
+     */
+    private int appendFullEntry(StringBuilder resultBuffer, int sequence, Object entry) {
+        ScheduleProcessTraceEvent event = entry instanceof ScheduleProcessTraceEvent
+                ? (ScheduleProcessTraceEvent) entry : this.buildSummaryEvent(String.valueOf(entry));
+        int nextSequence = sequence + 1;
+        this.appendEvent(resultBuffer, nextSequence, event);
+        return nextSequence;
+    }
+
+    /**
+     * 构建班次日志固定分段标题。
+     *
+     * @param shiftOrder 班次顺序
+     * @return 分段标题
+     */
+    private String buildShiftTitle(Integer shiftOrder) {
+        return MessageFormat.format("----------班次{0}----------", shiftOrder);
     }
 
     /**

@@ -142,7 +142,7 @@ public class TmPlanCalcService implements ITmPlanCalcService {
             addExperimentSpecTrace(context, task);
             addDemandTrace(context, task, demandQtyAlgorithmCode);
             // 打印需求量计算公式和关键中间量，便于按批次和业务键还原计划量入口。
-            log.info("[TM_DEMAND_QTY_CALC] batchNo={}, traceId={}, factoryCode={}, scheduleDate={}, businessKey={}, treadCode={}, shiftOrder={}, algorithmCode={}, formula=currentShiftDemandQty-rollingStockQty=>currentShiftStockGapQty,guardDemandQty-rollingStockQty=>stockGapQty,max(currentShiftStockGapQty,stockGapQty)=>demandQty",
+            log.info("[TM_DEMAND_QTY_CALC] batchNo={}, traceId={}, factoryCode={}, scheduleDate={}, businessKey={}, treadCode={}, shiftOrder={}, algorithmCode={}, formula=currentShiftDemandQty+guardDemandQty-rollingStockQty=>stockGapQty,stockGapQty=>demandQty",
                     context.getBatchNo(), context.getTraceId(), context.getFactoryCode(), formatScheduleDate(context),
                     task.getBusinessKey(), task.getTreadCode(), task.getShiftOrder(), demandQtyAlgorithmCode);
             log.info("[TM_DEMAND_QTY_CALC_DETAIL] batchNo={}, traceId={}, factoryCode={}, scheduleDate={}, businessKey={}, treadCode={}, shiftOrder={}, guardDemandQty={}, rollingStockQty={}, currentShiftStockGapQty={}, stockGapQty={}, currentShiftDemandQty={}, demandQty={}",
@@ -436,13 +436,10 @@ public class TmPlanCalcService implements ITmPlanCalcService {
         if (taskGroup == null || CollUtil.isEmpty(taskGroup.getSourceTaskList())) {
             return;
         }
-        boolean useCurrentShiftDemand = nvl(aggregateTask.getCurrentShiftDemandQty())
-                .compareTo(nvl(aggregateTask.getGuardDemandQty())) >= 0;
         Map<String, BigDecimal> sourceWeightMap = taskGroup.getSourceTaskList().stream()
                 .collect(Collectors.toMap(TmTaskDraft::getBusinessKey,
-                        sourceTask -> useCurrentShiftDemand
-                                ? nvl(sourceTask.getCurrentShiftDemandQty())
-                                : nvl(sourceTask.getGuardDemandQty()),
+                        sourceTask -> nvl(sourceTask.getCurrentShiftDemandQty())
+                                .add(nvl(sourceTask.getGuardDemandQty())),
                         BigDecimal::add, LinkedHashMap::new));
         taskGroup.setSourceWeightMap(sourceWeightMap);
         taskGroup.setGroupBaseDemandQty(aggregateTask.getBaseDemandQty());
@@ -501,7 +498,7 @@ public class TmPlanCalcService implements ITmPlanCalcService {
         task.setPlanGroupKey(taskGroup.getPlanGroupKey());
         task.setGroupSourceCount(taskGroup.getSourceTaskList().size());
         task.setGroupRequiredQty(nvl(taskGroup.getGroupCurrentShiftDemandQty())
-                .max(nvl(taskGroup.getGroupGuardDemandQty())));
+                .add(nvl(taskGroup.getGroupGuardDemandQty())));
         task.setGroupBaseDemandQty(taskGroup.getGroupBaseDemandQty());
         task.setGroupMinStartAdjustQty(taskGroup.getGroupMinStartAdjustQty());
         task.setGroupRoundAdjustQty(taskGroup.getGroupRoundAdjustQty());

@@ -15,8 +15,8 @@ import java.math.RoundingMode;
 /**
  * 胎面下班成型需求量策略。
  *
- * <p>数据加载层在算法 2 下已经把当前胎面班次需求切换为“下个成型班次”的需求。
- * 本策略负责把该需求接入引擎注册表，并继续使用库存保证缺口参与基础应排量计算。</p>
+ * <p>数据加载层在算法 2 下已将当前胎面班次与后续库存保证范围需求拆分为不重叠区间。
+ * 本策略负责汇总两段需求后计算库存缺口。</p>
  */
 @Component
 public class TmNextShiftDemandQtyStrategy implements ITmDemandQtyStrategy {
@@ -44,17 +44,17 @@ public class TmNextShiftDemandQtyStrategy implements ITmDemandQtyStrategy {
         if (input == null) {
             throw new ServiceException(TmScheduleErrorCodeEnum.TM_INVENTORY_PREDICT_INVALID.getDefaultMessage());
         }
-        BigDecimal nextShiftDemand = nvl(input.getCurrentShiftDemandQty());
+        BigDecimal currentDemand = nvl(input.getCurrentShiftDemandQty());
         BigDecimal guardDemand = nvl(input.getGuardDemandQty());
         BigDecimal rollingStock = nvl(input.getRollingStockQty());
         int guardShiftCount = input.getGuardShiftCount() == null || input.getGuardShiftCount() <= 0
                 ? TmScheduleConstants.DEFAULT_GUARD_SHIFT_COUNT : input.getGuardShiftCount();
-        BigDecimal currentShiftStockGap = nextShiftDemand.subtract(rollingStock).max(BigDecimal.ZERO);
-        BigDecimal stockGap = guardDemand.subtract(rollingStock).max(BigDecimal.ZERO);
-        BigDecimal demandQty = currentShiftStockGap.max(stockGap);
+        BigDecimal currentShiftStockGap = currentDemand.subtract(rollingStock).max(BigDecimal.ZERO);
+        BigDecimal stockGap = currentDemand.add(guardDemand).subtract(rollingStock).max(BigDecimal.ZERO);
+        BigDecimal demandQty = stockGap;
 
         TmDemandQtyResult result = new TmDemandQtyResult();
-        result.setCurrentShiftDemandQty(nextShiftDemand);
+        result.setCurrentShiftDemandQty(currentDemand);
         result.setGuardDemandQty(guardDemand);
         result.setRollingStockQty(rollingStock);
         result.setCurrentShiftStockGapQty(currentShiftStockGap);
@@ -62,7 +62,7 @@ public class TmNextShiftDemandQtyStrategy implements ITmDemandQtyStrategy {
         result.setDemandQty(demandQty);
         result.setGuardShiftCount(guardShiftCount);
         result.setSupplyHours(this.calculateSupplyHours(rollingStock, guardDemand, input.getGuardRangeHours()));
-        result.setCalcDesc("算法2按下个成型班次需求计算，需求=max(下班成型库存缺口, 保证范围库存缺口)");
+        result.setCalcDesc("算法2按不重叠的当班成型需求与保证范围需求计算，需求为两者合计扣减库存后的缺口");
         return result;
     }
 

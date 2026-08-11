@@ -662,7 +662,7 @@ public class TmAutoScheduleDataLoadService {
     /**
      * 成型计划已加载但按 TM_FORMING_SHIFT_OFFSET 偏移后无可排程班次时，记录细化提示到上下文。
      *
-     * <p>偏移后胎面班次 N 读取成型 CLASS(N+offset)，6 班覆盖 class(offset+1)~class(6+offset)，
+     * <p>偏移后胎面班次 N 读取成型 CLASS(N+max(offset,1)-1)，6 班覆盖当前需求起点至第六班对应的成型班次，
      * 统一夹到 CLASS1~CLASS8 区间；仅当成型行数大于 0 且区间有效时写入，供响应阶段优先展示。</p>
      *
      * @param context            自动排程上下文
@@ -673,9 +673,10 @@ public class TmAutoScheduleDataLoadService {
         if (formingRowCount <= 0) {
             return;
         }
-        // CLASS1~CLASS8 共 8 个班次，偏移后区间夹到 [1,8]
-        int clampedFirst = Math.max(1, Math.min(formingShiftOffset + 1, 8));
-        int clampedLast = Math.max(1, Math.min(TmScheduleConstants.TM_MAX_SHIFT_ORDER + formingShiftOffset, 8));
+        // CLASS1~CLASS8 共 8 个班次，当前需求起点与结束班次均夹到 [1,8]。
+        int currentDemandOffset = Math.max(formingShiftOffset, 1) - 1;
+        int clampedFirst = Math.max(1, Math.min(currentDemandOffset + 1, 8));
+        int clampedLast = Math.max(1, Math.min(TmScheduleConstants.TM_MAX_SHIFT_ORDER + currentDemandOffset, 8));
         if (clampedFirst > clampedLast) {
             return;
         }
@@ -823,7 +824,7 @@ public class TmAutoScheduleDataLoadService {
                 }
                 TmNewSpecInfo taskNewSpecInfo = buildTaskNewSpecInfo(newSpecInfoMap.get(treadCode), shiftOrder, demandQty);
                 int effectiveGuardShiftCount = this.resolveEffectiveGuardShiftCount(taskNewSpecInfo,
-                        guardShiftCount, shiftOrder, formingShiftOffset);
+                        guardShiftCount, shiftOrder, formingShiftOffset, algorithmCode);
                 int targetShiftOrder = resolveTargetShiftOrder(taskNewSpecInfo, shiftOrder);
                 TmTaskDraft taskDraft = new TmTaskDraft();
                 taskDraft.setOrderNo(row.getOrderNo() + "-CLASS" + shiftOrder);
@@ -860,21 +861,22 @@ public class TmAutoScheduleDataLoadService {
                         ? TmYesNoEnum.YES.getCode() : TmYesNoEnum.NO.getCode());
                 taskDraft.setTailBalanceQty(nvl(row.getCxRemainQty()));
                 taskDraft.setCurrentShiftDemandQty(demandQty);
-                taskDraft.setCurrentShiftFormingFinishQty(resolveFormingQty(classFinishQtyArray, shiftOrder,
-                        algorithmCode, formingShiftOffset).multiply(treadLength));
+                taskDraft.setCurrentShiftFormingFinishQty(this.resolveCurrentShiftFormingFinishQty(classFinishQtyArray,
+                        shiftOrder, algorithmCode, formingShiftOffset).multiply(treadLength));
                 BigDecimal rawGuardFormingQty = this.calculateGuardFormingQty(classQtyArray, shiftOrder,
-                        effectiveGuardShiftCount, formingShiftOffset);
+                        effectiveGuardShiftCount, formingShiftOffset, algorithmCode);
                 BigDecimal cappedGuardFormingQty = this.capGuardFormingQty(rawGuardFormingQty,
                         row.getLhRemainQty());
                 taskDraft.setGuardDemandQty(cappedGuardFormingQty.multiply(treadLength));
                 taskDraft.setFormingGuardWindowQtyMap(this.buildGuardWindowByBom(classQtyArray, shiftOrder,
-                        effectiveGuardShiftCount, formingShiftOffset, treadLength, cappedGuardFormingQty));
+                        effectiveGuardShiftCount, formingShiftOffset, algorithmCode, treadLength, cappedGuardFormingQty));
                 taskDraft.setDemandQty(demandQty);
                 taskDraft.setGuardShiftCount(effectiveGuardShiftCount);
                 this.addGuardDemandEstimateTrace(context, taskDraft, classQtyArray, shiftOrder,
                         effectiveGuardShiftCount,
-                        formingShiftOffset, row.getLhRemainQty(), rawGuardFormingQty, cappedGuardFormingQty, "BOM");
-                this.fillGuardRangeHours(context, taskDraft, shiftOrder, effectiveGuardShiftCount, formingShiftOffset);
+                        formingShiftOffset, algorithmCode, row.getLhRemainQty(), rawGuardFormingQty, cappedGuardFormingQty, "BOM");
+                this.fillGuardRangeHours(context, taskDraft, shiftOrder, effectiveGuardShiftCount,
+                        formingShiftOffset, algorithmCode);
                 taskDraft.setMinStartQty(minStartQty);
                 taskDraft.setDefaultCurlRollLength(defaultCurlLength);
                 if (toolTotalQty.compareTo(BigDecimal.ZERO) > 0) {
@@ -1071,7 +1073,7 @@ public class TmAutoScheduleDataLoadService {
                     skippedShiftNoFormingQty++;
                     continue;
                 }
-                int startIndex = resolveFormingStartIndex(shiftOrder, formingShiftOffset);
+                int startIndex = this.resolveCurrentDemandStartIndex(shiftOrder, formingShiftOffset);
                 int primarySpecIndex = Math.min(startIndex, 7);
                 TmConstructionTreadRowVo primarySpec = (primarySpecIndex >= 0 && primarySpecIndex < 8)
                         ? specByClass[primarySpecIndex] : null;
@@ -1092,7 +1094,7 @@ public class TmAutoScheduleDataLoadService {
                 }
                 TmNewSpecInfo taskNewSpecInfo = buildTaskNewSpecInfo(newSpecInfoMap.get(treadCode), shiftOrder, demandQty);
                 int effectiveGuardShiftCount = this.resolveEffectiveGuardShiftCount(taskNewSpecInfo,
-                        guardShiftCount, shiftOrder, formingShiftOffset);
+                        guardShiftCount, shiftOrder, formingShiftOffset, algorithmCode);
                 int targetShiftOrder = resolveTargetShiftOrder(taskNewSpecInfo, shiftOrder);
                 TmTaskDraft taskDraft = new TmTaskDraft();
                 taskDraft.setOrderNo(row.getOrderNo() + "-CLASS" + shiftOrder);
@@ -1128,14 +1130,14 @@ public class TmAutoScheduleDataLoadService {
                         ? TmYesNoEnum.YES.getCode() : TmYesNoEnum.NO.getCode());
                 taskDraft.setTailBalanceQty(nvl(row.getCxRemainQty()));
                 taskDraft.setCurrentShiftDemandQty(demandQty);
-                taskDraft.setCurrentShiftFormingFinishQty(resolveFormingQty(classFinishQtyArray, shiftOrder,
-                        algorithmCode, formingShiftOffset).multiply(treadLength));
+                taskDraft.setCurrentShiftFormingFinishQty(this.resolveCurrentShiftFormingFinishQty(classFinishQtyArray,
+                        shiftOrder, algorithmCode, formingShiftOffset).multiply(treadLength));
                 BigDecimal rawGuardFormingQty = this.calculateGuardFormingQty(classQtyArray, shiftOrder,
-                        effectiveGuardShiftCount, formingShiftOffset);
+                        effectiveGuardShiftCount, formingShiftOffset, algorithmCode);
                 BigDecimal cappedGuardFormingQty = this.capGuardFormingQty(rawGuardFormingQty,
                         row.getLhRemainQty());
                 Map<Integer, BigDecimal> formingGuardWindowQtyMap = this.buildGuardWindowByRecipe(classQtyArray,
-                        specByClass, shiftOrder, effectiveGuardShiftCount, formingShiftOffset, treadLength,
+                        specByClass, shiftOrder, effectiveGuardShiftCount, formingShiftOffset, algorithmCode, treadLength,
                         cappedGuardFormingQty);
                 taskDraft.setFormingGuardWindowQtyMap(formingGuardWindowQtyMap);
                 taskDraft.setGuardDemandQty(formingGuardWindowQtyMap.values().stream()
@@ -1144,8 +1146,9 @@ public class TmAutoScheduleDataLoadService {
                 taskDraft.setGuardShiftCount(effectiveGuardShiftCount);
                 this.addGuardDemandEstimateTrace(context, taskDraft, classQtyArray, shiftOrder,
                         effectiveGuardShiftCount,
-                        formingShiftOffset, row.getLhRemainQty(), rawGuardFormingQty, cappedGuardFormingQty, "RECIPE");
-                this.fillGuardRangeHours(context, taskDraft, shiftOrder, effectiveGuardShiftCount, formingShiftOffset);
+                        formingShiftOffset, algorithmCode, row.getLhRemainQty(), rawGuardFormingQty, cappedGuardFormingQty, "RECIPE");
+                this.fillGuardRangeHours(context, taskDraft, shiftOrder, effectiveGuardShiftCount,
+                        formingShiftOffset, algorithmCode);
                 taskDraft.setMinStartQty(minStartQty);
                 taskDraft.setDefaultCurlRollLength(defaultCurlLength);
                 if (toolTotalQty.compareTo(BigDecimal.ZERO) > 0) {
@@ -1226,16 +1229,18 @@ public class TmAutoScheduleDataLoadService {
      * @param shiftOrder      胎面排程班次，从 1 开始
      * @param guardShiftCount 库存最低保证班数
      * @param formingShiftOffset 胎面班次到成型班次的偏移量
+     * @param algorithmCode 需求量算法编码
      * @param currentTreadLength 当前任务胎面肩长，供超过 CLASS8 的班次换算
      * @param guardFormingQtyLimit 按硫化余量封顶后的保证需求条数
      * @return 库存保证范围内的成型需求米数合计
      */
     private BigDecimal calculateGuardDemandByRecipe(BigDecimal[] classQtyArray, TmConstructionTreadRowVo[] specByClass,
                                                     int shiftOrder, int guardShiftCount, int formingShiftOffset,
+                                                    String algorithmCode,
                                                     BigDecimal currentTreadLength,
                                                     BigDecimal guardFormingQtyLimit) {
         return this.buildGuardWindowByRecipe(classQtyArray, specByClass, shiftOrder, guardShiftCount,
-                formingShiftOffset, currentTreadLength, guardFormingQtyLimit).values().stream()
+                formingShiftOffset, algorithmCode, currentTreadLength, guardFormingQtyLimit).values().stream()
                 .filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
@@ -1246,17 +1251,19 @@ public class TmAutoScheduleDataLoadService {
      * @param shiftOrder 胎面排程班次
      * @param guardShiftCount 备库班数
      * @param formingShiftOffset 成型班次偏移
+     * @param algorithmCode 需求量算法编码
      * @param treadLength 当前胎面长度
      * @param guardFormingQtyLimit 封顶后的保证条数
      * @return 班次到换算后长度的窗口明细
      */
     private Map<Integer, BigDecimal> buildGuardWindowByBom(BigDecimal[] classQtyArray, int shiftOrder,
                                                             int guardShiftCount, int formingShiftOffset,
+                                                            String algorithmCode,
                                                             BigDecimal treadLength,
                                                             BigDecimal guardFormingQtyLimit) {
         Map<Integer, BigDecimal> windowQtyMap = new LinkedHashMap<>();
         BigDecimal remainingGuardFormingQty = this.nvl(guardFormingQtyLimit).max(BigDecimal.ZERO);
-        int startIndex = this.resolveFormingStartIndex(shiftOrder, formingShiftOffset);
+        int startIndex = this.resolveGuardStartIndex(shiftOrder, formingShiftOffset, algorithmCode);
         int count = Math.max(guardShiftCount, 1);
         for (int index = startIndex; index < startIndex + count; index++) {
             if (remainingGuardFormingQty.compareTo(BigDecimal.ZERO) <= 0) {
@@ -1281,6 +1288,7 @@ public class TmAutoScheduleDataLoadService {
      * @param shiftOrder 胎面排程班次
      * @param guardShiftCount 备库班数
      * @param formingShiftOffset 成型班次偏移
+     * @param algorithmCode 需求量算法编码
      * @param currentTreadLength 当前胎面长度
      * @param guardFormingQtyLimit 封顶后的保证条数
      * @return 班次到换算后长度的窗口明细
@@ -1288,11 +1296,12 @@ public class TmAutoScheduleDataLoadService {
     private Map<Integer, BigDecimal> buildGuardWindowByRecipe(BigDecimal[] classQtyArray,
                                                                 TmConstructionTreadRowVo[] specByClass,
                                                                 int shiftOrder, int guardShiftCount,
-                                                                int formingShiftOffset, BigDecimal currentTreadLength,
+                                                                int formingShiftOffset, String algorithmCode,
+                                                                BigDecimal currentTreadLength,
                                                                 BigDecimal guardFormingQtyLimit) {
         Map<Integer, BigDecimal> windowQtyMap = new LinkedHashMap<>();
         BigDecimal remainingGuardFormingQty = this.nvl(guardFormingQtyLimit).max(BigDecimal.ZERO);
-        int startIndex = this.resolveFormingStartIndex(shiftOrder, formingShiftOffset);
+        int startIndex = this.resolveGuardStartIndex(shiftOrder, formingShiftOffset, algorithmCode);
         int count = Math.max(guardShiftCount, 1);
         for (int index = startIndex; index < startIndex + count; index++) {
             if (remainingGuardFormingQty.compareTo(BigDecimal.ZERO) <= 0) {
@@ -1552,7 +1561,6 @@ public class TmAutoScheduleDataLoadService {
     private void mergeExperimentSpecTask(TmTaskDraft task, BigDecimal experimentPlanQty,
                                          TmExperimentSpecInfo experimentSpecInfo) {
         task.setCurrentShiftDemandQty(nvl(task.getCurrentShiftDemandQty()).add(experimentPlanQty));
-        task.setGuardDemandQty(nvl(task.getGuardDemandQty()).add(experimentPlanQty));
         task.setDemandQty(nvl(task.getDemandQty()).add(experimentPlanQty));
         if (task.getPlanQty() != null) {
             task.setPlanQty(task.getPlanQty().add(experimentPlanQty));
@@ -1627,7 +1635,7 @@ public class TmAutoScheduleDataLoadService {
         taskDraft.setTailFlag(TmYesNoEnum.NO.getCode());
         taskDraft.setTailBalanceQty(BigDecimal.ZERO);
         taskDraft.setCurrentShiftDemandQty(experimentPlanQty);
-        taskDraft.setGuardDemandQty(experimentPlanQty);
+        taskDraft.setGuardDemandQty(BigDecimal.ZERO);
         taskDraft.setDemandQty(experimentPlanQty);
         taskDraft.setPlanQty(experimentPlanQty);
         taskDraft.setBaseDemandQty(experimentPlanQty);
@@ -1878,10 +1886,11 @@ public class TmAutoScheduleDataLoadService {
      * @param baseGuardShiftCount 深度配置或参数解析出的基础保证班数
      * @param shiftOrder 胎面排程来源班次
      * @param formingShiftOffset 胎面班次到成型班次的偏移量
+     * @param algorithmCode 需求量算法编码
      * @return 当前任务实际使用的库存保证班数
      */
     private int resolveEffectiveGuardShiftCount(TmNewSpecInfo newSpecInfo, int baseGuardShiftCount,
-                                                int shiftOrder, int formingShiftOffset) {
+                                                int shiftOrder, int formingShiftOffset, String algorithmCode) {
         int normalizedBaseGuardShiftCount = Math.max(baseGuardShiftCount, 1);
         int effectiveGuardShiftCount = normalizedBaseGuardShiftCount;
         if (newSpecInfo != null && newSpecInfo.isNewSpecHit()) {
@@ -1890,7 +1899,7 @@ public class TmAutoScheduleDataLoadService {
             effectiveGuardShiftCount = Math.max(normalizedBaseGuardShiftCount, advanceShiftCount);
         }
         if (newSpecInfo != null) {
-            int formingWindowStartClass = this.resolveFormingStartIndex(shiftOrder, formingShiftOffset) + 1;
+            int formingWindowStartClass = this.resolveGuardStartIndex(shiftOrder, formingShiftOffset, algorithmCode) + 1;
             int formingWindowEndClass = formingWindowStartClass + effectiveGuardShiftCount - 1;
             newSpecInfo.setBaseGuardShiftCount(normalizedBaseGuardShiftCount);
             newSpecInfo.setEffectiveGuardShiftCount(effectiveGuardShiftCount);
@@ -2314,7 +2323,6 @@ public class TmAutoScheduleDataLoadService {
                     currentTaskList.add(targetTask);
                 } else {
                     targetTask.setCurrentShiftDemandQty(nvl(targetTask.getCurrentShiftDemandQty()).add(allocatedQty));
-                    targetTask.setGuardDemandQty(nvl(targetTask.getGuardDemandQty()).add(allocatedQty));
                     targetTask.setDemandQty(nvl(targetTask.getDemandQty()).add(allocatedQty));
                     targetTask.setSourceOrderNos(this.appendSourceOrderNos(targetTask.getSourceOrderNos(),
                             Collections.singletonList(sourceTask.getSourceOrderNos())));
@@ -2357,12 +2365,12 @@ public class TmAutoScheduleDataLoadService {
         targetTask.setTailFlag(sourceTask.getTailFlag());
         targetTask.setTailBalanceQty(sourceTask.getTailBalanceQty());
         targetTask.setCurrentShiftDemandQty(allocatedQty);
-        targetTask.setGuardDemandQty(allocatedQty);
-        targetTask.setFormingGuardWindowQtyMap(sourceTask.getFormingGuardWindowQtyMap());
+        targetTask.setGuardDemandQty(BigDecimal.ZERO);
+        targetTask.setFormingGuardWindowQtyMap(Collections.emptyMap());
         targetTask.setDemandQty(allocatedQty);
-        targetTask.setGuardShiftCount(sourceTask.getGuardShiftCount());
-        targetTask.setGuardRangeHours(sourceTask.getGuardRangeHours());
-        targetTask.setSupplyHours(sourceTask.getSupplyHours());
+        targetTask.setGuardShiftCount(0);
+        targetTask.setGuardRangeHours(BigDecimal.ZERO);
+        targetTask.setSupplyHours(null);
         targetTask.setMinStartQty(sourceTask.getMinStartQty());
         targetTask.setDefaultCurlRollLength(sourceTask.getDefaultCurlRollLength());
         targetTask.setCurlRollLength(sourceTask.getCurlRollLength());
@@ -2530,17 +2538,14 @@ public class TmAutoScheduleDataLoadService {
     }
 
     /**
-     * 根据算法和成型班次偏移量解析胎面当前班需求对应的成型计划量。
+     * 根据算法和已计算的成型需求起点解析当前班需求对应的成型计划量。
      *
      * @param classQtyArray 成型班次计划量数组，下标 0 对应成型 CLASS1
-     * @param shiftOrder 胎面排程班次，从 1 开始
+     * @param startIndex 成型需求起点，下标 0 对应成型 CLASS1
      * @param algorithmCode 需求量算法编码
-     * @param formingShiftOffset 胎面班次到成型班次的偏移量，0 表示同序号班次
      * @return 对应成型计划量；超过已加载成型班次时返回 0
      */
-    private BigDecimal resolveFormingQty(BigDecimal[] classQtyArray, int shiftOrder, String algorithmCode,
-            int formingShiftOffset) {
-        int startIndex = resolveFormingStartIndex(shiftOrder, formingShiftOffset);
+    private BigDecimal resolveFormingQty(BigDecimal[] classQtyArray, int startIndex, String algorithmCode) {
         if ("2".equals(algorithmCode)) {
             return readClassQty(classQtyArray, startIndex);
         }
@@ -2555,7 +2560,7 @@ public class TmAutoScheduleDataLoadService {
      * 解析胎面当前班需求对应的成型计划量。
      *
      * <p>需求起点超过成型 CLASS8 时，使用 CLASS6、CLASS7、CLASS8 的固定三班平均量估算未来需求；
-     * 成型完成量等非需求场景仍调用 {@link #resolveFormingQty(BigDecimal[], int, String, int)}，保持越界按零处理。</p>
+     * 成型完成量等非需求场景仍调用 {@link #resolveFormingQty(BigDecimal[], int, String)}，保持越界按零处理。</p>
      *
      * @param classQtyArray 成型班次计划量数组，下标 0 对应成型 CLASS1
      * @param shiftOrder 胎面排程班次，从 1 开始
@@ -2565,11 +2570,26 @@ public class TmAutoScheduleDataLoadService {
      */
     private BigDecimal resolveCurrentShiftFormingQty(BigDecimal[] classQtyArray, int shiftOrder, String algorithmCode,
                                                       int formingShiftOffset) {
-        int startIndex = this.resolveFormingStartIndex(shiftOrder, formingShiftOffset);
+        int startIndex = this.resolveCurrentDemandStartIndex(shiftOrder, formingShiftOffset);
         if (startIndex >= 8) {
             return this.calculateLastThreeClassAverageQty(classQtyArray);
         }
-        return this.resolveFormingQty(classQtyArray, shiftOrder, algorithmCode, formingShiftOffset);
+        return this.resolveFormingQty(classQtyArray, startIndex, algorithmCode);
+    }
+
+    /**
+     * 计算当前胎面班对应的成型完成量，不对超过 CLASS8 的班次做需求预测。
+     *
+     * @param classFinishQtyArray 成型班次完成量数组
+     * @param shiftOrder 胎面排程班次
+     * @param algorithmCode 需求量算法编码
+     * @param formingShiftOffset 成型班次偏移量
+     * @return 当前胎面班对应的成型完成量
+     */
+    private BigDecimal resolveCurrentShiftFormingFinishQty(BigDecimal[] classFinishQtyArray, int shiftOrder,
+                                                            String algorithmCode, int formingShiftOffset) {
+        return this.resolveFormingQty(classFinishQtyArray,
+                this.resolveCurrentDemandStartIndex(shiftOrder, formingShiftOffset), algorithmCode);
     }
 
     /**
@@ -2582,9 +2602,9 @@ public class TmAutoScheduleDataLoadService {
      * @return 库存保证范围内的成型计划量合计
      */
     private BigDecimal calculateGuardFormingQty(BigDecimal[] classQtyArray, int shiftOrder, int guardShiftCount,
-                                                int formingShiftOffset) {
+                                                int formingShiftOffset, String algorithmCode) {
         BigDecimal total = BigDecimal.ZERO;
-        int startIndex = this.resolveFormingStartIndex(shiftOrder, formingShiftOffset);
+        int startIndex = this.resolveGuardStartIndex(shiftOrder, formingShiftOffset, algorithmCode);
         int count = Math.max(guardShiftCount, 1);
         for (int index = startIndex; index < startIndex + count; index++) {
             total = total.add(this.resolveGuardClassQty(classQtyArray, index));
@@ -2651,10 +2671,10 @@ public class TmAutoScheduleDataLoadService {
      */
     private void addGuardDemandEstimateTrace(TmScheduleContext context, TmTaskDraft taskDraft,
                                              BigDecimal[] classQtyArray, int shiftOrder, int guardShiftCount,
-                                             int formingShiftOffset, BigDecimal lhRemainQty,
+                                             int formingShiftOffset, String algorithmCode, BigDecimal lhRemainQty,
                                              BigDecimal rawGuardFormingQty, BigDecimal cappedGuardFormingQty,
                                              String mode) {
-        int startIndex = this.resolveFormingStartIndex(shiftOrder, formingShiftOffset);
+        int startIndex = this.resolveGuardStartIndex(shiftOrder, formingShiftOffset, algorithmCode);
         int count = Math.max(guardShiftCount, 1);
         int exceedShiftCount = Math.max(startIndex + count - 8, 0);
         TmNewSpecInfo newSpecInfo = taskDraft.getNewSpecInfo();
@@ -2704,8 +2724,8 @@ public class TmAutoScheduleDataLoadService {
      * @param formingShiftOffset 成型班次偏移量
      */
     private void fillGuardRangeHours(TmScheduleContext context, TmTaskDraft taskDraft, int shiftOrder,
-                                     int guardShiftCount, int formingShiftOffset) {
-        int logicalStartShiftOrder = this.resolveFormingStartIndex(shiftOrder, formingShiftOffset) + 1;
+                                     int guardShiftCount, int formingShiftOffset, String algorithmCode) {
+        int logicalStartShiftOrder = this.resolveGuardStartIndex(shiftOrder, formingShiftOffset, algorithmCode) + 1;
         int count = Math.max(guardShiftCount, 1);
         BigDecimal guardRangeHours = BigDecimal.ZERO;
         List<Integer> mappedShiftOrders = new ArrayList<>();
@@ -2764,6 +2784,37 @@ public class TmAutoScheduleDataLoadService {
      */
     private int resolveFormingStartIndex(int shiftOrder, int formingShiftOffset) {
         return Math.max(shiftOrder, 1) + Math.max(formingShiftOffset, 0) - 1;
+    }
+
+    /**
+     * 解析当前胎面班需求的成型班次起点。
+     *
+     * <p>偏移量为 0 时当前需求取同序号成型班；偏移量大于 0 时，当前需求取原偏移窗口的前一班，
+     * 使其与后续库存保证窗口互不重叠。</p>
+     *
+     * @param shiftOrder 胎面排程班次，从 1 开始
+     * @param formingShiftOffset 成型班次偏移量
+     * @return 成型计划量数组下标
+     */
+    private int resolveCurrentDemandStartIndex(int shiftOrder, int formingShiftOffset) {
+        int currentDemandOffset = Math.max(formingShiftOffset, 1) - 1;
+        return this.resolveFormingStartIndex(shiftOrder, currentDemandOffset);
+    }
+
+    /**
+     * 解析库存保证范围的成型班次起点。
+     *
+     * <p>算法 2 的保证范围从当前单班需求的下一班开始；算法 1 的保证范围从当前三班最大值窗口结束后的下一班开始。</p>
+     *
+     * @param shiftOrder 胎面排程班次，从 1 开始
+     * @param formingShiftOffset 成型班次偏移量
+     * @param algorithmCode 需求量算法编码
+     * @return 成型计划量数组下标
+     */
+    private int resolveGuardStartIndex(int shiftOrder, int formingShiftOffset, String algorithmCode) {
+        int currentDemandStartIndex = this.resolveCurrentDemandStartIndex(shiftOrder, formingShiftOffset);
+        int currentDemandWindowSize = "1".equals(algorithmCode) ? 3 : 1;
+        return currentDemandStartIndex + currentDemandWindowSize;
     }
 
     /**

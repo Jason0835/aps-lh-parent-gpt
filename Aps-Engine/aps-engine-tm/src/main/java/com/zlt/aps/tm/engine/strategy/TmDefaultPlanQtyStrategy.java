@@ -33,12 +33,10 @@ public class TmDefaultPlanQtyStrategy implements ITmPlanQtyStrategy {
         }
         BigDecimal currentDemand = nvl(taskDraft.getCurrentShiftDemandQty());
         BigDecimal guardDemand = nvl(taskDraft.getGuardDemandQty());
-        BigDecimal grossDemand = currentDemand.max(guardDemand);
+        BigDecimal grossDemand = currentDemand.add(guardDemand);
         BigDecimal stock = nvl(taskDraft.getRollingStockQty());
         BigDecimal stockDeductQty = stock.min(grossDemand);
-        BigDecimal planQty = currentDemand.subtract(stock)
-                .max(guardDemand.subtract(stock))
-                .max(BigDecimal.ZERO);
+        BigDecimal planQty = grossDemand.subtract(stock).max(BigDecimal.ZERO);
         taskDraft.setStockDeductQty(stockDeductQty);
 
         TmPlanQtyResult result = new TmPlanQtyResult();
