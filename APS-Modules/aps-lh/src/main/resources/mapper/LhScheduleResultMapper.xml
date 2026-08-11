@@ -108,4 +108,64 @@
         WHERE e.IS_DELETE = 0
     </select>
 
+    <!-- 按机台批量查询当前排程日前7天内最近一次收尾规格。 -->
+    <select id="selectLatestCloseOutBeforeMaterial"
+            resultType="com.zlt.aps.lh.api.domain.entity.LhScheduleResult">
+        SELECT history.*
+        FROM T_LH_SCHEDULE_RESULT history
+        INNER JOIN (
+            SELECT SUBSTRING_INDEX(
+                       GROUP_CONCAT(
+                           CAST(close_out.ID AS CHAR)
+                           ORDER BY close_out.closeOutTime DESC,
+                                    close_out.SCHEDULE_DATE DESC,
+                                    close_out.ID DESC
+                           SEPARATOR ','
+                       ),
+                       ',',
+                       1
+                   ) AS selectedId,
+                   MAX(close_out.closeOutTime) AS closeOutTime
+            FROM (
+                SELECT ID,
+                       LH_MACHINE_CODE,
+                       SCHEDULE_DATE,
+                       COALESCE(
+                           CASE
+                               WHEN CLASS8_IS_END = '1' THEN CLASS8_END_TIME
+                               WHEN CLASS7_IS_END = '1' THEN CLASS7_END_TIME
+                               WHEN CLASS6_IS_END = '1' THEN CLASS6_END_TIME
+                               WHEN CLASS5_IS_END = '1' THEN CLASS5_END_TIME
+                               WHEN CLASS4_IS_END = '1' THEN CLASS4_END_TIME
+                               WHEN CLASS3_IS_END = '1' THEN CLASS3_END_TIME
+                               WHEN CLASS2_IS_END = '1' THEN CLASS2_END_TIME
+                               WHEN CLASS1_IS_END = '1' THEN CLASS1_END_TIME
+                           END,
+                           SPEC_END_TIME,
+                           SCHEDULE_DATE
+                       ) AS closeOutTime
+                FROM T_LH_SCHEDULE_RESULT
+                WHERE FACTORY_CODE = #{factoryCode}
+                  AND SCHEDULE_DATE &gt;= DATE_SUB(#{scheduleDate}, INTERVAL 7 DAY)
+                  AND SCHEDULE_DATE &lt; #{scheduleDate}
+                  AND LH_MACHINE_CODE IN
+                  <foreach collection="machineCodes" item="machineCode" open="(" separator="," close=")">
+                      #{machineCode}
+                  </foreach>
+                  AND (
+                      CLASS1_IS_END = '1'
+                      OR CLASS2_IS_END = '1'
+                      OR CLASS3_IS_END = '1'
+                      OR CLASS4_IS_END = '1'
+                      OR CLASS5_IS_END = '1'
+                      OR CLASS6_IS_END = '1'
+                      OR CLASS7_IS_END = '1'
+                      OR CLASS8_IS_END = '1'
+                  )
+            ) close_out
+            WHERE close_out.closeOutTime &lt; #{closeOutBefore}
+            GROUP BY close_out.LH_MACHINE_CODE
+        ) latest ON history.ID = latest.selectedId
+    </select>
+
 </mapper>

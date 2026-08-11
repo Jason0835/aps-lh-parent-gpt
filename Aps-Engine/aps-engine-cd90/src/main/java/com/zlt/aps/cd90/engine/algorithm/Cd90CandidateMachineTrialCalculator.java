@@ -46,11 +46,11 @@ public class Cd90CandidateMachineTrialCalculator {
         // 计算含损耗的实际排产量：在净需求基础上上浮损耗量，同时受起排量门槛和均分阈值约束
         BigDecimal actualQuantity = quantityCalculator.calculateActualQuantity(
                 input.getNetDemandQuantity(), input.isCloseOut(), lossRate.getLossRatePercent(),
-                input.getMinimumStartQuantity(), input.getVehiclePlanQuantity(), input.getEqualShareThreshold());
+                input.getMinimumStartQuantity(), input.getStandardCurlLength(), input.getEqualShareThreshold());
         // 工装试算：根据实际排产量和工装总数（卷轴）计算每台机可同时上机数量
         Cd90ToolingTrial tooling = toolingCalculator.calculate(
                 actualQuantity, input.getTotalToolingCount(), input.getOccupiedVehicleCount(),
-                input.getVehiclePlanQuantity());
+                input.getStandardCurlLength());
         // 大卷静置时效分配：按大卷释放时间排序，判断是否满足本班次用量，返回延迟秒数或失败
         Cd90BigRollAgingAllocation agingAllocation = agingAllocation(input, actualQuantity);
         // 大卷时效分配失败（如时效期不足），产能直接置零，标记为大卷时效限制
@@ -60,7 +60,7 @@ public class Cd90CandidateMachineTrialCalculator {
                     .lossRatePercent(lossRate.getLossRatePercent())
                     .lossRateLevel(lossRate.getMatchedLevel())
                     .actualQuantity(actualQuantity)
-                    .vehiclePlanQuantity(input.getVehiclePlanQuantity())
+                    .standardCurlLength(input.getStandardCurlLength())
                     .toolingQuantity(tooling.getSchedulableQuantity())
                     .capacityQuantity(BigDecimal.ZERO)
                     .finalSchedulableQuantity(BigDecimal.ZERO)
@@ -106,7 +106,7 @@ public class Cd90CandidateMachineTrialCalculator {
                 .lossRatePercent(lossRate.getLossRatePercent())
                 .lossRateLevel(lossRate.getMatchedLevel())
                 .actualQuantity(actualQuantity)
-                .vehiclePlanQuantity(input.getVehiclePlanQuantity())
+                .standardCurlLength(input.getStandardCurlLength())
                 .toolingQuantity(tooling.getSchedulableQuantity())
                 .capacityQuantity(capacity.getCapacityQuantity())
                 .finalSchedulableQuantity(finalQuantity)

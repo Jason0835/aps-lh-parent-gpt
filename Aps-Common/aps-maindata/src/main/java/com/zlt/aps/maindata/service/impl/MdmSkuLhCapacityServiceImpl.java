@@ -126,7 +126,7 @@ public class MdmSkuLhCapacityServiceImpl extends AbstractDocService<MdmSkuLhCapa
                     double ceilResult = Math.floor(divisionResult);
                     skuCapacity.setApsCapacity(Convert.toInt(ceilResult) * 2);
 
-                    this.setClassCapacity(skuCapacity);
+//                    this.setClassCapacity(skuCapacity);
                 });
         // 设置默认值
         sourceList.stream()
