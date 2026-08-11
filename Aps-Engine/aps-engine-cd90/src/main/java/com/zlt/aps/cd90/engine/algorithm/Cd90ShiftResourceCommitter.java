@@ -69,10 +69,10 @@ public class Cd90ShiftResourceCommitter {
             }
             // 在原状态副本上试提交，任何失败都直接丢弃副本，保证资源修改原子性。
             Cd90ShiftResourceState working = copy(originalState);
-            BigDecimal vehiclePlanQuantity = trial.getVehiclePlanQuantity();
+            BigDecimal standardCurlLength = trial.getStandardCurlLength();
             Cd90StorageLaneAllocationResult allocation = laneAllocator.allocate(
                     request.getClothCode(), trial.getFinalSchedulableQuantity(),
-                    vehiclePlanQuantity, working.getLanes());
+                    standardCurlLength, working.getLanes());
             if (!allocation.isSuccess() || !acceptPartialAllocation(allocation, request)) {
                 // 库排容量不足或部分排比例太小，均不提前修改工装和机台剩余时间。
                 lastFailureReason = "STORAGE_LANE_LIMIT";
@@ -90,7 +90,7 @@ public class Cd90ShiftResourceCommitter {
 
             int beforeSeconds = working.getRemainingSecondsByMachine().getOrDefault(
                     trial.getMachineCode(), fullShiftSeconds(request));
-            BigDecimal committedQuantity = committedQuantity(trial, vehiclePlanQuantity, allocatedVehicles);
+            BigDecimal committedQuantity = committedQuantity(trial, standardCurlLength, allocatedVehicles);
             int afterSeconds = adjustedRemainingSeconds(request, trial, beforeSeconds, committedQuantity);
             int elapsedBefore = Math.max(0, fullShiftSeconds(request) - beforeSeconds);
             int productionDurationSeconds = Math.max(0, beforeSeconds - afterSeconds - trial.getAgingDelaySeconds());
@@ -149,9 +149,9 @@ public class Cd90ShiftResourceCommitter {
         return assigned >= Math.max(1, request.getPartialMinVehicleCount());
     }
 
-    private BigDecimal committedQuantity(Cd90MachineTrial trial, BigDecimal vehiclePlanQuantity,
-                                         int allocatedVehicles) {
-        BigDecimal laneQuantity = vehiclePlanQuantity.multiply(BigDecimal.valueOf(allocatedVehicles));
+    private BigDecimal committedQuantity(Cd90MachineTrial trial, BigDecimal standardCurlLength,
+                                          int allocatedVehicles) {
+        BigDecimal laneQuantity = standardCurlLength.multiply(BigDecimal.valueOf(allocatedVehicles));
         BigDecimal trialQuantity = trial.getFinalSchedulableQuantity() == null
                 ? BigDecimal.ZERO : trial.getFinalSchedulableQuantity();
         BigDecimal result = trialQuantity.signum() > 0 ? laneQuantity.min(trialQuantity) : laneQuantity;

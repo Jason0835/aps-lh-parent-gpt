@@ -30,15 +30,15 @@ public class Cd90StorageLaneAllocator {
      *
      * @param clothCode 帘布代码
      * @param planQuantity 计划量,单位米
-     * @param vehiclePlanQuantity 单车对应的直裁排程米数
+     * @param standardCurlLength 标准卷曲长度，直接作为一车工装卷的排程容量
      * @param originalLanes 原库排状态
      * @return 分配结果
      */
     public Cd90StorageLaneAllocationResult allocate(String clothCode,
                                                       BigDecimal planQuantity,
-                                                      BigDecimal vehiclePlanQuantity,
+                                                      BigDecimal standardCurlLength,
                                                       List<Cd90StorageLaneState> originalLanes) {
-        return allocate(clothCode, planQuantity, vehiclePlanQuantity, originalLanes, false);
+        return allocate(clothCode, planQuantity, standardCurlLength, originalLanes, false);
     }
 
     /**
@@ -47,16 +47,16 @@ public class Cd90StorageLaneAllocator {
      */
     public Cd90StorageLaneAllocationResult allocate(String clothCode,
                                                       BigDecimal planQuantity,
-                                                      BigDecimal vehiclePlanQuantity,
+                                                      BigDecimal standardCurlLength,
                                                       List<Cd90StorageLaneState> originalLanes,
                                                       boolean isHardInsert) {
         if (planQuantity == null || planQuantity.signum() <= 0) {
             throw new IllegalArgumentException("库排分配计划量必须大于0");
         }
-        if (vehiclePlanQuantity == null || vehiclePlanQuantity.signum() <= 0) {
-            throw new IllegalArgumentException("单车直裁排程米数必须大于0");
+        if (standardCurlLength == null || standardCurlLength.signum() <= 0) {
+            throw new IllegalArgumentException("标准卷曲长度必须大于0");
         }
-        int required = planQuantity.divide(vehiclePlanQuantity, 0, RoundingMode.CEILING).intValueExact();
+        int required = planQuantity.divide(standardCurlLength, 0, RoundingMode.CEILING).intValueExact();
         List<Cd90StorageLaneState> lanes = originalLanes == null ? new ArrayList<>()
                 : originalLanes.stream().map(this::copy).collect(Collectors.toList());
 

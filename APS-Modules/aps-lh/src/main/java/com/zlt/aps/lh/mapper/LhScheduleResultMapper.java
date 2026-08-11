@@ -5,6 +5,7 @@ import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -25,4 +26,19 @@ public interface LhScheduleResultMapper extends BaseMapper<LhScheduleResult> {
 
     List<LhScheduleResult> changeMachinePreCheck(@Param("ids") List<Long> ids,
                                                  @Param("newMachineCode") String newMachineCode);
+
+    /**
+     * 批量查询命中机台近7天最近一次收尾的前规格物料。
+     *
+     * @param factoryCode  分厂编号
+     * @param scheduleDate 当前导出排程日期
+     * @param closeOutBefore 当前批次早班开始时间，历史收尾必须早于该时间
+     * @param machineCodes 命中的硫化机台编号
+     * @return 每台机最近一次收尾的前规格物料
+     */
+    List<LhScheduleResult> selectLatestCloseOutBeforeMaterial(
+            @Param("factoryCode") String factoryCode,
+            @Param("scheduleDate") Date scheduleDate,
+            @Param("closeOutBefore") Date closeOutBefore,
+            @Param("machineCodes") List<String> machineCodes);
 }

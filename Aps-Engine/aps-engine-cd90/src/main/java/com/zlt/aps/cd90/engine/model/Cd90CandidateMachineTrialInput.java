@@ -28,8 +28,8 @@ public class Cd90CandidateMachineTrialInput {
     private BigDecimal minimumStartQuantity;
     /** 各班计划量均分阈值，按加损耗前的净需求量判断是否触发均分。 */
     private BigDecimal equalShareThreshold;
-    /** 单车按胎体长度方向卷取后，对应的直裁排程米数。 */
-    private BigDecimal vehiclePlanQuantity;
+    /** 一车工装卷对应的标准卷曲长度，单位米。 */
+    private BigDecimal standardCurlLength;
     /** 工装总数。 */
     private int totalToolingCount;
     /** 当前库排占用车数。 */

@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.zlt.aps.utils.AppUtils;
 import com.zlt.aps.autoLogin.feign.FeignTokenHelper;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ShiftConfig;
 import com.zlt.aps.cd90.api.domain.entity.Cd90StorageLaneLimit;
@@ -164,7 +165,7 @@ public class Cd90TimedRollingCheckServiceImpl implements Cd90TimedRollingCheckSe
             AjaxResult result = FeignTokenHelper.callWithToken(
                     () -> this.mesItfService.syncCd90ShiftStock(syncRequest));
             return result != null
-                    && Objects.equals(AjaxResult.Type.SUCCESS.value(), result.get(AjaxResult.CODE_TAG));
+                    && Objects.equals(AppUtils.AJAX_RESULT_SUCCESS, result.get(AjaxResult.CODE_TAG));
         } catch (Exception exception) {
             log.error("直裁定时滚动前班次库存同步失败，factoryCode={}，shiftCode={}，shiftStartTime={}",
                     target.getFactoryCode(), target.getTargetShiftCode(), target.getHandoverTime(), exception);
@@ -186,7 +187,7 @@ public class Cd90TimedRollingCheckServiceImpl implements Cd90TimedRollingCheckSe
             AjaxResult result = FeignTokenHelper.callWithToken(
                     () -> this.mesItfService.syncCd90StorageLaneLimit(syncRequest));
             return result != null
-                    && Objects.equals(AjaxResult.Type.SUCCESS.value(), result.get(AjaxResult.CODE_TAG));
+                    && Objects.equals(AppUtils.AJAX_RESULT_SUCCESS, result.get(AjaxResult.CODE_TAG));
         } catch (Exception exception) {
             log.error("直裁定时滚动前库排同步失败，factoryCode={}，laneDate={}，shiftCode={}",
                     target.getFactoryCode(), target.getScheduleDate(),
