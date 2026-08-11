@@ -16,6 +16,7 @@ import com.zlt.aps.tc.service.ITcGlueMachineRealService;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.enums.ImportErrorTypeEnums;
 import com.zlt.common.utils.ImportExcelValidatedUtils;
+import com.zlt.common.utils.PubUtil;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -63,6 +64,21 @@ public class TcGlueMachineRealServiceImpl extends AbstractDocService<TcGlueMachi
     @Override
     protected List<String> getCheckUniqueFields() {
         return new ArrayList<>(Arrays.asList("factoryCode", "glueCode", "machineCode"));
+    }
+
+    @Override
+    public int removeByIds(List<Long> ids) {
+        if (PubUtil.isEmpty(ids)) {
+            return 0;
+        }
+        // 逻辑删除全局配置下 selectBatchIds 仅返回 IS_DELETE=0 的活跃记录
+        List<TcGlueMachineReal> list = tcGlueMachineRealMapper.selectBatchIds(ids);
+        // 清理同 (FACTORY_CODE, GLUE_CODE, MACHINE_CODE) 的历史墓碑，避免逻辑删除 0->1 时
+        // 唯一索引 uk_tc_glue_machine_real_factory_glue_machine 冲突（#23310）
+        for (TcGlueMachineReal item : list) {
+            tcGlueMachineRealMapper.physicalDeleteTombstones(item.getFactoryCode(), item.getGlueCode(), item.getMachineCode());
+        }
+        return super.removeByIds(ids);
     }
 
     @Override

@@ -78,7 +78,8 @@ export default {
             ...this.form,
             dataSource: 'BOARD',
             traceId: `TC-BOARD-${Date.now()}`,
-            confirmOverwrite: false
+            confirmOverwrite: false,
+            language: this.$store.getters.language || 'zh_CN'
           }
           const validateResult = this.unwrap(await validateAutoPlan(request))
           if (validateResult.confirmRequired) {

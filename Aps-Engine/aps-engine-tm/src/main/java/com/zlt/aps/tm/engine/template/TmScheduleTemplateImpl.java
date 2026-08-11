@@ -511,8 +511,41 @@ public class TmScheduleTemplateImpl extends AbsTmScheduleTemplate {
                 + "，当班成型消耗=" + this.nvl(task.getCurrentShiftDemandQty()).toPlainString()
                 + "，库存供应时长=" + this.displaySupplyHours(task.getSupplyHours())
                 + "，" + this.displayGuardWindow(task.getFormingGuardWindowQtyMap())
+                + "，" + this.buildToolUsageSummary(task)
                 + "，计划量=" + baseFormula
                 + String.join("", adjustmentTerms) + "=" + this.nvl(task.getPlanQty()).toPlainString();
+    }
+
+    /**
+     * 构建任务工装账本摘要，便于过程日志直接审计工装池占用和卷曲长度口径。
+     *
+     * @param task 当前排程任务
+     * @return 工装账本中文摘要
+     */
+    private String buildToolUsageSummary(TmTaskDraft task) {
+        if (task.getTotalToolQty() == null) {
+            return "工装账本：总工装数量=未配置（未启用工装约束），本任务净占用工装数量=未计算，剩余工装数量=未计算，有效卷曲长度=未计算";
+        }
+        boolean taskCurlLengthEffective = task.getCurlRollLength() != null
+                && task.getCurlRollLength().compareTo(BigDecimal.ZERO) > 0;
+        BigDecimal effectiveCurlLength = taskCurlLengthEffective ? task.getCurlRollLength()
+                : task.getDefaultCurlRollLength();
+        String curlLengthSource = taskCurlLengthEffective ? "任务卷曲长度" : "默认卷曲长度";
+        return "工装账本：总工装数量=" + this.displayToolQuantity(task.getTotalToolQty())
+                + "，本任务净占用工装数量=" + this.displayToolQuantity(task.getToolUsedQty())
+                + "，剩余工装数量=" + this.displayToolQuantity(task.getRemainingToolQty())
+                + "，有效卷曲长度=" + this.displayToolQuantity(effectiveCurlLength)
+                + "（" + curlLengthSource + "）";
+    }
+
+    /**
+     * 格式化工装账本数值，缺失值不以零替代，避免误导工装约束是否生效。
+     *
+     * @param quantity 待展示数值
+     * @return 去除无效小数位后的数值文本；未计算时返回对应标记
+     */
+    private String displayToolQuantity(BigDecimal quantity) {
+        return quantity == null ? "未计算" : quantity.stripTrailingZeros().toPlainString();
     }
 
     /**

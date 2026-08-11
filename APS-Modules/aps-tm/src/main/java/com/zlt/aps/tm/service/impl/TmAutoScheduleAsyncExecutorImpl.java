@@ -1,6 +1,9 @@
 package com.zlt.aps.tm.service.impl;
 
+import cn.hutool.core.util.StrUtil;
+import com.alibaba.fastjson.JSON;
 import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleIssueVo;
+import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleRequestVo;
 import com.zlt.aps.tm.domain.TmAutoScheduleTask;
 import com.zlt.aps.tm.service.ITmScheduleResultService;
 import com.zlt.aps.tm.service.TmAutoScheduleAsyncExecutor;
@@ -8,11 +11,14 @@ import com.zlt.aps.tm.service.TmAutoScheduleTaskService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.context.i18n.LocaleContext;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * 胎面自动排程异步执行实现。
@@ -21,6 +27,12 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class TmAutoScheduleAsyncExecutorImpl implements TmAutoScheduleAsyncExecutor {
+
+    private static final String LANGUAGE_ZH_CN = "zh_CN";
+
+    private static final String LANGUAGE_EN_US = "en_US";
+
+    private static final String LANGUAGE_VI_VN = "vi_VN";
 
     @Lazy
     private final ITmScheduleResultService tmScheduleResultService;
@@ -35,18 +47,67 @@ public class TmAutoScheduleAsyncExecutorImpl implements TmAutoScheduleAsyncExecu
     @Async
     @Override
     public void execute(String taskId) {
-        if (!taskService.start(taskId)) {
-            log.warn("[TM_AUTO_PLAN] 自动排程任务启动失败或状态已变化, taskId={}", taskId);
-            return;
+        LocaleContext originalLocaleContext = LocaleContextHolder.getLocaleContext();
+        LocaleContextHolder.setLocale(this.resolveTaskLocale(taskId));
+        try {
+            if (!taskService.start(taskId)) {
+                log.warn("[TM_AUTO_PLAN] 自动排程任务启动失败或状态已变化, taskId={}", taskId);
+                return;
+            }
+            try {
+                tmScheduleResultService.executeTmAutoPlanTask(taskId);
+            } catch (Exception exception) {
+                log.error("[TM_AUTO_PLAN] 自动排程异步任务执行失败, taskId={}", taskId, exception);
+                TmAutoScheduleTask task = taskService.findByTaskId(taskId);
+                List<TmAutoScheduleIssueVo> issues = task == null || taskService.toResponse(task) == null
+                        ? Collections.emptyList() : taskService.toResponse(task).getIssues();
+                taskService.markFailed(taskId, exception.getMessage(), issues);
+            }
+        } finally {
+            if (originalLocaleContext == null) {
+                LocaleContextHolder.resetLocaleContext();
+            } else {
+                LocaleContextHolder.setLocaleContext(originalLocaleContext);
+            }
+        }
+    }
+
+    /**
+     * 从任务请求快照解析提交时的界面语言，旧任务或非法语言统一回退中文。
+     *
+     * @param taskId 对外任务 ID
+     * @return 异步任务执行期间使用的语言
+     */
+    private Locale resolveTaskLocale(String taskId) {
+        TmAutoScheduleTask task = taskService.findByTaskId(taskId);
+        if (task == null || StrUtil.isBlank(task.getRequestSnapshot())) {
+            return Locale.SIMPLIFIED_CHINESE;
         }
         try {
-            tmScheduleResultService.executeTmAutoPlanTask(taskId);
-        } catch (Exception exception) {
-            log.error("[TM_AUTO_PLAN] 自动排程异步任务执行失败, taskId={}", taskId, exception);
-            TmAutoScheduleTask task = taskService.findByTaskId(taskId);
-            List<TmAutoScheduleIssueVo> issues = task == null || taskService.toResponse(task) == null
-                    ? Collections.emptyList() : taskService.toResponse(task).getIssues();
-            taskService.markFailed(taskId, exception.getMessage(), issues);
+            TmAutoScheduleRequestVo request = JSON.parseObject(task.getRequestSnapshot(), TmAutoScheduleRequestVo.class);
+            return this.resolveSupportedLocale(request == null ? null : request.getLanguage());
+        } catch (RuntimeException exception) {
+            log.warn("[TM_AUTO_PLAN] 自动排程任务语言解析失败，使用中文, taskId={}", taskId);
+            return Locale.SIMPLIFIED_CHINESE;
         }
+    }
+
+    /**
+     * 将受支持的语言编码转换为 Locale。
+     *
+     * @param language 界面语言编码
+     * @return 对应 Locale，缺失或非法时返回中文
+     */
+    private Locale resolveSupportedLocale(String language) {
+        if (LANGUAGE_EN_US.equalsIgnoreCase(language)) {
+            return Locale.US;
+        }
+        if (LANGUAGE_VI_VN.equalsIgnoreCase(language)) {
+            return new Locale("vi", "VN");
+        }
+        if (LANGUAGE_ZH_CN.equalsIgnoreCase(language)) {
+            return Locale.SIMPLIFIED_CHINESE;
+        }
+        return Locale.SIMPLIFIED_CHINESE;
     }
 }
