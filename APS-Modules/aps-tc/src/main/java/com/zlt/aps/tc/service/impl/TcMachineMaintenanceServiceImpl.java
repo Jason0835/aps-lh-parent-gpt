@@ -80,7 +80,7 @@ public class TcMachineMaintenanceServiceImpl extends AbstractDocService<TcMachin
     @Override
     protected Boolean serviceCheckAndDataHandle(TcMachineMaintenance importDocEntity, List<com.ruoyi.api.gateway.system.domain.ImportErrorLog> importErrorLogs, Long importLogId, int errorRowNum, Map<Object, Object> serviceCheckParams) {
         // 导入时自动计算停机班次
-        importDocEntity.setStopShift(resolveStopShift(importDocEntity.getStopStartTime()));
+        importDocEntity.setStopShift(this.resolveStopShift(importDocEntity.getFactoryCode(), importDocEntity.getStopStartTime()));
 
         @SuppressWarnings("unchecked")
         Map<String, TcMachineInfo> machineInfoMap = (Map<String, TcMachineInfo>) serviceCheckParams.get("machineMap");
@@ -103,12 +103,27 @@ public class TcMachineMaintenanceServiceImpl extends AbstractDocService<TcMachin
      * @return 班次字典编码（01=夜班, 02=早班, 03=中班），未匹配返回 null
      */
     public String resolveStopShift(Date stopStartTime) {
+        return this.resolveStopShift(null, stopStartTime);
+    }
+
+    /**
+     * 根据指定工厂的启用班制解析停机开始时间所属班次。
+     *
+     * @param factoryCode 工厂编号，为空时兼容历史调用并查询全部工厂
+     * @param stopStartTime 停机开始时间
+     * @return 班次字典编码（01=夜班、02=早班、03=中班）；未匹配返回空值
+     */
+    @Override
+    public String resolveStopShift(String factoryCode, Date stopStartTime) {
         if (stopStartTime == null) {
             return null;
         }
 
-        List<TcShiftConfig> shiftConfigs = tcShiftConfigMapper.selectList(
-                new LambdaQueryWrapper<TcShiftConfig>());
+        LambdaQueryWrapper<TcShiftConfig> shiftConfigQueryWrapper = new LambdaQueryWrapper<>();
+        shiftConfigQueryWrapper.eq(org.apache.commons.lang3.StringUtils.isNotBlank(factoryCode), TcShiftConfig::getFactoryCode, factoryCode)
+                .eq(TcShiftConfig::getOpenFlag, "1")
+                .orderByAsc(TcShiftConfig::getShiftOrder);
+        List<TcShiftConfig> shiftConfigs = tcShiftConfigMapper.selectList(shiftConfigQueryWrapper);
 
         if (shiftConfigs == null || shiftConfigs.isEmpty()) {
             return null;

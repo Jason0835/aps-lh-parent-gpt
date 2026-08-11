@@ -44,4 +44,8 @@ public class TcAutoScheduleRequestVo implements Serializable {
     /** 是否已确认覆盖全部未发布的旧批次 */
     @ApiModelProperty(value = "是否已确认覆盖全部未发布的旧批次", name = "confirmOverwrite")
     private Boolean confirmOverwrite;
+
+    /** 提交任务时的界面语言，支持 zh_CN、en_US、vi_VN */
+    @ApiModelProperty(value = "提交任务时的界面语言", name = "language")
+    private String language;
 }

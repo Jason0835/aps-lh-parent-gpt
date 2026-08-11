@@ -40,7 +40,7 @@ public class TmStock extends BaseEntity {
     private String treadCode;
 
     @Excel(name = "ui.data.column.tm.stock.stockQty")
-    @ImportValidated(number = true, min = 0, max = 999999)
+    @ImportValidated(required = true, number = true, min = 0, max = 999999)
     @ApiModelProperty(value = "库存数量", name = "stockQty")
     @TableField(value = "STOCK_QTY")
     private BigDecimal stockQty;

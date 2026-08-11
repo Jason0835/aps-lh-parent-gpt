@@ -16,54 +16,53 @@ public class TmGlueMachineReal extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
-    @Excel(name = "ui.data.column.tm.glueMachineReal.factoryCode", dictType = "biz_factory_name")
+    @Excel(name = "ui.data.column.tm.glueMachineReal.factoryCode", dictType = "biz_factory_name", sort = 10)
     @ImportValidated(required = true, isCode = true, maxLength = 50)
     @ApiModelProperty(value = "工厂编号", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 
-    @Excel(name = "ui.data.column.tm.glueMachineReal.glueCode")
+    @Excel(name = "ui.data.column.tm.glueMachineReal.glueCode", sort = 20)
     @ImportValidated(required = true, isCode = true, maxLength = 20)
     @ApiModelProperty(value = "胶料代号", name = "glueCode")
     @TableField(value = "GLUE_CODE")
     private String glueCode;
 
-    @Excel(name = "ui.data.column.tm.glueMachineReal.baseGlueCode")
-    @ImportValidated(isCode = true, maxLength = 60)
     @ApiModelProperty(value = "基部胶编码", name = "baseGlueCode")
     @TableField(value = "BASE_GLUE_CODE")
     private String baseGlueCode;
 
-    @Excel(name = "ui.data.column.tm.glueMachineReal.machineCode")
+    @Excel(name = "ui.data.column.tm.glueMachineReal.machineCode", sort = 40)
     @ImportValidated(required = true, isCode = true, maxLength = 50)
     @ApiModelProperty(value = "机台编码", name = "machineCode")
     @TableField(value = "MACHINE_CODE")
     private String machineCode;
 
-    @Excel(name = "ui.data.column.tm.glueMachineReal.priority")
+    @Excel(name = "ui.data.column.tm.glueMachineReal.priority", sort = 50)
     @ImportValidated(digits = true, min = 0, max = 999)
     @ApiModelProperty(value = "优先级", name = "priority")
     @TableField(value = "PRIORITY")
     private Integer priority;
 
-    @Excel(name = "ui.data.column.tm.glueMachineReal.allowFlag", dictType = "biz_yes_no")
+    @Excel(name = "ui.data.column.tm.glueMachineReal.allowFlag", dictType = "biz_yes_no", sort = 60)
     @ImportValidated(required = true, dictType = "biz_yes_no", maxLength = 1)
     @ApiModelProperty(value = "是否允许", name = "allowFlag")
     @TableField(value = "ALLOW_FLAG")
     private String allowFlag;
 
-    @Excel(name = "ui.data.column.tm.glueMachineReal.enableStatus", dictType = "biz_yes_no")
+    @Excel(name = "ui.data.column.tm.glueMachineReal.enableStatus", dictType = "biz_yes_no", sort = 70)
     @ImportValidated(required = true, dictType = "biz_yes_no", maxLength = 1)
     @ApiModelProperty(value = "是否启用", name = "enableStatus")
     @TableField(value = "ENABLE_STATUS")
     private String enableStatus;
 
-    @Excel(name = "ui.common.column.remark")
+    @Excel(name = "ui.common.column.remark", sort = 80)
     @ImportValidated(maxLength = 500)
     @ApiModelProperty("备注")
     @TableField("REMARK")
     private String remark;
 
+    @Excel(name = "ui.data.column.tmGlueMachineReal.machineName", sort = 30)
     @ApiModelProperty(value = "机台名称", name = "machineName")
     @TableField(exist = false)
     private String machineName;

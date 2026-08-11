@@ -1060,6 +1060,7 @@ public class TmAutoScheduleDataLoadService {
             BigDecimal[] classQtyArray = classQtyArrayList.get(rowIdx);
             BigDecimal[] classFinishQtyArray = classFinishQtyArrayList.get(rowIdx);
             TmConstructionTreadRowVo[] specByClass = specByClassList.get(rowIdx);
+            this.recordAllPlannedShiftConstructionMissingIssue(context, row, classQtyArray, specByClass);
             Integer guardShiftCount = this.resolveGuardShiftCount(context, row.getLhMachineCode(), row.getOrderNo(),
                     depthConfigList, fallbackGuardShiftCount);
             boolean noShutdownAvailableShift = redistributeShutdownDemand(context, classQtyArray, tmCalendar, cxCalendar);
@@ -1071,22 +1072,15 @@ public class TmAutoScheduleDataLoadService {
                     continue;
                 }
                 int startIndex = resolveFormingStartIndex(shiftOrder, formingShiftOffset);
-                String[] taskRecipeNoByClass = buildRecipeNoArray(row);
                 int primarySpecIndex = Math.min(startIndex, 7);
                 TmConstructionTreadRowVo primarySpec = (primarySpecIndex >= 0 && primarySpecIndex < 8)
                         ? specByClass[primarySpecIndex] : null;
                 if (primarySpec == null || StrUtil.isBlank(primarySpec.getTreadCode())
                         || nvl(primarySpec.getTreadShoulderLength()).compareTo(BigDecimal.ZERO) <= 0) {
-                    String missingRecipeNo = (primarySpecIndex >= 0 && primarySpecIndex < taskRecipeNoByClass.length)
-                            ? taskRecipeNoByClass[primarySpecIndex] : null;
                     String missingReason = primarySpec == null ? "示方书为空或未命中施工" : "施工胎面编码或肩长无效";
                     log.warn("[TM_RECIPE_MATCH] 跳过班次：factoryCode={}, orderNo={}, embryoCode={}, shiftOrder={}, startIndex={}, formingQty={}, 原因={}",
                             context.getFactoryCode(), row.getOrderNo(), row.getEmbryoCode(), shiftOrder, startIndex, formingQty,
                             missingReason);
-                    context.getIssueCollector().addConstructionIssue(TmAutoScheduleIssueLevelEnum.WARN,
-                            TmAutoScheduleIssueCategoryEnum.CONSTRUCTION_MISSING,
-                            row.getOrderNo(), row.getEmbryoCode(), missingRecipeNo,
-                            shiftOrder, primarySpec == null ? "recipeNo" : "treadCode/treadShoulderLength", missingReason);
                     skippedShiftNoSpec++;
                     continue;
                 }
@@ -1172,6 +1166,53 @@ public class TmAutoScheduleDataLoadService {
             this.recordEmptyFormingTaskMessage(context, rowList.size(), formingShiftOffset);
         }
         return taskDraftList;
+    }
+
+    /**
+     * 当成型工单所有有计划量班次均未命中施工时，记录一条工单级排程异常。
+     *
+     * <p>仅统计 CLASS1~CLASS8 中计划量大于 0 的班次。无计划量班次的示方书为空不提示；
+     * 只要任一有计划量班次命中施工，也不展示部分班次未命中的异常。</p>
+     *
+     * @param context       自动排程上下文
+     * @param row           成型工单行
+     * @param classQtyArray CLASS1~CLASS8 计划量
+     * @param specByClass   CLASS1~CLASS8 施工匹配结果
+     */
+    private void recordAllPlannedShiftConstructionMissingIssue(TmScheduleContext context,
+                                                                 TmFormingDemandRecipeRowVo row,
+                                                                 BigDecimal[] classQtyArray,
+                                                                 TmConstructionTreadRowVo[] specByClass) {
+        List<Integer> plannedShiftOrders = java.util.stream.IntStream.range(0, classQtyArray.length)
+                .filter(index -> readClassQty(classQtyArray, index).compareTo(BigDecimal.ZERO) > 0)
+                .mapToObj(index -> index + 1)
+                .collect(Collectors.toList());
+        if (plannedShiftOrders.isEmpty()) {
+            return;
+        }
+        boolean constructionMatched = plannedShiftOrders.stream()
+                .map(shiftOrder -> specByClass[shiftOrder - 1])
+                .anyMatch(Objects::nonNull);
+        if (constructionMatched) {
+            return;
+        }
+        String[] recipeNoByClass = buildRecipeNoArray(row);
+        List<String> recipeNoList = plannedShiftOrders.stream()
+                .map(shiftOrder -> recipeNoByClass[shiftOrder - 1])
+                .filter(StrUtil::isNotBlank)
+                .map(String::trim)
+                .distinct()
+                .collect(Collectors.toList());
+        String shiftOrders = plannedShiftOrders.stream().map(String::valueOf).collect(Collectors.joining(","));
+        String recipeNos = CollUtil.isEmpty(recipeNoList) ? "-" : String.join(",", recipeNoList);
+        String message = MessageFormat.format(
+                I18nUtil.getMessage("ui.data.alert.tm.schedule.allPlannedShiftsConstructionMissing"),
+                row.getOrderNo(), row.getEmbryoCode(), shiftOrders, recipeNos);
+        context.getIssueCollector().addConstructionIssue(TmAutoScheduleIssueLevelEnum.WARN,
+                TmAutoScheduleIssueCategoryEnum.CONSTRUCTION_MISSING,
+                row.getOrderNo(), row.getEmbryoCode(), null, null, "recipeNo", message);
+        log.warn("[TM_RECIPE_MATCH] 工单有计划量班次全部未命中施工：factoryCode={}, orderNo={}, embryoCode={}, plannedShiftOrders={}, recipeNos={}",
+                context.getFactoryCode(), row.getOrderNo(), row.getEmbryoCode(), shiftOrders, recipeNos);
     }
 
     /**
