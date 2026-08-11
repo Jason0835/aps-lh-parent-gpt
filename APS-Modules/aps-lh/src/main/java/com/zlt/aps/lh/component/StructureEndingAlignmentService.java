@@ -14,8 +14,11 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
 import javax.annotation.Resource;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -24,6 +27,7 @@ import java.util.Objects;
  * <p>规则定位：在新增排产物料每次实际选机时实时判断，不再做“续作排产后统一停产保机”的
  * 阶段式预判。对每个候选机台独立执行：</p>
  * <ol>
+ *   <li>先读取S4.2按结构聚合的转产最大收尾日期，仅当其位于[T,T+2]内时继续对齐判断；</li>
  *   <li>取候选机台收尾时间所在班次（缺失回退最早可换模时间所在班次）作为统计班次；</li>
  *   <li>从{@link StructureShiftInMachineIndex}读取该班次内待排SKU所属结构的在机物理机台数
  *       （包含该SKU当前已在机的机台，单控L/R已按物理整机去重）；</li>
@@ -56,8 +60,9 @@ public class StructureEndingAlignmentService {
     /**
      * 在S4.5新增选机开始前构建结构收尾对齐在机统计缓存。
      *
-     * <p>构建基于续作+换活字块排产完成后的实时排程结果，之后每次选机只读缓存，
-     * 并在结果提交时增量更新，避免SKU×候选×全量结果反复扫描。</p>
+     * <p>S4.2已完成结构转产最大收尾日期加载，本方法不得再次查询配置表；这里只基于
+     * 续作+换活字块排产完成后的实时排程结果构建动态在机缓存。之后每次选机先读日期快照，
+     * 三天门禁通过后再读在机缓存，并在结果提交时增量更新，避免SKU×候选×全量结果反复扫描。</p>
      *
      * @param context 排程上下文
      */
@@ -89,6 +94,14 @@ public class StructureEndingAlignmentService {
         if (StringUtils.isEmpty(structureName)) {
             log.info("结构收尾对齐跳过, batchNo: {}, materialCode: {}, machineCode: {}, reason: 待排SKU无结构",
                     context.getBatchNo(), sku.getMaterialCode(), machine.getMachineCode());
+            return decision;
+        }
+        /*
+         * 三天收尾是现有结构对齐规则的前置业务门禁。门禁未通过时必须立即按默认结果放行，
+         * 不读取最低机台数、不统计在机机台，也不改变后续正常候选列表及既有机台优先级。
+         */
+        if (!this.isStructureEndingWithinScheduleWindow(
+                context, sku, machine, structureName)) {
             return decision;
         }
         Integer minimumMachineCount =
@@ -202,6 +215,79 @@ public class StructureEndingAlignmentService {
                 machine.getMachineCode(), previousMaterialCode, previousMaterialSource, previousStructureName,
                 countingShiftIndex, inMachineCount, minimumMachineCount);
         return decision;
+    }
+
+    /**
+     * 判断结构转产配置中的最大收尾日期是否位于固定三天排程窗口内。
+     *
+     * <p>S4.2已按工厂、年月、排产版本、正常计划类型和结构名称查询配置，并对跨月多条记录
+     * 取完整自然日最大值。本方法只负责按自然日执行闭区间判断：
+     * {@code 最大收尾日期 >= T && 最大收尾日期 <= T+2}。配置不存在、END_DAY全部为空、
+     * 排程日期缺失或最大日期在窗口外时均返回false，使候选机台继续原正常选机流程。</p>
+     *
+     * @param context       排程上下文
+     * @param sku           当前待排SKU
+     * @param machine       当前候选机台
+     * @param structureName 待排SKU结构名称
+     * @return true-允许进入现有结构对齐内部规则；false-不触发结构对齐
+     */
+    private boolean isStructureEndingWithinScheduleWindow(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            MachineScheduleDTO machine,
+            String structureName) {
+        LocalDate windowStartDate = this.toLocalDate(context.getScheduleDate());
+        LocalDate windowEndDate = Objects.isNull(windowStartDate)
+                ? null : windowStartDate.plusDays(
+                        LhScheduleConstant.STRUCTURE_ENDING_ALIGNMENT_WINDOW_DAYS - 1L);
+        Map<String, LocalDate> maxEndingDateMap = context.getStructureMaxEndingDateMap();
+        LocalDate maxEndingDate = CollectionUtils.isEmpty(maxEndingDateMap)
+                ? null : maxEndingDateMap.get(structureName);
+        if (Objects.isNull(windowStartDate) || Objects.isNull(windowEndDate)) {
+            log.warn("结构收尾对齐三天门禁未通过, batchNo: {}, materialCode: {}, structureName: {}, "
+                            + "machineCode: {}, windowStartDate: {}, windowEndDate: {}, maxEndingDate: {}, "
+                            + "reason: 排程窗口日期不完整，继续正常选机",
+                    context.getBatchNo(), sku.getMaterialCode(), structureName,
+                    machine.getMachineCode(), windowStartDate, windowEndDate, maxEndingDate);
+            return false;
+        }
+        if (Objects.isNull(maxEndingDate)) {
+            log.info("结构收尾对齐三天门禁未通过, batchNo: {}, materialCode: {}, structureName: {}, "
+                            + "machineCode: {}, windowStartDate: {}, windowEndDate: {}, maxEndingDate: null, "
+                            + "reason: 未查询到结构转产配置或END_DAY为空，继续正常选机",
+                    context.getBatchNo(), sku.getMaterialCode(), structureName,
+                    machine.getMachineCode(), windowStartDate, windowEndDate);
+            return false;
+        }
+        boolean withinWindow = !maxEndingDate.isBefore(windowStartDate)
+                && !maxEndingDate.isAfter(windowEndDate);
+        if (!withinWindow) {
+            log.info("结构收尾对齐三天门禁未通过, batchNo: {}, materialCode: {}, structureName: {}, "
+                            + "machineCode: {}, windowStartDate: {}, windowEndDate: {}, maxEndingDate: {}, "
+                            + "reason: 结构最大收尾日期不在三天窗口内，继续正常选机",
+                    context.getBatchNo(), sku.getMaterialCode(), structureName,
+                    machine.getMachineCode(), windowStartDate, windowEndDate, maxEndingDate);
+            return false;
+        }
+        log.info("结构收尾对齐三天门禁通过, batchNo: {}, materialCode: {}, structureName: {}, "
+                        + "machineCode: {}, windowStartDate: {}, windowEndDate: {}, maxEndingDate: {}, "
+                        + "reason: 结构最大收尾日期位于三天窗口内，继续执行现有结构对齐规则",
+                context.getBatchNo(), sku.getMaterialCode(), structureName,
+                machine.getMachineCode(), windowStartDate, windowEndDate, maxEndingDate);
+        return true;
+    }
+
+    /**
+     * 将带时间部分的排程日期转换为系统时区自然日，避免时分秒影响结构收尾窗口判断。
+     *
+     * @param date 排程日期
+     * @return 自然日；入参为空时返回null
+     */
+    private LocalDate toLocalDate(Date date) {
+        if (Objects.isNull(date)) {
+            return null;
+        }
+        return date.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
     }
 
     /**
