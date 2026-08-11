@@ -12,11 +12,12 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * S4.5 新增排产胎胚最早可供硫化时间解析器。
+ * 提前生产胎胚最早可供硫化时间解析器。
  *
- * <p>本解析器只提供新增排产需要的时间下限和半开班次定位能力，不修改换模、
- * 换活字块、续作或公共排程接口。调用方只有在结构命中有效配置时才启用新口径，
- * 未命中配置时必须继续执行原有逻辑。</p>
+ * <p>本解析器统一提供 S4.4 结构切换提前生产、S4.5 新增排产需要的结构时间读取、
+ * 生产时间下限和半开班次定位能力。解析器不移动换模或换活字块等生产准备动作，
+ * 也不自行判断提前生产资格；调用方先按原规则计算理论开产时间，再使用本解析器
+ * 取理论开产时间和胎胚可供时间的较晚值。</p>
  *
  * @author APS
  */
@@ -38,7 +39,7 @@ public final class NewSpecEmbryoAvailableTimeResolver {
      * STRUCTURE_NAME 的大小写敏感匹配口径一致。</p>
      *
      * @param context 排程上下文
-     * @param sku 待排新增 SKU
+     * @param sku 待排 SKU
      * @return 命中有效配置时返回最早可供时间，否则返回 null
      */
     public static Date resolveEarliestAvailableTime(LhScheduleContext context, SkuScheduleDTO sku) {
@@ -57,8 +58,8 @@ public final class NewSpecEmbryoAvailableTimeResolver {
      * 判断当前 SKU 是否命中有效胎胚时间配置。
      *
      * @param context 排程上下文
-     * @param sku 待排新增 SKU
-     * @return true-命中有效时间配置；false-保持原排程行为
+     * @param sku 待排 SKU
+     * @return true-命中有效时间配置；false-未命中有效时间配置
      */
     public static boolean isConstrained(LhScheduleContext context, SkuScheduleDTO sku) {
         return Objects.nonNull(resolveEarliestAvailableTime(context, sku));
@@ -112,7 +113,7 @@ public final class NewSpecEmbryoAvailableTimeResolver {
      * 计算有效生产时间窗的秒数。
      *
      * <p>部分班次产能折算必须使用实际参与生产的时间窗长度，而不是完整班次长度；
-     * 该方法仅为命中胎胚约束的 S4.5 调用方提供统一口径。</p>
+     * 该方法为命中胎胚约束的提前生产调用方提供统一口径。</p>
      *
      * @param windowStartTime 有效生产开始时间
      * @param windowEndTime 有效生产结束时间

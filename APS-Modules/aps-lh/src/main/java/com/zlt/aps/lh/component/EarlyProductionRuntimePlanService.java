@@ -77,9 +77,14 @@ public class EarlyProductionRuntimePlanService {
             return runtimePlan;
         }
 
-        EarlyProductionDecision decision = EarlyProductionChecker.checkEarlyProduction(
-                context, sku, currentDate, windowStartDate, windowEndDate,
-                DailyMachineExpansionPlanner.resolveShortageAddMachineThreshold(context));
+        /*
+         * S4.4 换活字块提前生产与 S4.5 新规格提前生产统一从提前生产中心申请运行视图。
+         * 调用共享准入检查时，只有原始机台数命中结构切换提前，才先校验结构已存在
+         * “最早胎胚可供硫化时间”；普通结构提前和结构收尾提前继续执行原有条件。
+         * 本服务不复制场景识别、胎胚时间获取或计算逻辑，避免两个入口形成不同口径。
+         */
+        EarlyProductionDecision decision = this.evaluateEarlyProductionAdmission(
+                context, sku, currentDate, windowStartDate, windowEndDate);
         if (Objects.isNull(decision) || !decision.isEarlyProduction()
                 || Objects.isNull(decision.getFuturePlanDate())) {
             return this.keepFutureOnlyCandidateInactive(
@@ -89,6 +94,60 @@ public class EarlyProductionRuntimePlanService {
         return this.initializeRuntimePlan(
                 context, sku, currentDate, windowStartDate, windowEndDate,
                 runtimePlan, decision);
+    }
+
+    /**
+     * 只读评估指定业务日的提前生产准入，不初始化目标量或临时日计划账本。
+     *
+     * <p>S4.4 结构切换提前可能在理论开产业务日无计划，但受胎胚时间下限约束后实际
+     * 落到有计划日。此时仍需按理论业务日核验全部原提前生产条件，却不应为有计划的
+     * 实际生产日创建前移账本，因此提供本只读入口复用与运行视图相同的共享判断器。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 待判断 SKU
+     * @param currentDate 需要判断的理论开产业务日
+     * @return 共享提前生产准入结论；参数或排程窗口无效时返回明确的不放行结论
+     */
+    public EarlyProductionDecision evaluateEarlyProductionAdmission(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            LocalDate currentDate) {
+        LocalDate windowStartDate = Objects.isNull(context)
+                ? null : this.resolveScheduleWindowStartDate(context);
+        LocalDate windowEndDate = Objects.isNull(context)
+                ? null : this.resolveScheduleWindowEndDate(context);
+        return this.evaluateEarlyProductionAdmission(
+                context, sku, currentDate, windowStartDate, windowEndDate);
+    }
+
+    /**
+     * 使用已解析的排程窗口执行共享提前生产准入判断。
+     *
+     * @param context 排程上下文
+     * @param sku 待判断 SKU
+     * @param currentDate 当前业务日
+     * @param windowStartDate 排程窗口开始业务日
+     * @param windowEndDate 排程窗口结束业务日
+     * @return 共享提前生产准入结论
+     */
+    private EarlyProductionDecision evaluateEarlyProductionAdmission(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            LocalDate currentDate,
+            LocalDate windowStartDate,
+            LocalDate windowEndDate) {
+        if (Objects.isNull(context) || Objects.isNull(sku) || Objects.isNull(currentDate)) {
+            return EarlyProductionDecision.notEarlyProduction(
+                    false, "提前生产准入参数不完整");
+        }
+        if (Objects.isNull(windowStartDate) || Objects.isNull(windowEndDate)
+                || currentDate.isBefore(windowStartDate) || currentDate.isAfter(windowEndDate)) {
+            return EarlyProductionDecision.notEarlyProduction(
+                    false, "提前生产业务日超出排程窗口");
+        }
+        return EarlyProductionChecker.checkEarlyProduction(
+                context, sku, currentDate, windowStartDate, windowEndDate,
+                DailyMachineExpansionPlanner.resolveShortageAddMachineThreshold(context));
     }
 
     /**
