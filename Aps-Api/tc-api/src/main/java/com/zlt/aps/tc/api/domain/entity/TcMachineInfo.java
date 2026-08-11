@@ -58,9 +58,9 @@ public class TcMachineInfo extends BaseEntity {
 
     /**
      * 开机班次编码，允许以英文逗号分隔多个班次。
-     * 导入时用户填写班次名称(如 夜班,早班,中班)，由字典 class_num_three_plan 转换为编码存储(#23324)。
+     * 导入模板中由用户直接填写班次名称(如 夜班,早班,中班)，导入时由后端按字典 class_num_three_plan 转为编码(01,02,03)存储；导出时转回班次名称。
      */
-    @Excel(name = "ui.data.column.tc.machineInfo.openShiftCode", dictType = "class_num_three_plan")
+    @Excel(name = "ui.data.column.tc.machineInfo.openShiftCode")
     @ImportExcelValidated(maxLength = 20)
     @ApiModelProperty(value = "开机班次", name = "openShiftCode")
     @TableField(value = "OPEN_SHIFT_CODE")

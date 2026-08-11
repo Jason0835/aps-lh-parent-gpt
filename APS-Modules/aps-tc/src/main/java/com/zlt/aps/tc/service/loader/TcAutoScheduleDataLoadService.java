@@ -17,6 +17,7 @@ import com.zlt.aps.tc.engine.domain.*;
 import com.zlt.aps.tc.mapper.*;
 import com.zlt.aps.tc.service.cache.TcAutoScheduleRedisCacheService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
@@ -848,7 +849,7 @@ public class TcAutoScheduleDataLoadService {
             Integer guardShiftCount = this.resolveGuardShiftCount(context, row.getLhMachineCode(), row.getOrderNo(),
                     depthConfigList, fallbackGuardShiftCount);
             boolean noShutdownAvailableShift = redistributeShutdownDemand(context, classQtyArray, tmCalendar, cxCalendar);
-            for (int shiftOrder = 1; shiftOrder <= TcScheduleConstants.TC_MAX_SHIFT_ORDER; shiftOrder++) {
+            for (int shiftOrder = 1; shiftOrder <= TcScheduleConstants.TC_MAX_SHIFT_ORDER + 1; shiftOrder++) {
                 BigDecimal formingQty = this.resolveCurrentShiftFormingQty(classQtyArray, shiftOrder, algorithmCode,
                         formingShiftOffset, alg1LookbackShifts);
                 BigDecimal demandQty = formingQty.multiply(sidewallLength);
@@ -875,6 +876,7 @@ public class TcAutoScheduleDataLoadService {
                 taskDraft.setSmallGlueFlag(this.isSmallGlueCode(context, taskDraft.getGlueCode()));
                 taskDraft.setMouthPlateCode(row.getSidewallMouthPlate());
                 taskDraft.setShiftOrder(targetShiftOrder);
+                taskDraft.setSourceShiftOrder(shiftOrder);
                 taskDraft.setNewSpecInfo(taskNewSpecInfo);
                 taskDraft.setSidewallLength(sidewallLength);
                 taskDraft.setTailFlag(this.isCloseOutByPlanSurplus(row.getCxRemainQty(), formingQty)
@@ -909,6 +911,7 @@ public class TcAutoScheduleDataLoadService {
                 taskDraftList.add(taskDraft);
             }
         }
+        taskDraftList = this.prepareTwoShiftDemandTasks(taskDraftList);
         appendExperimentSpecTasks(context, taskDraftList, lossRuleList, minStartQty, defaultCurlLength, toolTotalQty);
         log.info("[TC_BOOTSTRAP_DETAIL] factoryCode={}, scheduleDate={} BOM模式任务生成汇总：成型行数={}，生成任务={}",
                 context.getFactoryCode(), DateUtil.formatDate(context.getScheduleDate()),
@@ -1074,7 +1077,7 @@ public class TcAutoScheduleDataLoadService {
             Integer guardShiftCount = this.resolveGuardShiftCount(context, row.getLhMachineCode(), row.getOrderNo(),
                     depthConfigList, fallbackGuardShiftCount);
             boolean noShutdownAvailableShift = redistributeShutdownDemand(context, classQtyArray, tmCalendar, cxCalendar);
-            for (int shiftOrder = 1; shiftOrder <= TcScheduleConstants.TC_MAX_SHIFT_ORDER; shiftOrder++) {
+            for (int shiftOrder = 1; shiftOrder <= TcScheduleConstants.TC_MAX_SHIFT_ORDER + 1; shiftOrder++) {
                 BigDecimal formingQty = this.resolveCurrentShiftFormingQty(classQtyArray, shiftOrder, algorithmCode,
                         formingShiftOffset, alg1LookbackShifts);
                 if (formingQty.compareTo(BigDecimal.ZERO) <= 0) {
@@ -1120,6 +1123,7 @@ public class TcAutoScheduleDataLoadService {
                 taskDraft.setSmallGlueFlag(this.isSmallGlueCode(context, taskDraft.getGlueCode()));
                 taskDraft.setMouthPlateCode(primarySpec.getSidewallMouthPlate());
                 taskDraft.setShiftOrder(targetShiftOrder);
+                taskDraft.setSourceShiftOrder(shiftOrder);
                 taskDraft.setNewSpecInfo(taskNewSpecInfo);
                 taskDraft.setSidewallLength(sidewallLength);
                 taskDraft.setTailFlag(this.isCloseOutByPlanSurplus(row.getCxRemainQty(), formingQty)
@@ -1157,6 +1161,7 @@ public class TcAutoScheduleDataLoadService {
                 taskDraftList.add(taskDraft);
             }
         }
+        taskDraftList = this.prepareTwoShiftDemandTasks(taskDraftList);
         appendExperimentSpecTasks(context, taskDraftList, lossRuleList, minStartQty, defaultCurlLength, toolTotalQty);
         log.info("[TC_BOOTSTRAP_DETAIL] factoryCode={}, scheduleDate={} RECIPE模式任务生成汇总：成型行数={}，跳过(成型量=0)={}班次，跳过(示方书/施工不匹配)={}班次，生成任务={}",
                 context.getFactoryCode(), DateUtil.formatDate(context.getScheduleDate()),
@@ -1661,6 +1666,119 @@ public class TcAutoScheduleDataLoadService {
         int dayOfMonth = DateUtil.calendar(experimentPlanDate).get(Calendar.DAY_OF_MONTH);
         return "DAY_" + dayOfMonth;
     }
+
+    /**
+     * 关联同一来源、同一胎侧编码的下一排程班需求，并补齐仅下一班有需求的提前候选任务。
+     *
+     * <p>数据加载时临时生成逻辑第七班任务，仅用于给第六班提供下一班需求；返回结果不会保留
+     * 逻辑第七班本身。新规格提前排产任务不参与本门槛，避免改变其既有排产班次和补量口径。</p>
+     *
+     * @param taskDraftList 含逻辑第七班的原始任务草稿
+     * @return 已写入下一班需求且只保留一至六班排程任务的列表
+     */
+    private List<TcTaskDraft> prepareTwoShiftDemandTasks(List<TcTaskDraft> taskDraftList) {
+        if (CollUtil.isEmpty(taskDraftList)) {
+            return taskDraftList;
+        }
+        List<TcTaskDraft> regularTaskList = taskDraftList.stream()
+                .filter(Objects::nonNull)
+                .filter(task -> task.getSourceShiftOrder() != null)
+                .filter(task -> !this.isNewSpecAdvanceTask(task))
+                .collect(Collectors.toList());
+        Map<String, List<TcTaskDraft>> sourceShiftTaskMap = regularTaskList.stream()
+                .collect(Collectors.groupingBy(task -> this.buildTwoShiftSourceKey(task,
+                        task.getSourceShiftOrder()), LinkedHashMap::new, Collectors.toList()));
+
+        regularTaskList.stream()
+                .filter(task -> task.getSourceShiftOrder() <= TcScheduleConstants.TC_MAX_SHIFT_ORDER)
+                .forEach(task -> task.setNextShiftDemandQty(sourceShiftTaskMap
+                        .getOrDefault(this.buildTwoShiftSourceKey(task, task.getSourceShiftOrder() + 1),
+                                Collections.emptyList())
+                        .stream().map(TcTaskDraft::getCurrentShiftDemandQty).map(this::nvl)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add)));
+
+        List<TcTaskDraft> leadTaskList = regularTaskList.stream()
+                .filter(task -> task.getSourceShiftOrder() > 1
+                        && task.getSourceShiftOrder() <= TcScheduleConstants.TC_MAX_SHIFT_ORDER + 1)
+                .filter(task -> sourceShiftTaskMap.getOrDefault(
+                        this.buildTwoShiftSourceKey(task, task.getSourceShiftOrder() - 1),
+                        Collections.emptyList()).isEmpty())
+                .map(this::buildTwoShiftLeadTask)
+                .collect(Collectors.toList());
+
+        List<TcTaskDraft> resultList = taskDraftList.stream()
+                .filter(Objects::nonNull)
+                .filter(task -> task.getSourceShiftOrder() == null
+                        || task.getSourceShiftOrder() <= TcScheduleConstants.TC_MAX_SHIFT_ORDER)
+                .collect(Collectors.toCollection(ArrayList::new));
+        resultList.addAll(leadTaskList);
+        return resultList;
+    }
+
+    /**
+     * 根据下一排程班任务生成当前班零需求提前候选。
+     *
+     * @param nextTask 下一排程班同产品任务
+     * @return 当前班零需求、携带下一班需求的候选任务
+     */
+    private TcTaskDraft buildTwoShiftLeadTask(TcTaskDraft nextTask) {
+        TcTaskDraft leadTask = new TcTaskDraft();
+        BeanUtils.copyProperties(nextTask, leadTask);
+        int leadShiftOrder = nextTask.getSourceShiftOrder() - 1;
+        leadTask.setOrderNo(nextTask.getOrderNo() + "-TWO-SHIFT-LEAD-CLASS" + leadShiftOrder);
+        leadTask.setBusinessKeySuffix(nextTask.getBusinessKeySuffix()
+                + "-TWO-SHIFT-LEAD-CLASS" + leadShiftOrder);
+        leadTask.setShiftOrder(leadShiftOrder);
+        leadTask.setSourceShiftOrder(leadShiftOrder);
+        leadTask.setCurrentShiftDemandQty(BigDecimal.ZERO);
+        leadTask.setNextShiftDemandQty(this.nvl(nextTask.getCurrentShiftDemandQty()));
+        leadTask.setDemandQty(BigDecimal.ZERO);
+        leadTask.setGuardDemandQty(this.resolveLeadGuardDemandQty(nextTask));
+        leadTask.setTwoShiftLeadTask(Boolean.TRUE);
+        leadTask.setTwoShiftDemandQty(null);
+        leadTask.setTwoShiftStockGapQty(null);
+        leadTask.setTwoShiftStockCovered(null);
+        leadTask.setUnplannedReasonCode(null);
+        leadTask.setUnplannedReasonDesc(null);
+        return leadTask;
+    }
+
+    /**
+     * 计算零需求提前候选在当前班应沿用的保证范围需求。
+     *
+     * @param nextTask 下一排程班任务
+     * @return 以下一班需求为首班，并保留剩余保证班数的需求量
+     */
+    private BigDecimal resolveLeadGuardDemandQty(TcTaskDraft nextTask) {
+        return this.nvl(nextTask.getGuardDemandQty());
+    }
+
+    /**
+     * 构造两班需求关联键，确保不同来源及不同胎侧编码之间互不串量。
+     *
+     * @param task       胎侧任务
+     * @param shiftOrder 要关联的来源班次
+     * @return 来源行、胎侧编码和班次组成的关联键
+     */
+    private String buildTwoShiftSourceKey(TcTaskDraft task, int shiftOrder) {
+        String businessKeySuffix = StrUtil.blankToDefault(task.getBusinessKeySuffix(), "");
+        int classMarkerIndex = businessKeySuffix.lastIndexOf("-CLASS");
+        String sourceKey = classMarkerIndex >= 0
+                ? businessKeySuffix.substring(0, classMarkerIndex) : businessKeySuffix;
+        return String.join("|", sourceKey, StrUtil.blankToDefault(task.getSidewallCode(), ""),
+                String.valueOf(shiftOrder));
+    }
+
+    /**
+     * 判断任务是否为新规格提前排产任务。
+     *
+     * @param task 胎侧任务
+     * @return true 表示保持新规格既有行为并绕过两班门槛
+     */
+    private boolean isNewSpecAdvanceTask(TcTaskDraft task) {
+        return task.getNewSpecInfo() != null && task.getNewSpecInfo().isNewSpecHit();
+    }
+
     /**
      * 构造来源任务业务键后缀。
      *

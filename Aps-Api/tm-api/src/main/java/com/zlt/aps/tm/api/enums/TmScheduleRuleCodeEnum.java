@@ -65,6 +65,9 @@ public enum TmScheduleRuleCodeEnum {
     /** 需求量计算。 */
     DEMAND_QTY_CALC("DEMAND_QTY_CALC", "需求量计算"),
 
+    /** 当班与下一排程班库存覆盖判断。 */
+    TWO_SHIFT_STOCK_COVERAGE("TWO_SHIFT_STOCK_COVERAGE", "两班库存覆盖判断"),
+
     /** 库存保证范围时长计算。 */
     GUARD_RANGE_HOURS("GUARD_RANGE_HOURS", "库存保证范围时长计算"),
 

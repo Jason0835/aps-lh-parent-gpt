@@ -165,7 +165,10 @@ public class TmPlanCalcService implements ITmPlanCalcService {
                 TmPlanQtyResult planQtyResult = planQtyStrategy.calculate(task, context);
                 applyPlanQtyResult(task, planQtyResult);
             }
-            this.applyStartupThreshold(context, task);
+            this.addTwoShiftStockCoverageTrace(context, task);
+            if (!Boolean.TRUE.equals(task.getTwoShiftStockCovered())) {
+                this.applyStartupThreshold(context, task);
+            }
             this.applyPlanGroupResult(context, task);
             this.calculateLatestStartPriority(context, task);
             task.setToolUsedQty(BigDecimal.ZERO.setScale(TmScheduleConstants.DECIMAL_CALCULATION_SCALE,
@@ -255,6 +258,9 @@ public class TmPlanCalcService implements ITmPlanCalcService {
             BigDecimal currentShiftDemandQty = groupSourceList.stream()
                     .map(TmTaskDraft::getCurrentShiftDemandQty).map(this::nvl)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal nextShiftDemandQty = groupSourceList.stream()
+                    .map(TmTaskDraft::getNextShiftDemandQty).map(this::nvl)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
             BigDecimal guardDemandQty = this.resolveGroupGuardDemandQty(groupSourceList,
                     currentShiftDemandQty);
             aggregateTask.setPlanGroupKey(planGroupKey);
@@ -273,6 +279,7 @@ public class TmPlanCalcService implements ITmPlanCalcService {
                     .distinct()
                     .collect(Collectors.joining(",")));
             aggregateTask.setCurrentShiftDemandQty(currentShiftDemandQty);
+            aggregateTask.setNextShiftDemandQty(nextShiftDemandQty);
             aggregateTask.setGuardDemandQty(guardDemandQty);
             aggregateTask.setDemandQty(null);
             if (groupSourceList.size() > 1) {
@@ -284,6 +291,7 @@ public class TmPlanCalcService implements ITmPlanCalcService {
             taskGroup.setAggregateTask(aggregateTask);
             taskGroup.setSourceTaskList(sourceSnapshotList);
             taskGroup.setGroupCurrentShiftDemandQty(currentShiftDemandQty);
+            taskGroup.setGroupNextShiftDemandQty(nextShiftDemandQty);
             taskGroup.setGroupGuardDemandQty(guardDemandQty);
             planTaskGroupMap.put(planGroupKey, taskGroup);
             aggregateTaskList.add(aggregateTask);
@@ -436,10 +444,12 @@ public class TmPlanCalcService implements ITmPlanCalcService {
         if (taskGroup == null || CollUtil.isEmpty(taskGroup.getSourceTaskList())) {
             return;
         }
+        boolean twoShiftStockCovered = Boolean.TRUE.equals(aggregateTask.getTwoShiftStockCovered());
         Map<String, BigDecimal> sourceWeightMap = taskGroup.getSourceTaskList().stream()
                 .collect(Collectors.toMap(TmTaskDraft::getBusinessKey,
                         sourceTask -> nvl(sourceTask.getCurrentShiftDemandQty())
-                                .add(nvl(sourceTask.getGuardDemandQty())),
+                                .add(nvl(twoShiftStockCovered
+                                        ? sourceTask.getNextShiftDemandQty() : sourceTask.getGuardDemandQty())),
                         BigDecimal::add, LinkedHashMap::new));
         taskGroup.setSourceWeightMap(sourceWeightMap);
         taskGroup.setGroupBaseDemandQty(aggregateTask.getBaseDemandQty());
@@ -469,6 +479,17 @@ public class TmPlanCalcService implements ITmPlanCalcService {
             sourceTask.setTailRoundAdjustQty(roundAllocationMap.get(sourceBusinessKey));
             sourceTask.setPlanQty(finalPlanAllocationMap.get(sourceBusinessKey));
             sourceTask.setPlanStockQty(planStockAllocationMap.get(sourceBusinessKey));
+            sourceTask.setTwoShiftDemandQty(aggregateTask.getTwoShiftDemandQty());
+            sourceTask.setTwoShiftStockGapQty(aggregateTask.getTwoShiftStockGapQty());
+            sourceTask.setTwoShiftStockCovered(aggregateTask.getTwoShiftStockCovered());
+            if (twoShiftStockCovered) {
+                sourceTask.setLossAddQty(BigDecimal.ZERO);
+                sourceTask.setToolLimitAdjustQty(BigDecimal.ZERO);
+                sourceTask.setToolOverflowQty(BigDecimal.ZERO);
+                sourceTask.setCapacityAdjustQty(BigDecimal.ZERO);
+                sourceTask.setPreLossPlanQty(BigDecimal.ZERO);
+                sourceTask.setPlanQtyBeforeToolLimit(BigDecimal.ZERO);
+            }
             sourceTask.setCalcFormulaDesc("同胎面同班次汇总后按来源需求分摊");
             this.fillGroupFields(sourceTask, taskGroup);
             Map<String, Object> sourceEvidence = this.buildPlanGroupEvidence(taskGroup);
@@ -477,6 +498,14 @@ public class TmPlanCalcService implements ITmPlanCalcService {
             sourceEvidence.put("allocatedPlanQty", sourceTask.getPlanQty());
             traceOf(context, sourceTask).addRuleHit(TmScheduleRuleCodeEnum.PLAN_QTY_SOURCE_ALLOCATE,
                     TmScheduleRuleResultEnum.PASS, sourceEvidence);
+            if (aggregateTask.getTwoShiftDemandQty() != null) {
+                Map<String, Object> coverageEvidence = this.buildTwoShiftCoverageEvidence(aggregateTask);
+                coverageEvidence.put("sourceBusinessKey", sourceBusinessKey);
+                coverageEvidence.put("sourceNextShiftDemandQty", sourceTask.getNextShiftDemandQty());
+                coverageEvidence.put("twoShiftLeadTask", sourceTask.getTwoShiftLeadTask());
+                traceOf(context, sourceTask).addRuleHit(TmScheduleRuleCodeEnum.TWO_SHIFT_STOCK_COVERAGE,
+                        this.resolveTwoShiftCoverageResult(aggregateTask), coverageEvidence);
+            }
         }
         traceOf(context, aggregateTask).addRuleHit(TmScheduleRuleCodeEnum.PLAN_QTY_AGGREGATE,
                 TmScheduleRuleResultEnum.PASS, this.buildPlanGroupEvidence(taskGroup));
@@ -497,8 +526,10 @@ public class TmPlanCalcService implements ITmPlanCalcService {
     private void fillGroupFields(TmTaskDraft task, TmPlanTaskGroup taskGroup) {
         task.setPlanGroupKey(taskGroup.getPlanGroupKey());
         task.setGroupSourceCount(taskGroup.getSourceTaskList().size());
-        task.setGroupRequiredQty(nvl(taskGroup.getGroupCurrentShiftDemandQty())
-                .add(nvl(taskGroup.getGroupGuardDemandQty())));
+        BigDecimal groupRequiredQty = Boolean.TRUE.equals(task.getTwoShiftStockCovered())
+                ? nvl(taskGroup.getGroupCurrentShiftDemandQty()).add(nvl(taskGroup.getGroupNextShiftDemandQty()))
+                : nvl(taskGroup.getGroupCurrentShiftDemandQty()).add(nvl(taskGroup.getGroupGuardDemandQty()));
+        task.setGroupRequiredQty(groupRequiredQty);
         task.setGroupBaseDemandQty(taskGroup.getGroupBaseDemandQty());
         task.setGroupMinStartAdjustQty(taskGroup.getGroupMinStartAdjustQty());
         task.setGroupRoundAdjustQty(taskGroup.getGroupRoundAdjustQty());
@@ -516,6 +547,7 @@ public class TmPlanCalcService implements ITmPlanCalcService {
         evidence.put("planGroupKey", taskGroup.getPlanGroupKey());
         evidence.put("sourceCount", taskGroup.getSourceTaskList().size());
         evidence.put("groupCurrentShiftDemandQty", taskGroup.getGroupCurrentShiftDemandQty());
+        evidence.put("groupNextShiftDemandQty", taskGroup.getGroupNextShiftDemandQty());
         evidence.put("groupGuardDemandQty", taskGroup.getGroupGuardDemandQty());
         evidence.put("groupBaseDemandQty", taskGroup.getGroupBaseDemandQty());
         evidence.put("groupMinStartAdjustQty", taskGroup.getGroupMinStartAdjustQty());
@@ -926,6 +958,10 @@ public class TmPlanCalcService implements ITmPlanCalcService {
     private void addPlanQtyTrace(TmScheduleContext context, TmTaskDraft task, String planQtyStrategyCode) {
         Map<String, Object> evidence = new LinkedHashMap<>();
         evidence.put("strategyCode", planQtyStrategyCode);
+        evidence.put("nextShiftDemandQty", task.getNextShiftDemandQty());
+        evidence.put("twoShiftDemandQty", task.getTwoShiftDemandQty());
+        evidence.put("twoShiftStockGapQty", task.getTwoShiftStockGapQty());
+        evidence.put("twoShiftStockCovered", task.getTwoShiftStockCovered());
         evidence.put("planQty", task.getPlanQty());
         evidence.put("demandQty", task.getDemandQty());
         evidence.put("stockDeductQty", task.getStockDeductQty());
@@ -945,6 +981,61 @@ public class TmPlanCalcService implements ITmPlanCalcService {
         evidence.put("calcFormulaDesc", task.getCalcFormulaDesc());
         traceOf(context, task).addRuleHit(TmScheduleRuleCodeEnum.PLAN_QTY_CALC,
                 TmScheduleRuleResultEnum.PASS, evidence);
+    }
+
+    /**
+     * 写入两班库存覆盖判断证据。
+     *
+     * @param context 胎面排程上下文
+     * @param task    汇总后的胎面任务
+     */
+    private void addTwoShiftStockCoverageTrace(TmScheduleContext context, TmTaskDraft task) {
+        if (task.getTwoShiftDemandQty() == null) {
+            return;
+        }
+        traceOf(context, task).addRuleHit(TmScheduleRuleCodeEnum.TWO_SHIFT_STOCK_COVERAGE,
+                this.resolveTwoShiftCoverageResult(task), this.buildTwoShiftCoverageEvidence(task));
+        log.info("[TM_TWO_SHIFT_STOCK_COVERAGE] batchNo={}, traceId={}, businessKey={}, treadCode={}, shiftOrder={}, currentShiftDemandQty={}, nextShiftDemandQty={}, rollingStockQty={}, twoShiftDemandQty={}, twoShiftStockGapQty={}, stockCovered={}, planQty={}",
+                context.getBatchNo(), context.getTraceId(), task.getBusinessKey(), task.getTreadCode(),
+                task.getShiftOrder(), task.getCurrentShiftDemandQty(), task.getNextShiftDemandQty(),
+                task.getRollingStockQty(), task.getTwoShiftDemandQty(), task.getTwoShiftStockGapQty(),
+                task.getTwoShiftStockCovered(), task.getPlanQty());
+    }
+
+    /**
+     * 构建两班库存覆盖判断的结构化证据。
+     *
+     * @param task 胎面任务
+     * @return 可写入解释 JSON 的证据
+     */
+    private Map<String, Object> buildTwoShiftCoverageEvidence(TmTaskDraft task) {
+        Map<String, Object> evidence = new LinkedHashMap<>();
+        boolean newSpecBypass = task.getNewSpecInfo() != null && task.getNewSpecInfo().isNewSpecHit();
+        boolean experimentSpecBypass = task.getExperimentSpecInfo() != null
+                && task.getExperimentSpecInfo().isExperimentSpecHit();
+        evidence.put("applicable", !newSpecBypass && !experimentSpecBypass && task.getPlanQty() != null);
+        evidence.put("bypassReason", newSpecBypass ? "NEW_SPEC_ADVANCE"
+                : experimentSpecBypass ? "EXPERIMENT_SPEC_PLAN_QTY" : null);
+        evidence.put("currentShiftDemandQty", task.getCurrentShiftDemandQty());
+        evidence.put("nextShiftDemandQty", task.getNextShiftDemandQty());
+        evidence.put("rollingStockQty", task.getRollingStockQty());
+        evidence.put("twoShiftDemandQty", task.getTwoShiftDemandQty());
+        evidence.put("twoShiftStockGapQty", task.getTwoShiftStockGapQty());
+        evidence.put("stockCovered", task.getTwoShiftStockCovered());
+        evidence.put("twoShiftLeadTask", task.getTwoShiftLeadTask());
+        evidence.put("finalPlanQty", task.getPlanQty());
+        return evidence;
+    }
+
+    /**
+     * 解析两班库存覆盖规则的执行结果。
+     *
+     * @param task 胎面任务
+     * @return 库存完全覆盖两班时返回 PASS，其他情况返回 SKIP
+     */
+    private TmScheduleRuleResultEnum resolveTwoShiftCoverageResult(TmTaskDraft task) {
+        return Boolean.TRUE.equals(task.getTwoShiftStockCovered())
+                ? TmScheduleRuleResultEnum.PASS : TmScheduleRuleResultEnum.SKIP;
     }
 
     /**

@@ -5,6 +5,7 @@ import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
+import com.zlt.aps.common.core.utils.MachineShiftDictUtil;
 import com.zlt.aps.tm.api.domain.entity.TmMachineInfo;
 import com.zlt.aps.tm.mapper.TmMachineInfoMapper;
 import com.zlt.aps.tm.service.ITmMachineInfoService;
@@ -89,6 +90,8 @@ public class TmMachineInfoServiceImpl extends AbstractDocService<TmMachineInfo> 
             ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(), errorRowNum, message, importErrorLogs);
             return Boolean.FALSE;
         }
+        // 开机班次：导入模板填写班次名称(如 夜班,早班)，转成字典值(01,02)入库
+        importDocEntity.setOpenShiftCode(MachineShiftDictUtil.labelsToValues(importDocEntity.getOpenShiftCode()));
         return super.serviceCheckAndDataHandle(importDocEntity, importErrorLogs, importLogId, errorRowNum, serviceCheckParams);
     }
 }
