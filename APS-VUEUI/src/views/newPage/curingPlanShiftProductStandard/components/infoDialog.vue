@@ -29,9 +29,9 @@
 </template>
 
 <script>
-import { mapState } from "vuex";
+import {mapState} from "vuex";
 
-import { saveCapacity,getCapacity } from "@/api/monthplan/mdmSkuLhCapacity";
+import {getCapacity, saveCapacity} from "@/api/monthplan/mdmSkuLhCapacity";
 import materialCodeSelect from "@/views/components/materialCodeSelect.vue";
 import infoForm from "@/views/components/infoForm.vue";
 
@@ -228,7 +228,8 @@ export default {
           label: this.$t("ui.data.column.mdmSkuLhCapacity.classCapacity"),
           span: 12,
           type: "number",
-          disabled:true
+          min: 0,
+          max: 99999999
         },
         {
           prop: "standardCapacity",
