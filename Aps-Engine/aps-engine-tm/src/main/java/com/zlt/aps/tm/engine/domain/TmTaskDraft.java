@@ -67,6 +67,18 @@ public class TmTaskDraft {
     /** 当前班成型胎面需求量，单位米 */
     private BigDecimal currentShiftDemandQty;
 
+    /** 同胎面下一排程班的成型需求量，单位米 */
+    private BigDecimal nextShiftDemandQty;
+
+    /** 当班与下一排程班需求合计，单位米 */
+    private BigDecimal twoShiftDemandQty;
+
+    /** 两班需求扣减班初滚动库存后的缺口，单位米 */
+    private BigDecimal twoShiftStockGapQty;
+
+    /** 滚动库存是否已覆盖当班与下一排程班需求 */
+    private Boolean twoShiftStockCovered;
+
     /** 当前逻辑班次对应的成型实际完成折米量。 */
     private BigDecimal currentShiftFormingFinishQty;
 
@@ -263,6 +275,9 @@ public class TmTaskDraft {
 
     /** 新规格判断与提前排产证据 */
     private TmNewSpecInfo newSpecInfo;
+
+    /** 两班库存判断中由下一排程班需求反向生成的当班候选标识 */
+    private Boolean twoShiftLeadTask;
 
     /** 是否命中小胶种连续生产规则 */
     private Boolean smallGlueFlag;

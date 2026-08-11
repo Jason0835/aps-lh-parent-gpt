@@ -53,6 +53,8 @@ import com.zlt.aps.tq.api.domain.entity.TqScheFinishQty;
 import com.zlt.aps.tq.api.domain.entity.TqShiftStock;
 import com.zlt.aps.tq.api.domain.entity.TqStock;
 import com.zlt.aps.tq.api.service.ITqMesSyncRemoteService;
+import com.zlt.aps.gsq.api.domain.entity.GsqDayFinishQty;
+import com.zlt.aps.gsq.api.service.IGsqMesSyncRemoteService;
 import com.zlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.core.dao.basedao.BaseDao;
 import com.zlt.sync.handle.SyncDataHandle;
@@ -126,6 +128,9 @@ public class MesItfServiceImpl implements MesItfService {
 
     @Autowired
     private ITqMesSyncRemoteService tqMesSyncRemoteService;
+
+    @Autowired
+    private IGsqMesSyncRemoteService gsqMesSyncRemoteService;
 
     @Autowired
     private ITmMesSyncRemoteService tmMesSyncRemoteService;
@@ -1904,6 +1909,67 @@ public class MesItfServiceImpl implements MesItfService {
         } catch (Exception e) {
             log.error("胎圈排程日完成量同步：Feign调用异常，factoryCode={}, 待插入数量={}", syncDataLogs.getFactoryCode(), insertList.size(), e);
             return AjaxResult.error("胎圈排程日完成量同步失败：" + e.getMessage());
+        }
+        return AjaxResult.success();
+    }
+
+    /**
+     * 同步钢丝圈排程日完成量
+     * 从MES中间表MES_GSQ_DAY_FINISH_TOTL查询前一天的数据，
+     * 逻辑删除APS旧数据并插入新数据
+     *
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    @Override
+    public AjaxResult syncGsqScheDayFinishQty(AuxReqSyncDataLogs syncDataLogs) {
+        DynamicDataSourceContextHolder.push(DataSource.MES);
+        Date nowDate = DateUtils.truncate(DateUtils.getNowDate(), Calendar.DATE);
+        Date lastDate = DateUtils.addDays(nowDate, -1);
+        syncDataLogs.setQueryParams(new HashMap<>());
+        syncDataLogs.getQueryParams().put("scheduleDate", lastDate);
+        List<GsqDayFinishQty> syncList = mesItfMapper.selectGsqScheDayFinishQtyList(syncDataLogs);
+        DynamicDataSourceContextHolder.poll();
+
+        if (CollectionUtils.isEmpty(syncList)) {
+            log.warn("钢丝圈排程日完成量同步：MES中间表查询结果为空，factoryCode={}", syncDataLogs.getFactoryCode());
+            return AjaxResult.success("MES中间表无数据可同步");
+        }
+
+        Map<String, GsqDayFinishQty> groupMap = syncList.stream()
+                .collect(Collectors.toMap(
+                        item -> item.getFactoryCode() + "|" + DateUtil.formatDate(item.getScheduleDate()) + "|" + item.getSteelRingCode(),
+                        Function.identity(),
+                        (v1, v2) -> v1
+                ));
+        syncList = new ArrayList<>(groupMap.values());
+
+        List<GsqDayFinishQty> insertList = new ArrayList<>();
+        for (GsqDayFinishQty item : syncList) {
+            GsqDayFinishQty entity = new GsqDayFinishQty();
+            BeanUtils.copyProperties(item, entity);
+            entity.setCreateBy("MES");
+            entity.setUpdateBy("MES");
+            entity.setCreateTime(DateUtils.getNowDate());
+            entity.setUpdateTime(DateUtils.getNowDate());
+            entity.setIsDelete(0);
+            insertList.add(entity);
+        }
+
+        try {
+            String factoryCode = syncDataLogs.getFactoryCode();
+            Date scheduleDate = insertList.stream().map(GsqDayFinishQty::getScheduleDate).filter(Objects::nonNull).findFirst().orElse(DateUtils.getNowDate());
+            String scheduleDateStr = DateUtil.formatDate(scheduleDate);
+            log.info("钢丝圈排程日完成量同步：开始同步，factoryCode={}, scheduleDate={}, 待插入数量={}", factoryCode, scheduleDateStr, insertList.size());
+
+            FeignTokenHelper.runWithToken(() -> {
+                gsqMesSyncRemoteService.logicDeleteAndSaveDayFinishQty(factoryCode, scheduleDateStr, "MES", insertList);
+            });
+
+            log.info("钢丝圈排程日完成量同步：同步完成，factoryCode={}, 插入数量={}", factoryCode, insertList.size());
+        } catch (Exception e) {
+            log.error("钢丝圈排程日完成量同步：Feign调用异常，factoryCode={}, 待插入数量={}", syncDataLogs.getFactoryCode(), insertList.size(), e);
+            return AjaxResult.error("钢丝圈排程日完成量同步失败：" + e.getMessage());
         }
         return AjaxResult.success();
     }

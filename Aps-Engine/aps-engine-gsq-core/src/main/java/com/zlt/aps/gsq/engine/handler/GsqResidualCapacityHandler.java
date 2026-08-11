@@ -103,7 +103,7 @@ public class GsqResidualCapacityHandler extends AbsGsqScheduleStepHandler {
 
         // 总量截断保护：确保每个备库规格6班总排产不超过 backupTotalQty
         // 各阶段（S3延后不完全消化、S5均衡调整、S5.5定额延后等）可能导致总排产量超上限，此处从最后一班逐班削减
-        capBackupTotalQty(scheduleList);
+        capBackupTotalQty(context, scheduleList);
     }
 
     /**
@@ -316,6 +316,68 @@ public class GsqResidualCapacityHandler extends AbsGsqScheduleStepHandler {
             context.getRuleTrace(spec.getSteelRingCode()).addRuleHit(
                     GsqScheduleRuleCodeEnum.RESIDUAL_CAPACITY_FILL,
                     GsqScheduleRuleResultEnum.ADJUST, evidence);
+        }
+
+        // 备库排完后，第6班仍有剩余产能时，排产胎圈7班估值（先备库后估值）
+        fillLastShiftEstimate(machineCode, specList, machineQuota, context);
+    }
+
+    /**
+     * 第6班备库排完后，将剩余产能分配给胎圈7班估值规格。
+     *
+     * <p>业务规则：胎圈7班估值在 S2.2 计算但不立即排产，等 S5.6 备库规格全部排完后，
+     * 第6班仍有剩余产能时才排产，确保"先备库后估值"的优先级。</p>
+     *
+     * @param machineCode 机台编码
+     * @param specList    该机台上所有规格的排程记录
+     * @param machineQuota 机台定额
+     * @param context     排程上下文
+     */
+    private void fillLastShiftEstimate(String machineCode, List<GsqScheduleResultVo> specList,
+                                       double machineQuota, GsqScheduleContext context) {
+        int classNum = 6;
+        // 统计第6班已排产量
+        double usedCapacity = 0D;
+        for (GsqScheduleResultVo s : specList) {
+            usedCapacity = BigDecimalUtil.add(usedCapacity, getClassPlanQty(s, classNum));
+        }
+        double residualCapacity = BigDecimalUtil.sub(machineQuota, usedCapacity);
+        if (residualCapacity <= 0) {
+            return;
+        }
+
+        // 逐规格排产胎圈7班估值（有估值的规格才排）
+        for (GsqScheduleResultVo spec : specList) {
+            Double estimate = context.getLastShiftEstimateMap().get(spec.getSteelRingCode());
+            if (estimate == null || estimate <= 0) {
+                continue;
+            }
+            // 已排产的估值量不再重复排
+            double currentPlan = getClassPlanQty(spec, classNum);
+            double remainingEstimate = BigDecimalUtil.sub(estimate, currentPlan);
+            if (remainingEstimate <= 0) {
+                continue;
+            }
+            // 重新统计剩余产能（前一个规格可能已消耗）
+            usedCapacity = 0D;
+            for (GsqScheduleResultVo s : specList) {
+                usedCapacity = BigDecimalUtil.add(usedCapacity, getClassPlanQty(s, classNum));
+            }
+            residualCapacity = BigDecimalUtil.sub(machineQuota, usedCapacity);
+            if (residualCapacity <= 0) {
+                break;
+            }
+            double assignQty = Math.min(residualCapacity, remainingEstimate);
+            assignQty = applyRoundingIfNeeded(assignQty);
+            if (assignQty <= 0) {
+                continue;
+            }
+            addClassPlanQty(spec, classNum, assignQty);
+
+            autoScheduleLogService.insertGsqScheduleLog(spec.getBatchNo(), spec.getOrderNo(),
+                    "S5.6-胎圈7班估值排产",
+                    "钢丝圈代码：" + spec.getSteelRingCode() + "，机台：" + machineCode
+                            + "，第6班排产估值" + assignQty);
         }
     }
 
@@ -573,7 +635,7 @@ public class GsqResidualCapacityHandler extends AbsGsqScheduleStepHandler {
      *
      * @param scheduleList 排程列表
      */
-    private void capBackupTotalQty(List<GsqScheduleResultVo> scheduleList) {
+    private void capBackupTotalQty(GsqScheduleContext context, List<GsqScheduleResultVo> scheduleList) {
         for (GsqScheduleResultVo scheduleVo : scheduleList) {
             // 仅处理备库规格
             if (scheduleVo.getBackupTriggerClass() == null || scheduleVo.getBackupTriggerClass() <= 0) {
@@ -593,22 +655,36 @@ public class GsqResidualCapacityHandler extends AbsGsqScheduleStepHandler {
             // 备库窗口之后仍有胎圈生产消耗（常规续供班次），总量上限必须包含这部分常规量，
             // 否则会从第6班往前把后续常规班次清零，导致"只排备库N班、后续不再排产"。
             // 备库窗口 = GSQ triggerClass ~ (triggerClass + backupShiftCount - 1) 班（供应胎圈 +1~+N 班）
+            // 常规续供班次已按损耗率放大（见 GsqPlanQtyCalcHandler.applyLossRateToRegularSupply），
+            // 故此处上限同样按损耗率放大，避免把乘了损耗的常规量从第6班往回截断。
+            // 注意：胎圈7班估值（钢丝圈6班）不在此处计入，由 S5.6 fillLastShiftEstimate 独立排产，
+            // 不受备库总量截断限制。
             Integer triggerClass = scheduleVo.getBackupTriggerClass();
             Integer backupShiftCount = scheduleVo.getBackupShiftCount();
             if (triggerClass != null && backupShiftCount != null && backupShiftCount > 0) {
-                for (int classNum = triggerClass + backupShiftCount; classNum <= 6; classNum++) {
-                    capLimit = BigDecimalUtil.add(capLimit, getTqPlan(scheduleVo, classNum + 1));
+                double regularMultiplier = getLossRateMultiplier(context, scheduleVo);
+                // 只统计窗口后到5班（6班对应胎圈7班估值，由 fillLastShiftEstimate 独立处理）
+                for (int classNum = triggerClass + backupShiftCount; classNum <= 5; classNum++) {
+                    double regularTq = getTqPlan(scheduleVo, classNum + 1);
+                    capLimit = BigDecimalUtil.add(capLimit, BigDecimalUtil.mul(regularTq, regularMultiplier));
                 }
             }
 
-            double totalScheduled = sumClassPlanQty(scheduleVo);
+            // 总排产量只统计备库窗口内班次及窗口后常规续供班次（triggerClass ~ 6班），
+            // 排除窗口前 gap fill（补库存）班次：gap fill 是"备库触发前因库存不足而补的量"，
+            // 不属于备库总量范畴，若计入会导致备库窗口班次被误削减。
+            double totalScheduled = 0D;
+            int startClass = triggerClass != null ? triggerClass : 1;
+            for (int classNum = startClass; classNum <= 6; classNum++) {
+                totalScheduled = BigDecimalUtil.add(totalScheduled, getClassPlanQty(scheduleVo, classNum));
+            }
             double overflow = BigDecimalUtil.sub(totalScheduled, capLimit);
             if (overflow <= 0) {
                 continue;
             }
 
-            // 从最后一班开始削减超排量
-            for (int classNum = 6; classNum >= 1 && overflow > 0; classNum--) {
+            // 从最后一班开始削减超排量（仅削减 triggerClass ~ 6班，不动窗口前 gap fill 班次）
+            for (int classNum = 6; classNum >= startClass && overflow > 0; classNum--) {
                 double classPlan = getClassPlanQty(scheduleVo, classNum);
                 if (classPlan <= 0) {
                     continue;
@@ -641,5 +717,23 @@ public class GsqResidualCapacityHandler extends AbsGsqScheduleStepHandler {
             total = BigDecimalUtil.add(total, getClassPlanQty(spec, i));
         }
         return total;
+    }
+
+    /**
+     * 获取规格损耗率乘数（1 + 损耗率）。
+     *
+     * <p>与 {@code GsqPlanQtyCalcHandler.applyLossRateToRegularSupply} 口径一致：
+     * 按钢丝圈代码取损耗率，未配置时回退全局参数损耗率。</p>
+     *
+     * @param context    排程上下文
+     * @param scheduleVo 排程记录
+     * @return 损耗率乘数
+     */
+    private double getLossRateMultiplier(GsqScheduleContext context, GsqScheduleResultVo scheduleVo) {
+        double paramLossRate = context.getParams().getLossRate() == null ? 0D : context.getParams().getLossRate();
+        Double specLossRate = context.getLossRateMap().get(scheduleVo.getSteelRingCode());
+        return specLossRate != null
+                ? BigDecimalUtil.add(1D, specLossRate)
+                : BigDecimalUtil.add(1D, paramLossRate);
     }
 }

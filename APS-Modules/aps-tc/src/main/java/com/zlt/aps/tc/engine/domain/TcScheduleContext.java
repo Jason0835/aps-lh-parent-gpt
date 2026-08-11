@@ -151,12 +151,33 @@ public class TcScheduleContext {
     }
 
     /**
+     * 追加指定班次的中文自动排程过程日志。
+     *
+     * @param shiftOrder 班次顺序
+     * @param format     日志格式，使用 MessageFormat 占位符
+     * @param args       日志参数
+     */
+    public void appendShiftProcessLog(Integer shiftOrder, String format, Object... args) {
+        this.getOrCreateProcessTraceBuffer().appendShiftSummary(shiftOrder, format, args);
+    }
+
+    /**
      * 追加一条完整中文过程事件。
      *
      * @param event 完整过程事件
      */
     public void appendFullProcessTrace(ScheduleProcessTraceEvent event) {
         this.getOrCreateProcessTraceBuffer().appendFull(event);
+    }
+
+    /**
+     * 追加指定班次的完整中文过程事件。
+     *
+     * @param shiftOrder 班次顺序
+     * @param event      完整过程事件
+     */
+    public void appendShiftFullProcessTrace(Integer shiftOrder, ScheduleProcessTraceEvent event) {
+        this.getOrCreateProcessTraceBuffer().appendShiftFull(shiftOrder, event);
     }
 
     /**

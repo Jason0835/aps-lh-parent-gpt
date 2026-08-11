@@ -1184,12 +1184,23 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         sourceTask.setPlanQty(remainQty);
         sourceTask.setPreLossPlanQty(this.deductQty(sourceTask.getPreLossPlanQty(), deductedQty));
         sourceTask.setPlanQtyBeforeToolLimit(this.deductQty(sourceTask.getPlanQtyBeforeToolLimit(), deductedQty));
-        sourceTask.setBaseDemandQty(this.deductQty(sourceTask.getBaseDemandQty(), deductedQty));
-        sourceTask.setDemandQty(this.deductQty(sourceTask.getDemandQty(), deductedQty));
-        sourceTask.setCurrentShiftDemandQty(this.deductQty(sourceTask.getCurrentShiftDemandQty(), deductedQty));
-        sourceTask.setGuardDemandQty(this.deductQty(sourceTask.getGuardDemandQty(), deductedQty));
-        sourceTask.setCurrentShiftStockGapQty(this.deductQty(sourceTask.getCurrentShiftStockGapQty(), deductedQty));
-        sourceTask.setStockGapQty(this.deductQty(sourceTask.getStockGapQty(), deductedQty));
+        // 当班需求与保证范围需求已拆分为不重叠区间，提前生产量先抵扣当班，再抵扣后续保证范围。
+        BigDecimal remainingDeductQty = nvl(deductedQty).max(BigDecimal.ZERO);
+        BigDecimal currentShiftDemandQty = nvl(sourceTask.getCurrentShiftDemandQty());
+        BigDecimal currentShiftDeductQty = currentShiftDemandQty.min(remainingDeductQty);
+        BigDecimal adjustedCurrentShiftDemandQty = currentShiftDemandQty.subtract(currentShiftDeductQty);
+        BigDecimal adjustedGuardDemandQty = nvl(sourceTask.getGuardDemandQty())
+                .subtract(remainingDeductQty.subtract(currentShiftDeductQty)).max(BigDecimal.ZERO);
+        sourceTask.setCurrentShiftDemandQty(adjustedCurrentShiftDemandQty);
+        sourceTask.setGuardDemandQty(adjustedGuardDemandQty);
+        sourceTask.setStockDeductQty(nvl(sourceTask.getRollingStockQty())
+                .min(adjustedCurrentShiftDemandQty.add(adjustedGuardDemandQty)));
+        sourceTask.setCurrentShiftStockGapQty(adjustedCurrentShiftDemandQty
+                .subtract(nvl(sourceTask.getRollingStockQty())).max(BigDecimal.ZERO));
+        sourceTask.setStockGapQty(adjustedCurrentShiftDemandQty.add(adjustedGuardDemandQty)
+                .subtract(nvl(sourceTask.getRollingStockQty())).max(BigDecimal.ZERO));
+        sourceTask.setDemandQty(sourceTask.getStockGapQty());
+        sourceTask.setBaseDemandQty(sourceTask.getStockGapQty());
         sourceTask.setPlanStockQty(nvl(sourceTask.getRollingStockQty()).add(nvl(sourceTask.getPlanQty()))
                 .subtract(nvl(sourceTask.getCurrentShiftDemandQty())).max(BigDecimal.ZERO));
         if (remainQty.compareTo(BigDecimal.ZERO) > 0) {
@@ -2217,7 +2228,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         BigDecimal currentSpecSwitchDeduct = this.nvl(task.getPreviousSpecSwitchHours())
                 .multiply(this.nvl(task.getMachineSpeed()));
         BigDecimal currentGlueSwitchDeduct = this.nvl(task.getPreviousGlueSwitchCapacityDeduct());
-        context.appendProcessLog("产能扣减：胎面代码={0}，机台={1}，班次={2}，最大产能={3}，检修扣减={4}，已排计划量扣减={5}，已发生切换扣减={6}，本次规格切换扣减={7}，本次胶料切换扣减={8}，分配前待承接量={9}，分配前剩余产能={10}，本次分配量={11}，分配后剩余产能={12}，溢出量={13}，拆分原因={14}",
+        context.appendShiftProcessLog(task.getShiftOrder(), "产能扣减：胎面代码={0}，机台={1}，班次={2}，最大产能={3}，检修扣减={4}，已排计划量扣减={5}，已发生切换扣减={6}，本次规格切换扣减={7}，本次胶料切换扣减={8}，分配前待承接量={9}，分配前剩余产能={10}，本次分配量={11}，分配后剩余产能={12}，溢出量={13}，拆分原因={14}",
                 task.getTreadCode(), candidate == null ? "未提供" : candidate.getMachineCode(), task.getShiftOrder(),
                 this.getCandidateEvidenceDecimal(evidence, "maxCapacity"),
                 this.getCandidateEvidenceDecimal(evidence, "maintenanceCapacityDeduct"),
@@ -2225,7 +2236,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
                 this.getCandidateEvidenceDecimal(evidence, "existingSwitchCapacityDeduct"),
                 currentSpecSwitchDeduct, currentGlueSwitchDeduct, this.nvl(beforeAssignQty), beforeRemainCapacity,
                 this.nvl(assignedQty), afterRemainCapacity, this.nvl(overflowQty), splitDesc);
-        context.appendFullProcessTrace(new ScheduleProcessTraceEvent(
+        context.appendShiftFullProcessTrace(task.getShiftOrder(), new ScheduleProcessTraceEvent(
                 "机台分配", task.getBusinessKey(), "机台产能即时扣减与拆分",
                 "选中机台的班次容量账本、检修计划、已排任务和切换扣减。",
                 "机台=" + (candidate == null ? "未提供" : candidate.getMachineCode()) + "，班次="

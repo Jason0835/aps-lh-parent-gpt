@@ -23,6 +23,7 @@ import com.zlt.aps.lh.api.enums.MouldChangeTypeEnum;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
 import com.zlt.aps.lh.api.enums.SkuScheduleSourceTypeEnum;
 import com.zlt.aps.lh.component.CapsuleReplacementRuleService;
+import com.zlt.aps.lh.component.EarlyProductionRuntimePlanService;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.component.OrderNoGenerator;
 import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
@@ -36,6 +37,9 @@ import com.zlt.aps.lh.engine.strategy.ITypeBlockProductionStrategy;
 import com.zlt.aps.lh.engine.strategy.support.DailyMachineExpansionPlanner;
 import com.zlt.aps.lh.engine.strategy.support.DailyMachineShortageQuotaPlan;
 import com.zlt.aps.lh.engine.strategy.support.DailyQuotaLedgerBaseline;
+import com.zlt.aps.lh.engine.strategy.support.EarlyProductionChecker;
+import com.zlt.aps.lh.engine.strategy.support.EarlyProductionDecision;
+import com.zlt.aps.lh.engine.strategy.support.EarlyProductionRuntimePlan;
 import com.zlt.aps.lh.engine.strategy.support.PendingSkuUnscheduledRule;
 import com.zlt.aps.lh.engine.strategy.support.SpecifiedMachineScheduleResult;
 import com.zlt.aps.lh.service.impl.LhMaintenanceScheduleService;
@@ -130,6 +134,9 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
     private IEndingJudgmentStrategy endingJudgmentStrategy;
     @Resource
     private TargetScheduleQtyResolver targetScheduleQtyResolver;
+    /** S4.4 与 S4.5 共用的提前生产运行态计划入口。 */
+    @Resource
+    private EarlyProductionRuntimePlanService earlyProductionRuntimePlanService;
     @Resource
     private LhMaintenanceScheduleService maintenanceScheduleService;
     @Resource
@@ -154,6 +161,16 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
         log.info("换活字块排产开始, 机台数: {}", context.getMachineScheduleMap().size());
 
         List<LhShiftConfigVO> shifts = LhScheduleTimeUtil.getScheduleShifts(context, context.getScheduleDate());
+        /*
+         * S4.4 的提前生产机台数门禁必须先纳入 S4.1～S4.3 已落地的续作结果。
+         * 该口径与 S4.5 共用上下文重建方法，避免换活字块阶段把已占用机台数误读为0。
+         */
+        int scheduledMachineRecordDateCount =
+                context.rebuildScheduledMachineCountMaps(shifts);
+        log.info("换活字块已排机台统计重建完成, factoryCode: {}, batchNo: {}, "
+                        + "resultCount: {}, recordDateCount: {}",
+                context.getFactoryCode(), context.getBatchNo(),
+                context.getScheduleResultList().size(), scheduledMachineRecordDateCount);
 
         // 基于续作收尾回写后的真实收尾时间，按机台收尾先后衔接换活字块。
         // 只有已标记收尾且有预计完工时刻的机台，才代表当前活字块可切换到下一规格。
@@ -729,6 +746,19 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                                         MachineScheduleDTO leftMachine,
                                         MachineScheduleDTO rightMachine,
                                         Map<String, String> machineTriggerSourceMap) {
+        /*
+         * 换活字块首先按机台真实收尾所属业务日竞争：T 日优先于 T+1，T+1 优先于 T+2。
+         * 同一业务日内继续沿用既有触发来源、切换就绪时间和机台顺序，避免改变原日内语义。
+         */
+        LocalDate leftEndingBusinessDate =
+                this.resolveTypeBlockEndingBusinessDate(context, leftMachine);
+        LocalDate rightEndingBusinessDate =
+                this.resolveTypeBlockEndingBusinessDate(context, rightMachine);
+        int endingBusinessDateCompare = this.compareNullableBusinessDate(
+                leftEndingBusinessDate, rightEndingBusinessDate);
+        if (endingBusinessDateCompare != 0) {
+            return endingBusinessDateCompare;
+        }
         String leftTriggerSource = machineTriggerSourceMap.get(leftMachine.getMachineCode());
         String rightTriggerSource = machineTriggerSourceMap.get(rightMachine.getMachineCode());
         int triggerOrderCompare = Integer.compare(
@@ -767,6 +797,74 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
             return endTimeCompare;
         }
         return compareMachineIdentity(leftMachine, rightMachine);
+    }
+
+    /**
+     * 解析机台预计收尾时刻所属的排程业务日。
+     *
+     * <p>夜班跨自然日时必须以班次 workDate 为准；恰好落在 06:00、14:00、22:00
+     * 边界的时刻归入下一班，但前后班的业务日口径保持项目现有班次配置。</p>
+     *
+     * @param context 排程上下文
+     * @param machine 候选机台
+     * @return 收尾所属业务日；无法命中班次时按自然日返回
+     */
+    private LocalDate resolveTypeBlockEndingBusinessDate(
+            LhScheduleContext context,
+            MachineScheduleDTO machine) {
+        if (Objects.isNull(machine) || Objects.isNull(machine.getEstimatedEndTime())) {
+            return null;
+        }
+        Date endingTime = machine.getEstimatedEndTime();
+        if (Objects.nonNull(context) && !CollectionUtils.isEmpty(context.getScheduleWindowShifts())) {
+            for (LhShiftConfigVO shift : context.getScheduleWindowShifts()) {
+                if (Objects.isNull(shift)
+                        || Objects.isNull(shift.getShiftStartDateTime())
+                        || Objects.isNull(shift.getShiftEndDateTime())
+                        || Objects.isNull(shift.getWorkDate())) {
+                    continue;
+                }
+                if (!endingTime.before(shift.getShiftStartDateTime())
+                        && endingTime.before(shift.getShiftEndDateTime())) {
+                    return shift.getWorkDate().toInstant()
+                            .atZone(ZoneId.systemDefault()).toLocalDate();
+                }
+            }
+        }
+        LocalDate endingDate = endingTime.toInstant()
+                .atZone(ZoneId.systemDefault()).toLocalDate();
+        if (Objects.nonNull(context) && !CollectionUtils.isEmpty(context.getScheduleWindowShifts())) {
+            LhShiftConfigVO firstShift = context.getScheduleWindowShifts().get(0);
+            if (Objects.nonNull(firstShift) && Objects.nonNull(firstShift.getWorkDate())) {
+                LocalDate windowStartDate = firstShift.getWorkDate().toInstant()
+                        .atZone(ZoneId.systemDefault()).toLocalDate();
+                // T 前已释放的兜底机台统一视为 T 日候选，不得形成额外的 T-1 排序层级。
+                if (endingDate.isBefore(windowStartDate)) {
+                    return windowStartDate;
+                }
+            }
+        }
+        return endingDate;
+    }
+
+    /**
+     * 比较可空业务日期，空日期排在有效日期之后。
+     *
+     * @param leftDate 左业务日
+     * @param rightDate 右业务日
+     * @return 比较结果
+     */
+    private int compareNullableBusinessDate(LocalDate leftDate, LocalDate rightDate) {
+        if (Objects.isNull(leftDate) && Objects.isNull(rightDate)) {
+            return 0;
+        }
+        if (Objects.isNull(leftDate)) {
+            return 1;
+        }
+        if (Objects.isNull(rightDate)) {
+            return -1;
+        }
+        return leftDate.compareTo(rightDate);
     }
 
     /**
@@ -1777,6 +1875,8 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
             recordTypeBlockAppendFailure(failureReason, "换活字块日计划账本回裁后为0");
             log.info("换活字块日计划账本回裁后为0, 跳过落地, machineCode: {}, materialCode: {}, 原排产量: {}",
                     machine.getMachineCode(), sku.getMaterialCode(), result.getDailyPlanQty());
+            // 回裁过程可能已经触碰临时前移 dayN、实际余量或胎胚账本，失败时必须完整恢复。
+            precisionQuotaBaseline.restore(context, sku);
             rollbackTypeBlockFirstInspectionSequence(context, machine, sku, switchStartTime, startTime, shifts);
             sku.setTargetScheduleQty(originalTargetScheduleQty);
             sku.setRemainingScheduleQty(originalRemainingScheduleQty);
@@ -1858,11 +1958,13 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                     context, "计划性维修与换活字块重叠时间轴", repairTimelineDetail.toString().trim());
         }
         registerMachineAssignment(context, machine.getMachineCode(), result);
+        this.recordTypeBlockScheduledMachineForResult(context, result, shifts);
         updateMachineState(context, machine, sku, result);
         if (wholeSingleControlUnit) {
             context.getScheduleResultList().add(pairResult);
             context.getScheduleResultSourceSkuMap().put(pairResult, sku);
             registerMachineAssignment(context, pairMachine.getMachineCode(), pairResult);
+            this.recordTypeBlockScheduledMachineForResult(context, pairResult, shifts);
             updateMachineState(context, pairMachine, sku, pairResult);
             log.info("双模换活字块L/R同步落地, materialCode: {}, primaryMachine: {}, pairMachine: {}, "
                             + "switchStartTime: {}, productionStartTime: {}, totalScheduledQty: {}",
@@ -1891,6 +1993,45 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
         log.debug("换活字块排产完成, 机台: {}, SKU: {}, 已排: {}, 剩余: {}",
                 machine.getMachineCode(), sku.getMaterialCode(), scheduledQty, remainingQty);
         return true;
+    }
+
+    /**
+     * 按结果实际有量业务日登记结构和 SKU 已排机台。
+     *
+     * <p>S4.4 可能连续处理多个提前生产 SKU，首个换活字块成功后必须立即更新物理机台
+     * 统计，后续候选才能正确执行“包含本次后不得超过计划硫化机台数”的硬约束。</p>
+     *
+     * @param context 排程上下文
+     * @param result 已落地换活字块结果
+     * @param shifts 排程窗口班次
+     */
+    private void recordTypeBlockScheduledMachineForResult(
+            LhScheduleContext context,
+            LhScheduleResult result,
+            List<LhShiftConfigVO> shifts) {
+        if (Objects.isNull(context) || Objects.isNull(result)
+                || CollectionUtils.isEmpty(shifts)
+                || StringUtils.isEmpty(result.getLhMachineCode())) {
+            return;
+        }
+        Set<LocalDate> recordedDateSet = new LinkedHashSet<LocalDate>(3);
+        for (LhShiftConfigVO shift : shifts) {
+            if (Objects.isNull(shift) || Objects.isNull(shift.getShiftIndex())
+                    || Objects.isNull(shift.getWorkDate())) {
+                continue;
+            }
+            Integer planQty = ShiftFieldUtil.getShiftPlanQty(
+                    result, shift.getShiftIndex());
+            if (Objects.nonNull(planQty) && planQty > 0) {
+                recordedDateSet.add(shift.getWorkDate().toInstant()
+                        .atZone(ZoneId.systemDefault()).toLocalDate());
+            }
+        }
+        for (LocalDate businessDate : recordedDateSet) {
+            context.recordScheduledMachine(
+                    businessDate, result.getStructureName(), result.getMaterialCode(),
+                    result.getProductStatus(), result.getLhMachineCode());
+        }
     }
 
     /**
@@ -2066,29 +2207,25 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                                                       boolean isSingleMachine,
                                                       StringBuilder failureReason) {
         /*
-         * 换活字块只能承接实际开产业务日已有原始 dayN 的 SKU。该校验必须在结果写入前执行，
-         * 且直接读取月计划原始值，禁止使用临时前移账本、历史欠产或剩余目标量替代。
+         * 实际开产业务日有原始 dayN 时沿用普通换活字块；原始 dayN 为0时，只有命中窗口内
+         * 未来计划并通过提前生产中心规则，才允许复用同一换活字块主链。
          */
         LocalDate productionWorkDate = resolveTypeBlockProductionWorkDate(shifts, startTime);
         int originalDayPlanQty = resolveTypeBlockOriginalDayPlanQty(
                 context, sku, productionWorkDate);
         boolean success = originalDayPlanQty > 0;
         if (!success) {
-            String reason = Objects.isNull(productionWorkDate)
-                    ? "换活字块实际开产业务日无法从班次窗口解析"
-                    : "换活字块实际开产业务日原始日计划量为0，禁止主动拉取未来SKU";
-            if (Objects.nonNull(failureReason)) {
-                if (failureReason.length() > 0) {
-                    failureReason.append('；');
-                }
-                failureReason.append(reason);
+            String earlyProductionRejectReason = this.prepareTypeBlockEarlyProduction(
+                    context, machine, sku, productionWorkDate,
+                    switchStartTime, startTime);
+            success = StringUtils.isEmpty(earlyProductionRejectReason);
+            if (!success) {
+                this.recordTypeBlockAppendFailure(
+                        failureReason, earlyProductionRejectReason);
             }
-            log.info("换活字块原始日计划准入未通过, materialCode: {}, machineCode: {}, "
-                            + "productionWorkDate: {}, originalDayPlanQty: {}, reason: {}",
-                    sku.getMaterialCode(), machine.getMachineCode(), productionWorkDate,
-                    originalDayPlanQty, reason);
-        } else {
-            // 调用处通过原始日计划准入后，继续复用既有换活字块结果构造和资源扣减主链。
+        }
+        if (success) {
+            // 普通 dayN 和提前生产共用既有换活字块结果构造、实际余量及日计划扣账主链。
             success = appendFollowUpResult(
                     context, machine, sku, startTime, switchStartTime, shifts,
                     isSingleMachine, failureReason);
@@ -2098,6 +2235,118 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
             getMouldChangeBalanceStrategy().rollbackMouldChange(context, switchStartTime);
         }
         return success;
+    }
+
+    /**
+     * 为零原始日计划的换活字块候选准备提前生产运行视图并执行候选机台硬控。
+     *
+     * <p>换活字块和开产时刻必须同时位于本批窗口；结构机台数达到月计划上限后，
+     * 只允许复用已经计入目标结构的物理机台。准入失败只回滚当前换活字块时间配额，
+     * 不删除已激活运行视图，使后续合法机台或 S4.5 可以继续消费同一账本。</p>
+     *
+     * @param context 排程上下文
+     * @param machine 当前候选机台
+     * @param sku 目标 SKU
+     * @param productionWorkDate 实际开产业务日
+     * @param switchStartTime 换活字块开始时刻
+     * @param productionStartTime 开产时刻
+     * @return 空串表示允许；非空为明确拒绝原因
+     */
+    private String prepareTypeBlockEarlyProduction(
+            LhScheduleContext context,
+            MachineScheduleDTO machine,
+            SkuScheduleDTO sku,
+            LocalDate productionWorkDate,
+            Date switchStartTime,
+            Date productionStartTime) {
+        if (Objects.isNull(productionWorkDate)) {
+            return "换活字块实际开产业务日无法从班次窗口解析";
+        }
+        if (!this.isTimeInScheduleWindow(context, switchStartTime)
+                || !this.isTimeInScheduleWindow(context, productionStartTime)) {
+            return "提前生产换活字块或开产时刻超出排程窗口";
+        }
+        if (Objects.isNull(earlyProductionRuntimePlanService)) {
+            return "提前生产运行态计划服务未初始化";
+        }
+        EarlyProductionRuntimePlan runtimePlan =
+                earlyProductionRuntimePlanService.prepareRuntimePlan(
+                        context, sku, productionWorkDate);
+        EarlyProductionDecision decision = Objects.isNull(runtimePlan)
+                ? null : runtimePlan.getDecision();
+        if (Objects.isNull(runtimePlan) || !runtimePlan.isActive()
+                || Objects.isNull(decision) || !decision.isEarlyProduction()
+                || !decision.isAllowed() || Objects.isNull(runtimePlan.getFuturePlanDate())) {
+            String decisionReason = Objects.isNull(decision)
+                    ? "未命中窗口内未来日计划"
+                    : decision.getReason();
+            log.info("换活字块提前生产准入未通过, factoryCode: {}, batchNo: {}, "
+                            + "materialCode: {}, machineCode: {}, productionWorkDate: {}, reason: {}",
+                    context.getFactoryCode(), context.getBatchNo(), sku.getMaterialCode(),
+                    machine.getMachineCode(), productionWorkDate, decisionReason);
+            return new StringBuilder("换活字块实际开产业务日原始日计划量为0，提前生产准入未通过：")
+                    .append(StringUtils.defaultString(decisionReason, "无明确原因"))
+                    .toString();
+        }
+        boolean machineAllowed = EarlyProductionChecker.canUseMachineForEarlyProduction(
+                context, sku, productionWorkDate, runtimePlan.getFuturePlanDate(),
+                machine.getMachineCode());
+        if (!machineAllowed) {
+            int scheduledMachineCount = context.getStructureScheduledMachineCount(
+                    productionWorkDate, sku.getStructureName());
+            int planMachineCount = EarlyProductionChecker.resolveEffectiveStructurePlanMachineCount(
+                    context, sku, productionWorkDate, runtimePlan.getFuturePlanDate());
+            boolean exceededPlanMachineCount =
+                    planMachineCount > 0 && scheduledMachineCount > planMachineCount;
+            String reasonPrefix = exceededPlanMachineCount
+                    ? "同结构当前已排物理机台数超过计划硫化机台数，禁止提前生产，结构="
+                    : "同结构计划硫化机台数已达上限，禁止提前生产新增物理机台，结构=";
+            String reason = new StringBuilder(reasonPrefix)
+                    .append(PriorityTraceLogHelper.safeText(sku.getStructureName()))
+                    .append("，当前已排物理机台数=").append(scheduledMachineCount)
+                    .append("，计划机台数=").append(planMachineCount)
+                    .append("，候选机台=")
+                    .append(PriorityTraceLogHelper.safeText(machine.getMachineCode()))
+                    .toString();
+            log.info("换活字块提前生产结构机台数限制, factoryCode: {}, batchNo: {}, "
+                            + "materialCode: {}, productionWorkDate: {}, futurePlanDate: {}, reason: {}",
+                    context.getFactoryCode(), context.getBatchNo(), sku.getMaterialCode(),
+                    productionWorkDate, runtimePlan.getFuturePlanDate(), reason);
+            return reason;
+        }
+        context.getNewSpecEarlyProductionAllowedMap().put(sku, Boolean.TRUE);
+        log.info("换活字块提前生产准入通过, factoryCode: {}, batchNo: {}, materialCode: {}, "
+                        + "machineCode: {}, productionWorkDate: {}, futurePlanDate: {}, "
+                        + "switchStartTime: {}, productionStartTime: {}, structureName: {}",
+                context.getFactoryCode(), context.getBatchNo(), sku.getMaterialCode(),
+                machine.getMachineCode(), productionWorkDate, runtimePlan.getFuturePlanDate(),
+                LhScheduleTimeUtil.formatDateTime(switchStartTime),
+                LhScheduleTimeUtil.formatDateTime(productionStartTime), sku.getStructureName());
+        return StringUtils.EMPTY;
+    }
+
+    /**
+     * 判断时刻是否位于本批排程窗口内。
+     *
+     * @param context 排程上下文
+     * @param dateTime 待判断时刻
+     * @return true-大于等于首班开始且早于末班结束
+     */
+    private boolean isTimeInScheduleWindow(LhScheduleContext context, Date dateTime) {
+        if (Objects.isNull(context) || Objects.isNull(dateTime)
+                || CollectionUtils.isEmpty(context.getScheduleWindowShifts())) {
+            return false;
+        }
+        LhShiftConfigVO firstShift = context.getScheduleWindowShifts().get(0);
+        LhShiftConfigVO lastShift = context.getScheduleWindowShifts()
+                .get(context.getScheduleWindowShifts().size() - 1);
+        if (Objects.isNull(firstShift) || Objects.isNull(lastShift)
+                || Objects.isNull(firstShift.getShiftStartDateTime())
+                || Objects.isNull(lastShift.getShiftEndDateTime())) {
+            return false;
+        }
+        return !dateTime.before(firstShift.getShiftStartDateTime())
+                && dateTime.before(lastShift.getShiftEndDateTime());
     }
 
     /**
@@ -3343,7 +3592,7 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
         // 日标准产量：复用上下文 SKU 日硫化产能主数据，无主数据则为 0
         result.setStandardCapacity(ShiftCapacityResolverUtil.resolveDailyStandardQty(
                 context, sku.getMaterialCode()));
-        // 换活字块结果不参与提前生产判定，标识固定为 0
+        // 普通换活字块默认不是提前生产；命中共享运行视图时由结果审计方法统一改为1并追加备注。
         result.setIsEarlyProduction(NO_FLAG);
         result.setIsEnd(isEnding ? YES_FLAG : NO_FLAG);
         result.setIsDelivery(sku.isDeliveryLocked() ? YES_FLAG : NO_FLAG);
@@ -3429,8 +3678,57 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
         refreshResultSummary(context, result, shifts);
         result.setRealScheduleDate(context.getScheduleDate());
         result.setProductionStatus(NO_FLAG);
+        this.appendTypeBlockEarlyProductionAudit(
+                context, sku, result,
+                resolveTypeBlockProductionWorkDate(shifts, startTime));
 
         return result;
+    }
+
+    /**
+     * 将换活字块提前生产判定写入结果标识和备注。
+     *
+     * @param context 排程上下文
+     * @param sku 当前 SKU
+     * @param result 换活字块结果
+     * @param productionWorkDate 实际开产业务日
+     */
+    private void appendTypeBlockEarlyProductionAudit(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            LhScheduleResult result,
+            LocalDate productionWorkDate) {
+        if (Objects.isNull(context) || Objects.isNull(sku) || Objects.isNull(result)) {
+            return;
+        }
+        EarlyProductionRuntimePlan runtimePlan =
+                context.getEarlyProductionRuntimePlan(sku);
+        EarlyProductionDecision decision = Objects.isNull(runtimePlan)
+                ? null : runtimePlan.getDecision();
+        if (Objects.isNull(runtimePlan) || !runtimePlan.isActive()
+                || Objects.isNull(decision) || !decision.isEarlyProduction()
+                || !decision.isAllowed()
+                || !Objects.equals(productionWorkDate, runtimePlan.getCurrentDate())
+                || this.resolveTypeBlockOriginalDayPlanQty(
+                context, sku, productionWorkDate) > 0) {
+            return;
+        }
+        result.setIsEarlyProduction(YES_FLAG);
+        String remarkFragment = decision.buildRemark();
+        if (StringUtils.isNotEmpty(remarkFragment)
+                && !StringUtils.contains(result.getRemark(), remarkFragment)) {
+            String currentRemark = result.getRemark();
+            result.setRemark(StringUtils.isEmpty(currentRemark)
+                    ? remarkFragment
+                    : new StringBuilder(currentRemark.length() + remarkFragment.length() + 1)
+                    .append(currentRemark).append('；').append(remarkFragment).toString());
+        }
+        log.info("换活字块提前生产结果审计写入, factoryCode: {}, batchNo: {}, "
+                        + "materialCode: {}, machineCode: {}, productionWorkDate: {}, "
+                        + "futurePlanDate: {}, isEarlyProduction: {}, remark: {}",
+                context.getFactoryCode(), context.getBatchNo(), result.getMaterialCode(),
+                result.getLhMachineCode(), productionWorkDate, runtimePlan.getFuturePlanDate(),
+                result.getIsEarlyProduction(), result.getRemark());
     }
 
     /**
@@ -4578,7 +4876,14 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
         if (cappedQty <= 0) {
             return 0;
         }
-        Map<LocalDate, SkuDailyPlanQuotaDTO> quotaMap = sku.getDailyPlanQuotaMap();
+        /*
+         * 提前生产必须消费共享的临时前移 dayN；普通换活字块直接消费 SKU 原始账本。
+         * 不能让已激活但不属于本结果业务日的临时视图污染原计划日扣账。
+         */
+        Map<LocalDate, SkuDailyPlanQuotaDTO> quotaMap =
+                YES_FLAG.equals(result.getIsEarlyProduction())
+                        ? context.resolveEffectiveDailyPlanQuotaMap(sku)
+                        : sku.getDailyPlanQuotaMap();
         if (quotaMap == null || quotaMap.isEmpty()) {
             refreshResultSummary(context, result, shifts);
             int actualQty = result.getDailyPlanQty() != null ? result.getDailyPlanQty() : 0;

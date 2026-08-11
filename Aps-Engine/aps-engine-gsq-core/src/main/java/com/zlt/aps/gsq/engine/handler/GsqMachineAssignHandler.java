@@ -364,6 +364,11 @@ public class GsqMachineAssignHandler extends AbsGsqScheduleStepHandler {
             }
 
             // 逐班次限制当班初始排产，超出部分延后到下一班（但不得推出备库窗口）
+            // 仅限制备库窗口内非末班班次（triggerClass ~ windowEnd-1）：
+            //   - 窗口前的 gap fill（补库存）班次不受备库多规格限制，避免把 gap fill 量误延后到备库窗口内，
+            //     导致窗口内超排（如 211000015 的 1 班 gap fill 867 被限制为 500，367 延后到 2 班，
+            //     使备库窗口内总量从 872 超排到 1239）
+            //   - 窗口末班不限制，避免备库量被推到窗口外
             for (int classIndex = 1; classIndex <= 6; classIndex++) {
                 double plan = getShiftPlan(scheduleVo, classIndex);
                 if (plan <= 0) {
@@ -372,8 +377,8 @@ public class GsqMachineAssignHandler extends AbsGsqScheduleStepHandler {
                 if (plan <= limit) {
                     continue;
                 }
-                // 窗口末班：不往窗口外延后，保持当前班排产（总量由 S5.5/S5.6 兜底）
-                if (classIndex >= windowEnd) {
+                // 跳过窗口前 gap fill 班次和窗口末班
+                if (classIndex < triggerClass || classIndex >= windowEnd) {
                     continue;
                 }
                 double overflow = BigDecimalUtil.sub(plan, limit);

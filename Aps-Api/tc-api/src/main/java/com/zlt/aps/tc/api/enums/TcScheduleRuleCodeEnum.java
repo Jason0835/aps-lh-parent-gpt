@@ -74,6 +74,9 @@ public enum TcScheduleRuleCodeEnum {
     /** 需求量计算。 */
     DEMAND_QTY_CALC("DEMAND_QTY_CALC", "需求量计算"),
 
+    /** 当班与下一排程班库存覆盖判断。 */
+    TWO_SHIFT_STOCK_COVERAGE("TWO_SHIFT_STOCK_COVERAGE", "两班库存覆盖判断"),
+
     /** 计划量计算。 */
     PLAN_QTY_CALC("PLAN_QTY_CALC", "计划量计算"),
 

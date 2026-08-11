@@ -2,24 +2,24 @@ package com.zlt.aps.mdm.service.impl;
 
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.mdm.api.domain.entity.MdmSkuLhCapacity;
 import com.zlt.aps.mdm.mapper.MdmSkuLhCapacityEntityMapper;
 import com.zlt.aps.mdm.service.IMdmSkuLhCapacityService;
-import com.zlt.aps.mdm.api.domain.entity.MdmSkuLhCapacity;
+import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.utils.PubUtil;
 import com.zlt.sysdef.domain.SysDocType;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import lombok.extern.slf4j.Slf4j;
+import org.springframework.transaction.annotation.Transactional;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-
-import org.springframework.transaction.annotation.Transactional;
-import com.zlt.bill.common.service.AbstractDocService;
-import com.ruoyi.common.exception.ServiceException;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -84,7 +84,7 @@ public class MdmSkuLhCapacityServiceImpl extends AbstractDocService<MdmSkuLhCapa
     @Override
     public AjaxResult importData(List<MdmSkuLhCapacity> list, boolean updateSupport, Long importLogId) {
         // 计算APS日硫化量
-        calculateApsCapacity(list);
+//        calculateApsCapacity(list);
         return super.importData(list, updateSupport, importLogId);
     }
 

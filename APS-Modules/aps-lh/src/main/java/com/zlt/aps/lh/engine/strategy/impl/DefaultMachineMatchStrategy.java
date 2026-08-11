@@ -34,6 +34,7 @@ import com.zlt.aps.lh.util.MachineStatusUtil;
 import com.zlt.aps.lh.util.PriorityTraceLogHelper;
 import com.zlt.aps.lh.util.ShiftProductionControlUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
+import com.zlt.aps.lh.util.SkuConstructionRefResolverUtil;
 import com.zlt.aps.mdm.api.domain.entity.MdmDevicePlanShut;
 import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmModelInfo;
@@ -1921,8 +1922,8 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
 
     /**
      * 记录当前新增 SKU 实际使用的候选机台优先级顺序。
-     * <p>候选列表由新增排产主链完成动态过滤和选机顺序调整，本方法只复用现有排序得分与
-     * 收尾窗口画像生成日志，禁止重新执行候选过滤或排序。</p>
+     * <p>候选列表由新增排产主链完成动态过滤和选机顺序调整。本方法禁止重新执行业务候选
+     * 过滤或正式选机排序，只允许在独立日志列表上按收尾时间调整展示顺序。</p>
      *
      * @param context 排程上下文
      * @param sku 当前待选机 SKU
@@ -1953,7 +1954,8 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
     /**
      * 输出当前选机时点的完整优先级日志。
      *
-     * <p>排序后的快照已由调用处和诊断构建入口共同确定，本方法只格式化并写过程日志。
+     * <p>快照已由调用处和诊断构建入口共同确定。本方法只复制日志候选并按冻结收尾时间
+     * 调整展示顺序，然后格式化并写入过程日志，不修改快照或正式选机顺序。
      * 实际可选机台显示“可用”；仅因其它 SKU 占用而补入的机台显示“已被占用、仅日志展示”。
      * 部分占用后仍可接续的正式候选继续显示“可用”，同时完整展示前序占用明细。</p>
      *
@@ -1991,8 +1993,8 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
                 resolveSelectedDisplayMachineCode(traceSnapshot);
         String actualHitDisplayMachineCode =
                 resolveActualHitDisplayMachineCode(traceSnapshot);
-        String traceHeader = buildMachinePriorityTraceHeader(
-                traceSnapshot, selectedDisplayMachineCode, actualHitDisplayMachineCode);
+        String traceHeader = this.buildMachinePriorityTraceHeader(
+                sku, traceSnapshot, selectedDisplayMachineCode, actualHitDisplayMachineCode);
         if (CollectionUtils.isEmpty(orderedCandidates)) {
             PriorityTraceLogHelper.logSortSummary(
                     log, context, title,
@@ -2002,16 +2004,19 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
 
         Map<String, CandidateWindowProfile> profileCache =
                 new HashMap<>(Math.max(4, orderedCandidates.size() * 2));
+        /*
+         * 日志展示使用独立列表按冻结收尾时间稳定排序，收尾时间相同保持快照原顺序，空时间放最后。
+         * 禁止修改快照中的正式候选顺序，首选候选和实际命中仍以主链已经确认的结果为准。
+         */
+        List<MachineScheduleDTO> displayCandidates =
+                this.sortPriorityTraceDisplayCandidates(
+                        context, sku, traceSnapshot, orderedCandidates, profileCache);
         StringBuilder detailBuilder =
-                new StringBuilder(Math.max(512, orderedCandidates.size() * 360));
+                new StringBuilder(Math.max(512, displayCandidates.size() * 360));
         detailBuilder.append(traceHeader).append('\n');
-        for (int i = 0; i < orderedCandidates.size(); i++) {
-            MachineScheduleDTO machine = orderedCandidates.get(i);
-            if (Objects.isNull(machine)) {
-                continue;
-            }
+        for (int i = 0; i < displayCandidates.size(); i++) {
+            MachineScheduleDTO machine = displayCandidates.get(i);
             // 复用当前选机比较器使用的得分，保证日志指标与真实排序口径一致。
-            CandidateWindowProfile profile = resolveCandidateWindowProfile(context, sku, machine, profileCache);
             int singleControlScore = resolveSingleControlScore(context, sku, machine);
             int embryoMatchScore = resolveEmbryoMatchScore(context, sku, machine);
             int mouldShellMatchScore = resolveMouldShellMatchScore(context, sku, machine);
@@ -2044,12 +2049,8 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
              * 已被推进而污染延迟日志。旧日志入口未携带冻结值时，继续回落到原有实时解析逻辑，
              * 保持非默认策略和历史测试替身兼容。
              */
-            Date traceEndingTime =
-                    traceSnapshot.hasPriorityTraceEndingTime(machine.getMachineCode())
-                            ? traceSnapshot.resolvePriorityTraceEndingTime(
-                            machine.getMachineCode())
-                            : this.resolvePriorityTraceEndingTime(
-                            context, profile.getReferenceTime(), occupationText);
+            Date traceEndingTime = this.resolvePriorityTraceDisplayEndingTime(
+                    context, sku, traceSnapshot, machine, profileCache);
             detailBuilder.append(i + 1).append(". ")
                     .append(resolvePriorityTraceTitleValue(displayMachineCode))
                     .append("｜机台类型：")
@@ -2074,7 +2075,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
                     .append("（").append(resolveYesNo(capsuleScore == 0)).append("）")
                     .append("｜同英寸：").append(resolveMatchedValueText(proSizeMatchScore == 0, proSizeMatchedValue))
                     .append("｜相近英寸：").append(resolvePriorityInchDistance(inchDistance));
-            if (i < orderedCandidates.size() - 1) {
+            if (i < displayCandidates.size() - 1) {
                 detailBuilder.append('\n');
             }
         }
@@ -2084,17 +2085,25 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
     /**
      * 构建选机日志顶部的结果摘要。
      *
+     * @param sku 当前待选机 SKU
      * @param traceSnapshot 已确认命中或未命中的日志快照
      * @param selectedDisplayMachineCode 首选候选展示编码
      * @param actualHitDisplayMachineCode 实际命中展示编码
      * @return 包含首选候选、实际命中、结果及终止原因的多行摘要
      */
     private String buildMachinePriorityTraceHeader(
+            SkuScheduleDTO sku,
             MachinePriorityTraceSnapshot traceSnapshot,
             String selectedDisplayMachineCode,
             String actualHitDisplayMachineCode) {
-        StringBuilder headerBuilder = new StringBuilder(192);
-        headerBuilder.append("本轮首选候选机台：")
+        StringBuilder headerBuilder = new StringBuilder(256);
+        headerBuilder.append("物料： ")
+                .append(sku.getMaterialCode())
+                .append("  产品状态： ")
+                .append(SkuConstructionRefResolverUtil.resolveProductStatusDesc(
+                        sku.getProductStatus()))
+                .append('\n')
+                .append("本轮首选候选机台：")
                 .append(StringUtils.isEmpty(selectedDisplayMachineCode)
                         ? "无" : selectedDisplayMachineCode)
                 .append('\n')
@@ -2111,6 +2120,68 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
                     .append(traceSnapshot.getNoHitReason());
         }
         return headerBuilder.toString();
+    }
+
+    /**
+     * 按日志实际展示的收尾时间生成独立候选顺序。
+     *
+     * <p>本方法只复制并排序日志列表，不修改快照保存的正式选机顺序。排序采用稳定排序，
+     * 收尾时间相同继续保持快照原顺序，收尾时间为空的机台统一放在最后。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 当前待选机 SKU
+     * @param traceSnapshot 选机时点日志快照
+     * @param orderedCandidates 快照中的原始日志候选顺序
+     * @param profileCache 候选时间画像缓存
+     * @return 仅供日志展示的收尾时间升序列表
+     */
+    private List<MachineScheduleDTO> sortPriorityTraceDisplayCandidates(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            MachinePriorityTraceSnapshot traceSnapshot,
+            List<MachineScheduleDTO> orderedCandidates,
+            Map<String, CandidateWindowProfile> profileCache) {
+        List<MachineScheduleDTO> displayCandidates = orderedCandidates.stream()
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+        displayCandidates.sort(Comparator.comparing(
+                (MachineScheduleDTO machine) ->
+                        this.resolvePriorityTraceDisplayEndingTime(
+                                context, sku, traceSnapshot, machine, profileCache),
+                Comparator.nullsLast(Comparator.naturalOrder())));
+        return displayCandidates;
+    }
+
+    /**
+     * 获取机台在选机日志中实际展示并用于展示排序的收尾时间。
+     *
+     * <p>正式新增排产优先读取选机时点冻结值，避免排产提交后机台时间被推进；
+     * 兼容旧入口时继续复用原有候选画像及无占用机台的窗口起点口径。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 当前待选机 SKU
+     * @param traceSnapshot 选机时点日志快照
+     * @param machine 日志候选机台
+     * @param profileCache 候选时间画像缓存
+     * @return 日志展示收尾时间，无法确定时返回 null
+     */
+    private Date resolvePriorityTraceDisplayEndingTime(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            MachinePriorityTraceSnapshot traceSnapshot,
+            MachineScheduleDTO machine,
+            Map<String, CandidateWindowProfile> profileCache) {
+        if (Objects.isNull(machine)) {
+            return null;
+        }
+        if (traceSnapshot.hasPriorityTraceEndingTime(machine.getMachineCode())) {
+            return traceSnapshot.resolvePriorityTraceEndingTime(machine.getMachineCode());
+        }
+        CandidateWindowProfile profile = this.resolveCandidateWindowProfile(
+                context, sku, machine, profileCache);
+        return this.resolvePriorityTraceEndingTime(
+                context, profile.getReferenceTime(),
+                traceSnapshot.resolveOccupationText(machine.getMachineCode()));
     }
 
     /**

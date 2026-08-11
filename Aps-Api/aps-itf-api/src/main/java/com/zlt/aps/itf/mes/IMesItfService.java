@@ -340,6 +340,24 @@ public interface IMesItfService {
     public AjaxResult syncMesTqStock(@RequestBody AuxReqSyncDataLogs syncDataLogs);
 
     /**
+     * 同步胎圈排程日完成量
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步胎圈排程日完成量")
+    @PostMapping("/mesItf/syncTqScheDayFinishQty")
+    public AjaxResult syncTqScheDayFinishQty(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 同步钢丝圈排程日完成量
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步钢丝圈排程日完成量")
+    @PostMapping("/mesItf/syncGsqScheDayFinishQty")
+    public AjaxResult syncGsqScheDayFinishQty(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /**
      * 同步成型排程完成量
      * @param syncDataLogs 参数
      * @return 结果

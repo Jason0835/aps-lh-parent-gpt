@@ -629,6 +629,22 @@ public class MesItfController {
         return mesItfService.syncTqScheDayFinishQty(syncDataLogs);
     }
 
+    /**
+     * 同步钢丝圈排程日完成量
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步钢丝圈排程日完成量")
+    @PostMapping("/syncGsqScheDayFinishQty")
+    @AutoLoginLog
+    public AjaxResult syncGsqScheDayFinishQty(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
+        String factoryCode = syncDataLogs.getFactoryCode();
+        if (StringUtils.isBlank(factoryCode)) {
+            syncDataLogs.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        }
+        return mesItfService.syncGsqScheDayFinishQty(syncDataLogs);
+    }
+
 
 
     /**

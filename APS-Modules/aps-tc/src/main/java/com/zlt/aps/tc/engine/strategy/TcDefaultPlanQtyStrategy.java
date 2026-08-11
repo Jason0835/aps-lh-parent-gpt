@@ -32,9 +32,22 @@ public class TcDefaultPlanQtyStrategy implements ITcPlanQtyStrategy {
             throw new ServiceException(TcScheduleErrorCodeEnum.TC_TASK_NOT_FOUND.getDefaultMessage());
         }
         BigDecimal currentDemand = nvl(taskDraft.getCurrentShiftDemandQty());
+        BigDecimal nextShiftDemand = nvl(taskDraft.getNextShiftDemandQty());
         BigDecimal guardDemand = nvl(taskDraft.getGuardDemandQty());
-        BigDecimal grossDemand = currentDemand.max(guardDemand);
         BigDecimal stock = nvl(taskDraft.getRollingStockQty());
+        BigDecimal twoShiftDemand = currentDemand.add(nextShiftDemand);
+        BigDecimal twoShiftStockGap = twoShiftDemand.subtract(stock);
+        taskDraft.setTwoShiftDemandQty(twoShiftDemand);
+        taskDraft.setTwoShiftStockGapQty(twoShiftStockGap);
+        if (this.isTwoShiftStockCoverageApplicable(taskDraft)
+                && twoShiftStockGap.compareTo(BigDecimal.ZERO) <= 0) {
+            taskDraft.setTwoShiftStockCovered(Boolean.TRUE);
+            return this.buildTwoShiftCoveredResult(taskDraft, currentDemand, twoShiftDemand, stock);
+        }
+        if (this.isTwoShiftStockCoverageApplicable(taskDraft)) {
+            taskDraft.setTwoShiftStockCovered(Boolean.FALSE);
+        }
+        BigDecimal grossDemand = currentDemand.max(guardDemand);
         BigDecimal stockDeductQty = stock.min(grossDemand);
         BigDecimal planQty = currentDemand.subtract(stock)
                 .max(guardDemand.subtract(stock))
@@ -77,6 +90,54 @@ public class TcDefaultPlanQtyStrategy implements ITcPlanQtyStrategy {
         taskDraft.setPlanStockQty(calculateHandoverStock(stock, currentDemand, planQty));
         result.setCalcFormulaDesc(tailTask ? "收尾余量" : "基础需求->库存抵扣->派机前最小起排与卷数取整估算");
         taskDraft.setPlanQty(planQty);
+        return result;
+    }
+
+    /**
+     * 判断当前任务是否应用两班库存覆盖门槛。
+     *
+     * <p>常规和收尾成型需求应用门槛；新规格提前排产和实验规格固定补量保持原有优先级，
+     * 即使特殊任务因兼容路径进入本策略，也不会被两班库存门槛清零。</p>
+     *
+     * @param taskDraft 胎侧任务草稿
+     * @return true 表示应执行两班库存判断
+     */
+    private boolean isTwoShiftStockCoverageApplicable(TcTaskDraft taskDraft) {
+        boolean newSpecAdvanceTask = taskDraft.getNewSpecInfo() != null
+                && taskDraft.getNewSpecInfo().isNewSpecHit();
+        boolean experimentSpecTask = taskDraft.getExperimentSpecInfo() != null
+                && taskDraft.getExperimentSpecInfo().isExperimentSpecHit();
+        return !newSpecAdvanceTask && !experimentSpecTask;
+    }
+
+    /**
+     * 构建滚动库存已覆盖当班和下班需求时的零计划结果。
+     *
+     * @param taskDraft      胎侧任务草稿
+     * @param currentDemand  当班成型需求
+     * @param twoShiftDemand 当班与下班需求合计
+     * @param stock          当班班初滚动库存
+     * @return 各计划量分量均为0的计划量结果
+     */
+    private TcPlanQtyResult buildTwoShiftCoveredResult(TcTaskDraft taskDraft, BigDecimal currentDemand,
+                                                        BigDecimal twoShiftDemand, BigDecimal stock) {
+        BigDecimal zero = BigDecimal.ZERO;
+        taskDraft.setStockDeductQty(stock.min(twoShiftDemand));
+        taskDraft.setPlanStockQty(stock.subtract(currentDemand).max(zero));
+        taskDraft.setPlanQty(zero);
+
+        TcPlanQtyResult result = new TcPlanQtyResult();
+        result.setBaseDemandQty(zero);
+        result.setLossAddQty(zero);
+        result.setMinStartAdjustQty(zero);
+        result.setTailRoundAdjustQty(zero);
+        result.setToolLimitAdjustQty(zero);
+        result.setToolOverflowQty(zero);
+        result.setCapacityAdjustQty(zero);
+        result.setPreLossPlanQty(zero);
+        result.setPlanQtyBeforeToolLimit(zero);
+        result.setFinalPlanQty(zero);
+        result.setCalcFormulaDesc("两班需求已由班初滚动库存覆盖，当班无需排产");
         return result;
     }
 

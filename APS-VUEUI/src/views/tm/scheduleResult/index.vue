@@ -493,12 +493,14 @@ export default {
               align: "center",
               label: this.$t("ui.data.column.tm.scheduleResult.class1PlanQty"),
               minWidth: 70,
+              formatter: (row, column, value) => this.formatQtyForDisplay(value),
             },
             {
               prop: "class1FinishQty",
               align: "center",
               label: this.$t("ui.data.column.tm.scheduleResult.class1FinishQty"),
               minWidth: 70,
+              formatter: (row, column, value) => this.formatQtyForDisplay(value),
             },
           ],
         },
@@ -516,12 +518,14 @@ export default {
               align: "center",
               label: this.$t("ui.data.column.tm.scheduleResult.class2PlanQty"),
               minWidth: 70,
+              formatter: (row, column, value) => this.formatQtyForDisplay(value),
             },
             {
               prop: "class2FinishQty",
               align: "center",
               label: this.$t("ui.data.column.tm.scheduleResult.class2FinishQty"),
               minWidth: 70,
+              formatter: (row, column, value) => this.formatQtyForDisplay(value),
             },
           ],
         },
@@ -539,12 +543,14 @@ export default {
               align: "center",
               label: this.$t("ui.data.column.tm.scheduleResult.class3PlanQty"),
               minWidth: 70,
+              formatter: (row, column, value) => this.formatQtyForDisplay(value),
             },
             {
               prop: "class3FinishQty",
               align: "center",
               label: this.$t("ui.data.column.tm.scheduleResult.class3FinishQty"),
               minWidth: 70,
+              formatter: (row, column, value) => this.formatQtyForDisplay(value),
             },
           ],
         },
@@ -562,12 +568,14 @@ export default {
               align: "center",
               label: this.$t("ui.data.column.tm.scheduleResult.class4PlanQty"),
               minWidth: 70,
+              formatter: (row, column, value) => this.formatQtyForDisplay(value),
             },
             {
               prop: "class4FinishQty",
               align: "center",
               label: this.$t("ui.data.column.tm.scheduleResult.class4FinishQty"),
               minWidth: 70,
+              formatter: (row, column, value) => this.formatQtyForDisplay(value),
             },
           ],
         },
@@ -585,12 +593,14 @@ export default {
               align: "center",
               label: this.$t("ui.data.column.tm.scheduleResult.class5PlanQty"),
               minWidth: 70,
+              formatter: (row, column, value) => this.formatQtyForDisplay(value),
             },
             {
               prop: "class5FinishQty",
               align: "center",
               label: this.$t("ui.data.column.tm.scheduleResult.class5FinishQty"),
               minWidth: 70,
+              formatter: (row, column, value) => this.formatQtyForDisplay(value),
             },
           ],
         },
@@ -608,12 +618,14 @@ export default {
               align: "center",
               label: this.$t("ui.data.column.tm.scheduleResult.class6PlanQty"),
               minWidth: 70,
+              formatter: (row, column, value) => this.formatQtyForDisplay(value),
             },
             {
               prop: "class6FinishQty",
               align: "center",
               label: this.$t("ui.data.column.tm.scheduleResult.class6FinishQty"),
               minWidth: 70,
+              formatter: (row, column, value) => this.formatQtyForDisplay(value),
             },
           ],
         },
@@ -707,6 +719,18 @@ export default {
     },
   },
   methods: {
+    /**
+     * 格式化排程数量，数值为 0 时前端显示为空，其他值保持原样。
+     *
+     * @param {Number|String|null|undefined} value 待展示的数量
+     * @returns {Number|String|null|undefined} 前端展示值
+     */
+    formatQtyForDisplay(value) {
+      if (value === null || value === undefined || value === "") {
+        return value;
+      }
+      return Number(value) === 0 ? "" : value;
+    },
     /**
      * 切换查询工厂后清空旧机台编码，并加载新工厂的机台选项。
      *
