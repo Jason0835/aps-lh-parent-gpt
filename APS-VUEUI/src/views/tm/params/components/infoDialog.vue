@@ -170,18 +170,6 @@ export default {
           inactiveValue: "0",
         },
         {
-          prop: "regularExpression",
-          label: this.$t("ui.data.column.tm.params.regularExpression"),
-          span: 12,
-          maxlength: 200,
-        },
-        {
-          prop: "errorTips",
-          label: this.$t("ui.data.column.tm.params.errorTips"),
-          span: 12,
-          maxlength: 200,
-        },
-        {
           prop: "remark",
           label: this.$t("ui.common.column.remark"),
           span: 24,

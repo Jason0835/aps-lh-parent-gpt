@@ -36,7 +36,7 @@ public class TmParams extends BaseEntity {
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 
-    @Excel(name = "ui.data.column.tm.params.paramCode")
+    @Excel(name = "ui.data.column.paramsCode")
     @ImportValidated(required = true, isCode = true, maxLength = 50)
     @ApiModelProperty(value = "参数编码", name = "paramCode")
     @TableField(value = "PARAM_CODE")
@@ -68,14 +68,14 @@ public class TmParams extends BaseEntity {
     @TableField(value = "ERROR_TIPS")
     private String errorTips;
 
-    @Excel(name = "ui.data.column.tm.params.paramGroup")
-    @ImportValidated(maxLength = 50)
+    @Excel(name = "ui.data.column.tm.params.paramGroup", dictType = "biz_param_group")
+    @ImportValidated(maxLength = 50, dictType = "biz_param_group")
     @ApiModelProperty(value = "参数分组", name = "paramGroup")
     @TableField(value = "PARAM_GROUP")
     private String paramGroup;
 
-    @Excel(name = "ui.data.column.tm.params.valueType")
-    @ImportValidated(maxLength = 50)
+    @Excel(name = "ui.data.column.tm.params.valueType", dictType = "biz_param_value_type")
+    @ImportValidated(maxLength = 50, dictType = "biz_param_value_type")
     @ApiModelProperty(value = "参数值类型", name = "valueType")
     @TableField(value = "VALUE_TYPE")
     private String valueType;

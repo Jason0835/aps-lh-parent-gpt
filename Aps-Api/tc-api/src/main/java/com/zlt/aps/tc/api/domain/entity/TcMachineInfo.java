@@ -56,6 +56,10 @@ public class TcMachineInfo extends BaseEntity {
     @TableField(value = "MAX_CAPACITY")
     private BigDecimal maxCapacity;
 
+    /**
+     * 开机班次编码，允许以英文逗号分隔多个班次。
+     * 导入时用户填写班次名称(如 夜班,早班,中班)，由字典 class_num_three_plan 转换为编码存储(#23324)。
+     */
     @Excel(name = "ui.data.column.tc.machineInfo.openShiftCode", dictType = "class_num_three_plan")
     @ImportValidated(maxLength = 20)
     @ApiModelProperty(value = "开机班次", name = "openShiftCode")
