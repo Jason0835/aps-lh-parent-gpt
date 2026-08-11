@@ -86,8 +86,10 @@ public class NewProductionHandler extends AbsScheduleStepHandler {
 
             /*
              * S4.5.3.1 结构收尾对齐在机统计缓存构建：
+             * 结构转产表最大收尾日期已在S4.2月计划完成后的依赖任务中加载，本调用不再查询数据库。
              * 基于续作+换活字块排产完成后的实时排程结果构建【结构×班次】在机统计，
-             * 后续每次新增选机只读缓存并按结果提交增量更新，避免反复全表扫描。
+             * 后续每次新增选机先用S4.2日期快照校验[T,T+2]门禁；通过后才读取该动态缓存执行
+             * 原结构对齐规则，并按结果提交增量更新，避免反复全表扫描且保证前后数据时序正确。
              */
             structureEndingAlignmentService.prepareStructureEndingAlignmentIndex(context);
 

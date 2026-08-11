@@ -558,7 +558,38 @@ public class CapsuleReplacementRuleService {
         if (context.getCapsuleRuntimeUsageMap().containsKey(physicalMachineCode)) {
             return;
         }
+        /*
+         * 初始化运行态与胶囊感知收尾分摊必须共用同一份“排程开始前快照”口径。
+         * 这里不再复制左右模取值逻辑，避免后续一处修正规则而另一处仍使用旧值。
+         */
+        int machineUsage = this.resolveInitialMachineUsage(context, machineCode);
+        context.getCapsuleRuntimeUsageMap().put(physicalMachineCode, machineUsage);
+        if (machineUsage >= this.resolveUsageUpperLimit(context)) {
+            /*
+             * 初始快照已经达到或超过上限，说明本批开始前已越过阈值。
+             * 按确认口径仅继续累计，不在本批首个生产班次补扣换胶囊产能。
+             */
+            context.getCapsuleThresholdHandledMachineSet().add(physicalMachineCode);
+        }
+    }
 
+    /**
+     * 读取物理机台在本批排程开始前的胶囊使用次数。
+     *
+     * <p>该方法只读取基础数据快照，不读取、也不修改排程中的动态累计次数。普通机台取
+     * {@code REPLACE_CAPSULE_COUNT/REPLACE_CAPSULE_COUNT2} 最大值；单控L/R机台先归一到
+     * 物理机台，再分别读取左右侧记录并取最大值。基础快照缺失时继续沿用项目已有的
+     * {@link MachineScheduleDTO} 初值回退口径。</p>
+     *
+     * @param context 排程上下文
+     * @param machineCode 当前结果机台编码；单控机台可传L/R侧编码
+     * @return 排程开始前的物理机台胶囊使用次数，缺失时返回0
+     */
+    public int resolveInitialMachineUsage(LhScheduleContext context, String machineCode) {
+        if (Objects.isNull(context) || StringUtils.isEmpty(machineCode)) {
+            return 0;
+        }
+        String physicalMachineCode = LhSingleControlMachineUtil.resolvePhysicalMachineCode(machineCode);
         int positionOneUsage = 0;
         int positionTwoUsage = 0;
         Map<String, LhRepairCapsule> capsuleUsageMap = context.getCapsuleUsageMap();
@@ -570,17 +601,16 @@ public class CapsuleReplacementRuleService {
                 LhRepairCapsule rightCapsule = capsuleUsageMap.get(
                         LhSingleControlMachineUtil.resolveRightMachineCode(machineCode));
                 positionOneUsage = Objects.nonNull(leftCapsule)
-                        ? resolveCapsuleCount(leftCapsule, false)
-                        : resolveCapsuleCount(physicalCapsule, false);
+                        ? this.resolveCapsuleCount(leftCapsule, false)
+                        : this.resolveCapsuleCount(physicalCapsule, false);
                 positionTwoUsage = Objects.nonNull(rightCapsule)
-                        ? resolveCapsuleCount(rightCapsule, false)
-                        : resolveCapsuleCount(physicalCapsule, true);
+                        ? this.resolveCapsuleCount(rightCapsule, false)
+                        : this.resolveCapsuleCount(physicalCapsule, true);
             } else {
-                positionOneUsage = resolveCapsuleCount(physicalCapsule, false);
-                positionTwoUsage = resolveCapsuleCount(physicalCapsule, true);
+                positionOneUsage = this.resolveCapsuleCount(physicalCapsule, false);
+                positionTwoUsage = this.resolveCapsuleCount(physicalCapsule, true);
             }
         }
-
         if (positionOneUsage == 0 && positionTwoUsage == 0
                 && !CollectionUtils.isEmpty(context.getMachineScheduleMap())) {
             MachineScheduleDTO machine = context.getMachineScheduleMap().get(machineCode);
@@ -592,15 +622,7 @@ public class CapsuleReplacementRuleService {
                 positionTwoUsage = Math.max(0, machine.getCapsuleUsageCount2());
             }
         }
-        int machineUsage = Math.max(positionOneUsage, positionTwoUsage);
-        context.getCapsuleRuntimeUsageMap().put(physicalMachineCode, machineUsage);
-        if (machineUsage >= resolveUsageUpperLimit(context)) {
-            /*
-             * 初始快照已经达到或超过上限，说明本批开始前已越过阈值。
-             * 按确认口径仅继续累计，不在本批首个生产班次补扣换胶囊产能。
-             */
-            context.getCapsuleThresholdHandledMachineSet().add(physicalMachineCode);
-        }
+        return Math.max(positionOneUsage, positionTwoUsage);
     }
 
     private int resolveCapsuleCount(LhRepairCapsule capsule, boolean secondPosition) {
