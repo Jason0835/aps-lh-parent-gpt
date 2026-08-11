@@ -6,6 +6,7 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
+import com.zlt.aps.common.core.utils.MachineShiftDictUtil;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.tc.api.domain.entity.TcMachineInfo;
 import com.zlt.aps.tc.mapper.TcMachineInfoMapper;
@@ -113,7 +114,10 @@ public class TcMachineInfoController extends AbstractDocBizController<TcMachineI
         this.builderCondition(wrapper, obj);
         // 与列表页排序保持一致，避免导出数据顺序与页面不一致
         wrapper.last("ORDER BY " + getOrderBy());
-        return tcMachineInfoMapper.selectList(wrapper);
+        List<TcMachineInfo> list = tcMachineInfoMapper.selectList(wrapper);
+        // 开机班次：导出时把数据库字典值(01,02)转回班次名称(夜班,早班)
+        list.forEach(entity -> entity.setOpenShiftCode(MachineShiftDictUtil.valuesToLabels(entity.getOpenShiftCode())));
+        return list;
     }
 
     @Override
