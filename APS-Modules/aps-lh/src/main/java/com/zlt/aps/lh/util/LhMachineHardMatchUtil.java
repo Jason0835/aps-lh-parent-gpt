@@ -32,7 +32,7 @@ public final class LhMachineHardMatchUtil {
     private static final String VALUE_SEPARATOR = ",";
     /** 通用模套型号（等同空值，适配所有） */
     private static final String UNIVERSAL_MOULD_SET_CODE = "通用";
-    /** 仅存在模具到货关系时的模壳优先级命中说明 */
+    /** 仅存在模具到货关系时的模套硬兼容说明 */
     private static final String DELIVERY_MOULD_MATCH_VALUE = "模具到货不降级";
 
     private LhMachineHardMatchUtil() {
@@ -79,7 +79,9 @@ public final class LhMachineHardMatchUtil {
     }
 
     /**
-     * 判断SKU模套型号是否匹配机台配置。
+     * 判断SKU模壳是否匹配机台配置。
+     * <p>该入口由换活字块、特殊材料替代等既有策略复用，继续保留原有严格口径：
+     * 普通模具缺少可识别模壳时不放行，不将新增选机的“仅到货模具不降级”语义扩散到其它入口。</p>
      *
      * @param context 排程上下文
      * @param sku SKU排程信息
@@ -114,35 +116,34 @@ public final class LhMachineHardMatchUtil {
     }
 
     /**
-     * 判断SKU模壳是否命中机台模套型号。
-     * <p>该方法同时用于选机硬过滤与同模壳排序优先级：普通模具模壳必须命中机台模套型号，
-     * 否则视为不匹配；模具到货关系存在模具可用日期，只代表新增模具可承接，不参与模壳降级；
-     * 机台模套为空或通用时默认适配。</p>
+     * 判断SKU模壳是否满足机台模套硬兼容要求。
+     * <p>该方法只用于候选机台硬过滤，不再承担“实际同模壳”排序判断。普通模具模壳必须命中
+     * 机台模套型号；仅存在模具到货关系时保持不降级；机台模套为空或通用时允许生产。</p>
      *
      * @param context 排程上下文
      * @param sku SKU排程信息
      * @param machine 候选机台
-     * @return true-模壳匹配或无需降级，false-普通模具模壳未命中
+     * @return true-模套硬兼容，false-普通模具模壳未命中机台模套
      */
-    public static boolean isMouldSetPriorityMatched(LhScheduleContext context,
-                                                    SkuScheduleDTO sku,
-                                                    MachineScheduleDTO machine) {
-        return StringUtils.isNotEmpty(resolveMouldSetPriorityMatchedValue(context, sku, machine));
+    public static boolean isMouldSetHardCompatible(LhScheduleContext context,
+                                                   SkuScheduleDTO sku,
+                                                   MachineScheduleDTO machine) {
+        return StringUtils.isNotEmpty(resolveMouldSetHardCompatibleValue(context, sku, machine));
     }
 
     /**
-     * 解析SKU模壳与机台模套的实际优先级命中值。
-     * <p>该方法与{@link #isMouldSetPriorityMatched(LhScheduleContext, SkuScheduleDTO, MachineScheduleDTO)}
-     * 共用同一判断入口，供选机Comparator和日志复用，避免日志重新计算另一套模壳匹配口径。</p>
+     * 解析SKU模壳与机台模套的硬兼容命中值。
+     * <p>该方法与{@link #isMouldSetHardCompatible(LhScheduleContext, SkuScheduleDTO, MachineScheduleDTO)}
+     * 共用同一判断入口，只说明机台能否承接目标SKU，不表示候选机台当前在机模具与目标SKU同模壳。</p>
      *
      * @param context 排程上下文
      * @param sku SKU排程信息
      * @param machine 候选机台
-     * @return 实际命中的模壳型号集合；通用模套返回“通用”，仅到货模具返回“模具到货不降级”，未命中返回null
+     * @return 硬兼容命中的模壳型号集合；通用模套返回“通用”，仅到货模具返回“模具到货不降级”，未命中返回null
      */
-    public static String resolveMouldSetPriorityMatchedValue(LhScheduleContext context,
-                                                             SkuScheduleDTO sku,
-                                                             MachineScheduleDTO machine) {
+    public static String resolveMouldSetHardCompatibleValue(LhScheduleContext context,
+                                                            SkuScheduleDTO sku,
+                                                            MachineScheduleDTO machine) {
         String machineMouldSetCode = normalizeToken(Objects.isNull(machine) ? null : machine.getShellStandard());
         if (StringUtils.isEmpty(machineMouldSetCode)
                 || StringUtils.equals(machineMouldSetCode, UNIVERSAL_MOULD_SET_CODE)) {
