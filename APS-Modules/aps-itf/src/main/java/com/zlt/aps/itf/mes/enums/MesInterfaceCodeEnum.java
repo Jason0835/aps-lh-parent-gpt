@@ -139,6 +139,16 @@ public enum MesInterfaceCodeEnum {
     LH_SCHE_DAY_FINISH_QTY("LH_SCHE_DAY_FINISH_QTY", "mesItfService", "syncLhScheDayFinishQty", "硫化排程日完成量同步"),
 
     /**
+     * 胎圈排程日完成量同步
+     */
+    TQ_DAY_COMPLETE("TQ_DAY_COMPLETE", "mesItfService", "syncTqScheDayFinishQty", "胎圈排程日完成量同步"),
+
+    /**
+     * 钢丝圈排程日完成量同步
+     */
+    GSQ_DAY_COMPLETE("GSQ_DAY_COMPLETE", "mesItfService", "syncGsqScheDayFinishQty", "钢丝圈排程日完成量同步"),
+
+    /**
      * 模具交替计划下发
      */
     MOLD_ALTER_PLAN_ISSUE("MOLD_ALTER_PLAN_ISSUE", "mesItfService", "issueMoldAlterPlan", "模具交替计划下发"),

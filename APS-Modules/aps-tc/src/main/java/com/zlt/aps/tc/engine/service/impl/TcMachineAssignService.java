@@ -2231,7 +2231,7 @@ public class TcMachineAssignService implements ITcMachineAssignService {
         BigDecimal currentSpecSwitchDeduct = this.nvl(task.getPreviousSpecSwitchHours())
                 .multiply(this.nvl(task.getMachineSpeed()));
         BigDecimal currentGlueSwitchDeduct = this.nvl(task.getPreviousGlueSwitchCapacityDeduct());
-        context.appendProcessLog("产能扣减：胎侧代码={0}，机台={1}，班次={2}，最大产能={3}，检修扣减={4}，已排计划量扣减={5}，已发生切换扣减={6}，本次规格切换扣减={7}，本次胶料切换扣减={8}，分配前待承接量={9}，分配前剩余产能={10}，本次分配量={11}，分配后剩余产能={12}，溢出量={13}，拆分原因={14}",
+        context.appendShiftProcessLog(task.getShiftOrder(), "产能扣减：胎侧代码={0}，机台={1}，班次={2}，最大产能={3}，检修扣减={4}，已排计划量扣减={5}，已发生切换扣减={6}，本次规格切换扣减={7}，本次胶料切换扣减={8}，分配前待承接量={9}，分配前剩余产能={10}，本次分配量={11}，分配后剩余产能={12}，溢出量={13}，拆分原因={14}",
                 task.getSidewallCode(), candidate == null ? "未提供" : candidate.getMachineCode(), task.getShiftOrder(),
                 this.getCandidateEvidenceDecimal(evidence, "maxCapacity"),
                 this.getCandidateEvidenceDecimal(evidence, "maintenanceCapacityDeduct"),
@@ -2239,7 +2239,7 @@ public class TcMachineAssignService implements ITcMachineAssignService {
                 this.getCandidateEvidenceDecimal(evidence, "existingSwitchCapacityDeduct"),
                 currentSpecSwitchDeduct, currentGlueSwitchDeduct, this.nvl(beforeAssignQty), beforeRemainCapacity,
                 this.nvl(assignedQty), afterRemainCapacity, this.nvl(overflowQty), splitDesc);
-        context.appendFullProcessTrace(new ScheduleProcessTraceEvent(
+        context.appendShiftFullProcessTrace(task.getShiftOrder(), new ScheduleProcessTraceEvent(
                 "机台分配", task.getBusinessKey(), "机台产能即时扣减与拆分",
                 "选中机台的班次容量账本、检修计划、已排任务、胎侧/垫胶共用机台约束和切换扣减。",
                 "机台=" + (candidate == null ? "未提供" : candidate.getMachineCode()) + "，班次="

@@ -31,6 +31,7 @@
 <script>
 import infoForm from "@/views/components/infoForm.vue";
 import {saveTcMachineMaintenance} from "@/api/tc/machineMaintenance";
+import {listTcShiftConfig} from "@/api/tc/shiftConfig";
 
 export default {
   components: { infoForm },
@@ -40,6 +41,7 @@ export default {
       loading: false,
       visible: false,
       isEdit: false,
+      shiftConfigs: [],
       form: {},
       rules: {
         factoryCode: [
@@ -139,6 +141,7 @@ export default {
                 const machine = this.machines.find(m => m.machineCode === value);
                 if (machine) {
                   this.form.factoryCode = machine.factoryCode;
+                  this.loadShiftConfig(this.form.factoryCode);
                 }
               }
             },
@@ -151,6 +154,11 @@ export default {
           type: "date",
           dateType: "datetime",
           valueFormat: "yyyy-MM-dd HH:mm:ss",
+          listeners: {
+            change: (value) => {
+              this.resolveStopShiftByTime(value);
+            },
+          },
           pickerOptions: {
             disabledDate: (time) => {
               if (this.form.stopEndTime) {
@@ -199,6 +207,56 @@ export default {
     },
   },
   methods: {
+    // 加载当前工厂启用的班次配置，用于根据停机开始时间自动回显停机班次
+    async loadShiftConfig(factoryCode) {
+      if (!factoryCode) {
+        this.shiftConfigs = [];
+        return;
+      }
+      try {
+        const res = await listTcShiftConfig({ factoryCode });
+        const rows = (res && res.rows) || [];
+        this.shiftConfigs = rows
+          .filter((item) => item.openFlag === "1")
+          .sort((a, b) => (a.shiftOrder || 0) - (b.shiftOrder || 0));
+      } catch (error) {
+        console.log(error);
+        this.shiftConfigs = [];
+      }
+    },
+    // 根据停机开始时间解析并回显停机班次（与后端 resolveStopShift 逻辑保持一致）
+    resolveStopShiftByTime(value) {
+      if (!value) {
+        this.$set(this.form, "stopShift", undefined);
+        return;
+      }
+      const date = new Date(value);
+      const timeMinutes = date.getHours() * 60 + date.getMinutes();
+      const matched = (this.shiftConfigs || []).find((config) => {
+        const start = this.parseTimeToMinutes(config.planStartTime);
+        const end = this.parseTimeToMinutes(config.planEndTime);
+        if (config.crossDayFlag === "1") {
+          return end <= start
+            ? timeMinutes >= start || timeMinutes < end
+            : timeMinutes >= start && timeMinutes < end;
+        }
+        return timeMinutes >= start && timeMinutes < end;
+      });
+      this.$set(this.form, "stopShift", matched ? this.mapShiftNameToCode(matched.shiftName) : undefined);
+    },
+    // 班次名称映射为 class_num_three_plan 字典编码：夜班→01, 早班→02, 中班→03
+    mapShiftNameToCode(shiftName) {
+      if (shiftName === "夜班") return "01";
+      if (shiftName === "早班") return "02";
+      if (shiftName === "中班") return "03";
+      return undefined;
+    },
+    // 将 HH:mm:ss 时间字符串转换为分钟数
+    parseTimeToMinutes(timeStr) {
+      if (!timeStr) return 0;
+      const parts = timeStr.split(":");
+      return parseInt(parts[0], 10) * 60 + (parts.length > 1 ? parseInt(parts[1], 10) : 0);
+    },
     async save(params) {
       try {
         this.loading = true;
@@ -225,6 +283,7 @@ export default {
           factoryCode: "116",
         };
       }
+      this.loadShiftConfig(this.form.factoryCode);
     },
     hide() {
       this.form = {};

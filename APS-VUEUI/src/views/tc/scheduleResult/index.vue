@@ -414,8 +414,8 @@ export default {
           label: this.shiftLabel(shiftOrder),
           children: [
             { prop: `class${shiftOrder}Sequence`, label: this.$t('ui.tc.schedule.sequence'), width: 72, align: 'center' },
-            { prop: `class${shiftOrder}PlanQty`, label: this.$t('ui.tc.schedule.planQty'), width: 88, align: 'right' },
-            { prop: `class${shiftOrder}FinishQty`, label: this.$t('ui.tc.schedule.finishQty'), width: 88, align: 'right' }
+            { prop: `class${shiftOrder}PlanQty`, label: this.$t('ui.tc.schedule.planQty'), width: 88, align: 'right', formatter: (row, column, value) => this.formatQtyForDisplay(value) },
+            { prop: `class${shiftOrder}FinishQty`, label: this.$t('ui.tc.schedule.finishQty'), width: 88, align: 'right', formatter: (row, column, value) => this.formatQtyForDisplay(value) }
           ]
         }
       })
@@ -518,6 +518,18 @@ export default {
     this.clearOperationTimer()
   },
   methods: {
+    /**
+     * 格式化排程数量，数值为 0 时前端显示为空，其他值保持原样。
+     *
+     * @param {Number|String|null|undefined} value 待展示的数量
+     * @returns {Number|String|null|undefined} 前端展示值
+     */
+    formatQtyForDisplay(value) {
+      if (value === null || value === undefined || value === '') {
+        return value
+      }
+      return Number(value) === 0 ? '' : value
+    },
     /**
      * 切换查询工厂后清空旧机台编码，并按新工厂立即刷新机台选项。
      *

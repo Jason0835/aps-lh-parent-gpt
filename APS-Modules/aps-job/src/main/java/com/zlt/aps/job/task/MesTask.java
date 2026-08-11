@@ -194,6 +194,22 @@ public class MesTask {
     }
 
     /**
+     * 同步胎圈排程日完成量
+     */
+    @ApiOperation("同步胎圈排程日完成量")
+    public void syncTqScheDayFinishQty() {
+        FeignTokenHelper.runWithToken(() -> iMesItfService.syncTqScheDayFinishQty(new AuxReqSyncDataLogs()));
+    }
+
+    /**
+     * 同步钢丝圈排程日完成量
+     */
+    @ApiOperation("同步钢丝圈排程日完成量")
+    public void syncGsqScheDayFinishQty() {
+        FeignTokenHelper.runWithToken(() -> iMesItfService.syncGsqScheDayFinishQty(new AuxReqSyncDataLogs()));
+    }
+
+    /**
      * 同步模具交替计划完成回报
      */
     @ApiOperation("同步模具交替计划完成回报")

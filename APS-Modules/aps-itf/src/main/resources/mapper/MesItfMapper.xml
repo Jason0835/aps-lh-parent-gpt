@@ -557,6 +557,23 @@
         <if test="queryParams != null and queryParams.scheduleDate != null">AND CONVERT(DATE, SCHEDULE_DATE) = CONVERT(DATE, #{queryParams.scheduleDate})</if>
     </select>
 
+    <!-- 查询钢丝圈排程日完成量同步数据 -->
+    <select id="selectGsqScheDayFinishQtyList" resultType="com.zlt.aps.gsq.api.domain.entity.GsqDayFinishQty">
+        SELECT
+        SCHEDULE_DATE,
+        STEEL_RING_CODE,
+        FINISH_QTY,
+        DATA_VERSION,
+        COMPANY_CODE,
+        FACTORY_CODE
+        FROM MES_GSQ_DAY_FINISH_TOTL
+        WHERE 1 = 1
+        <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
+        <if test="companyCode != null and companyCode != ''">AND COMPANY_CODE = #{companyCode}</if>
+        <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
+        <if test="queryParams != null and queryParams.scheduleDate != null">AND CONVERT(DATE, SCHEDULE_DATE) = CONVERT(DATE, #{queryParams.scheduleDate})</if>
+    </select>
+
     <!-- 查询胎面排程完成量同步数据（取当天最新版本） -->
     <select id="selectTmClassShiftFinishQtyList" resultType="com.zlt.aps.tm.api.domain.entity.TmScheFinishQty">
         SELECT
