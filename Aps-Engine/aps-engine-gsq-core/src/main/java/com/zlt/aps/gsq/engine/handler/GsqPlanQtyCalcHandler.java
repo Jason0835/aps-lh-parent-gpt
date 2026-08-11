@@ -66,6 +66,9 @@ public class GsqPlanQtyCalcHandler extends AbsGsqScheduleStepHandler {
         // 1. 逐规格应用备库模型（基于胎圈消耗）
         applyBackupModel(context);
 
+        // 1.1 常规排产（备库窗口外）班次计入损耗率
+        applyLossRateToRegularSupply(context);
+
         // 2. 聚合6班次总计划量统计
         aggregateTotalPlanQty(context);
 
@@ -116,17 +119,27 @@ public class GsqPlanQtyCalcHandler extends AbsGsqScheduleStepHandler {
             double availableStock = vo.getPlanStockQty() == null ? 0D : vo.getPlanStockQty();
             int backupTriggerClass = 0;
             double backupTotalQty = 0;
+            // 触发备库时的已扣库存（含当前班消耗），供回写 S3 重算使用
+            double stockAtTrigger = 0D;
 
             for (int classNum = 1; classNum <= 6 && backupTriggerClass == 0; classNum++) {
                 // 扣掉当前胎圈班消耗后的剩余库存
-                double stockAfterCurrent = BigDecimalUtil.sub(availableStock, getTqPlan(vo, classNum));
+                // 注意：planStockQty 在 S1 阶段已扣减胎圈1班消耗
+                // （planStock = stockQty + lastMidPlan - tqClass1，见 GsqPreValidationHandler.initScheduleFields），
+                // classNum=1 时不重复扣减 tqClass1，避免 gap fill 缺口虚增（如 350 被误算为 850）
+                double stockAfterCurrent;
+                if (classNum == 1) {
+                    stockAfterCurrent = availableStock;
+                } else {
+                    stockAfterCurrent = BigDecimalUtil.sub(availableStock, getTqPlan(vo, classNum));
+                }
                 // 下一胎圈班消耗（钢丝圈N班供应胎圈N+1班）
                 double nextTqConsume = getTqPlan(vo, classNum + 1);
                 // 胎圈X+1班没排产（消耗<=0）时，本班不触发备库，仅处理库存缺口
                 if (nextTqConsume <= 0) {
-                    // 库存不足（可用库存为负）时，当前班常规供应补足缺口
-                    if (availableStock < 0) {
-                        double gap = Math.ceil(BigDecimalUtil.sub(0D, availableStock));
+                    // 库存不足（扣完当前班消耗后为负）时，当前班常规供应补足缺口
+                    if (stockAfterCurrent < 0) {
+                        double gap = Math.ceil(BigDecimalUtil.sub(0D, stockAfterCurrent));
                         setClassPlanQty(vo, classNum, gap);
                         availableStock = 0D;
                     } else {
@@ -135,11 +148,12 @@ public class GsqPlanQtyCalcHandler extends AbsGsqScheduleStepHandler {
                     continue;
                 }
                 if (stockAfterCurrent < BigDecimalUtil.mul(nextTqConsume, triggerThreshold)) {
-                    // 触发备库
+                    // 触发备库：传 stockAfterCurrent（已扣当前班消耗），pureDemand 含缺口
                     backupTriggerClass = classNum;
+                    stockAtTrigger = stockAfterCurrent;
                     backupTotalQty = calculateBackupTotalQty(backupTriggerClass, backupShiftCount, vo, coefficient);
                     double actualTotalPlan = triggerBackupAndAllocate(
-                            vo, backupTriggerClass, backupTotalQty, availableStock, context);
+                            vo, backupTriggerClass, backupTotalQty, stockAfterCurrent, context);
                     availableStock = BigDecimalUtil.add(availableStock, actualTotalPlan);
 
                     autoScheduleLogService.insertGsqScheduleLog(vo.getBatchNo(), vo.getOrderNo(),
@@ -153,6 +167,14 @@ public class GsqPlanQtyCalcHandler extends AbsGsqScheduleStepHandler {
 
             vo.setBackupTriggerClass(backupTriggerClass);
             vo.setBackupTotalQty(backupTotalQty);
+            // 回写触发时的已扣库存（stockAfterCurrent，不含排产量），供 S3 recalcPlanQtyByMachineLossRate 使用。
+            // 若回写 availableStock+actualTotalPlan 则 S3 pureDemand 恒为0（备库量被清零）；
+            // 若回写原始 planStockQty 则 S3 pureDemand 不含当前班缺口（备库量偏小）。
+            if (backupTriggerClass > 0) {
+                vo.setPlanStockQty(stockAtTrigger);
+            } else {
+                vo.setPlanStockQty(availableStock);
+            }
 
             // 备库未触发且库存充足（有剩余）时，库存已覆盖需求，无需排产，清零初始计划量
             if (backupTriggerClass == 0 && availableStock > 0) {
@@ -164,6 +186,53 @@ public class GsqPlanQtyCalcHandler extends AbsGsqScheduleStepHandler {
             if (backupTriggerClass > 0) {
                 recordBackupTriggerEvidence(context, vo, backupTriggerClass, null,
                         backupShiftCount, backupTotalQty, availableStock);
+            }
+        }
+    }
+
+    /**
+     * 常规排产（备库窗口外）班次计入损耗率。
+     *
+     * <p>背景：备库窗口内计划量已在 {@link #triggerBackupAndAllocate} 中计入损耗率，
+     * 但窗口外的常规续供班次（基于胎圈消耗的 base plan）未乘损耗率，会导致钢丝圈对胎圈
+     * 常规消耗的排产量偏小。本方法对窗口外所有有排产的班次统一乘损耗率（向上取整）。</p>
+     *
+     * @param context 排程上下文
+     */
+    private void applyLossRateToRegularSupply(GsqScheduleContext context) {
+        double paramLossRate = context.getParams().getLossRate() == null ? 0D : context.getParams().getLossRate();
+        for (GsqScheduleResultVo vo : context.getScheduleList()) {
+            // 按钢丝圈代码取损耗率，未配置时回退全局参数损耗率（与备库分摊口径一致）
+            Double specLossRate = context.getLossRateMap().get(vo.getSteelRingCode());
+            double multiplier = specLossRate != null
+                    ? BigDecimalUtil.add(1D, specLossRate)
+                    : BigDecimalUtil.add(1D, paramLossRate);
+            if (multiplier <= 1D) {
+                continue;
+            }
+
+            // 计算备库窗口 [triggerClass, windowEnd]，窗口内班次已含损耗率，跳过
+            Integer triggerClass = vo.getBackupTriggerClass();
+            Integer backupShiftCount = vo.getBackupShiftCount();
+            int windowStart = triggerClass != null ? triggerClass : 0;
+            int windowEnd = 6;
+            if (triggerClass != null && triggerClass > 0 && backupShiftCount != null && backupShiftCount > 0) {
+                windowEnd = Math.min(6, triggerClass + backupShiftCount - 1);
+            } else {
+                // 非备库触发规格：无备库窗口，全部班次均视为常规排产
+                windowStart = 0;
+                windowEnd = 0;
+            }
+
+            for (int classNum = 1; classNum <= 6; classNum++) {
+                if (windowStart > 0 && classNum >= windowStart && classNum <= windowEnd) {
+                    continue;
+                }
+                double plan = getClassPlanQty(vo, classNum);
+                if (plan > 0) {
+                    double inflated = Math.ceil(BigDecimalUtil.mul(plan, multiplier));
+                    setClassPlanQty(vo, classNum, inflated);
+                }
             }
         }
     }
@@ -258,9 +327,7 @@ public class GsqPlanQtyCalcHandler extends AbsGsqScheduleStepHandler {
         double specLossRateMultiplier = specLossRate != null
                 ? BigDecimalUtil.add(1D, specLossRate)
                 : BigDecimalUtil.add(1D, paramLossRate);
-        double totalPlanQty = BigDecimalUtil.mul(pureDemand, specLossRateMultiplier);
-        // 备库总量做小数向上取整（如509.04 → 510）
-        totalPlanQty = Math.ceil(totalPlanQty);
+        double totalPlanQty = Math.ceil(BigDecimalUtil.mul(pureDemand, specLossRateMultiplier));
 
         double actualTotalPlan = allocatePlanQty(vo, triggerClass, totalPlanQty, context);
         // 记录分摊后的实际总计划量，供 S5.6 总量截断上限使用（而非理论 backupTotalQty）
@@ -347,6 +414,7 @@ public class GsqPlanQtyCalcHandler extends AbsGsqScheduleStepHandler {
             return;
         }
         double backupTotalQty = vo.getBackupTotalQty() == null ? 0D : vo.getBackupTotalQty();
+        // 取 S2.3 回写后的触发时已扣库存（stockAfterCurrent，不含排产量）
         double availableStock = vo.getPlanStockQty() == null ? 0D : vo.getPlanStockQty();
         double pureDemand = Math.max(0, BigDecimalUtil.sub(backupTotalQty, availableStock));
 
@@ -364,9 +432,10 @@ public class GsqPlanQtyCalcHandler extends AbsGsqScheduleStepHandler {
         double totalPlanQty = Math.ceil(BigDecimalUtil.mul(pureDemand, multiplier));
         double actualTotalPlan = allocatePlanQty(vo, triggerClass, totalPlanQty, context);
         vo.setBackupAllocatedQty(actualTotalPlan);
-        log.info("[S3] 规格[{}] 机台[{}] 损耗率[{}] 重算分摊后总量[{}]",
+        log.info("[S3] 规格[{}] 机台[{}] 损耗率[{}] 重算分摊后总量[{}]（备库总量{} 库存{}）",
                 vo.getSteelRingCode(), machineCode,
-                machineLossRate != null ? machineLossRate : ("全局:" + paramLossRate), actualTotalPlan);
+                machineLossRate != null ? machineLossRate : ("全局:" + paramLossRate),
+                actualTotalPlan, backupTotalQty, availableStock);
     }
 
     /**

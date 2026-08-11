@@ -271,6 +271,17 @@ public interface MesItfService {
     AjaxResult syncTqScheDayFinishQty(AuxReqSyncDataLogs syncDataLogs);
 
     /**
+     * 同步钢丝圈排程日完成量
+     * T_GSQ_DAY_FINISH_QTY：采用逻辑删除+插入方案
+     *   步骤1：逻辑删除当天排程日期的所有数据（IS_DELETE置为1）
+     *   步骤2：将MES最新排程日完成量数据批量插入（新记录，IS_DELETE=0）
+     *
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    AjaxResult syncGsqScheDayFinishQty(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
      * 同步胎面排程完成量
      * T_TM_SCHE_FINISH_QTY：采用逻辑删除+插入方案
      *   步骤1：逻辑删除当天排程日期的所有数据（IS_DELETE置为1）
