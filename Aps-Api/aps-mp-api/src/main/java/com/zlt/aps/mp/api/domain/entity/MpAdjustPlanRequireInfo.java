@@ -110,7 +110,7 @@ public class MpAdjustPlanRequireInfo extends BaseEntity {
     /**
      * MES物料编码
      */
-    @Excel(name = "ui.data.column.mpAdjustPlanInfo.mesMaterialCode")
+//    @Excel(name = "ui.data.column.mpAdjustPlanInfo.mesMaterialCode")
     @ApiModelProperty(value = "MES物料编码", name = "mesMaterialCode")
     @TableField(value = "MES_MATERIAL_CODE")
     private String mesMaterialCode;

@@ -7,6 +7,8 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.domain.RowStateEnum;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.maindata.mapper.MdmSkuStructureRefEntityMapper;
+import com.zlt.aps.mp.api.domain.entity.MdmSkuStructureRef;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustPlanRequireInfo;
 import com.zlt.aps.mp.factory.mapper.MpAdjustPlanRequireInfoEntityMapper;
 import com.zlt.aps.mp.factory.service.IMpAdjustPlanRequireInfoService;
@@ -21,6 +23,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -39,12 +42,21 @@ public class MpAdjustPlanRequireInfoServiceImpl extends AbstractDocService<MpAdj
 
     private final MpAdjustPlanRequireInfoEntityMapper adjustPlanInfoMapper;
 
+    private final MdmSkuStructureRefEntityMapper mdmSkuStructureRefMapper;
+
     @Override
     public List<MpAdjustPlanRequireInfo> getListByCondition(QueryWrapper<MpAdjustPlanRequireInfo> wrapper) {
         if (null == wrapper) {
             return Collections.emptyList();
         }
         return adjustPlanInfoMapper.selectList(wrapper);
+    }
+
+    @Override
+    public String[] getQueryFormulas() {
+        return new String[]{
+                "materialDesc -> getcolvalue(T_MDM_MATERIAL_INFO, MATERIAL_DESC, MATERIAL_CODE, materialCode)"
+        };
     }
 
     @Override
@@ -75,6 +87,8 @@ public class MpAdjustPlanRequireInfoServiceImpl extends AbstractDocService<MpAdj
             if (docEntity.getId() != null && docEntity.getId() == -999L) {
                 continue;
             }
+            // 调整后计划量统一由导入值计算；本月计划产量或调整数量为空时按 0 处理。
+            this.calculateAdjustFinalQty(docEntity);
             // 调整原因与调整类型一致性校验：原因编码前两位必须等于调整类型编码（如类型 01 追加计划 -> 原因 0101~0109）
             if (StringUtils.isNotBlank(docEntity.getPlanAdjustType())
                     && StringUtils.isNotBlank(docEntity.getAdjustReason())
@@ -82,6 +96,15 @@ public class MpAdjustPlanRequireInfoServiceImpl extends AbstractDocService<MpAdj
                 failureNum++;
                 ImportExcelValidatedUtils.addImportErrorLog(importLogId, errorNum,
                         String.format(I18nUtil.getMessage("ui.message.mpAdjustPlanInfo.typeReasonMismatch"), errorNum), importErrorLogs);
+                continue;
+            }
+            // 产品结构与物料编码必须在 SKU 结构关系基础数据中存在有效对应关系。
+            if (!this.existsSkuStructureRef(docEntity)) {
+                failureNum++;
+                ImportExcelValidatedUtils.addImportErrorLog(importLogId, errorNum,
+                        MessageFormat.format(I18nUtil.getMessage("ui.message.mpAdjustPlanInfo.skuStructureRefNotExist"),
+                                errorNum, docEntity.getFactoryCode(), docEntity.getStructureName(), docEntity.getMaterialCode()),
+                        importErrorLogs);
                 continue;
             }
             MpAdjustPlanRequireInfo exist = getExistByFactoryAndMaterial(docEntity);
@@ -110,6 +133,29 @@ public class MpAdjustPlanRequireInfoServiceImpl extends AbstractDocService<MpAdj
             return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum, importErrorLogs);
         }
         return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + successNum);
+    }
+
+    /**
+     * 计算调整后计划量：本月计划产量 - 调整数量，空值按 0 处理。
+     */
+    private void calculateAdjustFinalQty(MpAdjustPlanRequireInfo entity) {
+        int monthPlanQty = entity.getMonthPlanQty() == null ? 0 : entity.getMonthPlanQty();
+        int adjustPlanQty = entity.getAdjustPlanQty() == null ? 0 : entity.getAdjustPlanQty();
+        entity.setAdjustFinalQty(monthPlanQty - adjustPlanQty);
+    }
+
+    /**
+     * 校验分厂、产品结构、物料编码在 SKU 结构关系基础数据中存在精确对应关系。
+     */
+    private boolean existsSkuStructureRef(MpAdjustPlanRequireInfo entity) {
+        if (StringUtils.isAnyBlank(entity.getFactoryCode(), entity.getStructureName(), entity.getMaterialCode())) {
+            return false;
+        }
+        LambdaQueryWrapper<MdmSkuStructureRef> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(MdmSkuStructureRef::getFactoryCode, entity.getFactoryCode());
+        wrapper.eq(MdmSkuStructureRef::getStructureName, entity.getStructureName());
+        wrapper.eq(MdmSkuStructureRef::getMaterialCode, entity.getMaterialCode());
+        return mdmSkuStructureRefMapper.selectCount(wrapper) > 0;
     }
 
     /**

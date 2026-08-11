@@ -23,6 +23,13 @@ public interface IMpAdjustPlanRequireInfoService extends IDocService<MpAdjustPla
     List<MpAdjustPlanRequireInfo> getListByCondition(QueryWrapper<MpAdjustPlanRequireInfo> wrapper);
 
     /**
+     * 反显公式：物料描述按物料编码从主数据反显（列表/导出）
+     *
+     * @return 反显公式数组
+     */
+    String[] getQueryFormulas();
+
+    /**
      * 导入计划调整需求信息数据
      *
      * @param list          导入数据
