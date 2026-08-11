@@ -32,7 +32,7 @@ import java.util.Set;
  */
 public class MachinePriorityTraceSnapshot {
 
-    /** 日志展示顺序，包含实际可选机台和仅日志展示机台。 */
+    /** 日志观察候选原顺序，包含实际可选机台和仅日志展示机台。 */
     private final List<MachineScheduleDTO> orderedCandidates;
 
     /** 正式选机主链在当前时点确认的实际可选机台编码。 */
@@ -120,7 +120,7 @@ public class MachinePriorityTraceSnapshot {
     /**
      * 创建完整日志快照。
      *
-     * @param orderedCandidates 日志展示顺序
+     * @param orderedCandidates 日志观察候选原顺序
      * @param actualSelectableMachineCodes 实际可选机台编码
      * @param actualSelectedMachineCode 实际首选机台编码
      * @param displayMachineCodeMap 展示编码映射
@@ -141,7 +141,7 @@ public class MachinePriorityTraceSnapshot {
     /**
      * 创建包含选机时点占用明细的完整日志快照。
      *
-     * @param orderedCandidates 日志展示顺序
+     * @param orderedCandidates 日志观察候选原顺序
      * @param actualSelectableMachineCodes 实际可选机台编码
      * @param actualSelectedMachineCode 首选候选机台编码
      * @param displayMachineCodeMap 展示编码映射
@@ -164,7 +164,7 @@ public class MachinePriorityTraceSnapshot {
     /**
      * 创建同时冻结占用明细和日志收尾时间的完整快照。
      *
-     * @param orderedCandidates 日志展示顺序
+     * @param orderedCandidates 日志观察候选原顺序
      * @param actualSelectableMachineCodes 实际可选机台编码
      * @param actualSelectedMachineCode 首选候选机台编码
      * @param displayMachineCodeMap 展示编码映射
@@ -189,7 +189,7 @@ public class MachinePriorityTraceSnapshot {
     /**
      * 创建带选机结果的完整日志快照。
      *
-     * @param orderedCandidates 日志展示顺序
+     * @param orderedCandidates 日志观察候选原顺序
      * @param actualSelectableMachineCodes 实际可选机台编码
      * @param actualSelectedMachineCode 首选候选机台编码
      * @param displayMachineCodeMap 展示编码映射
@@ -386,7 +386,7 @@ public class MachinePriorityTraceSnapshot {
     }
 
     /**
-     * 获取日志展示顺序。
+     * 获取日志观察候选原顺序。
      *
      * @return 只读候选列表
      */
