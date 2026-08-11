@@ -11,6 +11,8 @@ import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.component.StructureShiftInMachineIndex;
 import com.zlt.aps.lh.engine.strategy.support.*;
 import com.zlt.aps.lh.handler.SkuMonthPlanCalculator;
+import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
+import com.zlt.aps.lh.util.ShiftFieldUtil;
 import com.zlt.aps.lh.util.SkuConstructionRefResolverUtil;
 import com.zlt.aps.mdm.api.domain.entity.*;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
@@ -411,7 +413,9 @@ public class LhScheduleContext {
     private Map<LocalDate, Map<String, Integer>> structurePlanMachineCountMap =
             new LinkedHashMap<LocalDate, Map<String, Integer>>(4);
     /**
-     * 业务日期 -> 产品结构 -> 已排硫化机台编码集合，按 Set 去重后用于提前生产准入判断
+     * 业务日期 -> 产品结构 -> 已排硫化机台运行态编码集合。
+     * <p>集合保留 KxxxxL/KxxxxR 原码，保证单侧结果回滚时不会误删仍在生产的配对侧；
+     * 结构计数和候选存在性判断时再统一按 Kxxxx 物理机台去重。</p>
      */
     private Map<LocalDate, Map<String, Set<String>>> structureScheduledMachineCodeMap =
             new LinkedHashMap<LocalDate, Map<String, Set<String>>>(4);
@@ -1129,8 +1133,52 @@ public class LhScheduleContext {
     }
 
     /**
+     * 基于当前排程结果重建结构和 SKU 已排机台运行态。
+     *
+     * <p>S4.4 换活字块与 S4.5 新增排产都依赖该统计执行提前生产机台数门禁，
+     * 必须在各阶段开始前纳入已经落地的续作、换活字块和新增结果。结构机台数在读取时
+     * 统一按物理机台去重，单控 L/R 结果不会重复计数。</p>
+     *
+     * @param shifts 排程窗口班次
+     * @return 实际登记的“结果业务日”数量
+     */
+    public int rebuildScheduledMachineCountMaps(List<LhShiftConfigVO> shifts) {
+        this.clearScheduledMachineCountMaps();
+        if (CollectionUtils.isEmpty(scheduleResultList) || CollectionUtils.isEmpty(shifts)) {
+            return 0;
+        }
+        int recordDateCount = 0;
+        for (LhScheduleResult result : scheduleResultList) {
+            if (Objects.isNull(result) || StringUtils.isEmpty(result.getLhMachineCode())) {
+                continue;
+            }
+            Set<LocalDate> recordedDateSet = new LinkedHashSet<LocalDate>(3);
+            for (LhShiftConfigVO shift : shifts) {
+                if (Objects.isNull(shift) || Objects.isNull(shift.getShiftIndex())
+                        || Objects.isNull(shift.getWorkDate())) {
+                    continue;
+                }
+                Integer planQty = ShiftFieldUtil.getShiftPlanQty(
+                        result, shift.getShiftIndex());
+                if (Objects.nonNull(planQty) && planQty > 0) {
+                    recordedDateSet.add(
+                            SkuMonthPlanCalculator.getDate(shift.getWorkDate()));
+                }
+            }
+            for (LocalDate businessDate : recordedDateSet) {
+                this.recordScheduledMachine(
+                        businessDate, result.getStructureName(), result.getMaterialCode(),
+                        result.getProductStatus(), result.getLhMachineCode());
+            }
+            recordDateCount += recordedDateSet.size();
+        }
+        return recordDateCount;
+    }
+
+    /**
      * 登记已排硫化机台。
-     * <p>结构与 SKU 均按“业务日 + 机台编码”去重，避免同一机台多个班次重复计数。</p>
+     * <p>结构和 SKU 集合均保留运行态机台编码；结构计数时统一按物理机台去重，
+     * SKU 继续按原编码统计，避免改变既有 SKU 级节奏和双模规则。</p>
      *
      * @param productionDate 业务日期
      * @param structureName  产品结构
@@ -1147,14 +1195,15 @@ public class LhScheduleContext {
             return;
         }
         if (StringUtils.isNotEmpty(structureName)) {
-            recordMachine(structureScheduledMachineCodeMap, productionDate, structureName, machineCode);
+            this.recordMachine(
+                    structureScheduledMachineCodeMap, productionDate, structureName, machineCode);
         }
         if (StringUtils.isNotEmpty(materialCode)) {
             // 已排统计与读取入口使用同一产品状态归一化规则，空状态统一按正规 S 处理。
             String normalizedProductStatus = StringUtils.isEmpty(productStatus)
                     ? FORMAL_PRODUCT_STATUS : productStatus;
             String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(materialCode, normalizedProductStatus);
-            recordMachine(skuScheduledMachineCodeMap, productionDate, skuKey, machineCode);
+            this.recordMachine(skuScheduledMachineCodeMap, productionDate, skuKey, machineCode);
         }
     }
 
@@ -1178,14 +1227,15 @@ public class LhScheduleContext {
             return;
         }
         if (StringUtils.isNotEmpty(structureName)) {
-            removeMachine(structureScheduledMachineCodeMap, productionDate, structureName, machineCode);
+            this.removeMachine(
+                    structureScheduledMachineCodeMap, productionDate, structureName, machineCode);
         }
         if (StringUtils.isNotEmpty(materialCode)) {
             // 与登记口径保持一致：空状态统一按正规 S 归一化后再移除
             String normalizedProductStatus = StringUtils.isEmpty(productStatus)
                     ? FORMAL_PRODUCT_STATUS : productStatus;
             String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(materialCode, normalizedProductStatus);
-            removeMachine(skuScheduledMachineCodeMap, productionDate, skuKey, machineCode);
+            this.removeMachine(skuScheduledMachineCodeMap, productionDate, skuKey, machineCode);
         }
     }
 
@@ -1310,7 +1360,58 @@ public class LhScheduleContext {
      * @return 已排机台数
      */
     public int getStructureScheduledMachineCount(LocalDate productionDate, String structureName) {
-        return getScheduledMachineCount(structureScheduledMachineCodeMap, productionDate, structureName);
+        if (Objects.isNull(productionDate) || StringUtils.isEmpty(structureName)
+                || CollectionUtils.isEmpty(structureScheduledMachineCodeMap)) {
+            return 0;
+        }
+        Map<String, Set<String>> dateMachineMap =
+                structureScheduledMachineCodeMap.get(productionDate);
+        if (CollectionUtils.isEmpty(dateMachineMap)) {
+            return 0;
+        }
+        Set<String> structureMachineCodeSet = dateMachineMap.get(structureName);
+        if (CollectionUtils.isEmpty(structureMachineCodeSet)) {
+            return 0;
+        }
+        return (int) structureMachineCodeSet.stream()
+                .map(LhSingleControlMachineUtil::resolvePhysicalMachineCode)
+                .filter(StringUtils::isNotEmpty)
+                .distinct()
+                .count();
+    }
+
+    /**
+     * 判断指定物理机台是否已经计入当前业务日的结构机台集合。
+     *
+     * <p>该方法供提前生产候选机台级硬控使用：结构达到计划数后，已计入的物理机台仍可
+     * 复用，新物理机台禁止加入。普通排产和真实历史欠产不调用该判断。</p>
+     *
+     * @param productionDate 业务日期
+     * @param structureName 产品结构
+     * @param machineCode 候选运行态机台编码
+     * @return true-候选所属物理机台已计入该结构；false-尚未计入
+     */
+    public boolean hasStructureScheduledMachine(LocalDate productionDate,
+                                                String structureName,
+                                                String machineCode) {
+        if (Objects.isNull(productionDate) || StringUtils.isEmpty(structureName)
+                || StringUtils.isEmpty(machineCode)
+                || CollectionUtils.isEmpty(structureScheduledMachineCodeMap)) {
+            return false;
+        }
+        Map<String, Set<String>> dateMachineMap =
+                structureScheduledMachineCodeMap.get(productionDate);
+        if (CollectionUtils.isEmpty(dateMachineMap)) {
+            return false;
+        }
+        Set<String> structureMachineCodeSet = dateMachineMap.get(structureName);
+        String physicalMachineCode =
+                LhSingleControlMachineUtil.resolvePhysicalMachineCode(machineCode);
+        return StringUtils.isNotEmpty(physicalMachineCode)
+                && !CollectionUtils.isEmpty(structureMachineCodeSet)
+                && structureMachineCodeSet.stream()
+                .map(LhSingleControlMachineUtil::resolvePhysicalMachineCode)
+                .anyMatch(physicalMachineCode::equals);
     }
 
     /**
@@ -1329,7 +1430,7 @@ public class LhScheduleContext {
                 ? FORMAL_PRODUCT_STATUS : productStatus;
         String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(
                 materialCode, normalizedProductStatus);
-        return getScheduledMachineCount(skuScheduledMachineCodeMap, productionDate, skuKey);
+        return this.getScheduledMachineCount(skuScheduledMachineCodeMap, productionDate, skuKey);
     }
 
     /**

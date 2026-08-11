@@ -28,6 +28,7 @@ import com.zlt.aps.lh.api.enums.SkuScheduleSourceTypeEnum;
 import com.zlt.aps.lh.api.enums.SkuTagEnum;
 import com.zlt.aps.lh.component.CapsuleReplacementRuleService;
 import com.zlt.aps.lh.component.EarlyProductionQuantityCalculator;
+import com.zlt.aps.lh.component.EarlyProductionRuntimePlanService;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.component.OrderNoGenerator;
 import com.zlt.aps.lh.component.SkuDecrementChecker;
@@ -169,6 +170,9 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
     private static final String EARLY_PRODUCTION_PARTIAL_REMAINING_REASON_TEMPLATE =
             "提前生产已使用正常阶段后的剩余资源，按当前结构及日计划机台节奏不再扩机，"
                     + "剩余%d保留原计划日期";
+    /** 结构计划机台数达到上限时，提前生产禁止新增物理机台的原因前缀。 */
+    private static final String EARLY_PRODUCTION_STRUCTURE_MACHINE_LIMIT_REASON =
+            "同结构计划硫化机台数已达上限，禁止提前生产";
     private static final int NEW_SPEC_CHANGEOVER_PROBE_LIMIT = 16;
     /** 日驱动新增排产固定覆盖 T、T+1、T+2 三个业务日。 */
     private static final int DAY_DRIVEN_SCHEDULE_DAY_COUNT = 3;
@@ -203,6 +207,9 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
     private LocalSearchMachineAllocatorStrategy localSearchMachineAllocator;
     @Resource
     private TargetScheduleQtyResolver targetScheduleQtyResolver;
+    /** S4.4 与 S4.5 共用的提前生产运行态计划入口。 */
+    @Resource
+    private EarlyProductionRuntimePlanService earlyProductionRuntimePlanService;
     @Resource
     private SkuDecrementChecker skuDecrementChecker;
     @Resource
@@ -876,12 +883,11 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
     }
 
     /**
-     * 判断零日计划 SKU 是否属于既有历史欠产或收尾遗留任务。
+     * 判断零日计划 SKU 是否属于既有真实历史欠产或无未来计划收尾遗留任务。
      *
-     * <p>该类任务不属于提前生产：它没有命中未来 N 天日计划，只是延续原新增排产
-     * 的历史欠产/收尾口径。为保证当日正常 SKU 的资源优先级，它只允许在正常计划
-     * 和正常加机台阶段全部完成后执行；换活字块转新增任务仍必须有实际业务日原始
-     * 日计划，不能借此分支主动拉取未来 SKU。</p>
+     * <p>真实历史欠产属于非提前生产，即使 SKU 同时存在未来计划也可按既有欠产口径处理；
+     * 没有真实历史欠产时，必须在完整原始计划范围确认未来无计划后，才允许按收尾遗留任务
+     * 进入。提前生产天数阈值只用于“何时可提前”，不能用于判断“是否存在未来计划”。</p>
      *
      * @param context 排程上下文
      * @param sku 待判断 SKU
@@ -895,18 +901,22 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                                                     boolean boundOnMachine) {
         if (Objects.isNull(context) || Objects.isNull(sku) || Objects.isNull(currentDate)
                 || boundOnMachine
-                || context.isFutureOnlyEarlyProductionCandidate(sku)
                 || StringUtils.equals(
                 SkuScheduleSourceTypeEnum.TYPE_BLOCK_TO_NEW_SPEC.getCode(), sku.getSourceType())
-                || resolveOriginalNewSpecDayPlanQty(context, sku, currentDate) > 0
-                || Objects.nonNull(EarlyProductionChecker.resolveFirstFuturePlanDate(
-                context, sku, currentDate))) {
+                || resolveOriginalNewSpecDayPlanQty(context, sku, currentDate) > 0) {
             return false;
         }
         int historyShortageQty =
                 EarlyProductionChecker.resolveHistoryShortageQty(context, sku, currentDate);
-        return historyShortageQty > 0
-                || endingJudgmentStrategy.isCurrentWindowEnding(context, sku);
+        if (historyShortageQty > 0) {
+            return true;
+        }
+        if (context.isFutureOnlyEarlyProductionCandidate(sku)
+                || Objects.nonNull(EarlyProductionChecker.resolveFirstFutureOriginalPlanDate(
+                context, sku, currentDate))) {
+            return false;
+        }
+        return endingJudgmentStrategy.isCurrentWindowEnding(context, sku);
     }
 
     /**
@@ -928,258 +938,9 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         if (Objects.isNull(context) || Objects.isNull(dayContext) || Objects.isNull(sku)) {
             return null;
         }
-        LocalDate currentDate = dayContext.getScheduleDate();
-        LocalDate windowStartDate = resolveScheduleWindowStartLocalDate(context);
-        LocalDate windowEndDate = resolveScheduleTargetLocalDate(context);
-        if (Objects.isNull(currentDate) || Objects.isNull(windowStartDate)
-                || Objects.isNull(windowEndDate)) {
-            return null;
-        }
-        EarlyProductionRuntimePlan runtimePlan =
-                context.getEarlyProductionRuntimePlan(sku);
-
-        /*
-         * 调用处先完成提前生产业务准入，再创建临时视图。Checker 只判定准入，
-         * 不分配机台、模具、胎胚，也不修改任何资源。
-         */
-        EarlyProductionDecision decision = EarlyProductionChecker.checkEarlyProduction(
-                context, sku, currentDate, windowStartDate, windowEndDate,
-                resolveNewSpecShortageAddMachineThreshold(context));
-        if (Objects.isNull(decision) || !decision.isEarlyProduction()
-                || Objects.isNull(decision.getFuturePlanDate())) {
-            if (Objects.nonNull(runtimePlan) && runtimePlan.isFutureOnlyCandidate()) {
-                /*
-                 * futurePlanDate 尚未进入 currentDate+N 时保持候选态，不删除运行视图、
-                 * 不创建目标量，也不进入任何正常阶段；下一业务日继续用同一候选视图判断。
-                 */
-                runtimePlan.setCurrentDate(currentDate);
-                runtimePlan.setActive(false);
-                runtimePlan.setDecision(decision);
-                runtimePlan.getShiftedDailyPlanQuotaMap().clear();
-                context.registerEarlyProductionRuntimePlan(sku, runtimePlan);
-                log.info("提前生产候选尚未激活, materialCode: {}, currentDate: {}, "
-                                + "futurePlanDate: {}, earlyProductionDaysThreshold: {}, reason: {}",
-                        sku.getMaterialCode(), currentDate, runtimePlan.getFuturePlanDate(),
-                        runtimePlan.getEarlyProductionDaysThreshold(),
-                        Objects.isNull(decision) ? "未形成准入结论" : decision.getReason());
-                return runtimePlan;
-            }
-            return null;
-        }
-
-        LocalDate futurePlanDate = decision.getFuturePlanDate();
-        int earlyDays = (int) java.time.temporal.ChronoUnit.DAYS.between(
-                currentDate, futurePlanDate);
-        if (Objects.isNull(runtimePlan)) {
-            runtimePlan = new EarlyProductionRuntimePlan();
-        }
-        runtimePlan.setActive(false);
-        runtimePlan.setCurrentDate(currentDate);
-        runtimePlan.setFuturePlanDate(futurePlanDate);
-        runtimePlan.setEarlyDays(earlyDays);
-        runtimePlan.setEarlyProductionDaysThreshold(
-                EarlyProductionChecker.resolveEarlyProductionDaysThreshold(context));
-        runtimePlan.setOriginalCurrentDayPlanQty(
-                resolveOriginalNewSpecDayPlanQty(context, sku, currentDate));
-        runtimePlan.setFutureDayPlanQty(
-                MonthPlanDateResolver.resolveDayQty(
-                        context, sku.getMaterialCode(), sku.getProductStatus(), futurePlanDate));
-        runtimePlan.setHistoryShortageQty(
-                EarlyProductionChecker.resolveHistoryShortageQty(context, sku, currentDate));
-        runtimePlan.setDecision(decision);
-        if (runtimePlan.isFutureOnlyCandidate()) {
-            /*
-             * 当前月 TOTAL_QTY=0 的 SKU 只能读取 futurePlanDate 所属计划月数量视图；
-             * 通用 sku.surplusQty 保持正常排产原口径，不在此处覆盖。
-             */
-            EarlyProductionQuantityCalculator.populateFutureMonthQuantityView(
-                    context, sku, windowStartDate, runtimePlan);
-        }
-        /*
-         * 准入失败时只返回本次判定对象，不注册未激活运行视图：
-         * 若注册，后续业务日严格收尾会误读 effectiveTargetQty=0，把真实硫化余量错误收敛为0，
-         * 造成当日有日计划、机台空闲却整班不排产。最终未排原因已由调用处延期任务冻结，
-         * 不依赖这里的注册动作。
-         */
-        if (!decision.isAllowed()) {
-            log.info("提前生产准入未通过，不注册中心运行视图, materialCode: {}, currentDate: {}, "
-                            + "futurePlanDate: {}, structureName: {}, reason: {}",
-                    sku.getMaterialCode(), currentDate, futurePlanDate,
-                    sku.getStructureName(), decision.getReason());
-            return runtimePlan;
-        }
-        // 准入通过后才允许注册运行视图；激活态与目标量在下方完成初始化后再次注册覆盖。
-        context.registerEarlyProductionRuntimePlan(sku, runtimePlan);
-
-        Map<LocalDate, SkuDailyPlanQuotaDTO> sourceQuotaMap =
-                buildEarlyProductionSourceQuotaMap(
-                        context, sku, currentDate, windowEndDate, earlyDays);
-        Map<LocalDate, SkuDailyPlanQuotaDTO> shiftedQuotaMap =
-                SkuDailyPlanQuotaUtil.buildShiftedEarlyProductionQuotaMap(
-                        sourceQuotaMap, currentDate, windowEndDate, futurePlanDate);
-        if (CollectionUtils.isEmpty(shiftedQuotaMap)) {
-            return runtimePlan;
-        }
-
-        /*
-         * 当前业务月前日累计欠产只追加到临时账本首日，且与 futurePlanDate 所属月
-         * 的真实硫化余量相加。即使未来月计划已携带上月超欠产，仍按确认口径完整
-         * 追加当前月历史欠产，禁止在这里做抵扣或去重。
-         */
-        int historyShortageQty =
-                EarlyProductionChecker.resolveHistoryShortageQty(context, sku, currentDate);
-        appendHistoryShortageToShiftedQuota(
-                shiftedQuotaMap, currentDate, historyShortageQty);
-        int futureMonthSurplusQty = runtimePlan.isFutureOnlyCandidate()
-                ? runtimePlan.getFutureMonthSurplusQty() : Math.max(0, sku.getSurplusQty());
-        long effectiveTargetQtyLong =
-                (long) futureMonthSurplusQty + historyShortageQty;
-        if (effectiveTargetQtyLong > Integer.MAX_VALUE) {
-            throw new ScheduleException(
-                    ScheduleErrorCode.SURPLUS_CALCULATION_ERROR,
-                    new StringBuilder("提前生产目标量超出整数范围, materialCode: ")
-                            .append(sku.getMaterialCode())
-                            .append(", futurePlanDate: ").append(futurePlanDate)
-                            .append(", futureMonthSurplusQty: ").append(futureMonthSurplusQty)
-                            .append(", historyShortageQty: ").append(historyShortageQty)
-                            .toString());
-        }
-        int effectiveTargetQty = (int) effectiveTargetQtyLong;
-        sku.setMonthlyHistoryShortageQty(historyShortageQty);
-        sku.setEffectiveCarryForwardQty(historyShortageQty);
-        sku.setTargetScheduleQty(effectiveTargetQty);
-        sku.setPendingQty(effectiveTargetQty);
-        sku.setRemainingScheduleQty(effectiveTargetQty);
-        sku.setWindowPlanQty(sumSimulationWindowMonthPlanQty(shiftedQuotaMap));
-        sku.setWindowRemainingPlanQty(SkuDailyPlanQuotaUtil.sumRemainingQty(shiftedQuotaMap));
-        /*
-         * SKU 实际消费账本在 S4.3 已按原月计划初始化。提前生产目标采用未来月余量
-         * 加当前月历史欠产，必须在调用处同步覆盖为中心视图目标，后续所有结果扣减
-         * 才会使用同一口径。
-         */
-        getTargetScheduleQtyResolver().syncProductionRemainingQtyToTarget(
-                context, sku, effectiveTargetQty, "提前生产中心运行视图初始化");
-        /*
-         * 候选激活并取得真实目标量后，立即刷新胎胚有效 SKU 和共用胎胚库存分配。
-         * 阶段一已占用资源不会被释放，后续选机仍只使用冻结后的剩余资源。
-         */
-        getTargetScheduleQtyResolver().refreshActiveEmbryoSkuMap(context);
-        getTargetScheduleQtyResolver().refreshAllSharedEmbryoStockAllocations(
-                context, "提前生产候选激活");
-
-        runtimePlan.setHistoryShortageQty(historyShortageQty);
-        runtimePlan.setEffectiveTargetQty(effectiveTargetQty);
-        runtimePlan.setDecision(decision);
-        runtimePlan.setShiftedDailyPlanQuotaMap(shiftedQuotaMap);
-        runtimePlan.setActive(true);
-        // 调用处注册运行视图，供选机、加机台、模拟、排程块扣账和结果备注统一读取。
-        context.registerEarlyProductionRuntimePlan(sku, runtimePlan);
-
-        log.info("提前生产中心运行视图初始化完成, materialCode: {}, currentDate: {}, "
-                        + "futurePlanDate: {}, earlyDays: {}, earlyProductionDaysThreshold: {}, "
-                        + "originalCurrentDayPlanQty: {}, futureDayPlanQty: {}, shiftedCurrentDayPlanQty: {}, "
-                        + "normalProductionPhaseFinished: true, structureName: {}, currentPlanMachineCount: {}, "
-                        + "futurePlanMachineCount: {}, scheduledStructureCount: {}, scheduledSkuCount: {}, "
-                        + "historyShortageQty: {}, threshold: {}, dailyQty: {}, futureMonthSurplusQty: {}, "
-                        + "effectiveTargetQty: {}, allowed: true",
-                sku.getMaterialCode(), currentDate, futurePlanDate, earlyDays,
-                runtimePlan.getEarlyProductionDaysThreshold(),
-                runtimePlan.getOriginalCurrentDayPlanQty(), runtimePlan.getFutureDayPlanQty(),
-                resolveQuotaDayPlanQty(shiftedQuotaMap, currentDate),
-                sku.getStructureName(),
-                context.getStructurePlanMachineCount(currentDate, sku.getStructureName()),
-                context.getStructurePlanMachineCount(futurePlanDate, sku.getStructureName()),
-                context.getStructureScheduledMachineCount(currentDate, sku.getStructureName()),
-                context.getSkuScheduledMachineCount(
-                        currentDate, sku.getMaterialCode(), sku.getProductStatus()),
-                historyShortageQty,
-                resolveNewSpecShortageAddMachineThreshold(context), Math.max(0, sku.getDailyCapacity()),
-                futureMonthSurplusQty, effectiveTargetQty);
-        return runtimePlan;
-    }
-
-    /**
-     * 构造覆盖“当前业务日到窗口结束日 + 提前天数”的原始日计划读取视图。
-     *
-     * @param context 排程上下文
-     * @param sku SKU
-     * @param currentDate 当前业务日
-     * @param windowEndDate 排程窗口结束日
-     * @param earlyDays 实际提前天数
-     * @return 仅承载原始 dayN 的临时来源账本
-     */
-    private Map<LocalDate, SkuDailyPlanQuotaDTO> buildEarlyProductionSourceQuotaMap(
-            LhScheduleContext context,
-            SkuScheduleDTO sku,
-            LocalDate currentDate,
-            LocalDate windowEndDate,
-            int earlyDays) {
-        LocalDate sourceEndDate = windowEndDate.plusDays(Math.max(0, earlyDays));
-        int initialCapacity = Math.max(
-                4, (int) java.time.temporal.ChronoUnit.DAYS.between(
-                        currentDate, sourceEndDate) + 1);
-        Map<LocalDate, SkuDailyPlanQuotaDTO> sourceQuotaMap =
-                new LinkedHashMap<LocalDate, SkuDailyPlanQuotaDTO>(initialCapacity);
-        LocalDate cursor = currentDate;
-        while (!cursor.isAfter(sourceEndDate)) {
-            int dayPlanQty = Math.max(0, MonthPlanDateResolver.resolveDayQty(
-                    context, sku.getMaterialCode(), sku.getProductStatus(), cursor));
-            SkuDailyPlanQuotaDTO quota = new SkuDailyPlanQuotaDTO();
-            quota.setMaterialCode(sku.getMaterialCode());
-            quota.setProductionDate(cursor);
-            quota.setDayPlanQty(dayPlanQty);
-            quota.setRemainingQty(dayPlanQty);
-            sourceQuotaMap.put(cursor, quota);
-            cursor = cursor.plusDays(1);
-        }
-        SkuDailyPlanQuotaUtil.refreshRollingFields(sourceQuotaMap);
-        return sourceQuotaMap;
-    }
-
-    /**
-     * 将当前月历史欠产追加到临时前移账本首日。
-     *
-     * @param shiftedQuotaMap 临时前移账本
-     * @param currentDate 当前业务日
-     * @param historyShortageQty 当前月前日累计欠产
-     */
-    private void appendHistoryShortageToShiftedQuota(
-            Map<LocalDate, SkuDailyPlanQuotaDTO> shiftedQuotaMap,
-            LocalDate currentDate,
-            int historyShortageQty) {
-        if (historyShortageQty <= 0 || CollectionUtils.isEmpty(shiftedQuotaMap)) {
-            return;
-        }
-        SkuDailyPlanQuotaDTO currentQuota = shiftedQuotaMap.get(currentDate);
-        if (Objects.isNull(currentQuota)) {
-            return;
-        }
-        long remainingQtyLong =
-                (long) Math.max(0, currentQuota.getRemainingQty()) + historyShortageQty;
-        if (remainingQtyLong > Integer.MAX_VALUE) {
-            throw new ScheduleException(
-                    ScheduleErrorCode.SURPLUS_CALCULATION_ERROR,
-                    "提前生产临时日计划追加历史欠产后超出整数范围");
-        }
-        currentQuota.setRemainingQty((int) remainingQtyLong);
-        SkuDailyPlanQuotaUtil.refreshRollingFields(shiftedQuotaMap);
-    }
-
-    /**
-     * 读取临时账本指定日期的日计划量。
-     *
-     * @param quotaMap 临时日计划账本
-     * @param productionDate 业务日期
-     * @return 日计划量
-     */
-    private int resolveQuotaDayPlanQty(
-            Map<LocalDate, SkuDailyPlanQuotaDTO> quotaMap,
-            LocalDate productionDate) {
-        if (CollectionUtils.isEmpty(quotaMap) || Objects.isNull(productionDate)) {
-            return 0;
-        }
-        SkuDailyPlanQuotaDTO quota = quotaMap.get(productionDate);
-        return Objects.isNull(quota) ? 0 : Math.max(0, quota.getDayPlanQty());
+        // S4.5 只负责提供当前业务日，准入、数量、临时 dayN 和实际消费账本统一交给共享服务。
+        return earlyProductionRuntimePlanService.prepareRuntimePlan(
+                context, sku, dayContext.getScheduleDate());
     }
 
     /**
@@ -2941,6 +2702,23 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 // 当前轮已消费上一轮重试标记；本轮若再次需要顺延，会在对应失败分支重新写入。
                 pendingFirstInspectionRetryMachineCode = null;
                 if (Objects.isNull(candidateMachine)) {
+                    /*
+                     * 提前生产结构已达计划机台数、且当前不存在真实可复用候选时，虽然没有机台进入
+                     * 后续资源扣减，也必须把“禁止再新增物理机台”的业务原因带到最终未排结果。
+                     * 该判断只补充本阶段选机失败原因，不在公共候选入口拦截正常排产或历史欠产。
+                     */
+                    if (StringUtils.isEmpty(dailyDeferredReason)
+                            && CollectionUtils.isEmpty(currentSelectableCandidates)) {
+                        String noSelectableMachineLimitReason =
+                                this.resolveEarlyProductionStructureMachineLimitReason(
+                                        context, dayContext, sku, null);
+                        if (StringUtils.isNotEmpty(noSelectableMachineLimitReason)) {
+                            dailyDeferredReason = noSelectableMachineLimitReason;
+                            this.appendEarlyProductionStructureMachineLimitLog(
+                                    context, dayContext, sku, null,
+                                    noSelectableMachineLimitReason);
+                        }
+                    }
                     break;
                 }
                 String machineCode = candidateMachine.getMachineCode();
@@ -2973,6 +2751,29 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 // 业务日循环已确定模具到货和占用日期，dayN 增机日只能作为非日驱动调用的回退信息。
                 refreshCurrentScheduleDate(
                         context, dayContext.getScheduleDate(), sku, currentAddMachineProductionDate);
+                /*
+                 * 结构计划机台数只约束提前生产新增物理机台。校验必须放在候选已经确定、
+                 * 模具和胎胚等资源尚未扣减的位置：结构达到计划数后可继续复用本结构已有机台，
+                 * 但禁止候选把结构物理机台数继续增加；正常排产及真实历史欠产完全不走此分支。
+                 */
+                String earlyProductionStructureLimitReason =
+                        this.resolveEarlyProductionStructureMachineLimitReason(
+                                context, dayContext, sku, candidateMachine.getMachineCode());
+                if (StringUtils.isNotEmpty(earlyProductionStructureLimitReason)) {
+                    excludedMachineCodes.add(machineCode);
+                    candidateCache.removeMachine(machineCode);
+                    this.recordExcludedMachineReason(
+                            excludedMachineReasonMap, machineCode,
+                            earlyProductionStructureLimitReason,
+                            null, null, null, null, null, null, null, null, null);
+                    this.appendEarlyProductionStructureMachineLimitLog(
+                            context, dayContext, sku, candidateMachine.getMachineCode(),
+                            earlyProductionStructureLimitReason);
+                    dailyDeferredReason = earlyProductionStructureLimitReason;
+                    failReason = this.selectHigherPriorityFailReason(
+                            failReason, NewSpecFailReasonEnum.MACHINE_SELECTION_FAILED);
+                    continue;
+                }
                 // SKU新增机台必须先按候选机台模数预占可用模具；模具不足只跳过当前机台，不能中断排程主链。
                 MouldResourceAllocationResult mouldResourceAllocationResult = tryAllocateMouldResourceForAddMachine(
                         context, sku, candidateMachine, originalAddMachineCount, actualAllowedAddMachineCount);
@@ -5783,6 +5584,128 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
     }
 
     /**
+     * 校验提前生产候选是否会突破同结构计划硫化机台数。
+     *
+     * <p>本校验只绑定 {@link DailySchedulePhase#EARLY_PRODUCTION}。结构已达到计划机台数时，
+     * 已经计入同结构的物理机台仍可复用，只有会新增物理机台的候选返回限制原因。
+     * 调用位置位于候选确定后、模具及其它生产资源扣减前，保证拒绝时不产生资源副作用。</p>
+     *
+     * @param context 排程上下文
+     * @param dayContext 当前业务日上下文
+     * @param sku 当前提前生产 SKU
+     * @param candidateMachineCode 当前候选机台编码；为空表示当前无真实可复用候选，仅解析失败原因
+     * @return 空串表示允许；非空表示禁止提前生产的明确原因
+     */
+    private String resolveEarlyProductionStructureMachineLimitReason(
+            LhScheduleContext context,
+            DayScheduleContext dayContext,
+            SkuScheduleDTO sku,
+            String candidateMachineCode) {
+        if (Objects.isNull(context) || Objects.isNull(dayContext) || Objects.isNull(sku)
+                || dayContext.getCurrentPhase() != DailySchedulePhase.EARLY_PRODUCTION) {
+            return null;
+        }
+        EarlyProductionRuntimePlan runtimePlan =
+                context.getEarlyProductionRuntimePlan(sku);
+        if (Objects.isNull(runtimePlan) || !runtimePlan.isActive()
+                || Objects.isNull(runtimePlan.getDecision())
+                || !runtimePlan.getDecision().isEarlyProduction()) {
+            return null;
+        }
+        LocalDate currentDate = dayContext.getScheduleDate();
+        LocalDate futurePlanDate = runtimePlan.getFuturePlanDate();
+        if (StringUtils.isNotEmpty(candidateMachineCode)
+                && EarlyProductionChecker.canUseMachineForEarlyProduction(
+                context, sku, currentDate, futurePlanDate,
+                candidateMachineCode)) {
+            return null;
+        }
+        int scheduledStructureMachineCount =
+                context.getStructureScheduledMachineCount(
+                        currentDate, sku.getStructureName());
+        int planMachineCount =
+                EarlyProductionChecker.resolveEffectiveStructurePlanMachineCount(
+                        context, sku, currentDate, futurePlanDate);
+        /*
+         * 没有实际候选时，本方法只在结构确已达到计划数后补充组合失败原因；结构尚有新增
+         * 机台额度时继续沿用原选机失败原因，避免把普通资源不足误报成结构上限限制。
+         */
+        if (StringUtils.isEmpty(candidateMachineCode)
+                && (planMachineCount <= 0
+                || scheduledStructureMachineCount < planMachineCount)) {
+            return null;
+        }
+        String physicalMachineCode =
+                LhSingleControlMachineUtil.resolvePhysicalMachineCode(
+                        candidateMachineCode);
+        StringBuilder reasonBuilder = new StringBuilder(192)
+                .append(EARLY_PRODUCTION_STRUCTURE_MACHINE_LIMIT_REASON)
+                .append("，结构=").append(PriorityTraceLogHelper.safeText(sku.getStructureName()))
+                .append("，当前已排物理机台数=").append(scheduledStructureMachineCount)
+                .append("，计划机台数=").append(planMachineCount);
+        if (StringUtils.isEmpty(candidateMachineCode)) {
+            reasonBuilder.append("，当前无可复用的同结构物理机台");
+        } else {
+            reasonBuilder.append("，候选物理机台=")
+                    .append(PriorityTraceLogHelper.safeText(physicalMachineCode));
+        }
+        return reasonBuilder.toString();
+    }
+
+    /**
+     * 记录提前生产因结构计划机台数达到上限而排除候选机台的过程日志。
+     *
+     * @param context 排程上下文
+     * @param dayContext 当前业务日上下文
+     * @param sku 当前提前生产 SKU
+     * @param candidateMachineCode 被拒绝的候选机台编码；为空表示没有真实可复用候选
+     * @param reason 明确限制原因
+     */
+    private void appendEarlyProductionStructureMachineLimitLog(
+            LhScheduleContext context,
+            DayScheduleContext dayContext,
+            SkuScheduleDTO sku,
+            String candidateMachineCode,
+            String reason) {
+        if (Objects.isNull(context) || Objects.isNull(dayContext) || Objects.isNull(sku)) {
+            return;
+        }
+        EarlyProductionRuntimePlan runtimePlan =
+                context.getEarlyProductionRuntimePlan(sku);
+        LocalDate futurePlanDate = Objects.isNull(runtimePlan)
+                ? null : runtimePlan.getFuturePlanDate();
+        int planMachineCount =
+                EarlyProductionChecker.resolveEffectiveStructurePlanMachineCount(
+                        context, sku, dayContext.getScheduleDate(), futurePlanDate);
+        int scheduledStructureMachineCount =
+                context.getStructureScheduledMachineCount(
+                        dayContext.getScheduleDate(), sku.getStructureName());
+        String physicalMachineCode =
+                LhSingleControlMachineUtil.resolvePhysicalMachineCode(
+                        candidateMachineCode);
+        String detail = new StringBuilder(384)
+                .append("batchNo=").append(PriorityTraceLogHelper.safeText(context.getBatchNo()))
+                .append(", scheduleDate=")
+                .append(LhScheduleTimeUtil.formatDate(context.getScheduleTargetDate()))
+                .append(", currentDate=").append(dayContext.getScheduleDate())
+                .append(", futurePlanDate=").append(PriorityTraceLogHelper.safeText(futurePlanDate))
+                .append(", phase=").append(DailySchedulePhase.EARLY_PRODUCTION)
+                .append(", materialCode=").append(sku.getMaterialCode())
+                .append(", structureName=").append(PriorityTraceLogHelper.safeText(sku.getStructureName()))
+                .append(", candidateMachineCode=")
+                .append(PriorityTraceLogHelper.safeText(candidateMachineCode))
+                .append(", physicalMachineCode=").append(PriorityTraceLogHelper.safeText(physicalMachineCode))
+                .append(", scheduledStructureMachineCount=").append(scheduledStructureMachineCount)
+                .append(", planMachineCount=").append(planMachineCount)
+                .append(", result=REJECT")
+                .append(", reason=").append(PriorityTraceLogHelper.safeText(reason))
+                .toString();
+        log.info("提前生产结构机台数限制, {}", detail);
+        PriorityTraceLogHelper.appendProcessLog(
+                context, "提前生产结构机台数限制", detail);
+    }
+
+    /**
      * 形成当前真正进入新增选机排序和尝试流程的候选机台列表。
      * <p>硬约束已经由机台匹配策略完成；本方法继续复用正式窗口产能计算及当前SKU候选缓存，
      * 排除已失败、已使用以及窗口剩余产能不大于0的机台。返回列表保持原候选顺序，
@@ -8092,14 +8015,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         if (Objects.isNull(context)) {
             return;
         }
-        context.clearScheduledMachineCountMaps();
-        if (CollectionUtils.isEmpty(context.getScheduleResultList()) || CollectionUtils.isEmpty(shifts)) {
-            return;
-        }
-        int recordCount = 0;
-        for (LhScheduleResult result : context.getScheduleResultList()) {
-            recordCount += recordScheduledMachineForResult(context, result, shifts, false);
-        }
+        // S4.5 与 S4.4 共用上下文重建入口，避免两个阶段统计续作占用机台的口径不一致。
+        int recordCount = context.rebuildScheduledMachineCountMaps(shifts);
         log.debug("提前生产已排机台统计重建完成, factoryCode: {}, resultCount: {}, recordDateCount: {}",
                 context.getFactoryCode(), context.getScheduleResultList().size(), recordCount);
     }
@@ -10735,27 +10652,35 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             PriorityTraceLogHelper.appendLine(detailBuilder, "TOP" + outputCount + "候选排序:");
             for (int i = 0; i < outputCount; i++) {
                 MachineScheduleDTO machine = candidates.get(i);
-                boolean isSingleCtrl = isSingleControlMachine(context, machine.getMachineCode());
+                /*
+                 * TOP5 与详细优先级日志统一读取选机时点冻结的 DTO。仅冻结收尾时间不够：
+                 * 排产提交还会把前物料、前规格和英寸推进为本轮 SKU，导致延迟日志误判同规格、同英寸。
+                 */
+                MachineScheduleDTO traceMachine = Objects.isNull(confirmedSnapshot)
+                        ? null : confirmedSnapshot.resolveCandidateSnapshot(machine.getMachineCode());
+                MachineScheduleDTO logMachine = Objects.isNull(traceMachine) ? machine : traceMachine;
+                boolean isSingleCtrl = this.isSingleControlMachine(
+                        context, logMachine.getMachineCode());
                 String reasonSuffix = (i == 0 && success && finalMachine != null
-                        && StringUtils.equals(machine.getMachineCode(), finalMachine.getMachineCode()))
+                        && StringUtils.equals(logMachine.getMachineCode(), finalMachine.getMachineCode()))
                         ? "最优候选" : ("候选" + (i + 1));
                 /*
                  * 优先输出选机时点冻结的收尾时间，避免整轮结束后机台 estimatedEndTime
                  * 已被本轮结果推进，导致 TOP5 日志与正式选机画像口径不一致。
                  */
                 Date traceEndingTime = Objects.nonNull(confirmedSnapshot)
-                        && confirmedSnapshot.hasPriorityTraceEndingTime(machine.getMachineCode())
-                        ? confirmedSnapshot.resolvePriorityTraceEndingTime(machine.getMachineCode())
-                        : machine.getEstimatedEndTime();
+                        && confirmedSnapshot.hasPriorityTraceEndingTime(logMachine.getMachineCode())
+                        ? confirmedSnapshot.resolvePriorityTraceEndingTime(logMachine.getMachineCode())
+                        : logMachine.getEstimatedEndTime();
                 PriorityTraceLogHelper.appendLine(detailBuilder,
                         (i + 1)
-                                + ". " + PriorityTraceLogHelper.kv("机台", machine.getMachineCode())
-                                + ", " + PriorityTraceLogHelper.kv("名称", machine.getMachineName())
+                                + ". " + PriorityTraceLogHelper.kv("机台", logMachine.getMachineCode())
+                                + ", " + PriorityTraceLogHelper.kv("名称", logMachine.getMachineName())
                                 + ", " + PriorityTraceLogHelper.kv("单控", PriorityTraceLogHelper.oneZero(isSingleCtrl))
                                 + ", " + PriorityTraceLogHelper.kv("收尾时间", PriorityTraceLogHelper.formatDateTime(traceEndingTime))
-                                + ", " + PriorityTraceLogHelper.kv("当前在机", machine.getPreviousMaterialCode())
-                                + ", " + PriorityTraceLogHelper.kv("前规格", machine.getPreviousSpecCode())
-                                + ", " + PriorityTraceLogHelper.kv("机台顺序", machine.getMachineOrder())
+                                + ", " + PriorityTraceLogHelper.kv("当前在机", logMachine.getPreviousMaterialCode())
+                                + ", " + PriorityTraceLogHelper.kv("前规格", logMachine.getPreviousSpecCode())
+                                + ", " + PriorityTraceLogHelper.kv("机台顺序", logMachine.getMachineOrder())
                                 + ", " + PriorityTraceLogHelper.kv("原因", reasonSuffix));
             }
             if (PriorityTraceLogHelper.sizeOf(candidates) > topN) {
