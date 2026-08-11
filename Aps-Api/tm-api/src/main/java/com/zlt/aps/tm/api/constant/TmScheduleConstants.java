@@ -180,7 +180,7 @@ public final class TmScheduleConstants {
     public static final String DEFAULT_FORMING_SHIFT_OFFSET = "2";
 
     /** 班次表头起始日期相对排程日期的默认偏移天数。 */
-    public static final int DEFAULT_SHIFT_DATE_START_OFFSET = -2;
+    public static final int DEFAULT_SHIFT_DATE_START_OFFSET = -1;
 
     /** 小胶种编码默认值。 */
     public static final String DEFAULT_SMALL_GLUE_CODES = "";

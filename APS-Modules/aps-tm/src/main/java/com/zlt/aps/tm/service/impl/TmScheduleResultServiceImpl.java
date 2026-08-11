@@ -1052,7 +1052,7 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
      * 获取胎面排程班次日期列表
      * 根据工厂参数和排程日期构建6个班次的日期展示列表。
      * 胎面排程6个班次覆盖D日中班、D+1日夜早中、D+2日夜早，
-     * D默认等于排程日期减2天，可通过TM_SHIFT_DATE_START_OFFSET按工厂维护：
+     * D默认等于排程日期减1天，可通过TM_SHIFT_DATE_START_OFFSET按工厂维护：
      * 班次1：D日中班，班次2~4：D+1日夜早中，班次5~6：D+2日夜早
      *
      * @param factoryCode 工厂编码
@@ -1062,7 +1062,7 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
     @Override
     public List<TmScheduleShiftDateVO> listScheduleShiftDates(String factoryCode, Date scheduleDate) {
         if (scheduleDate == null) {
-            scheduleDate = DateUtil.offsetDay(new Date(), 2);
+            scheduleDate = DateUtil.offsetDay(new Date(), 1);
         }
         int shiftDateStartOffset = this.resolveShiftDateStartOffset(factoryCode);
         Date dDay = DateUtil.offsetDay(scheduleDate, shiftDateStartOffset);
