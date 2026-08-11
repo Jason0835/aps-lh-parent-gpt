@@ -52,6 +52,8 @@ import com.zlt.aps.lh.engine.strategy.support.DailyMachineCapacitySimulationResu
 import com.zlt.aps.lh.engine.strategy.support.DailyMachineCapacitySimulationUtil;
 import com.zlt.aps.lh.engine.strategy.support.DailyMachineExpansionPlanner;
 import com.zlt.aps.lh.engine.strategy.support.DailyNewSpecCandidate;
+import com.zlt.aps.lh.engine.strategy.support.DailyNewSpecOrderLogCollector;
+import com.zlt.aps.lh.engine.strategy.support.DailyNewSpecOrderLogEntry;
 import com.zlt.aps.lh.engine.strategy.support.DailyQuotaLedgerBaseline;
 import com.zlt.aps.lh.engine.strategy.support.DailySchedulePhase;
 import com.zlt.aps.lh.engine.strategy.support.DayDrivenScheduleState;
@@ -577,7 +579,130 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 context, dayContext, state, DailySchedulePhase.EARLY_PRODUCTION,
                 machineMatch, mouldChangeBalance, inspectionBalance, capacityCalculate,
                 unscheduledReasonCountMap);
+        /*
+         * 当天正常、历史遗留和提前生产阶段全部执行完成后，使用同一个采集器生成唯一过程日志。
+         * 明细顺序来自各阶段真实主循环的追加顺序；在机延续阶段未调用采集器，因此不会进入日志。
+         */
+        this.appendDailyNewSpecOrderProcessLog(context, dayContext);
         return scheduledCount;
+    }
+
+    /**
+     * 将当前业务日新增排产实际顺序写入现有硫化排程过程日志。
+     *
+     * <p>该日志不受选机优先级跟踪开关控制，每个实际业务日固定写入一条；当天无可排 SKU 时，
+     * 采集器输出固定空日说明。过程日志仍由现有 {@code scheduleLogList} 在排程完成后统一批量落库，
+     * 本方法不新增数据库访问，也不改变排程事务边界。</p>
+     *
+     * @param context 排程上下文
+     * @param dayContext 当前业务日编排上下文
+     */
+    private void appendDailyNewSpecOrderProcessLog(LhScheduleContext context,
+                                                   DayScheduleContext dayContext) {
+        DailyNewSpecOrderLogCollector collector = dayContext.getNewSpecOrderLogCollector();
+        String title = collector.buildTitle();
+        String detail = collector.buildDetail();
+        PriorityTraceLogHelper.appendProcessLog(context, title, detail);
+        // 日志实体已持有完整字符串，立即释放轻量明细集合，避免跨后续业务日继续占用内存。
+        collector.clear();
+    }
+
+    /**
+     * 记录当前 SKU 本次真实进入新增排产主循环的顺序。
+     *
+     * <p>调用点必须位于 SKU 前置过滤、正式机台候选匹配、当前日加机生效日期和
+     * dayN 机台上限全部放行之后；无正式候选或被上述规则过滤的 SKU 不调用本方法。
+     * 同一 SKU 跨阶段或跨轮次再次进入会创建新明细，不按物料编码去重。</p>
+     *
+     * @param context 排程上下文
+     * @param dayContext 当前业务日及实际阶段
+     * @param sku 当前真实参与排产的 SKU
+     * @return 当前遍历对应的可回填日志明细
+     */
+    private DailyNewSpecOrderLogEntry recordDailyNewSpecOrder(
+            LhScheduleContext context,
+            DayScheduleContext dayContext,
+            SkuScheduleDTO sku) {
+        int initialRequiredMachineCount = 1;
+        if (SkuScheduleSourceTypeEnum.isContinuationAddMachine(sku.getSourceType())) {
+            /*
+             * 续作新增直接复用续作中心链路已按 dayN 节奏计算的当日缺口机台数，
+             * 避免严格目标、单候选等不进入动态模拟的真实路径丢失目标数；若后续真实
+             * dayN 模拟执行，则继续按当前资源状态回填更准确的当日结果。
+             */
+            initialRequiredMachineCount = Math.max(
+                    initialRequiredMachineCount, sku.getContinuationShortageMachineCount());
+        }
+        return dayContext.getNewSpecOrderLogCollector().record(
+                sku.getMaterialCode(),
+                dayContext.getCurrentPhase(),
+                sku.getSourceType(),
+                this.resolveOriginalNewSpecDayPlanQty(
+                        context, sku, dayContext.getScheduleDate()),
+                this.isStructureEarlyProduction(context, sku),
+                initialRequiredMachineCount);
+    }
+
+    /**
+     * 判断当前 SKU 是否命中现有结构类提前生产决策。
+     *
+     * <p>这里只读取提前生产中心运行视图中已经形成的判定，不根据当前阶段或未来计划日期重新推导。
+     * 普通提前生产仍记录“否”，只有已允许的结构切换、结构收尾提前生产记录“是”。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 当前 SKU
+     * @return true-结构提前；false-非结构提前
+     */
+    private boolean isStructureEarlyProduction(LhScheduleContext context, SkuScheduleDTO sku) {
+        EarlyProductionRuntimePlan runtimePlan = context.getEarlyProductionRuntimePlan(sku);
+        if (Objects.isNull(runtimePlan) || Objects.isNull(runtimePlan.getDecision())) {
+            return false;
+        }
+        EarlyProductionDecision decision = runtimePlan.getDecision();
+        if (!decision.isEarlyProduction() || !decision.isAllowed()) {
+            return false;
+        }
+        return StringUtils.equals(
+                EarlyProductionDecision.SCENE_STRUCTURE_SWITCH, decision.getSceneType())
+                || StringUtils.equals(
+                EarlyProductionDecision.SCENE_STRUCTURE_ENDING, decision.getSceneType());
+    }
+
+    /**
+     * 使用现有动态扩机结果回填当前业务日目标机台数。
+     *
+     * <p>{@code requiredMachineCount} 是真实排产规则已经计算出的当前新增阶段目标数；
+     * 若 dayN 模拟同时给出了各新增机台生效日期，只统计生效日期不晚于当前业务日的机台，
+     * 防止把 T+1、T+2 才允许启用的机台提前记入当天。日期列表为空表示现有规则允许本日
+     * 连续竞争这些机台，直接使用完整目标数。</p>
+     *
+     * @param dayContext 当前业务日
+     * @param entry 当前遍历对应日志明细
+     * @param requiredMachineCount 现有规则计算的目标机台数
+     * @param addMachineProductionDateList 各追加机台现有生效日期列表
+     */
+    private void updateDailyRequiredMachineCount(
+            DayScheduleContext dayContext,
+            DailyNewSpecOrderLogEntry entry,
+            int requiredMachineCount,
+            List<LocalDate> addMachineProductionDateList) {
+        if (Objects.isNull(entry) || requiredMachineCount <= 0) {
+            return;
+        }
+        int currentDayRequiredMachineCount = requiredMachineCount;
+        if (!CollectionUtils.isEmpty(addMachineProductionDateList)) {
+            // 当前候选机台是本轮首台；日期列表只包含模拟中后续新增机台的生效业务日。
+            currentDayRequiredMachineCount = 1;
+            for (LocalDate productionDate : addMachineProductionDateList) {
+                if (Objects.nonNull(productionDate)
+                        && !productionDate.isAfter(dayContext.getScheduleDate())) {
+                    currentDayRequiredMachineCount++;
+                }
+            }
+            currentDayRequiredMachineCount = Math.min(
+                    requiredMachineCount, currentDayRequiredMachineCount);
+        }
+        entry.updateRequiredMachineCount(currentDayRequiredMachineCount);
     }
 
     /**
@@ -2243,6 +2368,11 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         Set<String> reverseMatchReservedMachineCodes = new HashSet<String>(4);
         while (iterator.hasNext()) {
             SkuScheduleDTO sku = iterator.next();
+            /*
+             * 每次真实遍历独立持有一条顺序明细：多机台候选重试只回填同一条，跨阶段或
+             * 下一轮再次遍历则创建新条目，从而同时满足真实顺序和“不去重”的审计要求。
+             */
+            DailyNewSpecOrderLogEntry dailyOrderEntry = null;
             boolean currentSkuRemoved = false;
             String dailyDeferredReason = null;
             Date earliestEmbryoAvailableTime =
@@ -2557,6 +2687,17 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                             totalScheduledQty, "已满足dayN理论机台数上限，停止继续扩机");
                     dailyDeferredReason = "已满足dayN理论机台数上限，停止继续扩机";
                     break;
+                }
+                /*
+                 * 当前 SKU 已通过当天所有前置过滤、加机生效日和 dayN 上限，下一步将使用
+                 * 真实候选列表执行选机。首次进入时按实际遍历顺序追加一条，后续同轮机台重试
+                 * 只更新该条目标机台数，不重复追加 SKU 顺序。
+                 */
+                if (Objects.isNull(dailyOrderEntry)) {
+                    dailyOrderEntry = this.recordDailyNewSpecOrder(context, dayContext, sku);
+                }
+                if (Objects.nonNull(dailyOrderEntry)) {
+                    dailyOrderEntry.updateRequiredMachineCount(actualAllowedAddMachineCount + 1);
                 }
                 /*
                  * 基础硬约束或当前日尝试失败仍可能在后续业务日恢复，T、T+1 必须保留历史
@@ -3362,7 +3503,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                     machinePlanQty = resolveDynamicMachinePlanQtyByDailyCapacity(
                             context, sku, candidates, excludedMachineCodes, quantityPolicy, segment,
                             candidateMachine, shifts, capacityCalculate, candidateTargetQty,
-                            totalScheduledQty, machinePlanQty);
+                            totalScheduledQty, machinePlanQty, dayContext, dailyOrderEntry);
                 }
                 if (CollectionUtils.isEmpty(addMachineProductionDateList)
                         && !CollectionUtils.isEmpty(segment.getAddMachineProductionDateList())) {
@@ -3405,6 +3546,13 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                         pendingTraceSelectedMachine = null;
                         pendingTraceDayEndTime = null;
                         state.clearPendingMachinePriorityTrace(sku);
+                        if (actualAllowedAddMachineCount <= 0) {
+                            /*
+                             * 当前遍历最终确认已有同物料机台已满足 dayN，未产生任何新增机台需求；
+                             * 因而撤销刚才的观察条目，避免把实际已被现有规则过滤的 SKU 记入每日顺序。
+                             */
+                            dayContext.getNewSpecOrderLogCollector().remove(dailyOrderEntry);
+                        }
                         break;
                     }
                     log.debug("新增SKU动态分配后本机台计划量为0, materialCode: {}, 机台: {}, 目标量: {}, 换模开始: {}, 开产时间: {}",
@@ -8199,6 +8347,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
      * @param targetQty 窗口目标量
      * @param scheduledQty 当前已排量
      * @param defaultPlanQty 原计划量
+     * @param dayContext 当前实际业务日，用于限定日志中的当日目标机台数
+     * @param dailyOrderEntry 当前真实遍历对应的每日顺序日志明细
      * @return 当前机台计划量
      */
     private int resolveDynamicMachinePlanQtyByDailyCapacity(LhScheduleContext context,
@@ -8212,7 +8362,9 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                                                             ICapacityCalculateStrategy capacityCalculate,
                                                             int targetQty,
                                                             int scheduledQty,
-                                                            int defaultPlanQty) {
+                                                            int defaultPlanQty,
+                                                            DayScheduleContext dayContext,
+                                                            DailyNewSpecOrderLogEntry dailyOrderEntry) {
         if (!shouldUseDailyDynamicMachineAllocation(
                 context, sku, candidates, excludedMachineCodes, policy, segment)) {
             return defaultPlanQty;
@@ -8229,6 +8381,13 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         int requiredMachineCountByDailyCapacity = resolveRequiredMachineCountByDailyCapacity(
                 context, sku, candidates, excludedMachineCodes, policy, segment, candidateMachine,
                 shifts, capacityCalculate, remainingTargetQty, availableMachineCount);
+        /*
+         * 直接使用本次真实 dayN 模拟的目标机台数和生效日期回填日志，不为日志重新运行模拟。
+         * 后续总目标拆量若推导出更大机台数，会在同一条明细上继续更新。
+         */
+        this.updateDailyRequiredMachineCount(
+                dayContext, dailyOrderEntry, requiredMachineCountByDailyCapacity,
+                segment.getAddMachineProductionDateList());
         if (requiredMachineCountByDailyCapacity == 0 && segment.isExistingSameMaterialSatisfied()) {
             // 已有同物料机台满足逐日加机台规则时，当前候选不再因目标剩余继续新增。
             log.info("新增SKU已有同物料机台满足dayN增机台规则，跳过当前新增候选, "
@@ -8285,6 +8444,10 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         int requiredMachineCount = resolveRequiredMachineCount(
                 remainingTargetQty, segment.getMaxQtyToWindowEnd(), availableMachineCount,
                 requiredMachineCountByDailyCapacity);
+        // 总目标拆量同样只回填计算结果；若后续机台尚未到生效日，当前日过滤仍由已有日期列表完成。
+        this.updateDailyRequiredMachineCount(
+                dayContext, dailyOrderEntry, requiredMachineCount,
+                segment.getAddMachineProductionDateList());
         int balancedPlanQty = roundUpToShiftCapacity(
                 divideCeiling(remainingTargetQty, requiredMachineCount), segment.getShiftCapacity());
         balancedPlanQty = Math.min(balancedPlanQty, segment.getMaxQtyToWindowEnd());

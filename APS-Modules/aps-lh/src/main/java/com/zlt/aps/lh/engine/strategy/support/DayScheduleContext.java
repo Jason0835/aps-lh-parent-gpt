@@ -31,6 +31,8 @@ public class DayScheduleContext {
     private final boolean firstScheduleDay;
     /** 当前业务日是否为排程窗口最后一日 */
     private final boolean lastScheduleDay;
+    /** 当前业务日唯一的新增排产实际顺序日志采集器 */
+    private final DailyNewSpecOrderLogCollector newSpecOrderLogCollector;
     /** 当前正在执行的日内阶段 */
     private DailySchedulePhase currentPhase;
 
@@ -55,6 +57,16 @@ public class DayScheduleContext {
         this.dayEndTime = this.dayShifts.get(this.dayShifts.size() - 1).getShiftEndDateTime();
         this.firstScheduleDay = firstScheduleDay;
         this.lastScheduleDay = lastScheduleDay;
+        Integer dateOffset = this.dayShifts.get(0).getDateOffset();
+        if (Objects.isNull(dateOffset)) {
+            throw new IllegalArgumentException("当前业务日首班次日期偏移不能为空");
+        }
+        /*
+         * 每个业务日只创建一个采集器，正常、历史遗留和提前生产阶段共享同一顺序序列；
+         * 采集器只保存日志标量字段，不复制当前日班次、SKU 或机台资源。
+         */
+        this.newSpecOrderLogCollector =
+                new DailyNewSpecOrderLogCollector(this.scheduleDate, dateOffset);
     }
 
     /**
@@ -105,6 +117,10 @@ public class DayScheduleContext {
 
     public boolean isLastScheduleDay() {
         return lastScheduleDay;
+    }
+
+    public DailyNewSpecOrderLogCollector getNewSpecOrderLogCollector() {
+        return newSpecOrderLogCollector;
     }
 
     public DailySchedulePhase getCurrentPhase() {
