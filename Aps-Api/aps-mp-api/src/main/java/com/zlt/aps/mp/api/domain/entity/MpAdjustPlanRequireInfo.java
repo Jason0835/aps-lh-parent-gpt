@@ -2,8 +2,10 @@ package com.zlt.aps.mp.api.domain.entity;
 
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
+import com.zlt.common.annotation.ImportExcelValidated;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -12,8 +14,8 @@ import java.util.Date;
 
 /**
  * Copyright (c) 2022, All rights reserved。
- * 文件名称：MpAdjustPlanInfo.java
- * 描    述：调整-调整结果记录对象 t_mp_adjust_plan_info
+ * 文件名称：MpAdjustPlanRequireInfo.java
+ * 描    述：月度计划调整需求信息对象 t_mp_adjust_plan_require_info
  *
  * @author zlt
  * @version 1.0
@@ -36,6 +38,7 @@ public class MpAdjustPlanRequireInfo extends BaseEntity {
      * 分厂编码
      */
     @Excel(name = "ui.data.column.mpAdjustPlanInfo.factoryCode", dictType = "biz_factory_name")
+    @ImportExcelValidated(required = true, maxLength = 50, dictType = "biz_factory_name")
     @ApiModelProperty(value = "分厂编码，字典：biz_factory_name", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
@@ -44,6 +47,7 @@ public class MpAdjustPlanRequireInfo extends BaseEntity {
      * 内外销
      */
     @Excel(name = "ui.data.column.mpAdjustPlanInfo.locationType", dictType = "biz_stor_type")
+    @ImportExcelValidated(required = true, dictType = "biz_stor_type")
     @ApiModelProperty(value = "内外销", name = "locationType")
     @TableField(value = "LOCATION_TYPE")
     private String locationType;
@@ -51,7 +55,9 @@ public class MpAdjustPlanRequireInfo extends BaseEntity {
     /**
      * 调整日期
      */
-    @Excel(name = "ui.data.column.mpAdjustPlanInfo.adjustDate")
+    @Excel(name = "ui.data.column.mpAdjustPlanInfo.adjustDate", dateFormat = "yyyy-MM-dd")
+    @ImportExcelValidated(required = true, date = true)
+    @JsonFormat(pattern = "yyyy-MM-dd")
     @ApiModelProperty(value = "调整日期", name = "adjustDate")
     @TableField(value = "ADJUST_DATE")
     private Date adjustDate;
@@ -60,6 +66,7 @@ public class MpAdjustPlanRequireInfo extends BaseEntity {
      * 区域
      */
     @Excel(name = "ui.data.column.mpAdjustPlanInfo.area")
+    @ImportExcelValidated(required = true, maxLength = 100)
     @ApiModelProperty(value = "区域", name = "area")
     @TableField(value = "AREA")
     private String area;
@@ -67,6 +74,7 @@ public class MpAdjustPlanRequireInfo extends BaseEntity {
      * 计划调整类型 01-追加计划，02-调减计划，03-计划提前，04-计划延迟
      */
     @Excel(name = "ui.data.column.mpAdjustPlanInfo.planAdjustType", dictType = "biz_plan_adjust_type")
+    @ImportExcelValidated(required = true, dictType = "biz_plan_adjust_type")
     @ApiModelProperty(value = "调整类型 01-追加计划，02-调减计划，03-计划提前，04-计划延迟", name = "planAdjustType")
     @TableField(value = "PLAN_ADJUST_TYPE")
     private String planAdjustType;
@@ -79,6 +87,7 @@ public class MpAdjustPlanRequireInfo extends BaseEntity {
      * 04-计划延迟 产能调配延迟 生产异常延迟
      */
     @Excel(name = "ui.data.column.mpAdjustPlanInfo.adjustReason", dictType = "biz_adjust_reason")
+    @ImportExcelValidated(dictType = "biz_adjust_reason")
     @ApiModelProperty(value = "调整原因", name = "adjustReason")
     @TableField(value = "ADJUST_REASON")
     private String adjustReason;
@@ -126,6 +135,7 @@ public class MpAdjustPlanRequireInfo extends BaseEntity {
      * 本月计划产量
      */
     @Excel(name = "ui.data.column.mpAdjustPlanInfo.monthPlanQty")
+    @ImportExcelValidated(number = true)
     @ApiModelProperty(value = "本月计划产量", name = "monthPlanQty")
     @TableField(value = "MONTH_PLAN_QTY")
     private Integer monthPlanQty;
@@ -134,6 +144,7 @@ public class MpAdjustPlanRequireInfo extends BaseEntity {
      * 调整数量
      */
     @Excel(name = "ui.data.column.mpAdjustPlanInfo.adjustPlanQty")
+    @ImportExcelValidated(number = true)
     @ApiModelProperty(value = "调整数量", name = "adjustPlanQty")
     @TableField(value = "ADJUST_PLAN_QTY")
     private Integer adjustPlanQty;
@@ -142,6 +153,7 @@ public class MpAdjustPlanRequireInfo extends BaseEntity {
      * 调整后计划量
      */
     @Excel(name = "ui.data.column.mpAdjustPlanInfo.adjustFinalQty")
+    @ImportExcelValidated(number = true)
     @ApiModelProperty(value = "调整后计划量", name = "adjustFinalQty")
     @TableField(value = "ADJUST_FINAL_QTY")
     private Integer adjustFinalQty;
@@ -150,6 +162,7 @@ public class MpAdjustPlanRequireInfo extends BaseEntity {
      * 实际调整数量
      */
     @Excel(name = "ui.data.column.mpAdjustPlanInfo.realAdjustQty")
+    @ImportExcelValidated(number = true)
     @ApiModelProperty(value = "实际调整数量", name = "realAdjustQty")
     @TableField(value = "REAL_ADJUST_QTY")
     private Integer realAdjustQty;
@@ -160,4 +173,18 @@ public class MpAdjustPlanRequireInfo extends BaseEntity {
     @ApiModelProperty(value = "是否EXCEL导入", name = "isImport")
     @TableField(value = "IS_IMPORT")
     private String isImport;
+
+    /**
+     * 调整日期起（查询条件，非表字段）
+     */
+    @ApiModelProperty(value = "调整日期起（查询条件）", name = "adjustDateStart")
+    @TableField(exist = false)
+    private String adjustDateStart;
+
+    /**
+     * 调整日期止（查询条件，非表字段）
+     */
+    @ApiModelProperty(value = "调整日期止（查询条件）", name = "adjustDateEnd")
+    @TableField(exist = false)
+    private String adjustDateEnd;
 }
