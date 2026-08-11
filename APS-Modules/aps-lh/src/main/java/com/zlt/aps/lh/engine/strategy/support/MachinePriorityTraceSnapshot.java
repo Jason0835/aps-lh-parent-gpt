@@ -32,7 +32,7 @@ import java.util.Set;
  */
 public class MachinePriorityTraceSnapshot {
 
-    /** 日志展示顺序，包含实际可选机台和仅日志展示机台。 */
+    /** 日志观察候选原顺序，包含实际可选机台和仅日志展示机台。 */
     private final List<MachineScheduleDTO> orderedCandidates;
 
     /** 正式选机主链在当前时点确认的实际可选机台编码。 */
@@ -120,7 +120,7 @@ public class MachinePriorityTraceSnapshot {
     /**
      * 创建完整日志快照。
      *
-     * @param orderedCandidates 日志展示顺序
+     * @param orderedCandidates 日志观察候选原顺序
      * @param actualSelectableMachineCodes 实际可选机台编码
      * @param actualSelectedMachineCode 实际首选机台编码
      * @param displayMachineCodeMap 展示编码映射
@@ -141,7 +141,7 @@ public class MachinePriorityTraceSnapshot {
     /**
      * 创建包含选机时点占用明细的完整日志快照。
      *
-     * @param orderedCandidates 日志展示顺序
+     * @param orderedCandidates 日志观察候选原顺序
      * @param actualSelectableMachineCodes 实际可选机台编码
      * @param actualSelectedMachineCode 首选候选机台编码
      * @param displayMachineCodeMap 展示编码映射
@@ -164,7 +164,7 @@ public class MachinePriorityTraceSnapshot {
     /**
      * 创建同时冻结占用明细和日志收尾时间的完整快照。
      *
-     * @param orderedCandidates 日志展示顺序
+     * @param orderedCandidates 日志观察候选原顺序
      * @param actualSelectableMachineCodes 实际可选机台编码
      * @param actualSelectedMachineCode 首选候选机台编码
      * @param displayMachineCodeMap 展示编码映射
@@ -189,7 +189,7 @@ public class MachinePriorityTraceSnapshot {
     /**
      * 创建带选机结果的完整日志快照。
      *
-     * @param orderedCandidates 日志展示顺序
+     * @param orderedCandidates 日志观察候选原顺序
      * @param actualSelectableMachineCodes 实际可选机台编码
      * @param actualSelectedMachineCode 首选候选机台编码
      * @param displayMachineCodeMap 展示编码映射
@@ -211,11 +211,13 @@ public class MachinePriorityTraceSnapshot {
             String actualHitMachineCode,
             Boolean selectionSucceeded,
             String noHitReason) {
+        /*
+         * 新增排产在候选命中后会原地推进 MachineScheduleDTO 的前物料、前规格、英寸和收尾时间。
+         * 选机日志属于延迟写入，如果这里只复制 List 容器，列表中的可变 DTO 仍会被本轮结果污染，
+         * 最终把“选机前画像”错误记录为“选机后画像”。因此候选 DTO 必须在选机时点逐字段冻结。
+         */
         this.orderedCandidates = Collections.unmodifiableList(
-                new ArrayList<MachineScheduleDTO>(
-                        CollectionUtils.isEmpty(orderedCandidates)
-                                ? Collections.<MachineScheduleDTO>emptyList()
-                                : orderedCandidates));
+                copyTraceCandidates(orderedCandidates));
         this.actualSelectableMachineCodes = Collections.unmodifiableSet(
                 new LinkedHashSet<String>(
                         CollectionUtils.isEmpty(actualSelectableMachineCodes)
@@ -265,6 +267,102 @@ public class MachinePriorityTraceSnapshot {
     }
 
     /**
+     * 深复制选机日志候选列表。
+     *
+     * <p>该复制只服务日志观察，不参与正式选机。数组、日期和列表均切断与运行态机台对象的
+     * 可变引用，保证延迟日志稳定还原选机发生时的真实机台画像。</p>
+     *
+     * @param sourceCandidates 选机时点候选列表
+     * @return 不与运行态机台对象共享可变字段的候选列表
+     */
+    private static List<MachineScheduleDTO> copyTraceCandidates(
+            List<MachineScheduleDTO> sourceCandidates) {
+        if (CollectionUtils.isEmpty(sourceCandidates)) {
+            return new ArrayList<MachineScheduleDTO>(0);
+        }
+        List<MachineScheduleDTO> copiedCandidates =
+                new ArrayList<MachineScheduleDTO>(sourceCandidates.size());
+        for (MachineScheduleDTO sourceCandidate : sourceCandidates) {
+            if (Objects.nonNull(sourceCandidate)) {
+                copiedCandidates.add(copyTraceCandidate(sourceCandidate));
+            }
+        }
+        return copiedCandidates;
+    }
+
+    /**
+     * 复制单台候选机台的日志观察字段。
+     *
+     * @param sourceCandidate 运行态候选机台
+     * @return 选机时点独立快照
+     */
+    private static MachineScheduleDTO copyTraceCandidate(MachineScheduleDTO sourceCandidate) {
+        MachineScheduleDTO copiedCandidate = new MachineScheduleDTO();
+        copiedCandidate.setMachineCode(sourceCandidate.getMachineCode());
+        copiedCandidate.setMachineName(sourceCandidate.getMachineName());
+        copiedCandidate.setMaxMoldNum(sourceCandidate.getMaxMoldNum());
+        copiedCandidate.setStatus(sourceCandidate.getStatus());
+        copiedCandidate.setDimensionMinimum(sourceCandidate.getDimensionMinimum());
+        copiedCandidate.setDimensionMaximum(sourceCandidate.getDimensionMaximum());
+        copiedCandidate.setShellStandard(sourceCandidate.getShellStandard());
+        copiedCandidate.setSupport195WideBase(sourceCandidate.getSupport195WideBase());
+        copiedCandidate.setSupport225WideBase(sourceCandidate.getSupport225WideBase());
+        copiedCandidate.setSupportChipTire(sourceCandidate.getSupportChipTire());
+        copiedCandidate.setMachineOrder(sourceCandidate.getMachineOrder());
+        copiedCandidate.setCurrentMaterialCode(sourceCandidate.getCurrentMaterialCode());
+        copiedCandidate.setCurrentMaterialDesc(sourceCandidate.getCurrentMaterialDesc());
+        copiedCandidate.setPreviousMaterialCode(sourceCandidate.getPreviousMaterialCode());
+        copiedCandidate.setPreviousMaterialDesc(sourceCandidate.getPreviousMaterialDesc());
+        copiedCandidate.setPreviousSpecCode(sourceCandidate.getPreviousSpecCode());
+        copiedCandidate.setPreviousProSize(sourceCandidate.getPreviousProSize());
+        copiedCandidate.setEnding(sourceCandidate.isEnding());
+        copiedCandidate.setStructureEndingAligned(sourceCandidate.isStructureEndingAligned());
+        copiedCandidate.setEstimatedEndTime(copyDate(sourceCandidate.getEstimatedEndTime()));
+        copiedCandidate.setNextMaterialCode(sourceCandidate.getNextMaterialCode());
+        copiedCandidate.setShiftRemainingCapacity(
+                Objects.isNull(sourceCandidate.getShiftRemainingCapacity())
+                        ? null : sourceCandidate.getShiftRemainingCapacity().clone());
+        copiedCandidate.setShiftAvailable(
+                Objects.isNull(sourceCandidate.getShiftAvailable())
+                        ? null : sourceCandidate.getShiftAvailable().clone());
+        copiedCandidate.setPlanStopStartTime(copyDate(sourceCandidate.getPlanStopStartTime()));
+        copiedCandidate.setPlanStopEndTime(copyDate(sourceCandidate.getPlanStopEndTime()));
+        copiedCandidate.setStopType(sourceCandidate.getStopType());
+        copiedCandidate.setHasDryIceCleaning(sourceCandidate.isHasDryIceCleaning());
+        copiedCandidate.setHasSandBlastCleaning(sourceCandidate.isHasSandBlastCleaning());
+        copiedCandidate.setCleaningPlanTime(copyDate(sourceCandidate.getCleaningPlanTime()));
+        copiedCandidate.setCleaningWindowList(
+                CollectionUtils.isEmpty(sourceCandidate.getCleaningWindowList())
+                        ? new ArrayList<>(0)
+                        : new ArrayList<>(sourceCandidate.getCleaningWindowList()));
+        copiedCandidate.setHasMaintenancePlan(sourceCandidate.isHasMaintenancePlan());
+        copiedCandidate.setMaintenancePlanTime(copyDate(sourceCandidate.getMaintenancePlanTime()));
+        copiedCandidate.setMaintenanceWindowList(
+                CollectionUtils.isEmpty(sourceCandidate.getMaintenanceWindowList())
+                        ? new ArrayList<>(0)
+                        : new ArrayList<>(sourceCandidate.getMaintenanceWindowList()));
+        copiedCandidate.setHasRepairPlan(sourceCandidate.isHasRepairPlan());
+        copiedCandidate.setRepairPlanTime(copyDate(sourceCandidate.getRepairPlanTime()));
+        copiedCandidate.setCapsuleUsageCount(sourceCandidate.getCapsuleUsageCount());
+        copiedCandidate.setCapsuleUsageCount2(sourceCandidate.getCapsuleUsageCount2());
+        copiedCandidate.setMouldChangeTasks(
+                CollectionUtils.isEmpty(sourceCandidate.getMouldChangeTasks())
+                        ? new ArrayList<>(0)
+                        : new ArrayList<>(sourceCandidate.getMouldChangeTasks()));
+        return copiedCandidate;
+    }
+
+    /**
+     * 防御性复制日期。
+     *
+     * @param sourceDate 原日期
+     * @return 独立日期实例；原日期为空时返回 null
+     */
+    private static Date copyDate(Date sourceDate) {
+        return Objects.isNull(sourceDate) ? null : new Date(sourceDate.getTime());
+    }
+
+    /**
      * 深复制日志收尾时间映射，防止调用方修改可变 {@link Date} 对象污染已冻结快照。
      *
      * @param sourceMap 原始日志收尾时间映射
@@ -288,12 +386,34 @@ public class MachinePriorityTraceSnapshot {
     }
 
     /**
-     * 获取日志展示顺序。
+     * 获取日志观察候选原顺序。
      *
      * @return 只读候选列表
      */
     public List<MachineScheduleDTO> getOrderedCandidates() {
-        return orderedCandidates;
+        return Collections.unmodifiableList(copyTraceCandidates(orderedCandidates));
+    }
+
+    /**
+     * 获取指定机台在选机时点冻结的候选画像。
+     *
+     * <p>TOP5 日志和详细优先级日志必须统一读取该快照，禁止在排产提交后再次读取已经推进的
+     * 运行态 {@link MachineScheduleDTO}，否则会把本轮物料误写成前物料并产生同规格、同英寸假象。</p>
+     *
+     * @param machineCode 代表机台编码
+     * @return 防御性复制后的选机时点候选；快照中不存在时返回 null
+     */
+    public MachineScheduleDTO resolveCandidateSnapshot(String machineCode) {
+        if (StringUtils.isEmpty(machineCode)) {
+            return null;
+        }
+        for (MachineScheduleDTO candidate : orderedCandidates) {
+            if (Objects.nonNull(candidate)
+                    && StringUtils.equals(machineCode, candidate.getMachineCode())) {
+                return copyTraceCandidate(candidate);
+            }
+        }
+        return null;
     }
 
     /**
