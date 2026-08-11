@@ -87,7 +87,7 @@ public class MdmSkuLhCapacityController extends AbstractDocBizController<MdmSkuL
     @PostMapping("/save")
     @Override
     public AjaxResult save(@RequestBody MdmSkuLhCapacity billVO){
-        mdmSkuLhCapacityService.setClassCapacity(billVO);
+//        mdmSkuLhCapacityService.setClassCapacity(billVO);
         return super.save(billVO);
     }
 
