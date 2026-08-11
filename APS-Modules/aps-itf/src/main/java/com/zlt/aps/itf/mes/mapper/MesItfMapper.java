@@ -12,6 +12,7 @@ import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.tm.api.domain.entity.TmDayFinishQty;
 import com.zlt.aps.tm.api.domain.entity.TmMesStock;
 import com.zlt.aps.tm.api.domain.entity.TmScheFinishQty;
+import com.zlt.aps.gsq.api.domain.entity.GsqDayFinishQty;
 import com.zlt.aps.tq.api.domain.entity.TqDayFinishQty;
 import com.zlt.aps.tq.api.domain.entity.TqMesStock;
 import com.zlt.aps.tq.api.domain.entity.TqScheFinishQty;
@@ -251,6 +252,14 @@ public interface MesItfMapper {
      * @return 列表
      */
     List<TqDayFinishQty> selectTqScheDayFinishQtyList(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 查询钢丝圈排程日完成量同步数据
+     *
+     * @param syncDataLogs 参数
+     * @return 列表
+     */
+    List<GsqDayFinishQty> selectGsqScheDayFinishQtyList(AuxReqSyncDataLogs syncDataLogs);
 
     /**
      * 查询胎面排程完成量同步数据

@@ -63,26 +63,39 @@ public class GsqDemandCalcHandler extends AbsGsqScheduleStepHandler {
             return;
         }
 
-        int estimateClassCount = params.getLastShiftEstimateClassCount() == null ? 3 : params.getLastShiftEstimateClassCount();
-        if (estimateClassCount <= 0) {
-            estimateClassCount = 3;
-        }
-
         for (GsqScheduleResultVo vo : context.getScheduleList()) {
-            // 取胎圈4~6班均值作为7班估值
+            // 取胎圈4~6班作为7班估值来源
             double tqClass4 = vo.getTqClass4Plan() == null ? 0 : vo.getTqClass4Plan();
             double tqClass5 = vo.getTqClass5Plan() == null ? 0 : vo.getTqClass5Plan();
             double tqClass6 = vo.getTqClass6Plan() == null ? 0 : vo.getTqClass6Plan();
 
-            double sum = tqClass4 + tqClass5 + tqClass6;
-            double avg = sum / estimateClassCount;
+            // 合计胎圈4/5/6班已排班次的量，按实际有排班次数取均值作为7班估值：
+            // 排1班就÷1、排2班就÷2、排3班就÷3；456班均未排则不估算（钢丝圈6班保持0）
+            double sum = 0D;
+            int scheduledCount = 0;
+            if (tqClass4 > 0) {
+                sum += tqClass4;
+                scheduledCount++;
+            }
+            if (tqClass5 > 0) {
+                sum += tqClass5;
+                scheduledCount++;
+            }
+            if (tqClass6 > 0) {
+                sum += tqClass6;
+                scheduledCount++;
+            }
+            if (scheduledCount == 0) {
+                continue;
+            }
+            double avg = sum / scheduledCount;
 
             // BOM分解得到钢丝圈6班需求估值
             double bomQty = context.getBomDecomposeMap().getOrDefault(vo.getSteelRingCode(), 1D);
             double gsqClass6Estimate = avg * bomQty;
 
             vo.setTqClass7Plan(avg);
-            vo.setClass6PlanQty(gsqClass6Estimate);
+            // 不直接写 class6PlanQty，只记录估值，由 S5.6 备库排完后根据剩余产能决定是否排产
             context.getLastShiftEstimateMap().put(vo.getSteelRingCode(), gsqClass6Estimate);
         }
 
