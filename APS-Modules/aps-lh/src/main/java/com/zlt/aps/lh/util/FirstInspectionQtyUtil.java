@@ -401,6 +401,44 @@ public final class FirstInspectionQtyUtil {
     }
 
     /**
+     * 读取当前班次最近一次已经登记的实际首检数量。
+     *
+     * <p>该方法只用于结果提交后的审计日志。首检写入时已经推进班次顺序计数器，若此时再次调用
+     * {@link #resolvePreviewFirstInspectionQty(LhScheduleContext, SkuScheduleDTO, LhShiftConfigVO, int,
+     * int, String, String)}，会错误读取“下一台”首检参数。例如当前结果是班次内第2台首检，
+     * 实际应使用 SYS0303002，但二次预演会按第3台读取 SYS0303003。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 当前 SKU
+     * @param attributionShift 首检归属班次
+     * @param shiftCapacity 运行态班产
+     * @param remainingQty 当前机台目标量
+     * @param scheduleType 排程类型
+     * @param machineCode 机台编码
+     * @return 最近一次已登记首检的实际数量；当前班次尚未登记时返回0
+     */
+    public static int resolveLastRecordedFirstInspectionQty(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            LhShiftConfigVO attributionShift,
+            int shiftCapacity,
+            int remainingQty,
+            String scheduleType,
+            String machineCode) {
+        if (isTrialTimeBasedFirstInspection(sku, attributionShift, scheduleType)) {
+            return 0;
+        }
+        int recordedSequence = resolveNextFirstInspectionSequence(
+                context, attributionShift) - 1;
+        if (recordedSequence <= 0) {
+            return 0;
+        }
+        return resolveEffectiveFirstInspectionQty(
+                context, sku, attributionShift, shiftCapacity, remainingQty,
+                scheduleType, machineCode, recordedSequence, false);
+    }
+
+    /**
      * 将普通换模首检数量写入归属班次。
      *
      * <p>首检数量参与排产量和硫化余量消耗，因此写入结果前会按剩余目标量与班产上限收敛。
@@ -701,12 +739,13 @@ public final class FirstInspectionQtyUtil {
     /**
      * 按胎胚最早可供时间路径调整首检班次的部分班次总产能。
      *
-     * <p>该方法只供 S4.5 命中胎胚时间配置时调用。普通 SKU 的首检条数属于部分班次
-     * 总产能的一部分，因此不再额外叠加；若残余总产能不足完整首检，当前班次直接归零。
-     * 试制 SKU 不生成首检条数，仍按现有规则固定扣减两小时对应产能。</p>
+     * <p>该方法供 S4.5 新增排产及 S4.4 结构切换提前生产命中胎胚时间配置时调用。
+     * 普通 SKU 的首检条数属于部分班次总产能的一部分，因此不再额外叠加；若残余
+     * 总产能不足完整首检，当前班次直接归零。试制 SKU 不生成首检条数，仍按现有规则
+     * 固定扣减两小时对应产能。</p>
      *
      * @param context 排程上下文
-     * @param sku 当前新增 SKU
+     * @param sku 当前待排 SKU
      * @param shifts 当前业务日班次
      * @param attributionShift 实际生产开始班次，即首检归属班次
      * @param shiftCapacityMap 已按实际生产开始时间折算的班次总产能
@@ -758,7 +797,7 @@ public final class FirstInspectionQtyUtil {
      * 解析胎胚时间所在部分班次扣除首检后的可用总产能。
      *
      * @param context 排程上下文
-     * @param sku 当前新增 SKU
+     * @param sku 当前待排 SKU
      * @param shift 首检归属班次
      * @param partialShiftCapacity 从实际开始时间至班次结束的物理总产能
      * @param firstInspectionQty 普通 SKU 完整首检条数
@@ -866,12 +905,13 @@ public final class FirstInspectionQtyUtil {
     /**
      * 按胎胚可供部分班次口径解析首检后的正常生产量。
      *
-     * <p>仅在 S4.5 命中胎胚时间配置时启用。传入的 shiftMaxQty 已是从实际开始时间
-     * 到班次结束的物理产能，普通 SKU 需直接从该产能扣除首检条数；试制 SKU 需直接
-     * 扣除固定两小时产能。未启用时完整复用原方法，其他排程入口不受影响。</p>
+     * <p>仅在 S4.5 新增排产或 S4.4 结构切换提前生产命中胎胚时间配置时启用。
+     * 传入的 shiftMaxQty 已是从实际开始时间到班次结束的物理产能，普通 SKU 需直接
+     * 从该产能扣除首检条数；试制 SKU 需直接扣除固定两小时产能。未启用时完整复用
+     * 原方法，其他排程入口不受影响。</p>
      *
      * @param context 排程上下文
-     * @param sku 当前新增 SKU
+     * @param sku 当前待排 SKU
      * @param shift 当前班次
      * @param shiftMaxQty 当前部分班次物理产能
      * @param firstInspectionShiftIndex 首检归属班次

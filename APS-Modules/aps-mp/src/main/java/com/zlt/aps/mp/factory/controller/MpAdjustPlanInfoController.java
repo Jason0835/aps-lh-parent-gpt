@@ -1,35 +1,41 @@
 package com.zlt.aps.mp.factory.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.ruoyi.api.gateway.system.domain.ExportLog;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
-import com.ruoyi.api.gateway.system.service.IExportLogService;
-import com.ruoyi.common.core.utils.DateUtils;
-import com.ruoyi.common.core.utils.ServletUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanMouldDayResult;
+import com.zlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.maindata.mapper.MdmSkuStructureRefEntityMapper;
+import com.zlt.aps.mp.api.domain.entity.MdmSkuStructureRef;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustPlanRequireInfo;
-import com.zlt.aps.mp.factory.dto.FactoryMonthPlanMouldDayResultExportVo;
 import com.zlt.aps.mp.factory.service.IMpAdjustPlanRequireInfoService;
+import com.zlt.aps.utils.AppUtils;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
+import com.zlt.common.exception.QueryExprException;
 import com.zlt.common.utils.PubUtil;
+import com.zlt.core.queryformulas.QueryFormulaUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Date;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：MpAdjustPlanInfoController.java
- * 描    述：S2-0604.排产结果-生产计划排产结果 控制层类：....
+ * 描    述：S2-0611.计划调整需求信息 控制层类：....
  *
  * @author zlt
  * @version 1.0
@@ -41,104 +47,141 @@ import java.util.List;
  * @date 20260716
  */
 @Slf4j
+@Api(tags = "计划调整需求信息")
 @RestController
-@Api(tags = ".计划调整需求信息")
-@RequiredArgsConstructor
 @RequestMapping("/adjustPlanRequireInfo")
+@RequiredArgsConstructor
 public class MpAdjustPlanInfoController extends AbstractDocBizController<MpAdjustPlanRequireInfo> {
 
     private final IMpAdjustPlanRequireInfoService mpAdjustPlanInfoService;
 
-    private final IExportLogService iExportLogService;
+    private final MdmSkuStructureRefEntityMapper mdmSkuStructureRefMapper;
 
     /**
-     * 查询S2-0801.计划调整信息查询列表
+     * 产品结构下拉数据（来源 mdmSkuStructureRef，去重）
      */
-    @Override
-    @ApiOperation("查询列表")
+    @ApiOperation("产品结构下拉数据")
+    @GetMapping("/structureOptions")
+    public AjaxResult structureOptions(@RequestParam(value = "factoryCode", required = false) String factoryCode,
+                                       @RequestParam(value = "structureName", required = false) String structureName) {
+        MdmSkuStructureRef query = new MdmSkuStructureRef();
+        query.setFactoryCode(PubUtil.isNotEmpty(factoryCode) ? factoryCode : "116");
+        query.setStructureName(structureName);
+        List<MdmSkuStructureRef> list = mdmSkuStructureRefMapper.getStructureSelectList(query);
+        List<Map<String, Object>> options = new ArrayList<>();
+        if (CollectionUtils.isNotEmpty(list)) {
+            for (MdmSkuStructureRef r : list) {
+                if (PubUtil.isNotEmpty(r.getStructureName())) {
+                    Map<String, Object> m = new HashMap<>();
+                    m.put("label", r.getStructureName());
+                    m.put("value", r.getStructureName());
+                    options.add(m);
+                }
+            }
+        }
+        return AjaxResult.success(options);
+    }
+
+    /**
+     * 物料编码下拉数据（来源 mdmSkuStructureRef，按结构过滤，含物料描述反显）
+     */
+    @ApiOperation("物料编码下拉数据")
+    @GetMapping("/materialOptions")
+    public AjaxResult materialOptions(@RequestParam(value = "factoryCode", required = false) String factoryCode,
+                                      @RequestParam(value = "structureName", required = false) String structureName,
+                                      @RequestParam(value = "materialCode", required = false) String materialCode) {
+        MdmSkuStructureRef query = new MdmSkuStructureRef();
+        query.setFactoryCode(PubUtil.isNotEmpty(factoryCode) ? factoryCode : "116");
+        query.setStructureName(structureName);
+        query.setMaterialCode(materialCode);
+        QueryWrapper<MdmSkuStructureRef> wrapper = new QueryWrapper<>();
+        wrapper.eq(PubUtil.isNotEmpty(query.getFactoryCode()), "a.FACTORY_CODE", query.getFactoryCode());
+        wrapper.like(PubUtil.isNotEmpty(query.getStructureName()), "a.STRUCTURE_NAME", query.getStructureName());
+        wrapper.like(PubUtil.isNotEmpty(query.getMaterialCode()), "a.MATERIAL_CODE", query.getMaterialCode());
+        wrapper.eq("a.IS_DELETE", YesOrNoEnum.NO.getValue());
+        List<MdmSkuStructureRef> list = mdmSkuStructureRefMapper.getMdmSkuStructureRefList(wrapper);
+        if (CollectionUtils.isNotEmpty(list)) {
+            try {
+                QueryFormulaUtil.execFormula(list, new String[]{
+                        "materialDesc -> getcolvalue(T_MDM_MATERIAL_INFO, MATERIAL_DESC, MATERIAL_CODE, materialCode)"
+                });
+            } catch (QueryExprException e) {
+                throw new ServiceException("执行查询公式时发生错误.");
+            }
+        }
+        List<Map<String, Object>> options = new ArrayList<>();
+        if (CollectionUtils.isNotEmpty(list)) {
+            for (MdmSkuStructureRef r : list) {
+                if (PubUtil.isNotEmpty(r.getMaterialCode())) {
+                    Map<String, Object> m = new HashMap<>();
+                    m.put("label", r.getMaterialCode());
+                    m.put("value", r.getMaterialCode());
+                    m.put("materialDesc", r.getMaterialDesc());
+                    options.add(m);
+                }
+            }
+        }
+        return AjaxResult.success(options);
+    }
+
+    /** 查询计划调整需求信息列表 */
+    @ApiOperation("查询计划调整需求信息列表")
     @PostMapping("/list")
+    @Override
     public TableDataInfo list(@RequestBody MpAdjustPlanRequireInfo queryVO) {
-        TableDataInfo tableDataInfo = super.list(queryVO);
-        return tableDataInfo;
+        return super.list(queryVO);
     }
 
-    @Override
-    protected String getOrderBy() {
-        return "ADJUST_DATE,STRUCTURE_NAME,MATERIAL_DESC";
+    /** 新增计划调整需求信息 */
+    @Log(title = "ui.data.column.mpAdjustPlanInfo.modelName", businessType = BusinessType.INSERT)
+    @ApiOperation("新增计划调整需求信息")
+    @PostMapping("/add")
+    public AjaxResult add(@RequestBody MpAdjustPlanRequireInfo entity) {
+        return super.save(entity);
     }
 
-    /**
-     * 保存
-     */
-    @Override
-    @ApiOperation("保存")
-    @PostMapping("/save")
-    @Log(title = "ui.data.column.factoryMonthPlanMouldDayResult.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
-    public AjaxResult save(@RequestBody MpAdjustPlanRequireInfo billVO) {
-        return super.save(billVO);
+    /** 编辑计划调整需求信息 */
+    @Log(title = "ui.data.column.mpAdjustPlanInfo.modelName", businessType = BusinessType.UPDATE)
+    @ApiOperation("编辑计划调整需求信息")
+    @PostMapping("/edit")
+    public AjaxResult edit(@RequestBody MpAdjustPlanRequireInfo entity) {
+        return super.save(entity);
     }
 
-    /**
-     * 删除
-     */
+    /** 删除计划调整需求信息 */
+    @Log(title = "ui.data.column.mpAdjustPlanInfo.modelName", businessType = BusinessType.DELETE)
+    @ApiOperation("删除计划调整需求信息")
+    @PostMapping("/remove")
     @Override
-    @ApiOperation("删除")
-    @DeleteMapping("/remove")
-    @Log(title = "ui.data.column.factoryMonthPlanMouldDayResult.modelName", businessType = BusinessType.DELETE)
     public AjaxResult removeByIds(@RequestBody List<Long> ids) {
         return super.removeByIds(ids);
     }
 
-
-    /**
-     * 获取S2-0604.排产结果-生产计划排产结果详细信息
-     */
+    /** 获取计划调整需求信息详情 */
+    @ApiOperation("获取计划调整需求信息详情")
+    @GetMapping("/getInfo/{id}")
     @Override
-    @ApiOperation("获取详细信息")
-    @GetMapping(value = "/{billId}")
-    public MpAdjustPlanRequireInfo getInfo(@PathVariable("billId") Long billId) {
-        return super.getInfo(billId);
+    public MpAdjustPlanRequireInfo getInfo(@PathVariable("id") Long id) {
+        return super.getInfo(id);
     }
 
-
-    /**
-     * 根据集合导入S2-0604.排产结果-生产计划排产结果数据
-     *
-     * @param importContext 导入上下文
-     * @param updateSupport 已存在记录是否更新
-     * @return 结果
-     */
-    @Override
-    @ApiOperation("导入数据")
+    /** 导入计划调整需求信息 */
+    @Log(title = "ui.data.column.mpAdjustPlanInfo.modelName", businessType = BusinessType.IMPORT)
+    @ApiOperation("导入计划调整需求信息")
     @PostMapping("/importData")
-    @Log(title = "ui.data.column.factoryMonthPlanMouldDayResult.modelName", businessType = BusinessType.IMPORT)
+    @Override
     public AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport) throws Exception {
         return super.importData(importContext, updateSupport);
     }
 
-    /**
-     * 保存导出日志
-     *
-     * @param queryVO   查询条件
-     * @param fileName  导出文件名
-     * @param beginTime 导出开始时间
-     * @param list      导出数据
-     */
-    private void saveExportLog(FactoryMonthPlanMouldDayResult queryVO, String fileName, Date beginTime,
-                               List<FactoryMonthPlanMouldDayResultExportVo> list) {
-        Date endTime = DateUtils.getNowDate();
-        ExportLog exportLog = new ExportLog();
-        exportLog.setProcedureCode("0");
-        exportLog.setExportParams(queryVO.toString());
-        String uri = ServletUtils.getRequest().getRequestURI();
-        exportLog.setFunctionCode(uri.split("/")[1]);
-        exportLog.setFunctionName(fileName);
-        exportLog.setFileName(fileName + ".xlsx");
-        exportLog.setRowCount(list.size());
-        exportLog.setBeginTime(beginTime);
-        exportLog.setEndTime(endTime);
-        exportLog.setSpendTime(DateUtils.getDiffTime(endTime, beginTime));
-        this.iExportLogService.add(exportLog);
+    /** 导出计划调整需求信息 */
+    @Log(title = "ui.data.column.mpAdjustPlanInfo.modelName", businessType = BusinessType.EXPORT)
+    @ApiOperation("导出计划调整需求信息")
+    @PostMapping("/exportData/{fileName}")
+    @Override
+    public byte[] exportData(@RequestBody MpAdjustPlanRequireInfo queryVO, @PathVariable("fileName") String fileName,
+                             HttpServletResponse response) throws IOException {
+        return super.exportData(queryVO, fileName, response);
     }
 
     @Override
@@ -146,7 +189,18 @@ public class MpAdjustPlanInfoController extends AbstractDocBizController<MpAdjus
         QueryWrapper<MpAdjustPlanRequireInfo> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
         wrapper.orderByAsc("ADJUST_DATE", "MATERIAL_DESC");
-        return mpAdjustPlanInfoService.getListByCondition(wrapper);
+        List<MpAdjustPlanRequireInfo> list = mpAdjustPlanInfoService.getListByCondition(wrapper);
+        // 导出前按反显公式回填物料描述（物料编码 -> 主数据物料描述）
+        AppUtils.formatData(list, getQueryFormulas());
+        return list;
+    }
+
+    /**
+     * 反显公式：物料描述按物料编码从主数据反显（列表/导出）
+     */
+    @Override
+    protected String[] getQueryFormulas() {
+        return mpAdjustPlanInfoService.getQueryFormulas();
     }
 
     @Override
@@ -157,21 +211,22 @@ public class MpAdjustPlanInfoController extends AbstractDocBizController<MpAdjus
     /**
      * 条件拼接
      *
-     * @param queryWrapper
-     * @param queryVO
+     * @param queryWrapper 查询包装器
+     * @param queryVO      查询条件
      */
     @Override
     protected void builderCondition(QueryWrapper<MpAdjustPlanRequireInfo> queryWrapper, MpAdjustPlanRequireInfo queryVO) {
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFactoryCode());
-        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("structureName")), "STRUCTURE_NAME", queryVO.getStructureName());
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("mesMaterialCode")), "MES_MATERIAL_CODE", queryVO.getMesMaterialCode());
-        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialCode")), "MATERIAL_CODE", queryVO.getMaterialCode());
-        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialDesc")), "MATERIAL_DESC", queryVO.getMaterialDesc());
-
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("area")), "AREA", queryVO.getArea());
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("planAdjustType")), "PLAN_ADJUST_TYPE", queryVO.getPlanAdjustType());
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("adjustReason")), "ADJUST_REASON", queryVO.getAdjustReason());
-        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("remark")), "REMARK", queryVO.getFieldValueByFieldName("remark"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFactoryCode()), "FACTORY_CODE", queryVO.getFactoryCode());
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getStructureName()), "STRUCTURE_NAME", queryVO.getStructureName());
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getMesMaterialCode()), "MES_MATERIAL_CODE", queryVO.getMesMaterialCode());
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getMaterialCode()), "MATERIAL_CODE", queryVO.getMaterialCode());
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getMaterialDesc()), "MATERIAL_DESC", queryVO.getMaterialDesc());
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getArea()), "AREA", queryVO.getArea());
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getPlanAdjustType()), "PLAN_ADJUST_TYPE", queryVO.getPlanAdjustType());
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getAdjustReason()), "ADJUST_REASON", queryVO.getAdjustReason());
+        queryWrapper.ge(PubUtil.isNotEmpty(queryVO.getAdjustDateStart()), "ADJUST_DATE", queryVO.getAdjustDateStart());
+        queryWrapper.le(PubUtil.isNotEmpty(queryVO.getAdjustDateEnd()), "ADJUST_DATE", queryVO.getAdjustDateEnd());
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getRemark()), "REMARK", queryVO.getRemark());
     }
 
     @Override
@@ -179,4 +234,8 @@ public class MpAdjustPlanInfoController extends AbstractDocBizController<MpAdjus
         return "S2-0801";
     }
 
+    @Override
+    protected String getOrderBy() {
+        return "ADJUST_DATE,STRUCTURE_NAME,MATERIAL_DESC";
+    }
 }
