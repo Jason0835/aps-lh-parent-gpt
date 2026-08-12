@@ -97,6 +97,7 @@ public class TmShiftConfigController extends AbstractDocBizController<TmShiftCon
     protected List<TmShiftConfig> listExportData(TmShiftConfig obj) {
         QueryWrapper<TmShiftConfig> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
+        wrapper.last("ORDER BY " + this.getOrderBy(obj));
         return tmShiftConfigMapper.selectList(wrapper);
     }
 

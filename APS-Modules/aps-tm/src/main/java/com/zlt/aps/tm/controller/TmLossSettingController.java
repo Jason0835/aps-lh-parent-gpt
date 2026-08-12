@@ -97,6 +97,7 @@ public class TmLossSettingController extends AbstractDocBizController<TmLossSett
     protected List<TmLossSetting> listExportData(TmLossSetting obj) {
         QueryWrapper<TmLossSetting> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
+        wrapper.last("ORDER BY " + this.getOrderBy(obj));
         return tmLossSettingMapper.selectList(wrapper);
     }
 

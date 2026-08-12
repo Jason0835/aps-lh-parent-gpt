@@ -123,6 +123,7 @@ public class TcParamsController extends AbstractDocBizController<TcParams> {
     protected List<TcParams> listExportData(TcParams obj) {
         QueryWrapper<TcParams> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
+        wrapper.last("ORDER BY " + this.getOrderBy(obj));
         return tcParamsMapper.selectList(wrapper);
     }
 
