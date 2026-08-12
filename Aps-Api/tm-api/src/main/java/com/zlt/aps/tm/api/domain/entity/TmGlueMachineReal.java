@@ -62,7 +62,9 @@ public class TmGlueMachineReal extends BaseEntity {
     @TableField("REMARK")
     private String remark;
 
-    @Excel(name = "ui.data.column.tmGlueMachineReal.machineName", sort = 30)
+    /**
+     * 机台名称仅用于列表展示，由机台编码关联反显；不参与 Excel 导入模板。
+     */
     @ApiModelProperty(value = "机台名称", name = "machineName")
     @TableField(exist = false)
     private String machineName;
