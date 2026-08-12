@@ -176,11 +176,13 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
     private final IRawSpecialMaterialRecordService rawSpecialMaterialRecordService;
     private final IMdmSkuScheduleCategoryService mdmSkuScheduleCategoryService;
     private final ISpecialMaterialResultService iSpecialMaterialResultService;
-    private final MpAdjustStructureInStrategy mpAdjustStructureInStrategy;
     private final Map<Long, Map<String, String>> importMachineMapCache = new ConcurrentHashMap<>();
     @Autowired
     @Lazy
     private MpMonthPlanStaticService mpMonthPlanStaticService;
+    @Autowired
+    @Lazy
+    private MpAdjustStructureInStrategy mpAdjustStructureInStrategy;
 
     @Autowired
     private RedisService redisService;
