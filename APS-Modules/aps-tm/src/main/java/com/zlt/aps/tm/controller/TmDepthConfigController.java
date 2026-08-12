@@ -1,10 +1,12 @@
 package com.zlt.aps.tm.controller;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.tm.api.domain.entity.TmDepthConfig;
+import com.zlt.aps.tm.mapper.TmDepthConfigMapper;
 import com.zlt.aps.tm.service.ITmDepthConfigService;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
@@ -15,6 +17,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import javax.annotation.Resource;
+import java.util.List;
 
 /**
  * 备库班数配置Controller
@@ -28,6 +33,9 @@ public class TmDepthConfigController extends AbstractDocBizController<TmDepthCon
 
     @Autowired
     private ITmDepthConfigService depthConfigService;
+
+    @Resource
+    private TmDepthConfigMapper tmDepthConfigMapper;
 
     /**
      * 查询信息列表
@@ -67,6 +75,20 @@ public class TmDepthConfigController extends AbstractDocBizController<TmDepthCon
     @PostMapping("/checkRangeCross")
     public String checkRangeCross(@RequestBody TmDepthConfig entity) {
         return depthConfigService.checkRangeCross(entity);
+    }
+
+    /**
+     * 查询备库班数配置导出数据。
+     *
+     * @param obj 导出筛选条件
+     * @return 按页面排序口径排列的导出数据
+     */
+    @Override
+    protected List<TmDepthConfig> listExportData(TmDepthConfig obj) {
+        QueryWrapper<TmDepthConfig> wrapper = new QueryWrapper<>();
+        this.builderCondition(wrapper, obj);
+        wrapper.last("ORDER BY " + this.getOrderBy(obj));
+        return tmDepthConfigMapper.selectList(wrapper);
     }
 
     @Override

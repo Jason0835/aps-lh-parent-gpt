@@ -149,6 +149,11 @@ public enum MesInterfaceCodeEnum {
     GSQ_DAY_COMPLETE("GSQ_DAY_COMPLETE", "mesItfService", "syncGsqScheDayFinishQty", "钢丝圈排程日完成量同步"),
 
     /**
+     * 钢丝圈库存同步
+     */
+    STEEL_WIRE_STOCK("STEEL_WIRE_STOCK", "mesItfService", "syncMesGsqStock", "钢丝圈库存同步"),
+
+    /**
      * 模具交替计划下发
      */
     MOLD_ALTER_PLAN_ISSUE("MOLD_ALTER_PLAN_ISSUE", "mesItfService", "issueMoldAlterPlan", "模具交替计划下发"),

@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.zlt.aps.mp.api.domain.entity.MdmDevMaintenancePlan;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Update;
 
 import java.util.List;
 
@@ -20,8 +21,8 @@ public interface MdmDevMaintenancePlanEntityMapper extends BaseMapper<MdmDevMain
      * @param factoryCode 厂别
      * @return 查询结果
      */
-    MdmDevMaintenancePlan selectByUniqueKey(@Param("devCode") String devCode, 
-                                             @Param("precisionType") String precisionType, 
+    MdmDevMaintenancePlan selectByUniqueKey(@Param("devCode") String devCode,
+                                             @Param("precisionType") String precisionType,
                                              @Param("factoryCode") String factoryCode);
 
     /**
@@ -50,4 +51,39 @@ public interface MdmDevMaintenancePlanEntityMapper extends BaseMapper<MdmDevMain
      */
     String selectMaxDataVersionByPrefix(@Param("precisionType") String precisionType,
                                          @Param("versionPrefix") String versionPrefix);
+
+    /**
+     * 逻辑删除指定分厂所有未删除的设备保养计划数据
+     * 用于全量同步前清理旧数据（不限精度类型，按分厂清理）
+     * WHERE必须包含FACTORY_CODE业务主键，否则会被BlockAttackInnerInterceptor拦截
+     *
+     * @param factoryCode 分厂编号
+     * @return 受影响行数
+     */
+    @Update("UPDATE T_MDM_DEV_MAINTENANCE_PLAN SET IS_DELETE = 1, UPDATE_BY = 'MES', UPDATE_TIME = NOW() WHERE FACTORY_CODE = #{factoryCode} AND IS_DELETE = 0")
+    int logicDeleteByFactoryCode(@Param("factoryCode") String factoryCode);
+
+    /**
+     * 逻辑删除指定分厂和精度类型的设备保养计划数据
+     * 用于按精度类型同步前清理旧数据（精确匹配，如：硫化精度）
+     * WHERE必须包含FACTORY_CODE业务主键，否则会被BlockAttackInnerInterceptor拦截
+     *
+     * @param factoryCode 分厂编号
+     * @param precisionType 精度类型（精确匹配）
+     * @return 受影响行数
+     */
+    @Update("UPDATE T_MDM_DEV_MAINTENANCE_PLAN SET IS_DELETE = 1, UPDATE_BY = 'MES', UPDATE_TIME = NOW() WHERE FACTORY_CODE = #{factoryCode} AND PRECISION_TYPE = #{precisionType} AND IS_DELETE = 0")
+    int logicDeleteByFactoryCodeAndPrecisionType(@Param("factoryCode") String factoryCode, @Param("precisionType") String precisionType);
+
+    /**
+     * 逻辑删除指定分厂和精度类型前缀的设备保养计划数据
+     * 用于成型精度同步前清理旧数据（成型精度15天/成型精度60天都匹配）
+     * WHERE必须包含FACTORY_CODE业务主键，否则会被BlockAttackInnerInterceptor拦截
+     *
+     * @param factoryCode 分厂编号
+     * @param precisionTypePrefix 精度类型前缀（如：成型精度）
+     * @return 受影响行数
+     */
+    @Update("UPDATE T_MDM_DEV_MAINTENANCE_PLAN SET IS_DELETE = 1, UPDATE_BY = 'MES', UPDATE_TIME = NOW() WHERE FACTORY_CODE = #{factoryCode} AND PRECISION_TYPE LIKE CONCAT(#{precisionTypePrefix}, '%') AND IS_DELETE = 0")
+    int logicDeleteByFactoryCodeAndPrecisionTypePrefix(@Param("factoryCode") String factoryCode, @Param("precisionTypePrefix") String precisionTypePrefix);
 }

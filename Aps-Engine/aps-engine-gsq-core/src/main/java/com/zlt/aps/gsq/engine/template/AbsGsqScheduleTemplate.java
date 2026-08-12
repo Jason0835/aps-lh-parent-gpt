@@ -24,9 +24,9 @@ import lombok.extern.slf4j.Slf4j;
  *   ↓
  * S5 班次均衡调整
  *   ↓
- * S5.5 定额校验与顺序重置
+ * S5.5 定额校验
  *   ↓
- * S5.6 最终剩余产能回填
+ * S5.6 最终剩余产能回填（含生产顺序重置）
  *   ↓
  * S6 结果校验与持久化
  * </pre>
@@ -78,7 +78,7 @@ public abstract class AbsGsqScheduleTemplate {
         context.setCurrentStep(GsqScheduleStepEnum.S5_BALANCE.getCode());
         doBalance(context);
 
-        // S5.5: 定额校验与顺序重置
+        // S5.5: 定额校验
         context.setCurrentStep(GsqScheduleStepEnum.S5_5_QUOTA_VALIDATE.getCode());
         doQuotaValidate(context);
 
@@ -116,10 +116,10 @@ public abstract class AbsGsqScheduleTemplate {
     /** S5: 班次均衡调整 */
     protected abstract void doBalance(GsqScheduleContext context);
 
-    /** S5.5: 定额校验与顺序重置 */
+    /** S5.5: 定额校验 */
     protected abstract void doQuotaValidate(GsqScheduleContext context);
 
-    /** S5.6: 最终剩余产能回填（在 S5.5 之后执行，避免回填结果被覆盖） */
+    /** S5.6: 最终剩余产能回填与生产顺序重置（在 S5.5 之后执行，确保顺序值与最终计划量一致） */
     protected abstract void doResidualCapacity(GsqScheduleContext context);
 
     /** S6: 结果校验与持久化 */

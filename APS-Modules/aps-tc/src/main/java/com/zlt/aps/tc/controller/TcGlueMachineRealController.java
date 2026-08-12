@@ -105,6 +105,7 @@ public class TcGlueMachineRealController extends AbstractDocBizController<TcGlue
     protected List<TcGlueMachineReal> listExportData(TcGlueMachineReal obj) {
         QueryWrapper<TcGlueMachineReal> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
+        wrapper.last("ORDER BY " + this.getOrderBy(obj));
         List<TcGlueMachineReal> list = tcGlueMachineRealMapper.selectList(wrapper);
         AppUtils.formatData(list, getQueryFormulas());
         return list;

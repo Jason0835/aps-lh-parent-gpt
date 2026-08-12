@@ -93,6 +93,19 @@ public interface ICxPrecisionPlanRemoteService {
      */
     @ApiOperation("根据设备保养计划生成并推算成型精度计划")
     @PostMapping("/cxPrecisionPlan/generateFromMaintenance")
-    AjaxResult generateFromMaintenancePlan(@RequestBody List<Long> maintenancePlanIds, 
+    AjaxResult generateFromMaintenancePlan(@RequestBody List<Long> maintenancePlanIds,
                                            @RequestParam("cycleDays") Integer cycleDays);
+
+    /**
+     * 按设备保养计划(MES同步数据)分发写入成型精度计划表
+     * 现逻辑：MES全权决定计划时间和实际完成时间，APS侧不再回填实际日期、不再生成下一次精度计划。
+     * 本方法根据MES字段值直接计算派生字段并upsert到T_CX_PRECISION_PLAN。
+     * 精度类型映射：MES "成型精度15天"→APS PRECISION_TYPE='成型精度', PRECISION_CYCLE='15'
+     *
+     * @param maintenancePlanIds 设备保养计划ID列表（处理PRECISION_TYPE以'成型精度'开头的数据）
+     * @return 分发写入的记录数
+     */
+    @ApiOperation("按设备保养计划分发写入成型精度计划表")
+    @PostMapping("/cxPrecisionPlan/dispatchFromMaintenance")
+    AjaxResult dispatchFromMaintenancePlan(@RequestBody List<Long> maintenancePlanIds);
 }

@@ -12,6 +12,7 @@ import java.time.LocalDate;
 /**
  * MES钢丝圈排程结果中间表实体
  * 对应表：MES_GSQ_SCHEDULE_RESULT
+ * 仅保留 MES 表实际存在的字段
  *
  * @author APS
  */
@@ -27,10 +28,10 @@ public class MesGsqScheduleResult implements Serializable {
     @TableField(value = "SCHEDULE_DATE")
     private LocalDate scheduleDate;
 
-    /** 成型批次号 */
-    @ApiModelProperty(value = "成型批次号", name = "cxBatchNo")
-    @TableField(value = "CX_BATCH_NO")
-    private String cxBatchNo;
+    /** 胎圈批次号 */
+    @ApiModelProperty(value = "胎圈批次号", name = "tqBatchNo")
+    @TableField(value = "TQ_BATCH_NO")
+    private String tqBatchNo;
 
     /** 钢丝圈批次号 */
     @ApiModelProperty(value = "钢丝圈批次号", name = "batchNo")
@@ -42,6 +43,11 @@ public class MesGsqScheduleResult implements Serializable {
     @TableField(value = "ORDER_NO")
     private String orderNo;
 
+    /** 钢丝圈类型 */
+    @ApiModelProperty(value = "钢丝圈类型", name = "steelType")
+    @TableField(value = "STEEL_TYPE")
+    private String steelType;
+
     /** 钢丝圈代码 */
     @ApiModelProperty(value = "钢丝圈代码", name = "steelRingCode")
     @TableField(value = "STEEL_RING_CODE")
@@ -52,10 +58,10 @@ public class MesGsqScheduleResult implements Serializable {
     @TableField(value = "MATERIAL_CODE")
     private String materialCode;
 
-    /** 钢丝圈类型 */
-    @ApiModelProperty(value = "钢丝圈类型", name = "steelType")
-    @TableField(value = "STEEL_TYPE")
-    private String steelType;
+    /** 机台编号 */
+    @ApiModelProperty(value = "机台编号", name = "machineCode")
+    @TableField(value = "MACHINE_CODE")
+    private String machineCode;
 
     /** 胎胚描述 */
     @ApiModelProperty(value = "胎胚描述", name = "embryoSpecDesc")
@@ -67,46 +73,15 @@ public class MesGsqScheduleResult implements Serializable {
     @TableField(value = "UNIT_CONSUME")
     private Double unitConsume;
 
-    /** 钢丝缠绕盘代码 */
-    @ApiModelProperty(value = "钢丝缠绕盘代码", name = "twiningDiscCode")
-    @TableField(value = "TWINING_DISC_CODE")
-    private String twiningDiscCode;
-
-    /** 英寸 */
-    @ApiModelProperty(value = "英寸", name = "proSize")
-    @TableField(value = "PRO_SIZE")
-    private String proSize;
-
-    /** 机台编号 */
-    @ApiModelProperty(value = "机台编号", name = "machineCode")
-    @TableField(value = "MACHINE_CODE")
-    private String machineCode;
-
     /** 库存数量 */
     @ApiModelProperty(value = "库存数量", name = "stockQty")
     @TableField(value = "STOCK_QTY")
     private Double stockQty;
 
-    // ========== 中班(14:00-22:00) ==========
-    /** 中班计划量 */
-    @ApiModelProperty(value = "中班计划量", name = "midPlanQty")
-    @TableField(value = "MID_PLAN_QTY")
-    private Double midPlanQty;
-
-    /** 中班生产顺序 */
-    @ApiModelProperty(value = "中班生产顺序", name = "midProduceOrder")
-    @TableField(value = "MID_PRODUCE_ORDER")
-    private Integer midProduceOrder;
-
-    /** 中班系统原因分析 */
-    @ApiModelProperty(value = "中班系统原因分析", name = "midSysAnalysis")
-    @TableField(value = "MID_SYS_ANALYSIS")
-    private String midSysAnalysis;
-
-    /** 中班手工输入原因分析 */
-    @ApiModelProperty(value = "中班手工输入原因分析", name = "midHandAnalysis")
-    @TableField(value = "MID_HAND_ANALYSIS")
-    private String midHandAnalysis;
+    /** 库存供应时长（小时） */
+    @ApiModelProperty(value = "库存供应时长", name = "supplyTime")
+    @TableField(value = "SUPPLY_TIME")
+    private Double supplyTime;
 
     // ========== 夜班(22:00-06:00) ==========
     /** 夜班计划量 */
@@ -129,6 +104,11 @@ public class MesGsqScheduleResult implements Serializable {
     @TableField(value = "NIGHT_HAND_ANALYSIS")
     private String nightHandAnalysis;
 
+    /** 夜班备注（使用原因分析值赋值） */
+    @ApiModelProperty(value = "夜班备注", name = "nightRemark")
+    @TableField(value = "NIGHT_REMARK")
+    private String nightRemark;
+
     // ========== 早班(06:00-14:00) ==========
     /** 早班计划量 */
     @ApiModelProperty(value = "早班计划量", name = "dayPlanQty")
@@ -150,74 +130,38 @@ public class MesGsqScheduleResult implements Serializable {
     @TableField(value = "DAY_HAND_ANALYSIS")
     private String dayHandAnalysis;
 
-    // ========== 次日中班(次日14:00-22:00) ==========
-    /** 次日中班计划量 */
-    @ApiModelProperty(value = "次日中班计划量", name = "nextMidPlanQty")
-    @TableField(value = "NEXT_MID_PLAN_QTY")
-    private Double nextMidPlanQty;
+    /** 早班备注（使用原因分析值赋值） */
+    @ApiModelProperty(value = "早班备注", name = "dayRemark")
+    @TableField(value = "DAY_REMARK")
+    private String dayRemark;
 
-    /** 次日中班生产顺序 */
-    @ApiModelProperty(value = "次日中班生产顺序", name = "nextMidProduceOrder")
-    @TableField(value = "NEXT_MID_PRODUCE_ORDER")
-    private Integer nextMidProduceOrder;
+    // ========== 中班(14:00-22:00) ==========
+    /** 中班计划量 */
+    @ApiModelProperty(value = "中班计划量", name = "midPlanQty")
+    @TableField(value = "MID_PLAN_QTY")
+    private Double midPlanQty;
 
-    /** 次日中班系统原因分析 */
-    @ApiModelProperty(value = "次日中班系统原因分析", name = "nextMidSysAnalysis")
-    @TableField(value = "NEXT_MID_SYS_ANALYSIS")
-    private String nextMidSysAnalysis;
+    /** 中班生产顺序 */
+    @ApiModelProperty(value = "中班生产顺序", name = "midProduceOrder")
+    @TableField(value = "MID_PRODUCE_ORDER")
+    private Integer midProduceOrder;
 
-    /** 次日中班手工输入原因分析 */
-    @ApiModelProperty(value = "次日中班手工输入原因分析", name = "nextMidHandAnalysis")
-    @TableField(value = "NEXT_MID_HAND_ANALYSIS")
-    private String nextMidHandAnalysis;
+    /** 中班系统原因分析 */
+    @ApiModelProperty(value = "中班系统原因分析", name = "midSysAnalysis")
+    @TableField(value = "MID_SYS_ANALYSIS")
+    private String midSysAnalysis;
 
-    // ========== 对应胎圈1~6班消耗量 ==========
-    /** 对应胎圈1班消耗量 */
-    @ApiModelProperty(value = "对应胎圈1班消耗量", name = "tqClass1Plan")
-    @TableField(value = "TQ_CLASS1_PLAN")
-    private Integer tqClass1Plan;
+    /** 中班手工输入原因分析 */
+    @ApiModelProperty(value = "中班手工输入原因分析", name = "midHandAnalysis")
+    @TableField(value = "MID_HAND_ANALYSIS")
+    private String midHandAnalysis;
 
-    /** 对应胎圈2班消耗量 */
-    @ApiModelProperty(value = "对应胎圈2班消耗量", name = "tqClass2Plan")
-    @TableField(value = "TQ_CLASS2_PLAN")
-    private Integer tqClass2Plan;
+    /** 中班备注（使用原因分析值赋值） */
+    @ApiModelProperty(value = "中班备注", name = "midRemark")
+    @TableField(value = "MID_REMARK")
+    private String midRemark;
 
-    /** 对应胎圈3班消耗量 */
-    @ApiModelProperty(value = "对应胎圈3班消耗量", name = "tqClass3Plan")
-    @TableField(value = "TQ_CLASS3_PLAN")
-    private Integer tqClass3Plan;
-
-    /** 对应胎圈4班消耗量 */
-    @ApiModelProperty(value = "对应胎圈4班消耗量", name = "tqClass4Plan")
-    @TableField(value = "TQ_CLASS4_PLAN")
-    private Integer tqClass4Plan;
-
-    /** 对应胎圈5班消耗量 */
-    @ApiModelProperty(value = "对应胎圈5班消耗量", name = "tqClass5Plan")
-    @TableField(value = "TQ_CLASS5_PLAN")
-    private Integer tqClass5Plan;
-
-    /** 对应胎圈6班消耗量 */
-    @ApiModelProperty(value = "对应胎圈6班消耗量", name = "tqClass6Plan")
-    @TableField(value = "TQ_CLASS6_PLAN")
-    private Integer tqClass6Plan;
-
-    // ========== 状态与公共字段 ==========
-    /** 是否发布 */
-    @ApiModelProperty(value = "是否发布", name = "isRelease")
-    @TableField(value = "IS_RELEASE")
-    private String isRelease;
-
-    /** 收尾规格标记(0：收尾，1：非收尾) */
-    @ApiModelProperty(value = "收尾规格标记", name = "closeOutSpecFlag")
-    @TableField(value = "CLOSE_OUT_SPEC_FLAG")
-    private String closeOutSpecFlag;
-
-    /** 生产状态 */
-    @ApiModelProperty(value = "生产状态", name = "productionStatus")
-    @TableField(value = "PRODUCTION_STATUS")
-    private String productionStatus;
-
+    // ========== 公共字段 ==========
     /** 备注 */
     @ApiModelProperty(value = "备注", name = "remark")
     @TableField(value = "REMARK")

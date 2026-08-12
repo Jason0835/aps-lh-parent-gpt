@@ -47,6 +47,11 @@ public class ContinuousProductionHandler extends AbsScheduleStepHandler {
                 context.getContinuousSkuList().size(), context.getNewSpecSkuList().size(),
                 context.getScheduleResultList().size());
         ISkuPriorityStrategy priorityStrategy = strategyFactory.getSkuPriorityStrategy();
+        /*
+         * S4.4排序调用：排序策略从S4.2独立的结构排序日期快照读取最大END_DAY，按结构只计算一次
+         * 与T日的包含首尾距离；严格小于SYS0304002时统一标记当前同结构候选SKU。这里只消费
+         * 排序结果，不查询结构转产表，也不调用或改变S4.5结构收尾对齐选机规则。
+         */
         priorityStrategy.sortByPriority(context);
         log.debug("续作排产优先级排序完成, 续作SKU: {}, 新增SKU: {}",
                 context.getContinuousSkuList().size(), context.getNewSpecSkuList().size());

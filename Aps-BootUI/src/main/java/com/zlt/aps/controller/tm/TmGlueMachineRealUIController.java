@@ -7,6 +7,7 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
+import com.zlt.aps.common.utils.ExportSortParamUtil;
 import com.zlt.aps.tm.api.domain.entity.TmGlueMachineReal;
 import com.zlt.aps.tm.api.service.ITmGlueMachineRealRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
@@ -59,6 +60,7 @@ public class TmGlueMachineRealUIController extends BaseUIController<TmGlueMachin
     @PostMapping("/list")
     @ResponseBody
     public TableDataInfo list(TmGlueMachineReal query) {
+        ExportSortParamUtil.applySortParams(query, this.getRequest());
         return iTmGlueMachineRealService.list(query);
     }
 
@@ -97,6 +99,7 @@ public class TmGlueMachineRealUIController extends BaseUIController<TmGlueMachin
     @GetMapping("/export")
     @RequiresPermissions("tm:tmGlueMachineReal:export")
     public void export(HttpServletResponse response, TmGlueMachineReal entity) throws IOException {
+        ExportSortParamUtil.applySortParams(entity, this.getRequest());
         String fileName = I18nUtil.getMessage("ui.data.column.tm.glueMachineReal.modelName");
         byte[] excelBytes = iTmGlueMachineRealService.exportData(entity, fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);

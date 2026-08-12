@@ -68,7 +68,12 @@ public class NewProductionHandler extends AbsScheduleStepHandler {
             IProductionStrategy strategy = strategyFactory.getProductionStrategy(
                     ScheduleTypeEnum.NEW_SPEC.getCode());
 
-            // S4.5.2 SKU优先级排序
+            /*
+             * S4.5.2 SKU优先级排序：S4.4已消费的SKU会同步移出structureSkuMap，本次排序继续
+             * 对当前仍参与新增排产的结构按最大END_DAY计算一次距离，并统一标记同结构全部候选。
+             * 排序标记只读取独立的structurePriorityMaxEndingDateMap，不读取也不修改后续结构收尾
+             * 对齐使用的固定三天快照，确保本次变更只影响SKU排序标记。
+             */
             ISkuPriorityStrategy priorityStrategy = strategyFactory.getSkuPriorityStrategy();
             priorityStrategy.sortByPriority(context);
             log.debug("新增规格SKU优先级排序完成, 待排新增SKU: {}", context.getNewSpecSkuList().size());

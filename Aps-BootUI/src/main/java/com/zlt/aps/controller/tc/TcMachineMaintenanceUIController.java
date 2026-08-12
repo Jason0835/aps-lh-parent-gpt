@@ -7,6 +7,7 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
+import com.zlt.aps.common.utils.ExportSortParamUtil;
 import com.zlt.aps.tc.api.domain.entity.TcMachineMaintenance;
 import com.zlt.aps.tc.api.service.ITcMachineMaintenanceRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
@@ -59,6 +60,7 @@ public class TcMachineMaintenanceUIController extends BaseUIController<TcMachine
     @PostMapping("/list")
     @ResponseBody
     public TableDataInfo list(TcMachineMaintenance query) {
+        ExportSortParamUtil.applySortParams(query, this.getRequest());
         return iTcMachineMaintenanceService.list(query);
     }
 
@@ -97,6 +99,7 @@ public class TcMachineMaintenanceUIController extends BaseUIController<TcMachine
     @GetMapping("/export")
     @RequiresPermissions("tc:tcMachineMaintenance:export")
     public void export(HttpServletResponse response, TcMachineMaintenance entity) throws IOException {
+        ExportSortParamUtil.applySortParams(entity, this.getRequest());
         String fileName = I18nUtil.getMessage("ui.data.column.tc.machineMaintenance.modelName");
         byte[] excelBytes = iTcMachineMaintenanceService.exportData(entity, fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);

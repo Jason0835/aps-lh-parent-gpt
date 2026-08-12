@@ -213,6 +213,36 @@ public interface IMesItfService {
     public AjaxResult syncDevMaintenancePlanOnly(@RequestBody AuxReqSyncDataLogs syncDataLogs);
 
     /**
+     * 同步设备保养计划并按精度类型分发写入对应的精度计划表（现逻辑）
+     * 现逻辑：MES全权决定计划时间(OPER_TIME)和实际完成时间(FIRST_WASH_TIME)，
+     * APS侧不再回填实际日期、不再生成下一次精度计划。
+     * 执行步骤：
+     * 1. 同步MES设备保养计划数据到T_MDM_DEV_MAINTENANCE_PLAN
+     * 2. 按PRECISION_TYPE分发：
+     *    - "硫化精度" → 调用lh模块dispatchFromMaintenancePlan写入T_LH_PRECISION_PLAN
+     *    - "成型精度15天"/"成型精度60天" → 调用cx模块dispatchFromMaintenancePlan写入T_CX_PRECISION_PLAN
+     * 3. 分发时根据MES字段值直接计算派生字段(DUE_DATE/DAYS_TO_DUE/COMPLETION_STATUS等)
+     *
+     * @param syncDataLogs 同步参数（可指定精度类型）
+     * @return 同步+分发结果
+     */
+    @ApiOperation("同步设备保养计划并分发写入精度计划表（现逻辑）")
+    @PostMapping("/mesItf/syncAndDispatchDevMaintenancePlan")
+    public AjaxResult syncAndDispatchDevMaintenancePlan(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 按指定版本号同步设备保养计划并分发写入精度计划表（临时任务）
+     * 与原syncAndDispatchDevMaintenancePlan的区别：不限精度类型、不查最大版本号，
+     * 直接按指定版本号查询MES中间表所有数据，同步后按版本号从APS本地表精确查询本次同步数据并分发。
+     *
+     * @param dataVersion 指定版本号
+     * @return 同步+分发结果
+     */
+    @ApiOperation("按指定版本号同步设备保养计划并分发写入精度计划表（临时任务）")
+    @PostMapping("/mesItf/syncAndDispatchDevMaintenancePlanByVersion")
+    AjaxResult syncAndDispatchDevMaintenancePlanByVersion(@RequestParam("dataVersion") String dataVersion);
+
+    /**
      * 同步胶囊已使用次数
      * @param syncDataLogs 参数
      * @return 结果
@@ -338,6 +368,15 @@ public interface IMesItfService {
     @ApiOperation("同步胎圈库存")
     @PostMapping("/mesItf/syncMesTqStock")
     public AjaxResult syncMesTqStock(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 同步钢丝圈库存
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步钢丝圈库存")
+    @PostMapping("/mesItf/syncMesGsqStock")
+    public AjaxResult syncMesGsqStock(@RequestBody AuxReqSyncDataLogs syncDataLogs);
 
     /**
      * 同步胎圈排程日完成量

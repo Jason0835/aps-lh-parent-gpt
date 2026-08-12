@@ -97,6 +97,7 @@ public class TcShiftConfigController extends AbstractDocBizController<TcShiftCon
     protected List<TcShiftConfig> listExportData(TcShiftConfig obj) {
         QueryWrapper<TcShiftConfig> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
+        wrapper.last("ORDER BY " + this.getOrderBy(obj));
         return tcShiftConfigMapper.selectList(wrapper);
     }
 

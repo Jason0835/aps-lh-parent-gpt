@@ -232,8 +232,6 @@ public class LhScheduleConfigResolver {
         // 结构清单按字符串原值进入配置快照，由配置对象统一完成逗号拆分、去空格和精确匹配。
         putStringValue(resolvedParamMap, lhParamsMap, LhScheduleParamConstant.DAILY_STANDARD_CAPACITY_STRUCTURE_LIST,
                 LhScheduleConstant.DAILY_STANDARD_CAPACITY_STRUCTURE_LIST);
-        putIntValue(resolvedParamMap, lhParamsMap, LhScheduleParamConstant.ENABLE_TODAY_IDLE_MACHINE_PRIORITY,
-                LhScheduleConstant.ENABLE_TODAY_IDLE_MACHINE_PRIORITY);
         putIntValue(resolvedParamMap, lhParamsMap, LhScheduleParamConstant.ENABLE_CHANGEOVER_BALANCE,
                 LhScheduleConstant.ENABLE_CHANGEOVER_BALANCE);
         putIntValue(resolvedParamMap, lhParamsMap, LhScheduleParamConstant.CONTINUOUS_SHORTAGE_LOOK_AHEAD_DAYS,

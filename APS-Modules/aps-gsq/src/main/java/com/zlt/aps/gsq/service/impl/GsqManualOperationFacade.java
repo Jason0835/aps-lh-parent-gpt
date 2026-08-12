@@ -542,7 +542,7 @@ public class GsqManualOperationFacade {
         request.setSteelRingCode(persisted.getSteelRingCode());
         request.setTwiningDiscCode(persisted.getTwiningDiscCode());
         request.setProSize(persisted.getProSize());
-        request.setCxBatchNo(persisted.getCxBatchNo());
+        request.setTqBatchNo(persisted.getTqBatchNo());
         request.setStockQty(persisted.getStockQty());
         request.setTqClass1Plan(persisted.getTqClass1Plan());
         request.setTqClass2Plan(persisted.getTqClass2Plan());
@@ -579,7 +579,7 @@ public class GsqManualOperationFacade {
         this.validateProtectedField("steelRingCode", request.getSteelRingCode(), persisted.getSteelRingCode());
         this.validateProtectedField("twiningDiscCode", request.getTwiningDiscCode(), persisted.getTwiningDiscCode());
         this.validateProtectedField("proSize", request.getProSize(), persisted.getProSize());
-        this.validateProtectedField("cxBatchNo", request.getCxBatchNo(), persisted.getCxBatchNo());
+        this.validateProtectedField("tqBatchNo", request.getTqBatchNo(), persisted.getTqBatchNo());
         this.validateProtectedField("stockQty", request.getStockQty(), persisted.getStockQty());
         this.validateProtectedField("isRelease", request.getIsRelease(), persisted.getIsRelease());
         this.validateProtectedField("dataSource", request.getDataSource(), persisted.getDataSource());

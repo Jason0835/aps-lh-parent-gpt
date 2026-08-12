@@ -52,6 +52,10 @@ public class GsqResidualCapacityHandler extends AbsGsqScheduleStepHandler {
     @Resource
     private com.zlt.aps.common.engine.service.AutoScheduleLogService autoScheduleLogService;
 
+    /** S3 机台分配 Handler：复用其 setProduceOrder 方法在 S5.6 末尾重置生产顺序 */
+    @Resource
+    private GsqMachineAssignHandler machineAssignHandler;
+
     @Override
     protected String getStepName() {
         return "S5.6-最终剩余产能回填";
@@ -74,36 +78,41 @@ public class GsqResidualCapacityHandler extends AbsGsqScheduleStepHandler {
                 .filter(s -> StringUtils.isNotEmpty(s.getMachineCode()))
                 .collect(Collectors.groupingBy(GsqScheduleResultVo::getMachineCode));
 
-        if (machineSpecMap.isEmpty()) {
-            log.info("[S5.6] 无已分配机台的规格，跳过剩余产能回填");
-            return;
-        }
+        if (!machineSpecMap.isEmpty()) {
+            // 2. 构建机台信息Map，便于取机台定额
+            Map<String, GsqMachineInfo> machineInfoMap = context.getAllMachineList().stream()
+                    .collect(Collectors.toMap(GsqMachineInfo::getMachineCode, m -> m, (a, b) -> a));
 
-        // 2. 构建机台信息Map，便于取机台定额
-        Map<String, GsqMachineInfo> machineInfoMap = context.getAllMachineList().stream()
-                .collect(Collectors.toMap(GsqMachineInfo::getMachineCode, m -> m, (a, b) -> a));
+            // 3. 逐机台处理剩余产能回填
+            for (Map.Entry<String, List<GsqScheduleResultVo>> entry : machineSpecMap.entrySet()) {
+                String machineCode = entry.getKey();
+                List<GsqScheduleResultVo> specList = entry.getValue();
+                GsqMachineInfo machine = machineInfoMap.get(machineCode);
+                double machineQuota = getMachineQuota(machine);
 
-        // 3. 逐机台处理剩余产能回填
-        for (Map.Entry<String, List<GsqScheduleResultVo>> entry : machineSpecMap.entrySet()) {
-            String machineCode = entry.getKey();
-            List<GsqScheduleResultVo> specList = entry.getValue();
-            GsqMachineInfo machine = machineInfoMap.get(machineCode);
-            double machineQuota = getMachineQuota(machine);
+                // 按班次顺序处理 1~5 班的剩余产能回填
+                for (int classNum = 1; classNum <= 5; classNum++) {
+                    fillResidualCapacity(machineCode, specList, classNum, machineQuota, context);
+                }
 
-            // 按班次顺序处理 1~5 班的剩余产能回填
-            for (int classNum = 1; classNum <= 5; classNum++) {
-                fillResidualCapacity(machineCode, specList, classNum, machineQuota, context);
+                // 第6班特殊处理：把剩余产能塞入第6班已排产的规格
+                fillLastClassWithAllRemaining(machineCode, specList, machineQuota, context);
             }
 
-            // 第6班特殊处理：把剩余产能塞入第6班已排产的规格
-            fillLastClassWithAllRemaining(machineCode, specList, machineQuota, context);
+            log.info("[S5.6] 最终剩余产能回填完成, 机台数:{}", machineSpecMap.size());
+
+            // 总量截断保护：确保每个备库规格6班总排产不超过 backupTotalQty
+            // 各阶段（S3延后不完全消化、S5均衡调整、S5.5定额延后等）可能导致总排产量超上限，此处从最后一班逐班削减
+            capBackupTotalQty(context, scheduleList);
+        } else {
+            log.info("[S5.6] 无已分配机台的规格，跳过剩余产能回填");
         }
 
-        log.info("[S5.6] 最终剩余产能回填完成, 机台数:{}", machineSpecMap.size());
-
-        // 总量截断保护：确保每个备库规格6班总排产不超过 backupTotalQty
-        // 各阶段（S3延后不完全消化、S5均衡调整、S5.5定额延后等）可能导致总排产量超上限，此处从最后一班逐班削减
-        capBackupTotalQty(context, scheduleList);
+        // 生产顺序重置（S5.6 是最后一个修改计划量的阶段）：
+        // S5.6 会对备库窗口内班次做前拉重排（可能把后序班次清零），必须在所有计划量修改完成后重置顺序值，
+        // 否则会出现"计划量=0 但顺序值有值"的数据不一致。
+        machineAssignHandler.setProduceOrder(scheduleList);
+        log.info("[S5.6] 生产顺序重置完成");
     }
 
     /**

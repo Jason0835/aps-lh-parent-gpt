@@ -97,6 +97,7 @@ public class TcSpecifyMachineController extends AbstractDocBizController<TcSpeci
     protected List<TcSpecifyMachine> listExportData(TcSpecifyMachine obj) {
         QueryWrapper<TcSpecifyMachine> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
+        wrapper.last("ORDER BY " + this.getOrderBy(obj));
         return tcSpecifyMachineMapper.selectList(wrapper);
     }
 

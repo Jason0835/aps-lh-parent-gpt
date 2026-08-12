@@ -113,7 +113,7 @@ public class TmMachineInfoController extends AbstractDocBizController<TmMachineI
         QueryWrapper<TmMachineInfo> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
         // 与列表页排序保持一致，避免导出数据顺序与页面不一致
-        wrapper.last("ORDER BY " + getOrderBy());
+        wrapper.last("ORDER BY " + this.getOrderBy(obj));
         List<TmMachineInfo> list = tmMachineInfoMapper.selectList(wrapper);
         // 开机班次：导出时把数据库字典值(01,02)转回班次名称(夜班,早班)
         list.forEach(entity -> entity.setOpenShiftCode(MachineShiftDictUtil.valuesToLabels(entity.getOpenShiftCode())));

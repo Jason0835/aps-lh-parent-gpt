@@ -179,4 +179,16 @@ public interface ILhPrecisionPlanService extends IDocService<LhPrecisionPlan> {
      * @return 待下发计划列表
      */
     List<com.zlt.aps.lh.api.domain.entity.LhPrecisionPlanIssue> listPendingIssuePlans(String factoryCode);
+
+    /**
+     * 按设备保养计划(MES同步数据)分发写入硫化精度计划表
+     * 现逻辑：MES全权决定计划时间(OPER_TIME)和实际完成时间(FIRST_WASH_TIME)，
+     * APS侧不再回填实际日期、不再生成下一次精度计划。
+     * 本方法根据MES字段值直接计算派生字段(DUE_DATE/DAYS_TO_DUE/COMPLETION_STATUS等)并upsert到T_LH_PRECISION_PLAN。
+     * 匹配键：MES_SOURCE_ID（=T_MDM_DEV_MAINTENANCE_PLAN.ID）
+     *
+     * @param maintenancePlanIds 设备保养计划ID列表（仅处理PRECISION_TYPE='硫化精度'的数据）
+     * @return 分发写入的记录数
+     */
+    int dispatchFromMaintenancePlan(List<Long> maintenancePlanIds);
 }

@@ -3,6 +3,7 @@ package com.zlt.aps.gsq.api.service;
 import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.gsq.api.domain.entity.GsqDayFinishQty;
+import com.zlt.aps.gsq.api.domain.entity.GsqStock;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -40,4 +41,20 @@ public interface IGsqMesSyncRemoteService {
                                                @RequestParam("scheduleDate") String scheduleDate,
                                                @RequestParam("updateBy") String updateBy,
                                                @RequestBody List<GsqDayFinishQty> list);
+
+    /**
+     * 逻辑删除并批量保存钢丝圈库存（事务性操作）
+     * 步骤1：逻辑删除指定库存日期的旧数据（IS_DELETE置为1）
+     * 步骤2：批量插入MES最新钢丝圈库存数据（新记录，IS_DELETE=0）
+     *
+     * @param stockDate 库存日期，格式：yyyy-MM-dd
+     * @param updateBy  更新者
+     * @param list      待插入的钢丝圈库存列表
+     * @return 结果
+     */
+    @ApiOperation("逻辑删除并批量保存钢丝圈库存（事务性操作）")
+    @PostMapping("/gsqMesSync/logicDeleteAndSaveGsqStockByStockDate")
+    AjaxResult logicDeleteAndSaveGsqStockByStockDate(@RequestParam("stockDate") String stockDate,
+                                                      @RequestParam("updateBy") String updateBy,
+                                                      @RequestBody List<GsqStock> list);
 }

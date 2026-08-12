@@ -7,6 +7,7 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
+import com.zlt.aps.common.utils.ExportSortParamUtil;
 import com.zlt.aps.tm.api.domain.entity.TmParams;
 import com.zlt.aps.tm.api.service.ITmParamsRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
@@ -59,6 +60,7 @@ public class TmParamsUIController extends BaseUIController<TmParams> {
     @PostMapping("/list")
     @ResponseBody
     public TableDataInfo list(TmParams query) {
+        ExportSortParamUtil.applySortParams(query, this.getRequest());
         return iTmParamsService.list(query);
     }
 
@@ -97,6 +99,7 @@ public class TmParamsUIController extends BaseUIController<TmParams> {
     @GetMapping("/export")
     @RequiresPermissions("tm:tmParams:export")
     public void export(HttpServletResponse response, TmParams entity) throws IOException {
+        ExportSortParamUtil.applySortParams(entity, this.getRequest());
         String fileName = I18nUtil.getMessage("ui.data.column.tm.params.modelName");
         byte[] excelBytes = iTmParamsService.exportData(entity, fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);

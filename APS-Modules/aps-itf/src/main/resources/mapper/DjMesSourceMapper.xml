@@ -11,17 +11,9 @@
                CAST(0 AS DECIMAL(18, 6)) AS MODIFY_NUM,
                CAST(0 AS DECIMAL(18, 6)) AS BAD_NUM,
                'MES' AS DATA_SOURCE,
-               DATA_VERSION,
-               COMPANY_CODE,
-               FACTORY_CODE
-        FROM MES_PAD_STOCK source_data
-        WHERE DATA_VERSION = #{dataVersion}
-        <if test="factoryCode != null and factoryCode != ''">
-            AND FACTORY_CODE = #{factoryCode}
-        </if>
-        <if test="companyCode != null and companyCode != ''">
-            AND COMPANY_CODE = #{companyCode}
-        </if>
+               '116' COMPANY_CODE,
+               '116' FACTORY_CODE
+        FROM MES_DJ_STOCK
     </select>
 
     <select id="selectShiftFinishQtyList" resultType="com.zlt.aps.dj.api.domain.entity.DjScheFinishQty">

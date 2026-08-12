@@ -4,6 +4,7 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.gsq.api.domain.entity.GsqStock;
 import com.zlt.bill.common.service.IDocService;
 
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -31,4 +32,13 @@ public interface IGsqStockService extends IDocService<GsqStock> {
      * @return 导入后提示信息
      */
     AjaxResult importData(List<GsqStock> list, boolean updateSupport, Long importLogId);
+
+    /**
+     * 逻辑删除指定库存日期的旧数据并批量插入新数据（事务性操作）
+     *
+     * @param stockDate 库存日期
+     * @param updateBy  更新者
+     * @param list      待插入的钢丝圈库存列表
+     */
+    void logicDeleteAndSaveBatch(Date stockDate, String updateBy, List<GsqStock> list);
 }

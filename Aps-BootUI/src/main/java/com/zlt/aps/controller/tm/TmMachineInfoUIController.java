@@ -7,6 +7,7 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
+import com.zlt.aps.common.utils.ExportSortParamUtil;
 import com.zlt.aps.tm.api.domain.entity.TmMachineInfo;
 import com.zlt.aps.tm.api.service.ITmMachineInfoRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
@@ -73,6 +74,7 @@ public class TmMachineInfoUIController extends BaseUIController<TmMachineInfo> {
     @PostMapping("/list")
     @ResponseBody
     public TableDataInfo list(TmMachineInfo query) {
+        ExportSortParamUtil.applySortParams(query, this.getRequest());
         return iTmMachineInfoService.list(query);
     }
 
@@ -111,6 +113,7 @@ public class TmMachineInfoUIController extends BaseUIController<TmMachineInfo> {
     @GetMapping("/export")
     @RequiresPermissions("tm:tmMachineInfo:export")
     public void export(HttpServletResponse response, TmMachineInfo entity) throws IOException {
+        ExportSortParamUtil.applySortParams(entity, this.getRequest());
         String fileName = I18nUtil.getMessage("ui.data.column.tm.machineInfo.modelName");
         byte[] excelBytes = iTmMachineInfoService.exportData(entity, fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);

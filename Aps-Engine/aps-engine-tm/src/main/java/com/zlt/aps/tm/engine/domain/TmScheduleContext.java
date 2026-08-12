@@ -4,6 +4,7 @@ import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.StrUtil;
 import com.ruoyi.common.exception.ServiceException;
 import com.zlt.aps.common.engine.schedule.*;
+import com.zlt.aps.common.engine.schedule.constraint.ScheduleToolLedgerSnapshot;
 import com.zlt.aps.tm.api.enums.TmScheduleErrorCodeEnum;
 import com.zlt.aps.tm.engine.service.TmAutoScheduleProgressListener;
 import com.zlt.aps.tm.engine.service.collector.TmAutoScheduleIssueCollector;
@@ -102,6 +103,9 @@ public class TmScheduleContext {
     /** 机台分配阶段正在滚动使用的全局可用工装数量 */
     private BigDecimal currentAvailableToolQty;
 
+    /** 工装账本快照，key=任务业务键。 */
+    private Map<String, ScheduleToolLedgerSnapshot> toolLedgerSnapshotMap = new LinkedHashMap<>();
+
     /** 本批次全局工装账本稳定序号 */
     private Integer toolLedgerSequence = 0;
 
@@ -159,6 +163,27 @@ public class TmScheduleContext {
     }
 
     /**
+     * 追加指定班次的延后过程日志，渲染时位于库存、计划量和机台评分日志之后。
+     *
+     * @param shiftOrder 班次顺序
+     * @param format     日志格式，使用 MessageFormat 占位符
+     * @param args       日志参数
+     */
+    public void appendDeferredShiftProcessLog(Integer shiftOrder, String format, Object... args) {
+        this.getOrCreateProcessTraceBuffer().appendDeferredShiftSummary(shiftOrder, format, args);
+    }
+
+    /**
+     * 追加一条必须在所有班次日志之后输出的批次尾部日志。
+     *
+     * @param format 日志格式，使用 MessageFormat 占位符
+     * @param args   日志参数
+     */
+    public void appendTailProcessLog(String format, Object... args) {
+        this.getOrCreateProcessTraceBuffer().appendTailSummary(format, args);
+    }
+
+    /**
      * 追加一条完整中文过程事件。
      *
      * @param event 完整过程事件
@@ -175,6 +200,16 @@ public class TmScheduleContext {
      */
     public void appendShiftFullProcessTrace(Integer shiftOrder, ScheduleProcessTraceEvent event) {
         this.getOrCreateProcessTraceBuffer().appendShiftFull(shiftOrder, event);
+    }
+
+    /**
+     * 追加指定班次的延后完整过程事件，渲染时位于该班次普通事件之后。
+     *
+     * @param shiftOrder 班次顺序
+     * @param event      完整过程事件
+     */
+    public void appendDeferredShiftFullProcessTrace(Integer shiftOrder, ScheduleProcessTraceEvent event) {
+        this.getOrCreateProcessTraceBuffer().appendDeferredShiftFull(shiftOrder, event);
     }
 
     /**

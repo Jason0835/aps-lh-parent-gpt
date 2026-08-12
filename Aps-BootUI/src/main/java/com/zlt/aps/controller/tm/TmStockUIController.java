@@ -7,6 +7,7 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
+import com.zlt.aps.common.utils.ExportSortParamUtil;
 import com.zlt.aps.tm.api.domain.entity.TmStock;
 import com.zlt.aps.tm.api.service.ITmStockRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
@@ -59,6 +60,7 @@ public class TmStockUIController extends BaseUIController<TmStock> {
     @PostMapping("/list")
     @ResponseBody
     public TableDataInfo list(TmStock query) {
+        ExportSortParamUtil.applySortParams(query, this.getRequest());
         return iTmStockService.list(query);
     }
 
@@ -97,6 +99,7 @@ public class TmStockUIController extends BaseUIController<TmStock> {
     @GetMapping("/export")
     @RequiresPermissions("tm:tmStock:export")
     public void export(HttpServletResponse response, TmStock entity) throws IOException {
+        ExportSortParamUtil.applySortParams(entity, this.getRequest());
         String fileName = I18nUtil.getMessage("ui.data.column.tm.stock.modelName");
         byte[] excelBytes = iTmStockService.exportData(entity, fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);

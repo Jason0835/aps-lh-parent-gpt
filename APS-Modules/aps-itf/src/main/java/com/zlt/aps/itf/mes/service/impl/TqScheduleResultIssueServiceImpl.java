@@ -238,18 +238,17 @@ public class TqScheduleResultIssueServiceImpl implements ITqScheduleResultIssueS
 
     /**
      * 转换为MES中间表实体
+     * 班次备注(NIGHT_REMARK/DAY_REMARK/MID_REMARK)使用对应班次的原因分析值赋值
      */
     private MesTqScheduleResult convertToMesEntity(TqScheduleResultIssue item, String dataVersion,
                                                     String companyCode, String factoryCode) {
         MesTqScheduleResult mesItem = new MesTqScheduleResult();
         mesItem.setScheduleDate(item.getScheduleDate());
-        mesItem.setCxBatchNo(item.getCxBatchNo());
         mesItem.setBatchNo(item.getBatchNo());
         mesItem.setOrderNo(item.getOrderNo());
         mesItem.setBeadCode(item.getBeadCode());
-        mesItem.setSapMaterialCode(item.getSapMaterialCode());
+        mesItem.setMaterialCode(item.getMaterialCode());
         mesItem.setSteelRingCode(item.getSteelRingCode());
-        mesItem.setTriangleGlueCode(item.getTriangleGlueCode());
         mesItem.setGlueCode(item.getGlueCode());
         mesItem.setMouthPlateCode(item.getMouthPlateCode());
         mesItem.setSpecSize(item.getSpecSize());
@@ -270,10 +269,10 @@ public class TqScheduleResultIssueServiceImpl implements ITqScheduleResultIssueS
         mesItem.setDayProduceOrder(item.getDayProduceOrder());
         mesItem.setDaySysAnalysis(item.getDaySysAnalysis());
         mesItem.setDayHandAnalysis(item.getDayHandAnalysis());
-        mesItem.setNextMidPlanQty(item.getNextMidPlanQty());
-        mesItem.setNextMidProduceOrder(item.getNextMidProduceOrder());
-        mesItem.setNextMidSysAnalysis(item.getNextMidSysAnalysis());
-        mesItem.setNextMidHandAnalysis(item.getNextMidHandAnalysis());
+        // 班次备注使用原因分析值赋值
+        mesItem.setNightRemark(item.getNightSysAnalysis());
+        mesItem.setDayRemark(item.getDaySysAnalysis());
+        mesItem.setMidRemark(item.getMidSysAnalysis());
         // 成型3~8班计划量
         mesItem.setCxClass3Plan(item.getCxClass3Plan());
         mesItem.setCxClass4Plan(item.getCxClass4Plan());
@@ -281,10 +280,7 @@ public class TqScheduleResultIssueServiceImpl implements ITqScheduleResultIssueS
         mesItem.setCxClass6Plan(item.getCxClass6Plan());
         mesItem.setCxClass7Plan(item.getCxClass7Plan());
         mesItem.setCxClass8Plan(item.getCxClass8Plan());
-        // 状态与公共字段
-        mesItem.setIsRelease("1");
-        mesItem.setMarkCloseOutTip(item.getMarkCloseOutTip());
-        mesItem.setProductionStatus(item.getProductionStatus());
+        // 公共字段
         mesItem.setRemark(item.getRemark());
         mesItem.setDataVersion(dataVersion);
         mesItem.setCompanyCode(companyCode);

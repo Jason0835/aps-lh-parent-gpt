@@ -28,6 +28,12 @@ public class ScheduleProcessTraceBuffer {
     /** 按班次顺序保存的班次级摘要文本或完整事件。 */
     private final Map<Integer, List<Object>> shiftEntryMap = new TreeMap<>();
 
+    /** 按班次顺序保存必须在库存、计划量和机台评分之后输出的产能扣减摘要或完整事件。 */
+    private final Map<Integer, List<Object>> deferredShiftEntryMap = new TreeMap<>();
+
+    /** 保存必须在所有班次日志之后输出的尾部摘要。 */
+    private final List<Object> tailEntries = new ArrayList<>();
+
     /** 当前有效日志级别。 */
     private ScheduleProcessLogLevel level = ScheduleProcessLogLevel.DEFAULT_LEVEL;
 
@@ -49,6 +55,8 @@ public class ScheduleProcessTraceBuffer {
         if (ScheduleProcessLogLevel.OFF == this.level) {
             this.entries.clear();
             this.shiftEntryMap.clear();
+            this.deferredShiftEntryMap.clear();
+            this.tailEntries.clear();
             return;
         }
         if (this.fallback) {
@@ -86,6 +94,35 @@ public class ScheduleProcessTraceBuffer {
     }
 
     /**
+     * 追加指定班次的延后摘要日志，渲染时位于该班次普通摘要之后。
+     *
+     * @param shiftOrder 班次顺序
+     * @param format     日志格式，使用 MessageFormat 占位符
+     * @param args       日志参数
+     */
+    public void appendDeferredShiftSummary(Integer shiftOrder, String format, Object... args) {
+        if (ScheduleProcessLogLevel.OFF == this.level || StrUtil.isBlank(format)) {
+            return;
+        }
+        Object[] plainArgs = this.toPlainArgs(args);
+        this.getDeferredEntryList(shiftOrder).add(MessageFormat.format(format, plainArgs));
+    }
+
+    /**
+     * 追加必须在批次级和班次级日志之后输出的尾部摘要。
+     *
+     * @param format 日志格式，使用 MessageFormat 占位符
+     * @param args   日志参数
+     */
+    public void appendTailSummary(String format, Object... args) {
+        if (ScheduleProcessLogLevel.OFF == this.level || StrUtil.isBlank(format)) {
+            return;
+        }
+        Object[] plainArgs = this.toPlainArgs(args);
+        this.tailEntries.add(MessageFormat.format(format, plainArgs));
+    }
+
+    /**
      * 追加完整中文过程事件。
      *
      * @param event 完整过程事件
@@ -105,6 +142,18 @@ public class ScheduleProcessTraceBuffer {
     public void appendShiftFull(Integer shiftOrder, ScheduleProcessTraceEvent event) {
         if (ScheduleProcessLogLevel.FULL == this.level && event != null) {
             this.getEntryList(shiftOrder).add(event);
+        }
+    }
+
+    /**
+     * 追加指定班次的延后完整事件，渲染时位于该班次普通事件之后。
+     *
+     * @param shiftOrder 班次顺序
+     * @param event      完整过程事件
+     */
+    public void appendDeferredShiftFull(Integer shiftOrder, ScheduleProcessTraceEvent event) {
+        if (ScheduleProcessLogLevel.FULL == this.level && event != null) {
+            this.getDeferredEntryList(shiftOrder).add(event);
         }
     }
 
@@ -146,9 +195,13 @@ public class ScheduleProcessTraceBuffer {
         }
         if (ScheduleProcessLogLevel.SUMMARY == this.level) {
             return this.countSummaryEntries(this.entries) + this.shiftEntryMap.values().stream()
-                    .mapToInt(this::countSummaryEntries).sum();
+                    .mapToInt(this::countSummaryEntries).sum()
+                    + this.deferredShiftEntryMap.values().stream().mapToInt(this::countSummaryEntries).sum()
+                    + this.countSummaryEntries(this.tailEntries);
         }
-        return this.entries.size() + this.shiftEntryMap.values().stream().mapToInt(List::size).sum();
+        return this.entries.size() + this.shiftEntryMap.values().stream().mapToInt(List::size).sum()
+                + this.deferredShiftEntryMap.values().stream().mapToInt(List::size).sum()
+                + this.tailEntries.size();
     }
 
     /**
@@ -164,11 +217,20 @@ public class ScheduleProcessTraceBuffer {
         if (ScheduleProcessLogLevel.SUMMARY == this.level) {
             this.appendSummaryEntries(resultBuffer, this.entries);
             this.shiftEntryMap.forEach((shiftOrder, shiftEntries) -> {
-                if (this.countSummaryEntries(shiftEntries) > 0) {
+                List<Object> deferredEntries = this.deferredShiftEntryMap.getOrDefault(shiftOrder, new ArrayList<>());
+                if (this.countSummaryEntries(shiftEntries) > 0 || this.countSummaryEntries(deferredEntries) > 0) {
                     resultBuffer.append(this.buildShiftTitle(shiftOrder)).append(System.lineSeparator());
                     this.appendSummaryEntries(resultBuffer, shiftEntries);
+                    this.appendSummaryEntries(resultBuffer, deferredEntries);
                 }
             });
+            this.deferredShiftEntryMap.forEach((shiftOrder, deferredEntries) -> {
+                if (!this.shiftEntryMap.containsKey(shiftOrder) && this.countSummaryEntries(deferredEntries) > 0) {
+                    resultBuffer.append(this.buildShiftTitle(shiftOrder)).append(System.lineSeparator());
+                    this.appendSummaryEntries(resultBuffer, deferredEntries);
+                }
+            });
+            this.appendSummaryEntries(resultBuffer, this.tailEntries);
             return this.normalizeText(resultBuffer.toString());
         }
         int sequence = 0;
@@ -176,13 +238,29 @@ public class ScheduleProcessTraceBuffer {
             sequence = this.appendFullEntry(resultBuffer, sequence, entry);
         }
         for (Map.Entry<Integer, List<Object>> shiftEntry : this.shiftEntryMap.entrySet()) {
-            if (shiftEntry.getValue().isEmpty()) {
+            List<Object> deferredEntries = this.deferredShiftEntryMap.getOrDefault(shiftEntry.getKey(), new ArrayList<>());
+            if (shiftEntry.getValue().isEmpty() && deferredEntries.isEmpty()) {
                 continue;
             }
             resultBuffer.append(this.buildShiftTitle(shiftEntry.getKey())).append(System.lineSeparator());
             for (Object entry : shiftEntry.getValue()) {
                 sequence = this.appendFullEntry(resultBuffer, sequence, entry);
             }
+            for (Object entry : deferredEntries) {
+                sequence = this.appendFullEntry(resultBuffer, sequence, entry);
+            }
+        }
+        for (Map.Entry<Integer, List<Object>> deferredShiftEntry : this.deferredShiftEntryMap.entrySet()) {
+            if (this.shiftEntryMap.containsKey(deferredShiftEntry.getKey())) {
+                continue;
+            }
+            resultBuffer.append(this.buildShiftTitle(deferredShiftEntry.getKey())).append(System.lineSeparator());
+            for (Object entry : deferredShiftEntry.getValue()) {
+                sequence = this.appendFullEntry(resultBuffer, sequence, entry);
+            }
+        }
+        for (Object entry : this.tailEntries) {
+            sequence = this.appendFullEntry(resultBuffer, sequence, entry);
         }
         return this.normalizeText(resultBuffer.toString());
     }
@@ -198,6 +276,19 @@ public class ScheduleProcessTraceBuffer {
             return this.entries;
         }
         return this.shiftEntryMap.computeIfAbsent(shiftOrder, key -> new ArrayList<>());
+    }
+
+    /**
+     * 获取指定班次的延后日志容器；无有效班次时降级为批次级日志。
+     *
+     * @param shiftOrder 班次顺序
+     * @return 对应的延后日志容器
+     */
+    private List<Object> getDeferredEntryList(Integer shiftOrder) {
+        if (shiftOrder == null || shiftOrder <= 0) {
+            return this.entries;
+        }
+        return this.deferredShiftEntryMap.computeIfAbsent(shiftOrder, key -> new ArrayList<>());
     }
 
     /**

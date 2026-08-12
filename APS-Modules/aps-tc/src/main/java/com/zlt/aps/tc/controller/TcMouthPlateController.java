@@ -97,6 +97,7 @@ public class TcMouthPlateController extends AbstractDocBizController<TcMouthPlat
     protected List<TcMouthPlate> listExportData(TcMouthPlate obj) {
         QueryWrapper<TcMouthPlate> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
+        wrapper.last("ORDER BY " + this.getOrderBy(obj));
         return tcMouthPlateMapper.selectList(wrapper);
     }
 

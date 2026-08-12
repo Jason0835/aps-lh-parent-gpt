@@ -281,12 +281,12 @@ public class TcBizSnapshotAndPersistService implements ITcSnapshotAndPersistServ
                         classQtyArray[arrayIndex] = this.nvl(classQtyArray[arrayIndex]).add(this.nvl(task.getPlanQty()));
                     }
                 });
-        context.appendProcessLog("排程结果汇总：已排分组数量={0}", quantityMap.size());
+        context.appendTailProcessLog("排程结果汇总：已排分组数量={0}", quantityMap.size());
         quantityMap.forEach((groupKey, classQtyArray) -> {
             String[] groupInfo = groupInfoMap.get(groupKey);
             BigDecimal totalQty = Arrays.stream(classQtyArray).filter(Objects::nonNull)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
-            context.appendProcessLog("机台={0}，胎侧代码={1}（{2}）：总产量={3} 班1={4} 班2={5} 班3={6} 班4={7} 班5={8} 班6={9}",
+            context.appendTailProcessLog("机台={0}，胎侧代码={1}（{2}）：总产量={3} 班1={4} 班2={5} 班3={6} 班4={7} 班5={8} 班6={9}",
                     groupInfo[0], groupInfo[1], groupInfo[2], totalQty,
                     this.nvl(classQtyArray[0]), this.nvl(classQtyArray[1]), this.nvl(classQtyArray[2]),
                     this.nvl(classQtyArray[3]), this.nvl(classQtyArray[4]), this.nvl(classQtyArray[5]));

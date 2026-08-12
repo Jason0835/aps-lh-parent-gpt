@@ -97,6 +97,7 @@ public class TmStockController extends AbstractDocBizController<TmStock> {
     protected List<TmStock> listExportData(TmStock obj) {
         QueryWrapper<TmStock> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
+        wrapper.last("ORDER BY " + this.getOrderBy(obj));
         return tmStockMapper.selectList(wrapper);
     }
 

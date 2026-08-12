@@ -97,6 +97,7 @@ public class TcLossSettingController extends AbstractDocBizController<TcLossSett
     protected List<TcLossSetting> listExportData(TcLossSetting obj) {
         QueryWrapper<TcLossSetting> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
+        wrapper.last("ORDER BY " + this.getOrderBy(obj));
         return tcLossSettingMapper.selectList(wrapper);
     }
 

@@ -187,6 +187,34 @@ public interface MesItfService {
     AjaxResult syncDevMaintenancePlanOnly(AuxReqSyncDataLogs syncDataLogs);
 
     /**
+     * 同步设备保养计划并按精度类型分发写入对应的精度计划表（现逻辑）
+     * 现逻辑：MES全权决定计划时间(OPER_TIME)和实际完成时间(FIRST_WASH_TIME)，
+     * APS侧不再回填实际日期、不再生成下一次精度计划。
+     * 执行步骤：
+     * 1. 同步MES设备保养计划数据到T_MDM_DEV_MAINTENANCE_PLAN
+     * 2. 按PRECISION_TYPE分发：
+     *    - "硫化精度" → 调用lh模块dispatchFromMaintenancePlan写入T_LH_PRECISION_PLAN
+     *    - "成型精度15天"/"成型精度60天" → 调用cx模块dispatchFromMaintenancePlan写入T_CX_PRECISION_PLAN
+     * 3. 分发时根据MES字段值直接计算派生字段
+     *
+     * @param syncDataLogs 同步参数（可指定精度类型）
+     * @return 同步+分发结果
+     */
+    AjaxResult syncAndDispatchDevMaintenancePlan(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 按指定版本号同步设备保养计划并分发写入精度计划表（临时任务）
+     * 与原syncAndDispatchDevMaintenancePlan的区别：
+     * 1. 不查最大版本号，直接使用传入的dataVersion查询MES中间表
+     * 2. 不限精度类型，同步指定版本下的全部精度类型数据
+     * 3. 分发时按dataVersion精确查询APS本地表，仅分发本次同步的数据（避免历史数据重复分发）
+     *
+     * @param dataVersion 指定版本号
+     * @return 同步+分发结果
+     */
+    AjaxResult syncAndDispatchDevMaintenancePlanByVersion(String dataVersion);
+
+    /**
      * 同步胶囊已使用次数
      *
      * @param syncDataLogs 同步参数
@@ -246,6 +274,18 @@ public interface MesItfService {
      * @return 结果
      */
     AjaxResult syncMesTqStock(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 同步钢丝圈库存
+     * T_GSQ_STOCK：采用逻辑删除+插入方案
+     *   步骤1：逻辑删除当天库存日期的所有数据（IS_DELETE置为1）
+     *   步骤2：将MES最新库存数据批量插入（新记录，IS_DELETE=0）
+     *   历史数据保留，只删当天库存日期的数据
+     *
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    AjaxResult syncMesGsqStock(AuxReqSyncDataLogs syncDataLogs);
 
     /**
      * 同步胎圈排程完成量

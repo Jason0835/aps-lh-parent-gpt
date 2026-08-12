@@ -105,6 +105,7 @@ public class TmGlueMachineRealController extends AbstractDocBizController<TmGlue
     protected List<TmGlueMachineReal> listExportData(TmGlueMachineReal obj) {
         QueryWrapper<TmGlueMachineReal> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
+        wrapper.last("ORDER BY " + this.getOrderBy(obj));
         List<TmGlueMachineReal> list = tmGlueMachineRealMapper.selectList(wrapper);
         AppUtils.formatData(list, getQueryFormulas());
         return list;

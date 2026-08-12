@@ -99,6 +99,7 @@ public class TcMachineMaintenanceController extends AbstractDocBizController<TcM
     protected List<TcMachineMaintenance> listExportData(TcMachineMaintenance obj) {
         QueryWrapper<TcMachineMaintenance> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
+        wrapper.last("ORDER BY " + this.getOrderBy(obj));
         return tcMachineMaintenanceMapper.selectList(wrapper);
     }
 

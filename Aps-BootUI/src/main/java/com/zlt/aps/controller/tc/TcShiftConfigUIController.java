@@ -7,6 +7,7 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
+import com.zlt.aps.common.utils.ExportSortParamUtil;
 import com.zlt.aps.tc.api.domain.entity.TcShiftConfig;
 import com.zlt.aps.tc.api.service.ITcShiftConfigRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
@@ -59,6 +60,7 @@ public class TcShiftConfigUIController extends BaseUIController<TcShiftConfig> {
     @PostMapping("/list")
     @ResponseBody
     public TableDataInfo list(TcShiftConfig query) {
+        ExportSortParamUtil.applySortParams(query, this.getRequest());
         return iTcShiftConfigService.list(query);
     }
 
@@ -97,6 +99,7 @@ public class TcShiftConfigUIController extends BaseUIController<TcShiftConfig> {
     @GetMapping("/export")
     @RequiresPermissions("tc:tcShiftConfig:export")
     public void export(HttpServletResponse response, TcShiftConfig entity) throws IOException {
+        ExportSortParamUtil.applySortParams(entity, this.getRequest());
         String fileName = I18nUtil.getMessage("ui.data.column.tc.shiftConfig.modelName");
         byte[] excelBytes = iTcShiftConfigService.exportData(entity, fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);

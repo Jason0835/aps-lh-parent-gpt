@@ -71,7 +71,7 @@ public class GsqMachineInfo extends BaseEntity {
     private String openMachineClass;
 
     /**
-     * 机台状态，0--启用，1--禁用。对应数据字典STATUS
+     * 机台状态，1--启用，0--禁用。对应数据字典STATUS
      */
     @ApiModelProperty(value = "机台状态", position = 90)
     @Excel(name = "ui.data.column.machine.status", dictType = "STATUS")

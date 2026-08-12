@@ -8,6 +8,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.constant.UserConstants;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
+import com.zlt.aps.common.utils.ExportSortParamUtil;
 import com.zlt.aps.tc.api.domain.entity.TcDepthConfig;
 import com.zlt.aps.tc.api.service.ITcDepthConfigRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
@@ -75,6 +76,7 @@ public class TcDepthConfigUIController extends BaseUIController<TcDepthConfig> {
     @PostMapping("/list")
     @ResponseBody
     public TableDataInfo list(TcDepthConfig tcDepthConfig) {
+        ExportSortParamUtil.applySortParams(tcDepthConfig, this.getRequest());
         return iTcDepthConfigService.list(tcDepthConfig);
     }
 
@@ -147,6 +149,7 @@ public class TcDepthConfigUIController extends BaseUIController<TcDepthConfig> {
     @ResponseBody
     @Override
     public void export(HttpServletResponse response, TcDepthConfig entity) throws IOException {
+        ExportSortParamUtil.applySortParams(entity, this.getRequest());
         String fileName = this.getExportTemplateFileName();
         byte[] excelBytes = iTcDepthConfigService.exportData(entity, fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);

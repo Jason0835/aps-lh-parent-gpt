@@ -60,6 +60,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 /**
@@ -423,7 +424,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
             return "SKU寸口超出历史指定机台范围";
         }
         if (MachineAvailabilityReason.MOULD_SET_MISMATCH == reason) {
-            return "SKU模套型号与历史指定机台不匹配";
+            return "SKU模壳型号与历史指定机台模套不兼容";
         }
         if (MachineAvailabilityReason.SPECIAL_195_UNSUPPORTED == reason
                 || MachineAvailabilityReason.SPECIAL_225_UNSUPPORTED == reason
@@ -2024,6 +2025,8 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
             int capsuleScore = resolveCapsuleAffinityScore(context, sku, machine);
             int proSizeMatchScore = resolveProSizeMatchScore(sku, machine);
             double inchDistance = resolveInchDistance(sku, machine);
+            boolean mouldSetHardCompatible =
+                    LhMachineHardMatchUtil.isMouldSetHardCompatible(context, sku, machine);
             String embryoMatchedValue = resolveEmbryoMatchedValue(context, sku, machine);
             String mouldShellMatchedValue = resolveMouldShellMatchedValue(context, sku, machine);
             String specMatchedValue = resolveSpecMatchedValue(sku, machine);
@@ -2069,6 +2072,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
                     .append(resolveSingleControlSortDescription(
                             sku, singleControlMachine, singleControlScore))
                     .append("｜同胎胚：").append(resolveMatchedValueText(embryoMatchScore == 0, embryoMatchedValue))
+                    .append("｜模套硬兼容：").append(resolveYesNo(mouldSetHardCompatible))
                     .append("｜同模壳：").append(resolveMatchedValueText(mouldShellMatchScore == 0, mouldShellMatchedValue))
                     .append("｜同规格：").append(resolveMatchedValueText(specMatchScore == 0, specMatchedValue))
                     .append("｜胶囊共用性：").append(capsuleScore)
@@ -2381,8 +2385,8 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
                 skuInch, machine.getDimensionMinimum(), machine.getDimensionMaximum())) {
             return MachineAvailabilityReason.INCH_MISMATCH;
         }
-        // 模套型号硬过滤：普通模具模壳必须命中机台模套型号，仅到货模具时不降级。
-        if (!LhMachineHardMatchUtil.isMouldSetPriorityMatched(context, sku, machine)) {
+        // 模套硬兼容只负责候选准入；实际同模壳由候选机台当前绑定模具与目标SKU模具台账独立判断。
+        if (!LhMachineHardMatchUtil.isMouldSetHardCompatible(context, sku, machine)) {
             return MachineAvailabilityReason.MOULD_SET_MISMATCH;
         }
         MachineAvailabilityReason specialSupportReason =
@@ -2921,17 +2925,6 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
     }
 
     /**
-     * 比较当天空闲机台优先级。
-     *
-     * @param leftProfile 左机台画像
-     * @param rightProfile 右机台画像
-     * @return 比较结果
-     */
-    private int compareTodayIdlePriority(CandidateWindowProfile leftProfile, CandidateWindowProfile rightProfile) {
-        return Integer.compare(leftProfile.getTodayIdleScore(), rightProfile.getTodayIdleScore());
-    }
-
-    /**
      * 比较限制作业定点机台优先级。
      *
      * @param context 排程上下文
@@ -3262,24 +3255,102 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
      * @param context 排程上下文
      * @param sku 待排SKU
      * @param machine 候选机台
-     * @return 0-模壳匹配或不受模壳限制，1-模壳不匹配
+     * @return 0-目标SKU与候选机台当前绑定模具存在相同模壳，1-不同模壳或缺少实际绑定数据
      */
     private int resolveMouldShellMatchScore(LhScheduleContext context, SkuScheduleDTO sku, MachineScheduleDTO machine) {
         return StringUtils.isNotEmpty(resolveMouldShellMatchedValue(context, sku, machine)) ? 0 : 1;
     }
 
     /**
-     * 解析模壳与机台模套的实际命中值。
+     * 解析目标SKU与候选机台当前在机模具的实际同模壳命中值。
+     * <p>目标侧严格按“SKU-模具关系 -> 模具台账 -> 模壳型号”解析；候选机台侧严格按
+     * “运行态当前绑定模具号 -> 模具台账 -> 模壳型号”解析。机台模套为空或通用只代表硬兼容，
+     * 不能再作为实际同模壳得分。</p>
      *
      * @param context 排程上下文
      * @param sku 待排SKU
      * @param machine 候选机台
-     * @return 实际命中的模壳型号集合或通用说明，未命中返回null
+     * @return 双方实际命中的模壳型号集合，未命中或缺少绑定模具返回null
      */
     private String resolveMouldShellMatchedValue(LhScheduleContext context,
                                                  SkuScheduleDTO sku,
                                                  MachineScheduleDTO machine) {
-        return LhMachineHardMatchUtil.resolveMouldSetPriorityMatchedValue(context, sku, machine);
+        if (Objects.isNull(context) || Objects.isNull(sku) || Objects.isNull(machine)
+                || StringUtils.isEmpty(machine.getMachineCode())) {
+            return null;
+        }
+        Set<String> skuMouldShellStandardSet = resolveSkuMouldShellStandardSet(context, sku);
+        Set<String> machineBoundMouldShellStandardSet =
+                resolveMachineBoundMouldShellStandardSet(context, machine.getMachineCode());
+        if (CollectionUtils.isEmpty(skuMouldShellStandardSet)
+                || CollectionUtils.isEmpty(machineBoundMouldShellStandardSet)) {
+            return null;
+        }
+        Set<String> matchedShellStandardSet = new TreeSet<String>(skuMouldShellStandardSet);
+        matchedShellStandardSet.retainAll(machineBoundMouldShellStandardSet);
+        return CollectionUtils.isEmpty(matchedShellStandardSet)
+                ? null : StringUtils.join(matchedShellStandardSet, ",");
+    }
+
+    /**
+     * 解析目标SKU关联模具在模具台账中的模壳型号集合。
+     *
+     * @param context 排程上下文
+     * @param sku 目标SKU
+     * @return 去重并稳定排序后的模壳型号集合
+     */
+    private Set<String> resolveSkuMouldShellStandardSet(LhScheduleContext context, SkuScheduleDTO sku) {
+        Set<String> shellStandardSet = new TreeSet<String>();
+        if (Objects.isNull(context) || Objects.isNull(sku)
+                || StringUtils.isEmpty(sku.getMaterialCode())
+                || CollectionUtils.isEmpty(context.getSkuMouldRelMap())
+                || CollectionUtils.isEmpty(context.getModelInfoMap())) {
+            return shellStandardSet;
+        }
+        List<MdmSkuMouldRel> mouldRelList = context.getSkuMouldRelMap().get(sku.getMaterialCode());
+        if (CollectionUtils.isEmpty(mouldRelList)) {
+            return shellStandardSet;
+        }
+        for (MdmSkuMouldRel mouldRel : mouldRelList) {
+            if (Objects.isNull(mouldRel) || StringUtils.isEmpty(mouldRel.getMouldCode())) {
+                continue;
+            }
+            MdmModelInfo modelInfo = context.getModelInfoMap().get(mouldRel.getMouldCode().trim());
+            String shellStandard = normalizeToken(Objects.isNull(modelInfo) ? null : modelInfo.getShellStandard());
+            if (StringUtils.isNotEmpty(shellStandard)) {
+                shellStandardSet.add(shellStandard);
+            }
+        }
+        return shellStandardSet;
+    }
+
+    /**
+     * 解析候选机台当前实际绑定模具在模具台账中的模壳型号集合。
+     *
+     * @param context 排程上下文
+     * @param machineCode 候选机台编码
+     * @return 去重并稳定排序后的当前在机模壳型号集合
+     */
+    private Set<String> resolveMachineBoundMouldShellStandardSet(LhScheduleContext context,
+                                                                 String machineCode) {
+        Set<String> shellStandardSet = new TreeSet<String>();
+        if (Objects.isNull(context) || StringUtils.isEmpty(machineCode)
+                || CollectionUtils.isEmpty(context.getModelInfoMap())) {
+            return shellStandardSet;
+        }
+        Set<String> boundMouldCodeSet =
+                resolveMouldResourceContext(context).resolveMachineBoundMouldCodes(machineCode);
+        for (String mouldCode : boundMouldCodeSet) {
+            if (StringUtils.isEmpty(mouldCode)) {
+                continue;
+            }
+            MdmModelInfo modelInfo = context.getModelInfoMap().get(mouldCode.trim());
+            String shellStandard = normalizeToken(Objects.isNull(modelInfo) ? null : modelInfo.getShellStandard());
+            if (StringUtils.isNotEmpty(shellStandard)) {
+                shellStandardSet.add(shellStandard);
+            }
+        }
+        return shellStandardSet;
     }
 
     /**
@@ -3431,7 +3502,8 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
         profile.setReleasedContinuousMachineScore(resolveReleasedContinuousMachineScore(context, sku, machine, referenceTime));
         profile.setOtherSkuOccupiedScore(resolveOtherSkuOccupiedScore(context, sku, machine));
         fillSchedulableShiftMetrics(context, sku, profile);
-        profile.setTodayIdleScore(resolveTodayIdleScore(context, sku, machine, profile));
+        // 当天空闲只保留为真实状态诊断，不参与中心比较器，也不受任何排序参数控制。
+        profile.setTodayIdleScore(resolveTodayIdleScore(context, machine, profile));
         profileCache.put(machine.getMachineCode(), profile);
         return profile;
     }
@@ -3637,22 +3709,19 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
     }
 
     /**
-     * 解析当天空闲机台优先得分。
-     * <p>仅在当前 SKU 首日确实需要排产时生效；当天无有效占用且可首班承接的机台优先。</p>
+     * 解析候选机台当天空闲诊断值。
+     * <p>当天无有效占用且参考收尾时间不晚于窗口首班开始时记为空闲。该值只供日志诊断，
+     * 与SKU首日需求和选机参数解耦，禁止重新进入普通新增选机排序。</p>
      *
      * @param context 排程上下文
-     * @param sku 待排 SKU
      * @param machine 候选机台
      * @param profile 候选机台窗口画像
      * @return 0-当天空闲且可首班承接，1-非当天空闲
      */
     private int resolveTodayIdleScore(LhScheduleContext context,
-                                      SkuScheduleDTO sku,
                                       MachineScheduleDTO machine,
                                       CandidateWindowProfile profile) {
-        if (!isTodayIdleMachinePriorityEnabled(context)
-                || !isSkuNeedScheduleOnFirstDay(context, sku)
-                || context == null || machine == null || profile == null
+        if (context == null || machine == null || profile == null
                 || StringUtils.isEmpty(machine.getMachineCode())) {
             return 1;
         }
@@ -3674,18 +3743,6 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
             return 1;
         }
         return 0;
-    }
-
-    /**
-     * 判断当天空闲机台优先规则是否启用。
-     *
-     * @param context 排程上下文
-     * @return true-启用
-     */
-    private boolean isTodayIdleMachinePriorityEnabled(LhScheduleContext context) {
-        return context != null && context.getParamIntValue(
-                LhScheduleParamConstant.ENABLE_TODAY_IDLE_MACHINE_PRIORITY,
-                LhScheduleConstant.ENABLE_TODAY_IDLE_MACHINE_PRIORITY) == 1;
     }
 
     /**
@@ -3951,7 +4008,8 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
             int machineCodeScore = StringUtils.isEmpty(machine.getMachineCode()) ? 1 : 0;
             boolean inchMatched = LhMachineHardMatchUtil.isInchInRange(
                     parseInch(sku.getProSize()), machine.getDimensionMinimum(), machine.getDimensionMaximum());
-            boolean mouldSetMatched = mouldShellMatchScore == 0;
+            boolean mouldSetHardCompatible =
+                    LhMachineHardMatchUtil.isMouldSetHardCompatible(context, sku, machine);
             boolean specialMatched = LhMachineHardMatchUtil.isSpecialMaterialSupported(matchResult, machine);
             boolean specialSupportMachine = !LhMachineHardMatchUtil.isNormalMachine(machine);
             String skuShellStandard = resolveSkuShellStandardDisplay(context, sku);
@@ -4004,8 +4062,8 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
                             + ", " + PriorityTraceLogHelper.kv("SKU英寸", sku.getProSize())
                             + ", " + PriorityTraceLogHelper.kv("机台英寸下限", machine.getDimensionMinimum())
                             + ", " + PriorityTraceLogHelper.kv("机台英寸上限", machine.getDimensionMaximum())
-                            + ", " + PriorityTraceLogHelper.kv("模套匹配", PriorityTraceLogHelper.oneZero(mouldSetMatched))
-                            + ", " + PriorityTraceLogHelper.kv("SKU模套型号", skuShellStandard)
+                            + ", " + PriorityTraceLogHelper.kv("模套硬兼容", PriorityTraceLogHelper.oneZero(mouldSetHardCompatible))
+                            + ", " + PriorityTraceLogHelper.kv("SKU模壳型号", skuShellStandard)
                             + ", " + PriorityTraceLogHelper.kv("机台适用模套型号", machine.getShellStandard())
                             + ", " + PriorityTraceLogHelper.kv("特殊材料匹配", PriorityTraceLogHelper.oneZero(specialMatched))
                             + ", " + PriorityTraceLogHelper.kv("当前在机", machine.getPreviousMaterialCode())
@@ -4363,31 +4421,14 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
     }
 
     /**
-     * 汇总SKU模套型号，供日志输出。
+     * 汇总SKU关联模具的模壳型号，供硬兼容和实际同模壳日志输出。
      *
      * @param context 排程上下文
      * @param sku SKU
-     * @return 模套型号文本
+     * @return 模壳型号文本
      */
     private String resolveSkuShellStandardDisplay(LhScheduleContext context, SkuScheduleDTO sku) {
-        if (context == null || sku == null || StringUtils.isEmpty(sku.getMaterialCode())) {
-            return null;
-        }
-        List<MdmSkuMouldRel> mouldRelList = context.getSkuMouldRelMap().get(sku.getMaterialCode());
-        if (CollectionUtils.isEmpty(mouldRelList) || CollectionUtils.isEmpty(context.getModelInfoMap())) {
-            return null;
-        }
-        Set<String> shellStandardSet = new java.util.LinkedHashSet<String>(mouldRelList.size());
-        for (MdmSkuMouldRel mouldRel : mouldRelList) {
-            if (mouldRel == null || StringUtils.isEmpty(mouldRel.getMouldCode())) {
-                continue;
-            }
-            MdmModelInfo modelInfo = context.getModelInfoMap().get(mouldRel.getMouldCode());
-            String shellStandard = normalizeToken(modelInfo == null ? null : modelInfo.getShellStandard());
-            if (StringUtils.isNotEmpty(shellStandard)) {
-                shellStandardSet.add(shellStandard);
-            }
-        }
+        Set<String> shellStandardSet = resolveSkuMouldShellStandardSet(context, sku);
         return CollectionUtils.isEmpty(shellStandardSet) ? null : StringUtils.join(shellStandardSet, ",");
     }
 

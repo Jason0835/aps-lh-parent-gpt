@@ -97,6 +97,7 @@ public class TcMachineSpeedController extends AbstractDocBizController<TcMachine
     protected List<TcMachineSpeed> listExportData(TcMachineSpeed obj) {
         QueryWrapper<TcMachineSpeed> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
+        wrapper.last("ORDER BY " + this.getOrderBy(obj));
         return tcMachineSpeedMapper.selectList(wrapper);
     }
 

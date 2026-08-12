@@ -97,6 +97,7 @@ public class TcGlueOrderController extends AbstractDocBizController<TcGlueOrder>
     protected List<TcGlueOrder> listExportData(TcGlueOrder obj) {
         QueryWrapper<TcGlueOrder> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
+        wrapper.last("ORDER BY " + this.getOrderBy(obj));
         return tcGlueOrderMapper.selectList(wrapper);
     }
 
