@@ -1,6 +1,7 @@
 package com.zlt.aps.mp.factory.controller;
 
 import com.ruoyi.api.gateway.system.domain.ExportLog;
+import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.api.gateway.system.domain.ImportLog;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.api.gateway.system.service.IExportLogService;
@@ -304,22 +305,25 @@ public class MpStructureAllocationController extends AbstractDocBizController<Mp
         Date beginTime = DateUtils.getNowDate();
         byte[] fileBytes = importContext.getFileBytes();
         ImportLog importLog = ImportExcelUtils.getImportLogAndUploadFile(fileBytes, importContext.getImportFilePath(), importContext.getProcedureCode(), importContext.getFunctionName(), importContext.getOriFileName(), 1);
-        importLog = this.iImportLogService.add(importLog);
         // 执行导入逻辑
         AjaxResult ajaxResult = mpStructureAllocationService.importData(fileBytes, importLog);
+        importLog = this.iImportLogService.add(importLog);
         // 处理返回结果
         Map<String, Object> returnData = (Map<String, Object>) (ajaxResult.get(AjaxResult.DATA_TAG));
         Integer rowCount = 0;
         Integer errorNum = 0;
         Integer successNum = 0;
-        List<Object> importErrorLogs = Collections.EMPTY_LIST;
+        List<ImportErrorLog> importErrorLogs = Collections.EMPTY_LIST;
         if (returnData != null) {
             rowCount = (Integer) returnData.getOrDefault("rowCount", 0);
             errorNum = (Integer) returnData.getOrDefault("errorNum", 0);
             successNum = (Integer) returnData.getOrDefault("successNum", 0);
-            importErrorLogs = (List<Object>) returnData.get("importErrorLogs");
+            importErrorLogs = (List<ImportErrorLog>) returnData.get("importErrorLogs");
         }
-
+        if (importErrorLogs != null && importLog != null && importLog.getId() != null) {
+            Long importLogId = importLog.getId();
+            importErrorLogs.forEach(err -> err.setImportLogId(importLogId));
+        }
         AjaxResult logResult; // 日志消息，用于更新日志
         AjaxResult finalResult;
         if (errorNum > 0) {
