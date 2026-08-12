@@ -7,6 +7,7 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
+import com.zlt.aps.common.utils.ExportSortParamUtil;
 import com.zlt.aps.tc.api.domain.entity.TcMachineSpeed;
 import com.zlt.aps.tc.api.service.ITcMachineSpeedRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
@@ -59,6 +60,7 @@ public class TcMachineSpeedUIController extends BaseUIController<TcMachineSpeed>
     @PostMapping("/list")
     @ResponseBody
     public TableDataInfo list(TcMachineSpeed query) {
+        ExportSortParamUtil.applySortParams(query, this.getRequest());
         return iTcMachineSpeedRemoteService.list(query);
     }
 
@@ -97,6 +99,7 @@ public class TcMachineSpeedUIController extends BaseUIController<TcMachineSpeed>
     @GetMapping("/export")
     @RequiresPermissions("tc:tcMachineSpeed:export")
     public void export(HttpServletResponse response, TcMachineSpeed entity) throws IOException {
+        ExportSortParamUtil.applySortParams(entity, this.getRequest());
         String fileName = I18nUtil.getMessage("ui.data.column.tc.machineSpeed.modelName");
         byte[] excelBytes = iTcMachineSpeedRemoteService.exportData(entity, fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);

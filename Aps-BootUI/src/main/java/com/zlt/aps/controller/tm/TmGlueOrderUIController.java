@@ -7,6 +7,7 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
+import com.zlt.aps.common.utils.ExportSortParamUtil;
 import com.zlt.aps.tm.api.domain.entity.TmGlueOrder;
 import com.zlt.aps.tm.api.service.ITmGlueOrderRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
@@ -59,6 +60,7 @@ public class TmGlueOrderUIController extends BaseUIController<TmGlueOrder> {
     @PostMapping("/list")
     @ResponseBody
     public TableDataInfo list(TmGlueOrder query) {
+        ExportSortParamUtil.applySortParams(query, this.getRequest());
         return iTmGlueOrderService.list(query);
     }
 
@@ -97,6 +99,7 @@ public class TmGlueOrderUIController extends BaseUIController<TmGlueOrder> {
     @GetMapping("/export")
     @RequiresPermissions("tm:tmGlueOrder:export")
     public void export(HttpServletResponse response, TmGlueOrder entity) throws IOException {
+        ExportSortParamUtil.applySortParams(entity, this.getRequest());
         String fileName = I18nUtil.getMessage("ui.data.column.tm.glueOrder.modelName");
         byte[] excelBytes = iTmGlueOrderService.exportData(entity, fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);

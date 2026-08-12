@@ -8,6 +8,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.constant.UserConstants;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
+import com.zlt.aps.common.utils.ExportSortParamUtil;
 import com.zlt.aps.tm.api.domain.entity.TmDepthConfig;
 import com.zlt.aps.tm.api.service.ITmDepthConfigRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
@@ -76,6 +77,7 @@ public class TmDepthConfigUIController extends BaseUIController<TmDepthConfig> {
     @PostMapping("/list")
     @ResponseBody
     public TableDataInfo list(TmDepthConfig tmDepthConfig) {
+        ExportSortParamUtil.applySortParams(tmDepthConfig, this.getRequest());
         return iTmDepthConfigService.list(tmDepthConfig);
     }
 
@@ -148,6 +150,7 @@ public class TmDepthConfigUIController extends BaseUIController<TmDepthConfig> {
     @ResponseBody
     @Override
     public void export(HttpServletResponse response, TmDepthConfig entity) throws IOException {
+        ExportSortParamUtil.applySortParams(entity, this.getRequest());
         String fileName = this.getExportTemplateFileName();
         byte[] excelBytes = iTmDepthConfigService.exportData(entity, fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
