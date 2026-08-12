@@ -26,10 +26,6 @@ public class TqScheduleResultIssue extends BaseEntity {
     @ApiModelProperty(value = "排程日期", name = "scheduleDate")
     private LocalDate scheduleDate;
 
-    /** 成型批次号 */
-    @ApiModelProperty(value = "成型批次号", name = "cxBatchNo")
-    private String cxBatchNo;
-
     /** 胎圈批次号 */
     @ApiModelProperty(value = "胎圈批次号", name = "batchNo")
     private String batchNo;
@@ -42,17 +38,13 @@ public class TqScheduleResultIssue extends BaseEntity {
     @ApiModelProperty(value = "胎圈代码", name = "beadCode")
     private String beadCode;
 
-    /** SAP物料编码 */
-    @ApiModelProperty(value = "SAP物料编码", name = "sapMaterialCode")
-    private String sapMaterialCode;
+    /** 物料编码 */
+    @ApiModelProperty(value = "物料编码", name = "materialCode")
+    private String materialCode;
 
     /** 钢丝圈代码 */
     @ApiModelProperty(value = "钢丝圈代码", name = "steelRingCode")
     private String steelRingCode;
-
-    /** 三角胶代码 */
-    @ApiModelProperty(value = "三角胶代码", name = "triangleGlueCode")
-    private String triangleGlueCode;
 
     /** 胶料代码 */
     @ApiModelProperty(value = "胶料代码", name = "glueCode")
@@ -81,23 +73,6 @@ public class TqScheduleResultIssue extends BaseEntity {
     /** 库存供应成型时长（小时） */
     @ApiModelProperty(value = "库存供应成型时长", name = "supplyTime")
     private Double supplyTime;
-
-    // ========== 中班(14:00-22:00) ==========
-    /** 中班计划量 */
-    @ApiModelProperty(value = "中班计划量", name = "midPlanQty")
-    private Double midPlanQty;
-
-    /** 中班生产顺序 */
-    @ApiModelProperty(value = "中班生产顺序", name = "midProduceOrder")
-    private Integer midProduceOrder;
-
-    /** 中班系统原因分析 */
-    @ApiModelProperty(value = "中班系统原因分析", name = "midSysAnalysis")
-    private String midSysAnalysis;
-
-    /** 中班手工输入原因分析 */
-    @ApiModelProperty(value = "中班手工输入原因分析", name = "midHandAnalysis")
-    private String midHandAnalysis;
 
     // ========== 夜班(22:00-06:00) ==========
     /** 夜班计划量 */
@@ -133,22 +108,22 @@ public class TqScheduleResultIssue extends BaseEntity {
     @ApiModelProperty(value = "早班手工输入原因分析", name = "dayHandAnalysis")
     private String dayHandAnalysis;
 
-    // ========== 次日中班(次日14:00-22:00) ==========
-    /** 次日中班计划量 */
-    @ApiModelProperty(value = "次日中班计划量", name = "nextMidPlanQty")
-    private Double nextMidPlanQty;
+    // ========== 中班(14:00-22:00) ==========
+    /** 中班计划量 */
+    @ApiModelProperty(value = "中班计划量", name = "midPlanQty")
+    private Double midPlanQty;
 
-    /** 次日中班生产顺序 */
-    @ApiModelProperty(value = "次日中班生产顺序", name = "nextMidProduceOrder")
-    private Integer nextMidProduceOrder;
+    /** 中班生产顺序 */
+    @ApiModelProperty(value = "中班生产顺序", name = "midProduceOrder")
+    private Integer midProduceOrder;
 
-    /** 次日中班系统原因分析 */
-    @ApiModelProperty(value = "次日中班系统原因分析", name = "nextMidSysAnalysis")
-    private String nextMidSysAnalysis;
+    /** 中班系统原因分析 */
+    @ApiModelProperty(value = "中班系统原因分析", name = "midSysAnalysis")
+    private String midSysAnalysis;
 
-    /** 次日中班手工输入原因分析 */
-    @ApiModelProperty(value = "次日中班手工输入原因分析", name = "nextMidHandAnalysis")
-    private String nextMidHandAnalysis;
+    /** 中班手工输入原因分析 */
+    @ApiModelProperty(value = "中班手工输入原因分析", name = "midHandAnalysis")
+    private String midHandAnalysis;
 
     // ========== 对应成型1~8班计划量 ==========
     /** 对应成型1班计划量（D日早班库存直接供应） */
@@ -183,15 +158,7 @@ public class TqScheduleResultIssue extends BaseEntity {
     @ApiModelProperty(value = "对应成型8班计划量", name = "cxClass8Plan")
     private Integer cxClass8Plan;
 
-    // ========== 状态字段 ==========
-    /** 收尾提示标识(0:提示收尾；1:不需要提示) */
-    @ApiModelProperty(value = "收尾提示标识", name = "markCloseOutTip")
-    private String markCloseOutTip;
-
-    /** 生产状态 */
-    @ApiModelProperty(value = "生产状态", name = "productionStatus")
-    private String productionStatus;
-
+    // ========== 公共字段 ==========
     /** 备注 */
     @ApiModelProperty(value = "备注", name = "remark")
     private String remark;

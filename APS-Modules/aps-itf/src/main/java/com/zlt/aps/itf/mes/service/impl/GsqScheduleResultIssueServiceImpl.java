@@ -248,6 +248,7 @@ public class GsqScheduleResultIssueServiceImpl implements IGsqScheduleResultIssu
 
     /**
      * 转换为MES中间表实体
+     * 班次备注(NIGHT_REMARK/DAY_REMARK/MID_REMARK)使用对应班次的原因分析值赋值
      */
     private MesGsqScheduleResult convertToMesEntity(GsqScheduleResultIssue item, String dataVersion,
                                                     String companyCode, String factoryCode) {
@@ -259,12 +260,11 @@ public class GsqScheduleResultIssueServiceImpl implements IGsqScheduleResultIssu
         mesItem.setSteelRingCode(item.getSteelRingCode());
         mesItem.setMaterialCode(item.getMaterialCode());
         mesItem.setSteelType(item.getSteelType());
+        mesItem.setMachineCode(item.getMachineCode());
         mesItem.setEmbryoSpecDesc(item.getEmbryoSpecDesc());
         mesItem.setUnitConsume(item.getUnitConsume());
-        mesItem.setTwiningDiscCode(item.getTwiningDiscCode());
-        mesItem.setProSize(item.getProSize());
-        mesItem.setMachineCode(item.getMachineCode());
         mesItem.setStockQty(item.getStockQty());
+        mesItem.setSupplyTime(item.getSupplyTime());
         // 班次计划量
         mesItem.setMidPlanQty(item.getMidPlanQty());
         mesItem.setMidProduceOrder(item.getMidProduceOrder());
@@ -278,21 +278,11 @@ public class GsqScheduleResultIssueServiceImpl implements IGsqScheduleResultIssu
         mesItem.setDayProduceOrder(item.getDayProduceOrder());
         mesItem.setDaySysAnalysis(item.getDaySysAnalysis());
         mesItem.setDayHandAnalysis(item.getDayHandAnalysis());
-        mesItem.setNextMidPlanQty(item.getNextMidPlanQty());
-        mesItem.setNextMidProduceOrder(item.getNextMidProduceOrder());
-        mesItem.setNextMidSysAnalysis(item.getNextMidSysAnalysis());
-        mesItem.setNextMidHandAnalysis(item.getNextMidHandAnalysis());
-        // 对应胎圈1~6班消耗量
-        mesItem.setTqClass1Plan(item.getTqClass1Plan());
-        mesItem.setTqClass2Plan(item.getTqClass2Plan());
-        mesItem.setTqClass3Plan(item.getTqClass3Plan());
-        mesItem.setTqClass4Plan(item.getTqClass4Plan());
-        mesItem.setTqClass5Plan(item.getTqClass5Plan());
-        mesItem.setTqClass6Plan(item.getTqClass6Plan());
-        // 状态与公共字段
-        mesItem.setIsRelease("1");
-        mesItem.setCloseOutSpecFlag(item.getCloseOutSpecFlag());
-        mesItem.setProductionStatus(item.getProductionStatus());
+        // 班次备注使用原因分析值赋值
+        mesItem.setNightRemark(item.getNightSysAnalysis());
+        mesItem.setDayRemark(item.getDaySysAnalysis());
+        mesItem.setMidRemark(item.getMidSysAnalysis());
+        // 公共字段
         mesItem.setRemark(item.getRemark());
         mesItem.setDataVersion(dataVersion);
         mesItem.setCompanyCode(companyCode);
