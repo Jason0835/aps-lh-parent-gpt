@@ -169,9 +169,18 @@ public class LhScheduleContext {
      * 结构名称 -> 结构转产配置中的最大收尾自然日。
      * <p>S4.2在月计划加载完成后，按排程窗口[T,T+2]覆盖的每个自然月及该月排产版本查询
      * {@code T_MP_STRUCTURE_ALLOCATION}，将非空END_DAY还原为完整自然日后按结构取最大值。
-     * S4.5新增SKU选机只读该快照，最大日期不在窗口内或结构无记录时不触发结构收尾对齐。</p>
+     * S4.5新增SKU选机只读该快照，最大日期不在窗口内或结构无记录时不触发结构收尾对齐；
+     * SKU排序不得读取或扩大该快照，应使用独立的structurePriorityMaxEndingDateMap。</p>
      */
     private Map<String, LocalDate> structureMaxEndingDateMap = new LinkedHashMap<>(16);
+    /**
+     * 结构名称 -> SKU排序使用的结构转产最大收尾自然日。
+     * <p>S4.2按参数{@code SYS0304002}确定严格小于阈值时可能命中的日期范围，复用结构转产表
+     * 的工厂、年月、排产版本、正常计划类型和结构名称查询口径，将非空END_DAY还原为完整
+     * 自然日并按结构取最大值。S4.4/S4.5排序仅从该快照按结构计算一次距离天数，再把命中结果
+     * 应用于当前参与排产的同结构全部SKU；该快照与三天结构收尾对齐快照隔离，禁止用于选机。</p>
+     */
+    private Map<String, LocalDate> structurePriorityMaxEndingDateMap = new LinkedHashMap<>(16);
     /**
      * 物料+产品状态+年月 -> 月累计完成量，避免同一物料不同产品状态或跨月时完成量串月
      */

@@ -24,6 +24,9 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
 import javax.annotation.Resource;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -60,7 +63,11 @@ public class DefaultSkuPriorityStrategy implements ISkuPriorityStrategy {
         log.info("执行SKU优先级排序, 续作SKU数: {}, 新增SKU数: {}",
                 context.getContinuousSkuList().size(), context.getNewSpecSkuList().size());
 
-        // 结构收尾元数据使用对象身份保存，避免相同物料编码在不同阶段/列表中互相覆盖。
+        /*
+         * 排序开始时按结构转产表最大END_DAY构建一次结构收尾标记：同结构只计算一次包含首尾的
+         * 日期距离，命中后将当前参与排产的同结构全部SKU写入对象身份快照。后续比较器、排序日志
+         * 和结果描述只读该快照，既不逐SKU查询数据库，也不重复执行结构日期计算。
+         */
         Map<SkuScheduleDTO, Integer> structureEndingDaysMap = new IdentityHashMap<>(16);
         Map<String, StructurePriorityMeta> structurePriorityMap = buildStructurePriorityMap(
                 context, structureEndingDaysMap);
@@ -155,7 +162,8 @@ public class DefaultSkuPriorityStrategy implements ISkuPriorityStrategy {
      * <ol>
      *   <li>有发货要求优先（deliveryLocked=true 排前）</li>
      *   <li>延误天数负值越小越优先（delayDays 升序，负数<0<正数）</li>
-     *   <li>未来结构全收尾优先：未来N天内（N可配置）结构下全部SKU均收尾时，该结构内收尾日越晚（endingDaysRemaining 越大）的越优先上机</li>
+     *   <li>结构N天内收尾优先：结构转产表最大END_DAY与T日的包含首尾距离严格小于
+     *       {@code SYS0304002}时，同结构全部候选SKU进入原结构收尾层级，结构收尾日越晚越优先</li>
      *   <li>供应链优先级：高优先级(04) → 周期排产(05) → 中优先级(06) → 搭配排产(07)</li>
      * </ol>
      * </p>
@@ -169,7 +177,7 @@ public class DefaultSkuPriorityStrategy implements ISkuPriorityStrategy {
                 .comparingInt((SkuScheduleDTO s) -> s.isDeliveryLocked() ? 0 : 1)
                 // 顺序2：延迟上机越久越优先（负数越小越优先），未知值排后。
                 .thenComparing(SkuScheduleDTO::getDelayDays, Comparator.nullsLast(Comparator.naturalOrder()))
-                // 顺序3：未来结构全收尾优先，命中结构内按最晚收尾优先。
+                // 顺序3：结构N天内收尾优先，继续沿用原层级位置，并按结构最大END_DAY距T日天数降序。
                 .thenComparingInt((SkuScheduleDTO s) -> isStructureAllEndingPriority(structurePriorityMap, s) ? 0 : 1)
                 .thenComparingInt((SkuScheduleDTO s) -> isStructureAllEndingPriority(structurePriorityMap, s)
                         && hasKnownStructureEndingDays(structureEndingDaysMap, s) ? 0 : 1)
@@ -414,7 +422,16 @@ public class DefaultSkuPriorityStrategy implements ISkuPriorityStrategy {
     }
 
     /**
-     * 构建结构全收尾优先级快照，避免比较器中重复扫描结构列表。
+     * 按结构转产表最大END_DAY构建结构N天内收尾优先级快照。
+     *
+     * <p>判断口径固定为：END_DAY不早于上下文T日，且包含首尾的距离天数
+     * {@code END_DAY - T + 1}严格小于参数{@code SYS0304002}。基础数据阶段已经按结构取最大
+     * 完整自然日并缓存，本方法只按结构计算一次；命中后将当前structureSkuMap中同结构全部SKU
+     * 写入structureEndingDaysMap，使原比较器、排序层级和后续排产逻辑保持不变。</p>
+     *
+     * @param context                排程上下文，scheduleDate为本次排程T日
+     * @param structureEndingDaysMap SKU对象对应的结构收尾距离天数快照
+     * @return 结构名称对应的排序优先级元数据
      */
     private Map<String, StructurePriorityMeta> buildStructurePriorityMap(LhScheduleContext context,
                                                                          Map<SkuScheduleDTO, Integer> structureEndingDaysMap) {
@@ -424,45 +441,127 @@ public class DefaultSkuPriorityStrategy implements ISkuPriorityStrategy {
         }
         int structureEndingDays = context.getScheduleConfig() != null
                 ? context.getScheduleConfig().getStructureEndingDays()
-                : LhScheduleConstant.DEFAULT_STRUCTURE_ENDING_DAYS;
+                : context.getParamIntValue(LhScheduleParamConstant.STRUCTURE_ENDING_DAYS,
+                LhScheduleConstant.DEFAULT_STRUCTURE_ENDING_DAYS);
+        LocalDate scheduleDate = this.toLocalDate(context.getScheduleDate());
+        Map<String, LocalDate> structureMaxEndingDateMap =
+                context.getStructurePriorityMaxEndingDateMap();
+        int hitStructureCount = 0;
+        int markedSkuCount = 0;
         for (Map.Entry<String, List<SkuScheduleDTO>> entry : context.getStructureSkuMap().entrySet()) {
             if (StringUtils.isEmpty(entry.getKey()) || CollectionUtils.isEmpty(entry.getValue())) {
                 continue;
             }
-            int totalSkuCount = 0;
-            int endingSkuCount = 0;
-            int latestEndingDays = -1;
-            for (SkuScheduleDTO sku : entry.getValue()) {
-                if (sku == null) {
-                    continue;
-                }
-                totalSkuCount++;
-                if (!endingJudgmentStrategy.isStructureEndingForPriority(context, sku)) {
-                    continue;
-                }
-                endingSkuCount++;
-                int actualEndingDays = endingJudgmentStrategy.calculateEndingDaysForStructurePriority(context, sku);
-                structureEndingDaysMap.put(sku, actualEndingDays);
-                if (actualEndingDays >= 0) {
-                    latestEndingDays = Math.max(latestEndingDays, actualEndingDays);
-                }
+            List<SkuScheduleDTO> structureSkuList = entry.getValue().stream()
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toList());
+            int totalSkuCount = structureSkuList.size();
+            LocalDate maxEndingDate = CollectionUtils.isEmpty(structureMaxEndingDateMap)
+                    ? null : structureMaxEndingDateMap.get(entry.getKey());
+            int distanceDays = this.calculateInclusiveDistanceDays(scheduleDate, maxEndingDate);
+            boolean structureEndingPriority = totalSkuCount > 0
+                    && distanceDays > 0
+                    && distanceDays < structureEndingDays;
+            if (structureEndingPriority) {
+                /*
+                 * 结构命中后统一标记本次仍参与排产的全部SKU，不再逐SKU判断预计收尾、余量或产能。
+                 * 同一SKU在续作/新增主列表与structureSkuMap中可能是不同运行对象，因此三个入口都要
+                 * 写入IdentityHashMap，保证每个实际参与排序的对象都获得相同结构距离天数。
+                 */
+                int markedSkuCountBefore = structureEndingDaysMap.size();
+                this.markStructureEndingSkuList(
+                        context.getContinuousSkuList(), entry.getKey(), distanceDays,
+                        structureEndingDaysMap);
+                this.markStructureEndingSkuList(
+                        context.getNewSpecSkuList(), entry.getKey(), distanceDays,
+                        structureEndingDaysMap);
+                this.markStructureEndingSkuList(
+                        structureSkuList, entry.getKey(), distanceDays, structureEndingDaysMap);
+                hitStructureCount++;
+                markedSkuCount += structureEndingDaysMap.size() - markedSkuCountBefore;
             }
-            boolean allSkusEnding = totalSkuCount > 0 && endingSkuCount == totalSkuCount;
             StructurePriorityMeta meta = new StructurePriorityMeta();
             meta.setTotalSkuCount(totalSkuCount);
-            meta.setEndingSkuCount(endingSkuCount);
-            meta.setAllSkusEnding(allSkusEnding);
-            meta.setLatestEndingDays(latestEndingDays);
-            meta.setAllSkusEndingPriority(allSkusEnding
-                    && latestEndingDays >= 0
-                    && latestEndingDays <= structureEndingDays);
+            meta.setEndingSkuCount(structureEndingPriority ? totalSkuCount : 0);
+            meta.setAllSkusEnding(structureEndingPriority);
+            meta.setLatestEndingDays(distanceDays);
+            meta.setAllSkusEndingPriority(structureEndingPriority);
             structurePriorityMap.put(entry.getKey(), meta);
+            log.debug("结构N天内收尾排序判断, batchNo: {}, structureName: {}, scheduleDate: {}, "
+                            + "maxEndingDate: {}, inclusiveDistanceDays: {}, thresholdDays: {}, "
+                            + "candidateSkuCount: {}, hit: {}",
+                    context.getBatchNo(), entry.getKey(), scheduleDate, maxEndingDate, distanceDays,
+                    structureEndingDays, totalSkuCount, structureEndingPriority);
         }
+        log.info("结构N天内收尾排序标记完成, batchNo: {}, scheduleDate: {}, thresholdDays: {}, "
+                        + "structureCount: {}, hitStructureCount: {}, markedSkuCount: {}",
+                context.getBatchNo(), scheduleDate, structureEndingDays, structurePriorityMap.size(),
+                hitStructureCount, markedSkuCount);
         return structurePriorityMap;
     }
 
     /**
-     * 判断SKU所属结构是否进入"未来结构全收尾"优先级。
+     * 将指定结构下实际参与本轮排序的SKU运行对象写入结构收尾距离缓存。
+     *
+     * <p>同物料可能因续作转新增、产品状态或阶段拆分形成多个DTO对象，不能只按物料编码去重，
+     * 也不能只缓存structureSkuMap中的对象。本方法逐列表按结构名称筛选，并依赖调用方传入的
+     * IdentityHashMap按对象身份保存，确保所有实际排序对象都获得同一结构判断结果。</p>
+     *
+     * @param skuList 当前参与排序的SKU列表
+     * @param structureName 已命中的结构名称
+     * @param distanceDays 结构最大END_DAY与T日之间包含首尾的距离天数
+     * @param structureEndingDaysMap SKU运行对象对应的结构收尾距离缓存
+     */
+    private void markStructureEndingSkuList(
+            List<SkuScheduleDTO> skuList,
+            String structureName,
+            int distanceDays,
+            Map<SkuScheduleDTO, Integer> structureEndingDaysMap) {
+        if (CollectionUtils.isEmpty(skuList)) {
+            return;
+        }
+        skuList.stream()
+                .filter(Objects::nonNull)
+                .filter(sku -> Objects.equals(structureName, sku.getStructureName()))
+                .forEach(sku -> structureEndingDaysMap.put(sku, distanceDays));
+    }
+
+    /**
+     * 计算两个完整自然日之间包含首尾的距离天数。
+     *
+     * <p>使用LocalDate和ChronoUnit计算，能够正确处理跨月、跨年和不同月份天数；结束日早于T日、
+     * 任一日期为空时返回-1，调用方据此判定结构不命中。</p>
+     *
+     * @param scheduleDate 排程上下文T日
+     * @param maxEndingDate 结构转产表中该结构的最大END_DAY完整自然日
+     * @return 包含首尾的距离天数；无法判断或结束日早于T日时返回-1
+     */
+    private int calculateInclusiveDistanceDays(LocalDate scheduleDate, LocalDate maxEndingDate) {
+        if (Objects.isNull(scheduleDate)
+                || Objects.isNull(maxEndingDate)
+                || maxEndingDate.isBefore(scheduleDate)) {
+            return -1;
+        }
+        return Math.toIntExact(ChronoUnit.DAYS.between(scheduleDate, maxEndingDate) + 1L);
+    }
+
+    /**
+     * 将带时间部分的排程T日转换为系统时区自然日，避免时分秒影响结构收尾距离。
+     *
+     * @param date 排程上下文T日
+     * @return T日自然日；日期为空时返回null
+     */
+    private LocalDate toLocalDate(Date date) {
+        if (Objects.isNull(date)) {
+            return null;
+        }
+        return date.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+    }
+
+    /**
+     * 判断SKU所属结构是否进入原“结构全收尾”排序层级。
+     * <p>方法名和排序层级保持兼容，实际标记口径已调整为结构转产表最大END_DAY距T日严格小于
+     * {@code SYS0304002}，不再逐SKU判断预计收尾。</p>
      */
     private boolean isStructureAllEndingPriority(Map<String, StructurePriorityMeta> structurePriorityMap, SkuScheduleDTO sku) {
         if (sku == null || StringUtils.isEmpty(sku.getStructureName())) {
@@ -1196,18 +1295,20 @@ public class DefaultSkuPriorityStrategy implements ISkuPriorityStrategy {
 
     /**
      * 结构收尾排序元数据。
+     * <p>为保持既有比较器和排序日志层级稳定，字段名称继续沿用“全部SKU收尾”语义；其值改为
+     * 按结构转产表最大END_DAY统一判断，结构命中后当前参与排产的同结构SKU全部视为命中。</p>
      */
     @lombok.Data
     private static class StructurePriorityMeta {
         /** 结构内SKU总数 */
         private int totalSkuCount;
-        /** 结构内收尾SKU数量 */
+        /** 结构命中后统一标记的SKU数量；未命中时为0 */
         private int endingSkuCount;
-        /** 结构内是否全部SKU收尾 */
+        /** 当前参与排产的同结构SKU是否已统一命中结构收尾标记 */
         private boolean allSkusEnding;
-        /** 结构是否进入未来全收尾优先级 */
+        /** 结构是否进入原结构收尾排序优先级 */
         private boolean allSkusEndingPriority;
-        /** 结构内最晚收尾天数 */
+        /** 结构最大END_DAY与T日之间包含首尾的距离天数 */
         private int latestEndingDays;
     }
 }

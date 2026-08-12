@@ -146,10 +146,11 @@ public class DataInitHandler extends AbsScheduleStepHandler {
      */
     private void loadBaseData(LhScheduleContext context) {
         baseDataService.loadAllBaseData(context);
-        log.info("基础数据加载完成, 月计划: {}, 结构收尾配置: {}, 机台: {}, SKU产能: {}, "
+        log.info("基础数据加载完成, 月计划: {}, 结构对齐收尾配置: {}, SKU排序收尾配置: {}, "
+                        + "机台: {}, SKU产能: {}, "
                         + "SKU模具关系: {}, MES在机: {}, 前批次结果: {}, 停机计划: {}",
                 context.getMonthPlanList().size(), context.getStructureMaxEndingDateMap().size(),
-                context.getMachineInfoMap().size(),
+                context.getStructurePriorityMaxEndingDateMap().size(), context.getMachineInfoMap().size(),
                 context.getSkuLhCapacityMap().size(), context.getSkuMouldRelMap().size(),
                 context.getMachineOnlineInfoMap().size(), context.getPreviousScheduleResultList().size(),
                 context.getDevicePlanShutList().size());

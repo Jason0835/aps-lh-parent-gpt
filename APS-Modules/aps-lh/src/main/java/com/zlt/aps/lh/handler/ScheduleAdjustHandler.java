@@ -154,9 +154,10 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
 
         /*
          * S4.3.3.2 冻结全部有效结构并按月计划结构类型读取最低机台数。
-         * S4.2已独立加载结构转产表最大收尾日期；这里仍需为全部有效结构冻结SKU快照和最低机台数，
-         * 不能按三天门禁提前裁剪，因为后续待排结构视图会随SKU出队动态缩小。S4.5实际选机时
-         * 先判断结构最大收尾日期是否位于[T,T+2]，通过后才复用这里准备的现有对齐内部规则。
+         * S4.2已分别加载结构收尾对齐固定三天快照和SKU排序动态阈值快照；这里仍需为全部有效
+         * 结构冻结SKU快照和最低机台数，不能按任一日期门禁提前裁剪，因为后续待排结构视图会随
+         * SKU出队动态缩小。S4.5实际选机只读取原固定三天快照，通过后才复用这里准备的现有
+         * 对齐内部规则；SKU排序专用快照不会进入本分支。
          */
         if (Objects.nonNull(structureMinMachineRetentionService)) {
             structureMinMachineRetentionService.initializeStructureMinimumMachineConfigs(context);
