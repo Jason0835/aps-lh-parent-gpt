@@ -288,16 +288,14 @@ public class TcScheduleTemplateImpl extends AbsTcScheduleTemplate {
                 .filter(Objects::nonNull)
                 .collect(Collectors.groupingBy(TcTaskDraft::getShiftOrder, TreeMap::new, Collectors.toList()));
         shiftTaskMap.forEach((shiftOrder, shiftTaskList) -> {
+            // 同一班次按固定分段输出，避免多个任务的计划量与选机台明细交错，影响过程追溯。
             this.appendShiftRollingInventory(context, shiftOrder, shiftTaskList);
-            shiftTaskList.forEach(task -> {
-                context.appendShiftProcessLog(shiftOrder, this.buildPlanFormula(task));
-                this.appendMachineCandidateDetail(context, task);
-                if (task.isUnassigned()) {
+            shiftTaskList.forEach(task -> context.appendShiftProcessLog(shiftOrder, this.buildPlanFormula(task)));
+            shiftTaskList.forEach(task -> this.appendMachineCandidateDetail(context, task));
+            shiftTaskList.stream().filter(TcTaskDraft::isUnassigned).forEach(task ->
                     context.appendShiftProcessLog(shiftOrder, "未排任务：胎侧代码={0}（胎胚号={1}），班次={2}，计划量={3}，未排原因={4}",
                             task.getSidewallCode(), this.displayEmbryoCode(task.getEmbryoCode()), task.getShiftOrder(),
-                            task.getPlanQty(), task.getUnplannedReasonDesc());
-                }
-            });
+                            task.getPlanQty(), task.getUnplannedReasonDesc()));
         });
     }
 
@@ -325,27 +323,23 @@ public class TcScheduleTemplateImpl extends AbsTcScheduleTemplate {
                     .filter(assignedTask -> Objects.equals(sidewallCode, assignedTask.getSidewallCode()))
                     .map(assignedTask -> this.nvl(assignedTask.getPlanQty()))
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
-            context.appendShiftProcessLog(shiftOrder, this.buildRollingInventoryFormula(context, task, assignedQty));
+            context.appendShiftProcessLog(shiftOrder, this.buildRollingInventoryFormula(task, assignedQty));
         });
     }
 
     /**
      * 构建班次库存滚动日志。
      *
-     * @param context     胎侧排程上下文
      * @param task        当前产品班次任务
      * @param assignedQty 当前班次实际已排量
      * @return 中文库存滚动日志
      */
-    private String buildRollingInventoryFormula(TcScheduleContext context, TcTaskDraft task, BigDecimal assignedQty) {
-        BigDecimal shortageQty = context.getProductShiftShortageMap().getOrDefault(
-                task.getSidewallCode() + "|" + task.getShiftOrder(), BigDecimal.ZERO);
+    private String buildRollingInventoryFormula(TcTaskDraft task, BigDecimal assignedQty) {
         return "库存滚动：胎侧代码=" + task.getSidewallCode() + "，班次=" + task.getShiftOrder()
                 + "，班初滚动库存=" + this.nvl(task.getRollingStockQty()).toPlainString()
                 + "，实际排产量=" + this.nvl(assignedQty).toPlainString()
                 + "，当班消耗=" + this.nvl(task.getCurrentShiftDemandQty()).toPlainString()
-                + "，班末可用库存=" + this.nvl(task.getPlanStockQty()).toPlainString()
-                + "，短缺量=" + this.nvl(shortageQty).toPlainString();
+                + "，班末可用库存=" + this.nvl(task.getPlanStockQty()).toPlainString();
     }
 
     /**
@@ -604,18 +598,36 @@ public class TcScheduleTemplateImpl extends AbsTcScheduleTemplate {
      */
     private String buildToolUsageSummary(TcTaskDraft task) {
         if (task.getTotalToolQty() == null) {
-            return "工装账本：总工装数量=未配置（未启用工装约束），本任务净占用工装数量=未计算，剩余工装数量=未计算，有效卷曲长度=未计算";
+            return "工装限制：总工装米数=未计算（未启用工装约束），可用工装米数=未计算，本任务净占用工装米数=未计算，剩余工装米数=未计算，有效卷曲长度=未计算";
         }
         boolean taskCurlLengthEffective = task.getCurlRollLength() != null
                 && task.getCurlRollLength().compareTo(BigDecimal.ZERO) > 0;
         BigDecimal effectiveCurlLength = taskCurlLengthEffective ? task.getCurlRollLength()
                 : task.getDefaultCurlRollLength();
         String curlLengthSource = taskCurlLengthEffective ? "任务卷曲长度" : "默认卷曲长度";
-        return "工装账本：总工装数量=" + this.displayToolQuantity(task.getTotalToolQty())
-                + "，本任务净占用工装数量=" + this.displayToolQuantity(task.getToolUsedQty())
-                + "，剩余工装数量=" + this.displayToolQuantity(task.getRemainingToolQty())
+        if (effectiveCurlLength == null || effectiveCurlLength.compareTo(BigDecimal.ZERO) <= 0) {
+            return "工装限制：总工装米数=未计算，可用工装米数=未计算，本任务净占用工装米数=未计算，剩余工装米数=未计算，有效卷曲长度=未计算";
+        }
+        return "工装限制：总工装米数=" + this.displayToolMeter(task.getTotalToolQty(), effectiveCurlLength)
+                + "，可用工装米数=" + this.displayToolMeter(task.getAvailableToolQty(), effectiveCurlLength)
+                + "，本任务净占用工装米数=" + this.displayToolMeter(task.getToolUsedQty(), effectiveCurlLength)
+                + "，剩余工装米数=" + this.displayToolMeter(task.getRemainingToolQty(), effectiveCurlLength)
                 + "，有效卷曲长度=" + this.displayToolQuantity(effectiveCurlLength)
                 + "（" + curlLengthSource + "）";
+    }
+
+    /**
+     * 将工装数量按有效卷曲长度换算为过程日志使用的米数。
+     *
+     * @param toolQuantity 工装数量
+     * @param curlLength 有效卷曲长度
+     * @return 工装米数；缺失输入时返回未计算
+     */
+    private String displayToolMeter(BigDecimal toolQuantity, BigDecimal curlLength) {
+        if (toolQuantity == null || curlLength == null || curlLength.compareTo(BigDecimal.ZERO) <= 0) {
+            return "未计算";
+        }
+        return toolQuantity.multiply(curlLength).stripTrailingZeros().toPlainString();
     }
 
     /**
