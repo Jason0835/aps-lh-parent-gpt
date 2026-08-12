@@ -1235,6 +1235,8 @@
   "ui.data.column.gsq.scheduleResult.modelName": "钢丝圈排程结果信息",
   "ui.data.column.gsqScheduleResult.factoryCode": "工厂",
   "ui.data.column.gsqScheduleResult.scheduleDate": "排程日期",
+  "ui.data.column.gsqScheduleResult.tqBatchNo": "胎圈批次号",
+  "ui.data.column.gsqScheduleResult.batchNo": "钢丝圈批次号",
   "ui.data.column.gsqScheduleResult.steelRingCode": "钢丝圈代码",
   "ui.data.column.gsqScheduleResult.twiningDiscCode": "缠绕盘代码",
   "ui.data.column.gsqScheduleResult.proSize": "产品尺寸",

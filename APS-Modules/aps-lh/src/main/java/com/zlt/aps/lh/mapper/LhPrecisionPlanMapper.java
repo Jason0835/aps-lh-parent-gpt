@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.zlt.aps.lh.api.domain.entity.LhPrecisionPlan;
 import com.zlt.aps.lh.api.domain.vo.LhPrecisionPlanVo;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Update;
 
 import java.util.List;
 
@@ -85,6 +86,17 @@ public interface LhPrecisionPlanMapper extends BaseMapper<LhPrecisionPlan> {
      * @return 精度计划列表
      */
     List<LhPrecisionPlan> selectByMesSourceIdBatch(@Param("mesSourceIds") List<Long> mesSourceIds);
+
+    /**
+     * 逻辑删除指定分厂所有MES同步来源的硫化精度计划数据
+     * 用于分发同步前清理旧数据（仅清理DATA_SOURCE='0'的MES同步数据，保留系统自动生成的数据）
+     * WHERE必须包含FACTORY_CODE业务主键，否则会被BlockAttackInnerInterceptor拦截
+     *
+     * @param factoryCode 分厂编号
+     * @return 受影响行数
+     */
+    @Update("UPDATE T_LH_PRECISION_PLAN SET IS_DELETE = 1, UPDATE_BY = 'MES', UPDATE_TIME = NOW() WHERE FACTORY_CODE = #{factoryCode} AND PRECISION_TYPE = '硫化精度' AND DATA_SOURCE = '0' AND IS_DELETE = 0")
+    int logicDeleteMesSyncByFactoryCode(@Param("factoryCode") String factoryCode);
 
     /**
      * 根据机台编码列表和年份批量查询计划

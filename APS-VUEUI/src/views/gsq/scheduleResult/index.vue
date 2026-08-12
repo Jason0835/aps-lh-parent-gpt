@@ -343,6 +343,16 @@ export default {
           },
         },
         {
+          label: this.$t("ui.data.column.gsqScheduleResult.tqBatchNo"),
+          prop: "tqBatchNo",
+          width: 140,
+        },
+        {
+          label: this.$t("ui.data.column.gsqScheduleResult.batchNo"),
+          prop: "batchNo",
+          width: 140,
+        },
+        {
           label: this.$t("ui.data.column.gsqScheduleResult.steelRingCode"),
           prop: "steelRingCode",
           width: 140,

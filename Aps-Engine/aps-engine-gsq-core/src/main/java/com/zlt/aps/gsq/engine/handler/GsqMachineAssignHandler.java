@@ -472,13 +472,15 @@ public class GsqMachineAssignHandler extends AbsGsqScheduleStepHandler {
     /**
      * 设置6个班次的生产顺序（对齐胎圈TQ）。
      *
-     * <p>由 {@code GsqQuotaValidateHandler} 在 S5.5 定额校验完成后调用，统一重置生产顺序。</p>
+     * <p>由 {@code GsqResidualCapacityHandler} 在 S5.6 末尾调用，统一重置生产顺序。
+     * S5.6 是最后一个修改计划量的阶段，确保顺序值与最终计划量一致。</p>
      *
      * <p>排序规则：1.相同英寸连续生产 2.同英寸内按库存供应时长升序排序。
      * 顺序值按机台独立编号（同一机台同一班次内的规格顺序1,2,3...），而非全局编号，
      * 避免"机台只有2个规格但顺序值=4"的问题。</p>
      *
-     * <p>写入每个班次的 CLASSX_SEQUENCE 字段（class1Sequence~class6Sequence）。</p>
+     * <p>写入每个班次的 CLASSX_SEQUENCE 字段（class1Sequence~class6Sequence）。
+     * 无计划量的班次顺序值清空（设为null），避免"计划量=0 但顺序值有值"的数据不一致。</p>
      *
      * @param scheduleList 排程记录列表
      */
@@ -492,6 +494,13 @@ public class GsqMachineAssignHandler extends AbsGsqScheduleStepHandler {
             // 每个机台内独立设置顺序值
             for (Map.Entry<String, List<GsqScheduleResultVo>> entry : machineGroupMap.entrySet()) {
                 List<GsqScheduleResultVo> machineSpecs = entry.getValue();
+
+                // 先清除该机台所有规格该班次的顺序值，避免无计划量的班次残留旧顺序值
+                // （S5.6 前拉重排可能把后序班次清零，需同步清除顺序值）
+                for (GsqScheduleResultVo vo : machineSpecs) {
+                    setClassSequence(vo, classIndex, null);
+                }
+
                 // 排序：1.相同英寸连续 2.同英寸内按供应时长升序
                 int finalClassIndex = classIndex;
                 List<GsqScheduleResultVo> sortedList = machineSpecs.stream()
@@ -521,8 +530,12 @@ public class GsqMachineAssignHandler extends AbsGsqScheduleStepHandler {
 
     /**
      * 设置指定班次的生产顺序值（classXSequence）。
+     *
+     * @param vo        排程记录
+     * @param classIndex 班次索引（1~6）
+     * @param sequence  顺序值，null 表示清空（无计划量班次）
      */
-    private void setClassSequence(GsqScheduleResultVo vo, int classIndex, int sequence) {
+    private void setClassSequence(GsqScheduleResultVo vo, int classIndex, Integer sequence) {
         vo.setFieldValueByFieldName("class" + classIndex + "Sequence", sequence);
     }
 }

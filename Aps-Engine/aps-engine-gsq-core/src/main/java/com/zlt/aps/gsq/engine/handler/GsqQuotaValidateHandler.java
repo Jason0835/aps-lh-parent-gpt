@@ -20,11 +20,10 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * S5.5: 钢丝圈定额校验与顺序重置Handler。
+ * S5.5: 钢丝圈定额校验Handler。
  *
  * <p>职责（对齐胎圈TQ）：在S4(停产协调)和S5(班次均衡)修改计划量之后，对所有机台所有班次进行定额校验，
- * 确保单机台单班次排产量不超过机台定额（quota），超出部分按优先级延后到下一班次；
- * 最后统一重置6个班次的生产顺序值。</p>
+ * 确保单机台单班次排产量不超过机台定额（quota），超出部分按优先级延后到下一班次。</p>
  *
  * <p>背景：S3阶段分配机台时按定额控制排产，但S4/S5修改计划量时不检查定额，
  * 可能导致单机台单班次总排产量超过quota。本Handler在所有计划量修改完成后统一校验修正。</p>
@@ -35,8 +34,10 @@ import java.util.stream.Collectors;
  *   <li>逐机台逐班次（1→6）校验：Σ(同机台同班次计划量) ≤ quota</li>
  *   <li>若超量：按供应时长降序排序规格（供应时长大的先延后），将超出部分延后到下一班</li>
  *   <li>第6班超量无法延后，仅记录日志</li>
- *   <li>调用{@code GsqMachineAssignHandler.setProduceOrder()}重置所有班次生产顺序</li>
  * </ol>
+ *
+ * <p>生产顺序重置移至 S5.6 末尾执行：S5.6 会对备库窗口内班次做前拉重排（可能把后序班次清零），
+ * 若在 S5.5 重置顺序值，S5.6 修改计划量后会出现"计划量=0 但顺序值有值"的数据不一致。</p>
  *
  * <p>无备库版：钢丝圈当前无备库字段与概念，故不包含胎圈"S5.5跳过备库触发班次延后"的逻辑。</p>
  *
@@ -49,12 +50,9 @@ public class GsqQuotaValidateHandler extends AbsGsqScheduleStepHandler {
     @Resource
     private AutoScheduleLogService autoScheduleLogService;
 
-    @Resource
-    private GsqMachineAssignHandler machineAssignHandler;
-
     @Override
     protected String getStepName() {
-        return "S5.5-定额校验与顺序重置";
+        return "S5.5-定额校验";
     }
 
     @Override
@@ -95,9 +93,8 @@ public class GsqQuotaValidateHandler extends AbsGsqScheduleStepHandler {
 
         log.info("[S5.5] 定额校验完成, 机台数:{}, 累计超量延后次数:{}", machineSpecMap.size(), totalOverflowCount);
 
-        // 5. 所有计划量修改完成后，统一重置6个班次的生产顺序
-        machineAssignHandler.setProduceOrder(scheduleList);
-        log.info("[S5.5] 生产顺序重置完成");
+        // 生产顺序重置移至 S5.6 末尾执行：S5.6 会对备库窗口内班次做前拉重排（可能把后序班次清零），
+        // 若在 S5.5 重置顺序值，S5.6 修改计划量后会出现"计划量=0 但顺序值有值"的数据不一致。
 
         // 埋点生产顺序重置证据（每条已分配机台的排程记录都受影响）
         for (GsqScheduleResultVo scheduleVo : scheduleList) {

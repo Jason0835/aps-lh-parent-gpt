@@ -714,6 +714,16 @@
         WHERE 1 = 1
     </select>
 
+    <!-- 查询钢丝圈库存同步数据（MES字段MATERIAL_CODE映射为STEEL_RING_CODE） -->
+    <select id="selectMesGsqStockList" resultType="com.zlt.aps.gsq.api.domain.entity.GsqStock">
+        SELECT
+        STOCK_DATE,
+        MATERIAL_CODE AS STEEL_RING_CODE,
+        AVAILABLE_STOCK AS STOCK_NUM
+        FROM MES_GSQ_STOCK
+        WHERE 1 = 1
+    </select>
+
     <!-- 查询胎圈自动滚动指定物理日的最新库存，对齐胎面 selectTreadShiftStockList -->
     <select id="selectBeadShiftStockList" resultType="com.zlt.aps.tq.api.domain.entity.TqMesStock">
         SELECT source_data.STOCK_DATE,

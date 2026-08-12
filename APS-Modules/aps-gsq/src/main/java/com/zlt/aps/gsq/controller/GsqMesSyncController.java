@@ -3,8 +3,10 @@ package com.zlt.aps.gsq.controller;
 import cn.hutool.core.date.DateUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.gsq.api.domain.entity.GsqDayFinishQty;
+import com.zlt.aps.gsq.api.domain.entity.GsqStock;
 import com.zlt.aps.gsq.api.service.IGsqMesSyncRemoteService;
 import com.zlt.aps.gsq.service.IGsqDayFinishQtyService;
+import com.zlt.aps.gsq.service.IGsqStockService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
@@ -32,6 +34,9 @@ public class GsqMesSyncController implements IGsqMesSyncRemoteService {
     @Autowired
     private IGsqDayFinishQtyService gsqDayFinishQtyService;
 
+    @Autowired
+    private IGsqStockService gsqStockService;
+
     /**
      * 逻辑删除并批量保存钢丝圈排程日完成量（事务性操作）
      * 步骤1：逻辑删除指定分厂+排程日期的旧数据（IS_DELETE置为1）
@@ -52,6 +57,27 @@ public class GsqMesSyncController implements IGsqMesSyncRemoteService {
                                                       @RequestBody List<GsqDayFinishQty> list) {
         Date date = DateUtil.parse(scheduleDate);
         gsqDayFinishQtyService.logicDeleteAndSaveBatch(factoryCode, date, updateBy, list);
+        return AjaxResult.success();
+    }
+
+    /**
+     * 逻辑删除并批量保存钢丝圈库存（事务性操作）
+     * 步骤1：逻辑删除指定库存日期的旧数据（IS_DELETE置为1）
+     * 步骤2：批量插入MES最新钢丝圈库存数据（新记录，IS_DELETE=0）
+     *
+     * @param stockDate 库存日期，格式：yyyy-MM-dd
+     * @param updateBy  更新者
+     * @param list      待插入的钢丝圈库存列表
+     * @return 结果
+     */
+    @Override
+    @ApiOperation("逻辑删除并批量保存钢丝圈库存（事务性操作）")
+    @PostMapping("/gsqMesSync/logicDeleteAndSaveGsqStockByStockDate")
+    public AjaxResult logicDeleteAndSaveGsqStockByStockDate(@RequestParam("stockDate") String stockDate,
+                                                             @RequestParam("updateBy") String updateBy,
+                                                             @RequestBody List<GsqStock> list) {
+        Date date = DateUtil.parse(stockDate);
+        gsqStockService.logicDeleteAndSaveBatch(date, updateBy, list);
         return AjaxResult.success();
     }
 }

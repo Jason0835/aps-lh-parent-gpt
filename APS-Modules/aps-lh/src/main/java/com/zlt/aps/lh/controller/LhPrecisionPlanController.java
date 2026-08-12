@@ -442,4 +442,24 @@ public class LhPrecisionPlanController extends AbstractDocBizController<LhPrecis
             return AjaxResult.error("查询失败：" + e.getMessage());
         }
     }
+
+    /**
+     * 按设备保养计划(MES同步数据)分发写入硫化精度计划表
+     * 现逻辑：MES全权决定计划时间和实际完成时间，APS侧不再回填实际日期、不再生成下一次精度计划。
+     * 根据MES字段值直接计算派生字段并upsert到T_LH_PRECISION_PLAN。
+     *
+     * @param maintenancePlanIds 设备保养计划ID列表（仅处理PRECISION_TYPE='硫化精度'的数据）
+     * @return 分发写入的记录数
+     */
+    @ApiOperation("按设备保养计划分发写入硫化精度计划表")
+    @PostMapping("/dispatchFromMaintenance")
+    public AjaxResult dispatchFromMaintenancePlan(@RequestBody List<Long> maintenancePlanIds) {
+        try {
+            int count = lhPrecisionPlanService.dispatchFromMaintenancePlan(maintenancePlanIds);
+            return AjaxResult.success("分发硫化精度计划完成", count);
+        } catch (Exception e) {
+            log.error("分发硫化精度计划失败", e);
+            return AjaxResult.error("分发失败：" + e.getMessage());
+        }
+    }
 }

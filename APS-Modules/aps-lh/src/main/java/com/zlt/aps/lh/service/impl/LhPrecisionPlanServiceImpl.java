@@ -42,6 +42,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.Date;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -1928,5 +1929,126 @@ public class LhPrecisionPlanServiceImpl extends AbstractDocService<LhPrecisionPl
         }
 
         return result;
+    }
+
+    /**
+     * 按设备保养计划(MES同步数据)分发写入硫化精度计划表
+     * 现逻辑：MES全权决定计划时间(OPER_TIME)和实际完成时间(FIRST_WASH_TIME)，
+     * APS侧不再回填实际日期、不再生成下一次精度计划。
+     * 本方法根据MES字段值直接计算派生字段并upsert到T_LH_PRECISION_PLAN。
+     *
+     * 派生字段计算规则：
+     * - PLAN_DATE = MES.OPER_TIME
+     * - ACTUAL_DATE = MES.FIRST_WASH_TIME（可空）
+     * - COMPLETION_STATUS = FIRST_WASH_TIME非空 ? '1'(已完成) : '0'(未完成)
+     * - LAST_MAINTENANCE_DATE = FIRST_WASH_TIME（可空）
+     * - DUE_DATE = FIRST_WASH_TIME非空 ? (FIRST_WASH_TIME + 间隔年数) : null
+     * - YEAR = OPER_TIME 年份
+     * - DAYS_TO_DUE = today - PLAN_DATE（≥0）
+     * - WARNING_STATUS/IS_WARNING_SENT = '0'（由独立checkWarning任务扫描更新）
+     * - DATA_SOURCE = '0'(MES同步)
+     * - MES_SOURCE_ID = MES.id（upsert匹配键）
+     *
+     * @param maintenancePlanIds 设备保养计划ID列表（仅处理PRECISION_TYPE='硫化精度'的数据）
+     * @return 分发写入的记录数
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public int dispatchFromMaintenancePlan(List<Long> maintenancePlanIds) {
+        if (CollectionUtils.isEmpty(maintenancePlanIds)) {
+            log.info("分发硫化精度计划：ID列表为空，跳过");
+            return 0;
+        }
+        log.info("开始分发硫化精度计划，ID数量={}", maintenancePlanIds.size());
+
+        // 查询T_MDM_DEV_MAINTENANCE_PLAN中指定ID且精度类型为"硫化精度"的数据
+        LambdaQueryWrapper<MdmDevMaintenancePlan> wrapper = new LambdaQueryWrapper<>();
+        wrapper.in(MdmDevMaintenancePlan::getId, maintenancePlanIds)
+                .eq(MdmDevMaintenancePlan::getPrecisionType, PRECISION_TYPE_LH)
+                .eq(MdmDevMaintenancePlan::getIsDelete, 0);
+        List<MdmDevMaintenancePlan> mesPlans = mdmDevMaintenancePlanEntityMapper.selectList(wrapper);
+        if (CollectionUtils.isEmpty(mesPlans)) {
+            log.info("未查询到精度类型为'硫化精度'的设备保养计划数据，跳过分发");
+            return 0;
+        }
+        log.info("查询到硫化精度设备保养计划数据{}条", mesPlans.size());
+
+        // 步骤1：按分厂逻辑删除APS本地表所有MES同步来源的旧硫化精度计划（先删后插模式）
+        // 仅清理DATA_SOURCE='0'的MES同步数据，保留系统自动生成的数据
+        // 取第一条的factoryCode（MES同步时已按factoryCode过滤，所有记录factoryCode一致）
+        String factoryCode = mesPlans.get(0).getFactoryCode();
+        int deletedCount = lhPrecisionPlanMapper.logicDeleteMesSyncByFactoryCode(factoryCode);
+        log.info("逻辑删除APS本地表旧MES同步硫化精度计划完成，分厂={}，删除{}条", factoryCode, deletedCount);
+
+        // 步骤2：将MES新版本数据全量插入
+        int intervalYears = getIntervalYears();
+        LocalDate today = LocalDate.now();
+        List<LhPrecisionPlan> toInsert = new ArrayList<>();
+
+        for (MdmDevMaintenancePlan mesPlan : mesPlans) {
+            // 计划时间必填，无计划时间跳过
+            LocalDate planDateLocal = parseDate(mesPlan.getOperTime());
+            if (planDateLocal == null) {
+                log.warn("机台{}的计划时间为空，跳过分发", mesPlan.getDevCode());
+                continue;
+            }
+
+            LhPrecisionPlan plan = new LhPrecisionPlan();
+            plan.setMesSourceId(mesPlan.getId());
+            plan.setDataSource(DATA_SOURCE_MES);
+
+            // 基础字段
+            plan.setMachineCode(mesPlan.getDevCode());
+            plan.setPrecisionType(PRECISION_TYPE_LH);
+            plan.setCompanyCode(mesPlan.getCompanyCode());
+            plan.setFactoryCode(mesPlan.getFactoryCode());
+            plan.setIsDelete(0);
+
+            // 计划日期=OPER_TIME
+            Date planDate = Date.from(planDateLocal.atStartOfDay(ZoneId.systemDefault()).toInstant());
+            plan.setPlanDate(planDate);
+            plan.setYear(new BigDecimal(planDateLocal.getYear()));
+
+            // 实际完成日期=FIRST_WASH_TIME（可空）
+            LocalDate actualDateLocal = parseDate(mesPlan.getFirstWashTime());
+            if (actualDateLocal != null) {
+                Date actualDate = Date.from(actualDateLocal.atStartOfDay(ZoneId.systemDefault()).toInstant());
+                plan.setActualDate(actualDate);
+                plan.setLastMaintenanceDate(actualDate);
+                plan.setCompletionStatus(COMPLETION_STATUS_COMPLETED);
+                // DUE_DATE = 实际完成时间 + 间隔年数
+                LocalDate dueDateLocal = actualDateLocal.plusYears(intervalYears);
+                plan.setDueDate(Date.from(dueDateLocal.atStartOfDay(ZoneId.systemDefault()).toInstant()));
+            } else {
+                plan.setActualDate(null);
+                plan.setLastMaintenanceDate(null);
+                plan.setCompletionStatus(COMPLETION_STATUS_PENDING);
+                plan.setDueDate(null);
+            }
+
+            // 剩余天数 = PLAN_DATE - today（≥0）
+            int daysToDue = (int) ChronoUnit.DAYS.between(today, planDateLocal);
+            if (daysToDue < 0) {
+                daysToDue = 0;
+            }
+            plan.setDaysToDue(daysToDue);
+
+            // 预警相关字段：由独立checkWarning任务扫描更新，分发时重置为未预警
+            plan.setWarningStatus(WARNING_STATUS_NO);
+            plan.setIsWarningSent(WARNING_SENT_NO);
+            plan.setWarningDate(null);
+
+            toInsert.add(plan);
+        }
+
+        if (CollectionUtils.isEmpty(toInsert)) {
+            log.info("硫化精度计划分发：无有效数据可写入");
+            return 0;
+        }
+
+        // 批量插入
+        baseDao.insertBatch(toInsert);
+        log.info("硫化精度计划分发完成，共插入{}条", toInsert.size());
+        return toInsert.size();
     }
 }

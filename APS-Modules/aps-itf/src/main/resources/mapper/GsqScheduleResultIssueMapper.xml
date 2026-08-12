@@ -7,7 +7,7 @@
     <!-- 批量新增钢丝圈排程结果到MES中间表 -->
     <insert id="batchInsertGsqScheduleResult" parameterType="list">
         INSERT INTO MES_GSQ_SCHEDULE_RESULT (
-            SCHEDULE_DATE, CX_BATCH_NO, BATCH_NO, ORDER_NO,
+            SCHEDULE_DATE, TQ_BATCH_NO, BATCH_NO, ORDER_NO,
             STEEL_RING_CODE, MATERIAL_CODE, STEEL_TYPE, EMBRYO_SPEC_DESC,
             UNIT_CONSUME, TWINING_DISC_CODE, PRO_SIZE, MACHINE_CODE,
             STOCK_QTY,
@@ -23,7 +23,7 @@
         <foreach collection="list" item="item" separator=" UNION ALL ">
             SELECT
             #{item.scheduleDate} AS SCHEDULE_DATE,
-            #{item.cxBatchNo} AS CX_BATCH_NO,
+            #{item.tqBatchNo} AS TQ_BATCH_NO,
             #{item.batchNo} AS BATCH_NO,
             #{item.orderNo} AS ORDER_NO,
             #{item.steelRingCode} AS STEEL_RING_CODE,
