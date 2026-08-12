@@ -107,6 +107,7 @@ public class Cd15CurlLengthController extends AbstractDocBizController<Cd15CurlL
     protected List<Cd15CurlLength> listExportData(Cd15CurlLength obj) {
         QueryWrapper<Cd15CurlLength> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
+        wrapper.last("ORDER BY " + this.getOrderBy());
         List<Cd15CurlLength> list = cd15CurlLengthMapper.selectList(wrapper);
         AppUtils.formatData(list, getQueryFormulas());
         return list;

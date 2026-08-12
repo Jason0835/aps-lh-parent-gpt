@@ -52,6 +52,9 @@ public class Cd15MachineRollMappingServiceImpl extends AbstractDocService<Cd15Ma
     @Override
     public AjaxResult saveWithConfirm(Cd15MachineRollMapping entity) {
         this.normalize(entity);
+        if (UserConstants.NOT_UNIQUE.equals(this.checkUnique(entity))) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.cd15MachineRollMapping.checkUnique"));
+        }
         Cd15MachineInfo machineInfo = this.getEnabledMachineInfo(entity);
         if (machineInfo == null) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.cd15MachineRollMapping.machineInvalid"));
@@ -68,6 +71,9 @@ public class Cd15MachineRollMappingServiceImpl extends AbstractDocService<Cd15Ma
     @Override
     public int save(Cd15MachineRollMapping entity) {
         this.normalize(entity);
+        if (UserConstants.NOT_UNIQUE.equals(this.checkUnique(entity))) {
+            throw new RuntimeException(I18nUtil.getMessage("ui.data.column.cd15MachineRollMapping.checkUnique"));
+        }
         if (this.getEnabledMachineInfo(entity) == null) {
             throw new RuntimeException(I18nUtil.getMessage("ui.data.column.cd15MachineRollMapping.machineInvalid"));
         }

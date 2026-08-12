@@ -35,10 +35,7 @@
           :disabled="selection.length === 0"
           @click="handleBatchDelete"
         >{{ $t("ui.frame.btn.delete") }}</el-button>
-        <el-button
-          v-hasPermi="['cd15:specifyMachine:removeAll']"
-          @click="handleRemoveAll"
-        >{{ $t("ui.frame.btn.delete") }}</el-button>
+
         <el-button
           v-hasPermi="['cd15:specifyMachine:import']"
           @click="$refs.tltUpload.handleImport()"

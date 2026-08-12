@@ -39,29 +39,28 @@ public class Cd15MachineMaintenancePlan extends BaseEntity implements Serializab
 
     /** 停机日期，按停机开始时间所属日期生成 */
     @ApiModelProperty("停机日期")
-    @ImportExcelValidated(required = true, maxLength = 10)
     @TableField("DOWNTIME_DATE")
-    @Excel(name = "ui.data.column.cd15MachineMaintenancePlan.downtimeDate")
     private Date downtimeDate;
 
     /** 停机开始时间 */
     @ApiModelProperty("停机开始时间")
     @ImportExcelValidated(required = true, maxLength = 20)
     @TableField("DOWNTIME_START_TIME")
-    @Excel(name = "ui.data.column.cd15MachineMaintenancePlan.downtimeStartTime")
+    @Excel(name = "ui.data.column.cd15MachineMaintenancePlan.downtimeStartTime", width = 30,
+            dateFormat = "yyyy-MM-dd HH:mm:ss")
     private Date downtimeStartTime;
 
-    /** 停机结束日期，前端跨日辅助字段，不落库 */
+    /** 停机结束日期，兼容既有调用方的辅助字段，不落库、不参与导入导出 */
     @ApiModelProperty("停机结束日期")
     @TableField(exist = false)
-    @Excel(name = "ui.data.column.cd15MachineMaintenancePlan.downtimeEndDate")
     private Date downtimeEndDate;
 
     /** 停机结束时间 */
     @ApiModelProperty("停机结束时间")
     @ImportExcelValidated(required = true, maxLength = 20)
     @TableField("DOWNTIME_END_TIME")
-    @Excel(name = "ui.data.column.cd15MachineMaintenancePlan.downtimeEndTime")
+    @Excel(name = "ui.data.column.cd15MachineMaintenancePlan.downtimeEndTime", width = 30,
+            dateFormat = "yyyy-MM-dd HH:mm:ss")
     private Date downtimeEndTime;
 
     /** 停机时长(小时) */

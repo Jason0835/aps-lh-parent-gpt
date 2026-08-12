@@ -75,4 +75,10 @@ public class Cd15StorageLaneLimit extends BaseEntity implements Serializable {
     @TableField("MES_SYNC_TIME")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private Date mesSyncTime;
+
+    /** 备注 */
+    @ApiModelProperty(value = "备注", name = "remark")
+    @TableField("REMARK")
+    @Excel(name = "ui.common.column.remark")
+    private String remark;
 }

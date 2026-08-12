@@ -137,6 +137,7 @@ public class Cd15MachineInfoController extends AbstractDocBizController<Cd15Mach
     protected List<Cd15MachineInfo> listExportData(Cd15MachineInfo obj) {
         QueryWrapper<Cd15MachineInfo> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
+        wrapper.last("ORDER BY " + getOrderBy());
         List<Cd15MachineInfo> list = cd15MachineInfoMapper.selectList(wrapper);
         AppUtils.formatData(list, getQueryFormulas());
         return list;

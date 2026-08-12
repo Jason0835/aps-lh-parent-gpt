@@ -131,6 +131,7 @@ public class Cd15StorageLaneLimitController extends AbstractDocBizController<Cd1
     protected List<Cd15StorageLaneLimit> listExportData(Cd15StorageLaneLimit obj) {
         QueryWrapper<Cd15StorageLaneLimit> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
+        wrapper.last("ORDER BY " + this.getOrderBy());
         List<Cd15StorageLaneLimit> list = cd15StorageLaneLimitMapper.selectList(wrapper);
         AppUtils.formatData(list, getQueryFormulas());
         return list;

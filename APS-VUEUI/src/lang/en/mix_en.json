@@ -53,6 +53,7 @@
   "ui.frame.btn.add": "Add",
   "ui.frame.btn.modify": "Modify",
   "ui.frame.btn.delete": "Delete",
+  "ui.frame.btn.all.delete": "Delete All",
   "ui.frame.btn.import": "Import",
   "ui.frame.btn.export": "Export",
   "ui.frame.btn.update": "Update",
