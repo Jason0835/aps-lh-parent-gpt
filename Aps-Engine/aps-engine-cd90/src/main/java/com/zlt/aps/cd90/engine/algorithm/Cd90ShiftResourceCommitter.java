@@ -91,9 +91,7 @@ public class Cd90ShiftResourceCommitter {
             int beforeSeconds = working.getRemainingSecondsByMachine().getOrDefault(
                     trial.getMachineCode(), fullShiftSeconds(request));
             BigDecimal committedQuantity = committedQuantity(trial, standardCurlLength, allocatedVehicles);
-            int afterSeconds = adjustedRemainingSeconds(request, trial, beforeSeconds, committedQuantity);
             int elapsedBefore = Math.max(0, fullShiftSeconds(request) - beforeSeconds);
-            int productionDurationSeconds = Math.max(0, beforeSeconds - afterSeconds - trial.getAgingDelaySeconds());
             LocalDateTime originalStart = request.getShiftStart().plusSeconds(elapsedBefore);
             Cd90BigRollAgingAllocation agingAllocation = commitAgingAllocation(
                     working, request.getBigRollCode(), committedQuantity, originalStart);
@@ -101,6 +99,11 @@ public class Cd90ShiftResourceCommitter {
                 lastFailureReason = Cd90BigRollAgingAllocator.AGING_PERIOD_LIMIT;
                 continue;
             }
+            int committedAgingDelaySeconds = agingAllocation == null ? 0 : agingAllocation.getDelaySeconds();
+            int afterSeconds = this.adjustedRemainingSeconds(
+                    request, trial, beforeSeconds, committedQuantity, committedAgingDelaySeconds);
+            int productionDurationSeconds = Math.max(
+                    0, beforeSeconds - afterSeconds - committedAgingDelaySeconds);
             LocalDateTime expectedStart = agingAllocation == null ? originalStart : agingAllocation.getTaskStartTime();
             int produceOrder = (int) working.getTasks().stream()
                     .filter(item -> trial.getMachineCode().equals(item.getMachineCode())).count() + 1;
@@ -159,15 +162,17 @@ public class Cd90ShiftResourceCommitter {
     }
 
     private int adjustedRemainingSeconds(Cd90ShiftCommitRequest request, Cd90MachineTrial trial,
-                                         int beforeSeconds, BigDecimal committedQuantity) {
+                                         int beforeSeconds, BigDecimal committedQuantity,
+                                         int committedAgingDelaySeconds) {
         BigDecimal trialQuantity = trial.getFinalSchedulableQuantity();
-        if (trialQuantity == null || committedQuantity.compareTo(trialQuantity) >= 0
+        if (trialQuantity == null || (committedQuantity.compareTo(trialQuantity) >= 0
+                && committedAgingDelaySeconds == trial.getAgingDelaySeconds())
                 || trial.getProductionSeconds() <= 0) {
             return trial.getRemainingSeconds();
         }
         int productionSeconds = committedQuantity.multiply(BigDecimal.valueOf(trial.getProductionSeconds()))
                 .divide(trialQuantity, 0, RoundingMode.CEILING).intValueExact();
-        return Math.max(0, beforeSeconds - trial.getAgingDelaySeconds()
+        return Math.max(0, beforeSeconds - committedAgingDelaySeconds
                 - trial.getChangeSeconds() - productionSeconds);
     }
 

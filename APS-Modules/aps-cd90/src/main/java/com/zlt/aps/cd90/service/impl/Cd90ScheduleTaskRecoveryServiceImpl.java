@@ -2,6 +2,7 @@ package com.zlt.aps.cd90.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ShiftConfig;
+import com.zlt.aps.cd90.engine.constant.Cd90ScheduleTaskStatus;
 import com.zlt.aps.cd90.engine.domain.Cd90ScheduleTask;
 import com.zlt.aps.cd90.engine.model.Cd90AutoScheduleParameters;
 import com.zlt.aps.cd90.engine.service.Cd90AutoScheduleLockService;
@@ -24,7 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/** 遗留RUNNING任务补偿实现，不配置内部定时器。 */
+/** 遗留PENDING和RUNNING任务补偿实现，不配置内部定时器。 */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -43,39 +44,50 @@ public class Cd90ScheduleTaskRecoveryServiceImpl implements Cd90ScheduleTaskReco
         if (timeoutMinutes != null && timeoutMinutes <= 0) {
             throw new IllegalArgumentException("自动排程补偿超时分钟数必须大于0");
         }
-        List<Cd90ScheduleTask> tasks = taskService.findRunningTasks(SCAN_LIMIT);
+        List<Cd90ScheduleTask> tasks = taskService.findRecoverableTasks(SCAN_LIMIT);
         Map<String, Integer> timeoutByFactory = new HashMap<>();
         int failed = 0;
         int skipped = 0;
         Instant now = Instant.now();
-        log.info("[直裁自动排程] 遗留任务补偿扫描开始, runningCount={}, overrideTimeoutMinutes={}",
+        log.info("[直裁自动排程] 遗留任务补偿扫描开始, activeCount={}, overrideTimeoutMinutes={}",
                 tasks.size(), timeoutMinutes);
         for (Cd90ScheduleTask task : tasks) {
             int taskTimeout = timeoutMinutes == null
                     ? timeoutByFactory.computeIfAbsent(task.getFactoryCode(), this::loadTimeoutMinutes)
                     : timeoutMinutes;
-            Date heartbeat = task.getLastHeartbeatTime() == null
+            boolean pending = Cd90ScheduleTaskStatus.PENDING.equals(task.getTaskStatus());
+            Date activityTime = pending ? task.getCreateTime()
+                    : task.getLastHeartbeatTime() == null
                     ? task.getStartTime() : task.getLastHeartbeatTime();
-            if (heartbeat == null || heartbeat.toInstant().plus(taskTimeout, ChronoUnit.MINUTES).isAfter(now)) {
+            if (activityTime != null
+                    && activityTime.toInstant().plus(taskTimeout, ChronoUnit.MINUTES).isAfter(now)) {
                 skipped++;
                 continue;
             }
-            LocalDate scheduleDate = toLocalDate(task.getScheduleDate());
+            LocalDate scheduleDate = this.toLocalDate(task.getScheduleDate());
             RLock lock = lockService.getLock(task.getFactoryCode(), scheduleDate);
-            if (lock.isLocked()) {
+            if (!lock.tryLock()) {
                 skipped++;
                 log.info("[直裁自动排程] 遗留任务锁仍存在，跳过补偿, taskId={}, factoryCode={}, scheduleDate={}",
                         task.getTaskId(), task.getFactoryCode(), scheduleDate);
                 continue;
             }
-            boolean updated = taskService.markTimeoutFailed(task.getTaskId(),
-                    "自动排程任务心跳超过" + taskTimeout + "分钟且执行锁不存在");
-            if (updated) {
-                failed++;
-                log.warn("[直裁自动排程] 遗留任务已补偿为失败, taskId={}, timeoutMinutes={}",
-                        task.getTaskId(), taskTimeout);
-            } else {
-                skipped++;
+            try {
+                String timeoutReason = pending
+                        ? "自动排程任务等待执行超过" + taskTimeout + "分钟且执行锁不存在"
+                        : "自动排程任务心跳超过" + taskTimeout + "分钟且执行锁不存在";
+                boolean updated = taskService.markTimeoutFailed(task.getTaskId(), timeoutReason);
+                if (updated) {
+                    failed++;
+                    log.warn("[直裁自动排程] 遗留任务已补偿为失败, taskId={}, taskStatus={}, timeoutMinutes={}",
+                            task.getTaskId(), task.getTaskStatus(), taskTimeout);
+                } else {
+                    skipped++;
+                }
+            } finally {
+                if (lock.isHeldByCurrentThread()) {
+                    lock.unlock();
+                }
             }
         }
         log.info("[直裁自动排程] 遗留任务补偿扫描完成, scannedCount={}, failedCount={}, skippedCount={}",

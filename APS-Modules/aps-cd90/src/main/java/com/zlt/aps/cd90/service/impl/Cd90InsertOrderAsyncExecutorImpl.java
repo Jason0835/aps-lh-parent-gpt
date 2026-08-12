@@ -44,7 +44,7 @@ public class Cd90InsertOrderAsyncExecutorImpl implements Cd90InsertOrderAsyncExe
             if (!lock.tryLock()) {
                 log.info("[直裁插单] 执行锁已由其他任务持有, taskId={}, factoryCode={}, scheduleDate={}",
                         taskId, request.getFactoryCode(), scheduleDate);
-                taskService.markFailed(taskId,
+                taskService.markPendingFailed(taskId,
                         I18nUtil.getMessage("ui.cd90.insert.activeTask"));
                 return;
             }
@@ -78,7 +78,7 @@ public class Cd90InsertOrderAsyncExecutorImpl implements Cd90InsertOrderAsyncExe
             if (!lock.tryLock()) {
                 log.info("[直裁转机台] 执行锁已由其他任务持有, taskId={}, factoryCode={}, scheduleDate={}",
                         taskId, request.getFactoryCode(), scheduleDate);
-                taskService.markFailed(taskId,
+                taskService.markPendingFailed(taskId,
                         I18nUtil.getMessage("ui.cd90.insert.activeTask"));
                 return;
             }
@@ -110,7 +110,7 @@ public class Cd90InsertOrderAsyncExecutorImpl implements Cd90InsertOrderAsyncExe
             if (!lock.tryLock()) {
                 log.info("[直裁调量] 执行锁已由其他任务持有, taskId={}, factoryCode={}, scheduleDate={}",
                         taskId, request.getFactoryCode(), scheduleDate);
-                taskService.markFailed(taskId,
+                taskService.markPendingFailed(taskId,
                         I18nUtil.getMessage("ui.cd90.insert.activeTask"));
                 return;
             }

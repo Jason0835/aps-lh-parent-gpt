@@ -1,18 +1,23 @@
 package com.zlt.aps.cd90.engine.service.impl;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.cd90.api.domain.entity.Cd90CurlLength;
 import com.zlt.aps.cd90.api.domain.entity.Cd90MachineInfo;
 import com.zlt.aps.cd90.api.domain.entity.Cd90Params;
+import com.zlt.aps.cd90.api.domain.entity.Cd90ShiftConfig;
 import com.zlt.aps.cd90.api.domain.entity.Cd90StorageLaneLimit;
+import com.zlt.aps.cd90.engine.algorithm.Cd90ShiftWindowResolver;
 import com.zlt.aps.cd90.engine.constant.Cd90AutoScheduleParamCode;
 import com.zlt.aps.cd90.engine.mapper.Cd90AutoScheduleParamsMapper;
+import com.zlt.aps.cd90.engine.mapper.Cd90AutoScheduleShiftMapper;
 import com.zlt.aps.cd90.engine.mapper.Cd90EngineConstructionMapper;
 import com.zlt.aps.cd90.engine.mapper.Cd90EngineCurlLengthMapper;
 import com.zlt.aps.cd90.engine.mapper.Cd90EngineCxScheduleMapper;
 import com.zlt.aps.cd90.engine.mapper.Cd90EngineMachineInfoMapper;
 import com.zlt.aps.cd90.engine.mapper.Cd90EngineStorageLaneMapper;
 import com.zlt.aps.cd90.engine.model.Cd90BatchDataCheckResult;
+import com.zlt.aps.cd90.engine.model.Cd90ShiftDescriptor;
 import com.zlt.aps.cd90.engine.service.Cd90AutoScheduleBatchDataValidator;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.cx.api.domain.entity.CxScheduleResult;
@@ -24,7 +29,9 @@ import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.sql.Date;
+import java.text.MessageFormat;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -49,6 +56,7 @@ import java.util.stream.Collectors;
 public class Cd90AutoScheduleBatchDataValidatorImpl implements Cd90AutoScheduleBatchDataValidator {
 
     private static final int CONSTRUCTION_LAYERS = 3;
+    private static final int ACTIVE = 1;
     private static final String[] CLASS_RECIPE_FIELDS = {
             "CLASS1_RECIPE_NO", "CLASS2_RECIPE_NO", "CLASS3_RECIPE_NO", "CLASS4_RECIPE_NO",
             "CLASS5_RECIPE_NO", "CLASS6_RECIPE_NO", "CLASS7_RECIPE_NO", "CLASS8_RECIPE_NO"
@@ -60,6 +68,8 @@ public class Cd90AutoScheduleBatchDataValidatorImpl implements Cd90AutoScheduleB
     private final Cd90EngineMachineInfoMapper machineInfoMapper;
     private final Cd90EngineStorageLaneMapper storageLaneMapper;
     private final Cd90AutoScheduleParamsMapper paramsMapper;
+    private final Cd90AutoScheduleShiftMapper shiftConfigMapper;
+    private final Cd90ShiftWindowResolver shiftWindowResolver;
 
     @Override
     public Cd90BatchDataCheckResult check(String factoryCode, LocalDate scheduleDate) {
@@ -79,7 +89,7 @@ public class Cd90AutoScheduleBatchDataValidatorImpl implements Cd90AutoScheduleB
         checkMachineInfo(builder, factoryCode);
         Set<String> clothCodes = checkConstructionInfo(builder, factoryCode, formingSchedules);
         checkCurlLength(builder, factoryCode, clothCodes);
-        checkStorageLaneLimit(builder, factoryCode, scheduleDate);
+        this.checkStorageLaneLimit(builder, factoryCode);
 
         Cd90BatchDataCheckResult result = builder.build();
         if (result.isFailed()) {
@@ -317,20 +327,49 @@ public class Cd90AutoScheduleBatchDataValidatorImpl implements Cd90AutoScheduleB
     }
 
     /**
-     * 批次级检查:库排限制数据完整性。
-     * 检查排程日期当天所有班次的库排数据:
+     * 批次级检查：任务启动时当前资源班次的库排数据完整性。
      * 1. MAX_CAR_NUM 必须维护且 >0(2026/06/24 变更,去掉 default 7,必填);
      * 2. CAR_NUM 不能为负,且不能大于 MAX_CAR_NUM;
      * 3. 空库排(MATERIAL_CODE 为空)时 CAR_NUM 必须 = 0。
      * 排程前拦截,避免 Allocator 运行时抛异常。
      */
     private void checkStorageLaneLimit(Cd90BatchDataCheckResult.Builder builder,
-                                       String factoryCode, LocalDate scheduleDate) {
+                                       String factoryCode) {
+        List<Cd90ShiftConfig> configs = shiftConfigMapper.selectList(
+                Wrappers.<Cd90ShiftConfig>lambdaQuery()
+                        .eq(Cd90ShiftConfig::getFactoryCode, factoryCode)
+                        .eq(Cd90ShiftConfig::getIsActive, ACTIVE));
+        Cd90ShiftDescriptor baselineShift;
+        try {
+            baselineShift = shiftWindowResolver.resolveCurrentResourceShift(
+                    LocalDateTime.now(), configs);
+        } catch (IllegalArgumentException exception) {
+            builder.addError(I18nUtil.getMessage(
+                            "ui.data.column.cd90StorageLaneLimit.modelName"),
+                    "DATA_MISSING",
+                    MessageFormat.format(I18nUtil.getMessage(
+                                    "ui.cd90.autoSchedule.resourceBaselineResolveFailed"),
+                            exception.getMessage()),
+                    I18nUtil.getMessage(
+                            "ui.cd90.autoSchedule.resourceBaselineResolveSuggestion"));
+            return;
+        }
         List<Cd90StorageLaneLimit> lanes = storageLaneMapper.selectList(
                 Wrappers.<Cd90StorageLaneLimit>lambdaQuery()
                         .eq(Cd90StorageLaneLimit::getFactoryCode, factoryCode)
-                        .eq(Cd90StorageLaneLimit::getLaneDate, Date.valueOf(scheduleDate)));
+                        .eq(Cd90StorageLaneLimit::getLaneDate,
+                                Date.valueOf(baselineShift.getScheduleDate()))
+                        .eq(Cd90StorageLaneLimit::getShiftCode,
+                                baselineShift.getShiftCode()));
         if (lanes == null || lanes.isEmpty()) {
+            builder.addError(I18nUtil.getMessage(
+                            "ui.data.column.cd90StorageLaneLimit.modelName"),
+                    "DATA_MISSING",
+                    MessageFormat.format(I18nUtil.getMessage(
+                                    "ui.cd90.autoSchedule.resourceBaselineMissing"),
+                            baselineShift.getScheduleDate(), baselineShift.getShiftCode()),
+                    I18nUtil.getMessage(
+                            "ui.cd90.autoSchedule.resourceBaselineSyncSuggestion"));
             return;
         }
         for (Cd90StorageLaneLimit lane : lanes) {

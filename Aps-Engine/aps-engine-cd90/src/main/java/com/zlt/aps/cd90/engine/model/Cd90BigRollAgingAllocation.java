@@ -14,7 +14,7 @@ import java.util.List;
 @Builder
 public class Cd90BigRollAgingAllocation {
 
-    /** 是否满足本次任务所需大卷米数。 */
+    /** 是否存在可用于本次试算的成熟流水；正式提交还需校验分配量完整覆盖最终计划量。 */
     private boolean success;
     /** 不满足时的内部失败原因。 */
     private String failureReason;

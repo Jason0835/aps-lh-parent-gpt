@@ -119,6 +119,7 @@ public class Cd90TimedRollingCheckServiceImpl implements Cd90TimedRollingCheckSe
         }
         String inputVersion = rollingInputVersionService.fingerprint(target);
         String stateKey = factoryCode + ":" + target.getScheduleDate()
+                + ":" + target.getResourceBaselineDate()
                 + ":" + target.getTargetShiftCode();
         boolean stable = rollingStabilityService.observe(stateKey, inputVersion,
                 triggerTime.atZone(ZoneId.systemDefault()).toInstant(),
@@ -135,7 +136,7 @@ public class Cd90TimedRollingCheckServiceImpl implements Cd90TimedRollingCheckSe
         }
         Cd90ScheduleTask task = rollingTaskService.createPending(factoryCode, scheduleDate,
                 requestSnapshot(target, inputVersion), idempotencyKey);
-        if (!idempotencyKey.equals(task.getIdempotencyKey())) {
+        if (task == null) {
             skippedFactories.add(skip(factoryCode, "SCHEDULE_TASK_BUSY"));
             return;
         }
@@ -144,6 +145,7 @@ public class Cd90TimedRollingCheckServiceImpl implements Cd90TimedRollingCheckSe
         created.put("factoryCode", factoryCode);
         created.put("taskId", task.getTaskId());
         created.put("batchNo", target.getBatchNo());
+        created.put("resourceBaselineDate", target.getResourceBaselineDate());
         created.put("targetShiftCode", target.getTargetShiftCode());
         createdTasks.add(created);
     }
@@ -174,13 +176,13 @@ public class Cd90TimedRollingCheckServiceImpl implements Cd90TimedRollingCheckSe
     }
 
     /**
-     * 在输入指纹计算前同步目标排程日期和班次的库排快照。
+     * 在输入指纹计算前同步目标班次对应日期的库排快照。
      */
     private boolean syncTargetStorageLane(Cd90RollingTarget target) {
         AuxReqSyncDataLogs syncRequest = new AuxReqSyncDataLogs();
         syncRequest.setFactoryCode(target.getFactoryCode());
         HashMap<String, Object> queryParams = new HashMap<>();
-        queryParams.put("laneDate", target.getScheduleDate().toString());
+        queryParams.put("laneDate", target.getResourceBaselineDate().toString());
         queryParams.put("shiftCode", target.getTargetShiftCode());
         syncRequest.setQueryParams(queryParams);
         try {
@@ -190,21 +192,21 @@ public class Cd90TimedRollingCheckServiceImpl implements Cd90TimedRollingCheckSe
                     && Objects.equals(AppUtils.AJAX_RESULT_SUCCESS, result.get(AjaxResult.CODE_TAG));
         } catch (Exception exception) {
             log.error("直裁定时滚动前库排同步失败，factoryCode={}，laneDate={}，shiftCode={}",
-                    target.getFactoryCode(), target.getScheduleDate(),
+                    target.getFactoryCode(), target.getResourceBaselineDate(),
                     target.getTargetShiftCode(), exception);
             return false;
         }
     }
 
     /**
-     * 检查目标排程日期和班次至少存在一条有效库排。
+     * 检查目标班次对应日期至少存在一条有效库排。
      */
     private boolean isTargetStorageLaneReady(Cd90RollingTarget target) {
         Long count = this.storageLaneLimitMapper.selectCount(
                 new LambdaQueryWrapper<Cd90StorageLaneLimit>()
                         .eq(Cd90StorageLaneLimit::getFactoryCode, target.getFactoryCode())
                         .eq(Cd90StorageLaneLimit::getLaneDate,
-                                java.sql.Date.valueOf(target.getScheduleDate()))
+                                java.sql.Date.valueOf(target.getResourceBaselineDate()))
                         .eq(Cd90StorageLaneLimit::getShiftCode, target.getTargetShiftCode()));
         return count != null && count > 0;
     }

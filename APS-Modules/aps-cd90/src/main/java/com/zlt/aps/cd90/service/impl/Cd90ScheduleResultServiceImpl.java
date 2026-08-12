@@ -25,6 +25,7 @@ import com.zlt.aps.cd90.engine.constant.Cd90ScheduleTaskType;
 import com.zlt.aps.cd90.engine.model.Cd90BatchDataCheckResult;
 import com.zlt.aps.cd90.engine.model.Cd90InsertCarryoverImpact;
 import com.zlt.aps.cd90.engine.model.Cd90InsertRollingOutput;
+import com.zlt.aps.cd90.engine.model.Cd90ScheduleTaskCreationResult;
 import com.zlt.aps.cd90.engine.service.Cd90AutoScheduleBatchDataValidator;
 import com.zlt.aps.cd90.engine.service.Cd90AutoScheduleLockService;
 import com.zlt.aps.cd90.engine.service.Cd90InsertRollingService;
@@ -484,8 +485,72 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
 
     /** 将数据库排程日期转换为分布式锁使用的本地日期。 */
     private LocalDate toLocalDate(Date scheduleDate) {
+        if (scheduleDate instanceof java.sql.Date) {
+            return ((java.sql.Date) scheduleDate).toLocalDate();
+        }
         return scheduleDate.toInstant().atZone(ZoneId.systemDefault())
                 .toLocalDate();
+    }
+
+    /**
+     * 在工厂和排程日期分布式锁内检查活动任务并创建PENDING任务。
+     * <p>该方法返回后锁已经释放，调用方只能对created=true的任务执行一次异步派发。</p>
+     *
+     * @param factoryCode 工厂编码
+     * @param scheduleDate 排程日期
+     * @param taskType 任务类型
+     * @param triggerType 触发类型
+     * @param requestSnapshot 请求快照
+     * @param createBy 创建人
+     * @return 任务提交结果；锁被其他业务占用且尚未查到活动任务时task为空
+     */
+    private TaskSubmission createPendingTask(String factoryCode, Date scheduleDate,
+                                             String taskType, String triggerType,
+                                             String requestSnapshot, String createBy) {
+        RLock submissionLock = lockService.getLock(factoryCode,
+                this.toLocalDate(scheduleDate));
+        try {
+            if (!submissionLock.tryLock()) {
+                return TaskSubmission.busy(taskService.findActive(factoryCode, scheduleDate));
+            }
+            Cd90ScheduleTaskCreationResult creationResult = taskService.createPending(
+                    factoryCode, scheduleDate,
+                    taskType, triggerType, requestSnapshot, createBy);
+            return creationResult.isCreated()
+                    ? TaskSubmission.created(creationResult.getTask())
+                    : TaskSubmission.busy(creationResult.getTask());
+        } finally {
+            if (submissionLock.isHeldByCurrentThread()) {
+                submissionLock.unlock();
+            }
+        }
+    }
+
+    /** 分布式锁内任务创建结果，用于区分新建任务和已有/占用任务。 */
+    private static final class TaskSubmission {
+        private final Cd90ScheduleTask task;
+        private final boolean created;
+
+        private TaskSubmission(Cd90ScheduleTask task, boolean created) {
+            this.task = task;
+            this.created = created;
+        }
+
+        private static TaskSubmission created(Cd90ScheduleTask task) {
+            return new TaskSubmission(task, true);
+        }
+
+        private static TaskSubmission busy(Cd90ScheduleTask task) {
+            return new TaskSubmission(task, false);
+        }
+
+        private Cd90ScheduleTask getTask() {
+            return task;
+        }
+
+        private boolean isCreated() {
+            return created;
+        }
     }
 
     /**
@@ -712,25 +777,25 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
             data.put("needConfirm", true);
             return AjaxResult.success(decision.getMessage(), data);
         }
-        // 先查询当前工厂、当前排程日期是否已有进行中的自动排程任务，
-        // 如果存在则直接返回已有任务ID，避免重复提交相同日期的异步任务。
-        Cd90ScheduleTask activeTask = taskService.findActive(
-                scheduleResult.getFactoryCode(), scheduleResult.getScheduleDate());
-        if (activeTask != null) {
-            data.put("needConfirm", false);
-            data.put("taskId", activeTask.getTaskId());
-            // 信息：当前日期已有自动排程任务正在执行
-            return AjaxResult.success(I18nUtil.getMessage("ui.cd90.autoSchedule.activeTask"), data);
-        }
-
-        // 组装本次触发请求的快照信息，并创建一条 PENDING 状态的自动排程任务记录，
-        // 便于异步执行链路进行状态跟踪、异常回溯和任务审计。
+        // 使用与执行阶段相同的“工厂 + 排程日期”分布式锁串行化活动任务检查和PENDING创建。
+        // 锁在异步派发前释放，避免新任务启动时与提交线程争抢同一把锁。
         String snapshot = "factoryCode=" + scheduleResult.getFactoryCode()
                 + ",scheduleDate=" + scheduleResult.getScheduleDate()
                 + ",forceRegenerate=" + Boolean.TRUE.equals(scheduleResult.getForceRegenerate());
-        Cd90ScheduleTask task = taskService.createPending(scheduleResult.getFactoryCode(),
-                scheduleResult.getScheduleDate(), Cd90ScheduleTaskType.AUTO_SCHEDULE,
-                "MANUAL", snapshot, null);
+        TaskSubmission submission = this.createPendingTask(
+                scheduleResult.getFactoryCode(), scheduleResult.getScheduleDate(),
+                Cd90ScheduleTaskType.AUTO_SCHEDULE, "MANUAL", snapshot, null);
+        if (!submission.isCreated()) {
+            data.put("needConfirm", false);
+            if (submission.getTask() != null) {
+                data.put("taskId", submission.getTask().getTaskId());
+                // 信息：当前日期已有自动排程任务正在执行
+                return AjaxResult.success(
+                        I18nUtil.getMessage("ui.cd90.autoSchedule.activeTask"), data);
+            }
+            return AjaxResult.error(I18nUtil.getMessage("ui.cd90.schedule.taskActive"));
+        }
+        Cd90ScheduleTask task = submission.getTask();
 
         // 将任务投递到异步执行器中实际启动排程计算，并把新任务ID返回给前端，
         // 前端后续可通过 taskId 轮询任务状态和排程结果。
@@ -922,9 +987,7 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
         if (clothCheckResult != null) {
             return AjaxResult.success("帘布 " + request.getClothCode() + " 施工数据检查失败", clothCheckResult);
         }
-        Cd90ScheduleTask activeTask = taskService.findActive(
-                request.getFactoryCode(), request.getScheduleDate());
-        if (activeTask != null) {
+        if (taskService.findActive(request.getFactoryCode(), request.getScheduleDate()) != null) {
             return AjaxResult.error(I18nUtil.getMessage("ui.cd90.insert.activeTask"));
         }
         if (!Boolean.TRUE.equals(request.getConfirmed())) {
@@ -933,9 +996,13 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
                 return previewResult;
             }
         }
-        Cd90ScheduleTask task = taskService.createPending(request.getFactoryCode(),
+        TaskSubmission submission = this.createPendingTask(request.getFactoryCode(),
                 request.getScheduleDate(), Cd90ScheduleTaskType.INSERT_ORDER,
                 "MANUAL", request.toString(), null);
+        if (!submission.isCreated()) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.cd90.insert.activeTask"));
+        }
+        Cd90ScheduleTask task = submission.getTask();
         insertOrderAsyncExecutor.execute(task.getTaskId(), request);
         Map<String, Object> data = new HashMap<>();
         data.put("taskId", task.getTaskId());
@@ -1118,9 +1185,7 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
             data.put("warnings", toErrorList(batchCheck.getWarnings()));
             return AjaxResult.success(batchCheck.getPrimaryMessage(), data);
         }
-        Cd90ScheduleTask activeTask = taskService.findActive(
-                request.getFactoryCode(), request.getScheduleDate());
-        if (activeTask != null) {
+        if (taskService.findActive(request.getFactoryCode(), request.getScheduleDate()) != null) {
             return AjaxResult.error(I18nUtil.getMessage("ui.cd90.insert.activeTask"));
         }
         if (!Boolean.TRUE.equals(request.getConfirmed())) {
@@ -1129,9 +1194,13 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
                 return previewResult;
             }
         }
-        Cd90ScheduleTask task = taskService.createPending(request.getFactoryCode(),
+        TaskSubmission submission = this.createPendingTask(request.getFactoryCode(),
                 request.getScheduleDate(), Cd90ScheduleTaskType.TRANSFER_MACHINE,
                 "MANUAL", request.toString(), null);
+        if (!submission.isCreated()) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.cd90.insert.activeTask"));
+        }
+        Cd90ScheduleTask task = submission.getTask();
         insertOrderAsyncExecutor.executeTransfer(task.getTaskId(), request);
         Map<String, Object> data = new HashMap<>();
         data.put("taskId", task.getTaskId());
@@ -1300,9 +1369,7 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
             data.put("warnings", toErrorList(batchCheck.getWarnings()));
             return AjaxResult.success(batchCheck.getPrimaryMessage(), data);
         }
-        Cd90ScheduleTask activeTask = taskService.findActive(
-                request.getFactoryCode(), request.getScheduleDate());
-        if (activeTask != null) {
+        if (taskService.findActive(request.getFactoryCode(), request.getScheduleDate()) != null) {
             return AjaxResult.error(I18nUtil.getMessage("ui.cd90.insert.activeTask"));
         }
         if (!Boolean.TRUE.equals(request.getConfirmed())) {
@@ -1311,9 +1378,13 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
                 return previewResult;
             }
         }
-        Cd90ScheduleTask task = taskService.createPending(request.getFactoryCode(),
+        TaskSubmission submission = this.createPendingTask(request.getFactoryCode(),
                 request.getScheduleDate(), Cd90ScheduleTaskType.CHANGE_QTY,
                 "MANUAL", request.toString(), null);
+        if (!submission.isCreated()) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.cd90.insert.activeTask"));
+        }
+        Cd90ScheduleTask task = submission.getTask();
         insertOrderAsyncExecutor.executeChangeQty(task.getTaskId(), request);
         Map<String, Object> data = new HashMap<>();
         data.put("taskId", task.getTaskId());
