@@ -34,9 +34,9 @@ public class GsqScheduleResultIssue extends BaseEntity {
     @ApiModelProperty(value = "排程日期", name = "scheduleDate")
     private LocalDate scheduleDate;
 
-    /** 成型批次号 */
-    @ApiModelProperty(value = "成型批次号", name = "cxBatchNo")
-    private String cxBatchNo;
+    /** 胎圈批次号 */
+    @ApiModelProperty(value = "胎圈批次号", name = "tqBatchNo")
+    private String tqBatchNo;
 
     /** 钢丝圈批次号 */
     @ApiModelProperty(value = "钢丝圈批次号", name = "batchNo")

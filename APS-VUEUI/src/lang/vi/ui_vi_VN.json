@@ -1135,6 +1135,8 @@
   "ui.data.column.gsq.params.enableStatus": "Trạng thái kích hoạt",
   "ui.data.column.gsq.params.regularExpression": "Biểu thức chính quy",
   "ui.data.column.gsq.params.errorTips": "Mẹo lỗi",
+  "ui.data.column.gsqScheduleResult.tqBatchNo": "Số lô vành lốp",
+  "ui.data.column.gsqScheduleResult.batchNo": "Số lô vành thép",
   "ui.data.column.gsqScheduleResult.stockQty": "Tồn kho",
   "ui.data.column.gdyy.params.modelName": "Thông tin tham số cán dọc dải thép",
   "ui.data.column.tq.params.modelName": "Thông tin tham số vòng lốp",

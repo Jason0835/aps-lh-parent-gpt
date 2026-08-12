@@ -1007,7 +1007,7 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
         // 日期转换：Date → LocalDate
         issue.setScheduleDate(scheduleDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate());
         // 基础信息
-        issue.setCxBatchNo(source.getCxBatchNo());
+        issue.setTqBatchNo(source.getTqBatchNo());
         issue.setBatchNo(source.getBatchNo());
         issue.setOrderNo(source.getOrderNo());
         // 物料信息（从施工信息表关联获取）

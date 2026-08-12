@@ -11,10 +11,13 @@ import com.zlt.aps.gsq.mapper.GsqStockMapper;
 import com.zlt.aps.gsq.service.IGsqStockService;
 import com.zlt.bill.common.service.AbstractDocService;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -156,6 +159,41 @@ public class GsqStockServiceImpl extends AbstractDocService<GsqStock>
             return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum, importErrorLogs);
         } else {
             return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + successNum);
+        }
+    }
+
+    /**
+     * 逻辑删除指定库存日期的旧数据并批量插入新数据（事务性操作）
+     * 步骤1：逻辑删除当天库存日期的旧数据（IS_DELETE置为1）
+     * 步骤2：批量插入MES最新钢丝圈库存数据
+     *
+     * @param stockDate 库存日期
+     * @param updateBy  更新者
+     * @param list      待插入的钢丝圈库存列表
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void logicDeleteAndSaveBatch(Date stockDate, String updateBy, List<GsqStock> list) {
+        if (stockDate == null) {
+            throw new IllegalArgumentException("库存日期不能为空");
+        }
+        // 步骤1：逻辑删除当天库存日期的旧数据
+        Date updateTime = new Date();
+        int deleteCount = gsqStockMapper.logicDeleteByStockDate(stockDate, updateBy, updateTime);
+        log.info("钢丝圈库存同步：逻辑删除库存日期={}的旧数据，删除数量={}", stockDate, deleteCount);
+
+        // 步骤2：批量插入MES最新库存数据
+        if (CollectionUtils.isNotEmpty(list)) {
+            // 分批插入，每批1000条
+            int batchSize = 1000;
+            for (int i = 0; i < list.size(); i += batchSize) {
+                int end = Math.min(i + batchSize, list.size());
+                List<GsqStock> batch = list.subList(i, end);
+                for (GsqStock stock : batch) {
+                    baseDao.save(stock);
+                }
+            }
+            log.info("钢丝圈库存同步：批量插入完成，插入数量={}", list.size());
         }
     }
 }

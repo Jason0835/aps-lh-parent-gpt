@@ -187,8 +187,8 @@ export default {
             return (
               <el-switch
                 value={row.status}
-                active-value="0"
-                inactive-value="1"
+                active-value="1"
+                inactive-value="0"
                 onChange={(value) => this.handleChangeStatus(value, row)}
               />
             );
@@ -240,7 +240,7 @@ export default {
   methods: {
     handleChangeStatus(status, row) {
       let title =
-        status === "0"
+        status === "1"
           ? this.$t("ui.biz.alter.isOpen")
           : this.$t("ui.biz.alter.isStop");
 

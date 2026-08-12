@@ -35,6 +35,7 @@ import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -810,5 +811,136 @@ public class CxPrecisionPlanServiceImpl extends AbstractDocService<CxPrecisionPl
         } catch (Exception e) {
             return null;
         }
+    }
+
+    /**
+     * 按设备保养计划(MES同步数据)分发写入成型精度计划表
+     * 现逻辑：MES全权决定计划时间(OPER_TIME)和实际完成时间(FIRST_WASH_TIME)，
+     * APS侧不再回填实际日期、不再生成下一次精度计划。
+     * 本方法根据MES字段值直接计算派生字段并upsert到T_CX_PRECISION_PLAN。
+     *
+     * 派生字段计算规则：
+     * - PRECISION_TYPE = '成型精度'（固定，不再带15/60后缀）
+     * - PRECISION_CYCLE = 从MES PRECISION_TYPE提取数字（"成型精度15天"→"15"，"成型精度60天"→"60"）
+     * - PLAN_DATE = MES.OPER_TIME
+     * - ACTUAL_DATE = MES.FIRST_WASH_TIME（可空）
+     * - COMPLETION_STATUS = FIRST_WASH_TIME非空 ? '1'(已完成) : '0'(未完成)
+     * - LAST_MAINTENANCE_DATE = FIRST_WASH_TIME（可空）
+     * - DUE_DATE = PLAN_DATE
+     * - YEAR = OPER_TIME 年份
+     * - DAYS_TO_DUE = today - PLAN_DATE
+     * - WARNING_STATUS/IS_WARNING_SENT = '0'（由独立checkWarning任务扫描更新）
+     * - DATA_SOURCE = '0'(MES同步)
+     * - MES_SOURCE_ID = MES.id（upsert匹配键）
+     * - SYNC_TIME = 当前时间
+     *
+     * @param maintenancePlanIds 设备保养计划ID列表（处理PRECISION_TYPE以'成型精度'开头的数据）
+     * @return 分发写入的记录数
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public int dispatchFromMaintenancePlan(List<Long> maintenancePlanIds) {
+        if (CollectionUtils.isEmpty(maintenancePlanIds)) {
+            log.info("分发成型精度计划：ID列表为空，跳过");
+            return 0;
+        }
+        log.info("开始分发成型精度计划，ID数量={}", maintenancePlanIds.size());
+
+        // 查询T_MDM_DEV_MAINTENANCE_PLAN中指定ID且精度类型以"成型精度"开头的数据
+        LambdaQueryWrapper<MdmDevMaintenancePlan> wrapper = new LambdaQueryWrapper<>();
+        wrapper.in(MdmDevMaintenancePlan::getId, maintenancePlanIds)
+                .likeRight(MdmDevMaintenancePlan::getPrecisionType, PRECISION_TYPE_CX)
+                .eq(MdmDevMaintenancePlan::getIsDelete, 0);
+        List<MdmDevMaintenancePlan> mesPlans = mdmDevMaintenancePlanEntityMapper.selectList(wrapper);
+        if (CollectionUtils.isEmpty(mesPlans)) {
+            log.info("未查询到精度类型以'成型精度'开头的设备保养计划数据，跳过分发");
+            return 0;
+        }
+        log.info("查询到成型精度设备保养计划数据{}条", mesPlans.size());
+
+        // 步骤1：按分厂逻辑删除APS本地表所有MES同步来源的旧成型精度计划（先删后插模式）
+        // 仅清理DATA_SOURCE='0'的MES同步数据，保留系统自动生成的数据
+        // 取第一条的factoryCode（MES同步时已按factoryCode过滤，所有记录factoryCode一致）
+        String factoryCode = mesPlans.get(0).getFactoryCode();
+        int deletedCount = cxPrecisionPlanMapper.logicDeleteMesSyncByFactoryCode(factoryCode);
+        log.info("逻辑删除APS本地表旧MES同步成型精度计划完成，分厂={}，删除{}条", factoryCode, deletedCount);
+
+        // 步骤2：将MES新版本数据全量插入
+        Date now = new Date();
+        List<CxPrecisionPlan> toInsert = new ArrayList<>();
+
+        for (MdmDevMaintenancePlan mesPlan : mesPlans) {
+            // 计划时间必填，无计划时间跳过
+            Date planDate = parseDate(mesPlan.getOperTime());
+            if (planDate == null) {
+                log.warn("机台{}的计划时间为空，跳过分发", mesPlan.getDevCode());
+                continue;
+            }
+
+            // 从MES精度类型提取周期数字（"成型精度15天"→"15"）
+            String precisionCycle = extractNumberFromPrecisionType(mesPlan.getPrecisionType());
+            if (StringUtils.isEmpty(precisionCycle)) {
+                log.warn("机台{}的精度类型{}无法提取周期数字，跳过分发", mesPlan.getDevCode(), mesPlan.getPrecisionType());
+                continue;
+            }
+
+            CxPrecisionPlan plan = new CxPrecisionPlan();
+            plan.setMesSourceId(mesPlan.getId());
+            plan.setDataSource(DATA_SOURCE_MES);
+
+            // 基础字段
+            plan.setMachineCode(mesPlan.getDevCode());
+            plan.setPrecisionType(PRECISION_TYPE_CX);
+            plan.setPrecisionCycle(precisionCycle);
+            plan.setCompanyCode(mesPlan.getCompanyCode());
+            plan.setFactoryCode(mesPlan.getFactoryCode());
+            plan.setIsDelete(0);
+
+            // 计划日期=OPER_TIME
+            plan.setPlanDate(planDate);
+            // 年度=计划日期年份
+            Calendar cal = Calendar.getInstance();
+            cal.setTime(planDate);
+            plan.setYear(new BigDecimal(cal.get(Calendar.YEAR)));
+
+            // 实际完成日期=FIRST_WASH_TIME（可空）
+            Date actualDate = parseDate(mesPlan.getFirstWashTime());
+            if (actualDate != null) {
+                plan.setActualDate(actualDate);
+                plan.setLastMaintenanceDate(actualDate);
+                plan.setCompletionStatus(COMPLETION_STATUS_COMPLETED);
+            } else {
+                plan.setActualDate(null);
+                plan.setLastMaintenanceDate(null);
+                plan.setCompletionStatus(COMPLETION_STATUS_PENDING);
+            }
+
+            // DUE_DATE = PLAN_DATE
+            plan.setDueDate(planDate);
+
+            // 剩余天数 = today - PLAN_DATE
+            long daysToDue = DateUtil.betweenDay(DateUtil.date(), planDate, true);
+            plan.setDaysToDue(daysToDue);
+
+            // 预警相关字段：由独立checkWarning任务扫描更新，分发时重置为未预警
+            plan.setWarningStatus(WARNING_STATUS_NO);
+            plan.setIsWarningSent(WARNING_SENT_NO);
+            plan.setWarningDate(null);
+
+            // 同步时间
+            plan.setSyncTime(now);
+
+            toInsert.add(plan);
+        }
+
+        if (CollectionUtils.isEmpty(toInsert)) {
+            log.info("成型精度计划分发：无有效数据可写入");
+            return 0;
+        }
+
+        // 批量插入
+        baseDao.insertBatch(toInsert);
+        log.info("成型精度计划分发完成，共插入{}条", toInsert.size());
+        return toInsert.size();
     }
 }

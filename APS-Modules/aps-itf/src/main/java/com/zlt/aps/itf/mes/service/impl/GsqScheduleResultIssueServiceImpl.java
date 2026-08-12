@@ -253,7 +253,7 @@ public class GsqScheduleResultIssueServiceImpl implements IGsqScheduleResultIssu
                                                     String companyCode, String factoryCode) {
         MesGsqScheduleResult mesItem = new MesGsqScheduleResult();
         mesItem.setScheduleDate(item.getScheduleDate());
-        mesItem.setCxBatchNo(item.getCxBatchNo());
+        mesItem.setTqBatchNo(item.getTqBatchNo());
         mesItem.setBatchNo(item.getBatchNo());
         mesItem.setOrderNo(item.getOrderNo());
         mesItem.setSteelRingCode(item.getSteelRingCode());

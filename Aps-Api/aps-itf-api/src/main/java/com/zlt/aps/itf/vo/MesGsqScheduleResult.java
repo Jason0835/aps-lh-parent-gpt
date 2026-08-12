@@ -27,10 +27,10 @@ public class MesGsqScheduleResult implements Serializable {
     @TableField(value = "SCHEDULE_DATE")
     private LocalDate scheduleDate;
 
-    /** 成型批次号 */
-    @ApiModelProperty(value = "成型批次号", name = "cxBatchNo")
-    @TableField(value = "CX_BATCH_NO")
-    private String cxBatchNo;
+    /** 胎圈批次号 */
+    @ApiModelProperty(value = "胎圈批次号", name = "tqBatchNo")
+    @TableField(value = "TQ_BATCH_NO")
+    private String tqBatchNo;
 
     /** 钢丝圈批次号 */
     @ApiModelProperty(value = "钢丝圈批次号", name = "batchNo")

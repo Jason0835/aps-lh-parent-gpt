@@ -135,8 +135,8 @@ export default {
           label: this.$t("ui.data.column.machine.status"),
           prop: "status",
           type: "switch",
-          activeValue: "0",
-          inactiveValue: "1",
+          activeValue: "1",
+          inactiveValue: "0",
         },
         {
           label: this.$t("ui.common.column.remark"),
