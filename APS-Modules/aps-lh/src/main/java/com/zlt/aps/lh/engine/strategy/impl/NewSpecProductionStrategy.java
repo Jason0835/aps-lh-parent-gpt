@@ -669,6 +669,142 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
     }
 
     /**
+     * 读取当前计划日可复用的结构切换提前判定。
+     *
+     * <p>前一业务日只完成准入判断和延期，不选机、不锁机；到未来计划日的正常资源竞争阶段，
+     * 先沿用现有排序选出真实候选机台，再用此前冻结的准入结论判断该机台能否回看前一业务日
+     * 安排换模。这样既不会提前占用机台改变全局选机顺序，也不会因当前日已有计划量而丢失
+     * “结构由0台切换为有计划机台”的原始业务事实。</p>
+     *
+     * @param context 排程上下文
+     * @param dayContext 当前业务日上下文
+     * @param sku 当前 SKU
+     * @param earliestEmbryoAvailableTime 最早胎胚可供时间
+     * @return 可复用的结构切换提前判定；不满足条件时返回 null
+     */
+    private EarlyProductionDecision resolveStructureSwitchLookbackDecision(
+            LhScheduleContext context,
+            DayScheduleContext dayContext,
+            SkuScheduleDTO sku,
+            Date earliestEmbryoAvailableTime) {
+        if (Objects.isNull(context) || Objects.isNull(dayContext) || Objects.isNull(sku)
+                || Objects.isNull(earliestEmbryoAvailableTime)
+                || dayContext.getCurrentPhase()
+                != DailySchedulePhase.NORMAL_RESOURCE_COMPETITION
+                || CollectionUtils.isEmpty(context.getScheduleWindowShifts())) {
+            return null;
+        }
+        EarlyProductionRuntimePlan runtimePlan =
+                context.getEarlyProductionRuntimePlan(sku);
+        EarlyProductionDecision decision = Objects.isNull(runtimePlan)
+                ? null : runtimePlan.getDecision();
+        LocalDate currentDate = dayContext.getScheduleDate();
+        if (Objects.isNull(runtimePlan) || !runtimePlan.isActive()
+                || Objects.isNull(runtimePlan.getCurrentDate())
+                || !runtimePlan.getCurrentDate().plusDays(1).equals(currentDate)
+                || Objects.isNull(decision) || !decision.isEarlyProduction()
+                || !decision.isAllowed()
+                || !currentDate.equals(decision.getFuturePlanDate())
+                || resolveOriginalNewSpecDayPlanQty(context, sku, currentDate) <= 0
+                || !EarlyProductionChecker.isStructureSwitchEarlyProduction(
+                        context, sku, runtimePlan.getCurrentDate(),
+                        decision.getFuturePlanDate())) {
+            return null;
+        }
+        LocalDate embryoBusinessDate = resolveProductionWorkDate(
+                context.getScheduleWindowShifts(), earliestEmbryoAvailableTime);
+        return currentDate.equals(embryoBusinessDate) ? decision : null;
+    }
+
+    /**
+     * 判断选定机台的实际换模时间轴是否命中“前一业务日换模、当前计划日生产”。
+     *
+     * <p>只放宽换模开始时间的当前日窗口限制；换模仍必须位于完整八班窗口内、早于胎胚可供
+     * 时间并在当前业务日日终前完成。停机、晚班禁换模、每日换模次数、首检资源和生产产能
+     * 仍由原分配链路校验。</p>
+     *
+     * @param context 排程上下文
+     * @param dayContext 当前业务日上下文
+     * @param earliestEmbryoAvailableTime 最早胎胚可供时间
+     * @param mouldChangeStartTime 换模开始时间
+     * @param mouldChangeCompleteTime 换模完成时间
+     * @return true-命中跨日回看换模；false-执行原当前日窗口规则
+     */
+    private boolean isStructureSwitchLookbackTimeline(
+            LhScheduleContext context,
+            DayScheduleContext dayContext,
+            Date earliestEmbryoAvailableTime,
+            Date mouldChangeStartTime,
+            Date mouldChangeCompleteTime) {
+        if (Objects.isNull(context) || Objects.isNull(dayContext)
+                || Objects.isNull(earliestEmbryoAvailableTime)
+                || Objects.isNull(mouldChangeStartTime)
+                || Objects.isNull(mouldChangeCompleteTime)
+                || !mouldChangeStartTime.before(mouldChangeCompleteTime)
+                || !mouldChangeStartTime.before(earliestEmbryoAvailableTime)
+                || !mouldChangeStartTime.before(dayContext.getDayStartTime())
+                || dayContext.reachesOrPassesDayEnd(mouldChangeCompleteTime)) {
+            return false;
+        }
+        List<LhShiftConfigVO> windowShifts = context.getScheduleWindowShifts();
+        Date windowStartTime = resolveScheduleWindowStartTime(context, windowShifts);
+        LocalDate switchBusinessDate = resolveProductionWorkDate(
+                windowShifts, mouldChangeStartTime);
+        return Objects.nonNull(windowStartTime)
+                && !mouldChangeStartTime.before(windowStartTime)
+                && dayContext.getScheduleDate().minusDays(1).equals(switchBusinessDate);
+    }
+
+    /**
+     * 记录结构切换跨日换模最终落地时间轴。
+     *
+     * @param context 排程上下文
+     * @param dayContext 当前业务日上下文
+     * @param sku 当前 SKU
+     * @param machine 落地机台
+     * @param machineReadyTime 机台真实空闲时间
+     * @param mouldChangeStartTime 换模开始时间
+     * @param mouldChangeCompleteTime 换模完成时间
+     * @param earliestEmbryoAvailableTime 最早胎胚可供时间
+     * @param firstProductionStartTime 实际首个生产时间
+     * @param firstInspectionAttributionShift 首检归属班次
+     */
+    private void appendStructureSwitchLookbackProcessLog(
+            LhScheduleContext context,
+            DayScheduleContext dayContext,
+            SkuScheduleDTO sku,
+            MachineScheduleDTO machine,
+            Date machineReadyTime,
+            Date mouldChangeStartTime,
+            Date mouldChangeCompleteTime,
+            Date earliestEmbryoAvailableTime,
+            Date firstProductionStartTime,
+            LhShiftConfigVO firstInspectionAttributionShift) {
+        String detail = new StringBuilder(384)
+                .append("批次=").append(context.getBatchNo())
+                .append("，计划业务日=").append(dayContext.getScheduleDate())
+                .append("，物料=").append(sku.getMaterialCode())
+                .append("，机台=").append(machine.getMachineCode())
+                .append("，机台真实空闲=")
+                .append(LhScheduleTimeUtil.formatDateTime(machineReadyTime))
+                .append("，换模开始=")
+                .append(LhScheduleTimeUtil.formatDateTime(mouldChangeStartTime))
+                .append("，换模完成=")
+                .append(LhScheduleTimeUtil.formatDateTime(mouldChangeCompleteTime))
+                .append("，胎胚最早可供=")
+                .append(LhScheduleTimeUtil.formatDateTime(earliestEmbryoAvailableTime))
+                .append("，实际开产=")
+                .append(LhScheduleTimeUtil.formatDateTime(firstProductionStartTime))
+                .append("，首检归属=class")
+                .append(Objects.isNull(firstInspectionAttributionShift)
+                        ? null : firstInspectionAttributionShift.getShiftIndex())
+                .toString();
+        log.info("新增SKU结构切换跨日换模已落地, {}", detail);
+        PriorityTraceLogHelper.appendProcessLog(
+                context, "结构切换提前跨日换模", detail);
+    }
+
+    /**
      * 使用现有动态扩机结果回填当前业务日目标机台数。
      *
      * <p>{@code requiredMachineCount} 是真实排产规则已经计算出的当前新增阶段目标数；
@@ -2979,11 +3115,23 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 // 本次规则禁止换模与精度计划并行，统一使用已经避开精度及预热窗口的机台就绪时间。
                 boolean maintenanceOverlapSwitch = false;
                 Date switchReadyTime = machineReadyTime;
+                /*
+                 * 当前计划日先按原规则完成选机，再读取前一业务日冻结的结构切换准入结论。
+                 * 这里只放宽已选机台的换模时间轴，不提前锁机，也不改写候选顺序。
+                 */
+                EarlyProductionDecision structureSwitchLookbackDecision =
+                        this.resolveStructureSwitchLookbackDecision(
+                                context, dayContext, sku, earliestEmbryoAvailableTime);
+                boolean structureSwitchLookbackAllowed =
+                        Objects.nonNull(structureSwitchLookbackDecision);
                 switchReadyTime = resolveSpecifyReservedReadyTime(context, sku, machineCode, switchReadyTime);
                 // 试制SKU换模需在早班完成，不受开产模式限制；非试制SKU仍受开产模式约束
                 switchReadyTime = ShiftProductionControlUtil.resolveEarliestSwitchStartTime(
                         context, switchReadyTime, sku);
-                switchReadyTime = alignNewSpecSwitchReadyTimeToWindowStart(context, shifts, switchReadyTime);
+                List<LhShiftConfigVO> switchAlignmentShifts = structureSwitchLookbackAllowed
+                        ? context.getScheduleWindowShifts() : shifts;
+                switchReadyTime = alignNewSpecSwitchReadyTimeToWindowStart(
+                        context, switchAlignmentShifts, switchReadyTime);
                 // 历史映射班次只作为指定机台首次尝试起点，不继承具体时刻，也不限制本批实际合法班次。
                 switchReadyTime = alignHistoricalReverseSwitchReadyTime(
                         context, historicalDirective, switchReadyTime);
@@ -3006,12 +3154,25 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 Date theoreticalProductionStartTime = null;
                 Date firstProductionStartTime = null;
                 EarlyProductionDecision earlyProductionDecision = null;
+                boolean structureSwitchLookbackApplied = false;
                 boolean firstInspectionRetryRequired = false;
                 NewSpecFailReasonEnum switchAllocateFailReason = null;
                 // 续作增机补偿的首台与后续机台统一按 dayN 首次增机日对齐换模。
-                switchReadyTime = alignSwitchReadyTimeByAddMachineDate(
-                        context, sku, switchReadyTime, shifts, totalScheduledQty,
-                        currentAddMachineProductionDate, isEnding, dayContext.getCurrentPhase());
+                if (structureSwitchLookbackAllowed) {
+                    log.info("新增SKU结构切换保留已选机台真实空闲时间用于跨日换模, "
+                                    + "batchNo: {}, scheduleDate: {}, materialCode: {}, machineCode: {}, "
+                                    + "machineReadyTime: {}, switchReadyTime: {}, futurePlanDate: {}",
+                            context.getBatchNo(), dayContext.getScheduleDate(),
+                            sku.getMaterialCode(), machineCode,
+                            LhScheduleTimeUtil.formatDateTime(machineReadyTime),
+                            LhScheduleTimeUtil.formatDateTime(switchReadyTime),
+                            structureSwitchLookbackDecision.getFuturePlanDate());
+                } else {
+                    switchReadyTime = alignSwitchReadyTimeByAddMachineDate(
+                            context, sku, switchReadyTime, shifts, totalScheduledQty,
+                            currentAddMachineProductionDate, isEnding,
+                            dayContext.getCurrentPhase());
+                }
                 Date firstInspectionRetryReadyTime = firstInspectionRetryReadyTimeMap.get(machineCode);
                 if (Objects.nonNull(firstInspectionRetryReadyTime)
                         && (Objects.isNull(switchReadyTime)
@@ -3034,7 +3195,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                     mouldChangeStartTime = allocateNewSpecMouldChangeStartTime(
                             context, sku, machineCode, switchReadyTime, switchDurationHours,
                             mouldChangeBalance, dayContext.getCurrentPhase(), isTypeBlockRelation,
-                            dayContext.getDayEndTime());
+                            dayContext.getDayEndTime(), structureSwitchLookbackAllowed);
                 boolean historicalMouldChangeInMappedShift =
                         isHistoricalReverseMouldChangeInMappedShift(
                                 context, historicalDirective, mouldChangeStartTime);
@@ -3062,13 +3223,18 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 }
                 if (mouldChangeStartTime != null) {
                     mouldChangeCompleteTime = LhScheduleTimeUtil.addHours(mouldChangeStartTime, switchDurationHours);
+                    structureSwitchLookbackApplied = structureSwitchLookbackAllowed
+                            && this.isStructureSwitchLookbackTimeline(
+                                    context, dayContext, earliestEmbryoAvailableTime,
+                                    mouldChangeStartTime, mouldChangeCompleteTime);
                     /*
                      * 换模均衡器可以顺延到下一业务日。按天编排下，当前阶段只能提交 dayShifts 内的资源；
-                     * 若换模开始或完成已经越过日窗口，必须回滚本次换模次数和模具预占，下一业务日再
-                     * 使用同一个全局上下文重新计算，禁止当前日提前占用未来日机台时间和换模配额。
+                     * 普通场景若换模开始或完成越过日窗口，必须回滚本次换模次数和模具预占。
+                     * 结构切换回看场景只允许换模起点落在前一业务日，其余日窗口约束保持不变。
                      */
-                    if (!dayContext.contains(mouldChangeStartTime)
-                            || dayContext.reachesOrPassesDayEnd(mouldChangeCompleteTime)) {
+                    if ((!dayContext.contains(mouldChangeStartTime)
+                            || dayContext.reachesOrPassesDayEnd(mouldChangeCompleteTime))
+                            && !structureSwitchLookbackApplied) {
                         dailyDeferredReason = "换模完成时间超出当前业务日日窗口";
                         rollbackMouldChangeAllocation(
                                 context, sku, mouldChangeBalance, mouldChangeStartTime);
@@ -3213,9 +3379,11 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                                         context, machineCode, trialAdjustedProductionStartTime, shifts,
                                         constrainedRuntimeShiftCapacity, sku.getLhTimeSeconds(),
                                         constrainedMachineMouldQty);
-                        earlyProductionDecision = resolveEarlyProductionDecision(
-                                context, sku, theoreticalProductionStartTime, shifts, isEnding,
-                                dayContext.getCurrentPhase());
+                        earlyProductionDecision = structureSwitchLookbackApplied
+                                ? structureSwitchLookbackDecision
+                                : resolveEarlyProductionDecision(
+                                        context, sku, theoreticalProductionStartTime, shifts,
+                                        isEnding, dayContext.getCurrentPhase());
                         // 调用处显式保留既有增机日对齐，再应用胎胚时间下限，避免改变 dayN 扩机节奏。
                         theoreticalProductionStartTime = alignProductionStartTimeByAddMachineDate(
                                 context, sku, theoreticalProductionStartTime, shifts, totalScheduledQty,
@@ -3402,9 +3570,11 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                             ShiftProductionControlUtil.resolveFirstSchedulableStartIgnoringCleaning(
                                     context, machineCode, productionStartTime, shifts,
                                     runtimeShiftCapacity, sku.getLhTimeSeconds(), machineMouldQty);
-                    earlyProductionDecision = resolveEarlyProductionDecision(
-                            context, sku, firstProductionStartTime, shifts, isEnding,
-                            dayContext.getCurrentPhase());
+                    earlyProductionDecision = structureSwitchLookbackApplied
+                            ? structureSwitchLookbackDecision
+                            : resolveEarlyProductionDecision(
+                                    context, sku, firstProductionStartTime, shifts, isEnding,
+                                    dayContext.getCurrentPhase());
                     // 补偿 SKU 已由续作中心链路确定首次增机日，不得再被已消费的剩余日计划额度推迟。
                     firstProductionStartTime = alignProductionStartTimeByAddMachineDate(
                             context, sku, firstProductionStartTime, shifts, totalScheduledQty,
@@ -3805,6 +3975,14 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                             firstProductionStartTime, mouldChangeStartTime,
                             firstInspectionAttributionShift, shiftCapacityMap,
                             runtimeShiftCapacity, machinePlanQty);
+                }
+                if (structureSwitchLookbackApplied) {
+                    // 仅对最终形成有效计划量的结果记录跨日换模，失败候选不会污染过程日志。
+                    this.appendStructureSwitchLookbackProcessLog(
+                            context, dayContext, sku, candidateMachine,
+                            machineReadyTime, mouldChangeStartTime, mouldChangeCompleteTime,
+                            earliestEmbryoAvailableTime, firstProductionStartTime,
+                            firstInspectionAttributionShift);
                 }
                 if (getMaintenanceScheduleService().shouldMarkPrecisionPreInsert(
                         candidateMachine, mouldChangeStartTime)) {
@@ -12945,7 +13123,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         }
         int convertedShiftQty = CollectionUtils.isEmpty(shiftCapacityMap)
                 ? 0 : Math.max(0, shiftCapacityMap.getOrDefault(attributionShift.getShiftIndex(), 0));
-        int firstInspectionQty = FirstInspectionQtyUtil.resolvePreviewFirstInspectionQty(
+        int firstInspectionQty = FirstInspectionQtyUtil.resolveLastRecordedFirstInspectionQty(
                 context, sku, attributionShift, runtimeShiftCapacity, machinePlanQty,
                 ScheduleTypeEnum.NEW_SPEC.getCode(), machine.getMachineCode());
         log.info("新增SKU胎胚最早可供时间限制已落地, batchNo: {}, scheduleDate: {}, structureName: {}, "
@@ -14429,6 +14607,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
      * @param mouldChangeBalance 换模均衡策略
      * @param phase 当前业务日内阶段
      * @param isTypeBlock 是否按换活字块口径分配切换时间
+     * @param structureSwitchLookbackAllowed 是否允许选定机台回看前一业务日换模
      * @return 实际换模开始时间；无法安排时返回 null
      */
     private Date allocateNewSpecMouldChangeStartTime(LhScheduleContext context,
@@ -14439,13 +14618,15 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                                                      IMouldChangeBalanceStrategy mouldChangeBalance,
                                                      DailySchedulePhase phase,
                                                      boolean isTypeBlock,
-                                                     Date businessDayEndTime) {
+                                                     Date businessDayEndTime,
+                                                     boolean structureSwitchLookbackAllowed) {
         if (isChangeoverBalanceEnabled(context)) {
             String actionType;
             if (isTypeBlock) {
                 // 同胎胚同模具切换按换活字块占用均衡配额，与 S4.4 换活字块主链口径一致。
                 actionType = IMouldChangeBalanceStrategy.ACTION_TYPE_BLOCK_CHANGE;
-            } else if (isEarlyProductionTargetDayMouldChange(
+            } else if (structureSwitchLookbackAllowed
+                    || isEarlyProductionTargetDayMouldChange(
                     context, sku, switchReadyTime, phase)) {
                 actionType = IMouldChangeBalanceStrategy.ACTION_EARLY_PRODUCTION_NEW_SPEC_MOULD_CHANGE;
             } else {
@@ -14806,9 +14987,56 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         if (Objects.isNull(context) || StringUtils.isEmpty(machineCode)) {
             return null;
         }
-        LhScheduleResult latestResult = resolveLatestAssignedResult(
-                context, context.getMachineAssignmentMap().get(machineCode));
-        return Objects.nonNull(latestResult) ? latestResult.getSpecEndTime() : null;
+        List<LhScheduleResult> assignedResultList =
+                context.getMachineAssignmentMap().get(machineCode);
+        if (CollectionUtils.isEmpty(assignedResultList)) {
+            return null;
+        }
+        Date latestEndTime = null;
+        for (LhScheduleResult result : assignedResultList) {
+            if (Objects.isNull(result)
+                    || Objects.isNull(result.getDailyPlanQty())
+                    || result.getDailyPlanQty() <= 0) {
+                continue;
+            }
+            Date effectiveEndTime = this.resolveResultEffectiveOccupationEndTime(result);
+            if (Objects.nonNull(effectiveEndTime)
+                    && (Objects.isNull(latestEndTime)
+                    || effectiveEndTime.after(latestEndTime))) {
+                latestEndTime = effectiveEndTime;
+            }
+        }
+        return latestEndTime;
+    }
+
+    /**
+     * 解析结果行的真实物理占用结束时间。
+     *
+     * <p>{@code SPEC_END_TIME} 是结果汇总字段，历史结果可能因整模取整或后置时间轴校正而早于
+     * 最后一个正计划班次的结束时间。新物料换模必须取两者较晚值，否则会在前物料仍生产时
+     * 提前占用机台。只读取正计划班次，避免空班次残留时间误延长机台占用。</p>
+     *
+     * @param result 已登记机台结果
+     * @return 汇总结束时间与最后正计划班次结束时间的较晚值
+     */
+    private Date resolveResultEffectiveOccupationEndTime(LhScheduleResult result) {
+        if (Objects.isNull(result)) {
+            return null;
+        }
+        Date effectiveEndTime = result.getSpecEndTime();
+        for (int shiftIndex = 1;
+                shiftIndex <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT;
+                shiftIndex++) {
+            Integer shiftPlanQty = ShiftFieldUtil.getShiftPlanQty(result, shiftIndex);
+            Date shiftEndTime = ShiftFieldUtil.getShiftEndTime(result, shiftIndex);
+            if (Objects.nonNull(shiftPlanQty) && shiftPlanQty > 0
+                    && Objects.nonNull(shiftEndTime)
+                    && (Objects.isNull(effectiveEndTime)
+                    || shiftEndTime.after(effectiveEndTime))) {
+                effectiveEndTime = shiftEndTime;
+            }
+        }
+        return effectiveEndTime;
     }
 
     /**

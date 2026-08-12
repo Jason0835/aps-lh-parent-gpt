@@ -401,6 +401,44 @@ public final class FirstInspectionQtyUtil {
     }
 
     /**
+     * 读取当前班次最近一次已经登记的实际首检数量。
+     *
+     * <p>该方法只用于结果提交后的审计日志。首检写入时已经推进班次顺序计数器，若此时再次调用
+     * {@link #resolvePreviewFirstInspectionQty(LhScheduleContext, SkuScheduleDTO, LhShiftConfigVO, int,
+     * int, String, String)}，会错误读取“下一台”首检参数。例如当前结果是班次内第2台首检，
+     * 实际应使用 SYS0303002，但二次预演会按第3台读取 SYS0303003。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 当前 SKU
+     * @param attributionShift 首检归属班次
+     * @param shiftCapacity 运行态班产
+     * @param remainingQty 当前机台目标量
+     * @param scheduleType 排程类型
+     * @param machineCode 机台编码
+     * @return 最近一次已登记首检的实际数量；当前班次尚未登记时返回0
+     */
+    public static int resolveLastRecordedFirstInspectionQty(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            LhShiftConfigVO attributionShift,
+            int shiftCapacity,
+            int remainingQty,
+            String scheduleType,
+            String machineCode) {
+        if (isTrialTimeBasedFirstInspection(sku, attributionShift, scheduleType)) {
+            return 0;
+        }
+        int recordedSequence = resolveNextFirstInspectionSequence(
+                context, attributionShift) - 1;
+        if (recordedSequence <= 0) {
+            return 0;
+        }
+        return resolveEffectiveFirstInspectionQty(
+                context, sku, attributionShift, shiftCapacity, remainingQty,
+                scheduleType, machineCode, recordedSequence, false);
+    }
+
+    /**
      * 将普通换模首检数量写入归属班次。
      *
      * <p>首检数量参与排产量和硫化余量消耗，因此写入结果前会按剩余目标量与班产上限收敛。
