@@ -3859,10 +3859,12 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             finalImportList.add(insertItem);
             finalAdjustList.add(mpFinalVo);
         }
+        MpRollAdjustContextDTO contextDTO = this.initAdjustContext(firstResult);
+        contextDTO.setFactoryMonthPlanProdFinalList(finalAdjustList);
         // 3、生成统计信息（handleMonthPlanStatistics）
-        mpMonthPlanStaticService.handleMonthPlanStatistics(finalImportList, isAdjust);
+        mpMonthPlanStaticService.handleMonthPlanStatistics(contextDTO, finalImportList, isAdjust);
         // 4、校验导入数据中的各项限制
-        this.checkAdjustLimit(finalImportList, finalAdjustList, dailyCapacityMap, weekRollAdjustEngine,
+        this.checkAdjustLimit(contextDTO, finalImportList, dailyCapacityMap, weekRollAdjustEngine,
                 adjustDailyCapacityLimitObj, importLogId, importErrorLogs);
         // 5、生成特殊材料排产记录
         iSpecialMaterialResultService.buildSecialMaterialResult(finalImportList);
@@ -3872,25 +3874,23 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
     /**
      * 校验导入数据中的各项限制
      * 
+     * @param contextDTO
      * @param finalImportList
-     * @param finalAdjustList
      * @param dailyCapacityMap
      * @param weekRollAdjustEngine
      * @param adjustDailyCapacityLimitObj
      * @param importLogId
      * @param importErrorLogs
      */
-    private void checkAdjustLimit(List<FactoryMonthPlanMouldDayResult> finalImportList,
-            List<FactoryMonthPlanFinalAdjustVo> finalAdjustList, Map<Integer, MpDailyCapacityLimitVo> dailyCapacityMap,
+    private void checkAdjustLimit(MpRollAdjustContextDTO contextDTO, List<FactoryMonthPlanMouldDayResult> finalImportList,
+            Map<Integer, MpDailyCapacityLimitVo> dailyCapacityMap,
             MpWeekRollAdjustEngine weekRollAdjustEngine, MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj,
             Long importLogId, List<ImportErrorLog> importErrorLogs) {
         if (CollectionUtils.isEmpty(finalImportList)) {
             return;
         }
         // 初始化校验相关逻辑的上下文
-        FactoryMonthPlanMouldDayResult firstResult = CollectionUtils.firstElement(finalImportList);
-        MpRollAdjustContextDTO contextDTO = this.initAdjustContext(firstResult);
-        contextDTO.setFactoryMonthPlanProdFinalList(finalAdjustList);
+        List<FactoryMonthPlanFinalAdjustVo> finalAdjustList = contextDTO.getFactoryMonthPlanProdFinalList();
         // 初始化计划的模壳
         for (FactoryMonthPlanFinalAdjustVo adjustVo: finalAdjustList){
             String key = getSpecAndMainPatternKey(adjustVo.getSpecifications(),adjustVo.getMainPattern());
