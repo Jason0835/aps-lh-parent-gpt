@@ -3308,7 +3308,20 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             String noStructureNameStr = I18nUtil.getMessage("ui.data.alert.MpStructureAllocation.noStructureNameStr");
             String outOfRangeStr = I18nUtil.getMessage("ui.data.alert.MpStructureAllocation.outOfRange");
             String noStructureDateStr = I18nUtil.getMessage("ui.data.alert.MpStructureAllocation.noStructureDateStr");
-
+            
+            try {
+                Integer.parseInt(year);
+            } catch (NumberFormatException e) {
+                throw new BusinessException(yearErrorStr);
+            }
+            try {
+                Integer.parseInt(month);
+            } catch (NumberFormatException e) {
+                throw new BusinessException(monthErrorStr);
+            }
+            if (StringUtils.isEmpty(factoryCode)) {
+                throw new BusinessException(String.format(noFactoryStr, factoryName));
+            }
             // 查询结构转产表
             Map<String, List<MpStructureAllocation>> allStructureNameMap = this.getAllStructureNameMap(factoryCode, productVersion, list);
             // 按结构分组汇总结构转产表的最早上机日期和最晚下机日期
@@ -3324,6 +3337,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                 if (StringUtils.isBlank(item.getMaterialCode())) { // 没有物料编码的是合计行，直接跳过，不需要记录错误
                     continue;
                 }
+                String structureName = item.getStructureName();
                 item.setIsImport(YesOrNoEnum.YES.getCode());
                 item.setMonthPlanVersion(monthPlanVersion);
                 item.setProductionVersion(productVersion);
@@ -3335,57 +3349,29 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                     item.setId(errorImportId);
                     continue;
                 }
-
                 if (productTypeMap.containsKey(params[3])) {
                     item.setProductTypeCode(productTypeMap.get(params[3]));
                 }
-                if (StringUtils.isBlank(item.getCxMachineCode()) && StringUtils.isNotBlank(item.getStructureName())) {
-                    String machineCode = structureMachineMap.get(item.getStructureName());
+                if (StringUtils.isBlank(item.getCxMachineCode()) && StringUtils.isNotBlank(structureName)) {
+                    String machineCode = structureMachineMap.get(structureName);
                     if (StringUtils.isNotBlank(machineCode)) {
                         item.setCxMachineCode(machineCode);
                     }
                 }
-
-                try {
-                    item.setYear(Integer.parseInt(year));
-                } catch (NumberFormatException e) {
-                    item.setId(errorImportId);
-                    failureNum++;
-                    addImportErrorLog(importLogId, errorNum, yearErrorStr, importErrorLogs);
-                    continue;
-                }
-                try {
-                    item.setMonth(Integer.parseInt(month));
-                } catch (NumberFormatException e) {
-                    item.setId(errorImportId);
-                    failureNum++;
-                    addImportErrorLog(importLogId, errorNum, monthErrorStr, importErrorLogs);
-                    continue;
-                }
-                if (StringUtils.isNoneEmpty(factoryCode)) {
-                    item.setFactoryCode(factoryCode);
-                } else {
-                    item.setId(errorImportId);
-                    failureNum++;
-                    addImportErrorLog(importLogId, errorNum, String.format(noFactoryStr, factoryName), importErrorLogs);
-                    continue;
-                }
+                item.setYear(Integer.parseInt(year));
+                item.setMonth(Integer.parseInt(month));
+                item.setFactoryCode(factoryCode);
 
                 List<ImportErrorLog> validated = ImportExcelValidatedUtils.validated(importLogId, errorNum, item);
                 if (CollUtil.isNotEmpty(validated)) {
                     item.setId(errorImportId);
-//                    failureNum++;
-//                    importErrorLogs.addAll(validated);
                     String errorMsg = validated.get(0).getErrorDetail();
                     this.appendErrorMessage(sbError, errorMsg);
                     continue;
                 }
                 // 结构转产表校验
-                if (!allStructureNameMap.containsKey(item.getStructureName())) {
-                    item.setId(errorImportId);
-//                    failureNum++;
-//                    addImportErrorLog(importLogId, errorNum, String.format(noStructureNameStr, item.getStructureName()), importErrorLogs);
-                    String errorMsg = String.format(noStructureNameStr, item.getStructureName());
+                if (!allStructureNameMap.containsKey(structureName)) {
+                    String errorMsg = String.format(noStructureNameStr, structureName);
                     this.appendErrorMessage(sbError, errorMsg);
                     continue;
                 }
@@ -3397,21 +3383,17 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                     continue;
                 }
                 // 校验月计划的排产日期是否在结构转产表的范围内
-                MpStructureAllocation mpStructureAllocation = structureDayMap.get(item.getStructureName());
+                MpStructureAllocation mpStructureAllocation = structureDayMap.get(structureName);
                 if (mpStructureAllocation != null) {
                     Integer structureBeginDay = mpStructureAllocation.getBeginDay();
                     Integer structureEndDay = mpStructureAllocation.getEndDay();
                     if (resultBeginDay < structureBeginDay || resultEndDay > structureEndDay) { // 超范围则记录错误信息
-                        item.setId(errorImportId);
-                        String errorMsg = String.format(outOfRangeStr, item.getMaterialDesc(), structureBeginDay, structureEndDay);
-//                        failureNum++;
-//                        addImportErrorLog(importLogId, errorNum, errorMsg, importErrorLogs);
+                        String errorMsg = String.format(outOfRangeStr, structureName, item.getMaterialDesc(), structureBeginDay, structureEndDay);
                         this.appendErrorMessage(sbError, errorMsg);
                         continue;
                     }
                 } else { // 结构没有开始结束时间
-//                    failureNum++;
-                    String errorMsg = String.format(noStructureDateStr, item.getStructureName());
+                    String errorMsg = String.format(noStructureDateStr, structureName);
                     this.appendErrorMessage(sbError, errorMsg);
                     continue;
                 }
@@ -3728,14 +3710,14 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             MdmMaterialInfo materialInfo = materialInfoMap.get(materialCode);
             if (materialInfo == null) {
                 insertItem.setId(errorImportId);
-                String errorMsg = String.format(notMaterialStr, materialDesc + materialCode);
+                String errorMsg = String.format(notMaterialStr, structureName, materialDesc);
                 addImportErrorLog(importLogId, rowNum, errorMsg, importErrorLogs);
                 continue;
             }
             // 2.2、模具校验
             if (!materialHasMoldSet.contains(materialDesc)) {
                 insertItem.setId(errorImportId);
-                String errorMsg = String.format(notSkuMoldRelStr, materialDesc + materialCode);
+                String errorMsg = String.format(notSkuMoldRelStr, structureName, materialDesc);
                 addImportErrorLog(importLogId, rowNum, errorMsg, importErrorLogs);
                 continue;
             }
@@ -3822,7 +3804,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                 insertItem.setMainMaterialDesc(constructionInfo.getMainMaterialDesc());
             }
             if (StringUtils.isEmpty(insertItem.getLhNo())) {
-                String errorMsg = String.format(notConstructStr, materialDesc + materialCode);
+                String errorMsg = String.format(notConstructStr, structureName, materialDesc);
                 this.appendErrorMessage(sbError, errorMsg);
                 continue;
             }
