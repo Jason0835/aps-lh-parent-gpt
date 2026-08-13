@@ -124,6 +124,7 @@ public class Cd15MachineRollMappingController extends AbstractDocBizController<C
     protected List<Cd15MachineRollMapping> listExportData(Cd15MachineRollMapping obj) {
         QueryWrapper<Cd15MachineRollMapping> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
+        wrapper.last("ORDER BY " + this.getOrderBy());
         List<Cd15MachineRollMapping> list = cd15MachineRollMappingMapper.selectList(wrapper);
         AppUtils.formatData(list, getQueryFormulas());
         return list;

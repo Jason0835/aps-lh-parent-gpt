@@ -1,5 +1,6 @@
 package com.zlt.aps.cd90.service;
 
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleResult;
 import com.zlt.aps.cd90.model.Cd90ScheduleOverwriteDecision;
 import org.springframework.stereotype.Component;
@@ -34,15 +35,16 @@ public class Cd90ScheduleOverwriteValidator {
         }
         if (!forceRegenerate) {
             return Cd90ScheduleOverwriteDecision.builder().needConfirm(true)
-                    .message("当前日期已存在未完成且未发布的自动排程，是否重新生成？").build();
+                    .message(I18nUtil.getMessage(
+                            "ui.cd90.scheduleResult.overwrite.needConfirm"))
+                    .build();
         }
         return allowed();
     }
 
     private String conflict(Cd90ScheduleResult result) {
-//        if (!"0".equals(result.getDataSource())) {
-//            return "当前日期存在插单或人工调整结果，自动排程不能覆盖";
-//        }
+        // 人工插单/调整（DATA_SOURCE=1）按业务约定允许被重新自动排程覆盖；
+        // 是否可覆盖只由锁定、发布和已生产状态决定。
         if (Integer.valueOf(1).equals(result.getIsLocked())) {
             return "当前日期存在人工锁定结果，自动排程不能覆盖";
         }

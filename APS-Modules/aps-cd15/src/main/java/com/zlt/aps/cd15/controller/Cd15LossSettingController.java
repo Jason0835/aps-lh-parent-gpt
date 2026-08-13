@@ -123,6 +123,6 @@ public class Cd15LossSettingController extends AbstractDocBizController<Cd15Loss
 
     @Override
     protected String getOrderBy() {
-        return "MACHINE_CODE asc, STEEL_STRIP_CODE asc, UPDATE_TIME desc";
+        return "CREATE_TIME desc";
     }
 }

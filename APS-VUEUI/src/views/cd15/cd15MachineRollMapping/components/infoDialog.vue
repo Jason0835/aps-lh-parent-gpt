@@ -38,17 +38,16 @@ export default {
       type: Array,
       default: () => [],
     },
+    articleCrownSpecOptions: {
+      type: Array,
+      default: () => [],
+    },
   },
   data() {
     const requiredSelect = {
       required: true,
       message: this.$t("common.rule.select"),
       trigger: "change",
-    };
-    const requiredInput = {
-      required: true,
-      message: this.$t("common.rule.input"),
-      trigger: "blur",
     };
     return {
       loading: false,
@@ -60,7 +59,7 @@ export default {
       localMachineOptions: [],
       rules: {
         factoryCode: [requiredSelect],
-        bigRollCode: [requiredInput],
+        bigRollCode: [requiredSelect],
         machineCode: [requiredSelect],
         shiftCode: [
           {
@@ -90,12 +89,16 @@ export default {
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
           filterable: true,
-          change: () => this.loadMachineOptions(),
+          listeners: {
+            change: (factoryCode) => this.handleFactoryChange(factoryCode),
+          },
         },
         {
           prop: "bigRollCode",
           label: this.$t("ui.data.column.cd15MachineRollMapping.bigRollCode"),
-          maxlength: 30,
+          type: "select",
+          dictData: this.articleCrownSpecOptions,
+          filterable: true,
         },
         {
           prop: "machineCode",
@@ -177,10 +180,22 @@ export default {
         shiftCode: Array.isArray(params.shiftCode) ? params.shiftCode.join(",") : params.shiftCode,
       };
     },
-    async loadMachineOptions() {
-      const res = await getCd15MachineEnableOptions({ factoryCode: this.form.factoryCode || "116" });
+    async loadMachineOptions(factoryCode = this.form.factoryCode) {
+      this.localMachineOptions = [];
+      if (!factoryCode) {
+        return;
+      }
+      const res = await getCd15MachineEnableOptions({ factoryCode });
+      if (`${this.form.factoryCode || ""}` !== `${factoryCode}`) {
+        return;
+      }
       const rows = Array.isArray(res) ? res : (res.rows || res.data || []);
       this.localMachineOptions = rows.map((item) => ({ label: item.machineCode, value: item.machineCode }));
+    },
+    handleFactoryChange(factoryCode) {
+      this.form.factoryCode = factoryCode;
+      this.form.machineCode = "";
+      this.loadMachineOptions(factoryCode);
     },
     show(data) {
       if (data) {
@@ -195,9 +210,9 @@ export default {
           shiftCode: [],
         };
       }
-      this.localMachineOptions = this.machineOptions;
+      this.localMachineOptions = [];
       this.visible = true;
-      this.loadMachineOptions();
+      this.loadMachineOptions(this.form.factoryCode);
     },
     hide() {
       this.form = { shiftCode: [] };

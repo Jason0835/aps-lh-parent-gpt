@@ -78,6 +78,8 @@ public class Cd90TimedRollingEngineExecutor {
         validate(target, inputVersion);
         Cd90AutoScheduleContext context = autoScheduleEngineService.prepare(
                 target.getFactoryCode(), date(target));
+        context.setResourceBaselineDate(target.getResourceBaselineDate());
+        context.setResourceBaselineShiftCode(target.getTargetShiftCode());
         List<Cd90ShiftDescriptor> affectedShifts = shiftSlicer.slice(
                 context.getShifts(), target.getTargetClassField());
         List<Cd90ScheduleResult> sourceResults = loadSourceResults(target);
@@ -523,6 +525,8 @@ public class Cd90TimedRollingEngineExecutor {
                                             Cd90ShiftDescriptor shift) {
         return inputService.load(context.getFactoryCode(), context.getScheduleDate(),
                 shift.getClassField(), shift.getShiftCode(),
+                context.getResourceBaselineDate(),
+                context.getResourceBaselineShiftCode(),
                 context.getParameters().getAgingPeriodHours());
     }
 
@@ -624,6 +628,7 @@ public class Cd90TimedRollingEngineExecutor {
 
     private void validate(Cd90RollingTarget target, String inputVersion) {
         if (target == null || target.getScheduleDate() == null
+                || target.getResourceBaselineDate() == null
                 || target.getFactoryCode() == null || target.getBatchNo() == null
                 || target.getTargetClassField() == null || inputVersion == null) {
             throw new IllegalArgumentException("定时滚动排程目标和输入版本不能为空");

@@ -177,6 +177,8 @@ public class Cd90InsertRollingServiceImpl implements Cd90InsertRollingService {
             int classIndex = classIndex(shift.getClassField());
             Cd90AutoScheduleInput input = inputService.load(context.getFactoryCode(),
                     context.getScheduleDate(), shift.getClassField(), shift.getShiftCode(),
+                    context.getResourceBaselineDate(),
+                    context.getResourceBaselineShiftCode(),
                     context.getParameters().getAgingPeriodHours());
             this.ensureInsertMaterial(input, insertMaterial);
             if (rollingResources == null) {

@@ -41,4 +41,10 @@ public class Cd15CurlLength extends BaseEntity implements Serializable {
     @TableField("CURL_LENGTH")
     @Excel(name = "ui.data.column.cd15CurlLength.curlLength")
     private Double curlLength;
+
+    /** 备注 */
+    @ApiModelProperty(value = "备注", name = "remark")
+    @TableField("REMARK")
+    @Excel(name = "ui.common.column.remark")
+    private String remark;
 }

@@ -71,7 +71,7 @@ public class Cd15MachineInfo extends BaseEntity implements Serializable {
     /** 是否支持一出二：1--支持，0--不支持 */
     @ApiModelProperty(value = "是否支持一出二", name = "isOutTwo")
     @TableField("IS_OUT_TWO")
-    @Excel(name = "ui.data.column.cd15MachineInfo.isOutTwo", dictType = "biz_yes_no")
+//    @Excel(name = "ui.data.column.cd15MachineInfo.isOutTwo", dictType = "biz_yes_no")
     private String isOutTwo;
 
     /** 是否支持单裁：1--支持，0--不支持 */
@@ -98,7 +98,7 @@ public class Cd15MachineInfo extends BaseEntity implements Serializable {
     /** 历史日产量模式切换阈值保留字段，不参与自动排程 */
     @ApiModelProperty(value = "历史日产量模式切换阈值保留字段，不参与自动排程", name = "dailyOutputModeThreshold")
     @TableField("DAILY_OUTPUT_MODE_THRESHOLD")
-    @Excel(name = "ui.data.column.cd15MachineInfo.dailyOutputModeThreshold")
+//    @Excel(name = "ui.data.column.cd15MachineInfo.dailyOutputModeThreshold")
     private Double dailyOutputModeThreshold;
 
     /** 单裁班产能力，单位米/班 */
@@ -125,4 +125,10 @@ public class Cd15MachineInfo extends BaseEntity implements Serializable {
     @TableField("STEEL_STRIP_WIDTH")
 //    @Excel(name = "ui.data.column.cd15MachineInfo.steelStripWidth")
     private Double steelStripWidth;
+
+    /** 备注 */
+    @ApiModelProperty(value = "备注", name = "remark")
+    @TableField("REMARK")
+    @Excel(name = "ui.common.column.remark")
+    private String remark;
 }

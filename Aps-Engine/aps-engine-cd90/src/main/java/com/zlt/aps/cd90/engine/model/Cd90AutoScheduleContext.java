@@ -20,6 +20,10 @@ public class Cd90AutoScheduleContext {
     private LocalDate scheduleDate;
     /** 本次计算启动时间。 */
     private LocalDateTime startTime;
+    /** 页面自动排程启动时冻结的资源快照业务日期。 */
+    private LocalDate resourceBaselineDate;
+    /** 页面自动排程启动时冻结的资源快照班次。 */
+    private String resourceBaselineShiftCode;
     /** 当前执行阶段。 */
     private String currentStage;
     /** 启动时固定的参数快照。 */
@@ -28,6 +32,6 @@ public class Cd90AutoScheduleContext {
     private List<Cd90ShiftDescriptor> shifts;
     /** 工厂当前全部启用班次数，用于最终参数复核。 */
     private int enabledShiftCount;
-    /** 成型计划、6点库存和库排资源的启动版本指纹。 */
+    /** 自动排程全部关键输入的启动版本指纹。 */
     private String inputVersionFingerprint;
 }

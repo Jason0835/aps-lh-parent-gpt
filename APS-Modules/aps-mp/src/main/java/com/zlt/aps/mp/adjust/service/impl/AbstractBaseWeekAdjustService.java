@@ -1238,11 +1238,34 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
     }
 
     /**
+     * 初始化上下文
+     * @param factoryCode
+     * @param productType
+     * @return
+     */
+    @Override
+    public MpRollAdjustContextDTO initContextDTO(String factoryCode, String productType) {
+        MpRollAdjustContextDTO contextDTO = new MpRollAdjustContextDTO();
+        contextDTO.setFactoryCode(factoryCode);
+        contextDTO.setProductType(productType);
+        // 设置周程滚动参数
+        contextDTO.setParamMap(mpAdjustStructureInService.getMpWeekAdjustParam(contextDTO.getFactoryCode(), productType));
+        // 初始化SKU排产分类
+        initSkuProductionType(contextDTO);
+        initMaterialInfo(contextDTO);
+        initMouldInfo(contextDTO);
+        initMouldShellInfo(contextDTO);
+        initCapsuleChuckInfo(contextDTO);
+        return contextDTO;
+    }
+
+    /**
      * 检查模壳标准限制
      *
      * @param contextDTO 滚动上下文
      */
-    private void checkMouldShellLimit(MpRollAdjustContextDTO contextDTO) {
+    @Override
+    public void checkMouldShellLimit(MpRollAdjustContextDTO contextDTO) {
         if (PubUtil.isEmpty(contextDTO.getMdmMouldInfoMap())){
             return;
         }
@@ -1354,7 +1377,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      *
      * @param contextDTO 滚动上下文
      */
-    private void checkCapsuleChuckLimit(MpRollAdjustContextDTO contextDTO) {
+    @Override
+    public void checkCapsuleChuckLimit(MpRollAdjustContextDTO contextDTO) {
         if (PubUtil.isEmpty(contextDTO.getMdmCapsuleChuckList())){
             return;
         }
@@ -1684,7 +1708,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      *
      * @param contextDTO
      */
-    protected void handleMonthPlanStatistics(MpRollAdjustContextDTO contextDTO, String tempFlag) {
+    @Override
+    public void handleMonthPlanStatistics(MpRollAdjustContextDTO contextDTO, String tempFlag) {
         // 获取月度生产计划
         List<FactoryMonthPlanFinalAdjustVo> monthPLanList = contextDTO.getFactoryMonthPlanProdFinalList();
         if (PubUtil.isEmpty(monthPLanList)) {

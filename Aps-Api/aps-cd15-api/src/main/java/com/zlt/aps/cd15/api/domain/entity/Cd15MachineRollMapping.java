@@ -48,6 +48,12 @@ public class Cd15MachineRollMapping extends BaseEntity implements Serializable {
     @Excel(name = "ui.data.column.cd15MachineRollMapping.shiftCode", dictType = "class_num_three_plan")
     private String shiftCode;
 
+    /** 备注 */
+    @ApiModelProperty(value = "备注", name = "remark")
+    @TableField("REMARK")
+    @Excel(name = "ui.common.column.remark")
+    private String remark;
+
     @TableField(exist = false)
     private Boolean confirmOutOfOpenShift;
 }

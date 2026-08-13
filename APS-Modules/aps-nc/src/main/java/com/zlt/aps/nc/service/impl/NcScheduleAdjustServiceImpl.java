@@ -9,7 +9,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
@@ -47,6 +50,7 @@ import com.zlt.aps.nc.mapper.NcDayFinishQtyMapper;
 import com.zlt.aps.nc.mapper.NcScheduleResultMapper;
 import com.zlt.aps.nc.mapper.NcSpecifyMachineMapper;
 import com.zlt.aps.nc.model.NcAdjustScheduleContext;
+import com.zlt.aps.nc.model.ScheduleDateGroup;
 import com.zlt.aps.nc.service.INcScheduleAdjustService;
 import com.zlt.aps.nc.service.INcShiftConfigService;
 import com.zlt.aps.nc.service.NcDispatcherLogService;
@@ -199,8 +203,16 @@ public class NcScheduleAdjustServiceImpl implements INcScheduleAdjustService {
         String factoryCode = insertVO.getFactoryCode();
         String machineCode = insertVO.getMachineCode();
 
-        // 根据首班班次计算实际排产日期（取代前端直接传入的 scheduleDate）
-        Date scheduleDate = this.calculateInsertScheduleDate(insertVO);
+        // 2.1.1 计算排产日期分组（支持一次插入6个班，跨排产日自动拆分多笔记录）
+        List<ScheduleDateGroup> dateGroups = this.calculateInsertScheduleDateGroups(insertVO);
+        if (dateGroups.isEmpty()) {
+            log.warn("插单排产日期计算为空");
+            return AjaxResult.error(I18nUtil.getMessage("ui.message.data.error"));
+        }
+
+        // 取第一组排产日期为主日，用于校验和顺延
+        ScheduleDateGroup firstGroup = dateGroups.get(0);
+        Date scheduleDate = firstGroup.getScheduleDate();
         insertVO.setScheduleDate(scheduleDate);
 
         // 1. 公共数据预加载
@@ -218,13 +230,14 @@ public class NcScheduleAdjustServiceImpl implements INcScheduleAdjustService {
             return paramCheck;
         }
 
-        // 确定目标班次和顺位
+        // 确定目标班次和顺位（基于第一组），并转换为第一组记录中的输出class位置
         int targetClass = resolveTargetClass(insertVO);
         int targetSeq = resolveTargetSequence(insertVO, targetClass);
+        int recordClass = resolveRecordClass(firstGroup, targetClass);
 
         // 2.2 约束一校验 — 生产顺位合法性
         ShiftValidateResult shiftResult = iNcScheduleShiftEngineService.validateInsertConstraint(factoryCode,
-                scheduleDate, machineCode, targetClass, targetSeq);
+                scheduleDate, machineCode, recordClass, targetSeq);
         if (!shiftResult.isPassed()) {
             log.info("插单约束校验不通过：{}", shiftResult.getErrorMsg());
             return AjaxResult.error(shiftResult.getErrorMsg());
@@ -232,12 +245,12 @@ public class NcScheduleAdjustServiceImpl implements INcScheduleAdjustService {
 
         // 2.3 约束二校验 — 产能校验（三档判断）
         BigDecimal insertPlanQty = getPlanQtyByClass(insertVO, targetClass);
-        CapacityValidateResult capacityResult = iNcScheduleShiftEngineService.validateCapacity(machineCode, targetClass,
+        CapacityValidateResult capacityResult = iNcScheduleShiftEngineService.validateCapacity(machineCode, recordClass,
                 targetSeq, insertPlanQty, ctx.getScheduleResults(), factoryCode, scheduleDate);
 
         // 第一档：插单量 ≤ 剩余产能（定额 - 当班原有计划量），无产能问题直接执行插单
         if (capacityResult.isWithinQuota()) {
-            return executeInsertInternal(insertVO, targetClass, targetSeq, ctx);
+            return executeInsertInternalWithGroups(insertVO, recordClass, targetSeq, ctx, dateGroups);
         }
 
         // 第三档：插单量 > 实际剩余产能（定额 - 已生产量），超当班剩余产能，拒绝插单
@@ -248,7 +261,7 @@ public class NcScheduleAdjustServiceImpl implements INcScheduleAdjustService {
 
         // 第二档在 insertOrderValidate 中已处理，用户确认后直接执行
         // 若走到这里说明未经过前置校验或前置已确认，直接执行插单
-        return executeInsertInternal(insertVO, targetClass, targetSeq, ctx);
+        return executeInsertInternalWithGroups(insertVO, recordClass, targetSeq, ctx, dateGroups);
     }
 
     /**
@@ -269,8 +282,15 @@ public class NcScheduleAdjustServiceImpl implements INcScheduleAdjustService {
      */
     @Override
     public AjaxResult insertOrderValidate(NcScheduleResult insertVO) {
-        // 2.1.1 根据首班班次计算实际排产日期（取代前端直接传入的 scheduleDate）
-        Date scheduleDate = this.calculateInsertScheduleDate(insertVO);
+        // 2.1.1 计算排产日期分组，取第一组排产日用于校验
+        List<ScheduleDateGroup> dateGroups = this.calculateInsertScheduleDateGroups(insertVO);
+        if (dateGroups.isEmpty()) {
+            log.warn("插单排产日期计算为空");
+            return AjaxResult.error(I18nUtil.getMessage("ui.message.data.error"));
+        }
+
+        ScheduleDateGroup firstGroup = dateGroups.get(0);
+        Date scheduleDate = firstGroup.getScheduleDate();
         insertVO.setScheduleDate(scheduleDate);
 
         String factoryCode = insertVO.getFactoryCode();
@@ -282,7 +302,7 @@ public class NcScheduleAdjustServiceImpl implements INcScheduleAdjustService {
             return lockedCheck;
         }
 
-        // 2.1.2 排程计划存在性校验：使用计算后的实际排产日期
+        // 2.1.2 排程计划存在性校验：使用计算后的第一个排产日
         AjaxResult scheduleExistCheck = this.checkScheduleExists(factoryCode, scheduleDate, machineCode);
         if (scheduleExistCheck != null) {
             return scheduleExistCheck;
@@ -297,20 +317,21 @@ public class NcScheduleAdjustServiceImpl implements INcScheduleAdjustService {
             return paramCheck;
         }
 
-        // 确定目标班次和顺位
+        // 确定目标班次和顺位，并转换为第一组记录中的输出class位置
         int targetClass = resolveTargetClass(insertVO);
         int targetSeq = resolveTargetSequence(insertVO, targetClass);
+        int recordClass = resolveRecordClass(firstGroup, targetClass);
 
         // 2.2 约束一校验 — 生产顺位合法性
         ShiftValidateResult shiftResult = iNcScheduleShiftEngineService.validateInsertConstraint(factoryCode,
-                scheduleDate, machineCode, targetClass, targetSeq);
+                scheduleDate, machineCode, recordClass, targetSeq);
         if (!shiftResult.isPassed()) {
             return AjaxResult.error(shiftResult.getErrorMsg());
         }
 
         // 2.3 约束二校验 — 产能校验（三档判断）
         BigDecimal insertPlanQty = getPlanQtyByClass(insertVO, targetClass);
-        CapacityValidateResult capacityResult = iNcScheduleShiftEngineService.validateCapacity(machineCode, targetClass,
+        CapacityValidateResult capacityResult = iNcScheduleShiftEngineService.validateCapacity(machineCode, recordClass,
                 targetSeq, insertPlanQty, ctx.getScheduleResults(), factoryCode, scheduleDate);
 
         return this.handleCapacityResult(capacityResult, insertPlanQty);
@@ -325,8 +346,15 @@ public class NcScheduleAdjustServiceImpl implements INcScheduleAdjustService {
         String factoryCode = insertVO.getFactoryCode();
         String machineCode = insertVO.getMachineCode();
 
-        // 根据首班班次计算实际排产日期
-        Date scheduleDate = this.calculateInsertScheduleDate(insertVO);
+        // 计算排产日期分组
+        List<ScheduleDateGroup> dateGroups = this.calculateInsertScheduleDateGroups(insertVO);
+        if (dateGroups.isEmpty()) {
+            log.warn("插单排产日期计算为空");
+            return AjaxResult.error(I18nUtil.getMessage("ui.message.data.error"));
+        }
+
+        ScheduleDateGroup firstGroup = dateGroups.get(0);
+        Date scheduleDate = firstGroup.getScheduleDate();
         insertVO.setScheduleDate(scheduleDate);
 
         NcAdjustScheduleContext ctx = this.loadBaseData(factoryCode, scheduleDate);
@@ -338,15 +366,26 @@ public class NcScheduleAdjustServiceImpl implements INcScheduleAdjustService {
 
         int targetClass = resolveTargetClass(insertVO);
         int targetSeq = resolveTargetSequence(insertVO, targetClass);
+        int recordClass = resolveRecordClass(firstGroup, targetClass);
 
-        return executeInsertInternal(insertVO, targetClass, targetSeq, ctx);
+        return executeInsertInternalWithGroups(insertVO, recordClass, targetSeq, ctx, dateGroups);
     }
 
     /**
-     * 插单内部执行
+     * 插单内部执行（支持多排产日分组）
+     * <p>
+     * 第一组执行顺延处理，后续组直接插入新记录。
+     * </p>
+     *
+     * @param insertVO   插单参数（含6个班次计划量/顺位/原因分析）
+     * @param targetClass 目标输出class位置（第一组记录中的class索引，1~6）
+     * @param targetSeq   目标生产顺位
+     * @param ctx         调整上下文（基于第一组排产日加载）
+     * @param dateGroups  排产日期分组列表（第一组执行顺延，后续组直接插入）
+     * @return 操作结果
      */
-    private AjaxResult executeInsertInternal(NcScheduleResult insertVO, int targetClass, int targetSeq,
-            NcAdjustScheduleContext ctx) {
+    private AjaxResult executeInsertInternalWithGroups(NcScheduleResult insertVO, int targetClass, int targetSeq,
+            NcAdjustScheduleContext ctx, List<ScheduleDateGroup> dateGroups) {
         String factoryCode = ctx.getFactoryCode();
         Date scheduleDate = ctx.getScheduleDate();
         String machineCode = insertVO.getMachineCode();
@@ -357,7 +396,10 @@ public class NcScheduleAdjustServiceImpl implements INcScheduleAdjustService {
             specName = insertVO.getLiningCode();
         }
 
-        // 2.4.1：生成工单号
+        // ====== 第一组：按现有逻辑执行顺延 ======
+        ScheduleDateGroup firstGroup = dateGroups.get(0);
+
+        // 2.4.1：生成工单号（基于第一组的排产日）
         // 批次号取当前排产日其余记录的值（同一排产日内所有记录批次号一致）
         String batchNoFromExisting = "";
         for (NcScheduleResult r : ctx.getScheduleResults()) {
@@ -383,7 +425,7 @@ public class NcScheduleAdjustServiceImpl implements INcScheduleAdjustService {
         String orderNo = iNcOrderGeneratorService.generateOrderNo(batchNoFromExisting, maxOrderSeq);
         insertVO.setOrderNo(orderNo);
         insertVO.setBatchNo(batchNoFromExisting);
-        insertVO.setDataSource(NcEngineConstants.DATA_SOURCE_INSERT); // "2"=插单
+        insertVO.setDataSource(NcEngineConstants.DATA_SOURCE_INSERT); // "1"=插单
         insertVO.setReleaseStatus(ApsConstant.NO_RELEASE);
         insertVO.setPublishSuccessCount(0);
         insertVO.setFactoryCode(factoryCode);
@@ -404,32 +446,33 @@ public class NcScheduleAdjustServiceImpl implements INcScheduleAdjustService {
         BigDecimal stockQty = loadPaddingStock(factoryCode, scheduleDate, insertVO.getLiningCode());
         insertVO.setStockQty(BigDecimalUtils.valueOf(stockQty));
 
-        // 开产班次取当前排产日其余记录的值（同一批数据值都一样）
-        for (NcScheduleResult r : ctx.getScheduleResults()) {
-            if (StringUtils.isNotBlank(r.getScheduleShiftClass())) {
-                insertVO.setScheduleShiftClass(r.getScheduleShiftClass());
-                break;
+        // 开产班次：优先取第一组的首班班次（保证class映射与排产日期计算一致）；
+        // 无分组信息时兼容旧逻辑，取当前排产日其余记录的值
+        if (StringUtils.isNotBlank(firstGroup.getScheduleShiftClass())) {
+            insertVO.setScheduleShiftClass(firstGroup.getScheduleShiftClass());
+        } else {
+            for (NcScheduleResult r : ctx.getScheduleResults()) {
+                if (StringUtils.isNotBlank(r.getScheduleShiftClass())) {
+                    insertVO.setScheduleShiftClass(r.getScheduleShiftClass());
+                    break;
+                }
             }
         }
 
         // 收尾标记默认 0（否）
         insertVO.setTailFlag("0");
 
-        // 确保只有目标班次有计划量
-        for (int c = 1; c <= NcEngineConstants.SHIFT_COUNT; c++) {
-            if (c == targetClass) {
-                setPlanQtyByClass(insertVO, c, getPlanQtyByClass(insertVO, c)); // 需从insertVO提取实际值
-                setSeqByClass(insertVO, c, targetSeq);
-            } else {
-                setPlanQtyByClass(insertVO, c, null);
-                setSeqByClass(insertVO, c, null);
-            }
-        }
+        // 第一组记录副本：保留 insertVO 原始输入位置数据（后续组仍按输入位置取值），
+        // 副本按 positionClassMap 将输入位置数据迁移到输出 class 位置
+        NcScheduleResult firstRecord = new NcScheduleResult();
+        BeanUtils.copyProperties(insertVO, firstRecord);
+        this.fillRecordClassData(firstRecord, firstGroup, insertVO);
 
         // 获取当前排程结果（深拷贝）
         List<NcScheduleResult> currentResults = new ArrayList<>(ctx.getScheduleResults());
 
-        // 2.4.2+2.4.3+2.4.4：执行顺延
+        // 2.4.2+2.4.3+2.4.4：对第一组的目标输出class执行顺延
+        // 顺延引擎按排程记录中的 class 位置处理，因此传入记录位置 recordClass（而非输入位置 targetClass）
         ShiftContext shiftCtx = new ShiftContext().setFactoryCode(factoryCode).setScheduleDate(scheduleDate)
                 .setMachineCode(machineCode).setTargetClass(targetClass).setTargetSeq(targetSeq)
                 .setInsertSpecName(specName).setInsertPlanQty(getPlanQtyByClass(insertVO, targetClass))
@@ -438,8 +481,8 @@ public class NcScheduleAdjustServiceImpl implements INcScheduleAdjustService {
         List<NcScheduleResult> updatedResults = iNcScheduleShiftEngineService.processInsertAndCascade(shiftCtx);
 
         // 2.5：保存数据
-        // 先保存新插单记录
-        NcScheduleResultMapper.insert(insertVO);
+        // 先保存第一组的新插单记录
+        NcScheduleResultMapper.insert(firstRecord);
 
         // 更新被顺延的记录
         for (NcScheduleResult updated : updatedResults) {
@@ -448,7 +491,52 @@ public class NcScheduleAdjustServiceImpl implements INcScheduleAdjustService {
             }
         }
 
-        // 记录操作日志
+        // ====== 后续组：直接插入新记录（无需顺延） ======
+        if (dateGroups.size() > 1) {
+            for (int i = 1; i < dateGroups.size(); i++) {
+                ScheduleDateGroup group = dateGroups.get(i);
+                NcScheduleResult groupRecord = new NcScheduleResult();
+                BeanUtils.copyProperties(insertVO, groupRecord);
+                groupRecord.setId(null); // 新记录
+                groupRecord.setScheduleDate(group.getScheduleDate());
+                groupRecord.setScheduleShiftClass(group.getScheduleShiftClass());
+
+                // 为后续组单独生成工单号（基于该排产日已有记录）
+                List<NcScheduleResult> groupResults = NcScheduleResultMapper
+                        .selectList(new LambdaQueryWrapper<NcScheduleResult>()
+                                .eq(NcScheduleResult::getFactoryCode, factoryCode)
+                                .eq(NcScheduleResult::getScheduleDate, group.getScheduleDate()));
+                String groupBatchNo = "";
+                for (NcScheduleResult r : groupResults) {
+                    if (StringUtils.isNotBlank(r.getBatchNo())) {
+                        groupBatchNo = r.getBatchNo();
+                        break;
+                    }
+                }
+                int groupMaxOrderSeq = 0;
+                for (NcScheduleResult r : groupResults) {
+                    if (r.getOrderNo() != null && r.getOrderNo().endsWith("-")) {
+                        String seqPart = r.getOrderNo().substring(r.getOrderNo().lastIndexOf("-") + 1);
+                        try {
+                            int seq = Integer.parseInt(seqPart);
+                            if (seq > groupMaxOrderSeq) {
+                                groupMaxOrderSeq = seq;
+                            }
+                        } catch (NumberFormatException ignored) {
+                        }
+                    }
+                }
+                groupRecord.setBatchNo(groupBatchNo);
+                groupRecord.setOrderNo(iNcOrderGeneratorService.generateOrderNo(groupBatchNo, groupMaxOrderSeq));
+
+                // 按 positionClassMap 将输入位置数据迁移到该组记录的输出 class 位置
+                this.fillRecordClassData(groupRecord, group, insertVO);
+
+                NcScheduleResultMapper.insert(groupRecord);
+            }
+        }
+
+        // 记录操作日志（基于第一组）
         this.recordDispatcherLog(ApsConstant.DISPATCHER_OPER_INSERT_ORDER, insertVO, ctx.getScheduleResults(),
                 insertVO);
 
@@ -1077,38 +1165,112 @@ public class NcScheduleAdjustServiceImpl implements INcScheduleAdjustService {
     }
 
     /**
-     * 根据首班班次计算插单的实际排产日期
+     * 将输入班次位置转换为第一组排程记录中的输出class位置
      * <p>
-     * 逻辑说明：
-     * <ol>
-     *   <li>从传入的 insertVO 中获取 {@code scheduleShiftClass}（首班班次，打开插单页面时记录）</li>
-     *   <li>通过 {@link #resolveTargetClass(NcScheduleResult)} 确定插单目标班次（连续3个班中的第几个班）</li>
-     *   <li>查询活跃班次配置，以首班班次为起点、目标班次为终点（含两端），遍历检查是否有跨天班次（crossDayFlag="1"）：</li>
-     *   <li>无跨天班次 → 排产日期 = 当前服务器时间所在排产日；有跨天班次 → 排产日期 = 当前服务器时间所在排产日 + 1</li>
-     * </ol>
+     * 多班次插单时，组内第N个有量位置映射到该组记录的classN（该组记录的首班班次即第一个有量位置的班次），
+     * 无映射时直接使用原位置（兼容旧逻辑）。
      * </p>
      *
-     * @param insertVO 插单参数（需包含 scheduleShiftClass 及各班次计划量）
-     * @return 计算后的排产日期；若缺少必要参数则返回前端传入的原始 scheduleDate
+     * @param firstGroup  第一组排产日期分组
+     * @param targetClass 输入班次位置（1~6）
+     * @return 输出class位置（1~6）
      */
-    private Date calculateInsertScheduleDate(NcScheduleResult insertVO) {
+    private int resolveRecordClass(ScheduleDateGroup firstGroup, int targetClass) {
+        Map<Integer, Integer> classMap = firstGroup.getPositionClassMap();
+        Integer outputClass = classMap != null ? classMap.get(targetClass) : null;
+        return outputClass != null ? outputClass : targetClass;
+    }
+
+    /**
+     * 插单排产日期组 — 班次粒度计算，支持跨排产日拆分
+     * <p>
+     * 对 position=1~lastClass 逐位计算独立排产日期，将有量班次按排产日期分组返回。
+     * </p>
+     * <p>
+     * 排产日期变化条件（每个班次独立判断，累积偏移）：
+     * 当遇到跨天班次（crossDayFlag=1）时，后续位置排产日+1。
+     * </p>
+     * <p>
+     * 组内映射规则：第N个有量位置映射到该组记录的classN，
+     * 该组的首班班次（scheduleShiftClass）为组内第一个有量位置的班次。
+     * </p>
+     *
+     * @param insertVO 插单参数
+     * @return 排产日期分组列表（按日期升序）
+     */
+    private List<ScheduleDateGroup> calculateInsertScheduleDateGroups(NcScheduleResult insertVO) {
         String startShiftClass = insertVO.getScheduleShiftClass();
         if (StringUtils.isBlank(startShiftClass)) {
-            // 无首班班次时直接使用前端传入的排产日期（兼容旧逻辑）
-            return insertVO.getScheduleDate();
+            // 无首班班次时直接使用前端传入的排产日期（兼容旧逻辑如调量转插单）
+            return Collections.singletonList(
+                    buildSingleDateGroup(insertVO, insertVO.getScheduleDate(), insertVO.getScheduleShiftClass()));
         }
 
-        // 确定目标班次是连续3个班中的第几个班（1/2/3）
-        int targetClass = resolveTargetClass(insertVO);
+        int lastClass = resolveLastClass(insertVO);
 
         // 查询活动班次配置
         List<NcShiftConfig> activeShifts = djShiftConfigService.listActiveShifts();
         if (CollectionUtils.isEmpty(activeShifts)) {
-            log.warn("未找到活动班次配置，无法计算插单排产日期，使用前端传入日期");
-            return insertVO.getScheduleDate();
+            return Collections.singletonList(buildSingleDateGroup(insertVO, insertVO.getScheduleDate(), startShiftClass));
         }
 
         // 计算当前服务器时间所在的排产日
+        LocalDate serverProductionDate = calculateServerProductionDate(activeShifts);
+
+        // 查找首班班次索引
+        int startIndex = findShiftIndex(activeShifts, startShiftClass);
+        if (startIndex < 0) {
+            return Collections.singletonList(buildSingleDateGroup(insertVO, insertVO.getScheduleDate(), startShiftClass));
+        }
+
+        // 计算各位置的排产日期偏移
+        int totalShifts = activeShifts.size();
+        List<Integer> dateOffsetPerPosition = new ArrayList<>(lastClass);
+        int dateOffset = 0;
+        for (int position = 1; position <= lastClass; position++) {
+            NcShiftConfig shift = activeShifts.get((startIndex + position - 1) % totalShifts);
+            // 日期偏移：跨天班次（crossDayFlag=1）时排产日+1（首位置不判断）
+            if (position > 1 && ApsConstant.TRUE.equals(shift.getCrossDayFlag())) {
+                dateOffset++;
+            }
+            dateOffsetPerPosition.add(dateOffset);
+        }
+
+        // 按排产日期偏移分组
+        Map<Integer, ScheduleDateGroup> dateGroupMap = new LinkedHashMap<>();
+        for (int position = 1; position <= lastClass; position++) {
+            if (!hasPlanQty(insertVO, position)) {
+                continue;
+            }
+            int offset = dateOffsetPerPosition.get(position - 1);
+
+            dateGroupMap.computeIfAbsent(offset, k -> {
+                ScheduleDateGroup g = new ScheduleDateGroup();
+                g.setScheduleDate(Date.from(
+                        serverProductionDate.plusDays(k).atStartOfDay(ZoneId.systemDefault()).toInstant()));
+                return g;
+            });
+
+            ScheduleDateGroup g = dateGroupMap.get(offset);
+            g.getPositions().add(position);
+            g.getPositionDates().put(position, g.getScheduleDate());
+
+            // 组内第N个有量位置 → 输出class N
+            g.getPositionClassMap().put(position, g.getPositions().size());
+
+            // 第一个遇到该组的班次设为首班班次（即组内第一个有量位置的班次）
+            if (g.getScheduleShiftClass() == null) {
+                g.setScheduleShiftClass(activeShifts.get((startIndex + position - 1) % totalShifts).getShiftCode());
+            }
+        }
+
+        return new ArrayList<>(dateGroupMap.values());
+    }
+
+    /**
+     * 计算服务器当前时间所在的排产日
+     */
+    private LocalDate calculateServerProductionDate(List<NcShiftConfig> activeShifts) {
         LocalTime now = LocalTime.now();
         LocalDate serverDate = LocalDate.now();
         LocalDate serverProductionDate = serverDate;
@@ -1128,35 +1290,93 @@ public class NcScheduleAdjustServiceImpl implements INcScheduleAdjustService {
                 break;
             }
         }
+        return serverProductionDate;
+    }
 
-        // 查找首班班次在活跃班次列表中的索引
-        int startIndex = -1;
-        int totalShifts = activeShifts.size();
-        for (int i = 0; i < totalShifts; i++) {
-            if (activeShifts.get(i).getShiftCode().equals(startShiftClass)) {
-                startIndex = i;
-                break;
+    /**
+     * 在活动班次列表中查找指定班次编码的索引
+     */
+    private int findShiftIndex(List<NcShiftConfig> activeShifts, String shiftCode) {
+        for (int i = 0; i < activeShifts.size(); i++) {
+            if (activeShifts.get(i).getShiftCode().equals(shiftCode)) {
+                return i;
             }
         }
-        if (startIndex < 0) {
-            log.warn("首班班次 {} 不在活跃班次配置中，使用前端传入日期", startShiftClass);
-            return insertVO.getScheduleDate();
-        }
+        return -1;
+    }
 
-        // 判断从首班班次到目标班次之间（含首班）是否有跨天班次
-        boolean hasCrossDay = false;
-        for (int j = 0; j < targetClass; j++) {
-            if (ApsConstant.TRUE.equals(activeShifts.get((startIndex + j) % totalShifts).getCrossDayFlag())) {
-                hasCrossDay = true;
-                break;
+    /**
+     * 构建单组排产日分组（无跨天/无班次配置时的保底逻辑）
+     */
+    private ScheduleDateGroup buildSingleDateGroup(NcScheduleResult insertVO, Date scheduleDate, String shiftClass) {
+        ScheduleDateGroup group = new ScheduleDateGroup();
+        group.setScheduleDate(scheduleDate);
+        group.setScheduleShiftClass(shiftClass);
+        for (int p = 1; p <= NcEngineConstants.SHIFT_COUNT; p++) {
+            if (hasPlanQty(insertVO, p)) {
+                group.getPositions().add(p);
+                group.getPositionDates().put(p, scheduleDate);
             }
         }
+        return group;
+    }
 
-        // 计算排产日期
-        LocalDate calculatedDate = hasCrossDay ? serverProductionDate.plusDays(1) : serverProductionDate;
-        log.info("插单排产日期计算：startShiftClass={}, targetClass={}, hasCrossDay={}, serverProductionDate={}, calculatedDate={}",
-                startShiftClass, targetClass, hasCrossDay, serverProductionDate, calculatedDate);
-        return Date.from(calculatedDate.atStartOfDay(ZoneId.systemDefault()).toInstant());
+    /**
+     * 判断指定班次位置是否有计划量
+     */
+    private boolean hasPlanQty(NcScheduleResult vo, int position) {
+        BigDecimal qty = getPlanQtyByClass(vo, position);
+        return qty != null && qty.compareTo(BigDecimal.ZERO) > 0;
+    }
+
+    /**
+     * 将排产日期分组内的输入班次数据迁移到输出记录对应的 class 位置
+     * <p>
+     * 先清空记录的全部 class 位置，再按分组的 positionClassMap（输入位置 → 输出class位置）
+     * 从源对象（保留输入位置数据的原始插单参数）取值填充，无映射时直接使用原位置（兼容旧逻辑）。
+     * </p>
+     *
+     * @param record   目标排程记录（输出 class 数据写入该对象）
+     * @param group    排产日期分组（含 positionClassMap）
+     * @param sourceVO 源插单参数（保留输入位置数据，不可被清空）
+     */
+    private void fillRecordClassData(NcScheduleResult record, ScheduleDateGroup group, NcScheduleResult sourceVO) {
+        // 先清除所有class位置，只保留该组映射到的class
+        for (int c = 1; c <= NcEngineConstants.SHIFT_COUNT; c++) {
+            setPlanQtyByClass(record, c, null);
+            setSeqByClass(record, c, null);
+        }
+
+        // 根据positionClassMap填充该组班次的计划量和顺位
+        Map<Integer, Integer> groupClassMap = group.getPositionClassMap();
+        boolean hasMapping = groupClassMap != null && !groupClassMap.isEmpty();
+        for (int origPos : group.getPositions()) {
+            Integer outputClass = hasMapping ? groupClassMap.get(origPos) : null;
+            if (outputClass == null) {
+                outputClass = origPos; // 无映射时直接使用原位置（兼容旧逻辑）
+            }
+            BigDecimal qty = getPlanQtyByClass(sourceVO, origPos);
+            Integer seq = getSeqByClass(sourceVO, origPos);
+            if (qty != null) {
+                setPlanQtyByClass(record, outputClass, qty);
+            }
+            if (seq != null) {
+                setSeqByClass(record, outputClass, seq);
+            }
+        }
+    }
+
+    /**
+     * 获取最后一个有计划量的班次位置
+     */
+    private int resolveLastClass(NcScheduleResult vo) {
+        for (int c = NcEngineConstants.SHIFT_COUNT; c >= 1; c--) {
+            BigDecimal planQty = getPlanQtyByClass(vo, c);
+            if (planQty != null && planQty.compareTo(BigDecimal.ZERO) > 0) {
+                return c;
+            }
+        }
+        return 1;
     }
 
     /**
