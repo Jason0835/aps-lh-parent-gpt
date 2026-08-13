@@ -39,19 +39,19 @@ public class MpMonthPlanStaticService extends AbstractBaseWeekAdjustServiceMonth
      *
      * @param resultList
      */
-    public void handleMonthPlanStatistics(List<FactoryMonthPlanMouldDayResult> resultList, boolean isAdjust) {
+    public void handleMonthPlanStatistics(MpRollAdjustContextDTO contextDTO, List<FactoryMonthPlanMouldDayResult> resultList, boolean isAdjust) {
         FactoryMonthPlanMouldDayResult monthPlan = CollectionUtils.firstElement(resultList);
         String factoryCode = monthPlan.getFactoryCode();
         String productType = monthPlan.getProductTypeCode();
         String productionVersion = monthPlan.getProductionVersion();
         String tempFlag = isAdjust? YesOrNoEnum.YES.getCode(): YesOrNoEnum.NO.getCode();
-        Integer mpYear = monthPlan.getYear();
-        Integer mpMonth = monthPlan.getMonth();
-        MpRollAdjustContextDTO contextDTO = new MpRollAdjustContextDTO();
-        contextDTO.setMpYear(mpYear);
-        contextDTO.setMpMonth(mpMonth);
-        contextDTO.setFactoryCode(factoryCode);
-        contextDTO.setProductionVersion(productionVersion);
+//        Integer mpYear = monthPlan.getYear();
+//        Integer mpMonth = monthPlan.getMonth();
+//        MpRollAdjustContextDTO contextDTO = new MpRollAdjustContextDTO();
+//        contextDTO.setMpYear(mpYear);
+//        contextDTO.setMpMonth(mpMonth);
+//        contextDTO.setFactoryCode(factoryCode);
+//        contextDTO.setProductionVersion(productionVersion);
 
         QueryWrapper<MpStructureAllocation> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("FACTORY_CODE", factoryCode);

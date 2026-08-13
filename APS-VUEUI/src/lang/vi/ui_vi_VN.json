@@ -36,6 +36,8 @@
   "ui.tq.depthConfig.positiveInteger": "Vui lòng nhập số nguyên dương",
   "ui.dj.schedule.validate.atLeastOneShiftQty": "Ít nhất một ca phải có số lượng kế hoạch",
   "ui.dj.schedule.validate.seqRequired": "Ca có số lượng kế hoạch phải có thứ tự",
+  "ui.nc.schedule.validate.atLeastOneShiftQty": "Ít nhất một ca phải có số lượng kế hoạch",
+  "ui.nc.schedule.validate.seqRequired": "Ca có số lượng kế hoạch phải có thứ tự",
   "ui.tm.depthConfig.column.modalName": "Cài đặt số ca dự trữ",
   "ui.tm.depthConfig.column.factoryCode": "Nhà máy",
   "ui.tm.depthConfig.column.minMachineQty": "Số máy lưu hóa ≥",

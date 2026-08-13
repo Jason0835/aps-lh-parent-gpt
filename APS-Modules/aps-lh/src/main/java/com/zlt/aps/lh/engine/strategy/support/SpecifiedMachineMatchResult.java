@@ -9,7 +9,7 @@ import java.util.Objects;
  * 指定机台硬约束匹配结果。
  *
  * <p>该对象用于“机台反选SKU”场景返回机台和明确失败原因。普通候选机台匹配仍返回有序列表，
- * 两种入口共享硬过滤，但指定机台入口不参与最早收尾窗口和候选优先级排序。</p>
+ * 两种入口共享硬过滤，但指定机台入口不参与生产窗口分组和候选优先级排序。</p>
  */
 @Getter
 public class SpecifiedMachineMatchResult {

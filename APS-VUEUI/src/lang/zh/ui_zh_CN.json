@@ -191,6 +191,8 @@
   "ui.dj.specifyMachine.column.modalName": "内衬定点机台",
   "ui.dj.schedule.validate.atLeastOneShiftQty": "至少需要有一个班次填写计划量",
   "ui.dj.schedule.validate.seqRequired": "填写了计划量的班次，顺序不能为空",
+  "ui.nc.schedule.validate.atLeastOneShiftQty": "至少需要有一个班次填写计划量",
+  "ui.nc.schedule.validate.seqRequired": "填写了计划量的班次，顺序不能为空",
   "ui.cd15.specifyMachine.column.modalName": "钢丝斜裁定点机台",
   "ui.cd90.specifyMachine.column.modalName": "纤维直裁定点机台",
   "ui.tq.specifyMachine.column.beadCode": "胎圈代码",
