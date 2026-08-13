@@ -28,6 +28,9 @@ public class ScheduleDateGroup {
     /** 各原始班次位置对应的排产日期 */
     private Map<Integer, Date> positionDates = new java.util.HashMap<>();
 
+    /** 输入位置→输出DjScheduleResult class位置的映射，key=输入position(1~lastClass), value=输出class位置(1~6) */
+    private Map<Integer, Integer> positionClassMap = new java.util.HashMap<>();
+
     public Date getScheduleDate() {
         return scheduleDate;
     }
@@ -58,5 +61,13 @@ public class ScheduleDateGroup {
 
     public void setPositionDates(Map<Integer, Date> positionDates) {
         this.positionDates = positionDates;
+    }
+
+    public Map<Integer, Integer> getPositionClassMap() {
+        return positionClassMap;
+    }
+
+    public void setPositionClassMap(Map<Integer, Integer> positionClassMap) {
+        this.positionClassMap = positionClassMap;
     }
 }

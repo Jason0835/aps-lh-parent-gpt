@@ -46,6 +46,7 @@ import com.zlt.aps.dj.engine.mapper.DjEngineCxScheduleResultMapper;
 import com.zlt.aps.dj.engine.mapper.DjEngineDepthConfigMapper;
 import com.zlt.aps.dj.engine.mapper.DjEngineGlueMapper;
 import com.zlt.aps.dj.engine.mapper.DjEngineLossMapper;
+import com.zlt.aps.dj.engine.mapper.DjEngineMachineMaintenanceMapper;
 import com.zlt.aps.dj.engine.mapper.DjEngineMachineMapper;
 import com.zlt.aps.dj.engine.mapper.DjEngineMonthPlanMonitorMapper;
 import com.zlt.aps.dj.engine.mapper.DjEngineParamsMapper;
@@ -59,6 +60,7 @@ import com.zlt.aps.dj.engine.mapper.DjEngineStockMapper;
 import com.zlt.aps.dj.engine.constant.DjEngineConstants;
 import com.zlt.aps.dj.engine.model.DjPaddingDemand;
 import com.zlt.aps.dj.engine.model.DjScheduleContext;
+import com.zlt.aps.dj.engine.model.ProduceQtyResult;
 import com.zlt.aps.dj.engine.model.SupplementaryResult;
 import com.zlt.aps.dj.engine.service.DjEngineNewService;
 import com.zlt.aps.dj.engine.service.IDjOrderGeneratorService;
@@ -93,6 +95,9 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
 
     @Autowired
     private DjEngineMachineMapper djEngineMachineMapper;
+
+    @Autowired
+    private DjEngineMachineMaintenanceMapper djEngineMachineMaintenanceMapper;
 
     @Autowired
     private DjEngineStockMapper djEngineStockMapper;
@@ -341,6 +346,8 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
         }
         context.setScheduleDays(scheduleDays);
         context.setShiftCountPerDay(allEnabledShifts.size());
+        // 缓存启用的班次配置列表，供停机班次按时间窗匹配使用
+        context.setShiftConfigList(allEnabledShifts);
         log.info("步骤2.2：启用的班次顺序={}，各垫胶班次排产日={}，每日班次数={}",
                 String.join(",", orderedShiftCodes), java.util.Arrays.toString(scheduleDays),
                 allEnabledShifts.size());
@@ -496,6 +503,7 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
      */
     private void step4SelectMachine(DjScheduleContext context, String factoryCode,
             List<DjPaddingDemand> demandList) {
+        context.appendLog("===== 步骤4：机台分配 =====");
         // 4.1 加载垫胶机台
         List<DjMachineInfo> machineList = this.loadDjMachines(factoryCode);
         if (CollectionUtils.isEmpty(machineList)) {
@@ -505,6 +513,9 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
                 .collect(Collectors.toMap(DjMachineInfo::getMachineCode, m -> m));
         context.setMachineMap(machineMap);
         log.info("步骤4.1：加载垫胶机台 {} 台", machineList.size());
+
+        // 4.1.1 加载机台维修计划（按停机时间与排产日时间窗有交集过滤）
+        this.loadMachineMaintenance(context, factoryCode, machineMap.keySet());
 
         // 4.2 加载定点机台
         Set<String> paddingCodes = demandList.stream().map(DjPaddingDemand::getPaddingCode).collect(Collectors.toSet());
@@ -519,7 +530,6 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
         this.loadAuxiliaryData(factoryCode, context, new ArrayList<>(paddingCodes));
         log.info("步骤4.4：辅助配置数据加载完成");
 
-        context.appendLog("===== 步骤4：机台分配 =====");
         for (DjPaddingDemand demand : demandList) {
             context.appendLog("  规格 {0}：是否新规格={1}，是否量试/试制={2}，机台={3}",
                     DjScheduleContext.buildDisplayName(demand.getPaddingName(), demand.getPaddingCode()),
@@ -1258,6 +1268,56 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
     }
 
     /**
+     * 加载机台维修计划并按机台分组写入上下文
+     * <p>
+     * 停机班次字段已弃用，查询条件改为停机时间范围（stopStartTime ~ stopEndTime）
+     * 与排产日时间窗有交集，具体落在哪个班次由 isMaintenanceInShift 按班次时间窗匹配。
+     *
+     * @param context      排产上下文
+     * @param factoryCode  工厂编码
+     * @param machineCodes 机台编码集合
+     */
+    private void loadMachineMaintenance(DjScheduleContext context, String factoryCode, Set<String> machineCodes) {
+        if (CollectionUtils.isEmpty(machineCodes)) {
+            log.warn("步骤4.1.1：机台编码集合为空，跳过维修计划加载");
+            return;
+        }
+        // 排产日时间窗：前一天零点 ~ 排产日末（覆盖跨天夜班在排产日前一天开班的情况）
+        Date dayStart = DateUtil.offsetDay(DateUtil.beginOfDay(context.getScheduleDate()), -1);
+        Date dayEnd = DateUtil.endOfDay(context.getScheduleDate());
+        log.info("步骤4.1.1：开始加载机台维修计划，factoryCode={}，候选机台 {} 台，查询时间窗 {} ~ {}",
+                factoryCode, machineCodes.size(),
+                DateUtil.formatDateTime(dayStart), DateUtil.formatDateTime(dayEnd));
+        List<DjMachineMaintenance> maintenanceList = djEngineMachineMaintenanceMapper.selectList(
+                new LambdaQueryWrapper<DjMachineMaintenance>()
+                        .eq(DjMachineMaintenance::getFactoryCode, factoryCode)
+                        .in(DjMachineMaintenance::getMachineCode, machineCodes)
+                        .le(DjMachineMaintenance::getStopStartTime, dayEnd)
+                        .ge(DjMachineMaintenance::getStopEndTime, dayStart));
+        log.info("步骤4.1.1：维修计划查询返回 {} 条", maintenanceList.size());
+        // 按机台分组，过滤机台编码为空的数据
+        Map<String, List<DjMachineMaintenance>> maintenanceMap = maintenanceList.stream()
+                .filter(m -> StringUtils.isNotBlank(m.getMachineCode()))
+                .collect(Collectors.groupingBy(DjMachineMaintenance::getMachineCode));
+        // 逐条打印维修记录，确认分组结果，并同步到排程过程日志
+        for (Map.Entry<String, List<DjMachineMaintenance>> entry : maintenanceMap.entrySet()) {
+            for (DjMachineMaintenance maintenance : entry.getValue()) {
+                String timeRange = DateUtil.formatDateTime(maintenance.getStopStartTime()) + " ~ "
+                        + DateUtil.formatDateTime(maintenance.getStopEndTime());
+                log.info("步骤4.1.1：机台 {} 维修计划 [{}]，id={}",
+                        entry.getKey(), timeRange, maintenance.getId());
+                context.appendLog("步骤4.1.1：机台 {0} 维修计划 [{1}]，id={2}",
+                        entry.getKey(), timeRange, maintenance.getId());
+            }
+        }
+        context.setMaintenanceMap(maintenanceMap);
+        log.info("步骤4.1.1：加载机台维修计划完成，共 {} 条，覆盖机台 {} 台，context.getMaintenanceMap().size()={}",
+                maintenanceList.size(), maintenanceMap.size(), context.getMaintenanceMap().size());
+        context.appendLog("步骤4.1.1：加载机台维修计划 {0} 条，覆盖机台 {1} 台",
+                maintenanceList.size(), maintenanceMap.size());
+    }
+
+    /**
      * 加载定点机台
      */
     private List<DjSpecifyMachine> loadSpecifyMachines(String factoryCode, List<String> paddingCodes) {
@@ -1587,10 +1647,11 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
             spec.setRemainingDemand(remainingWindowDemand);
             boolean oldSupplyGapMode = spec.isSupplyGapMode();
             spec.setSupplyGapMode(false);
-            BigDecimal produceQty = this.calcProduceQty(spec, remainingCapacity, shiftIndex, context);
+            ProduceQtyResult produceResult = this.calcProduceQty(spec, remainingCapacity, shiftIndex, context);
             spec.setSupplyGapMode(oldSupplyGapMode);
             spec.setRemainingDemand(oldRemainingDemand);
 
+            BigDecimal produceQty = produceResult.getProduceQty();
             if (BigDecimalUtils.leZero(produceQty)) continue;
 
             // 记录排产结果
@@ -1734,13 +1795,16 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
             }
 
             // 生产量计算
-            BigDecimal produceQty = calcProduceQty(spec, remainingCapacity.subtract(switchLoss),
+            ProduceQtyResult produceResult = calcProduceQty(spec, remainingCapacity.subtract(switchLoss),
                     shiftIndex, context);
-            if (BigDecimalUtils.leZero(produceQty)) {
-                context.appendLog("    规格 {0}：剩余产能不足以生产至少1台车，跳过",
-                        context.getPaddingNameByCode(spec.getPaddingCode()));
+            if (BigDecimalUtils.leZero(produceResult.getProduceQty())) {
+                // 输出真实的跳过原因（可能并非产能不足，而是无供应缺口/台车容量未配置等）
+                context.appendLog("    规格 {0}：{1}，跳过",
+                        context.getPaddingNameByCode(spec.getPaddingCode()),
+                        produceResult.getSkipReason() != null ? produceResult.getSkipReason() : "不排产");
                 continue;
             }
+            BigDecimal produceQty = produceResult.getProduceQty();
 
             // 记录规格选择和满足的条件
             StringJoiner conditionJoiner = new StringJoiner("、");
@@ -1952,24 +2016,10 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
             boolean hasCurrentGap = BigDecimalUtils.gtZero(currentShiftConsume)
                     && incomingInventory.compareTo(currentShiftConsume) < 0;
 
-            int windowStartClass = firstFormingClass + 1;
-            int windowEndClass = Math.min(firstFormingClass + specSupplyDepth,
-                    DjEngineConstants.CX_SHIFT_COUNT);
-
-            // 新规格特殊处理：窗口结束班次后移覆盖提前备料天数
-            // 窗口开始保持与正常逻辑一致（firstFormingClass + 1），结束班次至少到 开班班次 + advanceDays × shiftCountPerDay
-            if (spec.isNewSpec()) {
-                int advanceDays = this.getParamAsDecimal(context,
-                        DjEngineConstants.PARAM_NEW_SPEC_ADVANCE_DAYS).intValue();
-                if (advanceDays < 1) {
-                    advanceDays = 1;
-                } else if (advanceDays > 2) {
-                    advanceDays = 2;
-                }
-                int minWindowEnd = windowStartClass + advanceDays * context.getShiftCountPerDay();
-                windowEndClass = Math.min(Math.max(windowEndClass, minWindowEnd),
-                        DjEngineConstants.CX_SHIFT_COUNT);
-            }
+            // 供应窗口 = [firstFormingClass+1, windowEndClass]（与 calcWindowGap 共享同一计算口径）
+            int[] windowRange = this.calcSupplyWindowRange(spec, firstFormingClass, context);
+            int windowStartClass = windowRange[0];
+            int windowEndClass = windowRange[1];
 
             // 按当前供应窗口重算是否收尾（供应窗口变化时重新判断，检查 1~windowEndClass 班次）
             spec.setTailFinished(this.isAllFormingPlansFinished(context, spec.getPaddingCode(), windowEndClass));
@@ -2322,15 +2372,28 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
                 // 检修计划在上下文中维护
                 if (context.getMaintenanceMap() != null) {
                     List<DjMachineMaintenance> maintenanceList = context.getMaintenanceMap().get(machineCode);
-                    if (maintenanceList != null) {
+                    if (maintenanceList != null && !maintenanceList.isEmpty()) {
                         for (DjMachineMaintenance maintenance : maintenanceList) {
-                            if (this.isMaintenanceInShift(maintenance, shiftIndex, context.getScheduleDate(),
-                                    context.getShiftClassMap())) {
+                            boolean inShift = this.isMaintenanceInShift(maintenance, shiftIndex,
+                                    context.getShiftClassMap(), context.getShiftConfigList());
+                            log.debug("机台 {} 班次 {}：维修计划 [{} ~ {}] 命中={}，班次编码={}，班次配置列表 {} 条",
+                                    machineCode, shiftIndex,
+                                    DateUtil.formatDateTime(maintenance.getStopStartTime()),
+                                    DateUtil.formatDateTime(maintenance.getStopEndTime()),
+                                    inShift, context.getShiftClassMap()[shiftIndex - 1],
+                                    context.getShiftConfigList() == null ? -1 : context.getShiftConfigList().size());
+                            if (inShift) {
                                 BigDecimal stopHours = this.calcStopHours(maintenance);
                                 BigDecimal lossQty = stopHours
                                         .divide(DjEngineConstants.SHIFT_HOURS, 4, RoundingMode.HALF_UP)
                                         .multiply(baseQuata);
                                 effectiveCapacity = effectiveCapacity.subtract(lossQty);
+                                // 排程过程日志：体现扣减后的真实剩余产能
+                                context.appendLog("机台 {0} 班次 {1}：存在维修计划 [{2} ~ {3}]，停机 {4} 小时，扣减产能 {5}，扣减后产能 {6}",
+                                        machineCode, shiftIndex,
+                                        DateUtil.formatDateTime(maintenance.getStopStartTime()),
+                                        DateUtil.formatDateTime(maintenance.getStopEndTime()),
+                                        stopHours, lossQty, effectiveCapacity);
                             }
                         }
                     }
@@ -2464,18 +2527,101 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
 
     /**
      * 判断检修计划是否落在某班次内
+     * <p>
+     * 停机班次字段已弃用，改为通过检修停机时间范围（stopStartTime ~ stopEndTime）
+     * 与班次配置的计划时间窗（planStartTime ~ planEndTime，支持跨天）做交集判断。
+     *
+     * @param maintenance     检修计划
+     * @param shiftIndex      班次索引（从1开始）
+     * @param shiftClassMap   班次索引→班次编码映射数组
+     * @param shiftConfigList 启用的班次配置列表
+     * @return 检修计划是否落在该班次时间窗内
      */
-    private boolean isMaintenanceInShift(DjMachineMaintenance maintenance, int shiftIndex, Date scheduleDate,
-            String[] shiftClassMap) {
+    private boolean isMaintenanceInShift(DjMachineMaintenance maintenance, int shiftIndex,
+            String[] shiftClassMap, List<DjShiftConfig> shiftConfigList) {
         if (maintenance.getStopStartTime() == null || maintenance.getStopEndTime() == null) {
             return false;
         }
-        // 通过停机班次字段匹配
-        if (maintenance.getStopShift() != null) {
-            String shiftClass = shiftClassMap[shiftIndex - 1];
-            return shiftClass.equals(maintenance.getStopShift());
+        if (shiftIndex < 1 || shiftClassMap == null || shiftIndex > shiftClassMap.length
+                || shiftClassMap[shiftIndex - 1] == null) {
+            return false;
         }
+        // 根据班次编码找到对应的班次配置
+        String shiftCode = shiftClassMap[shiftIndex - 1];
+        DjShiftConfig shiftConfig = shiftConfigList == null ? null : shiftConfigList.stream()
+                .filter(cfg -> shiftCode.equals(cfg.getShiftCode()))
+                .findFirst().orElse(null);
+        if (shiftConfig == null) {
+            log.debug("维修计划匹配失败：班次 {} 编码 {} 未在班次配置列表中找到（列表 {} 条）",
+                    shiftIndex, shiftCode, shiftConfigList == null ? -1 : shiftConfigList.size());
+            return false;
+        }
+        // 解析班次计划开始/结束时间（分钟），跨天班次（结束≤开始）结束时间加 1440 分钟
+        int startMin = this.parseTimeToMinutes(shiftConfig.getPlanStartTime());
+        int endMin = this.parseTimeToMinutes(shiftConfig.getPlanEndTime());
+        if (startMin < 0 || endMin < 0) {
+            log.debug("维修计划匹配失败：班次 {} 编码 {} 计划时间非法（start={}, end={}）",
+                    shiftIndex, shiftCode, shiftConfig.getPlanStartTime(), shiftConfig.getPlanEndTime());
+            return false;
+        }
+        boolean crossDay = endMin <= startMin;
+        if (crossDay) {
+            endMin += 24 * 60;
+        }
+        // 检修停机时间范围（毫秒）
+        long stopStartMillis = maintenance.getStopStartTime().getTime();
+        long stopEndMillis = maintenance.getStopEndTime().getTime();
+        // 以检修开始时间的当天零点为基准构建班次时间窗
+        long dayStartMillis = DateUtil.beginOfDay(maintenance.getStopStartTime()).getTime();
+        long windowStart = dayStartMillis + startMin * 60000L;
+        long windowEnd = dayStartMillis + endMin * 60000L;
+        // 检修时间与班次时间窗有交集即命中
+        if (stopStartMillis < windowEnd && stopEndMillis > windowStart) {
+            return true;
+        }
+        // 跨天班次：检修若在凌晨，可能归属于前一天开班的班次时间窗
+        if (crossDay) {
+            long dayMillis = 24 * 60 * 60 * 1000L;
+            long prevWindowStart = windowStart - dayMillis;
+            long prevWindowEnd = windowEnd - dayMillis;
+            if (stopStartMillis < prevWindowEnd && stopEndMillis > prevWindowStart) {
+                return true;
+            }
+            log.debug("维修计划匹配失败：班次 {} 编码 {} 跨天窗口无交集，窗口 [{} ~ {}]（含前一日 [{} ~ {}]），维修 [{} ~ {}]",
+                    shiftIndex, shiftCode,
+                    DateUtil.formatDateTime(new Date(windowStart)), DateUtil.formatDateTime(new Date(windowEnd)),
+                    DateUtil.formatDateTime(new Date(prevWindowStart)), DateUtil.formatDateTime(new Date(prevWindowEnd)),
+                    DateUtil.formatDateTime(maintenance.getStopStartTime()), DateUtil.formatDateTime(maintenance.getStopEndTime()));
+            return false;
+        }
+        log.debug("维修计划匹配失败：班次 {} 编码 {} 窗口无交集，窗口 [{} ~ {}]，维修 [{} ~ {}]",
+                shiftIndex, shiftCode,
+                DateUtil.formatDateTime(new Date(windowStart)), DateUtil.formatDateTime(new Date(windowEnd)),
+                DateUtil.formatDateTime(maintenance.getStopStartTime()), DateUtil.formatDateTime(maintenance.getStopEndTime()));
         return false;
+    }
+
+    /**
+     * 解析 "HH:mm:ss" 时间字符串为当天分钟数
+     *
+     * @param time 时间字符串，如 "20:00:00"
+     * @return 当天分钟数，解析失败返回 -1
+     */
+    private int parseTimeToMinutes(String time) {
+        if (StringUtils.isBlank(time)) {
+            return -1;
+        }
+        String[] parts = time.split(":");
+        if (parts.length < 2) {
+            return -1;
+        }
+        try {
+            int hour = Integer.parseInt(parts[0].trim());
+            int minute = Integer.parseInt(parts[1].trim());
+            return hour * 60 + minute;
+        } catch (NumberFormatException e) {
+            return -1;
+        }
     }
 
     /**
@@ -2734,30 +2880,31 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
      * 受 SYS1401013（单规格每班最大排产量）约束：
      * - 已收尾规格超过限制时直接截断；
      * - 未收尾规格截断后再向上取整台车，因取整车多出的部分允许超过限制。
-     * 供应缺口填补模式（supplyGapMode=true）时，补本班成型消耗缺口 + 安全水位(SYS1401005)，
-     * 生产量受缺口量约束，超出部分留待后续班次排产。
+     * 供应缺口填补模式（supplyGapMode=true）时，补本班成型消耗缺口 + 安全水位(SYS1401005)；
+     * 若本班无缺口但供应窗口存在缺口（与 checkDemandForShift 判定口径一致），按窗口缺口补量，
+     * 避免产能闲置。生产量受缺口量约束，超出部分留待后续班次排产。
      * </p>
      *
      * @param spec              垫胶需求规格
      * @param remainingCapacity 机台本班剩余产能
      * @param shiftIndex        当前班次索引（用于计算成型消耗量）
      * @param context           排产上下文（用于读取参数）
-     * @return 本班生产量（米）
+     * @return 排产量计算结果（含不生产时的真实跳过原因）
      */
-    private BigDecimal calcProduceQty(DjPaddingDemand spec, BigDecimal remainingCapacity,
+    private ProduceQtyResult calcProduceQty(DjPaddingDemand spec, BigDecimal remainingCapacity,
             int shiftIndex, DjScheduleContext context) {
         if (BigDecimalUtils.leZero(remainingCapacity)) {
-            return BigDecimal.ZERO;
+            return ProduceQtyResult.skip("剩余产能不足");
         }
 
         BigDecimal remainingDemand = spec.getRemainingDemand() != null ? spec.getRemainingDemand() : BigDecimal.ZERO;
         // 保存原始待排量（供应缺口模式 recalculation 后用于比较是否可一次排完）
         BigDecimal originalRemainingDemand = remainingDemand;
         if (BigDecimalUtils.leZero(remainingDemand)) {
-            return BigDecimal.ZERO;
+            return ProduceQtyResult.skip("剩余需求不足");
         }
 
-        // 供应缺口填补模式：仅补本班成型消耗缺口，不补供应窗口净需求（收尾规格跳过，直接用含损耗率的原始待排量）
+        // 供应缺口填补模式：优先补本班成型消耗缺口，本班无缺口时补供应窗口缺口（收尾规格跳过，直接用含损耗率的原始待排量）
         if (spec.isSupplyGapMode() && !spec.isTailFinished()) {
             int firstFormingClass = this.getFormingClassByShiftIndex(shiftIndex, context);
             if (firstFormingClass < 1) {
@@ -2769,19 +2916,27 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
             BigDecimal incomingInv = spec.getIncomingInventory() != null ? spec.getIncomingInventory() : BigDecimal.ZERO;
             BigDecimal supplyGap = currentShiftConsume.subtract(incomingInv);
             if (BigDecimalUtils.leZero(supplyGap)) {
-                return BigDecimal.ZERO; // 无供应缺口，不需要生产
-            }
-            // 供应缺口填补模式：补充缺口 + 安全水位库存
-            // 安全水位量 = nextFormingClass 开始连续 SAFETY_STOCK_LEVEL 个成型班次的消耗量之和
-            int safetyStockLevel = this.getParamAsDecimal(context, DjEngineConstants.PARAM_SAFETY_STOCK_LEVEL).intValue();
-            BigDecimal safetyStockQty = BigDecimal.ZERO;
-            for (int fc = firstFormingClass + 1; fc <= firstFormingClass + safetyStockLevel; fc++) {
-                if (fc <= DjEngineConstants.CX_SHIFT_COUNT) {
-                    safetyStockQty = safetyStockQty.add(
-                            this.calcShiftConsume(context, spec.getPaddingCode(), fc));
+                // 本班无供应缺口：检查供应窗口是否存在缺口（与 checkDemandForShift 口径一致）
+                BigDecimal windowGap = this.calcWindowGap(spec, incomingInv, firstFormingClass, context);
+                if (BigDecimalUtils.leZero(windowGap)) {
+                    // 本班及供应窗口均无缺口，无需生产
+                    return ProduceQtyResult.skip("本班及供应窗口均无供应缺口，无需排产");
                 }
+                // 按窗口缺口补量，不超原始待排量
+                remainingDemand = windowGap.min(originalRemainingDemand);
+            } else {
+                // 供应缺口填补模式：补充缺口 + 安全水位库存
+                // 安全水位量 = nextFormingClass 开始连续 SAFETY_STOCK_LEVEL 个成型班次的消耗量之和
+                int safetyStockLevel = this.getParamAsDecimal(context, DjEngineConstants.PARAM_SAFETY_STOCK_LEVEL).intValue();
+                BigDecimal safetyStockQty = BigDecimal.ZERO;
+                for (int fc = firstFormingClass + 1; fc <= firstFormingClass + safetyStockLevel; fc++) {
+                    if (fc <= DjEngineConstants.CX_SHIFT_COUNT) {
+                        safetyStockQty = safetyStockQty.add(
+                                this.calcShiftConsume(context, spec.getPaddingCode(), fc));
+                    }
+                }
+                remainingDemand = supplyGap.add(safetyStockQty);
             }
-            remainingDemand = supplyGap.add(safetyStockQty);
         }
 
         // 计算基础排产量（暂不限制最大排产量）
@@ -2800,7 +2955,7 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
                 int needTrolleys = remainingDemand.divide(trolleyCapacity, 0, RoundingMode.CEILING).intValue();
                 int actualTrolleys = Math.min(maxTrolleys, needTrolleys);
                 if (actualTrolleys <= 0) {
-                    return BigDecimal.ZERO;
+                    return ProduceQtyResult.skip("剩余产能不足以生产至少1台车");
                 }
                 baseProduceQty = BigDecimal.valueOf(actualTrolleys).multiply(trolleyCapacity);
             } else if (remainingDemand.compareTo(remainingCapacity) <= 0) {
@@ -2812,7 +2967,7 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
                 int needTrolleys = remainingDemand.divide(trolleyCapacity, 0, RoundingMode.CEILING).intValue();
                 int actualTrolleys = Math.min(maxTrolleys, needTrolleys);
                 if (actualTrolleys <= 0) {
-                    return BigDecimal.ZERO;
+                    return ProduceQtyResult.skip("剩余产能不足以生产至少1台车");
                 }
                 baseProduceQty = BigDecimal.valueOf(actualTrolleys).multiply(trolleyCapacity);
                 // 收尾规格：整车量不能超过剩余待排量
@@ -2824,7 +2979,7 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
             // 未收尾规格：需台车容量整倍数
             BigDecimal trolleyCapacity = spec.getTrolleyCapacity();
             if (BigDecimalUtils.leZero(trolleyCapacity)) {
-                return BigDecimal.ZERO;
+                return ProduceQtyResult.skip("台车容量未配置，无法按整车排产");
             }
 
             // 计算最大可生产的整台车数
@@ -2839,7 +2994,7 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
                     // 剩余需求不足一台车但至少生产一台车
                     actualTrolleys = 1;
                 } else {
-                    return BigDecimal.ZERO;
+                    return ProduceQtyResult.skip("剩余产能不足以生产至少1台车");
                 }
             }
             baseProduceQty = BigDecimal.valueOf(actualTrolleys).multiply(trolleyCapacity);
@@ -2866,7 +3021,90 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
             }
         }
 
-        return baseProduceQty;
+        return ProduceQtyResult.success(baseProduceQty);
+    }
+
+    /**
+     * 计算规格在供应窗口内的缺口量（与 checkDemandForShift 判定口径一致）
+     * <p>
+     * 窗口 = [firstFormingClass + 1, windowEndClass]，
+     * 窗口有效库存 = max(0, 接班库存 - 当前班成型消耗量)。
+     * 从窗口首班逐班累计覆盖，返回第一个无法完全覆盖的成型班次的缺口消耗量；
+     * 窗口全部可覆盖则返回 0。
+     * </p>
+     *
+     * @param spec             垫胶需求规格
+     * @param incomingInventory 接班库存
+     * @param firstFormingClass 当前成型班次序号
+     * @param context           排产上下文
+     * @return 供应窗口缺口量（米），无缺口返回 0
+     */
+    private BigDecimal calcWindowGap(DjPaddingDemand spec, BigDecimal incomingInventory,
+            int firstFormingClass, DjScheduleContext context) {
+        int[] windowRange = this.calcSupplyWindowRange(spec, firstFormingClass, context);
+        int windowStartClass = windowRange[0];
+        int windowEndClass = windowRange[1];
+
+        // 当前成型班次消耗量，窗口有效库存 = max(0, 接班库存 - 当前班消耗)
+        BigDecimal currentShiftConsume = this.calcShiftConsume(
+                context, spec.getPaddingCode(), firstFormingClass);
+        BigDecimal windowEffectiveInventory = incomingInventory.subtract(currentShiftConsume);
+        if (BigDecimalUtils.ltZero(windowEffectiveInventory)) {
+            windowEffectiveInventory = BigDecimal.ZERO;
+        }
+
+        BigDecimal remainingInventory = windowEffectiveInventory;
+        for (int fc = windowStartClass; fc <= windowEndClass; fc++) {
+            BigDecimal consume = this.calcShiftConsume(context, spec.getPaddingCode(), fc);
+            if (BigDecimalUtils.leZero(consume)) {
+                continue;
+            }
+            if (remainingInventory.compareTo(consume) >= 0) {
+                remainingInventory = remainingInventory.subtract(consume);
+            } else {
+                // 该成型班次消耗无法完全覆盖，缺口 = 未覆盖的消耗量
+                return consume.subtract(remainingInventory);
+            }
+        }
+        return BigDecimal.ZERO;
+    }
+
+    /**
+     * 计算成型供应窗口范围 [startClass, endClass]（与 checkDemandForShift 口径一致）
+     * <p>
+     * 窗口 = [firstFormingClass + 1, firstFormingClass + specSupplyDepth]，上限为 8 班；
+     * 新规格窗口结束班次后移覆盖提前备料天数。
+     * </p>
+     *
+     * @param spec              垫胶需求规格
+     * @param firstFormingClass 当前成型班次序号
+     * @param context           排产上下文
+     * @return [窗口开始班次, 窗口结束班次]
+     */
+    private int[] calcSupplyWindowRange(DjPaddingDemand spec, int firstFormingClass, DjScheduleContext context) {
+        // 该规格的备库班数（排产深度）
+        int specSupplyDepth = context.getPaddingSupplyDepth().getOrDefault(spec.getPaddingCode(),
+                DjEngineConstants.CX_SHIFT_COUNT);
+
+        int windowStartClass = firstFormingClass + 1;
+        int windowEndClass = Math.min(firstFormingClass + specSupplyDepth,
+                DjEngineConstants.CX_SHIFT_COUNT);
+
+        // 新规格特殊处理：窗口结束班次后移覆盖提前备料天数
+        // 窗口开始保持与正常逻辑一致（firstFormingClass + 1），结束班次至少到 开班班次 + advanceDays × shiftCountPerDay
+        if (spec.isNewSpec()) {
+            int advanceDays = this.getParamAsDecimal(context,
+                    DjEngineConstants.PARAM_NEW_SPEC_ADVANCE_DAYS).intValue();
+            if (advanceDays < 1) {
+                advanceDays = 1;
+            } else if (advanceDays > 2) {
+                advanceDays = 2;
+            }
+            int minWindowEnd = windowStartClass + advanceDays * context.getShiftCountPerDay();
+            windowEndClass = Math.min(Math.max(windowEndClass, minWindowEnd),
+                    DjEngineConstants.CX_SHIFT_COUNT);
+        }
+        return new int[]{windowStartClass, windowEndClass};
     }
 
     /**
