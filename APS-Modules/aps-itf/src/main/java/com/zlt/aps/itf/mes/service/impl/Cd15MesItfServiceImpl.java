@@ -55,8 +55,7 @@ public class Cd15MesItfServiceImpl implements ICd15MesItfService {
 
     @Override
     public AjaxResult syncStock(AuxReqSyncDataLogs syncDataLogs) {
-        String factoryCode = StringUtils.defaultIfBlank(syncDataLogs.getFactoryCode(),
-                FactoryConstant.DEFAULT_FACTORY_CODE);
+        String factoryCode = FactoryConstant.DEFAULT_FACTORY_CODE;
         syncDataLogs.setFactoryCode(factoryCode);
         List<Cd15MesStock> sourceList;
         DynamicDataSourceContextHolder.push(DataSource.MES);
@@ -73,11 +72,10 @@ public class Cd15MesItfServiceImpl implements ICd15MesItfService {
                 Function.identity(),
                 (first, second) -> {
                     BigDecimal firstValue = first.getAvailableStock() == null
-                            ? first.getStockNum() : first.getAvailableStock();
+                            ? BigDecimal.ZERO : first.getAvailableStock();
                     BigDecimal secondValue = second.getAvailableStock() == null
-                            ? second.getStockNum() : second.getAvailableStock();
-                    first.setAvailableStock((firstValue == null ? BigDecimal.ZERO : firstValue)
-                            .add(secondValue == null ? BigDecimal.ZERO : secondValue));
+                            ? BigDecimal.ZERO : second.getAvailableStock();
+                    first.setAvailableStock(firstValue.add(secondValue));
                     return first;
                 }));
         Date now = DateUtils.getNowDate();
@@ -86,9 +84,7 @@ public class Cd15MesItfServiceImpl implements ICd15MesItfService {
             target.setFactoryCode(factoryCode);
             target.setStockDate(source.getStockDate());
             target.setMaterialCode(source.getMaterialCode());
-            BigDecimal stockNum = source.getAvailableStock() == null
-                    ? source.getStockNum() : source.getAvailableStock();
-            target.setStockNum(stockNum == null ? 0D : stockNum.doubleValue());
+            target.setStockNum(source.getAvailableStock().doubleValue());
             target.setModifyNum(0D);
             target.setBadNum(0D);
             target.setCreateBy("MES");
@@ -132,9 +128,8 @@ public class Cd15MesItfServiceImpl implements ICd15MesItfService {
                 || StringUtils.isBlank(request.getShiftCode()) || request.getShiftStartTime() == null) {
             return AjaxResult.error(I18nUtil.getMessage("ui.cd15.shiftStock.syncArgumentsInvalid"));
         }
-        request.setFactoryCode(StringUtils.defaultIfBlank(request.getFactoryCode(),
-                FactoryConstant.DEFAULT_FACTORY_CODE));
-        request.setCompanyCode(StringUtils.defaultIfBlank(request.getCompanyCode(), request.getFactoryCode()));
+        request.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        request.setCompanyCode(FactoryConstant.DEFAULT_FACTORY_CODE);
         request.setStockDate(DateUtil.beginOfDay(request.getStockDate()));
         request.setShiftCode(request.getShiftCode().trim());
         List<Cd15MesStock> sourceList;
@@ -148,7 +143,7 @@ public class Cd15MesItfServiceImpl implements ICd15MesItfService {
         Set<String> materialCodes = new HashSet<>();
         if (safeSourceList.stream().anyMatch(source -> source == null
                 || StringUtils.isBlank(source.getMaterialCode())
-                || (source.getAvailableStock() == null && source.getStockNum() == null)
+                || source.getAvailableStock() == null
                 || !materialCodes.add(source.getMaterialCode().trim()))) {
             return AjaxResult.error(I18nUtil.getMessage("ui.cd15.shiftStock.syncSourceInvalid"));
         }
@@ -160,12 +155,10 @@ public class Cd15MesItfServiceImpl implements ICd15MesItfService {
             target.setShiftCode(request.getShiftCode());
             target.setShiftStartTime(request.getShiftStartTime());
             target.setMaterialCode(source.getMaterialCode().trim());
-            BigDecimal stockNum = source.getAvailableStock() == null
-                    ? source.getStockNum() : source.getAvailableStock();
-            target.setStockNum(stockNum.doubleValue());
+            target.setStockNum(source.getAvailableStock().doubleValue());
             target.setModifyNum(0D);
             target.setBadNum(0D);
-            target.setSnapshotTime(request.getShiftStartTime());
+            target.setSnapshotTime(now);
             target.setCreateBy("MES");
             target.setUpdateBy("MES");
             target.setCreateTime(now);
