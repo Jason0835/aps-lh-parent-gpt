@@ -4,6 +4,7 @@ import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.enums.ScheduleStepEnum;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
+import com.zlt.aps.lh.component.NewSpecDelayDaysResolver;
 import com.zlt.aps.lh.component.StructureEndingAlignmentService;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.factory.ScheduleStrategyFactory;
@@ -47,6 +48,8 @@ public class NewProductionHandler extends AbsScheduleStepHandler {
     private IHistoricalMouldChangeReverseSelectionStrategy historicalReverseSelectionStrategy;
     @Resource
     private StructureEndingAlignmentService structureEndingAlignmentService;
+    @Resource
+    private NewSpecDelayDaysResolver newSpecDelayDaysResolver;
 
     @Override
     protected void doHandle(LhScheduleContext context) {
@@ -67,6 +70,14 @@ public class NewProductionHandler extends AbsScheduleStepHandler {
             // 获取 S4.5 新增排产策略；特殊材料置换由本 Handler 完成后的独立 S4.5.1 步骤执行。
             IProductionStrategy strategy = strategyFactory.getProductionStrategy(
                     ScheduleTypeEnum.NEW_SPEC.getCode());
+
+            /*
+             * S4.5.2 排序字段准备：必须在 S4.4 全部完成后、最终新增 SKU 排序前统一重算延误天数。
+             * 此时续作因 dayN 加机台进入新增排产的补偿 SKU 已生成，首次增机日期也已固化；普通新增
+             * SKU 则只读取 S4.2 已加载月计划和完成量。解析器仅改写 delayDays，不改动待排量、日计划
+             * 账本、SKU分组、比较器层级和排序方向，确保影响范围严格限制在新增排产排序字段。
+             */
+            newSpecDelayDaysResolver.refreshDelayDays(context);
 
             /*
              * S4.5.2 SKU优先级排序：S4.4已消费的SKU会同步移出structureSkuMap，本次排序继续

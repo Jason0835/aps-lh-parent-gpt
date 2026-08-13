@@ -112,7 +112,18 @@ public class SkuScheduleDTO {
     private String sortDesc;
     /** 是否有发货要求(锁定交期) */
     private boolean deliveryLocked;
-    /** 延误天数，月计划开始日距T日的天数差（beginDate - scheduleDate），负数=延误，null=未知 */
+    /**
+     * 延误天数。
+     * <p>S4.3按原月计划首个正dayN初始化，供续作排序保持原行为；进入S4.5的待排新增SKU会在最终排序前重算：</p>
+     * <ul>
+     *   <li>续作加机台：首次需要新增机台日期 - T日；</li>
+     *   <li>窗口内存在计划：窗口内最早正计划日 - T日；</li>
+     *   <li>窗口无计划但未来有计划：未来最早正计划日 - T日；</li>
+     *   <li>仅欠产且本月从未排产：本月最早计划日 - T日；</li>
+     *   <li>均未命中或所需日期缺失：0。</li>
+     * </ul>
+     * <p>统一按自然日保留正数、0和负数，不取绝对值。</p>
+     */
     private Integer delayDays;
     /** 供应链优先级 */
     private String supplyChainPriority;

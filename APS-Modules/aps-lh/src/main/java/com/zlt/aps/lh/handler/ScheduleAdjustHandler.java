@@ -978,6 +978,11 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         dto.setSupplyChainPriority(targetMonthPlan.getProductionType());
         dto.setProductionType(targetMonthPlan.getProductionType());
         dto.setDeliveryLocked(isDeliveryLocked(context, targetMonthPlan));
+        /*
+         * S4.3 仍保留原有月计划首个正 dayN 的初始化口径，供 S4.4 续作 SKU 排序继续使用。
+         * 仅当 SKU 最终进入 S4.5 新增排产时，NewSpecDelayDaysResolver 才会在新增最终排序前
+         * 按新增排产业务场景覆盖 delayDays，避免本次需求反向改变续作分组、续作排序及其他排产规则。
+         */
         dto.setDelayDays(resolveDelayDays(context, plan));
         dto.setHighPriorityPendingQty(safeInt(targetMonthPlan.getHeightProductionQty()));
         dto.setCycleProductionPendingQty(safeInt(targetMonthPlan.getCycleProductionQty()));
