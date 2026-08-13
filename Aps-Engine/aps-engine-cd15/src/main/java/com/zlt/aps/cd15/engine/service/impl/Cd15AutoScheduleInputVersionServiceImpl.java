@@ -159,13 +159,15 @@ public class Cd15AutoScheduleInputVersionServiceImpl implements Cd15AutoSchedule
         String constructions = constructionEntities.stream()
                 .map(this::constructionFingerprint)
                 .collect(Collectors.joining("|"));
-        LocalDate stockDate = scheduleDate.minusDays(1);
         String stock = includeStock ? stockMapper.selectList(Wrappers.<Cd15Stock>lambdaQuery()
                         .eq(Cd15Stock::getFactoryCode, factoryCode)
-                        .eq(Cd15Stock::getStockDate, Date.valueOf(stockDate))
+                        .eq(Cd15Stock::getStockDate, Date.valueOf(resourceBaselineDate))
+                        .eq(Cd15Stock::getShiftCode, resourceBaselineShiftCode)
+                        .orderByAsc(Cd15Stock::getMaterialCode)
                         .orderByAsc(Cd15Stock::getId))
                 .stream()
                 .map(item -> item.getId() + ":" + item.getMaterialCode() + ":" + item.getStockDate()
+                        + ":" + item.getShiftCode()
                         + ":" + item.getStockNum() + ":" + item.getModifyNum() + ":" + item.getBadNum()
                         + ":" + item.getUpdateTime())
                 .collect(Collectors.joining("|")) : "";

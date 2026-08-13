@@ -551,8 +551,10 @@ public class Cd15ScheduleResultServiceImpl extends AbstractDocService<Cd15Schedu
                 queryVO.getScheduleDate(), -1);
         List<Cd15ScheduleResult> previousResults =
                 this.loadPreviousResults(queryVO, previousDate);
+        String earlyShiftCode = this.resolveEarlyShiftCode(
+                queryVO.getFactoryCode());
         List<Cd15Stock> stocks = this.loadStocks(
-                queryVO.getFactoryCode(), previousDate);
+                queryVO.getFactoryCode(), previousDate, earlyShiftCode);
         List<CxScheduleResult> formingResults = this.loadFormingResults(
                 queryVO.getFactoryCode(), queryVO.getScheduleDate());
         List<MdmConstructionInfo> constructions =
@@ -651,13 +653,34 @@ public class Cd15ScheduleResultServiceImpl extends AbstractDocService<Cd15Schedu
         return this.resultMapper.selectList(wrapper);
     }
 
-    /** 加载排程日期前一日的钢带库存。 */
+    /** 解析工厂早班（CLASS3）的班次编码。 */
+    private String resolveEarlyShiftCode(String factoryCode) {
+        return this.shiftConfigMapper.selectList(
+                        Wrappers.<Cd15ShiftConfig>lambdaQuery()
+                                .eq(Cd15ShiftConfig::getFactoryCode, factoryCode)
+                                .eq(Cd15ShiftConfig::getIsActive, 1)
+                                .eq(Cd15ShiftConfig::getClassField, "CLASS3")
+                                .orderByAsc(Cd15ShiftConfig::getScheduleDay)
+                                .orderByAsc(Cd15ShiftConfig::getDayShiftOrder)
+                                .orderByAsc(Cd15ShiftConfig::getShiftOrder))
+                .stream()
+                .map(Cd15ShiftConfig::getShiftCode)
+                .filter(PubUtil::isNotEmpty)
+                .findFirst()
+                .orElse(null);
+    }
+
+    /** 加载指定日期和班次的钢带库存。 */
     private List<Cd15Stock> loadStocks(
-            String factoryCode, Date stockDate) {
+            String factoryCode, Date stockDate, String shiftCode) {
+        if (!PubUtil.isNotEmpty(shiftCode)) {
+            return Collections.emptyList();
+        }
         return this.stockMapper.selectList(
                 Wrappers.<Cd15Stock>lambdaQuery()
                         .eq(Cd15Stock::getFactoryCode, factoryCode)
                         .eq(Cd15Stock::getStockDate, stockDate)
+                        .eq(Cd15Stock::getShiftCode, shiftCode)
                         .orderByAsc(Cd15Stock::getMaterialCode));
     }
 
