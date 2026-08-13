@@ -109,13 +109,11 @@ public final class EarlyProductionChecker {
                 currentDate, sku.getStructureName());
         int scheduledSkuCount = context.getSkuScheduledMachineCount(
                 currentDate, sku.getMaterialCode(), sku.getProductStatus());
-        int historyShortageQty = resolveHistoryShortageQty(context, sku, currentDate);
         int threshold = Math.max(0, shortageThreshold);
         /*
          * 结构切换提前必须同时满足：当前日结构计划机台数为0、未来计划日结构计划机台数大于0、
-         * 且结构存在最早胎胚可供硫化时间。这里直接使用原始结构机台数识别场景，并把门禁放在
-         * 历史欠产强制放行之前，不能依赖最终 sceneType；历史欠产分支会按原逻辑返回 NORMAL，
-         * 若依赖 sceneType 将导致实际结构切换候选绕过胎胚时间门禁。
+         * 且结构存在最早胎胚可供硫化时间。这里直接使用原始结构机台数识别场景，不能依赖
+         * 最终sceneType反推，避免实际结构切换候选绕过胎胚时间门禁。
          * 普通结构提前和结构收尾提前不进入该分支，完整恢复本次调整前的原准入行为。
          */
         boolean structureSwitchEarlyProduction = isStructureSwitchEarlyProduction(
@@ -147,20 +145,11 @@ public final class EarlyProductionChecker {
                     false, sceneType, firstFuturePlanDate,
                     structurePlanMachineCounts, exceededReason);
         }
-        if (historyShortageQty > threshold) {
-            logEarlyProductionDecision(context, sku, currentDate, firstFuturePlanDate,
-                    planMachineCount, scheduledStructureCount, scheduledSkuCount,
-                    threshold, earlyProductionDaysThreshold, earlyDays, futurePlanQty, true,
-                    "本月前日累计欠产超过阈值，复用原强制加机台逻辑");
-            return EarlyProductionDecision.earlyProduction(true, EarlyProductionDecision.SCENE_NORMAL,
-                    firstFuturePlanDate, structurePlanMachineCounts,
-                    "本月前日累计欠产超过阈值，复用原强制加机台逻辑");
-        }
         if (planMachineCount > 0) {
             /*
              * 结构计划机台数只能限制“提前生产是否新增物理机台”，不能在选机前整体拒绝 SKU：
              * 达到计划数后，SKU 仍可能复用已经计入本结构的机台。最终硬控下沉到候选机台
-             * 确定后、模具和胎胚等资源正式扣减前执行，普通排产和真实历史欠产不走该校验。
+             * 确定后、模具和胎胚等资源正式扣减前执行，当前日正常排产不走该校验。
              */
             boolean reachedPlanMachineCount = scheduledStructureCount >= planMachineCount;
             logEarlyProductionDecision(context, sku, currentDate, firstFuturePlanDate, planMachineCount,
@@ -185,25 +174,26 @@ public final class EarlyProductionChecker {
                             ? "结构已排机台数达到计划机台数，仅允许复用已计入同结构的物理机台"
                             : "结构已排机台数未达到计划机台数");
         }
-        boolean allowedByEndingSurplus = isEndingStructureLargeSurplus(
-                context, sku, currentDate, firstFuturePlanDate);
+        /*
+         * 历史欠产/收尾遗留阶段下线后，结构没有有效计划机台数时不得再使用历史欠产
+         * 或收尾余量强制放行。保留STRUCTURE_ENDING场景编码只用于兼容既有日志和清理节奏。
+         */
+        boolean allowedByEndingSurplus = false;
+        String noPlanMachineReason = "结构无有效计划机台数，禁止提前生产";
         logEarlyProductionDecision(context, sku, currentDate, firstFuturePlanDate, planMachineCount,
                 scheduledStructureCount, scheduledSkuCount, threshold, earlyProductionDaysThreshold,
-                earlyDays, futurePlanQty, allowedByEndingSurplus,
-                allowedByEndingSurplus ? "结构已收尾且SKU余量大于已排机台日硫化量" : "结构无有效计划且SKU余量不足");
+                earlyDays, futurePlanQty, allowedByEndingSurplus, noPlanMachineReason);
         return EarlyProductionDecision.earlyProduction(allowedByEndingSurplus,
                 EarlyProductionDecision.SCENE_STRUCTURE_ENDING, firstFuturePlanDate,
-                structurePlanMachineCounts,
-                allowedByEndingSurplus ? "结构已收尾且SKU余量大于已排机台日硫化量" : "结构无有效计划且SKU余量不足");
+                structurePlanMachineCounts, noPlanMachineReason);
     }
 
     /**
      * 按原始结构计划机台数识别结构切换提前场景。
      *
      * <p>必须直接比较当前业务日和最早未来计划日的结构计划机台数，不能使用最终
-     * {@link EarlyProductionDecision#getSceneType()} 反推。历史欠产超过阈值时，原逻辑会将
-     * 决策场景记录为 NORMAL，但业务上仍可能是“当前结构无计划、未来结构恢复计划”的
-     * 结构切换提前，仍应受最早胎胚可供硫化时间约束。</p>
+     * {@link EarlyProductionDecision#getSceneType()} 反推。“当前结构无计划、未来结构恢复计划”的
+     * 结构切换提前始终受最早胎胚可供硫化时间约束。</p>
      *
      * @param context 排程上下文
      * @param sku 待判断 SKU
@@ -253,6 +243,8 @@ public final class EarlyProductionChecker {
 
     /**
      * 判断是否命中结构已收尾但 SKU 余量较大的强制加机台条件。
+     * <p>历史欠产/收尾遗留阶段下线后，主提前生产准入不再调用本方法；暂时保留供后续
+     * 关联代码统一清理。</p>
      *
      * @param context 排程上下文
      * @param sku SKU
@@ -264,22 +256,8 @@ public final class EarlyProductionChecker {
                                                         SkuScheduleDTO sku,
                                                         LocalDate currentDate,
                                                         LocalDate firstFuturePlanDate) {
-        if (Objects.isNull(context) || Objects.isNull(sku) || Objects.isNull(currentDate)
-                || StringUtils.isEmpty(sku.getStructureName())) {
-            return false;
-        }
-        int effectivePlanMachineCount = resolveEffectiveStructurePlanMachineCount(
-                context, sku, currentDate, firstFuturePlanDate);
-        if (effectivePlanMachineCount > 0) {
-            return false;
-        }
-        int historyShortageQty = resolveHistoryShortageQty(context, sku, currentDate);
-        int scheduledSkuCount = context.getSkuScheduledMachineCount(
-                currentDate, sku.getMaterialCode(), sku.getProductStatus());
-        int dailyCapacity = Math.max(0, sku.getDailyCapacity());
-        // 结构已收尾时，用本月前日累计欠产与当前已排SKU机台的日硫化量对比，判断是否仍需进入强制扩机。
-        long scheduledDailyCapacity = (long) scheduledSkuCount * dailyCapacity;
-        return dailyCapacity > 0 && (long) historyShortageQty > scheduledDailyCapacity;
+        // 历史欠产/收尾遗留阶段已下线，残留调用统一不得触发强制扩机。
+        return false;
     }
 
     /**
@@ -328,7 +306,7 @@ public final class EarlyProductionChecker {
     /**
      * 解析当前日之后最早存在的原始未来计划日，不受提前生产天数阈值限制。
      *
-     * <p>该方法只回答“是否存在未来计划”，用于区分真正的历史欠产/无未来计划收尾任务
+     * <p>该方法只回答“是否存在未来计划”，用于区分应静默出队的纯历史遗留任务
      * 与尚未进入提前生产窗口的未来计划任务。提前生产正式准入仍必须调用
      * {@link #resolveFirstFuturePlanDate(LhScheduleContext, SkuScheduleDTO, LocalDate)}，
      * 两个判断范围不得混用。</p>
@@ -401,8 +379,8 @@ public final class EarlyProductionChecker {
      *
      * <p>结构计划机台数达到上限后，只允许复用已经计入同结构的物理机台；尚未达到上限时
      * 可以新增机台；当前已排数已经超过计划数时，复用原机台也不得继续提前生产。
-     * 调用方必须仅在 {@code EARLY_PRODUCTION} 阶段、资源扣减前调用，普通排产及真实历史欠产
-     * 不得使用该方法作为公共准入条件。</p>
+     * 调用方必须仅在 {@code EARLY_PRODUCTION} 阶段、资源扣减前调用，普通排产不得使用
+     * 该方法作为公共准入条件。</p>
      *
      * @param context 排程上下文
      * @param sku 提前生产 SKU

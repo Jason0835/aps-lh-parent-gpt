@@ -194,14 +194,15 @@ public class EarlyProductionRuntimePlanService {
         if (CollectionUtils.isEmpty(shiftedQuotaMap)) {
             return runtimePlan;
         }
-        int historyShortageQty = EarlyProductionChecker.resolveHistoryShortageQty(
-                context, sku, currentDate);
-        this.appendHistoryShortage(
-                shiftedQuotaMap, currentDate, historyShortageQty);
+        /*
+         * 历史欠产/收尾遗留阶段下线后，提前生产只前移未来原始计划量。
+         * 历史欠产不再追加到临时dayN，也不参与本轮有效目标量计算。
+         */
+        int historyShortageQty = 0;
         int futureMonthSurplusQty = runtimePlan.isFutureOnlyCandidate()
                 ? runtimePlan.getFutureMonthSurplusQty() : Math.max(0, sku.getSurplusQty());
         int effectiveTargetQty = this.resolveEffectiveTargetQty(
-                sku, futurePlanDate, futureMonthSurplusQty, historyShortageQty);
+                sku, futurePlanDate, futureMonthSurplusQty);
         this.activateRuntimePlan(
                 context, sku, currentDate, futurePlanDate, earlyDays,
                 runtimePlan, decision, shiftedQuotaMap, historyShortageQty,
@@ -240,8 +241,8 @@ public class EarlyProductionRuntimePlanService {
                 this.resolveOriginalDayPlanQty(context, sku, currentDate));
         runtimePlan.setFutureDayPlanQty(Math.max(0, MonthPlanDateResolver.resolveDayQty(
                 context, sku.getMaterialCode(), sku.getProductStatus(), futurePlanDate)));
-        runtimePlan.setHistoryShortageQty(
-                EarlyProductionChecker.resolveHistoryShortageQty(context, sku, currentDate));
+        // 历史欠产不再迁移到提前生产运行视图，审计字段固定记录为0。
+        runtimePlan.setHistoryShortageQty(0);
         runtimePlan.setDecision(decision);
         if (runtimePlan.isFutureOnlyCandidate()) {
             EarlyProductionQuantityCalculator.populateFutureMonthQuantityView(
@@ -260,7 +261,7 @@ public class EarlyProductionRuntimePlanService {
      * @param runtimePlan 运行视图
      * @param decision 准入结论
      * @param shiftedQuotaMap 临时前移 dayN
-     * @param historyShortageQty 当前月历史欠产
+     * @param historyShortageQty 当前月历史欠产，阶段下线后固定为0
      * @param futureMonthSurplusQty 硫化余量
      * @param effectiveTargetQty 本轮有效目标量
      */
@@ -446,32 +447,23 @@ public class EarlyProductionRuntimePlanService {
     }
 
     /**
-     * 计算未来计划余量加当前月历史欠产后的有效目标量。
+     * 计算提前生产未来计划有效目标量。
      *
      * @param sku SKU
      * @param futurePlanDate 未来计划日
      * @param futureMonthSurplusQty 未来计划段或当前月硫化余量
-     * @param historyShortageQty 当前月历史欠产
      * @return 非负有效目标量
      */
     private int resolveEffectiveTargetQty(
             SkuScheduleDTO sku,
             LocalDate futurePlanDate,
-            int futureMonthSurplusQty,
-            int historyShortageQty) {
-        long effectiveTargetQty =
-                (long) Math.max(0, futureMonthSurplusQty) + Math.max(0, historyShortageQty);
-        if (effectiveTargetQty > Integer.MAX_VALUE) {
-            throw new ScheduleException(
-                    ScheduleErrorCode.SURPLUS_CALCULATION_ERROR,
-                    new StringBuilder("提前生产目标量超出整数范围, materialCode: ")
-                            .append(Objects.isNull(sku) ? null : sku.getMaterialCode())
-                            .append(", futurePlanDate: ").append(futurePlanDate)
-                            .append(", futureMonthSurplusQty: ").append(futureMonthSurplusQty)
-                            .append(", historyShortageQty: ").append(historyShortageQty)
-                            .toString());
-        }
-        return (int) effectiveTargetQty;
+            int futureMonthSurplusQty) {
+        int effectiveTargetQty = Math.max(0, futureMonthSurplusQty);
+        log.debug("提前生产目标量仅使用未来计划余量, materialCode: {}, futurePlanDate: {}, "
+                        + "futureMonthSurplusQty: {}, effectiveTargetQty: {}",
+                Objects.isNull(sku) ? null : sku.getMaterialCode(), futurePlanDate,
+                futureMonthSurplusQty, effectiveTargetQty);
+        return effectiveTargetQty;
     }
 
     /**
