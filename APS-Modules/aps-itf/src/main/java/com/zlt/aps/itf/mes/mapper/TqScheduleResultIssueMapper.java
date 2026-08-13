@@ -37,14 +37,6 @@ public interface TqScheduleResultIssueMapper {
                               @Param("dataVersion") String dataVersion);
 
     /**
-     * 批量根据排程日期+机台+胎圈编码更新数据
-     *
-     * @param list 数据列表
-     * @return 影响行数
-     */
-    int batchUpdateByScheduleDateAndMachine(@Param("list") List<MesTqScheduleResult> list);
-
-    /**
      * 批量查询中间表中已存在的记录（按排程日期+机台编码+胎圈编码匹配，不含版本号）
      * 说明：匹配键不含版本号，目的是让同一天的重新发布能覆盖旧版本数据，避免中间表多版本残留。
      *

@@ -53,4 +53,10 @@ public class Cd15SpecifyMachine extends BaseEntity implements Serializable {
     @TableField("JOB_TYPE")
     @Excel(name = "ui.data.column.cd15SpecifyMachine.jobType", dictType = "JOB_TYPE")
     private String jobType;
+
+    /** 备注 */
+    @ApiModelProperty(value = "备注", name = "remark")
+    @TableField("REMARK")
+    @Excel(name = "ui.common.column.remark")
+    private String remark;
 }

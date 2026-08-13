@@ -79,6 +79,14 @@ public class MachinePriorityTraceSnapshot {
     private final Map<String, Date> priorityTraceEndingTimeMap;
 
     /**
+     * 代表机台在正式模具分配前冻结的软排序指标。
+     *
+     * <p>该映射同时保存候选具体目标模具、选机前实际在机模具和由两者计算出的同模壳结果，
+     * 防止延迟日志读取正式分配后的模具运行态并产生“自己与自己比较”的假同模壳。</p>
+     */
+    private final Map<String, MachinePriorityMetricSnapshot> priorityMetricSnapshotMap;
+
+    /**
      * 创建只包含正式候选的兼容快照。
      *
      * <p>非默认机台匹配策略和测试替身可以直接使用该入口，原有日志行为不受诊断扩展影响。</p>
@@ -114,7 +122,8 @@ public class MachinePriorityTraceSnapshot {
                 displayCodeMap,
                 memberCodeMap,
                 Collections.<String, String>emptyMap(),
-                Collections.<String, Date>emptyMap());
+                Collections.<String, Date>emptyMap(),
+                Collections.<String, MachinePriorityMetricSnapshot>emptyMap());
     }
 
     /**
@@ -135,7 +144,8 @@ public class MachinePriorityTraceSnapshot {
         this(orderedCandidates, actualSelectableMachineCodes, actualSelectedMachineCode,
                 displayMachineCodeMap, memberMachineCodeMap,
                 Collections.<String, String>emptyMap(),
-                Collections.<String, Date>emptyMap());
+                Collections.<String, Date>emptyMap(),
+                Collections.<String, MachinePriorityMetricSnapshot>emptyMap());
     }
 
     /**
@@ -158,6 +168,7 @@ public class MachinePriorityTraceSnapshot {
         this(orderedCandidates, actualSelectableMachineCodes, actualSelectedMachineCode,
                 displayMachineCodeMap, memberMachineCodeMap, occupationTextMap,
                 Collections.<String, Date>emptyMap(),
+                Collections.<String, MachinePriorityMetricSnapshot>emptyMap(),
                 null, null, null);
     }
 
@@ -183,6 +194,34 @@ public class MachinePriorityTraceSnapshot {
         this(orderedCandidates, actualSelectableMachineCodes, actualSelectedMachineCode,
                 displayMachineCodeMap, memberMachineCodeMap, occupationTextMap,
                 priorityTraceEndingTimeMap,
+                Collections.<String, MachinePriorityMetricSnapshot>emptyMap(),
+                null, null, null);
+    }
+
+    /**
+     * 创建同时冻结占用、收尾时间和软排序指标的完整快照。
+     *
+     * @param orderedCandidates 日志观察候选原顺序
+     * @param actualSelectableMachineCodes 实际可选机台编码
+     * @param actualSelectedMachineCode 首选候选机台编码
+     * @param displayMachineCodeMap 展示编码映射
+     * @param memberMachineCodeMap 物理成员编码映射
+     * @param occupationTextMap 选机时点占用明细
+     * @param priorityTraceEndingTimeMap 选机时点日志收尾时间
+     * @param priorityMetricSnapshotMap 正式模具分配前冻结的软排序指标
+     */
+    public MachinePriorityTraceSnapshot(
+            List<MachineScheduleDTO> orderedCandidates,
+            Set<String> actualSelectableMachineCodes,
+            String actualSelectedMachineCode,
+            Map<String, String> displayMachineCodeMap,
+            Map<String, List<String>> memberMachineCodeMap,
+            Map<String, String> occupationTextMap,
+            Map<String, Date> priorityTraceEndingTimeMap,
+            Map<String, MachinePriorityMetricSnapshot> priorityMetricSnapshotMap) {
+        this(orderedCandidates, actualSelectableMachineCodes, actualSelectedMachineCode,
+                displayMachineCodeMap, memberMachineCodeMap, occupationTextMap,
+                priorityTraceEndingTimeMap, priorityMetricSnapshotMap,
                 null, null, null);
     }
 
@@ -208,6 +247,7 @@ public class MachinePriorityTraceSnapshot {
             Map<String, List<String>> memberMachineCodeMap,
             Map<String, String> occupationTextMap,
             Map<String, Date> priorityTraceEndingTimeMap,
+            Map<String, MachinePriorityMetricSnapshot> priorityMetricSnapshotMap,
             String actualHitMachineCode,
             Boolean selectionSucceeded,
             String noHitReason) {
@@ -241,6 +281,11 @@ public class MachinePriorityTraceSnapshot {
                                 : occupationTextMap));
         this.priorityTraceEndingTimeMap = Collections.unmodifiableMap(
                 copyPriorityTraceEndingTimeMap(priorityTraceEndingTimeMap));
+        this.priorityMetricSnapshotMap = Collections.unmodifiableMap(
+                new LinkedHashMap<String, MachinePriorityMetricSnapshot>(
+                        CollectionUtils.isEmpty(priorityMetricSnapshotMap)
+                                ? Collections.<String, MachinePriorityMetricSnapshot>emptyMap()
+                                : priorityMetricSnapshotMap));
     }
 
     /**
@@ -417,6 +462,17 @@ public class MachinePriorityTraceSnapshot {
     }
 
     /**
+     * 获取指定机台在正式模具分配前冻结的软排序指标。
+     *
+     * @param machineCode 代表机台编码
+     * @return 软排序指标快照；未冻结时返回 null
+     */
+    public MachinePriorityMetricSnapshot resolvePriorityMetricSnapshot(String machineCode) {
+        return StringUtils.isEmpty(machineCode)
+                ? null : priorityMetricSnapshotMap.get(machineCode);
+    }
+
+    /**
      * 判断代表机台是否属于正式可选集合。
      *
      * @param machineCode 代表机台编码
@@ -507,7 +563,7 @@ public class MachinePriorityTraceSnapshot {
         return new MachinePriorityTraceSnapshot(
                 orderedCandidates, actualSelectableMachineCodes, actualSelectedMachineCode,
                 displayMachineCodeMap, memberMachineCodeMap, occupationTextMap,
-                priorityTraceEndingTimeMap,
+                priorityTraceEndingTimeMap, priorityMetricSnapshotMap,
                 actualHitMachineCode, Boolean.TRUE, null);
     }
 
@@ -521,7 +577,7 @@ public class MachinePriorityTraceSnapshot {
         return new MachinePriorityTraceSnapshot(
                 orderedCandidates, actualSelectableMachineCodes, actualSelectedMachineCode,
                 displayMachineCodeMap, memberMachineCodeMap, occupationTextMap,
-                priorityTraceEndingTimeMap,
+                priorityTraceEndingTimeMap, priorityMetricSnapshotMap,
                 null, Boolean.FALSE, noHitReason);
     }
 

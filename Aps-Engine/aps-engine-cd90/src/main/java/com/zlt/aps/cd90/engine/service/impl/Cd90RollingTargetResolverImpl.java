@@ -101,6 +101,7 @@ public class Cd90RollingTargetResolverImpl implements Cd90RollingTargetResolver 
                 .batchNo(batchNo)
                 .targetShiftCode(shift.getShiftCode())
                 .targetClassField(shift.getClassField())
+                .resourceBaselineDate(shift.getScheduleDate())
                 .handoverTime(handoverTime)
                 .windowStart(windowStart)
                 .windowEnd(windowEnd)

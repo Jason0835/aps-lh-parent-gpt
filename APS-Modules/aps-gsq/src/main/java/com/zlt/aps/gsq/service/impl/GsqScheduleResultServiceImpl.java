@@ -930,8 +930,6 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
         issue.setNightProduceOrder(null);
         issue.setDayPlanQty(null);
         issue.setDayProduceOrder(null);
-        issue.setNextMidPlanQty(null);
-        issue.setNextMidProduceOrder(null);
         return issue;
     }
 
@@ -940,7 +938,6 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
      * 钢丝圈2班(D+1日夜班) → MES夜班(NIGHT_PLAN_QTY)
      * 钢丝圈3班(D+1日早班) → MES早班(DAY_PLAN_QTY)
      * 钢丝圈4班(D+1日中班) → MES中班(MID_PLAN_QTY)
-     * NEXT_MID不下发
      *
      * @param source      钢丝圈排程结果
      * @param dPlus1Day   D+1日日期
@@ -959,9 +956,6 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
         // 钢丝圈4班→MES中班
         issue.setMidPlanQty(source.getClass4PlanQty() != null ? source.getClass4PlanQty().doubleValue() : null);
         issue.setMidProduceOrder(source.getClass4Sequence());
-        // NEXT_MID不下发
-        issue.setNextMidPlanQty(null);
-        issue.setNextMidProduceOrder(null);
         return issue;
     }
 
@@ -969,7 +963,7 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
      * 构建D+2日（后天）下发数据
      * 钢丝圈5班(D+2日夜班) → MES夜班(NIGHT_PLAN_QTY)
      * 钢丝圈6班(D+2日早班) → MES早班(DAY_PLAN_QTY)
-     * 中班尚未排产不下发，NEXT_MID不下发
+     * 中班尚未排产不下发
      *
      * @param source      钢丝圈排程结果
      * @param dPlus2Day   D+2日日期
@@ -988,13 +982,13 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
         // 中班尚未排产不下发
         issue.setMidPlanQty(null);
         issue.setMidProduceOrder(null);
-        issue.setNextMidPlanQty(null);
-        issue.setNextMidProduceOrder(null);
         return issue;
     }
 
     /**
-     * 构建基础下发对象（公共字段+胎圈1~6班计划量全量传递）
+     * 构建基础下发对象（公共字段）
+     * 说明：胎圈1~6班计划量、缠绕盘代码、英寸、收尾规格标记、生产状态等字段
+     *       在MES中间表中不存在，已从下发对象中删除
      *
      * @param source       钢丝圈排程结果
      * @param scheduleDate MES目标日期
@@ -1023,21 +1017,9 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
             // 施工信息查不到时，单耗默认设为1
             issue.setUnitConsume(1.0);
         }
-        issue.setTwiningDiscCode(source.getTwiningDiscCode());
-        issue.setProSize(source.getProSize());
         issue.setMachineCode(source.getMachineCode());
         // 库存信息
         issue.setStockQty(source.getStockQty() != null ? source.getStockQty().doubleValue() : null);
-        // 胎圈1~6班计划量全量传递（MES通过这些字段理解钢丝圈与胎圈的供应关系）
-        issue.setTqClass1Plan(source.getTqClass1Plan());
-        issue.setTqClass2Plan(source.getTqClass2Plan());
-        issue.setTqClass3Plan(source.getTqClass3Plan());
-        issue.setTqClass4Plan(source.getTqClass4Plan());
-        issue.setTqClass5Plan(source.getTqClass5Plan());
-        issue.setTqClass6Plan(source.getTqClass6Plan());
-        // 状态
-        issue.setProductionStatus(ApsConstant.NO_PRODUNTION);
-        issue.setCloseOutSpecFlag(source.getCloseOutSpecFlag());
         issue.setFactoryCode(source.getFactoryCode());
         return issue;
     }

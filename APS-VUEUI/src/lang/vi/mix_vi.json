@@ -51,6 +51,7 @@
   "ui.frame.btn.add": "Thêm",
   "ui.frame.btn.modify": "Sửa đổi",
   "ui.frame.btn.delete": "Xóa",
+  "ui.frame.btn.all.delete": "Xóa tất cả",
   "ui.frame.btn.import": "Nhập",
   "ui.frame.btn.export": "Xuất",
   "ui.frame.btn.update": "Cập nhật",

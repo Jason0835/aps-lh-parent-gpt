@@ -124,10 +124,11 @@ public interface IMpStructureAllocationService extends IDocService<MpStructureAl
      * @param params           表头参数
      * @param monthPlanVersion 月计划版本
      * @param productVersion   生产版本
+     * @param structureMachineMap   结构机台映射
      * @return 结果
      */
     AjaxResult importDataStructureAllocation(List<MpStructureAllocationExportVo> list, List<FactoryMonthPlanMouldDayResult> list4DayResult, boolean updateSupport, Long importLogId, String[] params, String monthPlanVersion, String productVersion,
-                                             Map<String, String> factoryMap, Map<String, String> productTypeMap);
+                                             Map<String, String> factoryMap, Map<String, String> productTypeMap, Map<String, String> structureMachineMap);
 
     /**
      * 导入
@@ -139,9 +140,10 @@ public interface IMpStructureAllocationService extends IDocService<MpStructureAl
      * @param params           表头参数
      * @param monthPlanVersion 月计划版本
      * @param productVersion   生产版本
+     * @param structureMachineMap   结构机台映射
      * @param isAdjust         是否调整
      * @return 结果
      */
     AjaxResult importDataDayResult(List<MpStructureAllocationExportVo> list, List<FactoryMonthPlanMouldDayResult> list4DayResult, boolean updateSupport, Long importLogId, String[] params, String monthPlanVersion, String productVersion,
-                                   Map<String, String> factoryMap, Map<String, String> productTypeMap, boolean isAdjust);
+                                   Map<String, String> factoryMap, Map<String, String> productTypeMap, Map<String, String> structureMachineMap, boolean isAdjust);
 }

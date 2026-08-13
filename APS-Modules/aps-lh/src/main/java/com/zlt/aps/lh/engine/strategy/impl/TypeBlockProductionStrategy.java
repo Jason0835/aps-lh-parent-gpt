@@ -21,7 +21,6 @@ import com.zlt.aps.lh.api.enums.ConstructionStageEnum;
 import com.zlt.aps.lh.api.enums.MachineStopTypeEnum;
 import com.zlt.aps.lh.api.enums.MouldChangeTypeEnum;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
-import com.zlt.aps.lh.api.enums.SkuScheduleSourceTypeEnum;
 import com.zlt.aps.lh.component.CapsuleReplacementRuleService;
 import com.zlt.aps.lh.component.EarlyProductionRuntimePlanService;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
@@ -227,8 +226,6 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
 
         // completedMachineMap 记录本轮不再尝试的机台，避免同一机台在一轮中反复失败重试。
         Map<String, Boolean> completedMachineMap = new HashMap<>(Math.max(16, candidateMachines.size() * 2));
-        // 已回流 S4.5 的物料不再被 S4.4 二次抢回，避免换活字块和新增换模主链重复争抢同一 SKU。
-        Set<String> returnedToNewSpecMaterialCodes = new LinkedHashSet<String>(16);
         int typeBlockScheduledCount = 0;
         while (!CollectionUtils.isEmpty(context.getNewSpecSkuList())) {
             List<MachineScheduleDTO> activeMachines = buildActiveMachineList(
@@ -254,20 +251,9 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                 }
                 SkuScheduleDTO specifySku = isTypeBlockCandidate(context, machine, limitSpecifySku)
                         ? limitSpecifySku : null;
-                if (specifySku != null && StringUtils.isNotEmpty(specifySku.getMaterialCode())
-                        && returnedToNewSpecMaterialCodes.contains(
-                        MonthPlanDateResolver.buildMaterialStatusKey(
-                                specifySku.getMaterialCode(), specifySku.getProductStatus()))) {
-                    completedMachineMap.put(machineCode, true);
-                    log.info("定点换活字块SKU已回流新增排产，跳过S4.4二次承接, machineCode: {}, materialCode: {}",
-                            machineCode, specifySku.getMaterialCode());
-                    continue;
-                }
                 if (specifySku != null && appendSpecifyTypeBlockResult(
                         context, machine, specifySku, shifts, completedMachineMap, activeMachines)) {
                     clearSpecifyReservation(context, machineCode, specifySku.getMaterialCode());
-                    // 如果定点换活字块单台不足，剩余量仍保留在新增待排列表，后续统一交给 S4.5 补机台。
-                    collectReturnedToNewSpecMaterial(returnedToNewSpecMaterialCodes, context, specifySku);
                     scheduledInCurrentRound = true;
                     typeBlockScheduledCount++;
                     break;
@@ -276,7 +262,7 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                 // 基于同胎胚、同模具、同主花纹等条件筛选可换活字块候选。
                 // 该阶段只允许不更换整套模具的轻量衔接，完整换模能力评估必须留给 S4.5 新增主链。
                 List<SkuScheduleDTO> typeBlockCandidates = filterTypeBlockCandidates(
-                        context, machine, returnedToNewSpecMaterialCodes);
+                        context, machine);
                 if (StringUtils.equals(TYPE_BLOCK_TRIGGER_FIRST_DAY_NO_PLAN_RELEASE,
                         machineTriggerSourceMap.get(machineCode))) {
                     log.info("释放机台换活字块候选SKU列表, machineCode: {}, currentMaterialCode: {}, candidates: {}",
@@ -352,7 +338,6 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                 }
                 scheduledInCurrentRound = true;
                 typeBlockScheduledCount++;
-                collectReturnedToNewSpecMaterial(returnedToNewSpecMaterialCodes, context, typeBlockSku);
                 if (!machine.isEnding()) {
                     completedMachineMap.put(machineCode, true);
                 }
@@ -1027,46 +1012,14 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
      * @return 候选SKU
      */
     private List<SkuScheduleDTO> filterTypeBlockCandidates(LhScheduleContext context,
-                                                           MachineScheduleDTO machine,
-                                                           Set<String> returnedToNewSpecMaterialCodes) {
+                                                           MachineScheduleDTO machine) {
         List<SkuScheduleDTO> candidateList = new ArrayList<>(context.getNewSpecSkuList().size());
         for (SkuScheduleDTO sku : context.getNewSpecSkuList()) {
-            if (sku != null && !CollectionUtils.isEmpty(returnedToNewSpecMaterialCodes)
-                    && returnedToNewSpecMaterialCodes.contains(
-                    MonthPlanDateResolver.buildMaterialStatusKey(
-                            sku.getMaterialCode(), sku.getProductStatus()))) {
-                continue;
-            }
             if (isTypeBlockCandidate(context, machine, sku, false)) {
                 candidateList.add(sku);
             }
         }
         return candidateList;
-    }
-
-    /**
-     * 记录已由换活字块首台承接但仍需回流 S4.5 的业务SKU，避免 S4.4 再次按换活字块扩机。
-     *
-     * @param returnedToNewSpecMaterialCodes 回流新增排产物料集合
-     * @param context 排程上下文
-     * @param sku 当前 SKU
-     */
-    private void collectReturnedToNewSpecMaterial(Set<String> returnedToNewSpecMaterialCodes,
-                                                  LhScheduleContext context,
-                                                  SkuScheduleDTO sku) {
-        if (returnedToNewSpecMaterialCodes == null
-                || context == null || sku == null || StringUtils.isEmpty(sku.getMaterialCode())) {
-            return;
-        }
-        if (context.getNewSpecSkuList().contains(sku) && sku.getRemainingScheduleQty() > 0) {
-            /*
-             * 调用处明确标记换活字块回流来源。S4.5 后续仍可在有原始日计划的业务日
-             * 复用新增换模主链，但 EarlyProductionChecker 会据此禁止主动拉取未来 SKU。
-             */
-            sku.setSourceType(SkuScheduleSourceTypeEnum.TYPE_BLOCK_TO_NEW_SPEC.getCode());
-            returnedToNewSpecMaterialCodes.add(MonthPlanDateResolver.buildMaterialStatusKey(
-                    sku.getMaterialCode(), sku.getProductStatus()));
-        }
     }
 
     /**
@@ -1933,7 +1886,7 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
         }
 
         // 换活字块结果按日计划账本回裁，收尾严格截断，避免超产。
-        // 非收尾正规/量试可保留满班补齐口径，剩余缺口继续留给 S4.5。
+        // 非收尾正规/量试可保留满班补齐口径；成功后的剩余缺口只做换活字块残量审计。
         DailyQuotaLedgerBaseline precisionQuotaBaseline =
                 DailyQuotaLedgerBaseline.capture(context, sku);
         int quotaTrimmedQty = wholeSingleControlUnit
@@ -2044,26 +1997,100 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                     LhScheduleTimeUtil.formatDateTime(startTime), quotaTrimmedQty);
         }
         int scheduledQty = quotaTrimmedQty;
-        // 换活字块结果可能被“物料+产品状态”实际消费账本裁剪，回流量必须同时受原目标缺口和账本剩余约束。
-        // 若本状态账本已扣完，不得按裁剪前目标量再次回流 S4.5，否则会出现同状态已排满后仍生成未排记录。
-        int remainingQty = resolveRemainingQtyForNewSchedule(
+        // 换活字块结果可能被“物料+产品状态”实际消费账本裁剪，残量必须同时受目标缺口和账本剩余约束。
+        int remainingQty = resolveTypeBlockResidualQty(
                 context, sku, adoptedTargetQty, scheduledQty);
+        this.completeSuccessfulTypeBlockSchedule(
+                context, machine, sku, adoptedTargetQty, scheduledQty,
+                remainingQty, originalStrictTargetQty);
+        return true;
+    }
+
+    /**
+     * 收口已经成功形成结果的换活字块 SKU。
+     *
+     * <p>成功完整量和成功部分量都必须退出通用新增待排队列；只有完全没有形成有效结果的失败状态
+     * 才继续保留在新增队列。成功部分量通过独立过程日志保留审计证据，下一滚动窗口再按月计划与
+     * 已排结果重算，不得进入当前批次新增 SKU 排序。</p>
+     *
+     * @param context 排程上下文
+     * @param machine 已成功承接的机台
+     * @param sku 已成功换活字块的 SKU
+     * @param adoptedTargetQty 本次采用目标量
+     * @param scheduledQty 本次实际排产量
+     * @param remainingQty 本次未覆盖残量
+     * @param originalStrictTargetQty 原严格目标量标识
+     */
+    private void completeSuccessfulTypeBlockSchedule(
+            LhScheduleContext context,
+            MachineScheduleDTO machine,
+            SkuScheduleDTO sku,
+            int adoptedTargetQty,
+            int scheduledQty,
+            int remainingQty,
+            boolean originalStrictTargetQty) {
+        /*
+         * 换活字块一旦成功形成有效结果，无论是否覆盖完整目标量，都已完成本窗口的上机方式决策。
+         * 必须先移出通用新增待排队列，禁止同一 SKU 再进入 S4.5 排序、换模和新增排序日志。
+         * 未覆盖量保留在月计划/实际消费账本中，由下一滚动窗口重新加载，不在当前窗口伪装成新增 SKU。
+         */
+        context.getNewSpecSkuList().remove(sku);
+        context.removePendingSkuFromStructureMap(sku);
         if (remainingQty > 0) {
-            // 换活字块只在当前衔接机台落一段产能；单台不足时，不在 S4.4 继续扩第二台，
-            // 而是把剩余量写回 SKU，交给 S4.5 新增排产重新选机、换模和扣账。
+            // 成功部分量保留明确残量状态，仅用于当前批次审计，不再参与通用新增排产。
             sku.setTargetScheduleQty(remainingQty);
             sku.setRemainingScheduleQty(remainingQty);
             sku.setStrictTargetQty(originalStrictTargetQty);
-            log.info("换活字块单台产能不足，剩余量回流新增排产, machineCode: {}, materialCode: {}, 已排: {}, "
-                            + "remainingQtyForNewSchedule: {}, 回流阶段: S4.5新增排产/换模",
-                    machine.getMachineCode(), sku.getMaterialCode(), scheduledQty, remainingQty);
-            return true;
+            this.appendTypeBlockPartialResidualProcessLog(
+                    context, machine, sku, adoptedTargetQty, scheduledQty, remainingQty);
+            log.info("换活字块成功部分量，残量退出当前窗口通用新增排产, machineCode: {}, materialCode: {}, "
+                            + "adoptedTargetQty: {}, scheduledQty: {}, residualQty: {}, outcome: SUCCESS_PARTIAL",
+                    machine.getMachineCode(), sku.getMaterialCode(), adoptedTargetQty,
+                    scheduledQty, remainingQty);
+            return;
         }
-        context.getNewSpecSkuList().remove(sku);
-        context.removePendingSkuFromStructureMap(sku);
-        log.debug("换活字块排产完成, 机台: {}, SKU: {}, 已排: {}, 剩余: {}",
-                machine.getMachineCode(), sku.getMaterialCode(), scheduledQty, remainingQty);
-        return true;
+        log.debug("换活字块成功完整量, 机台: {}, SKU: {}, 目标量: {}, 已排: {}, 剩余: {}, outcome: SUCCESS_COMPLETE",
+                machine.getMachineCode(), sku.getMaterialCode(), adoptedTargetQty,
+                scheduledQty, remainingQty);
+    }
+
+    /**
+     * 记录换活字块成功部分量的独立残量审计。
+     *
+     * <p>该记录只说明本次换活字块已成功但未覆盖完整目标量，不属于新增 SKU 排序日志，
+     * 也不创建通用新增未排记录。下一滚动窗口会根据月计划与已排结果重新计算真实余量。</p>
+     *
+     * @param context 排程上下文
+     * @param machine 已成功承接的机台
+     * @param sku 已成功换活字块的 SKU
+     * @param adoptedTargetQty 本次采用目标量
+     * @param scheduledQty 本次实际排产量
+     * @param residualQty 本次未覆盖残量
+     */
+    private void appendTypeBlockPartialResidualProcessLog(
+            LhScheduleContext context,
+            MachineScheduleDTO machine,
+            SkuScheduleDTO sku,
+            int adoptedTargetQty,
+            int scheduledQty,
+            int residualQty) {
+        if (Objects.isNull(context) || Objects.isNull(machine) || Objects.isNull(sku)) {
+            return;
+        }
+        String detail = new StringBuilder(256)
+                .append("scheduleDate=")
+                .append(LhScheduleTimeUtil.formatDate(context.getScheduleTargetDate()))
+                .append(", materialCode=").append(sku.getMaterialCode())
+                .append(", productStatus=").append(sku.getProductStatus())
+                .append(", machineCode=").append(machine.getMachineCode())
+                .append(", adoptedTargetQty=").append(adoptedTargetQty)
+                .append(", scheduledQty=").append(scheduledQty)
+                .append(", residualQty=").append(residualQty)
+                .append(", outcome=SUCCESS_PARTIAL")
+                .append(", nextAction=下一滚动窗口按月计划与已排结果重算")
+                .toString();
+        PriorityTraceLogHelper.appendProcessLog(
+                context, "换活字块成功部分量残量", detail);
     }
 
     /**
@@ -2106,18 +2133,18 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
     }
 
     /**
-     * 计算换活字块完成后可回流新增排产的剩余量。
+     * 计算换活字块成功后未覆盖的独立残量。
      *
      * @param context 排程上下文
      * @param sku 当前业务SKU
      * @param adoptedTargetQty 换活字块采用的目标量
      * @param scheduledQty 本次实际排产量
-     * @return 同时受目标缺口和本产品状态实际消费账本约束的回流量
+     * @return 同时受目标缺口和本产品状态实际消费账本约束的残量
      */
-    private int resolveRemainingQtyForNewSchedule(LhScheduleContext context,
-                                                   SkuScheduleDTO sku,
-                                                   int adoptedTargetQty,
-                                                   int scheduledQty) {
+    private int resolveTypeBlockResidualQty(LhScheduleContext context,
+                                            SkuScheduleDTO sku,
+                                            int adoptedTargetQty,
+                                            int scheduledQty) {
         int targetRemainingQty = Math.max(0, adoptedTargetQty - scheduledQty);
         int ledgerRemainingQty = targetScheduleQtyResolver.resolveProductionRemainingQty(context, sku);
         return Math.min(targetRemainingQty, ledgerRemainingQty);
@@ -2910,7 +2937,7 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
             sku.setRemainingScheduleQty(adoptedTargetQty);
             sku.setStrictTargetQty(false);
             appliedRule = newSpecExpansionAvailable
-                    ? "单机台换活字块承接+新增换模扩机"
+                    ? "单机台换活字块承接+记录新增扩机需求残量"
                     : resolveSingleMachineWindowRuleName(sku, adoptedTargetQty, windowCapacityQty);
         } else if (isEnding) {
             sku.setStrictTargetQty(true);
@@ -2930,8 +2957,12 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
 
     /**
      * 解析单机台换活字块在非收尾场景下的目标量。
-     * <p>若后续仍有新增换模扩机能力，则保留窗口账本需求量，允许剩余量回流 S4.5；
-     * 否则沿用当前单机台满排窗口口径。</p>
+     *
+     * <p>若当前窗口仍存在新增换模扩机能力，则保留完整窗口账本需求量，用于换活字块
+     * 部分成功后的真实残量审计；该信号只决定本次采用目标量，不表示残量重新进入 S4.5。
+     * 换活字块一旦形成有效结果，完整成功和部分成功都按既定业务规则退出当前批次通用
+     * 新增队列，残量只写独立过程日志并由下一滚动窗口重新计算。没有扩机能力时，继续
+     * 沿用当前单机台满排窗口口径。</p>
      *
      * @param sku SKU
      * @param windowCapacityQty 当前机台窗口产能

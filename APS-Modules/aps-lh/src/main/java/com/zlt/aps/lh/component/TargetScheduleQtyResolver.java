@@ -1381,7 +1381,7 @@ public class TargetScheduleQtyResolver {
         if (Objects.isNull(sku) || sku.getShiftCapacity() <= 0) {
             return Math.max(0, sku != null ? sku.getPendingQty() : 0);
         }
-        List<LhShiftConfigVO> shifts = resolveScheduleShifts(context);
+        List<LhShiftConfigVO> shifts = this.resolveScheduleShifts(context);
         if (CollectionUtils.isEmpty(shifts)) {
             return Math.max(0, sku.getPendingQty());
         }
@@ -1829,8 +1829,9 @@ public class TargetScheduleQtyResolver {
     /**
      * 按指定生产时间下限计算单台机台在剩余窗口内的可排产能。
      *
-     * <p>该重载供 S4.5 胎胚最早可供时间试算调用；生产时间下限只裁剪生产产能，
-     * 换模耗时仍按现有候选机台时间轴先行扣减。传 null 时保持原有行为。</p>
+     * <p>该重载供 S4.5 统一生产门禁试算调用；时间下限可来自正规当前日首班、X/T 首次
+     * 正计划中班或胎胚最早可供时间，只裁剪生产产能，换模耗时仍按现有候选机台时间轴
+     * 先行扣减。传 null 时保持原有行为。</p>
      *
      * @param context 排程上下文
      * @param sku 当前 SKU
@@ -1845,32 +1846,87 @@ public class TargetScheduleQtyResolver {
         if (Objects.isNull(context) || Objects.isNull(sku) || Objects.isNull(machine)) {
             return 0;
         }
-        List<LhShiftConfigVO> shifts = resolveScheduleShifts(context);
+        List<LhShiftConfigVO> shifts = this.resolveScheduleShifts(context);
         if (CollectionUtils.isEmpty(shifts)) {
             return 0;
         }
-        if (Objects.nonNull(productionNotBeforeTime)) {
+        /*
+         * 结构胎胚时间配置保持原有“命中即使用精确首检试算”的语义；新增的正规/X/T 类型
+         * 门禁只有在真实推迟候选理论开产时才启用精确裁剪，避免扩大正规 SKU 影响范围。
+         */
+        boolean productionGateConstrained = Objects.nonNull(productionNotBeforeTime)
+                && (NewSpecEmbryoAvailableTimeResolver.isConstrained(context, sku)
+                || this.isCandidateProductionGateConstrained(
+                        context, sku, machine, shifts, productionNotBeforeTime));
+        if (productionGateConstrained) {
             /*
-             * 胎胚时间试算不仅裁剪可供前产能，还要使用与正式落班一致的首检占用口径。
+             * 生产门禁试算不仅裁剪门禁前产能，还要使用与正式落班一致的首检占用口径。
              * 首个仍有物理产能的班次即为候选首检班次；普通SKU首检计入该班总产能，
              * 试制SKU继续扣除固定2小时。
              */
             LinkedHashMap<Integer, Integer> capacityByShift =
-                    calculateMachineAvailableCapacityByShiftInWindow(
+                    this.calculateMachineAvailableCapacityByShiftInWindow(
                             context, sku, machine, shifts, true, productionNotBeforeTime);
             int runtimeShiftCapacity = ShiftCapacityResolverUtil.resolveRuntimeShiftCapacity(
                     context, machine, sku.getShiftCapacity());
-            Map<Integer, Integer> adjustedCapacityMap = resolveEmbryoAvailableCapacityMap(
+            Map<Integer, Integer> adjustedCapacityMap = this.resolveProductionGateCapacityMap(
                     context, sku, shifts, capacityByShift, runtimeShiftCapacity,
                     sku.resolveTargetScheduleQty(), machine.getMachineCode());
-            return sumShiftCapacity(adjustedCapacityMap);
+            return this.sumShiftCapacity(adjustedCapacityMap);
         }
-        return calculateMachineAvailableCapacityInWindow(
-                context, sku, machine, shifts, productionNotBeforeTime);
+        /*
+         * 正规 SKU 的门禁通常就是当前业务日首班。如果机台完成切换的理论时间已经不早于
+         * 该门禁，门禁没有改变任何生产时间，此时必须继续走原窗口产能口径，避免仅因传入了
+         * 一个非空 Date 就额外执行部分班次首检收口，造成正规 SKU 候选产能被无关缩小。
+         */
+        return this.calculateMachineAvailableCapacityInWindow(
+                context, sku, machine, shifts, null);
     }
 
     /**
-     * 按胎胚时间和强制首检规则收口候选班次产能图。
+     * 判断统一生产门禁是否真实推迟当前候选机台的理论开产时间。
+     *
+     * <p>本判断严格复用候选产能试算已有的轻量时间口径：窗口起点与机台预计释放时间取较晚值，
+     * 物料变化时再追加一次现有换模总时长。只有门禁晚于该理论时点，才需要裁剪门禁前产能并
+     * 使用部分班次首检规则。方法只进行常数次时间比较，不额外构造班次产能图。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 当前 SKU
+     * @param machine 候选机台
+     * @param shifts 完整排程窗口班次
+     * @param productionNotBeforeTime 统一生产门禁
+     * @return true-门禁真实推迟理论开产；false-门禁未改变现有时间轴
+     */
+    private boolean isCandidateProductionGateConstrained(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            MachineScheduleDTO machine,
+            List<LhShiftConfigVO> shifts,
+            Date productionNotBeforeTime) {
+        if (Objects.isNull(context) || Objects.isNull(sku) || Objects.isNull(machine)
+                || Objects.isNull(productionNotBeforeTime) || CollectionUtils.isEmpty(shifts)
+                || Objects.isNull(shifts.get(0))
+                || Objects.isNull(shifts.get(0).getShiftStartDateTime())) {
+            return false;
+        }
+        Date windowStartTime = shifts.get(0).getShiftStartDateTime();
+        Date machineAvailableTime = machine.getEstimatedEndTime();
+        Date theoreticalProductionStartTime = Objects.nonNull(machineAvailableTime)
+                && machineAvailableTime.after(windowStartTime)
+                ? machineAvailableTime : windowStartTime;
+        if (!StringUtils.equals(machine.getPreviousMaterialCode(), sku.getMaterialCode())) {
+            int mouldChangeHours = LhScheduleTimeUtil.getMouldChangeTotalHours(context);
+            if (mouldChangeHours > 0) {
+                theoreticalProductionStartTime = LhScheduleTimeUtil.addHours(
+                        theoreticalProductionStartTime, mouldChangeHours);
+            }
+        }
+        return Objects.nonNull(theoreticalProductionStartTime)
+                && productionNotBeforeTime.after(theoreticalProductionStartTime);
+    }
+
+    /**
+     * 按统一生产门禁和强制首检规则收口候选班次产能图。
      *
      * <p>首个部分班次不足完整首检时，该班及其之前班次不能保留常规生产量，必须把首检
      * 与生产整体顺延到后续可完整承载的班次；否则候选试算会比最终落班虚高。</p>
@@ -1878,13 +1934,13 @@ public class TargetScheduleQtyResolver {
      * @param context 排程上下文
      * @param sku 当前 SKU
      * @param shifts 排程班次
-     * @param physicalCapacityMap 已按胎胚时间裁剪的物理产能图
+     * @param physicalCapacityMap 已按统一生产门禁裁剪的物理产能图
      * @param runtimeShiftCapacity 运行态完整班产
      * @param remainingQty 候选目标量
      * @param machineCode 候选机台编码
      * @return 首检和正常生产共同收口后的候选产能图
      */
-    private Map<Integer, Integer> resolveEmbryoAvailableCapacityMap(
+    private Map<Integer, Integer> resolveProductionGateCapacityMap(
             LhScheduleContext context,
             SkuScheduleDTO sku,
             List<LhShiftConfigVO> shifts,

@@ -1,6 +1,9 @@
 package com.zlt.aps.mp.adjust.service;
 
+import java.util.List;
+
 import com.zlt.aps.mp.api.domain.dto.MpRollAdjustContextDTO;
+import com.zlt.aps.mp.api.domain.entity.MpMonthPlanStatistics;
 
 /**
  * 周程滚动调整接口
@@ -44,5 +47,32 @@ public interface IMpWeekAdjustService {
      * @param contextDTO 周程滚动调整上下文对象
      */
     void recalculate(MpRollAdjustContextDTO contextDTO, Boolean isHandleMonthPlanStatistics);
+    
+    /**
+     * 校验胶囊卡盘
+     * @param contextDTO
+     */
+    void checkCapsuleChuckLimit(MpRollAdjustContextDTO contextDTO);
+    
+    /**
+     * 检查模壳标准限制
+     * @param contextDTO
+     */
+    void checkMouldShellLimit(MpRollAdjustContextDTO contextDTO);
+    
+    /**
+     * 初始化上下文
+     * @param factoryCode
+     * @param productType
+     * @return
+     */
+    MpRollAdjustContextDTO initContextDTO(String factoryCode,String productType);
+    
+    /**
+     * 处理月计划统计结果
+     * @param contextDTO
+     * @param tempFlag
+     */
+    List<MpMonthPlanStatistics> handleMonthPlanStatistics(MpRollAdjustContextDTO contextDTO, String tempFlag);
 }
 

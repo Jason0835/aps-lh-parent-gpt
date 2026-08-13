@@ -6,6 +6,7 @@ import com.zlt.aps.cd90.engine.constant.Cd90ScheduleTaskStage;
 import com.zlt.aps.cd90.engine.constant.Cd90ScheduleTaskStatus;
 import com.zlt.aps.cd90.engine.domain.Cd90ScheduleTask;
 import com.zlt.aps.cd90.engine.mapper.Cd90ScheduleTaskMapper;
+import com.zlt.aps.cd90.engine.model.Cd90ScheduleTaskCreationResult;
 import com.zlt.aps.cd90.engine.service.Cd90ScheduleTaskService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -48,19 +49,20 @@ public class Cd90ScheduleTaskServiceImpl implements Cd90ScheduleTaskService {
      * @param requestSnapshot 请求快照，记录触发时的关键参数（如"factoryCode=XX,scheduleDate=XX,forceRegenerate=true"），
      *                        便于事后审计排程触发条件
      * @param createBy        创建人标识，手动触发时记录操作人，自动触发时为 null
-     * @return 新创建的任务对象；如果同工厂、同日期的活跃任务已存在，则返回已有任务（幂等）
+     * @return 任务创建结果，明确标识本次新建或幂等返回已有任务
      */
     @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
-    public Cd90ScheduleTask createPending(String factoryCode, Date scheduleDate, String taskType,
-                                          String triggerType, String requestSnapshot, String createBy) {
+    public Cd90ScheduleTaskCreationResult createPending(String factoryCode, Date scheduleDate,
+                                                        String taskType, String triggerType,
+                                                        String requestSnapshot, String createBy) {
         // --- 1. 幂等性检查：查询同工厂、同日期是否已有进行中的任务 ---
         // findActive 查询条件：factoryCode + scheduleDate + taskStatus IN (PENDING, RUNNING)
         // 如果查询到活跃任务，说明已有任务在处理该日期的排程，直接返回已有任务，防止重复创建
         Cd90ScheduleTask activeTask = findActive(factoryCode, scheduleDate);
         if (activeTask != null) {
             // 幂等返回：已有活跃任务，无需重复创建
-            return activeTask;
+            return Cd90ScheduleTaskCreationResult.existing(activeTask);
         }
 
         // --- 2. 构建新任务对象 ---
@@ -103,7 +105,7 @@ public class Cd90ScheduleTaskServiceImpl implements Cd90ScheduleTaskService {
                         + "taskType={}, triggerType={}",
                 task.getTaskId(), factoryCode, scheduleDate, taskType, triggerType);
 
-        return task;
+        return Cd90ScheduleTaskCreationResult.created(task);
     }
 
     /**
@@ -279,24 +281,50 @@ public class Cd90ScheduleTaskServiceImpl implements Cd90ScheduleTaskService {
     }
 
     /**
-     * 查询所有 RUNNING 状态的任务，按心跳时间升序排列。
-     * <p>用于心跳超时检测，优先处理长时间未更新心跳的任务。</p>
+     * 仅将仍在等待执行的任务标记为失败。
+     * <p>异步执行器获取执行锁失败时使用该方法，避免重复派发场景误伤已经RUNNING的同一任务。</p>
      *
-     * @param limit 最大返回条数，0 或负数时使用默认值 500，上限 1000
-     * @return RUNNING 状态的任务列表
+     * @param taskId       任务唯一标识
+     * @param errorMessage 失败原因描述
+     * @return true 表示更新成功
      */
     @Override
-    public List<Cd90ScheduleTask> findRunningTasks(int limit) {
+    @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
+    public boolean markPendingFailed(String taskId, String errorMessage) {
+        String summary = errorMessage == null ? "自动排程任务未获取到执行锁" : errorMessage;
+        if (summary.length() > MAX_ERROR_LENGTH) {
+            summary = summary.substring(0, MAX_ERROR_LENGTH);
+        }
+        return taskMapper.update(null, new LambdaUpdateWrapper<Cd90ScheduleTask>()
+                .eq(Cd90ScheduleTask::getTaskId, taskId)
+                .eq(Cd90ScheduleTask::getTaskStatus, Cd90ScheduleTaskStatus.PENDING)
+                .set(Cd90ScheduleTask::getTaskStatus, Cd90ScheduleTaskStatus.FAILED)
+                .set(Cd90ScheduleTask::getErrorMessage, summary)
+                .set(Cd90ScheduleTask::getEndTime, new Date())
+                .set(Cd90ScheduleTask::getLastHeartbeatTime, new Date())) == 1;
+    }
+
+    /**
+     * 查询所有 PENDING 或 RUNNING 状态的任务，按创建时间升序排列。
+     * <p>用于等待执行超时和运行心跳超时补偿，优先处理创建时间较早的任务。</p>
+     *
+     * @param limit 最大返回条数，0 或负数时使用默认值 500，上限 1000
+     * @return PENDING 或 RUNNING 状态的任务列表
+     */
+    @Override
+    public List<Cd90ScheduleTask> findRecoverableTasks(int limit) {
         int queryLimit = limit <= 0 ? 500 : Math.min(limit, 1000);
         return taskMapper.selectList(new LambdaQueryWrapper<Cd90ScheduleTask>()
-                .eq(Cd90ScheduleTask::getTaskStatus, Cd90ScheduleTaskStatus.RUNNING)
-                .orderByAsc(Cd90ScheduleTask::getLastHeartbeatTime)
+                .in(Cd90ScheduleTask::getTaskStatus,
+                        Arrays.asList(Cd90ScheduleTaskStatus.PENDING,
+                                Cd90ScheduleTaskStatus.RUNNING))
+                .orderByAsc(Cd90ScheduleTask::getCreateTime)
                 .last("limit " + queryLimit));
     }
 
     /**
      * 将心跳超时的任务标记为失败（使用独立短事务）。
-     * <p>由心跳超时补偿任务调用，仅处理 RUNNING 状态的任务。错误信息超过 2000 字符时自动截断。</p>
+     * <p>由超时补偿任务调用，仅处理 PENDING 或 RUNNING 状态的任务。错误信息超过 2000 字符时自动截断。</p>
      *
      * @param taskId       任务唯一标识
      * @param errorMessage 超时原因描述
@@ -306,12 +334,16 @@ public class Cd90ScheduleTaskServiceImpl implements Cd90ScheduleTaskService {
     @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
     public boolean markTimeoutFailed(String taskId, String errorMessage) {
         String summary = errorMessage == null ? "自动排程任务心跳超时" : errorMessage;
-        if (summary.length() > MAX_ERROR_LENGTH) summary = summary.substring(0, MAX_ERROR_LENGTH);
+        if (summary.length() > MAX_ERROR_LENGTH) {
+            summary = summary.substring(0, MAX_ERROR_LENGTH);
+        }
         return taskMapper.update(null, new LambdaUpdateWrapper<Cd90ScheduleTask>()
                 .eq(Cd90ScheduleTask::getTaskId, taskId)
-                .eq(Cd90ScheduleTask::getTaskStatus, Cd90ScheduleTaskStatus.RUNNING)
+                .in(Cd90ScheduleTask::getTaskStatus,
+                        Arrays.asList(Cd90ScheduleTaskStatus.PENDING,
+                                Cd90ScheduleTaskStatus.RUNNING))
                 .set(Cd90ScheduleTask::getTaskStatus, Cd90ScheduleTaskStatus.FAILED)
-                .set(Cd90ScheduleTask::getCurrentStageName, "心跳超时补偿失败")
+                .set(Cd90ScheduleTask::getCurrentStageName, "任务超时补偿失败")
                 .set(Cd90ScheduleTask::getErrorMessage, summary)
                 .set(Cd90ScheduleTask::getEndTime, new Date())) == 1;
     }
