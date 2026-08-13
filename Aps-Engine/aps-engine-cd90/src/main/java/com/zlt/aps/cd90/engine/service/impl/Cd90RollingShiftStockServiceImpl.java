@@ -65,7 +65,7 @@ public class Cd90RollingShiftStockServiceImpl implements Cd90RollingShiftStockSe
                         + item.getStockDate() + ":" + item.getShiftCode() + ":"
                         + item.getShiftStartTime() + ":" + item.getMaterialCode() + ":"
                         + item.getStockNum() + ":" + item.getModifyNum() + ":"
-                        + item.getBadNum() + ":" + item.getSnapshotTime())
+                        + item.getBadNum())
                 .collect(Collectors.joining("|"));
         return this.sha256(source);
     }

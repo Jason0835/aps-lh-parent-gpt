@@ -104,9 +104,7 @@ public class Cd15ShiftResourceCommitter {
                     committedQuantity, request.getUnitConsumeMillimeter(),
                     request.getCraftWidth(), request.getCordWidth(),
                     request.getSteelStripCode(), request.getBigRollCode());
-            int afterSeconds = adjustedRemainingSeconds(request, trial, beforeSeconds, committedQuantity);
             int elapsedBefore = Math.max(0, fullShiftSeconds(request) - beforeSeconds);
-            int productionDurationSeconds = Math.max(0, beforeSeconds - afterSeconds - trial.getAgingDelaySeconds());
             LocalDateTime originalStart = request.getShiftStart().plusSeconds(elapsedBefore);
             Cd15BigRollAgingAllocation agingAllocation = commitAgingAllocation(
                     working, request.getBigRollCode(), bigRollConsumeQuantity, originalStart);
@@ -114,6 +112,13 @@ public class Cd15ShiftResourceCommitter {
                 lastFailureReason = Cd15BigRollAgingAllocator.AGING_PERIOD_LIMIT;
                 continue;
             }
+            int committedAgingDelaySeconds = agingAllocation == null
+                    ? 0 : agingAllocation.getDelaySeconds();
+            int afterSeconds = this.adjustedRemainingSeconds(
+                    request, trial, beforeSeconds, committedQuantity,
+                    committedAgingDelaySeconds);
+            int productionDurationSeconds = Math.max(0,
+                    beforeSeconds - afterSeconds - committedAgingDelaySeconds);
             LocalDateTime expectedStart = agingAllocation == null ? originalStart : agingAllocation.getTaskStartTime();
             int produceOrder = working.getTasks().stream()
                     .filter(item -> trial.getMachineCode().equals(item.getMachineCode()))
@@ -273,8 +278,6 @@ public class Cd15ShiftResourceCommitter {
             int beforeSeconds = working.getRemainingSecondsByMachine()
                     .getOrDefault(trial.getMachineCode(),
                             this.fullShiftSeconds(request));
-            int afterSeconds = this.adjustedRemainingSeconds(
-                    request, trial, beforeSeconds, committedQuantity);
             int elapsedBefore = Math.max(0,
                     this.fullShiftSeconds(request) - beforeSeconds);
             LocalDateTime originalStart = request.getShiftStart()
@@ -287,10 +290,15 @@ public class Cd15ShiftResourceCommitter {
                 lastFailureReason = Cd15BigRollAgingAllocator.AGING_PERIOD_LIMIT;
                 continue;
             }
+            int committedAgingDelaySeconds = agingAllocation == null
+                    ? 0 : agingAllocation.getDelaySeconds();
+            int afterSeconds = this.adjustedRemainingSeconds(
+                    request, trial, beforeSeconds, committedQuantity,
+                    committedAgingDelaySeconds);
             LocalDateTime expectedStart = agingAllocation == null
                     ? originalStart : agingAllocation.getTaskStartTime();
             int productionDurationSeconds = Math.max(0,
-                    beforeSeconds - afterSeconds - trial.getAgingDelaySeconds());
+                    beforeSeconds - afterSeconds - committedAgingDelaySeconds);
             int produceOrder = working.getTasks().stream()
                     .filter(item -> trial.getMachineCode().equals(
                             item.getMachineCode()))
@@ -656,15 +664,17 @@ public class Cd15ShiftResourceCommitter {
     }
 
     private int adjustedRemainingSeconds(Cd15ShiftCommitRequest request, Cd15MachineTrial trial,
-                                         int beforeSeconds, BigDecimal committedQuantity) {
+                                         int beforeSeconds, BigDecimal committedQuantity,
+                                         int committedAgingDelaySeconds) {
         BigDecimal trialQuantity = trial.getFinalSchedulableQuantity();
-        if (trialQuantity == null || committedQuantity.compareTo(trialQuantity) >= 0
+        if (trialQuantity == null || (committedQuantity.compareTo(trialQuantity) >= 0
+                && committedAgingDelaySeconds == trial.getAgingDelaySeconds())
                 || trial.getProductionSeconds() <= 0) {
             return trial.getRemainingSeconds();
         }
         int productionSeconds = committedQuantity.multiply(BigDecimal.valueOf(trial.getProductionSeconds()))
                 .divide(trialQuantity, 0, RoundingMode.CEILING).intValueExact();
-        return Math.max(0, beforeSeconds - trial.getAgingDelaySeconds()
+        return Math.max(0, beforeSeconds - committedAgingDelaySeconds
                 - trial.getChangeSeconds() - productionSeconds);
     }
 
@@ -721,9 +731,6 @@ public class Cd15ShiftResourceCommitter {
                                                              String bigRollCode,
                                                              BigDecimal committedQuantity,
                                                              LocalDateTime originalStart) {
-        if (working.getBigRollAgingStocks() == null || working.getBigRollAgingStocks().isEmpty()) {
-            return null;
-        }
         return agingAllocator.allocate(working.getBigRollAgingStocks(), bigRollCode, committedQuantity, originalStart);
     }
 

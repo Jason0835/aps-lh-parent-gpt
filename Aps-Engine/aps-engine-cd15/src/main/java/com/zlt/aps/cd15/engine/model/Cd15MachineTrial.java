@@ -57,6 +57,6 @@ public class Cd15MachineTrial {
     private int agingDelaySeconds;
     /** 本次任务的大卷成熟流水试算结果。 */
     private Cd15BigRollAgingAllocation agingAllocation;
-    /** 试算受限原因：TOOLING_LIMIT表示工装不足，CAPACITY_LIMIT表示机台产能不足；未受限时为空。 */
+    /** 试算受限原因：TOOLING_LIMIT表示工装不足，CAPACITY_LIMIT表示机台产能不足，AGING_PERIOD_LIMIT表示成熟流水受限。 */
     private String limitReason;
 }

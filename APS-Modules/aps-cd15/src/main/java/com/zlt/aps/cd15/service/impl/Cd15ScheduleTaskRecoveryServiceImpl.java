@@ -3,6 +3,7 @@ package com.zlt.aps.cd15.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.cd15.api.domain.entity.Cd15ShiftConfig;
+import com.zlt.aps.cd15.engine.constant.Cd15ScheduleTaskStatus;
 import com.zlt.aps.cd15.engine.domain.Cd15ScheduleTask;
 import com.zlt.aps.cd15.engine.model.Cd15AutoScheduleParameters;
 import com.zlt.aps.cd15.engine.service.Cd15AutoScheduleLockService;
@@ -26,7 +27,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/** 遗留运行中任务补偿实现；调度频率由外部 Job 服务管理。 */
+/** 遗留PENDING和RUNNING任务补偿实现；调度频率由外部Job服务管理。 */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -47,21 +48,23 @@ public class Cd15ScheduleTaskRecoveryServiceImpl
             throw new IllegalArgumentException(I18nUtil.getMessage(
                     "ui.cd15.taskRecovery.invalidTimeout"));
         }
-        List<Cd15ScheduleTask> tasks = taskService.findRunningTasks(SCAN_LIMIT);
+        List<Cd15ScheduleTask> tasks = taskService.findRecoverableTasks(SCAN_LIMIT);
         Map<String, Integer> timeoutByFactory = new HashMap<>();
         int failedCount = 0;
         int skippedCount = 0;
         Instant currentTime = Instant.now();
-        log.info("[斜裁自动排程] 遗留任务补偿扫描开始, runningCount={}, overrideTimeoutMinutes={}",
+        log.info("[斜裁自动排程] 遗留任务补偿扫描开始, activeCount={}, overrideTimeoutMinutes={}",
                 tasks.size(), timeoutMinutes);
         for (Cd15ScheduleTask task : tasks) {
             int taskTimeoutMinutes = timeoutMinutes == null
                     ? timeoutByFactory.computeIfAbsent(
                             task.getFactoryCode(), this::loadTimeoutMinutes)
                     : timeoutMinutes;
-            Date heartbeatTime = task.getLastHeartbeatTime() == null
+            boolean pending = Cd15ScheduleTaskStatus.PENDING.equals(task.getTaskStatus());
+            Date activityTime = pending ? task.getCreateTime()
+                    : task.getLastHeartbeatTime() == null
                     ? task.getStartTime() : task.getLastHeartbeatTime();
-            if (heartbeatTime == null || heartbeatTime.toInstant()
+            if (activityTime != null && activityTime.toInstant()
                     .plus(taskTimeoutMinutes, ChronoUnit.MINUTES)
                     .isAfter(currentTime)) {
                 skippedCount++;
@@ -70,22 +73,31 @@ public class Cd15ScheduleTaskRecoveryServiceImpl
             LocalDate scheduleDate = this.toLocalDate(task.getScheduleDate());
             RLock executionLock = lockService.getLock(
                     task.getFactoryCode(), scheduleDate);
-            if (executionLock.isLocked()) {
+            if (!executionLock.tryLock()) {
                 skippedCount++;
                 log.info("[斜裁自动排程] 遗留任务锁仍存在，跳过补偿, taskId={}, "
                                 + "factoryCode={}, scheduleDate={}",
                         task.getTaskId(), task.getFactoryCode(), scheduleDate);
                 continue;
             }
-            String timeoutReason = MessageFormat.format(
-                    I18nUtil.getMessage("ui.cd15.taskRecovery.timeoutReason"),
-                    taskTimeoutMinutes);
-            if (taskService.markTimeoutFailed(task.getTaskId(), timeoutReason)) {
-                failedCount++;
-                log.warn("[斜裁自动排程] 遗留任务已补偿为失败, taskId={}, timeoutMinutes={}",
-                        task.getTaskId(), taskTimeoutMinutes);
-            } else {
-                skippedCount++;
+            try {
+                String reasonKey = pending
+                        ? "ui.cd15.taskRecovery.pendingTimeoutReason"
+                        : "ui.cd15.taskRecovery.timeoutReason";
+                String timeoutReason = MessageFormat.format(
+                        I18nUtil.getMessage(reasonKey), taskTimeoutMinutes);
+                if (taskService.markTimeoutFailed(task.getTaskId(), timeoutReason)) {
+                    failedCount++;
+                    log.warn("[斜裁自动排程] 遗留任务已补偿为失败, taskId={}, "
+                                    + "taskStatus={}, timeoutMinutes={}",
+                            task.getTaskId(), task.getTaskStatus(), taskTimeoutMinutes);
+                } else {
+                    skippedCount++;
+                }
+            } finally {
+                if (executionLock.isHeldByCurrentThread()) {
+                    executionLock.unlock();
+                }
             }
         }
         log.info("[斜裁自动排程] 遗留任务补偿扫描完成, scannedCount={}, "

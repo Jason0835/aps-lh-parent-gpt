@@ -79,6 +79,8 @@ public class Cd15TimedRollingEngineExecutor {
         validate(target, inputVersion);
         Cd15AutoScheduleContext context = autoScheduleEngineService.prepare(
                 target.getFactoryCode(), date(target));
+        context.setResourceBaselineDate(target.getResourceBaselineDate());
+        context.setResourceBaselineShiftCode(target.getTargetShiftCode());
         List<Cd15ShiftDescriptor> affectedShifts = shiftSlicer.slice(
                 context.getShifts(), target.getTargetClassField());
         List<Cd15ScheduleResult> sourceResults = loadSourceResults(target);
@@ -806,7 +808,10 @@ public class Cd15TimedRollingEngineExecutor {
     private void validate(Cd15RollingTarget target, String inputVersion) {
         if (target == null || target.getScheduleDate() == null
                 || target.getFactoryCode() == null || target.getBatchNo() == null
-                || target.getTargetClassField() == null || inputVersion == null) {
+                || target.getTargetClassField() == null
+                || target.getTargetShiftCode() == null
+                || target.getResourceBaselineDate() == null
+                || inputVersion == null) {
             throw new IllegalArgumentException("定时滚动排程目标和输入版本不能为空");
         }
     }

@@ -26,6 +26,7 @@ import com.zlt.aps.cd15.engine.domain.Cd15ScheduleTask;
 import com.zlt.aps.cd15.engine.model.Cd15BatchDataCheckResult;
 import com.zlt.aps.cd15.engine.model.Cd15InsertCarryoverImpact;
 import com.zlt.aps.cd15.engine.model.Cd15InsertRollingOutput;
+import com.zlt.aps.cd15.engine.model.Cd15ScheduleTaskCreationResult;
 import com.zlt.aps.cd15.engine.model.Cd15ShiftDescriptor;
 import com.zlt.aps.cd15.engine.service.Cd15AutoScheduleBatchDataValidator;
 import com.zlt.aps.cd15.engine.service.Cd15AutoScheduleLockService;
@@ -753,18 +754,22 @@ public class Cd15ScheduleResultServiceImpl extends AbstractDocService<Cd15Schedu
             data.put("existingCount", existing.size());
             return AjaxResult.success(overwriteDecision.getMessage(), data);
         }
-        Cd15ScheduleTask activeTask = taskService.findActive(
-                scheduleResult.getFactoryCode(), scheduleResult.getScheduleDate());
-        if (activeTask != null) {
-            return AjaxResult.success(I18nUtil.getMessage(
-                    "ui.cd15.schedule.taskActive"), this.toTaskData(activeTask));
-        }
         String snapshot = "factoryCode=" + scheduleResult.getFactoryCode()
                 + ",scheduleDate=" + scheduleResult.getScheduleDate()
                 + ",forceRegenerate=" + Boolean.TRUE.equals(scheduleResult.getForceRegenerate());
-        Cd15ScheduleTask task = taskService.createPending(
+        TaskSubmission submission = this.createPendingTask(
                 scheduleResult.getFactoryCode(), scheduleResult.getScheduleDate(),
                 Cd15ScheduleTaskType.AUTO_SCHEDULE, "MANUAL", snapshot, null);
+        if (!submission.isCreated()) {
+            Cd15ScheduleTask activeTask = submission.getTask();
+            if (activeTask != null
+                    && Cd15ScheduleTaskType.AUTO_SCHEDULE.equals(activeTask.getTaskType())) {
+                return AjaxResult.success(I18nUtil.getMessage(
+                        "ui.cd15.schedule.taskActive"), this.toTaskData(activeTask));
+            }
+            return AjaxResult.error(I18nUtil.getMessage("ui.cd15.schedule.taskActive"));
+        }
+        Cd15ScheduleTask task = submission.getTask();
         autoScheduleAsyncExecutor.execute(task.getTaskId(), task.getFactoryCode(), task.getScheduleDate());
         return AjaxResult.success(I18nUtil.getMessage("ui.message.operation.success"), this.toTaskData(task));
     }
@@ -844,12 +849,13 @@ public class Cd15ScheduleResultServiceImpl extends AbstractDocService<Cd15Schedu
         if (batchValidation != null) {
             return batchValidation;
         }
-        Cd15ScheduleTask activeTask = taskService.findActive(request.getFactoryCode(), request.getScheduleDate());
-        if (activeTask != null) {
+        TaskSubmission submission = this.createPendingTask(
+                request.getFactoryCode(), request.getScheduleDate(),
+                Cd15ScheduleTaskType.INSERT_ORDER, "MANUAL", request.toString(), null);
+        if (!submission.isCreated()) {
             return AjaxResult.error(I18nUtil.getMessage("ui.cd15.schedule.taskActive"));
         }
-        Cd15ScheduleTask task = taskService.createPending(request.getFactoryCode(), request.getScheduleDate(),
-                Cd15ScheduleTaskType.INSERT_ORDER, "MANUAL", request.toString(), null);
+        Cd15ScheduleTask task = submission.getTask();
         insertOrderAsyncExecutor.execute(task.getTaskId(), request);
         return AjaxResult.success(I18nUtil.getMessage("ui.message.operation.success"), this.toTaskData(task));
     }
@@ -1085,8 +1091,13 @@ public class Cd15ScheduleResultServiceImpl extends AbstractDocService<Cd15Schedu
                 return previewResult;
             }
         }
-        Cd15ScheduleTask task = taskService.createPending(request.getFactoryCode(), request.getScheduleDate(),
+        TaskSubmission submission = this.createPendingTask(
+                request.getFactoryCode(), request.getScheduleDate(),
                 Cd15ScheduleTaskType.TRANSFER_MACHINE, "MANUAL", request.toString(), null);
+        if (!submission.isCreated()) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.cd15.schedule.taskActive"));
+        }
+        Cd15ScheduleTask task = submission.getTask();
         insertOrderAsyncExecutor.executeTransfer(task.getTaskId(), request);
         return AjaxResult.success(I18nUtil.getMessage("ui.message.operation.success"), this.toTaskData(task));
     }
@@ -1363,8 +1374,13 @@ public class Cd15ScheduleResultServiceImpl extends AbstractDocService<Cd15Schedu
                 return previewResult;
             }
         }
-        Cd15ScheduleTask task = taskService.createPending(request.getFactoryCode(), request.getScheduleDate(),
+        TaskSubmission submission = this.createPendingTask(
+                request.getFactoryCode(), request.getScheduleDate(),
                 Cd15ScheduleTaskType.CHANGE_QTY, "MANUAL", request.toString(), null);
+        if (!submission.isCreated()) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.cd15.schedule.taskActive"));
+        }
+        Cd15ScheduleTask task = submission.getTask();
         insertOrderAsyncExecutor.executeChangeQty(task.getTaskId(), request);
         return AjaxResult.success(I18nUtil.getMessage("ui.message.operation.success"), this.toTaskData(task));
     }
@@ -1635,7 +1651,60 @@ public class Cd15ScheduleResultServiceImpl extends AbstractDocService<Cd15Schedu
     }
 
     private LocalDate toLocalDate(Date scheduleDate) {
+        if (scheduleDate instanceof java.sql.Date) {
+            return ((java.sql.Date) scheduleDate).toLocalDate();
+        }
         return scheduleDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+    }
+
+    /** 在工厂和排程日期锁内检查活动任务并创建PENDING任务。 */
+    private TaskSubmission createPendingTask(String factoryCode, Date scheduleDate,
+                                             String taskType, String triggerType,
+                                             String requestSnapshot, String createBy) {
+        RLock submissionLock = lockService.getLock(factoryCode,
+                this.toLocalDate(scheduleDate));
+        try {
+            if (!submissionLock.tryLock()) {
+                return TaskSubmission.busy(taskService.findActive(factoryCode, scheduleDate));
+            }
+            Cd15ScheduleTaskCreationResult creationResult = taskService.createPending(
+                    factoryCode, scheduleDate, taskType, triggerType,
+                    requestSnapshot, createBy);
+            return creationResult.isCreated()
+                    ? TaskSubmission.created(creationResult.getTask())
+                    : TaskSubmission.busy(creationResult.getTask());
+        } finally {
+            if (submissionLock.isHeldByCurrentThread()) {
+                submissionLock.unlock();
+            }
+        }
+    }
+
+    /** 分布式锁内任务创建结果，用于区分新建任务和已有/占用任务。 */
+    private static final class TaskSubmission {
+        private final Cd15ScheduleTask task;
+        private final boolean created;
+
+        private TaskSubmission(Cd15ScheduleTask task, boolean created) {
+            this.task = task;
+            this.created = created;
+        }
+
+        private static TaskSubmission created(Cd15ScheduleTask task) {
+            return new TaskSubmission(task, true);
+        }
+
+        private static TaskSubmission busy(Cd15ScheduleTask task) {
+            return new TaskSubmission(task, false);
+        }
+
+        private Cd15ScheduleTask getTask() {
+            return task;
+        }
+
+        private boolean isCreated() {
+            return created;
+        }
     }
 
     private Map<String, Object> toTaskData(Cd15ScheduleTask task) {

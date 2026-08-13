@@ -4,48 +4,39 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.itf.mes.mapper.Cd90MesItfMapper">
 
-    <!-- 查询直裁库存同步数据 -->
+    <!-- 查询直裁库存完整快照；MES仅提供库存日期、帘布代码和可用库存 -->
     <select id="selectStockList" resultType="com.zlt.aps.mp.api.domain.entity.Cd90MesStock">
         SELECT
-        STOCK_DATE,
-        MATERIAL_CODE,
-        STOCK_NUM,
-        AVAILABLE_STOCK,
-        DATA_VERSION
-        FROM T_MES_CD90_STOCK
-        WHERE IS_DELETE = 0
-        AND STOCK_DATE IS NOT NULL
+        CONVERT(DATE, STOCK_DATE) AS STOCK_DATE,
+        LTRIM(RTRIM(MATERIAL_CODE)) AS MATERIAL_CODE,
+        SUM(AVAILABLE_STOCK) AS AVAILABLE_STOCK
+        FROM MES_CD90_STOCK
+        WHERE STOCK_DATE IS NOT NULL
         AND MATERIAL_CODE IS NOT NULL
-        <if test="queryParams != null and queryParams.stockDate != null and queryParams.stockDate != ''">
-            AND CONVERT(DATE, STOCK_DATE) = CONVERT(DATE, #{queryParams.stockDate})
-        </if>
-        <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
-    </select>
-
-    <!-- 查询直裁自动滚动目标班次库存；同一物理日取MES最新版本 -->
-    <select id="selectShiftStockList" resultType="com.zlt.aps.mp.api.domain.entity.Cd90MesStock">
-        SELECT
-        STOCK_DATE,
-        MATERIAL_CODE,
-        STOCK_NUM,
-        AVAILABLE_STOCK,
-        DATA_VERSION
-        FROM T_MES_CD90_STOCK
-        WHERE IS_DELETE = 0
-        AND CONVERT(DATE, STOCK_DATE) = CONVERT(DATE, #{stockDate})
+        AND AVAILABLE_STOCK IS NOT NULL
         <choose>
-            <when test="dataVersion != null and dataVersion != ''">
-                AND DATA_VERSION = #{dataVersion}
+            <when test="queryParams != null and queryParams.stockDate != null and queryParams.stockDate != ''">
+                AND CONVERT(DATE, STOCK_DATE) = CONVERT(DATE, #{queryParams.stockDate})
             </when>
             <otherwise>
-                AND DATA_VERSION = (
-                    SELECT MAX(DATA_VERSION)
-                    FROM T_MES_CD90_STOCK
-                    WHERE IS_DELETE = 0
-                    AND CONVERT(DATE, STOCK_DATE) = CONVERT(DATE, #{stockDate})
-                )
+                AND CONVERT(DATE, STOCK_DATE) = CONVERT(DATE, GETDATE())
             </otherwise>
         </choose>
+        GROUP BY CONVERT(DATE, STOCK_DATE), LTRIM(RTRIM(MATERIAL_CODE))
+    </select>
+
+    <!-- 查询直裁自动滚动目标班次库存；按目标物理日读取完整快照 -->
+    <select id="selectShiftStockList" resultType="com.zlt.aps.mp.api.domain.entity.Cd90MesStock">
+        SELECT
+        CONVERT(DATE, STOCK_DATE) AS STOCK_DATE,
+        LTRIM(RTRIM(MATERIAL_CODE)) AS MATERIAL_CODE,
+        SUM(AVAILABLE_STOCK) AS AVAILABLE_STOCK
+        FROM MES_CD90_STOCK
+        WHERE STOCK_DATE IS NOT NULL
+        AND MATERIAL_CODE IS NOT NULL
+        AND AVAILABLE_STOCK IS NOT NULL
+        AND CONVERT(DATE, STOCK_DATE) = CONVERT(DATE, #{stockDate})
+        GROUP BY CONVERT(DATE, STOCK_DATE), LTRIM(RTRIM(MATERIAL_CODE))
     </select>
 
     <!-- 查询直裁库排状态最新快照；MES实际表名或列名变化时仅调整本SQL -->
