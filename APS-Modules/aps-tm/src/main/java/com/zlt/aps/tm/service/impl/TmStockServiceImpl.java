@@ -1,5 +1,8 @@
 package com.zlt.aps.tm.service.impl;
 
+import cn.hutool.core.date.DateUtil;
+import cn.hutool.core.util.StrUtil;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
@@ -14,10 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
 
 @Slf4j
 @Service
@@ -86,5 +86,46 @@ public class TmStockServiceImpl extends AbstractDocService<TmStock> implements I
             }
             log.info("胎面库存同步：批量插入完成，插入数量={}", list.size());
         }
+    }
+
+    /**
+     * 替换指定工厂和库存日期的胎面库存快照。
+     *
+     * @param factoryCode 工厂编码
+     * @param stockDate 库存日期
+     * @param updateBy 更新人
+     * @param stockList MES库存列表，空集合表示清空快照
+     * @throws ServiceException 工厂或库存日期为空时抛出
+     */
+    @Override
+    public void replaceStock(String factoryCode, Date stockDate, String updateBy, List<TmStock> stockList) {
+        if (StrUtil.isBlank(factoryCode) || stockDate == null) {
+            throw new ServiceException(I18nUtil.getMessage("ui.itf.mes.stockArgumentsInvalid"));
+        }
+        String normalizedFactoryCode = StrUtil.trim(factoryCode);
+        Date normalizedStockDate = DateUtil.beginOfDay(stockDate);
+        String operator = StrUtil.blankToDefault(StrUtil.trim(updateBy), "MES");
+        Date now = new Date();
+        int deleteCount = this.tmStockMapper.update(null, new LambdaUpdateWrapper<TmStock>()
+                .eq(TmStock::getFactoryCode, normalizedFactoryCode)
+                .eq(TmStock::getStockDate, normalizedStockDate)
+                .set(TmStock::getIsDelete, 1)
+                .set(TmStock::getUpdateBy, operator)
+                .set(TmStock::getUpdateTime, now));
+        List<TmStock> normalizedList = stockList == null ? Collections.emptyList() : stockList;
+        normalizedList.forEach(stock -> {
+            stock.setFactoryCode(normalizedFactoryCode);
+            stock.setStockDate(normalizedStockDate);
+            stock.setCreateBy(operator);
+            stock.setUpdateBy(operator);
+            stock.setCreateTime(now);
+            stock.setUpdateTime(now);
+            stock.setIsDelete(0);
+        });
+        if (CollectionUtils.isNotEmpty(normalizedList)) {
+            this.baseDao.saveBatch(normalizedList);
+        }
+        log.info("胎面库存快照替换完成，factoryCode={}，stockDate={}，失效数量={}，新增数量={}",
+                normalizedFactoryCode, DateUtil.formatDate(normalizedStockDate), deleteCount, normalizedList.size());
     }
 }

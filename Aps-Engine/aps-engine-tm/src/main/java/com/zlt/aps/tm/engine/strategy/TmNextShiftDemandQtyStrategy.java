@@ -1,6 +1,7 @@
 package com.zlt.aps.tm.engine.strategy;
 
 import com.ruoyi.common.exception.ServiceException;
+import com.zlt.aps.common.engine.schedule.ScheduleSupplyDurationCalculator;
 import com.zlt.aps.tm.api.constant.TmScheduleConstants;
 import com.zlt.aps.tm.api.enums.TmDemandAlgorithmEnum;
 import com.zlt.aps.tm.api.enums.TmScheduleErrorCodeEnum;
@@ -10,7 +11,6 @@ import com.zlt.aps.tm.engine.domain.TmScheduleContext;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 
 /**
  * 胎面下班成型需求量策略。
@@ -61,31 +61,10 @@ public class TmNextShiftDemandQtyStrategy implements ITmDemandQtyStrategy {
         result.setStockGapQty(stockGap);
         result.setDemandQty(demandQty);
         result.setGuardShiftCount(guardShiftCount);
-        result.setSupplyHours(this.calculateSupplyHours(rollingStock, guardDemand, input.getGuardRangeHours()));
+        result.setSupplyHours(ScheduleSupplyDurationCalculator.calculate(rollingStock,
+                input.getFormingGuardWindowQtyMap(), input.getFormingGuardWindowHoursMap()).getSupplyHours());
         result.setCalcDesc("算法2按不重叠的当班成型需求与保证范围需求计算，需求为两者合计扣减库存后的缺口");
         return result;
-    }
-
-    /**
-     * 计算库存供应时长。
-     *
-     * @param rollingStock    当前滚动库存
-     * @param futureDemandQty 未来保证范围需求量
-     * @param rangeHours      未来保证范围总小时数
-     * @return 供应时长；需求或小时数为 0 时返回 null
-     */
-    public BigDecimal calculateSupplyHours(BigDecimal rollingStock, BigDecimal futureDemandQty, BigDecimal rangeHours) {
-        BigDecimal demand = nvl(futureDemandQty);
-        BigDecimal hours = nvl(rangeHours);
-        if (demand.compareTo(BigDecimal.ZERO) <= 0 || hours.compareTo(BigDecimal.ZERO) <= 0) {
-            return null;
-        }
-        BigDecimal futureDemandPerHour = demand.divide(hours,
-                TmScheduleConstants.DECIMAL_CALCULATION_SCALE, RoundingMode.HALF_UP);
-        if (futureDemandPerHour.compareTo(BigDecimal.ZERO) <= 0) {
-            return null;
-        }
-        return nvl(rollingStock).divide(futureDemandPerHour, 2, RoundingMode.HALF_UP);
     }
 
     /**

@@ -21,7 +21,10 @@ public enum TmLossMatchLevelEnum {
     NONE("NONE", "未匹配"),
 
     /** 兼容任务草稿已有损耗值。 */
-    LEGACY_TASK("LEGACY_TASK", "任务已有损耗值");
+    LEGACY_TASK("LEGACY_TASK", "任务已有损耗值"),
+
+    /** 命中工厂默认损耗率参数。 */
+    PARAM_DEFAULT("PARAM_DEFAULT", "参数默认");
 
     private final String code;
 

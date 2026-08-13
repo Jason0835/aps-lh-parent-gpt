@@ -5,6 +5,7 @@ import com.zlt.aps.dj.api.domain.entity.DjMachineInfo;
 import com.zlt.aps.dj.api.domain.entity.DjMachineMaintenance;
 import com.zlt.aps.dj.api.domain.entity.DjParams;
 import com.zlt.aps.dj.api.domain.entity.DjScheduleResult;
+import com.zlt.aps.dj.api.domain.entity.DjShiftConfig;
 import com.zlt.aps.mdm.api.domain.entity.MdmConstructionInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmWorkCalendar;
 import lombok.Data;
@@ -69,6 +70,9 @@ public class DjScheduleContext {
 
     /** 机台维修计划 Map<machineCode, List<DjMachineMaintenance>> */
     private Map<String, List<DjMachineMaintenance>> maintenanceMap;
+
+    /** 启用的班次配置列表（按班次顺序排序），用于按时间窗匹配停机班次 */
+    private List<DjShiftConfig> shiftConfigList;
 
     /** 工作日历（垫胶 + 成型）Map<procCode, List<MdmWorkCalendar>> */
     private Map<String, List<MdmWorkCalendar>> workCalendarMap;

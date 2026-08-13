@@ -110,6 +110,9 @@ public final class TmScheduleConstants {
     /** 整车率参数键，控制工厂级工装实际可用比例。 */
     public static final String PARAM_VEHICLE_RATE = "TM_VEHICLE_RATE";
 
+    /** 未命中损耗基础数据时使用的默认损耗率参数。 */
+    public static final String PARAM_DEFAULT_LOSS_RATE = "TM_DEFAULT_LOSS_RATE";
+
     /** 缺库存快照处理策略参数键。 */
     public static final String PARAM_STOCK_MISSING_POLICY = "TM_STOCK_MISSING_POLICY";
 
@@ -242,6 +245,9 @@ public final class TmScheduleConstants {
 
     /** 整车率默认值。 */
     public static final String DEFAULT_VEHICLE_RATE = "1";
+
+    /** 默认损耗率参数的代码兜底值，按百分比口径；参数行缺失时仍按0%兼容。 */
+    public static final String DEFAULT_LOSS_RATE = "0";
 
     /** 缺库存快照默认按零继续排程。 */
     public static final String DEFAULT_STOCK_MISSING_POLICY = "ZERO";

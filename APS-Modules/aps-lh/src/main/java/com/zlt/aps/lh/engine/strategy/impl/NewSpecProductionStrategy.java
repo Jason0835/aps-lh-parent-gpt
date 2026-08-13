@@ -562,16 +562,6 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 unscheduledReasonCountMap);
 
         /*
-         * 当前日无原始日计划且阈值内也无未来计划、但存在历史欠产或既有收尾目标的 SKU，
-         * 属于原新增排产遗留任务，不是提前生产。它们必须在当天正常 SKU 及其加机台全部
-         * 完成后、提前生产开始前执行，且继续复用原排序和原新增主链。
-         */
-        scheduledCount += scheduleDailyCandidatePhase(
-                context, dayContext, state, DailySchedulePhase.LEGACY_SHORTAGE_OR_ENDING,
-                machineMatch, mouldChangeBalance, inspectionBalance, capacityCalculate,
-                unscheduledReasonCountMap, true);
-
-        /*
          * 提前生产开始前基于正常阶段最新结果重建 Set 去重统计，相当于冻结正常排程结果和资源占用。
          * 提前生产后续只读取该时点之后的真实剩余资源，禁止回调正常阶段重新选机或释放资源。
          */
@@ -581,7 +571,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 machineMatch, mouldChangeBalance, inspectionBalance, capacityCalculate,
                 unscheduledReasonCountMap);
         /*
-         * 当天正常、历史遗留和提前生产阶段全部执行完成后，使用同一个采集器生成唯一过程日志。
+         * 当天正常和提前生产阶段全部执行完成后，使用同一个采集器生成唯一过程日志。
          * 明细顺序来自各阶段真实主循环的追加顺序；在机延续阶段未调用采集器，因此不会进入日志。
          */
         this.appendDailyNewSpecOrderProcessLog(context, dayContext);
@@ -1286,38 +1276,21 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
     /**
      * 判断零日计划 SKU 是否属于既有真实历史欠产或无未来计划收尾遗留任务。
      *
-     * <p>真实历史欠产属于非提前生产，即使 SKU 同时存在未来计划也可按既有欠产口径处理；
-     * 没有真实历史欠产时，必须在完整原始计划范围确认未来无计划后，才允许按收尾遗留任务
-     * 进入。提前生产天数阈值只用于“何时可提前”，不能用于判断“是否存在未来计划”。</p>
+     * <p>历史欠产/收尾遗留阶段已下线，本方法暂时保留以兼容现有阶段枚举和测试清理节奏，
+     * 统一返回 false，确保任何残留调用都不能重新放行遗留任务。后续清理阶段再连同枚举、
+     * 候选原因和日志映射一起删除。</p>
      *
      * @param context 排程上下文
      * @param sku 待判断 SKU
      * @param currentDate 当前业务日期
      * @param boundOnMachine 当前业务日是否已有在机绑定
-     * @return true-属于正常遗留任务；false-不属于
+     * @return 固定返回 false
      */
     private boolean isLegacyNoFutureNormalCandidate(LhScheduleContext context,
                                                     SkuScheduleDTO sku,
                                                     LocalDate currentDate,
                                                     boolean boundOnMachine) {
-        if (Objects.isNull(context) || Objects.isNull(sku) || Objects.isNull(currentDate)
-                || boundOnMachine
-                || StringUtils.equals(
-                SkuScheduleSourceTypeEnum.TYPE_BLOCK_TO_NEW_SPEC.getCode(), sku.getSourceType())
-                || resolveOriginalNewSpecDayPlanQty(context, sku, currentDate) > 0) {
-            return false;
-        }
-        int historyShortageQty =
-                EarlyProductionChecker.resolveHistoryShortageQty(context, sku, currentDate);
-        if (historyShortageQty > 0) {
-            return true;
-        }
-        if (context.isFutureOnlyEarlyProductionCandidate(sku)
-                || Objects.nonNull(EarlyProductionChecker.resolveFirstFutureOriginalPlanDate(
-                context, sku, currentDate))) {
-            return false;
-        }
-        return endingJudgmentStrategy.isCurrentWindowEnding(context, sku);
+        return false;
     }
 
     /**

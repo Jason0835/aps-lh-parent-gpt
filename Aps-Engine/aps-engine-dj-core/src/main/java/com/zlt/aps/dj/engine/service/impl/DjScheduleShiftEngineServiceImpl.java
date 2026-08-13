@@ -663,6 +663,67 @@ public class DjScheduleShiftEngineServiceImpl implements IDjScheduleShiftEngineS
     }
 
     /**
+     * 获取班次顺序索引
+     * <p>
+     * 排序规则：
+     * <ol>
+     *   <li>开班班次（openFlag=1）在最前面</li>
+     *   <li>然后排 SHIFT_ORDER 比开班班次大的，按 SHIFT_ORDER 升序</li>
+     *   <li>最后排其余未排序的班次（SHIFT_ORDER 比开班班次小的），按 SHIFT_ORDER 升序</li>
+     * </ol>
+     * 在排序后的列表中匹配传入的 shiftCode，返回其序号（1-based）。
+     * </p>
+     *
+     * @param shiftCode       目标班次编码
+     * @param shiftConfigList 班次配置列表
+     * @return 目标班次在排序后的序号（从1开始），未找到返回 0
+     */
+    @Override
+    public int getShiftOrderIndex(String shiftCode, List<DjShiftConfig> shiftConfigList) {
+        // 查找开班班次
+        DjShiftConfig openShift = shiftConfigList.stream()
+                .filter(s -> "1".equals(s.getOpenFlag()))
+                .findFirst().orElse(null);
+
+        // 按规则排序：开班最前 → 比开班大的升序 → 其余升序
+        List<DjShiftConfig> sortedList;
+        if (openShift == null) {
+            // 无开班班次，按 SHIFT_ORDER 升序
+            sortedList = shiftConfigList.stream()
+                    .sorted(Comparator.comparingInt(DjShiftConfig::getShiftOrder))
+                    .collect(Collectors.toList());
+        } else {
+            int openOrder = openShift.getShiftOrder();
+            sortedList = shiftConfigList.stream()
+                    .sorted((a, b) -> {
+                        // 开班班次最前
+                        boolean aIsOpen = "1".equals(a.getOpenFlag());
+                        boolean bIsOpen = "1".equals(b.getOpenFlag());
+                        if (aIsOpen != bIsOpen) {
+                            return aIsOpen ? -1 : 1;
+                        }
+                        // 比开班大的排前面
+                        boolean aHigher = a.getShiftOrder() > openOrder;
+                        boolean bHigher = b.getShiftOrder() > openOrder;
+                        if (aHigher != bHigher) {
+                            return aHigher ? -1 : 1;
+                        }
+                        // 同组内按 SHIFT_ORDER 升序
+                        return Integer.compare(a.getShiftOrder(), b.getShiftOrder());
+                    })
+                    .collect(Collectors.toList());
+        }
+
+        // 在排序后的列表中查找目标班次
+        for (int i = 0; i < sortedList.size(); i++) {
+            if (sortedList.get(i).getShiftCode().equals(shiftCode)) {
+                return i + 1;
+            }
+        }
+        return 0;
+    }
+
+    /**
      * 获取机台定额
      */
     private BigDecimal getMachineQuota(String machineCode) {

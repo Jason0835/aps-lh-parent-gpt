@@ -7,63 +7,17 @@
     <select id="selectStockList" resultType="com.zlt.aps.tc.api.domain.entity.TcMesStock">
         SELECT STOCK_DATE,
                MATERIAL_CODE AS SIDEWALL_CODE,
-               AVAILABLE_STOCK AS STOCK_QTY,
-               CAST(0 AS DECIMAL(18, 6)) AS BAD_QTY,
-               CAST(0 AS DECIMAL(18, 6)) AS ADJUST_QTY,
-               DATA_VERSION,
-               COMPANY_CODE,
-               FACTORY_CODE
+               AVAILABLE_STOCK AS STOCK_QTY
         FROM MES_TC_STOCK source_data
-        WHERE 1 = 1
-        <if test="factoryCode != null and factoryCode != ''">
-            AND FACTORY_CODE = #{factoryCode}
-        </if>
-        <if test="companyCode != null and companyCode != ''">
-            AND COMPANY_CODE = #{companyCode}
-        </if>
-        <choose>
-            <when test="dataVersion != null and dataVersion != ''">
-                AND DATA_VERSION = #{dataVersion}
-            </when>
-            <otherwise>
-                AND DATA_VERSION = (
-                    SELECT MAX(latest.DATA_VERSION) FROM MES_TC_STOCK latest
-                    WHERE latest.FACTORY_CODE = source_data.FACTORY_CODE
-                    <if test="companyCode != null and companyCode != ''">
-                        AND latest.COMPANY_CODE = #{companyCode}
-                    </if>
-                )
-            </otherwise>
-        </choose>
+        WHERE CONVERT(DATE, source_data.STOCK_DATE) = CONVERT(DATE, #{queryParams.stockDate})
     </select>
 
     <select id="selectShiftStockList" resultType="com.zlt.aps.tc.api.domain.entity.TcMesStock">
         SELECT source_data.STOCK_DATE,
                source_data.MATERIAL_CODE AS SIDEWALL_CODE,
-               source_data.AVAILABLE_STOCK AS STOCK_QTY,
-               CAST(0 AS DECIMAL(18, 6)) AS BAD_QTY,
-               CAST(0 AS DECIMAL(18, 6)) AS ADJUST_QTY,
-               source_data.DATA_VERSION,
-               source_data.COMPANY_CODE,
-               source_data.FACTORY_CODE
+               source_data.AVAILABLE_STOCK AS STOCK_QTY
         FROM MES_TC_STOCK source_data
-        WHERE source_data.FACTORY_CODE = #{factoryCode}
-          AND source_data.COMPANY_CODE = #{companyCode}
-          AND CONVERT(DATE, source_data.STOCK_DATE) = CONVERT(DATE, #{stockDate})
-        <choose>
-            <when test="dataVersion != null and dataVersion != ''">
-                AND source_data.DATA_VERSION = #{dataVersion}
-            </when>
-            <otherwise>
-                AND source_data.DATA_VERSION = (
-                    SELECT MAX(latest.DATA_VERSION)
-                    FROM MES_TC_STOCK latest
-                    WHERE latest.FACTORY_CODE = #{factoryCode}
-                      AND latest.COMPANY_CODE = #{companyCode}
-                      AND CONVERT(DATE, latest.STOCK_DATE) = CONVERT(DATE, #{stockDate})
-                )
-            </otherwise>
-        </choose>
+        WHERE CONVERT(DATE, source_data.STOCK_DATE) = CONVERT(DATE, #{stockDate})
     </select>
 
     <select id="selectShiftFinishQtyList" resultType="com.zlt.aps.tc.api.domain.entity.TcScheFinishQty">

@@ -12,9 +12,14 @@ import com.zlt.aps.lh.api.domain.dto.*;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleShiftDateVO;
 import com.zlt.aps.lh.api.domain.vo.ScheduleSummaryReportVO;
+import com.zlt.aps.common.core.utils.ExcelUtils;
+import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
+import com.zlt.aps.cx.service.ICxScheduleResultService;
 import com.zlt.aps.lh.api.service.ILhScheduleResultRemoteService;
 import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.WorkbookFactory;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import org.apache.commons.io.IOUtils;
@@ -27,6 +32,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.*;
 
@@ -37,6 +43,9 @@ public class LhScheduleResultUIController extends BaseUIController<LhScheduleRes
 
     @Autowired
     private ILhScheduleResultRemoteService iLhScheduleResultRemoteService;
+
+    @Autowired
+    private ICxScheduleResultService iCxScheduleResultService;
 
     @ApiOperation("获取详细信息")
     @GetMapping("/getInfo/{id}")
@@ -194,11 +203,73 @@ public class LhScheduleResultUIController extends BaseUIController<LhScheduleRes
     public void export(HttpServletResponse response, LhScheduleResult entity) throws IOException {
         Date scheduleDate = entity != null && entity.getScheduleDate() != null ? entity.getScheduleDate() : new Date();
         String fileName = "硫化日计划" + cn.hutool.core.date.DateUtil.format(scheduleDate, "yyyyMMdd");
-        byte[] excelBytes = iLhScheduleResultRemoteService.exportData(entity, fileName);
+        byte[] excelBytes = exportCombined(entity, scheduleDate, fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
         ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
         IOUtils.copy(in, response.getOutputStream());
         response.flushBuffer();
+    }
+
+    /**
+     * 合并导出：硫化日计划 + 成型日计划 合并为一份Excel。
+     * 直接复用硫化、成型各自的导出方法（返回byte[]），再用POI将两个工作簿合并，
+     * 不挪动成型导出原有代码，原方法仍可独立使用。
+     */
+    @ApiOperation("合并导出（硫化+成型）")
+    @GetMapping({"/exportCombine"})
+    @ResponseBody
+    public void exportCombine(HttpServletResponse response, LhScheduleResult entity) throws IOException {
+        Date scheduleDate = entity != null && entity.getScheduleDate() != null ? entity.getScheduleDate() : new Date();
+        String fileName = "硫化日计划" + cn.hutool.core.date.DateUtil.format(scheduleDate, "yyyyMMdd");
+        byte[] excelBytes = exportCombined(entity, scheduleDate, fileName);
+        ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
+        ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
+        IOUtils.copy(in, response.getOutputStream());
+        response.flushBuffer();
+    }
+
+    /**
+     * 合并导出核心逻辑：分别调用硫化导出、成型余量导出，再将两个工作簿合并为一个。
+     *
+     * @param entity 硫化排程查询条件
+     * @param scheduleDate 排程日期（已兜底非空）
+     * @param fileName 导出文件名
+     * @return 合并后的Excel字节数组
+     */
+    private byte[] exportCombined(LhScheduleResult entity, Date scheduleDate, String fileName) throws IOException {
+        // 1. 硫化导出
+        byte[] lhBytes = iLhScheduleResultRemoteService.exportData(entity, fileName);
+
+        // 2. 成型导出（使用相同排程日期与工厂条件，导出 CxExport.xlsx 多Sheet）
+        CxScheduleResult cxEntity = new CxScheduleResult();
+        cxEntity.setScheduleDate(scheduleDate);
+        if (entity != null) {
+            cxEntity.setFactoryCode(entity.getFactoryCode());
+        }
+        byte[] cxBytes = iCxScheduleResultService.exportCxRemainQty(cxEntity, "成型日计划");
+
+        // 3. 合并两个工作簿：成型只复制有数据的 0(成型余量)/1(成型日计划)/7(成型结构切换)/8(排产小结) 四个页签
+        return mergeExcel(lhBytes, cxBytes, 0, 1, 7, 8);
+    }
+
+    /**
+     * 将源工作簿指定索引的Sheet复制到目标工作簿中，返回合并后的字节数组。
+     *
+     * @param targetBytes 目标工作簿字节数组（硫化导出，保留其原有Sheet）
+     * @param sourceBytes 源工作簿字节数组（成型导出，按sheetIndices指定的Sheet被追加到目标）
+     * @param sheetIndices 需要从源工作簿复制的Sheet索引（从0开始）
+     * @return 合并后的工作簿字节数组
+     */
+    private byte[] mergeExcel(byte[] targetBytes, byte[] sourceBytes, int... sheetIndices) throws IOException {
+        try (Workbook targetWorkbook = WorkbookFactory.create(new ByteArrayInputStream(targetBytes));
+             Workbook sourceWorkbook = WorkbookFactory.create(new ByteArrayInputStream(sourceBytes))) {
+            for (int i : sheetIndices) {
+                ExcelUtils.copySheet(sourceWorkbook, i, targetWorkbook);
+            }
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            targetWorkbook.write(baos);
+            return baos.toByteArray();
+        }
     }
 
     /**

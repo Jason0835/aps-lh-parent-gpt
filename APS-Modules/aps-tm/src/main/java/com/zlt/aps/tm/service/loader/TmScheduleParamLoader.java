@@ -166,6 +166,8 @@ public class TmScheduleParamLoader {
                 TmScheduleConstants.DEFAULT_GLUE_CHANGE_CAPACITY_DEDUCT);
         this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_VEHICLE_RATE,
                 TmScheduleConstants.DEFAULT_VEHICLE_RATE);
+        this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_DEFAULT_LOSS_RATE,
+                TmScheduleConstants.DEFAULT_LOSS_RATE);
         this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_STOCK_MISSING_POLICY,
                 TmScheduleConstants.DEFAULT_STOCK_MISSING_POLICY);
         this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_FILTER_RULE_ORDER,

@@ -4,7 +4,6 @@ import cn.hutool.core.date.DateUtil;
 import com.alibaba.fastjson.JSONObject;
 import com.baomidou.dynamic.datasource.toolkit.DynamicDataSourceContextHolder;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.exception.ServiceException;
@@ -21,11 +20,17 @@ import com.zlt.aps.cx.api.service.ICxPrecisionPlanRemoteService;
 import com.zlt.aps.enums.LocationTypeEnum;
 import com.zlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.gsq.api.domain.entity.GsqDayFinishQty;
+import com.zlt.aps.gsq.api.domain.entity.GsqStock;
+import com.zlt.aps.gsq.api.service.IGsqMesSyncRemoteService;
 import com.zlt.aps.itf.constant.DataSource;
 import com.zlt.aps.itf.constant.SysCode;
 import com.zlt.aps.itf.mes.enums.ItfSyncKeyEnum;
 import com.zlt.aps.itf.mes.enums.MouldCategoryConvertEnum;
-import com.zlt.aps.itf.mes.mapper.*;
+import com.zlt.aps.itf.mes.mapper.LhScheduleResultQueryMapper;
+import com.zlt.aps.itf.mes.mapper.MesItfMapper;
+import com.zlt.aps.itf.mes.mapper.MesViewMapper;
+import com.zlt.aps.itf.mes.mapper.MoldAlterPlanIssueMapper;
 import com.zlt.aps.itf.mes.service.IPrecisionPlanIssueService;
 import com.zlt.aps.itf.mes.service.ITmScheduleResultIssueService;
 import com.zlt.aps.itf.mes.service.MesItfService;
@@ -48,15 +53,8 @@ import com.zlt.aps.mdm.api.domain.entity.MdmMoldAlterPlan;
 import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.tm.api.domain.entity.*;
 import com.zlt.aps.tm.api.service.ITmMesSyncRemoteService;
-import com.zlt.aps.tq.api.domain.entity.TqDayFinishQty;
-import com.zlt.aps.tq.api.domain.entity.TqMesStock;
-import com.zlt.aps.tq.api.domain.entity.TqScheFinishQty;
-import com.zlt.aps.tq.api.domain.entity.TqShiftStock;
-import com.zlt.aps.tq.api.domain.entity.TqStock;
+import com.zlt.aps.tq.api.domain.entity.*;
 import com.zlt.aps.tq.api.service.ITqMesSyncRemoteService;
-import com.zlt.aps.gsq.api.domain.entity.GsqDayFinishQty;
-import com.zlt.aps.gsq.api.domain.entity.GsqStock;
-import com.zlt.aps.gsq.api.service.IGsqMesSyncRemoteService;
 import com.zlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.core.dao.basedao.BaseDao;
 import com.zlt.sync.handle.SyncDataHandle;
@@ -3605,70 +3603,68 @@ public class MesItfServiceImpl implements MesItfService {
     }
 
     /**
-     * 同步胎面库存
-     * T_TM_STOCK：采用逻辑删除+插入方案（经Feign调用tm模块）
-     *   步骤1：逻辑删除当天库存日期的旧数据（IS_DELETE置为1）
-     *   步骤2：将MES最新库存数据批量插入（新记录，IS_DELETE=0）
-     *   历史数据保留，只删当天库存日期的数据
-     * @param syncDataLogs 同步参数
-     * @return 结果
+     * 同步指定物理日的胎面库存快照。
+     *
+     * <p>MES_TM_STOCK 仅提供库存日期、物料编码和可用库存，工厂归属由请求参数确定；
+     * 同一物料编码的可用库存汇总后替换 APS 中指定工厂和日期的完整快照。</p>
+     *
+     * @param syncDataLogs 同步参数，queryParams.stockDate 必传
+     * @return 同步结果
      */
     @Override
     public AjaxResult syncTreadStock(AuxReqSyncDataLogs syncDataLogs) {
-        // 切换到MES数据源查询中间表
-        DynamicDataSourceContextHolder.push(DataSource.MES);
-        List<TmMesStock> syncList = mesItfMapper.selectTreadStockList(syncDataLogs);
-        DynamicDataSourceContextHolder.poll();
-
-        // 按分厂+库存日期+物料编码去重，保留第一条
-        Map<String, TmMesStock> groupMap = syncList.stream()
-                .collect(Collectors.toMap(
-                        item -> item.getFactoryCode() + "|" + DateUtil.formatDate(item.getStockDate()) + "|" + item.getMaterialCode(),
-                        Function.identity(),
-                        (v1, v2) -> v1
-                ));
-        syncList = new ArrayList<>(groupMap.values());
-
-        if (CollectionUtils.isEmpty(syncList)) {
-            log.warn("胎面库存同步：MES中间表查询结果为空");
-            return AjaxResult.success("MES中间表无数据可同步");
+        if (syncDataLogs == null || syncDataLogs.getQueryParams() == null
+                || syncDataLogs.getQueryParams().get("stockDate") == null) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.itf.mes.stockArgumentsInvalid"));
         }
-
-        // 转换 TmMesStock → TmStock（materialCode→treadCode, availableStock→stockQty）
-        List<TmStock> tmStockInsertList = syncList.stream().map(item -> {
+        String factoryCode = StringUtils.defaultIfBlank(syncDataLogs.getFactoryCode(),
+                FactoryConstant.DEFAULT_FACTORY_CODE);
+        Date stockDate;
+        try {
+            Object stockDateValue = syncDataLogs.getQueryParams().get("stockDate");
+            stockDate = stockDateValue instanceof Date ? (Date) stockDateValue
+                    : DateUtil.parseDate(String.valueOf(stockDateValue));
+        } catch (Exception exception) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.itf.mes.stockArgumentsInvalid"));
+        }
+        if (stockDate == null) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.itf.mes.stockArgumentsInvalid"));
+        }
+        Date normalizedStockDate = DateUtil.beginOfDay(stockDate);
+        syncDataLogs.setFactoryCode(factoryCode);
+        syncDataLogs.getQueryParams().put("stockDate", normalizedStockDate);
+        List<TmMesStock> sourceList;
+        DynamicDataSourceContextHolder.push(DataSource.MES);
+        try {
+            sourceList = this.mesItfMapper.selectTreadStockList(syncDataLogs);
+        } finally {
+            DynamicDataSourceContextHolder.poll();
+        }
+        Map<String, BigDecimal> stockQtyMap = CollectionUtils.emptyIfNull(sourceList).stream()
+                .filter(source -> StringUtils.isNotBlank(source.getMaterialCode()))
+                .collect(Collectors.toMap(source -> StringUtils.trim(source.getMaterialCode()),
+                        source -> BigDecimalUtils.valueOf(source.getAvailableStock()), BigDecimal::add,
+                        LinkedHashMap::new));
+        List<TmStock> stockList = stockQtyMap.entrySet().stream().map(entry -> {
             TmStock tmStock = new TmStock();
-            tmStock.setFactoryCode(item.getFactoryCode());
-            tmStock.setStockDate(item.getStockDate());
-            tmStock.setTreadCode(item.getMaterialCode());
-            tmStock.setStockQty(item.getAvailableStock() != null ? item.getAvailableStock() : BigDecimal.ZERO);
-            tmStock.setCreateBy("MES");
-            tmStock.setUpdateBy("MES");
-            tmStock.setCreateTime(DateUtils.getNowDate());
-            tmStock.setUpdateTime(DateUtils.getNowDate());
+            tmStock.setTreadCode(entry.getKey());
+            tmStock.setStockQty(entry.getValue());
+            tmStock.setBadQty(BigDecimal.ZERO);
+            tmStock.setAdjustQty(BigDecimal.ZERO);
             return tmStock;
         }).collect(Collectors.toList());
-
         try {
-            // 取第一条数据的库存日期作为逻辑删除条件
-            Date stockDate = tmStockInsertList.stream()
-                    .map(TmStock::getStockDate)
-                    .filter(Objects::nonNull)
-                    .findFirst()
-                    .orElse(DateUtils.getNowDate());
-            String stockDateStr = DateUtil.formatDate(stockDate);
-
-            log.info("胎面库存同步：开始同步，待插入数量={}, 库存日期={}", tmStockInsertList.size(), stockDateStr);
-
-            FeignTokenHelper.runWithToken(() -> {
-                tmMesSyncRemoteService.logicDeleteAndSaveTmStockByStockDate(stockDateStr, "MES", tmStockInsertList);
-            });
-
-            log.info("胎面库存同步：同步完成，插入数量={}", tmStockInsertList.size());
-        } catch (Exception e) {
-            log.error("胎面库存同步：Feign调用异常，待插入数量={}", tmStockInsertList.size(), e);
-            return AjaxResult.error("胎面库存同步失败：" + e.getMessage());
+            AjaxResult result = FeignTokenHelper.callWithToken(() -> this.tmMesSyncRemoteService.replaceStock(
+                    factoryCode, DateUtil.formatDate(normalizedStockDate), "MES", stockList));
+            if (result == null || !Objects.equals(AJAX_SUCCESS_CODE, result.get(AjaxResult.CODE_TAG))) {
+                return AjaxResult.error(I18nUtil.getMessage("ui.itf.mes.stockRemoteFailed"));
+            }
+        } catch (Exception exception) {
+            log.error("胎面库存同步失败，factoryCode={}，stockDate={}，数量={}", factoryCode,
+                    DateUtil.formatDate(normalizedStockDate), stockList.size(), exception);
+            return AjaxResult.error(I18nUtil.getMessage("ui.itf.mes.stockRemoteFailed"));
         }
-        return AjaxResult.success();
+        return AjaxResult.success(stockList.size());
     }
 
     /**
@@ -3706,17 +3702,18 @@ public class MesItfServiceImpl implements MesItfService {
         } finally {
             DynamicDataSourceContextHolder.poll();
         }
-        Map<String, TmMesStock> uniqueMap = CollectionUtils.emptyIfNull(sourceList).stream()
+        Map<String, BigDecimal> stockQtyMap = CollectionUtils.emptyIfNull(sourceList).stream()
                 .filter(source -> StringUtils.isNotBlank(source.getMaterialCode()))
-                .collect(Collectors.toMap(TmMesStock::getMaterialCode, Function.identity(),
-                        (first, ignored) -> first, LinkedHashMap::new));
-        List<TmShiftStock> stockList = uniqueMap.values().stream().map(source -> {
+                .collect(Collectors.toMap(source -> StringUtils.trim(source.getMaterialCode()),
+                        source -> BigDecimalUtils.valueOf(source.getAvailableStock()), BigDecimal::add,
+                        LinkedHashMap::new));
+        List<TmShiftStock> stockList = stockQtyMap.entrySet().stream().map(entry -> {
             TmShiftStock target = new TmShiftStock();
             target.setFactoryCode(request.getFactoryCode());
             target.setStockDate(request.getStockDate());
             target.setShiftOrder(request.getShiftOrder());
-            target.setTreadCode(source.getMaterialCode());
-            target.setStockQty(BigDecimalUtils.valueOf(source.getAvailableStock()));
+            target.setTreadCode(entry.getKey());
+            target.setStockQty(entry.getValue());
             target.setBadQty(BigDecimal.ZERO);
             target.setAdjustQty(BigDecimal.ZERO);
             return target;

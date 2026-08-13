@@ -9,6 +9,7 @@ import com.zlt.aps.cx.constant.ScheduleConstants;
 import com.zlt.aps.cx.entity.CxMaterialEnding;
 import com.zlt.aps.cx.api.domain.entity.CxStock;
 import com.zlt.aps.cx.entity.config.CxKeyProduct;
+import com.zlt.aps.cx.entity.config.CxLhMachineSupplyConfig;
 import com.zlt.aps.cx.entity.config.CxParamConfig;
 import com.zlt.aps.cx.entity.config.CxShiftConfig;
 import com.zlt.aps.cx.entity.schedule.CxScheduleDetail;
@@ -183,6 +184,7 @@ public class ScheduleServiceImpl implements ScheduleService {
     private final FactoryParamMapper factoryParamMapper;
     private final CxStructureTreadConfigMapper structureShiftCapacityMapper;
     private final CxKeyProductMapper keyProductMapper;
+    private final CxLhMachineSupplyConfigMapper lhMachineSupplyConfigMapper;
     private final LhScheduleResultMapper lhScheduleResultMapper;
     private final CxMachineOnlineInfoMapper onlineInfoMapper;
     private final CxShiftConfigMapper shiftConfigMapper;
@@ -475,6 +477,13 @@ public class ScheduleServiceImpl implements ScheduleService {
                 loadKeyProducts(context);
             } catch (Exception e) {
                 log.warn("加载关键产品配置失败，继续执行：{}", e.getMessage());
+            }
+
+            // 1.11.1 硫化机专供成型机配置（均衡/续作/试制分配专供约束，T_CX_LH_MACHINE_SUPPLY）
+            try {
+                loadLhMachineSupplyConfigs(context);
+            } catch (Exception e) {
+                log.warn("加载硫化机专供成型机配置失败，继续执行：{}", e.getMessage());
             }
 
             // 1.12 物料日硫化产能 + 结构硫化配比映射
@@ -978,6 +987,32 @@ public class ScheduleServiceImpl implements ScheduleService {
             keyProductCodes.add(product.getEmbryoCode());
         }
         context.setKeyProductCodes(keyProductCodes);
+    }
+
+    /**
+     * 加载硫化机专供成型机配置。
+     *
+     * <p>从 T_CX_LH_MACHINE_SUPPLY 表读取启用记录，按硫化机台号分组为
+     * {@code Map<lhMachineCode, Set<cxMachineCode>>} 写入 {@code context.lhMachineSupplyMap}。
+     */
+    private void loadLhMachineSupplyConfigs(ScheduleContextVo context) {
+        List<CxLhMachineSupplyConfig> configs = lhMachineSupplyConfigMapper.selectList(
+                new LambdaQueryWrapper<CxLhMachineSupplyConfig>()
+                        .eq(CxLhMachineSupplyConfig::getIsActive, ACTIVE_STATUS)
+                        .eq(CxLhMachineSupplyConfig::getIsDelete, "0"));
+
+        Map<String, Set<String>> supplyMap = new HashMap<>();
+        for (CxLhMachineSupplyConfig config : configs) {
+            String lhMachineCode = config.getLhMachineCode();
+            String cxMachineCode = config.getCxMachineCode();
+            if (lhMachineCode == null || lhMachineCode.isEmpty()
+                    || cxMachineCode == null || cxMachineCode.isEmpty()) {
+                continue;
+            }
+            supplyMap.computeIfAbsent(lhMachineCode, k -> new HashSet<>()).add(cxMachineCode);
+        }
+        context.setLhMachineSupplyMap(supplyMap);
+        log.info("硫化机专供成型机配置加载完成，共 {} 台硫化机配置专供", supplyMap.size());
     }
 
     /**

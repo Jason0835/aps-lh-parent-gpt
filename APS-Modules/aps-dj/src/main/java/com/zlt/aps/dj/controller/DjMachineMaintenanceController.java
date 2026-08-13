@@ -82,20 +82,6 @@ public class DjMachineMaintenanceController extends AbstractDocBizController<DjM
     @PostMapping("/save")
     @Override
     public AjaxResult save(@RequestBody DjMachineMaintenance billVO) {
-        Date stopStartTime = billVO.getStopStartTime();
-        if (stopStartTime != null) {
-            Calendar instance = Calendar.getInstance();
-            instance.setTime(stopStartTime);
-            int hour = instance.get(Calendar.HOUR_OF_DAY);
-            // 按 ClassNumThreePlanEnums 班次定义："01"=夜班(22:00~06:00)、"02"=早班(06:00~14:00)、"03"=中班(14:00~22:00)
-            if (hour >= 6 && hour < 14) {
-                billVO.setStopShift(EngineConstants.MORNING_CLASS_SHIFT);
-            } else if (hour >= 14 && hour < 22) {
-                billVO.setStopShift(EngineConstants.DAY_CLASS_SHIFT);
-            } else {
-                billVO.setStopShift(EngineConstants.NIGHT_CLASS_SHIFT);
-            }
-        }
         return super.save(billVO);
     }
 

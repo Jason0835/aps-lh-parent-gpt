@@ -25,7 +25,7 @@ import java.util.stream.Collectors;
 /**
  * 胎侧机台分配默认步骤服务。
  *
- * <p>对已预置机台编码的任务直接追加到对应机台任务链；
+ * <p>对已预置机台编码的任务固定候选机台后复用统一工装与产能校验；
  * 对未预置机台的任务执行候选机台过滤规则链和评分策略，选择最高分机台分配任务。
  * 全部候选机台被过滤时按过滤原因归类未排原因（产能不足→CAPACITY_NOT_ENOUGH 等）。</p>
  */
@@ -230,6 +230,14 @@ public class TcMachineAssignService implements ITcMachineAssignService {
      * @param context 胎侧排程上下文
      */
     private void assignSingleTask(TcTaskDraft task, TcScheduleContext context) {
+        if (this.nvl(task.getPlanQty()).compareTo(BigDecimal.ZERO) <= 0
+                && this.nvl(task.getToolOverflowQty()).compareTo(BigDecimal.ZERO) <= 0) {
+            context.getCandidateTraceMap().put(task.getBusinessKey(), Collections.emptyList());
+            this.addAssignTrace(context, task, TcScheduleRuleResultEnum.SKIP, null,
+                    TcScheduleTaskStatusEnum.NO_PRODUCTION_NEEDED.getCode(),
+                    TcScheduleTaskStatusEnum.NO_PRODUCTION_NEEDED.getDesc());
+            return;
+        }
         if (task.isUnassigned()) {
             // 未预置机台的任务走完整过滤评分流程
             this.assignByFilterAndScore(task, context);
@@ -243,15 +251,18 @@ public class TcMachineAssignService implements ITcMachineAssignService {
             this.assignByFilterAndScore(task, context);
             return;
         }
-        // 已预置机台的任务补齐速度、剩余产能等运行态信息后直接追加到对应机台任务链。
+        // 预置机台仅固定候选机台，工装、产能、结算和顺延仍复用普通选中机台流程。
         TcMachineCandidate candidate = this.resolvePresetMachineCandidate(task, context);
         context.getCandidateTraceMap().put(task.getBusinessKey(), Collections.singletonList(candidate));
         this.addAssignTrace(context, task, TcScheduleRuleResultEnum.PASS, task.getMachineCode(), null, null);
         this.bindSmallGlueMachine(context, task, task.getMachineCode(), null,
                 TcScheduleConstants.PRESET_MACHINE_BIND_SOURCE);
-        this.taskChainScheduleService.appendAutoTask(task, candidate, context);
-        this.appendCapacityDeductProcessLog(context, task, candidate, task.getPlanQty(), task.getPlanQty(),
-                BigDecimal.ZERO, "预置机台承接");
+        ITcMachineFilterRule filterRule = strategyRegistry.getMachineFilterRule(this.resolveParamValue(context,
+                TcScheduleConstants.PARAM_MACHINE_FILTER_STRATEGY, TcScheduleStrategyEnum.DEFAULT.getCode()));
+        ITcMachineScoreStrategy scoreStrategy = strategyRegistry.getMachineScoreStrategy(this.resolveParamValue(context,
+                TcScheduleConstants.PARAM_MACHINE_SCORE_STRATEGY, TcScheduleStrategyEnum.DEFAULT.getCode()));
+        this.appendTaskWithCapacityOverflow(task, candidate, Collections.singletonList(candidate), filterRule,
+                scoreStrategy, context, "预置机台");
     }
 
     /**
@@ -279,8 +290,8 @@ public class TcMachineAssignService implements ITcMachineAssignService {
      * @return true 表示任务计划量大于零且尚未明确标记未排
      */
     private boolean isMachineAssignmentRequired(TcTaskDraft task) {
-        return task != null && task.getPlanQty() != null
-                && task.getPlanQty().compareTo(BigDecimal.ZERO) > 0
+        return task != null && (this.nvl(task.getPlanQty()).compareTo(BigDecimal.ZERO) > 0
+                || this.nvl(task.getToolOverflowQty()).compareTo(BigDecimal.ZERO) > 0)
                 && StrUtil.isBlank(task.getUnplannedReasonCode());
     }
 
@@ -774,7 +785,8 @@ public class TcMachineAssignService implements ITcMachineAssignService {
                 bestCandidate.getMachineCode(), null, null);
 
         // 当前班先由选中机台承接；产能溢出先尝试同班其他机台，工装溢出及同班剩余量再顺延。
-        this.appendTaskWithCapacityOverflow(task, bestCandidate, passedCandidates, filterRule, scoreStrategy, context);
+        this.appendTaskWithCapacityOverflow(task, bestCandidate, passedCandidates, filterRule, scoreStrategy, context,
+                "普通排产");
     }
 
     /**
@@ -875,14 +887,15 @@ public class TcMachineAssignService implements ITcMachineAssignService {
      * @param filterRule 机台过滤规则
      * @param scoreStrategy 机台评分策略
      * @param context 胎侧排程上下文
+     * @param taskSource 任务来源
      */
     private void appendTaskWithCapacityOverflow(TcTaskDraft task, TcMachineCandidate selectedCandidate,
                                                 List<TcMachineCandidate> firstShiftCandidates,
                                                 ITcMachineFilterRule filterRule,
                                                 ITcMachineScoreStrategy scoreStrategy,
-                                                TcScheduleContext context) {
+                                                TcScheduleContext context, String taskSource) {
         BigDecimal originalToolOverflowQty = nvl(task.getToolOverflowQty());
-        this.finalizeSelectedTaskPlan(task, selectedCandidate, context);
+        this.finalizeSelectedTaskPlan(task, selectedCandidate, context, taskSource);
         BigDecimal currentShiftPlanQty = nvl(task.getPlanQty());
         BigDecimal toolOverflowQty = nvl(task.getToolOverflowQty());
         Integer startShiftOrder = task.getShiftOrder() == null ? 1 : task.getShiftOrder();
@@ -901,9 +914,8 @@ public class TcMachineAssignService implements ITcMachineAssignService {
         }
         if (currentShiftPlanQty.compareTo(BigDecimal.ZERO) <= 0
                 && toolOverflowQty.compareTo(BigDecimal.ZERO) > 0) {
-            // 工装限制将计划量压为零且存在工装溢出：原任务标记产能不足未排并记证据，溢出量继续顺延承接，避免 machineCode 留空形成 null 原因孤儿任务
-            this.markUnplanned(task, TcUnplannedReasonEnum.CAPACITY_NOT_ENOUGH);
-            this.addToolLimitUnplannedTrace(context, task, toolOverflowQty, startShiftOrder);
+            // 本任务先以0计划量结算当班成型消耗，释放结果只能供后续任务或顺延任务使用。
+            this.settleAssignedTaskToolState(task, context, taskSource);
             this.appendCarryoverQty(task, selectedCandidate, firstShiftCandidates, filterRule, scoreStrategy,
                     context, toolOverflowQty, BigDecimal.ZERO, toolOverflowQty, startShiftOrder, false);
             return;
@@ -925,7 +937,7 @@ public class TcMachineAssignService implements ITcMachineAssignService {
                 if (originalToolOverflowQty.compareTo(BigDecimal.ZERO) > 0) {
                     task.setPlanQty(assignedQty);
                 }
-                this.settleAssignedTaskToolState(task, context);
+                this.settleAssignedTaskToolState(task, context, taskSource);
                 this.addContextTask(context, task);
                 context.getCandidateTraceMap().put(task.getBusinessKey(), Collections.singletonList(runtimeCandidate));
                 this.addCapacitySplitTrace(context, task, currentShiftPlanQty, assignedQty, capacityOverflowQty,
@@ -986,7 +998,9 @@ public class TcMachineAssignService implements ITcMachineAssignService {
                     continue;
                 }
                 BigDecimal sourcePlanQty = nvl(sourceTask.getPlanQty());
-                BigDecimal assignedQty = sourcePlanQty.min(nvl(runtimeCandidate.getRemainCapacity()));
+                BigDecimal capacityAllowedQty = sourcePlanQty.min(nvl(runtimeCandidate.getRemainCapacity()));
+                BigDecimal assignedQty = this.limitPlanQtyByCurrentTool(
+                        sourceTask, context, capacityAllowedQty, "提前补产");
                 if (assignedQty.compareTo(BigDecimal.ZERO) <= 0) {
                     continue;
                 }
@@ -994,7 +1008,7 @@ public class TcMachineAssignService implements ITcMachineAssignService {
                         sourceShiftOrder, earlyFillIndex, runtimeCandidate.getMachineCode());
                 this.applyCapacitySplitResult(earlyFillTask, sourcePlanQty, assignedQty,
                         nvl(runtimeCandidate.getRemainCapacity()), nvl(runtimeCandidate.getMachineSpeed()), "后续班次提前补产");
-                this.settleAssignedTaskToolState(earlyFillTask, context);
+                this.settleAssignedTaskToolState(earlyFillTask, context, "提前补产");
                 this.addContextTask(context, earlyFillTask);
                 context.getCandidateTraceMap().put(earlyFillTask.getBusinessKey(), Collections.singletonList(runtimeCandidate));
                 this.addFutureEarlyFillTrace(context, earlyFillTask, sourceTask, sourceShiftOrder, targetShiftOrder,
@@ -1292,8 +1306,18 @@ public class TcMachineAssignService implements ITcMachineAssignService {
                     continue;
                 }
                 BigDecimal beforeAssignQty = remainingQty;
-                BigDecimal assignedQty = candidateAssignableQty.min(remainCapacity);
+                BigDecimal capacityAllowedQty = candidateAssignableQty.min(remainCapacity);
+                BigDecimal assignedQty = this.limitPlanQtyByCurrentTool(
+                        sourceTask, context, capacityAllowedQty,
+                        mergeTarget == null ? "顺延新建" : "顺延合并");
                 BigDecimal overflowQty = remainingQty.subtract(assignedQty);
+                if (assignedQty.compareTo(capacityAllowedQty) < 0) {
+                    toolOverflowQty = remainingQty.max(nvl(toolOverflowQty));
+                    sourceType = this.resolveCarryoverSourceType(capacityOverflowQty, toolOverflowQty);
+                }
+                if (assignedQty.compareTo(BigDecimal.ZERO) <= 0) {
+                    continue;
+                }
                 if (mergeTarget != null) {
                     BigDecimal beforeMergeQty = nvl(mergeTarget.getPlanQty());
                     BigDecimal afterMergeQty = beforeMergeQty.add(assignedQty);
@@ -1325,7 +1349,7 @@ public class TcMachineAssignService implements ITcMachineAssignService {
                         overflowTask.setCalcFormulaDesc(this.appendFormulaDesc(overflowTask.getCalcFormulaDesc(),
                                 "当前班无可用承接，后续班承接"));
                     }
-                    this.settleAssignedTaskToolState(overflowTask, context);
+                    this.settleAssignedTaskToolState(overflowTask, context, "顺延新建");
                     this.addContextTask(context, overflowTask);
                     context.getCandidateTraceMap().put(overflowTask.getBusinessKey(), Collections.singletonList(runtimeCandidate));
                     this.addCapacitySplitTrace(context, overflowTask, beforeAssignQty, assignedQty, overflowQty,
@@ -1358,14 +1382,20 @@ public class TcMachineAssignService implements ITcMachineAssignService {
             unplannedTask.setPlanQty(remainingQty);
             unplannedTask.setShiftOrder(TcScheduleConstants.TC_MAX_SHIFT_ORDER);
             unplannedTask.setMachineCode(null);
-            unplannedTask.setUnplannedReasonCode(TcUnplannedReasonEnum.CAPACITY_NOT_ENOUGH.getCode());
-            unplannedTask.setUnplannedReasonDesc(TcUnplannedReasonEnum.CAPACITY_NOT_ENOUGH.getDesc());
+            TcUnplannedReasonEnum unplannedReason = nvl(toolOverflowQty).compareTo(BigDecimal.ZERO) > 0
+                    ? TcUnplannedReasonEnum.TOOL_NOT_ENOUGH : TcUnplannedReasonEnum.CAPACITY_NOT_ENOUGH;
+            unplannedTask.setUnplannedReasonCode(unplannedReason.getCode());
+            unplannedTask.setUnplannedReasonDesc(unplannedReason.getDesc());
             if (capacityBlockedCarryover) {
                 unplannedTask.setCalcFormulaDesc(this.appendFormulaDesc(unplannedTask.getCalcFormulaDesc(),
                         "6班承接结束仍有剩余"));
             }
             this.addContextTask(context, unplannedTask);
-            this.addCapacityUnplannedTrace(context, unplannedTask, remainingQty);
+            if (TcUnplannedReasonEnum.TOOL_NOT_ENOUGH.equals(unplannedReason)) {
+                this.addToolLimitUnplannedTrace(context, unplannedTask, remainingQty, sourceShiftOrder);
+            } else {
+                this.addCapacityUnplannedTrace(context, unplannedTask, remainingQty);
+            }
             this.addCarryoverTrace(context, unplannedTask, sourceTask, sourceType, remainingQty, sourceShiftOrder,
                     TcScheduleConstants.TC_MAX_SHIFT_ORDER, null,
                     BigDecimal.ZERO, BigDecimal.ZERO, false);
@@ -1373,9 +1403,8 @@ public class TcMachineAssignService implements ITcMachineAssignService {
                     capacityOverflowQty, toolOverflowQty, sourceShiftOrder,
                     TcScheduleConstants.TC_MAX_SHIFT_ORDER, null,
                     BigDecimal.ZERO, BigDecimal.ZERO, remainingQty, false);
-        this.addAssignTrace(context, unplannedTask, TcScheduleRuleResultEnum.REJECT, null,
-                    TcUnplannedReasonEnum.CAPACITY_NOT_ENOUGH.getCode(),
-                    TcUnplannedReasonEnum.CAPACITY_NOT_ENOUGH.getDesc());
+            this.addAssignTrace(context, unplannedTask, TcScheduleRuleResultEnum.REJECT, null,
+                    unplannedReason.getCode(), unplannedReason.getDesc());
         }
     }
 
@@ -1669,11 +1698,11 @@ public class TcMachineAssignService implements ITcMachineAssignService {
      * @param context 排程上下文
      */
     private void finalizeSelectedTaskPlan(TcTaskDraft task, TcMachineCandidate selectedCandidate,
-                                          TcScheduleContext context) {
+                                          TcScheduleContext context, String taskSource) {
         BigDecimal preLossPlanQty = task.getPreLossPlanQty() == null ? nvl(task.getPlanQty()) : nvl(task.getPreLossPlanQty());
         TcLossRuleMatchResult matchResult = this.lossRateResolver.resolve(context.getLossRuleList(), task.getSidewallCode(), selectedCandidate == null ? task.getMachineCode() : selectedCandidate.getMachineCode());
         BigDecimal resolvedLossRate = matchResult == null || matchResult.getLossRate() == null
-                ? nvl(task.getLossRate()) : nvl(matchResult.getLossRate());
+                ? this.resolveFallbackLossRate(context, task) : nvl(matchResult.getLossRate());
         boolean tailTask = this.isTailTask(task);
         BigDecimal originalTailAdjustQty = nvl(task.getTailRoundAdjustQty());
         BigDecimal curlLength = this.resolveCurlLength(task);
@@ -1692,27 +1721,30 @@ public class TcMachineAssignService implements ITcMachineAssignService {
         BigDecimal toolLimitAdjustQty = BigDecimal.ZERO;
         BigDecimal toolOverflowQty = BigDecimal.ZERO;
         if (currentAvailableToolQty != null && curlLength.compareTo(BigDecimal.ZERO) > 0) {
-            BigDecimal maxPlanQty = currentAvailableToolQty.multiply(curlLength);
-            if (finalPlanQty.compareTo(maxPlanQty) > 0) {
-                finalPlanQty = maxPlanQty.max(BigDecimal.ZERO);
-                toolLimitAdjustQty = finalPlanQty.subtract(planQtyBeforeToolLimit)
-                        .setScale(TcScheduleConstants.DECIMAL_CALCULATION_SCALE,
-                                java.math.RoundingMode.HALF_UP);
-                toolOverflowQty = planQtyBeforeToolLimit.subtract(finalPlanQty).max(BigDecimal.ZERO)
-                        .setScale(TcScheduleConstants.DECIMAL_CALCULATION_SCALE,
-                                java.math.RoundingMode.HALF_UP);
+            finalPlanQty = this.limitPlanQtyByCurrentTool(task, context, planQtyBeforeToolLimit, taskSource);
+            toolLimitAdjustQty = finalPlanQty.subtract(planQtyBeforeToolLimit)
+                    .setScale(TcScheduleConstants.DECIMAL_CALCULATION_SCALE,
+                            java.math.RoundingMode.HALF_UP);
+            toolOverflowQty = planQtyBeforeToolLimit.subtract(finalPlanQty).max(BigDecimal.ZERO)
+                    .setScale(TcScheduleConstants.DECIMAL_CALCULATION_SCALE,
+                            java.math.RoundingMode.HALF_UP);
+        } else {
+            this.limitPlanQtyByCurrentTool(task, context, planQtyBeforeToolLimit, taskSource);
+            if (originalToolOverflowQty.compareTo(BigDecimal.ZERO) > 0) {
+                toolLimitAdjustQty = originalToolLimitAdjustQty;
+                toolOverflowQty = originalToolOverflowQty;
             }
-        } else if (originalToolOverflowQty.compareTo(BigDecimal.ZERO) > 0) {
-            toolLimitAdjustQty = originalToolLimitAdjustQty;
-            toolOverflowQty = originalToolOverflowQty;
         }
         task.setAvailableToolQty(currentAvailableToolQty);
         task.setResolvedLossRate(resolvedLossRate);
         task.setLossMatchLevel(matchResult == null
                 ? (task.getLossRate() == null
-                ? TcLossMatchLevelEnum.NONE.getCode() : TcLossMatchLevelEnum.LEGACY_TASK.getCode())
+                ? (this.hasConfiguredLossRate(context)
+                ? TcLossMatchLevelEnum.PARAM_DEFAULT.getCode() : TcLossMatchLevelEnum.NONE.getCode())
+                : TcLossMatchLevelEnum.LEGACY_TASK.getCode())
                 : matchResult.getMatchLevel());
-        task.setLossMatchSource(this.buildLossMatchSource(task, selectedCandidate, matchResult));
+        task.setLossMatchSource(this.buildLossMatchSource(task, selectedCandidate, matchResult,
+                task.getLossMatchLevel()));
         task.setPreLossPlanQty(planQtyAdjustmentResult.getPreLossPlanQty());
         task.setLossAddQty(planQtyAdjustmentResult.getLossAddQty());
         task.setMinStartAdjustQty(startupThresholdAdjusted
@@ -1846,12 +1878,49 @@ public class TcMachineAssignService implements ITcMachineAssignService {
     }
 
     /**
+     * 使用生产前工装余额限制当前入口的实际承接量，并记录完整代入式。
+     *
+     * @param task 当前任务
+     * @param context 排程上下文
+     * @param requestedQty 本入口请求承接量
+     * @param taskSource 任务来源
+     * @return 工装允许的实际承接量；未启用约束或卷曲长度无效时返回请求量
+     */
+    private BigDecimal limitPlanQtyByCurrentTool(TcTaskDraft task, TcScheduleContext context,
+                                                 BigDecimal requestedQty, String taskSource) {
+        BigDecimal normalizedRequestedQty = nvl(requestedQty).max(BigDecimal.ZERO);
+        BigDecimal currentAvailableToolQty = this.resolveCurrentAvailableToolQty(context, task);
+        if (currentAvailableToolQty == null) {
+            context.appendDeferredShiftProcessLog(task.getShiftOrder(),
+                    "工装生产前校验：来源={0}，胎侧代码={1}，请求量={2}米；总工装未配置或非正数，未启用工装约束，实际承接量={2}米。",
+                    taskSource, task.getSidewallCode(), normalizedRequestedQty);
+            return normalizedRequestedQty;
+        }
+        BigDecimal curlLength = this.resolveCurlLength(task);
+        if (curlLength.compareTo(BigDecimal.ZERO) <= 0) {
+            context.appendDeferredShiftProcessLog(task.getShiftOrder(),
+                    "工装生产前校验：来源={0}，胎侧代码={1}，请求量={2}米；规格卷曲长度及默认卷曲长度均无效，无法计算工装允许量，沿用请求量。",
+                    taskSource, task.getSidewallCode(), normalizedRequestedQty);
+            return normalizedRequestedQty;
+        }
+        ScheduleToolLedgerResult limitResult = this.constraintCalculator
+                .settleProductionBeforeReleaseToolLedger(normalizedRequestedQty, BigDecimal.ZERO,
+                        currentAvailableToolQty, task.getTotalToolQty(), curlLength);
+        context.appendDeferredShiftProcessLog(task.getShiftOrder(),
+                "工装生产前校验：来源={0}，胎侧代码={1}，校验前可用工装={2}套，请求量={3}米，有效卷曲长度={4}米/套；允许量=min({3}米,max({2}套,0)×{4}米/套)={5}米；工装溢出量=max({3}米-{5}米,0)={6}米；实际承接量={5}米。",
+                taskSource, task.getSidewallCode(), currentAvailableToolQty, normalizedRequestedQty, curlLength,
+                limitResult.getAllowedPlanQty(), limitResult.getOverflowPlanQty());
+        return limitResult.getAllowedPlanQty();
+    }
+
+    /**
      * 在任务实际落到班次机台后结算工装占用和剩余工装。
      *
      * @param task 当前任务
      * @param context 排程上下文
+     * @param taskSource 任务来源
      */
-    private void settleAssignedTaskToolState(TcTaskDraft task, TcScheduleContext context) {
+    private void settleAssignedTaskToolState(TcTaskDraft task, TcScheduleContext context, String taskSource) {
         BigDecimal currentAvailableToolQty = this.resolveCurrentAvailableToolQty(context, task);
         if (currentAvailableToolQty == null) {
             return;
@@ -1867,7 +1936,7 @@ public class TcMachineAssignService implements ITcMachineAssignService {
             this.recordToolLedgerSnapshot(context, task, currentAvailableToolQty, task.getToolUsedQty(), currentAvailableToolQty);
             return;
         }
-        ScheduleToolLedgerResult ledgerResult = this.constraintCalculator.settleCommittedToolLedger(
+        ScheduleToolLedgerResult ledgerResult = this.constraintCalculator.settleProductionBeforeReleaseToolLedger(
                 task.getPlanQty(), task.getCurrentShiftDemandQty(), currentAvailableToolQty,
                 task.getTotalToolQty(), curlLength);
         task.setToolUsedQty(ledgerResult.getToolUsedQty());
@@ -1877,6 +1946,11 @@ public class TcMachineAssignService implements ITcMachineAssignService {
                 .subtract(nvl(task.getCurrentShiftDemandQty())).max(BigDecimal.ZERO));
         context.setCurrentAvailableToolQty(ledgerResult.getRemainingToolQty());
         this.recordToolLedgerSnapshot(context, task, ledgerResult.getAvailableToolQty(), ledgerResult.getToolUsedQty(),
+                ledgerResult.getRemainingToolQty());
+        context.appendDeferredShiftProcessLog(task.getShiftOrder(),
+                "工装任务后结算：来源={0}，胎侧代码={1}，净占用工装数量=({2}米-{3}米)÷{4}米/套={5}套；下一任务可用工装数量=min(max({6}套-{5}套,0),{7}套)={8}套。本任务释放量仅供下一任务使用。",
+                taskSource, task.getSidewallCode(), nvl(task.getPlanQty()), nvl(task.getCurrentShiftDemandQty()),
+                curlLength, ledgerResult.getToolUsedQty(), currentAvailableToolQty, task.getTotalToolQty(),
                 ledgerResult.getRemainingToolQty());
     }
 
@@ -1934,6 +2008,10 @@ public class TcMachineAssignService implements ITcMachineAssignService {
         context.setCurrentAvailableToolQty(ledgerResult.getRemainingToolQty());
         this.recordToolLedgerSnapshot(context, mergeTarget, ledgerResult.getAvailableToolQty(),
                 mergeTarget.getToolUsedQty(), ledgerResult.getRemainingToolQty());
+        context.appendDeferredShiftProcessLog(mergeTarget.getShiftOrder(),
+                "工装任务后结算：来源=顺延合并，胎侧代码={0}，净占用工装数量=({1}米-0米)÷{2}米/套={3}套；下一任务可用工装数量=min(max({4}套-{3}套,0),{5}套)={6}套。",
+                mergeTarget.getSidewallCode(), nvl(carryoverQty), curlLength, ledgerResult.getToolUsedQty(),
+                currentAvailableToolQty, mergeTarget.getTotalToolQty(), ledgerResult.getRemainingToolQty());
     }
 
     /**
@@ -1955,13 +2033,15 @@ public class TcMachineAssignService implements ITcMachineAssignService {
      * @param task 当前任务
      * @param selectedCandidate 已选中机台
      * @param matchResult 匹配结果
+     * @param lossMatchLevel 最终损耗匹配层级
      * @return 命中来源说明
      */
     private String buildLossMatchSource(TcTaskDraft task, TcMachineCandidate selectedCandidate,
-                                        TcLossRuleMatchResult matchResult) {
+                                        TcLossRuleMatchResult matchResult, String lossMatchLevel) {
         String machineCode = selectedCandidate == null ? task.getMachineCode() : selectedCandidate.getMachineCode();
         if (matchResult == null || matchResult.getMatchedRule() == null) {
-            return "machineCode=" + machineCode + ",sidewallCode=" + task.getSidewallCode();
+            return "machineCode=" + machineCode + ",sidewallCode=" + task.getSidewallCode()
+                    + ",lossMatchLevel=" + lossMatchLevel;
         }
         TcLossRule matchedRule = matchResult.getMatchedRule();
         return "machineCode=" + machineCode + ",sidewallCode=" + task.getSidewallCode()
@@ -2033,6 +2113,7 @@ public class TcMachineAssignService implements ITcMachineAssignService {
         target.setGuardRangeHours(source.getGuardRangeHours());
         target.setSupplyHours(source.getSupplyHours());
         target.setFormingGuardWindowQtyMap(source.getFormingGuardWindowQtyMap());
+        target.setFormingGuardWindowHoursMap(source.getFormingGuardWindowHoursMap());
         target.setCurrentShiftStockGapQty(BigDecimal.ZERO);
         target.setStockGapQty(BigDecimal.ZERO);
         target.setStockDeductQty(BigDecimal.ZERO);
@@ -2077,6 +2158,8 @@ public class TcMachineAssignService implements ITcMachineAssignService {
         target.setGroupMinStartAdjustQty(source.getGroupMinStartAdjustQty());
         target.setGroupRoundAdjustQty(source.getGroupRoundAdjustQty());
         target.setGroupFinalPlanQty(source.getGroupFinalPlanQty());
+        // 顺延任务沿用来源任务的待排名次，保证过程日志与原任务处理顺序一致。
+        target.setBaseSortIndex(source.getBaseSortIndex());
         target.setBusinessKeySuffix(this.buildOverflowBusinessKeySuffix(source, sourceShift, shiftOrder, machineCode, overflowIndex));
         return target;
     }
@@ -2372,8 +2455,8 @@ public class TcMachineAssignService implements ITcMachineAssignService {
     private void addCapacityUnplannedTrace(TcScheduleContext context, TcTaskDraft task, BigDecimal remainingQty) {
         Map<String, Object> evidence = new LinkedHashMap<>();
         evidence.put("remainingQty", remainingQty);
-        evidence.put("reasonCode", TcUnplannedReasonEnum.CAPACITY_NOT_ENOUGH.getCode());
-        evidence.put("reasonDesc", TcUnplannedReasonEnum.CAPACITY_NOT_ENOUGH.getDesc());
+        evidence.put("reasonCode", TcUnplannedReasonEnum.TOOL_NOT_ENOUGH.getCode());
+        evidence.put("reasonDesc", TcUnplannedReasonEnum.TOOL_NOT_ENOUGH.getDesc());
         traceOf(context, task).addRuleHit(TcScheduleRuleCodeEnum.CAPACITY_OVERFLOW_UNPLANNED,
                 TcScheduleRuleResultEnum.REJECT, evidence);
     }
@@ -3239,6 +3322,41 @@ public class TcMachineAssignService implements ITcMachineAssignService {
      */
     private BigDecimal nvl(BigDecimal value) {
         return value == null ? BigDecimal.ZERO : value;
+    }
+
+    /**
+     * 按任务旧值、工厂参数顺序解析无基础规则命中时的损耗率。
+     *
+     * @param context 排程上下文
+     * @param task 当前任务
+     * @return 百分比口径的非负损耗率
+     */
+    BigDecimal resolveFallbackLossRate(TcScheduleContext context, TcTaskDraft task) {
+        if (task != null && task.getLossRate() != null) {
+            return this.nvl(task.getLossRate()).max(BigDecimal.ZERO);
+        }
+        String value = this.resolveParamValue(context, TcScheduleConstants.PARAM_DEFAULT_LOSS_RATE,
+                TcScheduleConstants.DEFAULT_LOSS_RATE);
+        try {
+            return new BigDecimal(value).max(BigDecimal.ZERO);
+        } catch (NumberFormatException exception) {
+            return new BigDecimal(TcScheduleConstants.DEFAULT_LOSS_RATE);
+        }
+    }
+
+    /**
+     * 判断本次排程是否存在有效的默认损耗率参数值。
+     *
+     * @param context 排程上下文
+     * @return true表示参数快照中存在非空值
+     */
+    private boolean hasConfiguredLossRate(TcScheduleContext context) {
+        if (context == null || context.getParamMap() == null) {
+            return false;
+        }
+        TcParamValue paramValue = context.getParamMap().get(TcScheduleConstants.PARAM_DEFAULT_LOSS_RATE);
+        return paramValue != null && TcParamValueSourceEnum.TABLE.getCode().equals(paramValue.getSource())
+                && StrUtil.isNotBlank(paramValue.getEffectiveValue());
     }
 
     /**

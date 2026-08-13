@@ -7,6 +7,7 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -29,6 +30,16 @@ public interface LhScheduleResultMapper extends BaseMapper<LhScheduleResult> {
      */
     @Select("SELECT * FROM t_lh_schedule_result WHERE  IS_DELETE = '0' ORDER BY SCHEDULE_DATE, MACHINE_ORDER")
     List<LhScheduleResult> selectAll();
+
+    /**
+     * 按主键ID批量查询硫化排程结果。
+     *
+     * @param ids 硫化排程结果ID集合
+     * @return 硫化排程结果列表
+     */
+    @Select("<script>SELECT * FROM t_lh_schedule_result WHERE IS_DELETE = '0' AND ID IN "
+            + "<foreach collection='ids' item='id' open='(' separator=',' close=')'>#{id}</foreach></script>")
+    List<LhScheduleResult> selectByIds(@Param("ids") Collection<Long> ids);
 
     /**
      * 查询指定物料在给定日期之前最近的一条硫化排程记录（仅限当月范围内）

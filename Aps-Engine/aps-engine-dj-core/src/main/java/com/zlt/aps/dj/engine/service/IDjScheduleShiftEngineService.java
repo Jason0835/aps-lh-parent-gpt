@@ -6,6 +6,7 @@ import java.util.List;
 
 import com.zlt.aps.dj.api.domain.entity.DjDayFinishQty;
 import com.zlt.aps.dj.api.domain.entity.DjScheduleResult;
+import com.zlt.aps.dj.api.domain.entity.DjShiftConfig;
 import com.zlt.aps.dj.engine.model.CapacityValidateResult;
 import com.zlt.aps.dj.engine.model.ShiftContext;
 import com.zlt.aps.dj.engine.model.ShiftValidateResult;
@@ -84,6 +85,19 @@ public interface IDjScheduleShiftEngineService {
      * @param skipSeq        需要保留的顺位（该位置不会被分配，留给新插单记录）
      */
     void reorganizeAfterReduce(List<DjScheduleResult> machineResults, int classIndex, Integer skipSeq);
+
+    /**
+     * 获取班次顺序索引
+     * <p>
+     * 按开班顺序对班次配置排序：开班班次最前 → SHIFT_ORDER 比开班大的升序 → 其余班次按 SHIFT_ORDER 升序。
+     * 在排序后的列表中匹配 shiftCode，返回其序号（1-based）。
+     * </p>
+     *
+     * @param shiftCode       目标班次编码
+     * @param shiftConfigList 班次配置列表
+     * @return 目标班次在排序后的序号（从1开始），未找到返回 0
+     */
+    int getShiftOrderIndex(String shiftCode, List<DjShiftConfig> shiftConfigList);
 
     // ==================== 班次字段访问工具方法 ====================
 

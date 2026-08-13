@@ -29,7 +29,6 @@ public class TcDispatcherLog extends BaseEntity {
     private String factoryCode;
 
     /** 批次号 */
-    @Excel(name = "ui.data.column.tc.dispatcherLog.batchNo")
     @ApiModelProperty(value = "批次号", name = "batchNo")
     @TableField(value = "BATCH_NO")
     private String batchNo;
@@ -46,13 +45,11 @@ public class TcDispatcherLog extends BaseEntity {
     private String operType;
 
     /** 本次人工操作的班次顺序 */
-    @Excel(name = "ui.data.column.tc.dispatcherLog.shiftOrder")
     @ApiModelProperty(value = "本次人工操作的班次顺序", name = "shiftOrder")
     @TableField(value = "SHIFT_ORDER")
     private Integer shiftOrder;
 
     /** 人工操作原因 */
-    @Excel(name = "ui.data.column.tc.dispatcherLog.reason")
     @ApiModelProperty(value = "人工操作原因", name = "reason")
     @TableField(value = "REASON")
     private String reason;

@@ -151,14 +151,14 @@ public class TmPlanCalcService implements ITmPlanCalcService {
                     task.getGuardDemandQty(), task.getRollingStockQty(), task.getCurrentShiftStockGapQty(), task.getStockGapQty(),
                     task.getCurrentShiftDemandQty(), task.getDemandQty());
             // 打印供应时长计算公式和关键中间量，便于解释排序中的库存紧急度。
-            log.info("[TM_DEMAND_QTY_SUPPLY] batchNo={}, traceId={}, factoryCode={}, scheduleDate={}, businessKey={}, treadCode={}, shiftOrder={}, formula=supplyHours=rollingStockQty/(guardDemandQty/guardRangeHours)",
+            log.info("[TM_DEMAND_QTY_SUPPLY] batchNo={}, traceId={}, factoryCode={}, scheduleDate={}, businessKey={}, treadCode={}, shiftOrder={}, formula=逐班扣减滚动库存，完整覆盖累计实际班次时长，首个不能完整覆盖的班次按剩余库存/该班需求*该班实际时长折算后停止",
                     context.getBatchNo(), context.getTraceId(), context.getFactoryCode(), formatScheduleDate(context),
                     task.getBusinessKey(), task.getTreadCode(), task.getShiftOrder());
-            log.info("[TM_DEMAND_QTY_SUPPLY_DETAIL] batchNo={}, traceId={}, factoryCode={}, scheduleDate={}, businessKey={}, treadCode={}, shiftOrder={}, supplyHours={}, rollingStockQty={}, guardDemandQty={}, guardRangeHours={}",
+            log.info("[TM_DEMAND_QTY_SUPPLY_DETAIL] batchNo={}, traceId={}, factoryCode={}, scheduleDate={}, businessKey={}, treadCode={}, shiftOrder={}, supplyHours={}, rollingStockQty={}, formingGuardWindowQtyMap={}, formingGuardWindowHoursMap={}",
                     context.getBatchNo(), context.getTraceId(), context.getFactoryCode(), formatScheduleDate(context),
                     task.getBusinessKey(), task.getTreadCode(), task.getShiftOrder(),
                     task.getSupplyHours(), task.getRollingStockQty(),
-                    task.getGuardDemandQty(), task.getGuardRangeHours());
+                    task.getFormingGuardWindowQtyMap(), task.getFormingGuardWindowHoursMap());
 
             // 已有计划量表示上游已完成特殊业务调整，此处保持不变。
             if (task.getPlanQty() == null) {
@@ -281,6 +281,8 @@ public class TmPlanCalcService implements ITmPlanCalcService {
             aggregateTask.setCurrentShiftDemandQty(currentShiftDemandQty);
             aggregateTask.setNextShiftDemandQty(nextShiftDemandQty);
             aggregateTask.setGuardDemandQty(guardDemandQty);
+            aggregateTask.setFormingGuardWindowQtyMap(this.resolveGroupGuardWindowQtyMap(groupSourceList));
+            aggregateTask.setFormingGuardWindowHoursMap(this.resolveGroupGuardWindowHoursMap(groupSourceList));
             aggregateTask.setDemandQty(null);
             if (groupSourceList.size() > 1) {
                 aggregateTask.setPlanQty(null);
@@ -330,6 +332,41 @@ public class TmPlanCalcService implements ITmPlanCalcService {
                 .map(this::nvl)
                 .orElse(BigDecimal.ZERO);
         return anchorGuardDemandQty.max(this.nvl(currentShiftDemandQty));
+    }
+
+    /**
+     * 汇总计划组逐班成型需求窗口。
+     *
+     * @param groupSourceList 计划组来源任务
+     * @return 按逻辑班次汇总的成型需求量
+     */
+    private Map<Integer, BigDecimal> resolveGroupGuardWindowQtyMap(List<TmTaskDraft> groupSourceList) {
+        boolean allNewSpec = groupSourceList.stream()
+                .allMatch(task -> task.getNewSpecInfo() != null && task.getNewSpecInfo().isNewSpecHit());
+        if (allNewSpec) {
+            return groupSourceList.stream()
+                    .min(Comparator.comparing(task -> Optional.ofNullable(task.getNewSpecInfo().getNormalTargetShift())
+                            .orElse(Integer.MAX_VALUE)))
+                    .map(TmTaskDraft::getFormingGuardWindowQtyMap)
+                    .orElse(Collections.emptyMap());
+        }
+        Map<Integer, BigDecimal> resultMap = new LinkedHashMap<>();
+        groupSourceList.stream().map(TmTaskDraft::getFormingGuardWindowQtyMap)
+                .filter(Objects::nonNull).forEach(windowQtyMap -> windowQtyMap.forEach(
+                        (shiftOrder, demandQty) -> resultMap.merge(shiftOrder, this.nvl(demandQty), BigDecimal::add)));
+        return resultMap;
+    }
+
+    /**
+     * 读取计划组逐班实际时长窗口。
+     *
+     * @param groupSourceList 计划组来源任务
+     * @return 与逐班需求同键的实际时长
+     */
+    private Map<Integer, BigDecimal> resolveGroupGuardWindowHoursMap(List<TmTaskDraft> groupSourceList) {
+        return groupSourceList.stream().map(TmTaskDraft::getFormingGuardWindowHoursMap)
+                .filter(Objects::nonNull).filter(windowHoursMap -> !windowHoursMap.isEmpty())
+                .findFirst().orElse(Collections.emptyMap());
     }
 
     /**
@@ -943,6 +980,9 @@ public class TmPlanCalcService implements ITmPlanCalcService {
         evidence.put("currentShiftStockGapQty", task.getCurrentShiftStockGapQty());
         evidence.put("stockGapQty", task.getStockGapQty());
         evidence.put("demandQty", task.getDemandQty());
+        evidence.put("formingGuardWindowQtyMap", task.getFormingGuardWindowQtyMap());
+        evidence.put("formingGuardWindowHoursMap", task.getFormingGuardWindowHoursMap());
+        evidence.put("supplyHours", task.getSupplyHours());
         evidence.put("sourceOrderNos", task.getSourceOrderNos());
         traceOf(context, task).addRuleHit(TmScheduleRuleCodeEnum.DEMAND_QTY_CALC,
                 TmScheduleRuleResultEnum.PASS, evidence);
@@ -1063,6 +1103,8 @@ public class TmPlanCalcService implements ITmPlanCalcService {
         input.setRollingStockQty(task.getRollingStockQty());
         input.setGuardShiftCount(task.getGuardShiftCount());
         input.setGuardRangeHours(task.getGuardRangeHours());
+        input.setFormingGuardWindowQtyMap(task.getFormingGuardWindowQtyMap());
+        input.setFormingGuardWindowHoursMap(task.getFormingGuardWindowHoursMap());
         return input;
     }
 
@@ -1098,7 +1140,8 @@ public class TmPlanCalcService implements ITmPlanCalcService {
      */
     private BigDecimal initializeGlobalAvailableToolQty(TmScheduleContext context, Map<String, TmStockForecast> stockForecastMap) {
         BigDecimal totalToolQty = this.resolveGlobalTotalToolQty(context);
-        if (totalToolQty == null) {
+        if (totalToolQty == null || totalToolQty.compareTo(BigDecimal.ZERO) <= 0) {
+            context.appendProcessLog("全局工装池初始化：TM_TOOL_TOTAL_QTY未配置或非正数，未启用工装约束；初始可用工装数量=未计算。");
             return null;
         }
         Map<String, TmTaskDraft> representativeTaskMap = new LinkedHashMap<>();
@@ -1108,20 +1151,43 @@ public class TmPlanCalcService implements ITmPlanCalcService {
             }
         }
         BigDecimal initialUsedToolQty = BigDecimal.ZERO;
+        List<String> inventoryToolDetailList = new ArrayList<>();
         for (Map.Entry<String, TmTaskDraft> entry : representativeTaskMap.entrySet()) {
             BigDecimal curlLength = this.resolveCurlLength(entry.getValue());
             if (curlLength.compareTo(BigDecimal.ZERO) <= 0) {
+                inventoryToolDetailList.add(entry.getKey()
+                        + "：有效卷曲长度无效，14点预计库存无法折算，按现有计算口径不计入库存占用");
                 continue;
             }
             BigDecimal forecastStockQty = this.resolveForecastRollingStock(entry.getKey(), entry.getValue(), stockForecastMap);
-            initialUsedToolQty = initialUsedToolQty.add(forecastStockQty.divide(curlLength,
-                    TmScheduleConstants.DECIMAL_CALCULATION_SCALE, RoundingMode.HALF_UP));
+            BigDecimal productUsedToolQty = forecastStockQty.divide(curlLength,
+                    TmScheduleConstants.DECIMAL_CALCULATION_SCALE, RoundingMode.HALF_UP);
+            initialUsedToolQty = initialUsedToolQty.add(productUsedToolQty);
+            inventoryToolDetailList.add(entry.getKey() + "：14点预计库存"
+                    + this.displayQuantity(forecastStockQty) + "米÷有效卷曲长度"
+                    + this.displayQuantity(curlLength) + "米/套="
+                    + this.displayQuantity(productUsedToolQty) + "套");
         }
         BigDecimal vehicleRate = this.readDecimalParam(context, TmScheduleConstants.PARAM_VEHICLE_RATE,
                 BigDecimal.ONE).max(BigDecimal.ZERO);
-        return totalToolQty.subtract(initialUsedToolQty).max(BigDecimal.ZERO)
+        BigDecimal initialAvailableToolQty = totalToolQty.subtract(initialUsedToolQty).max(BigDecimal.ZERO)
                 .multiply(vehicleRate)
                 .setScale(TmScheduleConstants.DECIMAL_CALCULATION_SCALE, RoundingMode.HALF_UP);
+        context.appendProcessLog("全局工装池初始化：库存占用工装={0}={1}套；初始可用工装数量=max({2}套-{1}套,0)×TM_VEHICLE_RATE {3}={4}套。",
+                inventoryToolDetailList.isEmpty() ? "无有效胎面库存占用" : String.join(" + ", inventoryToolDetailList),
+                this.displayQuantity(initialUsedToolQty), this.displayQuantity(totalToolQty),
+                this.displayQuantity(vehicleRate), this.displayQuantity(initialAvailableToolQty));
+        return initialAvailableToolQty;
+    }
+
+    /**
+     * 格式化工装初始化日志中的数量，移除无意义的小数末尾零。
+     *
+     * @param quantity 待展示数量
+     * @return 普通十进制数量文本；空值返回未计算
+     */
+    private String displayQuantity(BigDecimal quantity) {
+        return quantity == null ? "未计算" : quantity.stripTrailingZeros().toPlainString();
     }
 
     /**
