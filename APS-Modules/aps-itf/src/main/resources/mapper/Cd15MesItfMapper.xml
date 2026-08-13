@@ -36,7 +36,7 @@
 
     <select id="selectStorageLaneLimitList"
             resultType="com.zlt.aps.cd15.api.domain.entity.Cd15StorageLaneLimit">
-        SELECT FACTORY_CODE, LANE_DATE, SHIFT_CODE, STORAGE_LANE_CODE,
+        SELECT FACTORY_CODE, LANE_DATE, SHIFT_CODE, MACHINE_CODE, STORAGE_LANE_CODE,
                MATERIAL_CODE, CAR_NUM, MAX_CAR_NUM, AVAILABLE_CAR_NUM
         FROM T_MES_CD15_STORAGE_LANE_LIMIT
         WHERE IS_DELETE = 0

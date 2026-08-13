@@ -278,7 +278,8 @@ public class Cd15MesItfServiceImpl implements ICd15MesItfService {
             return AjaxResult.success(I18nUtil.getMessage("ui.cd15.storageLaneLimit.syncNoData"));
         }
         Cd15StorageLaneLimit invalidSource = sourceList.stream().filter(source -> source.getLaneDate() == null
-                || StringUtils.isBlank(source.getShiftCode()) || StringUtils.isBlank(source.getStorageLaneCode())
+                || StringUtils.isBlank(source.getShiftCode()) || StringUtils.isBlank(source.getMachineCode())
+                || StringUtils.isBlank(source.getStorageLaneCode())
                 || source.getCarNum() == null || source.getMaxCarNum() == null
                 || source.getMaxCarNum() <= 0 || source.getCarNum() < 0
                 || source.getCarNum() > source.getMaxCarNum()).findFirst().orElse(null);
@@ -293,6 +294,7 @@ public class Cd15MesItfServiceImpl implements ICd15MesItfService {
             target.setFactoryCode(factoryCode);
             target.setLaneDate(source.getLaneDate());
             target.setShiftCode(source.getShiftCode());
+            target.setMachineCode(source.getMachineCode());
             target.setStorageLaneCode(source.getStorageLaneCode());
             target.setMaterialCode(source.getMaterialCode());
             target.setCarNum(source.getCarNum());

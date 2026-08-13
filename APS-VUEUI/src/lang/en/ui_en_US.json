@@ -1646,5 +1646,6 @@
   "ui.schedule.autoPlan.viewIssues": "View Issues",
   "ui.schedule.autoPlan.viewUnplanned": "View Unplanned Tasks",
   "ui.schedule.autoPlan.refreshBoard": "Refresh Board",
-  "ui.data.column.cd90StorageLaneLimit.machineCode": "Bound Machine"
+  "ui.data.column.cd90StorageLaneLimit.machineCode": "Bound Machine",
+  "ui.data.column.cd15StorageLaneLimit.machineCode": "Bound Machine"
 }

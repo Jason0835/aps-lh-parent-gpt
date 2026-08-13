@@ -40,7 +40,7 @@ public class Cd15StorageLaneBaselineValidator {
     }
 
     /**
-     * 校验资源基线中的库排号唯一，避免算法按同一物理库排重复计算容量。
+     * 校验资源基线中的库排号唯一且均已绑定机台，避免重复计算容量或跨机台分配。
      *
      * @param baselineDate 资源基线日期
      * @param baselineShiftCode 资源基线班次
@@ -49,6 +49,18 @@ public class Cd15StorageLaneBaselineValidator {
     public void validateUnique(LocalDate baselineDate,
                                String baselineShiftCode,
                                List<Cd15StorageLaneLimit> lanes) {
+        List<String> missingMachineLaneCodes = lanes == null ? Collections.emptyList()
+                : lanes.stream()
+                        .filter(item -> item != null
+                                && StringUtils.hasText(item.getStorageLaneCode())
+                                && !StringUtils.hasText(item.getMachineCode()))
+                        .map(Cd15StorageLaneLimit::getStorageLaneCode)
+                        .collect(Collectors.toList());
+        if (!missingMachineLaneCodes.isEmpty()) {
+            throw new IllegalStateException("库排资源基线 " + baselineDate + "/"
+                    + baselineShiftCode + " 存在未绑定机台的库排: "
+                    + String.join(",", missingMachineLaneCodes));
+        }
         List<String> duplicateLaneCodes = this.findDuplicateLaneCodes(lanes);
         if (!duplicateLaneCodes.isEmpty()) {
             throw new IllegalStateException("库排资源基线 " + baselineDate + "/"

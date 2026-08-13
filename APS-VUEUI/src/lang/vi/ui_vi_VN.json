@@ -2560,5 +2560,6 @@
   "ui.schedule.autoPlan.viewIssues": "Xem chi tiết vấn đề",
   "ui.schedule.autoPlan.viewUnplanned": "Xem tác vụ chưa lập lịch",
   "ui.schedule.autoPlan.refreshBoard": "Làm mới bảng",
-  "ui.data.column.cd90StorageLaneLimit.machineCode": "Máy liên kết"
+  "ui.data.column.cd90StorageLaneLimit.machineCode": "Máy liên kết",
+  "ui.data.column.cd15StorageLaneLimit.machineCode": "Máy liên kết"
 }

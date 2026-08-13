@@ -336,6 +336,10 @@ public class Cd15ExistingScheduleResourceReserver {
                             "锁定任务原库排不存在: " + row.getStorageLaneCode()));
             int vehicles = row.getAllocatedCartCount() == null
                     ? 0 : row.getAllocatedCartCount();
+            if (!Objects.equals(result.getMachineCode(), lane.getMachineCode())) {
+                throw new IllegalStateException("锁定任务原库排未绑定当前机台: "
+                        + row.getStorageLaneCode());
+            }
             if (vehicles <= 0 || lane.getVehicleCount() + vehicles > lane.getMaxVehicleCount()) {
                 throw new IllegalStateException("锁定任务原库排容量不足: " + row.getStorageLaneCode());
             }

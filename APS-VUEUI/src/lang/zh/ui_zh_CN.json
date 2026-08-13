@@ -3750,6 +3750,7 @@
   "ui.data.column.cd15StorageLaneLimit.factoryCode": "工厂",
   "ui.data.column.cd15StorageLaneLimit.laneDate": "日期",
   "ui.data.column.cd15StorageLaneLimit.shiftCode": "班次",
+  "ui.data.column.cd15StorageLaneLimit.machineCode": "绑定机台",
   "ui.data.column.cd15StorageLaneLimit.storageLaneCode": "库排号",
   "ui.data.column.cd15StorageLaneLimit.materialCode": "物料编号/规格",
   "ui.data.column.cd15StorageLaneLimit.carNum": "当前车数",

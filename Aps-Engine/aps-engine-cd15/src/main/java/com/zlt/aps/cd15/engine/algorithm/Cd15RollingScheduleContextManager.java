@@ -198,7 +198,8 @@ public class Cd15RollingScheduleContextManager {
             remainingQuantity = remainingQuantity.subtract(allocationQuantity);
             context.getPlannedInboundRecords().add(Cd15InboundRecord.builder()
                     .taskKey(taskKey).actual(false).steelStripCode(task.getSteelStripCode())
-                    .laneCode(allocation.getLaneCode()).vehicleCount(allocation.getVehicleCount())
+                    .laneCode(allocation.getLaneCode()).machineCode(task.getMachineCode())
+                    .vehicleCount(allocation.getVehicleCount())
                     .inboundQuantity(allocationQuantity)
                     .inboundTime(task.getExpectedEndTime()).build());
         }
@@ -274,7 +275,8 @@ public class Cd15RollingScheduleContextManager {
             return new ArrayList<>();
         }
         return lanes.stream().map(item -> Cd15StorageLaneState.builder()
-                .laneCode(item.getLaneCode()).steelStripCode(item.getSteelStripCode())
+                .laneCode(item.getLaneCode()).machineCode(item.getMachineCode())
+                .steelStripCode(item.getSteelStripCode())
                 .vehicleCount(item.getVehicleCount()).maxVehicleCount(item.getMaxVehicleCount())
                 .build()).collect(Collectors.toList());
     }

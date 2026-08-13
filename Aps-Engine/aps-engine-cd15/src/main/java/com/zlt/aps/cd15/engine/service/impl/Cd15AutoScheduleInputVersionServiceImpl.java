@@ -257,7 +257,7 @@ public class Cd15AutoScheduleInputVersionServiceImpl implements Cd15AutoSchedule
                         .orderByAsc(Cd15StorageLaneLimit::getStorageLaneCode))
                 .stream()
                 .map(item -> this.row(item.getFactoryCode(), item.getLaneDate(), item.getMaterialCode(),
-                        item.getShiftCode(), item.getStorageLaneCode(), item.getCarNum(),
+                        item.getShiftCode(), item.getMachineCode(), item.getStorageLaneCode(), item.getCarNum(),
                         item.getMaxCarNum(), item.getAvailableCarNum(), item.getDataSource(),
                         item.getMesSyncTime()))
                 .collect(Collectors.joining("|"));

@@ -74,7 +74,8 @@ public class Cd15ShiftResourceCommitter {
             Cd15ShiftResourceState working = copy(originalState);
             BigDecimal vehiclePlanQuantity = trial.getVehiclePlanQuantity();
             Cd15StorageLaneAllocationResult allocation = laneAllocator.allocate(
-                    request.getSteelStripCode(), trial.getFinalSchedulableQuantity(),
+                    request.getSteelStripCode(), trial.getMachineCode(),
+                    trial.getFinalSchedulableQuantity(),
                     vehiclePlanQuantity, working.getLanes());
             if (!allocation.isSuccess() || !acceptPartialAllocation(allocation, request)) {
                 // 库排容量不足或部分排比例太小，均不提前修改工装和机台剩余时间。
@@ -215,7 +216,7 @@ public class Cd15ShiftResourceCommitter {
             BigDecimal vehiclePlanQuantity = trial.getVehiclePlanQuantity();
             Cd15ShiftResourceState preview = this.copy(originalState);
             Cd15StorageLaneAllocationResult firstPreview = this.laneAllocator.allocate(
-                    request.getSteelStripCode(), branchTrialQuantity,
+                    request.getSteelStripCode(), trial.getMachineCode(), branchTrialQuantity,
                     vehiclePlanQuantity, preview.getLanes());
             if (!firstPreview.isSuccess()) {
                 lastFailureReason = "STORAGE_LANE_LIMIT";
@@ -223,7 +224,7 @@ public class Cd15ShiftResourceCommitter {
             }
             preview.setLanes(firstPreview.getLanes());
             Cd15StorageLaneAllocationResult secondPreview = this.laneAllocator.allocate(
-                    request.getSteelStripCode(), branchTrialQuantity,
+                    request.getSteelStripCode(), trial.getMachineCode(), branchTrialQuantity,
                     vehiclePlanQuantity, preview.getLanes());
             if (!secondPreview.isSuccess()) {
                 lastFailureReason = "STORAGE_LANE_LIMIT";
@@ -257,12 +258,12 @@ public class Cd15ShiftResourceCommitter {
             Cd15ShiftResourceState working = this.copy(originalState);
             Cd15StorageLaneAllocationResult firstAllocation =
                     this.laneAllocator.allocate(
-                            request.getSteelStripCode(), branchCommittedQuantity,
+                            request.getSteelStripCode(), trial.getMachineCode(), branchCommittedQuantity,
                             vehiclePlanQuantity, working.getLanes());
             working.setLanes(firstAllocation.getLanes());
             Cd15StorageLaneAllocationResult secondAllocation =
                     this.laneAllocator.allocate(
-                            request.getSteelStripCode(), branchCommittedQuantity,
+                            request.getSteelStripCode(), trial.getMachineCode(), branchCommittedQuantity,
                             vehiclePlanQuantity, working.getLanes());
             if (!firstAllocation.isSuccess() || !secondAllocation.isSuccess()) {
                 lastFailureReason = "STORAGE_LANE_LIMIT";
@@ -432,6 +433,7 @@ public class Cd15ShiftResourceCommitter {
             Cd15ShiftResourceState working = this.copy(originalState);
             Cd15StorageLaneAllocationResult firstAllocation = laneAllocator.allocate(
                     firstRequest.getSteelStripCode(),
+                    firstTrial.getMachineCode(),
                     firstTrial.getFinalSchedulableQuantity(),
                     firstTrial.getVehiclePlanQuantity(), working.getLanes());
             if (!firstAllocation.isSuccess()
@@ -442,6 +444,7 @@ public class Cd15ShiftResourceCommitter {
             working.setLanes(firstAllocation.getLanes());
             Cd15StorageLaneAllocationResult secondAllocation = laneAllocator.allocate(
                     secondRequest.getSteelStripCode(),
+                    secondTrial.getMachineCode(),
                     secondTrial.getFinalSchedulableQuantity(),
                     secondTrial.getVehiclePlanQuantity(), working.getLanes());
             if (!secondAllocation.isSuccess()
@@ -699,7 +702,8 @@ public class Cd15ShiftResourceCommitter {
     private Cd15ShiftResourceState copy(Cd15ShiftResourceState source) {
         List<Cd15StorageLaneState> lanes = source.getLanes() == null ? new ArrayList<>()
                 : source.getLanes().stream().map(item -> Cd15StorageLaneState.builder()
-                        .laneCode(item.getLaneCode()).steelStripCode(item.getSteelStripCode())
+                        .laneCode(item.getLaneCode()).machineCode(item.getMachineCode())
+                        .steelStripCode(item.getSteelStripCode())
                         .vehicleCount(item.getVehicleCount()).maxVehicleCount(item.getMaxVehicleCount())
                         .build()).collect(Collectors.toList());
         return Cd15ShiftResourceState.builder().lanes(lanes)
