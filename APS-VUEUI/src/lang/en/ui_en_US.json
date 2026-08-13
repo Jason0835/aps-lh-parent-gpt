@@ -1645,5 +1645,6 @@
   "ui.schedule.autoPlan.batchNo": "Schedule Batch",
   "ui.schedule.autoPlan.viewIssues": "View Issues",
   "ui.schedule.autoPlan.viewUnplanned": "View Unplanned Tasks",
-  "ui.schedule.autoPlan.refreshBoard": "Refresh Board"
+  "ui.schedule.autoPlan.refreshBoard": "Refresh Board",
+  "ui.data.column.cd90StorageLaneLimit.machineCode": "Bound Machine"
 }

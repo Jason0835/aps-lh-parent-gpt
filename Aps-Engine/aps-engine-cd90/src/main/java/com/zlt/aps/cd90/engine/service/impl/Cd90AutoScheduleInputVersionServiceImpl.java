@@ -264,7 +264,7 @@ public class Cd90AutoScheduleInputVersionServiceImpl
                                 .orderByAsc(Cd90StorageLaneLimit::getId))
                 .stream()
                 .map(item -> this.row(item.getId(), item.getLaneDate(), item.getShiftCode(),
-                        item.getStorageLaneCode(), item.getMaterialCode(), item.getCarNum(),
+                        item.getMachineCode(), item.getStorageLaneCode(), item.getMaterialCode(), item.getCarNum(),
                         item.getMaxCarNum(), item.getAvailableCarNum(), item.getDataSource(),
                         item.getMesSyncTime(), item.getUpdateTime()))
                 .collect(Collectors.joining("|"));

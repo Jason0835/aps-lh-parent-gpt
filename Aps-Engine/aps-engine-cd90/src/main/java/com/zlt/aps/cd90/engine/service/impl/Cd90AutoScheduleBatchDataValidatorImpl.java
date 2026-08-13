@@ -372,10 +372,27 @@ public class Cd90AutoScheduleBatchDataValidatorImpl implements Cd90AutoScheduleB
                             "ui.cd90.autoSchedule.resourceBaselineSyncSuggestion"));
             return;
         }
+        Set<String> enabledMachineCodes = machineInfoMapper.selectList(
+                        Wrappers.<Cd90MachineInfo>lambdaQuery()
+                                .eq(Cd90MachineInfo::getFactoryCode, factoryCode)
+                                .eq(Cd90MachineInfo::getStatus, ApsConstant.APS_STRING_1))
+                .stream()
+                .map(Cd90MachineInfo::getMachineCode)
+                .filter(StringUtils::hasText)
+                .collect(Collectors.toSet());
         for (Cd90StorageLaneLimit lane : lanes) {
             String laneCode = lane.getStorageLaneCode();
             String shiftCode = lane.getShiftCode();
             String prefix = "库排 " + laneCode + "(班次 " + shiftCode + ") ";
+            if (!StringUtils.hasText(lane.getMachineCode())) {
+                builder.addError("库排限制", "MACHINE_CODE_MISSING",
+                        prefix + "未绑定直裁机台",
+                        "请在库排限制维护页面选择绑定机台");
+            } else if (!enabledMachineCodes.contains(lane.getMachineCode())) {
+                builder.addError("库排限制", "MACHINE_CODE_INVALID",
+                        prefix + "绑定机台 " + lane.getMachineCode() + " 不存在或未启用",
+                        "请修正库排绑定机台或启用对应直裁机台");
+            }
             Integer maxCarNum = lane.getMaxCarNum();
             if (maxCarNum == null || maxCarNum <= 0) {
                 builder.addError("库排限制", "MAX_CAR_NUM_MISSING",

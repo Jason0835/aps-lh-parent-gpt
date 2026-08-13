@@ -46,6 +46,7 @@
         FACTORY_CODE,
         LANE_DATE,
         SHIFT_CODE,
+        MACHINE_CODE,
         STORAGE_LANE_CODE,
         MATERIAL_CODE,
         CAR_NUM,

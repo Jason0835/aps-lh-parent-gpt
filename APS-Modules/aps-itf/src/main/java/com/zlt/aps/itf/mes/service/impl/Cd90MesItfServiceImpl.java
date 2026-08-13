@@ -298,6 +298,7 @@ public class Cd90MesItfServiceImpl implements ICd90MesItfService {
         Cd90StorageLaneLimit invalidSource = sourceList.stream()
                 .filter(source -> source.getLaneDate() == null
                         || StringUtils.isBlank(source.getShiftCode())
+                        || StringUtils.isBlank(source.getMachineCode())
                         || StringUtils.isBlank(source.getStorageLaneCode())
                         || source.getCarNum() == null
                         || source.getMaxCarNum() == null
@@ -319,6 +320,7 @@ public class Cd90MesItfServiceImpl implements ICd90MesItfService {
             target.setFactoryCode(factoryCode);
             target.setLaneDate(source.getLaneDate());
             target.setShiftCode(source.getShiftCode());
+            target.setMachineCode(source.getMachineCode());
             target.setStorageLaneCode(source.getStorageLaneCode());
             target.setMaterialCode(source.getMaterialCode());
             target.setCarNum(source.getCarNum());
