@@ -10,10 +10,12 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import javax.annotation.Resource;
@@ -453,6 +455,26 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
 
         List<DjScheduleResult> updatedResults = iDjScheduleShiftEngineService.processInsertAndCascade(shiftCtx);
 
+        // 根据positionClassMap清除第一组不属本组的class位置数据（只保留该组映射到的输出class）
+        Map<Integer, Integer> firstGroupClassMap = firstGroup.getPositionClassMap();
+        if (firstGroupClassMap != null && !firstGroupClassMap.isEmpty()) {
+            Set<Integer> mappedClasses = new HashSet<>(firstGroupClassMap.values());
+            for (int c = 1; c <= DjEngineConstants.SHIFT_COUNT; c++) {
+                if (!mappedClasses.contains(c)) {
+                    setPlanQtyByClass(insertVO, c, null);
+                    setSeqByClass(insertVO, c, null);
+                }
+            }
+        } else {
+            // 没有positionClassMap时，只保留positions中对应的class位置（兼容旧逻辑）
+            for (int c = 1; c <= DjEngineConstants.SHIFT_COUNT; c++) {
+                if (!firstGroup.getPositions().contains(c)) {
+                    setPlanQtyByClass(insertVO, c, null);
+                    setSeqByClass(insertVO, c, null);
+                }
+            }
+        }
+
         // 保存第一组的新插单记录
         djScheduleResultMapper.insert(insertVO);
 
@@ -502,15 +524,26 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
                 groupRecord.setBatchNo(groupBatchNo);
                 groupRecord.setOrderNo(iDjOrderGeneratorService.generateOrderNo(groupBatchNo, groupMaxOrderSeq));
 
-                // 填充该组班次的计划量和顺位
+                // 先清除所有class位置，只保留该组映射到的class
+                for (int c = 1; c <= DjEngineConstants.SHIFT_COUNT; c++) {
+                    setPlanQtyByClass(groupRecord, c, null);
+                    setSeqByClass(groupRecord, c, null);
+                }
+
+                // 根据positionClassMap填充该组班次的计划量和顺位
+                Map<Integer, Integer> groupClassMap = group.getPositionClassMap();
                 for (int origPos : group.getPositions()) {
+                    Integer outputClass = groupClassMap != null ? groupClassMap.get(origPos) : null;
+                    if (outputClass == null) {
+                        outputClass = origPos; // 无映射时直接使用原位置（兼容旧逻辑）
+                    }
                     BigDecimal qty = getPlanQtyByClass(insertVO, origPos);
                     Integer seq = getSeqByClass(insertVO, origPos);
                     if (qty != null) {
-                        setPlanQtyByClass(groupRecord, origPos, qty);
+                        setPlanQtyByClass(groupRecord, outputClass, qty);
                     }
                     if (seq != null) {
-                        setSeqByClass(groupRecord, origPos, seq);
+                        setSeqByClass(groupRecord, outputClass, seq);
                     }
                 }
 
@@ -1260,6 +1293,13 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
      * 按设计文档 2.1.1 精细化算法：对 position=1~lastClass 逐位计算独立排产日期，
      * 将有量班次按排产日期分组返回。
      * </p>
+     * <p>
+     * 排产日期变化条件（每个班次独立判断，累积偏移）：
+     * <ol>
+     *   <li>当遇到跨天班次（crossDayFlag=1）时，后续位置排产日+1</li>
+     *   <li>当遇到开班班次（openFlag=1）且非首位置时（即生产周期切换边界），后续位置排产日+1</li>
+     * </ol>
+     * </p>
      *
      * @param insertVO 插单参数
      * @return 排产日期分组列表（按日期升序）
@@ -1268,17 +1308,7 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
         String startShiftClass = insertVO.getScheduleShiftClass();
         if (StringUtils.isBlank(startShiftClass)) {
             // 无首班班次时直接使用前端传入的排产日期（兼容旧逻辑如调量转插单）
-            ScheduleDateGroup group = new ScheduleDateGroup();
-            group.setScheduleDate(insertVO.getScheduleDate());
-            group.setScheduleShiftClass(insertVO.getScheduleShiftClass());
-            for (int p = 1; p <= DjEngineConstants.SHIFT_COUNT; p++) {
-                BigDecimal qty = getPlanQtyByClass(insertVO, p);
-                if (qty != null && qty.compareTo(BigDecimal.ZERO) > 0) {
-                    group.getPositions().add(p);
-                    group.getPositionDates().put(p, insertVO.getScheduleDate());
-                }
-            }
-            return Collections.singletonList(group);
+            return Collections.singletonList(buildSingleDateGroup(insertVO, insertVO.getScheduleDate(), insertVO.getScheduleShiftClass()));
         }
 
         int lastClass = resolveLastClass(insertVO);
@@ -1286,19 +1316,135 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
         // 查询活动班次配置
         List<DjShiftConfig> activeShifts = djShiftConfigService.listActiveShifts();
         if (CollectionUtils.isEmpty(activeShifts)) {
-            ScheduleDateGroup group = new ScheduleDateGroup();
-            group.setScheduleDate(insertVO.getScheduleDate());
-            group.setScheduleShiftClass(startShiftClass);
-            for (int p = 1; p <= lastClass; p++) {
-                if (hasPlanQty(insertVO, p)) {
-                    group.getPositions().add(p);
-                    group.getPositionDates().put(p, insertVO.getScheduleDate());
-                }
-            }
-            return Collections.singletonList(group);
+            return Collections.singletonList(buildSingleDateGroup(insertVO, insertVO.getScheduleDate(), startShiftClass));
         }
 
         // 计算当前服务器时间所在的排产日
+        LocalDate serverProductionDate = calculateServerProductionDate(activeShifts);
+
+        // 查找首班班次索引
+        int startIndex = findShiftIndex(activeShifts, startShiftClass);
+        if (startIndex < 0) {
+            return Collections.singletonList(buildSingleDateGroup(insertVO, insertVO.getScheduleDate(), startShiftClass));
+        }
+
+        // 查找开班班次索引（用于生产周期边界检测）
+        int openShiftIndex = findOpeningShiftIndex(activeShifts);
+
+        // 计算各位置的排产日期偏移和位置→class映射
+        int totalShifts = activeShifts.size();
+        List<Integer> dateOffsetPerPosition = new ArrayList<>(lastClass);
+        Map<Integer, Integer> positionClassMap = new HashMap<>();
+
+        // 构建开班班次到class位置的映射：key=shiftIndex, value=classPosition(1~3)
+        Map<Integer, Integer> shiftToClassMap = buildShiftToClassMap(activeShifts, openShiftIndex);
+
+        int dateOffset = 0;
+        for (int position = 1; position <= lastClass; position++) {
+            int shiftIndex = (startIndex + position - 1) % totalShifts;
+            DjShiftConfig shift = activeShifts.get(shiftIndex);
+
+            // 日期偏移：每个班次独立判断，跨天（crossDayFlag=1）或开班边界（openFlag=1且非首位置）时排产日+1
+            if (position > 1) {
+                boolean isCrossDay = ApsConstant.TRUE.equals(shift.getCrossDayFlag());
+                boolean isCycleBoundary = (shiftIndex == openShiftIndex);
+                if (isCrossDay || isCycleBoundary) {
+                    dateOffset++;
+                }
+            }
+
+            dateOffsetPerPosition.add(dateOffset);
+
+            // 计算输入position→输出class位置的映射
+            Integer outputClass = shiftToClassMap.get(shiftIndex);
+            if (outputClass != null) {
+                positionClassMap.put(position, outputClass);
+            }
+        }
+
+        // 按排产日期偏移分组
+        Map<Integer, ScheduleDateGroup> dateGroupMap = new LinkedHashMap<>();
+        for (int position = 1; position <= lastClass; position++) {
+            if (!hasPlanQty(insertVO, position)) {
+                continue;
+            }
+            int offset = dateOffsetPerPosition.get(position - 1);
+            LocalDate posDate = serverProductionDate.plusDays(offset);
+            int offsetKey = offset;
+
+            dateGroupMap.computeIfAbsent(offsetKey, k -> {
+                ScheduleDateGroup g = new ScheduleDateGroup();
+                g.setScheduleDate(Date.from(serverProductionDate.plusDays(k).atStartOfDay(ZoneId.systemDefault()).toInstant()));
+                return g;
+            });
+
+            ScheduleDateGroup g = dateGroupMap.get(offsetKey);
+            g.getPositions().add(position);
+            g.getPositionDates().put(position, g.getScheduleDate());
+
+            // 记录位置→class映射
+            Integer outputClass = positionClassMap.get(position);
+            if (outputClass != null) {
+                g.getPositionClassMap().put(position, outputClass);
+            }
+
+            // 第一个遇到该组的班次设为首班班次
+            if (g.getScheduleShiftClass() == null) {
+                int si = (startIndex + position - 1) % totalShifts;
+                g.setScheduleShiftClass(activeShifts.get(si).getShiftCode());
+            }
+        }
+
+        return new ArrayList<>(dateGroupMap.values());
+    }
+
+    /**
+     * 构建开班班次到输出class位置的映射
+     * <p>
+     * 以开班班次为起点，按班次生产周期顺序（通过 getNextClass 确定），
+     * 将每个班次编码映射到输出DjScheduleResult的class位置(1~3)。
+     * 例如：开班="03"，则映射为 03→1, 01→2, 02→3。
+     * </p>
+     */
+    private Map<Integer, Integer> buildShiftToClassMap(List<DjShiftConfig> activeShifts, int openShiftIndex) {
+        Map<Integer, Integer> map = new HashMap<>();
+        int totalShifts = activeShifts.size();
+        // 开班班次为class1（在输出记录中的位置）
+        for (int classPos = 1; classPos <= totalShifts; classPos++) {
+            int shiftIndex = (openShiftIndex + classPos - 1) % totalShifts;
+            map.put(shiftIndex, classPos);
+        }
+        return map;
+    }
+
+    /**
+     * 在活动班次列表中查找开班班次索引
+     */
+    private int findOpeningShiftIndex(List<DjShiftConfig> activeShifts) {
+        for (int i = 0; i < activeShifts.size(); i++) {
+            if ("1".equals(activeShifts.get(i).getOpenFlag())) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * 在活动班次列表中查找指定班次编码的索引
+     */
+    private int findShiftIndex(List<DjShiftConfig> activeShifts, String shiftCode) {
+        for (int i = 0; i < activeShifts.size(); i++) {
+            if (activeShifts.get(i).getShiftCode().equals(shiftCode)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * 计算服务器当前时间所在的排产日
+     */
+    private LocalDate calculateServerProductionDate(List<DjShiftConfig> activeShifts) {
         LocalTime now = LocalTime.now();
         LocalDate serverDate = LocalDate.now();
         LocalDate serverProductionDate = serverDate;
@@ -1318,81 +1464,23 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
                 break;
             }
         }
+        return serverProductionDate;
+    }
 
-        // 查找首班班次索引
-        int startIndex = -1;
-        int totalShifts = activeShifts.size();
-        for (int i = 0; i < totalShifts; i++) {
-            if (activeShifts.get(i).getShiftCode().equals(startShiftClass)) {
-                startIndex = i;
-                break;
+    /**
+     * 构建单组排产日分组（无跨天/无班次配置时的保底逻辑）
+     */
+    private ScheduleDateGroup buildSingleDateGroup(DjScheduleResult insertVO, Date scheduleDate, String shiftClass) {
+        ScheduleDateGroup group = new ScheduleDateGroup();
+        group.setScheduleDate(scheduleDate);
+        group.setScheduleShiftClass(shiftClass);
+        for (int p = 1; p <= DjEngineConstants.SHIFT_COUNT; p++) {
+            if (hasPlanQty(insertVO, p)) {
+                group.getPositions().add(p);
+                group.getPositionDates().put(p, scheduleDate);
             }
         }
-        if (startIndex < 0) {
-            ScheduleDateGroup group = new ScheduleDateGroup();
-            group.setScheduleDate(insertVO.getScheduleDate());
-            group.setScheduleShiftClass(startShiftClass);
-            for (int p = 1; p <= lastClass; p++) {
-                if (hasPlanQty(insertVO, p)) {
-                    group.getPositions().add(p);
-                    group.getPositionDates().put(p, insertVO.getScheduleDate());
-                }
-            }
-            return Collections.singletonList(group);
-        }
-
-        // 按班次位置计算每班的独立排产日期（position=1~lastClass）
-        boolean hasCrossDay = false;
-        for (int position = 1; position <= lastClass; position++) {
-            int shiftIndex = (startIndex + position - 1) % totalShifts;
-            if (ApsConstant.TRUE.equals(activeShifts.get(shiftIndex).getCrossDayFlag())) {
-                hasCrossDay = true;
-            }
-        }
-
-        // 如果所有有量班次都在同一排产日（lastClass 范围内无跨天），直接返回单组
-        if (!hasCrossDay) {
-            ScheduleDateGroup group = new ScheduleDateGroup();
-            group.setScheduleDate(Date.from(serverProductionDate.atStartOfDay(ZoneId.systemDefault()).toInstant()));
-            group.setScheduleShiftClass(startShiftClass);
-            for (int p = 1; p <= lastClass; p++) {
-                if (hasPlanQty(insertVO, p)) {
-                    group.getPositions().add(p);
-                    group.getPositionDates().put(p, group.getScheduleDate());
-                }
-            }
-            return Collections.singletonList(group);
-        }
-
-        // 有跨天：逐位计算日期并按排产日分组
-        Map<LocalDate, ScheduleDateGroup> dateGroupMap = new LinkedHashMap<>();
-        hasCrossDay = false;
-        for (int position = 1; position <= lastClass; position++) {
-            int shiftIndex = (startIndex + position - 1) % totalShifts;
-            if (ApsConstant.TRUE.equals(activeShifts.get(shiftIndex).getCrossDayFlag())) {
-                hasCrossDay = true;
-            }
-            LocalDate posDate = hasCrossDay ? serverProductionDate.plusDays(1) : serverProductionDate;
-            // 该位置对应的班次编码（用于该组的 scheduleShiftClass）
-            String shiftCode = activeShifts.get(shiftIndex).getShiftCode();
-
-            dateGroupMap.computeIfAbsent(posDate, k -> {
-                ScheduleDateGroup g = new ScheduleDateGroup();
-                g.setScheduleDate(Date.from(k.atStartOfDay(ZoneId.systemDefault()).toInstant()));
-                return g;
-            });
-
-            ScheduleDateGroup g = dateGroupMap.get(posDate);
-            if (hasPlanQty(insertVO, position)) {
-                g.getPositions().add(position);
-                g.getPositionDates().put(position, g.getScheduleDate());
-            }
-            // 第一个遇到该组的班次设为首班班次
-            if (g.getScheduleShiftClass() == null) {
-                g.setScheduleShiftClass(shiftCode);
-            }
-        }
-        return new ArrayList<>(dateGroupMap.values());
+        return group;
     }
 
     private boolean hasPlanQty(DjScheduleResult vo, int position) {
