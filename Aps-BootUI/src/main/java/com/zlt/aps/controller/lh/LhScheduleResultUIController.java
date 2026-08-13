@@ -229,7 +229,7 @@ public class LhScheduleResultUIController extends BaseUIController<LhScheduleRes
     }
 
     /**
-     * 合并导出核心逻辑：分别调用硫化、成型导出，再将两个工作簿合并为一个。
+     * 合并导出核心逻辑：分别调用硫化导出、成型余量导出，再将两个工作簿合并为一个。
      *
      * @param entity 硫化排程查询条件
      * @param scheduleDate 排程日期（已兜底非空）
@@ -240,13 +240,13 @@ public class LhScheduleResultUIController extends BaseUIController<LhScheduleRes
         // 1. 硫化导出
         byte[] lhBytes = iLhScheduleResultRemoteService.exportData(entity, fileName);
 
-        // 2. 成型导出（使用相同排程日期与工厂条件）
+        // 2. 成型导出（使用相同排程日期与工厂条件，导出 CxExport.xlsx 多Sheet）
         CxScheduleResult cxEntity = new CxScheduleResult();
         cxEntity.setScheduleDate(scheduleDate);
         if (entity != null) {
             cxEntity.setFactoryCode(entity.getFactoryCode());
         }
-        byte[] cxBytes = iCxScheduleResultService.exportData(cxEntity, "成型日计划");
+        byte[] cxBytes = iCxScheduleResultService.exportCxRemainQty(cxEntity, "成型日计划");
 
         // 3. 合并两个工作簿
         return mergeExcel(lhBytes, cxBytes);
