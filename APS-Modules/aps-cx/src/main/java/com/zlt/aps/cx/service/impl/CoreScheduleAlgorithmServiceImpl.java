@@ -267,6 +267,9 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             lastDay = day;
         }
 
+        // 2.4.8 跨班次总产量均衡：确保同一机台在同一天各班次的总产量差异不超过1车
+        balanceCrossShiftQuantity(shiftResults, context);
+
         // 2.5 汇总多班次结果：机台+胎胚+物料 -> CLASS1~8 主表记录
         List<CxScheduleResult> allResults = buildFinalScheduleResultsFromShifts(context, shiftResults, allShiftConfigs, initialEmbryoStockMap);
 
@@ -1176,6 +1179,190 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             // 3.5 同胎胚调拨（往调拨目标靠拢，尽量达到合理量，受跨班次区间约束）
             transferWithinStructure(machineAggs, tripCap, structure, context, lhIdToMoldQty);
         }
+    }
+
+    /**
+     * 跨班次总产量均衡：确保同一机台在同一天各班次的总产量差异不超过1车。
+     *
+     * <p>在班次精排完成后执行，对 ShiftProductionResult 做后处理调整：
+     * 从高产班次减1车某胎胚，给低产班次加1车同胎胚，直到差异 <= 1车或无法调拨。
+     *
+     * <p>约束：
+     * - 排除试制/量试/收尾任务
+     * - 调拨量必须整车（tripCap 的倍数）
+     * - 必须是同一胎胚（giver 和 receiver 班次都有该胎胚的 SPR）
+     * - 高产班次该胎胚产量 >= 1车
+     *
+     * @param shiftResults 所有班次的排程结果
+     * @param context 排程上下文
+     */
+    void balanceCrossShiftQuantity(List<ShiftScheduleResult> shiftResults, ScheduleContextVo context) {
+        if (CollectionUtils.isEmpty(shiftResults) || shiftResults.size() < 2) {
+            return;
+        }
+
+        // 1. 按天分组
+        Map<Integer, List<ShiftScheduleResult>> dayShiftMap = new LinkedHashMap<>();
+        for (ShiftScheduleResult sr : shiftResults) {
+            dayShiftMap.computeIfAbsent(sr.getDay(), k -> new ArrayList<>()).add(sr);
+        }
+
+        // 2. 逐天处理
+        int totalTransfers = 0;
+        for (Map.Entry<Integer, List<ShiftScheduleResult>> dayEntry : dayShiftMap.entrySet()) {
+            int day = dayEntry.getKey();
+            List<ShiftScheduleResult> dayShifts = dayEntry.getValue();
+            if (dayShifts.size() < 2) continue;
+
+            // 3. 按机台分组，收集各班次各胎胚的可参与 SPR
+            // machineCode -> shiftCode -> embryoCode -> List<SPR>
+            Map<String, Map<String, Map<String, List<ShiftProductionResult>>>> machineMap = new LinkedHashMap<>();
+            for (ShiftScheduleResult sr : dayShifts) {
+                String shiftCode = sr.getShiftConfig() != null ? sr.getShiftConfig().getShiftCode() : "UNKNOWN";
+                if (sr.getShiftProductionResults() == null) continue;
+                for (ShiftProductionResult spr : sr.getShiftProductionResults()) {
+                    if (spr.getMachineCode() == null || spr.getEmbryoCode() == null) continue;
+                    // 排除试制/收尾
+                    if (Boolean.TRUE.equals(spr.getIsTrialTask())) continue;
+                    if (Boolean.TRUE.equals(spr.getIsEndingTask())) continue;
+                    if (Boolean.TRUE.equals(spr.getIsLastEndingBatch())) continue;
+                    if (Boolean.TRUE.equals(spr.getSourceTask() != null ? spr.getSourceTask().getIsProductionTrial() : null)) continue;
+
+                    machineMap
+                            .computeIfAbsent(spr.getMachineCode(), k -> new LinkedHashMap<>())
+                            .computeIfAbsent(shiftCode, k -> new LinkedHashMap<>())
+                            .computeIfAbsent(spr.getEmbryoCode(), k -> new ArrayList<>())
+                            .add(spr);
+                }
+            }
+
+            // 4. 逐机台均衡
+            for (Map.Entry<String, Map<String, Map<String, List<ShiftProductionResult>>>> machineEntry : machineMap.entrySet()) {
+                String machineCode = machineEntry.getKey();
+                Map<String, Map<String, List<ShiftProductionResult>>> shiftEmbryoMap = machineEntry.getValue();
+                if (shiftEmbryoMap.size() < 2) continue;
+
+                totalTransfers += balanceMachineCrossShift(machineCode, day, shiftEmbryoMap);
+            }
+        }
+
+        if (totalTransfers > 0) {
+            log.info("【跨班次总产量均衡】共执行 {} 次调拨", totalTransfers);
+        }
+    }
+
+    /**
+     * 单机台跨班次均衡：从高产班次调拨整车到低产班次。
+     *
+     * @param machineCode 机台编码
+     * @param day 天
+     * @param shiftEmbryoMap shiftCode -> embryoCode -> List<SPR>
+     * @return 实际执行的调拨次数
+     */
+    private int balanceMachineCrossShift(String machineCode, int day,
+                                         Map<String, Map<String, List<ShiftProductionResult>>> shiftEmbryoMap) {
+
+        // 获取整车容量（取任一 SPR 的 tripCapacity）
+        int tripCap = 0;
+        for (Map<String, List<ShiftProductionResult>> embryoMap : shiftEmbryoMap.values()) {
+            for (List<ShiftProductionResult> sprs : embryoMap.values()) {
+                if (!sprs.isEmpty() && sprs.get(0).getTripCapacity() != null && sprs.get(0).getTripCapacity() > 0) {
+                    tripCap = sprs.get(0).getTripCapacity();
+                    break;
+                }
+            }
+            if (tripCap > 0) break;
+        }
+        if (tripCap <= 0) return 0;
+
+        int transferCount = 0;
+        int maxIterations = 30; // 安全阀
+
+        while (maxIterations-- > 0) {
+            // 计算各班次总产量
+            Map<String, Integer> shiftTotals = new LinkedHashMap<>();
+            for (Map.Entry<String, Map<String, List<ShiftProductionResult>>> shiftEntry : shiftEmbryoMap.entrySet()) {
+                int total = 0;
+                for (List<ShiftProductionResult> sprs : shiftEntry.getValue().values()) {
+                    for (ShiftProductionResult spr : sprs) {
+                        total += spr.getQuantity() != null ? spr.getQuantity() : 0;
+                    }
+                }
+                shiftTotals.put(shiftEntry.getKey(), total);
+            }
+
+            // 找高产和低产班次
+            String maxShift = null, minShift = null;
+            int maxQty = Integer.MIN_VALUE, minQty = Integer.MAX_VALUE;
+            for (Map.Entry<String, Integer> e : shiftTotals.entrySet()) {
+                if (e.getValue() > maxQty) { maxQty = e.getValue(); maxShift = e.getKey(); }
+                if (e.getValue() < minQty) { minQty = e.getValue(); minShift = e.getKey(); }
+            }
+
+            // 差异 <= 1车，均衡完成
+            if (maxShift == null || maxQty - minQty <= tripCap) break;
+
+            // 找共同胎胚（高产班次有 >= 1车可减，低产班次有该胎胚可加）
+            Map<String, List<ShiftProductionResult>> maxEmbryoMap = shiftEmbryoMap.get(maxShift);
+            Map<String, List<ShiftProductionResult>> minEmbryoMap = shiftEmbryoMap.get(minShift);
+
+            String bestEmbryo = null;
+            BigDecimal bestStockHours = null;
+            for (String embryo : maxEmbryoMap.keySet()) {
+                if (!minEmbryoMap.containsKey(embryo)) continue;
+                List<ShiftProductionResult> maxSprs = maxEmbryoMap.get(embryo);
+                int maxEmbryoQty = maxSprs.stream().mapToInt(s -> s.getQuantity() != null ? s.getQuantity() : 0).sum();
+                if (maxEmbryoQty < tripCap) continue;
+
+                // 选 stockHours 最高的胎胚（库存多的先减）
+                for (ShiftProductionResult spr : maxSprs) {
+                    BigDecimal sh = spr.getStockHours() != null ? spr.getStockHours() : BigDecimal.ZERO;
+                    if (bestStockHours == null || sh.compareTo(bestStockHours) > 0) {
+                        bestStockHours = sh;
+                        bestEmbryo = embryo;
+                    }
+                }
+            }
+
+            if (bestEmbryo == null) break; // 无可调拨胎胚
+
+            // 执行调拨：高产班次减1车，低产班次加1车
+            List<ShiftProductionResult> maxSprs = maxEmbryoMap.get(bestEmbryo);
+            List<ShiftProductionResult> minSprs = minEmbryoMap.get(bestEmbryo);
+
+            // 从高产班次的 SPR 中减1车（选 stockHours 最高的 SPR）
+            ShiftProductionResult giverSpr = maxSprs.stream()
+                    .max(Comparator.comparing(s -> s.getStockHours() != null ? s.getStockHours() : BigDecimal.ZERO))
+                    .orElse(null);
+            if (giverSpr == null || giverSpr.getQuantity() == null || giverSpr.getQuantity() < tripCap) break;
+
+            giverSpr.setQuantity(giverSpr.getQuantity() - tripCap);
+
+            // 给低产班次的 SPR 加1车（选 stockHours 最低的 SPR）
+            ShiftProductionResult receiverSpr = minSprs.stream()
+                    .min(Comparator.comparing(s -> s.getStockHours() != null ? s.getStockHours() : BigDecimal.ZERO))
+                    .orElse(null);
+            if (receiverSpr == null) {
+                // 回滚 giver
+                giverSpr.setQuantity(giverSpr.getQuantity() + tripCap);
+                break;
+            }
+
+            receiverSpr.setQuantity(receiverSpr.getQuantity() + tripCap);
+
+            int maxBefore = maxQty;
+            int minBefore = minQty;
+            log.info("【跨班次均衡】机台={}, 天={}, 调拨1车({}条): {}班(胎胚{},stockHours={}) -> {}班(胎胚{}), "
+                            + "{}班 {}->{} , {}班 {}->{}",
+                    machineCode, day, tripCap, maxShift, bestEmbryo, bestStockHours,
+                    minShift, bestEmbryo,
+                    maxShift, maxBefore, maxBefore - tripCap,
+                    minShift, minBefore, minBefore + tripCap);
+
+            transferCount++;
+        }
+
+        return transferCount;
     }
 
     /**

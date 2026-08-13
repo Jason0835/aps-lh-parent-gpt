@@ -1,6 +1,9 @@
 package com.zlt.aps.mp.adjust.service;
 
+import java.util.List;
+
 import com.zlt.aps.mp.api.domain.dto.MpRollAdjustContextDTO;
+import com.zlt.aps.mp.api.domain.entity.MpMonthPlanStatistics;
 
 /**
  * 周程滚动调整接口
@@ -70,6 +73,6 @@ public interface IMpWeekAdjustService {
      * @param contextDTO
      * @param tempFlag
      */
-    void handleMonthPlanStatistics(MpRollAdjustContextDTO contextDTO, String tempFlag);
+    List<MpMonthPlanStatistics> handleMonthPlanStatistics(MpRollAdjustContextDTO contextDTO, String tempFlag);
 }
 

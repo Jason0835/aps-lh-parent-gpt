@@ -204,6 +204,13 @@ public class ContinueTaskProcessor {
                     if (remainingToReserve <= 0) break;
 
                     int demand = matchedTask.getVulcanizeMachineCount() != null ? matchedTask.getVulcanizeMachineCount() : 0;
+                    // 专供约束：该任务硫化机有专供要求、且当前历史机台非专供成型机时，
+                    // 不在该机台保底预留，交由新增均衡优先分到专供成型机（优先专供可回退）。
+                    if (!isDedicatedSupplyAllowed(matchedTask, machineCode, context)) {
+                        log.info("机台 {} 非硫化机 {} 的专供成型机，跳过保底预留胎胚 {}（交给新增均衡优先专供）",
+                                machineCode, matchedTask.getLhMachineCode(), embryoCode);
+                        continue;
+                    }
                     int reservedForThisTask = Math.min(demand, remainingToReserve);
                     matchedTask.setVulcanizeMachineCount(demand - reservedForThisTask);
 
@@ -252,6 +259,22 @@ public class ContinueTaskProcessor {
         allocation.getTaskAllocations().add(taskAllocation);
         allocation.setUsedCapacity(allocation.getUsedCapacity() + reservedVulcanizeCount);
         allocation.setRemainingCapacity(allocation.getRemainingCapacity() - reservedVulcanizeCount);
+    }
+
+    /**
+     * 判断续作任务是否允许在当前成型机保底预留（专供约束）。
+     *
+     * <p>任务无专供配置、或当前机台在专供集合内时允许；否则不允许，
+     * 交由新增均衡优先分到专供成型机（优先专供可回退）。
+     *
+     * @param task        续作任务
+     * @param machineCode 当前历史成型机台号
+     * @param context     排程上下文
+     * @return true 表示允许在该机台保底预留
+     */
+    private boolean isDedicatedSupplyAllowed(DailyEmbryoTask task, String machineCode, ScheduleContextVo context) {
+        Set<String> dedicated = context.getDedicatedSupplyMachines(task.getLhMachineCode());
+        return dedicated.isEmpty() || dedicated.contains(machineCode);
     }
 
     // ==================== 参数与历史映射 ====================

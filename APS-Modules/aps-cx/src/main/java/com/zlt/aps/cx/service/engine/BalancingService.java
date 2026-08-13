@@ -334,6 +334,7 @@ public class BalancingService {
         params.setContinueLoadMap(continueLoadMap);
         params.setContinueTypeMap(continueTypeMap);
         params.setContinueLhMachineCodeMap(continueLhMachineCodeMap);
+        params.setLhMachineSupplyMap(context.getLhMachineSupplyMap());
 
         BalancingResult greedyResult = greedyAssign(
                 sortedTasks, params, typeDiffThreshold, loadDiffThreshold, totalDemand);
@@ -533,14 +534,16 @@ public class BalancingService {
 
         // ---- 4. Phase 1a: 贪心分配（maxTypes=target） ----
         int remainingAfter1a = greedyAssignPhase(machineStates, ctx.getEmbryoGroups(), ctx.getSortedEmbryos(),
-                params.getMachineHistoryMap(), ctx.getTargetTypes(), ctx.getTargetLoad(), loadDiffThreshold);
+                params.getMachineHistoryMap(), ctx.getTargetTypes(), ctx.getTargetLoad(), loadDiffThreshold,
+                params.getLhMachineSupplyMap());
 
         // ---- 5. Phase 1b: 放宽分配（maxTypes=原始值，仅对 Phase 1a 未分配的任务） ----
         int remainingAfter1b = remainingAfter1a;
         if (remainingAfter1a > 0) {
             log.info("Phase 1a 剩余 {} 台未分配，放宽 maxTypes 到原始值重试", remainingAfter1a);
             remainingAfter1b = greedyAssignPhase(machineStates, ctx.getEmbryoGroups(), ctx.getSortedEmbryos(),
-                    params.getMachineHistoryMap(), Integer.MAX_VALUE, ctx.getTargetLoad(), loadDiffThreshold);
+                    params.getMachineHistoryMap(), Integer.MAX_VALUE, ctx.getTargetLoad(), loadDiffThreshold,
+                    params.getLhMachineSupplyMap());
         }
 
         boolean allAssigned = (remainingAfter1b == 0);
@@ -558,7 +561,7 @@ public class BalancingService {
         if (loadGap > loadDiffThreshold || typeGap > typeDiffThreshold) {
             log.info("Phase 2 局部搜索: loadGap={}, typeGap={}, 阈值={}/{}",
                     loadGap, typeGap, loadDiffThreshold, typeDiffThreshold);
-            localSearch(machineStates, loadDiffThreshold, typeDiffThreshold);
+            localSearch(machineStates, loadDiffThreshold, typeDiffThreshold, params.getLhMachineSupplyMap());
         }
 
         // ---- 7. Phase 3: 验证 P1 ----
@@ -624,14 +627,16 @@ public class BalancingService {
 
         // ---- 4a. Phase 1a: 按 targetLoad 分配（同R1逻辑，maxTypes=原始值） ----
         int remainingAfter1a = greedyAssignPhase(machineStates, ctx.getEmbryoGroups(), ctx.getSortedEmbryos(),
-                params.getMachineHistoryMap(), Integer.MAX_VALUE, ctx.getTargetLoad(), loadDiffThreshold);
+                params.getMachineHistoryMap(), Integer.MAX_VALUE, ctx.getTargetLoad(), loadDiffThreshold,
+                params.getLhMachineSupplyMap());
 
         // ---- 4b. Phase 1b: 剩余任务放宽容量上限分配（可突破 maxLh） ----
         int remaining = remainingAfter1a;
         if (remainingAfter1a > 0) {
             log.info("贪心R2 Phase 1a 剩余 {} 台，放宽容量上限重试", remainingAfter1a);
             remaining = greedyAssignPhaseRelaxed(machineStates, ctx.getEmbryoGroups(), ctx.getSortedEmbryos(),
-                    params.getMachineHistoryMap(), ctx.getTargetLoad(), loadDiffThreshold);
+                    params.getMachineHistoryMap(), ctx.getTargetLoad(), loadDiffThreshold,
+                    params.getLhMachineSupplyMap());
         }
 
         boolean allAssigned = (remaining == 0);
@@ -644,7 +649,7 @@ public class BalancingService {
         if (loadGap > loadDiffThreshold || typeGap > typeDiffThreshold) {
             log.info("贪心R2 Phase 2 局部搜索: loadGap={}, typeGap={}, 阈值={}/{}",
                     loadGap, typeGap, loadDiffThreshold, typeDiffThreshold);
-            localSearch(machineStates, loadDiffThreshold, typeDiffThreshold);
+            localSearch(machineStates, loadDiffThreshold, typeDiffThreshold, params.getLhMachineSupplyMap());
         }
 
         // ---- 6. Phase 3: 验证 P1 ----
@@ -689,7 +694,8 @@ public class BalancingService {
             List<String> sortedEmbryos,
             Map<String, Set<String>> machineHistoryMap,
             int targetLoad,
-            int loadDiffThreshold) {
+            int loadDiffThreshold,
+            Map<String, Set<String>> lhMachineSupplyMap) {
 
         int totalRemaining = 0;
 
@@ -699,7 +705,9 @@ public class BalancingService {
                     .mapToInt(t -> t.getVulcanizeMachineCount() != null ? t.getVulcanizeMachineCount() : 0).sum();
             if (remaining <= 0) continue;
 
-            List<MachineState> candidates = sortGreedyCandidates(machineStates, embryoCode, machineHistoryMap, Integer.MAX_VALUE);
+            Set<String> dedicatedMachines = collectDedicatedMachines(taskList, lhMachineSupplyMap);
+            List<MachineState> candidates = sortGreedyCandidates(
+                    machineStates, embryoCode, machineHistoryMap, Integer.MAX_VALUE, dedicatedMachines);
 
             int taskIndex = 0;
             for (MachineState candidate : candidates) {
@@ -955,7 +963,8 @@ public class BalancingService {
             Map<String, Set<String>> machineHistoryMap,
             int maxTypesLimit,
             int targetLoad,
-            int loadDiffThreshold) {
+            int loadDiffThreshold,
+            Map<String, Set<String>> lhMachineSupplyMap) {
 
         int totalUnassigned = 0;
 
@@ -969,9 +978,10 @@ public class BalancingService {
                 continue;
             }
 
-            // 候选机台排序: 历史 > 已有该胎胚 > 负荷最低 > 种类槽最多
+            Set<String> dedicatedMachines = collectDedicatedMachines(taskList, lhMachineSupplyMap);
+            // 候选机台排序: 专供 > 历史 > 已有该胎胚 > 负荷最低 > 种类槽最多
             List<MachineState> candidates = sortGreedyCandidates(
-                    machineStates, embryoCode, machineHistoryMap, maxTypesLimit);
+                    machineStates, embryoCode, machineHistoryMap, maxTypesLimit, dedicatedMachines);
 
             // 逐机台聚集分配
             int taskIndex = 0;
@@ -1040,11 +1050,17 @@ public class BalancingService {
             List<MachineState> machineStates,
             String embryoCode,
             Map<String, Set<String>> machineHistoryMap,
-            int maxTypesLimit) {
+            int maxTypesLimit,
+            Set<String> dedicatedMachines) {
 
         return machineStates.stream()
                 .sorted((a, b) -> {
-                    // ① 历史机台优先
+                    // ① 专供机台优先（优先专供可回退：专供机满负荷后再回退到其他机台）
+                    boolean aDedicated = dedicatedMachines != null && dedicatedMachines.contains(a.getMachineCode());
+                    boolean bDedicated = dedicatedMachines != null && dedicatedMachines.contains(b.getMachineCode());
+                    if (aDedicated != bDedicated) return aDedicated ? -1 : 1;
+
+                    // ② 历史机台优先
                     Set<String> histA = machineHistoryMap.get(a.getMachineCode());
                     Set<String> histB = machineHistoryMap.get(b.getMachineCode());
                     boolean aIsHistory = histA != null && histA.contains(embryoCode);
@@ -1052,20 +1068,72 @@ public class BalancingService {
                     if (aIsHistory && !bIsHistory) return -1;
                     if (!aIsHistory && bIsHistory) return 1;
 
-                    // ② 已有该胎胚的机台优先（聚集）
+                    // ③ 已有该胎胚的机台优先（聚集）
                     boolean aHas = a.getAssignedEmbryos().stream().anyMatch(e -> embryoCode.equals(e.getEmbryoCode()));
                     boolean bHas = b.getAssignedEmbryos().stream().anyMatch(e -> embryoCode.equals(e.getEmbryoCode()));
                     if (aHas && !bHas) return -1;
                     if (!aHas && bHas) return 1;
 
-                    // ③ 负荷最低优先（均衡）
+                    // ④ 负荷最低优先（均衡）
                     int loadCompare = Integer.compare(a.getCurrentLoad(), b.getCurrentLoad());
                     if (loadCompare != 0) return loadCompare;
 
-                    // ④ 种类槽最多优先
+                    // ⑤ 种类槽最多优先
                     return Integer.compare(a.getCurrentTypes(), b.getCurrentTypes());
                 })
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * 收集一组任务（同一胎胚）的专供成型机台号并集。
+     *
+     * <p>同一胎胚可能有多个任务（不同硫化机），专供约束按任务（lhMachineCode）区分，
+     * 此处取并集用于候选机台排序：并集中的机台视为该胎胚的优先机台。
+     *
+     * @param tasks              同一胎胚的任务列表
+     * @param lhMachineSupplyMap 硫化机专供成型机映射（null 表示无专供约束）
+     * @return 专供成型机台号并集，无专供配置时返回空集合
+     */
+    private Set<String> collectDedicatedMachines(
+            List<DailyEmbryoTask> tasks,
+            Map<String, Set<String>> lhMachineSupplyMap) {
+        if (lhMachineSupplyMap == null || lhMachineSupplyMap.isEmpty() || tasks == null) {
+            return Collections.emptySet();
+        }
+        Set<String> result = new HashSet<>();
+        for (DailyEmbryoTask task : tasks) {
+            if (task.getLhMachineCode() == null) {
+                continue;
+            }
+            Set<String> dedicated = lhMachineSupplyMap.get(task.getLhMachineCode());
+            if (dedicated != null) {
+                result.addAll(dedicated);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * 判断任务是否允许分配到指定成型机（专供约束）。
+     *
+     * <p>任务无专供配置、或目标机台在专供集合内时允许；否则不允许（防止局部搜索
+     * 把专供任务搬到非专供机台）。
+     *
+     * @param task              待移动任务
+     * @param machineCode       目标成型机台号
+     * @param lhMachineSupplyMap 硫化机专供成型机映射
+     * @return true 表示允许
+     */
+    private boolean isDedicatedAllowed(
+            DailyEmbryoTask task,
+            String machineCode,
+            Map<String, Set<String>> lhMachineSupplyMap) {
+        if (task == null || task.getLhMachineCode() == null
+                || lhMachineSupplyMap == null || lhMachineSupplyMap.isEmpty()) {
+            return true;
+        }
+        Set<String> dedicated = lhMachineSupplyMap.get(task.getLhMachineCode());
+        return dedicated == null || dedicated.isEmpty() || dedicated.contains(machineCode);
     }
 
     /**
@@ -1083,11 +1151,13 @@ public class BalancingService {
      * @param machineStates    机台状态列表（会被修改）
      * @param loadDiffThreshold 负荷差阈值
      * @param typeDiffThreshold 种类差阈值
+     * @param lhMachineSupplyMap 硫化机专供成型机映射（null 表示无专供约束）
      */
     private void localSearch(
             List<MachineState> machineStates,
             int loadDiffThreshold,
-            int typeDiffThreshold) {
+            int typeDiffThreshold,
+            Map<String, Set<String>> lhMachineSupplyMap) {
 
         for (int iter = 0; iter < GREEDY_LOCAL_SEARCH_MAX_ITERATIONS; iter++) {
             int loadGap = calculateLoadGap(machineStates);
@@ -1100,7 +1170,7 @@ public class BalancingService {
 
             // 优先处理种类差：将高种类机台的独占胎胚移到低种类机台
             if (typeGap > typeDiffThreshold) {
-                boolean typeMoved = tryTypeBalance(machineStates, typeDiffThreshold);
+                boolean typeMoved = tryTypeBalance(machineStates, typeDiffThreshold, lhMachineSupplyMap);
                 if (typeMoved) {
                     continue; // 种类移动后重新评估
                 }
@@ -1125,14 +1195,14 @@ public class BalancingService {
                 }
 
                 // 尝试 Move: 从 highMachine 找一个任务移到 lowMachine
-                boolean moved = tryMove(highMachine, lowMachine, typeDiffThreshold);
+                boolean moved = tryMove(highMachine, lowMachine, typeDiffThreshold, lhMachineSupplyMap);
                 if (!moved) {
                     // Move 失败，尝试在所有高低机台对中找可移动的
-                    moved = tryMoveAnyPair(machineStates, loadDiffThreshold, typeDiffThreshold);
+                    moved = tryMoveAnyPair(machineStates, loadDiffThreshold, typeDiffThreshold, lhMachineSupplyMap);
                 }
                 if (!moved) {
                     // 尝试 Swap
-                    moved = trySwap(highMachine, lowMachine);
+                    moved = trySwap(highMachine, lowMachine, lhMachineSupplyMap);
                 }
                 if (!moved) {
                     log.info("局部搜索第{}轮: 无可用 Move/Swap，终止", iter);
@@ -1157,9 +1227,11 @@ public class BalancingService {
      * @param highMachine       高负荷机台（移出方）
      * @param lowMachine        低负荷机台（移入方）
      * @param typeDiffThreshold 种类差阈值（预留，当前未使用）
+     * @param lhMachineSupplyMap 硫化机专供成型机映射（null 表示无专供约束）
      * @return true 如果成功移动
      */
-    private boolean tryMove(MachineState highMachine, MachineState lowMachine, int typeDiffThreshold) {
+    private boolean tryMove(MachineState highMachine, MachineState lowMachine, int typeDiffThreshold,
+                            Map<String, Set<String>> lhMachineSupplyMap) {
         // 遍历高负荷机台上的分配记录，找可移动的
         for (int i = 0; i < highMachine.getAssignedEmbryos().size(); i++) {
             EmbryoAssignment ea = highMachine.getAssignedEmbryos().get(i);
@@ -1168,6 +1240,10 @@ public class BalancingService {
             }
 
             String embryoCode = ea.getEmbryoCode();
+            // 专供约束：不允许把专供任务搬到非专供机台
+            if (!isDedicatedAllowed(ea.getTask(), lowMachine.getMachineCode(), lhMachineSupplyMap)) {
+                continue;
+            }
             boolean lowHasEmbryo = lowMachine.getAssignedEmbryos().stream()
                     .anyMatch(e -> embryoCode.equals(e.getEmbryoCode()));
 
@@ -1234,7 +1310,8 @@ public class BalancingService {
      * @param typeDiffThreshold 种类差阈值
      * @return true 如果任一对成功 Move
      */
-    private boolean tryMoveAnyPair(List<MachineState> machineStates, int loadDiffThreshold, int typeDiffThreshold) {
+    private boolean tryMoveAnyPair(List<MachineState> machineStates, int loadDiffThreshold, int typeDiffThreshold,
+                                   Map<String, Set<String>> lhMachineSupplyMap) {
         // 按负荷降序排列
         List<MachineState> sorted = machineStates.stream()
                 .sorted((a, b) -> Integer.compare(b.getCurrentLoad(), a.getCurrentLoad()))
@@ -1247,7 +1324,7 @@ public class BalancingService {
                 if (high.getCurrentLoad() - low.getCurrentLoad() <= loadDiffThreshold) {
                     return false; // 已无改善空间
                 }
-                if (tryMove(high, low, typeDiffThreshold)) {
+                if (tryMove(high, low, typeDiffThreshold, lhMachineSupplyMap)) {
                     return true;
                 }
             }
@@ -1263,9 +1340,11 @@ public class BalancingService {
      *
      * @param highMachine 高负荷机台
      * @param lowMachine  低负荷机台
+     * @param lhMachineSupplyMap 硫化机专供成型机映射（null 表示无专供约束）
      * @return true 如果成功交换
      */
-    private boolean trySwap(MachineState highMachine, MachineState lowMachine) {
+    private boolean trySwap(MachineState highMachine, MachineState lowMachine,
+                            Map<String, Set<String>> lhMachineSupplyMap) {
         for (EmbryoAssignment highEa : new ArrayList<>(highMachine.getAssignedEmbryos())) {
             if (highEa.getTask() == null || highEa.getAssignedQty() <= 0) continue;
 
@@ -1275,6 +1354,12 @@ public class BalancingService {
                 String highEmbryo = highEa.getEmbryoCode();
                 String lowEmbryo = lowEa.getEmbryoCode();
                 if (highEmbryo.equals(lowEmbryo)) continue;
+
+                // 专供约束：交换后每个任务仍须落在其专供机台（或任务无专供）
+                if (!isDedicatedAllowed(highEa.getTask(), lowMachine.getMachineCode(), lhMachineSupplyMap)
+                        || !isDedicatedAllowed(lowEa.getTask(), highMachine.getMachineCode(), lhMachineSupplyMap)) {
+                    continue;
+                }
 
                 // 检查种类约束（交换后不新增种类）
                 boolean highHasLowEmbryo = highMachine.getAssignedEmbryos().stream()
@@ -1338,9 +1423,11 @@ public class BalancingService {
      *
      * @param machineStates    机台状态列表
      * @param typeDiffThreshold 种类差阈值
+     * @param lhMachineSupplyMap 硫化机专供成型机映射（null 表示无专供约束）
      * @return true 如果成功移动
      */
-    private boolean tryTypeBalance(List<MachineState> machineStates, int typeDiffThreshold) {
+    private boolean tryTypeBalance(List<MachineState> machineStates, int typeDiffThreshold,
+                                   Map<String, Set<String>> lhMachineSupplyMap) {
         // 找种类最多和最少的机台
         MachineState highTypeMachine = null;
         MachineState lowTypeMachine = null;
@@ -1371,6 +1458,10 @@ public class BalancingService {
             }
 
             String embryoCode = ea.getEmbryoCode();
+            // 专供约束：不允许把专供任务搬到非专供机台
+            if (!isDedicatedAllowed(ea.getTask(), lowTypeMachine.getMachineCode(), lhMachineSupplyMap)) {
+                continue;
+            }
             boolean lowHasEmbryo = lowTypeMachine.getAssignedEmbryos().stream()
                     .anyMatch(e -> embryoCode.equals(e.getEmbryoCode()));
             if (lowHasEmbryo) {

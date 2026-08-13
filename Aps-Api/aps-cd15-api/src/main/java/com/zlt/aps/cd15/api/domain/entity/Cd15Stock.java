@@ -97,4 +97,10 @@ public class Cd15Stock extends BaseEntity implements Serializable {
     @DateTimeFormat(pattern = "yyyy-MM-dd")
     @TableField(exist = false)
     private Date stockDateEnd;
+
+    /** 备注 */
+    @ApiModelProperty(value = "备注", name = "remark")
+    @TableField("REMARK")
+    @Excel(name = "ui.common.column.remark")
+    private String remark;
 }
