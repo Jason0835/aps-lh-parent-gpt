@@ -44,4 +44,22 @@ public interface ICd90StorageLaneLimitRemoteService {
     @ApiOperation("导入")
     @PostMapping("/cd90StorageLaneLimit/importData")
     AjaxResult importData(@RequestBody ImportContext c, @RequestParam("updateSupport") boolean u);
+
+    /**
+     * 按工厂、日期和班次全量覆盖库排状态。
+     *
+     * @param factoryCode 工厂编码
+     * @param laneDate 库排日期
+     * @param shiftCode 班次编码
+     * @param updateBy 更新人
+     * @param list 库排状态
+     * @return 保存结果
+     */
+    @ApiOperation("MES全量覆盖直裁库排状态")
+    @PostMapping("/cd90StorageLaneLimit/logicDeleteAndSaveMesBatch")
+    AjaxResult logicDeleteAndSaveMesBatch(@RequestParam("factoryCode") String factoryCode,
+                                          @RequestParam("laneDate") String laneDate,
+                                          @RequestParam("shiftCode") String shiftCode,
+                                          @RequestParam("updateBy") String updateBy,
+                                          @RequestBody List<Cd90StorageLaneLimit> list);
 }

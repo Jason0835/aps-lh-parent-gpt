@@ -48,10 +48,10 @@ public class GsqLossRate extends BaseEntity {
     private String machineName;
 
     /** 损耗率(百分比) */
-    @Excel(name = "ui.data.column.gsq.lossRate.lossRate")
+    @Excel(name = "ui.data.column.gsq.lossRate.lossRate", suffix = "%")
     @ApiModelProperty(value = "损耗率(百分比)", position = 40)
     @TableField("LOSS_RATE")
-    @ImportValidated(required = true, number = true, min = 0, max = 999999)
+    @ImportValidated(required = true, number = true, min = 0, max = 99.99)
     private BigDecimal lossRate;
 
     /** 备注 */

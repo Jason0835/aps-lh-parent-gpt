@@ -2,12 +2,12 @@ package com.zlt.aps.mp.engine.handler;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import com.zlt.aps.mp.engine.basedata.assemble.appoint.GroupAppointHandler;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.CxContinueInfoHelper;
 import com.zlt.aps.mp.engine.domain.dto.CxMachineAllocationPlanHelper;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.mp.engine.domain.vo.CxMachineBaseInfoVo;
+import com.zlt.aps.mp.engine.handler.appoint.GroupAppointBusinessHandler;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,7 +33,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ContinueGroupAdjustHandler {
 
-    private final GroupAppointHandler groupAppointHandler;
+    private final GroupAppointBusinessHandler groupAppointHandler;
 
     /**
      * 业务场景：续作在机分组(结构)进行模拟排产后，

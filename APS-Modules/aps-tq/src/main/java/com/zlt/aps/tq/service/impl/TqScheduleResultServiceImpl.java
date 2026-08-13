@@ -842,8 +842,6 @@ public class TqScheduleResultServiceImpl extends AbstractDocService<TqScheduleRe
         issue.setNightProduceOrder(null);
         issue.setDayPlanQty(null);
         issue.setDayProduceOrder(null);
-        issue.setNextMidPlanQty(null);
-        issue.setNextMidProduceOrder(null);
         return issue;
     }
 
@@ -852,7 +850,6 @@ public class TqScheduleResultServiceImpl extends AbstractDocService<TqScheduleRe
      * 胎圈2班(D+1日夜班) → MES夜班(NIGHT_PLAN_QTY)
      * 胎圈3班(D+1日早班) → MES早班(DAY_PLAN_QTY)
      * 胎圈4班(D+1日中班) → MES中班(MID_PLAN_QTY)
-     * NEXT_MID不下发
      *
      * @param source    胎圈排程结果
      * @param dPlus1Day D+1日日期
@@ -869,9 +866,6 @@ public class TqScheduleResultServiceImpl extends AbstractDocService<TqScheduleRe
         // 胎圈4班→MES中班
         issue.setMidPlanQty(source.getClass4PlanQty() != null ? source.getClass4PlanQty().doubleValue() : null);
         issue.setMidProduceOrder(source.getClass4Sequence());
-        // NEXT_MID不下发
-        issue.setNextMidPlanQty(null);
-        issue.setNextMidProduceOrder(null);
         return issue;
     }
 
@@ -879,7 +873,7 @@ public class TqScheduleResultServiceImpl extends AbstractDocService<TqScheduleRe
      * 构建D+2日（后天）下发数据
      * 胎圈5班(D+2日夜班) → MES夜班(NIGHT_PLAN_QTY)
      * 胎圈6班(D+2日早班) → MES早班(DAY_PLAN_QTY)
-     * 中班尚未排产不下发，NEXT_MID不下发
+     * 中班尚未排产不下发
      *
      * @param source    胎圈排程结果
      * @param dPlus2Day D+2日日期
@@ -896,13 +890,11 @@ public class TqScheduleResultServiceImpl extends AbstractDocService<TqScheduleRe
         // 中班尚未排产不下发
         issue.setMidPlanQty(null);
         issue.setMidProduceOrder(null);
-        issue.setNextMidPlanQty(null);
-        issue.setNextMidProduceOrder(null);
         return issue;
     }
 
     /**
-     * 构建基础下发对象（公共字段+成型3~8班计划量全量传递）
+     * 构建基础下发对象（公共字段+成型1~8班计划量全量传递）
      *
      * @param source       胎圈排程结果
      * @param scheduleDate MES目标日期
@@ -913,13 +905,11 @@ public class TqScheduleResultServiceImpl extends AbstractDocService<TqScheduleRe
         // 日期转换：Date → LocalDate
         issue.setScheduleDate(scheduleDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate());
         // 基础信息
-        issue.setCxBatchNo(source.getCxBatchNo());
         issue.setBatchNo(source.getBatchNo());
         issue.setOrderNo(source.getOrderNo());
         // 物料信息
         issue.setBeadCode(source.getBeadCode());
         issue.setSteelRingCode(source.getSteelRingCode());
-        issue.setTriangleGlueCode(source.getTriangleGlueCode());
         issue.setSpecSize(source.getProSize());
         issue.setMachineCode(source.getMachineCode());
         // 库存信息
@@ -934,8 +924,6 @@ public class TqScheduleResultServiceImpl extends AbstractDocService<TqScheduleRe
         issue.setCxClass6Plan(source.getCxClass6Plan());
         issue.setCxClass7Plan(source.getCxClass7Plan());
         issue.setCxClass8Plan(source.getCxClass8Plan());
-        // 状态
-        issue.setProductionStatus(ApsConstant.NO_PRODUNTION);
         return issue;
     }
 

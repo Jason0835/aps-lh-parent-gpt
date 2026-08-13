@@ -99,6 +99,7 @@ public class TmMachineMaintenanceController extends AbstractDocBizController<TmM
     protected List<TmMachineMaintenance> listExportData(TmMachineMaintenance obj) {
         QueryWrapper<TmMachineMaintenance> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
+        wrapper.last("ORDER BY " + this.getOrderBy(obj));
         return tmMachineMaintenanceMapper.selectList(wrapper);
     }
 

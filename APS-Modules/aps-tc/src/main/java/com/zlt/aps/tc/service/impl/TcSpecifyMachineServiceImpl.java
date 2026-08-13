@@ -1,6 +1,5 @@
 package com.zlt.aps.tc.service.impl;
 
-import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.collection.ListUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
@@ -82,10 +81,9 @@ public class TcSpecifyMachineServiceImpl extends AbstractDocService<TcSpecifyMac
             wrapper.in(TcMachineInfo::getMachineCode, codes);
             machineInfoList.addAll(tcMachineInfoMapper.selectList(wrapper));
         }
-        if (CollUtil.isNotEmpty(machineInfoList)) {
-            serviceCheckParams.put("tcMachineCodeList",
-                    machineInfoList.stream().map(TcMachineInfo::getMachineCode).collect(Collectors.toList()));
-        }
+        // 始终放入机台编码列表（即使为空），确保 serviceCheckAndDataHandle 对每行都做机台存在性校验（#23315）
+        serviceCheckParams.put("tcMachineCodeList",
+                machineInfoList.stream().map(TcMachineInfo::getMachineCode).collect(Collectors.toList()));
         return serviceCheckParams;
     }
 

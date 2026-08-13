@@ -31,6 +31,9 @@ public class TmPlanTaskGroup {
     /** 汇总当前班需求量 */
     private BigDecimal groupCurrentShiftDemandQty;
 
+    /** 汇总下一排程班需求量 */
+    private BigDecimal groupNextShiftDemandQty;
+
     /** 汇总保证范围需求量 */
     private BigDecimal groupGuardDemandQty;
 
@@ -46,4 +49,3 @@ public class TmPlanTaskGroup {
     /** 汇总最终计划量 */
     private BigDecimal groupFinalPlanQty;
 }
-

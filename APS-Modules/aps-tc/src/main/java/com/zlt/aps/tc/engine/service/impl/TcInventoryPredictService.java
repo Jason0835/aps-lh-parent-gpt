@@ -133,9 +133,6 @@ public class TcInventoryPredictService implements ITcInventoryPredictService {
                     DateUtil.formatDate(DateUtil.offsetDay(scheduleDate, -1)), String.join(",", missingCodeList)));
         }
         for (String sidewallCode : missingCodeList) {
-            String message = MessageFormat.format(I18nUtil.getMessage("ui.tc.schedule.stockMissingZero"),
-                    DateUtil.formatDate(DateUtil.offsetDay(scheduleDate, -1)), sidewallCode);
-            context.getIssueCollector().addStockMissingIssue(sidewallCode, message);
             log.warn("[TC_STOCK_MISSING] policy=ZERO, scheduleDate={}, sidewallCode={}",
                     DateUtil.formatDate(scheduleDate), sidewallCode);
         }

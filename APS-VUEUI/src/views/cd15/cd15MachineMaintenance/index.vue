@@ -39,7 +39,6 @@ export default {
         { type: "selection", fixed: "left" },
         { prop: "factoryCode", align: "center", halign: "center", label: this.$t("ui.data.column.cd15MachineMaintenancePlan.factoryCode"), minWidth: 120, formatter: (row, column, value) => this.selectDictLabel(this.dict.type.biz_factory_name, value) },
         { prop: "machineCode", align: "center", halign: "center", label: this.$t("ui.data.column.cd15MachineMaintenancePlan.machineCode"), minWidth: 140 },
-        { prop: "downtimeDate", align: "center", halign: "center", label: this.$t("ui.data.column.cd15MachineMaintenancePlan.downtimeDate"), minWidth: 120 },
         { prop: "downtimeStartTime", align: "center", halign: "center", label: this.$t("ui.data.column.cd15MachineMaintenancePlan.downtimeStartTime"), minWidth: 160 },
         { prop: "downtimeEndTime", align: "center", halign: "center", label: this.$t("ui.data.column.cd15MachineMaintenancePlan.downtimeEndTime"), minWidth: 160 },
         { prop: "downtimeHours", align: "center", halign: "center", label: this.$t("ui.data.column.cd15MachineMaintenancePlan.downtimeHours"), minWidth: 120 },

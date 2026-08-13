@@ -1,5 +1,6 @@
 package com.zlt.aps.cd90.service.impl;
 
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.cd90.engine.model.Cd90AutoScheduleContext;
 import com.zlt.aps.cd90.engine.model.Cd90AutoScheduleOutputDraft;
 import com.zlt.aps.cd90.engine.service.Cd90AutoScheduleEngineService;
@@ -40,6 +41,8 @@ public class Cd90AutoScheduleAsyncExecutorImpl implements Cd90AutoScheduleAsyncE
             if (!lock.tryLock()) {
                 log.info("[直裁自动排程] 执行锁已由其他任务持有, taskId={}, factoryCode={}, scheduleDate={}",
                         taskId, factoryCode, localDate);
+                taskService.markPendingFailed(taskId,
+                        I18nUtil.getMessage("ui.cd90.schedule.taskActive"));
                 return;
             }
             if (!taskService.start(taskId)) {

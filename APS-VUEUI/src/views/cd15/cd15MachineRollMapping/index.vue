@@ -54,7 +54,12 @@
       labelWidth="0"
       :columns="importColumns"
     />
-    <info-dialog ref="infoRef" :machineOptions="machineOptions" @success="getList" />
+    <info-dialog
+      ref="infoRef"
+      :machineOptions="machineOptions"
+      :articleCrownSpecOptions="articleCrownSpecOptions"
+      @success="getList"
+    />
   </basic-container>
 </template>
 

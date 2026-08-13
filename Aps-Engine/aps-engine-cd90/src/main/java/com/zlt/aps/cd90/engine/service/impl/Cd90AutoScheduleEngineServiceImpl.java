@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ShiftConfig;
+import com.zlt.aps.cd90.engine.algorithm.Cd90EnabledShiftConfigValidator;
 import com.zlt.aps.cd90.engine.algorithm.Cd90ShiftWindowResolver;
 import com.zlt.aps.cd90.engine.algorithm.Cd90AutoScheduleOutputDraftBuilder;
 import com.zlt.aps.cd90.engine.algorithm.Cd90MultiShiftScheduleExecutor;
@@ -42,6 +43,7 @@ public class Cd90AutoScheduleEngineServiceImpl implements Cd90AutoScheduleEngine
     private static final String STAGE_BASIC_VALIDATION = "基础数据校验";
 
     private final Cd90AutoScheduleShiftMapper shiftMapper;
+    private final Cd90EnabledShiftConfigValidator enabledShiftConfigValidator;
     private final Cd90AutoScheduleParameterService parameterService;
     private final Cd90ShiftWindowResolver shiftWindowResolver;
     private final Cd90MultiShiftScheduleExecutor multiShiftScheduleExecutor;
@@ -69,25 +71,37 @@ public class Cd90AutoScheduleEngineServiceImpl implements Cd90AutoScheduleEngine
 
         // 班次数量参与参数校验，必须先加载班次，再解析输出窗口等强类型参数。
         List<Cd90ShiftConfig> enabledShifts = loadEnabledShifts(factoryCode);
+        enabledShiftConfigValidator.validate(enabledShifts);
         Cd90AutoScheduleParameters parameters = parameterService.load(factoryCode, enabledShifts.size());
         // 输出窗口按业务班次顺序截取，保证后续滚动计算和结果CLASS字段顺序一致。
         List<Cd90ShiftDescriptor> shifts = shiftWindowResolver.resolve(localScheduleDate, enabledShifts)
                 .stream().limit(parameters.getScheduleWindow()).collect(Collectors.toList());
-        // 输入版本指纹会在最终事务前复核，防止计算期间基础数据变化后覆盖新数据。
+        LocalDateTime startTime = LocalDateTime.now();
+        Cd90ShiftDescriptor resourceBaselineShift = shiftWindowResolver
+                .resolveCurrentResourceShift(startTime, enabledShifts);
+        // 页面全窗口共用任务启动时的一份资源基线，最终事务前按同一基线复核版本。
         Cd90AutoScheduleContext context = Cd90AutoScheduleContext.builder()
                 .factoryCode(factoryCode)
                 .scheduleDate(localScheduleDate)
-                .startTime(LocalDateTime.now())
+                .startTime(startTime)
+                .resourceBaselineDate(resourceBaselineShift.getScheduleDate())
+                .resourceBaselineShiftCode(resourceBaselineShift.getShiftCode())
                 .currentStage(STAGE_BASIC_VALIDATION)
                 .parameters(parameters)
                 .shifts(shifts)
                 .enabledShiftCount(enabledShifts.size())
-                .inputVersionFingerprint(inputVersionService.fingerprint(factoryCode, localScheduleDate))
+                .inputVersionFingerprint(inputVersionService.fingerprint(
+                        factoryCode, localScheduleDate,
+                        resourceBaselineShift.getScheduleDate(),
+                        resourceBaselineShift.getShiftCode()))
                 .build();
 
         log.info("[直裁自动排程] Engine计算上下文准备完成, factoryCode={}, scheduleDate={}, "
+                        + "resourceBaselineDate={}, resourceBaselineShiftCode={}, "
                         + "enabledShiftCount={}, scheduleWindow={}, fingerprint={}",
-                factoryCode, localScheduleDate, enabledShifts.size(),
+                factoryCode, localScheduleDate,
+                resourceBaselineShift.getScheduleDate(), resourceBaselineShift.getShiftCode(),
+                enabledShifts.size(),
                 parameters.getScheduleWindow(), parameters.getFingerprint());
         return context;
     }

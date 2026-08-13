@@ -130,14 +130,6 @@ export default {
           minWidth: 140,
         },
         {
-          prop: "isStickFilm",
-          align: "center",
-          halign: "center",
-          label: this.$t("ui.data.column.cd90MachineInfo.isStickFilm"),
-          minWidth: 130,
-          formatter: (row, column, value) => this.selectDictLabel(this.dict.type.biz_yes_no, value),
-        },
-        {
           prop: "clothWidthMax",
           align: "center",
           halign: "center",

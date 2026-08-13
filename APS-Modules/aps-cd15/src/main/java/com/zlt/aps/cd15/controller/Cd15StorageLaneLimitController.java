@@ -1,6 +1,7 @@
 package com.zlt.aps.cd15.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import cn.hutool.core.date.DateUtil;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
@@ -103,6 +104,19 @@ public class Cd15StorageLaneLimitController extends AbstractDocBizController<Cd1
         return super.importData(importContext, updateSupport);
     }
 
+    /** 替换斜裁MES库排快照。 */
+    @ApiOperation("替换斜裁MES库排快照")
+    @PostMapping("/logicDeleteAndSaveMesBatch")
+    public AjaxResult logicDeleteAndSaveMesBatch(@RequestParam("factoryCode") String factoryCode,
+                                                  @RequestParam("laneDate") String laneDate,
+                                                  @RequestParam("shiftCode") String shiftCode,
+                                                  @RequestParam("updateBy") String updateBy,
+                                                  @RequestBody List<Cd15StorageLaneLimit> list) {
+        this.cd15StorageLaneLimitService.logicDeleteAndSaveBatch(factoryCode,
+                DateUtil.parseDate(laneDate), shiftCode, updateBy, list);
+        return AjaxResult.success();
+    }
+
     /** 导出斜裁库排限制 */
     @Log(title = "ui.data.column.cd15StorageLaneLimit.modelName", businessType = BusinessType.EXPORT)
     @ApiOperation("导出斜裁库排限制")
@@ -117,6 +131,7 @@ public class Cd15StorageLaneLimitController extends AbstractDocBizController<Cd1
     protected List<Cd15StorageLaneLimit> listExportData(Cd15StorageLaneLimit obj) {
         QueryWrapper<Cd15StorageLaneLimit> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
+        wrapper.last("ORDER BY " + this.getOrderBy());
         List<Cd15StorageLaneLimit> list = cd15StorageLaneLimitMapper.selectList(wrapper);
         AppUtils.formatData(list, getQueryFormulas());
         return list;

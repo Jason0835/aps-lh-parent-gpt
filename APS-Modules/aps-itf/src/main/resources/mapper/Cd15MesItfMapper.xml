@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.itf.mes.mapper.Cd15MesItfMapper">
+
+    <select id="selectStockList" resultType="com.zlt.aps.itf.mes.domain.Cd15MesStock">
+        SELECT STOCK_DATE, MATERIAL_CODE, STOCK_NUM, AVAILABLE_STOCK, DATA_VERSION
+        FROM T_MES_CD15_STOCK
+        WHERE IS_DELETE = 0
+          AND STOCK_DATE IS NOT NULL
+          AND MATERIAL_CODE IS NOT NULL
+        <if test="queryParams != null and queryParams.stockDate != null and queryParams.stockDate != ''">
+            AND CONVERT(DATE, STOCK_DATE) = CONVERT(DATE, #{queryParams.stockDate})
+        </if>
+        <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
+    </select>
+
+    <select id="selectShiftStockList" resultType="com.zlt.aps.itf.mes.domain.Cd15MesStock">
+        SELECT STOCK_DATE, MATERIAL_CODE, STOCK_NUM, AVAILABLE_STOCK, DATA_VERSION
+        FROM T_MES_CD15_STOCK
+        WHERE IS_DELETE = 0
+          AND CONVERT(DATE, STOCK_DATE) = CONVERT(DATE, #{stockDate})
+        <choose>
+            <when test="dataVersion != null and dataVersion != ''">
+                AND DATA_VERSION = #{dataVersion}
+            </when>
+            <otherwise>
+                AND DATA_VERSION = (
+                    SELECT MAX(DATA_VERSION)
+                    FROM T_MES_CD15_STOCK
+                    WHERE IS_DELETE = 0
+                      AND CONVERT(DATE, STOCK_DATE) = CONVERT(DATE, #{stockDate})
+                )
+            </otherwise>
+        </choose>
+    </select>
+
+    <select id="selectStorageLaneLimitList"
+            resultType="com.zlt.aps.cd15.api.domain.entity.Cd15StorageLaneLimit">
+        SELECT FACTORY_CODE, LANE_DATE, SHIFT_CODE, STORAGE_LANE_CODE,
+               MATERIAL_CODE, CAR_NUM, MAX_CAR_NUM, AVAILABLE_CAR_NUM
+        FROM T_MES_CD15_STORAGE_LANE_LIMIT
+        WHERE IS_DELETE = 0
+          AND LANE_DATE IS NOT NULL
+          AND SHIFT_CODE IS NOT NULL
+          AND STORAGE_LANE_CODE IS NOT NULL
+        <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
+        <if test="queryParams != null and queryParams.laneDate != null and queryParams.laneDate != ''">
+            AND CONVERT(DATE, LANE_DATE) = CONVERT(DATE, #{queryParams.laneDate})
+        </if>
+        <if test="queryParams != null and queryParams.shiftCode != null and queryParams.shiftCode != ''">
+            AND SHIFT_CODE = #{queryParams.shiftCode}
+        </if>
+        <choose>
+            <when test="dataVersion != null and dataVersion != ''">
+                AND DATA_VERSION = #{dataVersion}
+            </when>
+            <otherwise>
+                AND DATA_VERSION = (
+                    SELECT MAX(DATA_VERSION)
+                    FROM T_MES_CD15_STORAGE_LANE_LIMIT
+                    WHERE IS_DELETE = 0
+                    <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
+                    <if test="queryParams != null and queryParams.laneDate != null and queryParams.laneDate != ''">
+                        AND CONVERT(DATE, LANE_DATE) = CONVERT(DATE, #{queryParams.laneDate})
+                    </if>
+                    <if test="queryParams != null and queryParams.shiftCode != null and queryParams.shiftCode != ''">
+                        AND SHIFT_CODE = #{queryParams.shiftCode}
+                    </if>
+                )
+            </otherwise>
+        </choose>
+    </select>
+</mapper>

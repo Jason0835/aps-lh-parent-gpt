@@ -97,6 +97,7 @@ public class TcCurlRollController extends AbstractDocBizController<TcCurlRoll> {
     protected List<TcCurlRoll> listExportData(TcCurlRoll obj) {
         QueryWrapper<TcCurlRoll> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
+        wrapper.last("ORDER BY " + this.getOrderBy(obj));
         return tcCurlRollMapper.selectList(wrapper);
     }
 

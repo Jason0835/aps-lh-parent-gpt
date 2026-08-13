@@ -75,7 +75,7 @@ export default {
     infoDialog,
     TltUploadForm,
   },
-  dicts: ["biz_factory_name", "biz_yes_no"],
+  dicts: ["biz_factory_name", "biz_yes_no", "biz_param_group", "biz_param_value_type"],
   provide() {
     return {
       parentDict: this.dict,
@@ -261,23 +261,13 @@ export default {
           prop: "paramGroup",
           label: this.$t("ui.data.column.tm.params.paramGroup"),
           type: "select",
-          options: [
-            { label: "全局参数", value: "GLOBAL" },
-            { label: "班次参数", value: "SHIFT" },
-            { label: "机台参数", value: "MACHINE" },
-            { label: "胎面参数", value: "TREAD" },
-          ],
+          dictData: this.dict.type.biz_param_group,
         },
         {
           prop: "valueType",
           label: this.$t("ui.data.column.tm.params.valueType"),
           type: "select",
-          options: [
-            { label: "字符串", value: "STRING" },
-            { label: "数值", value: "NUMBER" },
-            { label: "布尔", value: "BOOLEAN" },
-            { label: "结构化对象", value: "JSON" },
-          ],
+          dictData: this.dict.type.biz_param_value_type,
         },
         {
           prop: "enableStatus",

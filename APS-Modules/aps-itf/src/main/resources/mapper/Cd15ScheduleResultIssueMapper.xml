@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.itf.mes.mapper.Cd15ScheduleResultIssueMapper">
+
+    <!-- 业务键不含DATA_VERSION，重发时覆盖相同任务的所有历史版本。 -->
+    <delete id="batchDeleteByBusinessKey">
+        DELETE FROM MES_CD15_SCHEDULE_RESULT
+        WHERE FACTORY_CODE = #{factoryCode}
+          AND (
+        <foreach collection="list" item="item" separator=" OR ">
+            (COALESCE(CD15_BATCH_NO, '') = COALESCE(#{item.cd15BatchNo}, '')
+             AND COALESCE(ORDER_NO, '') = COALESCE(#{item.orderNo}, '')
+             AND COALESCE(GROUP_NO, '') = COALESCE(#{item.groupNo}, '')
+             AND SCHEDULE_DATE = #{item.scheduleDate}
+             AND COALESCE(MACHINE_CODE, '') = COALESCE(#{item.machineCode}, '')
+             AND COALESCE(STEEL_STRIP_CODE, '') = COALESCE(#{item.steelStripCode}, '')
+             AND COALESCE(BIG_ROLL_CODE, '') = COALESCE(#{item.bigRollCode}, '')
+             AND COALESCE(CUTTING_ANGLE, '') = COALESCE(#{item.cuttingAngle}, '')
+             AND COALESCE(CLASS_FIELD, '') = COALESCE(#{item.classField}, ''))
+        </foreach>
+          )
+    </delete>
+
+    <insert id="batchInsert">
+        INSERT INTO MES_CD15_SCHEDULE_RESULT (
+            CD15_BATCH_NO, ORDER_NO, GROUP_NO, SCHEDULE_DATE,
+            MACHINE_CODE, STEEL_STRIP_CODE, BIG_ROLL_CODE,
+            STORAGE_LANE_CODE, CUTTING_ANGLE, CUT_MODE,
+            SHIFT_NAME, CLASS_FIELD, SCHEDULE_DAY, DAY_SHIFT_ORDER,
+            PLAN_QTY, CX_PLAN_QTY, FINISH_QTY, PRODUCE_ORDER,
+            FINISH_RATE, ANALYSIS, ANALYSIS_INPUT, CRAFT_WIDTH,
+            UNIT_CONSUME_MILLIMETER, CURL_LENGTH, CORD_WIDTH,
+            SOURCE_TYPE, PRODUCTION_STATUS, CLEAR_EXISTING_PLAN,
+            PUBLISH_TRACE_ID, IS_RELEASE, DATA_VERSION,
+            COMPANY_CODE, FACTORY_CODE
+        )
+        SELECT * FROM (
+        <foreach collection="list" item="item" separator=" UNION ALL ">
+            SELECT
+                #{item.cd15BatchNo} AS CD15_BATCH_NO,
+                #{item.orderNo} AS ORDER_NO,
+                #{item.groupNo} AS GROUP_NO,
+                #{item.scheduleDate} AS SCHEDULE_DATE,
+                #{item.machineCode} AS MACHINE_CODE,
+                #{item.steelStripCode} AS STEEL_STRIP_CODE,
+                #{item.bigRollCode} AS BIG_ROLL_CODE,
+                #{item.storageLaneCode} AS STORAGE_LANE_CODE,
+                #{item.cuttingAngle} AS CUTTING_ANGLE,
+                #{item.cutMode} AS CUT_MODE,
+                #{item.shiftName} AS SHIFT_NAME,
+                #{item.classField} AS CLASS_FIELD,
+                #{item.scheduleDay} AS SCHEDULE_DAY,
+                #{item.dayShiftOrder} AS DAY_SHIFT_ORDER,
+                #{item.planQty} AS PLAN_QTY,
+                #{item.cxPlanQty} AS CX_PLAN_QTY,
+                #{item.finishQty} AS FINISH_QTY,
+                #{item.produceOrder} AS PRODUCE_ORDER,
+                #{item.finishRate} AS FINISH_RATE,
+                #{item.analysis} AS ANALYSIS,
+                #{item.analysisInput} AS ANALYSIS_INPUT,
+                #{item.craftWidth} AS CRAFT_WIDTH,
+                #{item.unitConsumeMillimeter} AS UNIT_CONSUME_MILLIMETER,
+                #{item.curlLength} AS CURL_LENGTH,
+                #{item.cordWidth} AS CORD_WIDTH,
+                #{item.sourceType} AS SOURCE_TYPE,
+                #{item.productionStatus} AS PRODUCTION_STATUS,
+                #{item.clearExistingPlan} AS CLEAR_EXISTING_PLAN,
+                #{item.publishTraceId} AS PUBLISH_TRACE_ID,
+                '1' AS IS_RELEASE,
+                #{dataVersion} AS DATA_VERSION,
+                #{companyCode} AS COMPANY_CODE,
+                #{factoryCode} AS FACTORY_CODE
+        </foreach>
+        ) AS source_data
+    </insert>
+</mapper>

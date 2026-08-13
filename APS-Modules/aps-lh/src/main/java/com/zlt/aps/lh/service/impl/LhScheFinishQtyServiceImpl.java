@@ -84,12 +84,20 @@ public class LhScheFinishQtyServiceImpl extends AbstractDocService<LhScheFinishQ
         log.info("【完成量回写】汇总后数据条数：{}", summaryMap.size());
 
         int totalUpdateCount = 0;
+        // 诊断统计：分类记录跳过原因，便于定位回填失败根因
+        int scheduleDateNullCount = 0;       // 排程日期为空跳过
+        int noResultCount = 0;               // 查询排程结果为空跳过
+        int validateFailCount = 0;           // 示方类型/产品状态校验不通过跳过
+        int invalidOffsetCount = 0;          // 日期偏移量异常跳过
+        int updateZeroCount = 0;             // update返回0行（命中记录但未实际更新）
+        int successUpdateCount = 0;          // 成功更新记录数（update>0）
 
         for (Map.Entry<String, LhScheFinishQty> entry : summaryMap.entrySet()) {
             LhScheFinishQty summary = entry.getValue();
             Date scheduleDate = summary.getScheduleDate();
             if (scheduleDate == null) {
-                log.warn("【完成量回写】排程日期为空，跳过，机台：{}，物料：{}", summary.getLhMachineCode(), summary.getMaterialCode());
+                scheduleDateNullCount++;
+                log.warn("【完成量回写】跳过[排程日期为空]：机台={}，物料={}", summary.getLhMachineCode(), summary.getMaterialCode());
                 continue;
             }
 
@@ -118,9 +126,12 @@ public class LhScheFinishQtyServiceImpl extends AbstractDocService<LhScheFinishQ
             List<LhScheduleResult> resultList = lhScheduleResultMapper.selectList(queryWrapper);
 
             if (CollectionUtils.isEmpty(resultList)) {
-                log.info("【完成量回写】未找到排程结果数据，工厂：{}，机台：{}，物料：{}，日期范围：{}~{}",
+                noResultCount++;
+                log.warn("【完成量回写】跳过[未找到排程结果]：工厂={}，机台={}，物料={}，MES物料={}，回报日期={}，查询日期范围={}~{}，MES产品状态={}，夜班示方类型={}，早班示方类型={}，中班示方类型={}",
                         summary.getFactoryCode(), summary.getLhMachineCode(), summary.getMaterialCode(),
-                        DateUtil.formatDate(dateDMinus1), DateUtil.formatDate(dateDPlus1));
+                        summary.getMesMaterialCode(), DateUtil.formatDate(scheduleDate),
+                        DateUtil.formatDate(dateDMinus1), DateUtil.formatDate(dateDPlus1),
+                        mesProductStatus, summary.getClass1LhType(), summary.getClass2LhType(), summary.getClass3LhType());
                 continue;
             }
 
@@ -131,9 +142,11 @@ public class LhScheFinishQtyServiceImpl extends AbstractDocService<LhScheFinishQ
 
                 // 回填前校验：通过物料编码+各班示方号去SKU与示方关系表校验示方类型是否一致
                 if (!validateLhTypeConsistency(result, dayOffset, summary)) {
-                    log.warn("【完成量回写】示方类型校验不通过，跳过回填。工厂={}，机台={}，物料={}，排程日期={}",
+                    validateFailCount++;
+                    log.warn("【完成量回写】跳过[示方类型/产品状态校验不通过]：工厂={}，机台={}，物料={}，排程日期={}，偏移={}天，MES产品状态={}，排程结果产品状态={}，排程结果ID={}",
                             summary.getFactoryCode(), summary.getLhMachineCode(), summary.getMaterialCode(),
-                            DateUtil.formatDate(resultScheduleDate));
+                            DateUtil.formatDate(resultScheduleDate), dayOffset, mesProductStatus,
+                            result.getProductStatus(), result.getId());
                     continue;
                 }
 
@@ -148,15 +161,36 @@ public class LhScheFinishQtyServiceImpl extends AbstractDocService<LhScheFinishQ
                     // 排程日期D+1：1班(早)=MES2班，2班(中)=MES3班
                     updateCount = updateDay1FinishQty(result, morningQty, middleQty, summary);
                 } else {
-                    log.warn("【完成量回写】排程日期偏移量不在预期范围内，偏移：{}天，排程日期：{}", dayOffset, DateUtil.formatDate(resultScheduleDate));
+                    invalidOffsetCount++;
+                    log.warn("【完成量回写】跳过[日期偏移量异常]：偏移={}天，排程日期={}，回报日期={}，排程结果ID={}",
+                            dayOffset, DateUtil.formatDate(resultScheduleDate), DateUtil.formatDate(scheduleDate), result.getId());
                     continue;
                 }
 
+                if (updateCount == 0) {
+                    updateZeroCount++;
+                    log.warn("【完成量回写】update返回0行：排程结果ID={}，机台={}，物料={}，排程日期={}，偏移={}天，可能因update的where条件中示方类型不匹配（排程结果班次示方类型与MES回报不一致）",
+                            result.getId(), summary.getLhMachineCode(), summary.getMaterialCode(),
+                            DateUtil.formatDate(resultScheduleDate), dayOffset);
+                } else {
+                    successUpdateCount++;
+                }
                 totalUpdateCount += updateCount;
             }
         }
 
-        log.info("【完成量回写】回写完成，累计更新记录数：{}", totalUpdateCount);
+        // 诊断汇总：一次性输出全部统计，便于快速定位回填失败根因
+        log.info("【完成量回写】回写完成汇总：汇总条数={}，成功更新记录={}，累计更新行数={}，跳过[排程日期为空]={}，跳过[未找到排程结果]={}，跳过[校验不通过]={}，跳过[日期偏移异常]={}，update返回0行={}",
+                summaryMap.size(), successUpdateCount, totalUpdateCount,
+                scheduleDateNullCount, noResultCount, validateFailCount, invalidOffsetCount, updateZeroCount);
+
+        // 当回填全部失败时返回error，便于上层接口感知；update部分不抛异常，已更新行保留（下次回报按日期逻辑删除+插入覆盖）
+        if (successUpdateCount == 0 && summaryMap.size() > 0) {
+            String msg = String.format("回写0条成功（汇总%d条），跳过明细：未找到排程结果=%d，校验不通过=%d，update返回0行=%d，排程日期为空=%d，日期偏移异常=%d",
+                    summaryMap.size(), noResultCount, validateFailCount, updateZeroCount, scheduleDateNullCount, invalidOffsetCount);
+            log.error("【完成量回写】回写全部失败！{}", msg);
+            return AjaxResult.error(msg);
+        }
         return AjaxResult.success();
     }
 

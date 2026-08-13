@@ -98,4 +98,9 @@ public class MpDailyCapacityLimitVo {
      */
     private Integer dayProductionRate;
 
+    /**
+     * 模壳换活块机台数
+     */
+    private Map<String, Integer> mouldShellBlockMachinesMap;
+
 }

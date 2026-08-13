@@ -142,7 +142,8 @@ export default {
     async save(form) {
       const params = {
         ...form,
-        dataSource: 'AUTO'
+        dataSource: 'AUTO',
+        language: this.$store.getters.language || 'zh_CN'
       }
       try {
         this.loading = true

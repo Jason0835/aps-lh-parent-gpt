@@ -603,7 +603,7 @@ public class SchedulePersistenceService {
      * 回填 SKU 排序名次（{@code skuSortRank}）和单行描述（{@code skuSortDesc}）。
      * <p>通过 {@code scheduleResultSourceSkuMap} 按对象身份取到来源 SKU 后，
      * 写入 sortRank/sortDesc；与“SKU排序优先级汇总”日志同源。
-     * 滚动继承结果与无来源 SKU 的占位结果保持原值不覆盖。</p>
+     * 无来源 SKU 的占位结果保持原值不覆盖。</p>
      *
      * @param context 排程上下文
      * @param scheduleResults 排程结果列表
@@ -617,7 +617,7 @@ public class SchedulePersistenceService {
             return;
         }
         for (LhScheduleResult result : scheduleResults) {
-            if (Objects.isNull(result) || result.isRollingInherited()) {
+            if (Objects.isNull(result)) {
                 continue;
             }
             SkuScheduleDTO sourceSku = sourceSkuMap.get(result);
@@ -637,8 +637,7 @@ public class SchedulePersistenceService {
     /**
      * 回填结构计划/已排机台数串与 SKU 已排机台数串，格式 {@code T=N,T+1=N,T+2=N}。
      * <p>T 日为 {@code context.scheduleDate}，与 {@code dayNRange} 同窗口；
-     * 结构名或物料编码为空时对应字段不写；
-     * 滚动继承结果保留原值不覆盖。</p>
+     * 结构名或物料编码为空时对应字段不写。</p>
      *
      * @param context 排程上下文
      * @param scheduleResults 排程结果列表
@@ -653,7 +652,7 @@ public class SchedulePersistenceService {
                 .atZone(ZoneId.systemDefault()).toLocalDate();
         LocalDate[] dates = new LocalDate[]{baseDate, baseDate.plusDays(1), baseDate.plusDays(2)};
         for (LhScheduleResult result : scheduleResults) {
-            if (Objects.isNull(result) || result.isRollingInherited()) {
+            if (Objects.isNull(result)) {
                 continue;
             }
             if (StringUtils.isNotEmpty(result.getStructureName())) {

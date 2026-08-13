@@ -244,6 +244,7 @@ public class MpAdjustResultServiceImpl extends AbstractDocService<MpAdjustResult
         String[] params4DayResult = helper.getParams4DayResult();
         String monthPlanVersion = helper.getMonthPlanVersion();
         String productVersion = helper.getProductVersion();
+        Map<String, String> structureMachineMap = new HashMap<>();
         
         List<FactoryMonthPlanMouldDayResult> list4DayResult;
         List<MpStructureAllocationExportVo> list;
@@ -256,10 +257,10 @@ public class MpAdjustResultServiceImpl extends AbstractDocService<MpAdjustResult
         }
         
         // 结构转产导入
-        AjaxResult ajaxResult = mpStructureAllocationService.importDataStructureAllocation(list, list4DayResult, true, importLog.getId(), params, monthPlanVersion, productVersion, factoryMap, productTypeMap);
+        AjaxResult ajaxResult = mpStructureAllocationService.importDataStructureAllocation(list, list4DayResult, true, importLog.getId(), params, monthPlanVersion, productVersion, factoryMap, productTypeMap, structureMachineMap);
 
         // 月计划调整排产导入
-        AjaxResult ajaxResult4DayResult = mpStructureAllocationService.importDataDayResult(list, list4DayResult, true, importLog.getId(), params4DayResult, monthPlanVersion, productVersion, factoryMap, productTypeMap, true);
+        AjaxResult ajaxResult4DayResult = mpStructureAllocationService.importDataDayResult(list, list4DayResult, true, importLog.getId(), params4DayResult, monthPlanVersion, productVersion, factoryMap, productTypeMap, structureMachineMap, true);
 
         // 处理返回结果，统一
         int errorNum = 0;

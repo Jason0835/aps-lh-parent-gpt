@@ -104,14 +104,14 @@ public class KeyInformationLogRecorder {
     /**
      * 结构新增机台分配情形
      *
-     * @param context                       排产上下文
-     * @param preSelectedGroupAllocationMap 新增分配机台信息
+     * @param context              排产上下文
+     * @param addAllocationInfoMap 新增分配机台信息
      */
-    public static void recorderInsertAllocationGroupInfoLog(Context context, Map<String, Set<CxMachineAllocationPlanHelper>> preSelectedGroupAllocationMap) {
-        if (CollectionUtils.isEmpty(preSelectedGroupAllocationMap)) {
+    public static void recorderInsertAllocationGroupInfoLog(Context context, Map<String, Set<CxMachineAllocationPlanHelper>> addAllocationInfoMap) {
+        if (CollectionUtils.isEmpty(addAllocationInfoMap)) {
             return;
         }
-        preSelectedGroupAllocationMap.forEach((groupName, allocationList) -> {
+        addAllocationInfoMap.forEach((groupName, allocationList) -> {
             if (CollectionUtils.isEmpty(allocationList)) {
                 return;
             }

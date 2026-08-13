@@ -1,5 +1,6 @@
 package com.zlt.aps.cd90.service.impl;
 
+import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
@@ -15,6 +16,7 @@ import com.zlt.common.enums.ImportErrorTypeEnums;
 import com.zlt.common.utils.ImportExcelValidatedUtils;
 import com.zlt.common.utils.PubUtil;
 import com.zlt.sysdef.domain.SysDocType;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
@@ -23,10 +25,14 @@ import org.springframework.transaction.annotation.Transactional;
 import javax.annotation.Resource;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
+@Slf4j
 @Service
 @Transactional(rollbackFor = Exception.class)
 public class Cd90StorageLaneLimitServiceImpl extends AbstractDocService<Cd90StorageLaneLimit> implements ICd90StorageLaneLimitService {
@@ -142,6 +148,65 @@ public class Cd90StorageLaneLimitServiceImpl extends AbstractDocService<Cd90Stor
     protected List<String> getCheckUniqueFields() {
         // 唯一键去掉 MATERIAL_CODE:同库排同班次唯一(空库排或有帘布库排均唯一)
         return Arrays.asList("factoryCode", "laneDate", "shiftCode", "storageLaneCode");
+    }
+
+    @Override
+    public void logicDeleteAndSaveBatch(String factoryCode, Date laneDate, String shiftCode,
+                                        String updateBy, List<Cd90StorageLaneLimit> list) {
+        Date normalizedLaneDate = DateUtil.beginOfDay(laneDate);
+        List<Cd90StorageLaneLimit> normalizedList = list == null
+                ? new ArrayList<>() : new ArrayList<>(list);
+        normalizedList.sort(Comparator.comparing(Cd90StorageLaneLimit::getStorageLaneCode,
+                Comparator.nullsFirst(String::compareTo)));
+        List<Cd90StorageLaneLimit> existingList = this.mapper.selectList(
+                new LambdaQueryWrapper<Cd90StorageLaneLimit>()
+                        .eq(Cd90StorageLaneLimit::getFactoryCode, factoryCode)
+                        .eq(Cd90StorageLaneLimit::getLaneDate, normalizedLaneDate)
+                        .eq(Cd90StorageLaneLimit::getShiftCode, shiftCode)
+                        .orderByAsc(Cd90StorageLaneLimit::getStorageLaneCode));
+        if (this.isSameMesSnapshot(existingList, normalizedList)) {
+            log.info("直裁库排MES快照未变化，跳过替换：factoryCode={}，laneDate={}，shiftCode={}，数量={}",
+                    factoryCode, DateUtil.formatDate(normalizedLaneDate), shiftCode, normalizedList.size());
+            return;
+        }
+        Date updateTime = new Date();
+        this.mapper.logicDeleteByScope(factoryCode, normalizedLaneDate, shiftCode, updateBy, updateTime);
+        normalizedList.forEach(item -> {
+            item.setFactoryCode(factoryCode);
+            item.setLaneDate(normalizedLaneDate);
+            item.setShiftCode(shiftCode);
+            item.setUpdateBy(updateBy);
+            item.setUpdateTime(updateTime);
+            item.setIsDelete(0);
+        });
+        if (CollectionUtils.isNotEmpty(normalizedList)) {
+            int batchSize = 1000;
+            for (int startIndex = 0; startIndex < normalizedList.size(); startIndex += batchSize) {
+                int endIndex = Math.min(startIndex + batchSize, normalizedList.size());
+                this.baseDao.saveBatch(normalizedList.subList(startIndex, endIndex));
+            }
+        }
+    }
+
+    private boolean isSameMesSnapshot(List<Cd90StorageLaneLimit> existingList,
+                                      List<Cd90StorageLaneLimit> incomingList) {
+        if (existingList == null || existingList.size() != incomingList.size()) {
+            return false;
+        }
+        for (int index = 0; index < existingList.size(); index++) {
+            Cd90StorageLaneLimit existing = existingList.get(index);
+            Cd90StorageLaneLimit incoming = incomingList.get(index);
+            if (!Objects.equals(existing.getStorageLaneCode(), incoming.getStorageLaneCode())
+                    || !Objects.equals(StringUtils.trimToEmpty(existing.getMaterialCode()),
+                            StringUtils.trimToEmpty(incoming.getMaterialCode()))
+                    || !Objects.equals(existing.getCarNum(), incoming.getCarNum())
+                    || !Objects.equals(existing.getMaxCarNum(), incoming.getMaxCarNum())
+                    || !Objects.equals(existing.getAvailableCarNum(), incoming.getAvailableCarNum())
+                    || !Objects.equals(existing.getDataSource(), incoming.getDataSource())) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private boolean isTireFabricCodeExists(Cd90StorageLaneLimit entity, Set<String> tireFabricCodes) {

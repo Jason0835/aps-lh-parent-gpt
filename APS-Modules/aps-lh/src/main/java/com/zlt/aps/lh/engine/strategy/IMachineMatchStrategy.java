@@ -7,11 +7,14 @@ import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.engine.strategy.support.MachinePriorityMetricSnapshot;
 import com.zlt.aps.lh.engine.strategy.support.MachinePriorityTraceSnapshot;
 import com.zlt.aps.lh.engine.strategy.support.SpecifiedMachineMatchResult;
 
 import java.util.Date;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -26,8 +29,11 @@ public interface IMachineMatchStrategy {
     /**
      * 匹配可用硫化机台
      * <p>
-     * 规则: 先锁定最早可开产时间所在班次，保留机台收尾时间落在该班次的候选，再按单控拆分 ->
-     * 同胎胚 -> 同模壳 -> 同规格 -> 胶囊共用 -> 同英寸 -> 相近英寸 -> 机台编码逐层选择最优机台。
+     * 规则: 先按统一生产门禁将多个收尾班次的机台收敛为生产窗口组，同组内再按
+     * SKU 资源保护档 -> 班次距离档 -> 单控拆分 -> 同胎胚 -> 同模壳 -> 同规格 ->
+     * 胶囊共用 -> 同英寸 -> 相近英寸 -> 机台编码逐层软排序。正规 SKU 也应用距离档，
+     * 但只在相同资源保护档内比较，确保普通机台不会被距离更近的单控机台越过。
+     * 所有合法候选均保留，后续窗口组和远距离档用于资源失败后的顺序重试。
      * </p>
      *
      * @param context 排程上下文
@@ -39,7 +45,7 @@ public interface IMachineMatchStrategy {
     /**
      * 校验并返回指定机台。
      *
-     * <p>该入口复用普通新增选机的全部硬过滤和单控粒度规则，但不执行最早收尾班次筛选、
+     * <p>该入口复用普通新增选机的全部硬过滤和单控粒度规则，但不执行生产窗口分组、
      * 候选机台排序和最优机台选择。适用于业务已经固定“机台+SKU”关系的反选场景。</p>
      *
      * @param context 排程上下文
@@ -99,7 +105,8 @@ public interface IMachineMatchStrategy {
     /**
      * 记录当前新增 SKU 实际使用的候选机台优先级顺序。
      * <p>调用方必须传入已经完成过滤、排序及动态选机调整的最终列表，
-     * 本方法只负责输出日志，不得重新过滤、排序或修改候选集合。</p>
+     * 本方法只负责输出日志，不得重新执行业务过滤、正式选机排序或修改候选集合；
+     * 如需调整日志展示顺序，必须复制独立列表处理。</p>
      *
      * @param context 排程上下文
      * @param sku 当前待选机 SKU
@@ -136,6 +143,51 @@ public interface IMachineMatchStrategy {
         // 调用处明确传入正式候选和实际首选；默认策略外不扩展观察范围，避免改变未知策略语义。
         return MachinePriorityTraceSnapshot.fromActualCandidates(
                 actualOrderedCandidates, actualSelectedMachine);
+    }
+
+    /**
+     * 构建携带正式模具分配前软排序指标的选机日志快照。
+     *
+     * <p>默认实现继续调用原快照入口，保证非默认策略和测试替身无需同步修改。
+     * 生产默认策略会将调用方已冻结的指标并入完整日志观察快照。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 当前待选机 SKU
+     * @param actualOrderedCandidates 正式选机主链本轮使用的有序候选
+     * @param actualSelectedMachine 正式选机主链确定的本轮首选机台
+     * @param currentDayEndTime 当前业务日结束时间
+     * @param targetScheduleQtyResolver 正式产能计算组件
+     * @param priorityMetricSnapshotMap 正式模具分配前冻结的软排序指标
+     * @return 当前选机时点的只读日志快照
+     */
+    default MachinePriorityTraceSnapshot buildMachinePriorityTraceSnapshot(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            List<MachineScheduleDTO> actualOrderedCandidates,
+            MachineScheduleDTO actualSelectedMachine,
+            Date currentDayEndTime,
+            TargetScheduleQtyResolver targetScheduleQtyResolver,
+            Map<String, MachinePriorityMetricSnapshot> priorityMetricSnapshotMap) {
+        return this.buildMachinePriorityTraceSnapshot(
+                context, sku, actualOrderedCandidates, actualSelectedMachine,
+                currentDayEndTime, targetScheduleQtyResolver);
+    }
+
+    /**
+     * 在正式模具分配前冻结候选机台软排序指标。
+     *
+     * <p>默认策略外不具备完整排序指标，返回空映射即可；该方法不得修改模具、机台或产能运行态。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 当前待选机 SKU
+     * @param orderedCandidates 本轮正式有序候选
+     * @return 机台编码到软排序指标快照的映射
+     */
+    default Map<String, MachinePriorityMetricSnapshot> captureMachinePriorityMetricSnapshots(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            List<MachineScheduleDTO> orderedCandidates) {
+        return Collections.emptyMap();
     }
 
     /**

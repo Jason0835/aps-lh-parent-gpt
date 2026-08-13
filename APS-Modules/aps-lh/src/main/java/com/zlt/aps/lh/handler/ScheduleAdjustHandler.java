@@ -154,8 +154,10 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
 
         /*
          * S4.3.3.2 冻结全部有效结构并按月计划结构类型读取最低机台数。
-         * 本规则不再依赖“3天内收尾”标记；必须在续作/新增分类前完成，因为后续待排结构视图会随
-         * SKU出队动态缩小，而真实下机判断必须始终能够找到当前SKU的原始结构配置。
+         * S4.2已分别加载结构收尾对齐固定三天快照和SKU排序动态阈值快照；这里仍需为全部有效
+         * 结构冻结SKU快照和最低机台数，不能按任一日期门禁提前裁剪，因为后续待排结构视图会随
+         * SKU出队动态缩小。S4.5实际选机只读取原固定三天快照，通过后才复用这里准备的现有
+         * 对齐内部规则；SKU排序专用快照不会进入本分支。
          */
         if (Objects.nonNull(structureMinMachineRetentionService)) {
             structureMinMachineRetentionService.initializeStructureMinimumMachineConfigs(context);
@@ -905,8 +907,6 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         int windowPlanQty = MonthPlanDateResolver.resolveWindowPlanQty(context, plan.getMaterialCode(),
                 plan.getProductStatus(),
                 toLocalDate(context.getScheduleDate()), toLocalDate(context.getWindowEndDate()));
-        // 继承量已由滚动衔接占用，需从窗口待排量中扣减，防止重复排产
-        int inheritedPlanQty = Math.max(0, context.getInheritedPlanQtyMap().getOrDefault(materialStatusKey, 0));
         dto.setWindowPlanQty(windowPlanQty);
         // 固化排程窗口原始DAY_N汇总：收尾/胎胚库存目标量同步只抬高windowPlanQty，
         // 本字段保持月计划原始口径，供试制、量试日计划准入按原始DAY_N判断。
@@ -918,18 +918,17 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         dto.setFutureMonthPlanQtyAfterWindow(resolveFutureMonthPlanQtyAfterWindow(context, plan));
         dto.setNextDayPlanQtyAfterWindow(resolveNextDayPlanQtyAfterWindow(context, plan));
 
-        // 初始化日计划额度账本：按排程窗口日期读取月计划 dayN，扣减继承量。
+        // 初始化日计划额度账本：按排程窗口日期读取月计划 dayN。
         // day1/day2/day3 的业务日期由窗口 T日～目标日决定，不能按字段名固定绑定自然日。
         Map<LocalDate, SkuDailyPlanQuotaDTO> dailyPlanQuotaMap = buildDailyPlanQuotaMap(
                 context, plan, dto.getMaterialCode());
-        deductInheritedFromDailyQuota(dailyPlanQuotaMap, inheritedPlanQty);
         deductScheDayFinishFromDailyQuota(context, dailyPlanQuotaMap, plan);
 
         // 只把“本月历史欠产”叠加到首日日计划账本，不处理上月欠产和超产抵扣。
         applyCarryForwardToDailyQuota(dailyPlanQuotaMap, carryForwardQty, dto.getMaterialCode());
         dto.setDailyPlanQuotaMap(dailyPlanQuotaMap);
 
-        // 窗口内日计划剩余量汇总（已扣减继承量，已叠加欠产传导）
+        // 窗口内日计划剩余量汇总（已叠加欠产传导）
         int windowRemainingPlanQty = SkuDailyPlanQuotaUtil.sumRemainingQty(dailyPlanQuotaMap);
         dto.setWindowRemainingPlanQty(windowRemainingPlanQty);
 
@@ -937,9 +936,9 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         //20260713+ 含上月超欠产 surplus.getMonthPlanSumTotal()
         dto.setMonthPlanSumTotal(surplus.getRealMonthPlanSumTotal());
         dto.setEmbryoStock(resolveRawEmbryoStock(context, plan));
-        // 待排量保持"需求口径"：使用月计划余量扣减滚动继承量，再与胎胚库存取大。
+        // 待排量保持"需求口径"：使用月计划余量与胎胚库存取大。
         // 本月历史欠产已体现在首日日计划账本中，不能再次重复叠加。
-        int basePendingQty = resolveBasePendingQty(surplus.getSurplusQty(), inheritedPlanQty, dto.getEmbryoStock());
+        int basePendingQty = resolveBasePendingQty(surplus.getSurplusQty(), dto.getEmbryoStock());
         if (context.isStopProductionMode()) {
             // 停产收尾按"停产日含损耗计划量"和"胎胚库存"取大，优先把停锅前可收的量拉齐。
             basePendingQty = resolveStopProductionDemandQty(context, plan, dto.getEmbryoStock());
@@ -974,11 +973,6 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
                 dto.getWindowRemainingPlanQty(), dto.getFinishedQty(), surplus.getLastMonthOverdueQty(),
                 surplus.getIgnoredOverProductionQty(), dto.getSurplusQty(), dto.getPendingQty(),
                 dto.getTargetScheduleQty(), dto.getShiftCapacity());
-        if (context.isRollingScheduleHandoff() || inheritedPlanQty > 0) {
-            log.info("滚动待排量拆解, 物料: {}, 窗口计划量: {}, 已继承量: {}, 本月历史欠产量: {}, 待排量: {}, 余量: {}, 目标量: {}",
-                    dto.getMaterialCode(), windowPlanQty, inheritedPlanQty, carryForwardQty,
-                    dto.getPendingQty(), dto.getSurplusQty(), dto.getTargetScheduleQty());
-        }
 
         // 优先级信息
         dto.setSupplyChainPriority(targetMonthPlan.getProductionType());
@@ -1163,38 +1157,6 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     }
 
     /**
-     * 从日计划额度账本中按日期顺序扣减继承量。
-     * <p>滚动衔接中已继承的排产量需要从窗口计划额度中扣减，避免重复排产。
-     * 扣减策略：从最早日期开始依次扣减，直到继承量全部扣完。</p>
-     *
-     * @param dailyPlanQuotaMap 日计划额度账本
-     * @param inheritedPlanQty  待扣减的继承量
-     */
-    private void deductInheritedFromDailyQuota(Map<LocalDate, SkuDailyPlanQuotaDTO> dailyPlanQuotaMap,
-                                               int inheritedPlanQty) {
-        if (inheritedPlanQty <= 0 || dailyPlanQuotaMap == null || dailyPlanQuotaMap.isEmpty()) {
-            return;
-        }
-        int remainingToDeduct = inheritedPlanQty;
-        for (SkuDailyPlanQuotaDTO quota : dailyPlanQuotaMap.values()) {
-            if (remainingToDeduct <= 0) {
-                break;
-            }
-            int deduction = Math.min(quota.getRemainingQty(), remainingToDeduct);
-            quota.setScheduledQty(quota.getScheduledQty() + deduction);
-            quota.setRemainingQty(Math.max(0, quota.getRemainingQty() - deduction));
-            remainingToDeduct -= deduction;
-        }
-        SkuDailyPlanQuotaUtil.refreshRollingFields(dailyPlanQuotaMap);
-        if (remainingToDeduct > 0) {
-            log.debug("继承量超出窗口日计划总额度, 继承量: {}, 窗口总额度: {}, 超出: {}",
-                    inheritedPlanQty,
-                    dailyPlanQuotaMap.values().stream().mapToInt(SkuDailyPlanQuotaDTO::getDayPlanQty).sum(),
-                    remainingToDeduct);
-        }
-    }
-
-    /**
      * 从日计划额度账本中扣减T日排程晚班完成量。
      * <p>T日晚班完成量已经计入月计划完成量，日计划账本也必须同步扣减，避免续作首日重复排产。</p>
      *
@@ -1329,17 +1291,15 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
 
     /**
      * 解析常规待排需求量。
-     * <p>待排需求 = Max(月计划余量 - 已继承量, 0) 与胎胚库存取大。</p>
+     * <p>待排需求 = Max(月计划余量, 0) 与胎胚库存取大。</p>
      *
-     * @param surplusQty       月计划余量
-     * @param inheritedPlanQty 已继承量
-     * @param embryoStock      胎胚库存
+     * @param surplusQty  月计划余量
+     * @param embryoStock 胎胚库存
      * @return 待排需求量
      */
     private int resolveBasePendingQty(int surplusQty,
-                                      int inheritedPlanQty,
                                       int embryoStock) {
-        int surplusDemandQty = Math.max(0, surplusQty - Math.max(0, inheritedPlanQty));
+        int surplusDemandQty = Math.max(0, surplusQty);
         int effectiveEmbryoStock = Math.max(0, embryoStock);
         return Math.max(surplusDemandQty, effectiveEmbryoStock);
     }
@@ -1603,44 +1563,6 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     }
 
     /**
-     * 解析欠/超产传导使用的计划量。
-     *
-     * @param context 排程上下文
-     * @param result  前批次排程结果
-     * @return 参与传导的计划量
-     */
-    private int resolveCarryForwardPlanQty(LhScheduleContext context, LhScheduleResult result) {
-        if (!context.isRollingScheduleHandoff()) {
-            return ShiftFieldUtil.sumPlanQty(result, LhScheduleConstant.MAX_SHIFT_SLOT_COUNT);
-        }
-        // 结转边界 = 排程窗口最早班次开始时间，此前的班次量参与欠超产传导，此后的已被继承
-        Date carryForwardBoundaryTime = resolveCarryForwardBoundaryTime(context);
-        int totalQty = 0;
-        for (int shiftIndex = 1; shiftIndex <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shiftIndex++) {
-            Date endTime = ShiftFieldUtil.getShiftEndTime(result, shiftIndex);
-            // 滚动衔接场景下，只结转完整结束在继承窗口前的班次，避免与继承量重复。
-            if (Objects.nonNull(endTime) && !endTime.after(carryForwardBoundaryTime)) {
-                totalQty += safeInt(ShiftFieldUtil.getShiftPlanQty(result, shiftIndex));
-            }
-        }
-        return totalQty;
-    }
-
-    /**
-     * 解析滚动排程结转边界。
-     *
-     * @param context 排程上下文
-     * @return 结转边界时间
-     */
-    private Date resolveCarryForwardBoundaryTime(LhScheduleContext context) {
-        return context.getScheduleWindowShifts().stream()
-                .map(LhShiftConfigVO::getShiftStartDateTime)
-                .filter(Objects::nonNull)
-                .min(Date::compareTo)
-                .orElseThrow(() -> new IllegalStateException("滚动排程结转边界解析失败：排程窗口班次为空"));
-    }
-
-    /**
      * 获取指定日期的物料日完成量（按"物料+产品状态+日期"聚合）。
      *
      * @param context    排程上下文
@@ -1791,26 +1713,14 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * @return 前日日期
      */
     private Date resolvePreviousScheduleDate(LhScheduleContext context) {
-        // 滚动衔接或强制重排时，前日基线以窗口起点T日前一日为准。
-        if (isPreviousBaselineFromScheduleDate(context) && Objects.nonNull(context.getScheduleDate())) {
+        // 前日基线固定以窗口起点T日前一日为准。
+        if (Objects.nonNull(context.getScheduleDate())) {
             return LhScheduleTimeUtil.clearTime(LhScheduleTimeUtil.addDays(context.getScheduleDate(), -1));
         }
         if (Objects.nonNull(context.getScheduleTargetDate())) {
             return LhScheduleTimeUtil.clearTime(LhScheduleTimeUtil.addDays(context.getScheduleTargetDate(), -1));
         }
         return LhScheduleTimeUtil.clearTime(context.getScheduleDate());
-    }
-
-    /**
-     * 判断前日传导基线是否应以窗口起点T日计算。
-     *
-     * @param context 排程上下文
-     * @return true-使用T日前一日
-     */
-    private boolean isPreviousBaselineFromScheduleDate(LhScheduleContext context) {
-        return context.isRollingScheduleHandoff()
-                || context.getParamIntValue(LhScheduleParamConstant.FORCE_RESCHEDULE,
-                LhScheduleConstant.FORCE_RESCHEDULE) == LhScheduleConstant.FORCE_RESCHEDULE_ENABLED;
     }
 
     /**
@@ -2130,7 +2040,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
 
 
     /**
-     * 按精确优先、降级在后的顺序分配MES与滚动续作SKU。
+     * 按精确优先、降级在后的顺序分配MES在机续作SKU。
      *
      * @param context               排程上下文
      * @param skuByMaterialMap      物料编码到待匹配SKU列表
@@ -2143,112 +2053,17 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
                                       Map<String, SkuScheduleDTO> continuousTemplateMap,
                                       List<SkuScheduleDTO> continuousSkuList,
                                       boolean allowMaterialFallback) {
-        // 保持MES最近快照顺序消费，同时优先承接滚动衔接后的机台当前物料。
+        // 保持MES最近快照顺序消费，按在机物料承接续作SKU。
         Map<String, MachineScheduleDTO> schedulableMachineMap = context.getMachineScheduleMap();
         for (Map.Entry<String, LhMachineOnlineInfo> entry : context.getMachineOnlineInfoMap().entrySet()) {
             if (CollectionUtils.isEmpty(schedulableMachineMap)
                     || !schedulableMachineMap.containsKey(entry.getKey())) {
                 continue;
             }
-            LhScheduleResult rollingResult = resolveRollingContinuousResult(
-                    context, entry.getKey(), schedulableMachineMap.get(entry.getKey()));
-            String materialCode = Objects.nonNull(rollingResult)
-                    ? rollingResult.getMaterialCode() : entry.getValue().getMaterialCode();
-            String productStatus = Objects.nonNull(rollingResult)
-                    ? resolveSameMaterialStatusRollingProductStatus(
-                    context, entry.getKey(), rollingResult, skuByMaterialMap)
-                    : entry.getValue().getProductStatus();
-            assignContinuousSku(entry.getKey(), materialCode, productStatus, skuByMaterialMap,
+            assignContinuousSku(entry.getKey(), entry.getValue().getMaterialCode(),
+                    entry.getValue().getProductStatus(), skuByMaterialMap,
                     continuousTemplateMap, continuousSkuList, allowMaterialFallback);
         }
-
-        if (context.isRollingScheduleHandoff() && !CollectionUtils.isEmpty(schedulableMachineMap)) {
-            for (Map.Entry<String, MachineScheduleDTO> entry : schedulableMachineMap.entrySet()) {
-                LhScheduleResult rollingResult = resolveRollingContinuousResult(
-                        context, entry.getKey(), entry.getValue());
-                assignContinuousSku(entry.getKey(),
-                        Objects.nonNull(rollingResult) ? rollingResult.getMaterialCode() : null,
-                        Objects.nonNull(rollingResult)
-                                ? resolveSameMaterialStatusRollingProductStatus(
-                                context, entry.getKey(), rollingResult, skuByMaterialMap)
-                                : null,
-                        skuByMaterialMap, continuousTemplateMap, continuousSkuList, allowMaterialFallback);
-            }
-        }
-    }
-
-    /**
-     * 还原同物料多状态状态链跨滚动窗口后的正规续作身份和原承接机台。
-     *
-     * <p>专用X/T结果会在每个有效班次写入持久化标记。下一滚动窗口即使最新结果仍是X/T，
-     * 也必须把同物料正规SKU继续识别为该机台的续作，并把剩余X/T锁回同一机台。</p>
-     *
-     * @param context          排程上下文
-     * @param machineCode      滚动继承机台编码
-     * @param rollingResult    最新滚动继承结果
-     * @param skuByMaterialMap 当前待匹配SKU集合
-     * @return 续作匹配应使用的产品状态
-     */
-    private String resolveSameMaterialStatusRollingProductStatus(
-            LhScheduleContext context,
-            String machineCode,
-            LhScheduleResult rollingResult,
-            Map<String, List<SkuScheduleDTO>> skuByMaterialMap) {
-        if (Objects.isNull(rollingResult)
-                || !containsSameMaterialStatusContinuationAnalysis(rollingResult)) {
-            return Objects.nonNull(rollingResult) ? rollingResult.getProductStatus() : null;
-        }
-        List<SkuScheduleDTO> sameMaterialSkuList = skuByMaterialMap.get(
-                rollingResult.getMaterialCode());
-        if (CollectionUtils.isEmpty(sameMaterialSkuList)) {
-            return rollingResult.getProductStatus();
-        }
-        boolean hasFormalSku = false;
-        for (SkuScheduleDTO sku : sameMaterialSkuList) {
-            if (Objects.isNull(sku)) {
-                continue;
-            }
-            String productStatus = normalizeOnlineProductStatus(sku.getProductStatus());
-            if (StringUtils.equals(TrialStatusEnum.FORMAL.getCode(), productStatus)) {
-                hasFormalSku = true;
-                continue;
-            }
-            if ((StringUtils.equals(TrialStatusEnum.TRIAL.getCode(), productStatus)
-                    || StringUtils.equals(TrialStatusEnum.MASS_TRIAL.getCode(), productStatus))
-                    && sku.resolveTargetScheduleQty() > 0) {
-                sku.setPreferredContinuousMachineCode(machineCode);
-            }
-        }
-        if (!hasFormalSku) {
-            return rollingResult.getProductStatus();
-        }
-        log.info("同物料多状态续作跨窗口身份还原, factoryCode: {}, batchNo: {}, materialCode: {}, "
-                        + "rollingProductStatus: {}, formalProductStatus: {}, carrierMachineCode: {}",
-                context.getFactoryCode(), context.getBatchNo(), rollingResult.getMaterialCode(),
-                rollingResult.getProductStatus(), TrialStatusEnum.FORMAL.getCode(), machineCode);
-        return TrialStatusEnum.FORMAL.getCode();
-    }
-
-    /**
-     * 判断滚动继承结果是否带有同物料多状态续作链标记。
-     *
-     * @param result 滚动继承结果
-     * @return true-专用状态链结果；false-普通续作结果
-     */
-    private boolean containsSameMaterialStatusContinuationAnalysis(LhScheduleResult result) {
-        if (Objects.isNull(result)) {
-            return false;
-        }
-        for (int shiftIndex = 1;
-             shiftIndex <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT;
-             shiftIndex++) {
-            if (StringUtils.contains(
-                    ShiftFieldUtil.getShiftAnalysis(result, shiftIndex),
-                    LhScheduleConstant.SAME_MATERIAL_STATUS_CONTINUATION_ANALYSIS)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     /**
@@ -2278,8 +2093,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      */
     private void resetIdleMachineEndingTimeToWindowStart(LhScheduleContext context,
                                                          List<SkuScheduleDTO> continuousSkuList) {
-        if (Objects.isNull(context) || Objects.isNull(context.getScheduleConfig())
-                || !context.getScheduleConfig().isForceRescheduleEnabled()
+        if (Objects.isNull(context)
                 || CollectionUtils.isEmpty(context.getMachineScheduleMap())
                 || CollectionUtils.isEmpty(context.getScheduleWindowShifts())) {
             return;
@@ -2320,46 +2134,11 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
             if (Objects.nonNull(initialMachine)) {
                 initialMachine.setEstimatedEndTime(windowStartTime);
             }
-            // 同步修正滚动衔接继承结果的结束时间，避免 resolveLatestAssignedEndTime 仍取旧时间；
-            // 保留继承结果用于识别机台当前物料和前规格，不能直接删除导致换模匹配画像丢失。
-            alignInheritedMachineAssignmentEndTime(context, entry.getKey(),
-                    machine.getCurrentMaterialCode(), windowStartTime);
             log.info("在机物料不需要排程，机台收尾时间重置为窗口首班开始, 机台: {}, 在机物料: {}, "
                             + "原收尾时间: {}, 窗口首班: {}",
                     entry.getKey(), machine.getCurrentMaterialCode(),
                     LhScheduleTimeUtil.formatDateTime(originalEndTime),
                     LhScheduleTimeUtil.formatDateTime(windowStartTime));
-        }
-    }
-
-    /**
-     * 将不再续作的在机物料继承结果结束时间对齐到排程窗口起点。
-     * <p>强制重排会继承目标日前一日结果到机台分配账本。当前在机SKU本次无需排程时，
-     * 继承结果只用于保留前规格识别，不再代表本窗口内的真实占用，因此仅修正结束时间，
-     * 不删除继承结果。</p>
-     *
-     * @param context         排程上下文
-     * @param machineCode     机台编码
-     * @param materialCode    当前在机物料编码
-     * @param windowStartTime 排程窗口首班开始时间
-     */
-    private void alignInheritedMachineAssignmentEndTime(LhScheduleContext context,
-                                                        String machineCode,
-                                                        String materialCode,
-                                                        Date windowStartTime) {
-        if (Objects.isNull(context) || StringUtils.isEmpty(machineCode)
-                || StringUtils.isEmpty(materialCode) || Objects.isNull(windowStartTime)) {
-            return;
-        }
-        List<LhScheduleResult> assignedResultList = context.getMachineAssignmentMap().get(machineCode);
-        if (CollectionUtils.isEmpty(assignedResultList)) {
-            return;
-        }
-        for (LhScheduleResult assignedResult : assignedResultList) {
-            if (Objects.nonNull(assignedResult)
-                    && StringUtils.equals(materialCode, assignedResult.getMaterialCode())) {
-                assignedResult.setSpecEndTime(windowStartTime);
-            }
         }
     }
 
@@ -2481,7 +2260,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         if (StringUtils.isEmpty(machineCode) || StringUtils.isEmpty(normalizedMaterialCode)) {
             return;
         }
-        // MES快照循环已完成分配时，滚动衔接循环不得再次为同一机台降级匹配其他状态SKU。
+        // 同一机台已被分配时，不得再次降级匹配其他状态SKU。
         for (SkuScheduleDTO continuousSku : continuousSkuList) {
             if (Objects.nonNull(continuousSku)
                     && StringUtils.equals(machineCode, continuousSku.getContinuousMachineCode())) {
@@ -2525,7 +2304,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     }
 
     /**
-     * 归一化MES或滚动续作产品状态。
+     * 归一化MES在机产品状态。
      * <p>业务明确规定在机产品状态为空时属于正规SKU，因此空值统一转换为S。</p>
      *
      * @param productStatus 原始产品状态
@@ -2541,7 +2320,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * 查找同物料SKU列表中产品状态一致的候选位置。
      *
      * @param matchedSkuList 同物料待匹配SKU列表
-     * @param productStatus  MES在机或滚动继承产品状态
+     * @param productStatus  MES在机产品状态
      * @return 状态一致的SKU位置；未匹配返回-1
      */
     private int resolveProductStatusMatchedSkuIndex(List<SkuScheduleDTO> matchedSkuList, String productStatus) {
@@ -2655,57 +2434,6 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         return copy;
     }
 
-
-    /**
-     * 解析滚动衔接后机台应继续承接的最新未收尾结果。
-     *
-     * @param context     排程上下文
-     * @param machineCode 机台编码
-     * @param machine     机台状态
-     * @return 最新未收尾继承结果；不存在时返回null
-     */
-    private LhScheduleResult resolveRollingContinuousResult(LhScheduleContext context,
-                                                            String machineCode,
-                                                            MachineScheduleDTO machine) {
-        if (context == null
-                || !context.isRollingScheduleHandoff()
-                || machine == null
-                || StringUtils.isEmpty(machineCode)
-                || StringUtils.isEmpty(machine.getCurrentMaterialCode())
-                || CollectionUtils.isEmpty(context.getRollingInheritedScheduleResultList())) {
-            return null;
-        }
-        LhScheduleResult latestInheritedResult = null;
-        for (LhScheduleResult inheritedResult : context.getRollingInheritedScheduleResultList()) {
-            if (inheritedResult == null
-                    || !StringUtils.equals(machineCode, inheritedResult.getLhMachineCode())
-                    || !StringUtils.equals(machine.getCurrentMaterialCode(), inheritedResult.getMaterialCode())) {
-                continue;
-            }
-            if (latestInheritedResult == null) {
-                latestInheritedResult = inheritedResult;
-                continue;
-            }
-            Date latestSpecEndTime = latestInheritedResult.getSpecEndTime();
-            Date currentSpecEndTime = inheritedResult.getSpecEndTime();
-            if (latestSpecEndTime == null
-                    || (currentSpecEndTime != null && currentSpecEndTime.after(latestSpecEndTime))) {
-                latestInheritedResult = inheritedResult;
-            }
-        }
-        if (latestInheritedResult == null) {
-            return null;
-        }
-        /*
-         * 普通收尾结果仍按原逻辑结束续作；专用同物料状态链即使X/T在窗口末班完成，
-         * 下一窗口仍需据此恢复正规SKU到原机台，不能因为isEnd=1丢失承接关系。
-         */
-        if (StringUtils.equals("1", latestInheritedResult.getIsEnd())
-                && !containsSameMaterialStatusContinuationAnalysis(latestInheritedResult)) {
-            return null;
-        }
-        return latestInheritedResult;
-    }
 
     /**
      * 安全获取Integer值，null时返回0

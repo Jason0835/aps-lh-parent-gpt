@@ -12,7 +12,7 @@ import java.time.LocalDate;
 /**
  * MES胎圈排程结果中间表实体
  * 对应表：MES_TQ_SCHEDULE_RESULT
- * 保留旧版字段命名，CX_CLASS改为3~8班
+ * 仅保留 MES 表实际存在的字段
  *
  * @author APS
  */
@@ -27,11 +27,6 @@ public class MesTqScheduleResult implements Serializable {
     @ApiModelProperty(value = "排程日期", name = "scheduleDate")
     @TableField(value = "SCHEDULE_DATE")
     private LocalDate scheduleDate;
-
-    /** 成型批次号 */
-    @ApiModelProperty(value = "成型批次号", name = "cxBatchNo")
-    @TableField(value = "CX_BATCH_NO")
-    private String cxBatchNo;
 
     /** 胎圈批次号 */
     @ApiModelProperty(value = "胎圈批次号", name = "batchNo")
@@ -48,20 +43,15 @@ public class MesTqScheduleResult implements Serializable {
     @TableField(value = "BEAD_CODE")
     private String beadCode;
 
-    /** SAP物料编码 */
-    @ApiModelProperty(value = "SAP物料编码", name = "sapMaterialCode")
-    @TableField(value = "SAP_MATERIAL_CODE")
-    private String sapMaterialCode;
+    /** 物料编码 */
+    @ApiModelProperty(value = "物料编码", name = "materialCode")
+    @TableField(value = "MATERIAL_CODE")
+    private String materialCode;
 
     /** 钢丝圈代码 */
     @ApiModelProperty(value = "钢丝圈代码", name = "steelRingCode")
     @TableField(value = "STEEL_RING_CODE")
     private String steelRingCode;
-
-    /** 三角胶代码 */
-    @ApiModelProperty(value = "三角胶代码", name = "triangleGlueCode")
-    @TableField(value = "TRIANGLE_GLUE_CODE")
-    private String triangleGlueCode;
 
     /** 胶料代码 */
     @ApiModelProperty(value = "胶料代码", name = "glueCode")
@@ -98,27 +88,6 @@ public class MesTqScheduleResult implements Serializable {
     @TableField(value = "SUPPLY_TIME")
     private Double supplyTime;
 
-    // ========== 中班(14:00-22:00) ==========
-    /** 中班计划量 */
-    @ApiModelProperty(value = "中班计划量", name = "midPlanQty")
-    @TableField(value = "MID_PLAN_QTY")
-    private Double midPlanQty;
-
-    /** 中班生产顺序 */
-    @ApiModelProperty(value = "中班生产顺序", name = "midProduceOrder")
-    @TableField(value = "MID_PRODUCE_ORDER")
-    private Integer midProduceOrder;
-
-    /** 中班系统原因分析 */
-    @ApiModelProperty(value = "中班系统原因分析", name = "midSysAnalysis")
-    @TableField(value = "MID_SYS_ANALYSIS")
-    private String midSysAnalysis;
-
-    /** 中班手工输入原因分析 */
-    @ApiModelProperty(value = "中班手工输入原因分析", name = "midHandAnalysis")
-    @TableField(value = "MID_HAND_ANALYSIS")
-    private String midHandAnalysis;
-
     // ========== 夜班(22:00-06:00) ==========
     /** 夜班计划量 */
     @ApiModelProperty(value = "夜班计划量", name = "nightPlanQty")
@@ -139,6 +108,11 @@ public class MesTqScheduleResult implements Serializable {
     @ApiModelProperty(value = "夜班手工输入原因分析", name = "nightHandAnalysis")
     @TableField(value = "NIGHT_HAND_ANALYSIS")
     private String nightHandAnalysis;
+
+    /** 夜班备注（使用原因分析值赋值） */
+    @ApiModelProperty(value = "夜班备注", name = "nightRemark")
+    @TableField(value = "NIGHT_REMARK")
+    private String nightRemark;
 
     // ========== 早班(06:00-14:00) ==========
     /** 早班计划量 */
@@ -161,26 +135,36 @@ public class MesTqScheduleResult implements Serializable {
     @TableField(value = "DAY_HAND_ANALYSIS")
     private String dayHandAnalysis;
 
-    // ========== 次日中班(次日14:00-22:00) ==========
-    /** 次日中班计划量 */
-    @ApiModelProperty(value = "次日中班计划量", name = "nextMidPlanQty")
-    @TableField(value = "NEXT_MID_PLAN_QTY")
-    private Double nextMidPlanQty;
+    /** 早班备注（使用原因分析值赋值） */
+    @ApiModelProperty(value = "早班备注", name = "dayRemark")
+    @TableField(value = "DAY_REMARK")
+    private String dayRemark;
 
-    /** 次日中班生产顺序 */
-    @ApiModelProperty(value = "次日中班生产顺序", name = "nextMidProduceOrder")
-    @TableField(value = "NEXT_MID_PRODUCE_ORDER")
-    private Integer nextMidProduceOrder;
+    // ========== 中班(14:00-22:00) ==========
+    /** 中班计划量 */
+    @ApiModelProperty(value = "中班计划量", name = "midPlanQty")
+    @TableField(value = "MID_PLAN_QTY")
+    private Double midPlanQty;
 
-    /** 次日中班系统原因分析 */
-    @ApiModelProperty(value = "次日中班系统原因分析", name = "nextMidSysAnalysis")
-    @TableField(value = "NEXT_MID_SYS_ANALYSIS")
-    private String nextMidSysAnalysis;
+    /** 中班生产顺序 */
+    @ApiModelProperty(value = "中班生产顺序", name = "midProduceOrder")
+    @TableField(value = "MID_PRODUCE_ORDER")
+    private Integer midProduceOrder;
 
-    /** 次日中班手工输入原因分析 */
-    @ApiModelProperty(value = "次日中班手工输入原因分析", name = "nextMidHandAnalysis")
-    @TableField(value = "NEXT_MID_HAND_ANALYSIS")
-    private String nextMidHandAnalysis;
+    /** 中班系统原因分析 */
+    @ApiModelProperty(value = "中班系统原因分析", name = "midSysAnalysis")
+    @TableField(value = "MID_SYS_ANALYSIS")
+    private String midSysAnalysis;
+
+    /** 中班手工输入原因分析 */
+    @ApiModelProperty(value = "中班手工输入原因分析", name = "midHandAnalysis")
+    @TableField(value = "MID_HAND_ANALYSIS")
+    private String midHandAnalysis;
+
+    /** 中班备注（使用原因分析值赋值） */
+    @ApiModelProperty(value = "中班备注", name = "midRemark")
+    @TableField(value = "MID_REMARK")
+    private String midRemark;
 
     // ========== 对应成型3~8班计划量 ==========
     /** 对应成型3班计划量 */
@@ -213,22 +197,7 @@ public class MesTqScheduleResult implements Serializable {
     @TableField(value = "CX_CLASS8_PLAN")
     private Integer cxClass8Plan;
 
-    // ========== 状态与公共字段 ==========
-    /** 是否发布 */
-    @ApiModelProperty(value = "是否发布", name = "isRelease")
-    @TableField(value = "IS_RELEASE")
-    private String isRelease;
-
-    /** 收尾提示标识(0:提示收尾；1:不需要提示) */
-    @ApiModelProperty(value = "收尾提示标识", name = "markCloseOutTip")
-    @TableField(value = "MARK_CLOSE_OUT_TIP")
-    private String markCloseOutTip;
-
-    /** 生产状态 */
-    @ApiModelProperty(value = "生产状态", name = "productionStatus")
-    @TableField(value = "PRODUCTION_STATUS")
-    private String productionStatus;
-
+    // ========== 公共字段 ==========
     /** 备注 */
     @ApiModelProperty(value = "备注", name = "remark")
     @TableField(value = "REMARK")

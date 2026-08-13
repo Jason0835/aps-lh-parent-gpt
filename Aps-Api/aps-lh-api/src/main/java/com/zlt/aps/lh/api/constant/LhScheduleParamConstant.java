@@ -146,8 +146,6 @@ public final class LhScheduleParamConstant {
     public static final String ENABLE_FULL_CAPACITY_SCHEDULING = "SYS0304005";
     /** 满排模式是否按余量命中收尾规则2 */
     public static final String ENABLE_ENDING_BY_SURPLUS_IN_FULL_MODE = "SYS0304006";
-    /** 是否强制重排（0-否，1-是） */
-    public static final String FORCE_RESCHEDULE = "SYS0304007";
     /** MES在机信息往前追溯天数 */
     public static final String MACHINE_ONLINE_LOOKBACK_DAYS = "SYS0304008";
     /** 停机超时阈值（小时） */
@@ -218,8 +216,6 @@ public final class LhScheduleParamConstant {
     public static final String CONTINUOUS_ENDING_SURPLUS_TOLERANCE_QTY = "SYS0304023";
     /** 奇数班产计划量加一班别（1-晚班，2-早班，3-中班；空值不启用） */
     public static final String ODD_SHIFT_CAPACITY_PLUS_SHIFT_TYPE = "SYS0304024";
-    /** 当天空闲机台优先开关（0-关闭，1-开启） */
-    public static final String ENABLE_TODAY_IDLE_MACHINE_PRIORITY = "SYS0304025";
     /** 日标准产量剩余班次（1-晚班，2-早班，3-中班） */
     public static final String DAILY_STANDARD_CAPACITY_REMAIN_SHIFT_TYPE = "SYS0304026";
     /** 是否开启换模均衡（0-关闭，1-开启） */

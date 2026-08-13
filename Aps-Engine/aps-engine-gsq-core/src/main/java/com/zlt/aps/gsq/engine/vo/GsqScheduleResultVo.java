@@ -74,6 +74,9 @@ public class GsqScheduleResultVo extends ApsBaseDto {
     @ApiModelProperty(value = "库存数量")
     private Double stockQty;
 
+    @ApiModelProperty(value = "月计划剩余量（对齐胎圈，回填自月计划剩余量映射）")
+    private Integer monthSurplusQty;
+
     @ApiModelProperty(value = "库存供应胎圈时长，单位：小时")
     private Double supplyTime;
 
@@ -247,6 +250,9 @@ public class GsqScheduleResultVo extends ApsBaseDto {
 
     /** 备库剩余待排量（S5.6 重算剩余产能时使用） */
     private Double backupRemainingQty;
+
+    /** 备库分摊后的实际总计划量（按损耗率乘数计算并分摊，S2.3/S3写入；S5.6 总量截断上限使用） */
+    private Double backupAllocatedQty;
 
     /** 工艺参数（运行时辅助参数传递，不持久化） */
     @ApiModelProperty(value = "工艺参数Map，运行时传递，不持久化")

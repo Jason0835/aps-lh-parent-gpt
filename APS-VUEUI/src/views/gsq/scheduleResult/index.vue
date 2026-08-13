@@ -343,6 +343,16 @@ export default {
           },
         },
         {
+          label: this.$t("ui.data.column.gsqScheduleResult.tqBatchNo"),
+          prop: "tqBatchNo",
+          width: 140,
+        },
+        {
+          label: this.$t("ui.data.column.gsqScheduleResult.batchNo"),
+          prop: "batchNo",
+          width: 140,
+        },
+        {
           label: this.$t("ui.data.column.gsqScheduleResult.steelRingCode"),
           prop: "steelRingCode",
           width: 140,
@@ -376,54 +386,54 @@ export default {
         {
           label: this.getShiftLabel(1),
           children: [
+            { label: this.$t("ui.data.column.gsqScheduleResult.sequence"), prop: "class1Sequence", width: 80 },
             { label: this.$t("ui.data.column.gsqScheduleResult.planQty"), prop: "class1PlanQty", width: 90 },
             { label: this.$t("ui.data.column.gsqScheduleResult.finishQty"), prop: "class1FinishQty", width: 90 },
-            { label: this.$t("ui.data.column.gsqScheduleResult.sequence"), prop: "class1Sequence", width: 80 },
             { label: this.$t("ui.data.column.gsqScheduleResult.handAnalysis"), prop: "class1HandAnalysis", width: 130 },
           ],
         },
         {
           label: this.getShiftLabel(2),
           children: [
+            { label: this.$t("ui.data.column.gsqScheduleResult.sequence"), prop: "class2Sequence", width: 80 },
             { label: this.$t("ui.data.column.gsqScheduleResult.planQty"), prop: "class2PlanQty", width: 90 },
             { label: this.$t("ui.data.column.gsqScheduleResult.finishQty"), prop: "class2FinishQty", width: 90 },
-            { label: this.$t("ui.data.column.gsqScheduleResult.sequence"), prop: "class2Sequence", width: 80 },
             { label: this.$t("ui.data.column.gsqScheduleResult.handAnalysis"), prop: "class2HandAnalysis", width: 130 },
           ],
         },
         {
           label: this.getShiftLabel(3),
           children: [
+            { label: this.$t("ui.data.column.gsqScheduleResult.sequence"), prop: "class3Sequence", width: 80 },
             { label: this.$t("ui.data.column.gsqScheduleResult.planQty"), prop: "class3PlanQty", width: 90 },
             { label: this.$t("ui.data.column.gsqScheduleResult.finishQty"), prop: "class3FinishQty", width: 90 },
-            { label: this.$t("ui.data.column.gsqScheduleResult.sequence"), prop: "class3Sequence", width: 80 },
             { label: this.$t("ui.data.column.gsqScheduleResult.handAnalysis"), prop: "class3HandAnalysis", width: 130 },
           ],
         },
         {
           label: this.getShiftLabel(4),
           children: [
+            { label: this.$t("ui.data.column.gsqScheduleResult.sequence"), prop: "class4Sequence", width: 80 },
             { label: this.$t("ui.data.column.gsqScheduleResult.planQty"), prop: "class4PlanQty", width: 90 },
             { label: this.$t("ui.data.column.gsqScheduleResult.finishQty"), prop: "class4FinishQty", width: 90 },
-            { label: this.$t("ui.data.column.gsqScheduleResult.sequence"), prop: "class4Sequence", width: 80 },
             { label: this.$t("ui.data.column.gsqScheduleResult.handAnalysis"), prop: "class4HandAnalysis", width: 130 },
           ],
         },
         {
           label: this.getShiftLabel(5),
           children: [
+            { label: this.$t("ui.data.column.gsqScheduleResult.sequence"), prop: "class5Sequence", width: 80 },
             { label: this.$t("ui.data.column.gsqScheduleResult.planQty"), prop: "class5PlanQty", width: 90 },
             { label: this.$t("ui.data.column.gsqScheduleResult.finishQty"), prop: "class5FinishQty", width: 90 },
-            { label: this.$t("ui.data.column.gsqScheduleResult.sequence"), prop: "class5Sequence", width: 80 },
             { label: this.$t("ui.data.column.gsqScheduleResult.handAnalysis"), prop: "class5HandAnalysis", width: 130 },
           ],
         },
         {
           label: this.getShiftLabel(6),
           children: [
+            { label: this.$t("ui.data.column.gsqScheduleResult.sequence"), prop: "class6Sequence", width: 80 },
             { label: this.$t("ui.data.column.gsqScheduleResult.planQty"), prop: "class6PlanQty", width: 90 },
             { label: this.$t("ui.data.column.gsqScheduleResult.finishQty"), prop: "class6FinishQty", width: 90 },
-            { label: this.$t("ui.data.column.gsqScheduleResult.sequence"), prop: "class6Sequence", width: 80 },
             { label: this.$t("ui.data.column.gsqScheduleResult.handAnalysis"), prop: "class6HandAnalysis", width: 130 },
           ],
         },

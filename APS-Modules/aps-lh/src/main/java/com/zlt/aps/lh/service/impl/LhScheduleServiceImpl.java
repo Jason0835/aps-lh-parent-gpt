@@ -70,6 +70,7 @@ import java.nio.charset.StandardCharsets;
 import java.text.MessageFormat;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -274,13 +275,12 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         context.setScheduleDate(LhScheduleTimeUtil.addDays(target, -offsetDays));
         // 排程窗口结束日期 = T + 2，用于产能计算、加机台、收尾等核心逻辑
         context.setWindowEndDate(LhScheduleTimeUtil.addDays(context.getScheduleDate(), scheduleDays - 1));
-        log.info("排程上下文构建完成, 工厂: {}, 工厂名称: {}, 目标日(业务): {}, T日: {}, 窗口结束日: {}, 排程天数: {}, 强制重排: {}, 局部搜索: {}, 定点机台规则: {}",
+        log.info("排程上下文构建完成, 工厂: {}, 工厂名称: {}, 目标日(业务): {}, T日: {}, 窗口结束日: {}, 排程天数: {}, 局部搜索: {}, 定点机台规则: {}",
                 context.getFactoryCode(), context.getFactoryDisplayName(),
                 LhScheduleTimeUtil.formatDate(context.getScheduleTargetDate()),
                 LhScheduleTimeUtil.formatDate(context.getScheduleDate()),
                 LhScheduleTimeUtil.formatDate(context.getWindowEndDate()),
                 scheduleDays,
-                context.getScheduleConfig().isForceRescheduleEnabled(),
                 context.getScheduleConfig().isLocalSearchEnabled(),
                 context.getScheduleConfig().isSpecifyMachineRuleEnabled());
         return context;
@@ -765,6 +765,10 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         // 明细区域则保持为空，避免空指针影响模板导出。
         List<LhScheduleResult> exportList = Objects.isNull(list) ? Collections.emptyList() : list;
 
+        // 明细行统一按导出顺序排序（机台升序 → 同机台收尾班次序号升序 → 物料编码升序）。
+        // 该顺序同时用于 buildExportDataList 填充明细和 fillExportSummaryFormulas 按行匹配收尾标识。
+        List<LhScheduleResult> sortedExportList = sortExportList(exportList);
+
         // 节点3：模板表头数据只负责替换普通占位符，例如排程日期、版本、批次号、
         // 以及 8 个班次标题里的 shiftDate1 ~ shiftDate8。
         Map<String, Object> tableMap = buildExportTableMap(exportList, result.getScheduleDate());
@@ -778,8 +782,9 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         // 节点4：模板第 7 行为 {.xxx} 明细模板行，writeMultiList 会从该行开始复制填充。
         // 当前只有一个明细列表，因此只放入一个 List<Map<String,Object>>。
         List<List<Map<String, Object>>> excelDataList = new ArrayList<>();
-        List<Map<String, Object>> exportDataList = buildExportDataList(
-                exportList, result.getScheduleDate(), mouldChangePlanList);
+        ExportDataBuildResult exportDataBuildResult = buildExportDataList(
+                sortedExportList, result.getScheduleDate(), mouldChangePlanList);
+        List<Map<String, Object>> exportDataList = exportDataBuildResult.getDataList();
         excelDataList.add(exportDataList);
 
         // 节点5：硫化计划数据位于模板第 0 个 sheet（下标 0）的“硫化计划”页。
@@ -802,7 +807,8 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
 
         // 排产小结已迁移至成型日计划导出（aps-cx 通过 Feign 调用 buildScheduleSummaryExportData），
         // 硫化日计划导出不再写入排产小结 sheet。
-        return fillExportSummaryFormulas(exportBytes, exportDataList.size(), placeholderMap);
+        return this.fillExportSummaryFormulas(exportBytes, exportDataList.size(), placeholderMap,
+                exportDataBuildResult.getAlignedExportList(), tableMap);
     }
 
     /**
@@ -982,40 +988,57 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      * @param exportBytes    Excel 导出字节
      * @param dataRowCount   明细数据行数
      * @param placeholderMap 占位符名称→列索引（0起始）的映射，由 exportData 在模板扫描阶段生成
+     * @param exportList     按导出顺序排列的排程结果列表，用于按行匹配收尾标识（淡橙标记）
+     * @param tableMap       表头普通占位符及对应渲染值
      * @return 已回填公式的 Excel 导出字节
      */
-    private byte[] fillExportSummaryFormulas(byte[] exportBytes, int dataRowCount, Map<String, Integer> placeholderMap) {
+    private byte[] fillExportSummaryFormulas(byte[] exportBytes, int dataRowCount, Map<String, Integer> placeholderMap,
+                                             List<LhScheduleResult> exportList,
+                                             Map<String, Object> tableMap) {
         if (Objects.isNull(exportBytes) || exportBytes.length == 0 || dataRowCount <= 0) {
             return exportBytes;
         }
 
         // 从占位符映射中获取各列的动态索引，替代原先的硬编码列号。
         int dailyPlanQtyCol = placeholderMap.getOrDefault("dailyPlanQty", -1);
+        int sameMaterialPlanQtyTotalCol = placeholderMap.getOrDefault("sameMaterialPlanQtyTotal", -1);
+        int materialCodeCol = placeholderMap.getOrDefault("materialCode", -1);
         int totalDailyPlanQtyCol = placeholderMap.getOrDefault("totalDailyPlanQty", -1);
         int todayNightFinishQtyCol = placeholderMap.getOrDefault("todayNightFinishQty", -1);
-        // 夜班合计计划量 / 夜班合计完成量 / 总计划量公式列，模板中以特殊占位符标记
+        // T+2日合计计划量 / T+2日合计完成量 / 1~8班总计划量公式列，模板中以特殊占位符标记
         int nightPlanQtyTotalCol = placeholderMap.getOrDefault("nightPlanQtyTotal", -1);
         int nightFinishQtyTotalCol = placeholderMap.getOrDefault("nightFinishQtyTotal", -1);
         int totalPlanQtyFormulaCol = placeholderMap.getOrDefault("totalPlanQtyFormula", -1);
-        // 夜班 3 个班次（6/7/8）的计划量和完成量列索引
-        int class6PlanQtyCol = placeholderMap.getOrDefault("class6PlanQty", -1);
-        int class7PlanQtyCol = placeholderMap.getOrDefault("class7PlanQty", -1);
-        int class8PlanQtyCol = placeholderMap.getOrDefault("class8PlanQty", -1);
-        int class6FinishQtyCol = placeholderMap.getOrDefault("class6FinishQty", -1);
-        int class7FinishQtyCol = placeholderMap.getOrDefault("class7FinishQty", -1);
-        int class8FinishQtyCol = placeholderMap.getOrDefault("class8FinishQty", -1);
+        int[] t2PlanQtyCols = this.resolveShiftColumnIndexes(placeholderMap, "PlanQty", 6, 8);
+        int[] t2FinishQtyCols = this.resolveShiftColumnIndexes(placeholderMap, "FinishQty", 6, 8);
+        int[] allPlanQtyCols = this.resolveShiftColumnIndexes(placeholderMap, "PlanQty", 1, 8);
         // 占位符行在模板中的 POI 行号，writeMultiList 处理后数据行从此位置开始
         int startRowIndex = placeholderMap.getOrDefault("_templateRowIndex", 6);
+        int startExcelRowNum = startRowIndex + 1;
+        int endExcelRowNum = startRowIndex + dataRowCount;
 
         try (ByteArrayInputStream inputStream = new ByteArrayInputStream(exportBytes);
              XSSFWorkbook workbook = new XSSFWorkbook(inputStream);
              ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
             Sheet sheet = workbook.getSheetAt(0);
+            this.fillExportHeaderPlaceholders(sheet, tableMap);
             for (int rowIndex = startRowIndex; rowIndex < startRowIndex + dataRowCount; rowIndex++) {
                 int excelRowNum = rowIndex + 1;
                 Row row = sheet.getRow(rowIndex);
                 if (Objects.isNull(row)) {
                     row = sheet.createRow(rowIndex);
+                }
+                LhScheduleResult rowResult = rowIndex - startRowIndex < exportList.size()
+                        ? exportList.get(rowIndex - startRowIndex) : null;
+                // B/C列按T+2日的6~8班写入计划、实际合计公式，D列按1~8班写入总计划公式。
+                this.fillPlanFinishSummaryFormulas(row, excelRowNum,
+                        nightPlanQtyTotalCol, nightFinishQtyTotalCol, totalPlanQtyFormulaCol,
+                        t2PlanQtyCols, t2FinishQtyCols, allPlanQtyCols);
+                this.fillSameMaterialPlanQtyTotalFormula(row, excelRowNum,
+                        startExcelRowNum, endExcelRowNum,
+                        sameMaterialPlanQtyTotalCol, materialCodeCol, totalPlanQtyFormulaCol);
+                if (Objects.isNull(rowResult)) {
+                    continue;
                 }
 
                 // 日计划量列（原 J 列，现 F 列）：后续需要参与导入，不能保留公式；
@@ -1023,9 +1046,15 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                 if (dailyPlanQtyCol >= 0 && todayNightFinishQtyCol >= 0 && totalDailyPlanQtyCol >= 0) {
                     BigDecimal dailyPlanValue = readNumericCell(row.getCell(todayNightFinishQtyCol))
                             .subtract(readNumericCell(row.getCell(totalDailyPlanQtyCol)));
-                    setNumericCell(row, dailyPlanQtyCol, dailyPlanValue);
-                    // 日计划量 ≤ 400：该单元格标淡橙提示产量偏低
-                    if (dailyPlanValue.abs().compareTo(BigDecimal.valueOf(400)) <= 0) {
+                    // 20260810+ 合计余量为 0 时导出为空，不为 0 时写静态数值（后续需要参与导入，不能保留公式）。
+                    if (dailyPlanValue.compareTo(BigDecimal.ZERO) == 0) {
+                        setEmptyCell(row, dailyPlanQtyCol);
+                    } else {
+                        setNumericCell(row, dailyPlanQtyCol, dailyPlanValue);
+                    }
+                    // 20260810+ 淡橙标识规则调整：8 个班次内存在收尾标识（classXIsEnd ∈ 1/2/3）的行才标淡橙，
+                    // 不再按 |合计余量| ≤ 400 判断。
+                    if (isCloseOutSku(rowResult)) {
                         XSSFColor orange = new XSSFColor(new byte[]{(byte) 0xFC, (byte) 0xD5, (byte) 0xB4}, null);
                         Cell cell = row.getCell(dailyPlanQtyCol);
                         if (cell != null) {
@@ -1038,33 +1067,6 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                     }
                 }
 
-                // 夜班合计计划量 / 夜班合计完成量：后续同样需要导入，直接写入静态合计值。
-                if (nightPlanQtyTotalCol >= 0 && class6PlanQtyCol >= 0 && class7PlanQtyCol >= 0 && class8PlanQtyCol >= 0) {
-                    setNumericCell(row, nightPlanQtyTotalCol,
-                            sumNumericCells(row, class6PlanQtyCol, class7PlanQtyCol, class8PlanQtyCol));
-                }
-                if (nightFinishQtyTotalCol >= 0 && class6FinishQtyCol >= 0 && class7FinishQtyCol >= 0 && class8FinishQtyCol >= 0) {
-                    setNumericCell(row, nightFinishQtyTotalCol,
-                            sumNumericCells(row, class7FinishQtyCol, class8FinishQtyCol, class6FinishQtyCol));
-                }
-
-                // 总计划量列：8 个班次 PlanQty 之和，以 Excel 公式形式写入。
-                // 动态拼接公式，不再硬编码列字母，模板列变动后公式自动适配。
-                if (totalPlanQtyFormulaCol >= 0) {
-                    StringBuilder formulaBuilder = new StringBuilder();
-                    for (int shift = 1; shift <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shift++) {
-                        Integer colIndex = placeholderMap.get("class" + shift + "PlanQty");
-                        if (colIndex != null && colIndex >= 0) {
-                            if (formulaBuilder.length() > 0) {
-                                formulaBuilder.append("+");
-                            }
-                            formulaBuilder.append(columnIndexToLetter(colIndex)).append(excelRowNum);
-                        }
-                    }
-                    if (formulaBuilder.length() > 0) {
-                        setFormulaCell(row, totalPlanQtyFormulaCol, formulaBuilder.toString());
-                    }
-                }
             }
             workbook.setForceFormulaRecalculation(true);
             sheet.setForceFormulaRecalculation(true);
@@ -1074,6 +1076,130 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         } catch (Exception e) {
             throw new ServiceException("硫化计划导出公式回填失败");
         }
+    }
+
+    /**
+     * 回填模板中与固定文字混排的普通表头占位符。
+     * <p>部分xlsx单元格以inlineStr保存时，公共模板工具未替换`{yearmonthday}`、
+     * `{productionVersion}`、`{shiftDate1}`等混排占位符，因此在最终工作簿中统一兜底替换。</p>
+     *
+     * @param sheet    硫化计划工作表
+     * @param tableMap 普通占位符及渲染值
+     */
+    private void fillExportHeaderPlaceholders(Sheet sheet, Map<String, Object> tableMap) {
+        if (Objects.isNull(sheet) || Objects.isNull(tableMap) || tableMap.isEmpty()) {
+            return;
+        }
+        for (Row row : sheet) {
+            for (Cell cell : row) {
+                if (!CellType.STRING.equals(cell.getCellType())) {
+                    continue;
+                }
+                String originalValue = cell.getStringCellValue();
+                if (StringUtils.isBlank(originalValue) || !originalValue.contains("{")) {
+                    continue;
+                }
+                String renderedValue = originalValue;
+                for (Map.Entry<String, Object> entry : tableMap.entrySet()) {
+                    String placeholder = "{" + entry.getKey() + "}";
+                    if (renderedValue.contains(placeholder)) {
+                        renderedValue = renderedValue.replace(
+                                placeholder, Objects.toString(entry.getValue(), ""));
+                    }
+                }
+                if (!originalValue.equals(renderedValue)) {
+                    cell.setCellValue(renderedValue);
+                }
+            }
+        }
+    }
+
+    /**
+     * 写入相同物料跨机台的总计划量公式。
+     *
+     * @param row                         Excel明细行
+     * @param excelRowNum                 当前Excel行号（1起始）
+     * @param startExcelRowNum            明细起始Excel行号（1起始）
+     * @param endExcelRowNum              明细结束Excel行号（1起始）
+     * @param sameMaterialPlanQtyTotalCol 相同物料总计划量列
+     * @param materialCodeCol             物料号列
+     * @param totalPlanQtyFormulaCol      单行总计划量列
+     */
+    private void fillSameMaterialPlanQtyTotalFormula(
+            Row row, int excelRowNum, int startExcelRowNum, int endExcelRowNum,
+            int sameMaterialPlanQtyTotalCol, int materialCodeCol, int totalPlanQtyFormulaCol) {
+        if (sameMaterialPlanQtyTotalCol < 0 || materialCodeCol < 0 || totalPlanQtyFormulaCol < 0) {
+            return;
+        }
+        String materialCodeColumn = this.columnIndexToLetter(materialCodeCol);
+        String totalPlanQtyColumn = this.columnIndexToLetter(totalPlanQtyFormulaCol);
+        String formula = "SUMIF($" + materialCodeColumn + "$" + startExcelRowNum
+                + ":$" + materialCodeColumn + "$" + endExcelRowNum
+                + "," + materialCodeColumn + excelRowNum
+                + ",$" + totalPlanQtyColumn + "$" + startExcelRowNum
+                + ":$" + totalPlanQtyColumn + "$" + endExcelRowNum + ")";
+        this.setFormulaCell(row, sameMaterialPlanQtyTotalCol, formula);
+    }
+
+    /**
+     * 为导出明细行写入B/C列的T+2日合计公式及D列的1~8班总计划公式。
+     *
+     * @param row                    Excel明细行
+     * @param excelRowNum            Excel行号（1起始）
+     * @param planQtyTotalCol        计划合计列
+     * @param finishQtyTotalCol      实际合计列
+     * @param totalPlanQtyFormulaCol 总计划量公式列
+     * @param t2PlanQtyCols          T+2日（6~8班）计划量列
+     * @param t2FinishQtyCols        T+2日（6~8班）实际量列
+     * @param allPlanQtyCols         1~8班计划量列
+     */
+    private void fillPlanFinishSummaryFormulas(
+            Row row, int excelRowNum,
+            int planQtyTotalCol, int finishQtyTotalCol, int totalPlanQtyFormulaCol,
+            int[] t2PlanQtyCols, int[] t2FinishQtyCols, int[] allPlanQtyCols) {
+        if (planQtyTotalCol >= 0 && Arrays.stream(t2PlanQtyCols).allMatch(columnIndex -> columnIndex >= 0)) {
+            this.setFormulaCell(row, planQtyTotalCol,
+                    this.buildRowSumFormula(excelRowNum, t2PlanQtyCols));
+        }
+        if (finishQtyTotalCol >= 0 && Arrays.stream(t2FinishQtyCols).allMatch(columnIndex -> columnIndex >= 0)) {
+            this.setFormulaCell(row, finishQtyTotalCol,
+                    this.buildRowSumFormula(excelRowNum, t2FinishQtyCols));
+        }
+        if (totalPlanQtyFormulaCol >= 0
+                && Arrays.stream(allPlanQtyCols).allMatch(columnIndex -> columnIndex >= 0)) {
+            this.setFormulaCell(row, totalPlanQtyFormulaCol,
+                    this.buildRowSumFormula(excelRowNum, allPlanQtyCols));
+        }
+    }
+
+    /**
+     * 获取指定班次范围内某字段的Excel列索引。
+     *
+     * @param placeholderMap 占位符名称到列索引的映射
+     * @param fieldSuffix    班次字段后缀
+     * @param startShift     起始班次
+     * @param endShift       结束班次
+     * @return 按班次范围排列的列索引
+     */
+    private int[] resolveShiftColumnIndexes(
+            Map<String, Integer> placeholderMap, String fieldSuffix, int startShift, int endShift) {
+        return IntStream.rangeClosed(startShift, endShift)
+                .map(shift -> placeholderMap.getOrDefault("class" + shift + fieldSuffix, -1))
+                .toArray();
+    }
+
+    /**
+     * 构建同一Excel行多个单元格的SUM公式。
+     * <p>使用SUM而不是单元格直接相加，避免班次计划量或实际量为文本空格时产生#VALUE!。</p>
+     *
+     * @param excelRowNum Excel行号（1起始）
+     * @param columnIndexes 列索引集合（0起始）
+     * @return 不带等号的Excel公式
+     */
+    private String buildRowSumFormula(int excelRowNum, int... columnIndexes) {
+        return Arrays.stream(columnIndexes)
+                .mapToObj(columnIndex -> this.columnIndexToLetter(columnIndex) + excelRowNum)
+                .collect(Collectors.joining(",", "SUM(", ")"));
     }
 
     /**
@@ -1217,6 +1343,26 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     }
 
     /**
+     * 将单元格写为空字符串（保留原样式）。
+     * <p>用于合计余量为 0 时导出为空，避免明细行出现无意义的 0。</p>
+     *
+     * @param row         当前数据行
+     * @param columnIndex 列下标，POI 从 0 开始计数
+     */
+    private void setEmptyCell(Row row, int columnIndex) {
+        Cell cell = row.getCell(columnIndex);
+        CellStyle cellStyle = Objects.nonNull(cell) ? cell.getCellStyle() : null;
+        if (Objects.nonNull(cell)) {
+            row.removeCell(cell);
+        }
+        cell = row.createCell(columnIndex);
+        if (Objects.nonNull(cellStyle)) {
+            cell.setCellStyle(cellStyle);
+        }
+        cell.setCellValue("");
+    }
+
+    /**
      * 安全读取单元格数值。
      * <p>模板写入后的 CE/CF 可能是数字，也可能因为占位符替换被写成字符串；
      * 这里统一转换为 BigDecimal，转换失败时按 0 处理，保证 J 列静态值可稳定生成。</p>
@@ -1248,25 +1394,6 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         }
         return BigDecimal.ZERO;
     }
-
-    /**
-     * 汇总同一行多个数字单元格。
-     *
-     * @param row           当前数据行
-     * @param columnIndexes 需要汇总的列下标，POI 从 0 开始计数
-     * @return 汇总值
-     */
-    private BigDecimal sumNumericCells(Row row, int... columnIndexes) {
-        if (Objects.isNull(row) || Objects.isNull(columnIndexes)) {
-            return BigDecimal.ZERO;
-        }
-        BigDecimal total = BigDecimal.ZERO;
-        for (int columnIndex : columnIndexes) {
-            total = total.add(readNumericCell(row.getCell(columnIndex)));
-        }
-        return total;
-    }
-
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -2312,13 +2439,13 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     private Map<String, Object> buildExportTableMap(List<LhScheduleResult> list, Date scheduleDate) {
         Map<String, Object> tableMap = new HashMap<>(16);
 
-        // 优先使用前端传入的 scheduleDate 作为排程基准日；如果旧入口未传，
-        // 再从列表首条数据兜底，保证导出标题和班次日期仍有来源。
-        Date exportScheduleDate = Objects.nonNull(scheduleDate) ? scheduleDate : list.stream()
+        // 有导出数据时使用结果中的实际排程日期，保证标题与明细一致；
+        // 空结果场景再回退前端查询日期，使空模板仍能展示所选日期。
+        Date exportScheduleDate = list.stream()
                 .map(LhScheduleResult::getScheduleDate)
                 .filter(Objects::nonNull)
                 .findFirst()
-                .orElse(null);
+                .orElse(scheduleDate);
 
         // 班次标题不能写死。这里复用 listScheduleShiftDates 的排班日历规则，
         // 将 1~8 班对应的 MM/dd 回填到模板中的 {shiftDate1} ~ {shiftDate8}。
@@ -2485,36 +2612,75 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     }
 
     /**
-     * 构建模板列表数据
+     * 值为 0 时导出为空字符串，避免明细行出现无意义的 0。
+     * <p>应用于合计余量、胎胚库存、硫化班产、各班计划量/完成量等导出列。</p>
      *
-     * @param list         排程结果列表
-     * @param scheduleDate        导出入口传入的排程日期，用于固定 T 日完成量查询口径
-     * @param mouldChangePlanList 模具交替计划，用于按同批次、同排程日、同机台修正一班顺序
-     * @return 模板列表数据
+     * @param value 数值
+     * @return value 为 0 时返回空字符串，否则原样返回
      */
-    private List<Map<String, Object>> buildExportDataList(List<LhScheduleResult> list, Date scheduleDate,
-                                                          List<LhMouldChangePlan> mouldChangePlanList) {
-        List<Map<String, Object>> dataList = new ArrayList<>(list.size() + 1);
-        Map<String, LhRepairCapsule> capsuleMap = buildRepairCapsuleExportMap(list);
-        Map<Long, String> cxMachineCodeMap = buildCxMachineCodeExportMap(list);
-        Map<String, Object> todayNightFinishQtyMap = buildTodayNightFinishQtyExportMap(list, scheduleDate);
-        Map<String, String> recipeTypeMap = loadLhTrialStatusDictMap();
-        Map<String, String> endTypeMap = loadBizEndTypeDictMap();
+    private static Object zeroToEmpty(Integer value) {
+        return Objects.nonNull(value) && value.intValue() == 0 ? "" : value;
+    }
 
-        // 先按硫化机台升序（忽略大小写），再按同机台不同物料的收尾班次序号升序排（先收尾下机的物料排前面）
-        List<LhScheduleResult> sortedList = list.stream()
+    /**
+     * 按导出顺序排序排程结果。
+     * <p>先按硫化机台升序（忽略大小写），再按同机台不同物料的收尾班次序号升序（先收尾下机的物料排前面），
+     * 最后按物料编码升序。导出明细填充与收尾标识匹配均基于该顺序。</p>
+     *
+     * @param list 排程结果列表
+     * @return 排序后的列表
+     */
+    private List<LhScheduleResult> sortExportList(List<LhScheduleResult> list) {
+        return list.stream()
                 .sorted(Comparator
                         .comparing((LhScheduleResult r) -> StringUtils.defaultString(r.getLhMachineCode()), String.CASE_INSENSITIVE_ORDER)
                         .thenComparingInt(r -> findLastPlannedShift(r))
                         .thenComparing(r -> StringUtils.defaultString(r.getMaterialCode())))
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * 构建模板列表数据
+     *
+     * @param list         排程结果列表（已按导出顺序排序）
+     * @param scheduleDate        导出入口传入的排程日期，用于固定 T 日完成量查询口径
+     * @param mouldChangePlanList 模具交替计划，用于按同批次、同排程日、同机台修正一班顺序
+     * @return 模板列表数据及与Excel行对齐的排程结果
+     */
+    private ExportDataBuildResult buildExportDataList(List<LhScheduleResult> list, Date scheduleDate,
+                                                       List<LhMouldChangePlan> mouldChangePlanList) {
+        List<Map<String, Object>> dataList = new ArrayList<>(list.size() + 1);
+        List<LhScheduleResult> alignedExportList = new ArrayList<>(list.size() + 1);
+        Map<String, LhRepairCapsule> capsuleMap = buildRepairCapsuleExportMap(list);
+        Map<String, Object> todayNightFinishQtyMap = buildTodayNightFinishQtyExportMap(list, scheduleDate);
+        Map<String, String> recipeTypeMap = loadLhTrialStatusDictMap();
+        Map<String, String> endTypeMap = loadBizEndTypeDictMap();
+        Map<String, LhScheduleResult> beforeMaterialResultMap = this.buildBeforeMaterialResultMap(list, scheduleDate);
+        List<LhScheduleResult> cxMachineLookupList = new ArrayList<>(list);
+        cxMachineLookupList.addAll(beforeMaterialResultMap.values());
+        Map<Long, String> cxMachineCodeMap = buildCxMachineCodeExportMap(cxMachineLookupList);
+
+        // 导出顺序由 sortExportList 统一排序（机台升序 → 同机台收尾班次序号升序 → 物料编码升序），
+        // 此处直接按传入顺序遍历。
+        List<LhScheduleResult> sortedList = list;
 
         // 构建8班顺序值映射：同一物料按班次1~8遍历，每个班次内有计划量的记录按机台编码升序，顺序值从1~n连续编排
         Map<String, Map<Integer, Integer>> shiftOrderMap = buildContinuousShiftOrderMap(sortedList);
         Map<String, Integer> class1MouldChangeOrderMap = buildClass1MouldChangeOrderMap(mouldChangePlanList);
         Map<LhScheduleResult, ExportRowStyleFlag> rowStyleFlagMap = buildMachinePostCloseOutStyleFlagMap(sortedList);
+        Set<String> insertedReferenceMachineCodes = new HashSet<>();
 
         for (LhScheduleResult result : sortedList) {
+            LhScheduleResult beforeMaterialResult = beforeMaterialResultMap.get(result.getLhMachineCode());
+            boolean hasBeforeMaterialReference = this.isBeforeMaterialTriggerResult(result)
+                    && Objects.nonNull(beforeMaterialResult);
+            if (hasBeforeMaterialReference
+                    && insertedReferenceMachineCodes.add(result.getLhMachineCode())) {
+                Map<String, Object> referenceRow = this.buildBeforeMaterialReferenceRow(beforeMaterialResult,
+                        cxMachineCodeMap, recipeTypeMap, endTypeMap);
+                dataList.add(referenceRow);
+                alignedExportList.add(null);
+            }
             Map<String, Object> row = new HashMap<>(112);
             row.put("height", 17);
             row.put("lhMachineCode", result.getLhMachineCode());
@@ -2533,10 +2699,10 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
 
             // 成型机台号来自成型排程结果的 LH_SCHEDULE_IDS 反查，多个成型机台用分号拼接。
             row.put("cxMachineCode", cxMachineCodeMap.get(result.getId()));
-            row.put("todayNightFinishQty", result.getTotalFinishQty());
+            row.put("todayNightFinishQty", zeroToEmpty(result.getTotalFinishQty()));
             row.put("mouldSurplusQty", result.getMouldSurplusQty());
-            row.put("embryoStock", result.getEmbryoStock());
-            row.put("singleMouldShiftQty", result.getSingleMouldShiftQty());
+            row.put("embryoStock", zeroToEmpty(result.getEmbryoStock()));
+            row.put("singleMouldShiftQty", zeroToEmpty(result.getSingleMouldShiftQty()));
             row.put("leftRightMould", result.getLeftRightMould());
             row.put("mouldMethod", result.getMouldMethod());
             row.put("structureName", result.getStructureName());
@@ -2547,7 +2713,10 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             // 明细行的 dailyPlanQty 已按需求从 totalDailyPlanQty 改为 dailyPlanQty。
             // totalPlanQty 只是模板“总计”占位符，为了明细行保持同一日计划量展示，
             // 当前同步写入 dailyPlanQty；首行汇总会在 buildSummaryRow 中单独计算。
-            row.put("dailyPlanQty", (Objects.isNull(result.getTotalFinishQty()) ? 0 : result.getTotalFinishQty()) - (Objects.isNull(result.getTotalDailyPlanQty()) ? 0 : result.getTotalDailyPlanQty()));
+            // 20260810+ 合计余量为 0 时导出为空。
+            int dailyPlanQty = (Objects.isNull(result.getTotalFinishQty()) ? 0 : result.getTotalFinishQty())
+                    - (Objects.isNull(result.getTotalDailyPlanQty()) ? 0 : result.getTotalDailyPlanQty());
+            row.put("dailyPlanQty", dailyPlanQty == 0 ? "" : dailyPlanQty);
             row.put("totalPlanQty", result.getDailyPlanQty());
             row.put("totalDailyPlanQty", result.getTotalDailyPlanQty());
             row.put("monthPlanSumTotal", result.getMonthPlanSumTotal());
@@ -2556,6 +2725,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             // 公式列占位符：模板中 BZ/CA/CB 列使用 {.nightPlanQtyTotal} / {.nightFinishQtyTotal} /
             // {.totalPlanQtyFormula} 占位符标记列位置，writeMultiList 会将其替换为空字符串，
             // 后续由 fillExportSummaryFormulas 根据占位符映射动态定位并写入实际值/公式。
+            row.put("sameMaterialPlanQtyTotal", "");
             row.put("nightPlanQtyTotal", "");
             row.put("nightFinishQtyTotal", "");
             row.put("totalPlanQtyFormula", "");
@@ -2564,10 +2734,14 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             // 与模板中的 {.class1PlanQty}、{.class8Analysis} 等占位符一一对应。
             for (int shift = 1; shift <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shift++) {
                 row.put("class" + shift + "LeftRightMould", buildShiftLeftRightMould(result, shift));
-                row.put("class" + shift + "Order", resolveExportShiftOrder(
-                        shiftOrderMap, class1MouldChangeOrderMap, result, shift));
-                row.put("class" + shift + "PlanQty", getClassPlanQty(result, shift));
-                row.put("class" + shift + "FinishQty", getClassFinishQty(result, shift));
+                Object shiftOrder = resolveExportShiftOrder(
+                        shiftOrderMap, class1MouldChangeOrderMap, result, shift);
+                if (shift == 1 && hasBeforeMaterialReference) {
+                    shiftOrder = 2;
+                }
+                row.put("class" + shift + "Order", shiftOrder);
+                row.put("class" + shift + "PlanQty", zeroToEmpty(getClassPlanQty(result, shift)));
+                row.put("class" + shift + "FinishQty", zeroToEmpty(getClassFinishQty(result, shift)));
                 Object shiftType = buildShiftType(result, shift, endTypeMap);
                 Object shiftLhType = buildShiftMouldMethod(result, shift, recipeTypeMap);
                 Object shiftProductStatus = buildShiftProductStatus(result, shift, recipeTypeMap);
@@ -2583,8 +2757,165 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             applyExportRowStyle(row, rowStyleFlagMap.get(result));
 
             dataList.add(row);
+            alignedExportList.add(result);
         }
-        return dataList;
+        return new ExportDataBuildResult(dataList, alignedExportList);
+    }
+
+    /**
+     * 构建前规格参考行。
+     * <p>参考行沿用历史收尾记录的规格及状态信息；8个班次的顺序、计划量、实际量，
+     * 以及当前计划相关的汇总量、库存、胶囊次数和产量字段不写入，保持为空。</p>
+     *
+     * @param beforeMaterialResult 前规格历史排程记录
+     * @param cxMachineCodeMap     成型机台映射
+     * @param recipeTypeMap        示方类型字典
+     * @param endTypeMap           收尾类型字典
+     * @return 前规格参考行
+     */
+    private Map<String, Object> buildBeforeMaterialReferenceRow(
+            LhScheduleResult beforeMaterialResult,
+            Map<Long, String> cxMachineCodeMap,
+            Map<String, String> recipeTypeMap,
+            Map<String, String> endTypeMap) {
+        Map<String, Object> referenceRow = new HashMap<>(96);
+        referenceRow.put("height", 17);
+        referenceRow.put("lhMachineCode", beforeMaterialResult.getLhMachineCode());
+        referenceRow.put("materialCode", beforeMaterialResult.getMaterialCode());
+        referenceRow.put("materialDesc", beforeMaterialResult.getMaterialDesc());
+        referenceRow.put("embryoCode", beforeMaterialResult.getEmbryoCode());
+        referenceRow.put("mainMaterialDesc", beforeMaterialResult.getMainMaterialDesc());
+        referenceRow.put("structureName", beforeMaterialResult.getStructureName());
+        referenceRow.put("cxMachineCode", cxMachineCodeMap.get(beforeMaterialResult.getId()));
+        referenceRow.put("remark", beforeMaterialResult.getRemark());
+        referenceRow.put("mouldSurplusQty", beforeMaterialResult.getMouldSurplusQty());
+        referenceRow.put("leftRightMould", beforeMaterialResult.getLeftRightMould());
+        referenceRow.put("mouldMethod", beforeMaterialResult.getMouldMethod());
+        referenceRow.put("isEnd", this.buildUnifiedShiftType(beforeMaterialResult, endTypeMap));
+        referenceRow.put("trialStatus", this.buildUnifiedLhType(beforeMaterialResult, recipeTypeMap));
+        referenceRow.put("monthPlanSumTotal", beforeMaterialResult.getMonthPlanSumTotal());
+
+        for (int shift = 1; shift <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shift++) {
+            referenceRow.put("class" + shift + "LeftRightMould",
+                    this.buildShiftLeftRightMould(beforeMaterialResult, shift));
+            Object shiftType = this.buildShiftType(beforeMaterialResult, shift, endTypeMap);
+            referenceRow.put("class" + shift + "IsEnd", shiftType);
+            referenceRow.put("class" + shift + "Type", shiftType);
+            referenceRow.put("class" + shift + "LhType",
+                    this.buildShiftProductStatus(beforeMaterialResult, shift, recipeTypeMap));
+            referenceRow.put("class" + shift + "MouldMethod",
+                    this.buildShiftMouldMethod(beforeMaterialResult, shift, recipeTypeMap));
+            referenceRow.put("class" + shift + "Analysis", this.getClassAnalysis(beforeMaterialResult, shift));
+            referenceRow.put("class" + shift + "Dot", "");
+        }
+        return referenceRow;
+    }
+
+    /**
+     * 导出明细构建结果。
+     */
+    private static class ExportDataBuildResult {
+
+        /** Excel模板明细数据。 */
+        private final List<Map<String, Object>> dataList;
+
+        /** 与Excel明细行对齐的排程结果，前规格参考行对应null。 */
+        private final List<LhScheduleResult> alignedExportList;
+
+        /**
+         * 构造导出明细构建结果。
+         *
+         * @param dataList         Excel模板明细数据
+         * @param alignedExportList 与Excel明细行对齐的排程结果
+         */
+        private ExportDataBuildResult(List<Map<String, Object>> dataList,
+                                      List<LhScheduleResult> alignedExportList) {
+            this.dataList = dataList;
+            this.alignedExportList = alignedExportList;
+        }
+
+        /** @return Excel模板明细数据 */
+        private List<Map<String, Object>> getDataList() {
+            return dataList;
+        }
+
+        /** @return 与Excel明细行对齐的排程结果 */
+        private List<LhScheduleResult> getAlignedExportList() {
+            return alignedExportList;
+        }
+    }
+
+    /**
+     * 批量查询早班换模或换活字块机台近7天最近一次收尾的前规格物料。
+     * <p>先从当前导出明细中收集命中机台，再通过一条SQL按机台分组取最近收尾记录，
+     * 避免逐台查询。未命中机台、导出日期为空或工厂为空时不访问数据库。</p>
+     *
+     * @param list         当前导出排程结果
+     * @param scheduleDate 当前导出排程日期
+     * @return key=硫化机台编号，value=前规格历史排程记录
+     */
+    private Map<String, LhScheduleResult> buildBeforeMaterialResultMap(
+            List<LhScheduleResult> list, Date scheduleDate) {
+        if (CollUtil.isEmpty(list) || Objects.isNull(scheduleDate)) {
+            return Collections.emptyMap();
+        }
+        List<LhScheduleResult> triggerResults = list.stream()
+                .filter(this::isBeforeMaterialTriggerResult)
+                .collect(Collectors.toList());
+        if (CollUtil.isEmpty(triggerResults)) {
+            return Collections.emptyMap();
+        }
+        String factoryCode = triggerResults.stream()
+                .map(LhScheduleResult::getFactoryCode)
+                .filter(StringUtils::isNotBlank)
+                .findFirst()
+                .orElse(null);
+        if (StringUtils.isBlank(factoryCode)) {
+            return Collections.emptyMap();
+        }
+        Date closeOutBefore = triggerResults.stream()
+                .map(LhScheduleResult::getClass1StartTime)
+                .filter(Objects::nonNull)
+                .min(Date::compareTo)
+                .orElse(null);
+        if (Objects.isNull(closeOutBefore)) {
+            return Collections.emptyMap();
+        }
+        List<String> machineCodes = triggerResults.stream()
+                .map(LhScheduleResult::getLhMachineCode)
+                .filter(StringUtils::isNotBlank)
+                .distinct()
+                .collect(Collectors.toList());
+        if (CollUtil.isEmpty(machineCodes)) {
+            return Collections.emptyMap();
+        }
+        List<LhScheduleResult> beforeMaterialList = scheduleResultMapper
+                .selectLatestCloseOutBeforeMaterial(
+                        factoryCode, scheduleDate, closeOutBefore, machineCodes);
+        if (CollUtil.isEmpty(beforeMaterialList)) {
+            return Collections.emptyMap();
+        }
+        return beforeMaterialList.stream()
+                .filter(item -> StringUtils.isNotBlank(item.getLhMachineCode()))
+                .filter(item -> StringUtils.isNotBlank(item.getMaterialCode()))
+                .collect(Collectors.toMap(
+                        LhScheduleResult::getLhMachineCode,
+                        item -> item,
+                        (first, second) -> first));
+    }
+
+    /**
+     * 判断排程结果是否触发前规格物料查询。
+     *
+     * @param result 排程结果
+     * @return true-早班有计划量且排程类型为换模或换活字块
+     */
+    private boolean isBeforeMaterialTriggerResult(LhScheduleResult result) {
+        if (Objects.isNull(result) || Objects.isNull(result.getClass1PlanQty())
+                || result.getClass1PlanQty() <= 0) {
+            return false;
+        }
+        return "02".equals(result.getScheduleType()) || "03".equals(result.getScheduleType());
     }
 
     /**
@@ -3260,7 +3591,8 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      *
      * <p>规则：同一机台发生收尾后，后续再次排产的规格视为收尾后的新开规格或再生产，
      * 机台/物料号/物料描述列涂灰；同时把对应收尾行的机台列涂灰。</p>
-     * <p>规则 3（已移至 exportData 方法）：日计划量 ≤ 400，dailyPlanQty 列涂淡橙。</p>
+     * <p>规则 3（已移至 exportData 方法）：8 个班次内存在收尾标识（classXIsEnd ∈ 1/2/3）的行，
+     * dailyPlanQty（合计余量）列涂淡橙；不再按 |合计余量| ≤ 400 判断。</p>
      *
      * @param row       导出行数据
      * @param styleFlag 导出行样式标记

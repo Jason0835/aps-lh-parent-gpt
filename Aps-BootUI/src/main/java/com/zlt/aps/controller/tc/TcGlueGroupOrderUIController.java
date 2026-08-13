@@ -7,6 +7,7 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
+import com.zlt.aps.common.utils.ExportSortParamUtil;
 import com.zlt.aps.tc.api.domain.entity.TcGlueGroupOrder;
 import com.zlt.aps.tc.api.service.ITcGlueGroupOrderRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
@@ -59,6 +60,7 @@ public class TcGlueGroupOrderUIController extends BaseUIController<TcGlueGroupOr
     @PostMapping("/list")
     @ResponseBody
     public TableDataInfo list(TcGlueGroupOrder query) {
+        ExportSortParamUtil.applySortParams(query, this.getRequest());
         return iTcGlueGroupOrderService.list(query);
     }
 
@@ -97,6 +99,7 @@ public class TcGlueGroupOrderUIController extends BaseUIController<TcGlueGroupOr
     @GetMapping("/export")
     @RequiresPermissions("tc:tcGlueGroupOrder:export")
     public void export(HttpServletResponse response, TcGlueGroupOrder entity) throws IOException {
+        ExportSortParamUtil.applySortParams(entity, this.getRequest());
         String fileName = I18nUtil.getMessage("ui.data.column.tc.glueGroupOrder.modelName");
         byte[] excelBytes = iTcGlueGroupOrderService.exportData(entity, fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);

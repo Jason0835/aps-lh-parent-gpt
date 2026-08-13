@@ -97,6 +97,7 @@ public class TmGlueGroupOrderController extends AbstractDocBizController<TmGlueG
     protected List<TmGlueGroupOrder> listExportData(TmGlueGroupOrder obj) {
         QueryWrapper<TmGlueGroupOrder> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
+        wrapper.last("ORDER BY " + this.getOrderBy(obj));
         return tmGlueGroupOrderMapper.selectList(wrapper);
     }
 

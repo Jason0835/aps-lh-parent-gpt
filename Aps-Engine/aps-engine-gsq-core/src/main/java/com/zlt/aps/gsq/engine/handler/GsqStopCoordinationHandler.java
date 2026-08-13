@@ -108,29 +108,13 @@ public class GsqStopCoordinationHandler extends AbsGsqScheduleStepHandler {
      * 将指定班次计划量清零。
      */
     private void setShiftPlanZero(GsqScheduleResultVo vo, int classIndex) {
-        switch (classIndex) {
-            case 1: vo.setClass1PlanQty(0D); break;
-            case 2: vo.setClass2PlanQty(0D); break;
-            case 3: vo.setClass3PlanQty(0D); break;
-            case 4: vo.setClass4PlanQty(0D); break;
-            case 5: vo.setClass5PlanQty(0D); break;
-            case 6: vo.setClass6PlanQty(0D); break;
-            default: break;
-        }
+        vo.setFieldValueByFieldName("class" + classIndex + "PlanQty", 0D);
     }
 
     /**
      * 设置指定班次分析说明。
      */
     private void setShiftAnalysis(GsqScheduleResultVo vo, int classIndex, String analysis) {
-        switch (classIndex) {
-            case 1: vo.setClass1Analysis(analysis); break;
-            case 2: vo.setClass2Analysis(analysis); break;
-            case 3: vo.setClass3Analysis(analysis); break;
-            case 4: vo.setClass4Analysis(analysis); break;
-            case 5: vo.setClass5Analysis(analysis); break;
-            case 6: vo.setClass6Analysis(analysis); break;
-            default: break;
-        }
+        vo.setFieldValueByFieldName("class" + classIndex + "Analysis", analysis);
     }
 }

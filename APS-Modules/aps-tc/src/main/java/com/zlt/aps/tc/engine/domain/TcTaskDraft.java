@@ -52,11 +52,26 @@ public class TcTaskDraft {
     /** 班次顺序 */
     private Integer shiftOrder;
 
+    /** 成型需求原始映射到的胎侧逻辑班次，两班前瞻或自动提前时与实际排程班次不同 */
+    private Integer sourceShiftOrder;
+
     /** TASK_SORT 阶段生成的稳定基础优先级，数值越小越优先 */
     private Integer baseSortIndex;
 
     /** 当前班成型胎侧需求量，单位米 */
     private BigDecimal currentShiftDemandQty;
+
+    /** 同胎侧下一排程班的成型需求量，单位米 */
+    private BigDecimal nextShiftDemandQty;
+
+    /** 当班与下一排程班需求合计，单位米 */
+    private BigDecimal twoShiftDemandQty;
+
+    /** 两班需求扣减班初滚动库存后的缺口，单位米 */
+    private BigDecimal twoShiftStockGapQty;
+
+    /** 滚动库存是否已覆盖当班与下一排程班需求 */
+    private Boolean twoShiftStockCovered;
 
     /** 保证范围内成型胎侧需求量，单位米 */
     private BigDecimal guardDemandQty;
@@ -263,6 +278,9 @@ public class TcTaskDraft {
 
     /** 新规格判断与提前排产证据 */
     private TcNewSpecInfo newSpecInfo;
+
+    /** 两班库存判断中由下一排程班需求反向生成的当班候选标识 */
+    private Boolean twoShiftLeadTask;
 
     /** 是否命中小胶种连续生产规则 */
     private Boolean smallGlueFlag;

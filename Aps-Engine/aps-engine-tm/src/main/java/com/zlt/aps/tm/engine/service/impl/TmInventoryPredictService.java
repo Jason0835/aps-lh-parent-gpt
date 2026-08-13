@@ -135,9 +135,6 @@ public class TmInventoryPredictService implements ITmInventoryPredictService {
                     stockDate, String.join(",", missingCodeList)));
         }
         for (String treadCode : missingCodeList) {
-            String message = MessageFormat.format(I18nUtil.getMessage("ui.tm.schedule.stockMissingZero"),
-                    stockDate, treadCode);
-            context.getIssueCollector().addStockMissingIssue(treadCode, message);
             log.warn("[TM_STOCK_MISSING] policy=ZERO, scheduleDate={}, treadCode={}",
                     DateUtil.formatDate(scheduleDate), treadCode);
         }

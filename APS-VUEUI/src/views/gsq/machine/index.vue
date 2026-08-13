@@ -76,7 +76,7 @@ import TltUploadForm from "@/views/components/tltUploadForm.vue";
 export default {
   name: "GsqMachine",
   components: { InfoDialog, TltUploadForm },
-  dicts: ["STATUS", "CLASS_SHIFT", "CLASS_NUM", "CLASS_NUM_THREE"],
+  dicts: ["STATUS", "LH_CLASS_SHIFT", "class_num_three_plan"],
   provide() {
     return {
       parentDict: this.dict,
@@ -161,7 +161,7 @@ export default {
             if (this.isEmpty(value)) {
               return "";
             }
-            return this.selectDictLabels(this.dict.type.CLASS_SHIFT, value);
+            return this.selectDictLabels(this.dict.type.LH_CLASS_SHIFT, value);
           },
         },
         {
@@ -174,7 +174,7 @@ export default {
               return "";
             }
             return this.selectDictLabels(
-              this.dict.type.CLASS_NUM_THREE,
+              this.dict.type.class_num_three_plan,
               value
             );
           },
@@ -187,8 +187,8 @@ export default {
             return (
               <el-switch
                 value={row.status}
-                active-value="0"
-                inactive-value="1"
+                active-value="1"
+                inactive-value="0"
                 onChange={(value) => this.handleChangeStatus(value, row)}
               />
             );
@@ -240,7 +240,7 @@ export default {
   methods: {
     handleChangeStatus(status, row) {
       let title =
-        status === "0"
+        status === "1"
           ? this.$t("ui.biz.alter.isOpen")
           : this.$t("ui.biz.alter.isStop");
 

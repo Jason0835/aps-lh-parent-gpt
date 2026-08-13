@@ -4,7 +4,10 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.zlt.aps.utils.AppUtils;
+import com.zlt.aps.autoLogin.feign.FeignTokenHelper;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ShiftConfig;
+import com.zlt.aps.cd90.api.domain.entity.Cd90StorageLaneLimit;
 import com.zlt.aps.cd90.api.domain.vo.Cd90RollingCheckRequest;
 import com.zlt.aps.cd90.engine.domain.Cd90ScheduleTask;
 import com.zlt.aps.cd90.engine.mapper.Cd90AutoScheduleShiftMapper;
@@ -16,10 +19,15 @@ import com.zlt.aps.cd90.engine.service.Cd90RollingScheduleTaskService;
 import com.zlt.aps.cd90.engine.service.Cd90RollingShiftStockService;
 import com.zlt.aps.cd90.engine.service.Cd90RollingTargetResolver;
 import com.zlt.aps.cd90.engine.service.Cd90ScheduleTaskService;
+import com.zlt.aps.cd90.mapper.Cd90StorageLaneLimitMapper;
 import com.zlt.aps.cd90.service.Cd90RollingStabilityService;
 import com.zlt.aps.cd90.service.Cd90TimedRollingAsyncExecutor;
 import com.zlt.aps.cd90.service.Cd90TimedRollingCheckService;
+import com.zlt.aps.itf.mes.IMesItfService;
+import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
+import com.zlt.aps.itf.vo.MesShiftStockSyncRequest;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -27,13 +35,16 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /** CD90定时滚动排程检查协调服务实现。 */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class Cd90TimedRollingCheckServiceImpl implements Cd90TimedRollingCheckService {
@@ -47,6 +58,8 @@ public class Cd90TimedRollingCheckServiceImpl implements Cd90TimedRollingCheckSe
     private final Cd90RollingShiftStockService rollingShiftStockService;
     private final Cd90ScheduleTaskService taskService;
     private final Cd90TimedRollingAsyncExecutor timedRollingAsyncExecutor;
+    private final IMesItfService mesItfService;
+    private final Cd90StorageLaneLimitMapper storageLaneLimitMapper;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -82,8 +95,20 @@ public class Cd90TimedRollingCheckServiceImpl implements Cd90TimedRollingCheckSe
             return;
         }
         Cd90RollingTarget target = optionalTarget.get();
+        if (!this.syncTargetShiftStock(target)) {
+            skippedFactories.add(skip(factoryCode, "SHIFT_STOCK_SYNC_FAILED"));
+            return;
+        }
+        if (!this.syncTargetStorageLane(target)) {
+            skippedFactories.add(skip(factoryCode, "STORAGE_LANE_SYNC_FAILED"));
+            return;
+        }
         if (!rollingShiftStockService.exists(target)) {
             skippedFactories.add(skip(factoryCode, "SHIFT_STOCK_NOT_READY"));
+            return;
+        }
+        if (!this.isTargetStorageLaneReady(target)) {
+            skippedFactories.add(skip(factoryCode, "STORAGE_LANE_NOT_READY"));
             return;
         }
         Date scheduleDate = Date.from(target.getScheduleDate().atStartOfDay(
@@ -94,6 +119,7 @@ public class Cd90TimedRollingCheckServiceImpl implements Cd90TimedRollingCheckSe
         }
         String inputVersion = rollingInputVersionService.fingerprint(target);
         String stateKey = factoryCode + ":" + target.getScheduleDate()
+                + ":" + target.getResourceBaselineDate()
                 + ":" + target.getTargetShiftCode();
         boolean stable = rollingStabilityService.observe(stateKey, inputVersion,
                 triggerTime.atZone(ZoneId.systemDefault()).toInstant(),
@@ -110,7 +136,7 @@ public class Cd90TimedRollingCheckServiceImpl implements Cd90TimedRollingCheckSe
         }
         Cd90ScheduleTask task = rollingTaskService.createPending(factoryCode, scheduleDate,
                 requestSnapshot(target, inputVersion), idempotencyKey);
-        if (!idempotencyKey.equals(task.getIdempotencyKey())) {
+        if (task == null) {
             skippedFactories.add(skip(factoryCode, "SCHEDULE_TASK_BUSY"));
             return;
         }
@@ -119,8 +145,70 @@ public class Cd90TimedRollingCheckServiceImpl implements Cd90TimedRollingCheckSe
         created.put("factoryCode", factoryCode);
         created.put("taskId", task.getTaskId());
         created.put("batchNo", target.getBatchNo());
+        created.put("resourceBaselineDate", target.getResourceBaselineDate());
         created.put("targetShiftCode", target.getTargetShiftCode());
         createdTasks.add(created);
+    }
+
+    /**
+     * 在读取库存和计算输入指纹前同步目标交班班次库存。
+     */
+    private boolean syncTargetShiftStock(Cd90RollingTarget target) {
+        ZoneId zoneId = ZoneId.systemDefault();
+        MesShiftStockSyncRequest syncRequest = new MesShiftStockSyncRequest();
+        syncRequest.setFactoryCode(target.getFactoryCode());
+        syncRequest.setCompanyCode(target.getFactoryCode());
+        syncRequest.setStockDate(Date.from(target.getHandoverTime().toLocalDate()
+                .atStartOfDay(zoneId).toInstant()));
+        syncRequest.setShiftCode(target.getTargetShiftCode());
+        syncRequest.setShiftStartTime(Date.from(target.getHandoverTime()
+                .atZone(zoneId).toInstant()));
+        try {
+            AjaxResult result = FeignTokenHelper.callWithToken(
+                    () -> this.mesItfService.syncCd90ShiftStock(syncRequest));
+            return result != null
+                    && Objects.equals(AppUtils.AJAX_RESULT_SUCCESS, result.get(AjaxResult.CODE_TAG));
+        } catch (Exception exception) {
+            log.error("直裁定时滚动前班次库存同步失败，factoryCode={}，shiftCode={}，shiftStartTime={}",
+                    target.getFactoryCode(), target.getTargetShiftCode(), target.getHandoverTime(), exception);
+            return false;
+        }
+    }
+
+    /**
+     * 在输入指纹计算前同步目标班次对应日期的库排快照。
+     */
+    private boolean syncTargetStorageLane(Cd90RollingTarget target) {
+        AuxReqSyncDataLogs syncRequest = new AuxReqSyncDataLogs();
+        syncRequest.setFactoryCode(target.getFactoryCode());
+        HashMap<String, Object> queryParams = new HashMap<>();
+        queryParams.put("laneDate", target.getResourceBaselineDate().toString());
+        queryParams.put("shiftCode", target.getTargetShiftCode());
+        syncRequest.setQueryParams(queryParams);
+        try {
+            AjaxResult result = FeignTokenHelper.callWithToken(
+                    () -> this.mesItfService.syncCd90StorageLaneLimit(syncRequest));
+            return result != null
+                    && Objects.equals(AppUtils.AJAX_RESULT_SUCCESS, result.get(AjaxResult.CODE_TAG));
+        } catch (Exception exception) {
+            log.error("直裁定时滚动前库排同步失败，factoryCode={}，laneDate={}，shiftCode={}",
+                    target.getFactoryCode(), target.getResourceBaselineDate(),
+                    target.getTargetShiftCode(), exception);
+            return false;
+        }
+    }
+
+    /**
+     * 检查目标班次对应日期至少存在一条有效库排。
+     */
+    private boolean isTargetStorageLaneReady(Cd90RollingTarget target) {
+        Long count = this.storageLaneLimitMapper.selectCount(
+                new LambdaQueryWrapper<Cd90StorageLaneLimit>()
+                        .eq(Cd90StorageLaneLimit::getFactoryCode, target.getFactoryCode())
+                        .eq(Cd90StorageLaneLimit::getLaneDate,
+                                java.sql.Date.valueOf(target.getResourceBaselineDate()))
+                        .eq(Cd90StorageLaneLimit::getShiftCode, target.getTargetShiftCode()));
+        return count != null && count > 0;
     }
 
     private List<String> resolveFactoryCodes(Cd90RollingCheckRequest request) {

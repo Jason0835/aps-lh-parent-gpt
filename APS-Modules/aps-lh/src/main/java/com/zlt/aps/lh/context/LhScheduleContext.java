@@ -8,8 +8,11 @@ import com.zlt.aps.lh.api.domain.entity.*;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.enums.SingleControlMachineModeEnum;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
+import com.zlt.aps.lh.component.StructureShiftInMachineIndex;
 import com.zlt.aps.lh.engine.strategy.support.*;
 import com.zlt.aps.lh.handler.SkuMonthPlanCalculator;
+import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
+import com.zlt.aps.lh.util.ShiftFieldUtil;
 import com.zlt.aps.lh.util.SkuConstructionRefResolverUtil;
 import com.zlt.aps.mdm.api.domain.entity.*;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
@@ -73,14 +76,12 @@ public class LhScheduleContext {
     /**
      * 排程窗口结束日期 T+2 日：由 {@link #scheduleDate} + 2 得到，
      * 用于 day1/day2/day3 月计划映射、产能计算、加机台、收尾、欠产追补、换模日上限、
-     * 跨月检测、滚动续作追加起点、班次日期反推等排程核心逻辑，
+     * 跨月检测、班次日期反推等排程核心逻辑，
      * 与仅用于业务保存/查询的 {@link #scheduleTargetDate}（T+1）分离。
      */
     private Date windowEndDate;
 
-    /**
-     * 当前排程日期，滚动变化
-     */
+    /** 当前排程日期 */
     private Date currentScheduleDate;
     /**
      * 批次号
@@ -164,6 +165,22 @@ public class LhScheduleContext {
      * 年月 -> 定稿排产版本，跨月加载月计划和结构机台统计时按自然月取版本
      */
     private Map<String, String> productionVersionByYearMonthMap = new LinkedHashMap<>();
+    /**
+     * 结构名称 -> 结构转产配置中的最大收尾自然日。
+     * <p>S4.2在月计划加载完成后，按排程窗口[T,T+2]覆盖的每个自然月及该月排产版本查询
+     * {@code T_MP_STRUCTURE_ALLOCATION}，将非空END_DAY还原为完整自然日后按结构取最大值。
+     * S4.5新增SKU选机只读该快照，最大日期不在窗口内或结构无记录时不触发结构收尾对齐；
+     * SKU排序不得读取或扩大该快照，应使用独立的structurePriorityMaxEndingDateMap。</p>
+     */
+    private Map<String, LocalDate> structureMaxEndingDateMap = new LinkedHashMap<>(16);
+    /**
+     * 结构名称 -> SKU排序使用的结构转产最大收尾自然日。
+     * <p>S4.2按参数{@code SYS0304002}确定严格小于阈值时可能命中的日期范围，复用结构转产表
+     * 的工厂、年月、排产版本、正常计划类型和结构名称查询口径，将非空END_DAY还原为完整
+     * 自然日并按结构取最大值。S4.4/S4.5排序仅从该快照按结构计算一次距离天数，再把命中结果
+     * 应用于当前参与排产的同结构全部SKU；该快照与三天结构收尾对齐快照隔离，禁止用于选机。</p>
+     */
+    private Map<String, LocalDate> structurePriorityMaxEndingDateMap = new LinkedHashMap<>(16);
     /**
      * 物料+产品状态+年月 -> 月累计完成量，避免同一物料不同产品状态或跨月时完成量串月
      */
@@ -361,13 +378,9 @@ public class LhScheduleContext {
      */
     private List<LhScheduleResult> previousCureFormulaResultList = new ArrayList<>();
     /**
-     * 前日模具交替计划列表，供滚动衔接继承到本批次
-     */
-    private List<LhMouldChangePlan> previousMouldChangePlanList = new ArrayList<>();
-    /**
      * 业务目标日前一日模具交替计划列表，仅供“前日交替计划机台反选SKU”使用。
-     * <p>该列表固定按 {@link #scheduleTargetDate} 前一日查询，不复用滚动排程的
-     * {@link #previousMouldChangePlanList}，避免强制重排时两种历史日期口径互相污染。</p>
+     * <p>该列表固定按 {@link #scheduleTargetDate} 前一日查询，与前日排程结果加载的
+     * 窗口起点口径互相隔离。</p>
      */
     private List<LhMouldChangePlan> historicalReverseMouldChangePlanList = new ArrayList<>();
     /**
@@ -378,26 +391,13 @@ public class LhScheduleContext {
     private List<HistoricalReverseSelectionDirective> historicalReverseSelectionDirectiveList =
             new ArrayList<HistoricalReverseSelectionDirective>();
     /**
-     * 滚动排程继承结果列表，仅存放本批次继承的排程结果
-     */
-    private List<LhScheduleResult> rollingInheritedScheduleResultList = new ArrayList<>();
-    /**
-     * 滚动排程继承计划量Map，key=materialCode_productStatus；ScheduleAdjustHandler据此从同状态待排量中扣减
-     */
-    private Map<String, Integer> inheritedPlanQtyMap = new HashMap<>();
-    /**
-     * 是否已执行滚动排程衔接，影响结转口径和前日日期解析
-     */
-    private boolean rollingScheduleHandoff;
-    /**
      * SKU按结构归集, key=structureName, value=SKU排程DTO列表
      */
     private Map<String, List<SkuScheduleDTO>> structureSkuMap = new LinkedHashMap<>();
     /**
      * 结构最低机台规则使用的全量结构SKU快照。
-     * <p>该快照在S4.3按现有结构分组一次性冻结，不受后续待排结构视图出队影响；规则不再以
-     * “当前3天内可收尾”为准入条件。S4.4续作和换活字块全部完成后，结构停产保机统一从该快照
-     * 解析结构归属；S4.5选机继续使用同一快照比较待排SKU与保机前物料的结构。</p>
+     * <p>该快照在S4.3按现有结构分组一次性冻结，不受后续待排结构视图出队影响；
+     * 结构收尾对齐规则统一从该快照解析结构归属，并比较待排SKU与候选机台前物料的结构。</p>
      */
     private Map<String, List<SkuScheduleDTO>> structureMinMachineSkuSnapshotMap = new LinkedHashMap<>();
     /**
@@ -405,50 +405,26 @@ public class LhScheduleContext {
      */
     private Map<String, Integer> structureMinVulcanizingMachineMap = new LinkedHashMap<>();
     /**
-     * 尚未完成全部SKU排产的收尾结构临时保护机台，key=运行态机台编码，value=结构名称。
-     * <p>临时保护阻止后续SKU提前选走已占用机台；结构完成后按最终判断清除或转为统一释放时间，
-     * 窗口末班机台数已达到最低值时可提前确认不命中并清除。</p>
+     * S4.4 共用胎胚收尾均衡可调整物理机台快照，用于过程对账和最终未均衡原因分类。
+     * <p>只登记仍满足均衡适用范围的机台，不含非共用胎胚或不足两台组内的机台。</p>
      */
-    private Map<String, String> endingStructureProtectedMachineMap = new LinkedHashMap<>();
+    private Set<String> sharedEmbryoEndingBalanceEligibleMachineCodeSet =
+            new LinkedHashSet<String>(8);
     /**
-     * 已可提前确认不命中最低机台保留规则的结构集合。
-     *
-     * <p>仅当结构当前已有量的最晚班次已经是排程窗口最后一班，且该班有量物理机台数
-     * 已达到最低配置时登记。后续待排SKU只能增加窗口末班机台数，不能把最晚班次继续后移，
-     * 因此这些结构无需继续临时锁住提前收尾机台，避免影响正常换活字块、历史反选和新增选机。</p>
+     * 结构收尾对齐在机机台统计缓存（内存态，不落库）。
+     * <p>S4.5新增选机开始前由{@link com.zlt.aps.lh.component.StructureEndingAlignmentService}
+     * 基于续作+换活字块完成后的实时排程结果构建，选机过程中随结果提交增量更新。</p>
      */
-    private Set<String> structureMinMachineConfirmedNonRetainedStructureSet = new LinkedHashSet<>();
-    /**
-     * 命中结构最低机台数保留规则的结构名称集合
-     */
-    private Set<String> structureMinMachineRetainedStructureSet = new LinkedHashSet<>();
-    /**
-     * 命中规则后的机台统一释放时间，key=运行态机台编码，value=结构最晚有量班次结束时间
-     */
-    private Map<String, Date> structureMinMachineRetentionEndTimeMap = new LinkedHashMap<>();
-    /**
-     * 结构停产保机机台的前物料编码，key=运行态机台编码。
-     * <p>该快照在S4.4阶段级判断命中时写入，新增选机不得通过机台后续可变的当前物料反推结构，
-     * 必须固定使用真正触发保机的前物料进行同结构放行或不同结构拦截。</p>
-     */
-    private Map<String, String> structureMinMachineRetentionPreMaterialMap = new LinkedHashMap<>();
-    /**
-     * 结构停产保机机台的前物料结构，key=运行态机台编码。
-     * <p>同结构SKU允许在保机零量班次换模或换活字块；不同结构SKU只能在统一释放时间后使用机台。</p>
-     */
-    private Map<String, String> structureMinMachineRetentionPreStructureMap = new LinkedHashMap<>();
-    /**
-     * 结构停产保机前物料最后实际生产结束时间，key=运行态机台编码。
-     * <p>同结构接管时以该时间作为最早切换基准，不使用为了保机而顺延后的机台预计结束时间。</p>
-     */
-    private Map<String, Date> structureMinMachineRetentionActualEndTimeMap = new LinkedHashMap<>();
+    private StructureShiftInMachineIndex structureShiftInMachineIndex;
     /**
      * 业务日期 -> 产品结构 -> 计划硫化机台数，来源于月计划统计表 dayN.lhMachines
      */
     private Map<LocalDate, Map<String, Integer>> structurePlanMachineCountMap =
             new LinkedHashMap<LocalDate, Map<String, Integer>>(4);
     /**
-     * 业务日期 -> 产品结构 -> 已排硫化机台编码集合，按 Set 去重后用于提前生产准入判断
+     * 业务日期 -> 产品结构 -> 已排硫化机台运行态编码集合。
+     * <p>集合保留 KxxxxL/KxxxxR 原码，保证单侧结果回滚时不会误删仍在生产的配对侧；
+     * 结构计数和候选存在性判断时再统一按 Kxxxx 物理机台去重。</p>
      */
     private Map<LocalDate, Map<String, Set<String>>> structureScheduledMachineCodeMap =
             new LinkedHashMap<LocalDate, Map<String, Set<String>>>(4);
@@ -1166,8 +1142,52 @@ public class LhScheduleContext {
     }
 
     /**
+     * 基于当前排程结果重建结构和 SKU 已排机台运行态。
+     *
+     * <p>S4.4 换活字块与 S4.5 新增排产都依赖该统计执行提前生产机台数门禁，
+     * 必须在各阶段开始前纳入已经落地的续作、换活字块和新增结果。结构机台数在读取时
+     * 统一按物理机台去重，单控 L/R 结果不会重复计数。</p>
+     *
+     * @param shifts 排程窗口班次
+     * @return 实际登记的“结果业务日”数量
+     */
+    public int rebuildScheduledMachineCountMaps(List<LhShiftConfigVO> shifts) {
+        this.clearScheduledMachineCountMaps();
+        if (CollectionUtils.isEmpty(scheduleResultList) || CollectionUtils.isEmpty(shifts)) {
+            return 0;
+        }
+        int recordDateCount = 0;
+        for (LhScheduleResult result : scheduleResultList) {
+            if (Objects.isNull(result) || StringUtils.isEmpty(result.getLhMachineCode())) {
+                continue;
+            }
+            Set<LocalDate> recordedDateSet = new LinkedHashSet<LocalDate>(3);
+            for (LhShiftConfigVO shift : shifts) {
+                if (Objects.isNull(shift) || Objects.isNull(shift.getShiftIndex())
+                        || Objects.isNull(shift.getWorkDate())) {
+                    continue;
+                }
+                Integer planQty = ShiftFieldUtil.getShiftPlanQty(
+                        result, shift.getShiftIndex());
+                if (Objects.nonNull(planQty) && planQty > 0) {
+                    recordedDateSet.add(
+                            SkuMonthPlanCalculator.getDate(shift.getWorkDate()));
+                }
+            }
+            for (LocalDate businessDate : recordedDateSet) {
+                this.recordScheduledMachine(
+                        businessDate, result.getStructureName(), result.getMaterialCode(),
+                        result.getProductStatus(), result.getLhMachineCode());
+            }
+            recordDateCount += recordedDateSet.size();
+        }
+        return recordDateCount;
+    }
+
+    /**
      * 登记已排硫化机台。
-     * <p>结构与 SKU 均按“业务日 + 机台编码”去重，避免同一机台多个班次重复计数。</p>
+     * <p>结构和 SKU 集合均保留运行态机台编码；结构计数时统一按物理机台去重，
+     * SKU 继续按原编码统计，避免改变既有 SKU 级节奏和双模规则。</p>
      *
      * @param productionDate 业务日期
      * @param structureName  产品结构
@@ -1184,20 +1204,21 @@ public class LhScheduleContext {
             return;
         }
         if (StringUtils.isNotEmpty(structureName)) {
-            recordMachine(structureScheduledMachineCodeMap, productionDate, structureName, machineCode);
+            this.recordMachine(
+                    structureScheduledMachineCodeMap, productionDate, structureName, machineCode);
         }
         if (StringUtils.isNotEmpty(materialCode)) {
             // 已排统计与读取入口使用同一产品状态归一化规则，空状态统一按正规 S 处理。
             String normalizedProductStatus = StringUtils.isEmpty(productStatus)
                     ? FORMAL_PRODUCT_STATUS : productStatus;
             String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(materialCode, normalizedProductStatus);
-            recordMachine(skuScheduledMachineCodeMap, productionDate, skuKey, machineCode);
+            this.recordMachine(skuScheduledMachineCodeMap, productionDate, skuKey, machineCode);
         }
     }
 
     /**
      * 移除指定业务日已登记的已排硫化机台。
-     * <p>用于续作结果被停产保机或释放边界置零后回滚补满登记的结构/SKU机台统计，
+     * <p>用于续作结果被释放边界置零后回滚补满登记的结构/SKU机台统计，
      * 避免后续同结构机台收尾补满被“结构机台数已达标”误拦。</p>
      *
      * @param productionDate 业务日期
@@ -1215,14 +1236,15 @@ public class LhScheduleContext {
             return;
         }
         if (StringUtils.isNotEmpty(structureName)) {
-            removeMachine(structureScheduledMachineCodeMap, productionDate, structureName, machineCode);
+            this.removeMachine(
+                    structureScheduledMachineCodeMap, productionDate, structureName, machineCode);
         }
         if (StringUtils.isNotEmpty(materialCode)) {
             // 与登记口径保持一致：空状态统一按正规 S 归一化后再移除
             String normalizedProductStatus = StringUtils.isEmpty(productStatus)
                     ? FORMAL_PRODUCT_STATUS : productStatus;
             String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(materialCode, normalizedProductStatus);
-            removeMachine(skuScheduledMachineCodeMap, productionDate, skuKey, machineCode);
+            this.removeMachine(skuScheduledMachineCodeMap, productionDate, skuKey, machineCode);
         }
     }
 
@@ -1347,7 +1369,58 @@ public class LhScheduleContext {
      * @return 已排机台数
      */
     public int getStructureScheduledMachineCount(LocalDate productionDate, String structureName) {
-        return getScheduledMachineCount(structureScheduledMachineCodeMap, productionDate, structureName);
+        if (Objects.isNull(productionDate) || StringUtils.isEmpty(structureName)
+                || CollectionUtils.isEmpty(structureScheduledMachineCodeMap)) {
+            return 0;
+        }
+        Map<String, Set<String>> dateMachineMap =
+                structureScheduledMachineCodeMap.get(productionDate);
+        if (CollectionUtils.isEmpty(dateMachineMap)) {
+            return 0;
+        }
+        Set<String> structureMachineCodeSet = dateMachineMap.get(structureName);
+        if (CollectionUtils.isEmpty(structureMachineCodeSet)) {
+            return 0;
+        }
+        return (int) structureMachineCodeSet.stream()
+                .map(LhSingleControlMachineUtil::resolvePhysicalMachineCode)
+                .filter(StringUtils::isNotEmpty)
+                .distinct()
+                .count();
+    }
+
+    /**
+     * 判断指定物理机台是否已经计入当前业务日的结构机台集合。
+     *
+     * <p>该方法供提前生产候选机台级硬控使用：结构达到计划数后，已计入的物理机台仍可
+     * 复用，新物理机台禁止加入。普通排产和真实历史欠产不调用该判断。</p>
+     *
+     * @param productionDate 业务日期
+     * @param structureName 产品结构
+     * @param machineCode 候选运行态机台编码
+     * @return true-候选所属物理机台已计入该结构；false-尚未计入
+     */
+    public boolean hasStructureScheduledMachine(LocalDate productionDate,
+                                                String structureName,
+                                                String machineCode) {
+        if (Objects.isNull(productionDate) || StringUtils.isEmpty(structureName)
+                || StringUtils.isEmpty(machineCode)
+                || CollectionUtils.isEmpty(structureScheduledMachineCodeMap)) {
+            return false;
+        }
+        Map<String, Set<String>> dateMachineMap =
+                structureScheduledMachineCodeMap.get(productionDate);
+        if (CollectionUtils.isEmpty(dateMachineMap)) {
+            return false;
+        }
+        Set<String> structureMachineCodeSet = dateMachineMap.get(structureName);
+        String physicalMachineCode =
+                LhSingleControlMachineUtil.resolvePhysicalMachineCode(machineCode);
+        return StringUtils.isNotEmpty(physicalMachineCode)
+                && !CollectionUtils.isEmpty(structureMachineCodeSet)
+                && structureMachineCodeSet.stream()
+                .map(LhSingleControlMachineUtil::resolvePhysicalMachineCode)
+                .anyMatch(physicalMachineCode::equals);
     }
 
     /**
@@ -1366,7 +1439,7 @@ public class LhScheduleContext {
                 ? FORMAL_PRODUCT_STATUS : productStatus;
         String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(
                 materialCode, normalizedProductStatus);
-        return getScheduledMachineCount(skuScheduledMachineCodeMap, productionDate, skuKey);
+        return this.getScheduledMachineCount(skuScheduledMachineCodeMap, productionDate, skuKey);
     }
 
     /**
@@ -1871,31 +1944,12 @@ public class LhScheduleContext {
     }
 
     /**
-     * 判断机台是否正被尚未完成排产的三天内收尾结构临时保护。
-     * <p>一旦进入临时保护，任何后续SKU均不得提前选择该机台；待结构全部SKU处理完成后，
-     * 再由最终最低机台数判断决定清除保护或延迟至结构最晚班次结束。若窗口末班生产机台数
-     * 已达到最低值，则提前确认不命中并清除保护，保持原机台释放逻辑。</p>
+     * 获取S4.4共用胎胚收尾均衡可调整物理机台快照。
      *
-     * @param machineCode 运行态机台编码
-     * @return true-机台处于临时保护，当前SKU不得选择；false-不受临时保护限制
+     * @return 可调整物理机台编码集合（单控整机已按物理机台去重）
      */
-    public boolean isEndingStructureProtectedMachine(String machineCode) {
-        if (StringUtils.isEmpty(machineCode) || CollectionUtils.isEmpty(endingStructureProtectedMachineMap)) {
-            return false;
-        }
-        return StringUtils.isNotEmpty(endingStructureProtectedMachineMap.get(machineCode));
-    }
-
-    /**
-     * 判断机台是否已命中结构最低机台数保留规则。
-     *
-     * @param machineCode 运行态机台编码
-     * @return true-命中规则并已登记统一释放时间；false-未命中
-     */
-    public boolean isStructureMinMachineRetained(String machineCode) {
-        return StringUtils.isNotEmpty(machineCode)
-                && !CollectionUtils.isEmpty(structureMinMachineRetentionEndTimeMap)
-                && structureMinMachineRetentionEndTimeMap.containsKey(machineCode);
+    public Set<String> getSharedEmbryoEndingBalanceEligibleMachineCodeSet() {
+        return sharedEmbryoEndingBalanceEligibleMachineCodeSet;
     }
 
     /**

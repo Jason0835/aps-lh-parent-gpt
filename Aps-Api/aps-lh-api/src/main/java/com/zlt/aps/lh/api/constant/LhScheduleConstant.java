@@ -320,14 +320,12 @@ public final class LhScheduleConstant {
 
     /** 排程天数（默认值；运行期以硫化参数 SCHEDULE_DAYS 为准） */
     public static final int SCHEDULE_DAYS = 3;
+    /** 结构收尾对齐固定观察窗口天数：T、T+1、T+2三个自然日 */
+    public static final int STRUCTURE_ENDING_ALIGNMENT_WINDOW_DAYS = 3;
     /** 是否按产能满排默认值（0-按需求排产，1-按产能满排） */
     public static final int ENABLE_FULL_CAPACITY_SCHEDULING = 1;
     /** 满排模式是否按余量命中收尾规则2默认值（0-关闭，1-开启） */
     public static final int ENABLE_ENDING_BY_SURPLUS_IN_FULL_MODE = 1;
-    /** 是否强制重排默认值（0-否，1-是，默认启用强制重排） */
-    public static final int FORCE_RESCHEDULE = 1;
-    /** 是否强制重排启用值（1-是） */
-    public static final int FORCE_RESCHEDULE_ENABLED = 1;
     /** MES在机信息往前追溯天数默认值（运行期以硫化参数 MACHINE_ONLINE_LOOKBACK_DAYS 为准） */
     public static final int MACHINE_ONLINE_LOOKBACK_DAYS = 90;
 
@@ -383,9 +381,6 @@ public final class LhScheduleConstant {
 
     /** 按日标准量排产结构清单默认值，空值表示所有结构均按原始班产排产 */
     public static final String DAILY_STANDARD_CAPACITY_STRUCTURE_LIST = "";
-
-    /** 当天空闲机台优先开关默认值（0-关闭，1-开启） */
-    public static final int ENABLE_TODAY_IDLE_MACHINE_PRIORITY = 1;
 
     /** 新增排产换模均衡开关默认值（0-关闭，1-开启） */
     public static final int ENABLE_CHANGEOVER_BALANCE = 1;

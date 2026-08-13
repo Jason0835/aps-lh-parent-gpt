@@ -8,6 +8,7 @@ import com.zlt.aps.common.engine.schedule.*;
 import com.zlt.aps.common.engine.schedule.constraint.ScheduleConstraintCalculator;
 import com.zlt.aps.common.engine.schedule.constraint.SchedulePlanQtyAdjustmentResult;
 import com.zlt.aps.common.engine.schedule.constraint.ScheduleToolLedgerResult;
+import com.zlt.aps.common.engine.schedule.constraint.ScheduleToolLedgerSnapshot;
 import com.zlt.aps.tm.api.constant.TmScheduleConstants;
 import com.zlt.aps.tm.api.enums.*;
 import com.zlt.aps.tm.engine.domain.*;
@@ -1184,12 +1185,23 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         sourceTask.setPlanQty(remainQty);
         sourceTask.setPreLossPlanQty(this.deductQty(sourceTask.getPreLossPlanQty(), deductedQty));
         sourceTask.setPlanQtyBeforeToolLimit(this.deductQty(sourceTask.getPlanQtyBeforeToolLimit(), deductedQty));
-        sourceTask.setBaseDemandQty(this.deductQty(sourceTask.getBaseDemandQty(), deductedQty));
-        sourceTask.setDemandQty(this.deductQty(sourceTask.getDemandQty(), deductedQty));
-        sourceTask.setCurrentShiftDemandQty(this.deductQty(sourceTask.getCurrentShiftDemandQty(), deductedQty));
-        sourceTask.setGuardDemandQty(this.deductQty(sourceTask.getGuardDemandQty(), deductedQty));
-        sourceTask.setCurrentShiftStockGapQty(this.deductQty(sourceTask.getCurrentShiftStockGapQty(), deductedQty));
-        sourceTask.setStockGapQty(this.deductQty(sourceTask.getStockGapQty(), deductedQty));
+        // 当班需求与保证范围需求已拆分为不重叠区间，提前生产量先抵扣当班，再抵扣后续保证范围。
+        BigDecimal remainingDeductQty = nvl(deductedQty).max(BigDecimal.ZERO);
+        BigDecimal currentShiftDemandQty = nvl(sourceTask.getCurrentShiftDemandQty());
+        BigDecimal currentShiftDeductQty = currentShiftDemandQty.min(remainingDeductQty);
+        BigDecimal adjustedCurrentShiftDemandQty = currentShiftDemandQty.subtract(currentShiftDeductQty);
+        BigDecimal adjustedGuardDemandQty = nvl(sourceTask.getGuardDemandQty())
+                .subtract(remainingDeductQty.subtract(currentShiftDeductQty)).max(BigDecimal.ZERO);
+        sourceTask.setCurrentShiftDemandQty(adjustedCurrentShiftDemandQty);
+        sourceTask.setGuardDemandQty(adjustedGuardDemandQty);
+        sourceTask.setStockDeductQty(nvl(sourceTask.getRollingStockQty())
+                .min(adjustedCurrentShiftDemandQty.add(adjustedGuardDemandQty)));
+        sourceTask.setCurrentShiftStockGapQty(adjustedCurrentShiftDemandQty
+                .subtract(nvl(sourceTask.getRollingStockQty())).max(BigDecimal.ZERO));
+        sourceTask.setStockGapQty(adjustedCurrentShiftDemandQty.add(adjustedGuardDemandQty)
+                .subtract(nvl(sourceTask.getRollingStockQty())).max(BigDecimal.ZERO));
+        sourceTask.setDemandQty(sourceTask.getStockGapQty());
+        sourceTask.setBaseDemandQty(sourceTask.getStockGapQty());
         sourceTask.setPlanStockQty(nvl(sourceTask.getRollingStockQty()).add(nvl(sourceTask.getPlanQty()))
                 .subtract(nvl(sourceTask.getCurrentShiftDemandQty())).max(BigDecimal.ZERO));
         if (remainQty.compareTo(BigDecimal.ZERO) > 0) {
@@ -1341,7 +1353,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
                 TmTaskDraft mergeTarget = this.findMergeTarget(context, candidate.getMachineCode(), shiftOrder,
                         sourceTask);
                 runtimeCandidate.setRemainCapacity(mergeTarget == null
-                        ? this.resolvePrependRemainCapacity(capacityProbeTask, context, runtimeCandidate, machineSpeed)
+                        ? this.resolveRemainCapacity(capacityProbeTask, context, runtimeCandidate, machineSpeed)
                         : this.resolveRemainCapacityWithoutNewSwitch(capacityProbeTask, context, runtimeCandidate,
                                 machineSpeed));
                 BigDecimal remainCapacity = nvl(runtimeCandidate.getRemainCapacity());
@@ -1850,6 +1862,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
             task.setRemainingToolQty(currentAvailableToolQty);
             task.setToolLedgerOrder(context.nextToolLedgerOrder());
             context.setCurrentAvailableToolQty(currentAvailableToolQty);
+            this.recordToolLedgerSnapshot(context, task, currentAvailableToolQty, task.getToolUsedQty(), currentAvailableToolQty);
             return;
         }
         ScheduleToolLedgerResult ledgerResult = this.constraintCalculator.settleCommittedToolLedger(
@@ -1861,6 +1874,30 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         task.setPlanStockQty(nvl(task.getRollingStockQty()).add(nvl(task.getPlanQty()))
                 .subtract(nvl(task.getCurrentShiftDemandQty())).max(BigDecimal.ZERO));
         context.setCurrentAvailableToolQty(ledgerResult.getRemainingToolQty());
+        this.recordToolLedgerSnapshot(context, task, ledgerResult.getAvailableToolQty(), ledgerResult.getToolUsedQty(),
+                ledgerResult.getRemainingToolQty());
+    }
+
+    /**
+     * 保存任务本次工装结算快照，供过程日志按实际分配结果展示。
+     *
+     * @param context           胎面排程上下文
+     * @param task              已完成工装结算的任务
+     * @param availableToolQty  结算前可用工装数量
+     * @param toolUsedQty       本次净占用工装数量
+     * @param remainingToolQty  结算后剩余工装数量
+     */
+    private void recordToolLedgerSnapshot(TmScheduleContext context, TmTaskDraft task,
+                                          BigDecimal availableToolQty, BigDecimal toolUsedQty,
+                                          BigDecimal remainingToolQty) {
+        if (context == null || task == null || StrUtil.isBlank(task.getBusinessKey())) {
+            return;
+        }
+        ScheduleToolLedgerSnapshot snapshot = new ScheduleToolLedgerSnapshot();
+        snapshot.setAvailableToolQty(availableToolQty);
+        snapshot.setToolUsedQty(toolUsedQty);
+        snapshot.setRemainingToolQty(remainingToolQty);
+        context.getToolLedgerSnapshotMap().put(task.getBusinessKey(), snapshot);
     }
 
     /**
@@ -1880,6 +1917,8 @@ public class TmMachineAssignService implements ITmMachineAssignService {
             mergeTarget.setRemainingToolQty(currentAvailableToolQty);
             mergeTarget.setToolLedgerOrder(context.nextToolLedgerOrder());
             context.setCurrentAvailableToolQty(currentAvailableToolQty);
+            this.recordToolLedgerSnapshot(context, mergeTarget, currentAvailableToolQty,
+                    mergeTarget.getToolUsedQty(), currentAvailableToolQty);
             return;
         }
         ScheduleToolLedgerResult ledgerResult = this.constraintCalculator.settleCommittedToolLedger(
@@ -1891,6 +1930,8 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         mergeTarget.setToolLedgerOrder(context.nextToolLedgerOrder());
         mergeTarget.setPlanStockQty(nvl(mergeTarget.getPlanStockQty()).add(nvl(carryoverQty)));
         context.setCurrentAvailableToolQty(ledgerResult.getRemainingToolQty());
+        this.recordToolLedgerSnapshot(context, mergeTarget, ledgerResult.getAvailableToolQty(),
+                mergeTarget.getToolUsedQty(), ledgerResult.getRemainingToolQty());
     }
 
     /**
@@ -2197,7 +2238,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
     }
 
     /**
-     * 在任务进入机台任务链后立即记录实际产能扣减，确保过程日志顺序与机台承接顺序一致。
+     * 在任务进入机台任务链后记录实际产能扣减，并延后到机台评分日志之后渲染。
      *
      * @param context         胎面排程上下文
      * @param task            已承接任务
@@ -2217,16 +2258,15 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         BigDecimal currentSpecSwitchDeduct = this.nvl(task.getPreviousSpecSwitchHours())
                 .multiply(this.nvl(task.getMachineSpeed()));
         BigDecimal currentGlueSwitchDeduct = this.nvl(task.getPreviousGlueSwitchCapacityDeduct());
-        context.appendProcessLog("产能扣减：胎面代码={0}，机台={1}，班次={2}，最大产能={3}，检修扣减={4}，已排计划量扣减={5}，已发生切换扣减={6}，重排切换扣减={7}，本次规格切换扣减={8}，本次胶料切换扣减={9}，分配前待承接量={10}，分配前剩余产能={11}，本次分配量={12}，分配后剩余产能={13}，溢出量={14}，拆分原因={15}",
+        context.appendDeferredShiftProcessLog(task.getShiftOrder(), "产能扣减：胎面代码={0}，机台={1}，班次={2}，最大产能={3}，检修扣减={4}，已排计划量扣减={5}，已发生切换扣减={6}，本次规格切换扣减={7}，本次胶料切换扣减={8}，分配前待承接量={9}，分配前剩余产能={10}，本次分配量={11}，分配后剩余产能={12}，溢出量={13}，拆分原因={14}",
                 task.getTreadCode(), candidate == null ? "未提供" : candidate.getMachineCode(), task.getShiftOrder(),
                 this.getCandidateEvidenceDecimal(evidence, "maxCapacity"),
                 this.getCandidateEvidenceDecimal(evidence, "maintenanceCapacityDeduct"),
                 this.getCandidateEvidenceDecimal(evidence, "assignedPlanQty"),
                 this.getCandidateEvidenceDecimal(evidence, "existingSwitchCapacityDeduct"),
-                this.getCandidateEvidenceDecimal(evidence, "reorderedTotalSwitchCapacityDeduct"),
                 currentSpecSwitchDeduct, currentGlueSwitchDeduct, this.nvl(beforeAssignQty), beforeRemainCapacity,
                 this.nvl(assignedQty), afterRemainCapacity, this.nvl(overflowQty), splitDesc);
-        context.appendFullProcessTrace(new ScheduleProcessTraceEvent(
+        context.appendDeferredShiftFullProcessTrace(task.getShiftOrder(), new ScheduleProcessTraceEvent(
                 "机台分配", task.getBusinessKey(), "机台产能即时扣减与拆分",
                 "选中机台的班次容量账本、检修计划、已排任务和切换扣减。",
                 "机台=" + (candidate == null ? "未提供" : candidate.getMachineCode()) + "，班次="

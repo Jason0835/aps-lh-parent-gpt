@@ -40,12 +40,6 @@ public class Cd90MachineInfo extends BaseEntity implements Serializable {
     @TableField("MACHINE_NAME")
     private String machineName;
 
-    /** 是否支持贴胶片：0 支持，1 不支持 */
-    @ApiModelProperty(value = "是否支持贴胶片", name = "isStickFilm")
-    @TableField("IS_STICK_FILM")
-    @Excel(name = "ui.data.column.cd90MachineInfo.isStickFilm", dictType = "biz_yes_no")
-    private String isStickFilm;
-
     /** 帘布宽度上限 */
     @ApiModelProperty(value = "帘布宽度上限", name = "clothWidthMax")
     @TableField("CLOTH_WIDTH_MAX")

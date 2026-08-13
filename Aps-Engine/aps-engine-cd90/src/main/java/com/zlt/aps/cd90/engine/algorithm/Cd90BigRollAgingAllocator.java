@@ -37,7 +37,7 @@ public class Cd90BigRollAgingAllocator {
      * @param bigRollCode 帘线大卷编码
      * @param requestedQuantity 本次任务米数
      * @param originalStartTime 机台原预计可上机时间
-     * @return 分配试算结果
+     * @return 分配试算结果；库存不足时返回当前最大可供量，完全无可用流水时返回失败
      */
     public Cd90BigRollAgingAllocation preview(List<Cd90BigRollAgingStock> stocks, String bigRollCode,
             BigDecimal requestedQuantity, LocalDateTime originalStartTime) {
@@ -79,7 +79,8 @@ public class Cd90BigRollAgingAllocator {
                         .build();
             }
         }
-        // 遍历完所有可用大卷仍未满足需求，返回失败
+        // 遍历完所有可用大卷仍未满足需求时，将已选流水作为部分可供量返回。
+        // 试算只提供上限且不扣减库存；正式提交仍要求完整覆盖最终提交量。
         BigDecimal totalAvailable = requestQty.subtract(remaining);
         log.warn("[直裁自动排程] 大卷静置库存不足, bigRollCode={}, requestedQuantity={}, "
                         + "totalAvailableInStocks={}, shortfall={}, stockDetails={}",
@@ -90,7 +91,21 @@ public class Cd90BigRollAgingAllocator {
                                 s.getSourceId(), s.getAvailableQuantity(), s.getAllocatedQuantity(),
                                 s.getRemainingQuantity(), s.getReleaseTime()))
                         .collect(java.util.stream.Collectors.joining(", ")));
-        return failure(requestQty, originalStartTime);
+        if (totalAvailable.compareTo(BigDecimal.ZERO) <= 0) {
+            return failure(requestQty, originalStartTime);
+        }
+        LocalDateTime taskStartTime = latestReleaseTime.isAfter(originalStartTime)
+                ? latestReleaseTime : originalStartTime;
+        return Cd90BigRollAgingAllocation.builder()
+                .success(true)
+                .requestedQuantity(requestQty)
+                .allocatedQuantity(totalAvailable)
+                .originalStartTime(originalStartTime)
+                .taskStartTime(taskStartTime)
+                .latestReleaseTime(latestReleaseTime)
+                .delaySeconds(delaySeconds(originalStartTime, taskStartTime))
+                .items(items)
+                .build();
     }
 
     /**
@@ -100,6 +115,11 @@ public class Cd90BigRollAgingAllocator {
             BigDecimal requestedQuantity, LocalDateTime originalStartTime) {
         // 先试算确定分配方案，再提交扣减
         Cd90BigRollAgingAllocation allocation = preview(stocks, bigRollCode, requestedQuantity, originalStartTime);
+        BigDecimal requestQty = requestedQuantity == null ? BigDecimal.ZERO : requestedQuantity;
+        if (!allocation.isSuccess() || allocation.getAllocatedQuantity().compareTo(requestQty) < 0) {
+            // 正式提交禁止部分扣减：资源副本不足以覆盖最终计划量时，返回失败且不修改库存。
+            return failure(requestQty, originalStartTime);
+        }
         commit(allocation);
         return allocation;
     }

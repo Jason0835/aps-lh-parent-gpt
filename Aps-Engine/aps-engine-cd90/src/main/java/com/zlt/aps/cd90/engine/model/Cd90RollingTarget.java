@@ -21,6 +21,8 @@ public class Cd90RollingTarget {
     private String targetShiftCode;
     /** 目标结果字段，如CLASS4。 */
     private String targetClassField;
+    /** 目标班次对应的库排资源基线日期。 */
+    private LocalDate resourceBaselineDate;
     /** 交班物理时间。 */
     private LocalDateTime handoverTime;
     /** 滚动窗口开始时间。 */

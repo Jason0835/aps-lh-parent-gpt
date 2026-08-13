@@ -38,6 +38,7 @@ import org.springframework.util.CollectionUtils;
 
 import javax.annotation.Resource;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashSet;
@@ -50,16 +51,25 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * 默认共用胎胚/同SKU多机台收尾均衡策略实现。
+ * 默认共用胎胚多机台收尾均衡策略实现。
  *
  * <p>核心思路：</p>
  * <ul>
- *   <li>只处理同一胎胚编码下存在两台及以上收尾机台的场景；单胎胚单机台不触发；</li>
- *   <li>场景一：同SKU多机台同班次收尾时，通过同SKU尾量分摊错开收尾班次；</li>
- *   <li>场景二：共用胎胚多物料组级统一均衡，胎胚收尾以组级胎胚库存账本为唯一硬约束，
+ *   <li>只处理运行态共用胎胚，且同胎胚组当前仍有两台及以上可调整续作收尾机台；</li>
+ *   <li>同物料多机台SKU余量收尾先按排程前胶囊次数做最小模数偏置：低次数机台少分摊、
+ *       严格更早下机，高次数机台承接尾量；次数相同时保持原均衡与排序；</li>
+ *   <li>按日期升序、早班后中班检查班次次数，只有超过早8/中7参考上限或日15硬上限风险时才调整；</li>
+ *   <li>可调整对象按业务优先级选择：同物料（物料编码+产品状态）多机台第一优先级，
+ *       三种收尾类型（胎胚收尾/余量收尾/按时间下机）均参与；共用胎胚组第二优先级，
+ *       组间按机台数量降序、胎胚编码升序，组内按机台编码升序；</li>
+ *   <li>独立续作停产保机机台仍参与收尾均衡，调整后继续保持其窗口末班占用边界；
+ *       已废弃的结构收尾停产保机判断、标识和占机逻辑不再进入本链路；</li>
+ *   <li>同一SKU多机台与同一胎胚多SKU统一纳入全局预演，候选始终按机台编码升序；</li>
+ *   <li>胎胚收尾以组级胎胚库存账本为唯一硬约束，
  *       允许同组跨物料互转尾量，互转成功后通过 SKU 内部额度重分配落地归属；</li>
  *   <li>SKU余量收尾保持该SKU总计划量不变，只能在同SKU多机台之间分摊；</li>
- *   <li>按时间下机收尾允许补量/后延或减量/提前，每次最多移动一个班次；</li>
+ *   <li>按时间下机收尾允许补量/后延或减量/提前；日内每次最多移动一个班次，
+ *       跨天时必须连续补满中间班次并在目标早班06:00真实收尾；</li>
  *   <li>双模SKU单控整机L/R按一台物理机台成对参与均衡，两侧计划量始终一致；</li>
  *   <li>换模班次预测复用 {@link IMouldChangeBalanceStrategy#previewEndingStaggerMouldChange}，
  *       只做模拟计数，不预占真实换模次数；</li>
@@ -88,16 +98,16 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
     private static final String ENDING_TYPE_TIME = "按时间下机收尾";
 
     /** 尾量分摊班次原因分析备注 */
-    private static final String BALANCE_TRANSFER_ANALYSIS = "收尾均衡尾量分摊";
+    private static final String BALANCE_TRANSFER_ANALYSIS = "均衡分摊";
 
     /** 后延补量班次原因分析备注 */
-    private static final String BALANCE_POSTPONE_ANALYSIS = "收尾均衡后延补量";
+    private static final String BALANCE_POSTPONE_ANALYSIS = "均衡补量";
 
     /** 提前减量班次原因分析备注 */
-    private static final String BALANCE_ADVANCE_ANALYSIS = "收尾均衡提前减量";
+    private static final String BALANCE_ADVANCE_ANALYSIS = "均衡减量";
 
-    /** 均衡调整最大轮次，避免极端数据死循环 */
-    private static final int MAX_BALANCE_ROUNDS = 32;
+    /** 跨天补量班次原因分析备注 */
+    private static final String BALANCE_POSTPONE_CROSS_DAY_ANALYSIS = "均衡补量（跨天）";
 
     /** 触发均衡的最少收尾机台数 */
     private static final int MIN_GROUP_MACHINE_COUNT = 2;
@@ -121,7 +131,7 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
     private CapsuleReplacementRuleService capsuleReplacementRuleService = new CapsuleReplacementRuleService();
 
     /**
-     * 执行共用胎胚/同SKU多机台收尾均衡。
+     * 执行共用胎胚多机台收尾均衡。
      *
      * @param context 排程上下文
      * @param shifts 排程窗口班次
@@ -139,54 +149,114 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
                     context.getScheduleDate());
             return false;
         }
-        // 收集全部续作收尾候选机台（含胎胚收尾、SKU余量收尾、按时间下机收尾）。
-        List<LhScheduleResult> candidateList = new ArrayList<LhScheduleResult>(16);
-        Map<LhScheduleResult, Integer> endingShiftMap = new IdentityHashMap<LhScheduleResult, Integer>(16);
-        Map<LhScheduleResult, Integer> endingQtyMap = new IdentityHashMap<LhScheduleResult, Integer>(16);
+        // 首轮按最终续作结果收集候选；每次提交后还会重新收集，避免沿用已经失效的收尾类型或分组。
         Map<LhScheduleResult, SkuScheduleDTO> sourceSkuMap = new IdentityHashMap<LhScheduleResult, SkuScheduleDTO>(16);
         Map<LhScheduleResult, String> endingTypeMap = new IdentityHashMap<LhScheduleResult, String>(16);
         Map<LhScheduleResult, LhScheduleResult> pairResultMap =
                 new IdentityHashMap<LhScheduleResult, LhScheduleResult>(8);
-        collectBalanceCandidates(
-                context, candidateList, endingShiftMap, endingQtyMap, sourceSkuMap, endingTypeMap, pairResultMap);
-        if (candidateList.size() < MIN_GROUP_MACHINE_COUNT) {
+        List<LhScheduleResult> fixedCountResultList = new ArrayList<LhScheduleResult>(16);
+        List<LhScheduleResult> adjustableResultList = this.collectAdjustableBalanceCandidates(
+                context, sourceSkuMap, endingTypeMap, pairResultMap, fixedCountResultList);
+        if (adjustableResultList.size() < MIN_GROUP_MACHINE_COUNT) {
             return false;
         }
-        // 按胎胚编码分组；单胎胚同SKU多机台、共用胎胚多物料组级均衡统一按胎胚组处理。
-        Map<String, List<LhScheduleResult>> embryoGroupMap =
-                groupCandidatesByEmbryo(candidateList, sourceSkuMap);
-        // 全部胎胚组共用一份本地预演账本：前一组预测出的换模次数会成为后一组的基线，
-        // 但不写真实dailyMouldChangeCountMap，避免均衡预演与后续正式换模分配重复计数。
-        Map<String, int[]> sharedSimulationCountMap =
-                copyDailyMouldChangeCountMap(context.getDailyMouldChangeCountMap());
-        boolean adjusted = false;
-        for (Map.Entry<String, List<LhScheduleResult>> entry : embryoGroupMap.entrySet()) {
-            List<LhScheduleResult> groupResults = entry.getValue();
-            if (balanceEmbryoGroup(context, shifts, entry.getKey(), groupResults,
-                    sourceSkuMap, endingTypeMap, pairResultMap, sharedSimulationCountMap)) {
-                adjusted = true;
+        /*
+         * 调用点说明：胶囊感知分摊必须发生在既有换模次数均衡评分之前。
+         * 该前置层只处理“运行态共用胎胚 + 同物料多机台 + SKU余量收尾”，以排程开始前
+         * 胶囊快照决定尾量方向；随后重新收集候选，再由原有早8/中7/日15、产能和换模规则
+         * 继续做全局均衡。这样既能实际改变分摊量，又不会把胎胚收尾、按时间下机带入新规则。
+         */
+        boolean capsuleAdjusted = this.balanceSkuEndingByInitialCapsuleUsage(
+                context, shifts, adjustableResultList, sourceSkuMap, endingTypeMap, pairResultMap);
+        if (capsuleAdjusted) {
+            sourceSkuMap = new IdentityHashMap<LhScheduleResult, SkuScheduleDTO>(16);
+            endingTypeMap = new IdentityHashMap<LhScheduleResult, String>(16);
+            pairResultMap = new IdentityHashMap<LhScheduleResult, LhScheduleResult>(8);
+            fixedCountResultList = new ArrayList<LhScheduleResult>(16);
+            adjustableResultList = this.collectAdjustableBalanceCandidates(
+                    context, sourceSkuMap, endingTypeMap, pairResultMap, fixedCountResultList);
+            if (adjustableResultList.size() < MIN_GROUP_MACHINE_COUNT) {
+                return true;
             }
+        }
+        /*
+         * 所有共用胎胚组一次性进入同一个预演状态，不能按胎胚组各自从旧统计开始判断。
+         * 这样首个超限桶严格由“日期升序、早班后中班”确定，实际尝试机台再按编码升序，
+         * 避免胎胚分组插入顺序改变最终结果。
+         */
+        Map<String, int[]> originalCountMap =
+                this.copyDailyMouldChangeCountMap(context.getDailyMouldChangeCountMap());
+        Map<String, int[]> baseSimulationCountMap = this.buildFixedSimulationCountMap(
+                context, fixedCountResultList, sourceSkuMap, originalCountMap);
+        EmbryoEndingBalanceState state = this.buildBalanceState(
+                context, shifts, adjustableResultList, sourceSkuMap, endingTypeMap,
+                pairResultMap, baseSimulationCountMap);
+        if (!this.needsBalance(state)) {
+            log.info("共用胎胚收尾均衡无需调整, scheduleDate: {}, 可调整机台数: {}, "
+                            + "胶囊感知分摊已调整: {}, 原因: 早班/中班未超参考上限且每日总数无硬限风险",
+                    context.getScheduleDate(), adjustableResultList.size(), capsuleAdjusted);
+            return capsuleAdjusted;
+        }
+        boolean adjusted = capsuleAdjusted;
+        int maxRounds = Math.max(1, adjustableResultList.size() * shifts.size());
+        Set<String> visitedStateKeySet = new LinkedHashSet<String>(maxRounds);
+        for (int round = 1; round <= maxRounds && this.needsBalance(state); round++) {
+            String stateKey = this.buildBalanceStateKey(state);
+            if (!visitedStateKeySet.add(stateKey)) {
+                this.recordUnresolvedBalanceReason(context, state, "调整状态重复，为避免无效循环终止当前均衡");
+                break;
+            }
+            EmbryoEndingBalanceMove move = this.findFirstImprovingMove(
+                    context, shifts, state, pairResultMap, baseSimulationCountMap);
+            if (Objects.isNull(move)) {
+                this.recordUnresolvedBalanceReason(
+                        context, state, "总量守恒、班次产能、机台占用或禁止换模时间限制下无可行候选");
+                break;
+            }
+            adjusted = true;
+            /*
+             * 分摊可能改变SKU内部目标额度，补量/减量也可能改变最后有量班次。
+             * 每次提交后必须从真实结果重新解析候选、收尾类型和共用胎胚分组；若某胎胚组
+             * 已不足两台，立即从后续轮次移除，不能继续使用提交前的静态候选集合。
+             */
+            sourceSkuMap = new IdentityHashMap<LhScheduleResult, SkuScheduleDTO>(16);
+            endingTypeMap = new IdentityHashMap<LhScheduleResult, String>(16);
+            pairResultMap = new IdentityHashMap<LhScheduleResult, LhScheduleResult>(8);
+            fixedCountResultList = new ArrayList<LhScheduleResult>(16);
+            adjustableResultList = this.collectAdjustableBalanceCandidates(
+                    context, sourceSkuMap, endingTypeMap, pairResultMap, fixedCountResultList);
+            if (adjustableResultList.size() < MIN_GROUP_MACHINE_COUNT) {
+                log.info("共用胎胚收尾均衡结束, scheduleDate: {}, 轮次: {}, 原因: 调整后无两台以上可调整胎胚组",
+                        context.getScheduleDate(), round);
+                break;
+            }
+            baseSimulationCountMap = this.buildFixedSimulationCountMap(
+                    context, fixedCountResultList, sourceSkuMap, originalCountMap);
+            state = this.buildBalanceState(
+                    context, shifts, adjustableResultList, sourceSkuMap, endingTypeMap,
+                    pairResultMap, baseSimulationCountMap);
+            log.info("共用胎胚收尾均衡提交, scheduleDate: {}, 轮次: {}, 移动类型: {}, 调整后计数: {}",
+                    context.getScheduleDate(), round, move.getMoveType(),
+                    this.buildCountSummary(state.getSimulatedCountMap()));
         }
         return adjusted;
     }
 
     /**
      * 收集续作收尾均衡候选机台。
-     * <p>排除：非续作结果、换活字块结果、零计划结果、结构停产保机机台、
-     * 同物料多产品状态续作切换结果。候选保留结果行的收尾班次、收尾班次计划量和来源SKU。</p>
+     * <p>排除：非续作结果、换活字块结果、零计划结果、同物料多产品状态续作切换结果。
+     * 候选保留结果行的收尾班次、收尾班次计划量和来源SKU。</p>
+     * <p>独立续作停产保机机台不排除，仍参与当前收尾时间与换模次数均衡；原结构收尾
+     * 停产保机规则已经废弃，本策略不再读取其判断、标识、冻结快照或占机状态。</p>
      *
      * @param context 排程上下文
      * @param candidateList 候选结果列表
-     * @param endingShiftMap 收尾班次映射
-     * @param endingQtyMap 收尾班次计划量映射
      * @param sourceSkuMap 来源SKU映射
      * @param endingTypeMap 收尾类型映射
      * @param pairResultMap 双模SKU单控整机代表结果到配对侧结果的映射
      */
     private void collectBalanceCandidates(LhScheduleContext context,
                                           List<LhScheduleResult> candidateList,
-                                          Map<LhScheduleResult, Integer> endingShiftMap,
-                                          Map<LhScheduleResult, Integer> endingQtyMap,
                                           Map<LhScheduleResult, SkuScheduleDTO> sourceSkuMap,
                                           Map<LhScheduleResult, String> endingTypeMap,
                                           Map<LhScheduleResult, LhScheduleResult> pairResultMap) {
@@ -238,19 +308,120 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
                 }
                 pairResultMap.put(representative, pairSide);
                 candidateList.add(representative);
-                endingShiftMap.put(representative, representativeEndingShift);
-                endingQtyMap.put(representative,
-                        ShiftFieldUtil.getShiftPlanQty(representative, representativeEndingShift));
                 sourceSkuMap.put(representative, sourceSku);
                 endingTypeMap.put(representative, endingType);
                 continue;
             }
             candidateList.add(result);
-            endingShiftMap.put(result, endingShiftIndex);
-            endingQtyMap.put(result, endingQty);
             sourceSkuMap.put(result, sourceSku);
             endingTypeMap.put(result, endingType);
         }
+    }
+
+    /**
+     * 重新收集当前仍可调整的共用胎胚多机台组。
+     * <p>先复用统一候选判断排除零量等不产生可统计收尾事件的结果，再按胎胚编码预分组；
+     * 停产保机机台只要仍有正量收尾班次，同样进入候选。
+     * 运行态非共用胎胚或不足两台的组只进入固定计数，不进入调整集合。该方法在首轮和每次
+     * 成功提交后调用，保证收尾类型、SKU额度、固定计数和分组判断始终来自最新排程结果。</p>
+     *
+     * @param context 排程上下文
+     * @param sourceSkuMap 返回结果到来源SKU的身份映射
+     * @param endingTypeMap 返回结果到收尾类型的映射
+     * @param pairResultMap 返回单控整机代表侧到配对侧的映射
+     * @param fixedCountResultList 返回不可调整、但仍需占用换模统计的结果
+     * @return 当前仍可调整的结果列表
+     */
+    private List<LhScheduleResult> collectAdjustableBalanceCandidates(
+            LhScheduleContext context,
+            Map<LhScheduleResult, SkuScheduleDTO> sourceSkuMap,
+            Map<LhScheduleResult, String> endingTypeMap,
+            Map<LhScheduleResult, LhScheduleResult> pairResultMap,
+            List<LhScheduleResult> fixedCountResultList) {
+        List<LhScheduleResult> candidateList = new ArrayList<LhScheduleResult>(16);
+        this.collectBalanceCandidates(
+                context, candidateList, sourceSkuMap, endingTypeMap, pairResultMap);
+        if (candidateList.size() < MIN_GROUP_MACHINE_COUNT) {
+            return new ArrayList<LhScheduleResult>(0);
+        }
+        Map<String, List<LhScheduleResult>> embryoGroupMap =
+                this.groupCandidatesByEmbryo(candidateList, sourceSkuMap);
+        List<LhScheduleResult> adjustableResultList =
+                new ArrayList<LhScheduleResult>(candidateList.size());
+        for (List<LhScheduleResult> groupResultList : embryoGroupMap.values()) {
+            SkuScheduleDTO groupSourceSku = CollectionUtils.isEmpty(groupResultList)
+                    ? null : sourceSkuMap.get(groupResultList.get(0));
+            /*
+             * 非共用胎胚和不足两台的组禁止调整，但其后物料换模事件仍属于当天真实次数，
+             * 必须先写入本地统计基线，不能因为“不参与均衡”就从早/中/日次数中消失。
+             */
+            if (groupResultList.size() >= MIN_GROUP_MACHINE_COUNT
+                    && this.isRuntimeSharedEmbryo(context, groupSourceSku)) {
+                adjustableResultList.addAll(groupResultList);
+            }
+        }
+        // 登记本轮仍满足均衡适用范围的物理机台快照（单控整机按物理机台去重），
+        // 供过程对账和最终未均衡原因分类使用。
+        for (LhScheduleResult adjustableResult : adjustableResultList) {
+            if (Objects.nonNull(adjustableResult)
+                    && StringUtils.isNotEmpty(adjustableResult.getLhMachineCode())) {
+                context.getSharedEmbryoEndingBalanceEligibleMachineCodeSet()
+                        .add(LhSingleControlMachineUtil.resolvePhysicalMachineCode(
+                                adjustableResult.getLhMachineCode()));
+            }
+        }
+        Set<LhScheduleResult> adjustableResultSet =
+                Collections.newSetFromMap(new IdentityHashMap<LhScheduleResult, Boolean>(
+                        Math.max(1, adjustableResultList.size())));
+        adjustableResultSet.addAll(adjustableResultList);
+        for (LhScheduleResult candidate : candidateList) {
+            if (!adjustableResultSet.contains(candidate)) {
+                fixedCountResultList.add(candidate);
+            }
+        }
+        return adjustableResultList;
+    }
+
+    /**
+     * 将不可调整的续作收尾事件预演到统计基线。
+     * <p>非共用胎胚、共用胎胚单机台组等结果虽然不能搬量，仍须按项目现有预演口径占用一次
+     * 换模/换活字块次数，保证可调整组看到的是完整的早/中/日负荷。
+     * 停产保机机台即使未进入调整组，也按实际生产结束时间参与固定计数。</p>
+     *
+     * @param context 排程上下文
+     * @param fixedCountResultList 不可调整但需要计数的结果
+     * @param sourceSkuMap 结果到来源SKU的映射
+     * @param originalCountMap 当前真实次数账本
+     * @return 已加入固定事件的本地预演基线
+     */
+    private Map<String, int[]> buildFixedSimulationCountMap(
+            LhScheduleContext context,
+            List<LhScheduleResult> fixedCountResultList,
+            Map<LhScheduleResult, SkuScheduleDTO> sourceSkuMap,
+            Map<String, int[]> originalCountMap) {
+        Map<String, int[]> fixedSimulationCountMap =
+                this.copyDailyMouldChangeCountMap(originalCountMap);
+        if (CollectionUtils.isEmpty(fixedCountResultList)) {
+            return fixedSimulationCountMap;
+        }
+        List<LhScheduleResult> sortedFixedResultList =
+                new ArrayList<LhScheduleResult>(fixedCountResultList);
+        sortedFixedResultList.sort(Comparator.comparing(
+                result -> StringUtils.defaultString(result.getLhMachineCode())));
+        for (LhScheduleResult result : sortedFixedResultList) {
+            int endingShiftIndex = ShiftFieldUtil.resolveLastPlannedShiftIndex(result);
+            // 固定计数使用实际生产结束时间，避免独立续作停产保机的窗口末班占用边界
+            // 把后物料换模错误预测到窗口末班之后；旧结构统一释放时间已不再进入本链路。
+            Date endingTime = this.resolveBalanceEndingTime(context, result, endingShiftIndex);
+            if (Objects.isNull(endingTime)) {
+                continue;
+            }
+            this.mouldChangeBalanceStrategy.previewEndingStaggerMouldChange(
+                    context, result.getLhMachineCode(), endingTime,
+                    LhScheduleTimeUtil.getMouldChangeTotalHours(context),
+                    sourceSkuMap.get(result), fixedSimulationCountMap);
+        }
+        return fixedSimulationCountMap;
     }
 
     /**
@@ -305,14 +476,11 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
                 || StringUtils.isEmpty(result.getLhMachineCode())) {
             return false;
         }
-        // 结构停产保机结果保持原样，不参与收尾均衡。
-        if (context.isStructureMinMachineRetained(result.getLhMachineCode())) {
-            return false;
-        }
-        // 停产保机零产量/占用结果保持原样，不参与收尾均衡。
-        if (context.isContinuousStopHoldMachine(result.getLhMachineCode())) {
-            return false;
-        }
+        /*
+         * 独立续作停产保机机台必须参与收尾均衡，其占用边界不改变当前真实生产结束时间。
+         * 已废弃的结构收尾停产保机不再有候选过滤或衍生同步；零计划量占位结果仍由下方
+         * 正量检查自然排除。
+         */
         // 同物料多产品状态续作切换保持专用链精确尾量，不参与收尾均衡。
         if (isSameMaterialMultiStatusSwitchResult(result)) {
             return false;
@@ -446,6 +614,29 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
     }
 
     /**
+     * 解析均衡预演使用的真实生产收尾时间。
+     *
+     * <p>续作停产保机机台的 {@code specEndTime} 可能已被占用边界后移（续作停产保机窗口末班占用），
+     * 换模/换活字块预演必须使用实际生产结束时间：直接取最后有量班次结束时间。</p>
+     *
+     * @param context 排程上下文
+     * @param result 排程结果
+     * @param endingShiftIndex 最后有量班次序号
+     * @return 实际生产结束时间；无法解析时返回null
+     */
+    private Date resolveBalanceEndingTime(LhScheduleContext context,
+                                          LhScheduleResult result,
+                                          int endingShiftIndex) {
+        if (Objects.isNull(result)) {
+            return null;
+        }
+        // 普通机台直接取最后有量班次的结束时间，不依赖可能被占用边界后移的specEndTime。
+        Date shiftEndTime = endingShiftIndex > 0
+                ? ShiftFieldUtil.getShiftEndTime(result, endingShiftIndex) : null;
+        return Objects.nonNull(shiftEndTime) ? shiftEndTime : result.getSpecEndTime();
+    }
+
+    /**
      * 按胎胚编码对候选机台分组。
      *
      * @param candidateList 候选结果列表
@@ -468,72 +659,819 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
     }
 
     /**
-     * 对单个胎胚组执行收尾均衡。
+     * 按排程开始前胶囊使用次数，对共用胎胚同SKU多机台余量收尾执行适度尾量偏置。
+     *
+     * <p>该方法是方案B的实际分摊层，不参与胎胚收尾和按时间下机。每个SKU组先做完整快照，
+     * 从一个模数单位开始尝试；只有次数少的机台计划量不大于次数多的机台、且真实收尾时间
+     * 严格更早时才提交。任一机台产能、占用、胶囊或晚班禁换模约束无法满足时，整组恢复。</p>
      *
      * @param context 排程上下文
      * @param shifts 排程窗口班次
-     * @param embryoCode 胎胚编码
-     * @param groupResults 组内候选机台结果
-     * @param sourceSkuMap 来源SKU映射
-     * @param endingTypeMap 收尾类型映射
-     * @param pairResultMap 双模SKU单控整机代表结果到配对侧结果的映射
-     * @param sharedSimulationCountMap 全部胎胚组共用的换模预演账本
-     * @return true-执行了至少一次调整
+     * @param candidateList 当前共用胎胚可调整候选
+     * @param sourceSkuMap 候选来源SKU映射
+     * @param endingTypeMap 候选收尾类型映射
+     * @param pairResultMap 单控整机代表侧到配对侧映射
+     * @return true-至少一个SKU组实际完成尾量分摊；false-没有需要或没有可行调整
      */
-    private boolean balanceEmbryoGroup(LhScheduleContext context,
-                                       List<LhShiftConfigVO> shifts,
-                                       String embryoCode,
-                                       List<LhScheduleResult> groupResults,
-                                       Map<LhScheduleResult, SkuScheduleDTO> sourceSkuMap,
-                                       Map<LhScheduleResult, String> endingTypeMap,
-                                       Map<LhScheduleResult, LhScheduleResult> pairResultMap,
-                                       Map<String, int[]> sharedSimulationCountMap) {
-        EmbryoEndingBalanceState state = buildBalanceState(
-                context, shifts, groupResults, sourceSkuMap, endingTypeMap,
-                pairResultMap, sharedSimulationCountMap);
-        // 单机台组不执行尾量调整，但其预测换模动作仍需占用全局预演次数，供后续胎胚组判断每日硬上限。
-        if (groupResults.size() < MIN_GROUP_MACHINE_COUNT) {
-            replaceSimulationCountMap(sharedSimulationCountMap, state.getSimulatedCountMap());
-            return false;
-        }
-        logBalanceState(context, embryoCode, state, "均衡前");
-        // 没有集中、超限或同班次收尾风险时不做调整。
-        if (!needsBalance(state)) {
-            log.info("共用胎胚收尾均衡无需调整, scheduleDate: {}, embryoCode: {}, 机台数: {}, "
-                            + "原因: 无同班次集中收尾且预测换模次数未超过软目标/硬限制",
-                    context.getScheduleDate(), embryoCode, groupResults.size());
-            replaceSimulationCountMap(sharedSimulationCountMap, state.getSimulatedCountMap());
-            return false;
-        }
-        boolean adjusted = false;
-        int round = 0;
-        // 每轮只提交一个使整体评分严格变优的移动，直到风险消除或无法继续改善。
-        // 硬限制/超软目标/同班次集中都已消除后立即停止，不再仅为早中班比例偏差
-        // 继续执行提前减量或后延补量，避免对按时间下机机台产生非必要的整班减产。
-        while (round < MAX_BALANCE_ROUNDS && needsBalance(state)) {
-            round++;
-            EmbryoEndingBalanceMove bestMove = findFirstImprovingMove(
-                    context, shifts, state, pairResultMap, sharedSimulationCountMap);
-            if (Objects.isNull(bestMove)) {
-                break;
+    private boolean balanceSkuEndingByInitialCapsuleUsage(
+            LhScheduleContext context,
+            List<LhShiftConfigVO> shifts,
+            List<LhScheduleResult> candidateList,
+            Map<LhScheduleResult, SkuScheduleDTO> sourceSkuMap,
+            Map<LhScheduleResult, String> endingTypeMap,
+            Map<LhScheduleResult, LhScheduleResult> pairResultMap) {
+        Map<String, List<LhScheduleResult>> skuGroupMap =
+                new LinkedHashMap<String, List<LhScheduleResult>>(8);
+        for (LhScheduleResult result : candidateList) {
+            /*
+             * 调用范围必须同时满足“SKU被判定为余量收尾”和“本机台结果已经真实收尾”。
+             * SKU标签只能说明本轮存在收尾目标；当总余量超过窗口可用产能时，部分机台可能
+             * 跑满排程窗口且IS_END=0，它们尚未下机，不属于本次同物料多机台余量收尾。
+             * 若仅按标签入组，会对无法承接更多产能的窗口满产机台反复尝试并生成误导日志。
+             */
+            if (!StringUtils.equals(ENDING_TYPE_SKU, endingTypeMap.get(result))
+                    || !"1".equals(result.getIsEnd())) {
+                continue;
             }
-            state = buildBalanceState(
-                    context, shifts, groupResults, sourceSkuMap, endingTypeMap,
-                    pairResultMap, sharedSimulationCountMap);
-            adjusted = true;
-            log.info("共用胎胚收尾均衡提交, scheduleDate: {}, embryoCode: {}, 移动类型: {}, 轮次: {}, "
-                            + "调整后详情: {}",
-                    context.getScheduleDate(), embryoCode, bestMove.getMoveType(), round,
-                    buildStateSummary(context, state));
+            String skuKey = this.resolveSkuKey(sourceSkuMap.get(result));
+            if (StringUtils.isNotEmpty(skuKey)) {
+                skuGroupMap.computeIfAbsent(
+                        skuKey, key -> new ArrayList<LhScheduleResult>(2)).add(result);
+            }
         }
-        if (needsBalance(state)) {
-            log.info("共用胎胚收尾均衡无法继续改善, scheduleDate: {}, embryoCode: {}, 原因: "
-                            + "候选移动均无法降低换模集中/超限评分，保留当前排程结果",
-                    context.getScheduleDate(), embryoCode);
+        List<String> orderedSkuKeyList = new ArrayList<String>(skuGroupMap.keySet());
+        Collections.sort(orderedSkuKeyList);
+        boolean adjusted = false;
+        for (String skuKey : orderedSkuKeyList) {
+            List<LhScheduleResult> skuResultList = skuGroupMap.get(skuKey);
+            if (CollectionUtils.isEmpty(skuResultList)
+                    || skuResultList.size() < MIN_GROUP_MACHINE_COUNT) {
+                continue;
+            }
+            adjusted |= this.balanceSingleSkuCapsuleUsageGroup(
+                    context, shifts, skuResultList, sourceSkuMap, pairResultMap);
         }
-        // 当前组最终预测结果提交到全局本地账本，后一组必须在该次数基础上继续预演。
-        replaceSimulationCountMap(sharedSimulationCountMap, state.getSimulatedCountMap());
         return adjusted;
+    }
+
+    /**
+     * 原子调整单个SKU的胶囊感知尾量分配。
+     *
+     * @param context 排程上下文
+     * @param shifts 排程窗口班次
+     * @param skuResultList 同一物料+产品状态的余量收尾结果
+     * @param sourceSkuMap 候选来源SKU映射
+     * @param pairResultMap 单控整机代表侧到配对侧映射
+     * @return true-整组满足胶囊顺序并实际发生搬量；false-无需调整或整组回滚
+     */
+    private boolean balanceSingleSkuCapsuleUsageGroup(
+            LhScheduleContext context,
+            List<LhShiftConfigVO> shifts,
+            List<LhScheduleResult> skuResultList,
+            Map<LhScheduleResult, SkuScheduleDTO> sourceSkuMap,
+            Map<LhScheduleResult, LhScheduleResult> pairResultMap) {
+        Map<LhScheduleResult, Integer> initialUsageMap =
+                new IdentityHashMap<LhScheduleResult, Integer>(skuResultList.size());
+        Set<Integer> distinctUsageSet = new LinkedHashSet<Integer>(skuResultList.size());
+        for (LhScheduleResult result : skuResultList) {
+            int initialUsage = this.capsuleReplacementRuleService.resolveInitialMachineUsage(
+                    context, result.getLhMachineCode());
+            initialUsageMap.put(result, initialUsage);
+            distinctUsageSet.add(initialUsage);
+        }
+        // 次数完全相同不叠加偏置，后续继续执行既有换模评分和机台编码排序。
+        if (distinctUsageSet.size() <= 1) {
+            return false;
+        }
+        // 现有分配若已经满足低次数少分摊且严格更早下机，不为制造差异而继续搬量。
+        if (this.isCapsuleUsageGroupOrdered(
+                context, skuResultList, initialUsageMap, pairResultMap)) {
+            return false;
+        }
+        Set<LhScheduleResult> affectedResultSet =
+                new LinkedHashSet<LhScheduleResult>(skuResultList);
+        BalanceSnapshot groupSnapshot = this.snapshotGroupState(
+                context, affectedResultSet, pairResultMap);
+        int totalBefore = this.resolveGroupScheduledQty(skuResultList, pairResultMap);
+        String beforeSummary = this.buildCapsuleAllocationSummary(
+                context, skuResultList, initialUsageMap, pairResultMap);
+        boolean balanced = this.adjustCapsuleUsageGroup(
+                context, shifts, skuResultList, initialUsageMap, pairResultMap);
+        int totalAfter = this.resolveGroupScheduledQty(skuResultList, pairResultMap);
+        if (!balanced || totalBefore != totalAfter
+                || !this.isCapsuleUsageGroupOrdered(
+                context, skuResultList, initialUsageMap, pairResultMap)) {
+            this.restoreGroupState(groupSnapshot);
+            this.appendCapsuleAllocationProcessLog(
+                    context, sourceSkuMap.get(skuResultList.get(0)), beforeSummary,
+                    beforeSummary, false,
+                    "总量守恒、机台产能、占用、胶囊或20:00后禁换模约束下无完整可行解");
+            return false;
+        }
+        // 分摊同时减少转出机、增加承接机，提交后统一重建胶囊运行态，避免保留尝试过程增量。
+        this.capsuleReplacementRuleService.rebuildRuntimeState(context, null);
+        String afterSummary = this.buildCapsuleAllocationSummary(
+                context, skuResultList, initialUsageMap, pairResultMap);
+        this.appendCapsuleAllocationProcessLog(
+                context, sourceSkuMap.get(skuResultList.get(0)), beforeSummary,
+                afterSummary, true, "按最小可行模数完成胶囊感知尾量分摊");
+        return !StringUtils.equals(beforeSummary, afterSummary);
+    }
+
+    /**
+     * 循环修复同一SKU中所有“低次数未早于高次数”的成对违反项。
+     *
+     * @param context 排程上下文
+     * @param shifts 排程窗口班次
+     * @param skuResultList 同SKU结果
+     * @param initialUsageMap 排程开始前胶囊次数
+     * @param pairResultMap 单控整机配对映射
+     * @return true-全部不同次数层级均满足顺序；false-存在不可行违反项
+     */
+    private boolean adjustCapsuleUsageGroup(
+            LhScheduleContext context,
+            List<LhShiftConfigVO> shifts,
+            List<LhScheduleResult> skuResultList,
+            Map<LhScheduleResult, Integer> initialUsageMap,
+            Map<LhScheduleResult, LhScheduleResult> pairResultMap) {
+        int totalGroupQty = this.resolveGroupScheduledQty(skuResultList, pairResultMap);
+        int maxRounds = Math.max(1, totalGroupQty + skuResultList.size());
+        for (int round = 0; round < maxRounds; round++) {
+            LhScheduleResult[] violation = this.findCapsuleUsageOrderViolation(
+                    context, skuResultList, initialUsageMap, pairResultMap);
+            if (Objects.isNull(violation)) {
+                return true;
+            }
+            if (!this.tryMinimumCapsuleAwareTransfer(
+                    context, shifts, violation[0], violation[1], pairResultMap)) {
+                return false;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 查找第一个胶囊次数顺序违反项，返回低次数转出机和高次数承接机。
+     *
+     * @param context 排程上下文
+     * @param skuResultList 同SKU结果
+     * @param initialUsageMap 排程开始前胶囊次数
+     * @param pairResultMap 单控整机配对映射
+     * @return 长度为2的结果数组；全部满足时返回null
+     */
+    private LhScheduleResult[] findCapsuleUsageOrderViolation(
+            LhScheduleContext context,
+            List<LhScheduleResult> skuResultList,
+            Map<LhScheduleResult, Integer> initialUsageMap,
+            Map<LhScheduleResult, LhScheduleResult> pairResultMap) {
+        List<LhScheduleResult> orderedResultList = new ArrayList<LhScheduleResult>(skuResultList);
+        orderedResultList.sort(Comparator
+                .comparingInt((LhScheduleResult result) -> initialUsageMap.getOrDefault(result, 0))
+                .thenComparing(result -> StringUtils.defaultString(result.getLhMachineCode())));
+        for (int lowerIndex = 0; lowerIndex < orderedResultList.size(); lowerIndex++) {
+            LhScheduleResult lowerUsageResult = orderedResultList.get(lowerIndex);
+            for (int higherIndex = lowerIndex + 1;
+                 higherIndex < orderedResultList.size(); higherIndex++) {
+                LhScheduleResult higherUsageResult = orderedResultList.get(higherIndex);
+                int lowerUsage = initialUsageMap.getOrDefault(lowerUsageResult, 0);
+                int higherUsage = initialUsageMap.getOrDefault(higherUsageResult, 0);
+                if (lowerUsage >= higherUsage) {
+                    continue;
+                }
+                /*
+                 * 数量与下机先后已经有序，但任一真实收尾点落在20:00后禁换模窗口时，
+                 * 仍需继续从低次数机台向高次数机台搬量：低次数侧通过减量提前，高次数侧
+                 * 通过连续补量尝试延伸到次日06:00。不能因数量顺序已满足就跳过晚班硬约束。
+                 */
+                if (!this.isCapsulePairOrdered(
+                        context, lowerUsageResult, higherUsageResult, pairResultMap)
+                        || !this.isMouldChangeEndingAllowed(context, lowerUsageResult)
+                        || !this.isMouldChangeEndingAllowed(context, higherUsageResult)) {
+                    return new LhScheduleResult[]{lowerUsageResult, higherUsageResult};
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 从一个物理模数单位开始递增尝试低次数机台向高次数机台搬量。
+     *
+     * @param context 排程上下文
+     * @param shifts 排程窗口班次
+     * @param donor 低胶囊次数转出机
+     * @param receiver 高胶囊次数承接机
+     * @param pairResultMap 单控整机配对映射
+     * @return true-首个满足数量、收尾顺序和禁换模约束的方案已提交
+     */
+    private boolean tryMinimumCapsuleAwareTransfer(
+            LhScheduleContext context,
+            List<LhShiftConfigVO> shifts,
+            LhScheduleResult donor,
+            LhScheduleResult receiver,
+            Map<LhScheduleResult, LhScheduleResult> pairResultMap) {
+        int transferUnit = this.resolveCapsuleTransferUnit(donor, receiver, pairResultMap);
+        int donorAvailableQty = this.resolvePhysicalResultScheduledQty(donor, pairResultMap);
+        if (transferUnit <= 0 || donorAvailableQty < transferUnit) {
+            return false;
+        }
+        for (int candidateQty = transferUnit;
+             candidateQty <= donorAvailableQty; candidateQty += transferUnit) {
+            Set<LhScheduleResult> affectedResultSet = new LinkedHashSet<LhScheduleResult>(2);
+            affectedResultSet.add(donor);
+            affectedResultSet.add(receiver);
+            BalanceSnapshot attemptSnapshot = this.snapshotGroupState(
+                    context, affectedResultSet, pairResultMap);
+            int pairTotalBefore = this.resolvePhysicalResultScheduledQty(donor, pairResultMap)
+                    + this.resolvePhysicalResultScheduledQty(receiver, pairResultMap);
+            int appliedQty = this.applyCapsuleAwareTransfer(
+                    context, shifts, donor, receiver, candidateQty, pairResultMap);
+            int pairTotalAfter = this.resolvePhysicalResultScheduledQty(donor, pairResultMap)
+                    + this.resolvePhysicalResultScheduledQty(receiver, pairResultMap);
+            if (appliedQty > 0 && pairTotalBefore == pairTotalAfter
+                    && this.isMouldChangeEndingAllowed(context, donor)
+                    && this.isMouldChangeEndingAllowed(context, receiver)
+                    && this.isCapsulePairOrdered(context, donor, receiver, pairResultMap)) {
+                return true;
+            }
+            this.restoreGroupState(attemptSnapshot);
+        }
+        return false;
+    }
+
+    /**
+     * 原子执行一次胶囊感知尾量搬移：承接机连续增量成功后，再从转出机尾部等量扣减。
+     *
+     * @param context 排程上下文
+     * @param shifts 排程窗口班次
+     * @param donor 转出机
+     * @param receiver 承接机
+     * @param candidateGroupQty 候选物理机台总量
+     * @param pairResultMap 单控整机配对映射
+     * @return 实际搬移的物理机台总量；失败返回0
+     */
+    private int applyCapsuleAwareTransfer(
+            LhScheduleContext context,
+            List<LhShiftConfigVO> shifts,
+            LhScheduleResult donor,
+            LhScheduleResult receiver,
+            int candidateGroupQty,
+            Map<LhScheduleResult, LhScheduleResult> pairResultMap) {
+        LhScheduleResult donorPair = pairResultMap.get(donor);
+        LhScheduleResult receiverPair = pairResultMap.get(receiver);
+        if (Objects.nonNull(donorPair) != Objects.nonNull(receiverPair)) {
+            return 0;
+        }
+        int appliedGroupQty = this.addCapsuleAwareReceiverQty(
+                context, shifts, receiver, receiverPair, candidateGroupQty);
+        if (appliedGroupQty <= 0
+                || !this.reduceCapsuleAwareDonorQty(
+                context, shifts, donor, donorPair, appliedGroupQty)) {
+            return 0;
+        }
+        this.refreshCapsuleTransferResult(context, shifts, donor);
+        this.refreshCapsuleTransferResult(context, shifts, receiver);
+        if (Objects.nonNull(donorPair)) {
+            this.refreshCapsuleTransferResult(context, shifts, donorPair);
+            this.refreshCapsuleTransferResult(context, shifts, receiverPair);
+        }
+        // 正式结果已同时增减完成，统一重建运行态，使胶囊次数只反映最终计划而非尝试路径。
+        this.capsuleReplacementRuleService.rebuildRuntimeState(context, null);
+        return appliedGroupQty;
+    }
+
+    /**
+     * 将候选尾量从承接机当前收尾班次起连续写入；若跨越20:00，只有补满到次日06:00
+     * 才可能在外层通过结束时间校验，因此不会留下中班到夜班之间的生产空档。
+     *
+     * @param context 排程上下文
+     * @param shifts 排程窗口班次
+     * @param receiver 承接机结果
+     * @param receiverPair 单控整机配对侧；普通机台为null
+     * @param candidateGroupQty 候选物理机台总量
+     * @return 实际承接的物理机台总量；失败返回0
+     */
+    private int addCapsuleAwareReceiverQty(
+            LhScheduleContext context,
+            List<LhShiftConfigVO> shifts,
+            LhScheduleResult receiver,
+            LhScheduleResult receiverPair,
+            int candidateGroupQty) {
+        boolean pairUnit = Objects.nonNull(receiverPair);
+        if (candidateGroupQty <= 0 || pairUnit && candidateGroupQty % 2 != 0) {
+            return 0;
+        }
+        int remainingPerSideQty = pairUnit ? candidateGroupQty / 2 : candidateGroupQty;
+        int appliedPerSideQty = 0;
+        int firstShiftIndex = ShiftFieldUtil.resolveLastPlannedShiftIndex(receiver);
+        for (int shiftIndex = firstShiftIndex;
+             shiftIndex <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT
+                     && remainingPerSideQty > 0; shiftIndex++) {
+            LhShiftConfigVO targetShift = this.findShiftByIndex(shifts, shiftIndex);
+            if (!this.isCapsuleReceiverShiftAvailable(
+                    context, receiver, receiverPair, targetShift, shiftIndex)) {
+                return 0;
+            }
+            int freeCapacity = this.resolveShiftFreeCapacity(context, receiver, targetShift);
+            if (pairUnit) {
+                freeCapacity = Math.min(freeCapacity,
+                        this.resolveShiftFreeCapacity(context, receiverPair, targetShift));
+            }
+            if (freeCapacity <= 0) {
+                if (this.isResultShiftFull(context, receiver, targetShift)
+                        && (!pairUnit || this.isResultShiftFull(
+                        context, receiverPair, targetShift))) {
+                    continue;
+                }
+                return 0;
+            }
+            int requestPerSideQty = Math.min(remainingPerSideQty, freeCapacity);
+            int actualPerSideQty = this.resolveCapsuleTransferActualQty(
+                    context, receiver, receiverPair, targetShift, requestPerSideQty);
+            if (actualPerSideQty <= 0
+                    || !this.applyReceiverTransferSide(
+                    context, shifts, receiver, targetShift, actualPerSideQty)
+                    || pairUnit && !this.applyReceiverTransferSide(
+                    context, shifts, receiverPair, targetShift, actualPerSideQty)) {
+                return 0;
+            }
+            appliedPerSideQty += actualPerSideQty;
+            remainingPerSideQty -= actualPerSideQty;
+            /*
+             * 换胶囊固定扣量会使当前班次实际承接量小于请求量，缺口不能在本班次补回，
+             * 但仍需作为待转移生产量连续排入下一班次。否则候选量无论增大多少都只会
+             * 停留在首次换胶囊班次，无法同时满足总量守恒和跨20:00连续生产约束。
+             */
+        }
+        return appliedPerSideQty * (pairUnit ? 2 : 1);
+    }
+
+    /**
+     * 判断胶囊感知承接目标班次是否可以连续排产。
+     *
+     * @param context 排程上下文
+     * @param receiver 承接结果
+     * @param receiverPair 单控配对侧
+     * @param targetShift 目标班次
+     * @param shiftIndex 目标班次序号
+     * @return true-可继续写入；false-被边界、占用或窗口限制拦截
+     */
+    private boolean isCapsuleReceiverShiftAvailable(
+            LhScheduleContext context,
+            LhScheduleResult receiver,
+            LhScheduleResult receiverPair,
+            LhShiftConfigVO targetShift,
+            int shiftIndex) {
+        return Objects.nonNull(targetShift)
+                && !this.isBeyondReleaseBoundary(context, receiver, shiftIndex)
+                && (Objects.isNull(receiverPair)
+                || !this.isBeyondReleaseBoundary(context, receiverPair, shiftIndex))
+                && !this.isShiftOccupiedByOtherSku(context, receiver, targetShift)
+                && (Objects.isNull(receiverPair)
+                || !this.isShiftOccupiedByOtherSku(context, receiverPair, targetShift));
+    }
+
+    /**
+     * 通过公共胶囊规则解析当前承接班次的真实可写量。
+     *
+     * @param context 排程上下文
+     * @param receiver 承接结果
+     * @param receiverPair 单控配对侧
+     * @param targetShift 目标班次
+     * @param requestPerSideQty 单侧请求量
+     * @return 两侧共同可落地的单侧实际量
+     */
+    private int resolveCapsuleTransferActualQty(
+            LhScheduleContext context,
+            LhScheduleResult receiver,
+            LhScheduleResult receiverPair,
+            LhShiftConfigVO targetShift,
+            int requestPerSideQty) {
+        int actualPerSideQty = this.capsuleReplacementRuleService.resolveActualPlanQty(
+                context, receiver, targetShift, requestPerSideQty,
+                "共用胎胚同物料胶囊感知尾量分摊");
+        if (Objects.nonNull(receiverPair)) {
+            int pairActualQty = this.capsuleReplacementRuleService.resolveActualPlanQty(
+                    context, receiverPair, targetShift, requestPerSideQty,
+                    "共用胎胚同物料胶囊感知尾量分摊");
+            actualPerSideQty = Math.min(actualPerSideQty, pairActualQty);
+        }
+        return actualPerSideQty;
+    }
+
+    /**
+     * 判断结果在目标班次是否已经达到当前全部硬约束收口后的有效产能。
+     *
+     * @param context 排程上下文
+     * @param result 排程结果
+     * @param shift 目标班次
+     * @return true-已经满产，可无缝进入下一班次
+     */
+    private boolean isResultShiftFull(LhScheduleContext context,
+                                      LhScheduleResult result,
+                                      LhShiftConfigVO shift) {
+        int capacity = this.resolveResultShiftCapacity(context, result, shift);
+        return capacity > 0 && this.resolveShiftPlanQty(result, shift.getShiftIndex()) >= capacity;
+    }
+
+    /**
+     * 从低胶囊次数机台最后有量班次开始向前等量扣减。
+     *
+     * @param context 排程上下文
+     * @param shifts 排程窗口班次
+     * @param donor 转出结果
+     * @param donorPair 单控配对侧
+     * @param appliedGroupQty 需要扣减的物理机台总量
+     * @return true-主结果及配对侧均精确扣减；false-数量不足
+     */
+    private boolean reduceCapsuleAwareDonorQty(
+            LhScheduleContext context,
+            List<LhShiftConfigVO> shifts,
+            LhScheduleResult donor,
+            LhScheduleResult donorPair,
+            int appliedGroupQty) {
+        boolean pairUnit = Objects.nonNull(donorPair);
+        if (appliedGroupQty <= 0 || pairUnit && appliedGroupQty % 2 != 0) {
+            return false;
+        }
+        int perSideQty = pairUnit ? appliedGroupQty / 2 : appliedGroupQty;
+        if (ShiftFieldUtil.resolveScheduledQty(donor) < perSideQty
+                || pairUnit && ShiftFieldUtil.resolveScheduledQty(donorPair) < perSideQty) {
+            return false;
+        }
+        return this.reduceResultQtyFromTail(context, shifts, donor, perSideQty)
+                && (!pairUnit || this.reduceResultQtyFromTail(
+                context, shifts, donorPair, perSideQty));
+    }
+
+    /**
+     * 从单条结果尾部精确扣减计划量，保持剩余计划为从前向后的连续时间轴。
+     *
+     * @param context 排程上下文
+     * @param shifts 排程窗口班次
+     * @param result 待扣减结果
+     * @param reduceQty 扣减量
+     * @return true-精确扣完；false-结果总量不足
+     */
+    private boolean reduceResultQtyFromTail(LhScheduleContext context,
+                                            List<LhShiftConfigVO> shifts,
+                                            LhScheduleResult result,
+                                            int reduceQty) {
+        int remainingQty = reduceQty;
+        for (int shiftIndex = LhScheduleConstant.MAX_SHIFT_SLOT_COUNT;
+             shiftIndex >= 1 && remainingQty > 0; shiftIndex--) {
+            int currentQty = this.resolveShiftPlanQty(result, shiftIndex);
+            if (currentQty <= 0) {
+                continue;
+            }
+            int currentReduceQty = Math.min(currentQty, remainingQty);
+            int adjustedQty = currentQty - currentReduceQty;
+            if (adjustedQty <= 0) {
+                ShiftFieldUtil.setShiftPlanQty(result, shiftIndex, 0, null, null);
+                ShiftFieldUtil.clearShiftPlanAuxFields(result, shiftIndex);
+            } else {
+                Date startTime = ShiftFieldUtil.getShiftStartTime(result, shiftIndex);
+                LhShiftConfigVO shift = this.findShiftByIndex(shifts, shiftIndex);
+                if (Objects.isNull(startTime) && Objects.nonNull(shift)) {
+                    startTime = shift.getShiftStartDateTime();
+                }
+                Date endTime = this.resolveShiftCompletionTime(
+                        context, shifts, result, shiftIndex, adjustedQty);
+                ShiftFieldUtil.setShiftPlanQty(
+                        result, shiftIndex, adjustedQty, startTime, endTime);
+            }
+            ShiftFieldUtil.appendShiftAnalysis(result, shiftIndex, BALANCE_TRANSFER_ANALYSIS);
+            remainingQty -= currentReduceQty;
+        }
+        return remainingQty == 0;
+    }
+
+    /**
+     * 刷新胶囊感知搬量后的结果汇总、续作停产保机边界和机台结束时间。
+     *
+     * @param context 排程上下文
+     * @param shifts 排程窗口班次
+     * @param result 已调整结果
+     */
+    private void refreshCapsuleTransferResult(LhScheduleContext context,
+                                              List<LhShiftConfigVO> shifts,
+                                              LhScheduleResult result) {
+        this.refreshResultSummary(context, result, shifts);
+        this.syncStopHoldBoundaryAfterBalance(context, result, shifts);
+        this.syncMachineEstimatedEndTime(context, result);
+    }
+
+    /**
+     * 校验同一SKU所有不同胶囊次数层级均满足“低次数少分摊、严格更早下机”。
+     *
+     * @param context 排程上下文
+     * @param skuResultList 同SKU代表结果
+     * @param initialUsageMap 排程开始前胶囊次数
+     * @param pairResultMap 单控整机配对映射
+     * @return true-全部满足或次数相同；false-仍存在逆序
+     */
+    private boolean isCapsuleUsageGroupOrdered(
+            LhScheduleContext context,
+            List<LhScheduleResult> skuResultList,
+            Map<LhScheduleResult, Integer> initialUsageMap,
+            Map<LhScheduleResult, LhScheduleResult> pairResultMap) {
+        return Objects.isNull(this.findCapsuleUsageOrderViolation(
+                context, skuResultList, initialUsageMap, pairResultMap));
+    }
+
+    /**
+     * 校验一对不同胶囊次数机台的数量及真实下机时间顺序。
+     *
+     * @param context 排程上下文
+     * @param lowerUsageResult 低胶囊次数机台
+     * @param higherUsageResult 高胶囊次数机台
+     * @param pairResultMap 单控整机配对映射
+     * @return true-低次数计划量不大于高次数且严格更早下机
+     */
+    private boolean isCapsulePairOrdered(
+            LhScheduleContext context,
+            LhScheduleResult lowerUsageResult,
+            LhScheduleResult higherUsageResult,
+            Map<LhScheduleResult, LhScheduleResult> pairResultMap) {
+        int lowerQty = this.resolvePhysicalResultScheduledQty(lowerUsageResult, pairResultMap);
+        int higherQty = this.resolvePhysicalResultScheduledQty(higherUsageResult, pairResultMap);
+        if (lowerQty > higherQty) {
+            return false;
+        }
+        Date lowerEndingTime = this.resolveActualProductionEndingTime(context, lowerUsageResult);
+        Date higherEndingTime = this.resolveActualProductionEndingTime(context, higherUsageResult);
+        // 转出机计划量归零代表已优先下机；高次数机仍必须保留正量承接尾量。
+        if (lowerQty <= 0) {
+            return higherQty > 0;
+        }
+        return Objects.nonNull(lowerEndingTime) && Objects.nonNull(higherEndingTime)
+                && lowerEndingTime.before(higherEndingTime);
+    }
+
+    /**
+     * 校验机台最终真实收尾点能否立即换模；计划量归零视为已提前释放。
+     *
+     * @param context 排程上下文
+     * @param result 排程结果
+     * @return true-不在20:00后至次日06:00禁换模窗口，或结果已归零
+     */
+    private boolean isMouldChangeEndingAllowed(LhScheduleContext context, LhScheduleResult result) {
+        if (ShiftFieldUtil.resolveScheduledQty(result) <= 0) {
+            return true;
+        }
+        Date endingTime = this.resolveActualProductionEndingTime(context, result);
+        return Objects.nonNull(endingTime)
+                && !LhScheduleTimeUtil.isNoMouldChangeTime(context, endingTime);
+    }
+
+    /**
+     * 解析结果最后有量班次的真实生产结束时间，不受续作停产保机占用边界影响。
+     *
+     * @param context 排程上下文
+     * @param result 排程结果
+     * @return 真实生产结束时间；无计划量时返回null
+     */
+    private Date resolveActualProductionEndingTime(LhScheduleContext context,
+                                                   LhScheduleResult result) {
+        int endingShiftIndex = ShiftFieldUtil.resolveLastPlannedShiftIndex(result);
+        return endingShiftIndex <= 0
+                ? null : this.resolveBalanceEndingTime(context, result, endingShiftIndex);
+    }
+
+    /**
+     * 计算代表结果对应物理机台的计划总量；单控整机按L/R两侧合计。
+     *
+     * @param result 代表结果
+     * @param pairResultMap 单控整机配对映射
+     * @return 物理机台计划总量
+     */
+    private int resolvePhysicalResultScheduledQty(
+            LhScheduleResult result,
+            Map<LhScheduleResult, LhScheduleResult> pairResultMap) {
+        int totalQty = Objects.isNull(result) ? 0 : ShiftFieldUtil.resolveScheduledQty(result);
+        LhScheduleResult pairResult = pairResultMap.get(result);
+        return totalQty + (Objects.isNull(pairResult)
+                ? 0 : ShiftFieldUtil.resolveScheduledQty(pairResult));
+    }
+
+    /**
+     * 计算一个SKU代表结果集合的物理机台总计划量。
+     *
+     * @param resultList 代表结果集合
+     * @param pairResultMap 单控整机配对映射
+     * @return SKU组计划总量
+     */
+    private int resolveGroupScheduledQty(
+            List<LhScheduleResult> resultList,
+            Map<LhScheduleResult, LhScheduleResult> pairResultMap) {
+        int totalQty = 0;
+        for (LhScheduleResult result : resultList) {
+            totalQty += this.resolvePhysicalResultScheduledQty(result, pairResultMap);
+        }
+        return totalQty;
+    }
+
+    /**
+     * 解析转出与承接机共同支持的最小物理搬移单位。
+     *
+     * @param donor 转出结果
+     * @param receiver 承接结果
+     * @param pairResultMap 单控整机配对映射
+     * @return 普通机台为两者模数最小公倍数；单控整机再乘左右两侧
+     */
+    private int resolveCapsuleTransferUnit(
+            LhScheduleResult donor,
+            LhScheduleResult receiver,
+            Map<LhScheduleResult, LhScheduleResult> pairResultMap) {
+        int donorUnit = ShiftCapacityResolverUtil.resolveMachineMouldQty(donor.getMouldQty());
+        int receiverUnit = ShiftCapacityResolverUtil.resolveMachineMouldQty(receiver.getMouldQty());
+        int perSideUnit = this.resolveLeastCommonMultiple(donorUnit, receiverUnit);
+        return Objects.nonNull(pairResultMap.get(donor)) ? perSideUnit * 2 : perSideUnit;
+    }
+
+    /**
+     * 判断既有换模均衡尾量搬移是否符合胶囊次数方向。
+     *
+     * @param context 排程上下文
+     * @param donor 既有均衡拟转出机台
+     * @param receiver 既有均衡拟承接机台
+     * @return true-次数相同，或转出机次数严格少于承接机；false-会造成反向分摊
+     */
+    private boolean isCapsuleTransferDirectionAllowed(LhScheduleContext context,
+                                                      LhScheduleResult donor,
+                                                      LhScheduleResult receiver) {
+        int donorUsage = this.capsuleReplacementRuleService.resolveInitialMachineUsage(
+                context, donor.getLhMachineCode());
+        int receiverUsage = this.capsuleReplacementRuleService.resolveInitialMachineUsage(
+                context, receiver.getLhMachineCode());
+        return donorUsage <= receiverUsage;
+    }
+
+    /**
+     * 校验胶囊前置分摊之后，既有全局换模均衡的尾量移动仍满足本次新增硬约束。
+     *
+     * @param context 排程上下文
+     * @param move 已执行但尚未提交的既有均衡移动
+     * @param nextState 移动后状态
+     * @return true-非尾量分摊，或结束时间与胶囊顺序均合法
+     */
+    private boolean isExistingTransferBusinessConstraintSatisfied(
+            LhScheduleContext context,
+            EmbryoEndingBalanceMove move,
+            EmbryoEndingBalanceState nextState) {
+        if (!MOVE_TYPE_TRANSFER.equals(move.getMoveType())
+                || Objects.isNull(move.getReceiver())) {
+            return true;
+        }
+        LhScheduleResult donor = move.getDonor();
+        LhScheduleResult receiver = move.getReceiver();
+        boolean sameSkuEndingTransfer = StringUtils.equals(
+                ENDING_TYPE_SKU, nextState.getEndingTypeMap().get(donor))
+                && StringUtils.equals(ENDING_TYPE_SKU, nextState.getEndingTypeMap().get(receiver))
+                && "1".equals(donor.getIsEnd())
+                && "1".equals(receiver.getIsEnd())
+                && StringUtils.equals(
+                this.resolveSkuKey(nextState.getSourceSkuMap().get(donor)),
+                this.resolveSkuKey(nextState.getSourceSkuMap().get(receiver)));
+        if (!sameSkuEndingTransfer) {
+            /*
+             * 胎胚收尾、按时间下机及IS_END=0窗口满产行继续完全沿用原全局均衡规则。
+             * 胶囊方向和20:00/06:00二次保护只服务于本次新增的真实SKU余量收尾分摊，
+             * 不能借全局移动入口改变其他收尾场景的既有结果。
+             */
+            return true;
+        }
+        if (!this.isMouldChangeEndingAllowed(context, donor)
+                || !this.isMouldChangeEndingAllowed(context, receiver)) {
+            return false;
+        }
+        /*
+         * 原有换模均衡可能在三台及以上机台间再次搬量。只校验本次转出/承接两台不够，
+         * 因为它们虽然有序，却可能与未参与本次移动的第三台形成数量或时间逆序。
+         * 因此每次候选移动后都按同一SKU整组重建排程前胶囊快照并复核全部次数层级。
+         */
+        return this.isExistingSkuCapsuleGroupOrdered(
+                context, nextState, this.resolveSkuKey(nextState.getSourceSkuMap().get(donor)));
+    }
+
+    /**
+     * 校验既有换模均衡移动后的同SKU胶囊次数整组顺序。
+     *
+     * @param context 排程上下文
+     * @param nextState 既有均衡移动后的预演状态
+     * @param skuKey 需要复核的物料+产品状态键
+     * @return true-全部不同次数层级仍满足少分摊、早下机及晚班禁换模；false-任一层级逆序
+     */
+    private boolean isExistingSkuCapsuleGroupOrdered(
+            LhScheduleContext context,
+            EmbryoEndingBalanceState nextState,
+            String skuKey) {
+        List<LhScheduleResult> skuResultList = new ArrayList<LhScheduleResult>(4);
+        Map<LhScheduleResult, Integer> initialUsageMap =
+                new IdentityHashMap<LhScheduleResult, Integer>(4);
+        for (LhScheduleResult candidate : nextState.getSourceSkuMap().keySet()) {
+            if (!StringUtils.equals(ENDING_TYPE_SKU, nextState.getEndingTypeMap().get(candidate))
+                    || !"1".equals(candidate.getIsEnd())
+                    || !StringUtils.equals(
+                    skuKey, this.resolveSkuKey(nextState.getSourceSkuMap().get(candidate)))) {
+                continue;
+            }
+            skuResultList.add(candidate);
+            initialUsageMap.put(candidate,
+                    this.capsuleReplacementRuleService.resolveInitialMachineUsage(
+                            context, candidate.getLhMachineCode()));
+        }
+        return skuResultList.size() < MIN_GROUP_MACHINE_COUNT
+                || this.isCapsuleUsageGroupOrdered(
+                context, skuResultList, initialUsageMap, nextState.getPairResultMap());
+    }
+
+    /**
+     * 计算两个正整数的最小公倍数。
+     *
+     * @param firstValue 第一个值
+     * @param secondValue 第二个值
+     * @return 最小公倍数
+     */
+    private int resolveLeastCommonMultiple(int firstValue, int secondValue) {
+        int normalizedFirst = Math.max(1, firstValue);
+        int normalizedSecond = Math.max(1, secondValue);
+        int left = normalizedFirst;
+        int right = normalizedSecond;
+        while (right != 0) {
+            int remainder = left % right;
+            left = right;
+            right = remainder;
+        }
+        return normalizedFirst / left * normalizedSecond;
+    }
+
+    /**
+     * 构建胶囊感知分摊前后的机台级对账摘要。
+     *
+     * @param context 排程上下文
+     * @param resultList 同SKU代表结果
+     * @param initialUsageMap 排程开始前胶囊次数
+     * @param pairResultMap 单控整机配对映射
+     * @return 机台、胶囊次数、计划量和真实收尾时间摘要
+     */
+    private String buildCapsuleAllocationSummary(
+            LhScheduleContext context,
+            List<LhScheduleResult> resultList,
+            Map<LhScheduleResult, Integer> initialUsageMap,
+            Map<LhScheduleResult, LhScheduleResult> pairResultMap) {
+        List<LhScheduleResult> orderedResultList = new ArrayList<LhScheduleResult>(resultList);
+        orderedResultList.sort(Comparator.comparing(
+                result -> StringUtils.defaultString(result.getLhMachineCode())));
+        StringBuilder summary = new StringBuilder(192);
+        for (LhScheduleResult result : orderedResultList) {
+            summary.append("[机台=").append(result.getLhMachineCode())
+                    .append(",初始胶囊次数=").append(initialUsageMap.getOrDefault(result, 0))
+                    .append(",计划量=").append(
+                            this.resolvePhysicalResultScheduledQty(result, pairResultMap))
+                    .append(",真实收尾=").append(this.formatDateTimeSafe(
+                            this.resolveActualProductionEndingTime(context, result)))
+                    .append(']');
+        }
+        return summary.toString();
+    }
+
+    /**
+     * 记录胶囊感知尾量分摊成功或整组回滚结果。
+     *
+     * @param context 排程上下文
+     * @param sourceSku 来源SKU
+     * @param beforeSummary 调整前摘要
+     * @param afterSummary 调整后摘要
+     * @param success 是否成功提交
+     * @param reason 结果原因
+     */
+    private void appendCapsuleAllocationProcessLog(
+            LhScheduleContext context,
+            SkuScheduleDTO sourceSku,
+            String beforeSummary,
+            String afterSummary,
+            boolean success,
+            String reason) {
+        StringBuilder detail = new StringBuilder(384);
+        detail.append("scheduleDate=").append(LhScheduleTimeUtil.formatDate(context.getScheduleDate()))
+                .append(", materialCode=").append(
+                        Objects.isNull(sourceSku) ? null : sourceSku.getMaterialCode())
+                .append(", productStatus=").append(
+                        Objects.isNull(sourceSku) ? null : sourceSku.getProductStatus())
+                .append(", embryoCode=").append(
+                        Objects.isNull(sourceSku) ? null : sourceSku.getEmbryoCode())
+                .append(", 调整前=").append(beforeSummary)
+                .append(", 调整后=").append(afterSummary)
+                .append(", 结果=").append(success ? "已提交" : "已拒绝并整组回滚")
+                .append(", 原因=").append(reason);
+        PriorityTraceLogHelper.appendProcessLog(
+                context, "共用胎胚胶囊感知尾量分摊", detail.toString());
+        if (success) {
+            log.info("共用胎胚胶囊感知尾量分摊完成, {}", detail);
+        } else {
+            log.warn("共用胎胚胶囊感知尾量分摊未执行, {}", detail);
+        }
     }
 
     /**
@@ -553,15 +1491,29 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
                                                            EmbryoEndingBalanceState state,
                                                            Map<LhScheduleResult, LhScheduleResult> pairResultMap,
                                                            Map<String, int[]> baseSimulationCountMap) {
-        List<EmbryoEndingBalanceMove> moveList = buildCandidateMoves(context, shifts, state);
+        List<EmbryoEndingBalanceMove> moveList = this.buildCandidateMoves(context, shifts, state);
         if (CollectionUtils.isEmpty(moveList)) {
             return null;
         }
+        BalanceOverflowBucket overflowBucket = this.resolveFirstOverflowBucket(context, state);
         for (EmbryoEndingBalanceMove move : moveList) {
+            // 每轮只处理日期升序下的首个超限班次，同日先早班后中班。
+            if (Objects.nonNull(overflowBucket)
+                    && !this.isMoveRelatedToOverflowBucket(context, state, move, overflowBucket)) {
+                continue;
+            }
+            Set<LhScheduleResult> affectedResultSet = new LinkedHashSet<LhScheduleResult>(2);
+            affectedResultSet.add(move.getDonor());
+            if (Objects.nonNull(move.getReceiver())) {
+                affectedResultSet.add(move.getReceiver());
+            }
+            // 每次尝试只复制转出/承接结果及其单控配对侧，不深拷贝全部候选或完整排程结果。
             BalanceSnapshot snapshot = snapshotGroupState(
-                    context, state.getSourceSkuMap().keySet(), pairResultMap);
+                    context, affectedResultSet, pairResultMap);
             boolean applied = executeMove(context, shifts, move, state);
             if (!applied) {
+                this.appendRejectedMoveProcessLog(context, shifts, move, state, null,
+                        "执行失败：班次产能、其他SKU占用、降模边界、胶囊或单控配对校验未通过");
                 restoreGroupState(snapshot);
                 continue;
             }
@@ -569,18 +1521,254 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
                     context, shifts, new ArrayList<LhScheduleResult>(state.getSourceSkuMap().keySet()),
                     state.getSourceSkuMap(), state.getEndingTypeMap(), pairResultMap,
                     baseSimulationCountMap);
-            if (compareScore(nextState, state) < 0) {
-                // 评分严格变优后才落地跨物料互转的SKU额度重分配，避免失败尝试污染账本。
-                if (!commitMoveQuotaChanges(context, move, state)) {
-                    restoreGroupState(snapshot);
-                    continue;
-                }
-                appendMoveProcessLog(context, shifts, move, state, nextState);
-                return move;
+            if (!this.isExistingTransferBusinessConstraintSatisfied(context, move, nextState)) {
+                this.appendRejectedMoveProcessLog(context, shifts, move, state, nextState,
+                        "尾量分摊后不满足低胶囊次数优先下机，或收尾落入20:00后禁换模窗口");
+                restoreGroupState(snapshot);
+                continue;
             }
-            restoreGroupState(snapshot);
+            if (compareScore(nextState, state) >= 0) {
+                this.appendRejectedMoveProcessLog(context, shifts, move, state, nextState,
+                        "评分未严格变优（目标班次次数未下降或产生其他超限）");
+                restoreGroupState(snapshot);
+                continue;
+            }
+            if (!this.isOverflowBucketImproved(state, nextState, overflowBucket)) {
+                this.appendRejectedMoveProcessLog(context, shifts, move, state, nextState,
+                        "目标班次次数没有下降");
+                restoreGroupState(snapshot);
+                continue;
+            }
+            if (!this.doesNotCreateNewShiftOverflow(context, state, nextState)) {
+                this.appendRejectedMoveProcessLog(context, shifts, move, state, nextState,
+                        "制造另一班次超限");
+                restoreGroupState(snapshot);
+                continue;
+            }
+            if (!this.isCrossDayProductionCompleted(context, state, nextState, move)) {
+                this.appendRejectedMoveProcessLog(context, shifts, move, state, nextState,
+                        "跨天未连续生产到目标06:00");
+                restoreGroupState(snapshot);
+                continue;
+            }
+            // 评分严格变优后才落地跨物料互转的SKU额度重分配，避免失败尝试污染账本。
+            if (!commitMoveQuotaChanges(context, move, state)) {
+                this.appendRejectedMoveProcessLog(context, shifts, move, state, nextState,
+                        "总量/额度账本不守恒");
+                restoreGroupState(snapshot);
+                continue;
+            }
+            appendMoveProcessLog(context, shifts, move, state, nextState);
+            return move;
         }
         return null;
+    }
+
+    /**
+     * 校验因每日硬上限跨天的调整已经把前物料真实生产到目标早班06:00。
+     * <p>若分摊后该机台的换模已经回到原日期，说明通过合并换模事件解决，
+     * 无需跨天补量；若仍落在原跨天日期，则收尾时间必须与换模可就绪的06:00完全一致。</p>
+     *
+     * @param context 排程上下文
+     * @param beforeState 调整前状态
+     * @param afterState 调整后状态
+     * @param move 当前移动
+     * @return true-非跨天或已连续生产到目标时间
+     */
+    private boolean isCrossDayProductionCompleted(LhScheduleContext context,
+                                                  EmbryoEndingBalanceState beforeState,
+                                                  EmbryoEndingBalanceState afterState,
+                                                  EmbryoEndingBalanceMove move) {
+        List<LhScheduleResult> affectedResultList = new ArrayList<LhScheduleResult>(2);
+        affectedResultList.add(move.getDonor());
+        if (Objects.nonNull(move.getReceiver())) {
+            affectedResultList.add(move.getReceiver());
+        }
+        for (LhScheduleResult result : affectedResultList) {
+            if (!this.isMouldChangeDeferredByDailyLimit(context, beforeState, result)) {
+                continue;
+            }
+            Date beforeAssignedTime = beforeState.getChangeTimeMap().get(result);
+            Date afterChangeTime = afterState.getChangeTimeMap().get(result);
+            Date afterEndingTime = afterState.getEndingTimeMap().get(result);
+            if (Objects.isNull(afterChangeTime)) {
+                return false;
+            }
+            if (LhScheduleTimeUtil.clearTime(afterChangeTime)
+                    .before(LhScheduleTimeUtil.clearTime(beforeAssignedTime))) {
+                continue;
+            }
+            if (!afterChangeTime.equals(afterEndingTime)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * 解析首个需要处理的日期班次桶。
+     * <p>日期使用yyyy-MM-dd自然顺序，同日固定先检查早班再检查中班。
+     * 预演被每日硬上限拒绝时无法归属某个已计数班次，返回null交由硬限评分处理。</p>
+     *
+     * @param context 排程上下文
+     * @param state 当前均衡状态
+     * @return 首个超限桶；无班次超限时返回null
+     */
+    private BalanceOverflowBucket resolveFirstOverflowBucket(LhScheduleContext context,
+                                                             EmbryoEndingBalanceState state) {
+        List<String> dateKeyList = new ArrayList<String>(state.getSimulatedCountMap().keySet());
+        dateKeyList.sort(String::compareTo);
+        int morningLimit = LhScheduleTimeUtil.getMorningMouldChangeLimit(context);
+        int afternoonLimit = LhScheduleTimeUtil.getAfternoonMouldChangeLimit(context);
+        for (String dateKey : dateKeyList) {
+            int[] counts = state.getSimulatedCountMap().get(dateKey);
+            int morningCount = Objects.nonNull(counts) && counts.length > 0 ? counts[0] : 0;
+            int afternoonCount = Objects.nonNull(counts) && counts.length > 1 ? counts[1] : 0;
+            if (morningCount > morningLimit
+                    && this.hasCandidateInCountBucket(context, state, dateKey, 0)) {
+                return new BalanceOverflowBucket(dateKey, 0, morningCount, morningLimit);
+            }
+            if (afternoonCount > afternoonLimit
+                    && this.hasCandidateInCountBucket(context, state, dateKey, 1)) {
+                return new BalanceOverflowBucket(dateKey, 1, afternoonCount, afternoonLimit);
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 判断计数桶内是否至少有一台当前共用胎胚候选机台。
+     * <p>真实账本基线中已存在、但不属于当前均衡候选的历史超限不能通过修改
+     * 其他日期的收尾机台解决，因此跳过该桶，最终校验仍会保留实际问题。</p>
+     *
+     * @param context 排程上下文
+     * @param state 当前状态
+     * @param dateKey 日期键
+     * @param shiftCountIndex 班次计数下标：0-早班，1-中班
+     * @return true-存在可调整候选
+     */
+    private boolean hasCandidateInCountBucket(LhScheduleContext context,
+                                              EmbryoEndingBalanceState state,
+                                              String dateKey,
+                                              int shiftCountIndex) {
+        BalanceOverflowBucket bucket = new BalanceOverflowBucket(dateKey, shiftCountIndex, 0, 0);
+        for (LhScheduleResult result : state.getChangeTimeMap().keySet()) {
+            if (this.isResultInOverflowBucket(context, state, result, bucket)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 判断移动是否直接调整当前超限班次已登记的机台。
+     *
+     * @param context 排程上下文
+     * @param state 当前状态
+     * @param move 候选移动
+     * @param bucket 当前超限桶
+     * @return true-移动的转出或承接机台位于该桶
+     */
+    private boolean isMoveRelatedToOverflowBucket(LhScheduleContext context,
+                                                  EmbryoEndingBalanceState state,
+                                                  EmbryoEndingBalanceMove move,
+                                                  BalanceOverflowBucket bucket) {
+        return this.isResultInOverflowBucket(context, state, move.getDonor(), bucket)
+                || this.isResultInOverflowBucket(context, state, move.getReceiver(), bucket);
+    }
+
+    /**
+     * 判断指定结果的预测换模落点是否位于目标桶。
+     *
+     * @param context 排程上下文
+     * @param state 当前状态
+     * @param result 排程结果
+     * @param bucket 目标桶
+     * @return true-位于目标桶
+     */
+    private boolean isResultInOverflowBucket(LhScheduleContext context,
+                                             EmbryoEndingBalanceState state,
+                                             LhScheduleResult result,
+                                             BalanceOverflowBucket bucket) {
+        if (Objects.isNull(result) || Objects.isNull(bucket)) {
+            return false;
+        }
+        Date changeTime = state.getChangeTimeMap().get(result);
+        if (Objects.isNull(changeTime)
+                || !StringUtils.equals(bucket.getDateKey(), LhScheduleTimeUtil.formatDate(changeTime))) {
+            return false;
+        }
+        return bucket.getShiftCountIndex() == 0
+                ? LhScheduleTimeUtil.isMorningShift(context, changeTime)
+                : LhScheduleTimeUtil.isAfternoonShift(context, changeTime);
+    }
+
+    /**
+     * 校验当前调整已使目标班次次数严格下降。
+     *
+     * @param beforeState 调整前状态
+     * @param afterState 调整后状态
+     * @param bucket 目标超限桶；null表示当前只处理硬限风险
+     * @return true-目标桶严格改善或硬限评分改善
+     */
+    private boolean isOverflowBucketImproved(EmbryoEndingBalanceState beforeState,
+                                             EmbryoEndingBalanceState afterState,
+                                             BalanceOverflowBucket bucket) {
+        if (Objects.isNull(bucket)) {
+            return afterState.getHardViolationCount() < beforeState.getHardViolationCount()
+                    || afterState.getDailyLimitDeferredCount()
+                    < beforeState.getDailyLimitDeferredCount();
+        }
+        return this.resolveBucketCount(afterState, bucket) < this.resolveBucketCount(beforeState, bucket);
+    }
+
+    /**
+     * 取状态中指定班次桶的次数。
+     *
+     * @param state 均衡状态
+     * @param bucket 班次桶
+     * @return 当前次数
+     */
+    private int resolveBucketCount(EmbryoEndingBalanceState state, BalanceOverflowBucket bucket) {
+        int[] counts = state.getSimulatedCountMap().get(bucket.getDateKey());
+        return Objects.nonNull(counts) && counts.length > bucket.getShiftCountIndex()
+                ? counts[bucket.getShiftCountIndex()] : 0;
+    }
+
+    /**
+     * 校验调整不会把原本未超限的早班/中班/全日推成新的超限。
+     * <p>已经超限的班次或日期只允许严格降低次数，从而支持多轮逐台消减初始超限；
+     * 禁止为了降低当前早班或中班次数，把其他班次或日期的超限程度加重。</p>
+     *
+     * @param context 排程上下文
+     * @param beforeState 调整前状态
+     * @param afterState 调整后状态
+     * @return true-没有新超限；false-会制造或加重其他班次超限
+     */
+    private boolean doesNotCreateNewShiftOverflow(LhScheduleContext context,
+                                                  EmbryoEndingBalanceState beforeState,
+                                                  EmbryoEndingBalanceState afterState) {
+        Set<String> dateKeySet = new LinkedHashSet<String>(beforeState.getSimulatedCountMap().keySet());
+        dateKeySet.addAll(afterState.getSimulatedCountMap().keySet());
+        int[] limits = new int[]{LhScheduleTimeUtil.getMorningMouldChangeLimit(context),
+                LhScheduleTimeUtil.getAfternoonMouldChangeLimit(context)};
+        int dailyLimit = LhScheduleTimeUtil.getDailyMouldChangeLimit(context);
+        for (String dateKey : dateKeySet) {
+            int[] beforeCounts = beforeState.getSimulatedCountMap().getOrDefault(dateKey, new int[]{0, 0});
+            int[] afterCounts = afterState.getSimulatedCountMap().getOrDefault(dateKey, new int[]{0, 0});
+            int beforeDailyCount = beforeCounts[0] + beforeCounts[1];
+            int afterDailyCount = afterCounts[0] + afterCounts[1];
+            if (afterDailyCount > dailyLimit && afterDailyCount >= beforeDailyCount) {
+                return false;
+            }
+            for (int shiftCountIndex = 0; shiftCountIndex < limits.length; shiftCountIndex++) {
+                if (afterCounts[shiftCountIndex] > limits[shiftCountIndex]
+                        && afterCounts[shiftCountIndex] > beforeCounts[shiftCountIndex]) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     /**
@@ -622,7 +1810,8 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
             if (Objects.isNull(endingShift)) {
                 continue;
             }
-            Date endingTime = result.getSpecEndTime();
+            // 停产保机机台的specEndTime可能已被占用边界后移，预演统一使用实际生产结束时间。
+            Date endingTime = this.resolveBalanceEndingTime(context, result, endingShiftIndex);
             if (Objects.isNull(endingTime)) {
                 endingTime = endingShift.getShiftEndDateTime();
             }
@@ -639,6 +1828,13 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
         }
         state.setSimulatedCountMap(simulatedCountMap);
         computeScore(context, state);
+        int dailyLimitDeferredCount = 0;
+        for (LhScheduleResult result : state.getChangeTimeMap().keySet()) {
+            if (this.isMouldChangeDeferredByDailyLimit(context, state, result)) {
+                dailyLimitDeferredCount++;
+            }
+        }
+        state.setDailyLimitDeferredCount(dailyLimitDeferredCount);
         return state;
     }
 
@@ -650,8 +1846,8 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
      */
     private boolean needsBalance(EmbryoEndingBalanceState state) {
         return state.getHardViolationCount() > 0
-                || state.getExceededShiftCount() > 0
-                || state.getSameShiftPairCount() > 0;
+                || state.getDailyLimitDeferredCount() > 0
+                || state.getExceededShiftCount() > 0;
     }
 
     /**
@@ -691,7 +1887,7 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
             balanceDeviation += Math.abs((long) morningCount * afternoonLimit
                     - (long) afternoonCount * morningLimit);
         }
-        // 同班次收尾集中度：每个收尾班次桶内超过1台的机台数之和。
+        // 同班次收尾集中度仅用于日志对账，不是独立触发条件。
         Map<Integer, Integer> shiftBucketMap = new LinkedHashMap<Integer, Integer>(8);
         for (Integer endingShiftIndex : state.getEndingShiftMap().values()) {
             shiftBucketMap.merge(endingShiftIndex, 1, Integer::sum);
@@ -709,8 +1905,8 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
 
     /**
      * 比较两个状态的评分，返回小于0表示左侧更优。
-     * <p>优先级与需求一致：先保证每日换模总次数硬限制，再消除同班次集中收尾，
-     * 然后才优化早班8/中班7软目标和早中班比例偏差。</p>
+     * <p>优先级与需求一致：先保证每日换模总次数硬限制，
+     * 再消除早班8/中班7超限，同班次收尾集中度仅用于同分方案的稳定性比较。</p>
      *
      * @param left 左侧状态
      * @param right 右侧状态
@@ -721,7 +1917,8 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
         if (comparison != 0) {
             return comparison;
         }
-        comparison = Integer.compare(left.getSameShiftPairCount(), right.getSameShiftPairCount());
+        comparison = Integer.compare(
+                left.getDailyLimitDeferredCount(), right.getDailyLimitDeferredCount());
         if (comparison != 0) {
             return comparison;
         }
@@ -733,11 +1930,18 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
         if (comparison != 0) {
             return comparison;
         }
-        return Long.compare(left.getBalanceDeviation(), right.getBalanceDeviation());
+        comparison = Long.compare(left.getBalanceDeviation(), right.getBalanceDeviation());
+        if (comparison != 0) {
+            return comparison;
+        }
+        return Integer.compare(left.getSameShiftPairCount(), right.getSameShiftPairCount());
     }
 
     /**
      * 构建候选移动列表，顺序：尾量分摊 -> 后延补量 -> 提前减量，组内按机台编码升序。
+     * <p>对象优先级：同物料多机台（第一优先级）优先于共用胎胚组（第二优先级）；
+     * 共用胎胚组间按机台数量降序、胎胚编码升序；同一对象组内按机台编码升序，
+     * 同一机台再按 分摊->补量->减量 尝试，承接机台编码作为最后稳定键。</p>
      *
      * @param context 排程上下文
      * @param shifts 排程窗口班次
@@ -754,7 +1958,181 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
         buildTransferMoves(context, shifts, state, sortedResults, moveList);
         buildPostponeMoves(context, shifts, state, sortedResults, moveList);
         buildAdvanceMoves(context, shifts, state, sortedResults, moveList);
+        /*
+         * 每轮从当前可调整候选重算同物料多机台分组和共用胎胚组排行，保证对象优先级
+         * 不依赖集合原始遍历顺序：
+         * 阶段（同物料多机台=0，共用胎胚组=1）-> 对象组排行 -> 组内机台编码升序 ->
+         * 同一机台的移动类型顺序（分摊<补量<减量）-> 承接机台编码升序。
+         */
+        Map<LhScheduleResult, String> sameMaterialGroupKeyMap =
+                this.resolveSameMaterialGroupKeyMap(state.getSourceSkuMap());
+        Map<String, Integer> embryoRankMap =
+                this.resolveEmbryoGroupRankMap(state.getSourceSkuMap());
+        moveList.sort(Comparator
+                .comparingInt((EmbryoEndingBalanceMove move) ->
+                        this.resolveMovePhase(move, sameMaterialGroupKeyMap))
+                .thenComparingInt(move -> this.resolveMoveGroupRank(
+                        move, sameMaterialGroupKeyMap, state.getSourceSkuMap(), embryoRankMap))
+                .thenComparing(move -> this.resolveMoveGroupKey(
+                        move, sameMaterialGroupKeyMap, state.getSourceSkuMap()))
+                .thenComparing(move ->
+                        StringUtils.defaultString(move.getDonor().getLhMachineCode()))
+                .thenComparingInt(move -> this.resolveMoveTypeOrder(move.getMoveType()))
+                .thenComparing(move -> Objects.isNull(move.getReceiver()) ? ""
+                        : StringUtils.defaultString(move.getReceiver().getLhMachineCode())));
         return moveList;
+    }
+
+    /**
+     * 解析同一机台的均衡策略尝试顺序。
+     *
+     * @param moveType 移动类型
+     * @return 顺序值，越小越优先
+     */
+    private int resolveMoveTypeOrder(String moveType) {
+        if (MOVE_TYPE_TRANSFER.equals(moveType)) {
+            return 0;
+        }
+        if (MOVE_TYPE_POSTPONE.equals(moveType)) {
+            return 1;
+        }
+        return 2;
+    }
+
+    /**
+     * 计算当前可调整候选中的同物料多机台分组键。
+     *
+     * <p>同物料口径为“物料编码+产品状态”（即SKU）。同一SKU存在两台及以上可调整
+     * 收尾机台时，组内所有机台进入第一优先级，且不因收尾类型（胎胚收尾/余量收尾/
+     * 按时间下机）不同而排除。</p>
+     *
+     * @param sourceSkuMap 当前可调整结果到来源SKU的映射
+     * @return 结果到同物料分组键（SKU key）的映射；不在同物料多机台组中的结果不包含
+     */
+    private Map<LhScheduleResult, String> resolveSameMaterialGroupKeyMap(
+            Map<LhScheduleResult, SkuScheduleDTO> sourceSkuMap) {
+        Map<LhScheduleResult, String> groupKeyMap =
+                new IdentityHashMap<LhScheduleResult, String>(16);
+        if (CollectionUtils.isEmpty(sourceSkuMap)) {
+            return groupKeyMap;
+        }
+        Map<String, Integer> skuMachineCountMap = new LinkedHashMap<String, Integer>(8);
+        for (SkuScheduleDTO sourceSku : sourceSkuMap.values()) {
+            if (Objects.isNull(sourceSku)) {
+                continue;
+            }
+            skuMachineCountMap.merge(this.resolveSkuKey(sourceSku), 1, Integer::sum);
+        }
+        for (Map.Entry<LhScheduleResult, SkuScheduleDTO> entry : sourceSkuMap.entrySet()) {
+            SkuScheduleDTO sourceSku = entry.getValue();
+            String skuKey = Objects.isNull(sourceSku) ? null : this.resolveSkuKey(sourceSku);
+            if (Objects.nonNull(skuKey)
+                    && skuMachineCountMap.getOrDefault(skuKey, 0) >= MIN_GROUP_MACHINE_COUNT) {
+                groupKeyMap.put(entry.getKey(), skuKey);
+            }
+        }
+        return groupKeyMap;
+    }
+
+    /**
+     * 计算共用胎胚组的优先级排行：机台数量降序，数量相同时胎胚编码升序。
+     *
+     * @param sourceSkuMap 当前可调整结果到来源SKU的映射
+     * @return 胎胚编码到优先级序号（0最高）的映射
+     */
+    private Map<String, Integer> resolveEmbryoGroupRankMap(
+            Map<LhScheduleResult, SkuScheduleDTO> sourceSkuMap) {
+        Map<String, Integer> machineCountMap = new LinkedHashMap<String, Integer>(8);
+        if (CollectionUtils.isEmpty(sourceSkuMap)) {
+            return machineCountMap;
+        }
+        for (SkuScheduleDTO sourceSku : sourceSkuMap.values()) {
+            if (Objects.isNull(sourceSku) || StringUtils.isEmpty(sourceSku.getEmbryoCode())) {
+                continue;
+            }
+            machineCountMap.merge(sourceSku.getEmbryoCode(), 1, Integer::sum);
+        }
+        List<String> embryoCodeList = new ArrayList<String>(machineCountMap.keySet());
+        embryoCodeList.sort(Comparator
+                .comparingInt((String embryoCode) -> machineCountMap.getOrDefault(embryoCode, 0))
+                .reversed()
+                .thenComparing(String::compareTo));
+        Map<String, Integer> rankMap = new LinkedHashMap<String, Integer>(embryoCodeList.size());
+        for (int rank = 0; rank < embryoCodeList.size(); rank++) {
+            rankMap.put(embryoCodeList.get(rank), rank);
+        }
+        return rankMap;
+    }
+
+    /**
+     * 解析移动所属的对象优先级阶段。
+     *
+     * <p>阶段0：同物料多机台移动（同SKU尾量分摊、同物料组内机台的补量/减量）；
+     * 阶段1：共用胎胚组移动（跨SKU胎胚收尾互转、非同物料组机台的补量/减量）。
+     * 同物料多机台必须优先于共用胎胚补量、减量、分摊。</p>
+     *
+     * @param move 候选移动
+     * @param sameMaterialGroupKeyMap 同物料多机台分组键映射
+     * @return 0-同物料多机台；1-共用胎胚组
+     */
+    private int resolveMovePhase(EmbryoEndingBalanceMove move,
+                                 Map<LhScheduleResult, String> sameMaterialGroupKeyMap) {
+        if (Objects.isNull(move) || Objects.isNull(move.getDonor())) {
+            return 1;
+        }
+        if (MOVE_TYPE_TRANSFER.equals(move.getMoveType())) {
+            // 同SKU分摊属于同物料多机台；跨SKU胎胚收尾互转属于共用胎胚组。
+            String donorSkuKey = sameMaterialGroupKeyMap.get(move.getDonor());
+            if (Objects.nonNull(move.getReceiver()) && StringUtils.isNotEmpty(donorSkuKey)
+                    && StringUtils.equals(donorSkuKey,
+                    sameMaterialGroupKeyMap.get(move.getReceiver()))) {
+                return 0;
+            }
+            return 1;
+        }
+        // 后延补量/提前减量：机台本身属于同物料多机台组时进入第一优先级。
+        return sameMaterialGroupKeyMap.containsKey(move.getDonor()) ? 0 : 1;
+    }
+
+    /**
+     * 解析移动所属对象组的优先级序号。
+     *
+     * @param move 候选移动
+     * @param sameMaterialGroupKeyMap 同物料多机台分组键映射
+     * @param sourceSkuMap 当前可调整结果到来源SKU的映射
+     * @param embryoRankMap 共用胎胚组优先级序号映射
+     * @return 同物料组固定为0；共用胎胚组返回组排行（0最高）
+     */
+    private int resolveMoveGroupRank(EmbryoEndingBalanceMove move,
+                                     Map<LhScheduleResult, String> sameMaterialGroupKeyMap,
+                                     Map<LhScheduleResult, SkuScheduleDTO> sourceSkuMap,
+                                     Map<String, Integer> embryoRankMap) {
+        if (this.resolveMovePhase(move, sameMaterialGroupKeyMap) == 0) {
+            return 0;
+        }
+        SkuScheduleDTO sourceSku = sourceSkuMap.get(move.getDonor());
+        String embryoCode = Objects.isNull(sourceSku) ? null : sourceSku.getEmbryoCode();
+        return Objects.isNull(embryoCode) ? Integer.MAX_VALUE
+                : embryoRankMap.getOrDefault(embryoCode, Integer.MAX_VALUE);
+    }
+
+    /**
+     * 解析移动所属对象组的组内稳定键。
+     *
+     * @param move 候选移动
+     * @param sameMaterialGroupKeyMap 同物料多机台分组键映射
+     * @param sourceSkuMap 当前可调整结果到来源SKU的映射
+     * @return 同物料组返回SKU key；共用胎胚组返回胎胚编码
+     */
+    private String resolveMoveGroupKey(EmbryoEndingBalanceMove move,
+                                       Map<LhScheduleResult, String> sameMaterialGroupKeyMap,
+                                       Map<LhScheduleResult, SkuScheduleDTO> sourceSkuMap) {
+        if (this.resolveMovePhase(move, sameMaterialGroupKeyMap) == 0) {
+            return sameMaterialGroupKeyMap.get(move.getDonor());
+        }
+        SkuScheduleDTO sourceSku = sourceSkuMap.get(move.getDonor());
+        return Objects.isNull(sourceSku) ? ""
+                : StringUtils.defaultString(sourceSku.getEmbryoCode());
     }
 
     /**
@@ -781,6 +2159,8 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
             }
             String donorEndingType = state.getEndingTypeMap().get(donor);
             String donorSkuKey = resolveSkuKey(state.getSourceSkuMap().get(donor));
+            String donorEmbryoCode = Objects.isNull(state.getSourceSkuMap().get(donor))
+                    ? null : state.getSourceSkuMap().get(donor).getEmbryoCode();
             LhScheduleResult donorPair = state.getPairResultMap().get(donor);
             boolean donorPairUnit = Objects.nonNull(donorPair);
             int donorEndingGroupQty = donorPairUnit ? donorEndingQty * 2 : donorEndingQty;
@@ -788,6 +2168,12 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
                     + (donorPairUnit ? ShiftFieldUtil.resolveScheduledQty(donorPair) : 0);
             for (LhScheduleResult receiver : sortedResults) {
                 if (receiver == donor) {
+                    continue;
+                }
+                String receiverEmbryoCode = Objects.isNull(state.getSourceSkuMap().get(receiver))
+                        ? null : state.getSourceSkuMap().get(receiver).getEmbryoCode();
+                // 全局预演中同时存在多个胎胚组，尾量只能在同一共用胎胚组内流转。
+                if (!StringUtils.equals(donorEmbryoCode, receiverEmbryoCode)) {
                     continue;
                 }
                 LhScheduleResult receiverPair = state.getPairResultMap().get(receiver);
@@ -806,11 +2192,42 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
                 if (!sameSkuTransfer && !embryoEndingTransfer) {
                     continue;
                 }
+                /*
+                 * 胶囊感知前置分摊完成后，既有换模次数均衡仍可因早8/中7/日15继续搬量，
+                 * 但同SKU余量收尾不得反向把尾量从高次数机台搬回低次数机台。
+                 * 次数相同时不限制方向，完整保留原机台编码和评分规则。
+                 */
+                if (sameSkuTransfer
+                        && StringUtils.equals(ENDING_TYPE_SKU, donorEndingType)
+                        && StringUtils.equals(ENDING_TYPE_SKU, receiverEndingType)
+                        && "1".equals(donor.getIsEnd())
+                        && "1".equals(receiver.getIsEnd())
+                        && !this.isCapsuleTransferDirectionAllowed(context, donor, receiver)) {
+                    continue;
+                }
                 Integer receiverEndingShift = state.getEndingShiftMap().get(receiver);
-                // 尾量分摊只解决同一收尾班次集中收尾，转出方与接收方原收尾班次必须相同，
-                // 不允许把尾量跨多个班次甚至跨业务日搬运。
-                if (!Objects.equals(donorEndingShift, receiverEndingShift)
-                        || receiverEndingShift >= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT) {
+                // 分摊只在原收尾班次相同的机台间尝试，避免跨多班次搬运造成时间轴断层。
+                if (!Objects.equals(donorEndingShift, receiverEndingShift)) {
+                    continue;
+                }
+                /*
+                 * 中班超限时，先尝试把一台机的完整收尾残量并入另一台机的当前收尾班次。
+                 * 转出机提前收尾，承接机仍只产生一次换模，因此能在不改变严格总量的前提下减少一次当班换模。
+                 */
+                LhShiftConfigVO currentEndingShift = findShiftByIndex(shifts, receiverEndingShift);
+                int currentShiftFreeCapacity = Objects.isNull(currentEndingShift)
+                        ? 0 : resolveShiftFreeCapacity(context, receiver, currentEndingShift);
+                if (receiverPairUnit && Objects.nonNull(currentEndingShift)) {
+                    currentShiftFreeCapacity = Math.min(currentShiftFreeCapacity,
+                            resolveShiftFreeCapacity(context, receiverPair, currentEndingShift));
+                }
+                if (donorTotalGroupQty - donorEndingGroupQty > 0
+                        && currentShiftFreeCapacity >= donorEndingQty) {
+                    moveList.add(new EmbryoEndingBalanceMove(
+                            MOVE_TYPE_TRANSFER, donor, receiver,
+                            donorEndingGroupQty, receiverEndingShift));
+                }
+                if (receiverEndingShift >= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT) {
                     continue;
                 }
                 // 承接机台若存在降模释放边界，后延班次不得越过该边界（单控整机两侧都要校验）。
@@ -877,19 +2294,36 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
                 continue;
             }
             Integer endingShift = state.getEndingShiftMap().get(result);
-            if (Objects.isNull(endingShift)
-                    || endingShift >= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT) {
+            if (Objects.isNull(endingShift)) {
                 continue;
             }
             LhScheduleResult pairResult = state.getPairResultMap().get(result);
             boolean pairUnit = Objects.nonNull(pairResult);
-            // 后延不得越过降模释放边界。
-            if (isBeyondReleaseBoundary(context, result, endingShift + 1)
-                    || (pairUnit && isBeyondReleaseBoundary(
-                    context, pairResult, endingShift + 1))) {
+            int targetShiftIndex = endingShift + 1;
+            LhShiftConfigVO currentEndingShift = findShiftByIndex(shifts, endingShift);
+            Date changeTime = state.getChangeTimeMap().get(result);
+            /*
+             * 早班换模超限且前物料本身在早班内提前收尾时，
+             * 应先补满当前早班到14:00，使换模真实落到中班；不能直接跳到中班再补满，
+             * 否则前物料可能在20:00后才收尾而被错误顺延到次日。
+             */
+            if (Objects.nonNull(currentEndingShift) && Objects.nonNull(changeTime)
+                    && LhScheduleTimeUtil.isMorningShift(context, changeTime)
+                    && LhScheduleTimeUtil.isMorningShift(
+                    context, currentEndingShift.getShiftStartDateTime())
+                    && resolveShiftFreeCapacity(context, result, currentEndingShift) > 0) {
+                targetShiftIndex = endingShift;
+            }
+            if (targetShiftIndex > LhScheduleConstant.MAX_SHIFT_SLOT_COUNT) {
                 continue;
             }
-            LhShiftConfigVO nextShift = findShiftByIndex(shifts, endingShift + 1);
+            // 后延不得越过降模释放边界。
+            if (isBeyondReleaseBoundary(context, result, targetShiftIndex)
+                    || (pairUnit && isBeyondReleaseBoundary(
+                    context, pairResult, targetShiftIndex))) {
+                continue;
+            }
+            LhShiftConfigVO nextShift = findShiftByIndex(shifts, targetShiftIndex);
             if (Objects.isNull(nextShift)
                     || isShiftOccupiedByOtherSku(context, result, nextShift)
                     || (pairUnit && isShiftOccupiedByOtherSku(context, pairResult, nextShift))) {
@@ -905,7 +2339,7 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
             }
             int postponeQty = pairUnit ? freeCapacity * 2 : freeCapacity;
             moveList.add(new EmbryoEndingBalanceMove(
-                    MOVE_TYPE_POSTPONE, result, null, postponeQty, endingShift + 1));
+                    MOVE_TYPE_POSTPONE, result, null, postponeQty, targetShiftIndex));
         }
     }
 
@@ -929,9 +2363,16 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
             }
             Integer endingShift = state.getEndingShiftMap().get(result);
             Integer endingQty = state.getEndingQtyMap().get(result);
-            // 首班收尾机台不能再提前。
-            if (Objects.isNull(endingShift) || endingShift <= 1
+            if (Objects.isNull(endingShift) || endingShift <= 0
                     || Objects.isNull(endingQty) || endingQty <= 0) {
+                continue;
+            }
+            LhScheduleResult pairResult = state.getPairResultMap().get(result);
+            int resultTotalQty = ShiftFieldUtil.resolveScheduledQty(result);
+            int pairTotalQty = Objects.isNull(pairResult)
+                    ? Integer.MAX_VALUE : ShiftFieldUtil.resolveScheduledQty(pairResult);
+            // 提前减量不能把续作结果整行清空，避免均衡变成未经业务决策的降模释放。
+            if (resultTotalQty <= endingQty || pairTotalQty <= endingQty) {
                 continue;
             }
             moveList.add(new EmbryoEndingBalanceMove(
@@ -1034,15 +2475,19 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
             return false;
         }
         refreshResultSummary(context, donor, shifts);
+        syncStopHoldBoundaryAfterBalance(context, donor, shifts);
         refreshResultSummary(context, receiver, shifts);
+        syncStopHoldBoundaryAfterBalance(context, receiver, shifts);
         syncMachineEstimatedEndTime(context, donor);
         syncMachineEstimatedEndTime(context, receiver);
         if (donorPairUnit) {
             refreshResultSummary(context, donorPair, shifts);
+            syncStopHoldBoundaryAfterBalance(context, donorPair, shifts);
             syncMachineEstimatedEndTime(context, donorPair);
         }
         if (receiverPairUnit) {
             refreshResultSummary(context, receiverPair, shifts);
+            syncStopHoldBoundaryAfterBalance(context, receiverPair, shifts);
             syncMachineEstimatedEndTime(context, receiverPair);
         }
         // 记录实际落地的组级互转量，供提交阶段重分配SKU内部额度。
@@ -1085,6 +2530,8 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
             ShiftFieldUtil.setShiftPlanQty(result, endingShift, 0, null, null);
             ShiftFieldUtil.clearShiftPlanAuxFields(result, endingShift);
         }
+        // 减量发生在转出班次，备注必须写在该班次而不是新收尾班次。
+        ShiftFieldUtil.appendShiftAnalysis(result, endingShift, BALANCE_TRANSFER_ANALYSIS);
         return true;
     }
 
@@ -1191,6 +2638,29 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
         if (Objects.isNull(nextShift)) {
             return false;
         }
+        /*
+         * 若当前换模落点是因每日硬上限从自然最早班次推到次日早班，
+         * 不允许只改换模时间或留一段空等；必须连续补满中间各班次，
+         * 让前物料在目标早班06:00真实收尾。
+         */
+        if (this.isMouldChangeDeferredByDailyLimit(context, state, result)) {
+            return this.applyCrossDayPostponeMove(
+                    context, shifts, move, state, result, pairResult,
+                    state.getChangeTimeMap().get(result));
+        }
+        /*
+         * 中班超限机台后延到夜班时，目标班次结束点是次日06:00。此时也必须走连续补量：
+         * 先补满当前中班剩余产能，再补满夜班，禁止从当前收尾时间空等到20:00后只补夜班。
+         */
+        Date currentEndingTime = state.getEndingTimeMap().get(result);
+        Date targetShiftEndTime = nextShift.getShiftEndDateTime();
+        if (Objects.nonNull(currentEndingTime) && Objects.nonNull(targetShiftEndTime)
+                && LhScheduleTimeUtil.clearTime(targetShiftEndTime)
+                .after(LhScheduleTimeUtil.clearTime(currentEndingTime))
+                && LhScheduleTimeUtil.isMorningShift(context, targetShiftEndTime)) {
+            return this.applyCrossDayPostponeMove(
+                    context, shifts, move, state, result, pairResult, targetShiftEndTime);
+        }
         int freeCapacity = resolveShiftFreeCapacity(context, result, nextShift);
         if (pairUnit) {
             freeCapacity = Math.min(freeCapacity,
@@ -1234,12 +2704,177 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
                     pairResult, actualAddQty, Integer::sum);
         }
         refreshResultSummary(context, result, shifts);
+        syncStopHoldBoundaryAfterBalance(context, result, shifts);
         syncMachineEstimatedEndTime(context, result);
         if (pairUnit) {
             refreshResultSummary(context, pairResult, shifts);
+            syncStopHoldBoundaryAfterBalance(context, pairResult, shifts);
             syncMachineEstimatedEndTime(context, pairResult);
         }
         move.setAppliedQty(actualAddQty * (pairUnit ? 2 : 1));
+        return true;
+    }
+
+    /**
+     * 判断后物料换模是否因每日总次数硬上限被顺延到更晚日期。
+     *
+     * @param context 排程上下文
+     * @param state 当前均衡状态
+     * @param result 待判断结果
+     * @return true-模拟账本使换模日期晚于无次数占用时的自然落点
+     */
+    private boolean isMouldChangeDeferredByDailyLimit(LhScheduleContext context,
+                                                      EmbryoEndingBalanceState state,
+                                                      LhScheduleResult result) {
+        Date assignedChangeTime = state.getChangeTimeMap().get(result);
+        Date endingTime = state.getEndingTimeMap().get(result);
+        SkuScheduleDTO sourceSku = state.getSourceSkuMap().get(result);
+        if (Objects.isNull(assignedChangeTime) || Objects.isNull(endingTime)
+                || !assignedChangeTime.after(endingTime)
+                || !LhScheduleTimeUtil.isMorningShift(context, assignedChangeTime)) {
+            return false;
+        }
+        Map<String, int[]> emptyCountMap = new LinkedHashMap<String, int[]>(2);
+        Date naturalChangeTime = mouldChangeBalanceStrategy.previewEndingStaggerMouldChange(
+                context, result.getLhMachineCode(), endingTime,
+                LhScheduleTimeUtil.getMouldChangeTotalHours(context), sourceSku, emptyCountMap);
+        return Objects.nonNull(naturalChangeTime)
+                && LhScheduleTimeUtil.clearTime(assignedChangeTime)
+                .after(LhScheduleTimeUtil.clearTime(naturalChangeTime));
+    }
+
+    /**
+     * 执行跨天补量：从当前收尾班次连续补到目标早班06:00。
+     * <p>任一中间班次被其他SKU占用、不可排、越过降模边界、产能不足或胶囊规则
+     * 无法精确补满时整笔失败，由外层快照恢复，不会留下半条连续生产时间轴。</p>
+     *
+     * @param context 排程上下文
+     * @param shifts 排程窗口班次
+     * @param move 均衡移动
+     * @param state 调整前状态
+     * @param result 待补量主结果
+     * @param pairResult 单控整机配对侧；普通机台为null
+     * @param targetMorning 目标早班06:00
+     * @return true-精确生产到目标06:00；false-无法连续补满
+     */
+    private boolean applyCrossDayPostponeMove(LhScheduleContext context,
+                                              List<LhShiftConfigVO> shifts,
+                                              EmbryoEndingBalanceMove move,
+                                              EmbryoEndingBalanceState state,
+                                              LhScheduleResult result,
+                                              LhScheduleResult pairResult,
+                                              Date targetMorning) {
+        if (Objects.isNull(targetMorning)) {
+            return false;
+        }
+        int currentEndingShiftIndex = state.getEndingShiftMap().get(result);
+        int targetNightShiftIndex = -1;
+        for (LhShiftConfigVO shift : shifts) {
+            if (Objects.nonNull(shift) && Objects.nonNull(shift.getShiftEndDateTime())
+                    && shift.getShiftEndDateTime().equals(targetMorning)) {
+                targetNightShiftIndex = shift.getShiftIndex();
+                break;
+            }
+        }
+        if (targetNightShiftIndex < currentEndingShiftIndex || targetNightShiftIndex <= 0) {
+            return false;
+        }
+        boolean pairUnit = Objects.nonNull(pairResult);
+        int totalAddedPerSideQty = 0;
+        for (int shiftIndex = currentEndingShiftIndex;
+             shiftIndex <= targetNightShiftIndex; shiftIndex++) {
+            LhShiftConfigVO targetShift = this.findShiftByIndex(shifts, shiftIndex);
+            if (Objects.isNull(targetShift)
+                    || this.isBeyondReleaseBoundary(context, result, shiftIndex)
+                    || (pairUnit && this.isBeyondReleaseBoundary(context, pairResult, shiftIndex))
+                    || this.isShiftOccupiedByOtherSku(context, result, targetShift)
+                    || (pairUnit && this.isShiftOccupiedByOtherSku(context, pairResult, targetShift))) {
+                return false;
+            }
+            int freeCapacity = this.resolveShiftFreeCapacity(context, result, targetShift);
+            if (pairUnit) {
+                freeCapacity = Math.min(freeCapacity,
+                        this.resolveShiftFreeCapacity(context, pairResult, targetShift));
+            }
+            if (freeCapacity <= 0) {
+                // 已经满产的中间班次可直接继续，但最终收尾班次必须由本次调整延伸到。
+                if (shiftIndex < targetNightShiftIndex
+                        && this.resolveShiftPlanQty(result, shiftIndex)
+                        >= this.resolveResultShiftCapacity(context, result, targetShift)) {
+                    continue;
+                }
+                return false;
+            }
+            int actualAddQty = capsuleReplacementRuleService.resolveActualPlanQty(
+                    context, result, targetShift, freeCapacity, "共用胎胚收尾均衡补量（跨天）");
+            if (pairUnit) {
+                int pairActualAddQty = capsuleReplacementRuleService.resolveActualPlanQty(
+                        context, pairResult, targetShift, freeCapacity,
+                        "共用胎胚收尾均衡补量（跨天）");
+                actualAddQty = Math.min(actualAddQty, pairActualAddQty);
+            }
+            if (actualAddQty != freeCapacity
+                    || !this.applyCrossDayPostponeSide(
+                    context, shifts, result, targetShift, actualAddQty)
+                    || (pairUnit && !this.applyCrossDayPostponeSide(
+                    context, shifts, pairResult, targetShift, actualAddQty))) {
+                return false;
+            }
+            totalAddedPerSideQty += actualAddQty;
+        }
+        this.refreshResultSummary(context, result, shifts);
+        if (!targetMorning.equals(result.getSpecEndTime())) {
+            return false;
+        }
+        context.getSharedEmbryoEndingStaggerAllowedOverQtyMap().merge(
+                result, totalAddedPerSideQty, Integer::sum);
+        this.syncStopHoldBoundaryAfterBalance(context, result, shifts);
+        this.syncMachineEstimatedEndTime(context, result);
+        if (pairUnit) {
+            this.refreshResultSummary(context, pairResult, shifts);
+            if (!targetMorning.equals(pairResult.getSpecEndTime())) {
+                return false;
+            }
+            context.getSharedEmbryoEndingStaggerAllowedOverQtyMap().merge(
+                    pairResult, totalAddedPerSideQty, Integer::sum);
+            this.syncStopHoldBoundaryAfterBalance(context, pairResult, shifts);
+            this.syncMachineEstimatedEndTime(context, pairResult);
+        }
+        move.setAppliedQty(totalAddedPerSideQty * (pairUnit ? 2 : 1));
+        move.setCrossDay(true);
+        return totalAddedPerSideQty > 0;
+    }
+
+    /**
+     * 将跨天补量写入单侧结果，并在实际补量班次追加原因。
+     *
+     * @param context 排程上下文
+     * @param shifts 排程窗口班次
+     * @param result 待补量结果
+     * @param targetShift 目标班次
+     * @param addQty 补量数量
+     * @return true-写入成功
+     */
+    private boolean applyCrossDayPostponeSide(LhScheduleContext context,
+                                              List<LhShiftConfigVO> shifts,
+                                              LhScheduleResult result,
+                                              LhShiftConfigVO targetShift,
+                                              int addQty) {
+        if (addQty <= 0) {
+            return false;
+        }
+        int existingQty = this.resolveShiftPlanQty(result, targetShift.getShiftIndex());
+        int newQty = existingQty + addQty;
+        Date startTime = ShiftFieldUtil.getShiftStartTime(result, targetShift.getShiftIndex());
+        if (Objects.isNull(startTime)) {
+            startTime = targetShift.getShiftStartDateTime();
+        }
+        Date endTime = this.resolveShiftCompletionTime(
+                context, shifts, result, targetShift.getShiftIndex(), newQty);
+        ShiftFieldUtil.setShiftPlanQty(
+                result, targetShift.getShiftIndex(), newQty, startTime, endTime);
+        ShiftFieldUtil.appendShiftAnalysis(
+                result, targetShift.getShiftIndex(), BALANCE_POSTPONE_CROSS_DAY_ANALYSIS);
         return true;
     }
 
@@ -1290,7 +2925,7 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
         LhScheduleResult pairResult = state.getPairResultMap().get(result);
         boolean pairUnit = Objects.nonNull(pairResult);
         Integer endingShift = move.getTargetShiftIndex();
-        if (Objects.isNull(endingShift) || endingShift <= 1) {
+        if (Objects.isNull(endingShift) || endingShift <= 0) {
             return false;
         }
         Integer currentQty = ShiftFieldUtil.getShiftPlanQty(result, endingShift);
@@ -1304,41 +2939,97 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
                 return false;
             }
         }
-        // 清空收尾班次，机台提前到前一班次收尾。
+        // 先清空当前收尾班次，把前物料收尾点提前到上一个真实有量班次。
         ShiftFieldUtil.setShiftPlanQty(result, endingShift, 0, null, null);
         ShiftFieldUtil.clearShiftPlanAuxFields(result, endingShift);
+        ShiftFieldUtil.appendShiftAnalysis(result, endingShift, BALANCE_ADVANCE_ANALYSIS);
         if (pairUnit) {
             ShiftFieldUtil.setShiftPlanQty(pairResult, endingShift, 0, null, null);
             ShiftFieldUtil.clearShiftPlanAuxFields(pairResult, endingShift);
-        }
-        // 提前减量备注写入新的收尾班次，便于结果对账。
-        ShiftFieldUtil.appendShiftAnalysis(result, endingShift - 1, BALANCE_ADVANCE_ANALYSIS);
-        if (pairUnit) {
-            ShiftFieldUtil.appendShiftAnalysis(pairResult, endingShift - 1, BALANCE_ADVANCE_ANALYSIS);
+            ShiftFieldUtil.appendShiftAnalysis(pairResult, endingShift, BALANCE_ADVANCE_ANALYSIS);
         }
         refreshResultSummary(context, result, shifts);
+        if (pairUnit) {
+            refreshResultSummary(context, pairResult, shifts);
+        }
+        /*
+         * 14:00整点已属于中班；若清空中班尾量后前一早班仍恰好在14:00收尾，
+         * 需再减少一个模数单位，使后物料真正落入当日早班换模。
+         */
+        Date originalChangeTime = state.getChangeTimeMap().get(result);
+        if (Objects.nonNull(originalChangeTime)
+                && LhScheduleTimeUtil.isAfternoonShift(context, originalChangeTime)
+                && Objects.nonNull(result.getSpecEndTime())) {
+            Date afternoonStart = LhScheduleTimeUtil.getAfternoonShiftStart(context, originalChangeTime);
+            if (!result.getSpecEndTime().before(afternoonStart)
+                    && LhScheduleTimeUtil.isSameDay(result.getSpecEndTime(), afternoonStart)
+                    && !this.reduceOneMouldUnitFromEndingShift(context, shifts, result)) {
+                return false;
+            }
+            if (pairUnit && !pairResult.getSpecEndTime().before(afternoonStart)
+                    && LhScheduleTimeUtil.isSameDay(pairResult.getSpecEndTime(), afternoonStart)
+                    && !this.reduceOneMouldUnitFromEndingShift(context, shifts, pairResult)) {
+                return false;
+            }
+        }
+        refreshResultSummary(context, result, shifts);
+        syncStopHoldBoundaryAfterBalance(context, result, shifts);
         syncMachineEstimatedEndTime(context, result);
         if (pairUnit) {
             refreshResultSummary(context, pairResult, shifts);
+            syncStopHoldBoundaryAfterBalance(context, pairResult, shifts);
             syncMachineEstimatedEndTime(context, pairResult);
         }
+        move.setAppliedQty(currentQty * (pairUnit ? 2 : 1));
         return true;
     }
 
     /**
-     * 快照当前胎胚组的排程结果、机台结束时间和胶囊/允许超量运行态。
+     * 从结果当前最后一个有量班次减少一个模数单位并重算收尾时间。
      *
      * @param context 排程上下文
-     * @param groupResults 组内候选机台结果
+     * @param shifts 排程窗口班次
+     * @param result 待减量结果
+     * @return true-减量成功；false-无可减量或减量会清空结果
+     */
+    private boolean reduceOneMouldUnitFromEndingShift(LhScheduleContext context,
+                                                      List<LhShiftConfigVO> shifts,
+                                                      LhScheduleResult result) {
+        int endingShiftIndex = ShiftFieldUtil.resolveLastPlannedShiftIndex(result);
+        int endingQty = this.resolveShiftPlanQty(result, endingShiftIndex);
+        int mouldUnitQty = ShiftCapacityResolverUtil.resolveMachineMouldQty(result.getMouldQty());
+        if (endingShiftIndex <= 0 || endingQty <= mouldUnitQty
+                || ShiftFieldUtil.resolveScheduledQty(result) <= mouldUnitQty) {
+            return false;
+        }
+        int adjustedQty = endingQty - mouldUnitQty;
+        Date startTime = ShiftFieldUtil.getShiftStartTime(result, endingShiftIndex);
+        LhShiftConfigVO endingShift = this.findShiftByIndex(shifts, endingShiftIndex);
+        if (Objects.isNull(startTime) && Objects.nonNull(endingShift)) {
+            startTime = endingShift.getShiftStartDateTime();
+        }
+        Date endTime = this.resolveShiftCompletionTime(
+                context, shifts, result, endingShiftIndex, adjustedQty);
+        ShiftFieldUtil.setShiftPlanQty(
+                result, endingShiftIndex, adjustedQty, startTime, endTime);
+        ShiftFieldUtil.appendShiftAnalysis(result, endingShiftIndex, BALANCE_ADVANCE_ANALYSIS);
+        return true;
+    }
+
+    /**
+     * 快照当前移动实际影响的排程结果、机台结束时间和胶囊/允许超量运行态。
+     *
+     * @param context 排程上下文
+     * @param affectedResults 当前移动的转出/承接机台结果
      * @param pairResultMap 双模SKU单控整机代表结果到配对侧结果的映射
      * @return 快照
      */
     private BalanceSnapshot snapshotGroupState(LhScheduleContext context,
-                                               Set<LhScheduleResult> groupResults,
+                                               Set<LhScheduleResult> affectedResults,
                                                Map<LhScheduleResult, LhScheduleResult> pairResultMap) {
         BalanceSnapshot snapshot = new BalanceSnapshot();
         snapshot.setContext(context);
-        Set<LhScheduleResult> expandedResults = expandGroupResults(groupResults, pairResultMap);
+        Set<LhScheduleResult> expandedResults = expandGroupResults(affectedResults, pairResultMap);
         for (LhScheduleResult result : expandedResults) {
             LhScheduleResult resultCopy = new LhScheduleResult();
             BeanUtil.copyProperties(result, resultCopy);
@@ -1366,16 +3057,16 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
     /**
      * 展开均衡候选集合，把单控整机的配对侧结果一并纳入快照。
      *
-     * @param groupResults 组内候选代表结果
+     * @param affectedResults 当前移动涉及的代表结果
      * @param pairResultMap 代表结果到配对侧结果的映射
      * @return 包含配对侧的结果集合
      */
     private Set<LhScheduleResult> expandGroupResults(
-            Set<LhScheduleResult> groupResults,
+            Set<LhScheduleResult> affectedResults,
             Map<LhScheduleResult, LhScheduleResult> pairResultMap) {
         Set<LhScheduleResult> expandedResults =
-                new LinkedHashSet<LhScheduleResult>(Math.max(8, groupResults.size() * 2));
-        for (LhScheduleResult result : groupResults) {
+                new LinkedHashSet<LhScheduleResult>(Math.max(4, affectedResults.size() * 2));
+        for (LhScheduleResult result : affectedResults) {
             if (Objects.isNull(result)) {
                 continue;
             }
@@ -1437,7 +3128,6 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
             return;
         }
         ShiftFieldUtil.syncDailyPlanQty(result);
-        result.setTotalDailyPlanQty(result.getDailyPlanQty());
         if (Objects.isNull(result.getDailyPlanQty()) || result.getDailyPlanQty() <= 0) {
             result.setSpecEndTime(null);
             result.setTdaySpecEndTime(null);
@@ -1488,6 +3178,48 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
         if (Objects.nonNull(machine)) {
             machine.setEstimatedEndTime(result.getSpecEndTime());
         }
+    }
+
+    /**
+     * 均衡调整后同步停产保机机台的占用边界与冻结快照。
+     *
+     * <p>续作停产保机：恢复“占用延续到窗口末班”的边界语义，
+     * 与续作主链 {@code extendContinuousStopHoldOccupancyToWindowEnd} 保持同一口径。</p>
+     *
+     * @param context 排程上下文
+     * @param result 刚被均衡调整的结果
+     * @param shifts 排程窗口班次
+     */
+    private void syncStopHoldBoundaryAfterBalance(LhScheduleContext context,
+                                                  LhScheduleResult result,
+                                                  List<LhShiftConfigVO> shifts) {
+        if (Objects.isNull(context) || Objects.isNull(result)
+                || StringUtils.isEmpty(result.getLhMachineCode())) {
+            return;
+        }
+        String machineCode = result.getLhMachineCode();
+        if (context.isContinuousStopHoldMachine(machineCode)
+                && Objects.nonNull(result.getDailyPlanQty()) && result.getDailyPlanQty() > 0) {
+            // 有量停产保机结果只延长机台/模具占用结束时间，不改变班次计划量。
+            Date occupiedEndTime = CollectionUtils.isEmpty(shifts)
+                    ? context.getWindowEndDate() : shifts.get(shifts.size() - 1).getShiftEndDateTime();
+            if (Objects.nonNull(occupiedEndTime)) {
+                result.setSpecEndTime(occupiedEndTime);
+                result.setTdaySpecEndTime(occupiedEndTime);
+            }
+        }
+    }
+
+    /**
+     * 判断机台是否处于续作停产保机状态。
+     *
+     * @param context 排程上下文
+     * @param machineCode 机台编码
+     * @return true-处于停产保机；false-未处于停产保机
+     */
+    private boolean isStopHoldMachine(LhScheduleContext context, String machineCode) {
+        return Objects.nonNull(context) && StringUtils.isNotEmpty(machineCode)
+                && context.isContinuousStopHoldMachine(machineCode);
     }
 
     /**
@@ -1564,7 +3296,15 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
                 ShiftCapacityResolverUtil.resolveOddShiftCapacityPlusShiftType(context),
                 ScheduleTypeEnum.CONTINUOUS.getCode(),
                 plannedRepairFixedQty);
-        return ShiftProductionControlUtil.deductCapacityByControl(control, shiftMaxQty, mouldQty);
+        int controlledShiftCapacity = ShiftProductionControlUtil.deductCapacityByControl(
+                control, shiftMaxQty, mouldQty);
+        /*
+         * 调用点说明：同一胶囊感知分摊可能分多轮向同一承接机搬量。若前一轮已在该班次
+         * 首次换胶囊，当前班次的真实产能上限必须继续保留固定扣产，不能把扣掉的数量
+         * 再识别为空闲产能。这里复用公共胶囊规则记录的精确上限，不重复扣产或累计次数。
+         */
+        return this.capsuleReplacementRuleService.resolveReplacementShiftCapacityUpperLimit(
+                context, result, shift, controlledShiftCapacity);
     }
 
     /**
@@ -1704,8 +3444,9 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
         if (!CollectionUtils.isEmpty(context.getMachineAssignmentMap())) {
             List<LhScheduleResult> assignedResults =
                     context.getMachineAssignmentMap().get(currentResult.getLhMachineCode());
-            if (isShiftOccupiedByOtherSku(assignedResults, currentResult, targetShift)) {
-                return true;
+            if (Objects.nonNull(assignedResults)) {
+                // 机台分配索引已按机台预分组，命中时直接在小集合中判断，避免每个候选重复扫描全部排程结果。
+                return this.isShiftOccupiedByOtherSku(assignedResults, currentResult, targetShift);
             }
         }
         return isShiftOccupiedByOtherSku(context.getScheduleResultList(), currentResult, targetShift);
@@ -1760,19 +3501,6 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
             copiedCountMap.put(entry.getKey(), new int[]{morningCount, afternoonCount});
         }
         return copiedCountMap;
-    }
-
-    /**
-     * 使用当前胎胚组的最终预演结果覆盖全局本地预演账本。
-     * <p>覆盖时再次深拷贝次数数组，避免下一组预演修改当前状态对象中的历史评分数据。</p>
-     *
-     * @param targetCountMap 全部胎胚组共用的预演账本
-     * @param sourceCountMap 当前胎胚组最终预演结果
-     */
-    private void replaceSimulationCountMap(Map<String, int[]> targetCountMap,
-                                           Map<String, int[]> sourceCountMap) {
-        targetCountMap.clear();
-        targetCountMap.putAll(copyDailyMouldChangeCountMap(sourceCountMap));
     }
 
     /**
@@ -1852,23 +3580,6 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
     }
 
     /**
-     * 输出均衡前/后状态日志。
-     *
-     * @param context 排程上下文
-     * @param embryoCode 胎胚编码
-     * @param state 均衡状态
-     * @param phase 阶段描述
-     */
-    private void logBalanceState(LhScheduleContext context,
-                                 String embryoCode,
-                                 EmbryoEndingBalanceState state,
-                                 String phase) {
-        log.info("共用胎胚收尾均衡{}状态, scheduleDate: {}, embryoCode: {}, 机台数: {}, 详情: {}",
-                phase, context.getScheduleDate(), embryoCode,
-                state.getEndingShiftMap().size(), buildStateSummary(context, state));
-    }
-
-    /**
      * 构建状态摘要：机台、收尾类型、收尾班次、预测换模时间及评分。
      *
      * @param context 排程上下文
@@ -1897,6 +3608,7 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
                     .append("]");
         }
         detail.append(", 评分[硬限制风险=").append(state.getHardViolationCount())
+                .append(", 日上限跨天待补满=").append(state.getDailyLimitDeferredCount())
                 .append(", 超软目标班次数=").append(state.getExceededShiftCount())
                 .append(", 超目标累计次数=").append(state.getOverflowQty())
                 .append(", 早中班比例偏差=").append(state.getBalanceDeviation())
@@ -1940,9 +3652,58 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
             int[] counts = entry.getValue();
             int morningCount = Objects.nonNull(counts) && counts.length > 0 ? counts[0] : 0;
             int afternoonCount = Objects.nonNull(counts) && counts.length > 1 ? counts[1] : 0;
-            countTextList.add(entry.getKey() + "早" + morningCount + "中" + afternoonCount);
+            StringBuilder countText = new StringBuilder(48);
+            countText.append(entry.getKey())
+                    .append("[早=").append(morningCount)
+                    .append(",中=").append(afternoonCount)
+                    .append(",日=").append(morningCount + afternoonCount)
+                    .append(']');
+            countTextList.add(countText.toString());
         }
         return StringUtils.join(countTextList, ",");
+    }
+
+    /**
+     * 构建防循环状态键。
+     * <p>只拼接稳定的机台编码、收尾班次、收尾量和换模计数，
+     * 不持有排程结果副本，避免均衡循环创建大量临时对象。</p>
+     *
+     * @param state 当前均衡状态
+     * @return 稳定状态键
+     */
+    private String buildBalanceStateKey(EmbryoEndingBalanceState state) {
+        StringBuilder stateKey = new StringBuilder(256);
+        List<LhScheduleResult> resultList =
+                new ArrayList<LhScheduleResult>(state.getEndingShiftMap().keySet());
+        resultList.sort(Comparator.comparing(
+                result -> StringUtils.defaultString(result.getLhMachineCode())));
+        for (LhScheduleResult result : resultList) {
+            stateKey.append(result.getLhMachineCode()).append(':')
+                    .append(state.getEndingShiftMap().get(result)).append(':')
+                    .append(state.getEndingQtyMap().get(result)).append(';');
+        }
+        stateKey.append('|').append(this.buildCountSummary(state.getSimulatedCountMap()));
+        return stateKey.toString();
+    }
+
+    /**
+     * 记录无法完全均衡的非阻断问题。
+     * <p>班次参考上限在总量守恒或产能等硬约束下允许暂时超出，
+     * 因此只追加到过程日志和响应校验问题，不抛异常、不中断后续排程。</p>
+     *
+     * @param context 排程上下文
+     * @param state 当前均衡状态
+     * @param reason 无法继续均衡的原因
+     */
+    private void recordUnresolvedBalanceReason(LhScheduleContext context,
+                                               EmbryoEndingBalanceState state,
+                                               String reason) {
+        String detail = "共用胎胚收尾均衡未完全解决: scheduleDate="
+                + LhScheduleTimeUtil.formatDate(context.getScheduleDate())
+                + ", 原因=" + reason
+                + ", 当前换模分布=" + this.buildCountSummary(state.getSimulatedCountMap());
+        PriorityTraceLogHelper.appendProcessLog(context, "共用胎胚收尾均衡", detail);
+        log.warn("{}", detail);
     }
 
     /**
@@ -1966,10 +3727,13 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
         detail.append("scheduleDate=").append(context.getScheduleDate())
                 .append(", embryoCode=").append(
                         Objects.isNull(donorSku) ? null : donorSku.getEmbryoCode())
-                .append(", 移动类型=").append(move.getMoveType())
+                .append(", 移动类型=").append(move.isCrossDay()
+                        ? MOVE_TYPE_POSTPONE + "（跨天）" : move.getMoveType())
                 .append(", 转出机台=").append(donor.getLhMachineCode())
                 .append(", 转出物料=").append(donor.getMaterialCode())
                 .append(", 转出收尾类型=").append(beforeState.getEndingTypeMap().get(donor))
+                .append(", 是否停产保机=").append(
+                        this.isStopHoldMachine(context, donor.getLhMachineCode()))
                 .append(", 转出调整前=[班次").append(beforeState.getEndingShiftMap().get(donor))
                 .append("=").append(beforeState.getEndingQtyMap().get(donor))
                 .append(", 收尾时间=").append(LhScheduleTimeUtil.formatDateTime(
@@ -1981,6 +3745,8 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
             detail.append(", 承接机台=").append(receiver.getLhMachineCode())
                     .append(", 承接物料=").append(receiver.getMaterialCode())
                     .append(", 承接收尾类型=").append(beforeState.getEndingTypeMap().get(receiver))
+                    .append(", 承接是否停产保机=").append(
+                            this.isStopHoldMachine(context, receiver.getLhMachineCode()))
                     .append(", 承接调整前=[班次").append(beforeState.getEndingShiftMap().get(receiver))
                     .append("=").append(beforeState.getEndingQtyMap().get(receiver))
                     .append(", 收尾时间=").append(LhScheduleTimeUtil.formatDateTime(
@@ -1991,12 +3757,76 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
         detail.append(", 调整前评分[硬限制风险=").append(beforeState.getHardViolationCount())
                 .append(", 超软目标=").append(beforeState.getExceededShiftCount())
                 .append(", 同班次集中=").append(beforeState.getSameShiftPairCount()).append("]")
+                .append(", 调整前换模分布=").append(
+                        this.buildCountSummary(beforeState.getSimulatedCountMap()))
                 .append(", 调整后评分[硬限制风险=").append(afterState.getHardViolationCount())
                 .append(", 超软目标=").append(afterState.getExceededShiftCount())
                 .append(", 同班次集中=").append(afterState.getSameShiftPairCount()).append("]")
                 .append(", 调整后预测换模分布=").append(buildStateSummary(context, afterState));
         PriorityTraceLogHelper.appendProcessLog(context, "共用胎胚收尾均衡", detail.toString());
         log.info("共用胎胚收尾均衡移动提交, {}", detail);
+    }
+
+    /**
+     * 追加候选被拒绝并完整回滚的过程日志。
+     *
+     * <p>按 spec 要求逐台记录日期、班次、胎胚、SKU、机台、收尾类型、是否停产保机、
+     * 尝试策略、承接机台、调整前后收尾信息、调整前后早/中/日次数和具体拒绝原因。
+     * 失败候选已完整恢复快照，不会残留班次备注。</p>
+     *
+     * @param context 排程上下文
+     * @param shifts 排程窗口班次
+     * @param move 被拒绝的移动
+     * @param beforeState 调整前状态
+     * @param afterState 调整后状态；执行阶段失败时为null
+     * @param rejectReason 具体拒绝原因
+     */
+    private void appendRejectedMoveProcessLog(LhScheduleContext context,
+                                              List<LhShiftConfigVO> shifts,
+                                              EmbryoEndingBalanceMove move,
+                                              EmbryoEndingBalanceState beforeState,
+                                              EmbryoEndingBalanceState afterState,
+                                              String rejectReason) {
+        if (Objects.isNull(context) || Objects.isNull(move) || Objects.isNull(move.getDonor())) {
+            return;
+        }
+        LhScheduleResult donor = move.getDonor();
+        SkuScheduleDTO donorSku = beforeState.getSourceSkuMap().get(donor);
+        StringBuilder detail = new StringBuilder(256);
+        detail.append("scheduleDate=").append(context.getScheduleDate())
+                .append(", embryoCode=").append(
+                        Objects.isNull(donorSku) ? null : donorSku.getEmbryoCode())
+                .append(", materialCode=").append(donor.getMaterialCode())
+                .append(", 机台=").append(donor.getLhMachineCode())
+                .append(", 收尾类型=").append(beforeState.getEndingTypeMap().get(donor))
+                .append(", 是否停产保机=").append(
+                        this.isStopHoldMachine(context, donor.getLhMachineCode()))
+                .append(", 尝试策略=").append(move.isCrossDay()
+                        ? MOVE_TYPE_POSTPONE + "（跨天）" : move.getMoveType())
+                .append(", 承接机台=").append(Objects.isNull(move.getReceiver()) ? "无"
+                        : move.getReceiver().getLhMachineCode())
+                .append(", 调整前=[班次").append(beforeState.getEndingShiftMap().get(donor))
+                .append("=").append(beforeState.getEndingQtyMap().get(donor))
+                .append(", 收尾时间=").append(LhScheduleTimeUtil.formatDateTime(
+                        beforeState.getEndingTimeMap().get(donor)))
+                .append(", 预测换模=").append(formatDateTimeSafe(
+                        beforeState.getChangeTimeMap().get(donor))).append("]")
+                .append(", 调整前换模分布=").append(
+                        this.buildCountSummary(beforeState.getSimulatedCountMap()));
+        if (Objects.nonNull(afterState)) {
+            detail.append(", 调整后=[班次").append(afterState.getEndingShiftMap().get(donor))
+                    .append("=").append(afterState.getEndingQtyMap().get(donor))
+                    .append(", 收尾时间=").append(LhScheduleTimeUtil.formatDateTime(
+                            afterState.getEndingTimeMap().get(donor)))
+                    .append(", 预测换模=").append(formatDateTimeSafe(
+                            afterState.getChangeTimeMap().get(donor))).append("]")
+                    .append(", 调整后换模分布=").append(
+                            this.buildCountSummary(afterState.getSimulatedCountMap()));
+        }
+        detail.append(", 结果=已拒绝并回滚")
+                .append(", 原因=").append(StringUtils.defaultString(rejectReason));
+        PriorityTraceLogHelper.appendProcessLog(context, "共用胎胚收尾均衡候选拒绝", detail.toString());
+        log.info("共用胎胚收尾均衡候选拒绝, {}", detail);
     }
 
     /**
@@ -2007,6 +3837,47 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
      */
     private String formatDateTimeSafe(Date dateTime) {
         return Objects.isNull(dateTime) ? "无" : LhScheduleTimeUtil.formatDateTime(dateTime);
+    }
+}
+
+/**
+ * 共用胎胚收尾均衡的日期班次超限桶（包级可见，仅供默认策略使用）。
+ */
+class BalanceOverflowBucket {
+
+    /** yyyy-MM-dd日期键 */
+    private final String dateKey;
+
+    /** 计数数组下标：0-早班，1-中班 */
+    private final int shiftCountIndex;
+
+    /** 调整前班次次数 */
+    private final int count;
+
+    /** 班次参考上限 */
+    private final int limit;
+
+    public BalanceOverflowBucket(String dateKey, int shiftCountIndex, int count, int limit) {
+        this.dateKey = dateKey;
+        this.shiftCountIndex = shiftCountIndex;
+        this.count = count;
+        this.limit = limit;
+    }
+
+    public String getDateKey() {
+        return dateKey;
+    }
+
+    public int getShiftCountIndex() {
+        return shiftCountIndex;
+    }
+
+    public int getCount() {
+        return count;
+    }
+
+    public int getLimit() {
+        return limit;
     }
 }
 
@@ -2048,6 +3919,9 @@ class EmbryoEndingBalanceState {
 
     /** 硬限制风险数（预测被拒绝或每日总次数超过15） */
     private int hardViolationCount;
+
+    /** 因每日总次数上限跨天，但前物料尚未连续生产到目标06:00的机台数 */
+    private int dailyLimitDeferredCount;
 
     /** 超过早班8/中班7软目标的班次数 */
     private int exceededShiftCount;
@@ -2109,6 +3983,14 @@ class EmbryoEndingBalanceState {
         this.hardViolationCount = hardViolationCount;
     }
 
+    public int getDailyLimitDeferredCount() {
+        return dailyLimitDeferredCount;
+    }
+
+    public void setDailyLimitDeferredCount(int dailyLimitDeferredCount) {
+        this.dailyLimitDeferredCount = dailyLimitDeferredCount;
+    }
+
     public int getExceededShiftCount() {
         return exceededShiftCount;
     }
@@ -2165,6 +4047,9 @@ class EmbryoEndingBalanceMove {
     /** 实际落地数量（尾量分摊/后延补量成功后写入，单控整机为组级合计） */
     private int appliedQty;
 
+    /** 是否为连续生产到次日06:00的跨天补量 */
+    private boolean crossDay;
+
     public EmbryoEndingBalanceMove(String moveType,
                                    LhScheduleResult donor,
                                    LhScheduleResult receiver,
@@ -2203,6 +4088,14 @@ class EmbryoEndingBalanceMove {
 
     public void setAppliedQty(int appliedQty) {
         this.appliedQty = appliedQty;
+    }
+
+    public boolean isCrossDay() {
+        return crossDay;
+    }
+
+    public void setCrossDay(boolean crossDay) {
+        this.crossDay = crossDay;
     }
 }
 

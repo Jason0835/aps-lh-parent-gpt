@@ -2672,6 +2672,7 @@ export default {
                 structureName: current.structureName,
                 showBackground: "light-green",
                 materialCode: this.$t("ui.data.column.mouldingDayResult.embryoCount"),
+                _overDays: {},
               };
               const lhMachines = {
                 structureName: current.structureName,
@@ -2685,6 +2686,15 @@ export default {
                   const dayData = JSON.parse(statistList[s][key]);
                   embryoCount[key] = dayData.embryoCount;
                   lhMachines[key] = dayData.lhMachines;
+                  // 胎胚种类数超限标红：embryoCount > maxEmbryoTypes
+                  if (
+                    dayData.embryoCount != null &&
+                    dayData.maxEmbryoTypes != null &&
+                    Number(dayData.embryoCount) > Number(dayData.maxEmbryoTypes)
+                  ) {
+                    embryoCount._overDays[key] = true;
+                  }
+                  // 硫化机台数超限标红：lhMachines > maxLhMachines
                   if (
                     dayData.lhMachines != null &&
                     dayData.maxLhMachines != null &&

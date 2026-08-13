@@ -134,6 +134,7 @@
             RAW_MATERIAL_NAME,
             RAW_MATERIAL_CODE,
             RAW_MATERIAL_WEIGHT,
+            construction_stage,
             FACTORY_CODE,
             DEL_FLAG IS_DELETE,
             REMARK

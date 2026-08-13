@@ -111,6 +111,7 @@ public class TmParamsController extends AbstractDocBizController<TmParams> {
     protected List<TmParams> listExportData(TmParams obj) {
         QueryWrapper<TmParams> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
+        wrapper.last("ORDER BY " + this.getOrderBy(obj));
         return tmParamsMapper.selectList(wrapper);
     }
 

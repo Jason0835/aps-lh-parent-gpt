@@ -120,6 +120,21 @@ public enum ItfSyncKeyEnum {
     TQ_SCHE_DAY_FINISH_QTY("TQ_DAY_COMPLETE", "MES", "APS", "胎圈排程日完成量同步"),
 
     /**
+     * 钢丝圈排程结果下发
+     */
+    SYNC_GSQ_SCHEDULE_RESULT("STEEL_RING_SCHE_RST_FBK", "APS", "MES", "钢丝圈排程结果下发接口"),
+
+    /**
+     * 钢丝圈排程完成量同步
+     */
+    GSQ_CLASS_SHIFT_FINISH_QTY("STEEL_RING_COMPLETE_QUANTITY", "MES", "APS", "钢丝圈排程完成量同步"),
+
+    /**
+     * 钢丝圈排程日完成量同步
+     */
+    GSQ_SCHE_DAY_FINISH_QTY("GSQ_DAY_COMPLETE", "MES", "APS", "钢丝圈排程日完成量同步"),
+
+    /**
      * 胎面排程结果下发
      */
     SYNC_TM_SCHEDULE_RESULT("TREAD_SCHE_RST_FBK", "APS", "MES", "胎面排程结果下发接口"),

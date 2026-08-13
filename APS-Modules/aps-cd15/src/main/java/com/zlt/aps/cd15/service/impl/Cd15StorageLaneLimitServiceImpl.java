@@ -1,5 +1,6 @@
 package com.zlt.aps.cd15.service.impl;
 
+import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
@@ -18,19 +19,24 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import lombok.extern.slf4j.Slf4j;
 
 import javax.annotation.Resource;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 /**
  * 斜裁库排限制 Service 实现。
  */
 @Service
+@Slf4j
 @Transactional(rollbackFor = Exception.class)
 public class Cd15StorageLaneLimitServiceImpl extends AbstractDocService<Cd15StorageLaneLimit> implements ICd15StorageLaneLimitService {
 
@@ -142,6 +148,63 @@ public class Cd15StorageLaneLimitServiceImpl extends AbstractDocService<Cd15Stor
             return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum, errorList);
         }
         return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + successNum);
+    }
+
+    @Override
+    public void logicDeleteAndSaveBatch(String factoryCode, Date laneDate, String shiftCode,
+                                        String updateBy, List<Cd15StorageLaneLimit> list) {
+        Date normalizedLaneDate = DateUtil.beginOfDay(laneDate);
+        List<Cd15StorageLaneLimit> normalizedList = list == null
+                ? new ArrayList<>() : new ArrayList<>(list);
+        normalizedList.sort(Comparator.comparing(Cd15StorageLaneLimit::getStorageLaneCode));
+        List<Cd15StorageLaneLimit> existingList = this.cd15StorageLaneLimitMapper.selectList(
+                new LambdaQueryWrapper<Cd15StorageLaneLimit>()
+                        .eq(Cd15StorageLaneLimit::getFactoryCode, factoryCode)
+                        .eq(Cd15StorageLaneLimit::getLaneDate, normalizedLaneDate)
+                        .eq(Cd15StorageLaneLimit::getShiftCode, shiftCode)
+                        .orderByAsc(Cd15StorageLaneLimit::getStorageLaneCode));
+        if (this.isSameMesSnapshot(existingList, normalizedList)) {
+            log.info("斜裁MES库排快照未变化，跳过替换：factoryCode={}，laneDate={}，shiftCode={}，数量={}",
+                    factoryCode, DateUtil.formatDate(normalizedLaneDate), shiftCode, normalizedList.size());
+            return;
+        }
+        Date now = new Date();
+        this.cd15StorageLaneLimitMapper.logicDeleteByScope(
+                factoryCode, normalizedLaneDate, shiftCode, updateBy, now);
+        normalizedList.forEach(item -> {
+            item.setFactoryCode(factoryCode);
+            item.setLaneDate(normalizedLaneDate);
+            item.setShiftCode(shiftCode);
+            item.setCreateBy(updateBy);
+            item.setUpdateBy(updateBy);
+            item.setCreateTime(now);
+            item.setUpdateTime(now);
+            item.setIsDelete(0);
+        });
+        if (CollectionUtils.isNotEmpty(normalizedList)) {
+            this.baseDao.saveBatch(normalizedList);
+        }
+    }
+
+    private boolean isSameMesSnapshot(List<Cd15StorageLaneLimit> existingList,
+                                      List<Cd15StorageLaneLimit> incomingList) {
+        if (existingList == null || existingList.size() != incomingList.size()) {
+            return false;
+        }
+        for (int index = 0; index < existingList.size(); index++) {
+            Cd15StorageLaneLimit existing = existingList.get(index);
+            Cd15StorageLaneLimit incoming = incomingList.get(index);
+            if (!Objects.equals(existing.getStorageLaneCode(), incoming.getStorageLaneCode())
+                    || !Objects.equals(StringUtils.trimToEmpty(existing.getMaterialCode()),
+                            StringUtils.trimToEmpty(incoming.getMaterialCode()))
+                    || !Objects.equals(existing.getCarNum(), incoming.getCarNum())
+                    || !Objects.equals(existing.getMaxCarNum(), incoming.getMaxCarNum())
+                    || !Objects.equals(existing.getAvailableCarNum(), incoming.getAvailableCarNum())
+                    || !Objects.equals(existing.getDataSource(), incoming.getDataSource())) {
+                return false;
+            }
+        }
+        return true;
     }
 
     @Override

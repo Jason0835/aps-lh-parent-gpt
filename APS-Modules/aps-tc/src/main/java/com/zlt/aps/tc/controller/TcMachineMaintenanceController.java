@@ -53,7 +53,7 @@ public class TcMachineMaintenanceController extends AbstractDocBizController<TcM
             billVO.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
         }
         // 自动计算停机班次
-        billVO.setStopShift(tcMachineMaintenanceService.resolveStopShift(billVO.getStopStartTime()));
+        billVO.setStopShift(tcMachineMaintenanceService.resolveStopShift(billVO.getFactoryCode(), billVO.getStopStartTime()));
         return super.save(billVO);
     }
 
@@ -99,6 +99,7 @@ public class TcMachineMaintenanceController extends AbstractDocBizController<TcM
     protected List<TcMachineMaintenance> listExportData(TcMachineMaintenance obj) {
         QueryWrapper<TcMachineMaintenance> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
+        wrapper.last("ORDER BY " + this.getOrderBy(obj));
         return tcMachineMaintenanceMapper.selectList(wrapper);
     }
 

@@ -8,6 +8,7 @@ import com.zlt.aps.common.engine.schedule.*;
 import com.zlt.aps.common.engine.schedule.constraint.ScheduleConstraintCalculator;
 import com.zlt.aps.common.engine.schedule.constraint.SchedulePlanQtyAdjustmentResult;
 import com.zlt.aps.common.engine.schedule.constraint.ScheduleToolLedgerResult;
+import com.zlt.aps.common.engine.schedule.constraint.ScheduleToolLedgerSnapshot;
 import com.zlt.aps.tc.api.constant.TcScheduleConstants;
 import com.zlt.aps.tc.api.enums.*;
 import com.zlt.aps.tc.engine.domain.*;
@@ -1283,7 +1284,7 @@ public class TcMachineAssignService implements ITcMachineAssignService {
                 TcTaskDraft mergeTarget = this.findMergeTarget(context, candidate.getMachineCode(), shiftOrder,
                         sourceTask);
                 runtimeCandidate.setRemainCapacity(mergeTarget == null
-                        ? this.resolvePrependRemainCapacity(capacityProbeTask, context, runtimeCandidate, machineSpeed)
+                        ? this.resolveRemainCapacity(capacityProbeTask, context, runtimeCandidate, machineSpeed)
                         : this.resolveRemainCapacityWithoutNewSwitch(capacityProbeTask, context, runtimeCandidate,
                                 machineSpeed));
                 BigDecimal remainCapacity = nvl(runtimeCandidate.getRemainCapacity());
@@ -1863,6 +1864,7 @@ public class TcMachineAssignService implements ITcMachineAssignService {
             task.setRemainingToolQty(currentAvailableToolQty);
             task.setToolLedgerOrder(context.nextToolLedgerOrder());
             context.setCurrentAvailableToolQty(currentAvailableToolQty);
+            this.recordToolLedgerSnapshot(context, task, currentAvailableToolQty, task.getToolUsedQty(), currentAvailableToolQty);
             return;
         }
         ScheduleToolLedgerResult ledgerResult = this.constraintCalculator.settleCommittedToolLedger(
@@ -1874,6 +1876,30 @@ public class TcMachineAssignService implements ITcMachineAssignService {
         task.setPlanStockQty(nvl(task.getRollingStockQty()).add(nvl(task.getPlanQty()))
                 .subtract(nvl(task.getCurrentShiftDemandQty())).max(BigDecimal.ZERO));
         context.setCurrentAvailableToolQty(ledgerResult.getRemainingToolQty());
+        this.recordToolLedgerSnapshot(context, task, ledgerResult.getAvailableToolQty(), ledgerResult.getToolUsedQty(),
+                ledgerResult.getRemainingToolQty());
+    }
+
+    /**
+     * 保存任务本次工装结算快照，供过程日志按实际分配结果展示。
+     *
+     * @param context           胎侧排程上下文
+     * @param task              已完成工装结算的任务
+     * @param availableToolQty  结算前可用工装数量
+     * @param toolUsedQty       本次净占用工装数量
+     * @param remainingToolQty  结算后剩余工装数量
+     */
+    private void recordToolLedgerSnapshot(TcScheduleContext context, TcTaskDraft task,
+                                          BigDecimal availableToolQty, BigDecimal toolUsedQty,
+                                          BigDecimal remainingToolQty) {
+        if (context == null || task == null || StrUtil.isBlank(task.getBusinessKey())) {
+            return;
+        }
+        ScheduleToolLedgerSnapshot snapshot = new ScheduleToolLedgerSnapshot();
+        snapshot.setAvailableToolQty(availableToolQty);
+        snapshot.setToolUsedQty(toolUsedQty);
+        snapshot.setRemainingToolQty(remainingToolQty);
+        context.getToolLedgerSnapshotMap().put(task.getBusinessKey(), snapshot);
     }
 
     /**
@@ -1893,6 +1919,8 @@ public class TcMachineAssignService implements ITcMachineAssignService {
             mergeTarget.setRemainingToolQty(currentAvailableToolQty);
             mergeTarget.setToolLedgerOrder(context.nextToolLedgerOrder());
             context.setCurrentAvailableToolQty(currentAvailableToolQty);
+            this.recordToolLedgerSnapshot(context, mergeTarget, currentAvailableToolQty,
+                    mergeTarget.getToolUsedQty(), currentAvailableToolQty);
             return;
         }
         ScheduleToolLedgerResult ledgerResult = this.constraintCalculator.settleCommittedToolLedger(
@@ -1904,6 +1932,8 @@ public class TcMachineAssignService implements ITcMachineAssignService {
         mergeTarget.setToolLedgerOrder(context.nextToolLedgerOrder());
         mergeTarget.setPlanStockQty(nvl(mergeTarget.getPlanStockQty()).add(nvl(carryoverQty)));
         context.setCurrentAvailableToolQty(ledgerResult.getRemainingToolQty());
+        this.recordToolLedgerSnapshot(context, mergeTarget, ledgerResult.getAvailableToolQty(),
+                mergeTarget.getToolUsedQty(), ledgerResult.getRemainingToolQty());
     }
 
     /**
@@ -2211,7 +2241,7 @@ public class TcMachineAssignService implements ITcMachineAssignService {
     }
 
     /**
-     * 在任务进入机台任务链后立即记录实际产能扣减，确保过程日志顺序与机台承接顺序一致。
+     * 在任务进入机台任务链后记录实际产能扣减，并延后到机台评分日志之后渲染。
      *
      * @param context         胎侧排程上下文
      * @param task            已承接任务
@@ -2231,16 +2261,15 @@ public class TcMachineAssignService implements ITcMachineAssignService {
         BigDecimal currentSpecSwitchDeduct = this.nvl(task.getPreviousSpecSwitchHours())
                 .multiply(this.nvl(task.getMachineSpeed()));
         BigDecimal currentGlueSwitchDeduct = this.nvl(task.getPreviousGlueSwitchCapacityDeduct());
-        context.appendProcessLog("产能扣减：胎侧代码={0}，机台={1}，班次={2}，最大产能={3}，检修扣减={4}，已排计划量扣减={5}，已发生切换扣减={6}，重排切换扣减={7}，本次规格切换扣减={8}，本次胶料切换扣减={9}，分配前待承接量={10}，分配前剩余产能={11}，本次分配量={12}，分配后剩余产能={13}，溢出量={14}，拆分原因={15}",
+        context.appendDeferredShiftProcessLog(task.getShiftOrder(), "产能扣减：胎侧代码={0}，机台={1}，班次={2}，最大产能={3}，检修扣减={4}，已排计划量扣减={5}，已发生切换扣减={6}，本次规格切换扣减={7}，本次胶料切换扣减={8}，分配前待承接量={9}，分配前剩余产能={10}，本次分配量={11}，分配后剩余产能={12}，溢出量={13}，拆分原因={14}",
                 task.getSidewallCode(), candidate == null ? "未提供" : candidate.getMachineCode(), task.getShiftOrder(),
                 this.getCandidateEvidenceDecimal(evidence, "maxCapacity"),
                 this.getCandidateEvidenceDecimal(evidence, "maintenanceCapacityDeduct"),
                 this.getCandidateEvidenceDecimal(evidence, "assignedPlanQty"),
                 this.getCandidateEvidenceDecimal(evidence, "existingSwitchCapacityDeduct"),
-                this.getCandidateEvidenceDecimal(evidence, "reorderedTotalSwitchCapacityDeduct"),
                 currentSpecSwitchDeduct, currentGlueSwitchDeduct, this.nvl(beforeAssignQty), beforeRemainCapacity,
                 this.nvl(assignedQty), afterRemainCapacity, this.nvl(overflowQty), splitDesc);
-        context.appendFullProcessTrace(new ScheduleProcessTraceEvent(
+        context.appendDeferredShiftFullProcessTrace(task.getShiftOrder(), new ScheduleProcessTraceEvent(
                 "机台分配", task.getBusinessKey(), "机台产能即时扣减与拆分",
                 "选中机台的班次容量账本、检修计划、已排任务、胎侧/垫胶共用机台约束和切换扣减。",
                 "机台=" + (candidate == null ? "未提供" : candidate.getMachineCode()) + "，班次="

@@ -19,25 +19,25 @@ public class Cd90ToolingCalculator {
      * @param actualQuantity 实际排产量
      * @param totalToolingCount 工装总数
      * @param occupiedVehicleCount 当前库排占用车数
-     * @param vehiclePlanQuantity 单个工装对应的直裁排程米数
+     * @param standardCurlLength 标准卷曲长度，直接作为单个工装的排程容量
      * @return 工装试算结果
      */
     public Cd90ToolingTrial calculate(BigDecimal actualQuantity,
                                       int totalToolingCount,
                                       int occupiedVehicleCount,
-                                      BigDecimal vehiclePlanQuantity) {
+                                      BigDecimal standardCurlLength) {
         if (actualQuantity == null || actualQuantity.compareTo(BigDecimal.ZERO) < 0) {
             throw new IllegalArgumentException("实际排产量不能小于0");
         }
         if (totalToolingCount < 0 || occupiedVehicleCount < 0) {
             throw new IllegalArgumentException("工装总数和库排占用车数不能小于0");
         }
-        if (vehiclePlanQuantity == null || vehiclePlanQuantity.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("单车直裁排程米数必须大于0");
+        if (standardCurlLength == null || standardCurlLength.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("标准卷曲长度必须大于0");
         }
 
         int availableCount = Math.max(0, totalToolingCount - occupiedVehicleCount);
-        BigDecimal availableQuantity = vehiclePlanQuantity.multiply(BigDecimal.valueOf(availableCount));
+        BigDecimal availableQuantity = standardCurlLength.multiply(BigDecimal.valueOf(availableCount));
         BigDecimal schedulableQuantity = actualQuantity.min(availableQuantity);
         return Cd90ToolingTrial.builder()
                 .availableToolingCount(availableCount)

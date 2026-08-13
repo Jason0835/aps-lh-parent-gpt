@@ -3,4 +3,12 @@
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.cd15.mapper.Cd15StorageLaneLimitMapper">
+    <update id="logicDeleteByScope">
+        UPDATE t_cd15_storage_lane_limit
+        SET IS_DELETE = 1, UPDATE_BY = #{updateBy}, UPDATE_TIME = #{updateTime}
+        WHERE FACTORY_CODE = #{factoryCode}
+          AND DATE(LANE_DATE) = DATE(#{laneDate})
+          AND SHIFT_CODE = #{shiftCode}
+          AND IS_DELETE = 0
+    </update>
 </mapper>

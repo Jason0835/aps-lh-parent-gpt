@@ -112,6 +112,18 @@ public enum MesInterfaceCodeEnum {
     CX_CLASS_SHIFT_FINISH_QTY("FINISH_SCHE_COMPLETE", "mesItfService", "syncCxClassShiftFinishQty", "成型排程完成量同步"),
 
     /**
+     * 直裁每日三班完成量同步
+     */
+    CD90_CLASS_SHIFT_FINISH_QTY("CD90_CLASS_SHIFT_FINISH_QTY", "cd90MesItfService",
+            "syncClassShiftFinishQty", "直裁排程完成量同步"),
+
+    /**
+     * 直裁库排状态同步
+     */
+    CD90_STORAGE_LANE_LIMIT("CD90_STORAGE_LANE_LIMIT", "cd90MesItfService",
+            "syncStorageLaneLimit", "直裁库排状态同步"),
+
+    /**
      * 硫化排程完成量同步
      */
     LH_CLASS_SHIFT_FINISH_QTY("LH_CLASS_SHIFT_FINISH_QTY", "mesItfService", "syncLhClassShiftFinishQty", "硫化排程完成量同步"),
@@ -125,6 +137,21 @@ public enum MesInterfaceCodeEnum {
      * 硫化排程日完成量同步
      */
     LH_SCHE_DAY_FINISH_QTY("LH_SCHE_DAY_FINISH_QTY", "mesItfService", "syncLhScheDayFinishQty", "硫化排程日完成量同步"),
+
+    /**
+     * 胎圈排程日完成量同步
+     */
+    TQ_DAY_COMPLETE("TQ_DAY_COMPLETE", "mesItfService", "syncTqScheDayFinishQty", "胎圈排程日完成量同步"),
+
+    /**
+     * 钢丝圈排程日完成量同步
+     */
+    GSQ_DAY_COMPLETE("GSQ_DAY_COMPLETE", "mesItfService", "syncGsqScheDayFinishQty", "钢丝圈排程日完成量同步"),
+
+    /**
+     * 钢丝圈库存同步
+     */
+    STEEL_WIRE_STOCK("STEEL_WIRE_STOCK", "mesItfService", "syncMesGsqStock", "钢丝圈库存同步"),
 
     /**
      * 模具交替计划下发

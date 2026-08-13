@@ -108,11 +108,13 @@ public class MesTask {
     }
 
     /**
-     * 同步设备保养计划
+     * 同步设备保养计划并按精度类型分发写入对应的精度计划表（现逻辑）
+     * 现逻辑：MES全权决定计划时间和实际完成时间，APS只做同步+分发，不再回填/生成下一次精度计划。
+     * 原 syncDevMaintenancePlan 方法（含回填+生成）已 @Deprecated 备份保留。
      */
-    @ApiOperation("同步设备保养计划")
+    @ApiOperation("同步设备保养计划并分发写入精度计划表")
     public void syncDevMaintenancePlan() {
-        FeignTokenHelper.runWithToken(() -> iMesItfService.syncDevMaintenancePlan(new AuxReqSyncDataLogs()));
+        FeignTokenHelper.runWithToken(() -> iMesItfService.syncAndDispatchDevMaintenancePlan(new AuxReqSyncDataLogs()));
     }
 
     /**
@@ -146,19 +148,19 @@ public class MesTask {
     }
 
     /**
-     * 同步直裁库存（从 MES 中间表 T_MES_CD90_STOCK 同步到 t_cd90_stock）
-     */
-    @ApiOperation("同步直裁库存")
-    public void syncMesCd90Stock() {
-        FeignTokenHelper.runWithToken(() -> iMesItfService.syncMesCd90Stock(new AuxReqSyncDataLogs()));
-    }
-
-    /**
      * 同步胎圈库存
      */
     @ApiOperation("同步胎圈库存")
     public void syncMesTqStock() {
         FeignTokenHelper.runWithToken(() -> iMesItfService.syncMesTqStock(new AuxReqSyncDataLogs()));
+    }
+
+    /**
+     * 同步钢丝圈库存
+     */
+    @ApiOperation("同步钢丝圈库存")
+    public void syncMesGsqStock() {
+        FeignTokenHelper.runWithToken(() -> iMesItfService.syncMesGsqStock(new AuxReqSyncDataLogs()));
     }
 
     /**
@@ -202,6 +204,22 @@ public class MesTask {
     }
 
     /**
+     * 同步胎圈排程日完成量
+     */
+    @ApiOperation("同步胎圈排程日完成量")
+    public void syncTqScheDayFinishQty() {
+        FeignTokenHelper.runWithToken(() -> iMesItfService.syncTqScheDayFinishQty(new AuxReqSyncDataLogs()));
+    }
+
+    /**
+     * 同步钢丝圈排程日完成量
+     */
+    @ApiOperation("同步钢丝圈排程日完成量")
+    public void syncGsqScheDayFinishQty() {
+        FeignTokenHelper.runWithToken(() -> iMesItfService.syncGsqScheDayFinishQty(new AuxReqSyncDataLogs()));
+    }
+
+    /**
      * 同步模具交替计划完成回报
      */
     @ApiOperation("同步模具交替计划完成回报")
@@ -211,10 +229,13 @@ public class MesTask {
 
     /**
      * 同步MES硫化精度计划实际执行日期回填数据
+     * 已停用：现逻辑APS不再回填实际执行日期、不再生成下一次精度计划。
+     * 现逻辑改由 syncDevMaintenancePlan 调 syncAndDispatchDevMaintenancePlan 完成同步+分发。
+     * 方法签名保留以便调度配置不动，如需恢复原逻辑可调用 iMesItfService.syncLhPrecisionPlanActual。
      */
-    @ApiOperation("同步MES硫化精度计划实际执行日期回填数据")
+    @ApiOperation("同步MES硫化精度计划实际执行日期回填数据（已停用）")
     public void syncLhPrecisionPlanActual() {
-        FeignTokenHelper.runWithToken(() -> iMesItfService.syncLhPrecisionPlanActual(new AuxReqSyncDataLogs()));
+        log.info("定时任务syncLhPrecisionPlanActual已停用：现逻辑APS不再回填实际执行日期、不再生成下一次精度计划");
     }
 
     /**
@@ -241,26 +262,13 @@ public class MesTask {
 
     /**
      * 临时任务：按版本前缀APS_MES_AH01抓取MES硫化精度数据并生成硫化精度计划
-     * 执行步骤：
-     * 1. 同步MES设备保养计划到APS（仅硫化精度）
-     * 2. 同步MES硫化精度计划实际执行日期回填数据
-     * 3. 只处理版本号前缀为APS_MES_AH01且类型为硫化精度的数据，生成新的硫化精度计划
-     * 4. 新的硫化精度计划只有计划时间（planDate），实际时间（actualDate）为空，等待MES回填
-     * 5. 自动推算下一年度硫化精度计划
+     * 已停用：现逻辑APS不再回填实际执行日期、不再生成下一次精度计划。
+     * 现逻辑改由 syncDevMaintenancePlan 调 syncAndDispatchDevMaintenancePlan 完成同步+分发。
+     * 方法签名保留以便调度配置不动，如需恢复原逻辑可调用 iMesItfService.syncAndGenerateLhPrecisionPlanByVersionPrefix。
      */
-    @ApiOperation("临时任务-按版本前缀APS_MES_AH01抓取MES硫化精度数据并生成计划")
+    @ApiOperation("临时任务-按版本前缀APS_MES_AH01抓取MES硫化精度数据并生成计划（已停用）")
     public void syncAndGenerateLhPrecisionPlanByVersionPrefix() {
-        log.info("临时任务-开始按版本前缀APS_MES_AH01抓取MES硫化精度数据并生成计划");
-        try {
-            FeignTokenHelper.runWithToken(() -> {
-                Integer currentYear = LocalDate.now().getYear();
-                AjaxResult result = iMesItfService.syncAndGenerateLhPrecisionPlanByVersionPrefix("APS_MES_AH01", currentYear);
-                log.info("临时任务-按版本前缀APS_MES_AH01抓取MES硫化精度数据并生成计划结果：{}", result);
-            });
-        } catch (Exception e) {
-            log.error("临时任务-按版本前缀APS_MES_AH01抓取MES硫化精度数据并生成计划异常", e);
-        }
-        log.info("临时任务-按版本前缀APS_MES_AH01抓取MES硫化精度数据并生成计划完成");
+        log.info("临时任务syncAndGenerateLhPrecisionPlanByVersionPrefix已停用：现逻辑APS不再回填/生成精度计划");
     }
 
     /**
@@ -303,78 +311,70 @@ public class MesTask {
 
     /**
      * 定时任务：从MES同步版本前缀为APS_MES_AH01的硫化精度数据并生成硫化精度计划
-     * 与临时任务syncAndGenerateLhPrecisionPlanByVersionPrefix的区别：
-     * 不限制最大版本号，版本前缀为APS_MES_AH01的所有版本数据都参与生成
-     * 执行步骤：
-     * 1. 同步MES设备保养计划到APS（仅硫化精度）
-     * 2. 同步MES硫化精度计划实际执行日期回填数据
-     * 3. 按版本前缀APS_MES_AH01过滤，不限最大版本号，生成硫化精度计划
-     * 4. 自动推算下一年度硫化精度计划
+     * 现逻辑：MES全权决定计划时间和实际完成时间，APS只做同步+分发，不再回填/生成下一次精度计划。
+     * 原 syncAndGenerateLhPrecisionPlanByVersionPrefixAllVersions 方法已 @Deprecated 备份保留。
+     * 现改为调用 syncAndDispatchDevMaintenancePlan 完成同步+分发。
      */
-    @ApiOperation("定时任务-按版本前缀APS_MES_AH01同步MES硫化精度数据并生成计划（不限最大版本号）")
+    @ApiOperation("定时任务-按版本前缀APS_MES_AH01同步MES硫化精度数据并分发写入计划表")
     public void syncAndGenerateLhPrecisionPlanByAh01() {
-        log.info("定时任务-开始按版本前缀APS_MES_AH01同步MES硫化精度数据并生成计划（不限最大版本号）");
+        log.info("定时任务-开始按版本前缀APS_MES_AH01同步MES硫化精度数据并分发写入计划表");
         try {
             FeignTokenHelper.runWithToken(() -> {
-                Integer currentYear = LocalDate.now().getYear();
-                AjaxResult result = iMesItfService.syncAndGenerateLhPrecisionPlanByVersionPrefixAllVersions("APS_MES_AH01", currentYear);
+                AjaxResult result = iMesItfService.syncAndDispatchDevMaintenancePlan(new AuxReqSyncDataLogs());
                 log.info("定时任务执行结果：{}", result);
             });
         } catch (Exception e) {
-            log.error("定时任务-按版本前缀APS_MES_AH01同步MES硫化精度数据并生成计划异常", e);
+            log.error("定时任务-按版本前缀APS_MES_AH01同步MES硫化精度数据并分发写入计划表异常", e);
         }
-        log.info("定时任务-按版本前缀APS_MES_AH01同步MES硫化精度数据并生成计划完成");
+        log.info("定时任务-按版本前缀APS_MES_AH01同步MES硫化精度数据并分发写入计划表完成");
+    }
+
+    /**
+     * 临时任务：按指定版本号同步设备保养计划并分发写入精度计划表
+     * 与原syncDevMaintenancePlan的区别：不查最大版本号，直接按指定版本号查询MES中间表所有数据
+     * 同步后按版本号从APS本地表精确查询本次同步数据，按精度类型分发到lh/cx模块精度计划表
+     * 执行步骤：
+     * 1. 从MES中间表按指定版本号查询设备保养计划数据（不限精度类型、不限日期）
+     * 2. upsert到APS本地表T_MDM_DEV_MAINTENANCE_PLAN
+     * 3. 按版本号查询本次同步的数据，按PRECISION_TYPE分发：
+     *    - "硫化精度" → 调lh模块写入T_LH_PRECISION_PLAN
+     *    - "成型精度15天"/"成型精度60天" → 调cx模块写入T_CX_PRECISION_PLAN
+     */
+    @ApiOperation("临时任务-按指定版本号同步设备保养计划并分发写入精度计划表")
+    public void syncAndDispatchDevMaintenancePlanByVersion() {
+        String dataVersion = "APS_MES_AH01_20260812000000001"; // TODO: 替换为实际版本号
+        log.info("临时任务-开始按版本号{}同步设备保养计划并分发写入精度计划表", dataVersion);
+        try {
+            FeignTokenHelper.runWithToken(() -> {
+                AjaxResult result = iMesItfService.syncAndDispatchDevMaintenancePlanByVersion(dataVersion);
+                log.info("临时任务-按版本号{}同步分发结果：{}", dataVersion, result);
+            });
+        } catch (Exception e) {
+            log.error("临时任务-按版本号{}同步设备保养计划并分发写入精度计划表异常", dataVersion, e);
+        }
+        log.info("临时任务-按版本号{}同步设备保养计划并分发写入精度计划表完成", dataVersion);
     }
 
     /**
      * 临时任务：按计划时间年份过滤，从MES同步硫化精度数据并生成目标年度计划
-     * 取最新版本+版本前缀APS_MES_AH01+计划时间在25年的硫化精度数据，生成26年精度计划
-     * 用于MES全量版本数据中只取特定年份的数据，避免跨年数据干扰
-     * 执行步骤：
-     * 1. 同步MES设备保养计划到APS（仅硫化精度）
-     * 2. 按计划时间年份25年过滤，生成26年硫化精度计划
+     * 已停用：现逻辑APS不再回填实际执行日期、不再生成下一次精度计划。
+     * 现逻辑改由 syncDevMaintenancePlan 调 syncAndDispatchDevMaintenancePlan 完成同步+分发。
+     * 方法签名保留以便调度配置不动，如需恢复原逻辑可调用 lhPrecisionPlanRemoteService.generatePlansFromMesByOperYear。
      */
-    @ApiOperation("临时任务-按计划时间年份25年过滤生成26年硫化精度计划")
+    @ApiOperation("临时任务-按计划时间年份25年过滤生成26年硫化精度计划（已停用）")
     public void generateLhPrecisionPlanByOperYear2025() {
-        log.info("临时任务-开始按计划时间年份25年过滤生成26年硫化精度计划");
-        try {
-            FeignTokenHelper.runWithToken(() -> {
-                // 先同步MES设备保养计划到APS（仅同步，不触发生成精度计划）
-                AuxReqSyncDataLogs lhSyncParam = new AuxReqSyncDataLogs();
-                lhSyncParam.setPrecisionType("硫化精度");
-                AjaxResult syncResult = iMesItfService.syncDevMaintenancePlanOnly(lhSyncParam);
-                log.info("同步设备保养计划结果：{}", syncResult.get("msg"));
-
-                // 按计划时间年份25年过滤，生成26年硫化精度计划
-                AjaxResult result = lhPrecisionPlanRemoteService.generatePlansFromMesByOperYear("APS_MES_AH01", 2025, 2026);
-                log.info("临时任务执行结果：{}", result);
-            });
-        } catch (Exception e) {
-            log.error("临时任务-按计划时间年份25年过滤生成26年硫化精度计划异常", e);
-        }
-        log.info("临时任务-按计划时间年份25年过滤生成26年硫化精度计划完成");
+        log.info("临时任务generateLhPrecisionPlanByOperYear2025已停用：现逻辑APS不再回填/生成精度计划");
     }
 
     /**
      * 临时任务：同步MES 26年硫化精度数据，回填26年精度计划的实际执行日期，并生成27年精度计划
-     * 执行步骤：
-     * 1. 同步MES设备保养计划到APS（仅硫化精度），确保26年数据在本地表中
-     * 2. 从APS本地表查版本前缀APS_MES_AH01+计划时间在26年+有实际执行时间的硫化精度数据
-     * 3. 用查到的数据回填26年精度计划的实际执行日期
-     * 4. 基于实际执行日期推算生成27年精度计划
+     * 已停用：现逻辑APS不再回填实际执行日期、不再生成下一次精度计划。
+     * 现逻辑改由 syncDevMaintenancePlan 调 syncAndDispatchDevMaintenancePlan 完成同步+分发。
+     * 方法签名保留以便调度配置不动，如需恢复原逻辑可调用 iMesItfService.syncAndFillActualDateByOperYear。
      */
-    @ApiOperation("临时任务-同步26年数据回填26年精度计划实际日期并生成27年计划")
+    @ApiOperation("临时任务-同步26年数据回填26年精度计划实际日期并生成27年计划（已停用）")
     public void syncAndFillActualDateByOperYear2026() {
-        log.info("临时任务-开始同步26年数据回填26年精度计划实际日期并生成27年计划");
-        try {
-            FeignTokenHelper.runWithToken(() -> {
-                AjaxResult result = iMesItfService.syncAndFillActualDateByOperYear("APS_MES_AH01", 2026);
-                log.info("临时任务执行结果：{}", result);
-            });
-        } catch (Exception e) {
-            log.error("临时任务-同步26年数据回填26年精度计划实际日期并生成27年计划异常", e);
-        }
-        log.info("临时任务-同步26年数据回填26年精度计划实际日期并生成27年计划完成");
+        log.info("临时任务syncAndFillActualDateByOperYear2026已停用：现逻辑APS不再回填/生成精度计划");
     }
 
     /**

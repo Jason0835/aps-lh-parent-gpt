@@ -1,17 +1,25 @@
 package com.zlt.aps.cd90.engine.algorithm;
 
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ShiftConfig;
 import com.zlt.aps.cd90.engine.model.Cd90ShiftDescriptor;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
+import java.text.MessageFormat;
+import java.time.DateTimeException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -24,6 +32,8 @@ public class Cd90ShiftWindowResolver {
     private static final String SHIFT_NAME_MIDDLE = "中班";
     private static final String SHIFT_NAME_NIGHT = "夜班";
     private static final String SHIFT_NAME_DAY = "早班";
+    private static final DateTimeFormatter TIME_FORMATTER =
+            DateTimeFormatter.ofPattern("HH:mm:ss");
 
     /**
      * 解析启用班次并按排程日、当天顺序和结果字段稳定排序。
@@ -47,6 +57,98 @@ public class Cd90ShiftWindowResolver {
                         .thenComparing(config -> safe(config.getClassField())))
                 .map(config -> resolveOne(scheduleDate, config))
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * 根据任务启动时刻解析当前现场资源班次，快照日期沿用班次业务日期口径。
+     *
+     * @param executionTime 任务启动时刻
+     * @param configs 启用班次配置
+     * @return 当前资源班次
+     */
+    public Cd90ShiftDescriptor resolveCurrentResourceShift(
+            LocalDateTime executionTime, List<Cd90ShiftConfig> configs) {
+        if (executionTime == null) {
+            throw new IllegalArgumentException(
+                    I18nUtil.getMessage("ui.cd90.autoSchedule.resourceExecutionTimeEmpty"));
+        }
+        if (configs == null || configs.isEmpty()) {
+            throw new IllegalArgumentException(
+                    I18nUtil.getMessage("ui.cd90.autoSchedule.resourceShiftConfigEmpty"));
+        }
+        Map<String, Cd90ShiftConfig> configByShiftCode = configs.stream()
+                .filter(this::isEnabled)
+                .peek(this::validate)
+                .collect(Collectors.toMap(
+                        config -> config.getShiftCode().trim(),
+                        Function.identity(),
+                        this::mergeSameResourceShift,
+                        LinkedHashMap::new));
+        List<Cd90ShiftConfig> matchedConfigs = configByShiftCode.values().stream()
+                .filter(config -> this.contains(executionTime.toLocalTime(), config))
+                .collect(Collectors.toList());
+        if (matchedConfigs.size() != 1) {
+            throw new IllegalArgumentException(MessageFormat.format(
+                    I18nUtil.getMessage("ui.cd90.autoSchedule.resourceShiftMatchInvalid"),
+                    executionTime, matchedConfigs.size()));
+        }
+        Cd90ShiftConfig matchedConfig = matchedConfigs.get(0);
+        LocalTime startTime = this.parseResourceTime(
+                matchedConfig.getStartTime(), matchedConfig.getClassField(), "START_TIME");
+        LocalTime endTime = this.parseResourceTime(
+                matchedConfig.getEndTime(), matchedConfig.getClassField(), "END_TIME");
+        boolean crossDay = Integer.valueOf(1).equals(matchedConfig.getIsCrossDay());
+        LocalDate startDate = executionTime.toLocalDate();
+        if (crossDay && executionTime.toLocalTime().isBefore(endTime)) {
+            startDate = startDate.minusDays(1);
+        }
+        LocalDate endDate = crossDay ? startDate.plusDays(1) : startDate;
+        LocalDate businessDate = crossDay ? endDate : startDate;
+        LocalDateTime start = LocalDateTime.of(startDate, startTime);
+        LocalDateTime end = LocalDateTime.of(endDate, endTime);
+        return Cd90ShiftDescriptor.builder()
+                .shiftCode(matchedConfig.getShiftCode().trim())
+                .shiftDisplayName(matchedConfig.getShiftName())
+                .scheduleDate(businessDate)
+                .startTime(start)
+                .endTime(end)
+                .durationSeconds((int) ChronoUnit.SECONDS.between(start, end))
+                .build();
+    }
+
+    /** 同一班次编码的多日配置必须保持相同的资源班次定义。 */
+    private Cd90ShiftConfig mergeSameResourceShift(Cd90ShiftConfig left,
+                                                    Cd90ShiftConfig right) {
+        if (!this.trim(left.getStartTime()).equals(this.trim(right.getStartTime()))
+                || !this.trim(left.getEndTime()).equals(this.trim(right.getEndTime()))
+                || !Objects.equals(left.getIsCrossDay(), right.getIsCrossDay())) {
+            throw new IllegalArgumentException(MessageFormat.format(
+                    I18nUtil.getMessage("ui.cd90.autoSchedule.resourceShiftDefinitionConflict"),
+                    left.getShiftCode()));
+        }
+        return left;
+    }
+
+    /** 使用左闭右开区间判断任务启动时刻所属班次。 */
+    private boolean contains(LocalTime currentTime, Cd90ShiftConfig config) {
+        LocalTime startTime = this.parseResourceTime(
+                config.getStartTime(), config.getClassField(), "START_TIME");
+        LocalTime endTime = this.parseResourceTime(
+                config.getEndTime(), config.getClassField(), "END_TIME");
+        if (Integer.valueOf(1).equals(config.getIsCrossDay())) {
+            return !currentTime.isBefore(startTime) || currentTime.isBefore(endTime);
+        }
+        return !currentTime.isBefore(startTime) && currentTime.isBefore(endTime);
+    }
+
+    private LocalTime parseResourceTime(String value, String classField, String fieldName) {
+        try {
+            return LocalTime.parse(value.trim(), TIME_FORMATTER);
+        } catch (DateTimeException exception) {
+            throw new IllegalArgumentException(MessageFormat.format(
+                    I18nUtil.getMessage("ui.cd90.autoSchedule.resourceShiftTimeInvalid"),
+                    classField, fieldName), exception);
+        }
     }
 
     private Cd90ShiftDescriptor resolveOne(LocalDate scheduleDate, Cd90ShiftConfig config) {
@@ -126,5 +228,9 @@ public class Cd90ShiftWindowResolver {
 
     private String safe(String value) {
         return value == null ? "" : value;
+    }
+
+    private String trim(String value) {
+        return value == null ? "" : value.trim();
     }
 }

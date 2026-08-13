@@ -29,7 +29,7 @@ public class Cd90TimedRollingExecutionServiceImpl
         RLock lock = lockService.getLock(target.getFactoryCode(), target.getScheduleDate());
         try {
             if (!lock.tryLock()) {
-                taskService.markFailed(taskId, "同排程日已有任务持有执行锁");
+                taskService.markPendingFailed(taskId, "同排程日已有任务持有执行锁");
                 return;
             }
             if (!taskService.start(taskId)) {

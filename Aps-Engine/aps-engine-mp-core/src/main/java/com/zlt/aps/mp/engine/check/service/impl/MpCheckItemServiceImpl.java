@@ -9,7 +9,7 @@ import com.zlt.aps.enums.MonthPlanNoProductionReasonEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.api.domain.entity.MpCheckItemRecord;
 import com.zlt.aps.mp.api.domain.vo.MpCheckItemVo;
-import com.zlt.aps.mp.engine.basedata.assemble.appoint.GroupAppointHandler;
+import com.zlt.aps.mp.engine.basedata.assemble.appoint.GroupAppointDataHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.calendar.WorkerCalendarHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.cyclegroup.CycleGroupDataHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.datalist.GroupListHandler;
@@ -57,7 +57,7 @@ public class MpCheckItemServiceImpl extends AbstractDataLoaderService implements
 
     public MpCheckItemServiceImpl(GroupListHandler groupListHandler,
                                   ProductionMdmDataService dataService,
-                                  GroupAppointHandler groupAppointHandler,
+                                  GroupAppointDataHandler groupAppointHandler,
                                   DpRequireDataService dpRequireDataService,
                                   CycleGroupDataHandler cycleGroupDataHandler,
                                   WorkerCalendarHandler workerCalendarHandler,

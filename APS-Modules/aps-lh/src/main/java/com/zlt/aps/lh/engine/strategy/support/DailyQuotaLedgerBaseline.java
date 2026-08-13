@@ -7,6 +7,7 @@ import com.zlt.aps.lh.context.EmbryoStockConsumeLedger;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import org.springframework.util.CollectionUtils;
 
+import java.time.LocalDate;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -58,11 +59,12 @@ public final class DailyQuotaLedgerBaseline {
     public static DailyQuotaLedgerBaseline capture(LhScheduleContext context, SkuScheduleDTO sku) {
         Map<SkuDailyPlanQuotaDTO, SkuDailyPlanQuotaDTO> quotaStateMap =
                 new IdentityHashMap<SkuDailyPlanQuotaDTO, SkuDailyPlanQuotaDTO>();
-        if (Objects.nonNull(sku) && !CollectionUtils.isEmpty(sku.getDailyPlanQuotaMap())) {
-            for (SkuDailyPlanQuotaDTO quota : sku.getDailyPlanQuotaMap().values()) {
-                if (Objects.nonNull(quota) && !quotaStateMap.containsKey(quota)) {
-                    quotaStateMap.put(quota, copyQuota(quota));
-                }
+        if (Objects.nonNull(sku)) {
+            // 普通场景保存原始 dayN；提前生产场景还必须保存上下文返回的临时前移 dayN。
+            captureQuotaMap(quotaStateMap, sku.getDailyPlanQuotaMap());
+            if (Objects.nonNull(context)) {
+                captureQuotaMap(
+                        quotaStateMap, context.resolveEffectiveDailyPlanQuotaMap(sku));
             }
         }
         if (Objects.isNull(context)) {
@@ -79,6 +81,25 @@ public final class DailyQuotaLedgerBaseline {
                 new LinkedHashMap<String, Integer>(context.getSkuShiftFillOverQtyMap()),
                 copyEmbryoLedgerMap(context.getEmbryoStockConsumeLedgerMap()),
                 Objects.isNull(sku) ? 0 : sku.getShiftFillOverQty());
+    }
+
+    /**
+     * 按对象身份捕获日计划账本，避免原始账本与临时账本引用相同时重复复制。
+     *
+     * @param quotaStateMap 账本对象快照集合
+     * @param quotaMap 待捕获账本
+     */
+    private static void captureQuotaMap(
+            Map<SkuDailyPlanQuotaDTO, SkuDailyPlanQuotaDTO> quotaStateMap,
+            Map<LocalDate, SkuDailyPlanQuotaDTO> quotaMap) {
+        if (CollectionUtils.isEmpty(quotaMap)) {
+            return;
+        }
+        for (SkuDailyPlanQuotaDTO quota : quotaMap.values()) {
+            if (Objects.nonNull(quota) && !quotaStateMap.containsKey(quota)) {
+                quotaStateMap.put(quota, copyQuota(quota));
+            }
+        }
     }
 
     /**

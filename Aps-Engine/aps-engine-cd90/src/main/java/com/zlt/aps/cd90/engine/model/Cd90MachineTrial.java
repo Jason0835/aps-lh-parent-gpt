@@ -21,8 +21,8 @@ public class Cd90MachineTrial {
     private String lossRateLevel;
     /** 实际排产量。 */
     private BigDecimal actualQuantity;
-    /** 单车按胎体长度方向卷取后，对应的直裁排程米数。 */
-    private BigDecimal vehiclePlanQuantity;
+    /** 一车工装卷对应的标准卷曲长度，单位米。 */
+    private BigDecimal standardCurlLength;
     /** 工装可排量。 */
     private BigDecimal toolingQuantity;
     /** 机台产能可排量。 */
@@ -51,6 +51,6 @@ public class Cd90MachineTrial {
     private int agingDelaySeconds;
     /** 本次任务的大卷成熟流水试算结果。 */
     private Cd90BigRollAgingAllocation agingAllocation;
-    /** 试算受限原因：TOOLING_LIMIT表示工装不足，CAPACITY_LIMIT表示机台产能不足；未受限时为空。 */
+    /** 试算受限原因：TOOLING_LIMIT表示工装不足，CAPACITY_LIMIT表示机台产能不足，AGING_PERIOD_LIMIT表示成熟流水受限。 */
     private String limitReason;
 }

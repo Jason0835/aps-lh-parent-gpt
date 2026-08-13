@@ -134,16 +134,6 @@ public class LhScheduleConfig {
                 LhScheduleConstant.ENABLE_ENDING_BY_SURPLUS_IN_FULL_MODE) == 1;
     }
 
-    /**
-     * 判断是否启用强制重排。
-     *
-     * @return true-窗口内全部重排；false-滚动衔接排程
-     */
-    public boolean isForceRescheduleEnabled() {
-        return getParamIntValue(LhScheduleParamConstant.FORCE_RESCHEDULE,
-                LhScheduleConstant.FORCE_RESCHEDULE) == LhScheduleConstant.FORCE_RESCHEDULE_ENABLED;
-    }
-
     public ScheduleTargetModeEnum getScheduleTargetMode() {
         return isFullCapacitySchedulingEnabled()
                 ? ScheduleTargetModeEnum.CAPACITY_FULL
@@ -707,16 +697,6 @@ public class LhScheduleConfig {
     public boolean isDailyStandardCapacityStructureMatched(String structureName) {
         return StringUtils.isNotEmpty(structureName)
                 && dailyStandardCapacityStructureSet.contains(structureName);
-    }
-
-    /**
-     * 判断新增选机是否启用当天空闲机台优先。
-     *
-     * @return true-启用；false-关闭
-     */
-    public boolean isTodayIdleMachinePriorityEnabled() {
-        return getParamIntValue(LhScheduleParamConstant.ENABLE_TODAY_IDLE_MACHINE_PRIORITY,
-                LhScheduleConstant.ENABLE_TODAY_IDLE_MACHINE_PRIORITY) == 1;
     }
 
     /**

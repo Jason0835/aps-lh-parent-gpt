@@ -27,6 +27,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.redis.service.RedisService;
 import com.zlt.aps.baseVo.excelVo.CellStyle;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.common.core.constant.BusiConstant;
 import com.zlt.aps.common.core.enums.DataSourceEnum;
 import com.zlt.aps.common.core.utils.AjaxResultUtils;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
@@ -40,14 +41,16 @@ import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.*;
-import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.maindata.service.IMdmSkuScheduleCategoryService;
 import com.zlt.aps.maindata.service.IRawSpecialMaterialRecordService;
 import com.zlt.aps.maindata.utils.FactoryParamUtils;
 import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.mp.adjust.mapper.MpAdjustResultEntityMapper;
+import com.zlt.aps.mp.adjust.service.IMpWeekAdjustService;
+import com.zlt.aps.mp.adjust.service.impl.MpAdjustStructureInStrategy;
 import com.zlt.aps.mp.adjust.service.impl.MpMonthPlanStaticService;
 import com.zlt.aps.mp.api.domain.capacity.MpDailyCapacityLimitVo;
+import com.zlt.aps.mp.api.domain.dto.MpRollAdjustContextDTO;
 import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.mp.api.domain.vo.*;
 import com.zlt.aps.mp.api.enums.AlternativeTypeEnum;
@@ -71,7 +74,6 @@ import com.zlt.aps.mp.factory.dto.MpStructureAllocationExportStatisticsVo;
 import com.zlt.aps.mp.factory.dto.MpStructureAllocationExportVo;
 import com.zlt.aps.mp.factory.dto.MpStructureAllocationImportHelper;
 import com.zlt.aps.mp.factory.mapper.*;
-import com.zlt.aps.mp.factory.service.IFactoryMonthPlanMouldDayResultService;
 import com.zlt.aps.mp.factory.service.IMpMonthPlanStatisticsService;
 import com.zlt.aps.mp.factory.service.IMpStructureAllocationService;
 import com.zlt.aps.mp.factory.service.ISpecialMaterialResultService;
@@ -172,13 +174,15 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
     private final FactoryMonthPlanProductMouldMapper factoryMonthPlanProductMouldMapper;
     private final DataManager dataManager;
     private final IRawSpecialMaterialRecordService rawSpecialMaterialRecordService;
-    private final IFactoryMonthPlanMouldDayResultService iFactoryMonthPlanMouldDayResultService;
     private final IMdmSkuScheduleCategoryService mdmSkuScheduleCategoryService;
     private final ISpecialMaterialResultService iSpecialMaterialResultService;
     private final Map<Long, Map<String, String>> importMachineMapCache = new ConcurrentHashMap<>();
     @Autowired
     @Lazy
     private MpMonthPlanStaticService mpMonthPlanStaticService;
+    @Autowired
+    @Lazy
+    private MpAdjustStructureInStrategy mpAdjustStructureInStrategy;
 
     @Autowired
     private RedisService redisService;
@@ -2491,6 +2495,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         if (AjaxResultUtils.checkAjaxError(helper.getAjaxResult())) {
             return helper.getAjaxResult();
         }
+        Map<String, String> structureMachineMap = new HashMap<>();
         String[] params = helper.getParams();
         String[] params4DayResult = helper.getParams4DayResult();
         String monthPlanVersion = helper.getMonthPlanVersion();
@@ -2509,13 +2514,13 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         }
 
         // 结构转产导入
-        AjaxResult ajaxResult = this.importDataStructureAllocation(list, list4DayResult, false, importLog.getId(), params, monthPlanVersion, productVersion, factoryMap, productTypeMap);
+        AjaxResult ajaxResult = this.importDataStructureAllocation(list, list4DayResult, false, importLog.getId(), params, monthPlanVersion, productVersion, factoryMap, productTypeMap, structureMachineMap);
         boolean isStrcutreImport = AjaxResultUtils.checkAjaxSuccess(ajaxResult);
         AjaxResult ajaxResult4DayResult = null;
         // 月计划排产导入
         boolean isDayDataImport = isStrcutreImport;
         if (isStrcutreImport) {
-            ajaxResult4DayResult = this.importDataDayResult(list, list4DayResult, false, importLog.getId(), params4DayResult, monthPlanVersion, productVersion, factoryMap, productTypeMap, false);
+            ajaxResult4DayResult = this.importDataDayResult(list, list4DayResult, false, importLog.getId(), params4DayResult, monthPlanVersion, productVersion, factoryMap, productTypeMap, structureMachineMap, false);
             isDayDataImport = AjaxResultUtils.checkAjaxSuccess(ajaxResult);
         }
         // 月计划或者结构转产任意一个导入成功都要生成版本
@@ -2800,7 +2805,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
     public AjaxResult importDataStructureAllocation(List<MpStructureAllocationExportVo> list,
                                                     List<FactoryMonthPlanMouldDayResult> list4DayResult, boolean updateSupport, Long importLogId,
                                                     String[] params, String monthPlanVersion, String productVersion, Map<String, String> factoryMap,
-                                                    Map<String, String> productTypeMap) {
+                                                    Map<String, String> productTypeMap, Map<String, String> structureMachineMap) {
         // 1.初始化
         int successNum = 0;
         int failureNum = 0;
@@ -2829,7 +2834,6 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             // 上个月的定稿数据作为初始在产结构数据
             machineLastValidRecordMap = this.getLastMachineStructureMap(importFactoryCode, importYear, importMonth);
         }
-        Map<String, String> machineMap = new HashMap<>();
 
         //3.公共校验（非空校验、长度校验等）
         for (int i = 0; i < list.size(); i++) {
@@ -2889,7 +2893,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             this.genAlternatingType(item, machineLastValidRecordMap);
             insertList.add(item);
 
-            machineMap.put(item.getStructureName(), item.getCxMachineCode());
+            structureMachineMap.put(item.getStructureName(), item.getCxMachineCode());
         }
 
         // 过滤id不等于空的数据
@@ -2942,7 +2946,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         }
 
         //返回提示信息及错误集合
-        cacheImportMachineMap(importLogId, machineMap);
+//        cacheImportMachineMap(importLogId, machineMap);
         if (successNum == 0) {
             return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum, importErrorLogs);
         } else if (failureNum > 0) {
@@ -3280,8 +3284,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
      */
     @Override
     public AjaxResult importDataDayResult(List<MpStructureAllocationExportVo> list, List<FactoryMonthPlanMouldDayResult> list4DayResult, boolean updateSupport, Long importLogId, String[] params, String monthPlanVersion, String productVersion,
-                                          Map<String, String> factoryMap, Map<String, String> productTypeMap, boolean isAdjust) {
-        Map<String, String> machineMap = getImportMachineMap(importLogId);
+                                          Map<String, String> factoryMap, Map<String, String> productTypeMap, Map<String, String> structureMachineMap, boolean isAdjust) {
         try {
             //1.初始化
             int successNum = 0;
@@ -3334,7 +3337,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                     item.setProductTypeCode(productTypeMap.get(params[3]));
                 }
                 if (StringUtils.isBlank(item.getCxMachineCode()) && StringUtils.isNotBlank(item.getStructureName())) {
-                    String machineCode = machineMap.get(item.getStructureName());
+                    String machineCode = structureMachineMap.get(item.getStructureName());
                     if (StringUtils.isNotBlank(machineCode)) {
                         item.setCxMachineCode(machineCode);
                     }
@@ -3591,8 +3594,9 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         String notDayVulcanizationQtyStr = I18nUtil.getMessage("ui.data.alert.MpStructureAllocation.dayVulcanizationQty"); // 没有维护日硫化量
         String notMaterialStr = I18nUtil.getMessage("ui.data.alert.MpStructureAllocation.notMaterial"); // 物料不存在
         String notSkuMoldRelStr = I18nUtil.getMessage("ui.data.alert.MpStructureAllocation.notSkuMoldRel"); // SKU与模具关系不存在
+        String notConstructStr = I18nUtil.getMessage("ui.data.alert.MpStructureAllocation.notConstructStr"); // 示方书不存在
 
-        // 1、加载必要的数据
+        // 1、加载必要的数据=======【start】=======
         // 1.1、加载需求计划
         QueryWrapper<DpDemandPlan> dpDemandPlanQueryWrapper = new QueryWrapper<>();
         dpDemandPlanQueryWrapper.select("STRUCTURE_NAME", "MATERIAL_CODE", "MES_MATERIAL_CODE", "PLAN_TYPE", "PRODUCT_TYPE_CODE",
@@ -3664,33 +3668,12 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         Map<String, MdmMaterialInfo> materialInfoMap = mdmMaterialInfoEntityMapper
                 .selectList(mdmMaterialInfoQueryWrapper).stream()
                 .collect(Collectors.toMap(MdmMaterialInfo::getMaterialCode, Function.identity(), (m1, m2) -> m1));
-        // 1.9、加载日历
-        MpStructureAllocation mpStructureAllocation = new MpStructureAllocation();
-        mpStructureAllocation.setFactoryCode(factoryCode);
-        mpStructureAllocation.setYear(year);
-        mpStructureAllocation.setMonth(month);
-        List<MdmWorkCalendar> calendarList = this.queryMdmWorkCalendar(mpStructureAllocation);
-        Map<Integer, MpDailyCapacityLimitVo> dailyCapacityMap = new HashMap<>();
-        Set<Integer> stopDaySet = new HashSet<>();
-        for (MdmWorkCalendar workCalendar : calendarList) {
-            MpDailyCapacityLimitVo limitVo = new MpDailyCapacityLimitVo();
-            Integer day = workCalendar.getDay();
-            Integer lastDay = day - 1;
-            boolean isOpenProductionFirstDay = false;
-            if (Objects.equals(workCalendar.getDayFlag(), YesOrNoEnum.YES.getCode())) { // 在产
-                if (stopDaySet.contains(lastDay)) { // 检查上一天是否停产
-                    isOpenProductionFirstDay = true;
-                }
-            } else { // 停产
-                stopDaySet.add(day);
-            }
-            limitVo.setDayProductionRate(workCalendar.getRate());
-            limitVo.setOpenProductionFirstDay(isOpenProductionFirstDay);
-            dailyCapacityMap.put(day, limitVo);
-        }
+        // 1.9、加载硫化日产
+        Map<Integer, MpDailyCapacityLimitVo> dailyCapacityMap = this.loadDailyCapacityMap(factoryCode, year, month);
         // 1.10、加载SKU与模具关系
         List<MoldCavityInsertMaxValueCalculatorVo> moldList = factoryMonthPlanProductMouldMapper
                 .getEnableProductionMouldInfoByNetDemand(factoryCode, year, yearMonth, monthPlanVersion, true);
+        Map<String, String> mdmMouldInfoMap = convertToMouldInfoMap(moldList);
         // 1.10.1、加载模具到货计划
         LocalDate monthStart = LocalDate.of(year, month, ProductionConstant.MONTH_START_DAY);
         Date productionStartDate = DateUtils.getDate(LocalDate.of(year, month, ProductionConstant.MONTH_START_DAY));
@@ -3698,35 +3681,39 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         List<MoldCavityInsertMaxValueCalculatorVo> mouldDeliveryList = factoryMonthPlanProductMouldMapper
                 .getEnableMouldDeliveryInfoByNetDemand(factoryCode, year, month, monthPlanVersion, productionStartDate,
                         productionEndDate);
+        // 1.10.2、合并SKU与模具关系以及模具到货计划
         Set<String> materialHasMoldSet = moldList.stream().map(MoldCavityInsertMaxValueCalculatorVo::getMaterialDesc).distinct().collect(Collectors.toSet()); // 有模具的sku列表
         materialHasMoldSet.addAll(mouldDeliveryList.stream().map(MoldCavityInsertMaxValueCalculatorVo::getMaterialDesc).distinct().collect(Collectors.toSet())); // 模具到货计划合并到sku列表中
-        
         // 1.11、初始化SKU排产分类，Map<物料编码, 分类>
         Map<String, String> productionTypeMap = mdmSkuScheduleCategoryService.skuToProductionType(factoryCode);
         if (PubUtil.isEmpty(productionTypeMap)) {
             productionTypeMap = new HashMap<>();
         }
+        
+        // 1、加载必要的数据=======【end】=======
 
         // 2、遍历导入数据，填充各必要栏位数值
         List<FactoryMonthPlanMouldDayResult> finalImportList = new ArrayList<>();
+        List<FactoryMonthPlanFinalAdjustVo> finalAdjustList = new ArrayList<>();
         for (FactoryMonthPlanMouldDayResult insertItem : insertList) {
             String structureName = insertItem.getStructureName();
             String materialDesc = insertItem.getMaterialDesc();
             String materialCode = insertItem.getMaterialCode();
+            Integer rowNum = insertItem.getImportRowNum();
             DpDemandPlan demandPlan = dpDemandPlanMap.get(materialCode);
             // 2.1、物料校验
             MdmMaterialInfo materialInfo = materialInfoMap.get(materialCode);
             if (materialInfo == null) {
                 insertItem.setId(errorImportId);
                 String errorMsg = String.format(notMaterialStr, materialDesc + materialCode);
-                addImportErrorLog(importLogId, insertItem.getImportRowNum(), errorMsg, importErrorLogs);
+                addImportErrorLog(importLogId, rowNum, errorMsg, importErrorLogs);
                 continue;
             }
             // 2.2、模具校验
             if (!materialHasMoldSet.contains(materialDesc)) {
                 insertItem.setId(errorImportId);
                 String errorMsg = String.format(notSkuMoldRelStr, materialDesc + materialCode);
-                addImportErrorLog(importLogId, insertItem.getImportRowNum(), errorMsg, importErrorLogs);
+                addImportErrorLog(importLogId, rowNum, errorMsg, importErrorLogs);
                 continue;
             }
             // 2.3、从需求计划或者物料表中关联必要信息
@@ -3811,6 +3798,10 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                 insertItem.setProductStatus(constructionInfo.getTrialStatus());
                 insertItem.setMainMaterialDesc(constructionInfo.getMainMaterialDesc());
             }
+            if (StringUtils.isEmpty(insertItem.getLhNo())) {
+                String errorMsg = String.format(notConstructStr, materialDesc + materialCode);
+                throw new BusinessException(errorMsg);
+            }
             if (insertItem.getConstructionStage() == null) {
                 insertItem.setConstructionStage(ConstructionStageEnum.NO_CONSTRUCTION.getStage());
             }
@@ -3830,8 +3821,9 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             if (insertItem.getDayVulcanizationQty() == null) {
                 insertItem.setId(errorImportId);
                 String errorMsg = String.format(notDayVulcanizationQtyStr, materialDesc + materialCode);
-                addImportErrorLog(importLogId, insertItem.getImportRowNum(), errorMsg, importErrorLogs);
-                continue;
+                throw new BusinessException(errorMsg); // 强控，任意一个有错都不允许导入
+//                addImportErrorLog(importLogId, rowNum, errorMsg, importErrorLogs);
+//                continue;
             }
 
             // 2.6、英寸---根据结构名称解析
@@ -3850,32 +3842,214 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             // 2.8、各排产量倒推，高优先级排产数量 = min(高优先级，剩余排产量) ->中优先级排产数量 = min(中优先级，剩余排产量) ->周期排产储备排产 = min(周期储备量，剩余排产量) -> 常规储备排产 = 剩余排产量；
             insertItem.allocateProductionByPriority();
 
-            // 2.9、模具变化信息
-            FactoryMonthPlanFinalAdjustVo mpFinalVo = new FactoryMonthPlanFinalAdjustVo();
-            mpFinalVo.setMaterialCode(materialCode);
-            mpFinalVo.setMaterialDesc(materialDesc);
-            mpFinalVo.setDayVulcanizationQty(insertItem.getDayVulcanizationQty());
-            int startDay = 0;
-            for (int day = FactoryConstant.MONTH_START_DAY; day <= FactoryConstant.MONTH_MAX_DAY; day++) {
-                String dayField = FactoryConstant.DAY_FIELD + day;
-                int planQty = intValue(insertItem.getFieldValueByFieldName(dayField));
-                mpFinalVo.setFieldValueByFieldName(dayField, planQty);
-                if (planQty > 0 && startDay == 0) {
-                    startDay = day;
-                }
+            // 填充模壳标准，用于 统计表可以存储
+            String key = getSpecAndMainPatternKey(insertItem.getSpecifications(),insertItem.getMainPattern());
+            if (StringUtils.isNotBlank(mdmMouldInfoMap.get(key))){
+                insertItem.setMouldShell(mdmMouldInfoMap.get(key));
             }
-            weekRollAdjustEngine.setMouldChangeInfo(adjustDailyCapacityLimitObj, paramMap, startDay, mpFinalVo,
-                    dailyCapacityMap);
+
+            // 2.9、构建调整对象
+            FactoryMonthPlanFinalAdjustVo mpFinalVo = this.castToAdjustVo(insertItem);
+            // 2.9.2、生成模具变化信息
+            weekRollAdjustEngine.setMouldChangeInfo(adjustDailyCapacityLimitObj, paramMap, mpFinalVo.getBeginDay(), mpFinalVo, dailyCapacityMap);
             insertItem.setMouldChangeInfo(mpFinalVo.getMouldChangeInfo());
+            
             insertItem.setYearMonth(yearMonth);
             insertItem.setProductionType(productionTypeMap.get(materialCode));
             finalImportList.add(insertItem);
+            finalAdjustList.add(mpFinalVo);
         }
+        MpRollAdjustContextDTO contextDTO = this.initAdjustContext(firstResult);
+        contextDTO.setFactoryMonthPlanProdFinalList(finalAdjustList);
         // 3、生成统计信息（handleMonthPlanStatistics）
-        mpMonthPlanStaticService.handleMonthPlanStatistics(finalImportList, isAdjust);
-        // 4、生成特殊材料排产记录
+        mpMonthPlanStaticService.handleMonthPlanStatistics(contextDTO, finalImportList, isAdjust);
+        // 4、校验导入数据中的各项限制
+        this.checkAdjustLimit(contextDTO, finalImportList, dailyCapacityMap, weekRollAdjustEngine,
+                adjustDailyCapacityLimitObj, importLogId, importErrorLogs);
+        // 5、生成特殊材料排产记录
         iSpecialMaterialResultService.buildSecialMaterialResult(finalImportList);
         return finalImportList;
+    }
+
+    /**
+     * 校验导入数据中的各项限制
+     * 
+     * @param contextDTO
+     * @param finalImportList
+     * @param dailyCapacityMap
+     * @param weekRollAdjustEngine
+     * @param adjustDailyCapacityLimitObj
+     * @param importLogId
+     * @param importErrorLogs
+     */
+    private void checkAdjustLimit(MpRollAdjustContextDTO contextDTO, List<FactoryMonthPlanMouldDayResult> finalImportList,
+            Map<Integer, MpDailyCapacityLimitVo> dailyCapacityMap,
+            MpWeekRollAdjustEngine weekRollAdjustEngine, MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj,
+            Long importLogId, List<ImportErrorLog> importErrorLogs) {
+        if (CollectionUtils.isEmpty(finalImportList)) {
+            return;
+        }
+        // 初始化校验相关逻辑的上下文
+        List<FactoryMonthPlanFinalAdjustVo> finalAdjustList = contextDTO.getFactoryMonthPlanProdFinalList();
+        // 初始化计划的模壳
+        for (FactoryMonthPlanFinalAdjustVo adjustVo: finalAdjustList){
+            String key = getSpecAndMainPatternKey(adjustVo.getSpecifications(),adjustVo.getMainPattern());
+            String mouldShell = contextDTO.getMdmMouldInfoMap().get(key);
+            if (StringUtils.isNotBlank(mouldShell)){
+                adjustVo.setMouldShell(mouldShell);
+            }
+        }
+        mpAdjustStructureInStrategy.handleMonthPlanStatistics(contextDTO, null);
+        // 1、校验模壳数
+        mpAdjustStructureInStrategy.checkMouldShellLimit(contextDTO);
+        // 2、校验卡盘数
+        mpAdjustStructureInStrategy.checkCapsuleChuckLimit(contextDTO);
+        // 3、校验活块数
+        String blockNumLimitStr = I18nUtil.getMessage("alg.data.mp.weekRollAdjust.confirm.blockNumLimit"); // 超活块数校验
+        int insertIndex = 0;
+        for (int i = 0, size = finalAdjustList.size(); i < size; i ++) {
+            FactoryMonthPlanFinalAdjustVo mpFinalVo = finalAdjustList.get(i);
+            FactoryMonthPlanMouldDayResult insertItem = finalImportList.get(insertIndex);
+            Integer rowNum = insertItem.getImportRowNum();
+
+            String structureName = mpFinalVo.getStructureName();
+            String materialCode = mpFinalVo.getMaterialCode();
+            Map<String, Object> adjustParam = contextDTO.getParamMap();
+            for (int day = mpFinalVo.getBeginDay(); day <= mpFinalVo.getEndDay(); day++) {
+                if (intValue(mpFinalVo.getFieldValueByFieldName(FactoryConstant.DAY_FIELD + day)) <= 0) {
+                    continue;
+                }
+                MpDailyCapacityLimitVo dailyCapacity = dailyCapacityMap.get(day);
+                int blockQty = mpFinalVo.getTypeBlockQty();
+                int moulds = weekRollAdjustEngine.getMouldByDay(adjustDailyCapacityLimitObj, adjustParam, day, mpFinalVo,
+                        dailyCapacity);
+                if (moulds > blockQty) {
+                    String errorMsg = String.format(blockNumLimitStr, structureName, materialCode, day, moulds, blockQty);
+                    throw new BusinessException(errorMsg); // 强控，任意一个有错都不允许导入
+//                    insertItem.setId(errorImportId);
+//                    addImportErrorLog(importLogId, rowNum, errorMsg, importErrorLogs);
+//                    finalAdjustList.remove(insertIndex);
+//                    continue;
+                }
+            }
+            insertIndex++;
+        }
+    }
+
+    /**
+     * 初始化调整上下文
+     * @param importResult
+     * @return
+     */
+    private MpRollAdjustContextDTO initAdjustContext(FactoryMonthPlanMouldDayResult importResult) {
+        String factoryCode = importResult.getFactoryCode();
+        String productTypeCode = importResult.getProductTypeCode();
+        String productionVersion = importResult.getProductionVersion();
+        Integer year = importResult.getYear();
+        Integer month = importResult.getMonth();
+        MpRollAdjustContextDTO contextDTO = mpAdjustStructureInStrategy.initContextDTO(factoryCode, productTypeCode);
+        contextDTO.setMpYear(year);
+        contextDTO.setMpMonth(month);
+        contextDTO.setProductionVersion(productionVersion);
+        return contextDTO;
+    }
+
+    /**
+     * 构建调整对象
+     * @param insertItem
+     * @return
+     */
+    private FactoryMonthPlanFinalAdjustVo castToAdjustVo(FactoryMonthPlanMouldDayResult insertItem) {
+        FactoryMonthPlanFinalAdjustVo mpFinalVo = new FactoryMonthPlanFinalAdjustVo();
+        mpFinalVo.setMaterialCode(insertItem.getMaterialDesc());
+        mpFinalVo.setMaterialDesc(insertItem.getMaterialCode());
+        mpFinalVo.setSpecifications(insertItem.getSpecifications());
+        mpFinalVo.setMainPattern(insertItem.getMainPattern());
+        mpFinalVo.setDayVulcanizationQty(insertItem.getDayVulcanizationQty());
+        mpFinalVo.setTypeBlockQty(insertItem.getTypeBlockQty());
+        mpFinalVo.setStructureName(insertItem.getStructureName());
+        for (int day = FactoryConstant.MONTH_START_DAY; day <= FactoryConstant.MONTH_MAX_DAY; day++) {
+            String dayField = FactoryConstant.DAY_FIELD + day;
+            int planQty = intValue(insertItem.getFieldValueByFieldName(dayField));
+            mpFinalVo.setFieldValueByFieldName(dayField, planQty);
+            if (planQty > 0) {
+                if (intValue(mpFinalVo.getBeginDay()) == 0) {
+                    mpFinalVo.setBeginDay(day);
+                }
+                mpFinalVo.setEndDay(day);
+            }
+        }
+        return mpFinalVo;
+    }
+    
+    /**
+     * 加载硫化日产
+     * @param factoryCode
+     * @param year
+     * @param month
+     * @return
+     */
+    private Map<Integer, MpDailyCapacityLimitVo> loadDailyCapacityMap(String factoryCode, Integer year, Integer month) {
+        // 加载排产日历
+        MpStructureAllocation mpStructureAllocation = new MpStructureAllocation();
+        mpStructureAllocation.setFactoryCode(factoryCode);
+        mpStructureAllocation.setYear(year);
+        mpStructureAllocation.setMonth(month);
+        List<MdmWorkCalendar> calendarList = this.queryMdmWorkCalendar(mpStructureAllocation);
+        Map<Integer, MpDailyCapacityLimitVo> dailyCapacityMap = new HashMap<>();
+        Set<Integer> stopDaySet = new HashSet<>();
+        for (MdmWorkCalendar workCalendar : calendarList) {
+            MpDailyCapacityLimitVo limitVo = new MpDailyCapacityLimitVo();
+            Integer day = workCalendar.getDay();
+            Integer lastDay = day - 1;
+            boolean isOpenProductionFirstDay = false;
+            if (Objects.equals(workCalendar.getDayFlag(), YesOrNoEnum.YES.getCode())) { // 在产
+                if (stopDaySet.contains(lastDay)) { // 检查上一天是否停产
+                    isOpenProductionFirstDay = true;
+                }
+            } else { // 停产
+                stopDaySet.add(day);
+            }
+            limitVo.setDayProductionRate(workCalendar.getRate());
+            limitVo.setOpenProductionFirstDay(isOpenProductionFirstDay);
+            dailyCapacityMap.put(day, limitVo);
+        }
+        return dailyCapacityMap;
+    }
+
+    /**
+     * MdmModelInfo转Map
+     */
+    private Map<String, String> convertToMouldInfoMap(List<MoldCavityInsertMaxValueCalculatorVo> mouldInfoList) {
+        if (PubUtil.isEmpty(mouldInfoList)) {
+            return Collections.emptyMap();
+        }
+
+        return mouldInfoList.stream()
+                .filter(info -> info != null
+                        && info.getSpecifications() != null
+                        && info.getMainPattern() != null
+                        && info.getShellStandard() != null)
+                .collect(Collectors.groupingBy(
+                        info -> getSpecAndMainPatternKey(info.getSpecifications(),info.getMainPattern()),
+                        Collectors.mapping(
+                                MoldCavityInsertMaxValueCalculatorVo::getShellStandard,
+                                Collectors.collectingAndThen(
+                                        Collectors.toSet(),
+                                        set -> String.join(BusiConstant.WeekRollAdjust.SPLIT_COMMA, set)
+                                )
+                        )
+                ));
+    }
+
+    /**
+     * 获取规格+主花纹Key
+     * @param spec
+     * @param mainPattern
+     * @return
+     */
+    private String getSpecAndMainPatternKey(String spec, String mainPattern){
+        return spec + BusiConstant.WeekRollAdjust.SPLIT_GROUP_KEY + mainPattern;
     }
 
     /**

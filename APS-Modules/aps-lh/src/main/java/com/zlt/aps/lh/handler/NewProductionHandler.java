@@ -4,7 +4,7 @@ import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.enums.ScheduleStepEnum;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
-import com.zlt.aps.lh.component.StructureMinMachineRetentionService;
+import com.zlt.aps.lh.component.StructureEndingAlignmentService;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.factory.ScheduleStrategyFactory;
 import com.zlt.aps.lh.engine.strategy.ICapacityCalculateStrategy;
@@ -46,8 +46,7 @@ public class NewProductionHandler extends AbsScheduleStepHandler {
     @Resource
     private IHistoricalMouldChangeReverseSelectionStrategy historicalReverseSelectionStrategy;
     @Resource
-    private StructureMinMachineRetentionService structureMinMachineRetentionService =
-            new StructureMinMachineRetentionService();
+    private StructureEndingAlignmentService structureEndingAlignmentService;
 
     @Override
     protected void doHandle(LhScheduleContext context) {
@@ -69,7 +68,12 @@ public class NewProductionHandler extends AbsScheduleStepHandler {
             IProductionStrategy strategy = strategyFactory.getProductionStrategy(
                     ScheduleTypeEnum.NEW_SPEC.getCode());
 
-            // S4.5.2 SKU优先级排序
+            /*
+             * S4.5.2 SKU优先级排序：S4.4已消费的SKU会同步移出structureSkuMap，本次排序继续
+             * 对当前仍参与新增排产的结构按最大END_DAY计算一次距离，并统一标记同结构全部候选。
+             * 排序标记只读取独立的structurePriorityMaxEndingDateMap，不读取也不修改后续结构收尾
+             * 对齐使用的固定三天快照，确保本次变更只影响SKU排序标记。
+             */
             ISkuPriorityStrategy priorityStrategy = strategyFactory.getSkuPriorityStrategy();
             priorityStrategy.sortByPriority(context);
             log.debug("新增规格SKU优先级排序完成, 待排新增SKU: {}", context.getNewSpecSkuList().size());
@@ -84,6 +88,15 @@ public class NewProductionHandler extends AbsScheduleStepHandler {
             log.info("前日交替计划机台反选完成, 排程结果数: {}, 待新增SKU: {}, 指令数: {}",
                     context.getScheduleResultList().size(), context.getNewSpecSkuList().size(),
                     context.getHistoricalReverseSelectionDirectiveList().size());
+
+            /*
+             * S4.5.3.1 结构收尾对齐在机统计缓存构建：
+             * 结构转产表最大收尾日期已在S4.2月计划完成后的依赖任务中加载，本调用不再查询数据库。
+             * 基于续作+换活字块排产完成后的实时排程结果构建【结构×班次】在机统计，
+             * 后续每次新增选机先用S4.2日期快照校验[T,T+2]门禁；通过后才读取该动态缓存执行
+             * 原结构对齐规则，并按结果提交增量更新，避免反复全表扫描且保证前后数据时序正确。
+             */
+            structureEndingAlignmentService.prepareStructureEndingAlignmentIndex(context);
 
             // S4.5.4 遍历新增SKU, 匹配机台
             IMachineMatchStrategy machineMatchStrategy = strategyFactory.getMachineMatchStrategy();
@@ -119,12 +132,6 @@ public class NewProductionHandler extends AbsScheduleStepHandler {
                     context.getScheduleResultList().size(), context.getNewSpecSkuList().size(),
                     context.getUnscheduledResultList().size());
             strategy.scheduleReduceMould(context);
-            /*
-             * S4.5结束后只同步阶段级判断已经命中的结构状态，不重新计算是否触发保机。
-             * 同结构SKU若已接管保机机台，此处负责清理旧结果中的纯保机占位、转移剩余保机区间，
-             * 并把命中标识同步到本阶段新增的同结构结果。
-             */
-            structureMinMachineRetentionService.synchronizeRetainedState(context);
             log.info("新增规格排产处理完成, 排程结果数: {}, 未排产数: {}",
                     context.getScheduleResultList().size(), context.getUnscheduledResultList().size());
         } finally {

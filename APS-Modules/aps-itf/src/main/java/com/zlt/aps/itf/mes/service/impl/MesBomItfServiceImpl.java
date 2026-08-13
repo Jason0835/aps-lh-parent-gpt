@@ -134,6 +134,7 @@ public class MesBomItfServiceImpl implements MesBomItfService {
                 info.getFactoryCode(), 
                 info.getMaterialCode(),
                 info.getRawMaterialName(), 
+                info.getConstructionStage(),
                 BigDecimalUtils.valueOf(info.getRawMaterialWeight()).toPlainString());
     }
 

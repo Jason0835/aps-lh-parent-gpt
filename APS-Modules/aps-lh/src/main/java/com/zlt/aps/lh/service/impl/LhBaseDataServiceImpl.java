@@ -48,6 +48,7 @@ import org.springframework.util.CollectionUtils;
 
 import javax.annotation.Resource;
 import java.math.BigDecimal;
+import java.time.DateTimeException;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.ZoneId;
@@ -84,6 +85,11 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     private static final String MAIN_PRODUCT_SCHEDULE_TYPE = "01";
 
     /**
+     * 结构转产配置的正常计划类型（T_MP_STRUCTURE_ALLOCATION.PLAN_TYPE）
+     */
+    private static final String STRUCTURE_ALLOCATION_NORMAL_PLAN_TYPE = "01";
+
+    /**
      * 非主销合并胎胚的收尾余量阈值：胎胚余量 <= 该值视为收尾
      */
     private static final int NON_MAIN_PRODUCT_ENDING_THRESHOLD = 2;
@@ -111,6 +117,9 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
 
     @Resource
     private MpFactoryProductionVersionMapper mpFactoryProductionVersionMapper;
+
+    @Resource
+    private MpStructureAllocationMapper mpStructureAllocationMapper;
 
     @Resource
     private MpMonthPlanStatisticsMapper monthPlanStatisticsMapper;
@@ -215,6 +224,28 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         // requiredMonthMap 使用右开区间；月计划归集查找 dayN 时使用闭区间，需回退一天得到真实结束日。
         Date earlyProductionRangeEndDate = LhScheduleTimeUtil.addDays(earlyProductionLookupEndDate, -1);
         Map<String, LocalDate> requiredMonthMap = resolveRequiredMonthMap(startDate, earlyProductionLookupEndDate);
+        /*
+         * 结构收尾对齐只观察固定三天窗口[T,T+2]。该月份集合必须与提前生产、续作前后看月份隔离，
+         * 否则会额外查询窗口外月份并把远期END_DAY错误纳入最大收尾日期。
+         */
+        Date structureEndingWindowEndExclusive = LhScheduleTimeUtil.addDays(
+                startDate, LhScheduleConstant.STRUCTURE_ENDING_ALIGNMENT_WINDOW_DAYS);
+        Map<String, LocalDate> structureEndingWindowMonthMap =
+                this.resolveRequiredMonthMap(startDate, structureEndingWindowEndExclusive);
+        /*
+         * SKU排序的“结构N天内收尾”使用严格小于SYS0304002的包含首尾距离：
+         * 当参数为5时，可能命中的最大END_DAY为T+3，因此查询范围为[T,T+4)，共4个自然日。
+         * 该月份集合与结构收尾对齐的固定三天集合分别维护，避免排序阈值扩大后改变S4.5选机门禁。
+         */
+        int structurePriorityEndingDays = Objects.nonNull(context.getScheduleConfig())
+                ? context.getScheduleConfig().getStructureEndingDays()
+                : context.getParamIntValue(LhScheduleParamConstant.STRUCTURE_ENDING_DAYS,
+                LhScheduleConstant.DEFAULT_STRUCTURE_ENDING_DAYS);
+        int structurePriorityCandidateDayCount = Math.max(0, structurePriorityEndingDays - 1);
+        Date structurePriorityWindowEndExclusive = LhScheduleTimeUtil.addDays(
+                startDate, structurePriorityCandidateDayCount);
+        Map<String, LocalDate> structurePriorityWindowMonthMap =
+                this.resolveRequiredMonthMap(startDate, structurePriorityWindowEndExclusive);
         int continuousMouldOfflineCheckDays = context.getScheduleConfig().getContinuousMouldOfflineCheckDays();
         Date continuousMouldOfflineLookupEndDate =
                 LhScheduleTimeUtil.addDays(endDate, continuousMouldOfflineCheckDays);
@@ -225,7 +256,16 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         Map<String, LocalDate> monthPlanRequiredMonthMap =
                 resolveMonthPlanRequiredMonthMap(startDate, monthPlanLookupEndDate,
                         continuousMouldOfflineCheckDays);
-        // 设备停机、工作日历沿用 T-1 覆盖范围，保证滚动继承和跨日停机判断可复用同一窗口。
+        /*
+         * SYS0304002可配置，排序日期范围可能超过月计划或提前生产的常规加载范围。排产版本加载
+         * 需要额外覆盖两份结构收尾快照涉及的月份，但月计划本身仍沿用原monthPlanRequiredMonthMap，
+         * 避免仅因排序参数扩大而改变SKU归集、日计划或其他排产业务数据范围。
+         */
+        Map<String, LocalDate> productionVersionRequiredMonthMap =
+                new LinkedHashMap<String, LocalDate>(monthPlanRequiredMonthMap);
+        productionVersionRequiredMonthMap.putAll(structureEndingWindowMonthMap);
+        productionVersionRequiredMonthMap.putAll(structurePriorityWindowMonthMap);
+        // 设备停机、工作日历沿用 T-1 覆盖范围，保证跨日停机判断可复用同一窗口。
         Date calendarControlStartDate = LhScheduleTimeUtil.addDays(startDate, -1);
 
         // 获取年月信息（按排程目标日取月计划所属年月）
@@ -237,7 +277,8 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         // 1. 定稿排产版本是月计划、周程滚动调整等任务的前置条件，先单独同步完成。
         //    （若不先同步获取 productionVersion，后续月计划查询会因缺少版本号导致加载不准确。）
         waitForDataInitTasks(runDataInitTaskAsync("月生产计划版本",
-                () -> loadFinalProductionVersions(context, factoryCode, monthPlanRequiredMonthMap, year, month),
+                () -> loadFinalProductionVersions(context, factoryCode,
+                        productionVersionRequiredMonthMap, year, month),
                 () -> StringUtils.isNotEmpty(context.getProductionVersion()) ? 1 : 0));
         if (context.isInterrupted()) {
             log.warn("[DataInit] 基础数据初始化中断：totalCost={}ms, reason={}",
@@ -259,6 +300,19 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                 () -> loadMonthPlan(context, factoryCode, monthPlanRequiredMonthMap,
                         scheduleWindowEndDate, earlyProductionRangeEndDate),
                 () -> sizeOf(context.getMonthPlanList()));
+        /*
+         * 结构转产收尾配置的查询条件包含结构名称，因此必须等待月计划完成后再执行；排产版本已在
+         * 上方同步任务中全部写入上下文。调用处同时传入结构收尾对齐固定三天月份和SKU排序
+         * 动态阈值月份：加载方法复用相同查询结果，但分别生成两份快照，保证S4.4/S4.5排序与
+         * S4.5结构收尾对齐互不改变。后续排序和候选机台循环都只读内存，不再访问数据库。
+         */
+        CompletableFuture<Void> structureEndingDateFuture = this.runAfterDataInitTask(
+                monthPlanFuture, "结构转产收尾配置",
+                () -> this.loadStructureEndingDates(
+                        context, factoryCode, structureEndingWindowMonthMap,
+                        structurePriorityWindowMonthMap),
+                () -> this.sizeOf(context.getStructureMaxEndingDateMap())
+                        + this.sizeOf(context.getStructurePriorityMaxEndingDateMap()));
         CompletableFuture<Void> monthPlanStatisticsFuture = runDataInitTaskAsync("月计划结构机台统计",
                 () -> loadMonthPlanStatistics(context, factoryCode, requiredMonthMap, startDate,
                         earlyProductionLookupEndDate),
@@ -296,6 +350,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         //      因此此处只需等待顶层 Future 完成即可（底层依赖链会自动传递完成状态）。
         waitForDataInitTasks(
                 monthPlanFuture,
+                structureEndingDateFuture,
                 monthPlanStatisticsFuture,
                 specialMaterialBomFuture,
                 embryoStockFuture,
@@ -343,9 +398,6 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                 runDataInitTaskAsync("目标日前一日硫化排程结果",
                         () -> loadTargetPreviousScheduleResults(context, factoryCode, targetDate),
                         () -> sizeOf(context.getTargetPreviousScheduleResultList())),
-                runDataInitTaskAsync("前日模具交替计划",
-                        () -> loadPreviousMouldChangePlans(context, factoryCode, targetDate),
-                        () -> sizeOf(context.getPreviousMouldChangePlanList())),
                 runDataInitTaskAsync("反选历史模具交替计划",
                         () -> loadHistoricalReverseMouldChangePlans(context, factoryCode, targetDate),
                         () -> sizeOf(context.getHistoricalReverseMouldChangePlanList())),
@@ -570,6 +622,249 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     }
 
     /**
+     * 加载结构转产表中的结构最大收尾自然日，并生成相互隔离的业务快照。
+     *
+     * <p>本方法作为月计划任务的后置基础数据任务执行：先从已加载月计划提取本次参与排产的
+     * 结构名称，再分别按“结构收尾对齐固定三天窗口”和“SKU排序参数窗口”检查月份版本并构建
+     * 快照。两个场景查询条件完全一致，同一自然月只查询一次；但各自只合并本场景月份内的数据，
+     * 避免SKU排序的动态阈值扩大后改变结构收尾对齐选机门禁。</p>
+     *
+     * @param context                         排程上下文
+     * @param factoryCode                     工厂编号
+     * @param alignmentWindowMonthMap         结构收尾对齐固定三天窗口覆盖的年月
+     * @param structurePriorityWindowMonthMap SKU排序严格小于参数阈值时可能命中的年月
+     */
+    private void loadStructureEndingDates(
+            LhScheduleContext context,
+            String factoryCode,
+            Map<String, LocalDate> alignmentWindowMonthMap,
+            Map<String, LocalDate> structurePriorityWindowMonthMap) {
+        Map<String, LocalDate> alignmentMaxEndingDateMap =
+                new LinkedHashMap<String, LocalDate>(16);
+        Map<String, LocalDate> structurePriorityMaxEndingDateMap =
+                new LinkedHashMap<String, LocalDate>(16);
+        /*
+         * 每次基础数据初始化先覆盖为空快照。某个场景月份为空、版本缺失、无配置或END_DAY全空时，
+         * 该场景按“不命中”处理，且不会把上一批次或另一业务场景的数据带入本轮排程。
+         */
+        context.setStructureMaxEndingDateMap(alignmentMaxEndingDateMap);
+        context.setStructurePriorityMaxEndingDateMap(structurePriorityMaxEndingDateMap);
+        Set<String> structureNameSet = this.resolveStructureNamesForEndingConfiguration(context);
+        if (CollectionUtils.isEmpty(structureNameSet)) {
+            log.info("结构转产收尾配置跳过加载, factoryCode: {}, reason: 本次月计划结构为空",
+                    factoryCode);
+            return;
+        }
+
+        // 两个场景共用单次任务内的查询缓存，避免重叠月份重复访问结构转产表。
+        Map<String, List<MpStructureAllocation>> allocationQueryCache =
+                new LinkedHashMap<String, List<MpStructureAllocation>>(4);
+        this.loadStructureEndingDateSnapshot(
+                context, factoryCode, "结构收尾对齐", alignmentWindowMonthMap,
+                structureNameSet, alignmentMaxEndingDateMap, allocationQueryCache);
+        this.loadStructureEndingDateSnapshot(
+                context, factoryCode, "SKU排序", structurePriorityWindowMonthMap,
+                structureNameSet, structurePriorityMaxEndingDateMap, allocationQueryCache);
+        log.info("结构转产收尾配置加载完成, factoryCode: {}, queryMonthCount: {}, "
+                        + "alignmentStructureCount: {}, priorityStructureCount: {}",
+                factoryCode, allocationQueryCache.size(), alignmentMaxEndingDateMap.size(),
+                structurePriorityMaxEndingDateMap.size());
+    }
+
+    /**
+     * 按单个业务场景的月份范围构建结构最大收尾日期快照。
+     *
+     * <p>跨月或跨年时必须为范围内每个自然月取得该月排产版本；任一版本缺失时仅清空当前
+     * 场景快照，不影响另一场景。每条END_DAY与查询记录所属年月组合为完整LocalDate，同结构
+     * 多条记录及跨月记录统一取最大自然日。</p>
+     *
+     * @param context              排程上下文
+     * @param factoryCode          工厂编号
+     * @param businessScene        业务场景，用于日志区分
+     * @param windowMonthMap       当前场景覆盖的年月
+     * @param structureNameSet     本次参与排产的结构名称集合
+     * @param maxEndingDateMap     当前场景待写入的结构最大收尾日期快照
+     * @param allocationQueryCache 本次基础数据任务内按年月复用的查询结果
+     */
+    private void loadStructureEndingDateSnapshot(
+            LhScheduleContext context,
+            String factoryCode,
+            String businessScene,
+            Map<String, LocalDate> windowMonthMap,
+            Set<String> structureNameSet,
+            Map<String, LocalDate> maxEndingDateMap,
+            Map<String, List<MpStructureAllocation>> allocationQueryCache) {
+        if (CollectionUtils.isEmpty(windowMonthMap)) {
+            log.info("结构转产收尾配置跳过场景加载, factoryCode: {}, businessScene: {}, "
+                            + "reason: 参数阈值下不存在可命中的自然日",
+                    factoryCode, businessScene);
+            return;
+        }
+        if (!this.hasCompleteStructureEndingProductionVersions(
+                context, factoryCode, businessScene, windowMonthMap)) {
+            return;
+        }
+        int queriedRowCount = 0;
+        for (Map.Entry<String, LocalDate> monthEntry : windowMonthMap.entrySet()) {
+            String monthKey = monthEntry.getKey();
+            LocalDate monthStartDate = monthEntry.getValue();
+            String productionVersion = this.resolveProductionVersion(
+                    context, monthStartDate.getYear(), monthStartDate.getMonthValue());
+            List<MpStructureAllocation> allocationList;
+            if (allocationQueryCache.containsKey(monthKey)) {
+                allocationList = allocationQueryCache.get(monthKey);
+            } else {
+                allocationList = this.queryStructureEndingAllocations(
+                        factoryCode, monthStartDate, productionVersion, structureNameSet);
+                allocationQueryCache.put(monthKey, CollectionUtils.isEmpty(allocationList)
+                        ? Collections.<MpStructureAllocation>emptyList() : allocationList);
+            }
+            queriedRowCount += CollectionUtils.isEmpty(allocationList) ? 0 : allocationList.size();
+            if (CollectionUtils.isEmpty(allocationList)) {
+                log.info("结构转产收尾配置未查询到记录, factoryCode: {}, businessScene: {}, "
+                                + "year: {}, month: {}, productionVersion: {}, planType: {}, "
+                                + "structureCount: {}",
+                        factoryCode, businessScene, monthStartDate.getYear(),
+                        monthStartDate.getMonthValue(), productionVersion,
+                        STRUCTURE_ALLOCATION_NORMAL_PLAN_TYPE, structureNameSet.size());
+                continue;
+            }
+            allocationList.stream()
+                    .filter(Objects::nonNull)
+                    .forEach(allocation -> this.mergeStructureMaxEndingDate(
+                            maxEndingDateMap, allocation, monthStartDate, factoryCode,
+                            productionVersion));
+        }
+        log.info("结构转产收尾配置场景快照完成, factoryCode: {}, businessScene: {}, "
+                        + "windowMonths: {}, queryStructureCount: {}, queriedRowCount: {}, "
+                        + "validStructureCount: {}",
+                factoryCode, businessScene, windowMonthMap.keySet(), structureNameSet.size(),
+                queriedRowCount, maxEndingDateMap.size());
+        log.debug("结构转产收尾配置最大日期快照, factoryCode: {}, businessScene: {}, config: {}",
+                factoryCode, businessScene, maxEndingDateMap);
+    }
+
+    /**
+     * 从已经完成加载的月计划中提取结构收尾配置查询所需的结构名称。
+     *
+     * @param context 排程上下文
+     * @return 去重且保持月计划顺序的非空结构名称集合
+     */
+    private Set<String> resolveStructureNamesForEndingConfiguration(LhScheduleContext context) {
+        if (Objects.isNull(context) || CollectionUtils.isEmpty(context.getMonthPlanList())) {
+            return new LinkedHashSet<String>(0);
+        }
+        int initialCapacity = Math.max(16, context.getMonthPlanList().size());
+        return context.getMonthPlanList().stream()
+                .filter(Objects::nonNull)
+                .map(FactoryMonthPlanProductionFinalResult::getStructureName)
+                .filter(StringUtils::isNotEmpty)
+                .collect(Collectors.toCollection(
+                        () -> new LinkedHashSet<String>(initialCapacity)));
+    }
+
+    /**
+     * 校验当前业务场景覆盖月份是否都已加载各自排产版本。
+     *
+     * @param context                排程上下文
+     * @param factoryCode            工厂编号
+     * @param businessScene         业务场景，用于日志区分
+     * @param scheduleWindowMonthMap 当前场景覆盖的年月
+     * @return true-所有月份版本完整；false-至少一个月份版本缺失
+     */
+    private boolean hasCompleteStructureEndingProductionVersions(
+            LhScheduleContext context,
+            String factoryCode,
+            String businessScene,
+            Map<String, LocalDate> scheduleWindowMonthMap) {
+        for (LocalDate monthStartDate : scheduleWindowMonthMap.values()) {
+            String productionVersion = this.resolveProductionVersion(
+                    context, monthStartDate.getYear(), monthStartDate.getMonthValue());
+            if (StringUtils.isEmpty(productionVersion)) {
+                log.warn("结构转产收尾配置跳过场景加载, factoryCode: {}, businessScene: {}, "
+                                + "year: {}, month: {}, reason: 排产版本为空，禁止跨月复用其他月份版本",
+                        factoryCode, businessScene, monthStartDate.getYear(),
+                        monthStartDate.getMonthValue());
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * 按单个自然月和该月排产版本批量查询结构转产配置。
+     *
+     * @param factoryCode      工厂编号
+     * @param monthStartDate   查询月份月初
+     * @param productionVersion 该月排产版本
+     * @param structureNameSet 本次月计划涉及的结构名称
+     * @return 结构转产配置列表
+     */
+    private List<MpStructureAllocation> queryStructureEndingAllocations(
+            String factoryCode,
+            LocalDate monthStartDate,
+            String productionVersion,
+            Set<String> structureNameSet) {
+        LambdaQueryWrapper<MpStructureAllocation> wrapper =
+                new LambdaQueryWrapper<MpStructureAllocation>()
+                        .select(MpStructureAllocation::getStructureName,
+                                MpStructureAllocation::getEndDay)
+                        .eq(MpStructureAllocation::getFactoryCode, factoryCode)
+                        .eq(MpStructureAllocation::getYear, monthStartDate.getYear())
+                        .eq(MpStructureAllocation::getMonth, monthStartDate.getMonthValue())
+                        .eq(MpStructureAllocation::getProductionVersion, productionVersion)
+                        .eq(MpStructureAllocation::getPlanType,
+                                STRUCTURE_ALLOCATION_NORMAL_PLAN_TYPE)
+                        .in(MpStructureAllocation::getStructureName, structureNameSet);
+        return mpStructureAllocationMapper.selectList(wrapper);
+    }
+
+    /**
+     * 将单条结构转产记录还原为完整自然日，并更新该结构的跨月最大收尾日期。
+     *
+     * @param maxEndingDateMap 结构最大收尾日期缓存
+     * @param allocation       结构转产记录
+     * @param monthStartDate   记录查询月份月初
+     * @param factoryCode      工厂编号
+     * @param productionVersion 排产版本
+     */
+    private void mergeStructureMaxEndingDate(
+            Map<String, LocalDate> maxEndingDateMap,
+            MpStructureAllocation allocation,
+            LocalDate monthStartDate,
+            String factoryCode,
+            String productionVersion) {
+        String structureName = allocation.getStructureName();
+        Integer endDay = allocation.getEndDay();
+        if (StringUtils.isEmpty(structureName) || Objects.isNull(endDay)) {
+            log.info("结构转产收尾配置忽略空值记录, factoryCode: {}, year: {}, month: {}, "
+                            + "productionVersion: {}, structureName: {}, endDay: {}",
+                    factoryCode, monthStartDate.getYear(), monthStartDate.getMonthValue(),
+                    productionVersion, structureName, endDay);
+            return;
+        }
+        LocalDate endingDate;
+        try {
+            // END_DAY只保存月内日号，必须与查询记录所属年月组合后再参与跨月自然日比较。
+            endingDate = monthStartDate.withDayOfMonth(endDay);
+        } catch (DateTimeException e) {
+            String message = new StringBuilder(192)
+                    .append("结构转产收尾日期非法, factoryCode: ").append(factoryCode)
+                    .append(", productionVersion: ").append(productionVersion)
+                    .append(", structureName: ").append(structureName)
+                    .append(", year: ").append(monthStartDate.getYear())
+                    .append(", month: ").append(monthStartDate.getMonthValue())
+                    .append(", endDay: ").append(endDay)
+                    .toString();
+            throw new ScheduleException(ScheduleStepEnum.S4_2_DATA_INIT,
+                    ScheduleErrorCode.DATA_INCOMPLETE, message, e);
+        }
+        maxEndingDateMap.merge(structureName, endingDate,
+                (existingDate, candidateDate) -> candidateDate.isAfter(existingDate)
+                        ? candidateDate : existingDate);
+    }
+
+    /**
      * 解析月计划及定稿版本需要加载的月份集合。
      * <p>续作停产保机需要比较窗口内业务日前后N天原始月计划量，因此月计划链路从窗口起点前N天开始，
      * 并由调用方把结束时间扩展到窗口末日后N天；该范围不用于结构统计、完成量等其他基础数据，
@@ -753,7 +1048,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
 
     /**
      * 加载业务目标日前一日硫化排程结果。
-     * <p>强制重排下 {@code previousScheduleResultList} 服务于窗口T日前一日滚动衔接；
+     * <p>{@code previousScheduleResultList} 固定按窗口起点T日前一日加载，
      * 新增历史欠产兜底判断需要按接口目标日前一日判断是否已排过，两者日期口径不能混用。</p>
      *
      * @param context     排程上下文
@@ -773,29 +1068,11 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     }
 
     /**
-     * 加载前日模具交替计划。
-     *
-     * @param context     排程上下文
-     * @param factoryCode 分厂编号
-     * @param targetDate  排程目标日
-     */
-    private void loadPreviousMouldChangePlans(LhScheduleContext context, String factoryCode, Date targetDate) {
-        Date previousDate = resolvePreviousDataDate(context, targetDate);
-        List<LhMouldChangePlan> list = lhMouldChangePlanMapper.selectList(new LambdaQueryWrapper<LhMouldChangePlan>()
-                .eq(LhMouldChangePlan::getFactoryCode, factoryCode)
-                .eq(LhMouldChangePlan::getScheduleDate, previousDate)
-                .eq(LhMouldChangePlan::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
-        context.setPreviousMouldChangePlanList(list != null ? list : new ArrayList<>());
-        log.info("前日模具交替计划加载完成, 数量: {}, 日期: {}",
-                context.getPreviousMouldChangePlanList().size(), LhScheduleTimeUtil.formatDate(previousDate));
-    }
-
-    /**
      * 加载前日交替计划机台反选使用的历史计划。
      *
      * <p>反选关系必须严格继承“业务目标日前一日”的换模、换活字块计划，因此这里直接使用
-     * {@code targetDate - 1}，不得复用滚动排程的前日日期解析。强制重排时，滚动衔接可能从
-     * 窗口起点回看历史结果，而反选业务仍只认目标日前一日，两种口径必须隔离。</p>
+     * {@code targetDate - 1}，不得复用窗口起点前一日的前日日期解析。
+     * 反选业务固定只认目标日前一日，两种口径必须隔离。</p>
      *
      * @param context 排程上下文
      * @param factoryCode 分厂编号
@@ -831,12 +1108,8 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
      * @return 前日基础数据日期
      */
     private Date resolvePreviousDataDate(LhScheduleContext context, Date targetDate) {
-        // 强制重排从窗口起点T日重新计算，前日排程/换模基线需取T日前一日。
-        if (context.getParamIntValue(LhScheduleParamConstant.FORCE_RESCHEDULE,
-                LhScheduleConstant.FORCE_RESCHEDULE) == LhScheduleConstant.FORCE_RESCHEDULE_ENABLED) {
-            return LhScheduleTimeUtil.clearTime(LhScheduleTimeUtil.addDays(context.getScheduleDate(), -1));
-        }
-        return LhScheduleTimeUtil.clearTime(LhScheduleTimeUtil.addDays(targetDate, -1));
+        // 排程从窗口起点T日重新计算，前日排程结果基线固定取T日前一日。
+        return LhScheduleTimeUtil.clearTime(LhScheduleTimeUtil.addDays(context.getScheduleDate(), -1));
     }
 
     /**
@@ -1670,7 +1943,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
      * <p>普通维修、精度等停机仍按排程窗口交集加载；干冰/喷砂清洗需要额外按计划开始时间加载
      * T 日及之后的未来候选，后续由清洗排程服务按班次和每日上限重新安排实际执行时间。
      * 两类查询均只加载排程日期为空的记录；排程日期非空代表该停机计划已被上一轮硫化排程回填、
-     * 已安排执行时间，滚动排程时不得再重复加载参与产能扣减、机台阻断或清洗重排。</p>
+     * 已安排执行时间，排程时不得再重复加载参与产能扣减、机台阻断或清洗重排。</p>
      *
      * @param context     排程上下文
      * @param factoryCode 分厂编号
@@ -2435,7 +2708,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         }
         /*
          * 调用统一模具归属解析，跨机台比较各自最近的 MES 记录。
-         * 这是基础数据进入续作、滚动衔接和共用模具置换前的唯一归属收口点：
+         * 这是基础数据进入续作和共用模具置换前的唯一归属收口点：
          * 若模具已由更新记录转移到其他机台，旧机台不能继续携带该模具进入运行态。
          */
         Map<String, List<String>> removedMouldCodeMap =
@@ -2531,7 +2804,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
      * <p>年度完整性审计读取全年原始计划；运行态只加载计划日期不早于排程T日、DAYS_TO_DUE进入
      * 预警范围、完成状态为未完成且实际执行日期为空的计划。精度允许在计划日前提前执行，但禁止把
      * 计划日期已经早于T日的历史计划延后到当前窗口执行。
-     * 已安排但设备侧未执行的计划不再按排程日期排除，允许在滚动排程中基于最新数据重新评估。</p>
+     * 已安排但设备侧未执行的计划不再按排程日期排除，允许在后续排程中基于最新数据重新评估。</p>
      *
      * @param context     排程上下文
      * @param factoryCode 分厂编号

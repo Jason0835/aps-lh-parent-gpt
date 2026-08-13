@@ -142,7 +142,7 @@ public class ConclusionLhMachineHandler {
         TbrProductionContext productionContext = (TbrProductionContext) context;
         Integer endDay = productionContext.getMonthDays();
         //1. 转换模具排产结果
-        List<FactoryMonthPlanMouldDayResult> mouldDayResultList = groupInfo.convertMouldDayResult(endDay);
+        List<FactoryMonthPlanMouldDayResult> mouldDayResultList = groupInfo.convertMouldDayResult(productionContext, endDay);
         //2. 组装参数Map
         Map<String, Object> paramMap = groupInfo.composeDailyCapacityParamMap(productionContext);
         //3. 计算日产能

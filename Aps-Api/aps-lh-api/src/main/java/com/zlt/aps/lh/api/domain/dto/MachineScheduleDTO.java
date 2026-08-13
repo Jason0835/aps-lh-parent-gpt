@@ -62,6 +62,8 @@ public class MachineScheduleDTO {
     // ========== 收尾信息 ==========
     /** 是否即将收尾；续作/换活字块会用该标识判断机台是否可以衔接下一规格 */
     private boolean ending;
+    /** 是否命中结构收尾对齐标识；新增排产在结构收尾对齐约束下选中该机台时置true，换料时清除（内存态） */
+    private boolean structureEndingAligned;
     /** 预计收尾时间 */
     private Date estimatedEndTime;
     /** 收尾后下一个SKU */
