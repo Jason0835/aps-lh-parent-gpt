@@ -33,8 +33,12 @@ import com.zlt.aps.maindata.mapper.MdmMaterialConsumeDetailMapper;
 import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialConsumeDetail;
+import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
 import com.zlt.aps.lh.api.domain.vo.ScheduleSummaryReportVO;
+import com.zlt.aps.lh.api.enums.MachineStopTypeEnum;
+import com.zlt.aps.lh.api.enums.MouldChangeTypeEnum;
 import com.zlt.aps.lh.api.service.ILhScheduleResultRemoteService;
+import com.zlt.aps.mp.api.domain.entity.MdmDevicePlanShut;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mp.api.domain.entity.MdmMonthSurplus;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
@@ -118,6 +122,12 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
     @Autowired
     private CxEmbryoLhTimeMapper cxEmbryoLhTimeMapper;
+
+    @Autowired
+    private LhMouldChangePlanMapper lhMouldChangePlanMapper;
+
+    @Autowired
+    private MdmDevicePlanShutMapper mdmDevicePlanShutMapper;
 
     @Override
     public List<CxScheduleResult> listByScheduleDate(LocalDate scheduleDate) {
@@ -329,10 +339,13 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         Set<String> endingStructureNames = this.loadEndingStructureNames(factoryCode);
         log.info("Sheet1过滤：收尾结构集合 = {}", endingStructureNames);
 
+        // 构建成型行备注映射（硫化侧事件实时计算，供成型余量Sheet与成型日计划Sheet共用）
+        Map<Long, String> rowRemarkMap = this.buildCxRowRemarkMap(exportList, scheduleDate, factoryCode);
+
         // Sheet 0: 成型余量-按机台
         Map<String, Object> remainQtyTableMap = new HashMap<>(16);
         List<List<Map<String, Object>>> remainQtyDataList = new ArrayList<>();
-        remainQtyDataList.add(buildCxRemainQtyExportDataList(exportList, endingStructureNames));
+        remainQtyDataList.add(buildCxRemainQtyExportDataList(exportList, endingStructureNames, rowRemarkMap));
         byte[] exportBytes = ExcelUtils.writeMultiList(inputStream, 0, remainQtyTableMap, remainQtyDataList);
 
         // Sheet 1: 成型日计划
@@ -366,7 +379,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         }
         planTableMap.put("version", productionVersion != null ? productionVersion : "");
         List<List<Map<String, Object>>> planDataList = new ArrayList<>();
-        List<Map<String, Object>> planRows = buildCxTemplateDataList(exportList, recipeTypeMap, totalDailyPlanQtyMap, todayNightFinishQtyMap, smallGlueMap, placeholderMap, shiftCapacitiesMap, keyProductEmbryoCodes, lhShiftConsumptionMap, endingStructureNames);
+        List<Map<String, Object>> planRows = buildCxTemplateDataList(exportList, recipeTypeMap, totalDailyPlanQtyMap, todayNightFinishQtyMap, smallGlueMap, placeholderMap, shiftCapacitiesMap, keyProductEmbryoCodes, lhShiftConsumptionMap, endingStructureNames, rowRemarkMap);
         planDataList.add(planRows);
 
         // 为小计行添加 DAEEF3 背景色标识 + 胎胚余量<400 红色背景
@@ -735,7 +748,8 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                                                                Map<String, String> shiftCapacitiesMap,
                                                                Set<String> keyProductEmbryoCodes,
                                                                Map<String, int[]> lhShiftConsumptionMap,
-                                                               Set<String> endingStructureNames) {
+                                                               Set<String> endingStructureNames,
+                                                               Map<Long, String> rowRemarkMap) {
         List<CxScheduleResult> exportList = Objects.isNull(list) ? Collections.emptyList() : list;
 
         Map<String, List<CxScheduleResult>> groupMap = exportList.stream()
@@ -753,7 +767,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                     String::compareTo));
 
             for (CxScheduleResult item : groupList) {
-                dataList.add(buildCxTemplateRow(item, recipeTypeMap, totalDailyPlanQtyMap, todayNightFinishQtyMap, smallGlueMap, placeholderMap, shiftCapacitiesMap, keyProductEmbryoCodes, lhShiftConsumptionMap));
+                dataList.add(buildCxTemplateRow(item, recipeTypeMap, totalDailyPlanQtyMap, todayNightFinishQtyMap, smallGlueMap, placeholderMap, shiftCapacitiesMap, keyProductEmbryoCodes, lhShiftConsumptionMap, rowRemarkMap));
             }
             dataList.add(buildCxTemplateSubtotalRow(groupList, lhShiftConsumptionMap));
         }
@@ -771,7 +785,8 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                                                       Map<String, String> placeholderMap,
                                                       Map<String, String> shiftCapacitiesMap,
                                                       Set<String> keyProductEmbryoCodes,
-                                                      Map<String, int[]> lhShiftConsumptionMap) {
+                                                      Map<String, int[]> lhShiftConsumptionMap,
+                                                      Map<Long, String> rowRemarkMap) {
         Map<String, Object> row = new LinkedHashMap<>();
         // 硫化排程6/7/8班消耗量（按胎胚代码匹配同日硫化计划量）
         String embryoKey = StringUtils.defaultString(item.getEmbryoCode()).trim();
@@ -853,7 +868,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         row.put("totalPlanQty", zeroToEmpty(sumLast3ShiftsPlan(item)));
         row.put("totalFinishQty", zeroToEmpty(totalFinish));
         row.put("dailyPlanQty", zeroToEmpty(totalPlan));
-        row.put("remark", item.getRemark());
+        row.put("remark", rowRemarkMap != null ? rowRemarkMap.getOrDefault(item.getId(), item.getRemark()) : item.getRemark());
         row.put("lhMachineQty", countLhScheduleIds(item.getLhScheduleIds()));
 
         String embryoDescKey = StringUtils.defaultString(item.getMainMaterialDesc()).trim();
@@ -1713,7 +1728,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
      * @param list 成型排程结果明细列表
      * @return 模板列表行数据，字段名与cxyl.xlsx中的列表占位符保持一致
      */
-    private List<Map<String, Object>> buildCxRemainQtyExportDataList(List<CxScheduleResult> list, Set<String> endingStructureNames) {
+    private List<Map<String, Object>> buildCxRemainQtyExportDataList(List<CxScheduleResult> list, Set<String> endingStructureNames, Map<Long, String> rowRemarkMap) {
         List<CxScheduleResult> exportList = Objects.isNull(list) ? Collections.emptyList() :
                 list.stream().sorted(Comparator.comparing(CxScheduleResult::getCxMachineCode, String.CASE_INSENSITIVE_ORDER)
                                 .thenComparing(CxScheduleResult::getMaterialCode))
@@ -1773,7 +1788,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                 row.put("smallGlue", "");
             }
             row.put("cxRemainQty", sumCxRemainQty(groupList));
-            row.put("remark", buildCxRemainQtyRemark(groupList));
+            row.put("remark", buildCxRemainQtyRemark(groupList, rowRemarkMap));
             dataList.add(row);
         }
         return dataList;
@@ -1822,16 +1837,384 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
     /**
      * 构建分组备注。
      *
-     * @param list 分组明细列表
+     * @param list         分组明细列表
+     * @param rowRemarkMap 排程结果ID到备注文本的映射（硫化侧事件实时计算）
      * @return 去重后的备注文本，多个备注使用中文分号拼接
      */
-    private String buildCxRemainQtyRemark(List<CxScheduleResult> list) {
+    private String buildCxRemainQtyRemark(List<CxScheduleResult> list, Map<Long, String> rowRemarkMap) {
         return list.stream()
-                .map(CxScheduleResult::getRemark)
+                .map(item -> {
+                    String rowRemark = rowRemarkMap != null ? rowRemarkMap.get(item.getId()) : null;
+                    return StringUtils.isBlank(rowRemark) ? item.getRemark() : rowRemark;
+                })
                 .filter(StringUtils::isNotBlank)
                 .map(String::trim)
                 .distinct()
                 .collect(Collectors.joining("；"));
+    }
+
+    /**
+     * 构建成型行备注映射（key=排程结果ID，value=备注文本）。
+     *
+     * <p>备注共9种情形，均从硫化侧实时计算，中文+越南语双语拼接：</p>
+     * <ol>
+     *   <li>新开规格：硫化排程类型=新增(02) 或 模具交替计划换模类型=正规换模(01)</li>
+     *   <li>N台硫化机：成型行关联的硫化机台去重数量</li>
+     *   <li>试验N条：关联硫化排程示方书类型=试制(X)，汇总计划量</li>
+     *   <li>量试N条：关联硫化排程示方书类型=量试(T)，汇总计划量</li>
+     *   <li>模具喷砂清洗：模具交替计划换模类型=喷砂(03)</li>
+     *   <li>早班换活字块：模具交替计划换模类型=换活字块(02) 且班次为早班</li>
+     *   <li>中班换活字块：模具交替计划换模类型=换活字块(02) 且班次为中班</li>
+     *   <li>维保：设备计划停机类型=预见性维护(03)/预防性维护(04)</li>
+     *   <li>维修：设备计划停机类型=计划性维修(05)/临时性故障(06)</li>
+     * </ol>
+     *
+     * @param exportList   成型排程结果列表
+     * @param scheduleDate 排程日期
+     * @param factoryCode  分厂编码
+     * @return 排程结果ID到备注文本的映射
+     */
+    private Map<Long, String> buildCxRowRemarkMap(List<CxScheduleResult> exportList, Date scheduleDate, String factoryCode) {
+        Map<Long, String> remarkMap = new HashMap<>();
+        if (CollectionUtils.isEmpty(exportList)) {
+            return remarkMap;
+        }
+
+        // 1. 收集成型行关联的硫化排程结果ID，并批量查询硫化排程结果
+        Set<Long> lhIdSet = exportList.stream()
+                .map(CxScheduleResult::getLhScheduleIds)
+                .filter(StringUtils::isNotBlank)
+                .flatMap(ids -> Arrays.stream(ids.split("[,，/;；]")))
+                .map(String::trim)
+                .filter(StringUtils::isNotEmpty)
+                .map(this::parseLongQuietly)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        Map<Long, LhScheduleResult> lhResultById = new HashMap<>();
+        Set<String> lhMachineCodes = new HashSet<>();
+        if (CollectionUtils.isNotEmpty(lhIdSet)) {
+            List<LhScheduleResult> lhResults = lhScheduleResultMapper.selectByIds(lhIdSet);
+            for (LhScheduleResult lhResult : lhResults) {
+                if (lhResult == null) {
+                    continue;
+                }
+                lhResultById.put(lhResult.getId(), lhResult);
+                if (StringUtils.isNotBlank(lhResult.getLhMachineCode())) {
+                    lhMachineCodes.add(lhResult.getLhMachineCode().trim());
+                }
+            }
+        }
+
+        // 2. 查询模具交替计划（换模01/换活字块02/喷砂03），按硫化机台分组
+        Map<String, List<LhMouldChangePlan>> mouldPlanByMachine = this.queryMouldChangePlanByMachine(factoryCode, scheduleDate, lhMachineCodes);
+
+        // 3. 查询设备计划停机（维保03/04、维修05/06），按机台分组
+        Map<String, List<MdmDevicePlanShut>> stopPlanByMachine = this.queryStopPlanByMachine(factoryCode, scheduleDate, lhMachineCodes);
+
+        // 4. 逐行构建备注
+        for (CxScheduleResult row : exportList) {
+            List<LhScheduleResult> linkedLhResults = this.resolveLinkedLhResults(row.getLhScheduleIds(), lhResultById);
+            remarkMap.put(row.getId(), this.buildRowLhEventRemark(linkedLhResults, mouldPlanByMachine, stopPlanByMachine));
+        }
+        return remarkMap;
+    }
+
+    /**
+     * 查询模具交替计划并按硫化机台分组。
+     *
+     * @param factoryCode    分厂编码
+     * @param scheduleDate   排程日期
+     * @param lhMachineCodes 硫化机台编码集合
+     * @return 硫化机台编码到模具交替计划列表的映射
+     */
+    private Map<String, List<LhMouldChangePlan>> queryMouldChangePlanByMachine(String factoryCode, Date scheduleDate, Set<String> lhMachineCodes) {
+        if (CollectionUtils.isEmpty(lhMachineCodes) || scheduleDate == null) {
+            return Collections.emptyMap();
+        }
+        List<LhMouldChangePlan> plans = lhMouldChangePlanMapper.selectList(
+                new LambdaQueryWrapper<LhMouldChangePlan>()
+                        .eq(LhMouldChangePlan::getFactoryCode, factoryCode)
+                        .eq(LhMouldChangePlan::getScheduleDate, scheduleDate)
+                        .in(LhMouldChangePlan::getLhMachineCode, lhMachineCodes));
+        if (CollectionUtils.isEmpty(plans)) {
+            return Collections.emptyMap();
+        }
+        return plans.stream()
+                .filter(plan -> StringUtils.isNotBlank(plan.getLhMachineCode()))
+                .collect(Collectors.groupingBy(plan -> plan.getLhMachineCode().trim()));
+    }
+
+    /**
+     * 查询设备计划停机并按机台分组。
+     *
+     * @param factoryCode    分厂编码
+     * @param scheduleDate   排程日期
+     * @param lhMachineCodes 硫化机台编码集合
+     * @return 机台编码到设备停机计划列表的映射
+     */
+    private Map<String, List<MdmDevicePlanShut>> queryStopPlanByMachine(String factoryCode, Date scheduleDate, Set<String> lhMachineCodes) {
+        if (CollectionUtils.isEmpty(lhMachineCodes) || scheduleDate == null) {
+            return Collections.emptyMap();
+        }
+        Date dayStart = DateUtil.beginOfDay(scheduleDate);
+        Date dayEnd = DateUtil.endOfDay(scheduleDate);
+        List<MdmDevicePlanShut> stops = mdmDevicePlanShutMapper.selectList(
+                new LambdaQueryWrapper<MdmDevicePlanShut>()
+                        .eq(MdmDevicePlanShut::getFactoryCode, factoryCode)
+                        .in(MdmDevicePlanShut::getMachineCode, lhMachineCodes)
+                        .le(MdmDevicePlanShut::getBeginDate, dayEnd)
+                        .ge(MdmDevicePlanShut::getEndDate, dayStart));
+        if (CollectionUtils.isEmpty(stops)) {
+            return Collections.emptyMap();
+        }
+        return stops.stream()
+                .filter(stop -> StringUtils.isNotBlank(stop.getMachineCode()))
+                .collect(Collectors.groupingBy(stop -> stop.getMachineCode().trim()));
+    }
+
+    /**
+     * 解析成型行关联的硫化排程结果。
+     *
+     * @param lhScheduleIds 逗号分隔的硫化排程结果ID
+     * @param lhResultById  硫化排程结果ID到实体的映射
+     * @return 关联的硫化排程结果列表
+     */
+    private List<LhScheduleResult> resolveLinkedLhResults(String lhScheduleIds, Map<Long, LhScheduleResult> lhResultById) {
+        if (StringUtils.isBlank(lhScheduleIds) || lhResultById.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return Arrays.stream(lhScheduleIds.split("[,，/;；]"))
+                .map(String::trim)
+                .filter(StringUtils::isNotEmpty)
+                .map(this::parseLongQuietly)
+                .filter(Objects::nonNull)
+                .map(lhResultById::get)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 安全地将字符串解析为Long，解析失败返回null。
+     *
+     * @param value 字符串
+     * @return 解析后的Long，解析失败返回null
+     */
+    private Long parseLongQuietly(String value) {
+        try {
+            return Long.valueOf(value);
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    /**
+     * 构建单条成型行的硫化侧事件备注（9种情形，中文+越南语）。
+     *
+     * @param linkedLhResults     成型行关联的硫化排程结果
+     * @param mouldPlanByMachine  模具交替计划按机台分组
+     * @param stopPlanByMachine   设备停机计划按机台分组
+     * @return 备注文本，多条备注用中文分号拼接
+     */
+    private String buildRowLhEventRemark(List<LhScheduleResult> linkedLhResults,
+                                         Map<String, List<LhMouldChangePlan>> mouldPlanByMachine,
+                                         Map<String, List<MdmDevicePlanShut>> stopPlanByMachine) {
+        List<String> fragments = new ArrayList<>();
+
+        // 关联的硫化机台集合
+        Set<String> machineCodes = linkedLhResults.stream()
+                .map(LhScheduleResult::getLhMachineCode)
+                .filter(StringUtils::isNotBlank)
+                .map(String::trim)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+
+        // 1. 新开规格：硫化排程类型=新增(02)，或模具交替计划换模类型=正规换模(01)
+        boolean newSpec = linkedLhResults.stream().anyMatch(lh -> "02".equals(lh.getScheduleType()))
+                || machineCodes.stream().anyMatch(machine -> this.containsMouldType(mouldPlanByMachine, machine, MouldChangeTypeEnum.REGULAR.getCode()));
+        if (newSpec) {
+            fragments.add("新开规格 Quy cách mới chính quy");
+        }
+
+        // 2. N台硫化机：关联的硫化机台去重数量（2台及以上才展示）
+        if (machineCodes.size() >= 2) {
+            fragments.add(machineCodes.size() + "台硫化机 " + machineCodes.size() + " máy lưu hóa");
+        }
+
+        // 3/4. 试验/量试：按关联硫化排程的示方书类型汇总计划量
+        int trialQty = 0;
+        int volumeTrialQty = 0;
+        for (LhScheduleResult lhResult : linkedLhResults) {
+            for (int classIndex = 1; classIndex <= 8; classIndex++) {
+                Object lhTypeObj = lhResult.getFieldValueByFieldName("class" + classIndex + "LhType");
+                Object planQtyObj = lhResult.getFieldValueByFieldName("class" + classIndex + "PlanQty");
+                String lhType = lhTypeObj == null ? "" : lhTypeObj.toString().trim();
+                int planQty = planQtyObj instanceof Number ? ((Number) planQtyObj).intValue() : 0;
+                if ("X".equalsIgnoreCase(lhType) || "试制".equals(lhType) || "试验".equals(lhType)) {
+                    trialQty += planQty;
+                } else if ("T".equalsIgnoreCase(lhType) || "量试".equals(lhType)) {
+                    volumeTrialQty += planQty;
+                }
+            }
+        }
+        if (trialQty > 0) {
+            fragments.add("试验" + trialQty + "条 Thử nghiệm " + trialQty + " lớp");
+        }
+        if (volumeTrialQty > 0) {
+            fragments.add("量试" + volumeTrialQty + "条 Thử nghiệm " + volumeTrialQty + " lớp");
+        }
+
+        // 5/6/7. 喷砂清洗、早班换活字块、中班换活字块（来自模具交替计划）
+        this.appendMouldChangeFragments(fragments, machineCodes, mouldPlanByMachine);
+
+        // 8/9. 维保、维修（来自设备计划停机）
+        this.appendStopPlanFragments(fragments, machineCodes, stopPlanByMachine);
+
+        return String.join("；", fragments);
+    }
+
+    /**
+     * 判断指定机台是否存在指定换模类型的模具交替计划。
+     *
+     * @param mouldPlanByMachine 模具交替计划按机台分组
+     * @param machineCode        机台编码
+     * @param changeMouldType    换模类型编码
+     * @return true-存在指定换模类型的计划
+     */
+    private boolean containsMouldType(Map<String, List<LhMouldChangePlan>> mouldPlanByMachine, String machineCode, String changeMouldType) {
+        List<LhMouldChangePlan> plans = mouldPlanByMachine.get(machineCode);
+        if (CollectionUtils.isEmpty(plans)) {
+            return false;
+        }
+        return plans.stream().anyMatch(plan -> MouldChangeTypeEnum.containsCode(plan.getChangeMouldType(), changeMouldType));
+    }
+
+    /**
+     * 追加模具交替计划相关备注（喷砂清洗、早班换活字块、中班换活字块）。
+     *
+     * @param fragments          备注片段集合
+     * @param machineCodes       硫化机台编码集合
+     * @param mouldPlanByMachine 模具交替计划按机台分组
+     */
+    private void appendMouldChangeFragments(List<String> fragments,
+                                            Set<String> machineCodes,
+                                            Map<String, List<LhMouldChangePlan>> mouldPlanByMachine) {
+        // 收集喷砂清洗机台（按日期分组机台）
+        Map<String, Set<String>> sandBlastByDay = new LinkedHashMap<>();
+        // 收集换活字块机台（按日期+班次分组机台）
+        Map<String, Set<String>> typeBlockByDayShift = new LinkedHashMap<>();
+
+        for (String machineCode : machineCodes) {
+            List<LhMouldChangePlan> plans = mouldPlanByMachine.get(machineCode);
+            if (CollectionUtils.isEmpty(plans)) {
+                continue;
+            }
+            for (LhMouldChangePlan plan : plans) {
+                if (plan.getPlanDate() == null) {
+                    continue;
+                }
+                String day = String.valueOf(DateUtil.toLocalDateTime(plan.getPlanDate()).getDayOfMonth());
+                String changeMouldType = plan.getChangeMouldType();
+                if (MouldChangeTypeEnum.containsCode(changeMouldType, MouldChangeTypeEnum.SAND_BLAST.getCode())) {
+                    sandBlastByDay.computeIfAbsent(day, k -> new LinkedHashSet<>()).add(machineCode);
+                } else if (MouldChangeTypeEnum.containsCode(changeMouldType, MouldChangeTypeEnum.TYPE_BLOCK.getCode())) {
+                    int classIndex = this.parseIntQuietly(plan.getClassIndex());
+                    String shiftLabel = this.resolveShiftLabel(classIndex);
+                    if ("早班".equals(shiftLabel) || "中班".equals(shiftLabel)) {
+                        typeBlockByDayShift.computeIfAbsent(day + "|" + shiftLabel, k -> new LinkedHashSet<>()).add(machineCode);
+                    }
+                }
+            }
+        }
+
+        // 喷砂清洗
+        for (Map.Entry<String, Set<String>> entry : sandBlastByDay.entrySet()) {
+            String day = entry.getKey();
+            String machines = String.join("+", entry.getValue());
+            fragments.add(machines + " " + day + "号模具喷砂清洗 " + machines + " Ngày " + day + " khuôn vệ sinh cát");
+        }
+
+        // 换活字块（早班/中班分别输出）
+        for (Map.Entry<String, Set<String>> entry : typeBlockByDayShift.entrySet()) {
+            String[] dayAndShift = entry.getKey().split("\\|", 2);
+            String day = dayAndShift[0];
+            String shiftLabel = dayAndShift[1];
+            String machines = String.join("+", entry.getValue());
+            if ("早班".equals(shiftLabel)) {
+                fragments.add(machines + " " + day + "号早班换活字块 " + machines + " sáng ngày " + day + " thay lắc");
+            } else if ("中班".equals(shiftLabel)) {
+                fragments.add(machines + " " + day + "号中班换活字块 " + machines + " chiều ngày " + day + " thay lắc");
+            }
+        }
+    }
+
+    /**
+     * 追加设备停机计划相关备注（维保、维修）。
+     *
+     * @param fragments         备注片段集合
+     * @param machineCodes      硫化机台编码集合
+     * @param stopPlanByMachine 设备停机计划按机台分组
+     */
+    private void appendStopPlanFragments(List<String> fragments,
+                                         Set<String> machineCodes,
+                                         Map<String, List<MdmDevicePlanShut>> stopPlanByMachine) {
+        Set<String> maintenanceMachines = new LinkedHashSet<>();
+        Set<String> repairMachines = new LinkedHashSet<>();
+        for (String machineCode : machineCodes) {
+            List<MdmDevicePlanShut> stops = stopPlanByMachine.get(machineCode);
+            if (CollectionUtils.isEmpty(stops)) {
+                continue;
+            }
+            for (MdmDevicePlanShut stop : stops) {
+                String stopType = stop.getMachineStopType();
+                if (MachineStopTypeEnum.PREDICTIVE_MAINTENANCE.getCode().equals(stopType)
+                        || MachineStopTypeEnum.PREVENTIVE_MAINTENANCE.getCode().equals(stopType)) {
+                    maintenanceMachines.add(machineCode);
+                } else if (MachineStopTypeEnum.PLANNED_REPAIR.getCode().equals(stopType)
+                        || MachineStopTypeEnum.TEMPORARY_FAULT.getCode().equals(stopType)) {
+                    repairMachines.add(machineCode);
+                }
+            }
+        }
+        for (String machine : maintenanceMachines) {
+            fragments.add(machine + "维保 Bảo dưỡng");
+        }
+        for (String machine : repairMachines) {
+            fragments.add(machine + "维修 Thiết bị sửa chữa");
+        }
+    }
+
+    /**
+     * 根据班次序号解析班次名称（1早/2中/3夜循环）。
+     *
+     * @param classIndex 班次序号（1-8）
+     * @return 早班、中班或夜班
+     */
+    private String resolveShiftLabel(int classIndex) {
+        int mod = classIndex % 3;
+        if (mod == 1) {
+            return "早班";
+        }
+        if (mod == 2) {
+            return "中班";
+        }
+        return "夜班";
+    }
+
+    /**
+     * 安全地将班次序号字符串解析为int，解析失败返回0。
+     *
+     * @param classIndex 班次序号字符串
+     * @return 解析后的班次序号，解析失败返回0
+     */
+    private int parseIntQuietly(String classIndex) {
+        if (StringUtils.isBlank(classIndex)) {
+            return 0;
+        }
+        try {
+            return Integer.parseInt(classIndex.trim());
+        } catch (NumberFormatException e) {
+            return 0;
+        }
     }
 
     /**
