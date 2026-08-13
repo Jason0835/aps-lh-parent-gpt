@@ -39,13 +39,13 @@ import java.util.*;
  *
  * <p>主要职责：</p>
  * <ul>
- *   <li>按当前排程月份累计历史欠产，只将本月已发生日期的欠产向本窗口传导，忽略上月欠产和超产；</li>
+ *   <li>初始化排程数量视图；历史欠产/收尾遗留阶段下线后，不再向本窗口传导历史欠产；</li>
  *   <li>从月计划结果构建 {@link SkuScheduleDTO}，映射物料、结构、胎胚、dayN、余量、库存和产能；</li>
  *   <li>按产品结构归集 SKU，标记 SKU 收尾、结构收尾、续作和新增；</li>
  *   <li>初始化日计划额度账本，供后续 S4.4/S4.5 按班次消费。</li>
  * </ul>
  *
- * <p>该步骤会修改上下文中的 SKU 列表、结构分组、欠产传导 Map 和未排结果列表，
+ * <p>该步骤会修改上下文中的 SKU 列表、结构分组、数量视图和未排结果列表，
  * 但不直接生成正常排程结果。</p>
  *
  * @author APS
@@ -130,16 +130,20 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
                 context.getFactoryCode(), LhScheduleTimeUtil.formatDate(context.getScheduleTargetDate()),
                 LhScheduleTimeUtil.formatDate(context.getScheduleDate()),
                 context.getMonthPlanList().size(), context.getPreviousScheduleResultList().size());
-        // S4.3.1 前日排程欠/超产量调整
-        adjustPreviousSchedule(context);
+        /*
+         * 历史欠产/收尾遗留阶段已下线。本轮明确清空历史欠产传导与动态欠产缓存，
+         * 后续正常排产和提前生产只能消费原始月计划及其既有运行态余量，禁止历史量
+         * 继续写入首日日计划账本、提前生产目标量或强制放行条件。
+         */
+        context.setCarryForwardQtyMap(new LinkedHashMap<String, Integer>(0));
+        context.setMonthlyHistoryShortageQtyMap(
+                new LinkedHashMap<LocalDate, Map<String, Integer>>(0));
 
         /*
          * S4.3 每次重新归集前先清理上一次运行视图。候选态将在本步骤按当前月 TOTAL_QTY
          * 和未来原始日计划重新建立，并由 S4.5 持续使用至整个三天窗口结束。
          */
         context.clearEarlyProductionRuntimePlans();
-        // 在 SKU 归集前统一初始化提前生产数量视图，后续准入只读按业务日隔离的历史欠产缓存。
-        EarlyProductionQuantityCalculator.initializeMonthlyHistoryShortageByBusinessDate(context);
 
         // S4.3.2 按产品结构归集SKU，计算硫化余量
         gatherSkuByStructure(context);
@@ -252,6 +256,18 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
 
             int targetScheduleQty = dto.resolveTargetScheduleQty();
             LocalDate scheduleStartDate = toLocalDate(context.getScheduleDate());
+            /*
+             * 目标量已经归零的纯历史欠产/收尾遗留SKU原本也不会进入续作或新增排产，
+             * 遗留阶段下线后不再为该非失败场景生成“无目标量”未排记录。
+             */
+            if (targetScheduleQty <= 0
+                    && PendingSkuUnscheduledRule.shouldExcludeLegacyOnlyNewSku(context, dto)) {
+                log.info("历史欠产/收尾遗留零目标SKU不进入结构待排池, factoryCode: {}, batchNo: {}, "
+                                + "materialCode: {}, productStatus: {}, reason: {}",
+                        context.getFactoryCode(), context.getBatchNo(), dto.getMaterialCode(),
+                        dto.getProductStatus(), PendingSkuUnscheduledRule.LEGACY_ONLY_EXCLUSION_REASON);
+                continue;
+            }
             if (EarlyProductionQuantityCalculator.applyCurrentMonthTotalRoute(
                     context, dto, scheduleStartDate, getTargetScheduleQtyResolver())) {
                 /*
@@ -978,6 +994,11 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         dto.setSupplyChainPriority(targetMonthPlan.getProductionType());
         dto.setProductionType(targetMonthPlan.getProductionType());
         dto.setDeliveryLocked(isDeliveryLocked(context, targetMonthPlan));
+        /*
+         * S4.3 仍保留原有月计划首个正 dayN 的初始化口径，供 S4.4 续作 SKU 排序继续使用。
+         * 仅当 SKU 最终进入 S4.5 新增排产时，NewSpecDelayDaysResolver 才会在新增最终排序前
+         * 按新增排产业务场景覆盖 delayDays，避免本次需求反向改变续作分组、续作排序及其他排产规则。
+         */
         dto.setDelayDays(resolveDelayDays(context, plan));
         dto.setHighPriorityPendingQty(safeInt(targetMonthPlan.getHeightProductionQty()));
         dto.setCycleProductionPendingQty(safeInt(targetMonthPlan.getCycleProductionQty()));
@@ -1863,6 +1884,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         List<SkuScheduleDTO> continuousSkuList = new ArrayList<>();
         List<SkuScheduleDTO> newSpecSkuList = new ArrayList<>();
         List<SkuScheduleDTO> blockedDailyPlanSkuList = new ArrayList<SkuScheduleDTO>(8);
+        List<SkuScheduleDTO> excludedLegacySkuList = new ArrayList<SkuScheduleDTO>(8);
         Map<String, List<SkuScheduleDTO>> skuByMaterialMap = buildSkuByMaterialMap(context);
         Map<String, SkuScheduleDTO> continuousTemplateMap = new LinkedHashMap<String, SkuScheduleDTO>(16);
 
@@ -1889,6 +1911,15 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
                     continue;
                 }
                 /*
+                 * 历史欠产/收尾遗留阶段下线后，正规新增SKU若窗口内及后续完整原始计划
+                 * 都没有正计划量，应在进入S4.4换活字块和S4.5新增排产前直接移出待排池。
+                 * 该场景不是排产失败，不生成未排记录，也不允许前日交替计划兜底放行。
+                 */
+                if (PendingSkuUnscheduledRule.shouldExcludeLegacyOnlyNewSku(context, sku)) {
+                    excludedLegacySkuList.add(sku);
+                    continue;
+                }
+                /*
                  * 非续作SKU正式进入换活字块、历史交替反选和普通新增选机前，统一判断T～窗口结束日后N天
                  * 是否存在日计划量；完整范围无量时，再按后物料检查前日排程T+1交替承接关系。
                  * 该前置规则只决定是否进入后续主链，不改变当前遍历顺序、SKU排序或任何资源校验逻辑。
@@ -1911,6 +1942,15 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         for (SkuScheduleDTO blockedSku : blockedDailyPlanSkuList) {
             cleanupBlockedSku(context, blockedSku,
                     PendingSkuUnscheduledRule.DAILY_PLAN_ADMISSION_UNSCHEDULED_REASON);
+        }
+        for (SkuScheduleDTO excludedLegacySku : excludedLegacySkuList) {
+            cleanupBlockedSku(context, excludedLegacySku,
+                    PendingSkuUnscheduledRule.LEGACY_ONLY_EXCLUSION_REASON);
+            log.info("历史欠产/收尾遗留SKU已移出新增待排池, factoryCode: {}, batchNo: {}, "
+                            + "materialCode: {}, productStatus: {}, reason: {}",
+                    context.getFactoryCode(), context.getBatchNo(), excludedLegacySku.getMaterialCode(),
+                    excludedLegacySku.getProductStatus(),
+                    PendingSkuUnscheduledRule.LEGACY_ONLY_EXCLUSION_REASON);
         }
 
         // 续作匹配完成后，在机物料本次不需要排程（余量为0/共用胎胚零余量/未排等）的机台，

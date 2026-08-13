@@ -4,10 +4,7 @@ import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.StrUtil;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.zlt.aps.common.engine.schedule.IScheduleProcessLogger;
-import com.zlt.aps.common.engine.schedule.ScheduleProcessEvidenceFormatter;
-import com.zlt.aps.common.engine.schedule.ScheduleProcessLogLevel;
-import com.zlt.aps.common.engine.schedule.ScheduleProcessTraceEvent;
+import com.zlt.aps.common.engine.schedule.*;
 import com.zlt.aps.common.engine.schedule.constraint.ScheduleToolLedgerSnapshot;
 import com.zlt.aps.tm.api.enums.TmAutoScheduleIssueCategoryEnum;
 import com.zlt.aps.tm.api.enums.TmScheduleRuleCodeEnum;
@@ -21,9 +18,9 @@ import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * 胎面自动排程模板实现。
@@ -264,15 +261,26 @@ public class TmScheduleTemplateImpl extends AbsTmScheduleTemplate {
         if (context == null) {
             return;
         }
-        this.appendFullStepDetail(context, stepEnum);
         switch (stepEnum) {
+            case INVENTORY_PREDICT:
+                // 库存预测的规格事件同样需要等待 TASK_SORT 名次，避免 FULL 日志按规格编码输出。
+                break;
             case PLAN_CALC:
-                this.appendShiftRollingInventory(context);
+                // 计划量任务此时尚未生成待排名次，统一延后到 TASK_SORT 完成后按真实待排顺序记录。
+                break;
+            case TASK_SORT:
+                this.appendFullStepDetail(context, TmScheduleStepEnum.INVENTORY_PREDICT);
+                this.appendFullStepDetail(context, TmScheduleStepEnum.PLAN_CALC);
+                this.appendFullStepDetail(context, stepEnum);
                 break;
             case MACHINE_ASSIGN:
+                this.appendFullStepDetail(context, stepEnum);
+                // 实际班次计划量只有机台分配完成后才能确定，库存日志延后到此处生成。
+                this.appendShiftRollingInventory(context);
                 this.appendShiftMachineCalculationDetail(context);
                 break;
             default:
+                this.appendFullStepDetail(context, stepEnum);
                 break;
         }
     }
@@ -283,7 +291,7 @@ public class TmScheduleTemplateImpl extends AbsTmScheduleTemplate {
      * @param context 胎面排程上下文
      */
     private void appendShiftMachineCalculationDetail(TmScheduleContext context) {
-        Map<Integer, List<TmTaskDraft>> shiftTaskMap = context.getTaskDraftList().stream()
+        Map<Integer, List<TmTaskDraft>> shiftTaskMap = this.sortedLogTaskStream(context)
                 .filter(Objects::nonNull)
                 .collect(Collectors.groupingBy(TmTaskDraft::getShiftOrder, TreeMap::new, Collectors.toList()));
         shiftTaskMap.forEach((shiftOrder, shiftTaskList) -> {
@@ -309,7 +317,7 @@ public class TmScheduleTemplateImpl extends AbsTmScheduleTemplate {
                                              List<TmTaskDraft> shiftTaskList) {
         Map<String, TmTaskDraft> productTaskMap = shiftTaskList.stream()
                 .filter(task -> StrUtil.isNotBlank(task.getTreadCode()))
-                .sorted(Comparator.comparing(TmTaskDraft::getBusinessKey, Comparator.nullsLast(Comparator.naturalOrder())))
+                .sorted(this.buildLogTaskComparator())
                 .collect(Collectors.toMap(TmTaskDraft::getTreadCode, task -> task, (left, right) -> left,
                         LinkedHashMap::new));
         productTaskMap.forEach((treadCode, task) -> {
@@ -318,17 +326,42 @@ public class TmScheduleTemplateImpl extends AbsTmScheduleTemplate {
     }
 
     /**
-     * 在计划量计算完成后按班次记录库存滚动日志，确保机台评分和产能扣减日志在其后输出。
+     * 在机台分配完成后按班次记录库存滚动日志，确保日志使用实际落入各班次的计划量。
      *
      * @param context 胎面排程上下文
      */
     private void appendShiftRollingInventory(TmScheduleContext context) {
-        Map<Integer, List<TmTaskDraft>> shiftTaskMap = context.getTaskDraftList().stream()
+        Map<Integer, List<TmTaskDraft>> shiftTaskMap = this.sortedLogTaskStream(context)
                 .filter(Objects::nonNull)
                 .filter(task -> task.getShiftOrder() != null)
                 .collect(Collectors.groupingBy(TmTaskDraft::getShiftOrder, TreeMap::new, Collectors.toList()));
         shiftTaskMap.forEach((shiftOrder, shiftTaskList) ->
                 this.appendShiftRollingInventory(context, shiftOrder, shiftTaskList));
+    }
+
+    /**
+     * 获取仅用于过程日志展示的待排任务流，不修改排程上下文中的实际任务顺序。
+     *
+     * @param context 胎面排程上下文
+     * @return 按待排名次稳定排序的任务流
+     */
+    private Stream<TmTaskDraft> sortedLogTaskStream(TmScheduleContext context) {
+        if (context == null || context.getTaskDraftList() == null) {
+            return Stream.empty();
+        }
+        return context.getTaskDraftList().stream().filter(Objects::nonNull).sorted(this.buildLogTaskComparator());
+    }
+
+    /**
+     * 构建过程日志任务排序器，以 TASK_SORT 名次为主，班次和业务键仅用于稳定兜底。
+     *
+     * @return 过程日志任务排序器
+     */
+    private Comparator<TmTaskDraft> buildLogTaskComparator() {
+        return Comparator.comparing(TmTaskDraft::getBaseSortIndex,
+                        Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(TmTaskDraft::getShiftOrder, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(TmTaskDraft::getBusinessKey, Comparator.nullsLast(Comparator.naturalOrder()));
     }
 
     /**
@@ -361,10 +394,12 @@ public class TmScheduleTemplateImpl extends AbsTmScheduleTemplate {
                 .orElse(null);
         if (previousTask != null) {
             BigDecimal previousOpeningStockQty = this.nvl(previousTask.getRollingStockQty());
-            BigDecimal previousPlanQty = this.nvl(previousTask.getPlanQty());
+            BigDecimal previousPlanQty = this.resolveActualShiftPlanQty(context, task.getTreadCode(),
+                    previousTask.getShiftOrder());
             BigDecimal previousDemandQty = this.nvl(previousTask.getCurrentShiftDemandQty());
             BigDecimal rawOpeningStockQty = previousOpeningStockQty.add(previousPlanQty).subtract(previousDemandQty);
-            return this.nvl(task.getRollingStockQty()).toPlainString() + "=上一班班初库存"
+            BigDecimal displayOpeningStockQty = rawOpeningStockQty.max(BigDecimal.ZERO);
+            return displayOpeningStockQty.toPlainString() + "=上一班班初库存"
                     + previousOpeningStockQty.toPlainString() + "+上一班计划量"
                     + previousPlanQty.toPlainString() + "-上一班成型消耗" + previousDemandQty.toPlainString()
                     + "=" + rawOpeningStockQty.toPlainString();
@@ -384,6 +419,33 @@ public class TmScheduleTemplateImpl extends AbsTmScheduleTemplate {
     }
 
     /**
+     * 汇总指定胎面在目标班次任务链中的实际计划量，仅用于过程日志展示。
+     *
+     * <p>任务草稿中的计划量是机台分配前的名义计划量，发生顺延或拆分时不能代表目标班次的实际计划量。
+     * 任务链不存在对应节点时按零处理，不回退名义计划量。</p>
+     *
+     * @param context    胎面排程上下文
+     * @param treadCode  胎面代码
+     * @param shiftOrder 目标班次顺序
+     * @return 目标班次实际计划量
+     */
+    private BigDecimal resolveActualShiftPlanQty(TmScheduleContext context, String treadCode, Integer shiftOrder) {
+        if (context == null || context.getTaskChainGroup() == null || StrUtil.isBlank(treadCode)
+                || shiftOrder == null) {
+            return BigDecimal.ZERO;
+        }
+        return context.getTaskChainGroup().values().stream()
+                .filter(Objects::nonNull)
+                .flatMap(chain -> chain.toList().stream())
+                .filter(Objects::nonNull)
+                .filter(node -> Objects.equals(shiftOrder, node.getShiftOrder()))
+                .filter(node -> node.getTask() != null
+                        && Objects.equals(treadCode, node.getTask().getTreadCode()))
+                .map(node -> this.nvl(node.getPlanQty()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    /**
      * 将当前步骤即时产生的结构化证据转换为中文 FULL 事件。
      *
      * @param context  排程上下文
@@ -394,8 +456,13 @@ public class TmScheduleTemplateImpl extends AbsTmScheduleTemplate {
             this.appendBootstrapFullDetail(context);
         }
         if (TmScheduleStepEnum.INVENTORY_PREDICT == stepEnum) {
-            context.getStockForecastMap().values().stream()
-                    .sorted(Comparator.comparing(stock -> StrUtil.blankToDefault(stock.getTreadCode(), "")))
+            this.sortedLogTaskStream(context)
+                    .filter(task -> StrUtil.isNotBlank(task.getTreadCode()))
+                    .collect(Collectors.toMap(TmTaskDraft::getTreadCode, task -> task, (left, right) -> left,
+                            LinkedHashMap::new))
+                    .keySet().stream()
+                    .map(context.getStockForecastMap()::get)
+                    .filter(Objects::nonNull)
                     .forEach(stock -> context.appendShiftFullProcessTrace(1, new ScheduleProcessTraceEvent(
                             stepEnum.getDesc(), StrUtil.blankToDefault(stock.getTreadCode(), "未知胎面"), "班次库存滚动",
                             "排程日前库存快照、前日首班计划和成型首班需求。",
@@ -410,7 +477,7 @@ public class TmScheduleTemplateImpl extends AbsTmScheduleTemplate {
         }
         this.appendUnrenderedRuleTrace(context, stepEnum);
         if (TmScheduleStepEnum.PLAN_CALC == stepEnum || TmScheduleStepEnum.MACHINE_ASSIGN == stepEnum) {
-            context.getTaskDraftList().forEach(task -> context.appendShiftFullProcessTrace(task.getShiftOrder(), new ScheduleProcessTraceEvent(
+            this.sortedLogTaskStream(context).forEach(task -> context.appendShiftFullProcessTrace(task.getShiftOrder(), new ScheduleProcessTraceEvent(
                     stepEnum.getDesc(), task.getBusinessKey(),
                     TmScheduleStepEnum.PLAN_CALC == stepEnum ? "库存抵扣与计划量计算" : "选机后计划量定稿",
                     "成型来源任务、滚动库存、施工资料、本批次参数和即时规则证据。",
@@ -427,13 +494,13 @@ public class TmScheduleTemplateImpl extends AbsTmScheduleTemplate {
             )));
         }
         if (TmScheduleStepEnum.PLAN_CALC == stepEnum) {
-            context.getTaskDraftList().forEach(task -> context.appendShiftFullProcessTrace(task.getShiftOrder(), new ScheduleProcessTraceEvent(
+            this.sortedLogTaskStream(context).forEach(task -> context.appendShiftFullProcessTrace(task.getShiftOrder(), new ScheduleProcessTraceEvent(
                     stepEnum.getDesc(), task.getBusinessKey(), "库存供应时长计算",
                     "当前班班初滚动库存、保证范围内成型需求和保证范围总小时数。",
-                    "滚动库存=" + this.nvl(task.getRollingStockQty()) + "米，保证范围需求="
-                            + this.nvl(task.getGuardDemandQty()) + "米，保证范围总时长="
-                            + this.nvl(task.getGuardRangeHours()) + "小时。",
-                    "先按保证范围需求计算平均每小时成型消耗，再计算现有库存可支撑的小时数；库存供应时长越小，库存越紧急。",
+                    "滚动库存=" + this.nvl(task.getRollingStockQty()) + "米，逐班成型需求="
+                            + task.getFormingGuardWindowQtyMap() + "，逐班实际时长="
+                            + task.getFormingGuardWindowHoursMap() + "小时。",
+                    "按成型班次顺序逐班扣减库存：完整覆盖则累计该班实际时长；首个不能完整覆盖的班次按剩余库存占该班需求的比例折算时长并停止。",
                     this.buildSupplyHoursFormula(task),
                     "库存供应时长=" + this.displaySupplyHours(task.getSupplyHours()) + "。",
                     "作为任务排序的库存紧急度指标，并用于后续缺料时点推算。"
@@ -455,7 +522,7 @@ public class TmScheduleTemplateImpl extends AbsTmScheduleTemplate {
             }
         }
         if (TmScheduleStepEnum.MACHINE_ASSIGN == stepEnum) {
-            context.getTaskDraftList().stream().filter(TmTaskDraft::isUnassigned).forEach(task ->
+            this.sortedLogTaskStream(context).filter(TmTaskDraft::isUnassigned).forEach(task ->
                     context.appendShiftFullProcessTrace(task.getShiftOrder(), new ScheduleProcessTraceEvent(
                             stepEnum.getDesc(), task.getBusinessKey(), "未排判定",
                             "机台过滤、评分、产能拆分和顺延后的任务状态。",
@@ -643,7 +710,7 @@ public class TmScheduleTemplateImpl extends AbsTmScheduleTemplate {
      */
     private String buildToolUsageSummary(TmTaskDraft task, TmScheduleContext context) {
         if (task.getTotalToolQty() == null) {
-            return "工装限制：总工装米数=未计算（未启用工装约束），可用工装米数=未计算，本任务净占用工装米数=未计算，剩余工装米数=未计算，有效卷曲长度=未计算";
+            return "工装限制：总工装米数=未计算（未启用工装约束），可用工装米数=未计算，本任务净占用工装米数=未计算，剩余工装米数=未计算，有效卷曲长度=未计算；TM_TOOL_TOTAL_QTY未配置或非正数，可用工装数量、工装允许最大计划量、净占用工装数量和剩余工装数量均未计算";
         }
         boolean taskCurlLengthEffective = task.getCurlRollLength() != null
                 && task.getCurlRollLength().compareTo(BigDecimal.ZERO) > 0;
@@ -651,19 +718,53 @@ public class TmScheduleTemplateImpl extends AbsTmScheduleTemplate {
                 : task.getDefaultCurlRollLength();
         String curlLengthSource = taskCurlLengthEffective ? "任务卷曲长度" : "默认卷曲长度";
         if (effectiveCurlLength == null || effectiveCurlLength.compareTo(BigDecimal.ZERO) <= 0) {
-            return "工装限制：总工装米数=未计算，可用工装米数=未计算，本任务净占用工装米数=未计算，剩余工装米数=未计算，有效卷曲长度=未计算";
+            return "工装限制：总工装米数=未计算，可用工装米数=未计算，本任务净占用工装米数=未计算，剩余工装米数=未计算，有效卷曲长度=未计算；任务卷曲长度和默认卷曲长度均未配置或非正数，无法计算可用工装数量对应产量、净占用工装数量和剩余工装数量";
         }
         ScheduleToolLedgerSnapshot snapshot = context == null ? null
                 : context.getToolLedgerSnapshotMap().get(task.getBusinessKey());
         BigDecimal availableToolQty = snapshot == null ? task.getAvailableToolQty() : snapshot.getAvailableToolQty();
         BigDecimal toolUsedQty = snapshot == null ? task.getToolUsedQty() : snapshot.getToolUsedQty();
         BigDecimal remainingToolQty = snapshot == null ? task.getRemainingToolQty() : snapshot.getRemainingToolQty();
+        String availableSource;
+        if (task.getToolLedgerOrder() == null) {
+            availableSource = "当前任务计算前全局可用工装快照";
+        } else if (task.getToolLedgerOrder() <= 1) {
+            availableSource = "批次初始可用工装";
+        } else {
+            availableSource = "上一任务结算后剩余工装";
+        }
+        BigDecimal maxPlanQty = availableToolQty == null ? null : availableToolQty.multiply(effectiveCurlLength);
         return "工装限制：总工装米数=" + this.displayToolMeter(task.getTotalToolQty(), effectiveCurlLength)
                 + "，可用工装米数=" + this.displayToolMeter(availableToolQty, effectiveCurlLength)
                 + "，本任务净占用工装米数=" + this.displayToolMeter(toolUsedQty, effectiveCurlLength)
                 + "，剩余工装米数=" + this.displayToolMeter(remainingToolQty, effectiveCurlLength)
                 + "，有效卷曲长度=" + this.displayToolQuantity(effectiveCurlLength)
-                + "（" + curlLengthSource + "）";
+                + "（" + curlLengthSource + "）"
+                + "；可用工装数量=" + availableSource
+                + this.displayToolQuantity(availableToolQty) + "套"
+                + "；工装允许最大计划量=" + this.displayToolQuantity(availableToolQty) + "套×"
+                + this.displayToolQuantity(effectiveCurlLength) + "米/套="
+                + this.displayToolQuantity(maxPlanQty) + "米"
+                + "；本任务净占用工装数量=(最终计划量" + this.displayToolQuantity(task.getPlanQty())
+                + "米-当班成型消耗量" + this.displayToolQuantity(task.getCurrentShiftDemandQty())
+                + "米)÷" + this.displayToolQuantity(effectiveCurlLength) + "米/套="
+                + this.displayToolQuantity(toolUsedQty) + "套"
+                + "；剩余工装数量=min(max(" + this.displayToolQuantity(availableToolQty)
+                + "套-" + this.displaySubtractedToolQuantity(toolUsedQty) + ",0),"
+                + this.displayToolQuantity(task.getTotalToolQty()) + "套)="
+                + this.displayToolQuantity(remainingToolQty) + "套";
+    }
+
+    /**
+     * 格式化剩余工装公式中的被减数，负数使用括号避免出现连续减号。
+     *
+     * @param quantity 净占用工装数量
+     * @return 带套数单位的公式文本
+     */
+    private String displaySubtractedToolQuantity(BigDecimal quantity) {
+        String quantityText = this.displayToolQuantity(quantity) + "套";
+        return quantity != null && quantity.compareTo(BigDecimal.ZERO) < 0
+                ? "(" + quantityText + ")" : quantityText;
     }
 
     /**
@@ -697,19 +798,9 @@ public class TmScheduleTemplateImpl extends AbsTmScheduleTemplate {
      * @return 中文公式文本
      */
     private String buildSupplyHoursFormula(TmTaskDraft task) {
-        BigDecimal guardDemandQty = this.nvl(task.getGuardDemandQty());
-        BigDecimal guardRangeHours = this.nvl(task.getGuardRangeHours());
-        if (guardDemandQty.compareTo(BigDecimal.ZERO) <= 0 || guardRangeHours.compareTo(BigDecimal.ZERO) <= 0) {
-            return "库存供应公式：保证范围需求量=" + guardDemandQty.toPlainString()
-                    + "米，保证范围总时长=" + guardRangeHours.toPlainString()
-                    + "小时，无法计算平均每小时成型消耗，供应时长按未提供处理。";
-        }
-        BigDecimal averageDemandPerHour = guardDemandQty.divide(guardRangeHours, 6, RoundingMode.HALF_UP);
-        return "库存供应公式：平均每小时成型消耗=保证范围需求" + guardDemandQty.toPlainString()
-                + "米÷保证范围总时长" + guardRangeHours.toPlainString() + "小时="
-                + averageDemandPerHour.toPlainString() + "米/H；库存供应时长=班初滚动库存"
-                + this.nvl(task.getRollingStockQty()).toPlainString() + "米÷平均每小时成型消耗"
-                + averageDemandPerHour.toPlainString() + "米/H=" + this.displaySupplyHours(task.getSupplyHours()) + "。";
+        ScheduleSupplyDurationResult result = ScheduleSupplyDurationCalculator.calculate(task.getRollingStockQty(),
+                task.getFormingGuardWindowQtyMap(), task.getFormingGuardWindowHoursMap());
+        return result.getCalculationDetail();
     }
 
     /**

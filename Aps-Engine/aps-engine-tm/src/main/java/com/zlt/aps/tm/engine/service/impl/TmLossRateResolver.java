@@ -25,7 +25,11 @@ public class TmLossRateResolver {
         if (CollUtil.isEmpty(ruleList)) {
             return null;
         }
-        for (TmLossMatchLevelEnum matchLevel : TmLossMatchLevelEnum.values()) {
+        for (TmLossMatchLevelEnum matchLevel : new TmLossMatchLevelEnum[]{
+                TmLossMatchLevelEnum.MACHINE_TREAD,
+                TmLossMatchLevelEnum.TREAD,
+                TmLossMatchLevelEnum.MACHINE,
+                TmLossMatchLevelEnum.DEFAULT}) {
             TmLossRuleMatchResult result = this.find(ruleList, treadCode, machineCode, matchLevel);
             if (result != null) {
                 return result;

@@ -689,6 +689,27 @@ public class TmAutoScheduleDataLoadService {
     }
 
     /**
+     * 成型班次有需求但示方书为空或未命中施工时，记录未生成任务的准确提示。
+     *
+     * @param context                  自动排程上下文
+     * @param formingRowCount          已加载的成型计划行数
+     * @param constructionMissingCount 因示方书为空或未命中有效施工而跳过的排程班次数
+     */
+    private void recordConstructionMissingTaskMessage(TmScheduleContext context, int formingRowCount,
+                                                      int constructionMissingCount) {
+        if (formingRowCount <= 0 || constructionMissingCount <= 0) {
+            return;
+        }
+        String template = I18nUtil.getMessage("ui.data.alert.tm.schedule.noTaskGeneratedWithConstructionMissing");
+        if (StrUtil.isBlank(template)
+                || "ui.data.alert.tm.schedule.noTaskGeneratedWithConstructionMissing".equals(template)) {
+            template = "胎面自动排程未生成结果：成型计划已加载 {0} 行，但偏移后有需求的 {1} 个排程班次未匹配到有效施工，请确认成型计划示方书与施工信息的胎胚编码、施工版本是否匹配";
+        }
+        context.setEmptyFormingTaskMessage(MessageFormat.format(template, formingRowCount,
+                constructionMissingCount));
+    }
+
+    /**
      * 从成型计划和施工信息构造胎面待排任务。
      *
      * <p>按参数 {@code TM_VERSION_MATCH_MODE} 分流：{@code RECIPE}（默认）走逐班示方书版本解析，
@@ -1169,7 +1190,11 @@ public class TmAutoScheduleDataLoadService {
                 context.getFactoryCode(), DateUtil.formatDate(context.getScheduleDate()),
                 rowList.size(), skippedShiftNoFormingQty, skippedShiftNoSpec, taskDraftList.size());
         if (taskDraftList.isEmpty()) {
-            this.recordEmptyFormingTaskMessage(context, rowList.size(), formingShiftOffset);
+            if (skippedShiftNoSpec > 0) {
+                this.recordConstructionMissingTaskMessage(context, rowList.size(), skippedShiftNoSpec);
+            } else {
+                this.recordEmptyFormingTaskMessage(context, rowList.size(), formingShiftOffset);
+            }
         }
         return taskDraftList;
     }
@@ -1269,14 +1294,8 @@ public class TmAutoScheduleDataLoadService {
         int startIndex = this.resolveGuardStartIndex(shiftOrder, formingShiftOffset, algorithmCode);
         int count = Math.max(guardShiftCount, 1);
         for (int index = startIndex; index < startIndex + count; index++) {
-            if (remainingGuardFormingQty.compareTo(BigDecimal.ZERO) <= 0) {
-                break;
-            }
             BigDecimal formingQty = this.resolveGuardClassQty(classQtyArray, index);
             BigDecimal appliedFormingQty = formingQty.min(remainingGuardFormingQty);
-            if (appliedFormingQty.compareTo(BigDecimal.ZERO) <= 0) {
-                continue;
-            }
             windowQtyMap.put(index + 1, appliedFormingQty.multiply(this.nvl(treadLength)));
             remainingGuardFormingQty = remainingGuardFormingQty.subtract(appliedFormingQty);
         }
@@ -1307,14 +1326,8 @@ public class TmAutoScheduleDataLoadService {
         int startIndex = this.resolveGuardStartIndex(shiftOrder, formingShiftOffset, algorithmCode);
         int count = Math.max(guardShiftCount, 1);
         for (int index = startIndex; index < startIndex + count; index++) {
-            if (remainingGuardFormingQty.compareTo(BigDecimal.ZERO) <= 0) {
-                break;
-            }
             BigDecimal formingQty = this.resolveGuardClassQty(classQtyArray, index);
             BigDecimal appliedFormingQty = formingQty.min(remainingGuardFormingQty);
-            if (appliedFormingQty.compareTo(BigDecimal.ZERO) <= 0) {
-                continue;
-            }
             BigDecimal treadLength = (index >= 0 && index < 8 && specByClass != null && specByClass[index] != null)
                     ? this.nvl(specByClass[index].getTreadShoulderLength()) : this.nvl(currentTreadLength);
             windowQtyMap.put(index + 1, appliedFormingQty.multiply(treadLength));
@@ -2484,6 +2497,7 @@ public class TmAutoScheduleDataLoadService {
         targetTask.setCurrentShiftDemandQty(allocatedQty);
         targetTask.setGuardDemandQty(BigDecimal.ZERO);
         targetTask.setFormingGuardWindowQtyMap(Collections.emptyMap());
+        targetTask.setFormingGuardWindowHoursMap(Collections.emptyMap());
         targetTask.setDemandQty(allocatedQty);
         targetTask.setGuardShiftCount(0);
         targetTask.setGuardRangeHours(BigDecimal.ZERO);
@@ -2847,6 +2861,7 @@ public class TmAutoScheduleDataLoadService {
         BigDecimal guardRangeHours = BigDecimal.ZERO;
         List<Integer> mappedShiftOrders = new ArrayList<>();
         List<BigDecimal> shiftHours = new ArrayList<>();
+        Map<Integer, BigDecimal> guardWindowHoursMap = new LinkedHashMap<>();
         String skipReason = null;
         for (int index = 0; index < count; index++) {
             int logicalShiftOrder = logicalStartShiftOrder + index;
@@ -2858,6 +2873,7 @@ public class TmAutoScheduleDataLoadService {
                 skipReason = "SHIFT_HOURS_MISSING_OR_NON_POSITIVE";
                 break;
             }
+            guardWindowHoursMap.put(logicalShiftOrder, currentShiftHours);
             guardRangeHours = guardRangeHours.add(currentShiftHours);
         }
         Map<String, Object> evidence = new LinkedHashMap<>();
@@ -2867,12 +2883,14 @@ public class TmAutoScheduleDataLoadService {
         evidence.put("shiftHours", shiftHours);
         if (skipReason == null) {
             taskDraft.setGuardRangeHours(guardRangeHours);
+            taskDraft.setFormingGuardWindowHoursMap(guardWindowHoursMap);
             evidence.put("guardRangeHours", guardRangeHours);
             context.getRuleTraceMap().computeIfAbsent(taskDraft.getBusinessKey(), key -> new TmRuleTrace())
                     .addRuleHit(TmScheduleRuleCodeEnum.GUARD_RANGE_HOURS, TmScheduleRuleResultEnum.PASS, evidence);
             return;
         }
         taskDraft.setGuardRangeHours(null);
+        taskDraft.setFormingGuardWindowHoursMap(Collections.emptyMap());
         evidence.put("guardRangeHours", null);
         evidence.put("reason", skipReason);
         context.getRuleTraceMap().computeIfAbsent(taskDraft.getBusinessKey(), key -> new TmRuleTrace())

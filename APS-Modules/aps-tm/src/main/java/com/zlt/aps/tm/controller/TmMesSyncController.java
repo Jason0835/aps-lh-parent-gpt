@@ -69,6 +69,26 @@ public class TmMesSyncController implements ITmMesSyncRemoteService {
     }
 
     /**
+     * 替换指定工厂和库存日期的胎面库存快照。
+     *
+     * @param factoryCode 工厂编码
+     * @param stockDate 库存日期
+     * @param updateBy 更新人
+     * @param stockList 库存列表，空集合表示清空快照
+     * @return 保存结果
+     */
+    @Override
+    @ApiOperation("替换胎面库存快照")
+    @PostMapping("/tmMesSync/replaceStock")
+    public AjaxResult replaceStock(@RequestParam("factoryCode") String factoryCode,
+                                   @RequestParam("stockDate") String stockDate,
+                                   @RequestParam("updateBy") String updateBy,
+                                   @RequestBody List<TmStock> stockList) {
+        this.tmStockService.replaceStock(factoryCode, DateUtil.parseDate(stockDate), updateBy, stockList);
+        return AjaxResult.success();
+    }
+
+    /**
      * 替换胎面自动滚动班次库存快照。
      *
      * @param factoryCode 工厂编码

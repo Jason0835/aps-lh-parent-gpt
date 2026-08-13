@@ -169,6 +169,8 @@ public class TcScheduleParamLoader {
                 TcScheduleConstants.DEFAULT_GLUE_CHANGE_CAPACITY_DEDUCT);
         this.putDefaultParam(paramMap, TcScheduleConstants.PARAM_VEHICLE_RATE,
                 TcScheduleConstants.DEFAULT_VEHICLE_RATE);
+        this.putDefaultParam(paramMap, TcScheduleConstants.PARAM_DEFAULT_LOSS_RATE,
+                TcScheduleConstants.DEFAULT_LOSS_RATE);
         this.putDefaultParam(paramMap, TcScheduleConstants.PARAM_STOCK_MISSING_POLICY,
                 TcScheduleConstants.DEFAULT_STOCK_MISSING_POLICY);
         this.putDefaultParam(paramMap, TcScheduleConstants.PARAM_FILTER_RULE_ORDER,

@@ -1,5 +1,7 @@
 package com.zlt.aps.tc.service.impl;
 
+import cn.hutool.core.date.DateUtil;
+import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.exception.ServiceException;
@@ -15,10 +17,7 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
 
 @Slf4j
 @Service
@@ -67,28 +66,37 @@ public class TcStockServiceImpl extends AbstractDocService<TcStock> implements I
      */
     @Override
     public void logicDeleteAndSaveBatch(String factoryCode, Date stockDate, String updateBy, List<TcStock> list) {
-        if (factoryCode == null || factoryCode.trim().isEmpty() || stockDate == null) {
-            throw new ServiceException(I18nUtil.getMessage("ui.tc.schedule.mes.stockArgumentsInvalid"));
+        if (StrUtil.isBlank(factoryCode) || stockDate == null) {
+            throw new ServiceException(I18nUtil.getMessage("ui.itf.mes.stockArgumentsInvalid"));
         }
+        String normalizedFactoryCode = StrUtil.trim(factoryCode);
+        Date normalizedStockDate = DateUtil.beginOfDay(stockDate);
+        String operator = StrUtil.blankToDefault(StrUtil.trim(updateBy), "MES");
         // 仅失效同工厂同日期快照，避免不同工厂之间互相覆盖。
         Date updateTime = new Date();
         int deleteCount = this.stockMapper.update(null, new LambdaUpdateWrapper<TcStock>()
-                .eq(TcStock::getFactoryCode, factoryCode)
-                .eq(TcStock::getStockDate, stockDate)
+                .eq(TcStock::getFactoryCode, normalizedFactoryCode)
+                .eq(TcStock::getStockDate, normalizedStockDate)
                 .set(TcStock::getIsDelete, 1)
-                .set(TcStock::getUpdateBy, updateBy)
+                .set(TcStock::getUpdateBy, operator)
                 .set(TcStock::getUpdateTime, updateTime));
-        log.info("胎侧库存同步：失效工厂={}、库存日期={}的旧快照，数量={}", factoryCode, stockDate, deleteCount);
+        log.info("胎侧库存同步：失效工厂={}、库存日期={}的旧快照，数量={}", normalizedFactoryCode,
+                normalizedStockDate, deleteCount);
 
         // 批量写入当前库存快照，空结果同样表示该日期快照已清空。
-        if (CollectionUtils.isNotEmpty(list)) {
-            list.stream().forEach(stock -> {
-                stock.setFactoryCode(factoryCode);
-                stock.setStockDate(stockDate);
-                stock.setCreateBy(updateBy);
+        List<TcStock> normalizedList = list == null ? Collections.emptyList() : list;
+        if (CollectionUtils.isNotEmpty(normalizedList)) {
+            normalizedList.forEach(stock -> {
+                stock.setFactoryCode(normalizedFactoryCode);
+                stock.setStockDate(normalizedStockDate);
+                stock.setCreateBy(operator);
+                stock.setUpdateBy(operator);
+                stock.setCreateTime(updateTime);
+                stock.setUpdateTime(updateTime);
+                stock.setIsDelete(0);
             });
-            baseDao.saveBatch(list);
-            log.info("胎侧库存同步：批量插入完成，插入数量={}", list.size());
+            this.baseDao.saveBatch(normalizedList);
+            log.info("胎侧库存同步：批量插入完成，插入数量={}", normalizedList.size());
         }
     }
 

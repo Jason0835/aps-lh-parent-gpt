@@ -88,6 +88,9 @@ public class TmTaskDraft {
     /** 成型备库窗口内按实际成型班次记录的有效计划长度，已按 LH_REMAIN_QTY 顺序封顶。 */
     private Map<Integer, BigDecimal> formingGuardWindowQtyMap = new LinkedHashMap<>();
 
+    /** 成型备库窗口内按逻辑班次记录的实际班次时长。 */
+    private Map<Integer, BigDecimal> formingGuardWindowHoursMap = new LinkedHashMap<>();
+
     /** 设置成型备库窗口明细并复制容器，避免顺延任务与来源任务共享可变映射。
      *
      * @param formingGuardWindowQtyMap 窗口班次明细
@@ -95,6 +98,16 @@ public class TmTaskDraft {
     public void setFormingGuardWindowQtyMap(Map<Integer, BigDecimal> formingGuardWindowQtyMap) {
         this.formingGuardWindowQtyMap = formingGuardWindowQtyMap == null
                 ? new LinkedHashMap<>() : new LinkedHashMap<>(formingGuardWindowQtyMap);
+    }
+
+    /**
+     * 设置成型备库窗口实际时长明细并复制容器。
+     *
+     * @param formingGuardWindowHoursMap 窗口班次实际时长明细
+     */
+    public void setFormingGuardWindowHoursMap(Map<Integer, BigDecimal> formingGuardWindowHoursMap) {
+        this.formingGuardWindowHoursMap = formingGuardWindowHoursMap == null
+                ? new LinkedHashMap<>() : new LinkedHashMap<>(formingGuardWindowHoursMap);
     }
 
     /** 当前班开始滚动库存，单位米 */

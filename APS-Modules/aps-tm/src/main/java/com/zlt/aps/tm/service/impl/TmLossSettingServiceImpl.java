@@ -51,6 +51,19 @@ public class TmLossSettingServiceImpl extends AbstractDocService<TmLossSetting> 
         return sysDocType;
     }
 
+    /**
+     * 校验损耗率配置必须填写非空损耗率。
+     *
+     * @param entity 待校验的胎面损耗配置
+     * @throws ServiceException 损耗率为空时抛出
+     */
+    @Override
+    public void validateLossRate(TmLossSetting entity) {
+        if (entity == null || entity.getLossRate() == null) {
+            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.lossSetting.lossRateRequired"));
+        }
+    }
+
     @Override
     public String checkUnique(TmLossSetting query) {
         if (StringUtils.isBlank(query.getTreadCode()) && StringUtils.isBlank(query.getMachineCode())) {
@@ -101,6 +114,11 @@ public class TmLossSettingServiceImpl extends AbstractDocService<TmLossSetting> 
     @Override
     protected Boolean serviceCheckAndDataHandle(TmLossSetting importDocEntity, List<ImportErrorLog> importErrorLogs,
                                                 Long importLogId, int errorRowNum, Map<Object, Object> serviceCheckParams) {
+        if (importDocEntity.getLossRate() == null) {
+            String message = I18nUtil.getMessage("ui.data.alert.tm.lossSetting.lossRateRequired");
+            ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(), errorRowNum, message, importErrorLogs);
+            return Boolean.FALSE;
+        }
         // 校验胎面编码与机台编码不能同时为空
         String treadCode = importDocEntity.getTreadCode();
         String machineCode = importDocEntity.getMachineCode();
