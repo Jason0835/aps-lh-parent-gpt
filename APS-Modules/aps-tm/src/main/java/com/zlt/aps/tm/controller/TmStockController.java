@@ -123,6 +123,6 @@ public class TmStockController extends AbstractDocBizController<TmStock> {
 
     @Override
     protected String getOrderBy() {
-        return "create_time desc";
+        return "update_time desc";
     }
 }
