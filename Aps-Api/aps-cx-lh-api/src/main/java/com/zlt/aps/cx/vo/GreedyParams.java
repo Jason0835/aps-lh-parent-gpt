@@ -28,4 +28,6 @@ public class GreedyParams {
     private Map<String, Set<String>> continueTypeMap;
     /** 续作预扣硫化机台号（null 表示无预扣） */
     private Map<String, Set<String>> continueLhMachineCodeMap;
+    /** 硫化机专供成型机映射（lhMachineCode -> 专供成型机台号集合，null 表示无专供约束） */
+    private Map<String, Set<String>> lhMachineSupplyMap;
 }

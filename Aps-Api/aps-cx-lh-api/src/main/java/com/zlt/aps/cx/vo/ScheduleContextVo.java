@@ -551,6 +551,14 @@ public class ScheduleContextVo {
     private Map<String, Map<String, Integer>> previousShiftMachineEmbryoLoadMap;
 
     /**
+     * 硫化机专供成型机映射（硫化机台号 -> 专供成型机台号集合）。
+     * <p>来源表 T_CX_LH_MACHINE_SUPPLY，加载时按 LH_MACHINE_CODE 分组。
+     * <p>均衡/续作/试制分配时据此判断任务（按 lhMachineCode）的专供成型机，
+     * 优先分配到专供成型机，专供机满负荷后再回退到其他成型机。
+     */
+    private Map<String, Set<String>> lhMachineSupplyMap;
+
+    /**
      * 月计划排产版本
      * 从硫化排程结果中提取，用于过滤结构排产配置
      */
@@ -654,6 +662,22 @@ public class ScheduleContextVo {
             }
         }
         return new ArrayList<>();
+    }
+
+    /**
+     * 获取指定硫化机台号的专供成型机台号集合。
+     *
+     * <p>无专供配置（或配置未加载）时返回空集合，表示不限制（正常均衡分配）。
+     *
+     * @param lhMachineCode 硫化机台号（去 L/R 后缀）
+     * @return 专供成型机台号集合，无配置时返回空集合（非 null）
+     */
+    public Set<String> getDedicatedSupplyMachines(String lhMachineCode) {
+        if (lhMachineSupplyMap == null || lhMachineCode == null || lhMachineCode.isEmpty()) {
+            return Collections.emptySet();
+        }
+        Set<String> machines = lhMachineSupplyMap.get(lhMachineCode);
+        return machines != null ? machines : Collections.emptySet();
     }
 
     /**

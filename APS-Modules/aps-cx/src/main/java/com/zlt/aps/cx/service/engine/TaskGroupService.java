@@ -506,8 +506,16 @@ public class TaskGroupService {
 
         // 机台级占用时间追踪（key = structureName|machineCode → 已占用秒数）
         Map<String, Long> machineOccupiedTimeMap = new HashMap<>();
-        // 结构全部收尾标记（结构 → 是否全部收尾）
+        // 结构全部收尾标记（结构 -> 是否全部收尾）
+        // 初始化：当日有排产配置的所有结构默认为"已收尾"，仅当当前班次有排产记录且
+        // updateMachineOccupationAndEndingStatus 判定为 false 时才更新为 false。
+        // 这样，当某结构在当前班次无排产记录时，机台可释放给提前生产结构使用。
         Map<String, Boolean> structureFullyEndedMap = new HashMap<>();
+        for (Set<String> structs : machineToStructuresMap.values()) {
+            for (String struct : structs) {
+                structureFullyEndedMap.putIfAbsent(struct, true);
+            }
+        }
         // 提前生产动态已用机台集合
         Set<String> advanceUsedMachineCodes = new HashSet<>();
         // 提前生产结构实际可用产能（结构 → 可用秒数，= 机台数×28800 - 前结构占用 - 切换耗时 - 跨班次遗留）
@@ -632,11 +640,15 @@ public class TaskGroupService {
                     normalResults.size(), advanceResults.size());
         }
 
-        // 2a: 班次计划量筛选（宽松窗口=提前腾机上限 LOOKAHEAD_ADVANCE）
-        // 命中即停：本班 → 下1班 → 下2班，任一有计划量即纳入；结构循环内再按普通/提前收紧窗口
+        // 2a: 班次计划量筛选
+        // 普通结构：LOOKAHEAD_NORMAL（本班+下1班）
+        // 提前生产结构：LOOKAHEAD_ADVANCE+1（本班+下3班），多看1班以便提前开始机台切换
         List<LhScheduleResult> activeResults = new ArrayList<>();
         for (LhScheduleResult lh : lhScheduleResults) {
-            Integer demandClassIdx = resolveDemandClassIndex(lh, currentClassIndex, LOOKAHEAD_ADVANCE);
+            String struct = lh.getStructureName();
+            boolean hasDayMachine = structHasDayMachineCache.getOrDefault(struct, true);
+            int lookAhead = hasDayMachine ? LOOKAHEAD_NORMAL : LOOKAHEAD_ADVANCE + 1;
+            Integer demandClassIdx = resolveDemandClassIndex(lh, currentClassIndex, lookAhead);
             if (demandClassIdx != null) {
                 if (!demandClassIdx.equals(currentClassIndex)) {
                     log.info("[班次筛选-前瞻有计划] 胎胚={}, 物料={}, 命中CLASS{}, 参与本班次排程",
@@ -646,9 +658,9 @@ public class TaskGroupService {
             }
         }
         if (activeResults.size() < lhScheduleResults.size()) {
-            log.info("[班次筛选] 本班次处理 {} / {} 条记录 (跳过 {} 条, 宽松窗口=本班+后{}班)",
+            log.info("[班次筛选] 本班次处理 {} / {} 条记录 (跳过 {} 条, 普通窗口=本班+后{}班, 提前生产窗口=本班+后{}班)",
                     activeResults.size(), lhScheduleResults.size(),
-                    lhScheduleResults.size() - activeResults.size(), LOOKAHEAD_ADVANCE);
+                    lhScheduleResults.size() - activeResults.size(), LOOKAHEAD_NORMAL, LOOKAHEAD_ADVANCE + 1);
         }
 
         // 按结构分组 activeResults（保持排序顺序：正常结构在前，提前生产结构在后）
@@ -1603,7 +1615,7 @@ public class TaskGroupService {
                         continue;
                     }
 
-                    // 产能检查：计算本项耗时
+                    // 产能检查：计算本项耗时（弹性余量：仅当成型产出 < 硫化消耗时允许超一车）
                     Integer dailyLhCapacity = productionCalculator.getDoubleMoldDailyLhCapacity(dtMaterialCode, state.context);
                     BigDecimal avgRatio = state.structureAvgRatioCache
                             .computeIfAbsent(structName, k -> {
@@ -1615,15 +1627,27 @@ public class TaskGroupService {
                     if (dailyLhCapacity != null && dailyLhCapacity > 0 && avgRatio.compareTo(BigDecimal.ZERO) > 0) {
                         timePerTire = productionCalculator.calculateTimePerTire(avgRatio, dailyLhCapacity);
                         tripTime = timePerTire.multiply(BigDecimal.valueOf(fallbackProduction));
-                        if (structDeferredTime.add(tripTime).compareTo(remainingCapacity) > 0) {
-                            log.info("  [R2-产能不足] 结构={}, 胎胚={}, 物料={}, 第{}轮, 已用={}s({}h) + 本项={}s({}h) > 剩余产能={}s({}h), break退出",
+                        // 弹性余量：当成型总产出 < 硫化总消耗时，允许超一车时间，使产出尽量匹配硫化需求
+                        BigDecimal elasticAllowance = BigDecimal.ZERO;
+                        int structTotalOutput = 0;
+                        int structTotalVulcConsumption = 0;
+                        for (DailyEmbryoTask st : entry.getValue()) {
+                            structTotalOutput += st.getPlannedProduction() != null ? st.getPlannedProduction() : 0;
+                            structTotalVulcConsumption += st.getVulcanizeDemand() != null ? st.getVulcanizeDemand() : 0;
+                        }
+                        if (structTotalOutput < structTotalVulcConsumption) {
+                            elasticAllowance = tripTime;
+                        }
+                        if (structDeferredTime.add(tripTime).compareTo(remainingCapacity.add(elasticAllowance)) > 0) {
+                            log.info("  [R2-产能不足] 结构={}, 胎胚={}, 物料={}, 第{}轮, 已用={}s({}h) + 本项={}s({}h) > 剩余产能={}s({}h)(含弹性{}s), 成型产出={}/硫化消耗={}, break退出",
                                     structName, minTask.getEmbryoCode(), dtMaterialCode, currentRound,
                                     structDeferredTime.toBigInteger(),
                                     structDeferredTime.divide(BigDecimal.valueOf(3600), 1, BigDecimal.ROUND_HALF_UP),
                                     tripTime.toBigInteger(),
                                     tripTime.divide(BigDecimal.valueOf(3600), 1, BigDecimal.ROUND_HALF_UP),
                                     remainingCapacity.toBigInteger(),
-                                    remainingCapacity.divide(BigDecimal.valueOf(3600), 1, BigDecimal.ROUND_HALF_UP));
+                                    remainingCapacity.divide(BigDecimal.valueOf(3600), 1, BigDecimal.ROUND_HALF_UP),
+                                    elasticAllowance.toBigInteger(), structTotalOutput, structTotalVulcConsumption);
                             deferredSkippedCapacity++;
                             skippedCapacityList.add(minTask.getEmbryoCode() + "/" + dtMaterialCode);
                             break;
@@ -2103,7 +2127,7 @@ public class TaskGroupService {
                         continue;
                     }
 
-                    // 产能检查
+                    // 产能检查（弹性余量：仅当成型产出 < 硫化消耗时允许超一车，与R2保持一致）
                     Integer dailyLhCapacity = productionCalculator.getDoubleMoldDailyLhCapacity(dtMaterialCode, state.context);
                     BigDecimal avgRatio = state.structureAvgRatioCache
                             .computeIfAbsent(structName, k -> {
@@ -2113,11 +2137,23 @@ public class TaskGroupService {
                     if (dailyLhCapacity != null && dailyLhCapacity > 0 && avgRatio.compareTo(BigDecimal.ZERO) > 0) {
                         BigDecimal timePerTire = productionCalculator.calculateTimePerTire(avgRatio, dailyLhCapacity);
                         BigDecimal tripTime = timePerTire.multiply(BigDecimal.valueOf(fallbackProduction));
-                        if (structDeferredTime.add(tripTime).compareTo(remainingCapacity) > 0) {
-                            log.info("  [R3-产能不足] 结构={}, 胎胚={}, 第{}轮, 已用={}s + 本项={}s > 剩余产能={}s, break退出",
+                        // 弹性余量：当成型总产出 < 硫化总消耗时，允许超一车时间
+                        BigDecimal elasticAllowance = BigDecimal.ZERO;
+                        int r3StructTotalOutput = 0;
+                        int r3StructTotalVulcConsumption = 0;
+                        for (DailyEmbryoTask st : entry.getValue()) {
+                            r3StructTotalOutput += st.getPlannedProduction() != null ? st.getPlannedProduction() : 0;
+                            r3StructTotalVulcConsumption += st.getVulcanizeDemand() != null ? st.getVulcanizeDemand() : 0;
+                        }
+                        if (r3StructTotalOutput < r3StructTotalVulcConsumption) {
+                            elasticAllowance = tripTime;
+                        }
+                        if (structDeferredTime.add(tripTime).compareTo(remainingCapacity.add(elasticAllowance)) > 0) {
+                            log.info("  [R3-产能不足] 结构={}, 胎胚={}, 第{}轮, 已用={}s + 本项={}s > 剩余产能={}s(含弹性{}s), 成型产出={}/硫化消耗={}, break退出",
                                     structName, minTask.getEmbryoCode(), structGlobalRound,
                                     structDeferredTime.toBigInteger(), tripTime.toBigInteger(),
-                                    remainingCapacity.toBigInteger());
+                                    remainingCapacity.toBigInteger(), elasticAllowance.toBigInteger(),
+                                    r3StructTotalOutput, r3StructTotalVulcConsumption);
                             r3SkippedCapacity++;
                             r3SkippedCapacityList.add(minTask.getEmbryoCode() + "/" + dtMaterialCode);
                             break;
