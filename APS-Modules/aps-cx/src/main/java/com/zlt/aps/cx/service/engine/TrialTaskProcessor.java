@@ -164,7 +164,7 @@ public class TrialTaskProcessor {
         String embryoCode = task.getEmbryoCode();
 
         MdmMoldingMachine selectedMachine = selectMachineForTrial(
-                embryoCode, structureName, structMachines, machineAllocationMap, context);
+                task, structureName, structMachines, machineAllocationMap, context);
         if (selectedMachine == null) {
             log.warn("试制任务 {} 无法找到合适的机台，跳过", embryoCode);
             return;
@@ -186,21 +186,28 @@ public class TrialTaskProcessor {
      *
      * <p><b>优先级</b>：
      * <ol>
+     *   <li>专供机台优先（任务硫化机有专供要求时，优先从专供成型机中选，专供机满负荷后回退其他机台）</li>
      *   <li>空机台 — {@code machineAllocationMap} 中无记录或 taskAllocations 为空，取第一个空机台</li>
      *   <li>无空机台 — 选 {@link #calculateImbalance} 最大者（与当前非空机台平均负载偏差最大）</li>
      * </ol>
      *
-     * @param embryoCode 胎胚编码
+     * @param task 试制任务（用于读取 lhMachineCode 判定专供成型机）
      */
     private MdmMoldingMachine selectMachineForTrial(
-            String embryoCode,
+            DailyEmbryoTask task,
             String structureName,
             List<MpCxCapacityConfiguration> structMachines,
             Map<String, MachineAllocationResult> machineAllocationMap,
             ScheduleContextVo context) {
 
+        Set<String> dedicatedMachines = context.getDedicatedSupplyMachines(task.getLhMachineCode());
+        boolean hasDedicated = !dedicatedMachines.isEmpty();
+
+        MdmMoldingMachine emptyDedicatedMachine = null;
         MdmMoldingMachine emptyMachine = null;
+        MdmMoldingMachine bestDedicatedMachine = null;
         MdmMoldingMachine bestImbalancedMachine = null;
+        int maxDedicatedImbalance = -1;
         int maxImbalance = -1;
 
         for (MpCxCapacityConfiguration config : structMachines) {
@@ -214,14 +221,23 @@ public class TrialTaskProcessor {
                 continue;
             }
 
+            boolean isDedicated = !hasDedicated || dedicatedMachines.contains(machineCode);
+
             MachineAllocationResult allocation = machineAllocationMap.get(machineCode);
 
             if (allocation == null || allocation.getTaskAllocations().isEmpty()) {
+                if (isDedicated && emptyDedicatedMachine == null) {
+                    emptyDedicatedMachine = machine;
+                }
                 if (emptyMachine == null) {
                     emptyMachine = machine;
                 }
             } else {
                 int imbalance = calculateImbalance(machineCode, machineAllocationMap);
+                if (isDedicated && imbalance > maxDedicatedImbalance) {
+                    maxDedicatedImbalance = imbalance;
+                    bestDedicatedMachine = machine;
+                }
                 if (imbalance > maxImbalance) {
                     maxImbalance = imbalance;
                     bestImbalancedMachine = machine;
@@ -229,6 +245,13 @@ public class TrialTaskProcessor {
             }
         }
 
+        // 优先专供可回退：专供空机台 > 专供不均衡机台 > 任意空机台 > 任意不均衡机台
+        if (emptyDedicatedMachine != null) {
+            return emptyDedicatedMachine;
+        }
+        if (bestDedicatedMachine != null) {
+            return bestDedicatedMachine;
+        }
         if (emptyMachine != null) {
             return emptyMachine;
         }
