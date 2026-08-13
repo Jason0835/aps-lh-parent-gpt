@@ -2879,11 +2879,11 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                 continue;
             }
             // 赋值开始结束日期
-            if (item.getBeginDay() == null || item.getEndDay() == null) { // 没有排产的结构过滤掉
-                item.setId(errorImportId);
-                failureNum++;
-                String errorMsg = String.format(noPlanStr, item.getStructureName());
-                addImportErrorLog(importLogId, errorNum, errorMsg, importErrorLogs);
+            if (item.getBeginDay() == null || item.getEndDay() == null) { // 没有排产的结构过滤掉，不提示直接过滤
+//                item.setId(errorImportId);
+//                failureNum++;
+//                String errorMsg = String.format(noPlanStr, item.getStructureName());
+//                addImportErrorLog(importLogId, errorNum, errorMsg, importErrorLogs);
                 continue;
             } else {
                 item.setAllotDays(item.getEndDay() - item.getBeginDay() + 1);
