@@ -82,6 +82,15 @@ export function validateAdd(query) {
   })
 }
 
+// 新建插单（支持一次插入6个班，后端按班次跨天拆分多笔记录）
+export function addScheduleResult(query) {
+  return request({
+    url: 'nc/ncScheduleResult/add',
+    method: 'post',
+    data: query
+  })
+}
+
 export function editScheduleResult(query) {
   return request({
     url: 'nc/ncScheduleResult/edit',
@@ -226,5 +235,30 @@ export function getSummaryVo(query) {
    url: `nc/ncScheduleResult/getSummaryVo`,
     method: 'post',
     data: query
+  })
+}
+
+// 查询指定排产日的工作班次（班次标题）
+export function getWorkClass(query) {
+  return request({
+   url: `nc/ncScheduleResult/getWorkClass`,
+    method: 'get',
+    params: query
+  })
+}
+
+// 获取内衬下拉列表（去重，按内衬名称排序）
+export function getPaddingDistList() {
+  return request({
+   url: `nc/ncScheduleResult/getPaddingDistList`,
+    method: 'get'
+  })
+}
+
+// 获取当前服务器时间对应的班次信息（用于插单弹窗）
+export function getCurrentShift() {
+  return request({
+    url: `nc/ncScheduleResult/getCurrentShift`,
+    method: 'get'
   })
 }

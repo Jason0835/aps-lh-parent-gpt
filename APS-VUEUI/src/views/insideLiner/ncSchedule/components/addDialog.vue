@@ -34,7 +34,14 @@ import { mapState } from "vuex";
 
 import infoForm from "@/views/components/infoForm.vue";
 
-import { validateAdd, editScheduleResult } from "@/api/nc/ncScheduleResult";
+import {
+  validateAdd,
+  addScheduleResult,
+  getPaddingDistList,
+  getCurrentShift,
+  getWorkClass,
+} from "@/api/nc/ncScheduleResult";
+import { getConfigKey } from "@/api/system/config";
 
 export default {
   components: { infoForm },
@@ -43,7 +50,14 @@ export default {
       loading: false,
       visible: false,
       isEdit: false,
-      editType: null,
+      liningList: [],
+      // 当前班次信息（来自 getCurrentShift API）
+      currentShiftData: null,
+      shiftList: [],
+      // 6个班的标题（来自 getWorkClass API），index 0 = 前日早班，index 1~6 对应 class1~class6
+      classHeaders: [],
+      // 排产起始班次（当前班次），用于提交后端计算实际排程日期和班次
+      startShiftClass: null,
       form: {
         scheduleDate: moment().add(1, "days").format("yyyy-MM-DD"),
       },
@@ -58,11 +72,11 @@ export default {
         liningCode: [
           {
             required: true,
-            message: this.$t("common.rule.input"),
+            message: this.$t("common.rule.select"),
             trigger: "blur",
           },
         ],
-        machineId: [
+        machineCode: [
           {
             required: true,
             message: this.$t("common.rule.select"),
@@ -80,72 +94,75 @@ export default {
       return this.$t("ui.data.column.ncScheduleResult.modalName");
     },
     columns() {
-      return [
+      const seqLabel = this.$t("ui.data.column.dj.scheduleResult.sequence");
+      const analysisLabel = this.$t("ui.data.column.dj.scheduleResult.analysis");
+      const planQtyLabel = this.$t("ui.data.column.dj.scheduleResult.planQty");
+      const colDefs = [
         {
           label: this.$t("ui.data.column.scheduleResult.scheduleDate"),
           prop: "scheduleDate",
           span: 24,
           type: "date",
           valueFormat: "yyyy-MM-dd",
+          disabled: true,
         },
         {
           label: this.$t("ui.data.column.scheduleResult.liningCode"),
           prop: "liningCode",
           span: 24,
-          maxlength: "20",
-          listeners: {
-            blur: this.toUpperCase,
-          },
+          type: "select",
+          dictData: this.liningList,
+          filterable: true,
         },
         {
           label: this.$t("ui.data.column.scheduleResult.produceLine"),
-          prop: "machineId",
+          prop: "machineCode",
           span: 24,
           type: "select",
           dictData: this.machines,
-          labelKey: "machineName",
-          valueKey: "id",
-        },
-        {
-          label: this.$t("ui.data.column.scheduleResult.nightPlanQty"),
-          prop: "dayPlanQty",
-          span: 24,
-        },
-        {
-          label: this.$t("ui.data.column.scheduleResult.nightHandAnalysis"),
-          prop: "dayHandAnalysis",
-          span: 24,
-          maxlength: "100",
-        },
-        {
-          label: this.$t("ui.data.column.scheduleResult.dayPlanQty"),
-          prop: "nightPlanQty",
-          span: 24,
-        },
-        {
-          label: this.$t("ui.data.column.scheduleResult.dayHandAnalysis"),
-          prop: "nightHandAnalysis",
-          span: 24,
-          maxlength: "100",
-        },
-        {
-          label: this.$t("中班计划量"),
-          prop: "nightPlanQty",
-          span: 24,
-        },
-        {
-          label: this.$t("中班手动输入原因分析"),
-          prop: "nightHandAnalysis",
-          span: 24,
-          maxlength: "100",
-        },
-        {
-          label: this.$t("ui.common.column.remark"),
-          prop: "class1PlanQty",
-          span: 24,
-          type: "textarea",
+          props: {
+            label: "machineName",
+            value: "machineCode",
+          },
         },
       ];
+
+      // 生成全部6个班的字段，每个班次前加标题区隔
+      for (let i = 0; i < 6; i++) {
+        const label = this.classHeaders[i + 1] || "class" + (i + 1);
+        const classIdx = i + 1;
+
+        // 标题区隔：x班 mm/dd
+        colDefs.push({
+          type: "title",
+          label: label,
+        });
+
+        colDefs.push({
+          label: planQtyLabel,
+          prop: "class" + classIdx + "PlanQty",
+          span: 12,
+        });
+        colDefs.push({
+          label: seqLabel,
+          prop: "class" + classIdx + "Sequence",
+          span: 12,
+        });
+        colDefs.push({
+          label: analysisLabel,
+          prop: "class" + classIdx + "Analysis",
+          span: 24,
+          maxlength: "100",
+        });
+      }
+
+      colDefs.push({
+        label: this.$t("ui.common.column.remark"),
+        prop: "remark",
+        span: 24,
+        type: "textarea",
+      });
+      return colDefs;
     },
   },
   methods: {
@@ -154,10 +171,21 @@ export default {
       return new Promise(async (resolve, reject) => {
         try {
           let valid = await validateAdd(params);
-          if (valid.msg == "0") {
-            this.$confirm(
-              this.$t("ui.data.column.scheduleResult.isContinueAdd")
-            )
+          if (valid.msg == "SCHEDULE_NOT_EXIST") {
+            this.$confirm(this.$t("ui.data.column.scheduleResult.isContinueAdd"))
+              .then(async () => {
+                resolve();
+              })
+              .catch((error) => {
+                reject(error);
+              });
+          } else if (valid.dialogType == "CAPACITY_OVERFLOW") {
+            // 第二档：产能溢出，用户确认后继续执行
+            this.$confirm(valid.msg, this.$t("ui.data.column.scheduleResult.insertOrder"), {
+              confirmButtonText: this.$t("common.button.confirm"),
+              cancelButtonText: this.$t("common.button.cancel"),
+              type: "warning",
+            })
               .then(async () => {
                 resolve();
               })
@@ -177,7 +205,8 @@ export default {
       try {
         this.loading = true;
         await this.validateAdd(params);
-        let result = await editScheduleResult(params);
+        // 新建插单走 /add（insertOrder），支持一次插入6个班跨排产日拆分
+        let result = await addScheduleResult(params);
         this.loading = false;
         if (result.code == 200) {
           this.$modal.msgSuccess(result.msg);
@@ -190,9 +219,50 @@ export default {
       }
     },
 
-    //utils
-    show(data, editType) {
+    // utils
+    loadLiningList() {
+      getPaddingDistList().then((res) => {
+        // 按 value 去重，防止重复 key 报错
+        const seen = new Set();
+        this.liningList = (res || []).filter((p) => {
+          if (seen.has(p.value)) {
+            return false;
+          }
+          seen.add(p.value);
+          return true;
+        });
+      });
+    },
+    loadCurrentShift() {
+      this.loading = true;
+      getCurrentShift()
+        .then((res) => {
+          this.loading = false;
+          // res 是 AjaxResult 解包后的 data
+          if (res) {
+            this.currentShiftData = res;
+            this.shiftList = res.shifts || [];
+            this.startShiftClass = res.currentShiftClass || null;
+            if (res.scheduleDate) {
+              this.form.scheduleDate = res.scheduleDate;
+            }
+          }
+        })
+        .catch(() => {
+          this.loading = false;
+        });
+    },
+    show(data) {
       this.visible = true;
+      // 新建时调用 getCurrentShift 获取当前班次
+      if (!data) {
+        this.loadCurrentShift();
+        // 获取工厂编码，与列表页面保持一致
+        getConfigKey("sys.factory.code").then((response) => {
+          this.form.factoryCode = response.msg;
+        });
+      }
+      this.loadLiningList();
       if (data) {
         this.isEdit = true;
         this.form = {
@@ -203,32 +273,54 @@ export default {
           scheduleDate: moment().add(1, "days").format("yyyy-MM-DD"),
         };
       }
+      // 加载班次标题（与列表页/修改弹窗一致）
+      const scheduleDate = this.form.scheduleDate;
+      getWorkClass({ scheduleDate }).then((res) => {
+        this.classHeaders = res;
+      });
     },
     hide() {
       this.form = {};
+      this.shiftList = [];
+      this.currentShiftData = null;
+      this.startShiftClass = null;
+      this.classHeaders = [];
       this.$refs.form.triggerResetForm();
-      // this.resetForm("infoForm");
       this.isEdit = false;
       this.visible = false;
-    },
-    toUpperCase(e) {
-      let value = e.target.value;
-      if (value.length) {
-        this.form.liningCode = value.toUpperCase();
-      }
     },
 
     handleConfirm() {
       this.$refs.form.triggerConfirm((params) => {
+        // 传入排产起始班次，供后端计算实际排程日期和班次
+        params.scheduleShiftClass = this.startShiftClass;
+
+        const groupLabels = this.shiftList.map((s) => s.label || "class" + s.classIndex);
+        // 自定义校验：至少一个班有录入计划量
+        const shifts = [
+          { qtyProp: "class1PlanQty", seqProp: "class1Sequence", label: groupLabels[0] },
+          { qtyProp: "class2PlanQty", seqProp: "class2Sequence", label: groupLabels[1] },
+          { qtyProp: "class3PlanQty", seqProp: "class3Sequence", label: groupLabels[2] },
+          { qtyProp: "class4PlanQty", seqProp: "class4Sequence", label: groupLabels[3] },
+          { qtyProp: "class5PlanQty", seqProp: "class5Sequence", label: groupLabels[4] },
+          { qtyProp: "class6PlanQty", seqProp: "class6Sequence", label: groupLabels[5] },
+        ];
+
+        const hasQty = shifts.filter((s) => params[s.qtyProp] != null && params[s.qtyProp] !== "");
+        if (hasQty.length === 0) {
+          this.$modal.msgWarning(this.$t("ui.nc.schedule.validate.atLeastOneShiftQty"));
+          return;
+        }
+
+        for (const s of hasQty) {
+          if (!params[s.seqProp] || params[s.seqProp] === "") {
+            this.$modal.msgWarning(this.$t("ui.nc.schedule.validate.seqRequired", { shift: s.label }));
+            return;
+          }
+        }
+
         this.save(params);
       });
-      // this.$refs.form.validate((valid) => {
-      //   if (valid) {
-      //     this.save({
-      //       ...this.form,
-      //     });
-      //   }
-      // });
     },
   },
 };
