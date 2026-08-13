@@ -3,6 +3,8 @@ package com.zlt.aps.tc.engine.domain;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * 胎侧需求量计算输入。
@@ -30,4 +32,10 @@ public class TcDemandQtyInput {
 
     /** 保证范围总小时数 */
     private BigDecimal guardRangeHours;
+
+    /** 保证窗口逐班成型需求量。 */
+    private Map<Integer, BigDecimal> formingGuardWindowQtyMap = new LinkedHashMap<>();
+
+    /** 保证窗口逐班实际班次时长。 */
+    private Map<Integer, BigDecimal> formingGuardWindowHoursMap = new LinkedHashMap<>();
 }

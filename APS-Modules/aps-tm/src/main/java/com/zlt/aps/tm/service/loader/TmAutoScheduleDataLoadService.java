@@ -1294,14 +1294,8 @@ public class TmAutoScheduleDataLoadService {
         int startIndex = this.resolveGuardStartIndex(shiftOrder, formingShiftOffset, algorithmCode);
         int count = Math.max(guardShiftCount, 1);
         for (int index = startIndex; index < startIndex + count; index++) {
-            if (remainingGuardFormingQty.compareTo(BigDecimal.ZERO) <= 0) {
-                break;
-            }
             BigDecimal formingQty = this.resolveGuardClassQty(classQtyArray, index);
             BigDecimal appliedFormingQty = formingQty.min(remainingGuardFormingQty);
-            if (appliedFormingQty.compareTo(BigDecimal.ZERO) <= 0) {
-                continue;
-            }
             windowQtyMap.put(index + 1, appliedFormingQty.multiply(this.nvl(treadLength)));
             remainingGuardFormingQty = remainingGuardFormingQty.subtract(appliedFormingQty);
         }
@@ -1332,14 +1326,8 @@ public class TmAutoScheduleDataLoadService {
         int startIndex = this.resolveGuardStartIndex(shiftOrder, formingShiftOffset, algorithmCode);
         int count = Math.max(guardShiftCount, 1);
         for (int index = startIndex; index < startIndex + count; index++) {
-            if (remainingGuardFormingQty.compareTo(BigDecimal.ZERO) <= 0) {
-                break;
-            }
             BigDecimal formingQty = this.resolveGuardClassQty(classQtyArray, index);
             BigDecimal appliedFormingQty = formingQty.min(remainingGuardFormingQty);
-            if (appliedFormingQty.compareTo(BigDecimal.ZERO) <= 0) {
-                continue;
-            }
             BigDecimal treadLength = (index >= 0 && index < 8 && specByClass != null && specByClass[index] != null)
                     ? this.nvl(specByClass[index].getTreadShoulderLength()) : this.nvl(currentTreadLength);
             windowQtyMap.put(index + 1, appliedFormingQty.multiply(treadLength));
@@ -2509,6 +2497,7 @@ public class TmAutoScheduleDataLoadService {
         targetTask.setCurrentShiftDemandQty(allocatedQty);
         targetTask.setGuardDemandQty(BigDecimal.ZERO);
         targetTask.setFormingGuardWindowQtyMap(Collections.emptyMap());
+        targetTask.setFormingGuardWindowHoursMap(Collections.emptyMap());
         targetTask.setDemandQty(allocatedQty);
         targetTask.setGuardShiftCount(0);
         targetTask.setGuardRangeHours(BigDecimal.ZERO);
@@ -2872,6 +2861,7 @@ public class TmAutoScheduleDataLoadService {
         BigDecimal guardRangeHours = BigDecimal.ZERO;
         List<Integer> mappedShiftOrders = new ArrayList<>();
         List<BigDecimal> shiftHours = new ArrayList<>();
+        Map<Integer, BigDecimal> guardWindowHoursMap = new LinkedHashMap<>();
         String skipReason = null;
         for (int index = 0; index < count; index++) {
             int logicalShiftOrder = logicalStartShiftOrder + index;
@@ -2883,6 +2873,7 @@ public class TmAutoScheduleDataLoadService {
                 skipReason = "SHIFT_HOURS_MISSING_OR_NON_POSITIVE";
                 break;
             }
+            guardWindowHoursMap.put(logicalShiftOrder, currentShiftHours);
             guardRangeHours = guardRangeHours.add(currentShiftHours);
         }
         Map<String, Object> evidence = new LinkedHashMap<>();
@@ -2892,12 +2883,14 @@ public class TmAutoScheduleDataLoadService {
         evidence.put("shiftHours", shiftHours);
         if (skipReason == null) {
             taskDraft.setGuardRangeHours(guardRangeHours);
+            taskDraft.setFormingGuardWindowHoursMap(guardWindowHoursMap);
             evidence.put("guardRangeHours", guardRangeHours);
             context.getRuleTraceMap().computeIfAbsent(taskDraft.getBusinessKey(), key -> new TmRuleTrace())
                     .addRuleHit(TmScheduleRuleCodeEnum.GUARD_RANGE_HOURS, TmScheduleRuleResultEnum.PASS, evidence);
             return;
         }
         taskDraft.setGuardRangeHours(null);
+        taskDraft.setFormingGuardWindowHoursMap(Collections.emptyMap());
         evidence.put("guardRangeHours", null);
         evidence.put("reason", skipReason);
         context.getRuleTraceMap().computeIfAbsent(taskDraft.getBusinessKey(), key -> new TmRuleTrace())

@@ -4,10 +4,7 @@ import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.StrUtil;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.zlt.aps.common.engine.schedule.IScheduleProcessLogger;
-import com.zlt.aps.common.engine.schedule.ScheduleProcessEvidenceFormatter;
-import com.zlt.aps.common.engine.schedule.ScheduleProcessLogLevel;
-import com.zlt.aps.common.engine.schedule.ScheduleProcessTraceEvent;
+import com.zlt.aps.common.engine.schedule.*;
 import com.zlt.aps.common.engine.schedule.constraint.ScheduleToolLedgerSnapshot;
 import com.zlt.aps.tm.api.enums.TmAutoScheduleIssueCategoryEnum;
 import com.zlt.aps.tm.api.enums.TmScheduleRuleCodeEnum;
@@ -21,7 +18,6 @@ import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -501,10 +497,10 @@ public class TmScheduleTemplateImpl extends AbsTmScheduleTemplate {
             this.sortedLogTaskStream(context).forEach(task -> context.appendShiftFullProcessTrace(task.getShiftOrder(), new ScheduleProcessTraceEvent(
                     stepEnum.getDesc(), task.getBusinessKey(), "库存供应时长计算",
                     "当前班班初滚动库存、保证范围内成型需求和保证范围总小时数。",
-                    "滚动库存=" + this.nvl(task.getRollingStockQty()) + "米，保证范围需求="
-                            + this.nvl(task.getGuardDemandQty()) + "米，保证范围总时长="
-                            + this.nvl(task.getGuardRangeHours()) + "小时。",
-                    "先按保证范围需求计算平均每小时成型消耗，再计算现有库存可支撑的小时数；库存供应时长越小，库存越紧急。",
+                    "滚动库存=" + this.nvl(task.getRollingStockQty()) + "米，逐班成型需求="
+                            + task.getFormingGuardWindowQtyMap() + "，逐班实际时长="
+                            + task.getFormingGuardWindowHoursMap() + "小时。",
+                    "按成型班次顺序逐班扣减库存：完整覆盖则累计该班实际时长；首个不能完整覆盖的班次按剩余库存占该班需求的比例折算时长并停止。",
                     this.buildSupplyHoursFormula(task),
                     "库存供应时长=" + this.displaySupplyHours(task.getSupplyHours()) + "。",
                     "作为任务排序的库存紧急度指标，并用于后续缺料时点推算。"
@@ -802,19 +798,9 @@ public class TmScheduleTemplateImpl extends AbsTmScheduleTemplate {
      * @return 中文公式文本
      */
     private String buildSupplyHoursFormula(TmTaskDraft task) {
-        BigDecimal guardDemandQty = this.nvl(task.getGuardDemandQty());
-        BigDecimal guardRangeHours = this.nvl(task.getGuardRangeHours());
-        if (guardDemandQty.compareTo(BigDecimal.ZERO) <= 0 || guardRangeHours.compareTo(BigDecimal.ZERO) <= 0) {
-            return "库存供应公式：保证范围需求量=" + guardDemandQty.toPlainString()
-                    + "米，保证范围总时长=" + guardRangeHours.toPlainString()
-                    + "小时，无法计算平均每小时成型消耗，供应时长按未提供处理。";
-        }
-        BigDecimal averageDemandPerHour = guardDemandQty.divide(guardRangeHours, 6, RoundingMode.HALF_UP);
-        return "库存供应公式：平均每小时成型消耗=保证范围需求" + guardDemandQty.toPlainString()
-                + "米÷保证范围总时长" + guardRangeHours.toPlainString() + "小时="
-                + averageDemandPerHour.toPlainString() + "米/H；库存供应时长=班初滚动库存"
-                + this.nvl(task.getRollingStockQty()).toPlainString() + "米÷平均每小时成型消耗"
-                + averageDemandPerHour.toPlainString() + "米/H=" + this.displaySupplyHours(task.getSupplyHours()) + "。";
+        ScheduleSupplyDurationResult result = ScheduleSupplyDurationCalculator.calculate(task.getRollingStockQty(),
+                task.getFormingGuardWindowQtyMap(), task.getFormingGuardWindowHoursMap());
+        return result.getCalculationDetail();
     }
 
     /**

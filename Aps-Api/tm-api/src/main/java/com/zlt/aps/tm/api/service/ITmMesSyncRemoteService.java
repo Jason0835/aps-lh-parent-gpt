@@ -39,6 +39,22 @@ public interface ITmMesSyncRemoteService {
                                                      @RequestBody List<TmStock> list);
 
     /**
+     * 替换指定工厂和库存日期的胎面库存快照。
+     *
+     * @param factoryCode 工厂编码
+     * @param stockDate 库存日期，格式：yyyy-MM-dd
+     * @param updateBy 更新人
+     * @param stockList 库存列表，空集合表示清空快照
+     * @return 保存结果
+     */
+    @ApiOperation("替换胎面库存快照")
+    @PostMapping("/tmMesSync/replaceStock")
+    AjaxResult replaceStock(@RequestParam("factoryCode") String factoryCode,
+                            @RequestParam("stockDate") String stockDate,
+                            @RequestParam("updateBy") String updateBy,
+                            @RequestBody List<TmStock> stockList);
+
+    /**
      * 替换胎面自动滚动班次库存快照。
      *
      * @param factoryCode 工厂编码

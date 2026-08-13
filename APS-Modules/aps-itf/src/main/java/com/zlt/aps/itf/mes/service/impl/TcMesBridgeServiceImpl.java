@@ -19,9 +19,9 @@ import com.zlt.aps.tc.api.service.ITcMesSyncRemoteService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
-import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -46,26 +46,40 @@ public class TcMesBridgeServiceImpl implements ITcMesBridgeService {
     @Override
     public AjaxResult syncStock(AuxReqSyncDataLogs request) {
         AuxReqSyncDataLogs normalizedRequest = this.normalizeRequest(request);
-        List<TcMesStock> sourceList = this.sourceMapper.selectStockList(normalizedRequest);
-        if (CollectionUtils.isEmpty(sourceList)) {
-            return AjaxResult.success(I18nUtil.getMessage("ui.tc.schedule.mes.noSourceData"));
+        if (normalizedRequest.getQueryParams() == null
+                || normalizedRequest.getQueryParams().get("stockDate") == null) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.itf.mes.stockArgumentsInvalid"));
         }
-        List<TcStock> stockList = sourceList.stream().map(source -> {
+        Date stockDate;
+        try {
+            Object stockDateValue = normalizedRequest.getQueryParams().get("stockDate");
+            stockDate = stockDateValue instanceof Date ? (Date) stockDateValue
+                    : DateUtil.parseDate(String.valueOf(stockDateValue));
+        } catch (Exception exception) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.itf.mes.stockArgumentsInvalid"));
+        }
+        if (stockDate == null) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.itf.mes.stockArgumentsInvalid"));
+        }
+        Date normalizedStockDate = DateUtil.beginOfDay(stockDate);
+        normalizedRequest.getQueryParams().put("stockDate", normalizedStockDate);
+        List<TcMesStock> sourceList = this.sourceMapper.selectStockList(normalizedRequest);
+        Map<String, BigDecimal> stockQtyMap = CollectionUtils.emptyIfNull(sourceList).stream()
+                .filter(source -> StrUtil.isNotBlank(source.getSidewallCode()))
+                .collect(Collectors.toMap(source -> StrUtil.trim(source.getSidewallCode()),
+                        source -> BigDecimalUtils.valueOf(source.getStockQty()), BigDecimal::add,
+                        LinkedHashMap::new));
+        List<TcStock> stockList = stockQtyMap.entrySet().stream().map(entry -> {
             TcStock target = new TcStock();
-            BeanUtils.copyProperties(source, target);
-            target.setCreateBy("MES");
-            target.setUpdateBy("MES");
+            target.setSidewallCode(entry.getKey());
+            target.setStockQty(entry.getValue());
+            target.setBadQty(BigDecimal.ZERO);
+            target.setAdjustQty(BigDecimal.ZERO);
             return target;
         }).collect(Collectors.toList());
-        Map<String, List<TcStock>> groupMap = stockList.stream().collect(Collectors.groupingBy(
-                item -> this.buildDateGroupKey(item.getFactoryCode(), item.getStockDate()),
-                LinkedHashMap::new, Collectors.toList()));
-        groupMap.values().stream().forEach(group -> {
-            TcStock firstItem = group.get(0);
-            AjaxResult result = FeignTokenHelper.callWithToken(() -> this.remoteService.logicDeleteAndSaveStock(
-                    firstItem.getFactoryCode(), DateUtil.formatDate(firstItem.getStockDate()), "MES", group));
-            this.assertRemoteSuccess(result);
-        });
+        AjaxResult result = FeignTokenHelper.callWithToken(() -> this.remoteService.logicDeleteAndSaveStock(
+                normalizedRequest.getFactoryCode(), DateUtil.formatDate(normalizedStockDate), "MES", stockList));
+        this.assertRemoteSuccess(result);
         return AjaxResult.success(I18nUtil.getMessage("ui.tc.schedule.mes.stockSyncSuccess"), stockList.size());
     }
 
@@ -82,19 +96,20 @@ public class TcMesBridgeServiceImpl implements ITcMesBridgeService {
     public AjaxResult syncShiftStock(MesShiftStockSyncRequest request) {
         MesShiftStockSyncRequest normalizedRequest = this.normalizeShiftStockRequest(request);
         List<TcMesStock> sourceList = this.sourceMapper.selectShiftStockList(normalizedRequest);
-        Map<String, TcMesStock> uniqueMap = CollectionUtils.emptyIfNull(sourceList).stream()
+        Map<String, BigDecimal> stockQtyMap = CollectionUtils.emptyIfNull(sourceList).stream()
                 .filter(source -> StrUtil.isNotBlank(source.getSidewallCode()))
-                .collect(Collectors.toMap(TcMesStock::getSidewallCode, Function.identity(),
-                        (first, ignored) -> first, LinkedHashMap::new));
-        List<TcShiftStock> stockList = uniqueMap.values().stream().map(source -> {
+                .collect(Collectors.toMap(source -> StrUtil.trim(source.getSidewallCode()),
+                        source -> BigDecimalUtils.valueOf(source.getStockQty()), BigDecimal::add,
+                        LinkedHashMap::new));
+        List<TcShiftStock> stockList = stockQtyMap.entrySet().stream().map(entry -> {
             TcShiftStock target = new TcShiftStock();
             target.setFactoryCode(normalizedRequest.getFactoryCode());
             target.setStockDate(normalizedRequest.getStockDate());
             target.setShiftOrder(normalizedRequest.getShiftOrder());
-            target.setSidewallCode(source.getSidewallCode());
-            target.setStockQty(BigDecimalUtils.valueOf(source.getStockQty()));
-            target.setBadQty(BigDecimalUtils.valueOf(source.getBadQty()));
-            target.setAdjustQty(BigDecimalUtils.valueOf(source.getAdjustQty()));
+            target.setSidewallCode(entry.getKey());
+            target.setStockQty(entry.getValue());
+            target.setBadQty(BigDecimal.ZERO);
+            target.setAdjustQty(BigDecimal.ZERO);
             return target;
         }).collect(Collectors.toList());
         AjaxResult result = FeignTokenHelper.callWithToken(() -> this.remoteService.replaceShiftStock(

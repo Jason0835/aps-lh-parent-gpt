@@ -2098,6 +2098,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         target.setGuardRangeHours(source.getGuardRangeHours());
         target.setSupplyHours(source.getSupplyHours());
         target.setFormingGuardWindowQtyMap(source.getFormingGuardWindowQtyMap());
+        target.setFormingGuardWindowHoursMap(source.getFormingGuardWindowHoursMap());
         target.setCurrentShiftStockGapQty(BigDecimal.ZERO);
         target.setStockGapQty(BigDecimal.ZERO);
         target.setStockDeductQty(BigDecimal.ZERO);

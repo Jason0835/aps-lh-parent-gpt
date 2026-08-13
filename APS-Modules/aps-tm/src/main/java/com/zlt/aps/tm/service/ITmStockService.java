@@ -19,4 +19,14 @@ public interface ITmStockService extends IDocService<TmStock> {
      * @param list      待插入的胎面库存列表
      */
     void logicDeleteAndSaveBatch(Date stockDate, String updateBy, List<TmStock> list);
+
+    /**
+     * 替换指定工厂和库存日期的胎面库存快照。
+     *
+     * @param factoryCode 工厂编码
+     * @param stockDate 库存日期
+     * @param updateBy 更新人
+     * @param stockList MES库存列表，空集合表示清空快照
+     */
+    void replaceStock(String factoryCode, Date stockDate, String updateBy, List<TmStock> stockList);
 }

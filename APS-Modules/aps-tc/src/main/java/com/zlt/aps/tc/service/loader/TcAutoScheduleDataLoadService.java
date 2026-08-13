@@ -1316,14 +1316,8 @@ public class TcAutoScheduleDataLoadService {
         int startIndex = this.resolveGuardStartIndex(shiftOrder, formingShiftOffset, algorithmCode);
         int count = Math.max(guardShiftCount, 1);
         for (int index = startIndex; index < startIndex + count; index++) {
-            if (remainingGuardFormingQty.compareTo(BigDecimal.ZERO) <= 0) {
-                break;
-            }
             BigDecimal formingQty = this.resolveGuardClassQty(classQtyArray, index);
             BigDecimal appliedFormingQty = formingQty.min(remainingGuardFormingQty);
-            if (appliedFormingQty.compareTo(BigDecimal.ZERO) <= 0) {
-                continue;
-            }
             windowQtyMap.put(index + 1, appliedFormingQty.multiply(this.nvl(sidewallLength)));
             remainingGuardFormingQty = remainingGuardFormingQty.subtract(appliedFormingQty);
         }
@@ -1354,14 +1348,8 @@ public class TcAutoScheduleDataLoadService {
         int startIndex = this.resolveGuardStartIndex(shiftOrder, formingShiftOffset, algorithmCode);
         int count = Math.max(guardShiftCount, 1);
         for (int index = startIndex; index < startIndex + count; index++) {
-            if (remainingGuardFormingQty.compareTo(BigDecimal.ZERO) <= 0) {
-                break;
-            }
             BigDecimal formingQty = this.resolveGuardClassQty(classQtyArray, index);
             BigDecimal appliedFormingQty = formingQty.min(remainingGuardFormingQty);
-            if (appliedFormingQty.compareTo(BigDecimal.ZERO) <= 0) {
-                continue;
-            }
             BigDecimal sidewallLength = (index >= 0 && index < 8 && specByClass != null && specByClass[index] != null)
                     ? this.nvl(specByClass[index].getSidewallLength()) : this.nvl(currentSidewallLength);
             windowQtyMap.put(index + 1, appliedFormingQty.multiply(sidewallLength));
@@ -2494,6 +2482,7 @@ public class TcAutoScheduleDataLoadService {
         targetTask.setCurrentShiftDemandQty(allocatedQty);
         targetTask.setGuardDemandQty(allocatedQty);
         targetTask.setFormingGuardWindowQtyMap(sourceTask.getFormingGuardWindowQtyMap());
+        targetTask.setFormingGuardWindowHoursMap(sourceTask.getFormingGuardWindowHoursMap());
         targetTask.setDemandQty(allocatedQty);
         targetTask.setGuardShiftCount(sourceTask.getGuardShiftCount());
         targetTask.setGuardRangeHours(sourceTask.getGuardRangeHours());
@@ -2887,6 +2876,7 @@ public class TcAutoScheduleDataLoadService {
         BigDecimal guardRangeHours = BigDecimal.ZERO;
         List<Integer> mappedShiftOrders = new ArrayList<>();
         List<BigDecimal> shiftHours = new ArrayList<>();
+        Map<Integer, BigDecimal> guardWindowHoursMap = new LinkedHashMap<>();
         String skipReason = null;
         for (int index = 0; index < count; index++) {
             int logicalShiftOrder = logicalStartShiftOrder + index;
@@ -2898,6 +2888,7 @@ public class TcAutoScheduleDataLoadService {
                 skipReason = "SHIFT_HOURS_MISSING_OR_NON_POSITIVE";
                 break;
             }
+            guardWindowHoursMap.put(logicalShiftOrder, currentShiftHours);
             guardRangeHours = guardRangeHours.add(currentShiftHours);
         }
         Map<String, Object> evidence = new LinkedHashMap<>();
@@ -2907,12 +2898,14 @@ public class TcAutoScheduleDataLoadService {
         evidence.put("shiftHours", shiftHours);
         if (skipReason == null) {
             taskDraft.setGuardRangeHours(guardRangeHours);
+            taskDraft.setFormingGuardWindowHoursMap(guardWindowHoursMap);
             evidence.put("guardRangeHours", guardRangeHours);
             context.getRuleTraceMap().computeIfAbsent(taskDraft.getBusinessKey(), key -> new TcRuleTrace())
                     .addRuleHit(TcScheduleRuleCodeEnum.GUARD_RANGE_HOURS, TcScheduleRuleResultEnum.PASS, evidence);
             return;
         }
         taskDraft.setGuardRangeHours(null);
+        taskDraft.setFormingGuardWindowHoursMap(Collections.emptyMap());
         evidence.put("guardRangeHours", null);
         evidence.put("reason", skipReason);
         context.getRuleTraceMap().computeIfAbsent(taskDraft.getBusinessKey(), key -> new TcRuleTrace())
