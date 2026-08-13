@@ -254,6 +254,38 @@ public class ScheduleConstraintCalculator {
     }
 
     /**
+     * 按生产前已有工装余额限制本任务计划量，并在计划量确认后结算成型消耗释放。
+     *
+     * <p>本方法与人工滚动使用的“先释放再计算增量”口径相互独立。自动排程必须先使用
+     * {@code availableToolQty} 计算本任务允许量，再用实际允许量减去当班成型消耗量结算下一任务余额，
+     * 因此本任务不能使用自身结算时释放的工装。</p>
+     *
+     * @param requestedProductionQty 本任务请求计划量
+     * @param releasedDemandQty 本任务结算时释放的当班成型消耗量
+     * @param availableToolQty 生产前可用工装数量；为空表示未启用工装约束
+     * @param totalToolQty 总工装数量上限
+     * @param curlRollLength 有效卷曲长度
+     * @return 允许计划量、工装溢出量、净占用量和任务后余额
+     */
+    public ScheduleToolLedgerResult settleProductionBeforeReleaseToolLedger(BigDecimal requestedProductionQty,
+                                                                            BigDecimal releasedDemandQty,
+                                                                            BigDecimal availableToolQty,
+                                                                            BigDecimal totalToolQty,
+                                                                            BigDecimal curlRollLength) {
+        BigDecimal normalizedRequestedQty = this.nonNegative(requestedProductionQty);
+        if (availableToolQty == null || this.nonNegative(curlRollLength).compareTo(BigDecimal.ZERO) <= 0) {
+            return this.settleCommittedToolLedger(normalizedRequestedQty, releasedDemandQty, availableToolQty,
+                    totalToolQty, curlRollLength);
+        }
+        BigDecimal allowedPlanQty = this.limitPlanQtyByTool(
+                normalizedRequestedQty, this.nonNegative(availableToolQty), curlRollLength);
+        ScheduleToolLedgerResult result = this.settleCommittedToolLedger(
+                allowedPlanQty, releasedDemandQty, availableToolQty, totalToolQty, curlRollLength);
+        result.setOverflowPlanQty(normalizedRequestedQty.subtract(allowedPlanQty).max(BigDecimal.ZERO));
+        return result;
+    }
+
+    /**
      * 判断两个非空编码是否发生变化。
      *
      * @param previousCode 前置编码

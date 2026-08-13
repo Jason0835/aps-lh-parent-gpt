@@ -52,6 +52,7 @@ public class TmLossSettingController extends AbstractDocBizController<TmLossSett
         if (StringUtil.isBlank(billVO.getFactoryCode())) {
             billVO.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
         }
+        tmLossSettingService.validateLossRate(billVO);
         return super.save(billVO);
     }
 

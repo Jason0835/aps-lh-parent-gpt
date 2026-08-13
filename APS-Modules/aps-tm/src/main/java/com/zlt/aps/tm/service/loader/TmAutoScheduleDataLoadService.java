@@ -689,6 +689,27 @@ public class TmAutoScheduleDataLoadService {
     }
 
     /**
+     * 成型班次有需求但示方书为空或未命中施工时，记录未生成任务的准确提示。
+     *
+     * @param context                  自动排程上下文
+     * @param formingRowCount          已加载的成型计划行数
+     * @param constructionMissingCount 因示方书为空或未命中有效施工而跳过的排程班次数
+     */
+    private void recordConstructionMissingTaskMessage(TmScheduleContext context, int formingRowCount,
+                                                      int constructionMissingCount) {
+        if (formingRowCount <= 0 || constructionMissingCount <= 0) {
+            return;
+        }
+        String template = I18nUtil.getMessage("ui.data.alert.tm.schedule.noTaskGeneratedWithConstructionMissing");
+        if (StrUtil.isBlank(template)
+                || "ui.data.alert.tm.schedule.noTaskGeneratedWithConstructionMissing".equals(template)) {
+            template = "胎面自动排程未生成结果：成型计划已加载 {0} 行，但偏移后有需求的 {1} 个排程班次未匹配到有效施工，请确认成型计划示方书与施工信息的胎胚编码、施工版本是否匹配";
+        }
+        context.setEmptyFormingTaskMessage(MessageFormat.format(template, formingRowCount,
+                constructionMissingCount));
+    }
+
+    /**
      * 从成型计划和施工信息构造胎面待排任务。
      *
      * <p>按参数 {@code TM_VERSION_MATCH_MODE} 分流：{@code RECIPE}（默认）走逐班示方书版本解析，
@@ -1169,7 +1190,11 @@ public class TmAutoScheduleDataLoadService {
                 context.getFactoryCode(), DateUtil.formatDate(context.getScheduleDate()),
                 rowList.size(), skippedShiftNoFormingQty, skippedShiftNoSpec, taskDraftList.size());
         if (taskDraftList.isEmpty()) {
-            this.recordEmptyFormingTaskMessage(context, rowList.size(), formingShiftOffset);
+            if (skippedShiftNoSpec > 0) {
+                this.recordConstructionMissingTaskMessage(context, rowList.size(), skippedShiftNoSpec);
+            } else {
+                this.recordEmptyFormingTaskMessage(context, rowList.size(), formingShiftOffset);
+            }
         }
         return taskDraftList;
     }

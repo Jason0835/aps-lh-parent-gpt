@@ -25,7 +25,11 @@ public class TcLossRateResolver {
         if (CollUtil.isEmpty(ruleList)) {
             return null;
         }
-        for (TcLossMatchLevelEnum matchLevel : TcLossMatchLevelEnum.values()) {
+        for (TcLossMatchLevelEnum matchLevel : new TcLossMatchLevelEnum[]{
+                TcLossMatchLevelEnum.MACHINE_SIDEWALL,
+                TcLossMatchLevelEnum.SIDEWALL,
+                TcLossMatchLevelEnum.MACHINE,
+                TcLossMatchLevelEnum.DEFAULT}) {
             TcLossRuleMatchResult result = this.find(ruleList, sidewallCode, machineCode, matchLevel);
             if (result != null) {
                 return result;
