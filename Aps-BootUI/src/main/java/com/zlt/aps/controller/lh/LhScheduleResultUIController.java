@@ -248,21 +248,22 @@ public class LhScheduleResultUIController extends BaseUIController<LhScheduleRes
         }
         byte[] cxBytes = iCxScheduleResultService.exportCxRemainQty(cxEntity, "成型日计划");
 
-        // 3. 合并两个工作簿
-        return mergeExcel(lhBytes, cxBytes);
+        // 3. 合并两个工作簿：成型只复制有数据的 0(成型余量)/1(成型日计划)/7(成型结构切换)/8(排产小结) 四个页签
+        return mergeExcel(lhBytes, cxBytes, 0, 1, 7, 8);
     }
 
     /**
-     * 将源工作簿的所有Sheet复制到目标工作簿中，返回合并后的字节数组。
+     * 将源工作簿指定索引的Sheet复制到目标工作簿中，返回合并后的字节数组。
      *
      * @param targetBytes 目标工作簿字节数组（硫化导出，保留其原有Sheet）
-     * @param sourceBytes 源工作簿字节数组（成型导出，其Sheet被追加到目标）
+     * @param sourceBytes 源工作簿字节数组（成型导出，按sheetIndices指定的Sheet被追加到目标）
+     * @param sheetIndices 需要从源工作簿复制的Sheet索引（从0开始）
      * @return 合并后的工作簿字节数组
      */
-    private byte[] mergeExcel(byte[] targetBytes, byte[] sourceBytes) throws IOException {
+    private byte[] mergeExcel(byte[] targetBytes, byte[] sourceBytes, int... sheetIndices) throws IOException {
         try (Workbook targetWorkbook = WorkbookFactory.create(new ByteArrayInputStream(targetBytes));
              Workbook sourceWorkbook = WorkbookFactory.create(new ByteArrayInputStream(sourceBytes))) {
-            for (int i = 0; i < sourceWorkbook.getNumberOfSheets(); i++) {
+            for (int i : sheetIndices) {
                 ExcelUtils.copySheet(sourceWorkbook, i, targetWorkbook);
             }
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
