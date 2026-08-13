@@ -71,12 +71,6 @@ public class CxScheduleResult extends BaseEntity implements Serializable {
     @TableField("PRODUCTION_STATUS")
     private String productionStatus;
 
-    /** 示方类型，T 量试、X 试制、S 正式 */
-    @Excel(name = "ui.data.column.mdmRawMaterialConversion.constructionStage")
-    @ApiModelProperty(value = "示方类型", name = "constructionStage")
-    @TableField(value = "CONSTRUCTION_STAGE")
-    private String constructionStage;
-
     @Excel(name = "ui.data.column.cxScheduleResult.scheduleDate", dateFormat = "yyyy-MM-dd")
     @ImportExcelValidated(required = true)
     @ApiModelProperty(value = "排程日期")
