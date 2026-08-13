@@ -21,8 +21,8 @@ import java.util.Objects;
 /**
  * 新增待排SKU前置未排规则。
  *
- * <p>统一处理收尾小余量和仅历史欠产两项规则，并固定按“收尾小余量优先、仅历史欠产其次”执行。
- * 换活字块和新增排产必须复用本规则，避免SKU在S4.4被提前消费后绕过S4.5未排判断。</p>
+ * <p>统一处理新增SKU日计划准入、纯遗留SKU静默出队、收尾小余量和仅历史欠产规则。
+ * 换活字块和新增排产必须复用本规则，避免SKU在S4.4被提前消费后绕过S4.5判断。</p>
  *
  * @author APS
  */
@@ -41,10 +41,43 @@ public final class PendingSkuUnscheduledRule {
     public static final String HISTORY_SHORTAGE_UNSCHEDULED_REASON =
             "仅历史欠产、后续无月计划，且最近一次（前一次）已有完成量，本次跳过不排";
 
+    /** 历史欠产/收尾遗留阶段下线后的纯遗留SKU出队原因 */
+    public static final String LEGACY_ONLY_EXCLUSION_REASON =
+            "历史欠产/收尾遗留阶段已下线，当前及未来无原始日计划，不进入本次排程";
+
     /** 自动排程数据来源 */
     private static final String AUTO_DATA_SOURCE = "0";
 
     private PendingSkuUnscheduledRule() {
+    }
+
+    /**
+     * 判断正规新增SKU是否只剩历史欠产或收尾遗留目标。
+     *
+     * <p>窗口原始DAY_N为0，并且从窗口结束日之后到已加载月计划末日都没有正计划量时，
+     * 该SKU不属于正常排产或提前生产范围。调用方应在待排池入口直接移除，不生成未排记录，
+     * 也不允许前日T+1交替计划作为无月计划场景的放行依据。</p>
+     *
+     * <p>试制、量试、续作补偿、换活字块回流等非正规新增来源继续执行各自既有规则；
+     * 当前月TOTAL_QTY为0但已注册未来计划候选的SKU必须保留，等待提前生产阶段逐日准入。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 待评估SKU
+     * @return true-只剩历史欠产或收尾遗留目标，应静默移出；false-继续既有准入流程
+     */
+    public static boolean shouldExcludeLegacyOnlyNewSku(LhScheduleContext context,
+                                                         SkuScheduleDTO sku) {
+        if (Objects.isNull(context) || Objects.isNull(sku)
+                || Objects.isNull(context.getWindowEndDate())
+                || !EarlyProductionChecker.isEligibleNewProductionSku(sku)
+                || sku.getOriginalWindowPlanQty() > 0
+                || context.isFutureOnlyEarlyProductionCandidate(sku)) {
+            return false;
+        }
+        LocalDate windowEndDate = toLocalDate(context.getWindowEndDate());
+        return Objects.nonNull(windowEndDate)
+                && Objects.isNull(EarlyProductionChecker.resolveFirstFutureOriginalPlanDate(
+                context, sku, windowEndDate));
     }
 
     /**
