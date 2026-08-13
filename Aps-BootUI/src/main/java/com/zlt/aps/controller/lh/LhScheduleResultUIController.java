@@ -203,7 +203,7 @@ public class LhScheduleResultUIController extends BaseUIController<LhScheduleRes
     public void export(HttpServletResponse response, LhScheduleResult entity) throws IOException {
         Date scheduleDate = entity != null && entity.getScheduleDate() != null ? entity.getScheduleDate() : new Date();
         String fileName = "硫化日计划" + cn.hutool.core.date.DateUtil.format(scheduleDate, "yyyyMMdd");
-        byte[] excelBytes = iLhScheduleResultRemoteService.exportData(entity, fileName);
+        byte[] excelBytes = exportCombined(entity, scheduleDate, fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
         ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
         IOUtils.copy(in, response.getOutputStream());
@@ -221,7 +221,22 @@ public class LhScheduleResultUIController extends BaseUIController<LhScheduleRes
     public void exportCombine(HttpServletResponse response, LhScheduleResult entity) throws IOException {
         Date scheduleDate = entity != null && entity.getScheduleDate() != null ? entity.getScheduleDate() : new Date();
         String fileName = "硫化日计划" + cn.hutool.core.date.DateUtil.format(scheduleDate, "yyyyMMdd");
+        byte[] excelBytes = exportCombined(entity, scheduleDate, fileName);
+        ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
+        ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
+        IOUtils.copy(in, response.getOutputStream());
+        response.flushBuffer();
+    }
 
+    /**
+     * 合并导出核心逻辑：分别调用硫化、成型导出，再将两个工作簿合并为一个。
+     *
+     * @param entity 硫化排程查询条件
+     * @param scheduleDate 排程日期（已兜底非空）
+     * @param fileName 导出文件名
+     * @return 合并后的Excel字节数组
+     */
+    private byte[] exportCombined(LhScheduleResult entity, Date scheduleDate, String fileName) throws IOException {
         // 1. 硫化导出
         byte[] lhBytes = iLhScheduleResultRemoteService.exportData(entity, fileName);
 
@@ -234,12 +249,7 @@ public class LhScheduleResultUIController extends BaseUIController<LhScheduleRes
         byte[] cxBytes = iCxScheduleResultService.exportData(cxEntity, "成型日计划");
 
         // 3. 合并两个工作簿
-        byte[] mergedBytes = mergeExcel(lhBytes, cxBytes);
-
-        ByteArrayInputStream in = new ByteArrayInputStream(mergedBytes);
-        ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
-        IOUtils.copy(in, response.getOutputStream());
-        response.flushBuffer();
+        return mergeExcel(lhBytes, cxBytes);
     }
 
     /**
