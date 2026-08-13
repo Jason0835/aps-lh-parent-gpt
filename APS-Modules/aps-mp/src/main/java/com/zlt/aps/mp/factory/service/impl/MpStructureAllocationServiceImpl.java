@@ -3971,6 +3971,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         mpFinalVo.setDayVulcanizationQty(insertItem.getDayVulcanizationQty());
         mpFinalVo.setTypeBlockQty(insertItem.getTypeBlockQty());
         mpFinalVo.setStructureName(insertItem.getStructureName());
+        mpFinalVo.setEmbryoCode(insertItem.getEmbryoCode());
         for (int day = FactoryConstant.MONTH_START_DAY; day <= FactoryConstant.MONTH_MAX_DAY; day++) {
             String dayField = FactoryConstant.DAY_FIELD + day;
             int planQty = intValue(insertItem.getFieldValueByFieldName(dayField));
