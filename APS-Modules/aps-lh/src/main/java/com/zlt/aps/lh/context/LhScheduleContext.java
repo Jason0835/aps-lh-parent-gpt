@@ -460,6 +460,12 @@ public class LhScheduleContext {
      */
     private Map<String, Integer> skuProductionRemainingQtyMap = new LinkedHashMap<>();
     /**
+     * SKU实际排产目标账本，key=materialCode_productStatus。
+     * <p>与剩余账本配套记录同一业务目标，用于收尾目标量重复同步时保留续作、新增、
+     * 换活字块已经消费的数量，禁止后续阶段把已扣减数量重新加回。</p>
+     */
+    private Map<String, Integer> skuProductionTargetQtyMap = new LinkedHashMap<>();
+    /**
      * 胎胚库存消费账本，key=embryoCode + "_" + T日业务日期；用于胎胚收尾T日硬目标扣减
      */
     private Map<String, EmbryoStockConsumeLedger> embryoStockConsumeLedgerMap = new LinkedHashMap<>();

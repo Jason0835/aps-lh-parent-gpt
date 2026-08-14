@@ -28,6 +28,7 @@ import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.observer.ScheduleEvent;
 import com.zlt.aps.lh.engine.observer.ScheduleEventPublisher;
+import com.zlt.aps.lh.engine.strategy.IEndingJudgmentStrategy;
 import com.zlt.aps.lh.engine.strategy.support.MouldResourceContext;
 import com.zlt.aps.lh.engine.strategy.support.ProductionQuantityPolicy;
 import com.zlt.aps.lh.engine.strategy.support.SpecialMaterialSubstitutionRecord;
@@ -78,6 +79,10 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
 
     @Resource
     private TargetScheduleQtyResolver targetScheduleQtyResolver;
+
+    /** 保存前按物料和产品状态统一复核最终收尾标识。 */
+    @Resource
+    private IEndingJudgmentStrategy endingJudgmentStrategy;
     /** 最终结果阶段只重建并核对胶囊运行态，不得再次扣减班次计划量 */
     @Resource
     private CapsuleReplacementRuleService capsuleReplacementRuleService = new CapsuleReplacementRuleService();
@@ -147,6 +152,13 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
 
             // S4.6.5.3 无计划量班次不展示硫化示方号和类型，避免空班次携带示方信息。
             clearUnplannedShiftCureFormulaFields(context);
+
+            /*
+             * 全部排产阶段及历史班次保护已经结束，此处按“物料+产品状态”汇总最终实际量，
+             * 统一刷新同组所有有效结果的isEnd，并执行保存前数量上限强校验。
+             */
+            refreshFinalEndingFlagByMaterialStatus(context);
+//            validateProductionQuantityPolicy(context);
 
             // S4.6.6 保存排程结果到数据库：由持久化服务统一做目标日原子替换。
             schedulePersistenceService.replaceScheduleAtomically(context);
@@ -1097,9 +1109,8 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
         // 保存前必须重新校验两侧完整性，禁止后置收尾、降模或释放逻辑拆散双模组后继续落库。
 //        validateWholeSingleControlMachineResults(context);
 
-//        TODO 这两个校验当前保持历史关闭状态。后续如需打开，应先用真实批次验证同胎胚换模和多机台补满结果。
+//        TODO 同胎胚换模校验当前保持历史关闭状态。后续如需打开，应先用真实批次验证同胎胚换模结果。
 //        validateGreenTireChangeoverShift(context);
-//        validateProductionQuantityPolicy(context);
 
         log.info("排程后置校验完成");
     }
@@ -1439,7 +1450,58 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
     }
 
     /**
-     * 校验SKU计划量口径是否满足策略约束。
+     * 按物料和产品状态汇总最终实际排产量，并统一刷新同组所有结果的收尾标识。
+     * <p>续作、换活字块和新增属于同一SKU在不同阶段的产能来源，最终落库不得再按阶段局部量判断。</p>
+     *
+     * @param context 排程上下文
+     */
+    private void refreshFinalEndingFlagByMaterialStatus(LhScheduleContext context) {
+        if (Objects.isNull(context) || CollectionUtils.isEmpty(context.getScheduleResultList())) {
+            return;
+        }
+        Map<String, Integer> scheduledQtyMap = new LinkedHashMap<String, Integer>(32);
+        Map<String, SkuScheduleDTO> sourceSkuMap = new LinkedHashMap<String, SkuScheduleDTO>(32);
+        for (LhScheduleResult result : context.getScheduleResultList()) {
+            if (Objects.isNull(result) || StringUtils.isEmpty(result.getMaterialCode())) {
+                continue;
+            }
+            String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(
+                    result.getMaterialCode(), result.getProductStatus());
+            scheduledQtyMap.merge(skuKey, resolveResultPlanQty(result), Integer::sum);
+            SkuScheduleDTO sourceSku = context.getScheduleResultSourceSkuMap().get(result);
+            SkuScheduleDTO validationSku = resolveValidationSourceSku(context, sourceSku);
+            sourceSkuMap.put(skuKey,
+                    selectPreferredValidationSku(sourceSkuMap.get(skuKey), validationSku));
+        }
+        for (Map.Entry<String, Integer> entry : scheduledQtyMap.entrySet()) {
+            SkuScheduleDTO sourceSku = sourceSkuMap.get(entry.getKey());
+            if (Objects.isNull(sourceSku)) {
+                log.warn("SKU排后最终收尾统一复核跳过, batchNo: {}, skuKey: {}, actualScheduledQty: {}, "
+                                + "原因: 排程结果缺少来源SKU映射",
+                        context.getBatchNo(), entry.getKey(), entry.getValue());
+                continue;
+            }
+            boolean finalTailFlag = endingJudgmentStrategy.isFinalEnding(
+                    context, sourceSku, entry.getValue());
+            context.getScheduleResultList().stream()
+                    .filter(Objects::nonNull)
+                    .filter(result -> StringUtils.equals(entry.getKey(),
+                            MonthPlanDateResolver.buildMaterialStatusKey(
+                                    result.getMaterialCode(), result.getProductStatus())))
+                    .forEach(result -> result.setIsEnd(finalTailFlag ? "1" : "0"));
+            int finalTargetQty = getTargetScheduleQtyResolver()
+                    .resolveFinalEndingTargetQty(context, sourceSku);
+            log.info("SKU排后最终收尾统一刷新完成, batchNo: {}, materialCode: {}, productStatus: {}, "
+                            + "actualScheduledQty: {}, finalTargetQty: {}, finalTailFlag: {}",
+                    context.getBatchNo(), sourceSku.getMaterialCode(), sourceSku.getProductStatus(),
+                    entry.getValue(), finalTargetQty, finalTailFlag);
+        }
+    }
+
+    /**
+     * 校验严格目标量SKU的跨阶段计划量上限。
+     * <p>正规/量试非收尾存在模台数归整、最后已开班补满和126/128等既有口径，
+     * 历史通用数量校验仍保持关闭；本次只启用收尾、试制等严格目标量的保存前强校验。</p>
      *
      * @param context 排程上下文
      */
@@ -1448,9 +1510,9 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
                 || CollectionUtils.isEmpty(context.getScheduleResultSourceSkuMap())) {
             return;
         }
-        Map<SkuScheduleDTO, Integer> scheduledQtyMap = new IdentityHashMap<>();
-        Map<SkuScheduleDTO, Integer> shiftCapacityMap = new IdentityHashMap<>();
-        Map<SkuScheduleDTO, Integer> endingAllowedOverQtyMap = new IdentityHashMap<>();
+        Map<String, Integer> scheduledQtyMap = new LinkedHashMap<String, Integer>(32);
+        Map<String, Integer> endingAllowedOverQtyMap = new LinkedHashMap<String, Integer>(32);
+        Map<String, SkuScheduleDTO> validationSkuMap = new LinkedHashMap<String, SkuScheduleDTO>(32);
         for (LhScheduleResult result : context.getScheduleResultList()) {
             SkuScheduleDTO sourceSku = context.getScheduleResultSourceSkuMap().get(result);
             if (Objects.isNull(sourceSku)) {
@@ -1464,15 +1526,22 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             if (planQty <= 0) {
                 continue;
             }
-            scheduledQtyMap.merge(validationSku, planQty, Integer::sum);
-            shiftCapacityMap.put(validationSku, resolveValidationShiftCapacity(validationSku, result));
+            String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(
+                    result.getMaterialCode(), result.getProductStatus());
+            scheduledQtyMap.merge(skuKey, planQty, Integer::sum);
+            validationSkuMap.put(skuKey,
+                    selectPreferredValidationSku(validationSkuMap.get(skuKey), validationSku));
             int allowedOverQty = resolveEndingAllowedOverQty(context, result);
             if (allowedOverQty > 0) {
-                endingAllowedOverQtyMap.merge(validationSku, allowedOverQty, Integer::sum);
+                endingAllowedOverQtyMap.merge(skuKey, allowedOverQty, Integer::sum);
             }
         }
-        for (Map.Entry<SkuScheduleDTO, Integer> entry : scheduledQtyMap.entrySet()) {
-            SkuScheduleDTO sku = entry.getKey();
+        for (Map.Entry<String, Integer> entry : scheduledQtyMap.entrySet()) {
+            String skuKey = entry.getKey();
+            SkuScheduleDTO sku = validationSkuMap.get(skuKey);
+            if (Objects.isNull(sku)) {
+                continue;
+            }
             int scheduledQty = entry.getValue();
             int targetQty = resolveValidationTargetQty(context, sku);
             if (targetQty <= 0) {
@@ -1480,12 +1549,30 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             }
             ProductionQuantityPolicy policy = ProductionQuantityPolicy.from(sku, sku.isStrictTargetQty());
             if (policy.isStrictUpperLimit()) {
-                int allowedOverQty = endingAllowedOverQtyMap.getOrDefault(sku, 0);
+                int allowedOverQty = endingAllowedOverQtyMap.getOrDefault(skuKey, 0);
                 validateStrictUpperLimit(context, sku, scheduledQty, targetQty + allowedOverQty);
-                continue;
             }
-            validateFormalQuantityPolicy(context, sku, scheduledQty, targetQty, shiftCapacityMap.get(sku));
         }
+    }
+
+    /**
+     * 从同一物料状态的多个运行态SKU副本中选择最终校验来源。
+     * <p>任一阶段已进入严格目标量后，全组必须沿用严格口径，禁止被另一阶段的普通副本降级。</p>
+     *
+     * @param currentSku 当前已选来源SKU
+     * @param candidateSku 候选来源SKU
+     * @return 最终校验来源SKU
+     */
+    private SkuScheduleDTO selectPreferredValidationSku(SkuScheduleDTO currentSku,
+                                                         SkuScheduleDTO candidateSku) {
+        if (Objects.isNull(currentSku)) {
+            return candidateSku;
+        }
+        if (Objects.nonNull(candidateSku)
+                && candidateSku.isStrictTargetQty() && !currentSku.isStrictTargetQty()) {
+            return candidateSku;
+        }
+        return currentSku;
     }
 
     /**
