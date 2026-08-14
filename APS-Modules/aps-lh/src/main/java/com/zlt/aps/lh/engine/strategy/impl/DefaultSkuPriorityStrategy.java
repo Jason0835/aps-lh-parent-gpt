@@ -846,6 +846,7 @@ public class DefaultSkuPriorityStrategy implements ISkuPriorityStrategy {
 
     /**
      * 输出排序后的SKU优先级跟踪日志（含汇总标题、TOP N、SortKey、HitLevel）。
+     * 新增SKU同时输出结构名称，以及按结构从胎胚最早可供硫化时间Map取得的时间。
      *
      * @param context 排程上下文
      * @param structurePriorityMap 结构收尾优先级快照
@@ -893,6 +894,15 @@ public class DefaultSkuPriorityStrategy implements ISkuPriorityStrategy {
                 // 复用 buildSkuSortDesc 生成单行描述，保证日志、运行态、落库三处口径完全一致。
                 String desc = buildSkuSortDesc(context, sku, i + 1, isNewSpec,
                         structurePriorityMap, structureEndingDaysMap);
+                if (isNewSpec) {
+                    // 新增排序日志按结构名称直接读取胎胚可供时间快照，便于核对时间排序依据。
+                    Date earliestLhTime = context.getStructureEarliestLhTimeMap()
+                            .get(sku.getStructureName());
+                    desc = desc
+                            + ", " + PriorityTraceLogHelper.kv("结构名称", sku.getStructureName())
+                            + ", " + PriorityTraceLogHelper.kv("最早胎胚可供硫化时间",
+                            PriorityTraceLogHelper.formatDateTime(earliestLhTime));
+                }
                 PriorityTraceLogHelper.appendLine(detailBuilder, desc);
             }
             if (skuCount > topN) {
