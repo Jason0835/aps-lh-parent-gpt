@@ -1,7 +1,5 @@
 package com.zlt.aps.itf.mes.service.impl;
 
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
@@ -21,7 +19,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.dj.api.domain.entity.DjDayFinishQty;
-import com.zlt.aps.dj.api.domain.entity.DjScheFinishQty;
+import com.zlt.aps.dj.api.domain.entity.DjDayFinishTotal;
 import com.zlt.aps.dj.api.domain.entity.DjScheduleResult;
 import com.zlt.aps.dj.api.domain.entity.DjStock;
 import com.zlt.aps.itf.constant.DataSource;
@@ -33,7 +31,6 @@ import com.zlt.aps.itf.mes.service.IMesItfDjService;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.aps.itf.vo.MesDjScheduleResult;
 import com.zlt.aps.itf.vo.SyncDataLogs;
-import com.zlt.aps.nc.api.domain.entity.NcScheduleResult;
 import com.zlt.core.dao.basedao.BaseDao;
 import com.zlt.sync.handle.SyncDataHandle;
 import com.zlt.sync.povo.SyncParamsVO;
@@ -44,9 +41,6 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @Service("mesItfDjService")
 public class MesItfDjServiceImpl implements IMesItfDjService {
-
-    /** 日期格式化器 */
-    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     /** SQL Server单次请求参数上限2100，每条记录约40个参数，安全批次大小为50 */
     private static final int BATCH_SIZE = 50;
     @Autowired
@@ -97,7 +91,7 @@ public class MesItfDjServiceImpl implements IMesItfDjService {
         if (StringUtils.isEmpty(request.getCompanyCode())) {
             request.setCompanyCode(FactoryConstant.DEFAULT_FACTORY_CODE);
         }
-        List<DjScheFinishQty> sourceList = djMesSourceMapper.selectShiftFinishQtyList(request);
+        List<DjDayFinishQty> sourceList = djMesSourceMapper.selectShiftFinishQtyList(request);
         if (CollectionUtils.isEmpty(sourceList)) {
             return AjaxResult.error();
         }
@@ -120,7 +114,7 @@ public class MesItfDjServiceImpl implements IMesItfDjService {
         if (StringUtils.isEmpty(request.getCompanyCode())) {
             request.setCompanyCode(FactoryConstant.DEFAULT_FACTORY_CODE);
         }
-        List<DjDayFinishQty> sourceList = djMesSourceMapper.selectDayFinishQtyList(request);
+        List<DjDayFinishTotal> sourceList = djMesSourceMapper.selectDayFinishQtyList(request);
         if (CollectionUtils.isEmpty(sourceList)) {
             return AjaxResult.success(I18nUtil.getMessage("ui.tc.schedule.mes.noSourceData"));
         }

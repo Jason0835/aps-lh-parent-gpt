@@ -1,7 +1,5 @@
 package com.zlt.aps.itf.mes.service.impl;
 
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
@@ -20,6 +18,7 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.constant.FactoryConstant;
+import com.zlt.aps.dj.api.domain.entity.DjDayFinishTotal;
 import com.zlt.aps.itf.constant.DataSource;
 import com.zlt.aps.itf.constant.SysCode;
 import com.zlt.aps.itf.mes.enums.ItfSyncKeyEnum;
@@ -30,7 +29,6 @@ import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.aps.itf.vo.MesNcScheduleResult;
 import com.zlt.aps.itf.vo.SyncDataLogs;
 import com.zlt.aps.nc.api.domain.entity.NcDayFinishQty;
-import com.zlt.aps.nc.api.domain.entity.NcScheFinishQty;
 import com.zlt.aps.nc.api.domain.entity.NcScheduleResult;
 import com.zlt.aps.nc.api.domain.entity.NcStock;
 import com.zlt.core.dao.basedao.BaseDao;
@@ -94,7 +92,7 @@ public class MesItfNcServiceImpl implements IMesItfNcService {
         if (StringUtils.isEmpty(request.getCompanyCode())) {
             request.setCompanyCode(FactoryConstant.DEFAULT_FACTORY_CODE);
         }
-        List<NcScheFinishQty> sourceList = ncMesSourceMapper.selectShiftFinishQtyList(request);
+        List<NcDayFinishQty> sourceList = ncMesSourceMapper.selectShiftFinishQtyList(request);
         if (CollectionUtils.isEmpty(sourceList)) {
             return AjaxResult.error();
         }
@@ -117,7 +115,7 @@ public class MesItfNcServiceImpl implements IMesItfNcService {
         if (StringUtils.isEmpty(request.getCompanyCode())) {
             request.setCompanyCode(FactoryConstant.DEFAULT_FACTORY_CODE);
         }
-        List<NcDayFinishQty> sourceList = ncMesSourceMapper.selectDayFinishQtyList(request);
+        List<DjDayFinishTotal> sourceList = ncMesSourceMapper.selectDayFinishQtyList(request);
         if (CollectionUtils.isEmpty(sourceList)) {
             return AjaxResult.success(I18nUtil.getMessage("ui.tc.schedule.mes.noSourceData"));
         }
