@@ -9,7 +9,6 @@ import com.zlt.aps.itf.vo.MesShiftStockSyncRequest;
 import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmMoldAlterPlan;
 import com.zlt.aps.mp.api.domain.entity.*;
-//import com.zlt.aps.gsq.api.domain.entity.GsqScheduleResultIssue;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResultIssue;
 
 import java.text.ParseException;
@@ -261,7 +260,7 @@ public interface MesItfService {
      * @param syncDataLogs 同步参数
      * @return 结果
      */
-    AjaxResult syncTreadStock(AuxReqSyncDataLogs syncDataLogs);
+    AjaxResult syncTmStock(AuxReqSyncDataLogs syncDataLogs);
 
     /**
      * 同步胎圈库存
@@ -376,7 +375,7 @@ public interface MesItfService {
      * @param request 工厂、物理库存日和班序
      * @return 同步结果
      */
-    AjaxResult syncTreadShiftStock(MesShiftStockSyncRequest request);
+    AjaxResult syncTmShiftStock(MesShiftStockSyncRequest request);
 
     /**
      * 同步成型排程完成量

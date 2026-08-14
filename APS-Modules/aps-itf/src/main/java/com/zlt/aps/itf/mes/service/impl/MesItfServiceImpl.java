@@ -2044,7 +2044,7 @@ public class MesItfServiceImpl implements MesItfService {
     /**
      * 从MES读取指定物理日的胎圈库存，并替换自动滚动班次快照。
      *
-     * <p>对齐胎面 syncTreadShiftStock，按工厂+物理日+班序从 MES_TQ_STOCK 取最新版本数据，
+     * <p>对齐胎面 syncTmShiftStock，按工厂+物理日+班序从 MES_TQ_STOCK 取最新版本数据，
      * 转换为 TqShiftStock 后远程调用 tqMesSyncRemoteService.replaceShiftStock 替换快照。</p>
      *
      * <p>MES无数据时仍调用 TQ 清空对应快照，防止自动滚动继续使用旧库存。
@@ -3612,7 +3612,7 @@ public class MesItfServiceImpl implements MesItfService {
      * @return 同步结果
      */
     @Override
-    public AjaxResult syncTreadStock(AuxReqSyncDataLogs syncDataLogs) {
+    public AjaxResult syncTmStock(AuxReqSyncDataLogs syncDataLogs) {
         if (syncDataLogs == null || syncDataLogs.getQueryParams() == null
                 || syncDataLogs.getQueryParams().get("stockDate") == null) {
             return AjaxResult.error(I18nUtil.getMessage("ui.itf.mes.stockArgumentsInvalid"));
@@ -3686,7 +3686,7 @@ public class MesItfServiceImpl implements MesItfService {
      * @throws ServiceException 参数非法或远程保存失败时抛出
      */
     @Override
-    public AjaxResult syncTreadShiftStock(MesShiftStockSyncRequest request) {
+    public AjaxResult syncTmShiftStock(MesShiftStockSyncRequest request) {
         if (request == null || request.getStockDate() == null || request.getShiftOrder() == null
                 || request.getShiftOrder() < 1 || request.getShiftOrder() > 6) {
             throw new ServiceException(I18nUtil.getMessage("ui.itf.mes.shiftStockArgumentsInvalid"));
