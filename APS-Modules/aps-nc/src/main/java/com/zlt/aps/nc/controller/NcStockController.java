@@ -65,7 +65,7 @@ public class NcStockController extends AbstractDocBizController<NcStock> {
     protected void builderCondition(QueryWrapper<NcStock> queryWrapper, NcStock queryVO) {
         super.builderCondition(queryWrapper, queryVO);
         queryWrapper.ge(queryVO.getStartTime() != null, "STOCK_DATE", queryVO.getStartTime());
-        queryWrapper.le(queryVO.getStartTime() != null, "STOCK_DATE", queryVO.getEndTime());
+        queryWrapper.le(queryVO.getEndTime() != null, "STOCK_DATE", queryVO.getEndTime());
     }
 
     /**
