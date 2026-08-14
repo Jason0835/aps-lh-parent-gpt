@@ -126,10 +126,7 @@ export function publishSchedule(data) {
   return request({
     url: '/gsq/scheduleResult/publish',
     method: 'post',
-    data: { scheduleDate: data.scheduleDate, factoryCode: data.factoryCode, ids: data.ids },
-    headers: {
-      'Content-Type': 'application/json;charset=UTF-8'
-    }
+    data: data
   })
 }
 

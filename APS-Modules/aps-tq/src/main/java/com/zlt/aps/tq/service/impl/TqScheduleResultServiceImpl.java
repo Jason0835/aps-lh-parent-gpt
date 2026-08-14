@@ -773,10 +773,10 @@ public class TqScheduleResultServiceImpl extends AbstractDocService<TqScheduleRe
         // 3. 将6班数据拆分为3天的下发列表
         List<TqScheduleResultIssue> issueList = new ArrayList<>();
         for (TqScheduleResult source : scheduleList) {
-            // D日 = 排程日期 - 2
-            Date dDay = DateUtil.offsetDay(scheduleDate, -2);
-            Date dPlus1Day = DateUtil.offsetDay(scheduleDate, -1);
-            Date dPlus2Day = scheduleDate;
+            // D日 = 排程日期 - 1（中班），D+1日 = 排程日期（夜早中），D+2日 = 排程日期 + 1（夜早）
+            Date dDay = DateUtil.offsetDay(scheduleDate, -1);
+            Date dPlus1Day = scheduleDate;
+            Date dPlus2Day = DateUtil.offsetDay(scheduleDate, 1);
 
             // Day1(D日)：胎圈1班→MES中班
             TqScheduleResultIssue day1Issue = buildDay1Issue(source, dDay);
@@ -909,7 +909,12 @@ public class TqScheduleResultServiceImpl extends AbstractDocService<TqScheduleRe
         issue.setOrderNo(source.getOrderNo());
         // 物料信息
         issue.setBeadCode(source.getBeadCode());
+        // 物料编码=胎圈编码
+        issue.setMaterialCode(source.getBeadCode());
         issue.setSteelRingCode(source.getSteelRingCode());
+        // 口型板代码：T_TQ_SCHEDULE_RESULT的TRIANGLE_GLUE_CODE列存的就是口型板代码，赋给MES的MOUTH_PLATE_CODE
+        issue.setMouthPlateCode(source.getTriangleGlueCode());
+        // 尺寸：T_TQ_SCHEDULE_RESULT无SPEC_SIZE列，用PRO_SIZE(英寸)赋值
         issue.setSpecSize(source.getProSize());
         issue.setMachineCode(source.getMachineCode());
         // 库存信息
@@ -1205,7 +1210,7 @@ public class TqScheduleResultServiceImpl extends AbstractDocService<TqScheduleRe
      * 4班：D+1日中班(16:00-24:00)
      * 5班：D+2日夜班(00:00-08:00)
      * 6班：D+2日早班(08:00-16:00)
-     * D = 排程日期 - 2
+     * D = 排程日期 - 1
      *
      * 根据排程日期精确判断当前时间落在哪个班次窗口内，
      * 无排程日期时按当前小时回退到简化判断。
@@ -1226,10 +1231,10 @@ public class TqScheduleResultServiceImpl extends AbstractDocService<TqScheduleRe
             }
         }
         Date now = new Date();
-        // D日 = 排程日期 - 2
-        Date dDay = DateUtil.beginOfDay(DateUtil.offsetDay(scheduleDate, -2));
-        Date dPlus1Day = DateUtil.beginOfDay(DateUtil.offsetDay(scheduleDate, -1));
-        Date dPlus2Day = DateUtil.beginOfDay(scheduleDate);
+        // D日 = 排程日期 - 1
+        Date dDay = DateUtil.beginOfDay(DateUtil.offsetDay(scheduleDate, -1));
+        Date dPlus1Day = DateUtil.beginOfDay(scheduleDate);
+        Date dPlus2Day = DateUtil.beginOfDay(DateUtil.offsetDay(scheduleDate, 1));
         // 各班次时间窗口
         // 1班：D日 16:00 - 24:00
         Date shift1Start = DateUtil.offsetHour(dDay, 16);
@@ -1452,7 +1457,7 @@ public class TqScheduleResultServiceImpl extends AbstractDocService<TqScheduleRe
      * 4班：D+1日中班(16:00-24:00)
      * 5班：D+2日夜班(00:00-08:00)
      * 6班：D+2日早班(08:00-16:00)
-     * D = 排程日期 - 2（即今天）
+     * D = 排程日期 - 1
      *
      * @param record     排程结果记录
      * @param shiftIndex 班次索引（1~6）
@@ -1463,8 +1468,8 @@ public class TqScheduleResultServiceImpl extends AbstractDocService<TqScheduleRe
         if (record.getScheduleDate() == null) {
             return false;
         }
-        // D = 排程日期 - 2
-        Date dDay = DateUtil.beginOfDay(DateUtil.offsetDay(record.getScheduleDate(), -2));
+        // D = 排程日期 - 1
+        Date dDay = DateUtil.beginOfDay(DateUtil.offsetDay(record.getScheduleDate(), -1));
         Date shiftEndTime = resolveShiftEndTime(dDay, shiftIndex);
         if (shiftEndTime == null) {
             return false;
@@ -1475,7 +1480,7 @@ public class TqScheduleResultServiceImpl extends AbstractDocService<TqScheduleRe
     /**
      * 根据D日和班次索引推导班次结束时间
      *
-     * @param dDay       D日（排程日期-2）
+     * @param dDay       D日（排程日期-1）
      * @param shiftIndex 班次索引（1~6）
      * @return 班次结束时间
      */

@@ -751,7 +751,7 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
      */
     @Override
     public AjaxResult publish(GsqScheduleResult queryVO) {
-        Date scheduleDate = queryVO.getScheduleDate();
+        Date scheduleDate = queryVO.getScheduleDateQuery();
         if (scheduleDate == null) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.gsqScheduleResult.scheduleDateRequired"));
         }
@@ -837,10 +837,10 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
         // 4. 将6班数据拆分为3天的下发列表
         List<GsqScheduleResultIssue> issueList = new ArrayList<>();
         for (GsqScheduleResult source : scheduleList) {
-            // D日 = 排程日期 - 2
-            Date dDay = DateUtil.offsetDay(scheduleDate, -2);
-            Date dPlus1Day = DateUtil.offsetDay(scheduleDate, -1);
-            Date dPlus2Day = scheduleDate;
+            // D日 = 排程日期 - 1
+            Date dDay = DateUtil.offsetDay(scheduleDate, -1);
+            Date dPlus1Day = scheduleDate;
+            Date dPlus2Day = DateUtil.offsetDay(scheduleDate, 1);
 
             // Day1(D日)：钢丝圈1班→MES中班
             GsqScheduleResultIssue day1Issue = this.buildDay1Issue(source, dDay, baseInfoMap);
@@ -1497,10 +1497,10 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
             }
         }
         Date now = new Date();
-        // D日 = 排程日期 - 2
-        Date dDay = DateUtil.beginOfDay(DateUtil.offsetDay(scheduleDate, -2));
-        Date dPlus1Day = DateUtil.beginOfDay(DateUtil.offsetDay(scheduleDate, -1));
-        Date dPlus2Day = DateUtil.beginOfDay(scheduleDate);
+        // D日 = 排程日期 - 1
+        Date dDay = DateUtil.beginOfDay(DateUtil.offsetDay(scheduleDate, -1));
+        Date dPlus1Day = DateUtil.beginOfDay(scheduleDate);
+        Date dPlus2Day = DateUtil.beginOfDay(DateUtil.offsetDay(scheduleDate, 1));
         // 各班次时间窗口
         Date shift1Start = DateUtil.offsetHour(dDay, 16);
         Date shift1End = DateUtil.offsetHour(dDay, 24);

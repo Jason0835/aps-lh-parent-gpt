@@ -334,3 +334,15 @@ export function listOrderVersion(query) {
     data: query
   })
 }
+
+// --------------- 月计划与实际产量对比 ---------------- //
+export function listMonthPlanCompare(query) {
+  return request({
+    url: '/monthplan/monthPlanCompare/list',
+    method: 'post',
+    data: query
+  })
+}
+export function exportMonthPlanCompare(query) {
+  downloadLink('/monthplan/monthPlanCompare/export', query)
+}
