@@ -1948,6 +1948,7 @@
   "ui.data.column.dj.machineMaintenance.stopEndTime": "Thời gian kết thúc dừng",
   "ui.data.column.dj.machineMaintenance.stopShift": "Ca dừng",
   "ui.data.column.nc.machineMaintenance.modelName": "Kế hoạch bảo trì máy lớp lót",
+  "ui.data.column.ncStock.modelName": "Thông tin tồn kho lớp lót",
   "ui.data.column.nc.machineMaintenance.factoryCode": "Mã nhà máy",
   "ui.data.column.nc.machineMaintenance.machineCode": "Mã máy",
   "ui.data.column.nc.machineMaintenance.machineName": "Tên máy",
