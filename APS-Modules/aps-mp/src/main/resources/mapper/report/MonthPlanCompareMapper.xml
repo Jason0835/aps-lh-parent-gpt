@@ -53,29 +53,8 @@
         <result property="day31" column="DAY_31"/>
     </resultMap>
 
-    <!-- 查询月计划定稿主数据（含每日计划量 DAY_1 ~ DAY_31） -->
-    <select id="selectFinalList" resultMap="finalResultMap">
-        SELECT
-            f.ID,
-            f.FACTORY_CODE,
-            f.YEAR,
-            f.MONTH,
-            f.PRODUCTION_VERSION,
-            f.MATERIAL_CODE,
-            f.MATERIAL_DESC,
-            f.PRODUCT_STATUS,
-            f.PRODUCT_TYPE_CODE,
-            f.BRAND,
-            f.SPECIFICATIONS,
-            f.PRO_SIZE,
-            f.ORIGINAL_TOTAL_QTY,
-            f.TOTAL_QTY,
-            f.DAY_1, f.DAY_2, f.DAY_3, f.DAY_4, f.DAY_5, f.DAY_6, f.DAY_7,
-            f.DAY_8, f.DAY_9, f.DAY_10, f.DAY_11, f.DAY_12, f.DAY_13, f.DAY_14,
-            f.DAY_15, f.DAY_16, f.DAY_17, f.DAY_18, f.DAY_19, f.DAY_20, f.DAY_21,
-            f.DAY_22, f.DAY_23, f.DAY_24, f.DAY_25, f.DAY_26, f.DAY_27, f.DAY_28,
-            f.DAY_29, f.DAY_30, f.DAY_31
-        FROM T_MP_MONTH_PLAN_PROD_FINAL f
+    <!-- 公共 WHERE 条件片段（用于 selectFinalList 与 selectFinalListCount） -->
+    <sql id="finalWhereClause">
         WHERE f.IS_DELETE = 0
           AND f.FACTORY_CODE = #{factoryCode}
           AND f.YEAR = #{year}
@@ -102,12 +81,50 @@
         <if test="productTypeCode != null and productTypeCode != ''">
             AND f.PRODUCT_TYPE_CODE = #{productTypeCode}
         </if>
+    </sql>
+
+    <!-- 查询月计划定稿主数据总数（分页总数） -->
+    <select id="selectFinalListCount" resultType="int">
+        SELECT COUNT(1)
+        FROM T_MP_MONTH_PLAN_PROD_FINAL f
+        <include refid="finalWhereClause"/>
+    </select>
+
+    <!-- 查询月计划定稿主数据（含每日计划量 DAY_1 ~ DAY_31），支持分页 -->
+    <select id="selectFinalList" resultMap="finalResultMap">
+        SELECT
+            f.ID,
+            f.FACTORY_CODE,
+            f.YEAR,
+            f.MONTH,
+            f.PRODUCTION_VERSION,
+            f.MATERIAL_CODE,
+            f.MATERIAL_DESC,
+            f.PRODUCT_STATUS,
+            f.PRODUCT_TYPE_CODE,
+            f.BRAND,
+            f.SPECIFICATIONS,
+            f.PRO_SIZE,
+            f.ORIGINAL_TOTAL_QTY,
+            f.TOTAL_QTY,
+            f.DAY_1, f.DAY_2, f.DAY_3, f.DAY_4, f.DAY_5, f.DAY_6, f.DAY_7,
+            f.DAY_8, f.DAY_9, f.DAY_10, f.DAY_11, f.DAY_12, f.DAY_13, f.DAY_14,
+            f.DAY_15, f.DAY_16, f.DAY_17, f.DAY_18, f.DAY_19, f.DAY_20, f.DAY_21,
+            f.DAY_22, f.DAY_23, f.DAY_24, f.DAY_25, f.DAY_26, f.DAY_27, f.DAY_28,
+            f.DAY_29, f.DAY_30, f.DAY_31
+        FROM T_MP_MONTH_PLAN_PROD_FINAL f
+        <include refid="finalWhereClause"/>
         ORDER BY f.MATERIAL_CODE
+        <!-- 分页：pageNum/pageSize 任一为空则查全量（用于导出场景） -->
+        <if test="pageNum != null and pageSize != null and pageNum > 0 and pageSize > 0">
+            LIMIT #{offset}, #{pageSize}
+        </if>
     </select>
 
     <!-- 查询每日实际完成量（按 物料编码 + LH_TYPE + 日期日 聚合） -->
     <!-- 日期范围按版本表 PRODUCTION_START_DATE ~ PRODUCTION_END_DATE 取数，并限制当月 -->
     <!-- 每月只有一个定稿版本，通过工厂+年月+IS_FINAL='1' 自动定位版本 -->
+    <!-- 通过 materialKeys（materialCode|lhType）限定只查当前页 SKU 的实际产量 -->
     <select id="selectDailyFinishQtyList" resultType="java.util.Map">
         SELECT
             q.MATERIAL_CODE   AS materialCode,
@@ -134,6 +151,14 @@
                 AND f.FACTORY_CODE = #{queryDto.factoryCode}
                 AND f.IS_DELETE = 0
           )
+        <if test="queryDto.materialKeys != null and queryDto.materialKeys.size() > 0">
+            AND (
+                q.MATERIAL_CODE + '|' + q.LH_TYPE
+            ) IN
+            <foreach collection="queryDto.materialKeys" item="mk" open="(" separator="," close=")">
+                #{mk}
+            </foreach>
+        </if>
         GROUP BY q.MATERIAL_CODE, q.LH_TYPE, DAY(q.FINISH_DATE)
     </select>
 
