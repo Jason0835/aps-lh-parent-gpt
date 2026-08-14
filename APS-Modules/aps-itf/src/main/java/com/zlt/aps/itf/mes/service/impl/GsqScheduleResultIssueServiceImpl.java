@@ -1,6 +1,7 @@
 package com.zlt.aps.itf.mes.service.impl;
 
 import com.alibaba.fastjson.JSONObject;
+import com.baomidou.dynamic.datasource.annotation.DSTransactional;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
@@ -25,6 +26,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 /**
@@ -54,9 +56,10 @@ public class GsqScheduleResultIssueServiceImpl implements IGsqScheduleResultIssu
     /**
      * 下发钢丝圈排程结果到MES
      * 业务规则：
-     * 1. D日（今天）：更新中班数据（钢丝圈1班→MES中班），夜班早班已过不下发
-     * 2. D+1日（明天）：更新夜早中3班数据（钢丝圈2/3/4班→MES夜/早/中班）
-     * 3. D+2日（后天）：先删后插夜早2班数据（钢丝圈5/6班→MES夜/早班），中班尚未排产不下发
+     * 1. 从下发数据中提取实际排程日期，按日期分组处理（不再依赖LocalDate.now()推导日期，避免发布日期与排程日期不一致导致数据被过滤）
+     * 2. 今天及过去日期的数据：upsert（存在则更新，不存在则插入）
+     * 3. 未来日期的数据：先删除后插入（确保数据干净）
+     * 4. 添加事务保证，任一批次失败则全部回滚
      *
      * @param gsqScheduleResultIssueList 钢丝圈排程结果下发列表（已按3天拆分）
      * @param factoryCode                厂别
@@ -64,48 +67,66 @@ public class GsqScheduleResultIssueServiceImpl implements IGsqScheduleResultIssu
      * @return 下发结果
      */
     @Override
+    @DSTransactional
     public AjaxResult issueGsqScheduleResult(List<GsqScheduleResultIssue> gsqScheduleResultIssueList, String factoryCode, String companyCode) {
         if (CollectionUtils.isEmpty(gsqScheduleResultIssueList)) {
             return AjaxResult.success();
         }
 
+        log.info("钢丝圈排程结果下发MES开始，传入记录数：{}", gsqScheduleResultIssueList.size());
+
         // 获取下发接口版本号
         String dataVersion = syncDataHandle.getDataVersion(ItfSyncKeyEnum.SYNC_GSQ_SCHEDULE_RESULT.getCode());
 
-        // 获取今天、明天、后天的日期
+        // 从下发数据中提取所有不重复的排程日期（不再依赖LocalDate.now()推导，避免发布日期与排程日期不一致导致数据被过滤）
+        Set<LocalDate> scheduleDates = gsqScheduleResultIssueList.stream()
+                .map(GsqScheduleResultIssue::getScheduleDate)
+                .filter(date -> date != null)
+                .collect(Collectors.toCollection(TreeSet::new));
+
+        if (CollectionUtils.isEmpty(scheduleDates)) {
+            return AjaxResult.success("没有需要下发的数据");
+        }
+
         LocalDate today = LocalDate.now();
-        LocalDate tomorrow = today.plusDays(1);
-        LocalDate dayAfterTomorrow = today.plusDays(2);
-
-        // 按日期分组处理数据
-        List<GsqScheduleResultIssue> todayList = filterByDate(gsqScheduleResultIssueList, today);
-        List<GsqScheduleResultIssue> tomorrowList = filterByDate(gsqScheduleResultIssueList, tomorrow);
-        List<GsqScheduleResultIssue> dayAfterTomorrowList = filterByDate(gsqScheduleResultIssueList, dayAfterTomorrow);
-
-        // 转换为MES实体
-        List<MesGsqScheduleResult> todayMesList = convertToMesList(todayList, dataVersion, companyCode, factoryCode);
-        List<MesGsqScheduleResult> tomorrowMesList = convertToMesList(tomorrowList, dataVersion, companyCode, factoryCode);
-        List<MesGsqScheduleResult> dayAfterTomorrowMesList = convertToMesList(dayAfterTomorrowList, dataVersion, companyCode, factoryCode);
-
-        // D日和D+1日数据：更新（存在则更新，不存在则插入）
-        upsertGsqScheduleResult(todayMesList, dataVersion);
-        upsertGsqScheduleResult(tomorrowMesList, dataVersion);
-
-        // D+2日数据：先删除后插入（确保数据干净）
-        insertGsqScheduleResult(dayAfterTomorrowMesList, dayAfterTomorrow, dataVersion);
-
-        // 合并所有数据用于发送MQ
         List<MesGsqScheduleResult> allMesList = new ArrayList<>();
-        allMesList.addAll(todayMesList);
-        allMesList.addAll(tomorrowMesList);
-        allMesList.addAll(dayAfterTomorrowMesList);
+
+        // 按实际排程日期分组处理
+        for (LocalDate scheduleDate : scheduleDates) {
+            List<GsqScheduleResultIssue> dayList = filterByDate(gsqScheduleResultIssueList, scheduleDate);
+            if (CollectionUtils.isEmpty(dayList)) {
+                continue;
+            }
+
+            log.info("处理排程日期{}，记录数：{}", scheduleDate, dayList.size());
+
+            // 转换为MES实体
+            List<MesGsqScheduleResult> dayMesList = convertToMesList(dayList, dataVersion, companyCode, factoryCode);
+            allMesList.addAll(dayMesList);
+
+            if (scheduleDate.isAfter(today)) {
+                // 未来日期：先删除后插入（确保数据干净）
+                insertGsqScheduleResult(dayMesList, scheduleDate, dataVersion);
+            } else {
+                // 今天及过去日期：upsert（存在则更新，不存在则插入）
+                upsertGsqScheduleResult(dayMesList, dataVersion);
+            }
+        }
 
         if (CollectionUtils.isEmpty(allMesList)) {
             return AjaxResult.success("没有需要下发的数据");
         }
 
+        // 获取日期范围用于MQ通知（scheduleDates已按TreeSet排序）
+        LocalDate startDate = scheduleDates.iterator().next();
+        LocalDate endDate = scheduleDates.stream()
+                .reduce((first, second) -> second)
+                .orElse(startDate);
+
+        log.info("钢丝圈排程结果下发MES完成，总记录数：{}，日期范围：{} ~ {}", allMesList.size(), startDate, endDate);
+
         // 发送MQ通知MES
-        return sendMqNotice(allMesList, today, dayAfterTomorrow, dataVersion, factoryCode, companyCode);
+        return sendMqNotice(allMesList, startDate, endDate, dataVersion, factoryCode, companyCode);
     }
 
     /**
@@ -178,8 +199,8 @@ public class GsqScheduleResultIssueServiceImpl implements IGsqScheduleResultIssu
     /**
      * 发送MQ通知
      */
-    private AjaxResult sendMqNotice(List<MesGsqScheduleResult> allMesList, LocalDate today,
-                                     LocalDate dayAfterTomorrow, String dataVersion,
+    private AjaxResult sendMqNotice(List<MesGsqScheduleResult> allMesList, LocalDate startDate,
+                                     LocalDate endDate, String dataVersion,
                                      String factoryCode, String companyCode) {
         AjaxResult ajaxResult;
         try {
@@ -190,8 +211,8 @@ public class GsqScheduleResultIssueServiceImpl implements IGsqScheduleResultIssu
             // 请求参数
             JSONObject params = new JSONObject();
             params.put("rowCount", allMesList.size());
-            params.put("startDate", today.format(DATE_FORMATTER));
-            params.put("endDate", dayAfterTomorrow.format(DATE_FORMATTER));
+            params.put("startDate", startDate.format(DATE_FORMATTER));
+            params.put("endDate", endDate.format(DATE_FORMATTER));
             syncParamsVO.setParams(params);
             syncParamsVO.setDataSys(SysCode.APS);
             syncParamsVO.setDockSys(ApsConstant.DOCK_SYS_MES);
