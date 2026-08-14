@@ -46,7 +46,6 @@ import com.zlt.aps.lh.api.service.ILhPrecisionPlanRemoteService;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.*;
 import com.zlt.aps.maindata.service.IFactoryParamService;
-import com.zlt.aps.maindata.service.IMdmDevMaintenancePlanService;
 import com.zlt.aps.maindata.service.IMdmProductModelRelationService;
 import com.zlt.aps.maindata.service.IMdmSkuStructureRefService;
 import com.zlt.aps.maindata.utils.ScmListUtils;
@@ -121,9 +120,6 @@ public class MesItfServiceImpl implements MesItfService {
 
     @Autowired
     private MdmDevMaintenancePlanEntityMapper devMaintenancePlanEntityMapper;
-
-    @Autowired
-    private IMdmDevMaintenancePlanService mdmDevMaintenancePlanService;
 
     @Autowired
     private MdmDevicePlanShutEntityMapper devicePlanShutEntityMapper;
@@ -1355,10 +1351,10 @@ public class MesItfServiceImpl implements MesItfService {
                 insertList.add(entity);
             }
 
-            // 批量插入，按1000条分批，使用Service层saveBatch确保实体字段正确映射
+            // 批量插入，按1000条分批
             List<List<MdmDevMaintenancePlan>> splitList = ScmListUtils.getSplitList(insertList, 1000);
             for (List<MdmDevMaintenancePlan> batch : splitList) {
-                mdmDevMaintenancePlanService.saveBatch(batch);
+                baseDao.saveBatch(batch);
             }
 
             log.info("仅同步设备保养计划完成（不触发生成精度计划），精度类型={}，同步{}条", precisionType, syncList.size());
