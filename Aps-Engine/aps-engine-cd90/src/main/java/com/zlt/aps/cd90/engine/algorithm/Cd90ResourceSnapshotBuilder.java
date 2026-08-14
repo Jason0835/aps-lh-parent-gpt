@@ -71,7 +71,7 @@ public class Cd90ResourceSnapshotBuilder {
             Cd90StorageLaneState lane = laneMap.get(inbound.getLaneCode());
             if (lane == null) {
                 lane = Cd90StorageLaneState.builder()
-                        .laneCode(inbound.getLaneCode()).vehicleCount(0)
+                        .laneCode(inbound.getLaneCode()).machineCode(inbound.getMachineCode()).vehicleCount(0)
                         .maxVehicleCount(inbound.getVehicleCount()).build();
                 lanes.add(lane);
                 laneMap.put(lane.getLaneCode(), lane);
@@ -97,7 +97,8 @@ public class Cd90ResourceSnapshotBuilder {
             return new ArrayList<>();
         }
         return lanes.stream().map(item -> Cd90StorageLaneState.builder()
-                .laneCode(item.getLaneCode()).clothCode(item.getClothCode())
+                .laneCode(item.getLaneCode()).machineCode(item.getMachineCode())
+                .clothCode(item.getClothCode())
                 .vehicleCount(item.getVehicleCount()).maxVehicleCount(item.getMaxVehicleCount())
                 .build()).collect(Collectors.toList());
     }

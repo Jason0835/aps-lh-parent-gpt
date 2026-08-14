@@ -772,7 +772,8 @@ public class Cd90InsertRollingServiceImpl implements Cd90InsertRollingService {
                     }
                     int vehicles = row.getAllocatedCartCount() == null
                             ? 0 : row.getAllocatedCartCount();
-                    return vehicles <= 0
+                    return !Objects.equals(result.getMachineCode(), lane.getMachineCode())
+                            || vehicles <= 0
                             || lane.getVehicleCount() + vehicles > lane.getMaxVehicleCount();
                 })
                 .map(Cd90ScheduleLaneAllocation::getStorageLaneCode)
@@ -792,6 +793,10 @@ public class Cd90InsertRollingServiceImpl implements Cd90InsertRollingService {
                     .findFirst().orElseThrow(() -> new IllegalStateException(
                             "原排程库排不存在于当前资源快照: " + row.getStorageLaneCode()));
             int vehicles = row.getAllocatedCartCount() == null ? 0 : row.getAllocatedCartCount();
+            if (!Objects.equals(result.getMachineCode(), lane.getMachineCode())) {
+                throw new IllegalStateException("原排程库排未绑定当前机台: "
+                        + row.getStorageLaneCode());
+            }
             if (vehicles <= 0 || lane.getVehicleCount() + vehicles > lane.getMaxVehicleCount()) {
                 throw new IllegalStateException("原排程库排资源已变化，无法保持锁定任务: "
                         + row.getStorageLaneCode());
@@ -842,7 +847,8 @@ public class Cd90InsertRollingServiceImpl implements Cd90InsertRollingService {
         BigDecimal toolingQuantity = standardCurlLength.multiply(BigDecimal.valueOf(availableTooling));
         BigDecimal trialQuantity = requestedQuantity.min(toolingQuantity);
         Cd90StorageLaneAllocationResult allocation = laneAllocator.allocate(
-                segment.result.getClothCode(), trialQuantity, standardCurlLength,
+                segment.result.getClothCode(), segment.result.getMachineCode(),
+                trialQuantity, standardCurlLength,
                 state.getLanes(), segment.hardInsert);
         if (!allocation.isSuccess() || allocation.getAllocatedVehicleCount() <= 0) {
             return new LaneCommit(BigDecimal.ZERO, Collections.emptyList(), 0,

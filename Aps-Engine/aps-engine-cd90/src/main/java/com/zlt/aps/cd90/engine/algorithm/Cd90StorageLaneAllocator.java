@@ -29,16 +29,18 @@ public class Cd90StorageLaneAllocator {
      * </p>
      *
      * @param clothCode 帘布代码
+     * @param machineCode 当前候选机台编码
      * @param planQuantity 计划量,单位米
      * @param standardCurlLength 标准卷曲长度，直接作为一车工装卷的排程容量
      * @param originalLanes 原库排状态
      * @return 分配结果
      */
     public Cd90StorageLaneAllocationResult allocate(String clothCode,
+                                                      String machineCode,
                                                       BigDecimal planQuantity,
                                                       BigDecimal standardCurlLength,
                                                       List<Cd90StorageLaneState> originalLanes) {
-        return allocate(clothCode, planQuantity, standardCurlLength, originalLanes, false);
+        return allocate(clothCode, machineCode, planQuantity, standardCurlLength, originalLanes, false);
     }
 
     /**
@@ -46,10 +48,14 @@ public class Cd90StorageLaneAllocator {
      * 让插单帘布优先获得这些库位资源。
      */
     public Cd90StorageLaneAllocationResult allocate(String clothCode,
+                                                      String machineCode,
                                                       BigDecimal planQuantity,
                                                       BigDecimal standardCurlLength,
                                                       List<Cd90StorageLaneState> originalLanes,
                                                       boolean isHardInsert) {
+        if (!StringUtils.hasText(machineCode)) {
+            throw new IllegalArgumentException("库排分配机台编码不能为空");
+        }
         if (planQuantity == null || planQuantity.signum() <= 0) {
             throw new IllegalArgumentException("库排分配计划量必须大于0");
         }
@@ -62,6 +68,7 @@ public class Cd90StorageLaneAllocator {
 
         // 第一段:同规格且有富余(车数多的优先,然后 laneCode 稳定排序)
         List<Cd90StorageLaneState> sameSpec = lanes.stream()
+                .filter(item -> machineCode.equals(item.getMachineCode()))
                 .filter(item -> item.getMaxVehicleCount() > item.getVehicleCount())
                 .filter(item -> clothCode.equals(item.getClothCode()))
                 .sorted(Comparator.comparingInt(Cd90StorageLaneState::getVehicleCount)
@@ -71,6 +78,7 @@ public class Cd90StorageLaneAllocator {
 
         // 第二段:空库排,硬插单时 vehicleCount=0 即视为空(不论是否残留旧帘布标签)
         List<Cd90StorageLaneState> emptyLanes = lanes.stream()
+                .filter(item -> machineCode.equals(item.getMachineCode()))
                 .filter(item -> item.getMaxVehicleCount() > 0)
                 .filter(item -> isHardInsert
                         ? item.getVehicleCount() == 0
@@ -113,6 +121,7 @@ public class Cd90StorageLaneAllocator {
 
     private Cd90StorageLaneState copy(Cd90StorageLaneState source) {
         return Cd90StorageLaneState.builder().laneCode(source.getLaneCode())
+                .machineCode(source.getMachineCode())
                 .clothCode(source.getClothCode()).vehicleCount(source.getVehicleCount())
                 .maxVehicleCount(source.getMaxVehicleCount()).build();
     }

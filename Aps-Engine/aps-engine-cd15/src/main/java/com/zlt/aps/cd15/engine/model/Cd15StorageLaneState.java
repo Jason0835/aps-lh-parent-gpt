@@ -12,6 +12,8 @@ public class Cd15StorageLaneState {
 
     /** 库排编码。 */
     private String laneCode;
+    /** 固定绑定的斜裁机台编码。 */
+    private String machineCode;
     /** 当前定向钢带代码；车数为0时仍保留原钢带归属。 */
     private String steelStripCode;
     /** 当前占用车数。 */

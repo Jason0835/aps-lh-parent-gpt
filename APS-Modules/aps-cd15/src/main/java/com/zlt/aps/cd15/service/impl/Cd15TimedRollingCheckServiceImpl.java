@@ -119,6 +119,7 @@ public class Cd15TimedRollingCheckServiceImpl implements Cd15TimedRollingCheckSe
         }
         String inputVersion = rollingInputVersionService.fingerprint(target);
         String stateKey = factoryCode + ":" + target.getScheduleDate()
+                + ":" + target.getResourceBaselineDate()
                 + ":" + target.getTargetShiftCode();
         boolean stable = rollingStabilityService.observe(stateKey, inputVersion,
                 triggerTime.atZone(ZoneId.systemDefault()).toInstant(),
@@ -135,7 +136,7 @@ public class Cd15TimedRollingCheckServiceImpl implements Cd15TimedRollingCheckSe
         }
         Cd15ScheduleTask task = rollingTaskService.createPending(factoryCode, scheduleDate,
                 requestSnapshot(target, inputVersion), idempotencyKey);
-        if (!idempotencyKey.equals(task.getIdempotencyKey())) {
+        if (task == null) {
             skippedFactories.add(skip(factoryCode, "SCHEDULE_TASK_BUSY"));
             return;
         }
@@ -144,6 +145,7 @@ public class Cd15TimedRollingCheckServiceImpl implements Cd15TimedRollingCheckSe
         created.put("factoryCode", factoryCode);
         created.put("taskId", task.getTaskId());
         created.put("batchNo", target.getBatchNo());
+        created.put("resourceBaselineDate", target.getResourceBaselineDate());
         created.put("targetShiftCode", target.getTargetShiftCode());
         createdTasks.add(created);
     }
@@ -176,7 +178,7 @@ public class Cd15TimedRollingCheckServiceImpl implements Cd15TimedRollingCheckSe
         AuxReqSyncDataLogs syncRequest = new AuxReqSyncDataLogs();
         syncRequest.setFactoryCode(target.getFactoryCode());
         HashMap<String, Object> queryParams = new HashMap<>();
-        queryParams.put("laneDate", target.getHandoverTime().toLocalDate().toString());
+        queryParams.put("laneDate", target.getResourceBaselineDate().toString());
         queryParams.put("shiftCode", target.getTargetShiftCode());
         syncRequest.setQueryParams(queryParams);
         try {
@@ -186,7 +188,7 @@ public class Cd15TimedRollingCheckServiceImpl implements Cd15TimedRollingCheckSe
                     && Objects.equals(AppUtils.AJAX_RESULT_SUCCESS, result.get(AjaxResult.CODE_TAG));
         } catch (Exception exception) {
             log.error("斜裁定时滚动前库排同步失败，factoryCode={}，laneDate={}，shiftCode={}",
-                    target.getFactoryCode(), target.getHandoverTime().toLocalDate(),
+                    target.getFactoryCode(), target.getResourceBaselineDate(),
                     target.getTargetShiftCode(), exception);
             return false;
         }
@@ -198,7 +200,7 @@ public class Cd15TimedRollingCheckServiceImpl implements Cd15TimedRollingCheckSe
                 new LambdaQueryWrapper<Cd15StorageLaneLimit>()
                         .eq(Cd15StorageLaneLimit::getFactoryCode, target.getFactoryCode())
                         .eq(Cd15StorageLaneLimit::getLaneDate,
-                                java.sql.Date.valueOf(target.getHandoverTime().toLocalDate()))
+                                java.sql.Date.valueOf(target.getResourceBaselineDate()))
                         .eq(Cd15StorageLaneLimit::getShiftCode, target.getTargetShiftCode()));
         return count != null && count > 0;
     }

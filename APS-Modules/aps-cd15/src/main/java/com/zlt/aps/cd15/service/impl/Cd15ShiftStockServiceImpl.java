@@ -109,8 +109,7 @@ public class Cd15ShiftStockServiceImpl implements ICd15ShiftStockService {
             if (!Objects.equals(existing.getMaterialCode(), incoming.getMaterialCode())
                     || !this.sameNumber(existing.getStockNum(), incoming.getStockNum())
                     || !this.sameNumber(existing.getModifyNum(), incoming.getModifyNum())
-                    || !this.sameNumber(existing.getBadNum(), incoming.getBadNum())
-                    || !Objects.equals(existing.getSnapshotTime(), incoming.getSnapshotTime())) {
+                    || !this.sameNumber(existing.getBadNum(), incoming.getBadNum())) {
                 return false;
             }
         }

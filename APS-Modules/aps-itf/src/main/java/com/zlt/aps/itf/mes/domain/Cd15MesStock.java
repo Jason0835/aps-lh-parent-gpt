@@ -7,7 +7,7 @@ import java.math.BigDecimal;
 import java.util.Date;
 
 /**
- * MES斜裁库存中间表查询对象。
+ * MES斜裁库存对象查询模型，映射MES_CD15_STOCK。
  */
 @Data
 public class Cd15MesStock implements Serializable {

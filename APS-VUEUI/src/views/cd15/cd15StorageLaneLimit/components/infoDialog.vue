@@ -24,6 +24,10 @@ export default {
       type: Array,
       default: () => [],
     },
+    machineOptions: {
+      type: Array,
+      default: () => [],
+    },
   },
   data() {
     const requiredSelect = { required: true, message: this.$t("common.rule.select"), trigger: "change" };
@@ -87,6 +91,7 @@ export default {
         factoryCode: [requiredSelect],
         laneDate: [requiredInput],
         shiftCode: [requiredSelect],
+        machineCode: [requiredSelect],
         storageLaneCode: [requiredInput],
         carNum: [carNumNonNegative, carNumNotExceedMax, emptyLaneCarNumZero],
         maxCarNum: [requiredInput, maxCarNumPositive],
@@ -99,10 +104,11 @@ export default {
     },
     columns() {
       return [
-        { prop: "factoryCode", label: this.$t("ui.data.column.cd15StorageLaneLimit.factoryCode"), type: "select", dictData: this.parentDict.type.biz_factory_name, filterable: true },
+        { prop: "factoryCode", label: this.$t("ui.data.column.cd15StorageLaneLimit.factoryCode"), type: "select", dictData: this.parentDict.type.biz_factory_name, filterable: true, change: this.onFactoryChange },
         { prop: "materialCode", label: this.$t("ui.data.column.cd15StorageLaneLimit.materialCode"), type: "select", dictData: this.steelStripOptions, filterable: true, clearable: true },
         { prop: "laneDate", label: this.$t("ui.data.column.cd15StorageLaneLimit.laneDate"), type: "date" },
         { prop: "shiftCode", label: this.$t("ui.data.column.cd15StorageLaneLimit.shiftCode"), type: "select", dictData: this.parentDict.type.class_num_three_plan, filterable: true },
+        { prop: "machineCode", label: this.$t("ui.data.column.cd15StorageLaneLimit.machineCode"), type: "select", dictData: this.machineOptions, filterable: true, required: true },
         { prop: "storageLaneCode", label: this.$t("ui.data.column.cd15StorageLaneLimit.storageLaneCode"), maxlength: 50 },
         { prop: "carNum", label: this.$t("ui.data.column.cd15StorageLaneLimit.carNum"), type: "number" },
         { prop: "maxCarNum", label: this.$t("ui.data.column.cd15StorageLaneLimit.maxCarNum"), type: "number", required: true },
@@ -111,6 +117,10 @@ export default {
     },
   },
   methods: {
+    onFactoryChange() {
+      this.form = { ...this.form, machineCode: undefined };
+      this.$emit("factory-change", this.form.factoryCode);
+    },
     async save(params) {
       this.loading = true;
       try {

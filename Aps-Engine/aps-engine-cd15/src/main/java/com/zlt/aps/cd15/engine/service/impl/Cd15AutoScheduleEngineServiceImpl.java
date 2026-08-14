@@ -5,6 +5,7 @@ import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.cd15.api.domain.entity.Cd15ShiftConfig;
 import com.zlt.aps.cd15.engine.algorithm.Cd15ShiftWindowResolver;
+import com.zlt.aps.cd15.engine.algorithm.Cd15EnabledShiftConfigValidator;
 import com.zlt.aps.cd15.engine.algorithm.Cd15RestartShiftResolver;
 import com.zlt.aps.cd15.engine.algorithm.Cd15AutoScheduleOutputDraftBuilder;
 import com.zlt.aps.cd15.engine.algorithm.Cd15MultiShiftScheduleExecutor;
@@ -47,6 +48,7 @@ public class Cd15AutoScheduleEngineServiceImpl implements Cd15AutoScheduleEngine
     private static final String CD15_PROCESS_CODE = "10";
 
     private final Cd15AutoScheduleShiftMapper shiftMapper;
+    private final Cd15EnabledShiftConfigValidator enabledShiftConfigValidator;
     private final Cd15EngineWorkCalendarMapper workCalendarMapper;
     private final Cd15AutoScheduleParameterService parameterService;
     private final Cd15ShiftWindowResolver shiftWindowResolver;
@@ -76,6 +78,7 @@ public class Cd15AutoScheduleEngineServiceImpl implements Cd15AutoScheduleEngine
 
         // 班次数量参与参数校验，必须先加载班次，再解析输出窗口等强类型参数。
         List<Cd15ShiftConfig> enabledShifts = loadEnabledShifts(factoryCode);
+        enabledShiftConfigValidator.validate(enabledShifts);
         Cd15AutoScheduleParameters parameters = parameterService.load(factoryCode, enabledShifts.size());
         // 输出窗口按业务班次顺序截取，保证后续滚动计算和结果CLASS字段顺序一致。
         List<Cd15ShiftDescriptor> shifts = shiftWindowResolver.resolve(localScheduleDate, enabledShifts)

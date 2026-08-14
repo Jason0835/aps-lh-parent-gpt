@@ -21,6 +21,8 @@ public class Cd90InboundRecord {
     private String clothCode;
     /** 分配库排编码。 */
     private String laneCode;
+    /** 库排绑定机台编码。 */
+    private String machineCode;
     /** 入库车辆数。 */
     private int vehicleCount;
     /** 精确入库数量，单位米；为空时资源计算仍可按车辆数处理。 */

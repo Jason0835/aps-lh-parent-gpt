@@ -81,7 +81,7 @@ import infoDialog from "./components/infoDialog.vue";
 export default {
   name: "Cd15Stock",
   components: { TltUploadForm, infoDialog },
-  dicts: ["biz_factory_name"],
+  dicts: ["biz_factory_name", "class_num_three_plan"],
   provide() {
     return { parentDict: this.dict };
   },
@@ -137,6 +137,15 @@ export default {
           halign: "center",
           label: this.$t("ui.data.column.cd15Stock.stockDate"),
           minWidth: 120,
+        },
+        {
+          prop: "shiftCode",
+          align: "center",
+          halign: "center",
+          label: this.$t("ui.data.column.cd15Stock.shiftCode"),
+          minWidth: 90,
+          formatter: (row, column, value) =>
+            this.selectDictLabel(this.dict.type.class_num_three_plan, value),
         },
         {
           prop: "materialCode",
@@ -231,6 +240,13 @@ export default {
           dictData: this.steelStripOptions,
           filterable: true,
           clearable: true,
+        },
+        {
+          label: this.$t("ui.data.column.cd15Stock.shiftCode"),
+          prop: "shiftCode",
+          type: "select",
+          dictData: this.dict.type.class_num_three_plan,
+          filterable: true,
         },
       ];
     },

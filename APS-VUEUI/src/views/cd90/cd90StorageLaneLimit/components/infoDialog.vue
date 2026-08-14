@@ -24,6 +24,10 @@ export default {
       type: Array,
       default: () => [],
     },
+    machineOptions: {
+      type: Array,
+      default: () => [],
+    },
   },
   data() {
     const requiredSelect = { required: true, message: this.$t("common.rule.select"), trigger: "change" };
@@ -56,6 +60,7 @@ export default {
         factoryCode: [requiredSelect],
         laneDate: [requiredInput],
         shiftCode: [requiredInput],
+        machineCode: [requiredSelect],
         storageLaneCode: [requiredInput],
         carNum: [requiredInput, carNumNotExceedMax, emptyLaneCarNumZero],
         maxCarNum: [maxCarNumRequired, maxCarNumPositive],
@@ -66,10 +71,11 @@ export default {
     title() { return this.isEdit ? this.$t("common.button.edit") : this.$t("common.button.add"); },
     columns() {
       return [
-        { prop: "factoryCode", label: this.$t("ui.data.column.cd90StorageLaneLimit.factoryCode"), type: "select", dictData: this.parentDict.type.biz_factory_name, filterable: true },
+        { prop: "factoryCode", label: this.$t("ui.data.column.cd90StorageLaneLimit.factoryCode"), type: "select", dictData: this.parentDict.type.biz_factory_name, filterable: true, change: this.onFactoryChange },
         { prop: "materialCode", label: this.$t("ui.data.column.cd90StorageLaneLimit.materialCode"), type: "select", dictData: this.clothOptions, filterable: true },
         { prop: "laneDate", label: this.$t("ui.data.column.cd90StorageLaneLimit.laneDate"), type: "date" },
         { prop: "shiftCode", label: this.$t("ui.data.column.cd90StorageLaneLimit.shiftCode"), type: "select", dictData: this.parentDict.type.class_num_three_plan, filterable: true },
+        { prop: "machineCode", label: this.$t("ui.data.column.cd90StorageLaneLimit.machineCode"), type: "select", dictData: this.machineOptions, filterable: true, required: true },
         { prop: "storageLaneCode", label: this.$t("ui.data.column.cd90StorageLaneLimit.storageLaneCode"), maxlength: 50 },
         { prop: "carNum", label: this.$t("ui.data.column.cd90StorageLaneLimit.carNum"), type: "number", required: true },
         { prop: "maxCarNum", label: this.$t("ui.data.column.cd90StorageLaneLimit.maxCarNum"), type: "number", required: true },
@@ -78,6 +84,10 @@ export default {
     },
   },
   methods: {
+    onFactoryChange() {
+      this.form = { ...this.form, machineCode: undefined };
+      this.$emit("factory-change", this.form.factoryCode);
+    },
     async save(params) { this.loading = true; try { const res = this.isEdit ? await updateStorageLaneLimit(params) : await addStorageLaneLimit(params); this.$modal.msgSuccess(res.msg); this.$emit("success"); this.hide(); } finally { this.loading = false; } },
     async show(data) {
       this.visible = true;

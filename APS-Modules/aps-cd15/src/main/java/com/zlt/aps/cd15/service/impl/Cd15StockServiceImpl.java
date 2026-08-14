@@ -49,6 +49,7 @@ public class Cd15StockServiceImpl extends AbstractDocService<Cd15Stock> implemen
         LambdaQueryWrapper<Cd15Stock> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Cd15Stock::getFactoryCode, entity.getFactoryCode());
         wrapper.eq(Cd15Stock::getStockDate, entity.getStockDate());
+        wrapper.eq(Cd15Stock::getShiftCode, entity.getShiftCode());
         wrapper.eq(Cd15Stock::getMaterialCode, entity.getMaterialCode());
         wrapper.ne(entity.getId() != null, Cd15Stock::getId, entity.getId());
         return cd15StockMapper.selectCount(wrapper) > 0 ? UserConstants.NOT_UNIQUE : UserConstants.UNIQUE;
@@ -109,7 +110,7 @@ public class Cd15StockServiceImpl extends AbstractDocService<Cd15Stock> implemen
     }
 
     @Override
-    public void logicDeleteAndSaveBatch(String factoryCode, Date stockDate,
+    public void logicDeleteAndSaveBatch(String factoryCode, Date stockDate, String shiftCode,
                                         String updateBy, List<Cd15Stock> stockList) {
         Date normalizedStockDate = DateUtil.beginOfDay(stockDate);
         List<Cd15Stock> normalizedList = stockList == null
@@ -119,17 +120,19 @@ public class Cd15StockServiceImpl extends AbstractDocService<Cd15Stock> implemen
                 new LambdaQueryWrapper<Cd15Stock>()
                         .eq(Cd15Stock::getFactoryCode, factoryCode)
                         .eq(Cd15Stock::getStockDate, normalizedStockDate)
+                        .eq(Cd15Stock::getShiftCode, shiftCode)
                         .orderByAsc(Cd15Stock::getMaterialCode));
         if (isSameMesSnapshot(existingList, normalizedList)) {
-            log.info("斜裁MES库存快照未变化，跳过替换：factoryCode={}，stockDate={}，数量={}",
-                    factoryCode, DateUtil.formatDate(normalizedStockDate), normalizedList.size());
+            log.info("斜裁MES库存快照未变化，跳过替换：factoryCode={}，stockDate={}，shiftCode={}，数量={}",
+                    factoryCode, DateUtil.formatDate(normalizedStockDate), shiftCode, normalizedList.size());
             return;
         }
         Date now = new Date();
-        cd15StockMapper.logicDeleteByScope(factoryCode, normalizedStockDate, updateBy, now);
+        cd15StockMapper.logicDeleteByScope(factoryCode, normalizedStockDate, shiftCode, updateBy, now);
         normalizedList.forEach(stock -> {
             stock.setFactoryCode(factoryCode);
             stock.setStockDate(normalizedStockDate);
+            stock.setShiftCode(shiftCode);
             stock.setCreateBy(updateBy);
             stock.setUpdateBy(updateBy);
             stock.setCreateTime(now);
@@ -162,7 +165,7 @@ public class Cd15StockServiceImpl extends AbstractDocService<Cd15Stock> implemen
     }
 
     /**
-     * 查询同工厂、同库存日期、同物料编号的已有库存。
+     * 查询同工厂、同库存日期、同班次、同物料编号的已有库存。
      *
      * @param entity 导入数据
      * @return 已有库存
@@ -171,6 +174,7 @@ public class Cd15StockServiceImpl extends AbstractDocService<Cd15Stock> implemen
         LambdaQueryWrapper<Cd15Stock> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Cd15Stock::getFactoryCode, entity.getFactoryCode());
         wrapper.eq(Cd15Stock::getStockDate, entity.getStockDate());
+        wrapper.eq(Cd15Stock::getShiftCode, entity.getShiftCode());
         wrapper.eq(Cd15Stock::getMaterialCode, entity.getMaterialCode());
         return cd15StockMapper.selectOne(wrapper);
     }
@@ -200,6 +204,6 @@ public class Cd15StockServiceImpl extends AbstractDocService<Cd15Stock> implemen
 
     @Override
     protected List<String> getCheckUniqueFields() {
-        return Arrays.asList("factoryCode", "stockDate", "materialCode");
+        return Arrays.asList("factoryCode", "stockDate", "shiftCode", "materialCode");
     }
 }

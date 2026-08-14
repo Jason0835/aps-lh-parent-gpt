@@ -45,6 +45,12 @@ public class Cd15StorageLaneLimit extends BaseEntity implements Serializable {
     @Excel(name = "ui.data.column.cd15StorageLaneLimit.shiftCode", dictType = "class_num_three_plan")
     private String shiftCode;
 
+    @ApiModelProperty("绑定机台编码")
+    @ImportExcelValidated(required = true, maxLength = 50)
+    @TableField("MACHINE_CODE")
+    @Excel(name = "ui.data.column.cd15StorageLaneLimit.machineCode")
+    private String machineCode;
+
     @ApiModelProperty("库排号")
     @ImportExcelValidated(required = true, maxLength = 50)
     @TableField("STORAGE_LANE_CODE")

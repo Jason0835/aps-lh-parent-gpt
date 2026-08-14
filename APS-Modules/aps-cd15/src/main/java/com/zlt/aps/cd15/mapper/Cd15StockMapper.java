@@ -13,9 +13,10 @@ import java.util.Date;
 @Mapper
 public interface Cd15StockMapper extends CommBaseMapper<Cd15Stock> {
 
-    /** 按工厂和库存日期失效旧快照。 */
+    /** 按工厂、库存日期和班次失效旧快照。 */
     int logicDeleteByScope(@Param("factoryCode") String factoryCode,
                            @Param("stockDate") Date stockDate,
+                           @Param("shiftCode") String shiftCode,
                            @Param("updateBy") String updateBy,
                            @Param("updateTime") Date updateTime);
 }

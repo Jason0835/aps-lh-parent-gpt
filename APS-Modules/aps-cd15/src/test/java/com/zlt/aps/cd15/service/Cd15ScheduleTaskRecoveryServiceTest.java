@@ -1,6 +1,7 @@
 package com.zlt.aps.cd15.service;
 
 import com.zlt.aps.cd15.engine.domain.Cd15ScheduleTask;
+import com.zlt.aps.cd15.engine.constant.Cd15ScheduleTaskStatus;
 import com.zlt.aps.cd15.engine.service.Cd15AutoScheduleLockService;
 import com.zlt.aps.cd15.engine.service.Cd15AutoScheduleParameterService;
 import com.zlt.aps.cd15.engine.service.Cd15ScheduleTaskService;
@@ -53,8 +54,25 @@ public class Cd15ScheduleTaskRecoveryServiceTest {
                 any(String.class), any(String.class));
     }
 
+    @Test
+    public void shouldRecoverExpiredPendingTaskBasedOnCreateTime() {
+        Fixture fixture = this.fixture(false, Cd15ScheduleTaskStatus.PENDING);
+
+        Cd15TaskRecoveryResult result = fixture.service.recover(30);
+
+        assertEquals(1, result.getScannedCount());
+        assertEquals(1, result.getFailedCount());
+        verify(fixture.taskService).markTimeoutFailed(
+                eq("TASK-1"), any(String.class));
+    }
+
     /** 使用显式超时时间构造测试环境，避免依赖参数表。 */
     private Fixture fixture(boolean locked) {
+        return this.fixture(locked, Cd15ScheduleTaskStatus.RUNNING);
+    }
+
+    /** 按任务状态构造活动时间，覆盖等待派发和执行中两类遗留任务。 */
+    private Fixture fixture(boolean locked, String taskStatus) {
         Cd15ScheduleTaskService taskService =
                 mock(Cd15ScheduleTaskService.class);
         Cd15AutoScheduleLockService lockService =
@@ -69,16 +87,21 @@ public class Cd15ScheduleTaskRecoveryServiceTest {
         task.setTaskId("TASK-1");
         task.setFactoryCode("116");
         task.setScheduleDate(Date.valueOf(LocalDate.of(2026, 7, 18)));
-        task.setStartTime(java.util.Date.from(
+        task.setCreateTime(java.util.Date.from(
                 Instant.now().minus(40, ChronoUnit.MINUTES)));
-        task.setLastHeartbeatTime(java.util.Date.from(
-                Instant.now().minus(31, ChronoUnit.MINUTES)));
-
-        when(taskService.findRunningTasks(500))
+        if (Cd15ScheduleTaskStatus.RUNNING.equals(taskStatus)) {
+            task.setStartTime(java.util.Date.from(
+                    Instant.now().minus(40, ChronoUnit.MINUTES)));
+            task.setLastHeartbeatTime(java.util.Date.from(
+                    Instant.now().minus(31, ChronoUnit.MINUTES)));
+        }
+        task.setTaskStatus(taskStatus);
+        when(taskService.findRecoverableTasks(500))
                 .thenReturn(Collections.singletonList(task));
         when(lockService.getLock("116", LocalDate.of(2026, 7, 18)))
                 .thenReturn(lock);
-        when(lock.isLocked()).thenReturn(locked);
+        when(lock.tryLock()).thenReturn(!locked);
+        when(lock.isHeldByCurrentThread()).thenReturn(!locked);
         when(taskService.markTimeoutFailed(
                 eq("TASK-1"), any(String.class))).thenReturn(true);
 
