@@ -154,6 +154,27 @@ public class Cd15AutoScheduleBatchDataValidatorImpl implements Cd15AutoScheduleB
                     "请同步当前自然班次库排快照，后续排程班次无需预先维护");
             return;
         }
+        Set<String> enabledMachineCodes = this.machineInfoMapper.selectList(
+                        Wrappers.<Cd15MachineInfo>lambdaQuery()
+                                .eq(Cd15MachineInfo::getFactoryCode, factoryCode)
+                                .eq(Cd15MachineInfo::getStatus, ApsConstant.APS_STRING_1))
+                .stream()
+                .map(Cd15MachineInfo::getMachineCode)
+                .filter(StringUtils::hasText)
+                .collect(Collectors.toSet());
+        lanes.forEach(lane -> {
+            String laneCode = lane.getStorageLaneCode();
+            if (!StringUtils.hasText(lane.getMachineCode())) {
+                builder.addError("库排资源", "MACHINE_CODE_MISSING",
+                        "库排 " + laneCode + " 未绑定斜裁机台",
+                        "请在斜裁库排限制页面选择绑定机台");
+            } else if (!enabledMachineCodes.contains(lane.getMachineCode())) {
+                builder.addError("库排资源", "MACHINE_CODE_INVALID",
+                        "库排 " + laneCode + " 绑定机台 " + lane.getMachineCode()
+                                + " 不存在或未启用",
+                        "请修正库排绑定机台或启用对应斜裁机台");
+            }
+        });
         List<String> duplicateLaneCodes =
                 this.storageLaneBaselineValidator.findDuplicateLaneCodes(lanes);
         if (!duplicateLaneCodes.isEmpty()) {

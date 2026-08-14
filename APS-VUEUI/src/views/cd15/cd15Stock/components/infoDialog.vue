@@ -59,6 +59,7 @@ export default {
       rules: {
         factoryCode: [requiredSelect],
         stockDate: [requiredInput],
+        shiftCode: [requiredSelect],
         materialCode: [requiredSelect],
         stockNum: [
           requiredInput,
@@ -101,6 +102,13 @@ export default {
           label: this.$t("ui.data.column.cd15Stock.materialCode"),
           type: "select",
           dictData: this.steelStripOptions,
+          filterable: true,
+        },
+        {
+          prop: "shiftCode",
+          label: this.$t("ui.data.column.cd15Stock.shiftCode"),
+          type: "select",
+          dictData: this.parentDict.type.class_num_three_plan,
           filterable: true,
         },
         {
@@ -148,7 +156,7 @@ export default {
         this.isEdit = true;
         this.form = { ...data };
       } else {
-        this.form = { factoryCode: "116" };
+        this.form = { factoryCode: "116", shiftCode: "02" };
       }
     },
     hide() {

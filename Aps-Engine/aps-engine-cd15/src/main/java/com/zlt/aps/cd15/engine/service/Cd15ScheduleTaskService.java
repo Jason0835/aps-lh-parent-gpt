@@ -1,6 +1,7 @@
 package com.zlt.aps.cd15.engine.service;
 
 import com.zlt.aps.cd15.engine.domain.Cd15ScheduleTask;
+import com.zlt.aps.cd15.engine.model.Cd15ScheduleTaskCreationResult;
 
 import java.util.Date;
 import java.util.List;
@@ -10,8 +11,9 @@ import java.util.List;
  */
 public interface Cd15ScheduleTaskService {
 
-    Cd15ScheduleTask createPending(String factoryCode, Date scheduleDate, String taskType,
-                                   String triggerType, String requestSnapshot, String createBy);
+    Cd15ScheduleTaskCreationResult createPending(String factoryCode, Date scheduleDate,
+                                                 String taskType, String triggerType,
+                                                 String requestSnapshot, String createBy);
 
     Cd15ScheduleTask findByTaskId(String taskId);
 
@@ -30,9 +32,12 @@ public interface Cd15ScheduleTaskService {
 
     boolean markFailed(String taskId, String errorMessage);
 
-    /** 查询待补偿检查的运行中任务，逻辑删除由框架处理。 */
-    List<Cd15ScheduleTask> findRunningTasks(int limit);
+    /** 仅将仍为PENDING的指定任务标记为失败，避免重复派发误伤已运行任务。 */
+    boolean markPendingFailed(String taskId, String errorMessage);
 
-    /** 仅将仍为RUNNING的指定任务标记为超时失败。 */
+    /** 查询待补偿检查的PENDING或RUNNING任务，逻辑删除由框架处理。 */
+    List<Cd15ScheduleTask> findRecoverableTasks(int limit);
+
+    /** 仅将仍为PENDING或RUNNING的指定任务标记为超时失败。 */
     boolean markTimeoutFailed(String taskId, String errorMessage);
 }

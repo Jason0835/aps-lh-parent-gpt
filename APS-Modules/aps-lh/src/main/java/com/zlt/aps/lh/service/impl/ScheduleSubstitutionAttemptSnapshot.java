@@ -58,6 +58,8 @@ final class ScheduleSubstitutionAttemptSnapshot {
     private Map<LhUnscheduledResult, LhUnscheduledResult> unscheduledResultStateMap;
     /** 置换前 SKU 剩余量账本 */
     private Map<String, Integer> skuProductionRemainingQtyMap;
+    /** 置换前 SKU 目标量账本 */
+    private Map<String, Integer> skuProductionTargetQtyMap;
     /** 置换前胎胚库存消费账本 */
     private Map<String, EmbryoStockConsumeLedger> embryoStockConsumeLedgerMap;
     /** 置换前各 SKU 胎胚库存配额 */
@@ -200,6 +202,8 @@ final class ScheduleSubstitutionAttemptSnapshot {
 
         snapshot.skuProductionRemainingQtyMap =
                 new LinkedHashMap<String, Integer>(context.getSkuProductionRemainingQtyMap());
+        snapshot.skuProductionTargetQtyMap =
+                new LinkedHashMap<String, Integer>(context.getSkuProductionTargetQtyMap());
         snapshot.embryoStockConsumeLedgerMap =
                 copyEmbryoLedgerMap(context.getEmbryoStockConsumeLedgerMap());
         /*
@@ -348,6 +352,8 @@ final class ScheduleSubstitutionAttemptSnapshot {
         context.setUnscheduledResultList(new ArrayList<LhUnscheduledResult>(unscheduledResultList));
         context.setSkuProductionRemainingQtyMap(
                 new LinkedHashMap<String, Integer>(skuProductionRemainingQtyMap));
+        context.setSkuProductionTargetQtyMap(
+                new LinkedHashMap<String, Integer>(skuProductionTargetQtyMap));
         context.setEmbryoStockConsumeLedgerMap(copyEmbryoLedgerMap(embryoStockConsumeLedgerMap));
         // 恢复候选试排前的胎胚配额和降模处理标记，确保失败候选对主排程上下文完全无副作用。
         context.setEmbryoStockSkuQuotaMap(

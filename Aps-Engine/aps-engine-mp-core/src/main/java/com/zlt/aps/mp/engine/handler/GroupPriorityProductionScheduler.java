@@ -277,6 +277,56 @@ public class GroupPriorityProductionScheduler {
         allocationFixedGroupSameCxMachineEarlyGroup(context, excludeGroupPlan, appointPriorityGroupList, discontinueGroupSet, resultStorage);
     }
 
+
+    /**
+     * 结构排产指定机台
+     *
+     * @param context           排产上下文
+     * @param groupInfo         指定的排产分组(TBR-结构)
+     * @param cxMachineInfo     指定的排产成型机台
+     * @param maxAllocationDays 最大可分配天数
+     * @param resultStorage     分配结果存储器
+     */
+    public void productionGroupAppointCxMachine(Context context,
+                                                ProductionPlanGroupInfo groupInfo,
+                                                CxMachineBaseInfoVo cxMachineInfo,
+                                                Integer maxAllocationDays,
+                                                Map<String, Set<CxMachineAllocationPlanHelper>> resultStorage) {
+        if (null == groupInfo || null == cxMachineInfo || null == maxAllocationDays || maxAllocationDays <= BigDecimal.ZERO.intValue()) {
+            return;
+        }
+        String groupName = groupInfo.getGroupName();
+        String cxMachineCode = cxMachineInfo.getCxMachineCode();
+        TbrSimulateProductionLogRecorder.addAppointGroupLog(context, groupName, cxMachineCode, "开始");
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        List<CxMachineBaseInfoVo> appointList = Lists.newArrayList();
+        appointList.add(cxMachineInfo);
+        //验证指定机台是否可分配
+        CxMachineBaseInfoVo selected = cxCapacityAllocationHandler.selectedCxMachineForGroupPlanByAppoint(productionContext, appointList, groupInfo);
+        if (null == selected) {
+            TbrSimulateProductionLogRecorder.addAppointGroupLog(context, groupName, cxMachineCode, "成型机台不可排产");
+            return;
+        }
+        GroupPrioritySchedulerResultHelper finalSelected = new GroupPrioritySchedulerResultHelper(groupInfo, selected);
+        //记录原始需分配天数
+        Integer originNeedAllocationDaysByGroupPlan = groupInfo.getLeftOverNeedAllocationDays();
+        CxMachineAllocationPlanHelper addHelper = buildAllocationDetailInfo(productionContext, finalSelected);
+        if (null == addHelper) {
+            TbrSimulateProductionLogRecorder.addAppointGroupLog(context, groupName, cxMachineCode, "成型机台分配不成功");
+            return;
+        }
+        TbrSimulateProductionLogRecorder.addAppointGroupLog(context, finalSelected.getPreSelectedGroupName(), finalSelected.getPreSelectedGroupName(), "模拟排产");
+        //5、对成型机台进行模拟模具排产
+        cxMouldProductionHandler.noContinueGroupPlanMouldProduction(context, false, selected.getCxMachineCode(), addHelper, new HashSet<>(), true);
+        Integer newNeedAllocationDaysByGroupPlan = groupInfo.getLeftOverNeedAllocationDays();
+        if (!newNeedAllocationDaysByGroupPlan.equals(originNeedAllocationDaysByGroupPlan)) {
+            //重新获取剩余天数：可能因提前收尾变化，导致计划实际没有排
+            addResultByStorage(addHelper, resultStorage);
+        }
+        //20260429+ 前分组分配是否需要延长处理
+        cxMouldProductionHandler.handlerTimeExtensionDayConclusionByBeforeGroup(productionContext, addHelper);
+    }
+
     /**
      * 获取结构优先级最高Top列表
      * 1、小于最短上机天数：跳过

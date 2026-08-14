@@ -1,5 +1,6 @@
 package com.zlt.aps.cd15.service.impl;
 
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.cd15.engine.model.Cd15RollingTarget;
 import com.zlt.aps.cd15.engine.model.Cd15TimedRollingOutput;
 import com.zlt.aps.cd15.engine.service.Cd15AutoScheduleLockService;
@@ -29,7 +30,8 @@ public class Cd15TimedRollingExecutionServiceImpl
         RLock lock = lockService.getLock(target.getFactoryCode(), target.getScheduleDate());
         try {
             if (!lock.tryLock()) {
-                taskService.markFailed(taskId, "同排程日已有任务持有执行锁");
+                taskService.markPendingFailed(taskId,
+                        I18nUtil.getMessage("ui.cd15.schedule.taskActive"));
                 return;
             }
             if (!taskService.start(taskId)) {

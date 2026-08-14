@@ -79,6 +79,34 @@ public class Cd15BigRollMeterCalculator {
         return calculate(planQuantity, craftWidthMillimeter, effectiveCordWidth);
     }
 
+    /**
+     * 将可用GDYY大卷米数反算为最多可生产的斜裁计划量。
+     * 反算统一向下保留，保证再正算时不会超过已有成熟大卷供给。
+     *
+     * @param bigRollMeters 可用大卷米数
+     * @param unitConsumeMillimeter 单条钢带长度，大卷幅宽缺失时作为有效幅宽
+     * @param craftWidthMillimeter 斜裁宽度
+     * @param cordWidthMillimeter 大卷幅宽
+     * @return 最大斜裁计划量
+     */
+    public BigDecimal calculatePlanQuantityForBigRollMeters(
+            BigDecimal bigRollMeters,
+            BigDecimal unitConsumeMillimeter,
+            BigDecimal craftWidthMillimeter,
+            BigDecimal cordWidthMillimeter) {
+        if (bigRollMeters == null || bigRollMeters.signum() <= 0) {
+            return BigDecimal.ZERO;
+        }
+        requirePositive(unitConsumeMillimeter, "单耗");
+        requirePositive(craftWidthMillimeter, "斜裁宽度");
+        BigDecimal effectiveCordWidth = cordWidthMillimeter == null
+                || cordWidthMillimeter.signum() <= 0
+                ? unitConsumeMillimeter : cordWidthMillimeter;
+        BigDecimal result = bigRollMeters.multiply(effectiveCordWidth)
+                .divide(craftWidthMillimeter, 10, RoundingMode.DOWN);
+        return this.normalize(result);
+    }
+
     /** 非正计划量同时记录钢带、大卷和施工尺寸，便于定位上游归零原因。 */
     private void requirePositivePlanQuantity(
             BigDecimal planQuantity,

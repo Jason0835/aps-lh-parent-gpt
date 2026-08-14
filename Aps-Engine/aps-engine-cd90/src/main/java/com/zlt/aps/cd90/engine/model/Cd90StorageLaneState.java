@@ -12,6 +12,8 @@ public class Cd90StorageLaneState {
 
     /** 库排编码。 */
     private String laneCode;
+    /** 固定绑定的直裁机台编码。 */
+    private String machineCode;
     /** 当前占用的帘布代码；车数为0时清空。 */
     private String clothCode;
     /** 当前占用车数。 */

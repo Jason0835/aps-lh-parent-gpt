@@ -3813,6 +3813,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             }
 
             // 2.5、日硫化量（单模），单条硫化时间---数据源：SKU双模日硫化量， 日标准产量/2，硫化总时间(s)
+            insertItem.setDayVulcanizationQty(0); // 处理前先清空，不能用excel上录入的
             MdmSkuLhCapacity mdmSkuLhCapacity = productLhCapacityMap.get(materialCode);
             if (mdmSkuLhCapacity != null) {
                 MonthPlanProductLhCapacityVo capacityVo = new MonthPlanProductLhCapacityVo();
@@ -3824,7 +3825,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                     insertItem.setDayVulcanizationQty(capacityVo.getDayVulcanizationQty() / 2);
                 }
             }
-            if (insertItem.getDayVulcanizationQty() == null) {
+            if (insertItem.getDayVulcanizationQty() <= 0) {
                 insertItem.setId(errorImportId);
                 String errorMsg = String.format(notDayVulcanizationQtyStr, structureName, materialDesc);
                 this.appendErrorMessage(sbError, errorMsg);
@@ -3872,8 +3873,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         // 3、生成统计信息（handleMonthPlanStatistics）
         mpMonthPlanStaticService.handleMonthPlanStatistics(contextDTO, finalImportList, isAdjust);
         // 4、校验导入数据中的各项限制
-        this.checkAdjustLimit(contextDTO, dailyCapacityMap, weekRollAdjustEngine, adjustDailyCapacityLimitObj,
-                importLogId, importErrorLogs);
+        this.checkAdjustLimit(contextDTO, dailyCapacityMap, weekRollAdjustEngine, adjustDailyCapacityLimitObj);
         // 5、生成特殊材料排产记录
         iSpecialMaterialResultService.buildSecialMaterialResult(finalImportList);
         return finalImportList;
@@ -3886,13 +3886,10 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
      * @param dailyCapacityMap
      * @param weekRollAdjustEngine
      * @param adjustDailyCapacityLimitObj
-     * @param importLogId
-     * @param importErrorLogs
      */
     private void checkAdjustLimit(MpRollAdjustContextDTO contextDTO,
             Map<Integer, MpDailyCapacityLimitVo> dailyCapacityMap, MpWeekRollAdjustEngine weekRollAdjustEngine,
-            MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj, Long importLogId,
-            List<ImportErrorLog> importErrorLogs) {
+            MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj) {
         // 初始化校验相关逻辑的上下文
         List<FactoryMonthPlanFinalAdjustVo> finalAdjustList = contextDTO.getFactoryMonthPlanProdFinalList();
         if (CollectionUtils.isEmpty(finalAdjustList)) {
@@ -3906,6 +3903,8 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                 adjustVo.setMouldShell(mouldShell);
             }
         }
+        // 校验前部分上下文数据需要重置
+        contextDTO.setStructureName(null);
         mpAdjustStructureInStrategy.handleMonthPlanStatistics(contextDTO, null);
         // 1、校验模壳数
         mpAdjustStructureInStrategy.checkMouldShellLimit(contextDTO);
@@ -3965,13 +3964,14 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
      */
     private FactoryMonthPlanFinalAdjustVo castToAdjustVo(FactoryMonthPlanMouldDayResult insertItem) {
         FactoryMonthPlanFinalAdjustVo mpFinalVo = new FactoryMonthPlanFinalAdjustVo();
-        mpFinalVo.setMaterialCode(insertItem.getMaterialDesc());
-        mpFinalVo.setMaterialDesc(insertItem.getMaterialCode());
+        mpFinalVo.setMaterialDesc(insertItem.getMaterialDesc());
+        mpFinalVo.setMaterialCode(insertItem.getMaterialCode());
         mpFinalVo.setSpecifications(insertItem.getSpecifications());
         mpFinalVo.setMainPattern(insertItem.getMainPattern());
         mpFinalVo.setDayVulcanizationQty(insertItem.getDayVulcanizationQty());
         mpFinalVo.setTypeBlockQty(insertItem.getTypeBlockQty());
         mpFinalVo.setStructureName(insertItem.getStructureName());
+        mpFinalVo.setEmbryoCode(insertItem.getEmbryoCode());
         for (int day = FactoryConstant.MONTH_START_DAY; day <= FactoryConstant.MONTH_MAX_DAY; day++) {
             String dayField = FactoryConstant.DAY_FIELD + day;
             int planQty = intValue(insertItem.getFieldValueByFieldName(dayField));

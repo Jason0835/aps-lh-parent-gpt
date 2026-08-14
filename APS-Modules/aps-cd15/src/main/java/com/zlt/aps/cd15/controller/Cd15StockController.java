@@ -99,10 +99,11 @@ public class Cd15StockController extends AbstractDocBizController<Cd15Stock> {
     @PostMapping("/logicDeleteAndSaveMesBatch")
     public AjaxResult logicDeleteAndSaveMesBatch(@RequestParam("factoryCode") String factoryCode,
                                                   @RequestParam("stockDate") String stockDate,
+                                                  @RequestParam("shiftCode") String shiftCode,
                                                   @RequestParam("updateBy") String updateBy,
                                                   @RequestBody List<Cd15Stock> stockList) {
         this.cd15StockService.logicDeleteAndSaveBatch(factoryCode,
-                DateUtil.parseDate(stockDate), updateBy, stockList);
+                DateUtil.parseDate(stockDate), shiftCode, updateBy, stockList);
         return AjaxResult.success();
     }
 
@@ -134,6 +135,7 @@ public class Cd15StockController extends AbstractDocBizController<Cd15Stock> {
     protected void builderCondition(QueryWrapper<Cd15Stock> queryWrapper, Cd15Stock queryVO) {
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFactoryCode()), "FACTORY_CODE", queryVO.getFactoryCode());
         queryWrapper.eq(queryVO.getStockDate() != null, "STOCK_DATE", queryVO.getStockDate());
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getShiftCode()), "SHIFT_CODE", queryVO.getShiftCode());
         queryWrapper.ge(queryVO.getStockDateStart() != null, "STOCK_DATE", queryVO.getStockDateStart());
         queryWrapper.le(queryVO.getStockDateEnd() != null, "STOCK_DATE", queryVO.getStockDateEnd());
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getMaterialCode()), "MATERIAL_CODE", queryVO.getMaterialCode());
@@ -146,6 +148,6 @@ public class Cd15StockController extends AbstractDocBizController<Cd15Stock> {
 
     @Override
     protected String getOrderBy() {
-        return "STOCK_DATE desc, MATERIAL_CODE asc";
+        return "STOCK_DATE desc, SHIFT_CODE asc, MATERIAL_CODE asc";
     }
 }

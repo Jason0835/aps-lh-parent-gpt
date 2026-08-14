@@ -515,6 +515,37 @@ public final class LhScheduleTimeUtil {
     }
 
     /**
+     * 按统一半开区间规则解析时间所属班次。
+     *
+     * <p>班次归属唯一使用 {@code [shiftStart, shiftEnd)}：开始时刻属于当前班次，
+     * 结束时刻属于后一个班次。新增选机、首检计数与既有班次索引入口必须共同复用
+     * 本方法，避免06:00、14:00、22:00在不同调用链出现不同归属。</p>
+     *
+     * @param shifts 待匹配的班次列表
+     * @param time 目标时间
+     * @return 命中的班次；参数为空、班次时间不完整或未命中时返回null
+     */
+    public static LhShiftConfigVO resolveShiftByTime(
+            List<LhShiftConfigVO> shifts,
+            Date time) {
+        if (CollectionUtils.isEmpty(shifts) || Objects.isNull(time)) {
+            return null;
+        }
+        for (LhShiftConfigVO shift : shifts) {
+            if (Objects.isNull(shift)
+                    || Objects.isNull(shift.getShiftStartDateTime())
+                    || Objects.isNull(shift.getShiftEndDateTime())) {
+                continue;
+            }
+            if (!time.before(shift.getShiftStartDateTime())
+                    && time.before(shift.getShiftEndDateTime())) {
+                return shift;
+            }
+        }
+        return null;
+    }
+
+    /**
      * 根据时间点判断所在班次索引（1-8）
      *
      * @param context      排程上下文
@@ -524,14 +555,9 @@ public final class LhScheduleTimeUtil {
      */
     public static int getShiftIndex(LhScheduleContext context, Date scheduleDate, Date time) {
         List<LhShiftConfigVO> shifts = getScheduleShifts(context, scheduleDate);
-        for (LhShiftConfigVO shift : shifts) {
-            Date st = shift.getShiftStartDateTime();
-            Date en = shift.getShiftEndDateTime();
-            if (st != null && en != null && !time.before(st) && time.before(en)) {
-                return shift.getShiftIndex();
-            }
-        }
-        return -1;
+        LhShiftConfigVO matchedShift = resolveShiftByTime(shifts, time);
+        return Objects.isNull(matchedShift) || Objects.isNull(matchedShift.getShiftIndex())
+                ? -1 : matchedShift.getShiftIndex();
     }
 
     /**
@@ -567,40 +593,35 @@ public final class LhScheduleTimeUtil {
                 || CollectionUtils.isEmpty(context.getScheduleWindowShifts())) {
             return LhScheduleConstant.MAX_SHIFT_SLOT_COUNT + 1;
         }
-        for (LhShiftConfigVO shift : context.getScheduleWindowShifts()) {
-            if (Objects.isNull(shift) || Objects.isNull(shift.getShiftIndex())
-                    || Objects.isNull(shift.getShiftStartDateTime())
-                    || Objects.isNull(shift.getShiftEndDateTime())) {
-                continue;
-            }
-            if (!date.before(shift.getShiftStartDateTime())
-                    && date.before(shift.getShiftEndDateTime())) {
-                return shift.getShiftIndex();
-            }
-        }
-        return LhScheduleConstant.MAX_SHIFT_SLOT_COUNT + 1;
+        LhShiftConfigVO matchedShift = resolveShiftByTime(
+                context.getScheduleWindowShifts(), date);
+        return Objects.isNull(matchedShift) || Objects.isNull(matchedShift.getShiftIndex())
+                ? LhScheduleConstant.MAX_SHIFT_SLOT_COUNT + 1
+                : matchedShift.getShiftIndex();
     }
 
     /**
-     * 判断指定时间是否在禁止换模时段（20:00 - 次日6:00）
+     * 判断指定时间是否在禁止换模时段（20:00（含）- 次日6:00（不含））。
+     *
+     * <p>换模开始条件统一使用 {@code startTime < 20:00}。因此机台恰好在20:00
+     * 才具备换模条件时也必须顺延；06:00是早班及可换模窗口起点，可以立即开始换模。
+     * 该方法是新增、换活字块、续作和换模均衡共用入口，禁止调用方自行放宽临界点。</p>
      *
      * @param context 排程上下文
      * @param time    时间点
      * @return true-禁止换模，false-可以换模
      */
     public static boolean isNoMouldChangeTime(LhScheduleContext context, Date time) {
+        if (Objects.isNull(time)) {
+            return false;
+        }
         int noChangeStart = getNoMouldChangeStartHour(context);
         int morningHour = getMorningStartHour(context);
         Calendar cal = Calendar.getInstance();
         cal.setTime(time);
         int hour = cal.get(Calendar.HOUR_OF_DAY);
-        int minute = cal.get(Calendar.MINUTE);
-        int second = cal.get(Calendar.SECOND);
-        int millisecond = cal.get(Calendar.MILLISECOND);
-        // 禁止的是20:00之后到次日06:00之前，两个整点本身允许开始换模。
-        boolean afterNoChangeStart = hour > noChangeStart
-                || (hour == noChangeStart && (minute > 0 || second > 0 || millisecond > 0));
-        return afterNoChangeStart || hour < morningHour;
+        // 20:00整已经进入禁止窗口；06:00整退出禁止窗口，临界点统一按左闭右开判断。
+        return hour >= noChangeStart || hour < morningHour;
     }
 
     /**

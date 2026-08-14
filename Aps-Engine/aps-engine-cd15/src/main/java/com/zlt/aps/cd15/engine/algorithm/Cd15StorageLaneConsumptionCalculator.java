@@ -111,6 +111,7 @@ public class Cd15StorageLaneConsumptionCalculator {
     private Cd15StorageLaneState copy(Cd15StorageLaneState source) {
         return Cd15StorageLaneState.builder()
                 .laneCode(source.getLaneCode())
+                .machineCode(source.getMachineCode())
                 .steelStripCode(source.getSteelStripCode())
                 .vehicleCount(source.getVehicleCount())
                 .maxVehicleCount(source.getMaxVehicleCount())

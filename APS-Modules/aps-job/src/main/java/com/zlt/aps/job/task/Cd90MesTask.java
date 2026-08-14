@@ -28,7 +28,7 @@ public class Cd90MesTask {
     private IMesItfService iMesItfService;
 
     /**
-     * 同步直裁库存（从 MES 中间表 T_MES_CD90_STOCK 同步到 t_cd90_stock）
+     * 同步直裁库存（从MES库存对象MES_CD90_STOCK同步到t_cd90_stock，工厂固定116）
      */
     @ApiOperation("同步直裁库存")
     @AutoLoginLog

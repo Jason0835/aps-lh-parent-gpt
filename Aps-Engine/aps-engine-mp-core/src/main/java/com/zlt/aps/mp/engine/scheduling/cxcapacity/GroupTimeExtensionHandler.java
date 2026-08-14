@@ -261,8 +261,8 @@ public class GroupTimeExtensionHandler extends OnLineGroupOnLineMachineHandler {
         if (CollectionUtils.isEmpty(continueCxMachineAllocation)) {
             return null;
         }
-        //&& single.isTimeExtensionFlag()
-        List<CxMachineAllocationPlanHelper> effectiveList = continueCxMachineAllocation.stream().filter(single -> single.getEndDay() < context.getProductionEndDay()).collect(Collectors.toList());
+        //20260812+ 因指定业务导致需要剔除不可延长的机台
+        List<CxMachineAllocationPlanHelper> effectiveList = continueCxMachineAllocation.stream().filter(single -> single.getEndDay() < context.getProductionEndDay() && single.isTimeExtensionFlag()).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(effectiveList)) {
             return null;
         }

@@ -279,8 +279,8 @@ public interface IMesItfService {
     public AjaxResult syncMesCxStock(@RequestBody AuxReqSyncDataLogs syncDataLogs);
 
     /**
-     * 同步直裁库存（从 MES 中间表 T_MES_CD90_STOCK 同步到 t_cd90_stock）
-     * @param syncDataLogs 参数（可传 factoryCode；queryParams.shiftCode 可覆盖自动推断班次）
+     * 同步直裁库存（从MES库存对象MES_CD90_STOCK同步到t_cd90_stock，工厂固定116）
+     * @param syncDataLogs 参数（factoryCode忽略并固定使用116；queryParams.shiftCode可覆盖自动推断班次）
      * @return 结果
      */
     @ApiOperation("同步直裁库存")
@@ -307,7 +307,7 @@ public interface IMesItfService {
     @PostMapping("/mesItf/syncCd90ShiftStock")
     AjaxResult syncCd90ShiftStock(@RequestBody MesShiftStockSyncRequest request);
 
-    /** 同步斜裁库存。 */
+    /** 从MES_CD15_STOCK同步斜裁库存，工厂固定116。 */
     @ApiOperation("同步斜裁库存")
     @PostMapping("/mesItf/syncMesCd15Stock")
     AjaxResult syncMesCd15Stock(@RequestBody AuxReqSyncDataLogs syncDataLogs);

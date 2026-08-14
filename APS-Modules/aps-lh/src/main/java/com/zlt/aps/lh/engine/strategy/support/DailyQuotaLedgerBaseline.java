@@ -29,6 +29,8 @@ public final class DailyQuotaLedgerBaseline {
     private final Map<SkuDailyPlanQuotaDTO, SkuDailyPlanQuotaDTO> quotaStateMap;
     /** SKU 实际生产余量账本快照。 */
     private final Map<String, Integer> productionRemainingQtyMap;
+    /** SKU 实际生产目标量账本快照。 */
+    private final Map<String, Integer> productionTargetQtyMap;
     /** SKU 满班补齐超排量汇总快照。 */
     private final Map<String, Integer> shiftFillOverQtyMap;
     /** 胎胚组级消费账本快照。 */
@@ -39,11 +41,13 @@ public final class DailyQuotaLedgerBaseline {
     private DailyQuotaLedgerBaseline(
             Map<SkuDailyPlanQuotaDTO, SkuDailyPlanQuotaDTO> quotaStateMap,
             Map<String, Integer> productionRemainingQtyMap,
+            Map<String, Integer> productionTargetQtyMap,
             Map<String, Integer> shiftFillOverQtyMap,
             Map<String, EmbryoStockConsumeLedger> embryoLedgerMap,
             int skuShiftFillOverQty) {
         this.quotaStateMap = quotaStateMap;
         this.productionRemainingQtyMap = productionRemainingQtyMap;
+        this.productionTargetQtyMap = productionTargetQtyMap;
         this.shiftFillOverQtyMap = shiftFillOverQtyMap;
         this.embryoLedgerMap = embryoLedgerMap;
         this.skuShiftFillOverQty = skuShiftFillOverQty;
@@ -72,12 +76,14 @@ public final class DailyQuotaLedgerBaseline {
                     quotaStateMap,
                     new LinkedHashMap<String, Integer>(0),
                     new LinkedHashMap<String, Integer>(0),
+                    new LinkedHashMap<String, Integer>(0),
                     new LinkedHashMap<String, EmbryoStockConsumeLedger>(0),
                     Objects.isNull(sku) ? 0 : sku.getShiftFillOverQty());
         }
         return new DailyQuotaLedgerBaseline(
                 quotaStateMap,
                 new LinkedHashMap<String, Integer>(context.getSkuProductionRemainingQtyMap()),
+                new LinkedHashMap<String, Integer>(context.getSkuProductionTargetQtyMap()),
                 new LinkedHashMap<String, Integer>(context.getSkuShiftFillOverQtyMap()),
                 copyEmbryoLedgerMap(context.getEmbryoStockConsumeLedgerMap()),
                 Objects.isNull(sku) ? 0 : sku.getShiftFillOverQty());
@@ -120,6 +126,8 @@ public final class DailyQuotaLedgerBaseline {
         }
         context.setSkuProductionRemainingQtyMap(
                 new LinkedHashMap<String, Integer>(productionRemainingQtyMap));
+        context.setSkuProductionTargetQtyMap(
+                new LinkedHashMap<String, Integer>(productionTargetQtyMap));
         context.setSkuShiftFillOverQtyMap(
                 new LinkedHashMap<String, Integer>(shiftFillOverQtyMap));
         context.setEmbryoStockConsumeLedgerMap(copyEmbryoLedgerMap(embryoLedgerMap));

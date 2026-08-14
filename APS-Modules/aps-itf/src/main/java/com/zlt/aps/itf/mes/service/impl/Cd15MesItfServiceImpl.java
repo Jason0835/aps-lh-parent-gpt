@@ -1,12 +1,14 @@
 package com.zlt.aps.itf.mes.service.impl;
 
 import cn.hutool.core.date.DateUtil;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.dynamic.datasource.toolkit.DynamicDataSourceContextHolder;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.autoLogin.feign.FeignTokenHelper;
 import com.zlt.aps.cd15.api.domain.entity.Cd15ShiftStock;
+import com.zlt.aps.cd15.api.domain.entity.Cd15ShiftConfig;
 import com.zlt.aps.cd15.api.domain.entity.Cd15Stock;
 import com.zlt.aps.cd15.api.domain.entity.Cd15StorageLaneLimit;
 import com.zlt.aps.cd15.api.service.ICd15MesSyncRemoteService;
@@ -16,6 +18,7 @@ import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.itf.constant.DataSource;
 import com.zlt.aps.itf.mes.domain.Cd15MesStock;
 import com.zlt.aps.itf.mes.mapper.Cd15MesItfMapper;
+import com.zlt.aps.itf.mes.mapper.Cd15ShiftQueryMapper;
 import com.zlt.aps.itf.mes.service.ICd15MesItfService;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.aps.utils.AppUtils;
@@ -49,14 +52,14 @@ import java.util.stream.Collectors;
 public class Cd15MesItfServiceImpl implements ICd15MesItfService {
 
     private final Cd15MesItfMapper cd15MesItfMapper;
+    private final Cd15ShiftQueryMapper cd15ShiftQueryMapper;
     private final ICd15MesSyncRemoteService cd15MesSyncRemoteService;
     private final ICd15StockRemoteService cd15StockRemoteService;
     private final ICd15StorageLaneLimitRemoteService cd15StorageLaneLimitRemoteService;
 
     @Override
     public AjaxResult syncStock(AuxReqSyncDataLogs syncDataLogs) {
-        String factoryCode = StringUtils.defaultIfBlank(syncDataLogs.getFactoryCode(),
-                FactoryConstant.DEFAULT_FACTORY_CODE);
+        String factoryCode = FactoryConstant.DEFAULT_FACTORY_CODE;
         syncDataLogs.setFactoryCode(factoryCode);
         List<Cd15MesStock> sourceList;
         DynamicDataSourceContextHolder.push(DataSource.MES);
@@ -68,16 +71,20 @@ public class Cd15MesItfServiceImpl implements ICd15MesItfService {
         if (CollectionUtils.isEmpty(sourceList)) {
             return AjaxResult.success(I18nUtil.getMessage("ui.cd15.stock.syncNoData"));
         }
+        String shiftCode = this.resolveShiftCode(syncDataLogs, factoryCode);
+        if (StringUtils.isBlank(shiftCode)) {
+            log.error("斜裁库存同步无法推断当前班次：factoryCode={}", factoryCode);
+            return AjaxResult.error(I18nUtil.getMessage("ui.cd15.stock.shiftNotFound"));
+        }
         Map<String, Cd15MesStock> stockMap = sourceList.stream().collect(Collectors.toMap(
                 item -> DateUtil.formatDate(item.getStockDate()) + "|" + item.getMaterialCode(),
                 Function.identity(),
                 (first, second) -> {
                     BigDecimal firstValue = first.getAvailableStock() == null
-                            ? first.getStockNum() : first.getAvailableStock();
+                            ? BigDecimal.ZERO : first.getAvailableStock();
                     BigDecimal secondValue = second.getAvailableStock() == null
-                            ? second.getStockNum() : second.getAvailableStock();
-                    first.setAvailableStock((firstValue == null ? BigDecimal.ZERO : firstValue)
-                            .add(secondValue == null ? BigDecimal.ZERO : secondValue));
+                            ? BigDecimal.ZERO : second.getAvailableStock();
+                    first.setAvailableStock(firstValue.add(secondValue));
                     return first;
                 }));
         Date now = DateUtils.getNowDate();
@@ -85,10 +92,9 @@ public class Cd15MesItfServiceImpl implements ICd15MesItfService {
             Cd15Stock target = new Cd15Stock();
             target.setFactoryCode(factoryCode);
             target.setStockDate(source.getStockDate());
+            target.setShiftCode(shiftCode);
             target.setMaterialCode(source.getMaterialCode());
-            BigDecimal stockNum = source.getAvailableStock() == null
-                    ? source.getStockNum() : source.getAvailableStock();
-            target.setStockNum(stockNum == null ? 0D : stockNum.doubleValue());
+            target.setStockNum(source.getAvailableStock().doubleValue());
             target.setModifyNum(0D);
             target.setBadNum(0D);
             target.setCreateBy("MES");
@@ -104,7 +110,7 @@ public class Cd15MesItfServiceImpl implements ICd15MesItfService {
             AjaxResult result = FeignTokenHelper.callWithToken(() -> {
                 for (Map.Entry<String, List<Cd15Stock>> entry : listByDate.entrySet()) {
                     AjaxResult scopeResult = this.cd15StockRemoteService.logicDeleteAndSaveMesBatch(
-                            factoryCode, entry.getKey(), "MES", entry.getValue());
+                            factoryCode, entry.getKey(), shiftCode, "MES", entry.getValue());
                     if (scopeResult == null || !Objects.equals(AppUtils.AJAX_RESULT_SUCCESS,
                             scopeResult.get(AjaxResult.CODE_TAG))) {
                         return scopeResult;
@@ -126,15 +132,64 @@ public class Cd15MesItfServiceImpl implements ICd15MesItfService {
         return AjaxResult.success();
     }
 
+    /**
+     * 解析本次库存快照所属班次，调用参数可显式覆盖当前时间推断结果。
+     *
+     * @param syncDataLogs 同步参数
+     * @param factoryCode 工厂编码
+     * @return 班次编码，无法解析时返回空
+     */
+    private String resolveShiftCode(AuxReqSyncDataLogs syncDataLogs, String factoryCode) {
+        Map<String, Object> queryParams = syncDataLogs.getQueryParams();
+        if (queryParams != null && queryParams.get("shiftCode") != null
+                && StringUtils.isNotBlank(String.valueOf(queryParams.get("shiftCode")))) {
+            return String.valueOf(queryParams.get("shiftCode")).trim();
+        }
+        List<Cd15ShiftConfig> activeShifts;
+        DynamicDataSourceContextHolder.push(DataSource.APS);
+        try {
+            activeShifts = this.cd15ShiftQueryMapper.selectList(
+                    Wrappers.<Cd15ShiftConfig>lambdaQuery()
+                            .eq(Cd15ShiftConfig::getFactoryCode, factoryCode)
+                            .eq(Cd15ShiftConfig::getIsActive, 1)
+                            .orderByAsc(Cd15ShiftConfig::getShiftOrder));
+        } finally {
+            DynamicDataSourceContextHolder.poll();
+        }
+        if (CollectionUtils.isEmpty(activeShifts)) {
+            return null;
+        }
+        String currentTime = DateUtil.format(new Date(), "HH:mm:ss");
+        return activeShifts.stream()
+                .filter(config -> this.matchShiftByTime(config, currentTime))
+                .map(Cd15ShiftConfig::getShiftCode)
+                .filter(StringUtils::isNotBlank)
+                .map(String::trim)
+                .findFirst()
+                .orElse(null);
+    }
+
+    /** 按当前时间匹配物理班次。 */
+    private boolean matchShiftByTime(Cd15ShiftConfig config, String currentTime) {
+        String startTime = config.getStartTime();
+        String endTime = config.getEndTime();
+        if (StringUtils.isBlank(startTime) || StringUtils.isBlank(endTime)) {
+            return false;
+        }
+        if (Objects.equals(config.getIsCrossDay(), 1)) {
+            return currentTime.compareTo(startTime) >= 0 || currentTime.compareTo(endTime) < 0;
+        }
+        return currentTime.compareTo(startTime) >= 0 && currentTime.compareTo(endTime) < 0;
+    }
+
     @Override
     public AjaxResult syncShiftStock(MesShiftStockSyncRequest request) {
         if (request == null || request.getStockDate() == null
                 || StringUtils.isBlank(request.getShiftCode()) || request.getShiftStartTime() == null) {
             return AjaxResult.error(I18nUtil.getMessage("ui.cd15.shiftStock.syncArgumentsInvalid"));
         }
-        request.setFactoryCode(StringUtils.defaultIfBlank(request.getFactoryCode(),
-                FactoryConstant.DEFAULT_FACTORY_CODE));
-        request.setCompanyCode(StringUtils.defaultIfBlank(request.getCompanyCode(), request.getFactoryCode()));
+        request.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        request.setCompanyCode(FactoryConstant.DEFAULT_FACTORY_CODE);
         request.setStockDate(DateUtil.beginOfDay(request.getStockDate()));
         request.setShiftCode(request.getShiftCode().trim());
         List<Cd15MesStock> sourceList;
@@ -148,7 +203,7 @@ public class Cd15MesItfServiceImpl implements ICd15MesItfService {
         Set<String> materialCodes = new HashSet<>();
         if (safeSourceList.stream().anyMatch(source -> source == null
                 || StringUtils.isBlank(source.getMaterialCode())
-                || (source.getAvailableStock() == null && source.getStockNum() == null)
+                || source.getAvailableStock() == null
                 || !materialCodes.add(source.getMaterialCode().trim()))) {
             return AjaxResult.error(I18nUtil.getMessage("ui.cd15.shiftStock.syncSourceInvalid"));
         }
@@ -160,12 +215,10 @@ public class Cd15MesItfServiceImpl implements ICd15MesItfService {
             target.setShiftCode(request.getShiftCode());
             target.setShiftStartTime(request.getShiftStartTime());
             target.setMaterialCode(source.getMaterialCode().trim());
-            BigDecimal stockNum = source.getAvailableStock() == null
-                    ? source.getStockNum() : source.getAvailableStock();
-            target.setStockNum(stockNum.doubleValue());
+            target.setStockNum(source.getAvailableStock().doubleValue());
             target.setModifyNum(0D);
             target.setBadNum(0D);
-            target.setSnapshotTime(request.getShiftStartTime());
+            target.setSnapshotTime(now);
             target.setCreateBy("MES");
             target.setUpdateBy("MES");
             target.setCreateTime(now);
@@ -225,7 +278,8 @@ public class Cd15MesItfServiceImpl implements ICd15MesItfService {
             return AjaxResult.success(I18nUtil.getMessage("ui.cd15.storageLaneLimit.syncNoData"));
         }
         Cd15StorageLaneLimit invalidSource = sourceList.stream().filter(source -> source.getLaneDate() == null
-                || StringUtils.isBlank(source.getShiftCode()) || StringUtils.isBlank(source.getStorageLaneCode())
+                || StringUtils.isBlank(source.getShiftCode()) || StringUtils.isBlank(source.getMachineCode())
+                || StringUtils.isBlank(source.getStorageLaneCode())
                 || source.getCarNum() == null || source.getMaxCarNum() == null
                 || source.getMaxCarNum() <= 0 || source.getCarNum() < 0
                 || source.getCarNum() > source.getMaxCarNum()).findFirst().orElse(null);
@@ -240,6 +294,7 @@ public class Cd15MesItfServiceImpl implements ICd15MesItfService {
             target.setFactoryCode(factoryCode);
             target.setLaneDate(source.getLaneDate());
             target.setShiftCode(source.getShiftCode());
+            target.setMachineCode(source.getMachineCode());
             target.setStorageLaneCode(source.getStorageLaneCode());
             target.setMaterialCode(source.getMaterialCode());
             target.setCarNum(source.getCarNum());

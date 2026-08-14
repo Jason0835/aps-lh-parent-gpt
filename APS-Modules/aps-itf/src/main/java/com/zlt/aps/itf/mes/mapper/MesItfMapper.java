@@ -306,13 +306,14 @@ public interface MesItfMapper {
     List<DevMaintenancePlan> selectLhPrecisionPlanActualList(AuxReqSyncDataLogs syncDataLogs);
 
     /**
-     * 查询MES中间表设备保养计划指定精度类型的最大版本号
+     * 查询MES中间表设备保养计划指定分厂和精度类型的最大版本号
      * 版本号格式如：APS_MES_AH01_20260510120430003，字符串MAX比较即可获取最新版本
      *
+     * @param factoryCode 分厂编码
      * @param precisionType 精度类型（如：硫化精度）
      * @return 最大版本号，无数据时返回null
      */
-    String selectMaxDataVersionFromMes(@Param("precisionType") String precisionType);
+    String selectMaxDataVersionFromMes(@Param("factoryCode") String factoryCode, @Param("precisionType") String precisionType);
 
     /**
      * 查询MES中间表模具清洗预警计划的最大版本号

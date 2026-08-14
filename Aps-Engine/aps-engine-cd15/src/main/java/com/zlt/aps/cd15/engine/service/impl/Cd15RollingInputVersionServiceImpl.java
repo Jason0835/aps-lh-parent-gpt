@@ -35,12 +35,13 @@ public class Cd15RollingInputVersionServiceImpl implements Cd15RollingInputVersi
     /** 生成确定性SHA-256版本，任一关键输入变化都会产生新版本。 */
     @Override
     public String fingerprint(Cd15RollingTarget target) {
-        if (target == null || target.getScheduleDate() == null) {
-            throw new IllegalArgumentException("滚动目标和排程日期不能为空");
+        if (target == null || target.getScheduleDate() == null
+                || target.getResourceBaselineDate() == null) {
+            throw new IllegalArgumentException("滚动目标、排程日期和资源基线日期不能为空");
         }
         String base = baseVersionService.fingerprintWithoutStock(
                 target.getFactoryCode(), target.getScheduleDate(),
-                target.getHandoverTime().toLocalDate(),
+                target.getResourceBaselineDate(),
                 target.getTargetShiftCode());
         String shiftStock = rollingShiftStockService.fingerprint(target);
         List<Cd15ScheduleResult> results = scheduleResultMapper.selectList(

@@ -10,15 +10,18 @@
       </template>
     </page-table>
     <tlt-upload-form ref="tltUpload" :updateSupport="true" downloadUrl="/cd90/cd90StorageLaneLimit/importTemplate" uploadUrl="/cd90/cd90StorageLaneLimit/importData" @uploadSuccess="getList" labelWidth="0" :columns="importColumns" />
-    <info-dialog ref="infoRef" :cloth-options="clothOptions" @success="getList" />
+    <info-dialog ref="infoRef" :cloth-options="clothOptions" :machine-options="machineOptions" @factory-change="loadMachineOptions" @success="getList" />
   </basic-container>
 </template>
 
 <script>
 import { listStorageLaneLimit, delStorageLaneLimit, exportStorageLaneLimit } from "@/api/cd90/storageLaneLimit";
 import { listTireFabricCodes } from "@/api/cd90/specifyMachine";
+import { getCd90MachineEnableOptions } from "@/api/cd90/cd90MachineInfo";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import infoDialog from "./components/infoDialog.vue";
+
+const DEFAULT_FACTORY_CODE = "116";
 
 export default {
   name: "StorageLaneLimit",
@@ -28,7 +31,7 @@ export default {
   data() {
     return {
       importColumns: [{ label: "", prop: "updateSupport", render: (form) => (<el-checkbox label={this.$t("common.rule.updateSupport")} v-model={form.updateSupport}>{this.$t("common.rule.updateSupport")}</el-checkbox>) }],
-      loading: false, data: [], selection: [], clothOptions: [],
+      loading: false, data: [], selection: [], clothOptions: [], machineOptions: [],
       page: { current: 1, pageSize: 20, total: 0 }, sort: {},
       search: { factoryCode: "116", laneDate: new Date().toISOString().slice(0, 10) }, query: { factoryCode: "116", laneDate: new Date().toISOString().slice(0, 10) },
     };
@@ -39,6 +42,7 @@ export default {
         { type: "selection", fixed: "left" },
         { prop: "factoryCode", align: "center", halign: "center", label: this.$t("ui.data.column.cd90StorageLaneLimit.factoryCode"), minWidth: 120, formatter: (row, column, value) => this.selectDictLabel(this.dict.type.biz_factory_name, value) },
         { prop: "laneDate", align: "center", halign: "center", label: this.$t("ui.data.column.cd90StorageLaneLimit.laneDate"), minWidth: 110 },
+        { prop: "machineCode", align: "center", halign: "center", label: this.$t("ui.data.column.cd90StorageLaneLimit.machineCode"), minWidth: 120 },
         { prop: "materialCode", align: "center", halign: "center", label: this.$t("ui.data.column.cd90StorageLaneLimit.materialCode"), minWidth: 150 },
         { prop: "shiftCode", align: "center", halign: "center", label: this.$t("ui.data.column.cd90StorageLaneLimit.shiftCode"), minWidth: 90, formatter: (row, column, value) => this.selectDictLabel(this.dict.type.class_num_three_plan, value) },
         { prop: "storageLaneCode", align: "center", halign: "center", label: this.$t("ui.data.column.cd90StorageLaneLimit.storageLaneCode"), minWidth: 130 },
@@ -56,6 +60,7 @@ export default {
         { label: this.$t("ui.data.column.cd90StorageLaneLimit.materialCode"), prop: "materialCode", type: "select", dictData: this.clothOptions, filterable: true, clearable: true },
         { label: this.$t("ui.data.column.cd90StorageLaneLimit.laneDate"), prop: "laneDate", type: "date", valueFormat: "yyyy-MM-dd" },
         { label: this.$t("ui.data.column.cd90StorageLaneLimit.shiftCode"), prop: "shiftCode", type: "select", dictData: this.dict.type.class_num_three_plan, filterable: true },
+        { label: this.$t("ui.data.column.cd90StorageLaneLimit.machineCode"), prop: "machineCode", type: "select", dictData: this.machineOptions, filterable: true, clearable: true },
         { label: this.$t("ui.data.column.cd90StorageLaneLimit.storageLaneCode"), prop: "storageLaneCode" },
       ];
     },
@@ -67,7 +72,7 @@ export default {
     handleDelete(row) { this.$confirm(this.$t("common.confirm.delete"), { type: "warning" }).then(() => { delStorageLaneLimit({ ids: row.id }).then((data) => { this.$modal.msgSuccess(data.msg); this.$set(this.page, "current", 1); this.getList(); }); }); },
     handleBatchDelete() { if (!this.selection || this.selection.length === 0) return; this.$confirm(this.$t("common.confirm.delete"), { type: "warning" }).then(() => { const ids = this.selection.map(item => item.id).join(","); delStorageLaneLimit({ ids }).then((data) => { this.$modal.msgSuccess(data.msg); this.selection = []; this.$set(this.page, "current", 1); this.getList(); }); }); },
     handleExport() { exportStorageLaneLimit(this.query); },
-    handleSearch(params) { this.page.current = 1; this.query = { ...params }; this.getList(); },
+    handleSearch(params) { this.page.current = 1; this.query = { ...params }; this.loadMachineOptions(params.factoryCode); this.getList(); },
     handlePageChange(current, pageSize) { this.page.current = current; this.page.pageSize = pageSize; this.getList(); },
     handleSortChange(sort) { this.sort = sort; this.getList(); },
     handleSelectionChange(selection) { this.selection = selection || []; },
@@ -77,7 +82,12 @@ export default {
       const rows = Array.isArray(res) ? res : (res.data || []);
       this.clothOptions = rows.map((code) => ({ label: code, value: code }));
     },
+    async loadMachineOptions(factoryCode = DEFAULT_FACTORY_CODE) {
+      const res = await getCd90MachineEnableOptions({ factoryCode: factoryCode || DEFAULT_FACTORY_CODE });
+      const rows = Array.isArray(res) ? res : (res.data || []);
+      this.machineOptions = rows.map((item) => ({ label: item.machineCode, value: item.machineCode }));
+    },
   },
-  created() { this.getList(); this.loadClothOptions(); },
+  created() { this.getList(); this.loadClothOptions(); this.loadMachineOptions(); },
 };
 </script>

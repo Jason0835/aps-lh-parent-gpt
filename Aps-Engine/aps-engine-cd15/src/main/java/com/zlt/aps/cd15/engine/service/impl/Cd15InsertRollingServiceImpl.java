@@ -1296,6 +1296,7 @@ public class Cd15InsertRollingServiceImpl implements Cd15InsertRollingService {
                 ? new ArrayList<>() : source.getLanes().stream()
                         .map(item -> Cd15StorageLaneState.builder()
                                 .laneCode(item.getLaneCode())
+                                .machineCode(item.getMachineCode())
                                 .steelStripCode(item.getSteelStripCode())
                                 .vehicleCount(item.getVehicleCount())
                                 .maxVehicleCount(item.getMaxVehicleCount()).build())
@@ -1606,7 +1607,8 @@ public class Cd15InsertRollingServiceImpl implements Cd15InsertRollingService {
                     }
                     int vehicles = row.getAllocatedCartCount() == null
                             ? 0 : row.getAllocatedCartCount();
-                    return vehicles <= 0
+                    return !Objects.equals(result.getMachineCode(), lane.getMachineCode())
+                            || vehicles <= 0
                             || lane.getVehicleCount() + vehicles > lane.getMaxVehicleCount();
                 })
                 .map(Cd15ScheduleLaneAllocation::getStorageLaneCode)
@@ -1626,6 +1628,10 @@ public class Cd15InsertRollingServiceImpl implements Cd15InsertRollingService {
                     .findFirst().orElseThrow(() -> new IllegalStateException(
                             "原排程库排不存在于当前资源快照: " + row.getStorageLaneCode()));
             int vehicles = row.getAllocatedCartCount() == null ? 0 : row.getAllocatedCartCount();
+            if (!Objects.equals(result.getMachineCode(), lane.getMachineCode())) {
+                throw new IllegalStateException("原排程库排未绑定当前机台: "
+                        + row.getStorageLaneCode());
+            }
             if (vehicles <= 0 || lane.getVehicleCount() + vehicles > lane.getMaxVehicleCount()) {
                 throw new IllegalStateException("原排程库排资源已变化，无法保持锁定任务: "
                         + row.getStorageLaneCode());
@@ -1679,7 +1685,8 @@ public class Cd15InsertRollingServiceImpl implements Cd15InsertRollingService {
         BigDecimal toolingQuantity = vehicleQuantity.multiply(BigDecimal.valueOf(availableTooling));
         BigDecimal trialQuantity = requestedQuantity.min(toolingQuantity);
         Cd15StorageLaneAllocationResult allocation = laneAllocator.allocate(
-                segment.result.getSteelStripCode(), trialQuantity, vehicleQuantity,
+                segment.result.getSteelStripCode(), segment.result.getMachineCode(),
+                trialQuantity, vehicleQuantity,
                 state.getLanes(), segment.hardInsert);
         if (!allocation.isSuccess() || allocation.getAllocatedVehicleCount() <= 0) {
             return new LaneCommit(BigDecimal.ZERO, Collections.emptyList(), 0,
@@ -1738,7 +1745,7 @@ public class Cd15InsertRollingServiceImpl implements Cd15InsertRollingService {
                 new BigDecimal("2"), 10, RoundingMode.UNNECESSARY);
         Cd15ShiftResourceState preview = this.copyShiftState(state);
         Cd15StorageLaneAllocationResult firstPreview = this.laneAllocator.allocate(
-                segment.result.getSteelStripCode(), branchTrialQuantity,
+                segment.result.getSteelStripCode(), segment.result.getMachineCode(), branchTrialQuantity,
                 vehicleQuantity, preview.getLanes(), segment.hardInsert);
         if (!firstPreview.isSuccess()) {
             return new LaneCommit(BigDecimal.ZERO,
@@ -1746,7 +1753,7 @@ public class Cd15InsertRollingServiceImpl implements Cd15InsertRollingService {
         }
         preview.setLanes(firstPreview.getLanes());
         Cd15StorageLaneAllocationResult secondPreview = this.laneAllocator.allocate(
-                segment.result.getSteelStripCode(), branchTrialQuantity,
+                segment.result.getSteelStripCode(), segment.result.getMachineCode(), branchTrialQuantity,
                 vehicleQuantity, preview.getLanes(), segment.hardInsert);
         if (!secondPreview.isSuccess()) {
             return new LaneCommit(BigDecimal.ZERO,
@@ -1763,11 +1770,11 @@ public class Cd15InsertRollingServiceImpl implements Cd15InsertRollingService {
                 vehicleQuantity.multiply(BigDecimal.valueOf(pairVehicleCount)));
         Cd15ShiftResourceState working = this.copyShiftState(state);
         Cd15StorageLaneAllocationResult first = this.laneAllocator.allocate(
-                segment.result.getSteelStripCode(), branchCommittedQuantity,
+                segment.result.getSteelStripCode(), segment.result.getMachineCode(), branchCommittedQuantity,
                 vehicleQuantity, working.getLanes(), segment.hardInsert);
         working.setLanes(first.getLanes());
         Cd15StorageLaneAllocationResult second = this.laneAllocator.allocate(
-                segment.result.getSteelStripCode(), branchCommittedQuantity,
+                segment.result.getSteelStripCode(), segment.result.getMachineCode(), branchCommittedQuantity,
                 vehicleQuantity, working.getLanes(), segment.hardInsert);
         if (!first.isSuccess() || !second.isSuccess()) {
             return new LaneCommit(BigDecimal.ZERO,

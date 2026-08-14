@@ -29,10 +29,10 @@ import com.zlt.aps.cx.service.CxScheduleDetailService;
 import com.zlt.aps.cx.service.CxScheduleResultService;
 import com.zlt.aps.cx.vo.CxScheduleResultTemplateImportVO;
 import com.zlt.aps.enums.YesOrNoEnum;
-import com.zlt.aps.maindata.mapper.MdmMaterialConsumeDetailMapper;
 import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
+import com.zlt.aps.maindata.mapper.MdmRawMaterialConversionEntityMapper;
+import com.zlt.aps.mdm.api.domain.entity.MdmRawMaterialConversion;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
-import com.zlt.aps.mp.api.domain.entity.MdmMaterialConsumeDetail;
 import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
 import com.zlt.aps.lh.api.domain.vo.ScheduleSummaryReportVO;
 import com.zlt.aps.lh.api.enums.MachineStopTypeEnum;
@@ -105,8 +105,8 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
     @Resource
     private CxParamConfigMapper cxParamConfigMapper;
 
-    @Resource
-    private MdmMaterialConsumeDetailMapper mdmMaterialConsumeDetailMapper;
+    @Autowired
+    private MdmRawMaterialConversionEntityMapper mdmRawMaterialConversionMapper;
 
     @Autowired
     private MdmMaterialInfoEntityMapper materialInfoEntityMapper;
@@ -345,7 +345,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         // Sheet 0: 成型余量-按机台
         Map<String, Object> remainQtyTableMap = new HashMap<>(16);
         List<List<Map<String, Object>>> remainQtyDataList = new ArrayList<>();
-        remainQtyDataList.add(buildCxRemainQtyExportDataList(exportList, endingStructureNames, rowRemarkMap));
+        remainQtyDataList.add(buildCxRemainQtyExportDataList(exportList, endingStructureNames, rowRemarkMap, smallGlueMap));
         byte[] exportBytes = ExcelUtils.writeMultiList(inputStream, 0, remainQtyTableMap, remainQtyDataList);
 
         // Sheet 1: 成型日计划
@@ -902,7 +902,9 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         row.put("cxRemainQty", zeroToEmpty(newLhRemainQty.subtract(totalStock)));
 
         String embryoCode = item.getEmbryoCode();
-        String smallGlueVal = smallGlueMap.getOrDefault(embryoCode, "");
+        // 胶种按 物料编码 + 示方类型 匹配（任意一个物料编码命中即可）
+        String glueKey = StringUtils.defaultString(item.getMaterialCode()).trim() + "|" + recipeType;
+        String smallGlueVal = smallGlueMap.getOrDefault(glueKey, "");
         row.put("smallGlue", smallGlueVal);
         row.put("placeholder", smallGlueVal);
 
@@ -1359,11 +1361,15 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
     /**
      * 构建小胶种和占位符映射。
-     * <p>直接从物料消耗明细表查询以AQ开头的胶种记录（不依赖参数配置），
-     * 取 CHILD_MATERIAL_NAME 去掉 AQ 前缀后展示。</p>
+     * <p>数据来源由物料消耗明细表切换为成品原材料折算表 T_MDM_RAW_MATERIAL_CONVERSION：</p>
+     * <ul>
+     *   <li>按 MATERIAL_CODE（物料编码）关联成型行，任意一个物料编码命中即可</li>
+     *   <li>按 CONSTRUCTION_STAGE（示方类型 T/X/S）关联成型行示方书类型</li>
+     *   <li>RAW_MATERIAL_NAME 以 AQT 开头，去掉 AQ 前缀后展示</li>
+     * </ul>
      *
      * @param exportList 成型排程结果列表
-     * @return key=smallGlue/placeholder, value=embryoCode→字符串的映射
+     * @return key=smallGlue/placeholder, value=materialCode|constructionStage→字符串的映射
      */
     private Map<String, Map<String, String>> buildSmallGlueMaps(List<CxScheduleResult> exportList) {
         Map<String, Map<String, String>> result = new HashMap<>(2);
@@ -1380,25 +1386,46 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                 .findFirst()
                 .orElse(null);
 
-        // 直接查询胶种数据（CHILD_MATERIAL_NAME以AQ开头），不依赖参数配置
-        List<MdmMaterialConsumeDetail> consumeDetails = mdmMaterialConsumeDetailMapper.selectList(
-                new LambdaQueryWrapper<MdmMaterialConsumeDetail>()
-                        .eq(BaseEntity::getIsDelete, YesOrNoEnum.NO.getCode())
-                        .eq(factoryCode != null, MdmMaterialConsumeDetail::getFactoryCode, factoryCode)
-                        .likeRight(MdmMaterialConsumeDetail::getChildMaterialName, "AQT"));
+        // 收集去重的物料编码
+        Set<String> materialCodes = exportList.stream()
+                .map(CxScheduleResult::getMaterialCode)
+                .filter(StringUtils::isNotBlank)
+                .map(String::trim)
+                .collect(Collectors.toSet());
 
-        if (CollectionUtils.isEmpty(consumeDetails)) {
+        // 收集去重的示方类型（取成型行第一个非空的示方书类型）
+        Set<String> recipeTypes = exportList.stream()
+                .map(this::resolveFirstRecipeType)
+                .filter(StringUtils::isNotBlank)
+                .map(String::trim)
+                .collect(Collectors.toSet());
+
+        if (materialCodes.isEmpty()) {
             return result;
         }
 
-        // embryoCode → 匹配到的参数值（去掉AQ前缀，去重后逗号连接）
-        Map<String, String> valueMap = consumeDetails.stream()
-                .filter(d -> StringUtils.isNotBlank(d.getEmbryoCode()))
+        // 查询成品原材料折算表：物料编码 + 示方类型 + 原材料名称AQT前缀过滤
+        List<MdmRawMaterialConversion> conversions = mdmRawMaterialConversionMapper.selectList(
+                new LambdaQueryWrapper<MdmRawMaterialConversion>()
+                        .eq(BaseEntity::getIsDelete, YesOrNoEnum.NO.getCode())
+                        .eq(factoryCode != null, MdmRawMaterialConversion::getFactoryCode, factoryCode)
+                        .in(MdmRawMaterialConversion::getMaterialCode, materialCodes)
+                        .in(CollectionUtils.isNotEmpty(recipeTypes), MdmRawMaterialConversion::getConstructionStage, recipeTypes)
+                        .likeRight(MdmRawMaterialConversion::getRawMaterialName, "AQT"));
+
+        if (CollectionUtils.isEmpty(conversions)) {
+            return result;
+        }
+
+        // materialCode|constructionStage → 原材料名称（去掉AQ前缀，去重后逗号连接）
+        Map<String, String> valueMap = conversions.stream()
+                .filter(c -> StringUtils.isNotBlank(c.getMaterialCode()) && StringUtils.isNotBlank(c.getRawMaterialName()))
                 .collect(Collectors.groupingBy(
-                        MdmMaterialConsumeDetail::getEmbryoCode,
+                        c -> StringUtils.defaultString(c.getMaterialCode()).trim() + "|"
+                                + StringUtils.defaultString(c.getConstructionStage()).trim(),
                         Collectors.mapping(
-                                d -> {
-                                    String name = StringUtils.defaultString(d.getChildMaterialName());
+                                c -> {
+                                    String name = StringUtils.defaultString(c.getRawMaterialName());
                                     return name.startsWith("AQ") ? name.substring(2) : name;
                                 },
                                 Collectors.collectingAndThen(
@@ -1411,6 +1438,25 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         result.get("placeholder").putAll(valueMap);
 
         return result;
+    }
+
+    /**
+     * 获取成型行第一个非空的示方书类型（S-正式、T-量试、X-试制）。
+     *
+     * @param item 成型排程结果
+     * @return 第一个非空的示方书类型，全部为空时返回空字符串
+     */
+    private String resolveFirstRecipeType(CxScheduleResult item) {
+        if (item == null) {
+            return "";
+        }
+        for (int classIndex = 1; classIndex <= 8; classIndex++) {
+            Object value = item.getFieldValueByFieldName("class" + classIndex + "RecipeType");
+            if (value != null && StringUtils.isNotBlank(value.toString().trim())) {
+                return value.toString().trim();
+            }
+        }
+        return "";
     }
 
     /**
@@ -1728,7 +1774,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
      * @param list 成型排程结果明细列表
      * @return 模板列表行数据，字段名与cxyl.xlsx中的列表占位符保持一致
      */
-    private List<Map<String, Object>> buildCxRemainQtyExportDataList(List<CxScheduleResult> list, Set<String> endingStructureNames, Map<Long, String> rowRemarkMap) {
+    private List<Map<String, Object>> buildCxRemainQtyExportDataList(List<CxScheduleResult> list, Set<String> endingStructureNames, Map<Long, String> rowRemarkMap, Map<String, String> smallGlueMap) {
         List<CxScheduleResult> exportList = Objects.isNull(list) ? Collections.emptyList() :
                 list.stream().sorted(Comparator.comparing(CxScheduleResult::getCxMachineCode, String.CASE_INSENSITIVE_ORDER)
                                 .thenComparing(CxScheduleResult::getMaterialCode))
@@ -1740,20 +1786,6 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         Map<String, List<CxScheduleResult>> groupMap = exportList.stream()
                 .filter(Objects::nonNull)
                 .collect(Collectors.groupingBy(this::buildCxRemainQtyGroupKey, LinkedHashMap::new, Collectors.toList()));
-
-        // 直接查询胶种数据（CHILD_MATERIAL_NAME以AQ开头），不依赖参数配置
-        Map<String, String> smallGlueMap = new HashMap<>();
-        List<MdmMaterialConsumeDetail> mdmMaterialConsumeDetailList = mdmMaterialConsumeDetailMapper.selectList(new LambdaQueryWrapper<MdmMaterialConsumeDetail>()
-                .eq(BaseEntity::getIsDelete, YesOrNoEnum.NO.getCode())
-                .eq(MdmMaterialConsumeDetail::getFactoryCode, list.get(0).getFactoryCode())
-                .likeRight(MdmMaterialConsumeDetail::getChildMaterialName, "AQT"));
-
-        if (CollectionUtils.isNotEmpty(mdmMaterialConsumeDetailList)) {
-            smallGlueMap = mdmMaterialConsumeDetailList.stream()
-                    .collect(Collectors.toMap(MdmMaterialConsumeDetail::getEmbryoCode,
-                            MdmMaterialConsumeDetail::getChildMaterialName, (a, b) -> a));
-        }
-
 
         List<Map<String, Object>> dataList = new ArrayList<>();
         for (List<CxScheduleResult> groupList : groupMap.values()) {
@@ -1779,14 +1811,9 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
             String embryoCode = first.getEmbryoCode();
             row.put("embryoCode", embryoCode);
             row.put("mainMaterialDesc", firstNonBlank(groupList, "mainMaterialDesc"));
-            // 胶种展示胎胚对应规格+花纹，在t_mdm_material_consume_detail表存在对应的胶种才展示
-            if (smallGlueMap.containsKey(embryoCode)) {
-                String smallGlue = StringUtils.defaultIfBlank(smallGlueMap.get(embryoCode), "");
-                smallGlue = smallGlue.substring(2);
-                row.put("smallGlue", smallGlue);
-            } else {
-                row.put("smallGlue", "");
-            }
+            // 胶种按 物料编码 + 示方类型 匹配（任意一个物料编码命中即可）
+            String glueKey = StringUtils.defaultString(first.getMaterialCode()).trim() + "|" + resolveFirstRecipeType(first);
+            row.put("smallGlue", StringUtils.defaultIfBlank(smallGlueMap.get(glueKey), ""));
             row.put("cxRemainQty", sumCxRemainQty(groupList));
             row.put("remark", buildCxRemainQtyRemark(groupList, rowRemarkMap));
             dataList.add(row);

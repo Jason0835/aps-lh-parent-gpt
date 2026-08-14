@@ -1,5 +1,6 @@
 package com.zlt.aps.mp.engine.scheduling;
 
+import com.google.common.collect.Maps;
 import com.zlt.aps.constant.StringConstant;
 import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.mp.api.domain.entity.MdmWorkCalendar;
@@ -137,6 +138,10 @@ public class BaseDataContainer implements Serializable {
      * 20260713+ 当月特殊的指定生产信息
      */
     private List<GroupAppointProductionInfoVo> appointConfiguration;
+    /**
+     * 20260810+ 整体模具产能受限Sku及分配量
+     */
+    private Map<String, Integer> moldCapacityLimitMap;
 
     /**
      * 判断同结构下前后两个Sku是否共用模具
@@ -254,33 +259,40 @@ public class BaseDataContainer implements Serializable {
      * @return
      */
     public Integer getSumProductionQty(String materialDesc) {
-        if (CollectionUtils.isEmpty(mouldInfoMap)) {
+        return getSumProductionQtyByDay(materialDesc, null);
+    }
+
+    /**
+     * 获取Sku截止到closingDay日已排产量
+     *
+     * @param materialDesc 物料描述
+     * @param closingDay   截止日
+     * @return
+     */
+    public Integer getSumProductionQty(String materialDesc, Integer closingDay) {
+        if (null == closingDay) {
             return BigDecimal.ZERO.intValue();
         }
-        Integer sumProductionQty = BigDecimal.ZERO.intValue();
-        for (Map.Entry<String, ProductionMouldInfoVo> entry : mouldInfoMap.entrySet()) {
-            ProductionMouldInfoVo productionInfo = entry.getValue();
-            if (null == productionInfo) {
-                continue;
-            }
-            Map<Integer, List<CxMouldDayProductionHelper>> dayProductionInfo = productionInfo.getDayProductionInfo();
-            if (CollectionUtils.isEmpty(dayProductionInfo)) {
-                continue;
-            }
-            for (Map.Entry<Integer, List<CxMouldDayProductionHelper>> dayEntry : dayProductionInfo.entrySet()) {
-                List<CxMouldDayProductionHelper> dayProductionList = dayEntry.getValue();
-                if (CollectionUtils.isEmpty(dayProductionList)) {
-                    continue;
-                }
-                List<CxMouldDayProductionHelper> skuProductionList = dayProductionList.stream().filter(singlePlan -> materialDesc.equals(singlePlan.getMaterialDesc())).collect(Collectors.toList());
-                if (CollectionUtils.isEmpty(skuProductionList)) {
-                    continue;
-                }
-                Integer singleSum = skuProductionList.stream().mapToInt(CxMouldDayProductionHelper::getProductionQty).sum();
-                sumProductionQty = sumProductionQty + singleSum;
-            }
+        return getSumProductionQtyByDay(materialDesc, closingDay);
+    }
+
+    /**
+     * 整体是否模具受限
+     *
+     * @param materialDesc
+     * @return
+     */
+    public boolean hasMoldCapacityLimit(String materialDesc) {
+        if (StringUtils.isBlank(materialDesc)) {
+            return false;
         }
-        return sumProductionQty;
+        if (CollectionUtils.isEmpty(moldCapacityLimitMap)) {
+            return false;
+        }
+        if (moldCapacityLimitMap.containsKey(materialDesc)) {
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -600,6 +612,91 @@ public class BaseDataContainer implements Serializable {
             return true;
         }
         return CollectionUtils.isEmpty(tireDrumInfoMap);
+    }
+
+    /**
+     * 获取Sku截止到endDay当前已排产量
+     *
+     * @param materialDesc Sku物料描述
+     * @return
+     */
+    private Integer getSumProductionQtyByDay(String materialDesc, Integer endDay) {
+        if (CollectionUtils.isEmpty(mouldInfoMap)) {
+            return BigDecimal.ZERO.intValue();
+        }
+        Integer sumProductionQty = BigDecimal.ZERO.intValue();
+        for (Map.Entry<String, ProductionMouldInfoVo> entry : mouldInfoMap.entrySet()) {
+            ProductionMouldInfoVo productionInfo = entry.getValue();
+            Integer singleMoldProductionQty = getSingleMoldSumProductionQty(materialDesc, endDay, productionInfo);
+            sumProductionQty = sumProductionQty + singleMoldProductionQty;
+        }
+        return sumProductionQty;
+    }
+
+    /**
+     * 获取单模具截止到endDay排产Sku：materialDesc排产量
+     *
+     * @param materialDesc   物料描述
+     * @param endDay         截止日，可以为空
+     * @param productionInfo 单模具排产信息对象
+     * @return
+     */
+    private Integer getSingleMoldSumProductionQty(String materialDesc, Integer endDay, ProductionMouldInfoVo productionInfo) {
+        if (StringUtils.isBlank(materialDesc)) {
+            return BigDecimal.ZERO.intValue();
+        }
+        Map<Integer, List<CxMouldDayProductionHelper>> dayProductionInfo = getEffectiveProductionInfoByDay(endDay, productionInfo);
+        if (CollectionUtils.isEmpty(dayProductionInfo)) {
+            return BigDecimal.ZERO.intValue();
+        }
+        Integer sumProductionQty = BigDecimal.ZERO.intValue();
+        for (Map.Entry<Integer, List<CxMouldDayProductionHelper>> dayEntry : dayProductionInfo.entrySet()) {
+            List<CxMouldDayProductionHelper> dayProductionList = dayEntry.getValue();
+            if (CollectionUtils.isEmpty(dayProductionList)) {
+                continue;
+            }
+            List<CxMouldDayProductionHelper> skuProductionList = dayProductionList.stream().filter(singlePlan -> materialDesc.equals(singlePlan.getMaterialDesc())).collect(Collectors.toList());
+            if (CollectionUtils.isEmpty(skuProductionList)) {
+                continue;
+            }
+            Integer singleSum = skuProductionList.stream().mapToInt(CxMouldDayProductionHelper::getProductionQty).sum();
+            sumProductionQty = sumProductionQty + singleSum;
+        }
+        return sumProductionQty;
+    }
+
+    /**
+     * 获取日有效排产信息，截止到endDay
+     *
+     * @param endDay         截止日
+     * @param productionInfo 所有日排产信息对象
+     * @return
+     */
+    private Map<Integer, List<CxMouldDayProductionHelper>> getEffectiveProductionInfoByDay(Integer endDay, ProductionMouldInfoVo productionInfo) {
+        if (null == productionInfo) {
+            return Collections.emptyMap();
+        }
+        Map<Integer, List<CxMouldDayProductionHelper>> dayProductionInfo = productionInfo.getDayProductionInfo();
+        if (CollectionUtils.isEmpty(dayProductionInfo)) {
+            return Collections.emptyMap();
+        }
+        if (null == endDay) {
+            return dayProductionInfo;
+        }
+        Map<Integer, List<CxMouldDayProductionHelper>> effectiveInfo = Maps.newHashMap();
+        dayProductionInfo.forEach((day, dayProductionDetailInfo) -> {
+            if (null == day) {
+                return;
+            }
+            if (day > endDay) {
+                return;
+            }
+            effectiveInfo.put(day, dayProductionDetailInfo);
+        });
+        if (CollectionUtils.isEmpty(effectiveInfo)) {
+            return Collections.emptyMap();
+        }
+        return effectiveInfo;
     }
 
 }

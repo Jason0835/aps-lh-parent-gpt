@@ -34,14 +34,23 @@
       labelWidth="0"
       :columns="importColumns"
     />
-    <info-dialog ref="infoRef" :steel-strip-options="steelStripOptions" @success="getList" />
+    <info-dialog
+      ref="infoRef"
+      :steel-strip-options="steelStripOptions"
+      :machine-options="machineOptions"
+      @factory-change="loadMachineOptions"
+      @success="getList"
+    />
   </basic-container>
 </template>
 
 <script>
 import { delStorageLaneLimit, exportStorageLaneLimit, listSteelStripCodes, listStorageLaneLimit } from "@/api/cd15/storageLaneLimit";
+import { getCd15MachineEnableOptions } from "@/api/cd15/cd15MachineInfo";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import infoDialog from "./components/infoDialog.vue";
+
+const DEFAULT_FACTORY_CODE = "116";
 
 export default {
   name: "Cd15StorageLaneLimit",
@@ -67,6 +76,7 @@ export default {
       data: [],
       selection: [],
       steelStripOptions: [],
+      machineOptions: [],
       page: { current: 1, pageSize: 20, total: 0 },
       sort: {},
       search: { factoryCode: "116", laneDate: new Date().toISOString().slice(0, 10) },
@@ -91,6 +101,13 @@ export default {
           halign: "center",
           label: this.$t("ui.data.column.cd15StorageLaneLimit.laneDate"),
           minWidth: 110,
+        },
+        {
+          prop: "machineCode",
+          align: "center",
+          halign: "center",
+          label: this.$t("ui.data.column.cd15StorageLaneLimit.machineCode"),
+          minWidth: 120,
         },
         {
           prop: "materialCode",
@@ -164,6 +181,7 @@ export default {
         { label: this.$t("ui.data.column.cd15StorageLaneLimit.materialCode"), prop: "materialCode", type: "select", dictData: this.steelStripOptions, filterable: true, clearable: true },
         { label: this.$t("ui.data.column.cd15StorageLaneLimit.laneDate"), prop: "laneDate", type: "date", valueFormat: "yyyy-MM-dd" },
         { label: this.$t("ui.data.column.cd15StorageLaneLimit.shiftCode"), prop: "shiftCode", type: "select", dictData: this.dict.type.class_num_three_plan, filterable: true },
+        { label: this.$t("ui.data.column.cd15StorageLaneLimit.machineCode"), prop: "machineCode", type: "select", dictData: this.machineOptions, filterable: true, clearable: true },
         { label: this.$t("ui.data.column.cd15StorageLaneLimit.storageLaneCode"), prop: "storageLaneCode" },
       ];
     },
@@ -172,7 +190,8 @@ export default {
     handleAdd() {
       this.$refs.infoRef && this.$refs.infoRef.show();
     },
-    handleEdit(row) {
+    async handleEdit(row) {
+      await this.loadMachineOptions(row.factoryCode);
       this.$refs.infoRef && this.$refs.infoRef.show(row);
     },
     handleBatchEdit() {
@@ -209,6 +228,7 @@ export default {
     handleSearch(params) {
       this.page.current = 1;
       this.query = { ...params };
+      this.loadMachineOptions(params.factoryCode);
       this.getList();
     },
     handlePageChange(current, pageSize) {
@@ -245,10 +265,16 @@ export default {
       const rows = Array.isArray(res) ? res : (res.data || []);
       this.steelStripOptions = rows.map((code) => ({ label: code, value: code }));
     },
+    async loadMachineOptions(factoryCode = DEFAULT_FACTORY_CODE) {
+      const res = await getCd15MachineEnableOptions({ factoryCode: factoryCode || DEFAULT_FACTORY_CODE });
+      const rows = Array.isArray(res) ? res : (res.data || []);
+      this.machineOptions = rows.map((item) => ({ label: item.machineCode, value: item.machineCode }));
+    },
   },
   created() {
     this.getList();
     this.loadSteelStripOptions();
+    this.loadMachineOptions();
   },
 };
 </script>
