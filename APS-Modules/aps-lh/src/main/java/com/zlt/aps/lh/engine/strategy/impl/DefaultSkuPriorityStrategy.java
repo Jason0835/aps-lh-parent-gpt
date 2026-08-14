@@ -183,8 +183,10 @@ public class DefaultSkuPriorityStrategy implements ISkuPriorityStrategy {
     /**
      * 根据胎胚最早可供硫化时间重新排序。
      *
-     * <p>本次仅修正历史注释口径；续作与新增 SKU 的既有排序行为继续保留，
-     * S4.5 的生产时间限制由新增排产中心解析器独立处理。</p>
+     * <p>仅允许延误天数相同的 SKU 在集合内部换位，避免胎胚时间二次排序覆盖主排序已经
+     * 确定的延误天数优先级。每个延误天数组内继续沿用既有规则：仅对存在胎胚时间的 SKU
+     * 按最早可供硫化时间升序排列，再回填到该组原有的“有时间”位置；无时间 SKU 保持原位。</p>
+     *
      * @param skuList SKU列表
      * @param embryoLhTimeMap 胎胚最早可供硫化时间 Map，key=结构名称，value=最早可供时间
      */
@@ -196,22 +198,31 @@ public class DefaultSkuPriorityStrategy implements ISkuPriorityStrategy {
             return;
         }
 
-        // 2. 找出所有有时间的元素，按时间排序
-        List<SkuScheduleDTO> sortedWithTime = skuList.stream()
-                .filter(sku -> embryoLhTimeMap.containsKey(sku.getStructureName()))
-                .sorted(Comparator.comparing(sku -> embryoLhTimeMap.get(sku.getStructureName())))
-                .collect(Collectors.toList());
-
-        // 3. 按原列表顺序，将排序后的"有时间"元素替换回原来的"有时间"位置
-        int timeIndex = 0;
-        for (int i = 0; i < skuList.size(); i++) {
-            SkuScheduleDTO sku = skuList.get(i);
+        /*
+         * 先按延误天数记录所有“有胎胚时间”的原始位置。LinkedHashMap允许null作为独立分组，
+         * 因此未赋延误天数的SKU仍保留原有换位资格，但不会与其他延误天数的SKU交叉换位。
+         */
+        Map<Integer, List<Integer>> timePositionMap = new LinkedHashMap<>(
+                Math.max(16, skuList.size() * 2));
+        for (int index = 0; index < skuList.size(); index++) {
+            SkuScheduleDTO sku = skuList.get(index);
             if (embryoLhTimeMap.containsKey(sku.getStructureName())) {
-                // 这个位置原本是有时间的，用排序后的元素替换
-                skuList.set(i, sortedWithTime.get(timeIndex++));
+                timePositionMap.computeIfAbsent(sku.getDelayDays(), key -> new ArrayList<>())
+                        .add(index);
             }
-            // 无时间的元素保持不变
         }
+
+        // 每个延误天数组独立执行原有胎胚时间排序，并回填该组原有的“有时间”位置。
+        timePositionMap.values().forEach(timePositionList -> {
+            List<SkuScheduleDTO> sortedWithTime = timePositionList.stream()
+                    .map(skuList::get)
+                    .sorted(Comparator.comparing(
+                            sku -> embryoLhTimeMap.get(sku.getStructureName())))
+                    .collect(Collectors.toList());
+            for (int timeIndex = 0; timeIndex < timePositionList.size(); timeIndex++) {
+                skuList.set(timePositionList.get(timeIndex), sortedWithTime.get(timeIndex));
+            }
+        });
     }
 
     /**
