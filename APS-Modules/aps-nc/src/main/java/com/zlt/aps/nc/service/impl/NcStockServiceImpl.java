@@ -1,6 +1,7 @@
 package com.zlt.aps.nc.service.impl;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import org.apache.commons.collections.CollectionUtils;
@@ -126,6 +127,11 @@ public class NcStockServiceImpl extends AbstractDocService<NcStock> implements N
         } else {
             return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + successNum);
         }
+    }
+    
+    @Override
+    protected List<String> getCheckUniqueFields() {
+        return Arrays.asList("factoryCode", "stockDate", "materialCode");
     }
 
     @Override

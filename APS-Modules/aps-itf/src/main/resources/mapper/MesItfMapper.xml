@@ -748,6 +748,7 @@
         SELECT MAX(DATA_VERSION)
         FROM DEV_MAINTENANCE_PLAN
         WHERE DATA_VERSION IS NOT NULL
+        <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
         <if test="precisionType != null and precisionType != ''">AND PRECISION_TYPE = #{precisionType}</if>
     </select>
 

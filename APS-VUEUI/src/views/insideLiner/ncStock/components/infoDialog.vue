@@ -34,6 +34,7 @@ import moment from "moment";
 import infoForm from "@/views/components/infoForm.vue";
 
 import { editStock } from "@/api/nc/stock";
+import { getConfigKey } from "@/api/system/config";
 
 export default {
   components: { infoForm },
@@ -43,6 +44,7 @@ export default {
       visible: false,
       isEdit: false,
       editType: null,
+      factoryCode: "",
       form: {},
       rules: {
         stockDate: [
@@ -188,6 +190,12 @@ export default {
     show(data, editType) {
       this.visible = true;
       this.editType = editType;
+      // 首次打开时获取当前工厂编码，保存时随参数一并提交
+      if (!this.factoryCode) {
+        getConfigKey("sys.factory.code").then((response) => {
+          this.factoryCode = response.msg;
+        });
+      }
       if (data) {
         this.isEdit = true;
         this.form = {
@@ -218,6 +226,7 @@ export default {
 
         this.save({
           ...params,
+          factoryCode: this.factoryCode,
           editType: this.editType,
         });
       });

@@ -87,7 +87,7 @@ public class NcMachineInfo extends ApsBaseEntity {
 
     /** 开机班次，如：中班、夜班；对应数据字典CLASS_NUM */
     @ApiModelProperty(value = "开机班次", position =85)
-    @Excel(name = "ui.data.column.machine.openMachineClass",dictType = "CLASS_NUM_THREE",dictTypeToExcelEnable = false)
+    @Excel(name = "ui.data.column.machine.openMachineClass",dictType = "class_num_three_plan",dictTypeToExcelEnable = false)
     @ImportValidated(name = "ui.data.column.machine.openMachineClass", maxLength = 20)
     @TableField("OPEN_MACHINE_CLASS")
     private String openMachineClass;

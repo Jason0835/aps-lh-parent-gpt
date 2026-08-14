@@ -854,6 +854,8 @@
   "ui.data.column.dj.machineMaintenance.stopEndTime": "Stop End Time",
   "ui.data.column.dj.machineMaintenance.stopShift": "Stop Shift",
   "ui.data.column.nc.machineMaintenance.modelName": "NC Machine Maintenance Plan",
+  "ui.data.column.ncStock.modelName": "Liner Stock Information",
+  "ui.data.column.ncMachine.modelName": "Liner Machine Management",
   "ui.data.column.nc.machineMaintenance.factoryCode": "Factory Code",
   "ui.data.column.nc.machineMaintenance.machineCode": "Machine Code",
   "ui.data.column.nc.machineMaintenance.machineName": "Machine Name",
