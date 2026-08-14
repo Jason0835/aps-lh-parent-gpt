@@ -130,6 +130,10 @@ public class MonthPlanCompareServiceImpl extends BaseController implements IMont
             queryDto.setPageSize(pageSize);
         }
         queryDto.setOffset((pageNum - 1) * pageSize);
+        // 打印分页参数，便于排查前端切换 pageSize 不生效问题
+        log.info("月计划与实际产量对比分页查询：factoryCode={}, year={}, month={}, pageNum={}, pageSize={}, offset={}",
+                queryDto.getFactoryCode(), queryDto.getYear(), queryDto.getMonth(),
+                pageNum, pageSize, queryDto.getOffset());
 
         // 2. 查询当前条件下 SKU 总数
         int total = monthPlanCompareMapper.selectFinalListCount(queryDto);

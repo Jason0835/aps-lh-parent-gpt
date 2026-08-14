@@ -66,6 +66,10 @@ export default {
       },
     };
   },
+  created() {
+    // 主动触发首次查询
+    this.getList();
+  },
   computed: {
     // 动态列：固定列 + 按天数生成日期列
     columns() {
@@ -158,10 +162,6 @@ export default {
         },
       ];
     },
-  },
-  // 主动触发首次查询（早于子组件 mounted，确保带默认参数请求）
-  created() {
-    this.getList();
   },
   methods: {
     // 必填校验：年月、工厂必填
@@ -284,7 +284,6 @@ export default {
         this.loading = true;
         const res = await listMonthPlanCompare(this.formatParams(true));
         this.data = res.rows || [];
-        // 更新分页总数（total = SKU 总数）
         this.$set(this.page, "total", res.total || 0);
       } catch (e) {
         console.error(e);
