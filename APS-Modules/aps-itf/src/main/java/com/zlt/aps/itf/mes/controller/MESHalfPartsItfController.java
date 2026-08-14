@@ -1,7 +1,5 @@
 package com.zlt.aps.itf.mes.controller;
 
-import java.util.List;
-
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -9,11 +7,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.zlt.aps.dj.api.domain.entity.DjScheduleResult;
 import com.zlt.aps.itf.mes.service.IMesItfDjService;
 import com.zlt.aps.itf.mes.service.IMesItfNcService;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
-import com.zlt.aps.nc.api.domain.entity.NcScheduleResult;
+import com.zlt.aps.itf.vo.MesDjScheduleResult;
+import com.zlt.aps.itf.vo.MesNcScheduleResult;
 
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -67,15 +65,19 @@ public class MESHalfPartsItfController {
 
     @ApiOperation("下发内衬排程")
     @PostMapping("/issueNcScheduleResult")
-    public AjaxResult issueNcScheduleResult(@RequestBody Long[] ids, String factoryCode,
-            String companyCode) {
+    public AjaxResult issueNcScheduleResult(@RequestBody MesNcScheduleResult mesNcScheduleResult) {
+        Long[] ids = mesNcScheduleResult.getIds();
+        String factoryCode = mesNcScheduleResult.getFactoryCode();
+        String companyCode = mesNcScheduleResult.getCompanyCode();
         return mesItfNcService.issueNcScheduleResult(ids, factoryCode, companyCode);
     }
 
     @ApiOperation("下发垫胶排程")
     @PostMapping("/issueDjScheduleResult")
-    public AjaxResult issueDjScheduleResult(@RequestBody Long[] ids, String factoryCode,
-            String companyCode) {
+    public AjaxResult issueDjScheduleResult(@RequestBody MesDjScheduleResult mesDjScheduleResult) {
+        Long[] ids = mesDjScheduleResult.getIds();
+        String factoryCode = mesDjScheduleResult.getFactoryCode();
+        String companyCode = mesDjScheduleResult.getCompanyCode();
         return mesItfDjService.issueDjScheduleResult(ids, factoryCode, companyCode);
     }
 }

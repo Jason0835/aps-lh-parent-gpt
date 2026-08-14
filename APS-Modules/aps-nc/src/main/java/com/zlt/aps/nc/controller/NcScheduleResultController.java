@@ -38,7 +38,7 @@ import com.zlt.aps.common.core.utils.AjaxResultUtils;
 import com.zlt.aps.common.engine.enums.ClassNumThreePlanEnums;
 import com.zlt.aps.common.engine.service.FactoryService;
 import com.zlt.aps.itf.mes.IMesHalfPartsItfService;
-import com.zlt.aps.itf.vo.SyncDataLogs;
+import com.zlt.aps.itf.vo.MesNcScheduleResult;
 import com.zlt.aps.mdm.api.domain.entity.MdmConstructionInfo;
 import com.zlt.aps.nc.api.domain.entity.NcDayFinishQty;
 import com.zlt.aps.nc.api.domain.entity.NcScheduleResult;
@@ -427,7 +427,11 @@ public class NcScheduleResultController extends AbstractBillBizController<NcSche
 //            syncParamsVO.setCompanyCode(companyCode);
 //            ncSyncDataHandle.syncNotice(syncParamsVO);  //往消息队列发送消息
             // 取回mes的反馈结果
-            AjaxResult syncResult = iMesHalfPartsItfService.issueDjScheduleResult(ncScheduleResult.getIds(), factoryCode, companyCode);
+            MesNcScheduleResult result = new MesNcScheduleResult();
+            result.setIds(ncScheduleResult.getIds());
+            result.setFactoryCode(factoryCode);
+            result.setCompanyCode(companyCode);
+            AjaxResult syncResult = iMesHalfPartsItfService.issueNcScheduleResult(result);
             String status = AjaxResultUtils.checkAjaxSuccess(syncResult)? ApsConstant.IS_RELEASE: ApsConstant.FAILURE_RELEASE;
             // 更新状态
             ncScheduleResultService.updateRelaseStatus(dataVersion, arr, status);
