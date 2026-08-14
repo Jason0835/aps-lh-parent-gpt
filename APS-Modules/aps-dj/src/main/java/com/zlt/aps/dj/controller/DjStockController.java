@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
@@ -58,6 +59,13 @@ public class DjStockController extends AbstractDocBizController<DjStock> {
     @ApiOperation("根据条件列表信息")
     public TableDataInfo list(@RequestBody DjStock queryVO) {
         return super.list(queryVO);
+    }
+    
+    @Override
+    protected void builderCondition(QueryWrapper<DjStock> queryWrapper, DjStock queryVO) {
+        super.builderCondition(queryWrapper, queryVO);
+        queryWrapper.ge(queryVO.getStartTime() != null, "STOCK_DATE", queryVO.getStartTime());
+        queryWrapper.le(queryVO.getStartTime() != null, "STOCK_DATE", queryVO.getEndTime());
     }
 
     /**
@@ -109,12 +117,10 @@ public class DjStockController extends AbstractDocBizController<DjStock> {
     @Log(title = "ui.frame.page.stock.title", businessType = BusinessType.IMPORT)
     @PostMapping("/importData")
     @ApiOperation("导入信息")
-    public AjaxResult importData(@RequestBody List<DjStock> list, @RequestParam("updateSupport") boolean updateSupport,
-            @RequestParam("importLogId") Long importLogId) {
-        if (StringUtils.isNull(list) || list.size() == 0) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.import.nodata"));
-        }
-        return stockService.importData(list, updateSupport, importLogId);
+    @Override
+    public AjaxResult importData(@RequestBody ImportContext importContext,
+            @RequestParam("updateSupport") boolean updateSupport) throws Exception {
+        return super.importData(importContext, updateSupport);
     }
 
     @Override
