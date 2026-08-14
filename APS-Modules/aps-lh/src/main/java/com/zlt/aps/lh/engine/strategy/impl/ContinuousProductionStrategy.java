@@ -7654,7 +7654,10 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
 
     /**
      * 解析允许发起切换（换模/换活字块）的开始时间。
-     * <p>20:00:00 允许发起切换，20:00:00 之后到次日早班前需顺延到下一个早班开始时间。</p>
+     * <p>全局统一使用 {@code 切换开始时间 < 20:00}。因此20:00:00整已不允许
+     * 发起切换，必须顺延到次日06:00；06:00整可以立即开始。具体边界由
+     * {@link LhScheduleTimeUtil#isNoMouldChangeTime(LhScheduleContext, Date)}
+     * 按 {@code [20:00, 次日06:00)} 集中判定，本调用处不得自行放宽。</p>
      */
     private Date resolveAllowedSwitchStartTime(LhScheduleContext context,
                                                String machineCode,

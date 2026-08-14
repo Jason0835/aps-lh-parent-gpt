@@ -1291,6 +1291,7 @@
   "ui.data.column.gsqScheduleResult.changeQtySuccess": "调量成功",
   "ui.data.btn.gsqScheduleResult.batchChangeMachine": "批量转机台",
   "ui.data.btn.gsqScheduleResult.batchChangeQty": "批量调量",
+  "ui.data.btn.gsqScheduleResult.publish": "排程发布",
   "ui.data.column.gsqScheduleResult.editSuccess": "修改成功",
   "ui.data.column.gsqScheduleResult.total": "合计",
   "ui.data.column.gsqScheduleResult.baseInfo": "基础信息",
@@ -1430,6 +1431,7 @@
   "ui.data.btn.tqScheduleResult.batchChangeMachine": "批量转机台",
   "ui.data.btn.tqScheduleResult.batchChangeQty": "批量调量",
   "ui.data.btn.tqScheduleResult.release": "发布",
+  "ui.data.btn.tqScheduleResult.publish": "排程发布",
   "ui.data.column.tqScheduleResult.baseInfo": "基本信息",
   "ui.data.column.tqScheduleResult.oldMachine": "原机台",
   "ui.data.column.tqScheduleResult.newMachine": "新机台",
@@ -3947,6 +3949,7 @@
   "ui.data.column.dj.machineMaintenance.stopEndTime": "停机结束时间",
   "ui.data.column.dj.machineMaintenance.stopShift": "停机班次",
   "ui.data.column.nc.machineMaintenance.modelName": "内衬机台维修计划",
+  "ui.data.column.ncStock.modelName": "内衬库存信息",
   "ui.data.column.nc.machineMaintenance.factoryCode": "工厂编码",
   "ui.data.column.nc.machineMaintenance.machineCode": "机台编码",
   "ui.data.column.nc.machineMaintenance.machineName": "机台名称",
@@ -4482,5 +4485,13 @@
   "ui.schedule.autoPlan.batchNo": "排程批次",
   "ui.schedule.autoPlan.viewIssues": "查看问题明细",
   "ui.schedule.autoPlan.viewUnplanned": "查看未排任务",
-  "ui.schedule.autoPlan.refreshBoard": "刷新看板"
+  "ui.schedule.autoPlan.refreshBoard": "刷新看板",
+  "ui.data.column.monthPlanCompare.materialCode": "物料编码",
+  "ui.data.column.monthPlanCompare.materialDesc": "物料描述",
+  "ui.data.column.monthPlanCompare.rowType": "日期",
+  "ui.data.column.monthPlanCompare.totalQty": "合计",
+  "ui.data.column.monthPlanCompare.productionVersion": "排产版本",
+  "ui.data.column.monthPlanCompare.productStatus": "产品状态",
+  "ui.data.column.monthPlanCompare.productTypeCode": "产品品类",
+  "ui.data.column.monthPlanCompare.modelName": "月计划与实际产量对比"
 }

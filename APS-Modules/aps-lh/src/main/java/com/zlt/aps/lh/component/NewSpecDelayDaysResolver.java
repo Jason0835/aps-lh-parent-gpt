@@ -26,7 +26,7 @@ import java.util.TreeMap;
  * S4.5 新增排产 SKU 延误天数解析器。
  *
  * <p>该组件只在新增排产最终排序前重算当前待排新增 SKU 的延误天数，不参与 S4.3 SKU
- * 初始化和 S4.4 续作排序。计算严格按“续作加机台、窗口内最早计划、窗口无计划但未来有计划、
+ * 初始化和 S4.4 续作排序。计算严格按“续作加机台、窗口内有计划、窗口无计划但未来有计划、
  * 仅欠产且本月从未排产”依次判断，任一场景命中后立即返回，避免后续场景覆盖前序结果。</p>
  *
  * <p>月计划只读取 S4.2 已加载的 {@code loadedMonthPlanList}，按物料、产品状态和业务日期
@@ -42,7 +42,7 @@ public class NewSpecDelayDaysResolver {
     /** 场景1：续作 SKU 因需要新增机台进入新增排产。 */
     private static final String SCENE_CONTINUATION_ADD_MACHINE = "场景1-续作加机台";
     /** 场景4：非续作加机台 SKU 在本次排程窗口内存在正月计划量。 */
-    private static final String SCENE_WINDOW_PLAN = "场景4-窗口内最早计划";
+    private static final String SCENE_WINDOW_PLAN = "场景4-窗口内有计划";
     /** 场景2：排程窗口内无正计划量，但已加载的未来月份或日期存在正计划量。 */
     private static final String SCENE_FUTURE_PLAN = "场景2-窗口无计划未来有计划";
     /** 场景3：当前待排量仅来自欠产，且本月从未排产。 */
@@ -123,15 +123,19 @@ public class NewSpecDelayDaysResolver {
 
         /*
          * 场景4用于细分原先命中默认值、但排程窗口内实际存在正月计划量的新增 SKU。
-         * T2严格取当前物料+产品状态在[T日, 窗口结束日]内最早聚合计划量大于0的日期，
-         * 延误天数按“T2-T日”计算。例如3302000156在本次窗口最早计划日为T+1，应得到1而不是0。
+         * 窗口内最早正计划日仅作为场景准入条件；真正参与延期计算的日期必须回到 S4.2 已加载
+         * 原始月计划，取当前物料+产品状态跨已加载月份的最早正计划日。延误天数按
+         * “月计划最早正计划日-T日”计算并保留负数，不能继续使用窗口内最早计划日代替。
          * 该分支位于场景1之后，确保续作加机台仍以首次需要新增机台日期作为唯一T2来源。
          */
         if (Objects.nonNull(firstWindowPlanDate)) {
-            int delayDays = this.calculateSignedDays(scheduleDate, firstWindowPlanDate);
-            this.applyDelayDays(context, sku, SCENE_WINDOW_PLAN,
-                    scheduleDate, firstWindowPlanDate, delayDays);
-            return;
+            LocalDate firstMonthPlanDate = this.findFirstPositivePlanDate(dailyPlanMap);
+            if (Objects.nonNull(firstMonthPlanDate)) {
+                int delayDays = this.calculateSignedDays(scheduleDate, firstMonthPlanDate);
+                this.applyDelayDays(context, sku, SCENE_WINDOW_PLAN,
+                        scheduleDate, firstMonthPlanDate, delayDays);
+                return;
+            }
         }
 
         /*
@@ -247,6 +251,22 @@ public class NewSpecDelayDaysResolver {
     }
 
     /**
+     * 查找已加载原始月计划中的最早正计划日。
+     *
+     * <p>日计划索引已经按物料+产品状态隔离，并按自然日聚合同日多条记录；这里从索引首日
+     * 开始扫描，可以直接复用现有跨月加载范围，不重新查询数据库，也不读取运行态日计划账本。</p>
+     *
+     * @param dailyPlanMap 单个物料+产品状态的日计划索引
+     * @return 已加载月份中的最早正计划日；不存在时返回null
+     */
+    private LocalDate findFirstPositivePlanDate(NavigableMap<LocalDate, Integer> dailyPlanMap) {
+        if (CollectionUtils.isEmpty(dailyPlanMap)) {
+            return null;
+        }
+        return this.findFirstPositivePlanDate(dailyPlanMap, dailyPlanMap.firstKey(), null);
+    }
+
+    /**
      * 判断当前待排量是否具有“仅历史欠产”来源。
      *
      * <p>复用项目现有仅历史欠产规则口径：本月历史欠产或有效上月欠产任一为正，并且当前
@@ -313,7 +333,7 @@ public class NewSpecDelayDaysResolver {
      * @param sku 待排新增 SKU
      * @param scene 命中场景
      * @param scheduleDate 排程窗口 T 日
-     * @param targetDate T2；场景3为本月最早计划日；默认场景为空
+     * @param targetDate 计算目标日；场景4和场景3为月计划最早正计划日，默认场景为空
      * @param delayDays 有符号延误天数
      */
     private void applyDelayDays(LhScheduleContext context,
@@ -324,7 +344,7 @@ public class NewSpecDelayDaysResolver {
                                 int delayDays) {
         sku.setDelayDays(delayDays);
         log.info("新增排产SKU延误天数重算, factoryCode: {}, batchNo: {}, materialCode: {}, "
-                        + "productStatus: {}, scene: {}, T日: {}, T2/最早计划日: {}, delayDays: {}",
+                        + "productStatus: {}, scene: {}, T日: {}, 计算目标日: {}, delayDays: {}",
                 context.getFactoryCode(), context.getBatchNo(), sku.getMaterialCode(), sku.getProductStatus(),
                 scene, scheduleDate, targetDate, delayDays);
     }

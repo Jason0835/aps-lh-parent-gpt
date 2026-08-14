@@ -46,6 +46,7 @@ import com.zlt.aps.lh.api.service.ILhPrecisionPlanRemoteService;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.*;
 import com.zlt.aps.maindata.service.IFactoryParamService;
+import com.zlt.aps.maindata.service.IMdmDevMaintenancePlanService;
 import com.zlt.aps.maindata.service.IMdmProductModelRelationService;
 import com.zlt.aps.maindata.service.IMdmSkuStructureRefService;
 import com.zlt.aps.maindata.utils.ScmListUtils;
@@ -66,6 +67,7 @@ import org.apache.commons.lang.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.text.ParseException;
@@ -119,6 +121,9 @@ public class MesItfServiceImpl implements MesItfService {
 
     @Autowired
     private MdmDevMaintenancePlanEntityMapper devMaintenancePlanEntityMapper;
+
+    @Autowired
+    private IMdmDevMaintenancePlanService mdmDevMaintenancePlanService;
 
     @Autowired
     private MdmDevicePlanShutEntityMapper devicePlanShutEntityMapper;
@@ -1096,8 +1101,9 @@ public class MesItfServiceImpl implements MesItfService {
     public AjaxResult syncDevMaintenancePlan(AuxReqSyncDataLogs syncDataLogs) {
         // 查询MES中间表指定精度类型的最大版本号，只同步最新版本的数据
         String precisionType = syncDataLogs != null ? syncDataLogs.getPrecisionType() : null;
+        String oldFactoryCode = syncDataLogs != null ? syncDataLogs.getFactoryCode() : null;
         DynamicDataSourceContextHolder.push(DataSource.MES);
-        String maxVersion = mesItfMapper.selectMaxDataVersionFromMes(precisionType);
+        String maxVersion = mesItfMapper.selectMaxDataVersionFromMes(oldFactoryCode, precisionType);
         DynamicDataSourceContextHolder.poll();
 
         if (maxVersion != null && !maxVersion.isEmpty()) {
@@ -1238,6 +1244,7 @@ public class MesItfServiceImpl implements MesItfService {
         return AjaxResult.success();
     }
 
+    @Transactional(rollbackFor = Exception.class)
     @Override
     public AjaxResult syncDevMaintenancePlanOnly(AuxReqSyncDataLogs syncDataLogs) {
         // 查询MES中间表指定精度类型的最大版本号，只同步最新版本的数据
@@ -1258,7 +1265,7 @@ public class MesItfServiceImpl implements MesItfService {
 
         if (StringUtils.isBlank(inputVersion)) {
             DynamicDataSourceContextHolder.push(DataSource.MES);
-            String maxVersion = mesItfMapper.selectMaxDataVersionFromMes(precisionType);
+            String maxVersion = mesItfMapper.selectMaxDataVersionFromMes(factoryCode, precisionType);
             DynamicDataSourceContextHolder.poll();
 
             if (maxVersion != null && !maxVersion.isEmpty()) {
@@ -1278,10 +1285,10 @@ public class MesItfServiceImpl implements MesItfService {
         List<DevMaintenancePlan> syncList = mesItfMapper.selectDevMaintenancePlanList(syncDataLogs);
         DynamicDataSourceContextHolder.poll();
 
-        // 按factoryCode|devCode|precisionType去重，同版本多条相同唯一键取第一条
+        // 按factoryCode|devCode|precisionType|operTime去重，同一设备同一精度类型不同计划日期的记录不能合并
         Map<String, DevMaintenancePlan> groupMap = syncList.stream()
                 .collect(Collectors.toMap(
-                        item -> item.getFactoryCode() + "|" + item.getDevCode() + "|" + item.getPrecisionType(),
+                        item -> item.getFactoryCode() + "|" + item.getDevCode() + "|" + item.getPrecisionType() + "|" + item.getOperTime(),
                         Function.identity(),
                         (v1, v2) -> v1
                 ));
@@ -1348,10 +1355,10 @@ public class MesItfServiceImpl implements MesItfService {
                 insertList.add(entity);
             }
 
-            // 批量插入，按1000条分批
+            // 批量插入，按1000条分批，使用Service层saveBatch确保实体字段正确映射
             List<List<MdmDevMaintenancePlan>> splitList = ScmListUtils.getSplitList(insertList, 1000);
             for (List<MdmDevMaintenancePlan> batch : splitList) {
-                baseDao.insertBatch(batch);
+                mdmDevMaintenancePlanService.saveBatch(batch);
             }
 
             log.info("仅同步设备保养计划完成（不触发生成精度计划），精度类型={}，同步{}条", precisionType, syncList.size());
@@ -3897,8 +3904,9 @@ public class MesItfServiceImpl implements MesItfService {
     @Override
     public AjaxResult syncLhPrecisionPlanActual(AuxReqSyncDataLogs syncDataLogs) {
         // 先查询MES中间表硫化精度类型的最大版本号，只同步最新版本的数据
+        String actualFactoryCode = syncDataLogs != null ? syncDataLogs.getFactoryCode() : null;
         DynamicDataSourceContextHolder.push(DataSource.MES);
-        String maxVersion = mesItfMapper.selectMaxDataVersionFromMes("硫化精度");
+        String maxVersion = mesItfMapper.selectMaxDataVersionFromMes(actualFactoryCode, "硫化精度");
         DynamicDataSourceContextHolder.poll();
 
         if (maxVersion == null || maxVersion.isEmpty()) {

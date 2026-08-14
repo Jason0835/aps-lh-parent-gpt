@@ -27,16 +27,15 @@ public interface ICapacityCalculateStrategy {
     int calculateShiftCapacity(LhScheduleContext context, int lhTimeSeconds, int mouldQty);
 
     /**
-     * 计算开产时间
-     * <p>
-     * 考虑: 前SKU收尾时间 + 换模含预热(4h) + 其他时间(4h, 首检+等待交替)
-     * 以及与保养/维修/清洗计划的重叠
-     * </p>
+     * 计算机台准备就绪时间。
+     * <p>本方法只收敛前 SKU 收尾、精度/保养及维修恢复等机台级下限，
+     * 不再预先叠加换模、换活字块或首检时长。新增选机会以该时刻为起点，
+     * 由统一真实可开产计划继续计算切换、首检、清洗、停机和正式生产时间轴。</p>
      *
      * @param context     排程上下文
      * @param machineCode 机台编号
      * @param endingTime  前SKU收尾时间
-     * @return 开产时间
+     * @return 机台可继续安排切换准备的就绪时间
      */
     Date calculateStartTime(LhScheduleContext context, String machineCode, Date endingTime);
 

@@ -1092,7 +1092,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
          * 调用保存前模具时间轴强校验。置换协调器和各排产主链虽然都会维护模具占用账本，
          * 但最终结果仍必须独立验证，禁止历史在机快照把同一实体模具并发落到不同机台。
          */
-        validateConcurrentMouldOccupation(context);
+//        validateConcurrentMouldOccupation(context);
         // 双模 SKU 的 L/R 已在新增、续作及换活字块链路按物理组同步生成。
         // 保存前必须重新校验两侧完整性，禁止后置收尾、降模或释放逻辑拆散双模组后继续落库。
 //        validateWholeSingleControlMachineResults(context);

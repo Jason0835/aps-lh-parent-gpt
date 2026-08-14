@@ -76,7 +76,7 @@
           type="primary"
           :disabled="selection.length === 0"
           @click="handlePublish"
-        >{{ $t("ui.data.column.scheduleResult.publish") }}</el-button>
+        >{{ $t("ui.data.btn.gsqScheduleResult.publish") }}</el-button>
         <el-dropdown>
           <el-button type="primary" style="margin-left: 10px">
             {{ $t("ui.frame.btn.more") }}<i class="el-icon-arrow-down el-icon--right"></i>
@@ -190,6 +190,8 @@ export default {
     return {
       loading: false,
       data: [],
+      // keep-alive 首次激活守卫：避免 created 与 activated 重复请求
+      pageActivatedOnce: false,
       page: {
         pageNum: 1,
         pageSize: 50,
@@ -458,6 +460,14 @@ export default {
     // 首次进入页面时加载数据（getList 内部会先 await getDate() 拉取班次日期）
     this.getList();
   },
+  activated() {
+    // keep-alive 首次激活不重复请求（created 已加载），后续重新进入页面时刷新数据
+    if (this.pageActivatedOnce) {
+      this.getList();
+      return;
+    }
+    this.pageActivatedOnce = true;
+  },
   methods: {
     /**
      * 获取班次列表头标签（班次名 + 日期）
@@ -582,19 +592,18 @@ export default {
     /** 发布排程：将选中记录下发MES，后端按发布状态过滤可发布记录 */
     handlePublish() {
       if (this.selection.length === 0) return;
-      this.$confirm(this.$t("ui.data.column.gsqScheduleResult.confirmPublish"), {
+      this.$confirm(this.$t("ui.biz.alter.makeSurePublish"), {
         type: "warning",
       }).then(async () => {
         try {
           this.loading = true;
           // 收集选中记录ID列表，与排程日期、分厂一并传给后端
           const ids = this.selection.map((item) => item.id);
-          const params = {
-            scheduleDate: this.selection[0].scheduleDate,
+          const data = await publishSchedule({
+            scheduleDateQuery: this.selection[0].scheduleDate,
             factoryCode: this.selection[0].factoryCode,
             ids: ids.join(","),
-          };
-          const data = await publishSchedule(params);
+          });
           this.$modal.msgSuccess(data.msg);
           this.getList();
         } catch (error) {

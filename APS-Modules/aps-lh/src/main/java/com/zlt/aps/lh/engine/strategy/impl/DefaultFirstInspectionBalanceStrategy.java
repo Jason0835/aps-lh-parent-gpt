@@ -15,7 +15,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
-import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
 import java.util.Objects;
@@ -33,7 +32,6 @@ public class DefaultFirstInspectionBalanceStrategy implements IFirstInspectionBa
     /** dailyFirstInspectionCountMap value数组下标：[0]=早班首检数, [1]=中班首检数 */
     private static final int IDX_MORNING = 0;
     private static final int IDX_AFTERNOON = 1;
-    private static final String DATE_KEY_FORMAT = "yyyy-MM-dd";
 
     @Override
     public Date previewInspection(LhScheduleContext context, String machineCode, Date mouldChangeTime) {
@@ -198,20 +196,16 @@ public class DefaultFirstInspectionBalanceStrategy implements IFirstInspectionBa
     }
 
     /**
-     * 首检从前一班顺延到下一班时避开重叠边界。
-     * <p>首检数量规则规定边界时刻归前一班，因此顺延时间在下一班起点后增加1秒，
-     * 保证资源班次和数量归属班次完全一致。未初始化排程窗口时保持原兼容行为。</p>
+     * 首检从前一班顺延到下一班时对齐下一班起点。
+     * <p>班次边界已统一为 {@code [start, end)}，下一班开始时刻天然归属于下一班，
+     * 不再人为增加1秒，避免真实可开产时间和结果时间轴产生无业务依据的偏移。</p>
      *
      * @param context 排程上下文
      * @param shiftStartTime 下一班开始时间
      * @return 可明确归入下一班的首检时间
      */
     private Date alignMovedInspectionTimeToShift(LhScheduleContext context, Date shiftStartTime) {
-        if (Objects.isNull(context) || Objects.isNull(shiftStartTime)
-                || CollectionUtils.isEmpty(context.getScheduleWindowShifts())) {
-            return shiftStartTime;
-        }
-        return DateUtil.offsetSecond(shiftStartTime, 1);
+        return shiftStartTime;
     }
 
     /**
@@ -227,8 +221,7 @@ public class DefaultFirstInspectionBalanceStrategy implements IFirstInspectionBa
     }
 
     private String formatDateKey(Date date) {
-        // TODO 后续可统一替换为 Hutool 或 java.time 格式化，当前保持首检日维度计数键不变。
-        return new SimpleDateFormat(DATE_KEY_FORMAT).format(date);
+        return DateUtil.formatDate(date);
     }
 
     /**
