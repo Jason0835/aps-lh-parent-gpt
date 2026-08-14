@@ -1,5 +1,6 @@
 package com.zlt.aps.mp.engine.domain.dto;
 
+import com.google.common.collect.Sets;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
@@ -121,7 +122,7 @@ public class CxMachineAllocationPlanHelper implements Serializable {
         this.allocationDay = allocationDay;
         this.startDay = startDay;
         this.endDay = endDay;
-        this.timeExtensionFlag = false;
+        this.timeExtensionFlag = true;
         this.realProductionPlanList = new ArrayList<>();
         //20260428+ 备份使用
         CxMachineAllocationPlanHelper cloneObject = new CxMachineAllocationPlanHelper();
@@ -134,7 +135,7 @@ public class CxMachineAllocationPlanHelper implements Serializable {
         cloneObject.allocationDay = allocationDay;
         cloneObject.startDay = startDay;
         cloneObject.endDay = endDay;
-        cloneObject.timeExtensionFlag = false;
+        cloneObject.timeExtensionFlag = true;
         cloneObject.realProductionPlanList = new ArrayList<>();
         this.cloneObject = cloneObject;
     }
@@ -176,6 +177,35 @@ public class CxMachineAllocationPlanHelper implements Serializable {
      */
     public void setChangeProSize(boolean isChangeProSize) {
         this.isChangeProSize = isChangeProSize;
+    }
+
+    /**
+     * 获取分配信息对应的真实可排产日信息集合
+     *
+     * @param context 排产上下文
+     * @return
+     */
+    public Set<Integer> getRealProductionDayInfo(Context context) {
+        if (StringUtils.isBlank(cxMachineCode)) {
+            return Collections.emptySet();
+        }
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        CxMachineBaseInfoVo cxMachineInfo = productionContext.getBaseDataContainer().getCxMachineInfoByCode(cxMachineCode);
+        if (null == cxMachineInfo) {
+            return Collections.emptySet();
+        }
+        Set<Integer> stopDayInfo = Optional.ofNullable(cxMachineInfo.getStopDayInfo()).orElse(Collections.emptySet());
+        Set<Integer> realProductionDayInfo = Sets.newHashSet();
+        for (Integer day = startDay; day <= endDay; ) {
+            if (!stopDayInfo.contains(day)) {
+                realProductionDayInfo.add(day);
+            }
+            day = day + BigDecimal.ONE.intValue();
+        }
+        if (CollectionUtils.isEmpty(realProductionDayInfo)) {
+            return Collections.emptySet();
+        }
+        return realProductionDayInfo;
     }
 
     /**
@@ -304,46 +334,38 @@ public class CxMachineAllocationPlanHelper implements Serializable {
     }
 
     /**
+     * 在机分组(TBR-结构)因指定业务导致的强制下机，故而新的收尾日 = newEndDay
      * 根据新的分配结束日，调整分配的结束日及分配天数
-     * 返回实际调整完后变化的分配天数
-     * =0 表示没有变化产能分配天数
-     * <0 表示提前了
-     * >0 表示延后了
+     * 并返回中间的实际排产日信息
      *
      * @param productionContext 排产上下文
      * @param newEndDay         新的分配结束日
      */
-    public int updateNewEndDay(TbrProductionContext productionContext, Integer newEndDay) {
+    public Set<Integer> getReduceDaysByForceOffline(TbrProductionContext productionContext, Integer newEndDay) {
         if (StringUtils.isBlank(cxMachineCode) || null == newEndDay) {
-            return BigDecimal.ZERO.intValue();
+            return Collections.emptySet();
         }
         //超出排产周期，则无效
         if (newEndDay < BigDecimal.ONE.intValue() || newEndDay > productionContext.getMonthDays()) {
-            return BigDecimal.ZERO.intValue();
+            return Collections.emptySet();
         }
         CxMachineBaseInfoVo cxMachineInfo = productionContext.getBaseDataContainer().getCxMachineInfoByCode(cxMachineCode);
         if (null == cxMachineInfo) {
-            return BigDecimal.ZERO.intValue();
+            return Collections.emptySet();
         }
         Integer originEndDay = endDay;
         if (newEndDay.equals(originEndDay)) {
-            return BigDecimal.ZERO.intValue();
+            return Collections.emptySet();
         }
-        Integer startDay = Math.min(originEndDay, newEndDay);
+        Integer startDay = Math.min(originEndDay, newEndDay) + BigDecimal.ONE.intValue();
         Integer endDay = Math.max(originEndDay, newEndDay);
-        Integer adjustCount = BigDecimal.ZERO.intValue();
-        for (Integer index = startDay; index < endDay; index++) {
+        Set<Integer> adjustDaySet = Sets.newHashSet();
+        for (Integer index = startDay; index <= endDay; index++) {
             if (!cxMachineInfo.getStopDayInfo().contains(index)) {
-                adjustCount = adjustCount + BigDecimal.ONE.intValue();
+                adjustDaySet.add(index);
             }
         }
-        Integer originAllocationDay = allocationDay;
-        if (newEndDay > originEndDay) {
-            allocationDay = originAllocationDay + adjustCount;
-            return adjustCount;
-        }
-        allocationDay = originAllocationDay - adjustCount;
-        return -adjustCount;
+        return adjustDaySet;
     }
 
     /**
@@ -421,10 +443,14 @@ public class CxMachineAllocationPlanHelper implements Serializable {
     }
 
     /**
-     * 标记进行结构延长探测处理
+     * 标记该机台
+     * 不可进行延长探测处理
+     * 业务场景：
+     * 1、指定业务，续作在机强行下机
+     * 2、指定业务，控制最长排产时间
      */
-    public void markTimeExtension() {
-        this.timeExtensionFlag = true;
+    public void markNoTimeExtension() {
+        this.timeExtensionFlag = false;
     }
 
     /**

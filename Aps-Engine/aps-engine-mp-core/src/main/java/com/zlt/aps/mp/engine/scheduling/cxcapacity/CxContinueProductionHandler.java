@@ -73,8 +73,13 @@ public class CxContinueProductionHandler {
                 return;
             }
             cxContinueSkuInfo.setMouldNumber(selectMouldList.size());
+            //20260812+ 因指定业务导致的提前下机日
+            Integer realEndDay = groupPlanInfo.getContinueSkuOfflineDay(continueSkuDeadLineDays, materialDesc);
+            if (null == realEndDay) {
+                return;
+            }
             //1、降膜排产
-            DeductMouldVo deductMould = DeductMouldScheduler.createDeductMouldBySku(continueSkuDeadLineDays, stopDays, new HashSet<>(), paramConfiguration, cxContinueSkuInfo);
+            DeductMouldVo deductMould = DeductMouldScheduler.createDeductMouldBySku(realEndDay, stopDays, new HashSet<>(), paramConfiguration, cxContinueSkuInfo);
             //20260421+ 降膜排产信息调整
             setDeductInfo(context, groupPlanInfo, deductMould, cxContinueSkuInfo);
             Integer needProductionQty = deductMould.getRemainingQty();
@@ -259,6 +264,8 @@ public class CxContinueProductionHandler {
             Integer dayMaxLimitLhMachines = dayMaxMoldNumber / ProductionConstant.DOUBLE_MOULD_PRODUCTION;
             dayMaxMachinesLimitMap.put(deductDay, dayMaxLimitLhMachines);
         });
+        //20260812+ 叠加指定业务导致的降膜
+        groupPlanInfo.addContinueSkuDeductMoldNumberByAppoint(materialDesc, dayMaxMachinesLimitMap);
         if (CollectionUtils.isEmpty(dayMaxMachinesLimitMap)) {
             deductMould.setDayMaxMachinesLimitMap(null);
             return;

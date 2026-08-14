@@ -27,6 +27,11 @@ public enum LogRecorderStageEnum {
      * 03 模拟排产阶段--即成型产能分配
      */
     SIMULATE_PRODUCTION("03", "模拟排产阶段"),
+
+    /**
+     * 030100 模拟排产阶段--指定在产调整阶段
+     */
+    SIMULATE_APPOINT_ADJUST_PRODUCTION("030100", "指定在产调整阶段"),
     /**
      * 030101 模拟交付优先-预排排产阶段
      */

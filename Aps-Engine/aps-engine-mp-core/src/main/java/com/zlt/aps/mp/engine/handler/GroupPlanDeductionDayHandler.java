@@ -51,7 +51,13 @@ public class GroupPlanDeductionDayHandler {
      * @param dayProductionInfoMap 日排产信息
      * @param deductionDaySet      释放日信息
      */
-    public void deductionDayInfo(Context context, DeductionDayProductionTypeEnum deductionType, CxMachineBaseInfoVo cxMachineInfo, ProductionPlanGroupInfo groupPlanInfo, CxMachineAllocationPlanHelper allocationInfo, Map<Integer, GroupPlanCxLhCapacityLimitHelper> dayProductionInfoMap, Set<Integer> deductionDaySet) {
+    public void deductionDayInfo(Context context,
+                                 DeductionDayProductionTypeEnum deductionType,
+                                 CxMachineBaseInfoVo cxMachineInfo,
+                                 ProductionPlanGroupInfo groupPlanInfo,
+                                 CxMachineAllocationPlanHelper allocationInfo,
+                                 Map<Integer, GroupPlanCxLhCapacityLimitHelper> dayProductionInfoMap,
+                                 Set<Integer> deductionDaySet) {
         if (!isEffectiveParam(cxMachineInfo, groupPlanInfo, allocationInfo, dayProductionInfoMap, deductionDaySet)) {
             return;
         }
@@ -64,10 +70,49 @@ public class GroupPlanDeductionDayHandler {
         //不可以标记结构分配完成，需等下一轮分配：故而调整为更新分配的天数
         groupPlanInfo.deductionAllocationDays(deductionDayCount);
         //释放，成型工装使用量，切换结构使用量、分配日产能、特殊材料分配量
-        cxMachineInfo.handlerBeforeConclusion(productionContext, allocationInfo, deductionDaySet, groupPlanInfo);
+        cxMachineInfo.handlerBeforeConclusion(productionContext, true, allocationInfo, deductionDaySet, groupPlanInfo);
         //逐日释放：模具排产信息 模具产能占用、模壳、胶囊卡盘、换模次数等
         deductionMouldProductionInfo(productionContext, groupPlanInfo, dayProductionInfoMap, deductionDaySet);
-        return;
+    }
+
+    /**
+     * 扣除产能占用：成型工装占用量、分配日产能量、特殊材料分配量
+     * 业务场景-在机分组(TBR-结构)与指定在排产时间上冲突时导致
+     * 在机分配需要在中途进行强制下机
+     *
+     * @param context         排产上下文
+     * @param cxMachineInfo   成型机台
+     * @param groupPlanInfo   分组信息对象
+     * @param allocationInfo  分配信息段
+     * @param deductionDaySet 扣除天数信息
+     */
+    public void deductionDayInfoByContinueForceOffline(Context context,
+                                                       CxMachineBaseInfoVo cxMachineInfo,
+                                                       ProductionPlanGroupInfo groupPlanInfo,
+                                                       CxMachineAllocationPlanHelper allocationInfo,
+                                                       Set<Integer> deductionDaySet) {
+        if (null == cxMachineInfo || null == groupPlanInfo || null == allocationInfo) {
+            return;
+        }
+        if (CollectionUtils.isEmpty(deductionDaySet)) {
+            return;
+        }
+        String cxMachineCode = cxMachineInfo.getCxMachineCode();
+        String groupName = groupPlanInfo.getGroupName();
+        if (StringUtils.isBlank(cxMachineCode) || StringUtils.isBlank(groupName)) {
+            return;
+        }
+        if (!(cxMachineCode.equals(allocationInfo.getCxMachineCode()) || !groupName.equals(allocationInfo.getAllocationGroup()))) {
+            return;
+        }
+        String daysInfo = deductionDaySet.stream().map(String::valueOf).collect(Collectors.joining(StringConstant.COMMA));
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        DeductionDayProductionInfoLogRecorder.addStartGroupDeductionDayCapacityLog(productionContext, groupName, DeductionDayProductionTypeEnum.APPOINT_FORCED, cxMachineCode, daysInfo);
+        Integer deductionDayCount = deductionDaySet.size();
+        //不可以标记结构分配完成，需等下一轮分配：故而调整为更新分配的天数
+        groupPlanInfo.deductionAllocationDays(deductionDayCount);
+        //释放，成型工装使用量、分配日产能、特殊材料分配量
+        cxMachineInfo.handlerBeforeConclusion(productionContext, false, allocationInfo, deductionDaySet, groupPlanInfo);
     }
 
     /**
@@ -82,7 +127,13 @@ public class GroupPlanDeductionDayHandler {
      * @param dayProductionInfoMap 日产限制集合
      * @param deductionDaySet      释放模具产能集合
      */
-    public void deductionMouldDayInfo(Context context, DeductionDayProductionTypeEnum deductionType, CxMachineBaseInfoVo cxMachineInfo, ProductionPlanGroupInfo groupPlanInfo, CxMachineAllocationPlanHelper allocationInfo, Map<Integer, GroupPlanCxLhCapacityLimitHelper> dayProductionInfoMap, Set<Integer> deductionDaySet) {
+    public void deductionMouldDayInfo(Context context,
+                                      DeductionDayProductionTypeEnum deductionType,
+                                      CxMachineBaseInfoVo cxMachineInfo,
+                                      ProductionPlanGroupInfo groupPlanInfo,
+                                      CxMachineAllocationPlanHelper allocationInfo,
+                                      Map<Integer, GroupPlanCxLhCapacityLimitHelper> dayProductionInfoMap,
+                                      Set<Integer> deductionDaySet) {
         if (!isEffectiveParam(cxMachineInfo, groupPlanInfo, allocationInfo, dayProductionInfoMap, deductionDaySet)) {
             return;
         }
@@ -105,7 +156,13 @@ public class GroupPlanDeductionDayHandler {
      * @param allMouldInfoMap    模具排产集合对象
      * @param singleDeductionDay 清除日
      */
-    public void clearProductionInfoBySkuMoldDay(TbrProductionContext productionContext, ProductionPlanGroupInfo groupPlanInfo, String materialDesc, DayCapacityLimitVo dayCapacityLimit, GroupPlanCxLhCapacityLimitHelper productionDayLimit, Map<String, ProductionMouldInfoVo> allMouldInfoMap, Integer singleDeductionDay) {
+    public void clearProductionInfoBySkuMoldDay(TbrProductionContext productionContext,
+                                                ProductionPlanGroupInfo groupPlanInfo,
+                                                String materialDesc,
+                                                DayCapacityLimitVo dayCapacityLimit,
+                                                GroupPlanCxLhCapacityLimitHelper productionDayLimit,
+                                                Map<String, ProductionMouldInfoVo> allMouldInfoMap,
+                                                Integer singleDeductionDay) {
         if (StringUtils.isBlank(materialDesc)) {
             return;
         }
@@ -125,12 +182,18 @@ public class GroupPlanDeductionDayHandler {
      * 校验参数是否有效
      * allocationInfo分配信息与成型机台、分组计划都得匹配上才有效
      *
-     * @param cxMachineInfo  成型机台
-     * @param groupPlanInfo  分组计划
-     * @param allocationInfo 分配信息
+     * @param cxMachineInfo        成型机台
+     * @param groupPlanInfo        分组计划
+     * @param allocationInfo       分配信息
+     * @param dayProductionInfoMap 日排产信息
+     * @param deductionDaySet      需要扣除的排产日信息
      * @return
      */
-    private boolean isEffectiveParam(CxMachineBaseInfoVo cxMachineInfo, ProductionPlanGroupInfo groupPlanInfo, CxMachineAllocationPlanHelper allocationInfo, Map<Integer, GroupPlanCxLhCapacityLimitHelper> dayProductionInfoMap, Set<Integer> deductionDaySet) {
+    private boolean isEffectiveParam(CxMachineBaseInfoVo cxMachineInfo,
+                                     ProductionPlanGroupInfo groupPlanInfo,
+                                     CxMachineAllocationPlanHelper allocationInfo,
+                                     Map<Integer, GroupPlanCxLhCapacityLimitHelper> dayProductionInfoMap,
+                                     Set<Integer> deductionDaySet) {
         if (null == cxMachineInfo || null == groupPlanInfo || null == allocationInfo) {
             return false;
         }
@@ -181,7 +244,12 @@ public class GroupPlanDeductionDayHandler {
      * @param allMouldInfoMap    模具排产集合对象
      * @param singleDeductionDay 清除日
      */
-    private void clearProductionInfoByDay(TbrProductionContext productionContext, ProductionPlanGroupInfo groupPlanInfo, DayCapacityLimitVo dayCapacityLimit, GroupPlanCxLhCapacityLimitHelper productionDayLimit, Map<String, ProductionMouldInfoVo> allMouldInfoMap, Integer singleDeductionDay) {
+    private void clearProductionInfoByDay(TbrProductionContext productionContext,
+                                          ProductionPlanGroupInfo groupPlanInfo,
+                                          DayCapacityLimitVo dayCapacityLimit,
+                                          GroupPlanCxLhCapacityLimitHelper productionDayLimit,
+                                          Map<String, ProductionMouldInfoVo> allMouldInfoMap,
+                                          Integer singleDeductionDay) {
         Map<String, SkuDayProductionInfoHelper> productionSkuQtyInfo = productionDayLimit.getProductionSkuQtyInfo();
         if (CollectionUtils.isEmpty(productionSkuQtyInfo)) {
             return;
@@ -202,7 +270,14 @@ public class GroupPlanDeductionDayHandler {
      * @param allMouldInfoMap      模具排产信息对象集合（指定清除的模具）
      * @param singleDeductionDay   清除日
      */
-    private void clearSkuProductionInfoByDay(TbrProductionContext productionContext, ProductionPlanGroupInfo groupPlanInfo, String materialDesc, SkuDayProductionInfoHelper skuDayProductionInfo, DayCapacityLimitVo dayCapacityLimit, GroupPlanCxLhCapacityLimitHelper productionDayLimit, Map<String, ProductionMouldInfoVo> allMouldInfoMap, Integer singleDeductionDay) {
+    private void clearSkuProductionInfoByDay(TbrProductionContext productionContext,
+                                             ProductionPlanGroupInfo groupPlanInfo,
+                                             String materialDesc,
+                                             SkuDayProductionInfoHelper skuDayProductionInfo,
+                                             DayCapacityLimitVo dayCapacityLimit,
+                                             GroupPlanCxLhCapacityLimitHelper productionDayLimit,
+                                             Map<String, ProductionMouldInfoVo> allMouldInfoMap,
+                                             Integer singleDeductionDay) {
         if (StringUtils.isBlank(materialDesc) || null == skuDayProductionInfo || !materialDesc.equals(skuDayProductionInfo.getMaterialDesc())) {
             return;
         }

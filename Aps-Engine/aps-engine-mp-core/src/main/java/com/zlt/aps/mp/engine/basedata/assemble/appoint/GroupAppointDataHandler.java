@@ -36,7 +36,7 @@ public class GroupAppointDataHandler {
     public void loadAppointInfo(Context context) {
         TbrProductionContext productionContext = (TbrProductionContext) context;
         //获取配置信息
-        List<GroupAppointProductionInfoVo> allConfigurationList = monthProductionDataService.getMonthAppointProductionInfo(productionContext.getFactoryCode(), productionContext.getYear(), productionContext.getMonth());
+        List<GroupAppointProductionInfoVo> allConfigurationList = monthProductionDataService.getMonthAppointProductionInfo(context);
         if (CollectionUtils.isEmpty(allConfigurationList)) {
             productionContext.getBaseDataContainer().setAppointConfiguration(Collections.emptyList());
             return;

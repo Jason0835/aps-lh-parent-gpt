@@ -77,7 +77,7 @@ public class OnlineGroupAppointCxMachineInfo implements Serializable {
         }
         acceptRange = Math.abs(acceptRange);
         Integer latestDay = realEarliestChangeGroupDay + acceptRange;
-        return conclusionDay < latestDay;
+        return conclusionDay >= latestDay;
     }
 
     /**
