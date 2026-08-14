@@ -90,8 +90,6 @@ public class NcStock extends BaseEntity {
      * 库存量(卷)
      */
     @ApiModelProperty(value = "库存量(卷)", position = 70)
-    @Excel(name = "ui.data.column.stock.rollStockNum", scale = 1)
-    @ImportValidated(name = "ui.data.column.stock.rollStockNum", number = true, min = 0, max = 999999)
     @TableField("ROLL_STOCK_NUM")
     private BigDecimal rollStockNum;
 
@@ -99,8 +97,6 @@ public class NcStock extends BaseEntity {
      * 修正数量(卷)
      */
     @ApiModelProperty(value = "修正数量(卷)", position = 80)
-    @Excel(name = "ui.data.column.stock.rollModifyNum")
-    @ImportValidated(name = "ui.data.column.stock.rollModifyNum", number = true, min = -999999, max = 999999)
     @TableField("ROLL_MODIFY_NUM")
     private BigDecimal rollModifyNum;
 
@@ -108,8 +104,6 @@ public class NcStock extends BaseEntity {
      * 不良数量(卷)
      */
     @ApiModelProperty(value = "不良数量(卷)", position = 90)
-    @Excel(name = "ui.data.column.stock.rollBadNum")
-    @ImportValidated(name = "ui.data.column.stock.rollBadNum", number = true, min = 0, max = 999999)
     @TableField("ROLL_BAD_NUM")
     private BigDecimal rollBadNum;
 

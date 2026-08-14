@@ -3947,6 +3947,7 @@
   "ui.data.column.dj.machineMaintenance.stopEndTime": "停机结束时间",
   "ui.data.column.dj.machineMaintenance.stopShift": "停机班次",
   "ui.data.column.nc.machineMaintenance.modelName": "内衬机台维修计划",
+  "ui.data.column.ncStock.modelName": "内衬库存信息",
   "ui.data.column.nc.machineMaintenance.factoryCode": "工厂编码",
   "ui.data.column.nc.machineMaintenance.machineCode": "机台编码",
   "ui.data.column.nc.machineMaintenance.machineName": "机台名称",
