@@ -216,6 +216,25 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
     }
 
     /**
+     * 是否为有效计划(初始判断)
+     * isProduction = 1 且 有日硫化量 有主花纹
+     *
+     * @return
+     */
+    public boolean isEffectiveByBase() {
+        if (!YesOrNoEnum.YES.getCode().equals(getIsProduction())) {
+            return false;
+        }
+        if (!isEffectiveDayVulcanizationQty()) {
+            return false;
+        }
+        if (StringUtils.isBlank(getMainPattern())) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
      * 是否一起排产
      *
      * @return
@@ -408,17 +427,17 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      * @param productionQty
      */
     public void calculateInventorySalesRatio(Integer productionQty) {
-        //月均销量没有或是为零，则表示库销比越低，最高
-        Integer averageSaleQty = getAverageSaleQty();
-        if (null == averageSaleQty || averageSaleQty <= BigDecimal.ZERO.intValue()) {
-            inventorySalesRatio = BigDecimal.valueOf(Integer.MIN_VALUE).doubleValue();
-            return;
-        }
-        if (null == productionQty || productionQty < BigDecimal.ZERO.intValue()) {
-            productionQty = BigDecimal.ZERO.intValue();
-        }
-        Integer sumStockQty = getStockQty() + productionQty;
-        inventorySalesRatio = BigDecimal.valueOf(sumStockQty).divide(BigDecimal.valueOf(averageSaleQty), 1, RoundingMode.HALF_UP).doubleValue();
+        inventorySalesRatio = calculateInventorySalesRatioByAddProductionQty(productionQty);
+    }
+
+    /**
+     * 因排产量变化，重新计算库销比
+     *
+     * @param productionQty
+     * @return
+     */
+    public double getInventorySalesRatioByAddProductionQty(Integer productionQty) {
+        return calculateInventorySalesRatioByAddProductionQty(productionQty);
     }
 
     /**
@@ -818,6 +837,25 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      */
     public boolean hasPlannedProduction() {
         return !heightProductionQty.equals(originHeightProductionQty) || !productionQty.equals(originProductionQty);
+    }
+
+    /**
+     * 重新计算库销比，根据当前排产量
+     *
+     * @param productionQty 新增的排产量
+     * @return
+     */
+    private Double calculateInventorySalesRatioByAddProductionQty(Integer productionQty) {
+        //月均销量没有或是为零，则表示库销比越低，最高
+        Integer averageSaleQty = getAverageSaleQty();
+        if (null == averageSaleQty || averageSaleQty <= BigDecimal.ZERO.intValue()) {
+            return BigDecimal.valueOf(Integer.MIN_VALUE).doubleValue();
+        }
+        if (null == productionQty || productionQty < BigDecimal.ZERO.intValue()) {
+            productionQty = BigDecimal.ZERO.intValue();
+        }
+        Integer sumStockQty = getStockQty() + productionQty;
+        return BigDecimal.valueOf(sumStockQty).divide(BigDecimal.valueOf(averageSaleQty), 1, RoundingMode.HALF_UP).doubleValue();
     }
 
     /**

@@ -19,7 +19,11 @@ public enum DeductionDayProductionTypeEnum {
     /**
      * 02 延长重排探测
      */
-    TIME_EXTENSION_REST("02", "延长重排探测");
+    TIME_EXTENSION_REST("02", "延长重排探测"),
+    /**
+     * 03 指定机台强制下机
+     */
+    APPOINT_FORCED("03", "指定机台强制下机");
 
     private String type;
 

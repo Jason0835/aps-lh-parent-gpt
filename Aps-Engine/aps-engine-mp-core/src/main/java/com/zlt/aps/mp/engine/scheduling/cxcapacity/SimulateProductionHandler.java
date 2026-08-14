@@ -17,6 +17,7 @@ import com.zlt.aps.mp.engine.enums.ContinueTypeEnum;
 import com.zlt.aps.mp.engine.enums.LogRecorderStageEnum;
 import com.zlt.aps.mp.engine.enums.ProductionStageEnum;
 import com.zlt.aps.mp.engine.handler.*;
+import com.zlt.aps.mp.engine.handler.appoint.GroupAppointBusinessHandler;
 import com.zlt.aps.mp.engine.logrecorder.KeyInformationLogRecorder;
 import com.zlt.aps.mp.engine.logrecorder.TbrProductionGroupLogRecorder;
 import com.zlt.aps.mp.engine.logrecorder.TbrSimulateProductionLogRecorder;
@@ -59,6 +60,10 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
 
     private final CxCapacityAllocationHandler cxCapacityAllocationHandler;
 
+    private final GroupAppointBusinessHandler groupAppointBusinessHandler;
+
+    private final DayProductionStatisticsHandler dayProductionStatisticsHandler;
+
     private final SpecialMaterialScheduleHandler specialMaterialScheduleHandler;
 
     private final GroupPriorityProductionScheduler groupPriorityProductionScheduler;
@@ -66,8 +71,6 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
     private final SupplementCxMachineDistributionHandler supplementCxMachineDistributionHandler;
 
     private final DifferentGroupMoldAllocationAdjustHandler differentGroupMoldAllocationAdjustHandler;
-
-    private final DayProductionStatisticsHandler dayProductionStatisticsHandler;
 
     /**
      * 模拟排产计划
@@ -92,6 +95,8 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
         TbrSimulateProductionLogRecorder.addProductionModeLog(productionContext, productionMode);
         //打印在产-日产和换膜信息
         dayProductionStatisticsHandler.printDayLimitKeyInformationLog(productionContext);
+        //20280811+ 指定业务处理
+        continueAdjustByAppoint(productionContext, allGroupPlanMap, continueAllocationList, allContinueMap);
         if (YesOrNoEnum.YES.getValue().equals(productionMode)) {
             //交付优先，在机分组之后，按分组的高优先级排序，优先级高的分组先进行排产
             deliveryPriorityProduction(productionContext, allGroupPlanMap, continueAllocationList, allContinueMap);
@@ -121,6 +126,26 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
         allContinueInfo.forEach((structureName, cxContinueInfo) -> {
             productionContinueByType(cxAddSkuProductionHandler, productionStage, context, allGroupPlanInfo, structureName, cxContinueInfo, ContinueTypeEnum.SAME_SKU);
         });
+    }
+
+    /**
+     * 在机分组调整(TBR-结构),因指定业务处理
+     *
+     * @param productionContext
+     * @param allGroupPlanMap
+     * @param continueAllocationList
+     * @param allContinueMap
+     */
+    private void continueAdjustByAppoint(TbrProductionContext productionContext, Map<String, ProductionPlanGroupInfo> allGroupPlanMap, List<CxMachineAllocationPlanHelper> continueAllocationList, Map<String, CxContinueInfoHelper> allContinueMap) {
+        productionContext.addStageLogBuilder(LogRecorderStageEnum.SIMULATE_APPOINT_ADJUST_PRODUCTION);
+        boolean isContinueAdjust = groupAppointBusinessHandler.hasContinueGroupAdjust(productionContext, continueAllocationList, allContinueMap);
+        if (!isContinueAdjust) {
+            //指定优先排产
+            groupAppointBusinessHandler.appointPriority(productionContext, allGroupPlanMap, continueAllocationList, allContinueMap);
+            return;
+        }
+        //在机分组(TBR-结构)重排
+        resetProduction(productionContext, allGroupPlanMap, continueAllocationList, allContinueMap);
     }
 
     /**
@@ -237,6 +262,9 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
         mouldProductionByContinueGroup(productionContext, allGroupPlanMap, continueAllocationList, allContinueMap);
         KeyInformationLogRecorder.recorderContinueCxMachineProductionLog(productionContext, allGroupPlanMap, allContinueMap);
         dayProductionStatisticsHandler.printDayLimitKeyInformationLog(productionContext);
+        //4、指定优先排产
+        groupAppointBusinessHandler.appointPriority(productionContext, allGroupPlanMap, continueAllocationList, allContinueMap);
+
     }
 
     /**

@@ -4,6 +4,7 @@ import com.zlt.aps.mp.engine.domain.dto.ProductGroupCxCapacityInfo;
 import com.zlt.aps.mp.engine.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.mp.engine.domain.vo.ProductionMouldInfoVo;
 import com.zlt.aps.mp.engine.handler.GroupPrioritySchedulerResultHelper;
+import com.zlt.aps.mp.engine.handler.appoint.DayReduceLhMachinePriorityInfo;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.Comparator;
@@ -119,10 +120,29 @@ public class ProductionComparatorUtils {
      *
      * @return
      */
-    public static Comparator getGroupPrioritySchedulerSort(){
+    public static Comparator getGroupPrioritySchedulerSort() {
         return Comparator.comparing(GroupPrioritySchedulerResultHelper::getSelectedPriorityValue)
                 .thenComparing(GroupPrioritySchedulerResultHelper::getSelectedPriorityDiffValue);
     }
+
+    /**
+     * 续作Sku强制下机的优先顺序
+     * 1、oem品牌优先下机
+     * 2、模具不受限的优先下机
+     * 3、非高优先级的优先下机
+     * 4、库销比大的优先下机
+     * 5、排产量小的优先下机
+     *
+     * @return
+     */
+    public static Comparator getReduceSkuPrioritySort() {
+        return Comparator.comparing(DayReduceLhMachinePriorityInfo::getIsOemBrand, Comparator.reverseOrder())
+                .thenComparing(DayReduceLhMachinePriorityInfo::getIsMoldCapacityLimit)
+                .thenComparing(DayReduceLhMachinePriorityInfo::getHasHeightPriority)
+                .thenComparing(DayReduceLhMachinePriorityInfo::getInventorySaleRatio, Comparator.reverseOrder())
+                .thenComparing(DayReduceLhMachinePriorityInfo::getProductionQty);
+    }
+
     /**
      * 前提条件：分组计划已经找出可生产的成型机台
      * 挑选可生产匹配机台，按匹配优先级优先规则

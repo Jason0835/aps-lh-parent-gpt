@@ -1,13 +1,16 @@
 package com.zlt.aps.mp.engine.domain.vo;
 
 import com.zlt.aps.constant.FactoryConstant;
+import com.zlt.aps.mp.api.domain.entity.MpFactoryAppointConfiguration;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
+import com.zlt.aps.mp.engine.utils.DateUtils;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 
 import java.io.Serializable;
+import java.util.Date;
 
 /**
  * 分组指定生产信息对象
@@ -34,6 +37,32 @@ public class GroupAppointProductionInfoVo implements Serializable {
      * 最大可分配生产天数
      */
     private Integer maxAllocationDay;
+
+    /**
+     * 根据原始配置构建需要的信息
+     *
+     * @param context
+     * @param configuration
+     * @return
+     */
+    public static GroupAppointProductionInfoVo buildByEntity(Context context, MpFactoryAppointConfiguration configuration) {
+        if (null == configuration || StringUtils.isBlank(configuration.getStructureName())) {
+            return null;
+        }
+        GroupAppointProductionInfoVo configurationInfo = new GroupAppointProductionInfoVo();
+        configurationInfo.groupName = configuration.getStructureName();
+        configurationInfo.cxMachineCode = configuration.getCxMachineCode();
+        Date onlineDate = configuration.getBeginDate();
+        Integer beginDay;
+        if (null != onlineDate) {
+            beginDay = DateUtils.getIntervalDays(context.getProductionStartDate(), onlineDate);
+        } else {
+            beginDay = configuration.getBeginDay();
+        }
+        configurationInfo.monthStartDay = beginDay;
+        configurationInfo.maxAllocationDay = configuration.getAllotDays();
+        return configurationInfo;
+    }
 
     /**
      * 是否有效配置:必须指定分组名(TBR-结构)

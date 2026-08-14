@@ -583,14 +583,14 @@ public class MesItfController {
      * @return 结果
      */
     @ApiOperation("同步胎面库存")
-    @PostMapping("/syncTreadStock")
+    @PostMapping("/syncTmStock")
     @AutoLoginLog
-    public AjaxResult syncTreadStock(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
+    public AjaxResult syncTmStock(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
         String factoryCode = syncDataLogs.getFactoryCode();
         if (StringUtils.isBlank(factoryCode)) {
             syncDataLogs.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
         }
-        return mesItfService.syncTreadStock(syncDataLogs);
+        return mesItfService.syncTmStock(syncDataLogs);
     }
 
     /**
@@ -600,16 +600,16 @@ public class MesItfController {
      * @return 同步结果
      */
     @ApiOperation("同步胎面自动滚动班次库存")
-    @PostMapping("/syncTreadShiftStock")
+    @PostMapping("/syncTmShiftStock")
     @AutoLoginLog
-    public AjaxResult syncTreadShiftStock(@RequestBody MesShiftStockSyncRequest request) {
-        return this.mesItfService.syncTreadShiftStock(request);
+    public AjaxResult syncTmShiftStock(@RequestBody MesShiftStockSyncRequest request) {
+        return this.mesItfService.syncTmShiftStock(request);
     }
 
     /**
      * 同步胎圈自动滚动班次库存。
      *
-     * <p>对齐胎面 syncTreadShiftStock，按工厂+物理日+班序从 MES 同步最新胎圈库存快照。</p>
+     * <p>对齐胎面 syncTmShiftStock，按工厂+物理日+班序从 MES 同步最新胎圈库存快照。</p>
      *
      * @param request 工厂、物理库存日和班序
      * @return 同步结果
@@ -944,9 +944,9 @@ public class MesItfController {
      * @return 同步结果
      */
     @ApiOperation("同步胎侧库存")
-    @PostMapping("/syncSidewallStock")
+    @PostMapping("/syncTcStock")
     @AutoLoginLog
-    public AjaxResult syncSidewallStock(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
+    public AjaxResult syncTcStock(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
         return this.tcMesBridgeService.syncStock(syncDataLogs);
     }
 
@@ -957,9 +957,9 @@ public class MesItfController {
      * @return 同步结果
      */
     @ApiOperation("同步胎侧自动滚动班次库存")
-    @PostMapping("/syncSidewallShiftStock")
+    @PostMapping("/syncTcShiftStock")
     @AutoLoginLog
-    public AjaxResult syncSidewallShiftStock(@RequestBody MesShiftStockSyncRequest request) {
+    public AjaxResult syncTcShiftStock(@RequestBody MesShiftStockSyncRequest request) {
         return this.tcMesBridgeService.syncShiftStock(request);
     }
 
