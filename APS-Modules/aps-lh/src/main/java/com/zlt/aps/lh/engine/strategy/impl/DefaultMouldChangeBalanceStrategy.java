@@ -228,6 +228,91 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
     }
 
     /**
+     * 无副作用预演换模/换活字块落点。
+     *
+     * <p>该方法逐分支复用正式分配的判断顺序，只读取真实早/中班计数，不调用登记、
+     * 回滚、未排原因和过程日志方法。关闭均衡开关时只保留停机与20:00禁换模约束，
+     * 与新增正式基础换模入口保持一致。</p>
+     *
+     * @param context 排程上下文
+     * @param machineCode 机台编码
+     * @param endingTime 机台具备切换条件的时间
+     * @param switchDurationHours 切换时长
+     * @param sku 当前 SKU
+     * @param actionType 切换动作类型
+     * @param businessDayEndTime 当前业务日日终
+     * @return 预演开始时间；无可用班次返回null
+     */
+    @Override
+    public Date previewMouldChange(LhScheduleContext context,
+                                   String machineCode,
+                                   Date endingTime,
+                                   int switchDurationHours,
+                                   SkuScheduleDTO sku,
+                                   String actionType,
+                                   Date businessDayEndTime) {
+        if (Objects.isNull(endingTime)) {
+            return null;
+        }
+        Date adjustedTime = endingTime;
+        for (int attempt = 0; attempt < MAX_ALLOCATION_ATTEMPTS; attempt++) {
+            Date downtimeAdjustedTime = resolveDowntimeAdjustedStartTime(
+                    context, machineCode, adjustedTime, switchDurationHours);
+            if (downtimeAdjustedTime.after(adjustedTime)) {
+                adjustedTime = downtimeAdjustedTime;
+                continue;
+            }
+            if (LhScheduleTimeUtil.isNoMouldChangeTime(context, adjustedTime)) {
+                adjustedTime = LhScheduleTimeUtil.resolveNextMorningAfterNoMouldChangeWindow(
+                        context, adjustedTime);
+                continue;
+            }
+            if (!isChangeoverBalanceEnabled(context)) {
+                return adjustedTime;
+            }
+
+            String dateKey = formatDateKey(adjustedTime);
+            int[] counts = context.getDailyMouldChangeCountMap()
+                    .getOrDefault(dateKey, new int[]{0, 0});
+            if (getTotalUsed(counts) >= getDailyLimit(context)) {
+                if (isOnOrAfterScheduleTargetDate(context, adjustedTime)) {
+                    return null;
+                }
+                adjustedTime = getNextCalendarDayMorningStart(context, adjustedTime);
+                continue;
+            }
+            if (LhScheduleTimeUtil.isMorningShift(context, adjustedTime)) {
+                if (counts[IDX_MORNING] < getMorningLimit(context)) {
+                    return adjustedTime;
+                }
+                Date afternoonCandidate = resolveAfternoonBalanceCandidate(
+                        context, machineCode, dateKey, adjustedTime, switchDurationHours,
+                        counts, getAfternoonLimit(context), businessDayEndTime);
+                if (Objects.nonNull(afternoonCandidate)) {
+                    return afternoonCandidate;
+                }
+                if (isOnOrAfterScheduleTargetDate(context, adjustedTime)) {
+                    return null;
+                }
+                adjustedTime = getNextCalendarDayMorningStart(context, adjustedTime);
+                continue;
+            }
+            if (LhScheduleTimeUtil.isAfternoonShift(context, adjustedTime)) {
+                if (counts[IDX_AFTERNOON] < getAfternoonLimit(context)) {
+                    return adjustedTime;
+                }
+                if (isOnOrAfterScheduleTargetDate(context, adjustedTime)) {
+                    return null;
+                }
+                adjustedTime = getNextCalendarDayMorningStart(context, adjustedTime);
+                continue;
+            }
+            adjustedTime = getNextCalendarDayMorningStart(context, adjustedTime);
+        }
+        return null;
+    }
+
+    /**
      * 解析早班满8后当天中班的候选落点。
      *
      * <p>中班候选必须满足：中班未达参考上限、停机/禁止换模避让后仍落在当天中班、
