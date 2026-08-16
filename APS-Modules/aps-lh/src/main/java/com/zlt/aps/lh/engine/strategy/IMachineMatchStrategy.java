@@ -173,6 +173,39 @@ public interface IMachineMatchStrategy {
     }
 
     /**
+     * 构建同时携带换模/换活字块完成时间与真实可开产时间的完整选机日志快照。
+     *
+     * <p>两个时间均由新增排产日驱动主链在逐班筛选时计算，并与正式落地复用同一份
+     * {@code NewSpecMachineAvailabilityPlan}。默认策略外仍回落到不含这两个时间的既有入口，
+     * 保证测试替身与非默认策略无需同步实现。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 当前待选机 SKU
+     * @param actualOrderedCandidates 正式选机主链本轮有序候选
+     * @param actualSelectedMachine 正式选机主链确定的本轮首选机台
+     * @param currentDayEndTime 当前业务日结束时间
+     * @param targetScheduleQtyResolver 产能计算组件
+     * @param priorityMetricSnapshotMap 正式模具分配前冻结的软排序指标
+     * @param traceChangeoverEndTimeMap 机台编码到换模或换活字块完成时间的映射
+     * @param realAvailableProductionTimeMap 机台编码到真实可开产时间的映射
+     * @return 当前选机时点的只读日志快照
+     */
+    default MachinePriorityTraceSnapshot buildMachinePriorityTraceSnapshot(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            List<MachineScheduleDTO> actualOrderedCandidates,
+            MachineScheduleDTO actualSelectedMachine,
+            Date currentDayEndTime,
+            TargetScheduleQtyResolver targetScheduleQtyResolver,
+            Map<String, MachinePriorityMetricSnapshot> priorityMetricSnapshotMap,
+            Map<String, Date> traceChangeoverEndTimeMap,
+            Map<String, Date> realAvailableProductionTimeMap) {
+        return this.buildMachinePriorityTraceSnapshot(
+                context, sku, actualOrderedCandidates, actualSelectedMachine,
+                currentDayEndTime, targetScheduleQtyResolver, priorityMetricSnapshotMap);
+    }
+
+    /**
      * 在正式模具分配前冻结候选机台软排序指标。
      *
      * <p>默认策略外不具备完整排序指标，返回空映射即可；该方法不得修改模具、机台或产能运行态。</p>

@@ -182,6 +182,10 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
     private static final int NEW_SPEC_CHANGEOVER_PROBE_LIMIT = 16;
     /** 日驱动新增排产固定覆盖 T、T+1、T+2 三个业务日。 */
     private static final int DAY_DRIVEN_SCHEDULE_DAY_COUNT = 3;
+    /** 新增排产按日顺序日志合并后唯一标题。 */
+    private static final String NEW_SPEC_ORDER_MERGED_LOG_TITLE = "新增排产明细";
+    /** 新增排产按日顺序日志分节分隔符，相邻业务日之间保留一个空行。 */
+    private static final String NEW_SPEC_ORDER_LOG_SECTION_SEPARATOR = "\n\n";
     /** T 日允许写入的班次索引。 */
     private static final List<Integer> DAY_DRIVEN_FIRST_DAY_SHIFT_INDEXES =
             Collections.unmodifiableList(Arrays.asList(1, 2));
@@ -389,6 +393,11 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         int dayIndex = 0;
         int totalDayCount = dayShiftMap.size();
         /*
+         * 三天窗口只输出一条“新增排产明细”，此处先按业务日先后暂存每日标题与明细，
+         * 待窗口全部编排结束后统一合并写入过程日志，避免继续产生 T/T+1/T+2 三条日志。
+         */
+        List<String> newSpecOrderLogSections = new ArrayList<String>(totalDayCount);
+        /*
          * S4.3 已按当前月 TOTAL_QTY 建立提前生产候选视图。这里必须保留候选态，
          * 使 futurePlanDate 尚未进入阈值的 SKU 能随业务日推进后再尝试激活。
          */
@@ -415,10 +424,13 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
              */
             scheduledCount += scheduleCurrentBusinessDay(
                     context, dayContext, state, machineMatch, mouldChangeBalance,
-                    inspectionBalance, capacityCalculate, shifts, unscheduledReasonCountMap);
+                    inspectionBalance, capacityCalculate, shifts, unscheduledReasonCountMap,
+                    newSpecOrderLogSections);
             finalizeDayDrivenScheduleDay(context, dayContext, state, shifts);
         }
 
+        // 三天新增排产顺序分节合并为一条过程日志，只调整日志输出，不影响新增排产逻辑。
+        this.appendMergedNewSpecOrderProcessLog(context, newSpecOrderLogSections);
         // 三个业务日全部完成后，才把仍未完成的临时延期任务转成窗口级最终未排。
         finalizeWindowUnscheduled(
                 context, state, unscheduledReasonCountMap, machineMatch);
@@ -532,6 +544,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
      * @param capacityCalculate 产能计算策略
      * @param allShifts 完整排程窗口班次
      * @param unscheduledReasonCountMap 最终未排原因计数
+     * @param newSpecOrderLogSections 三天窗口新增排产顺序日志分节暂存列表
      * @return 当前业务日新形成有效上机结果的数量
      */
     private int scheduleCurrentBusinessDay(LhScheduleContext context,
@@ -542,7 +555,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                                            IFirstInspectionBalanceStrategy inspectionBalance,
                                            ICapacityCalculateStrategy capacityCalculate,
                                            List<LhShiftConfigVO> allShifts,
-                                           Map<String, Integer> unscheduledReasonCountMap) {
+                                           Map<String, Integer> unscheduledReasonCountMap,
+                                           List<String> newSpecOrderLogSections) {
         int scheduledCount = 0;
 
         // 阶段一：前一业务日已上机 SKU 必须先使用原机台连续生产，不重新选机、换模或首检。
@@ -569,31 +583,56 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 machineMatch, mouldChangeBalance, inspectionBalance, capacityCalculate,
                 unscheduledReasonCountMap);
         /*
-         * 当天正常和提前生产阶段全部执行完成后，使用同一个采集器生成唯一过程日志。
-         * 明细顺序来自各阶段真实主循环的追加顺序；在机延续阶段未调用采集器，因此不会进入日志。
+         * 当天正常和提前生产阶段全部执行完成后，使用同一个采集器生成当前日日志分节并暂存，
+         * 供三天窗口结束后统一合并。明细顺序来自各阶段真实主循环的追加顺序；
+         * 在机延续阶段未调用采集器，因此不会进入日志。
          */
-        this.appendDailyNewSpecOrderProcessLog(context, dayContext);
+        this.appendDailyNewSpecOrderLogSection(dayContext, newSpecOrderLogSections);
         return scheduledCount;
     }
 
     /**
-     * 将当前业务日新增排产实际顺序写入现有硫化排程过程日志。
+     * 构建当前业务日新增排产顺序日志分节并暂存，供三天窗口结束后统一合并输出。
      *
-     * <p>该日志不受选机优先级跟踪开关控制，每个实际业务日固定写入一条；当天无可排 SKU 时，
-     * 采集器输出固定空日说明。过程日志仍由现有 {@code scheduleLogList} 在排程完成后统一批量落库，
-     * 本方法不新增数据库访问，也不改变排程事务边界。</p>
+     * <p>该分节不受选机优先级跟踪开关控制，每个实际业务日固定生成一节；当天无可排 SKU 时，
+     * 采集器输出固定空日说明。分节由调用方在三天窗口结束后合并成一条过程日志，
+     * 本方法不直接写库、不新增数据库访问，也不改变排程事务边界。</p>
      *
-     * @param context 排程上下文
      * @param dayContext 当前业务日编排上下文
+     * @param newSpecOrderLogSections 按业务日先后追加的分节暂存列表
      */
-    private void appendDailyNewSpecOrderProcessLog(LhScheduleContext context,
-                                                   DayScheduleContext dayContext) {
+    private void appendDailyNewSpecOrderLogSection(
+            DayScheduleContext dayContext,
+            List<String> newSpecOrderLogSections) {
         DailyNewSpecOrderLogCollector collector = dayContext.getNewSpecOrderLogCollector();
         String title = collector.buildTitle();
         String detail = collector.buildDetail();
-        PriorityTraceLogHelper.appendProcessLog(context, title, detail);
-        // 日志实体已持有完整字符串，立即释放轻量明细集合，避免跨后续业务日继续占用内存。
+        if (newSpecOrderLogSections != null) {
+            newSpecOrderLogSections.add(title + "\n" + detail);
+        }
+        // 分节已持有完整字符串，立即释放轻量明细集合，避免跨后续业务日继续占用内存。
         collector.clear();
+    }
+
+    /**
+     * 将三天窗口收集的新增排产顺序分节合并成单条过程日志。
+     *
+     * <p>合并后标题固定为“新增排产明细”，明细依次保留 T、T+1、T+2 各日标题及原明细，
+     * 相邻业务日之间用一个空行分隔。该改动只调整日志呈现，
+     * 不读取或修改新增排产业务数据。</p>
+     *
+     * @param context 排程上下文
+     * @param newSpecOrderLogSections 按业务日先后排列的日志分节
+     */
+    private void appendMergedNewSpecOrderProcessLog(LhScheduleContext context,
+                                                    List<String> newSpecOrderLogSections) {
+        if (CollectionUtils.isEmpty(newSpecOrderLogSections)) {
+            return;
+        }
+        String mergedDetail = String.join(
+                NEW_SPEC_ORDER_LOG_SECTION_SEPARATOR, newSpecOrderLogSections);
+        PriorityTraceLogHelper.appendProcessLog(
+                context, NEW_SPEC_ORDER_MERGED_LOG_TITLE, mergedDetail);
     }
 
     /**
@@ -655,6 +694,27 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 EarlyProductionDecision.SCENE_STRUCTURE_SWITCH, decision.getSceneType())
                 || StringUtils.equals(
                 EarlyProductionDecision.SCENE_STRUCTURE_ENDING, decision.getSceneType());
+    }
+
+    /**
+     * 解析 SKU 选机日志展示的“类型线上”取值。
+     *
+     * <p>结构提前优先于来源类型：命中结构切换/结构收尾提前生产时显示“结构提前新增”；
+     * 续作加机台候选显示“续作新增”；其余普通完全新增候选显示“完全新增”。
+     * 与“新增排产明细”复用同一套来源类型和结构提前判定，仅服务日志展示。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 当前选机 SKU
+     * @return SKU 类型展示值：完全新增 / 续作新增 / 结构提前新增
+     */
+    private String resolveTraceSkuType(LhScheduleContext context, SkuScheduleDTO sku) {
+        if (this.isStructureEarlyProduction(context, sku)) {
+            return "结构提前新增";
+        }
+        if (SkuScheduleSourceTypeEnum.isContinuationAddMachine(sku.getSourceType())) {
+            return "续作新增";
+        }
+        return "完全新增";
     }
 
     /**
@@ -751,58 +811,47 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
      * 也不改变候选顺序。必须同时满足：</p>
      * <ul>
      *   <li>机台合法切换就绪时间早于当前业务日开始，且不早于完整排程窗口开始；</li>
-     *   <li>本次切换耗时大于0，并可在当前 SKU 统一生产门禁前完成；</li>
-     *   <li>生产门禁落在当前业务日内，防止跨越本次排程窗口或把未来日资源提前锁定。</li>
+     *   <li>本次切换耗时大于0，并可在当前生产业务日日终前完成。</li>
      * </ul>
      *
-     * <p>这里只做常数次 Date 比较，候选机台仍逐台按现有分配链校验停机、晚班禁换模、
-     * 换模配额和首检资源，不建立跨机台时间矩阵。</p>
+     * <p>生产门禁不再参与回看判定：正规、小批量 SKU 已无 SKU 类型门禁，胎胚可供时间仅作为
+     * 正式开产下限，不得反过来禁止提前换模。这里只做常数次 Date 比较，候选机台仍逐台按现有
+     * 分配链校验停机、晚班禁换模、换模配额和首检资源，不建立跨机台时间矩阵。</p>
      *
      * @param context 排程上下文
      * @param dayContext 当前业务日上下文
      * @param switchReadyTime 经过机台就绪、定点和开产模式收口后的合法切换时间
      * @param switchDurationHours 本次换模或换活字块耗时
-     * @param productionNotBeforeTime SKU 正式生产门禁
      * @return true-允许查看窗口内更早班次安排准备；false-仅使用当前业务日班次
      */
     private boolean isProductionPreparationLookbackAllowed(
             LhScheduleContext context,
             DayScheduleContext dayContext,
             Date switchReadyTime,
-            int switchDurationHours,
-            Date productionNotBeforeTime) {
+            int switchDurationHours) {
         if (Objects.isNull(context) || Objects.isNull(dayContext)
                 || Objects.isNull(switchReadyTime)
-                || Objects.isNull(productionNotBeforeTime)
                 || switchDurationHours <= 0
                 || Objects.isNull(dayContext.getDayStartTime())
                 || Objects.isNull(dayContext.getDayEndTime())
-                || !switchReadyTime.before(dayContext.getDayStartTime())
-                || productionNotBeforeTime.before(dayContext.getDayStartTime())
-                || !productionNotBeforeTime.before(dayContext.getDayEndTime())) {
-            return false;
-        }
-        Date windowStartTime = this.resolveScheduleWindowStartTime(
-                context, context.getScheduleWindowShifts());
-        if (Objects.isNull(windowStartTime) || switchReadyTime.before(windowStartTime)) {
+                || !switchReadyTime.before(dayContext.getDayStartTime())) {
             return false;
         }
         Date theoreticalSwitchCompleteTime = LhScheduleTimeUtil.addHours(
                 switchReadyTime, switchDurationHours);
-        return Objects.nonNull(theoreticalSwitchCompleteTime)
-                && !theoreticalSwitchCompleteTime.after(productionNotBeforeTime);
+        return this.isProductionPreparationLookbackWithinDay(
+                context, dayContext, switchReadyTime, theoreticalSwitchCompleteTime);
     }
 
     /**
-     * 校验分配后的真实时间轴是否属于“当前业务日前准备、生产门禁后开产”。
+     * 校验分配后的真实时间轴是否属于“当前业务日前准备、当前业务日内完成”。
      *
      * <p>预判放行后，换模分配器仍可能因晚班禁换模、停机或配额把开始时间顺延；因此日窗口
      * 守卫必须使用实际开始/完成时间再次确认。准备可以落在窗口内任意更早业务日，不限定只回看
-     * 前一天；但完成时间不得晚于生产门禁，且开始时间不能越过完整排程窗口起点。</p>
+     * 前一天；完成时间必须早于当前业务日日终，且开始时间不能越过完整排程窗口起点。</p>
      *
      * @param context 排程上下文
      * @param dayContext 当前业务日上下文
-     * @param productionNotBeforeTime SKU 正式生产门禁
      * @param mouldChangeStartTime 实际准备开始时间
      * @param mouldChangeCompleteTime 实际准备完成时间
      * @return true-真实时间轴允许跨日提交；false-仍执行普通当前日窗口守卫
@@ -810,23 +859,52 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
     private boolean isProductionPreparationLookbackTimeline(
             LhScheduleContext context,
             DayScheduleContext dayContext,
-            Date productionNotBeforeTime,
             Date mouldChangeStartTime,
             Date mouldChangeCompleteTime) {
         if (Objects.isNull(context) || Objects.isNull(dayContext)
-                || Objects.isNull(productionNotBeforeTime)
                 || Objects.isNull(mouldChangeStartTime)
                 || Objects.isNull(mouldChangeCompleteTime)
-                || !mouldChangeStartTime.before(mouldChangeCompleteTime)
-                || !mouldChangeStartTime.before(dayContext.getDayStartTime())
-                || mouldChangeCompleteTime.after(productionNotBeforeTime)
-                || dayContext.reachesOrPassesDayEnd(mouldChangeCompleteTime)) {
+                || Objects.isNull(dayContext.getDayStartTime())
+                || Objects.isNull(dayContext.getDayEndTime())) {
+            return false;
+        }
+        return this.isProductionPreparationLookbackWithinDay(
+                context, dayContext, mouldChangeStartTime, mouldChangeCompleteTime);
+    }
+
+    /**
+     * 校验跨日生产准备的统一时间边界。
+     *
+     * <p>换模或换活字块只要在完整排程窗口内合法开始，并在目标生产业务日日终前完成，
+     * 就允许占用生产日前的空闲时间。SKU 生产门禁不再作为准备完成上限，避免机台在中班收尾后
+     * 本可连续换模，却被整体顺延到目标业务日早班；胎胚可供时间与 X/T 中班下限仍由后续
+     * 正式开产时间计算负责。</p>
+     *
+     * @param context 排程上下文
+     * @param dayContext 当前生产业务日上下文
+     * @param preparationStartTime 实际或理论准备开始时间
+     * @param preparationCompleteTime 实际或理论准备完成时间
+     * @return true-准备时间轴落在允许的跨日边界内；false-不得跨日提交
+     */
+    private boolean isProductionPreparationLookbackWithinDay(
+            LhScheduleContext context,
+            DayScheduleContext dayContext,
+            Date preparationStartTime,
+            Date preparationCompleteTime) {
+        if (Objects.isNull(context) || Objects.isNull(dayContext)
+                || Objects.isNull(preparationStartTime)
+                || Objects.isNull(preparationCompleteTime)
+                || Objects.isNull(dayContext.getDayStartTime())
+                || Objects.isNull(dayContext.getDayEndTime())
+                || !preparationStartTime.before(preparationCompleteTime)
+                || !preparationStartTime.before(dayContext.getDayStartTime())
+                || dayContext.reachesOrPassesDayEnd(preparationCompleteTime)) {
             return false;
         }
         Date windowStartTime = this.resolveScheduleWindowStartTime(
                 context, context.getScheduleWindowShifts());
         return Objects.nonNull(windowStartTime)
-                && !mouldChangeStartTime.before(windowStartTime);
+                && !preparationStartTime.before(windowStartTime);
     }
 
     /**
@@ -879,7 +957,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
     }
 
     /**
-     * 记录普通生产门禁前跨日准备最终落地时间轴。
+     * 记录普通生产日前跨日准备最终落地时间轴。
      *
      * <p>只有候选已形成有效排产结果后才调用，失败试排不会写入过程日志。日志同时记录机台
      * 空闲、准备开始/完成、统一生产门禁、实际开产和首检班次，可直接核对“提前换模但不提前
@@ -927,9 +1005,9 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 .append(Objects.isNull(firstInspectionAttributionShift)
                         ? null : firstInspectionAttributionShift.getShiftIndex())
                 .toString();
-        log.info("新增SKU生产门禁前跨日准备已落地, {}", detail);
+        log.info("新增SKU生产日前跨日准备已落地, {}", detail);
         PriorityTraceLogHelper.appendProcessLog(
-                context, "新增SKU生产门禁前跨日准备", detail);
+                context, "新增SKU生产日前跨日准备", detail);
     }
 
     /**
@@ -2629,9 +2707,9 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                     NewSpecEmbryoAvailableTimeResolver.resolveEarliestAvailableTime(context, sku);
             boolean embryoAvailableTimeConstrained = Objects.nonNull(earliestEmbryoAvailableTime);
             /*
-             * 统一生产门禁供候选分组、跨日准备、首检归属和最终产能裁剪共同使用。
-             * 正规 SKU 保持当前日驱动业务日首班；试制/量试锁定首次正日计划中班；
-             * 命中胎胚可供配置时再取较晚值。门禁只限制生产，不禁止窗口内提前换模。
+             * 统一生产下限供候选分组、跨日准备、首检归属和最终产能裁剪共同使用。
+             * 正规/小批量仅保留胎胚可供时间；试制/量试锁定首次正日计划中班；
+             * 命中胎胚可供配置时再取较晚值。下限只限制生产，不禁止窗口内提前换模。
              */
             Date productionNotBeforeTime = NewSpecEmbryoAvailableTimeResolver
                     .resolveProductionNotBeforeTime(
@@ -2696,9 +2774,10 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 continue;
             }
             /*
-             * 统一生产门禁只限制实际资源分配，不能绕过既有减量清单、收尾和前置未排规则。
-             * 因此前置硬规则完成后、选机和换模资源预占前再决定是否延期：T/T+1 仅登记
-             * 下一业务日延期，窗口最后一日仍未到达时写入统一终局未排原因。
+             * 统一生产下限（试制/量试中班门禁与胎胚可供时间）只限制实际资源分配，
+             * 不能绕过既有减量清单、收尾和前置未排规则。因此前置硬规则完成后、
+             * 选机和换模资源预占前再决定是否延期：T/T+1 仅登记下一业务日延期，
+             * 窗口最后一日仍未到达时写入统一终局未排原因。
              */
             if (NewSpecEmbryoAvailableTimeResolver.reachesOrPassesDayEnd(
                     productionNotBeforeTime, dayContext.getDayEndTime())) {
@@ -2819,7 +2898,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                         machineMatch.buildMachinePriorityTraceSnapshot(
                                 context, sku, Collections.<MachineScheduleDTO>emptyList(),
                                 null, dayContext.getDayEndTime(),
-                                getTargetScheduleQtyResolver());
+                                getTargetScheduleQtyResolver())
+                                .withTraceSkuType(this.resolveTraceSkuType(context, sku));
                 String noCandidateReason = resolveNoCandidateMachineReason(context, sku);
                 /*
                  * 当前日、当前阶段无正式候选并不等于三天窗口最终未排。只把实时快照保存在日驱动状态，
@@ -3293,14 +3373,14 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 switchReadyTime = ShiftProductionControlUtil.resolveEarliestSwitchStartTime(
                         context, switchReadyTime, sku);
                 /*
-                 * 生产门禁前准备回看是通用能力，不再只服务结构提前生产。选中机台如果在当前
-                 * 生产日之前已经空闲，且按本次真实切换耗时能在统一生产门禁前完成准备，就允许
-                 * 在完整八班窗口中寻找换模时点；生产仍由 productionNotBeforeTime 严格限时。
+                 * 生产日前准备回看是通用能力，不再只服务结构提前生产。选中机台如果在当前
+                 * 生产日之前已经空闲，且按本次真实切换耗时能在当前业务日日终前完成准备，就允许
+                 * 在完整八班窗口中寻找换模时点；正式开产仍按换模/首检完成时间与胎胚可供时间取较晚值。
                  */
                 boolean productionPreparationLookbackAllowed = structureSwitchLookbackAllowed
                         || this.isProductionPreparationLookbackAllowed(
                                 context, dayContext, switchReadyTime,
-                                switchDurationHours, productionNotBeforeTime);
+                                switchDurationHours);
                 List<LhShiftConfigVO> switchAlignmentShifts = productionPreparationLookbackAllowed
                         ? context.getScheduleWindowShifts() : shifts;
                 switchReadyTime = alignNewSpecSwitchReadyTimeToWindowStart(
@@ -3335,7 +3415,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 NewSpecFailReasonEnum switchAllocateFailReason = null;
                 // 续作增机补偿的首台与后续机台统一按 dayN 首次增机日对齐换模。
                 if (productionPreparationLookbackAllowed) {
-                    log.info("新增SKU保留已选机台真实空闲时间用于生产门禁前跨日准备, "
+                    log.info("新增SKU保留已选机台真实空闲时间用于生产日前跨日准备, "
                                     + "batchNo: {}, scheduleDate: {}, materialCode: {}, machineCode: {}, "
                                     + "machineReadyTime: {}, switchReadyTime: {}, switchDurationHours: {}, "
                                     + "productionNotBeforeTime: {}, structureLookback: {}, futurePlanDate: {}",
@@ -3420,13 +3500,13 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                                     mouldChangeStartTime, mouldChangeCompleteTime);
                     productionPreparationLookbackApplied = structureSwitchLookbackApplied
                             || this.isProductionPreparationLookbackTimeline(
-                                    context, dayContext, productionNotBeforeTime,
+                                    context, dayContext,
                                     mouldChangeStartTime, mouldChangeCompleteTime);
                     /*
                      * 换模均衡器可以顺延到下一业务日。按天编排下，当前阶段只能提交 dayShifts 内的资源；
                      * 普通场景若换模开始或完成越过日窗口，必须回滚本次换模次数和模具预占。
-                     * 生产门禁前回看场景只放宽换模起点可落在当前业务日前；完成时间必须不晚于
-                     * 生产门禁且仍在当前业务日日终之前，其余日窗口约束保持不变。
+                     * 生产日前回看场景只放宽换模起点可落在当前业务日前；完成时间必须仍
+                     * 在当前业务日日终之前，其余日窗口约束保持不变。
                      */
                     if ((!dayContext.contains(mouldChangeStartTime)
                             || dayContext.reachesOrPassesDayEnd(mouldChangeCompleteTime))
@@ -4392,6 +4472,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                         context, sku, machineMatch,
                         pendingTraceCandidates, pendingTraceSelectedMachine, pendingTraceDayEndTime,
                         pendingPriorityMetricSnapshotMap,
+                        candidateAvailabilityPlanMap,
                         orderedCandidates, candidateMachine, dayContext.getDayEndTime());
                 lastConfirmedTraceSnapshot = pendingCandidateTraceSnapshot;
                 pendingTraceCandidates = null;
@@ -4419,7 +4500,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                             earliestEmbryoAvailableTime, firstProductionStartTime,
                             firstInspectionAttributionShift);
                 } else if (productionPreparationLookbackApplied) {
-                    // 普通正规、试制和量试统一记录生产门禁前跨日准备，便于核对空闲产能是否被利用。
+                    // 普通正规、试制和量试统一记录生产日前跨日准备，便于核对空闲产能是否被利用。
                     this.appendProductionPreparationLookbackProcessLog(
                             context, dayContext, sku, candidateMachine,
                             machineReadyTime, mouldChangeStartTime, mouldChangeCompleteTime,
@@ -4696,12 +4777,24 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                  * 不立即写完整优先级日志。后续业务日成功会清理该快照；三天窗口最终仍未命中时
                  * 只输出一次汇总。此时本 SKU 之后的机台状态尚未落库，占用/收尾时间与试排时点一致。
                  */
-                state.rememberPendingMachinePriorityTrace(
-                        sku, buildUnscheduledTraceSnapshot(
+                MachinePriorityTraceSnapshot unscheduledTraceSnapshot =
+                        buildUnscheduledTraceSnapshot(
                                 context, sku, machineMatch,
                                 pendingTraceCandidates, pendingTraceSelectedMachine,
                                 pendingTraceDayEndTime, pendingPriorityMetricSnapshotMap,
-                                dayContext.getDayEndTime()));
+                                candidateAvailabilityPlanMap,
+                                dayContext.getDayEndTime());
+                /*
+                 * 当前业务日没有形成真实候选选择时，不得用“仅日志展示”的空快照覆盖前序业务日
+                 * 已经暂存的最后一次真实选机快照；只有从未登记过真实快照时才允许登记空诊断快照，
+                 * 保证三天窗口收口日志输出的是 SKU 最后一次真实选机时的候选机台列表。
+                 */
+                boolean hasRealCandidateSelection = Objects.nonNull(pendingTraceCandidates)
+                        || Objects.nonNull(pendingTraceSelectedMachine);
+                if (hasRealCandidateSelection
+                        || Objects.isNull(state.getPendingMachinePriorityTrace(sku))) {
+                    state.rememberPendingMachinePriorityTrace(sku, unscheduledTraceSnapshot);
+                }
                 // 当前阶段所有候选机台都失败，只登记延期；T+2 仍需保留给同日后续阶段。
                 log.warn("新增SKU排产失败, materialCode: {}, 结构: {}, 规格: {}, 目标量: {}, 候选机台数: {}, 排除机台: {}, 原因: {}",
                         sku.getMaterialCode(), sku.getStructureName(), sku.getSpecCode(),
@@ -6156,8 +6249,9 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
      * 无副作用计算单台候选机台的真实可开产计划。
      *
      * <p>计算顺序与正式主链一致：机台占用收尾→精度/维修就绪→换模起点门禁→
-     * 20:00与停机窗口→换模/换活字块耗时→首检时间分摊→维修预热→胎胚门禁→
-     * 班次管控及设备计划产能。任一环节失败即返回不可用计划，不消费真实资源。</p>
+     * 20:00与停机窗口→换模/换活字块耗时→首检时间分摊→维修预热→试制量试中班及
+     * 胎胚时间下限→完整八班窗口内的班次管控及设备计划产能。任一环节失败即返回
+     * 不可用计划，不消费真实资源。</p>
      */
     private NewSpecMachineAvailabilityPlan resolveMachineAvailabilityPlan(
             LhScheduleContext context,
@@ -6190,8 +6284,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         switchReadyTime = ShiftProductionControlUtil.resolveEarliestSwitchStartTime(
                 context, switchReadyTime, sku);
         boolean preparationLookbackAllowed = this.isProductionPreparationLookbackAllowed(
-                context, dayContext, switchReadyTime, switchDurationHours,
-                productionNotBeforeTime);
+                context, dayContext, switchReadyTime, switchDurationHours);
         List<LhShiftConfigVO> switchShifts = preparationLookbackAllowed
                 ? context.getScheduleWindowShifts() : dayContext.getDayShifts();
         switchReadyTime = alignNewSpecSwitchReadyTimeToWindowStart(
@@ -6207,6 +6300,15 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             return this.unavailablePlan(machine, "无法确定机台切换就绪时间",
                     occupationEndTime, machineReadyTime, productionNotBeforeTime);
         }
+        /*
+         * 选机日志展示用的换模/换活字块完成时间：从同一换模就绪时间出发，只避让停机与
+         * 20:00-06:00 禁换模约束，不参与每日换模均衡配额，避免空闲机台的可开产时间
+         * 因配额打满被顺延到后续班次。正式换模仍沿用下方 previewMouldChange 的配额分配。
+         */
+        Date traceChangeoverStartTime = this.allocateBasicMouldChangeStartTime(
+                context, machine.getMachineCode(), switchReadyTime, switchDurationHours);
+        Date traceChangeoverEndTime = Objects.isNull(traceChangeoverStartTime)
+                ? null : LhScheduleTimeUtil.addHours(traceChangeoverStartTime, switchDurationHours);
 
         String inspectionScheduleType = typeBlockRelation
                 ? ScheduleTypeEnum.TYPE_BLOCK.getCode() : ScheduleTypeEnum.NEW_SPEC.getCode();
@@ -6270,7 +6372,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 return new NewSpecMachineAvailabilityPlan(
                         machine, false, inspectionPlan.getInvalidReason(), occupationEndTime,
                         machineReadyTime, changeoverStartTime, changeoverEndTime,
-                        productionNotBeforeTime, null, null, inspectionPlan);
+                        productionNotBeforeTime, null, null, inspectionPlan, traceChangeoverEndTime);
             }
             LhShiftConfigVO quantityShift = inspectionPlan.getCountingShift();
             Date quantityAttributionTime = inspectionPlan.getInspectionQty() > 0
@@ -6310,7 +6412,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             return new NewSpecMachineAvailabilityPlan(
                     machine, false, "首检资源在当前业务日无可承接班次", occupationEndTime,
                     machineReadyTime, changeoverStartTime, changeoverEndTime,
-                    productionNotBeforeTime, null, null, inspectionPlan);
+                    productionNotBeforeTime, null, null, inspectionPlan, traceChangeoverEndTime);
         }
 
         Date preparationReadyTime = changeoverEndTime;
@@ -6329,33 +6431,34 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 preparationReadyTime, ScheduleTypeEnum.NEW_SPEC.getCode());
         productionStartTime = NewSpecEmbryoAvailableTimeResolver.resolveActualProductionStartTime(
                 productionStartTime, productionNotBeforeTime);
+        /*
+         * 正规、小批量已无 SKU 生产门禁，试制/量试仍保留首次正计划日中班下限，
+         * 胎胚可供时间继续取较晚值。真实开产时间必须在完整八班窗口内解析，
+         * 不能再用当前业务日班次截断，否则 14:00/20:00 会被抬到 T+2 首班 22:00；
+         * 候选是否落在当前业务日由下方 dayContext.contains 统一判定。
+         */
         productionStartTime = this.resolveFirstActualProductionTime(
                 context, machine, sku, changeoverStartTime, changeoverEndTime,
                 productionStartTime,
-                dayContext.getDayShifts(), runtimeShiftCapacity);
+                context.getScheduleWindowShifts(), runtimeShiftCapacity);
         if (Objects.isNull(productionStartTime)) {
             return new NewSpecMachineAvailabilityPlan(
                     machine, false, "班次管控后无可开产时间", occupationEndTime,
                     machineReadyTime, changeoverStartTime, changeoverEndTime,
-                    productionNotBeforeTime, null, null, inspectionPlan);
+                    productionNotBeforeTime, null, null, inspectionPlan, traceChangeoverEndTime);
         }
-        EarlyProductionDecision earlyProductionDecision = resolveEarlyProductionDecision(
-                context, sku, productionStartTime, dayContext.getDayShifts(), isEnding,
-                dayContext.getCurrentPhase());
-        productionStartTime = alignProductionStartTimeByAddMachineDate(
-                context, sku, productionStartTime, dayContext.getDayShifts(), totalScheduledQty,
-                addMachineProductionDate, isEnding, earlyProductionDecision);
         productionStartTime = NewSpecEmbryoAvailableTimeResolver.resolveActualProductionStartTime(
                 productionStartTime, productionNotBeforeTime);
         productionStartTime = this.resolveFirstActualProductionTime(
                 context, machine, sku, changeoverStartTime, changeoverEndTime,
                 productionStartTime,
-                dayContext.getDayShifts(), runtimeShiftCapacity);
+                context.getScheduleWindowShifts(), runtimeShiftCapacity);
         if (Objects.isNull(productionStartTime) || !dayContext.contains(productionStartTime)) {
             return new NewSpecMachineAvailabilityPlan(
                     machine, false, "当前业务日无可开产时间", occupationEndTime,
                     machineReadyTime, changeoverStartTime, changeoverEndTime,
-                    productionNotBeforeTime, productionStartTime, null, inspectionPlan);
+                    productionNotBeforeTime, productionStartTime, null, inspectionPlan,
+                    traceChangeoverEndTime);
         }
 
         boolean productionStartConstrained = Objects.nonNull(productionNotBeforeTime)
@@ -6392,7 +6495,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         return new NewSpecMachineAvailabilityPlan(
                 machine, available, available ? null : "设备计划扣减后无正产能班次",
                 occupationEndTime, machineReadyTime, changeoverStartTime, changeoverEndTime,
-                productionNotBeforeTime, availableProductionTime, targetShift, inspectionPlan);
+                productionNotBeforeTime, availableProductionTime, targetShift, inspectionPlan,
+                traceChangeoverEndTime);
     }
 
     /**
@@ -6544,7 +6648,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             Date productionNotBeforeTime) {
         return new NewSpecMachineAvailabilityPlan(
                 machine, false, reason, occupationEndTime, machineReadyTime,
-                null, null, productionNotBeforeTime, null, null, null);
+                null, null, productionNotBeforeTime, null, null, null, null);
     }
 
     /**
@@ -6795,6 +6899,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
      * @param pendingTraceSelectedMachine 暂存的首选机台，可能为 null
      * @param pendingTraceDayEndTime 暂存的当日结束时间，可能为 null
      * @param pendingPriorityMetricSnapshotMap 正式模具分配前冻结的软排序指标
+     * @param candidateAvailabilityPlanMap 当前选机回合的真实可开产计划缓存
      * @param currentOrderedCandidates 当前轮正式有序候选（暂存为空时的回退输入）
      * @param currentCandidateMachine 当前轮首选机台（回退输入）
      * @param currentDayEndTime 当前业务日结束时间（回退输入）
@@ -6808,6 +6913,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             MachineScheduleDTO pendingTraceSelectedMachine,
             Date pendingTraceDayEndTime,
             Map<String, MachinePriorityMetricSnapshot> pendingPriorityMetricSnapshotMap,
+            Map<String, NewSpecMachineAvailabilityPlan> candidateAvailabilityPlanMap,
             List<MachineScheduleDTO> currentOrderedCandidates,
             MachineScheduleDTO currentCandidateMachine,
             Date currentDayEndTime) {
@@ -6820,10 +6926,18 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             traceSelectedMachine = currentCandidateMachine;
             traceDayEndTime = currentDayEndTime;
         }
+        Map<String, Date> traceChangeoverEndTimeMap =
+                this.resolveTraceChangeoverEndTimeMap(
+                        traceCandidates, candidateAvailabilityPlanMap);
+        Map<String, Date> realAvailableProductionTimeMap =
+                this.resolveRealAvailableProductionTimeMap(
+                        traceCandidates, candidateAvailabilityPlanMap);
         return machineMatch.buildMachinePriorityTraceSnapshot(
                 context, sku, traceCandidates, traceSelectedMachine,
                 traceDayEndTime, getTargetScheduleQtyResolver(),
-                pendingPriorityMetricSnapshotMap);
+                pendingPriorityMetricSnapshotMap,
+                traceChangeoverEndTimeMap, realAvailableProductionTimeMap)
+                .withTraceSkuType(this.resolveTraceSkuType(context, sku));
     }
 
     /**
@@ -6839,6 +6953,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
      * @param pendingTraceSelectedMachine 暂存的首选机台，可能为 null
      * @param pendingTraceDayEndTime 暂存的当日结束时间，可能为 null
      * @param pendingPriorityMetricSnapshotMap 正式模具分配前冻结的软排序指标
+     * @param candidateAvailabilityPlanMap 当前选机回合的真实可开产计划缓存
      * @param currentDayEndTime 当前业务日结束时间
      * @return 本次选机时点的只读日志快照
      */
@@ -6850,6 +6965,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             MachineScheduleDTO pendingTraceSelectedMachine,
             Date pendingTraceDayEndTime,
             Map<String, MachinePriorityMetricSnapshot> pendingPriorityMetricSnapshotMap,
+            Map<String, NewSpecMachineAvailabilityPlan> candidateAvailabilityPlanMap,
             Date currentDayEndTime) {
         List<MachineScheduleDTO> traceCandidates = pendingTraceCandidates;
         MachineScheduleDTO traceSelectedMachine = pendingTraceSelectedMachine;
@@ -6859,10 +6975,93 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             traceCandidates = Collections.<MachineScheduleDTO>emptyList();
             traceDayEndTime = currentDayEndTime;
         }
+        Map<String, Date> traceChangeoverEndTimeMap =
+                this.resolveTraceChangeoverEndTimeMap(
+                        traceCandidates, candidateAvailabilityPlanMap);
+        Map<String, Date> realAvailableProductionTimeMap =
+                this.resolveRealAvailableProductionTimeMap(
+                        traceCandidates, candidateAvailabilityPlanMap);
         return machineMatch.buildMachinePriorityTraceSnapshot(
                 context, sku, traceCandidates, traceSelectedMachine,
                 traceDayEndTime, getTargetScheduleQtyResolver(),
-                pendingPriorityMetricSnapshotMap);
+                pendingPriorityMetricSnapshotMap,
+                traceChangeoverEndTimeMap, realAvailableProductionTimeMap)
+                .withTraceSkuType(this.resolveTraceSkuType(context, sku));
+    }
+
+    /**
+     * 从当前选机回合的真实可开产计划缓存中提取日志候选的换模或换活字块完成时间。
+     *
+     * <p>该时间从换模就绪时间出发，只避让停机与20:00-06:00禁换模约束，不参与每日换模均衡
+     * 配额，也不包含首检、胎胚可供时间、试制量试中班下限或设备计划产能，仅用于日志展示
+     * “可开产时间（换模/换活字块完成时间）”。未参与逐班筛选的机台不会写入映射，
+     * 日志侧回退为“无（未知班次）”。</p>
+     *
+     * @param traceCandidates 日志候选列表
+     * @param candidateAvailabilityPlanMap 当前选机回合的真实可开产计划缓存
+     * @return 机台编码到换模或换活字块完成时间的映射
+     */
+    private Map<String, Date> resolveTraceChangeoverEndTimeMap(
+            List<MachineScheduleDTO> traceCandidates,
+            Map<String, NewSpecMachineAvailabilityPlan> candidateAvailabilityPlanMap) {
+        if (CollectionUtils.isEmpty(traceCandidates)
+                || CollectionUtils.isEmpty(candidateAvailabilityPlanMap)) {
+            return Collections.emptyMap();
+        }
+        Map<String, Date> traceChangeoverEndTimeMap =
+                new LinkedHashMap<String, Date>(Math.max(4, traceCandidates.size() * 2));
+        for (MachineScheduleDTO traceCandidate : traceCandidates) {
+            if (Objects.isNull(traceCandidate)
+                    || StringUtils.isEmpty(traceCandidate.getMachineCode())) {
+                continue;
+            }
+            NewSpecMachineAvailabilityPlan availabilityPlan =
+                    candidateAvailabilityPlanMap.get(traceCandidate.getMachineCode());
+            if (Objects.isNull(availabilityPlan)) {
+                continue;
+            }
+            traceChangeoverEndTimeMap.put(
+                    traceCandidate.getMachineCode(),
+                    availabilityPlan.getTraceChangeoverEndTime());
+        }
+        return traceChangeoverEndTimeMap;
+    }
+
+    /**
+     * 从当前选机回合的真实可开产计划缓存中提取日志候选的真实可开产时间。
+     *
+     * <p>该时间与逐班筛选使用的 {@code targetShift} 同源，综合换模、首检、胎胚可供时间、
+     * 试制量试中班下限及设备计划产能后的首个可开产时刻，仅用于日志展示“真实可开产时间”。
+     * 未参与逐班筛选的机台不会写入映射，日志侧回退为“无（未知班次）”。</p>
+     *
+     * @param traceCandidates 日志候选列表
+     * @param candidateAvailabilityPlanMap 当前选机回合的真实可开产计划缓存
+     * @return 机台编码到真实可开产时间的映射
+     */
+    private Map<String, Date> resolveRealAvailableProductionTimeMap(
+            List<MachineScheduleDTO> traceCandidates,
+            Map<String, NewSpecMachineAvailabilityPlan> candidateAvailabilityPlanMap) {
+        if (CollectionUtils.isEmpty(traceCandidates)
+                || CollectionUtils.isEmpty(candidateAvailabilityPlanMap)) {
+            return Collections.emptyMap();
+        }
+        Map<String, Date> realAvailableProductionTimeMap =
+                new LinkedHashMap<String, Date>(Math.max(4, traceCandidates.size() * 2));
+        for (MachineScheduleDTO traceCandidate : traceCandidates) {
+            if (Objects.isNull(traceCandidate)
+                    || StringUtils.isEmpty(traceCandidate.getMachineCode())) {
+                continue;
+            }
+            NewSpecMachineAvailabilityPlan availabilityPlan =
+                    candidateAvailabilityPlanMap.get(traceCandidate.getMachineCode());
+            if (Objects.isNull(availabilityPlan)) {
+                continue;
+            }
+            realAvailableProductionTimeMap.put(
+                    traceCandidate.getMachineCode(),
+                    availabilityPlan.getMachineAvailableProductionTime());
+        }
+        return realAvailableProductionTimeMap;
     }
 
     /**
@@ -10998,8 +11197,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             }
         }
         /*
-         * 候选容量预检与最终落班共用同一生产门禁。正规 SKU 沿用当前业务日首班，
-         * X/T 使用首次正日计划中班，并继续叠加胎胚最早可供时间。缓存只保存最终整数容量，
+         * 候选容量预检与最终落班共用同一生产下限。正规、小批量仅叠加胎胚最早可供时间，
+         * X/T 使用首次正日计划中班并继续叠加胎胚最早可供时间。缓存只保存最终整数容量，
          * 命中后不重复扫描日计划和班次，也不保留“机台 × 班次”明细，控制 CPU 与堆占用。
          */
         Date productionNotBeforeTime = NewSpecEmbryoAvailableTimeResolver

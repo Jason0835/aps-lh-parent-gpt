@@ -17,6 +17,7 @@ import com.zlt.aps.lh.api.enums.LhSpecialMaterialCategoryEnum;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
 import com.zlt.aps.lh.api.enums.SkuTagEnum;
 import com.zlt.aps.lh.api.enums.TrialStatusEnum;
+import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.IMachineMatchStrategy;
@@ -1080,6 +1081,42 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
             Date currentDayEndTime,
             TargetScheduleQtyResolver targetScheduleQtyResolver,
             Map<String, MachinePriorityMetricSnapshot> priorityMetricSnapshotMap) {
+        return this.buildMachinePriorityTraceSnapshot(
+                context, sku, actualOrderedCandidates, actualSelectedMachine,
+                currentDayEndTime, targetScheduleQtyResolver,
+                priorityMetricSnapshotMap,
+                Collections.<String, Date>emptyMap(),
+                Collections.<String, Date>emptyMap());
+    }
+
+    /**
+     * 构建同时携带换模/换活字块完成时间与真实可开产时间的完整选机日志快照。
+     *
+     * <p>两个时间均由新增排产日驱动主链在逐班筛选时计算，并作为只读映射传入。
+     * 映射只冻结选机时点时间，不参与正式候选过滤、排序或机台状态修改。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 当前待选机 SKU
+     * @param actualOrderedCandidates 正式选机主链本轮有序候选
+     * @param actualSelectedMachine 正式选机主链本轮首选机台
+     * @param currentDayEndTime 当前业务日结束时间
+     * @param targetScheduleQtyResolver 产能计算组件
+     * @param priorityMetricSnapshotMap 正式模具分配前冻结的软排序指标
+     * @param traceChangeoverEndTimeMap 机台编码到换模或换活字块完成时间的映射
+     * @param realAvailableProductionTimeMap 机台编码到真实可开产时间的映射
+     * @return 独立的只读日志快照
+     */
+    @Override
+    public MachinePriorityTraceSnapshot buildMachinePriorityTraceSnapshot(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            List<MachineScheduleDTO> actualOrderedCandidates,
+            MachineScheduleDTO actualSelectedMachine,
+            Date currentDayEndTime,
+            TargetScheduleQtyResolver targetScheduleQtyResolver,
+            Map<String, MachinePriorityMetricSnapshot> priorityMetricSnapshotMap,
+            Map<String, Date> traceChangeoverEndTimeMap,
+            Map<String, Date> realAvailableProductionTimeMap) {
         MachinePriorityTraceSnapshot actualOnlySnapshot =
                 MachinePriorityTraceSnapshot.fromActualCandidates(
                         actualOrderedCandidates, actualSelectedMachine);
@@ -1138,7 +1175,10 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
                 memberMachineCodeMap,
                 occupationTextMap,
                 priorityTraceEndingTimeMap,
-                mergedPriorityMetricSnapshotMap);
+                mergedPriorityMetricSnapshotMap,
+                traceChangeoverEndTimeMap,
+                realAvailableProductionTimeMap)
+                .withTraceSnapshotContext(context.getCurrentScheduleDate(), sku.getSortRank());
     }
 
     /**
@@ -2031,7 +2071,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
         String actualHitDisplayMachineCode =
                 resolveActualHitDisplayMachineCode(traceSnapshot);
         String traceHeader = this.buildMachinePriorityTraceHeader(
-                sku, traceSnapshot, selectedDisplayMachineCode, actualHitDisplayMachineCode);
+                context, sku, traceSnapshot, selectedDisplayMachineCode, actualHitDisplayMachineCode);
         if (CollectionUtils.isEmpty(orderedCandidates)) {
             PriorityTraceLogHelper.logSortSummary(
                     log, context, title,
@@ -2095,6 +2135,14 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
              */
             Date traceEndingTime = this.resolvePriorityTraceDisplayEndingTime(
                     context, sku, traceSnapshot, machine, referenceTimeCache);
+            /*
+             * 换模/换活字块完成时间与真实可开产时间都取选机时点冻结的计划，避免排产提交后
+             * 机台运行态被推进而误显示本轮实际开工时间。未参与逐班筛选的机台保持“无（未知班次）”。
+             */
+            Date traceChangeoverEndTime =
+                    traceSnapshot.resolveTraceChangeoverEndTime(machine.getMachineCode());
+            Date realAvailableProductionTime =
+                    traceSnapshot.resolveRealAvailableProductionTime(machine.getMachineCode());
             detailBuilder.append(i + 1).append(". ")
                     .append(resolvePriorityTraceTitleValue(displayMachineCode))
                     .append("｜机台类型：")
@@ -2104,7 +2152,11 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
                     .append("｜本轮首选候选：").append(resolveYesNo(actualSelected))
                     .append("｜实际命中：").append(resolveYesNo(actualHit))
                     .append("｜收尾时间：")
-                    .append(resolveEndingTimeShiftText(context, traceEndingTime))
+                    .append(resolveTimeShiftText(context, traceEndingTime))
+                    .append("｜可开产时间（换模/换活字块完成时间）：")
+                    .append(resolveTimeShiftText(context, traceChangeoverEndTime))
+                    .append("｜真实可开产时间：")
+                    .append(resolveTimeShiftText(context, realAvailableProductionTime))
                     .append("｜占用SKU：").append(occupationText)
                     .append("｜单控硬规则：")
                     .append(singleControlMachine ? "满足" : "不适用")
@@ -2145,6 +2197,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
      * @return 包含首选候选、实际命中、结果及终止原因的多行摘要
      */
     private String buildMachinePriorityTraceHeader(
+            LhScheduleContext context,
             SkuScheduleDTO sku,
             MachinePriorityTraceSnapshot traceSnapshot,
             String selectedDisplayMachineCode,
@@ -2155,6 +2208,20 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
                 .append("  产品状态： ")
                 .append(SkuConstructionRefResolverUtil.resolveProductStatusDesc(
                         sku.getProductStatus()))
+                .append("  结构名称： ")
+                .append(resolvePriorityTraceTitleValue(sku.getStructureName()))
+                .append("  类型： ")
+                .append(resolvePriorityTraceTitleValue(traceSnapshot.getTraceSkuType()))
+                .append("  计划日期： ")
+                .append(this.resolvePlanDateText(traceSnapshot.getTraceScheduleDate()))
+                .append("  本轮排序： ")
+                .append(traceSnapshot.getTraceSortRank())
+                .append("  月计划dayN： ")
+                .append(this.buildMonthPlanDayNText(context, sku))
+                .append("  班产： ")
+                .append(sku.getShiftCapacity())
+                .append("  最早胎胚可供硫化时间： ")
+                .append(this.resolveEmbryoAvailableTimeText(context, sku))
                 .append('\n')
                 .append("本轮首选候选机台：")
                 .append(StringUtils.isEmpty(selectedDisplayMachineCode)
@@ -2173,6 +2240,65 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
                     .append(traceSnapshot.getNoHitReason());
         }
         return headerBuilder.toString();
+    }
+
+    /**
+     * 解析选机日志中的计划日期文本。
+     *
+     * <p>计划日期取选机快照冻结的业务日期（traceScheduleDate），
+     * 仅用于日志展示，不参与选机或排产计算。</p>
+     *
+     * @param planDate 选机时点冻结的业务日期
+     * @return yyyy-MM-dd 格式计划日期；日期缺失时返回“未知”
+     */
+    private String resolvePlanDateText(Date planDate) {
+        return resolvePriorityTraceTitleValue(
+                LhScheduleTimeUtil.formatDate(planDate));
+    }
+
+    /**
+     * 解析选机日志中的最早胎胚可供硫化时间文本。
+     *
+     * <p>胎胚时间按 SKU 结构名称读取配置表，只用于日志展示，不参与选机或排产计算。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 当前选机 SKU
+     * @return yyyy-MM-dd HH:mm:ss 格式胎胚可供时间；未命中配置时返回“无”
+     */
+    private String resolveEmbryoAvailableTimeText(LhScheduleContext context, SkuScheduleDTO sku) {
+        Date availableTime =
+                NewSpecEmbryoAvailableTimeResolver.resolveEarliestAvailableTime(context, sku);
+        return Objects.isNull(availableTime)
+                ? "无"
+                : LhScheduleTimeUtil.formatDateTime(availableTime);
+    }
+
+    /**
+     * 构建月计划 T~T+2 日计划量（dayN）逗号分隔文本。
+     *
+     * <p>复用 {@link MonthPlanDateResolver#resolveDayQty} 按业务日期读取月计划 dayN，
+     * 与排程结果落库 dayNRange 同口径；仅用于日志展示，不影响新增排产和选机。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 当前待选机 SKU
+     * @return 逗号分隔的 dayN 计划量，如 "48,48,80"；窗口起点缺失时返回“未知”
+     */
+    private String buildMonthPlanDayNText(LhScheduleContext context, SkuScheduleDTO sku) {
+        if (Objects.isNull(context) || Objects.isNull(context.getScheduleDate()) || Objects.isNull(sku)) {
+            return "未知";
+        }
+        LocalDate windowStartDate = context.getScheduleDate().toInstant()
+                .atZone(ZoneId.systemDefault()).toLocalDate();
+        StringBuilder dayNBuilder = new StringBuilder(16);
+        for (int offset = 0; offset < 3; offset++) {
+            if (offset > 0) {
+                dayNBuilder.append(",");
+            }
+            LocalDate productionDate = windowStartDate.plusDays(offset);
+            dayNBuilder.append(MonthPlanDateResolver.resolveDayQty(
+                    context, sku.getMaterialCode(), sku.getProductStatus(), productionDate));
+        }
+        return dayNBuilder.toString();
     }
 
     /**
@@ -2299,13 +2425,13 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
     }
 
     /**
-     * 解析参考收尾时间及其所在班次。
+     * 解析时间及其所在班次，统一输出“时间（班次）”格式文本。
      *
      * @param context 排程上下文
-     * @param referenceTime 当前排序使用的参考收尾时间
+     * @param referenceTime 待格式化的时间
      * @return “时间（班次）”格式文本
      */
-    private String resolveEndingTimeShiftText(LhScheduleContext context, Date referenceTime) {
+    private String resolveTimeShiftText(LhScheduleContext context, Date referenceTime) {
         if (Objects.isNull(referenceTime)) {
             return "无（未知班次）";
         }
