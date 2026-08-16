@@ -3394,6 +3394,15 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                  */
                 switchReadyTime = alignSpecialMaterialSubstitutionSwitchReadyTime(
                         context, sku, machineCode, switchReadyTime);
+                /*
+                 * 结构切换/生产日前回看场景下，若真实开产被胎胚可供时间顺延到换模完成之后，
+                 * 在 20:00 禁换模约束内尽量延后换模，避免换完模后长时间空等，使换模完成点贴近开产。
+                 */
+                if (productionPreparationLookbackAllowed && Objects.nonNull(productionNotBeforeTime)) {
+                    switchReadyTime = delaySwitchReadyTimeCloseToProductionStart(
+                            context, sku.getMaterialCode(), machineCode,
+                            switchReadyTime, switchDurationHours, productionNotBeforeTime);
+                }
 
                 // 4. 分配换模窗口；晚班不可换模、换模上限和维保重叠都在分配器中统一收口。
                 // 基础换模时间永远执行，换模均衡仅在开关开启时介入。
@@ -3763,6 +3772,16 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                                 NewSpecEmbryoAvailableTimeResolver.resolveProductionShift(
                                         shifts, firstProductionStartTime);
                         firstInspectionAttributionTime = firstProductionStartTime;
+                        /*
+                         * 胎胚可供时间把真实开产顺延到换模完成之后时，首检必须落到真实开产班次，
+                         * 不能继续沿用按换模完成时间倒推的跨班首检计划，否则首检会被写到开产前的班次。
+                         * 这里清空跨班计划，让下游回退到“真实开产班次单班首检”口径。
+                         */
+                        if (Objects.nonNull(firstProductionStartTime)
+                                && Objects.nonNull(mouldChangeCompleteTime)
+                                && firstProductionStartTime.after(mouldChangeCompleteTime)) {
+                            firstInspectionAllocationPlan = null;
+                        }
                     } else {
                         // 生产门禁没有推迟现有时间轴时，继续使用原首检归属和开产语义。
                         firstInspectionAttributionShift =
@@ -6291,6 +6310,15 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 context, switchShifts, switchReadyTime);
         switchReadyTime = alignSpecialMaterialSubstitutionSwitchReadyTime(
                 context, sku, machine.getMachineCode(), switchReadyTime);
+        /*
+         * 与正式排产保持一致：生产日前回看且真实开产被胎胚时间顺延时，在 20:00 禁换模
+         * 约束内尽量延后换模，保证选机预演和正式落班的换模时间轴一致。
+         */
+        if (preparationLookbackAllowed && Objects.nonNull(productionNotBeforeTime)) {
+            switchReadyTime = delaySwitchReadyTimeCloseToProductionStart(
+                    context, sku.getMaterialCode(), machine.getMachineCode(),
+                    switchReadyTime, switchDurationHours, productionNotBeforeTime);
+        }
         if (!preparationLookbackAllowed) {
             switchReadyTime = alignSwitchReadyTimeByAddMachineDate(
                     context, sku, switchReadyTime, dayContext.getDayShifts(), totalScheduledQty,
@@ -6301,12 +6329,13 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                     occupationEndTime, machineReadyTime, productionNotBeforeTime);
         }
         /*
-         * 选机日志展示用的换模/换活字块完成时间：从同一换模就绪时间出发，只避让停机与
-         * 20:00-06:00 禁换模约束，不参与每日换模均衡配额，避免空闲机台的可开产时间
-         * 因配额打满被顺延到后续班次。正式换模仍沿用下方 previewMouldChange 的配额分配。
+         * 选机日志展示用的换模/换活字块完成时间：从机台收尾时间出发，只避让停机与
+         * 20:00-06:00 禁换模约束，不参与每日换模均衡配额、首检、胎胚可供时间、
+         * 班次管控及生产日回看延后等正式排产逻辑。正式换模仍沿用下方 previewMouldChange
+         * 的配额分配与时间轴。
          */
         Date traceChangeoverStartTime = this.allocateBasicMouldChangeStartTime(
-                context, machine.getMachineCode(), switchReadyTime, switchDurationHours);
+                context, machine.getMachineCode(), occupationEndTime, switchDurationHours);
         Date traceChangeoverEndTime = Objects.isNull(traceChangeoverStartTime)
                 ? null : LhScheduleTimeUtil.addHours(traceChangeoverStartTime, switchDurationHours);
 
@@ -6992,7 +7021,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
     /**
      * 从当前选机回合的真实可开产计划缓存中提取日志候选的换模或换活字块完成时间。
      *
-     * <p>该时间从换模就绪时间出发，只避让停机与20:00-06:00禁换模约束，不参与每日换模均衡
+     * <p>该时间从机台收尾时间出发，只避让停机与20:00-06:00禁换模约束，不参与每日换模均衡
      * 配额，也不包含首检、胎胚可供时间、试制量试中班下限或设备计划产能，仅用于日志展示
      * “可开产时间（换模/换活字块完成时间）”。未参与逐班筛选的机台不会写入映射，
      * 日志侧回退为“无（未知班次）”。</p>
@@ -15785,6 +15814,54 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             mouldChangeBalance.rollbackMouldChange(context, mouldChangeStartTime);
         }
         rollbackGreenTireChangeoverShift(context, sku, mouldChangeStartTime);
+    }
+
+    /**
+     * 在“生产日前跨日准备”场景下，把换模开始时间尽量延后，使换模完成后贴近真实开产时间。
+     *
+     * <p>当真实开产被胎胚可供时间顺延到换模完成之后时，机台换模完成后会长时间空等。
+     * 这里在 20:00(含)-次日06:00(不含) 禁换模约束内，把换模开始点延后到
+     * {@code productionNotBeforeTime - switchDurationHours}；若该点落入禁换模窗口，
+     * 则回退到最晚可开始点。该方法只调整换模开始时间，不放松禁换模或晚班约束。</p>
+     *
+     * @param context 排程上下文
+     * @param materialCode 物料编码
+     * @param machineCode 机台编码
+     * @param switchReadyTime 原机台可切换时间
+     * @param switchDurationHours 换模耗时
+     * @param productionNotBeforeTime 正式生产下限（胎胚可供时间等）
+     * @return 延后后的机台可切换时间；无延后空间时返回原值
+     */
+    private Date delaySwitchReadyTimeCloseToProductionStart(LhScheduleContext context,
+                                                            String materialCode,
+                                                            String machineCode,
+                                                            Date switchReadyTime,
+                                                            int switchDurationHours,
+                                                            Date productionNotBeforeTime) {
+        if (Objects.isNull(switchReadyTime) || Objects.isNull(productionNotBeforeTime)
+                || switchDurationHours <= 0) {
+            return switchReadyTime;
+        }
+        // 理想换模开始点 = 生产下限 - 换模时长，使换模完成后尽量紧挨真实开产。
+        Date desiredStartTime = LhScheduleTimeUtil.addHours(productionNotBeforeTime, -switchDurationHours);
+        if (Objects.isNull(desiredStartTime) || !desiredStartTime.after(switchReadyTime)) {
+            return switchReadyTime;
+        }
+        // 理想开始点落入 20:00(含)-次日06:00(不含) 禁换模窗口时，回退到最晚可开始点。
+        if (LhScheduleTimeUtil.isNoMouldChangeTime(context, desiredStartTime)) {
+            desiredStartTime = LhScheduleTimeUtil.resolveLatestMouldChangeStartTime(context, desiredStartTime);
+        }
+        if (Objects.nonNull(desiredStartTime) && desiredStartTime.after(switchReadyTime)) {
+            log.info("新增SKU换模延后贴近真实开产, batchNo: {}, materialCode: {}, machineCode: {}, "
+                            + "原可切换: {}, 延后开始: {}, 换模时长: {}, 生产下限: {}",
+                    context.getBatchNo(), materialCode, machineCode,
+                    LhScheduleTimeUtil.formatDateTime(switchReadyTime),
+                    LhScheduleTimeUtil.formatDateTime(desiredStartTime),
+                    switchDurationHours,
+                    LhScheduleTimeUtil.formatDateTime(productionNotBeforeTime));
+            return desiredStartTime;
+        }
+        return switchReadyTime;
     }
 
     /**

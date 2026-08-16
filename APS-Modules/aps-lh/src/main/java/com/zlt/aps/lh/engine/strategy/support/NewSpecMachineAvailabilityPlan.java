@@ -36,7 +36,7 @@ public class NewSpecMachineAvailabilityPlan {
     /** 换模或换活字块结束时间。 */
     private final Date changeoverEndTime;
 
-    /** 选机日志展示用的换模或换活字块完成时间（豁免换模均衡配额，保留停机与20:00-06:00禁换模约束）。 */
+    /** 选机日志展示用的换模或换活字块完成时间（从机台收尾时间出发，只避让停机与20:00-06:00禁换模约束，豁免换模均衡配额）。 */
     private final Date traceChangeoverEndTime;
 
     /** 正式生产门禁时间。 */
