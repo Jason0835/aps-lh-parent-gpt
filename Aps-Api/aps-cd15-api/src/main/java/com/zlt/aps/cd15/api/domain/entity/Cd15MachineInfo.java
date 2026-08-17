@@ -92,7 +92,7 @@ public class Cd15MachineInfo extends BaseEntity implements Serializable {
     @ApiModelProperty(value = "默认裁断模式", name = "defaultCutMode")
     @ImportExcelValidated(required = true, maxLength = 20)
     @TableField("DEFAULT_CUT_MODE")
-    @Excel(name = "ui.data.column.cd15MachineInfo.defaultCutMode")
+    @Excel(name = "ui.data.column.cd15MachineInfo.defaultCutMode", dictType = "cd15_default_cut_mode")
     private String defaultCutMode;
 
     /** 历史日产量模式切换阈值保留字段，不参与自动排程 */

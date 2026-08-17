@@ -27,13 +27,12 @@ public class Cd15StorageLaneLimit extends BaseEntity implements Serializable {
     private String factoryCode;
 
     @ApiModelProperty("日期")
-    @ImportExcelValidated(required = true, maxLength = 10)
+    @ImportExcelValidated(required = true, maxLength = 30)
     @TableField("LANE_DATE")
     @Excel(name = "ui.data.column.cd15StorageLaneLimit.laneDate", width = 30, dateFormat = "yyyy-MM-dd")
     @JsonFormat(pattern = "yyyy-MM-dd")
     private Date laneDate;
 
-    @ApiModelProperty("物料编码/钢带代码")
     @ImportExcelValidated(required = false, maxLength = 60)
     @TableField("MATERIAL_CODE")
     @Excel(name = "ui.data.column.cd15StorageLaneLimit.materialCode")

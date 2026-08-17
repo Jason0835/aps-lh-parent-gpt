@@ -1649,5 +1649,21 @@
   "ui.schedule.autoPlan.viewUnplanned": "View Unplanned Tasks",
   "ui.schedule.autoPlan.refreshBoard": "Refresh Board",
   "ui.data.column.cd90StorageLaneLimit.machineCode": "Bound Machine",
-  "ui.data.column.cd15StorageLaneLimit.machineCode": "Bound Machine"
+  "ui.data.column.cd15StorageLaneLimit.machineCode": "Bound Machine",
+  "ui.data.column.lhDayPlanAdjustRequire.modelName": "Curing Daily Plan Adjustment Requirements",
+  "ui.data.column.lhDayPlanAdjustRequire.factoryCode": "Factory",
+  "ui.data.column.lhDayPlanAdjustRequire.yearMonth": "Year Month",
+  "ui.data.column.lhDayPlanAdjustRequire.materialCode": "NC Material Code",
+  "ui.data.column.lhDayPlanAdjustRequire.materialDesc": "Material Description",
+  "ui.data.column.lhDayPlanAdjustRequire.monthPlanQty": "Monthly Plan",
+  "ui.data.column.lhDayPlanAdjustRequire.adjustGroup": "Daily Plan Adjustment",
+  "ui.data.column.lhDayPlanAdjustRequire.adjust": "Adjustment {0}",
+  "ui.data.column.lhDayPlanAdjustRequire.adjustedTotalQty": "Adjusted Daily Plan Total",
+  "ui.data.column.lhDayPlanAdjustRequire.treadGlueTd": "Tread Compound TD",
+  "ui.data.column.lhDayPlanAdjustRequire.reasonGroup": "Adjustment Reasons",
+  "ui.data.column.lhDayPlanAdjustRequire.reason": "Reason {0}",
+  "ui.data.column.lhDayPlanAdjustRequire.productStatus": "Product Status",
+  "ui.data.alert.lhDayPlanAdjustRequire.adjustQtyRequired": "Enter adjustment {0} quantity before entering adjustment {0} reason",
+  "ui.data.alert.lhDayPlanAdjustRequire.adjustReasonRequired": "After entering adjustment {0} quantity, adjustment {0} reason is required",
+  "ui.data.alert.lhDayPlanAdjustRequire.unsavedChanges": "This page has unsaved adjustments. Discard the changes?"
 }

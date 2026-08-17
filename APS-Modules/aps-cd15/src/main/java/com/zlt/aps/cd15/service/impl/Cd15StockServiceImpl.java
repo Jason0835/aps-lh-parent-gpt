@@ -10,11 +10,14 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.cd15.api.domain.entity.Cd15Stock;
 import com.zlt.aps.cd15.mapper.Cd15StockMapper;
 import com.zlt.aps.cd15.service.ICd15StockService;
+import com.zlt.aps.maindata.service.IMdmConstructionInfoService;
 import com.zlt.bill.common.service.AbstractDocService;
+import com.zlt.common.enums.ImportErrorTypeEnums;
 import com.zlt.common.utils.ImportExcelValidatedUtils;
 import com.zlt.common.utils.PubUtil;
 import com.zlt.sysdef.domain.SysDocType;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.extern.slf4j.Slf4j;
@@ -25,8 +28,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * 斜裁库存管理 Service 实现。
@@ -38,6 +43,9 @@ public class Cd15StockServiceImpl extends AbstractDocService<Cd15Stock> implemen
 
     @Resource
     private Cd15StockMapper cd15StockMapper;
+
+    @Resource
+    private IMdmConstructionInfoService mdmConstructionInfoService;
 
     @Override
     protected String getDocTypeCode() {
@@ -56,11 +64,21 @@ public class Cd15StockServiceImpl extends AbstractDocService<Cd15Stock> implemen
     }
 
     @Override
+    public String validateBusiness(Cd15Stock entity) {
+        if (entity != null && StringUtils.isNotBlank(entity.getMaterialCode())
+                && !this.isSteelStripCodeExists(entity.getMaterialCode())) {
+            return "ui.data.column.cd15Stock.materialCodeInvalid";
+        }
+        return null;
+    }
+
+    @Override
     public AjaxResult importData(List<Cd15Stock> list, boolean updateSupport, Long importLogId) {
         int successNum = 0;
         int failureNum = 0;
         List<Cd15Stock> insertList = new ArrayList<>();
         List<ImportErrorLog> errorList = new ArrayList<>();
+        Set<String> steelStripCodes = this.loadSteelStripCodes();
         String uniqueMessage = I18nUtil.getMessage("import.validated.unique");
 
         for (int index = 0; index < list.size(); index++) {
@@ -69,6 +87,10 @@ public class Cd15StockServiceImpl extends AbstractDocService<Cd15Stock> implemen
             List<ImportErrorLog> validateList = ImportExcelValidatedUtils.validated(importLogId, rowNum, importEntity);
             ImportExcelValidatedUtils.validatedRepeat(list, importEntity, index, 2, importLogId, validateList,
                     this.getCheckUniqueFields().toArray(new String[0]));
+            if (StringUtils.isNotBlank(importEntity.getMaterialCode()) && !steelStripCodes.contains(importEntity.getMaterialCode())) {
+                ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
+                        rowNum, I18nUtil.getMessage("ui.data.column.cd15Stock.materialCodeInvalid"), validateList);
+            }
             if (CollectionUtils.isNotEmpty(validateList)) {
                 failureNum++;
                 importEntity.setId(-999L);
@@ -205,5 +227,17 @@ public class Cd15StockServiceImpl extends AbstractDocService<Cd15Stock> implemen
     @Override
     protected List<String> getCheckUniqueFields() {
         return Arrays.asList("factoryCode", "stockDate", "shiftCode", "materialCode");
+    }
+
+    private boolean isSteelStripCodeExists(String materialCode) {
+        if (StringUtils.isBlank(materialCode)) {
+            return true;
+        }
+        return this.loadSteelStripCodes().contains(materialCode);
+    }
+
+    private Set<String> loadSteelStripCodes() {
+        List<String> steelStripCodeList = mdmConstructionInfoService.listSteelStripCodes();
+        return CollectionUtils.isEmpty(steelStripCodeList) ? new HashSet<>() : new HashSet<>(steelStripCodeList);
     }
 }

@@ -648,6 +648,36 @@ public final class LhScheduleTimeUtil {
     }
 
     /**
+     * 解析禁止换模窗口开始前的最晚可开始换模时刻。
+     *
+     * <p>禁止换模时段为 {@code [禁止换模开始小时(默认20:00), 次日早班开始小时(默认06:00))}。
+     * 若给定时间位于晚间段（大于等于禁止换模开始小时），最晚可开始点回退到当天
+     * 禁止换模开始小时前一刻；若位于凌晨段（小于早班开始小时），则回退到前一天
+     * 禁止换模开始小时前一刻。该时刻严格早于禁止窗口，供“换模尽量贴近真实开产”使用，
+     * 不改变既有 {@link #isNoMouldChangeTime(LhScheduleContext, Date)} 的临界点语义。</p>
+     *
+     * @param context  排程上下文
+     * @param baseTime 当前处于禁止换模时段内的时间点
+     * @return 最晚可开始换模时间；context 或 baseTime 为 null 时返回 null
+     */
+    public static Date resolveLatestMouldChangeStartTime(LhScheduleContext context, Date baseTime) {
+        if (context == null || baseTime == null) {
+            return null;
+        }
+        Calendar calendar = Calendar.getInstance();
+        calendar.setTime(baseTime);
+        int hour = calendar.get(Calendar.HOUR_OF_DAY);
+        Date baseDate = clearTime(baseTime);
+        // 凌晨段属于前一夜的禁止换模时段，最晚可开始点回退到前一天。
+        if (hour < getMorningStartHour(context)) {
+            baseDate = addDays(baseDate, -1);
+        }
+        // 禁止换模开始小时整点已进入禁止窗口，因此最晚合法开始点为前一分钟最后一秒。
+        int noChangeStart = getNoMouldChangeStartHour(context);
+        return buildTime(baseDate, noChangeStart - 1, 59, 59);
+    }
+
+    /**
      * 解析指定时间之后的下一个早班开始时刻。
      * <p>试制SKU换模必须在早班完成，如果机台释放时间不在早班时段，
      * 需要顺延到下一个早班开始时间，确保换模在早班内完成、生产从中班开始。</p>

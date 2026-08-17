@@ -7,7 +7,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 
@@ -39,7 +38,6 @@ import com.zlt.aps.common.core.utils.AjaxResultUtils;
 import com.zlt.aps.common.engine.enums.ClassNumThreePlanEnums;
 import com.zlt.aps.common.engine.service.FactoryService;
 import com.zlt.aps.dj.api.domain.entity.DjDayFinishQty;
-import com.zlt.aps.dj.api.domain.entity.DjDispatcherLog;
 import com.zlt.aps.dj.api.domain.entity.DjScheduleResult;
 import com.zlt.aps.dj.api.domain.entity.DjShiftConfig;
 import com.zlt.aps.dj.engine.mapper.DjEngineConstructionInfoMapper;
@@ -49,7 +47,7 @@ import com.zlt.aps.dj.service.DjScheduleResultService;
 import com.zlt.aps.dj.service.IDjScheduleAdjustService;
 import com.zlt.aps.dj.service.IDjShiftConfigService;
 import com.zlt.aps.itf.mes.IMesHalfPartsItfService;
-import com.zlt.aps.itf.vo.SyncDataLogs;
+import com.zlt.aps.itf.vo.MesDjScheduleResult;
 import com.zlt.aps.mdm.api.domain.entity.MdmConstructionInfo;
 import com.zlt.bill.common.controller.AbstractBillBizController;
 import com.zlt.bill.common.service.IBillService;
@@ -431,8 +429,12 @@ public class DjScheduleResultController extends AbstractBillBizController<DjSche
 
 			// 取回mes的反馈结果
 //			SyncDataLogs logs = syncDataLogsService.getSyncDataResult(dataVersion);
-            
-            AjaxResult syncResult = iMesHalfPartsItfService.issueDjScheduleResult(djScheduleResult.getIds(), factoryCode, companyCode);
+
+            MesDjScheduleResult result = new MesDjScheduleResult();
+            result.setIds(djScheduleResult.getIds());
+            result.setFactoryCode(factoryCode);
+            result.setCompanyCode(companyCode);
+            AjaxResult syncResult = iMesHalfPartsItfService.issueDjScheduleResult(result);
 			String status = AjaxResultUtils.checkAjaxSuccess(syncResult)? ApsConstant.IS_RELEASE: ApsConstant.FAILURE_RELEASE;
 			// 更新状态
 			djScheduleResultService.updateRelaseStatus(dataVersion, arr, status);

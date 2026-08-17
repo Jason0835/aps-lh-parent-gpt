@@ -223,4 +223,7 @@ public class MesNcScheduleResult implements Serializable {
     @ApiModelProperty(value = "厂别", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
+
+    @TableField(exist = false)
+    private Long[] ids;
 }

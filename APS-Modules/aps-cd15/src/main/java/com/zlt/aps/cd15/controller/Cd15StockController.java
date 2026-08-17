@@ -5,6 +5,7 @@ import cn.hutool.core.date.DateUtil;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.cd15.api.domain.entity.Cd15Stock;
@@ -16,6 +17,7 @@ import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
@@ -50,6 +52,10 @@ public class Cd15StockController extends AbstractDocBizController<Cd15Stock> {
     @ApiOperation("新增斜裁库存")
     @PostMapping("/add")
     public AjaxResult add(@RequestBody Cd15Stock entity) {
+        String errorKey = cd15StockService.validateBusiness(entity);
+        if (StringUtils.isNotBlank(errorKey)) {
+            return AjaxResult.error(I18nUtil.getMessage(errorKey));
+        }
         return super.save(entity);
     }
 
@@ -58,6 +64,10 @@ public class Cd15StockController extends AbstractDocBizController<Cd15Stock> {
     @ApiOperation("编辑斜裁库存")
     @PostMapping("/edit")
     public AjaxResult edit(@RequestBody Cd15Stock entity) {
+        String errorKey = cd15StockService.validateBusiness(entity);
+        if (StringUtils.isNotBlank(errorKey)) {
+            return AjaxResult.error(I18nUtil.getMessage(errorKey));
+        }
         return super.save(entity);
     }
 

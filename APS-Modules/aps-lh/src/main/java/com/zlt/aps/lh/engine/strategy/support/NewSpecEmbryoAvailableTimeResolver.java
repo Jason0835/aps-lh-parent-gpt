@@ -19,12 +19,13 @@ import java.util.Objects;
  * 新增规格生产时间下限解析器。
  *
  * <p>本解析器统一提供 S4.4 结构切换提前生产、S4.5 新增排产需要的胎胚时间读取、
- * SKU 生产门禁、生产时间下限和半开班次定位能力。生产门禁只限制首检及正式生产，
+ * SKU 生产时间下限和半开班次定位能力。生产下限只限制首检及正式生产，
  * 不直接移动换模或换活字块等准备动作；调用方可以在排程窗口内提前完成准备，但最终
- * 开产时间必须取既有规则理论开产时间、SKU 门禁时间和胎胚可供时间中的较晚值。</p>
+ * 开产时间必须取既有规则理论开产时间、试制/量试中班门禁和胎胚可供时间中的较晚值。</p>
  *
- * <p>正规 SKU 的门禁沿用日驱动主链已经确定的当前业务日首个班次，不改变既有提前生产
- * 准入；试制（X）和量试（T）为了等待胎胚供应，统一从首次正日计划日的中班开始生产。
+ * <p>正规、小批量 SKU 不再设置“当前业务日首班”生产门禁，实际开产时间只取
+ * max(换模/首检完成时间, 胎胚可供时间)；试制（X）和量试（T）统一从首次正计划日的
+ * 中班开始生产。
  * 日计划判断只读取 {@link SkuDailyPlanQuotaDTO#getDayPlanQty()} 原始月计划节奏，禁止读取
  * 排程过程中会被收尾补量、欠产滚动和实际扣账持续修改的 remainingQty。</p>
  *
@@ -77,18 +78,13 @@ public final class NewSpecEmbryoAvailableTimeResolver {
     /**
      * 解析当前新增 SKU 正式生产不得早于的统一时间。
      *
-     * <p>该时间同时收敛 SKU 类型门禁与胎胚最早可供时间：</p>
-     * <ul>
-     *   <li>正规及小批量 SKU：沿用当前日驱动业务日的首个窗口班次；</li>
-     *   <li>试制、量试 SKU：不得早于首次正日计划日中班；当前业务日已经晚于首次计划日时，
-     *   仍从当前业务日中班开始，保持“首次启动必须等待中班”的业务口径；</li>
-     *   <li>命中结构胎胚可供时间时，再与上述门禁取较晚值。</li>
-     * </ul>
+     * <p>正规、小批量 SKU 只返回胎胚最早可供时间（未配置时返回 null）；
+     * 试制、量试 SKU 返回“首次正计划日中班”与胎胚最早可供时间中的较晚值。</p>
      *
      * @param context 排程上下文，提供当前日驱动业务日和胎胚可供时间
      * @param sku 待排 SKU
      * @param shifts 完整排程窗口班次；必须保持时间升序
-     * @return 正式生产时间下限；上下文或班次不完整时仅返回可解析到的胎胚时间
+     * @return 正式生产时间下限；未配置任何下限时返回 null
      */
     public static Date resolveProductionNotBeforeTime(LhScheduleContext context,
                                                       SkuScheduleDTO sku,
@@ -102,14 +98,14 @@ public final class NewSpecEmbryoAvailableTimeResolver {
     /**
      * 解析 SKU 类型对应的开产门禁时间。
      *
-     * <p>本方法不判断当前 SKU 是否有资格进入某个日驱动阶段。正规 SKU 是否允许提前生产，
-     * 仍由 {@link EarlyProductionChecker} 和新增主链决定；进入当前日后这里只把门禁对齐到
-     * 当前业务日首班。X/T 则在此追加首次正计划日中班的硬下限，防止候选扩展后误在早班开产。</p>
+     * <p>正规、小批量 SKU 不再设置 SKU 类型门禁，直接返回 null，实际开产时间由调用方
+     * 按“max(换模/首检完成时间, 胎胚可供时间)”计算。试制、量试 SKU 保留首次正计划日中班
+     * 的硬下限，防止候选扩展后误在早班开产。</p>
      *
      * @param context 排程上下文
      * @param sku 待排 SKU
      * @param shifts 完整排程窗口班次
-     * @return SKU 类型门禁时间；首次计划日在窗口外时返回该日零点供调用方判定超窗
+     * @return SKU 类型门禁时间；正规及小批量返回 null，试制量试首次计划日在窗口外时返回该日零点供调用方判定超窗
      */
     public static Date resolveSkuProductionGateTime(LhScheduleContext context,
                                                     SkuScheduleDTO sku,
@@ -117,22 +113,24 @@ public final class NewSpecEmbryoAvailableTimeResolver {
         if (Objects.isNull(context) || Objects.isNull(sku) || CollectionUtils.isEmpty(shifts)) {
             return null;
         }
+        // 去除正规/小批量的生产门禁，只保留试制、量试“首次正计划日中班开产”的 SKU 类型下限。
+        boolean trialOrMassTrial = isTrialOrMassTrial(sku);
+        if (!trialOrMassTrial) {
+            return null;
+        }
         LocalDate currentBusinessDate = resolveCurrentBusinessDate(context, shifts);
         if (Objects.isNull(currentBusinessDate)) {
             return null;
         }
-        boolean trialOrMassTrial = isTrialOrMassTrial(sku);
         LocalDate eligibilityDate = currentBusinessDate;
-        if (trialOrMassTrial) {
-            LocalDate firstPositivePlanDate = resolveFirstPositivePlanDate(
-                    context, sku, currentBusinessDate);
-            if (Objects.nonNull(firstPositivePlanDate)
-                    && firstPositivePlanDate.isAfter(eligibilityDate)) {
-                eligibilityDate = firstPositivePlanDate;
-            }
+        LocalDate firstPositivePlanDate = resolveFirstPositivePlanDate(
+                context, sku, currentBusinessDate);
+        if (Objects.nonNull(firstPositivePlanDate)
+                && firstPositivePlanDate.isAfter(eligibilityDate)) {
+            eligibilityDate = firstPositivePlanDate;
         }
         Date gateTime = resolveShiftStartOnOrAfterDate(
-                shifts, eligibilityDate, trialOrMassTrial);
+                shifts, eligibilityDate, true);
         if (Objects.nonNull(gateTime)) {
             return gateTime;
         }

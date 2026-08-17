@@ -36,6 +36,9 @@ public class NewSpecMachineAvailabilityPlan {
     /** 换模或换活字块结束时间。 */
     private final Date changeoverEndTime;
 
+    /** 选机日志展示用的换模或换活字块完成时间（从机台收尾时间出发，只避让停机与20:00-06:00禁换模约束，豁免换模均衡配额）。 */
+    private final Date traceChangeoverEndTime;
+
     /** 正式生产门禁时间。 */
     private final Date productionNotBeforeTime;
 
@@ -59,7 +62,8 @@ public class NewSpecMachineAvailabilityPlan {
             Date productionNotBeforeTime,
             Date machineAvailableProductionTime,
             LhShiftConfigVO targetShift,
-            FirstInspectionAllocationPlan firstInspectionPlan) {
+            FirstInspectionAllocationPlan firstInspectionPlan,
+            Date traceChangeoverEndTime) {
         this.machine = machine;
         this.available = available;
         this.unavailableReason = unavailableReason;
@@ -67,6 +71,7 @@ public class NewSpecMachineAvailabilityPlan {
         this.machineReadyTime = machineReadyTime;
         this.changeoverStartTime = changeoverStartTime;
         this.changeoverEndTime = changeoverEndTime;
+        this.traceChangeoverEndTime = traceChangeoverEndTime;
         this.productionNotBeforeTime = productionNotBeforeTime;
         this.machineAvailableProductionTime = machineAvailableProductionTime;
         this.targetShift = targetShift;
@@ -99,6 +104,10 @@ public class NewSpecMachineAvailabilityPlan {
 
     public Date getChangeoverEndTime() {
         return changeoverEndTime;
+    }
+
+    public Date getTraceChangeoverEndTime() {
+        return traceChangeoverEndTime;
     }
 
     public Date getProductionNotBeforeTime() {

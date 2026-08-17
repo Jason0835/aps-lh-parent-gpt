@@ -4494,5 +4494,21 @@
   "ui.data.column.monthPlanCompare.productionVersion": "排产版本",
   "ui.data.column.monthPlanCompare.productStatus": "产品状态",
   "ui.data.column.monthPlanCompare.productTypeCode": "产品品类",
-  "ui.data.column.monthPlanCompare.modelName": "月计划与实际产量对比"
+  "ui.data.column.monthPlanCompare.modelName": "月计划与实际产量对比",
+  "ui.data.column.lhDayPlanAdjustRequire.modelName": "硫化日计划调整需求",
+  "ui.data.column.lhDayPlanAdjustRequire.factoryCode": "工厂",
+  "ui.data.column.lhDayPlanAdjustRequire.yearMonth": "年月",
+  "ui.data.column.lhDayPlanAdjustRequire.materialCode": "NC物料编码",
+  "ui.data.column.lhDayPlanAdjustRequire.materialDesc": "物料描述",
+  "ui.data.column.lhDayPlanAdjustRequire.monthPlanQty": "月计划",
+  "ui.data.column.lhDayPlanAdjustRequire.adjustGroup": "日计划调整",
+  "ui.data.column.lhDayPlanAdjustRequire.adjust": "调整{0}",
+  "ui.data.column.lhDayPlanAdjustRequire.adjustedTotalQty": "日计划调整后合计",
+  "ui.data.column.lhDayPlanAdjustRequire.treadGlueTd": "胎面胶TD",
+  "ui.data.column.lhDayPlanAdjustRequire.reasonGroup": "日计划调整原因",
+  "ui.data.column.lhDayPlanAdjustRequire.reason": "原因{0}",
+  "ui.data.column.lhDayPlanAdjustRequire.productStatus": "产品状态",
+  "ui.data.alert.lhDayPlanAdjustRequire.adjustQtyRequired": "调整{0}填写原因前必须填写调整{0}调整量",
+  "ui.data.alert.lhDayPlanAdjustRequire.adjustReasonRequired": "调整{0}填写调整量后必须填写调整{0}原因",
+  "ui.data.alert.lhDayPlanAdjustRequire.unsavedChanges": "当前页存在未保存的调整，是否放弃修改？"
 }

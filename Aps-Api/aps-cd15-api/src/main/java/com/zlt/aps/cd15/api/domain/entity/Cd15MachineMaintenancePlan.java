@@ -8,6 +8,7 @@ import com.zlt.common.annotation.ImportExcelValidated;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
+import org.springframework.format.annotation.DateTimeFormat;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
@@ -44,7 +45,7 @@ public class Cd15MachineMaintenancePlan extends BaseEntity implements Serializab
 
     /** 停机开始时间 */
     @ApiModelProperty("停机开始时间")
-    @ImportExcelValidated(required = true, maxLength = 20)
+    @ImportExcelValidated(required = true, date = true)
     @TableField("DOWNTIME_START_TIME")
     @Excel(name = "ui.data.column.cd15MachineMaintenancePlan.downtimeStartTime", width = 30,
             dateFormat = "yyyy-MM-dd HH:mm:ss")
@@ -55,9 +56,33 @@ public class Cd15MachineMaintenancePlan extends BaseEntity implements Serializab
     @TableField(exist = false)
     private Date downtimeEndDate;
 
+    /** 查询参数：停机开始时间起（含），不落库 */
+    @ApiModelProperty("查询参数：停机开始时间起")
+    @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @TableField(exist = false)
+    private Date downtimeStartTimeStart;
+
+    /** 查询参数：停机开始时间止（含），不落库 */
+    @ApiModelProperty("查询参数：停机开始时间止")
+    @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @TableField(exist = false)
+    private Date downtimeStartTimeEnd;
+
+    /** 查询参数：停机结束时间起（含），不落库 */
+    @ApiModelProperty("查询参数：停机结束时间起")
+    @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @TableField(exist = false)
+    private Date downtimeEndTimeStart;
+
+    /** 查询参数：停机结束时间止（含），不落库 */
+    @ApiModelProperty("查询参数：停机结束时间止")
+    @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @TableField(exist = false)
+    private Date downtimeEndTimeEnd;
+
     /** 停机结束时间 */
     @ApiModelProperty("停机结束时间")
-    @ImportExcelValidated(required = true, maxLength = 20)
+    @ImportExcelValidated(required = true, date = true)
     @TableField("DOWNTIME_END_TIME")
     @Excel(name = "ui.data.column.cd15MachineMaintenancePlan.downtimeEndTime", width = 30,
             dateFormat = "yyyy-MM-dd HH:mm:ss")

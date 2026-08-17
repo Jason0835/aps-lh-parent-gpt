@@ -166,20 +166,7 @@ export default {
           prop: "defaultCutMode",
           label: this.$t("ui.data.column.cd15MachineInfo.defaultCutMode"),
           type: "select",
-          dictData: [
-            {
-              value: "SINGLE",
-              label: this.$t("ui.data.value.cd15MachineInfo.cutModeSingle"),
-            },
-            {
-              value: "SPLIT",
-              label: this.$t("ui.data.value.cd15MachineInfo.cutModeSplit"),
-            },
-            {
-              value: "DAILY_OUTPUT",
-              label: this.$t("ui.data.value.cd15MachineInfo.cutModeDailyOutput"),
-            },
-          ],
+          dictData: this.parentDict.type.cd15_default_cut_mode,
         },
         {
           prop: "singleShiftCapacity",
