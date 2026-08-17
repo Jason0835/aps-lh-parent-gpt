@@ -839,7 +839,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                     sourceSku.getMaterialCode(), joinMachineCodes(skuResults), true);
             // 多机台续作必须先抬高SKU目标量下限：满排模式下S4.3可能把目标量初始化为单台机台窗口产能，
             // 多机台共用该目标量会在账本裁剪阶段把应保留的机台误裁为0（如 3302000467/3302001761/3302001508）。
-            // 收尾SKU按下限口径 MAX(硫化余量,胎胚库存)，非收尾按窗口剩余日计划与保留机台合计产能取大。
+            // 收尾SKU（共用胎胚）按下限口径仅取硫化余量，非收尾按窗口剩余日计划与保留机台合计产能取大。
             raiseMultiMachineContinuationTargetFloor(context, sourceSku, skuResults, shifts);
             // 降模排序规则只在当前续作 SKU 分组内生效，提前记录启用条件和清洗候选，便于对账最终下机顺序。
             logContinuationReduceSortRule(context, sourceSku, skuResults);
@@ -3246,8 +3246,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
 
     /**
      * 多机台续作收尾目标量决策。
-     * <p>同一收尾 SKU 同时在多台机台续作时，必须先统一按中心收尾口径
-     * {@code MAX(硫化余量, 胎胚库存)} 收口，再进入降模释放机台。</p>
+     * <p>同一收尾 SKU 同时在多台机台续作时，该物料属于共用胎胚，必须先统一按
+     * “仅取硫化余量”口径收口，再进入降模释放机台。</p>
      *
      * @param context 排程上下文
      * @param sourceSku 来源SKU
@@ -3277,7 +3277,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             if (originalTargetQty != endingTargetQty) {
                 endingTargetQty = getTargetScheduleQtyResolver().upsizeEndingTargetQty(context, sourceSku);
             }
-            ruleName = "多机台收尾MAX(余量,胎胚库存)";
+            ruleName = "多机台收尾共用胎胚仅取硫化余量";
         }
         log.info("续作多机台收尾目标量决策, materialCode: {}, 机台列表: {}, 原目标量: {}, "
                         + "收尾目标量: {}, surplusQty: {}, embryoStock: {}, rule: {}",
@@ -3288,6 +3288,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
 
     /**
      * 解析多机台续作收尾目标量。
+     * <p>同物料多机台属于共用胎胚，只取硫化余量；单胎胚仍取 MAX(硫化余量, 胎胚库存)。</p>
      *
      * @param context 排程上下文
      * @param sourceSku 来源SKU
@@ -3297,9 +3298,17 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
     private int resolveMultiMachineEndingTargetQty(LhScheduleContext context,
                                                    SkuScheduleDTO sourceSku,
                                                    List<LhScheduleResult> skuResults) {
-        int endingDemandQty = !CollectionUtils.isEmpty(skuResults)
-                ? resolveEndingDemandQty(context, skuResults.get(0))
-                : Math.max(Math.max(0, sourceSku.getSurplusQty()), Math.max(0, sourceSku.getEmbryoStock()));
+        int endingDemandQty;
+        if (!CollectionUtils.isEmpty(skuResults)) {
+            endingDemandQty = resolveEndingDemandQty(context, skuResults.get(0));
+        } else {
+            // 兜底：同物料多机台属于共用胎胚只取硫化余量；单胎胚才取 MAX。
+            int surplusQty = Math.max(0, sourceSku.getSurplusQty());
+            int embryoStock = Math.max(0, sourceSku.getEmbryoStock());
+            endingDemandQty = SkuTagEnum.ENDING.getCode().equals(sourceSku.getSkuTag())
+                    && getTargetScheduleQtyResolver().isSharedEmbryoInWindow(context, sourceSku)
+                    ? surplusQty : Math.max(surplusQty, embryoStock);
+        }
         return ShiftCapacityResolverUtil.roundUpQtyToMouldMultiple(endingDemandQty, sourceSku.getMouldQty());
     }
 
@@ -3311,7 +3320,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
      * 减机台班次不对”等反复出现的问题。</p>
      * <p>本方法在降模决策前统一收口：</p>
      * <ul>
-     *   <li>收尾（严格上限）SKU：目标量按 MAX(硫化余量, 胎胚库存) 口径抬高，与主规格一致；</li>
+     *   <li>收尾（严格上限）SKU：同物料多机台属于共用胎胚，目标量按“仅取硫化余量”口径抬高；</li>
      *   <li>非收尾多机台：目标量取“窗口剩余日计划”和“保留机台合计窗口产能”的较大值，
      *   保证 dayN 计划可以排完、保留机台不会被账本提前清零。</li>
      * </ul>
@@ -3333,10 +3342,10 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         String ruleName;
         ProductionQuantityPolicy policy = ProductionQuantityPolicy.from(sourceSku, hasEndingResult(skuResults));
         if (policy.isStrictUpperLimit()) {
-            // 收尾多机台目标量必须以 MAX(硫化余量,胎胚库存) 为准，不能停留在满排模式单机台产能。
+            // 收尾多机台目标量必须以“共用胎胚仅取硫化余量”为准，不能停留在满排模式单机台产能。
             floorTargetQty = Math.max(floorTargetQty,
                     resolveMultiMachineEndingTargetQty(context, sourceSku, skuResults));
-            ruleName = "收尾多机台MAX(余量,胎胚库存)";
+            ruleName = "收尾多机台共用胎胚仅取硫化余量";
         } else {
             // 非收尾多机台：窗口剩余日计划决定本轮要排完的量，保留机台合计窗口产能决定满排上限，
             // 两者取大后作为账本下限，保证按 dayN 保留的生产机台不会被后续裁剪清成 0。

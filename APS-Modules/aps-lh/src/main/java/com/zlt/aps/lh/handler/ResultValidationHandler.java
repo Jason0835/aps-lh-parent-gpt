@@ -1490,7 +1490,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
                                     result.getMaterialCode(), result.getProductStatus())))
                     .forEach(result -> result.setIsEnd(finalTailFlag ? "1" : "0"));
             int finalTargetQty = getTargetScheduleQtyResolver()
-                    .resolveFinalEndingTargetQty(context, sourceSku);
+                    .resolveFinalEndingTargetQtyByStaticRelation(context, sourceSku);
             log.info("SKU排后最终收尾统一刷新完成, batchNo: {}, materialCode: {}, productStatus: {}, "
                             + "actualScheduledQty: {}, finalTargetQty: {}, finalTailFlag: {}",
                     context.getBatchNo(), sourceSku.getMaterialCode(), sourceSku.getProductStatus(),

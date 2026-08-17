@@ -1282,6 +1282,24 @@ public class TargetScheduleQtyResolver {
      * @return 最终收尾比较目标量
      */
     public int resolveFinalEndingTargetQty(LhScheduleContext context, SkuScheduleDTO sku) {
+        return resolveFinalEndingTargetQty(context, sku, false);
+    }
+
+    /**
+     * 按胎胚静态关系解析排后最终收尾目标量。
+     * <p>排产阶段共用胎胚用运行态活跃生产单元判断；排后最终复核必须用胎胚静态关系判断，
+     * 避免运行态集合在排产过程中被消耗/移除后把共用胎胚误判成单胎胚。</p>
+     *
+     * @param context 排程上下文
+     * @param sku SKU排程DTO
+     * @return 最终收尾比较目标量
+     */
+    public int resolveFinalEndingTargetQtyByStaticRelation(LhScheduleContext context, SkuScheduleDTO sku) {
+        return resolveFinalEndingTargetQty(context, sku, true);
+    }
+
+    private int resolveFinalEndingTargetQty(LhScheduleContext context, SkuScheduleDTO sku,
+                                           boolean useStaticEmbryoRelation) {
         if (Objects.isNull(sku)) {
             return 0;
         }
@@ -1307,7 +1325,9 @@ public class TargetScheduleQtyResolver {
 
         int surplusQty = Math.max(0, sku.getSurplusQty());
         int embryoStock = Math.max(0, sku.getEmbryoStock());
-        boolean sharedEmbryo = isSharedEmbryoInWindow(context, sku);
+        boolean sharedEmbryo = useStaticEmbryoRelation
+                ? countOriginalSkusSharingEmbryo(context, sku) > 1
+                : isSharedEmbryoInWindow(context, sku);
         int baseTargetQty = sharedEmbryo ? surplusQty : Math.max(surplusQty, embryoStock);
         int finalTargetQty = ShiftCapacityResolverUtil.roundUpQtyToMouldMultiple(baseTargetQty, mouldQty);
         if (sharedEmbryo && embryoStock > surplusQty) {
@@ -1318,8 +1338,9 @@ public class TargetScheduleQtyResolver {
                     Math.max(surplusQty, embryoStock) - surplusQty);
         }
         log.debug("最终收尾目标量解析, materialCode: {}, 胎胚编码: {}, 原始目标量: {}, "
-                        + "精确硬目标: 无, 基础比较量: {}, 模台数: {}, 最终比较目标: {}",
+                        + "精确硬目标: 无, 共用胎胚: {}, 胎胚关系口径: {}, 基础比较量: {}, 模台数: {}, 最终比较目标: {}",
                 sku.getMaterialCode(), sku.getEmbryoCode(), originalTargetQty,
+                sharedEmbryo, useStaticEmbryoRelation ? "静态关系" : "运行态活跃",
                 baseTargetQty, mouldQty, finalTargetQty);
         return finalTargetQty;
     }
@@ -1737,6 +1758,39 @@ public class TargetScheduleQtyResolver {
         log.debug("SKU多机台合计产能计算完成, materialCode: {}, 候选机台数: {}, 合计产能: {}",
                 sku.getMaterialCode(), candidates.size(), totalCapacity);
         return totalCapacity;
+    }
+
+    /**
+     * 计算 SKU 收尾判定使用的窗口可用产能。
+     * <p>续作在机 SKU 按续作机台自身窗口产能计算；新增 SKU 按候选机台合计产能计算。
+     * 续作机台通常不参与新增选机，直接走新增选机口径会低估窗口产能，导致仍有硫化余量
+     * 且可在窗口内排完的续作 SKU 被漏判为收尾。</p>
+     *
+     * @param context 排程上下文
+     * @param sku SKU排程DTO
+     * @return 窗口可用产能
+     */
+    public int calcSkuEndingAvailableCapacityInWindow(LhScheduleContext context, SkuScheduleDTO sku) {
+        if (Objects.isNull(context) || Objects.isNull(sku)) {
+            return 0;
+        }
+        // 续作在机 SKU 已绑定续作机台，按续作机台自身窗口产能判断能否排完硫化余量。
+        String continuousMachineCode = sku.getContinuousMachineCode();
+        if (StringUtils.isNotEmpty(continuousMachineCode)) {
+            MachineScheduleDTO machine = Objects.nonNull(context.getMachineScheduleMap())
+                    ? context.getMachineScheduleMap().get(continuousMachineCode) : null;
+            if (Objects.nonNull(machine)) {
+                List<LhShiftConfigVO> shifts = resolveScheduleShifts(context);
+                if (!CollectionUtils.isEmpty(shifts)) {
+                    // 续作仍有硫化余量时从T日首个可排班次起排，据此估算续作机台窗口产能。
+                    Date startTime = shifts.get(0).getShiftStartDateTime();
+                    return calcMachineAvailableCapacityByStartTime(
+                            context, sku, machine, null, startTime, shifts,
+                            ScheduleTypeEnum.CONTINUOUS.getCode());
+                }
+            }
+        }
+        return calcSkuTotalAvailableCapacityInWindow(context, sku);
     }
 
     /**
@@ -2457,7 +2511,7 @@ public class TargetScheduleQtyResolver {
         int surplusQty = Math.max(0, sku.getSurplusQty());
         int windowPlanQty = Math.max(0, sku.getWindowPlanQty());
 
-        // 共用胎胚收尾只按硫化余量排，不按胎胚库存排；单胎胚未命中胎胚收尾标记时按 MAX(余量, 胎胚库存)
+        // 共用胎胚（多SKU共用同胎胚 或 同物料多机台）只按硫化余量排；单胎胚按 MAX(余量, 胎胚库存)
         int originalSkuCount = countOriginalSkusSharingEmbryo(context, sku);
         int activeSkuCount = countActiveSkusSharingEmbryo(context, sku);
         boolean sharedEmbryo = activeSkuCount > 1;
@@ -2478,8 +2532,8 @@ public class TargetScheduleQtyResolver {
         String direction = endingTargetQty > currentTargetQty ? "上调"
                 : endingTargetQty < currentTargetQty ? "下调" : "保持";
         int windowRemainingPlanQty = Math.max(0, sku.getWindowRemainingPlanQty());
-        log.info("收尾SKU目标量{}, materialCode: {}, 胎胚编码: {}, 原始共用SKU数: {}, "
-                        + "有效共用SKU数: {}, 是否动态共用胎胚: {}, 目标量取值来源: {}, "
+        log.info("收尾SKU目标量{}, materialCode: {}, 胎胚编码: {}, 原始生产单元数: {}, "
+                        + "有效生产单元数: {}, 是否共用胎胚: {}, 目标量取值来源: {}, "
                         + "原目标量: {}, 基础目标量: {}, 模台数: {}, 调整后: {}, 窗口日计划总量: {}, 窗口日计划剩余: {}, "
                         + "胎胚库存: {}, 月计划余量: {}, 未排原因: {}",
                 direction, sku.getMaterialCode(), sku.getEmbryoCode(), originalSkuCount,
@@ -2648,30 +2702,42 @@ public class TargetScheduleQtyResolver {
         if (CollectionUtils.isEmpty(context.getActiveEmbryoSkuMap())) {
             refreshActiveEmbryoSkuMap(context);
         }
-        List<String> activeSkuList = context.getActiveEmbryoSkuMap().get(sku.getEmbryoCode());
-        return CollectionUtils.isEmpty(activeSkuList) ? 0 : activeSkuList.size();
+        /*
+         * 活跃集合按物料+产品状态去重维护，但共用胎胚判断必须按“生产单元（SKU × 机台）”计数，
+         * 否则同一物料多机台会被误判成单胎胚。此处回查候选列表，把同胎胚活跃 SKU 拆成生产单元再计数。
+         */
+        Set<String> activeSkuKeySet = new HashSet<String>(
+                context.getActiveEmbryoSkuMap().getOrDefault(sku.getEmbryoCode(), Collections.emptyList()));
+        Set<String> productionUnitKeySet = new HashSet<String>(8);
+        for (SkuScheduleDTO candidateSku : collectCandidateSkus(context)) {
+            if (candidateSku != null && StringUtils.equals(sku.getEmbryoCode(), candidateSku.getEmbryoCode())
+                    && activeSkuKeySet.contains(buildSkuKey(candidateSku))) {
+                productionUnitKeySet.add(buildEmbryoProductionUnitKey(candidateSku));
+            }
+        }
+        return productionUnitKeySet.size();
     }
 
     /**
-     * 统计同胎胚原始SKU数量。
-     * <p>用于日志呈现静态关系下的共用数量，动态判断仍以 activeEmbryoSkuMap 为准。</p>
+     * 统计同胎胚原始生产单元数。
+     * <p>静态关系下的共用数量按“生产单元（SKU × 机台）”计数，排后最终复核使用该静态口径。</p>
      *
      * @param context 排程上下文
      * @param sku 当前SKU
-     * @return 原始同胎胚SKU数
+     * @return 原始同胎胚生产单元数
      */
     private int countOriginalSkusSharingEmbryo(LhScheduleContext context, SkuScheduleDTO sku) {
         if (Objects.isNull(context) || Objects.isNull(sku) || StringUtils.isEmpty(sku.getEmbryoCode())) {
             return 0;
         }
-        Set<String> skuKeySet = new HashSet<>(8);
+        Set<String> productionUnitKeySet = new HashSet<>(8);
         for (SkuScheduleDTO candidateSku : collectCandidateSkus(context)) {
             if (candidateSku != null && StringUtils.equals(sku.getEmbryoCode(), candidateSku.getEmbryoCode())
                     && StringUtils.isNotEmpty(candidateSku.getMaterialCode())) {
-                skuKeySet.add(buildSkuKey(candidateSku));
+                productionUnitKeySet.add(buildEmbryoProductionUnitKey(candidateSku));
             }
         }
-        return skuKeySet.size();
+        return productionUnitKeySet.size();
     }
 
     /**
@@ -3207,6 +3273,23 @@ public class TargetScheduleQtyResolver {
         }
         return MonthPlanDateResolver.buildMaterialStatusKey(
                 sku.getMaterialCode(), sku.getProductStatus());
+    }
+
+    /**
+     * 构建胎胚生产单元键（SKU × 机台）。
+     * <p>同物料多机台会因续作机台不同拆成多个生产单元，与多 SKU 共用同一胎胚一样都算共用胎胚；
+     * 新增 SKU 尚未绑定机台，统一按空机台处理。</p>
+     *
+     * @param sku SKU排程信息
+     * @return 生产单元键
+     */
+    private String buildEmbryoProductionUnitKey(SkuScheduleDTO sku) {
+        if (Objects.isNull(sku)) {
+            return null;
+        }
+        String skuKey = buildSkuKey(sku);
+        String machineCode = StringUtils.defaultString(sku.getContinuousMachineCode());
+        return skuKey + "#" + machineCode;
     }
 
     /**
