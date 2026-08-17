@@ -181,7 +181,7 @@ public class LhDayPlanAdjustRequireServiceImpl extends AbstractDocService<LhDayP
     /**
      * 查询有效排产版本的月计划明细。
      *
-     * @param queryVO 查询条件
+     * @param queryVO           查询条件
      * @param productionVersion 排产版本
      * @return 月计划明细
      */
@@ -203,9 +203,9 @@ public class LhDayPlanAdjustRequireServiceImpl extends AbstractDocService<LhDayP
     /**
      * 按物料和产品状态归并月计划量。
      *
-     * @param queryVO 查询条件
+     * @param queryVO           查询条件
      * @param productionVersion 排产版本
-     * @param monthPlanList 月计划明细
+     * @param monthPlanList     月计划明细
      * @return 归并列表
      */
     private List<LhDayPlanAdjustRequire> aggregateMonthPlanRows(
@@ -252,9 +252,9 @@ public class LhDayPlanAdjustRequireServiceImpl extends AbstractDocService<LhDayP
     /**
      * 创建月计划列表基础行。
      *
-     * @param queryVO 查询条件
+     * @param queryVO           查询条件
      * @param productionVersion 排产版本
-     * @param plan 月计划明细
+     * @param plan              月计划明细
      * @return 基础行
      */
     private LhDayPlanAdjustRequire createMonthPlanRow(
@@ -279,8 +279,8 @@ public class LhDayPlanAdjustRequireServiceImpl extends AbstractDocService<LhDayP
     /**
      * 对归并后的列表执行内存分页。
      *
-     * @param allRows 全部归并行
-     * @param pageNum 页码
+     * @param allRows  全部归并行
+     * @param pageNum  页码
      * @param pageSize 每页数量
      * @return 当前页
      */
@@ -427,8 +427,8 @@ public class LhDayPlanAdjustRequireServiceImpl extends AbstractDocService<LhDayP
      * 校验单个调整槽位的数量和原因必须同时填写或同时清空。
      *
      * @param materialCode 物料编码
-     * @param adjustIndex 调整序号
-     * @param adjustQty 调整量
+     * @param adjustIndex  调整序号
+     * @param adjustQty    调整量
      * @param adjustReason 调整原因
      */
     private void validateAdjustSlot(
@@ -605,7 +605,7 @@ public class LhDayPlanAdjustRequireServiceImpl extends AbstractDocService<LhDayP
 
     @Override
     public List<LhDayPlanAdjustVo> getMonthPlanLhDayAdjustList(YearMonth yearMonth, List<String> factoryList, List<String> materialCodeList) {
-        if (null == yearMonth || CollectionUtils.isEmpty(factoryList) || CollectionUtils.isEmpty(materialCodeList)) {
+        if (null == yearMonth || CollectionUtils.isEmpty(factoryList)) {
             return Collections.emptyList();
         }
         List<LhDayPlanAdjustRequire> monthLhDayPlanAdjustRequireList = Lists.newArrayList();
@@ -681,7 +681,7 @@ public class LhDayPlanAdjustRequireServiceImpl extends AbstractDocService<LhDayP
         wrapper.eq(LhDayPlanAdjustRequire::getFactoryCode, version.getFactoryCode())
                 .eq(LhDayPlanAdjustRequire::getYear, version.getYear())
                 .eq(LhDayPlanAdjustRequire::getMonth, version.getMonth())
-                .in(LhDayPlanAdjustRequire::getMaterialCode, materialCodeList)
+                .in(CollectionUtils.isNotEmpty(materialCodeList), LhDayPlanAdjustRequire::getMaterialCode, materialCodeList)
                 .eq(LhDayPlanAdjustRequire::getIsDelete, DeleteFlagEnum.NORMAL.getCode());
         List<LhDayPlanAdjustRequire> dataResult = lhDayPlanAdjustRequireMapper.selectList(wrapper);
         if (CollectionUtils.isEmpty(dataResult)) {
