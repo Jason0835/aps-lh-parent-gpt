@@ -1,14 +1,17 @@
 package com.zlt.aps.lh.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import cn.hutool.core.date.DateUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.google.common.collect.Lists;
 import com.ruoyi.common.constant.HttpStatus;
 import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
+import com.zlt.aps.common.engine.domain.LhDayPlanAdjustVo;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.lh.api.domain.entity.LhDayPlanAdjustRequire;
+import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
 import com.zlt.aps.lh.mapper.FactoryMonthPlanProductionFinalResultMapper;
 import com.zlt.aps.lh.mapper.LhDayPlanAdjustRequireMapper;
 import com.zlt.aps.lh.mapper.MpFactoryProductionVersionMapper;
@@ -17,6 +20,7 @@ import com.zlt.aps.maindata.mapper.MdmRawMaterialConversionEntityMapper;
 import com.zlt.aps.mdm.api.domain.entity.MdmRawMaterialConversion;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
+import com.zlt.aps.utils.BeanCopyUtils;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import org.apache.commons.collections4.CollectionUtils;
@@ -26,16 +30,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.Date;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
+import java.time.YearMonth;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -184,7 +180,7 @@ public class LhDayPlanAdjustRequireServiceImpl extends AbstractDocService<LhDayP
     /**
      * 查询有效排产版本的月计划明细。
      *
-     * @param queryVO 查询条件
+     * @param queryVO           查询条件
      * @param productionVersion 排产版本
      * @return 月计划明细
      */
@@ -206,9 +202,9 @@ public class LhDayPlanAdjustRequireServiceImpl extends AbstractDocService<LhDayP
     /**
      * 按物料和产品状态归并月计划量。
      *
-     * @param queryVO 查询条件
+     * @param queryVO           查询条件
      * @param productionVersion 排产版本
-     * @param monthPlanList 月计划明细
+     * @param monthPlanList     月计划明细
      * @return 归并列表
      */
     private List<LhDayPlanAdjustRequire> aggregateMonthPlanRows(
@@ -255,9 +251,9 @@ public class LhDayPlanAdjustRequireServiceImpl extends AbstractDocService<LhDayP
     /**
      * 创建月计划列表基础行。
      *
-     * @param queryVO 查询条件
+     * @param queryVO           查询条件
      * @param productionVersion 排产版本
-     * @param plan 月计划明细
+     * @param plan              月计划明细
      * @return 基础行
      */
     private LhDayPlanAdjustRequire createMonthPlanRow(
@@ -282,8 +278,8 @@ public class LhDayPlanAdjustRequireServiceImpl extends AbstractDocService<LhDayP
     /**
      * 对归并后的列表执行内存分页。
      *
-     * @param allRows 全部归并行
-     * @param pageNum 页码
+     * @param allRows  全部归并行
+     * @param pageNum  页码
      * @param pageSize 每页数量
      * @return 当前页
      */
@@ -349,7 +345,7 @@ public class LhDayPlanAdjustRequireServiceImpl extends AbstractDocService<LhDayP
     /**
      * 批量查询并回填胎面胶 TD。
      *
-     * @param pageRows 当前页月计划行
+     * @param pageRows    当前页月计划行
      * @param factoryCode 工厂编码
      */
     private void fillTreadGlueTd(List<LhDayPlanAdjustRequire> pageRows, String factoryCode) {
@@ -429,7 +425,7 @@ public class LhDayPlanAdjustRequireServiceImpl extends AbstractDocService<LhDayP
     /**
      * 校验单个调整槽位的数量和原因必须同时填写或同时清空。
      *
-     * @param adjustQty 调整量
+     * @param adjustQty    调整量
      * @param adjustReason 调整原因
      */
     private void validateAdjustSlot(BigDecimal adjustQty, String adjustReason) {
@@ -446,7 +442,7 @@ public class LhDayPlanAdjustRequireServiceImpl extends AbstractDocService<LhDayP
     /**
      * 查询保存行对应的有效月计划。
      *
-     * @param entity 当前行数据
+     * @param entity            当前行数据
      * @param productionVersion 排产版本
      * @return 月计划来源快照
      */
@@ -484,10 +480,10 @@ public class LhDayPlanAdjustRequireServiceImpl extends AbstractDocService<LhDayP
     /**
      * 新增、更新或清空一个调整槽位。
      *
-     * @param request 当前行请求
-     * @param sourcePlan 月计划来源行
-     * @param adjustIndex 调整序号
-     * @param adjustQty 调整量
+     * @param request      当前行请求
+     * @param sourcePlan   月计划来源行
+     * @param adjustIndex  调整序号
+     * @param adjustQty    调整量
      * @param adjustReason 调整原因
      */
     private void saveAdjustSlot(
@@ -548,7 +544,7 @@ public class LhDayPlanAdjustRequireServiceImpl extends AbstractDocService<LhDayP
     /**
      * 生成物料和产品状态组合键。
      *
-     * @param materialCode 物料编码
+     * @param materialCode  物料编码
      * @param productStatus 产品状态/示方类型
      * @return 组合键
      */
@@ -560,7 +556,7 @@ public class LhDayPlanAdjustRequireServiceImpl extends AbstractDocService<LhDayP
     /**
      * 生成已回填调整槽位键。
      *
-     * @param row 月计划行
+     * @param row         月计划行
      * @param adjustCount 调整序号
      * @return 槽位键
      */
@@ -582,7 +578,7 @@ public class LhDayPlanAdjustRequireServiceImpl extends AbstractDocService<LhDayP
     /**
      * 构建统一分页响应。
      *
-     * @param rows 当前页数据
+     * @param rows  当前页数据
      * @param total 总数
      * @return 分页响应
      */
@@ -601,6 +597,28 @@ public class LhDayPlanAdjustRequireServiceImpl extends AbstractDocService<LhDayP
     }
 
     @Override
+    public List<LhDayPlanAdjustVo> getMonthPlanLhDayAdjustList(YearMonth yearMonth, List<String> factoryList, List<String> materialCodeList) {
+        if (null == yearMonth || CollectionUtils.isEmpty(factoryList) || CollectionUtils.isEmpty(materialCodeList)) {
+            return Collections.emptyList();
+        }
+        List<LhDayPlanAdjustRequire> monthLhDayPlanAdjustRequireList = Lists.newArrayList();
+        int year = yearMonth.getYear();
+        int month = yearMonth.getMonthValue();
+        for (String factoryCode : factoryList) {
+            MpFactoryProductionVersion version = getFinalProductionVersion(factoryCode, year, month);
+            List<LhDayPlanAdjustRequire> singleFactoryList = getProductionVersionYearMonthLhDayPlanAdjustInfo(version, materialCodeList);
+            if (CollectionUtils.isNotEmpty(singleFactoryList)) {
+                monthLhDayPlanAdjustRequireList.addAll(singleFactoryList);
+            }
+        }
+        if (CollectionUtils.isEmpty(monthLhDayPlanAdjustRequireList)) {
+            return Collections.emptyList();
+        }
+        List<LhDayPlanAdjustVo> resultList = BeanCopyUtils.copyBeanList(monthLhDayPlanAdjustRequireList, LhDayPlanAdjustVo.class);
+        return resultList;
+    }
+
+    @Override
     protected String getDocTypeCode() {
         return "0";
     }
@@ -615,5 +633,53 @@ public class LhDayPlanAdjustRequireServiceImpl extends AbstractDocService<LhDayP
     @Override
     protected List<String> getCheckUniqueFields() {
         return Arrays.asList("factoryCode", "yearMonth", "materialCode", "productStatus", "adjustCount");
+    }
+
+    /**
+     * 获取定稿排产版本
+     *
+     * @param factoryCode 分厂编码
+     * @param year        年份
+     * @param month       月份
+     * @return 定稿排产版本，不存在返回null
+     */
+    private MpFactoryProductionVersion getFinalProductionVersion(String factoryCode, int year, int month) {
+        if (StringUtils.isBlank(factoryCode)) {
+            return null;
+        }
+        LambdaQueryWrapper<MpFactoryProductionVersion> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(MpFactoryProductionVersion::getFactoryCode, factoryCode)
+                .eq(MpFactoryProductionVersion::getYear, year)
+                .eq(MpFactoryProductionVersion::getMonth, month)
+                .eq(MpFactoryProductionVersion::getIsFinal, "1")
+                .eq(MpFactoryProductionVersion::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
+                .orderByDesc(MpFactoryProductionVersion::getUpdateTime)
+                .orderByDesc(MpFactoryProductionVersion::getId)
+                .last("LIMIT 1");
+        return productionVersionMapper.selectOne(wrapper);
+    }
+
+    /**
+     * 根据排产版本号，获取对应年月的硫化日计划调整信息
+     *
+     * @param version          排产版本信息
+     * @param materialCodeList 需要查询的Sku信息
+     * @return
+     */
+    private List<LhDayPlanAdjustRequire> getProductionVersionYearMonthLhDayPlanAdjustInfo(MpFactoryProductionVersion version, List<String> materialCodeList) {
+        if (null == version || CollectionUtils.isEmpty(materialCodeList)) {
+            return Collections.emptyList();
+        }
+        LambdaQueryWrapper<LhDayPlanAdjustRequire> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(LhDayPlanAdjustRequire::getFactoryCode, version.getFactoryCode())
+                .eq(LhDayPlanAdjustRequire::getYear, version.getYear())
+                .eq(LhDayPlanAdjustRequire::getMonth, version.getMonth())
+                .in(LhDayPlanAdjustRequire::getMaterialCode, materialCodeList)
+                .eq(LhDayPlanAdjustRequire::getIsDelete, DeleteFlagEnum.NORMAL.getCode());
+        List<LhDayPlanAdjustRequire> dataResult = lhDayPlanAdjustRequireMapper.selectList(wrapper);
+        if (CollectionUtils.isEmpty(dataResult)) {
+            return Collections.emptyList();
+        }
+        return dataResult;
     }
 }
