@@ -262,7 +262,14 @@ export default {
           prop: 'factoryCode',
           type: 'select',
           dictData: this.dict.type.biz_factory_name,
-          filterable: true
+          filterable: true,
+          listeners: {
+            change: (factoryCode) => {
+              // 工厂切换后按新工厂重新加载机台选项，并清空已选机台，避免旧工厂机台残留
+              this.search = { ...this.search, factoryCode, machineCode: undefined }
+              this.loadMachineOptions(factoryCode)
+            }
+          }
         },
         {
           label: this.$t('ui.data.column.cd90ScheduleResult.scheduleDate'),
@@ -697,8 +704,14 @@ export default {
         }))
       })
     },
-    loadMachineOptions() {
-      getCd90MachineEnableOptions({ factoryCode: this.query.factoryCode || this.search.factoryCode }).then(res => {
+    loadMachineOptions(factoryCode) {
+      // 未传工厂时使用当前查询条件中的工厂；工厂为空时清空选项，避免展示全厂机台
+      const code = factoryCode || this.query.factoryCode || this.search.factoryCode
+      if (!code) {
+        this.machineOptions = []
+        return
+      }
+      getCd90MachineEnableOptions({ factoryCode: code }).then(res => {
         const rows = Array.isArray(res) ? res : (res.rows || res.data || [])
         this.machineOptions = rows.map(item => ({
           label: item.machineCode,

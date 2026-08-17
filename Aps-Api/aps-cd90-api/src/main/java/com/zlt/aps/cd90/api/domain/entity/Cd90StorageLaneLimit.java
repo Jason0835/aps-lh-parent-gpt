@@ -27,11 +27,12 @@ public class Cd90StorageLaneLimit extends BaseEntity implements Serializable {
     @TableField("FACTORY_CODE")
     @Excel(name = "ui.data.column.cd90StorageLaneLimit.factoryCode", dictType = "biz_factory_name")
     private String factoryCode;
+
     /**
      * 日期
      */
     @ApiModelProperty("日期")
-    @ImportExcelValidated(required = true, maxLength = 10)
+    @ImportExcelValidated(required = true, maxLength = 30)
     @TableField("LANE_DATE")
     @Excel(name = "ui.data.column.cd90StorageLaneLimit.laneDate", width = 30, dateFormat = "yyyy-MM-dd")
     @JsonFormat(pattern = "yyyy-MM-dd")
@@ -81,6 +82,7 @@ public class Cd90StorageLaneLimit extends BaseEntity implements Serializable {
     @TableField("CAR_NUM")
     @Excel(name = "ui.data.column.cd90StorageLaneLimit.carNum")
     private Integer carNum;
+
     /**
      * 最大车数
      */
@@ -89,26 +91,34 @@ public class Cd90StorageLaneLimit extends BaseEntity implements Serializable {
     @TableField("MAX_CAR_NUM")
     @Excel(name = "ui.data.column.cd90StorageLaneLimit.maxCarNum")
     private Integer maxCarNum;
+
     /**
      * 剩余可用车数
      */
     @ApiModelProperty("剩余可用车数")
     @TableField("AVAILABLE_CAR_NUM")
-//    @Excel(name = "ui.data.column.cd90StorageLaneLimit.availableCarNum")
     private Integer availableCarNum;
+
     /**
      * 数据来源
      */
     @ApiModelProperty("数据来源")
     @TableField("DATA_SOURCE")
-//    @Excel(name = "ui.data.column.cd90StorageLaneLimit.dataSource")
     private String dataSource;
+
     /**
      * MES同步时间
      */
     @ApiModelProperty("MES同步时间")
     @TableField("MES_SYNC_TIME")
-//    @Excel(name = "ui.data.column.cd90StorageLaneLimit.mesSyncTime", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private Date mesSyncTime;
+
+    /**
+     * 备注
+     */
+    @ApiModelProperty(value = "备注", name = "remark")
+    @TableField("REMARK")
+    @Excel(name = "ui.common.column.remark")
+    private String remark;
 }

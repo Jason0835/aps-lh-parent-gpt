@@ -22,6 +22,9 @@ public class Cd90ScheduleResultIssue implements Serializable {
     /** 直裁批次号 */
     private String cd90BatchNo;
 
+    /** 对应成型批次号 */
+    private String cxBatchNo;
+
     /** 工单号 */
     private String orderNo;
 
@@ -34,6 +37,18 @@ public class Cd90ScheduleResultIssue implements Serializable {
 
     /** 帘布代号 */
     private String clothCode;
+
+    /** 产出物类别，直裁固定为纤维 */
+    private String outputType;
+
+    /** 产出物代码 */
+    private String outputCode;
+
+    /** 产出物料号 */
+    private String outputMaterialCode;
+
+    /** 成型胎胚物料描述，多个规格使用斜杠拼接 */
+    private String embryoSpecDesc;
 
     /** 帘布大卷编号 */
     private String bigRollCode;
@@ -76,6 +91,36 @@ public class Cd90ScheduleResultIssue implements Serializable {
 
     /** 单耗（成型一个胎耗多少米） */
     private Double unitConsume;
+
+    /** 库存数量 */
+    private Double stockQty;
+
+    /** 库存供应成型时长，单位小时 */
+    private Double supplyTime;
+
+    /** 当前班次示方类型 */
+    private String exampleType;
+
+    /** 当前班次示方号 */
+    private String exampleNo;
+
+    /** 当前班次备注 */
+    private String shiftRemark;
+
+    /** 对应成型一班计划量 */
+    private Double cxClass1Plan;
+
+    /** 对应成型二班计划量 */
+    private Double cxClass2Plan;
+
+    /** 对应成型三班计划量 */
+    private Double cxClass3Plan;
+
+    /** 对应成型四班计划量 */
+    private Double cxClass4Plan;
+
+    /** 排程备注 */
+    private String remark;
 
     /** 数据版本号 */
     private String dataVersion;
