@@ -783,7 +783,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         // 当前只有一个明细列表，因此只放入一个 List<Map<String,Object>>。
         List<List<Map<String, Object>>> excelDataList = new ArrayList<>();
         ExportDataBuildResult exportDataBuildResult = buildExportDataList(
-                sortedExportList, result.getScheduleDate(), mouldChangePlanList);
+                sortedExportList, result.getScheduleDate());
         List<Map<String, Object>> exportDataList = exportDataBuildResult.getDataList();
         excelDataList.add(exportDataList);
 
@@ -2624,8 +2624,8 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
 
     /**
      * 按导出顺序排序排程结果。
-     * <p>先按硫化机台升序（忽略大小写），再按同机台不同物料的收尾班次序号升序（先收尾下机的物料排前面），
-     * 最后按物料编码升序。导出明细填充与收尾标识匹配均基于该顺序。</p>
+     * <p>先按硫化机台升序（忽略大小写），再按同机台物料首次有计划量的实际开始时间升序，
+     * 最后按首次计划班次和物料编码升序。导出明细顺序与班次顺序值保持一致。</p>
      *
      * @param list 排程结果列表
      * @return 排序后的列表
@@ -2634,7 +2634,8 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         return list.stream()
                 .sorted(Comparator
                         .comparing((LhScheduleResult r) -> StringUtils.defaultString(r.getLhMachineCode()), String.CASE_INSENSITIVE_ORDER)
-                        .thenComparingInt(r -> findLastPlannedShift(r))
+                        .thenComparing(this::findFirstPlannedStartTime, Comparator.nullsLast(Date::compareTo))
+                        .thenComparingInt(this::findFirstPlannedShift)
                         .thenComparing(r -> StringUtils.defaultString(r.getMaterialCode())))
                 .collect(Collectors.toList());
     }
@@ -2643,12 +2644,10 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      * 构建模板列表数据
      *
      * @param list         排程结果列表（已按导出顺序排序）
-     * @param scheduleDate        导出入口传入的排程日期，用于固定 T 日完成量查询口径
-     * @param mouldChangePlanList 模具交替计划，用于按同批次、同排程日、同机台修正一班顺序
+     * @param scheduleDate 导出入口传入的排程日期，用于固定 T 日完成量查询口径
      * @return 模板列表数据及与Excel行对齐的排程结果
      */
-    private ExportDataBuildResult buildExportDataList(List<LhScheduleResult> list, Date scheduleDate,
-                                                       List<LhMouldChangePlan> mouldChangePlanList) {
+    private ExportDataBuildResult buildExportDataList(List<LhScheduleResult> list, Date scheduleDate) {
         List<Map<String, Object>> dataList = new ArrayList<>(list.size() + 1);
         List<LhScheduleResult> alignedExportList = new ArrayList<>(list.size() + 1);
         Map<String, LhRepairCapsule> capsuleMap = buildRepairCapsuleExportMap(list);
@@ -2660,13 +2659,14 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         cxMachineLookupList.addAll(beforeMaterialResultMap.values());
         Map<Long, String> cxMachineCodeMap = buildCxMachineCodeExportMap(cxMachineLookupList);
 
-        // 导出顺序由 sortExportList 统一排序（机台升序 → 同机台收尾班次序号升序 → 物料编码升序），
+        // 导出顺序由 sortExportList 统一排序（机台升序 → 同机台物料首次生产时间升序 → 物料编码升序），
         // 此处直接按传入顺序遍历。
         List<LhScheduleResult> sortedList = list;
 
-        // 构建8班顺序值映射：同一物料按班次1~8遍历，每个班次内有计划量的记录按机台编码升序，顺序值从1~n连续编排
-        Map<String, Map<Integer, Integer>> shiftOrderMap = buildContinuousShiftOrderMap(sortedList);
-        Map<String, Integer> class1MouldChangeOrderMap = buildClass1MouldChangeOrderMap(mouldChangePlanList);
+        // 前规格参考行代表该机台已先生产过一个物料，参与机台内物料上机顺序编号。
+        List<LhScheduleResult> shiftOrderSourceList = new ArrayList<>(sortedList);
+        shiftOrderSourceList.addAll(beforeMaterialResultMap.values());
+        Map<String, Map<Integer, Integer>> shiftOrderMap = buildContinuousShiftOrderMap(shiftOrderSourceList);
         Map<LhScheduleResult, ExportRowStyleFlag> rowStyleFlagMap = buildMachinePostCloseOutStyleFlagMap(sortedList);
         Set<String> insertedReferenceMachineCodes = new HashSet<>();
 
@@ -2734,12 +2734,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             // 与模板中的 {.class1PlanQty}、{.class8Analysis} 等占位符一一对应。
             for (int shift = 1; shift <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shift++) {
                 row.put("class" + shift + "LeftRightMould", buildShiftLeftRightMould(result, shift));
-                Object shiftOrder = resolveExportShiftOrder(
-                        shiftOrderMap, class1MouldChangeOrderMap, result, shift);
-                if (shift == 1 && hasBeforeMaterialReference) {
-                    shiftOrder = 2;
-                }
-                row.put("class" + shift + "Order", shiftOrder);
+                row.put("class" + shift + "Order", getContinuousShiftOrder(shiftOrderMap, result, shift));
                 row.put("class" + shift + "PlanQty", zeroToEmpty(getClassPlanQty(result, shift)));
                 row.put("class" + shift + "FinishQty", zeroToEmpty(getClassFinishQty(result, shift)));
                 Object shiftType = buildShiftType(result, shift, endTypeMap);
@@ -2916,69 +2911,6 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             return false;
         }
         return "02".equals(result.getScheduleType()) || "03".equals(result.getScheduleType());
-    }
-
-    /**
-     * 构建模具交替计划对应的一班顺序映射。
-     * 同一硫化结果批次、排程日期和机台内，前规格为1，后规格为2。
-     *
-     * @param mouldChangePlanList 模具交替计划
-     * @return key=批次号|排程日期|机台|物料编码，value=一班顺序
-     */
-    private Map<String, Integer> buildClass1MouldChangeOrderMap(List<LhMouldChangePlan> mouldChangePlanList) {
-        Map<String, Integer> orderMap = new HashMap<>();
-        if (CollUtil.isEmpty(mouldChangePlanList)) {
-            return orderMap;
-        }
-        mouldChangePlanList.forEach(plan -> {
-            if (StringUtils.isNotBlank(plan.getBeforeMaterialCode())) {
-                orderMap.put(buildMouldChangeOrderKey(plan.getLhResultBatchNo(), plan.getScheduleDate(),
-                        plan.getLhMachineCode(), plan.getBeforeMaterialCode()), 1);
-            }
-            if (StringUtils.isNotBlank(plan.getAfterMaterialCode())) {
-                orderMap.put(buildMouldChangeOrderKey(plan.getLhResultBatchNo(), plan.getScheduleDate(),
-                        plan.getLhMachineCode(), plan.getAfterMaterialCode()), 2);
-            }
-        });
-        return orderMap;
-    }
-
-    /**
-     * 获取导出班次顺序。仅一班命中模具交替计划时覆盖为前规格1、后规格2，其他情况保持原顺序。
-     *
-     * @param shiftOrderMap             原连续顺序映射
-     * @param class1MouldChangeOrderMap 一班模具交替顺序映射
-     * @param result                    排程结果
-     * @param shift                     班次序号
-     * @return 导出顺序
-     */
-    private Object resolveExportShiftOrder(Map<String, Map<Integer, Integer>> shiftOrderMap,
-                                           Map<String, Integer> class1MouldChangeOrderMap,
-                                           LhScheduleResult result, int shift) {
-        Object currentOrder = getContinuousShiftOrder(shiftOrderMap, result, shift);
-        if (shift != 1 || !(currentOrder instanceof Integer)) {
-            return currentOrder;
-        }
-        String key = buildMouldChangeOrderKey(result.getBatchNo(), result.getScheduleDate(),
-                result.getLhMachineCode(), result.getMaterialCode());
-        return class1MouldChangeOrderMap.getOrDefault(key, (Integer) currentOrder);
-    }
-
-    /**
-     * 构建模具交替顺序匹配Key。
-     *
-     * @param batchNo     硫化结果批次号
-     * @param scheduleDate 排程日期
-     * @param machineCode 硫化机台编码
-     * @param materialCode 物料编码
-     * @return 匹配Key
-     */
-    private String buildMouldChangeOrderKey(String batchNo, Date scheduleDate,
-                                            String machineCode, String materialCode) {
-        String scheduleDay = Objects.nonNull(scheduleDate) ? DateUtil.formatDate(scheduleDate) : "";
-        return StringUtils.defaultString(batchNo).trim() + "|" + scheduleDay + "|"
-                + StringUtils.defaultString(machineCode).trim() + "|"
-                + StringUtils.defaultString(materialCode).trim();
     }
 
     /**
@@ -3469,7 +3401,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      * @param shift  班次序号
      * @return 班次顺序
      * @deprecated 已被 {@link #buildContinuousShiftOrderMap} + {@link #getContinuousShiftOrder} 替代，
-     * 不再使用数据库字段 scheduleOrder，改为同一物料按班次连续编排
+     * 不再使用数据库字段 scheduleOrder，改为同一机台按物料上机先后连续编排
      */
     @Deprecated
     private Object buildShiftOrder(LhScheduleResult result, int shift) {
@@ -3478,89 +3410,89 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     }
 
     /**
-     * 构建同一物料下8班连续顺序值映射。
-     * <p>编排规则：按物料分组 → 按班次1~8顺序遍历 → 同一SKU+机台的顺序号一旦确定，后续班次沿用不变。
-     * 机台首次上机时按机台编码升序分配顺序号，后续班次新增机台从当前最大顺序号+1递增。</p>
-     * <p>例如：5台机台K111/K1113/K1206/K1313/K2024排同一物料，
-     * 班次1(早班)K1313和K2024有排产，按上机时间+机台编码升序 → K1313=1, K2024=2；
-     * 班次2(中班)5台都有排产，K1313和K2024沿用顺序1和2，新增K111=3, K1113=4, K1206=5；
-     * 后续班次中5台机台的顺序号始终保持不变。</p>
+     * 构建同一机台内物料上机顺序映射。
+     * <p>编排规则：按硫化机台分组，同机台物料按首次有计划量的实际开始时间排序并从1编号；
+     * 同一物料一旦取得顺序号，其所有有计划量班次均沿用该顺序号。</p>
      *
-     * @param sortedList 已按物料编码+机台编码排序的排程结果列表
+     * @param scheduleResultList 排程结果列表，包含导出明细及需要参与顺序计算的前规格参考结果
      * @return key=物料编码|排程结果ID，value=该记录在各班次的顺序值Map（班次号→顺序值）
      */
-    private Map<String, Map<Integer, Integer>> buildContinuousShiftOrderMap(List<LhScheduleResult> sortedList) {
-        Map<String, Map<Integer, Integer>> resultMap = new HashMap<>(sortedList.size());
-        if (PubUtil.isEmpty(sortedList)) {
+    private Map<String, Map<Integer, Integer>> buildContinuousShiftOrderMap(
+            List<LhScheduleResult> scheduleResultList) {
+        Map<String, Map<Integer, Integer>> resultMap = new HashMap<>(scheduleResultList.size());
+        if (PubUtil.isEmpty(scheduleResultList)) {
             return resultMap;
         }
 
-        // 按物料编码分组，保持排序后的顺序
-        Map<String, List<LhScheduleResult>> materialGroupMap = new LinkedHashMap<>();
-        for (LhScheduleResult r : sortedList) {
-            String materialCode = StringUtils.defaultString(r.getMaterialCode());
-            materialGroupMap.computeIfAbsent(materialCode, k -> new ArrayList<>()).add(r);
-        }
+        Map<String, List<LhScheduleResult>> machineGroupMap = scheduleResultList.stream()
+                .collect(Collectors.groupingBy(
+                        result -> StringUtils.defaultString(result.getLhMachineCode()),
+                        LinkedHashMap::new,
+                        Collectors.toList()));
 
-        // 对每个物料组，按班次1~8遍历
-        // 机台首次上机时分配顺序号，后续班次沿用不变；新增机台从当前最大顺序号+1递增
-        for (Map.Entry<String, List<LhScheduleResult>> entry : materialGroupMap.entrySet()) {
-            List<LhScheduleResult> groupList = entry.getValue();
+        machineGroupMap.values().forEach(machineResultList -> {
+            List<LhScheduleResult> orderedResultList = machineResultList.stream()
+                    .filter(result -> this.findFirstPlannedShift(result) <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT)
+                    .sorted(Comparator
+                            .comparing(this::findFirstPlannedStartTime, Comparator.nullsLast(Date::compareTo))
+                            .thenComparingInt(this::findFirstPlannedShift)
+                            .thenComparing(result -> StringUtils.defaultString(result.getMaterialCode())))
+                    .collect(Collectors.toList());
+            Map<String, Integer> materialOrderMap = new LinkedHashMap<>();
+            int nextOrder = 1;
 
-            // 机台编码→已分配的顺序号，跨班次保持
-            Map<String, Integer> machineOrderMap = new LinkedHashMap<>();
-            // 当前已分配的最大顺序号
-            int maxOrder = 0;
-
-            for (int shift = 1; shift <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shift++) {
-                // 收集当前班次有计划量的记录，按机台编码升序
-                int finalShift = shift;
-                List<LhScheduleResult> shiftRecords = groupList.stream()
-                        .filter(r -> {
-                            Integer planQty = getClassPlanQty(r, finalShift);
-                            return Objects.nonNull(planQty) && planQty > 0;
-                        })
-                        .sorted(Comparator.comparing(r -> StringUtils.defaultString(r.getLhMachineCode()), String.CASE_INSENSITIVE_ORDER))
-                        .collect(Collectors.toList());
-
-                for (LhScheduleResult r : shiftRecords) {
-                    String machineCode = StringUtils.defaultString(r.getLhMachineCode());
-                    int order;
-                    if (machineOrderMap.containsKey(machineCode)) {
-                        // 已排上机的机台，沿用已有顺序号
-                        order = machineOrderMap.get(machineCode);
-                    } else {
-                        // 新上机台，分配下一个顺序号
-                        maxOrder++;
-                        order = maxOrder;
-                        machineOrderMap.put(machineCode, order);
+            for (LhScheduleResult result : orderedResultList) {
+                String materialCode = StringUtils.defaultString(result.getMaterialCode());
+                Integer materialOrder = materialOrderMap.get(materialCode);
+                if (Objects.isNull(materialOrder)) {
+                    materialOrder = nextOrder++;
+                    materialOrderMap.put(materialCode, materialOrder);
+                }
+                for (int shift = 1; shift <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shift++) {
+                    Integer planQty = getClassPlanQty(result, shift);
+                    if (Objects.nonNull(planQty) && planQty > 0) {
+                        resultMap.computeIfAbsent(buildShiftOrderMapKey(result), key -> new HashMap<>())
+                                .put(shift, materialOrder);
                     }
-                    String key = buildShiftOrderMapKey(r);
-                    resultMap.computeIfAbsent(key, k -> new HashMap<>()).put(shift, order);
                 }
             }
-        }
-
+        });
         return resultMap;
     }
 
     /**
-     * 查找排程结果中最后一个有计划量的班次序号。
-     * 遍历班次1~8，返回最后一个有计划量（planQty > 0）的班次序号。
-     * 用于同机台不同物料的收尾排序：班次序号越小表示越早收尾下机。
+     * 查找排程结果首个有计划量班次的实际开始时间。
      *
      * @param result 排程结果
-     * @return 最后一个有计划量的班次序号（1~8），所有班次均无计划量时返回0
+     * @return 首次生产开始时间；无有效开始时间时返回null
      */
-    private int findLastPlannedShift(LhScheduleResult result) {
-        int lastShift = 0;
+    private Date findFirstPlannedStartTime(LhScheduleResult result) {
         for (int shift = 1; shift <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shift++) {
             Integer planQty = getClassPlanQty(result, shift);
             if (Objects.nonNull(planQty) && planQty > 0) {
-                lastShift = shift;
+                Date startTime = ShiftFieldUtil.getShiftStartTime(result, shift);
+                if (Objects.nonNull(startTime)) {
+                    return startTime;
+                }
             }
         }
-        return lastShift;
+        return null;
+    }
+
+    /**
+     * 查找排程结果首个有计划量的班次序号。
+     *
+     * @param result 排程结果
+     * @return 首个有计划量班次；无计划量时返回最大班次数加1
+     */
+    private int findFirstPlannedShift(LhScheduleResult result) {
+        for (int shift = 1; shift <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shift++) {
+            Integer planQty = getClassPlanQty(result, shift);
+            if (Objects.nonNull(planQty) && planQty > 0) {
+                return shift;
+            }
+        }
+        return LhScheduleConstant.MAX_SHIFT_SLOT_COUNT + 1;
     }
 
     // ==================== 导出着色规则 ====================

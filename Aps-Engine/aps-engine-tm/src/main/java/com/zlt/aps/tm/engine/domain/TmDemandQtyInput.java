@@ -33,9 +33,9 @@ public class TmDemandQtyInput {
     /** 保证范围总小时数 */
     private BigDecimal guardRangeHours;
 
-    /** 保证窗口逐班成型需求量。 */
+    /** 供应时长窗口逐班成型需求量，包含当班对应的成型需求。 */
     private Map<Integer, BigDecimal> formingGuardWindowQtyMap = new LinkedHashMap<>();
 
-    /** 保证窗口逐班实际班次时长。 */
+    /** 供应时长窗口逐班实际班次时长。 */
     private Map<Integer, BigDecimal> formingGuardWindowHoursMap = new LinkedHashMap<>();
 }

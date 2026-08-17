@@ -58,7 +58,7 @@ public final class ScheduleSupplyDurationCalculator {
                 remainingStockQty = remainingStockQty.subtract(demandQty);
                 accumulatedHours = accumulatedHours.add(shiftHours);
                 stepDetails.add("班" + shiftOrder + "完整覆盖：库存" + display(beforeStockQty)
-                        + "米-需求" + display(demandQty) + "米=" + display(remainingStockQty)
+                        + "米-班" + shiftOrder + "需求" + display(demandQty) + "米=" + display(remainingStockQty)
                         + "米，累计实际时长+" + display(shiftHours) + "H");
                 continue;
             }
@@ -66,7 +66,7 @@ public final class ScheduleSupplyDurationCalculator {
                     .multiply(shiftHours);
             accumulatedHours = accumulatedHours.add(partialHours);
             stepDetails.add("班" + shiftOrder + "部分覆盖：剩余库存" + display(remainingStockQty)
-                    + "米÷该班需求" + display(demandQty) + "米×该班实际时长"
+                    + "米÷班" + shiftOrder + "需求" + display(demandQty) + "米×班" + shiftOrder + "实际时长"
                     + display(shiftHours) + "H=" + display(partialHours) + "H，随后停止");
             result.setSupplyHours(accumulatedHours.setScale(RESULT_SCALE, RoundingMode.HALF_UP));
             result.setCalculationDetail(buildDetail(rollingStockQty, stepDetails, result.getSupplyHours(), false));
@@ -120,7 +120,7 @@ public final class ScheduleSupplyDurationCalculator {
                                       BigDecimal supplyHours, boolean fullWindowCovered) {
         return "库存供应逐班计算：班初滚动库存=" + display(nvl(rollingStockQty).max(BigDecimal.ZERO))
                 + "米；" + String.join("；", stepDetails) + "；库存供应时长="
-                + display(supplyHours) + "H" + (fullWindowCovered ? "（至少覆盖整个保证窗口）" : "") + "。";
+                + display(supplyHours) + "H" + (fullWindowCovered ? "（至少覆盖整个库存供应计算窗口）" : "") + "。";
     }
 
     /**

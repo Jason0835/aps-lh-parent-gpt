@@ -1663,7 +1663,7 @@
   "ui.data.column.lhDayPlanAdjustRequire.reasonGroup": "Adjustment Reasons",
   "ui.data.column.lhDayPlanAdjustRequire.reason": "Reason {0}",
   "ui.data.column.lhDayPlanAdjustRequire.productStatus": "Product Status",
-  "ui.data.alert.lhDayPlanAdjustRequire.adjustQtyRequired": "Enter the quantity for adjustment {0} before its reason",
-  "ui.data.alert.lhDayPlanAdjustRequire.adjustReasonRequired": "Enter the reason for adjustment {0}",
+  "ui.data.alert.lhDayPlanAdjustRequire.adjustQtyRequired": "Material {0}: enter adjustment {1} quantity before entering adjustment {1} reason",
+  "ui.data.alert.lhDayPlanAdjustRequire.adjustReasonRequired": "Material {0}: after entering adjustment {1} quantity, adjustment {1} reason is required",
   "ui.data.alert.lhDayPlanAdjustRequire.unsavedChanges": "This page has unsaved adjustments. Discard the changes?"
 }

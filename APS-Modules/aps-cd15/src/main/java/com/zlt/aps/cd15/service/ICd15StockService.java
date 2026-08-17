@@ -30,6 +30,9 @@ public interface ICd15StockService extends IDocService<Cd15Stock> {
      */
     AjaxResult importData(List<Cd15Stock> list, boolean updateSupport, Long importLogId);
 
+    /** 校验业务规则（物料编码合法性等）。 */
+    String validateBusiness(Cd15Stock entity);
+
     /** 替换指定工厂、库存日期和班次的MES快照。 */
     void logicDeleteAndSaveBatch(String factoryCode, Date stockDate, String shiftCode,
                                  String updateBy, List<Cd15Stock> stockList);

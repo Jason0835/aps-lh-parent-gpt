@@ -909,8 +909,11 @@ public class TcAutoScheduleDataLoadService {
                 BigDecimal cappedGuardFormingQty = this.capGuardFormingQty(rawGuardFormingQty,
                         row.getLhRemainQty());
                 taskDraft.setGuardDemandQty(cappedGuardFormingQty.multiply(sidewallLength));
-                taskDraft.setFormingGuardWindowQtyMap(this.buildGuardWindowByBom(classQtyArray, shiftOrder,
-                        effectiveGuardShiftCount, formingShiftOffset, algorithmCode, sidewallLength, cappedGuardFormingQty));
+                Map<Integer, BigDecimal> formingGuardWindowQtyMap = this.buildGuardWindowByBom(classQtyArray,
+                        shiftOrder, effectiveGuardShiftCount, formingShiftOffset, algorithmCode, sidewallLength,
+                        cappedGuardFormingQty);
+                taskDraft.setFormingGuardWindowQtyMap(this.buildSupplyWindowQtyMap(shiftOrder, formingShiftOffset,
+                        demandQty, formingGuardWindowQtyMap));
                 taskDraft.setDemandQty(demandQty);
                 taskDraft.setGuardShiftCount(effectiveGuardShiftCount);
                 this.addGuardDemandEstimateTrace(context, taskDraft, classQtyArray, shiftOrder,
@@ -1158,9 +1161,10 @@ public class TcAutoScheduleDataLoadService {
                 Map<Integer, BigDecimal> formingGuardWindowQtyMap = this.buildGuardWindowByRecipe(classQtyArray,
                         specByClass, shiftOrder, effectiveGuardShiftCount, formingShiftOffset, algorithmCode, sidewallLength,
                         cappedGuardFormingQty);
-                taskDraft.setFormingGuardWindowQtyMap(formingGuardWindowQtyMap);
                 taskDraft.setGuardDemandQty(formingGuardWindowQtyMap.values().stream()
                         .filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add));
+                taskDraft.setFormingGuardWindowQtyMap(this.buildSupplyWindowQtyMap(shiftOrder, formingShiftOffset,
+                        demandQty, formingGuardWindowQtyMap));
                 taskDraft.setDemandQty(demandQty);
                 taskDraft.setGuardShiftCount(effectiveGuardShiftCount);
                 this.addGuardDemandEstimateTrace(context, taskDraft, classQtyArray, shiftOrder,
@@ -1356,6 +1360,31 @@ public class TcAutoScheduleDataLoadService {
             remainingGuardFormingQty = remainingGuardFormingQty.subtract(appliedFormingQty);
         }
         return windowQtyMap;
+    }
+
+    /**
+     * 构建库存供应时长使用的连续需求窗口。
+     *
+     * <p>需求量计算中的保证窗口必须与当班需求保持不重叠，但库存供应时长需要从当班对应的
+     * 成型需求开始扣减，因此在保证窗口前补入当班需求。例如胎侧 CLASS1 对应成型 CLASS2 时，
+     * 供应时长先扣成型 CLASS2，再继续扣保证窗口中的 CLASS3 及后续班次。</p>
+     *
+     * @param shiftOrder 胎侧排程班次
+     * @param formingShiftOffset 成型班次偏移量
+     * @param currentShiftDemandQty 当班对应的成型需求量
+     * @param guardWindowQtyMap 不含当班需求的保证窗口
+     * @return 从当班成型需求开始的有序供应时长窗口
+     */
+    private Map<Integer, BigDecimal> buildSupplyWindowQtyMap(int shiftOrder, int formingShiftOffset,
+                                                              BigDecimal currentShiftDemandQty,
+                                                              Map<Integer, BigDecimal> guardWindowQtyMap) {
+        Map<Integer, BigDecimal> supplyWindowQtyMap = new LinkedHashMap<>();
+        int currentFormingShiftOrder = this.resolveCurrentDemandStartIndex(shiftOrder, formingShiftOffset) + 1;
+        supplyWindowQtyMap.put(currentFormingShiftOrder, this.nvl(currentShiftDemandQty));
+        if (guardWindowQtyMap != null) {
+            supplyWindowQtyMap.putAll(guardWindowQtyMap);
+        }
+        return supplyWindowQtyMap;
     }
 
     /**
@@ -2859,8 +2888,9 @@ public class TcAutoScheduleDataLoadService {
     /**
      * 计算库存保证范围总时长，供需求量策略计算供应时长 supplyHours 与排序库存紧急度使用。
      *
-     * <p>从需求起点班次起连续 guardShiftCount 个成型班次，按其映射后的胎侧班次配置时长累加；
-     * 班次时长缺失或非正时置 null 并记 SKIP，避免 supplyHours 误算。移植自胎面 TmAutoScheduleDataLoadService。</p>
+     * <p>供应时长窗口先补入当前胎侧班对应的成型班次，再追加保证范围内的成型班次；保证范围时长
+     * {@code guardRangeHours} 仍只累计保证班次。任一窗口班次时长缺失或非正时置 null 并记 SKIP，
+     * 避免 supplyHours 误算。移植自胎面 TmAutoScheduleDataLoadService。</p>
      *
      * @param context 排程上下文
      * @param taskDraft 任务草稿
@@ -2871,6 +2901,7 @@ public class TcAutoScheduleDataLoadService {
      */
     private void fillGuardRangeHours(TcScheduleContext context, TcTaskDraft taskDraft, int shiftOrder,
                                      int guardShiftCount, int formingShiftOffset, String algorithmCode) {
+        int currentLogicalShiftOrder = this.resolveCurrentDemandStartIndex(shiftOrder, formingShiftOffset) + 1;
         int logicalStartShiftOrder = this.resolveGuardStartIndex(shiftOrder, formingShiftOffset, algorithmCode) + 1;
         int count = Math.max(guardShiftCount, 1);
         BigDecimal guardRangeHours = BigDecimal.ZERO;
@@ -2878,7 +2909,19 @@ public class TcAutoScheduleDataLoadService {
         List<BigDecimal> shiftHours = new ArrayList<>();
         Map<Integer, BigDecimal> guardWindowHoursMap = new LinkedHashMap<>();
         String skipReason = null;
+        int currentMappedShiftOrder = this.mapGuardLogicalShiftOrder(currentLogicalShiftOrder);
+        BigDecimal currentDemandShiftHours = context.getShiftHoursMap().get(currentMappedShiftOrder);
+        mappedShiftOrders.add(currentMappedShiftOrder);
+        shiftHours.add(currentDemandShiftHours);
+        if (currentDemandShiftHours == null || currentDemandShiftHours.compareTo(BigDecimal.ZERO) <= 0) {
+            skipReason = "CURRENT_SHIFT_HOURS_MISSING_OR_NON_POSITIVE";
+        } else {
+            guardWindowHoursMap.put(currentLogicalShiftOrder, currentDemandShiftHours);
+        }
         for (int index = 0; index < count; index++) {
+            if (skipReason != null) {
+                break;
+            }
             int logicalShiftOrder = logicalStartShiftOrder + index;
             int mappedShiftOrder = this.mapGuardLogicalShiftOrder(logicalShiftOrder);
             BigDecimal currentShiftHours = context.getShiftHoursMap().get(mappedShiftOrder);
@@ -2892,10 +2935,12 @@ public class TcAutoScheduleDataLoadService {
             guardRangeHours = guardRangeHours.add(currentShiftHours);
         }
         Map<String, Object> evidence = new LinkedHashMap<>();
+        evidence.put("currentLogicalShiftOrder", currentLogicalShiftOrder);
         evidence.put("logicalStartShiftOrder", logicalStartShiftOrder);
         evidence.put("guardShiftCount", count);
         evidence.put("mappedShiftOrders", mappedShiftOrders);
         evidence.put("shiftHours", shiftHours);
+        evidence.put("supplyWindowHoursMap", guardWindowHoursMap);
         if (skipReason == null) {
             taskDraft.setGuardRangeHours(guardRangeHours);
             taskDraft.setFormingGuardWindowHoursMap(guardWindowHoursMap);

@@ -76,10 +76,10 @@ public class TcTaskDraft {
     /** 保证范围内成型胎侧需求量，单位米 */
     private BigDecimal guardDemandQty;
 
-    /** 成型备库窗口内按实际成型班次记录的有效计划长度，已按 LH_REMAIN_QTY 顺序封顶。 */
+    /** 库存供应时长窗口的逐班成型需求，首项为当班对应的成型需求，后续为备库保证窗口。 */
     private Map<Integer, BigDecimal> formingGuardWindowQtyMap = new LinkedHashMap<>();
 
-    /** 成型备库窗口内按逻辑班次记录的实际班次时长。 */
+    /** 库存供应时长窗口内按逻辑班次记录的实际班次时长。 */
     private Map<Integer, BigDecimal> formingGuardWindowHoursMap = new LinkedHashMap<>();
 
     /** 设置成型备库窗口明细并复制容器，避免顺延任务与来源任务共享可变映射。

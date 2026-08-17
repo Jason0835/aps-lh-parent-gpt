@@ -38,15 +38,19 @@ export default {
     title() { return this.isEdit ? this.$t("common.button.edit") : this.$t("common.button.add"); },
     columns() {
       return [
-        { prop: "factoryCode", label: this.$t("ui.data.column.cd15LossSetting.factoryCode"), type: "select", dictData: this.parentDict.type.biz_factory_name, filterable: true, change: () => this.loadMachineOptions() },
+        { prop: "factoryCode", label: this.$t("ui.data.column.cd15LossSetting.factoryCode"), type: "select", dictData: this.parentDict.type.biz_factory_name, filterable: true, listeners: { change: () => this.handleFactoryChange() }, change: () => this.handleFactoryChange() },
         { prop: "steelStripCode", label: this.$t("ui.data.column.cd15LossSetting.steelStripCode"), type: "select", dictData: this.steelStripOptions, filterable: true },
-        { prop: "machineCode", label: this.$t("ui.data.column.cd15LossSetting.machineCode"), type: "select", dictData: this.machineOptions, filterable: true },
+        { prop: "machineCode", label: this.$t("ui.data.column.cd15LossSetting.machineCode"), type: "select", dictData: this.machineOptions, filterable: true, clearable: true },
         { prop: "lossRate", label: this.$t("ui.data.column.cd15LossSetting.lossRate"), type: "number" },
         { prop: "remark", label: this.$t("ui.common.column.remark"), type: "textarea", rows: 3, maxlength: 900 },
       ];
     },
   },
   methods: {
+    handleFactoryChange() {
+      this.$set(this.form, "machineCode", "");
+      this.loadMachineOptions();
+    },
     async save(params) { this.loading = true; try { const res = this.isEdit ? await updateLossSetting(params) : await addLossSetting(params); this.$modal.msgSuccess(res.msg); this.$emit("success"); this.hide(); } finally { this.loading = false; } },
     async loadMachineOptions() {
       const res = await getCd15MachineEnableOptions({ factoryCode: this.form.factoryCode });

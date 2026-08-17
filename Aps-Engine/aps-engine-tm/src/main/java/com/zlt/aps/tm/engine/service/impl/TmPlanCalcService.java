@@ -1173,9 +1173,11 @@ public class TmPlanCalcService implements ITmPlanCalcService {
         BigDecimal initialAvailableToolQty = totalToolQty.subtract(initialUsedToolQty).max(BigDecimal.ZERO)
                 .multiply(vehicleRate)
                 .setScale(TmScheduleConstants.DECIMAL_CALCULATION_SCALE, RoundingMode.HALF_UP);
-        context.appendProcessLog("全局工装池初始化：库存占用工装={0}={1}套；初始可用工装数量=max({2}套-{1}套,0)×TM_VEHICLE_RATE {3}={4}套。",
-                inventoryToolDetailList.isEmpty() ? "无有效胎面库存占用" : String.join(" + ", inventoryToolDetailList),
-                this.displayQuantity(initialUsedToolQty), this.displayQuantity(totalToolQty),
+        context.appendProcessLog("全局工装池初始化：总工装数量={0}套。", this.displayQuantity(totalToolQty));
+        context.appendProcessLog("14点预计库存：\n{0}", inventoryToolDetailList.isEmpty()
+                ? "无有效胎面库存占用" : String.join("\n", inventoryToolDetailList));
+        context.appendProcessLog("初始可用工装数量=max(总工装数量{0}套-14点预计库存占用工装合计{1}套,0)×TM_VEHICLE_RATE {2}={3}套。",
+                this.displayQuantity(totalToolQty), this.displayQuantity(initialUsedToolQty),
                 this.displayQuantity(vehicleRate), this.displayQuantity(initialAvailableToolQty));
         return initialAvailableToolQty;
     }

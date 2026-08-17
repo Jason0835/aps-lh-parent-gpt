@@ -137,6 +137,12 @@ public class Cd15MachineMaintenancePlanController extends AbstractDocBizControll
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFactoryCode()), "FACTORY_CODE", queryVO.getFactoryCode());
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getMachineCode()), "MACHINE_CODE", queryVO.getMachineCode());
         queryWrapper.eq(queryVO.getDowntimeDate() != null, "DOWNTIME_DATE", queryVO.getDowntimeDate());
+        // 按停机开始时间范围筛选（页面使用日期时间范围控件）
+        queryWrapper.ge(queryVO.getDowntimeStartTimeStart() != null, "DOWNTIME_START_TIME", queryVO.getDowntimeStartTimeStart());
+        queryWrapper.le(queryVO.getDowntimeStartTimeEnd() != null, "DOWNTIME_START_TIME", queryVO.getDowntimeStartTimeEnd());
+        // 按停机结束时间范围筛选（页面使用日期时间范围控件）
+        queryWrapper.ge(queryVO.getDowntimeEndTimeStart() != null, "DOWNTIME_END_TIME", queryVO.getDowntimeEndTimeStart());
+        queryWrapper.le(queryVO.getDowntimeEndTimeEnd() != null, "DOWNTIME_END_TIME", queryVO.getDowntimeEndTimeEnd());
     }
 
     @Override
