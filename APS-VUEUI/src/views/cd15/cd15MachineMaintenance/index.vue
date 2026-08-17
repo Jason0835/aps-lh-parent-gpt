@@ -50,9 +50,10 @@ export default {
     },
     searchColumns() {
       return [
-        { label: this.$t("ui.data.column.cd15MachineMaintenancePlan.factoryCode"), prop: "factoryCode", type: "select", dictData: this.dict.type.biz_factory_name, filterable: true, change: () => this.loadMachineOptions() },
+        { label: this.$t("ui.data.column.cd15MachineMaintenancePlan.factoryCode"), prop: "factoryCode", type: "select", dictData: this.dict.type.biz_factory_name, filterable: true, listeners: { change: (factoryCode) => this.loadMachineOptions(factoryCode) } },
         { label: this.$t("ui.data.column.cd15MachineMaintenancePlan.machineCode"), prop: "machineCode", type: "select", dictData: this.machineOptions, filterable: true, clearable: true },
-        { label: this.$t("ui.data.column.cd15MachineMaintenancePlan.downtimeDate"), prop: "downtimeDate" },
+        { label: this.$t("ui.data.column.cd15MachineMaintenancePlan.downtimeStartTime"), prop: "downtimeStartTimeRange", type: "date", dateType: "datetimerange", valueFormat: "yyyy-MM-dd HH:mm:ss" },
+        { label: this.$t("ui.data.column.cd15MachineMaintenancePlan.downtimeEndTime"), prop: "downtimeEndTimeRange", type: "date", dateType: "datetimerange", valueFormat: "yyyy-MM-dd HH:mm:ss" },
       ];
     },
   },
@@ -63,13 +64,36 @@ export default {
     handleDelete(row) { this.$confirm(this.$t("common.confirm.delete"), { type: "warning" }).then(() => { delMachineMaintenancePlan({ ids: row.id }).then((data) => { this.$modal.msgSuccess(data.msg); this.$set(this.page, "current", 1); this.getList(); }); }); },
     handleBatchDelete() { if (!this.selection || this.selection.length === 0) return; this.$confirm(this.$t("common.confirm.delete"), { type: "warning" }).then(() => { const ids = this.selection.map(item => item.id).join(","); delMachineMaintenancePlan({ ids }).then((data) => { this.$modal.msgSuccess(data.msg); this.selection = []; this.$set(this.page, "current", 1); this.getList(); }); }); },
     handleExport() { exportMachineMaintenancePlan(this.query); },
-    handleSearch(params) { this.page.current = 1; this.query = { ...params }; this.loadMachineOptions(); this.getList(); },
+    handleSearch(params) {
+      this.page.current = 1;
+      const queryParams = { ...params };
+      // 日期时间范围控件返回 [起, 止] 数组，拆分为开始/结束两个查询参数提交
+      const splitRange = (rangeProp, startProp, endProp) => {
+        const range = queryParams[rangeProp];
+        if (Array.isArray(range) && range.length === 2) {
+          queryParams[startProp] = range[0];
+          queryParams[endProp] = range[1];
+        }
+        delete queryParams[rangeProp];
+      };
+      splitRange("downtimeStartTimeRange", "downtimeStartTimeStart", "downtimeStartTimeEnd");
+      splitRange("downtimeEndTimeRange", "downtimeEndTimeStart", "downtimeEndTimeEnd");
+      this.query = queryParams;
+      this.loadMachineOptions();
+      this.getList();
+    },
     handlePageChange(current, pageSize) { this.page.current = current; this.page.pageSize = pageSize; this.getList(); },
     handleSortChange(sort) { this.sort = sort; this.getList(); },
     handleSelectionChange(selection) { this.selection = selection || []; },
     async getList() { this.loading = true; try { const params = { ...this.query, pageNum: this.page.current, pageSize: this.page.pageSize, orderByColumn: this.sort.prop, isAsc: this.sort.order }; const res = await listMachineMaintenancePlan(params); this.data = res.rows || []; this.page.total = res.total || 0; } finally { this.loading = false; } },
-    async loadMachineOptions() {
-      const res = await getCd15MachineEnableOptions({ factoryCode: this.query.factoryCode });
+    async loadMachineOptions(factoryCode) {
+      // 未传工厂时使用当前查询条件中的工厂；工厂为空时不请求，避免展示全厂机台
+      const code = factoryCode || this.query.factoryCode;
+      if (!code) {
+        this.machineOptions = [];
+        return;
+      }
+      const res = await getCd15MachineEnableOptions({ factoryCode: code });
       const rows = Array.isArray(res) ? res : (res.rows || res.data || []);
       this.machineOptions = rows.map((item) => ({ label: item.machineCode, value: item.machineCode }));
     },
