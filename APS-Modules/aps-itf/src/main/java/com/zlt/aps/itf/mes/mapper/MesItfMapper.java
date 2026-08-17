@@ -13,6 +13,7 @@ import com.zlt.aps.tm.api.domain.entity.TmDayFinishQty;
 import com.zlt.aps.tm.api.domain.entity.TmMesStock;
 import com.zlt.aps.tm.api.domain.entity.TmScheFinishQty;
 import com.zlt.aps.gsq.api.domain.entity.GsqDayFinishQty;
+import com.zlt.aps.gsq.api.domain.entity.GsqScheFinishQty;
 import com.zlt.aps.gsq.api.domain.entity.GsqStock;
 import com.zlt.aps.tq.api.domain.entity.TqDayFinishQty;
 import com.zlt.aps.tq.api.domain.entity.TqMesStock;
@@ -269,6 +270,31 @@ public interface MesItfMapper {
      * @return 列表
      */
     List<GsqDayFinishQty> selectGsqScheDayFinishQtyList(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 查询钢丝圈排程完成量同步数据（取最新版本，默认当天，支持传参指定日期）
+     *
+     * @param syncDataLogs 参数
+     * @return 列表
+     */
+    List<GsqScheFinishQty> selectGsqClassShiftFinishQtyList(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 按上一天最新版本号查询钢丝圈排程完成量同步数据，用于临时任务
+     * 逻辑同 selectGsqClassShiftFinishQtyList，但日期条件改为上一天（DATEADD(DAY, -1, GETDATE())）
+     *
+     * @param syncDataLogs 参数
+     * @return 列表
+     */
+    List<GsqScheFinishQty> selectGsqClassShiftFinishQtyByYesterday(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 按指定版本号查询钢丝圈排程完成量同步数据（不限日期），用于临时任务
+     *
+     * @param syncDataLogs 参数（dataVersion 必传）
+     * @return 列表
+     */
+    List<GsqScheFinishQty> selectGsqClassShiftFinishQtyByVersion(AuxReqSyncDataLogs syncDataLogs);
 
     /**
      * 查询胎面排程完成量同步数据
