@@ -674,7 +674,7 @@ public class LhDayPlanAdjustRequireServiceImpl extends AbstractDocService<LhDayP
      * @return
      */
     private List<LhDayPlanAdjustRequire> getProductionVersionYearMonthLhDayPlanAdjustInfo(MpFactoryProductionVersion version, List<String> materialCodeList) {
-        if (null == version || CollectionUtils.isEmpty(materialCodeList)) {
+        if (null == version) {
             return Collections.emptyList();
         }
         LambdaQueryWrapper<LhDayPlanAdjustRequire> wrapper = new LambdaQueryWrapper<>();

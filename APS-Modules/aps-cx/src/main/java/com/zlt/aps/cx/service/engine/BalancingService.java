@@ -15,6 +15,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -116,6 +118,9 @@ public class BalancingService {
 
     /** 默认：硫化机台数允许差额（最多差3台） */
     private static final int DEFAULT_LOAD_DIFF_THRESHOLD = 3;
+
+    /** 单班次物理产能（秒）：8小时班次（机台累计耗时硬校验上限） */
+    private static final int SECONDS_PER_SHIFT = 8 * 60 * 60;
 
     // ==================== 5.3.3.2.5 均衡分配入口 ====================
 
@@ -725,6 +730,13 @@ public class BalancingService {
                 // R2 Phase 1b：机台已超 targetLoad 时，每次只分配1台（避免堆积）
                 int assignQty = calcRelaxedAssignQty(candidate, remaining, targetLoad);
 
+                // 机台累计耗时硬校验：R2 可突破 targetLoad 但不得超单班物理产能 28800s
+                int availableByTime = availableLoadByTime(candidate);
+                if (availableByTime <= 0) {
+                    continue;
+                }
+                assignQty = Math.min(assignQty, availableByTime);
+
                 int[] assignResult = assignTasksToCandidate(
                         candidate, taskList, embryoCode, assignQty, remaining, taskIndex, alreadyHas);
                 remaining = assignResult[0];
@@ -763,6 +775,28 @@ public class BalancingService {
     }
 
     /**
+     * 机台累计耗时校验：按物理产能（28800s/班）折算本机台还能接纳的硫化机台数。
+     *
+     * <p>每台硫化机对应成型耗时 = 28800 / 机台配比（秒/班），累计耗时 = Σ(负荷 × 单台耗时)。
+     * 该校验为硬约束：即使 R2 放宽容量（可突破 targetLoad），也不得超单班物理产能，
+     * 避免分配结果被后续 S5.3.MQ 机台精排大幅削减。
+     *
+     * @param candidate 候选机台状态
+     * @return 还能分配的硫化机台数（向下取整）；secondsPerLhMachine 未初始化时返回 MAX_VALUE（不校验）
+     */
+    private int availableLoadByTime(MachineState candidate) {
+        BigDecimal secPerLh = candidate.getSecondsPerLhMachine();
+        if (secPerLh == null || secPerLh.signum() <= 0) {
+            return Integer.MAX_VALUE;
+        }
+        BigDecimal available = BigDecimal.valueOf(SECONDS_PER_SHIFT).subtract(candidate.getUsedSeconds());
+        if (available.signum() <= 0) {
+            return 0;
+        }
+        return available.divide(secPerLh, 0, RoundingMode.FLOOR).intValue();
+    }
+
+    /**
      * 初始化贪心用机台状态（含续作预扣）。
      *
      * <p>为每台可用机台创建 {@link MachineState}，设置 maxCapacity/maxTypes，
@@ -797,6 +831,12 @@ public class BalancingService {
             Integer maxLh = machineMaxLhMap.get(mc.getCxMachineCode());
             state.setMaxCapacity(maxLh != null ? maxLh : ScheduleConstants.DEFAULT_MAX_LH_MACHINE_QTY);
 
+            // 单台硫化机对应成型耗时（秒/班）= 28800 / 配比：1台硫化机每班消耗 dailyLh/3 条，
+            // 每条耗时 86400/(配比×dailyLh)，两者相乘 dailyLh 消去得 28800/配比（向下取整防超物理产能）
+            int ratio = state.getMaxCapacity();
+            state.setSecondsPerLhMachine(BigDecimal.valueOf(SECONDS_PER_SHIFT)
+                    .divide(BigDecimal.valueOf(ratio), 6, RoundingMode.FLOOR));
+
             Integer maxTypes = machineMaxEmbryoTypesMap.get(mc.getCxMachineCode());
             state.setMaxTypes(maxTypes != null ? maxTypes : ScheduleConstants.DEFAULT_MAX_TYPES_PER_MACHINE);
 
@@ -825,7 +865,9 @@ public class BalancingService {
                 for (String embryo : preTypes) {
                     state.getAssignedEmbryos().add(new EmbryoAssignment(embryo, null, 0));
                 }
-                log.info("  【贪心初始化】{}: 续作预扣={}台, 种类={}", mc.getCxMachineCode(), preLoad, preTypes);
+                state.setUsedSeconds(state.getSecondsPerLhMachine().multiply(BigDecimal.valueOf(preLoad)));
+                log.info("  【贪心初始化】{}: 续作预扣={}台({}s), 种类={}", mc.getCxMachineCode(), preLoad,
+                        state.getUsedSeconds().setScale(0, RoundingMode.HALF_UP).toBigInteger(), preTypes);
             }
             machineStates.add(state);
         }
@@ -922,6 +964,10 @@ public class BalancingService {
 
             candidate.getAssignedEmbryos().add(new EmbryoAssignment(embryoCode, task, actualAssign));
             candidate.setCurrentLoad(candidate.getCurrentLoad() + loadInc);
+            if (loadInc > 0 && candidate.getSecondsPerLhMachine() != null) {
+                candidate.setUsedSeconds(candidate.getUsedSeconds().add(
+                        candidate.getSecondsPerLhMachine().multiply(BigDecimal.valueOf(loadInc))));
+            }
             if (isNewLhMachine) {
                 candidate.getAssignedLhMachineCodes().add(machineKey);
             }
@@ -1010,7 +1056,13 @@ public class BalancingService {
                     continue;
                 }
 
-                int assignQty = Math.min(remaining, Math.min(availableLoad, maxAssignForBalance));
+                // 机台累计耗时硬校验：负荷折算秒数不得超过单班物理产能 28800s
+                int availableByTime = availableLoadByTime(candidate);
+                if (availableByTime <= 0) {
+                    continue;
+                }
+
+                int assignQty = Math.min(remaining, Math.min(availableLoad, Math.min(maxAssignForBalance, availableByTime)));
 
                 // 从 taskList 中取任务分配
                 int[] assignResult = assignTasksToCandidate(
@@ -1209,7 +1261,11 @@ public class BalancingService {
                     return;
                 }
             } else {
-                // loadGap 已满足但 typeGap 未满足，且 tryTypeBalance 也失败
+                // loadGap 已满足但 typeGap 未满足，且 tryTypeBalance 因负荷方向冲突失败（低种类机台恰为高负荷机台）：
+                // 尝试种类对向互换（1:1 互换保持负荷不变，仅向低种类机台转移种类）
+                if (tryTypeSwap(machineStates, lhMachineSupplyMap)) {
+                    continue;
+                }
                 log.info("局部搜索第{}轮: loadGap={}已满足, typeGap={}未满足但无法改善, 终止",
                         iter, loadGap, typeGap);
                 return;
@@ -1260,10 +1316,19 @@ public class BalancingService {
             boolean highHasLhKey = highMachine.getAssignedLhMachineCodes().contains(machineKey);
             boolean lowHasLhKey = lowMachine.getAssignedLhMachineCodes().contains(machineKey);
 
+            // 机台累计耗时硬校验：目标机台新增负荷不得超单班物理产能 28800s
+            if (!lowHasLhKey && availableLoadByTime(lowMachine) < 1) {
+                continue;
+            }
+
             // 更新高负荷机台
             ea.setAssignedQty(ea.getAssignedQty() - 1);
             int highLoadDec = highHasLhKey ? 1 : 0;
             highMachine.setCurrentLoad(highMachine.getCurrentLoad() - highLoadDec);
+            if (highLoadDec > 0 && highMachine.getSecondsPerLhMachine() != null) {
+                highMachine.setUsedSeconds(highMachine.getUsedSeconds().subtract(
+                        highMachine.getSecondsPerLhMachine().multiply(BigDecimal.valueOf(highLoadDec))));
+            }
             if (ea.getAssignedQty() == 0) {
                 highMachine.getAssignedEmbryos().remove(i);
                 // 检查该胎胚是否还有其他分配记录
@@ -1281,6 +1346,10 @@ public class BalancingService {
             lowMachine.getAssignedEmbryos().add(new EmbryoAssignment(embryoCode, task, 1));
             int lowLoadInc = lowHasLhKey ? 0 : 1;
             lowMachine.setCurrentLoad(lowMachine.getCurrentLoad() + lowLoadInc);
+            if (lowLoadInc > 0 && lowMachine.getSecondsPerLhMachine() != null) {
+                lowMachine.setUsedSeconds(lowMachine.getUsedSeconds().add(
+                        lowMachine.getSecondsPerLhMachine().multiply(BigDecimal.valueOf(lowLoadInc))));
+            }
             if (!lowHasLhKey) {
                 lowMachine.getAssignedLhMachineCodes().add(machineKey);
             }
@@ -1374,31 +1443,8 @@ public class BalancingService {
                     continue;
                 }
 
-                // 执行 Swap: highEa 的 1 台 <-> lowEa 的 1 台
-                // 简化处理：仅当能减少负荷差时执行
-                // highMachine 失去1台 highEmbryo, 得到1台 lowEmbryo -> 净负荷变化取决于 lhMachineCode
-                // 这里简化为直接交换1台负荷
-                highEa.setAssignedQty(highEa.getAssignedQty() - 1);
-                lowEa.setAssignedQty(lowEa.getAssignedQty() - 1);
-
-                highMachine.getAssignedEmbryos().add(new EmbryoAssignment(lowEmbryo, lowEa.getTask(), 1));
-                lowMachine.getAssignedEmbryos().add(new EmbryoAssignment(highEmbryo, highEa.getTask(), 1));
-
-                if (highEa.getAssignedQty() == 0) {
-                    highMachine.getAssignedEmbryos().remove(highEa);
-                    boolean stillHas = highMachine.getAssignedEmbryos().stream()
-                            .anyMatch(e -> highEmbryo.equals(e.getEmbryoCode()));
-                    if (!stillHas) highMachine.setCurrentTypes(highMachine.getCurrentTypes() - 1);
-                }
-                if (lowEa.getAssignedQty() == 0) {
-                    lowMachine.getAssignedEmbryos().remove(lowEa);
-                    boolean stillHas = lowMachine.getAssignedEmbryos().stream()
-                            .anyMatch(e -> lowEmbryo.equals(e.getEmbryoCode()));
-                    if (!stillHas) lowMachine.setCurrentTypes(lowMachine.getCurrentTypes() - 1);
-                }
-
-                if (!highHasLowEmbryo) highMachine.setCurrentTypes(highMachine.getCurrentTypes() + 1);
-                if (!lowHasHighEmbryo) lowMachine.setCurrentTypes(lowMachine.getCurrentTypes() + 1);
+                // 执行 Swap: highEa 的 1 台 <-> lowEa 的 1 台（净负荷不变，种类按需增减）
+                applyUnitSwap(highMachine, highEa, lowMachine, lowEa);
 
                 log.info("  Swap: {} 的 {} <-> {} 的 {}",
                         highMachine.getMachineCode(), highEmbryo,
@@ -1487,9 +1533,18 @@ public class BalancingService {
                 continue; // 移动会恶化负荷差，跳过
             }
 
+            // 机台累计耗时硬校验：低种类机台新增负荷不得超单班物理产能 28800s
+            if (lowLoadInc > 0 && availableLoadByTime(lowTypeMachine) < 1) {
+                continue;
+            }
+
             // 执行 Move
             ea.setAssignedQty(ea.getAssignedQty() - 1);
             highTypeMachine.setCurrentLoad(highTypeMachine.getCurrentLoad() - highLoadDec);
+            if (highLoadDec > 0 && highTypeMachine.getSecondsPerLhMachine() != null) {
+                highTypeMachine.setUsedSeconds(highTypeMachine.getUsedSeconds().subtract(
+                        highTypeMachine.getSecondsPerLhMachine().multiply(BigDecimal.valueOf(highLoadDec))));
+            }
             if (ea.getAssignedQty() == 0) {
                 highTypeMachine.getAssignedEmbryos().remove(ea);
                 // 检查该胎胚是否还有其他分配记录
@@ -1502,6 +1557,10 @@ public class BalancingService {
 
             lowTypeMachine.getAssignedEmbryos().add(new EmbryoAssignment(embryoCode, task, 1));
             lowTypeMachine.setCurrentLoad(lowTypeMachine.getCurrentLoad() + lowLoadInc);
+            if (lowLoadInc > 0 && lowTypeMachine.getSecondsPerLhMachine() != null) {
+                lowTypeMachine.setUsedSeconds(lowTypeMachine.getUsedSeconds().add(
+                        lowTypeMachine.getSecondsPerLhMachine().multiply(BigDecimal.valueOf(lowLoadInc))));
+            }
             if (!lowHasLhKey) {
                 lowTypeMachine.getAssignedLhMachineCodes().add(machineKey);
             }
@@ -1516,6 +1575,137 @@ public class BalancingService {
                     highTypeMachine.getCurrentTypes() + 1, highTypeMachine.getCurrentTypes(),
                     lowTypeMachine.getCurrentTypes() - 1, lowTypeMachine.getCurrentTypes());
             return true;
+        }
+        return false;
+    }
+
+    /**
+     * 执行 1:1 单台互换：m1 的 ea1 胎胚 1 台与 m2 的 ea2 胎胚 1 台互换。
+     *
+     * <p>两机台各自失去 1 台又得到 1 台，负荷总量不变；种类数按实际情况增减
+     * （换入的胎胚若机台原本没有则 +1，换出的胎胚若在机台清空则 -1）。
+     * 供 {@link #trySwap} 与 {@link #tryTypeSwap} 共用。
+     *
+     * @param m1  机台1（移出 ea1 胎胚 1 台，移入 ea2 胎胚 1 台）
+     * @param ea1 机台1 上的分配记录（assignedQty 减 1，清零则移除）
+     * @param m2  机台2（移出 ea2 胎胚 1 台，移入 ea1 胎胚 1 台）
+     * @param ea2 机台2 上的分配记录（assignedQty 减 1，清零则移除）
+     */
+    private void applyUnitSwap(MachineState m1, EmbryoAssignment ea1, MachineState m2, EmbryoAssignment ea2) {
+        String embryo1 = ea1.getEmbryoCode();
+        String embryo2 = ea2.getEmbryoCode();
+        boolean m1HasEmbryo2 = m1.getAssignedEmbryos().stream()
+                .anyMatch(e -> embryo2.equals(e.getEmbryoCode()));
+        boolean m2HasEmbryo1 = m2.getAssignedEmbryos().stream()
+                .anyMatch(e -> embryo1.equals(e.getEmbryoCode()));
+
+        ea1.setAssignedQty(ea1.getAssignedQty() - 1);
+        ea2.setAssignedQty(ea2.getAssignedQty() - 1);
+
+        m1.getAssignedEmbryos().add(new EmbryoAssignment(embryo2, ea2.getTask(), 1));
+        m2.getAssignedEmbryos().add(new EmbryoAssignment(embryo1, ea1.getTask(), 1));
+
+        if (ea1.getAssignedQty() == 0) {
+            m1.getAssignedEmbryos().remove(ea1);
+            boolean stillHas = m1.getAssignedEmbryos().stream()
+                    .anyMatch(e -> embryo1.equals(e.getEmbryoCode()));
+            if (!stillHas) {
+                m1.setCurrentTypes(m1.getCurrentTypes() - 1);
+            }
+        }
+        if (ea2.getAssignedQty() == 0) {
+            m2.getAssignedEmbryos().remove(ea2);
+            boolean stillHas = m2.getAssignedEmbryos().stream()
+                    .anyMatch(e -> embryo2.equals(e.getEmbryoCode()));
+            if (!stillHas) {
+                m2.setCurrentTypes(m2.getCurrentTypes() - 1);
+            }
+        }
+
+        if (!m1HasEmbryo2) {
+            m1.setCurrentTypes(m1.getCurrentTypes() + 1);
+        }
+        if (!m2HasEmbryo1) {
+            m2.setCurrentTypes(m2.getCurrentTypes() + 1);
+        }
+    }
+
+    /**
+     * 种类对向互换：高种类机台的独占胎胚（低种类机台没有）与低种类机台上的共有胎胚
+     * （高种类机台已有）按 1:1 互换。
+     *
+     * <p>适用场景：loadGap 已满足但 typeGap 超标，且 {@link #tryTypeBalance} 因负荷守卫
+     * 无法移动（种类均衡需要移入的机台恰为高负荷机台，单向移动会拉大负荷差）。
+     * 互换保持两机台负荷不变，仅向低种类机台转移 1 个种类；若独占胎胚在高种类机台清空，
+     * 则高种类机台种类同步 -1，种类差进一步缩小。
+     *
+     * <p>续作预留占位条目（task==null）不参与互换，保底台数不受影响。
+     *
+     * @param machineStates     机台状态列表
+     * @param lhMachineSupplyMap 硫化机专供成型机映射（null 表示无专供约束）
+     * @return true 如果成功互换
+     */
+    private boolean tryTypeSwap(List<MachineState> machineStates, Map<String, Set<String>> lhMachineSupplyMap) {
+        // 找种类最多和最少的机台（同 tryTypeBalance）
+        MachineState highTypeMachine = null;
+        MachineState lowTypeMachine = null;
+        for (MachineState ms : machineStates) {
+            if (highTypeMachine == null || ms.getCurrentTypes() > highTypeMachine.getCurrentTypes()) {
+                highTypeMachine = ms;
+            }
+            if (lowTypeMachine == null || ms.getCurrentTypes() < lowTypeMachine.getCurrentTypes()) {
+                lowTypeMachine = ms;
+            }
+        }
+        if (highTypeMachine == lowTypeMachine) {
+            return false;
+        }
+        // 低种类机台种类槽已满，无法接受新种类
+        if (lowTypeMachine.getCurrentTypes() >= lowTypeMachine.getMaxTypes()) {
+            return false;
+        }
+
+        // 低种类机台上找共有胎胚（高种类机台已有）：换出不增加高种类机台种类
+        for (EmbryoAssignment sharedEa : new ArrayList<>(lowTypeMachine.getAssignedEmbryos())) {
+            if (sharedEa.getTask() == null || sharedEa.getAssignedQty() <= 0) {
+                continue; // 续作预留占位（task==null）不可移动
+            }
+            String sharedEmbryo = sharedEa.getEmbryoCode();
+            if (!isDedicatedAllowed(sharedEa.getTask(), highTypeMachine.getMachineCode(), lhMachineSupplyMap)) {
+                continue;
+            }
+            boolean highHasShared = highTypeMachine.getAssignedEmbryos().stream()
+                    .anyMatch(e -> sharedEmbryo.equals(e.getEmbryoCode()));
+            if (!highHasShared) {
+                continue;
+            }
+
+            // 高种类机台上找独占胎胚（低种类机台没有）
+            for (EmbryoAssignment exclusiveEa : new ArrayList<>(highTypeMachine.getAssignedEmbryos())) {
+                if (exclusiveEa.getTask() == null || exclusiveEa.getAssignedQty() <= 0) {
+                    continue;
+                }
+                String exclusiveEmbryo = exclusiveEa.getEmbryoCode();
+                if (exclusiveEmbryo.equals(sharedEmbryo)) {
+                    continue;
+                }
+                if (!isDedicatedAllowed(exclusiveEa.getTask(), lowTypeMachine.getMachineCode(), lhMachineSupplyMap)) {
+                    continue;
+                }
+                boolean lowHasExclusive = lowTypeMachine.getAssignedEmbryos().stream()
+                        .anyMatch(e -> exclusiveEmbryo.equals(e.getEmbryoCode()));
+                if (lowHasExclusive) {
+                    continue;
+                }
+
+                applyUnitSwap(highTypeMachine, exclusiveEa, lowTypeMachine, sharedEa);
+                log.info("  TypeSwap: {} 的 {}(独占) <-> {} 的 {}(共有), 种类: {}={}, {}={}",
+                        highTypeMachine.getMachineCode(), exclusiveEmbryo,
+                        lowTypeMachine.getMachineCode(), sharedEmbryo,
+                        highTypeMachine.getMachineCode(), highTypeMachine.getCurrentTypes(),
+                        lowTypeMachine.getMachineCode(), lowTypeMachine.getCurrentTypes());
+                return true;
+            }
         }
         return false;
     }

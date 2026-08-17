@@ -382,7 +382,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         List<Map<String, Object>> planRows = buildCxTemplateDataList(exportList, recipeTypeMap, totalDailyPlanQtyMap, todayNightFinishQtyMap, smallGlueMap, placeholderMap, shiftCapacitiesMap, keyProductEmbryoCodes, lhShiftConsumptionMap, endingStructureNames, rowRemarkMap);
         planDataList.add(planRows);
 
-        // 为小计行添加 DAEEF3 背景色标识 + 胎胚余量<400 红色背景
+        // 为小计行添加 DAEEF3 背景色标识 + 胎胚余量<400 的 J列添加浅红色背景（FFC7CE）
         List<CellStyle> cellStyleList = new ArrayList<>();
         int templateListStartRow = 4;
         // 从明细行计算实际列数，避免CellStyle引用超出模板列范围导致Excel损坏
@@ -407,11 +407,11 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                 if (cxRemainVal instanceof Number) {
                     BigDecimal remainQty = new BigDecimal(cxRemainVal.toString());
                     if (remainQty.compareTo(new BigDecimal("400")) < 0) {
-                        // color传白色避免setFillPattern(SOLID_FOREGROUND)无填充色导致Excel损坏
+                        // 胎胚余量<400 时 J列（索引9）背景标浅红色，颜色与成型结构切换Sheet一致
                         cellStyleList.add(new CellStyle(
                                 rowNum, rowNum,
-                                7, 7,
-                                "#FFFFFF", true, false, null, "#FF0000"));
+                                9, 9,
+                                "#FFC7CE", true));
                     }
                 }
             }
