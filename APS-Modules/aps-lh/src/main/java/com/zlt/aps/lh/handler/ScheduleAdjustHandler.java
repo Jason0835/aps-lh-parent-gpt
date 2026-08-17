@@ -1,6 +1,7 @@
 package com.zlt.aps.lh.handler;
 
 import com.google.common.collect.Lists;
+import com.zlt.aps.common.engine.domain.LhDayPlanAdjustVo;
 import com.zlt.aps.common.engine.utils.MonthPlanSurplusCalculator;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
@@ -685,12 +686,15 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
                         allMonthPlanList, allProductionDate, plan.getFactoryCode(),
                         plan.getMaterialCode(), plan.getProductStatus());
         Map<YearMonth, Integer> monthPlanQtyMap = context.getMonthPlanQty(plan);
+        //20260817+ 硫化日计划调整量
+        List<LhDayPlanAdjustVo> allLhDayPlanAdjustList = context.getAllLhDayPlanAdjustList();
+        Map<YearMonth, Integer> yearMonthAdjustQtyMap = MonthPlanSurplusCalculator.getYearMonthLhDayAdjustQty(plan, allLhDayPlanAdjustList);
         boolean isCrossMonth = context.isCrossMonthByProductionDateInfo();
         //当前排产计划总量
         int totalPlanQty = MonthPlanSurplusCalculator.sumQty(monthPlanQtyMap);
         int remainingDemandQty = MonthPlanSurplusCalculator.getSurplusQty(
                 productionYearMonth, allProductionDate, dayProductionPlanMap,
-                monthOverdueQtyMap, monthPlanQtyMap, actualFinishedQty);
+                monthOverdueQtyMap, monthPlanQtyMap, yearMonthAdjustQtyMap, actualFinishedQty);
         remainingDemandQty = Math.max(BigDecimal.ZERO.intValue(), remainingDemandQty);
         // 保留逐日超产统计用于诊断日志，不参与余量计算
         int ignoredOverProductionQty = calculateIgnoredOverProductionQty(context, plan);
