@@ -58,4 +58,10 @@ public class Cd15Params extends BaseEntity implements Serializable {
     @ImportExcelValidated(maxLength = 50)
     @TableField("REMARK2")
     private String remark2;
+
+    /** 备注 */
+    @ApiModelProperty(value = "备注", name = "remark")
+    @TableField("REMARK")
+    @Excel(name = "ui.common.column.remark")
+    private String remark;
 }

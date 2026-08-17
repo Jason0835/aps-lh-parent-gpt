@@ -21,6 +21,7 @@ import com.zlt.aps.enums.LocationTypeEnum;
 import com.zlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.gsq.api.domain.entity.GsqDayFinishQty;
+import com.zlt.aps.gsq.api.domain.entity.GsqScheFinishQty;
 import com.zlt.aps.gsq.api.domain.entity.GsqStock;
 import com.zlt.aps.gsq.api.service.IGsqMesSyncRemoteService;
 import com.zlt.aps.itf.constant.DataSource;
@@ -66,6 +67,7 @@ import org.apache.commons.lang.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.text.ParseException;
@@ -1096,8 +1098,9 @@ public class MesItfServiceImpl implements MesItfService {
     public AjaxResult syncDevMaintenancePlan(AuxReqSyncDataLogs syncDataLogs) {
         // 查询MES中间表指定精度类型的最大版本号，只同步最新版本的数据
         String precisionType = syncDataLogs != null ? syncDataLogs.getPrecisionType() : null;
+        String oldFactoryCode = syncDataLogs != null ? syncDataLogs.getFactoryCode() : null;
         DynamicDataSourceContextHolder.push(DataSource.MES);
-        String maxVersion = mesItfMapper.selectMaxDataVersionFromMes(precisionType);
+        String maxVersion = mesItfMapper.selectMaxDataVersionFromMes(oldFactoryCode, precisionType);
         DynamicDataSourceContextHolder.poll();
 
         if (maxVersion != null && !maxVersion.isEmpty()) {
@@ -1238,6 +1241,7 @@ public class MesItfServiceImpl implements MesItfService {
         return AjaxResult.success();
     }
 
+    @Transactional(rollbackFor = Exception.class)
     @Override
     public AjaxResult syncDevMaintenancePlanOnly(AuxReqSyncDataLogs syncDataLogs) {
         // 查询MES中间表指定精度类型的最大版本号，只同步最新版本的数据
@@ -1258,7 +1262,7 @@ public class MesItfServiceImpl implements MesItfService {
 
         if (StringUtils.isBlank(inputVersion)) {
             DynamicDataSourceContextHolder.push(DataSource.MES);
-            String maxVersion = mesItfMapper.selectMaxDataVersionFromMes(precisionType);
+            String maxVersion = mesItfMapper.selectMaxDataVersionFromMes(factoryCode, precisionType);
             DynamicDataSourceContextHolder.poll();
 
             if (maxVersion != null && !maxVersion.isEmpty()) {
@@ -1278,10 +1282,10 @@ public class MesItfServiceImpl implements MesItfService {
         List<DevMaintenancePlan> syncList = mesItfMapper.selectDevMaintenancePlanList(syncDataLogs);
         DynamicDataSourceContextHolder.poll();
 
-        // 按factoryCode|devCode|precisionType去重，同版本多条相同唯一键取第一条
+        // 按factoryCode|devCode|precisionType|operTime去重，同一设备同一精度类型不同计划日期的记录不能合并
         Map<String, DevMaintenancePlan> groupMap = syncList.stream()
                 .collect(Collectors.toMap(
-                        item -> item.getFactoryCode() + "|" + item.getDevCode() + "|" + item.getPrecisionType(),
+                        item -> item.getFactoryCode() + "|" + item.getDevCode() + "|" + item.getPrecisionType() + "|" + item.getOperTime(),
                         Function.identity(),
                         (v1, v2) -> v1
                 ));
@@ -1351,7 +1355,7 @@ public class MesItfServiceImpl implements MesItfService {
             // 批量插入，按1000条分批
             List<List<MdmDevMaintenancePlan>> splitList = ScmListUtils.getSplitList(insertList, 1000);
             for (List<MdmDevMaintenancePlan> batch : splitList) {
-                baseDao.insertBatch(batch);
+                baseDao.saveBatch(batch);
             }
 
             log.info("仅同步设备保养计划完成（不触发生成精度计划），精度类型={}，同步{}条", precisionType, syncList.size());
@@ -2044,7 +2048,7 @@ public class MesItfServiceImpl implements MesItfService {
     /**
      * 从MES读取指定物理日的胎圈库存，并替换自动滚动班次快照。
      *
-     * <p>对齐胎面 syncTreadShiftStock，按工厂+物理日+班序从 MES_TQ_STOCK 取最新版本数据，
+     * <p>对齐胎面 syncTmShiftStock，按工厂+物理日+班序从 MES_TQ_STOCK 取最新版本数据，
      * 转换为 TqShiftStock 后远程调用 tqMesSyncRemoteService.replaceShiftStock 替换快照。</p>
      *
      * <p>MES无数据时仍调用 TQ 清空对应快照，防止自动滚动继续使用旧库存。
@@ -2147,12 +2151,20 @@ public class MesItfServiceImpl implements MesItfService {
             return AjaxResult.error("胎圈排程完成量同步失败：" + e.getMessage());
         }
 
+        // 回写胎圈排程结果表：接收Feign返回值并校验，避免回写失败被吞导致接口误判成功
         try {
-            FeignTokenHelper.runWithToken(() -> {
-                tqMesSyncRemoteService.writeBackScheduleResultFinishQty(insertList);
-            });
+            AjaxResult writeBackResult = FeignTokenHelper.callWithToken(() ->
+                    tqMesSyncRemoteService.writeBackScheduleResultFinishQty(insertList));
+            if (AJAX_SUCCESS_CODE != (Integer) writeBackResult.get(AjaxResult.CODE_TAG)) {
+                log.error("胎圈排程完成量回写失败：factoryCode={}, 返回code={}, 返回消息={}",
+                        syncDataLogs.getFactoryCode(), writeBackResult.get(AjaxResult.CODE_TAG), writeBackResult.get(AjaxResult.MSG_TAG));
+                return AjaxResult.error("胎圈排程完成量回写失败：" + writeBackResult.get(AjaxResult.MSG_TAG));
+            }
+            log.info("胎圈排程完成量回写完成：factoryCode={}, 回写数据条数={}", syncDataLogs.getFactoryCode(), insertList.size());
         } catch (Exception e) {
-            log.error("【胎圈排程完成量回写】回写胎圈排程结果表完成量异常", e);
+            log.error("胎圈排程完成量回写Feign调用异常：factoryCode={}, 待回写数据条数={}",
+                    syncDataLogs.getFactoryCode(), insertList.size(), e);
+            return AjaxResult.error("胎圈排程完成量回写失败：" + e.getMessage());
         }
         return AjaxResult.success();
     }
@@ -2214,6 +2226,230 @@ public class MesItfServiceImpl implements MesItfService {
         } catch (Exception e) {
             log.error("胎圈排程日完成量同步：Feign调用异常，factoryCode={}, 待插入数量={}", syncDataLogs.getFactoryCode(), insertList.size(), e);
             return AjaxResult.error("胎圈排程日完成量同步失败：" + e.getMessage());
+        }
+        return AjaxResult.success();
+    }
+
+    /**
+     * 同步钢丝圈排程完成量
+     * 从MES中间表MES_GSQ_SCHE_FINISH_QTY查询当天最新版本数据，
+     * 逻辑删除APS旧数据并插入新数据，最后回写钢丝圈排程结果表各班次完成量
+     *
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    @Override
+    public AjaxResult syncGsqClassShiftFinishQty(AuxReqSyncDataLogs syncDataLogs) {
+        DynamicDataSourceContextHolder.push(DataSource.MES);
+        List<GsqScheFinishQty> syncList = mesItfMapper.selectGsqClassShiftFinishQtyList(syncDataLogs);
+        DynamicDataSourceContextHolder.poll();
+
+        if (CollectionUtils.isEmpty(syncList)) {
+            log.warn("钢丝圈排程完成量同步：MES中间表查询结果为空，factoryCode={}", syncDataLogs.getFactoryCode());
+            return AjaxResult.success("MES中间表无数据可同步");
+        }
+
+        List<GsqScheFinishQty> insertList = new ArrayList<>();
+        for (GsqScheFinishQty item : syncList) {
+            GsqScheFinishQty entity = new GsqScheFinishQty();
+            BeanUtils.copyProperties(item, entity);
+            entity.setCreateBy("MES");
+            entity.setUpdateBy("MES");
+            entity.setCreateTime(DateUtils.getNowDate());
+            entity.setUpdateTime(DateUtils.getNowDate());
+            entity.setIsDelete(0);
+            insertList.add(entity);
+        }
+        try {
+            String factoryCode = syncDataLogs.getFactoryCode();
+            Date scheduleDate = insertList.stream().map(GsqScheFinishQty::getScheduleDate).filter(Objects::nonNull).findFirst().orElse(DateUtils.getNowDate());
+            String scheduleDateStr = DateUtil.formatDate(scheduleDate);
+            log.info("钢丝圈排程完成量同步：开始同步，factoryCode={}, scheduleDate={}, 待插入数量={}", factoryCode, scheduleDateStr, insertList.size());
+
+            // 接收Feign返回值并校验，避免服务端异常被全局异常处理器吞掉返回HTTP 200+AjaxResult.error时，itf端误判为成功
+            AjaxResult saveResult = FeignTokenHelper.callWithToken(() ->
+                    gsqMesSyncRemoteService.logicDeleteAndSaveScheFinishQty(factoryCode, scheduleDateStr, "MES", insertList));
+            if (AJAX_SUCCESS_CODE != (Integer) saveResult.get(AjaxResult.CODE_TAG)) {
+                log.error("钢丝圈排程完成量同步：同步失败，factoryCode={}, 返回code={}, 返回消息={}",
+                        factoryCode, saveResult.get(AjaxResult.CODE_TAG), saveResult.get(AjaxResult.MSG_TAG));
+                return AjaxResult.error("钢丝圈排程完成量同步失败：" + saveResult.get(AjaxResult.MSG_TAG));
+            }
+
+            log.info("钢丝圈排程完成量同步：同步完成，factoryCode={}, 插入数量={}", factoryCode, insertList.size());
+        } catch (Exception e) {
+            log.error("钢丝圈排程完成量同步：Feign调用异常，factoryCode={}, 待插入数量={}", syncDataLogs.getFactoryCode(), insertList.size(), e);
+            return AjaxResult.error("钢丝圈排程完成量同步失败：" + e.getMessage());
+        }
+
+        // 回写钢丝圈排程结果表：接收Feign返回值并校验，避免回写失败被吞导致接口误判成功
+        try {
+            AjaxResult writeBackResult = FeignTokenHelper.callWithToken(() ->
+                    gsqMesSyncRemoteService.writeBackScheduleResultFinishQty(insertList));
+            if (AJAX_SUCCESS_CODE != (Integer) writeBackResult.get(AjaxResult.CODE_TAG)) {
+                log.error("钢丝圈排程完成量回写失败：factoryCode={}, 返回code={}, 返回消息={}",
+                        syncDataLogs.getFactoryCode(), writeBackResult.get(AjaxResult.CODE_TAG), writeBackResult.get(AjaxResult.MSG_TAG));
+                return AjaxResult.error("钢丝圈排程完成量回写失败：" + writeBackResult.get(AjaxResult.MSG_TAG));
+            }
+            log.info("钢丝圈排程完成量回写完成：factoryCode={}, 回写数据条数={}", syncDataLogs.getFactoryCode(), insertList.size());
+        } catch (Exception e) {
+            log.error("钢丝圈排程完成量回写Feign调用异常：factoryCode={}, 待回写数据条数={}",
+                    syncDataLogs.getFactoryCode(), insertList.size(), e);
+            return AjaxResult.error("钢丝圈排程完成量回写失败：" + e.getMessage());
+        }
+        return AjaxResult.success();
+    }
+
+    /**
+     * 按上一天最新版本号同步钢丝圈排程完成量（临时任务）
+     * 逻辑同syncGsqClassShiftFinishQty（抓当天最新版本），但日期条件改为上一天
+     * 从MES中间表查询上一天（SCHEDULE_DATE = DATEADD(DAY, -1, GETDATE())）的钢丝圈排程完成量数据，
+     * 按排程日期+钢丝圈代码+订单号分组取MAX(DATA_VERSION)，然后逻辑删除APS旧数据并插入新数据，最后回填排程结果
+     *
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    @Override
+    public AjaxResult syncGsqClassShiftFinishQtyByYesterday(AuxReqSyncDataLogs syncDataLogs) {
+        DynamicDataSourceContextHolder.push(DataSource.MES);
+        List<GsqScheFinishQty> syncList = mesItfMapper.selectGsqClassShiftFinishQtyByYesterday(syncDataLogs);
+        DynamicDataSourceContextHolder.poll();
+
+        List<GsqScheFinishQty> insertList = new ArrayList<>();
+        for (GsqScheFinishQty item : syncList) {
+            GsqScheFinishQty entity = new GsqScheFinishQty();
+            BeanUtils.copyProperties(item, entity);
+            entity.setCreateBy("MES");
+            entity.setUpdateBy("MES");
+            entity.setCreateTime(DateUtils.getNowDate());
+            entity.setUpdateTime(DateUtils.getNowDate());
+            entity.setIsDelete(0);
+            insertList.add(entity);
+        }
+
+        try {
+            String factoryCode = syncDataLogs.getFactoryCode();
+            Date scheduleDate = insertList.stream().map(GsqScheFinishQty::getScheduleDate).filter(Objects::nonNull).findFirst().orElse(DateUtils.getNowDate());
+            String scheduleDateStr = DateUtil.formatDate(scheduleDate);
+            log.info("钢丝圈排程完成量按上一天最新版本同步：开始同步，factoryCode={}, scheduleDate={}, 待插入数量={}", factoryCode, scheduleDateStr, insertList.size());
+
+            // 接收Feign返回值并校验，避免服务端异常被全局异常处理器吞掉返回HTTP 200+AjaxResult.error时，itf端误判为成功
+            AjaxResult saveResult = FeignTokenHelper.callWithToken(() ->
+                    gsqMesSyncRemoteService.logicDeleteAndSaveScheFinishQty(factoryCode, scheduleDateStr, "MES", insertList));
+            if (AJAX_SUCCESS_CODE != (Integer) saveResult.get(AjaxResult.CODE_TAG)) {
+                log.error("钢丝圈排程完成量按上一天最新版本同步：同步失败，factoryCode={}, 返回code={}, 返回消息={}",
+                        factoryCode, saveResult.get(AjaxResult.CODE_TAG), saveResult.get(AjaxResult.MSG_TAG));
+                return AjaxResult.error("钢丝圈排程完成量按上一天最新版本同步失败：" + saveResult.get(AjaxResult.MSG_TAG));
+            }
+
+            log.info("钢丝圈排程完成量按上一天最新版本同步：同步完成，factoryCode={}, 插入数量={}", factoryCode, insertList.size());
+        } catch (Exception e) {
+            log.error("钢丝圈排程完成量按上一天最新版本同步：Feign调用异常，factoryCode={}, 待插入数量={}", syncDataLogs.getFactoryCode(), insertList.size(), e);
+            return AjaxResult.error("钢丝圈排程完成量按上一天最新版本同步失败：" + e.getMessage());
+        }
+
+        // 回写钢丝圈排程结果表：接收Feign返回值并校验，避免回写失败被吞导致接口误判成功
+        try {
+            AjaxResult writeBackResult = FeignTokenHelper.callWithToken(() ->
+                    gsqMesSyncRemoteService.writeBackScheduleResultFinishQty(insertList));
+            if (AJAX_SUCCESS_CODE != (Integer) writeBackResult.get(AjaxResult.CODE_TAG)) {
+                log.error("钢丝圈排程完成量按上一天最新版本回写失败：factoryCode={}, 返回code={}, 返回消息={}",
+                        syncDataLogs.getFactoryCode(), writeBackResult.get(AjaxResult.CODE_TAG), writeBackResult.get(AjaxResult.MSG_TAG));
+                return AjaxResult.error("钢丝圈排程完成量按上一天最新版本回写失败：" + writeBackResult.get(AjaxResult.MSG_TAG));
+            }
+            log.info("钢丝圈排程完成量按上一天最新版本回写完成：factoryCode={}, 回写数据条数={}",
+                    syncDataLogs.getFactoryCode(), insertList.size());
+        } catch (Exception e) {
+            log.error("钢丝圈排程完成量按上一天最新版本回写Feign调用异常：factoryCode={}, 待回写数据条数={}",
+                    syncDataLogs.getFactoryCode(), insertList.size(), e);
+            return AjaxResult.error("钢丝圈排程完成量按上一天最新版本回写失败：" + e.getMessage());
+        }
+        return AjaxResult.success();
+    }
+
+    /**
+     * 按指定版本号同步钢丝圈排程完成量（临时任务）
+     * 与原syncGsqClassShiftFinishQty的区别：不限日期，按指定版本号查询MES中间表所有日期数据
+     * 同步后同样回填排程结果
+     * 由于指定版本可能包含多个排程日期的数据，按排程日期分组后逐组调用逻辑删除+插入
+     *
+     * @param dataVersion 指定版本号
+     * @return 结果
+     */
+    @Override
+    public AjaxResult syncGsqClassShiftFinishQtyByVersion(String dataVersion) {
+        AuxReqSyncDataLogs syncDataLogs = new AuxReqSyncDataLogs();
+        syncDataLogs.setDataVersion(dataVersion);
+
+        DynamicDataSourceContextHolder.push(DataSource.MES);
+        List<GsqScheFinishQty> syncList = mesItfMapper.selectGsqClassShiftFinishQtyByVersion(syncDataLogs);
+        DynamicDataSourceContextHolder.poll();
+
+        if (CollectionUtils.isEmpty(syncList)) {
+            log.warn("钢丝圈排程完成量按版本号同步：MES中间表查询结果为空，dataVersion={}", dataVersion);
+            return AjaxResult.success("MES中间表无数据可同步");
+        }
+
+        List<GsqScheFinishQty> insertList = new ArrayList<>();
+        for (GsqScheFinishQty item : syncList) {
+            GsqScheFinishQty entity = new GsqScheFinishQty();
+            BeanUtils.copyProperties(item, entity);
+            entity.setCreateBy("MES");
+            entity.setUpdateBy("MES");
+            entity.setCreateTime(DateUtils.getNowDate());
+            entity.setUpdateTime(DateUtils.getNowDate());
+            entity.setIsDelete(0);
+            insertList.add(entity);
+        }
+
+        // 按排程日期分组，逐组同步（原逻辑按单个排程日期做逻辑删除+插入）
+        Map<String, List<GsqScheFinishQty>> groupByScheduleDate = insertList.stream()
+                .collect(Collectors.groupingBy(item -> {
+                    Date scheduleDate = item.getScheduleDate();
+                    return scheduleDate != null ? DateUtil.formatDate(scheduleDate) : "unknown";
+                }));
+
+        for (Map.Entry<String, List<GsqScheFinishQty>> entry : groupByScheduleDate.entrySet()) {
+            String scheduleDateStr = entry.getKey();
+            List<GsqScheFinishQty> groupList = entry.getValue();
+            String factoryCode = groupList.get(0).getFactoryCode();
+
+            try {
+                log.info("钢丝圈排程完成量按版本号同步：开始同步，dataVersion={}, factoryCode={}, scheduleDate={}, 待插入数量={}",
+                        dataVersion, factoryCode, scheduleDateStr, groupList.size());
+
+                String finalFactoryCode = factoryCode;
+                // 接收Feign返回值并校验，避免服务端异常被全局异常处理器吞掉返回HTTP 200+AjaxResult.error时，itf端误判为成功
+                AjaxResult saveResult = FeignTokenHelper.callWithToken(() ->
+                        gsqMesSyncRemoteService.logicDeleteAndSaveScheFinishQty(finalFactoryCode, scheduleDateStr, "MES", groupList));
+                if (AJAX_SUCCESS_CODE != (Integer) saveResult.get(AjaxResult.CODE_TAG)) {
+                    log.error("钢丝圈排程完成量按版本号同步：同步失败，dataVersion={}, factoryCode={}, scheduleDate={}, 返回code={}, 返回消息={}",
+                            dataVersion, factoryCode, scheduleDateStr, saveResult.get(AjaxResult.CODE_TAG), saveResult.get(AjaxResult.MSG_TAG));
+                    return AjaxResult.error("钢丝圈排程完成量按版本号同步失败：" + saveResult.get(AjaxResult.MSG_TAG));
+                }
+
+                log.info("钢丝圈排程完成量按版本号同步：同步完成，dataVersion={}, factoryCode={}, scheduleDate={}, 插入数量={}",
+                        dataVersion, factoryCode, scheduleDateStr, groupList.size());
+            } catch (Exception e) {
+                log.error("钢丝圈排程完成量按版本号同步：Feign调用异常，dataVersion={}, factoryCode={}, scheduleDate={}",
+                        dataVersion, factoryCode, scheduleDateStr, e);
+                return AjaxResult.error("钢丝圈排程完成量按版本号同步失败：" + e.getMessage());
+            }
+        }
+
+        // 回写钢丝圈排程结果表：接收Feign返回值并校验，避免回写失败被吞导致接口误判成功
+        try {
+            AjaxResult writeBackResult = FeignTokenHelper.callWithToken(() ->
+                    gsqMesSyncRemoteService.writeBackScheduleResultFinishQty(insertList));
+            if (AJAX_SUCCESS_CODE != (Integer) writeBackResult.get(AjaxResult.CODE_TAG)) {
+                log.error("钢丝圈排程完成量按版本号回写失败：dataVersion={}, 返回code={}, 返回消息={}",
+                        dataVersion, writeBackResult.get(AjaxResult.CODE_TAG), writeBackResult.get(AjaxResult.MSG_TAG));
+                return AjaxResult.error("钢丝圈排程完成量按版本号回写失败：" + writeBackResult.get(AjaxResult.MSG_TAG));
+            }
+            log.info("钢丝圈排程完成量按版本号回写完成：dataVersion={}, 回写数据条数={}", dataVersion, insertList.size());
+        } catch (Exception e) {
+            log.error("钢丝圈排程完成量按版本号回写Feign调用异常：dataVersion={}, 待回写数据条数={}",
+                    dataVersion, insertList.size(), e);
+            return AjaxResult.error("钢丝圈排程完成量按版本号回写失败：" + e.getMessage());
         }
         return AjaxResult.success();
     }
@@ -3612,7 +3848,7 @@ public class MesItfServiceImpl implements MesItfService {
      * @return 同步结果
      */
     @Override
-    public AjaxResult syncTreadStock(AuxReqSyncDataLogs syncDataLogs) {
+    public AjaxResult syncTmStock(AuxReqSyncDataLogs syncDataLogs) {
         if (syncDataLogs == null || syncDataLogs.getQueryParams() == null
                 || syncDataLogs.getQueryParams().get("stockDate") == null) {
             return AjaxResult.error(I18nUtil.getMessage("ui.itf.mes.stockArgumentsInvalid"));
@@ -3686,7 +3922,7 @@ public class MesItfServiceImpl implements MesItfService {
      * @throws ServiceException 参数非法或远程保存失败时抛出
      */
     @Override
-    public AjaxResult syncTreadShiftStock(MesShiftStockSyncRequest request) {
+    public AjaxResult syncTmShiftStock(MesShiftStockSyncRequest request) {
         if (request == null || request.getStockDate() == null || request.getShiftOrder() == null
                 || request.getShiftOrder() < 1 || request.getShiftOrder() > 6) {
             throw new ServiceException(I18nUtil.getMessage("ui.itf.mes.shiftStockArgumentsInvalid"));
@@ -3897,8 +4133,9 @@ public class MesItfServiceImpl implements MesItfService {
     @Override
     public AjaxResult syncLhPrecisionPlanActual(AuxReqSyncDataLogs syncDataLogs) {
         // 先查询MES中间表硫化精度类型的最大版本号，只同步最新版本的数据
+        String actualFactoryCode = syncDataLogs != null ? syncDataLogs.getFactoryCode() : null;
         DynamicDataSourceContextHolder.push(DataSource.MES);
-        String maxVersion = mesItfMapper.selectMaxDataVersionFromMes("硫化精度");
+        String maxVersion = mesItfMapper.selectMaxDataVersionFromMes(actualFactoryCode, "硫化精度");
         DynamicDataSourceContextHolder.poll();
 
         if (maxVersion == null || maxVersion.isEmpty()) {

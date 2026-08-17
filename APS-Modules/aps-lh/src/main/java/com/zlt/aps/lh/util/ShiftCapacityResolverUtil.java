@@ -1102,6 +1102,60 @@ public final class ShiftCapacityResolverUtil {
     }
 
     /**
+     * 解析指定窗口内首个能够完整生产一模的真实时刻。
+     *
+     * <p>净产能只回答“窗口内还有多少可生产秒数”，不能回答第一条轮胎实际从何时开始。
+     * 当请求时刻正落在精度、维修、停机、清洗或预热窗口内时，本方法沿用现有不可生产
+     * 区间并集，顺延到该区间结束；若前方空档不足一个完整硫化周期，则继续寻找下一段
+     * 连续空档。区间统一使用 {@code [start, end)}，因此任务结束整点可以立即开产。</p>
+     *
+     * @param devicePlanShutList 设备停机计划
+     * @param cleaningWindowList 清洗窗口
+     * @param maintenanceWindowList 精度、维修及预热容量窗口
+     * @param machineCode 机台编码
+     * @param windowStartTime 请求开产时间（含）
+     * @param windowEndTime 当前班次有效结束时间（不含）
+     * @param lhTimeSeconds 单次完整硫化周期秒数
+     * @return 首个真实可开产时间；窗口内不存在完整生产周期时返回 null
+     */
+    public static Date resolveFirstContinuousProductiveTime(
+            List<MdmDevicePlanShut> devicePlanShutList,
+            List<MachineCleaningWindowDTO> cleaningWindowList,
+            List<MachineMaintenanceWindowDTO> maintenanceWindowList,
+            String machineCode,
+            Date windowStartTime,
+            Date windowEndTime,
+            int lhTimeSeconds) {
+        if (Objects.isNull(windowStartTime) || Objects.isNull(windowEndTime)
+                || !windowStartTime.before(windowEndTime) || lhTimeSeconds <= 0) {
+            return null;
+        }
+        long requiredMillis = (long) lhTimeSeconds * 1000L;
+        Date cursorTime = windowStartTime;
+        List<Date[]> downtimeIntervals = collectMergedDowntimeIntervals(
+                devicePlanShutList, cleaningWindowList, maintenanceWindowList,
+                machineCode, windowStartTime, windowEndTime);
+        for (Date[] downtimeInterval : downtimeIntervals) {
+            if (Objects.isNull(downtimeInterval) || downtimeInterval.length < 2
+                    || Objects.isNull(downtimeInterval[0])
+                    || Objects.isNull(downtimeInterval[1])) {
+                continue;
+            }
+            Date downtimeStartTime = downtimeInterval[0];
+            Date downtimeEndTime = downtimeInterval[1];
+            if (downtimeStartTime.after(cursorTime)
+                    && downtimeStartTime.getTime() - cursorTime.getTime() >= requiredMillis) {
+                return cursorTime;
+            }
+            if (downtimeEndTime.after(cursorTime)) {
+                cursorTime = downtimeEndTime;
+            }
+        }
+        return windowEndTime.getTime() - cursorTime.getTime() >= requiredMillis
+                ? cursorTime : null;
+    }
+
+    /**
      * 计算扣减停机与清洗后的班次最大计划量。
      * <p>先按设备停机与干冰清洗扣出“剩余有效生产时间”，再减去喷砂清洗损失量。</p>
      * <p>之所以分两步，是因为当前业务口径不同：干冰按剩余有效时间折算班产，喷砂按清洗重叠时长折算扣量。</p>

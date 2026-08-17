@@ -5,6 +5,7 @@ import cn.hutool.core.date.DateUtil;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.cd15.api.domain.entity.Cd15Stock;
@@ -16,6 +17,7 @@ import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
@@ -50,6 +52,10 @@ public class Cd15StockController extends AbstractDocBizController<Cd15Stock> {
     @ApiOperation("新增斜裁库存")
     @PostMapping("/add")
     public AjaxResult add(@RequestBody Cd15Stock entity) {
+        String errorKey = cd15StockService.validateBusiness(entity);
+        if (StringUtils.isNotBlank(errorKey)) {
+            return AjaxResult.error(I18nUtil.getMessage(errorKey));
+        }
         return super.save(entity);
     }
 
@@ -58,6 +64,10 @@ public class Cd15StockController extends AbstractDocBizController<Cd15Stock> {
     @ApiOperation("编辑斜裁库存")
     @PostMapping("/edit")
     public AjaxResult edit(@RequestBody Cd15Stock entity) {
+        String errorKey = cd15StockService.validateBusiness(entity);
+        if (StringUtils.isNotBlank(errorKey)) {
+            return AjaxResult.error(I18nUtil.getMessage(errorKey));
+        }
         return super.save(entity);
     }
 
@@ -99,10 +109,11 @@ public class Cd15StockController extends AbstractDocBizController<Cd15Stock> {
     @PostMapping("/logicDeleteAndSaveMesBatch")
     public AjaxResult logicDeleteAndSaveMesBatch(@RequestParam("factoryCode") String factoryCode,
                                                   @RequestParam("stockDate") String stockDate,
+                                                  @RequestParam("shiftCode") String shiftCode,
                                                   @RequestParam("updateBy") String updateBy,
                                                   @RequestBody List<Cd15Stock> stockList) {
         this.cd15StockService.logicDeleteAndSaveBatch(factoryCode,
-                DateUtil.parseDate(stockDate), updateBy, stockList);
+                DateUtil.parseDate(stockDate), shiftCode, updateBy, stockList);
         return AjaxResult.success();
     }
 
@@ -134,6 +145,7 @@ public class Cd15StockController extends AbstractDocBizController<Cd15Stock> {
     protected void builderCondition(QueryWrapper<Cd15Stock> queryWrapper, Cd15Stock queryVO) {
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFactoryCode()), "FACTORY_CODE", queryVO.getFactoryCode());
         queryWrapper.eq(queryVO.getStockDate() != null, "STOCK_DATE", queryVO.getStockDate());
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getShiftCode()), "SHIFT_CODE", queryVO.getShiftCode());
         queryWrapper.ge(queryVO.getStockDateStart() != null, "STOCK_DATE", queryVO.getStockDateStart());
         queryWrapper.le(queryVO.getStockDateEnd() != null, "STOCK_DATE", queryVO.getStockDateEnd());
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getMaterialCode()), "MATERIAL_CODE", queryVO.getMaterialCode());
@@ -146,6 +158,6 @@ public class Cd15StockController extends AbstractDocBizController<Cd15Stock> {
 
     @Override
     protected String getOrderBy() {
-        return "STOCK_DATE desc, MATERIAL_CODE asc";
+        return "STOCK_DATE desc, SHIFT_CODE asc, MATERIAL_CODE asc";
     }
 }

@@ -642,16 +642,16 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
     }
 
     /**
-     * S3.2 剩余产能二次分配（集中排产）。
+     * S3.2 剩余产能二次分配（供应时长优先排产）。
      *
-     * <p>每个班次逐规格阈值排产后，回收机台剩余产能，按备库剩余缺口从大到小回填给备库胎圈。
-     * 避免缺口最大的规格因阈值限制被分散到多班排产，实现"缺口越大越优先排满"的集中排产语义。</p>
+     * <p>每个班次逐规格阈值排产后，回收机台剩余产能，回填给备库胎圈。
+     * 排序规则：供应时长升序（短=紧急=优先排），与 S3.1 初始排产、S5.6 兜底回填口径一致。</p>
      *
      * <p>处理流程：
      * <ol>
      *   <li>按机台分组当班有排产且仍有备库剩余量的胎圈规格</li>
      *   <li>仅处理多规格机台（单规格机台S3已按定额满排）</li>
-     *   <li>按备库剩余缺口(backupRemainingQty)从大到小排序</li>
+     *   <li>按供应时长(supplyTime)升序排序（短=紧急=优先回填）</li>
      *   <li>逐规格回填剩余产能：回填量 = min(机台剩余产能, 备库剩余量)</li>
      *   <li>更新当班计划量、机台产能占用、备库剩余量</li>
      * </ol></p>
@@ -789,14 +789,25 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
             TqMachineInfo machine = machineInfoMap.get(machineCode);
             double machineQuota = getMachineQuota(machine, defaultQuota);
 
-            // 按备库剩余缺口(backupRemainingQty)从大到小排序
+            // 按供应时长升序排序（短=紧急=优先回填），与S3.1/S5.6口径一致
             List<TqScheduleResultVo> sortedSpecs = backupSpecs.stream()
                     .sorted((o1, o2) -> {
-                        double rem1 = o1.getBackupRemainingQty() == null ? 0D : o1.getBackupRemainingQty();
-                        double rem2 = o2.getBackupRemainingQty() == null ? 0D : o2.getBackupRemainingQty();
-                        return Double.compare(rem2, rem1);
+                        double st1 = o1.getSupplyTime() == null ? 0D : o1.getSupplyTime();
+                        double st2 = o2.getSupplyTime() == null ? 0D : o2.getSupplyTime();
+                        return Double.compare(st1, st2);
                     })
                     .collect(Collectors.toList());
+
+            // 诊断日志：输出S3.2排序详情（供应时长+备库剩余缺口），用于排查剩余产能分配方向
+            log.info("[S3.2-DIAG] 机台:{} {}班 剩余产能二次分配排序结果(按supplyTime升序):",
+                    machineCode, classIdx + 1);
+            for (TqScheduleResultVo spec : sortedSpecs) {
+                log.info("[S3.2-DIAG]   beadCode={} supplyTime={} backupRemainingQty={} triggerClass={}",
+                        spec.getBeadCode(),
+                        spec.getSupplyTime(),
+                        spec.getBackupRemainingQty(),
+                        spec.getBackupTriggerClass());
+            }
 
             // 逐规格回填剩余产能
             for (TqScheduleResultVo spec : sortedSpecs) {

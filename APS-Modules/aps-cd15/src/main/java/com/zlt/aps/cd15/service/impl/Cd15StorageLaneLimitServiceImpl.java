@@ -74,6 +74,9 @@ public class Cd15StorageLaneLimitServiceImpl extends AbstractDocService<Cd15Stor
     public String validateBusiness(Cd15StorageLaneLimit entity) {
         this.normalize(entity);
         this.fillDerivedFields(entity);
+        if (StringUtils.isBlank(entity.getMachineCode())) {
+            return "ui.cd15.storageLaneLimit.machineRequired";
+        }
         if (entity.getCarNum() == null || entity.getCarNum() < 0) {
             return "ui.data.column.cd15StorageLaneLimit.carNumNonNegative";
         }
@@ -195,6 +198,7 @@ public class Cd15StorageLaneLimitServiceImpl extends AbstractDocService<Cd15Stor
             Cd15StorageLaneLimit existing = existingList.get(index);
             Cd15StorageLaneLimit incoming = incomingList.get(index);
             if (!Objects.equals(existing.getStorageLaneCode(), incoming.getStorageLaneCode())
+                    || !Objects.equals(existing.getMachineCode(), incoming.getMachineCode())
                     || !Objects.equals(StringUtils.trimToEmpty(existing.getMaterialCode()),
                             StringUtils.trimToEmpty(incoming.getMaterialCode()))
                     || !Objects.equals(existing.getCarNum(), incoming.getCarNum())
@@ -246,6 +250,7 @@ public class Cd15StorageLaneLimitServiceImpl extends AbstractDocService<Cd15Stor
     }
 
     private void copyImportValues(Cd15StorageLaneLimit target, Cd15StorageLaneLimit source) {
+        target.setMachineCode(source.getMachineCode());
         target.setMaterialCode(source.getMaterialCode());
         target.setCarNum(source.getCarNum());
         target.setMaxCarNum(source.getMaxCarNum());
@@ -273,6 +278,7 @@ public class Cd15StorageLaneLimitServiceImpl extends AbstractDocService<Cd15Stor
         }
         entity.setFactoryCode(StringUtils.trimToEmpty(entity.getFactoryCode()));
         entity.setShiftCode(StringUtils.trimToEmpty(entity.getShiftCode()));
+        entity.setMachineCode(StringUtils.trimToEmpty(entity.getMachineCode()));
         entity.setStorageLaneCode(StringUtils.trimToEmpty(entity.getStorageLaneCode()));
         entity.setMaterialCode(StringUtils.trimToNull(entity.getMaterialCode()));
         entity.setDataSource(StringUtils.trimToNull(entity.getDataSource()));

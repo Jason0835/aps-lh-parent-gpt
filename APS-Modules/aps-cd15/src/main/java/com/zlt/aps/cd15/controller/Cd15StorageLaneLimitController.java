@@ -147,6 +147,7 @@ public class Cd15StorageLaneLimitController extends AbstractDocBizController<Cd1
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFactoryCode()), "FACTORY_CODE", queryVO.getFactoryCode());
         queryWrapper.eq(queryVO.getLaneDate() != null, "LANE_DATE", queryVO.getLaneDate());
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getShiftCode()), "SHIFT_CODE", queryVO.getShiftCode());
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getMachineCode()), "MACHINE_CODE", queryVO.getMachineCode());
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getStorageLaneCode()), "STORAGE_LANE_CODE", queryVO.getStorageLaneCode());
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getMaterialCode()), "MATERIAL_CODE", queryVO.getMaterialCode());
     }

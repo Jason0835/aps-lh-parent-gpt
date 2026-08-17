@@ -9,7 +9,6 @@ import com.zlt.aps.itf.vo.MesShiftStockSyncRequest;
 import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmMoldAlterPlan;
 import com.zlt.aps.mp.api.domain.entity.*;
-//import com.zlt.aps.gsq.api.domain.entity.GsqScheduleResultIssue;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResultIssue;
 
 import java.text.ParseException;
@@ -261,7 +260,7 @@ public interface MesItfService {
      * @param syncDataLogs 同步参数
      * @return 结果
      */
-    AjaxResult syncTreadStock(AuxReqSyncDataLogs syncDataLogs);
+    AjaxResult syncTmStock(AuxReqSyncDataLogs syncDataLogs);
 
     /**
      * 同步胎圈库存
@@ -322,6 +321,38 @@ public interface MesItfService {
     AjaxResult syncGsqScheDayFinishQty(AuxReqSyncDataLogs syncDataLogs);
 
     /**
+     * 同步钢丝圈排程完成量
+     * T_GSQ_SCHE_FINISH_QTY：采用逻辑删除+插入方案
+     *   步骤1：逻辑删除当天排程日期的所有数据（IS_DELETE置为1）
+     *   步骤2：将MES最新排程完成量数据批量插入（新记录，IS_DELETE=0）
+     *   步骤3：回写钢丝圈排程结果表各班次完成量
+     *
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    AjaxResult syncGsqClassShiftFinishQty(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 按上一天最新版本号同步钢丝圈排程完成量（临时任务）
+     * 逻辑同 syncGsqClassShiftFinishQty（抓当天最新版本），但日期条件改为上一天
+     *
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    AjaxResult syncGsqClassShiftFinishQtyByYesterday(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 按指定版本号同步钢丝圈排程完成量（临时任务）
+     * 与原 syncGsqClassShiftFinishQty 的区别：不限日期，按指定版本号查询MES中间表所有日期数据
+     * 同步后同样回写排程结果
+     * 由于指定版本可能包含多个排程日期的数据，按排程日期分组后逐组调用逻辑删除+插入
+     *
+     * @param dataVersion 指定版本号
+     * @return 结果
+     */
+    AjaxResult syncGsqClassShiftFinishQtyByVersion(String dataVersion);
+
+    /**
      * 同步胎面排程完成量
      * T_TM_SCHE_FINISH_QTY：采用逻辑删除+插入方案
      *   步骤1：逻辑删除当天排程日期的所有数据（IS_DELETE置为1）
@@ -376,7 +407,7 @@ public interface MesItfService {
      * @param request 工厂、物理库存日和班序
      * @return 同步结果
      */
-    AjaxResult syncTreadShiftStock(MesShiftStockSyncRequest request);
+    AjaxResult syncTmShiftStock(MesShiftStockSyncRequest request);
 
     /**
      * 同步成型排程完成量

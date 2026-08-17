@@ -7,7 +7,7 @@ import java.math.BigDecimal;
 import java.util.Date;
 
 /**
- * MES 直裁库存中间表实体，映射 T_MES_CD90_STOCK。
+ * MES直裁库存视图实体，映射MES_CD90_STOCK。
  * 用于 aps-itf 从 MES 数据源查询直裁库存同步数据。
  *
  * @author APS Team

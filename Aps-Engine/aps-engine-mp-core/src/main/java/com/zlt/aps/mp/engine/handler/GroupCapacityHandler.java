@@ -106,6 +106,9 @@ public class GroupCapacityHandler {
             if (isHandlerMoldCapacity) {
                 List<MpSkuMoldCapacityAllocateLog> singleGroupResultList = moldCapacityLimitAllocateHandler.moldCapacityAllocate(groupInfo, skuPlanList, maxEnableMouldNumberMap, productionContext);
                 if (!CollectionUtils.isEmpty(singleGroupResultList)) {
+                    Map<String, Integer> moldCapacityLimitMap = Maps.newHashMap();
+                    singleGroupResultList.forEach(single -> moldCapacityLimitMap.put(single.getMaterialDesc(), single.getNetQty()));
+                    productionContext.getBaseDataContainer().setMoldCapacityLimitMap(moldCapacityLimitMap);
                     moldCapacityResultList.addAll(singleGroupResultList);
                 }
             }

@@ -270,6 +270,18 @@ public class TqResidualCapacityHandler extends AbsTqScheduleStepHandler {
                 .sorted(buildResidualPriorityComparator(supplyTimeThreshold, classNum))
                 .collect(Collectors.toList());
 
+        // 诊断日志：输出S5.6排序详情，用于排查兜底回填是否覆盖S3.2结果
+        log.info("[S5.6-DIAG] 机台:{} {}班 剩余产能={} 候选规格排序结果:",
+                machineCode, classNum, residualCapacity);
+        for (TqScheduleResultVo spec : candidates) {
+            log.info("[S5.6-DIAG]   beadCode={} supplyTime={} backupRemainingQty={} triggerClass={} currentPlan={}",
+                    spec.getBeadCode(),
+                    spec.getSupplyTime(),
+                    spec.getBackupRemainingQty(),
+                    spec.getBackupTriggerClass(),
+                    getClassPlanQty(spec, classNum));
+        }
+
         // 3. 逐规格回填剩余产能（每次迭代前重新计算剩余产能，确保不超定额）
         for (TqScheduleResultVo spec : candidates) {
             // 每次迭代前重新计算剩余产能，防止累积超量
@@ -470,8 +482,7 @@ public class TqResidualCapacityHandler extends AbsTqScheduleStepHandler {
      * <ol>
      *   <li>备库胎圈优先（backupTriggerClass &gt; 0）</li>
      *   <li>同为备库胎圈：按触发班次升序（先触发的优先继续排）</li>
-     *   <li>同组内按供应时长阈值分组：未达阈值优先（Priority-2），已达阈值排后（Priority-3）</li>
-     *   <li>同组内按供应时长升序</li>
+     *   <li>同组内按供应时长升序（短=紧急=优先排，与S3.2口径一致）</li>
      * </ol>
      *
      * @param supplyTimeThreshold 供应时长阈值

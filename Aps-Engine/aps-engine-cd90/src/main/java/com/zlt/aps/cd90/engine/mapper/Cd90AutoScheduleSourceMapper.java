@@ -109,6 +109,7 @@ public class Cd90AutoScheduleSourceMapper {
         }
         return Cd90StorageLaneState.builder()
                 .laneCode(source.getStorageLaneCode())
+                .machineCode(source.getMachineCode())
                 .clothCode(source.getMaterialCode())
                 .vehicleCount(vehicleCount)
                 .maxVehicleCount(maxCarNum)

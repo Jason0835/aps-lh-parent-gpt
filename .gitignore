@@ -34,3 +34,4 @@ APS-Modules/aps-lh/src/test/
 APS-Modules/aps-lh/openspec/
 APS-Modules/aps-lh/*.md
 /.agents/
+/.codegraph/

@@ -18,7 +18,7 @@
       :selectArea="false"
     >
       <template slot="header">
-        <!-- <el-button
+        <el-button
           type="primary"
           plain
           v-hasPermi="['nc:stock:add']"
@@ -45,7 +45,7 @@
           v-hasPermi="['nc:stock:remove']"
           @click="handleBatchDelete"
           >{{ $t("ui.frame.btn.delete") }}</el-button
-        > -->
+        >
         <el-button
           v-hasPermi="['nc:stock:import']"
           @click="$refs.tltUpload.handleImport()"
@@ -169,7 +169,7 @@ export default {
             return (
               <div>
                 <el-button
-                  v-hasPermi={["nc:stock:stockRevise"]}
+                  v-hasPermi={["nc:stock:edit"]}
                   class="minus"
                   type="success"
                   onClick={() => this.handleModifyStock(row)}

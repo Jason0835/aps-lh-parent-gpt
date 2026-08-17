@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.mp.report.mapper.MonthPlanCompareMapper">
+
+    <!-- 月计划定稿主数据结果映射 -->
+    <resultMap id="finalResultMap" type="com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult">
+        <id property="id" column="ID"/>
+        <result property="factoryCode" column="FACTORY_CODE"/>
+        <result property="year" column="YEAR"/>
+        <result property="month" column="MONTH"/>
+        <result property="productionVersion" column="PRODUCTION_VERSION"/>
+        <result property="materialCode" column="MATERIAL_CODE"/>
+        <result property="materialDesc" column="MATERIAL_DESC"/>
+        <result property="productStatus" column="PRODUCT_STATUS"/>
+        <result property="productTypeCode" column="PRODUCT_TYPE_CODE"/>
+        <result property="brand" column="BRAND"/>
+        <result property="specifications" column="SPECIFICATIONS"/>
+        <result property="proSize" column="PRO_SIZE"/>
+        <result property="originalTotalQty" column="ORIGINAL_TOTAL_QTY"/>
+        <result property="totalQty" column="TOTAL_QTY"/>
+        <result property="day1" column="DAY_1"/>
+        <result property="day2" column="DAY_2"/>
+        <result property="day3" column="DAY_3"/>
+        <result property="day4" column="DAY_4"/>
+        <result property="day5" column="DAY_5"/>
+        <result property="day6" column="DAY_6"/>
+        <result property="day7" column="DAY_7"/>
+        <result property="day8" column="DAY_8"/>
+        <result property="day9" column="DAY_9"/>
+        <result property="day10" column="DAY_10"/>
+        <result property="day11" column="DAY_11"/>
+        <result property="day12" column="DAY_12"/>
+        <result property="day13" column="DAY_13"/>
+        <result property="day14" column="DAY_14"/>
+        <result property="day15" column="DAY_15"/>
+        <result property="day16" column="DAY_16"/>
+        <result property="day17" column="DAY_17"/>
+        <result property="day18" column="DAY_18"/>
+        <result property="day19" column="DAY_19"/>
+        <result property="day20" column="DAY_20"/>
+        <result property="day21" column="DAY_21"/>
+        <result property="day22" column="DAY_22"/>
+        <result property="day23" column="DAY_23"/>
+        <result property="day24" column="DAY_24"/>
+        <result property="day25" column="DAY_25"/>
+        <result property="day26" column="DAY_26"/>
+        <result property="day27" column="DAY_27"/>
+        <result property="day28" column="DAY_28"/>
+        <result property="day29" column="DAY_29"/>
+        <result property="day30" column="DAY_30"/>
+        <result property="day31" column="DAY_31"/>
+    </resultMap>
+
+    <!-- 公共 WHERE 条件片段（用于 selectFinalList 与 selectFinalListCount） -->
+    <sql id="finalWhereClause">
+        WHERE f.IS_DELETE = 0
+          AND f.FACTORY_CODE = #{factoryCode}
+          AND f.YEAR = #{year}
+          AND f.MONTH = #{month}
+          <!-- 每月只有一个定稿版本，通过EXISTS自动匹配 IS_FINAL='1' 的定稿版本 -->
+          AND EXISTS (
+              SELECT 1 FROM T_MP_PROC_VERSION v
+              WHERE v.PRODUCTION_VERSION = f.PRODUCTION_VERSION
+                AND v.IS_DELETE = 0
+                AND v.IS_FINAL = '1'
+                AND v.FACTORY_CODE = f.FACTORY_CODE
+                AND v.YEAR = f.YEAR
+                AND v.MONTH = f.MONTH
+          )
+        <if test="materialCode != null and materialCode != ''">
+            AND f.MATERIAL_CODE LIKE CONCAT('%', #{materialCode}, '%')
+        </if>
+        <if test="materialDesc != null and materialDesc != ''">
+            AND f.MATERIAL_DESC LIKE CONCAT('%', #{materialDesc}, '%')
+        </if>
+        <if test="productStatus != null and productStatus != ''">
+            AND f.PRODUCT_STATUS = #{productStatus}
+        </if>
+        <if test="productTypeCode != null and productTypeCode != ''">
+            AND f.PRODUCT_TYPE_CODE = #{productTypeCode}
+        </if>
+    </sql>
+
+    <!-- 查询月计划定稿主数据总数（分页总数） -->
+    <select id="selectFinalListCount" resultType="int">
+        SELECT COUNT(1)
+        FROM T_MP_MONTH_PLAN_PROD_FINAL f
+        <include refid="finalWhereClause"/>
+    </select>
+
+    <!-- 查询月计划定稿主数据（含每日计划量 DAY_1 ~ DAY_31），支持分页 -->
+    <select id="selectFinalList" resultMap="finalResultMap">
+        SELECT
+            f.ID,
+            f.FACTORY_CODE,
+            f.YEAR,
+            f.MONTH,
+            f.PRODUCTION_VERSION,
+            f.MATERIAL_CODE,
+            f.MATERIAL_DESC,
+            f.PRODUCT_STATUS,
+            f.PRODUCT_TYPE_CODE,
+            f.BRAND,
+            f.SPECIFICATIONS,
+            f.PRO_SIZE,
+            f.ORIGINAL_TOTAL_QTY,
+            f.TOTAL_QTY,
+            f.DAY_1, f.DAY_2, f.DAY_3, f.DAY_4, f.DAY_5, f.DAY_6, f.DAY_7,
+            f.DAY_8, f.DAY_9, f.DAY_10, f.DAY_11, f.DAY_12, f.DAY_13, f.DAY_14,
+            f.DAY_15, f.DAY_16, f.DAY_17, f.DAY_18, f.DAY_19, f.DAY_20, f.DAY_21,
+            f.DAY_22, f.DAY_23, f.DAY_24, f.DAY_25, f.DAY_26, f.DAY_27, f.DAY_28,
+            f.DAY_29, f.DAY_30, f.DAY_31
+        FROM T_MP_MONTH_PLAN_PROD_FINAL f
+        <include refid="finalWhereClause"/>
+        ORDER BY f.MATERIAL_CODE
+        <!-- 分页：pageNum/pageSize 任一为空则查全量（用于导出场景） -->
+        <if test="pageNum != null and pageSize != null and pageNum > 0 and pageSize > 0">
+            LIMIT #{offset}, #{pageSize}
+        </if>
+    </select>
+
+    <!-- 查询每日实际完成量（按 物料编码 + LH_TYPE + 日期日 聚合） -->
+    <!-- 日期范围按版本表 PRODUCTION_START_DATE ~ PRODUCTION_END_DATE 取数，并限制当月 -->
+    <!-- 每月只有一个定稿版本，通过工厂+年月+IS_FINAL='1' 自动定位版本 -->
+    <!-- 通过 materialKeys（materialCode|lhType）限定只查当前页 SKU 的实际产量 -->
+    <select id="selectDailyFinishQtyList" resultType="java.util.Map">
+        SELECT
+            q.MATERIAL_CODE   AS materialCode,
+            q.LH_TYPE         AS lhType,
+            DAY(q.FINISH_DATE) AS dayNum,
+            SUM(q.DAY_FINISH_QTY) AS finishQty
+        FROM T_LH_DAY_FINISH_QTY q
+        INNER JOIN T_MP_PROC_VERSION v
+            ON v.IS_FINAL = '1'
+            AND v.IS_DELETE = 0
+            AND v.FACTORY_CODE = #{queryDto.factoryCode}
+            AND v.YEAR = #{queryDto.year}
+            AND v.MONTH = #{queryDto.month}
+        WHERE q.IS_DELETE = 0
+          AND q.FACTORY_CODE = #{queryDto.factoryCode}
+          AND q.FINISH_DATE BETWEEN v.PRODUCTION_START_DATE AND v.PRODUCTION_END_DATE
+          AND YEAR(q.FINISH_DATE) = #{queryDto.year}
+          AND MONTH(q.FINISH_DATE) = #{queryDto.month}
+          AND EXISTS (
+              SELECT 1 FROM T_MP_MONTH_PLAN_PROD_FINAL f
+              WHERE f.MATERIAL_CODE = q.MATERIAL_CODE
+                AND f.PRODUCT_STATUS = q.LH_TYPE
+                AND f.PRODUCTION_VERSION = v.PRODUCTION_VERSION
+                AND f.FACTORY_CODE = #{queryDto.factoryCode}
+                AND f.IS_DELETE = 0
+          )
+        <if test="queryDto.materialKeys != null and queryDto.materialKeys.size() > 0">
+            AND (
+                q.MATERIAL_CODE + '|' + q.LH_TYPE
+            ) IN
+            <foreach collection="queryDto.materialKeys" item="mk" open="(" separator="," close=")">
+                #{mk}
+            </foreach>
+        </if>
+        GROUP BY q.MATERIAL_CODE, q.LH_TYPE, DAY(q.FINISH_DATE)
+    </select>
+
+</mapper>

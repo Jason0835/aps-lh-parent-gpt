@@ -1,8 +1,7 @@
 package com.zlt.aps.itf.mes.service.impl;
 
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -14,10 +13,12 @@ import org.springframework.stereotype.Service;
 import com.alibaba.cloud.commons.lang.StringUtils;
 import com.alibaba.fastjson.JSONObject;
 import com.baomidou.dynamic.datasource.toolkit.DynamicDataSourceContextHolder;
+import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.constant.FactoryConstant;
+import com.zlt.aps.dj.api.domain.entity.DjDayFinishTotal;
 import com.zlt.aps.itf.constant.DataSource;
 import com.zlt.aps.itf.constant.SysCode;
 import com.zlt.aps.itf.mes.enums.ItfSyncKeyEnum;
@@ -28,7 +29,6 @@ import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.aps.itf.vo.MesNcScheduleResult;
 import com.zlt.aps.itf.vo.SyncDataLogs;
 import com.zlt.aps.nc.api.domain.entity.NcDayFinishQty;
-import com.zlt.aps.nc.api.domain.entity.NcScheFinishQty;
 import com.zlt.aps.nc.api.domain.entity.NcScheduleResult;
 import com.zlt.aps.nc.api.domain.entity.NcStock;
 import com.zlt.core.dao.basedao.BaseDao;
@@ -42,8 +42,6 @@ import lombok.extern.slf4j.Slf4j;
 @Service("mesItfNcService")
 public class MesItfNcServiceImpl implements IMesItfNcService {
 
-    /** 日期格式化器 */
-    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     /** SQL Server单次请求参数上限2100，每条记录约40个参数，安全批次大小为50 */
     private static final int BATCH_SIZE = 50;
     @Autowired
@@ -94,7 +92,7 @@ public class MesItfNcServiceImpl implements IMesItfNcService {
         if (StringUtils.isEmpty(request.getCompanyCode())) {
             request.setCompanyCode(FactoryConstant.DEFAULT_FACTORY_CODE);
         }
-        List<NcScheFinishQty> sourceList = ncMesSourceMapper.selectShiftFinishQtyList(request);
+        List<NcDayFinishQty> sourceList = ncMesSourceMapper.selectShiftFinishQtyList(request);
         if (CollectionUtils.isEmpty(sourceList)) {
             return AjaxResult.error();
         }
@@ -117,7 +115,7 @@ public class MesItfNcServiceImpl implements IMesItfNcService {
         if (StringUtils.isEmpty(request.getCompanyCode())) {
             request.setCompanyCode(FactoryConstant.DEFAULT_FACTORY_CODE);
         }
-        List<NcDayFinishQty> sourceList = ncMesSourceMapper.selectDayFinishQtyList(request);
+        List<DjDayFinishTotal> sourceList = ncMesSourceMapper.selectDayFinishQtyList(request);
         if (CollectionUtils.isEmpty(sourceList)) {
             return AjaxResult.success(I18nUtil.getMessage("ui.tc.schedule.mes.noSourceData"));
         }
@@ -132,12 +130,35 @@ public class MesItfNcServiceImpl implements IMesItfNcService {
         return AjaxResult.success();
     }
 
+    /**
+     * 下发内衬排程结果到MES
+     *
+     * @param ids         内衬排程结果下发ID列表
+     * @param factoryCode 厂别
+     * @param companyCode 分公司编码
+     * @return 下发结果
+     */
     @Override
-    public AjaxResult issueNcScheduleResult(List<NcScheduleResult> ncScheduleResultIssueList, String factoryCode,
+    public AjaxResult issueNcScheduleResult(Long[] ids, String factoryCode,
             String companyCode) {
+        if (ids == null || ids.length == 0) {
+            return AjaxResult.success();
+        }
+        // 获取排产记录
+        List<NcScheduleResult> ncScheduleResultIssueList;
+        try {
+            /** 切换APS数据源 start **/
+            DynamicDataSourceContextHolder.push(DataSource.MASTER);
+            ncScheduleResultIssueList = baseDao.selectByIds(NcScheduleResult.class, Arrays.asList(ids));
+        } finally {
+            DynamicDataSourceContextHolder.clear();
+            /** 切换APS数据源 end **/
+        }
         if (CollectionUtils.isEmpty(ncScheduleResultIssueList)) {
             return AjaxResult.success();
         }
+        
+        // 生成数据版本
         String dataVersion;
         try {
             /** 切换APS数据源 start **/
@@ -149,7 +170,7 @@ public class MesItfNcServiceImpl implements IMesItfNcService {
             /** 切换APS数据源 end **/
         }
         // 获取今天、明天、后天的日期
-        LocalDate today = LocalDate.now();
+        Date today = DateUtils.getNowDate();
 
         // 按日期分组处理数据
         List<NcScheduleResult> todayList = this.filterByDate(ncScheduleResultIssueList, today);
@@ -178,7 +199,7 @@ public class MesItfNcServiceImpl implements IMesItfNcService {
     /**
      * 发送MQ通知
      */
-    private AjaxResult sendMqNotice(List<MesNcScheduleResult> allMesList, LocalDate today, String dataVersion,
+    private AjaxResult sendMqNotice(List<MesNcScheduleResult> allMesList, Date today, String dataVersion,
             String factoryCode, String companyCode) {
         AjaxResult ajaxResult;
         try {
@@ -189,8 +210,8 @@ public class MesItfNcServiceImpl implements IMesItfNcService {
             // 请求参数
             JSONObject params = new JSONObject();
             params.put("rowCount", allMesList.size());
-            params.put("startDate", today.format(DATE_FORMATTER));
-            params.put("endDate", today.format(DATE_FORMATTER));
+            params.put("startDate", DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD, today));
+            params.put("endDate", DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD, today));
             syncParamsVO.setParams(params);
             syncParamsVO.setDataSys(SysCode.APS);
             syncParamsVO.setDockSys(ApsConstant.DOCK_SYS_MES);
@@ -219,7 +240,7 @@ public class MesItfNcServiceImpl implements IMesItfNcService {
     /**
      * 根据日期过滤数据
      */
-    private List<NcScheduleResult> filterByDate(List<NcScheduleResult> list, LocalDate date) {
+    private List<NcScheduleResult> filterByDate(List<NcScheduleResult> list, Date date) {
         return list.stream().filter(item -> item.getScheduleDate() != null)
                 .filter(item -> item.getScheduleDate().equals(date)).collect(Collectors.toList());
     }

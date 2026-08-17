@@ -7,6 +7,7 @@
         SET IS_DELETE = 1, UPDATE_BY = #{updateBy}, UPDATE_TIME = #{updateTime}
         WHERE FACTORY_CODE = #{factoryCode}
           AND DATE(STOCK_DATE) = DATE(#{stockDate})
+          AND SHIFT_CODE = #{shiftCode}
           AND IS_DELETE = 0
     </update>
 </mapper>

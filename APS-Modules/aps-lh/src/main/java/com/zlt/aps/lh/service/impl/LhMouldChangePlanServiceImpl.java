@@ -35,6 +35,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
+import java.text.MessageFormat;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -192,14 +193,14 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
                 failureNum++;
                 String message = I18nUtil.getMessage("ui.data.alert.lhMouldChangePlan.lhMachineCodeRequired");
                 ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
-                        errorNum, String.format(message, errorNum), importErrorLogs);
+                        errorNum, MessageFormat.format(message, errorNum), importErrorLogs);
                 continue;
             }
             if (!machineInfoMap.containsKey(docEntity.getFactoryCode() + "," + docEntity.getLhMachineCode())) {
                 failureNum++;
                 String message = I18nUtil.getMessage("ui.data.alert.lhMouldChangePlan.lhMachineCodeNotExist");
                 ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
-                        errorNum, String.format(message, errorNum, docEntity.getLhMachineCode()), importErrorLogs);
+                        errorNum, MessageFormat.format(message, errorNum, docEntity.getLhMachineCode()), importErrorLogs);
                 continue;
             }
 
@@ -209,7 +210,7 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
                 failureNum++;
                 String message = I18nUtil.getMessage("ui.data.alert.lhMouldChangePlan.beforeMaterialCodeNotExist");
                 ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
-                        errorNum, String.format(message, errorNum, docEntity.getBeforeMaterialCode()), importErrorLogs);
+                        errorNum, MessageFormat.format(message, errorNum, docEntity.getBeforeMaterialCode()), importErrorLogs);
                 continue;
             }
 
@@ -219,7 +220,7 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
                 failureNum++;
                 String message = I18nUtil.getMessage("ui.data.alert.lhMouldChangePlan.afterMaterialCodeNotExist");
                 ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
-                        errorNum, String.format(message, errorNum, docEntity.getAfterMaterialCode()), importErrorLogs);
+                        errorNum, MessageFormat.format(message, errorNum, docEntity.getAfterMaterialCode()), importErrorLogs);
                 continue;
             }
 
@@ -262,7 +263,7 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
                 if (exist == null) {
                     failureNum++;
                     ImportExcelValidatedUtils.addImportErrorLog(importLogId, errorNum,
-                            String.format(uniqueMsg, errorNum), importErrorLogs);
+                            MessageFormat.format(uniqueMsg, errorNum), importErrorLogs);
                     continue;
                 }
                 docEntity.setId(exist.getId());
@@ -275,12 +276,13 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
                 failureNum++;
                 // 数据库已经存在,不允许插入
                 ImportExcelValidatedUtils.addImportErrorLog(importLogId, errorNum,
-                        String.format(uniqueMsg, errorNum), importErrorLogs);
+                        MessageFormat.format(uniqueMsg, errorNum), importErrorLogs);
             }
         }
 
         if (CollectionUtils.isEmpty(importList) && updateNum == 0) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum, importErrorLogs);
+            String message = StringUtils.format(I18nUtil.getMessage("ui.message.import.fail"), successNum, failureNum);
+            return AjaxResult.error(message, importErrorLogs);
         }
 
         if (CollectionUtils.isNotEmpty(importList)) {
@@ -290,9 +292,11 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
 
         // 返回提示信息及错误集合
         if (failureNum > 0) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum, importErrorLogs);
+            String message = StringUtils.format(I18nUtil.getMessage("ui.message.import.fail"), successNum, failureNum);
+            return AjaxResult.error(message, importErrorLogs);
         } else {
-            return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + successNum);
+            String message = StringUtils.format(I18nUtil.getMessage("ui.message.import.success"), successNum);
+            return AjaxResult.success(message);
         }
     }
 

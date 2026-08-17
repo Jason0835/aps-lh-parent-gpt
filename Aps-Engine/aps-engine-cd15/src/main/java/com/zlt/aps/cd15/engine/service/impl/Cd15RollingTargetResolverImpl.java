@@ -101,6 +101,7 @@ public class Cd15RollingTargetResolverImpl implements Cd15RollingTargetResolver 
                 .batchNo(batchNo)
                 .targetShiftCode(shift.getShiftCode())
                 .targetClassField(shift.getClassField())
+                .resourceBaselineDate(shift.getScheduleDate())
                 .handoverTime(handoverTime)
                 .windowStart(windowStart)
                 .windowEnd(windowEnd)

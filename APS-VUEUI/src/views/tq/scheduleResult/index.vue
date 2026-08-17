@@ -65,6 +65,13 @@
           :disabled="selection.length < 2"
         >{{ $t("ui.data.btn.tqScheduleResult.batchChangeQty") }}</el-button>
         <el-button
+          type="success"
+          plain
+          v-hasPermi="['tq:scheduleResult:publish']"
+          @click="handleRelease"
+          :disabled="selection.length == 0"
+        >{{ $t("ui.data.btn.tqScheduleResult.publish") }}</el-button>
+        <el-button
           v-hasPermi="['tq:scheduleResult:import']"
           @click="handleImport"
         >{{ $t("ui.frame.btn.import") }}</el-button>
@@ -72,13 +79,6 @@
           @click="handleExport"
           v-hasPermi="['tq:scheduleResult:export']"
         >{{ $t("ui.frame.btn.export") }}</el-button>
-        <el-button
-          type="success"
-          plain
-          v-hasPermi="['tq:scheduleResult:release']"
-          @click="handleRelease"
-          :disabled="selection.length == 0"
-        >{{ $t("ui.data.btn.tqScheduleResult.release") }}</el-button>
       </template>
     </page-table>
     <tlt-upload-form
@@ -125,7 +125,8 @@ const getOffsetDate = (offsetDay) => {
 };
 
 export default {
-  name: "tqScheduleResult",
+  // 组件 name 必须与动态路由 name（菜单 PATH 首字母大写）一致，否则 keep-alive 缓存失效，切 tab 后查询条件与数据被重置
+  name: "TqScheduleResult",
   components: {
     TltUploadForm,
     InsertOrderDialog,
@@ -166,6 +167,8 @@ export default {
         { shift: 5, shiftType: "night", shiftDate: "" },
         { shift: 6, shiftType: "morning", shiftDate: "" },
       ],
+      // keep-alive 首次激活标志，避免 created 与 activated 同时触发重复请求
+      pageActivatedOnce: false,
     };
   },
   computed: {
@@ -583,7 +586,7 @@ export default {
         this.$modal.msgWarning(this.$t("common.tip.selectOne"));
         return;
       }
-      this.$confirm(this.$t("ui.data.btn.tqScheduleResult.release") + "?", {
+      this.$confirm(this.$t("ui.biz.alter.makeSurePublish"), {
         type: "warning",
       }).then(() => {
         publishSchedule({ scheduleDateQuery: this.query.scheduleDateQuery || this.search.scheduleDateQuery }).then((res) => {
@@ -714,8 +717,13 @@ export default {
     this.getList();
   },
   activated() {
-    this.$store.dispatch("tqBead/getMachineList");
-    this.getList();
+    // keep-alive 首次激活不重复请求（created 已加载），后续重新进入页面时刷新机台列表与数据
+    if (this.pageActivatedOnce) {
+      this.$store.dispatch("tqBead/getMachineList");
+      this.getList();
+      return;
+    }
+    this.pageActivatedOnce = true;
   },
 };
 </script>

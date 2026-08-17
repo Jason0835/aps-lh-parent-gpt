@@ -1,5 +1,6 @@
 package com.zlt.aps.cd15.service.impl;
 
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.cd15.engine.model.Cd15AutoScheduleContext;
 import com.zlt.aps.cd15.engine.model.Cd15AutoScheduleOutputDraft;
 import com.zlt.aps.cd15.engine.service.Cd15AutoScheduleEngineService;
@@ -40,6 +41,8 @@ public class Cd15AutoScheduleAsyncExecutorImpl implements Cd15AutoScheduleAsyncE
             if (!lock.tryLock()) {
                 log.info("[斜裁自动排程] 执行锁已由其他任务持有, taskId={}, factoryCode={}, scheduleDate={}",
                         taskId, factoryCode, localDate);
+                taskService.markPendingFailed(taskId,
+                        I18nUtil.getMessage("ui.cd15.schedule.taskActive"));
                 return;
             }
             if (!taskService.start(taskId)) {

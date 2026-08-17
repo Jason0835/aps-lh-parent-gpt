@@ -29,16 +29,19 @@ public class Cd15StorageLaneAllocator {
      * </p>
      *
      * @param steelStripCode 钢带代码
+     * @param machineCode 当前候选机台编码
      * @param planQuantity 计划量,单位米
      * @param vehiclePlanQuantity 单车可承载的钢带米数
      * @param originalLanes 原库排状态
      * @return 分配结果
      */
     public Cd15StorageLaneAllocationResult allocate(String steelStripCode,
+                                                      String machineCode,
                                                       BigDecimal planQuantity,
                                                       BigDecimal vehiclePlanQuantity,
                                                       List<Cd15StorageLaneState> originalLanes) {
-        return allocate(steelStripCode, planQuantity, vehiclePlanQuantity, originalLanes, false);
+        return allocate(steelStripCode, machineCode, planQuantity,
+                vehiclePlanQuantity, originalLanes, false);
     }
 
     /**
@@ -46,12 +49,16 @@ public class Cd15StorageLaneAllocator {
      * 让插单钢带优先获得这些库位资源。
      */
     public Cd15StorageLaneAllocationResult allocate(String steelStripCode,
+                                                      String machineCode,
                                                       BigDecimal planQuantity,
                                                       BigDecimal vehiclePlanQuantity,
                                                       List<Cd15StorageLaneState> originalLanes,
                                                       boolean isHardInsert) {
         if (!StringUtils.hasText(steelStripCode)) {
             throw new IllegalArgumentException("库排分配钢带代码不能为空");
+        }
+        if (!StringUtils.hasText(machineCode)) {
+            throw new IllegalArgumentException("库排分配机台编码不能为空");
         }
         if (planQuantity == null || planQuantity.signum() <= 0) {
             throw new IllegalArgumentException("库排分配计划量必须大于0");
@@ -65,6 +72,7 @@ public class Cd15StorageLaneAllocator {
 
         // 第一段:同规格且有富余(车数多的优先,然后 laneCode 稳定排序)
         List<Cd15StorageLaneState> sameSpec = lanes.stream()
+                .filter(item -> machineCode.equals(item.getMachineCode()))
                 .filter(item -> item.getMaxVehicleCount() > item.getVehicleCount())
                 .filter(item -> steelStripCode.equals(item.getSteelStripCode()))
                 .sorted(Comparator.comparingInt(Cd15StorageLaneState::getVehicleCount)
@@ -74,6 +82,7 @@ public class Cd15StorageLaneAllocator {
 
         // 第二段:空库排,硬插单时 vehicleCount=0 即视为空(不论是否残留旧钢带标签)
         List<Cd15StorageLaneState> emptyLanes = lanes.stream()
+                .filter(item -> machineCode.equals(item.getMachineCode()))
                 .filter(item -> item.getMaxVehicleCount() > 0)
                 .filter(item -> isHardInsert
                         ? item.getVehicleCount() == 0
@@ -116,6 +125,7 @@ public class Cd15StorageLaneAllocator {
 
     private Cd15StorageLaneState copy(Cd15StorageLaneState source) {
         return Cd15StorageLaneState.builder().laneCode(source.getLaneCode())
+                .machineCode(source.getMachineCode())
                 .steelStripCode(source.getSteelStripCode()).vehicleCount(source.getVehicleCount())
                 .maxVehicleCount(source.getMaxVehicleCount()).build();
     }

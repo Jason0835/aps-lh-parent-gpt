@@ -279,8 +279,8 @@ public interface IMesItfService {
     public AjaxResult syncMesCxStock(@RequestBody AuxReqSyncDataLogs syncDataLogs);
 
     /**
-     * 同步直裁库存（从 MES 中间表 T_MES_CD90_STOCK 同步到 t_cd90_stock）
-     * @param syncDataLogs 参数（可传 factoryCode；queryParams.shiftCode 可覆盖自动推断班次）
+     * 同步直裁库存（从MES库存对象MES_CD90_STOCK同步到t_cd90_stock，工厂固定116）
+     * @param syncDataLogs 参数（factoryCode忽略并固定使用116；queryParams.shiftCode可覆盖自动推断班次）
      * @return 结果
      */
     @ApiOperation("同步直裁库存")
@@ -307,7 +307,7 @@ public interface IMesItfService {
     @PostMapping("/mesItf/syncCd90ShiftStock")
     AjaxResult syncCd90ShiftStock(@RequestBody MesShiftStockSyncRequest request);
 
-    /** 同步斜裁库存。 */
+    /** 从MES_CD15_STOCK同步斜裁库存，工厂固定116。 */
     @ApiOperation("同步斜裁库存")
     @PostMapping("/mesItf/syncMesCd15Stock")
     AjaxResult syncMesCd15Stock(@RequestBody AuxReqSyncDataLogs syncDataLogs);
@@ -342,25 +342,6 @@ public interface IMesItfService {
     public List<CxStock> getCxStock(@RequestBody AuxReqSyncDataLogs syncDataLogs);
 
     /**
-     * 同步胎面库存
-     * @param syncDataLogs 参数
-     * @return 结果
-     */
-    @ApiOperation("同步胎面库存")
-    @PostMapping("/mesItf/syncTreadStock")
-    public AjaxResult syncTreadStock(@RequestBody AuxReqSyncDataLogs syncDataLogs);
-
-    /**
-     * 同步胎面自动滚动班次库存。
-     *
-     * @param request 工厂、物理库存日和班序
-     * @return 同步结果
-     */
-    @ApiOperation("同步胎面自动滚动班次库存")
-    @PostMapping("/mesItf/syncTreadShiftStock")
-    AjaxResult syncTreadShiftStock(@RequestBody MesShiftStockSyncRequest request);
-
-    /**
      * 同步胎圈库存
      * @param syncDataLogs 参数
      * @return 结果
@@ -379,6 +360,16 @@ public interface IMesItfService {
     public AjaxResult syncMesGsqStock(@RequestBody AuxReqSyncDataLogs syncDataLogs);
 
     /**
+     * 同步胎圈排程完成量
+     * 链路：MES中间表(MES_TQ_SCHE_FINISH_QTY) → APS落库表(T_TQ_SCHE_FINISH_QTY) → 回写胎圈排程结果表各班次完成量
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步胎圈排程完成量")
+    @PostMapping("/mesItf/syncTqClassShiftFinishQty")
+    public AjaxResult syncTqClassShiftFinishQty(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /**
      * 同步胎圈排程日完成量
      * @param syncDataLogs 参数
      * @return 结果
@@ -386,6 +377,37 @@ public interface IMesItfService {
     @ApiOperation("同步胎圈排程日完成量")
     @PostMapping("/mesItf/syncTqScheDayFinishQty")
     public AjaxResult syncTqScheDayFinishQty(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 同步钢丝圈排程完成量
+     * 链路：MES中间表(MES_GSQ_SCHE_FINISH_QTY) → APS落库表(T_GSQ_SCHE_FINISH_QTY) → 回写钢丝圈排程结果表各班次完成量
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步钢丝圈排程完成量")
+    @PostMapping("/mesItf/syncGsqClassShiftFinishQty")
+    public AjaxResult syncGsqClassShiftFinishQty(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 按上一天最新版本号同步钢丝圈排程完成量（临时任务）
+     * 逻辑同 syncGsqClassShiftFinishQty（抓当天最新版本），但日期条件改为上一天
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    @ApiOperation("按上一天最新版本号同步钢丝圈排程完成量（临时任务）")
+    @PostMapping("/mesItf/syncGsqClassShiftFinishQtyByYesterday")
+    public AjaxResult syncGsqClassShiftFinishQtyByYesterday(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 按指定版本号同步钢丝圈排程完成量（临时任务）
+     * 与原 syncGsqClassShiftFinishQty 的区别：不限日期，按指定版本号查询MES中间表所有日期数据
+     * 同步后同样回写排程结果
+     * @param dataVersion 指定版本号
+     * @return 结果
+     */
+    @ApiOperation("按指定版本号同步钢丝圈排程完成量（临时任务）")
+    @PostMapping("/mesItf/syncGsqClassShiftFinishQtyByVersion")
+    public AjaxResult syncGsqClassShiftFinishQtyByVersion(@RequestParam("dataVersion") String dataVersion);
 
     /**
      * 同步钢丝圈排程日完成量
@@ -692,14 +714,33 @@ public interface IMesItfService {
     public AjaxResult syncDevPlanClose(@RequestBody AuxReqSyncDataLogs syncDataLogs);
 
     /**
+     * 同步胎面库存
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步胎面库存")
+    @PostMapping("/mesItf/syncTmStock")
+    public AjaxResult syncTmStock(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 同步胎面自动滚动班次库存。
+     *
+     * @param request 工厂、物理库存日和班序
+     * @return 同步结果
+     */
+    @ApiOperation("同步胎面自动滚动班次库存")
+    @PostMapping("/mesItf/syncTmShiftStock")
+    AjaxResult syncTmShiftStock(@RequestBody MesShiftStockSyncRequest request);
+
+    /**
      * 同步胎侧库存。
      *
      * @param syncDataLogs 同步参数
      * @return 同步结果
      */
     @ApiOperation("同步胎侧库存")
-    @PostMapping("/mesItf/syncSidewallStock")
-    AjaxResult syncSidewallStock(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+    @PostMapping("/mesItf/syncTcStock")
+    AjaxResult syncTcStock(@RequestBody AuxReqSyncDataLogs syncDataLogs);
 
     /**
      * 同步胎侧自动滚动班次库存。
@@ -708,8 +749,8 @@ public interface IMesItfService {
      * @return 同步结果
      */
     @ApiOperation("同步胎侧自动滚动班次库存")
-    @PostMapping("/mesItf/syncSidewallShiftStock")
-    AjaxResult syncSidewallShiftStock(@RequestBody MesShiftStockSyncRequest request);
+    @PostMapping("/mesItf/syncTcShiftStock")
+    AjaxResult syncTcShiftStock(@RequestBody MesShiftStockSyncRequest request);
 
     /**
      * 同步胎侧班次完成量并回写排程结果。
@@ -764,7 +805,7 @@ public interface IMesItfService {
     /**
      * 同步胎圈自动滚动班次库存。
      *
-     * <p>对齐胎面 syncTreadShiftStock 和胎侧 syncSidewallShiftStock，
+     * <p>对齐胎面 syncTmShiftStock 和胎侧 syncTcShiftStock，
      * 在胎圈自动滚动调量前调用，从 MES 中间表同步胎圈班次库存到 T_TQ_SHIFT_STOCK。</p>
      *
      * @param request 工厂、物理库存日和班序

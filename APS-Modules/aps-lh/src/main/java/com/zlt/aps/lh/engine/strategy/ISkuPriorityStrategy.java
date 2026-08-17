@@ -3,7 +3,10 @@
  */
 package com.zlt.aps.lh.engine.strategy;
 
+import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.context.LhScheduleContext;
+
+import java.util.List;
 
 /**
  * SKU排产优先级策略接口
@@ -29,4 +32,17 @@ public interface ISkuPriorityStrategy {
      * @param context 排程上下文
      */
     void sortByPriority(LhScheduleContext context);
+
+    /**
+     * 对当前业务日实际待排的新增 SKU 重新执行统一优先级排序。
+     *
+     * <p>日驱动排产中，前一业务日未选到机台的 SKU 只保留业务属性和剩余目标量，
+     * 不保留前一日排序位置。本方法复用 {@link #sortByPriority(LhScheduleContext)} 的新增
+     * SKU 比较器，并按当前待排集合重新回写名次及排序说明。</p>
+     *
+     * @param context 排程上下文
+     * @param pendingNewSpecSkuList 当前业务日实际待排的新增 SKU 列表
+     */
+    void sortNewSpecByPriority(LhScheduleContext context,
+                               List<SkuScheduleDTO> pendingNewSpecSkuList);
 }

@@ -6,6 +6,7 @@ import org.apache.ibatis.annotations.Mapper;
 
 import com.baomidou.dynamic.datasource.annotation.DS;
 import com.zlt.aps.dj.api.domain.entity.DjDayFinishQty;
+import com.zlt.aps.dj.api.domain.entity.DjDayFinishTotal;
 import com.zlt.aps.dj.api.domain.entity.DjScheFinishQty;
 import com.zlt.aps.dj.api.domain.entity.DjStock;
 import com.zlt.aps.itf.constant.DataSource;
@@ -32,7 +33,7 @@ public interface DjMesSourceMapper {
      * @param request 同步请求
      * @return 班次完成量
      */
-    List<DjScheFinishQty> selectShiftFinishQtyList(AuxReqSyncDataLogs request);
+    List<DjDayFinishQty> selectShiftFinishQtyList(AuxReqSyncDataLogs request);
 
     /**
      * 查询垫胶指定日期日完成量快照。
@@ -40,5 +41,5 @@ public interface DjMesSourceMapper {
      * @param request 同步请求
      * @return 日完成量
      */
-    List<DjDayFinishQty> selectDayFinishQtyList(AuxReqSyncDataLogs request);
+    List<DjDayFinishTotal> selectDayFinishQtyList(AuxReqSyncDataLogs request);
 }

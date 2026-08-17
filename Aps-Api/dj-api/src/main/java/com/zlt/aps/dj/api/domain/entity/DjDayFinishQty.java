@@ -16,7 +16,7 @@ import java.util.Date;
 
 /**
  * 垫胶排程计划每日各班完成量
- * @TableName T_NC_DAY_FINISH_QTY
+ * @TableName T_DJ_DAY_FINISH_QTY
  */
 @Data
 @EqualsAndHashCode(callSuper=false)

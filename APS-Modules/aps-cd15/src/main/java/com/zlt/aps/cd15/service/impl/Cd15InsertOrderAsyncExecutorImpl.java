@@ -44,8 +44,8 @@ public class Cd15InsertOrderAsyncExecutorImpl implements Cd15InsertOrderAsyncExe
             if (!lock.tryLock()) {
                 log.info("[斜裁插单] 执行锁已由其他任务持有, taskId={}, factoryCode={}, scheduleDate={}",
                         taskId, request.getFactoryCode(), scheduleDate);
-                taskService.markFailed(taskId,
-                        I18nUtil.getMessage("ui.cd15.insert.activeTask"));
+                taskService.markPendingFailed(taskId,
+                        I18nUtil.getMessage("ui.cd15.schedule.taskActive"));
                 return;
             }
             if (!taskService.start(taskId)) {
@@ -78,8 +78,8 @@ public class Cd15InsertOrderAsyncExecutorImpl implements Cd15InsertOrderAsyncExe
             if (!lock.tryLock()) {
                 log.info("[斜裁转机台] 执行锁已由其他任务持有, taskId={}, factoryCode={}, scheduleDate={}",
                         taskId, request.getFactoryCode(), scheduleDate);
-                taskService.markFailed(taskId,
-                        I18nUtil.getMessage("ui.cd15.insert.activeTask"));
+                taskService.markPendingFailed(taskId,
+                        I18nUtil.getMessage("ui.cd15.schedule.taskActive"));
                 return;
             }
             if (!taskService.start(taskId)) {
@@ -110,8 +110,8 @@ public class Cd15InsertOrderAsyncExecutorImpl implements Cd15InsertOrderAsyncExe
             if (!lock.tryLock()) {
                 log.info("[斜裁调量] 执行锁已由其他任务持有, taskId={}, factoryCode={}, scheduleDate={}",
                         taskId, request.getFactoryCode(), scheduleDate);
-                taskService.markFailed(taskId,
-                        I18nUtil.getMessage("ui.cd15.insert.activeTask"));
+                taskService.markPendingFailed(taskId,
+                        I18nUtil.getMessage("ui.cd15.schedule.taskActive"));
                 return;
             }
             if (!taskService.start(taskId)) {

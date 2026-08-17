@@ -74,7 +74,8 @@ public class Cd15ShiftResourceCommitter {
             Cd15ShiftResourceState working = copy(originalState);
             BigDecimal vehiclePlanQuantity = trial.getVehiclePlanQuantity();
             Cd15StorageLaneAllocationResult allocation = laneAllocator.allocate(
-                    request.getSteelStripCode(), trial.getFinalSchedulableQuantity(),
+                    request.getSteelStripCode(), trial.getMachineCode(),
+                    trial.getFinalSchedulableQuantity(),
                     vehiclePlanQuantity, working.getLanes());
             if (!allocation.isSuccess() || !acceptPartialAllocation(allocation, request)) {
                 // 库排容量不足或部分排比例太小，均不提前修改工装和机台剩余时间。
@@ -104,9 +105,7 @@ public class Cd15ShiftResourceCommitter {
                     committedQuantity, request.getUnitConsumeMillimeter(),
                     request.getCraftWidth(), request.getCordWidth(),
                     request.getSteelStripCode(), request.getBigRollCode());
-            int afterSeconds = adjustedRemainingSeconds(request, trial, beforeSeconds, committedQuantity);
             int elapsedBefore = Math.max(0, fullShiftSeconds(request) - beforeSeconds);
-            int productionDurationSeconds = Math.max(0, beforeSeconds - afterSeconds - trial.getAgingDelaySeconds());
             LocalDateTime originalStart = request.getShiftStart().plusSeconds(elapsedBefore);
             Cd15BigRollAgingAllocation agingAllocation = commitAgingAllocation(
                     working, request.getBigRollCode(), bigRollConsumeQuantity, originalStart);
@@ -114,6 +113,13 @@ public class Cd15ShiftResourceCommitter {
                 lastFailureReason = Cd15BigRollAgingAllocator.AGING_PERIOD_LIMIT;
                 continue;
             }
+            int committedAgingDelaySeconds = agingAllocation == null
+                    ? 0 : agingAllocation.getDelaySeconds();
+            int afterSeconds = this.adjustedRemainingSeconds(
+                    request, trial, beforeSeconds, committedQuantity,
+                    committedAgingDelaySeconds);
+            int productionDurationSeconds = Math.max(0,
+                    beforeSeconds - afterSeconds - committedAgingDelaySeconds);
             LocalDateTime expectedStart = agingAllocation == null ? originalStart : agingAllocation.getTaskStartTime();
             int produceOrder = working.getTasks().stream()
                     .filter(item -> trial.getMachineCode().equals(item.getMachineCode()))
@@ -210,7 +216,7 @@ public class Cd15ShiftResourceCommitter {
             BigDecimal vehiclePlanQuantity = trial.getVehiclePlanQuantity();
             Cd15ShiftResourceState preview = this.copy(originalState);
             Cd15StorageLaneAllocationResult firstPreview = this.laneAllocator.allocate(
-                    request.getSteelStripCode(), branchTrialQuantity,
+                    request.getSteelStripCode(), trial.getMachineCode(), branchTrialQuantity,
                     vehiclePlanQuantity, preview.getLanes());
             if (!firstPreview.isSuccess()) {
                 lastFailureReason = "STORAGE_LANE_LIMIT";
@@ -218,7 +224,7 @@ public class Cd15ShiftResourceCommitter {
             }
             preview.setLanes(firstPreview.getLanes());
             Cd15StorageLaneAllocationResult secondPreview = this.laneAllocator.allocate(
-                    request.getSteelStripCode(), branchTrialQuantity,
+                    request.getSteelStripCode(), trial.getMachineCode(), branchTrialQuantity,
                     vehiclePlanQuantity, preview.getLanes());
             if (!secondPreview.isSuccess()) {
                 lastFailureReason = "STORAGE_LANE_LIMIT";
@@ -252,12 +258,12 @@ public class Cd15ShiftResourceCommitter {
             Cd15ShiftResourceState working = this.copy(originalState);
             Cd15StorageLaneAllocationResult firstAllocation =
                     this.laneAllocator.allocate(
-                            request.getSteelStripCode(), branchCommittedQuantity,
+                            request.getSteelStripCode(), trial.getMachineCode(), branchCommittedQuantity,
                             vehiclePlanQuantity, working.getLanes());
             working.setLanes(firstAllocation.getLanes());
             Cd15StorageLaneAllocationResult secondAllocation =
                     this.laneAllocator.allocate(
-                            request.getSteelStripCode(), branchCommittedQuantity,
+                            request.getSteelStripCode(), trial.getMachineCode(), branchCommittedQuantity,
                             vehiclePlanQuantity, working.getLanes());
             if (!firstAllocation.isSuccess() || !secondAllocation.isSuccess()) {
                 lastFailureReason = "STORAGE_LANE_LIMIT";
@@ -273,8 +279,6 @@ public class Cd15ShiftResourceCommitter {
             int beforeSeconds = working.getRemainingSecondsByMachine()
                     .getOrDefault(trial.getMachineCode(),
                             this.fullShiftSeconds(request));
-            int afterSeconds = this.adjustedRemainingSeconds(
-                    request, trial, beforeSeconds, committedQuantity);
             int elapsedBefore = Math.max(0,
                     this.fullShiftSeconds(request) - beforeSeconds);
             LocalDateTime originalStart = request.getShiftStart()
@@ -287,10 +291,15 @@ public class Cd15ShiftResourceCommitter {
                 lastFailureReason = Cd15BigRollAgingAllocator.AGING_PERIOD_LIMIT;
                 continue;
             }
+            int committedAgingDelaySeconds = agingAllocation == null
+                    ? 0 : agingAllocation.getDelaySeconds();
+            int afterSeconds = this.adjustedRemainingSeconds(
+                    request, trial, beforeSeconds, committedQuantity,
+                    committedAgingDelaySeconds);
             LocalDateTime expectedStart = agingAllocation == null
                     ? originalStart : agingAllocation.getTaskStartTime();
             int productionDurationSeconds = Math.max(0,
-                    beforeSeconds - afterSeconds - trial.getAgingDelaySeconds());
+                    beforeSeconds - afterSeconds - committedAgingDelaySeconds);
             int produceOrder = working.getTasks().stream()
                     .filter(item -> trial.getMachineCode().equals(
                             item.getMachineCode()))
@@ -424,6 +433,7 @@ public class Cd15ShiftResourceCommitter {
             Cd15ShiftResourceState working = this.copy(originalState);
             Cd15StorageLaneAllocationResult firstAllocation = laneAllocator.allocate(
                     firstRequest.getSteelStripCode(),
+                    firstTrial.getMachineCode(),
                     firstTrial.getFinalSchedulableQuantity(),
                     firstTrial.getVehiclePlanQuantity(), working.getLanes());
             if (!firstAllocation.isSuccess()
@@ -434,6 +444,7 @@ public class Cd15ShiftResourceCommitter {
             working.setLanes(firstAllocation.getLanes());
             Cd15StorageLaneAllocationResult secondAllocation = laneAllocator.allocate(
                     secondRequest.getSteelStripCode(),
+                    secondTrial.getMachineCode(),
                     secondTrial.getFinalSchedulableQuantity(),
                     secondTrial.getVehiclePlanQuantity(), working.getLanes());
             if (!secondAllocation.isSuccess()
@@ -656,15 +667,17 @@ public class Cd15ShiftResourceCommitter {
     }
 
     private int adjustedRemainingSeconds(Cd15ShiftCommitRequest request, Cd15MachineTrial trial,
-                                         int beforeSeconds, BigDecimal committedQuantity) {
+                                         int beforeSeconds, BigDecimal committedQuantity,
+                                         int committedAgingDelaySeconds) {
         BigDecimal trialQuantity = trial.getFinalSchedulableQuantity();
-        if (trialQuantity == null || committedQuantity.compareTo(trialQuantity) >= 0
+        if (trialQuantity == null || (committedQuantity.compareTo(trialQuantity) >= 0
+                && committedAgingDelaySeconds == trial.getAgingDelaySeconds())
                 || trial.getProductionSeconds() <= 0) {
             return trial.getRemainingSeconds();
         }
         int productionSeconds = committedQuantity.multiply(BigDecimal.valueOf(trial.getProductionSeconds()))
                 .divide(trialQuantity, 0, RoundingMode.CEILING).intValueExact();
-        return Math.max(0, beforeSeconds - trial.getAgingDelaySeconds()
+        return Math.max(0, beforeSeconds - committedAgingDelaySeconds
                 - trial.getChangeSeconds() - productionSeconds);
     }
 
@@ -689,7 +702,8 @@ public class Cd15ShiftResourceCommitter {
     private Cd15ShiftResourceState copy(Cd15ShiftResourceState source) {
         List<Cd15StorageLaneState> lanes = source.getLanes() == null ? new ArrayList<>()
                 : source.getLanes().stream().map(item -> Cd15StorageLaneState.builder()
-                        .laneCode(item.getLaneCode()).steelStripCode(item.getSteelStripCode())
+                        .laneCode(item.getLaneCode()).machineCode(item.getMachineCode())
+                        .steelStripCode(item.getSteelStripCode())
                         .vehicleCount(item.getVehicleCount()).maxVehicleCount(item.getMaxVehicleCount())
                         .build()).collect(Collectors.toList());
         return Cd15ShiftResourceState.builder().lanes(lanes)
@@ -721,9 +735,6 @@ public class Cd15ShiftResourceCommitter {
                                                              String bigRollCode,
                                                              BigDecimal committedQuantity,
                                                              LocalDateTime originalStart) {
-        if (working.getBigRollAgingStocks() == null || working.getBigRollAgingStocks().isEmpty()) {
-            return null;
-        }
         return agingAllocator.allocate(working.getBigRollAgingStocks(), bigRollCode, committedQuantity, originalStart);
     }
 

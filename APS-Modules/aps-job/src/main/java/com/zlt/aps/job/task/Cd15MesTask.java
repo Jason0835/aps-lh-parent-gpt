@@ -22,7 +22,7 @@ public class Cd15MesTask {
 
     private final IMesItfService mesItfService;
 
-    /** 同步斜裁库存。 */
+    /** 从MES_CD15_STOCK同步斜裁库存，工厂固定116。 */
     @ApiOperation("同步斜裁库存")
     @AutoLoginLog
     public void syncMesCd15Stock() {

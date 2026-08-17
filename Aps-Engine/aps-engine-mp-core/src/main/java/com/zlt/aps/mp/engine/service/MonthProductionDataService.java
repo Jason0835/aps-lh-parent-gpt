@@ -143,12 +143,10 @@ public interface MonthProductionDataService {
     /**
      * 获取工厂、年-月的特殊定点生产配置信息
      *
-     * @param factoryCode 工厂编码
-     * @param year        年份
-     * @param month       月份
+     * @param context 排产上下文
      * @return
      */
-    List<GroupAppointProductionInfoVo> getMonthAppointProductionInfo(String factoryCode, Integer year, Integer month);
+    List<GroupAppointProductionInfoVo> getMonthAppointProductionInfo(Context context);
 
     /**
      * 获取续作SKU信息，包含续作机台及使用的模具数

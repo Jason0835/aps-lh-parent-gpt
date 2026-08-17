@@ -1,6 +1,7 @@
 package com.zlt.aps.nc.service.impl;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import org.apache.commons.collections4.CollectionUtils;
@@ -76,7 +77,7 @@ public class NcMachineInfoServiceImpl extends AbstractDocService<NcMachineInfo> 
         int failureNum = 0;
         List<NcMachineInfo> importList = new ArrayList<>();
         List<ImportErrorLog> importErrorLogs = new ArrayList<>();
-        String uniqueMsg = I18nUtil.getMessage("ui.data.alert.cxStock.embryoCodeNotUnique");
+        String uniqueMsg = I18nUtil.getMessage("ui.data.alert.ncMachine.machineCodeExists");
 
         for (int i = 0; i < list.size(); i++) {
             int errorNum = i + 2;
@@ -139,6 +140,11 @@ public class NcMachineInfoServiceImpl extends AbstractDocService<NcMachineInfo> 
         } else {
             return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + successNum);
         }
+    }
+    
+    @Override
+    protected List<String> getCheckUniqueFields() {
+        return Arrays.asList("factoryCode", "machineCode");
     }
 
     @Override

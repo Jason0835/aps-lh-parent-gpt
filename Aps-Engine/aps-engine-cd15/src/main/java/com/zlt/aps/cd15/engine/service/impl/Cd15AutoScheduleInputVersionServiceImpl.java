@@ -9,6 +9,7 @@ import com.zlt.aps.cd15.api.domain.entity.Cd15MachineInfo;
 import com.zlt.aps.cd15.api.domain.entity.Cd15MachineMaintenancePlan;
 import com.zlt.aps.cd15.api.domain.entity.Cd15MachineRollMapping;
 import com.zlt.aps.cd15.api.domain.entity.Cd15Params;
+import com.zlt.aps.cd15.api.domain.entity.Cd15ScheduleResult;
 import com.zlt.aps.cd15.api.domain.entity.Cd15StorageLaneLimit;
 import com.zlt.aps.cd15.api.domain.entity.Cd15SpecifyMachine;
 import com.zlt.aps.cd15.api.domain.entity.Cd15Stock;
@@ -25,16 +26,23 @@ import com.zlt.aps.cd15.engine.mapper.Cd15EngineLossSettingMapper;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineMachineInfoMapper;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineMachineRollMapper;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineMaintenanceMapper;
+import com.zlt.aps.cd15.engine.mapper.Cd15EngineMonthSurplusMapper;
+import com.zlt.aps.cd15.engine.mapper.Cd15EngineScheduleResultMapper;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineSpecifyMachineMapper;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineStockMapper;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineStorageLaneMapper;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineShiftConfigMapper;
+import com.zlt.aps.cd15.engine.mapper.Cd15EngineWorkCalendarMapper;
+import com.zlt.aps.cd15.engine.constant.Cd15AutoScheduleParamCode;
 import com.zlt.aps.cd15.engine.service.Cd15AutoScheduleInputVersionService;
 import com.zlt.aps.cx.api.domain.entity.CxScheduleResult;
 import com.zlt.aps.gdyy.api.domain.entity.GdyyScheduleResult;
 import com.zlt.aps.gdyy.api.domain.entity.GdyyStock;
 import com.zlt.aps.mdm.api.domain.entity.MdmConstructionInfo;
+import com.zlt.aps.mdm.api.domain.entity.MdmMonthSurplus;
+import com.zlt.aps.mdm.api.domain.entity.MdmWorkCalendar;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -43,6 +51,7 @@ import java.sql.Date;
 import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -52,8 +61,11 @@ import java.util.stream.IntStream;
 @Service
 public class Cd15AutoScheduleInputVersionServiceImpl implements Cd15AutoScheduleInputVersionService {
 
+    private static final String CD15_PROCESS_CODE = "CD15";
+
     private final Cd15EngineCxScheduleMapper cxMapper;
     private final Cd15EngineConstructionMapper constructionMapper;
+    private final Cd15EngineScheduleResultMapper scheduleResultMapper;
     private final Cd15EngineStockMapper stockMapper;
     private final Cd15EngineCurlLengthMapper curlLengthMapper;
     private final Cd15EngineAngleWidthMappingMapper angleWidthMappingMapper;
@@ -61,6 +73,8 @@ public class Cd15AutoScheduleInputVersionServiceImpl implements Cd15AutoSchedule
     private final Cd15EngineMachineRollMapper machineRollMappingMapper;
     private final Cd15EngineSpecifyMachineMapper specifyMachineMapper;
     private final Cd15EngineMaintenanceMapper maintenanceMapper;
+    private final Cd15EngineMonthSurplusMapper monthSurplusMapper;
+    private final Cd15EngineWorkCalendarMapper workCalendarMapper;
     private final Cd15EngineGdyyStockMapper gdyyStockMapper;
     private final Cd15EngineGdyyScheduleResultMapper gdyyScheduleResultMapper;
     private final Cd15EngineShiftConfigMapper shiftConfigMapper;
@@ -71,6 +85,7 @@ public class Cd15AutoScheduleInputVersionServiceImpl implements Cd15AutoSchedule
 
     public Cd15AutoScheduleInputVersionServiceImpl(Cd15EngineCxScheduleMapper cxMapper,
                                                    Cd15EngineConstructionMapper constructionMapper,
+                                                   Cd15EngineScheduleResultMapper scheduleResultMapper,
                                                    Cd15EngineStockMapper stockMapper,
                                                    Cd15EngineCurlLengthMapper curlLengthMapper,
                                                    Cd15EngineAngleWidthMappingMapper angleWidthMappingMapper,
@@ -78,6 +93,8 @@ public class Cd15AutoScheduleInputVersionServiceImpl implements Cd15AutoSchedule
                                                    Cd15EngineMachineRollMapper machineRollMappingMapper,
                                                    Cd15EngineSpecifyMachineMapper specifyMachineMapper,
                                                    Cd15EngineMaintenanceMapper maintenanceMapper,
+                                                   Cd15EngineMonthSurplusMapper monthSurplusMapper,
+                                                   Cd15EngineWorkCalendarMapper workCalendarMapper,
                                                    Cd15EngineGdyyStockMapper gdyyStockMapper,
                                                    Cd15EngineGdyyScheduleResultMapper gdyyScheduleResultMapper,
                                                    Cd15EngineShiftConfigMapper shiftConfigMapper,
@@ -87,6 +104,7 @@ public class Cd15AutoScheduleInputVersionServiceImpl implements Cd15AutoSchedule
                                                    Cd15AutoScheduleParamsMapper paramsMapper) {
         this.cxMapper = cxMapper;
         this.constructionMapper = constructionMapper;
+        this.scheduleResultMapper = scheduleResultMapper;
         this.stockMapper = stockMapper;
         this.curlLengthMapper = curlLengthMapper;
         this.angleWidthMappingMapper = angleWidthMappingMapper;
@@ -94,6 +112,8 @@ public class Cd15AutoScheduleInputVersionServiceImpl implements Cd15AutoSchedule
         this.machineRollMappingMapper = machineRollMappingMapper;
         this.specifyMachineMapper = specifyMachineMapper;
         this.maintenanceMapper = maintenanceMapper;
+        this.monthSurplusMapper = monthSurplusMapper;
+        this.workCalendarMapper = workCalendarMapper;
         this.gdyyStockMapper = gdyyStockMapper;
         this.gdyyScheduleResultMapper = gdyyScheduleResultMapper;
         this.shiftConfigMapper = shiftConfigMapper;
@@ -123,28 +143,31 @@ public class Cd15AutoScheduleInputVersionServiceImpl implements Cd15AutoSchedule
                                LocalDate resourceBaselineDate,
                                String resourceBaselineShiftCode,
                                boolean includeStock) {
-        String forming = cxMapper.selectList(Wrappers.<CxScheduleResult>lambdaQuery()
+        List<CxScheduleResult> formingEntities = cxMapper.selectList(
+                Wrappers.<CxScheduleResult>lambdaQuery()
                         .eq(CxScheduleResult::getFactoryCode, factoryCode)
                         .between(CxScheduleResult::getScheduleDate,
                                 Date.valueOf(scheduleDate.minusDays(1)), Date.valueOf(scheduleDate.plusDays(3)))
-                        .orderByAsc(CxScheduleResult::getId))
-                .stream()
-                .map(item -> item.getId() + ":" + item.getCxBatchNo() + ":" + item.getCxMachineCode()
-                        + ":" + item.getEmbryoCode() + ":" + item.getUpdateTime())
+                        .orderByAsc(CxScheduleResult::getId));
+        String forming = formingEntities.stream()
+                .map(this::formingFingerprint)
                 .collect(Collectors.joining("|"));
-        String constructions = constructionMapper.selectList(Wrappers.<MdmConstructionInfo>lambdaQuery()
+        List<MdmConstructionInfo> constructionEntities = constructionMapper.selectList(
+                Wrappers.<MdmConstructionInfo>lambdaQuery()
                         .eq(MdmConstructionInfo::getFactoryCode, factoryCode)
-                        .orderByAsc(MdmConstructionInfo::getId))
-                .stream()
+                        .orderByAsc(MdmConstructionInfo::getId));
+        String constructions = constructionEntities.stream()
                 .map(this::constructionFingerprint)
                 .collect(Collectors.joining("|"));
-        LocalDate stockDate = scheduleDate.minusDays(1);
         String stock = includeStock ? stockMapper.selectList(Wrappers.<Cd15Stock>lambdaQuery()
                         .eq(Cd15Stock::getFactoryCode, factoryCode)
-                        .eq(Cd15Stock::getStockDate, Date.valueOf(stockDate))
+                        .eq(Cd15Stock::getStockDate, Date.valueOf(resourceBaselineDate))
+                        .eq(Cd15Stock::getShiftCode, resourceBaselineShiftCode)
+                        .orderByAsc(Cd15Stock::getMaterialCode)
                         .orderByAsc(Cd15Stock::getId))
                 .stream()
                 .map(item -> item.getId() + ":" + item.getMaterialCode() + ":" + item.getStockDate()
+                        + ":" + item.getShiftCode()
                         + ":" + item.getStockNum() + ":" + item.getModifyNum() + ":" + item.getBadNum()
                         + ":" + item.getUpdateTime())
                 .collect(Collectors.joining("|")) : "";
@@ -234,24 +257,83 @@ public class Cd15AutoScheduleInputVersionServiceImpl implements Cd15AutoSchedule
                         .orderByAsc(Cd15StorageLaneLimit::getStorageLaneCode))
                 .stream()
                 .map(item -> this.row(item.getFactoryCode(), item.getLaneDate(), item.getMaterialCode(),
-                        item.getShiftCode(), item.getStorageLaneCode(), item.getCarNum(),
+                        item.getShiftCode(), item.getMachineCode(), item.getStorageLaneCode(), item.getCarNum(),
                         item.getMaxCarNum(), item.getAvailableCarNum(), item.getDataSource(),
                         item.getMesSyncTime()))
                 .collect(Collectors.joining("|"));
-        String parameters = paramsMapper.selectList(Wrappers.<Cd15Params>lambdaQuery()
+        List<Cd15Params> parameterEntities = paramsMapper.selectList(
+                Wrappers.<Cd15Params>lambdaQuery()
                         .eq(Cd15Params::getFactoryCode, factoryCode)
                         .orderByAsc(Cd15Params::getParamCode)
-                        .orderByAsc(Cd15Params::getId))
-                .stream()
+                        .orderByAsc(Cd15Params::getId));
+        String parameters = parameterEntities.stream()
                 .map(item -> this.row(item.getId(), item.getParamCode(), item.getParamValue(),
                         item.getRegularExpression(), item.getUpdateTime()))
+                .collect(Collectors.joining("|"));
+        Set<String> embryoCodes = formingEntities.stream()
+                .map(CxScheduleResult::getEmbryoCode)
+                .filter(StringUtils::hasText)
+                .collect(Collectors.toSet());
+        String monthSurpluses = embryoCodes.isEmpty() ? ""
+                : monthSurplusMapper.selectList(Wrappers.<MdmMonthSurplus>lambdaQuery()
+                                .eq(MdmMonthSurplus::getFactoryCode, factoryCode)
+                                .eq(MdmMonthSurplus::getYear, scheduleDate.getYear())
+                                .eq(MdmMonthSurplus::getMonth, scheduleDate.getMonthValue())
+                                .in(MdmMonthSurplus::getMaterialCode, embryoCodes)
+                                .orderByAsc(MdmMonthSurplus::getMaterialCode)
+                                .orderByAsc(MdmMonthSurplus::getId))
+                        .stream()
+                        .map(item -> this.row(item.getId(), item.getYear(), item.getMonth(),
+                                item.getRequireVersion(), item.getMaterialCode(),
+                                item.getPlanSurplusQty(), item.getStockCaptureDate(),
+                                item.getUpdateTime()))
+                        .collect(Collectors.joining("|"));
+        Set<String> steelStripCodes = constructionEntities.stream()
+                .flatMap(item -> Arrays.asList(item.getBeltCode1(), item.getBeltCode2(),
+                                item.getBeltCode3(), item.getBeltCodeLeftCode(),
+                                item.getBeltCodeRightCode()).stream())
+                .filter(StringUtils::hasText)
+                .collect(Collectors.toSet());
+        int lookbackDays = this.nonNegativeIntParameter(parameterEntities,
+                Cd15AutoScheduleParamCode.NEW_SPEC_LOOKBACK_DAYS);
+        String historySchedules = steelStripCodes.isEmpty() || lookbackDays <= 0 ? ""
+                : scheduleResultMapper.selectList(
+                                Wrappers.<Cd15ScheduleResult>lambdaQuery()
+                                        .eq(Cd15ScheduleResult::getFactoryCode, factoryCode)
+                                        .between(Cd15ScheduleResult::getScheduleDate,
+                                                Date.valueOf(scheduleDate.minusDays(lookbackDays)),
+                                                Date.valueOf(scheduleDate.minusDays(1)))
+                                        .in(Cd15ScheduleResult::getSteelStripCode, steelStripCodes)
+                                        .orderByAsc(Cd15ScheduleResult::getScheduleDate)
+                                        .orderByAsc(Cd15ScheduleResult::getSteelStripCode)
+                                        .orderByAsc(Cd15ScheduleResult::getId))
+                        .stream()
+                        .map(this::historyScheduleFingerprint)
+                        .collect(Collectors.joining("|"));
+        String workCalendars = workCalendarMapper.selectList(
+                        Wrappers.<MdmWorkCalendar>lambdaQuery()
+                                .eq(MdmWorkCalendar::getFactoryCode, factoryCode)
+                                .eq(MdmWorkCalendar::getProcCode, CD15_PROCESS_CODE)
+                                .between(MdmWorkCalendar::getProductionDate,
+                                        Date.valueOf(scheduleDate.minusDays(1)),
+                                        Date.valueOf(scheduleDate.plusDays(3)))
+                                .orderByAsc(MdmWorkCalendar::getProductionDate)
+                                .orderByAsc(MdmWorkCalendar::getId))
+                .stream()
+                .map(item -> this.row(item.getId(), item.getProductionDate(),
+                        item.getOneShiftFlag(), item.getTwoShiftFlag(),
+                        item.getThreeShiftFlag(), item.getDayFlag(), item.getRate(),
+                        item.getCalendarTime(), item.getHolidayNames(), item.getUpdateTime()))
                 .collect(Collectors.joining("|"));
         String gdyyStock = gdyyStockMapper.selectList(Wrappers.<GdyyStock>lambdaQuery()
                         .eq(GdyyStock::getFactoryCode, factoryCode)
                         .orderByAsc(GdyyStock::getId))
                 .stream()
-                .map(item -> item.getId() + ":" + item.getBigRollCode() + ":" + item.getBigRollBarcode()
-                        + ":" + item.getInboundTime() + ":" + item.getStockMeters() + ":" + item.getUpdateTime())
+                .map(item -> this.row(item.getId(), item.getStockDate(), item.getInboundTime(),
+                        item.getBigRollCode(), item.getBigRollBarcode(), item.getStockNum(),
+                        item.getStockRollNum(), item.getModifyNum(), item.getBadNum(),
+                        item.getStockMeters(),
+                        item.getEstimateStockFlag(), item.getUpdateTime()))
                 .collect(Collectors.joining("|"));
         String gdyyPlan = gdyyScheduleResultMapper.selectList(Wrappers.<GdyyScheduleResult>lambdaQuery()
                         .eq(GdyyScheduleResult::getFactoryCode, factoryCode)
@@ -259,13 +341,27 @@ public class Cd15AutoScheduleInputVersionServiceImpl implements Cd15AutoSchedule
                                 Date.valueOf(scheduleDate.minusDays(1)), Date.valueOf(scheduleDate.plusDays(2)))
                         .orderByAsc(GdyyScheduleResult::getId))
                 .stream()
-                .map(item -> item.getId() + ":" + item.getBatchNo() + ":" + item.getBigRollCode()
-                        + ":" + item.getMachineCode() + ":" + item.getUpdateTime())
+                .map(this::gdyyPlanFingerprint)
                 .collect(Collectors.joining("|"));
         String resourceBaseline = resourceBaselineDate + ":" + resourceBaselineShiftCode;
         return this.sha256(String.join("#", forming, constructions, stock, curls, angleWidths, machines,
                 machineRolls, specifyMachines, maintenances, shifts, depthConfigs, lossSettings,
-                resourceBaseline, lanes, parameters, gdyyStock, gdyyPlan));
+                resourceBaseline, lanes, parameters, monthSurpluses, historySchedules,
+                workCalendars, gdyyStock, gdyyPlan));
+    }
+
+    /** 成型摘要纳入实际参与需求展开的排程日期、计划量和示方书版本。 */
+    private String formingFingerprint(CxScheduleResult item) {
+        String classValues = IntStream.rangeClosed(1, 8)
+                .mapToObj(index -> this.row(
+                        item.getFieldValueByFieldName(
+                                String.format("class%dPlanQty", index)),
+                        item.getFieldValueByFieldName(
+                                String.format("class%dRecipeNo", index))))
+                .collect(Collectors.joining(":"));
+        return this.row(item.getId(), item.getCxBatchNo(), item.getScheduleDate(),
+                item.getCxMachineCode(), item.getEmbryoCode(), classValues,
+                item.getUpdateTime());
     }
 
     /**
@@ -281,6 +377,49 @@ public class Cd15AutoScheduleInputVersionServiceImpl implements Cd15AutoSchedule
                 item.getBeltCodeLeftLength(), item.getBeltCodeRightCode(),
                 item.getBeltCodeRightCraft(), item.getBeltCodeRightLength(),
                 item.getUpdateTime());
+    }
+
+    /** 新增规格判断实际读取的历史斜裁计划量。 */
+    private String historyScheduleFingerprint(Cd15ScheduleResult item) {
+        String classValues = IntStream.rangeClosed(1, 8)
+                .mapToObj(index -> this.row(item.getFieldValueByFieldName(
+                        String.format("class%dPlanQty", index))))
+                .collect(Collectors.joining(":"));
+        return this.row(item.getId(), item.getScheduleDate(),
+                item.getSteelStripCode(), classValues, item.getUpdateTime());
+    }
+
+    /** GDYY计划摘要纳入各班计划日期和计划量。 */
+    private String gdyyPlanFingerprint(GdyyScheduleResult item) {
+        String classValues = IntStream.rangeClosed(1, 8)
+                .mapToObj(index -> this.row(
+                        item.getFieldValueByFieldName(
+                                String.format("class%dScheduleDate", index)),
+                        item.getFieldValueByFieldName(
+                                String.format("class%dPlanQty", index))))
+                .collect(Collectors.joining(":"));
+        return this.row(item.getId(), item.getBatchNo(), item.getScheduleDate(),
+                item.getBigRollCode(), item.getMachineCode(), classValues,
+                item.getUpdateTime());
+    }
+
+    /** 从参数快照读取非负整数，口径与强类型参数解析保持一致。 */
+    private int nonNegativeIntParameter(List<Cd15Params> parameters,
+                                        String paramCode) {
+        String value = null;
+        for (Cd15Params parameter : parameters) {
+            if (paramCode.equals(parameter.getParamCode())) {
+                value = parameter.getParamValue();
+            }
+        }
+        if (!StringUtils.hasText(value)) {
+            return 0;
+        }
+        int result = Integer.parseInt(value.trim());
+        if (result < 0) {
+            throw new IllegalArgumentException(paramCode + "不能为负整数");
+        }
+        return result;
     }
 
     private String row(Object... values) {

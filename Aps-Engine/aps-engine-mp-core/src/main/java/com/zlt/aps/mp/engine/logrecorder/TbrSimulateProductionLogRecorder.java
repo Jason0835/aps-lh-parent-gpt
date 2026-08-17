@@ -204,6 +204,25 @@ public class TbrSimulateProductionLogRecorder {
     }
 
     /**
+     * 增加 指定结构指定机台指定排产时间 日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，指定业务：指定分组名 %s 指定机台 %s 排产====
+     *
+     * @param context       排程上下文
+     * @param groupName     分组名
+     * @param cxMachineCode 成型机台
+     * @param text          说明文本
+     * @return
+     */
+    public static String addAppointGroupLog(Context context, String groupName, String cxMachineCode, String text) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，指定业务%s：指定分组名 %s 指定机台 %s 排产====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                text, groupName, cxMachineCode);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.SIMULATE_MOULD_PRODUCTION, logContent);
+        return logContent;
+    }
+
+    /**
      * 增加 交付优先排产 结束 日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，交付优先排产模式模拟排产结束====
      *

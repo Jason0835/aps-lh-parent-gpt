@@ -42,7 +42,7 @@ public interface ICd15StockRemoteService {
     @PostMapping("/cd15Stock/remove")
     AjaxResult removeByIds(@RequestBody List<Long> ids);
 
-    /** 校验同工厂、日期、物料唯一 */
+    /** 校验同工厂、日期、班次、物料唯一 */
     @ApiOperation("校验斜裁库存唯一性")
     @PostMapping("/cd15Stock/checkUnique")
     String checkUnique(@RequestBody Cd15Stock entity);
@@ -57,11 +57,12 @@ public interface ICd15StockRemoteService {
     @PostMapping("/cd15Stock/importData")
     AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport);
 
-    /** 按工厂和库存日期替换MES库存快照。 */
+    /** 按工厂、库存日期和班次替换MES库存快照。 */
     @ApiOperation("替换斜裁MES库存快照")
     @PostMapping("/cd15Stock/logicDeleteAndSaveMesBatch")
     AjaxResult logicDeleteAndSaveMesBatch(@RequestParam("factoryCode") String factoryCode,
                                           @RequestParam("stockDate") String stockDate,
+                                          @RequestParam("shiftCode") String shiftCode,
                                           @RequestParam("updateBy") String updateBy,
                                           @RequestBody List<Cd15Stock> stockList);
 }

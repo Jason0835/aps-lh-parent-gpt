@@ -169,11 +169,16 @@ public enum MesInterfaceCodeEnum {
     DEV_PLAN_CLOSE("DEV_PLAN_CLOSE", "mesItfService", "syncDevPlanClose", "设备计划停机同步"),
     
     /**
+     * 内衬接口
+     */
+    NC_COMPLETE_QUANTITY("NC_COMPLETE_QUANTITY", "mesItfNcService", "syncShiftFinishQty", "内衬排程完成量同步"),
+    NC_DAY_COMPLETE("NC_DAY_COMPLETE", "mesItfNcService", "syncDayFinishQty", "内衬排程日完成量同步"),
+    
+    /**
      * 垫胶接口
      */
-    PAD_STOCK("PAD_STOCK", "mesItfDjService", "syncStock", "垫胶库存同步"),
-    PAD_COMPLETE_QUANTITY("PAD_COMPLETE_QUANTITY", "mesItfDjService", "syncStock", "垫胶排程完成量同步"),
-    PAD_DAY_COMPLETE("PAD_DAY_COMPLETE", "mesItfDjService", "syncStock", "垫胶排程日完成量同步"),
+    PAD_COMPLETE_QUANTITY("PAD_COMPLETE_QUANTITY", "mesItfDjService", "syncShiftFinishQty", "垫胶排程完成量同步"),
+    PAD_DAY_COMPLETE("PAD_DAY_COMPLETE", "mesItfDjService", "syncDayFinishQty", "垫胶排程日完成量同步"),
     
     ;
 

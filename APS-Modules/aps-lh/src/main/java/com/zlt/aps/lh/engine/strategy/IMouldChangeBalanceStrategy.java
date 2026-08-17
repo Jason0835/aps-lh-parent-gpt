@@ -112,6 +112,32 @@ public interface IMouldChangeBalanceStrategy {
     }
 
     /**
+     * 无副作用预演指定切换任务的真实开始时间。
+     *
+     * <p>新增选机需要在占用任何换模次数前比较全部候选机台。实现必须读取与正式分配
+     * 相同的停机、20:00禁换模、早中班均衡和每日上限，但不得修改真实计数、未排原因
+     * 或过程日志。正式命中后仍调用 {@link #allocateMouldChange} 完成唯一一次提交。</p>
+     *
+     * @param context 排程上下文
+     * @param machineCode 机台编码
+     * @param endingTime 机台具备切换条件的时间
+     * @param switchDurationHours 切换时长
+     * @param sku 当前 SKU
+     * @param actionType 切换动作类型
+     * @param businessDayEndTime 当前业务日日终；为空表示不限制
+     * @return 预演换模开始时间；无合法落点返回null
+     */
+    default Date previewMouldChange(LhScheduleContext context,
+                                    String machineCode,
+                                    Date endingTime,
+                                    int switchDurationHours,
+                                    SkuScheduleDTO sku,
+                                    String actionType,
+                                    Date businessDayEndTime) {
+        return null;
+    }
+
+    /**
      * 兼容旧调用方的默认入口。
      *
      * @param context 排程上下文

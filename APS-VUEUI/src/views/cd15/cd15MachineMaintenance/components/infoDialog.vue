@@ -34,7 +34,7 @@ export default {
     title() { return this.isEdit ? this.$t("common.button.edit") : this.$t("common.button.add"); },
     columns() {
       return [
-        { prop: "factoryCode", label: this.$t("ui.data.column.cd15MachineMaintenancePlan.factoryCode"), type: "select", dictData: this.parentDict.type.biz_factory_name, filterable: true, change: () => this.loadMachineOptions() },
+        { prop: "factoryCode", label: this.$t("ui.data.column.cd15MachineMaintenancePlan.factoryCode"), type: "select", dictData: this.parentDict.type.biz_factory_name, filterable: true, listeners: { change: (factoryCode) => this.handleFactoryChange(factoryCode) } },
         { prop: "machineCode", label: this.$t("ui.data.column.cd15MachineMaintenancePlan.machineCode"), type: "select", dictData: this.machineOptions, filterable: true },
         { prop: "downtimeStartTime", label: this.$t("ui.data.column.cd15MachineMaintenancePlan.downtimeStartTime"), type: "date", dateType: "datetime", valueFormat: "yyyy-MM-dd HH:mm:ss", listeners: { change: () => this.onDateTimeChange() } },
         { prop: "downtimeEndTime", label: this.$t("ui.data.column.cd15MachineMaintenancePlan.downtimeEndTime"), type: "date", dateType: "datetime", valueFormat: "yyyy-MM-dd HH:mm:ss", listeners: { change: () => this.onDateTimeChange() } },
@@ -72,8 +72,21 @@ export default {
         this.loading = false;
       }
     },
-    async loadMachineOptions() {
-      const res = await getCd15MachineEnableOptions({ factoryCode: this.form.factoryCode });
+    /** 切换工厂时联动刷新机台下拉，并清空已选机台 */
+    handleFactoryChange(factoryCode) {
+      this.form.factoryCode = factoryCode;
+      this.form.machineCode = "";
+      this.loadMachineOptions(factoryCode);
+    },
+    async loadMachineOptions(factoryCode = this.form.factoryCode) {
+      if (!factoryCode) {
+        this.machineOptions = [];
+        return;
+      }
+      const res = await getCd15MachineEnableOptions({ factoryCode });
+      if (`${this.form.factoryCode || ""}` !== `${factoryCode}`) {
+        return;
+      }
       const rows = Array.isArray(res) ? res : (res.rows || res.data || []);
       this.machineOptions = rows.map((item) => ({ label: item.machineCode, value: item.machineCode }));
     },

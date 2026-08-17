@@ -71,7 +71,7 @@ public class Cd90ShiftResourceCommitter {
             Cd90ShiftResourceState working = copy(originalState);
             BigDecimal standardCurlLength = trial.getStandardCurlLength();
             Cd90StorageLaneAllocationResult allocation = laneAllocator.allocate(
-                    request.getClothCode(), trial.getFinalSchedulableQuantity(),
+                    request.getClothCode(), trial.getMachineCode(), trial.getFinalSchedulableQuantity(),
                     standardCurlLength, working.getLanes());
             if (!allocation.isSuccess() || !acceptPartialAllocation(allocation, request)) {
                 // 库排容量不足或部分排比例太小，均不提前修改工装和机台剩余时间。
@@ -197,7 +197,8 @@ public class Cd90ShiftResourceCommitter {
     private Cd90ShiftResourceState copy(Cd90ShiftResourceState source) {
         List<Cd90StorageLaneState> lanes = source.getLanes() == null ? new ArrayList<>()
                 : source.getLanes().stream().map(item -> Cd90StorageLaneState.builder()
-                        .laneCode(item.getLaneCode()).clothCode(item.getClothCode())
+                        .laneCode(item.getLaneCode()).machineCode(item.getMachineCode())
+                        .clothCode(item.getClothCode())
                         .vehicleCount(item.getVehicleCount()).maxVehicleCount(item.getMaxVehicleCount())
                         .build()).collect(Collectors.toList());
         return Cd90ShiftResourceState.builder().lanes(lanes)

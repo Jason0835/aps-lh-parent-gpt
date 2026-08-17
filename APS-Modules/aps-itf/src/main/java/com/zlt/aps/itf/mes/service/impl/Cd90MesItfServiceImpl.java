@@ -68,8 +68,8 @@ public class Cd90MesItfServiceImpl implements ICd90MesItfService {
      */
     @Override
     public AjaxResult syncStock(AuxReqSyncDataLogs syncDataLogs) {
-        String factoryCode = StringUtils.isBlank(syncDataLogs.getFactoryCode())
-                ? FactoryConstant.DEFAULT_FACTORY_CODE : syncDataLogs.getFactoryCode();
+        String factoryCode = FactoryConstant.DEFAULT_FACTORY_CODE;
+        syncDataLogs.setFactoryCode(factoryCode);
 
         List<Cd90MesStock> syncList;
         DynamicDataSourceContextHolder.push(DataSource.MES);
@@ -171,7 +171,7 @@ public class Cd90MesItfServiceImpl implements ICd90MesItfService {
 
     /**
      * 同步直裁自动滚动目标班次库存。
-     * MES同一物理日的最新版本作为交班快照，空结果会清空目标范围，防止继续使用旧库存。
+     * MES指定物理日的完整库存作为滚动基线，空结果会清空目标范围，防止继续使用旧库存。
      *
      * @param request 目标库存日期、班次和开始时间
      * @return 同步结果
@@ -182,10 +182,8 @@ public class Cd90MesItfServiceImpl implements ICd90MesItfService {
                 || StringUtils.isBlank(request.getShiftCode()) || request.getShiftStartTime() == null) {
             return AjaxResult.error(I18nUtil.getMessage("ui.cd90.shiftStock.syncArgumentsInvalid"));
         }
-        request.setFactoryCode(StringUtils.defaultIfBlank(request.getFactoryCode(),
-                FactoryConstant.DEFAULT_FACTORY_CODE));
-        request.setCompanyCode(StringUtils.defaultIfBlank(request.getCompanyCode(),
-                request.getFactoryCode()));
+        request.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        request.setCompanyCode(FactoryConstant.DEFAULT_FACTORY_CODE);
         request.setStockDate(DateUtil.beginOfDay(request.getStockDate()));
         request.setShiftCode(request.getShiftCode().trim());
 
@@ -201,7 +199,7 @@ public class Cd90MesItfServiceImpl implements ICd90MesItfService {
         Set<String> materialCodes = new HashSet<>();
         Cd90MesStock invalidSource = safeSourceList.stream()
                 .filter(source -> source == null || StringUtils.isBlank(source.getMaterialCode())
-                        || (source.getAvailableStock() == null && source.getStockNum() == null)
+                        || source.getAvailableStock() == null
                         || !materialCodes.add(source.getMaterialCode().trim()))
                 .findFirst()
                 .orElse(null);
@@ -217,12 +215,10 @@ public class Cd90MesItfServiceImpl implements ICd90MesItfService {
             target.setShiftCode(request.getShiftCode());
             target.setShiftStartTime(request.getShiftStartTime());
             target.setMaterialCode(source.getMaterialCode().trim());
-            BigDecimal stockNum = source.getAvailableStock() == null
-                    ? source.getStockNum() : source.getAvailableStock();
-            target.setStockNum(stockNum.doubleValue());
+            target.setStockNum(source.getAvailableStock().doubleValue());
             target.setModifyNum(0D);
             target.setBadNum(0D);
-            target.setSnapshotTime(request.getShiftStartTime());
+            target.setSnapshotTime(now);
             target.setCreateBy("MES");
             target.setUpdateBy("MES");
             target.setCreateTime(now);
@@ -302,6 +298,7 @@ public class Cd90MesItfServiceImpl implements ICd90MesItfService {
         Cd90StorageLaneLimit invalidSource = sourceList.stream()
                 .filter(source -> source.getLaneDate() == null
                         || StringUtils.isBlank(source.getShiftCode())
+                        || StringUtils.isBlank(source.getMachineCode())
                         || StringUtils.isBlank(source.getStorageLaneCode())
                         || source.getCarNum() == null
                         || source.getMaxCarNum() == null
@@ -323,6 +320,7 @@ public class Cd90MesItfServiceImpl implements ICd90MesItfService {
             target.setFactoryCode(factoryCode);
             target.setLaneDate(source.getLaneDate());
             target.setShiftCode(source.getShiftCode());
+            target.setMachineCode(source.getMachineCode());
             target.setStorageLaneCode(source.getStorageLaneCode());
             target.setMaterialCode(source.getMaterialCode());
             target.setCarNum(source.getCarNum());

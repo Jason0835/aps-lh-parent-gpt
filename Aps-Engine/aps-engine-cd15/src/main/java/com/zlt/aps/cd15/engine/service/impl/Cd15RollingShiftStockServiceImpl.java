@@ -62,12 +62,10 @@ public class Cd15RollingShiftStockServiceImpl implements Cd15RollingShiftStockSe
     @Override
     public String fingerprint(Cd15RollingTarget target) {
         String source = this.select(target).stream()
-                .map(item -> item.getId() + ":" + item.getFactoryCode() + ":"
-                        + item.getStockDate() + ":" + item.getShiftCode() + ":"
+                .map(item -> item.getFactoryCode() + ":" + item.getStockDate() + ":" + item.getShiftCode() + ":"
                         + item.getShiftStartTime() + ":" + item.getMaterialCode() + ":"
                         + item.getStockNum() + ":" + item.getModifyNum() + ":"
-                        + item.getBadNum() + ":" + item.getSnapshotTime() + ":"
-                        + item.getUpdateTime())
+                        + item.getBadNum())
                 .collect(Collectors.joining("|"));
         return this.sha256(source);
     }

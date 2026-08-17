@@ -112,7 +112,7 @@ public class TcAutoRollingApplicationService {
         syncRequest.setStockDate(window.getStockDate());
         syncRequest.setShiftOrder(window.getTargetShiftOrder());
         AjaxResult result = FeignTokenHelper.callWithToken(
-                () -> this.mesItfService.syncSidewallShiftStock(syncRequest));
+                () -> this.mesItfService.syncTcShiftStock(syncRequest));
         if (result == null || !Objects.equals(HttpStatus.SUCCESS, result.get(AjaxResult.CODE_TAG))) {
             throw new ServiceException(I18nUtil.getMessage("ui.tc.schedule.rolling.stockSyncFailed"));
         }

@@ -99,6 +99,7 @@ public class Cd15LossSettingController extends AbstractDocBizController<Cd15Loss
     protected List<Cd15LossSetting> listExportData(Cd15LossSetting obj) {
         QueryWrapper<Cd15LossSetting> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
+        wrapper.last("ORDER BY " + this.getOrderBy());
         List<Cd15LossSetting> list = cd15LossSettingMapper.selectList(wrapper);
         AppUtils.formatData(list, getQueryFormulas());
         return list;
@@ -123,6 +124,6 @@ public class Cd15LossSettingController extends AbstractDocBizController<Cd15Loss
 
     @Override
     protected String getOrderBy() {
-        return "CREATE_TIME desc";
+        return "STEEL_STRIP_CODE asc, MACHINE_CODE asc, CREATE_TIME desc";
     }
 }

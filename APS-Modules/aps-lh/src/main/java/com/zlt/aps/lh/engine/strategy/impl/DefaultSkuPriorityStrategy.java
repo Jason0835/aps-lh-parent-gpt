@@ -16,6 +16,7 @@ import com.zlt.aps.lh.engine.strategy.IEndingJudgmentStrategy;
 import com.zlt.aps.lh.engine.strategy.ISkuPriorityStrategy;
 import com.zlt.aps.lh.util.LhSpecialMaterialUtil;
 import com.zlt.aps.lh.util.LhSpecifyMachineUtil;
+import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.PriorityTraceLogHelper;
 import com.zlt.common.utils.PubUtil;
 import lombok.extern.slf4j.Slf4j;
@@ -120,12 +121,72 @@ public class DefaultSkuPriorityStrategy implements ISkuPriorityStrategy {
                 CollectionUtils.isEmpty(orderedSkuList) ? "空" : orderedSkuList.get(0).getMaterialCode());
     }
 
+    /**
+     * 对当前业务日仍待排的新增 SKU 重新执行统一排序。
+     *
+     * <p>比较器、结构收尾快照、胎胚最早可供时间修正及排序说明全部复用 S4.5 初始排序，
+     * 唯一区别是输入范围仅为当前业务日仍待排的 SKU。这样前一日无机台而延期的 SKU
+     * 会与下一日其他待排 SKU 重新竞争，不继承旧名次。</p>
+     *
+     * @param context 排程上下文
+     * @param pendingNewSpecSkuList 当前业务日实际待排的新增 SKU 列表
+     */
+    @Override
+    public void sortNewSpecByPriority(LhScheduleContext context,
+                                      List<SkuScheduleDTO> pendingNewSpecSkuList) {
+        if (Objects.isNull(context) || CollectionUtils.isEmpty(pendingNewSpecSkuList)) {
+            return;
+        }
+        Map<SkuScheduleDTO, Integer> structureEndingDaysMap = new IdentityHashMap<>(
+                Math.max(16, pendingNewSpecSkuList.size() * 2));
+        Map<String, StructurePriorityMeta> structurePriorityMap =
+                this.buildStructurePriorityMap(context, structureEndingDaysMap);
+        /*
+         * buildStructurePriorityMap 会标记上下文主列表中的对象；日循环工作队列可能是动态补偿
+         * 对象，因此还要按结构快照显式标记本日列表，保证比较器读取到相同结构收尾语义。
+         */
+        for (SkuScheduleDTO sku : pendingNewSpecSkuList) {
+            if (Objects.isNull(sku) || StringUtils.isEmpty(sku.getStructureName())) {
+                continue;
+            }
+            StructurePriorityMeta structureMeta = structurePriorityMap.get(sku.getStructureName());
+            if (Objects.nonNull(structureMeta) && structureMeta.isAllSkusEndingPriority()) {
+                structureEndingDaysMap.put(sku, structureMeta.getLatestEndingDays());
+            }
+        }
+        Comparator<SkuScheduleDTO> tailComparator = this.buildTailComparator(context);
+        Comparator<SkuScheduleDTO> comparator = this.buildNewSpecComparator(
+                context, structurePriorityMap, structureEndingDaysMap, tailComparator);
+        this.sortSkuList(
+                pendingNewSpecSkuList, context.getStructureEarliestLhTimeMap(), comparator);
+        for (int index = 0; index < pendingNewSpecSkuList.size(); index++) {
+            SkuScheduleDTO sku = pendingNewSpecSkuList.get(index);
+            if (Objects.isNull(sku)) {
+                continue;
+            }
+            int rank = index + 1;
+            sku.setScheduleOrder(rank);
+            sku.setSortRank(rank);
+            sku.setSortDesc(this.buildSkuSortDesc(
+                    context, sku, rank, true, structurePriorityMap, structureEndingDaysMap));
+        }
+        log.info("新增SKU按业务日重新执行统一排序, batchNo: {}, currentScheduleDate: {}, "
+                        + "candidateCount: {}, orderedMaterials: {}",
+                context.getBatchNo(), LhScheduleTimeUtil.formatDate(context.getCurrentScheduleDate()),
+                pendingNewSpecSkuList.size(), pendingNewSpecSkuList.stream()
+                        .filter(Objects::nonNull)
+                        .map(SkuScheduleDTO::getMaterialCode)
+                        .collect(Collectors.toList()));
+    }
+
 
     /**
      * 根据胎胚最早可供硫化时间重新排序。
      *
-     * <p>本次仅修正历史注释口径；续作与新增 SKU 的既有排序行为继续保留，
-     * S4.5 的生产时间限制由新增排产中心解析器独立处理。</p>
+     * <p>仅允许延误天数相同的 SKU 在集合内部换位，避免胎胚时间二次排序覆盖主排序已经
+     * 确定的延误天数优先级。每个延误天数组内继续沿用既有规则：仅对存在胎胚时间的 SKU
+     * 按最早可供硫化时间升序排列，再回填到该组原有的“有时间”位置；无时间 SKU 保持原位。</p>
+     *
      * @param skuList SKU列表
      * @param embryoLhTimeMap 胎胚最早可供硫化时间 Map，key=结构名称，value=最早可供时间
      */
@@ -137,22 +198,31 @@ public class DefaultSkuPriorityStrategy implements ISkuPriorityStrategy {
             return;
         }
 
-        // 2. 找出所有有时间的元素，按时间排序
-        List<SkuScheduleDTO> sortedWithTime = skuList.stream()
-                .filter(sku -> embryoLhTimeMap.containsKey(sku.getStructureName()))
-                .sorted(Comparator.comparing(sku -> embryoLhTimeMap.get(sku.getStructureName())))
-                .collect(Collectors.toList());
-
-        // 3. 按原列表顺序，将排序后的"有时间"元素替换回原来的"有时间"位置
-        int timeIndex = 0;
-        for (int i = 0; i < skuList.size(); i++) {
-            SkuScheduleDTO sku = skuList.get(i);
+        /*
+         * 先按延误天数记录所有“有胎胚时间”的原始位置。LinkedHashMap允许null作为独立分组，
+         * 因此未赋延误天数的SKU仍保留原有换位资格，但不会与其他延误天数的SKU交叉换位。
+         */
+        Map<Integer, List<Integer>> timePositionMap = new LinkedHashMap<>(
+                Math.max(16, skuList.size() * 2));
+        for (int index = 0; index < skuList.size(); index++) {
+            SkuScheduleDTO sku = skuList.get(index);
             if (embryoLhTimeMap.containsKey(sku.getStructureName())) {
-                // 这个位置原本是有时间的，用排序后的元素替换
-                skuList.set(i, sortedWithTime.get(timeIndex++));
+                timePositionMap.computeIfAbsent(sku.getDelayDays(), key -> new ArrayList<>())
+                        .add(index);
             }
-            // 无时间的元素保持不变
         }
+
+        // 每个延误天数组独立执行原有胎胚时间排序，并回填该组原有的“有时间”位置。
+        timePositionMap.values().forEach(timePositionList -> {
+            List<SkuScheduleDTO> sortedWithTime = timePositionList.stream()
+                    .map(skuList::get)
+                    .sorted(Comparator.comparing(
+                            sku -> embryoLhTimeMap.get(sku.getStructureName())))
+                    .collect(Collectors.toList());
+            for (int timeIndex = 0; timeIndex < timePositionList.size(); timeIndex++) {
+                skuList.set(timePositionList.get(timeIndex), sortedWithTime.get(timeIndex));
+            }
+        });
     }
 
     /**
@@ -787,6 +857,7 @@ public class DefaultSkuPriorityStrategy implements ISkuPriorityStrategy {
 
     /**
      * 输出排序后的SKU优先级跟踪日志（含汇总标题、TOP N、SortKey、HitLevel）。
+     * 新增SKU同时输出结构名称，以及按结构从胎胚最早可供硫化时间Map取得的时间。
      *
      * @param context 排程上下文
      * @param structurePriorityMap 结构收尾优先级快照
@@ -834,6 +905,15 @@ public class DefaultSkuPriorityStrategy implements ISkuPriorityStrategy {
                 // 复用 buildSkuSortDesc 生成单行描述，保证日志、运行态、落库三处口径完全一致。
                 String desc = buildSkuSortDesc(context, sku, i + 1, isNewSpec,
                         structurePriorityMap, structureEndingDaysMap);
+                if (isNewSpec) {
+                    // 新增排序日志按结构名称直接读取胎胚可供时间快照，便于核对时间排序依据。
+                    Date earliestLhTime = context.getStructureEarliestLhTimeMap()
+                            .get(sku.getStructureName());
+                    desc = desc
+                            + ", " + PriorityTraceLogHelper.kv("结构名称", sku.getStructureName())
+                            + ", " + PriorityTraceLogHelper.kv("最早胎胚可供硫化时间",
+                            PriorityTraceLogHelper.formatDateTime(earliestLhTime));
+                }
                 PriorityTraceLogHelper.appendLine(detailBuilder, desc);
             }
             if (skuCount > topN) {

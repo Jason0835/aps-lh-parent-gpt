@@ -40,6 +40,13 @@ public class Cd15Stock extends BaseEntity implements Serializable {
     @Excel(name = "ui.data.column.cd15Stock.stockDate", width = 30, dateFormat = "yyyy-MM-dd")
     private Date stockDate;
 
+    /** 班次编码：01夜班、02早班、03中班 */
+    @ApiModelProperty(value = "班次编码", name = "shiftCode")
+    @ImportExcelValidated(required = true, maxLength = 20)
+    @TableField("SHIFT_CODE")
+    @Excel(name = "ui.data.column.cd15Stock.shiftCode", dictType = "class_num_three_plan")
+    private String shiftCode;
+
     /** 库存物料编号（钢带代码） */
     @ApiModelProperty(value = "库存物料编号（钢带代码）", name = "materialCode")
     @ImportExcelValidated(required = true, maxLength = 60)

@@ -138,20 +138,25 @@ public class TbrProductionContext extends Context {
      * @return
      */
     public MonthPlanProductionRequirePlanVo getBaseSkuInfoByPlan(String materialDesc) {
-        if (StringUtils.isBlank(materialDesc)) {
-            return null;
-        }
-        if (CollectionUtils.isEmpty(allSkuProductionPlan)) {
-            return null;
-        }
-        if (!allSkuProductionPlan.containsKey(materialDesc)) {
-            return null;
-        }
-        List<MonthPlanProductionRequirePlanVo> planList = allSkuProductionPlan.get(materialDesc);
+        List<MonthPlanProductionRequirePlanVo> planList = getPlanInfoBySku(materialDesc);
         if (CollectionUtils.isEmpty(planList)) {
             return null;
         }
         return planList.get(BigDecimal.ZERO.intValue());
+    }
+
+    /**
+     * 获取Sku初始的有效计划信息
+     *
+     * @param materialDesc
+     * @return
+     */
+    public List<MonthPlanProductionRequirePlanVo> getInitProductionInfoByPlan(String materialDesc) {
+        List<MonthPlanProductionRequirePlanVo> planList = getPlanInfoBySku(materialDesc);
+        if (CollectionUtils.isEmpty(planList)) {
+            return Collections.emptyList();
+        }
+        return planList.stream().filter(single -> single.isEffectiveByBase()).collect(Collectors.toList());
     }
 
     /**
@@ -557,71 +562,6 @@ public class TbrProductionContext extends Context {
     }
 
     /**
-     * 增加已排产量处理
-     *
-     * @param materialDesc  物料描述
-     * @param addQty        增加的量
-     * @param handlerQtyMap 处理的集合
-     */
-    private void addQtyHandler(String materialDesc, Integer addQty, Map<String, Integer> handlerQtyMap) {
-        //已排产量处理
-        if (null == addQty || addQty <= BigDecimal.ZERO.longValue()) {
-            addQty = BigDecimal.ZERO.intValue();
-        }
-        Integer sumQty = handlerQtyMap.get(materialDesc);
-        if (null == sumQty) {
-            sumQty = BigDecimal.ZERO.intValue();
-        }
-        sumQty = sumQty + addQty;
-        handlerQtyMap.put(materialDesc, sumQty);
-    }
-
-    /**
-     * 重新计算库销比
-     *
-     * @param materialDesc 物料描述
-     */
-    private void resetCalculateInventorySalesRatio(String materialDesc) {
-        if (StringUtils.isBlank(materialDesc)) {
-            return;
-        }
-        List<MonthPlanProductionRequirePlanVo> skuPlanList = allSkuProductionPlan.get(materialDesc);
-        if (CollectionUtils.isEmpty(skuPlanList)) {
-            return;
-        }
-        Integer sumPlannedQty = skuPlannedQtyMap.get(materialDesc);
-        if (null == sumPlannedQty) {
-            sumPlannedQty = BigDecimal.ZERO.intValue();
-        }
-        Integer plannedQty = sumPlannedQty;
-        skuPlanList.forEach(plan -> plan.calculateInventorySalesRatio(plannedQty));
-    }
-
-    /**
-     * 根据模具关系，获取在startDay~endDay有效排产的模具信息
-     *
-     * @param skuRelationList 配置的模具关系
-     * @param startDay        排产开始日
-     * @param endDay          排产结束日
-     * @return
-     */
-    private List<ProductionMouldInfoVo> getEffectiveByRange(List<MonthPlanProductMouldInfoVo> skuRelationList, Integer startDay, Integer endDay) {
-        List<ProductionMouldInfoVo> effectiveList = new ArrayList<>();
-        skuRelationList.forEach(skuRelation -> {
-            ProductionMouldInfoVo mouldInfo = baseDataContainer.getMouldInfoMap().get(skuRelation.getMouldCode());
-            if (null == mouldInfo) {
-                return;
-            }
-            if (!mouldInfo.isProduction(startDay, endDay)) {
-                return;
-            }
-            effectiveList.add(mouldInfo);
-        });
-        return effectiveList;
-    }
-
-
-    /**
      * 根据SKU获取模具信息列表
      *
      * @param materialDesc SKU
@@ -848,6 +788,27 @@ public class TbrProductionContext extends Context {
     }
 
     /**
+     * 根据结构的特殊材料列表刷新上下文的特殊材料结构关系表
+     *
+     * @param groupInfo 物料描述
+     */
+    public void updateSpecialMaterialStructureRelationMap(ProductionPlanGroupInfo groupInfo) {
+        if (!groupInfo.isSpecialMaterial()) {
+            return;
+        }
+        String strucureName = groupInfo.getGroupName();
+        Set<String> specialMaterialCodeSet = groupInfo.getEmbryoSpecialMaterialInfoMap().keySet();
+        for (String specialMaterialCode : specialMaterialCodeSet) {
+            Set<String> strucureSet = this.specialMaterialStructureRelationMap.get(specialMaterialCode);
+            if (strucureSet == null) {
+                strucureSet = new HashSet<>();
+                this.specialMaterialStructureRelationMap.put(specialMaterialCode, strucureSet);
+            }
+            strucureSet.add(strucureName);
+        }
+    }
+
+    /**
      * 对特殊材料已占用库存做标准长度取整处理
      *
      * @param groupInfo
@@ -875,6 +836,70 @@ public class TbrProductionContext extends Context {
                     });
 
         });
+    }
+
+    /**
+     * 增加已排产量处理
+     *
+     * @param materialDesc  物料描述
+     * @param addQty        增加的量
+     * @param handlerQtyMap 处理的集合
+     */
+    private void addQtyHandler(String materialDesc, Integer addQty, Map<String, Integer> handlerQtyMap) {
+        //已排产量处理
+        if (null == addQty || addQty <= BigDecimal.ZERO.longValue()) {
+            addQty = BigDecimal.ZERO.intValue();
+        }
+        Integer sumQty = handlerQtyMap.get(materialDesc);
+        if (null == sumQty) {
+            sumQty = BigDecimal.ZERO.intValue();
+        }
+        sumQty = sumQty + addQty;
+        handlerQtyMap.put(materialDesc, sumQty);
+    }
+
+    /**
+     * 重新计算库销比
+     *
+     * @param materialDesc 物料描述
+     */
+    private void resetCalculateInventorySalesRatio(String materialDesc) {
+        if (StringUtils.isBlank(materialDesc)) {
+            return;
+        }
+        List<MonthPlanProductionRequirePlanVo> skuPlanList = allSkuProductionPlan.get(materialDesc);
+        if (CollectionUtils.isEmpty(skuPlanList)) {
+            return;
+        }
+        Integer sumPlannedQty = skuPlannedQtyMap.get(materialDesc);
+        if (null == sumPlannedQty) {
+            sumPlannedQty = BigDecimal.ZERO.intValue();
+        }
+        Integer plannedQty = sumPlannedQty;
+        skuPlanList.forEach(plan -> plan.calculateInventorySalesRatio(plannedQty));
+    }
+
+    /**
+     * 根据模具关系，获取在startDay~endDay有效排产的模具信息
+     *
+     * @param skuRelationList 配置的模具关系
+     * @param startDay        排产开始日
+     * @param endDay          排产结束日
+     * @return
+     */
+    private List<ProductionMouldInfoVo> getEffectiveByRange(List<MonthPlanProductMouldInfoVo> skuRelationList, Integer startDay, Integer endDay) {
+        List<ProductionMouldInfoVo> effectiveList = new ArrayList<>();
+        skuRelationList.forEach(skuRelation -> {
+            ProductionMouldInfoVo mouldInfo = baseDataContainer.getMouldInfoMap().get(skuRelation.getMouldCode());
+            if (null == mouldInfo) {
+                return;
+            }
+            if (!mouldInfo.isProduction(startDay, endDay)) {
+                return;
+            }
+            effectiveList.add(mouldInfo);
+        });
+        return effectiveList;
     }
 
     /**
@@ -986,23 +1011,21 @@ public class TbrProductionContext extends Context {
     }
 
     /**
-     * 根据结构的特殊材料列表刷新上下文的特殊材料结构关系表
+     * 根据物料描述，获取该Sku所有计划信息
      *
-     * @param groupInfo 物料描述
+     * @param materialDesc
+     * @return
      */
-    public void updateSpecialMaterialStructureRelationMap(ProductionPlanGroupInfo groupInfo) {
-        if (!groupInfo.isSpecialMaterial()) {
-            return;
+    private List<MonthPlanProductionRequirePlanVo> getPlanInfoBySku(String materialDesc) {
+        if (StringUtils.isBlank(materialDesc)) {
+            return Collections.emptyList();
         }
-        String strucureName = groupInfo.getGroupName();
-        Set<String> specialMaterialCodeSet = groupInfo.getEmbryoSpecialMaterialInfoMap().keySet();
-        for (String specialMaterialCode : specialMaterialCodeSet) {
-            Set<String> strucureSet = this.specialMaterialStructureRelationMap.get(specialMaterialCode);
-            if (strucureSet == null) {
-                strucureSet = new HashSet<>();
-                this.specialMaterialStructureRelationMap.put(specialMaterialCode, strucureSet);
-            }
-            strucureSet.add(strucureName);
+        if (CollectionUtils.isEmpty(allSkuProductionPlan)) {
+            return Collections.emptyList();
         }
+        if (!allSkuProductionPlan.containsKey(materialDesc)) {
+            return Collections.emptyList();
+        }
+        return allSkuProductionPlan.get(materialDesc);
     }
 }

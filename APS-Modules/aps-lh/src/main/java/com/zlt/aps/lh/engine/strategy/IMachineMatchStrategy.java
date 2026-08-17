@@ -29,11 +29,10 @@ public interface IMachineMatchStrategy {
     /**
      * 匹配可用硫化机台
      * <p>
-     * 规则: 先按统一生产门禁将多个收尾班次的机台收敛为生产窗口组，同组内再按
-     * SKU 资源保护档 -> 班次距离档 -> 单控拆分 -> 同胎胚 -> 同模壳 -> 同规格 ->
-     * 胶囊共用 -> 同英寸 -> 相近英寸 -> 机台编码逐层软排序。正规 SKU 也应用距离档，
-     * 但只在相同资源保护档内比较，确保普通机台不会被距离更近的单控机台越过。
-     * 所有合法候选均保留，后续窗口组和远距离档用于资源失败后的顺序重试。
+     * 规则：先复用模具、胶囊、特殊物料、单控粒度等既有硬性约束保留合法机台，
+     * 再严格按照“同胎胚、同模壳、同规格、胶囊共用、同英寸、相近英寸、机台编码”
+     * 七层软规则排序。该入口只负责硬过滤和同层软排序；候选机台的真实可开产时间、
+     * 逐班筛选及跨天重排由新增排产日驱动主链统一处理。
      * </p>
      *
      * @param context 排程上下文
@@ -45,8 +44,8 @@ public interface IMachineMatchStrategy {
     /**
      * 校验并返回指定机台。
      *
-     * <p>该入口复用普通新增选机的全部硬过滤和单控粒度规则，但不执行生产窗口分组、
-     * 候选机台排序和最优机台选择。适用于业务已经固定“机台+SKU”关系的反选场景。</p>
+     * <p>该入口复用普通新增选机的全部硬过滤和单控粒度规则，但不执行七层软排序、
+     * 逐班候选筛选和最优机台选择。适用于业务已经固定“机台+SKU”关系的反选场景。</p>
      *
      * @param context 排程上下文
      * @param sku 待排产SKU
@@ -171,6 +170,39 @@ public interface IMachineMatchStrategy {
         return this.buildMachinePriorityTraceSnapshot(
                 context, sku, actualOrderedCandidates, actualSelectedMachine,
                 currentDayEndTime, targetScheduleQtyResolver);
+    }
+
+    /**
+     * 构建同时携带换模/换活字块完成时间与真实可开产时间的完整选机日志快照。
+     *
+     * <p>两个时间均由新增排产日驱动主链在逐班筛选时计算，并与正式落地复用同一份
+     * {@code NewSpecMachineAvailabilityPlan}。默认策略外仍回落到不含这两个时间的既有入口，
+     * 保证测试替身与非默认策略无需同步实现。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 当前待选机 SKU
+     * @param actualOrderedCandidates 正式选机主链本轮有序候选
+     * @param actualSelectedMachine 正式选机主链确定的本轮首选机台
+     * @param currentDayEndTime 当前业务日结束时间
+     * @param targetScheduleQtyResolver 产能计算组件
+     * @param priorityMetricSnapshotMap 正式模具分配前冻结的软排序指标
+     * @param traceChangeoverEndTimeMap 机台编码到换模或换活字块完成时间的映射
+     * @param realAvailableProductionTimeMap 机台编码到真实可开产时间的映射
+     * @return 当前选机时点的只读日志快照
+     */
+    default MachinePriorityTraceSnapshot buildMachinePriorityTraceSnapshot(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            List<MachineScheduleDTO> actualOrderedCandidates,
+            MachineScheduleDTO actualSelectedMachine,
+            Date currentDayEndTime,
+            TargetScheduleQtyResolver targetScheduleQtyResolver,
+            Map<String, MachinePriorityMetricSnapshot> priorityMetricSnapshotMap,
+            Map<String, Date> traceChangeoverEndTimeMap,
+            Map<String, Date> realAvailableProductionTimeMap) {
+        return this.buildMachinePriorityTraceSnapshot(
+                context, sku, actualOrderedCandidates, actualSelectedMachine,
+                currentDayEndTime, targetScheduleQtyResolver, priorityMetricSnapshotMap);
     }
 
     /**

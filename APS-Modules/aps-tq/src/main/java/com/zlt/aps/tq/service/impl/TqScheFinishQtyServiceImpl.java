@@ -195,17 +195,19 @@ public class TqScheFinishQtyServiceImpl extends AbstractDocService<TqScheFinishQ
     }
 
     /**
-     * 构建汇总分组Key（不含排程日期，用于关联排程结果）：胎圈代码|工单号
+     * 构建汇总分组Key（不含排程日期，用于关联排程结果）：工厂|胎圈代码|工单号
+     * <p>关联键含 FACTORY_CODE，避免跨工厂数据误关联。</p>
      */
     private String buildSummaryGroupKey(TqScheFinishQty item) {
-        return item.getBeadCode() + "|" + item.getOrderNo();
+        return item.getFactoryCode() + "|" + item.getBeadCode() + "|" + item.getOrderNo();
     }
 
     /**
-     * 构建排程结果分组Key：胎圈代码|工单号
+     * 构建排程结果分组Key：工厂|胎圈代码|工单号
+     * <p>与汇总分组Key对齐，关联键含 FACTORY_CODE。</p>
      */
     private String buildResultGroupKey(TqScheduleResult result) {
-        return result.getBeadCode() + "|" + result.getOrderNo();
+        return result.getFactoryCode() + "|" + result.getBeadCode() + "|" + result.getOrderNo();
     }
 
     /**

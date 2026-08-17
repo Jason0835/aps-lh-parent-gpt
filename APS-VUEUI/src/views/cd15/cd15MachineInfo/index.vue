@@ -69,7 +69,7 @@ export default {
     TltUploadForm,
     infoDialog,
   },
-  dicts: ["biz_factory_name", "biz_yes_no", "sys_enable_disable", "class_num_three_plan"],
+  dicts: ["biz_factory_name", "biz_yes_no", "sys_enable_disable", "class_num_three_plan", "cd15_default_cut_mode"],
   provide() {
     return {
       parentDict: this.dict,
@@ -180,7 +180,7 @@ export default {
           halign: "center",
           label: this.$t("ui.data.column.cd15MachineInfo.defaultCutMode"),
           minWidth: 150,
-          formatter: (row, column, value) => this.cutModeLabel(value),
+          formatter: (row, column, value) => this.selectDictLabel(this.dict.type.cd15_default_cut_mode, value),
         },
         {
           prop: "singleShiftCapacity",
@@ -275,14 +275,6 @@ export default {
     },
   },
   methods: {
-    cutModeLabel(value) {
-      const labels = {
-        SINGLE: this.$t("ui.data.value.cd15MachineInfo.cutModeSingle"),
-        SPLIT: this.$t("ui.data.value.cd15MachineInfo.cutModeSplit"),
-        DAILY_OUTPUT: this.$t("ui.data.value.cd15MachineInfo.cutModeDailyOutput"),
-      };
-      return labels[value] || value || "";
-    },
     handleStatusChange(row, value) {
       changeCd15MachineStatus({ id: row.id, status: value }).then((res) => {
         this.$modal.msgSuccess(res.msg);

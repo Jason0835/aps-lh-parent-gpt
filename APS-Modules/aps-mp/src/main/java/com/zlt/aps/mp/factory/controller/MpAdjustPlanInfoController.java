@@ -221,7 +221,7 @@ public class MpAdjustPlanInfoController extends AbstractDocBizController<MpAdjus
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getMesMaterialCode()), "MES_MATERIAL_CODE", queryVO.getMesMaterialCode());
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getMaterialCode()), "MATERIAL_CODE", queryVO.getMaterialCode());
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getMaterialDesc()), "MATERIAL_DESC", queryVO.getMaterialDesc());
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getArea()), "AREA", queryVO.getArea());
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getArea()), "AREA", queryVO.getArea());
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getPlanAdjustType()), "PLAN_ADJUST_TYPE", queryVO.getPlanAdjustType());
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getAdjustReason()), "ADJUST_REASON", queryVO.getAdjustReason());
         queryWrapper.ge(PubUtil.isNotEmpty(queryVO.getAdjustDateStart()), "ADJUST_DATE", queryVO.getAdjustDateStart());
