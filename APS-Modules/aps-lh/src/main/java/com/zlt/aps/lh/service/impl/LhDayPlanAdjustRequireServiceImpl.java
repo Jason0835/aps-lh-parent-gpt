@@ -26,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import java.math.BigDecimal;
+import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -115,7 +116,7 @@ public class LhDayPlanAdjustRequireServiceImpl extends AbstractDocService<LhDayP
                     String.format(ADJUST_QTY_FIELD_TEMPLATE, adjustIndex));
             String adjustReason = StringUtils.trim((String) entity.getFieldValueByFieldName(
                     String.format(ADJUST_REASON_FIELD_TEMPLATE, adjustIndex)));
-            this.validateAdjustSlot(adjustQty, adjustReason);
+            this.validateAdjustSlot(adjustIndex, adjustQty, adjustReason);
             this.saveAdjustSlot(entity, sourcePlan, adjustIndex, adjustQty, adjustReason);
         }
     }
@@ -429,17 +430,18 @@ public class LhDayPlanAdjustRequireServiceImpl extends AbstractDocService<LhDayP
     /**
      * 校验单个调整槽位的数量和原因必须同时填写或同时清空。
      *
+     * @param adjustIndex 调整序号
      * @param adjustQty 调整量
      * @param adjustReason 调整原因
      */
-    private void validateAdjustSlot(BigDecimal adjustQty, String adjustReason) {
+    private void validateAdjustSlot(int adjustIndex, BigDecimal adjustQty, String adjustReason) {
         if (Objects.isNull(adjustQty) && StringUtils.isNotBlank(adjustReason)) {
-            throw new IllegalArgumentException(I18nUtil.getMessage(
-                    "ui.data.alert.lhDayPlanAdjustRequire.adjustQtyRequired"));
+            throw new IllegalArgumentException(MessageFormat.format(I18nUtil.getMessage(
+                    "ui.data.alert.lhDayPlanAdjustRequire.adjustQtyRequired"), adjustIndex));
         }
         if (Objects.nonNull(adjustQty) && StringUtils.isBlank(adjustReason)) {
-            throw new IllegalArgumentException(I18nUtil.getMessage(
-                    "ui.data.alert.lhDayPlanAdjustRequire.adjustReasonRequired"));
+            throw new IllegalArgumentException(MessageFormat.format(I18nUtil.getMessage(
+                    "ui.data.alert.lhDayPlanAdjustRequire.adjustReasonRequired"), adjustIndex));
         }
     }
 
