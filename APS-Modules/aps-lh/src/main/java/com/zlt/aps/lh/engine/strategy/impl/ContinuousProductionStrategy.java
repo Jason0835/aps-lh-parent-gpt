@@ -8495,8 +8495,10 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
 
     /**
      * 恢复单条续作结果的停产保机零产量和真正降模释放边界。
-     * <p>日标准收敛、收尾补量和尾量归集均不得重新填充停产保机日期；真正降模结果只能保留
-     * 原释放前已有正计划班次，不能在最后正计划班次之后补活。</p>
+     * <p>日标准收敛、收尾补量和尾量归集均不得重新填充停产保机日期；真正降模结果默认只能保留
+     * 原释放前已有正计划班次，不能在最后正计划班次之后补活。
+     * 但同物料多机台收尾场景下，主销/常规 SKU 的收尾补满夜班（带“补量”备注）按 spec 保留，
+     * 不受降模释放边界回收。</p>
      *
      * @param context 排程上下文
      * @param result 续作结果
@@ -8529,6 +8531,15 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             boolean afterReleaseBoundary = reducedMachine
                     && (Objects.nonNull(releaseBoundaryShiftIndex)
                     ? shift.getShiftIndex() > releaseBoundaryShiftIndex : position > lastPositivePosition);
+            // 同物料多机台收尾：下机机台的收尾补满夜班按 spec 保留，降模释放边界不得回收补满夜班；
+            // 停产保机日期仍优先于补满，补满夜班不得穿透维护停产。
+            if (afterReleaseBoundary && !stopHold
+                    && isEndingFillAnalysisShift(result, shift.getShiftIndex())) {
+                log.info("同物料多机台收尾下机机台补满夜班保留, materialCode: {}, machineCode: {}, "
+                                + "shiftIndex: {}, 原因: 主销/常规收尾补满夜班按spec保留，释放边界不回收",
+                        result.getMaterialCode(), result.getLhMachineCode(), shift.getShiftIndex());
+                continue;
+            }
             if (!stopHold && !afterReleaseBoundary) {
                 continue;
             }
@@ -8559,6 +8570,21 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         if (context.isContinuousStopHoldMachine(result.getLhMachineCode())) {
             extendContinuousStopHoldOccupancyToWindowEnd(context, result, shifts);
         }
+    }
+
+    /**
+     * 判断指定班次是否带有收尾补满“补量”备注。
+     *
+     * @param result 排程结果
+     * @param shiftIndex 班次序号
+     * @return true-该班次由收尾补满规则新增计划量
+     */
+    private boolean isEndingFillAnalysisShift(LhScheduleResult result, int shiftIndex) {
+        if (Objects.isNull(result)) {
+            return false;
+        }
+        String analysis = ShiftFieldUtil.getShiftAnalysis(result, shiftIndex);
+        return StringUtils.contains(analysis, ENDING_FILL_ANALYSIS);
     }
 
     /**
