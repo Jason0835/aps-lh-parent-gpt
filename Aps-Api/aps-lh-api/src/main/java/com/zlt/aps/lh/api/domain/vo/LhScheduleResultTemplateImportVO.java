@@ -159,7 +159,7 @@ public class LhScheduleResultTemplateImportVO extends BaseEntity {
      */
     @ImportExcelValidated(required = true)
     @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.scheduleDate")
-    @JsonFormat(pattern = "yyyy-MM-dd", timezone = "GMT+8")
+    @JsonFormat(pattern = "yyyy-MM-dd")
     @ApiModelProperty(value = "排程日期", name = "scheduleDate")
     @TableField(value = "SCHEDULE_DATE")
     private Date scheduleDate;

@@ -76,7 +76,7 @@ public class LhSpecifyMachine  extends BaseEntity implements Serializable {
             fill = FieldFill.INSERT_UPDATE,
             jdbcType = JdbcType.TIMESTAMP
     )
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @ApiModelProperty(value = "更新时间", name = "updateTime")
     @Excel(name = "ui.data.column.updateTime",dateFormat = "yyyy-MM-dd HH:mm:ss")
     private Date updateTime;

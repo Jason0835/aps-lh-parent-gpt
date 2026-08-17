@@ -75,7 +75,7 @@ public class LhParams extends BaseEntity implements Serializable {
 
     @ApiModelProperty(value = "修改时间")
     @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Excel(name = "ui.data.column.lhParams.updateTime", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
     @TableField(value = "UPDATE_TIME")
     private Date updateTime;

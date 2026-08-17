@@ -90,7 +90,7 @@ public class LhChipStockImportVo extends BaseEntity {
      */
 //    @Excel(name = "ui.data.column.lhChipStock.updateTime", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
     @TableField(value = "UPDATE_TIME", fill = FieldFill.INSERT_UPDATE, jdbcType = JdbcType.TIMESTAMP)
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @ApiModelProperty(value = "更新时间")
     private Date updateTime;
 
