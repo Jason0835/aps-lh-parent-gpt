@@ -193,8 +193,8 @@ export default {
       this.localMachineOptions = rows.map((item) => ({ label: item.machineCode, value: item.machineCode }));
     },
     handleFactoryChange(factoryCode) {
-      this.form.factoryCode = factoryCode;
-      this.form.machineCode = "";
+      this.$set(this.form, "factoryCode", factoryCode);
+      this.$set(this.form, "machineCode", "");
       this.loadMachineOptions(factoryCode);
     },
     show(data) {
