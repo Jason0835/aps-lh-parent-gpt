@@ -250,13 +250,19 @@ export default {
         const adjustReason = (row[`adjustReason${adjustIndex}`] || "").trim();
         if ((adjustQty === null || adjustQty === undefined) && adjustReason) {
           this.$modal.msgError(
-            this.$t("ui.data.alert.lhDayPlanAdjustRequire.adjustQtyRequired", [adjustIndex])
+            this.$t("ui.data.alert.lhDayPlanAdjustRequire.adjustQtyRequired", [
+              row.materialCode,
+              adjustIndex,
+            ])
           );
           return false;
         }
         if (adjustQty !== null && adjustQty !== undefined && !adjustReason) {
           this.$modal.msgError(
-            this.$t("ui.data.alert.lhDayPlanAdjustRequire.adjustReasonRequired", [adjustIndex])
+            this.$t("ui.data.alert.lhDayPlanAdjustRequire.adjustReasonRequired", [
+              row.materialCode,
+              adjustIndex,
+            ])
           );
           return false;
         }

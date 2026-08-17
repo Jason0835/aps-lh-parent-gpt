@@ -3,6 +3,7 @@ package com.zlt.aps.lh.context;
 import cn.hutool.core.date.DateUtil;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+import com.zlt.aps.common.engine.domain.LhDayPlanAdjustVo;
 import com.zlt.aps.lh.api.domain.dto.*;
 import com.zlt.aps.lh.api.domain.entity.*;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
@@ -81,7 +82,9 @@ public class LhScheduleContext {
      */
     private Date windowEndDate;
 
-    /** 当前排程日期 */
+    /**
+     * 当前排程日期
+     */
     private Date currentScheduleDate;
     /**
      * 批次号
@@ -153,6 +156,10 @@ public class LhScheduleContext {
      * 本次排程加载的全部月计划列表，跨月时包含多个自然月；供按业务日期解析 dayN 使用
      */
     private List<FactoryMonthPlanProductionFinalResult> loadedMonthPlanList = new ArrayList<>();
+    /**
+     * 月-硫化日计划调整信息
+     */
+    private List<LhDayPlanAdjustVo> allLhDayPlanAdjustList = Lists.newArrayList();
     /**
      * 物料+产品状态+年月 -> 月计划记录索引，跨月或同物料多产品状态时避免误取其他计划
      */
@@ -1047,7 +1054,7 @@ public class LhScheduleContext {
         } else {
             startDay = DateUtil.dayOfMonth(planStartDate);
         }
-        return SkuMonthPlanCalculator.getPlanQty(allProductionDateList, loadedMonthPlanList, skuProductionInfo, startDay);
+        return SkuMonthPlanCalculator.getPlanQty(allProductionDateList, loadedMonthPlanList, allLhDayPlanAdjustList, skuProductionInfo, startDay);
     }
 
     /**
@@ -1064,7 +1071,7 @@ public class LhScheduleContext {
         } else {
             realPlanStartDate = planStartDate;
         }
-        return SkuMonthPlanCalculator.statisticsSumPlanQtyBySku(skuInfo, realPlanStartDate, loadedMonthPlanList);
+        return SkuMonthPlanCalculator.statisticsSumPlanQtyBySku(skuInfo, realPlanStartDate, loadedMonthPlanList, allLhDayPlanAdjustList);
     }
 
     /**
@@ -1402,8 +1409,8 @@ public class LhScheduleContext {
      * 复用，新物理机台禁止加入。普通排产和真实历史欠产不调用该判断。</p>
      *
      * @param productionDate 业务日期
-     * @param structureName 产品结构
-     * @param machineCode 候选运行态机台编码
+     * @param structureName  产品结构
+     * @param machineCode    候选运行态机台编码
      * @return true-候选所属物理机台已计入该结构；false-尚未计入
      */
     public boolean hasStructureScheduledMachine(LocalDate productionDate,

@@ -711,6 +711,7 @@ public class TaskGroupService {
         state.runningTotalProjectedStock = runningTotalProjectedStock;
         state.embryoTotalMoldMap = embryoTotalMoldMap;
         state.taskVulcConsumptionMap = taskVulcConsumptionMap;
+        state.preReleasedEmbryoCodes = new HashSet<>();
         state.machineOccupiedTimeMap = machineOccupiedTimeMap;
         state.structureFullyEndedMap = structureFullyEndedMap;
         state.advanceUsedMachineCodes = advanceUsedMachineCodes;
@@ -851,6 +852,10 @@ public class TaskGroupService {
                     }
                 }
             }
+
+            // S5.2.E 共用胎胚预释放：硫化余量≤0的兄弟物料本班硫化计划量会消耗共用物理库存，
+            // 提前并入本物料成型余量（写回 formingRemainderMap，检查2/收尾属性/R2入队/R3同口径）
+            preReleaseSharedEmbryoStock(lhResult, state);
 
             // 检查2：成型余量 <= 0，说明胎胚库存已满足硫化需求，不再需要成型生产
             Integer formingRemainder = this.getFormingRemainder(
@@ -1959,6 +1964,24 @@ public class TaskGroupService {
                     if (preFormingRemainder != null && (preFormingRemainder - preUsedRemainder) <= 0) {
                         log.info("  [R3-预处理-成型余量耗尽] 胎胚={}, 物料={}, 已用{}/总量{}, 跳过",
                                 dt.getEmbryoCode(), preMaterialCode, preUsedRemainder, preFormingRemainder);
+                        // 成型余量已耗尽且本班已有产量：不会再有增量，补标最后一批并回溯同物料任务，
+                        // 使结构全部收尾判定（提前生产机台当班释放）与班末余量锁定能生效
+                        if (dt.getPlannedProduction() != null && dt.getPlannedProduction() > 0
+                                && !Boolean.TRUE.equals(dt.getIsLastEndingBatch())) {
+                            dt.setIsLastEndingBatch(true);
+                            log.info("  [R3-预处理-成型余量耗尽] 胎胚={} 强制标记 isLastEndingBatch=true",
+                                    dt.getEmbryoCode());
+                            List<DailyEmbryoTask> preAllTasks = state.materialTasksMap.get(preMaterialStatusKey);
+                            if (preAllTasks != null) {
+                                for (DailyEmbryoTask prevTask : preAllTasks) {
+                                    if (prevTask != dt && !Boolean.TRUE.equals(prevTask.getIsLastEndingBatch())) {
+                                        prevTask.setIsLastEndingBatch(true);
+                                        log.info("  [R3-回溯] 物料={}, 胎胚={} isLastEndingBatch->true",
+                                                preMaterialCode, prevTask.getEmbryoCode());
+                                    }
+                                }
+                            }
+                        }
                         r3SkippedForming++;
                         r3SkippedFormingList.add(dt.getEmbryoCode() + "/" + preMaterialCode);
                         r3PreIter.remove();
@@ -2457,6 +2480,81 @@ public class TaskGroupService {
 
         // 计算优先级
         task.setPriority(calculateTaskPriority(task, context));
+    }
+
+    /**
+     * 共用胎胚库存预释放（S5.2.E）。
+     *
+     * <p>共用胎胚中硫化余量≤0的兄弟物料不参与库存分配（其硫化余量已耗尽），
+     * 但其本班次硫化计划量仍会消耗共用物理库存，导致本物料的成型余量滞后到
+     * 班末滚动（recalculateFormingRemainder）才显形，表现为：本班少排一条尾巴、
+     * 下个班次冒余量、结构全部收尾判定与提前生产机台释放推迟一个班次。
+     *
+     * <p>本方法在分组检查2之前，将兄弟物料本班次（currentClassIndex）硫化计划量
+     * 提前并入本物料成型余量，直接写回 formingRemainderMap（班末整体重建，不跨班残留），
+     * 使检查2、收尾属性计算、R2入队、R3检查全部读到同一口径。
+     *
+     * <p>限制：仅当本物料成型余量>0时释放（余量=0的场景需按未截断基数重算，暂不处理）；
+     * 同一胎胚每次分组只释放一次，归属首个处理的有余量物料，避免多物料重复计数。
+     *
+     * @param lhResult 当前任务对应的硫化记录
+     * @param state    分组工作状态
+     */
+    private void preReleaseSharedEmbryoStock(LhScheduleResult lhResult, StructureProcessStateVo state) {
+        String embryoCode = lhResult.getEmbryoCode();
+        if (embryoCode == null || lhResult.getMaterialCode() == null || state.currentClassIndex <= 0) {
+            return;
+        }
+        ScheduleContextVo context = state.context;
+        if (context.getLhScheduleResults() == null || context.getMonthSurplusMap() == null
+                || context.getFormingRemainderMap() == null) {
+            return;
+        }
+        String materialStatusKey = MonthPlanSurplusCalculator.buildMaterialStatusKey(
+                lhResult.getMaterialCode(), lhResult.getProductStatus());
+        Integer totalRemainder = context.getFormingRemainderMap().get(materialStatusKey);
+        if (totalRemainder == null || totalRemainder <= 0) {
+            return;
+        }
+        // 同胎胚只释放一次，避免多个有余量物料重复计数
+        if (state.preReleasedEmbryoCodes.contains(embryoCode)) {
+            return;
+        }
+
+        int releaseQty = 0;
+        List<String> releaseDetail = new ArrayList<>();
+        for (LhScheduleResult sibling : context.getLhScheduleResults()) {
+            if (sibling == null || sibling.getId() == null || sibling.getId().equals(lhResult.getId())) {
+                continue;
+            }
+            if (sibling.getEmbryoCode() == null || !sibling.getEmbryoCode().equals(embryoCode)) {
+                continue;
+            }
+            String siblingStatusKey = MonthPlanSurplusCalculator.buildMaterialStatusKey(
+                    sibling.getMaterialCode(), sibling.getProductStatus());
+            if (siblingStatusKey.equals(materialStatusKey)) {
+                // 同物料同状态（多硫化机任务）：消耗由本物料余量自身承担
+                continue;
+            }
+            MdmMonthSurplus siblingSurplus = context.getMonthSurplusMap().get(siblingStatusKey);
+            if (siblingSurplus == null || siblingSurplus.getPlanSurplusQty() == null
+                    || siblingSurplus.getPlanSurplusQty().intValue() > 0) {
+                // 兄弟物料硫化余量>0：其消耗由自身余量承担；无余量记录：无法判定，均不释放
+                continue;
+            }
+            Integer siblingPlanQty = productionCalculator.getClassPlanQtyByIndex(sibling, state.currentClassIndex);
+            if (siblingPlanQty != null && siblingPlanQty > 0) {
+                releaseQty += siblingPlanQty;
+                releaseDetail.add(sibling.getMaterialCode() + "(" + siblingPlanQty + ")");
+            }
+        }
+        if (releaseQty > 0) {
+            state.preReleasedEmbryoCodes.add(embryoCode);
+            context.getFormingRemainderMap().put(materialStatusKey, totalRemainder + releaseQty);
+            log.info("【共用胎胚预释放】胎胚={}, 物料={}, 兄弟物料(硫化余量≤0)本班计划量={}条[{}], 总成型余量 {} -> {}",
+                    embryoCode, lhResult.getMaterialCode(), releaseQty, String.join(",", releaseDetail),
+                    totalRemainder, totalRemainder + releaseQty);
+        }
     }
 
     /**

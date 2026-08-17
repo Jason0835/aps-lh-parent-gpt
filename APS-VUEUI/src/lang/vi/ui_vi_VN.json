@@ -2577,7 +2577,7 @@
   "ui.data.column.lhDayPlanAdjustRequire.reasonGroup": "Lý do điều chỉnh",
   "ui.data.column.lhDayPlanAdjustRequire.reason": "Lý do {0}",
   "ui.data.column.lhDayPlanAdjustRequire.productStatus": "Trạng thái sản phẩm",
-  "ui.data.alert.lhDayPlanAdjustRequire.adjustQtyRequired": "Phải nhập số lượng điều chỉnh {0} trước khi nhập lý do điều chỉnh {0}",
-  "ui.data.alert.lhDayPlanAdjustRequire.adjustReasonRequired": "Sau khi nhập số lượng điều chỉnh {0}, phải nhập lý do điều chỉnh {0}",
+  "ui.data.alert.lhDayPlanAdjustRequire.adjustQtyRequired": "Mã vật liệu {0}: phải nhập số lượng điều chỉnh {1} trước khi nhập lý do điều chỉnh {1}",
+  "ui.data.alert.lhDayPlanAdjustRequire.adjustReasonRequired": "Mã vật liệu {0}: sau khi nhập số lượng điều chỉnh {1}, phải nhập lý do điều chỉnh {1}",
   "ui.data.alert.lhDayPlanAdjustRequire.unsavedChanges": "Trang hiện tại có điều chỉnh chưa lưu. Bạn có muốn bỏ thay đổi không?"
 }

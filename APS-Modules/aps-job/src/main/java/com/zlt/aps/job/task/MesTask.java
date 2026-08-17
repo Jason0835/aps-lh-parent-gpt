@@ -204,6 +204,15 @@ public class MesTask {
     }
 
     /**
+     * 同步胎圈排程完成量
+     * 链路：MES中间表(MES_TQ_SCHE_FINISH_QTY) → APS落库表(T_TQ_SCHE_FINISH_QTY) → 回写胎圈排程结果表各班次完成量
+     */
+    @ApiOperation("同步胎圈排程完成量")
+    public void syncTqClassShiftFinishQty() {
+        FeignTokenHelper.runWithToken(() -> iMesItfService.syncTqClassShiftFinishQty(new AuxReqSyncDataLogs()));
+    }
+
+    /**
      * 同步胎圈排程日完成量
      */
     @ApiOperation("同步胎圈排程日完成量")
@@ -217,6 +226,65 @@ public class MesTask {
     @ApiOperation("同步钢丝圈排程日完成量")
     public void syncGsqScheDayFinishQty() {
         FeignTokenHelper.runWithToken(() -> iMesItfService.syncGsqScheDayFinishQty(new AuxReqSyncDataLogs()));
+    }
+
+    /**
+     * 同步钢丝圈排程完成量
+     * 执行步骤：
+     * 1. 从MES中间表MES_GSQ_SCHE_FINISH_QTY查询当天最新版本数据
+     * 2. 按排程日期+钢丝圈代码+订单号分组取MAX(DATA_VERSION)
+     * 3. 逻辑删除APS旧数据并插入新数据
+     * 4. 回写钢丝圈排程结果表各班次完成量（6班制3天窗口映射）
+     */
+    @ApiOperation("同步钢丝圈排程完成量")
+    public void syncGsqClassShiftFinishQty() {
+        FeignTokenHelper.runWithToken(() -> iMesItfService.syncGsqClassShiftFinishQty(new AuxReqSyncDataLogs()));
+    }
+
+    /**
+     * 临时任务：按上一天最新版本号抓取钢丝圈排程完成量回报数据
+     * 逻辑同抓当天最新版本（syncGsqClassShiftFinishQty），但日期条件改为上一天
+     * 执行步骤：
+     * 1. 从MES中间表查询上一天（SCHEDULE_DATE = DATEADD(DAY, -1, GETDATE())）的钢丝圈排程完成量数据
+     * 2. 按排程日期+钢丝圈代码+订单号分组取MAX(DATA_VERSION)，获取上一天最新版本数据
+     * 3. 逻辑删除APS旧数据并插入新数据
+     * 4. 回写钢丝圈排程结果表各班次完成量
+     */
+    @ApiOperation("临时任务-按上一天最新版本号抓取钢丝圈排程完成量回报")
+    public void syncGsqClassShiftFinishQtyByYesterday() {
+        log.info("临时任务-开始按上一天最新版本号抓取钢丝圈排程完成量回报数据");
+        try {
+            FeignTokenHelper.runWithToken(() -> {
+                AjaxResult result = iMesItfService.syncGsqClassShiftFinishQtyByYesterday(new AuxReqSyncDataLogs());
+                log.info("临时任务-按上一天最新版本号抓取钢丝圈排程完成量回报结果：{}", result);
+            });
+        } catch (Exception e) {
+            log.error("临时任务-按上一天最新版本号抓取钢丝圈排程完成量回报异常", e);
+        }
+        log.info("临时任务-按上一天最新版本号抓取钢丝圈排程完成量回报完成");
+    }
+
+    /**
+     * 临时任务：按指定版本号抓取钢丝圈排程完成量回报数据
+     * 执行步骤：
+     * 1. 从MES中间表按指定版本号查询钢丝圈排程完成量数据（不限日期）
+     * 2. 按排程日期分组，逐组逻辑删除APS旧数据并插入新数据
+     * 3. 回写钢丝圈排程结果表各班次完成量
+     * 注意：调用前需修改 dataVersion 为目标版本号
+     */
+    @ApiOperation("临时任务-按指定版本号抓取钢丝圈排程完成量回报")
+    public void syncGsqClassShiftFinishQtyByVersion() {
+        String dataVersion = "APS_MES_GSQ01_20260814000000000";
+        log.info("临时任务-开始按版本号{}抓取钢丝圈排程完成量回报数据", dataVersion);
+        try {
+            FeignTokenHelper.runWithToken(() -> {
+                AjaxResult result = iMesItfService.syncGsqClassShiftFinishQtyByVersion(dataVersion);
+                log.info("临时任务-按版本号{}抓取钢丝圈排程完成量回报结果：{}", dataVersion, result);
+            });
+        } catch (Exception e) {
+            log.error("临时任务-按版本号{}抓取钢丝圈排程完成量回报异常", dataVersion, e);
+        }
+        log.info("临时任务-按版本号{}抓取钢丝圈排程完成量回报完成", dataVersion);
     }
 
     /**

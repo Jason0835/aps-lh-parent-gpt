@@ -4508,7 +4508,7 @@
   "ui.data.column.lhDayPlanAdjustRequire.reasonGroup": "日计划调整原因",
   "ui.data.column.lhDayPlanAdjustRequire.reason": "原因{0}",
   "ui.data.column.lhDayPlanAdjustRequire.productStatus": "产品状态",
-  "ui.data.alert.lhDayPlanAdjustRequire.adjustQtyRequired": "调整{0}填写原因前必须填写调整{0}调整量",
-  "ui.data.alert.lhDayPlanAdjustRequire.adjustReasonRequired": "调整{0}填写调整量后必须填写调整{0}原因",
+  "ui.data.alert.lhDayPlanAdjustRequire.adjustQtyRequired": "物料号{0}：调整{1}填写原因前必须填写调整{1}调整量",
+  "ui.data.alert.lhDayPlanAdjustRequire.adjustReasonRequired": "物料号{0}：调整{1}填写调整量后必须填写调整{1}原因",
   "ui.data.alert.lhDayPlanAdjustRequire.unsavedChanges": "当前页存在未保存的调整，是否放弃修改？"
 }

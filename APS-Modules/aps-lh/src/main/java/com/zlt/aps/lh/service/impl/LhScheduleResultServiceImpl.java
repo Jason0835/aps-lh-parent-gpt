@@ -7,6 +7,9 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import com.zlt.aps.common.engine.domain.LhDayPlanAdjustVo;
+import com.zlt.aps.common.engine.domain.YearMonthLhDayAdjustVo;
+import com.zlt.aps.common.engine.utils.MonthPlanSurplusCalculator;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
@@ -19,6 +22,7 @@ import com.zlt.aps.lh.component.LhBatchNoRedisGenerator;
 import com.zlt.aps.lh.handler.LhInsertOrderValidateHandler;
 import com.zlt.aps.lh.handler.SkuMonthPlanCalculator;
 import com.zlt.aps.lh.mapper.*;
+import com.zlt.aps.lh.service.ILhDayPlanAdjustRequireService;
 import com.zlt.aps.lh.service.ILhScheduleResultService;
 import com.zlt.aps.lh.util.LeftRightMouldUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
@@ -94,6 +98,9 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
     private LhScheFinishQtyMapper lhScheFinishQtyMapper;
 
     @Resource
+    private ILhDayPlanAdjustRequireService lhDayPlanAdjustRequireService;
+
+    @Resource
     private MdmMonthSurplusMapper monthSurplusMapper;
     @Resource
     private LhParamsMapper lhParamsMapper;
@@ -102,26 +109,18 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
 
     @Override
     public List<LhScheduleResult> selectByDateAndFactory(Date scheduleDate, String factoryCode) {
-        return mapper.selectList(new LambdaQueryWrapper<LhScheduleResult>()
-                .eq(StringUtils.isNotEmpty(factoryCode), LhScheduleResult::getFactoryCode, factoryCode)
-                .eq(LhScheduleResult::getScheduleDate, scheduleDate)
-                .eq(LhScheduleResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
+        return mapper.selectList(new LambdaQueryWrapper<LhScheduleResult>().eq(StringUtils.isNotEmpty(factoryCode), LhScheduleResult::getFactoryCode, factoryCode).eq(LhScheduleResult::getScheduleDate, scheduleDate).eq(LhScheduleResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
     }
 
     @Override
     public List<LhScheduleResult> selectPreviousSchedule(Date scheduleDate, String factoryCode) {
-        return mapper.selectList(new LambdaQueryWrapper<LhScheduleResult>()
-                .eq(LhScheduleResult::getFactoryCode, factoryCode)
-                .eq(LhScheduleResult::getScheduleDate, scheduleDate)
-                .eq(LhScheduleResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
+        return mapper.selectList(new LambdaQueryWrapper<LhScheduleResult>().eq(LhScheduleResult::getFactoryCode, factoryCode).eq(LhScheduleResult::getScheduleDate, scheduleDate).eq(LhScheduleResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
     }
 
     @Override
     public int deleteByDateAndFactory(Date scheduleDate, String factoryCode) {
         LambdaQueryWrapper<LhScheduleResult> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(LhScheduleResult::getFactoryCode, factoryCode)
-                .eq(LhScheduleResult::getScheduleDate, scheduleDate)
-                .eq(LhScheduleResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode());
+        wrapper.eq(LhScheduleResult::getFactoryCode, factoryCode).eq(LhScheduleResult::getScheduleDate, scheduleDate).eq(LhScheduleResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode());
         return mapper.delete(wrapper);
     }
 
@@ -136,10 +135,7 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
     @Override
     public int countReleasedByDate(Date scheduleDate, String factoryCode) {
         LambdaQueryWrapper<LhScheduleResult> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(LhScheduleResult::getFactoryCode, factoryCode)
-                .eq(LhScheduleResult::getScheduleDate, scheduleDate)
-                .eq(LhScheduleResult::getIsRelease, ReleaseStatusEnum.RELEASED.getCode())
-                .eq(LhScheduleResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode());
+        wrapper.eq(LhScheduleResult::getFactoryCode, factoryCode).eq(LhScheduleResult::getScheduleDate, scheduleDate).eq(LhScheduleResult::getIsRelease, ReleaseStatusEnum.RELEASED.getCode()).eq(LhScheduleResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode());
         return mapper.selectCount(wrapper).intValue();
     }
 
@@ -199,8 +195,7 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void insertOrder(LhOrderInsertDTO dto) {
-        log.info("执行插单操作, 工厂: {}, 机台: {}, 物料: {}, 排程日期: {}",
-                dto.getFactoryCode(), dto.getLhMachineCode(), dto.getProductCode(), dto.getScheduleDate());
+        log.info("执行插单操作, 工厂: {}, 机台: {}, 物料: {}, 排程日期: {}", dto.getFactoryCode(), dto.getLhMachineCode(), dto.getProductCode(), dto.getScheduleDate());
 
         LhInsertOrderValidateResultDTO validateResult = insertOrderValidateHandler.validateInsertOrder(dto);
 
@@ -274,9 +269,7 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
      */
     private LhScheduleResult queryLatestScheduleResult(LhOrderInsertDTO dto, boolean includeInsert) {
         LambdaQueryWrapper<LhScheduleResult> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(LhScheduleResult::getLhMachineCode, dto.getLhMachineCode())
-                .eq(LhScheduleResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
-                .eq(LhScheduleResult::getScheduleDate, dto.getScheduleDate());
+        wrapper.eq(LhScheduleResult::getLhMachineCode, dto.getLhMachineCode()).eq(LhScheduleResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode()).eq(LhScheduleResult::getScheduleDate, dto.getScheduleDate());
         if (StringUtils.isNotBlank(dto.getFactoryCode())) {
             wrapper.eq(LhScheduleResult::getFactoryCode, dto.getFactoryCode());
         }
@@ -300,9 +293,7 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
         }
         Date prevDay = DateUtil.offsetDay(dto.getScheduleDate(), -1);
         LambdaQueryWrapper<LhScheduleResult> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(LhScheduleResult::getLhMachineCode, dto.getLhMachineCode())
-                .eq(LhScheduleResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
-                .eq(LhScheduleResult::getScheduleDate, prevDay);
+        wrapper.eq(LhScheduleResult::getLhMachineCode, dto.getLhMachineCode()).eq(LhScheduleResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode()).eq(LhScheduleResult::getScheduleDate, prevDay);
         if (StringUtils.isNotBlank(dto.getFactoryCode())) {
             wrapper.eq(LhScheduleResult::getFactoryCode, dto.getFactoryCode());
         }
@@ -320,8 +311,7 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
      * @param validateResult 校验结果（用于回填硫化余量/胎胚库存/班产/示方类型等字段）
      * @return 排程结果实体
      */
-    private LhScheduleResult buildInsertOrderResult(LhOrderInsertDTO dto, String batchNo, String orderNo,
-                                                    LhInsertOrderValidateResultDTO validateResult) {
+    private LhScheduleResult buildInsertOrderResult(LhOrderInsertDTO dto, String batchNo, String orderNo, LhInsertOrderValidateResultDTO validateResult) {
         LhScheduleResult result = new LhScheduleResult();
         result.setFactoryCode(dto.getFactoryCode());
         result.setBatchNo(batchNo);
@@ -433,11 +423,7 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
         MpFactoryProductionVersion finalVersion = getFinalProductionVersion(dto.getFactoryCode(), year, month);
 
         LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(FactoryMonthPlanProductionFinalResult::getFactoryCode, dto.getFactoryCode())
-                .eq(FactoryMonthPlanProductionFinalResult::getYear, year)
-                .eq(FactoryMonthPlanProductionFinalResult::getMonth, month)
-                .eq(FactoryMonthPlanProductionFinalResult::getMaterialCode, materialCode)
-                .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode());
+        wrapper.eq(FactoryMonthPlanProductionFinalResult::getFactoryCode, dto.getFactoryCode()).eq(FactoryMonthPlanProductionFinalResult::getYear, year).eq(FactoryMonthPlanProductionFinalResult::getMonth, month).eq(FactoryMonthPlanProductionFinalResult::getMaterialCode, materialCode).eq(FactoryMonthPlanProductionFinalResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode());
         if (finalVersion != null && StringUtils.isNotBlank(finalVersion.getProductionVersion())) {
             wrapper.eq(FactoryMonthPlanProductionFinalResult::getProductionVersion, finalVersion.getProductionVersion());
         }
@@ -481,15 +467,13 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
         if (dto.getScheduleDate() == null) {
             return;
         }
-        List<com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO> shifts =
-                LhScheduleTimeUtil.buildDefaultScheduleShifts(null, dto.getScheduleDate());
+        List<com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO> shifts = LhScheduleTimeUtil.buildDefaultScheduleShifts(null, dto.getScheduleDate());
         for (int i = 1; i <= com.zlt.aps.lh.api.constant.LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; i++) {
             Integer planQty = ShiftFieldUtil.getShiftPlanQty(result, i);
             if (planQty != null && planQty > 0) {
                 com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO shift = findShiftByIndex(shifts, i);
                 if (shift != null) {
-                    ShiftFieldUtil.setShiftPlanQty(result, i, planQty,
-                            shift.getShiftStartDateTime(), shift.getShiftEndDateTime());
+                    ShiftFieldUtil.setShiftPlanQty(result, i, planQty, shift.getShiftStartDateTime(), shift.getShiftEndDateTime());
                 }
             }
         }
@@ -502,8 +486,7 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
      * @param shiftIndex 班次索引（1-8）
      * @return 班次配置，未找到返回null
      */
-    private com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO findShiftByIndex(
-            List<com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO> shifts, int shiftIndex) {
+    private com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO findShiftByIndex(List<com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO> shifts, int shiftIndex) {
         if (shifts == null || shiftIndex < 1 || shiftIndex > shifts.size()) {
             return null;
         }
@@ -532,19 +515,12 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
      * @param beforeMaterialCode 前规格物料编码（在插入排程结果之前查询获得）
      * @param beforeMaterialDesc 前规格物料描述（在插入排程结果之前查询获得）
      */
-    private void generateInsertMouldChangePlan(LhOrderInsertDTO dto, String batchNo,
-                                               String beforeMaterialCode, String beforeMaterialDesc) {
+    private void generateInsertMouldChangePlan(LhOrderInsertDTO dto, String batchNo, String beforeMaterialCode, String beforeMaterialDesc) {
         String mouldCode = resolveMouldCode(dto);
         String afterMaterialCode = StringUtils.isNotBlank(dto.getProductCode()) ? dto.getProductCode() : dto.getMaterialCode();
 
         // 查询是否已存在同机台+同排程日期+同后规格物料的模具交替计划（避免删除插单后再次插单产生重复数据）
-        LhMouldChangePlan existingPlan = mouldChangePlanMapper.selectOne(
-                new LambdaQueryWrapper<LhMouldChangePlan>()
-                        .eq(LhMouldChangePlan::getFactoryCode, dto.getFactoryCode())
-                        .eq(LhMouldChangePlan::getScheduleDate, dto.getScheduleDate())
-                        .eq(LhMouldChangePlan::getLhMachineCode, dto.getLhMachineCode())
-                        .eq(LhMouldChangePlan::getAfterMaterialCode, afterMaterialCode)
-                        .last("LIMIT 1"));
+        LhMouldChangePlan existingPlan = mouldChangePlanMapper.selectOne(new LambdaQueryWrapper<LhMouldChangePlan>().eq(LhMouldChangePlan::getFactoryCode, dto.getFactoryCode()).eq(LhMouldChangePlan::getScheduleDate, dto.getScheduleDate()).eq(LhMouldChangePlan::getLhMachineCode, dto.getLhMachineCode()).eq(LhMouldChangePlan::getAfterMaterialCode, afterMaterialCode).last("LIMIT 1"));
 
         if (existingPlan != null) {
             // 覆盖更新已有记录，避免重复
@@ -557,8 +533,7 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
             existingPlan.setIsRelease(ReleaseStatusEnum.NOT_RELEASED.getCode());
             existingPlan.setMouldStatus("0");
             mouldChangePlanMapper.updateById(existingPlan);
-            log.info("插单覆盖更新模具交替计划, ID: {}, 机台: {}, 前规格: {}, 后规格: {}",
-                    existingPlan.getId(), dto.getLhMachineCode(), beforeMaterialCode, afterMaterialCode);
+            log.info("插单覆盖更新模具交替计划, ID: {}, 机台: {}, 前规格: {}, 后规格: {}", existingPlan.getId(), dto.getLhMachineCode(), beforeMaterialCode, afterMaterialCode);
             return;
         }
 
@@ -585,8 +560,7 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
         plan.setIsDelete(DeleteFlagEnum.NORMAL.getCode());
 
         mouldChangePlanMapper.insert(plan);
-        log.info("插单生成模具交替计划, 工单号: {}, 机台: {}, 前规格: {}, 后规格: {}",
-                plan.getOrderNo(), dto.getLhMachineCode(), beforeMaterialCode, afterMaterialCode);
+        log.info("插单生成模具交替计划, 工单号: {}, 机台: {}, 前规格: {}, 后规格: {}", plan.getOrderNo(), dto.getLhMachineCode(), beforeMaterialCode, afterMaterialCode);
     }
 
     /**
@@ -621,11 +595,7 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
         if (CollectionUtils.isEmpty(mouldRelList)) {
             return null;
         }
-        return mouldRelList.stream()
-                .map(MdmSkuMouldRel::getMouldCode)
-                .filter(StringUtils::isNotBlank)
-                .distinct()
-                .collect(Collectors.joining(","));
+        return mouldRelList.stream().map(MdmSkuMouldRel::getMouldCode).filter(StringUtils::isNotBlank).distinct().collect(Collectors.joining(","));
     }
 
     /**
@@ -641,22 +611,14 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
             return null;
         }
         LambdaQueryWrapper<MpFactoryProductionVersion> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(MpFactoryProductionVersion::getFactoryCode, factoryCode)
-                .eq(MpFactoryProductionVersion::getYear, year)
-                .eq(MpFactoryProductionVersion::getMonth, month)
-                .eq(MpFactoryProductionVersion::getIsFinal, "1")
-                .eq(MpFactoryProductionVersion::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
-                .orderByDesc(MpFactoryProductionVersion::getUpdateTime)
-                .orderByDesc(MpFactoryProductionVersion::getId)
-                .last("LIMIT 1");
+        wrapper.eq(MpFactoryProductionVersion::getFactoryCode, factoryCode).eq(MpFactoryProductionVersion::getYear, year).eq(MpFactoryProductionVersion::getMonth, month).eq(MpFactoryProductionVersion::getIsFinal, "1").eq(MpFactoryProductionVersion::getIsDelete, DeleteFlagEnum.NORMAL.getCode()).orderByDesc(MpFactoryProductionVersion::getUpdateTime).orderByDesc(MpFactoryProductionVersion::getId).last("LIMIT 1");
         return mpFactoryProductionVersionMapper.selectOne(wrapper);
     }
 
     @Override
     public void fillScheduleResultFields(List<LhScheduleResult> lhScheduleResultList, Date scheduleDate) {
         if (CollectionUtils.isEmpty(lhScheduleResultList) || Objects.isNull(scheduleDate)) {
-            log.warn("fillScheduleResultFields: 传入参数为空, listSize={}, scheduleDate={}",
-                    lhScheduleResultList == null ? 0 : lhScheduleResultList.size(), scheduleDate);
+            log.warn("fillScheduleResultFields: 传入参数为空, listSize={}, scheduleDate={}", lhScheduleResultList == null ? 0 : lhScheduleResultList.size(), scheduleDate);
             return;
         }
         String factoryCode = lhScheduleResultList.get(BigDecimal.ZERO.intValue()).getFactoryCode();
@@ -671,13 +633,11 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
         int month = DateUtil.month(dateTime) + 1;
         YearMonth productionYearMonth = YearMonth.of(year, month);
 
-        log.info("fillScheduleResultFields: 开始填充排程结果字段, 排程日期={}, 结果数量={}, year={}, month={}",
-                DateUtil.formatDate(scheduleDate), lhScheduleResultList.size(), year, month);
+        log.info("fillScheduleResultFields: 开始填充排程结果字段, 排程日期={}, 结果数量={}, year={}, month={}", DateUtil.formatDate(scheduleDate), lhScheduleResultList.size(), year, month);
 
         // scheduleDate 业务上为 T+1，计算 T 日用于完成量相关查询
         Date tDay = DateUtil.offsetDay(scheduleDate, -1);
-        log.info("fillScheduleResultFields: scheduleDate={}, T日={}",
-                DateUtil.formatDate(scheduleDate), DateUtil.formatDate(tDay));
+        log.info("fillScheduleResultFields: scheduleDate={}, T日={}", DateUtil.formatDate(scheduleDate), DateUtil.formatDate(tDay));
 
         // 收集所有去重key
         Set<String> factoryCodes = new HashSet<>();
@@ -712,16 +672,18 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
             }
         }
         log.info("fillScheduleResultFields: 排产版本加载完成, 工厂数={}, 匹配数={}", factoryCodes.size(), productionVersionMap.size());
-
+        List<String> factoryCodeList = Lists.newArrayList(factoryCodes);
+        List<String> materialCodeList = Lists.newArrayList(materialCodes);
         // ======== 2. 加载月计划定稿数据 ========
         // key: factoryCode + "|" + materialCode, value: FactoryMonthPlanProductionFinalResult
-        List<FactoryMonthPlanProductionFinalResult> allMonthPlanList = getMonthPlanList(allProductionDate, Lists.newArrayList(factoryCodes), Lists.newArrayList(materialCodes));
+        List<FactoryMonthPlanProductionFinalResult> allMonthPlanList = getMonthPlanList(allProductionDate, factoryCodeList, materialCodeList);
         Map<String, List<FactoryMonthPlanProductionFinalResult>> monthPlanMap = Maps.newHashMap();
         if (CollectionUtils.isNotEmpty(allMonthPlanList)) {
             monthPlanMap = allMonthPlanList.stream().collect(Collectors.groupingBy(FactoryMonthPlanProductionFinalResult::getFactoryMaterialStatusKey));
         }
         log.info("fillScheduleResultFields: 月计划定稿加载完成, 月计划匹配数={}", monthPlanMap.size());
-
+        List<LhDayPlanAdjustVo> allLhDayAdjustList = getLhDayPlanAdjustList(allProductionDate, factoryCodeList, materialCodeList);
+        Map<String, YearMonthLhDayAdjustVo> skuYearMonthLhDayAdjustMap = MonthPlanSurplusCalculator.getLhDayPlanAdjustInfo(allLhDayAdjustList);
         // ======== 3. 加载机台信息（使用模数） ========
         // key: machineCode, value: LhMachineInfo
         Map<String, LhMachineInfo> machineInfoMap = new HashMap<>(machineCodes.size());
@@ -775,12 +737,7 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
             LambdaQueryWrapper<MdmSkuConstructionRef> wrapper = new LambdaQueryWrapper<>();
             wrapper.in(MdmSkuConstructionRef::getMaterialCode, materialCodes);
             List<MdmSkuConstructionRef> refList = mdmSkuConstructionRefMapper.selectList(wrapper);
-            constructionRefMap = refList.stream()
-                    .filter(ref -> StringUtils.isNotEmpty(ref.getMaterialCode()))
-                    .collect(Collectors.toMap(
-                            ref -> ref.getMaterialCode() + "::" + StringUtils.defaultString(ref.getTrialStatus()),
-                            ref -> ref,
-                            (a, b) -> a));
+            constructionRefMap = refList.stream().filter(ref -> StringUtils.isNotEmpty(ref.getMaterialCode())).collect(Collectors.toMap(ref -> ref.getMaterialCode() + "::" + StringUtils.defaultString(ref.getTrialStatus()), ref -> ref, (a, b) -> a));
         }
         log.info("fillScheduleResultFields: 示方书关系加载完成, 物料数={}, 匹配数={}", materialCodes.size(), constructionRefMap.size());
 
@@ -797,10 +754,7 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
         }
         if (!factoryCodes.isEmpty() && !materialCodes.isEmpty()) {
             LambdaQueryWrapper<LhDayFinishQty> wrapper = new LambdaQueryWrapper<>();
-            wrapper.in(LhDayFinishQty::getFactoryCode, factoryCodes)
-                    .in(LhDayFinishQty::getMaterialCode, materialCodes)
-                    .ge(LhDayFinishQty::getFinishDate, startDate)
-                    .le(LhDayFinishQty::getFinishDate, dayBeforeTDay);
+            wrapper.in(LhDayFinishQty::getFactoryCode, factoryCodes).in(LhDayFinishQty::getMaterialCode, materialCodes).ge(LhDayFinishQty::getFinishDate, startDate).le(LhDayFinishQty::getFinishDate, dayBeforeTDay);
             List<LhDayFinishQty> dayFinishList = lhDayFinishQtyMapper.selectList(wrapper);
             dayFinishSumMap = SkuMonthPlanCalculator.getDayFinishQty(startDate, dayFinishList);
         }
@@ -811,13 +765,10 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
         Map<String, BigDecimal> scheNightFinishMap = new HashMap<>(materialCodes.size());
         if (!factoryCodes.isEmpty() && !materialCodes.isEmpty()) {
             LambdaQueryWrapper<LhScheFinishQty> wrapper = new LambdaQueryWrapper<>();
-            wrapper.in(LhScheFinishQty::getFactoryCode, factoryCodes)
-                    .in(LhScheFinishQty::getMaterialCode, materialCodes)
-                    .eq(LhScheFinishQty::getScheduleDate, tDay);
+            wrapper.in(LhScheFinishQty::getFactoryCode, factoryCodes).in(LhScheFinishQty::getMaterialCode, materialCodes).eq(LhScheFinishQty::getScheduleDate, tDay);
             List<LhScheFinishQty> scheFinishList = lhScheFinishQtyMapper.selectList(wrapper);
             for (LhScheFinishQty qty : scheFinishList) {
-                if (StringUtils.isNotEmpty(qty.getFactoryCode()) && StringUtils.isNotEmpty(qty.getMaterialCode())
-                        && Objects.nonNull(qty.getClass1FinishQty())) {
+                if (StringUtils.isNotEmpty(qty.getFactoryCode()) && StringUtils.isNotEmpty(qty.getMaterialCode()) && Objects.nonNull(qty.getClass1FinishQty())) {
                     String key = qty.getFactoryMaterialStatusKey();
                     scheNightFinishMap.merge(key, qty.getClass1FinishQty(), BigDecimal::add);
                 }
@@ -845,7 +796,7 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
                 monthPlan = SkuMonthPlanCalculator.getSkuYearMonthFinal(allMonthPlanList, skuInfo, nextMonth);
             }
             Integer startDay = DateUtil.dayOfMonth(startDate);
-            Map<YearMonth, Integer> yearMonthPlanQtyMap = SkuMonthPlanCalculator.getPlanQty(allProductionDate, allMonthPlanList, skuInfo, startDay);
+            Map<YearMonth, Integer> yearMonthPlanQtyMap = SkuMonthPlanCalculator.getPlanQty(allProductionDate, allMonthPlanList, allLhDayAdjustList, skuInfo, startDay);
             //20260713+ 计划总量加上上个月的超欠产
             Map<YearMonth, Integer> monthOverdueQtyMap = SkuMonthPlanCalculator.getOverdueProduction(isNextMonthFinal, allProductionDate, allMonthPlanList, skuInfo);
             int lastMonthOverdueQty = BigDecimal.ZERO.intValue();
@@ -853,12 +804,15 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
                 lastMonthOverdueQty = monthOverdueQtyMap.values().stream().mapToInt(Integer::intValue).sum();
             }
             Integer planQty = SkuMonthPlanCalculator.sumQty(yearMonthPlanQtyMap);
+            //20260817+ 硫化日计划调整量
+            Map<YearMonth, Integer> lhDayAdjustQtyMap = MonthPlanSurplusCalculator.getYearMonthLhDayAdjustQty(skuInfo, skuYearMonthLhDayAdjustMap);
+
             // ---------- TOTAL_DAILY_PLAN_QTY：到断点月计划总量 ----------
             if (Objects.nonNull(planQty)) {
                 result.setTotalDailyPlanQty(planQty + lastMonthOverdueQty);
             }
             // ---------- MONTH_PLAN_SUM_TOTAL：非断点月计划总量 ----------
-            Map<YearMonth, Integer> yearMonthSumPlanQtyMap = SkuMonthPlanCalculator.statisticsSumPlanQtyBySku(skuInfo, startDate, allMonthPlanList);
+            Map<YearMonth, Integer> yearMonthSumPlanQtyMap = SkuMonthPlanCalculator.statisticsSumPlanQtyBySku(skuInfo, startDate, allMonthPlanList, allLhDayAdjustList);
             Integer sumPlanQty = SkuMonthPlanCalculator.sumQty(yearMonthSumPlanQtyMap);
             if (Objects.nonNull(sumPlanQty)) {
                 result.setMonthPlanSumTotal(sumPlanQty + lastMonthOverdueQty);
@@ -874,8 +828,7 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
                 result.setMonthPlanVersion(finalVersion.getMonthPlanVersion());
             }
             // 如果排产版本表没有，再尝试从月计划定稿取
-            if (StringUtils.isEmpty(result.getMonthPlanVersion()) && Objects.nonNull(monthPlan)
-                    && StringUtils.isNotEmpty(monthPlan.getMonthPlanVersion())) {
+            if (StringUtils.isEmpty(result.getMonthPlanVersion()) && Objects.nonNull(monthPlan) && StringUtils.isNotEmpty(monthPlan.getMonthPlanVersion())) {
                 result.setMonthPlanVersion(monthPlan.getMonthPlanVersion());
             }
 
@@ -893,8 +846,7 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
             // ---------- LH_TIME：硫化时间 ----------
             Integer lhTime = null;
             MdmSkuLhCapacity capacity = skuLhCapacityMap.get(matCode);
-            if (Objects.nonNull(capacity) && Objects.nonNull(capacity.getVulcanizationTime())
-                    && capacity.getVulcanizationTime() > 0) {
+            if (Objects.nonNull(capacity) && Objects.nonNull(capacity.getVulcanizationTime()) && capacity.getVulcanizationTime() > 0) {
                 lhTime = capacity.getVulcanizationTime();
             }
             // 兜底：根据单班硫化量和使用模数反推
@@ -903,13 +855,11 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
                 Integer mouldQty = result.getMouldQty();
                 // 如果result的singleMouldShiftQty为空，尝试从产能主数据取班产
                 if (singleMouldShiftQty == null || singleMouldShiftQty <= 0) {
-                    if (Objects.nonNull(capacity) && Objects.nonNull(capacity.getClassCapacity())
-                            && capacity.getClassCapacity() > 0) {
+                    if (Objects.nonNull(capacity) && Objects.nonNull(capacity.getClassCapacity()) && capacity.getClassCapacity() > 0) {
                         singleMouldShiftQty = capacity.getClassCapacity();
                     }
                 }
-                if (singleMouldShiftQty != null && singleMouldShiftQty > 0
-                        && mouldQty != null && mouldQty > 0) {
+                if (singleMouldShiftQty != null && singleMouldShiftQty > 0 && mouldQty != null && mouldQty > 0) {
                     // 单班硫化量 = floor(28800 / 硫化时间) * 使用模数
                     // 反推：硫化时间 ≈ 28800 * 使用模数 / 单班硫化量
                     lhTime = (int) (28800.0 * mouldQty / singleMouldShiftQty);
@@ -922,9 +872,7 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
             // ---------- SINGLE_MOULD_SHIFT_QTY：单班硫化量 ----------
             // 模板导入未提供单班硫化量时，从 SKU 硫化产能主数据班产回填，与自动排程口径保持一致，
             // 避免导入结果缺失该字段（自动排程由 SingleMouldShiftQtyUtil 优先取班产）。
-            if ((result.getSingleMouldShiftQty() == null || result.getSingleMouldShiftQty() <= 0)
-                    && Objects.nonNull(capacity) && Objects.nonNull(capacity.getClassCapacity())
-                    && capacity.getClassCapacity() > 0) {
+            if ((result.getSingleMouldShiftQty() == null || result.getSingleMouldShiftQty() <= 0) && Objects.nonNull(capacity) && Objects.nonNull(capacity.getClassCapacity()) && capacity.getClassCapacity() > 0) {
                 result.setSingleMouldShiftQty(capacity.getClassCapacity());
             }
 
@@ -956,7 +904,7 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
             // ---------- MOULD_SURPLUS_QTY：硫化余量 ----------
             //硫化余量计算：不在排产后期内：
             Map<YearMonth, FactoryMonthPlanProductionFinalResult> hasProductionPlanMap = SkuMonthPlanCalculator.getHasProductionPlan(allMonthPlanList, allProductionDate, fc, matCode, result.getLhType());
-            int surplus = SkuMonthPlanCalculator.getSurplusQty(productionYearMonth, allProductionDate, hasProductionPlanMap, monthOverdueQtyMap, yearMonthPlanQtyMap, finishedQty);
+            int surplus = SkuMonthPlanCalculator.getSurplusQty(productionYearMonth, allProductionDate, hasProductionPlanMap, monthOverdueQtyMap, yearMonthPlanQtyMap, lhDayAdjustQtyMap, finishedQty);
             result.setMouldSurplusQty(Math.max(surplus, BigDecimal.ZERO.intValue()));
             // ---------- SPEC_CODE：规格编码 ----------
             MdmMaterialInfo materialInfo = materialInfoMap.get(matCode);
@@ -987,9 +935,7 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
      * @param monthPlan          月计划对象（可能为null）
      * @param constructionRefMap 示方书关系Map，key为 materialCode + "::" + trialStatus
      */
-    private void fillConstructionRefFields(LhScheduleResult result,
-                                           FactoryMonthPlanProductionFinalResult monthPlan,
-                                           Map<String, MdmSkuConstructionRef> constructionRefMap) {
+    private void fillConstructionRefFields(LhScheduleResult result, FactoryMonthPlanProductionFinalResult monthPlan, Map<String, MdmSkuConstructionRef> constructionRefMap) {
         String matCode = result.getMaterialCode();
         if (StringUtils.isBlank(matCode)) {
             return;
@@ -998,8 +944,7 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
         MdmSkuConstructionRef ref = null;
         // 按物料编码+产品状态统一降级匹配示方书关系（S→T→X；T→X；X 不降级）
         if (Objects.nonNull(monthPlan) && StringUtils.isNotEmpty(monthPlan.getProductStatus())) {
-            ref = SkuConstructionRefResolverUtil.resolveCuringRecipeRef(
-                    matCode, monthPlan.getProductStatus(), constructionRefMap);
+            ref = SkuConstructionRefResolverUtil.resolveCuringRecipeRef(matCode, monthPlan.getProductStatus(), constructionRefMap);
         }
 
         // 硫化示方类型：优先取示方书关系的lhType
@@ -1063,10 +1008,7 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
     @Override
     public List<LhScheduleResult> selectByFactoryCodeAndScheduleDate(String factoryCode, Date scheduleDate) {
         LambdaQueryWrapper<LhScheduleResult> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(LhScheduleResult::getFactoryCode, factoryCode)
-                .eq(LhScheduleResult::getScheduleDate, DateUtil.beginOfDay(scheduleDate))
-                .isNotNull(LhScheduleResult::getBatchNo)
-                .ne(LhScheduleResult::getBatchNo, "");
+        wrapper.eq(LhScheduleResult::getFactoryCode, factoryCode).eq(LhScheduleResult::getScheduleDate, DateUtil.beginOfDay(scheduleDate)).isNotNull(LhScheduleResult::getBatchNo).ne(LhScheduleResult::getBatchNo, "");
         return mapper.selectList(wrapper);
     }
 
@@ -1090,10 +1032,7 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
 
         // 2. 查询本次导入的模具交替计划（批次号为空的记录）
         LambdaQueryWrapper<LhMouldChangePlan> planWrapper = new LambdaQueryWrapper<>();
-        planWrapper.eq(LhMouldChangePlan::getFactoryCode, factoryCode)
-                .eq(LhMouldChangePlan::getScheduleDate, DateUtil.beginOfDay(scheduleDate))
-                .and(w -> w.isNull(LhMouldChangePlan::getLhResultBatchNo)
-                        .or().eq(LhMouldChangePlan::getLhResultBatchNo, ""));
+        planWrapper.eq(LhMouldChangePlan::getFactoryCode, factoryCode).eq(LhMouldChangePlan::getScheduleDate, DateUtil.beginOfDay(scheduleDate)).and(w -> w.isNull(LhMouldChangePlan::getLhResultBatchNo).or().eq(LhMouldChangePlan::getLhResultBatchNo, ""));
         List<LhMouldChangePlan> mouldChangePlans = mouldChangePlanMapper.selectList(planWrapper);
         if (CollectionUtils.isEmpty(mouldChangePlans)) {
             return;
@@ -1145,10 +1084,7 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
         if (StringUtils.isBlank(factoryCode)) {
             return BigDecimal.ZERO.intValue();
         }
-        Wrapper<LhParams> paramsQuery = new LambdaQueryWrapper<LhParams>()
-                .eq(LhParams::getFactoryCode, factoryCode)
-                .eq(LhParams::getParamCode, LhScheduleParamConstant.EARLY_PRODUCTION_DAYS_THRESHOLD)
-                .eq(LhParams::getIsDelete, DeleteFlagEnum.NORMAL.getCode());
+        Wrapper<LhParams> paramsQuery = new LambdaQueryWrapper<LhParams>().eq(LhParams::getFactoryCode, factoryCode).eq(LhParams::getParamCode, LhScheduleParamConstant.EARLY_PRODUCTION_DAYS_THRESHOLD).eq(LhParams::getIsDelete, DeleteFlagEnum.NORMAL.getCode());
         LhParams param = lhParamsMapper.selectOne(paramsQuery);
         int defaultValue = LhScheduleConstant.DEFAULT_EARLY_PRODUCTION_DAYS_THRESHOLD;
         if (null == param) {
@@ -1183,13 +1119,7 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
      */
     private Map<YearMonth, Date> getStartDay(YearMonth nextMonth, Date scheduleDate) {
         LambdaQueryWrapper<MpFactoryProductionVersion> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(MpFactoryProductionVersion::getYear, nextMonth.getYear())
-                .eq(MpFactoryProductionVersion::getMonth, nextMonth.getMonthValue())
-                .eq(MpFactoryProductionVersion::getIsFinal, "1")
-                .eq(MpFactoryProductionVersion::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
-                .orderByDesc(MpFactoryProductionVersion::getUpdateTime)
-                .orderByDesc(MpFactoryProductionVersion::getId)
-                .last("LIMIT 1");
+        wrapper.eq(MpFactoryProductionVersion::getYear, nextMonth.getYear()).eq(MpFactoryProductionVersion::getMonth, nextMonth.getMonthValue()).eq(MpFactoryProductionVersion::getIsFinal, "1").eq(MpFactoryProductionVersion::getIsDelete, DeleteFlagEnum.NORMAL.getCode()).orderByDesc(MpFactoryProductionVersion::getUpdateTime).orderByDesc(MpFactoryProductionVersion::getId).last("LIMIT 1");
         MpFactoryProductionVersion finalVersion = mpFactoryProductionVersionMapper.selectOne(wrapper);
         if (null == finalVersion) {
             Collections.emptyMap();
@@ -1254,6 +1184,30 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
         return monthPlanList;
     }
 
+    /**
+     * 获取对应月计划排产数据
+     *
+     * @param allProductionDate 日排产周期
+     * @param factoryList       工厂
+     * @param materialCodeList  物料信息
+     * @return
+     */
+    private List<LhDayPlanAdjustVo> getLhDayPlanAdjustList(List<Date> allProductionDate, List<String> factoryList, List<String> materialCodeList) {
+        if (CollectionUtils.isEmpty(allProductionDate)) {
+            return Collections.emptyList();
+        }
+        YearMonth first = SkuMonthPlanCalculator.getFirstYearMonth(allProductionDate);
+        YearMonth last = SkuMonthPlanCalculator.getLastYearMonth(allProductionDate);
+        //同年月
+        if (first.equals(last)) {
+            return lhDayPlanAdjustRequireService.getMonthPlanLhDayAdjustList(first, factoryList, materialCodeList);
+        }
+        //跨月
+        List<LhDayPlanAdjustVo> lhDayPlanAdjustList = Lists.newArrayList();
+        lhDayPlanAdjustList.addAll(lhDayPlanAdjustRequireService.getMonthPlanLhDayAdjustList(first, factoryList, materialCodeList));
+        lhDayPlanAdjustList.addAll(lhDayPlanAdjustRequireService.getMonthPlanLhDayAdjustList(last, factoryList, materialCodeList));
+        return lhDayPlanAdjustList;
+    }
 
     /**
      * 获取某个年月的排产月计划信息
@@ -1276,12 +1230,7 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
                 continue;
             }
             LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> wrapper = new LambdaQueryWrapper<>();
-            wrapper.eq(FactoryMonthPlanProductionFinalResult::getFactoryCode, version.getFactoryCode())
-                    .eq(FactoryMonthPlanProductionFinalResult::getYear, version.getYear())
-                    .eq(FactoryMonthPlanProductionFinalResult::getMonth, version.getMonth())
-                    .eq(FactoryMonthPlanProductionFinalResult::getProductionVersion, version.getProductionVersion())
-                    .in(FactoryMonthPlanProductionFinalResult::getMaterialCode, materialCodeList)
-                    .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode());
+            wrapper.eq(FactoryMonthPlanProductionFinalResult::getFactoryCode, version.getFactoryCode()).eq(FactoryMonthPlanProductionFinalResult::getYear, version.getYear()).eq(FactoryMonthPlanProductionFinalResult::getMonth, version.getMonth()).eq(FactoryMonthPlanProductionFinalResult::getProductionVersion, version.getProductionVersion()).in(FactoryMonthPlanProductionFinalResult::getMaterialCode, materialCodeList).eq(FactoryMonthPlanProductionFinalResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode());
             List<FactoryMonthPlanProductionFinalResult> singleList = monthPlanMapper.selectList(wrapper);
             if (CollectionUtils.isNotEmpty(singleList)) {
                 monthPlanList.addAll(singleList);
