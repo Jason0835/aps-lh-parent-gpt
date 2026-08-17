@@ -98,7 +98,7 @@ public class DefaultEndingJudgmentStrategy implements IEndingJudgmentStrategy {
             return false;
         }
         int totalAvailableCapacity = getTargetScheduleQtyResolver()
-                .calcSkuTotalAvailableCapacityInWindow(context, sku);
+                .calcSkuEndingAvailableCapacityInWindow(context, sku);
         boolean currentWindowTailFlag = totalAvailableCapacity >= tailTargetQty;
         boolean sharedEmbryo = getTargetScheduleQtyResolver().isSharedEmbryoInWindow(context, sku);
         log.info("SKU当前窗口收尾判断, materialCode: {}, window: 3天/8班, sharedEmbryo: {}, "
@@ -115,7 +115,7 @@ public class DefaultEndingJudgmentStrategy implements IEndingJudgmentStrategy {
         if (Objects.isNull(sku)) {
             return false;
         }
-        int tailTargetQty = resolveTailTargetQty(context, sku);
+        int tailTargetQty = resolveFinalReviewTailTargetQty(context, sku);
         boolean finalTailFlag = tailTargetQty > 0 && Math.max(0, actualScheduledQty) >= tailTargetQty;
         log.info("SKU排后最终收尾判断, materialCode: {}, actualScheduledQty: {}, tailTargetQty: {}, finalTailFlag: {}",
                 sku.getMaterialCode(), Math.max(0, actualScheduledQty), tailTargetQty, finalTailFlag);
@@ -265,8 +265,20 @@ public class DefaultEndingJudgmentStrategy implements IEndingJudgmentStrategy {
      * @return 收尾比较量
      */
     private int resolveTailTargetQty(LhScheduleContext context, SkuScheduleDTO sku) {
-        // 收尾预判和排后最终判定必须共用同一目标量，避免胎胚库存硬目标在最后一步再次被模台数放大。
+        // 排前收尾预判使用运行态活跃生产单元判断共用/单胎胚。
         return getTargetScheduleQtyResolver().resolveFinalEndingTargetQty(context, sku);
+    }
+
+    /**
+     * 解析排后最终复核使用的收尾目标量。
+     * <p>排后复核必须按胎胚静态关系判断共用/单胎胚，避免运行态活跃集合在排产中被消耗后误判。</p>
+     *
+     * @param context 排程上下文
+     * @param sku SKU排程DTO
+     * @return 排后最终收尾比较目标量
+     */
+    private int resolveFinalReviewTailTargetQty(LhScheduleContext context, SkuScheduleDTO sku) {
+        return getTargetScheduleQtyResolver().resolveFinalEndingTargetQtyByStaticRelation(context, sku);
     }
 
     /**
