@@ -2563,5 +2563,21 @@
   "ui.schedule.autoPlan.viewUnplanned": "Xem tác vụ chưa lập lịch",
   "ui.schedule.autoPlan.refreshBoard": "Làm mới bảng",
   "ui.data.column.cd90StorageLaneLimit.machineCode": "Máy liên kết",
-  "ui.data.column.cd15StorageLaneLimit.machineCode": "Máy liên kết"
+  "ui.data.column.cd15StorageLaneLimit.machineCode": "Máy liên kết",
+  "ui.data.column.lhDayPlanAdjustRequire.modelName": "Yêu cầu điều chỉnh kế hoạch lưu hóa ngày",
+  "ui.data.column.lhDayPlanAdjustRequire.factoryCode": "Nhà máy",
+  "ui.data.column.lhDayPlanAdjustRequire.yearMonth": "Năm tháng",
+  "ui.data.column.lhDayPlanAdjustRequire.materialCode": "Mã vật liệu NC",
+  "ui.data.column.lhDayPlanAdjustRequire.materialDesc": "Mô tả vật liệu",
+  "ui.data.column.lhDayPlanAdjustRequire.monthPlanQty": "Kế hoạch tháng",
+  "ui.data.column.lhDayPlanAdjustRequire.adjustGroup": "Điều chỉnh kế hoạch ngày",
+  "ui.data.column.lhDayPlanAdjustRequire.adjust": "Điều chỉnh {0}",
+  "ui.data.column.lhDayPlanAdjustRequire.adjustedTotalQty": "Tổng kế hoạch ngày sau điều chỉnh",
+  "ui.data.column.lhDayPlanAdjustRequire.treadGlueTd": "Cao su mặt lốp TD",
+  "ui.data.column.lhDayPlanAdjustRequire.reasonGroup": "Lý do điều chỉnh",
+  "ui.data.column.lhDayPlanAdjustRequire.reason": "Lý do {0}",
+  "ui.data.column.lhDayPlanAdjustRequire.productStatus": "Trạng thái sản phẩm",
+  "ui.data.alert.lhDayPlanAdjustRequire.adjustQtyRequired": "Nhập số lượng điều chỉnh {0} trước khi nhập lý do",
+  "ui.data.alert.lhDayPlanAdjustRequire.adjustReasonRequired": "Nhập lý do cho điều chỉnh {0}",
+  "ui.data.alert.lhDayPlanAdjustRequire.unsavedChanges": "Trang hiện tại có điều chỉnh chưa lưu. Bạn có muốn bỏ thay đổi không?"
 }
