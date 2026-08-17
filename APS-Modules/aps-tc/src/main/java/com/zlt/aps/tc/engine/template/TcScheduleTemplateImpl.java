@@ -683,7 +683,7 @@ public class TcScheduleTemplateImpl extends AbsTcScheduleTemplate {
      */
     private String buildToolUsageSummary(TcTaskDraft task, TcScheduleContext context) {
         if (task.getTotalToolQty() == null) {
-            return "工装限制：总工装米数=未计算（未启用工装约束），可用工装米数=未计算，本任务净占用工装米数=未计算，剩余工装米数=未计算，有效卷曲长度=未计算；TC_TOOL_TOTAL_QTY未配置或非正数，可用工装数量、工装允许最大计划量、净占用工装数量和剩余工装数量均未计算";
+            return "工装限制：可用工装米数=未计算（未启用工装约束），本任务净占用工装米数=未计算，剩余工装米数=未计算，有效卷曲长度=未计算；TC_TOOL_TOTAL_QTY未配置或非正数，可用工装数量、工装允许最大计划量、净占用工装数量和剩余工装数量均未计算";
         }
         boolean taskCurlLengthEffective = task.getCurlRollLength() != null
                 && task.getCurlRollLength().compareTo(BigDecimal.ZERO) > 0;
@@ -691,7 +691,7 @@ public class TcScheduleTemplateImpl extends AbsTcScheduleTemplate {
                 : task.getDefaultCurlRollLength();
         String curlLengthSource = taskCurlLengthEffective ? "任务卷曲长度" : "默认卷曲长度";
         if (effectiveCurlLength == null || effectiveCurlLength.compareTo(BigDecimal.ZERO) <= 0) {
-            return "工装限制：总工装米数=未计算，可用工装米数=未计算，本任务净占用工装米数=未计算，剩余工装米数=未计算，有效卷曲长度=未计算；任务卷曲长度和默认卷曲长度均未配置或非正数，无法计算可用工装数量对应产量、净占用工装数量和剩余工装数量";
+            return "工装限制：可用工装米数=未计算，本任务净占用工装米数=未计算，剩余工装米数=未计算，有效卷曲长度=未计算；任务卷曲长度和默认卷曲长度均未配置或非正数，无法计算可用工装数量对应产量、净占用工装数量和剩余工装数量";
         }
         ScheduleToolLedgerSnapshot snapshot = context == null ? null
                 : context.getToolLedgerSnapshotMap().get(task.getBusinessKey());
@@ -707,8 +707,7 @@ public class TcScheduleTemplateImpl extends AbsTcScheduleTemplate {
             availableSource = "上一任务结算后剩余工装";
         }
         BigDecimal maxPlanQty = availableToolQty == null ? null : availableToolQty.multiply(effectiveCurlLength);
-        return "工装限制：总工装米数=" + this.displayToolMeter(task.getTotalToolQty(), effectiveCurlLength)
-                + "，可用工装米数=" + this.displayToolMeter(availableToolQty, effectiveCurlLength)
+        return "工装限制：可用工装米数=" + this.displayToolMeter(availableToolQty, effectiveCurlLength)
                 + "，本任务净占用工装米数=" + this.displayToolMeter(toolUsedQty, effectiveCurlLength)
                 + "，剩余工装米数=" + this.displayToolMeter(remainingToolQty, effectiveCurlLength)
                 + "，有效卷曲长度=" + this.displayToolQuantity(effectiveCurlLength)
@@ -863,7 +862,7 @@ public class TcScheduleTemplateImpl extends AbsTcScheduleTemplate {
      */
     private String displayGuardWindow(Map<Integer, BigDecimal> windowQtyMap) {
         if (windowQtyMap == null || windowQtyMap.isEmpty()) {
-            return "成型窗口内计划合计=0";
+            return "库存供应计算窗口内成型需求合计=0";
         }
         BigDecimal total = windowQtyMap.values().stream()
                 .filter(Objects::nonNull)
@@ -872,7 +871,7 @@ public class TcScheduleTemplateImpl extends AbsTcScheduleTemplate {
                 .sorted(Map.Entry.comparingByKey())
                 .map(entry -> "班" + entry.getKey() + "=" + this.nvl(entry.getValue()).stripTrailingZeros().toPlainString())
                 .collect(Collectors.joining(" "));
-        return "成型窗口内计划合计=" + total.stripTrailingZeros().toPlainString() + "：" + detail;
+        return "库存供应计算窗口内成型需求合计=" + total.stripTrailingZeros().toPlainString() + "：" + detail;
     }
 
     /**
