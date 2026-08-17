@@ -67,6 +67,8 @@ public class StructureProcessStateVo {
     public int runningTotalProjectedStock;
     public Map<String, Integer> embryoTotalMoldMap;
     public Map<Long, Integer> taskVulcConsumptionMap;
+    /** 已执行共用胎胚预释放的胎胚编码（同胎胚只释放一次，归属首个处理的有余量物料） */
+    public Set<String> preReleasedEmbryoCodes;
 
     // ---- advance production ----
     public Map<String, Long> machineOccupiedTimeMap;
