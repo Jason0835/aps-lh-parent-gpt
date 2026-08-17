@@ -87,6 +87,50 @@ public class MachinePriorityTraceSnapshot {
     private final Map<String, MachinePriorityMetricSnapshot> priorityMetricSnapshotMap;
 
     /**
+     * 代表机台在本次选机时点对应的换模或换活字块完成时间。
+     *
+     * <p>该时间由新增排产日驱动主链按机台收尾时间计算，只避让停机与20:00-06:00禁换模约束，
+     * 不参与每日换模均衡配额，仅用于日志展示“可开产时间（换模/换活字块完成时间）”，
+     * 不参与正式排序或产能计算。</p>
+     */
+    private final Map<String, Date> traceChangeoverEndTimeMap;
+
+    /**
+     * 代表机台在本次选机时点对应的真实可开产时间。
+     *
+     * <p>该时间与逐班筛选的 {@code targetShift} 同源，由新增排产日驱动主链计算，
+     * 并复用同一份 {@code NewSpecMachineAvailabilityPlan}，仅用于日志展示“真实可开产时间”，
+     * 不参与正式排序或产能计算。</p>
+     */
+    private final Map<String, Date> realAvailableProductionTimeMap;
+
+    /**
+     * 本次选机实际发生时的业务日期。
+     *
+     * <p>选机日志采用延迟写入，写入时排程上下文已经推进到后续业务日，直接读取
+     * {@code currentScheduleDate} 会把计划日期错写成窗口最后一天。因此该日期必须在
+     * 候选快照构建时随占用、收尾时间和可开产时间一起冻结，只服务日志展示。</p>
+     */
+    private final Date traceScheduleDate;
+
+    /**
+     * 本次选机实际发生时该 SKU 在当天待排列表中的排序名次。
+     *
+     * <p>窗口收口日志延迟写入时，SKU 的 {@code sortRank} 可能已被后续业务日重新排序覆盖，
+     * 直接读取会把“本轮排序”错写成最后一天的名次。因此名次必须与选机业务日期一起随快照冻结，
+     * 保证日志展示的候选列表、计划日期和本轮排序来自同一次真实选机时点。</p>
+     */
+    private final int traceSortRank;
+
+    /**
+     * 本次选机日志展示的 SKU 类型，取值：完全新增 / 续作新增 / 结构提前新增。
+     *
+     * <p>该值与“新增排产明细”共用同一套来源与提前生产判定，只服务日志展示；
+     * 由新增排产主链在候选快照构建时冻结，延迟写入时不再重新读取运行态来源。</p>
+     */
+    private final String traceSkuType;
+
+    /**
      * 创建只包含正式候选的兼容快照。
      *
      * <p>非默认机台匹配策略和测试替身可以直接使用该入口，原有日志行为不受诊断扩展影响。</p>
@@ -169,7 +213,9 @@ public class MachinePriorityTraceSnapshot {
                 displayMachineCodeMap, memberMachineCodeMap, occupationTextMap,
                 Collections.<String, Date>emptyMap(),
                 Collections.<String, MachinePriorityMetricSnapshot>emptyMap(),
-                null, null, null);
+                Collections.<String, Date>emptyMap(),
+                Collections.<String, Date>emptyMap(),
+                null, null, null, null, 0, null);
     }
 
     /**
@@ -195,7 +241,9 @@ public class MachinePriorityTraceSnapshot {
                 displayMachineCodeMap, memberMachineCodeMap, occupationTextMap,
                 priorityTraceEndingTimeMap,
                 Collections.<String, MachinePriorityMetricSnapshot>emptyMap(),
-                null, null, null);
+                Collections.<String, Date>emptyMap(),
+                Collections.<String, Date>emptyMap(),
+                null, null, null, null, 0, null);
     }
 
     /**
@@ -222,7 +270,41 @@ public class MachinePriorityTraceSnapshot {
         this(orderedCandidates, actualSelectableMachineCodes, actualSelectedMachineCode,
                 displayMachineCodeMap, memberMachineCodeMap, occupationTextMap,
                 priorityTraceEndingTimeMap, priorityMetricSnapshotMap,
-                null, null, null);
+                Collections.<String, Date>emptyMap(),
+                Collections.<String, Date>emptyMap(),
+                null, null, null, null, 0, null);
+    }
+
+    /**
+     * 创建同时冻结占用、收尾时间、软排序指标、换模/换活字块完成时间和真实可开产时间的完整快照。
+     *
+     * @param orderedCandidates 日志观察候选原顺序
+     * @param actualSelectableMachineCodes 实际可选机台编码
+     * @param actualSelectedMachineCode 首选候选机台编码
+     * @param displayMachineCodeMap 展示编码映射
+     * @param memberMachineCodeMap 物理成员编码映射
+     * @param occupationTextMap 选机时点占用明细
+     * @param priorityTraceEndingTimeMap 选机时点日志收尾时间
+     * @param priorityMetricSnapshotMap 正式模具分配前冻结的软排序指标
+     * @param traceChangeoverEndTimeMap 选机时点换模或换活字块完成时间
+     * @param realAvailableProductionTimeMap 选机时点真实可开产时间
+     */
+    public MachinePriorityTraceSnapshot(
+            List<MachineScheduleDTO> orderedCandidates,
+            Set<String> actualSelectableMachineCodes,
+            String actualSelectedMachineCode,
+            Map<String, String> displayMachineCodeMap,
+            Map<String, List<String>> memberMachineCodeMap,
+            Map<String, String> occupationTextMap,
+            Map<String, Date> priorityTraceEndingTimeMap,
+            Map<String, MachinePriorityMetricSnapshot> priorityMetricSnapshotMap,
+            Map<String, Date> traceChangeoverEndTimeMap,
+            Map<String, Date> realAvailableProductionTimeMap) {
+        this(orderedCandidates, actualSelectableMachineCodes, actualSelectedMachineCode,
+                displayMachineCodeMap, memberMachineCodeMap, occupationTextMap,
+                priorityTraceEndingTimeMap, priorityMetricSnapshotMap,
+                traceChangeoverEndTimeMap, realAvailableProductionTimeMap,
+                null, null, null, null, 0, null);
     }
 
     /**
@@ -248,9 +330,14 @@ public class MachinePriorityTraceSnapshot {
             Map<String, String> occupationTextMap,
             Map<String, Date> priorityTraceEndingTimeMap,
             Map<String, MachinePriorityMetricSnapshot> priorityMetricSnapshotMap,
+            Map<String, Date> traceChangeoverEndTimeMap,
+            Map<String, Date> realAvailableProductionTimeMap,
             String actualHitMachineCode,
             Boolean selectionSucceeded,
-            String noHitReason) {
+            String noHitReason,
+            Date traceScheduleDate,
+            int traceSortRank,
+            String traceSkuType) {
         /*
          * 新增排产在候选命中后会原地推进 MachineScheduleDTO 的前物料、前规格、英寸和收尾时间。
          * 选机日志属于延迟写入，如果这里只复制 List 容器，列表中的可变 DTO 仍会被本轮结果污染，
@@ -280,12 +367,19 @@ public class MachinePriorityTraceSnapshot {
                                 ? Collections.<String, String>emptyMap()
                                 : occupationTextMap));
         this.priorityTraceEndingTimeMap = Collections.unmodifiableMap(
-                copyPriorityTraceEndingTimeMap(priorityTraceEndingTimeMap));
+                copyDateMap(priorityTraceEndingTimeMap));
         this.priorityMetricSnapshotMap = Collections.unmodifiableMap(
                 new LinkedHashMap<String, MachinePriorityMetricSnapshot>(
                         CollectionUtils.isEmpty(priorityMetricSnapshotMap)
                                 ? Collections.<String, MachinePriorityMetricSnapshot>emptyMap()
                                 : priorityMetricSnapshotMap));
+        this.traceChangeoverEndTimeMap = Collections.unmodifiableMap(
+                copyDateMap(traceChangeoverEndTimeMap));
+        this.realAvailableProductionTimeMap = Collections.unmodifiableMap(
+                copyDateMap(realAvailableProductionTimeMap));
+        this.traceScheduleDate = copyDate(traceScheduleDate);
+        this.traceSortRank = traceSortRank;
+        this.traceSkuType = traceSkuType;
     }
 
     /**
@@ -408,12 +502,12 @@ public class MachinePriorityTraceSnapshot {
     }
 
     /**
-     * 深复制日志收尾时间映射，防止调用方修改可变 {@link Date} 对象污染已冻结快照。
+     * 深复制日期映射，防止调用方修改可变 {@link Date} 对象污染已冻结快照。
      *
-     * @param sourceMap 原始日志收尾时间映射
+     * @param sourceMap 原始日期映射
      * @return 与调用方不共享 Date 实例的映射
      */
-    private static Map<String, Date> copyPriorityTraceEndingTimeMap(
+    private static Map<String, Date> copyDateMap(
             Map<String, Date> sourceMap) {
         if (CollectionUtils.isEmpty(sourceMap)) {
             return Collections.emptyMap();
@@ -551,6 +645,33 @@ public class MachinePriorityTraceSnapshot {
     }
 
     /**
+     * 获取本次选机实际发生时的业务日期。
+     *
+     * @return 防御性复制后的选机业务日期；旧快照或未冻结时返回 null
+     */
+    public Date getTraceScheduleDate() {
+        return copyDate(traceScheduleDate);
+    }
+
+    /**
+     * 获取本次选机实际发生时该 SKU 在当天待排列表中的排序名次。
+     *
+     * @return 冻结的排序名次；旧快照或未冻结时返回 0
+     */
+    public int getTraceSortRank() {
+        return traceSortRank;
+    }
+
+    /**
+     * 获取本次选机日志展示的 SKU 类型。
+     *
+     * @return 冻结的 SKU 类型；旧快照或未冻结时返回 null
+     */
+    public String getTraceSkuType() {
+        return traceSkuType;
+    }
+
+    /**
      * 基于当前选机时点快照生成实际命中快照。
      *
      * <p>调用方只能在排程结果、机台占用和跨日在机绑定全部提交成功后调用，
@@ -564,7 +685,9 @@ public class MachinePriorityTraceSnapshot {
                 orderedCandidates, actualSelectableMachineCodes, actualSelectedMachineCode,
                 displayMachineCodeMap, memberMachineCodeMap, occupationTextMap,
                 priorityTraceEndingTimeMap, priorityMetricSnapshotMap,
-                actualHitMachineCode, Boolean.TRUE, null);
+                traceChangeoverEndTimeMap, realAvailableProductionTimeMap,
+                actualHitMachineCode, Boolean.TRUE, null,
+                traceScheduleDate, traceSortRank, traceSkuType);
     }
 
     /**
@@ -578,7 +701,67 @@ public class MachinePriorityTraceSnapshot {
                 orderedCandidates, actualSelectableMachineCodes, actualSelectedMachineCode,
                 displayMachineCodeMap, memberMachineCodeMap, occupationTextMap,
                 priorityTraceEndingTimeMap, priorityMetricSnapshotMap,
-                null, Boolean.FALSE, noHitReason);
+                traceChangeoverEndTimeMap, realAvailableProductionTimeMap,
+                null, Boolean.FALSE, noHitReason,
+                traceScheduleDate, traceSortRank, traceSkuType);
+    }
+
+    /**
+     * 冻结本次选机实际发生的业务日期。
+     *
+     * <p>该日期由新增排产日驱动主链在候选快照构建时写入，只服务延迟日志展示；
+     * 后续实际命中、最终未命中复用同一冻结日期，避免读取已经推进到后续业务日的运行态日期。</p>
+     *
+     * @param traceScheduleDate 本次选机业务日期
+     * @return 携带冻结选机日期的新快照
+     */
+    public MachinePriorityTraceSnapshot withTraceScheduleDate(Date traceScheduleDate) {
+        return new MachinePriorityTraceSnapshot(
+                orderedCandidates, actualSelectableMachineCodes, actualSelectedMachineCode,
+                displayMachineCodeMap, memberMachineCodeMap, occupationTextMap,
+                priorityTraceEndingTimeMap, priorityMetricSnapshotMap,
+                traceChangeoverEndTimeMap, realAvailableProductionTimeMap,
+                actualHitMachineCode, selectionSucceeded, noHitReason,
+                traceScheduleDate, traceSortRank, traceSkuType);
+    }
+
+    /**
+     * 冻结本次选机实际发生的业务日期与当天排序名次。
+     *
+     * <p>日期与名次由新增排产日驱动主链在候选快照构建时一并写入，只服务延迟日志展示；
+     * 后续实际命中、最终未命中复用同一冻结值，保证窗口收口日志完整还原真实选机时点。</p>
+     *
+     * @param traceScheduleDate 本次选机业务日期
+     * @param traceSortRank 本次选机时点在当天待排列表中的排序名次
+     * @return 携带冻结选机日期与名次的新快照
+     */
+    public MachinePriorityTraceSnapshot withTraceSnapshotContext(Date traceScheduleDate, int traceSortRank) {
+        return new MachinePriorityTraceSnapshot(
+                orderedCandidates, actualSelectableMachineCodes, actualSelectedMachineCode,
+                displayMachineCodeMap, memberMachineCodeMap, occupationTextMap,
+                priorityTraceEndingTimeMap, priorityMetricSnapshotMap,
+                traceChangeoverEndTimeMap, realAvailableProductionTimeMap,
+                actualHitMachineCode, selectionSucceeded, noHitReason,
+                traceScheduleDate, traceSortRank, traceSkuType);
+    }
+
+    /**
+     * 冻结本次选机日志展示的 SKU 类型。
+     *
+     * <p>类型由新增排产主链按来源与提前生产判定写入，只服务延迟日志展示；
+     * 后续实际命中、最终未命中复用同一冻结值，避免延迟写入时重新读取运行态来源。</p>
+     *
+     * @param traceSkuType SKU 类型展示值（完全新增 / 续作新增 / 结构提前新增）
+     * @return 携带冻结 SKU 类型的新快照
+     */
+    public MachinePriorityTraceSnapshot withTraceSkuType(String traceSkuType) {
+        return new MachinePriorityTraceSnapshot(
+                orderedCandidates, actualSelectableMachineCodes, actualSelectedMachineCode,
+                displayMachineCodeMap, memberMachineCodeMap, occupationTextMap,
+                priorityTraceEndingTimeMap, priorityMetricSnapshotMap,
+                traceChangeoverEndTimeMap, realAvailableProductionTimeMap,
+                actualHitMachineCode, selectionSucceeded, noHitReason,
+                traceScheduleDate, traceSortRank, traceSkuType);
     }
 
     /**
@@ -643,5 +826,30 @@ public class MachinePriorityTraceSnapshot {
         Date endingTime = priorityTraceEndingTimeMap.get(representativeMachineCode);
         return Objects.isNull(endingTime)
                 ? null : new Date(endingTime.getTime());
+    }
+
+    /**
+     * 获取选机时点冻结的换模或换活字块完成时间。
+     *
+     * @param representativeMachineCode 代表机台编码
+     * @return 防御性复制后的换模或换活字块完成时间；选机时点无有效时间时返回 null
+     */
+    public Date resolveTraceChangeoverEndTime(String representativeMachineCode) {
+        Date traceChangeoverEndTime = traceChangeoverEndTimeMap.get(representativeMachineCode);
+        return Objects.isNull(traceChangeoverEndTime)
+                ? null : new Date(traceChangeoverEndTime.getTime());
+    }
+
+    /**
+     * 获取选机时点冻结的真实可开产时间。
+     *
+     * @param representativeMachineCode 代表机台编码
+     * @return 防御性复制后的真实可开产时间；选机时点无有效时间时返回 null
+     */
+    public Date resolveRealAvailableProductionTime(String representativeMachineCode) {
+        Date realAvailableProductionTime =
+                realAvailableProductionTimeMap.get(representativeMachineCode);
+        return Objects.isNull(realAvailableProductionTime)
+                ? null : new Date(realAvailableProductionTime.getTime());
     }
 }
