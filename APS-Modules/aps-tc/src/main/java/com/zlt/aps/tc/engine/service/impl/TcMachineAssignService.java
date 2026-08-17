@@ -1000,7 +1000,7 @@ public class TcMachineAssignService implements ITcMachineAssignService {
                 BigDecimal sourcePlanQty = nvl(sourceTask.getPlanQty());
                 BigDecimal capacityAllowedQty = sourcePlanQty.min(nvl(runtimeCandidate.getRemainCapacity()));
                 BigDecimal assignedQty = this.limitPlanQtyByCurrentTool(
-                        sourceTask, context, capacityAllowedQty, "提前补产");
+                        sourceTask, context, capacityAllowedQty, "提前补产", targetShiftOrder);
                 if (assignedQty.compareTo(BigDecimal.ZERO) <= 0) {
                     continue;
                 }
@@ -1309,7 +1309,7 @@ public class TcMachineAssignService implements ITcMachineAssignService {
                 BigDecimal capacityAllowedQty = candidateAssignableQty.min(remainCapacity);
                 BigDecimal assignedQty = this.limitPlanQtyByCurrentTool(
                         sourceTask, context, capacityAllowedQty,
-                        mergeTarget == null ? "顺延新建" : "顺延合并");
+                        mergeTarget == null ? "顺延新建" : "顺延合并", shiftOrder);
                 BigDecimal overflowQty = remainingQty.subtract(assignedQty);
                 if (assignedQty.compareTo(capacityAllowedQty) < 0) {
                     toolOverflowQty = remainingQty.max(nvl(toolOverflowQty));
@@ -1888,17 +1888,36 @@ public class TcMachineAssignService implements ITcMachineAssignService {
      */
     private BigDecimal limitPlanQtyByCurrentTool(TcTaskDraft task, TcScheduleContext context,
                                                  BigDecimal requestedQty, String taskSource) {
+        return this.limitPlanQtyByCurrentTool(task, context, requestedQty, taskSource,
+                task == null ? null : task.getShiftOrder());
+    }
+
+    /**
+     * 使用生产前工装余额限制当前入口的实际承接量，并按实际目标班次记录过程日志。
+     *
+     * @param task 当前任务
+     * @param context 排程上下文
+     * @param requestedQty 本入口请求承接量
+     * @param taskSource 任务来源
+     * @param processLogShiftOrder 过程日志归属班次
+     * @return 工装允许的实际承接量；未启用工装约束或卷曲长度无效时返回请求量
+     */
+    private BigDecimal limitPlanQtyByCurrentTool(TcTaskDraft task, TcScheduleContext context,
+                                                 BigDecimal requestedQty, String taskSource,
+                                                 Integer processLogShiftOrder) {
         BigDecimal normalizedRequestedQty = nvl(requestedQty).max(BigDecimal.ZERO);
         BigDecimal currentAvailableToolQty = this.resolveCurrentAvailableToolQty(context, task);
+        Integer logShiftOrder = processLogShiftOrder == null
+                ? (task == null ? null : task.getShiftOrder()) : processLogShiftOrder;
         if (currentAvailableToolQty == null) {
-            context.appendDeferredShiftProcessLog(task.getShiftOrder(),
+            context.appendDeferredShiftProcessLog(logShiftOrder,
                     "工装生产前校验：来源={0}，胎侧代码={1}，请求量={2}米；总工装未配置或非正数，未启用工装约束，实际承接量={2}米。",
                     taskSource, task.getSidewallCode(), normalizedRequestedQty);
             return normalizedRequestedQty;
         }
         BigDecimal curlLength = this.resolveCurlLength(task);
         if (curlLength.compareTo(BigDecimal.ZERO) <= 0) {
-            context.appendDeferredShiftProcessLog(task.getShiftOrder(),
+            context.appendDeferredShiftProcessLog(logShiftOrder,
                     "工装生产前校验：来源={0}，胎侧代码={1}，请求量={2}米；规格卷曲长度及默认卷曲长度均无效，无法计算工装允许量，沿用请求量。",
                     taskSource, task.getSidewallCode(), normalizedRequestedQty);
             return normalizedRequestedQty;
@@ -1906,7 +1925,7 @@ public class TcMachineAssignService implements ITcMachineAssignService {
         ScheduleToolLedgerResult limitResult = this.constraintCalculator
                 .settleProductionBeforeReleaseToolLedger(normalizedRequestedQty, BigDecimal.ZERO,
                         currentAvailableToolQty, task.getTotalToolQty(), curlLength);
-        context.appendDeferredShiftProcessLog(task.getShiftOrder(),
+        context.appendDeferredShiftProcessLog(logShiftOrder,
                 "工装生产前校验：来源={0}，胎侧代码={1}，校验前可用工装={2}套，请求量={3}米，有效卷曲长度={4}米/套；允许量=min({3}米,max({2}套,0)×{4}米/套)={5}米；工装溢出量=max({3}米-{5}米,0)={6}米；实际承接量={5}米。",
                 taskSource, task.getSidewallCode(), currentAvailableToolQty, normalizedRequestedQty, curlLength,
                 limitResult.getAllowedPlanQty(), limitResult.getOverflowPlanQty());
@@ -2845,8 +2864,8 @@ public class TcMachineAssignService implements ITcMachineAssignService {
             BigDecimal remainCapacity = resolveRemainCapacity(task, context, candidate, machineSpeed);
             candidate.setMachineSpeed(machineSpeed);
             candidate.setRemainCapacity(remainCapacity);
-            candidate.setMouthPlateMatched(isMouthPlateMatched(task, candidate));
-            candidate.setGlueMachineMatched(isGlueMachineMatched(task, candidate));
+            candidate.setMouthPlateMatched(this.isMouthPlateMatched(task, context, candidate));
+            candidate.setGlueMachineMatched(this.isGlueMachineMatched(task, context, candidate));
             boolean fixedAllowMatched = contains(candidate.getFixedAllowSidewallCodes(), task.getSidewallCode());
             candidate.setFixedMachineSelected(!hasFixedAllowRule || fixedAllowMatched);
             candidate.setFixedMachineMatched(fixedAllowMatched);
@@ -2875,15 +2894,18 @@ public class TcMachineAssignService implements ITcMachineAssignService {
     /**
      * 判断候选机台是否匹配任务口型板。
      *
-     * @param task      待排任务草稿
-     * @param candidate 候选机台
+     * @param task       待排任务草稿
+     * @param context    胎侧排程上下文
+     * @param candidate  候选机台
      * @return true 表示匹配
      */
-    private boolean isMouthPlateMatched(TcTaskDraft task, TcMachineCandidate candidate) {
+    private boolean isMouthPlateMatched(TcTaskDraft task, TcScheduleContext context,
+                                        TcMachineCandidate candidate) {
         if (StrUtil.isBlank(task.getMouthPlateCode())) {
             return true;
         }
-        if (CollUtil.isEmpty(candidate.getConfiguredMouthPlateCodes())) {
+        // 当前口型板在工厂范围未配置关系时不限制任何机台；已配置时按关系机台白名单过滤。
+        if (!contains(context.getConfiguredMouthPlateCodeSet(), task.getMouthPlateCode())) {
             return true;
         }
         return contains(candidate.getMouthPlateCodes(), task.getMouthPlateCode());
@@ -2892,23 +2914,23 @@ public class TcMachineAssignService implements ITcMachineAssignService {
     /**
      * 判断当前任务胶料是否符合候选机台胶料关系。
      *
-     * <p>禁用关系始终优先排除；当前机台没有配置任务主胶料时不限制，存在配置时按本机关系判断。</p>
+     * <p>任务主胶料在工厂范围没有启用关系时不限制；存在关系时只允许进入已配置机台。
+     * {@code allowFlag} 暂不参与匹配。</p>
      *
-     * @param task             待排任务草稿
-     * @param candidate        候选机台
+     * @param task       待排任务草稿
+     * @param context    胎侧排程上下文
+     * @param candidate  候选机台
      * @return true 表示匹配
      */
-    private boolean isGlueMachineMatched(TcTaskDraft task, TcMachineCandidate candidate) {
+    private boolean isGlueMachineMatched(TcTaskDraft task, TcScheduleContext context,
+                                         TcMachineCandidate candidate) {
         if (StrUtil.isBlank(task.getGlueCode())) {
             return true;
         }
-        if (contains(candidate.getForbiddenGlueCodes(), task.getGlueCode())) {
-            return false;
-        }
-        if (!contains(candidate.getConfiguredGlueCodes(), task.getGlueCode())) {
+        if (!contains(context.getConfiguredGlueCodeSet(), task.getGlueCode())) {
             return true;
         }
-        return contains(candidate.getAllowedGlueCodes(), task.getGlueCode());
+        return contains(candidate.getConfiguredGlueCodes(), task.getGlueCode());
     }
 
     /**
