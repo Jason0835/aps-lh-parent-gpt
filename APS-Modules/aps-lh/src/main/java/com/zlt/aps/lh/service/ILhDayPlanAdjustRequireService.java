@@ -1,8 +1,12 @@
 package com.zlt.aps.lh.service;
 
 import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.zlt.aps.common.engine.domain.LhDayPlanAdjustVo;
 import com.zlt.aps.lh.api.domain.entity.LhDayPlanAdjustRequire;
 import com.zlt.bill.common.service.IDocService;
+
+import java.time.YearMonth;
+import java.util.List;
 
 /**
  * 硫化日计划调整需求服务。
@@ -30,4 +34,14 @@ public interface ILhDayPlanAdjustRequireService extends IDocService<LhDayPlanAdj
      * @return 查询公式
      */
     String[] getQueryFormulas();
+
+    /**
+     * 获取指定年月，工厂、Sku的硫化日计划调整信息
+     *
+     * @param yearMonth        年-月
+     * @param factoryList      工厂信息
+     * @param materialCodeList Sku编码
+     * @return
+     */
+    List<LhDayPlanAdjustVo> getMonthPlanLhDayAdjustList(YearMonth yearMonth, List<String> factoryList, List<String> materialCodeList);
 }
