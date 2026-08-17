@@ -40,7 +40,9 @@ public class GroupPrioritySchedulerResultHelper implements Serializable {
         this.selectedCxMachine = selectedCxMachine;
         if (null != selectedCxMachine) {
             //拷贝
-            this.priorityValue = CxMachineGroupPriorityValueHelper.copy(selectedCxMachine.getPriorityValue());
+            if (null != selectedCxMachine.getPriorityValue()) {
+                this.priorityValue = CxMachineGroupPriorityValueHelper.copy(selectedCxMachine.getPriorityValue());
+            }
             this.selectedProductionDaySet = Sets.newHashSet();
             selectedProductionDaySet.addAll(selectedCxMachine.getSelectedProductionDaySet());
         }

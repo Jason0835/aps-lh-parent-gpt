@@ -53,6 +53,8 @@ public class MonthProductionDataServiceImpl extends AbstractDataService implemen
 
     private final FactoryEngineProductionVersionMapper factoryEngineProductionVersionMapper;
 
+    private final FactoryMonthAppointConfigurationMapper factoryMonthAppointConfigurationMapper;
+
     private final FactoryMonthPlanContinueProductInfoMapper factoryMonthPlanContinueProductInfoMapper;
 
     private final IFactoryMoldCapacityLogService factoryMoldCapacityLogService;
@@ -227,14 +229,31 @@ public class MonthProductionDataServiceImpl extends AbstractDataService implemen
     }
 
     @Override
-    public List<GroupAppointProductionInfoVo> getMonthAppointProductionInfo(String factoryCode, Integer year, Integer month) {
+    public List<GroupAppointProductionInfoVo> getMonthAppointProductionInfo(Context context) {
+        if (isEmptyFactoryAndYearMonth(context)) {
+            return Collections.emptyList();
+        }
+        QueryWrapper<MpFactoryAppointConfiguration> queryWrapper = new QueryWrapper();
+        queryWrapper.eq("FACTORY_CODE", context.getFactoryCode());
+        queryWrapper.eq("YEAR", context.getYear());
+        queryWrapper.eq("MONTH", context.getMonth());
+        queryWrapper.eq("PRODUCT_TYPE_CODE", context.getProductType().getValue());
+        queryWrapper.eq("IS_DELETE", YesOrNoEnum.NO.getCode());
+        List<MpFactoryAppointConfiguration> configurationList = factoryMonthAppointConfigurationMapper.selectList(queryWrapper);
+        if (CollectionUtils.isEmpty(configurationList)) {
+            return Collections.emptyList();
+        }
         List<GroupAppointProductionInfoVo> result = Lists.newArrayList();
-        GroupAppointProductionInfoVo add = new GroupAppointProductionInfoVo();
-        add.setGroupName("315/80R22.5-JY711零度");
-        add.setCxMachineCode("H1105");
-        add.setMonthStartDay(16);
-        add.setMaxAllocationDay(10);
-        result.add(add);
+        configurationList.forEach(singleConfiguration -> {
+            GroupAppointProductionInfoVo configuration = GroupAppointProductionInfoVo.buildByEntity(context, singleConfiguration);
+            if (null == configuration) {
+                return;
+            }
+            result.add(configuration);
+        });
+        if (CollectionUtils.isEmpty(result)) {
+            return Collections.emptyList();
+        }
         return result;
     }
 

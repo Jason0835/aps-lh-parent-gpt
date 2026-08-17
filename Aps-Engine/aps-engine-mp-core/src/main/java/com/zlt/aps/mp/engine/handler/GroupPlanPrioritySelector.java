@@ -59,38 +59,6 @@ public class GroupPlanPrioritySelector {
         }
         List<ProductionPlanGroupInfo> allGroupPlanRange = Lists.newArrayList(allGroupPlan.values());
         return getHighestPriorityGroupByGroupRange(context, allGroupPlanRange, excludeGroupPlan);
-//        List<ProductionPlanGroupInfo> needProductionGroupList = allGroupPlan.values().stream().filter(singleGroup -> {
-//            if (excludeGroupPlan.contains(singleGroup.getGroupName())) {
-//                return false;
-//            }
-//            return singleGroup.getRemainingNeedAllocationDays() > BigDecimal.ZERO.intValue();
-//        }).collect(Collectors.toList());
-//        if (CollectionUtils.isEmpty(needProductionGroupList)) {
-//            return null;
-//        }
-//        ProductionPlanGroupInfo selected;
-//        //结构优先列表 sandy+ 2026.3.26
-//        List<ProductionPlanGroupInfo> structurePriorityList = needProductionGroupList.stream().filter(x -> {
-//            return x.getGroupPlanData().stream().filter(y -> YesOrNoEnum.YES.getCode().equals(y.getStructurePriority())).count() > 0;
-//        }).collect(Collectors.toList());
-//        if (!CollectionUtils.isEmpty(structurePriorityList)) {
-//            needProductionGroupList = structurePriorityList;
-//        }
-//
-//        //高优先级需求SKU个数多的优先
-//        Integer maxHeightPriority = needProductionGroupList.stream().mapToInt(ProductionPlanGroupInfo::getHeightPriorityCount).max().getAsInt();
-//        List<ProductionPlanGroupInfo> heightList = needProductionGroupList.stream().filter(groupPlan -> maxHeightPriority.equals(groupPlan.getHeightPriorityCount())).collect(Collectors.toList());
-//        if (heightList.size() == BigDecimal.ONE.intValue()) {
-//            selected = heightList.get(BigDecimal.ZERO.intValue());
-//        } else {
-//            selected = getHighestOneGroup(productionContext, heightList);
-//        }
-//        //如果选上的是特殊原材料结构，则从所有特殊原材料结构中重新获取
-//        if (selected.isSpecialMaterial()) {
-//            TbrSpecialMaterialProductionLogRecorder.addProductionSpecialMaterialInfoLog(productionContext, "新结构挑选到");
-//            return getHeightPriorityGroupBySpecialMaterial(productionContext, excludeGroupPlan);
-//        }
-//        return selected;
     }
 
     /**

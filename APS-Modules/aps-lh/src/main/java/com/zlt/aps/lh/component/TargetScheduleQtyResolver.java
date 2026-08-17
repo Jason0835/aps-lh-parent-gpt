@@ -143,6 +143,7 @@ public class TargetScheduleQtyResolver {
         }
         Map<String, Integer> ledgerMap = context.getSkuProductionRemainingQtyMap();
         String skuKey = buildSkuKey(sku);
+        context.getSkuProductionTargetQtyMap().putIfAbsent(skuKey, initialQty);
         Integer oldQty = ledgerMap.get(skuKey);
         if (Objects.nonNull(oldQty)) {
             return Math.max(0, oldQty);
@@ -179,7 +180,9 @@ public class TargetScheduleQtyResolver {
 
     /**
      * 将 SKU 实际消费账本同步到指定目标量。
-     * <p>收尾目标量上调后必须覆盖实际消费账本，避免后续仍按初始化硫化余量扣减。</p>
+     * <p>目标量调整只改变账本总目标，必须保留同一“物料+产品状态”已经消费的数量。
+     * 续作、新增、换活字块会在不同阶段重复进入收尾目标量解析，禁止后进入阶段把
+     * 前一阶段已扣减的数量重新加回。</p>
      *
      * @param context 排程上下文
      * @param sku SKU
@@ -195,10 +198,61 @@ public class TargetScheduleQtyResolver {
         if (Objects.isNull(context) || Objects.isNull(sku) || StringUtils.isEmpty(sku.getMaterialCode())) {
             return resolvedTargetQty;
         }
-        Integer oldQty = context.getSkuProductionRemainingQtyMap().put(buildSkuKey(sku), resolvedTargetQty);
-        log.info("SKU实际消费账本同步, materialCode: {}, productStatus: {}, reason: {}, 原账本剩余: {}, 同步后剩余: {}",
-                sku.getMaterialCode(), sku.getProductStatus(), reason, oldQty, resolvedTargetQty);
-        return resolvedTargetQty;
+        String skuKey = buildSkuKey(sku);
+        Map<String, Integer> remainingQtyMap = context.getSkuProductionRemainingQtyMap();
+        Map<String, Integer> targetQtyMap = context.getSkuProductionTargetQtyMap();
+        Integer oldRemainingQtyValue = remainingQtyMap.get(skuKey);
+        int oldRemainingQty = Math.max(0, Objects.isNull(oldRemainingQtyValue)
+                ? resolveInitialProductionRemainingQty(sku, resolvedTargetQty) : oldRemainingQtyValue);
+        Integer oldTargetQtyValue = targetQtyMap.get(skuKey);
+        int oldTargetQty = Math.max(oldRemainingQty,
+                Objects.isNull(oldTargetQtyValue) ? oldRemainingQty : oldTargetQtyValue);
+        int consumedQty = Math.max(0, oldTargetQty - oldRemainingQty);
+        int synchronizedRemainingQty = Math.max(0, resolvedTargetQty - consumedQty);
+        targetQtyMap.put(skuKey, resolvedTargetQty);
+        remainingQtyMap.put(skuKey, synchronizedRemainingQty);
+        log.info("SKU实际消费账本同步, materialCode: {}, productStatus: {}, reason: {}, "
+                        + "原账本目标: {}, 原账本剩余: {}, 已消费: {}, 新账本目标: {}, 同步后剩余: {}",
+                sku.getMaterialCode(), sku.getProductStatus(), reason, oldTargetQty,
+                oldRemainingQtyValue, consumedQty, resolvedTargetQty, synchronizedRemainingQty);
+        return synchronizedRemainingQty;
+    }
+
+    /**
+     * 将 SKU 实际消费账本收敛到指定剩余量。
+     * <p>该方法用于前置补满规则曾放大目标、但真实物理收尾块必须回到严格硫化余量的场景。
+     * 参数是“尚可排数量”而不是“总目标量”，因此需要用已消费量反推新的账本总目标；禁止复用
+     * {@link #syncProductionRemainingQtyToTarget(LhScheduleContext, SkuScheduleDTO, int, String)}，
+     * 否则跨日续排会把剩余量再次扣除历史消费量并错误归零。</p>
+     *
+     * @param context 排程上下文
+     * @param sku SKU
+     * @param remainingQty 尚可排数量
+     * @param reason 同步原因
+     * @return 同步后的剩余量
+     */
+    public int syncProductionRemainingQtyToRemaining(LhScheduleContext context,
+                                                     SkuScheduleDTO sku,
+                                                     int remainingQty,
+                                                     String reason) {
+        int resolvedRemainingQty = Math.max(0, remainingQty);
+        if (Objects.isNull(context) || Objects.isNull(sku) || StringUtils.isEmpty(sku.getMaterialCode())) {
+            return resolvedRemainingQty;
+        }
+        String skuKey = buildSkuKey(sku);
+        Map<String, Integer> remainingQtyMap = context.getSkuProductionRemainingQtyMap();
+        Map<String, Integer> targetQtyMap = context.getSkuProductionTargetQtyMap();
+        int oldRemainingQty = Math.max(0, remainingQtyMap.getOrDefault(skuKey, resolvedRemainingQty));
+        int oldTargetQty = Math.max(oldRemainingQty, targetQtyMap.getOrDefault(skuKey, oldRemainingQty));
+        int consumedQty = Math.max(0, oldTargetQty - oldRemainingQty);
+        int synchronizedTargetQty = consumedQty + resolvedRemainingQty;
+        targetQtyMap.put(skuKey, synchronizedTargetQty);
+        remainingQtyMap.put(skuKey, resolvedRemainingQty);
+        log.info("SKU实际消费账本按剩余量收敛, materialCode: {}, productStatus: {}, reason: {}, "
+                        + "原账本目标: {}, 原账本剩余: {}, 已消费: {}, 新账本目标: {}, 同步后剩余: {}",
+                sku.getMaterialCode(), sku.getProductStatus(), reason, oldTargetQty,
+                oldRemainingQty, consumedQty, synchronizedTargetQty, resolvedRemainingQty);
+        return resolvedRemainingQty;
     }
 
     /**
@@ -267,6 +321,8 @@ public class TargetScheduleQtyResolver {
         quotaMap.put(receiverKey, newReceiverQuota);
         remainingMap.put(donorKey, newDonorRemaining);
         remainingMap.put(receiverKey, newReceiverRemaining);
+        context.getSkuProductionTargetQtyMap().put(donorKey, newDonorQuota);
+        context.getSkuProductionTargetQtyMap().put(receiverKey, newReceiverQuota);
         // 同一物料多机台会持有独立SKU副本；日计划Map可能共享也可能独立，按对象身份去重后同步一次。
         adjustEndingDailyQuotaDelta(donorAliasSet, -transferQty);
         adjustEndingDailyQuotaDelta(receiverAliasSet, transferQty);
@@ -531,6 +587,7 @@ public class TargetScheduleQtyResolver {
         int remainingQty = Objects.isNull(oldQty) || !ledgerConsumed
                 ? targetQty : Math.min(Math.max(0, oldQty), targetQty);
         remainingQtyMap.put(skuKey, remainingQty);
+        context.getSkuProductionTargetQtyMap().put(skuKey, targetQty);
         context.getEmbryoStockHardTargetMaterialSet().add(skuKey);
         context.getEmbryoStockSkuQuotaMap().put(skuKey, targetQty);
         log.info("成型胎胚库存收尾SKU实际消费账本同步, materialCode: {}, productStatus: {}, SKU内部额度: {}, 原账本剩余: {}, "
@@ -1123,6 +1180,12 @@ public class TargetScheduleQtyResolver {
         int quotaLimitQty = resolveEmbryoStockSkuQuotaLimit(context, sku);
         if (quotaLimitQty >= 0) {
             restoredRemainingQty = Math.min(restoredRemainingQty, quotaLimitQty);
+        }
+        if (Objects.nonNull(context)) {
+            Integer productionTargetQty = context.getSkuProductionTargetQtyMap().get(buildSkuKey(sku));
+            if (Objects.nonNull(productionTargetQty)) {
+                restoredRemainingQty = Math.min(restoredRemainingQty, Math.max(0, productionTargetQty));
+            }
         }
         if (Objects.nonNull(context) && StringUtils.isNotEmpty(sku.getMaterialCode())) {
             context.getSkuProductionRemainingQtyMap().put(buildSkuKey(sku), restoredRemainingQty);

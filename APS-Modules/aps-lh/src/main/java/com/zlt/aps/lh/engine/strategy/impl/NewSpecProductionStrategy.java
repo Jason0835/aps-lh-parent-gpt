@@ -1660,7 +1660,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 binding, productionRemainingQty, maxQtyToDayEnd);
         if (finalStrictBlock) {
             // 收尾目标曾被补满规则抬高时，必须先把实际消费账本收敛到真实硫化余量。
-            getTargetScheduleQtyResolver().syncProductionRemainingQtyToTarget(
+            getTargetScheduleQtyResolver().syncProductionRemainingQtyToRemaining(
                     context, sku, productionRemainingQty, "跨日在机真实严格收尾");
         }
         ProductionQuantityPolicy quantityPolicy =
@@ -4012,7 +4012,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                     quantityPolicy = ProductionQuantityPolicy.from(sku, true);
                     candidateTargetQty = realtimeProductionRemainingQty;
                     // 目标量补满只能用于前置资源规划，最终收尾提交必须恢复到实时硫化余量账本。
-                    getTargetScheduleQtyResolver().syncProductionRemainingQtyToTarget(
+                    getTargetScheduleQtyResolver().syncProductionRemainingQtyToRemaining(
                             context, sku, realtimeProductionRemainingQty, "新增真实物理块严格收尾");
                     log.info("新增SKU按真实物理产能块进入严格收尾, batchNo: {}, scheduleDate: {}, "
                                     + "materialCode: {}, machineCode: {}, productionRemainingQty: {}, "
@@ -16834,8 +16834,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
      * 解析当前SKU尚未落地的真实硫化余量。
      *
      * <p>收尾规划阶段允许临时放大目标量用于选机，但最终结果必须按初始硫化余量扣除
-     * 本批次同物料、同产品状态已落地的新增结果。单控整机L/R两侧分别落结果，因此这里
-     * 按结果行实际班次量合计，保证整机口径不会漏扣。</p>
+     * 本批次同物料、同产品状态在续作、换活字块和新增阶段已经落地的全部结果。
+     * 单控整机L/R两侧分别落结果，因此这里按结果行实际班次量合计，保证跨阶段和整机口径都不会漏扣。</p>
      *
      * @param context 排程上下文
      * @param sku 当前SKU
@@ -16874,8 +16874,10 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             }
             strictTargetQty = Math.max(0, sku.getSurplusQty());
         }
+        int productionRemainingQty = getTargetScheduleQtyResolver()
+                .resolveProductionRemainingQty(context, sku);
         if (Objects.isNull(context) || CollectionUtils.isEmpty(context.getScheduleResultList())) {
-            return strictTargetQty;
+            return Math.min(strictTargetQty, productionRemainingQty);
         }
         int scheduledQty = context.getScheduleResultList().stream()
                 .filter(Objects::nonNull)
@@ -16884,12 +16886,15 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 .filter(result -> StringUtils.equals(
                         StringUtils.trimToEmpty(sku.getProductStatus()),
                         StringUtils.trimToEmpty(result.getProductStatus())))
-                .filter(result -> StringUtils.equals(
-                        ScheduleTypeEnum.NEW_SPEC.getCode(), result.getScheduleType()))
-                .filter(result -> !StringUtils.equals("1", result.getIsTypeBlock()))
                 .mapToInt(ShiftFieldUtil::resolveScheduledQty)
                 .sum();
-        return Math.max(0, strictTargetQty - scheduledQty);
+        int resultRemainingQty = Math.max(0, strictTargetQty - scheduledQty);
+        int strictRemainingQty = Math.min(resultRemainingQty, productionRemainingQty);
+        log.info("严格收尾跨阶段剩余量核对, materialCode: {}, productStatus: {}, strictTargetQty: {}, "
+                        + "本批次全部阶段已排量: {}, 结果口径剩余: {}, 中心账本剩余: {}, 最终可排剩余: {}",
+                sku.getMaterialCode(), sku.getProductStatus(), strictTargetQty, scheduledQty,
+                resultRemainingQty, productionRemainingQty, strictRemainingQty);
+        return strictRemainingQty;
     }
 
     /**

@@ -1,9 +1,6 @@
 package com.zlt.aps.itf.mes.service;
 
-import java.util.List;
-
 import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.zlt.aps.dj.api.domain.entity.DjScheduleResult;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 
 /**
@@ -40,10 +37,10 @@ public interface IMesItfDjService {
     /**
      * 下发垫胶排程结果到MES
      *
-     * @param djScheduleResultIssueList 垫胶排程结果下发列表（已按3天拆分）
-     * @param factoryCode               厂别
-     * @param companyCode               分公司编码
+     * @param ids         垫胶排程结果下发ID列表
+     * @param factoryCode 厂别
+     * @param companyCode 分公司编码
      * @return 下发结果
      */
-    AjaxResult issueDjScheduleResult(List<DjScheduleResult> djScheduleResultIssueList, String factoryCode, String companyCode);
+    AjaxResult issueDjScheduleResult(Long[] ids, String factoryCode, String companyCode);
 }

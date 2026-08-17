@@ -7,7 +7,6 @@ import com.ruoyi.common.core.utils.ServletUtils;
 import com.ruoyi.common.core.web.controller.BaseController;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.mp.api.domain.dto.MonthPlanCompareDto;
-import com.zlt.aps.mp.api.domain.vo.MonthPlanCompareVo;
 import com.zlt.aps.mp.report.service.IMonthPlanCompareService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -20,7 +19,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Date;
-import java.util.List;
 
 /**
  * 月计划与实际产量对比报表 Controller
@@ -41,17 +39,17 @@ public class MonthPlanCompareController extends BaseController {
     private IExportLogService iExportLogService;
 
     /**
-     * 查询月计划与实际产量对比列表
+     * 查询月计划与实际产量对比列表（分页）
+     * <p>按 SKU 分页，total 为 SKU 总数，rows 为当前页 SKU 的 4 行 VO</p>
      *
-     * @param queryDto 查询条件
-     * @return TableDataInfo 结果
+     * @param queryDto 查询条件（含 pageNum/pageSize）
+     * @return TableDataInfo 结果（total=SKU总数，rows=当前页4×N行VO）
      */
-    @ApiOperation("查询月计划与实际产量对比列表")
+    @ApiOperation("查询月计划与实际产量对比列表（分页）")
     @PostMapping("/list")
     public TableDataInfo list(@RequestBody MonthPlanCompareDto queryDto) {
-        this.startPage();
-        List<MonthPlanCompareVo> voList = monthPlanCompareService.listMonthPlanCompare(queryDto);
-        return getDataTable(voList);
+        // 手动分页（按SKU分页，避免PageHelper对4行VO分页导致total/rows不一致）
+        return monthPlanCompareService.listMonthPlanComparePage(queryDto);
     }
 
     /**

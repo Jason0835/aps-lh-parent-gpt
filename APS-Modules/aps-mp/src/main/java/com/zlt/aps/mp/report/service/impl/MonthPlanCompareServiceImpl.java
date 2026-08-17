@@ -3,6 +3,7 @@ package com.zlt.aps.mp.report.service.impl;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.ServletUtils;
 import com.ruoyi.common.core.web.controller.BaseController;
+import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.mp.api.domain.dto.MonthPlanCompareDto;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
@@ -71,29 +72,129 @@ public class MonthPlanCompareServiceImpl extends BaseController implements IMont
     private MonthPlanCompareMapper monthPlanCompareMapper;
 
     /**
-     * 查询月计划与实际产量对比列表
+     * 默认每页SKU数量
+     */
+    private static final int DEFAULT_PAGE_SIZE = 20;
+
+    /**
+     * 查询月计划与实际产量对比列表（全量，用于导出）
      * <p>每个SKU返回4行（月计划/实际产量/差异/完成率）</p>
+     * <p>清除分页参数后查询全量数据</p>
      *
      * @param queryDto 查询参数
      * @return 结果列表
      */
     @Override
     public List<MonthPlanCompareVo> listMonthPlanCompare(MonthPlanCompareDto queryDto) {
-        // 1. 查询定稿主数据列表
+        // 清除分页参数，确保按全量查询
+        queryDto.setPageNum(null);
+        queryDto.setPageSize(null);
+        queryDto.setOffset(null);
+        queryDto.setMaterialKeys(null);
+
+        // 1. 查询定稿主数据列表（全量）
         List<FactoryMonthPlanProductionFinalResult> finalList = monthPlanCompareMapper.selectFinalList(queryDto);
         if (CollectionUtils.isEmpty(finalList)) {
             return Collections.emptyList();
         }
 
-        // 2. 查询每日实际完成量，按 materialCode|lhType 分组，内层按 dayNum 分组
+        // 2. 查询每日实际完成量（全量），按 materialCode|lhType 分组，内层按 dayNum 分组
         List<Map<String, Object>> dailyFinishList = monthPlanCompareMapper.selectDailyFinishQtyList(queryDto);
-        Map<String, Map<Integer, BigDecimal>> actualMap = this.buildActualMap(dailyFinishList);
 
         // 3. 计算当月天数
         YearMonth yearMonth = YearMonth.of(queryDto.getYear(), queryDto.getMonth());
         int daysInMonth = yearMonth.lengthOfMonth();
 
-        // 4. 组装结果：每个SKU -> 4行VO
+        // 4. 组装结果
+        return this.buildVoList(finalList, dailyFinishList, daysInMonth);
+    }
+
+    /**
+     * 查询月计划与实际产量对比列表（分页，用于列表展示）
+     * <p>按 SKU 分页，total 为 SKU 总数，rows 为当前页 SKU 的 4 行 VO</p>
+     *
+     * @param queryDto 查询参数（需包含 pageNum/pageSize）
+     * @return 分页结果（total=SKU总数，rows=当前页4×N行VO）
+     */
+    @Override
+    public TableDataInfo listMonthPlanComparePage(MonthPlanCompareDto queryDto) {
+        // 1. 校验并补全分页参数
+        Integer pageNum = queryDto.getPageNum();
+        Integer pageSize = queryDto.getPageSize();
+        if (pageNum == null || pageNum < 1) {
+            pageNum = 1;
+            queryDto.setPageNum(pageNum);
+        }
+        if (pageSize == null || pageSize < 1) {
+            pageSize = DEFAULT_PAGE_SIZE;
+            queryDto.setPageSize(pageSize);
+        }
+        queryDto.setOffset((pageNum - 1) * pageSize);
+        // 打印分页参数，便于排查前端切换 pageSize 不生效问题
+        log.info("月计划与实际产量对比分页查询：factoryCode={}, year={}, month={}, pageNum={}, pageSize={}, offset={}",
+                queryDto.getFactoryCode(), queryDto.getYear(), queryDto.getMonth(),
+                pageNum, pageSize, queryDto.getOffset());
+
+        // 2. 查询当前条件下 SKU 总数
+        int total = monthPlanCompareMapper.selectFinalListCount(queryDto);
+        if (total <= 0) {
+            return this.buildTableDataInfo(Collections.emptyList(), 0);
+        }
+
+        // 3. 分页查询当前页 SKU 定稿主数据
+        List<FactoryMonthPlanProductionFinalResult> finalList = monthPlanCompareMapper.selectFinalList(queryDto);
+        if (CollectionUtils.isEmpty(finalList)) {
+            return this.buildTableDataInfo(Collections.emptyList(), total);
+        }
+
+        // 4. 提取当前页 SKU 的物料键列表（materialCode|productStatus），用于限定实际产量查询范围
+        List<String> materialKeys = finalList.stream()
+                .map(item -> item.getMaterialCode() + "|" + StringUtils.trimToEmpty(item.getProductStatus()))
+                .collect(Collectors.toList());
+        queryDto.setMaterialKeys(materialKeys);
+
+        // 5. 查询当前页 SKU 的每日实际完成量
+        List<Map<String, Object>> dailyFinishList = monthPlanCompareMapper.selectDailyFinishQtyList(queryDto);
+
+        // 6. 计算当月天数
+        YearMonth yearMonth = YearMonth.of(queryDto.getYear(), queryDto.getMonth());
+        int daysInMonth = yearMonth.lengthOfMonth();
+
+        // 7. 组装当前页 VO 列表
+        List<MonthPlanCompareVo> voList = this.buildVoList(finalList, dailyFinishList, daysInMonth);
+
+        // 8. 返回分页结果（total=SKU总数，rows=当前页4×N行VO）
+        return this.buildTableDataInfo(voList, total);
+    }
+
+    /**
+     * 构建分页结果 TableDataInfo
+     * <p>显式设置 code=200 和 msg，避免前端响应拦截器将默认 code 当作错误处理</p>
+     *
+     * @param rows  当前页数据
+     * @param total 总数
+     * @return TableDataInfo
+     */
+    private TableDataInfo buildTableDataInfo(List<?> rows, long total) {
+        TableDataInfo rspData = new TableDataInfo();
+        rspData.setCode(200);
+        rspData.setRows(rows);
+        rspData.setMsg("查询成功");
+        rspData.setTotal(total);
+        return rspData;
+    }
+
+    /**
+     * 组装 VO 列表（每个 SKU 扩展为 4 行：月计划/实际产量/差异/完成率）
+     *
+     * @param finalList       定稿主数据列表
+     * @param dailyFinishList 每日实际完成量列表
+     * @param daysInMonth     当月天数
+     * @return VO 列表
+     */
+    private List<MonthPlanCompareVo> buildVoList(List<FactoryMonthPlanProductionFinalResult> finalList,
+                                                  List<Map<String, Object>> dailyFinishList, int daysInMonth) {
+        Map<String, Map<Integer, BigDecimal>> actualMap = this.buildActualMap(dailyFinishList);
         List<MonthPlanCompareVo> result = new ArrayList<>(finalList.size() * 4);
         for (FactoryMonthPlanProductionFinalResult item : finalList) {
             String key = item.getMaterialCode() + "|" + StringUtils.trimToEmpty(item.getProductStatus());

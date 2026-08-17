@@ -1,8 +1,7 @@
 package com.zlt.aps.itf.mes.service.impl;
 
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -14,12 +13,13 @@ import org.springframework.stereotype.Service;
 import com.alibaba.cloud.commons.lang.StringUtils;
 import com.alibaba.fastjson.JSONObject;
 import com.baomidou.dynamic.datasource.toolkit.DynamicDataSourceContextHolder;
+import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.dj.api.domain.entity.DjDayFinishQty;
-import com.zlt.aps.dj.api.domain.entity.DjScheFinishQty;
+import com.zlt.aps.dj.api.domain.entity.DjDayFinishTotal;
 import com.zlt.aps.dj.api.domain.entity.DjScheduleResult;
 import com.zlt.aps.dj.api.domain.entity.DjStock;
 import com.zlt.aps.itf.constant.DataSource;
@@ -41,9 +41,6 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @Service("mesItfDjService")
 public class MesItfDjServiceImpl implements IMesItfDjService {
-
-    /** 日期格式化器 */
-    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     /** SQL Server单次请求参数上限2100，每条记录约40个参数，安全批次大小为50 */
     private static final int BATCH_SIZE = 50;
     @Autowired
@@ -94,7 +91,7 @@ public class MesItfDjServiceImpl implements IMesItfDjService {
         if (StringUtils.isEmpty(request.getCompanyCode())) {
             request.setCompanyCode(FactoryConstant.DEFAULT_FACTORY_CODE);
         }
-        List<DjScheFinishQty> sourceList = djMesSourceMapper.selectShiftFinishQtyList(request);
+        List<DjDayFinishQty> sourceList = djMesSourceMapper.selectShiftFinishQtyList(request);
         if (CollectionUtils.isEmpty(sourceList)) {
             return AjaxResult.error();
         }
@@ -117,7 +114,7 @@ public class MesItfDjServiceImpl implements IMesItfDjService {
         if (StringUtils.isEmpty(request.getCompanyCode())) {
             request.setCompanyCode(FactoryConstant.DEFAULT_FACTORY_CODE);
         }
-        List<DjDayFinishQty> sourceList = djMesSourceMapper.selectDayFinishQtyList(request);
+        List<DjDayFinishTotal> sourceList = djMesSourceMapper.selectDayFinishQtyList(request);
         if (CollectionUtils.isEmpty(sourceList)) {
             return AjaxResult.success(I18nUtil.getMessage("ui.tc.schedule.mes.noSourceData"));
         }
@@ -132,9 +129,29 @@ public class MesItfDjServiceImpl implements IMesItfDjService {
         return AjaxResult.success();
     }
 
+    /**
+     * 下发垫胶排程结果到MES
+     *
+     * @param ids         内衬排程结果下发ID列表
+     * @param factoryCode 厂别
+     * @param companyCode 分公司编码
+     * @return 下发结果
+     */
     @Override
-    public AjaxResult issueDjScheduleResult(List<DjScheduleResult> djScheduleResultIssueList, String factoryCode,
+    public AjaxResult issueDjScheduleResult(Long[] ids, String factoryCode,
             String companyCode) {
+        if (ids == null || ids.length == 0) {
+            return AjaxResult.success();
+        }
+        List<DjScheduleResult> djScheduleResultIssueList;
+        try {
+            /** 切换APS数据源 start **/
+            DynamicDataSourceContextHolder.push(DataSource.MASTER);
+            djScheduleResultIssueList = baseDao.selectByIds(DjScheduleResult.class, Arrays.asList(ids));
+        } finally {
+            DynamicDataSourceContextHolder.clear();
+            /** 切换APS数据源 end **/
+        }
         if (CollectionUtils.isEmpty(djScheduleResultIssueList)) {
             return AjaxResult.success();
         }
@@ -149,7 +166,7 @@ public class MesItfDjServiceImpl implements IMesItfDjService {
             /** 切换APS数据源 end **/
         }
         // 获取今天、明天、后天的日期
-        LocalDate today = LocalDate.now();
+        Date today = DateUtils.getNowDate();
 
         // 按日期分组处理数据
         List<DjScheduleResult> todayList = this.filterByDate(djScheduleResultIssueList, today);
@@ -178,7 +195,7 @@ public class MesItfDjServiceImpl implements IMesItfDjService {
     /**
      * 发送MQ通知
      */
-    private AjaxResult sendMqNotice(List<MesDjScheduleResult> allMesList, LocalDate today, String dataVersion,
+    private AjaxResult sendMqNotice(List<MesDjScheduleResult> allMesList, Date today, String dataVersion,
             String factoryCode, String companyCode) {
         AjaxResult ajaxResult;
         try {
@@ -189,8 +206,8 @@ public class MesItfDjServiceImpl implements IMesItfDjService {
             // 请求参数
             JSONObject params = new JSONObject();
             params.put("rowCount", allMesList.size());
-            params.put("startDate", today.format(DATE_FORMATTER));
-            params.put("endDate", today.format(DATE_FORMATTER));
+            params.put("startDate", DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD, today));
+            params.put("endDate", DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD, today));
             syncParamsVO.setParams(params);
             syncParamsVO.setDataSys(SysCode.APS);
             syncParamsVO.setDockSys(ApsConstant.DOCK_SYS_MES);
@@ -219,7 +236,7 @@ public class MesItfDjServiceImpl implements IMesItfDjService {
     /**
      * 根据日期过滤数据
      */
-    private List<DjScheduleResult> filterByDate(List<DjScheduleResult> list, LocalDate date) {
+    private List<DjScheduleResult> filterByDate(List<DjScheduleResult> list, Date date) {
         return list.stream().filter(item -> item.getScheduleDate() != null)
                 .filter(item -> item.getScheduleDate().equals(date)).collect(Collectors.toList());
     }

@@ -1,10 +1,7 @@
 package com.zlt.aps.itf.mes.service;
 
-import java.util.List;
-
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
-import com.zlt.aps.nc.api.domain.entity.NcScheduleResult;
 
 /**
  * 内衬MES接口
@@ -40,10 +37,10 @@ public interface IMesItfNcService {
     /**
      * 下发内衬排程结果到MES
      *
-     * @param ncScheduleResultIssueList  内衬排程结果下发列表（已按3天拆分）
-     * @param factoryCode               厂别
-     * @param companyCode               分公司编码
+     * @param ids         内衬排程结果下发ID列表
+     * @param factoryCode 厂别
+     * @param companyCode 分公司编码
      * @return 下发结果
      */
-    AjaxResult issueNcScheduleResult(List<NcScheduleResult> ncScheduleResultIssueList, String factoryCode, String companyCode);
+    AjaxResult issueNcScheduleResult(Long[] ids, String factoryCode, String companyCode);
 }

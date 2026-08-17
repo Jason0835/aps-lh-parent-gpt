@@ -7,10 +7,11 @@
       :columns="columns"
       :searchColumns="searchColumns"
       :data="data"
-      :page="undefined"
+      :page="page"
       :search="search"
       @refresh="getList"
       @search="handleSearch"
+      @pageChange="handlePageChange"
       :showSummary="false"
       :selectArea="false"
       :span-method="objectSpanMethod"
@@ -37,14 +38,37 @@ export default {
   name: "MonthPlanCompare",
   dicts: ["biz_factory_name", "trial_status", "biz_product_type"],
   data() {
+    // 默认查询条件：工厂=越南工厂116，年月=当前月
+    const defaultDate = moment();
+    const defaultYearMonth = defaultDate.format("yyyy-MM");
+    const defaultDaysInMonth = defaultDate.daysInMonth();
     return {
       loading: false,
       data: [],
-      search: {},
-      query: {},
+      // 默认搜索条件（在 data 中初始化，避免子组件 mounted 先于父组件触发 refresh 时参数为空）
+      search: {
+        factoryCode: "116",
+        yearMonth: defaultYearMonth,
+      },
+      query: {
+        factoryCode: "116",
+        yearMonth: defaultYearMonth,
+        year: defaultDate.year(),
+        month: defaultDate.month() + 1,
+      },
       // 当月天数（动态计算）
-      daysInMonth: 31,
+      daysInMonth: defaultDaysInMonth,
+      // 分页对象（按SKU分页，pageSize=20 = 80行/页）
+      page: {
+        current: 1,
+        pageSize: 20,
+        total: 0,
+      },
     };
+  },
+  created() {
+    // 主动触发首次查询
+    this.getList();
   },
   computed: {
     // 动态列：固定列 + 按天数生成日期列
@@ -139,19 +163,6 @@ export default {
       ];
     },
   },
-  mounted() {
-    const date = moment();
-    this.search = {
-      factoryCode: "116",
-      yearMonth: date.format("yyyy-MM"),
-    };
-    this.query = { ...this.search };
-    // 计算当月天数
-    this.daysInMonth = moment(
-      `${date.year()}-${date.month() + 1}`,
-      "YYYY-M"
-    ).daysInMonth();
-  },
   methods: {
     // 必填校验：年月、工厂必填
     validateRequired() {
@@ -168,6 +179,8 @@ export default {
     handleSearch(data) {
       this.query = { ...data };
       if (!this.validateRequired()) return;
+      // 查询条件变化时重置到第1页
+      this.$set(this.page, "current", 1);
       // 根据年月重新计算当月天数
       if (data.yearMonth) {
         const arr = data.yearMonth.split("-");
@@ -177,9 +190,16 @@ export default {
       }
       this.getList();
     },
+    // 翻页/切换每页条数
+    handlePageChange(current, pageSize) {
+      this.$set(this.page, "current", current);
+      this.$set(this.page, "pageSize", pageSize);
+      this.getList();
+    },
     handleExport() {
       if (!this.validateRequired()) return;
-      exportMonthPlanCompare(this.formatParams());
+      // 导出全量数据，不传分页参数
+      exportMonthPlanCompare(this.formatParams(false));
     },
     // 行合并：物料编码、物料描述每4行合并
     objectSpanMethod({ row, column, rowIndex, columnIndex }) {
@@ -239,7 +259,11 @@ export default {
       }
       return value;
     },
-    formatParams() {
+    /**
+     * 组装请求参数
+     * @param hasPage 是否包含分页参数（列表查询=true，导出=false）
+     */
+    formatParams(hasPage = true) {
       const params = { ...this.query };
       if (params.yearMonth) {
         const arr = params.yearMonth.split("-");
@@ -247,17 +271,24 @@ export default {
         params.month = parseInt(arr[1]);
         delete params.yearMonth;
       }
+      // 列表查询时传分页参数（按SKU分页）
+      if (hasPage) {
+        params.pageNum = this.page.current;
+        params.pageSize = this.page.pageSize;
+      }
       return params;
     },
     // api
     async getList() {
       try {
         this.loading = true;
-        const res = await listMonthPlanCompare(this.formatParams());
-        this.data = res.rows || res.data || [];
+        const res = await listMonthPlanCompare(this.formatParams(true));
+        this.data = res.rows || [];
+        this.$set(this.page, "total", res.total || 0);
       } catch (e) {
         console.error(e);
         this.data = [];
+        this.$set(this.page, "total", 0);
       } finally {
         this.loading = false;
       }

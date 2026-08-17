@@ -114,7 +114,7 @@ public class TmAutoRollingApplicationService {
         syncRequest.setStockDate(window.getStockDate());
         syncRequest.setShiftOrder(window.getTargetShiftOrder());
         AjaxResult result = FeignTokenHelper.callWithToken(
-                () -> this.mesItfService.syncTreadShiftStock(syncRequest));
+                () -> this.mesItfService.syncTmShiftStock(syncRequest));
         if (result == null || !Objects.equals(HttpStatus.SUCCESS, result.get(AjaxResult.CODE_TAG))) {
             throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.schedule.shiftStockSyncFailed"));
         }

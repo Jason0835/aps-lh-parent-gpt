@@ -839,18 +839,25 @@ public class CxMachineBaseInfoVo implements Serializable {
      * 需要处理切换结构使用量 -1
      * 需要将成型工装数量还原即使用数量 - 1
      *
-     * @param context         排产上下文
-     * @param allocationInfo  结构收尾的分配段信息
-     * @param deductionDaySet 收尾的日期
-     * @param groupPlanInfo   收尾的结构信息
+     * @param context              排产上下文
+     * @param isReleaseChangeGroup 是否处理结构切换资源
+     * @param allocationInfo       结构收尾的分配段信息
+     * @param deductionDaySet      收尾的日期
+     * @param groupPlanInfo        收尾的结构信息
      */
-    public void handlerBeforeConclusion(Context context, CxMachineAllocationPlanHelper allocationInfo, Set<Integer> deductionDaySet, ProductionPlanGroupInfo groupPlanInfo) {
+    public void handlerBeforeConclusion(Context context,
+                                        boolean isReleaseChangeGroup,
+                                        CxMachineAllocationPlanHelper allocationInfo,
+                                        Set<Integer> deductionDaySet,
+                                        ProductionPlanGroupInfo groupPlanInfo) {
         //20260123 分配日清除
         if (!CollectionUtils.isEmpty(deductionDaySet)) {
             allocationDaySet.removeAll(deductionDaySet);
         }
-        //切换结构
-        handlerBeforeConclusionByAllocation(context, allocationInfo);
+        if (isReleaseChangeGroup) {
+            //切换结构次数
+            handlerBeforeConclusionByAllocation(context, allocationInfo);
+        }
         String proSize = groupPlanInfo.getProSizeInfo();
         if (StringUtils.isBlank(proSize) || CollectionUtils.isEmpty(deductionDaySet)) {
             return;
@@ -1212,6 +1219,34 @@ public class CxMachineBaseInfoVo implements Serializable {
         }
         CxMachineAllocationPlanHelper lastAllocationInfo = getLastAllocationInfo();
         return isChangeProSize(context, lastAllocationInfo, addNewGroupPlan.getGroupName());
+    }
+
+    /**
+     * 对成型机已分配段进行强行下机处理
+     * 即对已分配段进行删除处理，且天排产信息还原
+     *
+     * @param context               排产上下文
+     * @param offlineAllocationInfo 分配段
+     * @return
+     */
+    public boolean forceOffline(Context context, CxMachineAllocationPlanHelper offlineAllocationInfo) {
+        if (null == offlineAllocationInfo) {
+            return true;
+        }
+        if (!cxMachineCode.equals(offlineAllocationInfo.getCxMachineCode())) {
+            return false;
+        }
+        if (CollectionUtils.isEmpty(allocationList)) {
+            return false;
+        }
+        if (!hasAllocation(offlineAllocationInfo)) {
+            return false;
+        }
+        //实际排产日信息
+        Set<Integer> productionDayInfo = offlineAllocationInfo.getRealProductionDayInfo(context);
+        allocationDaySet.removeAll(productionDayInfo);
+        //成型机删除分配段
+        return allocationList.remove(offlineAllocationInfo);
     }
 
     /**

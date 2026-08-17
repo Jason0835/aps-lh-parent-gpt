@@ -7,7 +7,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 
@@ -35,10 +34,10 @@ import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.common.core.utils.AjaxResultUtils;
 import com.zlt.aps.common.engine.enums.ClassNumThreePlanEnums;
 import com.zlt.aps.common.engine.service.FactoryService;
 import com.zlt.aps.dj.api.domain.entity.DjDayFinishQty;
-import com.zlt.aps.dj.api.domain.entity.DjDispatcherLog;
 import com.zlt.aps.dj.api.domain.entity.DjScheduleResult;
 import com.zlt.aps.dj.api.domain.entity.DjShiftConfig;
 import com.zlt.aps.dj.engine.mapper.DjEngineConstructionInfoMapper;
@@ -47,7 +46,8 @@ import com.zlt.aps.dj.service.DjMachineInfoService;
 import com.zlt.aps.dj.service.DjScheduleResultService;
 import com.zlt.aps.dj.service.IDjScheduleAdjustService;
 import com.zlt.aps.dj.service.IDjShiftConfigService;
-import com.zlt.aps.itf.vo.SyncDataLogs;
+import com.zlt.aps.itf.mes.IMesHalfPartsItfService;
+import com.zlt.aps.itf.vo.MesDjScheduleResult;
 import com.zlt.aps.mdm.api.domain.entity.MdmConstructionInfo;
 import com.zlt.bill.common.controller.AbstractBillBizController;
 import com.zlt.bill.common.service.IBillService;
@@ -84,6 +84,8 @@ public class DjScheduleResultController extends AbstractBillBizController<DjSche
     private DjEngineConstructionInfoMapper djEngineConstructionInfoMapper;
     @Resource
     private IDjShiftConfigService djShiftConfigService;
+    @Resource
+    private IMesHalfPartsItfService iMesHalfPartsItfService;
 	
 
     @ApiOperation("按条件分页查询")
@@ -410,7 +412,7 @@ public class DjScheduleResultController extends AbstractBillBizController<DjSche
         String companyCode = factoryService.getCompanyCode();
         AjaxResult ajaxResult = null;
         try {
-            djScheduleResultService.batchUpdate(arr, scheduleDate, dataVersion, factoryCode, companyCode);
+//            djScheduleResultService.batchUpdate(arr, scheduleDate, dataVersion, factoryCode, companyCode);
             // 调整为itf接口
 //            //数据同步到中间库后，往mq中发送消息通知MES去取数据
 //            SyncParamsVO syncParamsVO = new SyncParamsVO();
@@ -426,8 +428,14 @@ public class DjScheduleResultController extends AbstractBillBizController<DjSche
 //            ncSyncDataHandle.syncNotice(syncParamsVO);  //往消息队列发送消息
 
 			// 取回mes的反馈结果
-			SyncDataLogs logs = syncDataLogsService.getSyncDataResult(dataVersion);
-			String status = logs.getStatus();
+//			SyncDataLogs logs = syncDataLogsService.getSyncDataResult(dataVersion);
+
+            MesDjScheduleResult result = new MesDjScheduleResult();
+            result.setIds(djScheduleResult.getIds());
+            result.setFactoryCode(factoryCode);
+            result.setCompanyCode(companyCode);
+            AjaxResult syncResult = iMesHalfPartsItfService.issueDjScheduleResult(result);
+			String status = AjaxResultUtils.checkAjaxSuccess(syncResult)? ApsConstant.IS_RELEASE: ApsConstant.FAILURE_RELEASE;
 			// 更新状态
 			djScheduleResultService.updateRelaseStatus(dataVersion, arr, status);
 			if (ApsConstant.IS_RELEASE.equals(status)) {
@@ -435,7 +443,7 @@ public class DjScheduleResultController extends AbstractBillBizController<DjSche
 				ajaxResult = AjaxResult.success(I18nUtil.getMessage("ui.data.column.scheduleResult.successPublish"));
 			} else {
 				// 失败，需要返回异常信息
-				ajaxResult = AjaxResult.error(logs.getMsg());
+				ajaxResult = AjaxResult.error(String.valueOf(syncResult.get(AjaxResult.MSG_TAG)));
 			}
         } catch (Exception e) {
             e.printStackTrace();

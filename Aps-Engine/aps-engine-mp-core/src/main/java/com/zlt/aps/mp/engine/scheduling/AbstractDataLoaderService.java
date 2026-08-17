@@ -1295,31 +1295,33 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         //排序，按起始日从小到大
         originAllocationList.sort(Comparator.comparing(MpStructureAllocation::getBeginDay));
         Set<MpStructureAllocation> mergeResult = Sets.newHashSet();
+        Set<MpStructureAllocation> isMergeInfo = Sets.newHashSet();
         int size = originAllocationList.size();
         int startIndex = BigDecimal.ZERO.intValue();
         for (; startIndex < size; startIndex++) {
             MpStructureAllocation previous = originAllocationList.get(startIndex);
+            if (isMergeInfo.contains(previous)) {
+                continue;
+            }
+            if (!mergeResult.contains(previous)) {
+                mergeResult.add(previous);
+            }
             //后一个配置
             int nextStartIndex = startIndex + BigDecimal.ONE.intValue();
             for (; nextStartIndex < size; nextStartIndex++) {
                 MpStructureAllocation next = originAllocationList.get(nextStartIndex);
                 Integer previousEndDay = previous.getEndDay();
                 Integer nextStartDay = next.getBeginDay();
-                //说明前后衔接
-                if (previousEndDay + BigDecimal.ONE.intValue() == nextStartDay) {
-                    previous.setEndDay(next.getEndDay());
-                    Integer allotDays = previous.getAllotDays() + next.getAllotDays();
-                    previous.setAllotDays(allotDays);
-                } else {
-                    if (!mergeResult.contains(previous)) {
-                        mergeResult.add(previous);
-                    }
-                    startIndex = nextStartIndex;
+                if (previousEndDay + BigDecimal.ONE.intValue() != nextStartDay) {
                     break;
                 }
-            }
-            if (mergeResult.contains(previous)) {
-                mergeResult.add(previous);
+                //说明前后衔接
+                startIndex = nextStartIndex;
+                previous.setEndDay(next.getEndDay());
+                Integer allotDays = previous.getAllotDays() + next.getAllotDays();
+                previous.setAllotDays(allotDays);
+                //后一个配置加入已合并集合
+                isMergeInfo.add(next);
             }
         }
         if (CollectionUtils.isEmpty(mergeResult)) {

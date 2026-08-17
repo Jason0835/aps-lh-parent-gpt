@@ -16,91 +16,36 @@
         FROM MES_NC_STOCK
     </select>
 
-    <select id="selectShiftFinishQtyList" resultType="com.zlt.aps.nc.api.domain.entity.NcScheFinishQty">
-        SELECT source_data.ORDER_NO,
-               source_data.SCHEDULE_DATE,
-               source_data.SIDEWALL_CODE AS PADDING_CODE,
-               source_data.NIGHT_FINISH_QTY,
-               source_data.DAY_FINISH_QTY,
-               source_data.MID_FINISH_QTY,
-               source_data.FACTORY_CODE
-        FROM MES_NC_CLASS_FINISH_QTY source_data
-        INNER JOIN (
-            SELECT SCHEDULE_DATE, SIDEWALL_CODE, ORDER_NO, MAX(DATA_VERSION) AS MAX_VERSION
-            FROM MES_NC_CLASS_FINISH_QTY
-            WHERE CONVERT(DATE, SCHEDULE_DATE) = CONVERT(DATE, GETDATE())
-            <if test="factoryCode != null and factoryCode != ''">
-                AND FACTORY_CODE = #{factoryCode}
-            </if>
-            <if test="companyCode != null and companyCode != ''">
-                AND COMPANY_CODE = #{companyCode}
-            </if>
-            <if test="dataVersion != null and dataVersion != ''">
-                AND DATA_VERSION = #{dataVersion}
-            </if>
-            GROUP BY SCHEDULE_DATE, SIDEWALL_CODE, ORDER_NO, FACTORY_CODE, COMPANY_CODE
-        ) latest ON source_data.SCHEDULE_DATE = latest.SCHEDULE_DATE
-            AND source_data.SIDEWALL_CODE = latest.SIDEWALL_CODE
-            AND source_data.ORDER_NO = latest.ORDER_NO
-            AND source_data.FACTORY_CODE = latest.FACTORY_CODE
-            AND source_data.COMPANY_CODE = latest.COMPANY_CODE
-            AND source_data.DATA_VERSION = latest.MAX_VERSION
-        WHERE CONVERT(DATE, source_data.SCHEDULE_DATE) = CONVERT(DATE, GETDATE())
+    <select id="selectShiftFinishQtyList" resultType="com.zlt.aps.nc.api.domain.entity.NcDayFinishQty">
+        SELECT ORDER_NO,
+               SCHEDULE_DATE,
+               LINING_CODE,
+               NIGHT_FINISH_QTY,
+               DAY_FINISH_QTY,
+               MID_FINISH_QTY,
+               FACTORY_CODE
+        FROM MES_NC_DAY_FINISH_QTY
+        WHERE DATA_VERSION = #{dataVersion}
         <if test="factoryCode != null and factoryCode != ''">
-            AND source_data.FACTORY_CODE = #{factoryCode}
+            AND FACTORY_CODE = #{factoryCode}
         </if>
         <if test="companyCode != null and companyCode != ''">
-            AND source_data.COMPANY_CODE = #{companyCode}
-        </if>
-        <if test="dataVersion != null and dataVersion != ''">
-            AND source_data.DATA_VERSION = #{dataVersion}
+            AND COMPANY_CODE = #{companyCode}
         </if>
     </select>
 
-    <select id="selectDayFinishQtyList" resultType="com.zlt.aps.nc.api.domain.entity.NcDayFinishQty">
-        SELECT source_data.SCHEDULE_DATE,
-               source_data.SIDEWALL_CODE AS LINING_CODE,
-               source_data.FINISH_QTY AS DAY_FINISH_QTY,
-               CAST(0 AS DECIMAL(18, 6)) AS NIGHT_FINISH_QTY,
-               CAST(0 AS DECIMAL(18, 6)) AS MID_FINISH_QTY,
-               '' AS ORDER_NO,
-               source_data.FACTORY_CODE
-        FROM MES_NC_DAY_FINISH_TOTL source_data
-        INNER JOIN (
-            SELECT SCHEDULE_DATE, SIDEWALL_CODE, FACTORY_CODE, COMPANY_CODE,
-                   MAX(DATA_VERSION) AS MAX_VERSION
-            FROM MES_NC_DAY_FINISH_TOTL
-            WHERE 1 = 1
-            <if test="factoryCode != null and factoryCode != ''">
-                AND FACTORY_CODE = #{factoryCode}
-            </if>
-            <if test="companyCode != null and companyCode != ''">
-                AND COMPANY_CODE = #{companyCode}
-            </if>
-            <if test="dataVersion != null and dataVersion != ''">
-                AND DATA_VERSION = #{dataVersion}
-            </if>
-            <if test="queryParams != null and queryParams.scheduleDate != null">
-                AND CONVERT(DATE, SCHEDULE_DATE) = CONVERT(DATE, #{queryParams.scheduleDate})
-            </if>
-            GROUP BY SCHEDULE_DATE, SIDEWALL_CODE, FACTORY_CODE, COMPANY_CODE
-        ) latest ON source_data.SCHEDULE_DATE = latest.SCHEDULE_DATE
-            AND source_data.SIDEWALL_CODE = latest.SIDEWALL_CODE
-            AND source_data.FACTORY_CODE = latest.FACTORY_CODE
-            AND source_data.COMPANY_CODE = latest.COMPANY_CODE
-            AND source_data.DATA_VERSION = latest.MAX_VERSION
-        WHERE 1 = 1
+    <select id="selectDayFinishQtyList" resultType="com.zlt.aps.nc.api.domain.entity.NcDayFinishTotal">
+        SELECT SCHEDULE_DATE,
+               LINING_CODE,
+               FINISH_QTY,
+               FACTORY_CODE
+        FROM MES_NC_DAY_FINISH_TOTL
+        WHERE DATA_VERSION = #{dataVersion}
         <if test="factoryCode != null and factoryCode != ''">
-            AND source_data.FACTORY_CODE = #{factoryCode}
+            AND FACTORY_CODE = #{factoryCode}
         </if>
         <if test="companyCode != null and companyCode != ''">
-            AND source_data.COMPANY_CODE = #{companyCode}
-        </if>
-        <if test="dataVersion != null and dataVersion != ''">
-            AND source_data.DATA_VERSION = #{dataVersion}
-        </if>
-        <if test="queryParams != null and queryParams.scheduleDate != null">
-            AND CONVERT(DATE, source_data.SCHEDULE_DATE) = CONVERT(DATE, #{queryParams.scheduleDate})
+            AND COMPANY_CODE = #{companyCode}
         </if>
     </select>
 </mapper>

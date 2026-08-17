@@ -18,7 +18,16 @@ import java.util.Map;
 public interface MonthPlanCompareMapper {
 
     /**
+     * 查询月计划定稿主数据总数（用于分页 total）
+     *
+     * @param queryDto 查询参数
+     * @return SKU 总数
+     */
+    int selectFinalListCount(MonthPlanCompareDto queryDto);
+
+    /**
      * 查询月计划定稿主数据（含每日计划量 DAY_1 ~ DAY_31）
+     * <p>当 queryDto.pageNum/pageSize/offset 不为空时按分页查询，否则查全量（导出场景）</p>
      *
      * @param queryDto 查询参数
      * @return 定稿列表
@@ -34,6 +43,7 @@ public interface MonthPlanCompareMapper {
      * dayNum       - 日期日（1~31）
      * finishQty    - 完成量合计
      * </p>
+     * <p>当 queryDto.materialKeys 不为空时，仅查询当前页 SKU 对应的实际产量</p>
      *
      * @param queryDto 查询参数
      * @return 每日完成量列表
