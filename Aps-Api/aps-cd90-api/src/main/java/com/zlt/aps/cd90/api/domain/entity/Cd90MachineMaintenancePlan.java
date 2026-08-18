@@ -61,4 +61,10 @@ public class Cd90MachineMaintenancePlan extends BaseEntity implements Serializab
     @TableField("DOWNTIME_HOURS")
     @Excel(name = "ui.data.column.cd90MachineMaintenancePlan.downtimeHours")
     private BigDecimal downtimeHours;
+
+    /** 备注 */
+    @ApiModelProperty(value = "备注", name = "remark")
+    @TableField("REMARK")
+    @Excel(name = "ui.common.column.remark")
+    private String remark;
 }

@@ -2,7 +2,9 @@ package com.zlt.aps.cd90.api.domain.entity;
 
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
+import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
 import java.io.Serializable;
@@ -20,4 +22,10 @@ public class Cd90ScheduleParamSnapshot extends BaseEntity implements Serializabl
     @TableField("PARAM_CODE") private String paramCode;
     @TableField("PARAM_VALUE") private String paramValue;
     @TableField("PARAM_FINGERPRINT") private String paramFingerprint;
+
+    /** 备注 */
+    @ApiModelProperty(value = "备注", name = "remark")
+    @TableField("REMARK")
+    @Excel(name = "ui.common.column.remark")
+    private String remark;
 }

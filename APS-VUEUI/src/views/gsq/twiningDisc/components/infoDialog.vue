@@ -64,7 +64,13 @@
             align="center"
           >
             <template slot-scope="scope">
-              <span>{{ scope.row.steelRingName || "-" }}</span>
+              <el-input
+                v-model="scope.row.steelRingName"
+                :placeholder="$t('ui.data.column.gsq.twiningDisc.steelRingName')"
+                size="mini"
+                maxlength="30"
+                @input="handleSteelRingNameInput(scope.row)"
+              />
             </template>
           </el-table-column>
           <el-table-column
@@ -210,6 +216,15 @@ export default {
     },
   },
   methods: {
+    /**
+     * 处理钢丝圈名称输入，限制最多30个汉字，超过则截断
+     * @param {Object} row 子表行数据
+     */
+    handleSteelRingNameInput(row) {
+      if (row.steelRingName && row.steelRingName.length > 30) {
+        row.steelRingName = row.steelRingName.substring(0, 30);
+      }
+    },
     /**
      * 新增子表行
      */

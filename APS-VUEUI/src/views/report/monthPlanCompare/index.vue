@@ -245,17 +245,17 @@ export default {
     // 格式化单元格显示
     formatCell(row, value) {
       if (row.rowType === "rate") {
-        // 完成率行：null显示"-"，否则加%
+        // 完成率行：null显示空白（当天置空或分母为0），否则加%
         if (value === null || value === undefined || value === "") {
-          return "-";
+          return "";
         }
         const numVal = parseFloat(value);
-        if (isNaN(numVal)) return "-";
+        if (isNaN(numVal)) return "";
         return numVal.toFixed(2) + "%";
       }
-      // 其他行：数值显示
+      // 其他行：数值显示，null显示空白（当天计划量与实际量均无值时后端置空）
       if (value === null || value === undefined || value === "") {
-        return "0";
+        return "";
       }
       return value;
     },

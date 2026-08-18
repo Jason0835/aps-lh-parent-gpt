@@ -8,7 +8,7 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.annotation.Excel;
-import com.zlt.aps.common.core.domain.ApsBaseEntity;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
@@ -25,7 +25,7 @@ import lombok.EqualsAndHashCode;
 @Data
 @TableName("T_DJ_DISPATCHER_LOG")
 @EqualsAndHashCode(callSuper = false)
-public class DjDispatcherLog extends ApsBaseEntity {
+public class DjDispatcherLog extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 

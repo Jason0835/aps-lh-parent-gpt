@@ -84,11 +84,11 @@ public class Cd90ScheduleResult extends BaseEntity implements Serializable {
     @TableField("STORAGE_LANE_CODE")
     @Excel(name = "ui.data.column.cd90ScheduleResult.storageLaneCode")
     private String storageLaneCode;
-//    /** 库存数量 */
-//    @ApiModelProperty("库存数量")
-//    @TableField("STOCK_QTY")
-//    @Excel(name = "ui.data.column.cd90ScheduleResult.stockQty")
-//    private Double stockQty;
+    /** 库存数量 */
+    @ApiModelProperty("库存数量")
+    @TableField("STOCK_QTY")
+    @Excel(name = "ui.data.column.cd90ScheduleResult.stockQty")
+    private Double stockQty;
     /** 供应时长 */
     @ApiModelProperty("供应时长")
     @TableField("SUPPLY_TIME")
@@ -324,4 +324,10 @@ public class Cd90ScheduleResult extends BaseEntity implements Serializable {
             throw new IllegalArgumentException("直裁排程结果字段不存在: " + fieldName, exception);
         }
     }
+
+    /** 备注 */
+    @ApiModelProperty(value = "备注", name = "remark")
+    @TableField("REMARK")
+    @Excel(name = "ui.common.column.remark")
+    private String remark;
 }

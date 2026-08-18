@@ -39,7 +39,7 @@ public class DjLossSetting extends BaseEntity {
     @TableField("PADDING_CODE")
     private String paddingCode;
 
-    @ApiModelProperty(value = "机台编码")
+    @ApiModelProperty(value = "机台")
     @Excel(name="ui.specifyMachine.column.machineName")
     @TableField("MACHINE_CODE")
     private String machineCode;
@@ -50,4 +50,8 @@ public class DjLossSetting extends BaseEntity {
     @TableField("LOSS_RATE")
     private BigDecimal lossRate;
 
+    @ImportValidated(name = "ui.data.column.info.remark", maxLength = 100)
+    @ApiModelProperty(value = "备注")
+    @TableField(value = "REMARK")
+    private String remark;
 }

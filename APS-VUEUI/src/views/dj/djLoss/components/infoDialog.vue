@@ -33,6 +33,7 @@ import { mapState } from "vuex";
 
 import infoForm from "@/views/components/infoForm.vue";
 
+import { getConfigKey } from "@/api/system/config";
 import { editLoss } from "@/api/dj/loss";
 
 export default {
@@ -42,6 +43,7 @@ export default {
       loading: false,
       visible: false,
       isEdit: false,
+      factoryCode: "",
       editType: null,
       form: {},
       rules: {
@@ -131,6 +133,12 @@ export default {
     //utils
     show(data) {
       this.visible = true;
+      // 获取当前工厂编码（保存时需要带工厂参数）
+      if (!this.factoryCode) {
+        getConfigKey("sys.factory.code").then((response) => {
+          this.factoryCode = response.msg;
+        });
+      }
       if (data) {
         this.isEdit = true;
         this.form = {
@@ -146,7 +154,12 @@ export default {
       this.visible = false;
     },
     handleConfirm() {
-      this.$refs.form.triggerConfirm(this.save);
+      this.$refs.form.triggerConfirm((params) => {
+        this.save({
+          ...params,
+          factoryCode: params.factoryCode || this.factoryCode,
+        });
+      });
     },
   },
 };

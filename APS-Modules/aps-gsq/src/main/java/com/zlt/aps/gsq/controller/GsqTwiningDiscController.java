@@ -1,18 +1,24 @@
 package com.zlt.aps.gsq.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.api.gateway.system.domain.ImportLog;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import com.ruoyi.api.gateway.system.service.IImportErrorLogService;
+import com.ruoyi.api.gateway.system.service.IImportLogService;
+import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.gsq.api.domain.entity.GsqTwiningDisc;
+import com.zlt.aps.gsq.api.domain.vo.GsqTwiningDiscImportVo;
 import com.zlt.aps.gsq.mapper.GsqTwiningDiscMapper;
 import com.zlt.aps.gsq.service.IGsqTwiningDiscService;
 import com.zlt.aps.utils.AppUtils;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
+import com.zlt.common.utils.ImportExcelUtils;
 import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -23,8 +29,11 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -43,6 +52,14 @@ public class GsqTwiningDiscController extends AbstractDocBizController<GsqTwinin
 
     @Autowired
     private IGsqTwiningDiscService gsqTwiningDiscService;
+
+    /** 导入日志服务（主子表平铺导入不走框架super.importData，需自行记录导入日志） */
+    @Autowired
+    private IImportLogService iImportLogService;
+
+    /** 导入错误明细服务 */
+    @Autowired
+    private IImportErrorLogService iImportErrorLogService;
 
     @Resource
     private GsqTwiningDiscMapper gsqTwiningDiscMapper;
@@ -95,7 +112,9 @@ public class GsqTwiningDiscController extends AbstractDocBizController<GsqTwinin
     }
 
     /**
-     * 导入钢丝圈缠绕盘
+     * 导入钢丝圈缠绕盘（主子表平铺格式）
+     * <p>模板与解析均使用 GsqTwiningDiscImportVo：一行 = 主表字段 + 子表字段，
+     * 按缠绕盘编码分组组装主表+子表明细后级联保存</p>
      */
     @Log(title = "钢丝圈缠绕盘", businessType = BusinessType.IMPORT)
     @ApiOperation("导入数据")
@@ -103,7 +122,28 @@ public class GsqTwiningDiscController extends AbstractDocBizController<GsqTwinin
     @Override
     public AjaxResult importData(@RequestBody ImportContext importContext,
                                  @RequestParam("updateSupport") boolean updateSupport) throws Exception {
-        return super.importData(importContext, updateSupport);
+        // 记录导入日志并上传导入文件
+        Date beginTime = DateUtils.getNowDate();
+        ImportLog importLog = ImportExcelUtils.getImportLogAndUploadFile(importContext.getFileBytes(),
+                importContext.getImportFilePath(), importContext.getProcedureCode(), importContext.getFunctionName(),
+                importContext.getOriFileName(), 1);
+        importLog = this.iImportLogService.add(importLog);
+
+        // 按导入VO解析平铺结构（主表字段+子表字段）
+        ExcelUtil<GsqTwiningDiscImportVo> util = new ExcelUtil<>(GsqTwiningDiscImportVo.class);
+        InputStream is = new ByteArrayInputStream(importContext.getFileBytes());
+        List<GsqTwiningDiscImportVo> list = util.importExcel(is);
+        AjaxResult ajaxResult = gsqTwiningDiscService.importMainAndSubData(list, updateSupport, importLog.getId());
+
+        // 回写导入日志（行数、耗时）并保存错误明细
+        Date endTime = DateUtils.getNowDate();
+        importLog.setRowCount(list.size());
+        importLog.setBeginTime(beginTime);
+        importLog.setEndTime(endTime);
+        importLog.setSpendTime(DateUtils.getDiffTime(endTime, beginTime));
+        ImportExcelUtils.updateImportLogAndFormatMsg(importLog, ajaxResult, this.iImportLogService);
+        ImportExcelUtils.saveImportErrorLogs(ajaxResult, this.iImportErrorLogService);
+        return ajaxResult;
     }
 
     /**

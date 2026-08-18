@@ -77,4 +77,10 @@ public class Cd90MachineInfo extends BaseEntity implements Serializable {
     @TableField("STATUS")
     @Excel(name = "ui.data.column.cd90MachineInfo.status", dictType = "sys_enable_disable")
     private String status;
+
+    /** 备注 */
+    @ApiModelProperty(value = "备注", name = "remark")
+    @TableField("REMARK")
+    @Excel(name = "ui.common.column.remark")
+    private String remark;
 }

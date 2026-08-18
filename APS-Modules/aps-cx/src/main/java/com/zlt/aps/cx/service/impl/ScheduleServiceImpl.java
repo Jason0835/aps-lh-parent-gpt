@@ -1608,9 +1608,6 @@ public class ScheduleServiceImpl implements ScheduleService {
         Map<YearMonth, Integer> monthOverdueQtyMap =
                 MonthPlanSurplusCalculator.getOverdueProduction(
                         isNextMonthFinal, productionDates, allMonthPlans, plan);
-        // 当前物料+计划类型在各年月的日计划调整量
-        Map<YearMonth, Integer> yearMonthAdjustQtyMap =
-                MonthPlanSurplusCalculator.getYearMonthLhDayAdjustQty(plan, allLhDayAdjustList);
         Map<YearMonth, Integer> monthPlanQtyMap =
                 MonthPlanSurplusCalculator.getPlanQty(
                         productionDates, allMonthPlans, allLhDayAdjustList, plan, startDay);
@@ -1618,7 +1615,7 @@ public class ScheduleServiceImpl implements ScheduleService {
                 + nextDayFinishedQty + nextScheFinishedQty;
         int surplusQty = MonthPlanSurplusCalculator.getSurplusQty(
                 productionYearMonth, productionDates, hasProductionPlanMap,
-                monthOverdueQtyMap, monthPlanQtyMap, yearMonthAdjustQtyMap, finishedQty);
+                monthOverdueQtyMap, monthPlanQtyMap, finishedQty);
         return Math.max(0, surplusQty);
     }
 

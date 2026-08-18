@@ -298,13 +298,12 @@ public class MonthPlanSurplusCalculator {
      * 硫化余量 = 计划量 - 已完成量 + 超欠产
      * </p>
      *
-     * @param productionYearMonth   当前排产年-月
-     * @param allProductionDate     日排产周期日
-     * @param hasProductionPlanMap  排产周期内有计划量的月计划信息
-     * @param monthOverdueQtyMap    年-月超欠产信息
-     * @param yearMonthPlanQtyMap   年-月计划量信息
-     * @param yearMonthAdjustQtyMap 年-月日计划调整量信息
-     * @param finishedQty           已完成量
+     * @param productionYearMonth  当前排产年-月
+     * @param allProductionDate    日排产周期日
+     * @param hasProductionPlanMap 排产周期内有计划量的月计划信息
+     * @param monthOverdueQtyMap   年-月超欠产信息
+     * @param yearMonthPlanQtyMap  年-月计划量信息(已经包含了对应的日计划调整量)
+     * @param finishedQty          已完成量
      * @return 硫化余量
      */
     public static Integer getSurplusQty(YearMonth productionYearMonth,
@@ -312,20 +311,12 @@ public class MonthPlanSurplusCalculator {
                                         Map<YearMonth, FactoryMonthPlanProductionFinalResult> hasProductionPlanMap,
                                         Map<YearMonth, Integer> monthOverdueQtyMap,
                                         Map<YearMonth, Integer> yearMonthPlanQtyMap,
-                                        Map<YearMonth, Integer> yearMonthAdjustQtyMap,
                                         Integer finishedQty) {
         if (null == finishedQty) {
             finishedQty = BigDecimal.ZERO.intValue();
         }
         YearMonth firstMonth = getFirstYearMonth(allProductionDate);
         boolean isCrossMonth = isCrossMonthByProductionDateInfo(allProductionDate);
-        //如果跨月，则日计划调整量取两个月总量，否则取当前月日计划调整量
-        Integer dayAdjustQty = BigDecimal.ZERO.intValue();
-        if (!CollectionUtils.isEmpty(yearMonthAdjustQtyMap) && isCrossMonth) {
-            dayAdjustQty = sumQty(yearMonthAdjustQtyMap);
-        } else if (!CollectionUtils.isEmpty(yearMonthAdjustQtyMap) && !isCrossMonth) {
-            dayAdjustQty = yearMonthAdjustQtyMap.get(productionYearMonth);
-        }
         //当前排产日所在年月的上月超欠产
         Integer overdueQty = monthOverdueQtyMap.get(productionYearMonth);
         if (null == overdueQty) {
@@ -337,13 +328,11 @@ public class MonthPlanSurplusCalculator {
             if (null == planQty) {
                 planQty = BigDecimal.ZERO.intValue();
             }
-            planQty = planQty + dayAdjustQty;
             return planQty - finishedQty + overdueQty;
         }
         if (!CollectionUtils.isEmpty(hasProductionPlanMap) && isCrossMonth) {
             //排产周期内有计划量，且排产周期跨月
             Integer sumPlanQty = sumQty(yearMonthPlanQtyMap);
-            sumPlanQty = sumPlanQty + dayAdjustQty;
             return sumPlanQty - finishedQty + overdueQty;
         }
         //排产周期内没有计划量
@@ -356,7 +345,6 @@ public class MonthPlanSurplusCalculator {
         if (null == productionYearMonthPlanQty) {
             productionYearMonthPlanQty = BigDecimal.ZERO.intValue();
         }
-        productionYearMonthPlanQty = productionYearMonthPlanQty + dayAdjustQty;
         int surplus;
         if (isCrossMonth) {
             overdueQty = monthOverdueQtyMap.get(productionYearMonth);
@@ -529,7 +517,7 @@ public class MonthPlanSurplusCalculator {
      * @param startDay               前一个月份计划量计算起始日
      * @param allProductionList      日排产周期
      * @param allMonthPlanList       所有月排产计划
-     * @param allLhDayAdjustList     所有年-月日计划调整量信息
+     * @param allLhDayAdjustList     所有对应年-月日计划调整量信息
      * @return
      */
     private static Map<YearMonth, Integer> getPlanQtyByMonthPlan(FactoryMonthPlanProductionFinalResult skuMonthProductionInfo,

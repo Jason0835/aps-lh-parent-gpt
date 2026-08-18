@@ -98,7 +98,7 @@ public class DjLossSettingUIController extends BaseUIController<DjLossSetting> {
     @ResponseBody
     public AjaxResult save(DjLossSetting djMachine) {
         if (UserConstants.NOT_UNIQUE.equals(iDjLossSettingService.checkUnique(djMachine))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.djMachine.embryoCodeNotUnique"));
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.djLossSetting.importUnique"));
         }
 
         return iDjLossSettingService.save(djMachine);

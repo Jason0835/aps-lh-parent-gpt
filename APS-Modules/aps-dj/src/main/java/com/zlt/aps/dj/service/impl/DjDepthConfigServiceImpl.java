@@ -9,6 +9,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.zlt.aps.common.engine.service.FactoryService;
 import com.zlt.aps.dj.api.domain.entity.DjDepthConfig;
 import com.zlt.aps.dj.mapper.DjDepthConfigMapper;
 import com.zlt.aps.dj.service.IDjDepthConfigService;
@@ -25,6 +27,24 @@ public class DjDepthConfigServiceImpl extends AbstractDocService<DjDepthConfig> 
 
     @Resource
     private DjDepthConfigMapper depthConfigMapper;
+
+    @Resource
+    private FactoryService factoryService;
+
+    /**
+     * 导入数据，并保存记录：导入模板不含工厂列，先统一填充当前工厂编码后再走基类导入逻辑
+     *
+     * @param list          要导入数据
+     * @param updateSupport 已存在是否更新
+     * @param importLogId   导入日志id
+     * @return 导入后提示信息
+     */
+    @Override
+    public AjaxResult importData(List<DjDepthConfig> list, boolean updateSupport, Long importLogId) {
+        String factoryCode = factoryService.getFactoryCode();
+        list.forEach(entity -> entity.setFactoryCode(factoryCode));
+        return super.importData(list, updateSupport, importLogId);
+    }
 
     /**
      * 校验配置区间的连续性和完整性

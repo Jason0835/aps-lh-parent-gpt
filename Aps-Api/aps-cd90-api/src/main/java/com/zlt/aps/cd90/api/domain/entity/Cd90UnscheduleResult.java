@@ -98,4 +98,10 @@ public class Cd90UnscheduleResult extends BaseEntity implements Serializable {
     @TableField("PROCESSED_TIME")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private Date processedTime;
+
+    /** 备注 */
+    @ApiModelProperty(value = "备注", name = "remark")
+    @TableField("REMARK")
+    @Excel(name = "ui.common.column.remark")
+    private String remark;
 }

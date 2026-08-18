@@ -50,6 +50,8 @@ public class LhDayPlanAdjustRequireServiceImpl extends AbstractDocService<LhDayP
     private static final String ADJUST_ID_FIELD_TEMPLATE = "adjustId%d";
     private static final String ADJUST_QTY_FIELD_TEMPLATE = "adjustQty%d";
     private static final String ADJUST_REASON_FIELD_TEMPLATE = "adjustReason%d";
+    private static final String ADJUSTER_FIELD_TEMPLATE = "adjuster%d";
+    private static final String ADJUST_TIME_FIELD_TEMPLATE = "adjustTime%d";
 
     @Resource
     private LhDayPlanAdjustRequireMapper lhDayPlanAdjustRequireMapper;
@@ -319,16 +321,21 @@ public class LhDayPlanAdjustRequireServiceImpl extends AbstractDocService<LhDayP
                         (first, second) -> first,
                         LinkedHashMap::new));
         Set<String> filledSlotSet = new LinkedHashSet<String>();
+        Set<String> latestAdjustSet = new LinkedHashSet<String>();
         for (LhDayPlanAdjustRequire adjust : adjustList) {
             if (Objects.isNull(adjust.getAdjustCount())
                     || adjust.getAdjustCount() < 1
                     || adjust.getAdjustCount() > ADJUST_SLOT_COUNT) {
                 continue;
             }
-            LhDayPlanAdjustRequire row = rowMap.get(
-                    this.buildMaterialStatusKey(adjust.getMaterialCode(), adjust.getProductStatus()));
+            String rowKey = this.buildMaterialStatusKey(adjust.getMaterialCode(), adjust.getProductStatus());
+            LhDayPlanAdjustRequire row = rowMap.get(rowKey);
             if (Objects.isNull(row)) {
                 continue;
+            }
+            if (latestAdjustSet.add(rowKey)) {
+                row.setAdjuster(adjust.getAdjuster());
+                row.setUpdateTime(adjust.getUpdateTime());
             }
             String slotKey = this.buildAdjustSlotKey(row, adjust.getAdjustCount());
             if (!filledSlotSet.add(slotKey)) {
@@ -340,6 +347,10 @@ public class LhDayPlanAdjustRequireServiceImpl extends AbstractDocService<LhDayP
                     adjust.getPlanQty());
             row.setFieldValueByFieldName(String.format(ADJUST_REASON_FIELD_TEMPLATE, adjust.getAdjustCount()),
                     adjust.getReason());
+            row.setFieldValueByFieldName(String.format(ADJUSTER_FIELD_TEMPLATE, adjust.getAdjustCount()),
+                    adjust.getAdjuster());
+            row.setFieldValueByFieldName(String.format(ADJUST_TIME_FIELD_TEMPLATE, adjust.getAdjustCount()),
+                    adjust.getUpdateTime());
         }
     }
 
@@ -519,6 +530,11 @@ public class LhDayPlanAdjustRequireServiceImpl extends AbstractDocService<LhDayP
             }
             return;
         }
+        if (Objects.nonNull(existing)
+                && this.isSameAdjustValue(existing.getPlanQty(), adjustQty)
+                && Objects.equals(existing.getReason(), adjustReason)) {
+            return;
+        }
 
         String currentUser = StringUtils.defaultIfBlank(SecurityUtils.getUsername(), "system");
         Date currentTime = new Date();
@@ -546,6 +562,20 @@ public class LhDayPlanAdjustRequireServiceImpl extends AbstractDocService<LhDayP
             return;
         }
         lhDayPlanAdjustRequireMapper.updateById(target);
+    }
+
+    /**
+     * 比较调整量，忽略BigDecimal的小数位差异。
+     *
+     * @param existingQty 已保存调整量
+     * @param requestQty  请求调整量
+     * @return 是否相同
+     */
+    private boolean isSameAdjustValue(BigDecimal existingQty, BigDecimal requestQty) {
+        if (Objects.isNull(existingQty) || Objects.isNull(requestQty)) {
+            return Objects.equals(existingQty, requestQty);
+        }
+        return existingQty.compareTo(requestQty) == 0;
     }
 
     /**

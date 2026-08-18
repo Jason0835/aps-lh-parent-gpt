@@ -33,6 +33,7 @@ import { mapState } from "vuex";
 
 import infoForm from "@/views/components/infoForm.vue";
 
+import { getConfigKey } from "@/api/system/config";
 import { editSpecifyMachine } from "@/api/dj/specifyMachine";
 
 export default {
@@ -44,6 +45,7 @@ export default {
       visible: false,
       isEdit: false,
       editType: null,
+      factoryCode: "",
       form: {},
       rules: {
         liningCode: [
@@ -65,7 +67,7 @@ export default {
   },
   computed: {
     ...mapState({
-      machines: (state) => state.insideLiner.machines,
+      machines: (state) => state.dj.machines,
     }),
     title: function () {
       return this.$t("ui.nc.specifyMachine.column.modalName");
@@ -85,8 +87,10 @@ export default {
           required: true,
           type: "select",
           dictData: this.machines,
-          valueKey: "machineCode",
-          labelKey: "machineName",
+          props: {
+            value: "machineCode",
+            label: "machineName",
+          },
         },
         {
           label: this.$t("ui.specifyMachine.column.lineType"),
@@ -132,6 +136,14 @@ export default {
     //utils
     show(data) {
       this.visible = true;
+      // 加载垫胶机台下拉数据（机台信息存于 vuex state.dj.machines）
+      this.$store.dispatch("dj/getMachineList");
+      // 获取当前工厂编码（保存时需要带工厂参数）
+      if (!this.factoryCode) {
+        getConfigKey("sys.factory.code").then((response) => {
+          this.factoryCode = response.msg;
+        });
+      }
       if (data) {
         this.isEdit = true;
         this.form = {
@@ -147,7 +159,12 @@ export default {
       this.visible = false;
     },
     handleConfirm() {
-      this.$refs.form.triggerConfirm(this.save);
+      this.$refs.form.triggerConfirm((params) => {
+        this.save({
+          ...params,
+          factoryCode: this.factoryCode,
+        });
+      });
     },
   },
 };

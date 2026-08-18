@@ -28,6 +28,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.domain.ApsBaseEntity;
 import com.zlt.aps.common.core.utils.ImportUtil;
+import com.zlt.aps.common.engine.service.FactoryService;
 import com.zlt.aps.dj.api.domain.entity.DjAssistSpec;
 import com.zlt.aps.dj.mapper.DjAssistSpecMapper;
 import com.zlt.aps.dj.service.DjAssistSpecService;
@@ -42,6 +43,9 @@ import com.zlt.aps.dj.service.DjAssistSpecService;
  */
 @Service
 public class DjAssistSpecServiceImpl extends ServiceImpl<DjAssistSpecMapper, DjAssistSpec> implements DjAssistSpecService {
+
+    @Resource
+    private FactoryService factoryService;
 
     @Resource
     private DjAssistSpecMapper ncAssistSpecMapper;
@@ -109,6 +113,9 @@ public class DjAssistSpecServiceImpl extends ServiceImpl<DjAssistSpecMapper, DjA
      */
     @Override
     public AjaxResult importData(List<DjAssistSpec> list, boolean updateSupport, Long importLogId) {
+        // 统一填充当前工厂编码（导入模板不含工厂列，取自 sys.factory.code 配置）
+        String factoryCode = factoryService.getFactoryCode();
+        list.forEach(entity -> entity.setFactoryCode(factoryCode));
         int successNum = 0;
         int failureNum = 0;
         // 校验
