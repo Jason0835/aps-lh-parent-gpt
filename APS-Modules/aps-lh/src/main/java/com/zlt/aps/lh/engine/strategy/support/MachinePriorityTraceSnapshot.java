@@ -96,11 +96,19 @@ public class MachinePriorityTraceSnapshot {
     private final Map<String, Date> traceChangeoverEndTimeMap;
 
     /**
-     * 代表机台在本次选机时点对应的真实可开产时间。
+     * 代表机台在本次选机时点的准备完成时间。
      *
-     * <p>该时间与逐班筛选的 {@code targetShift} 同源，由新增排产日驱动主链计算，
-     * 并复用同一份 {@code NewSpecMachineAvailabilityPlan}。它是候选预演时间，不叠加胎胚
-     * 最早可供时间，仅用于日志展示“真实可开产时间”，不参与正式排序或产能计算。</p>
+     * <p>该时间用于候选班次筛选，不代表正式生产时间；正式生产时间单独由
+     * {@link #realAvailableProductionTimeMap} 保存。</p>
+     */
+    private final Map<String, Date> preparationAvailableTimeMap;
+
+    /**
+     * 代表机台在本次选机时点对应的正式可开产时间。
+     *
+     * <p>该时间与正式候选班次筛选同源，由新增排产日驱动主链计算，并复用同一份
+     * {@code NewSpecMachineAvailabilityPlan}。它包含正式生产门禁、首检、班次管控及设备
+     * 计划产能约束，仅用于还原正式候选口径，不参与正式排序或产能扣减。</p>
      */
     private final Map<String, Date> realAvailableProductionTimeMap;
 
@@ -215,6 +223,7 @@ public class MachinePriorityTraceSnapshot {
                 Collections.<String, MachinePriorityMetricSnapshot>emptyMap(),
                 Collections.<String, Date>emptyMap(),
                 Collections.<String, Date>emptyMap(),
+                Collections.<String, Date>emptyMap(),
                 null, null, null, null, 0, null);
     }
 
@@ -241,6 +250,7 @@ public class MachinePriorityTraceSnapshot {
                 displayMachineCodeMap, memberMachineCodeMap, occupationTextMap,
                 priorityTraceEndingTimeMap,
                 Collections.<String, MachinePriorityMetricSnapshot>emptyMap(),
+                Collections.<String, Date>emptyMap(),
                 Collections.<String, Date>emptyMap(),
                 Collections.<String, Date>emptyMap(),
                 null, null, null, null, 0, null);
@@ -272,11 +282,12 @@ public class MachinePriorityTraceSnapshot {
                 priorityTraceEndingTimeMap, priorityMetricSnapshotMap,
                 Collections.<String, Date>emptyMap(),
                 Collections.<String, Date>emptyMap(),
+                Collections.<String, Date>emptyMap(),
                 null, null, null, null, 0, null);
     }
 
     /**
-     * 创建同时冻结占用、收尾时间、软排序指标、换模/换活字块完成时间和候选预演真实可开产时间的完整快照。
+     * 创建同时冻结占用、收尾时间、软排序指标、换模/换活字块完成时间和正式可开产时间的完整快照。
      *
      * @param orderedCandidates 日志观察候选原顺序
      * @param actualSelectableMachineCodes 实际可选机台编码
@@ -287,7 +298,7 @@ public class MachinePriorityTraceSnapshot {
      * @param priorityTraceEndingTimeMap 选机时点日志收尾时间
      * @param priorityMetricSnapshotMap 正式模具分配前冻结的软排序指标
      * @param traceChangeoverEndTimeMap 选机时点换模或换活字块完成时间
-     * @param realAvailableProductionTimeMap 选机时点候选预演真实可开产时间，不包含胎胚门禁
+     * @param realAvailableProductionTimeMap 选机时点正式可开产时间，包含正式生产门禁
      */
     public MachinePriorityTraceSnapshot(
             List<MachineScheduleDTO> orderedCandidates,
@@ -303,7 +314,43 @@ public class MachinePriorityTraceSnapshot {
         this(orderedCandidates, actualSelectableMachineCodes, actualSelectedMachineCode,
                 displayMachineCodeMap, memberMachineCodeMap, occupationTextMap,
                 priorityTraceEndingTimeMap, priorityMetricSnapshotMap,
-                traceChangeoverEndTimeMap, realAvailableProductionTimeMap,
+                traceChangeoverEndTimeMap, Collections.<String, Date>emptyMap(),
+                realAvailableProductionTimeMap,
+                null, null, null, null, 0, null);
+    }
+
+    /**
+     * 创建同时携带准备完成时间和正式候选生产时间的完整日志快照。
+     *
+     * @param orderedCandidates 日志观察候选原顺序
+     * @param actualSelectableMachineCodes 实际可选机台编码
+     * @param actualSelectedMachineCode 首选候选机台编码
+     * @param displayMachineCodeMap 展示编码映射
+     * @param memberMachineCodeMap 物理成员编码映射
+     * @param occupationTextMap 选机时点占用明细
+     * @param priorityTraceEndingTimeMap 选机时点日志收尾时间
+     * @param priorityMetricSnapshotMap 选机时点软排序指标
+     * @param traceChangeoverEndTimeMap 粗略换模完成时间
+     * @param preparationAvailableTimeMap 准备完成时间
+     * @param realAvailableProductionTimeMap 正式候选生产时间
+     */
+    public MachinePriorityTraceSnapshot(
+            List<MachineScheduleDTO> orderedCandidates,
+            Set<String> actualSelectableMachineCodes,
+            String actualSelectedMachineCode,
+            Map<String, String> displayMachineCodeMap,
+            Map<String, List<String>> memberMachineCodeMap,
+            Map<String, String> occupationTextMap,
+            Map<String, Date> priorityTraceEndingTimeMap,
+            Map<String, MachinePriorityMetricSnapshot> priorityMetricSnapshotMap,
+            Map<String, Date> traceChangeoverEndTimeMap,
+            Map<String, Date> preparationAvailableTimeMap,
+            Map<String, Date> realAvailableProductionTimeMap) {
+        this(orderedCandidates, actualSelectableMachineCodes, actualSelectedMachineCode,
+                displayMachineCodeMap, memberMachineCodeMap, occupationTextMap,
+                priorityTraceEndingTimeMap, priorityMetricSnapshotMap,
+                traceChangeoverEndTimeMap, preparationAvailableTimeMap,
+                realAvailableProductionTimeMap,
                 null, null, null, null, 0, null);
     }
 
@@ -331,6 +378,7 @@ public class MachinePriorityTraceSnapshot {
             Map<String, Date> priorityTraceEndingTimeMap,
             Map<String, MachinePriorityMetricSnapshot> priorityMetricSnapshotMap,
             Map<String, Date> traceChangeoverEndTimeMap,
+            Map<String, Date> preparationAvailableTimeMap,
             Map<String, Date> realAvailableProductionTimeMap,
             String actualHitMachineCode,
             Boolean selectionSucceeded,
@@ -375,6 +423,8 @@ public class MachinePriorityTraceSnapshot {
                                 : priorityMetricSnapshotMap));
         this.traceChangeoverEndTimeMap = Collections.unmodifiableMap(
                 copyDateMap(traceChangeoverEndTimeMap));
+        this.preparationAvailableTimeMap = Collections.unmodifiableMap(
+                copyDateMap(preparationAvailableTimeMap));
         this.realAvailableProductionTimeMap = Collections.unmodifiableMap(
                 copyDateMap(realAvailableProductionTimeMap));
         this.traceScheduleDate = copyDate(traceScheduleDate);
@@ -685,7 +735,8 @@ public class MachinePriorityTraceSnapshot {
                 orderedCandidates, actualSelectableMachineCodes, actualSelectedMachineCode,
                 displayMachineCodeMap, memberMachineCodeMap, occupationTextMap,
                 priorityTraceEndingTimeMap, priorityMetricSnapshotMap,
-                traceChangeoverEndTimeMap, realAvailableProductionTimeMap,
+                traceChangeoverEndTimeMap, preparationAvailableTimeMap,
+                realAvailableProductionTimeMap,
                 actualHitMachineCode, Boolean.TRUE, null,
                 traceScheduleDate, traceSortRank, traceSkuType);
     }
@@ -701,7 +752,8 @@ public class MachinePriorityTraceSnapshot {
                 orderedCandidates, actualSelectableMachineCodes, actualSelectedMachineCode,
                 displayMachineCodeMap, memberMachineCodeMap, occupationTextMap,
                 priorityTraceEndingTimeMap, priorityMetricSnapshotMap,
-                traceChangeoverEndTimeMap, realAvailableProductionTimeMap,
+                traceChangeoverEndTimeMap, preparationAvailableTimeMap,
+                realAvailableProductionTimeMap,
                 null, Boolean.FALSE, noHitReason,
                 traceScheduleDate, traceSortRank, traceSkuType);
     }
@@ -720,7 +772,8 @@ public class MachinePriorityTraceSnapshot {
                 orderedCandidates, actualSelectableMachineCodes, actualSelectedMachineCode,
                 displayMachineCodeMap, memberMachineCodeMap, occupationTextMap,
                 priorityTraceEndingTimeMap, priorityMetricSnapshotMap,
-                traceChangeoverEndTimeMap, realAvailableProductionTimeMap,
+                traceChangeoverEndTimeMap, preparationAvailableTimeMap,
+                realAvailableProductionTimeMap,
                 actualHitMachineCode, selectionSucceeded, noHitReason,
                 traceScheduleDate, traceSortRank, traceSkuType);
     }
@@ -740,7 +793,8 @@ public class MachinePriorityTraceSnapshot {
                 orderedCandidates, actualSelectableMachineCodes, actualSelectedMachineCode,
                 displayMachineCodeMap, memberMachineCodeMap, occupationTextMap,
                 priorityTraceEndingTimeMap, priorityMetricSnapshotMap,
-                traceChangeoverEndTimeMap, realAvailableProductionTimeMap,
+                traceChangeoverEndTimeMap, preparationAvailableTimeMap,
+                realAvailableProductionTimeMap,
                 actualHitMachineCode, selectionSucceeded, noHitReason,
                 traceScheduleDate, traceSortRank, traceSkuType);
     }
@@ -759,7 +813,8 @@ public class MachinePriorityTraceSnapshot {
                 orderedCandidates, actualSelectableMachineCodes, actualSelectedMachineCode,
                 displayMachineCodeMap, memberMachineCodeMap, occupationTextMap,
                 priorityTraceEndingTimeMap, priorityMetricSnapshotMap,
-                traceChangeoverEndTimeMap, realAvailableProductionTimeMap,
+                traceChangeoverEndTimeMap, preparationAvailableTimeMap,
+                realAvailableProductionTimeMap,
                 actualHitMachineCode, selectionSucceeded, noHitReason,
                 traceScheduleDate, traceSortRank, traceSkuType);
     }
@@ -841,10 +896,22 @@ public class MachinePriorityTraceSnapshot {
     }
 
     /**
-     * 获取选机时点冻结的候选预演真实可开产时间。
+     * 获取选机时点冻结的准备完成时间。
      *
      * @param representativeMachineCode 代表机台编码
-     * @return 防御性复制后的候选预演真实可开产时间；选机时点无有效时间时返回 null
+     * @return 防御性复制后的准备完成时间；选机时点无有效时间时返回 null
+     */
+    public Date resolvePreparationAvailableTime(String representativeMachineCode) {
+        Date preparationAvailableTime = preparationAvailableTimeMap.get(representativeMachineCode);
+        return Objects.isNull(preparationAvailableTime)
+                ? null : new Date(preparationAvailableTime.getTime());
+    }
+
+    /**
+     * 获取选机时点冻结的正式可开产时间。
+     *
+     * @param representativeMachineCode 代表机台编码
+     * @return 防御性复制后的正式可开产时间；选机时点无有效时间时返回 null
      */
     public Date resolveRealAvailableProductionTime(String representativeMachineCode) {
         Date realAvailableProductionTime =
