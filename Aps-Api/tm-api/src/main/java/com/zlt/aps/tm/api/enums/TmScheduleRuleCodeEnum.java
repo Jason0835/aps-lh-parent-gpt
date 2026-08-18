@@ -11,6 +11,9 @@ public enum TmScheduleRuleCodeEnum {
     /** 未来停产需求重分配。 */
     FUTURE_SHUTDOWN_REDISTRIBUTION("FUTURE_SHUTDOWN_REDISTRIBUTION", "未来停产需求重分配"),
 
+    /** 成型连续停产自动收尾。 */
+    FORMING_CONTINUOUS_SHUTDOWN_CLOSE_OUT("FORMING_CONTINUOUS_SHUTDOWN_CLOSE_OUT", "成型连续停产自动收尾"),
+
     /** 开机阈值调整。 */
     STARTUP_THRESHOLD_ADJUST("STARTUP_THRESHOLD_ADJUST", "开机阈值调整"),
 
@@ -64,6 +67,9 @@ public enum TmScheduleRuleCodeEnum {
 
     /** 需求量计算。 */
     DEMAND_QTY_CALC("DEMAND_QTY_CALC", "需求量计算"),
+
+    /** 按成型来源行八班计划合计判断收尾。 */
+    CLOSE_OUT_JUDGE("CLOSE_OUT_JUDGE", "收尾判定"),
 
     /** 当班与下一排程班库存覆盖判断。 */
     TWO_SHIFT_STOCK_COVERAGE("TWO_SHIFT_STOCK_COVERAGE", "两班库存覆盖判断"),

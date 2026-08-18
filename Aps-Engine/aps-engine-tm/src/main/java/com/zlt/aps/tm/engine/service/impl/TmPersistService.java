@@ -207,6 +207,9 @@ public class TmPersistService {
         if (task == null) {
             return null;
         }
+        if (Boolean.TRUE.equals(task.getFormingShutdownCloseOutFlag())) {
+            return task.getFormingShutdownCloseOutDemandQty();
+        }
         return task.getCurrentShiftDemandQty() == null ? task.getDemandQty() : task.getCurrentShiftDemandQty();
     }
 

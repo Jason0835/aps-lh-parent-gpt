@@ -8,10 +8,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.engine.quantity.PlanQuantityAllocationItem;
 import com.zlt.aps.common.engine.quantity.PlanQuantityAllocationUtils;
 import com.zlt.aps.tc.api.constant.TcScheduleConstants;
-import com.zlt.aps.tc.api.enums.TcScheduleErrorCodeEnum;
-import com.zlt.aps.tc.api.enums.TcScheduleRuleCodeEnum;
-import com.zlt.aps.tc.api.enums.TcScheduleRuleResultEnum;
-import com.zlt.aps.tc.api.enums.TcScheduleStrategyEnum;
+import com.zlt.aps.tc.api.enums.*;
 import com.zlt.aps.tc.engine.domain.*;
 import com.zlt.aps.tc.engine.service.ITcPlanCalcService;
 import com.zlt.aps.tc.engine.service.ITcPlanTailDecisionService;
@@ -128,6 +125,9 @@ public class TcPlanCalcService implements ITcPlanCalcService {
             // 旧骨架数据只提供 demandQty 时，将其作为当前班基础需求，避免默认策略按空值计算为 0。
             if (task.getCurrentShiftDemandQty() == null && task.getDemandQty() != null) {
                 task.setCurrentShiftDemandQty(task.getDemandQty());
+            }
+            if (task.getOriginalCurrentShiftDemandQty() == null) {
+                task.setOriginalCurrentShiftDemandQty(task.getCurrentShiftDemandQty());
             }
 
             // 计划量策略只读取当前任务班初全局可用工装，工装池滚动状态由本服务统一维护。
@@ -249,12 +249,24 @@ public class TcPlanCalcService implements ITcPlanCalcService {
                 BeanUtils.copyProperties(groupSourceList.get(0), aggregateTask);
             }
             this.planTailDecisionService.applyTailDecision(aggregateTask, groupSourceList);
+            boolean formingShutdownCloseOut = groupSourceList.stream()
+                    .allMatch(task -> Boolean.TRUE.equals(task.getFormingShutdownCloseOutFlag()));
+            aggregateTask.setFormingShutdownCloseOutFlag(formingShutdownCloseOut);
+            aggregateTask.setFormingShutdownCloseOutDemandQty(formingShutdownCloseOut
+                    ? groupSourceList.stream().map(TcTaskDraft::getFormingShutdownCloseOutDemandQty)
+                    .map(this::nvl).reduce(BigDecimal.ZERO, BigDecimal::add)
+                    : BigDecimal.ZERO);
+            if (formingShutdownCloseOut) {
+                aggregateTask.setTailFlag(TcYesNoEnum.YES.getCode());
+            }
             List<TcTaskDraft> sourceSnapshotList = groupSourceList.stream()
                     .map(sourceTask -> this.copySourceTask(sourceTask, planGroupKey))
                     .collect(Collectors.toList());
             BigDecimal currentShiftDemandQty = groupSourceList.stream()
                     .map(TcTaskDraft::getCurrentShiftDemandQty).map(this::nvl)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal originalCurrentShiftDemandQty = groupSourceList.stream()
+                    .map(this::resolveOriginalCurrentShiftDemandQty).reduce(BigDecimal.ZERO, BigDecimal::add);
             BigDecimal nextShiftDemandQty = groupSourceList.stream()
                     .map(TcTaskDraft::getNextShiftDemandQty).map(this::nvl)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -276,6 +288,7 @@ public class TcPlanCalcService implements ITcPlanCalcService {
                     .distinct()
                     .collect(Collectors.joining(",")));
             aggregateTask.setCurrentShiftDemandQty(currentShiftDemandQty);
+            aggregateTask.setOriginalCurrentShiftDemandQty(originalCurrentShiftDemandQty);
             aggregateTask.setNextShiftDemandQty(nextShiftDemandQty);
             aggregateTask.setGuardDemandQty(guardDemandQty);
             aggregateTask.setFormingGuardWindowQtyMap(this.resolveGroupGuardWindowQtyMap(groupSourceList));
@@ -381,7 +394,8 @@ public class TcPlanCalcService implements ITcPlanCalcService {
         if (task.getPlanQty() != null) {
             return groupKey + "|PRESET|" + task.getBusinessKey();
         }
-        return groupKey;
+        return Boolean.TRUE.equals(task.getFormingShutdownCloseOutFlag())
+                ? groupKey + "|FORMING_SHUTDOWN_CLOSE_OUT" : groupKey;
     }
 
     /**
@@ -487,7 +501,9 @@ public class TcPlanCalcService implements ITcPlanCalcService {
                 .compareTo(nvl(aggregateTask.getGuardDemandQty())) >= 0;
         Map<String, BigDecimal> sourceWeightMap = taskGroup.getSourceTaskList().stream()
                 .collect(Collectors.toMap(TcTaskDraft::getBusinessKey,
-                        sourceTask -> twoShiftStockCovered
+                        sourceTask -> Boolean.TRUE.equals(aggregateTask.getFormingShutdownCloseOutFlag())
+                                ? nvl(sourceTask.getFormingShutdownCloseOutDemandQty())
+                                : twoShiftStockCovered
                                 ? nvl(sourceTask.getCurrentShiftDemandQty()).add(nvl(sourceTask.getNextShiftDemandQty()))
                                 : useCurrentShiftDemand
                                         ? nvl(sourceTask.getCurrentShiftDemandQty())
@@ -568,7 +584,9 @@ public class TcPlanCalcService implements ITcPlanCalcService {
     private void fillGroupFields(TcTaskDraft task, TcPlanTaskGroup taskGroup) {
         task.setPlanGroupKey(taskGroup.getPlanGroupKey());
         task.setGroupSourceCount(taskGroup.getSourceTaskList().size());
-        BigDecimal groupRequiredQty = Boolean.TRUE.equals(task.getTwoShiftStockCovered())
+        BigDecimal groupRequiredQty = Boolean.TRUE.equals(task.getFormingShutdownCloseOutFlag())
+                ? nvl(task.getFormingShutdownCloseOutDemandQty())
+                : Boolean.TRUE.equals(task.getTwoShiftStockCovered())
                 ? nvl(taskGroup.getGroupCurrentShiftDemandQty()).add(nvl(taskGroup.getGroupNextShiftDemandQty()))
                 : nvl(taskGroup.getGroupCurrentShiftDemandQty()).max(nvl(taskGroup.getGroupGuardDemandQty()));
         task.setGroupRequiredQty(groupRequiredQty);
@@ -1012,6 +1030,8 @@ public class TcPlanCalcService implements ITcPlanCalcService {
         evidence.put("stockDeductQty", task.getStockDeductQty());
         evidence.put("planStockQty", task.getPlanStockQty());
         evidence.put("tailFlag", task.getTailFlag());
+        evidence.put("formingShutdownCloseOutFlag", task.getFormingShutdownCloseOutFlag());
+        evidence.put("formingShutdownCloseOutDemandQty", task.getFormingShutdownCloseOutDemandQty());
         evidence.put("toolOverflowQty", task.getToolOverflowQty());
         evidence.put("totalToolQty", task.getTotalToolQty());
         evidence.put("availableToolQty", task.getAvailableToolQty());
@@ -1300,6 +1320,20 @@ public class TcPlanCalcService implements ITcPlanCalcService {
      */
     private BigDecimal nvl(BigDecimal value) {
         return value == null ? BigDecimal.ZERO : value;
+    }
+
+    /**
+     * 获取任务原始成型当班需求量，兼容未初始化日志追溯字段的旧测试任务。
+     *
+     * @param task 待读取任务
+     * @return 原始成型当班需求量
+     */
+    private BigDecimal resolveOriginalCurrentShiftDemandQty(TcTaskDraft task) {
+        if (task == null) {
+            return BigDecimal.ZERO;
+        }
+        return task.getOriginalCurrentShiftDemandQty() == null
+                ? this.nvl(task.getCurrentShiftDemandQty()) : task.getOriginalCurrentShiftDemandQty();
     }
 
     /**

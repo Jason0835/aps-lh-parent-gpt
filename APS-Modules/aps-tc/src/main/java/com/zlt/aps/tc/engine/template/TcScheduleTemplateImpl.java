@@ -6,10 +6,7 @@ import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.engine.schedule.*;
 import com.zlt.aps.common.engine.schedule.constraint.ScheduleToolLedgerSnapshot;
-import com.zlt.aps.tc.api.enums.TcAutoScheduleIssueCategoryEnum;
-import com.zlt.aps.tc.api.enums.TcScheduleRuleCodeEnum;
-import com.zlt.aps.tc.api.enums.TcScheduleRuleResultEnum;
-import com.zlt.aps.tc.api.enums.TcScheduleStepEnum;
+import com.zlt.aps.tc.api.enums.*;
 import com.zlt.aps.tc.engine.domain.*;
 import com.zlt.aps.tc.engine.service.*;
 import com.zlt.aps.tc.engine.util.TcGlueSimilarityUtils;
@@ -300,15 +297,110 @@ public class TcScheduleTemplateImpl extends AbsTcScheduleTemplate {
                 .filter(Objects::nonNull)
                 .collect(Collectors.groupingBy(TcTaskDraft::getShiftOrder, TreeMap::new, Collectors.toList()));
         shiftTaskMap.forEach((shiftOrder, shiftTaskList) -> {
-            // 同一班次按固定分段输出，避免多个任务的计划量与选机台明细交错，影响过程追溯。
-            shiftTaskList.forEach(task -> context.appendShiftProcessLog(shiftOrder,
-                    this.buildStepCalculationFormula(context, task, TcScheduleStepEnum.MACHINE_ASSIGN)));
-            shiftTaskList.forEach(task -> this.appendMachineCandidateDetail(context, task));
-            shiftTaskList.stream().filter(TcTaskDraft::isUnassigned).forEach(task ->
-                    context.appendShiftProcessLog(shiftOrder, "未排任务：胎侧代码={0}（胎胚号={1}），班次={2}，计划量={3}，未排原因={4}",
+            // 仅改变过程日志展示顺序：已排任务按最终机台任务链连续成块，未排任务稳定排在最后。
+            shiftTaskList.sort(this.buildMachineProcessLogTaskComparator(context));
+            shiftTaskList.forEach(task -> {
+                context.appendShiftProcessLog(shiftOrder,
+                        this.buildStepCalculationFormula(context, task, TcScheduleStepEnum.MACHINE_ASSIGN));
+                this.appendMachineCandidateDetail(context, task);
+                if (!task.isUnassigned() && StrUtil.isNotBlank(task.getMachineCode())) {
+                    context.appendShiftProcessLog(shiftOrder, "机台确认：胎侧代码={0}，机台={1}",
+                            task.getSidewallCode(), task.getMachineCode());
+                }
+                context.flushDeferredTaskProcessLogs(task);
+                String unplannedReasonDesc = this.resolveProcessUnplannedReasonDesc(task);
+                if (StrUtil.isNotBlank(unplannedReasonDesc)) {
+                    context.appendShiftProcessLog(shiftOrder,
+                            "未排任务：胎侧代码={0}（胎胚号={1}），班次={2}，计划量={3}，未排原因={4}",
                             task.getSidewallCode(), this.displayEmbryoCode(task.getEmbryoCode()), task.getShiftOrder(),
-                            task.getPlanQty(), task.getUnplannedReasonDesc()));
+                            task.getPlanQty(), unplannedReasonDesc);
+                }
+            });
         });
+        context.flushRemainingDeferredTaskProcessLogs();
+    }
+
+    /**
+     * 构建机台分配过程日志任务排序器。
+     *
+     * <p>已排任务严格按最终任务链的机台和班内序号输出；未排任务排在已排任务之后，
+     * 并沿用原待排名次和业务键稳定排序。该排序器仅用于日志展示。</p>
+     *
+     * @param context 排程上下文
+     * @return 机台分配过程日志任务排序器
+     */
+    private Comparator<TcTaskDraft> buildMachineProcessLogTaskComparator(TcScheduleContext context) {
+        return Comparator.comparing((TcTaskDraft task) -> this.resolveFinalTaskNode(context, task) == null ? 1 : 0)
+                .thenComparing(task -> this.resolveFinalMachineCode(context, task),
+                        Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(task -> this.resolveFinalTaskSequence(context, task),
+                        Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(this.buildLogTaskComparator());
+    }
+
+    /**
+     * 获取任务对应的最终任务链节点。
+     *
+     * @param context 排程上下文
+     * @param task    当前任务
+     * @return 最终任务链节点；未进入任务链时返回 null
+     */
+    private ScheduleTaskNode<TcTaskDraft> resolveFinalTaskNode(TcScheduleContext context, TcTaskDraft task) {
+        if (context == null || task == null || StrUtil.isBlank(task.getBusinessKey())) {
+            return null;
+        }
+        return context.getTaskNode(task.getBusinessKey());
+    }
+
+    /**
+     * 获取任务最终机台编码。
+     *
+     * @param context 排程上下文
+     * @param task    当前任务
+     * @return 最终机台编码
+     */
+    private String resolveFinalMachineCode(TcScheduleContext context, TcTaskDraft task) {
+        ScheduleTaskNode<TcTaskDraft> node = this.resolveFinalTaskNode(context, task);
+        return node == null ? null : node.getMachineCode();
+    }
+
+    /**
+     * 获取任务最终班内生产序号。
+     *
+     * @param context 排程上下文
+     * @param task    当前任务
+     * @return 最终班内生产序号
+     */
+    private Integer resolveFinalTaskSequence(TcScheduleContext context, TcTaskDraft task) {
+        ScheduleTaskNode<TcTaskDraft> node = this.resolveFinalTaskNode(context, task);
+        return node == null ? null : node.getSequence();
+    }
+
+    /**
+     * 解析过程日志使用的胎侧未排中文原因。
+     *
+     * @param task 当前排程任务
+     * @return 实际中文未排原因；无法确认时返回 null
+     */
+    private String resolveProcessUnplannedReasonDesc(TcTaskDraft task) {
+        if (task == null || !task.isUnassigned()) {
+            return null;
+        }
+        if (StrUtil.isNotBlank(task.getUnplannedReasonDesc())) {
+            return task.getUnplannedReasonDesc();
+        }
+        if (StrUtil.isNotBlank(task.getUnplannedReasonCode())) {
+            return Arrays.stream(TcUnplannedReasonEnum.values())
+                    .filter(reason -> reason.getCode().equals(task.getUnplannedReasonCode()))
+                    .map(TcUnplannedReasonEnum::getDesc)
+                    .findFirst()
+                    .orElse(null);
+        }
+        if (task.getToolOverflowQty() != null
+                && task.getToolOverflowQty().compareTo(BigDecimal.ZERO) > 0) {
+            return TcUnplannedReasonEnum.TOOL_NOT_ENOUGH.getDesc();
+        }
+        return null;
     }
 
     /**
@@ -497,17 +589,20 @@ public class TcScheduleTemplateImpl extends AbsTcScheduleTemplate {
             }
         }
         if (TcScheduleStepEnum.MACHINE_ASSIGN == stepEnum) {
-            this.sortedLogTaskStream(context).filter(TcTaskDraft::isUnassigned).forEach(task ->
-                    context.appendShiftFullProcessTrace(task.getShiftOrder(), new ScheduleProcessTraceEvent(
-                            stepEnum.getDesc(), task.getBusinessKey(), "未排判定",
-                            "机台过滤、胎侧/垫胶共用机台约束、评分、产能拆分和顺延后的任务状态。",
-                            "计划量=" + this.nvl(task.getPlanQty()) + "米，未排原因编码="
-                                    + StrUtil.blankToDefault(task.getUnplannedReasonCode(), "未提供") + "。",
-                            "没有满足全部硬约束且具备可用产能的目标时，保存剩余计划量为未排任务；胎侧机台容量无效时按5500米回退。",
-                            "候选机台逐项处理后仍有剩余量=" + this.nvl(task.getPlanQty()) + "米。",
-                            "未排原因=" + StrUtil.blankToDefault(task.getUnplannedReasonDesc(), "未提供具体原因") + "。",
-                            "写入未排记录和解释记录，不写入已排结果。"
-                    )));
+            this.sortedLogTaskStream(context)
+                    .filter(task -> StrUtil.isNotBlank(this.resolveProcessUnplannedReasonDesc(task)))
+                    .forEach(task -> {
+                        String unplannedReasonDesc = this.resolveProcessUnplannedReasonDesc(task);
+                        context.appendShiftFullProcessTrace(task.getShiftOrder(), new ScheduleProcessTraceEvent(
+                                stepEnum.getDesc(), task.getBusinessKey(), "未排判定",
+                                "机台过滤、胎侧/垫胶共用机台约束、评分、产能拆分和顺延后的任务状态。",
+                                "计划量=" + this.nvl(task.getPlanQty()) + "米。",
+                                "没有满足全部硬约束且具备可用产能的目标时，保存剩余计划量为未排任务；胎侧机台容量无效时按5500米回退。",
+                                "候选机台逐项处理后仍有剩余量=" + this.nvl(task.getPlanQty()) + "米。",
+                                "未排原因=" + unplannedReasonDesc + "。",
+                                "写入未排记录和解释记录，不写入已排结果。"
+                        ));
+                    });
         }
     }
 
@@ -639,6 +734,20 @@ public class TcScheduleTemplateImpl extends AbsTcScheduleTemplate {
     }
 
     /**
+     * 获取过程日志使用的原始成型当班需求量，避免产能拆分任务的结算值覆盖原始需求。
+     *
+     * @param task 当前排程任务
+     * @return 原始成型当班需求量，单位米
+     */
+    private BigDecimal resolveOriginalCurrentShiftDemandQty(TcTaskDraft task) {
+        if (task == null) {
+            return BigDecimal.ZERO;
+        }
+        return task.getOriginalCurrentShiftDemandQty() == null
+                ? this.nvl(task.getCurrentShiftDemandQty()) : task.getOriginalCurrentShiftDemandQty();
+    }
+
+    /**
      * 构建任务计划量及计划调整公式。
      *
      * @param task 排程任务
@@ -651,6 +760,8 @@ public class TcScheduleTemplateImpl extends AbsTcScheduleTemplate {
         this.appendSignedTerm(adjustmentTerms, "卷长取整调整", task.getTailRoundAdjustQty());
         this.appendSignedTerm(adjustmentTerms, "工装限额调整", task.getToolLimitAdjustQty());
         this.appendSignedTerm(adjustmentTerms, "机台产能调整", task.getCapacityAdjustQty());
+        BigDecimal originalCurrentShiftDemandQty = this.resolveOriginalCurrentShiftDemandQty(task);
+        BigDecimal currentShiftDemandQty = this.nvl(task.getCurrentShiftDemandQty());
         String baseFormula = "基础应排量" + this.nvl(task.getBaseDemandQty()).toPlainString();
         if (task.getSourceRequiredQty() != null || task.getStockDeductQty() != null) {
             baseFormula = "需求量" + this.nvl(task.getSourceRequiredQty()).toPlainString()
@@ -664,7 +775,8 @@ public class TcScheduleTemplateImpl extends AbsTcScheduleTemplate {
                 + "，" + this.displayMachineSummary(task.getCxMachineCode(), "成型机")
                 + "，深度（备库班数）=" + this.displayGuardShiftCount(task.getGuardShiftCount())
                 + "，胎侧长=" + this.nvl(task.getSidewallLength()).toPlainString()
-                + "，当班成型消耗=" + this.nvl(task.getCurrentShiftDemandQty()).toPlainString()
+                + "，当班成型消耗=" + originalCurrentShiftDemandQty.toPlainString()
+                + "，当前任务结算成型消耗=" + currentShiftDemandQty.toPlainString()
                 + "，\n库存供应时长=" + this.displaySupplyHours(task.getSupplyHours())
                 + "，" + this.displayGuardWindow(task.getFormingGuardWindowQtyMap())
                 + "，" + this.buildSupplyHoursFormula(task)
