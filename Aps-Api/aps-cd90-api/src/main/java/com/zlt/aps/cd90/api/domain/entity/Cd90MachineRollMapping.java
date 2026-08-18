@@ -43,4 +43,10 @@ public class Cd90MachineRollMapping extends BaseEntity implements Serializable {
     @TableField("MACHINE_CODE")
     @Excel(name = "ui.data.column.cd90MachineRollMapping.machineCode")
     private String machineCode;
+
+    /** 备注 */
+    @ApiModelProperty(value = "备注", name = "remark")
+    @TableField("REMARK")
+    @Excel(name = "ui.common.column.remark")
+    private String remark;
 }

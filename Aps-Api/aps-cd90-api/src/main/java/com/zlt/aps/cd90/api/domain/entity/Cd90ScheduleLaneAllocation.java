@@ -2,7 +2,9 @@ package com.zlt.aps.cd90.api.domain.entity;
 
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
+import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
 import java.io.Serializable;
@@ -38,4 +40,10 @@ public class Cd90ScheduleLaneAllocation extends BaseEntity implements Serializab
     @TableField("ALLOCATED_CART_COUNT") private Integer allocatedCartCount;
     /** 分配顺序。 */
     @TableField("ALLOCATION_ORDER") private Integer allocationOrder;
+
+    /** 备注 */
+    @ApiModelProperty(value = "备注", name = "remark")
+    @TableField("REMARK")
+    @Excel(name = "ui.common.column.remark")
+    private String remark;
 }

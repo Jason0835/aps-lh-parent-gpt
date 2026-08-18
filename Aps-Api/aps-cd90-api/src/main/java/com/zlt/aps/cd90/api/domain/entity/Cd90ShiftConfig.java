@@ -98,4 +98,10 @@ public class Cd90ShiftConfig extends BaseEntity implements Serializable {
     @TableField("IS_ACTIVE")
     @Excel(name = "ui.data.column.cd90ShiftConfig.isActive", dictType = "sys_enable_disable")
     private Integer isActive;
+
+    /** 备注 */
+    @ApiModelProperty(value = "备注", name = "remark")
+    @TableField("REMARK")
+    @Excel(name = "ui.common.column.remark")
+    private String remark;
 }

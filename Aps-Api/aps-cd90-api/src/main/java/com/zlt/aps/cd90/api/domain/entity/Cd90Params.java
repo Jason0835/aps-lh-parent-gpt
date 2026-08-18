@@ -58,4 +58,10 @@ public class Cd90Params extends BaseEntity implements Serializable {
     @TableField("ERROR_TIPS")
     @Excel(name = "ui.data.column.cd90Params.errorTips")
     private String errorTips;
+
+    /** 备注 */
+    @ApiModelProperty(value = "备注", name = "remark")
+    @TableField("REMARK")
+    @Excel(name = "ui.common.column.remark")
+    private String remark;
 }

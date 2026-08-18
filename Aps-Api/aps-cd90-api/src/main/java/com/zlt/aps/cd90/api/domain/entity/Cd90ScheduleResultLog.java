@@ -77,4 +77,10 @@ public class Cd90ScheduleResultLog extends BaseEntity implements Serializable {
     /** 自动排程原因明细JSON */
     @TableField("REASON_DETAIL")
     private String reasonDetail;
+
+    /** 备注 */
+    @ApiModelProperty(value = "备注", name = "remark")
+    @TableField("REMARK")
+    @Excel(name = "ui.common.column.remark")
+    private String remark;
 }

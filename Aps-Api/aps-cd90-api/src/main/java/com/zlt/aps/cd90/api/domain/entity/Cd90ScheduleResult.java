@@ -324,4 +324,10 @@ public class Cd90ScheduleResult extends BaseEntity implements Serializable {
             throw new IllegalArgumentException("直裁排程结果字段不存在: " + fieldName, exception);
         }
     }
+
+    /** 备注 */
+    @ApiModelProperty(value = "备注", name = "remark")
+    @TableField("REMARK")
+    @Excel(name = "ui.common.column.remark")
+    private String remark;
 }

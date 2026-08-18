@@ -87,4 +87,10 @@ public class Cd90Stock extends BaseEntity implements Serializable {
     @TableField("DATA_SOURCE")
     @Excel(name = "ui.data.column.cd90Stock.dataSource", dictType = "lh_precision_data_source")
     private String dataSource;
+
+    /** 备注 */
+    @ApiModelProperty(value = "备注", name = "remark")
+    @TableField("REMARK")
+    @Excel(name = "ui.common.column.remark")
+    private String remark;
 }
