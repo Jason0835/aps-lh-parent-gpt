@@ -85,7 +85,7 @@ public class DjCurlRollServiceImpl extends AbstractDocService<DjCurlRoll> implem
         int failureNum = 0;
         List<DjCurlRoll> importList = new ArrayList<>();
         List<ImportErrorLog> importErrorLogs = new ArrayList<>();
-        String uniqueMsg = I18nUtil.getMessage("ui.data.alert.cxStock.embryoCodeNotUnique");
+        String uniqueMsg = I18nUtil.getMessage("ui.data.alert.djCurlRoll.importUnique");
 
         for (int i = 0; i < list.size(); i++) {
             int errorNum = i + 2;
@@ -110,7 +110,7 @@ public class DjCurlRollServiceImpl extends AbstractDocService<DjCurlRoll> implem
                 continue;
             }
 
-            if (checkUnique(docEntity).equals(UserConstants.UNIQUE)) {
+            if (checkUniqueByCache(docEntity, existCurlRollMap).equals(UserConstants.UNIQUE)) {
                 importList.add(docEntity);
                 successNum++;
             } else {
@@ -155,6 +155,23 @@ public class DjCurlRollServiceImpl extends AbstractDocService<DjCurlRoll> implem
         } else {
             return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + successNum);
         }
+    }
+
+    /**
+     * 基于内存中预先加载的已有记录判断唯一性，
+     * 与 checkUnique 使用相同的唯一键口径（工厂编码 + 填充码），
+     * 替代导入循环内逐笔调用 checkUnique 查询数据库，提升大数据量导入性能
+     *
+     * @param entity 待校验的记录
+     * @param existCurlRollMap 预先加载的已有记录，按唯一键分组
+     * @return 唯一返回 UserConstants.UNIQUE，否则返回 UserConstants.NOT_UNIQUE
+     */
+    private String checkUniqueByCache(DjCurlRoll entity, Map<String, List<DjCurlRoll>> existCurlRollMap) {
+        List<DjCurlRoll> existList = existCurlRollMap.get(this.buildCurlRollKey(entity));
+        if (CollectionUtils.isNotEmpty(existList)) {
+            return UserConstants.NOT_UNIQUE;
+        }
+        return UserConstants.UNIQUE;
     }
 
     /**

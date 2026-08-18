@@ -67,7 +67,7 @@ public class DjCurlRollController extends AbstractDocBizController<DjCurlRoll> {
     @PostMapping
     public AjaxResult save(@RequestBody DjCurlRoll stock) {
         if (UserConstants.NOT_UNIQUE.equals(curlRollService.checkUnique(stock))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.error.message.quota.unique"));
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.djCurlRoll.importUnique"));
         }
         return super.save(stock);
     }

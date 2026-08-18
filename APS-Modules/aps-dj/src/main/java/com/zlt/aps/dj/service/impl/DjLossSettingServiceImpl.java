@@ -5,7 +5,9 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
+import java.text.MessageFormat;
 
 import javax.annotation.Resource;
 
@@ -22,7 +24,9 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.engine.service.FactoryService;
 import com.zlt.aps.dj.api.domain.entity.DjLossSetting;
+import com.zlt.aps.dj.api.domain.entity.DjMachineInfo;
 import com.zlt.aps.dj.mapper.DjLossSettingMapper;
+import com.zlt.aps.dj.mapper.DjMachineInfoMapper;
 import com.zlt.aps.dj.service.DjLossSettingService;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.enums.ImportErrorTypeEnums;
@@ -44,6 +48,9 @@ public class DjLossSettingServiceImpl extends AbstractDocService<DjLossSetting> 
     @Resource
     private DjLossSettingMapper lossSettingMapper;
 
+    @Resource
+    private DjMachineInfoMapper machineInfoMapper;
+
     @Override
     public String checkUnique(DjLossSetting entity) {
         if (StringUtils.isEmpty(entity.getMachineCode()) && StringUtils.isEmpty(entity.getPaddingCode())) {
@@ -55,21 +62,44 @@ public class DjLossSettingServiceImpl extends AbstractDocService<DjLossSetting> 
         queryWrapper.eq("FACTORY_CODE", entity.getFactoryCode());
         List<DjLossSetting> list = lossSettingMapper.selectList(queryWrapper);
 
-        // 机台、物料号都不为空，看是否有全匹配的
-        if (StringUtils.isNotEmpty(entity.getMachineCode()) && StringUtils.isNotEmpty(entity.getPaddingCode())
-                && list.stream().anyMatch(item -> Objects.equal(entity.getMachineCode(), item.getMachineCode())
-                        && Objects.equal(entity.getPaddingCode(), item.getPaddingCode()))) {
-            return UserConstants.NOT_UNIQUE;
-        } else if (StringUtils.isNotEmpty(entity.getMachineCode())
-                && list.stream().anyMatch(item -> Objects.equal(entity.getMachineCode(), item.getMachineCode())
-                        && StringUtils.isEmpty(entity.getPaddingCode()))) {
-            return UserConstants.NOT_UNIQUE;
-        } else if (StringUtils.isNotEmpty(entity.getPaddingCode())
-                && list.stream().anyMatch(item -> Objects.equal(entity.getPaddingCode(), item.getPaddingCode())
-                        && StringUtils.isEmpty(entity.getPaddingCode()))) {
-            return UserConstants.NOT_UNIQUE;
+        // 唯一判断逻辑抽取至 isUnique，供逐笔校验与导入内存校验共用，保证口径一致
+        if (this.isUnique(entity, list)) {
+            return UserConstants.UNIQUE;
         }
-        return UserConstants.UNIQUE;
+        return UserConstants.NOT_UNIQUE;
+    }
+
+    /**
+     * 判断损耗率记录是否与已有记录存在唯一冲突，规则与原 checkUnique 一致：
+     * 1. 机台码与物料号均非空：存在两项全匹配的记录则冲突
+     * 2. 机台码非空：存在同机台码且物料号为空的记录则冲突
+     * 3. 物料号非空：存在同物料号且机台码为空的记录则冲突
+     * 抽取为内存判断，供导入时传入预先加载的数据校验，避免逐笔查询数据库
+     *
+     * @param entity 待校验记录
+     * @param existList 已有记录（同一工厂）
+     * @return 存在唯一冲突返回 false，唯一返回 true
+     */
+    private boolean isUnique(DjLossSetting entity, List<DjLossSetting> existList) {
+        // 机台码、物料号均非空时，存在两项全匹配的记录则冲突
+        if (StringUtils.isNotEmpty(entity.getMachineCode()) && StringUtils.isNotEmpty(entity.getPaddingCode())
+                && existList.stream().anyMatch(item -> Objects.equal(entity.getMachineCode(), item.getMachineCode())
+                        && Objects.equal(entity.getPaddingCode(), item.getPaddingCode()))) {
+            return false;
+        }
+        // 机台码非空时，存在同机台码且物料号为空的记录则冲突
+        if (StringUtils.isNotEmpty(entity.getMachineCode())
+                && existList.stream().anyMatch(item -> Objects.equal(entity.getMachineCode(), item.getMachineCode())
+                        && StringUtils.isEmpty(item.getPaddingCode()))) {
+            return false;
+        }
+        // 物料号非空时，存在同物料号且物料号为空的记录则冲突（保留原 checkUnique 判断条件，保证抽取前后行为一致）
+        if (StringUtils.isNotEmpty(entity.getPaddingCode())
+                && existList.stream().anyMatch(item -> Objects.equal(entity.getPaddingCode(), item.getPaddingCode())
+                        && StringUtils.isEmpty(item.getPaddingCode()))) {
+            return false;
+        }
+        return true;
     }
 
     /**
@@ -99,7 +129,10 @@ public class DjLossSettingServiceImpl extends AbstractDocService<DjLossSetting> 
         int failureNum = 0;
         List<DjLossSetting> importList = new ArrayList<>();
         List<ImportErrorLog> importErrorLogs = new ArrayList<>();
-        String uniqueMsg = I18nUtil.getMessage("ui.data.alert.cxStock.embryoCodeNotUnique");
+        String uniqueMsg = I18nUtil.getMessage("ui.data.alert.djLossSetting.importUnique");
+
+        // 循环外一次性加载当前工厂的机台主数据编码，用于导入机台存在性校验
+        Set<String> machineCodeSet = this.loadMachineCodeSet(factoryCode);
 
         for (int i = 0; i < list.size(); i++) {
             int errorNum = i + 2;
@@ -107,6 +140,14 @@ public class DjLossSettingServiceImpl extends AbstractDocService<DjLossSetting> 
             List<ImportErrorLog> validated = ImportExcelValidatedUtils.validated(importLogId, errorNum, docEntity);
             ImportExcelValidatedUtils.validatedRepeat(list, docEntity, i, 2, importLogId, validated,
                     this.getCheckUniqueFields().toArray(new String[0]));
+            // 机台存在性校验：导入的机台不在机台主数据中，该行视为导入失败
+            if (StringUtils.isNotEmpty(docEntity.getMachineCode())
+                    && !machineCodeSet.contains(docEntity.getMachineCode())) {
+                ImportExcelValidatedUtils.addImportErrorLog(importLogId, errorNum,
+                        MessageFormat.format(I18nUtil.getMessage("ui.data.alert.djMachine.machineNotExist"),
+                                docEntity.getMachineCode()),
+                        validated);
+            }
             if (CollectionUtils.isNotEmpty(validated)) {
                 failureNum++;
                 docEntity.setId(-999L);
@@ -114,7 +155,8 @@ public class DjLossSettingServiceImpl extends AbstractDocService<DjLossSetting> 
             }
         }
 
-        // 循环外一次性加载当前工厂的全部已有记录，避免在循环内逐笔查询数据库
+        // 循环外一次性加载当前工厂的全部已有记录（含关键字段为空的记录，兼容部分匹配校验），避免在循环内逐笔查询数据库
+        List<DjLossSetting> existLossSettingList = this.loadExistLossSettingList(factoryCode);
         Map<String, List<DjLossSetting>> existLossSettingMap = this.loadExistLossSettingMap(factoryCode);
 
         for (int i = 0; i < list.size(); i++) {
@@ -124,7 +166,7 @@ public class DjLossSettingServiceImpl extends AbstractDocService<DjLossSetting> 
                 continue;
             }
 
-            if (checkUnique(docEntity).equals(UserConstants.UNIQUE)) {
+            if (this.isUnique(docEntity, existLossSettingList)) {
                 importList.add(docEntity);
                 successNum++;
             } else {
@@ -172,6 +214,41 @@ public class DjLossSettingServiceImpl extends AbstractDocService<DjLossSetting> 
     }
 
     /**
+     * 一次性加载当前工厂的全部机台主数据编码，用于导入时校验机台是否存在
+     *
+     * @param factoryCode 工厂编码
+     * @return 该工厂存在的机台编码集合
+     */
+    private Set<String> loadMachineCodeSet(String factoryCode) {
+        if (StringUtils.isEmpty(factoryCode)) {
+            return Collections.emptySet();
+        }
+        return machineInfoMapper
+                .selectList(new LambdaQueryWrapper<DjMachineInfo>()
+                        .eq(DjMachineInfo::getFactoryCode, factoryCode)
+                        .select(DjMachineInfo::getMachineCode))
+                .stream().map(DjMachineInfo::getMachineCode).filter(StringUtils::isNotBlank)
+                .collect(Collectors.toSet());
+    }
+
+    /**
+     * 一次性加载当前工厂的全部已有损耗率记录（含关键字段为空的记录），
+     * 供导入时在内存中判断唯一性，兼容机台码/物料号部分匹配的校验口径
+     *
+     * @param factoryCode 工厂编码
+     * @return 当前工厂的全部已有损耗率记录
+     */
+    private List<DjLossSetting> loadExistLossSettingList(String factoryCode) {
+        if (StringUtils.isEmpty(factoryCode)) {
+            return Collections.emptyList();
+        }
+        return lossSettingMapper.selectList(new LambdaQueryWrapper<DjLossSetting>()
+                .eq(DjLossSetting::getFactoryCode, factoryCode)
+                .select(DjLossSetting::getId, DjLossSetting::getFactoryCode, DjLossSetting::getMachineCode,
+                        DjLossSetting::getPaddingCode));
+    }
+
+    /**
      * 一次性加载当前工厂的全部已有损耗率记录，并按唯一键分组，避免导入时逐笔查询数据库
      *
      * @param factoryCode 工厂编码
@@ -181,12 +258,8 @@ public class DjLossSettingServiceImpl extends AbstractDocService<DjLossSetting> 
         if (StringUtils.isEmpty(factoryCode)) {
             return Collections.emptyMap();
         }
-        // 一次批量查询该工厂的全部记录，仅取唯一键匹配所需字段
-        List<DjLossSetting> existList = lossSettingMapper.selectList(new LambdaQueryWrapper<DjLossSetting>()
-                .eq(DjLossSetting::getFactoryCode, factoryCode)
-                .select(DjLossSetting::getId, DjLossSetting::getFactoryCode, DjLossSetting::getMachineCode,
-                        DjLossSetting::getPaddingCode));
-        // 按唯一键分组；排除关键字段为空的记录（与原逐笔 eq 查询口径一致，null 值不会被命中）
+        // 复用全量查询结果，按唯一键分组；排除关键字段为空的记录（与原逐笔 eq 查询口径一致，null 值不会被命中）
+        List<DjLossSetting> existList = this.loadExistLossSettingList(factoryCode);
         return existList.stream()
                 .filter(item -> StringUtils.isNotBlank(item.getFactoryCode())
                         && StringUtils.isNotBlank(item.getMachineCode())

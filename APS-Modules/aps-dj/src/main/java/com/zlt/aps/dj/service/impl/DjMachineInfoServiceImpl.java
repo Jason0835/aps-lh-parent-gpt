@@ -2,7 +2,10 @@ package com.zlt.aps.dj.service.impl;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -99,6 +102,9 @@ public class DjMachineInfoServiceImpl extends AbstractDocService<DjMachineInfo> 
             }
         }
 
+        // 循环外一次性加载当前工厂的全部已有记录，避免在循环内逐笔查询数据库
+        Map<String, List<DjMachineInfo>> existMachineMap = this.loadExistMachineMap(factoryCode);
+
         for (int i = 0; i < list.size(); i++) {
             int errorNum = i + 2;
             DjMachineInfo docEntity = list.get(i);
@@ -106,16 +112,13 @@ public class DjMachineInfoServiceImpl extends AbstractDocService<DjMachineInfo> 
                 continue;
             }
 
-            if (checkUnique(docEntity).equals(UserConstants.UNIQUE)) {
+            if (checkUniqueByCache(docEntity, existMachineMap).equals(UserConstants.UNIQUE)) {
                 importList.add(docEntity);
                 successNum++;
             } else {
                 if (updateSupport) {
-                    LambdaQueryWrapper<DjMachineInfo> queryWrapper = new LambdaQueryWrapper<>();
-                    queryWrapper.eq(DjMachineInfo::getFactoryCode, docEntity.getFactoryCode());
-                    queryWrapper.eq(DjMachineInfo::getMachineCode, docEntity.getMachineCode());
+                    List<DjMachineInfo> existList = existMachineMap.get(this.buildMachineKey(docEntity));
                     logger.info("updateSupport:{}", docEntity);
-                    List<DjMachineInfo> existList = machineMapper.selectList(queryWrapper);
                     if (existList.size() > 1) {
                         failureNum++;
                         String multipleMsg = I18nUtil.getMessage("ui.data.alert.cxStock.multipleRecords");
@@ -148,7 +151,57 @@ public class DjMachineInfoServiceImpl extends AbstractDocService<DjMachineInfo> 
             return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + successNum);
         }
     }
-    
+
+    /**
+     * 基于内存中预先加载的已有记录判断唯一性，
+     * 与 checkUnique 使用相同的唯一键口径（工厂编码 + 机台编码），
+     * 替代导入循环内逐笔调用 checkUnique 查询数据库，提升大数据量导入性能
+     *
+     * @param entity 待校验的记录
+     * @param existMachineMap 预先加载的已有记录，按唯一键分组
+     * @return 唯一返回 UserConstants.UNIQUE，否则返回 UserConstants.NOT_UNIQUE
+     */
+    private String checkUniqueByCache(DjMachineInfo entity, Map<String, List<DjMachineInfo>> existMachineMap) {
+        List<DjMachineInfo> existList = existMachineMap.get(this.buildMachineKey(entity));
+        if (CollectionUtils.isNotEmpty(existList)) {
+            return UserConstants.NOT_UNIQUE;
+        }
+        return UserConstants.UNIQUE;
+    }
+
+    /**
+     * 一次性加载当前工厂的全部已有机台信息，并按唯一键分组，
+     * 供导入时在内存中匹配已有记录，避免逐笔查询数据库
+     *
+     * @param factoryCode 工厂编码
+     * @return 唯一键 -> 已有记录列表
+     */
+    private Map<String, List<DjMachineInfo>> loadExistMachineMap(String factoryCode) {
+        if (StringUtils.isEmpty(factoryCode)) {
+            return Collections.emptyMap();
+        }
+        // 一次批量查询该工厂的全部记录，仅取唯一键匹配所需字段
+        List<DjMachineInfo> existList = machineMapper.selectList(new LambdaQueryWrapper<DjMachineInfo>()
+                .eq(DjMachineInfo::getFactoryCode, factoryCode)
+                .select(DjMachineInfo::getId, DjMachineInfo::getFactoryCode, DjMachineInfo::getMachineCode));
+        // 按唯一键分组；排除关键字段为空的记录（与原逐笔 eq 查询口径一致，null 值不会被命中）
+        return existList.stream()
+                .filter(item -> StringUtils.isNotBlank(item.getFactoryCode())
+                        && StringUtils.isNotBlank(item.getMachineCode()))
+                .collect(Collectors.groupingBy(this::buildMachineKey));
+    }
+
+    /**
+     * 构建机台信息唯一键：工厂编码 + 机台编码，用于内存中快速匹配已有记录
+     *
+     * @param entity 机台信息记录
+     * @return 唯一键
+     */
+    private String buildMachineKey(DjMachineInfo entity) {
+        return StringUtils.defaultString(entity.getFactoryCode()) + "|"
+                + StringUtils.defaultString(entity.getMachineCode());
+    }
+
     @Override
     protected List<String> getCheckUniqueFields() {
         return Arrays.asList("factoryCode", "machineCode");

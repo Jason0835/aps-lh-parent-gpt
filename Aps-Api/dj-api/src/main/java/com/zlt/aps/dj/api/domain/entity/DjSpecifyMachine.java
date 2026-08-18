@@ -35,7 +35,7 @@ public class DjSpecifyMachine extends BaseEntity{
     @TableField("PADDING_CODE")
     private String paddingCode;
 
-    @ApiModelProperty(value = "机台编码")
+    @ApiModelProperty(value = "机台")
     @Excel(name="ui.specifyMachine.column.machineName")
     @ImportValidated(name = "ui.specifyMachine.column.machineName", required = true, isCode = true, maxLength = 30)
     @TableField("MACHINE_CODE")

@@ -83,7 +83,7 @@ public class DjStockServiceImpl extends AbstractDocService<DjStock> implements D
         int failureNum = 0;
         List<DjStock> importList = new ArrayList<>();
         List<ImportErrorLog> importErrorLogs = new ArrayList<>();
-        String uniqueMsg = I18nUtil.getMessage("ui.data.alert.cxStock.embryoCodeNotUnique");
+        String uniqueMsg = I18nUtil.getMessage("ui.data.alert.djStock.importUnique");
 
         for (int i = 0; i < list.size(); i++) {
             int errorNum = i + 2;
@@ -108,7 +108,7 @@ public class DjStockServiceImpl extends AbstractDocService<DjStock> implements D
                 continue;
             }
 
-            if (checkUnique(docEntity).equals(UserConstants.UNIQUE)) {
+            if (checkUniqueByCache(docEntity, existStockMap).equals(UserConstants.UNIQUE)) {
                 importList.add(docEntity);
                 successNum++;
             } else {
@@ -157,6 +157,23 @@ public class DjStockServiceImpl extends AbstractDocService<DjStock> implements D
         }
     }
     
+    /**
+     * 基于内存中预先加载的已有库存数据判断唯一性，
+     * 与 checkUnique 使用相同的唯一键口径（工厂编码 + 库存日期 + 物料编码），
+     * 替代导入循环内逐笔调用 checkUnique 查询数据库，提升大数据量导入性能
+     *
+     * @param entity 待校验的库存记录
+     * @param existStockMap 预先加载的已有库存数据，按唯一键分组
+     * @return 唯一返回 UserConstants.UNIQUE，否则返回 UserConstants.NOT_UNIQUE
+     */
+    private String checkUniqueByCache(DjStock entity, Map<String, List<DjStock>> existStockMap) {
+        List<DjStock> existList = existStockMap.get(this.buildStockKey(entity));
+        if (CollectionUtils.isNotEmpty(existList)) {
+            return UserConstants.NOT_UNIQUE;
+        }
+        return UserConstants.UNIQUE;
+    }
+
     /**
      * 一次性加载导入数据涉及日期的全部已有库存，并按唯一键分组，
      * 供导入时在内存中匹配已有记录，避免逐笔查询数据库
