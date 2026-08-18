@@ -1,9 +1,13 @@
 package com.zlt.aps.cx.service.impl;
 
+import com.alibaba.nacos.shaded.com.google.common.collect.Lists;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.common.engine.domain.LhDayPlanAdjustVo;
 import com.zlt.aps.common.engine.utils.MonthPlanSurplusCalculator;
+import com.zlt.aps.lh.api.domain.entity.LhDayPlanAdjustRequire;
+import com.zlt.aps.utils.BeanCopyUtils;
 import com.zlt.aps.cx.component.ScheduleExecutionGuard;
 import com.zlt.aps.cx.constant.ScheduleConstants;
 import com.zlt.aps.cx.entity.CxMaterialEnding;
@@ -197,6 +201,7 @@ public class ScheduleServiceImpl implements ScheduleService {
     private final CxShiftMachineLoadMapper cxShiftMachineLoadMapper;
     private final MpFactoryProductionVersionMapper mpFactoryProductionVersionMapper;
     private final MdmMonthSurplusMapper mdmMonthSurplusMapper;
+    private final LhDayPlanAdjustMapper lhDayPlanAdjustMapper;
 
     // ==================== S5.1 对外接口 ====================
 
@@ -1333,6 +1338,29 @@ public class ScheduleServiceImpl implements ScheduleService {
         // 提前生产天数（与硫化 getAllProductionDateInfo 口径一致）
         int advanceDays = this.getAdvanceDays(factoryCode);
 
+        // 3.5. 按月计划口径加载硫化日计划调整量（首月 + 跨月时末月）
+        // TODO(后续优化): 此处通过本地 Mapper 跨模块直查，后续应统一改为 Feign 调用
+        //       ILhDayPlanAdjustRequireRemoteService#getMonthPlanLhDayAdjustList(yearMonth, factoryList, materialCodeList)，
+        //       使定稿版本查找、过滤逻辑与硫化侧一致，避免重复口径。
+        List<LhDayPlanAdjustVo> allLhDayAdjustList = Lists.newArrayList();
+        YearMonth firstYearMonth = YearMonth.of(prevYear, prevMonth);
+        List<LhDayPlanAdjustVo> firstMonthAdjustList = this.getMonthPlanLhDayAdjustList(
+                firstYearMonth, factoryCodeList, materialCodeList);
+        if (!CollectionUtils.isEmpty(firstMonthAdjustList)) {
+            allLhDayAdjustList.addAll(firstMonthAdjustList);
+        }
+        if (crossMonth) {
+            YearMonth lastYearMonth = YearMonth.of(nextYear, nextMonth);
+            List<LhDayPlanAdjustVo> lastMonthAdjustList = this.getMonthPlanLhDayAdjustList(
+                    lastYearMonth, factoryCodeList, materialCodeList);
+            if (!CollectionUtils.isEmpty(lastMonthAdjustList)) {
+                allLhDayAdjustList.addAll(lastMonthAdjustList);
+            }
+        }
+        log.info("加载硫化日计划调整量：首月={} 跨月={} 合计{} 条",
+                CollectionUtils.isEmpty(firstMonthAdjustList) ? 0 : firstMonthAdjustList.size(),
+                crossMonth, allLhDayAdjustList.size());
+
         // 4. 计算每个物料的硫化余量（按断点日累加计划量，支持跨月）
         List<MdmMonthSurplus> monthSurplusList = new ArrayList<>();
         for (String statusKey : allStatusKeys) {
@@ -1369,7 +1397,7 @@ public class ScheduleServiceImpl implements ScheduleService {
             int surplusQty = this.calculateSurplusQtyBySharedCalculator(
                     prevPlans, nextPlans, scheduleDate, scheduleEndDate,
                     prevDayFinishedQty, prevScheFinishedQty, nextDayFinishedQty, nextScheFinishedQty,
-                    isNextMonthFinal, startDay, advanceDays);
+                    isNextMonthFinal, startDay, advanceDays, allLhDayAdjustList);
 
             MdmMonthSurplus surplus = new MdmMonthSurplus();
             surplus.setMaterialCode(materialCode);
@@ -1540,6 +1568,7 @@ public class ScheduleServiceImpl implements ScheduleService {
      * @param isNextMonthFinal    次月是否已定稿
      * @param startDay            计划量起始计算日（次月定稿时为库存抓取日，否则为1）
      * @param advanceDays         提前生产天数（扩展排产窗口，与硫化 getAllProductionDateInfo 口径一致）
+     * @param allLhDayAdjustList  硫化日计划调整量（首月+跨月末月合计，共享计算器内按物料+计划类型+年月累加）
      * @return 硫化余量
      */
     private int calculateSurplusQtyBySharedCalculator(
@@ -1548,7 +1577,8 @@ public class ScheduleServiceImpl implements ScheduleService {
             LocalDate scheduleDate, LocalDate scheduleEndDate,
             int prevDayFinishedQty, int prevScheFinishedQty,
             int nextDayFinishedQty, int nextScheFinishedQty,
-            boolean isNextMonthFinal, int startDay, int advanceDays) {
+            boolean isNextMonthFinal, int startDay, int advanceDays,
+            List<LhDayPlanAdjustVo> allLhDayAdjustList) {
         List<FactoryMonthPlanProductionFinalResult> allMonthPlans = Stream.concat(
                 prevPlans.stream(), nextPlans.stream()).collect(Collectors.toList());
         if (allMonthPlans.isEmpty()) {
@@ -1578,15 +1608,117 @@ public class ScheduleServiceImpl implements ScheduleService {
         Map<YearMonth, Integer> monthOverdueQtyMap =
                 MonthPlanSurplusCalculator.getOverdueProduction(
                         isNextMonthFinal, productionDates, allMonthPlans, plan);
+        // 当前物料+计划类型在各年月的日计划调整量
+        Map<YearMonth, Integer> yearMonthAdjustQtyMap =
+                MonthPlanSurplusCalculator.getYearMonthLhDayAdjustQty(plan, allLhDayAdjustList);
         Map<YearMonth, Integer> monthPlanQtyMap =
                 MonthPlanSurplusCalculator.getPlanQty(
-                        productionDates, allMonthPlans, plan, startDay);
+                        productionDates, allMonthPlans, allLhDayAdjustList, plan, startDay);
         int finishedQty = prevDayFinishedQty + prevScheFinishedQty
                 + nextDayFinishedQty + nextScheFinishedQty;
         int surplusQty = MonthPlanSurplusCalculator.getSurplusQty(
                 productionYearMonth, productionDates, hasProductionPlanMap,
-                monthOverdueQtyMap, monthPlanQtyMap, finishedQty);
+                monthOverdueQtyMap, monthPlanQtyMap, yearMonthAdjustQtyMap, finishedQty);
         return Math.max(0, surplusQty);
+    }
+
+    /**
+     * 按成型口径加载硫化日计划调整量（与 lh 侧 LhScheduleResultServiceImpl#getLhDayPlanAdjustList 逻辑对齐）。
+     *
+     * <ol>
+     *   <li>对每个工厂查该年-月的定稿排产版本（T_MP_PROC_VERSION.IS_FINAL=1，按 updateTime/id 倒序 LIMIT 1）；</li>
+     *   <li>根据定稿版本对应的 FACTORY_CODE、YEAR、MONTH 查询 T_LH_DAY_PLAN_ADJUST_REQUIRE 明细，
+     *       非空 materialCodeList 时按物料过滤；</li>
+     *   <li>结果转换为 {@link LhDayPlanAdjustVo}，供共享计算器按"物料+计划类型+年月"累加调整量。</li>
+     * </ol>
+     *
+     * <p>TODO(后续优化): 此处为跨模块共享数据源直查实现；后续统一通过 Feign 调用
+     * {@code ILhDayPlanAdjustRequireRemoteService#getMonthPlanLhDayAdjustList(yearMonth, factoryList, materialCodeList)}，
+     * 以保证定稿版本过滤、查询等业务口径与硫化侧保持一致，避免双方逻辑漂移。
+     * </p>
+     *
+     * @param yearMonth        目标年-月
+     * @param factoryCodeList  工厂编码列表，为空直接返回空列表
+     * @param materialCodeList 物料编码列表；为空时不按物料过滤（即取整月全部）
+     * @return 当月的硫化日计划调整量明细（空集合而非 null）
+     */
+    private List<LhDayPlanAdjustVo> getMonthPlanLhDayAdjustList(YearMonth yearMonth,
+                                                                 List<String> factoryCodeList,
+                                                                 List<String> materialCodeList) {
+        if (null == yearMonth || CollectionUtils.isEmpty(factoryCodeList)) {
+            return Collections.emptyList();
+        }
+        int year = yearMonth.getYear();
+        int month = yearMonth.getMonthValue();
+        List<LhDayPlanAdjustRequire> monthLhDayPlanAdjustRequireList = Lists.newArrayList();
+        for (String factoryCode : factoryCodeList) {
+            MpFactoryProductionVersion version = this.getFinalProductionVersion(factoryCode, year, month);
+            List<LhDayPlanAdjustRequire> singleFactoryList =
+                    this.getProductionVersionYearMonthLhDayPlanAdjustInfo(version, materialCodeList);
+            if (!CollectionUtils.isEmpty(singleFactoryList)) {
+                monthLhDayPlanAdjustRequireList.addAll(singleFactoryList);
+            }
+        }
+        if (CollectionUtils.isEmpty(monthLhDayPlanAdjustRequireList)) {
+            return Collections.emptyList();
+        }
+        return BeanCopyUtils.copyBeanList(monthLhDayPlanAdjustRequireList, LhDayPlanAdjustVo.class);
+    }
+
+    /**
+     * 查询指定工厂+年月的定稿排产版本。
+     *
+     * <p>与 lh 侧 LhDayPlanAdjustRequireServiceImpl#getFinalProductionVersion 口径一致：
+     * IS_FINAL="1"、IS_DELETE=0，按 UPDATE_TIME DESC、ID DESC LIMIT 1。
+     *
+     * @param factoryCode 工厂编码
+     * @param year        年份
+     * @param month       月份
+     * @return 定稿排产版本；不存在返回 null
+     */
+    private MpFactoryProductionVersion getFinalProductionVersion(String factoryCode, int year, int month) {
+        if (org.apache.commons.lang3.StringUtils.isBlank(factoryCode)) {
+            return null;
+        }
+        LambdaQueryWrapper<MpFactoryProductionVersion> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(MpFactoryProductionVersion::getFactoryCode, factoryCode)
+                .eq(MpFactoryProductionVersion::getYear, year)
+                .eq(MpFactoryProductionVersion::getMonth, month)
+                .eq(MpFactoryProductionVersion::getIsFinal, "1")
+                .eq(MpFactoryProductionVersion::getIsDelete, "0")
+                .orderByDesc(MpFactoryProductionVersion::getUpdateTime)
+                .orderByDesc(MpFactoryProductionVersion::getId)
+                .last("LIMIT 1");
+        return mpFactoryProductionVersionMapper.selectOne(wrapper);
+    }
+
+    /**
+     * 根据排产版本号，查询对应年月的硫化日计划调整明细。
+     *
+     * <p>与 lh 侧 LhDayPlanAdjustRequireServiceImpl#getProductionVersionYearMonthLhDayAdjustInfo 口径一致：
+     * 工厂+年月匹配，materialCodeList 非空时追加物料过滤，IS_DELETE=0。
+     *
+     * @param version          排产版本信息（提供 FACTORY_CODE / YEAR / MONTH）
+     * @param materialCodeList 需要查询的物料编码集合；为空时不过滤
+     * @return 硫化日计划调整明细；版本为空时返回空列表
+     */
+    private List<LhDayPlanAdjustRequire> getProductionVersionYearMonthLhDayPlanAdjustInfo(
+            MpFactoryProductionVersion version, List<String> materialCodeList) {
+        if (null == version) {
+            return Collections.emptyList();
+        }
+        LambdaQueryWrapper<LhDayPlanAdjustRequire> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(LhDayPlanAdjustRequire::getFactoryCode, version.getFactoryCode())
+                .eq(LhDayPlanAdjustRequire::getYear, version.getYear())
+                .eq(LhDayPlanAdjustRequire::getMonth, version.getMonth())
+                .in(!CollectionUtils.isEmpty(materialCodeList),
+                        LhDayPlanAdjustRequire::getMaterialCode, materialCodeList)
+                .eq(LhDayPlanAdjustRequire::getIsDelete, "0");
+        List<LhDayPlanAdjustRequire> dataResult = lhDayPlanAdjustMapper.selectList(wrapper);
+        if (CollectionUtils.isEmpty(dataResult)) {
+            return Collections.emptyList();
+        }
+        return dataResult;
     }
 
     /**

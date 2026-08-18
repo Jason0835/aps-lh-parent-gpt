@@ -17,6 +17,7 @@ import com.zlt.aps.tm.api.domain.vo.TmRollingRecalcResponseVO;
 import com.zlt.aps.tm.api.enums.TmReleaseStatusTransition;
 import com.zlt.aps.tm.api.enums.TmScheduleEventTypeEnum;
 import com.zlt.aps.tm.domain.TmRollingAdjustment;
+import com.zlt.aps.tm.engine.domain.TmMachineCandidate;
 import com.zlt.aps.tm.engine.domain.TmScheduleContext;
 import com.zlt.aps.tm.engine.domain.TmTaskDraft;
 import com.zlt.aps.tm.engine.event.TmScheduleEvent;
@@ -194,6 +195,7 @@ public class TmRollingUpdateServiceImpl implements ITmRollingUpdateService {
         for (TmRollingAdjustment adjustment : adjustmentList) {
             this.appendAdjustmentRequests(request, adjustment, changeRequestList);
         }
+        this.validateRollingMachineRelations(context, beforeList, changeRequestList);
         int updateCount = changeRequestList.isEmpty() ? 0
                 : tmManualInsertRollingService.changeQtyAndRollBatch(changeRequestList);
         List<TmScheduleResult> afterList = this.loadScheduleResults(request);
@@ -201,6 +203,71 @@ public class TmRollingUpdateServiceImpl implements ITmRollingUpdateService {
                 beforeList, afterList, adjustmentList, context, updateCount);
         this.recordRollingLog(request, runKey, beforeList, afterList, response);
         return response;
+    }
+
+    /**
+     * 校验自动滚动新增计划量仍满足口型板、胶料机台关系。
+     *
+     * <p>减量、清零和计划量未变化时不阻断；校验复用本次滚动已加载的自动排程关系快照，
+     * 保证与自动派机的关系生效条件一致。</p>
+     *
+     * @param context 自动排程加载上下文
+     * @param currentResultList 当前结果快照
+     * @param changeRequestList 滚动调量请求
+     * @throws ServiceException 调增任务所在机台未命中关系白名单时抛出
+     */
+    private void validateRollingMachineRelations(TmScheduleContext context,
+                                                   List<TmScheduleResult> currentResultList,
+                                                   List<TmScheduleResult> changeRequestList) {
+        Map<Long, TmScheduleResult> currentResultMap = currentResultList.stream()
+                .filter(result -> result.getId() != null)
+                .collect(Collectors.toMap(TmScheduleResult::getId, Function.identity(), (first, ignored) -> first));
+        for (TmScheduleResult changeRequest : changeRequestList) {
+            TmScheduleResult currentResult = currentResultMap.get(changeRequest.getId());
+            if (currentResult == null || !this.hasPlanIncrease(currentResult, changeRequest)) {
+                continue;
+            }
+            if (StrUtil.isBlank(currentResult.getMouthPlateCode())) {
+                throw new ServiceException(I18nUtil.getMessage(
+                        "ui.data.alert.tm.schedule.mouthPlateInvalid"));
+            }
+            Optional<TmMachineCandidate> candidateOptional = context.getMachineCandidateList().stream()
+                            .filter(candidate -> Objects.equals(candidate.getMachineCode(),
+                                    currentResult.getMachineCode()))
+                            .findFirst();
+            boolean mouthPlateMatched = !context.getConfiguredMouthPlateCodeSet()
+                    .contains(currentResult.getMouthPlateCode())
+                    || candidateOptional.map(candidate -> candidate.getConfiguredMouthPlateCodes()
+                            .contains(currentResult.getMouthPlateCode())).orElse(false);
+            if (!mouthPlateMatched) {
+                throw new ServiceException(I18nUtil.getMessage(
+                        "ui.data.alert.tm.schedule.mouthPlateRejected"));
+            }
+            boolean glueMatched = !context.getConfiguredGlueCodeSet().contains(currentResult.getGlueCode())
+                    || candidateOptional.map(candidate -> candidate.getConfiguredGlueCodes()
+                            .contains(currentResult.getGlueCode())).orElse(false);
+            if (!glueMatched) {
+                throw new ServiceException(I18nUtil.getMessage(
+                        "ui.data.alert.tm.schedule.glueMachineRejected"));
+            }
+        }
+    }
+
+    /**
+     * 判断调量请求是否增加任一班次计划量。
+     *
+     * @param currentResult 当前数据库结果
+     * @param changeRequest 调量请求
+     * @return true 表示至少一个班次增加
+     */
+    private boolean hasPlanIncrease(TmScheduleResult currentResult, TmScheduleResult changeRequest) {
+        for (int shiftOrder = 1; shiftOrder <= TmScheduleConstants.TM_MAX_SHIFT_ORDER; shiftOrder++) {
+            if (this.readShiftQty(changeRequest, shiftOrder, false)
+                    .compareTo(this.readShiftQty(currentResult, shiftOrder, false)) > 0) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
