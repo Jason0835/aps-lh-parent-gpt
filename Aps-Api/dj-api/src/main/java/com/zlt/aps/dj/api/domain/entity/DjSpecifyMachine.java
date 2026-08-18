@@ -52,4 +52,9 @@ public class DjSpecifyMachine extends BaseEntity{
     @ImportValidated(name = "ui.specifyMachine.column.jobType",required = true, maxLength = 12)
     @TableField("JOB_TYPE")
     private String jobType;
+
+    @ImportValidated(name = "ui.data.column.info.remark", maxLength = 100)
+    @ApiModelProperty(value = "备注")
+    @TableField(value = "REMARK")
+    private String remark;
 }

@@ -50,4 +50,8 @@ public class DjLossSetting extends BaseEntity {
     @TableField("LOSS_RATE")
     private BigDecimal lossRate;
 
+    @ImportValidated(name = "ui.data.column.info.remark", maxLength = 100)
+    @ApiModelProperty(value = "备注")
+    @TableField(value = "REMARK")
+    private String remark;
 }
