@@ -1652,7 +1652,7 @@
   "ui.data.column.cd90ScheduleResult.modalName": "纤维直裁排程结果",
   "ui.data.column.cd90ScheduleResult.alreadyExist": "已经存在相同帘布大卷和帘布代码的排程记录！",
   "ui.data.column.loss.lossRate": "损耗率",
-  "ui.data.column.loss.line": "生产线",
+  "ui.data.column.loss.line": "机台",
   "ui.data.column.loss.machineCode": "机台编码",
   "ui.data.column.loss.steelRingCode": "钢丝圈代码",
   "ui.data.column.loss.liningCode": "内衬代码",

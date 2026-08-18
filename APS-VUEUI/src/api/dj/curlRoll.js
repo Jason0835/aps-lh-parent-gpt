@@ -21,10 +21,3 @@ export function saveCurlRoll(query) {
     data: query
   })
 }
-export function checkCurlRollCodeUnique(query) {
-  return request({
-    url: 'dj/curlRoll/checkUnique',
-    method: 'post',
-    data: query
-  })
-}

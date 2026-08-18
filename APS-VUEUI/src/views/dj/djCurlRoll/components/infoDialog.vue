@@ -34,7 +34,7 @@ import { mapState } from "vuex";
 import infoForm from "@/views/components/infoForm.vue";
 
 import { getConfigKey } from "@/api/system/config";
-import { saveCurlRoll,checkCurlRollCodeUnique } from "@/api/dj/curlRoll";
+import { saveCurlRoll } from "@/api/dj/curlRoll";
 
 export default {
   components: { infoForm },
@@ -141,39 +141,12 @@ export default {
       this.isEdit = false;
       this.visible = false;
     },
-    checkCurlRollCodeUnique(rule, value, callback) {
-      return new Promise((resolve, reject) => {
-        checkCurlRollCodeUnique({
-          id: this.form.id,
-          paddingCode: this.form.paddingCode,
-        })
-          .then((res) => {
-            if (res === 0) {
-              resolve();
-            } else {
-              reject(new Error(this.$t("ui.curlRoll.alter.isSpecExist")));
-            }
-          })
-          .catch((error) => {
-            console.error(error);
-            reject(new Error("验证失败，请稍后再试"));
-          });
-      });
-    },
-
-   handleConfirm() {
-      this.$refs.form.triggerConfirm(async (params) => {
-        try {
-          this.loading = true;
-          await this.checkCurlRollCodeUnique();
-          this.save({
-            ...params,
-            factoryCode: params.factoryCode || this.factoryCode,
-          });
-        } catch (error) {
-          this.$modal.msgError(error.message);
-          this.loading = false;
-        }
+    handleConfirm() {
+      this.$refs.form.triggerConfirm((params) => {
+        this.save({
+          ...params,
+          factoryCode: params.factoryCode || this.factoryCode,
+        });
       });
     },
   },

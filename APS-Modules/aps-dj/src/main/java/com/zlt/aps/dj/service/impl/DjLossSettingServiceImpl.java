@@ -93,10 +93,10 @@ public class DjLossSettingServiceImpl extends AbstractDocService<DjLossSetting> 
                         && StringUtils.isEmpty(item.getPaddingCode()))) {
             return false;
         }
-        // 物料号非空时，存在同物料号且物料号为空的记录则冲突（保留原 checkUnique 判断条件，保证抽取前后行为一致）
+        // 物料号非空时，存在同物料号且机台号为空的记录则冲突（保留原 checkUnique 判断条件，保证抽取前后行为一致）
         if (StringUtils.isNotEmpty(entity.getPaddingCode())
                 && existList.stream().anyMatch(item -> Objects.equal(entity.getPaddingCode(), item.getPaddingCode())
-                        && StringUtils.isEmpty(item.getPaddingCode()))) {
+                        && StringUtils.isEmpty(item.getMachineCode()))) {
             return false;
         }
         return true;

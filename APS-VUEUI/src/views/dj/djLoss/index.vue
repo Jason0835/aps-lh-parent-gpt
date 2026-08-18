@@ -33,7 +33,7 @@
         > -->
         <el-button
           v-hasPermi="['dj:loss:import']"
-          @click="$refs.tltUpload.handleImport()"
+          @click="() => $refs.tltUploadForm.handleImport(importDefaultValue)"
           >{{ $t("ui.frame.btn.import") }}</el-button
         >
         <el-button @click="handleExport" v-hasPermi="['dj:loss:export']">{{
@@ -42,11 +42,15 @@
       </template>
     </page-table>
     <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
-    <tlt-upload
-      ref="tltUpload"
+    <tlt-upload-form
+      ref="tltUploadForm"
+      :title="$t('ui.dj.lossSetting.column.modalName')"
       downloadUrl="/dj/lossSetting/importTemplate"
       uploadUrl="/dj/lossSetting/importData"
       @uploadSuccess="getList"
+      labelWidth="0"
+      :columns="importColumns"
+      :rules="importRules"
     />
     <infoDialog ref="infoRef" @success="getList" />
   </basic-container>
@@ -60,14 +64,14 @@ import { downloadLink } from "@/utils/request";
 import { listLoss, removeLoss } from "@/api/dj/loss";
 import { getConfigKey } from "@/api/system/config";
 //components
-import tltUpload from "@/components/tltUpload/tltUpload.vue";
+import TltUploadForm from "@/views/components/tltUploadForm.vue";
 
 import infoDialog from "./components/infoDialog.vue";
 
 export default {
  name: "DjLoss",
   components: {
-    tltUpload,
+    TltUploadForm,
     infoDialog,
   },
   dicts: ["biz_factory_name"],
@@ -95,7 +99,25 @@ export default {
         factoryCode: '',
         mainPlanMonth: "",
       },
-      importDefaultValue: {},
+      importDefaultValue: {
+        updateSupport: false,
+      },
+      importColumns: [
+        {
+          label: "",
+          prop: "updateSupport",
+          render: (form) => {
+            return (
+              <el-checkbox
+                label={this.$t("ui.checkbox.updateExistingData")}
+                v-model={form.updateSupport}
+              >
+                {this.$t("ui.checkbox.updateExistingData")}
+              </el-checkbox>
+            );
+          },
+        },
+      ],
       importRules: {},
     };
   },
