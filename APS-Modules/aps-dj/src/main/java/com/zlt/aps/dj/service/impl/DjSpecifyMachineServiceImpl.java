@@ -91,9 +91,13 @@ public class DjSpecifyMachineServiceImpl extends AbstractDocService<DjSpecifyMac
         // 循环外一次性加载当前工厂的机台主数据编码，用于导入机台存在性校验
         Set<String> machineCodeSet = this.loadMachineCodeSet(factoryCode);
 
+        // 循环外一次性加载当前工厂的全部已有记录，避免在循环内逐笔查询数据库
+        Map<String, List<DjSpecifyMachine>> existSpecifyMachineMap = this.loadExistSpecifyMachineMap(factoryCode);
+
         for (int i = 0; i < list.size(); i++) {
             int errorNum = i + 2;
             DjSpecifyMachine docEntity = list.get(i);
+            // 基础字段校验与重复校验
             List<ImportErrorLog> validated = ImportExcelValidatedUtils.validated(importLogId, errorNum, docEntity);
             ImportExcelValidatedUtils.validatedRepeat(list, docEntity, i, 2, importLogId, validated,
                     this.getCheckUniqueFields().toArray(new String[0]));
@@ -106,19 +110,10 @@ public class DjSpecifyMachineServiceImpl extends AbstractDocService<DjSpecifyMac
                         validated);
             }
             if (CollectionUtils.isNotEmpty(validated)) {
+                // 校验不通过，该行直接跳过，不再进行唯一性判断
                 failureNum++;
                 docEntity.setId(-999L);
                 importErrorLogs.addAll(validated);
-            }
-        }
-
-        // 循环外一次性加载当前工厂的全部已有记录，避免在循环内逐笔查询数据库
-        Map<String, List<DjSpecifyMachine>> existSpecifyMachineMap = this.loadExistSpecifyMachineMap(factoryCode);
-
-        for (int i = 0; i < list.size(); i++) {
-            int errorNum = i + 2;
-            DjSpecifyMachine docEntity = list.get(i);
-            if (docEntity.getId() != null && docEntity.getId() == -999L) {
                 continue;
             }
 

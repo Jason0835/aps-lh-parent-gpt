@@ -450,7 +450,7 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
         // }
         DjScheduleResult oldSchedule = this.djScheduleResultMapper.selectById(newSchedule.getId()); // 操作前的排程数据
         // 构建日志并保存
-        djDispatcherLogService.saveBill(this.buildDispatcherLog(operType, newSchedule, oldSchedule));
+        djDispatcherLogService.save(this.buildDispatcherLog(operType, newSchedule, oldSchedule));
     }
 
     /**
@@ -471,7 +471,7 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
                     .orElse(null);
         }
         // 构建日志并保存
-        djDispatcherLogService.saveBill(this.buildDispatcherLog(operType, newSchedule, oldSchedule));
+        djDispatcherLogService.save(this.buildDispatcherLog(operType, newSchedule, oldSchedule));
     }
 
     /*

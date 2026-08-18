@@ -31,14 +31,13 @@ public class GsqSpecifyMachine extends BaseEntity {
     private String steelRingCode;
 
     /** 生产线（机台编码，对应T_GSQ_MACHINE_INFO表MACHINE_CODE） */
-    @Excel(name = "ui.data.column.gsq.specifyMachine.machineCode")
+    @Excel(name = "ui.data.column.gsq.specifyMachine.machineName")
     @ApiModelProperty(value = "生产线（机台编码）", position = 30)
     @TableField("MACHINE_CODE")
     @ImportValidated(required = true, maxLength = 50)
     private String machineCode;
 
-    /** 生产线名称（反显字段，非数据库字段） */
-    @Excel(name = "ui.data.column.gsq.specifyMachine.machineName")
+    /** 生产线名称（反显字段，非数据库字段，仅供列表/导出显示，不出现在导入模板） */
     @ApiModelProperty(value = "生产线名称", position = 35)
     @TableField(exist = false)
     private String machineName;

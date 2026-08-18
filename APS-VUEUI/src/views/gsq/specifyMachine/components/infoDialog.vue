@@ -33,8 +33,8 @@ import { saveSpecifyMachine, checkSpecifyMachineUnique } from "@/api/gsq/specify
 import { listEnabledMachines } from "@/api/gsq/machine";
 
 export default {
-  dicts: ["LINE_TYPE", "JOB_TYPE"],
   components: { infoForm },
+  inject: ["parentDict"],
   data() {
     return {
       loading: false,
@@ -100,7 +100,7 @@ export default {
           prop: "lineType",
           span: 24,
           type: "select",
-          dictData: this.dict.type.LINE_TYPE,
+          dictData: this.parentDict.type.LINE_TYPE,
           filterable: true,
         },
         {
@@ -108,7 +108,7 @@ export default {
           prop: "jobType",
           span: 24,
           type: "select",
-          dictData: this.dict.type.JOB_TYPE,
+          dictData: this.parentDict.type.JOB_TYPE,
           filterable: true,
         },
         {

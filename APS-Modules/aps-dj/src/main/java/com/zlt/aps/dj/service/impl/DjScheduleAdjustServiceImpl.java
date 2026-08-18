@@ -920,7 +920,7 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
                 logEntry.setScheduleDate(recordScheduleDate);
                 logEntry.setOperType(ApsConstant.DISPATCHER_OPER_DELETE);
                 logEntry.setScheduleId(deleteId);
-                djDispatcherLogService.saveBill(logEntry);
+                djDispatcherLogService.save(logEntry);
             }
         }
 
@@ -1163,7 +1163,7 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
             logEntry.setScheduleDate(newSchedule.getScheduleDate());
             logEntry.setOperType(operType);
             logEntry.setScheduleId(newSchedule.getId());
-            djDispatcherLogService.saveBill(logEntry);
+            djDispatcherLogService.save(logEntry);
         } catch (Exception e) {
             log.warn("记录操作日志失败", e);
         }

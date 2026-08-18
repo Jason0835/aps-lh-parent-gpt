@@ -168,4 +168,27 @@
         ) latest ON history.ID = latest.selectedId
     </select>
 
+    <!-- 查询T-4至T-1期间在所有硫化机台上存在任一班次计划量的候选物料。 -->
+    <select id="selectProducedMaterialCodes" resultType="java.lang.String">
+        SELECT DISTINCT MATERIAL_CODE
+        FROM T_LH_SCHEDULE_RESULT
+        WHERE FACTORY_CODE = #{factoryCode}
+          AND SCHEDULE_DATE &gt;= #{startDate}
+          AND SCHEDULE_DATE &lt; #{endDate}
+          AND MATERIAL_CODE IN
+        <foreach collection="materialCodes" item="materialCode" open="(" separator="," close=")">
+            #{materialCode}
+        </foreach>
+          AND (
+              COALESCE(CLASS1_PLAN_QTY, 0) &gt; 0
+              OR COALESCE(CLASS2_PLAN_QTY, 0) &gt; 0
+              OR COALESCE(CLASS3_PLAN_QTY, 0) &gt; 0
+              OR COALESCE(CLASS4_PLAN_QTY, 0) &gt; 0
+              OR COALESCE(CLASS5_PLAN_QTY, 0) &gt; 0
+              OR COALESCE(CLASS6_PLAN_QTY, 0) &gt; 0
+              OR COALESCE(CLASS7_PLAN_QTY, 0) &gt; 0
+              OR COALESCE(CLASS8_PLAN_QTY, 0) &gt; 0
+          )
+    </select>
+
 </mapper>

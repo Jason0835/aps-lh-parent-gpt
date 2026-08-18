@@ -93,10 +93,10 @@ public class DjLossSettingServiceImpl extends AbstractDocService<DjLossSetting> 
                         && StringUtils.isEmpty(item.getPaddingCode()))) {
             return false;
         }
-        // 物料号非空时，存在同物料号且物料号为空的记录则冲突（保留原 checkUnique 判断条件，保证抽取前后行为一致）
+        // 物料号非空时，存在同物料号且机台号为空的记录则冲突（保留原 checkUnique 判断条件，保证抽取前后行为一致）
         if (StringUtils.isNotEmpty(entity.getPaddingCode())
                 && existList.stream().anyMatch(item -> Objects.equal(entity.getPaddingCode(), item.getPaddingCode())
-                        && StringUtils.isEmpty(item.getPaddingCode()))) {
+                        && StringUtils.isEmpty(item.getMachineCode()))) {
             return false;
         }
         return true;
@@ -134,9 +134,14 @@ public class DjLossSettingServiceImpl extends AbstractDocService<DjLossSetting> 
         // 循环外一次性加载当前工厂的机台主数据编码，用于导入机台存在性校验
         Set<String> machineCodeSet = this.loadMachineCodeSet(factoryCode);
 
+        // 循环外一次性加载当前工厂的全部已有记录（含关键字段为空的记录，兼容部分匹配校验），避免在循环内逐笔查询数据库
+        List<DjLossSetting> existLossSettingList = this.loadExistLossSettingList(factoryCode);
+        Map<String, List<DjLossSetting>> existLossSettingMap = this.loadExistLossSettingMap(factoryCode);
+
         for (int i = 0; i < list.size(); i++) {
             int errorNum = i + 2;
             DjLossSetting docEntity = list.get(i);
+            // 基础字段校验与重复校验
             List<ImportErrorLog> validated = ImportExcelValidatedUtils.validated(importLogId, errorNum, docEntity);
             ImportExcelValidatedUtils.validatedRepeat(list, docEntity, i, 2, importLogId, validated,
                     this.getCheckUniqueFields().toArray(new String[0]));
@@ -149,20 +154,10 @@ public class DjLossSettingServiceImpl extends AbstractDocService<DjLossSetting> 
                         validated);
             }
             if (CollectionUtils.isNotEmpty(validated)) {
+                // 校验不通过，该行直接跳过，不再进行唯一性判断
                 failureNum++;
                 docEntity.setId(-999L);
                 importErrorLogs.addAll(validated);
-            }
-        }
-
-        // 循环外一次性加载当前工厂的全部已有记录（含关键字段为空的记录，兼容部分匹配校验），避免在循环内逐笔查询数据库
-        List<DjLossSetting> existLossSettingList = this.loadExistLossSettingList(factoryCode);
-        Map<String, List<DjLossSetting>> existLossSettingMap = this.loadExistLossSettingMap(factoryCode);
-
-        for (int i = 0; i < list.size(); i++) {
-            int errorNum = i + 2;
-            DjLossSetting docEntity = list.get(i);
-            if (docEntity.getId() != null && docEntity.getId() == -999L) {
                 continue;
             }
 

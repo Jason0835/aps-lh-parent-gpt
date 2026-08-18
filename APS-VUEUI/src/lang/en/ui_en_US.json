@@ -3,6 +3,7 @@
   "ui.data.column.factoryCode": "Factory",
   "ui.dj.lossSetting.column.paddingCode": "Padding code",
   "ui.dj.lossSetting.column.modalName": "Padding rubber loss rate management",
+  "ui.data.column.loss.line": "Machine",
   "ui.nc.lossSetting.column.liningCode": "Lining code",
   "ui.nc.lossSetting.column.modalName": "Lining loss rate management",
   "ui.dj.curlRoll.column.paddingCode": "Padding code",

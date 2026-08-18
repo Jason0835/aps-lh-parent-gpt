@@ -3,6 +3,7 @@
   "common.button.query": "Truy vấn",
   "ui.dj.lossSetting.column.paddingCode": "Mã đệm cao su",
   "ui.dj.lossSetting.column.modalName": "Quản lý tỷ lệ hao hụt đệm cao su",
+  "ui.data.column.loss.line": "Máy",
   "ui.nc.lossSetting.column.liningCode": "Mã lót trong",
   "ui.nc.lossSetting.column.modalName": "Quản lý tỷ lệ hao hụt lót trong",
   "ui.dj.curlRoll.column.paddingCode": "Mã đệm cao su",

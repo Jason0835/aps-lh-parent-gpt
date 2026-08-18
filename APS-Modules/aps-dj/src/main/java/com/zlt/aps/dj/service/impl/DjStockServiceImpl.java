@@ -85,26 +85,21 @@ public class DjStockServiceImpl extends AbstractDocService<DjStock> implements D
         List<ImportErrorLog> importErrorLogs = new ArrayList<>();
         String uniqueMsg = I18nUtil.getMessage("ui.data.alert.djStock.importUnique");
 
-        for (int i = 0; i < list.size(); i++) {
-            int errorNum = i + 2;
-            DjStock docEntity = list.get(i);
-            List<ImportErrorLog> validated = ImportExcelValidatedUtils.validated(importLogId, errorNum, docEntity);
-            ImportExcelValidatedUtils.validatedRepeat(list, docEntity, i, 2, importLogId, validated,
-                    this.getCheckUniqueFields().toArray(new String[0]));
-            if (CollectionUtils.isNotEmpty(validated)) {
-                failureNum++;
-                docEntity.setId(-999L);
-                importErrorLogs.addAll(validated);
-            }
-        }
-
         // 循环外一次性加载导入数据涉及日期的全部已有库存，避免在循环内逐笔查询数据库
         Map<String, List<DjStock>> existStockMap = this.loadExistStockMap(factoryCode, list);
 
         for (int i = 0; i < list.size(); i++) {
             int errorNum = i + 2;
             DjStock docEntity = list.get(i);
-            if (docEntity.getId() != null && docEntity.getId() == -999L) {
+            // 基础字段校验与重复校验
+            List<ImportErrorLog> validated = ImportExcelValidatedUtils.validated(importLogId, errorNum, docEntity);
+            ImportExcelValidatedUtils.validatedRepeat(list, docEntity, i, 2, importLogId, validated,
+                    this.getCheckUniqueFields().toArray(new String[0]));
+            if (CollectionUtils.isNotEmpty(validated)) {
+                // 校验不通过，该行直接跳过，不再进行唯一性判断
+                failureNum++;
+                docEntity.setId(-999L);
+                importErrorLogs.addAll(validated);
                 continue;
             }
 
