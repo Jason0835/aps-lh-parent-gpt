@@ -13,15 +13,15 @@
                         <li class="select-time">
                             <label>[[#{ui.data.column.stock.stockDate}]]：</label>
                             <input type="text" class="time-input"
-                                   th:placeholder="#{ui.data.column.stock.startTime}" name="startTime"/>
+                                   th:placeholder="#{ui.data.column.stock.startTime}" name="stockDateBegin"/>
                             <span  style='color: black;'>-</span>
                             <input type="text" class="time-input" id="endTime"
-                                   th:placeholder="#{ui.data.column.stock.endTime}" name="endTime"/>
+                                   th:placeholder="#{ui.data.column.stock.endTime}" name="stockDateEnd"/>
                         </li>
 
                         <li>
                             [[#{ui.data.column.quota.steelRingCode}]]：
-                            <input type="text" name="materialCode"/>
+                            <input type="text" name="steelRingCode"/>
                         </li>
                         <li>
                             <a class="btn btn-primary btn-rounded btn-sm" onclick="$.table.search()"><i
@@ -108,7 +108,7 @@
                     title: [[#{ui.data.column.stock.stockDate}]],
                 },
                 {
-                    field: 'materialCode',
+                    field: 'steelRingCode',
                     sortable: true,
                     align: 'center',
                     halign:'center',

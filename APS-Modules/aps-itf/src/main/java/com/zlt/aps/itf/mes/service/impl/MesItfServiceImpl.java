@@ -1950,6 +1950,7 @@ public class MesItfServiceImpl implements MesItfService {
         }
 
         // 转换 TqMesStock → TqStock，库存日期规范化到当天0点，保证与逻辑删除条件精确匹配
+        // 注意：IS_DELETE 必须显式置0，表默认值为NULL，且页面查询条件 IS_DELETE=0 不匹配NULL会导致数据不可见
         List<TqStock> tqStockInsertList = syncList.stream().map(item -> {
             TqStock tqStock = new TqStock();
             tqStock.setStockDate(item.getStockDate() == null ? null : DateUtil.beginOfDay(item.getStockDate()));
@@ -1959,6 +1960,7 @@ public class MesItfServiceImpl implements MesItfService {
             tqStock.setUpdateBy("MES");
             tqStock.setCreateTime(DateUtils.getNowDate());
             tqStock.setUpdateTime(DateUtils.getNowDate());
+            tqStock.setIsDelete(0);
             return tqStock;
         }).collect(Collectors.toList());
 
@@ -2018,12 +2020,14 @@ public class MesItfServiceImpl implements MesItfService {
         syncList = new ArrayList<>(groupMap.values());
 
         // 补审计字段，库存日期规范化到当天0点，保证与逻辑删除条件精确匹配
+        // 注意：IS_DELETE 必须显式置0，表默认值为NULL，且页面查询条件 IS_DELETE=0 不匹配NULL会导致数据不可见
         List<GsqStock> gsqStockInsertList = syncList.stream().map(item -> {
             item.setStockDate(item.getStockDate() == null ? null : DateUtil.beginOfDay(item.getStockDate()));
             item.setCreateBy("MES");
             item.setUpdateBy("MES");
             item.setCreateTime(DateUtils.getNowDate());
             item.setUpdateTime(DateUtils.getNowDate());
+            item.setIsDelete(0);
             return item;
         }).collect(Collectors.toList());
 

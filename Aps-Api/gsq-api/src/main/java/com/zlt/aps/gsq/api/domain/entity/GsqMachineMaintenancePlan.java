@@ -29,14 +29,13 @@ public class GsqMachineMaintenancePlan extends BaseEntity {
     private static final long serialVersionUID = 1L;
 
     /** 机台编码 */
-    @Excel(name = "ui.data.column.gsq.machineMaintenancePlan.machineCode")
+    @Excel(name = "ui.data.column.gsq.machineMaintenancePlan.machineName")
     @ApiModelProperty(value = "机台编码", position = 20)
     @TableField("MACHINE_CODE")
     @ImportValidated(required = true, maxLength = 50)
     private String machineCode;
 
-    /** 机台名称（反显字段，非数据库字段） */
-    @Excel(name = "ui.data.column.gsq.machineMaintenancePlan.machineName")
+    /** 机台名称（反显字段，非数据库字段，仅供列表/导出显示，不出现在导入模板） */
     @ApiModelProperty(value = "机台名称", position = 25)
     @TableField(exist = false)
     private String machineName;
