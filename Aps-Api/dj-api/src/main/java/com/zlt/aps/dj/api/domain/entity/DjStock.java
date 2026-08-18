@@ -109,6 +109,7 @@ public class DjStock extends BaseEntity {
     @TableField(exist = false)
     private BigDecimal curlLength;
 
+    @Excel(name = "ui.data.column.info.remark")
     @ImportValidated(name = "ui.data.column.info.remark", maxLength = 100)
     @ApiModelProperty(value = "备注")
     @TableField(value = "REMARK")
