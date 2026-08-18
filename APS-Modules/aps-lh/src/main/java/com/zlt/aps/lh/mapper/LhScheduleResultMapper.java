@@ -41,4 +41,19 @@ public interface LhScheduleResultMapper extends BaseMapper<LhScheduleResult> {
             @Param("scheduleDate") Date scheduleDate,
             @Param("closeOutBefore") Date closeOutBefore,
             @Param("machineCodes") List<String> machineCodes);
+
+    /**
+     * 查询指定日期区间内有计划量的物料编码。
+     *
+     * @param factoryCode  分厂编号
+     * @param startDate    开始日期（包含）
+     * @param endDate      结束日期（不包含）
+     * @param materialCodes 候选物料编码
+     * @return 区间内存在计划量的物料编码
+     */
+    List<String> selectProducedMaterialCodes(
+            @Param("factoryCode") String factoryCode,
+            @Param("startDate") Date startDate,
+            @Param("endDate") Date endDate,
+            @Param("materialCodes") List<String> materialCodes);
 }
