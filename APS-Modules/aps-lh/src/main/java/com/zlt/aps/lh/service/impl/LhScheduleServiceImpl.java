@@ -3114,8 +3114,10 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         if (CollUtil.isEmpty(list) || Objects.isNull(scheduleDate)) {
             return Collections.emptyMap();
         }
+        Set<String> multiMaterialMachineCodeSet = this.buildMultiMaterialMachineCodeSet(list);
         List<LhScheduleResult> triggerResults = list.stream()
                 .filter(this::isBeforeMaterialTriggerResult)
+                .filter(result -> !multiMaterialMachineCodeSet.contains(result.getLhMachineCode()))
                 .collect(Collectors.toList());
         if (CollUtil.isEmpty(triggerResults)) {
             return Collections.emptyMap();
@@ -3157,6 +3159,29 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                         LhScheduleResult::getLhMachineCode,
                         item -> item,
                         (first, second) -> first));
+    }
+
+    /**
+     * 收集当前排程日同机台存在多个物料的硫化机台编码。
+     * <p>前物料已出现在当前排程日明细中时，不再查询历史前规格，避免重复插入参考行。</p>
+     *
+     * @param list 当前排程日排程结果
+     * @return 同机台物料编码去重后大于1台的硫化机台编码集合
+     */
+    private Set<String> buildMultiMaterialMachineCodeSet(List<LhScheduleResult> list) {
+        if (CollUtil.isEmpty(list)) {
+            return Collections.emptySet();
+        }
+        return list.stream()
+                .filter(item -> StringUtils.isNotBlank(item.getLhMachineCode()))
+                .filter(item -> StringUtils.isNotBlank(item.getMaterialCode()))
+                .collect(Collectors.groupingBy(
+                        LhScheduleResult::getLhMachineCode,
+                        Collectors.mapping(LhScheduleResult::getMaterialCode, Collectors.toSet())))
+                .entrySet().stream()
+                .filter(entry -> entry.getValue().size() > 1)
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toSet());
     }
 
     /**
