@@ -1072,16 +1072,14 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                     }
                     // 20260810+ 淡橙标识规则调整：8 个班次内存在收尾标识（classXIsEnd ∈ 1/2/3）的行才标淡橙，
                     // 不再按 |合计余量| ≤ 400 判断。
-                    if (isCloseOutSku(rowResult)) {
-                        XSSFColor orange = new XSSFColor(new byte[]{(byte) 0xFC, (byte) 0xD5, (byte) 0xB4}, null);
-                        Cell cell = row.getCell(dailyPlanQtyCol);
-                        if (cell != null) {
-                            XSSFCellStyle style = workbook.createCellStyle();
-                            style.cloneStyleFrom(cell.getCellStyle());
-                            style.setFillForegroundColor(orange);
-                            style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
-                            cell.setCellStyle(style);
-                        }
+                    // 20260818+ 胎胚库存收尾标识（isEmbryoEnding=1）时，淡橙标记在“胎胚库存”列；
+                    // 其余收尾标识沿用原“合计余量”列淡橙。
+                    int highlightCol = ApsConstant.APS_STRING_1.equals(rowResult.getIsEmbryoEnding())
+                            ? this.resolveExportColorColumn(placeholderMap, "embryoStock", dailyPlanQtyCol)
+                            : dailyPlanQtyCol;
+                    if (isCloseOutSku(rowResult) && highlightCol >= 0) {
+                        this.applyRowForegroundColor(workbook, row, highlightCol,
+                                new byte[]{(byte) 0xFC, (byte) 0xD5, (byte) 0xB4});
                     }
                 }
 
@@ -1404,6 +1402,45 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             cell.setCellStyle(cellStyle);
         }
         cell.setBlank();
+    }
+
+    /**
+     * 为Excel明细行指定列写入前景色（纯色填充）。
+     *
+     * @param workbook 当前工作簿，用于创建单元格样式
+     * @param row      目标行
+     * @param colIndex 目标列索引（0起始）
+     * @param rgb      前景色RGB字节数组
+     */
+    private void applyRowForegroundColor(XSSFWorkbook workbook, Row row, int colIndex, byte[] rgb) {
+        if (Objects.isNull(workbook) || Objects.isNull(row) || colIndex < 0 || Objects.isNull(rgb)) {
+            return;
+        }
+        Cell cell = row.getCell(colIndex);
+        if (Objects.isNull(cell)) {
+            return;
+        }
+        XSSFColor color = new XSSFColor(rgb, null);
+        XSSFCellStyle style = workbook.createCellStyle();
+        style.cloneStyleFrom(cell.getCellStyle());
+        style.setFillForegroundColor(color);
+        style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+        cell.setCellStyle(style);
+    }
+
+    /**
+     * 解析导出颜色的目标列：优先使用指定业务列，缺失时回退到默认列。
+     *
+     * @param placeholderMap 占位符名称→列索引（0起始）的映射
+     * @param columnKey      目标列占位符名称
+     * @param defaultCol     默认列索引
+     * @return 解析出的目标列索引
+     */
+    private int resolveExportColorColumn(Map<String, Integer> placeholderMap, String columnKey, int defaultCol) {
+        if (StringUtils.isBlank(columnKey) || Objects.isNull(placeholderMap)) {
+            return defaultCol;
+        }
+        return Math.max(placeholderMap.getOrDefault(columnKey, -1), defaultCol);
     }
 
     /**
