@@ -1968,11 +1968,11 @@ public class TargetScheduleQtyResolver {
             return 0;
         }
         /*
-         * 结构胎胚时间配置保持原有“命中即使用精确首检试算”的语义；新增的正规/X/T 类型
+         * 结构胎胚时间保持“实际生效时才使用精确首检试算”的语义；新增的正规/X/T 类型
          * 门禁只有在真实推迟候选理论开产时才启用精确裁剪，避免扩大正规 SKU 影响范围。
          */
         boolean productionGateConstrained = Objects.nonNull(productionNotBeforeTime)
-                && (NewSpecEmbryoAvailableTimeResolver.isConstrained(context, sku)
+                && (NewSpecEmbryoAvailableTimeResolver.isEffectiveConstrained(context, sku)
                 || this.isCandidateProductionGateConstrained(
                         context, sku, machine, shifts, productionNotBeforeTime));
         if (productionGateConstrained) {

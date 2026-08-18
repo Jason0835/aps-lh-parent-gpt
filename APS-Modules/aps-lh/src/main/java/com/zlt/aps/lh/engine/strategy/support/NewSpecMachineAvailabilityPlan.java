@@ -39,13 +39,26 @@ public class NewSpecMachineAvailabilityPlan {
     /** 选机日志展示用的换模或换活字块完成时间（从机台收尾时间出发，只避让停机与20:00-06:00禁换模约束，豁免换模均衡配额）。 */
     private final Date traceChangeoverEndTime;
 
-    /** 正式生产门禁时间。 */
+    /** 正式生产门禁时间，包含胎胚最早可供时间。 */
     private final Date productionNotBeforeTime;
 
-    /** 综合全部约束后的真实可开产时间。 */
-    private final Date machineAvailableProductionTime;
+    /**
+     * 候选预演生产门禁时间。
+     *
+     * <p>仅保留试制/量试等 SKU 类型门禁，不包含胎胚最早可供时间；正规、小批量
+     * SKU 在候选预演阶段通常为空。</p>
+     */
+    private final Date candidateProductionNotBeforeTime;
 
-    /** 真实可开产时间严格按[start,end)命中的目标班次。 */
+    /**
+     * 候选预演真实可开产时间。
+     *
+     * <p>该时间用于逐班筛选和候选日志，不包含胎胚最早可供时间。正式生产时间由新增
+     * 排产主链在命中机台后重新应用 {@link #productionNotBeforeTime}。</p>
+     */
+    private final Date candidateAvailableProductionTime;
+
+    /** 候选预演真实可开产时间严格按[start,end)命中的目标班次。 */
     private final LhShiftConfigVO targetShift;
 
     /** 与候选时间轴同源的首检分摊计划。 */
@@ -60,7 +73,8 @@ public class NewSpecMachineAvailabilityPlan {
             Date changeoverStartTime,
             Date changeoverEndTime,
             Date productionNotBeforeTime,
-            Date machineAvailableProductionTime,
+            Date candidateProductionNotBeforeTime,
+            Date candidateAvailableProductionTime,
             LhShiftConfigVO targetShift,
             FirstInspectionAllocationPlan firstInspectionPlan,
             Date traceChangeoverEndTime) {
@@ -73,7 +87,8 @@ public class NewSpecMachineAvailabilityPlan {
         this.changeoverEndTime = changeoverEndTime;
         this.traceChangeoverEndTime = traceChangeoverEndTime;
         this.productionNotBeforeTime = productionNotBeforeTime;
-        this.machineAvailableProductionTime = machineAvailableProductionTime;
+        this.candidateProductionNotBeforeTime = candidateProductionNotBeforeTime;
+        this.candidateAvailableProductionTime = candidateAvailableProductionTime;
         this.targetShift = targetShift;
         this.firstInspectionPlan = firstInspectionPlan;
     }
@@ -114,8 +129,31 @@ public class NewSpecMachineAvailabilityPlan {
         return productionNotBeforeTime;
     }
 
+    /**
+     * 获取候选预演生产门禁时间。
+     *
+     * @return 不包含胎胚最早可供时间的候选预演门禁
+     */
+    public Date getCandidateProductionNotBeforeTime() {
+        return candidateProductionNotBeforeTime;
+    }
+
+    /**
+     * 获取候选预演真实可开产时间。
+     *
+     * @return 不包含胎胚最早可供时间的候选预演真实可开产时间
+     */
+    public Date getCandidateAvailableProductionTime() {
+        return candidateAvailableProductionTime;
+    }
+
+    /**
+     * 兼容已有调用方读取候选预演真实可开产时间。
+     *
+     * @return 候选预演真实可开产时间
+     */
     public Date getMachineAvailableProductionTime() {
-        return machineAvailableProductionTime;
+        return this.getCandidateAvailableProductionTime();
     }
 
     public LhShiftConfigVO getTargetShift() {

@@ -99,8 +99,8 @@ public class MachinePriorityTraceSnapshot {
      * 代表机台在本次选机时点对应的真实可开产时间。
      *
      * <p>该时间与逐班筛选的 {@code targetShift} 同源，由新增排产日驱动主链计算，
-     * 并复用同一份 {@code NewSpecMachineAvailabilityPlan}，仅用于日志展示“真实可开产时间”，
-     * 不参与正式排序或产能计算。</p>
+     * 并复用同一份 {@code NewSpecMachineAvailabilityPlan}。它是候选预演时间，不叠加胎胚
+     * 最早可供时间，仅用于日志展示“真实可开产时间”，不参与正式排序或产能计算。</p>
      */
     private final Map<String, Date> realAvailableProductionTimeMap;
 
@@ -276,7 +276,7 @@ public class MachinePriorityTraceSnapshot {
     }
 
     /**
-     * 创建同时冻结占用、收尾时间、软排序指标、换模/换活字块完成时间和真实可开产时间的完整快照。
+     * 创建同时冻结占用、收尾时间、软排序指标、换模/换活字块完成时间和候选预演真实可开产时间的完整快照。
      *
      * @param orderedCandidates 日志观察候选原顺序
      * @param actualSelectableMachineCodes 实际可选机台编码
@@ -287,7 +287,7 @@ public class MachinePriorityTraceSnapshot {
      * @param priorityTraceEndingTimeMap 选机时点日志收尾时间
      * @param priorityMetricSnapshotMap 正式模具分配前冻结的软排序指标
      * @param traceChangeoverEndTimeMap 选机时点换模或换活字块完成时间
-     * @param realAvailableProductionTimeMap 选机时点真实可开产时间
+     * @param realAvailableProductionTimeMap 选机时点候选预演真实可开产时间，不包含胎胚门禁
      */
     public MachinePriorityTraceSnapshot(
             List<MachineScheduleDTO> orderedCandidates,
@@ -841,10 +841,10 @@ public class MachinePriorityTraceSnapshot {
     }
 
     /**
-     * 获取选机时点冻结的真实可开产时间。
+     * 获取选机时点冻结的候选预演真实可开产时间。
      *
      * @param representativeMachineCode 代表机台编码
-     * @return 防御性复制后的真实可开产时间；选机时点无有效时间时返回 null
+     * @return 防御性复制后的候选预演真实可开产时间；选机时点无有效时间时返回 null
      */
     public Date resolveRealAvailableProductionTime(String representativeMachineCode) {
         Date realAvailableProductionTime =

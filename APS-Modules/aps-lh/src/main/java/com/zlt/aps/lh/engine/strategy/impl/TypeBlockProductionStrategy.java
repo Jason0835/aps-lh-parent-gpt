@@ -1741,8 +1741,18 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                         failureReason, earlyProductionRejectReason);
                 return false;
             }
-            earliestEmbryoAvailableTime =
+            Date configuredEarliestEmbryoAvailableTime =
                     NewSpecEmbryoAvailableTimeResolver.resolveEarliestAvailableTime(context, sku);
+            earliestEmbryoAvailableTime =
+                    NewSpecEmbryoAvailableTimeResolver.resolveEffectiveEarliestAvailableTime(context, sku);
+            if (Objects.nonNull(configuredEarliestEmbryoAvailableTime)
+                    && Objects.isNull(earliestEmbryoAvailableTime)) {
+                log.info("换活字块SKU胎胚最早可供时间因同结构续作已有有效排产而不生效, "
+                                + "batchNo: {}, materialCode: {}, structureName: {}, "
+                                + "configuredEarliestEmbryoAvailableTime: {}",
+                        context.getBatchNo(), sku.getMaterialCode(), sku.getStructureName(),
+                        LhScheduleTimeUtil.formatDateTime(configuredEarliestEmbryoAvailableTime));
+            }
             Date actualProductionStartTime = this.resolveTypeBlockEarlyProductionStartTime(
                     context, machine, sku, startTime, switchStartTime,
                     earliestEmbryoAvailableTime, shifts);
@@ -2414,7 +2424,7 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
      * 计算换活字块结构切换提前受胎胚时间和既有班次管控约束后的实际开产时间。
      *
      * <p>先复用现有时间解析器计算
-     * {@code max(原规则理论开产时间, 最早胎胚可供硫化时间)}，再复用班次管控工具顺延到
+     * {@code max(原规则理论开产时间, 当前生效的最早胎胚可供硫化时间)}，再复用班次管控工具顺延到
      * 首个真正具有硫化产能的时刻。换活字块开始和完成时间只作为日志与准备动作保留，
      * 不因胎胚尚未可供而后移。</p>
      *
