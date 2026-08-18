@@ -9,7 +9,7 @@ public enum TcProcessCodeEnum {
     FORMING("03", "成型"),
 
     /** 胎侧工序。 */
-    SIDEWALL("04", "胎侧");
+    SIDEWALL("05", "胎侧");
 
     private final String code;
 

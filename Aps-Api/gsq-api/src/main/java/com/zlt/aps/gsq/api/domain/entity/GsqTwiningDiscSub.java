@@ -39,15 +39,15 @@ public class GsqTwiningDiscSub extends BaseEntity implements Serializable {
     @ImportValidated(required = true, isCode = true, maxLength = 50)
     private String steelRingCode;
 
-    /** 钢丝圈名称（反显字段，非数据库字段，根据钢丝圈编号从施工信息表反显） */
+    /** 钢丝圈名称（数据库字段，页面可录入；编辑回显时根据钢丝圈编号从施工信息表反显） */
     @Excel(name = "ui.data.column.gsq.twiningDisc.steelRingName")
     @ApiModelProperty(value = "钢丝圈名称", position = 30)
-    @TableField(exist = false)
+    @TableField("STEEL_RING_NAME")
     private String steelRingName;
 
-    /** 备注 */
-    @Excel(name = "ui.common.column.remark")
-    @ApiModelProperty(value = "备注", position = 500)
+    /** 子表明细备注（与主表备注区分，使用独立多语言key） */
+    @Excel(name = "ui.data.column.gsq.twiningDisc.subRemark")
+    @ApiModelProperty(value = "明细备注", position = 500)
     @TableField("REMARK")
     @ImportValidated(maxLength = 900)
     private String remark;

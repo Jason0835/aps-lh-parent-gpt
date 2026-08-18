@@ -89,4 +89,10 @@ public class DjMachineInfo extends BaseEntity {
     @Excel(name = "ui.data.column.machine.status",dictType="STATUS")
     @ImportValidated(name = "ui.data.column.machine.status", maxLength = 6 ,required = true)
     private String status;
+
+    @Excel(name = "ui.data.column.info.remark")
+    @ImportValidated(name = "ui.data.column.info.remark", maxLength = 100)
+    @ApiModelProperty(value = "备注")
+    @TableField(value = "REMARK")
+    private String remark;
 }

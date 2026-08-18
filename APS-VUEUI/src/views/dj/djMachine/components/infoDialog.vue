@@ -29,6 +29,7 @@
 
 <script>
 import infoForm from "@/views/components/infoForm.vue";
+import { getConfigKey } from "@/api/system/config";
 import { editMachine } from "@/api/dj/machine";
 export default {
   components: { infoForm },
@@ -38,6 +39,7 @@ export default {
       loading: false,
       visible: false,
       isEdit: false,
+      factoryCode: "",
       form: {
         classShift: "2",
         openMachineClass: [],
@@ -196,6 +198,12 @@ export default {
     //utils
     show(data) {
       this.visible = true;
+      // 获取当前工厂编码（保存时需要带工厂参数）
+      if (!this.factoryCode) {
+        getConfigKey("sys.factory.code").then((response) => {
+          this.factoryCode = response.msg;
+        });
+      }
       if (data) {
         this.isEdit = true;
         this.form = {
@@ -232,7 +240,10 @@ export default {
 
         try {
           this.loading = true;
-          this.save(params);
+          this.save({
+            ...params,
+            factoryCode: params.factoryCode || this.factoryCode,
+          });
         } catch (error) {
           console.error(error);
           this.$modal.msgError(error.message);

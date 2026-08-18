@@ -16,8 +16,8 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.dj.api.domain.entity.DjDispatcherLog;
 import com.zlt.aps.dj.service.DjDispatcherLogService;
-import com.zlt.bill.common.controller.AbstractBillBizController;
-import com.zlt.bill.common.service.IBillService;
+import com.zlt.bill.common.controller.AbstractDocBizController;
+import com.zlt.bill.common.service.IDocService;
 
 import io.swagger.annotations.ApiOperation;
 
@@ -29,7 +29,7 @@ import io.swagger.annotations.ApiOperation;
  */
 @RestController
 @RequestMapping("/dj/dispatcherLog")
-public class DjDispatcherLogController extends AbstractBillBizController<DjDispatcherLog> {
+public class DjDispatcherLogController extends AbstractDocBizController<DjDispatcherLog> {
     @Autowired
     private DjDispatcherLogService dispatcherLogService;
 
@@ -61,8 +61,10 @@ public class DjDispatcherLogController extends AbstractBillBizController<DjDispa
         return super.exportData(dispatcherLog, I18nUtil.getMessage("ui.data.column.dj.dispatcherlog.modelName"), response);
     }
 
+
     @Override
-    protected IBillService<DjDispatcherLog> getBillService() {
+    @SuppressWarnings("rawtypes")
+    protected IDocService getDocService() {
         return dispatcherLogService;
     }
 

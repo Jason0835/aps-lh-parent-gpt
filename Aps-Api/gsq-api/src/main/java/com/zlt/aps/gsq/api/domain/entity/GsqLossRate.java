@@ -35,14 +35,13 @@ public class GsqLossRate extends BaseEntity {
     private String steelRingCode;
 
     /** 机台编码 */
-    @Excel(name = "ui.data.column.gsq.lossRate.machineCode")
+    @Excel(name = "ui.data.column.gsq.lossRate.machineName")
     @ApiModelProperty(value = "机台编码", position = 30)
     @TableField("MACHINE_CODE")
     @ImportValidated(maxLength = 50)
     private String machineCode;
 
-    /** 机台名称（反显字段，非数据库字段） */
-    @Excel(name = "ui.data.column.gsq.lossRate.machineName")
+    /** 机台名称（反显字段，非数据库字段，仅供列表/导出显示，不出现在导入模板） */
     @ApiModelProperty(value = "机台名称", position = 35)
     @TableField(exist = false)
     private String machineName;

@@ -34,6 +34,7 @@ import moment from "moment";
 import infoForm from "@/views/components/infoForm.vue";
 
 import { editStock } from "@/api/dj/stock";
+import { getConfigKey } from "@/api/system/config";
 import { getPaddingDistList } from "@/api/dj/djScheduleResult";
 
 export default {
@@ -43,6 +44,7 @@ export default {
       loading: false,
       visible: false,
       isEdit: false,
+      factoryCode: "",
       editType: null,
       form: {},
       paddingList: [],
@@ -204,6 +206,12 @@ export default {
     show(data, editType) {
       this.visible = true;
       this.editType = editType;
+      // 获取当前工厂编码（保存时需要带工厂参数）
+      if (!this.factoryCode) {
+        getConfigKey("sys.factory.code").then((response) => {
+          this.factoryCode = response.msg;
+        });
+      }
       this.loadPaddingList();
       if (data) {
         this.isEdit = true;
@@ -240,6 +248,7 @@ export default {
         }
         this.save({
           ...params,
+          factoryCode: params.factoryCode || this.factoryCode,
           editType: this.editType,
         });
       });

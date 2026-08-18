@@ -149,6 +149,15 @@ public class TmTaskDraft {
     /** 收尾成型余量，单位条 */
     private BigDecimal tailBalanceQty;
 
+    /** 成型需求对应的原始逻辑班次，取值1到8 */
+    private Integer formingLogicalShiftOrder;
+
+    /** 是否命中成型连续停产自动收尾 */
+    private Boolean formingShutdownCloseOutFlag;
+
+    /** 成型连续停产收尾需求量，单位米；按最后开放成型班原始需求计算 */
+    private BigDecimal formingShutdownCloseOutDemandQty;
+
     /** 损耗率，百分比；兼容旧测试或临时覆盖值 */
     private BigDecimal lossRate;
 

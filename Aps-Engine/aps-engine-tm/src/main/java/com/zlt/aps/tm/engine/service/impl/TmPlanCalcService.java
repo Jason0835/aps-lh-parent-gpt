@@ -8,10 +8,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.engine.quantity.PlanQuantityAllocationItem;
 import com.zlt.aps.common.engine.quantity.PlanQuantityAllocationUtils;
 import com.zlt.aps.tm.api.constant.TmScheduleConstants;
-import com.zlt.aps.tm.api.enums.TmScheduleErrorCodeEnum;
-import com.zlt.aps.tm.api.enums.TmScheduleRuleCodeEnum;
-import com.zlt.aps.tm.api.enums.TmScheduleRuleResultEnum;
-import com.zlt.aps.tm.api.enums.TmScheduleStrategyEnum;
+import com.zlt.aps.tm.api.enums.*;
 import com.zlt.aps.tm.engine.domain.*;
 import com.zlt.aps.tm.engine.service.ITmPlanCalcService;
 import com.zlt.aps.tm.engine.service.ITmPlanTailDecisionService;
@@ -252,6 +249,16 @@ public class TmPlanCalcService implements ITmPlanCalcService {
                 BeanUtils.copyProperties(groupSourceList.get(0), aggregateTask);
             }
             this.planTailDecisionService.applyTailDecision(aggregateTask, groupSourceList);
+            boolean formingShutdownCloseOut = groupSourceList.stream()
+                    .allMatch(task -> Boolean.TRUE.equals(task.getFormingShutdownCloseOutFlag()));
+            aggregateTask.setFormingShutdownCloseOutFlag(formingShutdownCloseOut);
+            aggregateTask.setFormingShutdownCloseOutDemandQty(formingShutdownCloseOut
+                    ? groupSourceList.stream().map(TmTaskDraft::getFormingShutdownCloseOutDemandQty)
+                    .map(this::nvl).reduce(BigDecimal.ZERO, BigDecimal::add)
+                    : BigDecimal.ZERO);
+            if (formingShutdownCloseOut) {
+                aggregateTask.setTailFlag(TmYesNoEnum.YES.getCode());
+            }
             List<TmTaskDraft> sourceSnapshotList = groupSourceList.stream()
                     .map(sourceTask -> this.copySourceTask(sourceTask, planGroupKey))
                     .collect(Collectors.toList());
@@ -384,7 +391,8 @@ public class TmPlanCalcService implements ITmPlanCalcService {
         if (task.getPlanQty() != null) {
             return groupKey + "|PRESET|" + task.getBusinessKey();
         }
-        return groupKey;
+        return Boolean.TRUE.equals(task.getFormingShutdownCloseOutFlag())
+                ? groupKey + "|FORMING_SHUTDOWN_CLOSE_OUT" : groupKey;
     }
 
     /**
@@ -484,7 +492,9 @@ public class TmPlanCalcService implements ITmPlanCalcService {
         boolean twoShiftStockCovered = Boolean.TRUE.equals(aggregateTask.getTwoShiftStockCovered());
         Map<String, BigDecimal> sourceWeightMap = taskGroup.getSourceTaskList().stream()
                 .collect(Collectors.toMap(TmTaskDraft::getBusinessKey,
-                        sourceTask -> nvl(sourceTask.getCurrentShiftDemandQty())
+                        sourceTask -> Boolean.TRUE.equals(aggregateTask.getFormingShutdownCloseOutFlag())
+                                ? nvl(sourceTask.getFormingShutdownCloseOutDemandQty())
+                                : nvl(sourceTask.getCurrentShiftDemandQty())
                                 .add(nvl(twoShiftStockCovered
                                         ? sourceTask.getNextShiftDemandQty() : sourceTask.getGuardDemandQty())),
                         BigDecimal::add, LinkedHashMap::new));
@@ -563,7 +573,9 @@ public class TmPlanCalcService implements ITmPlanCalcService {
     private void fillGroupFields(TmTaskDraft task, TmPlanTaskGroup taskGroup) {
         task.setPlanGroupKey(taskGroup.getPlanGroupKey());
         task.setGroupSourceCount(taskGroup.getSourceTaskList().size());
-        BigDecimal groupRequiredQty = Boolean.TRUE.equals(task.getTwoShiftStockCovered())
+        BigDecimal groupRequiredQty = Boolean.TRUE.equals(task.getFormingShutdownCloseOutFlag())
+                ? nvl(task.getFormingShutdownCloseOutDemandQty())
+                : Boolean.TRUE.equals(task.getTwoShiftStockCovered())
                 ? nvl(taskGroup.getGroupCurrentShiftDemandQty()).add(nvl(taskGroup.getGroupNextShiftDemandQty()))
                 : nvl(taskGroup.getGroupCurrentShiftDemandQty()).add(nvl(taskGroup.getGroupGuardDemandQty()));
         task.setGroupRequiredQty(groupRequiredQty);
@@ -1007,6 +1019,8 @@ public class TmPlanCalcService implements ITmPlanCalcService {
         evidence.put("stockDeductQty", task.getStockDeductQty());
         evidence.put("planStockQty", task.getPlanStockQty());
         evidence.put("tailFlag", task.getTailFlag());
+        evidence.put("formingShutdownCloseOutFlag", task.getFormingShutdownCloseOutFlag());
+        evidence.put("formingShutdownCloseOutDemandQty", task.getFormingShutdownCloseOutDemandQty());
         evidence.put("toolOverflowQty", task.getToolOverflowQty());
         evidence.put("totalToolQty", task.getTotalToolQty());
         evidence.put("availableToolQty", task.getAvailableToolQty());

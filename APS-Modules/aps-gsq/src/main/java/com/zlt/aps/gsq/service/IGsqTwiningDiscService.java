@@ -3,6 +3,7 @@ package com.zlt.aps.gsq.service;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.gsq.api.domain.entity.GsqTwiningDisc;
 import com.zlt.aps.gsq.api.domain.entity.GsqTwiningDiscSub;
+import com.zlt.aps.gsq.api.domain.vo.GsqTwiningDiscImportVo;
 import com.zlt.bill.common.service.IDocService;
 
 import java.util.List;
@@ -72,4 +73,17 @@ public interface IGsqTwiningDiscService extends IDocService<GsqTwiningDisc> {
      * @return 导入后提示信息
      */
     AjaxResult importData(List<GsqTwiningDisc> list, boolean updateSupport, Long importLogId);
+
+    /**
+     * 主子表平铺导入：按缠绕盘编码分组组装主表+子表明细后级联保存
+     * <p>导入模板一行 = 主表字段 + 子表字段；同一缠绕盘多行明细时主表字段以首行为准</p>
+     * <p>校验规则：缠绕盘编码/钢丝圈编号必填；同一缠绕盘+钢丝圈组合文件内不允许重复；
+     * 钢丝圈编号必须存在于施工信息表；钢丝圈名称未填写时按编号反显</p>
+     *
+     * @param list          平铺导入数据集合
+     * @param updateSupport 已存在是否更新（更新时级联替换旧子表明细）
+     * @param importLogId   导入日志id
+     * @return 导入后提示信息
+     */
+    AjaxResult importMainAndSubData(List<GsqTwiningDiscImportVo> list, boolean updateSupport, Long importLogId);
 }

@@ -98,7 +98,7 @@ public class DjCurlRollUIController extends BaseUIController<DjCurlRoll> {
     @ResponseBody
     public AjaxResult save(DjCurlRoll djMachine) {
         if (UserConstants.NOT_UNIQUE.equals(iDjCurlRollService.checkUnique(djMachine))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.djMachine.embryoCodeNotUnique"));
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.djCurlRoll.importUnique"));
         }
 
         return iDjCurlRollService.save(djMachine);

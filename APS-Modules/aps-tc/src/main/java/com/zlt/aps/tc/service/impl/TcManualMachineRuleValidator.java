@@ -6,9 +6,12 @@ import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.utils.MachineOpenShiftCodeUtil;
+import com.zlt.aps.common.core.utils.SixShiftWorkCalendarUtil;
 import com.zlt.aps.tc.api.constant.TcScheduleConstants;
 import com.zlt.aps.tc.api.domain.entity.*;
+import com.zlt.aps.tc.api.enums.TcProcessCodeEnum;
 import com.zlt.aps.tc.api.enums.TcSpecifyMachineJobTypeEnum;
+import com.zlt.aps.tc.domain.vo.TcWorkCalendarRowVo;
 import com.zlt.aps.tc.mapper.*;
 import org.springframework.stereotype.Service;
 
@@ -44,6 +47,8 @@ public class TcManualMachineRuleValidator {
 
     private final TcScheduleResultMapper scheduleResultMapper;
 
+    private final TcAutoScheduleDataLoadMapper autoScheduleDataLoadMapper;
+
     /**
      * 构造人工转机台校验器。
      *
@@ -56,6 +61,7 @@ public class TcManualMachineRuleValidator {
      * @param specifyMachineMapper 定点与禁排 Mapper
      * @param djSharedMachineMapper 胎侧垫胶共机 Mapper
      * @param scheduleResultMapper 排程结果 Mapper
+     * @param autoScheduleDataLoadMapper 工作日历查询 Mapper
      */
     public TcManualMachineRuleValidator(TcMachineInfoMapper machineInfoMapper,
                                         TcShiftConfigMapper shiftConfigMapper,
@@ -65,7 +71,8 @@ public class TcManualMachineRuleValidator {
                                         TcGlueMachineRealMapper glueMachineRealMapper,
                                         TcSpecifyMachineMapper specifyMachineMapper,
                                         TcDjSharedMachineMapper djSharedMachineMapper,
-                                        TcScheduleResultMapper scheduleResultMapper) {
+                                        TcScheduleResultMapper scheduleResultMapper,
+                                        TcAutoScheduleDataLoadMapper autoScheduleDataLoadMapper) {
         this.machineInfoMapper = machineInfoMapper;
         this.shiftConfigMapper = shiftConfigMapper;
         this.machineMaintenanceMapper = machineMaintenanceMapper;
@@ -75,6 +82,7 @@ public class TcManualMachineRuleValidator {
         this.specifyMachineMapper = specifyMachineMapper;
         this.djSharedMachineMapper = djSharedMachineMapper;
         this.scheduleResultMapper = scheduleResultMapper;
+        this.autoScheduleDataLoadMapper = autoScheduleDataLoadMapper;
     }
 
     /**
@@ -133,6 +141,7 @@ public class TcManualMachineRuleValidator {
                 || !this.isMachineShiftOpen(machineInfoList.get(0), shiftConfig)) {
             throw new ServiceException(I18nUtil.getMessage("ui.tc.schedule.changeMachine.machineShiftClosed"));
         }
+        this.requireWorkCalendarShiftOpen(sourceResult, shiftOrder);
     }
 
     /**
@@ -151,6 +160,7 @@ public class TcManualMachineRuleValidator {
         if (this.readPlanQty(requestResult, shiftOrder).compareTo(this.readPlanQty(currentResult, shiftOrder)) <= 0) {
             return;
         }
+        this.requireWorkCalendarShiftOpen(currentResult, shiftOrder);
         this.validateMouthPlate(currentResult, currentResult.getMachineCode());
         this.validateGlueMachine(currentResult, currentResult.getMachineCode());
     }
@@ -335,6 +345,9 @@ public class TcManualMachineRuleValidator {
      */
     BigDecimal resolveRollingCapacity(TcScheduleResult sourceResult, String targetMachineCode, Integer shiftOrder) {
         if (sourceResult == null || StringUtils.isBlank(targetMachineCode) || shiftOrder == null) {
+            return BigDecimal.ZERO;
+        }
+        if (!this.isWorkCalendarShiftOpen(sourceResult, shiftOrder)) {
             return BigDecimal.ZERO;
         }
         LambdaQueryWrapper<TcMachineInfo> machineWrapper = new LambdaQueryWrapper<>();
@@ -532,5 +545,51 @@ public class TcManualMachineRuleValidator {
         Object value = result.getFieldValueByFieldName(String.format(
                 TcScheduleConstants.SHIFT_PLAN_QTY_FIELD_TEMPLATE, shiftOrder));
         return value instanceof BigDecimal ? (BigDecimal) value : BigDecimal.ZERO;
+    }
+
+    /**
+     * 要求胎侧工作日历开放指定结果班次。
+     *
+     * @param scheduleResult 排程结果
+     * @param shiftOrder     结果班次顺序
+     * @throws ServiceException 工作日历停产或查询异常时抛出
+     */
+    private void requireWorkCalendarShiftOpen(TcScheduleResult scheduleResult, Integer shiftOrder) {
+        if (!this.isWorkCalendarShiftOpen(scheduleResult, shiftOrder)) {
+            throw new ServiceException(I18nUtil.getMessage("ui.tc.schedule.workCalendarShiftStopped"));
+        }
+    }
+
+    /**
+     * 查询胎侧工作日历并判断结果班次是否开放。
+     *
+     * @param scheduleResult 排程结果
+     * @param shiftOrder     结果班次顺序
+     * @return true表示开放，日历缺失或班次标志为空时兼容为开放
+     * @throws ServiceException 工作日历查询异常时抛出
+     */
+    private boolean isWorkCalendarShiftOpen(TcScheduleResult scheduleResult, Integer shiftOrder) {
+        if (scheduleResult == null || scheduleResult.getScheduleDate() == null || shiftOrder == null) {
+            return false;
+        }
+        try {
+            Date productionDate = SixShiftWorkCalendarUtil.resolveProductionDate(
+                    scheduleResult.getScheduleDate(), shiftOrder);
+            List<TcWorkCalendarRowVo> calendarList = this.autoScheduleDataLoadMapper.selectWorkCalendarRows(
+                    scheduleResult.getFactoryCode(), TcProcessCodeEnum.SIDEWALL.getCode(), productionDate);
+            if (calendarList == null || calendarList.isEmpty()) {
+                return true;
+            }
+            TcWorkCalendarRowVo calendar = calendarList.get(0);
+            if ("0".equals(calendar.getDayFlag())) {
+                return false;
+            }
+            int calendarShiftOrder = SixShiftWorkCalendarUtil.resolveCalendarShiftOrder(shiftOrder);
+            String shiftFlag = calendarShiftOrder == 1 ? calendar.getOneShiftFlag()
+                    : (calendarShiftOrder == 2 ? calendar.getTwoShiftFlag() : calendar.getThreeShiftFlag());
+            return shiftFlag == null || !"0".equals(shiftFlag);
+        } catch (RuntimeException exception) {
+            throw new ServiceException(I18nUtil.getMessage("ui.tc.schedule.workCalendarQueryFailed"), exception);
+        }
     }
 }

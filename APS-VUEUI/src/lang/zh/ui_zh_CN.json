@@ -175,7 +175,7 @@
   "ui.tc.glueOrder.column.modalName": "胎侧胶料顺序",
   "ui.nc.glueOrder.column.modalName": "内衬胶料顺序",
   "ui.specifyMachine.column.machineCode": "机台编码",
-  "ui.specifyMachine.column.machineName": "生产线",
+  "ui.specifyMachine.column.machineName": "机台",
   "ui.specifyMachine.column.lineType": "线路类型",
   "ui.specifyMachine.column.jobType": "作业类型",
   "ui.specifyMachine.column.specCode": "规格代号",

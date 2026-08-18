@@ -158,6 +158,7 @@ public class TcBizSnapshotAndPersistService implements ITcSnapshotAndPersistServ
         // 解释快照在事务外完成；最终事务只承担旧批次删除与新批次写入。
         this.buildSnapshot(context);
         TcPersistResult persistResult = transactionTemplate.execute(transactionStatus -> {
+            this.validateStoppedShiftPlanQuantity(context);
             this.logicDeleteOldSchedule(context);
             TcPersistResult result = this.persistScheduleContext(context, transactionStatus);
             this.saveScheduleProcessLog(context, result);
@@ -168,6 +169,24 @@ public class TcBizSnapshotAndPersistService implements ITcSnapshotAndPersistServ
             throw new ServiceException(I18nUtil.getMessage("ui.tc.schedule.persistFailed"));
         }
         context.setPersistResult(persistResult);
+    }
+
+    /**
+     * 落库前校验工作日历停产班次不存在已分配正计划量。
+     *
+     * @param context 胎侧排程上下文
+     * @throws ServiceException 停产班次仍存在已分配正计划量时抛出并回滚整批事务
+     */
+    private void validateStoppedShiftPlanQuantity(TcScheduleContext context) {
+        boolean invalid = context.getTaskDraftList().stream()
+                .filter(Objects::nonNull)
+                .filter(task -> task.getShiftOrder() != null
+                        && context.getWorkCalendarStoppedShiftOrderSet().contains(task.getShiftOrder()))
+                .anyMatch(task -> StrUtil.isNotBlank(task.getMachineCode())
+                        && BigDecimalUtils.valueOf(task.getPlanQty()).compareTo(BigDecimal.ZERO) > 0);
+        if (invalid) {
+            throw new ServiceException(I18nUtil.getMessage("ui.tc.schedule.workCalendarShiftStopped"));
+        }
     }
 
     /**
