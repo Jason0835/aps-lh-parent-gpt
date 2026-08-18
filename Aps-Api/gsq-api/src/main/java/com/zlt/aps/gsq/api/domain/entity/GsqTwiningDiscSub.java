@@ -20,7 +20,7 @@ import java.io.Serializable;
  * @date 2026-07-08
  */
 @Data
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = true)
 @TableName("T_GSQ_TWINING_DISC_SUB")
 @ApiModel(value = "钢丝圈缠绕盘明细对象", description = "钢丝圈缠绕盘明细")
 public class GsqTwiningDiscSub extends BaseEntity implements Serializable {
