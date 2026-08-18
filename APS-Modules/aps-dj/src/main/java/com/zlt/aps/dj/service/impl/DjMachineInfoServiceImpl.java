@@ -15,6 +15,7 @@ import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.common.engine.service.FactoryService;
 import com.zlt.aps.dj.api.domain.entity.DjMachineInfo;
 import com.zlt.aps.dj.mapper.DjMachineInfoMapper;
 import com.zlt.aps.dj.service.DjMachineInfoService;
@@ -31,6 +32,9 @@ import com.zlt.common.utils.PubUtil;
  */
 @Service
 public class DjMachineInfoServiceImpl extends AbstractDocService<DjMachineInfo> implements DjMachineInfoService {
+    @Autowired
+    private FactoryService factoryService;
+
     @Autowired
     private DjMachineInfoMapper machineMapper;
 
@@ -73,6 +77,9 @@ public class DjMachineInfoServiceImpl extends AbstractDocService<DjMachineInfo> 
      */
     @Override
     public AjaxResult importData(List<DjMachineInfo> list, boolean updateSupport, Long importLogId) {
+        // 统一填充当前工厂编码（导入模板不含工厂列，取自 sys.factory.code 配置）
+        String factoryCode = factoryService.getFactoryCode();
+        list.forEach(entity -> entity.setFactoryCode(factoryCode));
         int successNum = 0;
         int failureNum = 0;
         List<DjMachineInfo> importList = new ArrayList<>();

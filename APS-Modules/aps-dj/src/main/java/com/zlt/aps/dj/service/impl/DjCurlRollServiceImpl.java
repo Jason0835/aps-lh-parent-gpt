@@ -2,7 +2,10 @@ package com.zlt.aps.dj.service.impl;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import javax.annotation.Resource;
 
@@ -16,6 +19,7 @@ import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
+import com.zlt.aps.common.engine.service.FactoryService;
 import com.zlt.aps.dj.api.domain.entity.DjCurlRoll;
 import com.zlt.aps.dj.mapper.DjCurlRollMapper;
 import com.zlt.aps.dj.service.DjCurlRollService;
@@ -32,7 +36,9 @@ import com.zlt.common.utils.PubUtil;
  */
 @Service
 public class DjCurlRollServiceImpl extends AbstractDocService<DjCurlRoll> implements DjCurlRollService {
-
+    @Resource
+    private FactoryService factoryService;
+    
     @Resource
     private DjCurlRollMapper curlRollMapper;
 
@@ -72,6 +78,9 @@ public class DjCurlRollServiceImpl extends AbstractDocService<DjCurlRoll> implem
      */
     @Override
     public AjaxResult importData(List<DjCurlRoll> list, boolean updateSupport, Long importLogId) {
+        // 统一填充当前工厂编码（导入模板不含工厂列，取自 sys.factory.code 配置）
+        String factoryCode = factoryService.getFactoryCode();
+        list.forEach(entity -> entity.setFactoryCode(factoryCode));
         int successNum = 0;
         int failureNum = 0;
         List<DjCurlRoll> importList = new ArrayList<>();
@@ -91,6 +100,9 @@ public class DjCurlRollServiceImpl extends AbstractDocService<DjCurlRoll> implem
             }
         }
 
+        // 循环外一次性加载当前工厂的全部已有记录，避免在循环内逐笔查询数据库
+        Map<String, List<DjCurlRoll>> existCurlRollMap = this.loadExistCurlRollMap(factoryCode);
+
         for (int i = 0; i < list.size(); i++) {
             int errorNum = i + 2;
             DjCurlRoll docEntity = list.get(i);
@@ -103,12 +115,9 @@ public class DjCurlRollServiceImpl extends AbstractDocService<DjCurlRoll> implem
                 successNum++;
             } else {
                 if (updateSupport) {
-                    LambdaQueryWrapper<DjCurlRoll> queryWrapper = new LambdaQueryWrapper<>();
-                    queryWrapper.eq(DjCurlRoll::getFactoryCode, docEntity.getFactoryCode());
-                    queryWrapper.eq(DjCurlRoll::getPaddingCode, docEntity.getPaddingCode());
                     logger.info("updateSupport:{}", docEntity);
-                    List<DjCurlRoll> existList = curlRollMapper.selectList(queryWrapper);
-                    if (existList.size() > 1) {
+                    List<DjCurlRoll> existList = existCurlRollMap.get(this.buildCurlRollKey(docEntity));
+                    if (CollectionUtils.isNotEmpty(existList) && existList.size() > 1) {
                         failureNum++;
                         String multipleMsg = I18nUtil.getMessage("ui.data.alert.cxStock.multipleRecords");
                         ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
@@ -146,6 +155,38 @@ public class DjCurlRollServiceImpl extends AbstractDocService<DjCurlRoll> implem
         } else {
             return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + successNum);
         }
+    }
+
+    /**
+     * 一次性加载当前工厂的全部已有卷曲信息，并按唯一键分组，避免导入时逐笔查询数据库
+     *
+     * @param factoryCode 工厂编码
+     * @return 唯一键 -> 已有记录列表
+     */
+    private Map<String, List<DjCurlRoll>> loadExistCurlRollMap(String factoryCode) {
+        if (StringUtils.isEmpty(factoryCode)) {
+            return Collections.emptyMap();
+        }
+        // 一次批量查询该工厂的全部记录，仅取唯一键匹配所需字段
+        List<DjCurlRoll> existList = curlRollMapper.selectList(new LambdaQueryWrapper<DjCurlRoll>()
+                .eq(DjCurlRoll::getFactoryCode, factoryCode)
+                .select(DjCurlRoll::getId, DjCurlRoll::getFactoryCode, DjCurlRoll::getPaddingCode));
+        // 按唯一键分组；排除关键字段为空的记录（与原逐笔 eq 查询口径一致，null 值不会被命中）
+        return existList.stream()
+                .filter(item -> StringUtils.isNotBlank(item.getFactoryCode())
+                        && StringUtils.isNotBlank(item.getPaddingCode()))
+                .collect(Collectors.groupingBy(this::buildCurlRollKey));
+    }
+
+    /**
+     * 构建卷曲信息唯一键：工厂编码 + 填充码，用于内存中快速匹配已有记录
+     *
+     * @param entity 卷曲信息记录
+     * @return 唯一键
+     */
+    private String buildCurlRollKey(DjCurlRoll entity) {
+        return StringUtils.defaultString(entity.getFactoryCode()) + "|"
+                + StringUtils.defaultString(entity.getPaddingCode());
     }
 
     @Override
