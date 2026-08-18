@@ -202,8 +202,10 @@ export default {
           prop: "machineCode",
           type: "select",
           dictData: this.machines,
-          valueKey: "machineCode",
-          labelKey: "machineName",
+          props: {
+            value: "machineCode",
+            label: "machineName",
+          },
         },
         {
           label: this.$t("ui.data.column.specifyMachine.lineType"),
@@ -310,11 +312,14 @@ export default {
     },
   },
   created() {
+    // 加载垫胶机台下拉数据（机台信息存于 vuex state.dj.machines）
     getConfigKey("sys.factory.code").then(response => {
       this.search.factoryCode = response.msg;
       this.query.factoryCode = response.msg;
+      this.$store.dispatch("dj/getMachineList");
       this.getList();
     }).catch(() => {
+      this.$store.dispatch("dj/getMachineList");
       this.getList();
     });
   },
