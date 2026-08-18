@@ -2819,7 +2819,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         Date historyEndDate = DateUtil.beginOfDay(targetScheduleDate);
         Date historyStartDate = DateUtil.offsetDay(historyEndDate, -NEW_SPEC_HISTORY_DAYS);
         Map<String, List<String>> factoryMaterialCodeMap = resultList.stream()
-                .filter(this::hasAnyPlanQty)
+                .filter(LhScheduleServiceImpl::hasAnyPlanQty)
                 .filter(result -> StringUtils.isNotBlank(result.getFactoryCode()))
                 .filter(result -> StringUtils.isNotBlank(result.getMaterialCode()))
                 .collect(Collectors.groupingBy(
@@ -2849,7 +2849,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         beforeMaterialResultMap.forEach((machineCode, result) -> previousResultMap.put(
                 StringUtils.trimToEmpty(machineCode), result));
         for (LhScheduleResult result : sortedList) {
-            if (!this.hasAnyPlanQty(result)) {
+            if (!hasAnyPlanQty(result)) {
                 continue;
             }
             String machineCode = StringUtils.trimToEmpty(result.getLhMachineCode());
@@ -2875,7 +2875,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             List<LhScheduleResult> sortedList,
             Map<LhScheduleResult, LinkedHashSet<String>> remarkMap) {
         Map<String, List<LhScheduleResult>> materialEndingResultMap = sortedList.stream()
-                .filter(this::hasAnyPlanQty)
+                .filter(LhScheduleServiceImpl::hasAnyPlanQty)
                 .filter(result -> ApsConstant.APS_STRING_1.equals(result.getIsEnd()))
                 .filter(result -> StringUtils.isNotBlank(result.getMaterialCode()))
                 .collect(Collectors.groupingBy(LhScheduleResult::getMaterialCode));
@@ -2897,7 +2897,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             List<LhScheduleResult> sortedList,
             Map<LhScheduleResult, LinkedHashSet<String>> remarkMap) {
         Map<String, List<LhScheduleResult>> embryoEndingResultMap = sortedList.stream()
-                .filter(this::hasAnyPlanQty)
+                .filter(LhScheduleServiceImpl::hasAnyPlanQty)
                 .filter(result -> ApsConstant.APS_STRING_1.equals(result.getIsEmbryoEnding()))
                 .filter(result -> StringUtils.isNotBlank(result.getEmbryoCode()))
                 .collect(Collectors.groupingBy(LhScheduleResult::getEmbryoCode));
