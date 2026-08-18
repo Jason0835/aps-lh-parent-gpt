@@ -374,18 +374,18 @@ public class TmMachineAssignService implements ITmMachineAssignService {
                 ? this.selectStartupSupplyFirstTask(remainingTaskList, scoreMap)
                 : priorityStrategy.select(remainingTaskList, context, scoreMap);
         String appliedStrategyCode = startupShift ? "STARTUP_SUPPLY_FIRST" : priorityStrategy.getStrategyCode();
-        if (startupShift) {
-            Map<String, Object> sortEvidence = new LinkedHashMap<>();
-            sortEvidence.put("phase", "MACHINE_ASSIGN");
-            sortEvidence.put("strategyCode", appliedStrategyCode);
-            sortEvidence.put("shiftOrder", selectedTask.getShiftOrder());
-            sortEvidence.put("supplyHours", selectedTask.getSupplyHours());
-            sortEvidence.put("latestStartTime", selectedTask.getLatestStartTime());
-            sortEvidence.put("presetMachine", !selectedTask.isUnassigned());
-            sortEvidence.put("chainSortScore", scoreMap.get(selectedTask.getBusinessKey()));
-            traceOf(context, selectedTask).addRuleHit(TmScheduleRuleCodeEnum.TASK_SORT,
-                    TmScheduleRuleResultEnum.PASS, sortEvidence);
-        }
+        Map<String, Object> sortEvidence = new LinkedHashMap<>();
+        sortEvidence.put("phase", "MACHINE_ASSIGN");
+        sortEvidence.put("strategyCode", appliedStrategyCode);
+        sortEvidence.put("shiftOrder", selectedTask.getShiftOrder());
+        sortEvidence.put("supplyHours", selectedTask.getSupplyHours());
+        sortEvidence.put("latestStartTime", selectedTask.getLatestStartTime());
+        sortEvidence.put("presetMachine", !selectedTask.isUnassigned());
+        sortEvidence.put("chainSortScore", scoreMap.get(selectedTask.getBusinessKey()));
+        sortEvidence.put("sortPriority",
+                "SUPPLY_HOURS_ASC,LATEST_START_TIME_ASC,CHAIN_SCORE_DESC,BASE_SORT_INDEX_ASC,BUSINESS_KEY_ASC");
+        traceOf(context, selectedTask).addRuleHit(TmScheduleRuleCodeEnum.TASK_SORT,
+                TmScheduleRuleResultEnum.PASS, sortEvidence);
         log.info("[TM_CHAIN_TASK_ORDER] batchNo={}, traceId={}, factoryCode={}, scheduleDate={}, shiftOrder={}, predecessorSnapshot={}, selectedBusinessKey={}, selectedTreadCode={}, selectedGlueCode={}, strategyCode={}, chainSortScores={}",
                 context.getBatchNo(), context.getTraceId(), context.getFactoryCode(), this.formatScheduleDate(context),
                 this.normalizeShiftOrder(selectedTask.getShiftOrder()), this.summarizeMachinePredecessors(context,
