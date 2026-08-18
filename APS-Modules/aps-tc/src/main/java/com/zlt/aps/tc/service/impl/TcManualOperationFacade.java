@@ -170,6 +170,7 @@ public class TcManualOperationFacade {
                     this.copyOperationBaseFields(current, changeResult);
                     int shiftOrder = TcInsertPositionValidator.resolveShiftOrder(changeResult);
                     this.machineRuleValidator.validateIncreaseOpenShift(current, changeResult, shiftOrder);
+                    this.machineRuleValidator.validateIncreaseMachineRelations(current, changeResult, shiftOrder);
                     int affectedCount = this.rollingService.changeQtyAndRoll(changeResult);
                     List<TcScheduleResult> afterList = this.loadSnapshot(current,
                             Collections.singletonList(current.getMachineCode()));
@@ -201,6 +202,8 @@ public class TcManualOperationFacade {
                                     I18nUtil.getMessage("ui.tc.schedule.manual.concurrentChanged")));
                     this.validateExpectedVersion(expectedTaskVersion, current);
                     this.copyOperationBaseFields(current, changeResult);
+                    int shiftOrder = TcInsertPositionValidator.resolveShiftOrder(changeResult);
+                    this.machineRuleValidator.validateIncreaseMachineRelations(current, changeResult, shiftOrder);
                     int affectedCount = this.rollingService.changeQtyAndRoll(changeResult);
                     List<TcScheduleResult> afterList = this.loadSnapshot(current,
                             Collections.singletonList(current.getMachineCode()));
@@ -242,6 +245,8 @@ public class TcManualOperationFacade {
                                         I18nUtil.getMessage("ui.tc.schedule.manual.concurrentChanged")));
                         this.validateExpectedVersion(expectedVersionList.get(index), current);
                         this.copyOperationBaseFields(current, request);
+                        int shiftOrder = TcInsertPositionValidator.resolveShiftOrder(request);
+                        this.machineRuleValidator.validateIncreaseMachineRelations(current, request, shiftOrder);
                     }
                     int affectedCount = this.rollingService.changeQtyAndRollBatch(changeResultList);
                     List<TcScheduleResult> afterList = this.loadSnapshot(reference, machineCodeList);

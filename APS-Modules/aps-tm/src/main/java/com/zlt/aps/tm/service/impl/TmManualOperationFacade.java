@@ -71,6 +71,10 @@ public class TmManualOperationFacade {
     @Resource
     private TmMachineOpenShiftValidator machineOpenShiftValidator;
 
+    /** 胎面口型板、胶料机台关系校验器；字段注入用于兼容既有非 Spring 单元测试构造方式。 */
+    @Resource
+    private TmManualMachineRelationValidator machineRelationValidator;
+
     /**
      * 执行人工插单。
      *
@@ -84,6 +88,7 @@ public class TmManualOperationFacade {
         return this.executeWithMachineLocks(scheduleResult.getFactoryCode(), scheduleResult.getScheduleDate(), machineCodes,
                 () -> this.executeInTransaction(() -> {
                     this.validateInsertMachineOpenShift(scheduleResult);
+                    this.validateInsertMachineRelations(scheduleResult);
                     this.validateInsertAfterSecondSequence(scheduleResult);
                     List<TmScheduleResult> beforeList = this.lockAndValidateManualOpSnapshot(scheduleResult, machineCodes);
                     int changedCount = tmManualInsertRollingService.insertAndRoll(scheduleResult);
@@ -115,6 +120,7 @@ public class TmManualOperationFacade {
                     this.validateLockedSourceMachine(persisted, current);
                     this.normalizeExistingOperationRequest(scheduleResult, current, false);
                     this.validatePlanIncreaseMachineOpenShift(current, scheduleResult);
+                    this.validatePlanIncreaseMachineRelations(current, scheduleResult);
                     List<TmScheduleResult> beforeList = this.lockAndValidateManualOpSnapshot(current, machineCodes);
                     int changedCount = tmManualInsertRollingService.changeQtyAndRoll(scheduleResult);
                     List<TmScheduleResult> afterList = this.loadManualOpSnapshot(current, machineCodes);
@@ -190,6 +196,7 @@ public class TmManualOperationFacade {
                 this.normalizeExistingOperationRequest(requestList.get(index), current, true);
                 requestList.get(index).setMachineCode(targetMachineCode);
                 this.validateTransferMachineOpenShift(current, targetMachineCode);
+                this.validateTransferMachineRelations(current, targetMachineCode);
                 currentList.add(current);
             }
             List<String> machineCodes = currentList.stream().map(TmScheduleResult::getMachineCode)
@@ -225,6 +232,7 @@ public class TmManualOperationFacade {
         this.normalizeExistingOperationRequest(scheduleResult, current, true);
         scheduleResult.setMachineCode(targetMachineCode);
         this.validateTransferMachineOpenShift(current, targetMachineCode);
+        this.validateTransferMachineRelations(current, targetMachineCode);
         List<String> machineCodes = Arrays.asList(current.getMachineCode(), targetMachineCode);
         List<TmScheduleResult> beforeList = this.lockAndValidateManualOpSnapshot(current, machineCodes);
         int changedCount = tmManualInsertRollingService.changeMachineAndRoll(scheduleResult);
@@ -267,6 +275,42 @@ public class TmManualOperationFacade {
     private void validateTransferMachineOpenShift(TmScheduleResult currentResult, String targetMachineCode) {
         if (this.machineOpenShiftValidator != null) {
             this.machineOpenShiftValidator.validateTransfer(currentResult, targetMachineCode);
+        }
+    }
+
+    /**
+     * 校验人工插单目标机台的口型板、胶料关系。
+     *
+     * @param scheduleResult 插单结果
+     */
+    private void validateInsertMachineRelations(TmScheduleResult scheduleResult) {
+        if (this.machineRelationValidator != null) {
+            this.machineRelationValidator.validatePlacement(scheduleResult, scheduleResult.getMachineCode());
+        }
+    }
+
+    /**
+     * 校验人工调量中新增计划量仍满足当前机台关系。
+     *
+     * @param currentResult 当前数据库结果
+     * @param requestResult 调量请求
+     */
+    private void validatePlanIncreaseMachineRelations(TmScheduleResult currentResult,
+                                                        TmScheduleResult requestResult) {
+        if (this.machineRelationValidator != null) {
+            this.machineRelationValidator.validateIncrease(currentResult, requestResult);
+        }
+    }
+
+    /**
+     * 校验人工转入目标机台的口型板、胶料关系。
+     *
+     * @param currentResult 当前数据库结果
+     * @param targetMachineCode 目标机台编码
+     */
+    private void validateTransferMachineRelations(TmScheduleResult currentResult, String targetMachineCode) {
+        if (this.machineRelationValidator != null) {
+            this.machineRelationValidator.validatePlacement(currentResult, targetMachineCode);
         }
     }
 

@@ -1,9 +1,9 @@
 package com.zlt.aps.gsq.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.utils.ImportUtil;
@@ -22,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -98,19 +99,33 @@ public class GsqTwiningDiscServiceImpl extends AbstractDocService<GsqTwiningDisc
         if (UserConstants.NOT_UNIQUE.equals(checkUnique(entity))) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.gsq.twiningDisc.conflict"));
         }
-        // 保存主表（id为空新增，id不为空更新）
+        // 设置主表基础字段：新增设置createBy/createTime，更新设置updateBy/updateTime
+        boolean isNew = entity.getId() == null;
+        String username = getCurrentUsername();
+        if (isNew) {
+            entity.setCreateBy(username);
+            entity.setCreateTime(new Date());
+        } else {
+            entity.setUpdateBy(username);
+            entity.setUpdateTime(new Date());
+        }
+        // 保存主表（id为空新增，id不为空更新，由框架baseDao.save内部判断）
         this.save(entity);
         Long mainId = entity.getId();
-        // 删除旧子表（逻辑删除，按主表ID）
-        LambdaUpdateWrapper<GsqTwiningDiscSub> deleteWrapper = new LambdaUpdateWrapper<>();
+        // 删除旧子表（按主表ID，使用LambdaQueryWrapper）
+        LambdaQueryWrapper<GsqTwiningDiscSub> deleteWrapper = new LambdaQueryWrapper<>();
         deleteWrapper.eq(GsqTwiningDiscSub::getDiscId, mainId);
         gsqTwiningDiscSubMapper.delete(deleteWrapper);
-        // 保存新子表
+        // 保存新子表（重置主键并关联主表，补充基础字段；isDelete由BaseEntity构造器默认为0）
         List<GsqTwiningDiscSub> subList = entity.getSubList();
         if (CollectionUtils.isNotEmpty(subList)) {
+            Date now = new Date();
             for (GsqTwiningDiscSub sub : subList) {
                 sub.setId(null);
                 sub.setDiscId(mainId);
+                sub.setIsDelete(0);
+                sub.setCreateBy(username);
+                sub.setCreateTime(now);
                 gsqTwiningDiscSubMapper.insert(sub);
             }
         }
@@ -118,7 +133,7 @@ public class GsqTwiningDiscServiceImpl extends AbstractDocService<GsqTwiningDisc
     }
 
     /**
-     * 删除钢丝圈缠绕盘（逻辑删除主表，并级联逻辑删除子表）
+     * 删除钢丝圈缠绕盘（删除主表，并级联删除子表）
      *
      * @param ids 主表ID集合
      * @return 操作结果
@@ -129,13 +144,27 @@ public class GsqTwiningDiscServiceImpl extends AbstractDocService<GsqTwiningDisc
         if (CollectionUtils.isEmpty(ids)) {
             return AjaxResult.error("未选择删除数据");
         }
-        // 逻辑删除主表
-        this.removeByIds(ids);
-        // 级联逻辑删除子表
-        LambdaUpdateWrapper<GsqTwiningDiscSub> subWrapper = new LambdaUpdateWrapper<>();
+        // 级联删除子表（先删子表，使用LambdaQueryWrapper）
+        LambdaQueryWrapper<GsqTwiningDiscSub> subWrapper = new LambdaQueryWrapper<>();
         subWrapper.in(GsqTwiningDiscSub::getDiscId, ids);
         gsqTwiningDiscSubMapper.delete(subWrapper);
+        // 删除主表
+        this.removeByIds(ids);
         return AjaxResult.success();
+    }
+
+    /**
+     * 获取当前登录用户名，获取失败时降级为system
+     * （兼容Feign调用等无登录上下文场景，参照GsqMachineInfoServiceImpl的setBaseFieldValue写法）
+     *
+     * @return 用户名
+     */
+    private String getCurrentUsername() {
+        try {
+            return SecurityUtils.getUsername();
+        } catch (Exception e) {
+            return "system";
+        }
     }
 
     /**

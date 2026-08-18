@@ -206,20 +206,37 @@ public class MonthPlanCompareServiceImpl extends BaseController implements IMont
             BigDecimal planTotal = BigDecimal.ZERO;
             BigDecimal actualTotal = BigDecimal.ZERO;
             for (int day = 1; day <= daysInMonth; day++) {
-                BigDecimal planQty = BigDecimalUtils.valueOf(this.getDayFieldValue(item, day));
-                BigDecimal actQty = dailyActual.getOrDefault(day, BigDecimal.ZERO);
-                planDays.add(planQty);
-                actualDays.add(actQty);
-                planTotal = planTotal.add(planQty);
-                actualTotal = actualTotal.add(actQty);
+                Integer rawPlan = this.getDayFieldValue(item, day);
+                BigDecimal actQty = dailyActual.get(day);
+                // 判定当天计划量/实际量是否无值（null 或 0）
+                boolean planEmpty = rawPlan == null || rawPlan == 0;
+                boolean actEmpty = actQty == null || actQty.compareTo(BigDecimal.ZERO) == 0;
+                if (planEmpty && actEmpty) {
+                    // 当天计划量与实际量均无值：整天置空（显示空白），不显示0，也不参与合计
+                    planDays.add(null);
+                    actualDays.add(null);
+                } else {
+                    // 其中一方有值：无值一方按0显示，正常参与合计
+                    BigDecimal planQty = planEmpty ? BigDecimal.ZERO : BigDecimalUtils.valueOf(rawPlan);
+                    BigDecimal actualQty = actEmpty ? BigDecimal.ZERO : actQty;
+                    planDays.add(planQty);
+                    actualDays.add(actualQty);
+                    // 计划量合计 = 定稿表当月有排计划量的合计；实际产量合计 = 排产版本日期范围内日完成量汇总
+                    planTotal = planTotal.add(planQty);
+                    actualTotal = actualTotal.add(actualQty);
+                }
             }
 
+            // 合计置空判定：整月计划合计与实际合计均为0时，合计列也置空显示
+            boolean totalEmpty = planTotal.compareTo(BigDecimal.ZERO) == 0
+                    && actualTotal.compareTo(BigDecimal.ZERO) == 0;
+
             // 月计划行
-            result.add(this.buildVo(item, ROW_TYPE_PLAN, planTotal, planDays));
+            result.add(this.buildVo(item, ROW_TYPE_PLAN, totalEmpty ? null : planTotal, planDays));
             // 实际产量行
-            result.add(this.buildVo(item, ROW_TYPE_ACTUAL, actualTotal, actualDays));
-            // 差异行 = 实际 - 计划
-            result.add(this.buildDiffVo(item, planDays, actualDays, daysInMonth));
+            result.add(this.buildVo(item, ROW_TYPE_ACTUAL, totalEmpty ? null : actualTotal, actualDays));
+            // 差异行 = 实际 - 计划（合计按总量相减）
+            result.add(this.buildDiffVo(item, planDays, actualDays, planTotal, actualTotal, daysInMonth, totalEmpty));
             // 完成率行 = 实际 / 计划（百分比）
             result.add(this.buildRateVo(item, planDays, actualDays, planTotal, actualTotal, daysInMonth));
         }
@@ -352,10 +369,11 @@ public class MonthPlanCompareServiceImpl extends BaseController implements IMont
 
     /**
      * 通过反射动态获取定稿实体的 DAY_n 字段值
+     * <p>null 表示当天无计划量，由调用方结合置空规则处理，不再兜底转0</p>
      *
      * @param entity 定稿实体
      * @param day    日期（1~31）
-     * @return 计划量
+     * @return 计划量（当天无数据时返回null）
      */
     private Integer getDayFieldValue(FactoryMonthPlanProductionFinalResult entity, int day) {
         try {
@@ -364,12 +382,12 @@ public class MonthPlanCompareServiceImpl extends BaseController implements IMont
             field.setAccessible(true);
             Object value = field.get(entity);
             if (value == null) {
-                return 0;
+                return null;
             }
             return (Integer) value;
         } catch (Exception e) {
             log.warn("获取 DAY_{} 字段值失败", day, e);
-            return 0;
+            return null;
         }
     }
 
@@ -396,32 +414,44 @@ public class MonthPlanCompareServiceImpl extends BaseController implements IMont
 
     /**
      * 构建差异行VO（实际 - 计划）
+     * <p>当天计划量与实际量均置空时，差异也置空；差异合计 = 实际合计 - 计划合计（总量相减）</p>
      *
-     * @param item       定稿实体
-     * @param planDays   日计划数组
-     * @param actualDays 日实际数组
+     * @param item        定稿实体
+     * @param planDays    日计划数组（置空天为null）
+     * @param actualDays  日实际数组（置空天为null）
+     * @param planTotal   计划合计
+     * @param actualTotal 实际合计
      * @param daysInMonth 当月天数
+     * @param totalEmpty  合计是否置空（整月计划与实际合计均为0）
      * @return VO
      */
     private MonthPlanCompareVo buildDiffVo(FactoryMonthPlanProductionFinalResult item,
-                                           List<BigDecimal> planDays, List<BigDecimal> actualDays, int daysInMonth) {
+                                           List<BigDecimal> planDays, List<BigDecimal> actualDays,
+                                           BigDecimal planTotal, BigDecimal actualTotal,
+                                           int daysInMonth, boolean totalEmpty) {
         List<BigDecimal> diffDays = new ArrayList<>(daysInMonth);
-        BigDecimal diffTotal = BigDecimal.ZERO;
         for (int day = 0; day < daysInMonth; day++) {
-            BigDecimal diff = actualDays.get(day).subtract(planDays.get(day));
-            diffDays.add(diff);
-            diffTotal = diffTotal.add(diff);
+            BigDecimal planQty = planDays.get(day);
+            BigDecimal actQty = actualDays.get(day);
+            if (planQty == null || actQty == null) {
+                // 当天置空：差异也置空显示
+                diffDays.add(null);
+            } else {
+                diffDays.add(actQty.subtract(planQty));
+            }
         }
+        // 差异合计 = 实际合计 - 计划合计
+        BigDecimal diffTotal = totalEmpty ? null : actualTotal.subtract(planTotal);
         return this.buildVo(item, ROW_TYPE_DIFF, diffTotal, diffDays);
     }
 
     /**
      * 构建完成率行VO（实际 / 计划 * 100，百分比）
-     * <p>分母为0时返回null（前端展示为"-"）</p>
+     * <p>当天置空时完成率也置空；分母为0时返回null（前端展示为空白）</p>
      *
      * @param item        定稿实体
-     * @param planDays    日计划数组
-     * @param actualDays  日实际数组
+     * @param planDays    日计划数组（置空天为null）
+     * @param actualDays  日实际数组（置空天为null）
      * @param planTotal   计划合计
      * @param actualTotal 实际合计
      * @param daysInMonth 当月天数
@@ -434,10 +464,14 @@ public class MonthPlanCompareServiceImpl extends BaseController implements IMont
         for (int day = 0; day < daysInMonth; day++) {
             BigDecimal planQty = planDays.get(day);
             BigDecimal actQty = actualDays.get(day);
-            BigDecimal rate = this.calcRate(actQty, planQty);
-            rateDays.add(rate);
+            if (planQty == null || actQty == null) {
+                // 当天置空：完成率也置空显示
+                rateDays.add(null);
+            } else {
+                rateDays.add(this.calcRate(actQty, planQty));
+            }
         }
-        // 合计完成率 = 实际合计 / 计划合计
+        // 合计完成率 = 实际合计 / 计划合计（计划合计为0时返回null，展示空白）
         BigDecimal rateTotal = this.calcRate(actualTotal, planTotal);
         return this.buildVo(item, ROW_TYPE_RATE, rateTotal, rateDays);
     }
@@ -640,7 +674,7 @@ public class MonthPlanCompareServiceImpl extends BaseController implements IMont
 
     /**
      * 设置完成率单元格（含条件着色）
-     * <p>值null时显示"-"，<60%红色，60~80%黄色，>=80%默认</p>
+     * <p>值null时显示空白（当天置空或分母为0），<60%红色，60~80%黄色，>=80%默认</p>
      *
      * @param cell        单元格
      * @param rateValue   完成率值（百分比）
@@ -651,8 +685,8 @@ public class MonthPlanCompareServiceImpl extends BaseController implements IMont
     private void setRateCell(Cell cell, BigDecimal rateValue, CellStyle normalStyle,
                              CellStyle redStyle, CellStyle yellowStyle) {
         if (rateValue == null) {
+            // 置空场景显示空白
             cell.setCellStyle(normalStyle);
-            cell.setCellValue("-");
             return;
         }
         if (rateValue.compareTo(RATE_RED_THRESHOLD) < 0) {

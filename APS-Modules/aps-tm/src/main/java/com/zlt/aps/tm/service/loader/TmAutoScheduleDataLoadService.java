@@ -176,14 +176,19 @@ public class TmAutoScheduleDataLoadService {
         }
         LambdaQueryWrapper<TmMouthPlate> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(TmMouthPlate::getFactoryCode, context.getFactoryCode());
-        wrapper.in(TmMouthPlate::getMachineCode, candidateMap.keySet());
+        wrapper.eq(TmMouthPlate::getPlateStatus, TmYesNoEnum.YES.getCode());
         List<TmMouthPlate> mouthPlateList = tmMouthPlateMapper.selectList(wrapper);
         for (TmMouthPlate mouthPlate : mouthPlateList) {
-            TmMachineCandidate candidate = candidateMap.get(mouthPlate.getMachineCode());
-            if (candidate == null || StrUtil.isBlank(mouthPlate.getMouthPlateCode())) {
+            if (StrUtil.isBlank(mouthPlate.getMouthPlateCode())
+                    || !TmYesNoEnum.YES.getCode().equals(mouthPlate.getPlateStatus())) {
                 continue;
             }
-            // 口型板配置必须按机台隔离；候选机台自身无有效配置时，空集合表示不限制口型板。
+            context.getConfiguredMouthPlateCodeSet().add(mouthPlate.getMouthPlateCode());
+            TmMachineCandidate candidate = candidateMap.get(mouthPlate.getMachineCode());
+            if (candidate == null) {
+                continue;
+            }
+            // 候选机台只记录自身具备的口型板，是否启用白名单由工厂级配置集合判断。
             if (candidate.getConfiguredMouthPlateCodes() == null) {
                 candidate.setConfiguredMouthPlateCodes(new HashSet<>());
             }
@@ -196,7 +201,7 @@ public class TmAutoScheduleDataLoadService {
     }
 
     /**
-     * 填充候选机台胶料禁用规则。
+     * 填充候选机台胶料关系。
      *
      * @param context      自动排程上下文
      * @param candidateMap 候选机台映射
@@ -208,34 +213,22 @@ public class TmAutoScheduleDataLoadService {
         LambdaQueryWrapper<TmGlueMachineReal> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(TmGlueMachineReal::getFactoryCode, context.getFactoryCode());
         wrapper.eq(TmGlueMachineReal::getEnableStatus, TmYesNoEnum.YES.getCode());
-        wrapper.in(TmGlueMachineReal::getMachineCode, candidateMap.keySet());
         List<TmGlueMachineReal> glueRuleList = tmGlueMachineRealMapper.selectList(wrapper);
         for (TmGlueMachineReal glueRule : glueRuleList) {
             if (StrUtil.isBlank(glueRule.getGlueCode())
-                    || (!TmYesNoEnum.YES.getCode().equals(glueRule.getAllowFlag())
-                    && !TmYesNoEnum.NO.getCode().equals(glueRule.getAllowFlag()))) {
+                    || !TmYesNoEnum.YES.getCode().equals(glueRule.getEnableStatus())) {
                 continue;
             }
+            context.getConfiguredGlueCodeSet().add(glueRule.getGlueCode());
             TmMachineCandidate candidate = candidateMap.get(glueRule.getMachineCode());
             if (candidate == null) {
                 continue;
             }
-            // 胶料关系必须按机台隔离；当前机台未配置该主胶料时默认不限制。
+            // 胶料关系只表达主胶料可生产机台，allowFlag 暂不参与排程判断。
             if (candidate.getConfiguredGlueCodes() == null) {
                 candidate.setConfiguredGlueCodes(new HashSet<>());
             }
             candidate.getConfiguredGlueCodes().add(glueRule.getGlueCode());
-            if (TmYesNoEnum.YES.getCode().equals(glueRule.getAllowFlag())) {
-                if (candidate.getAllowedGlueCodes() == null) {
-                    candidate.setAllowedGlueCodes(new HashSet<>());
-                }
-                candidate.getAllowedGlueCodes().add(glueRule.getGlueCode());
-            } else {
-                if (candidate.getForbiddenGlueCodes() == null) {
-                    candidate.setForbiddenGlueCodes(new HashSet<>());
-                }
-                candidate.getForbiddenGlueCodes().add(glueRule.getGlueCode());
-            }
         }
     }
 

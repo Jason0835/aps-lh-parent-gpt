@@ -1054,6 +1054,7 @@ public class LhScheduleContext {
         } else {
             startDay = DateUtil.dayOfMonth(planStartDate);
         }
+        //20260817+ 硫化日计划调整量
         return SkuMonthPlanCalculator.getPlanQty(allProductionDateList, loadedMonthPlanList, allLhDayPlanAdjustList, skuProductionInfo, startDay);
     }
 

@@ -136,6 +136,26 @@ public class TcManualMachineRuleValidator {
     }
 
     /**
+     * 校验人工或自动滚动调增仍满足当前机台的口型板、胶料关系。
+     *
+     * <p>减量、清零和计划量未变化时不阻断，便于修复历史数据。</p>
+     *
+     * @param currentResult 当前数据库结果
+     * @param requestResult 调量请求
+     * @param shiftOrder 调整班次
+     * @throws ServiceException 调增后当前机台不在关系白名单时抛出
+     */
+    public void validateIncreaseMachineRelations(TcScheduleResult currentResult,
+                                                  TcScheduleResult requestResult,
+                                                  Integer shiftOrder) {
+        if (this.readPlanQty(requestResult, shiftOrder).compareTo(this.readPlanQty(currentResult, shiftOrder)) <= 0) {
+            return;
+        }
+        this.validateMouthPlate(currentResult, currentResult.getMachineCode());
+        this.validateGlueMachine(currentResult, currentResult.getMachineCode());
+    }
+
+    /**
      * 查询并校验排程班次已开班。
      *
      * @param sourceResult 源结果
@@ -193,23 +213,24 @@ public class TcManualMachineRuleValidator {
         }
         LambdaQueryWrapper<TcMouthPlate> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(TcMouthPlate::getFactoryCode, sourceResult.getFactoryCode());
-        wrapper.eq(TcMouthPlate::getMachineCode, targetMachineCode);
+        wrapper.eq(TcMouthPlate::getPlateStatus, "1");
         List<TcMouthPlate> mouthPlateList = this.mouthPlateMapper.selectList(wrapper);
-        List<TcMouthPlate> enabledMouthPlateList = mouthPlateList == null
+        List<TcMouthPlate> relevantMouthPlateList = mouthPlateList == null
                 ? Collections.emptyList()
                 : mouthPlateList.stream()
                 .filter(item -> "1".equals(item.getPlateStatus()))
+                .filter(item -> Objects.equals(item.getMouthPlateCode(), sourceResult.getMouthPlateCode()))
                 .collect(Collectors.toList());
-        // 目标机台没有有效口型板配置时表示不限制；存在配置时才按本机白名单校验。
-        boolean targetMatched = enabledMouthPlateList.isEmpty() || enabledMouthPlateList.stream()
-                .anyMatch(item -> Objects.equals(item.getMouthPlateCode(), sourceResult.getMouthPlateCode()));
+        // 当前口型板在工厂范围没有有效关系时不限制；存在关系时仅允许配置机台。
+        boolean targetMatched = relevantMouthPlateList.isEmpty() || relevantMouthPlateList.stream()
+                .anyMatch(item -> Objects.equals(item.getMachineCode(), targetMachineCode));
         if (!targetMatched) {
             throw new ServiceException(I18nUtil.getMessage("ui.tc.schedule.changeMachine.mouthPlateRejected"));
         }
     }
 
     /**
-     * 校验目标机台胶料允许/禁止规则。
+     * 校验目标机台胶料关系。
      *
      * @param sourceResult 源排程结果
      * @param targetMachineCode 目标机台
@@ -220,22 +241,17 @@ public class TcManualMachineRuleValidator {
         wrapper.eq(TcGlueMachineReal::getEnableStatus, "1");
         List<TcGlueMachineReal> ruleList = this.glueMachineRealMapper.selectList(wrapper);
         List<TcGlueMachineReal> relevantRuleList = ruleList == null ? Collections.emptyList()
-                : ruleList.stream().filter(item -> Objects.equals(item.getGlueCode(), sourceResult.getGlueCode()))
-                .filter(item -> "0".equals(item.getAllowFlag()) || "1".equals(item.getAllowFlag()))
-                .filter(item -> StringUtils.isBlank(item.getBaseGlueCode())
-                        || Objects.equals(item.getBaseGlueCode(), sourceResult.getBaseGlueCode()))
+                : ruleList.stream()
+                .filter(item -> "1".equals(item.getEnableStatus()))
+                .filter(item -> Objects.equals(item.getGlueCode(), sourceResult.getGlueCode()))
                 .collect(Collectors.toList());
         if (relevantRuleList.isEmpty()) {
             return;
         }
-        List<TcGlueMachineReal> targetRuleList = relevantRuleList.stream()
-                .filter(item -> Objects.equals(item.getMachineCode(), targetMachineCode)).collect(Collectors.toList());
-        if (targetRuleList.isEmpty()) {
-            return;
-        }
-        boolean forbidden = targetRuleList.stream().anyMatch(item -> "0".equals(item.getAllowFlag()));
-        boolean allowed = targetRuleList.stream().anyMatch(item -> "1".equals(item.getAllowFlag()));
-        if (forbidden || !allowed) {
+        // allowFlag、基部胶和优先级暂不参与判断，启用关系只表达主胶料可生产机台。
+        boolean targetMatched = relevantRuleList.stream()
+                .anyMatch(item -> Objects.equals(item.getMachineCode(), targetMachineCode));
+        if (!targetMatched) {
             throw new ServiceException(I18nUtil.getMessage("ui.tc.schedule.changeMachine.glueRejected"));
         }
     }

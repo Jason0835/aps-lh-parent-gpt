@@ -2,6 +2,7 @@ package com.zlt.aps.dj.service.impl;
 
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import javax.annotation.Resource;
@@ -138,6 +139,11 @@ public class DjSpecifyMachineServiceImpl extends AbstractDocService<DjSpecifyMac
         } else {
             return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + successNum);
         }
+    }
+    
+    @Override
+    protected List<String> getCheckUniqueFields() {
+        return Arrays.asList("factoryCode", "paddingCode", "machineCode");
     }
 
     @Override
