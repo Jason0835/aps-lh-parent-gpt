@@ -2,8 +2,10 @@ package com.zlt.aps.gsq.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.zlt.aps.gsq.api.domain.entity.GsqTwiningDisc;
+import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 钢丝圈缠绕盘 Mapper 接口
@@ -35,4 +37,12 @@ public interface GsqTwiningDiscMapper extends BaseMapper<GsqTwiningDisc> {
      * @param list 待保存数据集合
      */
     void mergeSql(List<GsqTwiningDisc> list);
+
+    /**
+     * 按钢丝圈编号批量查询施工信息表中的钢丝圈信息（编号->名称映射，用于导入校验与名称反显）
+     *
+     * @param codes 钢丝圈编号集合
+     * @return 钢丝圈信息列表（key：BEAD_CODE 钢丝圈编号、BEAD_NAME 钢丝圈名称）
+     */
+    List<Map<String, Object>> listSteelRingInfoByCodes(@Param("codes") List<String> codes);
 }
