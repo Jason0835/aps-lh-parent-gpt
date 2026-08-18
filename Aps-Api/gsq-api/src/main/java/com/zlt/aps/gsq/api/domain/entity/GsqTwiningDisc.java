@@ -22,7 +22,7 @@ import java.util.List;
  * @date 2026-07-08
  */
 @Data
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = true)
 @TableName("T_GSQ_TWINING_DISC")
 @ApiModel(value = "钢丝圈缠绕盘对象", description = "钢丝圈缠绕盘管理")
 public class GsqTwiningDisc extends BaseEntity implements Serializable {
