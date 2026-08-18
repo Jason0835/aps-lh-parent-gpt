@@ -1,6 +1,7 @@
 package com.zlt.aps.dj.service.impl;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import javax.annotation.Resource;
@@ -62,6 +63,16 @@ public class DjLossSettingServiceImpl extends AbstractDocService<DjLossSetting> 
             return UserConstants.NOT_UNIQUE;
         }
         return UserConstants.UNIQUE;
+    }
+
+    /**
+     * 唯一校验字段：工厂编码 + 机台编码 + 填充物料号
+     *
+     * @return 唯一校验字段名列表
+     */
+    @Override
+    protected List<String> getCheckUniqueFields() {
+        return Arrays.asList("factoryCode", "machineCode", "paddingCode");
     }
 
     /**
