@@ -9929,6 +9929,14 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             SkuScheduleDTO compensationSku = copyContinuousCompensationSku(
                     sourceSku, remainingQty, firstAddMachineProductionDate, activeMachineCount,
                     requiredMachineCount, shortageMachineCount, addMachineDayPlanQty);
+            /*
+             * 续作加机台补偿量是 S4.4 扣账后 S4.5 尚需排产的“剩余量”，不是新的总目标量。
+             * 同物料同状态共用中心账本：保留续作已消费量，并把账本剩余量收敛到本次补偿量。
+             * 若误用“按总目标量同步”，会再次扣减历史消费量，导致新增阶段只能拿到错误的残量；
+             * 没有生成续作补偿SKU的纯收尾路径不经过此处，既有严格收尾上限保持不变。
+             */
+            this.getTargetScheduleQtyResolver().syncProductionRemainingQtyToRemaining(
+                    context, sourceSku, remainingQty, "续作加机台补偿账本合并");
             // 续作加机台候选保留同一日计划账本，S4.5 排到后会继续消费剩余额度，避免重复扩大日计划。
             context.getNewSpecSkuList().add(compensationSku);
             log.info("续作加机台需求生成，转新增规格链路统一竞争, materialCode: {}, 原续作机台: {}, "
