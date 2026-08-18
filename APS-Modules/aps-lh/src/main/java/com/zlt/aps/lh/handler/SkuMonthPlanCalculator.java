@@ -2,7 +2,6 @@ package com.zlt.aps.lh.handler;
 
 import com.google.common.collect.Maps;
 import com.zlt.aps.common.engine.domain.LhDayPlanAdjustVo;
-import com.zlt.aps.common.engine.domain.YearMonthLhDayAdjustVo;
 import com.zlt.aps.common.engine.utils.MonthPlanSurplusCalculator;
 import com.zlt.aps.lh.api.domain.entity.LhDayFinishQty;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
@@ -117,19 +116,18 @@ public class SkuMonthPlanCalculator {
      * 获取硫化余量
      * 硫化余量 = 计划量(月计划量 + 硫化日调整量) - 已完成量 + 超欠产
      *
-     * @param productionYearMonth   当前排产年-月
-     * @param allProductionDate     日排产周期日
-     * @param hasProductionPlanMap  三日内排产计划信息
-     * @param monthOverdueQtyMap    年-月超欠产信息
-     * @param yearMonthPlanQtyMap   年-月计划量信息
-     * @param yearMonthAdjustQtyMap 年-月日计划调整量信息
-     * @param finishedQty           已完成量
+     * @param productionYearMonth  当前排产年-月
+     * @param allProductionDate    日排产周期日
+     * @param hasProductionPlanMap 三日内排产计划信息
+     * @param monthOverdueQtyMap   年-月超欠产信息
+     * @param yearMonthPlanQtyMap  年-月计划量信息(包含对应的日计划调整量)
+     * @param finishedQty          已完成量
      * @return
      */
-    public static Integer getSurplusQty(YearMonth productionYearMonth, List<Date> allProductionDate, Map<YearMonth, FactoryMonthPlanProductionFinalResult> hasProductionPlanMap, Map<YearMonth, Integer> monthOverdueQtyMap, Map<YearMonth, Integer> yearMonthPlanQtyMap, Map<YearMonth, Integer> yearMonthAdjustQtyMap, Integer finishedQty) {
+    public static Integer getSurplusQty(YearMonth productionYearMonth, List<Date> allProductionDate, Map<YearMonth, FactoryMonthPlanProductionFinalResult> hasProductionPlanMap, Map<YearMonth, Integer> monthOverdueQtyMap, Map<YearMonth, Integer> yearMonthPlanQtyMap, Integer finishedQty) {
         return MonthPlanSurplusCalculator.getSurplusQty(
                 productionYearMonth, allProductionDate, hasProductionPlanMap,
-                monthOverdueQtyMap, yearMonthPlanQtyMap, yearMonthAdjustQtyMap, finishedQty);
+                monthOverdueQtyMap, yearMonthPlanQtyMap, finishedQty);
     }
 
     /**

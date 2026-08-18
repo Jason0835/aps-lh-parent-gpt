@@ -1,6 +1,7 @@
 package com.zlt.aps.dj.service.impl;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import javax.annotation.Resource;
@@ -49,6 +50,16 @@ public class DjCurlRollServiceImpl extends AbstractDocService<DjCurlRoll> implem
             return UserConstants.NOT_UNIQUE;
         }
         return UserConstants.UNIQUE;
+    }
+
+    /**
+     * 唯一校验字段：工厂编码 + 填充物料号
+     *
+     * @return 唯一校验字段名列表
+     */
+    @Override
+    protected List<String> getCheckUniqueFields() {
+        return Arrays.asList("factoryCode", "paddingCode");
     }
 
     /**
