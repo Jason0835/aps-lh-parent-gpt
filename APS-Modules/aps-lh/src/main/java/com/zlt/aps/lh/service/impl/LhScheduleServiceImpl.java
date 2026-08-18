@@ -17,6 +17,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.domain.ExcelStyleVo;
 import com.zlt.aps.common.core.utils.ExcelUtils;
+import com.zlt.aps.cx.entity.CxStock;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
 import com.zlt.aps.cx.service.ICxScheduleResultService;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
@@ -149,6 +150,9 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      */
     @Resource
     private CxScheduleResultMapper cxScheduleResultMapper;
+
+    @Resource
+    private CxStockMapper cxStockMapper;
 
     @Resource
     private ScheduleEventPublisher scheduleEventPublisher;
@@ -1602,11 +1606,59 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         // 从物料表反显胎胚代码和产品结构
         AppUtils.formatData(insertList, getQueryFormulas());
 
+        // Excel 未维护胎胚库存时，按本次导入排程日期回填 T 日胎胚库存。
+        this.fillMissingImportEmbryoStock(insertList, factoryCode, scheduleDate);
+
         this.baseDao.insertBatch(insertList);
         if (failureNum > 0) {
             return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum, importErrorLogs);
         }
         return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + successNum);
+    }
+
+    /**
+     * 回填模板导入中缺失的 T 日胎胚库存。
+     *
+     * <p>Excel 已填写的库存保持不变；仅对库存为空且胎胚编码有效的记录，按工厂、
+     * 排程日期和胎胚编码查询 {@code T_CX_STOCK}，同一胎胚存在多条记录时汇总库存量。
+     * 未查询到库存记录时按自动排程现有口径回填为 0。</p>
+     *
+     * @param resultList  本次待写入的导入排程结果
+     * @param factoryCode 分厂编号
+     * @param scheduleDate 排程日期，即库存 T 日
+     */
+    private void fillMissingImportEmbryoStock(List<LhScheduleResult> resultList,
+                                               String factoryCode,
+                                               Date scheduleDate) {
+        Set<String> embryoCodes = resultList.stream()
+                .filter(Objects::nonNull)
+                .filter(item -> Objects.isNull(item.getEmbryoStock()))
+                .map(LhScheduleResult::getEmbryoCode)
+                .filter(StringUtils::isNotBlank)
+                .map(StringUtils::trim)
+                .collect(Collectors.toSet());
+        if (CollUtil.isEmpty(embryoCodes)) {
+            return;
+        }
+
+        List<CxStock> stockList = cxStockMapper.selectList(new LambdaQueryWrapper<CxStock>()
+                .eq(CxStock::getFactoryCode, factoryCode)
+                .eq(CxStock::getStockDate, scheduleDate)
+                .in(CxStock::getEmbryoCode, embryoCodes));
+        Map<String, Integer> embryoStockMap = stockList.stream()
+                .filter(Objects::nonNull)
+                .filter(stock -> StringUtils.isNotBlank(stock.getEmbryoCode()))
+                .collect(Collectors.groupingBy(
+                        stock -> stock.getEmbryoCode().trim(),
+                        Collectors.summingInt(stock -> Objects.isNull(stock.getStockNum())
+                                ? 0 : stock.getStockNum())));
+
+        resultList.stream()
+                .filter(Objects::nonNull)
+                .filter(item -> Objects.isNull(item.getEmbryoStock()))
+                .filter(item -> StringUtils.isNotBlank(item.getEmbryoCode()))
+                .forEach(item -> item.setEmbryoStock(
+                        embryoStockMap.getOrDefault(item.getEmbryoCode().trim(), 0)));
     }
 
     /**
@@ -2947,8 +2999,8 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             if (machineCodeSet.size() < MULTI_MACHINE_ENDING_MIN_COUNT) {
                 return;
             }
-            String remark = MessageFormat.format(I18nUtil.getMessage(MATERIAL_ENDING_REMARK_KEY),
-                    String.join("、", machineCodeSet));
+            String machineCodeText = String.join("、", machineCodeSet);
+            String remark = I18nUtil.getMessage(MATERIAL_ENDING_REMARK_KEY) + machineCodeText;
             resultList.forEach(result -> this.appendExportRemark(remarkMap, result, remark));
         });
     }
@@ -2969,8 +3021,8 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             if (machineCodeSet.size() < MULTI_MACHINE_ENDING_MIN_COUNT) {
                 return;
             }
-            String remark = MessageFormat.format(I18nUtil.getMessage(EMBRYO_ENDING_REMARK_KEY),
-                    String.join("、", machineCodeSet));
+            String machineCodeText = String.join("、", machineCodeSet);
+            String remark = I18nUtil.getMessage(EMBRYO_ENDING_REMARK_KEY) + machineCodeText;
             resultList.forEach(result -> this.appendExportRemark(remarkMap, result, remark));
         });
     }
