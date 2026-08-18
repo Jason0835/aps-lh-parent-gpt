@@ -1086,6 +1086,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                 }
 
             }
+            this.normalizeExportBlankCells(workbook);
             workbook.setForceFormulaRecalculation(true);
             sheet.setForceFormulaRecalculation(true);
             workbook.setActiveSheet(0);
@@ -1093,6 +1094,30 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             return removeCalcChain(outputStream.toByteArray());
         } catch (Exception e) {
             throw new ServiceException("硫化计划导出公式回填失败");
+        }
+    }
+
+    /**
+     * 将硫化导出工作簿中显示为空的字符串单元格转换为真正的空白单元格。
+     * <p>模板写入工具会把空字符串保存为字符串类型单元格，Excel 状态栏会将其计入“计数”。
+     * 最终写盘前统一转换为 BLANK，保留单元格样式；公式单元格不处理，避免删除有效公式。</p>
+     *
+     * @param workbook 硫化导出工作簿
+     */
+    private void normalizeExportBlankCells(Workbook workbook) {
+        if (Objects.isNull(workbook)) {
+            return;
+        }
+        for (int sheetIndex = 0; sheetIndex < workbook.getNumberOfSheets(); sheetIndex++) {
+            Sheet exportSheet = workbook.getSheetAt(sheetIndex);
+            for (Row row : exportSheet) {
+                for (Cell cell : row) {
+                    if (CellType.STRING.equals(cell.getCellType())
+                            && StringUtils.isBlank(cell.getStringCellValue())) {
+                        cell.setBlank();
+                    }
+                }
+            }
         }
     }
 
@@ -1361,8 +1386,9 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     }
 
     /**
-     * 将单元格写为空字符串（保留原样式）。
-     * <p>用于合计余量为 0 时导出为空，避免明细行出现无意义的 0。</p>
+     * 将单元格设置为真正的空白单元格（保留原样式）。
+     * <p>用于合计余量为 0 时导出为空，避免明细行出现无意义的 0，
+     * 同时避免空字符串被 Excel 状态栏计入“计数”。</p>
      *
      * @param row         当前数据行
      * @param columnIndex 列下标，POI 从 0 开始计数
@@ -1377,7 +1403,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         if (Objects.nonNull(cellStyle)) {
             cell.setCellStyle(cellStyle);
         }
-        cell.setCellValue("");
+        cell.setBlank();
     }
 
     /**
