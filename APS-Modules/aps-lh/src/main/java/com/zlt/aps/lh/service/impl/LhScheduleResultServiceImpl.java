@@ -683,7 +683,6 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
         }
         log.info("fillScheduleResultFields: 月计划定稿加载完成, 月计划匹配数={}", monthPlanMap.size());
         List<LhDayPlanAdjustVo> allLhDayAdjustList = getLhDayPlanAdjustList(allProductionDate, factoryCodeList, materialCodeList);
-        Map<String, YearMonthLhDayAdjustVo> skuYearMonthLhDayAdjustMap = MonthPlanSurplusCalculator.getLhDayPlanAdjustInfo(allLhDayAdjustList);
         // ======== 3. 加载机台信息（使用模数） ========
         // key: machineCode, value: LhMachineInfo
         Map<String, LhMachineInfo> machineInfoMap = new HashMap<>(machineCodes.size());
@@ -796,6 +795,7 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
                 monthPlan = SkuMonthPlanCalculator.getSkuYearMonthFinal(allMonthPlanList, skuInfo, nextMonth);
             }
             Integer startDay = DateUtil.dayOfMonth(startDate);
+            //20260817+ 硫化日计划调整信息
             Map<YearMonth, Integer> yearMonthPlanQtyMap = SkuMonthPlanCalculator.getPlanQty(allProductionDate, allMonthPlanList, allLhDayAdjustList, skuInfo, startDay);
             //20260713+ 计划总量加上上个月的超欠产
             Map<YearMonth, Integer> monthOverdueQtyMap = SkuMonthPlanCalculator.getOverdueProduction(isNextMonthFinal, allProductionDate, allMonthPlanList, skuInfo);
@@ -804,14 +804,13 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
                 lastMonthOverdueQty = monthOverdueQtyMap.values().stream().mapToInt(Integer::intValue).sum();
             }
             Integer planQty = SkuMonthPlanCalculator.sumQty(yearMonthPlanQtyMap);
-            //20260817+ 硫化日计划调整量
-            Map<YearMonth, Integer> lhDayAdjustQtyMap = MonthPlanSurplusCalculator.getYearMonthLhDayAdjustQty(skuInfo, skuYearMonthLhDayAdjustMap);
 
             // ---------- TOTAL_DAILY_PLAN_QTY：到断点月计划总量 ----------
             if (Objects.nonNull(planQty)) {
                 result.setTotalDailyPlanQty(planQty + lastMonthOverdueQty);
             }
             // ---------- MONTH_PLAN_SUM_TOTAL：非断点月计划总量 ----------
+            //20260817+ 硫化日计划调整信息
             Map<YearMonth, Integer> yearMonthSumPlanQtyMap = SkuMonthPlanCalculator.statisticsSumPlanQtyBySku(skuInfo, startDate, allMonthPlanList, allLhDayAdjustList);
             Integer sumPlanQty = SkuMonthPlanCalculator.sumQty(yearMonthSumPlanQtyMap);
             if (Objects.nonNull(sumPlanQty)) {
@@ -904,7 +903,7 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
             // ---------- MOULD_SURPLUS_QTY：硫化余量 ----------
             //硫化余量计算：不在排产后期内：
             Map<YearMonth, FactoryMonthPlanProductionFinalResult> hasProductionPlanMap = SkuMonthPlanCalculator.getHasProductionPlan(allMonthPlanList, allProductionDate, fc, matCode, result.getLhType());
-            int surplus = SkuMonthPlanCalculator.getSurplusQty(productionYearMonth, allProductionDate, hasProductionPlanMap, monthOverdueQtyMap, yearMonthPlanQtyMap, lhDayAdjustQtyMap, finishedQty);
+            int surplus = SkuMonthPlanCalculator.getSurplusQty(productionYearMonth, allProductionDate, hasProductionPlanMap, monthOverdueQtyMap, yearMonthPlanQtyMap, finishedQty);
             result.setMouldSurplusQty(Math.max(surplus, BigDecimal.ZERO.intValue()));
             // ---------- SPEC_CODE：规格编码 ----------
             MdmMaterialInfo materialInfo = materialInfoMap.get(matCode);
