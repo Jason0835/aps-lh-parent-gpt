@@ -1814,6 +1814,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             checkStruct2MaterialDate(contextDTO, targetMonthPlanList,maxDays,sbError);
 
             // 初始化日产信息
+            contextDTO.setBFirstDayNotDecMachines(Boolean.TRUE);
             Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = adjustDailyCapacityLimitObj.getDailyCapacityLimitMap(contextDTO);
             weekRollAdjustEngine.initDayProductionInfo(contextDTO, dailyCapacityLimitVoMap);
             // 设置日产能限制Map

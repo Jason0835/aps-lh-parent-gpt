@@ -43,6 +43,10 @@ public abstract class AbstractDailyCapacityLimit {
         Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = new HashMap<>();
         MpDailyCapacityLimitVo dailyCapacityLimitVo;
         Integer decLhMachines = (Integer) contextDTO.getParamMap().get(MonthPlanEnums.CHANGE_STRUCT_DEC_LH_MACHINES.getCode());
+        if (contextDTO.getBFirstDayNotDecMachines() != null && contextDTO.getBFirstDayNotDecMachines()){
+            //首日不减机台
+            decLhMachines = 0;
+        }
         //结构日分配多台成型机时，需要额外增加的硫化机台数配置
         String cxLhRatioExtra = (String) contextDTO.getParamMap().get(MonthPlanEnums.CX_LH_RATIO_EXTRA.getCode());
         Map<String,Integer> addStructExtraMap = new HashMap<>();
