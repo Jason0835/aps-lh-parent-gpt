@@ -6,9 +6,12 @@ package com.zlt.aps.lh.engine.strategy;
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.engine.strategy.support.DayTypeBlockReverseSelectionDirective;
 import com.zlt.aps.lh.engine.strategy.support.SpecifiedMachineScheduleResult;
 
+import java.time.LocalDate;
 import java.util.Date;
+import java.util.List;
 
 /**
  * 换活字块排产子策略接口
@@ -23,6 +26,28 @@ public interface ITypeBlockProductionStrategy {
      * @param context 排程上下文
      */
     void scheduleTypeBlockChange(LhScheduleContext context);
+
+    /**
+     * 按天换活字块机台反选匹配：给定当天候选机台与当天待排物料，返回稳定有序的机台→物料配对。
+     *
+     * <p>该方法只做无副作用匹配：机台顺序完全复用现有换活字块排序，物料按调用方传入的
+     * 当天 S4.5 优先级顺序取首位；每个机台只锁定一个物料、每个物料需求只被一台机台锁定，
+     * 保证结果稳定、确定且不可重复占用。实际切换时间、首检、班次计划量、机台收尾时间和
+     * 物料账本仍由 S4.5 新增主链统一计算，本方法不写入任何排程资源。</p>
+     *
+     * @param context 排程上下文
+     * @param scheduleDate 反选所属业务日
+     * @param dayMaterials 当天待排物料（已按当天 S4.5 优先级排序，不含提前生产物料）
+     * @param dayMachines 当天候选机台（已通过现有硬性过滤且可开产时间落在当天）
+     * @return 稳定有序的按天换活字块反选指令；无匹配时返回空列表
+     */
+    default List<DayTypeBlockReverseSelectionDirective> matchDayTypeBlockReversePairs(
+            LhScheduleContext context,
+            LocalDate scheduleDate,
+            List<SkuScheduleDTO> dayMaterials,
+            List<MachineScheduleDTO> dayMachines) {
+        return java.util.Collections.emptyList();
+    }
 
     /**
      * 在指定机台尝试换活字块排产。

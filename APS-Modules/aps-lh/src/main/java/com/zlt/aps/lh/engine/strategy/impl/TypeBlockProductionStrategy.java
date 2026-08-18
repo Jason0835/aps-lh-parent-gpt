@@ -36,6 +36,7 @@ import com.zlt.aps.lh.engine.strategy.ITypeBlockProductionStrategy;
 import com.zlt.aps.lh.engine.strategy.support.DailyMachineExpansionPlanner;
 import com.zlt.aps.lh.engine.strategy.support.DailyMachineShortageQuotaPlan;
 import com.zlt.aps.lh.engine.strategy.support.DailyQuotaLedgerBaseline;
+import com.zlt.aps.lh.engine.strategy.support.DayTypeBlockReverseSelectionDirective;
 import com.zlt.aps.lh.engine.strategy.support.EarlyProductionChecker;
 import com.zlt.aps.lh.engine.strategy.support.EarlyProductionDecision;
 import com.zlt.aps.lh.engine.strategy.support.EarlyProductionRuntimePlan;
@@ -78,6 +79,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
@@ -357,6 +359,79 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
         log.info("换活字块排产结束, 新增结果数: {}, 剩余新增SKU: {}, 当前排程结果数: {}",
                 typeBlockScheduledCount, context.getNewSpecSkuList().size(),
                 context.getScheduleResultList().size());
+    }
+
+    /**
+     * 按天换活字块机台反选匹配：给定当天候选机台与当天待排物料，返回稳定有序的机台→物料配对。
+     *
+     * <p>本方法只做无副作用匹配，不执行时间分配、首检、计数登记或结果写入：</p>
+     * <ul>
+     *   <li>机台顺序完全复用现有换活字块排序（同业务日下按切换就绪时间→收尾时间→机台编码）；</li>
+     *   <li>物料按调用方传入的当天 S4.5 优先级顺序取首位，保持候选判断口径与 S4.4 一致；</li>
+     *   <li>每个机台只锁定一个物料，每个物料需求只被一台机台锁定，结果稳定确定；</li>
+     *   <li>实际切换时间、首检、班次计划量、机台收尾时间和物料账本仍由 S4.5 新增主链统一计算。</li>
+     * </ul>
+     *
+     * @param context 排程上下文
+     * @param scheduleDate 反选所属业务日
+     * @param dayMaterials 当天待排物料（已按当天 S4.5 优先级排序，不含提前生产物料）
+     * @param dayMachines 当天候选机台（已通过现有硬性过滤且可开产时间落在当天）
+     * @return 稳定有序的按天换活字块反选指令；无匹配时返回空列表
+     */
+    @Override
+    public List<DayTypeBlockReverseSelectionDirective> matchDayTypeBlockReversePairs(
+            LhScheduleContext context,
+            LocalDate scheduleDate,
+            List<SkuScheduleDTO> dayMaterials,
+            List<MachineScheduleDTO> dayMachines) {
+        if (Objects.isNull(context) || Objects.isNull(scheduleDate)
+                || CollectionUtils.isEmpty(dayMaterials) || CollectionUtils.isEmpty(dayMachines)) {
+            return Collections.emptyList();
+        }
+        // 机台顺序沿用现有换活字块排序；同业务日下结束业务日一致，触发来源统一按默认值，
+        // 实际比较退化为“切换就绪时间→收尾时间→机台编码”，与 S4.4 窗口内同日竞争口径一致。
+        List<MachineScheduleDTO> orderedMachines = new ArrayList<MachineScheduleDTO>(dayMachines);
+        orderedMachines.sort((leftMachine, rightMachine) -> compareTypeBlockMachine(
+                context, leftMachine, rightMachine, Collections.<String, String>emptyMap()));
+        // 物料顺序由调用方按当天 S4.5 优先级传入，本方法保持该顺序不做二次排序。
+        Set<String> lockedMaterialKeySet = new LinkedHashSet<String>(dayMaterials.size());
+        List<DayTypeBlockReverseSelectionDirective> result =
+                new ArrayList<DayTypeBlockReverseSelectionDirective>(
+                        Math.min(dayMachines.size(), dayMaterials.size()));
+        for (MachineScheduleDTO machine : orderedMachines) {
+            if (Objects.isNull(machine) || StringUtils.isEmpty(machine.getMachineCode())) {
+                continue;
+            }
+            for (SkuScheduleDTO sku : dayMaterials) {
+                if (Objects.isNull(sku) || StringUtils.isEmpty(sku.getMaterialCode())
+                        || sku.resolveTargetScheduleQty() <= 0) {
+                    continue;
+                }
+                // 每个物料需求只被一台机台反选锁定，避免同一物料重复占用多个预留机台。
+                String materialStatusKey = MonthPlanDateResolver.buildMaterialStatusKey(
+                        sku.getMaterialCode(), sku.getProductStatus());
+                if (lockedMaterialKeySet.contains(materialStatusKey)) {
+                    continue;
+                }
+                // 完全复用现有换活字块候选判断：同胎胚同模具 + 机台硬性准入 + 当前物料不相同。
+                if (!isTypeBlockCandidate(context, machine, sku, false)) {
+                    continue;
+                }
+                DayTypeBlockReverseSelectionDirective directive =
+                        new DayTypeBlockReverseSelectionDirective();
+                directive.setScheduleDate(scheduleDate);
+                directive.setMachineCode(machine.getMachineCode());
+                directive.setPreviousMaterialCode(machine.getCurrentMaterialCode());
+                directive.setMaterialCode(sku.getMaterialCode());
+                directive.setProductStatus(sku.getProductStatus());
+                directive.setSkuSortRank(sku.getSortRank());
+                directive.setMatchedLayer("同胎胚+同模具");
+                result.add(directive);
+                lockedMaterialKeySet.add(materialStatusKey);
+                break;
+            }
+        }
+        return result;
     }
 
     /**

@@ -398,6 +398,22 @@ public class LhScheduleContext {
     private List<HistoricalReverseSelectionDirective> historicalReverseSelectionDirectiveList =
             new ArrayList<HistoricalReverseSelectionDirective>();
     /**
+     * 按天换活字块机台反选指令（S4.5 新增排产当天有效）。
+     * <p>由每天正常资源竞争阶段开始前的“换活字块检测 + 机台反选物料”生成，
+     * 只保存机台→物料配对与对账信息，不复制换活字块时间；当天正常竞争阶段结束统一结算并清空，
+     * 次日按最新机台运行态重新检测。</p>
+     */
+    private List<DayTypeBlockReverseSelectionDirective> dayTypeBlockReverseSelectionDirectiveList =
+            new ArrayList<DayTypeBlockReverseSelectionDirective>();
+    /**
+     * 按天换活字块反选机台预留，key=机台编码，value=物料+产品状态复合键。
+     * <p>预留只对当天正常资源竞争阶段生效：命中物料已前置到当天工作队列并优先尝试预留机台，
+     * 其他物料不会先于它占用该机台；命中物料成功落地或该阶段结束时立即释放，
+     * 避免机台被重复锁定或跨日残留。</p>
+     */
+    private Map<String, String> dayTypeBlockReverseSelectedSkuKeyMap =
+            new LinkedHashMap<String, String>(8);
+    /**
      * SKU按结构归集, key=structureName, value=SKU排程DTO列表
      */
     private Map<String, List<SkuScheduleDTO>> structureSkuMap = new LinkedHashMap<>();
@@ -1553,6 +1569,60 @@ public class LhScheduleContext {
         if (Objects.nonNull(result)) {
             historicalReverseProtectedResultSet.remove(result);
         }
+    }
+
+    /**
+     * 登记一条按天换活字块机台反选指令，并预留对应机台。
+     *
+     * @param directive 按天换活字块反选指令
+     */
+    public void registerDayTypeBlockReverseSelection(
+            DayTypeBlockReverseSelectionDirective directive) {
+        if (Objects.isNull(directive) || StringUtils.isEmpty(directive.getMachineCode())
+                || StringUtils.isEmpty(directive.getMaterialCode())) {
+            return;
+        }
+        dayTypeBlockReverseSelectionDirectiveList.add(directive);
+        String normalizedProductStatus = StringUtils.isEmpty(directive.getProductStatus())
+                ? FORMAL_PRODUCT_STATUS : directive.getProductStatus();
+        String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(
+                directive.getMaterialCode(), normalizedProductStatus);
+        dayTypeBlockReverseSelectedSkuKeyMap.put(
+                directive.getMachineCode(), skuKey);
+    }
+
+    /**
+     * 释放指定机台的按天换活字块反选预留。
+     *
+     * @param machineCode 机台编码
+     */
+    public void releaseDayTypeBlockReverseSelectedMachine(String machineCode) {
+        if (StringUtils.isEmpty(machineCode)) {
+            return;
+        }
+        dayTypeBlockReverseSelectedSkuKeyMap.remove(machineCode);
+    }
+
+    /**
+     * 判断机台是否已被按天换活字块反选预留。
+     *
+     * @param machineCode 机台编码
+     * @return true-当天正常竞争阶段已被反选预留；false-未预留
+     */
+    public boolean isDayTypeBlockReverseSelectedMachine(String machineCode) {
+        return StringUtils.isNotEmpty(machineCode)
+                && dayTypeBlockReverseSelectedSkuKeyMap.containsKey(machineCode);
+    }
+
+    /**
+     * 清空按天换活字块反选指令与机台预留。
+     *
+     * <p>必须在当天正常资源竞争阶段结束后调用，避免预留泄漏到提前生产阶段或下一业务日；
+     * 下一业务日开始时按最新机台运行态重新检测并登记。</p>
+     */
+    public void clearDayTypeBlockReverseSelection() {
+        dayTypeBlockReverseSelectionDirectiveList.clear();
+        dayTypeBlockReverseSelectedSkuKeyMap.clear();
     }
 
     /**

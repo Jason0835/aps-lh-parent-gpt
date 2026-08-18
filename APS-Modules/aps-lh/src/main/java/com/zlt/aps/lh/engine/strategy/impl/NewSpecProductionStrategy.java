@@ -45,6 +45,7 @@ import com.zlt.aps.lh.engine.strategy.IMouldChangeBalanceStrategy;
 import com.zlt.aps.lh.engine.strategy.IProductionStrategy;
 import com.zlt.aps.lh.engine.strategy.ISkuPriorityStrategy;
 import com.zlt.aps.lh.engine.strategy.ITrialProductionStrategy;
+import com.zlt.aps.lh.engine.strategy.ITypeBlockProductionStrategy;
 import com.zlt.aps.lh.engine.strategy.support.ActiveMachineBinding;
 import com.zlt.aps.lh.engine.strategy.support.DailyCandidateReason;
 import com.zlt.aps.lh.engine.strategy.support.DailyMachineCapacityDayDecision;
@@ -57,6 +58,7 @@ import com.zlt.aps.lh.engine.strategy.support.DailyNewSpecOrderLogCollector;
 import com.zlt.aps.lh.engine.strategy.support.DailyNewSpecOrderLogEntry;
 import com.zlt.aps.lh.engine.strategy.support.DailyQuotaLedgerBaseline;
 import com.zlt.aps.lh.engine.strategy.support.DailySchedulePhase;
+import com.zlt.aps.lh.engine.strategy.support.DayTypeBlockReverseSelectionDirective;
 import com.zlt.aps.lh.engine.strategy.support.DayDrivenScheduleState;
 import com.zlt.aps.lh.engine.strategy.support.DayScheduleContext;
 import com.zlt.aps.lh.engine.strategy.support.DeferredScheduleTask;
@@ -122,6 +124,7 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -224,6 +227,9 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
     /** 当前业务日待排新增 SKU 的统一重排入口。 */
     @Resource
     private ISkuPriorityStrategy skuPriorityStrategy;
+    /** 按天换活字块机台反选的公共匹配能力入口，匹配口径与 S4.4 换活字块主链完全一致。 */
+    @Resource
+    private ITypeBlockProductionStrategy typeBlockProductionStrategy;
     /** 胶囊次数累计与换胶囊班次扣减统一入口 */
     @Resource
     private CapsuleReplacementRuleService capsuleReplacementRuleService = new CapsuleReplacementRuleService();
@@ -564,6 +570,16 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         scheduledCount += scheduleCarryOverSkus(context, dayContext, state, allShifts);
 
         /*
+         * 阶段一完成后执行“换活字块检测 + 机台反选物料”：
+         * 只读扫描当天候选机台（硬性过滤且可开产时间落在当天）与当天正常待排物料（排除提前生产），
+         * 完全复用现有换活字块匹配口径生成机台→物料配对并预留机台；
+         * 正常资源竞争阶段会优先处理命中物料，剩余物料/机台仍走原新增排产。
+         */
+        detectAndRegisterDayTypeBlockReverseSelection(
+                context, dayContext, state, machineMatch, mouldChangeBalance,
+                inspectionBalance, capacityCalculate);
+
+        /*
          * 阶段二：把当天有计划且尚未绑定机台的普通新增，与当天确需新增机台的续作/在机 SKU
          * 合并成一个工作队列，严格按 S4.5 sortRank 统一竞争资源。单个 SKU 轮到后由既有
          * 多机台主循环一次性尝试完当天所需机台，再轮到下一 SKU。
@@ -572,6 +588,11 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 context, dayContext, state, DailySchedulePhase.NORMAL_RESOURCE_COMPETITION,
                 machineMatch, mouldChangeBalance, inspectionBalance, capacityCalculate,
                 unscheduledReasonCountMap);
+        /*
+         * 正常资源竞争阶段收口后统一结算按天换活字块反选指令并释放全部机台预留，
+         * 防止预留泄漏到提前生产阶段或下一业务日；次日会按最新机台运行态重新检测。
+         */
+        finalizeDayTypeBlockReverseSelection(context, dayContext);
 
         /*
          * 提前生产开始前基于正常阶段最新结果重建 Set 去重统计，相当于冻结正常排程结果和资源占用。
@@ -589,6 +610,526 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
          */
         this.appendDailyNewSpecOrderLogSection(dayContext, newSpecOrderLogSections);
         return scheduledCount;
+    }
+
+    /**
+     * 检测并按天登记换活字块机台反选配对。
+     *
+     * <p>本方法只读构建“当天正常待排物料（排除提前生产）”与“当天候选机台（硬性过滤且
+     * 可开产时间落在当天）”，完全复用现有换活字块匹配口径生成机台→物料配对并预留机台；
+     * 不写入排程结果、日计划账本或机台运行态。命中物料由正常资源竞争阶段优先落地，
+     * 实际切换时间、首检、班次计划量、机台收尾时间和物料账本仍走 S4.5 新增主链。</p>
+     *
+     * @param context 排程上下文
+     * @param dayContext 当前业务日上下文
+     * @param state 三天窗口共用日驱动状态
+     * @param machineMatch 机台匹配策略
+     * @param mouldChangeBalance 换模均衡策略
+     * @param inspectionBalance 首检均衡策略
+     * @param capacityCalculate 产能计算策略
+     */
+    private void detectAndRegisterDayTypeBlockReverseSelection(
+            LhScheduleContext context,
+            DayScheduleContext dayContext,
+            DayDrivenScheduleState state,
+            IMachineMatchStrategy machineMatch,
+            IMouldChangeBalanceStrategy mouldChangeBalance,
+            IFirstInspectionBalanceStrategy inspectionBalance,
+            ICapacityCalculateStrategy capacityCalculate) {
+        // 当天正常待排物料：复用正常资源竞争候选口径，天然排除提前生产、已排完和已未排物料。
+        List<SkuScheduleDTO> dayMaterials =
+                this.buildDayTypeBlockMaterialList(context, dayContext, state);
+        if (CollectionUtils.isEmpty(dayMaterials)) {
+            log.info("按天换活字块机台反选跳过, batchNo: {}, scheduleDate: {}, 原因: 当天无正常待排物料",
+                    context.getBatchNo(), dayContext.getScheduleDate());
+            return;
+        }
+        // 当天候选机台：对每个物料执行既有硬过滤，再用无副作用真实可开产计划确认落在当天。
+        List<MachineScheduleDTO> dayMachines = this.buildDayTypeBlockMachinePool(
+                context, dayContext, dayMaterials, machineMatch, mouldChangeBalance,
+                inspectionBalance, capacityCalculate);
+        if (CollectionUtils.isEmpty(dayMachines)) {
+            log.info("按天换活字块机台反选跳过, batchNo: {}, scheduleDate: {}, 当天待排物料: {}, 原因: 无当天候选机台",
+                    context.getBatchNo(), dayContext.getScheduleDate(), dayMaterials.size());
+            return;
+        }
+        // 公共匹配能力：完全复用现有换活字块候选判断与机台排序，返回稳定有序配对。
+        List<DayTypeBlockReverseSelectionDirective> directives =
+                typeBlockProductionStrategy.matchDayTypeBlockReversePairs(
+                        context, dayContext.getScheduleDate(), dayMaterials, dayMachines);
+        if (CollectionUtils.isEmpty(directives)) {
+            log.info("按天换活字块机台反选无命中, batchNo: {}, scheduleDate: {}, 候选机台: {}, 候选物料: {}, 原因: 无同胎胚同模具换活字块配对",
+                    context.getBatchNo(), dayContext.getScheduleDate(),
+                    dayMachines.size(), dayMaterials.size());
+            this.appendDayTypeBlockNoMatchLog(context, dayContext, dayMachines, dayMaterials);
+            return;
+        }
+        for (DayTypeBlockReverseSelectionDirective directive : directives) {
+            context.registerDayTypeBlockReverseSelection(directive);
+            this.appendDayTypeBlockReverseLog(context, directive, "命中并锁定",
+                    "机台反选物料命中换活字块关系，等待新增主链优先落地");
+        }
+        // 未命中机台逐台登记失败原因，命中机台与物料在指令日志中已完整记录。
+        Set<String> matchedMachineCodeSet = new LinkedHashSet<String>(directives.size());
+        for (DayTypeBlockReverseSelectionDirective directive : directives) {
+            if (Objects.nonNull(directive)
+                    && StringUtils.isNotEmpty(directive.getMachineCode())) {
+                matchedMachineCodeSet.add(directive.getMachineCode());
+            }
+        }
+        for (MachineScheduleDTO machine : dayMachines) {
+            if (Objects.isNull(machine) || StringUtils.isEmpty(machine.getMachineCode())
+                    || matchedMachineCodeSet.contains(machine.getMachineCode())) {
+                continue;
+            }
+            log.info("按天换活字块机台反选未命中, batchNo: {}, scheduleDate: {}, machineCode: {}, previousMaterialCode: {}, 原因: 当天待排物料均不满足同胎胚同模具换活字块条件或物料已被其他机台锁定",
+                    context.getBatchNo(), dayContext.getScheduleDate(),
+                    machine.getMachineCode(),
+                    StringUtils.defaultString(machine.getCurrentMaterialCode(), "-"));
+        }
+        log.info("按天换活字块机台反选完成, batchNo: {}, scheduleDate: {}, 候选机台: {}, 候选物料: {}, 命中并锁定: {}, 明细机台: {}, 明细物料: {}",
+                context.getBatchNo(), dayContext.getScheduleDate(),
+                dayMachines.size(), dayMaterials.size(), directives.size(),
+                dayMachines.stream().filter(Objects::nonNull)
+                        .map(MachineScheduleDTO::getMachineCode)
+                        .collect(Collectors.toList()),
+                dayMaterials.stream().filter(Objects::nonNull)
+                        .map(SkuScheduleDTO::getMaterialCode)
+                        .collect(Collectors.toList()));
+    }
+
+    /**
+     * 输出按天换活字块机台反选无命中的候选机台与物料明细日志。
+     *
+     * @param context 排程上下文
+     * @param dayContext 当前业务日上下文
+     * @param dayMachines 当天候选机台
+     * @param dayMaterials 当天正常待排物料
+     */
+    private void appendDayTypeBlockNoMatchLog(
+            LhScheduleContext context,
+            DayScheduleContext dayContext,
+            List<MachineScheduleDTO> dayMachines,
+            List<SkuScheduleDTO> dayMaterials) {
+        StringBuilder detailBuilder = new StringBuilder(320);
+        detailBuilder.append("scheduleTargetDate=")
+                .append(LhScheduleTimeUtil.formatDate(context.getScheduleTargetDate()))
+                .append(", scheduleDate=").append(dayContext.getScheduleDate())
+                .append(", 候选机台=").append(dayMachines.stream().filter(Objects::nonNull)
+                        .map(MachineScheduleDTO::getMachineCode)
+                        .collect(Collectors.toList()))
+                .append(", 候选物料=").append(dayMaterials.stream().filter(Objects::nonNull)
+                        .map(SkuScheduleDTO::getMaterialCode)
+                        .collect(Collectors.toList()))
+                .append(", 是否命中换活字块=否")
+                .append(", 失败原因=当天待排物料均不满足同胎胚同模具换活字块条件");
+        log.info("按天换活字块机台反选, {}", detailBuilder);
+        PriorityTraceLogHelper.appendProcessLog(
+                context, "按天换活字块机台反选", detailBuilder.toString());
+    }
+
+    /**
+     * 构建当天正常待排物料列表。
+     *
+     * @param context 排程上下文
+     * @param dayContext 当前业务日上下文
+     * @param state 三天窗口共用日驱动状态
+     * @return 已按当天 S4.5 优先级排序的物料列表；无候选时返回空列表
+     */
+    private List<SkuScheduleDTO> buildDayTypeBlockMaterialList(
+            LhScheduleContext context,
+            DayScheduleContext dayContext,
+            DayDrivenScheduleState state) {
+        List<DailyNewSpecCandidate> candidates = buildDailyCandidateList(
+                context, dayContext, state, DailySchedulePhase.NORMAL_RESOURCE_COMPETITION);
+        if (CollectionUtils.isEmpty(candidates)) {
+            return Collections.emptyList();
+        }
+        List<SkuScheduleDTO> materialList = new ArrayList<SkuScheduleDTO>(candidates.size());
+        for (DailyNewSpecCandidate candidate : candidates) {
+            if (Objects.nonNull(candidate) && Objects.nonNull(candidate.getSku())) {
+                materialList.add(candidate.getSku());
+            }
+        }
+        // 与正常资源竞争阶段同一排序口径，保证反选优先顺序与主循环一致。
+        this.skuPriorityStrategy.sortNewSpecByPriority(context, materialList);
+        return materialList;
+    }
+
+    /**
+     * 构建当天候选机台并集。
+     *
+     * <p>对每个当天物料复用 {@link IMachineMatchStrategy#matchMachines} 完成既有硬性过滤，
+     * 再通过无副作用的真实可开产计划确认“机台计算后的可开产时间落在当天”，
+     * 与正常资源竞争阶段的逐班候选口径保持一致。</p>
+     *
+     * @param context 排程上下文
+     * @param dayContext 当前业务日上下文
+     * @param dayMaterials 当天正常待排物料
+     * @param machineMatch 机台匹配策略
+     * @param mouldChangeBalance 换模均衡策略
+     * @param inspectionBalance 首检均衡策略
+     * @param capacityCalculate 产能计算策略
+     * @return 去重后的当天候选机台列表
+     */
+    private List<MachineScheduleDTO> buildDayTypeBlockMachinePool(
+            LhScheduleContext context,
+            DayScheduleContext dayContext,
+            List<SkuScheduleDTO> dayMaterials,
+            IMachineMatchStrategy machineMatch,
+            IMouldChangeBalanceStrategy mouldChangeBalance,
+            IFirstInspectionBalanceStrategy inspectionBalance,
+            ICapacityCalculateStrategy capacityCalculate) {
+        LinkedHashMap<String, MachineScheduleDTO> machineMap =
+                new LinkedHashMap<String, MachineScheduleDTO>(16);
+        for (SkuScheduleDTO sku : dayMaterials) {
+            if (Objects.isNull(sku)) {
+                continue;
+            }
+            List<MachineScheduleDTO> hardCandidates = machineMatch.matchMachines(context, sku);
+            if (CollectionUtils.isEmpty(hardCandidates)) {
+                continue;
+            }
+            Date candidateProductionNotBeforeTime = NewSpecEmbryoAvailableTimeResolver
+                    .resolveSkuProductionGateTime(context, sku, context.getScheduleWindowShifts());
+            Date productionNotBeforeTime = NewSpecEmbryoAvailableTimeResolver
+                    .resolveProductionNotBeforeTime(context, sku, context.getScheduleWindowShifts());
+            // 与正常资源竞争阶段同一口径：可用量取 SKU 运行态账本剩余量，保证首检/产能预演一致。
+            int schedulableRemainingQty = resolveSchedulableRemainingQty(context, sku);
+            boolean isEnding = endingJudgmentStrategy.isCurrentWindowEnding(context, sku);
+            for (MachineScheduleDTO machine : hardCandidates) {
+                if (Objects.isNull(machine) || StringUtils.isEmpty(machine.getMachineCode())) {
+                    continue;
+                }
+                NewSpecMachineAvailabilityPlan plan = this.resolveMachineAvailabilityPlan(
+                        context, sku, machine, dayContext, capacityCalculate, mouldChangeBalance,
+                        inspectionBalance, candidateProductionNotBeforeTime, productionNotBeforeTime,
+                        schedulableRemainingQty, 0, null, isEnding);
+                if (Objects.isNull(plan) || !plan.isAvailable() || !plan.isPreparationAvailable()
+                        || !this.isFormalTargetShiftInDay(plan, dayContext)) {
+                    continue;
+                }
+                machineMap.putIfAbsent(machine.getMachineCode(), machine);
+            }
+        }
+        return new ArrayList<MachineScheduleDTO>(machineMap.values());
+    }
+
+    /**
+     * 判断可开产计划的正式目标班次是否落在当前业务日。
+     *
+     * @param plan 真实可开产计划
+     * @param dayContext 当前业务日上下文
+     * @return true-正式开产班次属于当前业务日；false-不在当天
+     */
+    private boolean isFormalTargetShiftInDay(NewSpecMachineAvailabilityPlan plan,
+                                             DayScheduleContext dayContext) {
+        if (Objects.isNull(plan) || Objects.isNull(plan.getFormalTargetShift())
+                || Objects.isNull(dayContext)
+                || CollectionUtils.isEmpty(dayContext.getDayShifts())) {
+            return false;
+        }
+        Integer formalShiftIndex = plan.getFormalTargetShift().getShiftIndex();
+        for (LhShiftConfigVO dayShift : dayContext.getDayShifts()) {
+            if (Objects.nonNull(dayShift)
+                    && Objects.equals(dayShift.getShiftIndex(), formalShiftIndex)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 把按天换活字块反选命中的物料前置到当天工作队列。
+     *
+     * <p>命中物料之间仍保持当天 S4.5 相对优先级，未命中物料保持原顺序；
+     * 只调整优先处理顺序，不改变 SKU 类型、目标量、机台排序和选机规则。</p>
+     *
+     * @param context 排程上下文
+     * @param workingSkuList 已按当天 S4.5 优先级排序的工作队列
+     */
+    private void prependDayTypeBlockMatchedSkus(LhScheduleContext context,
+                                                List<SkuScheduleDTO> workingSkuList) {
+        List<DayTypeBlockReverseSelectionDirective> directives =
+                context.getDayTypeBlockReverseSelectionDirectiveList();
+        if (CollectionUtils.isEmpty(directives) || CollectionUtils.isEmpty(workingSkuList)) {
+            return;
+        }
+        // 使用对象身份收集当天命中物料，避免同物料多产品状态相互覆盖。
+        Set<SkuScheduleDTO> matchedSkuSet =
+                Collections.newSetFromMap(new IdentityHashMap<SkuScheduleDTO, Boolean>());
+        for (DayTypeBlockReverseSelectionDirective directive : directives) {
+            if (Objects.isNull(directive) || directive.isSatisfied()) {
+                continue;
+            }
+            String directiveSkuKey = MonthPlanDateResolver.buildMaterialStatusKey(
+                    directive.getMaterialCode(),
+                    this.normalizeDayTypeBlockProductStatus(directive.getProductStatus()));
+            for (SkuScheduleDTO sku : workingSkuList) {
+                if (Objects.isNull(sku)) {
+                    continue;
+                }
+                String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(
+                        sku.getMaterialCode(),
+                        this.normalizeDayTypeBlockProductStatus(sku.getProductStatus()));
+                if (StringUtils.equals(directiveSkuKey, skuKey)) {
+                    matchedSkuSet.add(sku);
+                }
+            }
+        }
+        if (CollectionUtils.isEmpty(matchedSkuSet)) {
+            return;
+        }
+        List<SkuScheduleDTO> reordered = new ArrayList<SkuScheduleDTO>(workingSkuList.size());
+        for (SkuScheduleDTO sku : workingSkuList) {
+            if (matchedSkuSet.contains(sku)) {
+                reordered.add(sku);
+            }
+        }
+        for (SkuScheduleDTO sku : workingSkuList) {
+            if (!matchedSkuSet.contains(sku)) {
+                reordered.add(sku);
+            }
+        }
+        workingSkuList.clear();
+        workingSkuList.addAll(reordered);
+        LocalDate directiveScheduleDate = null;
+        for (DayTypeBlockReverseSelectionDirective directive : directives) {
+            if (Objects.nonNull(directive)) {
+                directiveScheduleDate = directive.getScheduleDate();
+                break;
+            }
+        }
+        log.info("按天换活字块反选命中物料前置, batchNo: {}, scheduleDate: {}, 命中物料数: {}, 前置物料: {}",
+                context.getBatchNo(), directiveScheduleDate,
+                matchedSkuSet.size(),
+                reordered.stream()
+                        .filter(matchedSkuSet::contains)
+                        .map(SkuScheduleDTO::getMaterialCode)
+                        .collect(Collectors.toList()));
+    }
+
+    /**
+     * 在当前 SKU 的候选列表上应用按天换活字块反选机台优先。
+     *
+     * <p>命中 SKU 的预留机台置顶优先尝试，其余候选保持原顺序；命中物料已由当天
+     * 工作队列前置，正常资源竞争阶段内其他物料不会先于它占用预留机台。
+     * 预留机台不在当前候选列表或正式约束失败时自动回退普通新增，不阻塞其他物料。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 当前新增 SKU
+     * @param candidates 当前候选机台列表
+     * @return 应用反选优先后的候选列表
+     */
+    private List<MachineScheduleDTO> applyDayTypeBlockReverseSelection(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            List<MachineScheduleDTO> candidates) {
+        List<DayTypeBlockReverseSelectionDirective> directives =
+                context.getDayTypeBlockReverseSelectionDirectiveList();
+        if (CollectionUtils.isEmpty(directives) || CollectionUtils.isEmpty(candidates)) {
+            return candidates;
+        }
+        String currentSkuKey = MonthPlanDateResolver.buildMaterialStatusKey(
+                sku.getMaterialCode(),
+                this.normalizeDayTypeBlockProductStatus(sku.getProductStatus()));
+        List<MachineScheduleDTO> reservedForCurrent =
+                new ArrayList<MachineScheduleDTO>(1);
+        for (DayTypeBlockReverseSelectionDirective directive : directives) {
+            if (Objects.isNull(directive) || directive.isSatisfied() || directive.isSuccess()) {
+                continue;
+            }
+            String directiveSkuKey = MonthPlanDateResolver.buildMaterialStatusKey(
+                    directive.getMaterialCode(),
+                    this.normalizeDayTypeBlockProductStatus(directive.getProductStatus()));
+            if (!StringUtils.equals(currentSkuKey, directiveSkuKey)) {
+                continue;
+            }
+            // 命中物料轮到时把预留机台置顶优先尝试，并登记“已尝试”，供阶段收口区分失败原因。
+            directive.setAttempted(true);
+            for (MachineScheduleDTO machine : candidates) {
+                if (Objects.nonNull(machine)
+                        && StringUtils.equals(machine.getMachineCode(),
+                        directive.getMachineCode())) {
+                    reservedForCurrent.add(machine);
+                }
+            }
+        }
+        if (CollectionUtils.isEmpty(reservedForCurrent)) {
+            return candidates;
+        }
+        List<MachineScheduleDTO> result =
+                new ArrayList<MachineScheduleDTO>(candidates.size());
+        Set<String> addedMachineCodeSet =
+                new LinkedHashSet<String>(candidates.size());
+        for (MachineScheduleDTO machine : reservedForCurrent) {
+            if (Objects.nonNull(machine)
+                    && addedMachineCodeSet.add(machine.getMachineCode())) {
+                result.add(machine);
+            }
+        }
+        for (MachineScheduleDTO machine : candidates) {
+            if (Objects.nonNull(machine)
+                    && addedMachineCodeSet.add(machine.getMachineCode())) {
+                result.add(machine);
+            }
+        }
+        log.info("按天换活字块反选预留机台优先尝试, batchNo: {}, materialCode: {}, productStatus: {}, reservedMachines: {}",
+                context.getBatchNo(), sku.getMaterialCode(), sku.getProductStatus(),
+                reservedForCurrent.stream()
+                        .map(MachineScheduleDTO::getMachineCode)
+                        .collect(Collectors.toList()));
+        return result;
+    }
+
+    /**
+     * 标记按天换活字块反选指令成功并释放机台预留。
+     *
+     * <p>必须在新增主链结果与机台运行态提交后调用：此时机台当前物料与收尾时间已由
+     * {@code updateMachineState} 同步，物料账本已扣减；本方法只登记指令状态并释放当天
+     * 机台预留，保证该机台与物料在当天不再被重复反选或重复排产。</p>
+     *
+     * @param context 排程上下文
+     * @param machineCode 落地机台编码
+     * @param sku 当前 SKU
+     * @param result 新增主链生成的有效结果
+     */
+    private void markDayTypeBlockReverseDirectiveSucceeded(
+            LhScheduleContext context,
+            String machineCode,
+            SkuScheduleDTO sku,
+            LhScheduleResult result) {
+        if (StringUtils.isEmpty(machineCode) || Objects.isNull(sku) || Objects.isNull(result)) {
+            return;
+        }
+        DayTypeBlockReverseSelectionDirective directive =
+                this.findDayTypeBlockDirectiveByMachineAndSku(context, machineCode, sku);
+        if (Objects.isNull(directive)) {
+            return;
+        }
+        directive.setAttempted(true);
+        directive.setSuccess(true);
+        directive.setSatisfied(true);
+        directive.setResultReason("机台反选换活字块已由新增主链落地，机台收尾时间与物料账本同步更新");
+        context.releaseDayTypeBlockReverseSelectedMachine(machineCode);
+        this.appendDayTypeBlockReverseLog(context, directive, "成功", directive.getResultReason());
+    }
+
+    /**
+     * 按机台编码与 SKU 查找当天按天换活字块反选指令。
+     *
+     * @param context 排程上下文
+     * @param machineCode 机台编码
+     * @param sku 当前 SKU
+     * @return 对应指令；未命中返回 null
+     */
+    private DayTypeBlockReverseSelectionDirective findDayTypeBlockDirectiveByMachineAndSku(
+            LhScheduleContext context,
+            String machineCode,
+            SkuScheduleDTO sku) {
+        if (StringUtils.isEmpty(machineCode) || Objects.isNull(sku)
+                || CollectionUtils.isEmpty(
+                context.getDayTypeBlockReverseSelectionDirectiveList())) {
+            return null;
+        }
+        String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(
+                sku.getMaterialCode(),
+                this.normalizeDayTypeBlockProductStatus(sku.getProductStatus()));
+        for (DayTypeBlockReverseSelectionDirective directive
+                : context.getDayTypeBlockReverseSelectionDirectiveList()) {
+            if (Objects.isNull(directive)) {
+                continue;
+            }
+            String directiveSkuKey = MonthPlanDateResolver.buildMaterialStatusKey(
+                    directive.getMaterialCode(),
+                    this.normalizeDayTypeBlockProductStatus(directive.getProductStatus()));
+            if (StringUtils.equals(machineCode, directive.getMachineCode())
+                    && StringUtils.equals(skuKey, directiveSkuKey)) {
+                return directive;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 结算当天按天换活字块反选指令并释放全部机台预留。
+     *
+     * <p>在当天正常资源竞争阶段结束后调用：已成功落地指令保持成功状态，其余指令登记
+     * 明确失败原因，随后统一清空当天反选状态，避免预留泄漏到提前生产阶段或下一业务日。</p>
+     *
+     * @param context 排程上下文
+     * @param dayContext 当前业务日上下文
+     */
+    private void finalizeDayTypeBlockReverseSelection(LhScheduleContext context,
+                                                      DayScheduleContext dayContext) {
+        List<DayTypeBlockReverseSelectionDirective> directives =
+                context.getDayTypeBlockReverseSelectionDirectiveList();
+        int directiveCount = CollectionUtils.isEmpty(directives) ? 0 : directives.size();
+        if (!CollectionUtils.isEmpty(directives)) {
+            for (DayTypeBlockReverseSelectionDirective directive : directives) {
+                if (Objects.isNull(directive) || directive.isSatisfied() || directive.isSuccess()) {
+                    continue;
+                }
+                if (directive.isAttempted()) {
+                    directive.setResultReason("预留机台在当天正常竞争阶段未落地，自动释放并回退普通新增");
+                } else {
+                    directive.setResultReason("反选物料已由其他机台满足或当天无排产窗口，自动释放");
+                }
+                directive.setAttempted(true);
+                this.appendDayTypeBlockReverseLog(context, directive, "未落地",
+                        directive.getResultReason());
+            }
+        }
+        context.clearDayTypeBlockReverseSelection();
+        log.info("按天换活字块反选阶段收口, batchNo: {}, scheduleDate: {}, 指令数: {}",
+                context.getBatchNo(), dayContext.getScheduleDate(), directiveCount);
+    }
+
+    /**
+     * 按天换活字块反选物料产品状态归一化。
+     *
+     * @param productStatus 原始产品状态
+     * @return 非空产品状态；空值按正规 S 处理
+     */
+    private String normalizeDayTypeBlockProductStatus(String productStatus) {
+        return StringUtils.isEmpty(productStatus) ? FORMAL_PRODUCT_STATUS : productStatus;
+    }
+
+    /**
+     * 输出按天换活字块机台反选的应用日志与排程过程日志。
+     *
+     * @param context 排程上下文
+     * @param directive 反选指令
+     * @param result 结果状态（命中并锁定/成功/未落地）
+     * @param reason 结果说明
+     */
+    private void appendDayTypeBlockReverseLog(
+            LhScheduleContext context,
+            DayTypeBlockReverseSelectionDirective directive,
+            String result,
+            String reason) {
+        if (Objects.isNull(directive)) {
+            return;
+        }
+        StringBuilder detailBuilder = new StringBuilder(320);
+        detailBuilder.append("scheduleTargetDate=")
+                .append(LhScheduleTimeUtil.formatDate(context.getScheduleTargetDate()))
+                .append(", scheduleDate=").append(directive.getScheduleDate())
+                .append(", machineCode=")
+                .append(StringUtils.defaultString(directive.getMachineCode(), "-"))
+                .append(", previousMaterialCode=")
+                .append(StringUtils.defaultString(directive.getPreviousMaterialCode(), "-"))
+                .append(", materialCode=")
+                .append(StringUtils.defaultString(directive.getMaterialCode(), "-"))
+                .append(", productStatus=")
+                .append(StringUtils.defaultString(directive.getProductStatus(), "-"))
+                .append(", matchedLayer=")
+                .append(StringUtils.defaultString(directive.getMatchedLayer(), "-"))
+                .append(", result=").append(StringUtils.defaultString(result, "-"))
+                .append(", reason=").append(StringUtils.defaultString(reason, "-"));
+        log.info("按天换活字块机台反选, {}", detailBuilder);
+        PriorityTraceLogHelper.appendProcessLog(
+                context, "按天换活字块机台反选", detailBuilder.toString());
     }
 
     /**
@@ -1123,6 +1664,14 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
          * 写回上下文，保证后续迭代顺序和过程日志读取的是同一份本日快照。
          */
         this.skuPriorityStrategy.sortNewSpecByPriority(context, workingSkuList);
+        /*
+         * 正常资源竞争阶段把按天换活字块反选命中的物料前置到工作队列：
+         * 命中物料之间仍保持 S4.5 相对优先级，未命中物料顺序不变；
+         * 该动作只调整“优先处理顺序”，不改变 SKU 类型、目标量和选机规则。
+         */
+        if (phase == DailySchedulePhase.NORMAL_RESOURCE_COMPETITION) {
+            prependDayTypeBlockMatchedSkus(context, workingSkuList);
+        }
         context.getNewSpecSkuList().clear();
         context.getNewSpecSkuList().addAll(workingSkuList);
         refreshPendingNewSpecSkuTypeCounts(context);
@@ -1130,7 +1679,9 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         log.info("新增排产按日阶段开始, batchNo: {}, scheduleDate: {}, phase: {}, candidateCount: {}, "
                         + "candidateMaterials: {}",
                 context.getBatchNo(), dayContext.getScheduleDate(), phase, candidateList.size(),
-                candidateList.stream().map(candidate -> candidate.getSku().getMaterialCode())
+                context.getNewSpecSkuList().stream()
+                        .filter(Objects::nonNull)
+                        .map(SkuScheduleDTO::getMaterialCode)
                         .collect(Collectors.toList()));
 
         int scheduledCount = schedulePendingNewSpecs(
@@ -2902,6 +3453,12 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 candidates = prioritizeHistoricalReverseSpecifiedMachines(
                         context, sku, candidates, machineMatch);
             }
+            /*
+             * 按天换活字块反选机台预留：命中 SKU 的预留机台置顶优先尝试，
+             * 其余候选保持原顺序；命中物料已前置到当天工作队列，正常竞争阶段内
+             * 其他物料不会先于它占用预留机台。预留机台失败时自动回退普通候选列表。
+             */
+            candidates = applyDayTypeBlockReverseSelection(context, sku, candidates);
             logNewSpecMachineCandidateSnapshot(context, sku, candidates, EMPTY_STRING_SET, null);
             if (candidates.isEmpty()) {
                 /*
@@ -4601,6 +5158,13 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 registerMachineAssignment(context, machineCode, result);
                 recordScheduledMachineForResult(context, result, shifts);
                 clearSpecifyReservation(context, machineCode, sku.getMaterialCode());
+                /*
+                 * 按天换活字块反选成功：机台当前物料与收尾时间已由 updateMachineState 同步，
+                 * 物料账本已扣减；此处登记指令成功并释放当天机台预留，避免该机台/物料
+                 * 在当天或后续业务日被重复反选或重复排产。
+                 */
+                markDayTypeBlockReverseDirectiveSucceeded(
+                        context, machineCode, sku, result);
                 if (wholeSingleControlUnit) {
                     // 冻结为双模的SKU必须同时写入配对侧，配对侧沿用主侧整组裁剪后的班次数量。
                     context.getScheduleResultList().add(pairResult);
@@ -4619,6 +5183,9 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                     registerMachineAssignment(context, pairSingleControlMachine.getMachineCode(), pairResult);
                     recordScheduledMachineForResult(context, pairResult, shifts);
                     clearSpecifyReservation(context, pairSingleControlMachine.getMachineCode(), sku.getMaterialCode());
+                    // 单控整机配对侧若存在独立反选指令，同样登记成功并释放预留。
+                    markDayTypeBlockReverseDirectiveSucceeded(
+                            context, pairSingleControlMachine.getMachineCode(), sku, pairResult);
                 }
                 /*
                  * 结果和机台运行态全部提交成功后，才登记跨日在机绑定。下一业务日阶段一直接在该结果
