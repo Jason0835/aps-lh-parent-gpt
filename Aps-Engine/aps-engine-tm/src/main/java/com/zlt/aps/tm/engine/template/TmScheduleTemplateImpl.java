@@ -297,7 +297,7 @@ public class TmScheduleTemplateImpl extends AbsTmScheduleTemplate {
         shiftTaskMap.forEach((shiftOrder, shiftTaskList) -> {
             // 同一班次按固定分段输出，避免多个任务的计划量与选机台明细交错，影响过程追溯。
             shiftTaskList.forEach(task -> context.appendShiftProcessLog(shiftOrder,
-                    this.buildPlanFormula(context, task)));
+                    this.buildStepCalculationFormula(context, task, TmScheduleStepEnum.MACHINE_ASSIGN)));
             shiftTaskList.forEach(task -> this.appendMachineCandidateDetail(context, task));
             shiftTaskList.stream().filter(TmTaskDraft::isUnassigned).forEach(task ->
                     context.appendShiftProcessLog(shiftOrder, "未排任务：胎面代码={0}（胎胚号={1}），班次={2}，计划量={3}，未排原因={4}",
@@ -486,7 +486,7 @@ public class TmScheduleTemplateImpl extends AbsTmScheduleTemplate {
                             + this.nvl(task.getGuardDemandQty()) + "米，库存抵扣="
                             + this.nvl(task.getStockDeductQty()) + "米。",
                     "依次执行需求汇总、库存抵扣、新规格/实验规格、损耗、最小起排、卷长取整、工装和产能约束。",
-                    this.buildPlanFormula(context, task),
+                    this.buildStepCalculationFormula(context, task, stepEnum),
                     "当前最终计划量=" + this.nvl(task.getPlanQty()) + "米，未排标记="
                             + (task.isUnassigned() ? "是" : "否") + "。",
                     TmScheduleStepEnum.PLAN_CALC == stepEnum
@@ -663,7 +663,7 @@ public class TmScheduleTemplateImpl extends AbsTmScheduleTemplate {
     }
 
     /**
-     * 构建任务在机台分配完成后的实际计划量公式。
+     * 构建任务计划量及计划调整公式。
      *
      * @param context 排程上下文
      * @param task 排程任务
@@ -696,9 +696,25 @@ public class TmScheduleTemplateImpl extends AbsTmScheduleTemplate {
                 + "，" + this.displayGuardWindow(task.getFormingGuardWindowQtyMap())
                 + "，" + this.buildSupplyHoursFormula(task)
                 + "，\n" + this.buildStockDeductFormula(task)
-                + "，\n" + this.buildToolUsageSummary(task, context)
                 + "，\n计划量=" + baseFormula
                 + String.join("", adjustmentTerms) + "=" + this.nvl(task.getPlanQty()).toPlainString();
+    }
+
+    /**
+     * 按排程阶段构建计划量过程公式；工装账本只在机台分配完成后追加。
+     *
+     * @param context  排程上下文
+     * @param task     排程任务
+     * @param stepEnum 当前排程阶段
+     * @return 当前阶段对应的计划量及工装过程公式
+     */
+    private String buildStepCalculationFormula(TmScheduleContext context, TmTaskDraft task,
+                                               TmScheduleStepEnum stepEnum) {
+        String planFormula = this.buildPlanFormula(context, task);
+        if (TmScheduleStepEnum.MACHINE_ASSIGN != stepEnum || task.isUnassigned()) {
+            return planFormula;
+        }
+        return planFormula + "，\n" + this.buildToolUsageSummary(task, context);
     }
 
     /**
@@ -716,7 +732,6 @@ public class TmScheduleTemplateImpl extends AbsTmScheduleTemplate {
                 && task.getCurlRollLength().compareTo(BigDecimal.ZERO) > 0;
         BigDecimal effectiveCurlLength = taskCurlLengthEffective ? task.getCurlRollLength()
                 : task.getDefaultCurlRollLength();
-        String curlLengthSource = taskCurlLengthEffective ? "任务卷曲长度" : "默认卷曲长度";
         if (effectiveCurlLength == null || effectiveCurlLength.compareTo(BigDecimal.ZERO) <= 0) {
             return "工装限制：可用工装米数=未计算，本任务净占用工装米数=未计算，剩余工装米数=未计算，有效卷曲长度=未计算；任务卷曲长度和默认卷曲长度均未配置或非正数，无法计算可用工装数量对应产量、净占用工装数量和剩余工装数量";
         }
@@ -725,30 +740,12 @@ public class TmScheduleTemplateImpl extends AbsTmScheduleTemplate {
         BigDecimal availableToolQty = snapshot == null ? task.getAvailableToolQty() : snapshot.getAvailableToolQty();
         BigDecimal toolUsedQty = snapshot == null ? task.getToolUsedQty() : snapshot.getToolUsedQty();
         BigDecimal remainingToolQty = snapshot == null ? task.getRemainingToolQty() : snapshot.getRemainingToolQty();
-        String availableSource;
-        if (task.getToolLedgerOrder() == null) {
-            availableSource = "当前任务计算前全局可用工装快照";
-        } else if (task.getToolLedgerOrder() <= 1) {
-            availableSource = "批次初始可用工装";
-        } else {
-            availableSource = "上一任务结算后剩余工装";
-        }
-        BigDecimal maxPlanQty = availableToolQty == null ? null : availableToolQty.multiply(effectiveCurlLength);
-        return "工装限制：可用工装米数=" + this.displayToolMeter(availableToolQty, effectiveCurlLength)
-                + "，本任务净占用工装米数=" + this.displayToolMeter(toolUsedQty, effectiveCurlLength)
-                + "，剩余工装米数=" + this.displayToolMeter(remainingToolQty, effectiveCurlLength)
-                + "，有效卷曲长度=" + this.displayToolQuantity(effectiveCurlLength)
-                + "（" + curlLengthSource + "）"
-                + "；可用工装数量=" + availableSource
-                + this.displayToolQuantity(availableToolQty) + "套"
-                + "；工装允许最大计划量=" + this.displayToolQuantity(availableToolQty) + "套×"
-                + this.displayToolQuantity(effectiveCurlLength) + "米/套="
-                + this.displayToolQuantity(maxPlanQty) + "米"
-                + "；本任务净占用工装数量=(最终计划量" + this.displayToolQuantity(task.getPlanQty())
-                + "米-当班成型消耗量" + this.displayToolQuantity(task.getCurrentShiftDemandQty())
-                + "米)÷" + this.displayToolQuantity(effectiveCurlLength) + "米/套="
+        return "工装限制：可用工装数量=" + this.displayToolQuantity(availableToolQty) + "套"
+                + "；本任务净占用工装数量=(" + this.displayToolQuantity(task.getPlanQty())
+                + "-" + this.displayToolQuantity(task.getCurrentShiftDemandQty()) + ")÷"
+                + this.displayToolQuantity(effectiveCurlLength) + "="
                 + this.displayToolQuantity(toolUsedQty) + "套"
-                + "；剩余工装数量=min(max(" + this.displayToolQuantity(availableToolQty)
+                + "；下一任务可用工装数量=min(max(" + this.displayToolQuantity(availableToolQty)
                 + "套-" + this.displaySubtractedToolQuantity(toolUsedQty) + ",0),"
                 + this.displayToolQuantity(task.getTotalToolQty()) + "套)="
                 + this.displayToolQuantity(remainingToolQty) + "套";

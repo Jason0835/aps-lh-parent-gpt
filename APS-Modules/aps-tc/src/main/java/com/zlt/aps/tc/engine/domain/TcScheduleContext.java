@@ -97,6 +97,12 @@ public class TcScheduleContext {
     /** 工厂可用机台候选列表，由数据加载层填充，供机台分配步骤过滤评分使用 */
     private List<TcMachineCandidate> machineCandidateList = new ArrayList<>();
 
+    /** 工厂已配置的有效口型板编码集合，用于判断任务口型板是否启用机台白名单 */
+    private Set<String> configuredMouthPlateCodeSet = new HashSet<>();
+
+    /** 工厂已配置的启用胶料编码集合，用于判断任务主胶料是否启用机台白名单 */
+    private Set<String> configuredGlueCodeSet = new HashSet<>();
+
     /** 损耗率规则列表，由数据加载层填充，供机台分配步骤解析最终损耗率 */
     private List<TcLossRule> lossRuleList = new ArrayList<>();
 
