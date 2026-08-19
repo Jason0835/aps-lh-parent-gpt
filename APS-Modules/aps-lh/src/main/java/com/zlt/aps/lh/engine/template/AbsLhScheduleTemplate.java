@@ -23,7 +23,8 @@ import java.util.ArrayList;
  *
  * <pre>
  * 流程: S4.1前置校验 -> S4.2数据初始化 -> S4.3排程调整与SKU归集
- *       -> S4.4续作规格排产 -> S4.5新增规格排产 -> S4.5.1特殊材料硫化机置换 -> S4.6结果校验与发布保存
+ *       -> S4.4续作规格排产 -> S4.5新增规格排产 -> S4.5.2硫化日计划调整排产
+ *       -> S4.5.1特殊材料硫化机置换 -> S4.6结果校验与发布保存
  * </pre>
  *
  * @author APS
@@ -96,6 +97,20 @@ public abstract class AbsLhScheduleTemplate {
             }
 
             /*
+             * S4.5.2 硫化日计划调整排产：
+             * 必须严格在 S4.5 新增排产全部完成后执行，基于新增排产后的实时机台/产能状态，
+             * 只处理“本月月计划不存在、但 t_lh_day_plan_adjust_require 存在且汇总调整量与
+             * 硫化余量均大于0”的额外排产来源，避免混入新增排产主循环。
+             */
+            context.setCurrentStep(ScheduleStepEnum.S4_5_2_DAY_PLAN_ADJUST.getCode());
+            log.info(">>> 步骤 S4.5.2: {}", ScheduleStepEnum.S4_5_2_DAY_PLAN_ADJUST.getDescription());
+            doDayPlanAdjustProduction(context);
+            logStepSnapshot(context, ScheduleStepEnum.S4_5_2_DAY_PLAN_ADJUST);
+            if (context.isInterrupted()) {
+                return buildInterruptResponse(context);
+            }
+
+            /*
              * S4.5.1 置换后处理：
              * 先对所有“无空闲模具”的 SKU 执行共用模具 A/B 联动置换，
              * 再对剩余特殊材料执行原硫化机置换兜底；两类置换都只能使用 S4.5 前冻结的续作机台。
@@ -150,6 +165,9 @@ public abstract class AbsLhScheduleTemplate {
 
     /** S4.5 新增规格排产 */
     protected abstract void doNewSpecProduction(LhScheduleContext context);
+
+    /** S4.5.2 硫化日计划调整排产 */
+    protected abstract void doDayPlanAdjustProduction(LhScheduleContext context);
 
     /** S4.5.1 特殊材料硫化机置换 */
     protected abstract void doSpecialMaterialSubstitution(LhScheduleContext context);
