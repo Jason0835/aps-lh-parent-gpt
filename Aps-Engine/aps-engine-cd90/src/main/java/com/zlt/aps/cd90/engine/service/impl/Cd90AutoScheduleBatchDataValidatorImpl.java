@@ -31,7 +31,6 @@ import java.math.BigDecimal;
 import java.sql.Date;
 import java.text.MessageFormat;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -89,7 +88,7 @@ public class Cd90AutoScheduleBatchDataValidatorImpl implements Cd90AutoScheduleB
         checkMachineInfo(builder, factoryCode);
         Set<String> clothCodes = checkConstructionInfo(builder, factoryCode, formingSchedules);
         checkCurlLength(builder, factoryCode, clothCodes);
-        this.checkStorageLaneLimit(builder, factoryCode);
+        this.checkStorageLaneLimit(builder, factoryCode, scheduleDate);
 
         Cd90BatchDataCheckResult result = builder.build();
         if (result.isFailed()) {
@@ -327,22 +326,22 @@ public class Cd90AutoScheduleBatchDataValidatorImpl implements Cd90AutoScheduleB
     }
 
     /**
-     * 批次级检查：任务启动时当前资源班次的库排数据完整性。
+     * 批次级检查：排程窗口首班次的库排数据完整性。
      * 1. MAX_CAR_NUM 必须维护且 >0(2026/06/24 变更,去掉 default 7,必填);
      * 2. CAR_NUM 不能为负,且不能大于 MAX_CAR_NUM;
      * 3. 空库排(MATERIAL_CODE 为空)时 CAR_NUM 必须 = 0。
      * 排程前拦截,避免 Allocator 运行时抛异常。
      */
     private void checkStorageLaneLimit(Cd90BatchDataCheckResult.Builder builder,
-                                       String factoryCode) {
+                                       String factoryCode, LocalDate scheduleDate) {
         List<Cd90ShiftConfig> configs = shiftConfigMapper.selectList(
                 Wrappers.<Cd90ShiftConfig>lambdaQuery()
                         .eq(Cd90ShiftConfig::getFactoryCode, factoryCode)
                         .eq(Cd90ShiftConfig::getIsActive, ACTIVE));
         Cd90ShiftDescriptor baselineShift;
         try {
-            baselineShift = shiftWindowResolver.resolveCurrentResourceShift(
-                    LocalDateTime.now(), configs);
+            baselineShift = shiftWindowResolver.resolveScheduleBaselineShift(
+                    scheduleDate, configs);
         } catch (IllegalArgumentException exception) {
             builder.addError(I18nUtil.getMessage(
                             "ui.data.column.cd90StorageLaneLimit.modelName"),
