@@ -5222,7 +5222,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                         pendingCandidateTraceSnapshot.withActualHit(machineCode));
                 state.markMachinePriorityTraceHit(sku);
                 pendingCandidateTraceSnapshot = null;
-                // 单控只保留硬准入、L/R粒度、产能及首检折半，不再覆盖统一七层软排序。
+                // 单控只保留硬准入、L/R粒度、产能及首检折半，不再覆盖统一八层软排序。
                 candidateCache.clearCapacityCache();
                 scheduledCount++;
                 actualAllowedAddMachineCount++;
@@ -8483,7 +8483,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
     /**
      * 在当前业务作用域内选择首选机台。
      * <p>续作补偿锁回和试制/量试限制作业定点预选属于已确认的外部固定规则，继续保留；除此之外，普通新增候选
-     * 必须严格使用“目标班次筛选 + 七层软排序”已经生成的顺序。单机收完、尾量集中和当天空闲只属于
+     * 必须严格使用“目标班次筛选 + 八层软排序”已经生成的顺序。单机收完、尾量集中和当天空闲只属于
      * 数量分配或诊断维度，禁止在此二次改写首选机台。</p>
      *
      * @param context 排程上下文
@@ -8612,7 +8612,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
     /**
      * 判断当前SKU是否应仅尝试单控候选机台。
      * <p>只有冻结为单模的试制SKU禁止普通机台；冻结为双模的试制SKU允许普通机台和
-     * 单控 L/R 整组共同进入目标班次内的七层软排序。快照缺失时保持原有从严行为，
+     * 单控 L/R 整组共同进入目标班次内的八层软排序。快照缺失时保持原有从严行为，
      * 避免误落普通机台。</p>
      *
      * @param context 排程上下文
