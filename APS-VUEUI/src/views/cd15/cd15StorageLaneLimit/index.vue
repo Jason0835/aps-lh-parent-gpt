@@ -177,7 +177,7 @@ export default {
     },
     searchColumns() {
       return [
-        { label: this.$t("ui.data.column.cd15StorageLaneLimit.factoryCode"), prop: "factoryCode", type: "select", dictData: this.dict.type.biz_factory_name, filterable: true },
+        { label: this.$t("ui.data.column.cd15StorageLaneLimit.factoryCode"), prop: "factoryCode", type: "select", dictData: this.dict.type.biz_factory_name, filterable: true, listeners: { change: (factoryCode) => this.loadMachineOptions(factoryCode) } },
         { label: this.$t("ui.data.column.cd15StorageLaneLimit.materialCode"), prop: "materialCode", type: "select", dictData: this.steelStripOptions, filterable: true, clearable: true },
         { label: this.$t("ui.data.column.cd15StorageLaneLimit.laneDate"), prop: "laneDate", type: "date", valueFormat: "yyyy-MM-dd" },
         { label: this.$t("ui.data.column.cd15StorageLaneLimit.shiftCode"), prop: "shiftCode", type: "select", dictData: this.dict.type.class_num_three_plan, filterable: true },
@@ -228,7 +228,7 @@ export default {
     handleSearch(params) {
       this.page.current = 1;
       this.query = { ...params };
-      this.loadMachineOptions(params.factoryCode);
+      this.loadMachineOptions();
       this.getList();
     },
     handlePageChange(current, pageSize) {
@@ -265,8 +265,13 @@ export default {
       const rows = Array.isArray(res) ? res : (res.data || []);
       this.steelStripOptions = rows.map((code) => ({ label: code, value: code }));
     },
-    async loadMachineOptions(factoryCode = DEFAULT_FACTORY_CODE) {
-      const res = await getCd15MachineEnableOptions({ factoryCode: factoryCode || DEFAULT_FACTORY_CODE });
+    async loadMachineOptions(factoryCode) {
+      const code = factoryCode || this.query.factoryCode;
+      if (!code) {
+        this.machineOptions = [];
+        return;
+      }
+      const res = await getCd15MachineEnableOptions({ factoryCode: code });
       const rows = Array.isArray(res) ? res : (res.data || []);
       this.machineOptions = rows.map((item) => ({ label: item.machineCode, value: item.machineCode }));
     },

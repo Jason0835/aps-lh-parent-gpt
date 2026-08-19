@@ -51,7 +51,7 @@ export default {
     },
     searchColumns() {
       return [
-        { label: this.$t("ui.data.column.cd90MachineMaintenancePlan.factoryCode"), prop: "factoryCode", type: "select", dictData: this.dict.type.biz_factory_name, filterable: true },
+        { label: this.$t("ui.data.column.cd90MachineMaintenancePlan.factoryCode"), prop: "factoryCode", type: "select", dictData: this.dict.type.biz_factory_name, filterable: true, listeners: { change: (factoryCode) => this.loadMachineOptions(factoryCode) } },
         { label: this.$t("ui.data.column.cd90MachineMaintenancePlan.machineCode"), prop: "machineCode", type: "select", dictData: this.machineOptions, filterable: true, clearable: true },
         { label: this.$t("ui.data.column.cd90MachineMaintenancePlan.downtimeDate"), prop: "downtimeDate" },
       ];
@@ -64,13 +64,18 @@ export default {
     handleDelete(row) { this.$confirm(this.$t("common.confirm.delete"), { type: "warning" }).then(() => { delMachineMaintenancePlan({ ids: row.id }).then((data) => { this.$modal.msgSuccess(data.msg); this.$set(this.page, "current", 1); this.getList(); }); }); },
     handleBatchDelete() { if (!this.selection || this.selection.length === 0) return; this.$confirm(this.$t("common.confirm.delete"), { type: "warning" }).then(() => { const ids = this.selection.map(item => item.id).join(","); delMachineMaintenancePlan({ ids }).then((data) => { this.$modal.msgSuccess(data.msg); this.selection = []; this.$set(this.page, "current", 1); this.getList(); }); }); },
     handleExport() { exportMachineMaintenancePlan(this.query); },
-    handleSearch(params) { this.page.current = 1; this.query = { ...params }; this.getList(); },
+    handleSearch(params) { this.page.current = 1; this.query = { ...params }; this.loadMachineOptions(); this.getList(); },
     handlePageChange(current, pageSize) { this.page.current = current; this.page.pageSize = pageSize; this.getList(); },
     handleSortChange(sort) { this.sort = sort; this.getList(); },
     handleSelectionChange(selection) { this.selection = selection || []; },
     async getList() { this.loading = true; try { const params = { ...this.query, pageNum: this.page.current, pageSize: this.page.pageSize, orderByColumn: this.sort.prop, isAsc: this.sort.order }; const res = await listMachineMaintenancePlan(params); this.data = res.rows || []; this.page.total = res.total || 0; } finally { this.loading = false; } },
-    async loadMachineOptions() {
-      const res = await getCd90MachineEnableOptions({ factoryCode: this.query.factoryCode });
+    async loadMachineOptions(factoryCode) {
+      const code = factoryCode || this.query.factoryCode;
+      if (!code) {
+        this.machineOptions = [];
+        return;
+      }
+      const res = await getCd90MachineEnableOptions({ factoryCode: code });
       const rows = Array.isArray(res) ? res : (res.rows || res.data || []);
       this.machineOptions = rows.map((item) => ({ label: item.machineCode, value: item.machineCode }));
     },

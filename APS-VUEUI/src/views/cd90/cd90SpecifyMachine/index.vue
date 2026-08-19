@@ -207,6 +207,7 @@ export default {
           type: "select",
           dictData: this.dict.type.biz_factory_name,
           filterable: true,
+          listeners: { change: (factoryCode) => this.loadMachineOptions(factoryCode) },
         },
         {
           label: this.$t("ui.data.column.cd90SpecifyMachine.clothCode"),
@@ -243,8 +244,13 @@ export default {
         value: code,
       }));
     },
-    async loadMachineOptions() {
-      const res = await getCd90MachineEnableOptions({ factoryCode: this.query.factoryCode });
+    async loadMachineOptions(factoryCode) {
+      const code = factoryCode || this.query.factoryCode;
+      if (!code) {
+        this.machineOptions = [];
+        return;
+      }
+      const res = await getCd90MachineEnableOptions({ factoryCode: code });
       const rows = Array.isArray(res) ? res : (res.rows || res.data || []);
       this.machineOptions = rows.map((item) => ({
         label: item.machineCode,
@@ -307,6 +313,7 @@ export default {
     handleSearch(params) {
       this.page.current = 1;
       this.query = { ...params };
+      this.loadMachineOptions();
       this.getList();
     },
     handlePageChange(current, pageSize) {
