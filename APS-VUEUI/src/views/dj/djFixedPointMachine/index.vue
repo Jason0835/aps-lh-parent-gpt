@@ -151,7 +151,7 @@ export default {
           prop: "lineType",
           align: "center",
           halign: "center",
-          label: this.$t("ui.dj.specifyMachine.column.paddingCode"),
+          label: this.$t("ui.data.column.specifyMachine.lineType"),
           // sortable: "custom",
           formatter: (row, column, value, index) => {
             return this.selectDictLabel(this.dict.type.LINE_TYPE, value);
@@ -338,7 +338,8 @@ export default {
     getConfigKey("sys.factory.code").then(response => {
       this.search.factoryCode = response.msg;
       this.query.factoryCode = response.msg;
-      this.$store.dispatch("dj/getMachineList");
+      // 按当前工厂编码加载机台下拉数据，避免带出其他厂的机台
+      this.$store.dispatch("dj/getMachineList", { factoryCode: this.query.factoryCode });
       this.getList();
     }).catch(() => {
       this.$store.dispatch("dj/getMachineList");

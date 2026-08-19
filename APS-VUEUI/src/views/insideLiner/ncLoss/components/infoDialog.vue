@@ -146,7 +146,12 @@ export default {
       this.visible = false;
     },
     handleConfirm() {
-      this.$refs.form.triggerConfirm(this.save);
+      this.$refs.form.triggerConfirm((params) => {
+        this.save({
+          ...params,
+          factoryCode: params.factoryCode || this.factoryCode,
+        });
+      });
     },
   },
 };

@@ -1008,7 +1008,8 @@ export default {
     getConfigKey("sys.factory.code").then(response => {
       this.search.factoryCode = response.msg;
       this.query.factoryCode = response.msg;
-      this.$store.dispatch("dj/getMachineList");
+      // 按当前工厂编码加载机台下拉数据，避免带出其他厂的机台
+      this.$store.dispatch("dj/getMachineList", { factoryCode: this.query.factoryCode });
     }).catch(() => {
       this.$store.dispatch("dj/getMachineList");
     });

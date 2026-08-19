@@ -37,11 +37,15 @@ public class NcSpecifyMachine extends ApsBaseEntity implements Serializable {
     @TableField("LINING_CODE")
     private String liningCode;
 
-    @Excel(name="ui.specifyMachine.column.machineName")
-    @ImportExcelValidated(name = "ui.specifyMachine.column.machineName", required = true, isCode = true, maxLength = 30)
     @ApiModelProperty(value = "机台Code（对应T_NC_MACHINE_INFO表machineCode）")
     @TableField("MACHINE_CODE")
     private String machineCode;
+
+    @Excel(name="ui.specifyMachine.column.machineName")
+    @ImportExcelValidated(name = "ui.specifyMachine.column.machineName", required = true, maxLength = 30)
+    @ApiModelProperty(value = "机台")
+    @TableField(exist = false)
+    private String machineName;
 
     @Excel(name="ui.specifyMachine.column.lineType", dictType="LINE_TYPE")
     @ImportExcelValidated(name = "ui.specifyMachine.column.lineType", required = true, maxLength = 9)
