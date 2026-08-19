@@ -92,6 +92,11 @@ export default {
           showOverflowTooltip: true
         },
         {
+          prop: "updateBy",
+          label: this.$t("ui.data.column.updateBy"),
+          width: 100,
+        },
+        {
           prop: "updateTime",
           label: this.$t("ui.data.column.updateTime"),
           width:180

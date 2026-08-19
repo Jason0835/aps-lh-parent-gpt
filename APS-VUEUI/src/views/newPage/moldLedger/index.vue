@@ -206,12 +206,12 @@ export default {
         {
           prop: "updateBy",
           align: "center",
-          label: this.$t("common.updateByName"),
+          label: this.$t("ui.data.column.updateBy"),
           width: 100,
         },
         {
           prop: "updateTime",
-          label: this.$t("ui.data.column.scheduleAdjust.updata"),
+          label: this.$t("ui.data.column.updateTime"),
           width:200,
         },
 

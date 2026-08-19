@@ -306,7 +306,7 @@ export default {
         // },
         {
           prop: "updateByName",
-          label: this.$t("common.updateByName"),
+          label: this.$t("ui.data.column.updateBy"),
           minWidth: 100,
         },
         {

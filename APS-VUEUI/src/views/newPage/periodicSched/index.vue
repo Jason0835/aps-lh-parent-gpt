@@ -198,9 +198,15 @@ export default {
           label: this.$t("ui.data.column.mdmCycleSchStruConf.minVulcanizingMachine"),
         },
         {
+          prop: "updateBy",
+          align: "center",
+          label: this.$t("ui.data.column.updateBy"),
+          width: 100,
+        },
+        {
           prop: "updateTime",
           width: 180,
-          label: this.$t("ui.data.column.mdmCycleSchStruConf.updateDate"),
+          label: this.$t("ui.data.column.updateTime"),
         },
 
         {

@@ -162,7 +162,7 @@ export default {
         },
         {
           prop: "updateBy",
-          label: this.$t("common.updateByName"),
+          label: this.$t("ui.data.column.updateBy"),
         },
         {
           prop: "updateTime",
