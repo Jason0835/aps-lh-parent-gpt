@@ -2,8 +2,10 @@ package com.zlt.aps.cd90.api.domain.entity;
 
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import io.swagger.annotations.ApiModel;
+import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
 import java.io.Serializable;
@@ -66,4 +68,10 @@ public class Cd90ScheduleRollingAdjustLog extends BaseEntity implements Serializ
     @TableField("BEFORE_SNAPSHOT_JSON") private String beforeSnapshotJson;
     /** 调整后完整快照JSON。 */
     @TableField("AFTER_SNAPSHOT_JSON") private String afterSnapshotJson;
+
+    /** 备注 */
+    @ApiModelProperty(value = "备注", name = "remark")
+    @TableField("REMARK")
+    @Excel(name = "ui.common.column.remark")
+    private String remark;
 }

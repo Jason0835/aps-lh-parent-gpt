@@ -5,10 +5,14 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.utils.MachineOpenShiftCodeUtil;
+import com.zlt.aps.common.core.utils.SixShiftWorkCalendarUtil;
 import com.zlt.aps.tm.api.constant.TmScheduleConstants;
 import com.zlt.aps.tm.api.domain.entity.TmMachineInfo;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
 import com.zlt.aps.tm.api.domain.entity.TmShiftConfig;
+import com.zlt.aps.tm.api.enums.TmProcessCodeEnum;
+import com.zlt.aps.tm.domain.vo.TmWorkCalendarRowVo;
+import com.zlt.aps.tm.mapper.TmAutoScheduleDataLoadMapper;
 import com.zlt.aps.tm.mapper.TmMachineInfoMapper;
 import com.zlt.aps.tm.mapper.TmShiftConfigMapper;
 import org.springframework.stereotype.Service;
@@ -30,16 +34,21 @@ public class TmMachineOpenShiftValidator {
 
     private final TmShiftConfigMapper shiftConfigMapper;
 
+    private final TmAutoScheduleDataLoadMapper autoScheduleDataLoadMapper;
+
     /**
      * 创建机台开机班次校验器。
      *
      * @param machineInfoMapper 机台资料 Mapper
      * @param shiftConfigMapper 班次配置 Mapper
+     * @param autoScheduleDataLoadMapper 工作日历查询 Mapper
      */
     public TmMachineOpenShiftValidator(TmMachineInfoMapper machineInfoMapper,
-                                       TmShiftConfigMapper shiftConfigMapper) {
+                                       TmShiftConfigMapper shiftConfigMapper,
+                                       TmAutoScheduleDataLoadMapper autoScheduleDataLoadMapper) {
         this.machineInfoMapper = machineInfoMapper;
         this.shiftConfigMapper = shiftConfigMapper;
+        this.autoScheduleDataLoadMapper = autoScheduleDataLoadMapper;
     }
 
     /**
@@ -75,6 +84,7 @@ public class TmMachineOpenShiftValidator {
             BigDecimal currentQty = this.readPlanQty(currentResult, shiftOrder);
             BigDecimal requestQty = this.readPlanQty(requestResult, shiftOrder);
             if (requestQty.compareTo(currentQty) > 0) {
+                this.requireWorkCalendarShiftOpen(currentResult, shiftOrder);
                 this.requireMachineShiftOpen(currentResult.getFactoryCode(), currentResult.getMachineCode(), shiftOrder);
             }
         }
@@ -90,6 +100,9 @@ public class TmMachineOpenShiftValidator {
      */
     public BigDecimal resolveRollingCapacity(TmScheduleResult reference, String machineCode, Integer shiftOrder) {
         if (reference == null || StrUtil.isBlank(machineCode) || shiftOrder == null) {
+            return BigDecimal.ZERO;
+        }
+        if (!this.isWorkCalendarShiftOpen(reference, shiftOrder)) {
             return BigDecimal.ZERO;
         }
         TmMachineInfo machineInfo = this.loadMachine(reference.getFactoryCode(), machineCode);
@@ -110,6 +123,7 @@ public class TmMachineOpenShiftValidator {
     private void validatePositivePlanShifts(TmScheduleResult scheduleResult, String machineCode) {
         for (int shiftOrder = 1; shiftOrder <= TmScheduleConstants.TM_MAX_SHIFT_ORDER; shiftOrder++) {
             if (this.readPlanQty(scheduleResult, shiftOrder).compareTo(BigDecimal.ZERO) > 0) {
+                this.requireWorkCalendarShiftOpen(scheduleResult, shiftOrder);
                 this.requireMachineShiftOpen(scheduleResult.getFactoryCode(), machineCode, shiftOrder);
             }
         }
@@ -129,6 +143,53 @@ public class TmMachineOpenShiftValidator {
         if (machineInfo == null || shiftConfig == null || !"1".equals(machineInfo.getMachineStatus())
                 || !this.isMachineShiftOpen(machineInfo, shiftConfig)) {
             throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.schedule.machineShiftClosed"));
+        }
+    }
+
+    /**
+     * 要求胎面工作日历开放指定结果班次。
+     *
+     * @param scheduleResult 排程结果
+     * @param shiftOrder     结果班次顺序
+     * @throws ServiceException 工作日历停产或查询异常时抛出
+     */
+    private void requireWorkCalendarShiftOpen(TmScheduleResult scheduleResult, Integer shiftOrder) {
+        if (!this.isWorkCalendarShiftOpen(scheduleResult, shiftOrder)) {
+            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.schedule.workCalendarShiftStopped"));
+        }
+    }
+
+    /**
+     * 查询胎面工作日历并判断结果班次是否开放。
+     *
+     * @param scheduleResult 排程结果
+     * @param shiftOrder     结果班次顺序
+     * @return true表示开放，日历缺失或班次标志为空时兼容为开放
+     * @throws ServiceException 工作日历查询异常时抛出
+     */
+    private boolean isWorkCalendarShiftOpen(TmScheduleResult scheduleResult, Integer shiftOrder) {
+        if (scheduleResult == null || scheduleResult.getScheduleDate() == null || shiftOrder == null) {
+            return false;
+        }
+        try {
+            Date productionDate = SixShiftWorkCalendarUtil.resolveProductionDate(
+                    scheduleResult.getScheduleDate(), shiftOrder);
+            List<TmWorkCalendarRowVo> calendarList = this.autoScheduleDataLoadMapper.selectWorkCalendarRows(
+                    scheduleResult.getFactoryCode(), TmProcessCodeEnum.TREAD.getCode(), productionDate);
+            if (calendarList == null || calendarList.isEmpty()) {
+                return true;
+            }
+            TmWorkCalendarRowVo calendar = calendarList.get(0);
+            if ("0".equals(calendar.getDayFlag())) {
+                return false;
+            }
+            int calendarShiftOrder = SixShiftWorkCalendarUtil.resolveCalendarShiftOrder(shiftOrder);
+            String shiftFlag = calendarShiftOrder == 1 ? calendar.getOneShiftFlag()
+                    : (calendarShiftOrder == 2 ? calendar.getTwoShiftFlag() : calendar.getThreeShiftFlag());
+            return shiftFlag == null || !"0".equals(shiftFlag);
+        } catch (RuntimeException exception) {
+            throw new ServiceException(I18nUtil.getMessage(
+                    "ui.data.alert.tm.schedule.workCalendarQueryFailed"), exception);
         }
     }
 

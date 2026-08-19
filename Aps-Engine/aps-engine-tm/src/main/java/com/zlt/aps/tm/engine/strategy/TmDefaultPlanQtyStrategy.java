@@ -35,6 +35,9 @@ public class TmDefaultPlanQtyStrategy implements ITmPlanQtyStrategy {
         BigDecimal nextShiftDemand = nvl(taskDraft.getNextShiftDemandQty());
         BigDecimal guardDemand = nvl(taskDraft.getGuardDemandQty());
         BigDecimal stock = nvl(taskDraft.getRollingStockQty());
+        if (Boolean.TRUE.equals(taskDraft.getFormingShutdownCloseOutFlag())) {
+            return this.calculateFormingShutdownCloseOut(taskDraft, stock);
+        }
         BigDecimal twoShiftDemand = currentDemand.add(nextShiftDemand);
         BigDecimal twoShiftStockGap = twoShiftDemand.subtract(stock);
         taskDraft.setTwoShiftDemandQty(twoShiftDemand);
@@ -88,6 +91,42 @@ public class TmDefaultPlanQtyStrategy implements ITmPlanQtyStrategy {
         taskDraft.setPlanStockQty(calculateHandoverStock(stock, currentDemand, planQty));
         result.setCalcFormulaDesc(tailTask ? "收尾余量" : "基础需求->库存抵扣->派机前最小起排与卷数取整估算");
         taskDraft.setPlanQty(planQty);
+        return result;
+    }
+
+    /**
+     * 按停产前最后开放成型班需求计算收尾缺口。
+     *
+     * <p>该分支只抵扣库存，不叠加库存保证需求，不执行最小起排和卷曲取整；
+     * 损耗在机台确认后按实际机台规则统一增加。</p>
+     *
+     * @param taskDraft 胎面任务草稿
+     * @param stock     当前班初滚动库存
+     * @return 成型连续停产收尾计划量结果
+     */
+    private TmPlanQtyResult calculateFormingShutdownCloseOut(TmTaskDraft taskDraft, BigDecimal stock) {
+        BigDecimal closeOutDemandQty = nvl(taskDraft.getFormingShutdownCloseOutDemandQty());
+        BigDecimal stockDeductQty = stock.min(closeOutDemandQty);
+        BigDecimal planQty = closeOutDemandQty.subtract(stock).max(BigDecimal.ZERO);
+        taskDraft.setTwoShiftDemandQty(closeOutDemandQty);
+        taskDraft.setTwoShiftStockGapQty(closeOutDemandQty.subtract(stock));
+        taskDraft.setTwoShiftStockCovered(planQty.compareTo(BigDecimal.ZERO) == 0);
+        taskDraft.setStockDeductQty(stockDeductQty);
+        taskDraft.setPlanStockQty(stock.add(planQty).subtract(closeOutDemandQty).max(BigDecimal.ZERO));
+        taskDraft.setPlanQty(planQty);
+
+        TmPlanQtyResult result = new TmPlanQtyResult();
+        result.setBaseDemandQty(planQty);
+        result.setLossAddQty(BigDecimal.ZERO);
+        result.setMinStartAdjustQty(BigDecimal.ZERO);
+        result.setTailRoundAdjustQty(BigDecimal.ZERO);
+        result.setToolLimitAdjustQty(BigDecimal.ZERO);
+        result.setToolOverflowQty(BigDecimal.ZERO);
+        result.setCapacityAdjustQty(BigDecimal.ZERO);
+        result.setPreLossPlanQty(planQty);
+        result.setPlanQtyBeforeToolLimit(planQty);
+        result.setFinalPlanQty(planQty);
+        result.setCalcFormulaDesc("成型连续停产收尾需求->库存抵扣");
         return result;
     }
 

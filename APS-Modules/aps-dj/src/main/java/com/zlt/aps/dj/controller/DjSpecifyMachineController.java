@@ -64,7 +64,7 @@ public class DjSpecifyMachineController extends AbstractDocBizController<DjSpeci
     @Override
     public AjaxResult save(@RequestBody DjSpecifyMachine stock) {
         if (UserConstants.NOT_UNIQUE.equals(machineService.checkUnique(stock))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.error.message.quota.unique"));
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.djSpecifyMachine.importUnique"));
         }
         return super.save(stock);
     }

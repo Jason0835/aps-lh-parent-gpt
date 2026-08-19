@@ -286,6 +286,9 @@ public class TcPersistService {
         if (task == null) {
             return null;
         }
+        if (Boolean.TRUE.equals(task.getFormingShutdownCloseOutFlag())) {
+            return task.getFormingShutdownCloseOutDemandQty();
+        }
         return task.getCurrentShiftDemandQty() == null ? task.getDemandQty() : task.getCurrentShiftDemandQty();
     }
 
@@ -303,13 +306,14 @@ public class TcPersistService {
      * 判断任务是否使用收尾基础量口径。
      *
      * @param task 待排任务
-     * @return 收尾标识、收尾余量和胎侧长度均有效时返回true
+     * @return 成型连续停产收尾，或普通收尾标识、收尾余量和胎侧长度均有效时返回true
      */
     private boolean isTailTask(TcTaskDraft task) {
         return task != null
-                && TcYesNoEnum.YES.getCode().equals(task.getTailFlag())
+                && (Boolean.TRUE.equals(task.getFormingShutdownCloseOutFlag())
+                || (TcYesNoEnum.YES.getCode().equals(task.getTailFlag())
                 && this.nvl(task.getTailBalanceQty()).compareTo(BigDecimal.ZERO) > 0
-                && this.nvl(task.getSidewallLength()).compareTo(BigDecimal.ZERO) > 0;
+                && this.nvl(task.getSidewallLength()).compareTo(BigDecimal.ZERO) > 0));
     }
 
     private TcScheduleResult convertNodeToResult(ScheduleTaskNode<TcTaskDraft> node, TcScheduleContext context) {

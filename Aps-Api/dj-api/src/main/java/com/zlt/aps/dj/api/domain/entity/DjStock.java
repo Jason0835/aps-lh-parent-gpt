@@ -36,7 +36,7 @@ public class DjStock extends BaseEntity {
      * 库存日期
      */
     @JsonFormat(pattern = "yyyy-MM-dd")
-    @Excel(name = "ui.data.column.stock.stockDate", width = 30, dateFormat = "yyyy-MM-dd")
+    @Excel(name = "ui.data.column.stock.stockDate", dateFormat = "yyyy-MM-dd")
     @ImportValidated(name = "ui.data.column.stock.stockDate", required = true, date = true)
     @ApiModelProperty(value = "库存日期", position = 20)
     @TableField(value = "STOCK_DATE")
@@ -51,6 +51,15 @@ public class DjStock extends BaseEntity {
     private String endTime;
 
     /**
+     * 垫胶名称
+     */
+    @ApiModelProperty(value = "垫胶名称", position = 30)
+    @Excel(name = "ui.data.column.dj.scheduleResult.paddingName")
+    @ImportValidated(name = "ui.data.column.dj.scheduleResult.paddingName", maxLength = 50, isCode = true)
+    @TableField(value = "MATERIAL_NAME")
+    private String materialName;
+
+    /**
      * 垫胶编号
      */
     @ApiModelProperty(value = "垫胶编号", position = 30)
@@ -58,15 +67,6 @@ public class DjStock extends BaseEntity {
     @ImportValidated(name = "ui.data.column.dj.scheduleResult.paddingCode", required = true, maxLength = 50, isCode = true)
     @TableField(value = "MATERIAL_CODE")
     private String materialCode;
-
-    /**
-     * 垫胶名称
-     */
-    @ApiModelProperty(value = "垫胶名称", position = 30)
-    @Excel(name = "ui.data.column.dj.scheduleResult.paddingName")
-    @ImportValidated(name = "ui.data.column.dj.scheduleResult.paddingName", required = true, maxLength = 50, isCode = true)
-    @TableField(value = "MATERIAL_NAME")
-    private String materialName;
 
     /**
      * 库存量
@@ -108,4 +108,11 @@ public class DjStock extends BaseEntity {
     @ApiModelProperty(value = "卷曲长度。此胎面一卷的最大长度，单位：米。")
     @TableField(exist = false)
     private BigDecimal curlLength;
+
+    @Excel(name = "ui.data.column.info.remark")
+    @ImportValidated(name = "ui.data.column.info.remark", maxLength = 100)
+    @ApiModelProperty(value = "备注")
+    @TableField(value = "REMARK")
+    private String remark;
+
 }

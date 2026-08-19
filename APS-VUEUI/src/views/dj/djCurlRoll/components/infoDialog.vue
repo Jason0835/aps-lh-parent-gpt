@@ -33,7 +33,8 @@ import { mapState } from "vuex";
 
 import infoForm from "@/views/components/infoForm.vue";
 
-import { saveCurlRoll,checkCurlRollCodeUnique } from "@/api/dj/curlRoll";
+import { getConfigKey } from "@/api/system/config";
+import { saveCurlRoll } from "@/api/dj/curlRoll";
 
 export default {
   components: { infoForm },
@@ -42,6 +43,7 @@ export default {
       loading: false,
       visible: false,
       isEdit: false,
+      factoryCode: "",
       editType: null,
       form: {},
       rules: {
@@ -119,6 +121,12 @@ export default {
     //utils
     show(data) {
       this.visible = true;
+      // 获取当前工厂编码（保存时需要带工厂参数）
+      if (!this.factoryCode) {
+        getConfigKey("sys.factory.code").then((response) => {
+          this.factoryCode = response.msg;
+        });
+      }
       if (data) {
         this.isEdit = true;
         this.form = {
@@ -133,36 +141,12 @@ export default {
       this.isEdit = false;
       this.visible = false;
     },
-    checkCurlRollCodeUnique(rule, value, callback) {
-      return new Promise((resolve, reject) => {
-        checkCurlRollCodeUnique({
-          id: this.form.id,
-          paddingCode: this.form.paddingCode,
-        })
-          .then((res) => {
-            if (res === 0) {
-              resolve();
-            } else {
-              reject(new Error(this.$t("ui.curlRoll.alter.isSpecExist")));
-            }
-          })
-          .catch((error) => {
-            console.error(error);
-            reject(new Error("验证失败，请稍后再试"));
-          });
-      });
-    },
-
-   handleConfirm() {
-      this.$refs.form.triggerConfirm(async (params) => {
-        try {
-          this.loading = true;
-          await this.checkCurlRollCodeUnique();
-          this.save(params);
-        } catch (error) {
-          this.$modal.msgError(error.message);
-          this.loading = false;
-        }
+    handleConfirm() {
+      this.$refs.form.triggerConfirm((params) => {
+        this.save({
+          ...params,
+          factoryCode: params.factoryCode || this.factoryCode,
+        });
       });
     },
   },

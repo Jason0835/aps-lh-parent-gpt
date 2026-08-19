@@ -52,4 +52,10 @@ public class Cd90DepthConfig extends BaseEntity implements Serializable {
     @TableField("DEPTH_CLASS_QTY")
     @Excel(name = "ui.data.column.cd90DepthConfig.depthClassQty")
     private BigDecimal depthClassQty;
+
+    /** 备注 */
+    @ApiModelProperty(value = "备注", name = "remark")
+    @TableField("REMARK")
+    @Excel(name = "ui.common.column.remark")
+    private String remark;
 }

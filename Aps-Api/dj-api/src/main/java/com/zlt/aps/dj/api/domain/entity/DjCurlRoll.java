@@ -50,4 +50,10 @@ public class DjCurlRoll extends BaseEntity implements Serializable {
     @Excel(name = "ui.curlRoll.column.length")
     @ImportValidated(name = "ui.curlRoll.column.length", required = true, max = 999999, min = 0)
     private BigDecimal curlLength;
+
+    @Excel(name = "ui.data.column.info.remark")
+    @ImportValidated(name = "ui.data.column.info.remark", maxLength = 100)
+    @ApiModelProperty(value = "备注")
+    @TableField(value = "REMARK")
+    private String remark;
 }

@@ -12,15 +12,14 @@ import com.zlt.aps.mp.api.domain.entity.Cd90ScheduleResultIssue;
 import com.zlt.sync.handle.SyncDataHandle;
 import com.zlt.sync.povo.SyncParamsVO;
 import com.zlt.sync.service.SyncDataLogsService;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -28,31 +27,30 @@ import java.util.stream.Collectors;
 /**
  * 直裁排程结果下发 MES 服务实现。
  *
- * <p>当前阶段 MES 中间表 MES_CD90_SCHEDULE_RESULT 字段定义需与 MES 团队对齐后建表，
- * 故本实现暂以日志记录 + MQ 通知骨架落地，中间表 Mapper 待表结构确认后补齐。
- * 业务流程已按 LH 模式打通：按排班日期分组 day1/day2/day3，upsert/update+insert 分别处理，
- * 完成后通过 SyncDataHandle.syncNotice 发送 MQ 通知 MES 拉取，并轮询 SyncDataLogs 取回 MES 反馈。</p>
+ * <p>生成数据版本后，先把班次级载荷聚合并覆盖写入
+ * MES_CD90_SCHEDULE_RESULT，事务提交成功后再发送 MQ 通知 MES 拉取，
+ * 最后轮询同步日志获取 MES 反馈。</p>
  *
  * @author APS Team
  * @since 2.0.0
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class Cd90ScheduleResultIssueServiceImpl implements ICd90ScheduleResultIssueService {
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
-    @Autowired
-    private SyncDataHandle syncDataHandle;
-
-    @Autowired
-    private SyncDataLogsService syncDataLogsService;
+    private final SyncDataHandle syncDataHandle;
+    private final SyncDataLogsService syncDataLogsService;
+    private final Cd90ScheduleResultIssueWriter issueWriter;
 
     @Override
     public AjaxResult issueCd90ScheduleResult(List<Cd90ScheduleResultIssue> cd90ScheduleResultIssueList,
                                               String factoryCode, String companyCode) {
         if (CollectionUtils.isEmpty(cd90ScheduleResultIssueList)) {
-            return AjaxResult.success("没有需要下发的数据");
+            return AjaxResult.success(I18nUtil.getMessage(
+                    "ui.data.column.scheduleResult.noIssueData"));
         }
 
         String publishTraceId = cd90ScheduleResultIssueList.get(0).getPublishTraceId();
@@ -67,27 +65,37 @@ public class Cd90ScheduleResultIssueServiceImpl implements ICd90ScheduleResultIs
                 .collect(Collectors.toList());
         if (distinctDates.isEmpty()) {
             log.warn("直裁排程下发: 列表无有效排班日期, traceId={}", publishTraceId);
-            return AjaxResult.success("没有需要下发的数据");
+            return AjaxResult.error(I18nUtil.getMessage(
+                    "ui.data.column.scheduleResult.noIssueData"));
         }
 
         LocalDate firstDate = distinctDates.get(0);
         LocalDate lastDate = distinctDates.get(distinctDates.size() - 1);
 
-        // TODO: MES 中间表 MES_CD90_SCHEDULE_RESULT 字段定义待与 MES 团队对齐后建表，
-        //       届时补齐 MesCd90ScheduleResult 实体 + MesCd90ScheduleResultMapper，
-        //       按 day1/day2 走 upsert、day3 走 delete+insert 的模式落库。
-        //       当前阶段仅以日志记录下发动作，便于联调验证 MQ 链路。
-        log.info("直裁排程下发 MES 占位: traceId={}, dataVersion={}, factoryCode={}, 记录数={}, 日期范围={}~{}",
-                publishTraceId, dataVersion, factoryCode, cd90ScheduleResultIssueList.size(),
-                firstDate.format(DATE_FORMATTER), lastDate.format(DATE_FORMATTER));
-
-        return sendMqNotice(cd90ScheduleResultIssueList, firstDate, lastDate, dataVersion, factoryCode, companyCode, publishTraceId);
+        try {
+            int rowCount = this.issueWriter.replace(
+                    cd90ScheduleResultIssueList, dataVersion,
+                    companyCode, factoryCode);
+            log.info("直裁排程下发 MES: traceId={}, dataVersion={}, "
+                            + "factoryCode={}, rowCount={}, 日期范围={}~{}",
+                    publishTraceId, dataVersion, factoryCode, rowCount,
+                    firstDate.format(DATE_FORMATTER),
+                    lastDate.format(DATE_FORMATTER));
+            return this.sendMqNotice(rowCount, firstDate, lastDate,
+                    dataVersion, factoryCode, companyCode,
+                    publishTraceId);
+        } catch (Exception exception) {
+            log.error("直裁排程写入 MES 中间表失败, traceId={}, dataVersion={}",
+                    publishTraceId, dataVersion, exception);
+            return AjaxResult.error(I18nUtil.getMessage(
+                    "ui.data.column.scheduleResult.failedPublish"));
+        }
     }
 
     /**
      * 发送 MQ 通知 MES 拉取，并轮询 SyncDataLogs 取回 MES 反馈。
      */
-    private AjaxResult sendMqNotice(List<Cd90ScheduleResultIssue> allIssueList, LocalDate startDate,
+    private AjaxResult sendMqNotice(int rowCount, LocalDate startDate,
                                     LocalDate endDate, String dataVersion,
                                     String factoryCode, String companyCode, String publishTraceId) {
         try {
@@ -96,7 +104,7 @@ public class Cd90ScheduleResultIssueServiceImpl implements ICd90ScheduleResultIs
             syncParamsVO.setDataVersion(dataVersion);
 
             JSONObject params = new JSONObject();
-            params.put("rowCount", allIssueList.size());
+            params.put("rowCount", rowCount);
             params.put("startDate", startDate.format(DATE_FORMATTER));
             params.put("endDate", endDate.format(DATE_FORMATTER));
             params.put("publishTraceId", publishTraceId);
@@ -109,11 +117,15 @@ public class Cd90ScheduleResultIssueServiceImpl implements ICd90ScheduleResultIs
             syncDataHandle.syncNotice(syncParamsVO);
 
             SyncDataLogs logs = syncDataLogsService.getSyncDataResult(dataVersion);
-            String status = logs.getStatus();
-            if (ApsConstant.IS_RELEASE.equals(status)) {
+            if (logs != null && ApsConstant.IS_RELEASE.equals(
+                    logs.getStatus())) {
                 return AjaxResult.success(I18nUtil.getMessage("ui.data.column.scheduleResult.successPublish"));
             }
-            return AjaxResult.error(logs.getMsg());
+            String failureMessage = logs == null || logs.getMsg() == null
+                    ? I18nUtil.getMessage(
+                    "ui.data.column.scheduleResult.failedPublish")
+                    : logs.getMsg();
+            return AjaxResult.error(failureMessage);
         } catch (Exception e) {
             log.error("直裁排程下发 MQ 通知失败, traceId={}", publishTraceId, e);
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.failedPublish"));

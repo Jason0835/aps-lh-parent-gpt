@@ -705,14 +705,12 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         //月计划总量 20260817+ 月计划总量包含(硫化日计划调整量)
         Map<YearMonth, Integer> monthTotalMap = context.getSumPlanQty(plan);
         int monthPlanTotalQty = MonthPlanSurplusCalculator.sumQty(monthTotalMap);
-        if (lastMonthOverdueQty != 0 || scheDayFinishQty > 0 || isCrossMonth) {
-            log.info("硫化余量计算完成, materialCode: {}, monthPlanQty: {}, monthFinishedAndScheDayQty: {}, "
-                            + "scheDayFinishQty: {}, lastMonthValidFlag: {}, lastMonthOverdueQty: {}, surplusQty: {}, "
-                            + "crossMonth: {}, monthPlanTotalQty: {}",
-                    plan.getMaterialCode(), totalPlanQty, actualFinishedQty, scheDayFinishQty,
-                    plan.getLastMonthValidFlag(), lastMonthOverdueQty, remainingDemandQty,
-                    isCrossMonth, monthPlanTotalQty);
-        }
+        log.info("硫化余量计算完成, materialCode: {}, monthPlanQty: {}, monthFinishedAndScheDayQty: {}, "
+                        + "scheDayFinishQty: {}, lastMonthValidFlag: {}, lastMonthOverdueQty: {}, surplusQty: {}, "
+                        + "crossMonth: {}, monthPlanTotalQty: {}",
+                plan.getMaterialCode(), totalPlanQty, actualFinishedQty, scheDayFinishQty,
+                plan.getLastMonthValidFlag(), lastMonthOverdueQty, remainingDemandQty,
+                isCrossMonth, monthPlanTotalQty);
         return new SurplusCalculation(remainingDemandQty, actualFinishedQty, ignoredOverProductionQty,
                 lastMonthOverdueQty, totalPlanQty, monthPlanTotalQty, monthOverdueQtyMap);
     }

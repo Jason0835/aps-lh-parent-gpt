@@ -48,4 +48,10 @@ public class Cd90LossSetting extends BaseEntity implements Serializable {
     @TableField("LOSS_RATE")
     @Excel(name = "ui.data.column.cd90LossSetting.lossRate")
     private Double lossRate;
+
+    /** 备注 */
+    @ApiModelProperty(value = "备注", name = "remark")
+    @TableField("REMARK")
+    @Excel(name = "ui.common.column.remark")
+    private String remark;
 }

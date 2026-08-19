@@ -7,11 +7,10 @@ import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.engine.quantity.PlanQuantityAllocationItem;
 import com.zlt.aps.common.engine.quantity.PlanQuantityAllocationUtils;
+import com.zlt.aps.common.engine.schedule.ScheduleSupplyDurationCalculator;
+import com.zlt.aps.common.engine.schedule.ScheduleSupplyDurationResult;
 import com.zlt.aps.tm.api.constant.TmScheduleConstants;
-import com.zlt.aps.tm.api.enums.TmScheduleErrorCodeEnum;
-import com.zlt.aps.tm.api.enums.TmScheduleRuleCodeEnum;
-import com.zlt.aps.tm.api.enums.TmScheduleRuleResultEnum;
-import com.zlt.aps.tm.api.enums.TmScheduleStrategyEnum;
+import com.zlt.aps.tm.api.enums.*;
 import com.zlt.aps.tm.engine.domain.*;
 import com.zlt.aps.tm.engine.service.ITmPlanCalcService;
 import com.zlt.aps.tm.engine.service.ITmPlanTailDecisionService;
@@ -252,6 +251,16 @@ public class TmPlanCalcService implements ITmPlanCalcService {
                 BeanUtils.copyProperties(groupSourceList.get(0), aggregateTask);
             }
             this.planTailDecisionService.applyTailDecision(aggregateTask, groupSourceList);
+            boolean formingShutdownCloseOut = groupSourceList.stream()
+                    .allMatch(task -> Boolean.TRUE.equals(task.getFormingShutdownCloseOutFlag()));
+            aggregateTask.setFormingShutdownCloseOutFlag(formingShutdownCloseOut);
+            aggregateTask.setFormingShutdownCloseOutDemandQty(formingShutdownCloseOut
+                    ? groupSourceList.stream().map(TmTaskDraft::getFormingShutdownCloseOutDemandQty)
+                    .map(this::nvl).reduce(BigDecimal.ZERO, BigDecimal::add)
+                    : BigDecimal.ZERO);
+            if (formingShutdownCloseOut) {
+                aggregateTask.setTailFlag(TmYesNoEnum.YES.getCode());
+            }
             List<TmTaskDraft> sourceSnapshotList = groupSourceList.stream()
                     .map(sourceTask -> this.copySourceTask(sourceTask, planGroupKey))
                     .collect(Collectors.toList());
@@ -281,8 +290,10 @@ public class TmPlanCalcService implements ITmPlanCalcService {
             aggregateTask.setCurrentShiftDemandQty(currentShiftDemandQty);
             aggregateTask.setNextShiftDemandQty(nextShiftDemandQty);
             aggregateTask.setGuardDemandQty(guardDemandQty);
-            aggregateTask.setFormingGuardWindowQtyMap(this.resolveGroupGuardWindowQtyMap(groupSourceList));
-            aggregateTask.setFormingGuardWindowHoursMap(this.resolveGroupGuardWindowHoursMap(groupSourceList));
+            Map<Integer, BigDecimal> groupGuardWindowQtyMap = this.resolveGroupGuardWindowQtyMap(groupSourceList);
+            aggregateTask.setFormingGuardWindowQtyMap(groupGuardWindowQtyMap);
+            aggregateTask.setFormingGuardWindowHoursMap(
+                    this.resolveGroupGuardWindowHoursMap(context, groupGuardWindowQtyMap));
             aggregateTask.setDemandQty(null);
             if (groupSourceList.size() > 1) {
                 aggregateTask.setPlanQty(null);
@@ -360,13 +371,41 @@ public class TmPlanCalcService implements ITmPlanCalcService {
     /**
      * 读取计划组逐班实际时长窗口。
      *
-     * @param groupSourceList 计划组来源任务
+     * @param context 排程上下文
+     * @param groupGuardWindowQtyMap 计划组逐班成型需求窗口
      * @return 与逐班需求同键的实际时长
      */
-    private Map<Integer, BigDecimal> resolveGroupGuardWindowHoursMap(List<TmTaskDraft> groupSourceList) {
-        return groupSourceList.stream().map(TmTaskDraft::getFormingGuardWindowHoursMap)
-                .filter(Objects::nonNull).filter(windowHoursMap -> !windowHoursMap.isEmpty())
-                .findFirst().orElse(Collections.emptyMap());
+    private Map<Integer, BigDecimal> resolveGroupGuardWindowHoursMap(
+            TmScheduleContext context, Map<Integer, BigDecimal> groupGuardWindowQtyMap) {
+        Map<Integer, BigDecimal> resultMap = new LinkedHashMap<>();
+        if (CollUtil.isEmpty(groupGuardWindowQtyMap)) {
+            return resultMap;
+        }
+        groupGuardWindowQtyMap.keySet().stream()
+                .filter(Objects::nonNull)
+                .forEach(logicalShiftOrder -> {
+                    int mappedShiftOrder = this.mapGuardLogicalShiftOrder(logicalShiftOrder);
+                    BigDecimal shiftHours = context == null || context.getShiftHoursMap() == null
+                            ? null : context.getShiftHoursMap().get(mappedShiftOrder);
+                    resultMap.put(logicalShiftOrder, shiftHours);
+                });
+        return resultMap;
+    }
+
+    /**
+     * 将库存供应窗口的逻辑班次映射到工厂实际班次配置。
+     *
+     * <p>逻辑班次一至六直接使用对应配置，超过六班后按三班日周期映射到一至三班，
+     * 与需求加载阶段的班次时长映射保持一致。</p>
+     *
+     * @param logicalShiftOrder 从一开始连续增长的逻辑班次
+     * @return 工厂班次配置中的实际班次顺序
+     */
+    private int mapGuardLogicalShiftOrder(int logicalShiftOrder) {
+        if (logicalShiftOrder <= TmScheduleConstants.TM_MAX_SHIFT_ORDER) {
+            return logicalShiftOrder;
+        }
+        return ((logicalShiftOrder - TmScheduleConstants.TM_MAX_SHIFT_ORDER - 1) % 3) + 1;
     }
 
     /**
@@ -384,7 +423,8 @@ public class TmPlanCalcService implements ITmPlanCalcService {
         if (task.getPlanQty() != null) {
             return groupKey + "|PRESET|" + task.getBusinessKey();
         }
-        return groupKey;
+        return Boolean.TRUE.equals(task.getFormingShutdownCloseOutFlag())
+                ? groupKey + "|FORMING_SHUTDOWN_CLOSE_OUT" : groupKey;
     }
 
     /**
@@ -484,7 +524,9 @@ public class TmPlanCalcService implements ITmPlanCalcService {
         boolean twoShiftStockCovered = Boolean.TRUE.equals(aggregateTask.getTwoShiftStockCovered());
         Map<String, BigDecimal> sourceWeightMap = taskGroup.getSourceTaskList().stream()
                 .collect(Collectors.toMap(TmTaskDraft::getBusinessKey,
-                        sourceTask -> nvl(sourceTask.getCurrentShiftDemandQty())
+                        sourceTask -> Boolean.TRUE.equals(aggregateTask.getFormingShutdownCloseOutFlag())
+                                ? nvl(sourceTask.getFormingShutdownCloseOutDemandQty())
+                                : nvl(sourceTask.getCurrentShiftDemandQty())
                                 .add(nvl(twoShiftStockCovered
                                         ? sourceTask.getNextShiftDemandQty() : sourceTask.getGuardDemandQty())),
                         BigDecimal::add, LinkedHashMap::new));
@@ -563,7 +605,9 @@ public class TmPlanCalcService implements ITmPlanCalcService {
     private void fillGroupFields(TmTaskDraft task, TmPlanTaskGroup taskGroup) {
         task.setPlanGroupKey(taskGroup.getPlanGroupKey());
         task.setGroupSourceCount(taskGroup.getSourceTaskList().size());
-        BigDecimal groupRequiredQty = Boolean.TRUE.equals(task.getTwoShiftStockCovered())
+        BigDecimal groupRequiredQty = Boolean.TRUE.equals(task.getFormingShutdownCloseOutFlag())
+                ? nvl(task.getFormingShutdownCloseOutDemandQty())
+                : Boolean.TRUE.equals(task.getTwoShiftStockCovered())
                 ? nvl(taskGroup.getGroupCurrentShiftDemandQty()).add(nvl(taskGroup.getGroupNextShiftDemandQty()))
                 : nvl(taskGroup.getGroupCurrentShiftDemandQty()).add(nvl(taskGroup.getGroupGuardDemandQty()));
         task.setGroupRequiredQty(groupRequiredQty);
@@ -982,6 +1026,14 @@ public class TmPlanCalcService implements ITmPlanCalcService {
         evidence.put("demandQty", task.getDemandQty());
         evidence.put("formingGuardWindowQtyMap", task.getFormingGuardWindowQtyMap());
         evidence.put("formingGuardWindowHoursMap", task.getFormingGuardWindowHoursMap());
+        boolean supplyWindowKeyConsistent = task.getFormingGuardWindowQtyMap() != null
+                && task.getFormingGuardWindowHoursMap() != null
+                && task.getFormingGuardWindowQtyMap().keySet()
+                .equals(task.getFormingGuardWindowHoursMap().keySet());
+        ScheduleSupplyDurationResult supplyDurationResult = ScheduleSupplyDurationCalculator.calculate(
+                task.getRollingStockQty(), task.getFormingGuardWindowQtyMap(), task.getFormingGuardWindowHoursMap());
+        evidence.put("supplyWindowKeyConsistent", supplyWindowKeyConsistent);
+        evidence.put("supplyHoursInvalidReason", supplyDurationResult.getInvalidReason());
         evidence.put("supplyHours", task.getSupplyHours());
         evidence.put("sourceOrderNos", task.getSourceOrderNos());
         traceOf(context, task).addRuleHit(TmScheduleRuleCodeEnum.DEMAND_QTY_CALC,
@@ -1007,6 +1059,8 @@ public class TmPlanCalcService implements ITmPlanCalcService {
         evidence.put("stockDeductQty", task.getStockDeductQty());
         evidence.put("planStockQty", task.getPlanStockQty());
         evidence.put("tailFlag", task.getTailFlag());
+        evidence.put("formingShutdownCloseOutFlag", task.getFormingShutdownCloseOutFlag());
+        evidence.put("formingShutdownCloseOutDemandQty", task.getFormingShutdownCloseOutDemandQty());
         evidence.put("toolOverflowQty", task.getToolOverflowQty());
         evidence.put("totalToolQty", task.getTotalToolQty());
         evidence.put("availableToolQty", task.getAvailableToolQty());

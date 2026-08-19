@@ -188,12 +188,12 @@ public interface MesItfMapper {
     List<GsqStock> selectMesGsqStockList(AuxReqSyncDataLogs syncDataLogs);
 
     /**
-     * 查询胎圈自动滚动指定物理日的最新库存。
+     * 查询胎圈自动滚动指定物理日的库存。
      *
-     * <p>对齐胎面 selectTreadShiftStockList，按工厂+公司+物理日+DATA_VERSION（取最新）
-     * 从 MES_TQ_STOCK 查询胎圈班次库存快照。</p>
+     * <p>对齐胎面 selectTreadShiftStockList，按物理日从 MES_TQ_STOCK 查询胎圈班次库存快照。
+     * MES源表不含工厂、公司和版本字段，仅按库存日期过滤。</p>
      *
-     * @param request 工厂、物理库存日和可选版本
+     * @param request 工厂、物理库存日等参数（当前仅物理日参与SQL过滤）
      * @return 库存列表
      */
     List<TqMesStock> selectBeadShiftStockList(MesShiftStockSyncRequest request);
@@ -357,6 +357,22 @@ public interface MesItfMapper {
      * @return 最大版本号，无数据时返回null
      */
     String selectMaxDataVersionFromLhDayFinishQty(@Param("factoryCode") String factoryCode);
+
+    /**
+     * 查询MES胎圈排程日完成量中间表的最大版本号
+     *
+     * @param factoryCode 分厂编码（可选）
+     * @return 最大版本号，无数据时返回null
+     */
+    String selectMaxDataVersionFromTqDayFinishQty(@Param("factoryCode") String factoryCode);
+
+    /**
+     * 查询MES钢丝圈排程日完成量中间表的最大版本号
+     *
+     * @param factoryCode 分厂编码（可选）
+     * @return 最大版本号，无数据时返回null
+     */
+    String selectMaxDataVersionFromGsqDayFinishQty(@Param("factoryCode") String factoryCode);
 
     /**
      * 查询成型在机历史同步数据（今天之前每天最新版本）

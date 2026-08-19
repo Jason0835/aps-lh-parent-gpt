@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.itf.mes.mapper.Cd90ScheduleResultIssueMapper">
+
+    <!-- 业务键不含DATA_VERSION，重发时覆盖同一排程对象的历史版本。 -->
+    <delete id="batchDeleteByBusinessKey">
+        DELETE FROM MES_CD90_SCHEDULE_RESULT
+        WHERE FACTORY_CODE = #{factoryCode}
+          AND (
+        <foreach collection="list" item="item" separator=" OR ">
+            (SCHEDULE_DATE = #{item.scheduleDate}
+             AND BATCH_NO = #{item.batchNo}
+             AND ORDER_NO = #{item.orderNo}
+             AND MACHINE_CODE = #{item.machineCode}
+             AND BIG_ROLL_CODE = #{item.bigRollCode}
+             AND OUTPUT_CODE = #{item.outputCode})
+        </foreach>
+          )
+    </delete>
+
+    <insert id="batchInsert">
+        INSERT INTO MES_CD90_SCHEDULE_RESULT (
+            SCHEDULE_DATE, CX_BATCH_NO, BATCH_NO, ORDER_NO,
+            BIG_ROLL_CODE, OUTPUT_TYPE, OUTPUT_CODE,
+            OUTPUT_MATERIAL_CODE, EMBRYO_SPEC_DESC, UNIT_CONSUME,
+            MACHINE_CODE, STOCK_CODE, STOCK_QTY, SUPPLY_TIME,
+            NIGHT_PLAN_QTY, NIGHT_PRODUCE_ORDER, NIGHT_SYS_ANALYSIS,
+            NIGHT_HAND_ANALYSIS, NIGHT_EXAMPLE_TYPE, NIGHT_EXAMPLE_NO,
+            NIGHT_REMARK, DAY_PLAN_QTY, DAY_PRODUCE_ORDER,
+            DAY_SYS_ANALYSIS, DAY_HAND_ANALYSIS, DAY_EXAMPLE_TYPE,
+            DAY_EXAMPLE_NO, DAY_REMARK, MID_PLAN_QTY,
+            MID_PRODUCE_ORDER, MID_SYS_ANALYSIS, MID_HAND_ANALYSIS,
+            MID_EXAMPLE_TYPE, MID_EXAMPLE_NO, MID_REMARK,
+            CX_CLASS1_PLAN, CX_CLASS2_PLAN, CX_CLASS3_PLAN,
+            CX_CLASS4_PLAN, REMARK, CREATE_BY, CREATE_TIME,
+            UPDATE_BY, UPDATE_TIME, DATA_VERSION, COMPANY_CODE,
+            FACTORY_CODE
+        )
+        SELECT * FROM (
+        <foreach collection="list" item="item" separator=" UNION ALL ">
+            SELECT
+                #{item.scheduleDate} AS SCHEDULE_DATE,
+                #{item.cxBatchNo} AS CX_BATCH_NO,
+                #{item.batchNo} AS BATCH_NO,
+                #{item.orderNo} AS ORDER_NO,
+                #{item.bigRollCode} AS BIG_ROLL_CODE,
+                #{item.outputType} AS OUTPUT_TYPE,
+                #{item.outputCode} AS OUTPUT_CODE,
+                #{item.outputMaterialCode} AS OUTPUT_MATERIAL_CODE,
+                #{item.embryoSpecDesc} AS EMBRYO_SPEC_DESC,
+                #{item.unitConsume} AS UNIT_CONSUME,
+                #{item.machineCode} AS MACHINE_CODE,
+                #{item.stockCode} AS STOCK_CODE,
+                #{item.stockQty} AS STOCK_QTY,
+                #{item.supplyTime} AS SUPPLY_TIME,
+                #{item.nightPlanQty} AS NIGHT_PLAN_QTY,
+                #{item.nightProduceOrder} AS NIGHT_PRODUCE_ORDER,
+                #{item.nightSysAnalysis} AS NIGHT_SYS_ANALYSIS,
+                #{item.nightHandAnalysis} AS NIGHT_HAND_ANALYSIS,
+                #{item.nightExampleType} AS NIGHT_EXAMPLE_TYPE,
+                #{item.nightExampleNo} AS NIGHT_EXAMPLE_NO,
+                #{item.nightRemark} AS NIGHT_REMARK,
+                #{item.dayPlanQty} AS DAY_PLAN_QTY,
+                #{item.dayProduceOrder} AS DAY_PRODUCE_ORDER,
+                #{item.daySysAnalysis} AS DAY_SYS_ANALYSIS,
+                #{item.dayHandAnalysis} AS DAY_HAND_ANALYSIS,
+                #{item.dayExampleType} AS DAY_EXAMPLE_TYPE,
+                #{item.dayExampleNo} AS DAY_EXAMPLE_NO,
+                #{item.dayRemark} AS DAY_REMARK,
+                #{item.midPlanQty} AS MID_PLAN_QTY,
+                #{item.midProduceOrder} AS MID_PRODUCE_ORDER,
+                #{item.midSysAnalysis} AS MID_SYS_ANALYSIS,
+                #{item.midHandAnalysis} AS MID_HAND_ANALYSIS,
+                #{item.midExampleType} AS MID_EXAMPLE_TYPE,
+                #{item.midExampleNo} AS MID_EXAMPLE_NO,
+                #{item.midRemark} AS MID_REMARK,
+                #{item.cxClass1Plan} AS CX_CLASS1_PLAN,
+                #{item.cxClass2Plan} AS CX_CLASS2_PLAN,
+                #{item.cxClass3Plan} AS CX_CLASS3_PLAN,
+                #{item.cxClass4Plan} AS CX_CLASS4_PLAN,
+                #{item.remark} AS REMARK,
+                #{item.createBy} AS CREATE_BY,
+                #{item.createTime} AS CREATE_TIME,
+                #{item.updateBy} AS UPDATE_BY,
+                #{item.updateTime} AS UPDATE_TIME,
+                #{item.dataVersion} AS DATA_VERSION,
+                #{item.companyCode} AS COMPANY_CODE,
+                #{item.factoryCode} AS FACTORY_CODE
+        </foreach>
+        ) AS source_data
+    </insert>
+</mapper>

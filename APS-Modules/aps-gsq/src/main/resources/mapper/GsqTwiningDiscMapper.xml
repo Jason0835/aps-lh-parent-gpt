@@ -79,4 +79,14 @@
         REMARK = VALUES(REMARK)
     </insert>
 
+    <!-- 按钢丝圈编号批量查询施工信息表中的钢丝圈信息（用于导入校验与名称反显） -->
+    <select id="listSteelRingInfoByCodes" resultType="java.util.HashMap">
+        select distinct BEAD_CODE, BEAD_NAME
+        from T_MDM_CONSTRUCTION_INFO
+        where BEAD_CODE in
+        <foreach collection="codes" item="code" open="(" separator="," close=")">
+            #{code,jdbcType=VARCHAR}
+        </foreach>
+    </select>
+
 </mapper>

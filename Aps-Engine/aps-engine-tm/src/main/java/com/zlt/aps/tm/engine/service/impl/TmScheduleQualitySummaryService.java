@@ -193,6 +193,12 @@ public class TmScheduleQualitySummaryService {
         if (task == null) {
             return false;
         }
+        if (Boolean.TRUE.equals(task.getFormingShutdownCloseOutFlag())) {
+            BigDecimal closeOutQty = this.nvl(task.getFormingShutdownCloseOutDemandQty());
+            BigDecimal stockDeductQty = this.nvl(task.getStockDeductQty());
+            BigDecimal requiredPlanQty = closeOutQty.subtract(stockDeductQty).max(BigDecimal.ZERO);
+            return this.nvl(assignedQty).compareTo(requiredPlanQty) >= 0;
+        }
         BigDecimal tailQty = this.nvl(task.getTailBalanceQty())
                 .multiply(this.nvl(task.getTreadShoulderLength()));
         return !this.isPositive(tailQty) || this.nvl(assignedQty).compareTo(tailQty) >= 0;

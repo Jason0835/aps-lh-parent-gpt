@@ -9,6 +9,7 @@ import lombok.Data;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
+import java.util.Date;
 
 /**
  * 硫化日计划调整需求实体。
@@ -125,6 +126,30 @@ public class LhDayPlanAdjustRequire extends BaseEntity implements Serializable {
     /** 调整3原因 */
     @TableField(exist = false)
     private String adjustReason3;
+
+    /** 调整1修改人 */
+    @TableField(exist = false)
+    private String adjuster1;
+
+    /** 调整2修改人 */
+    @TableField(exist = false)
+    private String adjuster2;
+
+    /** 调整3修改人 */
+    @TableField(exist = false)
+    private String adjuster3;
+
+    /** 调整1修改时间 */
+    @TableField(exist = false)
+    private Date adjustTime1;
+
+    /** 调整2修改时间 */
+    @TableField(exist = false)
+    private Date adjustTime2;
+
+    /** 调整3修改时间 */
+    @TableField(exist = false)
+    private Date adjustTime3;
 
     /** 调整后合计 */
     @TableField(exist = false)

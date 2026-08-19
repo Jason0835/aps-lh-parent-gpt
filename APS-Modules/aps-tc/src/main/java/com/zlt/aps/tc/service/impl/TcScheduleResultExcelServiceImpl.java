@@ -593,9 +593,41 @@ public class TcScheduleResultExcelServiceImpl implements ITcScheduleResultExcelS
         if (StrUtil.isBlank(target.getMaterialDesc()) && StrUtil.isNotBlank(materialDesc)) {
             target.setMaterialDesc(materialDesc);
         }
-        if (StrUtil.isBlank(target.getCxMachineCode()) && StrUtil.isNotBlank(cxMachineCode)) {
-            target.setCxMachineCode(cxMachineCode);
+        this.mergeDistinctMachineCodes(target, cxMachineCode);
+    }
+
+    /**
+     * 将成型机台拆分、清理并按首次出现顺序去重后写回汇总对象。
+     *
+     * @param target 成型数据汇总对象
+     * @param cxMachineCode 成型机台编码，可包含逗号分隔的多个机台
+     */
+    private void mergeDistinctMachineCodes(TcScheduleResultFormingDataVo target, String cxMachineCode) {
+        if (target == null || StrUtil.isBlank(cxMachineCode)) {
+            return;
         }
+        Set<String> machineCodeSet = new LinkedHashSet<>();
+        this.addMachineCodes(machineCodeSet, target.getCxMachineCode());
+        this.addMachineCodes(machineCodeSet, cxMachineCode);
+        if (!machineCodeSet.isEmpty()) {
+            target.setCxMachineCode(String.join(",", machineCodeSet));
+        }
+    }
+
+    /**
+     * 将逗号分隔的成型机台编码加入目标集合。
+     *
+     * @param machineCodeSet 成型机台编码集合
+     * @param machineCodes 成型机台编码文本
+     */
+    private void addMachineCodes(Set<String> machineCodeSet, String machineCodes) {
+        if (machineCodeSet == null || StrUtil.isBlank(machineCodes)) {
+            return;
+        }
+        Arrays.stream(machineCodes.split(","))
+                .map(String::trim)
+                .filter(StrUtil::isNotBlank)
+                .forEach(machineCodeSet::add);
     }
 
     /**

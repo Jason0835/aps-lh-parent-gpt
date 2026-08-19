@@ -15,27 +15,31 @@
       :showSummary="false"
       :selectArea="false"
     />
+    <edit-dialog ref="editDialogRef" @success="getList" />
   </basic-container>
 </template>
 
 <script>
 import moment from "moment";
-import {
-  listLhDayPlanAdjustRequire,
-  saveLhDayPlanAdjustRequire,
-} from "@/api/lh/lhDayPlanAdjustRequire";
+import { listLhDayPlanAdjustRequire } from "@/api/lh/lhDayPlanAdjustRequire";
+import EditDialog from "./components/editDialog.vue";
 
 const ADJUST_SLOT_COUNT = 3;
 
 export default {
   name: "LhDayPlanAdjustRequire",
+  components: { EditDialog },
   dicts: ["biz_factory_name", "lh_trial_status"],
+  provide() {
+    return {
+      parentDict: this.dict,
+    };
+  },
   data() {
     const currentYearMonth = moment().format("yyyy-MM");
     return {
       loading: false,
       data: [],
-      savingRowKeys: {},
       page: {
         current: 1,
         pageSize: 20,
@@ -67,6 +71,12 @@ export default {
           align: "left",
         },
         {
+          prop: "yearMonth",
+          label: this.$t("ui.data.column.lhDayPlanAdjustRequire.yearMonth"),
+          width: 100,
+          formatter: (row, column, value) => this.formatYearMonth(value),
+        },
+        {
           prop: "monthPlanQty",
           label: this.$t("ui.data.column.lhDayPlanAdjustRequire.monthPlanQty"),
           minWidth: 110,
@@ -82,7 +92,6 @@ export default {
           label: this.$t("ui.data.column.lhDayPlanAdjustRequire.adjustedTotalQty"),
           minWidth: 130,
           align: "right",
-          render: ({ row }) => this.calculateAdjustedTotal(row),
         },
         {
           prop: "treadGlueTd",
@@ -103,26 +112,32 @@ export default {
             this.selectDictLabel(this.dict.type.lh_trial_status, value),
         },
         {
+          prop: "adjuster",
+          label: this.$t("ui.data.column.lhDayPlanAdjustRequire.lastAdjuster"),
+          minWidth: 120,
+        },
+        {
+          prop: "updateTime",
+          label: this.$t("ui.data.column.lhDayPlanAdjustRequire.lastAdjustTime"),
+          minWidth: 170,
+        },
+        {
           prop: "option",
           label: this.$t("ui.data.btn.option"),
           width: 100,
           fixed: "right",
           align: "center",
-          render: ({ row }) => {
-            const rowKey = this.buildRowKey(row);
-            return (
-              <el-button
-                v-hasPermi={["lh:dayPlanAdjustRequire:save"]}
-                type="primary"
-                size="mini"
-                icon="el-icon-check"
-                loading={Boolean(this.savingRowKeys[rowKey])}
-                onClick={() => this.handleSave(row)}
-              >
-                {this.$t("ui.frame.btn.save")}
-              </el-button>
-            );
-          },
+          render: ({ row }) => (
+            <el-button
+              v-hasPermi={["lh:dayPlanAdjustRequire:save"]}
+              type="primary"
+              size="mini"
+              icon="el-icon-edit"
+              onClick={() => this.handleEdit(row)}
+            >
+              {this.$t("ui.data.column.lhDayPlanAdjustRequire.editAction")}
+            </el-button>
+          ),
         },
       ];
     },
@@ -166,173 +181,47 @@ export default {
     buildAdjustQtyColumns() {
       return Array.from({ length: ADJUST_SLOT_COUNT }, (item, index) => {
         const adjustIndex = index + 1;
-        const fieldName = `adjustQty${adjustIndex}`;
         return {
-          prop: fieldName,
+          prop: `adjustQty${adjustIndex}`,
           label: this.$t("ui.data.column.lhDayPlanAdjustRequire.adjust", [adjustIndex]),
-          minWidth: 130,
-          align: "center",
-          render: ({ row }) => (
-            <el-input-number
-              v-model={row[fieldName]}
-              controls={false}
-              precision={0}
-              min={-99999999}
-              max={99999999}
-              style="width: 112px"
-            />
-          ),
+          minWidth: 100,
+          align: "right",
         };
       });
     },
     buildAdjustReasonColumns() {
       return Array.from({ length: ADJUST_SLOT_COUNT }, (item, index) => {
         const adjustIndex = index + 1;
-        const fieldName = `adjustReason${adjustIndex}`;
         return {
-          prop: fieldName,
+          prop: `adjustReason${adjustIndex}`,
           label: this.$t("ui.data.column.lhDayPlanAdjustRequire.reason", [adjustIndex]),
           minWidth: 220,
           align: "left",
-          render: ({ row }) => (
-            <el-input
-              v-model={row[fieldName]}
-              maxlength={2000}
-              clearable
-            />
-          ),
+          showOverflowTooltip: true,
         };
       });
     },
-    buildRowKey(row) {
-      return [row.factoryCode, row.yearMonth, row.materialCode, row.productStatus].join("|");
-    },
-    normalizeAdjustQty(value) {
-      return value === null || value === undefined ? null : Number(value);
-    },
-    buildSnapshot(row) {
-      const snapshot = {};
-      for (let adjustIndex = 1; adjustIndex <= ADJUST_SLOT_COUNT; adjustIndex += 1) {
-        snapshot[`adjustQty${adjustIndex}`] = this.normalizeAdjustQty(
-          row[`adjustQty${adjustIndex}`]
-        );
-        snapshot[`adjustReason${adjustIndex}`] = row[`adjustReason${adjustIndex}`] || "";
-      }
-      return snapshot;
-    },
-    decorateRow(row) {
-      const decoratedRow = { ...row };
-      for (let adjustIndex = 1; adjustIndex <= ADJUST_SLOT_COUNT; adjustIndex += 1) {
-        const fieldName = `adjustQty${adjustIndex}`;
-        if (decoratedRow[fieldName] === null) {
-          decoratedRow[fieldName] = undefined;
-        }
-      }
-      decoratedRow._adjustSnapshot = this.buildSnapshot(decoratedRow);
-      return decoratedRow;
-    },
-    isRowDirty(row) {
-      return JSON.stringify(this.buildSnapshot(row)) !== JSON.stringify(row._adjustSnapshot || {});
-    },
-    hasDirtyRows() {
-      return this.data.some((row) => this.isRowDirty(row));
-    },
-    calculateAdjustedTotal(row) {
-      let totalQty = Number(row.monthPlanQty || 0);
-      for (let adjustIndex = 1; adjustIndex <= ADJUST_SLOT_COUNT; adjustIndex += 1) {
-        totalQty += Number(row[`adjustQty${adjustIndex}`] || 0);
-      }
-      return totalQty;
-    },
-    validateRow(row) {
-      for (let adjustIndex = 1; adjustIndex <= ADJUST_SLOT_COUNT; adjustIndex += 1) {
-        const adjustQty = row[`adjustQty${adjustIndex}`];
-        const adjustReason = (row[`adjustReason${adjustIndex}`] || "").trim();
-        if ((adjustQty === null || adjustQty === undefined) && adjustReason) {
-          this.$modal.msgError(
-            this.$t("ui.data.alert.lhDayPlanAdjustRequire.adjustQtyRequired", [
-              row.materialCode,
-              adjustIndex,
-            ])
-          );
-          return false;
-        }
-        if (adjustQty !== null && adjustQty !== undefined && !adjustReason) {
-          this.$modal.msgError(
-            this.$t("ui.data.alert.lhDayPlanAdjustRequire.adjustReasonRequired", [
-              row.materialCode,
-              adjustIndex,
-            ])
-          );
-          return false;
-        }
-      }
-      return true;
-    },
-    buildSavePayload(row) {
-      const payload = {
-        factoryCode: row.factoryCode,
-        yearMonth: row.yearMonth,
-        materialCode: row.materialCode,
-        productStatus: row.productStatus,
-      };
-      for (let adjustIndex = 1; adjustIndex <= ADJUST_SLOT_COUNT; adjustIndex += 1) {
-        payload[`adjustId${adjustIndex}`] = row[`adjustId${adjustIndex}`];
-        payload[`adjustQty${adjustIndex}`] = row[`adjustQty${adjustIndex}`];
-        payload[`adjustReason${adjustIndex}`] = row[`adjustReason${adjustIndex}`];
-      }
-      return payload;
-    },
-    async confirmDiscardChanges() {
-      if (!this.hasDirtyRows()) {
-        return true;
-      }
-      try {
-        await this.$confirm(
-          this.$t("ui.data.alert.lhDayPlanAdjustRequire.unsavedChanges"),
-          this.$t("common.prompt"),
-          { type: "warning" }
-        );
-        return true;
-      } catch (error) {
-        return false;
-      }
-    },
     async handleSearch(data) {
-      if (!(await this.confirmDiscardChanges())) {
-        return;
-      }
       this.query = { ...data };
       this.$set(this.page, "current", 1);
       await this.getList();
     },
     async handlePageChange(current, pageSize) {
-      if (!(await this.confirmDiscardChanges())) {
-        return;
-      }
       this.$set(this.page, "current", current);
       this.$set(this.page, "pageSize", pageSize);
       await this.getList();
     },
     async handleRefresh() {
-      if (await this.confirmDiscardChanges()) {
-        await this.getList();
-      }
+      await this.getList();
     },
-    async handleSave(row) {
-      if (!this.validateRow(row)) {
-        return;
-      }
-      const rowKey = this.buildRowKey(row);
-      try {
-        this.$set(this.savingRowKeys, rowKey, true);
-        const result = await saveLhDayPlanAdjustRequire(this.buildSavePayload(row));
-        row.adjustedTotalQty = this.calculateAdjustedTotal(row);
-        row._adjustSnapshot = this.buildSnapshot(row);
-        this.$modal.msgSuccess(result.msg);
-      } finally {
-        this.$delete(this.savingRowKeys, rowKey);
-      }
+    handleEdit(row) {
+      this.$refs.editDialogRef.show(row);
+    },
+    formatYearMonth(value) {
+      const yearMonth = String(value || "");
+      return yearMonth.length === 6
+        ? `${yearMonth.slice(0, 4)}-${yearMonth.slice(4)}`
+        : yearMonth;
     },
     formatParams() {
       return {
@@ -346,25 +235,12 @@ export default {
       try {
         this.loading = true;
         const result = await listLhDayPlanAdjustRequire(this.formatParams());
-        this.data = (result.rows || []).map((row) => this.decorateRow(row));
+        this.data = result.rows || [];
         this.page.total = result.total || 0;
       } finally {
         this.loading = false;
       }
     },
-  },
-  beforeRouteLeave(to, from, next) {
-    if (!this.hasDirtyRows()) {
-      next();
-      return;
-    }
-    this.$confirm(
-      this.$t("ui.data.alert.lhDayPlanAdjustRequire.unsavedChanges"),
-      this.$t("common.prompt"),
-      { type: "warning" }
-    )
-      .then(() => next())
-      .catch(() => next(false));
   },
   activated() {
     this.getList();

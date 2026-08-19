@@ -18,6 +18,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.utils.ImportUtil;
 import com.zlt.aps.dj.api.domain.entity.DjMachineInfo;
+import com.zlt.aps.common.engine.service.FactoryService;
 import com.zlt.aps.dj.api.domain.entity.DjQuotaSetting;
 import com.zlt.aps.dj.mapper.DjQuotaSettingMapper;
 import com.zlt.aps.dj.service.DjMachineInfoService;
@@ -32,6 +33,9 @@ import com.zlt.aps.dj.service.DjQuotaSettingService;
  */
 @Service
 public class DjQuotaSettingServiceImpl implements DjQuotaSettingService {
+    @Autowired
+    private FactoryService factoryService;
+
     @Autowired
     private DjQuotaSettingMapper ncQuotaSettingMapper;
 
@@ -148,6 +152,9 @@ public class DjQuotaSettingServiceImpl implements DjQuotaSettingService {
      */
     @Override
     public AjaxResult importData(List<DjQuotaSetting> list, boolean updateSupport, Long importLogId) {
+        // 统一填充当前工厂编码（导入模板不含工厂列，取自 sys.factory.code 配置）
+        String factoryCode = factoryService.getFactoryCode();
+        list.forEach(entity -> entity.setFactoryCode(factoryCode));
         int successNum = 0;
         int failureNum = 0;
         List<ImportErrorLog> importErrorLogs = new ArrayList<>();

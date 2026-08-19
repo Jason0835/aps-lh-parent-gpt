@@ -789,52 +789,33 @@
         WHERE CONVERT(DATE, source_data.STOCK_DATE) = CONVERT(DATE, #{stockDate})
     </select>
 
-    <!-- 查询胎圈库存同步数据 -->
+    <!-- 查询胎圈库存同步数据：仅查当天数据，避免MES历史快照全量同步到APS（MES源表不含工厂、公司和版本字段，对齐胎面 selectTreadStockList） -->
     <select id="selectMesTqStockList" resultType="com.zlt.aps.tq.api.domain.entity.TqMesStock">
         SELECT
         STOCK_DATE,
         MATERIAL_CODE,
         AVAILABLE_STOCK
         FROM MES_TQ_STOCK
-        WHERE 1 = 1
+        WHERE CONVERT(DATE, STOCK_DATE) = CONVERT(DATE, GETDATE())
     </select>
 
-    <!-- 查询钢丝圈库存同步数据（MES字段MATERIAL_CODE映射为STEEL_RING_CODE） -->
+    <!-- 查询钢丝圈库存同步数据：仅查当天数据，避免MES历史快照全量同步到APS（MES字段MATERIAL_CODE映射为STEEL_RING_CODE） -->
     <select id="selectMesGsqStockList" resultType="com.zlt.aps.gsq.api.domain.entity.GsqStock">
         SELECT
         STOCK_DATE,
         MATERIAL_CODE AS STEEL_RING_CODE,
         AVAILABLE_STOCK AS STOCK_NUM
         FROM MES_GSQ_STOCK
-        WHERE 1 = 1
+        WHERE CONVERT(DATE, STOCK_DATE) = CONVERT(DATE, GETDATE())
     </select>
 
-    <!-- 查询胎圈自动滚动指定物理日的最新库存，对齐胎面 selectTreadShiftStockList -->
+    <!-- 查询胎圈自动滚动指定物理日库存，对齐胎面 selectTreadShiftStockList，MES源表不含工厂、公司和版本字段 -->
     <select id="selectBeadShiftStockList" resultType="com.zlt.aps.tq.api.domain.entity.TqMesStock">
-        SELECT source_data.STOCK_DATE,
-               source_data.MATERIAL_CODE,
-               source_data.AVAILABLE_STOCK,
-               source_data.DATA_VERSION,
-               source_data.COMPANY_CODE,
-               source_data.FACTORY_CODE
-        FROM MES_TQ_STOCK source_data
-        WHERE source_data.FACTORY_CODE = #{factoryCode}
-          AND source_data.COMPANY_CODE = #{companyCode}
-          AND CONVERT(DATE, source_data.STOCK_DATE) = CONVERT(DATE, #{stockDate})
-        <choose>
-            <when test="dataVersion != null and dataVersion != ''">
-                AND source_data.DATA_VERSION = #{dataVersion}
-            </when>
-            <otherwise>
-                AND source_data.DATA_VERSION = (
-                    SELECT MAX(latest.DATA_VERSION)
-                    FROM MES_TQ_STOCK latest
-                    WHERE latest.FACTORY_CODE = #{factoryCode}
-                      AND latest.COMPANY_CODE = #{companyCode}
-                      AND CONVERT(DATE, latest.STOCK_DATE) = CONVERT(DATE, #{stockDate})
-                )
-            </otherwise>
-        </choose>
+        SELECT STOCK_DATE,
+               MATERIAL_CODE,
+               AVAILABLE_STOCK
+        FROM MES_TQ_STOCK
+        WHERE CONVERT(DATE, STOCK_DATE) = CONVERT(DATE, #{stockDate})
     </select>
 
     <select id="selectLhPrecisionPlanActualList" resultType="com.zlt.aps.itf.vo.DevMaintenancePlan">
@@ -874,6 +855,22 @@
     <select id="selectMaxDataVersionFromLhDayFinishQty" resultType="java.lang.String">
         SELECT MAX(DATA_VERSION)
         FROM MES_LH_DAY_FINISH_QTY
+        WHERE DATA_VERSION IS NOT NULL
+        <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
+    </select>
+
+    <!-- 查询MES胎圈排程日完成量中间表的最大版本号 -->
+    <select id="selectMaxDataVersionFromTqDayFinishQty" resultType="java.lang.String">
+        SELECT MAX(DATA_VERSION)
+        FROM MES_TQ_DAY_FINISH_TOTL
+        WHERE DATA_VERSION IS NOT NULL
+        <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
+    </select>
+
+    <!-- 查询MES钢丝圈排程日完成量中间表的最大版本号 -->
+    <select id="selectMaxDataVersionFromGsqDayFinishQty" resultType="java.lang.String">
+        SELECT MAX(DATA_VERSION)
+        FROM MES_GSQ_DAY_FINISH_TOTL
         WHERE DATA_VERSION IS NOT NULL
         <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
     </select>

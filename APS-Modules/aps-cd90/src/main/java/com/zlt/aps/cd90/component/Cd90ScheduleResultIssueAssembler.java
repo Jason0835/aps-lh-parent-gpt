@@ -3,22 +3,28 @@ package com.zlt.aps.cd90.component;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleResult;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ShiftConfig;
+import com.zlt.aps.cd90.engine.mapper.Cd90EngineConstructionMapper;
 import com.zlt.aps.cd90.mapper.Cd90ShiftConfigMapper;
+import com.zlt.aps.mdm.api.domain.entity.MdmConstructionInfo;
 import com.zlt.aps.mp.api.domain.entity.Cd90ScheduleResultIssue;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
-import java.lang.reflect.Field;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.Date;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * 直裁排程结果下发 MES 装配组件。
@@ -34,8 +40,13 @@ import java.util.Map;
 @Component
 public class Cd90ScheduleResultIssueAssembler {
 
+    private static final String OUTPUT_TYPE_FIBER = "纤维";
+    private static final int EMBRYO_DESC_MAX_LENGTH = 900;
+
     @Resource
     private Cd90ShiftConfigMapper cd90ShiftConfigMapper;
+    @Resource
+    private Cd90EngineConstructionMapper constructionMapper;
 
     /**
      * 装配下发列表。
@@ -61,10 +72,14 @@ public class Cd90ScheduleResultIssueAssembler {
         }
 
         LocalDate scheduleLocalDate = toLocalDate(scheduleDate);
+        Map<String, String> embryoDescByCloth = this.loadEmbryoDescriptions(
+                sourceList, factoryCode);
         List<Cd90ScheduleResultIssue> result = new ArrayList<>(sourceList.size() * enabledConfigs.size());
         for (Cd90ScheduleResult source : sourceList) {
             for (Cd90ShiftConfig config : enabledConfigs) {
-                Cd90ScheduleResultIssue issue = convert(source, config, scheduleLocalDate, publishTraceId);
+                Cd90ScheduleResultIssue issue = this.convert(source, config,
+                        scheduleLocalDate, publishTraceId,
+                        embryoDescByCloth.get(source.getClothCode()));
                 if (issue != null) {
                     result.add(issue);
                 }
@@ -82,7 +97,7 @@ public class Cd90ScheduleResultIssueAssembler {
                 .eq(Cd90ShiftConfig::getIsActive, 1)
                 .orderByAsc(Cd90ShiftConfig::getScheduleDay)
                 .orderByAsc(Cd90ShiftConfig::getDayShiftOrder);
-        return cd90ShiftConfigMapper.selectList(wrapper);
+        return this.cd90ShiftConfigMapper.selectList(wrapper);
     }
 
     /**
@@ -93,7 +108,8 @@ public class Cd90ScheduleResultIssueAssembler {
      * SCHEDULE_DAY=3 → scheduleDate + 1（T+2 日）
      */
     private Cd90ScheduleResultIssue convert(Cd90ScheduleResult source, Cd90ShiftConfig config,
-                                            LocalDate scheduleLocalDate, String publishTraceId) {
+                                            LocalDate scheduleLocalDate, String publishTraceId,
+                                            String embryoSpecDesc) {
         String classField = config.getClassField();
         if (classField == null || classField.isEmpty()) {
             return null;
@@ -109,10 +125,15 @@ public class Cd90ScheduleResultIssueAssembler {
 
         Cd90ScheduleResultIssue issue = new Cd90ScheduleResultIssue();
         issue.setCd90BatchNo(source.getBatchNo());
+        issue.setCxBatchNo(source.getCxBatchNo());
         issue.setOrderNo(source.getOrderNo());
         issue.setScheduleDate(values.scheduleDate != null ? values.scheduleDate : shiftJavaDate);
         issue.setMachineCode(source.getMachineCode());
         issue.setClothCode(source.getClothCode());
+        issue.setOutputType(OUTPUT_TYPE_FIBER);
+        issue.setOutputCode(source.getClothCode());
+        issue.setOutputMaterialCode(source.getClothCode());
+        issue.setEmbryoSpecDesc(embryoSpecDesc);
         issue.setBigRollCode(source.getBigRollCode());
         issue.setStorageLaneCode(source.getStorageLaneCode());
         issue.setShiftName(config.getShiftName());
@@ -127,6 +148,13 @@ public class Cd90ScheduleResultIssueAssembler {
         issue.setAnalysis(values.analysis);
         issue.setAnalysisInput(values.analysisInput);
         issue.setUnitConsume(source.getUnitConsume());
+        issue.setStockQty(source.getStockQty());
+        issue.setSupplyTime(source.getSupplyTime());
+        issue.setCxClass1Plan(source.getClass1CxPlanQty());
+        issue.setCxClass2Plan(source.getClass2CxPlanQty());
+        issue.setCxClass3Plan(source.getClass3CxPlanQty());
+        issue.setCxClass4Plan(source.getClass4CxPlanQty());
+        issue.setRemark(source.getRemark());
         issue.setFactoryCode(source.getFactoryCode());
         issue.setPublishTraceId(publishTraceId);
         return issue;
@@ -147,14 +175,22 @@ public class Cd90ScheduleResultIssueAssembler {
     private ClassFieldValues readClassValues(Cd90ScheduleResult source, String prefix) {
         try {
             ClassFieldValues values = new ClassFieldValues();
-            values.scheduleDate = (Date) getFieldValue(source, prefix + "ScheduleDate");
-            values.cxPlanQty = (Double) getFieldValue(source, prefix + "CxPlanQty");
-            values.planQty = (Double) getFieldValue(source, prefix + "PlanQty");
-            values.finishQty = (Double) getFieldValue(source, prefix + "FinishQty");
-            values.produceOrder = (Integer) getFieldValue(source, prefix + "ProduceOrder");
-            values.finishRate = (Double) getFieldValue(source, prefix + "FinishRate");
-            values.analysis = (String) getFieldValue(source, prefix + "Analysis");
-            values.analysisInput = (String) getFieldValue(source, prefix + "AnalysisInput");
+            values.scheduleDate = (Date) source.getFieldValueByFieldName(
+                    prefix + "ScheduleDate");
+            values.cxPlanQty = (Double) source.getFieldValueByFieldName(
+                    prefix + "CxPlanQty");
+            values.planQty = (Double) source.getFieldValueByFieldName(
+                    prefix + "PlanQty");
+            values.finishQty = (Double) source.getFieldValueByFieldName(
+                    prefix + "FinishQty");
+            values.produceOrder = (Integer) source.getFieldValueByFieldName(
+                    prefix + "ProduceOrder");
+            values.finishRate = (Double) source.getFieldValueByFieldName(
+                    prefix + "FinishRate");
+            values.analysis = (String) source.getFieldValueByFieldName(
+                    prefix + "Analysis");
+            values.analysisInput = (String) source.getFieldValueByFieldName(
+                    prefix + "AnalysisInput");
             if (values.planQty == null && values.cxPlanQty == null) {
                 return null;
             }
@@ -166,26 +202,65 @@ public class Cd90ScheduleResultIssueAssembler {
         }
     }
 
-    private Object getFieldValue(Cd90ScheduleResult source, String fieldName) throws Exception {
-        Field field = fieldCache.get(fieldName);
-        if (field == null && !fieldCache.containsKey(fieldName)) {
-            try {
-                Field f = Cd90ScheduleResult.class.getDeclaredField(fieldName);
-                f.setAccessible(true);
-                field = f;
-            } catch (NoSuchFieldException e) {
-                log.warn("Cd90ScheduleResult 字段不存在: {}", fieldName);
-            }
-            fieldCache.put(fieldName, field);
+    /**
+     * 按帘布编码汇总施工信息中的胎胚描述。
+     *
+     * @param sourceList 待发布排程结果
+     * @param factoryCode 工厂编码
+     * @return 帘布编码对应的去重胎胚描述
+     */
+    private Map<String, String> loadEmbryoDescriptions(
+            List<Cd90ScheduleResult> sourceList, String factoryCode) {
+        Set<String> clothCodes = sourceList.stream()
+                .map(Cd90ScheduleResult::getClothCode)
+                .filter(StringUtils::isNotBlank)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        if (clothCodes.isEmpty()) {
+            return Collections.emptyMap();
         }
-        if (field == null) {
-            return null;
+        LambdaQueryWrapper<MdmConstructionInfo> wrapper =
+                new LambdaQueryWrapper<>();
+        wrapper.eq(MdmConstructionInfo::getFactoryCode, factoryCode)
+                .and(condition -> condition
+                        .in(MdmConstructionInfo::getTireFabricCode1, clothCodes)
+                        .or().in(MdmConstructionInfo::getTireFabricCode2, clothCodes)
+                        .or().in(MdmConstructionInfo::getTireFabricCode3, clothCodes));
+        List<MdmConstructionInfo> constructions =
+                this.constructionMapper.selectList(wrapper);
+        if (constructions == null || constructions.isEmpty()) {
+            return Collections.emptyMap();
         }
-        return field.get(source);
+        return clothCodes.stream().collect(Collectors.toMap(
+                Function.identity(),
+                clothCode -> this.joinEmbryoDescriptions(
+                        constructions, clothCode),
+                (first, second) -> first,
+                LinkedHashMap::new));
     }
 
-    /** 班次字段反射缓存，避免每次 assemble 重复 getDeclaredField。key=fieldName，value=Field 或 null（表示字段不存在） */
-    private final Map<String, Field> fieldCache = new HashMap<>();
+    /** 汇总包含指定帘布的胎胚描述，并限制在 MES 字段长度内。 */
+    private String joinEmbryoDescriptions(
+            List<MdmConstructionInfo> constructions, String clothCode) {
+        String value = constructions.stream()
+                .filter(construction -> this.containsCloth(
+                        construction, clothCode))
+                .map(MdmConstructionInfo::getEmbryoDesc)
+                .filter(StringUtils::isNotBlank)
+                .map(String::trim)
+                .distinct()
+                .collect(Collectors.joining("/"));
+        return value.length() <= EMBRYO_DESC_MAX_LENGTH
+                ? value : value.substring(0, EMBRYO_DESC_MAX_LENGTH);
+    }
+
+    /** 判断施工信息是否包含指定帘布。 */
+    private boolean containsCloth(
+            MdmConstructionInfo construction, String clothCode) {
+        return Objects.equals(clothCode, construction.getTireFabricCode1())
+                || Objects.equals(clothCode, construction.getTireFabricCode2())
+                || Objects.equals(clothCode,
+                construction.getTireFabricCode3());
+    }
 
     private static LocalDate toLocalDate(Date date) {
         if (date instanceof java.sql.Date) {

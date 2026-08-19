@@ -2,7 +2,9 @@ package com.zlt.aps.cd90.api.domain.entity;
 
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
+import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
 import java.io.Serializable;
@@ -24,4 +26,10 @@ public class Cd90ScheduleDemandSnapshot extends BaseEntity implements Serializab
     @TableField("DEMAND_QTY") private BigDecimal demandQty;
     @TableField("SOURCE_CX_BATCH_NO") private String sourceCxBatchNo;
     @TableField("SOURCE_VERSION") private String sourceVersion;
+
+    /** 备注 */
+    @ApiModelProperty(value = "备注", name = "remark")
+    @TableField("REMARK")
+    @Excel(name = "ui.common.column.remark")
+    private String remark;
 }

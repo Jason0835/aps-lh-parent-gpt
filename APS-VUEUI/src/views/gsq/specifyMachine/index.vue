@@ -66,6 +66,11 @@ export default {
     tltUpload,
     InfoDialog,
   },
+  provide() {
+    return {
+      parentDict: this.dict,
+    };
+  },
   data() {
     return {
       loading: false,
@@ -99,19 +104,21 @@ export default {
           labelKey: "machineName",
           valueKey: "machineCode",
           filterable: true,
+          loading: this.machineLoading,
+          onFocus: this.handleMachineFocus,
         },
         {
           label: this.$t("ui.data.column.gsq.specifyMachine.lineType"),
           prop: "lineType",
           type: "select",
-          dictType: "LINE_TYPE",
+          dictData: this.dict.type.LINE_TYPE,
           filterable: true,
         },
         {
           label: this.$t("ui.data.column.gsq.specifyMachine.jobType"),
           prop: "jobType",
           type: "select",
-          dictType: "JOB_TYPE",
+          dictData: this.dict.type.JOB_TYPE,
           filterable: true,
         },
       ];
