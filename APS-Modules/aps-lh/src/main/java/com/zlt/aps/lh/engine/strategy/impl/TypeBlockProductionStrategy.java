@@ -18,6 +18,7 @@ import com.zlt.aps.lh.api.domain.entity.LhUnscheduledResult;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.enums.CleaningTypeEnum;
 import com.zlt.aps.lh.api.enums.ConstructionStageEnum;
+import com.zlt.aps.lh.api.enums.EmbryoUsageType;
 import com.zlt.aps.lh.api.enums.MachineStopTypeEnum;
 import com.zlt.aps.lh.api.enums.MouldChangeTypeEnum;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
@@ -3029,7 +3030,8 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
             appliedRule = "多机台续排剩余目标量";
         } else if (isSingleMachine && isEnding) {
             getTargetScheduleQtyResolver().upsizeEndingTargetQty(context, sku);
-            appliedRule = getTargetScheduleQtyResolver().isSharedEmbryoInWindow(context, sku)
+            appliedRule = getTargetScheduleQtyResolver().resolveEmbryoUsageType(context, sku)
+                    == EmbryoUsageType.SHARED
                     ? "单机台收尾共用胎胚仅按余量" : "单机台收尾MAX(余量,胎胚库存)";
         } else if (isSingleMachine && getTargetScheduleQtyResolver().isFullCapacityMode(context)) {
             boolean newSpecExpansionAvailable = !DailyMachineExpansionPlanner.isDailyLookAheadCapacitySatisfied(
