@@ -11,7 +11,6 @@ import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.enums.ConstructionStageEnum;
-import com.zlt.aps.lh.api.enums.EmbryoUsageType;
 import com.zlt.aps.lh.api.enums.ScheduleTargetModeEnum;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
 import com.zlt.aps.lh.api.enums.ShiftEnum;
@@ -26,13 +25,11 @@ import com.zlt.aps.lh.util.CleaningScheduleRuleUtil;
 import com.zlt.aps.lh.util.FirstInspectionQtyUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.MachineCleaningOverlapUtil;
-import com.zlt.aps.lh.util.MonthPlanDayQtyUtil;
 import com.zlt.aps.lh.util.ShiftCapacityResolverUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
 import com.zlt.aps.lh.util.ShiftProductionControlUtil;
 import com.zlt.aps.lh.util.SkuDailyPlanQuotaUtil;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuLhCapacity;
-import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
@@ -78,8 +75,6 @@ public class TargetScheduleQtyResolver {
     private static final String EMBRYO_STOCK_LEDGER_KEY_SEPARATOR = "_";
     /** 未命中胎胚库存账本时的无限制标记 */
     private static final int NO_EMBRYO_STOCK_LEDGER_LIMIT = -1;
-    /** 月计划最大日序（DAY_1～DAY_31），用于构建胎胚日期使用索引 */
-    private static final int MAX_MONTH_DAY = 31;
 
     @Resource
     private IMachineMatchStrategy machineMatchStrategy;
@@ -485,7 +480,7 @@ public class TargetScheduleQtyResolver {
 
     /**
      * 判断当前SKU是否命中成型胎胚库存收尾。
-     * <p>单胎胚/非共用胎胚：只需胎胚收尾标记为1且SKU为收尾SKU，不再强制要求T日收尾。</p>
+     * <p>单胎胚（非共用胎胚）：只需胎胚收尾标记为1且SKU为收尾SKU，不再强制要求T日收尾。</p>
      * <p>共用胎胚：保持原有T日收尾判断（胎胚收尾标记为1 + SKU收尾 + endingDaysRemaining==1），
      * 确保共用胎胚同日收尾分摊口径不变。</p>
      *
@@ -501,9 +496,10 @@ public class TargetScheduleQtyResolver {
         if (!isEmbryoStockEndingFlagYes(context, sku.getEmbryoCode())) {
             return false;
         }
-        // 按三态胎胚类型判断：单胎胚/非共用胎胚仅需SKU收尾标记（条件2），不再要求T日收尾
-        EmbryoUsageType embryoUsageType = resolveEmbryoUsageType(context, sku);
-        if (embryoUsageType != EmbryoUsageType.SHARED) {
+        // 确保胎胚有效SKU集合已初始化，用于判断单胎胚/共用胎胚
+        ensureActiveEmbryoSkuMap(context, sku);
+        if (!isSharedEmbryoInWindow(context, sku)) {
+            // 单胎胚：仅需SKU收尾标记（条件2），不再要求T日收尾
             return isEndingSku(sku);
         }
         // 共用胎胚：保持原有T日收尾判断，确保同日收尾分摊逻辑不变
@@ -1286,12 +1282,12 @@ public class TargetScheduleQtyResolver {
      * @return 最终收尾比较目标量
      */
     public int resolveFinalEndingTargetQty(LhScheduleContext context, SkuScheduleDTO sku) {
-        return resolveFinalEndingTargetQtyInternal(context, sku);
+        return resolveFinalEndingTargetQty(context, sku, false);
     }
 
     /**
      * 按胎胚静态关系解析排后最终收尾目标量。
-     * <p>排前目标量与排后最终复核统一使用三态静态分类（同物料多机台 / T日～月底共用 / 整月单胎胚），
+     * <p>排产阶段共用胎胚用运行态活跃生产单元判断；排后最终复核必须用胎胚静态关系判断，
      * 避免运行态集合在排产过程中被消耗/移除后把共用胎胚误判成单胎胚。</p>
      *
      * @param context 排程上下文
@@ -1299,10 +1295,11 @@ public class TargetScheduleQtyResolver {
      * @return 最终收尾比较目标量
      */
     public int resolveFinalEndingTargetQtyByStaticRelation(LhScheduleContext context, SkuScheduleDTO sku) {
-        return resolveFinalEndingTargetQtyInternal(context, sku);
+        return resolveFinalEndingTargetQty(context, sku, true);
     }
 
-    private int resolveFinalEndingTargetQtyInternal(LhScheduleContext context, SkuScheduleDTO sku) {
+    private int resolveFinalEndingTargetQty(LhScheduleContext context, SkuScheduleDTO sku,
+                                           boolean useStaticEmbryoRelation) {
         if (Objects.isNull(sku)) {
             return 0;
         }
@@ -1328,15 +1325,23 @@ public class TargetScheduleQtyResolver {
 
         int surplusQty = Math.max(0, sku.getSurplusQty());
         int embryoStock = Math.max(0, sku.getEmbryoStock());
-        // 排前/排后最终复核统一按三态静态分类识别共用胎胚，避免运行态活跃集合消耗后误判成单胎胚
-        EmbryoUsageType embryoUsageType = resolveEmbryoUsageType(context, sku);
-        boolean sharedEmbryo = embryoUsageType == EmbryoUsageType.SHARED;
+        boolean sharedEmbryo = useStaticEmbryoRelation
+                ? countOriginalSkusSharingEmbryo(context, sku) > 1
+                : isSharedEmbryoInWindow(context, sku);
         int baseTargetQty = sharedEmbryo ? surplusQty : Math.max(surplusQty, embryoStock);
         int finalTargetQty = ShiftCapacityResolverUtil.roundUpQtyToMouldMultiple(baseTargetQty, mouldQty);
+        if (sharedEmbryo && embryoStock > surplusQty) {
+            log.debug("共用胎胚收尾判定比较量下调, materialCode: {}, 胎胚编码: {}, "
+                            + "原口径MAX(余量,库存): {}, 新口径仅余量: {}, 下调幅度: {}",
+                    sku.getMaterialCode(), sku.getEmbryoCode(),
+                    Math.max(surplusQty, embryoStock), surplusQty,
+                    Math.max(surplusQty, embryoStock) - surplusQty);
+        }
         log.debug("最终收尾目标量解析, materialCode: {}, 胎胚编码: {}, 原始目标量: {}, "
-                        + "精确硬目标: 无, 胎胚使用类型: {}, 基础比较量: {}, 模台数: {}, 最终比较目标: {}",
+                        + "精确硬目标: 无, 共用胎胚: {}, 胎胚关系口径: {}, 基础比较量: {}, 模台数: {}, 最终比较目标: {}",
                 sku.getMaterialCode(), sku.getEmbryoCode(), originalTargetQty,
-                embryoUsageType.getDescription(), baseTargetQty, mouldQty, finalTargetQty);
+                sharedEmbryo, useStaticEmbryoRelation ? "静态关系" : "运行态活跃",
+                baseTargetQty, mouldQty, finalTargetQty);
         return finalTargetQty;
     }
 
@@ -2506,10 +2511,10 @@ public class TargetScheduleQtyResolver {
         int surplusQty = Math.max(0, sku.getSurplusQty());
         int windowPlanQty = Math.max(0, sku.getWindowPlanQty());
 
-        // 按三态胎胚类型判断：共用胎胚（同物料多机台 或 T日～月底其他SKU共用）只按硫化余量排；
-        // 单胎胚/非共用胎胚按 MAX(余量, 胎胚库存) 排
-        EmbryoUsageType embryoUsageType = resolveEmbryoUsageType(context, sku);
-        boolean sharedEmbryo = embryoUsageType == EmbryoUsageType.SHARED;
+        // 共用胎胚（多SKU共用同胎胚 或 同物料多机台）只按硫化余量排；单胎胚按 MAX(余量, 胎胚库存)
+        int originalSkuCount = countOriginalSkusSharingEmbryo(context, sku);
+        int activeSkuCount = countActiveSkusSharingEmbryo(context, sku);
+        boolean sharedEmbryo = activeSkuCount > 1;
         int endingBaseQty;
         String qtySource;
         String unscheduledReason = "";
@@ -2521,18 +2526,18 @@ public class TargetScheduleQtyResolver {
             }
         } else {
             endingBaseQty = Math.max(embryoStock, surplusQty);
-            qtySource = embryoStock > surplusQty
-                    ? embryoUsageType.getDescription() + "-取胎胚库存"
-                    : embryoUsageType.getDescription() + "-取硫化余量";
+            qtySource = embryoStock > surplusQty ? "单胎胚-取胎胚库存" : "单胎胚-取硫化余量";
         }
         int endingTargetQty = ShiftCapacityResolverUtil.roundUpQtyToMouldMultiple(endingBaseQty, sku.getMouldQty());
         String direction = endingTargetQty > currentTargetQty ? "上调"
                 : endingTargetQty < currentTargetQty ? "下调" : "保持";
         int windowRemainingPlanQty = Math.max(0, sku.getWindowRemainingPlanQty());
-        log.info("收尾SKU目标量{}, materialCode: {}, 胎胚编码: {}, 胎胚使用类型: {}, 目标量取值来源: {}, "
+        log.info("收尾SKU目标量{}, materialCode: {}, 胎胚编码: {}, 原始生产单元数: {}, "
+                        + "有效生产单元数: {}, 是否共用胎胚: {}, 目标量取值来源: {}, "
                         + "原目标量: {}, 基础目标量: {}, 模台数: {}, 调整后: {}, 窗口日计划总量: {}, 窗口日计划剩余: {}, "
                         + "胎胚库存: {}, 月计划余量: {}, 未排原因: {}",
-                direction, sku.getMaterialCode(), sku.getEmbryoCode(), embryoUsageType.getDescription(), qtySource,
+                direction, sku.getMaterialCode(), sku.getEmbryoCode(), originalSkuCount,
+                activeSkuCount, sharedEmbryo, qtySource,
                 currentTargetQty, endingBaseQty, sku.getMouldQty(), endingTargetQty,
                 windowPlanQty, windowRemainingPlanQty, embryoStock, surplusQty, unscheduledReason);
         sku.setTargetScheduleQty(endingTargetQty);
@@ -2599,12 +2604,10 @@ public class TargetScheduleQtyResolver {
     /**
      * 动态判断当前SKU的胎胚在排程窗口内是否仍被多个未完成SKU共用。
      * <p>已收尾完成的SKU不参与共用胎胚判断，只统计当前仍在排程列表中的活跃SKU。</p>
-     * <p>注意：该方法只用于运行态流程（共用胎胚收尾均衡、收尾补满、零余量预剔除等）；
-     * 目标量计算与胎胚库存收尾门控必须使用 {@link #resolveEmbryoUsageType} 的三态静态分类。</p>
      *
      * @param context 排程上下文
      * @param sku 当前SKU
-     * @return true-运行态共用胎胚（活跃生产单元数 > 1）；false-非运行态共用
+     * @return true-共用胎胚（活跃SKU数 > 1）；false-单胎胚
      */
     public boolean isSharedEmbryoInWindow(LhScheduleContext context, SkuScheduleDTO sku) {
         return countActiveSkusSharingEmbryo(context, sku) > 1;
@@ -2716,258 +2719,25 @@ public class TargetScheduleQtyResolver {
     }
 
     /**
-     * 解析当前SKU的胎胚使用类型（三个类型互斥）。
-     * <p>判断优先级：</p>
-     * <ol>
-     *   <li>同物料多机台生产 -> 共用胎胚（即使本月只有该SKU使用此胎胚也强制共用）；</li>
-     *   <li>T 日～本月底存在其他 SKU 使用相同胎胚编码 -> 共用胎胚；</li>
-     *   <li>本月整月只有当前 SKU 使用该胎胚编码 -> 单胎胚；</li>
-     *   <li>其余（本月曾存在其他 SKU，但 T 日～月底已不存在且非多机台）-> 非共用胎胚。</li>
-     * </ol>
-     * <p>结果按“物料编码+产品状态”复合键缓存到上下文，排程过程中不随运行态活跃集合变化；
-     * 目标量计算与胎胚库存收尾门控统一读取，避免与运行态判断（{@link #isSharedEmbryoInWindow}）混用。</p>
+     * 统计同胎胚原始生产单元数。
+     * <p>静态关系下的共用数量按“生产单元（SKU × 机台）”计数，排后最终复核使用该静态口径。</p>
      *
      * @param context 排程上下文
      * @param sku 当前SKU
-     * @return 胎胚使用类型
+     * @return 原始同胎胚生产单元数
      */
-    public EmbryoUsageType resolveEmbryoUsageType(LhScheduleContext context, SkuScheduleDTO sku) {
-        if (Objects.isNull(context) || Objects.isNull(sku) || StringUtils.isEmpty(sku.getMaterialCode())) {
-            return EmbryoUsageType.NON_SHARED;
+    private int countOriginalSkusSharingEmbryo(LhScheduleContext context, SkuScheduleDTO sku) {
+        if (Objects.isNull(context) || Objects.isNull(sku) || StringUtils.isEmpty(sku.getEmbryoCode())) {
+            return 0;
         }
-        // 缓存键使用“物料+产品状态+胎胚编码”复合键，避免同物料+状态存在多条不同胎胚记录时误用缓存
-        String skuKey = buildEmbryoUsageTypeCacheKey(sku);
-        EmbryoUsageType cachedType = context.getEmbryoUsageTypeCache().get(skuKey);
-        if (Objects.nonNull(cachedType)) {
-            return cachedType;
-        }
-        ensureEmbryoMonthUsageIndex(context);
-        EmbryoUsageType embryoUsageType = classifyEmbryoUsageType(context, sku);
-        context.getEmbryoUsageTypeCache().put(skuKey, embryoUsageType);
-        log.info("胎胚使用类型解析完成, materialCode: {}, productStatus: {}, 胎胚编码: {}, "
-                        + "胎胚使用类型: {}, 排程T日: {}",
-                sku.getMaterialCode(), sku.getProductStatus(), sku.getEmbryoCode(),
-                embryoUsageType.getDescription(), context.getScheduleDate());
-        return embryoUsageType;
-    }
-
-    /**
-     * 构建胎胚使用类型缓存键（物料+产品状态+胎胚编码复合键）。
-     *
-     * @param sku 当前SKU
-     * @return 缓存键
-     */
-    private String buildEmbryoUsageTypeCacheKey(SkuScheduleDTO sku) {
-        if (Objects.isNull(sku)) {
-            return null;
-        }
-        return buildSkuKey(sku) + EMBRYO_STOCK_LEDGER_KEY_SEPARATOR
-                + StringUtils.defaultString(sku.getEmbryoCode());
-    }
-
-    /**
-     * 按四步优先级执行胎胚使用类型分类。
-     *
-     * @param context 排程上下文
-     * @param sku 当前SKU
-     * @return 胎胚使用类型
-     */
-    private EmbryoUsageType classifyEmbryoUsageType(LhScheduleContext context, SkuScheduleDTO sku) {
-        // 优先级1：同物料多机台生产，强制按共用胎胚处理
-        if (isSameMaterialMultiMachine(context, sku)) {
-            log.info("胎胚使用类型判断, materialCode: {}, 胎胚编码: {}, 分类原因: 同物料多机台生产",
-                    sku.getMaterialCode(), sku.getEmbryoCode());
-            return EmbryoUsageType.SHARED;
-        }
-        // 胎胚编码为空时无法确认共用关系，保守按非共用胎胚处理，允许使用 MAX(余量,胎胚库存)
-        if (StringUtils.isEmpty(sku.getEmbryoCode())) {
-            log.info("胎胚使用类型判断, materialCode: {}, 胎胚编码: 空, 分类原因: 胎胚编码为空按非共用胎胚处理",
-                    sku.getMaterialCode());
-            return EmbryoUsageType.NON_SHARED;
-        }
-        LocalDate scheduleDate = toLocalDate(context.getScheduleDate());
-        if (Objects.isNull(scheduleDate)) {
-            // 排程T日为空时无法确认日期范围，保守按非共用胎胚处理，允许使用 MAX(余量,胎胚库存)
-            log.warn("胎胚使用类型判断, materialCode: {}, 胎胚编码: {}, 分类原因: 排程T日为空按非共用胎胚处理",
-                    sku.getMaterialCode(), sku.getEmbryoCode());
-            return EmbryoUsageType.NON_SHARED;
-        }
-        LocalDate monthEndDate = scheduleDate.withDayOfMonth(scheduleDate.lengthOfMonth());
-        // 优先级2：T 日～本月底存在其他 SKU 使用相同胎胚编码（排除当前 SKU 自身）
-        if (hasOtherSkuUsingEmbryoInRange(context, sku, scheduleDate, monthEndDate)) {
-            log.info("胎胚使用类型判断, materialCode: {}, 胎胚编码: {}, 分类原因: T日~月底存在其他SKU共用",
-                    sku.getMaterialCode(), sku.getEmbryoCode());
-            return EmbryoUsageType.SHARED;
-        }
-        // 优先级3：本月整月只有当前 SKU 使用该胎胚编码
-        LocalDate monthStartDate = scheduleDate.withDayOfMonth(1);
-        if (!hasOtherSkuUsingEmbryoInRange(context, sku, monthStartDate, monthEndDate)) {
-            log.info("胎胚使用类型判断, materialCode: {}, 胎胚编码: {}, 分类原因: 本月整月仅当前SKU使用",
-                    sku.getMaterialCode(), sku.getEmbryoCode());
-            return EmbryoUsageType.SINGLE;
-        }
-        // 优先级4：本月曾存在其他 SKU，但 T 日～月底已不存在，且非多机台
-        log.info("胎胚使用类型判断, materialCode: {}, 胎胚编码: {}, 分类原因: T日前存在其他SKU但T日~月底不存在",
-                sku.getMaterialCode(), sku.getEmbryoCode());
-        return EmbryoUsageType.NON_SHARED;
-    }
-
-    /**
-     * 判断当前SKU是否同物料多机台生产。
-     * <p>复用项目既有在机/续作机台与已排结果机台口径：续作候选 SKU 的机台编码去重后数量大于 1，
-     * 或当前排程已落结果的同物料+状态机台去重后数量大于 1，即视为多机台；新增 SKU 未绑定机台不计数。</p>
-     *
-     * @param context 排程上下文
-     * @param sku 当前SKU
-     * @return true-同物料多机台；false-非多机台
-     */
-    private boolean isSameMaterialMultiMachine(LhScheduleContext context, SkuScheduleDTO sku) {
-        if (Objects.isNull(context) || Objects.isNull(sku) || StringUtils.isEmpty(sku.getMaterialCode())) {
-            return false;
-        }
-        Set<String> machineCodeSet = new HashSet<>(4);
-        // 在机/续作：同物料+产品状态的候选 SKU 去重机台编码
-        String skuKey = buildSkuKey(sku);
+        Set<String> productionUnitKeySet = new HashSet<>(8);
         for (SkuScheduleDTO candidateSku : collectCandidateSkus(context)) {
-            if (Objects.nonNull(candidateSku) && StringUtils.equals(skuKey, buildSkuKey(candidateSku))
-                    && StringUtils.isNotEmpty(candidateSku.getContinuousMachineCode())) {
-                machineCodeSet.add(candidateSku.getContinuousMachineCode());
+            if (candidateSku != null && StringUtils.equals(sku.getEmbryoCode(), candidateSku.getEmbryoCode())
+                    && StringUtils.isNotEmpty(candidateSku.getMaterialCode())) {
+                productionUnitKeySet.add(buildEmbryoProductionUnitKey(candidateSku));
             }
         }
-        if (machineCodeSet.size() > 1) {
-            return true;
-        }
-        // 当前有效排程结果：已落结果的同物料+状态机台去重编码并入后再次判断
-        machineCodeSet.addAll(collectScheduledMachineCodesForSku(context, sku));
-        return machineCodeSet.size() > 1;
-    }
-
-    /**
-     * 收集当前排程已落结果中同物料+状态机台编码集合。
-     *
-     * @param context 排程上下文
-     * @param sku 当前SKU
-     * @return 已排机台编码集合
-     */
-    private Set<String> collectScheduledMachineCodesForSku(LhScheduleContext context, SkuScheduleDTO sku) {
-        Set<String> machineCodeSet = new HashSet<>(4);
-        Map<LocalDate, Map<String, Set<String>>> skuScheduledMachineCodeMap =
-                context.getSkuScheduledMachineCodeMap();
-        if (CollectionUtils.isEmpty(skuScheduledMachineCodeMap) || Objects.isNull(sku)) {
-            return machineCodeSet;
-        }
-        String skuKey = buildSkuKey(sku);
-        LocalDate scheduleDate = toLocalDate(context.getScheduleDate());
-        if (Objects.isNull(scheduleDate)) {
-            return machineCodeSet;
-        }
-        for (Map.Entry<LocalDate, Map<String, Set<String>>> dateEntry : skuScheduledMachineCodeMap.entrySet()) {
-            // 只统计 T 日及之后的已排结果，避免历史批次机台污染本轮分类
-            if (Objects.isNull(dateEntry.getKey()) || dateEntry.getKey().isBefore(scheduleDate)) {
-                continue;
-            }
-            Map<String, Set<String>> skuMachineMap = dateEntry.getValue();
-            if (CollectionUtils.isEmpty(skuMachineMap)) {
-                continue;
-            }
-            Set<String> machineSet = skuMachineMap.get(skuKey);
-            if (!CollectionUtils.isEmpty(machineSet)) {
-                machineCodeSet.addAll(machineSet);
-            }
-        }
-        return machineCodeSet;
-    }
-
-    /**
-     * 构建月计划胎胚日期使用索引（惰性构建，本轮排程只执行一次）。
-     * <p>从已加载月计划中过滤 T 日所属年月，按“物料编码+产品状态”复合键合并有量日集合，
-     * 同 SKU 的重复月计划行会合并去重，供 T 日～月底、整月共用关系判断复用。</p>
-     *
-     * @param context 排程上下文
-     */
-    private void ensureEmbryoMonthUsageIndex(LhScheduleContext context) {
-        if (Objects.isNull(context) || !CollectionUtils.isEmpty(context.getEmbryoMonthUsageIndex())) {
-            return;
-        }
-        Map<String, Map<String, Set<Integer>>> embryoMonthUsageIndex =
-                new LinkedHashMap<String, Map<String, Set<Integer>>>(16);
-        List<FactoryMonthPlanProductionFinalResult> planList = context.getLoadedMonthPlanList();
-        if (CollectionUtils.isEmpty(planList)) {
-            planList = context.getMonthPlanList();
-        }
-        if (!CollectionUtils.isEmpty(planList)) {
-            LocalDate scheduleDate = toLocalDate(context.getScheduleDate());
-            if (Objects.isNull(scheduleDate)) {
-                log.warn("月计划胎胚日期使用索引构建跳过, 原因: 排程T日为空");
-            } else {
-                for (FactoryMonthPlanProductionFinalResult plan : planList) {
-                    // 只统计 T 日所属年月的月计划，跨月加载的其它月份不参与本月共用关系判断
-                    if (Objects.isNull(plan) || StringUtils.isEmpty(plan.getEmbryoCode())
-                            || StringUtils.isEmpty(plan.getMaterialCode())
-                            || Objects.isNull(plan.getYear()) || Objects.isNull(plan.getMonth())
-                            || plan.getYear() != scheduleDate.getYear()
-                            || plan.getMonth() != scheduleDate.getMonthValue()) {
-                        continue;
-                    }
-                    String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(
-                            plan.getMaterialCode(), plan.getProductStatus());
-                    Map<String, Set<Integer>> skuDayMap = embryoMonthUsageIndex.computeIfAbsent(
-                            plan.getEmbryoCode(), key -> new LinkedHashMap<String, Set<Integer>>(4));
-                    Set<Integer> daySet = skuDayMap.computeIfAbsent(skuKey, key -> new HashSet<Integer>(8));
-                    for (int dayOfMonth = 1; dayOfMonth <= MAX_MONTH_DAY; dayOfMonth++) {
-                        if (MonthPlanDayQtyUtil.resolveDayQty(plan, dayOfMonth) > 0) {
-                            daySet.add(dayOfMonth);
-                        }
-                    }
-                }
-            }
-        }
-        context.setEmbryoMonthUsageIndex(embryoMonthUsageIndex);
-        log.info("月计划胎胚日期使用索引构建完成, 胎胚数量: {}, 排程T日: {}",
-                embryoMonthUsageIndex.size(), context.getScheduleDate());
-    }
-
-    /**
-     * 判断指定日期范围内是否存在其他 SKU 使用相同胎胚编码。
-     * <p>按“物料编码+产品状态”复合键排除当前 SKU 自身；判定依据为月计划 DAY_n > 0。</p>
-     *
-     * @param context 排程上下文
-     * @param sku 当前SKU
-     * @param startDate 范围开始日期
-     * @param endDate 范围结束日期
-     * @return true-存在其他SKU使用；false-不存在
-     */
-    private boolean hasOtherSkuUsingEmbryoInRange(LhScheduleContext context,
-                                                  SkuScheduleDTO sku,
-                                                  LocalDate startDate,
-                                                  LocalDate endDate) {
-        if (Objects.isNull(context) || Objects.isNull(sku) || StringUtils.isEmpty(sku.getEmbryoCode())
-                || Objects.isNull(startDate) || Objects.isNull(endDate) || startDate.isAfter(endDate)) {
-            return false;
-        }
-        Map<String, Set<Integer>> skuDayMap = context.getEmbryoMonthUsageIndex().get(sku.getEmbryoCode());
-        if (CollectionUtils.isEmpty(skuDayMap)) {
-            return false;
-        }
-        String currentSkuKey = buildSkuKey(sku);
-        int startDay = startDate.getDayOfMonth();
-        int endDay = endDate.getDayOfMonth();
-        for (Map.Entry<String, Set<Integer>> entry : skuDayMap.entrySet()) {
-            // 排除当前 SKU 自身（物料编码+产品状态复合键）
-            if (StringUtils.equals(currentSkuKey, entry.getKey())) {
-                continue;
-            }
-            Set<Integer> daySet = entry.getValue();
-            if (CollectionUtils.isEmpty(daySet)) {
-                continue;
-            }
-            for (int dayOfMonth = startDay; dayOfMonth <= endDay; dayOfMonth++) {
-                if (daySet.contains(dayOfMonth)) {
-                    return true;
-                }
-            }
-        }
-        return false;
+        return productionUnitKeySet.size();
     }
 
     /**

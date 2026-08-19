@@ -19,7 +19,6 @@ import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.entity.LhUnscheduledResult;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.enums.ConstructionStageEnum;
-import com.zlt.aps.lh.api.enums.EmbryoUsageType;
 import com.zlt.aps.lh.api.enums.MachineStopTypeEnum;
 import com.zlt.aps.lh.api.enums.MouldChangeTypeEnum;
 import com.zlt.aps.lh.api.enums.NewSpecFailReasonEnum;
@@ -14976,8 +14975,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         // 仅收尾SKU才按共用胎胚规则（仅取硫化余量），非收尾SKU保持原口径
         if (sku != null
                 && SkuTagEnum.ENDING.getCode().equals(sku.getSkuTag())
-                && getTargetScheduleQtyResolver().resolveEmbryoUsageType(context, sku)
-                == EmbryoUsageType.SHARED) {
+                && getTargetScheduleQtyResolver().isSharedEmbryoInWindow(context, sku)) {
             return surplusQty;
         }
         return Math.max(surplusQty, embryoStock);
