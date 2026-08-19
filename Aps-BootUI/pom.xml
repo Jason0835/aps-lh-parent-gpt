@@ -196,6 +196,20 @@
         <plugins>
             <plugin>
                 <!--
+                    编译时保留方法参数名（MethodParameters 属性）。
+                    原因：本项目使用 classfinal 加密（方法体被清空，LocalVariableTable 随之丢失），
+                    Spring 对无显式名称的 @RequestParam/简单类型参数会回退解析 class 文件参数名，
+                    加密后的 class 解析不到导致运行时 IllegalArgumentException。
+                    显式指定 -parameters 后参数名独立于调试信息存在，加密不影响。
+                -->
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <compilerArgument>-parameters</compilerArgument>
+                </configuration>
+            </plugin>
+            <plugin>
+                <!--
                     1. 加密后,方法体被清空,保留方法参数、注解等信息.主要兼容swagger文档注解扫描
                     2. 方法体被清空后,反编译只能看到方法名和注解,看不到方法体的具体内容
                     3. 加密后的项目需要设置javaagent来启动,启动过程中解密class,完全内存解密,不留下任何解密后的文件
