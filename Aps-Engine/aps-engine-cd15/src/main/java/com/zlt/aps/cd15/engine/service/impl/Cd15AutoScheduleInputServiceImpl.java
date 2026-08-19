@@ -49,11 +49,14 @@ import java.math.BigDecimal;
 import java.sql.Date;
 import java.text.MessageFormat;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /**
  * 斜裁自动排程输入数据加载实现。
@@ -62,6 +65,10 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class Cd15AutoScheduleInputServiceImpl implements Cd15AutoScheduleInputService {
+
+    private static final int FORMING_SHIFT_HOURS = 8;
+    private static final LocalTime FORMING_FIRST_SHIFT_TIME = LocalTime.of(6, 0);
+    private static final LocalTime FIRST_FORMING_DEMAND_TIME = LocalTime.of(22, 0);
 
     private final Cd15EngineCxScheduleMapper cxScheduleMapper;
     private final Cd15EngineConstructionMapper constructionMapper;
@@ -129,9 +136,12 @@ public class Cd15AutoScheduleInputServiceImpl implements Cd15AutoScheduleInputSe
         List<Cd15ConstructionMaterial> constructionMaterials = loadConstructionMaterials(
                 factoryCode, embryoCodes, constructionVersions);
         fillStandardCurlLength(factoryCode, constructionMaterials);
+        LocalDateTime firstDemandStart = scheduleDate.minusDays(1)
+                .atTime(FIRST_FORMING_DEMAND_TIME);
         List<Cd15DemandShift> demandShifts = formingDemandExpander.expand(
-                formingSchedules, constructionMaterials);
-        this.validateEffectiveDemand(formingSchedules, demandShifts, formingEntities.size());
+                formingSchedules, constructionMaterials, firstDemandStart);
+        this.validateEffectiveDemand(
+                firstDemandStart, formingSchedules, demandShifts, formingEntities.size());
         List<Cd15DepthConfig> depthConfigs = depthConfigMapper.selectList(
                 Wrappers.<Cd15DepthConfig>lambdaQuery()
                         .eq(Cd15DepthConfig::getFactoryCode, factoryCode)
@@ -328,17 +338,27 @@ public class Cd15AutoScheduleInputServiceImpl implements Cd15AutoScheduleInputSe
         }
     }
 
-    /** 有正计划量但未形成任何有效钢带需求时终止任务，避免生成空的已排和未排结果。 */
-    private void validateEffectiveDemand(List<Cd15FormingScheduleSource> formingSchedules,
+    /** 晚班起点后的正计划量未形成任何有效钢带需求时终止任务。 */
+    private void validateEffectiveDemand(LocalDateTime firstDemandStart,
+                                         List<Cd15FormingScheduleSource> formingSchedules,
                                          List<Cd15DemandShift> demandShifts,
                                          int formingRecordCount) {
-        long positiveFormingShiftCount = safe(formingSchedules).stream()
+        long positiveFormingShiftCount = this.safe(formingSchedules).stream()
                 .filter(schedule -> schedule != null)
-                .flatMap(schedule -> safe(schedule.getClassPlanQuantities()).stream())
-                .filter(quantity -> quantity != null && quantity.signum() > 0)
+                .flatMapToLong(schedule -> IntStream.range(
+                                0, Math.min(8, this.safe(schedule.getClassPlanQuantities()).size()))
+                        .filter(index -> {
+                            BigDecimal quantity = schedule.getClassPlanQuantities().get(index);
+                            LocalDateTime shiftStart = this.formingShiftStart(schedule, index);
+                            return quantity != null && quantity.signum() > 0
+                                    && shiftStart != null
+                                    && !shiftStart.isBefore(firstDemandStart);
+                        })
+                        .mapToLong(index -> 1L))
                 .count();
-        boolean hasEffectiveDemand = safe(demandShifts).stream()
-                .filter(shift -> shift != null)
+        boolean hasEffectiveDemand = this.safe(demandShifts).stream()
+                .filter(shift -> shift != null && shift.getStartTime() != null)
+                .filter(shift -> !shift.getStartTime().isBefore(firstDemandStart))
                 .anyMatch(shift -> shift.getFormingQuantity() != null
                         && shift.getFormingQuantity().signum() > 0
                         && shift.getSteelStripDemandQuantity() != null
@@ -348,6 +368,15 @@ public class Cd15AutoScheduleInputServiceImpl implements Cd15AutoScheduleInputSe
                     I18nUtil.getMessage("ui.cd15.autoSchedule.noEffectiveSteelStripDemand"),
                     formingRecordCount, positiveFormingShiftCount));
         }
+    }
+
+    /** 将成型CLASS下标换算为自然班次开始时间。 */
+    private LocalDateTime formingShiftStart(Cd15FormingScheduleSource schedule, int classIndex) {
+        if (schedule == null || schedule.getScheduleDate() == null) {
+            return null;
+        }
+        return schedule.getScheduleDate().minusDays(1).atTime(FORMING_FIRST_SHIFT_TIME)
+                .plusHours(classIndex * (long) FORMING_SHIFT_HOURS);
     }
 
     private <T> List<T> safe(List<T> values) {
