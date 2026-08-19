@@ -127,4 +127,16 @@ public class GsqStockController extends AbstractDocBizController<GsqStock> {
     protected String getOrderBy() {
         return "STOCK_DATE desc, STEEL_RING_CODE asc";
     }
+
+    /**
+     * 导出数据列表查询
+     * 沿用列表查询条件与默认排序，返回全量数据供导出使用
+     */
+    @Override
+    protected List<GsqStock> listExportData(GsqStock obj) {
+        QueryWrapper<GsqStock> wrapper = new QueryWrapper<>();
+        this.builderCondition(wrapper, obj);
+        wrapper.last("ORDER BY " + getOrderBy());
+        return gsqStockMapper.selectList(wrapper);
+    }
 }
