@@ -4,7 +4,7 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
-import com.zlt.aps.common.core.annotation.ImportValidated;
+import com.zlt.common.annotation.ImportExcelValidated;
 
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -31,30 +31,30 @@ public class DjSpecifyMachine extends BaseEntity{
 
     @ApiModelProperty(value = "垫胶代码")
     @Excel(name="ui.dj.specifyMachine.column.paddingCode")
-    @ImportValidated(name = "ui.dj.specifyMachine.column.paddingCode", required = true, isCode = true, maxLength = 20)
+    @ImportExcelValidated(name = "ui.dj.specifyMachine.column.paddingCode", required = true, isCode = true, maxLength = 20)
     @TableField("PADDING_CODE")
     private String paddingCode;
 
     @ApiModelProperty(value = "机台")
     @Excel(name="ui.specifyMachine.column.machineName")
-    @ImportValidated(name = "ui.specifyMachine.column.machineName", required = true, isCode = true, maxLength = 30)
+    @ImportExcelValidated(name = "ui.specifyMachine.column.machineName", required = true, isCode = true, maxLength = 30)
     @TableField("MACHINE_CODE")
     private String machineCode;
 
     @ApiModelProperty(value = "线路，数据维护在数据字典：0-生产线、1-备用线")
     @Excel(name="ui.specifyMachine.column.lineType" ,dictType="LINE_TYPE")
-    @ImportValidated(name = "ui.specifyMachine.column.lineType",required = true, maxLength = 9)
+    @ImportExcelValidated(name = "ui.specifyMachine.column.lineType",required = true, maxLength = 9)
     @TableField("LINE_TYPE")
     private String lineType;
 
     @ApiModelProperty(value = "作业类型，数据维护在数据字典：0-限制作业；1-不可作业")
     @Excel(name="ui.specifyMachine.column.jobType",dictType="JOB_TYPE")
-    @ImportValidated(name = "ui.specifyMachine.column.jobType",required = true, maxLength = 12)
+    @ImportExcelValidated(name = "ui.specifyMachine.column.jobType",required = true, maxLength = 12)
     @TableField("JOB_TYPE")
     private String jobType;
 
     @Excel(name = "ui.data.column.info.remark")
-    @ImportValidated(name = "ui.data.column.info.remark", maxLength = 100)
+    @ImportExcelValidated(name = "ui.data.column.info.remark", maxLength = 100)
     @ApiModelProperty(value = "备注")
     @TableField(value = "REMARK")
     private String remark;

@@ -173,7 +173,7 @@ public interface IMachineMatchStrategy {
     }
 
     /**
-     * 构建同时携带换模/换活字块完成时间与真实可开产时间的完整选机日志快照。
+     * 构建同时携带换模/换活字块完成时间与正式可开产时间的完整选机日志快照。
      *
      * <p>两个时间均由新增排产日驱动主链在逐班筛选时计算，并与正式落地复用同一份
      * {@code NewSpecMachineAvailabilityPlan}。默认策略外仍回落到不含这两个时间的既有入口，
@@ -187,7 +187,7 @@ public interface IMachineMatchStrategy {
      * @param targetScheduleQtyResolver 产能计算组件
      * @param priorityMetricSnapshotMap 正式模具分配前冻结的软排序指标
      * @param traceChangeoverEndTimeMap 机台编码到换模或换活字块完成时间的映射
-     * @param realAvailableProductionTimeMap 机台编码到真实可开产时间的映射
+     * @param realAvailableProductionTimeMap 机台编码到正式可开产时间的映射
      * @return 当前选机时点的只读日志快照
      */
     default MachinePriorityTraceSnapshot buildMachinePriorityTraceSnapshot(
@@ -203,6 +203,41 @@ public interface IMachineMatchStrategy {
         return this.buildMachinePriorityTraceSnapshot(
                 context, sku, actualOrderedCandidates, actualSelectedMachine,
                 currentDayEndTime, targetScheduleQtyResolver, priorityMetricSnapshotMap);
+    }
+
+    /**
+     * 构建同时携带准备完成时间与正式候选生产时间的选机日志快照。
+     *
+     * <p>默认实现回落到既有日志入口，保证非默认机台匹配策略和历史测试替身无需同步实现；
+     * 默认新增策略由实现类覆盖该入口后再输出两套时间轴。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 当前待选机 SKU
+     * @param actualOrderedCandidates 正式选机主链本轮有序候选
+     * @param actualSelectedMachine 正式选机主链确定的本轮首选机台
+     * @param currentDayEndTime 当前业务日结束时间
+     * @param targetScheduleQtyResolver 产能计算组件
+     * @param priorityMetricSnapshotMap 正式模具分配前冻结的软排序指标
+     * @param traceChangeoverEndTimeMap 粗略换模完成时间
+     * @param preparationAvailableTimeMap 准备完成时间
+     * @param realAvailableProductionTimeMap 正式候选生产时间
+     * @return 当前选机时点的只读日志快照
+     */
+    default MachinePriorityTraceSnapshot buildMachinePriorityTraceSnapshot(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            List<MachineScheduleDTO> actualOrderedCandidates,
+            MachineScheduleDTO actualSelectedMachine,
+            Date currentDayEndTime,
+            TargetScheduleQtyResolver targetScheduleQtyResolver,
+            Map<String, MachinePriorityMetricSnapshot> priorityMetricSnapshotMap,
+            Map<String, Date> traceChangeoverEndTimeMap,
+            Map<String, Date> preparationAvailableTimeMap,
+            Map<String, Date> realAvailableProductionTimeMap) {
+        return this.buildMachinePriorityTraceSnapshot(
+                context, sku, actualOrderedCandidates, actualSelectedMachine,
+                currentDayEndTime, targetScheduleQtyResolver, priorityMetricSnapshotMap,
+                traceChangeoverEndTimeMap, realAvailableProductionTimeMap);
     }
 
     /**

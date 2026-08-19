@@ -141,7 +141,7 @@ public class TcManualMachineRuleValidator {
                 || !this.isMachineShiftOpen(machineInfoList.get(0), shiftConfig)) {
             throw new ServiceException(I18nUtil.getMessage("ui.tc.schedule.changeMachine.machineShiftClosed"));
         }
-        this.requireWorkCalendarShiftOpen(sourceResult, shiftOrder);
+        this.requireWorkCalendarShiftOpen(currentResult, shiftOrder);
     }
 
     /**

@@ -467,7 +467,7 @@ public class LocalSearchMachineAllocatorStrategy {
                 context, sku, shifts, firstInspectionBaseTime, repairAdjustedProductionStartTime,
                 ScheduleTypeEnum.NEW_SPEC.getCode());
         Date earliestEmbryoAvailableTime =
-                NewSpecEmbryoAvailableTimeResolver.resolveEarliestAvailableTime(context, sku);
+                NewSpecEmbryoAvailableTimeResolver.resolveEffectiveEarliestAvailableTime(context, sku);
         boolean embryoAvailableTimeConstrained = Objects.nonNull(earliestEmbryoAvailableTime);
         if (embryoAvailableTimeConstrained) {
             /*

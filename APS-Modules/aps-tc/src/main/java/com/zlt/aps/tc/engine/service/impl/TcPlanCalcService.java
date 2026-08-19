@@ -7,6 +7,8 @@ import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.engine.quantity.PlanQuantityAllocationItem;
 import com.zlt.aps.common.engine.quantity.PlanQuantityAllocationUtils;
+import com.zlt.aps.common.engine.schedule.ScheduleSupplyDurationCalculator;
+import com.zlt.aps.common.engine.schedule.ScheduleSupplyDurationResult;
 import com.zlt.aps.tc.api.constant.TcScheduleConstants;
 import com.zlt.aps.tc.api.enums.*;
 import com.zlt.aps.tc.engine.domain.*;
@@ -291,8 +293,10 @@ public class TcPlanCalcService implements ITcPlanCalcService {
             aggregateTask.setOriginalCurrentShiftDemandQty(originalCurrentShiftDemandQty);
             aggregateTask.setNextShiftDemandQty(nextShiftDemandQty);
             aggregateTask.setGuardDemandQty(guardDemandQty);
-            aggregateTask.setFormingGuardWindowQtyMap(this.resolveGroupGuardWindowQtyMap(groupSourceList));
-            aggregateTask.setFormingGuardWindowHoursMap(this.resolveGroupGuardWindowHoursMap(groupSourceList));
+            Map<Integer, BigDecimal> groupGuardWindowQtyMap = this.resolveGroupGuardWindowQtyMap(groupSourceList);
+            aggregateTask.setFormingGuardWindowQtyMap(groupGuardWindowQtyMap);
+            aggregateTask.setFormingGuardWindowHoursMap(
+                    this.resolveGroupGuardWindowHoursMap(context, groupGuardWindowQtyMap));
             aggregateTask.setDemandQty(null);
             if (groupSourceList.size() > 1) {
                 aggregateTask.setPlanQty(null);
@@ -370,13 +374,41 @@ public class TcPlanCalcService implements ITcPlanCalcService {
     /**
      * 读取计划组逐班实际时长窗口。
      *
-     * @param groupSourceList 计划组来源任务
+     * @param context 排程上下文
+     * @param groupGuardWindowQtyMap 计划组逐班成型需求窗口
      * @return 与逐班需求同键的实际时长
      */
-    private Map<Integer, BigDecimal> resolveGroupGuardWindowHoursMap(List<TcTaskDraft> groupSourceList) {
-        return groupSourceList.stream().map(TcTaskDraft::getFormingGuardWindowHoursMap)
-                .filter(Objects::nonNull).filter(windowHoursMap -> !windowHoursMap.isEmpty())
-                .findFirst().orElse(Collections.emptyMap());
+    private Map<Integer, BigDecimal> resolveGroupGuardWindowHoursMap(
+            TcScheduleContext context, Map<Integer, BigDecimal> groupGuardWindowQtyMap) {
+        Map<Integer, BigDecimal> resultMap = new LinkedHashMap<>();
+        if (CollUtil.isEmpty(groupGuardWindowQtyMap)) {
+            return resultMap;
+        }
+        groupGuardWindowQtyMap.keySet().stream()
+                .filter(Objects::nonNull)
+                .forEach(logicalShiftOrder -> {
+                    int mappedShiftOrder = this.mapGuardLogicalShiftOrder(logicalShiftOrder);
+                    BigDecimal shiftHours = context == null || context.getShiftHoursMap() == null
+                            ? null : context.getShiftHoursMap().get(mappedShiftOrder);
+                    resultMap.put(logicalShiftOrder, shiftHours);
+                });
+        return resultMap;
+    }
+
+    /**
+     * 将库存供应窗口的逻辑班次映射到工厂实际班次配置。
+     *
+     * <p>逻辑班次一至六直接使用对应配置，超过六班后按三班日周期映射到一至三班，
+     * 与需求加载阶段的班次时长映射保持一致。</p>
+     *
+     * @param logicalShiftOrder 从一开始连续增长的逻辑班次
+     * @return 工厂班次配置中的实际班次顺序
+     */
+    private int mapGuardLogicalShiftOrder(int logicalShiftOrder) {
+        if (logicalShiftOrder <= TcScheduleConstants.TC_MAX_SHIFT_ORDER) {
+            return logicalShiftOrder;
+        }
+        return ((logicalShiftOrder - TcScheduleConstants.TC_MAX_SHIFT_ORDER - 1) % 3) + 1;
     }
 
     /**
@@ -1005,6 +1037,14 @@ public class TcPlanCalcService implements ITcPlanCalcService {
         evidence.put("demandQty", task.getDemandQty());
         evidence.put("formingGuardWindowQtyMap", task.getFormingGuardWindowQtyMap());
         evidence.put("formingGuardWindowHoursMap", task.getFormingGuardWindowHoursMap());
+        boolean supplyWindowKeyConsistent = task.getFormingGuardWindowQtyMap() != null
+                && task.getFormingGuardWindowHoursMap() != null
+                && task.getFormingGuardWindowQtyMap().keySet()
+                .equals(task.getFormingGuardWindowHoursMap().keySet());
+        ScheduleSupplyDurationResult supplyDurationResult = ScheduleSupplyDurationCalculator.calculate(
+                task.getRollingStockQty(), task.getFormingGuardWindowQtyMap(), task.getFormingGuardWindowHoursMap());
+        evidence.put("supplyWindowKeyConsistent", supplyWindowKeyConsistent);
+        evidence.put("supplyHoursInvalidReason", supplyDurationResult.getInvalidReason());
         evidence.put("supplyHours", task.getSupplyHours());
         evidence.put("sourceOrderNos", task.getSourceOrderNos());
         traceOf(context, task).addRuleHit(TcScheduleRuleCodeEnum.DEMAND_QTY_CALC,

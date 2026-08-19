@@ -28,8 +28,8 @@ import java.util.Objects;
  *
  * <p>只判断后续日有计划量的SKU是否允许进入当前日提前生产，不执行选机、换模、
  * 换活字块、胎胚扣减或日计划扣账。S4.4 换活字块提前生产与 S4.5 新增排产共用
- * 本判断器；“结构存在最早胎胚可供硫化时间”只作为结构切换提前场景的附加前提，
- * 普通结构提前和结构收尾提前继续执行原有准入规则。</p>
+ * 本判断器；“结构未形成有效续作排产且存在最早胎胚可供硫化时间”只作为结构切换提前
+ * 场景的附加前提，普通结构提前和结构收尾提前继续执行原有准入规则。</p>
  */
 @Slf4j
 public final class EarlyProductionChecker {
@@ -111,17 +111,22 @@ public final class EarlyProductionChecker {
                 currentDate, sku.getMaterialCode(), sku.getProductStatus());
         int threshold = Math.max(0, shortageThreshold);
         /*
-         * 结构切换提前必须同时满足：当前日结构计划机台数为0、未来计划日结构计划机台数大于0、
-         * 且结构存在最早胎胚可供硫化时间。这里直接使用原始结构机台数识别场景，不能依赖
-         * 最终sceneType反推，避免实际结构切换候选绕过胎胚时间门禁。
+         * 结构切换提前必须同时满足：当前日结构计划机台数为0、未来计划日结构计划机台数大于0，
+         * 且同结构尚未形成有效续作排产时存在最早胎胚可供硫化时间。这里直接使用原始结构
+         * 机台数识别场景，不能依赖最终sceneType反推，避免实际结构切换候选绕过胎胚时间门禁。
          * 普通结构提前和结构收尾提前不进入该分支，完整恢复本次调整前的原准入行为。
          */
         boolean structureSwitchEarlyProduction = isStructureSwitchEarlyProduction(
                 context, sku, currentDate, firstFuturePlanDate);
+        boolean structureScheduledInContinuation = structureSwitchEarlyProduction
+                && NewSpecEmbryoAvailableTimeResolver.isStructureScheduledInCurrentContinuation(
+                        context, sku);
         Date earliestEmbryoAvailableTime = structureSwitchEarlyProduction
+                && !structureScheduledInContinuation
                 ? NewSpecEmbryoAvailableTimeResolver.resolveEarliestAvailableTime(context, sku)
                 : null;
-        if (structureSwitchEarlyProduction && Objects.isNull(earliestEmbryoAvailableTime)) {
+        if (structureSwitchEarlyProduction && !structureScheduledInContinuation
+                && Objects.isNull(earliestEmbryoAvailableTime)) {
             String missingEmbryoTimeReason =
                     "结构未配置最早胎胚可供硫化时间，禁止提前生产";
             logEarlyProductionDecision(context, sku, currentDate, firstFuturePlanDate,
@@ -131,6 +136,12 @@ public final class EarlyProductionChecker {
             return EarlyProductionDecision.earlyProduction(
                     false, EarlyProductionDecision.SCENE_STRUCTURE_SWITCH, firstFuturePlanDate,
                     structurePlanMachineCounts, missingEmbryoTimeReason);
+        }
+        if (structureScheduledInContinuation) {
+            log.info("提前生产结构已有续作有效排产，胎胚最早可供时间不生效, factoryCode: {}, "
+                            + "currentDate: {}, futurePlanDate: {}, materialCode: {}, structureName: {}",
+                    context.getFactoryCode(), currentDate, firstFuturePlanDate,
+                    sku.getMaterialCode(), sku.getStructureName());
         }
         if (planMachineCount > 0 && scheduledStructureCount > planMachineCount) {
             String exceededReason = "结构已排机台数已超过计划机台数，禁止提前生产";
@@ -192,8 +203,8 @@ public final class EarlyProductionChecker {
      * 按原始结构计划机台数识别结构切换提前场景。
      *
      * <p>必须直接比较当前业务日和最早未来计划日的结构计划机台数，不能使用最终
-     * {@link EarlyProductionDecision#getSceneType()} 反推。“当前结构无计划、未来结构恢复计划”的
-     * 结构切换提前始终受最早胎胚可供硫化时间约束。</p>
+         * {@link EarlyProductionDecision#getSceneType()} 反推。“当前结构无计划、未来结构恢复计划”的
+         * 结构切换提前，在同结构没有有效续作排产时受最早胎胚可供硫化时间约束。</p>
      *
      * @param context 排程上下文
      * @param sku 待判断 SKU
@@ -602,19 +613,26 @@ public final class EarlyProductionChecker {
                                                    int futurePlanQty,
                                                    boolean allowed,
                                                    String reason) {
-        Date earliestEmbryoAvailableTime =
+        Date configuredEarliestEmbryoAvailableTime =
                 NewSpecEmbryoAvailableTimeResolver.resolveEarliestAvailableTime(context, sku);
+        boolean structureScheduledInContinuation =
+                NewSpecEmbryoAvailableTimeResolver.isStructureScheduledInCurrentContinuation(context, sku);
+        Date effectiveEarliestEmbryoAvailableTime = structureScheduledInContinuation
+                ? null : configuredEarliestEmbryoAvailableTime;
         log.info("提前生产准入判断, factoryCode: {}, batchNo: {}, currentDate: {}, futurePlanDate: {}, "
                         + "materialCode: {}, "
                         + "structureName: {}, historyShortageQty: {}, threshold: {}, planMachineCount: {}, "
                         + "scheduledStructureCount: {}, scheduledSkuCount: {}, dailyQty: {}, "
                         + "earlyProductionDaysThreshold: {}, earlyDays: {}, futurePlanQty: {}, "
-                        + "earliestEmbryoAvailableTime: {}, result: {}, reason: {}",
+                        + "earliestEmbryoAvailableTime: {}, effectiveEarliestEmbryoAvailableTime: {}, "
+                        + "structureScheduledInContinuation: {}, result: {}, reason: {}",
                 context.getFactoryCode(), context.getBatchNo(), currentDate, futurePlanDate,
                 sku.getMaterialCode(),
                 sku.getStructureName(), resolveHistoryShortageQty(context, sku, currentDate), threshold,
                 planMachineCount, scheduledStructureCount, scheduledSkuCount,
                 Math.max(0, sku.getDailyCapacity()), earlyProductionDaysThreshold, earlyDays,
-                futurePlanQty, earliestEmbryoAvailableTime, allowed, reason);
+                futurePlanQty, configuredEarliestEmbryoAvailableTime,
+                effectiveEarliestEmbryoAvailableTime, structureScheduledInContinuation,
+                allowed, reason);
     }
 }

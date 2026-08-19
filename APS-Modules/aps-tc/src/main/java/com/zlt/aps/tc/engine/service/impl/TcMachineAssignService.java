@@ -342,18 +342,18 @@ public class TcMachineAssignService implements ITcMachineAssignService {
                 ? this.selectStartupSupplyFirstTask(remainingTaskList, scoreMap)
                 : priorityStrategy.select(remainingTaskList, context, scoreMap);
         String appliedStrategyCode = startupShift ? "STARTUP_SUPPLY_FIRST" : priorityStrategy.getStrategyCode();
-        if (startupShift) {
-            Map<String, Object> sortEvidence = new LinkedHashMap<>();
-            sortEvidence.put("phase", "MACHINE_ASSIGN");
-            sortEvidence.put("strategyCode", appliedStrategyCode);
-            sortEvidence.put("shiftOrder", selectedTask.getShiftOrder());
-            sortEvidence.put("supplyHours", selectedTask.getSupplyHours());
-            sortEvidence.put("latestStartTime", selectedTask.getLatestStartTime());
-            sortEvidence.put("presetMachine", !selectedTask.isUnassigned());
-            sortEvidence.put("chainSortScore", scoreMap.get(selectedTask.getBusinessKey()));
-            traceOf(context, selectedTask).addRuleHit(TcScheduleRuleCodeEnum.TASK_SORT,
-                    TcScheduleRuleResultEnum.PASS, sortEvidence);
-        }
+        Map<String, Object> sortEvidence = new LinkedHashMap<>();
+        sortEvidence.put("phase", "MACHINE_ASSIGN");
+        sortEvidence.put("strategyCode", appliedStrategyCode);
+        sortEvidence.put("shiftOrder", selectedTask.getShiftOrder());
+        sortEvidence.put("supplyHours", selectedTask.getSupplyHours());
+        sortEvidence.put("latestStartTime", selectedTask.getLatestStartTime());
+        sortEvidence.put("presetMachine", !selectedTask.isUnassigned());
+        sortEvidence.put("chainSortScore", scoreMap.get(selectedTask.getBusinessKey()));
+        sortEvidence.put("sortPriority",
+                "SUPPLY_HOURS_ASC,LATEST_START_TIME_ASC,CHAIN_SCORE_DESC,BASE_SORT_INDEX_ASC,BUSINESS_KEY_ASC");
+        traceOf(context, selectedTask).addRuleHit(TcScheduleRuleCodeEnum.TASK_SORT,
+                TcScheduleRuleResultEnum.PASS, sortEvidence);
         log.info("[TC_CHAIN_TASK_ORDER] batchNo={}, traceId={}, factoryCode={}, scheduleDate={}, shiftOrder={}, predecessorSnapshot={}, selectedBusinessKey={}, selectedSidewallCode={}, selectedGlueCode={}, strategyCode={}, chainSortScores={}",
                 context.getBatchNo(), context.getTraceId(), context.getFactoryCode(), this.formatScheduleDate(context),
                 this.normalizeShiftOrder(selectedTask.getShiftOrder()), this.summarizeMachinePredecessors(context,
@@ -1939,14 +1939,14 @@ public class TcMachineAssignService implements ITcMachineAssignService {
         Integer logShiftOrder = processLogShiftOrder == null
                 ? (task == null ? null : task.getShiftOrder()) : processLogShiftOrder;
         if (currentAvailableToolQty == null) {
-            context.appendDeferredTaskProcessLog(processLogTaskBusinessKey, logShiftOrder,
+            context.appendDeferredToolProcessLog(processLogTaskBusinessKey, logShiftOrder,
                     "工装生产前校验：来源={0}，胎侧代码={1}，请求量={2}米；总工装未配置或非正数，未启用工装约束，实际承接量={2}米。",
                     taskSource, task.getSidewallCode(), normalizedRequestedQty);
             return normalizedRequestedQty;
         }
         BigDecimal curlLength = this.resolveCurlLength(task);
         if (curlLength.compareTo(BigDecimal.ZERO) <= 0) {
-            context.appendDeferredTaskProcessLog(processLogTaskBusinessKey, logShiftOrder,
+            context.appendDeferredToolProcessLog(processLogTaskBusinessKey, logShiftOrder,
                     "工装生产前校验：来源={0}，胎侧代码={1}，请求量={2}米；规格卷曲长度及默认卷曲长度均无效，无法计算工装允许量，沿用请求量。",
                     taskSource, task.getSidewallCode(), normalizedRequestedQty);
             return normalizedRequestedQty;
@@ -1954,7 +1954,7 @@ public class TcMachineAssignService implements ITcMachineAssignService {
         ScheduleToolLedgerResult limitResult = this.constraintCalculator
                 .settleProductionBeforeReleaseToolLedger(normalizedRequestedQty, BigDecimal.ZERO,
                         currentAvailableToolQty, task.getTotalToolQty(), curlLength);
-        context.appendDeferredTaskProcessLog(processLogTaskBusinessKey, logShiftOrder,
+        context.appendDeferredToolProcessLog(processLogTaskBusinessKey, logShiftOrder,
                 "工装生产前校验：来源={0}，胎侧代码={1}，校验前可用工装={2}套，请求量={3}米，有效卷曲长度={4}米/套；允许量=min({3}米,max({2}套,0)×{4}米/套)={5}米；工装溢出量=max({3}米-{5}米,0)={6}米；实际承接量={5}米。",
                 taskSource, task.getSidewallCode(), currentAvailableToolQty, normalizedRequestedQty, curlLength,
                 limitResult.getAllowedPlanQty(), limitResult.getOverflowPlanQty());
@@ -1995,7 +1995,7 @@ public class TcMachineAssignService implements ITcMachineAssignService {
         context.setCurrentAvailableToolQty(ledgerResult.getRemainingToolQty());
         this.recordToolLedgerSnapshot(context, task, ledgerResult.getAvailableToolQty(), ledgerResult.getToolUsedQty(),
                 ledgerResult.getRemainingToolQty());
-        context.appendDeferredTaskProcessLog(task.getBusinessKey(), task.getShiftOrder(),
+        context.appendDeferredToolProcessLog(task.getBusinessKey(), task.getShiftOrder(),
                 "工装任务后结算：来源={0}，胎侧代码={1}，净占用工装数量=({2}米-{3}米)÷{4}米/套={5}套；下一任务可用工装数量=min(max({6}套-{5}套,0),{7}套)={8}套。本任务释放量仅供下一任务使用。",
                 taskSource, task.getSidewallCode(), nvl(task.getPlanQty()), nvl(task.getCurrentShiftDemandQty()),
                 curlLength, ledgerResult.getToolUsedQty(), currentAvailableToolQty, task.getTotalToolQty(),
@@ -2056,7 +2056,7 @@ public class TcMachineAssignService implements ITcMachineAssignService {
         context.setCurrentAvailableToolQty(ledgerResult.getRemainingToolQty());
         this.recordToolLedgerSnapshot(context, mergeTarget, ledgerResult.getAvailableToolQty(),
                 mergeTarget.getToolUsedQty(), ledgerResult.getRemainingToolQty());
-        context.appendDeferredTaskProcessLog(mergeTarget.getBusinessKey(), mergeTarget.getShiftOrder(),
+        context.appendDeferredToolProcessLog(mergeTarget.getBusinessKey(), mergeTarget.getShiftOrder(),
                 "工装任务后结算：来源=顺延合并，胎侧代码={0}，净占用工装数量=({1}米-0米)÷{2}米/套={3}套；下一任务可用工装数量=min(max({4}套-{3}套,0),{5}套)={6}套。",
                 mergeTarget.getSidewallCode(), nvl(carryoverQty), curlLength, ledgerResult.getToolUsedQty(),
                 currentAvailableToolQty, mergeTarget.getTotalToolQty(), ledgerResult.getRemainingToolQty());

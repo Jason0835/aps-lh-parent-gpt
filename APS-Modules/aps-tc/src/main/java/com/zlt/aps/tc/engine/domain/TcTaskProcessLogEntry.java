@@ -11,8 +11,17 @@ import lombok.Data;
 @Data
 public class TcTaskProcessLogEntry {
 
+    /** 机台选择和产能扣减过程日志类别。 */
+    public static final String CATEGORY_MACHINE_ASSIGN = "MACHINE_ASSIGN";
+
+    /** 工装限制过程日志类别。 */
+    public static final String CATEGORY_TOOL_LEDGER = "TOOL_LEDGER";
+
     /** 日志归属班次。 */
     private Integer shiftOrder;
+
+    /** 日志类别，用于将工装限制日志与机台分配日志分区渲染。 */
+    private String logCategory;
 
     /** 日志归属任务业务键。 */
     private String taskBusinessKey;

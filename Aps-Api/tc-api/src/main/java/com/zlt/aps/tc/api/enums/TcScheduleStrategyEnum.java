@@ -8,8 +8,8 @@ public enum TcScheduleStrategyEnum {
     /** 默认策略。 */
     DEFAULT("DEFAULT", "默认策略"),
 
-    /** 连续性优先链任务策略。 */
-    CONTINUITY_FIRST("CONTINUITY_FIRST", "连续性优先"),
+    /** 供应时长优先、连续性决胜链任务策略。 */
+    CONTINUITY_FIRST("CONTINUITY_FIRST", "供应时长优先、连续性决胜"),
 
     /** 紧急任务优先链任务策略。 */
     EMERGENCY_FIRST("EMERGENCY_FIRST", "紧急任务优先");

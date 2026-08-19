@@ -789,29 +789,33 @@
         WHERE CONVERT(DATE, source_data.STOCK_DATE) = CONVERT(DATE, #{stockDate})
     </select>
 
-    <!-- 查询胎圈库存同步数据：仅查当天数据，避免MES历史快照全量同步到APS（MES源表不含工厂、公司和版本字段，对齐胎面 selectTreadStockList） -->
+    <!-- 查询胎圈库存同步数据：仅查当天数据，避免MES历史快照全量同步到APS -->
+    <!-- STOCK_DATE输出为yyyy-MM-dd字符串（CONVERT style=23），彻底规避SQL Server JDBC跨时区读取Date偏移问题 -->
     <select id="selectMesTqStockList" resultType="com.zlt.aps.tq.api.domain.entity.TqMesStock">
         SELECT
-        STOCK_DATE,
+        CONVERT(VARCHAR(10), STOCK_DATE, 23) AS STOCK_DATE,
         MATERIAL_CODE,
         AVAILABLE_STOCK
         FROM MES_TQ_STOCK
         WHERE CONVERT(DATE, STOCK_DATE) = CONVERT(DATE, GETDATE())
     </select>
 
-    <!-- 查询钢丝圈库存同步数据：仅查当天数据，避免MES历史快照全量同步到APS（MES字段MATERIAL_CODE映射为STEEL_RING_CODE） -->
-    <select id="selectMesGsqStockList" resultType="com.zlt.aps.gsq.api.domain.entity.GsqStock">
+    <!-- 查询钢丝圈库存同步数据：仅查当天数据，避免MES历史快照全量同步到APS -->
+    <!-- STOCK_DATE输出为yyyy-MM-dd字符串（CONVERT style=23），彻底规避SQL Server JDBC跨时区读取Date偏移问题；
+         resultType使用专用GsqMesStock DTO接收（与TqMesStock对称），字段名为MES原始名materialCode/availableStock -->
+    <select id="selectMesGsqStockList" resultType="com.zlt.aps.gsq.api.domain.entity.GsqMesStock">
         SELECT
-        STOCK_DATE,
-        MATERIAL_CODE AS STEEL_RING_CODE,
-        AVAILABLE_STOCK AS STOCK_NUM
+        CONVERT(VARCHAR(10), STOCK_DATE, 23) AS STOCK_DATE,
+        MATERIAL_CODE,
+        AVAILABLE_STOCK
         FROM MES_GSQ_STOCK
         WHERE CONVERT(DATE, STOCK_DATE) = CONVERT(DATE, GETDATE())
     </select>
 
     <!-- 查询胎圈自动滚动指定物理日库存，对齐胎面 selectTreadShiftStockList，MES源表不含工厂、公司和版本字段 -->
+    <!-- STOCK_DATE同样输出字符串以匹配TqMesStock.stockDate的String类型（本方法不消费该字段，但类型需一致） -->
     <select id="selectBeadShiftStockList" resultType="com.zlt.aps.tq.api.domain.entity.TqMesStock">
-        SELECT STOCK_DATE,
+        SELECT CONVERT(VARCHAR(10), STOCK_DATE, 23) AS STOCK_DATE,
                MATERIAL_CODE,
                AVAILABLE_STOCK
         FROM MES_TQ_STOCK

@@ -181,6 +181,19 @@ public class TmScheduleContext {
     }
 
     /**
+     * 追加指定班次和业务分区的胎面过程日志。
+     *
+     * @param shiftOrder 班次顺序
+     * @param section    过程日志分区
+     * @param format     日志格式，使用 MessageFormat 占位符
+     * @param args       日志参数
+     */
+    public void appendShiftProcessLog(Integer shiftOrder, ScheduleProcessLogSection section,
+                                      String format, Object... args) {
+        this.getOrCreateProcessTraceBuffer().appendShiftSummary(shiftOrder, section, format, args);
+    }
+
+    /**
      * 追加指定班次的延后过程日志，渲染时位于库存、计划量和机台评分日志之后。
      *
      * @param shiftOrder 班次顺序
@@ -189,6 +202,19 @@ public class TmScheduleContext {
      */
     public void appendDeferredShiftProcessLog(Integer shiftOrder, String format, Object... args) {
         this.getOrCreateProcessTraceBuffer().appendDeferredShiftSummary(shiftOrder, format, args);
+    }
+
+    /**
+     * 追加指定班次和业务分区的延后胎面过程日志。
+     *
+     * @param shiftOrder 班次顺序
+     * @param section    过程日志分区
+     * @param format     日志格式，使用 MessageFormat 占位符
+     * @param args       日志参数
+     */
+    public void appendDeferredShiftProcessLog(Integer shiftOrder, ScheduleProcessLogSection section,
+                                               String format, Object... args) {
+        this.getOrCreateProcessTraceBuffer().appendDeferredShiftSummary(shiftOrder, section, format, args);
     }
 
     /**
@@ -221,6 +247,18 @@ public class TmScheduleContext {
     }
 
     /**
+     * 追加指定班次和业务分区的胎面 FULL 过程事件。
+     *
+     * @param shiftOrder 班次顺序
+     * @param section    过程日志分区
+     * @param event      完整过程事件
+     */
+    public void appendShiftFullProcessTrace(Integer shiftOrder, ScheduleProcessLogSection section,
+                                            ScheduleProcessTraceEvent event) {
+        this.getOrCreateProcessTraceBuffer().appendShiftFull(shiftOrder, section, event);
+    }
+
+    /**
      * 追加指定班次的延后完整过程事件，渲染时位于该班次普通事件之后。
      *
      * @param shiftOrder 班次顺序
@@ -228,6 +266,18 @@ public class TmScheduleContext {
      */
     public void appendDeferredShiftFullProcessTrace(Integer shiftOrder, ScheduleProcessTraceEvent event) {
         this.getOrCreateProcessTraceBuffer().appendDeferredShiftFull(shiftOrder, event);
+    }
+
+    /**
+     * 追加指定班次和业务分区的延后胎面 FULL 过程事件。
+     *
+     * @param shiftOrder 班次顺序
+     * @param section    过程日志分区
+     * @param event      完整过程事件
+     */
+    public void appendDeferredShiftFullProcessTrace(Integer shiftOrder, ScheduleProcessLogSection section,
+                                                    ScheduleProcessTraceEvent event) {
+        this.getOrCreateProcessTraceBuffer().appendDeferredShiftFull(shiftOrder, section, event);
     }
 
     /**
@@ -583,12 +633,25 @@ public class TmScheduleContext {
             return;
         }
         if (entry.getFullEvent() != null) {
-            this.getOrCreateProcessTraceBuffer().appendShiftFull(entry.getShiftOrder(), entry.getFullEvent());
+            this.getOrCreateProcessTraceBuffer().appendShiftFull(entry.getShiftOrder(),
+                    this.resolveTaskProcessLogSection(entry), entry.getFullEvent());
         } else {
             this.getOrCreateProcessTraceBuffer().appendShiftSummary(entry.getShiftOrder(),
-                    entry.getFormat(), entry.getArgs());
+                    this.resolveTaskProcessLogSection(entry), entry.getFormat(), entry.getArgs());
         }
         entry.setRendered(true);
+    }
+
+    /**
+     * 根据任务关联日志类别解析业务分区。
+     *
+     * @param entry 任务关联日志
+     * @return 过程日志分区
+     */
+    private ScheduleProcessLogSection resolveTaskProcessLogSection(TmTaskProcessLogEntry entry) {
+        return entry != null && TmTaskProcessLogEntry.CATEGORY_TOOL_LEDGER.equals(entry.getLogCategory())
+                ? ScheduleProcessLogSection.TOOL_LIMIT
+                : ScheduleProcessLogSection.MACHINE_SELECTION_CAPACITY;
     }
 
     /**

@@ -2,6 +2,7 @@ package com.zlt.aps.lh.engine.strategy.impl;
 
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
+import com.zlt.aps.lh.api.enums.EmbryoUsageType;
 import com.zlt.aps.lh.api.enums.SkuTagEnum;
 import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
@@ -100,11 +101,11 @@ public class DefaultEndingJudgmentStrategy implements IEndingJudgmentStrategy {
         int totalAvailableCapacity = getTargetScheduleQtyResolver()
                 .calcSkuEndingAvailableCapacityInWindow(context, sku);
         boolean currentWindowTailFlag = totalAvailableCapacity >= tailTargetQty;
-        boolean sharedEmbryo = getTargetScheduleQtyResolver().isSharedEmbryoInWindow(context, sku);
-        log.info("SKU当前窗口收尾判断, materialCode: {}, window: 3天/8班, sharedEmbryo: {}, "
+        EmbryoUsageType embryoUsageType = getTargetScheduleQtyResolver().resolveEmbryoUsageType(context, sku);
+        log.info("SKU当前窗口收尾判断, materialCode: {}, window: 3天/8班, 胎胚使用类型: {}, "
                         + "surplusQty: {}, embryoStock: {}, tailTargetQty: {}, totalAvailableCapacity: {}, "
                         + "currentWindowTailFlag: {}",
-                sku.getMaterialCode(), sharedEmbryo, Math.max(0, sku.getSurplusQty()),
+                sku.getMaterialCode(), embryoUsageType.getDescription(), Math.max(0, sku.getSurplusQty()),
                 Math.max(0, sku.getEmbryoStock()), tailTargetQty, totalAvailableCapacity,
                 currentWindowTailFlag);
         return currentWindowTailFlag;

@@ -17,6 +17,7 @@ import com.zlt.aps.lh.api.domain.entity.LhRepairCapsule;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.entity.LhUnscheduledResult;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
+import com.zlt.aps.lh.api.enums.EmbryoUsageType;
 import com.zlt.aps.lh.api.enums.MachineStopTypeEnum;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
 import com.zlt.aps.lh.api.enums.ShiftEnum;
@@ -406,7 +407,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             appliedRule = "窗口及月底无计划收尾严格控量";
         } else if (isSingleMachine && isEnding) {
             getTargetScheduleQtyResolver().upsizeEndingTargetQty(context, sku);
-            appliedRule = getTargetScheduleQtyResolver().isSharedEmbryoInWindow(context, sku)
+            appliedRule = getTargetScheduleQtyResolver().resolveEmbryoUsageType(context, sku)
+                    == EmbryoUsageType.SHARED
                     ? "单机台收尾共用胎胚仅按余量" : "单机台收尾MAX(余量,胎胚库存)";
         } else if (isSingleMachine && sku.isStrictNewSpecShortageOnly()) {
             appliedRule = "窗口无计划仅补本月欠产";
@@ -3302,11 +3304,12 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         if (!CollectionUtils.isEmpty(skuResults)) {
             endingDemandQty = resolveEndingDemandQty(context, skuResults.get(0));
         } else {
-            // 兜底：同物料多机台属于共用胎胚只取硫化余量；单胎胚才取 MAX。
+            // 兜底：共用胎胚（含同物料多机台）只取硫化余量；单胎胚/非共用胎胚才取 MAX。
             int surplusQty = Math.max(0, sourceSku.getSurplusQty());
             int embryoStock = Math.max(0, sourceSku.getEmbryoStock());
             endingDemandQty = SkuTagEnum.ENDING.getCode().equals(sourceSku.getSkuTag())
-                    && getTargetScheduleQtyResolver().isSharedEmbryoInWindow(context, sourceSku)
+                    && getTargetScheduleQtyResolver().resolveEmbryoUsageType(context, sourceSku)
+                    == EmbryoUsageType.SHARED
                     ? surplusQty : Math.max(surplusQty, embryoStock);
         }
         return ShiftCapacityResolverUtil.roundUpQtyToMouldMultiple(endingDemandQty, sourceSku.getMouldQty());
@@ -7063,7 +7066,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         int endingDemandQty;
         if (getTargetScheduleQtyResolver().isEmbryoStockEnding(context, sourceSku)) {
             endingDemandQty = Math.max(0, sourceSku.getEmbryoStock());
-        } else if (getTargetScheduleQtyResolver().isSharedEmbryoInWindow(context, sourceSku)) {
+        } else if (getTargetScheduleQtyResolver().resolveEmbryoUsageType(context, sourceSku)
+                == EmbryoUsageType.SHARED) {
             endingDemandQty = Math.max(0, sourceSku.getSurplusQty());
         } else {
             endingDemandQty = Math.max(Math.max(0, sourceSku.getSurplusQty()), Math.max(0, sourceSku.getEmbryoStock()));
@@ -9499,7 +9503,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         // 仅收尾SKU才按共用胎胚规则（仅取硫化余量），非收尾SKU保持原口径
         if (sku != null
                 && SkuTagEnum.ENDING.getCode().equals(sku.getSkuTag())
-                && getTargetScheduleQtyResolver().isSharedEmbryoInWindow(context, sku)) {
+                && getTargetScheduleQtyResolver().resolveEmbryoUsageType(context, sku)
+                == EmbryoUsageType.SHARED) {
             return surplusQty;
         }
         return Math.max(surplusQty, embryoStock);
@@ -9929,6 +9934,14 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             SkuScheduleDTO compensationSku = copyContinuousCompensationSku(
                     sourceSku, remainingQty, firstAddMachineProductionDate, activeMachineCount,
                     requiredMachineCount, shortageMachineCount, addMachineDayPlanQty);
+            /*
+             * 续作加机台补偿量是 S4.4 扣账后 S4.5 尚需排产的“剩余量”，不是新的总目标量。
+             * 同物料同状态共用中心账本：保留续作已消费量，并把账本剩余量收敛到本次补偿量。
+             * 若误用“按总目标量同步”，会再次扣减历史消费量，导致新增阶段只能拿到错误的残量；
+             * 没有生成续作补偿SKU的纯收尾路径不经过此处，既有严格收尾上限保持不变。
+             */
+            this.getTargetScheduleQtyResolver().syncProductionRemainingQtyToRemaining(
+                    context, sourceSku, remainingQty, "续作加机台补偿账本合并");
             // 续作加机台候选保留同一日计划账本，S4.5 排到后会继续消费剩余额度，避免重复扩大日计划。
             context.getNewSpecSkuList().add(compensationSku);
             log.info("续作加机台需求生成，转新增规格链路统一竞争, materialCode: {}, 原续作机台: {}, "
