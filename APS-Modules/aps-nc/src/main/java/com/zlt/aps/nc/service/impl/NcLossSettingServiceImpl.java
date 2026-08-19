@@ -82,22 +82,25 @@ public class NcLossSettingServiceImpl extends AbstractDocService<NcLossSetting> 
      */
     private boolean isUnique(NcLossSetting entity, List<NcLossSetting> existList) {
         // 机台码、内衬号均非空时，存在两项全匹配的记录则冲突
-        if (StringUtils.isNotEmpty(entity.getMachineCode()) && StringUtils.isNotEmpty(entity.getLiningCode())
-                && existList.stream().anyMatch(item -> Objects.equal(entity.getMachineCode(), item.getMachineCode())
-                        && Objects.equal(entity.getLiningCode(), item.getLiningCode()))) {
-            return false;
+        if (StringUtils.isNotEmpty(entity.getMachineCode()) && StringUtils.isNotEmpty(entity.getLiningCode())) {
+            if (existList.stream().anyMatch(item -> Objects.equal(entity.getMachineCode(), item.getMachineCode())
+                    && Objects.equal(entity.getLiningCode(), item.getLiningCode()))) {
+                return false;
+            }
         }
         // 机台码非空时，存在同机台码且内衬号为空的记录则冲突
-        if (StringUtils.isNotEmpty(entity.getMachineCode())
-                && existList.stream().anyMatch(item -> Objects.equal(entity.getMachineCode(), item.getMachineCode())
-                        && StringUtils.isEmpty(item.getLiningCode()))) {
-            return false;
+        if (StringUtils.isNotEmpty(entity.getMachineCode())) {
+            if (existList.stream().anyMatch(item -> Objects.equal(entity.getMachineCode(), item.getMachineCode())
+                    && StringUtils.isEmpty(item.getLiningCode()))) {
+                return false;
+            }
         }
         // 内衬号非空时，存在同内衬号且机台码为空的记录则冲突
-        if (StringUtils.isNotEmpty(entity.getLiningCode())
-                && existList.stream().anyMatch(item -> Objects.equal(entity.getLiningCode(), item.getLiningCode())
-                        && StringUtils.isEmpty(item.getMachineCode()))) {
-            return false;
+        if (StringUtils.isNotEmpty(entity.getLiningCode())) {
+            if (existList.stream().anyMatch(item -> Objects.equal(entity.getLiningCode(), item.getLiningCode())
+                    && StringUtils.isEmpty(item.getMachineCode()))) {
+                return false;
+            }
         }
         return true;
     }
