@@ -55,6 +55,7 @@ import java.util.stream.IntStream;
 public class Cd15AutoScheduleBatchDataValidatorImpl implements Cd15AutoScheduleBatchDataValidator {
 
     private static final int CONSTRUCTION_LAYERS = 3;
+    private static final int FORMING_CLASS_COUNT = 8;
     private static final int ACTIVE = 1;
     private static final String DATA_MISSING = "DATA_MISSING";
     private static final String ANGLE_WIDTH_CONFIG_MISSING = "ANGLE_WIDTH_CONFIG_MISSING";
@@ -87,17 +88,12 @@ public class Cd15AutoScheduleBatchDataValidatorImpl implements Cd15AutoScheduleB
         }
 
         Cd15BatchDataCheckResult.Builder builder = Cd15BatchDataCheckResult.builder();
-        List<Cd15ShiftDescriptor> shifts = this.checkShiftConfig(
-                builder, factoryCode, scheduleDate);
+        this.checkShiftConfig(builder, factoryCode, scheduleDate);
         this.checkStorageLaneBaseline(builder, factoryCode);
-        Set<Integer> activeClassIndexes = shifts.stream()
-                .map(Cd15ShiftDescriptor::getShiftOrder)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toCollection(LinkedHashSet::new));
         List<CxScheduleResult> formingSchedules = this.checkFormingSchedule(builder, factoryCode, scheduleDate);
         this.checkMachineInfo(builder, factoryCode);
         ConstructionCheckScope scope = this.checkConstructionInfo(
-                builder, factoryCode, formingSchedules, activeClassIndexes);
+                builder, factoryCode, formingSchedules);
         this.checkCurlLength(builder, factoryCode, scope.getSteelStripCodes());
         this.checkAngleWidthMapping(builder, factoryCode, scope.getCuttingAngles());
 
@@ -209,18 +205,30 @@ public class Cd15AutoScheduleBatchDataValidatorImpl implements Cd15AutoScheduleB
         }
     }
 
-    /** 检查排程日成型计划是否存在。 */
+    /** 按正式输入范围检查成型计划，并保留排程日当天必须存在成型计划的约束。 */
     private List<CxScheduleResult> checkFormingSchedule(Cd15BatchDataCheckResult.Builder builder,
                                                         String factoryCode,
                                                         LocalDate scheduleDate) {
+        LocalDate formingStartDate = scheduleDate.minusDays(1);
+        LocalDate formingEndDate = scheduleDate.plusDays(3);
         List<CxScheduleResult> schedules = cxScheduleMapper.selectList(Wrappers.<CxScheduleResult>lambdaQuery()
                 .eq(CxScheduleResult::getFactoryCode, factoryCode)
-                .eq(CxScheduleResult::getScheduleDate, Date.valueOf(scheduleDate)));
+                .between(CxScheduleResult::getScheduleDate,
+                        Date.valueOf(formingStartDate), Date.valueOf(formingEndDate)));
         if (schedules == null || schedules.isEmpty()) {
+            builder.addError("成型计划", DATA_MISSING,
+                    "未找到成型计划范围 " + formingStartDate + " 至 " + formingEndDate + " 的排程记录",
+                    "请先在成型排程页面生成对应日期范围的成型排程");
+            return new ArrayList<>();
+        }
+        boolean hasTargetSchedule = schedules.stream()
+                .filter(schedule -> schedule.getScheduleDate() != null)
+                .map(schedule -> new Date(schedule.getScheduleDate().getTime()).toLocalDate())
+                .anyMatch(scheduleDate::equals);
+        if (!hasTargetSchedule) {
             builder.addError("成型计划", DATA_MISSING,
                     "未找到排程日 " + scheduleDate + " 的成型排程记录",
                     "请先在成型排程页面生成排程日 " + scheduleDate + " 的成型排程");
-            return new ArrayList<>();
         }
         return schedules;
     }
@@ -275,8 +283,7 @@ public class Cd15AutoScheduleBatchDataValidatorImpl implements Cd15AutoScheduleB
     /** 检查施工记录和施工层位字段。 */
     private ConstructionCheckScope checkConstructionInfo(Cd15BatchDataCheckResult.Builder builder,
                                                          String factoryCode,
-                                                         List<CxScheduleResult> formingSchedules,
-                                                         Set<Integer> activeClassIndexes) {
+                                                         List<CxScheduleResult> formingSchedules) {
         ConstructionCheckScope scope = new ConstructionCheckScope();
         if (formingSchedules == null || formingSchedules.isEmpty()) {
             return scope;
@@ -293,14 +300,14 @@ public class Cd15AutoScheduleBatchDataValidatorImpl implements Cd15AutoScheduleB
                         "请检查成型排程数据的胎胚代号"));
 
         Set<String> constructionVersions = formingSchedules.stream()
-                .flatMap(schedule -> activeClassIndexes.stream()
+                .flatMap(schedule -> IntStream.rangeClosed(1, FORMING_CLASS_COUNT).boxed()
                         .filter(classIndex -> this.hasPositivePlan(schedule, classIndex))
                         .map(classIndex -> this.readString(schedule, String.format("class%dRecipeNo", classIndex))))
                 .filter(StringUtils::hasText)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
-        Set<String> constructionPairs = new LinkedHashSet<>();
+        Map<String, Set<String>> constructionPairUsages = new LinkedHashMap<>();
         formingSchedules.forEach(schedule -> this.collectConstructionPairs(
-                builder, schedule, constructionPairs, activeClassIndexes));
+                builder, schedule, constructionPairUsages));
 
         if (embryoCodes.isEmpty() || constructionVersions.isEmpty()) {
             return scope;
@@ -315,31 +322,36 @@ public class Cd15AutoScheduleBatchDataValidatorImpl implements Cd15AutoScheduleB
                         item -> item.getConstructionCode() + "@" + item.getConstructionVersion(),
                         item -> item, (left, right) -> left, LinkedHashMap::new));
 
-        constructionPairs.forEach(pair -> this.checkConstructionPair(builder, constructionByKey, pair, scope));
+        constructionPairUsages.forEach((pair, usages) ->
+                this.checkConstructionPair(builder, constructionByKey, pair, usages, scope));
         return scope;
     }
 
     /** 收集有正需求班次的胎胚和施工版本配对。 */
     private void collectConstructionPairs(Cd15BatchDataCheckResult.Builder builder,
                                           CxScheduleResult schedule,
-                                          Set<String> constructionPairs,
-                                          Set<Integer> activeClassIndexes) {
+                                          Map<String, Set<String>> constructionPairUsages) {
         String embryoCode = schedule.getEmbryoCode();
         if (!StringUtils.hasText(embryoCode)) {
             return;
         }
-        activeClassIndexes.stream()
-                .sorted()
+        IntStream.rangeClosed(1, FORMING_CLASS_COUNT)
+                .boxed()
                 .filter(classIndex -> this.hasPositivePlan(schedule, classIndex))
                 .forEach(classIndex -> {
                     String fieldName = String.format("CLASS%d_RECIPE_NO", classIndex);
                     String recipeNo = this.readString(schedule, String.format("class%dRecipeNo", classIndex));
+                    String formingDate = schedule.getScheduleDate() == null ? ""
+                            : new Date(schedule.getScheduleDate().getTime()).toLocalDate().toString();
                     if (!StringUtils.hasText(recipeNo)) {
                         builder.addError("成型计划", DATA_MISSING,
-                                "胎胚 " + embryoCode + " 的 " + fieldName + " 施工版本为空",
+                                "成型日期 " + formingDate + " 胎胚 " + embryoCode
+                                        + " 的 " + fieldName + " 施工版本为空",
                                 "请检查成型排程数据各班次施工版本");
                     } else {
-                        constructionPairs.add(embryoCode + "@" + recipeNo);
+                        constructionPairUsages.computeIfAbsent(embryoCode + "@" + recipeNo,
+                                        ignored -> new LinkedHashSet<>())
+                                .add(formingDate + "/CLASS" + classIndex);
                     }
                 });
     }
@@ -348,6 +360,7 @@ public class Cd15AutoScheduleBatchDataValidatorImpl implements Cd15AutoScheduleB
     private void checkConstructionPair(Cd15BatchDataCheckResult.Builder builder,
                                        Map<String, MdmConstructionInfo> constructionByKey,
                                        String pair,
+                                       Set<String> usages,
                                        ConstructionCheckScope scope) {
         String[] parts = pair.split("@", 2);
         String constructionCode = parts[0];
@@ -355,7 +368,8 @@ public class Cd15AutoScheduleBatchDataValidatorImpl implements Cd15AutoScheduleB
         MdmConstructionInfo construction = constructionByKey.get(pair);
         if (construction == null) {
             builder.addError("施工信息", DATA_MISSING,
-                    "胎胚 " + constructionCode + " 施工版本 " + constructionVersion + " 未维护",
+                    "胎胚 " + constructionCode + " 施工版本 " + constructionVersion
+                            + " 未维护，影响班次 " + String.join("、", usages),
                     "请在施工信息页面维护对应胎胚和版本的施工资料");
             return;
         }

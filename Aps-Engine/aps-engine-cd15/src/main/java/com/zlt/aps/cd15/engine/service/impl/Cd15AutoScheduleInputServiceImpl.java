@@ -1,6 +1,7 @@
 package com.zlt.aps.cd15.engine.service.impl;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.cd15.api.domain.entity.Cd15CurlLength;
 import com.zlt.aps.cd15.api.domain.entity.Cd15DepthConfig;
 import com.zlt.aps.cd15.api.domain.entity.Cd15ShiftConfig;
@@ -46,6 +47,7 @@ import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.sql.Date;
+import java.text.MessageFormat;
 import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
@@ -127,14 +129,15 @@ public class Cd15AutoScheduleInputServiceImpl implements Cd15AutoScheduleInputSe
         List<Cd15ConstructionMaterial> constructionMaterials = loadConstructionMaterials(
                 factoryCode, embryoCodes, constructionVersions);
         fillStandardCurlLength(factoryCode, constructionMaterials);
+        List<Cd15DemandShift> demandShifts = formingDemandExpander.expand(
+                formingSchedules, constructionMaterials);
+        this.validateEffectiveDemand(formingSchedules, demandShifts, formingEntities.size());
         List<Cd15DepthConfig> depthConfigs = depthConfigMapper.selectList(
                 Wrappers.<Cd15DepthConfig>lambdaQuery()
                         .eq(Cd15DepthConfig::getFactoryCode, factoryCode)
                         .orderByAsc(Cd15DepthConfig::getMinMachineQty));
         Map<String, BigDecimal> depthClassQtyBySteelStrip = steelStripDepthResolver.resolve(
                 formingSchedules, constructionMaterials, depthConfigs);
-        List<Cd15DemandShift> demandShifts = formingDemandExpander.expand(
-                formingSchedules, constructionMaterials);
         List<Cd15EmbryoPlanSurplus> embryoPlanSurpluses = loadEmbryoPlanSurpluses(
                 factoryCode, scheduleDate, embryoCodes);
         Map<String, Cd15SteelStripSourceTrace> steelStripSourceTraceBySteelStrip =
@@ -322,6 +325,28 @@ public class Cd15AutoScheduleInputServiceImpl implements Cd15AutoScheduleInputSe
         if (!missing.isEmpty()) {
             log.warn("[斜裁自动排程] 标准卷曲长度未维护或非正数，将使用参数CRIMP_LENGTH兜底, factoryCode={}, steelStripCodes={}",
                     factoryCode, missing);
+        }
+    }
+
+    /** 有正计划量但未形成任何有效钢带需求时终止任务，避免生成空的已排和未排结果。 */
+    private void validateEffectiveDemand(List<Cd15FormingScheduleSource> formingSchedules,
+                                         List<Cd15DemandShift> demandShifts,
+                                         int formingRecordCount) {
+        long positiveFormingShiftCount = safe(formingSchedules).stream()
+                .filter(schedule -> schedule != null)
+                .flatMap(schedule -> safe(schedule.getClassPlanQuantities()).stream())
+                .filter(quantity -> quantity != null && quantity.signum() > 0)
+                .count();
+        boolean hasEffectiveDemand = safe(demandShifts).stream()
+                .filter(shift -> shift != null)
+                .anyMatch(shift -> shift.getFormingQuantity() != null
+                        && shift.getFormingQuantity().signum() > 0
+                        && shift.getSteelStripDemandQuantity() != null
+                        && shift.getSteelStripDemandQuantity().signum() > 0);
+        if (positiveFormingShiftCount > 0 && !hasEffectiveDemand) {
+            throw new IllegalStateException(MessageFormat.format(
+                    I18nUtil.getMessage("ui.cd15.autoSchedule.noEffectiveSteelStripDemand"),
+                    formingRecordCount, positiveFormingShiftCount));
         }
     }
 

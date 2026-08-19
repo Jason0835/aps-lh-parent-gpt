@@ -55,17 +55,21 @@ public class Cd15FormingDemandExpander {
                 String classField = "CLASS" + (classIndex + 1);
                 String recipeNo = classIndex < recipeNos.size() ? recipeNos.get(classIndex) : null;
                 if (!StringUtils.hasText(recipeNo)) {
-                    log.warn("[斜裁自动排程] 成型班次施工版本为空，跳过该班施工分解, "
-                                    + "cxBatchNo={}, embryoCode={}, classField={}, startTime={}",
-                            schedule.getCxBatchNo(), schedule.getEmbryoCode(), classField, startTime);
+                    if (formingQuantity.signum() > 0) {
+                        log.warn("[斜裁自动排程] 成型班次施工版本为空，跳过该班施工分解, "
+                                        + "cxBatchNo={}, embryoCode={}, classField={}, startTime={}",
+                                schedule.getCxBatchNo(), schedule.getEmbryoCode(), classField, startTime);
+                    }
                     continue;
                 }
                 List<Cd15ConstructionMaterial> constructionMaterials = materialsByConstruction.get(
                         this.constructionKey(schedule.getEmbryoCode(), recipeNo));
                 if (constructionMaterials == null || constructionMaterials.isEmpty()) {
-                    log.warn("[斜裁自动排程] 未找到胎胚施工版本，跳过该班施工分解, "
-                                    + "cxBatchNo={}, embryoCode={}, constructionVersion={}, classField={}",
-                            schedule.getCxBatchNo(), schedule.getEmbryoCode(), recipeNo, classField);
+                    if (formingQuantity.signum() > 0) {
+                        log.warn("[斜裁自动排程] 未找到胎胚施工版本，跳过该班施工分解, "
+                                        + "cxBatchNo={}, embryoCode={}, constructionVersion={}, classField={}",
+                                schedule.getCxBatchNo(), schedule.getEmbryoCode(), recipeNo, classField);
+                    }
                     continue;
                 }
                 for (Cd15ConstructionMaterial material : constructionMaterials) {
