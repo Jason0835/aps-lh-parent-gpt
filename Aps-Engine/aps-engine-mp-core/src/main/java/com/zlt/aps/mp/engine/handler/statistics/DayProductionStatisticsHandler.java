@@ -1,10 +1,11 @@
-package com.zlt.aps.mp.engine.handler;
+package com.zlt.aps.mp.engine.handler.statistics;
 
 import com.alibaba.fastjson.JSON;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.mp.api.domain.capacity.MpDailyCapacityLimitVo;
 import com.zlt.aps.mp.api.domain.entity.MpMonthPlanStatistics;
 import com.zlt.aps.mp.api.domain.vo.MpDayProductionStatisticsDetailVo;
+import com.zlt.aps.mp.api.domain.vo.MpDayProductionStatisticsShellVo;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.daylimit.DayCapacityLimitHelper;
 import com.zlt.aps.mp.engine.daylimit.DayCapacityLimitVo;
@@ -77,6 +78,8 @@ public class DayProductionStatisticsHandler {
                 detail.setEmbryoCount(dayCapacityLimit.getEmbryoCodes().size());
                 detail.setLhMachines(dayCapacityLimit.getUsedLhMachines());
                 detail.setChangeMould(dayCapacityLimit.getUsedChangeMould());
+                //20260818+ 模壳标准使用量统计
+                setMoldShellStandardStatisticInfo(detail, dayCapacityLimit);
                 String dayFieldName = String.format(dayFieldNameFormat, day);
                 String dayInfo = JSON.toJSONString(detail);
                 statistics.setFieldValueByFieldName(dayFieldName, dayInfo);
@@ -433,17 +436,30 @@ public class DayProductionStatisticsHandler {
         detail.setMaxEmbryoTypes(dayLimitInfo.getMaxEmbryoCodeCount());
         return detail;
     }
-}
 
-/**
- * 日排产结果Vo对象
- *
- * @author ZLT
- * @date 20260210
- */
-@Data
-class MpMonthPlanStatisticsResultVo extends MpMonthPlanStatistics {
-
-    private Map<Integer, MpDayProductionStatisticsDetailVo> dayStatisticsDetailMap;
-
+    /**
+     * 设置模壳标准使用量统计信息
+     *
+     * @param dayCapacityLimit
+     */
+    private void setMoldShellStandardStatisticInfo(MpDayProductionStatisticsDetailVo detail, MpDailyCapacityLimitVo dayCapacityLimit) {
+        if (null == detail || null == dayCapacityLimit) {
+            return;
+        }
+        Map<String, Integer> moldShellStatisticsMap = dayCapacityLimit.getMouldShellBlockMachinesMap();
+        if (CollectionUtils.isEmpty(moldShellStatisticsMap)) {
+            return;
+        }
+        List<MpDayProductionStatisticsShellVo> mouldShellList = new ArrayList<>();
+        moldShellStatisticsMap.forEach((moldShell, usedCount) -> {
+            MpDayProductionStatisticsShellVo shellInfo = new MpDayProductionStatisticsShellVo();
+            shellInfo.setMouldShell(moldShell);
+            shellInfo.setBlockMachines(usedCount);
+            mouldShellList.add(shellInfo);
+        });
+        if (CollectionUtils.isEmpty(mouldShellList)) {
+            return;
+        }
+        detail.setMouldShellList(mouldShellList);
+    }
 }

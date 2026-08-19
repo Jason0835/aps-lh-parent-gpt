@@ -279,7 +279,7 @@ export default {
       this.selection = rows;
     },
     handleExport() {
-      downloadLink("/nc/loss/export", this.formatParams(false));
+      downloadLink("/nc/lossSetting/export", this.formatParams(false));
     },
 
     // utils
