@@ -63,10 +63,10 @@ public class NcCurlRollController extends AbstractDocBizController<NcCurlRoll> {
      */
     @Log(title = "ui.nc.curlRoll.column.modalName", businessType = BusinessType.INSERT)
     @ApiOperation("新增信息（id不为空）")
-    @PostMapping
+    @Override
     public AjaxResult save(@RequestBody NcCurlRoll stock) {
         if (UserConstants.NOT_UNIQUE.equals(curlRollService.checkUnique(stock))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.error.message.quota.unique"));
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.ncCurlRoll.importUnique"));
         }
         return super.save(stock);
     }

@@ -63,7 +63,7 @@ public class NcSpecifyMachineController extends AbstractDocBizController<NcSpeci
     @Override
     public AjaxResult save(@RequestBody NcSpecifyMachine stock) {
         if (UserConstants.NOT_UNIQUE.equals(machineService.checkUnique(stock))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.error.message.quota.unique"));
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.ncSpecifyMachine.importUnique"));
         }
         return super.save(stock);
     }

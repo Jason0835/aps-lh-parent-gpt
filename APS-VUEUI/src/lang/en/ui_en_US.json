@@ -11,6 +11,8 @@
   "ui.dj.curlRoll.column.modalName": "Padding rubber curl information maintenance",
   "ui.nc.curlRoll.column.liningCode": "Lining code",
   "ui.nc.curlRoll.column.modalName": "Lining curl length management",
+  "ui.nc.specifyMachine.column.modalName": "Lining fixed-point machine",
+  "ui.frame.page.stock.title": "Stock information",
   "ui.dj.params.column.factoryCode": "Factory code",
   "ui.dj.params.column.productTypeCode": "Product type",
   "ui.dj.params.column.paramCode": "Param code",

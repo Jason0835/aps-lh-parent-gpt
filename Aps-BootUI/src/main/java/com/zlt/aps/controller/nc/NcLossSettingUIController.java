@@ -98,7 +98,7 @@ public class NcLossSettingUIController extends BaseUIController<NcLossSetting> {
     @ResponseBody
     public AjaxResult save(NcLossSetting ncMachine) {
         if (UserConstants.NOT_UNIQUE.equals(iNcLossSettingService.checkUnique(ncMachine))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.ncMachine.embryoCodeNotUnique"));
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.ncLossSetting.importUnique"));
         }
 
         return iNcLossSettingService.save(ncMachine);

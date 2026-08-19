@@ -48,7 +48,7 @@
         >
         <el-button
           v-hasPermi="['nc:stock:import']"
-          @click="$refs.tltUpload.handleImport()"
+          @click="() => $refs.tltUploadForm.handleImport(importDefaultValue)"
           >{{ $t("ui.frame.btn.import") }}</el-button
         >
         <el-button @click="handleExport" v-hasPermi="['nc:stock:export']">{{
@@ -56,11 +56,15 @@
         }}</el-button>
       </template>
     </page-table>
-    <tlt-upload
-      ref="tltUpload"
+    <tlt-upload-form
+      ref="tltUploadForm"
+      :title="$t('ui.frame.page.stock.title')"
       downloadUrl="/nc/stock/importTemplate"
       uploadUrl="/nc/stock/importData"
       @uploadSuccess="getList"
+      labelWidth="0"
+      :columns="importColumns"
+      :rules="importRules"
     />
     <infoDialog ref="infoRef" @success="getList" />
   </basic-container>
@@ -74,14 +78,14 @@ import { downloadLink } from "@/utils/request";
 import { listStock, removeStock, releaseStock } from "@/api/nc/stock";
 import { getConfigKey } from "@/api/system/config";
 //components
-import tltUpload from "@/components/tltUpload/tltUpload.vue";
+import TltUploadForm from "@/views/components/tltUploadForm.vue";
 
 import infoDialog from "./components/infoDialog.vue";
 
 export default {
   name: "ncStock",
   components: {
-    tltUpload,
+    TltUploadForm,
     infoDialog,
   },
   dicts: ["biz_factory_name"],
@@ -107,6 +111,26 @@ export default {
       query: {
         factoryCode: '',
       },
+      importDefaultValue: {
+        updateSupport: false,
+      },
+      importColumns: [
+        {
+          label: "",
+          prop: "updateSupport",
+          render: (form) => {
+            return (
+              <el-checkbox
+                label={this.$t("ui.checkbox.updateExistingData")}
+                v-model={form.updateSupport}
+              >
+                {this.$t("ui.checkbox.updateExistingData")}
+              </el-checkbox>
+            );
+          },
+        },
+      ],
+      importRules: {},
     };
   },
   computed: {

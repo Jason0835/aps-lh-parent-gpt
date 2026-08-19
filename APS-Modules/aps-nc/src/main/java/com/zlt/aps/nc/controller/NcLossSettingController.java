@@ -66,7 +66,7 @@ public class NcLossSettingController extends AbstractDocBizController<NcLossSett
     @Override
     public AjaxResult save(@RequestBody NcLossSetting stock) {
         if (UserConstants.NOT_UNIQUE.equals(lossSettingService.checkUnique(stock))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.error.message.quota.unique"));
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.ncLossSetting.importUnique"));
         }
         return super.save(stock);
     }

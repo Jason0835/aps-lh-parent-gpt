@@ -2,8 +2,8 @@ package com.zlt.aps.nc.api.domain.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
 import com.ruoyi.common.core.annotation.Excel;
-import com.zlt.aps.common.core.annotation.ImportValidated;
 import com.zlt.aps.common.core.domain.ApsBaseEntity;
+import com.zlt.common.annotation.ImportExcelValidated;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -34,6 +34,7 @@ public class NcCurlRoll extends ApsBaseEntity implements Serializable {
     private String factoryCode;
 
     @Excel(name = "ui.data.column.quota.liningCode")
+    @ImportExcelValidated(name = "ui.data.column.quota.liningCode", required = true, isCode = true, maxLength = 20)
     @ApiModelProperty(value = "内衬编号")
     @TableField("LINING_CODE")
     private String liningCode;
@@ -41,7 +42,7 @@ public class NcCurlRoll extends ApsBaseEntity implements Serializable {
     @ApiModelProperty(value = "卷曲长度。此内衬一卷的最大长度，单位：米。")
     @TableField(value = "CURL_LENGTH", updateStrategy = FieldStrategy.IGNORED, jdbcType = JdbcType.DOUBLE)
     @Excel(name = "ui.curlRoll.column.length")
-    @ImportValidated(name = "ui.curlRoll.column.length", required = true, max = 999999, min = 0)
+    @ImportExcelValidated(name = "ui.curlRoll.column.length", required = true, max = 999999, min = 0)
     private BigDecimal curlLength;
 
     /**
@@ -50,4 +51,10 @@ public class NcCurlRoll extends ApsBaseEntity implements Serializable {
     @ApiModelProperty(value = "查询编号，用于精确查询")
     @TableField(exist = false)
     private String queryCode;
+
+    @Excel(name = "ui.data.column.info.remark")
+    @ImportExcelValidated(name = "ui.data.column.info.remark", maxLength = 100)
+    @ApiModelProperty(value = "备注")
+    @TableField(value = "REMARK")
+    private String remark;
 }

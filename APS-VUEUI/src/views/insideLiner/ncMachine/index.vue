@@ -97,15 +97,12 @@ export default {
           label: "",
           prop: "updateSupport",
           render: (form) => {
-            console.log(form);
             return (
               <el-checkbox
-                label="是否更新已经存在的用户数据"
-                true-label={true}
-                false-label={false}
+                label={this.$t("ui.checkbox.updateExistingData")}
                 v-model={form.updateSupport}
               >
-                是否更新已经存在的用户数据
+                {this.$t("ui.checkbox.updateExistingData")}
               </el-checkbox>
             );
           },
