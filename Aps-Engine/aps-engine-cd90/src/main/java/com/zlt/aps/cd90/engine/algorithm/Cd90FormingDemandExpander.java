@@ -57,18 +57,22 @@ public class Cd90FormingDemandExpander {
                 String classField = "CLASS" + (classIndex + 1);
                 String recipeNo = classIndex < recipeNos.size() ? recipeNos.get(classIndex) : null;
                 if (!StringUtils.hasText(recipeNo)) {
-                    log.warn("[直裁自动排程] 成型班次施工版本为空，跳过该班施工分解, "
-                                    + "cxBatchNo={}, embryoCode={}, classField={}, startTime={}",
-                            schedule.getCxBatchNo(), schedule.getEmbryoCode(), classField, startTime);
+                    if (formingQuantity.signum() > 0) {
+                        log.warn("[直裁自动排程] 成型班次施工版本为空，跳过该班施工分解, "
+                                        + "cxBatchNo={}, embryoCode={}, classField={}, startTime={}",
+                                schedule.getCxBatchNo(), schedule.getEmbryoCode(), classField, startTime);
+                    }
                     continue;
                 }
                 // 成型计划必须使用embryoCode+CLASSn_RECIPE_NO关联施工，不使用SAP品号或成型物料描述。
                 Map<String, BigDecimal> clothConsumes = consumeByConstruction.get(
                         constructionKey(schedule.getEmbryoCode(), recipeNo));
                 if (clothConsumes == null || clothConsumes.isEmpty()) {
-                    log.warn("[直裁自动排程] 未找到胎胚施工版本，跳过该班施工分解, "
-                                    + "cxBatchNo={}, embryoCode={}, constructionVersion={}, classField={}",
-                            schedule.getCxBatchNo(), schedule.getEmbryoCode(), recipeNo, classField);
+                    if (formingQuantity.signum() > 0) {
+                        log.warn("[直裁自动排程] 未找到胎胚施工版本，跳过该班施工分解, "
+                                        + "cxBatchNo={}, embryoCode={}, constructionVersion={}, classField={}",
+                                schedule.getCxBatchNo(), schedule.getEmbryoCode(), recipeNo, classField);
+                    }
                     continue;
                 }
                 for (Map.Entry<String, BigDecimal> entry : clothConsumes.entrySet()) {

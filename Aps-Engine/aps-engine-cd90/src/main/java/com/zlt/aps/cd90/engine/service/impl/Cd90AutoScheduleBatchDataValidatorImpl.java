@@ -111,22 +111,32 @@ public class Cd90AutoScheduleBatchDataValidatorImpl implements Cd90AutoScheduleB
 
     /**
      * 批次级检查：成型计划数据是否就绪。
-     * 按文档1.5节，成型 scheduleDate 与直裁排程日相同（均为 T+1），
-     * 成型一条记录的 CLASS1~CLASS8 已覆盖 T 日早班至 T+2 日共8个班次，
-     * 因此入口先行检查只查 scheduleDate 当天的成型排程记录即可。
-     * engine 运行时可能按停产场景额外读取相邻班次，但入口检查只关心用户该维护的核心记录是否存在。
+     * 与输入加载口径保持一致，检查 scheduleDate-1 至 scheduleDate+3 的成型排程记录，
+     * 避免相邻日期参与需求展开时才发现施工版本为空或胎胚施工版本未维护。
      * 返回查询到的成型记录，供后续施工信息检查使用。
      */
     private List<CxScheduleResult> checkFormingSchedule(Cd90BatchDataCheckResult.Builder builder,
                                                          String factoryCode, LocalDate scheduleDate) {
+        LocalDate formingStartDate = scheduleDate.minusDays(1);
+        LocalDate formingEndDate = scheduleDate.plusDays(3);
         List<CxScheduleResult> schedules = cxScheduleMapper.selectList(Wrappers.<CxScheduleResult>lambdaQuery()
                 .eq(CxScheduleResult::getFactoryCode, factoryCode)
-                .eq(CxScheduleResult::getScheduleDate, Date.valueOf(scheduleDate)));
+                .between(CxScheduleResult::getScheduleDate,
+                        Date.valueOf(formingStartDate), Date.valueOf(formingEndDate)));
         if (schedules == null || schedules.isEmpty()) {
+            builder.addError("成型计划", "DATA_MISSING",
+                    "未找到成型计划范围 " + formingStartDate + " 至 " + formingEndDate + " 的排程记录",
+                    "请先在成型排程页面生成对应日期范围的成型排程");
+            return new ArrayList<>();
+        }
+        boolean hasTargetSchedule = schedules.stream()
+                .filter(schedule -> schedule.getScheduleDate() != null)
+                .map(schedule -> new Date(schedule.getScheduleDate().getTime()).toLocalDate())
+                .anyMatch(scheduleDate::equals);
+        if (!hasTargetSchedule) {
             builder.addError("成型计划", "DATA_MISSING",
                     "未找到排程日 " + scheduleDate + " 的成型排程记录",
                     "请先在成型排程页面生成排程日 " + scheduleDate + " 的成型排程");
-            return new ArrayList<>();
         }
         return schedules;
     }
@@ -162,7 +172,7 @@ public class Cd90AutoScheduleBatchDataValidatorImpl implements Cd90AutoScheduleB
         // 1. 收集 (constructionCode, constructionVersion) 配对，同时校验胎胚代号和施工版本非空
         Set<String> embryoCodes = new LinkedHashSet<>();
         Set<String> constructionVersions = new LinkedHashSet<>();
-        Set<String> constructionPairs = new LinkedHashSet<>();
+        Map<String, Set<String>> constructionPairUsages = new LinkedHashMap<>();
         for (CxScheduleResult schedule : formingSchedules) {
             String embryoCode = schedule.getEmbryoCode();
             if (!StringUtils.hasText(embryoCode)) {
@@ -182,12 +192,15 @@ public class Cd90AutoScheduleBatchDataValidatorImpl implements Cd90AutoScheduleB
                 String recipeNo = getRecipeNo(schedule, classField);
                 if (!StringUtils.hasText(recipeNo)) {
                     builder.addError("成型计划", "DATA_MISSING",
-                            "胎胚 " + embryoCode + " 的 " + classField + " 施工版本为空",
+                            "成型日期 " + schedule.getScheduleDate() + " 胎胚 " + embryoCode
+                                    + " 的 " + classField + " 施工版本为空",
                             "请检查成型排程数据各班次施工版本");
                     continue;
                 }
                 constructionVersions.add(recipeNo);
-                constructionPairs.add(embryoCode + "@" + recipeNo);
+                constructionPairUsages.computeIfAbsent(embryoCode + "@" + recipeNo,
+                                ignored -> new LinkedHashSet<>())
+                        .add(schedule.getScheduleDate() + "/" + classField);
             }
         }
         if (embryoCodes.isEmpty() || constructionVersions.isEmpty()) {
@@ -207,14 +220,16 @@ public class Cd90AutoScheduleBatchDataValidatorImpl implements Cd90AutoScheduleB
 
         // 3. 逐个配对校验
         Set<String> clothCodes = new LinkedHashSet<>();
-        for (String pair : constructionPairs) {
+        for (Map.Entry<String, Set<String>> pairEntry : constructionPairUsages.entrySet()) {
+            String pair = pairEntry.getKey();
             String[] parts = pair.split("@", 2);
             String constructionCode = parts[0];
             String constructionVersion = parts[1];
             MdmConstructionInfo construction = constructionByKey.get(pair);
             if (construction == null) {
                 builder.addError("施工信息", "DATA_MISSING",
-                        "胎胚 " + constructionCode + " 施工版本 " + constructionVersion + " 未维护",
+                        "胎胚 " + constructionCode + " 施工版本 " + constructionVersion
+                                + " 未维护，影响班次 " + String.join("、", pairEntry.getValue()),
                         "请在施工信息页面维护对应胎胚和版本的施工资料");
                 continue;
             }
