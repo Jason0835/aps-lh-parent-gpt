@@ -260,7 +260,9 @@ export default {
           prop: "paramGroup",
           label: this.$t("ui.data.column.gsq.params.paramGroup"),
           type: "select",
-          options: [
+          filterable: true,
+          // 与编辑弹窗下拉保持一致：参数分组字典
+          dictData: [
             { label: "全局参数", value: "GLOBAL" },
             { label: "班次参数", value: "SHIFT" },
             { label: "机台参数", value: "MACHINE" },
@@ -271,7 +273,9 @@ export default {
           prop: "valueType",
           label: this.$t("ui.data.column.gsq.params.valueType"),
           type: "select",
-          options: [
+          filterable: true,
+          // 与编辑弹窗下拉保持一致：参数值类型字典
+          dictData: [
             { label: "字符串", value: "STRING" },
             { label: "数值", value: "NUMBER" },
             { label: "布尔", value: "BOOLEAN" },

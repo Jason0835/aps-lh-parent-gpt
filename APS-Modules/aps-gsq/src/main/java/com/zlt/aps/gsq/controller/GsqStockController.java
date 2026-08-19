@@ -113,7 +113,7 @@ public class GsqStockController extends AbstractDocBizController<GsqStock> {
 
     @Override
     protected void builderCondition(QueryWrapper<GsqStock> queryWrapper, GsqStock queryVO) {
-        queryWrapper.ge(queryVO.getStockDateBegin() != null, "STOCK_DATE", queryVO.getStockDateBegin());
+        queryWrapper.ge(queryVO.getStockDateStart() != null, "STOCK_DATE", queryVO.getStockDateStart());
         queryWrapper.le(queryVO.getStockDateEnd() != null, "STOCK_DATE", queryVO.getStockDateEnd());
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getSteelRingCode()), "STEEL_RING_CODE", queryVO.getSteelRingCode());
     }
