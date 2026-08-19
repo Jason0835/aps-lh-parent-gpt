@@ -1606,7 +1606,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         // 从物料表反显胎胚代码和产品结构
         AppUtils.formatData(insertList, getQueryFormulas());
 
-        // Excel 未维护胎胚库存时，按本次导入排程日期回填 T 日胎胚库存。
+        // Excel 排程日期为 T+1；未维护胎胚库存时，按排程日期前一天回填 T 日库存。
         this.fillMissingImportEmbryoStock(insertList, factoryCode, scheduleDate);
 
         this.baseDao.insertBatch(insertList);
@@ -1620,12 +1620,12 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      * 回填模板导入中缺失的 T 日胎胚库存。
      *
      * <p>Excel 已填写的库存保持不变；仅对库存为空且胎胚编码有效的记录，按工厂、
-     * 排程日期和胎胚编码查询 {@code T_CX_STOCK}，同一胎胚存在多条记录时汇总库存量。
+     * 排程日期前一天和胎胚编码查询 {@code T_CX_STOCK}，同一胎胚存在多条记录时汇总库存量。
      * 未查询到库存记录时按自动排程现有口径回填为 0。</p>
      *
      * @param resultList  本次待写入的导入排程结果
      * @param factoryCode 分厂编号
-     * @param scheduleDate 排程日期，即库存 T 日
+     * @param scheduleDate Excel 排程日期，即 T+1 日
      */
     private void fillMissingImportEmbryoStock(List<LhScheduleResult> resultList,
                                                String factoryCode,
@@ -1641,9 +1641,10 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             return;
         }
 
+        Date tDay = DateUtil.offsetDay(scheduleDate, -1);
         List<CxStock> stockList = cxStockMapper.selectList(new LambdaQueryWrapper<CxStock>()
                 .eq(CxStock::getFactoryCode, factoryCode)
-                .eq(CxStock::getStockDate, scheduleDate)
+                .eq(CxStock::getStockDate, tDay)
                 .in(CxStock::getEmbryoCode, embryoCodes));
         Map<String, Integer> embryoStockMap = stockList.stream()
                 .filter(Objects::nonNull)
