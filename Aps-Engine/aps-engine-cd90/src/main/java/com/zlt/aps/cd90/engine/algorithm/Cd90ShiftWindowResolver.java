@@ -60,6 +60,22 @@ public class Cd90ShiftWindowResolver {
     }
 
     /**
+     * 解析页面全量自动排程的资源基线班次。
+     * 资源基线固定使用排程窗口首班次，不受任务实际启动日期影响。
+     *
+     * @param scheduleDate 排程日期
+     * @param configs 启用班次配置
+     * @return 排程窗口首班次
+     */
+    public Cd90ShiftDescriptor resolveScheduleBaselineShift(
+            LocalDate scheduleDate, List<Cd90ShiftConfig> configs) {
+        return this.resolve(scheduleDate, configs).stream()
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException(
+                        I18nUtil.getMessage("ui.cd90.autoSchedule.resourceShiftConfigEmpty")));
+    }
+
+    /**
      * 根据任务启动时刻解析当前现场资源班次，快照日期沿用班次业务日期口径。
      *
      * @param executionTime 任务启动时刻

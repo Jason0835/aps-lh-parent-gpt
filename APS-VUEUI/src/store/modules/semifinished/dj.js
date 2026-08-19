@@ -13,9 +13,9 @@ const mutations = {
 }
 
 const actions = {
-  getMachineList({ commit, state }) {
+  getMachineList({ commit, state }, params) {
     return new Promise((resolve, reject) => {
-      listMachine()
+      listMachine(params)
         .then((res) => {
           commit("SET_MACHINES", res.rows);
           resolve(res);
