@@ -207,18 +207,20 @@ public class Cd90AutoScheduleBatchDataValidatorImpl implements Cd90AutoScheduleB
                     continue;
                 }
                 String classField = CLASS_RECIPE_FIELDS[classIndex - 1];
+                String className = "CLASS" + classIndex;
+                String formingDate = this.formingDate(schedule);
                 String recipeNo = getRecipeNo(schedule, classField);
                 if (!StringUtils.hasText(recipeNo)) {
                     builder.addError("成型计划", "DATA_MISSING",
-                            "成型日期 " + schedule.getScheduleDate() + " 胎胚 " + embryoCode
-                                    + " 的 " + classField + " 施工版本为空",
+                            "成型日期 " + formingDate + " 胎胚 " + embryoCode
+                                    + " 的 " + className + " 施工版本为空",
                             "请检查成型排程数据各班次施工版本");
                     continue;
                 }
                 constructionVersions.add(recipeNo);
                 constructionPairUsages.computeIfAbsent(embryoCode + "@" + recipeNo,
                                 ignored -> new LinkedHashSet<>())
-                        .add(schedule.getScheduleDate() + "/" + classField);
+                        .add(formingDate + "/" + className);
             }
         }
         if (embryoCodes.isEmpty() || constructionVersions.isEmpty()) {
@@ -246,8 +248,7 @@ public class Cd90AutoScheduleBatchDataValidatorImpl implements Cd90AutoScheduleB
             MdmConstructionInfo construction = constructionByKey.get(pair);
             if (construction == null) {
                 builder.addError("施工信息", "DATA_MISSING",
-                        "胎胚 " + constructionCode + " 施工版本 " + constructionVersion
-                                + " 未维护，影响班次 " + String.join("、", pairEntry.getValue()),
+                        "胎胚 " + constructionCode + " 施工版本 " + constructionVersion + " 未维护",
                         "请在施工信息页面维护对应胎胚和版本的施工资料");
                 continue;
             }
@@ -275,6 +276,14 @@ public class Cd90AutoScheduleBatchDataValidatorImpl implements Cd90AutoScheduleB
         LocalDate formingDate = new Date(schedule.getScheduleDate().getTime()).toLocalDate();
         return formingDate.minusDays(1).atTime(FORMING_FIRST_SHIFT_TIME)
                 .plusHours((classIndex - 1L) * FORMING_SHIFT_HOURS);
+    }
+
+    /** 成型日期统一输出ISO格式，避免java.util.Date默认英文时区文本。 */
+    private String formingDate(CxScheduleResult schedule) {
+        if (schedule == null || schedule.getScheduleDate() == null) {
+            return "";
+        }
+        return new Date(schedule.getScheduleDate().getTime()).toLocalDate().toString();
     }
 
     /**

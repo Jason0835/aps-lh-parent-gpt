@@ -1,6 +1,7 @@
 package com.zlt.aps.cd15.engine.service.impl;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.cd15.api.domain.entity.Cd15AngleWidthMapping;
 import com.zlt.aps.cd15.api.domain.entity.Cd15CurlLength;
 import com.zlt.aps.cd15.api.domain.entity.Cd15MachineInfo;
@@ -30,6 +31,7 @@ import org.springframework.util.StringUtils;
 import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.sql.Date;
+import java.text.MessageFormat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -93,7 +95,7 @@ public class Cd15AutoScheduleBatchDataValidatorImpl implements Cd15AutoScheduleB
 
         Cd15BatchDataCheckResult.Builder builder = Cd15BatchDataCheckResult.builder();
         this.checkShiftConfig(builder, factoryCode, scheduleDate);
-        this.checkStorageLaneBaseline(builder, factoryCode);
+        this.checkStorageLaneBaseline(builder, factoryCode, scheduleDate);
         List<CxScheduleResult> formingSchedules = this.checkFormingSchedule(builder, factoryCode, scheduleDate);
         this.checkMachineInfo(builder, factoryCode);
         ConstructionCheckScope scope = this.checkConstructionInfo(
@@ -121,22 +123,27 @@ public class Cd15AutoScheduleBatchDataValidatorImpl implements Cd15AutoScheduleB
     }
 
     /**
-     * 检查任务启动时当前班次库排资源基线是否存在，且同一物理库排只有一条活动记录。
+     * 检查排程窗口首班次库排资源基线是否存在，且同一物理库排只有一条活动记录。
      */
     private void checkStorageLaneBaseline(Cd15BatchDataCheckResult.Builder builder,
-                                          String factoryCode) {
+                                          String factoryCode, LocalDate scheduleDate) {
         List<Cd15ShiftConfig> configs = this.shiftConfigMapper.selectList(
                 Wrappers.<Cd15ShiftConfig>lambdaQuery()
                         .eq(Cd15ShiftConfig::getFactoryCode, factoryCode)
                         .eq(Cd15ShiftConfig::getIsActive, ACTIVE));
         Cd15ShiftDescriptor baselineShift;
         try {
-            baselineShift = this.shiftWindowResolver.resolveCurrentResourceShift(
-                    LocalDateTime.now(), configs);
+            baselineShift = this.shiftWindowResolver.resolveScheduleBaselineShift(
+                    scheduleDate, configs);
         } catch (IllegalArgumentException exception) {
-            builder.addError("库排资源", DATA_MISSING,
-                    "无法确定任务启动时的当前资源班次: " + exception.getMessage(),
-                    "请检查CD15启用班次的起止时间和跨天配置");
+            builder.addError(I18nUtil.getMessage(
+                            "ui.data.column.cd15StorageLaneLimit.modelName"),
+                    DATA_MISSING,
+                    MessageFormat.format(I18nUtil.getMessage(
+                                    "ui.cd15.autoSchedule.resourceBaselineResolveFailed"),
+                            exception.getMessage()),
+                    I18nUtil.getMessage(
+                            "ui.cd15.autoSchedule.resourceBaselineResolveSuggestion"));
             return;
         }
         List<Cd15StorageLaneLimit> lanes = this.storageLaneMapper.selectList(
@@ -148,10 +155,14 @@ public class Cd15AutoScheduleBatchDataValidatorImpl implements Cd15AutoScheduleB
                                 baselineShift.getShiftCode())
                         .orderByAsc(Cd15StorageLaneLimit::getStorageLaneCode));
         if (lanes == null || lanes.isEmpty()) {
-            builder.addError("库排资源", DATA_MISSING,
-                    "未找到任务启动时当前班次 " + baselineShift.getScheduleDate() + "/"
-                            + baselineShift.getShiftCode() + " 的库排资源基线",
-                    "请同步当前自然班次库排快照，后续排程班次无需预先维护");
+            builder.addError(I18nUtil.getMessage(
+                            "ui.data.column.cd15StorageLaneLimit.modelName"),
+                    DATA_MISSING,
+                    MessageFormat.format(I18nUtil.getMessage(
+                                    "ui.cd15.autoSchedule.resourceBaselineMissing"),
+                            baselineShift.getScheduleDate(), baselineShift.getShiftCode()),
+                    I18nUtil.getMessage(
+                            "ui.cd15.autoSchedule.resourceBaselineSyncSuggestion"));
             return;
         }
         Set<String> enabledMachineCodes = this.machineInfoMapper.selectList(
@@ -178,11 +189,15 @@ public class Cd15AutoScheduleBatchDataValidatorImpl implements Cd15AutoScheduleB
         List<String> duplicateLaneCodes =
                 this.storageLaneBaselineValidator.findDuplicateLaneCodes(lanes);
         if (!duplicateLaneCodes.isEmpty()) {
-            builder.addError("库排资源", DUPLICATE_STORAGE_LANE,
-                    "任务启动时当前班次 " + baselineShift.getScheduleDate() + "/"
-                            + baselineShift.getShiftCode() + " 存在重复库排号: "
-                            + String.join(",", duplicateLaneCodes),
-                    "请按工厂、日期、班次、库排号清理重复的活动记录");
+            builder.addError(I18nUtil.getMessage(
+                            "ui.data.column.cd15StorageLaneLimit.modelName"),
+                    DUPLICATE_STORAGE_LANE,
+                    MessageFormat.format(I18nUtil.getMessage(
+                                    "ui.cd15.autoSchedule.resourceBaselineDuplicate"),
+                            baselineShift.getScheduleDate(), baselineShift.getShiftCode(),
+                            String.join(",", duplicateLaneCodes)),
+                    I18nUtil.getMessage(
+                            "ui.cd15.autoSchedule.resourceBaselineDuplicateSuggestion"));
         }
     }
     /** 检查并解析排程、滚动共用的启用班次配置。 */
@@ -380,8 +395,7 @@ public class Cd15AutoScheduleBatchDataValidatorImpl implements Cd15AutoScheduleB
         MdmConstructionInfo construction = constructionByKey.get(pair);
         if (construction == null) {
             builder.addError("施工信息", DATA_MISSING,
-                    "胎胚 " + constructionCode + " 施工版本 " + constructionVersion
-                            + " 未维护，影响班次 " + String.join("、", usages),
+                    "胎胚 " + constructionCode + " 施工版本 " + constructionVersion + " 未维护",
                     "请在施工信息页面维护对应胎胚和版本的施工资料");
             return;
         }
