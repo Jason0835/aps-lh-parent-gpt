@@ -122,6 +122,8 @@ public class DayCapacityLimitHelper implements Serializable {
         DayCapacityLimitHelper initLimit = new DayCapacityLimitHelper(productionDay);
         if (null != ratio) {
             initLimit.capacityRatio = ratio;
+        }else{
+            ratio = 0;
         }
         Integer dayMaxCapacity = paramConfiguration.getDayMaxCapacity();
         if (null != dayMaxCapacity) {

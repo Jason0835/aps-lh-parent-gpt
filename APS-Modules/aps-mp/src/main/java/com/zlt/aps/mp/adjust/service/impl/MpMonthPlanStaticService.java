@@ -94,6 +94,7 @@ public class MpMonthPlanStaticService extends AbstractBaseWeekAdjustServiceMonth
 
                 // 初始化日产信息
                 MpWeekRollAdjustEngine weekRollAdjustEngine = new MpWeekRollAdjustEngine();
+                contextDTO.setBFirstDayNotDecMachines(Boolean.TRUE);
                 Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = mpMonthPlanDailyCapacityLimit
                         .getDailyCapacityLimitMap(contextDTO);
                 weekRollAdjustEngine.initDayProductionInfo(contextDTO, dailyCapacityLimitVoMap);
