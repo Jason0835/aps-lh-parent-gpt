@@ -6,7 +6,7 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
-import com.zlt.aps.common.core.annotation.ImportValidated;
+import com.zlt.common.annotation.ImportExcelValidated;
 
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
@@ -33,65 +33,65 @@ public class DjMachineInfo extends BaseEntity {
     /** 机台编号 */
     @ApiModelProperty(value = "机台编号", position =20)
     @Excel(name = "ui.data.column.machine.machineCode")
-    @ImportValidated(name = "ui.data.column.machine.machineCode", required = true, isCode = true, maxLength = 30)
+    @ImportExcelValidated(name = "ui.data.column.machine.machineCode", required = true, isCode = true, maxLength = 30)
     private String machineCode;
 
     /** 机台名称，比如：1线、2线 */
     @ApiModelProperty(value = "机台名称", position =30)
     @Excel(name = "ui.data.column.machine.machineName")
-    @ImportValidated(name = "ui.data.column.machine.machineName", required = true, maxLength = 20)
+    @ImportExcelValidated(name = "ui.data.column.machine.machineName", required = true, maxLength = 20)
     private String machineName;
 
     /** 前生产机台所生产的胶料最小宽度（米） */
     @ApiModelProperty(value = "胶料最小宽度", position =40)
     @Excel(name = "ui.data.column.machine.widthMin")
-    @ImportValidated(name = "ui.data.column.machine.widthMin", number = true, min = 0, max = 999999)
+    @ImportExcelValidated(name = "ui.data.column.machine.widthMin", number = true, min = 0, max = 999999)
     private BigDecimal widthMin;
 
     /** 前生产机台所生产的胶料最大宽度（米） */
     @ApiModelProperty(value = "胶料最大宽度", position =50)
     @Excel(name = "ui.data.column.machine.widthMax")
-    @ImportValidated(name = "ui.data.column.machine.widthMax", number = true, min = 0, max = 999999)
+    @ImportExcelValidated(name = "ui.data.column.machine.widthMax", number = true, min = 0, max = 999999)
     private BigDecimal widthMax;
 
     /** 前生产机台所生产的胶料最小厚度（米） */
     @ApiModelProperty(value = "胶料最小厚度", position =60)
     @Excel(name = "ui.data.column.machine.thickMin")
-    @ImportValidated(name = "ui.data.column.machine.thickMin", number = true, min = 0, max = 999999)
+    @ImportExcelValidated(name = "ui.data.column.machine.thickMin", number = true, min = 0, max = 999999)
     private BigDecimal thickMin;
 
     /** 前生产机台所生产的胶料最大厚度（米） */
     @ApiModelProperty(value = "胶料最大厚度", position =70)
     @Excel(name = "ui.data.column.machine.thickMax")
-    @ImportValidated(name = "ui.data.column.machine.thickMax", number = true, min = 0, max = 999999)
+    @ImportExcelValidated(name = "ui.data.column.machine.thickMax", number = true, min = 0, max = 999999)
     private BigDecimal thickMax;
 
     /** 生产定额，是指单班一次能生产的量，单位：米/班 */
     @ApiModelProperty(value = "生产定额", position =75)
     @Excel(name = "ui.data.column.machine.quata")
-    @ImportValidated(name = "ui.data.column.machine.quata", number = true, min = 0, max = 999999)
+    @ImportExcelValidated(name = "ui.data.column.machine.quata", number = true, min = 0, max = 999999)
     private BigDecimal quata;
 
     /** 班制，如：三班制，两班制；对应数据字典CLASS_SHIFT */
     @ApiModelProperty(value = "班制", position =80)
     @Excel(name = "ui.data.column.machine.classShift",dictType="CLASS_SHIFT")
-    @ImportValidated(name = "ui.data.column.machine.classShift", maxLength = 9,required = true)
+    @ImportExcelValidated(name = "ui.data.column.machine.classShift", maxLength = 9,required = true)
     private String classShift;
 
     /** 开机班次，存储 ClassNumThreePlanEnums.classIndex 值（"01"=夜班、"02"=早班、"03"=中班），如"01,02"表示夜班+早班 */
     @ApiModelProperty(value = "开机班次", position =85)
     @Excel(name = "ui.data.column.machine.openMachineClass",dictType = "class_num_three_plan",dictTypeToExcelEnable = false)
-    @ImportValidated(name = "ui.data.column.machine.openMachineClass", maxLength = 20)
+    @ImportExcelValidated(name = "ui.data.column.machine.openMachineClass", maxLength = 20)
     private String openMachineClass;
 
     /** 机台状态，0--启用，1--禁用。对应数据字典STATUS */
     @ApiModelProperty(value = "机台状态", position =90)
     @Excel(name = "ui.data.column.machine.status",dictType="STATUS")
-    @ImportValidated(name = "ui.data.column.machine.status", maxLength = 6 ,required = true)
+    @ImportExcelValidated(name = "ui.data.column.machine.status", maxLength = 6 ,required = true)
     private String status;
 
     @Excel(name = "ui.data.column.info.remark")
-    @ImportValidated(name = "ui.data.column.info.remark", maxLength = 100)
+    @ImportExcelValidated(name = "ui.data.column.info.remark", maxLength = 100)
     @ApiModelProperty(value = "备注")
     @TableField(value = "REMARK")
     private String remark;

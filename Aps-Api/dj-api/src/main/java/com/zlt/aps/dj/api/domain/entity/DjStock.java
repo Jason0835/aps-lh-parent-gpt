@@ -8,7 +8,7 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
-import com.zlt.aps.common.core.annotation.ImportValidated;
+import com.zlt.common.annotation.ImportExcelValidated;
 
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
@@ -37,7 +37,7 @@ public class DjStock extends BaseEntity {
      */
     @JsonFormat(pattern = "yyyy-MM-dd")
     @Excel(name = "ui.data.column.stock.stockDate", dateFormat = "yyyy-MM-dd")
-    @ImportValidated(name = "ui.data.column.stock.stockDate", required = true, date = true)
+    @ImportExcelValidated(name = "ui.data.column.stock.stockDate", required = true, date = true)
     @ApiModelProperty(value = "库存日期", position = 20)
     @TableField(value = "STOCK_DATE")
     private Date stockDate;
@@ -55,7 +55,7 @@ public class DjStock extends BaseEntity {
      */
     @ApiModelProperty(value = "垫胶名称", position = 30)
     @Excel(name = "ui.data.column.dj.scheduleResult.paddingName")
-    @ImportValidated(name = "ui.data.column.dj.scheduleResult.paddingName", maxLength = 50, isCode = true)
+    @ImportExcelValidated(name = "ui.data.column.dj.scheduleResult.paddingName", maxLength = 50, isCode = true)
     @TableField(value = "MATERIAL_NAME")
     private String materialName;
 
@@ -64,7 +64,7 @@ public class DjStock extends BaseEntity {
      */
     @ApiModelProperty(value = "垫胶编号", position = 30)
     @Excel(name = "ui.data.column.dj.scheduleResult.paddingCode")
-    @ImportValidated(name = "ui.data.column.dj.scheduleResult.paddingCode", required = true, maxLength = 50, isCode = true)
+    @ImportExcelValidated(name = "ui.data.column.dj.scheduleResult.paddingCode", required = true, maxLength = 50, isCode = true)
     @TableField(value = "MATERIAL_CODE")
     private String materialCode;
 
@@ -73,7 +73,7 @@ public class DjStock extends BaseEntity {
      */
     @ApiModelProperty(value = "库存量", position = 40)
     @Excel(name = "ui.data.column.stock.stockNum")
-    @ImportValidated(name = "ui.data.column.stock.stockNum", number = true, min = 0, max = 999999)
+    @ImportExcelValidated(name = "ui.data.column.stock.stockNum", number = true, min = 0, max = 999999)
     @TableField(value = "STOCK_NUM")
     private BigDecimal stockNum;
 
@@ -82,7 +82,7 @@ public class DjStock extends BaseEntity {
      */
     @ApiModelProperty(value = "修正数量", position = 50)
     @Excel(name = "ui.data.column.stock.modifyNum")
-    @ImportValidated(name = "ui.data.column.stock.modifyNum", number = true, min = -999999, max = 999999)
+    @ImportExcelValidated(name = "ui.data.column.stock.modifyNum", number = true, min = -999999, max = 999999)
     @TableField(value = "MODIFY_NUM")
     private BigDecimal modifyNum;
 
@@ -91,7 +91,7 @@ public class DjStock extends BaseEntity {
      */
     @ApiModelProperty(value = "不良数量", position = 60)
     @Excel(name = "ui.data.column.stock.badNum")
-    @ImportValidated(name = "ui.data.column.stock.badNum", number = true, min = 0, max = 999999)
+    @ImportExcelValidated(name = "ui.data.column.stock.badNum", number = true, min = 0, max = 999999)
     @TableField(value = "BAD_NUM")
     private BigDecimal badNum;
 
@@ -110,7 +110,7 @@ public class DjStock extends BaseEntity {
     private BigDecimal curlLength;
 
     @Excel(name = "ui.data.column.info.remark")
-    @ImportValidated(name = "ui.data.column.info.remark", maxLength = 100)
+    @ImportExcelValidated(name = "ui.data.column.info.remark", maxLength = 100)
     @ApiModelProperty(value = "备注")
     @TableField(value = "REMARK")
     private String remark;
