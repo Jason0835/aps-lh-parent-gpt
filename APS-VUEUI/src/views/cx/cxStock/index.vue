@@ -187,11 +187,18 @@ export default {
           }
         },
         {
+          prop: 'updateBy',
+          align: 'center',
+          halign: 'center',
+          label: this.$t('common.updateByName'),
+          minWidth: 100,
+        },
+        {
           prop: 'updateTime',
           align: 'center',
           halign: 'center',
           label: this.$t('ui.data.column.updateTime'),
-          minWidth: 160
+          minWidth: 180
         },
         {
           prop: 'remark',

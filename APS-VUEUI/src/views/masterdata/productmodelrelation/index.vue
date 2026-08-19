@@ -270,6 +270,12 @@ export default {
           label: this.$t("common.remark"),
         },
         {
+          prop: "updateBy",
+          align: "center",
+          label: this.$t("common.updateByName"),
+          width: 100,
+        },
+        {
           prop: "updateTime",
           width: 180,
           label: this.$t("ui.data.column.scheduleAdjust.updata"),

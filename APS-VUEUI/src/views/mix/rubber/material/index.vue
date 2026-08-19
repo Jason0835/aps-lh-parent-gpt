@@ -431,6 +431,13 @@ export default {
           label: this.$t("common.remark"),
         },
         {
+          prop: "updateBy",
+          align: "center",
+          halign: "center",
+          label: this.$t("common.updateByName"),
+          width: 100,
+        },
+        {
           prop: "updateTime",
           halign: "center",
           align: "center",

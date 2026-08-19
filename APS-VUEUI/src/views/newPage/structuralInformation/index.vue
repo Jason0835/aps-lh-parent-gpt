@@ -161,9 +161,15 @@ export default {
         },
 
         {
+          prop: "updateBy",
+          align: "center",
+          label: this.$t("common.updateByName"),
+          minWidth: 100,
+        },
+        {
           prop: "updateTime",
           label: this.$t("ui.data.column.scheduleAdjust.updata"),
-          with: 180,
+          width: 180,
         },
         {
           align: "center",

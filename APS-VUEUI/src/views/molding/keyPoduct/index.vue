@@ -130,6 +130,12 @@ export default {
           },
         },
         {
+          prop: "updateBy",
+          align: "center",
+          label: this.$t("common.updateByName"),
+          minWidth: 100,
+        },
+        {
           prop: "updateTime",
           align: "center",
           label: this.$t("ui.data.column.updateTime"),

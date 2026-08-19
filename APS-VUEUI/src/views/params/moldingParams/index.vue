@@ -141,6 +141,20 @@ export default {
           // sortable: "custom",
         },
         {
+          prop: "updateBy",
+          align: "center",
+          halign: "center",
+          label: this.$t("common.updateByName"),
+          minWidth: 100,
+        },
+        {
+          prop: "updateTime",
+          align: "center",
+          halign: "center",
+          label: this.$t("ui.data.column.updateTime"),
+          minWidth: 180,
+        },
+        {
           align: "center",
           halign: "center",
           label: this.$t("ui.data.btn.option"),

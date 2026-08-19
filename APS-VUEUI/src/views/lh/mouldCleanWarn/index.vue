@@ -94,6 +94,7 @@ export default {
         {
           prop: "updateTime",
           label: this.$t("ui.data.column.updateTime"),
+          width:180
         },
       ];
 

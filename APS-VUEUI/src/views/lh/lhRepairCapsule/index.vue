@@ -110,6 +110,13 @@ export default {
           minWidth: 120,
         },
         {
+          prop: "updateBy",
+          align: "center",
+          halign: "center",
+          label: this.$t("common.updateByName"),
+          minWidth: 100,
+        },
+        {
           prop: "updateTime",
           align: "center",
           halign: "center",

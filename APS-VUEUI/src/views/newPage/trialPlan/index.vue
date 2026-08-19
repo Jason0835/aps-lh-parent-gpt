@@ -306,7 +306,8 @@ export default {
         // },
         {
           prop: "updateByName",
-          label: this.$t("ui.data.column.updateByName"),
+          label: this.$t("common.updateByName"),
+          minWidth: 100,
         },
         {
           prop: "deptIdName",
@@ -320,7 +321,7 @@ export default {
         },
         {
           prop: "updateTime",
-          label: this.$t("ui.data.column.demandPlanSum.updateTime"),
+          label: this.$t("ui.data.column.updateTime"),
           width: 180,
         },
         {

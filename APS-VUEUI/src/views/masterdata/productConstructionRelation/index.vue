@@ -295,6 +295,11 @@ export default {
           width: 180,
         },
         {
+          prop: "updateBy",
+          label: this.$t("common.updateByName"),
+          width: 100,
+        },
+        {
           prop: "updateTime",
           label: this.$t("ui.data.column.scheduleAdjust.updata"),
           width: 180,

@@ -107,6 +107,11 @@ export default {
           formatter: (row, column, value) => this.selectDictLabel(this.dict.type.lh_trial_status, value),
         },
         {
+          prop: "updateBy",
+          label: this.$t("common.updateByName"),
+          minWidth: 100,
+        },
+        {
           prop: "updateTime",
           label: this.$t("ui.data.column.updateTime"),
           minWidth: 170,

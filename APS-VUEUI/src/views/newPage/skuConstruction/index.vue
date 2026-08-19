@@ -311,6 +311,16 @@ export default {
           label: this.$t("ui.data.column.mdmSkuConstructionRef.lhReleaseDate"),
           width: 180,
         },
+        {
+          prop: "updateBy",
+          label: this.$t("common.updateByName"),
+          width: 100,
+        },
+        {
+          prop: "updateTime",
+          label: this.$t("ui.data.column.updateTime"),
+          width: 180,
+        },
       ];
 
       return columns;
