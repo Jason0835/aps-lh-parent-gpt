@@ -1,7 +1,7 @@
 package com.zlt.aps.dj.api.domain.dto;
 
 import com.ruoyi.common.core.annotation.Excel;
-import com.zlt.aps.common.core.annotation.ImportValidated;
+import com.zlt.common.annotation.ImportExcelValidated;
 import com.zlt.aps.common.core.domain.ApsBaseDto;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
@@ -22,7 +22,7 @@ public class DjLossSettingDto extends ApsBaseDto {
     /** 垫胶代码 */
     @Excel(name = "ui.data.column.loss.liningCode",sort = 10)
     @ApiModelProperty(value = "垫胶代码")
-    @ImportValidated(name = "ui.data.column.loss.liningCode", isCode = true, maxLength = 20)
+    @ImportExcelValidated(name = "ui.data.column.loss.liningCode", isCode = true, maxLength = 20)
     private String liningCode;
 
     /** 机台id（对应T_NC_MACHINE_INFO表id） */
@@ -32,7 +32,7 @@ public class DjLossSettingDto extends ApsBaseDto {
     /** 损耗率(百分比) */
     @Excel(name = "ui.data.column.loss.lossRate", suffix = "%",sort = 30)
     @ApiModelProperty(value = "损耗率(百分比)")
-    @ImportValidated(name = "ui.data.column.loss.lossRate", number = true, required = true, min = 0, max = 99.99)
+    @ImportExcelValidated(name = "ui.data.column.loss.lossRate", number = true, required = true, min = 0, max = 99.99)
     private Double lossRate;
 
     /**
@@ -40,6 +40,6 @@ public class DjLossSettingDto extends ApsBaseDto {
      */
     @Excel(name = "ui.data.column.loss.line", importName = "ui.data.column.loss.line", sort = 20)
     @ApiModelProperty(value = "机台名称")
-    @ImportValidated(maxLength = 30)
+    @ImportExcelValidated(maxLength = 30)
     private String machineName;
 }

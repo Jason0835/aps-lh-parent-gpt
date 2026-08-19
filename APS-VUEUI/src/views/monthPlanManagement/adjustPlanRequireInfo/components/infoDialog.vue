@@ -49,7 +49,12 @@ export default {
       loading: false,
       visible: false,
       isEdit: false,
-      form: {},
+      form: {
+        factoryCode: "116",
+        monthPlanQty: undefined,
+        adjustPlanQty: undefined,
+        adjustFinalQty: undefined,
+      },
       rules: {
         factoryCode: [requiredSelect],
         locationType: [requiredSelect],
@@ -159,12 +164,32 @@ export default {
           label: this.$t("ui.data.column.mpAdjustPlanInfo.monthPlanQty"),
           type: "number",
           precision: 0,
+          listeners: {
+            change: (val) => {
+              this.$set(this.form, "monthPlanQty", val);
+              this.calculateAdjustFinalQty();
+            },
+            input: (val) => {
+              this.$set(this.form, "monthPlanQty", val);
+              this.calculateAdjustFinalQty();
+            },
+          },
         },
         {
           prop: "adjustPlanQty",
           label: this.$t("ui.data.column.mpAdjustPlanInfo.adjustPlanQty"),
           type: "number",
           precision: 0,
+          listeners: {
+            change: (val) => {
+              this.$set(this.form, "adjustPlanQty", val);
+              this.calculateAdjustFinalQty();
+            },
+            input: (val) => {
+              this.$set(this.form, "adjustPlanQty", val);
+              this.calculateAdjustFinalQty();
+            },
+          },
         },
         {
           prop: "adjustFinalQty",
@@ -198,11 +223,21 @@ export default {
     },
   },
   methods: {
-    /** 调整后计划量 = 本月计划产量 - 调整数量。 */
+    /** 调整后计划量 = 本月计划产量 + 调整数量（调整数量可为负数：正数追加、负数调减）。 */
     calculateAdjustFinalQty() {
-      const monthPlanQty = Number(this.form.monthPlanQty || 0);
-      const adjustPlanQty = Number(this.form.adjustPlanQty || 0);
-      this.$set(this.form, "adjustFinalQty", monthPlanQty - adjustPlanQty);
+      const monthPlanQty =
+        this.form.monthPlanQty !== undefined &&
+        this.form.monthPlanQty !== null &&
+        this.form.monthPlanQty !== ""
+          ? Number(this.form.monthPlanQty)
+          : 0;
+      const adjustPlanQty =
+        this.form.adjustPlanQty !== undefined &&
+        this.form.adjustPlanQty !== null &&
+        this.form.adjustPlanQty !== ""
+          ? Number(this.form.adjustPlanQty)
+          : 0;
+      this.$set(this.form, "adjustFinalQty", monthPlanQty + adjustPlanQty);
     },
     /** 选择产品结构后清空原物料信息，避免结构与物料不匹配。 */
     handleStructureChange(val, row) {
@@ -232,16 +267,30 @@ export default {
       this.visible = true;
       if (data) {
         this.isEdit = true;
-        this.form = { ...data };
+        this.form = {
+          monthPlanQty: undefined,
+          adjustPlanQty: undefined,
+          adjustFinalQty: undefined,
+          ...data,
+        };
       } else {
         this.isEdit = false;
         this.form = {
           factoryCode: "116",
+          monthPlanQty: undefined,
+          adjustPlanQty: undefined,
+          adjustFinalQty: undefined,
         };
       }
+      this.calculateAdjustFinalQty();
     },
     hide() {
-      this.form = {};
+      this.form = {
+        factoryCode: "116",
+        monthPlanQty: undefined,
+        adjustPlanQty: undefined,
+        adjustFinalQty: undefined,
+      };
       this.$refs.form && this.$refs.form.triggerResetForm();
       this.isEdit = false;
       this.visible = false;
