@@ -7,9 +7,12 @@ import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.domain.RowStateEnum;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.cd15.api.domain.entity.Cd15MachineInfo;
 import com.zlt.aps.cd15.api.domain.entity.Cd15MachineMaintenancePlan;
+import com.zlt.aps.cd15.mapper.Cd15MachineInfoMapper;
 import com.zlt.aps.cd15.mapper.Cd15MachineMaintenancePlanMapper;
 import com.zlt.aps.cd15.service.ICd15MachineMaintenancePlanService;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.enums.ImportErrorTypeEnums;
 import com.zlt.common.utils.ImportExcelValidatedUtils;
@@ -23,7 +26,6 @@ import org.springframework.transaction.annotation.Transactional;
 import javax.annotation.Resource;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -37,6 +39,9 @@ public class Cd15MachineMaintenancePlanServiceImpl extends AbstractDocService<Cd
 
     @Resource
     private Cd15MachineMaintenancePlanMapper cd15MachineMaintenancePlanMapper;
+
+    @Resource
+    private Cd15MachineInfoMapper cd15MachineInfoMapper;
 
     @Override
     protected String getDocTypeCode() {
@@ -103,6 +108,9 @@ public class Cd15MachineMaintenancePlanServiceImpl extends AbstractDocService<Cd
         if (!hasUniqueKey(entity)) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.cd15MachineMaintenancePlan.required"));
         }
+        if (this.getEnabledMachineInfo(entity) == null) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.cd15MachineMaintenancePlan.machineInvalid"));
+        }
         if (!isValidTimeRange(entity)) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.cd15MachineMaintenancePlan.dateRangeInvalid"));
         }
@@ -130,6 +138,10 @@ public class Cd15MachineMaintenancePlanServiceImpl extends AbstractDocService<Cd
             List<ImportErrorLog> validated = ImportExcelValidatedUtils.validated(importLogId, errorNum, docEntity);
             ImportExcelValidatedUtils.validatedRepeat(list, docEntity, i, 2, importLogId, validated,
                     getCheckUniqueFields().toArray(new String[0]));
+            if (this.getEnabledMachineInfo(docEntity) == null) {
+                ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
+                        errorNum, I18nUtil.getMessage("ui.data.column.cd15MachineMaintenancePlan.machineInvalid"), validated);
+            }
             if (!isValidTimeRange(docEntity)) {
                 ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
                         errorNum, I18nUtil.getMessage("ui.data.column.cd15MachineMaintenancePlan.dateRangeInvalid"), validated);
@@ -164,7 +176,7 @@ public class Cd15MachineMaintenancePlanServiceImpl extends AbstractDocService<Cd
             } else {
                 failureNum++;
                 ImportExcelValidatedUtils.addImportErrorLog(importLogId, errorNum,
-                        MessageFormat.format(uniqueMsg, errorNum), importErrorLogs);
+                        String.format(uniqueMsg, errorNum), importErrorLogs);
             }
         }
 
@@ -187,6 +199,17 @@ public class Cd15MachineMaintenancePlanServiceImpl extends AbstractDocService<Cd
         wrapper.eq(Cd15MachineMaintenancePlan::getDowntimeStartTime, entity.getDowntimeStartTime());
         wrapper.eq(Cd15MachineMaintenancePlan::getDowntimeEndTime, entity.getDowntimeEndTime());
         return cd15MachineMaintenancePlanMapper.selectOne(wrapper);
+    }
+
+    private Cd15MachineInfo getEnabledMachineInfo(Cd15MachineMaintenancePlan entity) {
+        if (entity == null || StringUtils.isBlank(entity.getFactoryCode()) || StringUtils.isBlank(entity.getMachineCode())) {
+            return null;
+        }
+        LambdaQueryWrapper<Cd15MachineInfo> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Cd15MachineInfo::getFactoryCode, entity.getFactoryCode());
+        wrapper.eq(Cd15MachineInfo::getMachineCode, entity.getMachineCode());
+        wrapper.eq(Cd15MachineInfo::getStatus, ApsConstant.APS_STRING_1);
+        return cd15MachineInfoMapper.selectOne(wrapper);
     }
 
     private boolean hasUniqueKey(Cd15MachineMaintenancePlan entity) {
