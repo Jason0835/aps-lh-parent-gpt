@@ -188,7 +188,7 @@ public class MpAdjustPlanInfoController extends AbstractDocBizController<MpAdjus
     protected List<MpAdjustPlanRequireInfo> listExportData(MpAdjustPlanRequireInfo obj) {
         QueryWrapper<MpAdjustPlanRequireInfo> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
-        wrapper.orderByAsc("ADJUST_DATE", "MATERIAL_DESC");
+        wrapper.orderByDesc("ADJUST_DATE", "STRUCTURE_NAME", "MATERIAL_DESC");
         List<MpAdjustPlanRequireInfo> list = mpAdjustPlanInfoService.getListByCondition(wrapper);
         // 导出前按反显公式回填物料描述（物料编码 -> 主数据物料描述）
         AppUtils.formatData(list, getQueryFormulas());
@@ -236,6 +236,6 @@ public class MpAdjustPlanInfoController extends AbstractDocBizController<MpAdjus
 
     @Override
     protected String getOrderBy() {
-        return "ADJUST_DATE,STRUCTURE_NAME,MATERIAL_DESC";
+        return "ADJUST_DATE desc, STRUCTURE_NAME desc, MATERIAL_DESC desc";
     }
 }
