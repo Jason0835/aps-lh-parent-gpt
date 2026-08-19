@@ -96,7 +96,7 @@ export default {
           prop: "machineCode",
           type: "select",
           dictData: this.machineList,
-          labelKey: "machineName",
+          labelKey: "machineCode",
           valueKey: "machineCode",
           filterable: true,
         },
@@ -116,13 +116,13 @@ export default {
           },
         },
         {
-          prop: "machineName",
+          prop: "machineCode",
           align: "center",
           halign: "center",
           label: this.$t("ui.data.column.gsq.lossRate.machineName"),
           minWidth: 150,
           formatter: (row) => {
-            return row.machineName || "-";
+            return row.machineCode || "-";
           },
         },
         {
