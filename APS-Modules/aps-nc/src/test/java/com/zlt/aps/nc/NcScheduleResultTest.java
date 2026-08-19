@@ -18,7 +18,7 @@ class NcScheduleResultTest {
     @Test
     public void test() throws IOException {
         String factoryCode = "116";
-        String scheduleDateStr = "2026-07-05";
+        String scheduleDateStr = "2026-07-26";
         Date scheduleDate = DateUtils.parseDate(scheduleDateStr);
         ncEngineService.autoNcSchedule(factoryCode, scheduleDate);
     }

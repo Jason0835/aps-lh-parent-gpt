@@ -263,7 +263,7 @@ public class TmScheduleTemplateImpl extends AbsTmScheduleTemplate {
                 // 库存预测的规格事件同样需要等待 TASK_SORT 名次，避免 FULL 日志按规格编码输出。
                 break;
             case PLAN_CALC:
-                // 计划量初算已完成，按计划量服务实际循环顺序输出初算日志。
+                // 计划量初算已完成，按库存供应时长升序输出初算日志。
                 this.appendInitialPlanCalculationDetail(context);
                 break;
             case TASK_SORT:
@@ -500,6 +500,18 @@ public class TmScheduleTemplateImpl extends AbsTmScheduleTemplate {
     }
 
     /**
+     * 构建计划量初算日志任务流，按库存供应时长升序排列；供应时长为空的任务排在末尾，时长相同时沿用计划量计算循环顺序。
+     *
+     * @param context 胎面排程上下文
+     * @return 按库存供应时长升序排列的计划量初算日志任务流
+     */
+    private Stream<TmTaskDraft> planCalculationLogTaskStream(TmScheduleContext context) {
+        return this.planCalculationTaskStream(context)
+                .sorted(Comparator.comparing(TmTaskDraft::getSupplyHours,
+                        Comparator.nullsLast(Comparator.naturalOrder())));
+    }
+
+    /**
      * 构建过程日志任务排序器，以 TASK_SORT 名次为主，班次和业务键仅用于稳定兜底。
      *
      * @return 过程日志任务排序器
@@ -625,7 +637,7 @@ public class TmScheduleTemplateImpl extends AbsTmScheduleTemplate {
         }
         this.appendUnrenderedRuleTrace(context, stepEnum);
         if (TmScheduleStepEnum.PLAN_CALC == stepEnum) {
-            this.planCalculationTaskStream(context).forEach(task -> context.appendShiftFullProcessTrace(
+            this.planCalculationLogTaskStream(context).forEach(task -> context.appendShiftFullProcessTrace(
                     task.getShiftOrder(), ScheduleProcessLogSection.PLAN_QTY_CALCULATION,
                     this.buildPlanCalculationFullEvent(context, task, false)));
         }
@@ -636,7 +648,7 @@ public class TmScheduleTemplateImpl extends AbsTmScheduleTemplate {
                             ScheduleProcessLogSection.TOOL_LIMIT, this.buildToolUsageFullEvent(context, task)));
         }
         if (TmScheduleStepEnum.PLAN_CALC == stepEnum) {
-            this.sortedLogTaskStream(context).forEach(task -> context.appendShiftFullProcessTrace(task.getShiftOrder(),
+            this.planCalculationLogTaskStream(context).forEach(task -> context.appendShiftFullProcessTrace(task.getShiftOrder(),
                     ScheduleProcessLogSection.PLAN_QTY_CALCULATION, new ScheduleProcessTraceEvent(
                     stepEnum.getDesc(), task.getBusinessKey(), "库存供应时长计算",
                     "当前班班初滚动库存、保证范围内成型需求和保证范围总小时数。",
@@ -785,7 +797,7 @@ public class TmScheduleTemplateImpl extends AbsTmScheduleTemplate {
      */
     private void appendInitialPlanCalculationDetail(TmScheduleContext context) {
         this.appendFullStepDetail(context, TmScheduleStepEnum.PLAN_CALC);
-        this.planCalculationTaskStream(context).forEach(task ->
+        this.planCalculationLogTaskStream(context).forEach(task ->
                 context.appendShiftProcessLog(task.getShiftOrder(), ScheduleProcessLogSection.PLAN_QTY_CALCULATION,
                         "计划量初算：{0}", this.buildPlanFormula(context, task)));
     }

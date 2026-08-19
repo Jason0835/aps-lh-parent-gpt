@@ -74,8 +74,7 @@ public class TcTaskSortService implements ITcTaskSortService {
             evidence.put("sortIndex", i + 1);
             evidence.put("supplyHours", task.getSupplyHours());
             evidence.put("startupShift", this.isStartupShift(context, task));
-            evidence.put("startupSortPriority", this.isStartupShift(context, task)
-                    ? "SUPPLY_HOURS_ASC" : "ORIGINAL_STRATEGY");
+            evidence.put("startupSortPriority", "SUPPLY_HOURS_ASC");
             evidence.put("glueCode", task.getGlueCode());
             evidence.put("baseGlueCode", task.getBaseGlueCode());
             evidence.put("mouthPlateCode", task.getMouthPlateCode());
@@ -90,20 +89,20 @@ public class TcTaskSortService implements ITcTaskSortService {
     }
 
     /**
-     * 构建开产班次库存紧急度严格优先的任务比较器。
+     * 构建库存供应时长优先的任务比较器。
      *
-     * <p>班次顺序保持第一优先级；仅在整日停产后的首个开放班次内，库存供应成型时长
-     * 优先于原排序策略，时长为空的任务排在有值任务之后。非开产班次完全委托原策略。</p>
+     * <p>班次顺序保持第一优先级；同一班次内所有任务均先按库存供应成型时长升序排序，
+     * 时长为空的任务排在有值任务之后，供应时长相同时再执行原排序策略。</p>
      *
      * @param context            排程上下文
      * @param originalComparator 原任务排序比较器
-     * @return 开产班次增强后的比较器
+     * @return 库存供应时长增强后的比较器
      */
     private Comparator<TcTaskDraft> buildStartupAwareComparator(TcScheduleContext context,
                                                                  Comparator<TcTaskDraft> originalComparator) {
         return Comparator
                 .comparing(TcTaskDraft::getShiftOrder, Comparator.nullsLast(Comparator.naturalOrder()))
-                .thenComparing(task -> this.isStartupShift(context, task) ? task.getSupplyHours() : null,
+                .thenComparing(TcTaskDraft::getSupplyHours,
                         Comparator.nullsLast(Comparator.naturalOrder()))
                 .thenComparing(originalComparator);
     }

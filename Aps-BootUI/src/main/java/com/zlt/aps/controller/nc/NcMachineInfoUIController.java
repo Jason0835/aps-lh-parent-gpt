@@ -97,7 +97,7 @@ public class NcMachineInfoUIController extends BaseUIController<NcMachineInfo> {
     @ResponseBody
     public AjaxResult save(NcMachineInfo ncMachine) {
         if (UserConstants.NOT_UNIQUE.equals(iNcMachineInfoService.checkUnique(ncMachine))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.ncMachine.embryoCodeNotUnique"));
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.ncMachine.machineCodeExists"));
         }
 
         return iNcMachineInfoService.save(ncMachine);
