@@ -5,6 +5,7 @@ import java.math.BigDecimal;
 import com.baomidou.mybatisplus.annotation.*;
 import com.ruoyi.common.core.annotation.Excel;
 import com.zlt.aps.common.core.domain.ApsBaseEntity;
+import com.zlt.common.annotation.ImportExcelValidated;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -40,8 +41,15 @@ public class NcLossSetting extends ApsBaseEntity {
     private String machineCode;
 
     @Excel(name = "ui.data.column.loss.lossRate", suffix = "%", sort = 30)
+    @ImportExcelValidated(name = "ui.data.column.loss.lossRate", required = true, isCode = true, maxLength = 20)
     @ApiModelProperty(value = "损耗率(百分比)")
     @TableField("LOSS_RATE")
     private BigDecimal lossRate;
+
+    @Excel(name = "ui.data.column.info.remark")
+    @ImportExcelValidated(name = "ui.data.column.info.remark", maxLength = 100)
+    @ApiModelProperty(value = "备注")
+    @TableField(value = "REMARK")
+    private String remark;
 
 }

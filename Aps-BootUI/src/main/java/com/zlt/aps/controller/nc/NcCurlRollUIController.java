@@ -98,7 +98,7 @@ public class NcCurlRollUIController extends BaseUIController<NcCurlRoll> {
     @ResponseBody
     public AjaxResult save(NcCurlRoll ncMachine) {
         if (UserConstants.NOT_UNIQUE.equals(iNcCurlRollService.checkUnique(ncMachine))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.ncMachine.embryoCodeNotUnique"));
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.ncCurlRoll.importUnique"));
         }
 
         return iNcCurlRollService.save(ncMachine);

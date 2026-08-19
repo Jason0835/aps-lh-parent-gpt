@@ -68,7 +68,7 @@ public class NcMachineInfoController extends AbstractDocBizController<NcMachineI
     @Override
     public AjaxResult save(@RequestBody NcMachineInfo machine) {
         if (UserConstants.NOT_UNIQUE.equals(machineService.checkUnique(machine))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.error.message.quota.unique"));
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.ncMachine.machineCodeExists"));
         }
         return super.save(machine);
     }

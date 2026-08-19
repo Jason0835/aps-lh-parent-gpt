@@ -18,7 +18,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
-import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -84,7 +83,7 @@ public class Cd15AngleWidthMappingServiceImpl extends AbstractDocService<Cd15Ang
                 successNum++;
             } else {
                 failureNum++;
-                ImportExcelValidatedUtils.addImportErrorLog(importLogId, errorNum, MessageFormat.format(uniqueMsg, errorNum), importErrorLogs);
+                ImportExcelValidatedUtils.addImportErrorLog(importLogId, errorNum, String.format(uniqueMsg, errorNum), importErrorLogs);
             }
         }
 

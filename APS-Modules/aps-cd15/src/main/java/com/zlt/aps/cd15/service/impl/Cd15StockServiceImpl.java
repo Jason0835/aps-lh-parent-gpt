@@ -23,7 +23,6 @@ import org.springframework.transaction.annotation.Transactional;
 import lombok.extern.slf4j.Slf4j;
 
 import javax.annotation.Resource;
-import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -115,7 +114,7 @@ public class Cd15StockServiceImpl extends AbstractDocService<Cd15Stock> implemen
             } else {
                 failureNum++;
                 ImportExcelValidatedUtils.addImportErrorLog(importLogId, rowNum,
-                        MessageFormat.format(uniqueMessage, rowNum), errorList);
+                        String.format(uniqueMessage, rowNum), errorList);
             }
         }
 

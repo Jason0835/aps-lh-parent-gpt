@@ -19,7 +19,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
-import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -151,7 +150,7 @@ public class Cd15DepthConfigServiceImpl extends AbstractDocService<Cd15DepthConf
             } else {
                 failNum++;
                 ImportExcelValidatedUtils.addImportErrorLog(importLogId, rowNum,
-                        MessageFormat.format(uniqueMsg, rowNum), errorList);
+                        String.format(uniqueMsg, rowNum), errorList);
             }
         }
 

@@ -22,7 +22,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
-import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -142,7 +141,7 @@ public class Cd15MachineInfoServiceImpl extends AbstractDocService<Cd15MachineIn
             } else {
                 failureNum++;
                 ImportExcelValidatedUtils.addImportErrorLog(importLogId, errorNum,
-                        MessageFormat.format(uniqueMsg, errorNum), importErrorLogs);
+                        String.format(uniqueMsg, errorNum), importErrorLogs);
             }
         }
 

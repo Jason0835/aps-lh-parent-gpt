@@ -34,7 +34,7 @@
         > -->
         <el-button
           v-hasPermi="['nc:specifyMachine:import']"
-          @click="$refs.tltUpload.handleImport()"
+          @click="() => $refs.tltUploadForm.handleImport(importDefaultValue)"
           >{{ $t("ui.frame.btn.import") }}</el-button
         >
         <el-button
@@ -45,11 +45,15 @@
       </template>
     </page-table>
     <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
-    <tlt-upload
-      ref="tltUpload"
+    <tlt-upload-form
+      ref="tltUploadForm"
+      :title="$t('ui.nc.specifyMachine.column.modalName')"
       downloadUrl="/nc/specifyMachine/importTemplate"
       uploadUrl="/nc/specifyMachine/importData"
       @uploadSuccess="getList"
+      labelWidth="0"
+      :columns="importColumns"
+      :rules="importRules"
     />
     <infoDialog ref="infoRef" @success="getList" />
   </basic-container>
@@ -67,14 +71,14 @@ import {
 } from "@/api/nc/specifyMachine";
 import { getConfigKey } from "@/api/system/config";
 //components
-import tltUpload from "@/components/tltUpload/tltUpload.vue";
+import TltUploadForm from "@/views/components/tltUploadForm.vue";
 
 import infoDialog from "./components/infoDialog.vue";
 
 export default {
   name: "ncFixedPointMachine",
   components: {
-    tltUpload,
+    TltUploadForm,
     infoDialog,
   },
   dicts: ["LINE_TYPE", "JOB_TYPE", "biz_factory_name"],
@@ -100,7 +104,25 @@ export default {
       query: {
         factoryCode: '',
       },
-      importDefaultValue: {},
+      importDefaultValue: {
+        updateSupport: false,
+      },
+      importColumns: [
+        {
+          label: "",
+          prop: "updateSupport",
+          render: (form) => {
+            return (
+              <el-checkbox
+                label={this.$t("ui.checkbox.updateExistingData")}
+                v-model={form.updateSupport}
+              >
+                {this.$t("ui.checkbox.updateExistingData")}
+              </el-checkbox>
+            );
+          },
+        },
+      ],
       importRules: {},
     };
   },
