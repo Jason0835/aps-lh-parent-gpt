@@ -263,11 +263,11 @@ public class TmScheduleTemplateImpl extends AbsTmScheduleTemplate {
                 // 库存预测的规格事件同样需要等待 TASK_SORT 名次，避免 FULL 日志按规格编码输出。
                 break;
             case PLAN_CALC:
-                // 计划量任务此时尚未生成待排名次，统一延后到 TASK_SORT 完成后按真实待排顺序记录。
+                // 计划量初算已完成，按计划量服务实际循环顺序输出初算日志。
+                this.appendInitialPlanCalculationDetail(context);
                 break;
             case TASK_SORT:
                 this.appendFullStepDetail(context, TmScheduleStepEnum.INVENTORY_PREDICT);
-                this.appendFullStepDetail(context, TmScheduleStepEnum.PLAN_CALC);
                 this.appendFullStepDetail(context, stepEnum);
                 break;
             case MACHINE_ASSIGN:
@@ -295,12 +295,6 @@ public class TmScheduleTemplateImpl extends AbsTmScheduleTemplate {
             // 先固定当前班次的机台展示顺序，作为无工装账本序号任务的稳定兜底顺序。
             shiftTaskList.sort(this.buildMachineProcessLogTaskComparator(context));
 
-            // 计划量计算日志先完整输出，避免工装和机台日志再次混入计划量计算区块。
-            shiftTaskList.forEach(task -> {
-                context.appendShiftProcessLog(shiftOrder, ScheduleProcessLogSection.PLAN_QTY_CALCULATION,
-                        this.buildPlanFormula(context, task));
-            });
-
             // 工装日志独立成块，并严格按全局工装账本序号排序；缺少序号时沿用当前展示顺序。
             Map<String, Integer> displayOrderMap = new HashMap<>();
             for (int index = 0; index < shiftTaskList.size(); index++) {
@@ -327,6 +321,9 @@ public class TmScheduleTemplateImpl extends AbsTmScheduleTemplate {
                     context.appendShiftProcessLog(shiftOrder, ScheduleProcessLogSection.MACHINE_SELECTION_CAPACITY,
                             "机台确认：胎面代码={0}，机台={1}",
                             task.getTreadCode(), task.getMachineCode());
+                    context.appendShiftProcessLog(shiftOrder, ScheduleProcessLogSection.MACHINE_SELECTION_CAPACITY,
+                            "最终计划量重算（选机后计划量定稿）：{0}", this.buildPlanFormula(context, task));
+                    this.appendFinalPlanCalculationFullDetail(context, task);
                 }
                 context.flushDeferredTaskProcessLogs(task);
             });
@@ -490,6 +487,19 @@ public class TmScheduleTemplateImpl extends AbsTmScheduleTemplate {
     }
 
     /**
+     * 获取计划量服务实际计算顺序的任务流，不重新排序。
+     *
+     * @param context 胎面排程上下文
+     * @return 按计划量计算实际顺序排列的任务流
+     */
+    private Stream<TmTaskDraft> planCalculationTaskStream(TmScheduleContext context) {
+        if (context == null || context.getTaskDraftList() == null) {
+            return Stream.empty();
+        }
+        return context.getTaskDraftList().stream().filter(Objects::nonNull);
+    }
+
+    /**
      * 构建过程日志任务排序器，以 TASK_SORT 名次为主，班次和业务键仅用于稳定兜底。
      *
      * @return 过程日志任务排序器
@@ -614,29 +624,16 @@ public class TmScheduleTemplateImpl extends AbsTmScheduleTemplate {
                     )));
         }
         this.appendUnrenderedRuleTrace(context, stepEnum);
-        if (TmScheduleStepEnum.PLAN_CALC == stepEnum || TmScheduleStepEnum.MACHINE_ASSIGN == stepEnum) {
-            this.sortedLogTaskStream(context).forEach(task -> context.appendShiftFullProcessTrace(task.getShiftOrder(),
-                    ScheduleProcessLogSection.PLAN_QTY_CALCULATION, new ScheduleProcessTraceEvent(
-                    stepEnum.getDesc(), task.getBusinessKey(),
-                    TmScheduleStepEnum.PLAN_CALC == stepEnum ? "库存抵扣与计划量计算" : "选机后计划量定稿",
-                    "成型来源任务、滚动库存、施工资料、本批次参数和即时规则证据。",
-                    "胎面=" + task.getTreadCode() + "，班次=" + task.getShiftOrder()
-                            + "，当班成型需求=" + this.nvl(task.getCurrentShiftDemandQty()) + "米，保证范围需求="
-                            + this.nvl(task.getGuardDemandQty()) + "米，库存抵扣="
-                            + this.nvl(task.getStockDeductQty()) + "米。",
-                    "依次执行需求汇总、库存抵扣、新规格/实验规格、损耗、最小起排、卷长取整、工装和产能约束。",
-                    this.buildPlanFormula(context, task),
-                    "当前最终计划量=" + this.nvl(task.getPlanQty()) + "米，未排标记="
-                            + (task.isUnassigned() ? "是" : "否") + "。",
-                    TmScheduleStepEnum.PLAN_CALC == stepEnum
-                            ? "进入任务排序和机台候选计算。" : "进入结果、未排和解释记录的数量分摊。"
-            )));
-            if (TmScheduleStepEnum.MACHINE_ASSIGN == stepEnum) {
-                this.sortedLogTaskStream(context)
-                        .filter(task -> !task.isUnassigned())
-                        .forEach(task -> context.appendShiftFullProcessTrace(task.getShiftOrder(),
-                                ScheduleProcessLogSection.TOOL_LIMIT, this.buildToolUsageFullEvent(context, task)));
-            }
+        if (TmScheduleStepEnum.PLAN_CALC == stepEnum) {
+            this.planCalculationTaskStream(context).forEach(task -> context.appendShiftFullProcessTrace(
+                    task.getShiftOrder(), ScheduleProcessLogSection.PLAN_QTY_CALCULATION,
+                    this.buildPlanCalculationFullEvent(context, task, false)));
+        }
+        if (TmScheduleStepEnum.MACHINE_ASSIGN == stepEnum) {
+            this.sortedLogTaskStream(context)
+                    .filter(task -> !task.isUnassigned())
+                    .forEach(task -> context.appendShiftFullProcessTrace(task.getShiftOrder(),
+                            ScheduleProcessLogSection.TOOL_LIMIT, this.buildToolUsageFullEvent(context, task)));
         }
         if (TmScheduleStepEnum.PLAN_CALC == stepEnum) {
             this.sortedLogTaskStream(context).forEach(task -> context.appendShiftFullProcessTrace(task.getShiftOrder(),
@@ -779,6 +776,56 @@ public class TmScheduleTemplateImpl extends AbsTmScheduleTemplate {
             default:
                 return "写入结果和解释证据。";
         }
+    }
+
+    /**
+     * 输出计划量初算过程日志。
+     *
+     * @param context 胎面排程上下文
+     */
+    private void appendInitialPlanCalculationDetail(TmScheduleContext context) {
+        this.appendFullStepDetail(context, TmScheduleStepEnum.PLAN_CALC);
+        this.planCalculationTaskStream(context).forEach(task ->
+                context.appendShiftProcessLog(task.getShiftOrder(), ScheduleProcessLogSection.PLAN_QTY_CALCULATION,
+                        "计划量初算：{0}", this.buildPlanFormula(context, task)));
+    }
+
+    /**
+     * 输出机台确认后的最终计划量 FULL 事件。
+     *
+     * @param context 胎面排程上下文
+     * @param task    已完成机台确认的任务
+     */
+    private void appendFinalPlanCalculationFullDetail(TmScheduleContext context, TmTaskDraft task) {
+        context.appendShiftFullProcessTrace(task.getShiftOrder(), ScheduleProcessLogSection.MACHINE_SELECTION_CAPACITY,
+                this.buildPlanCalculationFullEvent(context, task, true));
+    }
+
+    /**
+     * 构建计划量初算或机台确认后的最终计划量 FULL 事件。
+     *
+     * @param context              胎面排程上下文
+     * @param task                 排程任务
+     * @param finalRecalculation   是否为机台确认后的最终重算
+     * @return 计划量计算过程事件
+     */
+    private ScheduleProcessTraceEvent buildPlanCalculationFullEvent(TmScheduleContext context, TmTaskDraft task,
+                                                                     boolean finalRecalculation) {
+        return new ScheduleProcessTraceEvent(
+                finalRecalculation ? TmScheduleStepEnum.MACHINE_ASSIGN.getDesc()
+                        : TmScheduleStepEnum.PLAN_CALC.getDesc(),
+                task.getBusinessKey(), finalRecalculation ? "最终计划量重算（选机后计划量定稿）" : "计划量初算",
+                "成型来源任务、滚动库存、施工资料、本批次参数和即时规则证据。",
+                "胎面=" + task.getTreadCode() + "，班次=" + task.getShiftOrder()
+                        + "，当班成型需求=" + this.nvl(task.getCurrentShiftDemandQty()) + "米，保证范围需求="
+                        + this.nvl(task.getGuardDemandQty()) + "米，库存抵扣="
+                        + this.nvl(task.getStockDeductQty()) + "米。",
+                "依次执行需求汇总、库存抵扣、新规格/实验规格、损耗、最小起排、卷长取整、工装和产能约束。",
+                this.buildPlanFormula(context, task),
+                "当前最终计划量=" + this.nvl(task.getPlanQty()) + "米，未排标记="
+                        + (task.isUnassigned() ? "是" : "否") + "。",
+                finalRecalculation ? "进入结果、未排和解释记录的数量分摊。" : "进入任务排序和机台候选计算。"
+        );
     }
 
     /**
