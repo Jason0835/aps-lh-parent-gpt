@@ -127,13 +127,13 @@ public class NcLossSettingController extends AbstractDocBizController<NcLossSett
 
     @Override
     protected String getOrderBy() {
-        return "MACHINE_CODE, PADDING_CODE";
+        return "MACHINE_CODE, LINING_CODE";
     }
 
     @Override
     protected String[] getQueryFormulas() {
         return new String[]{
-                "machineName->getcolsvalue(T_NC_MACHINE_INFO, MACHINE_NAME, MACHINE_CODE, machineCode)"
+                "machineName->getcolvalue(T_NC_MACHINE_INFO, MACHINE_NAME, MACHINE_CODE, machineCode)"
         };
     }
 }

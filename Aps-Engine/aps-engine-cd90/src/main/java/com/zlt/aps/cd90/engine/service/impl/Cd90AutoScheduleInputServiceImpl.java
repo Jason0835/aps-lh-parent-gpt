@@ -1,6 +1,7 @@
 package com.zlt.aps.cd90.engine.service.impl;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.cd90.api.domain.entity.Cd90CurlLength;
 import com.zlt.aps.cd90.api.domain.entity.Cd90DepthConfig;
 import com.zlt.aps.cd90.api.domain.entity.Cd90Stock;
@@ -43,6 +44,7 @@ import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.sql.Date;
+import java.text.MessageFormat;
 import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
@@ -121,14 +123,15 @@ public class Cd90AutoScheduleInputServiceImpl implements Cd90AutoScheduleInputSe
         List<Cd90ConstructionMaterial> constructionMaterials = loadConstructionMaterials(
                 factoryCode, embryoCodes, constructionVersions);
         fillStandardCurlLength(factoryCode, constructionMaterials);
+        List<Cd90DemandShift> demandShifts = formingDemandExpander.expand(
+                formingSchedules, constructionMaterials);
+        this.validateEffectiveDemand(formingSchedules, demandShifts, formingEntities.size());
         List<Cd90DepthConfig> depthConfigs = depthConfigMapper.selectList(
                 Wrappers.<Cd90DepthConfig>lambdaQuery()
                         .eq(Cd90DepthConfig::getFactoryCode, factoryCode)
                         .orderByAsc(Cd90DepthConfig::getMinMachineQty));
         Map<String, BigDecimal> depthClassQtyByCloth = clothDepthResolver.resolve(
                 formingSchedules, constructionMaterials, depthConfigs);
-        List<Cd90DemandShift> demandShifts = formingDemandExpander.expand(
-                formingSchedules, constructionMaterials);
         List<Cd90EmbryoPlanSurplus> embryoPlanSurpluses = loadEmbryoPlanSurpluses(
                 factoryCode, scheduleDate, embryoCodes);
         Map<String, Cd90ClothSourceTrace> clothSourceTraceByCloth =
@@ -310,6 +313,28 @@ public class Cd90AutoScheduleInputServiceImpl implements Cd90AutoScheduleInputSe
         if (!missing.isEmpty()) {
             log.warn("[直裁自动排程] 标准卷曲长度未维护或非正数，将使用参数CRIMP_LENGTH兜底, factoryCode={}, clothCodes={}",
                     factoryCode, missing);
+        }
+    }
+
+    /** 有正计划量但未形成任何有效帘布需求时终止任务，避免生成空的已排和未排结果。 */
+    private void validateEffectiveDemand(List<Cd90FormingScheduleSource> formingSchedules,
+                                         List<Cd90DemandShift> demandShifts,
+                                         int formingRecordCount) {
+        long positiveFormingShiftCount = safe(formingSchedules).stream()
+                .filter(schedule -> schedule != null)
+                .flatMap(schedule -> safe(schedule.getClassPlanQuantities()).stream())
+                .filter(quantity -> quantity != null && quantity.signum() > 0)
+                .count();
+        boolean hasEffectiveDemand = safe(demandShifts).stream()
+                .filter(shift -> shift != null)
+                .anyMatch(shift -> shift.getFormingQuantity() != null
+                        && shift.getFormingQuantity().signum() > 0
+                        && shift.getClothDemandQuantity() != null
+                        && shift.getClothDemandQuantity().signum() > 0);
+        if (positiveFormingShiftCount > 0 && !hasEffectiveDemand) {
+            throw new IllegalStateException(MessageFormat.format(
+                    I18nUtil.getMessage("ui.cd90.autoSchedule.noEffectiveClothDemand"),
+                    formingRecordCount, positiveFormingShiftCount));
         }
     }
 

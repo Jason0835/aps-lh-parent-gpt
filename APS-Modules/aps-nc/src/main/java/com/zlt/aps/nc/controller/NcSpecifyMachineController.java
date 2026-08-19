@@ -130,7 +130,7 @@ public class NcSpecifyMachineController extends AbstractDocBizController<NcSpeci
     @Override
     protected String[] getQueryFormulas() {
         return new String[]{
-                "machineName->getcolsvalue(T_NC_MACHINE_INFO, MACHINE_NAME, MACHINE_CODE, machineCode)"
+                "machineName->getcolvalue(T_NC_MACHINE_INFO, MACHINE_NAME, MACHINE_CODE, machineCode)"
         };
     }
 }

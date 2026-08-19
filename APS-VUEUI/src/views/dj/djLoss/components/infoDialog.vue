@@ -61,12 +61,19 @@ export default {
             trigger: "blur",
           },
         ],
+        lossRate: [
+          {
+            required: true,
+            message: this.$t("common.rule.input"),
+            trigger: "blur",
+          },
+        ],
       },
     };
   },
   computed: {
     ...mapState({
-      machines: (state) => state.insideLiner.machines,
+      machines: (state) => state.dj.machines,
     }),
     title: function () {
       return (
@@ -133,11 +140,20 @@ export default {
     //utils
     show(data) {
       this.visible = true;
-      // 获取当前工厂编码（保存时需要带工厂参数）
+      // 加载垫胶机台下拉数据（机台信息存于 vuex state.dj.machines），按当前工厂编码过滤，避免带出其他厂的机台
+      const loadMachines = () => {
+        this.$store.dispatch("dj/getMachineList", {
+          factoryCode: this.factoryCode,
+        });
+      };
+      // 获取当前工厂编码（保存时需要带工厂参数，机台下拉过滤也需要）
       if (!this.factoryCode) {
         getConfigKey("sys.factory.code").then((response) => {
           this.factoryCode = response.msg;
+          loadMachines();
         });
+      } else {
+        loadMachines();
       }
       if (data) {
         this.isEdit = true;

@@ -33,6 +33,7 @@ import { mapState } from "vuex";
 
 import infoForm from "@/views/components/infoForm.vue";
 
+import { getConfigKey } from "@/api/system/config";
 import { editLoss } from "@/api/nc/loss";
 
 export default {
@@ -43,6 +44,7 @@ export default {
       visible: false,
       isEdit: false,
       editType: null,
+      factoryCode: "",
       form: {},
       rules: {
         machineType: [
@@ -53,6 +55,13 @@ export default {
           },
         ],
         specDimension: [
+          {
+            required: true,
+            message: this.$t("common.rule.input"),
+            trigger: "blur",
+          },
+        ],
+        lossRate: [
           {
             required: true,
             message: this.$t("common.rule.input"),
@@ -87,8 +96,10 @@ export default {
           span: 24,
           type: "select",
           dictData: this.machines,
-          labelKey: "machineName",
-          valueKey: "machineCode",
+          props: {
+            value: "machineCode",
+            label: "machineName",
+          },
         },
         {
           label: this.$t("ui.data.column.loss.lossRate"),
@@ -131,6 +142,21 @@ export default {
     //utils
     show(data) {
       this.visible = true;
+      // 加载内衬机台下拉数据（机台信息存于 vuex state.insideLiner.machines），按当前工厂编码过滤，避免带出其他厂的机台
+      const loadMachines = () => {
+        this.$store.dispatch("insideLiner/getMachineList", {
+          factoryCode: this.factoryCode,
+        });
+      };
+      // 获取当前工厂编码（保存时需要带工厂参数，机台下拉过滤也需要）
+      if (!this.factoryCode) {
+        getConfigKey("sys.factory.code").then((response) => {
+          this.factoryCode = response.msg;
+          loadMachines();
+        });
+      } else {
+        loadMachines();
+      }
       if (data) {
         this.isEdit = true;
         this.form = {
