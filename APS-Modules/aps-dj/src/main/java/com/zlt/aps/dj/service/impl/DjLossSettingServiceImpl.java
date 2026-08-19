@@ -82,22 +82,25 @@ public class DjLossSettingServiceImpl extends AbstractDocService<DjLossSetting> 
      */
     private boolean isUnique(DjLossSetting entity, List<DjLossSetting> existList) {
         // 机台码、物料号均非空时，存在两项全匹配的记录则冲突
-        if (StringUtils.isNotEmpty(entity.getMachineCode()) && StringUtils.isNotEmpty(entity.getPaddingCode())
-                && existList.stream().anyMatch(item -> Objects.equal(entity.getMachineCode(), item.getMachineCode())
-                        && Objects.equal(entity.getPaddingCode(), item.getPaddingCode()))) {
-            return false;
+        if (StringUtils.isNotEmpty(entity.getMachineCode()) && StringUtils.isNotEmpty(entity.getPaddingCode())) {
+            if (existList.stream().anyMatch(item -> Objects.equal(entity.getMachineCode(), item.getMachineCode())
+                    && Objects.equal(entity.getPaddingCode(), item.getPaddingCode()))) {
+                return false;
+            }
         }
         // 机台码非空时，存在同机台码且物料号为空的记录则冲突
-        if (StringUtils.isNotEmpty(entity.getMachineCode())
-                && existList.stream().anyMatch(item -> Objects.equal(entity.getMachineCode(), item.getMachineCode())
-                        && StringUtils.isEmpty(item.getPaddingCode()))) {
-            return false;
+        if (StringUtils.isNotEmpty(entity.getMachineCode())) {
+            if (existList.stream().anyMatch(item -> Objects.equal(entity.getMachineCode(), item.getMachineCode())
+                    && StringUtils.isEmpty(item.getPaddingCode()))) {
+                return false;
+            }
         }
         // 物料号非空时，存在同物料号且机台号为空的记录则冲突（保留原 checkUnique 判断条件，保证抽取前后行为一致）
-        if (StringUtils.isNotEmpty(entity.getPaddingCode())
-                && existList.stream().anyMatch(item -> Objects.equal(entity.getPaddingCode(), item.getPaddingCode())
-                        && StringUtils.isEmpty(item.getMachineCode()))) {
-            return false;
+        if (StringUtils.isNotEmpty(entity.getPaddingCode())) {
+            if (existList.stream().anyMatch(item -> Objects.equal(entity.getPaddingCode(), item.getPaddingCode())
+                    && StringUtils.isEmpty(item.getMachineCode()))) {
+                return false;
+            }
         }
         return true;
     }
