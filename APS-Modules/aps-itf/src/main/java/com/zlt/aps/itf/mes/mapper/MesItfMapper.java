@@ -13,8 +13,8 @@ import com.zlt.aps.tm.api.domain.entity.TmDayFinishQty;
 import com.zlt.aps.tm.api.domain.entity.TmMesStock;
 import com.zlt.aps.tm.api.domain.entity.TmScheFinishQty;
 import com.zlt.aps.gsq.api.domain.entity.GsqDayFinishQty;
+import com.zlt.aps.gsq.api.domain.entity.GsqMesStock;
 import com.zlt.aps.gsq.api.domain.entity.GsqScheFinishQty;
-import com.zlt.aps.gsq.api.domain.entity.GsqStock;
 import com.zlt.aps.tq.api.domain.entity.TqDayFinishQty;
 import com.zlt.aps.tq.api.domain.entity.TqMesStock;
 import com.zlt.aps.tq.api.domain.entity.TqScheFinishQty;
@@ -181,11 +181,12 @@ public interface MesItfMapper {
 
     /**
      * 查询钢丝圈库存同步数据
+     * 返回专用MES DTO（stockDate为字符串类型，避免跨时区JDBC偏移）
      *
      * @param syncDataLogs 参数
      * @return 列表
      */
-    List<GsqStock> selectMesGsqStockList(AuxReqSyncDataLogs syncDataLogs);
+    List<GsqMesStock> selectMesGsqStockList(AuxReqSyncDataLogs syncDataLogs);
 
     /**
      * 查询胎圈自动滚动指定物理日的库存。

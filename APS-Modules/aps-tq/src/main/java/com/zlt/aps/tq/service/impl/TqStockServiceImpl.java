@@ -15,6 +15,8 @@ import org.apache.commons.collections.CollectionUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import cn.hutool.core.date.DateUtil;
+
 import javax.annotation.Resource;
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -53,35 +55,46 @@ public class TqStockServiceImpl extends AbstractDocService<TqStock> implements I
 
     /**
      * 逻辑删除并批量保存胎圈库存（事务性操作）
-     * 步骤1：逻辑删除指定库存日期的旧数据（IS_DELETE置为1）
-     * 步骤2：批量插入MES最新库存数据（新记录，IS_DELETE=0）
+     * 步骤1：根据库存日期字符串逻辑删除当天旧数据（使用字符串比较规避时区偏移）
+     * 步骤2：在目标JVM时区解析日期字符串，回填stockDate/createBy/updateBy/isDelete
+     * 步骤3：使用XML批量插入绕过MetaObjectHandler，确保CREATE_BY/UPDATE_BY为传入值（MES）而非syncUser
      * 历史数据保留，只删当天库存日期的数据
      *
-     * @param stockDate 库存日期
-     * @param updateBy  更新者
-     * @param list      待插入的胎圈库存列表
+     * @param stockDateStr 库存日期字符串，格式yyyy-MM-dd
+     * @param createBy     创建者/更新者（MES同步场景固定传入"MES"）
+     * @param list         待插入的胎圈库存列表（stockDate/createBy等字段由本方法统一回填）
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void logicDeleteAndSaveBatch(Date stockDate, String updateBy, List<TqStock> list) {
-        if (stockDate == null) {
+    public void logicDeleteAndSaveBatch(String stockDateStr, String createBy, List<TqStock> list) {
+        if (stockDateStr == null || stockDateStr.trim().isEmpty()) {
             throw new IllegalArgumentException("库存日期不能为空");
         }
-        // 步骤1：逻辑删除当天库存日期的旧数据
-        Date updateTime = new Date();
-        int deleteCount = tqStockMapper.logicDeleteByStockDate(stockDate, updateBy, updateTime);
-        log.info("胎圈库存同步：逻辑删除库存日期={}的旧数据，删除数量={}", stockDate, deleteCount);
 
-        // 步骤2：批量插入MES最新库存数据
+        // 在目标JVM时区解析日期字符串为java.sql.Date，确保jdbcType=DATE绑定时仅日期部分落库
+        Date stockDate = DateUtil.parseDate(stockDateStr);
+        java.sql.Date sqlStockDate = new java.sql.Date(stockDate.getTime());
+
+        // 步骤1：逻辑删除当天库存日期的旧数据（使用字符串日期比较，彻底规避时区偏移）
+        Date updateTime = new Date();
+        int deleteCount = tqStockMapper.logicDeleteByStockDate(stockDateStr, createBy, updateTime);
+        log.info("胎圈库存同步：逻辑删除库存日期={}的旧数据，删除数量={}", stockDateStr, deleteCount);
+
+        // 步骤2：回填每条记录的stockDate/createBy/updateBy/isDelete
         if (CollectionUtils.isNotEmpty(list)) {
-            // 分批插入，每批1000条
+            for (TqStock stock : list) {
+                stock.setStockDate(sqlStockDate);
+                stock.setCreateBy(createBy);
+                stock.setUpdateBy(createBy);
+                stock.setIsDelete(0);
+            }
+
+            // 步骤3：分批XML批量插入，绕过MyBatis-Plus MetaObjectHandler自动填充
             int batchSize = 1000;
             for (int i = 0; i < list.size(); i += batchSize) {
                 int end = Math.min(i + batchSize, list.size());
                 List<TqStock> batch = list.subList(i, end);
-                for (TqStock stock : batch) {
-                    baseDao.save(stock);
-                }
+                tqStockMapper.batchInsertMesStock(batch);
             }
             log.info("胎圈库存同步：批量插入完成，插入数量={}", list.size());
         }

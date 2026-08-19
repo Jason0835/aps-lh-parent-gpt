@@ -43,4 +43,44 @@
         REMARK = VALUES(REMARK)
     </insert>
 
+    <!-- 根据库存日期字符串（yyyy-MM-dd）逻辑删除钢丝圈库存，只删当天数据，历史数据保留 -->
+    <!-- 使用字符串日期比较，规避JVM时区与SQL Server时区不一致导致的Date参数偏移 -->
+    <update id="logicDeleteByStockDate">
+        UPDATE T_GSQ_STOCK
+        SET IS_DELETE = 1,
+            UPDATE_BY = #{updateBy},
+            UPDATE_TIME = #{updateTime}
+        WHERE CONVERT(VARCHAR(10), STOCK_DATE, 23) = #{stockDateStr}
+          AND IS_DELETE = 0
+    </update>
+
+    <!--
+        MES库存同步专用批量插入。
+        使用XML显式指定列和值，绕过MyBatis-Plus MetaObjectHandler，
+        确保在Feign syncUser登录上下文下CREATE_BY/UPDATE_BY仍为"MES"，不被自动填充覆盖。
+        STOCK_DATE使用jdbcType=DATE并传入java.sql.Date，确保仅日期部分落库。
+    -->
+    <insert id="batchInsertMesStock" parameterType="list">
+        INSERT INTO T_GSQ_STOCK (
+            STOCK_DATE, STEEL_RING_CODE, STOCK_NUM, MODIFY_NUM, BAD_NUM,
+            IS_DELETE, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME, REMARK
+        )
+        VALUES
+        <foreach collection="list" item="item" separator=",">
+            (
+                #{item.stockDate,jdbcType=DATE},
+                #{item.steelRingCode,jdbcType=VARCHAR},
+                #{item.stockNum,jdbcType=DECIMAL},
+                #{item.modifyNum,jdbcType=DECIMAL},
+                #{item.badNum,jdbcType=DECIMAL},
+                0,
+                #{item.createBy,jdbcType=VARCHAR},
+                GETDATE(),
+                #{item.updateBy,jdbcType=VARCHAR},
+                GETDATE(),
+                #{item.remark,jdbcType=VARCHAR}
+            )
+        </foreach>
+    </insert>
+
 </mapper>
