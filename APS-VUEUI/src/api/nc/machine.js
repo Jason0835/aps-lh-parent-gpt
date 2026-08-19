@@ -31,6 +31,19 @@ export function checkMachineCodeUnique(query) {
     data: query
   })
 }
+/**
+ * 删除成型机台
+ * @param {Array|String} ids
+ * @returns
+ */
+export function removeMachine(ids) {
+  return request({
+    url: 'nc/machine/remove',
+    method: 'post',
+    params: { ids: ids instanceof Array ? ids.join(',') : ids }
+  })
+}
+
 export function exportData(query) {
   return downloadLink("/nc/machine/export", query);
 }

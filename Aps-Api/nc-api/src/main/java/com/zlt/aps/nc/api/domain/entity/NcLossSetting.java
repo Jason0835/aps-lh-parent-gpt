@@ -36,9 +36,15 @@ public class NcLossSetting extends ApsBaseEntity {
     @TableField("LINING_CODE")
     private String liningCode;
 
-    @ApiModelProperty(value = "机台id（对应T_NC_MACHINE_INFO表id）")
+    @ApiModelProperty(value = "机台编号")
     @TableField("MACHINE_CODE")
     private String machineCode;
+
+    @Excel(name = "ui.data.column.loss.line", sort = 20)
+    @ImportExcelValidated(name = "ui.data.column.loss.line", maxLength = 30)
+    @ApiModelProperty(value = "机台")
+    @TableField(exist = false)
+    private String machineName;
 
     @Excel(name = "ui.data.column.loss.lossRate", suffix = "%", sort = 30)
     @ImportExcelValidated(name = "ui.data.column.loss.lossRate", required = true, isCode = true, maxLength = 20)

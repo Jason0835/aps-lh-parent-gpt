@@ -246,7 +246,10 @@ export default {
           }
         });
 
-        this.save(params);
+        this.save({
+          ...params,
+          factoryCode: params.factoryCode || this.factoryCode,
+        });
       });
     },
   },

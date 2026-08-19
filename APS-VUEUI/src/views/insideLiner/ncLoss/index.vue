@@ -136,7 +136,7 @@ export default {
           sortable: true,
         },
         {
-          prop: "machineCode",
+          prop: "machineName",
           align: "center",
           halign: "center",
           label: this.$t("ui.data.column.loss.line"),

@@ -189,9 +189,16 @@ export default {
           ),
         },
         {
+          prop: "updateBy",
+          align: "center",
+          halign: "center",
+          label: this.$t("ui.data.column.updateBy"),
+          width: 100,
+        },
+        {
           prop: "updateTime",
           width: 180,
-          label: this.$t("ui.data.column.scheduleAdjust.updata"),
+          label: this.$t("ui.data.column.updateTime"),
         },
         {
           align: "center",

@@ -141,7 +141,7 @@ export default {
           // sortable: "custom",
         },
         {
-          prop: "machineCode",
+          prop: "machineName",
           align: "center",
           halign: "center",
           label: this.$t("ui.specifyMachine.column.machineName"),
@@ -224,8 +224,10 @@ export default {
           prop: "machineCode",
           type: "select",
           dictData: this.machines,
-          valueKey: "machineCode",
-          labelKey: "machineName",
+          props: {
+            value: "machineCode",
+            label: "machineName",
+          },
         },
         {
           label: this.$t("ui.data.column.specifyMachine.lineType"),
@@ -335,6 +337,8 @@ export default {
     getConfigKey("sys.factory.code").then(response => {
       this.search.factoryCode = response.msg;
       this.query.factoryCode = response.msg;
+      // 按当前工厂编码加载内衬机台下拉数据（机台信息存于 vuex state.insideLiner.machines），避免带出其他厂的机台
+      this.$store.dispatch("insideLiner/getMachineList", { factoryCode: this.query.factoryCode });
       this.getList();
     }).catch(() => {
       this.getList();

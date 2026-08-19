@@ -204,8 +204,14 @@ export default {
           label: this.$t("ui.remark"),
         },
         {
+          prop: "updateBy",
+          align: "center",
+          label: this.$t("ui.data.column.updateBy"),
+          width: 100,
+        },
+        {
           prop: "updateTime",
-          label: this.$t("ui.data.column.scheduleAdjust.updata"),
+          label: this.$t("ui.data.column.updateTime"),
           width:200,
         },
 

@@ -96,7 +96,7 @@ public class GsqParamsUIController extends BaseUIController<GsqParams> {
     @ApiOperation("校验唯一性")
     @PostMapping("/checkUnique")
     @ResponseBody
-    public String checkUnique(@RequestBody GsqParams query) {
+    public String checkUnique(GsqParams query) {
         return iGsqParamsService.checkUnique(query);
     }
 
