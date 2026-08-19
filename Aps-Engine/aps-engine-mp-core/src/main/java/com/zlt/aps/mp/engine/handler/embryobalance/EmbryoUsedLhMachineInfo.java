@@ -3,6 +3,7 @@ package com.zlt.aps.mp.engine.handler.embryobalance;
 import lombok.Getter;
 
 import java.io.Serializable;
+import java.math.BigDecimal;
 
 /**
  * 胎胚平衡检查业务
@@ -25,5 +26,16 @@ public class EmbryoUsedLhMachineInfo implements Serializable {
     public EmbryoUsedLhMachineInfo(String embryoCode, Integer usedLhMachines) {
         this.embryoCode = embryoCode;
         this.usedLhMachines = usedLhMachines;
+    }
+
+    /**
+     * 减机台
+     */
+    public final boolean reduceLhMachine() {
+        if (null == usedLhMachines || usedLhMachines <= BigDecimal.ONE.intValue()) {
+            return false;
+        }
+        usedLhMachines = usedLhMachines - BigDecimal.ONE.intValue();
+        return true;
     }
 }

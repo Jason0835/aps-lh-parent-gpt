@@ -14,6 +14,7 @@
                cmf.FIXED_STRUCTURE3,
                cmf.FIXED_STRUCTURE4,
                cmf.FIXED_MATERIAL_CODE,
+               cmf.FIXED_EMBRYO_CODE,
                cmf.DISABLE_STRUCTURE,
                cmf.DISABLE_MATERIAL_CODE
           FROM t_mdm_molding_machine mmm

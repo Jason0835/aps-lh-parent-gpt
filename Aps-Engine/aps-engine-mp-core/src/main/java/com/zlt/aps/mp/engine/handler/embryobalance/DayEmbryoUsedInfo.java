@@ -94,12 +94,50 @@ public class DayEmbryoUsedInfo implements Serializable {
         if (CollectionUtils.isEmpty(embryoUsedInfo)) {
             return true;
         }
+        //处理额外增机台
+        handlerExtraLhMachines(extraLhMachines);
+        //处理胎胚总机台数大于sumUsedLhMachines的处理
+        handlerEmbryoSumPassSumUsedLhMachines();
         Set<String> cxMachineCodeSet = cxMachineConfigurationList.stream().map(GroupCxMachineConfiguration::getCxMachineCode).collect(Collectors.toSet());
         if (cxMachineCodeSet.size() == BigDecimal.ONE.intValue()) {
             return checkSingleCxMachine();
         }
         //多机台
         return checkMultipleCxMachine();
+    }
+
+    /**
+     * 处理额外的硫化机台数
+     */
+    private void handlerExtraLhMachines(Integer extraLhMachines) {
+        if (null == extraLhMachines || extraLhMachines <= BigDecimal.ZERO.intValue()) {
+            return;
+        }
+        if (CollectionUtils.isEmpty(embryoUsedInfo)) {
+            return;
+        }
+        boolean result = reduceOneLhMachinesByMaxLhMachines();
+        if (result) {
+            extraLhMachines = extraLhMachines - BigDecimal.ONE.intValue();
+            handlerExtraLhMachines(extraLhMachines);
+        }
+    }
+
+    /**
+     * 分胎胚硫化机台数 > 总的使用硫化机台数时，表示胎胚有组合
+     */
+    private void handlerEmbryoSumPassSumUsedLhMachines() {
+        if (CollectionUtils.isEmpty(embryoUsedInfo)) {
+            return;
+        }
+        Integer sumEmbryoUsedLhMachines = embryoUsedInfo.stream().mapToInt(EmbryoUsedLhMachineInfo::getUsedLhMachines).sum();
+        if (sumEmbryoUsedLhMachines <= sumUsedLhMachines) {
+            return;
+        }
+        boolean result = reduceOneLhMachinesByMaxLhMachines();
+        if (result) {
+            handlerEmbryoSumPassSumUsedLhMachines();
+        }
     }
 
     /**
@@ -585,6 +623,22 @@ public class DayEmbryoUsedInfo implements Serializable {
             return Collections.emptyMap();
         }
         return sameResult;
+    }
+
+    /**
+     * 占用最大硫化机台数胎胚数减1
+     *
+     * @return
+     */
+    private boolean reduceOneLhMachinesByMaxLhMachines() {
+        List<EmbryoUsedLhMachineInfo> moreLhMachineList = embryoUsedInfo.stream().filter(singleEmbryoInfo -> singleEmbryoInfo.getUsedLhMachines() > BigDecimal.ONE.intValue()).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(moreLhMachineList)) {
+            return false;
+        }
+        //从大到小排序
+        moreLhMachineList.sort(Comparator.comparing(EmbryoUsedLhMachineInfo::getUsedLhMachines, Comparator.reverseOrder()));
+        EmbryoUsedLhMachineInfo maxEmbryoInfo = moreLhMachineList.get(BigDecimal.ZERO.intValue());
+        return maxEmbryoInfo.reduceLhMachine();
     }
 
 }
