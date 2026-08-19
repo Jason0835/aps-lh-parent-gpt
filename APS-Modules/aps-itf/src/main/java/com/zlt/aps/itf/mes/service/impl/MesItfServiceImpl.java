@@ -21,6 +21,7 @@ import com.zlt.aps.enums.LocationTypeEnum;
 import com.zlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.gsq.api.domain.entity.GsqDayFinishQty;
+import com.zlt.aps.gsq.api.domain.entity.GsqMesStock;
 import com.zlt.aps.gsq.api.domain.entity.GsqScheFinishQty;
 import com.zlt.aps.gsq.api.domain.entity.GsqStock;
 import com.zlt.aps.gsq.api.service.IGsqMesSyncRemoteService;
@@ -1930,15 +1931,17 @@ public class MesItfServiceImpl implements MesItfService {
      */
     @Override
     public AjaxResult syncMesTqStock(AuxReqSyncDataLogs syncDataLogs) {
-        // 切换到MES数据源查询中间表（仅当天最新版本数据）
+        // 切换到MES数据源查询中间表（仅当天数据，SQL已用CONVERT(VARCHAR)输出日期字符串规避跨时区偏移）
         DynamicDataSourceContextHolder.push(DataSource.MES);
         List<TqMesStock> syncList = mesItfMapper.selectMesTqStockList(syncDataLogs);
         DynamicDataSourceContextHolder.poll();
 
         // 按库存日期+物料编码去重（防御性处理MES同版本重复推送），保留任意一条
+        // stockDate已改为String(yyyy-MM-dd)，直接用字符串拼接去重键，不做Date转换
         Map<String, TqMesStock> groupMap = syncList.stream()
+                .filter(item -> StringUtils.isNotBlank(item.getStockDate()))
                 .collect(Collectors.toMap(
-                        item -> DateUtil.formatDate(item.getStockDate()) + "|" + item.getMaterialCode(),
+                        item -> item.getStockDate() + "|" + item.getMaterialCode(),
                         Function.identity(),
                         (v1, v2) -> v1
                 ));
@@ -1949,29 +1952,30 @@ public class MesItfServiceImpl implements MesItfService {
             return AjaxResult.success("MES中间表当天无数据可同步");
         }
 
-        // 转换 TqMesStock → TqStock，库存日期规范化到当天0点，保证与逻辑删除条件精确匹配
-        // 注意：IS_DELETE 必须显式置0，表默认值为NULL，且页面查询条件 IS_DELETE=0 不匹配NULL会导致数据不可见
+        // 转换 TqMesStock → TqStock（仅填充业务字段，日期/审计字段由目标微服务在其JVM时区设置）
+        // 关键：stockDate不在ITF模块设置（避免跨JVM时区的Jackson序列化偏移），
+        //      由远程Controller解析stockDateStr参数后统一回填；
+        //      createBy/createTime/updateBy/updateTime/isDelete由远程XML批量插入显式控制，
+        //      避免MetaObjectHandler在syncUser上下文下覆盖审计字段
         List<TqStock> tqStockInsertList = syncList.stream().map(item -> {
             TqStock tqStock = new TqStock();
-            tqStock.setStockDate(item.getStockDate() == null ? null : DateUtil.beginOfDay(item.getStockDate()));
+            // 不设置stockDate，由目标端Controller解析stockDateStr后统一回填
             tqStock.setBeadCode(item.getMaterialCode());
             tqStock.setStockNum(item.getAvailableStock() != null ? item.getAvailableStock() : BigDecimal.ZERO);
-            tqStock.setCreateBy("MES");
-            tqStock.setUpdateBy("MES");
-            tqStock.setCreateTime(DateUtils.getNowDate());
-            tqStock.setUpdateTime(DateUtils.getNowDate());
-            tqStock.setIsDelete(0);
+            // 修正数量/不良数量MES无此概念，默认0
+            tqStock.setModifyNum(BigDecimal.ZERO);
+            tqStock.setBadNum(BigDecimal.ZERO);
             return tqStock;
         }).collect(Collectors.toList());
 
         try {
-            // 取数据中最大库存日期作为逻辑删除条件（防止非当天数据混入时误删/漏删）
-            Date stockDate = tqStockInsertList.stream()
-                    .map(TqStock::getStockDate)
-                    .filter(Objects::nonNull)
-                    .max(Date::compareTo)
-                    .orElse(DateUtils.getNowDate());
-            String stockDateStr = DateUtil.formatDate(stockDate);
+            // 从MES数据中取库存日期字符串（所有数据均为同一天，取第一条非空即可）
+            // 字符串直接取自SQL CONVERT(VARCHAR)输出，不经过任何Date→String转换，彻底规避时区偏移
+            String stockDateStr = syncList.stream()
+                    .map(TqMesStock::getStockDate)
+                    .filter(StringUtils::isNotBlank)
+                    .findFirst()
+                    .orElse(DateUtil.formatDate(DateUtils.getNowDate()));
 
             log.info("胎圈库存同步：开始同步，待插入数量={}, 库存日期={}", tqStockInsertList.size(), stockDateStr);
 
@@ -2000,45 +2004,51 @@ public class MesItfServiceImpl implements MesItfService {
      */
     @Override
     public AjaxResult syncMesGsqStock(AuxReqSyncDataLogs syncDataLogs) {
-        // 切换到MES数据源查询中间表（仅当天最新版本数据）
+        // 切换到MES数据源查询中间表（仅当天数据，SQL已用CONVERT(VARCHAR)输出日期字符串规避跨时区偏移）
         DynamicDataSourceContextHolder.push(DataSource.MES);
-        List<GsqStock> syncList = mesItfMapper.selectMesGsqStockList(syncDataLogs);
+        List<GsqMesStock> syncList = mesItfMapper.selectMesGsqStockList(syncDataLogs);
         DynamicDataSourceContextHolder.poll();
+
+        // 按库存日期+钢丝圈编码去重（防御性处理MES同版本重复推送），保留任意一条
+        // stockDate已改为String(yyyy-MM-dd)，直接用字符串拼接去重键，不做Date转换
+        Map<String, GsqMesStock> groupMap = syncList.stream()
+                .filter(item -> StringUtils.isNotBlank(item.getStockDate()))
+                .collect(Collectors.toMap(
+                        item -> item.getStockDate() + "|" + item.getMaterialCode(),
+                        Function.identity(),
+                        (v1, v2) -> v1
+                ));
+        syncList = new ArrayList<>(groupMap.values());
 
         if (CollectionUtils.isEmpty(syncList)) {
             log.warn("钢丝圈库存同步：MES中间表当天无数据，本次跳过同步，避免误删APS当天已有数据");
             return AjaxResult.success("MES中间表当天无数据可同步");
         }
 
-        // 按库存日期+钢丝圈代码去重（防御性处理MES同版本重复推送），保留任意一条
-        Map<String, GsqStock> groupMap = syncList.stream()
-                .collect(Collectors.toMap(
-                        item -> DateUtil.formatDate(item.getStockDate()) + "|" + item.getSteelRingCode(),
-                        Function.identity(),
-                        (v1, v2) -> v1
-                ));
-        syncList = new ArrayList<>(groupMap.values());
-
-        // 补审计字段，库存日期规范化到当天0点，保证与逻辑删除条件精确匹配
-        // 注意：IS_DELETE 必须显式置0，表默认值为NULL，且页面查询条件 IS_DELETE=0 不匹配NULL会导致数据不可见
+        // 转换 GsqMesStock → GsqStock（仅填充业务字段，日期/审计字段由目标微服务在其JVM时区设置）
+        // 关键：stockDate不在ITF模块设置（避免跨JVM时区的Jackson序列化偏移），
+        //      由远程Controller解析stockDateStr参数后统一回填；
+        //      createBy/createTime/updateBy/updateTime/isDelete由远程XML批量插入显式控制，
+        //      避免MetaObjectHandler在syncUser上下文下覆盖审计字段
         List<GsqStock> gsqStockInsertList = syncList.stream().map(item -> {
-            item.setStockDate(item.getStockDate() == null ? null : DateUtil.beginOfDay(item.getStockDate()));
-            item.setCreateBy("MES");
-            item.setUpdateBy("MES");
-            item.setCreateTime(DateUtils.getNowDate());
-            item.setUpdateTime(DateUtils.getNowDate());
-            item.setIsDelete(0);
-            return item;
+            GsqStock gsqStock = new GsqStock();
+            // 不设置stockDate，由目标端Controller解析stockDateStr后统一回填
+            gsqStock.setSteelRingCode(item.getMaterialCode());
+            gsqStock.setStockNum(item.getAvailableStock() != null ? item.getAvailableStock() : BigDecimal.ZERO);
+            // 修正数量/不良数量MES无此概念，默认0
+            gsqStock.setModifyNum(BigDecimal.ZERO);
+            gsqStock.setBadNum(BigDecimal.ZERO);
+            return gsqStock;
         }).collect(Collectors.toList());
 
         try {
-            // 取数据中最大库存日期作为逻辑删除条件（防止非当天数据混入时误删/漏删）
-            Date stockDate = gsqStockInsertList.stream()
-                    .map(GsqStock::getStockDate)
-                    .filter(Objects::nonNull)
-                    .max(Date::compareTo)
-                    .orElse(DateUtils.getNowDate());
-            String stockDateStr = DateUtil.formatDate(stockDate);
+            // 从MES数据中取库存日期字符串（所有数据均为同一天，取第一条非空即可）
+            // 字符串直接取自SQL CONVERT(VARCHAR)输出，不经过任何Date→String转换，彻底规避时区偏移
+            String stockDateStr = syncList.stream()
+                    .map(GsqMesStock::getStockDate)
+                    .filter(StringUtils::isNotBlank)
+                    .findFirst()
+                    .orElse(DateUtil.formatDate(DateUtils.getNowDate()));
 
             log.info("钢丝圈库存同步：开始同步，待插入数量={}, 库存日期={}", gsqStockInsertList.size(), stockDateStr);
 

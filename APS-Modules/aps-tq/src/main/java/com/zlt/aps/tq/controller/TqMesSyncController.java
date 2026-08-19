@@ -52,10 +52,11 @@ public class TqMesSyncController implements ITqMesSyncRemoteService {
      * 步骤1：逻辑删除指定库存日期的旧数据（IS_DELETE置为1）
      * 步骤2：批量插入MES最新库存数据（新记录，IS_DELETE=0）
      * 历史数据保留，只删当天库存日期的数据
+     * 日期字符串由Service在目标JVM时区解析为Date，彻底规避跨时区日期偏移
      *
-     * @param stockDate 库存日期，格式：yyyy-MM-dd
+     * @param stockDate 库存日期，格式：yyyy-MM-dd（字符串形式传输，避免Feign Jackson序列化Date偏移）
      * @param updateBy  更新者
-     * @param list      待插入的胎圈库存列表
+     * @param list      待插入的胎圈库存列表（stockDate未设置，由Service统一回填）
      * @return 结果
      */
     @Override
@@ -64,8 +65,7 @@ public class TqMesSyncController implements ITqMesSyncRemoteService {
     public AjaxResult logicDeleteAndSaveTqStockByStockDate(@RequestParam("stockDate") String stockDate,
                                                             @RequestParam("updateBy") String updateBy,
                                                             @RequestBody List<TqStock> list) {
-        Date date = DateUtil.parse(stockDate);
-        tqStockService.logicDeleteAndSaveBatch(date, updateBy, list);
+        tqStockService.logicDeleteAndSaveBatch(stockDate, updateBy, list);
         return AjaxResult.success();
     }
 

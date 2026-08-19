@@ -107,10 +107,11 @@ public class GsqMesSyncController implements IGsqMesSyncRemoteService {
      * 逻辑删除并批量保存钢丝圈库存（事务性操作）
      * 步骤1：逻辑删除指定库存日期的旧数据（IS_DELETE置为1）
      * 步骤2：批量插入MES最新钢丝圈库存数据（新记录，IS_DELETE=0）
+     * 日期字符串由Service在目标JVM时区解析为Date，彻底规避跨时区日期偏移
      *
-     * @param stockDate 库存日期，格式：yyyy-MM-dd
+     * @param stockDate 库存日期，格式：yyyy-MM-dd（字符串形式传输，避免Feign Jackson序列化Date偏移）
      * @param updateBy  更新者
-     * @param list      待插入的钢丝圈库存列表
+     * @param list      待插入的钢丝圈库存列表（stockDate未设置，由Service统一回填）
      * @return 结果
      */
     @Override
@@ -119,8 +120,7 @@ public class GsqMesSyncController implements IGsqMesSyncRemoteService {
     public AjaxResult logicDeleteAndSaveGsqStockByStockDate(@RequestParam("stockDate") String stockDate,
                                                              @RequestParam("updateBy") String updateBy,
                                                              @RequestBody List<GsqStock> list) {
-        Date date = DateUtil.parse(stockDate);
-        gsqStockService.logicDeleteAndSaveBatch(date, updateBy, list);
+        gsqStockService.logicDeleteAndSaveBatch(stockDate, updateBy, list);
         return AjaxResult.success();
     }
 }
