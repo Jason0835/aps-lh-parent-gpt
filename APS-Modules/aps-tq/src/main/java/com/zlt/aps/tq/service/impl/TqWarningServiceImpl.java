@@ -227,7 +227,7 @@ public class TqWarningServiceImpl implements ITqWarningService {
      */
     private TqWarningRecord buildStockWarningRecord(TqStock stock, double threshold) {
         TqWarningRecord record = new TqWarningRecord();
-        record.setFactoryCode(stock.getFactoryCode());
+        // t_tq_stock 表已删除 FACTORY_CODE 字段，预警记录分厂留空
         record.setWarningType(WARNING_TYPE_STOCK);
         record.setBeadCode(stock.getBeadCode());
         record.setWarningLevel(WARNING_LEVEL_MIDDLE);

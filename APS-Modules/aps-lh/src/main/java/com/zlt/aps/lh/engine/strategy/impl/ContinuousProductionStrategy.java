@@ -17,7 +17,6 @@ import com.zlt.aps.lh.api.domain.entity.LhRepairCapsule;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.entity.LhUnscheduledResult;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
-import com.zlt.aps.lh.api.enums.EmbryoUsageType;
 import com.zlt.aps.lh.api.enums.MachineStopTypeEnum;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
 import com.zlt.aps.lh.api.enums.ShiftEnum;
@@ -407,8 +406,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             appliedRule = "窗口及月底无计划收尾严格控量";
         } else if (isSingleMachine && isEnding) {
             getTargetScheduleQtyResolver().upsizeEndingTargetQty(context, sku);
-            appliedRule = getTargetScheduleQtyResolver().resolveEmbryoUsageType(context, sku)
-                    == EmbryoUsageType.SHARED
+            appliedRule = getTargetScheduleQtyResolver().isSharedEmbryoInWindow(context, sku)
                     ? "单机台收尾共用胎胚仅按余量" : "单机台收尾MAX(余量,胎胚库存)";
         } else if (isSingleMachine && sku.isStrictNewSpecShortageOnly()) {
             appliedRule = "窗口无计划仅补本月欠产";
@@ -3304,12 +3302,11 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         if (!CollectionUtils.isEmpty(skuResults)) {
             endingDemandQty = resolveEndingDemandQty(context, skuResults.get(0));
         } else {
-            // 兜底：共用胎胚（含同物料多机台）只取硫化余量；单胎胚/非共用胎胚才取 MAX。
+            // 兜底：同物料多机台属于共用胎胚只取硫化余量；单胎胚才取 MAX。
             int surplusQty = Math.max(0, sourceSku.getSurplusQty());
             int embryoStock = Math.max(0, sourceSku.getEmbryoStock());
             endingDemandQty = SkuTagEnum.ENDING.getCode().equals(sourceSku.getSkuTag())
-                    && getTargetScheduleQtyResolver().resolveEmbryoUsageType(context, sourceSku)
-                    == EmbryoUsageType.SHARED
+                    && getTargetScheduleQtyResolver().isSharedEmbryoInWindow(context, sourceSku)
                     ? surplusQty : Math.max(surplusQty, embryoStock);
         }
         return ShiftCapacityResolverUtil.roundUpQtyToMouldMultiple(endingDemandQty, sourceSku.getMouldQty());
@@ -7066,8 +7063,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         int endingDemandQty;
         if (getTargetScheduleQtyResolver().isEmbryoStockEnding(context, sourceSku)) {
             endingDemandQty = Math.max(0, sourceSku.getEmbryoStock());
-        } else if (getTargetScheduleQtyResolver().resolveEmbryoUsageType(context, sourceSku)
-                == EmbryoUsageType.SHARED) {
+        } else if (getTargetScheduleQtyResolver().isSharedEmbryoInWindow(context, sourceSku)) {
             endingDemandQty = Math.max(0, sourceSku.getSurplusQty());
         } else {
             endingDemandQty = Math.max(Math.max(0, sourceSku.getSurplusQty()), Math.max(0, sourceSku.getEmbryoStock()));
@@ -9503,8 +9499,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         // 仅收尾SKU才按共用胎胚规则（仅取硫化余量），非收尾SKU保持原口径
         if (sku != null
                 && SkuTagEnum.ENDING.getCode().equals(sku.getSkuTag())
-                && getTargetScheduleQtyResolver().resolveEmbryoUsageType(context, sku)
-                == EmbryoUsageType.SHARED) {
+                && getTargetScheduleQtyResolver().isSharedEmbryoInWindow(context, sku)) {
             return surplusQty;
         }
         return Math.max(surplusQty, embryoStock);
