@@ -149,6 +149,7 @@ export default {
         {
           align: "center",
           label: this.$t("ui.data.btn.option"),
+          minWidth: 120, width: 120,
           render: ({ row }) => {
             return (
               <el-button

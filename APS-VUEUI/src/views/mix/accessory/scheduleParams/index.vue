@@ -153,8 +153,8 @@ export default {
           align: "center",
           halign: "center",
           label: this.$t("ui.data.btn.option"),
-          minWidth: 180,
-          width: 180,
+          minWidth: 120,
+          width: 120,
           fixed: "right",
           render: ({ row }) => {
             return (

@@ -45,7 +45,7 @@ export default {
         {
           label: this.$t("common.option"),
           prop: "option",
-          width: "80px",
+          width: "120px",
           fixed: "left",
           render: ({ row }) => {
             return (

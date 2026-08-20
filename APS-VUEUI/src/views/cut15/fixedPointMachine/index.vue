@@ -157,6 +157,7 @@ export default {
           align: "center",
           halign: "center",
           label: this.$t("ui.data.btn.option"),
+          minWidth: 160, width: 160,
           prop: "option",
           render: ({ row }) => {
             return (

@@ -748,6 +748,7 @@ export default {
           align: "center",
           prop: "rowOperator",
           label: this.$t("common.option"),
+          minWidth: 280,
           width: 280,
           fixed: "right",
           render: ({ row }) => {
@@ -755,9 +756,8 @@ export default {
               <div>
                 {checkPermi(["lh:lhScheduleResult:adjustQuantity"]) ? (
                   <el-button
-                    type="text"
-                    size="mini"
-                    icon="el-icon-edit"
+                    class="minus"
+                    type="success"
                     onClick={() => this.handleChangePlan(row)}
                   >
                     {this.$t("ui.data.column.scheduleResult.changePlan")}
@@ -765,9 +765,8 @@ export default {
                 ) : null}
                 {checkPermi(["lh:skuDecrement:confirm"]) ? (
                   <el-button
-                    type="text"
-                    size="mini"
-                    icon="el-icon-check"
+                    class="minus"
+                    type="primary"
                     onClick={() => this.handleConfirmSkuDecrement(row)}
                   >
                     {this.$t("ui.data.btn.lhSkuDecrement.confirm")}
@@ -775,9 +774,8 @@ export default {
                 ) : null}
                 {checkPermi(["lh:lhScheduleResult:remove"]) ? (
                   <el-button
-                    type="text"
-                    size="mini"
-                    icon="el-icon-delete"
+                    class="minus"
+                    type="danger"
                     onClick={() => this.handleDelete(row)}
                   >
                     {this.$t("ui.frame.btn.delete")}

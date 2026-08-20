@@ -225,6 +225,7 @@ export default {
         {
           align: "center",
           label: this.$t("common.option"),
+          minWidth: 160, width: 160,
           fixed: "right",
           render: ({ row }) => {
             return (

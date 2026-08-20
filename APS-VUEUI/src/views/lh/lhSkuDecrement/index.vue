@@ -119,20 +119,21 @@ export default {
         {
           prop: "option",
           label: this.$t("common.option"),
-          width: 90,
+          width: 120,
           fixed: "right",
           align: "center",
           render: ({ row }) => {
             return (
-              <el-button
-                v-hasPermi={["lh:skuDecrement:remove"]}
-                type="text"
-                size="mini"
-                icon="el-icon-delete"
-                onClick={() => this.handleDelete(row)}
-              >
-                {this.$t("ui.frame.btn.delete")}
-              </el-button>
+              <div>
+                <el-button
+                  v-hasPermi={["lh:skuDecrement:remove"]}
+                  class="minus"
+                  type="danger"
+                  onClick={() => this.handleDelete(row)}
+                >
+                  {this.$t("ui.frame.btn.delete")}
+                </el-button>
+              </div>
             );
           },
         },

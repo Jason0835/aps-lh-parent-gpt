@@ -239,7 +239,7 @@ export default {
           align: "center",
           label: this.$t("ui.data.btn.option"),
           fixed: "right",
-          width:180,
+          width: 160,
           render: ({ row }) => {
             return (
               <div>
