@@ -24,6 +24,13 @@
           @click="handleAdd"
           >{{ $t("ui.frame.btn.add") }}</el-button
         >
+        <el-button
+          v-hasPermi="['nc:glueGroupOrder:remove']"
+          type="danger"
+          @click="handleDeleteMulti"
+          :disabled="selection.length == 0"
+          >{{ $t("ui.frame.btn.delete") }}</el-button
+        >
         <!-- <el-button
           type="warning"
           v-hasPermi="['nc:glueGroupOrder:edit']"
@@ -215,6 +222,24 @@ export default {
         type: "warning",
       }).then(() => {
         const ids = row.id;
+        this.loading = true;
+        removeGlueGroupOrder({ ids })
+          .then((data) => {
+            this.$modal.msgSuccess(data.msg);
+            this.$set(this.page, "current", 1);
+            this.getList();
+          })
+          .catch((error) => {
+            console.log(error);
+            this.loading = false;
+          });
+      });
+    },
+    handleDeleteMulti() {
+      this.$confirm(this.$t("common.confirm.delete"), {
+        type: "warning",
+      }).then(() => {
+        const ids = this.selection.map((row) => row.id).join(",");
         this.loading = true;
         removeGlueGroupOrder({ ids })
           .then((data) => {
