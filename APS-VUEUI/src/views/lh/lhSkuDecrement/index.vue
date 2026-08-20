@@ -150,9 +150,9 @@ export default {
         {
           label: this.$t("ui.data.column.lhSkuDecrement.yearMonth"),
           prop: "yearMonth",
-          type: "month",
+          type: "date",
+          dateType: "month",
           valueFormat: "yyyy-MM",
-          format: "yyyy-MM",
           minWidth: 150,
         },
         {
