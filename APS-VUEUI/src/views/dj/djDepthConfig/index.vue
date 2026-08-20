@@ -118,6 +118,14 @@ export default {
       let columns = [
         { type: "selection", fixed: "left" },
         {
+          label: this.$t("ui.data.column.factoryCode"),
+          prop: "factoryCode",
+          minWidth: 100,
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_factory_name, value);
+          },
+        },
+        {
           prop: "minMachineQty",
           halign: "center",
           label: this.$t("ui.dj.depthConfig.column.minMachineQty"),
@@ -138,6 +146,13 @@ export default {
           halign: "center",
           label: this.$t("ui.common.column.remark"),
           minWidth: 100,
+        },
+        {
+          prop: "updateTime",
+          align: "center",
+          halign: "center",
+          label: this.$t("common.updateTime"),
+          minWidth: 160,
         },
         {
           align: "center",
