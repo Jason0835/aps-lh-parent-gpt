@@ -3041,7 +3041,7 @@ public class MpWeekRollAdjustEngine {
         DailyMouldAvailabilityResult cavity2BlockVo = contextDTO.getCavity2BlockMap().get(iDay);
         if (cavity2BlockVo != null && cavity2BlockVo.getCavityResults() != null){
             Integer cavityQty = cavity2BlockVo.getCavityResults().get(mpFinalVo.getStructureName()+mpFinalVo.getMainPattern());
-            return cavityQty != null ? cavityQty:mpFinalVo.getMouldCavityQty();
+            return cavityQty != null ? cavityQty:Convert.toInt(mpFinalVo.getMouldCavityQty(),0);
         }
         return mpFinalVo.getMouldCavityQty();
     }
