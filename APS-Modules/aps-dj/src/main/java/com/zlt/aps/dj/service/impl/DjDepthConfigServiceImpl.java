@@ -1,9 +1,16 @@
 package com.zlt.aps.dj.service.impl;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import javax.annotation.Resource;
 
+import org.apache.commons.collections.CollectionUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -11,6 +18,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.engine.service.FactoryService;
 import com.zlt.aps.dj.api.domain.entity.DjDepthConfig;
 import com.zlt.aps.dj.mapper.DjDepthConfigMapper;
@@ -45,7 +53,8 @@ public class DjDepthConfigServiceImpl extends AbstractDocService<DjDepthConfig> 
     }
 
     /**
-     * 导入数据，并保存记录：导入模板不含工厂列，先统一填充当前工厂编码后再走基类导入逻辑
+     * 导入数据，并保存记录：导入模板不含工厂列，先统一填充当前工厂编码后，
+     * 再将导入数据与数据库现有数据合并统一校验区间连续性与完整性，校验通过后走基类导入逻辑
      *
      * @param list          要导入数据
      * @param updateSupport 已存在是否更新
@@ -54,9 +63,40 @@ public class DjDepthConfigServiceImpl extends AbstractDocService<DjDepthConfig> 
      */
     @Override
     public AjaxResult importData(List<DjDepthConfig> list, boolean updateSupport, Long importLogId) {
-        String factoryCode = factoryService.getFactoryCode();
-        list.forEach(entity -> entity.setFactoryCode(factoryCode));
+        // 导入前：将导入数据与数据库现有数据合并后统一校验区间连续性与完整性
+        if (CollectionUtils.isNotEmpty(list)
+                && UserConstants.NOT_UNIQUE.equals(this.validateMergedContinuity(list, updateSupport))) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.dj.depthConfig.rangeCross"));
+        }
         return super.importData(list, updateSupport, importLogId);
+    }
+
+    /**
+     * 将导入数据与数据库现有数据合并后，统一校验配置区间的连续性与完整性
+     *
+     * @param list          导入数据
+     * @param updateSupport 已存在是否更新
+     * @return 校验结果：UserConstants.UNIQUE 合法，NOT_UNIQUE 不合法
+     */
+    private String validateMergedContinuity(List<DjDepthConfig> list, boolean updateSupport) {
+        // 查询当前工厂下现有配置
+        String factoryCode = list.get(0).getFactoryCode();
+        LambdaQueryWrapper<DjDepthConfig> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(DjDepthConfig::getFactoryCode, factoryCode);
+        List<DjDepthConfig> mergedList = new ArrayList<>(depthConfigMapper.selectList(queryWrapper));
+        if (updateSupport) {
+            // 更新模式下：导入数据将覆盖同区间(minMachineQty)的现有记录，先移除被覆盖记录再合并
+            Set<Integer> importMinSet = list.stream()
+                    .map(DjDepthConfig::getMinMachineQty)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+            mergedList.removeIf(exist -> importMinSet.contains(exist.getMinMachineQty()));
+        }
+        mergedList.addAll(list);
+        // 按最小机台数升序排列后统一校验
+        mergedList.sort(Comparator.comparing(DjDepthConfig::getMinMachineQty,
+                Comparator.nullsLast(Comparator.naturalOrder())));
+        return this.validateContinuity(mergedList);
     }
 
     /**
@@ -209,6 +249,13 @@ public class DjDepthConfigServiceImpl extends AbstractDocService<DjDepthConfig> 
             }
         }
         return UserConstants.UNIQUE;
+    }
+    
+    @Override
+    protected List<String> getCheckUniqueFields() {
+        List<String> fields = new ArrayList<>();
+        fields.add("minMachineQty");
+        return fields;
     }
 
     @Override

@@ -98,7 +98,7 @@ public class NcLossSettingController extends AbstractDocBizController<NcLossSett
     @Override
     protected List<NcLossSetting> listExportData(NcLossSetting obj) {
         QueryWrapper<NcLossSetting> wrapper = new QueryWrapper<>();
-        startPage("update_time desc");
+        startPage(getOrderBy());
         this.builderCondition(wrapper, obj);
         List<NcLossSetting> list = lossSettingMapper.selectList(wrapper);
         AppUtils.formatData(list, getQueryFormulas());
@@ -127,7 +127,7 @@ public class NcLossSettingController extends AbstractDocBizController<NcLossSett
 
     @Override
     protected String getOrderBy() {
-        return "MACHINE_CODE, LINING_CODE";
+        return "MACHINE_CODE, LINING_CODE, ID";
     }
 
     @Override

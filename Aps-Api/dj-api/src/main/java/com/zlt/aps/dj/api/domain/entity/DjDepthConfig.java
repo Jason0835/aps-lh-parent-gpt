@@ -61,7 +61,13 @@ public class DjDepthConfig extends BaseEntity implements Serializable {
      */
     @Excel(name = "ui.dj.depthConfig.column.depthClassQty")
     @ApiModelProperty(value = "垫胶备库班数")
-    @ImportExcelValidated(required = true, digits = true, min = 0, max = 99999)
+    @ImportExcelValidated(required = true, number = true, min = 0, max = 99999)
     @TableField("DEPTH_CLASS_QTY")
     private BigDecimal depthClassQty;
+
+    @Excel(name = "ui.data.column.info.remark")
+    @ImportExcelValidated(name = "ui.data.column.info.remark", maxLength = 100)
+    @ApiModelProperty(value = "备注")
+    @TableField(value = "REMARK")
+    private String remark;
 }
