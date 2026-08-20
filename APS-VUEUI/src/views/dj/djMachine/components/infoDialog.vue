@@ -41,7 +41,7 @@ export default {
       isEdit: false,
       factoryCode: "",
       form: {
-        classShift: "2",
+        classShift: "3",
         openMachineClass: [],
       },
       rules: {
@@ -73,6 +73,15 @@ export default {
     },
     columns() {
       return [
+        {
+          label: this.$t("ui.data.column.factoryCode"),
+          prop: "factoryCode",
+          span: 24,
+          type: "select",
+          dictData: this.parentDict.type.biz_factory_name,
+          required: true,
+          disabled: true,
+        },
         {
           label: this.$t("ui.data.column.machine.machineCode"),
           prop: "machineCode",
@@ -202,7 +211,14 @@ export default {
       if (!this.factoryCode) {
         getConfigKey("sys.factory.code").then((response) => {
           this.factoryCode = response.msg;
+          // 新增时默认选中默认工厂（工厂字段不可编辑）
+          if (!data) {
+            this.form = { ...this.form, factoryCode: response.msg };
+          }
         });
+      } else if (!data) {
+        // 新增时默认选中默认工厂（工厂字段不可编辑）
+        this.form = { ...this.form, factoryCode: this.factoryCode };
       }
       if (data) {
         this.isEdit = true;
@@ -217,7 +233,7 @@ export default {
       }
     },
     hide() {
-      this.form = { classShift: "2", openMachineClass: [] };
+      this.form = { classShift: "3", openMachineClass: [] };
       this.$refs.form.triggerResetForm();
       // this.resetForm("infoForm");
       this.isEdit = false;

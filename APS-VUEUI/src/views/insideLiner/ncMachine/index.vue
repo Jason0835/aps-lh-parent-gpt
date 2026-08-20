@@ -141,32 +141,6 @@ export default {
       return [
         { type: "selection", fixed: "left" },
         {
-          prop: "updateTime",
-          align: "center",
-          halign: "center",
-          label: this.$t("common.updateTime"),
-          minWidth: 160,
-        },
-        {
-          label: this.$t("common.option"),
-          prop: "option",
-          width: "100px",
-          fixed: "left",
-          render: ({ row }) => {
-            return (
-              <div>
-                <el-button
-                  class="minus"
-                  type="success"
-                  onClick={() => this.handleEdit(row)}
-                >
-                  {this.$t("ui.frame.btn.update")}
-                </el-button>
-              </div>
-            );
-          },
-        },
-        {
           label: this.$t("ui.data.column.factoryCode"),
           prop: "factoryCode",
           minWidth: 100,
@@ -262,6 +236,31 @@ export default {
           // sortable: "custom",
           formatter: (row) => {
             return row.remark || "-";
+          },
+        },
+        {
+          prop: "updateTime",
+          align: "center",
+          halign: "center",
+          label: this.$t("common.updateTime"),
+          minWidth: 160,
+        },
+        {
+          label: this.$t("common.option"),
+          prop: "option",
+          width: "100px",
+          render: ({ row }) => {
+            return (
+              <div>
+                <el-button
+                  class="minus"
+                  type="success"
+                  onClick={() => this.handleEdit(row)}
+                >
+                  {this.$t("ui.frame.btn.update")}
+                </el-button>
+              </div>
+            );
           },
         },
       ];
@@ -443,6 +442,7 @@ export default {
   },
   mounted() {},
   created() {
+    //localStorage.removeItem("insideLinerMachineMainTable");
     getConfigKey("sys.factory.code").then(response => {
       this.search.factoryCode = response.msg;
       this.query.factoryCode = response.msg;
