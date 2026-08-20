@@ -621,6 +621,7 @@ public class TcScheduleContext {
                 .filter(Objects::nonNull)
                 .filter(task -> entry.getTaskBusinessKey().equals(task.getBusinessKey()))
                 .map(TcTaskDraft::getToolLedgerOrder)
+                .filter(Objects::nonNull)
                 .findFirst()
                 .orElse(null);
     }
