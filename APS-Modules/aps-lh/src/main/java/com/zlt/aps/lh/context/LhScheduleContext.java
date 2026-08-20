@@ -322,6 +322,13 @@ public class LhScheduleContext {
     private Map<String, Integer> capsuleReplacementShiftCapacityLimitMap =
             new LinkedHashMap<String, Integer>();
     /**
+     * 换胶囊时间占用窗口，key=物理机台编码+工作日期+班次序号。
+     * <p>仅班次未满产的首次严格跨限写入；产能、开产与完工时间通过该窗口统一向后推进，
+     * 不再追加固定扣减量，避免同一次换胶囊重复扣产能。</p>
+     */
+    private Map<String, CapsuleReplacementTimeWindowDTO> capsuleReplacementTimeWindowMap =
+            new LinkedHashMap<String, CapsuleReplacementTimeWindowDTO>();
+    /**
      * 硫化精度保养计划Map, key=machineCode
      */
     private Map<String, LhPrecisionPlan> maintenancePlanMap = new HashMap<>();

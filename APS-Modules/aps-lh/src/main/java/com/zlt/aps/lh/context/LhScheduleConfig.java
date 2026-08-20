@@ -224,16 +224,29 @@ public class LhScheduleConfig {
     }
 
     /**
-     * 获取换胶囊班次固定扣减量。
+     * 获取换胶囊班次满产时的固定扣减量。
      *
-     * <p>默认值2代表换胶囊固定占用1小时，对应减少2条可排量；配置为0时仍可记录
-     * 换胶囊动作，但不减少班次计划量。</p>
+     * <p>仅当触发换胶囊的班次已经达到实际可用班产时使用该数量扣减；班次未满产时
+     * 改由 {@link #getCapsuleReplacementDurationHours()} 形成时间占用，禁止两种方式叠加。</p>
      *
-     * @return 本批首次严格跨限的班次扣减量，最小为0
+     * @return 本批首次严格跨限且班次满产时的扣减量，最小为0
      */
     public int getCapsuleChangeLossQty() {
         return Math.max(0, getParamIntValue(LhScheduleParamConstant.CAPSULE_CHANGE_LOSS_QTY,
                 LhScheduleConstant.CAPSULE_CHANGE_LOSS_QTY));
+    }
+
+    /**
+     * 获取换胶囊时长。
+     *
+     * <p>仅当触发换胶囊的班次未满产时使用。参数无效时由配置解析器回退默认值，
+     * 这里仍保留最小1小时保护，避免运行态生成零时长窗口。</p>
+     *
+     * @return 换胶囊占用时长（小时）
+     */
+    public int getCapsuleReplacementDurationHours() {
+        return Math.max(1, getParamIntValue(LhScheduleParamConstant.CAPSULE_REPLACEMENT_DURATION_HOURS,
+                LhScheduleConstant.CAPSULE_REPLACEMENT_DURATION_HOURS));
     }
 
     /**

@@ -14049,7 +14049,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             }
             // 回填是在原结果已有产量基础上的真实增量，必须用原结果判断胶囊次数并承载换胶囊备注。
             shiftRefillQty = capsuleReplacementRuleService.resolveActualPlanQty(
-                    context, sourceResult, shift, shiftRefillQty,
+                    context, sourceResult, shift, shiftRefillQty, currentQty + availableQty,
+                    shift.getShiftStartDateTime(),
                     "新增SKU增机台失败后原机台回填");
             if (shiftRefillQty <= 0) {
                 continue;
@@ -15120,6 +15121,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 // 当前班补量先执行换胶囊扣减，扣减差额继续保留在真实余量中供下一晚班排产。
                 currentShiftFillQty = capsuleReplacementRuleService.resolveActualPlanQty(
                         context, result, currentShift, currentShiftFillQty,
+                        currentShiftBeforeQty + currentShiftAvailableQty,
+                        currentShift.getShiftStartDateTime(),
                         "新增排产不可换模当前班补量");
                 Date currentShiftStartTime = ShiftFieldUtil.getShiftStartTime(result, currentShift.getShiftIndex());
                 setShiftPlanQty(result, currentShift.getShiftIndex(), currentShiftBeforeQty + currentShiftFillQty,
@@ -15142,7 +15145,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                     "晚班不可换模晚班补量")) {
                 // 下一晚班同样属于正式落班增量，实际余量只消费换胶囊扣减后的数量。
                 fillQty = capsuleReplacementRuleService.resolveActualPlanQty(
-                        context, result, nextShift, fillQty,
+                        context, result, nextShift, fillQty, currentQty + availableQty,
+                        nextShift.getShiftStartDateTime(),
                         "新增排产不可换模晚班补量");
                 setShiftPlanQty(result, nextShift.getShiftIndex(), currentQty + fillQty,
                         nextShift.getShiftStartDateTime(), null);
@@ -16008,9 +16012,13 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
              * 此处先记录实际扣减量，后续同班常规产量还要同时扣除这部分班产和需求上限，
              * 防止被扣的2条又在同一个班次以常规产量补回；差额必须保留给下一班继续排产。
              */
+            int firstInspectionShiftCapacity = Math.max(previewFirstInspectionQty,
+                    shiftPlanCapacityMap.getOrDefault(firstInspectionShift.getShiftIndex(), shiftCapacity));
+            Date firstInspectionStartTime = Objects.nonNull(mouldChangeCompleteTime)
+                    ? mouldChangeCompleteTime : startTime;
             int adjustedFirstInspectionQty = capsuleReplacementRuleService.resolveActualPlanQty(
                     context, result, firstInspectionShift, previewFirstInspectionQty,
-                    "新增排产首检");
+                    firstInspectionShiftCapacity, firstInspectionStartTime, "新增排产首检");
             if (adjustedFirstInspectionQty <= 0) {
                 log.warn("新增SKU强制首检经换胶囊规则收口后为0，终止当前候选班次分配, "
                                 + "batchNo: {}, materialCode: {}, machineCode: {}, firstInspectionShift: class{}",
@@ -16044,6 +16052,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             }
         }
         remaining -= firstInspectionQty;
+        // 首检阶段可能触发未满产换胶囊，后续常规生产必须使用已合并时间窗口的最新产能口径。
+        maintenanceWindowList = resolveMachineMaintenanceWindowList(context, result.getLhMachineCode());
         Map<Integer, ShiftRuntimeState> stateMap = context.getShiftRuntimeStateMap();
         int dryIceLossQty = context.getParamIntValue(
                 LhScheduleParamConstant.DRY_ICE_LOSS_QTY, LhScheduleConstant.DRY_ICE_LOSS_QTY);
@@ -16145,8 +16155,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                     && Objects.equals(firstInspectionShift.getShiftIndex(), shift.getShiftIndex());
             if (isCurrentShiftFirstInspectionShift && firstInspectionCapsuleLossQty > 0) {
                 /*
-                 * 换胶囊固定占用1小时，首检阶段已经触发时，当前班剩余常规产能仍须扣除同一份损失。
-                 * 同时按扣减前需求量封顶，避免余量较小时把已扣数量重新补回当前班次。
+                 * 满产数量模式在首检阶段已经触发时，当前班剩余常规产能仍须扣除同一份数量损失。
+                 * 未满产时间模式不进入本分支，后续班次产能由换胶囊时间窗口统一重算。
                  */
                 shiftMaxQty = Math.max(0, shiftMaxQty - firstInspectionCapsuleLossQty);
                 int currentShiftDemandCap = Math.max(0,
@@ -16233,7 +16243,9 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 }
                 // 起排上限等既有规则通过后再扣换胶囊产能，避免胶囊规则反向改变SKU起排和选机判断。
                 shiftQty = capsuleReplacementRuleService.resolveActualPlanQty(
-                        context, result, shift, shiftQty, "新增排产");
+                        context, result, shift, shiftQty, shiftMaxQty, effectiveStart, "新增排产");
+                // 未满产换胶囊可能刚登记时间窗口，后续班次必须立即读取最新窗口重新计算产能。
+                maintenanceWindowList = resolveMachineMaintenanceWindowList(context, result.getLhMachineCode());
                 if (shiftQty <= 0) {
                     logNewSpecShiftSkip(result, shift, remaining, shiftCapacity,
                             physicalShiftMaxQty, shiftMaxQty, "换胶囊固定扣减后本班实际排产量为0");
