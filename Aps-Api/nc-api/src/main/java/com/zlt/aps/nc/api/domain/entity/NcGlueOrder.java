@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
+import com.zlt.common.annotation.ImportExcelValidated;
 
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
@@ -27,6 +28,8 @@ public class NcGlueOrder extends BaseEntity implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
+    @Excel(name = "ui.data.column.factoryCode", dictType = "biz_factory_name")
+    @ImportExcelValidated(required = true, isCode = true, maxLength = 50)
     @ApiModelProperty(value = "工厂编码")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
@@ -37,21 +40,19 @@ public class NcGlueOrder extends BaseEntity implements Serializable {
 
     @Excel(name = "ui.glueOrder.column.glueCode")
     @ApiModelProperty(value = "胶料编号")
+    @ImportExcelValidated(required = true)
     @TableField("GLUE_CODE")
     private String glueCode;
 
     @Excel(name = "ui.glueOrder.column.orderNum")
     @ApiModelProperty(value = "生产顺序")
+    @ImportExcelValidated(required = true)
     @TableField("ORDER_NUM")
     private Integer orderNum;
 
-    @Excel(name = "ui.common.column.remark")
-    @ApiModelProperty(value = "备注")
-    @TableField("REMARK")
-    private String remark;
-
     /** 反显字段：胶料组代码 */
     @Excel(name = "ui.glueGroup.column.glueGroupCode")
+    @ImportExcelValidated(required = true)
     @TableField(exist = false)
     @ApiModelProperty(value = "胶料组代码")
     private String glueGroupCode;
@@ -67,4 +68,9 @@ public class NcGlueOrder extends BaseEntity implements Serializable {
     @TableField(exist = false)
     @ApiModelProperty(value = "胶料组序号")
     private Integer glueGroupOrderNum;
+
+    @Excel(name = "ui.common.column.remark")
+    @ApiModelProperty(value = "备注")
+    @TableField("REMARK")
+    private String remark;
 }

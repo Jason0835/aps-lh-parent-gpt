@@ -29,6 +29,8 @@ public class NcCurlRoll extends ApsBaseEntity implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
+    @Excel(name = "ui.data.column.factoryCode", dictType = "biz_factory_name")
+    @ImportExcelValidated(required = true, isCode = true, maxLength = 50)
     @ApiModelProperty(value = "工厂编码")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
