@@ -9919,11 +9919,11 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             }
             int dayNShortageCompensationQty = resolveContinuationAddMachineCompensationQty(
                     context, sourceSku, firstAddMachineProductionDate, activeMachineCount);
-            // remainingQty 是 S4.4 结果扣账后仍需由 S4.5 新增链路补齐的缺口。
-            int remainingQty = resolveContinuousCompensationQty(
+            // expansionTriggerQty 只决定是否进入新增链路；dayN 差额不得直接作为实际生产目标上限。
+            int expansionTriggerQty = resolveContinuousCompensationQty(
                     context, sourceSku, dayNShortageCompensationQty);
-            logContinuousExpansionDecision(context, sourceSku, shortageQuotaPlan, remainingQty);
-            if (remainingQty <= 0 || hasContinuousCompensationSku(context, sourceSku)) {
+            logContinuousExpansionDecision(context, sourceSku, shortageQuotaPlan, expansionTriggerQty);
+            if (expansionTriggerQty <= 0 || hasContinuousCompensationSku(context, sourceSku)) {
                 continue;
             }
             if (isContinuousDailyRhythmSatisfiedWithoutForcedShortage(context, sourceSku)) {
@@ -9934,26 +9934,45 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                         sourceSku.getShiftCapacity(), sumDailyPlanQty(sourceSku.getDailyPlanQuotaMap()));
                 continue;
             }
+            int productionRemainingQty = this.resolveContinuousCompensationProductionQty(
+                    context, sourceSku, dayNShortageCompensationQty, expansionTriggerQty);
+            if (productionRemainingQty <= 0) {
+                log.info("续作加机台需求跳过，物料实际生产账本已无余量, materialCode: {}, "
+                                + "首次增机日: {}, 增机触发差额: {}, 实际可生产余量: {}",
+                        sourceSku.getMaterialCode(), firstAddMachineProductionDate,
+                        expansionTriggerQty, productionRemainingQty);
+                continue;
+            }
             SkuScheduleDTO compensationSku = copyContinuousCompensationSku(
-                    sourceSku, remainingQty, firstAddMachineProductionDate, activeMachineCount,
+                    sourceSku, productionRemainingQty, expansionTriggerQty,
+                    firstAddMachineProductionDate, activeMachineCount,
                     requiredMachineCount, shortageMachineCount, addMachineDayPlanQty);
             /*
-             * 续作加机台补偿量是 S4.4 扣账后 S4.5 尚需排产的“剩余量”，不是新的总目标量。
-             * 同物料同状态共用中心账本：保留续作已消费量，并把账本剩余量收敛到本次补偿量。
-             * 若误用“按总目标量同步”，会再次扣减历史消费量，导致新增阶段只能拿到错误的残量；
-             * 没有生成续作补偿SKU的纯收尾路径不经过此处，既有严格收尾上限保持不变。
+             * dayN 产能缺口只负责触发新增机台和限制新增台数，不能收敛“物料+产品状态”实际消费账本：
+             * 否则 56-54=2 会被误当成整台机台的生产上限，新增机台只排2条首检便提前下机。
+             * 非 dayN 的历史欠产/严格补偿仍沿用原剩余量合并语义，避免扩大其业务目标。
              */
-            this.getTargetScheduleQtyResolver().syncProductionRemainingQtyToRemaining(
-                    context, sourceSku, remainingQty, "续作加机台补偿账本合并");
+            if (dayNShortageCompensationQty <= 0) {
+                this.getTargetScheduleQtyResolver().syncProductionRemainingQtyToRemaining(
+                        context, sourceSku, productionRemainingQty, "续作加机台补偿账本合并");
+            } else {
+                log.info("续作dayN加机台保留实际生产账本, materialCode: {}, productStatus: {}, "
+                                + "首次增机日: {}, 增机触发差额: {}, 缺口机台数: {}, 实际可生产余量: {}",
+                        sourceSku.getMaterialCode(), this.normalizeProductStatus(sourceSku.getProductStatus()),
+                        firstAddMachineProductionDate, expansionTriggerQty,
+                        shortageMachineCount, productionRemainingQty);
+            }
             // 续作加机台候选保留同一日计划账本，S4.5 排到后会继续消费剩余额度，避免重复扩大日计划。
             context.getNewSpecSkuList().add(compensationSku);
             log.info("续作加机台需求生成，转新增规格链路统一竞争, materialCode: {}, 原续作机台: {}, "
                             + "首次增机日: {}, 当前续作机台数: {}, dayN最小机台数: {}, 缺口机台数: {}, "
-                            + "增机日计划量: {}, 已排: {}, 需求量: {}, 窗口日计划剩余: {}, sourceType: {}, dayPlanSummary: {}",
+                            + "增机日计划量: {}, 已排: {}, 增机触发差额: {}, 实际可生产余量: {}, "
+                            + "窗口日计划剩余: {}, sourceType: {}, dayPlanSummary: {}",
                     sourceSku.getMaterialCode(), sourceSku.getContinuousMachineCode(),
                     firstAddMachineProductionDate, activeMachineCount, requiredMachineCount, shortageMachineCount,
                     addMachineDayPlanQty,
-                    resolveScheduledQtyBySourceSku(context, sourceSku), remainingQty,
+                    resolveScheduledQtyBySourceSku(context, sourceSku), expansionTriggerQty,
+                    productionRemainingQty,
                     SkuDailyPlanQuotaUtil.sumRemainingQty(sourceSku.getDailyPlanQuotaMap()),
                     compensationSku.getSourceType(),
                     formatDailyPlanQuotaSummary(sourceSku));
@@ -10093,6 +10112,28 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             return 0;
         }
         return targetRemainingQty;
+    }
+
+    /**
+     * 解析续作补偿SKU进入新增链路后的实际可生产余量。
+     * <p>dayN 缺口量只表示增机触发条件，实际排产必须继续读取物料+产品状态中心账本；
+     * 非 dayN 补偿没有独立触发差额，继续沿用已计算的补偿剩余量。</p>
+     *
+     * @param context 排程上下文
+     * @param sourceSku 来源续作SKU
+     * @param dayNShortageCompensationQty dayN 产能缺口量
+     * @param compensationQty 已计算的补偿量
+     * @return 补偿SKU进入新增主链后的实际可生产余量
+     */
+    private int resolveContinuousCompensationProductionQty(
+            LhScheduleContext context,
+            SkuScheduleDTO sourceSku,
+            int dayNShortageCompensationQty,
+            int compensationQty) {
+        if (dayNShortageCompensationQty > 0) {
+            return this.getTargetScheduleQtyResolver().resolveProductionRemainingQty(context, sourceSku);
+        }
+        return Math.max(0, compensationQty);
     }
 
     /**
@@ -10908,11 +10949,18 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
      * 复制续作SKU为新增补偿SKU。
      *
      * @param sourceSku 来源续作SKU
-     * @param remainingQty 补偿量
+     * @param productionRemainingQty 实际可生产余量
+     * @param addMachineTriggerQty dayN 增机触发差额
+     * @param firstAddMachineProductionDate 首次允许新增机台的业务日期
+     * @param activeMachineCount 当前有效续作机台数
+     * @param requiredMachineCount dayN要求的最小机台数
+     * @param shortageMachineCount 当前缺少的机台数
+     * @param addMachineDayPlanQty 首次增机日的原始日计划量
      * @return 新增补偿SKU
      */
     private SkuScheduleDTO copyContinuousCompensationSku(SkuScheduleDTO sourceSku,
-                                                         int remainingQty,
+                                                         int productionRemainingQty,
+                                                         int addMachineTriggerQty,
                                                          LocalDate firstAddMachineProductionDate,
                                                          int activeMachineCount,
                                                          int requiredMachineCount,
@@ -10927,15 +10975,16 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         // 续作增机台补偿只进入新增统一排序和统一选机，不锁回原续作机台。
         compensationSku.setPreferredContinuousMachineCode(null);
         compensationSku.setContinuousCompensationSku(true);
-        compensationSku.setTargetScheduleQty(remainingQty);
-        compensationSku.setPendingQty(remainingQty);
-        compensationSku.setRemainingScheduleQty(remainingQty);
+        compensationSku.setTargetScheduleQty(productionRemainingQty);
+        compensationSku.setPendingQty(productionRemainingQty);
+        compensationSku.setRemainingScheduleQty(productionRemainingQty);
         compensationSku.setStrictTargetQty(policy.isStrictUpperLimit());
         compensationSku.setFirstAddMachineProductionDate(firstAddMachineProductionDate);
         compensationSku.setContinuationActiveMachineCount(Math.max(0, activeMachineCount));
         compensationSku.setContinuationRequiredMachineCount(Math.max(0, requiredMachineCount));
         compensationSku.setContinuationShortageMachineCount(Math.max(0, shortageMachineCount));
         compensationSku.setContinuationAddMachineDayPlanQty(Math.max(0, addMachineDayPlanQty));
+        compensationSku.setContinuationAddMachineTriggerQty(Math.max(0, addMachineTriggerQty));
         // 复用同一份日计划账本，作为续作补偿SKU与来源续作SKU的共享归属锚点。
         compensationSku.setDailyPlanQuotaMap(sourceSku.getDailyPlanQuotaMap());
         // 显式传递窗口后下一日（T+3）与后续月计划量，确保补偿SKU进入新增链路后仍能按 dayN 节奏
