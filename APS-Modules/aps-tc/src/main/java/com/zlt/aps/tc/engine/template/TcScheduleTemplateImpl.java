@@ -299,21 +299,39 @@ public class TcScheduleTemplateImpl extends AbsTcScheduleTemplate {
         shiftTaskMap.forEach((shiftOrder, shiftTaskList) -> {
             // 仅改变过程日志展示顺序：已排任务按最终机台任务链连续成块，未排任务稳定排在最后。
             shiftTaskList.sort(this.buildMachineProcessLogTaskComparator(context));
-            shiftTaskList.forEach(task -> {
-                if (!task.isUnassigned()) {
-                    context.appendShiftProcessLog(shiftOrder, ScheduleProcessLogSection.TOOL_LIMIT,
-                            this.buildToolUsageSummary(task, context));
+            Map<String, Integer> displayOrderMap = new HashMap<>();
+            for (int index = 0; index < shiftTaskList.size(); index++) {
+                TcTaskDraft task = shiftTaskList.get(index);
+                if (task != null && StrUtil.isNotBlank(task.getBusinessKey())) {
+                    displayOrderMap.put(task.getBusinessKey(), index);
                 }
+            }
+            shiftTaskList.forEach(task -> {
                 this.appendMachineCandidateDetail(context, task);
                 if (!task.isUnassigned() && StrUtil.isNotBlank(task.getMachineCode())) {
-                    context.appendShiftProcessLog(shiftOrder, ScheduleProcessLogSection.MACHINE_SELECTION_CAPACITY,
+                    context.appendShiftProcessLog(shiftOrder, ScheduleProcessLogSection.MACHINE_SELECTION,
                             "机台确认：胎侧代码={0}，机台={1}",
                             task.getSidewallCode(), task.getMachineCode());
-                    context.appendShiftProcessLog(shiftOrder, ScheduleProcessLogSection.MACHINE_SELECTION_CAPACITY,
+                }
+            });
+            shiftTaskList.stream()
+                    .sorted(this.buildToolLedgerProcessLogTaskComparator(displayOrderMap))
+                    .forEach(task -> {
+                if (!task.isUnassigned() && StrUtil.isNotBlank(task.getMachineCode())) {
+                    context.appendShiftProcessLog(shiftOrder, ScheduleProcessLogSection.TOOL_LIMIT,
                             "最终计划量重算（选机后计划量定稿）：{0}", this.buildPlanFormula(context, task));
                     this.appendFinalPlanCalculationFullDetail(context, task);
                 }
-                context.flushDeferredTaskProcessLogs(task);
+            });
+            shiftTaskList.stream()
+                    .sorted(this.buildToolLedgerProcessLogTaskComparator(displayOrderMap))
+                    .forEach(task -> {
+                if (!task.isUnassigned()) {
+                    context.appendShiftProcessLog(shiftOrder, ScheduleProcessLogSection.TOOL_LEDGER_SETTLEMENT,
+                            this.buildToolUsageSummary(task, context));
+                }
+            });
+            shiftTaskList.forEach(task -> {
                 String unplannedReasonDesc = this.resolveProcessUnplannedReasonDesc(task);
                 if (StrUtil.isNotBlank(unplannedReasonDesc)) {
                     context.appendShiftProcessLog(shiftOrder, ScheduleProcessLogSection.UNPLANNED_TASK,
@@ -342,6 +360,19 @@ public class TcScheduleTemplateImpl extends AbsTcScheduleTemplate {
                 .thenComparing(task -> this.resolveFinalTaskSequence(context, task),
                         Comparator.nullsLast(Comparator.naturalOrder()))
                 .thenComparing(this.buildLogTaskComparator());
+    }
+
+    /**
+     * 构建工装执行阶段过程日志任务排序器。
+     *
+     * @param displayOrderMap 当前班次机台展示顺序，作为无账本序号时的稳定兜底
+     * @return 按工装账本序号及展示顺序排序的比较器
+     */
+    private Comparator<TcTaskDraft> buildToolLedgerProcessLogTaskComparator(
+            Map<String, Integer> displayOrderMap) {
+        return Comparator.comparing(TcTaskDraft::getToolLedgerOrder,
+                        Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(task -> displayOrderMap.getOrDefault(task.getBusinessKey(), Integer.MAX_VALUE));
     }
 
     /**
@@ -586,7 +617,8 @@ public class TcScheduleTemplateImpl extends AbsTcScheduleTemplate {
             this.sortedLogTaskStream(context)
                     .filter(task -> !task.isUnassigned())
                     .forEach(task -> context.appendShiftFullProcessTrace(task.getShiftOrder(),
-                            ScheduleProcessLogSection.TOOL_LIMIT, this.buildToolUsageFullEvent(context, task)));
+                            ScheduleProcessLogSection.TOOL_LEDGER_SETTLEMENT,
+                            this.buildToolUsageFullEvent(context, task)));
         }
         if (TcScheduleStepEnum.PLAN_CALC == stepEnum) {
             this.planCalculationLogTaskStream(context).forEach(task -> context.appendShiftFullProcessTrace(task.getShiftOrder(),
@@ -751,7 +783,7 @@ public class TcScheduleTemplateImpl extends AbsTcScheduleTemplate {
      * @param task    已完成机台确认的任务
      */
     private void appendFinalPlanCalculationFullDetail(TcScheduleContext context, TcTaskDraft task) {
-        context.appendShiftFullProcessTrace(task.getShiftOrder(), ScheduleProcessLogSection.MACHINE_SELECTION_CAPACITY,
+        context.appendShiftFullProcessTrace(task.getShiftOrder(), ScheduleProcessLogSection.TOOL_LIMIT,
                 this.buildPlanCalculationFullEvent(context, task, true));
     }
 
@@ -792,7 +824,7 @@ public class TcScheduleTemplateImpl extends AbsTcScheduleTemplate {
             return ScheduleProcessLogSection.INVENTORY_ROLLING;
         }
         if (TcScheduleStepEnum.MACHINE_ASSIGN == stepEnum) {
-            return ScheduleProcessLogSection.MACHINE_SELECTION_CAPACITY;
+            return ScheduleProcessLogSection.MACHINE_SELECTION;
         }
         return ScheduleProcessLogSection.PLAN_QTY_CALCULATION;
     }
@@ -1128,7 +1160,7 @@ public class TcScheduleTemplateImpl extends AbsTcScheduleTemplate {
         if (ScheduleProcessLogLevel.FULL == context.getProcessLogLevel()) {
             candidateList.forEach(candidate -> {
                 String evidenceText = ScheduleProcessEvidenceFormatter.format(candidate.getFilterEvidence());
-                context.appendShiftFullProcessTrace(task.getShiftOrder(), ScheduleProcessLogSection.MACHINE_SELECTION_CAPACITY,
+                context.appendShiftFullProcessTrace(task.getShiftOrder(), ScheduleProcessLogSection.MACHINE_SELECTION,
                         new ScheduleProcessTraceEvent(
                     TcScheduleStepEnum.MACHINE_ASSIGN.getDesc(), task.getBusinessKey(), "候选机台逐项过滤",
                     "机台候选清单、过滤规则顺序、规则开关、胎侧/垫胶共用机台配置和候选结构化证据。",
@@ -1143,7 +1175,7 @@ public class TcScheduleTemplateImpl extends AbsTcScheduleTemplate {
                 ));
                 if (!candidate.isFiltered() && candidate.getScoreResult() != null) {
                     candidate.getScoreResult().getScoreItems().forEach((scoreCode, scoreValue) ->
-                        context.appendShiftFullProcessTrace(task.getShiftOrder(), ScheduleProcessLogSection.MACHINE_SELECTION_CAPACITY,
+                        context.appendShiftFullProcessTrace(task.getShiftOrder(), ScheduleProcessLogSection.MACHINE_SELECTION,
                                 new ScheduleProcessTraceEvent(
                                 TcScheduleStepEnum.MACHINE_ASSIGN.getDesc(), task.getBusinessKey(),
                                 this.resolveScoreItemName(scoreCode),
@@ -1164,14 +1196,14 @@ public class TcScheduleTemplateImpl extends AbsTcScheduleTemplate {
                 .collect(Collectors.groupingBy(candidate -> StrUtil.blankToDefault(candidate.getFilterReasonDesc(), "未提供原因"),
                         LinkedHashMap::new, Collectors.mapping(TcMachineCandidate::getMachineCode, Collectors.toList())));
         if (!filteredMachineMap.isEmpty()) {
-            context.appendShiftProcessLog(task.getShiftOrder(), ScheduleProcessLogSection.MACHINE_SELECTION_CAPACITY,
+            context.appendShiftProcessLog(task.getShiftOrder(), ScheduleProcessLogSection.MACHINE_SELECTION,
                     "机台筛选：胎侧代码={0}，已过滤机台={1}", task.getSidewallCode(), filteredMachineMap);
         }
         candidateList.stream().filter(candidate -> !candidate.isFiltered())
                 .forEach(candidate -> context.appendShiftProcessLog(task.getShiftOrder(),
-                        ScheduleProcessLogSection.MACHINE_SELECTION_CAPACITY, this.buildScoreDetail(task, candidate)));
+                        ScheduleProcessLogSection.MACHINE_SELECTION, this.buildScoreDetail(task, candidate)));
         if (ScheduleProcessLogLevel.FULL == context.getProcessLogLevel()) {
-            context.appendShiftFullProcessTrace(task.getShiftOrder(), ScheduleProcessLogSection.MACHINE_SELECTION_CAPACITY,
+            context.appendShiftFullProcessTrace(task.getShiftOrder(), ScheduleProcessLogSection.MACHINE_SELECTION,
                     new ScheduleProcessTraceEvent(
                     TcScheduleStepEnum.MACHINE_ASSIGN.getDesc(), task.getBusinessKey(), "最终机台选择",
                     "通过过滤的候选机台、各项评分、总分以及当前机台和班次状态。",
@@ -1182,7 +1214,7 @@ public class TcScheduleTemplateImpl extends AbsTcScheduleTemplate {
                     "比较候选总分与并列决胜条件后，回写任务机台。",
                     "最终机台=" + StrUtil.blankToDefault(task.getMachineCode(), "未选中") + "，班次="
                             + task.getShiftOrder() + "。",
-                    StrUtil.isBlank(task.getMachineCode()) ? "进入顺延或未排处理。" : "进入产能扣减、拆分、合并和落库映射。"
+                    StrUtil.isBlank(task.getMachineCode()) ? "进入顺延或未排处理。" : "进入工装预校验、计划量定稿、产能扣减和工装账本结算。"
             ));
         }
     }

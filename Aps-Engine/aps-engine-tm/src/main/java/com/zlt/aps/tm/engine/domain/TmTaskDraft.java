@@ -61,6 +61,12 @@ public class TmTaskDraft {
     /** TASK_SORT 阶段生成的稳定基础优先级，数值越小越优先 */
     private Integer baseSortIndex;
 
+    /** 计划量计算阶段确定的统一任务顺序，数值越小越优先。 */
+    private Integer planCalcOrderIndex;
+
+    /** 当前班次实际进入机台资源尝试的顺序，仅用于过程日志和解释证据。 */
+    private Integer machineAssignmentSequence;
+
     /** 成型需求原始映射到的胎面逻辑班次，自动提前时与实际排程班次不同。 */
     private Integer sourceShiftOrder;
 

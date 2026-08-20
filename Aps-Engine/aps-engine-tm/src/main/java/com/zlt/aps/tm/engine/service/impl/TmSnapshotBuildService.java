@@ -34,8 +34,9 @@ public class TmSnapshotBuildService {
     public TmSnapshotBuildResult buildTaskExplain(TmTaskDraft task, TmScheduleContext context) {
         TmSnapshotBuildResult result = new TmSnapshotBuildResult();
         if (context != null && task != null) {
-            TmRuleTrace ruleTrace = context.getRuleTraceMap().get(task.getBusinessKey());
+            TmRuleTrace ruleTrace = this.resolveRuleTrace(task, context);
             result.setRuleHitJson(buildRuleHitJson(ruleTrace));
+            result.setRuleSummaryDesc(buildRuleSummaryDesc(ruleTrace));
             List<TmMachineCandidate> candidates = this.resolveCandidates(task, context);
             result.setCandidateMachineJson(buildCandidateMachineJson(candidates));
             String assignStatus = resolveAssignStatus(task);
@@ -50,6 +51,106 @@ public class TmSnapshotBuildService {
         }
         result.setSysAnalysis(task == null ? "任务为空" : "已生成任务规则、候选机台和选机解释");
         return result;
+    }
+
+    /**
+     * 解析任务实际规则证据；来源解释任务在没有自身顺延证据时补充其聚合任务证据。
+     *
+     * @param task    来源或实际排程任务
+     * @param context 胎面排程上下文
+     * @return 可用于解释表的规则证据
+     */
+    private TmRuleTrace resolveRuleTrace(TmTaskDraft task, TmScheduleContext context) {
+        if (task == null || context == null || context.getRuleTraceMap() == null) {
+            return null;
+        }
+        TmRuleTrace directTrace = context.getRuleTraceMap().get(task.getBusinessKey());
+        if (!Boolean.TRUE.equals(task.getSourceExplainTask()) || StrUtil.isBlank(task.getPlanGroupKey())
+                || this.hasCarryoverEvidence(directTrace) || context.getPlanTaskGroupMap() == null) {
+            return directTrace;
+        }
+        TmPlanTaskGroup taskGroup = context.getPlanTaskGroupMap().get(task.getPlanGroupKey());
+        TmTaskDraft aggregateTask = taskGroup == null ? null : taskGroup.getAggregateTask();
+        TmRuleTrace aggregateTrace = aggregateTask == null ? null
+                : context.getRuleTraceMap().get(aggregateTask.getBusinessKey());
+        if (!this.hasCarryoverEvidence(aggregateTrace)) {
+            return directTrace;
+        }
+        TmRuleTrace mergedTrace = new TmRuleTrace();
+        mergedTrace.appendFrom(directTrace);
+        mergedTrace.appendFrom(aggregateTrace);
+        return mergedTrace;
+    }
+
+    /**
+     * 判断规则证据是否包含顺延或实际承接记录。
+     *
+     * @param trace 规则证据
+     * @return true 表示已包含顺延相关证据
+     */
+    private boolean hasCarryoverEvidence(TmRuleTrace trace) {
+        if (trace == null || CollUtil.isEmpty(trace.getRuleHits())) {
+            return false;
+        }
+        return trace.getRuleHits().stream()
+                .filter(Objects::nonNull)
+                .map(TmRuleTraceItem::getRuleCode)
+                .anyMatch(ruleCode -> TmScheduleRuleCodeEnum.CAPACITY_BLOCKED_CARRYOVER.getCode().equals(ruleCode)
+                        || TmScheduleRuleCodeEnum.MACHINE_SHIFT_BLOCKED_CARRYOVER.getCode().equals(ruleCode)
+                        || TmScheduleRuleCodeEnum.PLAN_QTY_CARRYOVER.getCode().equals(ruleCode));
+    }
+
+    /**
+     * 构建来源解释行可直接展示的顺延原因和实际承接摘要。
+     *
+     * @param task    来源解释任务
+     * @param context 胎面排程上下文
+     * @return 顺延解释对象；没有顺延证据时返回空Map
+     */
+    public Map<String, Object> buildCarryoverExplanation(TmTaskDraft task, TmScheduleContext context) {
+        TmRuleTrace trace = this.resolveRuleTrace(task, context);
+        Map<String, Object> explanation = new LinkedHashMap<>();
+        List<Map<String, Object>> targetAssignments = new ArrayList<>();
+        if (trace == null || CollUtil.isEmpty(trace.getRuleHits())) {
+            return explanation;
+        }
+        for (TmRuleTraceItem item : trace.getRuleHits()) {
+            if (item == null || !(item.getEvidence() instanceof Map)) {
+                continue;
+            }
+            String ruleCode = item.getRuleCode();
+            if (!TmScheduleRuleCodeEnum.CAPACITY_BLOCKED_CARRYOVER.getCode().equals(ruleCode)
+                    && !TmScheduleRuleCodeEnum.MACHINE_SHIFT_BLOCKED_CARRYOVER.getCode().equals(ruleCode)
+                    && !TmScheduleRuleCodeEnum.PLAN_QTY_CARRYOVER.getCode().equals(ruleCode)) {
+                continue;
+            }
+            Map<?, ?> evidence = (Map<?, ?>) item.getEvidence();
+            if (evidence.get("sourceReasonDesc") != null) {
+                explanation.putIfAbsent("sourceShiftOrder", evidence.get("sourceShiftOrder"));
+                explanation.putIfAbsent("sourceReasonCode", evidence.get("sourceReasonCode"));
+                explanation.putIfAbsent("sourceReasonDesc", evidence.get("sourceReasonDesc"));
+                explanation.putIfAbsent("rejectReasonSummary", evidence.get("rejectReasonSummary"));
+                explanation.putIfAbsent("candidateDetails", evidence.get("candidateDetails"));
+                explanation.putIfAbsent("nextStep", evidence.get("nextStep"));
+                explanation.putIfAbsent("planCalcOrderIndex", evidence.get("planCalcOrderIndex"));
+                explanation.putIfAbsent("baseSortIndex", evidence.get("baseSortIndex"));
+                explanation.putIfAbsent("machineAssignmentSequence", evidence.get("machineAssignmentSequence"));
+            }
+            if (evidence.get("targetShiftOrder") != null) {
+                Map<String, Object> targetAssignment = new LinkedHashMap<>();
+                targetAssignment.put("targetShiftOrder", evidence.get("targetShiftOrder"));
+                targetAssignment.put("targetMachineCode", evidence.get("targetMachineCode"));
+                targetAssignment.put("carryoverQty", evidence.get("carryoverQty"));
+                targetAssignment.put("machineAssignmentSequence", evidence.get("machineAssignmentSequence"));
+                targetAssignment.put("planCalcOrderIndex", evidence.get("planCalcOrderIndex"));
+                targetAssignment.put("baseSortIndex", evidence.get("baseSortIndex"));
+                targetAssignments.add(targetAssignment);
+            }
+        }
+        if (!explanation.isEmpty() || !targetAssignments.isEmpty()) {
+            explanation.put("targetAssignments", targetAssignments);
+        }
+        return explanation;
     }
 
     /**
@@ -158,6 +259,16 @@ public class TmSnapshotBuildService {
         if (CollUtil.isNotEmpty(directCandidates)) {
             return directCandidates;
         }
+        TmPlanTaskGroup taskGroup = context.getPlanTaskGroupMap() == null ? null
+                : context.getPlanTaskGroupMap().get(task.getPlanGroupKey());
+        TmTaskDraft aggregateTask = taskGroup == null ? null : taskGroup.getAggregateTask();
+        if (aggregateTask != null) {
+            List<TmMachineCandidate> aggregateCandidates = context.getCandidateTraceMap()
+                    .get(aggregateTask.getBusinessKey());
+            if (CollUtil.isNotEmpty(aggregateCandidates)) {
+                return aggregateCandidates;
+            }
+        }
         if (StrUtil.isBlank(task.getPlanGroupKey())) {
             return new ArrayList<>();
         }
@@ -225,6 +336,7 @@ public class TmSnapshotBuildService {
                 } else if (TmScheduleRuleCodeEnum.TOOL_LIMIT_UNPLANNED.getCode().equals(ruleCode)
                         || TmScheduleRuleCodeEnum.CAPACITY_OVERFLOW_UNPLANNED.getCode().equals(ruleCode)
                         || TmScheduleRuleCodeEnum.CAPACITY_BLOCKED_CARRYOVER.getCode().equals(ruleCode)
+                        || TmScheduleRuleCodeEnum.MACHINE_SHIFT_BLOCKED_CARRYOVER.getCode().equals(ruleCode)
                         || (TmScheduleRuleCodeEnum.MACHINE_ASSIGN.getCode().equals(ruleCode)
                         && TmScheduleRuleResultEnum.REJECT.getCode().equals(item.getResult()))) {
                     JSONObject evObj = new JSONObject();
@@ -290,5 +402,50 @@ public class TmSnapshotBuildService {
      */
     public String buildRuleHitJson(TmRuleTrace trace) {
         return trace == null ? "[]" : trace.toExplainJson();
+    }
+
+    /**
+     * 构建解释表规则摘要，优先展示来源班次候选失败和顺延承接结论。
+     *
+     * @param trace 规则证据
+     * @return 规则摘要；没有顺延证据时返回null
+     */
+    private String buildRuleSummaryDesc(TmRuleTrace trace) {
+        if (trace == null || CollUtil.isEmpty(trace.getRuleHits())) {
+            return null;
+        }
+        String sourceFailure = null;
+        List<String> targetAssignments = new ArrayList<>();
+        for (TmRuleTraceItem item : trace.getRuleHits()) {
+            if (item == null || !(item.getEvidence() instanceof Map)) {
+                continue;
+            }
+            String ruleCode = item.getRuleCode();
+            if (!TmScheduleRuleCodeEnum.CAPACITY_BLOCKED_CARRYOVER.getCode().equals(ruleCode)
+                    && !TmScheduleRuleCodeEnum.MACHINE_SHIFT_BLOCKED_CARRYOVER.getCode().equals(ruleCode)
+                    && !TmScheduleRuleCodeEnum.PLAN_QTY_CARRYOVER.getCode().equals(ruleCode)) {
+                continue;
+            }
+            Map<?, ?> evidence = (Map<?, ?>) item.getEvidence();
+            Object sourceShiftOrder = evidence.get("sourceShiftOrder");
+            Object sourceReasonDesc = evidence.get("sourceReasonDesc");
+            if (sourceReasonDesc != null && sourceFailure == null) {
+                sourceFailure = "来源班次" + sourceShiftOrder + "候选失败：" + sourceReasonDesc;
+            }
+            Object targetShiftOrder = evidence.get("targetShiftOrder");
+            Object targetMachineCode = evidence.get("targetMachineCode");
+            Object carryoverQty = evidence.get("carryoverQty");
+            if (targetShiftOrder != null && targetMachineCode != null) {
+                targetAssignments.add("班次" + targetShiftOrder + "机台" + targetMachineCode
+                        + "承接" + carryoverQty + "米");
+            }
+        }
+        if (sourceFailure == null && targetAssignments.isEmpty()) {
+            return null;
+        }
+        String assignmentDesc = targetAssignments.isEmpty()
+                ? "后续班次继续尝试"
+                : "顺延承接：" + String.join("、", targetAssignments);
+        return (sourceFailure == null ? "发生计划量顺延" : sourceFailure) + "；" + assignmentDesc;
     }
 }

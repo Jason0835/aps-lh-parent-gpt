@@ -141,6 +141,7 @@ public class TmPersistService {
         }
         if (snapshot != null) {
             explain.setRuleHitJson(snapshot.getRuleHitJson());
+            explain.setRuleSummaryDesc(snapshot.getRuleSummaryDesc());
             explain.setCandidateMachineJson(snapshot.getCandidateMachineJson());
             explain.setSelectedMachineScore(snapshot.getSelectedMachineScore());
             explain.setMachineSelectReason(snapshot.getMachineSelectReason());

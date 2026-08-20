@@ -7,6 +7,7 @@ import org.springframework.util.CollectionUtils;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -149,6 +150,22 @@ public class GroupCxMachineConfiguration implements Serializable {
             usedLhMachines = usedLhMachines + extraLhMachines;
         }
         return usedLhMachines > max;
+    }
+
+    /**
+     * 得到胎胚平均硫化机台数
+     *
+     * @return
+     */
+    public Integer getEmbryoAverageLhMachine() {
+        if (null == maxEmbryoCodeCount || null == maxLhMachines) {
+            return BigDecimal.ZERO.intValue();
+        }
+        if (maxEmbryoCodeCount < BigDecimal.ONE.intValue() || maxLhMachines < BigDecimal.ONE.intValue()) {
+            return BigDecimal.ZERO.intValue();
+        }
+        //向上取整
+        return BigDecimal.valueOf(maxLhMachines).divide(BigDecimal.valueOf(maxEmbryoCodeCount), BigDecimal.ZERO.intValue(), RoundingMode.UP).intValue();
     }
 
     /**

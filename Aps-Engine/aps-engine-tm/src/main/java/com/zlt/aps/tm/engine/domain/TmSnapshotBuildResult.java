@@ -15,6 +15,9 @@ public class TmSnapshotBuildResult {
     /** 规则命中 JSON */
     private String ruleHitJson;
 
+    /** 规则摘要说明 */
+    private String ruleSummaryDesc;
+
     /** 候选机台 JSON */
     private String candidateMachineJson;
 

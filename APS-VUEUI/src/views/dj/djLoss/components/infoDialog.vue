@@ -48,6 +48,13 @@ export default {
       editType: null,
       form: {},
       rules: {
+        factoryCode: [
+          {
+            required: true,
+            message: this.$t("common.rule.select"),
+            trigger: "blur",
+          },
+        ],
         machineType: [
           {
             required: true,
@@ -92,7 +99,7 @@ export default {
           span: 24,
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
-          disabled: true,
+          required: true,
         },
         {
           label: this.$t("ui.dj.lossSetting.column.paddingCode"),

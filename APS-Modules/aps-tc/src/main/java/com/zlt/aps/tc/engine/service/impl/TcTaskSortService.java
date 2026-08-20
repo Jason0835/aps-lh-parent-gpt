@@ -58,20 +58,35 @@ public class TcTaskSortService implements ITcTaskSortService {
         String strategyCode = readParam(context, TcScheduleConstants.PARAM_TASK_SORT_STRATEGY,
                 TcScheduleStrategyEnum.DEFAULT.getCode());
         ITcTaskSortStrategy sortStrategy = strategyRegistry.getTaskSortStrategy(strategyCode);
-        Comparator<TcTaskDraft> comparator = this.buildStartupAwareComparator(context,
-                sortStrategy.buildComparator(context));
         String beforeOrder = summarizeTaskOrder(context);
-        context.getTaskDraftList().sort(comparator);
+        boolean planCalcOrderReady = context.getTaskDraftList().stream()
+                .allMatch(task -> task != null && task.getPlanCalcOrderIndex() != null);
+        String sortSource = planCalcOrderReady ? "PLAN_CALC_ORDER" : "LEGACY_TASK_SORT";
+        if (planCalcOrderReady) {
+            // 主流程已由计划量计算阶段确定顺序，此处只复用并固化该顺序，避免计划量完成后再次抢占任务。
+            context.getTaskDraftList().sort(Comparator
+                    .comparing(TcTaskDraft::getPlanCalcOrderIndex, Comparator.nullsLast(Comparator.naturalOrder()))
+                    .thenComparing(task -> StrUtil.blankToDefault(task.getBusinessKey(), "")));
+        } else {
+            // 独立调用或旧测试上下文未提供计划量顺序时保留兼容排序。
+            Comparator<TcTaskDraft> comparator = this.buildStartupAwareComparator(context,
+                    sortStrategy.buildComparator(context));
+            context.getTaskDraftList().sort(comparator);
+        }
         String afterOrder = summarizeTaskOrder(context);
-        log.info("[TC_TASK_SORT] batchNo={}, traceId={}, factoryCode={}, scheduleDate={}, strategyCode={}, taskCount={}, beforeOrder={}, afterOrder={}",
+        log.info("[TC_TASK_SORT] batchNo={}, traceId={}, factoryCode={}, scheduleDate={}, strategyCode={}, sortSource={}, taskCount={}, beforeOrder={}, afterOrder={}",
                 context.getBatchNo(), context.getTraceId(), context.getFactoryCode(), formatScheduleDate(context),
-                strategyCode, context.getTaskDraftList().size(), beforeOrder, afterOrder);
+                strategyCode, sortSource, context.getTaskDraftList().size(), beforeOrder, afterOrder);
         for (int i = 0; i < context.getTaskDraftList().size(); i++) {
             TcTaskDraft task = context.getTaskDraftList().get(i);
-            task.setBaseSortIndex(i + 1);
+            int sortIndex = planCalcOrderReady && task.getPlanCalcOrderIndex() != null
+                    ? task.getPlanCalcOrderIndex() : i + 1;
+            task.setBaseSortIndex(sortIndex);
             Map<String, Object> evidence = new LinkedHashMap<>();
             evidence.put("strategyCode", strategyCode);
-            evidence.put("sortIndex", i + 1);
+            evidence.put("sortSource", sortSource);
+            evidence.put("sortIndex", sortIndex);
+            evidence.put("planCalcOrderIndex", task.getPlanCalcOrderIndex());
             evidence.put("supplyHours", task.getSupplyHours());
             evidence.put("startupShift", this.isStartupShift(context, task));
             evidence.put("startupSortPriority", "SUPPLY_HOURS_ASC");
@@ -80,9 +95,9 @@ public class TcTaskSortService implements ITcTaskSortService {
             evidence.put("mouthPlateCode", task.getMouthPlateCode());
             traceOf(context, task).addRuleHit(TcScheduleRuleCodeEnum.TASK_SORT,
                     TcScheduleRuleResultEnum.PASS, evidence);
-            log.info("[TC_TASK_SORT_DETAIL] batchNo={}, traceId={}, factoryCode={}, scheduleDate={}, strategyCode={}, sortIndex={}, businessKey={}, sidewallCode={}, shiftOrder={}, supplyHours={}, glueCode={}, baseGlueCode={}, mouthPlateCode={}, planQty={}, demandQty={}",
+            log.info("[TC_TASK_SORT_DETAIL] batchNo={}, traceId={}, factoryCode={}, scheduleDate={}, strategyCode={}, sortSource={}, sortIndex={}, planCalcOrderIndex={}, businessKey={}, sidewallCode={}, shiftOrder={}, supplyHours={}, glueCode={}, baseGlueCode={}, mouthPlateCode={}, planQty={}, demandQty={}",
                     context.getBatchNo(), context.getTraceId(), context.getFactoryCode(), formatScheduleDate(context),
-                    strategyCode, i + 1, task.getBusinessKey(), task.getSidewallCode(), task.getShiftOrder(),
+                    strategyCode, sortSource, sortIndex, task.getPlanCalcOrderIndex(), task.getBusinessKey(), task.getSidewallCode(), task.getShiftOrder(),
                     task.getSupplyHours(), task.getGlueCode(), task.getBaseGlueCode(), task.getMouthPlateCode(),
                     task.getPlanQty(), task.getDemandQty());
         }
