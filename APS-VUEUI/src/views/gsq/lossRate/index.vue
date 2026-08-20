@@ -163,10 +163,10 @@ export default {
                 <el-button
                   v-hasPermi={["gsq:lossRate:edit"]}
                   class="minus"
-                  type="primary"
+                  type="success"
                   onClick={() => this.handleEdit(row)}
                 >
-                  {this.$t("ui.frame.btn.modify")}
+                  {this.$t("ui.frame.btn.update")}
                 </el-button>
                 <el-button
                   v-hasPermi={["gsq:lossRate:remove"]}

@@ -200,7 +200,7 @@ export default {
                   type="success"
                   onClick={() => this.handleEdit(row)}
                 >
-                  {this.$t("ui.frame.btn.modify")}
+                  {this.$t("ui.frame.btn.update")}
                 </el-button>
                 <el-button
                   v-hasPermi={["tq:stockShiftConfig:remove"]}
