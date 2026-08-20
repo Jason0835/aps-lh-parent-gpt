@@ -31,6 +31,8 @@ import java.math.BigDecimal;
 import java.sql.Date;
 import java.text.MessageFormat;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -56,6 +58,9 @@ public class Cd90AutoScheduleBatchDataValidatorImpl implements Cd90AutoScheduleB
 
     private static final int CONSTRUCTION_LAYERS = 3;
     private static final int ACTIVE = 1;
+    private static final int FORMING_SHIFT_HOURS = 8;
+    private static final LocalTime FORMING_FIRST_SHIFT_TIME = LocalTime.of(6, 0);
+    private static final LocalTime FIRST_FORMING_DEMAND_TIME = LocalTime.of(22, 0);
     private static final String[] CLASS_RECIPE_FIELDS = {
             "CLASS1_RECIPE_NO", "CLASS2_RECIPE_NO", "CLASS3_RECIPE_NO", "CLASS4_RECIPE_NO",
             "CLASS5_RECIPE_NO", "CLASS6_RECIPE_NO", "CLASS7_RECIPE_NO", "CLASS8_RECIPE_NO"
@@ -86,7 +91,8 @@ public class Cd90AutoScheduleBatchDataValidatorImpl implements Cd90AutoScheduleB
         Cd90BatchDataCheckResult.Builder builder = Cd90BatchDataCheckResult.builder();
         List<CxScheduleResult> formingSchedules = checkFormingSchedule(builder, factoryCode, scheduleDate);
         checkMachineInfo(builder, factoryCode);
-        Set<String> clothCodes = checkConstructionInfo(builder, factoryCode, formingSchedules);
+        Set<String> clothCodes = this.checkConstructionInfo(
+                builder, factoryCode, scheduleDate, formingSchedules);
         checkCurlLength(builder, factoryCode, clothCodes);
         this.checkStorageLaneLimit(builder, factoryCode, scheduleDate);
 
@@ -165,6 +171,7 @@ public class Cd90AutoScheduleBatchDataValidatorImpl implements Cd90AutoScheduleB
      */
     private Set<String> checkConstructionInfo(Cd90BatchDataCheckResult.Builder builder,
                                                String factoryCode,
+                                               LocalDate scheduleDate,
                                                List<CxScheduleResult> formingSchedules) {
         if (formingSchedules == null || formingSchedules.isEmpty()) {
             return new LinkedHashSet<>();
@@ -173,7 +180,19 @@ public class Cd90AutoScheduleBatchDataValidatorImpl implements Cd90AutoScheduleB
         Set<String> embryoCodes = new LinkedHashSet<>();
         Set<String> constructionVersions = new LinkedHashSet<>();
         Map<String, Set<String>> constructionPairUsages = new LinkedHashMap<>();
+        LocalDateTime firstDemandStart = scheduleDate.minusDays(1)
+                .atTime(FIRST_FORMING_DEMAND_TIME);
         for (CxScheduleResult schedule : formingSchedules) {
+            boolean hasPositiveDemandInWindow = false;
+            for (int classIndex = 1; classIndex <= CLASS_RECIPE_FIELDS.length; classIndex++) {
+                if (this.requiresConstructionCheck(schedule, classIndex, firstDemandStart)) {
+                    hasPositiveDemandInWindow = true;
+                    break;
+                }
+            }
+            if (!hasPositiveDemandInWindow) {
+                continue;
+            }
             String embryoCode = schedule.getEmbryoCode();
             if (!StringUtils.hasText(embryoCode)) {
                 builder.addError("成型计划", "DATA_MISSING",
@@ -183,24 +202,25 @@ public class Cd90AutoScheduleBatchDataValidatorImpl implements Cd90AutoScheduleB
             }
             embryoCodes.add(embryoCode);
             for (int classIndex = 1; classIndex <= CLASS_RECIPE_FIELDS.length; classIndex++) {
-                // 班次计划量为空或≤0时，该班次不生产，跳过施工版本校验
-                BigDecimal planQty = getClassPlanQty(schedule, classIndex);
-                if (planQty == null || planQty.signum() <= 0) {
+                // 只校验首个成型晚班及之后的正计划量班次。
+                if (!this.requiresConstructionCheck(schedule, classIndex, firstDemandStart)) {
                     continue;
                 }
                 String classField = CLASS_RECIPE_FIELDS[classIndex - 1];
+                String className = "CLASS" + classIndex;
+                String formingDate = this.formingDate(schedule);
                 String recipeNo = getRecipeNo(schedule, classField);
                 if (!StringUtils.hasText(recipeNo)) {
                     builder.addError("成型计划", "DATA_MISSING",
-                            "成型日期 " + schedule.getScheduleDate() + " 胎胚 " + embryoCode
-                                    + " 的 " + classField + " 施工版本为空",
+                            "成型日期 " + formingDate + " 胎胚 " + embryoCode
+                                    + " 的 " + className + " 施工版本为空",
                             "请检查成型排程数据各班次施工版本");
                     continue;
                 }
                 constructionVersions.add(recipeNo);
                 constructionPairUsages.computeIfAbsent(embryoCode + "@" + recipeNo,
                                 ignored -> new LinkedHashSet<>())
-                        .add(schedule.getScheduleDate() + "/" + classField);
+                        .add(formingDate + "/" + className);
             }
         }
         if (embryoCodes.isEmpty() || constructionVersions.isEmpty()) {
@@ -228,14 +248,42 @@ public class Cd90AutoScheduleBatchDataValidatorImpl implements Cd90AutoScheduleB
             MdmConstructionInfo construction = constructionByKey.get(pair);
             if (construction == null) {
                 builder.addError("施工信息", "DATA_MISSING",
-                        "胎胚 " + constructionCode + " 施工版本 " + constructionVersion
-                                + " 未维护，影响班次 " + String.join("、", pairEntry.getValue()),
+                        "胎胚 " + constructionCode + " 施工版本 " + constructionVersion + " 未维护",
                         "请在施工信息页面维护对应胎胚和版本的施工资料");
                 continue;
             }
             checkConstructionFields(builder, construction, clothCodes);
         }
         return clothCodes;
+    }
+
+    /** 首个成型晚班之前的计划不属于本次直裁供料窗口，不参与施工版本拦截。 */
+    private boolean requiresConstructionCheck(CxScheduleResult schedule,
+                                              int classIndex,
+                                              LocalDateTime firstDemandStart) {
+        BigDecimal planQty = this.getClassPlanQty(schedule, classIndex);
+        LocalDateTime formingShiftStart = this.formingShiftStart(schedule, classIndex);
+        return planQty != null && planQty.signum() > 0
+                && formingShiftStart != null
+                && !formingShiftStart.isBefore(firstDemandStart);
+    }
+
+    /** 将成型记录的CLASS序号换算为自然班次开始时间。 */
+    private LocalDateTime formingShiftStart(CxScheduleResult schedule, int classIndex) {
+        if (schedule == null || schedule.getScheduleDate() == null) {
+            return null;
+        }
+        LocalDate formingDate = new Date(schedule.getScheduleDate().getTime()).toLocalDate();
+        return formingDate.minusDays(1).atTime(FORMING_FIRST_SHIFT_TIME)
+                .plusHours((classIndex - 1L) * FORMING_SHIFT_HOURS);
+    }
+
+    /** 成型日期统一输出ISO格式，避免java.util.Date默认英文时区文本。 */
+    private String formingDate(CxScheduleResult schedule) {
+        if (schedule == null || schedule.getScheduleDate() == null) {
+            return "";
+        }
+        return new Date(schedule.getScheduleDate().getTime()).toLocalDate().toString();
     }
 
     /**
