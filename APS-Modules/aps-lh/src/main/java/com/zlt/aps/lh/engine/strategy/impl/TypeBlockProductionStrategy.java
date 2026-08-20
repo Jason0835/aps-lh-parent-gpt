@@ -4353,7 +4353,9 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                     context, result, Math.min(remaining, shiftMaxQty), shiftMaxQty, mouldQty);
             // 目标量、首检和物理产能全部收口后，再按本班实际候选量执行一次换胶囊扣减。
             shiftQty = capsuleReplacementRuleService.resolveActualPlanQty(
-                    context, result, shift, shiftQty, "换活字块排产");
+                    context, result, shift, shiftQty, shiftMaxQty, effectiveStart, "换活字块排产");
+            // 未满产换胶囊可能刚登记时间窗口，后续班次必须立即读取最新窗口重新计算产能。
+            maintenanceWindowList = resolveMachineMaintenanceWindowList(context, result.getLhMachineCode());
             if (shiftQty <= 0) {
                 logTypeBlockShiftSkip(result, shift, remaining, shiftCapacity,
                         physicalShiftMaxQty, shiftMaxQty, "目标量/硫化余量或换胶囊扣减后为0");
