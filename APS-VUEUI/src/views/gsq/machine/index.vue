@@ -180,6 +180,7 @@ export default {
           },
         },
         {
+          align: "center",
           label: this.$t("ui.data.column.machine.status"),
           prop: "status",
           minWidth: 80,
@@ -211,6 +212,8 @@ export default {
           label: this.$t("common.option"),
           prop: "option",
           width: "180px",
+          align: "center",
+          fixed: "right",
           render: ({ row }) => {
             return (
               <div>

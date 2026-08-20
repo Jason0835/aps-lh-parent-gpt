@@ -189,6 +189,8 @@ export default {
           label: this.$t("common.option"),
           prop: "option",
           width: "180px",
+          align: "center",
+          fixed: "right",
           render: ({ row }) => {
             return (
               <div>

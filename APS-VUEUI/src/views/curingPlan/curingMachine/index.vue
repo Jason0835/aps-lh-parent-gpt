@@ -250,6 +250,7 @@ export default {
           type: "number",
         },
         {
+          align: "center",
           label: this.$t("ui.data.column.machine.status"),
           prop: "status",
           minWidth: 100,

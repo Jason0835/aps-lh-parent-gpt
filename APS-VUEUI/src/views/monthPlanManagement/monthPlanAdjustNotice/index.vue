@@ -226,6 +226,7 @@ export default {
           },
         },
         {
+          align: "center",
           prop: "option",
           label: this.$t("common.option"),
           width: 120,

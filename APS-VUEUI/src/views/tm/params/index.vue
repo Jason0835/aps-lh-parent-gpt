@@ -161,6 +161,7 @@ export default {
           },
         },
         {
+          align: "center",
           prop: "enableStatus",
           halign: "center",
           label: this.$t("ui.data.column.tm.params.enableStatus"),

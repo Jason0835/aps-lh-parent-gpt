@@ -142,6 +142,7 @@ export default {
           label: this.$t("ui.data.column.tcGlueMachineReal.priority"),
         },
         {
+          align: "center",
           prop: "allowFlag",
           halign: "center",
           label: this.$t("ui.data.column.tcGlueMachineReal.allowFlag"),
@@ -179,6 +180,7 @@ export default {
           },
         },
         {
+          align: "center",
           prop: "enableStatus",
           halign: "center",
           label: this.$t("ui.data.column.tcGlueMachineReal.enableStatus"),

@@ -155,6 +155,7 @@ export default {
           width: 120,
         },
         {
+          align: "center",
           prop: "crossDayFlag",
           halign: "center",
           label: this.$t("ui.data.column.tm.shiftConfig.crossDayFlag"),
@@ -192,6 +193,7 @@ export default {
           },
         },
         {
+          align: "center",
           prop: "openFlag",
           halign: "center",
           label: this.$t("ui.data.column.tm.shiftConfig.openFlag"),

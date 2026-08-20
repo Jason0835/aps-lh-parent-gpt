@@ -745,6 +745,7 @@ export default {
         //   align: "right",
         // },
         {
+          align: "center",
           prop: "rowOperator",
           label: this.$t("common.option"),
           width: 280,

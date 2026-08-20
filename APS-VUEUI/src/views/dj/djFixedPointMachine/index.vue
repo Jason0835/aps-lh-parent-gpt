@@ -194,6 +194,7 @@ export default {
           halign: "center",
           label: this.$t("ui.data.btn.option"),
           prop: "option",
+          fixed: "right",
           render: ({ row }) => {
             return (
               <div>

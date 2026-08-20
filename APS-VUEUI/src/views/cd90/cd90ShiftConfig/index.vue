@@ -178,6 +178,7 @@ export default {
           prop: "classField",
         },
         {
+          align: "center",
           label: this.$t("ui.data.column.cd90ShiftConfig.isActive"),
           prop: "isActive",
           dictType: "sys_enable_disable",
@@ -197,6 +198,7 @@ export default {
           prop: "remark",
         },
         {
+          align: "center",
           label: this.$t("ui.frame.table.action"),
           render: (row) => {
             return (

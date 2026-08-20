@@ -136,6 +136,7 @@ export default {
           label: this.$t("ui.data.column.tc.mouthPlate.machineCode"),
         },
         {
+          align: "center",
           prop: "plateStatus",
           halign: "center",
           label: this.$t("ui.data.column.tc.mouthPlate.plateStatus"),

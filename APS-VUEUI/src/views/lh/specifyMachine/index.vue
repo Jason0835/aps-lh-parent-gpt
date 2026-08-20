@@ -186,6 +186,7 @@ export default {
           label: this.$t("ui.data.btn.option"),
           prop: "option",
           minWidth: 150,
+          fixed: "right",
           render: ({ row }) => {
             return (
               <div>

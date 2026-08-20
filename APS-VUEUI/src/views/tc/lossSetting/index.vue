@@ -137,6 +137,7 @@ export default {
           label: this.$t("ui.data.column.tc.lossSetting.lossRate"),
         },
         {
+          align: "center",
           prop: "enableStatus",
           halign: "center",
           label: this.$t("ui.data.column.tc.lossSetting.enableStatus"),
