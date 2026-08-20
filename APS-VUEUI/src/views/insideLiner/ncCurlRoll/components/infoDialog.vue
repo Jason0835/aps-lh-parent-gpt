@@ -79,7 +79,7 @@ export default {
           span: 24,
         },
         {
-          label: this.$t("ui.nc.curlRoll.column.curlLength"),
+          label: this.$t("ui.curlRoll.column.length"),
           prop: "curlLength",
           span: 24,
           required: true,
