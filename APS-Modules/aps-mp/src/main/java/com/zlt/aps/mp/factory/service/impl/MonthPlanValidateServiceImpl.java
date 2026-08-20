@@ -419,8 +419,6 @@ public class MonthPlanValidateServiceImpl extends AbstractDataLoaderService impl
         if (null == usedEmbryoTypes || usedEmbryoTypes <= BigDecimal.ZERO.intValue()) {
             return null;
         }
-
-
         return usedLhMachines;
     }
 
