@@ -13827,6 +13827,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         for (int shiftIndex = 1; shiftIndex <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shiftIndex++) {
             ShiftFieldUtil.removeShiftAnalysis(
                     pairResult, shiftIndex, CapsuleReplacementRuleService.CAPSULE_REPLACEMENT_ANALYSIS);
+            ShiftFieldUtil.removeShiftAnalysis(
+                    pairResult, shiftIndex, FirstInspectionQtyUtil.FIRST_INSPECTION_ANALYSIS);
         }
         refreshResultSummary(context, pairResult);
         return pairResult;

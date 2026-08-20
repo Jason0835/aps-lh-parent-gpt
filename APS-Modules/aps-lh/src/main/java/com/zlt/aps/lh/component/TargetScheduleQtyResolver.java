@@ -21,7 +21,9 @@ import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.IMachineMatchStrategy;
 import com.zlt.aps.lh.engine.strategy.IMouldChangeBalanceStrategy;
 import com.zlt.aps.lh.engine.strategy.support.NewSpecEmbryoAvailableTimeResolver;
+import com.zlt.aps.lh.engine.strategy.support.FirstInspectionAllocationPlan;
 import com.zlt.aps.lh.util.CleaningScheduleRuleUtil;
+import com.zlt.aps.lh.util.FirstInspectionAllocationUtil;
 import com.zlt.aps.lh.util.FirstInspectionQtyUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.MachineCleaningOverlapUtil;
@@ -1592,9 +1594,23 @@ public class TargetScheduleQtyResolver {
                 context, sku, shifts, firstInspectionBaseTime, scheduleType);
         int firstInspectionShiftIndex = Objects.isNull(firstInspectionShift)
                 || Objects.isNull(firstInspectionShift.getShiftIndex()) ? -1 : firstInspectionShift.getShiftIndex();
-        int firstInspectionQty = FirstInspectionQtyUtil.resolvePreviewFirstInspectionQty(
-                context, sku, firstInspectionShift, shiftCapacity,
-                Math.max(sku.resolveTargetScheduleQty(), shiftCapacity), scheduleType, machine.getMachineCode());
+        List<LhShiftConfigVO> inspectionShifts = CollectionUtils.isEmpty(context.getScheduleWindowShifts())
+                ? shifts : context.getScheduleWindowShifts();
+        FirstInspectionAllocationPlan firstInspectionAllocationPlan =
+                FirstInspectionAllocationUtil.buildPlan(
+                        context, sku, inspectionShifts, mouldChangeCompleteTime,
+                        shiftCapacity, Math.max(sku.resolveTargetScheduleQty(), shiftCapacity),
+                        scheduleType, machine.getMachineCode(), null);
+        Map<Integer, Integer> firstInspectionQtyMap =
+                FirstInspectionAllocationUtil.toShiftQtyMap(firstInspectionAllocationPlan);
+        boolean crossShiftInspection = firstInspectionAllocationPlan.isValid()
+                && firstInspectionAllocationPlan.getInspectionQty() > 0;
+        int firstInspectionQty = crossShiftInspection
+                ? firstInspectionAllocationPlan.getInspectionQty()
+                : FirstInspectionQtyUtil.resolvePreviewFirstInspectionQty(
+                        context, sku, firstInspectionShift, shiftCapacity,
+                        Math.max(sku.resolveTargetScheduleQty(), shiftCapacity),
+                        scheduleType, machine.getMachineCode());
         boolean started = false;
         for (LhShiftConfigVO shift : shifts) {
             if (!started) {
@@ -1630,18 +1646,29 @@ public class TargetScheduleQtyResolver {
                     scheduleType,
                     plannedRepairFixedQty);
             shiftMaxQty = ShiftProductionControlUtil.deductCapacityByControl(control, shiftMaxQty, mouldQty);
+            int currentShiftInspectionQty = crossShiftInspection
+                    ? Math.max(0, firstInspectionQtyMap.getOrDefault(shift.getShiftIndex(), 0)) : 0;
+            int effectiveFirstInspectionShiftIndex = crossShiftInspection
+                    ? (currentShiftInspectionQty > 0 ? shift.getShiftIndex() : -1)
+                    : firstInspectionShiftIndex;
+            int effectiveFirstInspectionQty = crossShiftInspection
+                    ? currentShiftInspectionQty : firstInspectionQty;
             shiftMaxQty = FirstInspectionQtyUtil.resolveNormalCapacityAfterFirstInspection(
-                    context, sku, shift, shiftMaxQty, firstInspectionShiftIndex, firstInspectionQty,
-                    shiftCapacity, scheduleType, machine.getMachineCode());
+                    context, sku, shift, shiftMaxQty, effectiveFirstInspectionShiftIndex,
+                    effectiveFirstInspectionQty, shiftCapacity, scheduleType, machine.getMachineCode());
             if (shiftMaxQty <= 0) {
                 continue;
             }
             totalQty += shiftMaxQty;
             cursorStartTime = effectiveEndTime;
         }
+        if (crossShiftInspection) {
+            totalQty += firstInspectionQty;
+        } else {
             totalQty += resolveFirstInspectionCapacityOutsideProductionWindow(
-                context, sku, shifts, firstInspectionShift, firstProductionStartTime,
-                shiftCapacity, totalQty, scheduleType, machine.getMachineCode());
+                    context, sku, shifts, firstInspectionShift, firstProductionStartTime,
+                    shiftCapacity, totalQty, scheduleType, machine.getMachineCode());
+        }
         return Math.max(totalQty, 0);
     }
 
