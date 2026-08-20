@@ -127,6 +127,6 @@ public class NcCurlRollController extends AbstractDocBizController<NcCurlRoll> {
 
     @Override
     protected String getOrderBy() {
-        return "PADDING_CODE";
+        return "LINING_CODE";
     }
 }
