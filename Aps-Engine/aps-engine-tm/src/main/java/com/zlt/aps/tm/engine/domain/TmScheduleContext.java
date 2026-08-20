@@ -290,18 +290,40 @@ public class TmScheduleContext {
      */
     public void appendDeferredTaskProcessLog(String taskBusinessKey, Integer shiftOrder,
                                              String format, Object... args) {
-        TmTaskProcessLogEntry entry = new TmTaskProcessLogEntry();
-        entry.setTaskBusinessKey(taskBusinessKey);
-        entry.setShiftOrder(shiftOrder);
-        entry.setLogCategory(TmTaskProcessLogEntry.CATEGORY_MACHINE_ASSIGN);
-        entry.setOccurrenceOrder(this.nextDeferredTaskProcessLogSequence());
-        entry.setFormat(format);
-        entry.setArgs(args == null ? new Object[0] : args.clone());
-        this.getOrCreateDeferredTaskProcessLogList().add(entry);
+        this.appendDeferredTaskProcessLogByCategory(taskBusinessKey, shiftOrder,
+                TmTaskProcessLogEntry.CATEGORY_CAPACITY_DEDUCTION, format, args);
     }
 
     /**
-     * 暂存一条任务关联工装账本摘要日志，待计划量日志完成后按全局工装账本顺序输出。
+     * 暂存一条选机后的工装预校验摘要日志。
+     *
+     * @param taskBusinessKey 任务业务键
+     * @param shiftOrder 班次顺序
+     * @param format 日志格式，使用 MessageFormat 占位符
+     * @param args 日志参数
+     */
+    public void appendDeferredToolPrecheckProcessLog(String taskBusinessKey, Integer shiftOrder,
+                                                     String format, Object... args) {
+        this.appendDeferredTaskProcessLogByCategory(taskBusinessKey, shiftOrder,
+                TmTaskProcessLogEntry.CATEGORY_TOOL_PRECHECK, format, args);
+    }
+
+    /**
+     * 暂存一条实际任务承接后的工装账本结算摘要日志。
+     *
+     * @param taskBusinessKey 任务业务键
+     * @param shiftOrder 班次顺序
+     * @param format 日志格式，使用 MessageFormat 占位符
+     * @param args 日志参数
+     */
+    public void appendDeferredToolLedgerSettlementProcessLog(String taskBusinessKey, Integer shiftOrder,
+                                                             String format, Object... args) {
+        this.appendDeferredTaskProcessLogByCategory(taskBusinessKey, shiftOrder,
+                TmTaskProcessLogEntry.CATEGORY_TOOL_LEDGER_SETTLEMENT, format, args);
+    }
+
+    /**
+     * 兼容历史测试的工装账本日志入口，统一按工装账本结算阶段输出。
      *
      * @param taskBusinessKey 任务业务键
      * @param shiftOrder 班次顺序
@@ -310,10 +332,24 @@ public class TmScheduleContext {
      */
     public void appendDeferredToolProcessLog(String taskBusinessKey, Integer shiftOrder,
                                              String format, Object... args) {
+        this.appendDeferredToolLedgerSettlementProcessLog(taskBusinessKey, shiftOrder, format, args);
+    }
+
+    /**
+     * 暂存一条指定执行阶段的任务关联摘要日志。
+     *
+     * @param taskBusinessKey 任务业务键
+     * @param shiftOrder 班次顺序
+     * @param logCategory 日志执行阶段类别
+     * @param format 日志格式，使用 MessageFormat 占位符
+     * @param args 日志参数
+     */
+    private void appendDeferredTaskProcessLogByCategory(String taskBusinessKey, Integer shiftOrder,
+                                                        String logCategory, String format, Object... args) {
         TmTaskProcessLogEntry entry = new TmTaskProcessLogEntry();
         entry.setTaskBusinessKey(taskBusinessKey);
         entry.setShiftOrder(shiftOrder);
-        entry.setLogCategory(TmTaskProcessLogEntry.CATEGORY_TOOL_LEDGER);
+        entry.setLogCategory(logCategory);
         entry.setOccurrenceOrder(this.nextDeferredTaskProcessLogSequence());
         entry.setFormat(format);
         entry.setArgs(args == null ? new Object[0] : args.clone());
@@ -347,16 +383,25 @@ public class TmScheduleContext {
      * @param task 当前最终任务
      */
     public void flushDeferredTaskProcessLogs(TmTaskDraft task) {
-        this.flushDeferredTaskProcessLogs(task, TmTaskProcessLogEntry.CATEGORY_MACHINE_ASSIGN);
+        this.flushDeferredTaskProcessLogs(task, TmTaskProcessLogEntry.CATEGORY_CAPACITY_DEDUCTION);
     }
 
     /**
-     * 将指定任务的工装账本日志写入当前班次日志块。
+     * 将指定任务的工装预校验日志写入当前班次日志块。
+     *
+     * @param task 当前最终任务
+     */
+    public void flushDeferredToolPrecheckProcessLogs(TmTaskDraft task) {
+        this.flushDeferredTaskProcessLogs(task, TmTaskProcessLogEntry.CATEGORY_TOOL_PRECHECK);
+    }
+
+    /**
+     * 将指定任务的工装账本结算日志写入当前班次日志块。
      *
      * @param task 当前最终任务
      */
     public void flushDeferredToolProcessLogs(TmTaskDraft task) {
-        this.flushDeferredTaskProcessLogs(task, TmTaskProcessLogEntry.CATEGORY_TOOL_LEDGER);
+        this.flushDeferredTaskProcessLogs(task, TmTaskProcessLogEntry.CATEGORY_TOOL_LEDGER_SETTLEMENT);
     }
 
     /**
@@ -394,7 +439,7 @@ public class TmScheduleContext {
     /**
      * 输出尚未关联到任务列表的工装账本日志。
      *
-     * <p>成功日志组装时在机台日志和未排任务日志之前调用，避免遗漏的工装日志落到未排任务之后。</p>
+     * <p>成功日志组装时在未排任务日志之前调用，避免遗漏的工装账本结算日志落到未排任务之后。</p>
      */
     public void flushRemainingDeferredToolProcessLogs() {
         this.flushRemainingDeferredToolProcessLogs(null);
@@ -408,7 +453,7 @@ public class TmScheduleContext {
     public void flushRemainingDeferredToolProcessLogs(Integer shiftOrder) {
         this.getOrCreateDeferredTaskProcessLogList().stream()
                 .filter(entry -> !entry.isRendered())
-                .filter(entry -> TmTaskProcessLogEntry.CATEGORY_TOOL_LEDGER.equals(entry.getLogCategory()))
+                .filter(entry -> TmTaskProcessLogEntry.CATEGORY_TOOL_LEDGER_SETTLEMENT.equals(entry.getLogCategory()))
                 .filter(entry -> shiftOrder == null || Objects.equals(shiftOrder, entry.getShiftOrder()))
                 .sorted(Comparator
                         .comparing((TmTaskProcessLogEntry entry) -> this.resolveTaskToolLedgerOrder(entry),
@@ -434,7 +479,7 @@ public class TmScheduleContext {
     public void flushRemainingDeferredMachineProcessLogs(Integer shiftOrder) {
         this.getOrCreateDeferredTaskProcessLogList().stream()
                 .filter(entry -> !entry.isRendered())
-                .filter(entry -> this.isLogCategory(entry, TmTaskProcessLogEntry.CATEGORY_MACHINE_ASSIGN))
+                .filter(entry -> this.isLogCategory(entry, TmTaskProcessLogEntry.CATEGORY_CAPACITY_DEDUCTION))
                 .filter(entry -> shiftOrder == null || Objects.equals(shiftOrder, entry.getShiftOrder()))
                 .sorted(this.buildTaskDisplayOrderComparator())
                 .forEach(this::renderDeferredTaskProcessLog);
@@ -518,20 +563,34 @@ public class TmScheduleContext {
                 .comparing((TmTaskProcessLogEntry entry) -> this.resolveTaskToolLedgerOrder(entry),
                         Comparator.nullsLast(Comparator.naturalOrder()))
                 .thenComparing(this.buildTaskDisplayOrderComparator());
-        Comparator<TmTaskProcessLogEntry> machineAssignComparator = this.buildTaskDisplayOrderComparator();
-        return Comparator.comparing((TmTaskProcessLogEntry entry) ->
-                        TmTaskProcessLogEntry.CATEGORY_TOOL_LEDGER.equals(entry.getLogCategory()) ? 0 : 1)
+        Comparator<TmTaskProcessLogEntry> taskComparator = this.buildTaskDisplayOrderComparator();
+        return Comparator.comparingInt((TmTaskProcessLogEntry entry) ->
+                        this.resolveTaskProcessLogSection(entry).ordinal())
                 .thenComparing((left, right) -> {
-                    boolean leftIsTool = TmTaskProcessLogEntry.CATEGORY_TOOL_LEDGER.equals(left.getLogCategory());
-                    boolean rightIsTool = TmTaskProcessLogEntry.CATEGORY_TOOL_LEDGER.equals(right.getLogCategory());
+                    boolean leftIsTool = this.isToolLedgerStage(left);
+                    boolean rightIsTool = this.isToolLedgerStage(right);
                     if (leftIsTool && rightIsTool) {
                         return toolLedgerComparator.compare(left, right);
                     }
                     if (!leftIsTool && !rightIsTool) {
-                        return machineAssignComparator.compare(left, right);
+                        return taskComparator.compare(left, right);
                     }
                     return 0;
                 });
+    }
+
+    /**
+     * 判断日志是否属于按全局工装账本序号展示的阶段。
+     *
+     * @param entry 任务关联过程日志
+     * @return true 表示工装预校验或工装账本结算阶段
+     */
+    private boolean isToolLedgerStage(TmTaskProcessLogEntry entry) {
+        if (entry == null) {
+            return false;
+        }
+        return TmTaskProcessLogEntry.CATEGORY_TOOL_PRECHECK.equals(entry.getLogCategory())
+                || TmTaskProcessLogEntry.CATEGORY_TOOL_LEDGER_SETTLEMENT.equals(entry.getLogCategory());
     }
 
     /**
@@ -587,7 +646,7 @@ public class TmScheduleContext {
         if (logCategory.equals(entry.getLogCategory())) {
             return true;
         }
-        return TmTaskProcessLogEntry.CATEGORY_MACHINE_ASSIGN.equals(logCategory)
+        return TmTaskProcessLogEntry.CATEGORY_CAPACITY_DEDUCTION.equals(logCategory)
                 && StrUtil.isBlank(entry.getLogCategory());
     }
 
@@ -649,9 +708,19 @@ public class TmScheduleContext {
      * @return 过程日志分区
      */
     private ScheduleProcessLogSection resolveTaskProcessLogSection(TmTaskProcessLogEntry entry) {
-        return entry != null && TmTaskProcessLogEntry.CATEGORY_TOOL_LEDGER.equals(entry.getLogCategory())
-                ? ScheduleProcessLogSection.TOOL_LIMIT
-                : ScheduleProcessLogSection.MACHINE_SELECTION_CAPACITY;
+        if (entry == null) {
+            return ScheduleProcessLogSection.MACHINE_SELECTION;
+        }
+        if (TmTaskProcessLogEntry.CATEGORY_TOOL_PRECHECK.equals(entry.getLogCategory())) {
+            return ScheduleProcessLogSection.TOOL_LIMIT;
+        }
+        if (TmTaskProcessLogEntry.CATEGORY_CAPACITY_DEDUCTION.equals(entry.getLogCategory())) {
+            return ScheduleProcessLogSection.CAPACITY_DEDUCTION;
+        }
+        if (TmTaskProcessLogEntry.CATEGORY_TOOL_LEDGER_SETTLEMENT.equals(entry.getLogCategory())) {
+            return ScheduleProcessLogSection.TOOL_LEDGER_SETTLEMENT;
+        }
+        return ScheduleProcessLogSection.MACHINE_SELECTION;
     }
 
     /**
@@ -819,6 +888,32 @@ public class TmScheduleContext {
             Map<Integer, Map<String, Object>> workCalendarStoppedShiftEvidenceMap) {
         this.workCalendarStoppedShiftEvidenceMap = workCalendarStoppedShiftEvidenceMap == null
                 ? new LinkedHashMap<>() : workCalendarStoppedShiftEvidenceMap;
+    }
+
+    /**
+     * 将工作日历停机证据追加到批次级过程日志。
+     *
+     * @throws NullPointerException 不抛出；停机证据为空时直接跳过
+     */
+    public void appendWorkCalendarStoppedShiftProcessLogs() {
+        if (this.workCalendarStoppedShiftEvidenceMap == null
+                || this.workCalendarStoppedShiftEvidenceMap.isEmpty()) {
+            return;
+        }
+        this.workCalendarStoppedShiftEvidenceMap.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .filter(entry -> entry.getValue() != null)
+                .forEach(entry -> {
+                    Map<String, Object> evidence = entry.getValue();
+                    String calendarField = String.valueOf(evidence.get("calendarField"));
+                    String stopReason = "DAY_FLAG".equals(calendarField)
+                            ? "工作日历整日停产（DAY_FLAG=0）"
+                            : "工作日历指定班次停产（" + calendarField + "=0）";
+                    this.appendProcessLog("工作日历停机：工序={0}，生产日期={1}，排程班次={2}，日历字段={3}，字段值={4}，停机原因={5}",
+                            evidence.get("procCode"), evidence.get("productionDate"),
+                            evidence.get("shiftOrder"), calendarField,
+                            evidence.get("calendarFieldValue"), stopReason);
+                });
     }
 
     public void setShiftTimeWindowMap(Map<Integer, TmShiftTimeWindow> shiftTimeWindowMap) {

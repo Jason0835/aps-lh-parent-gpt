@@ -643,7 +643,7 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
         List<ImportErrorLog> importErrorLogs = new ArrayList<>();
         List<DjScheduleResult> importList = new ArrayList<>();
         DjMachineInfo djMachineInfo = new DjMachineInfo();
-        djMachineInfo.setStatus("0");
+        djMachineInfo.setStatus("1");
         List<DjMachineInfo> machineInfoList = machineInfoService.selectMachineInfoList(djMachineInfo);
         if (CollectionUtils.isEmpty(machineInfoList)) {
             String message = I18nUtil.getMessage("ui.error.message.column.machineIsNull");

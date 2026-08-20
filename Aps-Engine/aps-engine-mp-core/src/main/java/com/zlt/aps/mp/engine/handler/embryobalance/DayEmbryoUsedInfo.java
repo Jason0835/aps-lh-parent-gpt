@@ -3,6 +3,7 @@ package com.zlt.aps.mp.engine.handler.embryobalance;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import com.zlt.aps.mp.engine.enums.EmbryoFindType;
 import lombok.Getter;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
@@ -282,7 +283,7 @@ public class DayEmbryoUsedInfo implements Serializable {
             return true;
         }
         //胎胚刚好满了
-        return checkNoAppointFullEmbryoCountBalance(extraLhMachines, embryoUsedInfo, cxMachineConfigurationList);
+        return checkAllocationNoAppointFullEmbryoCount(embryoUsedInfo, cxMachineConfigurationList);
     }
 
     /**
@@ -443,6 +444,50 @@ public class DayEmbryoUsedInfo implements Serializable {
     }
 
     /**
+     * 校验是否可分配
+     *
+     * @param embryoUsedInfo
+     * @param cxMachineConfigurationList
+     * @return
+     */
+    private boolean checkAllocationNoAppointFullEmbryoCount(List<EmbryoUsedLhMachineInfo> embryoUsedInfo, List<GroupCxMachineConfiguration> cxMachineConfigurationList) {
+        if (CollectionUtils.isEmpty(cxMachineConfigurationList) || CollectionUtils.isEmpty(embryoUsedInfo)) {
+            return true;
+        }
+        int maxEmbryoCount = cxMachineConfigurationList.stream().mapToInt(GroupCxMachineConfiguration::getMaxEmbryoCodeCount).max().getAsInt();
+        int maxEmbryoAverageLhMachine = cxMachineConfigurationList.stream().mapToInt(GroupCxMachineConfiguration::getEmbryoAverageLhMachine).max().getAsInt();
+        int groupSize = cxMachineConfigurationList.size();
+        //先分组
+        List<SplitEmbryoGroupInfo> groupList = Lists.newArrayList();
+        int index = BigDecimal.ONE.intValue();
+        for (; index <= groupSize; ) {
+            SplitEmbryoGroupInfo singleSplit = SplitEmbryoGroupInfo.buildInit(index, maxEmbryoAverageLhMachine, maxEmbryoCount);
+            groupList.add(singleSplit);
+            index = index + BigDecimal.ONE.intValue();
+        }
+        //从大到小排序
+        embryoUsedInfo.sort(Comparator.comparing(EmbryoUsedLhMachineInfo::getUsedLhMachines, Comparator.reverseOrder()));
+        Set<String> selectedEmbryoSet = Sets.newHashSet();
+        //先各自各分配一个
+        List<EmbryoUsedLhMachineInfo> fistAllocationList = embryoUsedInfo.subList(BigDecimal.ZERO.intValue(), groupSize);
+        groupList.forEach(singleGroup -> {
+            int groupNumber = singleGroup.getGroupNumber();
+            int selectIndex = groupNumber - BigDecimal.ONE.intValue();
+            EmbryoUsedLhMachineInfo selectedEmbryo = fistAllocationList.get(selectIndex);
+            singleGroup.addEmbryoLhMachines(selectedEmbryo);
+            selectedEmbryoSet.add(selectedEmbryo.getEmbryoCode());
+        });
+        //分配剩余胎胚
+        allocationLeftOver(groupList, embryoUsedInfo, selectedEmbryoSet);
+        //分好组后，校验。先胎胚多，硫化机台数多的先匹配
+        List<Boolean> checkList = checkBySplit(cxMachineConfigurationList, groupList);
+        if (CollectionUtils.isEmpty(checkList)) {
+            return true;
+        }
+        return false;
+    }
+
+    /**
      * 检测所有分配组，只要有一个不成立，则表示不能平衡分配
      *
      * @param extraLhMachines            额外处理机台数
@@ -511,6 +556,78 @@ public class DayEmbryoUsedInfo implements Serializable {
             return Collections.emptyList();
         }
         return findList;
+    }
+
+    /**
+     * 分配剩余胎胚-在第一个胎胚分配完成后
+     *
+     * @param groupList         分组信息
+     * @param embryoUsedInfo    需分配的胎胚信息
+     * @param selectedEmbryoSet 已经分配的胎胚信息
+     */
+    private void allocationLeftOver(List<SplitEmbryoGroupInfo> groupList, List<EmbryoUsedLhMachineInfo> embryoUsedInfo, Set<String> selectedEmbryoSet) {
+        groupList.forEach(singleGroup -> {
+            List<EmbryoUsedLhMachineInfo> canAllocationList = getLeftOverEmbryoUsedInfo(embryoUsedInfo, selectedEmbryoSet);
+            if (CollectionUtils.isEmpty(canAllocationList)) {
+                return;
+            }
+            if (!singleGroup.hasAddEmbryoLhMachines()) {
+                return;
+            }
+            List<EmbryoUsedLhMachineInfo> findList = getFindListByType(canAllocationList, singleGroup);
+            if (CollectionUtils.isEmpty(findList)) {
+                return;
+            }
+            findList.sort(Comparator.comparing(EmbryoUsedLhMachineInfo::getUsedLhMachines, Comparator.reverseOrder()));
+            EmbryoUsedLhMachineInfo selected = findList.get(BigDecimal.ZERO.intValue());
+            singleGroup.addEmbryoLhMachines(selected);
+            selectedEmbryoSet.add(selected.getEmbryoCode());
+        });
+        List<EmbryoUsedLhMachineInfo> leftOverEmbryoUsedInfo = getLeftOverEmbryoUsedInfo(embryoUsedInfo, selectedEmbryoSet);
+        if (CollectionUtils.isEmpty(leftOverEmbryoUsedInfo)) {
+            return;
+        }
+        //迭代下一轮
+        allocationLeftOver(groupList, embryoUsedInfo, selectedEmbryoSet);
+    }
+
+    /**
+     * 校验分配
+     * 胎胚多，硫化机台数多的先匹配
+     *
+     * @param cxMachineConfigurationList
+     * @param groupList
+     * @return
+     */
+    private List<Boolean> checkBySplit(List<GroupCxMachineConfiguration> cxMachineConfigurationList, List<SplitEmbryoGroupInfo> groupList) {
+        //胎胚种类大，且硫化机台数大的先组合
+        Comparator sort = Comparator.comparing(GroupCxMachineConfiguration::getMaxEmbryoCodeCount, Comparator.reverseOrder())
+                .thenComparing(GroupCxMachineConfiguration::getRealMaxLhMachines, Comparator.reverseOrder());
+        cxMachineConfigurationList.sort(sort);
+        List<Boolean> checkList = Lists.newArrayList();
+        Set<SplitEmbryoGroupInfo> selectedGroup = Sets.newHashSet();
+        cxMachineConfigurationList.forEach(singleCxMachine -> {
+            Integer maxEmbryoLimit = singleCxMachine.getMaxEmbryoCodeCount();
+            List<SplitEmbryoGroupInfo> canSelectList = getLeftOverGroup(groupList, selectedGroup);
+            if (CollectionUtils.isEmpty(canSelectList)) {
+                checkList.add(Boolean.FALSE);
+                return;
+            }
+            List<SplitEmbryoGroupInfo> findList = canSelectList.stream().filter(singleSplit -> singleSplit.getAllocationEmbryoCount() <= maxEmbryoLimit).collect(Collectors.toList());
+            if (CollectionUtils.isEmpty(findList)) {
+                findList = canSelectList;
+            }
+            //胎胚多，硫化机台数多先
+            Comparator groupSort = Comparator.comparing(SplitEmbryoGroupInfo::getAllocationEmbryoCount, Comparator.reverseOrder())
+                    .thenComparing(SplitEmbryoGroupInfo::getAllocationLhMachines, Comparator.reverseOrder());
+            findList.sort(groupSort);
+            SplitEmbryoGroupInfo findSelected = findList.get(BigDecimal.ZERO.intValue());
+            selectedGroup.add(findSelected);
+            if (findSelected.checkReachLimit(singleCxMachine)) {
+                checkList.add(Boolean.FALSE);
+            }
+        });
+        return checkList;
     }
 
     /**
@@ -641,4 +758,68 @@ public class DayEmbryoUsedInfo implements Serializable {
         return maxEmbryoInfo.reduceLhMachine();
     }
 
+    /**
+     * 获取剩余没有选中的
+     *
+     * @param groupList
+     * @param selectedSet
+     * @return
+     */
+    private List<SplitEmbryoGroupInfo> getLeftOverGroup(List<SplitEmbryoGroupInfo> groupList, Set<SplitEmbryoGroupInfo> selectedSet) {
+        if (CollectionUtils.isEmpty(groupList)) {
+            return Collections.emptyList();
+        }
+        Set<SplitEmbryoGroupInfo> excludeSet = Optional.ofNullable(selectedSet).orElse(Collections.emptySet());
+        return groupList.stream().filter(singleGroup -> !excludeSet.contains(singleGroup)).collect(Collectors.toList());
+    }
+
+    /**
+     * 获取符合条件的胎胚信息
+     *
+     * @param canAllocationList
+     * @param singleGroup
+     * @return
+     */
+    private List<EmbryoUsedLhMachineInfo> getFindListByType(List<EmbryoUsedLhMachineInfo> canAllocationList, SplitEmbryoGroupInfo singleGroup) {
+        if (CollectionUtils.isEmpty(canAllocationList)) {
+            return Collections.emptyList();
+        }
+        EmbryoFindType findType = singleGroup.findGreaterThanEmbryoAverageLhMachine();
+        if (EmbryoFindType.ET_AVERAGE == findType) {
+            //获取等于平均数的胎胚: 先等于 -> 再小于 -> 最后所有
+            List<EmbryoUsedLhMachineInfo> findResult = canAllocationList.stream().filter(singleEmbryo -> singleEmbryo.getUsedLhMachines() == singleGroup.getEmbryoAverageLhMachine()).collect(Collectors.toList());
+            if (CollectionUtils.isEmpty(findResult)) {
+                //等于没有，则获取小于
+                findResult = canAllocationList.stream().filter(singleEmbryo -> singleEmbryo.getUsedLhMachines() < singleGroup.getEmbryoAverageLhMachine()).collect(Collectors.toList());
+            }
+            if (CollectionUtils.isEmpty(findResult)) {
+                //所有
+                findResult = canAllocationList;
+            }
+            return findResult;
+        }
+        if (EmbryoFindType.LT_AVERAGE == findType) {
+            //获取小于平均数的胎胚: 先小于 -> 再等于 -> 最后所有
+            List<EmbryoUsedLhMachineInfo> findResult = canAllocationList.stream().filter(singleEmbryo -> singleEmbryo.getUsedLhMachines() < singleGroup.getEmbryoAverageLhMachine()).collect(Collectors.toList());
+            if (CollectionUtils.isEmpty(findResult)) {
+                //小于没有，则获取等于
+                findResult = canAllocationList.stream().filter(singleEmbryo -> singleEmbryo.getUsedLhMachines() == singleGroup.getEmbryoAverageLhMachine()).collect(Collectors.toList());
+            }
+            if (CollectionUtils.isEmpty(findResult)) {
+                //所有
+                findResult = canAllocationList;
+            }
+            return findResult;
+        }
+        //获取大于平均数的胎胚：先大于 -> 在等于 -> 最后所有
+        List<EmbryoUsedLhMachineInfo> findResult = canAllocationList.stream().filter(singleEmbryo -> singleEmbryo.getUsedLhMachines() > singleGroup.getEmbryoAverageLhMachine()).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(findResult)) {
+            //大于没有，获取等于
+            findResult = canAllocationList.stream().filter(singleEmbryo -> singleEmbryo.getUsedLhMachines() == singleGroup.getEmbryoAverageLhMachine()).collect(Collectors.toList());
+        }
+        if (CollectionUtils.isEmpty(findResult)) {
+            findResult = canAllocationList;
+        }
+        return findResult;
+    }
 }

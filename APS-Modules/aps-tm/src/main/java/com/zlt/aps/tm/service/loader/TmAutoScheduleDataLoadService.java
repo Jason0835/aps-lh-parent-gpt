@@ -37,6 +37,9 @@ import java.util.stream.Collectors;
 @Service
 public class TmAutoScheduleDataLoadService {
 
+    /** 施工表胎面长度单位由毫米换算为米的除数。 */
+    private static final BigDecimal CONSTRUCTION_LENGTH_UNIT_DIVISOR = BigDecimal.valueOf(1000L);
+
     private final TmAutoScheduleRedisCacheService tmAutoScheduleRedisCacheService;
     /** 参数装载组件，只负责构建单次排程参数快照 */
     private final TmScheduleParamLoader tmScheduleParamLoader;
@@ -824,7 +827,7 @@ public class TmAutoScheduleDataLoadService {
         for (TmFormingDemandRowVo row : demandRowList) {
             sourceRowIndex++;
             String treadCode = row.getTreadCode();
-            BigDecimal treadLength = nvl(row.getTreadShoulderLength());
+            BigDecimal treadLength = this.convertConstructionLengthToMeter(row.getTreadShoulderLength());
             if (StrUtil.isBlank(treadCode) || treadLength.compareTo(BigDecimal.ZERO) <= 0) {
                 continue;
             }
@@ -1132,7 +1135,7 @@ public class TmAutoScheduleDataLoadService {
                     continue;
                 }
                 String treadCode = primarySpec.getTreadCode();
-                BigDecimal treadLength = nvl(primarySpec.getTreadShoulderLength());
+                BigDecimal treadLength = this.convertConstructionLengthToMeter(primarySpec.getTreadShoulderLength());
                 BigDecimal demandQty = formingQty.multiply(treadLength);
                 if (demandQty.compareTo(BigDecimal.ZERO) <= 0) {
                     continue;
@@ -1360,7 +1363,8 @@ public class TmAutoScheduleDataLoadService {
             BigDecimal formingQty = this.resolveGuardClassQty(classQtyArray, index);
             BigDecimal appliedFormingQty = formingQty.min(remainingGuardFormingQty);
             BigDecimal treadLength = (index >= 0 && index < 8 && specByClass != null && specByClass[index] != null)
-                    ? this.nvl(specByClass[index].getTreadShoulderLength()) : this.nvl(currentTreadLength);
+                    ? this.convertConstructionLengthToMeter(specByClass[index].getTreadShoulderLength())
+                    : this.nvl(currentTreadLength);
             windowQtyMap.put(index + 1, appliedFormingQty.multiply(treadLength));
             remainingGuardFormingQty = remainingGuardFormingQty.subtract(appliedFormingQty);
         }
@@ -2575,6 +2579,7 @@ public class TmAutoScheduleDataLoadService {
         }
         context.setWorkCalendarStoppedShiftOrderSet(stoppedShiftOrders);
         context.setWorkCalendarStoppedShiftEvidenceMap(stoppedShiftEvidenceMap);
+        context.appendWorkCalendarStoppedShiftProcessLogs();
     }
 
     /**
@@ -3262,6 +3267,18 @@ public class TmAutoScheduleDataLoadService {
      */
     private BigDecimal nvl(BigDecimal value) {
         return value == null ? BigDecimal.ZERO : value;
+    }
+
+    /**
+     * 将施工表中的胎面长度由毫米换算为自动排程使用的米。
+     *
+     * <p>仅用于成型计划关联施工信息的任务草稿；原始值仍用于施工字段完整性校验。</p>
+     *
+     * @param constructionLength 施工表胎面长度，单位毫米
+     * @return 换算后的胎面长度，单位米；空值按0处理
+     */
+    private BigDecimal convertConstructionLengthToMeter(BigDecimal constructionLength) {
+        return this.nvl(constructionLength).divide(CONSTRUCTION_LENGTH_UNIT_DIVISOR);
     }
 
     /**

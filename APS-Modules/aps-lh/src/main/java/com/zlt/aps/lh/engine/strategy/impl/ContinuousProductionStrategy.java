@@ -7619,9 +7619,6 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         if (machine == null || estimatedEndTime == null) {
             return null;
         }
-        if (getMaintenanceScheduleService().shouldApplyMaintenanceOverlapSwitchRule(context, machine, estimatedEndTime)) {
-            return getMaintenanceScheduleService().resolveMaintenanceEndTime(context, machine);
-        }
         Date switchStartTime = resolveAllowedSwitchStartTime(
                 context, machine.getMachineCode(), estimatedEndTime);
         switchStartTime = getMaintenanceScheduleService().delaySwitchStartByMaintenance(
@@ -7639,11 +7636,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         if (switchStartTime == null) {
             return null;
         }
-        boolean maintenanceOverlapSwitch = getMaintenanceScheduleService()
-                .shouldApplyMaintenanceOverlapSwitchRule(context, machine, estimatedEndTime);
-        int switchDurationHours = maintenanceOverlapSwitch
-                ? LhScheduleTimeUtil.getMaintenanceOverlapSwitchHours(context)
-                : LhScheduleTimeUtil.getTypeBlockChangeTotalHours(context);
+        int switchDurationHours = LhScheduleTimeUtil.getTypeBlockChangeTotalHours(context);
         Date switchCompleteTime = LhScheduleTimeUtil.addHours(switchStartTime, switchDurationHours);
         boolean plannedRepairAffectingSwitch = ShiftCapacityResolverUtil.isPlannedRepairAffectingSwitch(
                 context, context.getDevicePlanShutList(), machine.getMachineCode(), estimatedEndTime,
@@ -7653,10 +7646,6 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             return ShiftCapacityResolverUtil.resolvePlannedRepairProductionReadyTime(
                     context, context.getDevicePlanShutList(), machine.getMachineCode(), estimatedEndTime,
                     switchStartTime, switchCompleteTime);
-        }
-        if (maintenanceOverlapSwitch) {
-            return LhScheduleTimeUtil.addHours(
-                    switchCompleteTime, LhScheduleTimeUtil.getFirstInspectionHours(context));
         }
         return switchCompleteTime;
     }

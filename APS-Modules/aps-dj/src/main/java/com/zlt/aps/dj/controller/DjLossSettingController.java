@@ -98,7 +98,7 @@ public class DjLossSettingController extends AbstractDocBizController<DjLossSett
     @Override
     protected List<DjLossSetting> listExportData(DjLossSetting obj) {
         QueryWrapper<DjLossSetting> wrapper = new QueryWrapper<>();
-        startPage("update_time desc");
+        startPage(getOrderBy());
         this.builderCondition(wrapper, obj);
         List<DjLossSetting> list = lossSettingMapper.selectList(wrapper);
         AppUtils.formatData(list, getQueryFormulas());
@@ -127,6 +127,6 @@ public class DjLossSettingController extends AbstractDocBizController<DjLossSett
 
     @Override
     protected String getOrderBy() {
-        return "MACHINE_CODE, PADDING_CODE";
+        return "MACHINE_CODE, PADDING_CODE, ID";
     }
 }

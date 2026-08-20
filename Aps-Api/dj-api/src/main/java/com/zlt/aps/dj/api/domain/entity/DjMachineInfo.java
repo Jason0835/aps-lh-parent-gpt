@@ -26,6 +26,8 @@ import lombok.EqualsAndHashCode;
 public class DjMachineInfo extends BaseEntity {
     private static final long serialVersionUID = 1L;
 
+    @Excel(name = "ui.data.column.factoryCode", dictType = "biz_factory_name")
+    @ImportExcelValidated(required = true, isCode = true, maxLength = 50)
     @ApiModelProperty(value = "工厂编码")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
@@ -93,7 +95,7 @@ public class DjMachineInfo extends BaseEntity {
     @TableField(value = "OPEN_MACHINE_CLASS")
     private String openMachineClass;
 
-    /** 机台状态，0--启用，1--禁用。对应数据字典STATUS */
+    /** 机台状态，1--启用，0--禁用。对应数据字典STATUS */
     @ApiModelProperty(value = "机台状态", position =90)
     @Excel(name = "ui.data.column.machine.status",dictType="biz_available_status")
     @ImportExcelValidated(name = "ui.data.column.machine.status", maxLength = 6 ,required = true)

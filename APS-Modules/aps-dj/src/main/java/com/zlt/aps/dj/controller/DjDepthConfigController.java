@@ -9,15 +9,22 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.ruoyi.common.log.annotation.Log;
+import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.dj.api.domain.entity.DjDepthConfig;
+import com.zlt.aps.dj.api.domain.entity.DjStock;
 import com.zlt.aps.dj.mapper.DjDepthConfigMapper;
 import com.zlt.aps.dj.service.IDjDepthConfigService;
+import com.zlt.aps.utils.AppUtils;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 
@@ -84,6 +91,25 @@ public class DjDepthConfigController extends AbstractDocBizController<DjDepthCon
     @PostMapping("/remove")
     public AjaxResult removeByIds(@RequestBody List<Long> ids) {
         return super.removeByIds(ids);
+    }
+
+    @Override
+    protected List<DjDepthConfig> listExportData(DjDepthConfig obj) {
+        QueryWrapper<DjDepthConfig> wrapper = new QueryWrapper<>();
+        startPage(getOrderBy());
+        this.builderCondition(wrapper, obj);
+        List<DjDepthConfig> list = depthConfigMapper.selectList(wrapper);
+        AppUtils.formatData(list, getQueryFormulas());
+        return list;
+    }
+
+    @Log(title = "ui.dj.depthConfig.column.modalName", businessType = BusinessType.IMPORT)
+    @PostMapping("/importData")
+    @ApiOperation("导入信息")
+    @Override
+    public AjaxResult importData(@RequestBody ImportContext importContext,
+            @RequestParam("updateSupport") boolean updateSupport) throws Exception {
+        return super.importData(importContext, updateSupport);
     }
 
     @Override
