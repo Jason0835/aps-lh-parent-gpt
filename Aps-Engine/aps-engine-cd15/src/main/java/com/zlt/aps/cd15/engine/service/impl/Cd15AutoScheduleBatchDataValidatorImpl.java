@@ -224,30 +224,18 @@ public class Cd15AutoScheduleBatchDataValidatorImpl implements Cd15AutoScheduleB
         }
     }
 
-    /** 按正式输入范围检查成型计划，并保留排程日当天必须存在成型计划的约束。 */
+    /** 按斜裁排程日期精确检查同日成型计划。 */
     private List<CxScheduleResult> checkFormingSchedule(Cd15BatchDataCheckResult.Builder builder,
                                                         String factoryCode,
                                                         LocalDate scheduleDate) {
-        LocalDate formingStartDate = scheduleDate.minusDays(1);
-        LocalDate formingEndDate = scheduleDate.plusDays(3);
         List<CxScheduleResult> schedules = cxScheduleMapper.selectList(Wrappers.<CxScheduleResult>lambdaQuery()
                 .eq(CxScheduleResult::getFactoryCode, factoryCode)
-                .between(CxScheduleResult::getScheduleDate,
-                        Date.valueOf(formingStartDate), Date.valueOf(formingEndDate)));
+                .eq(CxScheduleResult::getScheduleDate, Date.valueOf(scheduleDate)));
         if (schedules == null || schedules.isEmpty()) {
-            builder.addError("成型计划", DATA_MISSING,
-                    "未找到成型计划范围 " + formingStartDate + " 至 " + formingEndDate + " 的排程记录",
-                    "请先在成型排程页面生成对应日期范围的成型排程");
-            return new ArrayList<>();
-        }
-        boolean hasTargetSchedule = schedules.stream()
-                .filter(schedule -> schedule.getScheduleDate() != null)
-                .map(schedule -> new Date(schedule.getScheduleDate().getTime()).toLocalDate())
-                .anyMatch(scheduleDate::equals);
-        if (!hasTargetSchedule) {
             builder.addError("成型计划", DATA_MISSING,
                     "未找到排程日 " + scheduleDate + " 的成型排程记录",
                     "请先在成型排程页面生成排程日 " + scheduleDate + " 的成型排程");
+            return new ArrayList<>();
         }
         return schedules;
     }

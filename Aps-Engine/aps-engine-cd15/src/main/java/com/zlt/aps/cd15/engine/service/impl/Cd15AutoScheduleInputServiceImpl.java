@@ -113,14 +113,11 @@ public class Cd15AutoScheduleInputServiceImpl implements Cd15AutoScheduleInputSe
         Assert.notNull(resourceBaselineDate, "库排资源基线日期不能为空");
         Assert.hasText(resourceBaselineShiftCode, "库排资源基线班次不能为空");
 
-        LocalDate formingStartDate = scheduleDate.minusDays(1);
-        LocalDate formingEndDate = scheduleDate.plusDays(3);
-        log.info("[斜裁自动排程] 加载成型计划, factoryCode={}, scheduleDate={}, formingStartDate={}, formingEndDate={}",
-                factoryCode, scheduleDate, formingStartDate, formingEndDate);
-        List<CxScheduleResult> formingEntities = loadFormingSchedules(
-                factoryCode, formingStartDate, formingEndDate);
-        log.info("[斜裁自动排程] 成型计划加载结果, factoryCode={}, formingStartDate={}, formingEndDate={}, recordCount={}",
-                factoryCode, formingStartDate, formingEndDate, formingEntities.size());
+        log.info("[斜裁自动排程] 加载成型计划, factoryCode={}, scheduleDate={}",
+                factoryCode, scheduleDate);
+        List<CxScheduleResult> formingEntities = loadFormingSchedules(factoryCode, scheduleDate);
+        log.info("[斜裁自动排程] 成型计划加载结果, factoryCode={}, scheduleDate={}, recordCount={}",
+                factoryCode, scheduleDate, formingEntities.size());
         List<Cd15FormingScheduleSource> formingSchedules = formingEntities.stream()
                 .map(sourceMapper::mapFormingSchedule)
                 .collect(Collectors.toList());
@@ -201,11 +198,11 @@ public class Cd15AutoScheduleInputServiceImpl implements Cd15AutoScheduleInputSe
                 gdyyActualStocks, gdyyPlans, shiftConfigs, agingPeriodHours);
 
         log.info("[斜裁自动排程] 输入数据加载完成, factoryCode={}, scheduleDate={}, classField={}, shiftCode={}, "
-                        + "formingRange={}~{}, formingCount={}, constructionMaterialCount={}, "
+                        + "formingCount={}, constructionMaterialCount={}, "
                         + "demandShiftCount={}, depthSteelStripCount={}, resourceBaselineDate={}, "
                         + "resourceBaselineShiftCode={}, stockCount={}, storageLaneCount={}",
-                factoryCode, scheduleDate, classField, shiftCode, formingStartDate, formingEndDate,
-                formingSchedules.size(), constructionMaterials.size(), demandShifts.size(),
+                factoryCode, scheduleDate, classField, shiftCode, formingSchedules.size(),
+                constructionMaterials.size(), demandShifts.size(),
                 depthClassQtyBySteelStrip.size(), resourceBaselineDate,
                 resourceBaselineShiftCode, stocksAtSix.size(), storageLanesAtSix.size());
 
@@ -245,8 +242,7 @@ public class Cd15AutoScheduleInputServiceImpl implements Cd15AutoScheduleInputSe
     }
 
     private List<CxScheduleResult> loadFormingSchedules(String factoryCode,
-                                                         LocalDate startDate,
-                                                         LocalDate endDate) {
+                                                         LocalDate scheduleDate) {
         // 斜裁按胎胚代码分解施工层位，仅查询需求计算所需字段，避免共享实体的展示字段影响排程。
         return cxScheduleMapper.selectList(Wrappers.<CxScheduleResult>lambdaQuery()
                 .select(CxScheduleResult::getCxBatchNo,
@@ -270,8 +266,7 @@ public class Cd15AutoScheduleInputServiceImpl implements Cd15AutoScheduleInputSe
                         CxScheduleResult::getClass8PlanQty,
                         CxScheduleResult::getClass8RecipeNo)
                 .eq(CxScheduleResult::getFactoryCode, factoryCode)
-                .between(CxScheduleResult::getScheduleDate,
-                        Date.valueOf(startDate), Date.valueOf(endDate))
+                .eq(CxScheduleResult::getScheduleDate, Date.valueOf(scheduleDate))
                 .orderByAsc(CxScheduleResult::getScheduleDate)
                 .orderByAsc(CxScheduleResult::getCxBatchNo));
     }

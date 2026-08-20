@@ -117,32 +117,19 @@ public class Cd90AutoScheduleBatchDataValidatorImpl implements Cd90AutoScheduleB
 
     /**
      * 批次级检查：成型计划数据是否就绪。
-     * 与输入加载口径保持一致，检查 scheduleDate-1 至 scheduleDate+3 的成型排程记录，
-     * 避免相邻日期参与需求展开时才发现施工版本为空或胎胚施工版本未维护。
+     * 与输入加载口径保持一致，只检查与直裁排程日期相同的成型排程记录。
      * 返回查询到的成型记录，供后续施工信息检查使用。
      */
     private List<CxScheduleResult> checkFormingSchedule(Cd90BatchDataCheckResult.Builder builder,
                                                          String factoryCode, LocalDate scheduleDate) {
-        LocalDate formingStartDate = scheduleDate.minusDays(1);
-        LocalDate formingEndDate = scheduleDate.plusDays(3);
         List<CxScheduleResult> schedules = cxScheduleMapper.selectList(Wrappers.<CxScheduleResult>lambdaQuery()
                 .eq(CxScheduleResult::getFactoryCode, factoryCode)
-                .between(CxScheduleResult::getScheduleDate,
-                        Date.valueOf(formingStartDate), Date.valueOf(formingEndDate)));
+                .eq(CxScheduleResult::getScheduleDate, Date.valueOf(scheduleDate)));
         if (schedules == null || schedules.isEmpty()) {
-            builder.addError("成型计划", "DATA_MISSING",
-                    "未找到成型计划范围 " + formingStartDate + " 至 " + formingEndDate + " 的排程记录",
-                    "请先在成型排程页面生成对应日期范围的成型排程");
-            return new ArrayList<>();
-        }
-        boolean hasTargetSchedule = schedules.stream()
-                .filter(schedule -> schedule.getScheduleDate() != null)
-                .map(schedule -> new Date(schedule.getScheduleDate().getTime()).toLocalDate())
-                .anyMatch(scheduleDate::equals);
-        if (!hasTargetSchedule) {
             builder.addError("成型计划", "DATA_MISSING",
                     "未找到排程日 " + scheduleDate + " 的成型排程记录",
                     "请先在成型排程页面生成排程日 " + scheduleDate + " 的成型排程");
+            return new ArrayList<>();
         }
         return schedules;
     }
