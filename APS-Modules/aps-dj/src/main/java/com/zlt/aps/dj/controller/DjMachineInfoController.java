@@ -107,7 +107,7 @@ public class DjMachineInfoController extends AbstractDocBizController<DjMachineI
     @Override
     protected List<DjMachineInfo> listExportData(DjMachineInfo obj) {
         QueryWrapper<DjMachineInfo> wrapper = new QueryWrapper<>();
-        startPage("update_time desc");
+        startPage(getOrderBy());
         this.builderCondition(wrapper, obj);
         List<DjMachineInfo> list = machineMapper.selectList(wrapper);
         AppUtils.formatData(list, getQueryFormulas());
@@ -136,6 +136,6 @@ public class DjMachineInfoController extends AbstractDocBizController<DjMachineI
 
     @Override
     protected String getOrderBy() {
-        return "MACHINE_CODE";
+        return "MACHINE_CODE, ID";
     }
 }

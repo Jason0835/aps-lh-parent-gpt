@@ -95,7 +95,7 @@ public class NcSpecifyMachineController extends AbstractDocBizController<NcSpeci
     @Override
     protected List<NcSpecifyMachine> listExportData(NcSpecifyMachine obj) {
         QueryWrapper<NcSpecifyMachine> wrapper = new QueryWrapper<>();
-        startPage("update_time desc");
+        startPage(getOrderBy());
         this.builderCondition(wrapper, obj);
         List<NcSpecifyMachine> list = machineMapper.selectList(wrapper);
         AppUtils.formatData(list, getQueryFormulas());
@@ -124,7 +124,7 @@ public class NcSpecifyMachineController extends AbstractDocBizController<NcSpeci
 
     @Override
     protected String getOrderBy() {
-        return "MACHINE_CODE, LINING_CODE";
+        return "MACHINE_CODE, LINING_CODE, ID";
     }
 
     @Override

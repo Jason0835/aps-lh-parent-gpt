@@ -107,7 +107,7 @@ public class NcMachineInfoController extends AbstractDocBizController<NcMachineI
     @Override
     protected List<NcMachineInfo> listExportData(NcMachineInfo obj) {
         QueryWrapper<NcMachineInfo> wrapper = new QueryWrapper<>();
-        startPage("update_time desc");
+        startPage(getOrderBy());
         this.builderCondition(wrapper, obj);
         List<NcMachineInfo> list = machineMapper.selectList(wrapper);
         AppUtils.formatData(list, getQueryFormulas());
@@ -136,6 +136,6 @@ public class NcMachineInfoController extends AbstractDocBizController<NcMachineI
 
     @Override
     protected String getOrderBy() {
-        return "MACHINE_CODE";
+        return "MACHINE_CODE, ID";
     }
 }

@@ -109,7 +109,7 @@ public class DjStockController extends AbstractDocBizController<DjStock> {
     @Override
     protected List<DjStock> listExportData(DjStock obj) {
         QueryWrapper<DjStock> wrapper = new QueryWrapper<>();
-        startPage("update_time desc");
+        startPage(getOrderBy());
         this.builderCondition(wrapper, obj);
         List<DjStock> list = djStockMapper.selectList(wrapper);
         AppUtils.formatData(list, getQueryFormulas());
@@ -138,6 +138,6 @@ public class DjStockController extends AbstractDocBizController<DjStock> {
 
     @Override
     protected String getOrderBy() {
-        return "STOCK_DATE DESC, MATERIAL_CODE";
+        return "STOCK_DATE DESC, MATERIAL_CODE, ID";
     }
 }
