@@ -5842,9 +5842,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
     /**
      * 加载硫化日产
      *
-     * @param factoryCode
-     * @param year
-     * @param month
+     * @param contextDTO 上下文
      * @return
      */
     private Map<Integer, MpDailyCapacityLimitVo> loadDailyCapacityMap(MpRollAdjustContextDTO contextDTO) {
