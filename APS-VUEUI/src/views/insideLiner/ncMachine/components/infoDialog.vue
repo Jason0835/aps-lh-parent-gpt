@@ -87,7 +87,6 @@ export default {
           dictData: this.parentDict.type.biz_factory_name,
           filterable: true,
           required: true,
-          disabled: true,
         },
         {
           label: this.$t("ui.data.column.machine.machineCode"),

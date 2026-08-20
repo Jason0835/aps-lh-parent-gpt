@@ -44,6 +44,13 @@ export default {
         openMachineClass: [],
       },
       rules: {
+        factoryCode: [
+          {
+            required: true,
+            message: this.$t("common.rule.select"),
+            trigger: "blur",
+          },
+        ],
         machineCode: [
           {
             required: true,
@@ -79,7 +86,6 @@ export default {
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
           required: true,
-          disabled: true,
         },
         {
           label: this.$t("ui.data.column.machine.machineCode"),

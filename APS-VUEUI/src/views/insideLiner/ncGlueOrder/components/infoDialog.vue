@@ -54,6 +54,13 @@ export default {
       factoryCode: "",
       form: {},
       rules: {
+        factoryCode: [
+          {
+            required: true,
+            message: this.$t("common.rule.select"),
+            trigger: "blur",
+          },
+        ],
         glueGroupId: [
           {
             required: true,
@@ -83,7 +90,7 @@ export default {
           span: 24,
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
-          disabled: true,
+          required: true,
         },
         {
           label: this.$t("ui.glueOrder.column.glueGroup"),

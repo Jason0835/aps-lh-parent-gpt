@@ -50,6 +50,13 @@ export default {
       form: {},
       paddingList: [],
       rules: {
+        factoryCode: [
+          {
+            required: true,
+            message: this.$t("common.rule.select"),
+            trigger: "blur",
+          },
+        ],
         stockDate: [
           {
             required: true,
@@ -86,7 +93,7 @@ export default {
           span: 24,
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
-          disabled: true,
+          required: true,
         },
         {
           label: this.$t("ui.data.column.stock.stockDate"),

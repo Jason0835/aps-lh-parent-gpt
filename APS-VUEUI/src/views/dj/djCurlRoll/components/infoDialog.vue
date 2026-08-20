@@ -48,6 +48,13 @@ export default {
       editType: null,
       form: {},
       rules: {
+        factoryCode: [
+          {
+            required: true,
+            message: this.$t("common.rule.select"),
+            trigger: "blur",
+          },
+        ],
         paddingCode: [
           {
             required: true,
@@ -82,7 +89,6 @@ export default {
           span: 24,
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
-          disabled: true,
         },
         {
           label: this.$t("ui.dj.curlRoll.column.paddingCode"),
