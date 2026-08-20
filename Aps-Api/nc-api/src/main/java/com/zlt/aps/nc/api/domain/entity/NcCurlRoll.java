@@ -2,7 +2,7 @@ package com.zlt.aps.nc.api.domain.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
 import com.ruoyi.common.core.annotation.Excel;
-import com.zlt.aps.common.core.domain.ApsBaseEntity;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.zlt.common.annotation.ImportExcelValidated;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
@@ -25,7 +25,7 @@ import java.math.BigDecimal;
 @EqualsAndHashCode(callSuper = false)
 @TableName("T_NC_CURL_ROLL")
 @ApiModel(value = "NcCurlRoll对象", description = "内衬卷曲信息维护表")
-public class NcCurlRoll extends ApsBaseEntity implements Serializable {
+public class NcCurlRoll extends BaseEntity implements Serializable {
 
     private static final long serialVersionUID = 1L;
 

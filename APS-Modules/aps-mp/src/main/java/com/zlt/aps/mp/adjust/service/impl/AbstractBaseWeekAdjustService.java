@@ -1522,9 +1522,10 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             checkMonthPlanList = allMonthPlanList;
         }
         List<FactoryMonthPlanMouldDayResult> monthPlanList = BeanCopyUtils.copyBeanList(checkMonthPlanList, FactoryMonthPlanMouldDayResult.class);
-        String productionVersion = contextDTO.getProductionVersion();
-        String monthPlanVersion = contextDTO.getMonthPlanVersion();
-        Map<Integer, MpDailyCapacityLimitVo> dailyCapacityMap = contextDTO.getDailyCapacityLimitVoMap();
+        FactoryMonthPlanMouldDayResult firstResult = CollectionUtils.firstElement(monthPlanList);
+        String productionVersion = firstResult.getProductionVersion();
+        String monthPlanVersion = firstResult.getMonthPlanVersion();
+        Map<Integer, MpDailyCapacityLimitVo> dailyCapacityMap = loadDailyCapacityMap(contextDTO);
         monthPlanValidateService.validateEmbryoAllocation(monthPlanVersion, productionVersion, dailyCapacityMap, monthPlanList);
     }
 
@@ -5838,4 +5839,39 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 .anyMatch(childMaterialCodes::contains);
     }
 
+    /**
+     * 加载硫化日产
+     *
+     * @param contextDTO 上下文
+     * @return
+     */
+    private Map<Integer, MpDailyCapacityLimitVo> loadDailyCapacityMap(MpRollAdjustContextDTO contextDTO) {
+        // 加载排产日历
+        Map<Integer, MdmWorkCalendar> workCalendarMap = mpAdjustStructureInService.getWorkCalendarMap(contextDTO);
+        if (CollectionUtils.isEmpty(workCalendarMap)) {
+            return Collections.emptyMap();
+        }
+        Map<Integer, MpDailyCapacityLimitVo> dailyCapacityMap = new HashMap<>();
+        Set<Integer> stopDaySet = new HashSet<>();
+        workCalendarMap.forEach((day, workCalendar) -> {
+            MpDailyCapacityLimitVo limitVo = new MpDailyCapacityLimitVo();
+            day = workCalendar.getDay();
+            Integer lastDay = day - 1;
+            boolean isOpenProductionFirstDay = false;
+            // 在产
+            if (Objects.equals(workCalendar.getDayFlag(), YesOrNoEnum.YES.getCode())) {
+                // 检查上一天是否停产
+                if (stopDaySet.contains(lastDay)) {
+                    isOpenProductionFirstDay = true;
+                }
+            } else {
+                // 停产
+                stopDaySet.add(day);
+            }
+            limitVo.setDayProductionRate(workCalendar.getRate());
+            limitVo.setOpenProductionFirstDay(isOpenProductionFirstDay);
+            dailyCapacityMap.put(day, limitVo);
+        });
+        return dailyCapacityMap;
+    }
 }

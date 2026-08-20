@@ -259,6 +259,13 @@ export default {
                 >
                   {this.$t("ui.frame.btn.update")}
                 </el-button>
+                <el-button
+                  class="minus"
+                  type="danger"
+                  onClick={() => this.handleDelete(row)}
+                >
+                  {this.$t("ui.frame.btn.delete")}
+                </el-button>
               </div>
             );
           },
@@ -327,7 +334,7 @@ export default {
     },
 
     handleDelete(rows) {
-      const ids = rows.map((item) => item.id);
+      const ids = Array.isArray(rows) ? rows.map((item) => item.id) : [rows.id];
       this.$confirm(this.$t("common.confirm.delete"), {
         type: "warning",
       }).then(() => {

@@ -4,7 +4,7 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.ruoyi.common.core.annotation.Excel;
 import com.zlt.common.annotation.ImportExcelValidated;
-import com.zlt.aps.common.core.domain.ApsBaseEntity;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -22,7 +22,7 @@ import java.math.BigDecimal;
 @EqualsAndHashCode(callSuper = false)
 @ApiModel(value = "内衬机台信息对象", description = "内衬机台信息对象 ")
 @TableName("T_NC_MACHINE_INFO")
-public class NcMachineInfo extends ApsBaseEntity {
+public class NcMachineInfo extends BaseEntity {
     private static final long serialVersionUID = 1L;
 
     @Excel(name = "ui.data.column.factoryCode", dictType = "biz_factory_name")
