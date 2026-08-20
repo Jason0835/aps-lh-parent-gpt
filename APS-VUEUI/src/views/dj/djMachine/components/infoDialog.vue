@@ -41,7 +41,6 @@ export default {
       isEdit: false,
       factoryCode: "",
       form: {
-        classShift: "3",
         openMachineClass: [],
       },
       rules: {
@@ -233,7 +232,7 @@ export default {
       }
     },
     hide() {
-      this.form = { classShift: "3", openMachineClass: [] };
+      this.form = { openMachineClass: [] };
       this.$refs.form.triggerResetForm();
       // this.resetForm("infoForm");
       this.isEdit = false;
