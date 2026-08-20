@@ -79,7 +79,7 @@ import TltUploadForm from "@/views/components/tltUploadForm.vue";
 export default {
  name: "ncMachine",
   components: { InfoDialog, TltUploadForm },
-  dicts: ["STATUS", "CLASS_SHIFT", "class_num_three_plan", "biz_factory_name"],
+  dicts: ["biz_available_status", "CLASS_SHIFT", "class_num_three_plan", "biz_factory_name"],
 
   provide() {
     return {
@@ -286,7 +286,7 @@ export default {
           label: this.$t("ui.data.column.machine.status"),
           prop: "status",
           type: "select",
-          dictData: this.dict.type.STATUS,
+          dictData: this.dict.type.biz_available_status,
         },
       ];
     },
