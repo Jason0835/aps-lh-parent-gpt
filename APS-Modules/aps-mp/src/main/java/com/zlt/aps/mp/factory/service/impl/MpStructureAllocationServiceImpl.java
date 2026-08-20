@@ -3884,13 +3884,11 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         // 3、生成统计信息（handleMonthPlanStatistics）
         mpMonthPlanStaticService.handleMonthPlanStatistics(contextDTO, finalImportList, isAdjust);
         // 4、校验导入数据中的各项限制
-        this.checkAdjustLimit(contextDTO, dailyCapacityMap, weekRollAdjustEngine, adjustDailyCapacityLimitObj);
-        // 5、生成特殊材料排产记录
+//        this.checkAdjustLimit(monthPlanVersion, productionVersion, finalImportList, contextDTO, dailyCapacityMap, weekRollAdjustEngine, adjustDailyCapacityLimitObj);
+        //5、多机台胎胚是否可分配
+        monthPlanValidateService.validateEmbryoAllocation(monthPlanVersion, productionVersion, dailyCapacityMap, finalImportList);
+        //6、生成特殊材料排产记录
         iSpecialMaterialResultService.buildSecialMaterialResult(finalImportList);
-        // 6、多机台胎胚是否可分配
-        YearMonth yearAndMonth = YearMonth.of(year, month);
-        monthPlanValidateService.validateEmbryoAllocation(monthPlanVersion, productionVersion, isAdjust, dailyCapacityMap, finalImportList, yearAndMonth, importLogId, importErrorLogs);
-
         return finalImportList;
     }
 
@@ -3903,7 +3901,8 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
      * @param adjustDailyCapacityLimitObj
      */
     private void checkAdjustLimit(MpRollAdjustContextDTO contextDTO,
-                                  Map<Integer, MpDailyCapacityLimitVo> dailyCapacityMap, MpWeekRollAdjustEngine weekRollAdjustEngine,
+                                  Map<Integer, MpDailyCapacityLimitVo> dailyCapacityMap,
+                                  MpWeekRollAdjustEngine weekRollAdjustEngine,
                                   MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj) {
         // 初始化校验相关逻辑的上下文
         List<FactoryMonthPlanFinalAdjustVo> finalAdjustList = contextDTO.getFactoryMonthPlanProdFinalList();
@@ -3925,8 +3924,8 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         mpAdjustStructureInStrategy.checkMouldShellLimit(contextDTO);
         // 2、校验卡盘数
         mpAdjustStructureInStrategy.checkCapsuleChuckLimit(contextDTO);
-        // 3、校验活块数
-        String blockNumLimitStr = I18nUtil.getMessage("alg.data.mp.weekRollAdjust.confirm.blockNumLimit"); // 超活块数校验
+        // 3、校验活块数-超活块数校验
+        String blockNumLimitStr = I18nUtil.getMessage("alg.data.mp.weekRollAdjust.confirm.blockNumLimit");
         StringBuilder sbError = new StringBuilder(); // 记录校验异常的信息
         for (int i = 0, size = finalAdjustList.size(); i < size; i++) {
             FactoryMonthPlanFinalAdjustVo mpFinalVo = finalAdjustList.get(i);
