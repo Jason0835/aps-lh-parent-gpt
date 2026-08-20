@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.common.engine.service.FactoryService;
@@ -30,6 +31,18 @@ public class DjDepthConfigServiceImpl extends AbstractDocService<DjDepthConfig> 
 
     @Resource
     private FactoryService factoryService;
+    
+    @Override
+    public int save(DjDepthConfig docEntityVO) {
+        int result = super.save(docEntityVO);
+        if (docEntityVO.getId() != null && docEntityVO.getMaxMachineQty() == null) { // 最大机台为空时，需要特殊处理，否则无法更新成null
+            LambdaUpdateWrapper<DjDepthConfig> updateWrapper = new LambdaUpdateWrapper<>();
+            updateWrapper.eq(DjDepthConfig::getId, docEntityVO.getId());
+            updateWrapper.set(DjDepthConfig::getMaxMachineQty, docEntityVO.getMaxMachineQty());
+            depthConfigMapper.update(docEntityVO, updateWrapper);
+        }
+        return result;
+    }
 
     /**
      * 导入数据，并保存记录：导入模板不含工厂列，先统一填充当前工厂编码后再走基类导入逻辑
