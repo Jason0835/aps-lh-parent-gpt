@@ -23,7 +23,7 @@ public interface MonthPlanValidateService {
      * @param monthPlanList    所有排产计划信息
      */
     void validateEmbryoAllocation(String monthPlanVersion,
-                                           String productVersion,
-                                           Map<Integer, MpDailyCapacityLimitVo> dailyCapacityMap,
-                                           List<FactoryMonthPlanMouldDayResult> monthPlanList);
+                                  String productVersion,
+                                  Map<Integer, MpDailyCapacityLimitVo> dailyCapacityMap,
+                                  List<FactoryMonthPlanMouldDayResult> monthPlanList);
 }

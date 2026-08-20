@@ -3884,7 +3884,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         // 3、生成统计信息（handleMonthPlanStatistics）
         mpMonthPlanStaticService.handleMonthPlanStatistics(contextDTO, finalImportList, isAdjust);
         // 4、校验导入数据中的各项限制
-//        this.checkAdjustLimit(monthPlanVersion, productionVersion, finalImportList, contextDTO, dailyCapacityMap, weekRollAdjustEngine, adjustDailyCapacityLimitObj);
+        this.checkAdjustLimit(contextDTO, dailyCapacityMap, weekRollAdjustEngine, adjustDailyCapacityLimitObj);
         //5、多机台胎胚是否可分配
         monthPlanValidateService.validateEmbryoAllocation(monthPlanVersion, productionVersion, dailyCapacityMap, finalImportList);
         //6、生成特殊材料排产记录
