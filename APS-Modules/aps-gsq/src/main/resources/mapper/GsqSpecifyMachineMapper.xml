@@ -12,6 +12,7 @@
                    mi.MACHINE_NAME
             from T_GSQ_SPECIFY_MACHINE sm
             left join T_GSQ_MACHINE_INFO mi on sm.MACHINE_CODE = mi.MACHINE_CODE
+                and mi.IS_DELETE = '0'
             where sm.IS_DELETE = '0'
             <if test="steelRingCode != null and steelRingCode != ''">
                 and sm.STEEL_RING_CODE = #{steelRingCode}
