@@ -141,6 +141,13 @@ export default {
       return [
         { type: "selection", fixed: "left" },
         {
+          prop: "updateTime",
+          align: "center",
+          halign: "center",
+          label: this.$t("common.updateTime"),
+          minWidth: 160,
+        },
+        {
           label: this.$t("common.option"),
           prop: "option",
           width: "100px",

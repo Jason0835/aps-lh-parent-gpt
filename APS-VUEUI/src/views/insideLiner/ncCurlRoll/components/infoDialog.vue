@@ -33,16 +33,19 @@ import { mapState } from "vuex";
 
 import infoForm from "@/views/components/infoForm.vue";
 
+import { getConfigKey } from "@/api/system/config";
 import { saveCurlRoll } from "@/api/nc/curlRoll";
 
 export default {
   components: { infoForm },
+  inject: ["parentDict"],
   data() {
     return {
       loading: false,
       visible: false,
       isEdit: false,
       editType: null,
+      factoryCode: "",
       form: {},
       rules: {
         liningCode: [
@@ -74,12 +77,20 @@ export default {
     columns() {
       return [
         {
+          label: this.$t("ui.data.column.factoryCode"),
+          prop: "factoryCode",
+          span: 24,
+          type: "select",
+          dictData: this.parentDict.type.biz_factory_name,
+          disabled: true,
+        },
+        {
           label: this.$t("ui.nc.curlRoll.column.liningCode"),
           prop: "liningCode",
           span: 24,
         },
         {
-          label: this.$t("ui.nc.curlRoll.column.curlLength"),
+          label: this.$t("ui.curlRoll.column.length"),
           prop: "curlLength",
           span: 24,
           required: true,
@@ -123,7 +134,14 @@ export default {
       if (!this.factoryCode) {
         getConfigKey("sys.factory.code").then((response) => {
           this.factoryCode = response.msg;
+          // 新增时默认选中默认工厂（工厂字段不可编辑）
+          if (!data) {
+            this.form = { ...this.form, factoryCode: response.msg };
+          }
         });
+      } else if (!data) {
+        // 新增时默认选中默认工厂（工厂字段不可编辑）
+        this.form = { ...this.form, factoryCode: this.factoryCode };
       }
       if (data) {
         this.isEdit = true;

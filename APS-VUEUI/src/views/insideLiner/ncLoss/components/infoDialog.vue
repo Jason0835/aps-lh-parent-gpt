@@ -38,6 +38,7 @@ import { editLoss } from "@/api/nc/loss";
 
 export default {
   components: { infoForm },
+  inject: ["parentDict"],
   data() {
     return {
       loading: false,
@@ -85,6 +86,14 @@ export default {
     },
     columns() {
       return [
+        {
+          label: this.$t("ui.data.column.factoryCode"),
+          prop: "factoryCode",
+          span: 24,
+          type: "select",
+          dictData: this.parentDict.type.biz_factory_name,
+          disabled: true,
+        },
         {
           label: this.$t("ui.nc.lossSetting.column.liningCode"),
           prop: "liningCode",
@@ -153,9 +162,17 @@ export default {
         getConfigKey("sys.factory.code").then((response) => {
           this.factoryCode = response.msg;
           loadMachines();
+          // 新增时默认选中默认工厂（工厂字段不可编辑）
+          if (!data) {
+            this.form = { ...this.form, factoryCode: response.msg };
+          }
         });
       } else {
         loadMachines();
+        // 新增时默认选中默认工厂（工厂字段不可编辑）
+        if (!data) {
+          this.form = { ...this.form, factoryCode: this.factoryCode };
+        }
       }
       if (data) {
         this.isEdit = true;

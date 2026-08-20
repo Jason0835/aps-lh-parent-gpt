@@ -191,8 +191,15 @@ export default {
           width: 180,
         },
       ];
+      // 按列标识定位多级表头，避免末尾增列后下标错位
+      const areaAllColumn = columns.find((col) => {
+        return col.prop === "areaAll";
+      });
+      const monthAllColumn = columns.find((col) => {
+        return col.prop === "monthAll";
+      });
       for (let i = 0; i < this.areaList.length; i++) {
-        columns[columns.length - 3].children.push({
+        areaAllColumn.children.push({
           prop: this.areaList[i].areaCodeShow,
           label: this.areaList[i].areaCodeNameI18n,
           minWidth:120,
@@ -224,7 +231,7 @@ export default {
         });
       }
       for (let i = 0; i < this.monthList.length; i++) {
-        columns[columns.length - 2].children.push({
+        monthAllColumn.children.push({
           prop: this.monthList[i].monthShow,
           label: this.monthList[i].month + this.$t("common.month"),
           minWidth:120,

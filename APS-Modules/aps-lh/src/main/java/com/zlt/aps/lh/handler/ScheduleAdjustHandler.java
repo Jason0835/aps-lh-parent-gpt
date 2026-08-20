@@ -85,6 +85,14 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     private static final String SHARED_EMBRYO_ZERO_SURPLUS_UNSCHEDULED_REASON =
             "共用胎胚且硫化余量为0";
     /**
+     * 主销产品排产分类
+     */
+    private static final String MAIN_SALE_PRODUCTION_TYPE = "01";
+    /**
+     * 常规产品排产分类
+     */
+    private static final String REGULAR_PRODUCTION_TYPE = "02";
+    /**
      * 窗口无日计划且无本月历史欠产的新增SKU未排提示
      */
     private static final String WINDOW_NO_PLAN_NO_SHORTAGE_UNSCHEDULED_REASON =
@@ -428,13 +436,25 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * @return 需要剔除的SKU列表
      */
     private List<SkuScheduleDTO> collectSharedEmbryoZeroSurplusSkus(LhScheduleContext context) {
-        List<SkuScheduleDTO> pruneSkuList = new ArrayList<>(8);
+        // 按胎胚编码分组收集共用胎胚零余量SKU，每组只保留一个承接物料继续消化胎胚库存。
+        Map<String, List<SkuScheduleDTO>> zeroSurplusGroupMap = new LinkedHashMap<>();
         for (List<SkuScheduleDTO> skuList : context.getStructureSkuMap().values()) {
             if (CollectionUtils.isEmpty(skuList)) {
                 continue;
             }
             for (SkuScheduleDTO sku : skuList) {
                 if (isSharedEmbryoZeroSurplusSku(context, sku)) {
+                    zeroSurplusGroupMap.computeIfAbsent(
+                            sku.getEmbryoCode(), key -> new ArrayList<>(4)).add(sku);
+                }
+            }
+        }
+        List<SkuScheduleDTO> pruneSkuList = new ArrayList<>(8);
+        for (Map.Entry<String, List<SkuScheduleDTO>> entry : zeroSurplusGroupMap.entrySet()) {
+            SkuScheduleDTO consumerSku = selectSharedEmbryoZeroSurplusConsumer(context, entry.getValue());
+            for (SkuScheduleDTO sku : entry.getValue()) {
+                // 唯一承接物料保留在待排池，其余零余量SKU预剔除，避免多个物料重复消化同一份胎胚库存。
+                if (sku != consumerSku) {
                     pruneSkuList.add(sku);
                 }
             }
@@ -463,34 +483,112 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
                 || !getTargetScheduleQtyResolver().isSharedEmbryoInWindow(context, sku)) {
             return false;
         }
-        // 胎胚库存收尾生产者候选保留：共用胎胚组内消纳胎胚库存的自然生产者不得一刀切未排，
-        // 由动态转单胎胚归一化转为单胎胚按胎胚库存排产，避免胎胚库存无法消纳（违反动态转单胎胚/单胎胚放宽规则）。
-        return !isEmbryoStockEndingProducerCandidate(context, sku);
+        // 胎胚库存为0时无需消纳库存，零余量SKU照常预剔除。
+        return sku.getEmbryoStock() > 0;
     }
 
     /**
-     * 判断当前SKU是否为胎胚库存收尾生产者候选。
-     * <p>共用胎胚组内余量为0但胎胚仍处于收尾且有库存时，前一业务日(T-1)仍在产的SKU
-     * 是消纳胎胚库存的自然生产者，应在预剔除阶段保留，由动态转单胎胚归一化转为单胎胚按胎胚库存排产。</p>
+     * 选择共用胎胚零余量场景下唯一承接胎胚库存的物料。
+     * <p>优先级：主销产品(01) &gt; 常规产品(02) &gt; 非主销且非常规产品；
+     * 同优先级按物料编码升序保证结果稳定。仅续作在机物料可承接消化库存，
+     * 组内无在机物料时不保留承接者，全部按零余量预剔除。</p>
      *
      * @param context 排程上下文
-     * @param sku     当前SKU
-     * @return true-生产者候选，应保留不预剔除；false-非生产者，可预剔除
+     * @param skuList 同胎胚零余量SKU列表
+     * @return 唯一承接物料；无在机承接者时返回null
      */
-    private boolean isEmbryoStockEndingProducerCandidate(LhScheduleContext context, SkuScheduleDTO sku) {
-        // 胎胚收尾标识必须为是，否则该胎胚不属于清尾场景，零余量SKU照常预剔除
-        if (!getTargetScheduleQtyResolver().isEmbryoStockEndingFlagYes(context, sku.getEmbryoCode())) {
+    private SkuScheduleDTO selectSharedEmbryoZeroSurplusConsumer(LhScheduleContext context,
+                                                                 List<SkuScheduleDTO> skuList) {
+        if (CollectionUtils.isEmpty(skuList)) {
+            return null;
+        }
+        // 续作承接必须先有在机机台；无在机物料则无人可继续消化库存，全部预剔除。
+        List<SkuScheduleDTO> onlineSkuList = new ArrayList<>(skuList.size());
+        for (SkuScheduleDTO sku : skuList) {
+            if (isMaterialOnline(context, sku.getMaterialCode())) {
+                onlineSkuList.add(sku);
+            }
+        }
+        if (CollectionUtils.isEmpty(onlineSkuList)) {
+            return null;
+        }
+        SkuScheduleDTO consumerSku = null;
+        for (SkuScheduleDTO sku : onlineSkuList) {
+            if (Objects.isNull(consumerSku)
+                    || compareSharedEmbryoZeroSurplusConsumer(sku, consumerSku) < 0) {
+                consumerSku = sku;
+            }
+        }
+        log.info("共用胎胚零余量选择唯一承接物料, embryoCode: {}, materialCode: {}, productStatus: {}, "
+                        + "productionType: {}, 胎胚库存: {}, 候选在机物料数: {}",
+                consumerSku.getEmbryoCode(), consumerSku.getMaterialCode(), consumerSku.getProductStatus(),
+                consumerSku.getProductionType(), consumerSku.getEmbryoStock(), onlineSkuList.size());
+        return consumerSku;
+    }
+
+    /**
+     * 比较两个共用胎胚零余量承接候选：先按排产分类优先级，再按物料编码升序。
+     *
+     * @param left  左候选
+     * @param right 右候选
+     * @return 负数表示left优先，正数表示right优先
+     */
+    private int compareSharedEmbryoZeroSurplusConsumer(SkuScheduleDTO left, SkuScheduleDTO right) {
+        int leftPriority = resolveProductionTypePriority(left);
+        int rightPriority = resolveProductionTypePriority(right);
+        if (leftPriority != rightPriority) {
+            return Integer.compare(leftPriority, rightPriority);
+        }
+        String leftCode = left == null ? null : left.getMaterialCode();
+        String rightCode = right == null ? null : right.getMaterialCode();
+        if (Objects.isNull(leftCode) && Objects.isNull(rightCode)) {
+            return 0;
+        }
+        if (Objects.isNull(leftCode)) {
+            return 1;
+        }
+        if (Objects.isNull(rightCode)) {
+            return -1;
+        }
+        return leftCode.compareTo(rightCode);
+    }
+
+    /**
+     * 解析排产分类承接优先级：主销(01)最高，常规(02)次之，其余最低。
+     *
+     * @param sku SKU排程DTO
+     * @return 优先级序号，越小越优先
+     */
+    private int resolveProductionTypePriority(SkuScheduleDTO sku) {
+        String productionType = Objects.isNull(sku) ? null : sku.getProductionType();
+        if (StringUtils.equals(MAIN_SALE_PRODUCTION_TYPE, productionType)) {
+            return 0;
+        }
+        if (StringUtils.equals(REGULAR_PRODUCTION_TYPE, productionType)) {
+            return 1;
+        }
+        return 2;
+    }
+
+    /**
+     * 判断物料当前是否有在机机台（MES在机信息）。
+     *
+     * @param context      排程上下文
+     * @param materialCode 物料编码
+     * @return true-在机；false-不在机
+     */
+    private boolean isMaterialOnline(LhScheduleContext context, String materialCode) {
+        if (StringUtils.isEmpty(materialCode)
+                || CollectionUtils.isEmpty(context.getMachineOnlineInfoMap())) {
             return false;
         }
-        // 胎胚库存为0时无需消纳库存，零余量SKU照常预剔除
-        if (sku.getEmbryoStock() <= 0) {
-            return false;
+        for (LhMachineOnlineInfo onlineInfo : context.getMachineOnlineInfoMap().values()) {
+            if (Objects.nonNull(onlineInfo)
+                    && StringUtils.equals(materialCode, onlineInfo.getMaterialCode())) {
+                return true;
+            }
         }
-        // 前一业务日(T-1)有日计划，表示昨日仍在产，是消纳胎胚库存的自然生产者
-        LocalDate previousDay = toLocalDate(context.getScheduleDate()).minusDays(1);
-        int previousDayPlanQty = MonthPlanDateResolver.resolveDayQty(
-                context, sku.getMaterialCode(), sku.getProductStatus(), previousDay);
-        return previousDayPlanQty > 0;
+        return false;
     }
 
     /**
