@@ -48,14 +48,28 @@ export default {
       factoryCode: "",
       form: {},
       rules: {
-        liningCode: [
+        paddingCode: [
           {
             required: true,
             message: this.$t("common.rule.input"),
             trigger: "blur",
           },
         ],
-        machineId: [
+        machineCode: [
+          {
+            required: true,
+            message: this.$t("common.rule.select"),
+            trigger: "blur",
+          },
+        ],
+        lineType: [
+          {
+            required: true,
+            message: this.$t("common.rule.select"),
+            trigger: "blur",
+          },
+        ],
+        jobType: [
           {
             required: true,
             message: this.$t("common.rule.select"),
@@ -74,6 +88,14 @@ export default {
     },
     columns() {
       return [
+        {
+          label: this.$t("ui.data.column.factoryCode"),
+          prop: "factoryCode",
+          span: 24,
+          type: "select",
+          dictData: this.parentDict.type.biz_factory_name,
+          disabled: true,
+        },
         {
           label: this.$t("ui.dj.specifyMachine.column.paddingCode"),
           prop: "paddingCode",
@@ -96,6 +118,7 @@ export default {
           label: this.$t("ui.specifyMachine.column.lineType"),
           prop: "lineType",
           span: 24,
+          required: true,
           type: "select", //LINE_TYPE
           dictData: this.parentDict.type.LINE_TYPE,
         },
@@ -103,6 +126,7 @@ export default {
           label: this.$t("ui.specifyMachine.column.jobType"),
           prop: "jobType",
           span: 24,
+          required: true,
           type: "select", //JOB_TYPE
           dictData: this.parentDict.type.JOB_TYPE,
         },
@@ -136,13 +160,28 @@ export default {
     //utils
     show(data) {
       this.visible = true;
-      // 加载垫胶机台下拉数据（机台信息存于 vuex state.dj.machines）
-      this.$store.dispatch("dj/getMachineList");
-      // 获取当前工厂编码（保存时需要带工厂参数）
+      // 加载垫胶机台下拉数据（机台信息存于 vuex state.dj.machines），按当前工厂编码过滤，避免带出其他厂的机台
+      const loadMachines = () => {
+        this.$store.dispatch("dj/getMachineList", {
+          factoryCode: this.factoryCode,
+        });
+      };
+      // 获取当前工厂编码（保存时需要带工厂参数，机台下拉过滤也需要）
       if (!this.factoryCode) {
         getConfigKey("sys.factory.code").then((response) => {
           this.factoryCode = response.msg;
+          loadMachines();
+          // 新增时默认选中默认工厂（工厂字段不可编辑）
+          if (!data) {
+            this.form = { ...this.form, factoryCode: response.msg };
+          }
         });
+      } else {
+        loadMachines();
+        // 新增时默认选中默认工厂（工厂字段不可编辑）
+        if (!data) {
+          this.form = { ...this.form, factoryCode: this.factoryCode };
+        }
       }
       if (data) {
         this.isEdit = true;

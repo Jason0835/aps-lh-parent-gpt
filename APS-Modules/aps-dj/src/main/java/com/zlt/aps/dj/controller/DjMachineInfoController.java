@@ -60,6 +60,14 @@ public class DjMachineInfoController extends AbstractDocBizController<DjMachineI
     public TableDataInfo list(@RequestBody DjMachineInfo queryVO) {
         return super.list(queryVO);
     }
+    
+    @Override
+    protected void builderCondition(QueryWrapper<DjMachineInfo> queryWrapper, DjMachineInfo queryVO) {
+        queryWrapper.ge("FACTORY_CODE", queryVO.getFactoryCode());
+        queryWrapper.like(StringUtils.isNotEmpty(queryVO.getMachineCode()), "MACHINE_CODE", queryVO.getMachineCode());
+        queryWrapper.like(StringUtils.isNotEmpty(queryVO.getMachineName()), "MACHINE_NAME", queryVO.getMachineName());
+        queryWrapper.eq(StringUtils.isNotEmpty(queryVO.getStatus()), "STATUS", queryVO.getStatus());
+    }
 
     /**
      * 新增信息

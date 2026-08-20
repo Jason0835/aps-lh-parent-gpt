@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
@@ -107,12 +108,10 @@ public class NcCurlRollController extends AbstractDocBizController<NcCurlRoll> {
     @Log(title = "ui.nc.curlRoll.column.modalName", businessType = BusinessType.IMPORT)
     @PostMapping("/importData")
     @ApiOperation("导入信息")
-    public AjaxResult importData(@RequestBody List<NcCurlRoll> list, @RequestParam("updateSupport") boolean updateSupport,
-            @RequestParam("importLogId") Long importLogId) {
-        if (StringUtils.isNull(list) || list.size() == 0) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.import.nodata"));
-        }
-        return curlRollService.importData(list, updateSupport, importLogId);
+    @Override
+    public AjaxResult importData(@RequestBody ImportContext importContext,
+            @RequestParam("updateSupport") boolean updateSupport) throws Exception {
+        return super.importData(importContext, updateSupport);
     }
 
     @Override
@@ -128,6 +127,6 @@ public class NcCurlRollController extends AbstractDocBizController<NcCurlRoll> {
 
     @Override
     protected String getOrderBy() {
-        return "PADDING_CODE";
+        return "LINING_CODE";
     }
 }

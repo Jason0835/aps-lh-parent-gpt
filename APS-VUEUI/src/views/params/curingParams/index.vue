@@ -146,7 +146,7 @@ export default {
         {
           prop: "updateBy",
           halign: "center",
-          label: this.$t("ui.data.column.lhParams.updateBy"),
+          label: this.$t("ui.data.column.updateBy"),
           minWidth: 100,
         },
         {

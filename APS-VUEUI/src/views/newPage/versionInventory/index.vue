@@ -194,9 +194,14 @@ export default {
         },
 
         {
+          prop: "updateBy",
+          label: this.$t("ui.data.column.updateBy"),
+          width: 100,
+        },
+        {
           prop: "updateTime",
           width: 180,
-          label: this.$t("ui.data.column.demandPlan.updateTime"),
+          label: this.$t("ui.data.column.updateTime"),
         },
       ];
 

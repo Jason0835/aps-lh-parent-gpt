@@ -119,8 +119,12 @@ public class MdmDevicePlanShutUIController extends BaseUIController<MdmDevicePla
     @RequiresPermissions("monthplan:mdmDevicePlanShut:remove")
     @PostMapping("/remove")
     @ResponseBody
-    public AjaxResult remove(String ids) {
+    public AjaxResult remove(@RequestParam("ids") String ids) {
         Long[] arr = Convert.toLongArray(ids);
+        // 防御：未勾选记录时直接返回明确提示，避免空集合继续走后续删除逻辑
+        if (arr == null || arr.length == 0) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.mdmDevicePlanShut.idsNotEmpty"));
+        }
         return iMdmDevicePlanShutService.removeByIds(Arrays.asList(arr));
     }
 
@@ -197,7 +201,7 @@ public class MdmDevicePlanShutUIController extends BaseUIController<MdmDevicePla
     @ResponseBody
     @ApiOperation("数据导入")
     @Override
-    public AjaxResult importData(@RequestPart("file") MultipartFile file, boolean updateSupport) throws Exception {
+    public AjaxResult importData(@RequestPart("file") MultipartFile file, @RequestParam("updateSupport") boolean updateSupport) throws Exception {
         byte[] data = this.useFileEncrypt ? FileEncryptUtils.DecodeFile(file) : file.getBytes();
 
         ImportContext context = new ImportContext();

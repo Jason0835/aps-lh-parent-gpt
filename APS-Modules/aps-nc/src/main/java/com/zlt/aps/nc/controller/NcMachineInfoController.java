@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
@@ -58,6 +59,14 @@ public class NcMachineInfoController extends AbstractDocBizController<NcMachineI
     @ApiOperation("根据条件查询列表信息")
     public TableDataInfo list(@RequestBody NcMachineInfo queryVO) {
         return super.list(queryVO);
+    }
+    
+    @Override
+    protected void builderCondition(QueryWrapper<NcMachineInfo> queryWrapper, NcMachineInfo queryVO) {
+        queryWrapper.ge("FACTORY_CODE", queryVO.getFactoryCode());
+        queryWrapper.like(StringUtils.isNotEmpty(queryVO.getMachineCode()), "MACHINE_CODE", queryVO.getMachineCode());
+        queryWrapper.like(StringUtils.isNotEmpty(queryVO.getMachineName()), "MACHINE_NAME", queryVO.getMachineName());
+        queryWrapper.eq(StringUtils.isNotEmpty(queryVO.getStatus()), "STATUS", queryVO.getStatus());
     }
 
     /**
@@ -108,12 +117,10 @@ public class NcMachineInfoController extends AbstractDocBizController<NcMachineI
     @Log(title = "ui.nc.machine.column.modalName", businessType = BusinessType.IMPORT)
     @PostMapping("/importData")
     @ApiOperation("导入信息")
-    public AjaxResult importData(@RequestBody List<NcMachineInfo> list, @RequestParam("updateSupport") boolean updateSupport,
-            @RequestParam("importLogId") Long importLogId) {
-        if (StringUtils.isNull(list) || list.size() == 0) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.import.nodata"));
-        }
-        return machineService.importData(list, updateSupport, importLogId);
+    @Override
+    public AjaxResult importData(@RequestBody ImportContext importContext,
+            @RequestParam("updateSupport") boolean updateSupport) throws Exception {
+        return super.importData(importContext, updateSupport);
     }
 
     @Override

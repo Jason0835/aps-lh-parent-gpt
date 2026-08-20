@@ -184,9 +184,15 @@ export default {
           label: this.$t("ui.data.column.rawSpecialMaterialRecord.remark"),
         },
         {
+          prop: "updateBy",
+          align: "center",
+          label: this.$t("ui.data.column.updateBy"),
+          minWidth: 100,
+        },
+        {
           prop: "updateTime",
-          label: this.$t("ui.data.column.scheduleAdjust.updata"),
-          with: 180,
+          label: this.$t("ui.data.column.updateTime"),
+          width: 180,
         },
         {
           align: "center",

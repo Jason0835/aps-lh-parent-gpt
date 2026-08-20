@@ -109,6 +109,24 @@ public class MdmCxMachineFixed extends BaseEntity {
     private String fixedMaterialDesc;
 
     /**
+     * 固定胎胚  多个以,分隔拼接
+     */
+    @ImportExcelValidated(maxLength = 500)
+    @Excel(name = "ui.data.column.mdmCxMachineFixed.fixedEmbryoCode")
+    @ApiModelProperty(value = "固定胎胚  多个以,分隔拼接", name = "fixedEmbryoCode")
+    @TableField(value = "FIXED_EMBRYO_CODE", updateStrategy = FieldStrategy.IGNORED)
+    private String fixedEmbryoCode;
+
+    /**
+     * 固定胎胚描述  多个以,分隔拼接
+     */
+    @ImportExcelValidated(maxLength = 500)
+    @Excel(name = "ui.data.column.mdmCxMachineFixed.fixedMainMaterialDesc")
+    @ApiModelProperty(value = "固定胎胚描述  多个以,分隔拼接", name = "fixedMainMaterialDesc")
+    @TableField(value = "FIXED_MAIN_MATERIAL_DESC", updateStrategy = FieldStrategy.IGNORED)
+    private String fixedMainMaterialDesc;
+
+    /**
      * 不可作业结构  多个以,分隔拼接
      */
     @ImportExcelValidated(maxLength = 500)
@@ -160,6 +178,11 @@ public class MdmCxMachineFixed extends BaseEntity {
         return Arrays.stream(fixedMaterialCode.split(",")).filter(StringUtils::isNotBlank).map(String::trim).collect(Collectors.toList());
     }
 
+    public List<String> getSplitFixedEmbryoCode() {
+        String fixedEmbryoCode = StringUtils.defaultIfBlank(this.fixedEmbryoCode, "");
+        return Arrays.stream(fixedEmbryoCode.split(",")).filter(StringUtils::isNotBlank).map(String::trim).collect(Collectors.toList());
+    }
+
     public List<String> getSplitDisableMaterialCode() {
         String disableMaterialCode = StringUtils.defaultIfBlank(this.disableMaterialCode, "");
         return Arrays.stream(disableMaterialCode.split(",")).filter(StringUtils::isNotBlank).map(String::trim).collect(Collectors.toList());
@@ -168,6 +191,11 @@ public class MdmCxMachineFixed extends BaseEntity {
     public List<String> getSplitFixedMaterialDesc() {
         String fixedMaterialDesc = StringUtils.defaultIfBlank(this.fixedMaterialDesc, "");
         return Arrays.stream(fixedMaterialDesc.split(",")).filter(StringUtils::isNotBlank).map(String::trim).collect(Collectors.toList());
+    }
+
+    public List<String> getSplitFixedMainMaterialDesc() {
+        String fixedMainMaterialDesc = StringUtils.defaultIfBlank(this.fixedMainMaterialDesc, "");
+        return Arrays.stream(fixedMainMaterialDesc.split(",")).filter(StringUtils::isNotBlank).map(String::trim).collect(Collectors.toList());
     }
 
     public List<String> getSplitDisableStructure() {
@@ -179,4 +207,5 @@ public class MdmCxMachineFixed extends BaseEntity {
         String disableMaterialDesc = StringUtils.defaultIfBlank(this.disableMaterialDesc, "");
         return Arrays.stream(disableMaterialDesc.split(",")).filter(StringUtils::isNotBlank).map(String::trim).collect(Collectors.toList());
     }
+
 }

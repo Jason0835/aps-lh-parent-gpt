@@ -29,6 +29,7 @@
 
 <script>
 import infoForm from "@/views/components/infoForm.vue";
+import { getConfigKey } from "@/api/system/config";
 import { editMachine } from "@/api/nc/machine";
 export default {
   components: { infoForm },
@@ -38,8 +39,8 @@ export default {
       loading: false,
       visible: false,
       isEdit: false,
+      factoryCode: "",
       form: {
-        classShift: "2",
         openMachineClass: [],
         factoryCode: '',
       },
@@ -86,6 +87,7 @@ export default {
           dictData: this.parentDict.type.biz_factory_name,
           filterable: true,
           required: true,
+          disabled: true,
         },
         {
           label: this.$t("ui.data.column.machine.machineCode"),
@@ -182,8 +184,8 @@ export default {
           label: this.$t("ui.data.column.machine.status"),
           prop: "status",
           type: "switch",
-          activeValue: "0",
-          inactiveValue: "1",
+          activeValue: "1",
+          inactiveValue: "0",
         },
         {
           label: this.$t("ui.common.column.remark"),
@@ -212,6 +214,17 @@ export default {
     //utils
     show(data) {
       this.visible = true;
+      // 新增时默认选中默认工厂（工厂字段不可编辑）
+      if (!data) {
+        if (this.factoryCode) {
+          this.form = { ...this.form, factoryCode: this.factoryCode };
+        } else {
+          getConfigKey("sys.factory.code").then((response) => {
+            this.factoryCode = response.msg;
+            this.form = { ...this.form, factoryCode: response.msg };
+          });
+        }
+      }
       if (data) {
         this.isEdit = true;
         this.form = {
@@ -225,7 +238,7 @@ export default {
       }
     },
     hide() {
-      this.form = { classShift: "2", openMachineClass: [], factoryCode: '' };
+      this.form = { openMachineClass: [], factoryCode: '' };
       this.$refs.form.triggerResetForm();
       // this.resetForm("infoForm");
       this.isEdit = false;
@@ -246,7 +259,10 @@ export default {
           }
         });
 
-        this.save(params);
+        this.save({
+          ...params,
+          factoryCode: params.factoryCode || this.factoryCode,
+        });
       });
     },
   },

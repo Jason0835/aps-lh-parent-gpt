@@ -65,11 +65,20 @@ public class GsqStock extends BaseEntity {
     @ImportValidated(number = true, min = 0, max = 999999, digits = true)
     private BigDecimal badNum;
 
+    /** 备注（重写以支持Excel导入导出，BaseEntity中的remark无@Excel注解） */
+    @Excel(name = "ui.data.column.stock.remark", width = 30)
+    @ApiModelProperty(value = "备注", position = 70)
+    @TableField("REMARK")
+    @ImportValidated(maxLength = 300)
+    private String remark;
+
     /** 库存日期范围-开始（查询用，非数据库字段） */
+    @JsonFormat(pattern = "yyyy-MM-dd", timezone = "GMT+8")
     @TableField(exist = false)
-    private Date stockDateBegin;
+    private Date stockDateStart;
 
     /** 库存日期范围-结束（查询用，非数据库字段） */
+    @JsonFormat(pattern = "yyyy-MM-dd", timezone = "GMT+8")
     @TableField(exist = false)
     private Date stockDateEnd;
 }

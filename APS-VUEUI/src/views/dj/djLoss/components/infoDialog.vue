@@ -38,6 +38,7 @@ import { editLoss } from "@/api/dj/loss";
 
 export default {
   components: { infoForm },
+  inject: ["parentDict"],
   data() {
     return {
       loading: false,
@@ -61,12 +62,19 @@ export default {
             trigger: "blur",
           },
         ],
+        lossRate: [
+          {
+            required: true,
+            message: this.$t("common.rule.input"),
+            trigger: "blur",
+          },
+        ],
       },
     };
   },
   computed: {
     ...mapState({
-      machines: (state) => state.insideLiner.machines,
+      machines: (state) => state.dj.machines,
     }),
     title: function () {
       return (
@@ -79,6 +87,14 @@ export default {
     columns() {
       return [
         {
+          label: this.$t("ui.data.column.factoryCode"),
+          prop: "factoryCode",
+          span: 24,
+          type: "select",
+          dictData: this.parentDict.type.biz_factory_name,
+          disabled: true,
+        },
+        {
           label: this.$t("ui.dj.lossSetting.column.paddingCode"),
           prop: "paddingCode",
           span: 24,
@@ -89,8 +105,10 @@ export default {
           span: 24,
           type: "select",
           dictData: this.machines,
-          labelKey: "machineName",
-          valueKey: "machineCode",
+          props: {
+            value: "machineCode",
+            label: "machineName",
+          },
         },
         {
           label: this.$t("ui.data.column.loss.lossRate"),
@@ -133,11 +151,28 @@ export default {
     //utils
     show(data) {
       this.visible = true;
-      // 获取当前工厂编码（保存时需要带工厂参数）
+      // 加载垫胶机台下拉数据（机台信息存于 vuex state.dj.machines），按当前工厂编码过滤，避免带出其他厂的机台
+      const loadMachines = () => {
+        this.$store.dispatch("dj/getMachineList", {
+          factoryCode: this.factoryCode,
+        });
+      };
+      // 获取当前工厂编码（保存时需要带工厂参数，机台下拉过滤也需要）
       if (!this.factoryCode) {
         getConfigKey("sys.factory.code").then((response) => {
           this.factoryCode = response.msg;
+          loadMachines();
+          // 新增时默认选中默认工厂（工厂字段不可编辑）
+          if (!data) {
+            this.form = { ...this.form, factoryCode: response.msg };
+          }
         });
+      } else {
+        loadMachines();
+        // 新增时默认选中默认工厂（工厂字段不可编辑）
+        if (!data) {
+          this.form = { ...this.form, factoryCode: this.factoryCode };
+        }
       }
       if (data) {
         this.isEdit = true;

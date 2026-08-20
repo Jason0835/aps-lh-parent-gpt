@@ -87,7 +87,10 @@ export default {
     options: Array,
     columns: Array,
     rules: Object,
-    // defaultValue: Object,
+    updateSupport: {
+      type: Boolean,
+      default: false,
+    },
     labelPosition: { type: String, default: "right" },
     labelWidth: { type: String, default: "80px" },
     title: String,
@@ -113,7 +116,9 @@ export default {
         //文件列表
         fileList: [],
       },
-      defaultValue:{},
+      defaultValue: {
+        updateSupport: this.updateSupport,
+      },
     };
   },
 
@@ -191,7 +196,10 @@ export default {
     },
     confirmUpload(){
       //将获取输入的表单文件
-      this.upload.data = this.$refs.form.getValues();
+      this.upload.data = {
+        updateSupport: this.updateSupport,
+        ...this.$refs.form.getValues(),
+      };
       console.log(this.upload.data,this.$refs.form.getValues());
       setTimeout(() => {
         this.$refs.form.triggerConfirm(this.submitFileForm);
@@ -219,8 +227,8 @@ export default {
     },
     handleClose() {
       this.$refs.form.triggerResetForm();
-      this.defaultValue={
-        updateSupport:false
+      this.defaultValue = {
+        updateSupport: this.updateSupport,
       }
       this.upload.data={}
       this.upload.fileList = [];

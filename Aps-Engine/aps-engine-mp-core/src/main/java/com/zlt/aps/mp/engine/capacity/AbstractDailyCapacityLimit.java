@@ -329,7 +329,7 @@ public abstract class AbstractDailyCapacityLimit {
             dayPlanQty = (Integer) mpFinalVo.getFieldValueByFieldName(dayField);
            /* if (mpFinalVo.getFieldValueByFieldName("materialCode") != null){
                 String materialCode = (String) mpFinalVo.getFieldValueByFieldName("materialCode") ;
-                if (materialCode.equals("3302001002") && iDay == 21){
+                if (materialCode.equals("3202000550") && iDay == 25){
                     System.out.println("materialCode = " + materialCode + ", iDay = " + iDay);
                 }
             }*/

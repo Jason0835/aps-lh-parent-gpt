@@ -91,12 +91,12 @@ public class GsqStockUIController extends BaseUIController<GsqStock> {
         return gsqStockService.getInfo(id);
     }
 
-    /** 新增钢丝圈库存 */
+    /** 新增钢丝圈库存（前端统一以multipart/form-data提交，不能用@RequestBody，需用表单绑定） */
     @ApiOperation("新增钢丝圈库存")
     @RequiresPermissions("gsq:stock:add")
     @PostMapping("/add")
     @ResponseBody
-    public AjaxResult add(@RequestBody GsqStock entity) {
+    public AjaxResult add(GsqStock entity) {
         if (UserConstants.NOT_UNIQUE.equals(gsqStockService.checkUnique(entity))) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.gsq.stock.checkUnique"));
         }

@@ -44,13 +44,13 @@
     </insert>
 
     <!-- 根据库存日期字符串（yyyy-MM-dd）逻辑删除钢丝圈库存，只删当天数据，历史数据保留 -->
-    <!-- 使用字符串日期比较，规避JVM时区与SQL Server时区不一致导致的Date参数偏移 -->
+    <!-- 使用字符串日期比较，规避JVM时区与MySQL时区不一致导致的Date参数偏移 -->
     <update id="logicDeleteByStockDate">
         UPDATE T_GSQ_STOCK
         SET IS_DELETE = 1,
             UPDATE_BY = #{updateBy},
             UPDATE_TIME = #{updateTime}
-        WHERE CONVERT(VARCHAR(10), STOCK_DATE, 23) = #{stockDateStr}
+        WHERE DATE_FORMAT(STOCK_DATE, '%Y-%m-%d') = #{stockDateStr}
           AND IS_DELETE = 0
     </update>
 
@@ -75,9 +75,9 @@
                 #{item.badNum,jdbcType=DECIMAL},
                 0,
                 #{item.createBy,jdbcType=VARCHAR},
-                GETDATE(),
+                NOW(),
                 #{item.updateBy,jdbcType=VARCHAR},
-                GETDATE(),
+                NOW(),
                 #{item.remark,jdbcType=VARCHAR}
             )
         </foreach>

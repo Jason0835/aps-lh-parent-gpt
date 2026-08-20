@@ -38,9 +38,6 @@
         from T_TQ_STOCK
         where STOCK_DATE = DATE_ADD(STR_TO_DATE(#{stockDate}, '%Y-%m-%d'), INTERVAL -1 DAY) /*取排程日期前一天库存*/
         and IS_DELETE = '0'
-        <if test="factoryCode != null and factoryCode != ''">
-            and FACTORY_CODE = #{factoryCode}
-        </if>
         GROUP BY BEAD_CODE
     </select>
 

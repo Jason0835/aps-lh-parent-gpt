@@ -128,11 +128,19 @@ export default {
   },
   computed: {
     ...mapState({
-      machines: (state) => state.dj.machines,
+      machines: (state) => state.insideLiner.machines,
     }),
     columns() {
       let columns = [
         { type: "selection", fixed: "left" },
+        {
+          label: this.$t("ui.data.column.factoryCode"),
+          prop: "factoryCode",
+          minWidth: 100,
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_factory_name, value);
+          },
+        },
         {
           prop: "liningCode",
           align: "center",
@@ -141,7 +149,7 @@ export default {
           // sortable: "custom",
         },
         {
-          prop: "machineCode",
+          prop: "machineName",
           align: "center",
           halign: "center",
           label: this.$t("ui.specifyMachine.column.machineName"),
@@ -173,6 +181,13 @@ export default {
           label: this.$t("ui.common.column.remark"),
           minWidth: 100,
           // sortable: "custom",
+        },
+        {
+          prop: "updateTime",
+          align: "center",
+          halign: "center",
+          label: this.$t("common.updateTime"),
+          minWidth: 160,
         },
         {
           align: "center",
@@ -224,8 +239,10 @@ export default {
           prop: "machineCode",
           type: "select",
           dictData: this.machines,
-          valueKey: "machineCode",
-          labelKey: "machineName",
+          props: {
+            value: "machineCode",
+            label: "machineName",
+          },
         },
         {
           label: this.$t("ui.data.column.specifyMachine.lineType"),
@@ -335,6 +352,8 @@ export default {
     getConfigKey("sys.factory.code").then(response => {
       this.search.factoryCode = response.msg;
       this.query.factoryCode = response.msg;
+      // 按当前工厂编码加载内衬机台下拉数据（机台信息存于 vuex state.insideLiner.machines），避免带出其他厂的机台
+      this.$store.dispatch("insideLiner/getMachineList", { factoryCode: this.query.factoryCode });
       this.getList();
     }).catch(() => {
       this.getList();

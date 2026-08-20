@@ -1606,7 +1606,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         // 从物料表反显胎胚代码和产品结构
         AppUtils.formatData(insertList, getQueryFormulas());
 
-        // Excel 未维护胎胚库存时，按本次导入排程日期回填 T 日胎胚库存。
+        // Excel 排程日期为 T+1；未维护胎胚库存时，按排程日期前一天回填 T 日库存。
         this.fillMissingImportEmbryoStock(insertList, factoryCode, scheduleDate);
 
         this.baseDao.insertBatch(insertList);
@@ -1620,12 +1620,12 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      * 回填模板导入中缺失的 T 日胎胚库存。
      *
      * <p>Excel 已填写的库存保持不变；仅对库存为空且胎胚编码有效的记录，按工厂、
-     * 排程日期和胎胚编码查询 {@code T_CX_STOCK}，同一胎胚存在多条记录时汇总库存量。
+     * 排程日期前一天和胎胚编码查询 {@code T_CX_STOCK}，同一胎胚存在多条记录时汇总库存量。
      * 未查询到库存记录时按自动排程现有口径回填为 0。</p>
      *
      * @param resultList  本次待写入的导入排程结果
      * @param factoryCode 分厂编号
-     * @param scheduleDate 排程日期，即库存 T 日
+     * @param scheduleDate Excel 排程日期，即 T+1 日
      */
     private void fillMissingImportEmbryoStock(List<LhScheduleResult> resultList,
                                                String factoryCode,
@@ -1641,9 +1641,10 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             return;
         }
 
+        Date tDay = DateUtil.offsetDay(scheduleDate, -1);
         List<CxStock> stockList = cxStockMapper.selectList(new LambdaQueryWrapper<CxStock>()
                 .eq(CxStock::getFactoryCode, factoryCode)
-                .eq(CxStock::getStockDate, scheduleDate)
+                .eq(CxStock::getStockDate, tDay)
                 .in(CxStock::getEmbryoCode, embryoCodes));
         Map<String, Integer> embryoStockMap = stockList.stream()
                 .filter(Objects::nonNull)
@@ -2802,7 +2803,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         Map<String, Map<Integer, Integer>> shiftOrderMap = buildContinuousShiftOrderMap(shiftOrderSourceList);
         Map<LhScheduleResult, ExportRowStyleFlag> rowStyleFlagMap = buildMachinePostCloseOutStyleFlagMap(sortedList);
         Map<LhScheduleResult, LinkedHashSet<String>> exportRemarkMap = this.buildExportRemarkMap(
-                sortedList, beforeMaterialResultMap, scheduleDate);
+                sortedList, scheduleDate);
         Set<String> insertedReferenceMachineCodes = new HashSet<>();
 
         for (LhScheduleResult result : sortedList) {
@@ -2894,16 +2895,15 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
 
     /**
      * 构建硫化计划导出备注。
-     * <p>按顺序追加新开规格、物料多机台余量收尾和胎胚多机台库存收尾备注，原备注保留。</p>
+     * <p>先追加新开规格，再处理胎胚多机台库存收尾，最后处理物料多机台余量收尾。
+     * 同一行命中胎胚收尾时不再追加“确认收尾”，原备注保留。</p>
      *
-     * @param sortedList             当前排程日结果
-     * @param beforeMaterialResultMap 各机台历史前规格
-     * @param scheduleDate           排程日期
+     * @param sortedList   当前排程日结果
+     * @param scheduleDate 排程日期
      * @return 排程结果对应的新增备注集合
      */
     private Map<LhScheduleResult, LinkedHashSet<String>> buildExportRemarkMap(
             List<LhScheduleResult> sortedList,
-            Map<String, LhScheduleResult> beforeMaterialResultMap,
             Date scheduleDate) {
         Map<LhScheduleResult, LinkedHashSet<String>> remarkMap = new IdentityHashMap<>(sortedList.size());
         if (PubUtil.isEmpty(sortedList)) {
@@ -2911,10 +2911,10 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         }
         Set<String> recentlyProducedMaterialCodeSet = this.loadRecentlyProducedMaterialCodeSet(
                 sortedList, scheduleDate);
-        this.appendNewSpecExportRemarks(sortedList, beforeMaterialResultMap,
-                recentlyProducedMaterialCodeSet, remarkMap);
-        this.appendMaterialEndingExportRemarks(sortedList, remarkMap);
-        this.appendEmbryoEndingExportRemarks(sortedList, remarkMap);
+        this.appendNewSpecExportRemarks(sortedList, recentlyProducedMaterialCodeSet, remarkMap);
+        Set<LhScheduleResult> embryoEndingRemarkResultSet = this.appendEmbryoEndingExportRemarks(
+                sortedList, remarkMap);
+        this.appendMaterialEndingExportRemarks(sortedList, embryoEndingRemarkResultSet, remarkMap);
         return remarkMap;
     }
 
@@ -2954,32 +2954,23 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     }
 
     /**
-     * 追加新开规格备注：同机台前规格余量收尾，后规格在T-4至T-1所有机台均无计划量。
+     * 追加新开规格备注：当前物料在T-4至T-1所有硫化机台均无计划量。
+     * <p>不限制当前物料从哪个班次开始排产，也不依赖前规格收尾标识。</p>
      */
     private void appendNewSpecExportRemarks(List<LhScheduleResult> sortedList,
-                                            Map<String, LhScheduleResult> beforeMaterialResultMap,
                                             Set<String> recentlyProducedMaterialCodeSet,
                                             Map<LhScheduleResult, LinkedHashSet<String>> remarkMap) {
-        Map<String, LhScheduleResult> previousResultMap = new HashMap<>();
-        beforeMaterialResultMap.forEach((machineCode, result) -> previousResultMap.put(
-                StringUtils.trimToEmpty(machineCode), result));
         for (LhScheduleResult result : sortedList) {
             if (!hasAnyPlanQty(result)) {
                 continue;
             }
-            String machineCode = StringUtils.trimToEmpty(result.getLhMachineCode());
             String materialCode = StringUtils.trimToEmpty(result.getMaterialCode());
-            if (StringUtils.isBlank(machineCode) || StringUtils.isBlank(materialCode)) {
+            if (StringUtils.isBlank(materialCode)) {
                 continue;
             }
-            LhScheduleResult previousResult = previousResultMap.get(machineCode);
-            if (Objects.nonNull(previousResult)
-                    && ApsConstant.APS_STRING_1.equals(previousResult.getIsEnd())
-                    && !StringUtils.equals(materialCode, StringUtils.trimToEmpty(previousResult.getMaterialCode()))
-                    && !recentlyProducedMaterialCodeSet.contains(materialCode)) {
+            if (!recentlyProducedMaterialCodeSet.contains(materialCode)) {
                 this.appendExportRemark(remarkMap, result, I18nUtil.getMessage(NEW_SPEC_REMARK_KEY));
             }
-            previousResultMap.put(machineCode, result);
         }
     }
 
@@ -2988,10 +2979,12 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      */
     private void appendMaterialEndingExportRemarks(
             List<LhScheduleResult> sortedList,
+            Set<LhScheduleResult> embryoEndingRemarkResultSet,
             Map<LhScheduleResult, LinkedHashSet<String>> remarkMap) {
         Map<String, List<LhScheduleResult>> materialEndingResultMap = sortedList.stream()
                 .filter(LhScheduleServiceImpl::hasAnyPlanQty)
                 .filter(result -> ApsConstant.APS_STRING_1.equals(result.getIsEnd()))
+                .filter(result -> !embryoEndingRemarkResultSet.contains(result))
                 .filter(result -> StringUtils.isNotBlank(result.getMaterialCode()))
                 .collect(Collectors.groupingBy(LhScheduleResult::getMaterialCode));
         materialEndingResultMap.values().forEach(resultList -> {
@@ -2999,7 +2992,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             if (machineCodeSet.size() < MULTI_MACHINE_ENDING_MIN_COUNT) {
                 return;
             }
-            String machineCodeText = String.join("、", machineCodeSet);
+            String machineCodeText = String.join("/", machineCodeSet);
             String remark = I18nUtil.getMessage(MATERIAL_ENDING_REMARK_KEY) + machineCodeText;
             resultList.forEach(result -> this.appendExportRemark(remarkMap, result, remark));
         });
@@ -3008,9 +3001,10 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     /**
      * 追加同胎胚多机台库存收尾备注。
      */
-    private void appendEmbryoEndingExportRemarks(
+    private Set<LhScheduleResult> appendEmbryoEndingExportRemarks(
             List<LhScheduleResult> sortedList,
             Map<LhScheduleResult, LinkedHashSet<String>> remarkMap) {
+        Set<LhScheduleResult> embryoEndingRemarkResultSet = Collections.newSetFromMap(new IdentityHashMap<>());
         Map<String, List<LhScheduleResult>> embryoEndingResultMap = sortedList.stream()
                 .filter(LhScheduleServiceImpl::hasAnyPlanQty)
                 .filter(result -> ApsConstant.APS_STRING_1.equals(result.getIsEmbryoEnding()))
@@ -3021,21 +3015,51 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             if (machineCodeSet.size() < MULTI_MACHINE_ENDING_MIN_COUNT) {
                 return;
             }
-            String machineCodeText = String.join("、", machineCodeSet);
+            String machineCodeText = String.join("/", machineCodeSet);
             String remark = I18nUtil.getMessage(EMBRYO_ENDING_REMARK_KEY) + machineCodeText;
-            resultList.forEach(result -> this.appendExportRemark(remarkMap, result, remark));
+            resultList.forEach(result -> {
+                this.appendExportRemark(remarkMap, result, remark);
+                embryoEndingRemarkResultSet.add(result);
+            });
         });
+        return embryoEndingRemarkResultSet;
     }
 
     /**
-     * 收集并排序去重硫化机台编码。
+     * 按物理机台收集并排序去重硫化机台编码。
+     * <p>单控机台L/R两侧按一台物理机台计数；两侧同时存在时显示为K1501L/R，
+     * 普通机台及单控单侧保持原运行态编码。</p>
      */
     private Set<String> collectMachineCodeSet(List<LhScheduleResult> resultList) {
-        return resultList.stream()
+        Map<String, Set<String>> physicalMachineCodeMap = resultList.stream()
                 .map(LhScheduleResult::getLhMachineCode)
                 .filter(StringUtils::isNotBlank)
                 .map(String::trim)
+                .collect(Collectors.groupingBy(
+                        LhSingleControlMachineUtil::resolvePhysicalMachineCode,
+                        () -> new TreeMap<>(String.CASE_INSENSITIVE_ORDER),
+                        Collectors.toCollection(() -> new TreeSet<>(String.CASE_INSENSITIVE_ORDER))));
+        return physicalMachineCodeMap.entrySet().stream()
+                .map(entry -> this.buildEndingMachineDisplayCode(entry.getKey(), entry.getValue()))
                 .collect(Collectors.toCollection(() -> new TreeSet<>(String.CASE_INSENSITIVE_ORDER)));
+    }
+
+    /**
+     * 构建收尾备注中的物理机台展示编码。
+     */
+    private String buildEndingMachineDisplayCode(String physicalMachineCode,
+                                                 Set<String> runtimeMachineCodeSet) {
+        String leftMachineCode = physicalMachineCode + LhScheduleConstant.LEFT_MOULD;
+        String rightMachineCode = physicalMachineCode + LhScheduleConstant.RIGHT_MOULD;
+        boolean hasLeftMachine = runtimeMachineCodeSet.stream()
+                .anyMatch(machineCode -> StringUtils.equalsIgnoreCase(machineCode, leftMachineCode));
+        boolean hasRightMachine = runtimeMachineCodeSet.stream()
+                .anyMatch(machineCode -> StringUtils.equalsIgnoreCase(machineCode, rightMachineCode));
+        if (hasLeftMachine && hasRightMachine) {
+            return physicalMachineCode + LhScheduleConstant.LEFT_MOULD
+                    + "/" + LhScheduleConstant.RIGHT_MOULD;
+        }
+        return runtimeMachineCodeSet.stream().findFirst().orElse(physicalMachineCode);
     }
 
     /**
