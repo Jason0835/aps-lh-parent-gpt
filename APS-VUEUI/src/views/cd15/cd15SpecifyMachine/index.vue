@@ -204,7 +204,7 @@ export default {
           type: "select",
           dictData: this.dict.type.biz_factory_name,
           filterable: true,
-          change: () => this.loadMachineOptions(),
+          listeners: { change: (factoryCode) => this.loadMachineOptions(factoryCode) },
         },
         {
           label: this.$t("ui.data.column.cd15SpecifyMachine.steelStripCode"),
@@ -312,8 +312,13 @@ export default {
         value: code,
       }));
     },
-    async loadMachineOptions() {
-      const res = await getCd15MachineEnableOptions({ factoryCode: this.query.factoryCode || "116" });
+    async loadMachineOptions(factoryCode) {
+      const code = factoryCode || this.query.factoryCode;
+      if (!code) {
+        this.machineOptions = [];
+        return;
+      }
+      const res = await getCd15MachineEnableOptions({ factoryCode: code });
       const rows = Array.isArray(res) ? res : (res.rows || res.data || []);
       this.machineOptions = rows.map((item) => ({
         label: item.machineCode,

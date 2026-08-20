@@ -146,8 +146,7 @@ public class Cd15AutoScheduleInputVersionServiceImpl implements Cd15AutoSchedule
         List<CxScheduleResult> formingEntities = cxMapper.selectList(
                 Wrappers.<CxScheduleResult>lambdaQuery()
                         .eq(CxScheduleResult::getFactoryCode, factoryCode)
-                        .between(CxScheduleResult::getScheduleDate,
-                                Date.valueOf(scheduleDate.minusDays(1)), Date.valueOf(scheduleDate.plusDays(3)))
+                        .eq(CxScheduleResult::getScheduleDate, Date.valueOf(scheduleDate))
                         .orderByAsc(CxScheduleResult::getId));
         String forming = formingEntities.stream()
                 .map(this::formingFingerprint)

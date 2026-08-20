@@ -1,6 +1,8 @@
 {
   "btn.qualityControlUpdate": "Quality Control Update",
   "ui.data.column.factoryCode": "Factory",
+  "ui.data.column.updateBy": "Updated By",
+  "ui.data.column.updateTime": "Update Time",
   "ui.dj.lossSetting.column.paddingCode": "Padding code",
   "ui.dj.lossSetting.column.modalName": "Padding rubber loss rate management",
   "ui.data.column.loss.line": "Machine",
@@ -11,6 +13,8 @@
   "ui.dj.curlRoll.column.modalName": "Padding rubber curl information maintenance",
   "ui.nc.curlRoll.column.liningCode": "Lining code",
   "ui.nc.curlRoll.column.modalName": "Lining curl length management",
+  "ui.nc.specifyMachine.column.modalName": "Lining fixed-point machine",
+  "ui.frame.page.stock.title": "Stock information",
   "ui.dj.params.column.factoryCode": "Factory code",
   "ui.dj.params.column.productTypeCode": "Product type",
   "ui.dj.params.column.paramCode": "Param code",

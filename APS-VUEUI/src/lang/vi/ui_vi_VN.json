@@ -196,6 +196,7 @@
   "ui.data.alert.lhMouldChangePlan.hasHistoryDataByQuery": "Ngày sắp xếp trước hôm nay, là bản ghi lịch sử, không cho phép xuất bản",
   "ui.data.alert.lhPrecisionPlan.notUnique": "Kết hợp máy lưu hóa + loại độ chính xác + ngày kế hoạch đã tồn tại, không thể trùng lặp",
   "ui.data.column.remark": "Ghi chú",
+  "ui.data.column.updateBy": "Người cập nhật",
   "ui.data.column.updateTime": "Thời gian cập nhật",
   "ui.data.column.factoryCode": "Nhà máy",
   "ui.data.column.paramsCode": "Mã tham số",

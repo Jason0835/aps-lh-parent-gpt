@@ -186,7 +186,8 @@ public class MdmCxMachineFixedUIController extends BaseUIController<MdmCxMachine
     @ResponseBody
     @ApiOperation("数据导入")
     @Override
-    public AjaxResult importData(@RequestPart("file") MultipartFile file, boolean updateSupport) throws Exception {
+    public AjaxResult importData(@RequestPart("file") MultipartFile file,
+                                 @RequestParam("updateSupport") boolean updateSupport) throws Exception {
         byte[] data = this.useFileEncrypt ? FileEncryptUtils.DecodeFile(file) : file.getBytes();
 
         ImportContext context = new ImportContext();

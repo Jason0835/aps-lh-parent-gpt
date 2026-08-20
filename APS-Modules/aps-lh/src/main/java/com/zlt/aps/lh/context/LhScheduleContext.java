@@ -7,7 +7,6 @@ import com.zlt.aps.common.engine.domain.LhDayPlanAdjustVo;
 import com.zlt.aps.lh.api.domain.dto.*;
 import com.zlt.aps.lh.api.domain.entity.*;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
-import com.zlt.aps.lh.api.enums.EmbryoUsageType;
 import com.zlt.aps.lh.api.enums.SingleControlMachineModeEnum;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.component.StructureShiftInMachineIndex;
@@ -744,19 +743,6 @@ public class LhScheduleContext {
      * 当前仍有效参与排产的胎胚SKU集合, key=embryoCode, value=有效待排物料编码列表
      */
     private Map<String, List<String>> activeEmbryoSkuMap = new LinkedHashMap<>();
-    /**
-     * 胎胚使用类型缓存, key=物料编码+产品状态复合键, value=胎胚使用类型。
-     * <p>由 {@link com.zlt.aps.lh.component.TargetScheduleQtyResolver} 首次分类时
-     * 按 T 日、月计划与在机/已排结果一次性构建，排程过程中保持不变；
-     * 目标量计算、胎胚库存收尾门控统一读取该缓存，避免 SKU 循环内重复遍历月计划。</p>
-     */
-    private Map<String, EmbryoUsageType> embryoUsageTypeCache = new LinkedHashMap<>();
-    /**
-     * 月计划胎胚日期使用索引, key=胎胚编码, value=(物料编码+产品状态复合键 -> 当月有量日集合)。
-     * <p>由 {@link com.zlt.aps.lh.component.TargetScheduleQtyResolver} 首次分类时
-     * 从已加载月计划（限定 T 日所属年月）构建，供 T 日～月底、整月共用关系判断复用。</p>
-     */
-    private Map<String, Map<String, Set<Integer>>> embryoMonthUsageIndex = new LinkedHashMap<>();
     /**
      * 共用胎胚剔除零余量SKU后动态转为单胎胚收尾的物料编码集合
      */

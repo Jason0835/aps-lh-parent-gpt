@@ -89,7 +89,9 @@ export default {
         {
           label: this.$t("ui.data.column.gsq.machineMaintenancePlan.downtimeDate"),
           prop: "downtimeDate",
-          type: "daterange",
+          type: "date",
+          dateType: "daterange",
+          valueFormat: "yyyy-MM-dd",
         },
         {
           label: this.$t("ui.data.column.gsq.machineMaintenancePlan.machineName"),
@@ -253,15 +255,6 @@ export default {
     },
     handleSearch(data) {
       this.query = data;
-      if (data.downtimeDate && data.downtimeDate.length === 2) {
-        this.query.downtimeDateBegin = data.downtimeDate[0];
-        this.query.downtimeDateEnd = data.downtimeDate[1];
-        delete this.query.downtimeDate;
-      } else {
-        this.query.downtimeDateBegin = undefined;
-        this.query.downtimeDateEnd = undefined;
-        delete this.query.downtimeDate;
-      }
       this.$set(this.page, "current", 1);
       this.getList();
     },
@@ -292,6 +285,12 @@ export default {
       if (hasPage) {
         params.pageSize = this.page.pageSize;
         params.pageNum = this.page.current;
+      }
+      // 停机日期范围选择值拆分为开始/结束日期入参（对齐胎圈库存页面写法）
+      if (params.downtimeDate && params.downtimeDate[0]) {
+        params.downtimeDateBegin = params.downtimeDate[0];
+        params.downtimeDateEnd = params.downtimeDate[1];
+        params.downtimeDate = undefined;
       }
       return params;
     },

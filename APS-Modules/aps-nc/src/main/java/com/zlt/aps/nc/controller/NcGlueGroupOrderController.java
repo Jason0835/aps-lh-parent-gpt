@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
@@ -98,15 +99,13 @@ public class NcGlueGroupOrderController extends AbstractDocBizController<NcGlueG
         return list;
     }
 
-    @ApiOperation("导入数据")
     @Log(title = "ui.nc.glueGroupOrder.column.modalName", businessType = BusinessType.IMPORT)
     @PostMapping("/importData")
-    public AjaxResult importData(@RequestBody List<NcGlueGroupOrder> list, @RequestParam("updateSupport") boolean updateSupport,
-            @RequestParam("importLogId") Long importLogId) {
-        if (StringUtils.isNull(list) || list.size() == 0) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.import.nodata"));
-        }
-        return glueGroupOrderService.importData(list, updateSupport, importLogId);
+    @ApiOperation("导入信息")
+    @Override
+    public AjaxResult importData(@RequestBody ImportContext importContext,
+            @RequestParam("updateSupport") boolean updateSupport) throws Exception {
+        return super.importData(importContext, updateSupport);
     }
 
     @Override

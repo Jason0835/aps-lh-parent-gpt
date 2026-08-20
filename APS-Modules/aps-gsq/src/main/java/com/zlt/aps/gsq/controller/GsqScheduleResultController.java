@@ -210,6 +210,20 @@ public class GsqScheduleResultController extends AbstractDocBizController<GsqSch
     }
 
     /**
+     * 导出数据列表查询
+     * 沿用列表查询条件（buildQueryWrapper 内含默认排序），
+     * 并与列表页保持一致地回填胎圈排程结果数据到 TQ_CLASS1~6_PLAN 字段
+     */
+    @Override
+    protected List<GsqScheduleResult> listExportData(GsqScheduleResult obj) {
+        LambdaQueryWrapper<GsqScheduleResult> wrapper = buildQueryWrapper(obj);
+        List<GsqScheduleResult> list = gsqScheduleResultMapper.selectList(wrapper);
+        // 回填胎圈排程结果数据到 TQ_CLASS1~6_PLAN 字段
+        gsqScheduleResultService.fillTqPlanQty(list);
+        return list;
+    }
+
+    /**
      * 构建查询条件
      * 注意：isDelete 已由框架通过注解自动过滤，禁止手动追加条件
      */

@@ -418,6 +418,18 @@ export default {
           },
         },
         {
+          prop: "updateBy",
+          align: "center",
+          label: this.$t("ui.data.column.updateBy"),
+          minWidth: 100,
+        },
+        {
+          prop: "updateTime",
+          align: "center",
+          label: this.$t("ui.data.column.updateTime"),
+          minWidth: 180,
+        },
+        {
           align: "center",
           label: this.$t("ui.data.btn.option"),
           width: 200,

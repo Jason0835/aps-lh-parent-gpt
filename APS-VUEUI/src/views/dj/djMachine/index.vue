@@ -80,7 +80,7 @@ import TltUploadForm from "@/views/components/tltUploadForm.vue";
 export default {
  name: "DjMachine",
   components: { InfoDialog, TltUploadForm },
-  dicts: ["STATUS", "CLASS_SHIFT", "class_num_three_plan", "biz_factory_name"],
+  dicts: ["biz_available_status", "CLASS_SHIFT", "class_num_three_plan", "biz_factory_name"],
 
   provide() {
     return {
@@ -144,25 +144,6 @@ export default {
     columns() {
       return [
         { type: "selection", fixed: "left" },
-        {
-          label: this.$t("common.option"),
-          prop: "option",
-          width: "100px",
-          fixed: "left",
-          render: ({ row }) => {
-            return (
-              <div>
-                <el-button
-                  class="minus"
-                  type="success"
-                  onClick={() => this.handleEdit(row)}
-                >
-                  {this.$t("ui.frame.btn.update")}
-                </el-button>
-              </div>
-            );
-          },
-        },
         {
           label: this.$t("ui.data.column.factoryCode"),
           prop: "factoryCode",
@@ -268,6 +249,31 @@ export default {
             return row.remark || "-";
           },
         },
+        {
+          prop: "updateTime",
+          align: "center",
+          halign: "center",
+          label: this.$t("common.updateTime"),
+          minWidth: 160,
+        },
+        {
+          label: this.$t("common.option"),
+          prop: "option",
+          width: "100px",
+          render: ({ row }) => {
+            return (
+              <div>
+                <el-button
+                  class="minus"
+                  type="success"
+                  onClick={() => this.handleEdit(row)}
+                >
+                  {this.$t("ui.frame.btn.update")}
+                </el-button>
+              </div>
+            );
+          },
+        },
       ];
     },
     searchColumns() {
@@ -291,7 +297,7 @@ export default {
           label: this.$t("ui.data.column.machine.status"),
           prop: "status",
           type: "select",
-          dictData: this.dict.type.STATUS,
+          dictData: this.dict.type.biz_available_status,
         },
       ];
     },

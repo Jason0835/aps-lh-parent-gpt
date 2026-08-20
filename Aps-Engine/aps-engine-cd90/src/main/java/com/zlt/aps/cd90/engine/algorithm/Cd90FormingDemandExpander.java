@@ -39,6 +39,20 @@ public class Cd90FormingDemandExpander {
      */
     public List<Cd90DemandShift> expand(List<Cd90FormingScheduleSource> schedules,
                                         List<Cd90ConstructionMaterial> materials) {
+        return this.expand(schedules, materials, null);
+    }
+
+    /**
+     * 展开成型需求，并仅从指定自然班次起输出缺施工告警。
+     *
+     * @param schedules 成型排程窄模型
+     * @param materials 施工层位帘布单耗
+     * @param warningStartTime 缺施工告警起点；为空时检查全部正计划量班次
+     * @return 按帘布代码、班次开始时间排序的需求明细
+     */
+    public List<Cd90DemandShift> expand(List<Cd90FormingScheduleSource> schedules,
+                                        List<Cd90ConstructionMaterial> materials,
+                                        LocalDateTime warningStartTime) {
         // 施工单耗先按胎胚代码+施工版本分组；同一版本同一帘布多层出现时累加毫米单耗。
         Map<String, Map<String, BigDecimal>> consumeByConstruction = groupUnitConsume(materials);
         Map<String, DemandAccumulator> demandByClothAndShift = new LinkedHashMap<>();
@@ -57,18 +71,24 @@ public class Cd90FormingDemandExpander {
                 String classField = "CLASS" + (classIndex + 1);
                 String recipeNo = classIndex < recipeNos.size() ? recipeNos.get(classIndex) : null;
                 if (!StringUtils.hasText(recipeNo)) {
-                    log.warn("[直裁自动排程] 成型班次施工版本为空，跳过该班施工分解, "
-                                    + "cxBatchNo={}, embryoCode={}, classField={}, startTime={}",
-                            schedule.getCxBatchNo(), schedule.getEmbryoCode(), classField, startTime);
+                    if (this.shouldWarnMissingConstruction(
+                            formingQuantity, startTime, warningStartTime)) {
+                        log.warn("[直裁自动排程] 成型班次施工版本为空，跳过该班施工分解, "
+                                        + "cxBatchNo={}, embryoCode={}, classField={}, startTime={}",
+                                schedule.getCxBatchNo(), schedule.getEmbryoCode(), classField, startTime);
+                    }
                     continue;
                 }
                 // 成型计划必须使用embryoCode+CLASSn_RECIPE_NO关联施工，不使用SAP品号或成型物料描述。
                 Map<String, BigDecimal> clothConsumes = consumeByConstruction.get(
                         constructionKey(schedule.getEmbryoCode(), recipeNo));
                 if (clothConsumes == null || clothConsumes.isEmpty()) {
-                    log.warn("[直裁自动排程] 未找到胎胚施工版本，跳过该班施工分解, "
-                                    + "cxBatchNo={}, embryoCode={}, constructionVersion={}, classField={}",
-                            schedule.getCxBatchNo(), schedule.getEmbryoCode(), recipeNo, classField);
+                    if (this.shouldWarnMissingConstruction(
+                            formingQuantity, startTime, warningStartTime)) {
+                        log.warn("[直裁自动排程] 未找到胎胚施工版本，跳过该班施工分解, "
+                                        + "cxBatchNo={}, embryoCode={}, constructionVersion={}, classField={}",
+                                schedule.getCxBatchNo(), schedule.getEmbryoCode(), recipeNo, classField);
+                    }
                     continue;
                 }
                 for (Map.Entry<String, BigDecimal> entry : clothConsumes.entrySet()) {
@@ -86,6 +106,14 @@ public class Cd90FormingDemandExpander {
                 .sorted(Comparator.comparing(Cd90DemandShift::getClothCode)
                         .thenComparing(Cd90DemandShift::getStartTime))
                 .collect(Collectors.toList());
+    }
+
+    /** 零计划量及告警起点前的班次不输出缺施工日志。 */
+    private boolean shouldWarnMissingConstruction(BigDecimal formingQuantity,
+                                                  LocalDateTime startTime,
+                                                  LocalDateTime warningStartTime) {
+        return formingQuantity.signum() > 0
+                && (warningStartTime == null || !startTime.isBefore(warningStartTime));
     }
 
     private Map<String, Map<String, BigDecimal>> groupUnitConsume(List<Cd90ConstructionMaterial> materials) {

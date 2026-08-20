@@ -97,7 +97,7 @@ public class NcStockUIController extends BaseUIController<NcStock> {
     @ResponseBody
     public AjaxResult save(NcStock ncStock) {
         if (UserConstants.NOT_UNIQUE.equals(iNcStockService.checkUnique(ncStock))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.ncStock.embryoCodeNotUnique"));
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.ncStock.importUnique"));
         }
 
         return iNcStockService.save(ncStock);

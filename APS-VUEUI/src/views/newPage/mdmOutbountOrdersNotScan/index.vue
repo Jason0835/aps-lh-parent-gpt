@@ -141,9 +141,14 @@ export default {
           minWidth: 100,
         },
         {
+          prop: "updateBy",
+          label: this.$t("ui.data.column.updateBy"),
+          minWidth: 100,
+        },
+        {
           prop: "updateTime",
-          label: this.$t("ui.data.column.mdmOutbountOrdersNotScan.updateTime"),
-          minWidth: 150,
+          label: this.$t("ui.data.column.updateTime"),
+          minWidth: 180,
         },
       ];
 

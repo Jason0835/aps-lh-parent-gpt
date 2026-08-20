@@ -32,6 +32,7 @@ import java.sql.Date;
 import java.text.MessageFormat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -57,6 +58,9 @@ public class Cd90AutoScheduleBatchDataValidatorImpl implements Cd90AutoScheduleB
 
     private static final int CONSTRUCTION_LAYERS = 3;
     private static final int ACTIVE = 1;
+    private static final int FORMING_SHIFT_HOURS = 8;
+    private static final LocalTime FORMING_FIRST_SHIFT_TIME = LocalTime.of(6, 0);
+    private static final LocalTime FIRST_FORMING_DEMAND_TIME = LocalTime.of(22, 0);
     private static final String[] CLASS_RECIPE_FIELDS = {
             "CLASS1_RECIPE_NO", "CLASS2_RECIPE_NO", "CLASS3_RECIPE_NO", "CLASS4_RECIPE_NO",
             "CLASS5_RECIPE_NO", "CLASS6_RECIPE_NO", "CLASS7_RECIPE_NO", "CLASS8_RECIPE_NO"
@@ -87,9 +91,10 @@ public class Cd90AutoScheduleBatchDataValidatorImpl implements Cd90AutoScheduleB
         Cd90BatchDataCheckResult.Builder builder = Cd90BatchDataCheckResult.builder();
         List<CxScheduleResult> formingSchedules = checkFormingSchedule(builder, factoryCode, scheduleDate);
         checkMachineInfo(builder, factoryCode);
-        Set<String> clothCodes = checkConstructionInfo(builder, factoryCode, formingSchedules);
+        Set<String> clothCodes = this.checkConstructionInfo(
+                builder, factoryCode, scheduleDate, formingSchedules);
         checkCurlLength(builder, factoryCode, clothCodes);
-        this.checkStorageLaneLimit(builder, factoryCode);
+        this.checkStorageLaneLimit(builder, factoryCode, scheduleDate);
 
         Cd90BatchDataCheckResult result = builder.build();
         if (result.isFailed()) {
@@ -112,10 +117,7 @@ public class Cd90AutoScheduleBatchDataValidatorImpl implements Cd90AutoScheduleB
 
     /**
      * 批次级检查：成型计划数据是否就绪。
-     * 按文档1.5节，成型 scheduleDate 与直裁排程日相同（均为 T+1），
-     * 成型一条记录的 CLASS1~CLASS8 已覆盖 T 日早班至 T+2 日共8个班次，
-     * 因此入口先行检查只查 scheduleDate 当天的成型排程记录即可。
-     * engine 运行时可能按停产场景额外读取相邻班次，但入口检查只关心用户该维护的核心记录是否存在。
+     * 与输入加载口径保持一致，只检查与直裁排程日期相同的成型排程记录。
      * 返回查询到的成型记录，供后续施工信息检查使用。
      */
     private List<CxScheduleResult> checkFormingSchedule(Cd90BatchDataCheckResult.Builder builder,
@@ -156,6 +158,7 @@ public class Cd90AutoScheduleBatchDataValidatorImpl implements Cd90AutoScheduleB
      */
     private Set<String> checkConstructionInfo(Cd90BatchDataCheckResult.Builder builder,
                                                String factoryCode,
+                                               LocalDate scheduleDate,
                                                List<CxScheduleResult> formingSchedules) {
         if (formingSchedules == null || formingSchedules.isEmpty()) {
             return new LinkedHashSet<>();
@@ -163,8 +166,20 @@ public class Cd90AutoScheduleBatchDataValidatorImpl implements Cd90AutoScheduleB
         // 1. 收集 (constructionCode, constructionVersion) 配对，同时校验胎胚代号和施工版本非空
         Set<String> embryoCodes = new LinkedHashSet<>();
         Set<String> constructionVersions = new LinkedHashSet<>();
-        Set<String> constructionPairs = new LinkedHashSet<>();
+        Map<String, Set<String>> constructionPairUsages = new LinkedHashMap<>();
+        LocalDateTime firstDemandStart = scheduleDate.minusDays(1)
+                .atTime(FIRST_FORMING_DEMAND_TIME);
         for (CxScheduleResult schedule : formingSchedules) {
+            boolean hasPositiveDemandInWindow = false;
+            for (int classIndex = 1; classIndex <= CLASS_RECIPE_FIELDS.length; classIndex++) {
+                if (this.requiresConstructionCheck(schedule, classIndex, firstDemandStart)) {
+                    hasPositiveDemandInWindow = true;
+                    break;
+                }
+            }
+            if (!hasPositiveDemandInWindow) {
+                continue;
+            }
             String embryoCode = schedule.getEmbryoCode();
             if (!StringUtils.hasText(embryoCode)) {
                 builder.addError("成型计划", "DATA_MISSING",
@@ -174,21 +189,25 @@ public class Cd90AutoScheduleBatchDataValidatorImpl implements Cd90AutoScheduleB
             }
             embryoCodes.add(embryoCode);
             for (int classIndex = 1; classIndex <= CLASS_RECIPE_FIELDS.length; classIndex++) {
-                // 班次计划量为空或≤0时，该班次不生产，跳过施工版本校验
-                BigDecimal planQty = getClassPlanQty(schedule, classIndex);
-                if (planQty == null || planQty.signum() <= 0) {
+                // 只校验首个成型晚班及之后的正计划量班次。
+                if (!this.requiresConstructionCheck(schedule, classIndex, firstDemandStart)) {
                     continue;
                 }
                 String classField = CLASS_RECIPE_FIELDS[classIndex - 1];
+                String className = "CLASS" + classIndex;
+                String formingDate = this.formingDate(schedule);
                 String recipeNo = getRecipeNo(schedule, classField);
                 if (!StringUtils.hasText(recipeNo)) {
                     builder.addError("成型计划", "DATA_MISSING",
-                            "胎胚 " + embryoCode + " 的 " + classField + " 施工版本为空",
+                            "成型日期 " + formingDate + " 胎胚 " + embryoCode
+                                    + " 的 " + className + " 施工版本为空",
                             "请检查成型排程数据各班次施工版本");
                     continue;
                 }
                 constructionVersions.add(recipeNo);
-                constructionPairs.add(embryoCode + "@" + recipeNo);
+                constructionPairUsages.computeIfAbsent(embryoCode + "@" + recipeNo,
+                                ignored -> new LinkedHashSet<>())
+                        .add(formingDate + "/" + className);
             }
         }
         if (embryoCodes.isEmpty() || constructionVersions.isEmpty()) {
@@ -208,7 +227,8 @@ public class Cd90AutoScheduleBatchDataValidatorImpl implements Cd90AutoScheduleB
 
         // 3. 逐个配对校验
         Set<String> clothCodes = new LinkedHashSet<>();
-        for (String pair : constructionPairs) {
+        for (Map.Entry<String, Set<String>> pairEntry : constructionPairUsages.entrySet()) {
+            String pair = pairEntry.getKey();
             String[] parts = pair.split("@", 2);
             String constructionCode = parts[0];
             String constructionVersion = parts[1];
@@ -222,6 +242,35 @@ public class Cd90AutoScheduleBatchDataValidatorImpl implements Cd90AutoScheduleB
             checkConstructionFields(builder, construction, clothCodes);
         }
         return clothCodes;
+    }
+
+    /** 首个成型晚班之前的计划不属于本次直裁供料窗口，不参与施工版本拦截。 */
+    private boolean requiresConstructionCheck(CxScheduleResult schedule,
+                                              int classIndex,
+                                              LocalDateTime firstDemandStart) {
+        BigDecimal planQty = this.getClassPlanQty(schedule, classIndex);
+        LocalDateTime formingShiftStart = this.formingShiftStart(schedule, classIndex);
+        return planQty != null && planQty.signum() > 0
+                && formingShiftStart != null
+                && !formingShiftStart.isBefore(firstDemandStart);
+    }
+
+    /** 将成型记录的CLASS序号换算为自然班次开始时间。 */
+    private LocalDateTime formingShiftStart(CxScheduleResult schedule, int classIndex) {
+        if (schedule == null || schedule.getScheduleDate() == null) {
+            return null;
+        }
+        LocalDate formingDate = new Date(schedule.getScheduleDate().getTime()).toLocalDate();
+        return formingDate.minusDays(1).atTime(FORMING_FIRST_SHIFT_TIME)
+                .plusHours((classIndex - 1L) * FORMING_SHIFT_HOURS);
+    }
+
+    /** 成型日期统一输出ISO格式，避免java.util.Date默认英文时区文本。 */
+    private String formingDate(CxScheduleResult schedule) {
+        if (schedule == null || schedule.getScheduleDate() == null) {
+            return "";
+        }
+        return new Date(schedule.getScheduleDate().getTime()).toLocalDate().toString();
     }
 
     /**
@@ -327,22 +376,22 @@ public class Cd90AutoScheduleBatchDataValidatorImpl implements Cd90AutoScheduleB
     }
 
     /**
-     * 批次级检查：任务启动时当前资源班次的库排数据完整性。
+     * 批次级检查：排程窗口首班次的库排数据完整性。
      * 1. MAX_CAR_NUM 必须维护且 >0(2026/06/24 变更,去掉 default 7,必填);
      * 2. CAR_NUM 不能为负,且不能大于 MAX_CAR_NUM;
      * 3. 空库排(MATERIAL_CODE 为空)时 CAR_NUM 必须 = 0。
      * 排程前拦截,避免 Allocator 运行时抛异常。
      */
     private void checkStorageLaneLimit(Cd90BatchDataCheckResult.Builder builder,
-                                       String factoryCode) {
+                                       String factoryCode, LocalDate scheduleDate) {
         List<Cd90ShiftConfig> configs = shiftConfigMapper.selectList(
                 Wrappers.<Cd90ShiftConfig>lambdaQuery()
                         .eq(Cd90ShiftConfig::getFactoryCode, factoryCode)
                         .eq(Cd90ShiftConfig::getIsActive, ACTIVE));
         Cd90ShiftDescriptor baselineShift;
         try {
-            baselineShift = shiftWindowResolver.resolveCurrentResourceShift(
-                    LocalDateTime.now(), configs);
+            baselineShift = shiftWindowResolver.resolveScheduleBaselineShift(
+                    scheduleDate, configs);
         } catch (IllegalArgumentException exception) {
             builder.addError(I18nUtil.getMessage(
                             "ui.data.column.cd90StorageLaneLimit.modelName"),

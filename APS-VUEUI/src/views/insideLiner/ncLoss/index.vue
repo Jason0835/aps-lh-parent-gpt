@@ -33,7 +33,7 @@
         > -->
         <el-button
           v-hasPermi="['nc:loss:import']"
-          @click="$refs.tltUpload.handleImport()"
+          @click="() => $refs.tltUploadForm.handleImport(importDefaultValue)"
           >{{ $t("ui.frame.btn.import") }}</el-button
         >
         <el-button @click="handleExport" v-hasPermi="['nc:loss:export']">{{
@@ -42,11 +42,15 @@
       </template>
     </page-table>
     <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
-    <tlt-upload
-      ref="tltUpload"
+    <tlt-upload-form
+      ref="tltUploadForm"
+      :title="$t('ui.nc.lossSetting.column.modalName')"
       downloadUrl="/nc/loss/importTemplate"
       uploadUrl="/nc/loss/importData"
       @uploadSuccess="getList"
+      labelWidth="0"
+      :columns="importColumns"
+      :rules="importRules"
     />
     <infoDialog ref="infoRef" @success="getList" />
   </basic-container>
@@ -60,14 +64,14 @@ import { downloadLink } from "@/utils/request";
 import { listLoss, removeLoss } from "@/api/nc/loss";
 import { getConfigKey } from "@/api/system/config";
 //components
-import tltUpload from "@/components/tltUpload/tltUpload.vue";
+import TltUploadForm from "@/views/components/tltUploadForm.vue";
 
 import infoDialog from "./components/infoDialog.vue";
 
 export default {
- name: "ncLoss",
+  name: "ncLoss",
   components: {
-    tltUpload,
+    TltUploadForm,
     infoDialog,
   },
   dicts: ["biz_factory_name"],
@@ -95,7 +99,25 @@ export default {
         factoryCode: '',
         mainPlanMonth: "",
       },
-      importDefaultValue: {},
+      importDefaultValue: {
+        updateSupport: false,
+      },
+      importColumns: [
+        {
+          label: "",
+          prop: "updateSupport",
+          render: (form) => {
+            return (
+              <el-checkbox
+                label={this.$t("ui.checkbox.updateExistingData")}
+                v-model={form.updateSupport}
+              >
+                {this.$t("ui.checkbox.updateExistingData")}
+              </el-checkbox>
+            );
+          },
+        },
+      ],
       importRules: {},
     };
   },
@@ -107,6 +129,14 @@ export default {
       let columns = [
         { type: "selection", fixed: "left" },
         {
+          label: this.$t("ui.data.column.factoryCode"),
+          prop: "factoryCode",
+          minWidth: 100,
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_factory_name, value);
+          },
+        },
+        {
           prop: "liningCode",
           align: "center",
           halign: "center",
@@ -114,7 +144,7 @@ export default {
           sortable: true,
         },
         {
-          prop: "machineCode",
+          prop: "machineName",
           align: "center",
           halign: "center",
           label: this.$t("ui.data.column.loss.line"),
@@ -141,6 +171,13 @@ export default {
           label: this.$t("ui.common.column.remark"),
           sortable: true,
           minWidth: 100,
+        },
+        {
+          prop: "updateTime",
+          align: "center",
+          halign: "center",
+          label: this.$t("common.updateTime"),
+          minWidth: 160,
         },
         {
           align: "center",
@@ -257,7 +294,7 @@ export default {
       this.selection = rows;
     },
     handleExport() {
-      downloadLink("/nc/loss/export", this.formatParams(false));
+      downloadLink("/nc/lossSetting/export", this.formatParams(false));
     },
 
     // utils

@@ -24,6 +24,13 @@
           @click="handleAdd"
           >{{ $t("ui.frame.btn.add") }}</el-button
         >
+        <el-button
+          v-hasPermi="['nc:glueGroupOrder:remove']"
+          type="danger"
+          @click="handleDeleteMulti"
+          :disabled="selection.length == 0"
+          >{{ $t("ui.frame.btn.delete") }}</el-button
+        >
         <!-- <el-button
           type="warning"
           v-hasPermi="['nc:glueGroupOrder:edit']"
@@ -123,6 +130,14 @@ export default {
       let columns = [
         { type: "selection", fixed: "left" },
         {
+          label: this.$t("ui.data.column.factoryCode"),
+          prop: "factoryCode",
+          minWidth: 100,
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_factory_name, value);
+          },
+        },
+        {
           prop: "glueGroupCode",
           label: this.$t("ui.glueGroup.column.glueGroupCode"),
           halign: "center",
@@ -150,6 +165,13 @@ export default {
           label: this.$t("ui.common.column.remark"),
           minWidth: 100,
           // sortable: "custom",
+        },
+        {
+          prop: "updateTime",
+          align: "center",
+          halign: "center",
+          label: this.$t("common.updateTime"),
+          minWidth: 160,
         },
         {
           align: "center",
@@ -200,6 +222,24 @@ export default {
         type: "warning",
       }).then(() => {
         const ids = row.id;
+        this.loading = true;
+        removeGlueGroupOrder({ ids })
+          .then((data) => {
+            this.$modal.msgSuccess(data.msg);
+            this.$set(this.page, "current", 1);
+            this.getList();
+          })
+          .catch((error) => {
+            console.log(error);
+            this.loading = false;
+          });
+      });
+    },
+    handleDeleteMulti() {
+      this.$confirm(this.$t("common.confirm.delete"), {
+        type: "warning",
+      }).then(() => {
+        const ids = this.selection.map((row) => row.id).join(",");
         this.loading = true;
         removeGlueGroupOrder({ ids })
           .then((data) => {

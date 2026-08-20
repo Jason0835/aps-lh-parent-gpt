@@ -33,6 +33,7 @@ import { mapState } from "vuex";
 
 import infoForm from "@/views/components/infoForm.vue";
 
+import { getConfigKey } from "@/api/system/config";
 import { editSpecifyMachine } from "@/api/nc/specifyMachine";
 
 export default {
@@ -44,6 +45,7 @@ export default {
       visible: false,
       isEdit: false,
       editType: null,
+      factoryCode: "",
       form: {},
       rules: {
         liningCode: [
@@ -53,7 +55,21 @@ export default {
             trigger: "blur",
           },
         ],
-        machineId: [
+        machineCode: [
+          {
+            required: true,
+            message: this.$t("common.rule.select"),
+            trigger: "blur",
+          },
+        ],
+        lineType: [
+          {
+            required: true,
+            message: this.$t("common.rule.select"),
+            trigger: "blur",
+          },
+        ],
+        jobType: [
           {
             required: true,
             message: this.$t("common.rule.select"),
@@ -73,6 +89,14 @@ export default {
     columns() {
       return [
         {
+          label: this.$t("ui.data.column.factoryCode"),
+          prop: "factoryCode",
+          span: 24,
+          type: "select",
+          dictData: this.parentDict.type.biz_factory_name,
+          disabled: true,
+        },
+        {
           label: this.$t("ui.nc.specifyMachine.column.liningCode"),
           prop: "liningCode",
           span: 24,
@@ -85,13 +109,16 @@ export default {
           required: true,
           type: "select",
           dictData: this.machines,
-          valueKey: "machineCode",
-          labelKey: "machineName",
+          props: {
+            value: "machineCode",
+            label: "machineName",
+          },
         },
         {
           label: this.$t("ui.specifyMachine.column.lineType"),
           prop: "lineType",
           span: 24,
+          required: true,
           type: "select", //LINE_TYPE
           dictData: this.parentDict.type.LINE_TYPE,
         },
@@ -99,6 +126,7 @@ export default {
           label: this.$t("ui.specifyMachine.column.jobType"),
           prop: "jobType",
           span: 24,
+          required: true,
           type: "select", //JOB_TYPE
           dictData: this.parentDict.type.JOB_TYPE,
         },
@@ -132,6 +160,29 @@ export default {
     //utils
     show(data) {
       this.visible = true;
+      // 加载内衬机台下拉数据（机台信息存于 vuex state.insideLiner.machines），按当前工厂编码过滤，避免带出其他厂的机台
+      const loadMachines = () => {
+        this.$store.dispatch("insideLiner/getMachineList", {
+          factoryCode: this.factoryCode,
+        });
+      };
+      // 获取当前工厂编码（保存时需要带工厂参数，机台下拉过滤也需要）
+      if (!this.factoryCode) {
+        getConfigKey("sys.factory.code").then((response) => {
+          this.factoryCode = response.msg;
+          loadMachines();
+          // 新增时默认选中默认工厂（工厂字段不可编辑）
+          if (!data) {
+            this.form = { ...this.form, factoryCode: response.msg };
+          }
+        });
+      } else {
+        loadMachines();
+        // 新增时默认选中默认工厂（工厂字段不可编辑）
+        if (!data) {
+          this.form = { ...this.form, factoryCode: this.factoryCode };
+        }
+      }
       if (data) {
         this.isEdit = true;
         this.form = {
@@ -147,7 +198,23 @@ export default {
       this.visible = false;
     },
     handleConfirm() {
-      this.$refs.form.triggerConfirm(this.save);
+      this.$refs.form.triggerConfirm((params) => {
+        // 保存时统一带上工厂编码参数；若异步获取尚未完成，则先获取再保存
+        const doSave = (factoryCode) => {
+          this.save({
+            ...params,
+            factoryCode: factoryCode,
+          });
+        };
+        if (this.factoryCode) {
+          doSave(this.factoryCode);
+        } else {
+          getConfigKey("sys.factory.code").then((response) => {
+            this.factoryCode = response.msg;
+            doSave(this.factoryCode);
+          });
+        }
+      });
     },
   },
 };

@@ -172,18 +172,25 @@ export default {
         //   minWidth: 120,
         // },
         {
-          prop: "updateTime",
-          align: "center",
-          halign: "center",
-          label: this.$t("ui.data.column.updateTime"),
-          minWidth: 180,
-        },
-        {
           prop: "remark",
           align: "center",
           halign: "center",
           label: this.$t("ui.data.column.lhChipStock.remark"),
           minWidth: 200,
+        },
+        {
+          prop: "updateBy",
+          align: "center",
+          halign: "center",
+          label: this.$t("ui.data.column.updateBy"),
+          minWidth: 100,
+        },
+        {
+          prop: "updateTime",
+          align: "center",
+          halign: "center",
+          label: this.$t("ui.data.column.updateTime"),
+          minWidth: 180,
         },
         {
           align: "center",

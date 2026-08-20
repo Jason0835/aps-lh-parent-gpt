@@ -78,8 +78,8 @@ public class Cd90AutoScheduleEngineServiceImpl implements Cd90AutoScheduleEngine
                 .stream().limit(parameters.getScheduleWindow()).collect(Collectors.toList());
         LocalDateTime startTime = LocalDateTime.now();
         Cd90ShiftDescriptor resourceBaselineShift = shiftWindowResolver
-                .resolveCurrentResourceShift(startTime, enabledShifts);
-        // 页面全窗口共用任务启动时的一份资源基线，最终事务前按同一基线复核版本。
+                .resolveScheduleBaselineShift(localScheduleDate, enabledShifts);
+        // 页面全窗口共用排程窗口首班次的一份资源基线，最终事务前按同一基线复核版本。
         Cd90AutoScheduleContext context = Cd90AutoScheduleContext.builder()
                 .factoryCode(factoryCode)
                 .scheduleDate(localScheduleDate)
