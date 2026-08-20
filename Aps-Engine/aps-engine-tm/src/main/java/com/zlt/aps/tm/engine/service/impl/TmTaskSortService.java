@@ -54,24 +54,39 @@ public class TmTaskSortService implements ITmTaskSortService {
         if (CollUtil.isEmpty(context.getTaskDraftList())) {
             return;
         }
-        // 读取排序策略编码，缺省 DEFAULT
+        // 读取排序策略编码，缺省 DEFAULT。
         String strategyCode = readParam(context, TmScheduleConstants.PARAM_TASK_SORT_STRATEGY,
                 TmScheduleStrategyEnum.DEFAULT.getCode());
-        ITmTaskSortStrategy sortStrategy = strategyRegistry.getTaskSortStrategy(strategyCode);
-        Comparator<TmTaskDraft> comparator = this.buildStartupAwareComparator(context,
-                sortStrategy.buildComparator(context));
         String beforeOrder = summarizeTaskOrder(context);
-        context.getTaskDraftList().sort(comparator);
+        boolean planCalcOrderReady = context.getTaskDraftList().stream()
+                .allMatch(task -> task != null && task.getPlanCalcOrderIndex() != null);
+        String sortSource = planCalcOrderReady ? "PLAN_CALC_ORDER" : "LEGACY_TASK_SORT";
+        if (planCalcOrderReady) {
+            // 主流程已由计划量计算阶段确定顺序，此处只复用并固化该顺序，避免计划量完成后再次抢占任务。
+            context.getTaskDraftList().sort(Comparator
+                    .comparing(TmTaskDraft::getPlanCalcOrderIndex, Comparator.nullsLast(Comparator.naturalOrder()))
+                    .thenComparing(task -> StrUtil.blankToDefault(task.getBusinessKey(), "")));
+        } else {
+            // 独立调用或旧测试上下文未提供计划量顺序时保留兼容排序。
+            ITmTaskSortStrategy sortStrategy = strategyRegistry.getTaskSortStrategy(strategyCode);
+            Comparator<TmTaskDraft> comparator = this.buildStartupAwareComparator(context,
+                    sortStrategy.buildComparator(context));
+            context.getTaskDraftList().sort(comparator);
+        }
         String afterOrder = summarizeTaskOrder(context);
-        log.info("[TM_TASK_SORT] batchNo={}, traceId={}, factoryCode={}, scheduleDate={}, strategyCode={}, taskCount={}, beforeOrder={}, afterOrder={}",
+        log.info("[TM_TASK_SORT] batchNo={}, traceId={}, factoryCode={}, scheduleDate={}, strategyCode={}, sortSource={}, taskCount={}, beforeOrder={}, afterOrder={}",
                 context.getBatchNo(), context.getTraceId(), context.getFactoryCode(), formatScheduleDate(context),
-                strategyCode, context.getTaskDraftList().size(), beforeOrder, afterOrder);
+                strategyCode, sortSource, context.getTaskDraftList().size(), beforeOrder, afterOrder);
         for (int i = 0; i < context.getTaskDraftList().size(); i++) {
             TmTaskDraft task = context.getTaskDraftList().get(i);
-            task.setBaseSortIndex(i + 1);
+            int sortIndex = planCalcOrderReady && task.getPlanCalcOrderIndex() != null
+                    ? task.getPlanCalcOrderIndex() : i + 1;
+            task.setBaseSortIndex(sortIndex);
             Map<String, Object> evidence = new LinkedHashMap<>();
             evidence.put("strategyCode", strategyCode);
-            evidence.put("sortIndex", i + 1);
+            evidence.put("sortSource", sortSource);
+            evidence.put("sortIndex", sortIndex);
+            evidence.put("planCalcOrderIndex", task.getPlanCalcOrderIndex());
             evidence.put("supplyHours", task.getSupplyHours());
             evidence.put("startupShift", this.isStartupShift(context, task));
             evidence.put("startupSortPriority", "SUPPLY_HOURS_ASC");
@@ -80,9 +95,9 @@ public class TmTaskSortService implements ITmTaskSortService {
             evidence.put("mouthPlateCode", task.getMouthPlateCode());
             traceOf(context, task).addRuleHit(TmScheduleRuleCodeEnum.TASK_SORT,
                     TmScheduleRuleResultEnum.PASS, evidence);
-            log.info("[TM_TASK_SORT_DETAIL] batchNo={}, traceId={}, factoryCode={}, scheduleDate={}, strategyCode={}, sortIndex={}, businessKey={}, treadCode={}, shiftOrder={}, supplyHours={}, glueCode={}, baseGlueCode={}, mouthPlateCode={}, planQty={}, demandQty={}",
+            log.info("[TM_TASK_SORT_DETAIL] batchNo={}, traceId={}, factoryCode={}, scheduleDate={}, strategyCode={}, sortSource={}, sortIndex={}, planCalcOrderIndex={}, businessKey={}, treadCode={}, shiftOrder={}, supplyHours={}, glueCode={}, baseGlueCode={}, mouthPlateCode={}, planQty={}, demandQty={}",
                     context.getBatchNo(), context.getTraceId(), context.getFactoryCode(), formatScheduleDate(context),
-                    strategyCode, i + 1, task.getBusinessKey(), task.getTreadCode(), task.getShiftOrder(),
+                    strategyCode, sortSource, sortIndex, task.getPlanCalcOrderIndex(), task.getBusinessKey(), task.getTreadCode(), task.getShiftOrder(),
                     task.getSupplyHours(), task.getGlueCode(), task.getBaseGlueCode(), task.getMouthPlateCode(),
                     task.getPlanQty(), task.getDemandQty());
         }

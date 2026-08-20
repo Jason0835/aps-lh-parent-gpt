@@ -58,6 +58,12 @@ public class TcTaskDraft {
     /** TASK_SORT 阶段生成的稳定基础优先级，数值越小越优先 */
     private Integer baseSortIndex;
 
+    /** 计划量计算阶段确定的全局顺序，机台占用必须复用该顺序 */
+    private Integer planCalcOrderIndex;
+
+    /** 当前班次实际进入机台资源尝试的序号，从1开始 */
+    private Integer machineAssignmentSequence;
+
     /** 当前班成型胎侧需求量，单位米 */
     private BigDecimal currentShiftDemandQty;
 

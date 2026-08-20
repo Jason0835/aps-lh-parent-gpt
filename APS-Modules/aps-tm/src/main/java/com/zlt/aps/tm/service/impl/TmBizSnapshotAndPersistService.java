@@ -694,6 +694,7 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
             root.put("assignments", assignmentList);
             return JSONUtil.toJsonPrettyStr(root);
         }
+        this.appendCarryoverExplanation(root, sourceTask, context);
         TmPlanTaskGroup taskGroup = context.getPlanTaskGroupMap() == null
                 ? null : context.getPlanTaskGroupMap().get(sourceTask.getPlanGroupKey());
         List<TmTaskDraft> fragmentList = taskGroup == null
@@ -751,6 +752,21 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
         this.sortFinalAssignmentList(assignmentList);
         root.put("assignments", assignmentList);
         return JSONUtil.toJsonPrettyStr(root);
+    }
+
+    /**
+     * 将来源班次候选失败和顺延承接摘要写入最终分配JSON，便于解释表单次查询定位顺延原因。
+     *
+     * @param root       最终分配JSON根对象
+     * @param sourceTask 来源解释任务
+     * @param context    胎面排程上下文
+     */
+    private void appendCarryoverExplanation(Map<String, Object> root, TmTaskDraft sourceTask,
+                                             TmScheduleContext context) {
+        Map<String, Object> explanation = snapshotBuildService.buildCarryoverExplanation(sourceTask, context);
+        if (!explanation.isEmpty()) {
+            root.put("carryoverExplanation", explanation);
+        }
     }
 
     /**

@@ -4,7 +4,7 @@
 
     <select id="selectFirstShiftDemandRows" resultType="com.zlt.aps.tc.engine.domain.TcInventoryPredictQtyVo">
         SELECT ci.SIDEWALL_CODE AS sidewallCode,
-               SUM(IFNULL(cx.CLASS1_PLAN_QTY, 0) * IFNULL(ci.SIDEWALL_LENGTH, 0)) AS qty
+               SUM(IFNULL(cx.CLASS1_PLAN_QTY, 0) * IFNULL(ci.SIDEWALL_LENGTH, 0) / 1000) AS qty
         FROM T_CX_SCHEDULE_RESULT cx
         /* BOM 模式早班需求：与主流程 selectFormingDemandRows 同口径，同一胎胚按胎侧分组各取一条施工版本（择一），
            优先匹配 BOM_DATA_VERSION，未匹配或为空时取最新有效记录，避免版本 join 失败导致早班需求归 0 */
@@ -39,7 +39,7 @@
     <!-- RECIPE 模式：按 (EMBRYO_CODE, CLASS1_RECIPE_NO) 关联施工，recipe 为空时不匹配、该行不计入汇总 -->
     <select id="selectFirstShiftDemandRowsByRecipe" resultType="com.zlt.aps.tc.engine.domain.TcInventoryPredictQtyVo">
         SELECT ci.SIDEWALL_CODE AS sidewallCode,
-               SUM(IFNULL(cx.CLASS1_PLAN_QTY, 0) * IFNULL(ci.SIDEWALL_LENGTH, 0)) AS qty
+               SUM(IFNULL(cx.CLASS1_PLAN_QTY, 0) * IFNULL(ci.SIDEWALL_LENGTH, 0) / 1000) AS qty
         FROM T_CX_SCHEDULE_RESULT cx
         INNER JOIN T_MDM_CONSTRUCTION_INFO ci
                ON cx.EMBRYO_CODE = ci.CONSTRUCTION_CODE

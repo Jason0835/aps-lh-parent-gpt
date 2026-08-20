@@ -13,11 +13,17 @@ public enum ScheduleProcessLogSection {
     /** 计划量计算分区。 */
     PLAN_QTY_CALCULATION("计划量计算"),
 
-    /** 工装限制分区。 */
-    TOOL_LIMIT("工装限制"),
+    /** 机台过滤与选择分区。 */
+    MACHINE_SELECTION("机台过滤与选择"),
 
-    /** 机台选择和产能扣减分区。 */
-    MACHINE_SELECTION_CAPACITY("机台选择 产能扣减"),
+    /** 选机后的工装预校验和计划定稿分区。 */
+    TOOL_LIMIT("工装预校验及计划定稿"),
+
+    /** 选机后的机台产能扣减分区。 */
+    CAPACITY_DEDUCTION("产能扣减"),
+
+    /** 实际承接任务后的工装账本结算分区。 */
+    TOOL_LEDGER_SETTLEMENT("工装账本结算"),
 
     /** 未排任务分区。 */
     UNPLANNED_TASK("未排任务");

@@ -36,6 +36,18 @@ public class TmRuleTrace {
     }
 
     /**
+     * 追加另一任务的规则证据，供聚合任务向来源解释行同步实际占用证据。
+     *
+     * @param sourceTrace 待复制的规则证据
+     */
+    public void appendFrom(TmRuleTrace sourceTrace) {
+        if (sourceTrace == null || sourceTrace.getRuleHits() == null) {
+            return;
+        }
+        ruleHits.addAll(sourceTrace.getRuleHits());
+    }
+
+    /**
      * 转换为解释 JSON 文本（使用 hutool JSONUtil）。
      *
      * @return JSON 文本，用于写入解释表字段
