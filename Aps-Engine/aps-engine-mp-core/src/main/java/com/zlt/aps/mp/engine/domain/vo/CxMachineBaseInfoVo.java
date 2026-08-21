@@ -1078,6 +1078,27 @@ public class CxMachineBaseInfoVo implements Serializable {
     }
 
     /**
+     * 获取当前的前一天
+     *
+     * @param currentDay
+     * @return
+     */
+    public Integer getPreviousDay(Integer currentDay) {
+        if (null == currentDay) {
+            return null;
+        }
+        if (currentDay <= ProductionConstant.MONTH_START_DAY) {
+            return ProductionConstant.MONTH_START_DAY;
+        }
+        Integer previousDay = currentDay - BigDecimal.ONE.intValue();
+        Set<Integer> excludeDaySet = Optional.ofNullable(stopDayInfo).orElse(Collections.emptySet());
+        if (!excludeDaySet.contains(previousDay)) {
+            return previousDay;
+        }
+        return getPreviousDay(previousDay);
+    }
+
+    /**
      * 获取本次分配段排产日信息
      *
      * @param allocationInfo 分配信息
