@@ -157,10 +157,6 @@ public class SpecialMaterialScheduleHandler {
             resultTheoryDays = minAllocationDays;
         }
         if (isAddQty) {
-            //拉量时，但是其他特殊规格没有排上，则直接返回0
-            if (otherAllocationQty <= 0) {
-                return 0;
-            }
             //拉量时，不能进行提前收尾处理
             productionPlanInfo.setHasBeforeConclusionHandler(false);
         }
