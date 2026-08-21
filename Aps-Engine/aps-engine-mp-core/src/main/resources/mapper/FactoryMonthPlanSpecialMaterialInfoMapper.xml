@@ -7,8 +7,20 @@
                mcd.EMBRYO_CODE,
                mcd.CHILD_MATERIAL_CODE,
                mcd.CHILD_MATERIAL_NAME,
-               mcd.DOSAGE
+               ifnull(tt.DOSAGE,mcd.DOSAGE) DOSAGE
           FROM t_mdm_material_consume_detail mcd
+                    left join  (
+                    select b.CHILD_MATERIAL_CODE,
+                                round(
+                                max(case when process_code = '1' then process_value else '0' end)*
+                                max(case when process_code = '2' then process_value else '0' end)/
+                                max(case when process_code = '3' then process_value else '0' end) 
+                                ,2) DOSAGE
+                                from t_mdm_construction_process p
+                                inner join t_mdm_bom_info b on b.PARENT_CODE = p.MATERIAL_CODE and b.IS_DELETE = 0
+                                 where p.product_type_code = 'TBR' and p.IS_DELETE = 0
+                                 group by b.CHILD_MATERIAL_CODE,p.MATERIAL_CODE
+                    ) tt on mcd.CHILD_MATERIAL_CODE = tt.CHILD_MATERIAL_CODE
          WHERE IFNULL(mcd.IS_DELETE, 0) = 0
            AND mcd.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
            AND EXISTS (SELECT 1
@@ -67,7 +79,7 @@
 	    SELECT
 		    SMS.MATERIAL_CODE,
 		    SMR.MATERIAL_DESC,
-		    SMR.QUOTA * MAX( SMS.STOCK / SMS.PACKAGE_NUM ) / smr.quota STANDARD_LENGTH,
+		    STANDARD_LENGTH STANDARD_LENGTH,
 		    STANDARD_LENGTH ORI_STANDARD_LENGTH,
 		    SUM( SMS.STOCK ) STOCK 
 		FROM
