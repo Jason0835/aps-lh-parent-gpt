@@ -40,11 +40,13 @@
         >{{ $t("ui.frame.btn.export") }}</el-button>
       </template>
     </page-table>
-    <tlt-upload
+    <tlt-upload-form
       ref="tltUpload"
       downloadUrl="/gsq/twiningDisc/importTemplate"
       uploadUrl="/gsq/twiningDisc/importData"
       @uploadSuccess="getList"
+      labelWidth="0"
+      :columns="importColumns"
     />
     <InfoDialog ref="infoRef" @success="getList" />
   </basic-container>
@@ -55,18 +57,35 @@ import {
   removeTwiningDisc,
   exportTwiningDisc,
 } from "@/api/gsq/twiningDisc";
-import tltUpload from "@/components/tltUpload/tltUpload.vue";
+import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import InfoDialog from "./components/infoDialog.vue";
 
 export default {
   name: "GsqTwiningDisc",
   dicts: ["sys_normal_disable", "biz_factory_name", "lh_precision_data_source"],
   components: {
-    tltUpload,
+    TltUploadForm,
     InfoDialog,
   },
   data() {
     return {
+      // 导入弹窗表单配置：是否更新已存在数据复选框
+      importColumns: [
+        {
+          label: "",
+          prop: "updateSupport",
+          render: (form) => {
+            return (
+              <el-checkbox
+                label={this.$t("common.rule.updateSupport")}
+                v-model={form.updateSupport}
+              >
+                {this.$t("common.rule.updateSupport")}
+              </el-checkbox>
+            );
+          },
+        },
+      ],
       loading: false,
       data: [],
       selection: [],
@@ -291,9 +310,7 @@ export default {
     },
     handleBatchDelete() {
       if (this.selection.length === 0) {
-        this.$modal.msgWarning(
-          this.$t("common.confirm.selectDeleteData") || "请选择需要删除的数据"
-        );
+        this.$modal.msgWarning(this.$t("ui.placeholder.selectTableRow"));
         return;
       }
       this.$confirm(this.$t("common.confirm.delete"), {

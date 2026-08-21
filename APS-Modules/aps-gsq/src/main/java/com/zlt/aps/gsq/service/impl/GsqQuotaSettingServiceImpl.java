@@ -210,10 +210,26 @@ public class GsqQuotaSettingServiceImpl implements GsqQuotaSettingService {
             }
         }
         try {
-            //勾选更新记录，调用merge即可
             if (updateSupport && CollectionUtils.isNotEmpty(importList)) {
-                successNum = importList.size();
-                gsqQuotaSettingMapper.mergeSql(importList);
+                // 勾选更新：逐条按业务键（钢丝圈代码+机台ID）查询已存在记录，存在则更新原记录，不存在则新增
+                for (GsqQuotaSetting excelItem : importList) {
+                    List<GsqQuotaSetting> existingList = gsqQuotaSettingMapper.checkGsqQuotaSettingUnique(excelItem);
+                    if (CollectionUtils.isNotEmpty(existingList)) {
+                        // 已存在：回填主键ID，清空新增审计字段避免覆盖原记录创建信息后更新
+                        GsqQuotaSetting existing = existingList.get(0);
+                        excelItem.setId(existing.getId());
+                        excelItem.setCreateBy(null);
+                        excelItem.setCreateTime(null);
+                        excelItem.setDelFlag(null);
+                        excelItem.setBaseVale(existing.getId());
+                        gsqQuotaSettingMapper.updateGsqQuotaSetting(excelItem);
+                    } else {
+                        // 不存在：setBaseVale(null)自动补齐delFlag/createBy/createTime后插入
+                        excelItem.setBaseVale(null);
+                        gsqQuotaSettingMapper.insertGsqQuotaSetting(excelItem);
+                    }
+                    successNum++;
+                }
             } else {
                 //查询数据库已存在对象
                 for (int i = 0; i < list.size(); i++) {

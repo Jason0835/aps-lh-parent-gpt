@@ -60,11 +60,4 @@ public interface GsqMachineInfoMapper extends BaseMapper<GsqMachineInfo> {
 
 
     List<GsqMachineInfo> listMachineInfo(GsqMachineInfo machineInfo);
-
-    /**
-     * 合并操作，如果记录存在则更新，否则新增
-     *
-     * @param list 要合并的集合
-     */
-    public void mergeSql(List<GsqMachineInfo> list);
 }

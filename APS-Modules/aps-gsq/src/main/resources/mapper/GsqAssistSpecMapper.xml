@@ -18,26 +18,4 @@
         </if>
 
     </select>
-
-    <insert id="mergeSql" parameterType="list">
-        INSERT INTO t_gsq_assist_spec (
-        MATERIAL_CODE, create_by, create_time,
-        update_by, update_time, remark, del_flag
-        ) VALUES
-        <foreach collection="list" item="AssistSpec" separator=",">
-            (
-            #{AssistSpec.materialCode,jdbcType=VARCHAR},
-            #{AssistSpec.createBy,jdbcType=VARCHAR},
-            NOW(),
-            #{AssistSpec.updateBy,jdbcType=VARCHAR},
-            NOW(),
-            #{AssistSpec.remark,jdbcType=VARCHAR},
-            '0'
-            )
-        </foreach>
-        ON DUPLICATE KEY UPDATE
-        update_by = VALUES(create_by),
-        update_time = NOW(),
-        remark = VALUES(remark)
-    </insert>
 </mapper>

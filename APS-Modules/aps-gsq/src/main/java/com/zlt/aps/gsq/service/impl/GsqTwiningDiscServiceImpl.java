@@ -18,6 +18,7 @@ import com.zlt.aps.gsq.mapper.GsqTwiningDiscSpecMapper;
 import com.zlt.aps.gsq.service.IGsqTwiningDiscService;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.utils.PubUtil;
+import cn.hutool.core.collection.CollUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
 import org.springframework.stereotype.Service;
@@ -234,6 +235,8 @@ public class GsqTwiningDiscServiceImpl extends AbstractDocService<GsqTwiningDisc
             // 字段格式校验
             List<ImportErrorLog> validated = ImportUtil.validated(importLogId, i + 2, entity);
             if (validated.isEmpty()) {
+                // 导入数据默认数据来源为"1"（手工维护），避免覆盖系统字段
+                entity.setDataSource("1");
                 importList.add(entity);
             } else {
                 failureNum++;
@@ -242,11 +245,29 @@ public class GsqTwiningDiscServiceImpl extends AbstractDocService<GsqTwiningDisc
             }
         }
 
-        // 保存：updateSupport=true 走 mergeSql（存在则更新）；否则逐条校验唯一后 save
+        // 保存：updateSupport=true 走查-改-插（存在则更新原记录）；否则逐条校验唯一后 save
         try {
             if (updateSupport && !importList.isEmpty()) {
-                successNum = importList.size();
-                gsqTwiningDiscMapper.mergeSql(importList);
+                // 批量预取已存在缠绕盘（按缠绕盘编码匹配），存在则更新原记录，不存在则新增
+                Map<String, GsqTwiningDisc> existingMap = this.loadExistingDiscMap(importList);
+                for (GsqTwiningDisc excelItem : importList) {
+                    GsqTwiningDisc existing = existingMap.get(excelItem.getTwiningDiscCode());
+                    if (existing != null) {
+                        // 已存在：回填主键ID，清空新增审计字段避免覆盖原记录创建信息，保留原数据来源，补齐更新审计字段后更新
+                        excelItem.setId(existing.getId());
+                        excelItem.setCreateBy(null);
+                        excelItem.setCreateTime(null);
+                        // 保留原数据来源（导入不覆盖系统字段）
+                        excelItem.setDataSource(existing.getDataSource());
+                        this.setUpdateAuditFields(excelItem);
+                        gsqTwiningDiscMapper.updateById(excelItem);
+                    } else {
+                        // 不存在：补齐新增审计字段后插入（setInsertAuditFields内会设置dataSource默认值）
+                        this.setInsertAuditFields(excelItem);
+                        baseDao.save(excelItem);
+                    }
+                    successNum++;
+                }
             } else {
                 for (int i = 0; i < list.size(); i++) {
                     GsqTwiningDisc excelItem = list.get(i);
@@ -255,6 +276,8 @@ public class GsqTwiningDiscServiceImpl extends AbstractDocService<GsqTwiningDisc
                     }
                     int unique = gsqTwiningDiscMapper.checkUnique(excelItem);
                     if (unique == 0) {
+                        // 新增：补齐审计字段（含dataSource默认值）
+                        this.setInsertAuditFields(excelItem);
                         successNum++;
                         baseDao.save(excelItem);
                     } else {
@@ -277,6 +300,66 @@ public class GsqTwiningDiscServiceImpl extends AbstractDocService<GsqTwiningDisc
         } else {
             return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + successNum);
         }
+    }
+
+    /**
+     * 批量预取已存在的缠绕盘数据（导入更新模式使用）
+     * 按缠绕盘编码批量查询数据库已有记录，逻辑删除由框架自动过滤
+     *
+     * @param importList 导入数据列表
+     * @return 缠绕盘编码 -> 已存在缠绕盘记录 的映射
+     */
+    private Map<String, GsqTwiningDisc> loadExistingDiscMap(List<GsqTwiningDisc> importList) {
+        // 提取非空缠绕盘编码并去重
+        List<String> codeList = importList.stream()
+                .map(GsqTwiningDisc::getTwiningDiscCode)
+                .filter(PubUtil::isNotEmpty)
+                .distinct()
+                .collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(codeList)) {
+            return new HashMap<>();
+        }
+        // 按1000条一批查询，避免in条件超长；同编码多条时保留首条
+        return CollUtil.split(codeList, 1000).stream()
+                .flatMap(batch -> gsqTwiningDiscMapper.selectList(new LambdaQueryWrapper<GsqTwiningDisc>()
+                        .in(GsqTwiningDisc::getTwiningDiscCode, batch)).stream())
+                .collect(Collectors.toMap(GsqTwiningDisc::getTwiningDiscCode, Function.identity(), (oldValue, newValue) -> oldValue));
+    }
+
+    /**
+     * 设置导入更新模式的更新审计字段（updateBy/updateTime）
+     * 无登录上下文时回退为system
+     *
+     * @param entity 实体对象
+     */
+    private void setUpdateAuditFields(GsqTwiningDisc entity) {
+        try {
+            entity.setUpdateBy(SecurityUtils.getUsername());
+        } catch (Exception e) {
+            entity.setUpdateBy("system");
+        }
+        entity.setUpdateTime(new Date());
+    }
+
+    /**
+     * 设置导入新增模式的审计字段（isDelete/createBy/createTime/updateBy/updateTime/dataSource）
+     * 无登录上下文时回退为system
+     *
+     * @param entity 实体对象
+     */
+    private void setInsertAuditFields(GsqTwiningDisc entity) {
+        entity.setIsDelete(0);
+        // 导入新增数据默认数据来源为"1"（手工维护）
+        if (PubUtil.isEmpty(entity.getDataSource())) {
+            entity.setDataSource("1");
+        }
+        try {
+            entity.setCreateBy(SecurityUtils.getUsername());
+        } catch (Exception e) {
+            entity.setCreateBy("system");
+        }
+        entity.setCreateTime(new Date());
+        this.setUpdateAuditFields(entity);
     }
 
     /**

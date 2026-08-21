@@ -28,7 +28,7 @@
         select a.*,b.machine_name
         from t_gsq_loss_setting a
         left join T_GSQ_MACHINE_INFO b
-        on a.machine_id = b.id and b.del_flag = '0'
+        on a.machine_id = b.id and b.IS_DELETE = '0'
         where a.del_flag = '0'
         <if test="steelRingCode != null  and steelRingCode != ''">and INSTR(a.steel_ring_code, #{steelRingCode}) > 0</if>
         <if test="machineId != null ">and a.machine_id = #{machineId}</if>
@@ -116,32 +116,6 @@
             #{id}
         </foreach>
     </delete>
-
-    <insert id="mergeSql" parameterType="list">
-        INSERT INTO t_gsq_loss_setting (
-        steel_ring_code, machine_id, loss_rate,
-        create_by, create_time, update_by, update_time, remark, del_flag
-        ) VALUES
-        <foreach collection="list" item="LossSetting" separator=",">
-            (
-            #{LossSetting.steelRingCode,jdbcType=VARCHAR},
-            #{LossSetting.machineId,jdbcType=DOUBLE},
-            #{LossSetting.lossRate,jdbcType=DOUBLE},
-            #{LossSetting.createBy,jdbcType=VARCHAR},
-            NOW(),
-            #{LossSetting.updateBy,jdbcType=VARCHAR},
-            NOW(),
-            #{LossSetting.remark,jdbcType=VARCHAR},
-            '0'
-            )
-        </foreach>
-        ON DUPLICATE KEY UPDATE
-        loss_rate = VALUES(loss_rate),
-        update_by = VALUES(create_by),
-        update_time = NOW(),
-        remark = VALUES(remark)
-    </insert>
-
 
     <update id="deleteAll">
         update t_gsq_loss_setting set del_flag = NULL where del_flag = '0'

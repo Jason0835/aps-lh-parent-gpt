@@ -28,11 +28,4 @@ public interface GsqMachineMaintenancePlanMapper extends BaseMapper<GsqMachineMa
      * @return 已存在数量（0表示唯一，>0表示不唯一）
      */
     int checkUnique(GsqMachineMaintenancePlan entity);
-
-    /**
-     * 批量合并保存（存在则更新，否则新增），用于导入场景
-     *
-     * @param list 待保存数据集合
-     */
-    void mergeSql(List<GsqMachineMaintenancePlan> list);
 }

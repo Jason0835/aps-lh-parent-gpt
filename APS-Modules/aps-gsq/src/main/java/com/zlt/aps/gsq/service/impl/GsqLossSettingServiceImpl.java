@@ -1,11 +1,13 @@
 package com.zlt.aps.gsq.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.ImportUtil;
 import com.zlt.aps.gsq.api.domain.dto.GsqLossSettingDto;
 import com.zlt.aps.gsq.api.domain.entity.GsqMachineInfo;
@@ -21,6 +23,7 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
@@ -212,10 +215,26 @@ public class GsqLossSettingServiceImpl extends ServiceImpl<GsqLossSettingMapper,
             }
         }
         try {
-            //勾选更新记录，调用merge即可
             if (updateSupport && CollectionUtils.isNotEmpty(importList)) {
-                successNum = importList.size();
-                gsqLossSettingMapper.mergeSql(importList);
+                // 勾选更新：批量预取已存在损耗设定（按钢丝圈代码+机台ID匹配），存在则更新原记录，不存在则新增
+                Map<String, GsqLossSetting> existingMap = this.loadExistingLossSettingMap();
+                for (GsqLossSettingDto excelItem : importList) {
+                    GsqLossSetting lossSetting = new GsqLossSetting();
+                    BeanUtils.copyProperties(excelItem, lossSetting);
+                    GsqLossSetting existing = existingMap.get(this.buildLossSettingKey(lossSetting));
+                    if (existing != null) {
+                        // 已存在：回填主键ID，清空新增审计字段避免覆盖原记录创建信息，setBaseVale补齐更新审计字段后更新
+                        lossSetting.setId(existing.getId());
+                        lossSetting.setCreateBy(null);
+                        lossSetting.setCreateTime(null);
+                        lossSetting.setBaseVale(existing.getId());
+                        gsqLossSettingMapper.updateGsqLossSetting(lossSetting);
+                    } else {
+                        // 不存在：此前setBaseVale(null)已补齐delFlag/createBy/createTime，直接插入
+                        gsqLossSettingMapper.insertGsqLossSetting(lossSetting);
+                    }
+                    successNum++;
+                }
             } else {
                 //查询数据库已存在对象
                 for (int i = 0; i < list.size(); i++) {
@@ -258,5 +277,29 @@ public class GsqLossSettingServiceImpl extends ServiceImpl<GsqLossSettingMapper,
     @Override
     public void deleteAll() {
         this.gsqLossSettingMapper.deleteAll();
+    }
+
+    /**
+     * 批量预取已存在的损耗设定数据（导入更新模式使用）
+     * 该表数据量为规格×机台组合（较小），直接全量查询未删除记录
+     *
+     * @return 钢丝圈代码_机台ID -> 已存在损耗设定记录 的映射
+     */
+    private Map<String, GsqLossSetting> loadExistingLossSettingMap() {
+        LambdaQueryWrapper<GsqLossSetting> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(GsqLossSetting::getDelFlag, ApsConstant.DEL_FLAG_NORMAL);
+        return gsqLossSettingMapper.selectList(wrapper).stream()
+                .collect(Collectors.toMap(this::buildLossSettingKey, Function.identity(), (v1, v2) -> v1));
+    }
+
+    /**
+     * 构建"钢丝圈代码+机台ID"组合键（字段为空时按空字符串参与拼接）
+     *
+     * @param entity 损耗设定实体
+     * @return 组合键字符串
+     */
+    private String buildLossSettingKey(GsqLossSetting entity) {
+        return (entity.getSteelRingCode() == null ? "" : entity.getSteelRingCode())
+                + "_" + (entity.getMachineId() == null ? "" : entity.getMachineId());
     }
 }

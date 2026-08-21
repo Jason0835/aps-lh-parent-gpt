@@ -1138,6 +1138,7 @@
   "ui.frame.btn.import": "导入",
   "ui.frame.tooltip.importTemplate": "导入按照下载的模板来导入",
   "ui.frame.btn.export": "导出",
+  "ui.frame.btn.more": "更多",
   "ui.frame.btn.submit": "提交",
   "ui.frame.btn.moldingScheduleSequence": "成型排程顺位",
   "ui.data.column.scheduleResult.oldMachine": "原机台",
