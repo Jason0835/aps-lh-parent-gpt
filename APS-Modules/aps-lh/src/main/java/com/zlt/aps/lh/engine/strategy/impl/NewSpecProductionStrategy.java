@@ -1369,25 +1369,56 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
      * @param dayContext 当前业务日上下文
      * @param switchReadyTime 经过机台就绪、定点和开产模式收口后的合法切换时间
      * @param switchDurationHours 本次换模或换活字块耗时
+     * @param productionNotBeforeTime 当前增机业务日或SKU门禁确定的正式生产下限
      * @return true-允许查看窗口内更早班次安排准备；false-仅使用当前业务日班次
      */
     private boolean isProductionPreparationLookbackAllowed(
             LhScheduleContext context,
             DayScheduleContext dayContext,
             Date switchReadyTime,
-            int switchDurationHours) {
+            int switchDurationHours,
+            Date productionNotBeforeTime) {
         if (Objects.isNull(context) || Objects.isNull(dayContext)
                 || Objects.isNull(switchReadyTime)
                 || switchDurationHours <= 0
                 || Objects.isNull(dayContext.getDayStartTime())
                 || Objects.isNull(dayContext.getDayEndTime())
-                || !switchReadyTime.before(dayContext.getDayStartTime())) {
+                || !switchReadyTime.before(dayContext.getDayStartTime())
+                || (Objects.nonNull(productionNotBeforeTime)
+                && !switchReadyTime.before(productionNotBeforeTime))) {
             return false;
         }
         Date theoreticalSwitchCompleteTime = LhScheduleTimeUtil.addHours(
                 switchReadyTime, switchDurationHours);
         return this.isProductionPreparationLookbackWithinDay(
                 context, dayContext, switchReadyTime, theoreticalSwitchCompleteTime);
+    }
+
+    /**
+     * 解析生产日前准备必须贴近的正式生产下限。
+     *
+     * <p>续作补偿或普通新增机台存在明确增机业务日时，优先使用该业务日首个生产班次；
+     * SKU 类型门禁更晚时再取较晚值。该时间只用于把换模准备延后到最后合法窗口，
+     * 不改变 dayN 增机日期、正式开产门禁、胎胚可供时间或候选机台排序。</p>
+     *
+     * @param context 排程上下文
+     * @param shifts 当前调用方班次切片
+     * @param candidateProductionNotBeforeTime SKU 类型门禁确定的候选生产下限
+     * @param addMachineProductionDate 当前机台首次允许增机的业务日期
+     * @return 生产日前准备对齐下限；两个来源均为空时返回null
+     */
+    private Date resolveProductionPreparationNotBeforeTime(
+            LhScheduleContext context,
+            List<LhShiftConfigVO> shifts,
+            Date candidateProductionNotBeforeTime,
+            LocalDate addMachineProductionDate) {
+        List<LhShiftConfigVO> windowShifts = Objects.isNull(context)
+                || CollectionUtils.isEmpty(context.getScheduleWindowShifts())
+                ? shifts : context.getScheduleWindowShifts();
+        Date addMachineProductionStartTime = Objects.isNull(addMachineProductionDate)
+                ? null : resolveFirstShiftStartTime(windowShifts, addMachineProductionDate);
+        return this.resolveLaterTime(
+                candidateProductionNotBeforeTime, addMachineProductionStartTime);
     }
 
     /**
@@ -1399,6 +1430,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
      *
      * @param context 排程上下文
      * @param dayContext 当前业务日上下文
+     * @param productionNotBeforeTime 当前增机业务日或SKU门禁确定的正式生产下限
      * @param mouldChangeStartTime 实际准备开始时间
      * @param mouldChangeCompleteTime 实际准备完成时间
      * @return true-真实时间轴允许跨日提交；false-仍执行普通当前日窗口守卫
@@ -1406,13 +1438,16 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
     private boolean isProductionPreparationLookbackTimeline(
             LhScheduleContext context,
             DayScheduleContext dayContext,
+            Date productionNotBeforeTime,
             Date mouldChangeStartTime,
             Date mouldChangeCompleteTime) {
         if (Objects.isNull(context) || Objects.isNull(dayContext)
                 || Objects.isNull(mouldChangeStartTime)
                 || Objects.isNull(mouldChangeCompleteTime)
                 || Objects.isNull(dayContext.getDayStartTime())
-                || Objects.isNull(dayContext.getDayEndTime())) {
+                || Objects.isNull(dayContext.getDayEndTime())
+                || (Objects.nonNull(productionNotBeforeTime)
+                && !mouldChangeStartTime.before(productionNotBeforeTime))) {
             return false;
         }
         return this.isProductionPreparationLookbackWithinDay(
@@ -1517,6 +1552,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
      * @param machineReadyTime 机台真实空闲时间
      * @param mouldChangeStartTime 准备开始时间
      * @param mouldChangeCompleteTime 准备完成时间
+     * @param preparationProductionNotBeforeTime 增机业务日和SKU门禁共同确定的准备对齐生产下限
      * @param productionNotBeforeTime 正式生产门禁，包含胎胚最早可供时间
      * @param firstProductionStartTime 实际开产时间
      * @param firstInspectionAttributionShift 首检归属班次
@@ -1529,6 +1565,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             Date machineReadyTime,
             Date mouldChangeStartTime,
             Date mouldChangeCompleteTime,
+            Date preparationProductionNotBeforeTime,
             Date productionNotBeforeTime,
             Date firstProductionStartTime,
             LhShiftConfigVO firstInspectionAttributionShift) {
@@ -1544,6 +1581,9 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 .append(LhScheduleTimeUtil.formatDateTime(mouldChangeStartTime))
                 .append("，准备完成=")
                 .append(LhScheduleTimeUtil.formatDateTime(mouldChangeCompleteTime))
+                .append("，准备对齐生产下限=")
+                .append(LhScheduleTimeUtil.formatDateTime(
+                        preparationProductionNotBeforeTime))
                 .append("，生产门禁=")
                 .append(LhScheduleTimeUtil.formatDateTime(productionNotBeforeTime))
                 .append("，实际开产=")
@@ -2290,7 +2330,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         }
 
         int productionRemainingQty =
-                resolveStrictSurplusRemainingQty(context, sku);
+                this.resolveActualSurplusRemainingQty(context, sku);
         boolean finalStrictBlock = isFinalStrictCarryOverBlock(
                 binding, productionRemainingQty, maxQtyToDayEnd);
         if (finalStrictBlock) {
@@ -4030,6 +4070,10 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 // 试制SKU换模需在早班完成，不受开产模式限制；非试制SKU仍受开产模式约束
                 switchReadyTime = ShiftProductionControlUtil.resolveEarliestSwitchStartTime(
                         context, switchReadyTime, sku);
+                Date productionPreparationNotBeforeTime =
+                        this.resolveProductionPreparationNotBeforeTime(
+                                context, shifts, candidateProductionNotBeforeTime,
+                                currentAddMachineProductionDate);
                 /*
                  * 生产日前准备回看是通用能力，不再只服务结构提前生产。选中机台如果在当前
                  * 生产日之前已经空闲，且按本次真实切换耗时能在当前业务日日终前完成准备，就允许
@@ -4038,7 +4082,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 boolean productionPreparationLookbackAllowed = structureSwitchLookbackAllowed
                         || this.isProductionPreparationLookbackAllowed(
                                 context, dayContext, switchReadyTime,
-                                switchDurationHours);
+                                switchDurationHours, productionPreparationNotBeforeTime);
                 List<LhShiftConfigVO> switchAlignmentShifts = productionPreparationLookbackAllowed
                         ? context.getScheduleWindowShifts() : shifts;
                 switchReadyTime = alignNewSpecSwitchReadyTimeToWindowStart(
@@ -4057,10 +4101,11 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                  * 胎胚门禁只在正式生产起点应用，不能反向把候选机台的换模时间推迟到胎胚到位日。
                  */
                 if (productionPreparationLookbackAllowed
-                        && Objects.nonNull(candidateProductionNotBeforeTime)) {
+                        && Objects.nonNull(productionPreparationNotBeforeTime)) {
                     switchReadyTime = delaySwitchReadyTimeCloseToProductionStart(
                             context, sku.getMaterialCode(), machineCode,
-                            switchReadyTime, switchDurationHours, candidateProductionNotBeforeTime);
+                            switchReadyTime, switchDurationHours,
+                            productionPreparationNotBeforeTime);
                 }
 
                 // 4. 分配换模窗口；晚班不可换模、换模上限和维保重叠都在分配器中统一收口。
@@ -4169,6 +4214,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                     productionPreparationLookbackApplied = structureSwitchLookbackApplied
                             || this.isProductionPreparationLookbackTimeline(
                                     context, dayContext,
+                                    productionPreparationNotBeforeTime,
                                     mouldChangeStartTime, mouldChangeCompleteTime);
                     /*
                      * 换模均衡器可以顺延到下一业务日。按天编排下，当前阶段只能提交 dayShifts 内的资源；
@@ -4758,11 +4804,11 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                         maxQtyToWindowEnd, runtimeShiftCapacity, shiftCapacityMap);
                 /*
                  * 收尾必须在候选机台、换模完成点和真实班次产能确定后判定。
-                 * 只要SKU实际消费账本剩余量已能被当前物理机台组完整承接，本块立即切换为
+                 * 只要SKU真实硫化余量已能被当前物理机台组完整承接，本块立即切换为
                  * 严格收尾，结果、dayN和库存账本后续均以同一真实剩余量提交。
                  */
                 int realtimeProductionRemainingQty =
-                        resolveStrictSurplusRemainingQty(context, sku);
+                        this.resolveActualSurplusRemainingQty(context, sku);
                 boolean actualFinalStrictBlock = isFinalStrictProductionBlock(
                         realtimeProductionRemainingQty, maxQtyToWindowEnd, wholeSingleControlUnit);
                 if (actualFinalStrictBlock) {
@@ -5182,6 +5228,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                     this.appendProductionPreparationLookbackProcessLog(
                             context, dayContext, sku, candidateMachine,
                             machineReadyTime, mouldChangeStartTime, mouldChangeCompleteTime,
+                            productionPreparationNotBeforeTime,
                             productionNotBeforeTime, firstProductionStartTime,
                             firstInspectionAttributionShift);
                 }
@@ -7854,8 +7901,13 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 context, sku, machine.getMachineCode(), machineReadyTime);
         switchReadyTime = ShiftProductionControlUtil.resolveEarliestSwitchStartTime(
                 context, switchReadyTime, sku);
+        Date productionPreparationNotBeforeTime =
+                this.resolveProductionPreparationNotBeforeTime(
+                        context, dayContext.getDayShifts(), candidateProductionNotBeforeTime,
+                        addMachineProductionDate);
         boolean preparationLookbackAllowed = this.isProductionPreparationLookbackAllowed(
-                context, dayContext, switchReadyTime, switchDurationHours);
+                context, dayContext, switchReadyTime, switchDurationHours,
+                productionPreparationNotBeforeTime);
         List<LhShiftConfigVO> switchShifts = preparationLookbackAllowed
                 ? context.getScheduleWindowShifts() : dayContext.getDayShifts();
         switchReadyTime = alignNewSpecSwitchReadyTimeToWindowStart(
@@ -7866,10 +7918,12 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
          * 候选预演和正式落班共用不含胎胚门禁的准备时间轴。胎胚门禁只在正式生产起点
          * 应用，不能反向把候选机台的换模时间推迟到胎胚到位日。
          */
-        if (preparationLookbackAllowed && Objects.nonNull(candidateProductionNotBeforeTime)) {
+        if (preparationLookbackAllowed
+                && Objects.nonNull(productionPreparationNotBeforeTime)) {
             switchReadyTime = delaySwitchReadyTimeCloseToProductionStart(
                     context, sku.getMaterialCode(), machine.getMachineCode(),
-                    switchReadyTime, switchDurationHours, candidateProductionNotBeforeTime);
+                    switchReadyTime, switchDurationHours,
+                    productionPreparationNotBeforeTime);
         }
         if (!preparationLookbackAllowed) {
             switchReadyTime = alignSwitchReadyTimeByAddMachineDate(
@@ -7907,6 +7961,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         if (preparationLookbackAllowed) {
             preparationAvailableTime = this.resolvePreparationAvailableTime(
                     context, sku, machine, dayContext, switchReadyTime, switchDurationHours,
+                    productionPreparationNotBeforeTime,
                     runtimeShiftCapacity, machineMouldQty, inspectionScheduleType,
                     remainingQty, inspectionBalance);
             preparationTargetShift = this.resolvePreparationTargetShift(
@@ -8345,6 +8400,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
      * @param dayContext 当前业务日上下文
      * @param switchReadyTime 机台最早可切换时间
      * @param switchDurationHours 换模或换活字块耗时
+     * @param productionNotBeforeTime 当前增机业务日或SKU门禁确定的正式生产下限
      * @param runtimeShiftCapacity 运行态班产
      * @param machineMouldQty 运行态模数
      * @param inspectionScheduleType 首检排程类型
@@ -8359,6 +8415,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             DayScheduleContext dayContext,
             Date switchReadyTime,
             int switchDurationHours,
+            Date productionNotBeforeTime,
             int runtimeShiftCapacity,
             int machineMouldQty,
             String inspectionScheduleType,
@@ -8379,7 +8436,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         Date preparationCompleteTime = LhScheduleTimeUtil.addHours(
                 preparationStartTime, switchDurationHours);
         if (!this.isProductionPreparationLookbackTimeline(
-                context, dayContext, preparationStartTime, preparationCompleteTime)) {
+                context, dayContext, productionNotBeforeTime,
+                preparationStartTime, preparationCompleteTime)) {
             return null;
         }
         FirstInspectionAllocationPlan inspectionPlan =
@@ -19078,8 +19136,11 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
      * @param sku 当前SKU
      * @return 尚未落地的真实硫化余量
      */
-    private int resolveStrictSurplusRemainingQty(LhScheduleContext context, SkuScheduleDTO sku) {
-        if (Objects.isNull(sku) || sku.getSurplusQty() <= 0) {
+    private int resolveActualSurplusRemainingQty(LhScheduleContext context, SkuScheduleDTO sku) {
+        if (Objects.isNull(sku)) {
+            return 0;
+        }
+        if (sku.getSurplusQty() <= 0) {
             return getTargetScheduleQtyResolver().resolveProductionRemainingQty(context, sku);
         }
         /*
@@ -19111,10 +19172,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             }
             strictTargetQty = Math.max(0, sku.getSurplusQty());
         }
-        int productionRemainingQty = getTargetScheduleQtyResolver()
-                .resolveProductionRemainingQty(context, sku);
         if (Objects.isNull(context) || CollectionUtils.isEmpty(context.getScheduleResultList())) {
-            return Math.min(strictTargetQty, productionRemainingQty);
+            return strictTargetQty;
         }
         int scheduledQty = context.getScheduleResultList().stream()
                 .filter(Objects::nonNull)
@@ -19126,11 +19185,35 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 .mapToInt(ShiftFieldUtil::resolveScheduledQty)
                 .sum();
         int resultRemainingQty = Math.max(0, strictTargetQty - scheduledQty);
-        int strictRemainingQty = Math.min(resultRemainingQty, productionRemainingQty);
-        log.info("严格收尾跨阶段剩余量核对, materialCode: {}, productStatus: {}, strictTargetQty: {}, "
-                        + "本批次全部阶段已排量: {}, 结果口径剩余: {}, 中心账本剩余: {}, 最终可排剩余: {}",
-                sku.getMaterialCode(), sku.getProductStatus(), strictTargetQty, scheduledQty,
-                resultRemainingQty, productionRemainingQty, strictRemainingQty);
+        log.info("真实硫化余量跨阶段核对, materialCode: {}, productStatus: {}, strictTargetQty: {}, "
+                        + "本批次全部阶段已排量: {}, 真实硫化余量剩余: {}",
+                sku.getMaterialCode(), sku.getProductStatus(), strictTargetQty,
+                scheduledQty, resultRemainingQty);
+        return resultRemainingQty;
+    }
+
+    /**
+     * 解析当前SKU严格结果提交时允许继续落地的数量。
+     *
+     * <p>真实硫化余量负责判断是否进入最终严格收尾；中心实际消费账本只在已经确认严格
+     * 收尾后参与防重复消费。两个口径必须分开，避免续作补偿的窗口账本尾量把普通非收尾
+     * 在机块误判成真实收尾。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 当前SKU
+     * @return 严格结果提交时允许继续落地的数量
+     */
+    private int resolveStrictSurplusRemainingQty(LhScheduleContext context, SkuScheduleDTO sku) {
+        int actualSurplusRemainingQty = this.resolveActualSurplusRemainingQty(context, sku);
+        int productionRemainingQty = getTargetScheduleQtyResolver()
+                .resolveProductionRemainingQty(context, sku);
+        int strictRemainingQty = Math.min(
+                Math.max(0, actualSurplusRemainingQty), Math.max(0, productionRemainingQty));
+        log.info("严格收尾账本剩余量核对, materialCode: {}, productStatus: {}, "
+                        + "真实硫化余量剩余: {}, 中心账本剩余: {}, 最终可排剩余: {}",
+                Objects.isNull(sku) ? null : sku.getMaterialCode(),
+                Objects.isNull(sku) ? null : sku.getProductStatus(),
+                actualSurplusRemainingQty, productionRemainingQty, strictRemainingQty);
         return strictRemainingQty;
     }
 
