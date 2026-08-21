@@ -9,6 +9,7 @@ import com.zlt.aps.cx.entity.config.CxShiftConfig;
 import com.zlt.aps.cx.enums.ShiftType;
 import com.zlt.aps.cx.entity.schedule.LhScheduleResult;
 import com.zlt.aps.cx.vo.MonthPlanProductLhCapacityVo;
+import com.zlt.aps.cx.vo.AdvanceEndingInfo;
 import com.zlt.aps.cx.vo.ScheduleContextVo;
 import com.zlt.aps.cx.vo.DailyEmbryoTask;
 import com.zlt.aps.cx.vo.StructureProcessStateVo;
@@ -67,8 +68,10 @@ public class TaskGroupService {
     /** 紧急收尾天数阈值默认值（3 天内） */
     private static final int DEFAULT_URGENT_ENDING_DAYS = 3;
 
-    /** 普通结构：本班 + 往后看 1 个班次（命中即停） */
-    private static final int LOOKAHEAD_NORMAL = 1;
+    /** 普通结构：本班 + 往后看 2 个班次（命中即停）
+     *  <p>由 1→2：使仅在「本班+下2班」有硫化计划量的结构（如 315/80R22.5-JD758零度 08-19）
+     *  也被纳入 activeResults 参与 R4，避免这类结构整结构漏排（成型=0）。 */
+    private static final int LOOKAHEAD_NORMAL = 2;
 
     /** 提前腾机结构：本班 + 往后看 2 个班次（命中即停，不合并计划量） */
     private static final int LOOKAHEAD_ADVANCE = 2;
@@ -475,6 +478,8 @@ public class TaskGroupService {
         }
 
         // 构建机台→当日所属结构集合（反查：某机台当日被哪些结构配置占用）
+        refreshStructureHoldover(context, scheduleDate, materialMap, machineOnlineEmbryoMap);
+
         Map<String, Set<String>> machineToStructuresMap = new HashMap<>();
         if (context.getStructureAllocationMap() != null) {
             int structDayOfMonth = scheduleDate.getDayOfMonth();
@@ -492,6 +497,19 @@ public class TaskGroupService {
         }
 
         // 反转 machineOnlineEmbryoMap：机台→当前在产胎胚（用于切换耗时计算时获取英寸）
+        // 延用机台注入：机台->当日所属结构集合追加延用结构（配置段已到期不在上方结果中，
+        // 注入后提前生产三态判定能识别为 OCCUPIED，防误判 FREE_AVAILABLE 导致同班次双结构冲突）
+        if (context.getStructureHoldoverMachineMap() != null) {
+            for (Map.Entry<String, List<MpCxCapacityConfiguration>> holdoverEntry : context.getStructureHoldoverMachineMap().entrySet()) {
+                String holdoverStruct = holdoverEntry.getKey();
+                for (MpCxCapacityConfiguration config : holdoverEntry.getValue()) {
+                    if (config.getCxMachineCode() != null) {
+                        machineToStructuresMap.computeIfAbsent(config.getCxMachineCode(), k -> new HashSet<>()).add(holdoverStruct);
+                    }
+                }
+            }
+        }
+
         Map<String, String> machineCurrentEmbryoMap = new HashMap<>();
         if (machineOnlineEmbryoMap != null) {
             for (Map.Entry<String, Set<String>> embryoEntry : machineOnlineEmbryoMap.entrySet()) {
@@ -614,7 +632,6 @@ public class TaskGroupService {
         for (Object[] pair : sortPairs) {
             lhScheduleResults.add((LhScheduleResult) pair[0]);
         }
-
         log.info("按三层多级排序完成：L1(有计划+紧急9000>有计划+近期8000>有计划+正常7000>无计划+紧急6000>无计划+近期5000>无计划+正常4000) → L2(试制量试1500>续作800>非续作0) → L3(库存少优先)");
 
         // 提前生产结构重排：当日有机台的结构在前，无机台的（提前生产）在后
@@ -747,6 +764,7 @@ public class TaskGroupService {
             if (R3_ENABLED) {
                 processRound3(state, currentStructure);
             }
+            processRound4(state, currentStructure, structActiveResults, structureLookAhead);
 
             updateMachineOccupationAndEndingStatus(currentStructure, state.context,
                     state.structureRecommendedMachinesCache, state.structureCumulativeTimeMap,
@@ -789,6 +807,18 @@ public class TaskGroupService {
                     state.structureRecommendedMachinesCache, state.structureCumulativeTimeMap,
                     state.materialTasksMap, state.scheduleDate, state.structureAdvanceAvailableCapacityMap);
             if (advanceMachines.isEmpty()) {
+                // 被延用让位保护：结构当日配置机台全被前结构余量延用占用，属于"推迟"而非"永久无机台"，
+                // 跳过 NEVER_CONFIGURED 提前收尾判定，防止误生成"欠产延误提前收尾"标记
+                Set<String> deferredByHoldover = state.context.getDeferredByHoldoverStructures();
+                if (deferredByHoldover != null && deferredByHoldover.contains(currentStructure)) {
+                    log.info("【余量延用】结构={} 被前结构延用占用让位，本班次不排产（等待前结构余量耗尽后切换）", currentStructure);
+                    return null;
+                }
+                if (isNeverConfiguredInFuture(state.context, currentStructure)) {
+                    // NEVER_CONFIGURED：未来3个月从未配置过该结构 -> 成型机已切走且不会回来，
+                    // 收集仍有成型余量的胎胚生成提前收尾信息（主表备注 + S5.6 场景3），同时视为前结构全部收尾
+                    collectAdvanceEndingInfos(state, currentStructure, structActiveResults);
+                }
                 log.info("【提前生产】结构={} 无可用未来机台，跳过该结构所有任务", currentStructure);
                 return null;
             }
@@ -802,6 +832,259 @@ public class TaskGroupService {
                     currentStructure, structureLookAhead);
         }
         return structureLookAhead;
+    }
+
+    /**
+     * 判定结构是否为 NEVER_CONFIGURED：未来3个月排产配置中从未配置过该结构。
+     *
+     * <p>与"有配置但被冲突剔除"（EXCLUDED_BY_CONFLICT，如机台被前结构占用）区分：
+     * 只有从未配置过的结构才触发提前收尾收集；有配置的仍保留原"跳过"行为，等待后续班次腾机。
+     *
+     * @param context       排程上下文
+     * @param structureName 结构名称
+     * @return true=未来从未配置（触发提前收尾）
+     */
+    private boolean isNeverConfiguredInFuture(ScheduleContextVo context, String structureName) {
+        Map<String, List<MpCxCapacityConfiguration>> futureMap = context.getFutureStructureAllocationMap();
+        if (futureMap == null || futureMap.isEmpty()) {
+            return true;
+        }
+        List<MpCxCapacityConfiguration> configs = futureMap.get(structureName);
+        return configs == null || configs.isEmpty();
+    }
+
+    /**
+     * 查询当月（排程日期所在月）该结构的配置行，取 END_DAY 最大者。
+     *
+     * <p>匹配规则：先精确匹配结构名，失败后前缀匹配兜底（分组结构名如 265/70R19.5
+     * 与配置表结构名 265/70R19.5-12PR708F 口径不一致）。
+     *
+     * @param context      排程上下文
+     * @param structureName 结构名称
+     * @param scheduleDate 排程日期
+     * @return END_DAY 最大的配置行，当月无配置返回 null
+     */
+    private MpCxCapacityConfiguration resolveCurrentMonthMaxEndConfig(ScheduleContextVo context,
+                                                                      String structureName,
+                                                                      LocalDate scheduleDate) {
+        Map<String, List<MpCxCapacityConfiguration>> allocationMap = context.getStructureAllocationMap();
+        if (allocationMap == null || allocationMap.isEmpty() || structureName == null || scheduleDate == null) {
+            return null;
+        }
+        List<MpCxCapacityConfiguration> candidates = allocationMap.get(structureName);
+        if (candidates == null || candidates.isEmpty()) {
+            for (Map.Entry<String, List<MpCxCapacityConfiguration>> entry : allocationMap.entrySet()) {
+                if (entry.getKey() != null && entry.getKey().startsWith(structureName)
+                        && entry.getValue() != null && !entry.getValue().isEmpty()) {
+                    candidates = entry.getValue();
+                    break;
+                }
+            }
+        }
+        if (candidates == null || candidates.isEmpty()) {
+            return null;
+        }
+        int year = scheduleDate.getYear();
+        int month = scheduleDate.getMonthValue();
+        MpCxCapacityConfiguration maxEnd = null;
+        for (MpCxCapacityConfiguration config : candidates) {
+            if (config.getEndDay() == null || config.getYear() == null || config.getYear() != year
+                    || config.getMonth() == null || config.getMonth() != month) {
+                continue;
+            }
+            if (maxEnd == null || config.getEndDay() > maxEnd.getEndDay()) {
+                maxEnd = config;
+            }
+        }
+        return maxEnd;
+    }
+
+    /**
+     * 收集提前收尾信息：结构当日无机台 + 未来3个月从未配置，仍有成型余量的胎胚将永远无法排产。
+     *
+     * <p>处理内容：
+     * <ul>
+     *   <li>标记该结构全部收尾（structureFullyEndedMap=true），供后续提前生产结构释放机台</li>
+     *   <li>按 胎胚+物料+产品状态 去重收集成型余量>0 的胎胚（每班次刷新，末次为准）</li>
+     *   <li>收尾日/切换日/机台取当月配置（精确匹配回退前缀匹配）max END_DAY</li>
+     * </ul>
+     *
+     * @param state              结构处理状态
+     * @param structureName      结构名称
+     * @param structActiveResults 该结构的硫化任务列表
+     */
+    private void collectAdvanceEndingInfos(StructureProcessStateVo state,
+                                           String structureName,
+                                           List<LhScheduleResult> structActiveResults) {
+        ScheduleContextVo context = state.context;
+        MpCxCapacityConfiguration currentMonthConfig = resolveCurrentMonthMaxEndConfig(context, structureName, state.scheduleDate);
+
+        // 视为前结构全部收尾：后续提前生产结构的机台三态判定可释放该结构占用的机台
+        state.structureFullyEndedMap.put(structureName, true);
+
+        Map<String, List<AdvanceEndingInfo>> advanceEndingMap = context.getAdvanceEndingMap();
+        if (advanceEndingMap == null) {
+            advanceEndingMap = new LinkedHashMap<>();
+            context.setAdvanceEndingMap(advanceEndingMap);
+        }
+        List<AdvanceEndingInfo> infos = advanceEndingMap.computeIfAbsent(structureName, k -> new ArrayList<>());
+        infos.clear(); // 每班次重新收集，取最新余量（末次为准，天然幂等）
+
+        // 候选任务快照：首次 = 班次筛选后的任务 + 被"已收尾过滤"移除的同结构任务；后续班次直接复用。
+        // 不复用快照会导致：已收尾过滤移除的任务（运行中库存被共用胎胚消耗后重新出现缺口）永远收集不到；
+        // 班次筛选窗口漂移（末班窗口无计划量）也会丢任务。
+        List<LhScheduleResult> candidates = resolveAdvanceEndingCandidates(context, structureName, structActiveResults);
+
+        Set<String> dedupKeys = new HashSet<>();
+        for (LhScheduleResult lh : candidates) {
+            if (lh.getEmbryoCode() == null || lh.getMaterialCode() == null) {
+                continue;
+            }
+            String dedupKey = lh.getEmbryoCode() + "|" + lh.getMaterialCode() + "|"
+                    + (lh.getProductStatus() != null ? lh.getProductStatus() : "");
+            if (!dedupKeys.add(dedupKey)) {
+                continue;
+            }
+            String materialStatusKey = MonthPlanSurplusCalculator.buildMaterialStatusKey(
+                    lh.getMaterialCode(), lh.getProductStatus());
+            // 余量口径取 max(排程前快照, 当前运行值)：
+            // - 初始欠产（如库存仅覆盖部分硫化需求）由快照捕捉（运行中硫化超产消耗会把当前值压到0）
+            // - 运行中缺口（初始库存覆盖、后被共用胎胚消耗）由当前值捕捉
+            Integer totalFormingRemainder = resolveAdvanceEndingRemainder(lh.getMaterialCode(), lh.getProductStatus(), context);
+            if (totalFormingRemainder == null) {
+                continue;
+            }
+            int usedRemainder = state.materialUsedFormingRemainder.getOrDefault(materialStatusKey, 0);
+            int remainingForming = totalFormingRemainder - usedRemainder;
+            if (remainingForming <= 0) {
+                continue;
+            }
+
+            AdvanceEndingInfo info = new AdvanceEndingInfo();
+            info.setStructureName(structureName);
+            info.setConfigStructureName(currentMonthConfig != null ? currentMonthConfig.getStructureName() : null);
+            info.setEmbryoCode(lh.getEmbryoCode());
+            info.setMaterialCode(lh.getMaterialCode());
+            info.setMaterialDesc(lh.getMaterialDesc());
+            info.setProductStatus(lh.getProductStatus());
+            info.setFormingRemainder(remainingForming);
+            MdmMonthSurplus monthSurplus = context.getMonthSurplusMap() != null
+                    ? context.getMonthSurplusMap().get(materialStatusKey) : null;
+            info.setVulcanizeRemainder(monthSurplus != null && monthSurplus.getPlanSurplusQty() != null
+                    ? monthSurplus.getPlanSurplusQty().intValue() : null);
+            info.setEndingDay(currentMonthConfig != null ? currentMonthConfig.getEndDay() : null);
+            info.setSwitchDay(currentMonthConfig != null && currentMonthConfig.getEndDay() != null
+                    ? currentMonthConfig.getEndDay() + 1 : null);
+            info.setCxMachineCode(currentMonthConfig != null ? currentMonthConfig.getCxMachineCode() : null);
+            info.setLhScheduleIds(lh.getId() != null ? String.valueOf(lh.getId()) : null);
+            info.setRemark(buildAdvanceEndingRemark(info));
+            infos.add(info);
+        }
+        log.info("【提前收尾】结构={} 当月配置={} 收尾日={} 切换日={} 机台={}，候选任务 {} 条，收集成型余量>0胎胚 {} 个（余量详见各胎胚备注）",
+                structureName,
+                currentMonthConfig != null ? currentMonthConfig.getStructureName() : "无",
+                currentMonthConfig != null ? currentMonthConfig.getEndDay() : "无",
+                info_switchDayText(currentMonthConfig),
+                currentMonthConfig != null ? currentMonthConfig.getCxMachineCode() : "无",
+                candidates.size(),
+                infos.size());
+    }
+
+    /**
+     * 解析提前收尾候选任务快照：首次构建，后续班次复用。
+     *
+     * <p>首次构建数据源 = 班次筛选后的结构任务 + 被"已收尾物料过滤"从 lhScheduleResults 移除的同结构任务
+     * （后者在运行中库存被共用胎胚消耗后可能重新出现成型余量缺口，必须纳入候选），
+     * 按 胎胚+物料+产品状态 去重后存入 context.advanceEndingCandidateMap。
+     *
+     * @param context           排程上下文
+     * @param structureName     结构名称
+     * @param structActiveResults 本班次该结构经班次筛选后的任务
+     * @return 候选任务列表（快照或首次构建结果）
+     */
+    private List<LhScheduleResult> resolveAdvanceEndingCandidates(ScheduleContextVo context,
+                                                                  String structureName,
+                                                                  List<LhScheduleResult> structActiveResults) {
+        Map<String, List<LhScheduleResult>> candidateMap = context.getAdvanceEndingCandidateMap();
+        if (candidateMap == null) {
+            candidateMap = new LinkedHashMap<>();
+            context.setAdvanceEndingCandidateMap(candidateMap);
+        }
+        List<LhScheduleResult> cached = candidateMap.get(structureName);
+        if (cached != null) {
+            return cached;
+        }
+
+        List<LhScheduleResult> merged = new ArrayList<>(structActiveResults != null ? structActiveResults : Collections.emptyList());
+        List<LhScheduleResult> filteredCompleted = context.getFilteredCompletedLhResults();
+        if (filteredCompleted != null) {
+            Set<String> dedupKeys = new HashSet<>();
+            for (LhScheduleResult lh : merged) {
+                dedupKeys.add(lh.getEmbryoCode() + "|" + lh.getMaterialCode() + "|"
+                        + (lh.getProductStatus() != null ? lh.getProductStatus() : ""));
+            }
+            for (LhScheduleResult lh : filteredCompleted) {
+                if (lh == null || !structureName.equals(lh.getStructureName())) {
+                    continue;
+                }
+                String dedupKey = lh.getEmbryoCode() + "|" + lh.getMaterialCode() + "|"
+                        + (lh.getProductStatus() != null ? lh.getProductStatus() : "");
+                if (dedupKeys.add(dedupKey)) {
+                    merged.add(lh);
+                }
+            }
+        }
+        candidateMap.put(structureName, merged);
+        log.info("【提前收尾】结构={} 构建候选任务快照 {} 条（班次筛选 {} + 已收尾过滤移除补全）",
+                structureName, merged.size(), structActiveResults != null ? structActiveResults.size() : 0);
+        return merged;
+    }
+
+    /**
+     * 提前收尾余量口径：max(排程前快照 initialFormingRemainderMap, 当前运行值 formingRemainderMap)。
+     *
+     * <p>NEVER_CONFIGURED 结构机台永不回来，两个口径均为无法通过成型消化的缺口，取大者作为总缺口。
+     *
+     * @param materialCode  物料编码
+     * @param productStatus 产品状态
+     * @param context       排程上下文
+     * @return 成型余量缺口，无法计算时返回 null
+     */
+    private Integer resolveAdvanceEndingRemainder(String materialCode, String productStatus, ScheduleContextVo context) {
+        if (materialCode == null) {
+            return null;
+        }
+        int current = getFormingRemainder(materialCode, productStatus, context) != null
+                ? getFormingRemainder(materialCode, productStatus, context) : 0;
+        String materialStatusKey = MonthPlanSurplusCalculator.buildMaterialStatusKey(materialCode, productStatus);
+        int initial = 0;
+        if (context.getInitialFormingRemainderMap() != null) {
+            initial = context.getInitialFormingRemainderMap().getOrDefault(materialStatusKey, 0);
+        }
+        return Math.max(initial, current);
+    }
+
+    /** 日志辅助：切换日 = END_DAY + 1（无配置返回"无"文案） */
+    private String info_switchDayText(MpCxCapacityConfiguration config) {
+        return config != null && config.getEndDay() != null ? String.valueOf(config.getEndDay() + 1) : "无";
+    }
+
+    /**
+     * 构建提前收尾备注文本。
+     *
+     * <p>有切换日：成型机计划XX号切换结构，胎胚XX因欠产延误需要提前收尾，当前剩余XX余量
+     * <p>无当月配置（降级文案）：成型机已切换结构，胎胚XX因欠产延误需要提前收尾，当前剩余XX余量
+     *
+     * @param info 提前收尾信息
+     * @return 备注文本
+     */
+    private String buildAdvanceEndingRemark(AdvanceEndingInfo info) {
+        if (info.getSwitchDay() != null) {
+            return String.format("成型机计划%d号切换结构，胎胚%s因欠产延误需要提前收尾，当前剩余%d余量",
+                    info.getSwitchDay(), info.getEmbryoCode(), info.getFormingRemainder());
+        }
+        return String.format("成型机已切换结构，胎胚%s因欠产延误需要提前收尾，当前剩余%d余量",
+                info.getEmbryoCode(), info.getFormingRemainder());
     }
 
     private void clearPerStructureQueues(StructureProcessStateVo state) {
@@ -2394,6 +2677,282 @@ public class TaskGroupService {
 
 
     /**
+     * S5.2.R4 结构级第 4 轮：对齐本班硫化消耗。
+     *
+     * <p>结构级 R1/R2/R3 之后，把该结构成型计划量（plannedProduction）补到本班硫化计划量
+     * （vulcanizeDemand），使成型班产靠近硫化班耗。只补缺口（成型&lt;硫化）不削减；
+     * 受立库空间 + stockHours 硬上限 + 结构机台产能约束；试制/量试不参与。
+     */
+    private void processRound4(StructureProcessStateVo state, String currentStructure,
+                               List<LhScheduleResult> structActiveResults, int structureLookAhead) {
+        // 1. 收集该结构已入 result 的任务（三列表筛选 structureName == currentStructure）
+        List<DailyEmbryoTask> structTasks = new ArrayList<>();
+        for (DailyEmbryoTask t : state.result.getContinueTasks()) {
+            if (currentStructure.equals(t.getStructureName())) {
+                structTasks.add(t);
+            }
+        }
+        for (DailyEmbryoTask t : state.result.getTrialTasks()) {
+            if (currentStructure.equals(t.getStructureName())) {
+                structTasks.add(t);
+            }
+        }
+        for (DailyEmbryoTask t : state.result.getNewTasks()) {
+            if (currentStructure.equals(t.getStructureName())) {
+                structTasks.add(t);
+            }
+        }
+
+        // 1b. R4 纳入未建任务：本结构有本班/窗口内硫化计划量但未建成型任务（成型=0）的
+        //     硫化记录也纳入对齐目标（如 215103624：零净需求在 R3 被硬上限/落机失败挤出）。
+        //     仍保持「已收尾免排产」规则：硫化余量≤0 的物料不纳入（与检查1同口径）。
+        if (structActiveResults != null) {
+            for (LhScheduleResult lh : structActiveResults) {
+                if (lh.getEmbryoCode() == null || lh.getId() == null) {
+                    continue;
+                }
+                // 该硫化记录已建成型任务（同 lhId）则跳过
+                boolean covered = false;
+                for (DailyEmbryoTask t : structTasks) {
+                    if (t.getLhId() != null && t.getLhId().equals(lh.getId())) {
+                        covered = true;
+                        break;
+                    }
+                }
+                if (covered) {
+                    continue;
+                }
+                // 保持已收尾免排产：硫化余量 ≤ 0 的物料不纳入
+                String r4MaterialCode = lh.getMaterialCode();
+                String r4MaterialStatusKey = MonthPlanSurplusCalculator.buildMaterialStatusKey(
+                        r4MaterialCode, lh.getProductStatus());
+                if (state.context.getMonthSurplusMap() != null && r4MaterialCode != null) {
+                    MdmMonthSurplus r4Surplus = state.context.getMonthSurplusMap().get(r4MaterialStatusKey);
+                    if (r4Surplus != null && r4Surplus.getPlanSurplusQty() != null
+                            && r4Surplus.getPlanSurplusQty().intValue() <= 0) {
+                        continue;
+                    }
+                }
+                Integer demandIdx = resolveDemandClassIndex(lh, state.currentClassIndex, structureLookAhead);
+                if (demandIdx == null) {
+                    continue;
+                }
+                DailyEmbryoTask newTask = buildSingleTask(
+                        lh, state.materialMap, state.stockMap, state.context, demandIdx);
+                if (newTask == null) {
+                    continue;
+                }
+                newTask.setPlannedProduction(0);
+                newTask.setRequiredCars(0);
+                newTask.setEndingExtraInventory(0);
+                List<String> newContinueMachines = findContinueMachines(
+                        newTask.getMaterialCode(), lh.getEmbryoCode(), state.machineOnlineEmbryoMap);
+                boolean newIsContinue = !newContinueMachines.isEmpty();
+                String newStage = lh.getConstructionStage();
+                boolean newIsTrial = STAGE_TRIAL.equals(newStage);
+                boolean newIsProductionTrial = STAGE_PRODUCTION_TRIAL.equals(newStage);
+                newTask.setIsContinueTask(newIsContinue);
+                newTask.setIsTrialTask(newIsTrial);
+                newTask.setIsProductionTrial(newIsProductionTrial);
+                newTask.setContinueMachineCodes(newContinueMachines);
+                newTask.setIsFirstTask(!newIsContinue && !newIsTrial && !newIsProductionTrial);
+                newTask.setProductStatus(lh.getProductStatus());
+                newTask.setConstructionStage(newStage);
+                structTasks.add(newTask);
+                if (newIsContinue) {
+                    state.result.getContinueTasks().add(newTask);
+                } else if (newIsTrial || newIsProductionTrial) {
+                    state.result.getTrialTasks().add(newTask);
+                } else {
+                    state.result.getNewTasks().add(newTask);
+                }
+                log.info("[R4-纳入未建任务] 胎胚={}, 物料={}, 结构={}, 硫化需求={}, 原成型=0, 纳入对齐",
+                        lh.getEmbryoCode(), r4MaterialCode, currentStructure, newTask.getVulcanizeDemand());
+            }
+        }
+
+        if (structTasks.isEmpty()) {
+            return;
+        }
+
+        // 2. 按胎胚聚合：目标 = 该结构下该胎胚所有任务的硫化消耗(本班计划量)之和，
+        //    当前 = 该胎胚所有任务的成型计划量之和。
+        //    逐胎胚对齐（不再按结构聚合比较，盈余胎胚不再掩盖其它胎胚缺口）。
+        Map<String, List<DailyEmbryoTask>> embryoTasks = new LinkedHashMap<>();
+        for (DailyEmbryoTask t : structTasks) {
+            if (t.getEmbryoCode() == null) {
+                continue;
+            }
+            embryoTasks.computeIfAbsent(t.getEmbryoCode(), k -> new ArrayList<>()).add(t);
+        }
+        if (embryoTasks.isEmpty()) {
+            return;
+        }
+
+        int tripCapacity = 0;
+        for (DailyEmbryoTask t : structTasks) {
+            int cap = productionCalculator.getTripCapacity(currentStructure, t.getEmbryoCode(), state.context);
+            if (cap > 0) {
+                tripCapacity = cap;
+                break;
+            }
+        }
+        if (tripCapacity <= 0) {
+            return;
+        }
+
+        // 3. 按"胎胚缺口"降序（缺口大的先补）
+        List<Map.Entry<String, List<DailyEmbryoTask>>> embryos = new ArrayList<>(embryoTasks.entrySet());
+        embryos.sort(Comparator.comparingInt(e -> -calcEmbryoRound4Gap(e.getValue())));
+
+        // 4. 轮询补量：每胎胚补到其聚合目标（可补不足一整车的零头），
+        //    受 立库 + stockHours 硬上限 + 结构机台产能 约束；跳过试制/量试
+        boolean progressed = true;
+        while (progressed) {
+            progressed = false;
+            for (Map.Entry<String, List<DailyEmbryoTask>> entry : embryos) {
+                List<DailyEmbryoTask> tasks = entry.getValue();
+                int embryGap = calcEmbryoRound4Gap(tasks);
+                if (embryGap <= 0) {
+                    continue;
+                }
+                for (DailyEmbryoTask task : tasks) {
+                    if (Boolean.TRUE.equals(task.getIsTrialTask())
+                            || Boolean.TRUE.equals(task.getIsProductionTrial())) {
+                        continue;
+                    }
+                    int currentPP = task.getPlannedProduction() != null ? task.getPlannedProduction() : 0;
+                    int vulc = task.getVulcanizeDemand() != null ? task.getVulcanizeDemand() : 0;
+                    int taskRoom = vulc - currentPP;
+                    if (taskRoom <= 0) {
+                        continue;
+                    }
+                    int fallbackProduction = Math.min(tripCapacity, Math.min(taskRoom, embryGap));
+                    if (fallbackProduction <= 0) {
+                        continue;
+                    }
+
+                    if (!canAllocateWithinStructureCapacity(state, currentStructure, task, fallbackProduction)) {
+                        continue;
+                    }
+                    if (isWarehouseSpaceExceeded(state, fallbackProduction)) {
+                        continue;
+                    }
+                    // 对齐轮（R4）豁免 stockHours 硬上限：补量目标=本班硫化消耗，产出即被本班硫化消耗，不构成积压；
+                    // 仅受结构机台产能 + 立库空间约束。
+
+                    // 分配：更新计划量 + 回写成型产出 / 成型余量 / 机台耗时
+                    task.setPlannedProduction(currentPP + fallbackProduction);
+                    task.setRequiredCars(productionCalculator.calculateRequiredCars(
+                            task.getPlannedProduction(), tripCapacity));
+                    task.setEndingExtraInventory(task.getPlannedProduction());
+                    if (task.getEmbryoCode() != null) {
+                        state.shiftFormingOutputMap.merge(task.getEmbryoCode(), fallbackProduction, Integer::sum);
+                        state.runningTotalProjectedStock += fallbackProduction;
+                    }
+                    state.materialUsedFormingRemainder.merge(
+                            MonthPlanSurplusCalculator.buildMaterialStatusKey(
+                                    task.getMaterialCode(), task.getProductStatus()),
+                            fallbackProduction, Integer::sum);
+                    addStructureTime(state, currentStructure, task, fallbackProduction);
+
+                    progressed = true;
+                    log.info("[R4] 结构={} 胎胚={} 补量+{}条 对齐硫化消耗, 剩余缺口={}",
+                            currentStructure, task.getEmbryoCode(), fallbackProduction,
+                            Math.max(calcEmbryoRound4Gap(tasks), 0));
+                }
+            }
+        }
+    }
+
+    /** R4：计算单个胎胚的聚合缺口（硫化消耗合计 - 成型计划量合计）。 */
+    private int calcEmbryoRound4Gap(List<DailyEmbryoTask> tasks) {
+        int out = 0;
+        int vulc = 0;
+        for (DailyEmbryoTask t : tasks) {
+            out += t.getPlannedProduction() != null ? t.getPlannedProduction() : 0;
+            vulc += t.getVulcanizeDemand() != null ? t.getVulcanizeDemand() : 0;
+        }
+        return vulc - out;
+    }
+
+    /** R4：结构机台产能是否放得下补量（含弹性余量=允许超一车）。 */
+    private boolean canAllocateWithinStructureCapacity(StructureProcessStateVo state,
+                                                       String structure,
+                                                       DailyEmbryoTask task,
+                                                       int fallbackProduction) {
+        List<MpCxCapacityConfiguration> machines = state.structureRecommendedMachinesCache
+                .computeIfAbsent(structure, k -> getRecommendedMachinesForStructure(k, state.scheduleDate, state.context));
+        BigDecimal totalCapacitySeconds = state.structureAdvanceAvailableCapacityMap.containsKey(structure)
+                ? state.structureAdvanceAvailableCapacityMap.get(structure)
+                : BigDecimal.valueOf(machines != null ? machines.size() : 0)
+                .multiply(BigDecimal.valueOf(SECONDS_PER_SHIFT));
+        BigDecimal cumulativeTime = state.structureCumulativeTimeMap.getOrDefault(structure, BigDecimal.ZERO);
+
+        Integer dailyLhCapacity = productionCalculator.getDoubleMoldDailyLhCapacity(task.getMaterialCode(), state.context);
+        if (dailyLhCapacity == null || dailyLhCapacity <= 0) {
+            return false;
+        }
+        BigDecimal avgRatio = state.structureAvgRatioCache
+                .computeIfAbsent(structure, k -> {
+                    List<MpCxCapacityConfiguration> m = state.structureRecommendedMachinesCache.get(k);
+                    return m != null ? productionCalculator.calculateStructureAvgRatio(m, k, state.context) : BigDecimal.ONE;
+                });
+        if (avgRatio.compareTo(BigDecimal.ZERO) <= 0) {
+            return false;
+        }
+        BigDecimal timePerTire = productionCalculator.calculateTimePerTire(avgRatio, dailyLhCapacity);
+        BigDecimal tripTime = timePerTire.multiply(BigDecimal.valueOf(fallbackProduction));
+        // 弹性余量：R4 整体即"产出<消耗"，允许超一车（tripTime）
+        BigDecimal elasticAllowance = tripTime;
+        return cumulativeTime.add(tripTime).compareTo(totalCapacitySeconds.add(elasticAllowance)) <= 0;
+    }
+
+    /** R4：补量后是否超立库空间（预警线）。 */
+    private boolean isWarehouseSpaceExceeded(StructureProcessStateVo state, int fallbackProduction) {
+        if (state.whState == null) {
+            return false;
+        }
+        return state.whState.isSpaceExceeded(state.runningTotalProjectedStock + fallbackProduction);
+    }
+
+    /** R4：补量后 stockHours 是否超硬上限（复用 R3 公式：stock + prePP + 补量 - 硫化消耗）。 */
+    private boolean exceedsHardCap(StructureProcessStateVo state, DailyEmbryoTask task, int fallbackProduction) {
+        int moldQty = task.getVulcanizeMoldCount() != null ? task.getVulcanizeMoldCount() : 1;
+        int singleLhCap = productionCalculator.getSingleMoldDailyLhCapacity(task.getMaterialCode(), state.context);
+        if (moldQty <= 0 || singleLhCap <= 0) {
+            return false;
+        }
+        int prePP = task.getPlannedProduction() != null ? task.getPlannedProduction() : 0;
+        int taskStock = getCurrentStock(state.context, task.getLhId());
+        int taskVulcCons = state.taskVulcConsumptionMap.getOrDefault(task.getLhId(), 0);
+        int projectedAfterAdd = taskStock + prePP + fallbackProduction - taskVulcCons;
+        BigDecimal afterAddHours = productionCalculator.calculateStockHours(projectedAfterAdd, singleLhCap, moldQty);
+        return afterAddHours.compareTo(BigDecimal.valueOf(state.stockHoursCap)) > 0;
+    }
+
+    /** R4：回写结构机台累计耗时。 */
+    private void addStructureTime(StructureProcessStateVo state, String structure,
+                                  DailyEmbryoTask task, int fallbackProduction) {
+        Integer dailyLhCapacity = productionCalculator.getDoubleMoldDailyLhCapacity(task.getMaterialCode(), state.context);
+        if (dailyLhCapacity == null || dailyLhCapacity <= 0) {
+            return;
+        }
+        BigDecimal avgRatio = state.structureAvgRatioCache
+                .computeIfAbsent(structure, k -> {
+                    List<MpCxCapacityConfiguration> m = state.structureRecommendedMachinesCache.get(k);
+                    return m != null ? productionCalculator.calculateStructureAvgRatio(m, k, state.context) : BigDecimal.ONE;
+                });
+        if (avgRatio.compareTo(BigDecimal.ZERO) <= 0) {
+            return;
+        }
+        BigDecimal timePerTire = productionCalculator.calculateTimePerTire(avgRatio, dailyLhCapacity);
+        BigDecimal tripTime = timePerTire.multiply(BigDecimal.valueOf(fallbackProduction));
+        state.structureCumulativeTimeMap.merge(structure, tripTime, BigDecimal::add);
+    }
+
+
+    /**
      * 判断任务是否已在分组结果列表中（防止R2/R3重复添加第一轮已执行任务）
      */
     private boolean isTaskAlreadyInResult(DailyEmbryoTask task, TaskGroupResultVo result) {
@@ -3860,7 +4419,7 @@ public class TaskGroupService {
 
     /**
      * 获取可供硫化时长软退出阈值（小时）：R2超此值退出到R3
-     * 优先使用参数配置 SYS04080002，未配置时回退到 stockHoursCap（SYS04080001，向后兼容）
+     * 优先使用参数配置 SYS04080003，未配置时回退到 stockHoursCap（SYS04080001，向后兼容）
      */
     private int getStockHoursSoftTrigger(ScheduleContextVo context, int stockHoursCap) {
         return getIntParamValue(context, PARAM_STOCK_HOURS_SOFT_TRIGGER, stockHoursCap);
@@ -3947,7 +4506,7 @@ public class TaskGroupService {
         int dayOfMonth = scheduleDate.getDayOfMonth();
         int dateYear = scheduleDate.getYear();
         int dateMonth = scheduleDate.getMonthValue();
-        return configs.stream()
+        List<MpCxCapacityConfiguration> result = configs.stream()
                 .filter(c -> c.getBeginDay() != null && c.getEndDay() != null
                         && c.getBeginDay() <= dayOfMonth && c.getEndDay() >= dayOfMonth)
                 // 年月匹配：确保取到排程日期所在月份的配置
@@ -3957,6 +4516,255 @@ public class TaskGroupService {
                 .collect(Collectors.collectingAndThen(
                         Collectors.toMap(MpCxCapacityConfiguration::getCxMachineCode, c -> c, (a, b) -> a, LinkedHashMap::new),
                         m -> new ArrayList<>(m.values())));
+        // 余量延用：结构自身延用 -> 延用机台优先合并；其他结构 -> 剔除被延用占用的机台
+        Map<String, List<MpCxCapacityConfiguration>> holdoverMap = context.getStructureHoldoverMachineMap();
+        if (holdoverMap != null && !holdoverMap.isEmpty()) {
+            if (holdoverMap.containsKey(structureName)) {
+                Map<String, MpCxCapacityConfiguration> merged = new LinkedHashMap<>();
+                for (MpCxCapacityConfiguration c : holdoverMap.get(structureName)) {
+                    if (c.getCxMachineCode() != null) {
+                        merged.putIfAbsent(c.getCxMachineCode(), c);
+                    }
+                }
+                // 其他结构延用占用的机台：正常配置命中这些机台时剔除（一台机台同一班次只能一个结构）
+                Set<String> otherHoldoverCodes = new HashSet<>();
+                for (Map.Entry<String, List<MpCxCapacityConfiguration>> e : holdoverMap.entrySet()) {
+                    if (structureName.equals(e.getKey())) {
+                        continue;
+                    }
+                    for (MpCxCapacityConfiguration c : e.getValue()) {
+                        if (c.getCxMachineCode() != null) {
+                            otherHoldoverCodes.add(c.getCxMachineCode());
+                        }
+                    }
+                }
+                for (MpCxCapacityConfiguration c : result) {
+                    if (c.getCxMachineCode() == null || otherHoldoverCodes.contains(c.getCxMachineCode())) {
+                        continue;
+                    }
+                    merged.putIfAbsent(c.getCxMachineCode(), c);
+                }
+                result = new ArrayList<>(merged.values());
+            } else {
+                Set<String> holdoverCodes = new HashSet<>();
+                for (List<MpCxCapacityConfiguration> holdoverConfigs : holdoverMap.values()) {
+                    for (MpCxCapacityConfiguration c : holdoverConfigs) {
+                        if (c.getCxMachineCode() != null) {
+                            holdoverCodes.add(c.getCxMachineCode());
+                        }
+                    }
+                }
+                if (!holdoverCodes.isEmpty()) {
+                    result = result.stream()
+                            .filter(c -> c.getCxMachineCode() == null || !holdoverCodes.contains(c.getCxMachineCode()))
+                            .collect(Collectors.toList());
+                }
+            }
+        }
+        return result;
+    }
+
+    /**
+     * 余量延用判定（每班次刷新 context.structureHoldoverMachineMap / deferredByHoldoverStructures）。
+     *
+     * <p>规则：结构配置段已到期（当日无段覆盖，但历史有段）且结构成型余量未耗尽时，
+     * 最近班次生产该结构的机台突破 END_DAY 延用继续生产（原配置段整体复制，含 PRODUCTION_VERSION）。
+     * <ul>
+     *   <li>余量耗尽（班末检测释放后）：从延用中移除，机台切回正常配置</li>
+     *   <li>最近生产机台来源：context.structureLastMachinesMap（每班末更新，停产班次保持原值）；
+     *       窗口首班为空时回退初始在机信息（machineOnlineEmbryoMap 胎胚->结构反查）</li>
+     *   <li>被挤结构：当日配置机台全被延用占用 -> 加入 deferredByHoldoverStructures（让位不排产）</li>
+     * </ul>
+     *
+     * @param context                排程上下文
+     * @param scheduleDate           排程日期
+     * @param materialMap            物料映射（物料编码/胎胚编码 -> 物料信息）
+     * @param machineOnlineEmbryoMap 机台在产胎胚映射（胎胚编码 -> 机台集合）
+     */
+    private void refreshStructureHoldover(ScheduleContextVo context,
+                                          LocalDate scheduleDate,
+                                          Map<String, MdmMaterialInfo> materialMap,
+                                          Map<String, Set<String>> machineOnlineEmbryoMap) {
+        Map<String, List<MpCxCapacityConfiguration>> allocationMap = context.getStructureAllocationMap();
+        if (allocationMap == null || allocationMap.isEmpty()) {
+            return;
+        }
+        Map<String, List<MpCxCapacityConfiguration>> holdoverMap = context.getStructureHoldoverMachineMap();
+        if (holdoverMap == null) {
+            holdoverMap = new HashMap<>();
+            context.setStructureHoldoverMachineMap(holdoverMap);
+        }
+        Set<String> deferredSet = context.getDeferredByHoldoverStructures();
+        if (deferredSet == null) {
+            deferredSet = new HashSet<>();
+            context.setDeferredByHoldoverStructures(deferredSet);
+        }
+        deferredSet.clear();
+
+        int dayOfMonth = scheduleDate.getDayOfMonth();
+        int year = scheduleDate.getYear();
+        int month = scheduleDate.getMonthValue();
+        int todayComposite = compositeDate(year, month, dayOfMonth);
+
+        // 同机台多结构重叠识别：某机台当天有多个结构的配置段都有效（例如前结构 12~31、后结构 22~31），
+        // BEGIN_DAY 更早的前结构（余量未耗尽）优先占用机台，后结构让位（余量优先规则）
+        Map<String, String> overlapFrontStructByMachine = new HashMap<>();
+        {
+            Map<String, List<MpCxCapacityConfiguration>> machineTodayConfigs = new LinkedHashMap<>();
+            for (Map.Entry<String, List<MpCxCapacityConfiguration>> e : allocationMap.entrySet()) {
+                List<MpCxCapacityConfiguration> cs = e.getValue();
+                if (cs == null) continue;
+                for (MpCxCapacityConfiguration c : cs) {
+                    if (c.getCxMachineCode() == null || c.getBeginDay() == null || c.getEndDay() == null
+                            || c.getYear() == null || c.getMonth() == null) continue;
+                    if (c.getYear() != year || c.getMonth() != month) continue;
+                    if (c.getBeginDay() > dayOfMonth || c.getEndDay() < dayOfMonth) continue;
+                    machineTodayConfigs.computeIfAbsent(c.getCxMachineCode(), k -> new ArrayList<>()).add(c);
+                }
+            }
+            for (Map.Entry<String, List<MpCxCapacityConfiguration>> me : machineTodayConfigs.entrySet()) {
+                List<MpCxCapacityConfiguration> todayConfigs = me.getValue();
+                if (todayConfigs.size() < 2) continue;
+                todayConfigs.sort((a, b) -> Integer.compare(a.getBeginDay(), b.getBeginDay()));
+                String frontStruct = todayConfigs.get(0).getStructureName();
+                if (frontStruct != null) {
+                    overlapFrontStructByMachine.put(me.getKey(), frontStruct);
+                }
+            }
+        }
+
+        for (Map.Entry<String, List<MpCxCapacityConfiguration>> entry : allocationMap.entrySet()) {
+            String structureName = entry.getKey();
+            List<MpCxCapacityConfiguration> configs = entry.getValue();
+            if (configs == null || configs.isEmpty()) {
+                continue;
+            }
+
+            // 延用判定（机台级）：结构余量未耗尽时，最近生产过该结构且配置段已到期的机台延用继续生产。
+            // 注意按机台维度判定：即使结构当日仍有其他机台的有效段（接力机台），到期机台仍延用
+            // （客户规则：前结构余量消耗完毕才会切换下个结构，机台可用时间突破）
+            int remainder = context.getStructureRemainderTotal(structureName);
+            Map<String, MpCxCapacityConfiguration> holdoverConfigs = new LinkedHashMap<>();
+            if (remainder > 0) {
+                Set<String> lastMachines = context.getStructureLastMachinesMap() != null
+                        ? context.getStructureLastMachinesMap().get(structureName) : null;
+                if (lastMachines == null || lastMachines.isEmpty()) {
+                    lastMachines = resolveMachinesByOnlineEmbryo(structureName, machineOnlineEmbryoMap, materialMap);
+                }
+                if (lastMachines != null && !lastMachines.isEmpty()) {
+                    for (MpCxCapacityConfiguration c : configs) {
+                        if (c.getCxMachineCode() == null || c.getEndDay() == null
+                                || c.getYear() == null || c.getMonth() == null) {
+                            continue;
+                        }
+                        // 段已到期或当日到期（END_DAY <= 当天）：切换日当天前结构余量未耗尽时同样延用，
+                        // 避免前结构 END_DAY 与后结构 BEGIN_DAY 同日重叠导致同机台双结构冲突
+                        if (compositeDate(c.getYear(), c.getMonth(), c.getEndDay()) > todayComposite) {
+                            continue;
+                        }
+                        // 机台最近生产过该结构
+                        if (!lastMachines.contains(c.getCxMachineCode())) {
+                            continue;
+                        }
+                        holdoverConfigs.putIfAbsent(c.getCxMachineCode(), c);
+                    }
+                }
+                // 前结构优先（余量优先）：同机台当天有多个结构配置段重叠（前结构 12~31、后结构 22~31），
+                // BEGIN_DAY 更早的前结构余量未耗尽时优先占用机台，后结构让位。
+                // 前结构配置段尚未到期（END_DAY > 当天）也通过延用映射占位，使后结构读点剔除该机台，
+                // 同时被挤判定会将后结构标记为让位（deferredSet）。
+                for (Map.Entry<String, String> ov : overlapFrontStructByMachine.entrySet()) {
+                    if (!structureName.equals(ov.getValue())) {
+                        continue;
+                    }
+                    String overlapMachine = ov.getKey();
+                    for (MpCxCapacityConfiguration c : configs) {
+                        if (c.getCxMachineCode() == null || !overlapMachine.equals(c.getCxMachineCode())) {
+                            continue;
+                        }
+                        if (c.getBeginDay() == null || c.getEndDay() == null
+                                || c.getYear() == null || c.getMonth() == null) {
+                            continue;
+                        }
+                        if (c.getBeginDay() > dayOfMonth || c.getEndDay() < dayOfMonth
+                                || c.getYear() != year || c.getMonth() != month) {
+                            continue;
+                        }
+                        holdoverConfigs.putIfAbsent(c.getCxMachineCode(), c);
+                        break;
+                    }
+                }
+            }
+            if (!holdoverConfigs.isEmpty()) {
+                boolean isNew = !holdoverMap.containsKey(structureName);
+                holdoverMap.put(structureName, new ArrayList<>(holdoverConfigs.values()));
+                if (isNew) {
+                    log.info("【余量延用】结构={} 余量={}条未耗尽，机台={} 配置段已到期，突破配置时间窗延用继续生产",
+                            structureName, remainder, holdoverConfigs.keySet());
+                }
+            } else if (holdoverMap.containsKey(structureName)) {
+                holdoverMap.remove(structureName);
+                log.info("【余量延用】结构={} 余量已耗尽（或无最近生产机台），停止延用，机台切回正常配置", structureName);
+            }
+
+            // 被挤判定：结构当日段机台全被延用占用 -> 让位不排产
+            if (!holdoverMap.containsKey(structureName)) {
+                Set<String> holdoverCodes = new HashSet<>();
+                for (List<MpCxCapacityConfiguration> holdoverList : holdoverMap.values()) {
+                    for (MpCxCapacityConfiguration c : holdoverList) {
+                        if (c.getCxMachineCode() != null) {
+                            holdoverCodes.add(c.getCxMachineCode());
+                        }
+                    }
+                }
+                if (!holdoverCodes.isEmpty()) {
+                    boolean allOccupied = true;
+                    boolean anyMachine = false;
+                    for (MpCxCapacityConfiguration c : configs) {
+                        if (c.getBeginDay() == null || c.getEndDay() == null
+                                || c.getBeginDay() > dayOfMonth || c.getEndDay() < dayOfMonth
+                                || c.getYear() == null || c.getYear() != year
+                                || c.getMonth() == null || c.getMonth() != month
+                                || c.getCxMachineCode() == null) {
+                            continue;
+                        }
+                        anyMachine = true;
+                        if (!holdoverCodes.contains(c.getCxMachineCode())) {
+                            allOccupied = false;
+                            break;
+                        }
+                    }
+                    if (anyMachine && allOccupied) {
+                        deferredSet.add(structureName);
+                        log.info("【余量延用】结构={} 当日配置机台全被前结构延用占用，本班次让位不排产", structureName);
+                    }
+                }
+            }
+        }
+    }
+
+    /** 年月日复合值（用于跨月比较段结束时间与当前日期） */
+    private int compositeDate(int year, int month, int day) {
+        return year * 10000 + month * 100 + day;
+    }
+
+    /** 初始在机反查：机台在产胎胚所属结构 = 指定结构时，返回这些机台集合 */
+    private Set<String> resolveMachinesByOnlineEmbryo(String structureName,
+                                                      Map<String, Set<String>> machineOnlineEmbryoMap,
+                                                      Map<String, MdmMaterialInfo> materialMap) {
+        if (machineOnlineEmbryoMap == null || materialMap == null) {
+            return null;
+        }
+        Set<String> machines = new HashSet<>();
+        for (Map.Entry<String, Set<String>> embryoEntry : machineOnlineEmbryoMap.entrySet()) {
+            String embryoCode = embryoEntry.getKey();
+            MdmMaterialInfo material = materialMap.get(embryoCode);
+            if (material != null && structureName.equals(material.getStructureName())
+                    && embryoEntry.getValue() != null) {
+                machines.addAll(embryoEntry.getValue());
+            }
+        }
+        return machines;
     }
 
     /**

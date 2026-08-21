@@ -17,6 +17,7 @@ import com.zlt.aps.cx.mapper.LhScheduleResultMapper;
 import com.zlt.aps.cx.mapper.MdmMaterialInfoMapper;
 import com.zlt.aps.cx.mapper.MdmSkuConstructionRefMapper;
 import com.zlt.aps.cx.service.engine.*;
+import com.zlt.aps.cx.vo.AdvanceEndingInfo;
 import com.zlt.aps.cx.vo.DailyEmbryoTask;
 import com.zlt.aps.cx.vo.MachineAllocationResult;
 import com.zlt.aps.cx.vo.MonthPlanProductLhCapacityVo;
@@ -289,8 +290,11 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         // 2.5 汇总多班次结果：机台+胎胚+物料 -> CLASS1~8 主表记录
         List<CxScheduleResult> allResults = buildFinalScheduleResultsFromShifts(context, shiftResults, allShiftConfigs, initialEmbryoStockMap);
 
+        // 2.5.1 提前收尾结构（当日无机台+未来3个月从未配置）追加 0 产量行，备注写入对应班次 CLASS 分析
+        appendAdvanceEndingResults(context, allResults, sortedShiftConfigs, initialEmbryoStockMap);
+
         // 2.6 处理结构切换时的最早可供硫化时间
-        processStructureSwitchLhTime(context, shiftResults, sortedShiftConfigs);
+        processStructureSwitchLhTime(context, shiftResults, sortedShiftConfigs, allResults);
 
         // 2.7 构建子表（机台+胎胚+车次维度，含库存可供硫化时长和顺位）
         Map<String, List<CxScheduleDetail>> detailGroupMap = buildScheduleDetailsFromShifts(context, shiftResults, allShiftConfigs);
@@ -332,6 +336,344 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         log.info("子表关联主表完成：子表 {} 条，成功关联 {} 条", totalDetails, matched);
     }
 
+    // ==================== 2.5.1 提前收尾结构主表追加 ====================
+
+    /**
+     * 2.5.1 提前收尾结构追加主表 0 产量行。
+     *
+     * <p>触发条件（NEVER_CONFIGURED）：结构当日无机台 + 未来3个月从未配置，整结构被跳过排产，
+     * 但仍有成型余量的胎胚需提醒计划员"提前收尾"。
+     * <ul>
+     *   <li>行维度：当月配置机台 + 胎胚（正常排产不存在该行，避免重复追加）</li>
+     *   <li>标记班次：①收尾日在窗口内 -> 该日最后一个班次；②收尾日已过窗口 -> 首班；
+     *       ③收尾日在窗口之后 -> 本次不标（不加行）；④当月无配置 -> 首班（降级文案）</li>
+     *   <li>标记班次 CLASS：PLAN_QTY=0 + ANALYSIS=提前收尾备注；其余班次补 0</li>
+     *   <li>DATA_SOURCE="3"，MARK_CLOSE_OUT_TIP="0"（收尾提示）</li>
+     * </ul>
+     *
+     * @param context              排程上下文（含 advanceEndingMap）
+     * @param allResults           主表结果列表（追加）
+     * @param sortedShiftConfigs   已排序的班次配置
+     * @param initialEmbryoStockMap 排程前胎胚初始库存快照
+     */
+    private void appendAdvanceEndingResults(ScheduleContextVo context,
+                                            List<CxScheduleResult> allResults,
+                                            List<CxShiftConfig> sortedShiftConfigs,
+                                            Map<String, Integer> initialEmbryoStockMap) {
+        Map<String, List<AdvanceEndingInfo>> advanceEndingMap = context.getAdvanceEndingMap();
+        if (advanceEndingMap == null || advanceEndingMap.isEmpty()) {
+            return;
+        }
+        LocalDate startDate = context.getScheduleDate();
+        String dateStr = startDate.format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd"));
+        String cxBatchNo = "CXPC" + dateStr;
+
+        // 辅助映射：机台 / 物料
+        Map<String, MdmMoldingMachine> machineMap = new HashMap<>();
+        if (context.getAvailableMachines() != null) {
+            for (MdmMoldingMachine machine : context.getAvailableMachines()) {
+                machineMap.put(machine.getCxMachineCode(), machine);
+            }
+        }
+        Map<String, MdmMaterialInfo> materialByEmbryoMap = new HashMap<>();
+        Map<String, MdmMaterialInfo> materialByCodeMap = new HashMap<>();
+        if (context.getMaterials() != null) {
+            for (MdmMaterialInfo material : context.getMaterials()) {
+                if (material.getMaterialCode() != null) {
+                    materialByCodeMap.putIfAbsent(material.getMaterialCode(), material);
+                }
+                if (material.getEmbryoCode() != null) {
+                    materialByEmbryoMap.putIfAbsent(material.getEmbryoCode(), material);
+                }
+            }
+        }
+
+        // 已存在行去重（机台+胎胚）：正常排产行跳过；本批次已追加的提前收尾行（共用胎胚多物料）合并备注
+        Set<String> existingKeys = allResults.stream()
+                .map(r -> (r.getCxMachineCode() != null ? r.getCxMachineCode() : "") + "|"
+                        + (r.getEmbryoCode() != null ? r.getEmbryoCode() : ""))
+                .collect(Collectors.toSet());
+        Map<String, CxScheduleResult> appendedByKey = new LinkedHashMap<>();
+
+        int orderSeq = allResults.size();
+        int appended = 0;
+        int mergedCount = 0;
+        for (List<AdvanceEndingInfo> infos : advanceEndingMap.values()) {
+            for (AdvanceEndingInfo info : infos) {
+                String markClassField = resolveAdvanceEndingMarkClass(info, sortedShiftConfigs, context);
+                if (markClassField == null) {
+                    log.info("【提前收尾】结构={} 胎胚={} 收尾日={} 不在本班次窗口内，本次不标",
+                            info.getStructureName(), info.getEmbryoCode(), info.getEndingDay());
+                    continue;
+                }
+                String key = (info.getCxMachineCode() != null ? info.getCxMachineCode() : "") + "|"
+                        + (info.getEmbryoCode() != null ? info.getEmbryoCode() : "");
+                if (existingKeys.contains(key)) {
+                    CxScheduleResult appendedRow = appendedByKey.get(key);
+                    if (appendedRow != null) {
+                        // 共用胎胚（同一机台+胎胚多物料共用）：备注/余量/硫化任务ID合并进本批次已追加的提前收尾行
+                        mergeAdvanceEndingIntoRow(appendedRow, markClassField, info);
+                        mergedCount++;
+                    } else {
+                        log.info("【提前收尾】机台={} 胎胚={} 已有正常排产行，跳过追加", info.getCxMachineCode(), info.getEmbryoCode());
+                    }
+                    continue;
+                }
+                existingKeys.add(key);
+
+                CxScheduleResult result = new CxScheduleResult();
+                result.setScheduleDate(java.sql.Timestamp.valueOf(startDate.atStartOfDay()));
+
+                // 机台信息
+                result.setCxMachineCode(info.getCxMachineCode());
+                MdmMoldingMachine machine = machineMap.get(info.getCxMachineCode());
+                if (machine != null) {
+                    result.setCxMachineName(machine.getMachineName());
+                    result.setCxMachineType(machine.getCxMachineBrandCode());
+                }
+
+                // 胎胚信息
+                result.setEmbryoCode(info.getEmbryoCode());
+                MdmMaterialInfo materialByEmbryo = materialByEmbryoMap.get(info.getEmbryoCode());
+                if (materialByEmbryo != null) {
+                    result.setMainMaterialDesc(materialByEmbryo.getEmbryoDesc());
+                    if (materialByEmbryo.getProSize() != null) {
+                        try {
+                            result.setSpecDimension(new BigDecimal(materialByEmbryo.getProSize()));
+                        } catch (NumberFormatException e) {
+                            log.debug("无法解析寸口: {}", materialByEmbryo.getProSize());
+                        }
+                    }
+                    if (materialByEmbryo.getStructureName() != null) {
+                        result.setStructureName(materialByEmbryo.getStructureName());
+                    }
+                }
+                if (result.getStructureName() == null) {
+                    result.setStructureName(info.getStructureName());
+                }
+
+                // 物料信息
+                result.setMaterialCode(info.getMaterialCode());
+                MdmMaterialInfo materialByCode = materialByCodeMap.get(info.getMaterialCode());
+                if (materialByCode != null) {
+                    result.setMaterialDesc(materialByCode.getMaterialDesc());
+                    result.setBomDataVersion(materialByCode.getEmbryoNo());
+                }
+
+                // 库存（排程前初始快照）与余量
+                int totalStock = initialEmbryoStockMap != null
+                        ? initialEmbryoStockMap.getOrDefault(info.getEmbryoCode(), 0) : 0;
+                result.setTotalStock(new BigDecimal(totalStock));
+                result.setProductNum(BigDecimal.ZERO);
+                if (info.getVulcanizeRemainder() != null) {
+                    result.setLhRemainQty(new BigDecimal(info.getVulcanizeRemainder()));
+                }
+                if (info.getFormingRemainder() != null) {
+                    result.setCxRemainQty(new BigDecimal(info.getFormingRemainder()));
+                }
+
+                // 硫化任务关联
+                result.setLhScheduleIds(info.getLhScheduleIds());
+
+                // 状态字段：DATA_SOURCE="3"（提前收尾追加行）
+                result.setProductionStatus("0");
+                result.setIsRelease("0");
+                result.setDataSource("3");
+                result.setFactoryCode(context.getFactoryCode());
+                result.setCreateTime(new Date());
+                orderSeq++;
+                result.setCxBatchNo(cxBatchNo);
+                result.setOrderNo("CXGD" + dateStr + String.format("%03d", orderSeq));
+                result.setMarkCloseOutTip("0");
+
+                // 标记班次：PLAN_QTY=0 + ANALYSIS=备注；其余班次补 0
+                setClassPlanAndAnalysis(result, markClassField, info.getRemark());
+                fillDefaultClassValues(result, Collections.singleton(markClassField));
+
+                allResults.add(result);
+                appendedByKey.put(key, result);
+                appended++;
+                log.info("【提前收尾】追加主表行：机台={} 胎胚={} 物料={} 标记班次={} 备注={}",
+                        info.getCxMachineCode(), info.getEmbryoCode(), info.getMaterialCode(),
+                        markClassField, info.getRemark());
+            }
+        }
+        log.info("【提前收尾】主表追加 0 产量行完成，共 {} 条（另有共用胎胚合并 {} 条）", appended, mergedCount);
+    }
+
+    /**
+     * 共用胎胚合并：同一机台+胎胚被多物料共用时，后续物料的提前收尾信息合并进本批次已追加的提前收尾行。
+     *
+     * <p>合并内容：标记班次 CLASS 分析备注（分号拼接）、成型余量 CX_REMAIN_QTY（累加）、硫化任务ID（逗号拼接）。
+     *
+     * @param row            本批次已追加的提前收尾行（DATA_SOURCE="3"）
+     * @param markClassField 本物料的标记班次 CLASS_FIELD
+     * @param info           后续物料的提前收尾信息
+     */
+    private void mergeAdvanceEndingIntoRow(CxScheduleResult row, String markClassField, AdvanceEndingInfo info) {
+        // 备注合并（分号拼接）
+        String existingAnalysis = getClassAnalysis(row, markClassField);
+        String merged = (existingAnalysis == null || existingAnalysis.isEmpty())
+                ? info.getRemark() : existingAnalysis + "；" + info.getRemark();
+        setClassPlanAndAnalysis(row, markClassField, merged);
+
+        // 成型余量累加（共用胎胚多物料合计）
+        if (info.getFormingRemainder() != null) {
+            BigDecimal add = new BigDecimal(info.getFormingRemainder());
+            row.setCxRemainQty(row.getCxRemainQty() != null ? row.getCxRemainQty().add(add) : add);
+        }
+
+        // 硫化余量累加（共用胎胚多物料合计）
+        if (info.getVulcanizeRemainder() != null) {
+            BigDecimal addLh = new BigDecimal(info.getVulcanizeRemainder());
+            row.setLhRemainQty(row.getLhRemainQty() != null ? row.getLhRemainQty().add(addLh) : addLh);
+        }
+
+        // 物料编码合并（逗号拼接，与正常排产行多物料格式一致）
+        if (info.getMaterialCode() != null && !info.getMaterialCode().isEmpty()
+                && (row.getMaterialCode() == null || !row.getMaterialCode().contains(info.getMaterialCode()))) {
+            row.setMaterialCode(row.getMaterialCode() == null || row.getMaterialCode().isEmpty()
+                    ? info.getMaterialCode() : row.getMaterialCode() + "," + info.getMaterialCode());
+        }
+
+        // 硫化任务ID合并
+        if (info.getLhScheduleIds() != null && !info.getLhScheduleIds().isEmpty()) {
+            String ids = row.getLhScheduleIds();
+            row.setLhScheduleIds(ids == null || ids.isEmpty()
+                    ? info.getLhScheduleIds() : ids + "," + info.getLhScheduleIds());
+        }
+
+        log.info("【提前收尾】共用胎胚合并：机台={} 胎胚={} 追加物料={} 标记班次={} 本物料余量={} 合计余量={}",
+                info.getCxMachineCode(), info.getEmbryoCode(), info.getMaterialCode(),
+                markClassField, info.getFormingRemainder(), row.getCxRemainQty());
+    }
+
+    /**
+     * 读取指定班次 CLASS 的分析备注。
+     */
+    private String getClassAnalysis(CxScheduleResult result, String classField) {
+        switch (classField == null ? "" : classField) {
+            case "CLASS1": return result.getClass1Analysis();
+            case "CLASS2": return result.getClass2Analysis();
+            case "CLASS3": return result.getClass3Analysis();
+            case "CLASS4": return result.getClass4Analysis();
+            case "CLASS5": return result.getClass5Analysis();
+            case "CLASS6": return result.getClass6Analysis();
+            case "CLASS7": return result.getClass7Analysis();
+            case "CLASS8": return result.getClass8Analysis();
+            default: return null;
+        }
+    }
+
+    /**
+     * 解析提前收尾信息的标记班次（CLASS_FIELD）。
+     *
+     * <p>规则：
+     * <ul>
+     *   <li>④当月无配置（endingDay=null）-> 首班</li>
+     *   <li>①收尾日在班次窗口内 -> 该日最后一个班次（scheduleDay/dayShiftOrder 最大）</li>
+     *   <li>②收尾日在窗口前（已过）-> 首班</li>
+     *   <li>③收尾日在窗口后 -> null（本次不标）</li>
+     * </ul>
+     *
+     * @param info              提前收尾信息
+     * @param sortedShiftConfigs 已排序的班次配置
+     * @param context           排程上下文
+     * @return 标记班次 CLASS_FIELD，不标返回 null
+     */
+    private String resolveAdvanceEndingMarkClass(AdvanceEndingInfo info,
+                                                 List<CxShiftConfig> sortedShiftConfigs,
+                                                 ScheduleContextVo context) {
+        if (sortedShiftConfigs == null || sortedShiftConfigs.isEmpty()) {
+            return null;
+        }
+        // 日期 -> 该日最后一个班次；同时确定窗口首末日与首班
+        Map<LocalDate, CxShiftConfig> lastShiftOfDate = new LinkedHashMap<>();
+        LocalDate firstDate = null;
+        LocalDate lastDate = null;
+        CxShiftConfig firstShift = null;
+        for (CxShiftConfig config : sortedShiftConfigs) {
+            LocalDate d = scheduleDayTypeHelper.calculateShiftDate(context.getScheduleDate(), config);
+            if (d == null) {
+                continue;
+            }
+            if (firstDate == null || d.isBefore(firstDate)) {
+                firstDate = d;
+                firstShift = config;
+            }
+            if (lastDate == null || d.isAfter(lastDate)) {
+                lastDate = d;
+            }
+            CxShiftConfig current = lastShiftOfDate.get(d);
+            if (current == null || compareShiftOrder(config, current) >= 0) {
+                lastShiftOfDate.put(d, config);
+            }
+        }
+        if (firstShift == null) {
+            return null;
+        }
+        // ④无当月配置 -> 首班（降级文案）
+        if (info.getEndingDay() == null || info.getEndingDay() <= 0) {
+            return firstShift.getClassField();
+        }
+        LocalDate endingDate = LocalDate.of(context.getScheduleDate().getYear(),
+                context.getScheduleDate().getMonthValue(), info.getEndingDay());
+        // ①窗口内 -> 该日最后一个班次
+        if (!endingDate.isBefore(firstDate) && !endingDate.isAfter(lastDate)) {
+            CxShiftConfig last = lastShiftOfDate.get(endingDate);
+            return last != null ? last.getClassField() : firstShift.getClassField();
+        }
+        // ②窗口前（收尾日已过）-> 首班
+        if (endingDate.isBefore(firstDate)) {
+            return firstShift.getClassField();
+        }
+        // ③窗口后 -> 本次不标
+        return null;
+    }
+
+    /** 班次排序比较：scheduleDay -> dayShiftOrder */
+    private int compareShiftOrder(CxShiftConfig a, CxShiftConfig b) {
+        int dayA = a.getScheduleDay() != null ? a.getScheduleDay() : 0;
+        int dayB = b.getScheduleDay() != null ? b.getScheduleDay() : 0;
+        if (dayA != dayB) {
+            return Integer.compare(dayA, dayB);
+        }
+        int orderA = a.getDayShiftOrder() != null ? a.getDayShiftOrder() : 0;
+        int orderB = b.getDayShiftOrder() != null ? b.getDayShiftOrder() : 0;
+        return Integer.compare(orderA, orderB);
+    }
+
+    /**
+     * 设置指定班次的计划量=0、完成量=0、分析=备注（提前收尾行专用，不耦合 SPR）。
+     *
+     * @param result    主表记录
+     * @param classField CLASS1~CLASS8
+     * @param analysis  分析备注
+     */
+    private void setClassPlanAndAnalysis(CxScheduleResult result, String classField, String analysis) {
+        BigDecimal zero = BigDecimal.ZERO;
+        switch (classField == null ? "" : classField) {
+            case "CLASS1":
+                result.setClass1PlanQty(zero); result.setClass1FinishQty(zero); result.setClass1Analysis(analysis); break;
+            case "CLASS2":
+                result.setClass2PlanQty(zero); result.setClass2FinishQty(zero); result.setClass2Analysis(analysis); break;
+            case "CLASS3":
+                result.setClass3PlanQty(zero); result.setClass3FinishQty(zero); result.setClass3Analysis(analysis); break;
+            case "CLASS4":
+                result.setClass4PlanQty(zero); result.setClass4FinishQty(zero); result.setClass4Analysis(analysis); break;
+            case "CLASS5":
+                result.setClass5PlanQty(zero); result.setClass5FinishQty(zero); result.setClass5Analysis(analysis); break;
+            case "CLASS6":
+                result.setClass6PlanQty(zero); result.setClass6FinishQty(zero); result.setClass6Analysis(analysis); break;
+            case "CLASS7":
+                result.setClass7PlanQty(zero); result.setClass7FinishQty(zero); result.setClass7Analysis(analysis); break;
+            case "CLASS8":
+                result.setClass8PlanQty(zero); result.setClass8FinishQty(zero); result.setClass8Analysis(analysis); break;
+            default:
+                log.warn("【提前收尾】未知的 CLASS_FIELD: {}", classField);
+        }
+    }
+
     // ==================== 2.6 结构切换最早可供硫化时间 ====================
 
     /**
@@ -341,8 +683,8 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
      * <ul>
      *   <li><b>场景1（全部收尾）</b>：结构在所有机台上的末班记录均 isLastEndingBatch=true，
      *       取所有机台中最晚的 planEndTime 作为前结构结束时间，加切换耗时得到最早可供硫化时间。</li>
-     *   <li><b>场景2（未全部收尾）</b>：结构在部分机台未收尾，按总生产量/3估算日消耗，
-     *       用初始成型余量/日消耗判断消耗班次，取该班次结束时间加切换耗时。</li>
+     *   <li><b>场景2（未全部收尾）</b>：按各物料初始成型余量、双模日硫化量及结构排产机台配比
+     *       折算剩余生产秒数，取预计消耗完毕班次的结束时间加切换耗时。</li>
      * </ul>
      *
      * <p>结果写入 T_CX_EMBRYO_LH_TIME 表，先按 factoryCode 删除后插入。
@@ -353,7 +695,8 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
      */
     private void processStructureSwitchLhTime(ScheduleContextVo context,
                                               List<ShiftScheduleResult> shiftResults,
-                                              List<CxShiftConfig> sortedShiftConfigs) {
+                                              List<CxShiftConfig> sortedShiftConfigs,
+                                              List<CxScheduleResult> allResults) {
         String factoryCode = context.getFactoryCode();
 
         // 1. 构建物料映射
@@ -375,7 +718,11 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         }
 
         // 2. 构建结构 -> 初始成型余量映射
-        Map<String, Integer> structureRemainderMap = buildStructureFormingRemainderMap(context, materialToStructureMap);
+        Map<String, Map<String, Integer>> structureMaterialRemainderMap =
+                buildStructureMaterialFormingRemainderMap(context, materialToStructureMap);
+        Map<String, Integer> structureRemainderMap = structureMaterialRemainderMap.entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey,
+                        e -> e.getValue().values().stream().mapToInt(Integer::intValue).sum()));
 
         // 3. 构建机台 -> 未来结构反查映射
         Map<String, List<MpCxCapacityConfiguration>> machineFutureStructureMap = buildMachineFutureStructureMap(context);
@@ -436,12 +783,22 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 CxEmbryoLhTime record = processScenario2(structureName, machineSprMap, context,
                         materialByEmbryoMap, materialByCodeMap, machineFutureStructureMap,
                         sameInchHours, diffInchHours, structureRemainder, factoryCode,
-                        sortedShiftConfigs, shiftResults);
+                        sortedShiftConfigs, structureMaterialRemainderMap.get(structureName));
                 if (record != null) {
                     records.add(record);
                 }
             }
         }
+
+        // 6.5 场景3：提前收尾结构（当日无机台+未来3个月从未配置，整结构被跳过，无排产记录）
+        appendScenario3AdvanceEndingRecords(context, records, machineFutureStructureMap,
+                materialByEmbryoMap, materialByCodeMap, sameInchHours, diffInchHours);
+
+        // 6.6 机台切换：机台在排程期内从结构A切到结构B，且结构A未全部收尾（结构整体仍由其他机台接力生产）
+        //     在前结构最后排产班次标"结束机台使用"，主表 ANALYSIS 写备注 + S5.6 记录切换耗时
+        identifyAndMarkMachineSwitches(context, structureMachineSprMap, machineStructureTimelineMap,
+                structureRemainderMap, materialByEmbryoMap, materialByCodeMap,
+                sameInchHours, diffInchHours, sortedShiftConfigs, records, allResults);
 
         // 7. 仅删除本次有新记录的结构（按 factoryCode + scheduleDate + structure 维度），
         //    返回 null 的结构不进删除范围，保留旧值；其他排程日期的记录也不受影响
@@ -493,6 +850,204 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             }
         }
         return true;
+    }
+
+    /**
+     * 识别并标记机台切换：机台在排程期内从结构A切到结构B，且结构A未全部收尾。
+     *
+     * <p>与场景1（结构全部收尾 -> 切换）的区别：本场景结构整体未收尾，仅"该机台"结束使用前结构，
+     * 前结构仍由其他机台接力生产。此时在前结构最后排产班次标"结束机台使用"，主表 ANALYSIS 写备注，
+     * 并写 S5.6 记录（endingTime + 切换耗时 = 后结构在该机台最早可供硫化时间）。
+     *
+     * @param context                     排程上下文
+     * @param structureMachineSprMap       结构 -> 机台 -> SPR列表
+     * @param machineStructureTimelineMap  机台 -> 结构时间线（按班次顺序去重）
+     * @param structureRemainderMap        结构 -> 初始成型余量
+     * @param materialByEmbryoMap          胎胚编码 -> 物料
+     * @param materialByCodeMap            物料编码 -> 物料
+     * @param sameInchHours                同英寸切换耗时（小时）
+     * @param diffInchHours                异英寸切换耗时（小时）
+     * @param sortedShiftConfigs           已排序班次配置
+     * @param records                      S5.6 记录列表（追加）
+     * @param allResults                   主表结果列表（就地修改 ANALYSIS）
+     */
+    private void identifyAndMarkMachineSwitches(
+            ScheduleContextVo context,
+            Map<String, Map<String, List<ShiftProductionResult>>> structureMachineSprMap,
+            Map<String, List<String>> machineStructureTimelineMap,
+            Map<String, Integer> structureRemainderMap,
+            Map<String, MdmMaterialInfo> materialByEmbryoMap,
+            Map<String, MdmMaterialInfo> materialByCodeMap,
+            int sameInchHours, int diffInchHours,
+            List<CxShiftConfig> sortedShiftConfigs,
+            List<CxEmbryoLhTime> records,
+            List<CxScheduleResult> allResults) {
+
+        for (Map.Entry<String, List<String>> timelineEntry : machineStructureTimelineMap.entrySet()) {
+            String machineCode = timelineEntry.getKey();
+            List<String> timeline = timelineEntry.getValue();
+            if (timeline.size() < 2) {
+                continue; // 只有一个结构，无切换
+            }
+            for (int i = 0; i < timeline.size() - 1; i++) {
+                String prevStruct = timeline.get(i);
+                String nextStruct = timeline.get(i + 1);
+
+                // 前结构整体已全部收尾 -> 属于场景1，已处理，不重复标记
+                Map<String, List<ShiftProductionResult>> prevMachineSprMap = structureMachineSprMap.get(prevStruct);
+                if (checkAllMachinesFullyEnded(prevMachineSprMap)) {
+                    continue;
+                }
+
+                // 前结构在该机台上的 SPR（机台级结束使用）
+                List<ShiftProductionResult> prevSprList = prevMachineSprMap != null
+                        ? prevMachineSprMap.get(machineCode) : null;
+                if (prevSprList == null || prevSprList.isEmpty()) {
+                    continue;
+                }
+
+                // 标记班次 = 前结构在该机台上最后排产班次的 CLASS 字段
+                ShiftProductionResult lastPrevSpr = prevSprList.get(prevSprList.size() - 1);
+                String markClassField = resolveClassFieldByShiftCode(lastPrevSpr.getShiftCode(), sortedShiftConfigs);
+                if (markClassField == null) {
+                    continue;
+                }
+
+                // 前结构在该机台上的结束时间 = 最后班次最晚 planEndTime
+                LocalDateTime endingTime = resolveLastShiftEndTime(prevSprList, lastPrevSpr.getShiftCode());
+                if (endingTime == null) {
+                    continue;
+                }
+
+                // 切换日 = 后结构在该机台上首次排产班次所在日
+                LocalDate switchDate = null;
+                Map<String, List<ShiftProductionResult>> nextMachineSprMap = structureMachineSprMap.get(nextStruct);
+                List<ShiftProductionResult> nextSprList = nextMachineSprMap != null
+                        ? nextMachineSprMap.get(machineCode) : null;
+                if (nextSprList != null && !nextSprList.isEmpty()
+                        && nextSprList.get(0).getPlanStartTime() != null) {
+                    switchDate = nextSprList.get(0).getPlanStartTime().toLocalDate();
+                }
+
+                // 切换耗时
+                int switchHours = calculateSwitchHours(prevStruct, nextStruct,
+                        materialByEmbryoMap, materialByCodeMap, context, sameInchHours, diffInchHours);
+
+                // 结构余量
+                int structureRemainder = structureRemainderMap.getOrDefault(prevStruct, 0);
+
+                // 备注：本成型机计划XX号切换XX结构，前结构XX没有收尾完，后结构要考虑X小时切换耗时
+                String switchDayStr = switchDate != null ? String.valueOf(switchDate.getDayOfMonth()) : "?";
+                String remark = String.format("本成型机计划%s号切换%s结构，前结构%s没有收尾完，后结构要考虑%d小时切换耗时",
+                        switchDayStr, nextStruct, prevStruct, switchHours);
+
+                // S5.6 记录
+                LocalDateTime earliestLhTime = endingTime.plusHours(switchHours);
+                CxEmbryoLhTime record = new CxEmbryoLhTime();
+                record.setStructureName(prevStruct);
+                record.setCxMachineCode(machineCode);
+                record.setNextStructureName(nextStruct);
+                record.setEndingTime(java.sql.Timestamp.valueOf(endingTime));
+                record.setEarliestLhTime(java.sql.Timestamp.valueOf(earliestLhTime));
+                record.setStructureChangeRemaining(structureRemainder);
+                record.setRemark(remark);
+                records.add(record);
+
+                // 主表标记：前结构在该机台的所有胎胚行，标记班次 ANALYSIS 追加备注（不改 PLAN_QTY）
+                markMachineSwitchInMainTable(allResults, machineCode, prevStruct, markClassField, remark);
+
+                log.info("机台切换：机台={}，前结构={} -> 后结构={}，标记班次={}，切换日={}号，切换{}h，结束时间={}，最早可供硫化时间={}，前结构余量={}",
+                        machineCode, prevStruct, nextStruct, markClassField, switchDayStr, switchHours,
+                        endingTime, earliestLhTime, structureRemainder);
+            }
+        }
+    }
+
+    /**
+     * 班次编码 -> CLASS 字段（CLASS1~CLASS8）。
+     */
+    private String resolveClassFieldByShiftCode(String shiftCode, List<CxShiftConfig> sortedShiftConfigs) {
+        if (shiftCode == null || sortedShiftConfigs == null) {
+            return null;
+        }
+        for (CxShiftConfig config : sortedShiftConfigs) {
+            if (shiftCode.equals(config.getShiftCode())) {
+                return config.getClassField();
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 前结构在该机台上最后班次的结束时间（取该班次所有 SPR 的最晚 planEndTime）。
+     */
+    private LocalDateTime resolveLastShiftEndTime(List<ShiftProductionResult> sprList, String lastShiftCode) {
+        LocalDateTime maxEndTime = null;
+        for (ShiftProductionResult spr : sprList) {
+            if (lastShiftCode == null || lastShiftCode.equals(spr.getShiftCode())) {
+                if (spr.getPlanEndTime() != null
+                        && (maxEndTime == null || spr.getPlanEndTime().isAfter(maxEndTime))) {
+                    maxEndTime = spr.getPlanEndTime();
+                }
+            }
+        }
+        return maxEndTime;
+    }
+
+    /**
+     * 主表标记：前结构在机台上的所有胎胚行，在标记班次的 ANALYSIS 追加机台切换备注。
+     */
+    private void markMachineSwitchInMainTable(List<CxScheduleResult> allResults,
+                                              String machineCode,
+                                              String prevStruct,
+                                              String markClassField,
+                                              String remark) {
+        if (allResults == null || machineCode == null) {
+            return;
+        }
+        int marked = 0;
+        for (CxScheduleResult result : allResults) {
+            if (machineCode.equals(result.getCxMachineCode())
+                    && prevStruct != null && prevStruct.equals(result.getStructureName())) {
+                appendClassAnalysis(result, markClassField, remark);
+                marked++;
+            }
+        }
+        log.info("机台切换主表标记：机台={} 前结构={} 标记班次={} 共 {} 行", machineCode, prevStruct, markClassField, marked);
+    }
+
+    /**
+     * 追加指定班次的 ANALYSIS 备注（不改 PLAN_QTY/FINISH_QTY，用于正常排产行追加机台切换备注）。
+     */
+    private void appendClassAnalysis(CxScheduleResult result, String classField, String analysis) {
+        switch (classField == null ? "" : classField) {
+            case "CLASS1":
+                result.setClass1Analysis(joinAnalysis(result.getClass1Analysis(), analysis)); break;
+            case "CLASS2":
+                result.setClass2Analysis(joinAnalysis(result.getClass2Analysis(), analysis)); break;
+            case "CLASS3":
+                result.setClass3Analysis(joinAnalysis(result.getClass3Analysis(), analysis)); break;
+            case "CLASS4":
+                result.setClass4Analysis(joinAnalysis(result.getClass4Analysis(), analysis)); break;
+            case "CLASS5":
+                result.setClass5Analysis(joinAnalysis(result.getClass5Analysis(), analysis)); break;
+            case "CLASS6":
+                result.setClass6Analysis(joinAnalysis(result.getClass6Analysis(), analysis)); break;
+            case "CLASS7":
+                result.setClass7Analysis(joinAnalysis(result.getClass7Analysis(), analysis)); break;
+            case "CLASS8":
+                result.setClass8Analysis(joinAnalysis(result.getClass8Analysis(), analysis)); break;
+            default:
+                log.warn("【机台切换】未知的 CLASS_FIELD: {}", classField);
+        }
+    }
+
+    /** 拼接 ANALYSIS：已有内容非空时用分号追加，否则直接返回新内容。 */
+    private String joinAnalysis(String existing, String append) {
+        if (existing == null || existing.isEmpty()) {
+            return append;
+        }
+        return existing + "；" + append;
     }
 
     /**
@@ -588,8 +1143,8 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
 
     /**
      * 场景2：未全部收尾 -> 估算消耗。
-     * <p>汇总该结构所有机台8班次计划量，日消耗=总生产/3，
-     * 用初始成型余量/日消耗判断消耗班次，取该班次结束时间加切换耗时。
+     * <p>按物料初始成型余量、双模日硫化量和结构下成型机台配比折算剩余工作时间，
+     * 取预计消耗完毕班次的结束时间加切换耗时。
      */
     private CxEmbryoLhTime processScenario2(
             String structureName,
@@ -601,47 +1156,27 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             int sameInchHours, int diffInchHours,
             Integer structureRemainder, String factoryCode,
             List<CxShiftConfig> sortedShiftConfigs,
-            List<ShiftScheduleResult> shiftResults) {
+            Map<String, Integer> materialRemainderMap) {
 
-        // 1. 汇总该结构所有机台8班次计划量
-        int totalProduction = 0;
-        for (List<ShiftProductionResult> sprList : machineSprMap.values()) {
-            for (ShiftProductionResult spr : sprList) {
-                if (spr.getQuantity() != null) {
-                    totalProduction += spr.getQuantity();
-                }
-            }
-        }
-        if (totalProduction <= 0) {
-            log.warn("场景2：结构 {} 总生产量为0，跳过", structureName);
-            return null;
-        }
-
-        // 2. 日消耗 = 总生产 / 3
-        double dailyConsumption = (double) totalProduction / 3.0;
-
-        // 3. 初始成型余量
         if (structureRemainder <= 0) {
             log.info("场景2：结构 {} 初始成型余量为0或负，无需消耗，跳过", structureName);
             return null;
         }
 
-        // 4. 消耗天数 = 初始成型余量 / 日消耗
-        double daysToConsume = structureRemainder / dailyConsumption;
-        if (daysToConsume > 3.0) {
-            log.info("场景2：结构 {} 初始成型余量{}，日消耗{}，需{}天>3天，无法在排程期内消耗完毕，跳过",
-                    structureName, structureRemainder, String.format("%.1f", dailyConsumption), String.format("%.1f", daysToConsume));
+        Scenario2CapacityPrediction prediction = calculateScenario2CapacityPrediction(
+                structureName, machineSprMap.keySet(), materialRemainderMap, context);
+        if (prediction == null) {
+            log.warn("场景2：结构 {} 缺少有效成型产能数据，跳过", structureName);
             return null;
         }
 
-        // 5. 消耗班次序号 ≈ ceil(初始成型余量 × 8 / 总生产量)
-        int targetShiftIndex = (int) Math.ceil((double) structureRemainder * 8 / totalProduction);
-        if (targetShiftIndex < 1) targetShiftIndex = 1;
+        int targetShiftIndex = prediction.targetShiftIndex;
         if (targetShiftIndex > sortedShiftConfigs.size()) {
-            targetShiftIndex = sortedShiftConfigs.size();
+            log.info("场景2：结构 {} 按成型产能预计需{}个班次，超过排程期{}个班次，跳过",
+                    structureName, targetShiftIndex, sortedShiftConfigs.size());
+            return null;
         }
 
-        // 6. 取该班次的结束时间
         CxShiftConfig targetShiftConfig = sortedShiftConfigs.get(targetShiftIndex - 1);
         LocalDate shiftDate = scheduleDayTypeHelper.calculateShiftDate(context.getScheduleDate(), targetShiftConfig);
         LocalDateTime shiftEndTime = scheduleDayTypeHelper.calculateShiftEndTimeLocal(targetShiftConfig, shiftDate);
@@ -650,10 +1185,8 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             return null;
         }
 
-        // 7. 查找未来结构
         String nextStructureName = findFutureStructureForStructure(structureName, machineFutureStructureMap, machineSprMap, context);
 
-        // 8. 计算切换耗时
         int switchHours = 0;
         if (nextStructureName != null) {
             switchHours = calculateSwitchHours(structureName, nextStructureName,
@@ -661,10 +1194,8 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                     sameInchHours, diffInchHours);
         }
 
-        // 9. earliestLhTime = 班次结束时间 + 切换耗时
         LocalDateTime earliestLhTime = shiftEndTime.plusHours(switchHours);
 
-        // 10. 记录机台（取该结构下任意一个机台，优先取有未来结构配置的机台）
         String recordMachineCode = null;
         for (String mCode : machineSprMap.keySet()) {
             if (recordMachineCode == null) {
@@ -686,11 +1217,212 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         record.setEarliestLhTime(java.sql.Timestamp.valueOf(earliestLhTime));
         record.setStructureChangeRemaining(structureRemainder);
 
-        log.info("场景2（估算消耗）：机台={}，结构 {}，总生产={}，日消耗={}，初始余量={}，消耗{}天约第{}班次，结束时间={}，最早可供硫化时间={}",
-                recordMachineCode, structureName, totalProduction, String.format("%.1f", dailyConsumption),
-                structureRemainder, String.format("%.1f", daysToConsume), targetShiftIndex,
+        log.info("场景2（成型产能预测）：机台={}，结构={}，机台配比合计={}，初始余量={}，预计耗时={}h，约第{}班次，结束时间={}，最早可供硫化时间={}",
+                recordMachineCode, structureName, prediction.totalMachineRatio, structureRemainder,
+                prediction.requiredSeconds.divide(BigDecimal.valueOf(ScheduleConstants.SECONDS_PER_HOUR), 2, RoundingMode.HALF_UP), targetShiftIndex,
                 shiftEndTime, earliestLhTime);
         return record;
+    }
+
+    Scenario2CapacityPrediction calculateScenario2CapacityPrediction(
+            String structureName, Collection<String> machineCodes,
+            Map<String, Integer> materialRemainderMap, ScheduleContextVo context) {
+        if (machineCodes == null || machineCodes.isEmpty()
+                || materialRemainderMap == null || materialRemainderMap.isEmpty()) {
+            return null;
+        }
+        int totalMachineRatio = machineCodes.stream().filter(Objects::nonNull).distinct()
+                .mapToInt(machineCode -> {
+                    Integer ratio = productionCalculator.getMachineLhMaxQty(machineCode, structureName, context);
+                    return ratio != null && ratio > 0 ? ratio : 1;
+                }).sum();
+        if (totalMachineRatio <= 0) {
+            return null;
+        }
+        BigDecimal normalizedWorkSeconds = BigDecimal.ZERO;
+        for (Map.Entry<String, Integer> entry : materialRemainderMap.entrySet()) {
+            int remainder = entry.getValue() != null ? entry.getValue() : 0;
+            if (remainder <= 0) {
+                continue;
+            }
+            Integer dailyLhCapacity = productionCalculator.getDoubleMoldDailyLhCapacity(entry.getKey(), context);
+            if (dailyLhCapacity == null || dailyLhCapacity <= 0) {
+                return null;
+            }
+            normalizedWorkSeconds = normalizedWorkSeconds.add(
+                    BigDecimal.valueOf(remainder)
+                            .multiply(BigDecimal.valueOf(ScheduleConstants.SECONDS_PER_DAY))
+                            .divide(BigDecimal.valueOf(dailyLhCapacity), 8, RoundingMode.HALF_UP));
+        }
+        if (normalizedWorkSeconds.compareTo(BigDecimal.ZERO) <= 0) {
+            return null;
+        }
+        BigDecimal requiredSeconds = normalizedWorkSeconds
+                .divide(BigDecimal.valueOf(totalMachineRatio), 8, RoundingMode.HALF_UP);
+        int targetShiftIndex = requiredSeconds
+                .divide(BigDecimal.valueOf(SECONDS_PER_SHIFT), 0, RoundingMode.CEILING)
+                .intValue();
+        return new Scenario2CapacityPrediction(requiredSeconds, Math.max(1, targetShiftIndex), totalMachineRatio);
+    }
+
+    static class Scenario2CapacityPrediction {
+        final BigDecimal requiredSeconds;
+        final int targetShiftIndex;
+        final int totalMachineRatio;
+
+        Scenario2CapacityPrediction(BigDecimal requiredSeconds, int targetShiftIndex, int totalMachineRatio) {
+            this.requiredSeconds = requiredSeconds;
+            this.targetShiftIndex = targetShiftIndex;
+            this.totalMachineRatio = totalMachineRatio;
+        }
+    }
+
+    /**
+     * 场景3：提前收尾结构（当日无机台 + 未来3个月从未配置，整结构被跳过，无排产记录）。
+     *
+     * <p>数据来源：TaskGroupService.collectAdvanceEndingInfos 写入的 context.advanceEndingMap。
+     * <ul>
+     *   <li>endingTime：收尾日（当月配置 max END_DAY）当日末 = 收尾日次日 00:00；无当月配置时以排程日 00:00 兜底</li>
+     *   <li>nextStructureName：当月配置中该结构机台的 BEGIN_DAY > 收尾日 的最早其他结构，回退机台未来结构配置</li>
+     *   <li>earliestLhTime：endingTime + 切换耗时，且不早于本次排程日 00:00</li>
+     *   <li>structureChangeRemaining：该结构全部胎胚成型余量合计</li>
+     *   <li>remark：各胎胚提前收尾备注拼接（写入 REMARK 列）</li>
+     * </ul>
+     *
+     * @param context                 排程上下文（含 advanceEndingMap）
+     * @param records                 待写入记录列表（追加）
+     * @param machineFutureStructureMap 机台 -> 未来结构配置（BEGIN_DAY 升序）
+     * @param materialByEmbryoMap     胎胚编码 -> 物料
+     * @param materialByCodeMap       物料编码 -> 物料
+     * @param sameInchHours           同英寸切换耗时（小时）
+     * @param diffInchHours           不同英寸切换耗时（小时）
+     */
+    private void appendScenario3AdvanceEndingRecords(ScheduleContextVo context,
+                                                     List<CxEmbryoLhTime> records,
+                                                     Map<String, List<MpCxCapacityConfiguration>> machineFutureStructureMap,
+                                                     Map<String, MdmMaterialInfo> materialByEmbryoMap,
+                                                     Map<String, MdmMaterialInfo> materialByCodeMap,
+                                                     int sameInchHours, int diffInchHours) {
+        Map<String, List<AdvanceEndingInfo>> advanceEndingMap = context.getAdvanceEndingMap();
+        if (advanceEndingMap == null || advanceEndingMap.isEmpty()) {
+            return;
+        }
+        LocalDate scheduleDate = context.getScheduleDate();
+        for (Map.Entry<String, List<AdvanceEndingInfo>> entry : advanceEndingMap.entrySet()) {
+            String structureName = entry.getKey();
+            List<AdvanceEndingInfo> infos = entry.getValue();
+            if (infos == null || infos.isEmpty()) {
+                continue;
+            }
+            AdvanceEndingInfo first = infos.get(0);
+            int totalRemainder = infos.stream()
+                    .mapToInt(i -> i.getFormingRemainder() != null ? i.getFormingRemainder() : 0)
+                    .sum();
+            if (totalRemainder <= 0) {
+                log.info("场景3（提前收尾）：结构={} 余量合计<=0，跳过", structureName);
+                continue;
+            }
+
+            // 1. 前结构结束时间：收尾日当日末（= 切换日 00:00）
+            LocalDateTime endingTime;
+            if (first.getEndingDay() != null && first.getEndingDay() > 0) {
+                LocalDate endingDate = LocalDate.of(scheduleDate.getYear(), scheduleDate.getMonthValue(), first.getEndingDay());
+                endingTime = endingDate.plusDays(1).atStartOfDay();
+            } else {
+                endingTime = scheduleDate.atStartOfDay();
+            }
+
+            // 2. 下个结构：当月配置机台行 BEGIN_DAY > 收尾日 的最早其他结构，回退机台未来结构配置
+            String nextStructureName = findNextStructureForAdvanceEnding(context, first, machineFutureStructureMap);
+
+            // 3. 切换耗时与最早可供硫化时间（不早于本次排程日 00:00）
+            int switchHours = 0;
+            if (nextStructureName != null) {
+                switchHours = calculateSwitchHours(structureName, nextStructureName,
+                        materialByEmbryoMap, materialByCodeMap, context, sameInchHours, diffInchHours);
+            }
+            LocalDateTime earliestLhTime = endingTime.plusHours(switchHours);
+            if (earliestLhTime.isBefore(scheduleDate.atStartOfDay())) {
+                earliestLhTime = scheduleDate.atStartOfDay();
+            }
+
+            // 4. 汇总该结构全部胎胚备注
+            String remark = infos.stream()
+                    .map(AdvanceEndingInfo::getRemark)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.joining("；"));
+
+            CxEmbryoLhTime record = new CxEmbryoLhTime();
+            record.setStructureName(structureName);
+            record.setCxMachineCode(first.getCxMachineCode());
+            record.setNextStructureName(nextStructureName);
+            record.setEndingTime(java.sql.Timestamp.valueOf(endingTime));
+            record.setEarliestLhTime(java.sql.Timestamp.valueOf(earliestLhTime));
+            record.setStructureChangeRemaining(totalRemainder);
+            record.setRemark(remark);
+            records.add(record);
+            log.info("场景3（提前收尾）：结构={}，机台={}，收尾日={}，下个结构={}，切换{}h，结束时间={}，最早可供硫化时间={}，剩余余量合计={}，胎胚数={}",
+                    structureName, first.getCxMachineCode(), first.getEndingDay(), nextStructureName,
+                    switchHours, endingTime, earliestLhTime, totalRemainder, infos.size());
+        }
+    }
+
+    /**
+     * 场景3查找下个结构：当月配置中，该结构机台上 BEGIN_DAY > 收尾日 的最早其他结构行。
+     *
+     * <p>排除本结构自己的后续配置段（精确名或前缀命中的配置名）。
+     * 找不到时回退机台未来结构配置（BEGIN_DAY 升序的第一个）。
+     *
+     * @param context                排程上下文
+     * @param info                   提前收尾信息（含当月配置机台/收尾日/配置结构名）
+     * @param machineFutureStructureMap 机台 -> 未来结构配置（BEGIN_DAY 升序）
+     * @return 下个结构名称，找不到返回 null
+     */
+    private String findNextStructureForAdvanceEnding(ScheduleContextVo context,
+                                                     AdvanceEndingInfo info,
+                                                     Map<String, List<MpCxCapacityConfiguration>> machineFutureStructureMap) {
+        String machineCode = info.getCxMachineCode();
+        LocalDate scheduleDate = context.getScheduleDate();
+        Map<String, List<MpCxCapacityConfiguration>> allocationMap = context.getStructureAllocationMap();
+        if (machineCode != null && allocationMap != null) {
+            MpCxCapacityConfiguration earliest = null;
+            for (List<MpCxCapacityConfiguration> configs : allocationMap.values()) {
+                for (MpCxCapacityConfiguration config : configs) {
+                    if (config.getCxMachineCode() == null || !config.getCxMachineCode().equals(machineCode)) {
+                        continue;
+                    }
+                    if (config.getBeginDay() == null || info.getEndingDay() == null
+                            || config.getBeginDay() <= info.getEndingDay()) {
+                        continue;
+                    }
+                    if (config.getYear() == null || config.getYear() != scheduleDate.getYear()
+                            || config.getMonth() == null || config.getMonth() != scheduleDate.getMonthValue()) {
+                        continue;
+                    }
+                    // 排除本结构自己的后续配置段
+                    if (info.getStructureName() != null && info.getStructureName().equals(config.getStructureName())) {
+                        continue;
+                    }
+                    if (info.getConfigStructureName() != null && info.getConfigStructureName().equals(config.getStructureName())) {
+                        continue;
+                    }
+                    if (earliest == null || config.getBeginDay() < earliest.getBeginDay()) {
+                        earliest = config;
+                    }
+                }
+            }
+            if (earliest != null) {
+                return earliest.getStructureName();
+            }
+        }
+        // 回退：机台未来结构配置（BEGIN_DAY 升序第一个）
+        if (machineCode != null) {
+            List<MpCxCapacityConfiguration> futures = machineFutureStructureMap.get(machineCode);
+            if (futures != null && !futures.isEmpty()) {
+                return futures.get(0).getStructureName();
+            }
+        }
+        return null;
     }
 
     /**
@@ -825,13 +1557,9 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         return null;
     }
 
-    /**
-     * 构建结构 -> 初始成型余量映射。
-     * <p>从 initialFormingRemainderMap（materialCode -> 成型余量）按结构汇总。
-     */
-    private Map<String, Integer> buildStructureFormingRemainderMap(ScheduleContextVo context,
-                                                                   Map<String, String> materialToStructureMap) {
-        Map<String, Integer> result = new HashMap<>();
+    private Map<String, Map<String, Integer>> buildStructureMaterialFormingRemainderMap(
+            ScheduleContextVo context, Map<String, String> materialToStructureMap) {
+        Map<String, Map<String, Integer>> result = new HashMap<>();
         Map<String, Integer> initialRemainderMap = context.getInitialFormingRemainderMap();
         if (initialRemainderMap == null || materialToStructureMap == null) {
             return result;
@@ -842,7 +1570,8 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             String materialCode = surplus != null ? surplus.getMaterialCode() : null;
             String structureName = materialToStructureMap.get(materialCode);
             if (structureName != null) {
-                result.merge(structureName, entry.getValue() != null ? entry.getValue() : 0, Integer::sum);
+                result.computeIfAbsent(structureName, k -> new HashMap<>())
+                        .merge(materialCode, entry.getValue() != null ? entry.getValue() : 0, Integer::sum);
             }
         }
         return result;
@@ -1023,7 +1752,9 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         }
 
         // 执行机台级三轮精排：单机台物理产能封顶 + 胎胚维度限制（替代原结构内调拨均衡）
-        balanceMachineQuantityWithinStructure(allAllocations, context);
+        // 解析当前班次 CLASS 索引，供 MQ-R4 读取本班硫化计划量（对齐硫化消耗）
+        int classIndex = productionCalculator.parseClassIndex(shiftConfig);
+        balanceMachineQuantityWithinStructure(allAllocations, context, classIndex);
 
         // 5.3.5 精度计划挑选与提前扣量（每日首次执行，修改 TaskAllocation 数量）
         applyPrecisionPlanSelection(context, scheduleDate, shiftConfig, allAllocations);
@@ -1144,7 +1875,8 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
      */
     void balanceMachineQuantityWithinStructure(
             List<MachineAllocationResult> allAllocations,
-            ScheduleContextVo context) {
+            ScheduleContextVo context,
+            int classIndex) {
 
         if (CollectionUtils.isEmpty(allAllocations)) {
             return;
@@ -1163,11 +1895,17 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
 
         // 3. 构建 lhId -> mouldQty 映射（stockHours 增量计算用）
         Map<Long, Integer> lhIdToMoldQty = new HashMap<>();
+        // 3.1 构建 lhId -> 本班硫化计划量映射（MQ-R4 对齐硫化消耗用）
+        Map<Long, Integer> lhIdToClassPlanQty = new HashMap<>();
         if (context.getLhScheduleResults() != null) {
             for (LhScheduleResult lh : context.getLhScheduleResults()) {
                 if (lh.getId() != null) {
                     int mq = lh.getMouldQty() != null && lh.getMouldQty() > 0 ? lh.getMouldQty() : 1;
                     lhIdToMoldQty.put(lh.getId(), mq);
+                    Integer planQty = productionCalculator.getClassPlanQtyByIndex(lh, classIndex);
+                    if (planQty != null && planQty > 0) {
+                        lhIdToClassPlanQty.put(lh.getId(), planQty);
+                    }
                 }
             }
         }
@@ -1187,13 +1925,13 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
 
             for (MachineAgg agg : machineAggs.values()) {
                 refineSingleMachine(structure, agg, tripCap, context,
-                        stockHoursCapEnabled, stockHoursSoftTrigger, stockHoursHardCap, lhIdToMoldQty);
+                        stockHoursCapEnabled, stockHoursSoftTrigger, stockHoursHardCap, lhIdToMoldQty, lhIdToClassPlanQty);
             }
         }
     }
 
     /**
-     * 单机台三轮精排（MQ-R1 直排 / MQ-R2 软阈值轮询补量 / MQ-R3 硬上限补量）。
+     * 单机台三轮精排（MQ-R1 直排 / MQ-R2 软阈值轮询补量 / MQ-R3 硬上限补量 / MQ-R4 对齐本班硫化消耗）。
      *
      * @param structure            结构名
      * @param agg                  机台聚合
@@ -1203,10 +1941,30 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
      * @param softTrigger          软阈值（小时）
      * @param hardCap              硬上限（小时）
      * @param lhIdToMoldQty        lhId -> 模数映射
+     * @param lhIdToClassPlanQty   lhId -> 本班硫化计划量映射（MQ-R4 对齐用）
      */
+    /** 记录当前班次该机台发生切换耗时扣减（供 S5.10 跨班次均衡保护使用） */
+    private void recordShiftSwitchDeduct(ScheduleContextVo context, String machineCode) {
+        List<CxShiftConfig> currentShifts = context.getCurrentShiftConfigs();
+        if (currentShifts == null || currentShifts.isEmpty()) {
+            return;
+        }
+        String shiftCode = currentShifts.get(0).getShiftCode();
+        if (shiftCode == null) {
+            return;
+        }
+        Map<String, Set<String>> deductMap = context.getShiftSwitchDeductMachinesMap();
+        if (deductMap == null) {
+            deductMap = new HashMap<>();
+            context.setShiftSwitchDeductMachinesMap(deductMap);
+        }
+        deductMap.computeIfAbsent(shiftCode, k -> new HashSet<>()).add(machineCode);
+    }
+
     private void refineSingleMachine(String structure, MachineAgg agg, int tripCap,
                                      ScheduleContextVo context, boolean stockHoursCapEnabled,
-                                     int softTrigger, int hardCap, Map<Long, Integer> lhIdToMoldQty) {
+                                     int softTrigger, int hardCap, Map<Long, Integer> lhIdToMoldQty,
+                                     Map<Long, Integer> lhIdToClassPlanQty) {
         if (agg.eligibleTasks.isEmpty()) {
             return;
         }
@@ -1244,6 +2002,18 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             occupiedSeconds = occupiedSeconds.add(tpt.multiply(BigDecimal.valueOf(getTaskQty(ta))));
         }
         BigDecimal capacitySeconds = BigDecimal.valueOf(SECONDS_PER_SHIFT).subtract(occupiedSeconds);
+        // 余量延用释放后的切换耗时扣减：机台从延用结构切换到本结构（同英寸2h/异英寸8h，跨班次滚动）
+        Long holdoverSwitchRemaining = context.getMachineHoldoverSwitchMap() != null
+                ? context.getMachineHoldoverSwitchMap().get(agg.machineCode) : null;
+        if (holdoverSwitchRemaining != null && holdoverSwitchRemaining > 0) {
+            long deduct = Math.min(holdoverSwitchRemaining, SECONDS_PER_SHIFT);
+            capacitySeconds = capacitySeconds.subtract(BigDecimal.valueOf(deduct));
+            // 记录本班次该机台有切换扣减：S5.10 跨班次均衡时该班次不作为接收方，
+            // 防止均衡把产量挪回切换班次、突破扣减后产能上限（如 2h 扣减后 6h 班被补到 6.7h+）
+            recordShiftSwitchDeduct(context, agg.machineCode);
+            log.info("[MQ精排] 机台={} 余量延用切换中，扣除切换耗时{}s({}h)，剩余切换={}s",
+                    agg.machineCode, deduct, deduct / ScheduleConstants.SECONDS_PER_HOUR, holdoverSwitchRemaining);
+        }
         if (capacitySeconds.compareTo(BigDecimal.ZERO) <= 0) {
             log.info("[MQ精排] 结构={}, 机台={}, 排除任务已占满产能({}s)，可参与任务全部削减为0",
                     structure, agg.machineCode, occupiedSeconds.toBigInteger());
@@ -1384,6 +2154,49 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 }
                 if (!anyAction) {
                     break;
+                }
+            }
+        }
+
+        // ==================== MQ-R4：对齐本班硫化消耗（机台内按胎胚聚合补齐成型缺口） ====================
+        // 目标：同一胎胚可能对应多条硫化记录（多 lhId），按 机台×胎胚 聚合硫化计划量(classXPlanQty)作为目标，
+        //       聚合当前成型量，补到聚合缺口不足一整车为止；只补缺口（成型<硫化）不削减；
+        //       仅受机台物理产能约束（对齐轮豁免 stockHours 硬上限：补量目标=本班硫化消耗，产出即被本班消耗）。
+        if (!lhIdToClassPlanQty.isEmpty()) {
+            // 聚合目标：机台内该胎胚所有 lhId 的本班硫化计划量之和
+            Map<String, Integer> embryoLhTarget = new HashMap<>();
+            for (TaskAllocation ta : ordered) {
+                Integer p = lhIdToClassPlanQty.get(ta.getLhId());
+                if (p != null && p > 0) {
+                    embryoLhTarget.merge(ta.getEmbryoCode(), p, Integer::sum);
+                }
+            }
+            if (!embryoLhTarget.isEmpty()) {
+                // 聚合当前成型量
+                Map<String, Integer> embryoCurrentQty = new HashMap<>();
+                for (TaskAllocation ta : ordered) {
+                    embryoCurrentQty.merge(ta.getEmbryoCode(), getTaskQty(ta), Integer::sum);
+                }
+                for (TaskAllocation ta : ordered) {
+                    String em = ta.getEmbryoCode();
+                    Integer aggTarget = embryoLhTarget.get(em);
+                    if (aggTarget == null || aggTarget <= 0) {
+                        continue;
+                    }
+                    int gap = aggTarget - embryoCurrentQty.getOrDefault(em, 0);
+                    while (gap >= tripCap && usedSeconds.compareTo(capacitySeconds) < 0) {
+                        BigDecimal carSeconds = timePerTireMap.get(ta).multiply(BigDecimal.valueOf(tripCap));
+                        if (usedSeconds.add(carSeconds).compareTo(capacitySeconds) > 0) {
+                            break; // 放不下一整车（机台物理产能已满）
+                        }
+                        adjustTaskQty(ta, tripCap);
+                        updateTaskStockHours(ta, tripCap, context, lhIdToMoldQty);
+                        usedSeconds = usedSeconds.add(carSeconds);
+                        embryoCurrentQty.merge(em, tripCap, Integer::sum);
+                        gap -= tripCap;
+                        log.info("[MQ-R4] 对齐硫化消耗补量: 机台={}, 胚胎={}, +1车({}条), 聚合距硫化计划还差={}",
+                                agg.machineCode, em, tripCap, Math.max(gap, 0));
+                    }
                 }
             }
         }
@@ -1531,7 +2344,17 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 Map<String, Map<String, List<ShiftProductionResult>>> shiftEmbryoMap = machineEntry.getValue();
                 if (shiftEmbryoMap.size() < 2) continue;
 
-                totalTransfers += balanceMachineCrossShift(machineCode, day, shiftEmbryoMap);
+                // 该机台发生切换耗时扣减的班次集合（接收方保护，防止均衡突破扣减后产能上限）
+                Set<String> switchDeductShifts = new HashSet<>();
+                Map<String, Set<String>> deductMap = context.getShiftSwitchDeductMachinesMap();
+                if (deductMap != null) {
+                    for (Map.Entry<String, Set<String>> de : deductMap.entrySet()) {
+                        if (de.getValue().contains(machineCode)) {
+                            switchDeductShifts.add(de.getKey());
+                        }
+                    }
+                }
+                totalTransfers += balanceMachineCrossShift(machineCode, day, shiftEmbryoMap, switchDeductShifts);
             }
         }
 
@@ -1546,10 +2369,12 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
      * @param machineCode 机台编码
      * @param day 天
      * @param shiftEmbryoMap shiftCode -> embryoCode -> List<SPR>
+     * @param switchDeductShifts 该机台发生切换耗时扣减的班次编码集合（不作为接收方）
      * @return 实际执行的调拨次数
      */
     private int balanceMachineCrossShift(String machineCode, int day,
-                                         Map<String, Map<String, List<ShiftProductionResult>>> shiftEmbryoMap) {
+                                         Map<String, Map<String, List<ShiftProductionResult>>> shiftEmbryoMap,
+                                         Set<String> switchDeductShifts) {
 
         // 获取整车容量（取任一 SPR 的 tripCapacity）
         int tripCap = 0;
@@ -1580,16 +2405,18 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 shiftTotals.put(shiftEntry.getKey(), total);
             }
 
-            // 找高产和低产班次
+            // 找高产和低产班次（低产班次排除切换扣减班次：其低产量是切换耗时的物理结果，
+            // 补量会突破扣减后产能上限，如 2h 扣减后 6h 班被补到 6.7h+）
             String maxShift = null, minShift = null;
             int maxQty = Integer.MIN_VALUE, minQty = Integer.MAX_VALUE;
             for (Map.Entry<String, Integer> e : shiftTotals.entrySet()) {
                 if (e.getValue() > maxQty) { maxQty = e.getValue(); maxShift = e.getKey(); }
-                if (e.getValue() < minQty) { minQty = e.getValue(); minShift = e.getKey(); }
+                if (e.getValue() < minQty && !switchDeductShifts.contains(e.getKey())) {
+                    minQty = e.getValue();
+                    minShift = e.getKey();
+                }
             }
-
-            // 差异 <= 1车，均衡完成
-            if (maxShift == null || maxQty - minQty <= tripCap) break;
+            if (minShift == null || maxShift == null || maxQty - minQty <= tripCap) break;
 
             // 找共同胎胚（高产班次有 >= 1车可减，低产班次有该胎胚可加）
             Map<String, List<ShiftProductionResult>> maxEmbryoMap = shiftEmbryoMap.get(maxShift);
@@ -3777,8 +4604,176 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         log.info("【步骤5】重算成型余量（formingRemainderMap）...");
         recalculateFormingRemainder(context, lastBatchMaterials);
 
+        // 7. 余量延用：更新结构最近生产机台 + 释放余量已耗尽的延用结构（触发切换事件与耗时扣减）
+        updateStructureHoldoverAfterShift(context, shiftProductionResults);
+
         log.info("========== 第 {} 天 - {} 班上下文更新完成 ==========\n",
                 currentDay, shiftName);
+    }
+
+    /**
+     * 余量延用班末维护：
+     * <ol>
+     *   <li>更新 structureLastMachinesMap（结构 -> 本班次实际生产机台，有产量才更新，停产班次保持原值）</li>
+     *   <li>释放检测：延用结构余量耗尽 -> 移出延用，机台释放，切换耗时写入 machineHoldoverSwitchMap
+     *       （切换耗时 = 前结构 vs 下个结构英寸判定，同英寸2h/异英寸8h）</li>
+     *   <li>滚动扣减：machineHoldoverSwitchMap 已有记录减去本班 28800s（8h 切换跨班次时剩余滚入下一班）</li>
+     * </ol>
+     *
+     * @param context                排程上下文
+     * @param shiftProductionResults 当前班次成型排产结果
+     */
+    private void updateStructureHoldoverAfterShift(ScheduleContextVo context,
+                                                   List<ShiftProductionResult> shiftProductionResults) {
+        // 0. 快照进入本方法前已存在的切换记录（滚动扣减只作用于旧记录，释放时新写入的下一班才开始扣）
+        Set<String> preExistingSwitchMachines = new HashSet<>();
+        if (context.getMachineHoldoverSwitchMap() != null) {
+            preExistingSwitchMachines.addAll(context.getMachineHoldoverSwitchMap().keySet());
+        }
+
+        // 1. 结构最近生产机台（有产量才更新）
+        Map<String, Set<String>> lastMachinesMap = context.getStructureLastMachinesMap();
+        if (lastMachinesMap == null) {
+            lastMachinesMap = new HashMap<>();
+            context.setStructureLastMachinesMap(lastMachinesMap);
+        }
+        if (shiftProductionResults != null) {
+            for (ShiftProductionResult spr : shiftProductionResults) {
+                if (spr.getQuantity() == null || spr.getQuantity() <= 0) continue;
+                if (spr.getStructureName() == null || spr.getMachineCode() == null) continue;
+                lastMachinesMap.computeIfAbsent(spr.getStructureName(), k -> new HashSet<>()).add(spr.getMachineCode());
+            }
+        }
+
+        Map<String, List<MpCxCapacityConfiguration>> holdoverMap = context.getStructureHoldoverMachineMap();
+        if (holdoverMap == null || holdoverMap.isEmpty()) {
+            // 无延用结构时仍需滚动扣减切换耗时（延用已释放但切换可能跨班次进行中）
+            rollHoldoverSwitchCost(context, preExistingSwitchMachines);
+            return;
+        }
+
+        // 2. 释放检测：余量耗尽的延用结构
+        Iterator<Map.Entry<String, List<MpCxCapacityConfiguration>>> holdoverIt = holdoverMap.entrySet().iterator();
+        while (holdoverIt.hasNext()) {
+            Map.Entry<String, List<MpCxCapacityConfiguration>> holdoverEntry = holdoverIt.next();
+            String structureName = holdoverEntry.getKey();
+            int remainder = context.getStructureRemainderTotal(structureName);
+            if (remainder > 0) {
+                continue;
+            }
+            List<MpCxCapacityConfiguration> releasedConfigs = holdoverEntry.getValue();
+            holdoverIt.remove();
+
+            // 切换事件：计算切换耗时（前结构 vs 机台当日下个结构）
+            Map<String, MdmMaterialInfo> materialByEmbryoMap = new HashMap<>();
+            Map<String, MdmMaterialInfo> materialByCodeMap = new HashMap<>();
+            if (context.getMaterials() != null) {
+                for (MdmMaterialInfo material : context.getMaterials()) {
+                    if (material.getMaterialCode() != null) {
+                        materialByCodeMap.putIfAbsent(material.getMaterialCode(), material);
+                    }
+                    if (material.getEmbryoCode() != null) {
+                        materialByEmbryoMap.putIfAbsent(material.getEmbryoCode(), material);
+                    }
+                }
+            }
+            int sameInchHours = getIntParamValue(context, ScheduleConstants.PARAM_SAME_INCH_SWITCH_HOURS, ScheduleConstants.DEFAULT_SAME_INCH_SWITCH_HOURS);
+            int diffInchHours = getIntParamValue(context, ScheduleConstants.PARAM_DIFF_INCH_SWITCH_HOURS, ScheduleConstants.DEFAULT_DIFF_INCH_SWITCH_HOURS);
+
+            Map<String, Long> switchMap = context.getMachineHoldoverSwitchMap();
+            if (switchMap == null) {
+                switchMap = new HashMap<>();
+                context.setMachineHoldoverSwitchMap(switchMap);
+            }
+            for (MpCxCapacityConfiguration config : releasedConfigs) {
+                String machineCode = config.getCxMachineCode();
+                if (machineCode == null) continue;
+                String nextStructure = findNextStructureForHoldoverRelease(context, structureName, machineCode);
+                int switchHours = 0;
+                if (nextStructure != null) {
+                    switchHours = calculateSwitchHours(structureName, nextStructure,
+                            materialByEmbryoMap, materialByCodeMap, context, sameInchHours, diffInchHours);
+                }
+                switchMap.put(machineCode, switchHours * (long) ScheduleConstants.SECONDS_PER_HOUR);
+                log.info("【余量延用】结构={} 余量已耗尽，机台={} 释放，切换至下个结构={}，切换耗时={}h（下班次产能扣减）",
+                        structureName, machineCode, nextStructure != null ? nextStructure : "无（当日无后续配置）", switchHours);
+            }
+        }
+
+        // 3. 切换耗时滚动扣减
+        rollHoldoverSwitchCost(context, preExistingSwitchMachines);
+    }
+
+    /** 切换耗时滚动：旧记录减去本班 28800s，耗尽移除（释放时新写入的记录本班不扣，下一班开始扣） */
+    private void rollHoldoverSwitchCost(ScheduleContextVo context, Set<String> preExistingSwitchMachines) {
+        Map<String, Long> switchMap = context.getMachineHoldoverSwitchMap();
+        if (switchMap == null || switchMap.isEmpty() || preExistingSwitchMachines.isEmpty()) {
+            return;
+        }
+        Iterator<Map.Entry<String, Long>> it = switchMap.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry<String, Long> entry = it.next();
+            if (!preExistingSwitchMachines.contains(entry.getKey())) {
+                continue;
+            }
+            long remaining = entry.getValue() - SECONDS_PER_SHIFT;
+            if (remaining <= 0) {
+                it.remove();
+            } else {
+                entry.setValue(remaining);
+            }
+        }
+    }
+
+    /**
+     * 延用释放后查找机台的下个结构：当月配置中该机台上 BEGIN_DAY 不早于前结构最近到期段 END_DAY
+     * （含同日切换：后结构 BEGIN_DAY == 前结构 END_DAY）的最早其他结构。
+     */
+    private String findNextStructureForHoldoverRelease(ScheduleContextVo context,
+                                                       String prevStructureName,
+                                                       String machineCode) {
+        Map<String, List<MpCxCapacityConfiguration>> allocationMap = context.getStructureAllocationMap();
+        if (allocationMap == null || machineCode == null) {
+            return null;
+        }
+        // 前结构最近到期段的 END_DAY（年月日复合）
+        int prevEndComposite = -1;
+        List<MpCxCapacityConfiguration> prevConfigs = allocationMap.get(prevStructureName);
+        if (prevConfigs != null) {
+            for (MpCxCapacityConfiguration c : prevConfigs) {
+                if (machineCode.equals(c.getCxMachineCode()) && c.getEndDay() != null
+                        && c.getYear() != null && c.getMonth() != null) {
+                    int composite = c.getYear() * 10000 + c.getMonth() * 100 + c.getEndDay();
+                    if (composite > prevEndComposite) {
+                        prevEndComposite = composite;
+                    }
+                }
+            }
+        }
+        MpCxCapacityConfiguration earliest = null;
+        int earliestComposite = Integer.MAX_VALUE;
+        for (List<MpCxCapacityConfiguration> configs : allocationMap.values()) {
+            for (MpCxCapacityConfiguration c : configs) {
+                if (!machineCode.equals(c.getCxMachineCode())
+                        || c.getBeginDay() == null || c.getYear() == null || c.getMonth() == null) {
+                    continue;
+                }
+                if (prevStructureName != null && prevStructureName.equals(c.getStructureName())) {
+                    continue;
+                }
+                int beginComposite = c.getYear() * 10000 + c.getMonth() * 100 + c.getBeginDay();
+                // 同日切换（后结构 BEGIN_DAY == 前结构 END_DAY）也算下个结构：
+                // 前结构当日到期、余量耗尽后当日内切到后结构，切换耗时照常扣减
+                if (prevEndComposite >= 0 && beginComposite < prevEndComposite) {
+                    continue;
+                }
+                if (beginComposite < earliestComposite) {
+                    earliestComposite = beginComposite;
+                    earliest = c;
+                }
+            }
+        }
+        return earliest != null ? earliest.getStructureName() : null;
     }
 
     /**

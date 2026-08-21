@@ -154,9 +154,9 @@ public class ScheduleContextVo {
     private List<CxStock> stocks;
 
     /**
-     * 物料库存映射（按物料编码分配库存，共用胎胚按需求比例分配）
-     * Key: 物料编码 (materialCode)
-     * Value: 分配给该物料的库存数量
+     * 硫化任务库存映射（共用胎胚按需求比例分配）
+     * Key: 硫化任务ID (lhId -> String)
+     * Value: 分配给该硫化任务的库存数量
      */
     private Map<String, Integer> materialStockMap;
 
@@ -258,7 +258,7 @@ public class ScheduleContextVo {
     private Map<String, MdmStructureLhRatio> structureLhRatioMap;
 
     /**
-     * 成型余量映射（物料编码+产品状态 -> 成型余量）
+     * 成型余量映射（物料编码 -> 成型余量）
      * 成型余量 = 硫化余量 - 该物料对应的所有胎胚库存
      * 用于收尾计算
      */
@@ -266,7 +266,7 @@ public class ScheduleContextVo {
 
     /**
      * 初始成型余量映射（排程开始前的快照，不会被后续班次更新影响）
-     * Key: 物料编码+产品状态
+     * Key: 物料编码
      * Value: 初始成型余量
      */
     private Map<String, Integer> initialFormingRemainderMap;
@@ -354,11 +354,6 @@ public class ScheduleContextVo {
      * 机台小时产能（条/小时）
      */
     private Integer machineHourlyCapacity;
-
-    /**
-     * 是否开产日
-     */
-    private Boolean isOpeningDay;
 
     /**
      * 是否停产日
@@ -526,6 +521,28 @@ public class ScheduleContextVo {
     private Map<String, List<MpCxCapacityConfiguration>> advanceProductionMachineMap;
 
     /**
+     * 提前收尾信息映射（结构编码 -> 提前收尾胎胚列表）
+     * <p>触发条件（NEVER_CONFIGURED）：结构当日无机台且未来3个月从未配置过该结构，
+     * 由 TaskGroupService.collectAdvanceEndingInfos 每班次刷新（末次为准），
+     * 供 CoreScheduleAlgorithmServiceImpl 追加主表 0 产量行与 T_CX_EMBRYO_LH_TIME 场景3 记录
+     */
+    private Map<String, List<AdvanceEndingInfo>> advanceEndingMap;
+
+    /**
+     * 提前收尾候选任务快照（结构名 -> 该结构的硫化任务列表，含被"已收尾过滤"移除的任务）
+     * <p>首次发现 NEVER_CONFIGURED 结构时构建一次，后续班次直接复用，
+     * 规避班次筛选窗口漂移与已收尾过滤导致的任务缺失
+     */
+    private Map<String, List<LhScheduleResult>> advanceEndingCandidateMap;
+
+    /**
+     * 被"已收尾物料过滤"从 lhScheduleResults 移除的硫化任务（初始成型余量=0 的任务）
+     * <p>由 ScheduleServiceImpl 过滤时收集，供提前收尾候选快照补全数据源
+     * <p>注意：这些任务在运行中库存被共用胎胚消耗后可能重新出现成型余量缺口
+     */
+    private List<LhScheduleResult> filteredCompletedLhResults;
+
+    /**
      * 跨班次机台切换状态（key=机台编码|提前生产结构名, value=切换状态秒数）
      * <p>value 含义：
      * <ul>
@@ -569,6 +586,44 @@ public class ScheduleContextVo {
      * 从 CxParamConfig 获取，控制续作任务是否优先保留在原机台
      */
     private Boolean forceKeepHistoryTask;
+
+    /**
+     * 余量延用机台配置（结构名 -> 延用配置列表）。
+     * <p>触发：结构配置段已到期（当日无段覆盖）但结构成型余量未耗尽时，
+     * 由 TaskGroupService.refreshStructureHoldover 每班次刷新，最近班次生产该结构的机台
+     * 突破 END_DAY 延用继续生产，配置为原配置段整体复制（含 PRODUCTION_VERSION）。
+     * <p>消费：getAvailableMachinesForStructure / TaskGroupService.getRecommendedMachinesForStructure
+     * 合并延用机台；其他结构查询时剔除延用机台（防双占用）。
+     */
+    private Map<String, List<MpCxCapacityConfiguration>> structureHoldoverMachineMap;
+
+    /**
+     * 结构最近生产机台（结构名 -> 最近一个有产量班次的生产机台集合）。
+     * <p>由 CoreScheduleAlgorithmServiceImpl 每班末从 ShiftProductionResult 反查更新
+     * （有产量才更新，停产班次保持原值）；窗口首班为空时延用判定回退初始在机信息反查。
+     */
+    private Map<String, Set<String>> structureLastMachinesMap;
+
+    /**
+     * 被延用让位结构集合（当日配置机台全被前结构延用占用 -> 本班次不排产）。
+     * <p>由 refreshStructureHoldover 每班次重算；resolveAdvanceIfNeeded 读取以跳过
+     * NEVER_CONFIGURED 提前收尾判定（防止"被推迟"误标为"欠产延误提前收尾"）。
+     */
+    private Set<String> deferredByHoldoverStructures;
+
+    /**
+     * 延用释放切换剩余耗时（机台编码 -> 剩余切换秒数）。
+     * <p>延用结构余量耗尽释放机台时写入（切换耗时=同英寸2h/异英寸8h），
+     * MQ 精排按机台读取扣减产能，班末滚动扣减（8h 跨班次时剩余滚入下一班）。
+     */
+    private Map<String, Long> machineHoldoverSwitchMap;
+
+    /**
+     * 切换扣减班次记录（班次编码 -> 当班有切换耗时扣减的机台集合）。
+     * <p>MQ 精排扣减切换耗时时写入；S5.10 跨班次总产量均衡时，
+     * 有切换扣减的班次不作为调拨接收方，防止均衡把产量挪回切换班次突破扣减后产能上限。
+     */
+    private Map<String, Set<String>> shiftSwitchDeductMachinesMap;
 
     /**
      * 班次信息
@@ -628,12 +683,127 @@ public class ScheduleContextVo {
                                 Collectors.toMap(MpCxCapacityConfiguration::getCxMachineCode,
                                         c -> c, (a, b) -> a, LinkedHashMap::new),
                                 m -> new ArrayList<>(m.values())));
+                result = applyHoldoverToMachines(result, structureName);
                 if (!result.isEmpty()) {
                     return result;
                 }
             }
         }
+        // 余用结构当日无配置段时，延用配置也要参与回退前的判定
+        if (structureHoldoverMachineMap != null && structureHoldoverMachineMap.containsKey(structureName)) {
+            List<MpCxCapacityConfiguration> holdover = structureHoldoverMachineMap.get(structureName).stream()
+                    .filter(c -> c.getCxMachineCode() == null || availableMachineCodes.contains(c.getCxMachineCode()))
+                    .collect(Collectors.toList());
+            if (!holdover.isEmpty()) {
+                return holdover;
+            }
+        }
         return getAdvanceProductionMachines(structureName, productionVersion);
+    }
+
+    /**
+     * 余量延用机台合并/剔除：
+     * <ul>
+     *   <li>结构自身在延用中 -> 延用配置优先合并（突破 END_DAY 继续生产）</li>
+     *   <li>其他结构 -> 剔除延用机台（被前结构占用，防同班次双结构冲突）</li>
+     * </ul>
+     *
+     * @param machines       原始配置段过滤结果
+     * @param structureName  查询的结构名
+     * @return 合并/剔除后的机台配置列表
+     */
+    private List<MpCxCapacityConfiguration> applyHoldoverToMachines(
+            List<MpCxCapacityConfiguration> machines, String structureName) {
+        if (structureHoldoverMachineMap == null || structureHoldoverMachineMap.isEmpty()) {
+            return machines;
+        }
+        if (structureHoldoverMachineMap.containsKey(structureName)) {
+            // 结构自身延用：延用配置优先，再并入正常配置（按机台去重）
+            Map<String, MpCxCapacityConfiguration> merged = new LinkedHashMap<>();
+            for (MpCxCapacityConfiguration c : structureHoldoverMachineMap.get(structureName)) {
+                if (c.getCxMachineCode() != null) {
+                    merged.putIfAbsent(c.getCxMachineCode(), c);
+                }
+            }
+            // 其他结构延用占用的机台：正常配置命中这些机台时剔除（一台机台同一班次只能一个结构）
+            Set<String> otherHoldoverCodes = new HashSet<>();
+            for (Map.Entry<String, List<MpCxCapacityConfiguration>> e : structureHoldoverMachineMap.entrySet()) {
+                if (structureName.equals(e.getKey())) {
+                    continue;
+                }
+                for (MpCxCapacityConfiguration c : e.getValue()) {
+                    if (c.getCxMachineCode() != null) {
+                        otherHoldoverCodes.add(c.getCxMachineCode());
+                    }
+                }
+            }
+            for (MpCxCapacityConfiguration c : machines) {
+                if (c.getCxMachineCode() == null || otherHoldoverCodes.contains(c.getCxMachineCode())) {
+                    continue;
+                }
+                merged.putIfAbsent(c.getCxMachineCode(), c);
+            }
+            return new ArrayList<>(merged.values());
+        }
+        // 其他结构：剔除延用机台
+        Set<String> holdoverCodes = new HashSet<>();
+        for (List<MpCxCapacityConfiguration> configs : structureHoldoverMachineMap.values()) {
+            for (MpCxCapacityConfiguration c : configs) {
+                if (c.getCxMachineCode() != null) {
+                    holdoverCodes.add(c.getCxMachineCode());
+                }
+            }
+        }
+        if (holdoverCodes.isEmpty()) {
+            return machines;
+        }
+        return machines.stream()
+                .filter(c -> c.getCxMachineCode() == null || !holdoverCodes.contains(c.getCxMachineCode()))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 结构成型余量合计（formingRemainderMap 按物料所属结构聚合）。
+     * <p>余量延用判定的"结构未收尾"信号：>0 表示结构仍有成型缺口需要继续生产。
+     *
+     * @param structureName 结构名称
+     * @return 该结构全部物料的成型余量之和
+     */
+    public int getStructureRemainderTotal(String structureName) {
+        if (formingRemainderMap == null || formingRemainderMap.isEmpty()
+                || structureName == null || materials == null) {
+            return 0;
+        }
+        // 物料 -> 结构映射（懒加载缓存）
+        Map<String, String> materialToStructure = new HashMap<>();
+        for (MdmMaterialInfo material : materials) {
+            if (material.getMaterialCode() != null && material.getStructureName() != null) {
+                materialToStructure.putIfAbsent(material.getMaterialCode(), material.getStructureName());
+            }
+        }
+        // 窗口内活跃物料集合：仅统计排程窗口内仍有硫化任务的物料，
+        // 排除窗口外“孤儿物料”（硫化任务已过窗口，成型余量永远无法排掉的账面残留），
+        // 避免此类残留余量误触发“结构未耗尽”导致机台被持续延用、后结构空转。
+        Set<String> activeMaterialCodes = new HashSet<>();
+        if (lhScheduleResults != null) {
+            for (LhScheduleResult lh : lhScheduleResults) {
+                if (lh.getMaterialCode() != null) {
+                    activeMaterialCodes.add(lh.getMaterialCode());
+                }
+            }
+        }
+        int total = 0;
+        for (Map.Entry<String, Integer> entry : formingRemainderMap.entrySet()) {
+            String materialStatusKey = entry.getKey();
+            // key 格式：materialCode|*|productStatus，取物料编码部分
+            int idx = materialStatusKey.indexOf('|');
+            String materialCode = idx > 0 ? materialStatusKey.substring(0, idx) : materialStatusKey;
+            if (structureName.equals(materialToStructure.get(materialCode))
+                    && activeMaterialCodes.contains(materialCode)) {
+                total += entry.getValue() != null ? entry.getValue() : 0;
+            }
+        }
+        return total;
     }
 
     /**
