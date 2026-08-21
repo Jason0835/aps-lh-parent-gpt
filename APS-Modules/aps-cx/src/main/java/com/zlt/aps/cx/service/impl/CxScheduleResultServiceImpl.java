@@ -1428,8 +1428,10 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         }
 
         // 第一段：查询 SKU 与施工关系表，按 工厂+物料编码+胎胚代码+制造示方书类型 定位制造示方书号(EMBRYO_NO)
+        // 注意：显式过滤已删除记录，确保一个SKU组合只对应一个示方书号
         List<MdmSkuConstructionRef> skuRefList = mdmSkuConstructionRefMapper.selectList(
                 new LambdaQueryWrapper<MdmSkuConstructionRef>()
+                        .eq(MdmSkuConstructionRef::getIsDelete, 0)
                         .eq(factoryCode != null, MdmSkuConstructionRef::getFactoryCode, factoryCode)
                         .in(MdmSkuConstructionRef::getMaterialCode, materialCodes)
                         .in(MdmSkuConstructionRef::getEmbryoCode, embryoCodes)
@@ -1441,10 +1443,13 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         }
 
         // 收集所有制造示方书号，作为消耗明细表的胎胚版本(EMBRYO_VERSION)
+        // 注意：EMBRYO_NO 字段可能包含逗号分隔的多个示方书号，需要拆分处理
         Set<String> embryoVersions = skuRefList.stream()
                 .map(MdmSkuConstructionRef::getEmbryoNo)
                 .filter(StringUtils::isNotBlank)
+                .flatMap(embryoNo -> Arrays.stream(embryoNo.split(",")))
                 .map(String::trim)
+                .filter(StringUtils::isNotBlank)
                 .collect(Collectors.toSet());
 
         if (CollectionUtils.isEmpty(embryoVersions)) {
@@ -1452,8 +1457,10 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         }
 
         // 第二段：查询 BOM 物料消耗明细表，按 工厂+胎胚代码+胎胚版本 取 AQT 开头的原材料描述
+        // 注意：显式过滤已删除记录
         List<MdmMaterialConsumeDetail> consumeDetails = mdmMaterialConsumeDetailMapper.selectList(
                 new LambdaQueryWrapper<MdmMaterialConsumeDetail>()
+                        .eq(MdmMaterialConsumeDetail::getIsDelete, 0)
                         .eq(factoryCode != null, MdmMaterialConsumeDetail::getFactoryCode, factoryCode)
                         .in(MdmMaterialConsumeDetail::getEmbryoCode, embryoCodes)
                         .in(MdmMaterialConsumeDetail::getEmbryoVersion, embryoVersions)
@@ -1478,16 +1485,28 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                                 Collectors.toCollection(LinkedHashSet::new))));
 
         // 组装最终映射：物料编码|胎胚代码|制造示方书类型 → 胶种(逗号连接)
+        // 注意：EMBRYO_NO 可能包含逗号分隔的多个示方书号，需要逐个拆分匹配
         Map<String, Set<String>> glueAccumulator = new LinkedHashMap<>();
         for (MdmSkuConstructionRef skuRef : skuRefList) {
             if (StringUtils.isBlank(skuRef.getEmbryoNo()) || StringUtils.isBlank(skuRef.getEmbryoCode())) {
                 continue;
             }
             String glueKey = buildSmallGlueKey(skuRef.getMaterialCode(), skuRef.getEmbryoCode(), skuRef.getEmbryoType());
-            Set<String> glueNames = consumeGlueMap.getOrDefault(
-                    skuRef.getEmbryoCode().trim() + "|" + skuRef.getEmbryoNo().trim(),
-                    Collections.emptySet());
-            glueAccumulator.computeIfAbsent(glueKey, key -> new LinkedHashSet<>()).addAll(glueNames);
+            // 拆分逗号分隔的示方书号，逐个匹配胶种
+            Set<String> glueNames = new LinkedHashSet<>();
+            for (String embryoNo : skuRef.getEmbryoNo().split(",")) {
+                String trimmedNo = embryoNo.trim();
+                if (StringUtils.isBlank(trimmedNo)) {
+                    continue;
+                }
+                Set<String> found = consumeGlueMap.getOrDefault(
+                        skuRef.getEmbryoCode().trim() + "|" + trimmedNo,
+                        Collections.emptySet());
+                glueNames.addAll(found);
+            }
+            if (!glueNames.isEmpty()) {
+                glueAccumulator.computeIfAbsent(glueKey, key -> new LinkedHashSet<>()).addAll(glueNames);
+            }
         }
 
         Map<String, String> valueMap = new HashMap<>();
