@@ -2,6 +2,9 @@ package com.zlt.aps.lh.component;
 
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
+import com.zlt.aps.lh.api.domain.dto.CapsuleReplacementTimeWindowDTO;
+import com.zlt.aps.lh.api.domain.dto.MachineCleaningWindowDTO;
+import com.zlt.aps.lh.api.domain.dto.MachineMaintenanceWindowDTO;
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.api.domain.entity.LhRepairCapsule;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
@@ -19,9 +22,11 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -29,7 +34,7 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * 胶囊使用次数与换胶囊班次扣减公共规则。
+ * 胶囊使用次数与换胶囊产能调整公共规则。
  *
  * <p>业务口径：</p>
  * <ul>
@@ -37,7 +42,7 @@ import java.util.Set;
  *   收口后的“扣减前实际可排量”；</li>
  *   <li>本批初始次数取左右模次数最大值，普通双模按单侧生产循环数累计，其他机台沿用现有累计口径；</li>
  *   <li>只有当前次数加扣减前胶囊次数增量严格大于上限时才首次换胶囊，刚好达到上限不触发；</li>
- *   <li>本批首次跨限从候选计划量固定扣减配置值，后续继续累计但不重置、不重复扣减；</li>
+ *   <li>本批首次跨限时，满产班次固定扣减配置量；未满产班次登记换胶囊时间窗口，二者互斥；</li>
  *   <li>L/R整机结果按左右实际量合计一次，结果复制和同班多个结果不得重复累计；</li>
  *   <li>候选预演、选机模拟和产能模拟不得调用本类，避免污染正式运行态。</li>
  * </ul>
@@ -61,7 +66,7 @@ public class CapsuleReplacementRuleService {
     private static final int DOUBLE_MOULD_QTY = 2;
 
     /**
-     * 对正式落班候选量执行换胶囊判断、固定扣减和次数累计。
+     * 对正式落班候选量执行换胶囊判断、产能调整和次数累计。
      *
      * <p>调用位置必须在现有数量约束全部收口之后、班次计划量写入和SKU余量扣账之前。
      * 返回值才是允许写入结果并消费账本的实际排产量。</p>
@@ -70,6 +75,8 @@ public class CapsuleReplacementRuleService {
      * @param result 当前排程结果
      * @param shift 当前班次
      * @param candidateQty 扣减前实际可排量
+     * @param shiftCapacityBeforeReplacement 换胶囊前已按现有停机、清洗、保养、首检和班次管控收口的实际班产
+     * @param effectiveStartTime 当前候选的实际开产时间；为空时按结果已有班次开始时间或班次起点处理
      * @param scene 调用场景，用于对账日志
      * @return 换胶囊规则收口后的实际排产量
      */
@@ -77,11 +84,21 @@ public class CapsuleReplacementRuleService {
                                     LhScheduleResult result,
                                     LhShiftConfigVO shift,
                                     int candidateQty,
+                                    int shiftCapacityBeforeReplacement,
+                                    Date effectiveStartTime,
                                     String scene) {
         int normalizedCandidateQty = Math.max(0, candidateQty);
+        int normalizedShiftCapacity = Math.max(0, shiftCapacityBeforeReplacement);
         if (Objects.isNull(context) || Objects.isNull(result) || Objects.isNull(shift)
                 || Objects.isNull(shift.getShiftIndex()) || normalizedCandidateQty <= 0
                 || StringUtils.isEmpty(result.getLhMachineCode())) {
+            return normalizedCandidateQty;
+        }
+        if (normalizedShiftCapacity <= 0) {
+            log.warn("换胶囊规则未执行，原因: 未取得换胶囊前实际班产, batchNo: {}, materialCode: {}, machineCode: {}, "
+                            + "shiftIndex: {}, candidateQty: {}, scene: {}",
+                    context.getBatchNo(), result.getMaterialCode(), result.getLhMachineCode(),
+                    shift.getShiftIndex(), normalizedCandidateQty, scene);
             return normalizedCandidateQty;
         }
 
@@ -114,6 +131,7 @@ public class CapsuleReplacementRuleService {
                 return 0;
             }
         }
+        int existingPlanQty = resolveShiftPlanQty(result, shift.getShiftIndex());
         int effectiveLossQty = resolveEffectiveLossQty(
                 configuredLossQty, wholeSingleControlPair, result.getLhMachineCode());
         int beforeUsage = getMachineRuntimeUsage(context, physicalMachineCode);
@@ -125,48 +143,87 @@ public class CapsuleReplacementRuleService {
         boolean firstThresholdCrossing = !shiftAlreadyReplaced
                 && !thresholdHandled
                 && beforeUsage + candidateUsageIncrement > usageUpperLimit;
-        int actualPlanQty = firstThresholdCrossing
-                ? Math.max(0, normalizedCandidateQty - effectiveLossQty)
-                : normalizedCandidateQty;
+        int physicalShiftCapacity = resolvePhysicalShiftCapacity(
+                normalizedShiftCapacity, wholeSingleControlPair, result.getLhMachineCode());
+        int existingPhysicalShiftQty = resolveExistingPhysicalShiftPlanQty(
+                context, result, physicalMachineCode, shift.getShiftIndex(), wholeSingleControlPair);
+        int candidatePhysicalShiftQty = resolvePhysicalShiftQty(
+                normalizedCandidateQty, wholeSingleControlPair, result.getLhMachineCode());
+        boolean shiftFullBeforeReplacement = existingPhysicalShiftQty + candidatePhysicalShiftQty
+                >= physicalShiftCapacity;
+        int actualPlanQty = firstThresholdCrossing && shiftFullBeforeReplacement
+                ? Math.max(0, normalizedCandidateQty - effectiveLossQty) : normalizedCandidateQty;
 
         if (firstThresholdCrossing) {
-            // 首次严格跨限后登记物理机台，本批后续班次只累计次数，不再重复扣量或备注。
+            // 首次严格跨限后登记物理机台，本批后续班次只累计次数，不再重复触发换胶囊。
             context.getCapsuleThresholdHandledMachineSet().add(physicalMachineCode);
             context.getCapsuleReplacementShiftKeySet().add(shiftKey);
-            int existingPlanQty = resolveShiftPlanQty(result, shift.getShiftIndex());
-            context.getCapsuleReplacementShiftCapacityLimitMap().put(
-                    capacityLimitKey, existingPlanQty + actualPlanQty);
+            if (shiftFullBeforeReplacement) {
+                // 满产班次只保留既有固定扣量上限，禁止同时追加换胶囊时间窗口。
+                context.getCapsuleReplacementShiftCapacityLimitMap().put(
+                        capacityLimitKey, existingPlanQty + actualPlanQty);
+            } else {
+                // 未满产班次不扣量，当前候选生产完成后占用机台换胶囊时长，后续时间轴自然重新归属产能。
+                registerCapsuleReplacementTimeWindow(context, result, shift, shiftKey,
+                        existingPlanQty + normalizedCandidateQty, normalizedShiftCapacity, effectiveStartTime);
+            }
             ShiftFieldUtil.appendShiftAnalysis(
                     result, shift.getShiftIndex(), CAPSULE_REPLACEMENT_ANALYSIS);
         }
-        // 按扣量后的实际计划量重新计算增量，避免把换胶囊损失计入使用次数。
+        // 满产扣量后的损失不计入胶囊次数；未满产时间模式保留当前候选真实生产量。
         int actualUsageIncrement = resolveCapsuleUsageIncrement(
                 result, actualPlanQty, wholeSingleControlPair);
         applyActualUsageIncrement(context, physicalMachineCode, actualUsageIncrement);
 
         if (firstThresholdCrossing) {
-            log.info("换胶囊班次计划量收口, batchNo: {}, scheduleDate: {}, scene: {}, materialCode: {}, "
+            log.info("换胶囊产能调整, batchNo: {}, scheduleDate: {}, scene: {}, materialCode: {}, "
                             + "machineCode: {}, physicalMachineCode: {}, shiftIndex: {}, 当前机台胶囊次数: {}, "
-                            + "胶囊上限: {}, 扣减前结果可排量: {}, 候选胶囊次数增量: {}, 配置扣减量: {}, "
-                            + "本结果有效扣减量: {}, 实际结果量: {}, 实际胶囊次数增量: {}, "
+                            + "胶囊上限: {}, 扣减前结果可排量: {}, 候选胶囊次数增量: {}, 换胶囊前实际班产: {}, "
+                            + "班次是否满产: {}, 调整方式: {}, 配置扣减量: {}, 换胶囊时长小时: {}, "
+                            + "调整前后计划量: {}/{}，换胶囊开始结束时间: {}/{}，实际胶囊次数增量: {}, "
                             + "本批首次严格跨限: {}, 累计后机台胶囊次数: {}",
                     context.getBatchNo(), LhScheduleTimeUtil.formatDate(context.getScheduleDate()), scene,
                     result.getMaterialCode(), result.getLhMachineCode(), physicalMachineCode,
                     shift.getShiftIndex(), beforeUsage,
-                    usageUpperLimit, normalizedCandidateQty, candidateUsageIncrement,
-                    configuredLossQty, effectiveLossQty, actualPlanQty, actualUsageIncrement,
+                    usageUpperLimit, normalizedCandidateQty, candidateUsageIncrement, normalizedShiftCapacity,
+                    shiftFullBeforeReplacement, shiftFullBeforeReplacement ? "扣量" : "延时",
+                    configuredLossQty, shiftFullBeforeReplacement
+                            ? 0 : resolveReplacementDurationHours(context),
+                    normalizedCandidateQty, actualPlanQty,
+                    resolveReplacementWindowStartTime(context, shiftKey),
+                    resolveReplacementWindowEndTime(context, shiftKey), actualUsageIncrement,
                     true, getMachineRuntimeUsage(context, physicalMachineCode));
         }
         return actualPlanQty;
     }
 
     /**
+     * 同包历史单元测试的完整班次便捷入口。
+     *
+     * <p>正式排程必须传入换胶囊前实际班产和实际开产时间，避免把部分班次误判为满产。
+     * 该入口仅保留给既有同包测试构造“候选量即完整班次”的场景，实际决策仍委托统一主方法。</p>
+     */
+    int resolveActualPlanQty(LhScheduleContext context,
+                             LhScheduleResult result,
+                             LhShiftConfigVO shift,
+                             int candidateQty,
+                             String scene) {
+        int existingPlanQty = Objects.isNull(result) || Objects.isNull(shift)
+                || Objects.isNull(shift.getShiftIndex()) ? 0
+                : resolveShiftPlanQty(result, shift.getShiftIndex());
+        Date effectiveStartTime = Objects.isNull(result) || Objects.isNull(shift)
+                || Objects.isNull(shift.getShiftIndex()) ? null
+                : ShiftFieldUtil.getShiftStartTime(result, shift.getShiftIndex());
+        return this.resolveActualPlanQty(context, result, shift, candidateQty,
+                Math.max(0, existingPlanQty + candidateQty), effectiveStartTime, scene);
+    }
+
+    /**
      * 获取已换胶囊班次在后置处理阶段允许使用的最大产能。
      *
      * <p>续作日标准收敛、班次重分配和收尾补量会根据停机、清洗、保养等规则重新计算
-     * “扣除换胶囊前”的班次物理产能。若当前物理机台班次已经触发换胶囊，这些后置入口
-     * 必须继续保留首次扣除的固定产能，不能把已扣的2条重新补回。该方法只返回产能上限，
-     * 不再次累计胶囊次数、不再次追加备注，也不消费SKU余量账本。</p>
+     * “换胶囊前”的班次物理产能。数量模式必须继续保留首次扣除的固定产能；时间模式的
+     * 不可生产窗口已在底层时间轴扣除，本方法不得再次扣量。</p>
      *
      * <p>调用方传入的 {@code capacityBeforeReplacement} 必须是不含换胶囊损失的理论产能。
      * 普通机台按配置值扣减；L/R整机的结果量按单侧保存，因此沿用正式落班规则折算为
@@ -176,7 +233,7 @@ public class CapsuleReplacementRuleService {
      * @param result 当前排程结果
      * @param shift 当前班次
      * @param capacityBeforeReplacement 扣除换胶囊前的班次理论产能
-     * @return 保留换胶囊固定损失后的班次产能上限；未触发换胶囊时原值返回
+     * @return 数量模式保留固定损失后的班次产能上限；时间模式和未触发时返回传入产能
      */
     public int resolveReplacementShiftCapacityUpperLimit(LhScheduleContext context,
                                                           LhScheduleResult result,
@@ -195,6 +252,10 @@ public class CapsuleReplacementRuleService {
         if (StringUtils.isEmpty(shiftKey)
                 || !containsReplacementAnalysisForPhysicalShift(
                         context, result, physicalMachineCode, shift.getShiftIndex())) {
+            return normalizedCapacity;
+        }
+        if (containsReplacementTimeWindow(context, shiftKey)) {
+            // 时间模式的容量损失已由 ShiftCapacityResolverUtil 合并不可生产区间计算，禁止二次扣量。
             return normalizedCapacity;
         }
 
@@ -239,6 +300,10 @@ public class CapsuleReplacementRuleService {
         if (StringUtils.isEmpty(shiftKey)
                 || !containsReplacementAnalysisForPhysicalShift(
                         context, result, physicalMachineCode, shift.getShiftIndex())) {
+            return normalizedPlanQty;
+        }
+        if (containsReplacementTimeWindow(context, shiftKey)) {
+            // 时间模式没有固定数量上限，后续容量由换胶囊窗口重新折算。
             return normalizedPlanQty;
         }
         Integer recordedCapacityLimit = context.getCapsuleReplacementShiftCapacityLimitMap().get(
@@ -306,6 +371,11 @@ public class CapsuleReplacementRuleService {
         List<LhScheduleResult> resultList = collectCurrentResults(context, currentResult);
         List<LhShiftConfigVO> shifts = resolveScheduleShifts(context);
         Set<String> validReplacementShiftKeySet = new LinkedHashSet<String>();
+        Map<String, CapsuleReplacementTimeWindowDTO> originalTimeWindowMap =
+                new LinkedHashMap<String, CapsuleReplacementTimeWindowDTO>(
+                        context.getCapsuleReplacementTimeWindowMap());
+        Map<String, CapsuleReplacementTimeWindowDTO> validTimeWindowMap =
+                new LinkedHashMap<String, CapsuleReplacementTimeWindowDTO>();
 
         for (LhShiftConfigVO shift : shifts) {
             if (Objects.isNull(shift) || Objects.isNull(shift.getShiftIndex())) {
@@ -343,6 +413,10 @@ public class CapsuleReplacementRuleService {
                     if (context.getCapsuleReplacementShiftKeySet().add(shiftKey)) {
                         validReplacementShiftKeySet.add(shiftKey);
                     }
+                    CapsuleReplacementTimeWindowDTO timeWindow = originalTimeWindowMap.get(shiftKey);
+                    if (Objects.nonNull(timeWindow)) {
+                        validTimeWindowMap.put(shiftKey, timeWindow);
+                    }
                 }
                 // 重建与正式落班复用同一胶囊增量口径，防止后置缩量后运行态漂移。
                 int actualUsageIncrement = resolveCapsuleUsageIncrement(
@@ -351,6 +425,7 @@ public class CapsuleReplacementRuleService {
             }
         }
         context.getCapsuleReplacementShiftKeySet().retainAll(validReplacementShiftKeySet);
+        context.setCapsuleReplacementTimeWindowMap(validTimeWindowMap);
     }
 
     /**
@@ -368,9 +443,10 @@ public class CapsuleReplacementRuleService {
             return;
         }
         log.info("换胶囊规则最终核对完成, batchNo: {}, scheduleDate: {}, 换胶囊班次数: {}, "
-                        + "清理重复备注数: {}, 清理零量班次备注数: {}, 胶囊运行态: {}",
+                        + "时间模式窗口数: {}, 清理重复备注数: {}, 清理零量班次备注数: {}, 胶囊运行态: {}",
                 context.getBatchNo(), LhScheduleTimeUtil.formatDate(context.getScheduleDate()),
-                context.getCapsuleReplacementShiftKeySet().size(), duplicateAnalysisCount,
+                context.getCapsuleReplacementShiftKeySet().size(),
+                context.getCapsuleReplacementTimeWindowMap().size(), duplicateAnalysisCount,
                 zeroQtyRemarkCleanedCount, context.getCapsuleRuntimeUsageMap());
     }
 
@@ -410,10 +486,17 @@ public class CapsuleReplacementRuleService {
                         || !analysis.contains(CAPSULE_REPLACEMENT_ANALYSIS)) {
                     continue;
                 }
-                // 清零班次不属于真实换胶囊班次：移除备注并同步移除本批换胶囊班次登记。
+                String shiftKey = buildShiftKey(physicalMachineCode, shift);
+                if (containsReplacementTimeWindow(context, shiftKey)) {
+                    /*
+                     * 时间模式的换胶囊已经在当前班次实际发生，后续产量可能被时间轴顺延到下一班。
+                     * 此时保留事实备注和时间窗口，避免最终重建把已占用机台时间错误释放。
+                     */
+                    continue;
+                }
+                // 清零班次不属于数量模式的真实换胶囊班次：移除备注并同步移除本批登记。
                 ShiftFieldUtil.removeShiftAnalysis(
                         result, shift.getShiftIndex(), CAPSULE_REPLACEMENT_ANALYSIS);
-                String shiftKey = buildShiftKey(physicalMachineCode, shift);
                 if (StringUtils.isNotEmpty(shiftKey)) {
                     context.getCapsuleReplacementShiftKeySet().remove(shiftKey);
                 }
@@ -652,6 +735,132 @@ public class CapsuleReplacementRuleService {
                 LhScheduleConstant.CAPSULE_CHANGE_LOSS_QTY));
     }
 
+    /**
+     * 读取换胶囊时间模式的占用时长。
+     *
+     * @param context 排程上下文
+     * @return 换胶囊时长（小时）
+     */
+    private int resolveReplacementDurationHours(LhScheduleContext context) {
+        LhScheduleConfig scheduleConfig = context.getScheduleConfig();
+        return Objects.nonNull(scheduleConfig)
+                ? scheduleConfig.getCapsuleReplacementDurationHours()
+                : Math.max(1, context.getParamIntValue(
+                LhScheduleParamConstant.CAPSULE_REPLACEMENT_DURATION_HOURS,
+                LhScheduleConstant.CAPSULE_REPLACEMENT_DURATION_HOURS));
+    }
+
+    /**
+     * 登记未满产换胶囊的机台时间占用。
+     *
+     * <p>时间窗口从当前候选生产段结束时开始。当前候选量不因换胶囊直接减量，后续同机台
+     * 的生产、换模、首检和选机时间统一由容量时间轴感知该窗口并顺延。</p>
+     *
+     * @param context 排程上下文
+     * @param result 当前排程结果
+     * @param shift 当前班次
+     * @param shiftKey 物理机台班次键
+     * @param plannedQtyAfterCandidate 写入当前候选后的班次计划量
+     * @param shiftCapacityBeforeReplacement 换胶囊前实际班产
+     * @param effectiveStartTime 当前候选实际开产时间
+     */
+    private void registerCapsuleReplacementTimeWindow(LhScheduleContext context,
+                                                      LhScheduleResult result,
+                                                      LhShiftConfigVO shift,
+                                                      String shiftKey,
+                                                      int plannedQtyAfterCandidate,
+                                                      int shiftCapacityBeforeReplacement,
+                                                      Date effectiveStartTime) {
+        if (StringUtils.isEmpty(shiftKey) || containsReplacementTimeWindow(context, shiftKey)) {
+            return;
+        }
+        Date replacementStartTime = resolveReplacementStartTime(context, result, shift,
+                plannedQtyAfterCandidate, shiftCapacityBeforeReplacement, effectiveStartTime);
+        if (Objects.isNull(replacementStartTime)) {
+            return;
+        }
+        CapsuleReplacementTimeWindowDTO timeWindow = new CapsuleReplacementTimeWindowDTO();
+        timeWindow.setPhysicalMachineCode(LhSingleControlMachineUtil.resolvePhysicalMachineCode(
+                result.getLhMachineCode()));
+        timeWindow.setMaterialCode(result.getMaterialCode());
+        timeWindow.setShiftIndex(shift.getShiftIndex());
+        timeWindow.setReplacementStartTime(replacementStartTime);
+        timeWindow.setReplacementEndTime(LhScheduleTimeUtil.addHours(replacementStartTime,
+                resolveReplacementDurationHours(context)));
+        context.getCapsuleReplacementTimeWindowMap().put(shiftKey, timeWindow);
+    }
+
+    /**
+     * 解析未满产换胶囊的实际开始时间。
+     *
+     * <p>必须复用既有停机、清洗、保养时间轴推导当前候选生产段结束时间，不能以班次结束
+     * 时间或固定整点代替。这样临近班次结束触发时，窗口会自然跨入下一班。</p>
+     *
+     * @param context 排程上下文
+     * @param result 当前排程结果
+     * @param shift 当前班次
+     * @param plannedQtyAfterCandidate 写入当前候选后的班次计划量
+     * @param shiftCapacityBeforeReplacement 换胶囊前实际班产
+     * @param effectiveStartTime 当前候选实际开产时间
+     * @return 换胶囊开始时间
+     */
+    private Date resolveReplacementStartTime(LhScheduleContext context,
+                                             LhScheduleResult result,
+                                             LhShiftConfigVO shift,
+                                             int plannedQtyAfterCandidate,
+                                             int shiftCapacityBeforeReplacement,
+                                             Date effectiveStartTime) {
+        Date shiftStartTime = Objects.nonNull(effectiveStartTime)
+                ? effectiveStartTime : ShiftFieldUtil.getShiftStartTime(result, shift.getShiftIndex());
+        if (Objects.isNull(shiftStartTime)) {
+            shiftStartTime = shift.getShiftStartDateTime();
+        }
+        if (Objects.isNull(shiftStartTime) || Objects.isNull(shift.getShiftEndDateTime())) {
+            return shiftStartTime;
+        }
+        MachineScheduleDTO machine = context.getMachineScheduleMap().get(result.getLhMachineCode());
+        List<MachineCleaningWindowDTO> cleaningWindowList = Objects.isNull(machine)
+                || CollectionUtils.isEmpty(machine.getCleaningWindowList())
+                ? Collections.<MachineCleaningWindowDTO>emptyList() : machine.getCleaningWindowList();
+        List<MachineMaintenanceWindowDTO> maintenanceWindowList =
+                ShiftCapacityResolverUtil.resolveCapacityMaintenanceWindowList(context,
+                        context.getDevicePlanShutList(), result.getLhMachineCode(),
+                        Objects.isNull(machine) ? Collections.<MachineMaintenanceWindowDTO>emptyList()
+                                : machine.getMaintenanceWindowList());
+        Date plannedEndTime = ShiftCapacityResolverUtil.resolveShiftPlanEndTime(
+                context.getDevicePlanShutList(), cleaningWindowList, maintenanceWindowList,
+                result.getLhMachineCode(), shiftStartTime, shift.getShiftEndDateTime(),
+                Math.max(0, plannedQtyAfterCandidate), Math.max(1, shiftCapacityBeforeReplacement));
+        return Objects.nonNull(plannedEndTime) ? plannedEndTime : shiftStartTime;
+    }
+
+    /**
+     * 判断物理机台班次是否采用换胶囊时间模式。
+     *
+     * @param context 排程上下文
+     * @param shiftKey 物理机台班次键
+     * @return true-时间模式；false-数量模式或未触发
+     */
+    private boolean containsReplacementTimeWindow(LhScheduleContext context, String shiftKey) {
+        return Objects.nonNull(context) && StringUtils.isNotEmpty(shiftKey)
+                && !CollectionUtils.isEmpty(context.getCapsuleReplacementTimeWindowMap())
+                && context.getCapsuleReplacementTimeWindowMap().containsKey(shiftKey);
+    }
+
+    /** 获取换胶囊时间窗口开始时间，用于对账日志。 */
+    private Date resolveReplacementWindowStartTime(LhScheduleContext context, String shiftKey) {
+        CapsuleReplacementTimeWindowDTO timeWindow = containsReplacementTimeWindow(context, shiftKey)
+                ? context.getCapsuleReplacementTimeWindowMap().get(shiftKey) : null;
+        return Objects.isNull(timeWindow) ? null : timeWindow.getReplacementStartTime();
+    }
+
+    /** 获取换胶囊时间窗口结束时间，用于对账日志。 */
+    private Date resolveReplacementWindowEndTime(LhScheduleContext context, String shiftKey) {
+        CapsuleReplacementTimeWindowDTO timeWindow = containsReplacementTimeWindow(context, shiftKey)
+                ? context.getCapsuleReplacementTimeWindowMap().get(shiftKey) : null;
+        return Objects.isNull(timeWindow) ? null : timeWindow.getReplacementEndTime();
+    }
+
     private boolean isWholeSingleControlPairResult(LhScheduleContext context, LhScheduleResult result) {
         if (Objects.isNull(context) || Objects.isNull(result)
                 || !LhSingleControlMachineUtil.isSingleMouldMachine(result.getLhMachineCode())) {
@@ -715,6 +924,76 @@ public class CapsuleReplacementRuleService {
     private int resolveShiftPlanQty(LhScheduleResult result, int shiftIndex) {
         Integer planQty = ShiftFieldUtil.getShiftPlanQty(result, shiftIndex);
         return Objects.isNull(planQty) ? 0 : Math.max(0, planQty);
+    }
+
+    /**
+     * 按物理机台口径汇总当前班次已写入计划量。
+     *
+     * <p>同一普通机台可能存在同班不同 SKU，未满产判断必须汇总机台实际已占用量。单控 L/R
+     * 独立排产沿用既有“单侧为独立班产单元”口径；只有整机配对结果才按当前单侧数量折算整机量。</p>
+     *
+     * @param context 排程上下文
+     * @param currentResult 当前正在追加计划量的结果
+     * @param physicalMachineCode 物理机台编号
+     * @param shiftIndex 班次序号
+     * @param wholeSingleControlPair 是否单控整机配对结果
+     * @return 当前物理机台已写入的班次计划量
+     */
+    private int resolveExistingPhysicalShiftPlanQty(LhScheduleContext context,
+                                                    LhScheduleResult currentResult,
+                                                    String physicalMachineCode,
+                                                    int shiftIndex,
+                                                    boolean wholeSingleControlPair) {
+        int currentResultPlanQty = resolveShiftPlanQty(currentResult, shiftIndex);
+        if (wholeSingleControlPair
+                || LhSingleControlMachineUtil.isSingleMouldMachine(currentResult.getLhMachineCode())) {
+            return resolvePhysicalShiftQty(currentResultPlanQty, wholeSingleControlPair,
+                    currentResult.getLhMachineCode());
+        }
+        int totalPlanQty = 0;
+        for (LhScheduleResult scheduledResult : collectCurrentResults(context, currentResult)) {
+            if (Objects.isNull(scheduledResult) || StringUtils.isEmpty(scheduledResult.getLhMachineCode())) {
+                continue;
+            }
+            String scheduledPhysicalMachineCode = LhSingleControlMachineUtil.resolvePhysicalMachineCode(
+                    scheduledResult.getLhMachineCode());
+            if (StringUtils.equals(physicalMachineCode, scheduledPhysicalMachineCode)) {
+                totalPlanQty += resolveShiftPlanQty(scheduledResult, shiftIndex);
+            }
+        }
+        return Math.max(0, totalPlanQty);
+    }
+
+    /**
+     * 将当前结果侧别班产转换为物理机台班产。
+     *
+     * @param shiftQty 当前结果班产
+     * @param wholeSingleControlPair 是否单控整机配对
+     * @param machineCode 当前结果机台
+     * @return 物理机台班产
+     */
+    private int resolvePhysicalShiftQty(int shiftQty,
+                                        boolean wholeSingleControlPair,
+                                        String machineCode) {
+        int normalizedShiftQty = Math.max(0, shiftQty);
+        return wholeSingleControlPair && LhSingleControlMachineUtil.isSingleMouldMachine(machineCode)
+                ? normalizedShiftQty * DOUBLE_MOULD_QTY : normalizedShiftQty;
+    }
+
+    /**
+     * 将当前结果班产上限转换为物理机台班产上限。
+     *
+     * @param shiftCapacity 当前结果班产上限
+     * @param wholeSingleControlPair 是否单控整机配对
+     * @param machineCode 当前结果机台
+     * @return 物理机台班产上限
+     */
+    private int resolvePhysicalShiftCapacity(int shiftCapacity,
+                                             boolean wholeSingleControlPair,
+                                             String machineCode) {
+        int normalizedShiftCapacity = Math.max(0, shiftCapacity);
+        return wholeSingleControlPair && LhSingleControlMachineUtil.isSingleMouldMachine(machineCode)
+                ? normalizedShiftCapacity * DOUBLE_MOULD_QTY : normalizedShiftCapacity;
     }
 
     private boolean containsReplacementAnalysis(LhScheduleResult result, int shiftIndex) {

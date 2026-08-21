@@ -6,6 +6,7 @@ package com.zlt.aps.lh.engine.strategy.impl;
 import cn.hutool.core.bean.BeanUtil;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
+import com.zlt.aps.lh.api.domain.dto.CapsuleReplacementTimeWindowDTO;
 import com.zlt.aps.lh.api.domain.dto.MachineCleaningWindowDTO;
 import com.zlt.aps.lh.api.domain.dto.MachineMaintenanceWindowDTO;
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
@@ -1437,17 +1438,17 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                 int shiftQty = this.resolveSameMaterialSpecialShiftQty(
                         context, specialSku, remainingQty, shiftCapacity,
                         specialResult.getMouldQty());
+                Date effectiveStartTime = this.resolveSameMaterialStatusEffectiveStartTime(
+                        context, shift, cursorStartTime);
                 // 同物料多状态属于真实落班增量，必须在扣减余量前统一执行换胶囊判断。
                 shiftQty = capsuleReplacementRuleService.resolveActualPlanQty(
-                        context, specialResult, shift, shiftQty,
+                        context, specialResult, shift, shiftQty, shiftCapacity, effectiveStartTime,
                         "同物料多状态续作");
                 if (shiftQty <= 0) {
                     cursorPosition++;
                     cursorStartTime = null;
                     continue;
                 }
-                Date effectiveStartTime = this.resolveSameMaterialStatusEffectiveStartTime(
-                        context, shift, cursorStartTime);
                 Date shiftPlanEndTime = this.resolveSameMaterialStatusPlanEndTime(
                         context, specialResult, shift, effectiveStartTime, shiftQty, shiftCapacity);
                 if (Objects.isNull(effectiveStartTime) || Objects.isNull(shiftPlanEndTime)) {
@@ -5981,6 +5982,9 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                 new LinkedHashSet<String>(context.getCapsuleThresholdHandledMachineSet());
         Map<String, Integer> capsuleReplacementCapacitySnapshot =
                 new LinkedHashMap<String, Integer>(context.getCapsuleReplacementShiftCapacityLimitMap());
+        Map<String, CapsuleReplacementTimeWindowDTO> capsuleReplacementTimeWindowSnapshot =
+                new LinkedHashMap<String, CapsuleReplacementTimeWindowDTO>(
+                        context.getCapsuleReplacementTimeWindowMap());
         int beforeQty = ShiftFieldUtil.resolveScheduledQty(result);
         try {
             restoreSharedEmbryoEndingStaggerReleaseShift(context, result, endingShiftIndex, shifts);
@@ -5990,19 +5994,20 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                         context, result, resultSnapshot, machine, machineEstimatedEndTimeSnapshot,
                         hadAllowedOverQty, allowedOverQtySnapshot, capsuleRuntimeUsageSnapshot,
                         capsuleReplacementShiftKeySnapshot, capsuleThresholdHandledMachineSnapshot,
-                        capsuleReplacementCapacitySnapshot);
+                        capsuleReplacementCapacitySnapshot, capsuleReplacementTimeWindowSnapshot);
                 return false;
             }
             // 错峰后延会在下一班真实新增计划量，必须先执行换胶囊判断，不能在后置结果阶段直接减量。
             int actualNextShiftQty = capsuleReplacementRuleService.resolveActualPlanQty(
-                    context, result, nextShift, nextShiftCapacity,
+                    context, result, nextShift, nextShiftCapacity, nextShiftCapacity,
+                    nextShift.getShiftStartDateTime(),
                     "共用胎胚收尾错峰后延");
             if (actualNextShiftQty <= 0) {
                 rollbackSharedEmbryoEndingStaggerAttempt(
                         context, result, resultSnapshot, machine, machineEstimatedEndTimeSnapshot,
                         hadAllowedOverQty, allowedOverQtySnapshot, capsuleRuntimeUsageSnapshot,
                         capsuleReplacementShiftKeySnapshot, capsuleThresholdHandledMachineSnapshot,
-                        capsuleReplacementCapacitySnapshot);
+                        capsuleReplacementCapacitySnapshot, capsuleReplacementTimeWindowSnapshot);
                 return false;
             }
             // 原收尾班次，用于错峰后延后的班次摊平
@@ -6040,7 +6045,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                     context, result, resultSnapshot, machine, machineEstimatedEndTimeSnapshot,
                     hadAllowedOverQty, allowedOverQtySnapshot, capsuleRuntimeUsageSnapshot,
                     capsuleReplacementShiftKeySnapshot, capsuleThresholdHandledMachineSnapshot,
-                    capsuleReplacementCapacitySnapshot);
+                    capsuleReplacementCapacitySnapshot, capsuleReplacementTimeWindowSnapshot);
             log.warn("共用胎胚收尾错峰后延异常，已恢复尝试前状态, scheduleDate: {}, materialCode: {}, "
                             + "machineCode: {}, 原收尾班次: {}, 后延班次: {}",
                     context.getScheduleDate(), sourceSku.getMaterialCode(), result.getLhMachineCode(),
@@ -6158,6 +6163,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
      * @param capsuleReplacementShiftKeySnapshot 尝试前换胶囊班次集合
      * @param capsuleThresholdHandledMachineSnapshot 尝试前已处理胶囊阈值的物理机台集合
      * @param capsuleReplacementCapacitySnapshot 尝试前换胶囊班次产能上限
+     * @param capsuleReplacementTimeWindowSnapshot 尝试前换胶囊时间占用窗口
      */
     private void rollbackSharedEmbryoEndingStaggerAttempt(
             LhScheduleContext context,
@@ -6170,7 +6176,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             Map<String, Integer> capsuleRuntimeUsageSnapshot,
             Set<String> capsuleReplacementShiftKeySnapshot,
             Set<String> capsuleThresholdHandledMachineSnapshot,
-            Map<String, Integer> capsuleReplacementCapacitySnapshot) {
+            Map<String, Integer> capsuleReplacementCapacitySnapshot,
+            Map<String, CapsuleReplacementTimeWindowDTO> capsuleReplacementTimeWindowSnapshot) {
         BeanUtil.copyProperties(resultSnapshot, result);
         if (Objects.nonNull(machine)) {
             machine.setEstimatedEndTime(machineEstimatedEndTimeSnapshot);
@@ -6188,6 +6195,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         context.getCapsuleThresholdHandledMachineSet().addAll(capsuleThresholdHandledMachineSnapshot);
         context.getCapsuleReplacementShiftCapacityLimitMap().clear();
         context.getCapsuleReplacementShiftCapacityLimitMap().putAll(capsuleReplacementCapacitySnapshot);
+        context.setCapsuleReplacementTimeWindowMap(
+                new LinkedHashMap<String, CapsuleReplacementTimeWindowDTO>(capsuleReplacementTimeWindowSnapshot));
     }
 
     /**
@@ -6982,6 +6991,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             // 当前班补量属于正式新增产量，换胶囊扣减后的差额继续留在补量池供下一晚班承接。
             currentShiftFillQty = capsuleReplacementRuleService.resolveActualPlanQty(
                     context, result, currentShift, currentShiftFillQty,
+                    currentShiftBeforeQty + currentShiftAvailableQty,
+                    currentShift.getShiftStartDateTime(),
                     "续作中班下机前补量");
             Date currentShiftStartTime = ShiftFieldUtil.getShiftStartTime(result, currentShift.getShiftIndex());
             setShiftPlanQty(result, currentShift.getShiftIndex(), currentShiftBeforeQty + currentShiftFillQty,
@@ -6997,6 +7008,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             // 下一晚班补量在写结果和扣减补量池之前统一执行换胶囊规则，避免损失量被直接消费。
             fillQty = capsuleReplacementRuleService.resolveActualPlanQty(
                     context, result, nextShift, fillQty,
+                    nightShiftBeforeQty + nightShiftAvailableQty,
+                    nextShift.getShiftStartDateTime(),
                     "续作不可换模晚班补量");
             Date nightShiftEndTime = nightShiftBeforeQty + fillQty >= calculateResultShiftCapacity(context, result, nextShift)
                     ? nextShift.getShiftEndDateTime() : null;
@@ -7619,9 +7632,6 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         if (machine == null || estimatedEndTime == null) {
             return null;
         }
-        if (getMaintenanceScheduleService().shouldApplyMaintenanceOverlapSwitchRule(context, machine, estimatedEndTime)) {
-            return getMaintenanceScheduleService().resolveMaintenanceEndTime(context, machine);
-        }
         Date switchStartTime = resolveAllowedSwitchStartTime(
                 context, machine.getMachineCode(), estimatedEndTime);
         switchStartTime = getMaintenanceScheduleService().delaySwitchStartByMaintenance(
@@ -7639,11 +7649,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         if (switchStartTime == null) {
             return null;
         }
-        boolean maintenanceOverlapSwitch = getMaintenanceScheduleService()
-                .shouldApplyMaintenanceOverlapSwitchRule(context, machine, estimatedEndTime);
-        int switchDurationHours = maintenanceOverlapSwitch
-                ? LhScheduleTimeUtil.getMaintenanceOverlapSwitchHours(context)
-                : LhScheduleTimeUtil.getTypeBlockChangeTotalHours(context);
+        int switchDurationHours = LhScheduleTimeUtil.getTypeBlockChangeTotalHours(context);
         Date switchCompleteTime = LhScheduleTimeUtil.addHours(switchStartTime, switchDurationHours);
         boolean plannedRepairAffectingSwitch = ShiftCapacityResolverUtil.isPlannedRepairAffectingSwitch(
                 context, context.getDevicePlanShutList(), machine.getMachineCode(), estimatedEndTime,
@@ -7653,10 +7659,6 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             return ShiftCapacityResolverUtil.resolvePlannedRepairProductionReadyTime(
                     context, context.getDevicePlanShutList(), machine.getMachineCode(), estimatedEndTime,
                     switchStartTime, switchCompleteTime);
-        }
-        if (maintenanceOverlapSwitch) {
-            return LhScheduleTimeUtil.addHours(
-                    switchCompleteTime, LhScheduleTimeUtil.getFirstInspectionHours(context));
         }
         return switchCompleteTime;
     }
@@ -8212,7 +8214,9 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                     plannedRepairFixedQty);
             shiftMaxQty = ShiftProductionControlUtil.deductCapacityByControl(control, shiftMaxQty, mouldQty);
             int physicalShiftMaxQty = shiftMaxQty;
-            shiftMaxQty = dailyStandardShiftCapacityMap.getOrDefault(shift.getShiftIndex(), shiftMaxQty);
+            // 日标准量只能继续收紧当前物理产能，不能覆盖换胶囊时间窗口等后续新增不可生产时间。
+            shiftMaxQty = Math.min(shiftMaxQty,
+                    dailyStandardShiftCapacityMap.getOrDefault(shift.getShiftIndex(), shiftMaxQty));
             if (shiftMaxQty <= 0) {
                 String skipReason = physicalShiftMaxQty <= 0
                         ? "停机/清洗/保养/班次管控扣减后无可用产能"
@@ -8225,7 +8229,9 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                     context, result, Math.min(remaining, shiftMaxQty), shiftMaxQty, mouldQty);
             // 必须在写班次量和扣减SKU余量之前执行；返回值才是本班真实生产并累计胶囊次数的数量。
             shiftQty = capsuleReplacementRuleService.resolveActualPlanQty(
-                    context, result, shift, shiftQty, "续作排产");
+                    context, result, shift, shiftQty, shiftMaxQty, effectiveStart, "续作排产");
+            // 未满产换胶囊可能刚登记时间窗口，后续班次必须立即读取最新窗口重新计算产能。
+            maintenanceWindowList = this.resolveMachineMaintenanceWindowList(context, result.getLhMachineCode());
             if (shiftQty <= 0) {
                 logContinuousShiftSkip(result, shift, remaining, shiftCapacity,
                         physicalShiftMaxQty, shiftMaxQty, "目标量/硫化余量或换胶囊扣减后为0");
@@ -9105,6 +9111,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         if (Objects.nonNull(currentShift) && currentShiftCapacity > currentBeforeQty) {
             int currentFillQty = capsuleReplacementRuleService.resolveActualPlanQty(
                     context, result, currentShift, currentShiftCapacity - currentBeforeQty,
+                    currentShiftCapacity, currentShift.getShiftStartDateTime(),
                     "续作收尾当前班补满");
             Date currentStartTime = ShiftFieldUtil.getShiftStartTime(result, currentShift.getShiftIndex());
             setShiftPlanQty(result, currentShift.getShiftIndex(), currentBeforeQty + currentFillQty,
@@ -9120,6 +9127,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         if (nextShiftCapacity > nextBeforeQty) {
             int nextFillQty = capsuleReplacementRuleService.resolveActualPlanQty(
                     context, result, nextShift, nextShiftCapacity - nextBeforeQty,
+                    nextShiftCapacity, nextShift.getShiftStartDateTime(),
                     "续作收尾下一班补满");
             setShiftPlanQty(result, nextShift.getShiftIndex(), nextBeforeQty + nextFillQty,
                     nextShift.getShiftStartDateTime(), nextShift.getShiftEndDateTime());
@@ -9911,11 +9919,11 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             }
             int dayNShortageCompensationQty = resolveContinuationAddMachineCompensationQty(
                     context, sourceSku, firstAddMachineProductionDate, activeMachineCount);
-            // remainingQty 是 S4.4 结果扣账后仍需由 S4.5 新增链路补齐的缺口。
-            int remainingQty = resolveContinuousCompensationQty(
+            // expansionTriggerQty 只决定是否进入新增链路；dayN 差额不得直接作为实际生产目标上限。
+            int expansionTriggerQty = resolveContinuousCompensationQty(
                     context, sourceSku, dayNShortageCompensationQty);
-            logContinuousExpansionDecision(context, sourceSku, shortageQuotaPlan, remainingQty);
-            if (remainingQty <= 0 || hasContinuousCompensationSku(context, sourceSku)) {
+            logContinuousExpansionDecision(context, sourceSku, shortageQuotaPlan, expansionTriggerQty);
+            if (expansionTriggerQty <= 0 || hasContinuousCompensationSku(context, sourceSku)) {
                 continue;
             }
             if (isContinuousDailyRhythmSatisfiedWithoutForcedShortage(context, sourceSku)) {
@@ -9926,26 +9934,45 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                         sourceSku.getShiftCapacity(), sumDailyPlanQty(sourceSku.getDailyPlanQuotaMap()));
                 continue;
             }
+            int productionRemainingQty = this.resolveContinuousCompensationProductionQty(
+                    context, sourceSku, dayNShortageCompensationQty, expansionTriggerQty);
+            if (productionRemainingQty <= 0) {
+                log.info("续作加机台需求跳过，物料实际生产账本已无余量, materialCode: {}, "
+                                + "首次增机日: {}, 增机触发差额: {}, 实际可生产余量: {}",
+                        sourceSku.getMaterialCode(), firstAddMachineProductionDate,
+                        expansionTriggerQty, productionRemainingQty);
+                continue;
+            }
             SkuScheduleDTO compensationSku = copyContinuousCompensationSku(
-                    sourceSku, remainingQty, firstAddMachineProductionDate, activeMachineCount,
+                    sourceSku, productionRemainingQty, expansionTriggerQty,
+                    firstAddMachineProductionDate, activeMachineCount,
                     requiredMachineCount, shortageMachineCount, addMachineDayPlanQty);
             /*
-             * 续作加机台补偿量是 S4.4 扣账后 S4.5 尚需排产的“剩余量”，不是新的总目标量。
-             * 同物料同状态共用中心账本：保留续作已消费量，并把账本剩余量收敛到本次补偿量。
-             * 若误用“按总目标量同步”，会再次扣减历史消费量，导致新增阶段只能拿到错误的残量；
-             * 没有生成续作补偿SKU的纯收尾路径不经过此处，既有严格收尾上限保持不变。
+             * dayN 产能缺口只负责触发新增机台和限制新增台数，不能收敛“物料+产品状态”实际消费账本：
+             * 否则 56-54=2 会被误当成整台机台的生产上限，新增机台只排2条首检便提前下机。
+             * 非 dayN 的历史欠产/严格补偿仍沿用原剩余量合并语义，避免扩大其业务目标。
              */
-            this.getTargetScheduleQtyResolver().syncProductionRemainingQtyToRemaining(
-                    context, sourceSku, remainingQty, "续作加机台补偿账本合并");
+            if (dayNShortageCompensationQty <= 0) {
+                this.getTargetScheduleQtyResolver().syncProductionRemainingQtyToRemaining(
+                        context, sourceSku, productionRemainingQty, "续作加机台补偿账本合并");
+            } else {
+                log.info("续作dayN加机台保留实际生产账本, materialCode: {}, productStatus: {}, "
+                                + "首次增机日: {}, 增机触发差额: {}, 缺口机台数: {}, 实际可生产余量: {}",
+                        sourceSku.getMaterialCode(), this.normalizeProductStatus(sourceSku.getProductStatus()),
+                        firstAddMachineProductionDate, expansionTriggerQty,
+                        shortageMachineCount, productionRemainingQty);
+            }
             // 续作加机台候选保留同一日计划账本，S4.5 排到后会继续消费剩余额度，避免重复扩大日计划。
             context.getNewSpecSkuList().add(compensationSku);
             log.info("续作加机台需求生成，转新增规格链路统一竞争, materialCode: {}, 原续作机台: {}, "
                             + "首次增机日: {}, 当前续作机台数: {}, dayN最小机台数: {}, 缺口机台数: {}, "
-                            + "增机日计划量: {}, 已排: {}, 需求量: {}, 窗口日计划剩余: {}, sourceType: {}, dayPlanSummary: {}",
+                            + "增机日计划量: {}, 已排: {}, 增机触发差额: {}, 实际可生产余量: {}, "
+                            + "窗口日计划剩余: {}, sourceType: {}, dayPlanSummary: {}",
                     sourceSku.getMaterialCode(), sourceSku.getContinuousMachineCode(),
                     firstAddMachineProductionDate, activeMachineCount, requiredMachineCount, shortageMachineCount,
                     addMachineDayPlanQty,
-                    resolveScheduledQtyBySourceSku(context, sourceSku), remainingQty,
+                    resolveScheduledQtyBySourceSku(context, sourceSku), expansionTriggerQty,
+                    productionRemainingQty,
                     SkuDailyPlanQuotaUtil.sumRemainingQty(sourceSku.getDailyPlanQuotaMap()),
                     compensationSku.getSourceType(),
                     formatDailyPlanQuotaSummary(sourceSku));
@@ -10085,6 +10112,28 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             return 0;
         }
         return targetRemainingQty;
+    }
+
+    /**
+     * 解析续作补偿SKU进入新增链路后的实际可生产余量。
+     * <p>dayN 缺口量只表示增机触发条件，实际排产必须继续读取物料+产品状态中心账本；
+     * 非 dayN 补偿没有独立触发差额，继续沿用已计算的补偿剩余量。</p>
+     *
+     * @param context 排程上下文
+     * @param sourceSku 来源续作SKU
+     * @param dayNShortageCompensationQty dayN 产能缺口量
+     * @param compensationQty 已计算的补偿量
+     * @return 补偿SKU进入新增主链后的实际可生产余量
+     */
+    private int resolveContinuousCompensationProductionQty(
+            LhScheduleContext context,
+            SkuScheduleDTO sourceSku,
+            int dayNShortageCompensationQty,
+            int compensationQty) {
+        if (dayNShortageCompensationQty > 0) {
+            return this.getTargetScheduleQtyResolver().resolveProductionRemainingQty(context, sourceSku);
+        }
+        return Math.max(0, compensationQty);
     }
 
     /**
@@ -10900,11 +10949,18 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
      * 复制续作SKU为新增补偿SKU。
      *
      * @param sourceSku 来源续作SKU
-     * @param remainingQty 补偿量
+     * @param productionRemainingQty 实际可生产余量
+     * @param addMachineTriggerQty dayN 增机触发差额
+     * @param firstAddMachineProductionDate 首次允许新增机台的业务日期
+     * @param activeMachineCount 当前有效续作机台数
+     * @param requiredMachineCount dayN要求的最小机台数
+     * @param shortageMachineCount 当前缺少的机台数
+     * @param addMachineDayPlanQty 首次增机日的原始日计划量
      * @return 新增补偿SKU
      */
     private SkuScheduleDTO copyContinuousCompensationSku(SkuScheduleDTO sourceSku,
-                                                         int remainingQty,
+                                                         int productionRemainingQty,
+                                                         int addMachineTriggerQty,
                                                          LocalDate firstAddMachineProductionDate,
                                                          int activeMachineCount,
                                                          int requiredMachineCount,
@@ -10919,15 +10975,16 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         // 续作增机台补偿只进入新增统一排序和统一选机，不锁回原续作机台。
         compensationSku.setPreferredContinuousMachineCode(null);
         compensationSku.setContinuousCompensationSku(true);
-        compensationSku.setTargetScheduleQty(remainingQty);
-        compensationSku.setPendingQty(remainingQty);
-        compensationSku.setRemainingScheduleQty(remainingQty);
+        compensationSku.setTargetScheduleQty(productionRemainingQty);
+        compensationSku.setPendingQty(productionRemainingQty);
+        compensationSku.setRemainingScheduleQty(productionRemainingQty);
         compensationSku.setStrictTargetQty(policy.isStrictUpperLimit());
         compensationSku.setFirstAddMachineProductionDate(firstAddMachineProductionDate);
         compensationSku.setContinuationActiveMachineCount(Math.max(0, activeMachineCount));
         compensationSku.setContinuationRequiredMachineCount(Math.max(0, requiredMachineCount));
         compensationSku.setContinuationShortageMachineCount(Math.max(0, shortageMachineCount));
         compensationSku.setContinuationAddMachineDayPlanQty(Math.max(0, addMachineDayPlanQty));
+        compensationSku.setContinuationAddMachineTriggerQty(Math.max(0, addMachineTriggerQty));
         // 复用同一份日计划账本，作为续作补偿SKU与来源续作SKU的共享归属锚点。
         compensationSku.setDailyPlanQuotaMap(sourceSku.getDailyPlanQuotaMap());
         // 显式传递窗口后下一日（T+3）与后续月计划量，确保补偿SKU进入新增链路后仍能按 dayN 节奏

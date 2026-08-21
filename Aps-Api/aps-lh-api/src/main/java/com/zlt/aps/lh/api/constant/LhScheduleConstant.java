@@ -243,8 +243,11 @@ public final class LhScheduleConstant {
     /** 胶囊使用次数上限默认值；本批按机台总量累计并仅首次严格跨限触发 */
     public static final int CAPSULE_FORCE_DOWN_COUNT = 450;
 
-    /** 本批首次严格跨限固定扣减计划量默认值；2条对应固定占用1小时 */
+    /** 本批首次严格跨限且班次满产时的固定扣减计划量默认值 */
     public static final int CAPSULE_CHANGE_LOSS_QTY = 2;
+
+    /** 本批首次严格跨限且班次未满产时的换胶囊时长默认值（小时） */
+    public static final int CAPSULE_REPLACEMENT_DURATION_HOURS = 1;
 
     // ======================== 工作日历工序代码 ========================
 

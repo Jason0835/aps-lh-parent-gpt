@@ -343,8 +343,8 @@ public class LhScheduleConfigResolver {
     /**
      * 解析换胶囊参数。
      *
-     * <p>使用次数上限必须大于0，班次扣减量必须大于等于0。空值、非数字或越界值均使用
-     * 常量默认值，避免上限被修正为1或扣减量被修正为0后改变业务语义。</p>
+     * <p>使用次数上限和换胶囊时长必须大于0，班次满产扣减量必须大于等于0。空值、非数字或
+     * 越界值均使用常量默认值，避免上限被修正为1、时长被修正为0或扣减量被修正为0后改变业务语义。</p>
      *
      * @param resolvedParamMap 解析后参数
      * @param lhParamsMap 原始参数
@@ -357,6 +357,9 @@ public class LhScheduleConfigResolver {
         putCapsuleReplacementParam(resolvedParamMap, lhParamsMap,
                 LhScheduleParamConstant.CAPSULE_CHANGE_LOSS_QTY,
                 LhScheduleConstant.CAPSULE_CHANGE_LOSS_QTY, true);
+        putCapsuleReplacementParam(resolvedParamMap, lhParamsMap,
+                LhScheduleParamConstant.CAPSULE_REPLACEMENT_DURATION_HOURS,
+                LhScheduleConstant.CAPSULE_REPLACEMENT_DURATION_HOURS, false);
     }
 
     /**

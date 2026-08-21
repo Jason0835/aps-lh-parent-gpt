@@ -88,6 +88,9 @@ public class NewSpecMachineAvailabilityPlan {
     /** 与候选时间轴同源的首检分摊计划。 */
     private final FirstInspectionAllocationPlan firstInspectionPlan;
 
+    /** 当前选机回合命中的历史班次剩余产能画像；未命中时为空。 */
+    private final HistoricalResidualCapacityInfo historicalResidualCapacityInfo;
+
     public NewSpecMachineAvailabilityPlan(
             MachineScheduleDTO machine,
             boolean available,
@@ -109,7 +112,7 @@ public class NewSpecMachineAvailabilityPlan {
                 targetShift, available && Objects.nonNull(candidateAvailableProductionTime)
                         && Objects.nonNull(targetShift),
                 available ? candidateAvailableProductionTime : null,
-                available ? targetShift : null);
+                available ? targetShift : null, null);
     }
 
     /**
@@ -155,7 +158,7 @@ public class NewSpecMachineAvailabilityPlan {
                 firstInspectionPlan, traceChangeoverEndTime, preparationAvailableTime,
                 preparationTargetShift, preparationAvailable,
                 available ? candidateAvailableProductionTime : null,
-                available ? targetShift : null);
+                available ? targetShift : null, null);
     }
 
     /**
@@ -199,6 +202,57 @@ public class NewSpecMachineAvailabilityPlan {
             boolean preparationAvailable,
             Date formalAvailableProductionTime,
             LhShiftConfigVO formalTargetShift) {
+        this(machine, available, unavailableReason, occupationEndTime, machineReadyTime,
+                changeoverStartTime, changeoverEndTime, productionNotBeforeTime,
+                candidateProductionNotBeforeTime, candidateAvailableProductionTime, targetShift,
+                firstInspectionPlan, traceChangeoverEndTime, preparationAvailableTime,
+                preparationTargetShift, preparationAvailable, formalAvailableProductionTime,
+                formalTargetShift, null);
+    }
+
+    /**
+     * 创建带历史班次剩余产能画像的完整候选计划。
+     *
+     * @param machine 候选机台
+     * @param available 正式候选是否可用
+     * @param unavailableReason 正式候选不可用原因
+     * @param occupationEndTime 前序占用结束时间
+     * @param machineReadyTime 机台准备就绪时间
+     * @param changeoverStartTime 正式候选换模开始时间
+     * @param changeoverEndTime 正式候选换模结束时间
+     * @param productionNotBeforeTime 正式生产门禁
+     * @param candidateProductionNotBeforeTime 候选预演门禁
+     * @param candidateAvailableProductionTime 候选预演时间
+     * @param targetShift 候选预演班次
+     * @param firstInspectionPlan 正式候选首检计划
+     * @param traceChangeoverEndTime 粗略展示换模完成时间
+     * @param preparationAvailableTime 准备完成时间
+     * @param preparationTargetShift 准备完成班次
+     * @param preparationAvailable 准备时间轴是否可用
+     * @param formalAvailableProductionTime 正式可开产时间
+     * @param formalTargetShift 正式可开产班次
+     * @param historicalResidualCapacityInfo 历史班次剩余产能画像
+     */
+    private NewSpecMachineAvailabilityPlan(
+            MachineScheduleDTO machine,
+            boolean available,
+            String unavailableReason,
+            Date occupationEndTime,
+            Date machineReadyTime,
+            Date changeoverStartTime,
+            Date changeoverEndTime,
+            Date productionNotBeforeTime,
+            Date candidateProductionNotBeforeTime,
+            Date candidateAvailableProductionTime,
+            LhShiftConfigVO targetShift,
+            FirstInspectionAllocationPlan firstInspectionPlan,
+            Date traceChangeoverEndTime,
+            Date preparationAvailableTime,
+            LhShiftConfigVO preparationTargetShift,
+            boolean preparationAvailable,
+            Date formalAvailableProductionTime,
+            LhShiftConfigVO formalTargetShift,
+            HistoricalResidualCapacityInfo historicalResidualCapacityInfo) {
         this.machine = machine;
         this.available = available;
         this.unavailableReason = unavailableReason;
@@ -217,6 +271,24 @@ public class NewSpecMachineAvailabilityPlan {
         this.preparationAvailableTime = preparationAvailableTime;
         this.preparationTargetShift = preparationTargetShift;
         this.preparationAvailable = preparationAvailable;
+        this.historicalResidualCapacityInfo = historicalResidualCapacityInfo;
+    }
+
+    /**
+     * 在不修改原候选时间轴的前提下附加历史班次剩余产能画像。
+     *
+     * @param residualCapacityInfo 历史班次剩余产能画像
+     * @return 携带历史剩余产能画像的新计划对象
+     */
+    public NewSpecMachineAvailabilityPlan withHistoricalResidualCapacityInfo(
+            HistoricalResidualCapacityInfo residualCapacityInfo) {
+        return new NewSpecMachineAvailabilityPlan(
+                machine, available, unavailableReason, occupationEndTime, machineReadyTime,
+                changeoverStartTime, changeoverEndTime, productionNotBeforeTime,
+                candidateProductionNotBeforeTime, candidateAvailableProductionTime, targetShift,
+                firstInspectionPlan, traceChangeoverEndTime, preparationAvailableTime,
+                preparationTargetShift, preparationAvailable, formalAvailableProductionTime,
+                formalTargetShift, residualCapacityInfo);
     }
 
     public MachineScheduleDTO getMachine() {
@@ -338,5 +410,23 @@ public class NewSpecMachineAvailabilityPlan {
      */
     public boolean isPreparationAvailable() {
         return preparationAvailable;
+    }
+
+    /**
+     * 判断当前候选是否命中历史班次剩余产能优先池。
+     *
+     * @return true-命中；false-未命中
+     */
+    public boolean isHistoryResidualCapacityCandidate() {
+        return Objects.nonNull(historicalResidualCapacityInfo);
+    }
+
+    /**
+     * 获取历史班次剩余产能画像。
+     *
+     * @return 历史班次剩余产能画像；未命中时返回null
+     */
+    public HistoricalResidualCapacityInfo getHistoricalResidualCapacityInfo() {
+        return historicalResidualCapacityInfo;
     }
 }

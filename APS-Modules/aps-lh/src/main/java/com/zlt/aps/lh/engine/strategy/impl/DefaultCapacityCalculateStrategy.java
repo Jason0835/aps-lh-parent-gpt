@@ -10,6 +10,7 @@ import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.ICapacityCalculateStrategy;
 import com.zlt.aps.lh.service.impl.LhMaintenanceScheduleService;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
+import com.zlt.aps.lh.util.ShiftCapacityResolverUtil;
 import com.zlt.aps.mdm.api.domain.entity.MdmDevicePlanShut;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -52,8 +53,10 @@ public class DefaultCapacityCalculateStrategy implements ICapacityCalculateStrat
         // 清洗与换模/换活字块的重叠判定已下沉到后续切换链路，不在这里提前固化 readyTime。
         Date maintenanceStartTime = calculateMaintenanceStartTime(context, machineCode, baseReadyTime);
         Date repairStartTime = calculateRepairStartTime(context, machineCode);
+        Date capsuleReplacementReadyTime = ShiftCapacityResolverUtil.resolveCapsuleReplacementReadyTime(
+                context, machineCode, baseReadyTime);
 
-        // 取三者最大值：基础可用时间、保养后可用时间、维修后可用时间
+        // 取四者最大值：基础可用时间、保养后可用时间、维修后可用时间、换胶囊后可用时间。
         Date maxStartTime = baseReadyTime;
         if (maintenanceStartTime != null && maintenanceStartTime.after(maxStartTime)) {
             maxStartTime = maintenanceStartTime;
@@ -61,9 +64,17 @@ public class DefaultCapacityCalculateStrategy implements ICapacityCalculateStrat
         if (repairStartTime != null && repairStartTime.after(maxStartTime)) {
             maxStartTime = repairStartTime;
         }
+        if (capsuleReplacementReadyTime != null && capsuleReplacementReadyTime.after(maxStartTime)) {
+            maxStartTime = capsuleReplacementReadyTime;
+        }
 
-        log.debug("计算机台准备就绪时间, 机台: {}, 收尾时间: {}, 就绪时间: {}",
-                machineCode, LhScheduleTimeUtil.formatDateTime(endingTime), LhScheduleTimeUtil.formatDateTime(maxStartTime));
+        log.debug("计算机台准备就绪时间, 机台: {}, 收尾时间: {}, 保养后就绪时间: {}, 维修后就绪时间: {}, "
+                        + "换胶囊后就绪时间: {}, 最终就绪时间: {}",
+                machineCode, LhScheduleTimeUtil.formatDateTime(endingTime),
+                LhScheduleTimeUtil.formatDateTime(maintenanceStartTime),
+                LhScheduleTimeUtil.formatDateTime(repairStartTime),
+                LhScheduleTimeUtil.formatDateTime(capsuleReplacementReadyTime),
+                LhScheduleTimeUtil.formatDateTime(maxStartTime));
         return maxStartTime;
     }
 
@@ -114,8 +125,8 @@ public class DefaultCapacityCalculateStrategy implements ICapacityCalculateStrat
      * 计算设备维修后的开产时间
      * <p>
      * 维修规则：<br/>
-     * 若有换模：开产时间 = 维修开始时间(8:00) + 维修时间 + 换模含预热(4h) + 首检(1h)<br/>
-     * 若无换模：开产时间 = 维修开始时间(8:00) + 维修时间 + 胶囊预热时间(2.5h)
+     * 本方法只返回维修完成后的机台就绪时间；换模、换活字块和首检统一由
+     * 后续切换时间轴计算，换模总时长已包含首检，此处不再重复追加首检时长。
      * </p>
      *
      * @param context     排程上下文

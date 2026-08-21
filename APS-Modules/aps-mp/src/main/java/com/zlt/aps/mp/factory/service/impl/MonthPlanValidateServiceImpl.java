@@ -3,7 +3,6 @@ package com.zlt.aps.mp.factory.service.impl;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.BusiConstant;
 import com.zlt.aps.constant.StringConstant;
@@ -41,11 +40,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
-import java.time.YearMonth;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -77,18 +72,14 @@ public class MonthPlanValidateServiceImpl extends AbstractDataLoaderService impl
     @Override
     public void validateEmbryoAllocation(String monthPlanVersion,
                                          String productVersion,
-                                         boolean isAdjust,
                                          Map<Integer, MpDailyCapacityLimitVo> dailyCapacityMap,
-                                         List<FactoryMonthPlanMouldDayResult> monthPlanList,
-                                         YearMonth yearMonth,
-                                         Long importLogId,
-                                         List<ImportErrorLog> importErrorLogs) {
+                                         List<FactoryMonthPlanMouldDayResult> monthPlanList) {
         if (CollectionUtils.isEmpty(monthPlanList)) {
             return;
         }
         //构建组装使用的参数
         FactoryMonthPlanMouldDayResult arbitrary = monthPlanList.get(BigDecimal.ZERO.intValue());
-        TbrProductionContext productionContext = buildContext(arbitrary, monthPlanVersion, productVersion, isAdjust);
+        TbrProductionContext productionContext = buildContext(arbitrary, monthPlanVersion, productVersion);
         loadInitData(productionContext);
         //转产分配表
         List<MpStructureAllocation> allAllocationList = getMonthProductionDataService().getStructureAllocationInfoByProductionVersion(productionContext);
@@ -117,10 +108,11 @@ public class MonthPlanValidateServiceImpl extends AbstractDataLoaderService impl
             if (CollectionUtils.isEmpty(errorDaySet)) {
                 return;
             }
-            String daysInfo = errorDaySet.stream().map(String::valueOf).collect(Collectors.joining(StringConstant.COMMA));
+            List<Integer> errorDayList = Lists.newArrayList(errorDaySet);
+            errorDayList.sort(Comparator.comparing(Integer::intValue));
+            String daysInfo = errorDayList.stream().map(String::valueOf).collect(Collectors.joining(StringConstant.COMMA));
             errorInfo.append(String.format(errorFormat, groupName, daysInfo)).append(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE);
         });
-        // 任意一个强控项没有验证通过,都直接终止
         if (!StringUtil.isEmptyWithTrim(errorInfo.toString())) {
             throw new BusinessException(errorInfo.toString());
         }
@@ -132,10 +124,9 @@ public class MonthPlanValidateServiceImpl extends AbstractDataLoaderService impl
      * @param arbitrary
      * @param monthPlanVersion
      * @param productVersion
-     * @param isAdjust
      * @return
      */
-    private TbrProductionContext buildContext(FactoryMonthPlanMouldDayResult arbitrary, String monthPlanVersion, String productVersion, boolean isAdjust) {
+    private TbrProductionContext buildContext(FactoryMonthPlanMouldDayResult arbitrary, String monthPlanVersion, String productVersion) {
         String productTypeCode = arbitrary.getProductTypeCode();
         String factoryCode = arbitrary.getFactoryCode();
         Integer year = arbitrary.getYear();

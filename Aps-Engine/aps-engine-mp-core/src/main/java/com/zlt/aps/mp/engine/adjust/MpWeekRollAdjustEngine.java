@@ -79,6 +79,9 @@ public class MpWeekRollAdjustEngine {
                 //非正式忽略
                 continue;
             }
+            if (finalAdjustVo.getTotalQty() == null){
+                continue;
+            }
             finalAdjustVo.setAdjustDetail(new StringBuilder());
 
             if (finalAdjustVo.getPendingQty() >= 0){
