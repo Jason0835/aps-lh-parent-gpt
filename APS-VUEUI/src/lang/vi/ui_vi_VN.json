@@ -156,6 +156,7 @@
   "ui.frame.btn.delete": "Xóa",
   "ui.frame.btn.import": "Nhập",
   "ui.frame.btn.export": "Xuất",
+  "ui.frame.btn.more": "Thêm",
   "ui.data.btn.option": "Thao tác",
   "ui.data.btn.scheduleResult.unscheduledResult": "Kết quả chưa sắp xếp",
   "ui.data.btn.lhMouldChangePlan.issueSchedule": "Xuất bản kế hoạch thay đổi khuôn",

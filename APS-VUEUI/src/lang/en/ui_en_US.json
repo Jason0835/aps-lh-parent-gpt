@@ -415,6 +415,7 @@
   "ui.biz.alter.isOpen": "Confirm to enable?",
   "ui.biz.alter.isStop": "Confirm to disable?",
   "ui.frame.btn.moldingScheduleSequence": "Molding Schedule Sequence",
+  "ui.frame.btn.more": "More",
   "ui.data.column.cxScheduleResult.tripNo": "Trip No.",
   "ui.data.column.cxScheduleResult.tripNoPrefix": "Trip ",
   "ui.data.column.cxScheduleResult.tripCapacity": "Trip Capacity",

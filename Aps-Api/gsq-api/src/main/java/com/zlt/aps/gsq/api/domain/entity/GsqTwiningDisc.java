@@ -29,81 +29,83 @@ public class GsqTwiningDisc extends BaseEntity implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
+    /** 工厂代码 */
+    @Excel(name = "ui.data.column.gsq.twiningDisc.factoryCode", dictType = "biz_factory_name", sort = 10)
+    @ApiModelProperty(value = "工厂代码", position = 5)
+    @TableField("FACTORY_CODE")
+    @ImportValidated(required = true, maxLength = 50)
+    private String factoryCode;
+
     /** 缠绕盘编码（唯一） */
-    @Excel(name = "ui.data.column.gsq.twiningDisc.twiningDiscCode")
+    @Excel(name = "ui.data.column.gsq.twiningDisc.twiningDiscCode", sort = 20)
     @ApiModelProperty(value = "缠绕盘编码", position = 10)
     @TableField("TWINING_DISC_CODE")
     @ImportValidated(required = true, isCode = true, maxLength = 50)
     private String twiningDiscCode;
 
     /** 缠绕盘名称 */
-    @Excel(name = "ui.data.column.gsq.twiningDisc.twiningDiscName")
+    @Excel(name = "ui.data.column.gsq.twiningDisc.twiningDiscName", sort = 30)
     @ApiModelProperty(value = "缠绕盘名称", position = 20)
     @TableField("TWINING_DISC_NAME")
     @ImportValidated(required = true, maxLength = 100)
     private String twiningDiscName;
 
-    /** 状态（0正常 1停用） */
-    @Excel(name = "ui.data.column.gsq.twiningDisc.status", dictType = "sys_normal_disable")
-    @ApiModelProperty(value = "状态", position = 30)
-    @TableField("STATUS")
-    private String status;
-
     /** 英寸 */
-    @Excel(name = "ui.data.column.gsq.twiningDisc.proSize")
-    @ApiModelProperty(value = "英寸", position = 40)
+    @Excel(name = "ui.data.column.gsq.twiningDisc.proSize", sort = 40)
+    @ApiModelProperty(value = "英寸", position = 30)
     @TableField("PRO_SIZE")
     @ImportValidated(required = true, number = true, min = 0, max = 9999.99)
     private BigDecimal proSize;
 
+    /** 钢丝排列方式（如3-4-5-4-3，MES同步字段） */
+    @Excel(name = "ui.data.column.gsq.twiningDisc.sortType", sort = 50)
+    @ApiModelProperty(value = "钢丝排列方式", position = 40)
+    @TableField("SORT_TYPE")
+    @ImportValidated(required = true, maxLength = 50)
+    private String sortType;
+
     /** 数量 */
-    @Excel(name = "ui.data.column.gsq.twiningDisc.qty")
+    @Excel(name = "ui.data.column.gsq.twiningDisc.qty", sort = 60)
     @ApiModelProperty(value = "数量", position = 50)
     @TableField("QTY")
     @ImportValidated(number = true, min = 0, max = 999999)
     private Integer qty;
 
-    /** 钢丝排列方式（如3-4-5-4-3，MES同步字段） */
-    @Excel(name = "ui.data.column.gsq.twiningDisc.sortType")
-    @ApiModelProperty(value = "钢丝排列方式", position = 60)
-    @TableField("SORT_TYPE")
-    @ImportValidated(required = true, maxLength = 50)
-    private String sortType;
+    /** 关联钢丝圈规格数（非数据库字段，列表统计反显用，仅导出不导入） */
+    @Excel(name = "ui.data.column.gsq.twiningDisc.specCount", sort = 70, type = Excel.Type.EXPORT)
+    @ApiModelProperty(value = "关联钢丝圈规格数", position = 60)
+    @TableField(exist = false)
+    private Integer specCount;
 
-    /** 工厂代码 */
-    @Excel(name = "ui.data.column.gsq.twiningDisc.factoryCode", dictType = "biz_factory_name")
-    @ApiModelProperty(value = "工厂代码", position = 70)
-    @TableField("FACTORY_CODE")
-    @ImportValidated(maxLength = 50)
-    private String factoryCode;
+    /** 关联机台数（非数据库字段，列表统计反显用，仅导出不导入） */
+    @Excel(name = "ui.data.column.gsq.twiningDisc.machineCount", sort = 80, type = Excel.Type.EXPORT)
+    @ApiModelProperty(value = "关联机台数", position = 70)
+    @TableField(exist = false)
+    private Integer machineCount;
+
+    /** 状态（0正常 1停用） */
+    @Excel(name = "ui.data.column.gsq.twiningDisc.status", dictType = "sys_normal_disable", sort = 90)
+    @ApiModelProperty(value = "状态", position = 80)
+    @TableField("STATUS")
+    private String status;
 
     /** MES数据版本号（MES同步字段，手工数据为空） */
-    @ApiModelProperty(value = "MES数据版本号", position = 80)
+    @ApiModelProperty(value = "MES数据版本号", position = 85)
     @TableField("DATA_VERSION")
     private String dataVersion;
 
-    /** 数据来源（字典lh_precision_data_source）：0-MES同步，1-手工维护 */
-    @Excel(name = "ui.data.column.gsq.twiningDisc.dataSource", dictType = "lh_precision_data_source")
+    /** 数据来源（字典lh_precision_data_source）：0-MES同步，1-手工维护（仅导出不导入，导入时默认1-手工维护） */
+    @Excel(name = "ui.data.column.gsq.twiningDisc.dataSource", dictType = "lh_precision_data_source", sort = 100, type = Excel.Type.EXPORT)
     @ApiModelProperty(value = "数据来源（0-MES同步，1-手工维护）", position = 90)
     @TableField("DATA_SOURCE")
     private String dataSource;
 
     /** 备注 */
-    @Excel(name = "ui.common.column.remark")
+    @Excel(name = "ui.common.column.remark", sort = 110)
     @ApiModelProperty(value = "备注", position = 500)
     @TableField("REMARK")
     @ImportValidated(maxLength = 900)
     private String remark;
-
-    /** 关联钢丝圈规格数（非数据库字段，列表统计反显用） */
-    @ApiModelProperty(value = "关联钢丝圈规格数", position = 510)
-    @TableField(exist = false)
-    private Integer specCount;
-
-    /** 关联机台数（非数据库字段，列表统计反显用） */
-    @ApiModelProperty(value = "关联机台数", position = 520)
-    @TableField(exist = false)
-    private Integer machineCount;
 
     /** 排序字段（非数据库字段，用于列表动态排序，格式：字段名+排列方式） */
     @TableField(exist = false)

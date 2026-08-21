@@ -53,28 +53,4 @@
             #{id}
         </foreach>
     </delete>
-
-    <insert id="mergeSql" parameterType="list">
-        INSERT INTO t_gsq_reserve_stock (
-        steel_ring_code, reserve_stock_rate,
-        create_by, create_time, update_by, update_time, remark, del_flag
-        ) VALUES
-        <foreach collection="list" item="ReserveStock" separator=",">
-            (
-            #{ReserveStock.steelRingCode,jdbcType=VARCHAR},
-            #{ReserveStock.reserveStockRate,jdbcType=DOUBLE},
-            #{ReserveStock.createBy,jdbcType=VARCHAR},
-            NOW(),
-            #{ReserveStock.updateBy,jdbcType=VARCHAR},
-            NOW(),
-            #{ReserveStock.remark,jdbcType=VARCHAR},
-            '0'
-            )
-        </foreach>
-        ON DUPLICATE KEY UPDATE
-        reserve_stock_rate = VALUES(reserve_stock_rate),
-        update_by = VALUES(create_by),
-        update_time = NOW(),
-        remark = VALUES(remark)
-    </insert>
 </mapper>

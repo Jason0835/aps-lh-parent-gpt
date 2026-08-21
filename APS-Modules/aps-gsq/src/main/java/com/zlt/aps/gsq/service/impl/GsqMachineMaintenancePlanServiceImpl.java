@@ -3,8 +3,10 @@ package com.zlt.aps.gsq.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.utils.ImportUtil;
 import com.zlt.aps.gsq.api.domain.entity.GsqMachineInfo;
 import com.zlt.aps.gsq.api.domain.entity.GsqMachineMaintenancePlan;
@@ -13,6 +15,8 @@ import com.zlt.aps.gsq.service.GsqMachineInfoService;
 import com.zlt.aps.gsq.service.IGsqMachineMaintenancePlanService;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.utils.StringUtil;
+import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.date.DateUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,8 +24,11 @@ import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
@@ -149,11 +156,27 @@ public class GsqMachineMaintenancePlanServiceImpl extends AbstractDocService<Gsq
             }
         }
 
-        // 保存：updateSupport=true 走 mergeSql（存在则更新）；否则逐条校验唯一后 save
+        // 保存：updateSupport=true 走查-改-插（存在则更新原记录）；否则逐条校验唯一后 save
         try {
             if (updateSupport && !importList.isEmpty()) {
-                successNum = importList.size();
-                gsqMachineMaintenancePlanMapper.mergeSql(importList);
+                // 批量预取已存在保养计划（按停机日期+机台编码+停机班次匹配），存在则更新原记录，不存在则新增
+                Map<String, GsqMachineMaintenancePlan> existingMap = this.loadExistingMaintenancePlanMap(importList);
+                for (GsqMachineMaintenancePlan excelItem : importList) {
+                    GsqMachineMaintenancePlan existing = existingMap.get(this.buildMaintenancePlanKey(excelItem));
+                    if (existing != null) {
+                        // 已存在：回填主键ID，清空新增审计字段避免覆盖原记录创建信息，补齐更新审计字段后更新
+                        excelItem.setId(existing.getId());
+                        excelItem.setCreateBy(null);
+                        excelItem.setCreateTime(null);
+                        this.setUpdateAuditFields(excelItem);
+                        gsqMachineMaintenancePlanMapper.updateById(excelItem);
+                    } else {
+                        // 不存在：补齐新增审计字段后插入
+                        this.setInsertAuditFields(excelItem);
+                        baseDao.save(excelItem);
+                    }
+                    successNum++;
+                }
             } else {
                 for (int i = 0; i < list.size(); i++) {
                     GsqMachineMaintenancePlan excelItem = list.get(i);
@@ -184,5 +207,76 @@ public class GsqMachineMaintenancePlanServiceImpl extends AbstractDocService<Gsq
         } else {
             return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + successNum);
         }
+    }
+
+    /**
+     * 批量预取已存在的机台保养计划数据（导入更新模式使用）
+     * 按机台编码批量查询数据库已有记录，逻辑删除由框架自动过滤
+     *
+     * @param importList 导入数据列表
+     * @return 停机日期_机台编码_停机班次 -> 已存在保养计划记录 的映射
+     */
+    private Map<String, GsqMachineMaintenancePlan> loadExistingMaintenancePlanMap(List<GsqMachineMaintenancePlan> importList) {
+        // 提取非空机台编码并去重，用于分批查询
+        List<String> machineCodeList = importList.stream()
+                .map(GsqMachineMaintenancePlan::getMachineCode)
+                .filter(StringUtils::isNotBlank)
+                .distinct()
+                .collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(machineCodeList)) {
+            return new HashMap<>();
+        }
+        // 按1000条一批查询，避免in条件超长
+        List<GsqMachineMaintenancePlan> existingList = CollUtil.split(machineCodeList, 1000).stream()
+                .flatMap(batch -> gsqMachineMaintenancePlanMapper.selectList(new LambdaQueryWrapper<GsqMachineMaintenancePlan>()
+                        .in(GsqMachineMaintenancePlan::getMachineCode, batch)).stream())
+                .collect(Collectors.toList());
+        // 按"停机日期+机台编码+停机班次"组装映射，同键多条时保留首条
+        return existingList.stream()
+                .collect(Collectors.toMap(this::buildMaintenancePlanKey,
+                        Function.identity(), (oldValue, newValue) -> oldValue));
+    }
+
+    /**
+     * 构建"停机日期+机台编码+停机班次"组合键（停机日期格式化为yyyy-MM-dd，规避时分秒差异）
+     *
+     * @param entity 保养计划实体
+     * @return 组合键字符串
+     */
+    private String buildMaintenancePlanKey(GsqMachineMaintenancePlan entity) {
+        return DateUtil.format(entity.getDowntimeDate(), "yyyy-MM-dd")
+                + "_" + entity.getMachineCode() + "_" + entity.getDowntimeShift();
+    }
+
+    /**
+     * 设置导入更新模式的更新审计字段（updateBy/updateTime）
+     * 无登录上下文时回退为system
+     *
+     * @param entity 实体对象
+     */
+    private void setUpdateAuditFields(GsqMachineMaintenancePlan entity) {
+        try {
+            entity.setUpdateBy(SecurityUtils.getUsername());
+        } catch (Exception e) {
+            entity.setUpdateBy("system");
+        }
+        entity.setUpdateTime(new Date());
+    }
+
+    /**
+     * 设置导入新增模式的审计字段（isDelete/createBy/createTime/updateBy/updateTime）
+     * 无登录上下文时回退为system
+     *
+     * @param entity 实体对象
+     */
+    private void setInsertAuditFields(GsqMachineMaintenancePlan entity) {
+        entity.setIsDelete(0);
+        try {
+            entity.setCreateBy(SecurityUtils.getUsername());
+        } catch (Exception e) {
+            entity.setCreateBy("system");
+        }
+        entity.setCreateTime(new Date());
+        this.setUpdateAuditFields(entity);
     }
 }

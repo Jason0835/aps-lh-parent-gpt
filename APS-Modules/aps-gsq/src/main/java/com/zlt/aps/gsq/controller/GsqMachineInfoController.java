@@ -7,6 +7,7 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.common.engine.utils.CollectionUtil;
+import com.zlt.aps.common.core.utils.MachineShiftDictUtil;
 import com.zlt.aps.gsq.api.domain.entity.GsqMachineInfo;
 import com.zlt.aps.gsq.mapper.GsqMachineInfoMapper;
 import com.zlt.aps.gsq.service.GsqMachineInfoService;
@@ -241,6 +242,9 @@ public class GsqMachineInfoController extends AbstractDocBizController<GsqMachin
         QueryWrapper<GsqMachineInfo> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
         wrapper.last("ORDER BY " + getOrderBy());
-        return machineInfoMapper.selectList(wrapper);
+        List<GsqMachineInfo> list = machineInfoMapper.selectList(wrapper);
+        // 开机班次：导出时把数据库字典值(01,02)转回班次名称(夜班,早班)，与导入模板输入格式保持一致
+        list.forEach(entity -> entity.setOpenMachineClass(MachineShiftDictUtil.valuesToLabels(entity.getOpenMachineClass())));
+        return list;
     }
 }

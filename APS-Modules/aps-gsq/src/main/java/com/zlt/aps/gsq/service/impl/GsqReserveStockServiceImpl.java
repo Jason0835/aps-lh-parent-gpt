@@ -3,10 +3,13 @@ package com.zlt.aps.gsq.service.impl;
 import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import cn.hutool.core.collection.CollUtil;
 import org.apache.commons.collections.CollectionUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,6 +21,7 @@ import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.ImportUtil;
 import com.zlt.aps.gsq.api.domain.dto.GsqReserveStockDto;
@@ -149,10 +153,27 @@ public class GsqReserveStockServiceImpl extends ServiceImpl<GsqReserveStockMappe
         }
         if (CollectionUtils.isNotEmpty(list)) {
             try {
-                //勾选更新记录，调用merge即可
                 if (updateSupport && CollectionUtils.isNotEmpty(importList)) {
-                    successNum = importList.size();
-                    gsqReserveStockMapper.mergeSql(importList);
+                    // 勾选更新：批量预取已存在备库（按钢丝圈代码匹配），存在则更新原记录，不存在则新增
+                    Map<String, GsqReserveStock> existingMap = this.loadExistingReserveStockMap(importList);
+                    for (GsqReserveStockDto excelItem : importList) {
+                        GsqReserveStock reserveStock = new GsqReserveStock();
+                        BeanUtils.copyProperties(excelItem, reserveStock);
+                        GsqReserveStock existing = existingMap.get(excelItem.getSteelRingCode());
+                        if (existing != null) {
+                            // 已存在：回填主键ID，清空新增审计字段避免覆盖原记录创建信息，setBaseVale补齐更新审计字段后更新
+                            reserveStock.setId(existing.getId());
+                            reserveStock.setCreateBy(null);
+                            reserveStock.setCreateTime(null);
+                            reserveStock.setBaseVale(existing.getId());
+                            gsqReserveStockMapper.updateById(reserveStock);
+                        } else {
+                            // 不存在：setBaseVale(null)自动补齐delFlag/createBy/createTime后插入
+                            reserveStock.setBaseVale(null);
+                            gsqReserveStockMapper.insert(reserveStock);
+                        }
+                        successNum++;
+                    }
                 } else {
                     //查询数据库已存在对象
                     for (int i = 0; i < list.size(); i++) {
@@ -191,5 +212,30 @@ public class GsqReserveStockServiceImpl extends ServiceImpl<GsqReserveStockMappe
         } else {
             return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + successNum);
         }
+    }
+
+    /**
+     * 批量预取已存在的备库数据（导入更新模式使用）
+     * 按钢丝圈代码批量查询数据库未删除的已有记录
+     *
+     * @param importList 导入数据列表
+     * @return 钢丝圈代码 -> 已存在备库记录 的映射
+     */
+    private Map<String, GsqReserveStock> loadExistingReserveStockMap(List<GsqReserveStockDto> importList) {
+        // 提取非空钢丝圈代码并去重
+        List<String> codeList = importList.stream()
+                .map(GsqReserveStockDto::getSteelRingCode)
+                .filter(StringUtils::isNotEmpty)
+                .distinct()
+                .collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(codeList)) {
+            return new HashMap<>();
+        }
+        // 按1000条一批查询（过滤逻辑删除），避免in条件超长；同编码多条时保留首条
+        return CollUtil.split(codeList, 1000).stream()
+                .flatMap(batch -> gsqReserveStockMapper.selectList(new LambdaQueryWrapper<GsqReserveStock>()
+                        .eq(GsqReserveStock::getDelFlag, ApsConstant.DEL_FLAG_NORMAL)
+                        .in(GsqReserveStock::getSteelRingCode, batch)).stream())
+                .collect(Collectors.toMap(GsqReserveStock::getSteelRingCode, Function.identity(), (v1, v2) -> v1));
     }
 }

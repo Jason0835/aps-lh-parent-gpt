@@ -1,5 +1,6 @@
 package com.zlt.aps.gsq.service.impl;
 
+import cn.hutool.core.collection.CollUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
@@ -7,6 +8,7 @@ import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.utils.ImportUtil;
+import com.zlt.aps.common.core.utils.MachineShiftDictUtil;
 import com.zlt.aps.gsq.api.domain.entity.GsqMachineInfo;
 import com.zlt.aps.gsq.mapper.GsqMachineInfoMapper;
 import com.zlt.aps.gsq.service.GsqMachineInfoService;
@@ -21,8 +23,10 @@ import javax.annotation.Resource;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
@@ -183,6 +187,10 @@ public class GsqMachineInfoServiceImpl extends AbstractDocService<GsqMachineInfo
         for (int i = 0; i < list.size(); i++) {
             GsqMachineInfo machineInfo = list.get(i);
 
+            // 开机班次：导入模板填写班次名称(如 夜班,早班，多个用英文逗号分隔)，转成字典值(01,02)入库；
+            // 实体未配置dictType，框架解析层透传原始输入，此处统一转换以支持多选
+            machineInfo.setOpenMachineClass(MachineShiftDictUtil.labelsToValues(machineInfo.getOpenMachineClass()));
+
             //重复记录校验
             Long hasValue = groupMap.get(machineInfo.getMachineCode());
             if (hasValue != null && hasValue > 1) {
@@ -258,10 +266,25 @@ public class GsqMachineInfoServiceImpl extends AbstractDocService<GsqMachineInfo
             }
         }
         try {
-            //勾选更新记录，调用merge即可
             if (updateSupport && CollectionUtils.isNotEmpty(importList)) {
-                successNum = importList.size();
-                machineInfoMapper.mergeSql(importList);
+                // 勾选更新：批量预取已存在机台（按机台编码匹配），存在则在原记录上更新，不存在则新增
+                Map<String, GsqMachineInfo> existingMap = this.loadExistingMachineMap(importList);
+                for (GsqMachineInfo excelItem : importList) {
+                    GsqMachineInfo existing = existingMap.get(excelItem.getMachineCode());
+                    if (existing != null) {
+                        // 已存在：回填主键ID，清空新增审计字段避免覆盖原记录创建信息，补齐更新审计字段后更新
+                        excelItem.setId(existing.getId());
+                        excelItem.setCreateBy(null);
+                        excelItem.setCreateTime(null);
+                        this.setBaseFieldValue(excelItem, existing.getId());
+                        machineInfoMapper.updateMachineInfo(excelItem);
+                    } else {
+                        // 不存在：补齐新增审计字段后插入
+                        this.setBaseFieldValue(excelItem, null);
+                        machineInfoMapper.insertMachineInfo(excelItem);
+                    }
+                    successNum++;
+                }
             } else {
                 //查询数据库已存在对象
                 for (int i = 0; i < list.size(); i++) {
@@ -289,6 +312,30 @@ public class GsqMachineInfoServiceImpl extends AbstractDocService<GsqMachineInfo
         } else {
             return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + successNum);
         }
+    }
+
+    /**
+     * 批量预取已存在的机台信息（导入更新模式使用）
+     * 按机台编码批量查询数据库已有记录，逻辑删除由框架自动过滤
+     *
+     * @param importList 导入数据列表
+     * @return 机台编码 -> 已存在机台信息 的映射
+     */
+    private Map<String, GsqMachineInfo> loadExistingMachineMap(List<GsqMachineInfo> importList) {
+        // 提取非空机台编码并去重
+        List<String> machineCodeList = importList.stream()
+                .map(GsqMachineInfo::getMachineCode)
+                .filter(StringUtils::isNotBlank)
+                .distinct()
+                .collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(machineCodeList)) {
+            return new HashMap<>();
+        }
+        // 按1000条一批查询，避免in条件超长；同编码多条时保留首条
+        return CollUtil.split(machineCodeList, 1000).stream()
+                .flatMap(batch -> machineInfoMapper.selectList(new LambdaQueryWrapper<GsqMachineInfo>()
+                        .in(GsqMachineInfo::getMachineCode, batch)).stream())
+                .collect(Collectors.toMap(GsqMachineInfo::getMachineCode, Function.identity(), (oldValue, newValue) -> oldValue));
     }
 
     /**

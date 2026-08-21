@@ -150,37 +150,4 @@
         </if>
 
     </select>
-
-    <insert id="mergeSql" parameterType="list">
-        INSERT INTO t_gsq_machine_info (
-        machine_code, machine_name, quata,
-        class_shift, open_machine_class, status,
-        create_by, create_time, update_by, update_time, remark, IS_DELETE
-        ) VALUES
-        <foreach collection="list" item="MACHINE" separator=",">
-            (
-            #{MACHINE.machineCode,jdbcType=VARCHAR},
-            #{MACHINE.machineName,jdbcType=VARCHAR},
-            #{MACHINE.quata,jdbcType=DOUBLE},
-            #{MACHINE.classShift,jdbcType=VARCHAR},
-            #{MACHINE.openMachineClass,jdbcType=VARCHAR},
-            #{MACHINE.status,jdbcType=VARCHAR},
-            #{MACHINE.createBy,jdbcType=VARCHAR},
-            NOW(),
-            #{MACHINE.updateBy,jdbcType=VARCHAR},
-            NOW(),
-            #{MACHINE.remark,jdbcType=VARCHAR},
-            '0'
-            )
-        </foreach>
-        ON DUPLICATE KEY UPDATE
-        machine_name = VALUES(machine_name),
-        quata = VALUES(quata),
-        class_shift = VALUES(class_shift),
-        open_machine_class = VALUES(open_machine_class),
-        status = VALUES(status),
-        update_by = VALUES(create_by),
-        update_time = NOW(),
-        remark = VALUES(remark)
-    </insert>
 </mapper>
