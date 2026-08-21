@@ -2,9 +2,12 @@ package com.zlt.aps.lh.engine.strategy.support;
 
 import com.zlt.aps.lh.api.domain.dto.SkuDailyPlanQuotaDTO;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
+import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.enums.ConstructionStageEnum;
+import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
 import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.util.ShiftFieldUtil;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
 
@@ -39,6 +42,9 @@ public final class NewSpecEmbryoAvailableTimeResolver {
     /** 当前业务日尚未到达胎胚时间时的延期原因 */
     public static final String NOT_AVAILABLE_IN_CURRENT_DAY_REASON = "胎胚最早可供硫化时间尚未到达当前业务日";
 
+    /** 结果行换活字块标识：1-换活字块，0-普通续作或新增 */
+    private static final String TYPE_BLOCK_RESULT_YES = "1";
+
     private NewSpecEmbryoAvailableTimeResolver() {
     }
 
@@ -65,21 +71,83 @@ public final class NewSpecEmbryoAvailableTimeResolver {
     }
 
     /**
-     * 判断当前 SKU 是否命中有效胎胚时间配置。
+     * 判断当前 SKU 是否命中原始胎胚时间配置。
+     *
+     * <p>该方法只判断配置是否存在，不考虑本批次同结构续作排产对配置的抑制；需要判断
+     * 当前是否真正生效时，调用 {@link #isEffectiveConstrained(LhScheduleContext, SkuScheduleDTO)}。</p>
      *
      * @param context 排程上下文
      * @param sku 待排 SKU
-     * @return true-命中有效时间配置；false-未命中有效时间配置
+     * @return true-命中原始时间配置；false-未命中原始时间配置
      */
     public static boolean isConstrained(LhScheduleContext context, SkuScheduleDTO sku) {
         return Objects.nonNull(resolveEarliestAvailableTime(context, sku));
     }
 
     /**
+     * 判断当前 SKU 对应结构在本次续作排产中是否已经形成有效排产结果。
+     *
+     * <p>不能只判断 {@code continuousSkuList} 是否包含该结构，因为续作列表中可能存在
+     * 当前窗口无计划、被释放或最终被裁剪为零量的 SKU。这里以当前批次结果列表中的有效
+     * 续作结果作为“有排过”的唯一口径；换活字块结果不属于本判断范围。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 待排 SKU
+     * @return true-同结构已经形成有效续作排产；false-未形成有效续作排产
+     */
+    public static boolean isStructureScheduledInCurrentContinuation(
+            LhScheduleContext context, SkuScheduleDTO sku) {
+        if (Objects.isNull(context) || Objects.isNull(sku)
+                || StringUtils.isEmpty(sku.getStructureName())
+                || CollectionUtils.isEmpty(context.getScheduleResultList())) {
+            return false;
+        }
+        return context.getScheduleResultList().stream()
+                .filter(Objects::nonNull)
+                .filter(result -> StringUtils.equals(
+                        ScheduleTypeEnum.CONTINUOUS.getCode(), result.getScheduleType()))
+                .filter(result -> !StringUtils.equals(
+                        TYPE_BLOCK_RESULT_YES, result.getIsTypeBlock()))
+                .filter(result -> StringUtils.equals(
+                        sku.getStructureName(), result.getStructureName()))
+                .anyMatch(result -> ShiftFieldUtil.resolveScheduledQty(result) > 0);
+    }
+
+    /**
+     * 获取当前批次实际生效的胎胚最早可供硫化时间。
+     *
+     * <p>同结构已经在本次续作中形成有效排产时，说明该结构已经完成续作衔接，后续 SKU
+     * 不再受配置的最早胎胚时间限制；其余场景继续返回原始结构配置时间。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 待排 SKU
+     * @return 当前实际生效的胎胚可供时间；被续作结构规则抑制或未配置时返回 null
+     */
+    public static Date resolveEffectiveEarliestAvailableTime(
+            LhScheduleContext context, SkuScheduleDTO sku) {
+        if (isStructureScheduledInCurrentContinuation(context, sku)) {
+            return null;
+        }
+        return resolveEarliestAvailableTime(context, sku);
+    }
+
+    /**
+     * 判断当前 SKU 是否命中当前批次实际生效的胎胚时间约束。
+     *
+     * @param context 排程上下文
+     * @param sku 待排 SKU
+     * @return true-胎胚时间实际生效；false-未配置或已被续作结构规则抑制
+     */
+    public static boolean isEffectiveConstrained(LhScheduleContext context, SkuScheduleDTO sku) {
+        return Objects.nonNull(resolveEffectiveEarliestAvailableTime(context, sku));
+    }
+
+    /**
      * 解析当前新增 SKU 正式生产不得早于的统一时间。
      *
-     * <p>正规、小批量 SKU 只返回胎胚最早可供时间（未配置时返回 null）；
-     * 试制、量试 SKU 返回“首次正计划日中班”与胎胚最早可供时间中的较晚值。</p>
+     * <p>正规、小批量 SKU 只返回当前生效的胎胚最早可供时间（未配置或被续作结构规则
+     * 抑制时返回 null）；试制、量试 SKU 返回“首次正计划日中班”与当前生效胎胚时间
+     * 中的较晚值。试制、量试中班门禁不会因胎胚时间被抑制而消失。</p>
      *
      * @param context 排程上下文，提供当前日驱动业务日和胎胚可供时间
      * @param sku 待排 SKU
@@ -90,7 +158,7 @@ public final class NewSpecEmbryoAvailableTimeResolver {
                                                       SkuScheduleDTO sku,
                                                       List<LhShiftConfigVO> shifts) {
         Date skuProductionGateTime = resolveSkuProductionGateTime(context, sku, shifts);
-        Date earliestEmbryoAvailableTime = resolveEarliestAvailableTime(context, sku);
+        Date earliestEmbryoAvailableTime = resolveEffectiveEarliestAvailableTime(context, sku);
         return resolveActualProductionStartTime(
                 skuProductionGateTime, earliestEmbryoAvailableTime);
     }

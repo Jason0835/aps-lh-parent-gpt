@@ -4,7 +4,6 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.gsq.api.domain.entity.GsqStock;
 import com.zlt.bill.common.service.IDocService;
 
-import java.util.Date;
 import java.util.List;
 
 /**
@@ -35,10 +34,11 @@ public interface IGsqStockService extends IDocService<GsqStock> {
 
     /**
      * 逻辑删除指定库存日期的旧数据并批量插入新数据（事务性操作）
+     * 日期字符串在目标JVM时区解析，使用XML批量插入绕过MetaObjectHandler确保CREATE_BY/UPDATE_BY正确
      *
-     * @param stockDate 库存日期
-     * @param updateBy  更新者
-     * @param list      待插入的钢丝圈库存列表
+     * @param stockDateStr 库存日期字符串，格式yyyy-MM-dd
+     * @param createBy     创建者/更新者（MES同步场景固定为"MES"）
+     * @param list         待插入的钢丝圈库存列表（stockDate/createBy等字段由本方法统一回填）
      */
-    void logicDeleteAndSaveBatch(Date stockDate, String updateBy, List<GsqStock> list);
+    void logicDeleteAndSaveBatch(String stockDateStr, String createBy, List<GsqStock> list);
 }

@@ -1,13 +1,13 @@
 package com.zlt.aps.tm.service.loader;
 
 import cn.hutool.core.collection.CollUtil;
-import cn.hutool.core.date.DateUnit;
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
+import com.zlt.aps.common.core.utils.SixShiftWorkCalendarUtil;
 import com.zlt.aps.tm.api.constant.TmScheduleConstants;
 import com.zlt.aps.tm.api.domain.entity.*;
 import com.zlt.aps.tm.api.enums.*;
@@ -16,7 +16,6 @@ import com.zlt.aps.tm.engine.domain.*;
 import com.zlt.aps.tm.mapper.*;
 import com.zlt.aps.tm.service.cache.TmAutoScheduleRedisCacheService;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
@@ -36,11 +35,16 @@ import java.util.stream.Collectors;
 @Service
 public class TmAutoScheduleDataLoadService {
 
+    /** 施工表胎面长度单位由毫米换算为米的除数。 */
+    private static final BigDecimal CONSTRUCTION_LENGTH_UNIT_DIVISOR = BigDecimal.valueOf(1000L);
+
     private final TmAutoScheduleRedisCacheService tmAutoScheduleRedisCacheService;
     /** 参数装载组件，只负责构建单次排程参数快照 */
     private final TmScheduleParamLoader tmScheduleParamLoader;
     /** 损耗规则装载组件，只负责业务配置到引擎规则的转换 */
     private final TmLossRuleLoader tmLossRuleLoader;
+    /** 成型需求共用任务基础属性装配组件 */
+    private final TmFormingTaskBaseAssembler formingTaskBaseAssembler;
     @Resource
     private TmParamsMapper tmParamsMapper;
     @Resource
@@ -79,6 +83,7 @@ public class TmAutoScheduleDataLoadService {
         this.tmAutoScheduleRedisCacheService = tmAutoScheduleRedisCacheService;
         this.tmScheduleParamLoader = new TmScheduleParamLoader();
         this.tmLossRuleLoader = new TmLossRuleLoader();
+        this.formingTaskBaseAssembler = new TmFormingTaskBaseAssembler();
     }
 
     /**
@@ -189,13 +194,7 @@ public class TmAutoScheduleDataLoadService {
                 continue;
             }
             // 候选机台只记录自身具备的口型板，是否启用白名单由工厂级配置集合判断。
-            if (candidate.getConfiguredMouthPlateCodes() == null) {
-                candidate.setConfiguredMouthPlateCodes(new HashSet<>());
-            }
             candidate.getConfiguredMouthPlateCodes().add(mouthPlate.getMouthPlateCode());
-            if (candidate.getMouthPlateCodes() == null) {
-                candidate.setMouthPlateCodes(new HashSet<>());
-            }
             candidate.getMouthPlateCodes().add(mouthPlate.getMouthPlateCode());
         }
     }
@@ -225,9 +224,6 @@ public class TmAutoScheduleDataLoadService {
                 continue;
             }
             // 胶料关系只表达主胶料可生产机台，allowFlag 暂不参与排程判断。
-            if (candidate.getConfiguredGlueCodes() == null) {
-                candidate.setConfiguredGlueCodes(new HashSet<>());
-            }
             candidate.getConfiguredGlueCodes().add(glueRule.getGlueCode());
         }
     }
@@ -253,9 +249,6 @@ public class TmAutoScheduleDataLoadService {
                 .filter(StrUtil::isNotBlank)
                 .collect(Collectors.toSet());
         for (TmMachineCandidate candidate : candidateMap.values()) {
-            if (candidate.getConfiguredFixedAllowTreadCodes() == null) {
-                candidate.setConfiguredFixedAllowTreadCodes(new HashSet<>());
-            }
             candidate.getConfiguredFixedAllowTreadCodes().addAll(configuredFixedAllowTreadCodes);
         }
         for (TmSpecifyMachine specify : specifyList) {
@@ -264,14 +257,8 @@ public class TmAutoScheduleDataLoadService {
                 continue;
             }
             if (TmSpecifyMachineJobTypeEnum.ALLOW.getCode().equals(specify.getJobType())) {
-                if (candidate.getFixedAllowTreadCodes() == null) {
-                    candidate.setFixedAllowTreadCodes(new HashSet<>());
-                }
                 candidate.getFixedAllowTreadCodes().add(specify.getTreadCode());
             } else if (TmSpecifyMachineJobTypeEnum.FORBID.getCode().equals(specify.getJobType())) {
-                if (candidate.getFixedForbidTreadCodes() == null) {
-                    candidate.setFixedForbidTreadCodes(new HashSet<>());
-                }
                 candidate.getFixedForbidTreadCodes().add(specify.getTreadCode());
             }
         }
@@ -423,36 +410,14 @@ public class TmAutoScheduleDataLoadService {
      * @return 班次顺序到开始、结束时间的映射；配置不完整时跳过对应班次
      */
     private Map<Integer, Date[]> buildShiftWindowMap(TmScheduleContext context, List<TmShiftConfig> shiftConfigList) {
-        Map<Integer, Date[]> shiftWindowMap = new LinkedHashMap<>();
         if (context == null || context.getScheduleDate() == null || CollUtil.isEmpty(shiftConfigList)) {
-            return shiftWindowMap;
+            return new LinkedHashMap<>();
         }
         String scheduleDateText = DateUtil.formatDate(context.getScheduleDate());
-        Date previousEndTime = null;
-        for (TmShiftConfig config : shiftConfigList) {
-            if (config == null || config.getShiftOrder() == null
-                    || StrUtil.isBlank(config.getPlanStartTime()) || StrUtil.isBlank(config.getPlanEndTime())) {
-                continue;
-            }
-            try {
-                Date startTime = DateUtil.parse(scheduleDateText + " " + config.getPlanStartTime());
-                Date endTime = DateUtil.parse(scheduleDateText + " " + config.getPlanEndTime());
-            if (TmYesNoEnum.YES.getCode().equals(config.getCrossDayFlag()) || !endTime.after(startTime)) {
-                    endTime = DateUtil.offsetDay(endTime, 1);
-                }
-                while (previousEndTime != null && startTime.before(previousEndTime)) {
-                    startTime = DateUtil.offsetDay(startTime, 1);
-                    endTime = DateUtil.offsetDay(endTime, 1);
-                }
-                shiftWindowMap.put(config.getShiftOrder(), new Date[]{startTime, endTime});
-                previousEndTime = endTime;
-            } catch (Exception exception) {
-                log.warn("[TM_SHIFT_WINDOW_PARSE_FAIL] factoryCode={}, scheduleDate={}, shiftOrder={}, startTime={}, endTime={}",
+        return TmScheduleWindowUtils.buildShiftWindowMap(context.getScheduleDate(), shiftConfigList,
+                (config, exception) -> log.warn("[TM_SHIFT_WINDOW_PARSE_FAIL] factoryCode={}, scheduleDate={}, shiftOrder={}, startTime={}, endTime={}",
                         context.getFactoryCode(), scheduleDateText, config.getShiftOrder(),
-                        config.getPlanStartTime(), config.getPlanEndTime(), exception);
-            }
-        }
-        return shiftWindowMap;
+                        config.getPlanStartTime(), config.getPlanEndTime(), exception));
     }
 
     /**
@@ -465,17 +430,7 @@ public class TmAutoScheduleDataLoadService {
      * @return 重叠小时数；无重叠时返回 0
      */
     private BigDecimal calculateOverlapHours(Date sourceStart, Date sourceEnd, Date targetStart, Date targetEnd) {
-        if (sourceStart == null || sourceEnd == null || targetStart == null || targetEnd == null) {
-            return BigDecimal.ZERO;
-        }
-        Date overlapStart = sourceStart.after(targetStart) ? sourceStart : targetStart;
-        Date overlapEnd = sourceEnd.before(targetEnd) ? sourceEnd : targetEnd;
-        if (!overlapStart.before(overlapEnd)) {
-            return BigDecimal.ZERO;
-        }
-        return BigDecimal.valueOf(DateUtil.between(overlapStart, overlapEnd, DateUnit.MINUTE))
-                .divide(BigDecimal.valueOf(TmScheduleConstants.MINUTES_PER_HOUR),
-                        TmScheduleConstants.DECIMAL_CALCULATION_SCALE, RoundingMode.HALF_UP);
+        return TmScheduleWindowUtils.calculateOverlapHours(sourceStart, sourceEnd, targetStart, targetEnd);
     }
 
     /**
@@ -572,26 +527,22 @@ public class TmAutoScheduleDataLoadService {
      * @return 最后有效前置任务；不存在时返回 null
      */
     private TmTaskPredecessor resolveLatestPredecessor(TmScheduleResult result) {
-        for (int shiftOrder = 6; shiftOrder >= 1; shiftOrder--) {
-            BigDecimal planQty = this.toBigDecimal(result.getFieldValueByFieldName(
-                    String.format("class%dPlanQty", shiftOrder)));
-            Integer sequence = this.toInteger(result.getFieldValueByFieldName(
-                    String.format("class%dSequence", shiftOrder)));
-            if (planQty.compareTo(BigDecimal.ZERO) <= 0 || sequence == null) {
-                continue;
-            }
-            TmTaskPredecessor predecessor = new TmTaskPredecessor();
-            predecessor.setMachineCode(result.getMachineCode());
-            predecessor.setTreadCode(result.getTreadCode());
-            predecessor.setGlueCode(result.getGlueCode());
-            predecessor.setBaseGlueCode(result.getBaseGlueCode());
-            predecessor.setMouthPlateCode(result.getMouthPlateCode());
-            predecessor.setShiftOrder(shiftOrder);
-            predecessor.setSequence(sequence);
-            predecessor.setBusinessKey(String.valueOf(result.getId()));
-            return predecessor;
+        Integer shiftOrder = TmScheduleWindowUtils.resolveLatestShiftOrder(result, true);
+        if (shiftOrder == null) {
+            return null;
         }
-        return null;
+        Integer sequence = this.toInteger(result.getFieldValueByFieldName(
+                String.format(TmScheduleConstants.SHIFT_SEQUENCE_FIELD_TEMPLATE, shiftOrder)));
+        TmTaskPredecessor predecessor = new TmTaskPredecessor();
+        predecessor.setMachineCode(result.getMachineCode());
+        predecessor.setTreadCode(result.getTreadCode());
+        predecessor.setGlueCode(result.getGlueCode());
+        predecessor.setBaseGlueCode(result.getBaseGlueCode());
+        predecessor.setMouthPlateCode(result.getMouthPlateCode());
+        predecessor.setShiftOrder(shiftOrder);
+        predecessor.setSequence(sequence);
+        predecessor.setBusinessKey(String.valueOf(result.getId()));
+        return predecessor;
     }
 
     /**
@@ -669,8 +620,10 @@ public class TmAutoScheduleDataLoadService {
         }
         // CLASS1~CLASS8 共 8 个班次，当前需求起点与结束班次均夹到 [1,8]。
         int currentDemandOffset = Math.max(formingShiftOffset, 1) - 1;
-        int clampedFirst = Math.max(1, Math.min(currentDemandOffset + 1, 8));
-        int clampedLast = Math.max(1, Math.min(TmScheduleConstants.TM_MAX_SHIFT_ORDER + currentDemandOffset, 8));
+        int clampedFirst = Math.max(1, Math.min(currentDemandOffset + 1,
+                TmScheduleConstants.FORMING_MAX_SHIFT_ORDER));
+        int clampedLast = Math.max(1, Math.min(TmScheduleConstants.TM_MAX_SHIFT_ORDER + currentDemandOffset,
+                TmScheduleConstants.FORMING_MAX_SHIFT_ORDER));
         if (clampedFirst > clampedLast) {
             return;
         }
@@ -713,7 +666,7 @@ public class TmAutoScheduleDataLoadService {
      * @return 胎面待排任务列表
      */
     private List<TmTaskDraft> loadFormingDemandTasks(TmScheduleContext context, List<TmMachineInfo> machineList) {
-        String versionMatchMode = getParamValue(context, TmScheduleConstants.PARAM_VERSION_MATCH_MODE,
+        String versionMatchMode = resolveParamString(context, TmScheduleConstants.PARAM_VERSION_MATCH_MODE,
                 TmScheduleConstants.DEFAULT_VERSION_MATCH_MODE);
         log.info("[TM_BOOTSTRAP_DETAIL] factoryCode={}, scheduleDate={} 版本匹配模式={}",
                 context.getFactoryCode(), DateUtil.formatDate(context.getScheduleDate()), versionMatchMode);
@@ -735,9 +688,9 @@ public class TmAutoScheduleDataLoadService {
         try {
             rowList = tmAutoScheduleDataLoadMapper.selectFormingDemandRows(context.getFactoryCode(), context.getScheduleDate());
         } catch (RuntimeException ex) {
-            log.warn("[TM_AUTO_SCHEDULE_LOAD] 加载成型计划和施工信息失败，scheduleDate={}，原因={}",
-                    DateUtil.formatDate(context.getScheduleDate()), ex.getMessage());
-            return Collections.emptyList();
+            log.error("[TM_AUTO_SCHEDULE_LOAD] 加载 BOM 模式成型需求失败，factoryCode={}，scheduleDate={}，result=FAILED",
+                    context.getFactoryCode(), DateUtil.formatDate(context.getScheduleDate()), ex);
+            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.schedule.taskExecuteFailed"), ex);
         }
         if (rowList == null) {
             rowList = Collections.emptyList();
@@ -793,7 +746,7 @@ public class TmAutoScheduleDataLoadService {
         }
         // 成型来源需求不在数据加载阶段聚合，解释表需要逐条追溯原成型排程结果。
         List<TmFormingDemandRowVo> demandRowList = rowList;
-        String algorithmCode = getParamValue(context, TmScheduleConstants.PARAM_ALGORITHM_SWITCH,
+        String algorithmCode = resolveParamString(context, TmScheduleConstants.PARAM_ALGORITHM_SWITCH,
                 TmScheduleConstants.DEFAULT_ALGORITHM_SWITCH);
         BigDecimal minStartQty = getDecimalParam(context, TmScheduleConstants.PARAM_MIN_START_QTY);
         BigDecimal defaultCurlLength = getDecimalParam(context, TmScheduleConstants.PARAM_DEFAULT_CURL_LENGTH);
@@ -814,23 +767,32 @@ public class TmAutoScheduleDataLoadService {
                 .distinct().collect(Collectors.toList()), newSpecLookbackDays, newSpecAdvanceShiftCount);
         List<TmLossRule> lossRuleList = context.getLossRuleList();
         List<TmDepthConfig> depthConfigList = this.loadDepthConfigs(context);
-        TmWorkCalendarRowVo tmCalendar = loadWorkCalendar(context, TmProcessCodeEnum.TREAD.getCode());
-        TmWorkCalendarRowVo cxCalendar = loadWorkCalendar(context, TmProcessCodeEnum.FORMING.getCode());
+        Map<String, TmWorkCalendarRowVo> tmCalendarMap = this.loadSixShiftWorkCalendarMap(context,
+                TmProcessCodeEnum.TREAD.getCode());
+        Map<String, TmWorkCalendarRowVo> cxCalendarMap = this.loadSixShiftWorkCalendarMap(context,
+                TmProcessCodeEnum.FORMING.getCode());
         List<TmTaskDraft> taskDraftList = new ArrayList<>();
         int sourceRowIndex = 0;
         for (TmFormingDemandRowVo row : demandRowList) {
             sourceRowIndex++;
             String treadCode = row.getTreadCode();
-            BigDecimal treadLength = nvl(row.getTreadShoulderLength());
+            BigDecimal treadLength = this.convertConstructionLengthToMeter(row.getTreadShoulderLength());
             if (StrUtil.isBlank(treadCode) || treadLength.compareTo(BigDecimal.ZERO) <= 0) {
                 continue;
             }
             BigDecimal[] classQtyArray = buildClassQtyArray(row);
+            BigDecimal[] originalClassQtyArray = Arrays.copyOf(classQtyArray, classQtyArray.length);
+            BigDecimal totalFormingPlanQty = this.calculateTotalFormingPlanQty(originalClassQtyArray);
+            boolean closeOut = this.isCloseOutByPlanSurplus(row.getCxRemainQty(), totalFormingPlanQty);
+            this.logCloseOutJudge(context, row.getOrderNo(), row.getEmbryoCode(), originalClassQtyArray,
+                    totalFormingPlanQty, row.getCxRemainQty(), closeOut, "BOM");
             BigDecimal[] classFinishQtyArray = buildClassFinishQtyArray(row);
             Integer guardShiftCount = this.resolveGuardShiftCount(context, row.getLhMachineCode(), row.getOrderNo(),
                     depthConfigList, fallbackGuardShiftCount);
-            boolean noShutdownAvailableShift = redistributeShutdownDemand(context, classQtyArray, tmCalendar, cxCalendar);
+            boolean noShutdownAvailableShift = this.redistributeShutdownDemand(context, classQtyArray,
+                    tmCalendarMap, cxCalendarMap);
             for (int shiftOrder = 1; shiftOrder <= TmScheduleConstants.TM_MAX_SHIFT_ORDER + 1; shiftOrder++) {
+                int currentDemandStartIndex = this.resolveCurrentDemandStartIndex(shiftOrder, formingShiftOffset);
                 BigDecimal formingQty = this.resolveCurrentShiftFormingQty(classQtyArray, shiftOrder, algorithmCode,
                         formingShiftOffset);
                 BigDecimal demandQty = formingQty.multiply(treadLength);
@@ -841,39 +803,21 @@ public class TmAutoScheduleDataLoadService {
                 int effectiveGuardShiftCount = this.resolveEffectiveGuardShiftCount(taskNewSpecInfo,
                         guardShiftCount, shiftOrder, formingShiftOffset, algorithmCode);
                 int targetShiftOrder = resolveTargetShiftOrder(taskNewSpecInfo, shiftOrder);
-                TmTaskDraft taskDraft = new TmTaskDraft();
-                taskDraft.setOrderNo(row.getOrderNo() + "-CLASS" + shiftOrder);
-                taskDraft.setSourceOrderNos(row.getOrderNo());
-                taskDraft.setMaterialCode(row.getMaterialCode());
-                taskDraft.setMaterialDesc(row.getMaterialDesc());
-                taskDraft.setEmbryoCode(row.getEmbryoCode());
-                taskDraft.setMainMaterialDesc(row.getMainMaterialDesc());
-                taskDraft.setCxMachineCode(row.getCxMachineCode());
-                taskDraft.setLhMachineCode(row.getLhMachineCode());
-                taskDraft.setBusinessKeySuffix(buildSourceTaskBusinessKeySuffix(row, sourceRowIndex, shiftOrder));
-                taskDraft.setTreadCode(treadCode);
-                // 拆分胶料类别：第一个值为主胶料编码，其余值为基部胶编码
-                String rubberCategory = row.getTreadRubberCategory();
-                if (StrUtil.isNotBlank(rubberCategory)) {
-                    String[] glueParts = rubberCategory.split(",");
-                    taskDraft.setGlueCode(glueParts[0].trim());
-                    if (glueParts.length > 1) {
-                        // 使用英文逗号拼接剩余部分作为基部胶编码
-                        String baseGlueCode = String.join(",", Arrays.copyOfRange(glueParts, 1, glueParts.length));
-                        taskDraft.setBaseGlueCode(baseGlueCode);
-                    }
-                } else {
-                    taskDraft.setGlueCode(null);
-                    taskDraft.setBaseGlueCode(null);
-                }
-                taskDraft.setSmallGlueFlag(this.isSmallGlueCode(context, taskDraft.getGlueCode()));
-                taskDraft.setMouthPlateCode(row.getTreadMouthPlate());
+                TmTaskDraft taskDraft = this.assembleFormingTaskBase(context, row.getOrderNo() + "-CLASS" + shiftOrder,
+                        row.getOrderNo(), row.getMaterialCode(), row.getMaterialDesc(), row.getEmbryoCode(),
+                        row.getMainMaterialDesc(), row.getCxMachineCode(), row.getLhMachineCode(),
+                        this.buildSourceTaskBusinessKeySuffix(row, sourceRowIndex, shiftOrder), treadCode,
+                        row.getTreadRubberCategory(), row.getTreadMouthPlate());
                 taskDraft.setShiftOrder(targetShiftOrder);
                 taskDraft.setSourceShiftOrder(shiftOrder);
+                if (currentDemandStartIndex >= 0 && currentDemandStartIndex < originalClassQtyArray.length) {
+                    taskDraft.setFormingLogicalShiftOrder(currentDemandStartIndex + 1);
+                    taskDraft.setFormingShutdownCloseOutDemandQty(
+                            this.readClassQty(originalClassQtyArray, currentDemandStartIndex).multiply(treadLength));
+                }
                 taskDraft.setNewSpecInfo(taskNewSpecInfo);
                 taskDraft.setTreadShoulderLength(treadLength);
-                taskDraft.setTailFlag(this.isCloseOutByPlanSurplus(row.getCxRemainQty(), formingQty)
-                        ? TmYesNoEnum.YES.getCode() : TmYesNoEnum.NO.getCode());
+                taskDraft.setTailFlag(closeOut ? TmYesNoEnum.YES.getCode() : TmYesNoEnum.NO.getCode());
                 taskDraft.setTailBalanceQty(nvl(row.getCxRemainQty()));
                 taskDraft.setCurrentShiftDemandQty(demandQty);
                 taskDraft.setCurrentShiftFormingFinishQty(this.resolveCurrentShiftFormingFinishQty(classFinishQtyArray,
@@ -890,6 +834,8 @@ public class TmAutoScheduleDataLoadService {
                         demandQty, formingGuardWindowQtyMap));
                 taskDraft.setDemandQty(demandQty);
                 taskDraft.setGuardShiftCount(effectiveGuardShiftCount);
+                this.addCloseOutJudgeTrace(context, taskDraft, originalClassQtyArray, totalFormingPlanQty,
+                        row.getCxRemainQty(), "BOM");
                 this.addGuardDemandEstimateTrace(context, taskDraft, classQtyArray, shiftOrder,
                         effectiveGuardShiftCount,
                         formingShiftOffset, algorithmCode, row.getLhRemainQty(), rawGuardFormingQty, cappedGuardFormingQty, "BOM");
@@ -900,7 +846,9 @@ public class TmAutoScheduleDataLoadService {
                 if (toolTotalQty.compareTo(BigDecimal.ZERO) > 0) {
                     taskDraft.setTotalToolQty(toolTotalQty);
                 }
-                if (noShutdownAvailableShift && !isShiftOpen(tmCalendar, targetShiftOrder) && isShiftOpen(cxCalendar, shiftOrder)) {
+                if (noShutdownAvailableShift
+                        && !this.isSixShiftOpen(context, tmCalendarMap, targetShiftOrder)
+                        && this.isSixShiftOpen(context, cxCalendarMap, shiftOrder)) {
                     taskDraft.setUnplannedReasonCode(TmUnplannedReasonEnum.TM_SHUTDOWN_NO_AVAILABLE_SHIFT.getCode());
                     taskDraft.setUnplannedReasonDesc(TmUnplannedReasonEnum.TM_SHUTDOWN_NO_AVAILABLE_SHIFT.getDesc());
                 }
@@ -935,9 +883,9 @@ public class TmAutoScheduleDataLoadService {
             rowList = tmAutoScheduleDataLoadMapper.selectFormingDemandRowsByRecipe(
                     context.getFactoryCode(), context.getScheduleDate());
         } catch (RuntimeException ex) {
-            log.warn("[TM_AUTO_SCHEDULE_LOAD] RECIPE 模式加载成型计划失败，scheduleDate={}，原因={}",
-                    DateUtil.formatDate(context.getScheduleDate()), ex.getMessage());
-            return Collections.emptyList();
+            log.error("[TM_AUTO_SCHEDULE_LOAD] 加载 RECIPE 模式成型需求失败，factoryCode={}，scheduleDate={}，result=FAILED",
+                    context.getFactoryCode(), DateUtil.formatDate(context.getScheduleDate()), ex);
+            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.schedule.taskExecuteFailed"), ex);
         }
         if (CollUtil.isEmpty(rowList)) {
             log.warn("[TM_BOOTSTRAP_DETAIL] factoryCode={}, scheduleDate={} RECIPE模式查询成型计划结果为空，无排程任务可生成",
@@ -980,7 +928,7 @@ public class TmAutoScheduleDataLoadService {
                 embryoCodes.size(), recipeVersions.size(),
                 nullToEmpty(constructionList).size(), constructionMap.size());
         // 参数与基础数据
-        String algorithmCode = getParamValue(context, TmScheduleConstants.PARAM_ALGORITHM_SWITCH,
+        String algorithmCode = resolveParamString(context, TmScheduleConstants.PARAM_ALGORITHM_SWITCH,
                 TmScheduleConstants.DEFAULT_ALGORITHM_SWITCH);
         BigDecimal minStartQty = getDecimalParam(context, TmScheduleConstants.PARAM_MIN_START_QTY);
         BigDecimal defaultCurlLength = getDecimalParam(context, TmScheduleConstants.PARAM_DEFAULT_CURL_LENGTH);
@@ -998,8 +946,10 @@ public class TmAutoScheduleDataLoadService {
                 TmScheduleConstants.DEFAULT_FORMING_SHIFT_OFFSET_VALUE);
         List<TmLossRule> lossRuleList = context.getLossRuleList();
         List<TmDepthConfig> depthConfigList = this.loadDepthConfigs(context);
-        TmWorkCalendarRowVo tmCalendar = loadWorkCalendar(context, TmProcessCodeEnum.TREAD.getCode());
-        TmWorkCalendarRowVo cxCalendar = loadWorkCalendar(context, TmProcessCodeEnum.FORMING.getCode());
+        Map<String, TmWorkCalendarRowVo> tmCalendarMap = this.loadSixShiftWorkCalendarMap(context,
+                TmProcessCodeEnum.TREAD.getCode());
+        Map<String, TmWorkCalendarRowVo> cxCalendarMap = this.loadSixShiftWorkCalendarMap(context,
+                TmProcessCodeEnum.FORMING.getCode());
 
         // 预解析每行各班次施工规格，并收集有效胎面编码用于新规格判断
         List<BigDecimal[]> classQtyArrayList = new ArrayList<>();
@@ -1015,8 +965,9 @@ public class TmAutoScheduleDataLoadService {
             classQtyArrayList.add(classQtyArray);
             classFinishQtyArrayList.add(buildClassFinishQtyArrayByRecipe(row));
             String[] recipeNoByClass = buildRecipeNoArray(row);
-            TmConstructionTreadRowVo[] specByClass = new TmConstructionTreadRowVo[8];
-            for (int i = 0; i < 8; i++) {
+            TmConstructionTreadRowVo[] specByClass =
+                    new TmConstructionTreadRowVo[TmScheduleConstants.FORMING_MAX_SHIFT_ORDER];
+            for (int i = 0; i < TmScheduleConstants.FORMING_MAX_SHIFT_ORDER; i++) {
                 String recipeNo = recipeNoByClass[i];
                 if (StrUtil.isBlank(recipeNo)) {
                     continue;
@@ -1079,12 +1030,18 @@ public class TmAutoScheduleDataLoadService {
             TmFormingDemandRecipeRowVo row = rowList.get(rowIdx);
             sourceRowIndex++;
             BigDecimal[] classQtyArray = classQtyArrayList.get(rowIdx);
+            BigDecimal[] originalClassQtyArray = Arrays.copyOf(classQtyArray, classQtyArray.length);
+            BigDecimal totalFormingPlanQty = this.calculateTotalFormingPlanQty(originalClassQtyArray);
+            boolean closeOut = this.isCloseOutByPlanSurplus(row.getCxRemainQty(), totalFormingPlanQty);
+            this.logCloseOutJudge(context, row.getOrderNo(), row.getEmbryoCode(), originalClassQtyArray,
+                    totalFormingPlanQty, row.getCxRemainQty(), closeOut, "RECIPE");
             BigDecimal[] classFinishQtyArray = classFinishQtyArrayList.get(rowIdx);
             TmConstructionTreadRowVo[] specByClass = specByClassList.get(rowIdx);
             this.recordAllPlannedShiftConstructionMissingIssue(context, row, classQtyArray, specByClass);
             Integer guardShiftCount = this.resolveGuardShiftCount(context, row.getLhMachineCode(), row.getOrderNo(),
                     depthConfigList, fallbackGuardShiftCount);
-            boolean noShutdownAvailableShift = redistributeShutdownDemand(context, classQtyArray, tmCalendar, cxCalendar);
+            boolean noShutdownAvailableShift = this.redistributeShutdownDemand(context, classQtyArray,
+                    tmCalendarMap, cxCalendarMap);
             for (int shiftOrder = 1; shiftOrder <= TmScheduleConstants.TM_MAX_SHIFT_ORDER + 1; shiftOrder++) {
                 BigDecimal formingQty = this.resolveCurrentShiftFormingQty(classQtyArray, shiftOrder, algorithmCode,
                         formingShiftOffset);
@@ -1094,7 +1051,8 @@ public class TmAutoScheduleDataLoadService {
                 }
                 int startIndex = this.resolveCurrentDemandStartIndex(shiftOrder, formingShiftOffset);
                 int primarySpecIndex = Math.min(startIndex, 7);
-                TmConstructionTreadRowVo primarySpec = (primarySpecIndex >= 0 && primarySpecIndex < 8)
+                TmConstructionTreadRowVo primarySpec = (primarySpecIndex >= 0
+                        && primarySpecIndex < TmScheduleConstants.FORMING_MAX_SHIFT_ORDER)
                         ? specByClass[primarySpecIndex] : null;
                 if (primarySpec == null || StrUtil.isBlank(primarySpec.getTreadCode())
                         || nvl(primarySpec.getTreadShoulderLength()).compareTo(BigDecimal.ZERO) <= 0) {
@@ -1106,7 +1064,7 @@ public class TmAutoScheduleDataLoadService {
                     continue;
                 }
                 String treadCode = primarySpec.getTreadCode();
-                BigDecimal treadLength = nvl(primarySpec.getTreadShoulderLength());
+                BigDecimal treadLength = this.convertConstructionLengthToMeter(primarySpec.getTreadShoulderLength());
                 BigDecimal demandQty = formingQty.multiply(treadLength);
                 if (demandQty.compareTo(BigDecimal.ZERO) <= 0) {
                     continue;
@@ -1115,38 +1073,21 @@ public class TmAutoScheduleDataLoadService {
                 int effectiveGuardShiftCount = this.resolveEffectiveGuardShiftCount(taskNewSpecInfo,
                         guardShiftCount, shiftOrder, formingShiftOffset, algorithmCode);
                 int targetShiftOrder = resolveTargetShiftOrder(taskNewSpecInfo, shiftOrder);
-                TmTaskDraft taskDraft = new TmTaskDraft();
-                taskDraft.setOrderNo(row.getOrderNo() + "-CLASS" + shiftOrder);
-                taskDraft.setSourceOrderNos(row.getOrderNo());
-                taskDraft.setMaterialCode(row.getMaterialCode());
-                taskDraft.setMaterialDesc(row.getMaterialDesc());
-                taskDraft.setEmbryoCode(row.getEmbryoCode());
-                taskDraft.setMainMaterialDesc(row.getMainMaterialDesc());
-                taskDraft.setCxMachineCode(row.getCxMachineCode());
-                taskDraft.setLhMachineCode(row.getLhMachineCode());
-                taskDraft.setBusinessKeySuffix(buildSourceTaskBusinessKeySuffix(row, sourceRowIndex, shiftOrder));
-                taskDraft.setTreadCode(treadCode);
-                // 拆分胶料类别：第一个值为主胶料编码，其余值为基部胶编码
-                String rubberCategory = primarySpec.getTreadRubberCategory();
-                if (StrUtil.isNotBlank(rubberCategory)) {
-                    String[] glueParts = rubberCategory.split(",");
-                    taskDraft.setGlueCode(glueParts[0].trim());
-                    if (glueParts.length > 1) {
-                        String baseGlueCode = String.join(",", Arrays.copyOfRange(glueParts, 1, glueParts.length));
-                        taskDraft.setBaseGlueCode(baseGlueCode);
-                    }
-                } else {
-                    taskDraft.setGlueCode(null);
-                    taskDraft.setBaseGlueCode(null);
-                }
-                taskDraft.setSmallGlueFlag(this.isSmallGlueCode(context, taskDraft.getGlueCode()));
-                taskDraft.setMouthPlateCode(primarySpec.getTreadMouthPlate());
+                TmTaskDraft taskDraft = this.assembleFormingTaskBase(context, row.getOrderNo() + "-CLASS" + shiftOrder,
+                        row.getOrderNo(), row.getMaterialCode(), row.getMaterialDesc(), row.getEmbryoCode(),
+                        row.getMainMaterialDesc(), row.getCxMachineCode(), row.getLhMachineCode(),
+                        this.buildSourceTaskBusinessKeySuffix(row, sourceRowIndex, shiftOrder), treadCode,
+                        primarySpec.getTreadRubberCategory(), primarySpec.getTreadMouthPlate());
                 taskDraft.setShiftOrder(targetShiftOrder);
                 taskDraft.setSourceShiftOrder(shiftOrder);
+                if (startIndex >= 0 && startIndex < originalClassQtyArray.length) {
+                    taskDraft.setFormingLogicalShiftOrder(startIndex + 1);
+                    taskDraft.setFormingShutdownCloseOutDemandQty(
+                            this.readClassQty(originalClassQtyArray, startIndex).multiply(treadLength));
+                }
                 taskDraft.setNewSpecInfo(taskNewSpecInfo);
                 taskDraft.setTreadShoulderLength(treadLength);
-                taskDraft.setTailFlag(this.isCloseOutByPlanSurplus(row.getCxRemainQty(), formingQty)
-                        ? TmYesNoEnum.YES.getCode() : TmYesNoEnum.NO.getCode());
+                taskDraft.setTailFlag(closeOut ? TmYesNoEnum.YES.getCode() : TmYesNoEnum.NO.getCode());
                 taskDraft.setTailBalanceQty(nvl(row.getCxRemainQty()));
                 taskDraft.setCurrentShiftDemandQty(demandQty);
                 taskDraft.setCurrentShiftFormingFinishQty(this.resolveCurrentShiftFormingFinishQty(classFinishQtyArray,
@@ -1164,6 +1105,8 @@ public class TmAutoScheduleDataLoadService {
                         demandQty, formingGuardWindowQtyMap));
                 taskDraft.setDemandQty(demandQty);
                 taskDraft.setGuardShiftCount(effectiveGuardShiftCount);
+                this.addCloseOutJudgeTrace(context, taskDraft, originalClassQtyArray, totalFormingPlanQty,
+                        row.getCxRemainQty(), "RECIPE");
                 this.addGuardDemandEstimateTrace(context, taskDraft, classQtyArray, shiftOrder,
                         effectiveGuardShiftCount,
                         formingShiftOffset, algorithmCode, row.getLhRemainQty(), rawGuardFormingQty, cappedGuardFormingQty, "RECIPE");
@@ -1174,7 +1117,9 @@ public class TmAutoScheduleDataLoadService {
                 if (toolTotalQty.compareTo(BigDecimal.ZERO) > 0) {
                     taskDraft.setTotalToolQty(toolTotalQty);
                 }
-                if (noShutdownAvailableShift && !isShiftOpen(tmCalendar, targetShiftOrder) && isShiftOpen(cxCalendar, shiftOrder)) {
+                if (noShutdownAvailableShift
+                        && !this.isSixShiftOpen(context, tmCalendarMap, targetShiftOrder)
+                        && this.isSixShiftOpen(context, cxCalendarMap, shiftOrder)) {
                     taskDraft.setUnplannedReasonCode(TmUnplannedReasonEnum.TM_SHUTDOWN_NO_AVAILABLE_SHIFT.getCode());
                     taskDraft.setUnplannedReasonDesc(TmUnplannedReasonEnum.TM_SHUTDOWN_NO_AVAILABLE_SHIFT.getDesc());
                 }
@@ -1194,6 +1139,36 @@ public class TmAutoScheduleDataLoadService {
             }
         }
         return taskDraftList;
+    }
+
+    /**
+     * 在原数据加载调用点完成小胶种判定后，委托共用属性装配器创建任务草稿。
+     *
+     * @param context 自动排程上下文
+     * @param orderNo 任务工单号
+     * @param sourceOrderNos 来源工单号
+     * @param materialCode 物料编码
+     * @param materialDesc 物料描述
+     * @param embryoCode 胎胚编码
+     * @param mainMaterialDesc 主物料描述
+     * @param cxMachineCode 成型机台编码
+     * @param lhMachineCode 硫化机台编码
+     * @param businessKeySuffix 来源任务业务键后缀
+     * @param treadCode 胎面编码
+     * @param rubberCategory 胶料类别
+     * @param mouthPlateCode 口型板编码
+     * @return 已写入共用基础属性的待排任务草稿
+     */
+    private TmTaskDraft assembleFormingTaskBase(TmScheduleContext context, String orderNo, String sourceOrderNos,
+                                                String materialCode, String materialDesc, String embryoCode,
+                                                String mainMaterialDesc, String cxMachineCode, String lhMachineCode,
+                                                String businessKeySuffix, String treadCode, String rubberCategory,
+                                                String mouthPlateCode) {
+        String mainGlueCode = StrUtil.isBlank(rubberCategory) ? null : rubberCategory.split(",")[0].trim();
+        TmFormingTaskBaseInput input = new TmFormingTaskBaseInput(orderNo, sourceOrderNos, materialCode,
+                materialDesc, embryoCode, mainMaterialDesc, cxMachineCode, lhMachineCode, businessKeySuffix,
+                treadCode, rubberCategory, mouthPlateCode, this.isSmallGlueCode(context, mainGlueCode));
+        return this.formingTaskBaseAssembler.assemble(input);
     }
 
     /**
@@ -1291,6 +1266,10 @@ public class TmAutoScheduleDataLoadService {
         int startIndex = this.resolveGuardStartIndex(shiftOrder, formingShiftOffset, algorithmCode);
         int count = Math.max(guardShiftCount, 1);
         for (int index = startIndex; index < startIndex + count; index++) {
+            // 硫化余量已经全部分配后立即结束，避免在窗口明细中继续写入无意义的零需求班次。
+            if (remainingGuardFormingQty.compareTo(BigDecimal.ZERO) <= 0) {
+                break;
+            }
             BigDecimal formingQty = this.resolveGuardClassQty(classQtyArray, index);
             BigDecimal appliedFormingQty = formingQty.min(remainingGuardFormingQty);
             windowQtyMap.put(index + 1, appliedFormingQty.multiply(this.nvl(treadLength)));
@@ -1323,10 +1302,16 @@ public class TmAutoScheduleDataLoadService {
         int startIndex = this.resolveGuardStartIndex(shiftOrder, formingShiftOffset, algorithmCode);
         int count = Math.max(guardShiftCount, 1);
         for (int index = startIndex; index < startIndex + count; index++) {
+            // 硫化余量已经全部分配后立即结束，避免在窗口明细中继续写入无意义的零需求班次。
+            if (remainingGuardFormingQty.compareTo(BigDecimal.ZERO) <= 0) {
+                break;
+            }
             BigDecimal formingQty = this.resolveGuardClassQty(classQtyArray, index);
             BigDecimal appliedFormingQty = formingQty.min(remainingGuardFormingQty);
-            BigDecimal treadLength = (index >= 0 && index < 8 && specByClass != null && specByClass[index] != null)
-                    ? this.nvl(specByClass[index].getTreadShoulderLength()) : this.nvl(currentTreadLength);
+        BigDecimal treadLength = (index >= 0 && index < TmScheduleConstants.FORMING_MAX_SHIFT_ORDER
+                && specByClass != null && specByClass[index] != null)
+                    ? this.convertConstructionLengthToMeter(specByClass[index].getTreadShoulderLength())
+                    : this.nvl(currentTreadLength);
             windowQtyMap.put(index + 1, appliedFormingQty.multiply(treadLength));
             remainingGuardFormingQty = remainingGuardFormingQty.subtract(appliedFormingQty);
         }
@@ -1713,6 +1698,9 @@ public class TmAutoScheduleDataLoadService {
      */
     private String buildExperimentDayColumn(Date experimentPlanDate) {
         int dayOfMonth = DateUtil.calendar(experimentPlanDate).get(Calendar.DAY_OF_MONTH);
+        if (dayOfMonth < 1 || dayOfMonth > 31) {
+            throw new IllegalArgumentException("月计划日期列仅支持 DAY_1 至 DAY_31");
+        }
         return "DAY_" + dayOfMonth;
     }
 
@@ -1771,8 +1759,7 @@ public class TmAutoScheduleDataLoadService {
      * @return 当前班零需求、携带下一班需求的候选任务
      */
     private TmTaskDraft buildTwoShiftLeadTask(TmTaskDraft nextTask) {
-        TmTaskDraft leadTask = new TmTaskDraft();
-        BeanUtils.copyProperties(nextTask, leadTask);
+        TmTaskDraft leadTask = nextTask.copyForDerivedTask();
         int leadShiftOrder = nextTask.getSourceShiftOrder() - 1;
         leadTask.setOrderNo(nextTask.getOrderNo() + "-TWO-SHIFT-LEAD-CLASS" + leadShiftOrder);
         leadTask.setBusinessKeySuffix(nextTask.getBusinessKeySuffix()
@@ -1840,11 +1827,8 @@ public class TmAutoScheduleDataLoadService {
      * @return 来源任务业务键后缀
      */
     private String buildSourceTaskBusinessKeySuffix(TmFormingDemandRowVo row, int sourceRowIndex, int shiftOrder) {
-        String sourceOrderNo = row == null ? null : row.getOrderNo();
-        String sourceKey = row != null && row.getSourceRecordId() != null
-                ? "ID" + row.getSourceRecordId()
-                : StrUtil.blankToDefault(sourceOrderNo, "ROW" + sourceRowIndex);
-        return sourceKey + "-CLASS" + shiftOrder;
+        return this.buildSourceTaskBusinessKeySuffix(row == null ? null : row.getSourceRecordId(),
+                row == null ? null : row.getOrderNo(), sourceRowIndex, shiftOrder);
     }
 
     /**
@@ -1856,10 +1840,23 @@ public class TmAutoScheduleDataLoadService {
      * @return 来源任务业务键后缀
      */
     private String buildSourceTaskBusinessKeySuffix(TmFormingDemandRecipeRowVo row, int sourceRowIndex, int shiftOrder) {
-        String sourceOrderNo = row == null ? null : row.getOrderNo();
-        String sourceKey = row != null && row.getSourceRecordId() != null
-                ? "ID" + row.getSourceRecordId()
-                : StrUtil.blankToDefault(sourceOrderNo, "ROW" + sourceRowIndex);
+        return this.buildSourceTaskBusinessKeySuffix(row == null ? null : row.getSourceRecordId(),
+                row == null ? null : row.getOrderNo(), sourceRowIndex, shiftOrder);
+    }
+
+    /**
+     * 根据来源记录标识、工单和班次生成稳定的来源任务业务键后缀。
+     *
+     * @param sourceRecordId 来源记录主键
+     * @param sourceOrderNo 来源工单号
+     * @param sourceRowIndex 来源行顺序，从 1 开始
+     * @param shiftOrder 胎面排程班次
+     * @return 来源任务业务键后缀
+     */
+    private String buildSourceTaskBusinessKeySuffix(Long sourceRecordId, String sourceOrderNo,
+                                                     int sourceRowIndex, int shiftOrder) {
+        String sourceKey = sourceRecordId == null ? StrUtil.blankToDefault(sourceOrderNo, "ROW" + sourceRowIndex)
+                : "ID" + sourceRecordId;
         return sourceKey + "-CLASS" + shiftOrder;
     }
 
@@ -2295,14 +2292,27 @@ public class TmAutoScheduleDataLoadService {
                 TmScheduleConstants.MIN_SHUTDOWN_CHECK_WINDOW),
                 TmScheduleConstants.MAX_SHUTDOWN_CHECK_WINDOW);
         Date startDate = DateUtil.beginOfDay(DateUtil.offsetDay(context.getScheduleDate(), -1));
-        Date endDate = DateUtil.beginOfDay(DateUtil.offsetDay(context.getScheduleDate(), checkWindow - 1));
+        Date endDate = DateUtil.beginOfDay(DateUtil.offsetDay(context.getScheduleDate(),
+                Math.max(checkWindow - 1, 1)));
+        Date closeOutEndDate = this.resolveFormingShutdownCloseOutEndDate(context, taskDraftList);
+        if (closeOutEndDate.after(endDate)) {
+            endDate = closeOutEndDate;
+        }
         Map<String, TmWorkCalendarRowVo> tmCalendarMap = this.loadWorkCalendarRange(context,
                 TmProcessCodeEnum.TREAD.getCode(),
                 startDate, endDate);
         Map<String, TmWorkCalendarRowVo> cxCalendarMap = this.loadWorkCalendarRange(context,
                 TmProcessCodeEnum.FORMING.getCode(),
                 startDate, endDate);
+        this.resolveWorkCalendarStoppedShiftOrders(context, tmCalendarMap);
         this.resolveStartupShiftOrders(context, tmCalendarMap);
+        this.applyFormingContinuousShutdownCloseOut(context, taskDraftList, cxCalendarMap);
+        // 关闭停产需求重分配时，当前日和未来停产日必须使用同一开关口径。
+        if (!TmYesNoEnum.YES.getCode().equals(resolveParamString(context,
+                TmScheduleConstants.PARAM_SHUTDOWN_REDISTRIBUTION_ENABLED,
+                TmYesNoEnum.YES.getCode()))) {
+            return;
+        }
         for (int dayOffset = 1; dayOffset < checkWindow; dayOffset++) {
             Date sourceDate = DateUtil.beginOfDay(DateUtil.offsetDay(context.getScheduleDate(), dayOffset));
             TmWorkCalendarRowVo tmCalendar = tmCalendarMap.get(DateUtil.formatDate(sourceDate));
@@ -2319,6 +2329,127 @@ public class TmAutoScheduleDataLoadService {
             this.redistributeFutureShutdownTasks(context, taskDraftList, futureTaskList, sourceDate,
                     targetShiftOrders);
         }
+    }
+
+    /**
+     * 解析成型连续停产收尾所需的日历查询结束日期。
+     *
+     * @param context       排程上下文
+     * @param taskDraftList 当前任务列表
+     * @return 最晚成型来源班次后两个完整工作日的结束日期
+     */
+    private Date resolveFormingShutdownCloseOutEndDate(TmScheduleContext context,
+                                                        List<TmTaskDraft> taskDraftList) {
+        return nullToEmpty(taskDraftList).stream()
+                .filter(Objects::nonNull)
+                .map(TmTaskDraft::getFormingLogicalShiftOrder)
+                .filter(Objects::nonNull)
+                .filter(shiftOrder -> shiftOrder >= 1
+                        && shiftOrder <= TmScheduleConstants.FORMING_MAX_SHIFT_ORDER)
+                .map(shiftOrder -> SixShiftWorkCalendarUtil.resolveFormingProductionDate(
+                        context.getScheduleDate(), shiftOrder))
+                .map(productionDate -> DateUtil.beginOfDay(DateUtil.offsetDay(productionDate, 2)))
+                .max(Date::compareTo)
+                .orElse(DateUtil.beginOfDay(DateUtil.offsetDay(context.getScheduleDate(), 2)));
+    }
+
+    /**
+     * 标记停产前最后开放成型班次对应的胎面任务。
+     *
+     * <p>仅当该班之后本日无开放班，且随后两个完整工作日均全天停产时命中；
+     * 实验规格不参与，需求量使用原始成型单班需求，不使用算法一窗口最大值。</p>
+     *
+     * @param context       排程上下文
+     * @param taskDraftList 当前任务列表
+     * @param cxCalendarMap 成型工作日历
+     */
+    private void applyFormingContinuousShutdownCloseOut(TmScheduleContext context,
+                                                         List<TmTaskDraft> taskDraftList,
+                                                         Map<String, TmWorkCalendarRowVo> cxCalendarMap) {
+        nullToEmpty(taskDraftList).stream()
+                .filter(Objects::nonNull)
+                .filter(task -> task.getExperimentSpecInfo() == null)
+                .filter(task -> task.getFormingLogicalShiftOrder() != null)
+                .filter(task -> task.getFormingLogicalShiftOrder() >= 1
+                        && task.getFormingLogicalShiftOrder() <= TmScheduleConstants.FORMING_MAX_SHIFT_ORDER)
+                .filter(task -> this.isLastOpenFormingShiftBeforeTwoShutdownDays(
+                        context, cxCalendarMap, task.getFormingLogicalShiftOrder()))
+                .forEach(task -> this.markFormingShutdownCloseOutTask(context, task));
+    }
+
+    /**
+     * 判断指定成型逻辑班是否为连续两天停产前的最后开放班。
+     *
+     * @param context                  排程上下文
+     * @param cxCalendarMap            成型工作日历
+     * @param formingLogicalShiftOrder 成型逻辑班次
+     * @return true表示该班为最后开放班且随后两天全天停产
+     */
+    private boolean isLastOpenFormingShiftBeforeTwoShutdownDays(TmScheduleContext context,
+                                                                 Map<String, TmWorkCalendarRowVo> cxCalendarMap,
+                                                                 int formingLogicalShiftOrder) {
+        Date productionDate = SixShiftWorkCalendarUtil.resolveFormingProductionDate(
+                context.getScheduleDate(), formingLogicalShiftOrder);
+        int calendarShiftOrder = SixShiftWorkCalendarUtil.resolveFormingCalendarShiftOrder(
+                formingLogicalShiftOrder);
+        TmWorkCalendarRowVo productionCalendar = cxCalendarMap.get(DateUtil.formatDate(productionDate));
+        if (this.isShutdownDay(productionCalendar)
+                || !this.isShiftOpen(productionCalendar, calendarShiftOrder)) {
+            return false;
+        }
+        for (int shiftOrder = calendarShiftOrder + 1; shiftOrder <= 3; shiftOrder++) {
+            if (this.isShiftOpen(productionCalendar, shiftOrder)) {
+                return false;
+            }
+        }
+        Date firstShutdownDate = DateUtil.beginOfDay(DateUtil.offsetDay(productionDate, 1));
+        Date secondShutdownDate = DateUtil.beginOfDay(DateUtil.offsetDay(productionDate, 2));
+        return this.isShutdownDay(cxCalendarMap.get(DateUtil.formatDate(firstShutdownDate)))
+                && this.isShutdownDay(cxCalendarMap.get(DateUtil.formatDate(secondShutdownDate)));
+    }
+
+    /**
+     * 写入成型连续停产收尾任务标识、规则证据和运行日志。
+     *
+     * @param context 排程上下文
+     * @param task    待标记胎面任务
+     */
+    private void markFormingShutdownCloseOutTask(TmScheduleContext context, TmTaskDraft task) {
+        BigDecimal closeOutDemandQty = nvl(task.getFormingShutdownCloseOutDemandQty());
+        Date productionDate = SixShiftWorkCalendarUtil.resolveFormingProductionDate(
+                context.getScheduleDate(), task.getFormingLogicalShiftOrder());
+        Date firstShutdownDate = DateUtil.beginOfDay(DateUtil.offsetDay(productionDate, 1));
+        Date secondShutdownDate = DateUtil.beginOfDay(DateUtil.offsetDay(productionDate, 2));
+        Map<String, Object> evidence = new LinkedHashMap<>();
+        evidence.put("ruleCode", TmScheduleRuleCodeEnum.FORMING_CONTINUOUS_SHUTDOWN_CLOSE_OUT.getCode());
+        evidence.put("formingProcCode", TmProcessCodeEnum.FORMING.getCode());
+        evidence.put("lastOpenProductionDate", DateUtil.formatDate(productionDate));
+        evidence.put("lastOpenCalendarShiftOrder", SixShiftWorkCalendarUtil.resolveFormingCalendarShiftOrder(
+                task.getFormingLogicalShiftOrder()));
+        evidence.put("formingLogicalShiftOrder", task.getFormingLogicalShiftOrder());
+        evidence.put("sourceShiftOrder", task.getSourceShiftOrder());
+        evidence.put("targetShiftOrder", task.getShiftOrder());
+        evidence.put("shutdownStartDate", DateUtil.formatDate(firstShutdownDate));
+        evidence.put("shutdownEndDate", DateUtil.formatDate(secondShutdownDate));
+        evidence.put("consecutiveShutdownDays", 2);
+        evidence.put("closeOutDemandQty", closeOutDemandQty);
+        TmScheduleRuleResultEnum result = closeOutDemandQty.compareTo(BigDecimal.ZERO) > 0
+                ? TmScheduleRuleResultEnum.PASS : TmScheduleRuleResultEnum.SKIP;
+        if (result == TmScheduleRuleResultEnum.PASS) {
+            task.setFormingShutdownCloseOutFlag(Boolean.TRUE);
+            task.setTailFlag(TmYesNoEnum.YES.getCode());
+        } else {
+            evidence.put("skipReason", "LAST_OPEN_SHIFT_DEMAND_NOT_POSITIVE");
+        }
+        context.getRuleTraceMap().computeIfAbsent(task.getBusinessKey(), key -> new TmRuleTrace())
+                .addRuleHit(TmScheduleRuleCodeEnum.FORMING_CONTINUOUS_SHUTDOWN_CLOSE_OUT, result, evidence);
+        log.info("[TM_FORMING_SHUTDOWN_CLOSE_OUT] batchNo={}, traceId={}, factoryCode={}, treadCode={}, "
+                        + "sourceShiftOrder={}, targetShiftOrder={}, formingLogicalShiftOrder={}, "
+                        + "shutdownStartDate={}, shutdownEndDate={}, closeOutDemandQty={}, result={}",
+                context.getBatchNo(), context.getTraceId(), context.getFactoryCode(), task.getTreadCode(),
+                task.getSourceShiftOrder(), task.getShiftOrder(), task.getFormingLogicalShiftOrder(),
+                DateUtil.formatDate(firstShutdownDate), DateUtil.formatDate(secondShutdownDate),
+                closeOutDemandQty, result.getCode());
     }
 
     /**
@@ -2365,8 +2496,10 @@ public class TmAutoScheduleDataLoadService {
             if (this.isShutdownDay(previousCalendar) && !this.isShutdownDay(currentCalendar)) {
                 for (int calendarShift = 1; calendarShift <= 3; calendarShift++) {
                     if (this.isShiftOpen(currentCalendar, calendarShift)) {
-                        int startupShiftOrder = dayOffset * 3 + calendarShift;
-                        startupShiftOrders.add(startupShiftOrder);
+                        int startupShiftOrder = dayOffset * 3 + calendarShift + 1;
+                        if (startupShiftOrder <= TmScheduleConstants.TM_MAX_SHIFT_ORDER) {
+                            startupShiftOrders.add(startupShiftOrder);
+                        }
                         log.info("[TM_STARTUP_SHIFT] batchNo={}, traceId={}, factoryCode={}, previousDate={}, currentDate={}, startupShiftOrder={}, calendarShift={}, detectionScope=PREVIOUS_FULL_DAY_SHUTDOWN",
                                 context.getBatchNo(), context.getTraceId(), context.getFactoryCode(),
                                 DateUtil.formatDate(previousDate), DateUtil.formatDate(currentDate),
@@ -2384,6 +2517,38 @@ public class TmAutoScheduleDataLoadService {
     }
 
     /**
+     * 将胎面工作日历停产班次写入排程上下文，供所有机台分配路径执行硬过滤。
+     *
+     * @param context       排程上下文
+     * @param tmCalendarMap 胎面工作日历日期映射
+     */
+    private void resolveWorkCalendarStoppedShiftOrders(TmScheduleContext context,
+                                                        Map<String, TmWorkCalendarRowVo> tmCalendarMap) {
+        Set<Integer> stoppedShiftOrders = new LinkedHashSet<>();
+        Map<Integer, Map<String, Object>> stoppedShiftEvidenceMap = new LinkedHashMap<>();
+        for (int shiftOrder = 1; shiftOrder <= TmScheduleConstants.TM_MAX_SHIFT_ORDER; shiftOrder++) {
+            if (!this.isSixShiftOpen(context, tmCalendarMap, shiftOrder)) {
+                stoppedShiftOrders.add(shiftOrder);
+                Date productionDate = SixShiftWorkCalendarUtil.resolveProductionDate(
+                        context.getScheduleDate(), shiftOrder);
+                TmWorkCalendarRowVo calendar = tmCalendarMap.get(DateUtil.formatDate(productionDate));
+                Map<String, Object> evidence = new LinkedHashMap<>();
+                evidence.put("procCode", TmProcessCodeEnum.TREAD.getCode());
+                evidence.put("productionDate", DateUtil.formatDate(productionDate));
+                evidence.put("shiftOrder", shiftOrder);
+                evidence.put("calendarField", calendar != null
+                        && TmYesNoEnum.NO.getCode().equals(calendar.getDayFlag())
+                        ? "DAY_FLAG" : SixShiftWorkCalendarUtil.resolveCalendarShiftField(shiftOrder));
+                evidence.put("calendarFieldValue", "0");
+                stoppedShiftEvidenceMap.put(shiftOrder, evidence);
+            }
+        }
+        context.setWorkCalendarStoppedShiftOrderSet(stoppedShiftOrders);
+        context.setWorkCalendarStoppedShiftEvidenceMap(stoppedShiftEvidenceMap);
+        context.appendWorkCalendarStoppedShiftProcessLogs();
+    }
+
+    /**
      * 解析未来停产需求可提前承接的当前六班开放班次。
      *
      * @param context       排程上下文
@@ -2395,13 +2560,11 @@ public class TmAutoScheduleDataLoadService {
                                                              Map<String, TmWorkCalendarRowVo> tmCalendarMap) {
         List<Integer> targetShiftOrders = new ArrayList<>();
         for (int shiftOrder = 1; shiftOrder <= TmScheduleConstants.TM_MAX_SHIFT_ORDER; shiftOrder++) {
-            int dayOffset = (shiftOrder - 1) / 3;
-            Date targetDate = DateUtil.offsetDay(context.getScheduleDate(), dayOffset);
+            Date targetDate = SixShiftWorkCalendarUtil.resolveProductionDate(context.getScheduleDate(), shiftOrder);
             if (!targetDate.before(shutdownDate)) {
                 continue;
             }
-            TmWorkCalendarRowVo calendar = tmCalendarMap.get(DateUtil.formatDate(targetDate));
-            if (this.isShiftOpen(calendar, shiftOrder)) {
+            if (this.isSixShiftOpen(context, tmCalendarMap, shiftOrder)) {
                 targetShiftOrders.add(shiftOrder);
             }
         }
@@ -2441,6 +2604,7 @@ public class TmAutoScheduleDataLoadService {
                                                  List<TmTaskDraft> futureTaskList, Date sourceDate,
                                                  List<Integer> targetShiftOrders) {
         Set<String> sourceKeySet = new HashSet<>();
+        Map<String, TmTaskDraft> targetTaskMap = this.buildFutureShutdownTargetTaskMap(currentTaskList);
         for (TmTaskDraft sourceTask : futureTaskList) {
             String sourceKey = DateUtil.formatDate(sourceDate) + "|" + sourceTask.getSourceOrderNos()
                     + "|" + sourceTask.getShiftOrder() + "|" + sourceTask.getTreadCode();
@@ -2465,14 +2629,13 @@ public class TmAutoScheduleDataLoadService {
             BigDecimal allocatedQty = originalDemandQty.divide(BigDecimal.valueOf(targetShiftOrders.size()),
                     TmScheduleConstants.DECIMAL_CALCULATION_SCALE, RoundingMode.HALF_UP);
             for (Integer targetShiftOrder : targetShiftOrders) {
-                TmTaskDraft targetTask = currentTaskList.stream()
-                        .filter(task -> Objects.equals(task.getTreadCode(), sourceTask.getTreadCode()))
-                        .filter(task -> Objects.equals(task.getShiftOrder(), targetShiftOrder))
-                        .findFirst().orElse(null);
+                String targetTaskKey = this.buildFutureShutdownTargetTaskKey(sourceTask.getTreadCode(), targetShiftOrder);
+                TmTaskDraft targetTask = targetTaskMap.get(targetTaskKey);
                 if (targetTask == null) {
                     targetTask = this.copyFutureShutdownTask(sourceTask, targetShiftOrder, allocatedQty,
                             sourceDate, String.valueOf(sourceTask.getShiftOrder()));
                     currentTaskList.add(targetTask);
+                    targetTaskMap.putIfAbsent(targetTaskKey, targetTask);
                 } else {
                     targetTask.setCurrentShiftDemandQty(nvl(targetTask.getCurrentShiftDemandQty()).add(allocatedQty));
                     targetTask.setDemandQty(nvl(targetTask.getDemandQty()).add(allocatedQty));
@@ -2483,6 +2646,39 @@ public class TmAutoScheduleDataLoadService {
                         targetShiftOrder, originalDemandQty, allocatedQty, TmScheduleRuleResultEnum.PASS);
             }
         }
+    }
+
+    /**
+     * 为未来停产需求均摊建立当前可合并任务索引。
+     *
+     * <p>使用 {@code putIfAbsent} 保留原列表中首个非关尾任务，保持旧逻辑 {@code findFirst} 的选择语义；
+     * 新建补充任务同步写入索引，避免后续来源重复扫描整个任务列表。</p>
+     *
+     * @param currentTaskList 当前日任务列表
+     * @return 胎面编码与目标班次对应的首个可合并任务索引
+     */
+    private Map<String, TmTaskDraft> buildFutureShutdownTargetTaskMap(List<TmTaskDraft> currentTaskList) {
+        Map<String, TmTaskDraft> targetTaskMap = new LinkedHashMap<>();
+        if (CollUtil.isEmpty(currentTaskList)) {
+            return targetTaskMap;
+        }
+        currentTaskList.stream()
+                .filter(Objects::nonNull)
+                .filter(task -> !Boolean.TRUE.equals(task.getFormingShutdownCloseOutFlag()))
+                .forEach(task -> targetTaskMap.putIfAbsent(
+                        this.buildFutureShutdownTargetTaskKey(task.getTreadCode(), task.getShiftOrder()), task));
+        return targetTaskMap;
+    }
+
+    /**
+     * 构建未来停产需求均摊目标任务的稳定索引键。
+     *
+     * @param treadCode 胎面编码
+     * @param shiftOrder 目标班次
+     * @return 目标任务索引键
+     */
+    private String buildFutureShutdownTargetTaskKey(String treadCode, Integer shiftOrder) {
+        return String.valueOf(treadCode) + "\u0001" + String.valueOf(shiftOrder);
     }
 
     /**
@@ -2567,29 +2763,27 @@ public class TmAutoScheduleDataLoadService {
      *
      * @param context       自动排程上下文
      * @param classQtyArray 六班成型数量
-     * @param tmCalendar    胎面工作日历
-     * @param cxCalendar    成型工作日历
+     * @param tmCalendarMap 胎面工作日历日期映射
+     * @param cxCalendarMap 成型工作日历日期映射
      * @return true 表示胎面停产且没有可接收重分配需求的班次
      */
     private boolean redistributeShutdownDemand(TmScheduleContext context, BigDecimal[] classQtyArray,
-                                               TmWorkCalendarRowVo tmCalendar, TmWorkCalendarRowVo cxCalendar) {
-        if (!TmYesNoEnum.YES.getCode().equals(getParamValue(context,
+                                               Map<String, TmWorkCalendarRowVo> tmCalendarMap,
+                                               Map<String, TmWorkCalendarRowVo> cxCalendarMap) {
+        if (!TmYesNoEnum.YES.getCode().equals(resolveParamString(context,
                 TmScheduleConstants.PARAM_SHUTDOWN_REDISTRIBUTION_ENABLED,
                 TmYesNoEnum.YES.getCode()))) {
-            return false;
-        }
-        if (!isShutdownDay(tmCalendar) || isShutdownDay(cxCalendar)) {
             return false;
         }
         List<Integer> shutdownShiftList = new ArrayList<>();
         List<Integer> availableShiftList = new ArrayList<>();
         BigDecimal shutdownQty = BigDecimal.ZERO;
         for (int shiftOrder = 1; shiftOrder <= TmScheduleConstants.TM_MAX_SHIFT_ORDER; shiftOrder++) {
-            if (isShiftOpen(tmCalendar, shiftOrder)) {
+            if (this.isSixShiftOpen(context, tmCalendarMap, shiftOrder)) {
                 availableShiftList.add(shiftOrder);
                 continue;
             }
-            if (isShiftOpen(cxCalendar, shiftOrder)) {
+            if (this.isSixShiftOpen(context, cxCalendarMap, shiftOrder)) {
                 shutdownShiftList.add(shiftOrder);
                 shutdownQty = shutdownQty.add(classQtyArray[shiftOrder - 1]);
             }
@@ -2619,8 +2813,13 @@ public class TmAutoScheduleDataLoadService {
         for (Integer shiftOrder : shutdownShiftList) {
             classQtyArray[shiftOrder - 1] = BigDecimal.ZERO;
         }
-        for (Integer shiftOrder : availableShiftList) {
-            classQtyArray[shiftOrder - 1] = classQtyArray[shiftOrder - 1].add(increaseQty);
+        BigDecimal remainingRedistributeQty = shutdownQty;
+        for (int targetIndex = 0; targetIndex < availableShiftList.size(); targetIndex++) {
+            Integer shiftOrder = availableShiftList.get(targetIndex);
+            BigDecimal currentIncreaseQty = targetIndex == availableShiftList.size() - 1
+                    ? remainingRedistributeQty : increaseQty;
+            remainingRedistributeQty = remainingRedistributeQty.subtract(currentIncreaseQty);
+            classQtyArray[shiftOrder - 1] = classQtyArray[shiftOrder - 1].add(currentIncreaseQty);
             Map<String, Object> evidence = context.getCurrentDayShutdownEvidenceMap()
                     .computeIfAbsent(shiftOrder, key -> new LinkedHashMap<>());
             evidence.put("ruleCode", TmScheduleRuleCodeEnum.CURRENT_DAY_SHUTDOWN_REDISTRIBUTION.getCode());
@@ -2628,7 +2827,7 @@ public class TmAutoScheduleDataLoadService {
             evidence.put("sourceShiftOrders", new ArrayList<>(shutdownShiftList));
             evidence.put("targetShiftOrder", shiftOrder);
             evidence.put("originalDemandQty", nvl((BigDecimal) evidence.get("originalDemandQty")).add(shutdownQty));
-            evidence.put("adjustedQty", nvl((BigDecimal) evidence.get("adjustedQty")).add(increaseQty));
+            evidence.put("adjustedQty", nvl((BigDecimal) evidence.get("adjustedQty")).add(currentIncreaseQty));
             evidence.put("threshold", null);
             evidence.put("result", TmScheduleRuleResultEnum.PASS.getCode());
         }
@@ -2644,18 +2843,38 @@ public class TmAutoScheduleDataLoadService {
      * @param procCode 工序编码
      * @return 工作日历行，未维护时返回 null
      */
-    private TmWorkCalendarRowVo loadWorkCalendar(TmScheduleContext context, String procCode) {
-        try {
-            Date calendarDate = DateUtil.beginOfDay(context.getScheduleDate());
-            String cacheKey = "calendar:" + context.getFactoryCode() + ":" + procCode + ":" + DateUtil.formatDate(calendarDate);
-            List<TmWorkCalendarRowVo> rowList = tmAutoScheduleRedisCacheService.getCachedList(cacheKey,
-                    () -> tmAutoScheduleDataLoadMapper.selectWorkCalendarRows(context.getFactoryCode(), procCode, calendarDate));
-            return CollUtil.isEmpty(rowList) ? null : rowList.get(0);
-        } catch (RuntimeException ex) {
-            log.error("[TM_AUTO_SCHEDULE_LOAD] 加载工作日历失败，procCode={}，scheduleDate={}",
-                    procCode, DateUtil.formatDate(context.getScheduleDate()), ex);
-            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.schedule.workCalendarQueryFailed"), ex);
+    private Map<String, TmWorkCalendarRowVo> loadSixShiftWorkCalendarMap(TmScheduleContext context,
+                                                                          String procCode) {
+        Date startDate = DateUtil.beginOfDay(DateUtil.offsetDay(context.getScheduleDate(), -1));
+        Date endDate = DateUtil.beginOfDay(DateUtil.offsetDay(context.getScheduleDate(), 1));
+        return this.loadWorkCalendarRange(context, procCode, startDate, endDate);
+    }
+
+    /**
+     * 判断六班结果班次在指定工序工作日历中是否开放。
+     *
+     * @param context     排程上下文
+     * @param calendarMap 工作日历日期映射
+     * @param shiftOrder  结果班次顺序
+     * @return true表示开放；日历缺失、标志为空或六班窗口外均按开放兼容
+     */
+    private boolean isSixShiftOpen(TmScheduleContext context, Map<String, TmWorkCalendarRowVo> calendarMap,
+                                   int shiftOrder) {
+        if (shiftOrder < 1 || shiftOrder > TmScheduleConstants.TM_MAX_SHIFT_ORDER) {
+            return true;
         }
+        Date productionDate = SixShiftWorkCalendarUtil.resolveProductionDate(context.getScheduleDate(), shiftOrder);
+        TmWorkCalendarRowVo calendar = calendarMap.get(DateUtil.formatDate(productionDate));
+        if (calendar == null) {
+            return true;
+        }
+        if (TmYesNoEnum.NO.getCode().equals(calendar.getDayFlag())) {
+            return false;
+        }
+        int calendarShiftOrder = SixShiftWorkCalendarUtil.resolveCalendarShiftOrder(shiftOrder);
+        String shiftFlag = calendarShiftOrder == 1 ? calendar.getOneShiftFlag()
+                : (calendarShiftOrder == 2 ? calendar.getTwoShiftFlag() : calendar.getThreeShiftFlag());
+        return shiftFlag == null || !TmYesNoEnum.NO.getCode().equals(shiftFlag);
     }
 
     private boolean isShutdownDay(TmWorkCalendarRowVo calendar) {
@@ -2670,24 +2889,16 @@ public class TmAutoScheduleDataLoadService {
         if (calendar == null) {
             return true;
         }
-        int calendarShift = mapToCalendarShift(shiftOrder);
+        int calendarShift = shiftOrder;
+        String shiftFlag;
         if (calendarShift == 1) {
-                return TmYesNoEnum.YES.getCode().equals(calendar.getOneShiftFlag());
+            shiftFlag = calendar.getOneShiftFlag();
+        } else if (calendarShift == 2) {
+            shiftFlag = calendar.getTwoShiftFlag();
+        } else {
+            shiftFlag = calendar.getThreeShiftFlag();
         }
-        if (calendarShift == 2) {
-                return TmYesNoEnum.YES.getCode().equals(calendar.getTwoShiftFlag());
-        }
-                return TmYesNoEnum.YES.getCode().equals(calendar.getThreeShiftFlag());
-    }
-
-    /**
-     * 将排程六班序号映射为工作日历三班序号。
-     *
-     * @param shiftOrder 排程班次序号
-     * @return 工作日历班次序号，取值范围为1到3
-     */
-    private int mapToCalendarShift(int shiftOrder) {
-        return ((shiftOrder - 1) % 3) + 1;
+        return shiftFlag == null || !TmYesNoEnum.NO.getCode().equals(shiftFlag);
     }
 
     /**
@@ -2699,7 +2910,7 @@ public class TmAutoScheduleDataLoadService {
      * @return 对应成型计划量；超过已加载成型班次时返回 0
      */
     private BigDecimal resolveFormingQty(BigDecimal[] classQtyArray, int startIndex, String algorithmCode) {
-        if ("2".equals(algorithmCode)) {
+        if (TmScheduleConstants.ALGORITHM_SINGLE_SHIFT.equals(algorithmCode)) {
             return readClassQty(classQtyArray, startIndex);
         }
         BigDecimal maxQty = BigDecimal.ZERO;
@@ -2773,7 +2984,7 @@ public class TmAutoScheduleDataLoadService {
      * @return 指定班次成型计划量
      */
     private BigDecimal resolveGuardClassQty(BigDecimal[] classQtyArray, int classIndex) {
-        if (classIndex < 8) {
+            if (classIndex < TmScheduleConstants.FORMING_MAX_SHIFT_ORDER) {
             return this.readClassQty(classQtyArray, classIndex);
         }
         return this.calculateLastThreeClassAverageQty(classQtyArray);
@@ -2986,7 +3197,7 @@ public class TmAutoScheduleDataLoadService {
      */
     private int resolveGuardStartIndex(int shiftOrder, int formingShiftOffset, String algorithmCode) {
         int currentDemandStartIndex = this.resolveCurrentDemandStartIndex(shiftOrder, formingShiftOffset);
-        int currentDemandWindowSize = "1".equals(algorithmCode) ? 3 : 1;
+        int currentDemandWindowSize = TmScheduleConstants.ALGORITHM_MAX_WINDOW.equals(algorithmCode) ? 3 : 1;
         return currentDemandStartIndex + currentDemandWindowSize;
     }
 
@@ -3057,29 +3268,108 @@ public class TmAutoScheduleDataLoadService {
     }
 
     /**
-     * 按斜裁相同口径判断单胎胚当前班次是否收尾。
-     * <p>月计划余量和成型计划量均为条数，必须直接比较，不能混入胎面长度后的米数；
-     * 余量缺失或非法时保持非收尾，避免把数据缺失误判为可收尾。</p>
+     * 将施工表中的胎面长度由毫米换算为自动排程使用的米。
      *
-     * @param planSurplusQty 胎胚月计划余量，单位条
-     * @param formingPlanQty 当前班次成型计划量，单位条
-     * @return true-月计划余量可由当前班次计划完成，false-仍按非收尾规格处理
+     * <p>仅用于成型计划关联施工信息的任务草稿；原始值仍用于施工字段完整性校验。</p>
+     *
+     * @param constructionLength 施工表胎面长度，单位毫米
+     * @return 换算后的胎面长度，单位米；空值按0处理
      */
-    private boolean isCloseOutByPlanSurplus(BigDecimal planSurplusQty, BigDecimal formingPlanQty) {
-        return planSurplusQty != null
-                && planSurplusQty.compareTo(BigDecimal.ZERO) >= 0
-                && formingPlanQty != null
-                && formingPlanQty.compareTo(BigDecimal.ZERO) > 0
-                && planSurplusQty.compareTo(formingPlanQty) <= 0;
+    private BigDecimal convertConstructionLengthToMeter(BigDecimal constructionLength) {
+        return this.nvl(constructionLength).divide(CONSTRUCTION_LENGTH_UNIT_DIVISOR);
     }
 
-    private String getParamValue(TmScheduleContext context, String paramCode, String defaultValue) {
+    /**
+     * 汇总成型来源行 CLASS1 至 CLASS8 的有效计划量。
+     *
+     * <p>空值和负数不计入合计，且必须在班次偏移、需求算法和停产重分配前调用。</p>
+     *
+     * @param classQtyArray 成型来源行原始八班计划量
+     * @return 八班正计划量合计，单位条
+     */
+    private BigDecimal calculateTotalFormingPlanQty(BigDecimal[] classQtyArray) {
+        if (classQtyArray == null) {
+            return BigDecimal.ZERO;
+        }
+        return Arrays.stream(classQtyArray)
+                .filter(Objects::nonNull)
+                .filter(classQty -> classQty.compareTo(BigDecimal.ZERO) > 0)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    /**
+     * 按成型来源行八班计划合计判断单胎胚是否收尾。
+     * <p>月计划余量和成型计划合计均为条数，必须直接比较，不能混入胎面长度后的米数；
+     * 余量缺失、余量为负或八班计划合计为零时保持非收尾。</p>
+     *
+     * @param planSurplusQty 胎胚月计划余量，单位条
+     * @param totalFormingPlanQty 来源行 CLASS1 至 CLASS8 正计划量合计，单位条
+     * @return true-月计划余量可由来源行八班计划完成，false-仍按非收尾规格处理
+     */
+    private boolean isCloseOutByPlanSurplus(BigDecimal planSurplusQty, BigDecimal totalFormingPlanQty) {
+        return planSurplusQty != null
+                && planSurplusQty.compareTo(BigDecimal.ZERO) >= 0
+                && totalFormingPlanQty != null
+                && totalFormingPlanQty.compareTo(BigDecimal.ZERO) > 0
+                && planSurplusQty.compareTo(totalFormingPlanQty) <= 0;
+    }
+
+    /**
+     * 将来源行收尾判定写入任务解释链路。
+     *
+     * @param context 排程上下文
+     * @param taskDraft 任务草稿
+     * @param originalClassQtyArray 来源行原始八班计划量
+     * @param totalFormingPlanQty 八班正计划量合计
+     * @param planSurplusQty 胎胚月计划余量
+     * @param loadMode 成型需求加载模式
+     */
+    private void addCloseOutJudgeTrace(TmScheduleContext context, TmTaskDraft taskDraft,
+                                       BigDecimal[] originalClassQtyArray, BigDecimal totalFormingPlanQty,
+                                       BigDecimal planSurplusQty, String loadMode) {
+        Map<String, Object> evidence = new LinkedHashMap<>();
+        evidence.put("sourceOrderNo", taskDraft.getSourceOrderNos());
+        evidence.put("loadMode", loadMode);
+        evidence.put("decisionMode", "SOURCE_ROW_CLASS1_TO_CLASS8_TOTAL");
+        for (int classIndex = 0; classIndex < originalClassQtyArray.length; classIndex++) {
+            evidence.put("class" + (classIndex + 1) + "PlanQty", this.readClassQty(originalClassQtyArray, classIndex));
+        }
+        evidence.put("totalFormingPlanQty", totalFormingPlanQty);
+        evidence.put("cxRemainQty", planSurplusQty);
+        evidence.put("tailFlag", taskDraft.getTailFlag());
+        context.getRuleTraceMap().computeIfAbsent(taskDraft.getBusinessKey(), key -> new TmRuleTrace())
+                .addRuleHit(TmScheduleRuleCodeEnum.CLOSE_OUT_JUDGE, TmScheduleRuleResultEnum.PASS, evidence);
+    }
+
+    /**
+     * 按来源行记录一次收尾判定运行日志，避免按任务重复输出。
+     *
+     * @param context 排程上下文
+     * @param sourceOrderNo 成型来源工单号
+     * @param embryoCode 胎胚编码
+     * @param originalClassQtyArray 来源行原始八班计划量
+     * @param totalFormingPlanQty 八班正计划量合计
+     * @param planSurplusQty 胎胚月计划余量
+     * @param closeOut 是否收尾
+     * @param loadMode 成型需求加载模式
+     */
+    private void logCloseOutJudge(TmScheduleContext context, String sourceOrderNo, String embryoCode,
+                                  BigDecimal[] originalClassQtyArray, BigDecimal totalFormingPlanQty,
+                                  BigDecimal planSurplusQty, boolean closeOut, String loadMode) {
+        log.info("[TM_CLOSE_OUT_JUDGE] batchNo={}, sourceOrderNo={}, embryoCode={}, loadMode={}, "
+                        + "classPlanQty={}, totalFormingPlanQty={}, cxRemainQty={}, tailFlag={}",
+                context.getBatchNo(), sourceOrderNo, embryoCode, loadMode, Arrays.toString(originalClassQtyArray),
+                totalFormingPlanQty, planSurplusQty,
+                closeOut ? TmYesNoEnum.YES.getCode() : TmYesNoEnum.NO.getCode());
+    }
+
+    private String resolveParamString(TmScheduleContext context, String paramCode, String defaultValue) {
         TmParamValue value = context.getParamMap().get(paramCode);
         return value == null || StrUtil.isBlank(value.getEffectiveValue()) ? defaultValue : value.getEffectiveValue();
     }
 
     private BigDecimal getDecimalParam(TmScheduleContext context, String paramCode) {
-        String value = getParamValue(context, paramCode, "0");
+        String value = resolveParamString(context, paramCode, "0");
         try {
             return new BigDecimal(value);
         } catch (NumberFormatException ex) {
@@ -3088,7 +3378,7 @@ public class TmAutoScheduleDataLoadService {
     }
 
     private Integer getIntegerParam(TmScheduleContext context, String paramCode, Integer defaultValue) {
-        String value = getParamValue(context, paramCode, String.valueOf(defaultValue));
+        String value = resolveParamString(context, paramCode, String.valueOf(defaultValue));
         try {
             return Integer.valueOf(value);
         } catch (NumberFormatException ex) {
@@ -3116,7 +3406,7 @@ public class TmAutoScheduleDataLoadService {
      * @return 非负整数参数值
      */
     private Integer getNonNegativeIntegerParam(TmScheduleContext context, String paramCode, Integer defaultValue) {
-        String value = getParamValue(context, paramCode, String.valueOf(defaultValue));
+        String value = resolveParamString(context, paramCode, String.valueOf(defaultValue));
         try {
             Integer parsedValue = Integer.valueOf(value);
             if (parsedValue.compareTo(0) >= 0) {
@@ -3137,7 +3427,7 @@ public class TmAutoScheduleDataLoadService {
      * @return 正整数参数值
      */
     private Integer getPositiveIntegerParam(TmScheduleContext context, String paramCode, Integer defaultValue) {
-        String value = getParamValue(context, paramCode, String.valueOf(defaultValue));
+        String value = resolveParamString(context, paramCode, String.valueOf(defaultValue));
         try {
             Integer parsedValue = Integer.valueOf(value);
             if (parsedValue.compareTo(0) > 0) {
@@ -3180,7 +3470,7 @@ public class TmAutoScheduleDataLoadService {
      * @return 正数参数值
      */
     private BigDecimal getPositiveDecimalParam(TmScheduleContext context, String paramCode, BigDecimal defaultValue) {
-        String value = getParamValue(context, paramCode, String.valueOf(defaultValue));
+        String value = resolveParamString(context, paramCode, String.valueOf(defaultValue));
         try {
             BigDecimal parsedValue = new BigDecimal(value);
             if (parsedValue.compareTo(BigDecimal.ZERO) > 0) {

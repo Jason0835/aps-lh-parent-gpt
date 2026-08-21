@@ -16,10 +16,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.text.MessageFormat;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -264,6 +261,60 @@ public class TcSnapshotBuildService {
         result.set("schemaVersion", "1");
         result.set("hits", new JSONArray());
         return JSONUtil.toJsonPrettyStr(result);
+    }
+
+    /**
+     * 构建来源解释行可直接展示的顺延原因和实际承接摘要。
+     *
+     * @param task    来源解释任务
+     * @param context 胎侧排程上下文
+     * @return 顺延解释对象；没有顺延证据时返回空Map
+     */
+    public Map<String, Object> buildCarryoverExplanation(TcTaskDraft task, TcScheduleContext context) {
+        TcRuleTrace trace = context == null || task == null || context.getRuleTraceMap() == null
+                ? null : context.getRuleTraceMap().get(task.getBusinessKey());
+        Map<String, Object> explanation = new LinkedHashMap<>();
+        List<Map<String, Object>> targetAssignments = new ArrayList<>();
+        if (trace == null || CollUtil.isEmpty(trace.getRuleHits())) {
+            return explanation;
+        }
+        for (TcRuleTraceItem item : trace.getRuleHits()) {
+            if (item == null || !(item.getEvidence() instanceof Map)) {
+                continue;
+            }
+            String ruleCode = item.getRuleCode();
+            if (!TcScheduleRuleCodeEnum.CAPACITY_BLOCKED_CARRYOVER.getCode().equals(ruleCode)
+                    && !TcScheduleRuleCodeEnum.MACHINE_SHIFT_BLOCKED_CARRYOVER.getCode().equals(ruleCode)
+                    && !TcScheduleRuleCodeEnum.PLAN_QTY_CARRYOVER.getCode().equals(ruleCode)) {
+                continue;
+            }
+            Map<?, ?> evidence = (Map<?, ?>) item.getEvidence();
+            if (evidence.get("sourceReasonDesc") != null) {
+                explanation.putIfAbsent("sourceShiftOrder", evidence.get("sourceShiftOrder"));
+                explanation.putIfAbsent("sourceReasonCode", evidence.get("sourceReasonCode"));
+                explanation.putIfAbsent("sourceReasonDesc", evidence.get("sourceReasonDesc"));
+                explanation.putIfAbsent("rejectReasonSummary", evidence.get("rejectReasonSummary"));
+                explanation.putIfAbsent("candidateDetails", evidence.get("candidateDetails"));
+                explanation.putIfAbsent("nextStep", evidence.get("nextStep"));
+                explanation.putIfAbsent("planCalcOrderIndex", evidence.get("planCalcOrderIndex"));
+                explanation.putIfAbsent("baseSortIndex", evidence.get("baseSortIndex"));
+                explanation.putIfAbsent("machineAssignmentSequence", evidence.get("machineAssignmentSequence"));
+            }
+            if (evidence.get("targetShiftOrder") != null) {
+                Map<String, Object> targetAssignment = new LinkedHashMap<>();
+                targetAssignment.put("targetShiftOrder", evidence.get("targetShiftOrder"));
+                targetAssignment.put("targetMachineCode", evidence.get("targetMachineCode"));
+                targetAssignment.put("carryoverQty", evidence.get("carryoverQty"));
+                targetAssignment.put("machineAssignmentSequence", evidence.get("machineAssignmentSequence"));
+                targetAssignment.put("planCalcOrderIndex", evidence.get("planCalcOrderIndex"));
+                targetAssignment.put("baseSortIndex", evidence.get("baseSortIndex"));
+                targetAssignments.add(targetAssignment);
+            }
+        }
+        if (!explanation.isEmpty() || !targetAssignments.isEmpty()) {
+            explanation.put("targetAssignments", targetAssignments);
+        }
+        return explanation;
     }
 
     /**

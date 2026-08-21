@@ -81,8 +81,11 @@ public class TcMachineAssignService implements ITcMachineAssignService {
             List<TcTaskDraft> remainingTaskList = entry.getValue().stream()
                     .filter(this::isMachineAssignmentRequired)
                     .collect(Collectors.toList());
+            int machineAssignmentSequence = 0;
             while (CollUtil.isNotEmpty(remainingTaskList)) {
-                TcTaskDraft task = this.selectNextTaskByMachinePredecessor(remainingTaskList, context);
+                machineAssignmentSequence++;
+                TcTaskDraft task = this.selectNextTaskByBaseSortIndex(remainingTaskList, context,
+                        machineAssignmentSequence);
                 remainingTaskList.remove(task);
                 this.assignSingleTask(task, context);
             }
@@ -111,7 +114,7 @@ public class TcMachineAssignService implements ITcMachineAssignService {
         Set<String> recalculatedSidewallCodeSet = new HashSet<>();
         shiftTaskList.stream()
                 .filter(Objects::nonNull)
-                .sorted(Comparator.comparing(TcTaskDraft::getSidewallCode,
+                .sorted(Comparator.comparing(TcTaskDraft::getPlanCalcOrderIndex,
                                 Comparator.nullsLast(Comparator.naturalOrder()))
                         .thenComparing(TcTaskDraft::getBaseSortIndex,
                                 Comparator.nullsLast(Comparator.naturalOrder()))
@@ -321,45 +324,57 @@ public class TcMachineAssignService implements ITcMachineAssignService {
     }
 
     /**
-     * 根据同机台前置任务连续性选择下一个待排任务。
+     * 按计划量计算顺序选择本班次下一条实际机台分配任务。
      *
-     * <p>同一班次内每排入一个任务后都会重新计算剩余任务的连续性得分；一班没有当前链尾时使用
-     * 前一天同机台链尾，二到六班没有当前链尾时使用上一已排班次链尾。</p>
+     * <p>机台候选评分只决定当前任务进入分配后的目标机台，不得反向改变任务进入分配的顺序。
+     * 同一班次严格按 {@code planCalcOrderIndex/baseSortIndex} 升序尝试，排序序号相同时按业务键稳定排序；
+     * 当前任务完成候选过滤、工装校验、产能扣减及顺延处理后，才处理下一条任务。</p>
      *
-     * @param remainingTaskList 当前班次尚未分配的任务
+     * @param remainingTaskList 当前班次尚未分配的实际任务
      * @param context 胎侧排程上下文
-     * @return 本轮应优先分配的任务
+     * @param machineAssignmentSequence 本班次机台资源尝试序号，从1开始
+     * @return 本轮应优先尝试的任务
      */
-    private TcTaskDraft selectNextTaskByMachinePredecessor(List<TcTaskDraft> remainingTaskList,
-                                                           TcScheduleContext context) {
-        Map<String, TcChainSortScore> scoreMap = new LinkedHashMap<>();
-        for (TcTaskDraft task : remainingTaskList) {
-            scoreMap.put(task.getBusinessKey(), this.calculateBestChainSortScore(task, context));
-        }
-        ITcChainTaskPriorityStrategy priorityStrategy = this.resolveChainTaskPriorityStrategy(context);
-        boolean startupShift = this.isStartupShift(context, remainingTaskList.get(0));
-        TcTaskDraft selectedTask = startupShift
-                ? this.selectStartupSupplyFirstTask(remainingTaskList, scoreMap)
-                : priorityStrategy.select(remainingTaskList, context, scoreMap);
-        String appliedStrategyCode = startupShift ? "STARTUP_SUPPLY_FIRST" : priorityStrategy.getStrategyCode();
-        if (startupShift) {
-            Map<String, Object> sortEvidence = new LinkedHashMap<>();
-            sortEvidence.put("phase", "MACHINE_ASSIGN");
-            sortEvidence.put("strategyCode", appliedStrategyCode);
-            sortEvidence.put("shiftOrder", selectedTask.getShiftOrder());
-            sortEvidence.put("supplyHours", selectedTask.getSupplyHours());
-            sortEvidence.put("latestStartTime", selectedTask.getLatestStartTime());
-            sortEvidence.put("presetMachine", !selectedTask.isUnassigned());
-            sortEvidence.put("chainSortScore", scoreMap.get(selectedTask.getBusinessKey()));
-            traceOf(context, selectedTask).addRuleHit(TcScheduleRuleCodeEnum.TASK_SORT,
-                    TcScheduleRuleResultEnum.PASS, sortEvidence);
-        }
-        log.info("[TC_CHAIN_TASK_ORDER] batchNo={}, traceId={}, factoryCode={}, scheduleDate={}, shiftOrder={}, predecessorSnapshot={}, selectedBusinessKey={}, selectedSidewallCode={}, selectedGlueCode={}, strategyCode={}, chainSortScores={}",
+    private TcTaskDraft selectNextTaskByBaseSortIndex(List<TcTaskDraft> remainingTaskList,
+                                                       TcScheduleContext context,
+                                                       int machineAssignmentSequence) {
+        TcTaskDraft selectedTask = this.selectTaskByBaseSortIndex(remainingTaskList);
+        selectedTask.setMachineAssignmentSequence(machineAssignmentSequence);
+        Map<String, Object> sortEvidence = new LinkedHashMap<>();
+        sortEvidence.put("phase", "MACHINE_ASSIGN");
+        sortEvidence.put("strategyCode", "BASE_SORT_INDEX_FIRST");
+        sortEvidence.put("shiftOrder", selectedTask.getShiftOrder());
+        sortEvidence.put("planCalcOrderIndex", selectedTask.getPlanCalcOrderIndex());
+        sortEvidence.put("baseSortIndex", selectedTask.getBaseSortIndex());
+        sortEvidence.put("machineAssignmentSequence", machineAssignmentSequence);
+        sortEvidence.put("remainingTaskCountBeforeSelection", remainingTaskList.size());
+        sortEvidence.put("presetMachine", !selectedTask.isUnassigned());
+        sortEvidence.put("sortPriority", "PLAN_CALC_ORDER_ASC,BASE_SORT_INDEX_ASC,BUSINESS_KEY_ASC");
+        sortEvidence.put("selectionDecision", "排序优先选择");
+        traceOf(context, selectedTask).addRuleHit(TcScheduleRuleCodeEnum.TASK_SORT,
+                TcScheduleRuleResultEnum.PASS, sortEvidence);
+        log.info("[TC_MACHINE_ASSIGN_TASK_ORDER] batchNo={}, traceId={}, factoryCode={}, scheduleDate={}, shiftOrder={}, machineAssignmentSequence={}, planCalcOrderIndex={}, baseSortIndex={}, selectedBusinessKey={}, selectedSidewallCode={}, selectedGlueCode={}, strategyCode={}, selectionDecision={}, remainingTaskCount={}",
                 context.getBatchNo(), context.getTraceId(), context.getFactoryCode(), this.formatScheduleDate(context),
-                this.normalizeShiftOrder(selectedTask.getShiftOrder()), this.summarizeMachinePredecessors(context,
-                        this.normalizeShiftOrder(selectedTask.getShiftOrder())), selectedTask.getBusinessKey(),
-                selectedTask.getSidewallCode(), selectedTask.getGlueCode(), appliedStrategyCode, scoreMap);
+                this.normalizeShiftOrder(selectedTask.getShiftOrder()), machineAssignmentSequence,
+                selectedTask.getPlanCalcOrderIndex(), selectedTask.getBaseSortIndex(), selectedTask.getBusinessKey(),
+                selectedTask.getSidewallCode(), selectedTask.getGlueCode(), "BASE_SORT_INDEX_FIRST", "排序优先选择",
+                remainingTaskList.size());
         return selectedTask;
+    }
+
+    /**
+     * 使用计划量计算顺序和业务键稳定选择任务。
+     *
+     * @param remainingTaskList 当前班次尚未分配的实际任务
+     * @return 排序最靠前的任务
+     */
+    TcTaskDraft selectTaskByBaseSortIndex(List<TcTaskDraft> remainingTaskList) {
+        return remainingTaskList.stream()
+                .filter(Objects::nonNull)
+                .min(Comparator.comparing(TcTaskDraft::getBaseSortIndex,
+                                Comparator.nullsLast(Comparator.naturalOrder()))
+                        .thenComparing(task -> StrUtil.blankToDefault(task.getBusinessKey(), "")))
+                .orElseThrow(() -> new IllegalArgumentException("机台分配任务列表不能为空"));
     }
 
     /**
@@ -731,13 +746,17 @@ public class TcMachineAssignService implements ITcMachineAssignService {
         // 全部候选机台被过滤，按过滤原因归类未排原因
         if (passedCandidates.isEmpty()) {
             if (this.isCapacityOrShiftBlockedCarryover(task, context, filterRule)) {
+                boolean machineShiftBlocked = candidates.stream().anyMatch(candidate ->
+                        TcMachineFilterReasonEnum.MACHINE_SHIFT_NOT_OPEN.getCode()
+                                .equals(candidate.getFilterReasonCode()));
+                String carryoverSourceType = machineShiftBlocked
+                        ? "MACHINE_SHIFT_BLOCKED_CARRYOVER" : "CAPACITY_BLOCKED_CARRYOVER";
+                this.addSourceCarryoverFailureTrace(context, task, candidates, carryoverSourceType,
+                        nvl(task.getPlanQty()));
                 context.getCandidateTraceMap().put(task.getBusinessKey(), candidates);
                 log.info("[TC_MACHINE_ASSIGN] 任务[{}]当前班无可用承接，进入后续班次继续尝试",
                         task.getBusinessKey());
                 this.removeContextTask(context, task);
-                boolean machineShiftBlocked = candidates.stream().anyMatch(candidate ->
-                        TcMachineFilterReasonEnum.MACHINE_SHIFT_NOT_OPEN.getCode()
-                                .equals(candidate.getFilterReasonCode()));
                 BigDecimal capacityOverflowQty = machineShiftBlocked
                         ? BigDecimal.ZERO : nvl(task.getPlanQty());
                 this.appendCarryoverQty(task, null, Collections.emptyList(), filterRule, scoreStrategy, context,
@@ -999,8 +1018,11 @@ public class TcMachineAssignService implements ITcMachineAssignService {
                 }
                 BigDecimal sourcePlanQty = nvl(sourceTask.getPlanQty());
                 BigDecimal capacityAllowedQty = sourcePlanQty.min(nvl(runtimeCandidate.getRemainCapacity()));
+                TcTaskDraft earlyFillLogTask = this.copyFutureEarlyFillTask(sourceTask, targetShiftOrder,
+                        capacityAllowedQty, sourceShiftOrder, earlyFillIndex, runtimeCandidate.getMachineCode());
                 BigDecimal assignedQty = this.limitPlanQtyByCurrentTool(
-                        sourceTask, context, capacityAllowedQty, "提前补产", targetShiftOrder);
+                        sourceTask, context, capacityAllowedQty, "提前补产", targetShiftOrder,
+                        earlyFillLogTask.getBusinessKey());
                 if (assignedQty.compareTo(BigDecimal.ZERO) <= 0) {
                     continue;
                 }
@@ -1307,9 +1329,12 @@ public class TcMachineAssignService implements ITcMachineAssignService {
                 }
                 BigDecimal beforeAssignQty = remainingQty;
                 BigDecimal capacityAllowedQty = candidateAssignableQty.min(remainCapacity);
+                String processLogTaskBusinessKey = mergeTarget == null
+                        ? capacityProbeTask.getBusinessKey() : mergeTarget.getBusinessKey();
                 BigDecimal assignedQty = this.limitPlanQtyByCurrentTool(
                         sourceTask, context, capacityAllowedQty,
-                        mergeTarget == null ? "顺延新建" : "顺延合并", shiftOrder);
+                        mergeTarget == null ? "顺延新建" : "顺延合并", shiftOrder,
+                        processLogTaskBusinessKey);
                 BigDecimal overflowQty = remainingQty.subtract(assignedQty);
                 if (assignedQty.compareTo(capacityAllowedQty) < 0) {
                     toolOverflowQty = remainingQty.max(nvl(toolOverflowQty));
@@ -1475,6 +1500,11 @@ public class TcMachineAssignService implements ITcMachineAssignService {
                 sourceType, sourceShiftOrder, targetShiftOrder, targetMachineCode, carryoverQty, capacityOverflowQty,
                 toolOverflowQty, beforeMergeQty, afterMergeQty, remainingQty, merged,
                 targetTask == null ? null : targetTask.getUnplannedReasonCode());
+        if (context != null && sourceTask != null && sourceShiftOrder != null) {
+            context.appendShiftProcessLog(sourceShiftOrder, ScheduleProcessLogSection.MACHINE_SELECTION,
+                    "机台过滤与选择：胎侧代码={0}，顺延原因={1}。",
+                    sourceTask.getSidewallCode(), this.resolveCarryoverReasonDesc(sourceType));
+        }
     }
 
     /**
@@ -1757,7 +1787,10 @@ public class TcMachineAssignService implements ITcMachineAssignService {
         task.setToolLimitAdjustQty(toolLimitAdjustQty);
         task.setToolOverflowQty(toolOverflowQty);
         task.setPlanQty(finalPlanQty);
-        task.setPlanStockQty(nvl(task.getRollingStockQty()).add(finalPlanQty).subtract(nvl(task.getCurrentShiftDemandQty())).max(BigDecimal.ZERO));
+        BigDecimal stockConsumptionDemandQty = Boolean.TRUE.equals(task.getFormingShutdownCloseOutFlag())
+                ? nvl(task.getFormingShutdownCloseOutDemandQty()) : nvl(task.getCurrentShiftDemandQty());
+        task.setPlanStockQty(nvl(task.getRollingStockQty()).add(finalPlanQty)
+                .subtract(stockConsumptionDemandQty).max(BigDecimal.ZERO));
         task.setCalcFormulaDesc(this.buildFinalPlanCalcFormulaDesc(task.getCalcFormulaDesc(), tailTask));
         if (startupPlanQtyLimit != null) {
             task.setCalcFormulaDesc(this.appendFormulaDesc(task.getCalcFormulaDesc(), "开产阈值封顶"));
@@ -1788,7 +1821,8 @@ public class TcMachineAssignService implements ITcMachineAssignService {
      * @return 开产上限；非开产班次或当班需求量非正数时返回null
      */
     private BigDecimal resolveStartupPlanQtyLimit(TcScheduleContext context, TcTaskDraft task) {
-        if (!this.isStartupShift(context, task)
+        if (Boolean.TRUE.equals(task.getFormingShutdownCloseOutFlag())
+                || !this.isStartupShift(context, task)
                 || nvl(task.getCurrentShiftDemandQty()).compareTo(BigDecimal.ZERO) <= 0) {
             return null;
         }
@@ -1835,10 +1869,10 @@ public class TcMachineAssignService implements ITcMachineAssignService {
      * @return 收尾标识、收尾余量和标准长度均有效时返回true
      */
     private boolean isTailTask(TcTaskDraft task) {
-        return task != null
-                && TcYesNoEnum.YES.getCode().equals(task.getTailFlag())
+        return task != null && (Boolean.TRUE.equals(task.getFormingShutdownCloseOutFlag())
+                || (TcYesNoEnum.YES.getCode().equals(task.getTailFlag())
                 && this.nvl(task.getTailBalanceQty()).compareTo(BigDecimal.ZERO) > 0
-                && this.nvl(task.getSidewallLength()).compareTo(BigDecimal.ZERO) > 0;
+                && this.nvl(task.getSidewallLength()).compareTo(BigDecimal.ZERO) > 0));
     }
 
     /**
@@ -1905,19 +1939,38 @@ public class TcMachineAssignService implements ITcMachineAssignService {
     private BigDecimal limitPlanQtyByCurrentTool(TcTaskDraft task, TcScheduleContext context,
                                                  BigDecimal requestedQty, String taskSource,
                                                  Integer processLogShiftOrder) {
+        return this.limitPlanQtyByCurrentTool(task, context, requestedQty, taskSource,
+                processLogShiftOrder, task == null ? null : task.getBusinessKey());
+    }
+
+    /**
+     * 使用生产前工装余额限制当前入口的实际承接量，并将日志关联到实际承接任务。
+     *
+     * @param task                      当前计算任务
+     * @param context                   排程上下文
+     * @param requestedQty              本入口请求承接量
+     * @param taskSource                任务来源
+     * @param processLogShiftOrder      过程日志归属班次
+     * @param processLogTaskBusinessKey 过程日志归属的实际承接任务业务键
+     * @return 工装允许的实际承接量；未启用工装约束或卷曲长度无效时返回请求量
+     */
+    private BigDecimal limitPlanQtyByCurrentTool(TcTaskDraft task, TcScheduleContext context,
+                                                 BigDecimal requestedQty, String taskSource,
+                                                 Integer processLogShiftOrder,
+                                                 String processLogTaskBusinessKey) {
         BigDecimal normalizedRequestedQty = nvl(requestedQty).max(BigDecimal.ZERO);
         BigDecimal currentAvailableToolQty = this.resolveCurrentAvailableToolQty(context, task);
         Integer logShiftOrder = processLogShiftOrder == null
                 ? (task == null ? null : task.getShiftOrder()) : processLogShiftOrder;
         if (currentAvailableToolQty == null) {
-            context.appendDeferredShiftProcessLog(logShiftOrder,
+            context.appendDeferredToolPrecheckProcessLog(processLogTaskBusinessKey, logShiftOrder,
                     "工装生产前校验：来源={0}，胎侧代码={1}，请求量={2}米；总工装未配置或非正数，未启用工装约束，实际承接量={2}米。",
                     taskSource, task.getSidewallCode(), normalizedRequestedQty);
             return normalizedRequestedQty;
         }
         BigDecimal curlLength = this.resolveCurlLength(task);
         if (curlLength.compareTo(BigDecimal.ZERO) <= 0) {
-            context.appendDeferredShiftProcessLog(logShiftOrder,
+            context.appendDeferredToolPrecheckProcessLog(processLogTaskBusinessKey, logShiftOrder,
                     "工装生产前校验：来源={0}，胎侧代码={1}，请求量={2}米；规格卷曲长度及默认卷曲长度均无效，无法计算工装允许量，沿用请求量。",
                     taskSource, task.getSidewallCode(), normalizedRequestedQty);
             return normalizedRequestedQty;
@@ -1925,7 +1978,7 @@ public class TcMachineAssignService implements ITcMachineAssignService {
         ScheduleToolLedgerResult limitResult = this.constraintCalculator
                 .settleProductionBeforeReleaseToolLedger(normalizedRequestedQty, BigDecimal.ZERO,
                         currentAvailableToolQty, task.getTotalToolQty(), curlLength);
-        context.appendDeferredShiftProcessLog(logShiftOrder,
+        context.appendDeferredToolPrecheckProcessLog(processLogTaskBusinessKey, logShiftOrder,
                 "工装生产前校验：来源={0}，胎侧代码={1}，校验前可用工装={2}套，请求量={3}米，有效卷曲长度={4}米/套；允许量=min({3}米,max({2}套,0)×{4}米/套)={5}米；工装溢出量=max({3}米-{5}米,0)={6}米；实际承接量={5}米。",
                 taskSource, task.getSidewallCode(), currentAvailableToolQty, normalizedRequestedQty, curlLength,
                 limitResult.getAllowedPlanQty(), limitResult.getOverflowPlanQty());
@@ -1966,7 +2019,7 @@ public class TcMachineAssignService implements ITcMachineAssignService {
         context.setCurrentAvailableToolQty(ledgerResult.getRemainingToolQty());
         this.recordToolLedgerSnapshot(context, task, ledgerResult.getAvailableToolQty(), ledgerResult.getToolUsedQty(),
                 ledgerResult.getRemainingToolQty());
-        context.appendDeferredShiftProcessLog(task.getShiftOrder(),
+        context.appendDeferredToolLedgerSettlementProcessLog(task.getBusinessKey(), task.getShiftOrder(),
                 "工装任务后结算：来源={0}，胎侧代码={1}，净占用工装数量=({2}米-{3}米)÷{4}米/套={5}套；下一任务可用工装数量=min(max({6}套-{5}套,0),{7}套)={8}套。本任务释放量仅供下一任务使用。",
                 taskSource, task.getSidewallCode(), nvl(task.getPlanQty()), nvl(task.getCurrentShiftDemandQty()),
                 curlLength, ledgerResult.getToolUsedQty(), currentAvailableToolQty, task.getTotalToolQty(),
@@ -2027,7 +2080,7 @@ public class TcMachineAssignService implements ITcMachineAssignService {
         context.setCurrentAvailableToolQty(ledgerResult.getRemainingToolQty());
         this.recordToolLedgerSnapshot(context, mergeTarget, ledgerResult.getAvailableToolQty(),
                 mergeTarget.getToolUsedQty(), ledgerResult.getRemainingToolQty());
-        context.appendDeferredShiftProcessLog(mergeTarget.getShiftOrder(),
+        context.appendDeferredToolLedgerSettlementProcessLog(mergeTarget.getBusinessKey(), mergeTarget.getShiftOrder(),
                 "工装任务后结算：来源=顺延合并，胎侧代码={0}，净占用工装数量=({1}米-0米)÷{2}米/套={3}套；下一任务可用工装数量=min(max({4}套-{3}套,0),{5}套)={6}套。",
                 mergeTarget.getSidewallCode(), nvl(carryoverQty), curlLength, ledgerResult.getToolUsedQty(),
                 currentAvailableToolQty, mergeTarget.getTotalToolQty(), ledgerResult.getRemainingToolQty());
@@ -2125,6 +2178,8 @@ public class TcMachineAssignService implements ITcMachineAssignService {
         target.setMouthPlateCode(source.getMouthPlateCode());
         target.setShiftOrder(shiftOrder);
         target.setCurrentShiftDemandQty(BigDecimal.ZERO);
+        target.setOriginalCurrentShiftDemandQty(source.getOriginalCurrentShiftDemandQty() == null
+                ? this.nvl(source.getCurrentShiftDemandQty()) : source.getOriginalCurrentShiftDemandQty());
         target.setGuardDemandQty(BigDecimal.ZERO);
         target.setRollingStockQty(nvl(source.getPlanStockQty()));
         target.setSixClockStockQty(source.getSixClockStockQty());
@@ -2141,6 +2196,9 @@ public class TcMachineAssignService implements ITcMachineAssignService {
         target.setSidewallLength(source.getSidewallLength());
         target.setTailFlag(source.getTailFlag());
         target.setTailBalanceQty(source.getTailBalanceQty());
+        target.setFormingLogicalShiftOrder(source.getFormingLogicalShiftOrder());
+        target.setFormingShutdownCloseOutFlag(source.getFormingShutdownCloseOutFlag());
+        target.setFormingShutdownCloseOutDemandQty(source.getFormingShutdownCloseOutDemandQty());
         target.setLossRate(source.getLossRate());
         target.setResolvedLossRate(source.getResolvedLossRate());
         target.setLossMatchLevel(source.getLossMatchLevel());
@@ -2178,6 +2236,7 @@ public class TcMachineAssignService implements ITcMachineAssignService {
         target.setGroupRoundAdjustQty(source.getGroupRoundAdjustQty());
         target.setGroupFinalPlanQty(source.getGroupFinalPlanQty());
         // 顺延任务沿用来源任务的待排名次，保证过程日志与原任务处理顺序一致。
+        target.setPlanCalcOrderIndex(source.getPlanCalcOrderIndex());
         target.setBaseSortIndex(source.getBaseSortIndex());
         target.setBusinessKeySuffix(this.buildOverflowBusinessKeySuffix(source, sourceShift, shiftOrder, machineCode, overflowIndex));
         return target;
@@ -2308,6 +2367,77 @@ public class TcMachineAssignService implements ITcMachineAssignService {
     }
 
     /**
+     * 保存来源班次候选机台失败和顺延判定证据，供解释表还原顺延原因。
+     *
+     * @param context                胎侧排程上下文
+     * @param sourceTask             来源任务
+     * @param candidates             来源班次候选机台
+     * @param carryoverSourceType    顺延来源类型
+     * @param carryoverQty           待顺延计划量
+     */
+    private void addSourceCarryoverFailureTrace(TcScheduleContext context, TcTaskDraft sourceTask,
+                                                List<TcMachineCandidate> candidates, String carryoverSourceType,
+                                                BigDecimal carryoverQty) {
+        Map<String, Object> evidence = new LinkedHashMap<>();
+        evidence.put("sourceTask", sourceTask == null ? null : sourceTask.getBusinessKey());
+        evidence.put("sourceShiftOrder", sourceTask == null ? null : sourceTask.getShiftOrder());
+        evidence.put("sourcePlanQty", sourceTask == null ? null : sourceTask.getPlanQty());
+        evidence.put("planCalcOrderIndex", sourceTask == null ? null : sourceTask.getPlanCalcOrderIndex());
+        evidence.put("baseSortIndex", sourceTask == null ? null : sourceTask.getBaseSortIndex());
+        evidence.put("machineAssignmentSequence", sourceTask == null
+                ? null : sourceTask.getMachineAssignmentSequence());
+        evidence.put("carryoverQty", carryoverQty);
+        evidence.put("sourceType", carryoverSourceType);
+        evidence.put("sourceReasonCode", carryoverSourceType);
+        evidence.put("sourceReasonDesc", this.resolveCarryoverReasonDesc(carryoverSourceType));
+        evidence.put("candidateCount", candidates == null ? 0 : candidates.size());
+        evidence.put("passedCandidateCount", 0);
+        evidence.put("rejectReasonSummary", this.summarizeRejectReasons(candidates));
+        evidence.put("candidateDetails", this.buildCarryoverCandidateDetails(candidates));
+        evidence.put("nextStep", "从来源班次下一班开始重新过滤、评分并尝试承接");
+        TcScheduleRuleCodeEnum ruleCode = "MACHINE_SHIFT_BLOCKED_CARRYOVER".equals(carryoverSourceType)
+                ? TcScheduleRuleCodeEnum.MACHINE_SHIFT_BLOCKED_CARRYOVER
+                : TcScheduleRuleCodeEnum.CAPACITY_BLOCKED_CARRYOVER;
+        traceOf(context, sourceTask).addRuleHit(ruleCode, TcScheduleRuleResultEnum.REJECT, evidence);
+    }
+
+    /**
+     * 构建来源班次候选机台失败明细。
+     *
+     * @param candidates 候选机台
+     * @return 候选机台结构化失败明细
+     */
+    private List<Map<String, Object>> buildCarryoverCandidateDetails(List<TcMachineCandidate> candidates) {
+        if (CollUtil.isEmpty(candidates)) {
+            return Collections.emptyList();
+        }
+        return candidates.stream().filter(Objects::nonNull).map(candidate -> {
+            Map<String, Object> detail = new LinkedHashMap<>();
+            detail.put("machineCode", candidate.getMachineCode());
+            detail.put("filtered", candidate.isFiltered());
+            detail.put("filterReasonCode", candidate.getFilterReasonCode());
+            detail.put("filterReasonDesc", candidate.getFilterReasonDesc());
+            detail.put("remainCapacity", candidate.getRemainCapacity());
+            detail.put("maxCapacity", candidate.getMaxCapacity());
+            detail.put("evidence", candidate.getFilterEvidence());
+            return detail;
+        }).collect(Collectors.toList());
+    }
+
+    /**
+     * 解析来源班次顺延原因说明。
+     *
+     * @param carryoverSourceType 顺延来源类型
+     * @return 顺延原因说明
+     */
+    private String resolveCarryoverReasonDesc(String carryoverSourceType) {
+        if ("MACHINE_SHIFT_BLOCKED_CARRYOVER".equals(carryoverSourceType)) {
+            return "来源班次机台未开班或当前班不可生产，顺延到后续班次继续尝试";
+        }
+        return "来源班次候选机台均因当前班剩余产能不足被过滤，顺延到后续班次继续尝试";
+    }
+
+    /**
      * 写入统一顺延承接证据。
      *
      * @param context 排程上下文
@@ -2333,6 +2463,10 @@ public class TcMachineAssignService implements ITcMachineAssignService {
         evidence.put("carryoverQty", carryoverQty);
         evidence.put("targetShiftOrder", targetShiftOrder);
         evidence.put("targetMachineCode", targetMachineCode);
+        evidence.put("planCalcOrderIndex", targetTask == null ? null : targetTask.getPlanCalcOrderIndex());
+        evidence.put("baseSortIndex", targetTask == null ? null : targetTask.getBaseSortIndex());
+        evidence.put("machineAssignmentSequence", targetTask == null
+                ? null : targetTask.getMachineAssignmentSequence());
         evidence.put("merged", merged);
         evidence.put("beforeMergePlanQty", beforeMergeQty);
         evidence.put("afterMergePlanQty", afterMergeQty);
@@ -2340,6 +2474,12 @@ public class TcMachineAssignService implements ITcMachineAssignService {
                 ? TcScheduleRuleCodeEnum.CAPACITY_BLOCKED_CARRYOVER : TcScheduleRuleCodeEnum.PLAN_QTY_CARRYOVER;
         traceOf(context, targetTask).addRuleHit(ruleCode,
                 TcScheduleRuleResultEnum.PASS, evidence);
+        if (sourceTask != null && sourceTask != targetTask) {
+            Map<String, Object> sourceEvidence = new LinkedHashMap<>(evidence);
+            sourceEvidence.put("sourceEvidenceType", "CARRYOVER_TARGET_ASSIGNMENT");
+            traceOf(context, sourceTask).addRuleHit(ruleCode,
+                    TcScheduleRuleResultEnum.PASS, sourceEvidence);
+        }
     }
 
     /**
@@ -2363,7 +2503,7 @@ public class TcMachineAssignService implements ITcMachineAssignService {
         BigDecimal currentSpecSwitchDeduct = this.nvl(task.getPreviousSpecSwitchHours())
                 .multiply(this.nvl(task.getMachineSpeed()));
         BigDecimal currentGlueSwitchDeduct = this.nvl(task.getPreviousGlueSwitchCapacityDeduct());
-        context.appendDeferredShiftProcessLog(task.getShiftOrder(), "产能扣减：胎侧代码={0}，机台={1}，班次={2}，最大产能={3}，检修扣减={4}，已排计划量扣减={5}，已发生切换扣减={6}，本次规格切换扣减={7}，本次胶料切换扣减={8}，分配前待承接量={9}，分配前剩余产能={10}，本次分配量={11}，分配后剩余产能={12}，溢出量={13}，拆分原因={14}",
+        context.appendDeferredTaskProcessLog(task.getBusinessKey(), task.getShiftOrder(), "产能扣减：胎侧代码={0}，机台={1}，班次={2}，最大产能={3}，检修扣减={4}，已排计划量扣减={5}，已发生切换扣减={6}，本次规格切换扣减={7}，本次胶料切换扣减={8}，分配前待承接量={9}，分配前剩余产能={10}，本次分配量={11}，分配后剩余产能={12}，溢出量={13}，拆分原因={14}",
                 task.getSidewallCode(), candidate == null ? "未提供" : candidate.getMachineCode(), task.getShiftOrder(),
                 this.getCandidateEvidenceDecimal(evidence, "maxCapacity"),
                 this.getCandidateEvidenceDecimal(evidence, "maintenanceCapacityDeduct"),
@@ -2371,7 +2511,7 @@ public class TcMachineAssignService implements ITcMachineAssignService {
                 this.getCandidateEvidenceDecimal(evidence, "existingSwitchCapacityDeduct"),
                 currentSpecSwitchDeduct, currentGlueSwitchDeduct, this.nvl(beforeAssignQty), beforeRemainCapacity,
                 this.nvl(assignedQty), afterRemainCapacity, this.nvl(overflowQty), splitDesc);
-        context.appendDeferredShiftFullProcessTrace(task.getShiftOrder(), new ScheduleProcessTraceEvent(
+        context.appendDeferredTaskFullProcessTrace(task.getBusinessKey(), task.getShiftOrder(), new ScheduleProcessTraceEvent(
                 "机台分配", task.getBusinessKey(), "机台产能即时扣减与拆分",
                 "选中机台的班次容量账本、检修计划、已排任务、胎侧/垫胶共用机台约束和切换扣减。",
                 "机台=" + (candidate == null ? "未提供" : candidate.getMachineCode()) + "，班次="

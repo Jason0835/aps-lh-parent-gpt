@@ -292,6 +292,16 @@ export default {
           },
         },
         {
+          prop: "updateBy",
+          label: this.$t("ui.data.column.updateBy"),
+          minWidth: 100,
+        },
+        {
+          prop: "updateTime",
+          label: this.$t("ui.data.column.updateTime"),
+          minWidth: 180,
+        },
+        {
           label: this.$t("common.option"),
           prop: "option",
           width: "160px",

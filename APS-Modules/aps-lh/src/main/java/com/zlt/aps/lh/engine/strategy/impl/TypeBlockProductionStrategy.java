@@ -36,6 +36,7 @@ import com.zlt.aps.lh.engine.strategy.ITypeBlockProductionStrategy;
 import com.zlt.aps.lh.engine.strategy.support.DailyMachineExpansionPlanner;
 import com.zlt.aps.lh.engine.strategy.support.DailyMachineShortageQuotaPlan;
 import com.zlt.aps.lh.engine.strategy.support.DailyQuotaLedgerBaseline;
+import com.zlt.aps.lh.engine.strategy.support.DayTypeBlockReverseSelectionDirective;
 import com.zlt.aps.lh.engine.strategy.support.EarlyProductionChecker;
 import com.zlt.aps.lh.engine.strategy.support.EarlyProductionDecision;
 import com.zlt.aps.lh.engine.strategy.support.EarlyProductionRuntimePlan;
@@ -78,6 +79,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
@@ -357,6 +359,79 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
         log.info("换活字块排产结束, 新增结果数: {}, 剩余新增SKU: {}, 当前排程结果数: {}",
                 typeBlockScheduledCount, context.getNewSpecSkuList().size(),
                 context.getScheduleResultList().size());
+    }
+
+    /**
+     * 按天换活字块机台反选匹配：给定当天候选机台与当天待排物料，返回稳定有序的机台→物料配对。
+     *
+     * <p>本方法只做无副作用匹配，不执行时间分配、首检、计数登记或结果写入：</p>
+     * <ul>
+     *   <li>机台顺序完全复用现有换活字块排序（同业务日下按切换就绪时间→收尾时间→机台编码）；</li>
+     *   <li>物料按调用方传入的当天 S4.5 优先级顺序取首位，保持候选判断口径与 S4.4 一致；</li>
+     *   <li>每个机台只锁定一个物料，每个物料需求只被一台机台锁定，结果稳定确定；</li>
+     *   <li>实际切换时间、首检、班次计划量、机台收尾时间和物料账本仍由 S4.5 新增主链统一计算。</li>
+     * </ul>
+     *
+     * @param context 排程上下文
+     * @param scheduleDate 反选所属业务日
+     * @param dayMaterials 当天待排物料（已按当天 S4.5 优先级排序，不含提前生产物料）
+     * @param dayMachines 当天候选机台（已通过现有硬性过滤且可开产时间落在当天）
+     * @return 稳定有序的按天换活字块反选指令；无匹配时返回空列表
+     */
+    @Override
+    public List<DayTypeBlockReverseSelectionDirective> matchDayTypeBlockReversePairs(
+            LhScheduleContext context,
+            LocalDate scheduleDate,
+            List<SkuScheduleDTO> dayMaterials,
+            List<MachineScheduleDTO> dayMachines) {
+        if (Objects.isNull(context) || Objects.isNull(scheduleDate)
+                || CollectionUtils.isEmpty(dayMaterials) || CollectionUtils.isEmpty(dayMachines)) {
+            return Collections.emptyList();
+        }
+        // 机台顺序沿用现有换活字块排序；同业务日下结束业务日一致，触发来源统一按默认值，
+        // 实际比较退化为“切换就绪时间→收尾时间→机台编码”，与 S4.4 窗口内同日竞争口径一致。
+        List<MachineScheduleDTO> orderedMachines = new ArrayList<MachineScheduleDTO>(dayMachines);
+        orderedMachines.sort((leftMachine, rightMachine) -> compareTypeBlockMachine(
+                context, leftMachine, rightMachine, Collections.<String, String>emptyMap()));
+        // 物料顺序由调用方按当天 S4.5 优先级传入，本方法保持该顺序不做二次排序。
+        Set<String> lockedMaterialKeySet = new LinkedHashSet<String>(dayMaterials.size());
+        List<DayTypeBlockReverseSelectionDirective> result =
+                new ArrayList<DayTypeBlockReverseSelectionDirective>(
+                        Math.min(dayMachines.size(), dayMaterials.size()));
+        for (MachineScheduleDTO machine : orderedMachines) {
+            if (Objects.isNull(machine) || StringUtils.isEmpty(machine.getMachineCode())) {
+                continue;
+            }
+            for (SkuScheduleDTO sku : dayMaterials) {
+                if (Objects.isNull(sku) || StringUtils.isEmpty(sku.getMaterialCode())
+                        || sku.resolveTargetScheduleQty() <= 0) {
+                    continue;
+                }
+                // 每个物料需求只被一台机台反选锁定，避免同一物料重复占用多个预留机台。
+                String materialStatusKey = MonthPlanDateResolver.buildMaterialStatusKey(
+                        sku.getMaterialCode(), sku.getProductStatus());
+                if (lockedMaterialKeySet.contains(materialStatusKey)) {
+                    continue;
+                }
+                // 完全复用现有换活字块候选判断：同胎胚同模具 + 机台硬性准入 + 当前物料不相同。
+                if (!isTypeBlockCandidate(context, machine, sku, false)) {
+                    continue;
+                }
+                DayTypeBlockReverseSelectionDirective directive =
+                        new DayTypeBlockReverseSelectionDirective();
+                directive.setScheduleDate(scheduleDate);
+                directive.setMachineCode(machine.getMachineCode());
+                directive.setPreviousMaterialCode(machine.getCurrentMaterialCode());
+                directive.setMaterialCode(sku.getMaterialCode());
+                directive.setProductStatus(sku.getProductStatus());
+                directive.setSkuSortRank(sku.getSortRank());
+                directive.setMatchedLayer("同胎胚+同模具");
+                result.add(directive);
+                lockedMaterialKeySet.add(materialStatusKey);
+                break;
+            }
+        }
+        return result;
     }
 
     /**
@@ -1400,9 +1475,6 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                                                     MachineScheduleDTO machine,
                                                     Date estimatedEndTime,
                                                     Date switchStartTime) {
-        if (isTypeBlockMaintenanceOverlapSwitch(context, machine, estimatedEndTime, switchStartTime)) {
-            return LhScheduleTimeUtil.getMaintenanceOverlapSwitchHours(context);
-        }
         return LhScheduleTimeUtil.getTypeBlockChangeTotalHours(context);
     }
 
@@ -1422,11 +1494,7 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
         if (switchStartTime == null) {
             return null;
         }
-        boolean maintenanceOverlapSwitch = isTypeBlockMaintenanceOverlapSwitch(
-                context, machine, estimatedEndTime, switchStartTime);
-        int switchDurationHours = maintenanceOverlapSwitch
-                ? LhScheduleTimeUtil.getMaintenanceOverlapSwitchHours(context)
-                : LhScheduleTimeUtil.getTypeBlockChangeTotalHours(context);
+        int switchDurationHours = LhScheduleTimeUtil.getTypeBlockChangeTotalHours(context);
         Date switchCompleteTime = LhScheduleTimeUtil.addHours(switchStartTime, switchDurationHours);
         boolean plannedRepairAffectingSwitch = Objects.nonNull(machine)
                 && ShiftCapacityResolverUtil.isPlannedRepairAffectingSwitch(
@@ -1449,9 +1517,6 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                     LhScheduleTimeUtil.formatDateTime(switchCompleteTime),
                     LhScheduleTimeUtil.getCapsulePreheatMinutes(context),
                     LhScheduleTimeUtil.formatDateTime(productionStartTime));
-        } else if (maintenanceOverlapSwitch) {
-            productionStartTime = LhScheduleTimeUtil.addHours(
-                    switchCompleteTime, LhScheduleTimeUtil.getFirstInspectionHours(context));
         } else {
             productionStartTime = switchCompleteTime;
         }
@@ -1552,26 +1617,6 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
         return ShiftCapacityResolverUtil.resolvePlannedRepairProductionReadyTime(
                 context, context.getDevicePlanShutList(), machine.getMachineCode(), estimatedEndTime,
                 switchStartTime, switchCompleteTime);
-    }
-
-    /**
-     * 判断换活字块是否使用精度重叠切换口径。
-     *
-     * <p>最新规则明确精度计划不得与换活字块并行，切换开始时间已由统一时间轴顺延到
-     * 精度及胶囊预热结束后，因此该方法固定返回false。保留方法入口是为了不改变现有
-     * 换活字块时长解析结构，计划性维修的并行判断仍由其独立逻辑负责。</p>
-     *
-     * @param context 排程上下文
-     * @param machine 机台
-     * @param estimatedEndTime 预计收尾时间
-     * @param switchStartTime 实际切换开始时间
-     * @return 固定false
-     */
-    private boolean isTypeBlockMaintenanceOverlapSwitch(LhScheduleContext context,
-                                                        MachineScheduleDTO machine,
-                                                        Date estimatedEndTime,
-                                                        Date switchStartTime) {
-        return false;
     }
 
     /**
@@ -1741,8 +1786,18 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                         failureReason, earlyProductionRejectReason);
                 return false;
             }
-            earliestEmbryoAvailableTime =
+            Date configuredEarliestEmbryoAvailableTime =
                     NewSpecEmbryoAvailableTimeResolver.resolveEarliestAvailableTime(context, sku);
+            earliestEmbryoAvailableTime =
+                    NewSpecEmbryoAvailableTimeResolver.resolveEffectiveEarliestAvailableTime(context, sku);
+            if (Objects.nonNull(configuredEarliestEmbryoAvailableTime)
+                    && Objects.isNull(earliestEmbryoAvailableTime)) {
+                log.info("换活字块SKU胎胚最早可供时间因同结构续作已有有效排产而不生效, "
+                                + "batchNo: {}, materialCode: {}, structureName: {}, "
+                                + "configuredEarliestEmbryoAvailableTime: {}",
+                        context.getBatchNo(), sku.getMaterialCode(), sku.getStructureName(),
+                        LhScheduleTimeUtil.formatDateTime(configuredEarliestEmbryoAvailableTime));
+            }
             Date actualProductionStartTime = this.resolveTypeBlockEarlyProductionStartTime(
                     context, machine, sku, startTime, switchStartTime,
                     earliestEmbryoAvailableTime, shifts);
@@ -2414,7 +2469,7 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
      * 计算换活字块结构切换提前受胎胚时间和既有班次管控约束后的实际开产时间。
      *
      * <p>先复用现有时间解析器计算
-     * {@code max(原规则理论开产时间, 最早胎胚可供硫化时间)}，再复用班次管控工具顺延到
+     * {@code max(原规则理论开产时间, 当前生效的最早胎胚可供硫化时间)}，再复用班次管控工具顺延到
      * 首个真正具有硫化产能的时刻。换活字块开始和完成时间只作为日志与准备动作保留，
      * 不因胎胚尚未可供而后移。</p>
      *
@@ -2867,6 +2922,8 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
         for (int shiftIndex = 1; shiftIndex <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shiftIndex++) {
             ShiftFieldUtil.removeShiftAnalysis(
                     pairResult, shiftIndex, CapsuleReplacementRuleService.CAPSULE_REPLACEMENT_ANALYSIS);
+            ShiftFieldUtil.removeShiftAnalysis(
+                    pairResult, shiftIndex, FirstInspectionQtyUtil.FIRST_INSPECTION_ANALYSIS);
         }
         refreshResultSummary(context, pairResult, shifts);
         return pairResult;
@@ -3210,17 +3267,11 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                                                        Date endingTime) {
         Date machineReadyTime = getCapacityCalculateStrategy().calculateStartTime(
                 context, machine.getMachineCode(), endingTime);
-        boolean maintenanceOverlapSwitch = getMaintenanceScheduleService()
-                .shouldApplyMaintenanceOverlapSwitchRule(context, machine, endingTime);
-        Date switchReadyTime = maintenanceOverlapSwitch
-                ? getMaintenanceScheduleService().resolveMaintenanceEndTime(context, machine)
-                : machineReadyTime;
+        Date switchReadyTime = machineReadyTime;
         // 试制SKU换模需在早班完成，不受开产模式限制
         switchReadyTime = ShiftProductionControlUtil.resolveEarliestSwitchStartTime(
                 context, switchReadyTime, specifySku);
-        int switchDurationHours = maintenanceOverlapSwitch
-                ? LhScheduleTimeUtil.getMaintenanceOverlapSwitchHours(context)
-                : LhScheduleTimeUtil.getMouldChangeTotalHours(context);
+        int switchDurationHours = LhScheduleTimeUtil.getMouldChangeTotalHours(context);
         Date mouldChangeStartTime = getMouldChangeBalanceStrategy().allocateMouldChange(
                 context,
                 machine.getMachineCode(),
@@ -3264,9 +3315,7 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                 return false;
             }
             Date defaultProductionStartTime = plannedRepairAffectingSwitch
-                    ? firstInspectionBaseTime : maintenanceOverlapSwitch
-                    ? LhScheduleTimeUtil.addHours(inspectionTime, LhScheduleTimeUtil.getFirstInspectionHours(context))
-                    : mouldChangeCompleteTime;
+                    ? firstInspectionBaseTime : mouldChangeCompleteTime;
             Date productionStartTime = FirstInspectionQtyUtil.resolveTrialProductionStartTime(
                     context, specifySku, shifts, firstInspectionBaseTime, defaultProductionStartTime,
                     ScheduleTypeEnum.NEW_SPEC.getCode());
@@ -4304,7 +4353,9 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                     context, result, Math.min(remaining, shiftMaxQty), shiftMaxQty, mouldQty);
             // 目标量、首检和物理产能全部收口后，再按本班实际候选量执行一次换胶囊扣减。
             shiftQty = capsuleReplacementRuleService.resolveActualPlanQty(
-                    context, result, shift, shiftQty, "换活字块排产");
+                    context, result, shift, shiftQty, shiftMaxQty, effectiveStart, "换活字块排产");
+            // 未满产换胶囊可能刚登记时间窗口，后续班次必须立即读取最新窗口重新计算产能。
+            maintenanceWindowList = resolveMachineMaintenanceWindowList(context, result.getLhMachineCode());
             if (shiftQty <= 0) {
                 logTypeBlockShiftSkip(result, shift, remaining, shiftCapacity,
                         physicalShiftMaxQty, shiftMaxQty, "目标量/硫化余量或换胶囊扣减后为0");

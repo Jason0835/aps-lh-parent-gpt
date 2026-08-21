@@ -75,8 +75,8 @@
                 modalName: [[#{ui.data.column.gsq.dispatcherlog.modelName}]],
                 columns:[
                     [{title: [[#{ui.data.column.scheduleResult.baseInfo}]], align: 'center', colspan: 7},
-                        {title: [[#{ui.data.column.dispatcherlog.beforeOper}]], align: 'center', colspan: 4},
-                        {title: [[#{ui.data.column.dispatcherlog.AfterOper}]], align: 'center', colspan: 4}
+                        {title: [[#{ui.data.column.dispatcherlog.beforeOper}]], align: 'center', colspan: 7},
+                        {title: [[#{ui.data.column.dispatcherlog.AfterOper}]], align: 'center', colspan: 7}
                     ],
                     [
                         {
@@ -109,8 +109,8 @@
                             sortable: true,
                         },
                         {
-                            field: 'materialCode',
-                            title: [[#{ui.data.column.gsq.dispatcherlog.materialCode}]],
+                            field: 'steelRingCode',
+                            title: [[#{ui.data.column.gsq.dispatcherlog.steelRingCode}]],
                             valign: 'middle',
                             align: 'center',
                             halign:'center',
@@ -133,8 +133,8 @@
                             sortable: true,
                         },
                         {
-                            field: 'beforeMachineId',
-                            title: [[#{ui.data.column.dispatcherlog.line}]],
+                            field: 'beforeMachineCode',
+                            title: [[#{ui.data.column.dispatcherlog.machineId}]],
                             valign: 'middle',
                             align: 'center',
                             halign:'center',
@@ -147,32 +147,56 @@
                             }
                         },
                         {
-                            field: 'beforeMidPlan',
-                            title: [[#{ui.data.column.dispatcherlog.midPlan}]],
+                            field: 'beforeClass1Plan',
+                            title: [[#{ui.data.column.gsq.dispatcherlog.beforeClass1Plan}]],
                             valign: 'middle',
                             align: 'left',
                             halign:'center',
                             sortable: true,
                         },
                         {
-                            field: 'beforeNightPlan',
-                            title: [[#{ui.data.column.dispatcherlog.nightPlan}]],
+                            field: 'beforeClass2Plan',
+                            title: [[#{ui.data.column.gsq.dispatcherlog.beforeClass2Plan}]],
                             valign: 'middle',
                             align: 'left',
                             halign:'center',
                             sortable: true,
                         },
                         {
-                            field: 'beforeDayPlan',
-                            title: [[#{ui.data.column.dispatcherlog.dayPlan}]],
+                            field: 'beforeClass3Plan',
+                            title: [[#{ui.data.column.gsq.dispatcherlog.beforeClass3Plan}]],
                             valign: 'middle',
                             align: 'left',
                             halign:'center',
                             sortable: true,
                         },
                         {
-                            field: 'afterMachineId',
-                            title: [[#{ui.data.column.dispatcherlog.line}]],
+                            field: 'beforeClass4Plan',
+                            title: [[#{ui.data.column.gsq.dispatcherlog.beforeClass4Plan}]],
+                            valign: 'middle',
+                            align: 'left',
+                            halign:'center',
+                            sortable: true,
+                        },
+                        {
+                            field: 'beforeClass5Plan',
+                            title: [[#{ui.data.column.gsq.dispatcherlog.beforeClass5Plan}]],
+                            valign: 'middle',
+                            align: 'left',
+                            halign:'center',
+                            sortable: true,
+                        },
+                        {
+                            field: 'beforeClass6Plan',
+                            title: [[#{ui.data.column.gsq.dispatcherlog.beforeClass6Plan}]],
+                            valign: 'middle',
+                            align: 'left',
+                            halign:'center',
+                            sortable: true,
+                        },
+                        {
+                            field: 'afterMachineCode',
+                            title: [[#{ui.data.column.dispatcherlog.machineId}]],
                             valign: 'middle',
                             align: 'center',
                             halign:'center',
@@ -184,49 +208,91 @@
                                 return selectMachineName(machineNameList, value);
                             },
                             cellStyle: function(value, row, index) {
-                                if ( row.beforeMachineId != row.afterMachineId){
+                                if ( row.beforeMachineCode != row.afterMachineCode){
                                     return { css: { "background": "#FF7B7B"} };
                                 }
                                 return {};
                             },
                         },
                         {
-                            field: 'afterMidPlan',
-                            title: [[#{ui.data.column.dispatcherlog.midPlan}]],
+                            field: 'afterClass1Plan',
+                            title: [[#{ui.data.column.gsq.dispatcherlog.afterClass1Plan}]],
                             valign: 'middle',
                             align: 'left',
                             halign:'center',
                             sortable: true,
                             cellStyle: function(value, row, index) {
-                                if ( row.beforeMidPlan != row.afterMidPlan){
+                                if ( row.beforeClass1Plan != row.afterClass1Plan){
                                     return { css: { "background": "#FF7B7B"} };
                                 }
                                 return {};
                             },
                         },
                         {
-                            field: 'afterNightPlan',
-                            title: [[#{ui.data.column.dispatcherlog.nightPlan}]],
+                            field: 'afterClass2Plan',
+                            title: [[#{ui.data.column.gsq.dispatcherlog.afterClass2Plan}]],
                             valign: 'middle',
                             align: 'left',
                             halign:'center',
                             sortable: true,
                             cellStyle: function(value, row, index) {
-                                if ( row.beforeNightPlan != row.afterNightPlan){
+                                if ( row.beforeClass2Plan != row.afterClass2Plan){
                                     return { css: { "background": "#FF7B7B"} };
                                 }
                                 return {};
                             },
                         },
                         {
-                            field: 'afterDayPlan',
-                            title: [[#{ui.data.column.dispatcherlog.dayPlan}]],
+                            field: 'afterClass3Plan',
+                            title: [[#{ui.data.column.gsq.dispatcherlog.afterClass3Plan}]],
                             valign: 'middle',
                             align: 'left',
                             halign:'center',
                             sortable: true,
                             cellStyle: function(value, row, index) {
-                                if ( row.beforeDayPlan != row.afterDayPlan){
+                                if ( row.beforeClass3Plan != row.afterClass3Plan){
+                                    return { css: { "background": "#FF7B7B"} };
+                                }
+                                return {};
+                            },
+                        },
+                        {
+                            field: 'afterClass4Plan',
+                            title: [[#{ui.data.column.gsq.dispatcherlog.afterClass4Plan}]],
+                            valign: 'middle',
+                            align: 'left',
+                            halign:'center',
+                            sortable: true,
+                            cellStyle: function(value, row, index) {
+                                if ( row.beforeClass4Plan != row.afterClass4Plan){
+                                    return { css: { "background": "#FF7B7B"} };
+                                }
+                                return {};
+                            },
+                        },
+                        {
+                            field: 'afterClass5Plan',
+                            title: [[#{ui.data.column.gsq.dispatcherlog.afterClass5Plan}]],
+                            valign: 'middle',
+                            align: 'left',
+                            halign:'center',
+                            sortable: true,
+                            cellStyle: function(value, row, index) {
+                                if ( row.beforeClass5Plan != row.afterClass5Plan){
+                                    return { css: { "background": "#FF7B7B"} };
+                                }
+                                return {};
+                            },
+                        },
+                        {
+                            field: 'afterClass6Plan',
+                            title: [[#{ui.data.column.gsq.dispatcherlog.afterClass6Plan}]],
+                            valign: 'middle',
+                            align: 'left',
+                            halign:'center',
+                            sortable: true,
+                            cellStyle: function(value, row, index) {
+                                if ( row.beforeClass6Plan != row.afterClass6Plan){
                                     return { css: { "background": "#FF7B7B"} };
                                 }
                                 return {};
@@ -237,7 +303,7 @@
             $.table.init(options);
         });
 
-        // 回显机台名称
+        // 回显机台名称（日志记录的是机台编号 machineCode）
         function selectMachineName(datas, value) {
             if ($.common.isEmpty(datas)) {
                 return '';
@@ -246,9 +312,9 @@
             var arr = value.split(",");
             $.each(datas, function (index, dict) {
                 $.each(arr, function (index, item) {
-                    if (dict.id + '' == (item)) {
-                        var machineName = $.common.equals("default", dict.machineName) || $.common.isEmpty(dict.machineName) ? "" : dict.machineName;
-                        actions.push($.common.sprintf("<span>%s</span>", machineName, dict.machineName));
+                    if (dict.machineCode == item) {
+                        var machineName = $.common.isEmpty(dict.machineName) ? dict.machineCode : dict.machineName;
+                        actions.push($.common.sprintf("<span>%s</span>", machineName, dict.machineCode));
                         return false;
                     }
                 })

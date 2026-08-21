@@ -32,7 +32,6 @@ import com.zlt.aps.mp.engine.capacity.MpAdjustDailyCapacityLimit;
 import com.zlt.aps.mp.engine.check.DayTotalCapacityChecker;
 import com.zlt.aps.mp.engine.check.OemTotalCapacityChecker;
 import com.zlt.aps.mp.engine.check.SkuSecondChecker;
-import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.deduct.DeductMouldScheduler;
 import com.zlt.common.utils.PubUtil;
 import com.zlt.common.utils.StringUtil;
@@ -78,6 +77,9 @@ public class MpWeekRollAdjustEngine {
         for (FactoryMonthPlanFinalAdjustVo finalAdjustVo:mpProdFinalList){
             if (!ConstructionStageEnum.FORMAL_PRODUCTION.getStage().equals(finalAdjustVo.getConstructionStage())){
                 //非正式忽略
+                continue;
+            }
+            if (finalAdjustVo.getTotalQty() == null){
                 continue;
             }
             finalAdjustVo.setAdjustDetail(new StringBuilder());
@@ -142,6 +144,13 @@ public class MpWeekRollAdjustEngine {
         moveForwardWithOtherSku(contextDTO,lockNextDay,mpProdFinalList);
         endTime = new Date();
         contextDTO.getLogDetail().append(String.format("结构:%s,【其他SKU向前移动】,结束时间:%s,总耗时:%s毫秒",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
+
+        //8.优化：其他SKU往后移动
+        startTime = new Date();
+        contextDTO.getLogDetail().append(String.format("结构:%s,【其他SKU向后移动】,开始时间:%s",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,startTime))).append(ApsConstant.DIVISION);
+        moveBackwardWithOtherSku(contextDTO,lockNextDay,mpProdFinalList);
+        endTime = new Date();
+        contextDTO.getLogDetail().append(String.format("结构:%s,【其他SKU向后移动】,结束时间:%s,总耗时:%s毫秒",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
     }
 
     /**
@@ -868,6 +877,70 @@ public class MpWeekRollAdjustEngine {
         }*/
         return true;
     }
+    /**
+     * 优化：其他SKU往后移动
+     * @param contextDTO 调整上下文
+     * @param lockNextDay 锁定次日
+     * @param mpProdFinalList 定稿列表
+     */
+    private void moveBackwardWithOtherSku(MpRollAdjustContextDTO contextDTO, int lockNextDay,
+                                         List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList){
+        //1、从锁定次日向后遍历排产计划，检测每日硫化机台数超限制数或每日胎胚种类数超限制数的日期，记为有超限的日期；
+        //2、在有超限的日期向前依次找SKU，越靠近的SKU优先移动；
+        //3、将SKU整体模拟往后移动，并向后再次检测每日硫化机台数、胎胚种类数的符合性，若符合，则可以移动，否则不能移动，继续找下一个SKU；
+        int secStartDay;
+        List<FactoryMonthPlanFinalAdjustVo> canMoveFinalList;
+        FactoryMonthPlanFinalAdjustVo bakMpFinalVo;
+        Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = contextDTO.getDailyCapacityLimitVoMap();
+        MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit();
+        //从锁定次日到结构收尾日，依次遍历
+        for (int i = lockNextDay; i<= contextDTO.getStructureDeadLine(); i++){
+
+            //1、从第2天开始查找SKU
+            secStartDay = i+1;
+            canMoveFinalList = findCanMoveSkuListByBackward(mpProdFinalList,secStartDay);
+            if (getTrialNewOnlineDay(contextDTO,i,i, mpProdFinalList) == null){
+                //今天不可以移动量试
+                canMoveFinalList = canMoveFinalList.stream().filter(x->ConstructionStageEnum.FORMAL_PRODUCTION.getStage().equals(x.getConstructionStage())).collect(Collectors.toList());
+            }
+            if (PubUtil.isEmpty(canMoveFinalList)){
+                //若没有可以移动的列表，则退出
+                contextDTO.getLogDetail().append(String.format("结构:%s,【其他SKU向后移动】,排产日:%s,排产次日:%s查找可移动的SKU,未找到退出！",contextDTO.getStructureName(),i,secStartDay)).append(ApsConstant.DIVISION);
+                break;
+            }
+            //2、移动SKU列表，直到第I天没有剩余空间
+            int cavityQty;
+            for (FactoryMonthPlanFinalAdjustVo finalVo:canMoveFinalList){
+                adjustDailyCapacityLimitObj.calcLhMachinesWithEmbryoTypes(mpProdFinalList,i, dailyCapacityLimitVoMap.get(i), contextDTO.getParamMap(),finalVo.getMainPattern(),finalVo.getEmbryoCode());
+                contextDTO.getLogDetail().append(String.format("结构:%s,【其他SKU向后移动】,排产日:%s,其产能限制信息:%s！",contextDTO.getStructureName(),i,contextDTO.getDailyCapacityLimitVoMap().get(i) == null ? "" : contextDTO.getDailyCapacityLimitVoMap().get(i).toString())).append(ApsConstant.DIVISION);
+                //2.1、检查: 当前每日硫化机台数\当前每日胎胚种类数 符合性
+                //2.2、检查：主花纹向下模具数量(/2转成机台数) 符合性
+                cavityQty = getNewCavityQty(contextDTO,finalVo,i);
+                if (adjustDailyCapacityLimitObj.checkCapacitySatisfy(contextDTO.getDailyCapacityLimitVoMap().get(i)) &&
+                        checkMouldSatisfy(dailyCapacityLimitVoMap.get(i),cavityQty)){
+                    continue;
+                }
+
+                bakMpFinalVo = new FactoryMonthPlanFinalAdjustVo();
+                BeanUtils.copyProperties(finalVo,bakMpFinalVo);
+
+                //2.3、清空定稿表日计划量
+                clearMpFinalDayValue(contextDTO, i, finalVo);
+
+                //2.4、增模排产
+                contextDTO.getLogDetail().append(String.format("结构:%s,【其他SKU向后移动】--增模排产,排产日:%s,物料编码:%s,开始！",contextDTO.getStructureName(), i,finalVo.getMaterialCode())).append(ApsConstant.DIVISION);
+                incMouldProduction(mpProdFinalList, contextDTO, i, finalVo.getTotalQty(), finalVo,null);
+                contextDTO.getLogDetail().append(String.format("结构:%s,【其他SKU向后移动】--增模排产,排产日:%s,物料编码:%s,结束！",contextDTO.getStructureName(), i,finalVo.getMaterialCode())).append(ApsConstant.DIVISION);
+                //重置开始日\结束日\汇总值
+                resetBegin2EndDay2TotalQty(contextDTO.getStructureStartDay(),contextDTO.getStructureDeadLine(),finalVo);
+                //提示：【SKU移动】物料编码:%s,从排产日:%s,移动到排产日:%s,移动前总计划量:%s,移动后总计划量:%s！
+                addAdjustProcLog(contextDTO,finalVo,String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.log.moveForward.moveLog"),finalVo.getMaterialCode(),bakMpFinalVo.getBeginDay(),i,bakMpFinalVo.getTotalQty(),finalVo.getTotalQty()));
+                //设置移动标志，减少重复移动
+                finalVo.setMoveFlag(true);
+            }
+        }
+
+    }
 
     /**
      * 优化：其他SKU往前移动
@@ -978,6 +1051,19 @@ public class MpWeekRollAdjustEngine {
         return finalVoList;
     }
 
+    /**
+     * 查询可以移动的SKU列表(向后)
+     * @param mpProdFinalList
+     * @param secStartDay 第2天可开始日
+     * @return 可以移动的SKU列表
+     */
+    private List<FactoryMonthPlanFinalAdjustVo> findCanMoveSkuListByBackward(List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList, int secStartDay) {
+        List<FactoryMonthPlanFinalAdjustVo> finalVoList = mpProdFinalList.stream().filter(x-> (!x.isMoveFlag()) && x.getBeginDay()!=null && x.getBeginDay()>=secStartDay)
+                .sorted(Comparator.comparing(FactoryMonthPlanFinalAdjustVo::getBeginDay).reversed()
+                        .thenComparing(new AdjustAlignMoveComparator())).collect(Collectors.toList());
+
+        return finalVoList;
+    }
     /**
      * 生产对齐：超产减量
      * @param contextDTO 周程滚动调整上下文
@@ -1816,6 +1902,24 @@ public class MpWeekRollAdjustEngine {
             contextDTO.getLogDetail().append(String.format("结构:%s,【在机SKU增量】,物料编码:%s,扣减其他SKU的搭配-结束！", contextDTO.getStructureName(), mpFinalVo.getMaterialCode())).append(ApsConstant.DIVISION);
             //提示：在机的物料编码:%s,排产日:%s,模拟后的剩余未排量:%s,原搭配量:%s,挤搭配前的剩余计划量(扣原搭配量):%s,实际挤占量:%s！
             addAdjustProcLog(contextDTO,mpFinalVo,String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.log.online.realProduction"),mpFinalVo.getMaterialCode(),newOnLineDay,remainPlanQty,curServeProductionQty,newRemainPlanQty,oriTotalQty - mpFinalVo.getTotalQty()));
+            //若实单还有剩余，进行延后排产 sandy+ 2026.08.19
+            if (remainPlanQtyByMatchOtherSku > 0){
+                //重置开始日和结束日
+                resetBegin2EndDay2TotalQty(contextDTO.getStructureStartDay(),contextDTO.getStructureDeadLine(),mpFinalVo);
+                int remainPlanQtyDelayIncMould;
+                for (int iDay = mpFinalVo.getEndDay(); iDay <=contextDTO.getStructureDeadLine(); iDay++){
+                    FactoryMonthPlanFinalAdjustVo bakMpFinalVo2 = new FactoryMonthPlanFinalAdjustVo();
+                    BeanUtils.copyProperties(mpFinalVo,bakMpFinalVo2);
+                    //清空定稿表日计划量
+                    clearMpFinalDayValue(contextDTO, mpFinalVo.getBeginDay(), mpFinalVo);
+                    //延后增模排产
+                    remainPlanQtyDelayIncMould = delayIncMouldProductionByAlign(mpProdFinalList,contextDTO,mpFinalVo.getBeginDay(),iDay,mpFinalVo.getEndDay(),newRemainPlanQty,mpFinalVo,bakMpFinalVo2);
+                    if (remainPlanQtyDelayIncMould <=0){
+                        break;
+                    }
+                }
+            }
+
         }else {
             //提示：在机的物料编码:%s,排产日:%s,计划调整量(含搭配):%s,实际调整量:%s,剩余调整量:%s,原搭配量:%s,剩余搭配量:%s！
             addAdjustProcLog(contextDTO,mpFinalVo,String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.log.online.realProduction2"),mpFinalVo.getMaterialCode(),newOnLineDay,newPlanQty,newPlanQty - remainPlanQty,remainPlanQty,curServeProductionQty,remainPlanQty));
@@ -1836,11 +1940,6 @@ public class MpWeekRollAdjustEngine {
         }
         //3.重置开始日\结束日\汇总值
         resetBegin2EndDay2TotalQty(contextDTO.getStructureStartDay(),contextDTO.getStructureDeadLine(),mpFinalVo);
-
-        //4、若实单还有剩余，进行延后排产
-        if (remainPlanQtyByMatchOtherSku > 0){
-            //
-        }
     }
 
     /**
@@ -2665,6 +2764,176 @@ public class MpWeekRollAdjustEngine {
     }
 
     /**
+     * 延后增模排产 (对齐)
+     * @param mpProdFinalList 定稿列表
+     * @param contextDTO 周程滚动上下文
+     * @param newOnLineDay 新的上机日期
+     * @param newEndDay 新的截止日
+     * @param newPlanQty 新的计划量
+     * @param mpFinalVo 当前定稿记录
+     */
+    private synchronized int delayIncMouldProductionByAlign(List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList,
+                                                            MpRollAdjustContextDTO contextDTO,
+                                                            Integer newOnLineDay, Integer newEndDay, Integer oriEndDay, Integer newPlanQty, FactoryMonthPlanFinalAdjustVo mpFinalVo, FactoryMonthPlanFinalAdjustVo bakMpFinalVo) {
+        String dayField;
+        int dayValue;
+
+        Integer shortestProductionDays = (Integer)contextDTO.getParamMap().get(MonthPlanEnums.SKU_SHORTEST_PRODUCTION_DAYS.getCode());
+        int maxDays = YearMonth.of(contextDTO.getMpYear(), contextDTO.getMpMonth()).lengthOfMonth();
+        Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = contextDTO.getDailyCapacityLimitVoMap();
+        MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit();
+        int otherTotalQty = getOtherTotalQtyForSpecMaterial(mpProdFinalList,mpFinalVo);
+        //新上机日的产能限制Vo
+        MpDailyCapacityLimitVo dailyCapacityLimitVo = contextDTO.getDailyCapacityLimitVoMap().get(newOnLineDay);
+        int startMould = getStartMould(adjustDailyCapacityLimitObj,contextDTO.getParamMap(),newOnLineDay,mpFinalVo,dailyCapacityLimitVo);
+        int oriNewPlanQty = newPlanQty;
+        int dailyQty = getDayVulcanizationQty(mpFinalVo);
+        int blockQty,cavityQty,diffQty;
+        Integer dayVulcanizationQty;
+        IncMouldContext incMouldContext = new IncMouldContext();
+        incMouldContext.setBFirstAddMould(true);
+        incMouldContext.setHasProductionQty(getProductionQty(newOnLineDay,newEndDay,bakMpFinalVo));
+        while (newPlanQty > 0){
+            //已有排产标识，防止中间断开
+            //按硫化机维度，记录前日排产位置
+            incMouldContext.setBeforeProductionPosition(0);
+            //按硫化机维度，记录已排产天数及排产量
+            incMouldContext.setUsedProductionMap(new HashMap<>());
+            contextDTO.getLogDetail().append(String.format("结构:%s,【延后增模排产】,物料编码:%s,尝试增模具数:%s！",contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),startMould)).append(ApsConstant.DIVISION);
+            for (int i = newOnLineDay; i<= newEndDay; i++){
+                //SKU的模具数限制：SKU的模具数<=SKU活块的数量
+                blockQty = getNewTypeBlockQty(contextDTO,mpFinalVo,i);
+                contextDTO.getLogDetail().append(String.format("结构:%s,【延后增模排产】,物料编码:%s,排产日:%s,获取到新的活块数:%s！",contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),i,blockQty)).append(ApsConstant.DIVISION);
+                if (startMould > blockQty){
+                    contextDTO.getLogDetail().append(String.format("结构:%s,【延后增模排产】,物料编码:%s,排产日:%s,SKU增模后的模具数:%s 大于SKU活块的数量:%s！",contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),i,startMould,blockQty)).append(ApsConstant.DIVISION);
+                    return resetPlanQty(contextDTO,newOnLineDay,newEndDay,oriNewPlanQty,newPlanQty,incMouldContext.getHasProductionQty(),mpFinalVo,bakMpFinalVo);
+                }
+                //3.2、检查SKU二次上机
+                if (!checkSecOnline(mpFinalVo,newOnLineDay, i, contextDTO.getParamMap()) &&
+                        !hasPlanByDay(mpFinalVo, getPreDayCloseDay(contextDTO.getDailyCapacityLimitVoMap(),i -1))){
+                    contextDTO.getLogDetail().append(String.format("结构:%s,【延后增模排产】,物料编码:%s,排产日:%s,不符二次上机条件,退出！", contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),i)).append(ApsConstant.DIVISION);
+                    newPlanQty += revertPreDayQty(contextDTO,mpFinalVo,i,incMouldContext);
+                    continue;
+                }
+                //注：这里不能做预检查，会导致可以拼的SKU被忽略掉
+                dayField = FactoryConstant.DAY_FIELD + i;
+                dayValue = mpFinalVo.getFieldValueByFieldName(dayField) == null ? 0 : (Integer) mpFinalVo.getFieldValueByFieldName(dayField);
+                dayVulcanizationQty = dailyQty;
+                if (i == newOnLineDay){
+                    //上机日，要考虑衔接
+                    if (isIncMouldFirstDay(mpFinalVo,newOnLineDay-1,dayValue,dailyQty)){
+                        //增模首日
+                        if (i == newEndDay){
+                            //若是结构收尾日且是增模，因只会增1天，退出
+                            continue;
+                        }
+                        dayVulcanizationQty = adjustDailyCapacityLimitObj.getFirstDayQty(mpProdFinalList,newOnLineDay, dailyCapacityLimitVoMap.get(newOnLineDay), contextDTO.getParamMap(), mpFinalVo.getMainPattern(),mpFinalVo.getEmbryoCode());
+
+                    }
+                }else{
+                    if (incMouldContext.isBFirstAddMould()){
+                        if (i == newEndDay){
+                            //若是结构收尾日且是增模，因只会增1天，退出
+                            continue;
+                        }
+                        dayVulcanizationQty = adjustDailyCapacityLimitObj.getFirstDayQty(mpProdFinalList,i, dailyCapacityLimitVoMap.get(newOnLineDay), contextDTO.getParamMap(), mpFinalVo.getMainPattern(),mpFinalVo.getEmbryoCode());
+                    }
+                }
+                if(dayVulcanizationQty == null){
+                    //若获取到首日量是空值,表示主花纹向下，当日不让增模或换活字块
+                    contextDTO.getLogDetail().append(String.format("结构:%s,【延后增模排产】,物料编码:%s,排产日:%s,获取到的首日计划量为空,表示当前排产日主花纹下不允许换活块！",contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),i)).append(ApsConstant.DIVISION);
+                    if (incMouldContext.getUsedProductionMap().size() >1 && getBeforeProductionQty(incMouldContext) > 0 && YesOrNoEnum.YES.getCode().equals(dailyCapacityLimitVoMap.get(i).getDayOpenCloseFlag())){
+                        break;
+                    }
+                    newPlanQty += revertPreDayQty(contextDTO,mpFinalVo,i,incMouldContext);
+                    continue;
+                }
+
+                //检查是否自动补量
+                boolean isAutoReplenishment = checkAutoReplenishment(contextDTO.getParamMap(),i,mpFinalVo);
+                contextDTO.getLogDetail().append(String.format("结构:%s,【延后增模排产】,物料编码:%s,排产日:%s,自动补量标识:%s！",contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),i,isAutoReplenishment ? "是":"否")).append(ApsConstant.DIVISION);
+                if (!isAutoReplenishment){
+                    //若剩余计划量 < 日硫化量，则按剩余计划量累加
+                    dayVulcanizationQty = newPlanQty < dayVulcanizationQty ? newPlanQty : dayVulcanizationQty;
+                }
+                //若是开产日，计划量全部等比例减少
+                dayVulcanizationQty = getPlanQtyForOpenProductionFirstDay(contextDTO,adjustDailyCapacityLimitObj,dailyCapacityLimitVoMap.get(i),dayVulcanizationQty);
+                //若是特殊结构，其调整计划量不能超过原月计划总量
+                if (YesOrNoEnum.YES.getCode().equals(mpFinalVo.getHasSpecialMaterial())){
+                    diffQty = getDiffQtyForSpecMaterial(contextDTO,mpFinalVo,otherTotalQty,dayVulcanizationQty,i);
+                    if (diffQty == 0){
+                        newPlanQty += revertPreDayQty(contextDTO,mpFinalVo,i,incMouldContext);
+                        return resetPlanQty(contextDTO,newOnLineDay,newEndDay,oriNewPlanQty,newPlanQty,incMouldContext.getHasProductionQty(),mpFinalVo,bakMpFinalVo);
+                    }
+                    dayVulcanizationQty = diffQty > dayVulcanizationQty ? dayVulcanizationQty:diffQty;
+                }
+                dayValue += dayVulcanizationQty;
+                mpFinalVo.setFieldValueByFieldName(dayField,dayValue);
+                adjustDailyCapacityLimitObj.calcLhMachinesWithEmbryoTypes(mpProdFinalList,i, dailyCapacityLimitVoMap.get(i), contextDTO.getParamMap(), mpFinalVo.getMainPattern(),mpFinalVo.getEmbryoCode());
+                contextDTO.getLogDetail().append(String.format("结构:%s,【延后增模排产】,物料编码:%s,排产日:%s,其产能限制信息:%s！",contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),i,dailyCapacityLimitVoMap.get(i).toString())).append(ApsConstant.DIVISION);
+                //若不是延的时间，才检查: 当前每日硫化机台数\当前每日胎胚种类数\每日换模次数 符合性
+                if (i<=oriEndDay && !adjustDailyCapacityLimitObj.checkCapacitySatisfy(dailyCapacityLimitVoMap.get(i))){
+                    // 将值还原，并退出，继续加模
+                    dayValue -= dayVulcanizationQty;
+                    mpFinalVo.setFieldValueByFieldName(dayField,dayValue == 0 ? null:dayValue);
+                    contextDTO.getLogDetail().append(String.format("结构:%s,【增模排产】,物料编码:%s,排产日:%s,每日硫化机台数或每日胎胚种类数或每日换模次数不符合产能限制,退出！",contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),i)).append(ApsConstant.DIVISION);
+                    if (incMouldContext.getUsedProductionMap().size() >1 && getBeforeProductionQty(incMouldContext) > 0 && YesOrNoEnum.YES.getCode().equals(dailyCapacityLimitVoMap.get(i).getDayOpenCloseFlag())){
+                        break;
+                    }
+                    newPlanQty += revertPreDayQty(contextDTO,mpFinalVo,i,incMouldContext);
+                    continue;
+                }
+                //若不是延的时间，才检查：主花纹向下模具数量(/2转成机台数) 符合性
+                cavityQty = getNewCavityQty(contextDTO,mpFinalVo,i);
+                contextDTO.getLogDetail().append(String.format("结构:%s,【增模排产】,物料编码:%s,排产日:%s,获取到新的型腔数:%s！",contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),i,cavityQty)).append(ApsConstant.DIVISION);
+                if (i<=oriEndDay && !checkMouldSatisfy(dailyCapacityLimitVoMap.get(i),cavityQty)){
+                    // 将值还原，并退出 外循环
+                    dayValue -= dayVulcanizationQty;
+                    mpFinalVo.setFieldValueByFieldName(dayField,dayValue==0?null:dayValue);
+                    contextDTO.getLogDetail().append(String.format("结构:%s,【增模排产】,物料编码:%s,排产日:%s,主花纹:%s,其主花纹模具数不符合产能限制,退出！",contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),i,mpFinalVo.getMainPattern())).append(ApsConstant.DIVISION);
+                    newPlanQty += revertPreDayQty(contextDTO,mpFinalVo,i,incMouldContext);
+                    return resetPlanQty(contextDTO,newOnLineDay,newEndDay,oriNewPlanQty,newPlanQty,incMouldContext.getHasProductionQty(),mpFinalVo,bakMpFinalVo);
+                }
+                newPlanQty -= dayVulcanizationQty;
+                if (newPlanQty <=0 && !isAutoReplenishment){
+                    //这里不能再清前日1天的值，因当天实际是正常排的
+                    //newPlanQty += revertPreDayQty(contextDTO,mpFinalVo,i,incMouldContext);
+                    return 0;
+                }
+                incMouldContext.setBFirstAddMould(false);
+                if (mpFinalVo.getFieldValueByFieldName(dayField) !=null && (Integer) mpFinalVo.getFieldValueByFieldName(dayField) !=0){
+                    incMouldContext.setBeforeProductionPosition(i);
+                    incMouldContext.getUsedProductionMap().put(i,dayVulcanizationQty);
+                }
+            }
+
+            if (incMouldContext.getUsedProductionMap().size() == 0){
+                contextDTO.getLogDetail().append(String.format("结构:%s,【延后增模排产】,物料编码:%s,第:%s台硫化机,没有排产量,退出！",contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),startMould/2)).append(ApsConstant.DIVISION);
+                return resetPlanQty(contextDTO,newOnLineDay,newEndDay,oriNewPlanQty,newPlanQty,incMouldContext.getHasProductionQty(),mpFinalVo,bakMpFinalVo);
+            }
+
+            //非首次上模，判断最短排产天数; 并且不是临近月底，则执行撤回
+            //startMould/2 >= 2 ,第2台，开始撤回第1台；
+            //已排产天数 < 最短排产天数 incMouldContext.getUsedProductionMap().size() < shortestProductionDays
+            //不是临近月低 incMouldContext.getUsedProductionMap().get(maxDays) == null
+            if (startMould/2 >= 2 && incMouldContext.getUsedProductionMap().size() < shortestProductionDays &&
+                    incMouldContext.getUsedProductionMap().get(maxDays) == null){
+                contextDTO.getLogDetail().append(String.format("结构:%s,【延后增模排产】,物料编码:%s,非首次增模且非临近月底,尝试排产天数:%s,最短排产天数:%s,还原尝试排产量:%s,退出！",contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),incMouldContext.getUsedProductionMap().size(),shortestProductionDays,incMouldContext.getUsedProductionMap())).append(ApsConstant.DIVISION);
+                //还原已排产量
+                resetUsedProductionQty(mpFinalVo, incMouldContext);
+                newPlanQty = 0;
+                return resetPlanQty(contextDTO,newOnLineDay,newEndDay,oriNewPlanQty,newPlanQty,incMouldContext.getHasProductionQty(),mpFinalVo,bakMpFinalVo);
+            }
+
+            startMould += 2;
+
+            incMouldContext.setBFirstAddMould(true);
+        }
+
+        return resetPlanQty(contextDTO,newOnLineDay,newEndDay,oriNewPlanQty,newPlanQty,incMouldContext.getHasProductionQty(),mpFinalVo,bakMpFinalVo);
+    }
+
+    /**
      * 还原已排产量
      * @param mpFinalVo
      * @param incMouldContext
@@ -2720,7 +2989,7 @@ public class MpWeekRollAdjustEngine {
     private int resetPlanQty(MpRollAdjustContextDTO contextDTO, int newOnLineDay, int structureDeadLine, int oriNewPlanQty, int newPlanQty, int hasProductionQty,
                              FactoryMonthPlanFinalAdjustVo mpFinalVo, FactoryMonthPlanFinalAdjustVo bakMpFinalVo){
         int realProductionQty = getProductionQty(newOnLineDay,structureDeadLine,mpFinalVo);
-        if (realProductionQty < hasProductionQty){
+        if (realProductionQty < hasProductionQty && bakMpFinalVo != null){
             BeanUtils.copyProperties(bakMpFinalVo,mpFinalVo);
             contextDTO.getLogDetail().append(String.format("结构:%s,【增模排产】,物料编码:%s,模拟排产量比原计划量小,恢复原计划量！",contextDTO.getStructureName(),mpFinalVo.getMaterialCode())).append(ApsConstant.DIVISION);
             return oriNewPlanQty;
@@ -2797,7 +3066,7 @@ public class MpWeekRollAdjustEngine {
         DailyMouldAvailabilityResult cavity2BlockVo = contextDTO.getCavity2BlockMap().get(iDay);
         if (cavity2BlockVo != null && cavity2BlockVo.getCavityResults() != null){
             Integer cavityQty = cavity2BlockVo.getCavityResults().get(mpFinalVo.getStructureName()+mpFinalVo.getMainPattern());
-            return cavityQty != null ? cavityQty:mpFinalVo.getMouldCavityQty();
+            return cavityQty != null ? cavityQty:Convert.toInt(mpFinalVo.getMouldCavityQty(),0);
         }
         return mpFinalVo.getMouldCavityQty();
     }
@@ -3481,6 +3750,9 @@ public class MpWeekRollAdjustEngine {
      */
     private int getProductionQty(int startDay,int endDay,FactoryMonthPlanFinalAdjustVo mpFinalVo){
         String dayField;
+        if (mpFinalVo == null){
+            return 0;
+        }
         int productionQty = 0;
         for (int i = startDay; i <= endDay; i++){
             dayField = FactoryConstant.DAY_FIELD + i;

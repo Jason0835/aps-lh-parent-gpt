@@ -56,24 +56,24 @@ public class GsqLossRateUIController extends BaseUIController<GsqLossRate> {
         return gsqLossRateService.getInfo(id);
     }
 
-    /** 新增钢丝圈损耗率 */
+    /** 新增钢丝圈损耗率（前端统一以multipart/form-data提交，不能用@RequestBody，需用表单绑定） */
     @ApiOperation("新增钢丝圈损耗率")
     @RequiresPermissions("gsq:lossRate:add")
     @PostMapping("/add")
     @ResponseBody
-    public AjaxResult add(@RequestBody GsqLossRate entity) {
+    public AjaxResult add(GsqLossRate entity) {
         if (UserConstants.NOT_UNIQUE.equals(gsqLossRateService.checkUnique(entity))) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.gsq.lossRate.checkUnique"));
         }
         return gsqLossRateService.add(entity);
     }
 
-    /** 编辑钢丝圈损耗率 */
+    /** 编辑钢丝圈损耗率（前端统一以multipart/form-data提交，不能用@RequestBody，需用表单绑定） */
     @ApiOperation("编辑钢丝圈损耗率")
     @RequiresPermissions("gsq:lossRate:edit")
     @PostMapping("/edit")
     @ResponseBody
-    public AjaxResult edit(@RequestBody GsqLossRate entity) {
+    public AjaxResult edit(GsqLossRate entity) {
         if (UserConstants.NOT_UNIQUE.equals(gsqLossRateService.checkUnique(entity))) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.gsq.lossRate.checkUnique"));
         }

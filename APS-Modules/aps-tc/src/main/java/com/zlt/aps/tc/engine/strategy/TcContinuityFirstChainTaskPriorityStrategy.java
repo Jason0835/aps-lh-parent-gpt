@@ -9,12 +9,14 @@ import com.zlt.aps.tc.engine.domain.TcScheduleContext;
 import com.zlt.aps.tc.engine.domain.TcTaskDraft;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
-/** 连续性优先策略，保持二期实施前的生产排序口径，由 TcStrategyRegistry 收集注册。 */
+/** 供应时长优先、连续性决胜策略，保留原参数编码并由 TcStrategyRegistry 收集注册。 */
 @Component
 public class TcContinuityFirstChainTaskPriorityStrategy implements ITcChainTaskPriorityStrategy {
 
@@ -29,18 +31,21 @@ public class TcContinuityFirstChainTaskPriorityStrategy implements ITcChainTaskP
         if (CollUtil.isEmpty(remainingTaskList)) {
             throw new IllegalArgumentException(I18nUtil.getMessage("ui.tc.schedule.remainingTasksEmpty"));
         }
-        for (TcTaskDraft task : remainingTaskList) {
-            if (!task.isUnassigned()) {
-                return task;
-            }
-        }
-        List<TcTaskDraft> orderedTaskList = new ArrayList<>(remainingTaskList);
-        orderedTaskList.sort(Comparator
-                .comparing((TcTaskDraft task) -> chainScoreMap.getOrDefault(task.getBusinessKey(), TcChainSortScore.ZERO),
+        List<TcTaskDraft> presetTaskList = remainingTaskList.stream()
+                .filter(task -> !task.isUnassigned()).collect(Collectors.toList());
+        List<TcTaskDraft> candidateTaskList = CollUtil.isEmpty(presetTaskList)
+                ? new ArrayList<>(remainingTaskList) : presetTaskList;
+        candidateTaskList.sort(Comparator
+                .comparing((TcTaskDraft task) -> task.getSupplyHours() == null)
+                .thenComparing(task -> task.getSupplyHours() == null ? BigDecimal.ZERO : task.getSupplyHours())
+                .thenComparing(TcTaskDraft::getLatestStartTime,
+                        Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing((TcTaskDraft task) -> chainScoreMap.getOrDefault(
+                                task.getBusinessKey(), TcChainSortScore.ZERO),
                         Comparator.reverseOrder())
                 .thenComparing(TcTaskDraft::getBaseSortIndex,
                         Comparator.nullsLast(Comparator.naturalOrder()))
                 .thenComparing(task -> StrUtil.blankToDefault(task.getBusinessKey(), "")));
-        return orderedTaskList.get(0);
+        return candidateTaskList.get(0);
     }
 }

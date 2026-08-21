@@ -28,6 +28,10 @@ public class TcChangeQtyRequestVo implements Serializable {
     @ApiModelProperty(value = "新计划量", required = true)
     private BigDecimal newPlanQty;
 
+    /** 新原因分析。 */
+    @ApiModelProperty(value = "新原因分析")
+    private String newAnalysis;
+
     /** 期望任务版本。 */
     @ApiModelProperty(value = "期望任务版本", required = true)
     private Long expectedTaskVersion;

@@ -85,6 +85,14 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     private static final String SHARED_EMBRYO_ZERO_SURPLUS_UNSCHEDULED_REASON =
             "共用胎胚且硫化余量为0";
     /**
+     * 主销产品排产分类
+     */
+    private static final String MAIN_SALE_PRODUCTION_TYPE = "01";
+    /**
+     * 常规产品排产分类
+     */
+    private static final String REGULAR_PRODUCTION_TYPE = "02";
+    /**
      * 窗口无日计划且无本月历史欠产的新增SKU未排提示
      */
     private static final String WINDOW_NO_PLAN_NO_SHORTAGE_UNSCHEDULED_REASON =
@@ -154,22 +162,11 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         // 共用胎胚库存只有在不同SKU同一天收尾时才按标准产能分摊，依赖收尾标注结果统一刷新。
         getTargetScheduleQtyResolver().refreshAllSharedEmbryoStockAllocations(context, "S4.3收尾标注完成");
 
-        // S4.3.3.1 共用胎胚零余量SKU先出队，后续排产只使用动态归一化后的胎胚组
-        pruneSharedEmbryoZeroSurplusSkus(context);
-
         /*
-         * S4.3.3.2 冻结全部有效结构并按月计划结构类型读取最低机台数。
-         * S4.2已分别加载结构收尾对齐固定三天快照和SKU排序动态阈值快照；这里仍需为全部有效
-         * 结构冻结SKU快照和最低机台数，不能按任一日期门禁提前裁剪，因为后续待排结构视图会随
-         * SKU出队动态缩小。S4.5实际选机只读取原固定三天快照，通过后才复用这里准备的现有
-         * 对齐内部规则；SKU排序专用快照不会进入本分支。
+         * S4.3.4 区分续作SKU和新增SKU。共用胎胚零余量规则只适用于续作排产，因此必须先完成
+         * MES在机续作识别，再在分类方法内剔除命中的续作SKU；新增SKU保持原准入和排产链路。
          */
-        if (Objects.nonNull(structureMinMachineRetentionService)) {
-            structureMinMachineRetentionService.initializeStructureMinimumMachineConfigs(context);
-        }
-
-        // S4.3.4 区分续作SKU和新增SKU
-        classifyContinuousAndNewSkus(context);
+        this.classifyContinuousAndNewSkus(context);
 
         // 单控模式必须在续作、新增和换活字块开始前一次性冻结，后续待排量递减不得改变本轮模式。
         singleControlModeSnapshotInitializer.initialize(context);
@@ -376,81 +373,223 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     }
 
     /**
-     * 预剔除共用胎胚零余量SKU。
-     * <p>动态共用胎胚要以本轮排程初始有效SKU集合为准先处理零余量SKU，
-     * 避免零余量SKU参与新增、续作、换活字块候选、目标量计算和胎胚库存分配。</p>
+     * 预剔除共用胎胚零余量续作SKU。
+     * <p>本规则只消费已经由MES在机数据识别出的续作列表。若同胎胚仍有任一正余量物料，
+     * 零余量续作全部写未排；仅当同胎胚全部有效物料余量均为0且胎胚库存大于0时，
+     * 才保留唯一续作物料承接库存，避免多个物料重复消费同一份胎胚库存。</p>
      *
-     * @param context 排程上下文
+     * @param context           排程上下文
+     * @param continuousSkuList 已识别的续作SKU列表
+     * @return 需要在新增准入清理后重新归一化的胎胚集合
      */
-    private void pruneSharedEmbryoZeroSurplusSkus(LhScheduleContext context) {
-        if (Objects.isNull(context) || CollectionUtils.isEmpty(context.getStructureSkuMap())) {
-            return;
+    private Set<String> pruneSharedEmbryoZeroSurplusContinuousSkus(
+            LhScheduleContext context,
+            List<SkuScheduleDTO> continuousSkuList) {
+        Set<String> normalizeEmbryoSet = new LinkedHashSet<String>(8);
+        if (Objects.isNull(context) || CollectionUtils.isEmpty(continuousSkuList)
+                || CollectionUtils.isEmpty(context.getStructureSkuMap())) {
+            return normalizeEmbryoSet;
         }
-        List<SkuScheduleDTO> pruneSkuList = collectSharedEmbryoZeroSurplusSkus(context);
-        if (CollectionUtils.isEmpty(pruneSkuList)) {
-            return;
+        Set<String> pruneSkuKeySet = this.collectSharedEmbryoZeroSurplusContinuousSkuKeys(
+                context, continuousSkuList, normalizeEmbryoSet);
+        if (CollectionUtils.isEmpty(pruneSkuKeySet)) {
+            return normalizeEmbryoSet;
         }
-        Set<String> affectedEmbryoSet = new HashSet<>(8);
-        for (Map.Entry<String, List<SkuScheduleDTO>> entry : context.getStructureSkuMap().entrySet()) {
-            List<SkuScheduleDTO> skuList = entry.getValue();
-            if (CollectionUtils.isEmpty(skuList)) {
+
+        // 同物料多机台续作会产生多个DTO副本，按物料+产品状态统一移除，未排结果只写一条。
+        Map<String, SkuScheduleDTO> pruneSkuMap = new LinkedHashMap<String, SkuScheduleDTO>(pruneSkuKeySet.size());
+        int removedContinuationCount = 0;
+        Iterator<SkuScheduleDTO> iterator = continuousSkuList.iterator();
+        while (iterator.hasNext()) {
+            SkuScheduleDTO sku = iterator.next();
+            String skuKey = this.buildSkuKey(sku);
+            if (!pruneSkuKeySet.contains(skuKey)) {
                 continue;
             }
-            Iterator<SkuScheduleDTO> iterator = skuList.iterator();
-            while (iterator.hasNext()) {
-                SkuScheduleDTO sku = iterator.next();
-                if (!pruneSkuList.contains(sku)) {
-                    continue;
-                }
-                sku.setTargetScheduleQty(0);
-                sku.setRemainingScheduleQty(0);
-                addSharedEmbryoZeroSurplusUnscheduledResult(context, sku);
-                getTargetScheduleQtyResolver().removeActiveEmbryoSku(
-                        context, sku, SHARED_EMBRYO_ZERO_SURPLUS_UNSCHEDULED_REASON);
-                affectedEmbryoSet.add(sku.getEmbryoCode());
-                iterator.remove();
-            }
+            sku.setTargetScheduleQty(0);
+            sku.setRemainingScheduleQty(0);
+            pruneSkuMap.putIfAbsent(skuKey, sku);
+            iterator.remove();
+            removedContinuationCount++;
         }
-        context.getStructureSkuMap().entrySet().removeIf(entry -> CollectionUtils.isEmpty(entry.getValue()));
-        List<SkuScheduleDTO> remainingSkuList = collectStructureSkus(context);
-        context.setMaterialSharedEmbryoMap(buildMaterialSharedEmbryoMap(remainingSkuList));
-        context.setActiveEmbryoSkuMap(buildActiveEmbryoSkuMap(context, remainingSkuList));
-        normalizeDynamicSingleEmbryoEndingSkus(context, affectedEmbryoSet, remainingSkuList);
-        logNormalizedEmbryoGroups(context, affectedEmbryoSet);
-        log.info("共用胎胚零余量SKU预剔除完成, 剔除数量: {}", pruneSkuList.size());
+
+        for (SkuScheduleDTO sku : pruneSkuMap.values()) {
+            this.addSharedEmbryoZeroSurplusUnscheduledResult(context, sku);
+            this.cleanupBlockedSku(context, sku, SHARED_EMBRYO_ZERO_SURPLUS_UNSCHEDULED_REASON);
+            normalizeEmbryoSet.add(sku.getEmbryoCode());
+        }
+        List<SkuScheduleDTO> remainingSkuList = this.collectStructureSkus(context);
+        context.setMaterialSharedEmbryoMap(this.buildMaterialSharedEmbryoMap(remainingSkuList));
+        context.setActiveEmbryoSkuMap(this.buildActiveEmbryoSkuMap(context, remainingSkuList));
+        log.info("共用胎胚零余量续作SKU预剔除完成, factoryCode: {}, batchNo: {}, T日: {}, "
+                        + "剔除物料数: {}, 剔除续作副本数: {}",
+                context.getFactoryCode(), context.getBatchNo(),
+                LhScheduleTimeUtil.formatDate(context.getScheduleDate()),
+                pruneSkuMap.size(), removedContinuationCount);
+        return normalizeEmbryoSet;
     }
 
     /**
-     * 基于预处理开始时的动态共用胎胚组收集零余量SKU。
-     * <p>先收集后剔除，避免同胎胚多个零余量SKU在逐个移除时被误判为单胎胚。</p>
+     * 基于完整有效胎胚组收集需要剔除的零余量续作SKU复合键。
+     * <p>正余量判断必须读取结构待排池中的完整胎胚组，不能只看零余量子集合；否则单个在机
+     * 零余量SKU会被误选为库存承接者。返回复合键可同时覆盖同物料多机台续作副本。</p>
      *
-     * @param context 排程上下文
-     * @return 需要剔除的SKU列表
+     * @param context           排程上下文
+     * @param continuousSkuList 已识别的续作SKU列表
+     * @param consumerEmbryoSet 全零余量组唯一承接物料对应的胎胚集合
+     * @return 需要剔除的物料+产品状态复合键集合
      */
-    private List<SkuScheduleDTO> collectSharedEmbryoZeroSurplusSkus(LhScheduleContext context) {
-        List<SkuScheduleDTO> pruneSkuList = new ArrayList<>(8);
+    private Set<String> collectSharedEmbryoZeroSurplusContinuousSkuKeys(
+            LhScheduleContext context,
+            List<SkuScheduleDTO> continuousSkuList,
+            Set<String> consumerEmbryoSet) {
+        Map<String, Map<String, SkuScheduleDTO>> zeroSurplusGroupMap = new LinkedHashMap<>();
+        for (SkuScheduleDTO sku : continuousSkuList) {
+            if (!this.isSharedEmbryoZeroSurplusSku(context, continuousSkuList, sku)) {
+                continue;
+            }
+            zeroSurplusGroupMap.computeIfAbsent(
+                            sku.getEmbryoCode(), key -> new LinkedHashMap<String, SkuScheduleDTO>(4))
+                    .putIfAbsent(this.buildSkuKey(sku), sku);
+        }
+        Set<String> pruneSkuKeySet = new LinkedHashSet<String>(8);
+        for (Map.Entry<String, Map<String, SkuScheduleDTO>> entry : zeroSurplusGroupMap.entrySet()) {
+            String embryoCode = entry.getKey();
+            List<SkuScheduleDTO> zeroSurplusSkuList = new ArrayList<SkuScheduleDTO>(entry.getValue().values());
+            List<SkuScheduleDTO> positiveSurplusSkuList = this.collectPositiveSurplusSkus(context, embryoCode);
+            if (!CollectionUtils.isEmpty(positiveSurplusSkuList)) {
+                pruneSkuKeySet.addAll(entry.getValue().keySet());
+                this.traceMixedSurplusSharedEmbryoBlock(
+                        context, embryoCode, zeroSurplusSkuList, positiveSurplusSkuList);
+                continue;
+            }
+            SkuScheduleDTO consumerSku = this.selectSharedEmbryoZeroSurplusConsumer(zeroSurplusSkuList);
+            if (Objects.nonNull(consumerSku)) {
+                consumerEmbryoSet.add(embryoCode);
+            }
+            String consumerSkuKey = this.buildSkuKey(consumerSku);
+            for (Map.Entry<String, SkuScheduleDTO> zeroEntry : entry.getValue().entrySet()) {
+                // 全零组仅保留一个物料承接库存；库存为0时无承接者，全部写未排。
+                if (!StringUtils.equals(zeroEntry.getKey(), consumerSkuKey)) {
+                    pruneSkuKeySet.add(zeroEntry.getKey());
+                }
+            }
+        }
+        return pruneSkuKeySet;
+    }
+
+    /**
+     * 在续作和新增准入清理完成后，统一收口共用胎胚零余量组。
+     * <p>全零余量组的唯一续作承接物料可能在选择时仍与后续会出队的非续作物料共用胎胚，
+     * 因此必须等新增准入清理结束后再刷新活跃集合并动态转单胎胚，确保该续作按剩余胎胚库存
+     * 建立严格目标，不会被“窗口无日计划”规则释放。混合余量组也在此统一复核剩余关系。</p>
+     *
+     * @param context             排程上下文
+     * @param normalizeEmbryoSet 需要重新归一化的胎胚集合
+     */
+    private void finalizeSharedEmbryoZeroSurplusGroups(
+            LhScheduleContext context,
+            Set<String> normalizeEmbryoSet) {
+        if (Objects.isNull(context) || CollectionUtils.isEmpty(normalizeEmbryoSet)) {
+            return;
+        }
+        List<SkuScheduleDTO> remainingSkuList = this.collectStructureSkus(context);
+        context.setMaterialSharedEmbryoMap(this.buildMaterialSharedEmbryoMap(remainingSkuList));
+        context.setActiveEmbryoSkuMap(this.buildActiveEmbryoSkuMap(context, remainingSkuList));
+        this.normalizeDynamicSingleEmbryoEndingSkus(context, normalizeEmbryoSet, remainingSkuList);
+        this.logNormalizedEmbryoGroups(context, normalizeEmbryoSet);
+        log.info("共用胎胚零余量续作组最终归一化完成, factoryCode: {}, batchNo: {}, T日: {}, 胎胚集合: {}",
+                context.getFactoryCode(), context.getBatchNo(),
+                LhScheduleTimeUtil.formatDate(context.getScheduleDate()), normalizeEmbryoSet);
+    }
+
+    /**
+     * 收集同胎胚完整有效集合中的正余量SKU。
+     *
+     * @param context    排程上下文
+     * @param embryoCode 胎胚编码
+     * @return 正余量SKU列表
+     */
+    private List<SkuScheduleDTO> collectPositiveSurplusSkus(LhScheduleContext context, String embryoCode) {
+        Map<String, SkuScheduleDTO> positiveSkuMap = new LinkedHashMap<String, SkuScheduleDTO>(4);
         for (List<SkuScheduleDTO> skuList : context.getStructureSkuMap().values()) {
             if (CollectionUtils.isEmpty(skuList)) {
                 continue;
             }
             for (SkuScheduleDTO sku : skuList) {
-                if (isSharedEmbryoZeroSurplusSku(context, sku)) {
-                    pruneSkuList.add(sku);
+                if (Objects.nonNull(sku)
+                        && !context.isFutureOnlyEarlyProductionCandidate(sku)
+                        && StringUtils.equals(embryoCode, sku.getEmbryoCode())
+                        && sku.getSurplusQty() > 0) {
+                    positiveSkuMap.putIfAbsent(this.buildSkuKey(sku), sku);
                 }
             }
         }
-        return pruneSkuList;
+        return new ArrayList<SkuScheduleDTO>(positiveSkuMap.values());
+    }
+
+    /**
+     * 记录混合余量共用胎胚组阻断零余量续作的可对账日志。
+     *
+     * @param context                排程上下文
+     * @param embryoCode             胎胚编码
+     * @param zeroSurplusSkuList     零余量续作列表
+     * @param positiveSurplusSkuList 正余量SKU列表
+     */
+    private void traceMixedSurplusSharedEmbryoBlock(
+            LhScheduleContext context,
+            String embryoCode,
+            List<SkuScheduleDTO> zeroSurplusSkuList,
+            List<SkuScheduleDTO> positiveSurplusSkuList) {
+        List<String> zeroMaterialList = zeroSurplusSkuList.stream()
+                .filter(Objects::nonNull)
+                .map(SkuScheduleDTO::getMaterialCode)
+                .distinct()
+                .collect(java.util.stream.Collectors.toList());
+        List<String> positiveMaterialList = positiveSurplusSkuList.stream()
+                .filter(Objects::nonNull)
+                .map(sku -> sku.getMaterialCode() + "(" + sku.getSurplusQty() + ")")
+                .distinct()
+                .collect(java.util.stream.Collectors.toList());
+        String detail = String.format("工厂: %s, 批次: %s, T日: %s, 胎胚: %s, "
+                        + "零余量续作物料: %s, 正余量物料: %s, 结论: 零余量续作不排产并写入未排",
+                context.getFactoryCode(), context.getBatchNo(),
+                LhScheduleTimeUtil.formatDate(context.getScheduleDate()), embryoCode,
+                zeroMaterialList, positiveMaterialList);
+        PriorityTraceLogHelper.appendProcessLog(context, "共用胎胚续作零余量阻断", detail);
+        log.info("共用胎胚混合余量组阻断零余量续作, factoryCode: {}, batchNo: {}, T日: {}, "
+                        + "embryoCode: {}, zeroSurplusMaterials: {}, positiveSurplusMaterials: {}",
+                context.getFactoryCode(), context.getBatchNo(),
+                LhScheduleTimeUtil.formatDate(context.getScheduleDate()), embryoCode,
+                zeroMaterialList, positiveMaterialList);
+    }
+
+    /**
+     * 构建物料+产品状态复合键。
+     *
+     * @param sku SKU排程DTO
+     * @return 复合键；SKU为空时返回空字符串
+     */
+    private String buildSkuKey(SkuScheduleDTO sku) {
+        if (Objects.isNull(sku)) {
+            return StringUtils.EMPTY;
+        }
+        return MonthPlanDateResolver.buildMaterialStatusKey(sku.getMaterialCode(), sku.getProductStatus());
     }
 
 
     /**
      * 判断是否为共用胎胚零余量SKU。
      *
-     * @param context 排程上下文
-     * @param sku     SKU排程DTO
+     * @param context           排程上下文
+     * @param continuousSkuList 已识别的续作SKU列表
+     * @param sku               SKU排程DTO
      * @return true-命中共用胎胚零余量；false-未命中
      */
-    private boolean isSharedEmbryoZeroSurplusSku(LhScheduleContext context, SkuScheduleDTO sku) {
+    private boolean isSharedEmbryoZeroSurplusSku(
+            LhScheduleContext context,
+            List<SkuScheduleDTO> continuousSkuList,
+            SkuScheduleDTO sku) {
         if (Objects.isNull(sku)
                 /*
                  * 提前生产候选在激活前正常目标量固定为0，但未来月余量保存在中心运行视图。
@@ -460,37 +599,125 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
                 || sku.getSurplusQty() > 0
                 || StringUtils.isEmpty(sku.getEmbryoCode())
                 || StringUtils.isEmpty(sku.getMaterialCode())
-                || !getTargetScheduleQtyResolver().isSharedEmbryoInWindow(context, sku)) {
+                || !this.isSharedEmbryoContinuationGroup(context, continuousSkuList, sku)) {
             return false;
         }
-        // 胎胚库存收尾生产者候选保留：共用胎胚组内消纳胎胚库存的自然生产者不得一刀切未排，
-        // 由动态转单胎胚归一化转为单胎胚按胎胚库存排产，避免胎胚库存无法消纳（违反动态转单胎胚/单胎胚放宽规则）。
-        return !isEmbryoStockEndingProducerCandidate(context, sku);
+        return true;
     }
 
     /**
-     * 判断当前SKU是否为胎胚库存收尾生产者候选。
-     * <p>共用胎胚组内余量为0但胎胚仍处于收尾且有库存时，前一业务日(T-1)仍在产的SKU
-     * 是消纳胎胚库存的自然生产者，应在预剔除阶段保留，由动态转单胎胚归一化转为单胎胚按胎胚库存排产。</p>
+     * 判断续作SKU是否仍属于共用胎胚生产组。
+     * <p>优先读取S4.3建立的运行态有效SKU集合；同物料多机台在活跃集合中只有一个复合键，
+     * 因此还需按真实续作DTO数量识别多个生产单元。</p>
      *
-     * @param context 排程上下文
-     * @param sku     当前SKU
-     * @return true-生产者候选，应保留不预剔除；false-非生产者，可预剔除
+     * @param context           排程上下文
+     * @param continuousSkuList 已识别的续作SKU列表
+     * @param sku               当前续作SKU
+     * @return true-共用胎胚；false-单胎胚或非共用胎胚
      */
-    private boolean isEmbryoStockEndingProducerCandidate(LhScheduleContext context, SkuScheduleDTO sku) {
-        // 胎胚收尾标识必须为是，否则该胎胚不属于清尾场景，零余量SKU照常预剔除
-        if (!getTargetScheduleQtyResolver().isEmbryoStockEndingFlagYes(context, sku.getEmbryoCode())) {
+    private boolean isSharedEmbryoContinuationGroup(
+            LhScheduleContext context,
+            List<SkuScheduleDTO> continuousSkuList,
+            SkuScheduleDTO sku) {
+        if (Objects.isNull(context) || Objects.isNull(sku) || StringUtils.isEmpty(sku.getEmbryoCode())) {
             return false;
         }
-        // 胎胚库存为0时无需消纳库存，零余量SKU照常预剔除
-        if (sku.getEmbryoStock() <= 0) {
+        List<String> activeSkuKeyList = context.getActiveEmbryoSkuMap().get(sku.getEmbryoCode());
+        if (!CollectionUtils.isEmpty(activeSkuKeyList) && activeSkuKeyList.size() > 1) {
+            return true;
+        }
+        if (CollectionUtils.isEmpty(continuousSkuList)) {
             return false;
         }
-        // 前一业务日(T-1)有日计划，表示昨日仍在产，是消纳胎胚库存的自然生产者
-        LocalDate previousDay = toLocalDate(context.getScheduleDate()).minusDays(1);
-        int previousDayPlanQty = MonthPlanDateResolver.resolveDayQty(
-                context, sku.getMaterialCode(), sku.getProductStatus(), previousDay);
-        return previousDayPlanQty > 0;
+        long continuationUnitCount = continuousSkuList.stream()
+                .filter(Objects::nonNull)
+                /*
+                 * 仅未来提前生产候选尚未进入当前续作窗口，不能作为第二个生产单元把当前零余量
+                 * 续作误判为共用胎胚组；与本类其它活跃集合构建入口保持同一过滤口径。
+                 */
+                .filter(candidate -> !context.isFutureOnlyEarlyProductionCandidate(candidate))
+                .filter(candidate -> StringUtils.equals(sku.getEmbryoCode(), candidate.getEmbryoCode()))
+                .limit(2)
+                .count();
+        return continuationUnitCount > 1;
+    }
+
+    /**
+     * 选择共用胎胚零余量场景下唯一承接胎胚库存的物料。
+     * <p>优先级：主销产品(01) &gt; 常规产品(02) &gt; 非主销且非常规产品；
+     * 同优先级按物料编码升序保证结果稳定。调用方只传入已经完成MES在机匹配的续作物料，
+     * 因此不会把新增物料选为库存承接者。</p>
+     *
+     * @param skuList 同胎胚零余量SKU列表
+     * @return 唯一承接物料；无候选时返回null
+     */
+    private SkuScheduleDTO selectSharedEmbryoZeroSurplusConsumer(List<SkuScheduleDTO> skuList) {
+        if (CollectionUtils.isEmpty(skuList)) {
+            return null;
+        }
+        SkuScheduleDTO consumerSku = null;
+        int candidateCount = 0;
+        for (SkuScheduleDTO sku : skuList) {
+            if (Objects.isNull(sku) || sku.getEmbryoStock() <= 0) {
+                continue;
+            }
+            candidateCount++;
+            if (Objects.isNull(consumerSku)
+                    || this.compareSharedEmbryoZeroSurplusConsumer(sku, consumerSku) < 0) {
+                consumerSku = sku;
+            }
+        }
+        if (Objects.nonNull(consumerSku)) {
+            log.info("共用胎胚零余量选择唯一承接物料, embryoCode: {}, materialCode: {}, productStatus: {}, "
+                            + "productionType: {}, 胎胚库存: {}, 候选续作物料数: {}",
+                    consumerSku.getEmbryoCode(), consumerSku.getMaterialCode(), consumerSku.getProductStatus(),
+                    consumerSku.getProductionType(), consumerSku.getEmbryoStock(), candidateCount);
+        }
+        return consumerSku;
+    }
+
+    /**
+     * 比较两个共用胎胚零余量承接候选：先按排产分类优先级，再按物料编码升序。
+     *
+     * @param left  左候选
+     * @param right 右候选
+     * @return 负数表示left优先，正数表示right优先
+     */
+    private int compareSharedEmbryoZeroSurplusConsumer(SkuScheduleDTO left, SkuScheduleDTO right) {
+        int leftPriority = this.resolveProductionTypePriority(left);
+        int rightPriority = this.resolveProductionTypePriority(right);
+        if (leftPriority != rightPriority) {
+            return Integer.compare(leftPriority, rightPriority);
+        }
+        String leftCode = left == null ? null : left.getMaterialCode();
+        String rightCode = right == null ? null : right.getMaterialCode();
+        if (Objects.isNull(leftCode) && Objects.isNull(rightCode)) {
+            return 0;
+        }
+        if (Objects.isNull(leftCode)) {
+            return 1;
+        }
+        if (Objects.isNull(rightCode)) {
+            return -1;
+        }
+        return leftCode.compareTo(rightCode);
+    }
+
+    /**
+     * 解析排产分类承接优先级：主销(01)最高，常规(02)次之，其余最低。
+     *
+     * @param sku SKU排程DTO
+     * @return 优先级序号，越小越优先
+     */
+    private int resolveProductionTypePriority(SkuScheduleDTO sku) {
+        String productionType = Objects.isNull(sku) ? null : sku.getProductionType();
+        if (StringUtils.equals(MAIN_SALE_PRODUCTION_TYPE, productionType)) {
+            return 0;
+        }
+        if (StringUtils.equals(REGULAR_PRODUCTION_TYPE, productionType)) {
+            return 1;
+        }
+        return 2;
     }
 
     /**
@@ -705,14 +932,12 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         //月计划总量 20260817+ 月计划总量包含(硫化日计划调整量)
         Map<YearMonth, Integer> monthTotalMap = context.getSumPlanQty(plan);
         int monthPlanTotalQty = MonthPlanSurplusCalculator.sumQty(monthTotalMap);
-        if (lastMonthOverdueQty != 0 || scheDayFinishQty > 0 || isCrossMonth) {
-            log.info("硫化余量计算完成, materialCode: {}, monthPlanQty: {}, monthFinishedAndScheDayQty: {}, "
-                            + "scheDayFinishQty: {}, lastMonthValidFlag: {}, lastMonthOverdueQty: {}, surplusQty: {}, "
-                            + "crossMonth: {}, monthPlanTotalQty: {}",
-                    plan.getMaterialCode(), totalPlanQty, actualFinishedQty, scheDayFinishQty,
-                    plan.getLastMonthValidFlag(), lastMonthOverdueQty, remainingDemandQty,
-                    isCrossMonth, monthPlanTotalQty);
-        }
+        log.info("硫化余量计算完成, materialCode: {}, monthPlanQty: {}, monthFinishedAndScheDayQty: {}, "
+                        + "scheDayFinishQty: {}, lastMonthValidFlag: {}, lastMonthOverdueQty: {}, surplusQty: {}, "
+                        + "crossMonth: {}, monthPlanTotalQty: {}",
+                plan.getMaterialCode(), totalPlanQty, actualFinishedQty, scheDayFinishQty,
+                plan.getLastMonthValidFlag(), lastMonthOverdueQty, remainingDemandQty,
+                isCrossMonth, monthPlanTotalQty);
         return new SurplusCalculation(remainingDemandQty, actualFinishedQty, ignoredOverProductionQty,
                 lastMonthOverdueQty, totalPlanQty, monthPlanTotalQty, monthOverdueQtyMap);
     }
@@ -1886,6 +2111,17 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         assignContinuousSkus(context, skuByMaterialMap, continuousTemplateMap, continuousSkuList, true);
 
         /*
+         * 共用/非共用胎胚零余量门禁仅适用于续作阶段：必须使用上方已完成MES在机匹配的真实
+         * 续作列表执行。剔除完成后再冻结结构最低机台数快照，保持原有“先清理无效SKU、再冻结”
+         * 的调用语义，不让零余量续作污染结构机台保留规则。
+         */
+        Set<String> normalizeZeroSurplusEmbryoSet =
+                this.pruneSharedEmbryoZeroSurplusContinuousSkus(context, continuousSkuList);
+        if (Objects.nonNull(structureMinMachineRetentionService)) {
+            structureMinMachineRetentionService.initializeStructureMinimumMachineConfigs(context);
+        }
+
+        /*
          * 续作识别完成后、进入S4.4续作排产前，先拦截完整判断范围无日计划量的
          * 试制、量试SKU。过滤后列表保持原顺序，后续续作机台、加减机台和数量账本不做额外分支。
          */
@@ -1944,6 +2180,9 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
                     excludedLegacySku.getProductStatus(),
                     PendingSkuUnscheduledRule.LEGACY_ONLY_EXCLUSION_REASON);
         }
+
+        // 新增准入出队完成后再收口全零余量续作承接者，确保按胎胚库存严格排产而不是被零日计划释放。
+        this.finalizeSharedEmbryoZeroSurplusGroups(context, normalizeZeroSurplusEmbryoSet);
 
         // 续作匹配完成后，在机物料本次不需要排程（余量为0/共用胎胚零余量/未排等）的机台，
         // 收尾时间重置为排程窗口首班开始时间，使该机台从窗口起点即可参与新增排产换模。

@@ -182,8 +182,13 @@ export default {
           label: this.$t("common.remark"),
         },
         {
+          prop: "updateBy",
+          label: this.$t("ui.data.column.updateBy"),
+          width: 100,
+        },
+        {
           prop: "updateTime",
-          label: this.$t("ui.data.column.scheduleAdjust.updata"),
+          label: this.$t("ui.data.column.updateTime"),
           width: 180,
           formatter: (row, column, value) => {
             return this.parseTime(value);

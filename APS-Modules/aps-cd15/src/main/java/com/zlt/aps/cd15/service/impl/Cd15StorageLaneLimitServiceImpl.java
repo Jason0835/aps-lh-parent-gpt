@@ -22,7 +22,6 @@ import org.springframework.transaction.annotation.Transactional;
 import lombok.extern.slf4j.Slf4j;
 
 import javax.annotation.Resource;
-import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -31,7 +30,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-
 /**
  * 斜裁库排限制 Service 实现。
  */
@@ -137,7 +135,7 @@ public class Cd15StorageLaneLimitServiceImpl extends AbstractDocService<Cd15Stor
             } else {
                 failureNum++;
                 ImportExcelValidatedUtils.addImportErrorLog(importLogId, rowNum,
-                        MessageFormat.format(uniqueMessage, rowNum), errorList);
+                        String.format(uniqueMessage, rowNum), errorList);
             }
         }
 

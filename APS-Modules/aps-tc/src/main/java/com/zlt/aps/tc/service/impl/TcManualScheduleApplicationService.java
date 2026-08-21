@@ -98,8 +98,9 @@ public class TcManualScheduleApplicationService {
                 .sorted(Comparator.comparing(TcManualShiftItemVo::getShiftOrder)).collect(Collectors.toList());
         this.validateShiftItems(requestVo.getFactoryCode(), requestVo.getScheduleDate(), shiftItemList);
 
-        TcScheduleResult insertResult = this.manualOptionsService.resolveConstruction(requestVo.getFactoryCode(),
-                requestVo.getSidewallCode(), requestVo.getConstructionVersion());
+        TcScheduleResult insertResult = this.manualOptionsService.resolveUniqueConstructions(
+                requestVo.getFactoryCode(), Collections.singleton(requestVo.getSidewallCode()))
+                .get(requestVo.getSidewallCode());
         insertResult.setScheduleDate(requestVo.getScheduleDate());
         insertResult.setMachineCode(requestVo.getMachineCode().trim());
         insertResult.setBatchNo(this.resolveCurrentBatchNo(requestVo.getFactoryCode(), requestVo.getScheduleDate()));
@@ -110,8 +111,11 @@ public class TcManualScheduleApplicationService {
                     item.getShiftOrder()), item.getPlanQty());
             insertResult.setFieldValueByFieldName(String.format(TcScheduleConstants.SHIFT_SEQUENCE_FIELD_TEMPLATE,
                     item.getShiftOrder()), item.getSequence());
+            insertResult.setFieldValueByFieldName(String.format(TcScheduleConstants.SHIFT_ANALYSIS_FIELD_TEMPLATE,
+                    item.getShiftOrder()), item.getAnalysis());
         });
-        return this.manualOperationFacade.insertTask(insertResult, requestVo.getReason().trim(), ignoredTaskId);
+        String operationReason = StringUtils.isBlank(requestVo.getRemark()) ? "" : requestVo.getRemark().trim();
+        return this.manualOperationFacade.insertTask(insertResult, operationReason, ignoredTaskId);
     }
 
     /**
@@ -154,6 +158,8 @@ public class TcManualScheduleApplicationService {
         changeResult.setId(requestVo.getResultId());
         changeResult.setFieldValueByFieldName(String.format(TcScheduleConstants.SHIFT_PLAN_QTY_FIELD_TEMPLATE,
                 requestVo.getShiftOrder()), requestVo.getNewPlanQty());
+        changeResult.setFieldValueByFieldName(String.format(TcScheduleConstants.SHIFT_ANALYSIS_FIELD_TEMPLATE,
+                requestVo.getShiftOrder()), requestVo.getNewAnalysis());
         TcScheduleResult current = this.scheduleResultMapper.selectById(requestVo.getResultId());
         if (current == null) {
             throw new ServiceException(I18nUtil.getMessage("ui.tc.schedule.manual.resultNotFound"));
@@ -289,9 +295,7 @@ public class TcManualScheduleApplicationService {
     private void validateInsertRequest(TcInsertTaskRequestVo requestVo) {
         if (requestVo == null || StringUtils.isBlank(requestVo.getFactoryCode())
                 || requestVo.getScheduleDate() == null || StringUtils.isBlank(requestVo.getMachineCode())
-                || StringUtils.isBlank(requestVo.getSidewallCode())
-                || StringUtils.isBlank(requestVo.getConstructionVersion())
-                || StringUtils.isBlank(requestVo.getReason()) || requestVo.getShiftList() == null
+                || StringUtils.isBlank(requestVo.getSidewallCode()) || requestVo.getShiftList() == null
                 || requestVo.getShiftList().isEmpty()) {
             throw new ServiceException(I18nUtil.getMessage("ui.tc.schedule.insert.invalidRequest"));
         }

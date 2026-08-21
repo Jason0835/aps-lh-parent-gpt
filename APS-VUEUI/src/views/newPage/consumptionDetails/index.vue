@@ -168,6 +168,16 @@ export default {
           label: this.$t("ui.data.column.mdmMaterialConsumeDetail.dosage"),
         },
 
+        {
+          prop: "updateBy",
+          label: this.$t("ui.data.column.updateBy"),
+          minWidth: 100,
+        },
+        {
+          prop: "updateTime",
+          label: this.$t("ui.data.column.updateTime"),
+          minWidth: 180,
+        },
       ];
 
       return columns;

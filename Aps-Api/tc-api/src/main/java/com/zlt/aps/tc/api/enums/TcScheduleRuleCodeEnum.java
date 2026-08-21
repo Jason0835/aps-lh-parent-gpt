@@ -11,6 +11,9 @@ public enum TcScheduleRuleCodeEnum {
     /** 未来停产需求重分配。 */
     FUTURE_SHUTDOWN_REDISTRIBUTION("FUTURE_SHUTDOWN_REDISTRIBUTION", "未来停产需求重分配"),
 
+    /** 成型连续停产自动收尾。 */
+    FORMING_CONTINUOUS_SHUTDOWN_CLOSE_OUT("FORMING_CONTINUOUS_SHUTDOWN_CLOSE_OUT", "成型连续停产自动收尾"),
+
     /** 施工版本匹配及回退。 */
     VERSION_MATCH("VERSION_MATCH", "施工版本匹配及回退"),
 
@@ -34,6 +37,9 @@ public enum TcScheduleRuleCodeEnum {
 
     /** 静态可行但当前班产能不足的顺延。 */
     CAPACITY_BLOCKED_CARRYOVER("CAPACITY_BLOCKED_CARRYOVER", "当前班产能不足顺延"),
+
+    /** 来源班次机台未开班或当前班不可生产的顺延。 */
+    MACHINE_SHIFT_BLOCKED_CARRYOVER("MACHINE_SHIFT_BLOCKED_CARRYOVER", "来源班次机台不可用顺延"),
 
     /** 产能溢出拆分。 */
     CAPACITY_OVERFLOW_SPLIT("CAPACITY_OVERFLOW_SPLIT", "产能溢出拆分"),
@@ -73,6 +79,9 @@ public enum TcScheduleRuleCodeEnum {
 
     /** 需求量计算。 */
     DEMAND_QTY_CALC("DEMAND_QTY_CALC", "需求量计算"),
+
+    /** 按成型来源行八班计划合计判断收尾。 */
+    CLOSE_OUT_JUDGE("CLOSE_OUT_JUDGE", "收尾判定"),
 
     /** 当班与下一排程班库存覆盖判断。 */
     TWO_SHIFT_STOCK_COVERAGE("TWO_SHIFT_STOCK_COVERAGE", "两班库存覆盖判断"),

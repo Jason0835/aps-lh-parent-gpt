@@ -64,7 +64,7 @@ public class DjSpecifyMachineController extends AbstractDocBizController<DjSpeci
     @Override
     public AjaxResult save(@RequestBody DjSpecifyMachine stock) {
         if (UserConstants.NOT_UNIQUE.equals(machineService.checkUnique(stock))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.error.message.quota.unique"));
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.djSpecifyMachine.importUnique"));
         }
         return super.save(stock);
     }
@@ -95,7 +95,7 @@ public class DjSpecifyMachineController extends AbstractDocBizController<DjSpeci
     @Override
     protected List<DjSpecifyMachine> listExportData(DjSpecifyMachine obj) {
         QueryWrapper<DjSpecifyMachine> wrapper = new QueryWrapper<>();
-        startPage("update_time desc");
+        startPage(getOrderBy());
         this.builderCondition(wrapper, obj);
         List<DjSpecifyMachine> list = machineMapper.selectList(wrapper);
         AppUtils.formatData(list, getQueryFormulas());
@@ -124,6 +124,6 @@ public class DjSpecifyMachineController extends AbstractDocBizController<DjSpeci
 
     @Override
     protected String getOrderBy() {
-        return "MACHINE_CODE, PADDING_CODE";
+        return "MACHINE_CODE, PADDING_CODE, ID";
     }
 }

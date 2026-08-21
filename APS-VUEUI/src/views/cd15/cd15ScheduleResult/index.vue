@@ -227,7 +227,7 @@ export default {
     },
     searchColumns() {
       return [
-        { label: this.$t('ui.data.column.cd15ScheduleResult.factoryCode'), prop: 'factoryCode', type: 'select', dictData: this.dict.type.biz_factory_name, filterable: true },
+        { label: this.$t('ui.data.column.cd15ScheduleResult.factoryCode'), prop: 'factoryCode', type: 'select', dictData: this.dict.type.biz_factory_name, filterable: true, listeners: { change: (factoryCode) => this.loadMachineOptions(factoryCode) } },
         { label: this.$t('ui.data.column.cd15ScheduleResult.scheduleDate'), prop: 'scheduleDate', type: 'date', valueFormat: 'yyyy-MM-dd' },
         { label: this.$t('ui.data.column.cd15ScheduleResult.steelStripCode'), prop: 'steelStripCode' },
         { label: this.$t('ui.data.column.cd15ScheduleResult.bigRollCode'), prop: 'bigRollCode' },
@@ -593,8 +593,13 @@ export default {
         this.loading = false
       }
     },
-    loadMachineOptions() {
-      getCd15MachineEnableOptions({ factoryCode: this.query.factoryCode || this.search.factoryCode }).then(res => {
+    loadMachineOptions(factoryCode) {
+      const code = factoryCode || this.query.factoryCode || this.search.factoryCode;
+      if (!code) {
+        this.machineOptions = [];
+        return;
+      }
+      getCd15MachineEnableOptions({ factoryCode: code }).then(res => {
         const rows = Array.isArray(res) ? res : (res.rows || res.data || [])
         this.machineOptions = rows.map(item => ({
           label: item.machineCode || item.label || item.value,

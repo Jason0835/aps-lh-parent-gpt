@@ -27,4 +27,8 @@ public class TcManualShiftItemVo implements Serializable {
     /** 班内顺序。 */
     @ApiModelProperty(value = "班内顺序", required = true)
     private Integer sequence;
+
+    /** 班次原因分析。 */
+    @ApiModelProperty(value = "班次原因分析")
+    private String analysis;
 }

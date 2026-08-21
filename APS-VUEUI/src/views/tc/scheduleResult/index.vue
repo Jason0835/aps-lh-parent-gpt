@@ -121,7 +121,11 @@
     />
 
     <auto-plan-dialog ref="autoPlanRef" @success="handleAutoPlanSuccess" />
-    <insert-task-dialog ref="insertTaskRef" @success="handleOperationTask" />
+    <insert-task-dialog
+      ref="insertTaskRef"
+      :machine-options="machineOptions"
+      @success="handleOperationTask"
+    />
     <change-qty-dialog ref="changeQtyRef" @success="handleOperationTask" />
     <change-machine-dialog ref="changeMachineRef" @success="handleOperationTask" />
     <release-status-dialog ref="releaseStatusRef" @success="getList" />
@@ -431,12 +435,36 @@ export default {
         {
           label: this.$t('ui.data.btn.option'),
           fixed: 'right',
-          width: 110,
+          width: 300,
+          minWidth: 280,
           align: 'center',
+          halign: 'center',
           render: ({ row }) => (
-            <el-button type='text' onClick={() => this.$refs.explainRef.showResult(row.id)}>
-              {this.$t('ui.tc.schedule.viewExplain')}
-            </el-button>
+            <div>
+              <el-button
+                v-hasPermi={['tc:tcScheduleResult:edit']}
+                class='minus'
+                type='success'
+                onClick={() => this.handleChangeQty(row)}
+              >
+                {this.$t('ui.data.column.scheduleResult.changePlan')}
+              </el-button>
+              <el-button
+                v-hasPermi={['tc:tcScheduleResult:remove']}
+                class='minus'
+                type='danger'
+                onClick={() => this.handleRemove([row])}
+              >
+                {this.$t('ui.frame.btn.delete')}
+              </el-button>
+              <el-button
+                class='minus'
+                type='primary'
+                onClick={() => this.$refs.explainRef.showResult(row.id)}
+              >
+                {this.$t('ui.tc.schedule.viewExplain')}
+              </el-button>
+            </div>
           )
         }
       ])
@@ -748,11 +776,18 @@ export default {
       if (this.writeTaskRunning) return
       this.$refs.insertTaskRef.show(this.query.factoryCode, this.query.scheduleDate)
     },
-    handleChangeQty() {
+    /**
+     * 打开胎侧调量弹窗，支持顶部单选和列表行操作两种入口。
+     *
+     * @param {Object} row 行操作传入的排程结果，为空时使用顶部选中行
+     * @returns {void}
+     */
+    handleChangeQty(row) {
       if (this.writeTaskRunning) return
-      const row = this.selection[0]
-      if (this.isManualBlocked(row)) return
-      this.$refs.changeQtyRef.show(row)
+      const targetRow = row || this.selection[0]
+      if (!targetRow) return
+      if (this.isManualBlocked(targetRow)) return
+      this.$refs.changeQtyRef.show(targetRow)
     },
     handleChangeMachine() {
       if (this.writeTaskRunning) return
@@ -771,16 +806,24 @@ export default {
       }
       return false
     },
-    handleRemove() {
+    /**
+     * 删除胎侧排程结果，支持顶部批量删除和列表单行删除。
+     *
+     * @param {Array<Object>} targetRows 待删除的排程结果，为空时使用顶部选中行
+     * @returns {void}
+     */
+    handleRemove(targetRows = this.selection) {
       if (this.writeTaskRunning) return
-      const invalidRow = this.selection.find(item => !['0', '2', '5'].includes(String(item.releaseStatus)))
+      const removeRows = Array.isArray(targetRows) ? targetRows : []
+      if (removeRows.length === 0) return
+      const invalidRow = removeRows.find(item => !['0', '2', '5'].includes(String(item.releaseStatus)))
       if (invalidRow) {
         this.$modal.alertWarning(this.$t('ui.tc.schedule.removeReleaseBlocked'))
         return
       }
       this.$confirm(this.$t('ui.tc.schedule.confirmRemoveWholeRow'), { type: 'warning' }).then(async() => {
         try {
-          const task = await removeScheduleResult(this.selection.map(item => item.id))
+          const task = await removeScheduleResult(removeRows.map(item => item.id))
           this.page.current = 1
           this.handleOperationTask(task)
         } catch (error) {

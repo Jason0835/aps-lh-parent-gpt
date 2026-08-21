@@ -64,10 +64,10 @@ public class DjCurlRollController extends AbstractDocBizController<DjCurlRoll> {
      */
     @Log(title = "ui.dj.curlRoll.column.modalName", businessType = BusinessType.INSERT)
     @ApiOperation("新增信息（id不为空）")
-    @PostMapping
+    @Override
     public AjaxResult save(@RequestBody DjCurlRoll stock) {
         if (UserConstants.NOT_UNIQUE.equals(curlRollService.checkUnique(stock))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.error.message.quota.unique"));
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.djCurlRoll.importUnique"));
         }
         return super.save(stock);
     }
@@ -98,7 +98,7 @@ public class DjCurlRollController extends AbstractDocBizController<DjCurlRoll> {
     @Override
     protected List<DjCurlRoll> listExportData(DjCurlRoll obj) {
         QueryWrapper<DjCurlRoll> wrapper = new QueryWrapper<>();
-        startPage("update_time desc");
+        startPage(getOrderBy());
         this.builderCondition(wrapper, obj);
         List<DjCurlRoll> list = curlRollMapper.selectList(wrapper);
         AppUtils.formatData(list, getQueryFormulas());
@@ -127,6 +127,6 @@ public class DjCurlRollController extends AbstractDocBizController<DjCurlRoll> {
 
     @Override
     protected String getOrderBy() {
-        return "PADDING_CODE";
+        return "PADDING_CODE, ID";
     }
 }

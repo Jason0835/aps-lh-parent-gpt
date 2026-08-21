@@ -10,7 +10,7 @@ export function listLoss(query) {
 }
 export function editLoss(query) {
   return request({
-    url: 'dj/lossSetting/edit',
+    url: 'dj/lossSetting/save',
     method: 'post',
     data: query
   })

@@ -30,8 +30,8 @@ public interface IMachineMatchStrategy {
      * 匹配可用硫化机台
      * <p>
      * 规则：先复用模具、胶囊、特殊物料、单控粒度等既有硬性约束保留合法机台，
-     * 再严格按照“同胎胚、同模壳、同规格、胶囊共用、同英寸、相近英寸、机台编码”
-     * 七层软规则排序。该入口只负责硬过滤和同层软排序；候选机台的真实可开产时间、
+     * 再严格按照“同胎胚、同模壳、同规格、胶囊共用、同英寸、相近英寸、收尾时间、机台编码”
+     * 八层软规则排序。该入口只负责硬过滤和同层软排序；候选机台的真实可开产时间、
      * 逐班筛选及跨天重排由新增排产日驱动主链统一处理。
      * </p>
      *
@@ -44,7 +44,7 @@ public interface IMachineMatchStrategy {
     /**
      * 校验并返回指定机台。
      *
-     * <p>该入口复用普通新增选机的全部硬过滤和单控粒度规则，但不执行七层软排序、
+     * <p>该入口复用普通新增选机的全部硬过滤和单控粒度规则，但不执行八层软排序、
      * 逐班候选筛选和最优机台选择。适用于业务已经固定“机台+SKU”关系的反选场景。</p>
      *
      * @param context 排程上下文
@@ -173,7 +173,7 @@ public interface IMachineMatchStrategy {
     }
 
     /**
-     * 构建同时携带换模/换活字块完成时间与真实可开产时间的完整选机日志快照。
+     * 构建同时携带换模/换活字块完成时间与正式可开产时间的完整选机日志快照。
      *
      * <p>两个时间均由新增排产日驱动主链在逐班筛选时计算，并与正式落地复用同一份
      * {@code NewSpecMachineAvailabilityPlan}。默认策略外仍回落到不含这两个时间的既有入口，
@@ -187,7 +187,7 @@ public interface IMachineMatchStrategy {
      * @param targetScheduleQtyResolver 产能计算组件
      * @param priorityMetricSnapshotMap 正式模具分配前冻结的软排序指标
      * @param traceChangeoverEndTimeMap 机台编码到换模或换活字块完成时间的映射
-     * @param realAvailableProductionTimeMap 机台编码到真实可开产时间的映射
+     * @param realAvailableProductionTimeMap 机台编码到正式可开产时间的映射
      * @return 当前选机时点的只读日志快照
      */
     default MachinePriorityTraceSnapshot buildMachinePriorityTraceSnapshot(
@@ -203,6 +203,41 @@ public interface IMachineMatchStrategy {
         return this.buildMachinePriorityTraceSnapshot(
                 context, sku, actualOrderedCandidates, actualSelectedMachine,
                 currentDayEndTime, targetScheduleQtyResolver, priorityMetricSnapshotMap);
+    }
+
+    /**
+     * 构建同时携带准备完成时间与正式候选生产时间的选机日志快照。
+     *
+     * <p>默认实现回落到既有日志入口，保证非默认机台匹配策略和历史测试替身无需同步实现；
+     * 默认新增策略由实现类覆盖该入口后再输出两套时间轴。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 当前待选机 SKU
+     * @param actualOrderedCandidates 正式选机主链本轮有序候选
+     * @param actualSelectedMachine 正式选机主链确定的本轮首选机台
+     * @param currentDayEndTime 当前业务日结束时间
+     * @param targetScheduleQtyResolver 产能计算组件
+     * @param priorityMetricSnapshotMap 正式模具分配前冻结的软排序指标
+     * @param traceChangeoverEndTimeMap 粗略换模完成时间
+     * @param preparationAvailableTimeMap 准备完成时间
+     * @param realAvailableProductionTimeMap 正式候选生产时间
+     * @return 当前选机时点的只读日志快照
+     */
+    default MachinePriorityTraceSnapshot buildMachinePriorityTraceSnapshot(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            List<MachineScheduleDTO> actualOrderedCandidates,
+            MachineScheduleDTO actualSelectedMachine,
+            Date currentDayEndTime,
+            TargetScheduleQtyResolver targetScheduleQtyResolver,
+            Map<String, MachinePriorityMetricSnapshot> priorityMetricSnapshotMap,
+            Map<String, Date> traceChangeoverEndTimeMap,
+            Map<String, Date> preparationAvailableTimeMap,
+            Map<String, Date> realAvailableProductionTimeMap) {
+        return this.buildMachinePriorityTraceSnapshot(
+                context, sku, actualOrderedCandidates, actualSelectedMachine,
+                currentDayEndTime, targetScheduleQtyResolver, priorityMetricSnapshotMap,
+                traceChangeoverEndTimeMap, realAvailableProductionTimeMap);
     }
 
     /**

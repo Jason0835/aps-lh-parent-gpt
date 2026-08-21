@@ -85,13 +85,13 @@ export default {
         {
           label: this.$t("ui.data.column.gsq.stock.stockDate"),
           prop: "stockDate",
-          type: "daterange",
+          type: "date",
+          dateType: "daterange",
+          valueFormat: "yyyy-MM-dd",
         },
         {
           label: this.$t("ui.data.column.gsq.stock.steelRingCode"),
           prop: "steelRingCode",
-          type: "input",
-          placeholder: this.$t("ui.data.column.gsq.stock.steelRingCode"),
         },
       ];
     },
@@ -249,15 +249,6 @@ export default {
     },
     handleSearch(data) {
       this.query = data;
-      if (data.stockDate && data.stockDate.length === 2) {
-        this.query.stockDateBegin = data.stockDate[0];
-        this.query.stockDateEnd = data.stockDate[1];
-        delete this.query.stockDate;
-      } else {
-        this.query.stockDateBegin = undefined;
-        this.query.stockDateEnd = undefined;
-        delete this.query.stockDate;
-      }
       this.$set(this.page, "current", 1);
       this.getList();
     },
@@ -289,6 +280,14 @@ export default {
         params.pageSize = this.page.pageSize;
         params.pageNum = this.page.current;
       }
+
+      // 库存日期范围查询条件拆分为开始/结束日期（对齐胎圈库存页面）
+      if (params.stockDate && params.stockDate[0]) {
+        params.stockDateStart = params.stockDate[0];
+        params.stockDateEnd = params.stockDate[1];
+        params.stockDate = undefined;
+      }
+
       return params;
     },
     async getList() {

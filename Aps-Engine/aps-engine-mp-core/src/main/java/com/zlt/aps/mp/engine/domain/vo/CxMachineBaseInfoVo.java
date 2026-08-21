@@ -96,6 +96,10 @@ public class CxMachineBaseInfoVo implements Serializable {
      * 固定SKU
      */
     private String fixedMaterialCode;
+    /**
+     * 固定胎胚
+     */
+    private String fixedEmbryoCode;
 
     /**
      * 不可作业结构
@@ -1247,6 +1251,19 @@ public class CxMachineBaseInfoVo implements Serializable {
         allocationDaySet.removeAll(productionDayInfo);
         //成型机删除分配段
         return allocationList.remove(offlineAllocationInfo);
+    }
+
+    /**
+     * 获取指定胎胚配置
+     *
+     * @return
+     */
+    public Set<String> getFixedEmbryoCodeInfo() {
+        Set<String> fixedEmbryoCodeSet = new HashSet<>();
+        if (StringUtils.isNotBlank(fixedEmbryoCode)) {
+            CollectValueUtils.addSingleValueToCollect(fixedEmbryoCodeSet, fixedEmbryoCode, StringConstant.COMMA);
+        }
+        return fixedEmbryoCodeSet;
     }
 
     /**

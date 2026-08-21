@@ -33,7 +33,7 @@
         > -->
         <el-button
           v-hasPermi="['dj:curlRoll:import']"
-          @click="$refs.tltUpload.handleImport()"
+          @click="() => $refs.tltUploadForm.handleImport(importDefaultValue)"
           >{{ $t("ui.frame.btn.import") }}</el-button
         >
         <el-button @click="handleExport" v-hasPermi="['dj:curlRoll:export']">{{
@@ -42,11 +42,15 @@
       </template>
     </page-table>
     <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
-    <tlt-upload
-      ref="tltUpload"
+    <tlt-upload-form
+      ref="tltUploadForm"
+      :title="$t('ui.dj.curlRoll.column.modalName')"
       downloadUrl="/dj/curlRoll/importTemplate"
       uploadUrl="/dj/curlRoll/importData"
       @uploadSuccess="getList"
+      labelWidth="0"
+      :columns="importColumns"
+      :rules="importRules"
     />
     <infoDialog ref="infoRef" @success="getList" />
   </basic-container>
@@ -60,14 +64,14 @@ import { downloadLink } from "@/utils/request";
 import { listCurlRoll, removeCurlRoll } from "@/api/dj/curlRoll";
 import { getConfigKey } from "@/api/system/config";
 //components
-import tltUpload from "@/components/tltUpload/tltUpload.vue";
+import TltUploadForm from "@/views/components/tltUploadForm.vue";
 
 import infoDialog from "./components/infoDialog.vue";
 
 export default {
   name: "DjCurlRoll",
   components: {
-    tltUpload,
+    TltUploadForm,
     infoDialog,
   },
   dicts: ["biz_factory_name"],
@@ -95,7 +99,25 @@ export default {
         factoryCode: '',
         mainPlanMonth: "",
       },
-      importDefaultValue: {},
+      importDefaultValue: {
+        updateSupport: false,
+      },
+      importColumns: [
+        {
+          label: "",
+          prop: "updateSupport",
+          render: (form) => {
+            return (
+              <el-checkbox
+                label={this.$t("ui.checkbox.updateExistingData")}
+                v-model={form.updateSupport}
+              >
+                {this.$t("ui.checkbox.updateExistingData")}
+              </el-checkbox>
+            );
+          },
+        },
+      ],
       importRules: {},
     };
   },
@@ -106,6 +128,14 @@ export default {
     columns() {
       let columns = [
         { type: "selection", fixed: "left" },
+        {
+          label: this.$t("ui.data.column.factoryCode"),
+          prop: "factoryCode",
+          minWidth: 100,
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_factory_name, value);
+          },
+        },
         {
           prop: "paddingCode",
           align: "center",
@@ -127,6 +157,13 @@ export default {
           label: this.$t("ui.common.column.remark"),
           sortable: true,
           minWidth: 100,
+        },
+        {
+          prop: "updateTime",
+          align: "center",
+          halign: "center",
+          label: this.$t("common.updateTime"),
+          minWidth: 160,
         },
         {
           align: "center",

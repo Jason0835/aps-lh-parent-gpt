@@ -21,8 +21,6 @@ import { getCd90MachineEnableOptions } from "@/api/cd90/cd90MachineInfo";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import infoDialog from "./components/infoDialog.vue";
 
-const DEFAULT_FACTORY_CODE = "116";
-
 export default {
   name: "StorageLaneLimit",
   components: { TltUploadForm, infoDialog },
@@ -33,7 +31,7 @@ export default {
       importColumns: [{ label: "", prop: "updateSupport", render: (form) => (<el-checkbox label={this.$t("common.rule.updateSupport")} v-model={form.updateSupport}>{this.$t("common.rule.updateSupport")}</el-checkbox>) }],
       loading: false, data: [], selection: [], clothOptions: [], machineOptions: [],
       page: { current: 1, pageSize: 20, total: 0 }, sort: {},
-      search: { factoryCode: "116", laneDate: new Date().toISOString().slice(0, 10) }, query: { factoryCode: "116", laneDate: new Date().toISOString().slice(0, 10) },
+      search: { factoryCode: "116" }, query: { factoryCode: "116" },
     };
   },
   computed: {
@@ -56,7 +54,7 @@ export default {
     },
     searchColumns() {
       return [
-        { label: this.$t("ui.data.column.cd90StorageLaneLimit.factoryCode"), prop: "factoryCode", type: "select", dictData: this.dict.type.biz_factory_name, filterable: true },
+        { label: this.$t("ui.data.column.cd90StorageLaneLimit.factoryCode"), prop: "factoryCode", type: "select", dictData: this.dict.type.biz_factory_name, filterable: true, listeners: { change: (factoryCode) => this.loadMachineOptions(factoryCode) } },
         { label: this.$t("ui.data.column.cd90StorageLaneLimit.materialCode"), prop: "materialCode", type: "select", dictData: this.clothOptions, filterable: true, clearable: true },
         { label: this.$t("ui.data.column.cd90StorageLaneLimit.laneDate"), prop: "laneDate", type: "date", valueFormat: "yyyy-MM-dd" },
         { label: this.$t("ui.data.column.cd90StorageLaneLimit.shiftCode"), prop: "shiftCode", type: "select", dictData: this.dict.type.class_num_three_plan, filterable: true },
@@ -72,7 +70,7 @@ export default {
     handleDelete(row) { this.$confirm(this.$t("common.confirm.delete"), { type: "warning" }).then(() => { delStorageLaneLimit({ ids: row.id }).then((data) => { this.$modal.msgSuccess(data.msg); this.$set(this.page, "current", 1); this.getList(); }); }); },
     handleBatchDelete() { if (!this.selection || this.selection.length === 0) return; this.$confirm(this.$t("common.confirm.delete"), { type: "warning" }).then(() => { const ids = this.selection.map(item => item.id).join(","); delStorageLaneLimit({ ids }).then((data) => { this.$modal.msgSuccess(data.msg); this.selection = []; this.$set(this.page, "current", 1); this.getList(); }); }); },
     handleExport() { exportStorageLaneLimit(this.query); },
-    handleSearch(params) { this.page.current = 1; this.query = { ...params }; this.loadMachineOptions(params.factoryCode); this.getList(); },
+    handleSearch(params) { this.page.current = 1; this.query = { ...params }; this.loadMachineOptions(); this.getList(); },
     handlePageChange(current, pageSize) { this.page.current = current; this.page.pageSize = pageSize; this.getList(); },
     handleSortChange(sort) { this.sort = sort; this.getList(); },
     handleSelectionChange(selection) { this.selection = selection || []; },
@@ -82,9 +80,14 @@ export default {
       const rows = Array.isArray(res) ? res : (res.data || []);
       this.clothOptions = rows.map((code) => ({ label: code, value: code }));
     },
-    async loadMachineOptions(factoryCode = DEFAULT_FACTORY_CODE) {
-      const res = await getCd90MachineEnableOptions({ factoryCode: factoryCode || DEFAULT_FACTORY_CODE });
-      const rows = Array.isArray(res) ? res : (res.data || []);
+    async loadMachineOptions(factoryCode) {
+      const code = factoryCode || this.query.factoryCode;
+      if (!code) {
+        this.machineOptions = [];
+        return;
+      }
+      const res = await getCd90MachineEnableOptions({ factoryCode: code });
+      const rows = Array.isArray(res) ? res : (res.rows || res.data || []);
       this.machineOptions = rows.map((item) => ({ label: item.machineCode, value: item.machineCode }));
     },
   },

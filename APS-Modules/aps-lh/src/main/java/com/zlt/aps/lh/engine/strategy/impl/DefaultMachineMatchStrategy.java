@@ -75,8 +75,8 @@ import java.util.stream.Collectors;
  *   <li>为新增排产、局部搜索和目标量评估提供候选硫化机台；</li>
  *   <li>先执行硬性过滤：定点不可作业、机台状态、寸口、特殊材料能力、模具占用和停机窗口；</li>
  *   <li>再执行单控/普通机台类型约束，区分试制、量试、小批量和正规 SKU；</li>
- *   <li>最后只执行七层软排序：同胎胚、同模壳、同规格、胶囊共用、同英寸、相近英寸、
- *   机台编码；真实可开产时间和逐班次筛选由新增排产主链统一完成。</li>
+ *   <li>最后只执行八层软排序：同胎胚、同模壳、同规格、胶囊共用、同英寸、相近英寸、
+ *   收尾时间、机台编码；真实可开产时间和逐班次筛选由新增排产主链统一完成。</li>
  * </ul>
  *
  * <p>注意：该策略不直接分配班次排量，只返回候选和排序；真正的换模、首检和产能落地在新增策略中执行。</p>
@@ -202,7 +202,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
         // 2. 候选预检与正式分配共用同一份模具运行态，换下的共用模具不再被历史结果永久占用。
         MouldResourceContext mouldResourceContext = resolveMouldResourceContext(context);
         // 4. 过滤候选机台：状态启用 + 硬性指标匹配 + 模具未被占用。
-        // 模套型号匹配作为硬过滤（到货模具不降级），同模壳仍参与同一目标班次内的七层软排序。
+        // 模套型号匹配作为硬过滤（到货模具不降级），同模壳仍参与同一目标班次内的八层软排序。
         // 这里只保留业务上可承接的机台，不在这里提前决定最终排产量。
         BigDecimal skuInch = parseInch(sku.getProSize());
         SpecialMaterialMatchResult specialMaterialMatchResult =
@@ -252,11 +252,11 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
         candidates = applySingleControlReservationRule(context, sku, candidates, trace);
 
         /*
-         * 5. 硬过滤后只执行业务确认的七层软排序。真实可开产时间与目标班次由新增主链
+         * 5. 硬过滤后只执行业务确认的八层软排序。真实可开产时间与目标班次由新增主链
          * 使用完整设备时间轴统一计算；本策略不再构造近似生产窗口或班次距离档。
          */
         this.sortCandidates(context, candidates, sku);
-        this.traceMachineCandidatesBySevenLevels(
+        this.traceMachineCandidatesByEightLevels(
                 context, sku, specialMaterialMatchResult, candidates, trace);
 
         if (CollectionUtils.isEmpty(candidates)) {
@@ -277,7 +277,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
     /**
      * 校验历史交替计划指定的机台。
      *
-     * <p>本方法只跳过普通选机的七层软排序和新增主链逐班筛选，定点不可作业、
+     * <p>本方法只跳过普通选机的八层软排序和新增主链逐班筛选，定点不可作业、
      * 机台状态、寸口、模套、特殊材料、模具占用以及单控整机/单边规则仍与普通新增选机一致。
      * 正规双模SKU指定单控右侧时，单控规则以左侧作为物理整机代表返回，后续排产仍会同步占用
      * L/R两侧，因此没有改变历史指定的物理机台关系。</p>
@@ -458,7 +458,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
      * <p>试制单模只保留单边单控候选；试制双模保留L/R整组与普通机台；
      * 量试/小批量保留合法单控与普通候选；正规单控候选按冻结模式收敛为单边或L/R整机。
      * 这里仅形成合法候选，不决定最终顺序；正式优先级由真实可开产时间确定目标班次后，
-     * 在该班候选内执行统一七层软排序。</p>
+     * 在该班候选内执行统一八层软排序。</p>
      *
      * <p>业务边界：这里不做新增排序重排，不让后续试制/量试反向抢占当前 SKU 的全局顺序；
      * 只在当前 SKU 已轮到选机时，按类型决定单控和普通候选是否保留。</p>
@@ -709,7 +709,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
                 // 试制单模只能使用单控单边；快照缺失时保持原有从严口径，不允许误落普通机台。
                 return singleControlCandidates;
             }
-            // 试制双模保留已收敛的L/R整组和普通机台，后续统一按目标班次及七层软排序选机。
+            // 试制双模保留已收敛的L/R整组和普通机台，后续统一按目标班次及八层软排序选机。
             List<MachineScheduleDTO> retainedCandidates = new ArrayList<>(
                     singleControlCandidates.size() + normalCandidates.size());
             retainedCandidates.addAll(singleControlCandidates);
@@ -734,8 +734,8 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
 
     /**
      * 合并普通机台与合法单控机台候选。
-     * <p>本方法只恢复候选全集，不表达机台类型优先级；调用方随后执行完整七层软排序，
-     * 最终顺序由业务指标和机台编码决定。</p>
+     * <p>本方法只恢复候选全集，不表达机台类型优先级；调用方随后执行完整八层软排序，
+     * 最终顺序由业务指标、统一参考收尾时间和机台编码决定。</p>
      *
      * @param singleControlCandidates 单控候选
      * @param normalCandidates 普通候选
@@ -1090,7 +1090,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
     }
 
     /**
-     * 构建同时携带换模/换活字块完成时间与真实可开产时间的完整选机日志快照。
+     * 构建同时携带换模/换活字块完成时间与正式可开产时间的完整选机日志快照。
      *
      * <p>两个时间均由新增排产日驱动主链在逐班筛选时计算，并作为只读映射传入。
      * 映射只冻结选机时点时间，不参与正式候选过滤、排序或机台状态修改。</p>
@@ -1103,7 +1103,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
      * @param targetScheduleQtyResolver 产能计算组件
      * @param priorityMetricSnapshotMap 正式模具分配前冻结的软排序指标
      * @param traceChangeoverEndTimeMap 机台编码到换模或换活字块完成时间的映射
-     * @param realAvailableProductionTimeMap 机台编码到真实可开产时间的映射
+     * @param realAvailableProductionTimeMap 机台编码到正式可开产时间的映射
      * @return 独立的只读日志快照
      */
     @Override
@@ -1116,6 +1116,40 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
             TargetScheduleQtyResolver targetScheduleQtyResolver,
             Map<String, MachinePriorityMetricSnapshot> priorityMetricSnapshotMap,
             Map<String, Date> traceChangeoverEndTimeMap,
+            Map<String, Date> realAvailableProductionTimeMap) {
+        return this.buildMachinePriorityTraceSnapshot(
+                context, sku, actualOrderedCandidates, actualSelectedMachine,
+                currentDayEndTime, targetScheduleQtyResolver, priorityMetricSnapshotMap,
+                traceChangeoverEndTimeMap, Collections.<String, Date>emptyMap(),
+                realAvailableProductionTimeMap);
+    }
+
+    /**
+     * 构建携带准备完成时间和正式候选生产时间的完整选机日志快照。
+     *
+     * @param context 排程上下文
+     * @param sku 当前待选机 SKU
+     * @param actualOrderedCandidates 正式选机主链本轮有序候选
+     * @param actualSelectedMachine 正式选机主链确定的本轮首选机台
+     * @param currentDayEndTime 当前业务日结束时间
+     * @param targetScheduleQtyResolver 产能计算组件
+     * @param priorityMetricSnapshotMap 正式模具分配前冻结的软排序指标
+     * @param traceChangeoverEndTimeMap 粗略换模完成时间
+     * @param preparationAvailableTimeMap 准备完成时间
+     * @param realAvailableProductionTimeMap 正式候选生产时间
+     * @return 当前选机时点的只读日志快照
+     */
+    @Override
+    public MachinePriorityTraceSnapshot buildMachinePriorityTraceSnapshot(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            List<MachineScheduleDTO> actualOrderedCandidates,
+            MachineScheduleDTO actualSelectedMachine,
+            Date currentDayEndTime,
+            TargetScheduleQtyResolver targetScheduleQtyResolver,
+            Map<String, MachinePriorityMetricSnapshot> priorityMetricSnapshotMap,
+            Map<String, Date> traceChangeoverEndTimeMap,
+            Map<String, Date> preparationAvailableTimeMap,
             Map<String, Date> realAvailableProductionTimeMap) {
         MachinePriorityTraceSnapshot actualOnlySnapshot =
                 MachinePriorityTraceSnapshot.fromActualCandidates(
@@ -1177,6 +1211,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
                 priorityTraceEndingTimeMap,
                 mergedPriorityMetricSnapshotMap,
                 traceChangeoverEndTimeMap,
+                preparationAvailableTimeMap,
                 realAvailableProductionTimeMap)
                 .withTraceSnapshotContext(context.getCurrentScheduleDate(), sku.getSortRank());
     }
@@ -1928,7 +1963,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
     /**
      * 构建占用日志候选比较器。
      *
-     * <p>完整复用正式选机七层软排序。该比较器只排序并插入新增日志候选，
+     * <p>完整复用正式选机八层软排序。该比较器只排序并插入新增日志候选，
      * 不交换正式可选机台之间的相对顺序。</p>
      *
      * @param context 排程上下文
@@ -2141,6 +2176,8 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
              */
             Date traceChangeoverEndTime =
                     traceSnapshot.resolveTraceChangeoverEndTime(machine.getMachineCode());
+            Date preparationAvailableTime =
+                    traceSnapshot.resolvePreparationAvailableTime(machine.getMachineCode());
             Date realAvailableProductionTime =
                     traceSnapshot.resolveRealAvailableProductionTime(machine.getMachineCode());
             detailBuilder.append(i + 1).append(". ")
@@ -2155,7 +2192,9 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
                     .append(resolveTimeShiftText(context, traceEndingTime))
                     .append("｜可开产时间（换模/换活字块完成时间）：")
                     .append(resolveTimeShiftText(context, traceChangeoverEndTime))
-                    .append("｜真实可开产时间：")
+                    .append("｜准备完成时间：")
+                    .append(resolveTimeShiftText(context, preparationAvailableTime))
+                    .append("｜正式可开产时间：")
                     .append(resolveTimeShiftText(context, realAvailableProductionTime))
                     .append("｜占用SKU：").append(occupationText)
                     .append("｜单控硬规则：")
@@ -2851,7 +2890,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
     private void sortCandidates(LhScheduleContext context,
                                 List<MachineScheduleDTO> candidates,
                                 SkuScheduleDTO sku) {
-        // 同胎胚→同模壳→同规格→胶囊共用→同英寸→相近英寸→机台编码。
+        // 同胎胚→同模壳→同规格→胶囊共用→同英寸→相近英寸→收尾时间→机台编码。
         candidates.sort(this.buildMachineComparator(context, sku));
     }
 
@@ -3002,7 +3041,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
     /**
      * 构建机台优先级比较器。
      * <p>硬性过滤由本策略前置完成，真实可开产时间和目标班次由新增主链完成；本比较器只保留
-     * 业务确认的七层软排序，不读取生产窗口、班次距离或单控资源保护分值。</p>
+     * 业务确认的八层软排序，不读取生产窗口、班次距离或单控资源保护分值。</p>
      *
      * @param context 排程上下文
      * @param sku 待排SKU
@@ -3016,6 +3055,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
          */
         Map<String, MachinePriorityMetricSnapshot> metricSnapshotCache =
                 new HashMap<String, MachinePriorityMetricSnapshot>(16);
+        Map<String, Date> endingTimeCache = new HashMap<String, Date>(16);
         return (left, right) -> {
             MachinePriorityMetricSnapshot leftMetric = this.resolveMachinePriorityMetricSnapshot(
                     context, sku, left, metricSnapshotCache);
@@ -3058,8 +3098,56 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
                 return compareResult;
             }
 
+            /*
+             * 只有既有软排序指标全部相同时才比较收尾时间。这里复用新增选机统一参考时间，
+             * 保证续作释放、已登记结果、窗口首班对齐及正规单控L/R整机均使用同一口径。
+             * 收尾时间必须严格升序，不能套用带容差的历史比较方法，否则会让机台编码越过
+             * 实际更早的收尾时间。空时间统一排在有时间机台之后。
+             */
+            Date leftEndingTime = this.resolveCachedAlignedCandidateReferenceTime(
+                    context, sku, left, endingTimeCache);
+            Date rightEndingTime = this.resolveCachedAlignedCandidateReferenceTime(
+                    context, sku, right, endingTimeCache);
+            compareResult = Comparator.nullsLast(Date::compareTo)
+                    .compare(leftEndingTime, rightEndingTime);
+            if (compareResult != 0) {
+                return compareResult;
+            }
+
             return Comparator.nullsLast(String::compareTo).compare(left.getMachineCode(), right.getMachineCode());
         };
+    }
+
+    /**
+     * 获取本轮排序冻结的统一参考收尾时间。
+     *
+     * <p>缓存仅在单次 Comparator 生命周期内使用，避免排序比较过程中重复解析机台占用，
+     * 同时保证同一台机台在本轮排序中始终读取同一时点的收尾时间。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 当前待选机SKU
+     * @param machine 候选机台
+     * @param endingTimeCache 本轮机台收尾时间缓存
+     * @return 与新增选机窗口首班对齐后的统一参考收尾时间
+     */
+    private Date resolveCachedAlignedCandidateReferenceTime(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            MachineScheduleDTO machine,
+            Map<String, Date> endingTimeCache) {
+        if (Objects.isNull(machine)) {
+            return null;
+        }
+        String machineCode = machine.getMachineCode();
+        if (StringUtils.isEmpty(machineCode)) {
+            return this.resolveAlignedCandidateReferenceTime(context, sku, machine);
+        }
+        if (endingTimeCache.containsKey(machineCode)) {
+            return endingTimeCache.get(machineCode);
+        }
+        Date endingTime = this.resolveAlignedCandidateReferenceTime(context, sku, machine);
+        endingTimeCache.put(machineCode, endingTime);
+        return endingTime;
     }
 
     /**
@@ -4674,18 +4762,18 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
     }
 
     /**
-     * 输出新增选机硬过滤及七层软排序日志。
+     * 输出新增选机硬过滤及八层软排序日志。
      *
      * <p>真实可开产时间和逐班筛选由新增主链另行记录；本日志只还原本策略实际执行的
-     * 硬约束与七层软排序，不再输出已废弃的时间近似分组概念。</p>
+     * 硬约束与八层软排序，不再输出已废弃的时间近似分组概念。</p>
      *
      * @param context 排程上下文
      * @param sku 当前 SKU
      * @param matchResult 特殊物料匹配结果
-     * @param candidates 硬过滤后按七层规则排序的候选
+     * @param candidates 硬过滤后按八层规则排序的候选
      * @param trace 硬过滤统计
      */
-    private void traceMachineCandidatesBySevenLevels(
+    private void traceMachineCandidatesByEightLevels(
             LhScheduleContext context,
             SkuScheduleDTO sku,
             SpecialMaterialMatchResult matchResult,
@@ -4694,7 +4782,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
         if (!PriorityTraceLogHelper.isEnabled(context)) {
             return;
         }
-        String title = "机台排序优先级汇总【新增排产硬过滤与七层软排序】";
+        String title = "机台排序优先级汇总【新增排产硬过滤与八层软排序】";
         StringBuilder detailBuilder = new StringBuilder(1024);
         PriorityTraceLogHelper.appendTitleHeader(detailBuilder, title);
         int filteredCount = trace.notAllowedMachineFilteredCount + trace.disabledCount
@@ -4727,14 +4815,17 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
         }
         List<String> levelNames = java.util.Arrays.asList(
                 "L1_同胎胚", "L2_同模壳", "L3_同规格", "L4_胶囊共用",
-                "L5_同英寸", "L6_相近英寸", "L7_机台编码");
+                "L5_同英寸", "L6_相近英寸", "L7_收尾时间", "L8_机台编码");
         int topCount = Math.min(
                 LhScheduleConstant.MACHINE_SORT_TRACE_TOP_N, candidates.size());
-        PriorityTraceLogHelper.appendLine(detailBuilder, "TOP" + topCount + "候选七层软排序:");
+        PriorityTraceLogHelper.appendLine(detailBuilder, "TOP" + topCount + "候选八层软排序:");
+        Map<String, Date> endingTimeCache = new HashMap<String, Date>(Math.max(4, topCount * 2));
         for (int index = 0; index < topCount; index++) {
             MachineScheduleDTO machine = candidates.get(index);
             MachinePriorityMetricSnapshot metric = this.resolveMachinePriorityMetricSnapshot(
                     context, sku, machine);
+            Date endingTime = this.resolveCachedAlignedCandidateReferenceTime(
+                    context, sku, machine, endingTimeCache);
             List<String> sortKeyLevels = java.util.Arrays.asList(
                     "L1_同胎胚=" + metric.getEmbryoMatchScore(),
                     "L2_同模壳=" + metric.getMouldShellMatchScore(),
@@ -4742,13 +4833,14 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
                     "L4_胶囊共用=" + metric.getCapsuleScore(),
                     "L5_同英寸=" + metric.getProSizeMatchScore(),
                     "L6_相近英寸=" + formatInchDistance(metric.getInchDistance()),
-                    "L7_机台编码=" + machine.getMachineCode());
+                    "L7_收尾时间=" + PriorityTraceLogHelper.formatDateTime(endingTime),
+                    "L8_机台编码=" + machine.getMachineCode());
             List<Integer> scores = java.util.Arrays.asList(
                     metric.getEmbryoMatchScore(), metric.getMouldShellMatchScore(),
                     metric.getSpecMatchScore(), metric.getCapsuleScore(),
                     metric.getProSizeMatchScore(), safeInchDistanceScore(metric.getInchDistance()),
-                    StringUtils.isEmpty(machine.getMachineCode()) ? 1 : 0);
-            List<Integer> defaultScores = java.util.Arrays.asList(1, 1, 1, 1, 1, 0, 0);
+                    0, StringUtils.isEmpty(machine.getMachineCode()) ? 1 : 0);
+            List<Integer> defaultScores = java.util.Arrays.asList(1, 1, 1, 1, 1, 0, 0, 0);
             PriorityTraceLogHelper.appendLine(detailBuilder,
                     (index + 1) + ". " + PriorityTraceLogHelper.kv("机台", machine.getMachineCode())
                             + ", " + PriorityTraceLogHelper.kv("当前在机", machine.getPreviousMaterialCode())
@@ -4765,6 +4857,8 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
                             + ", " + PriorityTraceLogHelper.kv(
                             "英寸差", formatInchDistance(metric.getInchDistance()))
                             + ", " + PriorityTraceLogHelper.kv(
+                            "收尾时间", PriorityTraceLogHelper.formatDateTime(endingTime))
+                            + ", " + PriorityTraceLogHelper.kv(
                             "SortKey", PriorityTraceLogHelper.formatSortKey(sortKeyLevels))
                             + ", " + PriorityTraceLogHelper.kv(
                             "HitLevel", PriorityTraceLogHelper.resolveHitLevel(
@@ -4772,7 +4866,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
         }
         if (!CollectionUtils.isEmpty(candidates)) {
             PriorityTraceLogHelper.appendLine(detailBuilder,
-                    "七层软排序首选机台: " + candidates.get(0).getMachineCode()
+                    "八层软排序首选机台: " + candidates.get(0).getMachineCode()
                             + "；最终命中仍以逐班真实可开产时间筛选结果为准");
         }
         PriorityTraceLogHelper.appendTitleFooter(detailBuilder);

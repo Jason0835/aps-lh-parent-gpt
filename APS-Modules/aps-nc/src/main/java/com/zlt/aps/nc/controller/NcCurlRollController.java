@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
@@ -63,10 +64,10 @@ public class NcCurlRollController extends AbstractDocBizController<NcCurlRoll> {
      */
     @Log(title = "ui.nc.curlRoll.column.modalName", businessType = BusinessType.INSERT)
     @ApiOperation("新增信息（id不为空）")
-    @PostMapping
+    @Override
     public AjaxResult save(@RequestBody NcCurlRoll stock) {
         if (UserConstants.NOT_UNIQUE.equals(curlRollService.checkUnique(stock))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.error.message.quota.unique"));
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.ncCurlRoll.importUnique"));
         }
         return super.save(stock);
     }
@@ -97,7 +98,7 @@ public class NcCurlRollController extends AbstractDocBizController<NcCurlRoll> {
     @Override
     protected List<NcCurlRoll> listExportData(NcCurlRoll obj) {
         QueryWrapper<NcCurlRoll> wrapper = new QueryWrapper<>();
-        startPage("update_time desc");
+        startPage(getOrderBy());
         this.builderCondition(wrapper, obj);
         List<NcCurlRoll> list = curlRollMapper.selectList(wrapper);
         AppUtils.formatData(list, getQueryFormulas());
@@ -107,12 +108,10 @@ public class NcCurlRollController extends AbstractDocBizController<NcCurlRoll> {
     @Log(title = "ui.nc.curlRoll.column.modalName", businessType = BusinessType.IMPORT)
     @PostMapping("/importData")
     @ApiOperation("导入信息")
-    public AjaxResult importData(@RequestBody List<NcCurlRoll> list, @RequestParam("updateSupport") boolean updateSupport,
-            @RequestParam("importLogId") Long importLogId) {
-        if (StringUtils.isNull(list) || list.size() == 0) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.import.nodata"));
-        }
-        return curlRollService.importData(list, updateSupport, importLogId);
+    @Override
+    public AjaxResult importData(@RequestBody ImportContext importContext,
+            @RequestParam("updateSupport") boolean updateSupport) throws Exception {
+        return super.importData(importContext, updateSupport);
     }
 
     @Override
@@ -128,6 +127,6 @@ public class NcCurlRollController extends AbstractDocBizController<NcCurlRoll> {
 
     @Override
     protected String getOrderBy() {
-        return "PADDING_CODE";
+        return "LINING_CODE, ID";
     }
 }

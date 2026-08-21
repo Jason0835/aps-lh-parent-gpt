@@ -88,8 +88,8 @@ public class Cd15AutoScheduleEngineServiceImpl implements Cd15AutoScheduleEngine
                 this.loadWorkCalendars(factoryCode, shifts));
         LocalDateTime startTime = LocalDateTime.now();
         Cd15ShiftDescriptor resourceBaselineShift = shiftWindowResolver
-                .resolveCurrentResourceShift(startTime, enabledShifts);
-        // 输入版本指纹会在最终事务前按任务启动时冻结的当前资源班次复核。
+                .resolveScheduleBaselineShift(localScheduleDate, enabledShifts);
+        // 输入版本指纹会在最终事务前按排程窗口首班次资源基线复核。
         Cd15AutoScheduleContext context = Cd15AutoScheduleContext.builder()
                 .factoryCode(factoryCode)
                 .scheduleDate(localScheduleDate)

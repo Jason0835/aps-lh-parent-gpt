@@ -84,10 +84,14 @@ public class GsqParams extends BaseEntity {
     @TableField(value = "DEFAULT_VALUE")
     private String defaultValue;
 
+    @Excel(name = "ui.data.column.gsq.params.regularExpression")
+    @ImportValidated(maxLength = 200)
     @ApiModelProperty(value = "校验正则", name = "regularExpression")
     @TableField(value = "REGULAR_EXPRESSION")
     private String regularExpression;
 
+    @Excel(name = "ui.data.column.gsq.params.errorTips")
+    @ImportValidated(maxLength = 200)
     @ApiModelProperty(value = "错误提示", name = "errorTips")
     @TableField(value = "ERROR_TIPS")
     private String errorTips;

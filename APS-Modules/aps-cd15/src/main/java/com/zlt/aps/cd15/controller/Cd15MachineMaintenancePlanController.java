@@ -122,6 +122,7 @@ public class Cd15MachineMaintenancePlanController extends AbstractDocBizControll
     protected List<Cd15MachineMaintenancePlan> listExportData(Cd15MachineMaintenancePlan obj) {
         QueryWrapper<Cd15MachineMaintenancePlan> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
+        wrapper.last("ORDER BY " + this.getOrderBy());
         List<Cd15MachineMaintenancePlan> list = cd15MachineMaintenancePlanMapper.selectList(wrapper);
         AppUtils.formatData(list, getQueryFormulas());
         return list;

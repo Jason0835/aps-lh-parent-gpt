@@ -56,14 +56,13 @@
         GROUP BY STEEL_RING_CODE
     </select>
 
-    <!-- 查询钢丝圈-缠绕盘代码映射（缠绕盘子表关联主表，仅取启用分支盘 STATUS='0'） -->
+    <!-- 查询钢丝圈-缠绕盘代码映射（规格关系表按缠绕盘编码关联主表，仅取启用分支盘 STATUS='0'） -->
     <select id="listGsqTwiningDiscCode" resultType="java.util.Map">
         SELECT sub.STEEL_RING_CODE AS steelRingCode,
-               d.TWINING_DISC_CODE AS twiningDiscCode
-        FROM T_GSQ_TWINING_DISC_SUB sub
-        INNER JOIN T_GSQ_TWINING_DISC d ON sub.DISC_ID = d.ID
+               sub.TWINING_DISC_CODE AS twiningDiscCode
+        FROM T_GSQ_TWINING_DISC_SPEC sub
+        INNER JOIN T_GSQ_TWINING_DISC d ON d.TWINING_DISC_CODE = sub.TWINING_DISC_CODE AND d.IS_DELETE = '0'
         WHERE d.STATUS = '0'
-          AND d.IS_DELETE = '0'
           AND sub.IS_DELETE = '0'
     </select>
 </mapper>

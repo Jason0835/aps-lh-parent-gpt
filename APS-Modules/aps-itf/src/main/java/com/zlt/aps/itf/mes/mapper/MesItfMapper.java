@@ -13,8 +13,11 @@ import com.zlt.aps.tm.api.domain.entity.TmDayFinishQty;
 import com.zlt.aps.tm.api.domain.entity.TmMesStock;
 import com.zlt.aps.tm.api.domain.entity.TmScheFinishQty;
 import com.zlt.aps.gsq.api.domain.entity.GsqDayFinishQty;
+import com.zlt.aps.gsq.api.domain.entity.GsqMesStock;
 import com.zlt.aps.gsq.api.domain.entity.GsqScheFinishQty;
-import com.zlt.aps.gsq.api.domain.entity.GsqStock;
+import com.zlt.aps.gsq.api.domain.entity.GsqTwiningDisc;
+import com.zlt.aps.gsq.api.domain.entity.GsqTwiningDiscMachine;
+import com.zlt.aps.gsq.api.domain.entity.GsqTwiningDiscSpec;
 import com.zlt.aps.tq.api.domain.entity.TqDayFinishQty;
 import com.zlt.aps.tq.api.domain.entity.TqMesStock;
 import com.zlt.aps.tq.api.domain.entity.TqScheFinishQty;
@@ -181,19 +184,47 @@ public interface MesItfMapper {
 
     /**
      * 查询钢丝圈库存同步数据
+     * 返回专用MES DTO（stockDate为字符串类型，避免跨时区JDBC偏移）
      *
      * @param syncDataLogs 参数
      * @return 列表
      */
-    List<GsqStock> selectMesGsqStockList(AuxReqSyncDataLogs syncDataLogs);
+    List<GsqMesStock> selectMesGsqStockList(AuxReqSyncDataLogs syncDataLogs);
 
     /**
-     * 查询胎圈自动滚动指定物理日的最新库存。
+     * 查询MES缠绕盘清单同步数据（MES_WIRE_DISC_INFO）
+     * 按MOUTH_PLAT_CODE业务键取DATA_VERSION最大版本行
      *
-     * <p>对齐胎面 selectTreadShiftStockList，按工厂+公司+物理日+DATA_VERSION（取最新）
-     * 从 MES_TQ_STOCK 查询胎圈班次库存快照。</p>
+     * @param syncDataLogs 参数（可传factoryCode过滤分厂）
+     * @return 缠绕盘清单列表
+     */
+    List<GsqTwiningDisc> selectMesWireDiscInfoList(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 查询MES缠绕盘规格关系同步数据（MES_WIRE_DISC_SPEC_MAPPING）
+     * 按WIRE_DISC_CODE+STEEL_RING_CODE业务键取DATA_VERSION最大版本行
      *
-     * @param request 工厂、物理库存日和可选版本
+     * @param syncDataLogs 参数（可传factoryCode过滤分厂）
+     * @return 规格关系列表（twiningDiscCode为缠绕盘编码，APS落库侧按编码直接关联主表）
+     */
+    List<GsqTwiningDiscSpec> selectMesWireDiscSpecMappingList(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 查询MES缠绕盘机台关系同步数据（MES_WIRE_DISC_MACHINE_MAPPING）
+     * 按WIRE_DISC_CODE+MACHINE_CODE业务键取DATA_VERSION最大版本行
+     *
+     * @param syncDataLogs 参数（可传factoryCode过滤分厂）
+     * @return 机台关系列表
+     */
+    List<GsqTwiningDiscMachine> selectMesWireDiscMachineMappingList(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 查询胎圈自动滚动指定物理日的库存。
+     *
+     * <p>对齐胎面 selectTreadShiftStockList，按物理日从 MES_TQ_STOCK 查询胎圈班次库存快照。
+     * MES源表不含工厂、公司和版本字段，仅按库存日期过滤。</p>
+     *
+     * @param request 工厂、物理库存日等参数（当前仅物理日参与SQL过滤）
      * @return 库存列表
      */
     List<TqMesStock> selectBeadShiftStockList(MesShiftStockSyncRequest request);
@@ -357,6 +388,22 @@ public interface MesItfMapper {
      * @return 最大版本号，无数据时返回null
      */
     String selectMaxDataVersionFromLhDayFinishQty(@Param("factoryCode") String factoryCode);
+
+    /**
+     * 查询MES胎圈排程日完成量中间表的最大版本号
+     *
+     * @param factoryCode 分厂编码（可选）
+     * @return 最大版本号，无数据时返回null
+     */
+    String selectMaxDataVersionFromTqDayFinishQty(@Param("factoryCode") String factoryCode);
+
+    /**
+     * 查询MES钢丝圈排程日完成量中间表的最大版本号
+     *
+     * @param factoryCode 分厂编码（可选）
+     * @return 最大版本号，无数据时返回null
+     */
+    String selectMaxDataVersionFromGsqDayFinishQty(@Param("factoryCode") String factoryCode);
 
     /**
      * 查询成型在机历史同步数据（今天之前每天最新版本）

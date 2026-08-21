@@ -266,18 +266,15 @@ public class ProductionPlanGroupInfo {
         // 刷新上下文的特殊材料结构关系表
         productionContext.updateSpecialMaterialStructureRelationMap(groupInfo);
 
-        List<String> materialCodeList = groupPlanData.stream()
-                .map(MonthPlanProductionRequirePlanVo::getMaterialDesc).distinct().collect(Collectors.toList());
+        List<String> materialCodeList = groupPlanData.stream().map(MonthPlanProductionRequirePlanVo::getMaterialDesc).distinct().collect(Collectors.toList());
         Set<String> mouldCodeSet = new HashSet<>();
         for (String materialCode : materialCodeList) {
-            List<MonthPlanProductMouldInfoVo> mouldList = productionContext.getBaseDataContainer()
-                    .getSkuMouldRelationMap().get(materialCode);
+            List<MonthPlanProductMouldInfoVo> mouldList = productionContext.getBaseDataContainer().getSkuMouldRelationMap().get(materialCode);
             if (CollectionUtils.isEmpty(mouldList)) {
                 continue;
             }
 
-            Set<String> newMouldCodeSet = mouldList.stream().map(MonthPlanProductMouldInfoVo::getMouldCode)
-                    .filter(StringUtils::isNotEmpty).distinct().collect(Collectors.toSet());
+            Set<String> newMouldCodeSet = mouldList.stream().map(MonthPlanProductMouldInfoVo::getMouldCode).filter(StringUtils::isNotEmpty).distinct().collect(Collectors.toSet());
             if (CollectionUtils.isEmpty(newMouldCodeSet)) {
                 continue;
             }
@@ -1784,6 +1781,35 @@ public class ProductionPlanGroupInfo {
     }
 
     /**
+     * 根据分配信息，得到所有的排产日信息
+     *
+     * @param context             排产上下文
+     * @param groupAllocationList 所有分配信息
+     * @return
+     */
+    public Set<Integer> getAllProductionDay(Context context, List<MpStructureAllocation> groupAllocationList) {
+        if (CollectionUtils.isEmpty(groupAllocationList)) {
+            return Collections.emptySet();
+        }
+        return getAllProductionDaySet(context, groupAllocationList);
+    }
+
+    /**
+     * 获取在排产日对应的配置信息
+     *
+     * @param context                排产上下文
+     * @param productionDay          排产日
+     * @param groupAllAllocationList 分组下所有配置信息
+     * @return
+     */
+    public List<MpStructureAllocation> getProductionConfigurationByDay(Context context, Integer productionDay, List<MpStructureAllocation> groupAllAllocationList) {
+        if (CollectionUtils.isEmpty(groupAllAllocationList) || null == productionDay) {
+            return Collections.emptyList();
+        }
+        return getProductionConfiguration(context, productionDay, groupAllAllocationList);
+    }
+
+    /**
      * 检查能否加胎胚种类数
      *
      * @param productionContext
@@ -2136,8 +2162,7 @@ public class ProductionPlanGroupInfo {
     private boolean isOpenProductionFirstDay(Map<Integer, MdmWorkCalendar> workCalendarMap, int checkDay) {
         int preDay = checkDay - 1;
         preDay = preDay < FactoryConstant.MONTH_START_DAY ? FactoryConstant.MONTH_START_DAY : preDay;
-        return !YesOrNoEnum.YES.getCode().equals(workCalendarMap.get(preDay).getDayFlag()) &&
-                YesOrNoEnum.YES.getCode().equals(workCalendarMap.get(checkDay).getDayFlag());
+        return !YesOrNoEnum.YES.getCode().equals(workCalendarMap.get(preDay).getDayFlag()) && YesOrNoEnum.YES.getCode().equals(workCalendarMap.get(checkDay).getDayFlag());
     }
 
     /**

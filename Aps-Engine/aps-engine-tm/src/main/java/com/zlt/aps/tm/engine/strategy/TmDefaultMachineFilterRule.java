@@ -3,6 +3,7 @@ package com.zlt.aps.tm.engine.strategy;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.utils.MachineOpenShiftCodeUtil;
+import com.zlt.aps.common.core.utils.SixShiftWorkCalendarUtil;
 import com.zlt.aps.common.engine.schedule.ScheduleRuleResult;
 import com.zlt.aps.tm.api.constant.TmScheduleConstants;
 import com.zlt.aps.tm.api.enums.TmMachineFilterReasonEnum;
@@ -84,6 +85,9 @@ public class TmDefaultMachineFilterRule implements ITmMachineFilterRule {
             throw new ServiceException(TmScheduleErrorCodeEnum.TM_MACHINE_CANDIDATE_EMPTY.getDefaultMessage());
         }
         TmTaskDraft task = context.getTaskDraft();
+        if (this.hasWorkCalendarShiftConflict(candidate, context)) {
+            return this.reject(candidate, TmMachineFilterReasonEnum.WORK_CALENDAR_SHIFT_STOPPED);
+        }
         List<String> ruleOrder = this.resolveRuleOrder(context);
         candidate.getEvidence().put(staticOnly ? "staticFilterRuleOrder" : "filterRuleOrder", ruleOrder);
         for (String ruleCode : ruleOrder) {
@@ -263,6 +267,36 @@ public class TmDefaultMachineFilterRule implements ITmMachineFilterRule {
         candidate.getEvidence().put("legacyOpenShiftCode",
                 MachineOpenShiftCodeUtil.resolveLegacyOpenShiftCode(currentShiftCode));
         return !MachineOpenShiftCodeUtil.isMachineShiftOpen(openShiftCodes, currentShiftCode);
+    }
+
+    /**
+     * 判断任务结果班次是否被胎面工作日历关闭。
+     *
+     * @param candidate 候选机台
+     * @param context   机台规则上下文
+     * @return true表示工作日历停产，必须拒绝全部候选机台
+     */
+    private boolean hasWorkCalendarShiftConflict(TmMachineCandidate candidate, TmMachineRuleContext context) {
+        TmTaskDraft taskDraft = context.getTaskDraft();
+        TmScheduleContext scheduleContext = context.getScheduleContext();
+        if (taskDraft == null || taskDraft.getShiftOrder() == null || scheduleContext == null
+                || !scheduleContext.getWorkCalendarStoppedShiftOrderSet().contains(taskDraft.getShiftOrder())) {
+            return false;
+        }
+        Map<String, Object> calendarEvidence = scheduleContext.getWorkCalendarStoppedShiftEvidenceMap()
+                .get(taskDraft.getShiftOrder());
+        if (calendarEvidence != null) {
+            candidate.getEvidence().putAll(calendarEvidence);
+        } else {
+            candidate.getEvidence().put("procCode", "04");
+            candidate.getEvidence().put("shiftOrder", taskDraft.getShiftOrder());
+            candidate.getEvidence().put("productionDate", SixShiftWorkCalendarUtil.resolveProductionDate(
+                    scheduleContext.getScheduleDate(), taskDraft.getShiftOrder()));
+            candidate.getEvidence().put("calendarField", SixShiftWorkCalendarUtil.resolveCalendarShiftField(
+                    taskDraft.getShiftOrder()));
+            candidate.getEvidence().put("calendarFieldValue", "0");
+        }
+        return true;
     }
 
     /**

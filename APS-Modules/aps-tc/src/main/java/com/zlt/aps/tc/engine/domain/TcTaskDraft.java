@@ -58,8 +58,19 @@ public class TcTaskDraft {
     /** TASK_SORT 阶段生成的稳定基础优先级，数值越小越优先 */
     private Integer baseSortIndex;
 
+    /** 计划量计算阶段确定的全局顺序，机台占用必须复用该顺序 */
+    private Integer planCalcOrderIndex;
+
+    /** 当前班次实际进入机台资源尝试的序号，从1开始 */
+    private Integer machineAssignmentSequence;
+
     /** 当前班成型胎侧需求量，单位米 */
     private BigDecimal currentShiftDemandQty;
+
+    /**
+     * 原始成型当班需求量，单位米；仅用于过程日志追溯，拆分、顺延或提前补产时保持不变。
+     */
+    private BigDecimal originalCurrentShiftDemandQty;
 
     /** 同胎侧下一排程班的成型需求量，单位米 */
     private BigDecimal nextShiftDemandQty;
@@ -148,6 +159,15 @@ public class TcTaskDraft {
 
     /** 收尾成型余量，单位条 */
     private BigDecimal tailBalanceQty;
+
+    /** 成型需求对应的原始逻辑班次，取值1到8 */
+    private Integer formingLogicalShiftOrder;
+
+    /** 是否命中成型连续停产自动收尾 */
+    private Boolean formingShutdownCloseOutFlag;
+
+    /** 成型连续停产收尾需求量，单位米；按最后开放成型班原始需求计算 */
+    private BigDecimal formingShutdownCloseOutDemandQty;
 
     /** 损耗率，百分比；兼容旧测试或临时覆盖值 */
     private BigDecimal lossRate;

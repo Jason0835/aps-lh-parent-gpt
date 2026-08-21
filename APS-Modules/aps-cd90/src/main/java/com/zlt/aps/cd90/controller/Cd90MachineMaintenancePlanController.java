@@ -44,6 +44,10 @@ public class Cd90MachineMaintenancePlanController extends AbstractDocBizControll
     @ApiOperation("新增")
     @PostMapping("/add")
     public AjaxResult add(@RequestBody Cd90MachineMaintenancePlan entity) {
+        AjaxResult validateResult = cd90MachineMaintenancePlanService.validateForSave(entity);
+        if (validateResult != null) {
+            return validateResult;
+        }
         return super.save(entity);
     }
 
@@ -51,6 +55,10 @@ public class Cd90MachineMaintenancePlanController extends AbstractDocBizControll
     @ApiOperation("编辑")
     @PostMapping("/edit")
     public AjaxResult edit(@RequestBody Cd90MachineMaintenancePlan entity) {
+        AjaxResult validateResult = cd90MachineMaintenancePlanService.validateForSave(entity);
+        if (validateResult != null) {
+            return validateResult;
+        }
         return super.save(entity);
     }
 
@@ -96,6 +104,7 @@ public class Cd90MachineMaintenancePlanController extends AbstractDocBizControll
     protected List<Cd90MachineMaintenancePlan> listExportData(Cd90MachineMaintenancePlan obj) {
         QueryWrapper<Cd90MachineMaintenancePlan> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
+        wrapper.last("ORDER BY " + this.getOrderBy());
         List<Cd90MachineMaintenancePlan> list = cd90MachineMaintenancePlanMapper.selectList(wrapper);
         AppUtils.formatData(list, getQueryFormulas());
         return list;

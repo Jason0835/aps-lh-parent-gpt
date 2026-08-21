@@ -136,12 +136,13 @@ public class MpAdjustPlanRequireInfoServiceImpl extends AbstractDocService<MpAdj
     }
 
     /**
-     * 计算调整后计划量：本月计划产量 - 调整数量，空值按 0 处理。
+     * 计算调整后计划量 = 本月计划产量 + 调整数量，空值按 0 处理。
+     * 调整数量带正负号：正数表示追加、负数表示调减（新增/编辑时允许填写负数）。
      */
     private void calculateAdjustFinalQty(MpAdjustPlanRequireInfo entity) {
         int monthPlanQty = entity.getMonthPlanQty() == null ? 0 : entity.getMonthPlanQty();
         int adjustPlanQty = entity.getAdjustPlanQty() == null ? 0 : entity.getAdjustPlanQty();
-        entity.setAdjustFinalQty(monthPlanQty - adjustPlanQty);
+        entity.setAdjustFinalQty(monthPlanQty + adjustPlanQty);
     }
 
     /**

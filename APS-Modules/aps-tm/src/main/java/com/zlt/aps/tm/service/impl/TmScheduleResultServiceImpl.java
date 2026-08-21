@@ -542,28 +542,63 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
                     response.getUnplannedCount(), response.getMessage(), System.currentTimeMillis() - startMillis);
             return response;
         } catch (ServiceException ex) {
+            String failedBatchNo = this.resolveFailedBatchNo(context, response);
+            String failedTraceId = this.resolveFailedTraceId(context, response, request);
             log.warn("{} step=FAILED factoryCode={}, scheduleDate={}, batchNo={}, traceId={}, elapsedMs={}, exceptionType={}, message={}",
                     TmScheduleConstants.AUTO_PLAN_LOG_PREFIX, request == null ? null : request.getFactoryCode(),
                     formatAutoPlanDate(request == null ? null : request.getScheduleDate()),
-                    context == null ? response == null ? null : response.getBatchNo() : context.getBatchNo(),
-                    context == null ? response == null ? request == null ? null : request.getTraceId() : response.getTraceId() : context.getTraceId(),
+                    failedBatchNo, failedTraceId,
                     System.currentTimeMillis() - startMillis, ex.getClass().getSimpleName(), ex.getMessage());
             this.saveFailedProcessLogSafely(context, autoScheduleTask, request, ex);
             tmAutoScheduleTaskService.markFailed(taskId, ex.getMessage(),
                     this.collectFailureIssues(context, ex));
             throw ex;
         } catch (RuntimeException ex) {
+            String failedBatchNo = this.resolveFailedBatchNo(context, response);
+            String failedTraceId = this.resolveFailedTraceId(context, response, request);
             log.error("{} step=FAILED factoryCode={}, scheduleDate={}, batchNo={}, traceId={}, elapsedMs={}, exceptionType={}, message={}",
                     TmScheduleConstants.AUTO_PLAN_LOG_PREFIX, request == null ? null : request.getFactoryCode(),
                     formatAutoPlanDate(request == null ? null : request.getScheduleDate()),
-                    context == null ? response == null ? null : response.getBatchNo() : context.getBatchNo(),
-                    context == null ? response == null ? request == null ? null : request.getTraceId() : response.getTraceId() : context.getTraceId(),
+                    failedBatchNo, failedTraceId,
                     System.currentTimeMillis() - startMillis, ex.getClass().getSimpleName(), ex.getMessage(), ex);
             this.saveFailedProcessLogSafely(context, autoScheduleTask, request, ex);
             tmAutoScheduleTaskService.markFailed(taskId, ex.getMessage(),
                     this.collectFailureIssues(context, ex));
             throw ex;
         }
+    }
+
+    /**
+     * 按排程上下文、响应对象顺序解析失败日志批次号。
+     *
+     * @param context 自动排程上下文，允许为空
+     * @param response 自动排程响应，允许为空
+     * @return 用于失败日志的批次号，无法取得时返回空
+     */
+    private String resolveFailedBatchNo(TmScheduleContext context, TmAutoScheduleResponseVo response) {
+        if (context != null) {
+            return context.getBatchNo();
+        }
+        return response == null ? null : response.getBatchNo();
+    }
+
+    /**
+     * 按排程上下文、响应对象、请求顺序解析失败日志追踪号。
+     *
+     * @param context 自动排程上下文，允许为空
+     * @param response 自动排程响应，允许为空
+     * @param request 自动排程请求，允许为空
+     * @return 用于失败日志的追踪号，无法取得时返回空
+     */
+    private String resolveFailedTraceId(TmScheduleContext context, TmAutoScheduleResponseVo response,
+                                        TmAutoScheduleRequestVo request) {
+        if (context != null) {
+            return context.getTraceId();
+        }
+        if (response != null) {
+            return response.getTraceId();
+        }
+        return request == null ? null : request.getTraceId();
     }
 
     /**

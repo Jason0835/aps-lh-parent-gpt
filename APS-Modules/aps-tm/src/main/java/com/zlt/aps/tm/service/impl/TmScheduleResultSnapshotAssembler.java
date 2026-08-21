@@ -48,8 +48,11 @@ public final class TmScheduleResultSnapshotAssembler {
             return;
         }
 
-        result.setTreadShoulderLength(selectStableNumber(result, sortedTaskList,
-                "treadShoulderLength", TmTaskDraft::getTreadShoulderLength));
+        BigDecimal treadShoulderLength = selectStableNumber(result, sortedTaskList,
+                "treadShoulderLength", TmTaskDraft::getTreadShoulderLength);
+        if (treadShoulderLength != null) {
+            result.setTreadShoulderLength(treadShoulderLength);
+        }
         result.setCxRemainQty(sumRemainQtyBySourceOrder(result, sortedTaskList));
         result.setWholeGlueCode(buildWholeGlueCode(sortedTaskList));
         result.setMaterialCode(joinStableText(sortedTaskList, TmTaskDraft::getMaterialCode));
@@ -57,10 +60,16 @@ public final class TmScheduleResultSnapshotAssembler {
         result.setEmbryoCode(joinStableText(sortedTaskList, TmTaskDraft::getEmbryoCode));
         result.setMainMaterialDesc(joinStableText(sortedTaskList, TmTaskDraft::getMainMaterialDesc));
         result.setCxMachineCode(joinStableText(sortedTaskList, TmTaskDraft::getCxMachineCode));
-        result.setSixClockStockQty(selectStableNumber(result, sortedTaskList,
-                "sixClockStockQty", TmTaskDraft::getSixClockStockQty));
-        result.setCurlRollLength(selectStableNumber(result, sortedTaskList,
-                "curlRollLength", TmScheduleResultSnapshotAssembler::resolveEffectiveCurlRollLength));
+        BigDecimal sixClockStockQty = selectStableNumber(result, sortedTaskList,
+                "sixClockStockQty", TmTaskDraft::getSixClockStockQty);
+        if (sixClockStockQty != null) {
+            result.setSixClockStockQty(sixClockStockQty);
+        }
+        BigDecimal curlRollLength = selectStableNumber(result, sortedTaskList,
+                "curlRollLength", TmScheduleResultSnapshotAssembler::resolveEffectiveCurlRollLength);
+        if (curlRollLength != null) {
+            result.setCurlRollLength(curlRollLength);
+        }
         result.setTailFlag(resolveTailFlag(sortedTaskList));
     }
 

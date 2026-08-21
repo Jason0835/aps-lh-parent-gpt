@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
@@ -88,22 +89,20 @@ public class NcGlueOrderController extends AbstractDocBizController<NcGlueOrder>
     @Override
     protected List<NcGlueOrder> listExportData(NcGlueOrder obj) {
         QueryWrapper<NcGlueOrder> wrapper = new QueryWrapper<>();
-        startPage("update_time desc");
+        startPage(getOrderBy());
         this.builderCondition(wrapper, obj);
         List<NcGlueOrder> list = glueOrderMapper.selectList(wrapper);
         AppUtils.formatData(list, getQueryFormulas());
         return list;
     }
 
-    @ApiOperation("导入内衬胶料顺序信息")
     @Log(title = "ui.nc.glueOrder.column.modalName", businessType = BusinessType.IMPORT)
     @PostMapping("/importData")
-    public AjaxResult importData(@RequestBody List<NcGlueOrder> list, @RequestParam("updateSupport") boolean updateSupport,
-            @RequestParam("importLogId") Long importLogId) {
-        if (StringUtils.isNull(list) || list.size() == 0) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.import.nodata"));
-        }
-        return glueOrderService.importData(list, updateSupport, importLogId);
+    @ApiOperation("导入信息")
+    @Override
+    public AjaxResult importData(@RequestBody ImportContext importContext,
+            @RequestParam("updateSupport") boolean updateSupport) throws Exception {
+        return super.importData(importContext, updateSupport);
     }
 
     @Override
@@ -119,7 +118,7 @@ public class NcGlueOrderController extends AbstractDocBizController<NcGlueOrder>
 
     @Override
     protected String getOrderBy() {
-        return "GLUE_CODE";
+        return "GLUE_CODE, ID";
     }
 
     @Override

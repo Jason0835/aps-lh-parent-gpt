@@ -113,7 +113,7 @@ public class GsqStockController extends AbstractDocBizController<GsqStock> {
 
     @Override
     protected void builderCondition(QueryWrapper<GsqStock> queryWrapper, GsqStock queryVO) {
-        queryWrapper.ge(queryVO.getStockDateBegin() != null, "STOCK_DATE", queryVO.getStockDateBegin());
+        queryWrapper.ge(queryVO.getStockDateStart() != null, "STOCK_DATE", queryVO.getStockDateStart());
         queryWrapper.le(queryVO.getStockDateEnd() != null, "STOCK_DATE", queryVO.getStockDateEnd());
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getSteelRingCode()), "STEEL_RING_CODE", queryVO.getSteelRingCode());
     }
@@ -126,5 +126,17 @@ public class GsqStockController extends AbstractDocBizController<GsqStock> {
     @Override
     protected String getOrderBy() {
         return "STOCK_DATE desc, STEEL_RING_CODE asc";
+    }
+
+    /**
+     * 导出数据列表查询
+     * 沿用列表查询条件与默认排序，返回全量数据供导出使用
+     */
+    @Override
+    protected List<GsqStock> listExportData(GsqStock obj) {
+        QueryWrapper<GsqStock> wrapper = new QueryWrapper<>();
+        this.builderCondition(wrapper, obj);
+        wrapper.last("ORDER BY " + getOrderBy());
+        return gsqStockMapper.selectList(wrapper);
     }
 }

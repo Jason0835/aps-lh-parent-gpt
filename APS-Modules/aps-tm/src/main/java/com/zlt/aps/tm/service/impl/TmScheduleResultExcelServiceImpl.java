@@ -343,8 +343,8 @@ public class TmScheduleResultExcelServiceImpl implements ITmScheduleResultExcelS
             return Collections.emptyList();
         }
         Map<String, TmScheduleResult> previousResultMap = this.buildPreviousResultMap(queryVO);
-        Map<String, BigDecimal> formingPlanQtyMap = this.buildFormingPlanQtyMap(queryVO.getFactoryCode(),
-                DateUtil.beginOfDay(queryVO.getScheduleDate()));
+        Map<String, TmScheduleResultFormingDataVo> formingDataMap = this.buildFormingDataMap(
+                queryVO.getFactoryCode(), DateUtil.beginOfDay(queryVO.getScheduleDate()));
         List<Map<String, Object>> dataList = new ArrayList<>();
         for (TmScheduleResult result : resultList) {
             Map<String, Object> rowMap = new LinkedHashMap<>();
@@ -371,9 +371,11 @@ public class TmScheduleResultExcelServiceImpl implements ITmScheduleResultExcelS
             rowMap.put("class3PlanQty", this.blankIfZero(result.getClass3PlanQty()));
             rowMap.put("class3FinishQty", this.blankIfZero(result.getClass3FinishQty()));
             rowMap.put("class3Sequence", result.getClass3Sequence());
-            rowMap.put("cxPlanQty", formingPlanQtyMap.getOrDefault(result.getTreadCode(), BigDecimal.ZERO));
+            TmScheduleResultFormingDataVo formingData = formingDataMap.get(result.getTreadCode());
+            rowMap.put("cxPlanQty", formingData == null ? BigDecimal.ZERO : formingData.getCxPlanQty());
             rowMap.put("curlRollLength", result.getCurlRollLength());
-            rowMap.put("cxMachineCode", result.getCxMachineCode());
+            rowMap.put("cxMachineCode", formingData == null
+                    ? result.getCxMachineCode() : formingData.getCxMachineCode());
             rowMap.put("type", TmYesNoEnum.YES.getCode().equals(result.getTailFlag()) ? "收尾" : "");
             dataList.add(rowMap);
         }
@@ -412,18 +414,18 @@ public class TmScheduleResultExcelServiceImpl implements ITmScheduleResultExcelS
     }
 
     /**
-     * 按当前版本匹配模式汇总成型 CLASS1~4 计划量。
+     * 按当前版本匹配模式汇总成型 CLASS1~4 计划量和成型机台。
      *
      * @param factoryCode 工厂编码
      * @param scheduleDate 排程日期
-     * @return 胎面编码对应的成型计划量
+     * @return 胎面编码对应的成型计划量和成型机台
      */
-    private Map<String, BigDecimal> buildFormingPlanQtyMap(String factoryCode, Date scheduleDate) {
+    private Map<String, TmScheduleResultFormingDataVo> buildFormingDataMap(String factoryCode, Date scheduleDate) {
         TmVersionMatchModeEnum mode = this.resolveVersionMatchMode(factoryCode);
         if (TmVersionMatchModeEnum.BOM == mode) {
-            return this.buildBomFormingPlanQtyMap(factoryCode, scheduleDate);
+            return this.buildBomFormingDataMap(factoryCode, scheduleDate);
         }
-        return this.buildRecipeFormingPlanQtyMap(factoryCode, scheduleDate);
+        return this.buildRecipeFormingDataMap(factoryCode, scheduleDate);
     }
 
     /**
@@ -431,19 +433,20 @@ public class TmScheduleResultExcelServiceImpl implements ITmScheduleResultExcelS
      *
      * @param factoryCode 工厂编码
      * @param scheduleDate 排程日期
-     * @return 胎面编码对应的成型计划量
+     * @return 胎面编码对应的成型计划量和成型机台
      */
-    private Map<String, BigDecimal> buildBomFormingPlanQtyMap(String factoryCode, Date scheduleDate) {
+    private Map<String, TmScheduleResultFormingDataVo> buildBomFormingDataMap(String factoryCode,
+                                                                                Date scheduleDate) {
         List<TmFormingDemandRowVo> rowList = this.tmAutoScheduleDataLoadMapper
                 .selectFormingDemandRows(factoryCode, scheduleDate);
-        Map<String, BigDecimal> resultMap = new HashMap<>();
+        Map<String, TmScheduleResultFormingDataVo> resultMap = new LinkedHashMap<>();
         for (TmFormingDemandRowVo row : this.emptyIfNull(rowList)) {
             if (row == null || StrUtil.isBlank(row.getTreadCode())) {
                 continue;
             }
             BigDecimal planQty = BigDecimalUtils.add(row.getClass1PlanQty(), row.getClass2PlanQty(),
                     row.getClass3PlanQty(), row.getClass4PlanQty());
-            resultMap.merge(row.getTreadCode(), BigDecimalUtils.valueOf(planQty), BigDecimal::add);
+            this.mergeFormingData(resultMap, row.getTreadCode(), planQty, row.getCxMachineCode());
         }
         return resultMap;
     }
@@ -453,9 +456,10 @@ public class TmScheduleResultExcelServiceImpl implements ITmScheduleResultExcelS
      *
      * @param factoryCode 工厂编码
      * @param scheduleDate 排程日期
-     * @return 胎面编码对应的成型计划量
+     * @return 胎面编码对应的成型计划量和成型机台
      */
-    private Map<String, BigDecimal> buildRecipeFormingPlanQtyMap(String factoryCode, Date scheduleDate) {
+    private Map<String, TmScheduleResultFormingDataVo> buildRecipeFormingDataMap(String factoryCode,
+                                                                                   Date scheduleDate) {
         List<TmFormingDemandRecipeRowVo> rowList = this.tmAutoScheduleDataLoadMapper
                 .selectFormingDemandRowsByRecipe(factoryCode, scheduleDate);
         if (CollUtil.isEmpty(rowList)) {
@@ -482,16 +486,16 @@ public class TmScheduleResultExcelServiceImpl implements ITmScheduleResultExcelS
                 .collect(Collectors.toMap(item -> this.buildConstructionKey(item.getConstructionCode(),
                                 item.getConstructionVersion()), Function.identity(),
                         (first, ignored) -> first, LinkedHashMap::new));
-        Map<String, BigDecimal> resultMap = new HashMap<>();
+        Map<String, TmScheduleResultFormingDataVo> resultMap = new LinkedHashMap<>();
         for (TmFormingDemandRecipeRowVo row : rowList) {
             this.mergeRecipePlanQty(resultMap, constructionMap, row.getEmbryoCode(),
-                    row.getClass1RecipeNo(), row.getClass1PlanQty());
+                    row.getClass1RecipeNo(), row.getClass1PlanQty(), row.getCxMachineCode());
             this.mergeRecipePlanQty(resultMap, constructionMap, row.getEmbryoCode(),
-                    row.getClass2RecipeNo(), row.getClass2PlanQty());
+                    row.getClass2RecipeNo(), row.getClass2PlanQty(), row.getCxMachineCode());
             this.mergeRecipePlanQty(resultMap, constructionMap, row.getEmbryoCode(),
-                    row.getClass3RecipeNo(), row.getClass3PlanQty());
+                    row.getClass3RecipeNo(), row.getClass3PlanQty(), row.getCxMachineCode());
             this.mergeRecipePlanQty(resultMap, constructionMap, row.getEmbryoCode(),
-                    row.getClass4RecipeNo(), row.getClass4PlanQty());
+                    row.getClass4RecipeNo(), row.getClass4PlanQty(), row.getCxMachineCode());
         }
         return resultMap;
     }
@@ -522,10 +526,12 @@ public class TmScheduleResultExcelServiceImpl implements ITmScheduleResultExcelS
      * @param embryoCode 胎胚编码
      * @param recipeNo 示方书编号
      * @param planQty 班次计划量
+     * @param cxMachineCode 成型机台编码
      */
-    private void mergeRecipePlanQty(Map<String, BigDecimal> resultMap,
+    private void mergeRecipePlanQty(Map<String, TmScheduleResultFormingDataVo> resultMap,
                                     Map<String, TmConstructionTreadRowVo> constructionMap,
-                                    String embryoCode, String recipeNo, BigDecimal planQty) {
+                                    String embryoCode, String recipeNo, BigDecimal planQty,
+                                    String cxMachineCode) {
         if (StrUtil.isBlank(embryoCode) || StrUtil.isBlank(recipeNo)) {
             return;
         }
@@ -533,7 +539,60 @@ public class TmScheduleResultExcelServiceImpl implements ITmScheduleResultExcelS
         if (construction == null || StrUtil.isBlank(construction.getTreadCode())) {
             return;
         }
-        resultMap.merge(construction.getTreadCode(), BigDecimalUtils.valueOf(planQty), BigDecimal::add);
+        this.mergeFormingData(resultMap, construction.getTreadCode(), planQty, cxMachineCode);
+    }
+
+    /**
+     * 汇总成型计划量并追加去重后的成型机台。
+     *
+     * @param resultMap 胎面编码对应的成型数据
+     * @param treadCode 胎面编码
+     * @param planQty 成型计划量
+     * @param cxMachineCode 成型机台编码，可包含逗号分隔的多个机台
+     */
+    private void mergeFormingData(Map<String, TmScheduleResultFormingDataVo> resultMap,
+                                  String treadCode, BigDecimal planQty, String cxMachineCode) {
+        TmScheduleResultFormingDataVo target = resultMap.computeIfAbsent(treadCode, ignored -> {
+            TmScheduleResultFormingDataVo dataVo = new TmScheduleResultFormingDataVo();
+            dataVo.setCxPlanQty(BigDecimal.ZERO);
+            return dataVo;
+        });
+        target.setCxPlanQty(BigDecimalUtils.add(target.getCxPlanQty(), planQty));
+        this.mergeDistinctMachineCodes(target, cxMachineCode);
+    }
+
+    /**
+     * 将成型机台拆分、清理并按首次出现顺序去重后写回汇总对象。
+     *
+     * @param target 成型数据汇总对象
+     * @param cxMachineCode 成型机台编码，可包含逗号分隔的多个机台
+     */
+    private void mergeDistinctMachineCodes(TmScheduleResultFormingDataVo target, String cxMachineCode) {
+        if (target == null || StrUtil.isBlank(cxMachineCode)) {
+            return;
+        }
+        Set<String> machineCodeSet = new LinkedHashSet<>();
+        this.addMachineCodes(machineCodeSet, target.getCxMachineCode());
+        this.addMachineCodes(machineCodeSet, cxMachineCode);
+        if (!machineCodeSet.isEmpty()) {
+            target.setCxMachineCode(String.join(",", machineCodeSet));
+        }
+    }
+
+    /**
+     * 将逗号分隔的成型机台编码加入目标集合。
+     *
+     * @param machineCodeSet 成型机台编码集合
+     * @param machineCodes 成型机台编码文本
+     */
+    private void addMachineCodes(Set<String> machineCodeSet, String machineCodes) {
+        if (machineCodeSet == null || StrUtil.isBlank(machineCodes)) {
+            return;
+        }
+        Arrays.stream(machineCodes.split(","))
+                .map(String::trim)
+                .filter(StrUtil::isNotBlank)
+                .forEach(machineCodeSet::add);
     }
 
     /**

@@ -38,6 +38,20 @@ public class Cd15FormingDemandExpander {
      */
     public List<Cd15DemandShift> expand(List<Cd15FormingScheduleSource> schedules,
                                         List<Cd15ConstructionMaterial> materials) {
+        return this.expand(schedules, materials, null);
+    }
+
+    /**
+     * 展开成型需求，并仅从指定自然班次起输出缺施工告警。
+     *
+     * @param schedules 成型排程窄模型
+     * @param materials 施工层位钢带单耗
+     * @param warningStartTime 缺施工告警起点；为空时检查全部正计划量班次
+     * @return 按钢带、角度、工艺尺寸和班次排序的需求明细
+     */
+    public List<Cd15DemandShift> expand(List<Cd15FormingScheduleSource> schedules,
+                                        List<Cd15ConstructionMaterial> materials,
+                                        LocalDateTime warningStartTime) {
         Map<String, List<Cd15ConstructionMaterial>> materialsByConstruction =
                 this.groupMaterialsByConstruction(materials);
         Map<String, DemandAccumulator> demandByMaterialAndShift = new LinkedHashMap<>();
@@ -55,17 +69,23 @@ public class Cd15FormingDemandExpander {
                 String classField = "CLASS" + (classIndex + 1);
                 String recipeNo = classIndex < recipeNos.size() ? recipeNos.get(classIndex) : null;
                 if (!StringUtils.hasText(recipeNo)) {
-                    log.warn("[斜裁自动排程] 成型班次施工版本为空，跳过该班施工分解, "
-                                    + "cxBatchNo={}, embryoCode={}, classField={}, startTime={}",
-                            schedule.getCxBatchNo(), schedule.getEmbryoCode(), classField, startTime);
+                    if (this.shouldWarnMissingConstruction(
+                            formingQuantity, startTime, warningStartTime)) {
+                        log.warn("[斜裁自动排程] 成型班次施工版本为空，跳过该班施工分解, "
+                                        + "cxBatchNo={}, embryoCode={}, classField={}, startTime={}",
+                                schedule.getCxBatchNo(), schedule.getEmbryoCode(), classField, startTime);
+                    }
                     continue;
                 }
                 List<Cd15ConstructionMaterial> constructionMaterials = materialsByConstruction.get(
                         this.constructionKey(schedule.getEmbryoCode(), recipeNo));
                 if (constructionMaterials == null || constructionMaterials.isEmpty()) {
-                    log.warn("[斜裁自动排程] 未找到胎胚施工版本，跳过该班施工分解, "
-                                    + "cxBatchNo={}, embryoCode={}, constructionVersion={}, classField={}",
-                            schedule.getCxBatchNo(), schedule.getEmbryoCode(), recipeNo, classField);
+                    if (this.shouldWarnMissingConstruction(
+                            formingQuantity, startTime, warningStartTime)) {
+                        log.warn("[斜裁自动排程] 未找到胎胚施工版本，跳过该班施工分解, "
+                                        + "cxBatchNo={}, embryoCode={}, constructionVersion={}, classField={}",
+                                schedule.getCxBatchNo(), schedule.getEmbryoCode(), recipeNo, classField);
+                    }
                     continue;
                 }
                 for (Cd15ConstructionMaterial material : constructionMaterials) {
@@ -89,6 +109,14 @@ public class Cd15FormingDemandExpander {
                                 Comparator.nullsLast(BigDecimal::compareTo))
                         .thenComparing(Cd15DemandShift::getStartTime))
                 .collect(Collectors.toList());
+    }
+
+    /** 零计划量及告警起点前的班次不输出缺施工日志。 */
+    private boolean shouldWarnMissingConstruction(BigDecimal formingQuantity,
+                                                  LocalDateTime startTime,
+                                                  LocalDateTime warningStartTime) {
+        return formingQuantity.signum() > 0
+                && (warningStartTime == null || !startTime.isBefore(warningStartTime));
     }
 
     private Map<String, List<Cd15ConstructionMaterial>> groupMaterialsByConstruction(

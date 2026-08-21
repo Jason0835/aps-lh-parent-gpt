@@ -17,7 +17,9 @@ import com.zlt.aps.lh.engine.strategy.IFirstInspectionBalanceStrategy;
 import com.zlt.aps.lh.engine.strategy.IMachineMatchStrategy;
 import com.zlt.aps.lh.engine.strategy.IMouldChangeBalanceStrategy;
 import com.zlt.aps.lh.engine.strategy.support.NewSpecEmbryoAvailableTimeResolver;
+import com.zlt.aps.lh.engine.strategy.support.FirstInspectionAllocationPlan;
 import com.zlt.aps.lh.util.CleaningScheduleRuleUtil;
+import com.zlt.aps.lh.util.FirstInspectionAllocationUtil;
 import com.zlt.aps.lh.util.FirstInspectionQtyUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.MachineCleaningOverlapUtil;
@@ -29,6 +31,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -467,7 +470,7 @@ public class LocalSearchMachineAllocatorStrategy {
                 context, sku, shifts, firstInspectionBaseTime, repairAdjustedProductionStartTime,
                 ScheduleTypeEnum.NEW_SPEC.getCode());
         Date earliestEmbryoAvailableTime =
-                NewSpecEmbryoAvailableTimeResolver.resolveEarliestAvailableTime(context, sku);
+                NewSpecEmbryoAvailableTimeResolver.resolveEffectiveEarliestAvailableTime(context, sku);
         boolean embryoAvailableTimeConstrained = Objects.nonNull(earliestEmbryoAvailableTime);
         if (embryoAvailableTimeConstrained) {
             /*
@@ -503,7 +506,32 @@ public class LocalSearchMachineAllocatorStrategy {
         int firstInspectionQty = FirstInspectionQtyUtil.resolvePreviewFirstInspectionQty(
                 context, sku, firstInspectionShift, shiftCapacity, remainingQty,
                 ScheduleTypeEnum.NEW_SPEC.getCode(), machine.getMachineCode());
+        List<LhShiftConfigVO> inspectionShifts = CollectionUtils.isEmpty(context.getScheduleWindowShifts())
+                ? shifts : context.getScheduleWindowShifts();
+        FirstInspectionAllocationPlan firstInspectionAllocationPlan = embryoAvailableTimeConstrained
+                ? null : FirstInspectionAllocationUtil.buildPlan(
+                        context, sku, inspectionShifts, mouldChangeCompleteTime,
+                        shiftCapacity, remainingQty, ScheduleTypeEnum.NEW_SPEC.getCode(),
+                        machine.getMachineCode(), null);
+        Map<Integer, Integer> firstInspectionQtyMap = Objects.isNull(firstInspectionAllocationPlan)
+                ? Collections.<Integer, Integer>emptyMap()
+                : FirstInspectionAllocationUtil.toShiftQtyMap(firstInspectionAllocationPlan);
+        boolean crossShiftInspection = Objects.nonNull(firstInspectionAllocationPlan)
+                && firstInspectionAllocationPlan.isValid()
+                && firstInspectionAllocationPlan.getInspectionQty() > 0;
+        if (crossShiftInspection) {
+            firstInspectionQty = firstInspectionAllocationPlan.getInspectionQty();
+            /*
+             * 首检本身属于当前 SKU 的目标量。局部搜索的后续正式生产只能消费扣除首检后的
+             * 剩余目标量，最终再汇总首检量，避免跨班首检与下一班正式生产同时命中时超出目标量。
+             */
+            remainingQty = Math.max(0, remainingQty - firstInspectionQty);
+        }
         Date specEndTime = null;
+        if (crossShiftInspection) {
+            // 只有首检而没有后续正式生产时，首检完成时刻仍是该候选的有效收尾时间。
+            specEndTime = firstInspectionAllocationPlan.getInspectionEndTime();
+        }
         int totalQty = 0;
         boolean embryoFirstInspectionLanded = false;
         boolean started = false;
@@ -636,9 +664,17 @@ public class LocalSearchMachineAllocatorStrategy {
                 }
                 embryoFirstInspectionLanded = true;
             }
+            int currentShiftInspectionQty = crossShiftInspection
+                    ? Math.max(0, firstInspectionQtyMap.getOrDefault(shift.getShiftIndex(), 0)) : 0;
+            int effectiveFirstInspectionShiftIndex = crossShiftInspection
+                    ? (currentShiftInspectionQty > 0 ? shift.getShiftIndex() : -1)
+                    : firstInspectionShiftIndex;
+            int effectiveFirstInspectionQty = crossShiftInspection
+                    ? currentShiftInspectionQty : firstInspectionQty;
             shiftMaxQty = FirstInspectionQtyUtil.resolveNormalCapacityAfterFirstInspection(
-                    context, sku, shift, shiftMaxQty, firstInspectionShiftIndex, firstInspectionQty,
-                    shiftCapacity, ScheduleTypeEnum.NEW_SPEC.getCode(), machine.getMachineCode(),
+                    context, sku, shift, shiftMaxQty, effectiveFirstInspectionShiftIndex,
+                    effectiveFirstInspectionQty, shiftCapacity,
+                    ScheduleTypeEnum.NEW_SPEC.getCode(), machine.getMachineCode(),
                     embryoAvailableTimeConstrained);
             if (shiftMaxQty <= 0) {
                 continue;
@@ -665,7 +701,9 @@ public class LocalSearchMachineAllocatorStrategy {
             // 当前班次结束后再推进到下一班次，避免跨班次重叠计算
             cursorStartTime = effectiveEndTime;
         }
-        if (!embryoAvailableTimeConstrained) {
+        if (crossShiftInspection) {
+            totalQty += firstInspectionQty;
+        } else if (!embryoAvailableTimeConstrained) {
             // 未命中胎胚配置时继续沿用原“生产窗口外首检量”估算，保持既有局部搜索评分。
             totalQty += resolveFirstInspectionCapacityOutsideProductionWindow(
                     context, sku, shifts, firstInspectionShift, productionStartTime, shiftCapacity, totalQty,

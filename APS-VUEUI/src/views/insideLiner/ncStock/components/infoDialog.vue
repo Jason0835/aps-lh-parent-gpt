@@ -38,6 +38,7 @@ import { getConfigKey } from "@/api/system/config";
 
 export default {
   components: { infoForm },
+  inject: ["parentDict"],
   data() {
     return {
       loading: false,
@@ -47,6 +48,13 @@ export default {
       factoryCode: "",
       form: {},
       rules: {
+        factoryCode: [
+          {
+            required: true,
+            message: this.$t("common.rule.select"),
+            trigger: "blur",
+          },
+        ],
         stockDate: [
           {
             required: true,
@@ -77,6 +85,14 @@ export default {
     },
     columns() {
       return [
+        {
+          label: this.$t("ui.data.column.factoryCode"),
+          prop: "factoryCode",
+          span: 24,
+          type: "select",
+          dictData: this.parentDict.type.biz_factory_name,
+          required: true,
+        },
         {
           label: this.$t("ui.data.column.stock.stockDate"),
           prop: "stockDate",
@@ -194,7 +210,14 @@ export default {
       if (!this.factoryCode) {
         getConfigKey("sys.factory.code").then((response) => {
           this.factoryCode = response.msg;
+          // 新增时默认选中默认工厂（工厂字段不可编辑）
+          if (!data) {
+            this.form = { ...this.form, factoryCode: response.msg };
+          }
         });
+      } else if (!data) {
+        // 新增时默认选中默认工厂（工厂字段不可编辑）
+        this.form = { ...this.form, factoryCode: this.factoryCode };
       }
       if (data) {
         this.isEdit = true;

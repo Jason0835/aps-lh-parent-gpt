@@ -33,12 +33,13 @@
           :disabled="selection.length != 1"
           >{{ $t("ui.frame.btn.modify") }}</el-button
         >
-        <!-- <el-button
+        <el-button
+          v-hasPermi="['nc:machine:remove']"
           type="danger"
-          @click="handleDeleteMulti"
+          @click="handleDelete(selection)"
           :disabled="selection.length == 0"
           >{{ $t("ui.frame.btn.delete") }}</el-button
-        > -->
+        >
         <el-button
           v-hasPermi="['nc:machine:import']"
           @click="() => $refs.tltUploadForm.handleImport(importDefaultValue)"
@@ -69,8 +70,7 @@ import {
   listMachine,
   exportData,
   editMachine,
-  publishApsMoldAdjustPlan,
-  removeApsMoldAdjustPlan,
+  removeMachine,
 } from "@/api/nc/machine";
 import { getConfigKey } from "@/api/system/config";
 import InfoDialog from "./components/infoDialog.vue";
@@ -79,7 +79,7 @@ import TltUploadForm from "@/views/components/tltUploadForm.vue";
 export default {
  name: "ncMachine",
   components: { InfoDialog, TltUploadForm },
-  dicts: ["STATUS", "CLASS_SHIFT", "class_num_three_plan", "biz_factory_name"],
+  dicts: ["biz_available_status", "CLASS_SHIFT", "class_num_three_plan", "biz_factory_name"],
 
   provide() {
     return {
@@ -97,15 +97,12 @@ export default {
           label: "",
           prop: "updateSupport",
           render: (form) => {
-            console.log(form);
             return (
               <el-checkbox
-                label="是否更新已经存在的用户数据"
-                true-label={true}
-                false-label={false}
+                label={this.$t("ui.checkbox.updateExistingData")}
                 v-model={form.updateSupport}
               >
-                是否更新已经存在的用户数据
+                {this.$t("ui.checkbox.updateExistingData")}
               </el-checkbox>
             );
           },
@@ -143,25 +140,6 @@ export default {
     columns() {
       return [
         { type: "selection", fixed: "left" },
-        {
-          label: this.$t("common.option"),
-          prop: "option",
-          width: "100px",
-          fixed: "left",
-          render: ({ row }) => {
-            return (
-              <div>
-                <el-button
-                  class="minus"
-                  type="success"
-                  onClick={() => this.handleEdit(row)}
-                >
-                  {this.$t("ui.frame.btn.update")}
-                </el-button>
-              </div>
-            );
-          },
-        },
         {
           label: this.$t("ui.data.column.factoryCode"),
           prop: "factoryCode",
@@ -244,8 +222,8 @@ export default {
             return (
               <el-switch
                 value={row.status}
-                active-value="0"
-                inactive-value="1"
+                active-value="1"
+                inactive-value="0"
                 onChange={(value) => this.handleChangeStatus(value, row)}
               />
             );
@@ -258,6 +236,38 @@ export default {
           // sortable: "custom",
           formatter: (row) => {
             return row.remark || "-";
+          },
+        },
+        {
+          prop: "updateTime",
+          align: "center",
+          halign: "center",
+          label: this.$t("common.updateTime"),
+          minWidth: 160,
+        },
+        {
+          label: this.$t("common.option"),
+          prop: "option",
+          width: "100px",
+          render: ({ row }) => {
+            return (
+              <div>
+                <el-button
+                  class="minus"
+                  type="success"
+                  onClick={() => this.handleEdit(row)}
+                >
+                  {this.$t("ui.frame.btn.update")}
+                </el-button>
+                <el-button
+                  class="minus"
+                  type="danger"
+                  onClick={() => this.handleDelete(row)}
+                >
+                  {this.$t("ui.frame.btn.delete")}
+                </el-button>
+              </div>
+            );
           },
         },
       ];
@@ -283,7 +293,7 @@ export default {
           label: this.$t("ui.data.column.machine.status"),
           prop: "status",
           type: "select",
-          dictData: this.dict.type.STATUS,
+          dictData: this.dict.type.biz_available_status,
         },
       ];
     },
@@ -323,15 +333,18 @@ export default {
       }
     },
 
-    handleDelete(row) {
+    handleDelete(rows) {
+      const ids = Array.isArray(rows) ? rows.map((item) => item.id) : [rows.id];
       this.$confirm(this.$t("common.confirm.delete"), {
         type: "warning",
       }).then(() => {
-        const ids = row.id;
-        removeApsMoldAdjustPlan({ ids }).then((data) => {
+        this.loading = true;
+        removeMachine(ids).then((data) => {
           this.$modal.msgSuccess(data.msg);
           this.$set(this.page, "current", 1);
-          this.$getList();
+          this.getList();
+        }).catch(() => {
+          this.loading = false;
         });
       });
     },
@@ -436,6 +449,7 @@ export default {
   },
   mounted() {},
   created() {
+    //localStorage.removeItem("insideLinerMachineMainTable");
     getConfigKey("sys.factory.code").then(response => {
       this.search.factoryCode = response.msg;
       this.query.factoryCode = response.msg;

@@ -30,7 +30,7 @@ spring:
           data-id: application-aps-${spring.profiles.active}.${spring.cloud.nacos.config.file-extension}
           group: ${nacos.cfg-group}
         shared-configs[1]:
-          data-id: druidlocalhost_aps_${spring.profiles.active}.${spring.cloud.nacos.config.file-extension}
+          data-id: druid_aps_${spring.profiles.active}.${spring.cloud.nacos.config.file-extension}
           group: ${nacos.cfg-group}
         shared-configs[2]:
           data-id: system-frame-aps-${spring.profiles.active}.${spring.cloud.nacos.config.file-extension}

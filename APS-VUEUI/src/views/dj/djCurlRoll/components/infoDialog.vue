@@ -33,18 +33,28 @@ import { mapState } from "vuex";
 
 import infoForm from "@/views/components/infoForm.vue";
 
-import { saveCurlRoll,checkCurlRollCodeUnique } from "@/api/dj/curlRoll";
+import { getConfigKey } from "@/api/system/config";
+import { saveCurlRoll } from "@/api/dj/curlRoll";
 
 export default {
   components: { infoForm },
+  inject: ["parentDict"],
   data() {
     return {
       loading: false,
       visible: false,
       isEdit: false,
+      factoryCode: "",
       editType: null,
       form: {},
       rules: {
+        factoryCode: [
+          {
+            required: true,
+            message: this.$t("common.rule.select"),
+            trigger: "blur",
+          },
+        ],
         paddingCode: [
           {
             required: true,
@@ -73,6 +83,13 @@ export default {
     },
     columns() {
       return [
+        {
+          label: this.$t("ui.data.column.factoryCode"),
+          prop: "factoryCode",
+          span: 24,
+          type: "select",
+          dictData: this.parentDict.type.biz_factory_name,
+        },
         {
           label: this.$t("ui.dj.curlRoll.column.paddingCode"),
           prop: "paddingCode",
@@ -119,6 +136,19 @@ export default {
     //utils
     show(data) {
       this.visible = true;
+      // 获取当前工厂编码（保存时需要带工厂参数）
+      if (!this.factoryCode) {
+        getConfigKey("sys.factory.code").then((response) => {
+          this.factoryCode = response.msg;
+          // 新增时默认选中默认工厂（工厂字段不可编辑）
+          if (!data) {
+            this.form = { ...this.form, factoryCode: response.msg };
+          }
+        });
+      } else if (!data) {
+        // 新增时默认选中默认工厂（工厂字段不可编辑）
+        this.form = { ...this.form, factoryCode: this.factoryCode };
+      }
       if (data) {
         this.isEdit = true;
         this.form = {
@@ -133,36 +163,12 @@ export default {
       this.isEdit = false;
       this.visible = false;
     },
-    checkCurlRollCodeUnique(rule, value, callback) {
-      return new Promise((resolve, reject) => {
-        checkCurlRollCodeUnique({
-          id: this.form.id,
-          paddingCode: this.form.paddingCode,
-        })
-          .then((res) => {
-            if (res === 0) {
-              resolve();
-            } else {
-              reject(new Error(this.$t("ui.curlRoll.alter.isSpecExist")));
-            }
-          })
-          .catch((error) => {
-            console.error(error);
-            reject(new Error("验证失败，请稍后再试"));
-          });
-      });
-    },
-
-   handleConfirm() {
-      this.$refs.form.triggerConfirm(async (params) => {
-        try {
-          this.loading = true;
-          await this.checkCurlRollCodeUnique();
-          this.save(params);
-        } catch (error) {
-          this.$modal.msgError(error.message);
-          this.loading = false;
-        }
+    handleConfirm() {
+      this.$refs.form.triggerConfirm((params) => {
+        this.save({
+          ...params,
+          factoryCode: params.factoryCode || this.factoryCode,
+        });
       });
     },
   },

@@ -97,7 +97,7 @@ public class DjSpecifyMachineUIController extends BaseUIController<DjSpecifyMach
     @ResponseBody
     public AjaxResult save(DjSpecifyMachine djMachine) {
         if (UserConstants.NOT_UNIQUE.equals(iDjSpecifyMachineService.checkUnique(djMachine))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.djMachine.embryoCodeNotUnique"));
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.djSpecifyMachine.importUnique"));
         }
 
         return iDjSpecifyMachineService.save(djMachine);

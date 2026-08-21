@@ -1,7 +1,13 @@
 package com.zlt.aps.nc.service.impl;
 
+import java.text.MessageFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import javax.annotation.Resource;
 
@@ -16,8 +22,11 @@ import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
+import com.zlt.aps.common.engine.service.FactoryService;
 import com.zlt.aps.nc.api.domain.entity.NcLossSetting;
+import com.zlt.aps.nc.api.domain.entity.NcMachineInfo;
 import com.zlt.aps.nc.mapper.NcLossSettingMapper;
+import com.zlt.aps.nc.mapper.NcMachineInfoMapper;
 import com.zlt.aps.nc.service.NcLossSettingService;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.enums.ImportErrorTypeEnums;
@@ -28,13 +37,19 @@ import com.zlt.common.utils.PubUtil;
  * 内衬损耗率设定Service业务层处理
  *
  * @author chen
- * @date 2021-07-13
+ * @date 2026-07-13
  */
 @Service
 public class NcLossSettingServiceImpl extends AbstractDocService<NcLossSetting> implements NcLossSettingService {
 
     @Resource
+    private FactoryService factoryService;
+
+    @Resource
     private NcLossSettingMapper lossSettingMapper;
+
+    @Resource
+    private NcMachineInfoMapper machineInfoMapper;
 
     @Override
     public String checkUnique(NcLossSetting entity) {
@@ -47,21 +62,57 @@ public class NcLossSettingServiceImpl extends AbstractDocService<NcLossSetting> 
         queryWrapper.eq("FACTORY_CODE", entity.getFactoryCode());
         List<NcLossSetting> list = lossSettingMapper.selectList(queryWrapper);
 
-        // 机台、物料号都不为空，看是否有全匹配的
-        if (StringUtils.isNotEmpty(entity.getMachineCode()) && StringUtils.isNotEmpty(entity.getLiningCode())
-                && list.stream().anyMatch(item -> Objects.equal(entity.getMachineCode(), item.getMachineCode())
-                        && Objects.equal(entity.getLiningCode(), item.getLiningCode()))) {
-            return UserConstants.NOT_UNIQUE;
-        } else if (StringUtils.isNotEmpty(entity.getMachineCode())
-                && list.stream().anyMatch(item -> Objects.equal(entity.getMachineCode(), item.getMachineCode())
-                        && StringUtils.isEmpty(entity.getLiningCode()))) {
-            return UserConstants.NOT_UNIQUE;
-        } else if (StringUtils.isNotEmpty(entity.getLiningCode())
-                && list.stream().anyMatch(item -> Objects.equal(entity.getLiningCode(), item.getLiningCode())
-                        && StringUtils.isEmpty(entity.getLiningCode()))) {
-            return UserConstants.NOT_UNIQUE;
+        // 唯一判断逻辑抽取至 isUnique，供逐笔校验与导入内存校验共用，保证口径一致
+        if (this.isUnique(entity, list)) {
+            return UserConstants.UNIQUE;
         }
-        return UserConstants.UNIQUE;
+        return UserConstants.NOT_UNIQUE;
+    }
+
+    /**
+     * 判断损耗率记录是否与已有记录存在唯一冲突，规则与原 checkUnique 一致：
+     * 1. 机台码与内衬号均非空：存在两项全匹配的记录则冲突
+     * 2. 机台码非空：存在同机台码且内衬号为空的记录则冲突
+     * 3. 内衬号非空：存在同内衬号且机台码为空的记录则冲突
+     * 抽取为内存判断，供导入时传入预先加载的数据校验，避免逐笔查询数据库
+     *
+     * @param entity 待校验记录
+     * @param existList 已有记录（同一工厂）
+     * @return 存在唯一冲突返回 false，唯一返回 true
+     */
+    private boolean isUnique(NcLossSetting entity, List<NcLossSetting> existList) {
+        // 机台码、内衬号均非空时，存在两项全匹配的记录则冲突
+        if (StringUtils.isNotEmpty(entity.getMachineCode()) && StringUtils.isNotEmpty(entity.getLiningCode())) {
+            if (existList.stream().anyMatch(item -> Objects.equal(entity.getMachineCode(), item.getMachineCode())
+                    && Objects.equal(entity.getLiningCode(), item.getLiningCode()))) {
+                return false;
+            }
+        }
+        // 机台码非空时，存在同机台码且内衬号为空的记录则冲突
+        if (StringUtils.isNotEmpty(entity.getMachineCode())) {
+            if (existList.stream().anyMatch(item -> Objects.equal(entity.getMachineCode(), item.getMachineCode())
+                    && StringUtils.isEmpty(item.getLiningCode()))) {
+                return false;
+            }
+        }
+        // 内衬号非空时，存在同内衬号且机台码为空的记录则冲突
+        if (StringUtils.isNotEmpty(entity.getLiningCode())) {
+            if (existList.stream().anyMatch(item -> Objects.equal(entity.getLiningCode(), item.getLiningCode())
+                    && StringUtils.isEmpty(item.getMachineCode()))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * 唯一校验字段：工厂编码 + 机台编码 + 内衬号
+     *
+     * @return 唯一校验字段名列表
+     */
+    @Override
+    protected List<String> getCheckUniqueFields() {
+        return Arrays.asList("factoryCode", "machineCode", "liningCode");
     }
 
     /**
@@ -74,50 +125,59 @@ public class NcLossSettingServiceImpl extends AbstractDocService<NcLossSetting> 
      */
     @Override
     public AjaxResult importData(List<NcLossSetting> list, boolean updateSupport, Long importLogId) {
+        // 统一填充当前工厂编码（导入模板不含工厂列，取自 sys.factory.code 配置）
+        String factoryCode = factoryService.getFactoryCode();
+        list.forEach(entity -> entity.setFactoryCode(factoryCode));
         int successNum = 0;
         int failureNum = 0;
         List<NcLossSetting> importList = new ArrayList<>();
         List<ImportErrorLog> importErrorLogs = new ArrayList<>();
-        String uniqueMsg = I18nUtil.getMessage("ui.data.alert.cxStock.embryoCodeNotUnique");
+        String uniqueMsg = I18nUtil.getMessage("ui.data.alert.ncLossSetting.importUnique");
+
+        // 循环外一次性加载当前工厂的机台主数据编码，用于导入机台存在性校验
+        Set<String> machineCodeSet = this.loadMachineCodeSet(factoryCode);
+
+        // 循环外一次性加载当前工厂的全部已有记录（含关键字段为空的记录，兼容部分匹配校验），避免在循环内逐笔查询数据库
+        List<NcLossSetting> existLossSettingList = this.loadExistLossSettingList(factoryCode);
+        Map<String, List<NcLossSetting>> existLossSettingMap = this.loadExistLossSettingMap(factoryCode);
 
         for (int i = 0; i < list.size(); i++) {
             int errorNum = i + 2;
             NcLossSetting docEntity = list.get(i);
+            // 基础字段校验与重复校验
             List<ImportErrorLog> validated = ImportExcelValidatedUtils.validated(importLogId, errorNum, docEntity);
             ImportExcelValidatedUtils.validatedRepeat(list, docEntity, i, 2, importLogId, validated,
                     this.getCheckUniqueFields().toArray(new String[0]));
+            // 机台存在性校验：导入的机台不在机台主数据中，该行视为导入失败
+            if (StringUtils.isNotEmpty(docEntity.getMachineCode())
+                    && !machineCodeSet.contains(docEntity.getMachineCode())) {
+                ImportExcelValidatedUtils.addImportErrorLog(importLogId, errorNum,
+                        MessageFormat.format(I18nUtil.getMessage("ui.data.alert.ncMachine.machineNotExist"),
+                                docEntity.getMachineCode()),
+                        validated);
+            }
             if (CollectionUtils.isNotEmpty(validated)) {
+                // 校验不通过，该行直接跳过，不再进行唯一性判断
                 failureNum++;
                 docEntity.setId(-999L);
                 importErrorLogs.addAll(validated);
-            }
-        }
-
-        for (int i = 0; i < list.size(); i++) {
-            int errorNum = i + 2;
-            NcLossSetting docEntity = list.get(i);
-            if (docEntity.getId() != null && docEntity.getId() == -999L) {
                 continue;
             }
 
-            if (checkUnique(docEntity).equals(UserConstants.UNIQUE)) {
+            if (this.isUnique(docEntity, existLossSettingList)) {
                 importList.add(docEntity);
                 successNum++;
             } else {
                 if (updateSupport) {
-                    LambdaQueryWrapper<NcLossSetting> queryWrapper = new LambdaQueryWrapper<>();
-                    queryWrapper.eq(NcLossSetting::getFactoryCode, docEntity.getFactoryCode());
-                    queryWrapper.eq(NcLossSetting::getMachineCode, docEntity.getMachineCode());
-                    queryWrapper.eq(NcLossSetting::getLiningCode, docEntity.getLiningCode());
                     logger.info("updateSupport:{}", docEntity);
-                    List<NcLossSetting> existList = lossSettingMapper.selectList(queryWrapper);
-                    if (existList.size() > 1) {
+                    List<NcLossSetting> existList = existLossSettingMap.get(this.buildLossSettingKey(docEntity));
+                    if (CollectionUtils.isNotEmpty(existList) && existList.size() > 1) {
                         failureNum++;
                         String multipleMsg = I18nUtil.getMessage("ui.data.alert.cxStock.multipleRecords");
                         ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
                                 errorNum, String.format(multipleMsg, errorNum), importErrorLogs);
                         continue;
-                    } else if (existList.size() == 1) {
+                    } else if (CollectionUtils.isNotEmpty(existList)) {
                         docEntity.setId(existList.get(0).getId());
                         importList.add(docEntity);
                         successNum++;
@@ -149,6 +209,72 @@ public class NcLossSettingServiceImpl extends AbstractDocService<NcLossSetting> 
         } else {
             return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + successNum);
         }
+    }
+
+    /**
+     * 一次性加载当前工厂的全部机台主数据编码，用于导入时校验机台是否存在
+     *
+     * @param factoryCode 工厂编码
+     * @return 该工厂存在的机台编码集合
+     */
+    private Set<String> loadMachineCodeSet(String factoryCode) {
+        if (StringUtils.isEmpty(factoryCode)) {
+            return Collections.emptySet();
+        }
+        return machineInfoMapper
+                .selectList(new LambdaQueryWrapper<NcMachineInfo>()
+                        .eq(NcMachineInfo::getFactoryCode, factoryCode)
+                        .select(NcMachineInfo::getMachineCode))
+                .stream().map(NcMachineInfo::getMachineCode).filter(StringUtils::isNotBlank)
+                .collect(Collectors.toSet());
+    }
+
+    /**
+     * 一次性加载当前工厂的全部已有损耗率记录（含关键字段为空的记录），
+     * 供导入时在内存中判断唯一性，兼容机台码/内衬号部分匹配的校验口径
+     *
+     * @param factoryCode 工厂编码
+     * @return 当前工厂的全部已有损耗率记录
+     */
+    private List<NcLossSetting> loadExistLossSettingList(String factoryCode) {
+        if (StringUtils.isEmpty(factoryCode)) {
+            return Collections.emptyList();
+        }
+        return lossSettingMapper.selectList(new LambdaQueryWrapper<NcLossSetting>()
+                .eq(NcLossSetting::getFactoryCode, factoryCode)
+                .select(NcLossSetting::getId, NcLossSetting::getFactoryCode, NcLossSetting::getMachineCode,
+                        NcLossSetting::getLiningCode));
+    }
+
+    /**
+     * 一次性加载当前工厂的全部已有损耗率记录，并按唯一键分组，避免导入时逐笔查询数据库
+     *
+     * @param factoryCode 工厂编码
+     * @return 唯一键 -> 已有记录列表
+     */
+    private Map<String, List<NcLossSetting>> loadExistLossSettingMap(String factoryCode) {
+        if (StringUtils.isEmpty(factoryCode)) {
+            return Collections.emptyMap();
+        }
+        // 复用全量查询结果，按唯一键分组；排除关键字段为空的记录（与原逐笔 eq 查询口径一致，null 值不会被命中）
+        List<NcLossSetting> existList = this.loadExistLossSettingList(factoryCode);
+        return existList.stream()
+                .filter(item -> StringUtils.isNotBlank(item.getFactoryCode())
+                        && StringUtils.isNotBlank(item.getMachineCode())
+                        && StringUtils.isNotBlank(item.getLiningCode()))
+                .collect(Collectors.groupingBy(this::buildLossSettingKey));
+    }
+
+    /**
+     * 构建损耗率唯一键：工厂编码 + 机台编码 + 内衬号，用于内存中快速匹配已有记录
+     *
+     * @param entity 损耗率记录
+     * @return 唯一键
+     */
+    private String buildLossSettingKey(NcLossSetting entity) {
+        return StringUtils.defaultString(entity.getFactoryCode()) + "|"
+                + StringUtils.defaultString(entity.getMachineCode()) + "|"
+                + StringUtils.defaultString(entity.getLiningCode());
     }
 
     @Override

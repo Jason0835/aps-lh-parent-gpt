@@ -21,8 +21,13 @@ import com.zlt.aps.enums.LocationTypeEnum;
 import com.zlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.gsq.api.domain.entity.GsqDayFinishQty;
+import com.zlt.aps.gsq.api.domain.entity.GsqMesStock;
 import com.zlt.aps.gsq.api.domain.entity.GsqScheFinishQty;
 import com.zlt.aps.gsq.api.domain.entity.GsqStock;
+import com.zlt.aps.gsq.api.domain.entity.GsqTwiningDisc;
+import com.zlt.aps.gsq.api.domain.entity.GsqTwiningDiscMachine;
+import com.zlt.aps.gsq.api.domain.entity.GsqTwiningDiscSpec;
+import com.zlt.aps.gsq.api.domain.vo.GsqMesTwiningDiscSyncVO;
 import com.zlt.aps.gsq.api.service.IGsqMesSyncRemoteService;
 import com.zlt.aps.itf.constant.DataSource;
 import com.zlt.aps.itf.constant.SysCode;
@@ -1919,9 +1924,10 @@ public class MesItfServiceImpl implements MesItfService {
 
     /**
      * 同步胎圈库存
-     * T_TQ_STOCK：采用逻辑删除+插入方案
-     *   步骤1：逻辑删除当天库存日期的所有数据（IS_DELETE置为1）
-     *   步骤2：将MES最新库存数据批量插入（新记录，IS_DELETE=0）
+     * T_TQ_STOCK：采用逻辑删除+插入方案，对齐硫化库存"每天只同步当天"的口径
+     *   步骤1：MES中间表仅查询当天最新DATA_VERSION的数据（SQL已过滤，不拉历史快照）
+     *   步骤2：逻辑删除APS中当天库存日期的所有数据（IS_DELETE置为1）
+     *   步骤3：将MES最新库存数据批量插入（新记录，IS_DELETE=0）
      *   历史数据保留，只删当天库存日期的数据
      *
      * @param syncDataLogs 同步参数
@@ -1929,46 +1935,51 @@ public class MesItfServiceImpl implements MesItfService {
      */
     @Override
     public AjaxResult syncMesTqStock(AuxReqSyncDataLogs syncDataLogs) {
-        // 切换到MES数据源查询中间表
+        // 切换到MES数据源查询中间表（仅当天数据，SQL已用CONVERT(VARCHAR)输出日期字符串规避跨时区偏移）
         DynamicDataSourceContextHolder.push(DataSource.MES);
         List<TqMesStock> syncList = mesItfMapper.selectMesTqStockList(syncDataLogs);
         DynamicDataSourceContextHolder.poll();
 
-        // 按库存日期+物料编码去重，保留第一条
+        // 按库存日期+物料编码去重（防御性处理MES同版本重复推送），保留任意一条
+        // stockDate已改为String(yyyy-MM-dd)，直接用字符串拼接去重键，不做Date转换
         Map<String, TqMesStock> groupMap = syncList.stream()
+                .filter(item -> StringUtils.isNotBlank(item.getStockDate()))
                 .collect(Collectors.toMap(
-                        item -> DateUtil.formatDate(item.getStockDate()) + "|" + item.getMaterialCode(),
+                        item -> item.getStockDate() + "|" + item.getMaterialCode(),
                         Function.identity(),
                         (v1, v2) -> v1
                 ));
         syncList = new ArrayList<>(groupMap.values());
 
         if (CollectionUtils.isEmpty(syncList)) {
-            log.warn("胎圈库存同步：MES中间表查询结果为空");
-            return AjaxResult.success("MES中间表无数据可同步");
+            log.warn("胎圈库存同步：MES中间表当天无数据，本次跳过同步，避免误删APS当天已有数据");
+            return AjaxResult.success("MES中间表当天无数据可同步");
         }
 
-        // 转换 TqMesStock → TqStock
+        // 转换 TqMesStock → TqStock（仅填充业务字段，日期/审计字段由目标微服务在其JVM时区设置）
+        // 关键：stockDate不在ITF模块设置（避免跨JVM时区的Jackson序列化偏移），
+        //      由远程Controller解析stockDateStr参数后统一回填；
+        //      createBy/createTime/updateBy/updateTime/isDelete由远程XML批量插入显式控制，
+        //      避免MetaObjectHandler在syncUser上下文下覆盖审计字段
         List<TqStock> tqStockInsertList = syncList.stream().map(item -> {
             TqStock tqStock = new TqStock();
-            tqStock.setStockDate(item.getStockDate());
+            // 不设置stockDate，由目标端Controller解析stockDateStr后统一回填
             tqStock.setBeadCode(item.getMaterialCode());
             tqStock.setStockNum(item.getAvailableStock() != null ? item.getAvailableStock() : BigDecimal.ZERO);
-            tqStock.setCreateBy("MES");
-            tqStock.setUpdateBy("MES");
-            tqStock.setCreateTime(DateUtils.getNowDate());
-            tqStock.setUpdateTime(DateUtils.getNowDate());
+            // 修正数量/不良数量MES无此概念，默认0
+            tqStock.setModifyNum(BigDecimal.ZERO);
+            tqStock.setBadNum(BigDecimal.ZERO);
             return tqStock;
         }).collect(Collectors.toList());
 
         try {
-            // 取第一条数据的库存日期作为逻辑删除条件
-            Date stockDate = tqStockInsertList.stream()
-                    .map(TqStock::getStockDate)
-                    .filter(Objects::nonNull)
+            // 从MES数据中取库存日期字符串（所有数据均为同一天，取第一条非空即可）
+            // 字符串直接取自SQL CONVERT(VARCHAR)输出，不经过任何Date→String转换，彻底规避时区偏移
+            String stockDateStr = syncList.stream()
+                    .map(TqMesStock::getStockDate)
+                    .filter(StringUtils::isNotBlank)
                     .findFirst()
-                    .orElse(DateUtils.getNowDate());
-            String stockDateStr = DateUtil.formatDate(stockDate);
+                    .orElse(DateUtil.formatDate(DateUtils.getNowDate()));
 
             log.info("胎圈库存同步：开始同步，待插入数量={}, 库存日期={}", tqStockInsertList.size(), stockDateStr);
 
@@ -1986,50 +1997,62 @@ public class MesItfServiceImpl implements MesItfService {
 
     /**
      * 同步钢丝圈库存
-     * 从MES中间表MES_GSQ_STOCK查询全量数据，
-     * 逻辑删除APS旧数据并插入新数据
+     * T_GSQ_STOCK：采用逻辑删除+插入方案，对齐硫化库存"每天只同步当天"的口径
+     *   步骤1：MES中间表MES_GSQ_STOCK仅查询当天数据（SQL已过滤，不拉历史快照；MES源表不含版本字段）
+     *   步骤2：逻辑删除APS中当天库存日期的所有数据（IS_DELETE置为1）
+     *   步骤3：将MES最新库存数据批量插入（新记录，IS_DELETE=0）
+     *   历史数据保留，只删当天库存日期的数据
      *
      * @param syncDataLogs 同步参数
      * @return 结果
      */
     @Override
     public AjaxResult syncMesGsqStock(AuxReqSyncDataLogs syncDataLogs) {
-        // 切换到MES数据源查询中间表
+        // 切换到MES数据源查询中间表（仅当天数据，SQL已用CONVERT(VARCHAR)输出日期字符串规避跨时区偏移）
         DynamicDataSourceContextHolder.push(DataSource.MES);
-        List<GsqStock> syncList = mesItfMapper.selectMesGsqStockList(syncDataLogs);
+        List<GsqMesStock> syncList = mesItfMapper.selectMesGsqStockList(syncDataLogs);
         DynamicDataSourceContextHolder.poll();
 
-        if (CollectionUtils.isEmpty(syncList)) {
-            log.warn("钢丝圈库存同步：MES中间表查询结果为空");
-            return AjaxResult.success("MES中间表无数据可同步");
-        }
-
-        // 按库存日期+钢丝圈代码去重，保留第一条
-        Map<String, GsqStock> groupMap = syncList.stream()
+        // 按库存日期+钢丝圈编码去重（防御性处理MES同版本重复推送），保留任意一条
+        // stockDate已改为String(yyyy-MM-dd)，直接用字符串拼接去重键，不做Date转换
+        Map<String, GsqMesStock> groupMap = syncList.stream()
+                .filter(item -> StringUtils.isNotBlank(item.getStockDate()))
                 .collect(Collectors.toMap(
-                        item -> DateUtil.formatDate(item.getStockDate()) + "|" + item.getSteelRingCode(),
+                        item -> item.getStockDate() + "|" + item.getMaterialCode(),
                         Function.identity(),
                         (v1, v2) -> v1
                 ));
         syncList = new ArrayList<>(groupMap.values());
 
-        // 补审计字段
+        if (CollectionUtils.isEmpty(syncList)) {
+            log.warn("钢丝圈库存同步：MES中间表当天无数据，本次跳过同步，避免误删APS当天已有数据");
+            return AjaxResult.success("MES中间表当天无数据可同步");
+        }
+
+        // 转换 GsqMesStock → GsqStock（仅填充业务字段，日期/审计字段由目标微服务在其JVM时区设置）
+        // 关键：stockDate不在ITF模块设置（避免跨JVM时区的Jackson序列化偏移），
+        //      由远程Controller解析stockDateStr参数后统一回填；
+        //      createBy/createTime/updateBy/updateTime/isDelete由远程XML批量插入显式控制，
+        //      避免MetaObjectHandler在syncUser上下文下覆盖审计字段
         List<GsqStock> gsqStockInsertList = syncList.stream().map(item -> {
-            item.setCreateBy("MES");
-            item.setUpdateBy("MES");
-            item.setCreateTime(DateUtils.getNowDate());
-            item.setUpdateTime(DateUtils.getNowDate());
-            return item;
+            GsqStock gsqStock = new GsqStock();
+            // 不设置stockDate，由目标端Controller解析stockDateStr后统一回填
+            gsqStock.setSteelRingCode(item.getMaterialCode());
+            gsqStock.setStockNum(item.getAvailableStock() != null ? item.getAvailableStock() : BigDecimal.ZERO);
+            // 修正数量/不良数量MES无此概念，默认0
+            gsqStock.setModifyNum(BigDecimal.ZERO);
+            gsqStock.setBadNum(BigDecimal.ZERO);
+            return gsqStock;
         }).collect(Collectors.toList());
 
         try {
-            // 取第一条数据的库存日期作为逻辑删除条件
-            Date stockDate = gsqStockInsertList.stream()
-                    .map(GsqStock::getStockDate)
-                    .filter(Objects::nonNull)
+            // 从MES数据中取库存日期字符串（所有数据均为同一天，取第一条非空即可）
+            // 字符串直接取自SQL CONVERT(VARCHAR)输出，不经过任何Date→String转换，彻底规避时区偏移
+            String stockDateStr = syncList.stream()
+                    .map(GsqMesStock::getStockDate)
+                    .filter(StringUtils::isNotBlank)
                     .findFirst()
-                    .orElse(DateUtils.getNowDate());
-            String stockDateStr = DateUtil.formatDate(stockDate);
+                    .orElse(DateUtil.formatDate(DateUtils.getNowDate()));
 
             log.info("钢丝圈库存同步：开始同步，待插入数量={}, 库存日期={}", gsqStockInsertList.size(), stockDateStr);
 
@@ -2046,9 +2069,83 @@ public class MesItfServiceImpl implements MesItfService {
     }
 
     /**
+     * 同步MES钢丝圈缠绕盘三表数据（缠绕盘清单/规格关系/机台关系）
+     * <p>三表均按业务键取MES DATA_VERSION最大版本行（避免全局最大版本漏历史推送数据），
+     * 聚合为GsqMesTwiningDiscSyncVO后一次Feign调用，由钢丝圈微服务单事务落库保证三表一致性：</p>
+     * <p>1. MES_WIRE_DISC_INFO缠绕盘清单（按MOUTH_PLAT_CODE取最大版本）；
+     * 2. MES_WIRE_DISC_SPEC_MAPPING规格关系（按WIRE_DISC_CODE+STEEL_RING_CODE取最大版本）；
+     * 3. MES_WIRE_DISC_MACHINE_MAPPING机台关系（按WIRE_DISC_CODE+MACHINE_CODE取最大版本）</p>
+     * <p>三表均为字符串/数值字段，无日期字段，不存在SQL Server JDBC跨时区偏移问题；
+     * SORT_TYPE为MES decimal(6,2)，SQL侧CAST为字符串后Java侧去尾零（如34543.00→34543）</p>
+     *
+     * @param syncDataLogs 同步参数（可传factoryCode过滤分厂）
+     * @return 结果
+     */
+    @Override
+    public AjaxResult syncMesTwiningDisc(AuxReqSyncDataLogs syncDataLogs) {
+        // 切换到MES数据源查询三张缠绕盘表（各按业务键取最大版本，SQL已用别名映射APS实体字段）
+        DynamicDataSourceContextHolder.push(DataSource.MES);
+        List<GsqTwiningDisc> discList;
+        List<GsqTwiningDiscSpec> specList;
+        List<GsqTwiningDiscMachine> machineList;
+        try {
+            discList = mesItfMapper.selectMesWireDiscInfoList(syncDataLogs);
+            specList = mesItfMapper.selectMesWireDiscSpecMappingList(syncDataLogs);
+            machineList = mesItfMapper.selectMesWireDiscMachineMappingList(syncDataLogs);
+        } finally {
+            DynamicDataSourceContextHolder.poll();
+        }
+
+        log.info("缠绕盘MES同步：MES侧查询完成，缠绕盘清单={}条，规格关系={}条，机台关系={}条",
+                discList.size(), specList.size(), machineList.size());
+
+        // SORT_TYPE去尾零：MES侧decimal(6,2)经CAST输出如"34543.00"，转为APS侧展示用简洁格式"34543"
+        for (GsqTwiningDisc disc : discList) {
+            if (StringUtils.isNotBlank(disc.getSortType())) {
+                try {
+                    disc.setSortType(new BigDecimal(disc.getSortType().trim()).stripTrailingZeros().toPlainString());
+                } catch (NumberFormatException e) {
+                    log.warn("缠绕盘MES同步：缠绕盘[{}]排列方式[{}]非数值格式，按原值同步",
+                            disc.getTwiningDiscCode(), disc.getSortType());
+                }
+            }
+        }
+
+        // MES三表全部为空视为异常快照（全量同步空清单会导致误清空APS数据，防御性跳过，不发起Feign调用）
+        if (discList.isEmpty() && specList.isEmpty() && machineList.isEmpty()) {
+            log.warn("缠绕盘MES同步：MES三表均无数据，本次跳过同步");
+            return AjaxResult.success("MES无数据可同步");
+        }
+
+        // 聚合三表数据，一次Feign调用在钢丝圈微服务侧单事务落库
+        GsqMesTwiningDiscSyncVO syncVO = new GsqMesTwiningDiscSyncVO();
+        syncVO.setDiscList(discList);
+        syncVO.setSpecList(specList);
+        syncVO.setMachineList(machineList);
+
+        try {
+            FeignTokenHelper.runWithToken(() -> {
+                AjaxResult result = gsqMesSyncRemoteService.syncTwiningDisc("MES", syncVO);
+                // 框架bug：AjaxResult.success()硬编码code=200，须用AJAX_SUCCESS_CODE比较（见常量注释）
+                if (result == null || AJAX_SUCCESS_CODE != Integer.parseInt(result.get("code").toString())) {
+                    throw new RuntimeException("钢丝圈侧缠绕盘落库失败："
+                            + (result == null ? "Feign无返回" : result.get("msg")));
+                }
+            });
+            log.info("缠绕盘MES同步：同步完成，缠绕盘清单={}条，规格关系={}条，机台关系={}条",
+                    discList.size(), specList.size(), machineList.size());
+        } catch (Exception e) {
+            log.error("缠绕盘MES同步：Feign调用异常", e);
+            return AjaxResult.error("缠绕盘MES同步失败：" + e.getMessage());
+        }
+        return AjaxResult.success();
+    }
+
+    /**
      * 从MES读取指定物理日的胎圈库存，并替换自动滚动班次快照。
      *
-     * <p>对齐胎面 syncTmShiftStock，按工厂+物理日+班序从 MES_TQ_STOCK 取最新版本数据，
+     * <p>对齐胎面 syncTmShiftStock，按物理日从 MES_TQ_STOCK 查询库存
+     * （MES源表不含工厂、公司和版本字段，工厂编码取自请求参数用于APS侧字段填充），
      * 转换为 TqShiftStock 后远程调用 tqMesSyncRemoteService.replaceShiftStock 替换快照。</p>
      *
      * <p>MES无数据时仍调用 TQ 清空对应快照，防止自动滚动继续使用旧库存。
@@ -2171,27 +2268,36 @@ public class MesItfServiceImpl implements MesItfService {
 
     /**
      * 同步胎圈排程日完成量
-     * 从MES中间表MES_TQ_DAY_FINISH_TOTL查询前一天的数据，
-     * 逻辑删除APS旧数据并插入新数据
+     * 对齐硫化syncLhScheDayFinishQty模式：按MES中间表最新版本号查询（不限日期，取该版本下所有日期数据），
+     * 按排程日期分组逐组逻辑删除+插入，避免旧版本数据因无排序混入同步结果
      *
      * @param syncDataLogs 同步参数
      * @return 结果
      */
     @Override
     public AjaxResult syncTqScheDayFinishQty(AuxReqSyncDataLogs syncDataLogs) {
+        // 查询MES中间表最新版本号
         DynamicDataSourceContextHolder.push(DataSource.MES);
-        Date nowDate = DateUtils.truncate(DateUtils.getNowDate(), Calendar.DATE);
-        Date lastDate = DateUtils.addDays(nowDate, -1);
+        String latestVersion = mesItfMapper.selectMaxDataVersionFromTqDayFinishQty(syncDataLogs.getFactoryCode());
+        if (StringUtils.isBlank(latestVersion)) {
+            DynamicDataSourceContextHolder.poll();
+            log.warn("胎圈排程日完成量同步：MES中间表无版本号数据，factoryCode={}", syncDataLogs.getFactoryCode());
+            return AjaxResult.success("MES中间表无数据可同步");
+        }
+        log.info("胎圈排程日完成量同步：查询到最新版本号={}，factoryCode={}", latestVersion, syncDataLogs.getFactoryCode());
+
+        // 按最新版本号查询MES中间表多日数据（不传scheduleDate，取该版本下所有日期数据）
+        syncDataLogs.setDataVersion(latestVersion);
         syncDataLogs.setQueryParams(new HashMap<>());
-        syncDataLogs.getQueryParams().put("scheduleDate", lastDate);
         List<TqDayFinishQty> syncList = mesItfMapper.selectTqScheDayFinishQtyList(syncDataLogs);
         DynamicDataSourceContextHolder.poll();
 
         if (CollectionUtils.isEmpty(syncList)) {
-            log.warn("胎圈排程日完成量同步：MES中间表查询结果为空，factoryCode={}", syncDataLogs.getFactoryCode());
+            log.warn("胎圈排程日完成量同步：MES中间表查询结果为空，factoryCode={}, dataVersion={}", syncDataLogs.getFactoryCode(), latestVersion);
             return AjaxResult.success("MES中间表无数据可同步");
         }
 
+        // 分组去重：工厂|排程日期|胎圈编码（同版本内防御性去重）
         Map<String, TqDayFinishQty> groupMap = syncList.stream()
                 .collect(Collectors.toMap(
                         item -> item.getFactoryCode() + "|" + DateUtil.formatDate(item.getScheduleDate()) + "|" + item.getBeadCode(),
@@ -2212,20 +2318,28 @@ public class MesItfServiceImpl implements MesItfService {
             insertList.add(entity);
         }
 
-        try {
+        // 按排程日期分组，逐组同步（每组独立做逻辑删除+插入）
+        Map<String, List<TqDayFinishQty>> groupByScheduleDate = insertList.stream()
+                .filter(item -> item.getScheduleDate() != null)
+                .collect(Collectors.groupingBy(item -> DateUtil.formatDate(item.getScheduleDate())));
+
+        for (Map.Entry<String, List<TqDayFinishQty>> entry : groupByScheduleDate.entrySet()) {
+            String scheduleDateStr = entry.getKey();
+            List<TqDayFinishQty> groupList = entry.getValue();
             String factoryCode = syncDataLogs.getFactoryCode();
-            Date scheduleDate = insertList.stream().map(TqDayFinishQty::getScheduleDate).filter(Objects::nonNull).findFirst().orElse(DateUtils.getNowDate());
-            String scheduleDateStr = DateUtil.formatDate(scheduleDate);
-            log.info("胎圈排程日完成量同步：开始同步，factoryCode={}, scheduleDate={}, 待插入数量={}", factoryCode, scheduleDateStr, insertList.size());
 
-            FeignTokenHelper.runWithToken(() -> {
-                tqMesSyncRemoteService.logicDeleteAndSaveDayFinishQty(factoryCode, scheduleDateStr, "MES", insertList);
-            });
+            try {
+                log.info("胎圈排程日完成量同步：开始同步，factoryCode={}, scheduleDate={}, 待插入数量={}", factoryCode, scheduleDateStr, groupList.size());
 
-            log.info("胎圈排程日完成量同步：同步完成，factoryCode={}, 插入数量={}", factoryCode, insertList.size());
-        } catch (Exception e) {
-            log.error("胎圈排程日完成量同步：Feign调用异常，factoryCode={}, 待插入数量={}", syncDataLogs.getFactoryCode(), insertList.size(), e);
-            return AjaxResult.error("胎圈排程日完成量同步失败：" + e.getMessage());
+                FeignTokenHelper.runWithToken(() -> {
+                    tqMesSyncRemoteService.logicDeleteAndSaveDayFinishQty(factoryCode, scheduleDateStr, "MES", groupList);
+                });
+
+                log.info("胎圈排程日完成量同步：同步完成，factoryCode={}, scheduleDate={}, 插入数量={}", factoryCode, scheduleDateStr, groupList.size());
+            } catch (Exception e) {
+                log.error("胎圈排程日完成量同步：Feign调用异常，factoryCode={}, scheduleDate={}", factoryCode, scheduleDateStr, e);
+                return AjaxResult.error("胎圈排程日完成量同步失败：" + e.getMessage());
+            }
         }
         return AjaxResult.success();
     }
@@ -2456,27 +2570,36 @@ public class MesItfServiceImpl implements MesItfService {
 
     /**
      * 同步钢丝圈排程日完成量
-     * 从MES中间表MES_GSQ_DAY_FINISH_TOTL查询前一天的数据，
-     * 逻辑删除APS旧数据并插入新数据
+     * 对齐硫化syncLhScheDayFinishQty模式：按MES中间表最新版本号查询（不限日期，取该版本下所有日期数据），
+     * 按排程日期分组逐组逻辑删除+插入，避免旧版本数据因无排序混入同步结果
      *
      * @param syncDataLogs 同步参数
      * @return 结果
      */
     @Override
     public AjaxResult syncGsqScheDayFinishQty(AuxReqSyncDataLogs syncDataLogs) {
+        // 查询MES中间表最新版本号
         DynamicDataSourceContextHolder.push(DataSource.MES);
-        Date nowDate = DateUtils.truncate(DateUtils.getNowDate(), Calendar.DATE);
-        Date lastDate = DateUtils.addDays(nowDate, -1);
+        String latestVersion = mesItfMapper.selectMaxDataVersionFromGsqDayFinishQty(syncDataLogs.getFactoryCode());
+        if (StringUtils.isBlank(latestVersion)) {
+            DynamicDataSourceContextHolder.poll();
+            log.warn("钢丝圈排程日完成量同步：MES中间表无版本号数据，factoryCode={}", syncDataLogs.getFactoryCode());
+            return AjaxResult.success("MES中间表无数据可同步");
+        }
+        log.info("钢丝圈排程日完成量同步：查询到最新版本号={}，factoryCode={}", latestVersion, syncDataLogs.getFactoryCode());
+
+        // 按最新版本号查询MES中间表多日数据（不传scheduleDate，取该版本下所有日期数据）
+        syncDataLogs.setDataVersion(latestVersion);
         syncDataLogs.setQueryParams(new HashMap<>());
-        syncDataLogs.getQueryParams().put("scheduleDate", lastDate);
         List<GsqDayFinishQty> syncList = mesItfMapper.selectGsqScheDayFinishQtyList(syncDataLogs);
         DynamicDataSourceContextHolder.poll();
 
         if (CollectionUtils.isEmpty(syncList)) {
-            log.warn("钢丝圈排程日完成量同步：MES中间表查询结果为空，factoryCode={}", syncDataLogs.getFactoryCode());
+            log.warn("钢丝圈排程日完成量同步：MES中间表查询结果为空，factoryCode={}, dataVersion={}", syncDataLogs.getFactoryCode(), latestVersion);
             return AjaxResult.success("MES中间表无数据可同步");
         }
 
+        // 分组去重：工厂|排程日期|钢丝圈代码（同版本内防御性去重）
         Map<String, GsqDayFinishQty> groupMap = syncList.stream()
                 .collect(Collectors.toMap(
                         item -> item.getFactoryCode() + "|" + DateUtil.formatDate(item.getScheduleDate()) + "|" + item.getSteelRingCode(),
@@ -2497,20 +2620,28 @@ public class MesItfServiceImpl implements MesItfService {
             insertList.add(entity);
         }
 
-        try {
+        // 按排程日期分组，逐组同步（每组独立做逻辑删除+插入）
+        Map<String, List<GsqDayFinishQty>> groupByScheduleDate = insertList.stream()
+                .filter(item -> item.getScheduleDate() != null)
+                .collect(Collectors.groupingBy(item -> DateUtil.formatDate(item.getScheduleDate())));
+
+        for (Map.Entry<String, List<GsqDayFinishQty>> entry : groupByScheduleDate.entrySet()) {
+            String scheduleDateStr = entry.getKey();
+            List<GsqDayFinishQty> groupList = entry.getValue();
             String factoryCode = syncDataLogs.getFactoryCode();
-            Date scheduleDate = insertList.stream().map(GsqDayFinishQty::getScheduleDate).filter(Objects::nonNull).findFirst().orElse(DateUtils.getNowDate());
-            String scheduleDateStr = DateUtil.formatDate(scheduleDate);
-            log.info("钢丝圈排程日完成量同步：开始同步，factoryCode={}, scheduleDate={}, 待插入数量={}", factoryCode, scheduleDateStr, insertList.size());
 
-            FeignTokenHelper.runWithToken(() -> {
-                gsqMesSyncRemoteService.logicDeleteAndSaveDayFinishQty(factoryCode, scheduleDateStr, "MES", insertList);
-            });
+            try {
+                log.info("钢丝圈排程日完成量同步：开始同步，factoryCode={}, scheduleDate={}, 待插入数量={}", factoryCode, scheduleDateStr, groupList.size());
 
-            log.info("钢丝圈排程日完成量同步：同步完成，factoryCode={}, 插入数量={}", factoryCode, insertList.size());
-        } catch (Exception e) {
-            log.error("钢丝圈排程日完成量同步：Feign调用异常，factoryCode={}, 待插入数量={}", syncDataLogs.getFactoryCode(), insertList.size(), e);
-            return AjaxResult.error("钢丝圈排程日完成量同步失败：" + e.getMessage());
+                FeignTokenHelper.runWithToken(() -> {
+                    gsqMesSyncRemoteService.logicDeleteAndSaveDayFinishQty(factoryCode, scheduleDateStr, "MES", groupList);
+                });
+
+                log.info("钢丝圈排程日完成量同步：同步完成，factoryCode={}, scheduleDate={}, 插入数量={}", factoryCode, scheduleDateStr, groupList.size());
+            } catch (Exception e) {
+                log.error("钢丝圈排程日完成量同步：Feign调用异常，factoryCode={}, scheduleDate={}", factoryCode, scheduleDateStr, e);
+                return AjaxResult.error("钢丝圈排程日完成量同步失败：" + e.getMessage());
+            }
         }
         return AjaxResult.success();
     }

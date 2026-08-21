@@ -124,7 +124,7 @@ export default {
           filterable: true,
           loading: this.machineLoading,
           props: {
-            label: "machineName",
+            label: "machineCode",
             value: "machineCode",
           },
           onFocus: this.handleMachineFocus,
@@ -187,7 +187,7 @@ export default {
         this.form = {
           ...data,
         };
-        if (data.machineCode && data.machineName) {
+        if (data.machineCode) {
           this.machineList = [
             {
               machineCode: data.machineCode,

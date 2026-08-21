@@ -76,7 +76,7 @@ public class NcStockController extends AbstractDocBizController<NcStock> {
     @Override
     public AjaxResult save(@RequestBody NcStock stock) {
         if (UserConstants.NOT_UNIQUE.equals(stockService.checkUnique(stock))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.error.message.quota.unique"));
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.ncStock.importUnique"));
         }
         return super.save(stock);
     }
@@ -107,7 +107,7 @@ public class NcStockController extends AbstractDocBizController<NcStock> {
     @Override
     protected List<NcStock> listExportData(NcStock obj) {
         QueryWrapper<NcStock> wrapper = new QueryWrapper<>();
-        startPage("update_time desc");
+        startPage(getOrderBy());
         this.builderCondition(wrapper, obj);
         List<NcStock> list = ncStockMapper.selectList(wrapper);
         AppUtils.formatData(list, getQueryFormulas());
@@ -136,6 +136,6 @@ public class NcStockController extends AbstractDocBizController<NcStock> {
 
     @Override
     protected String getOrderBy() {
-        return "STOCK_DATE DESC, MATERIAL_CODE";
+        return "STOCK_DATE DESC, MATERIAL_CODE, ID";
     }
 }

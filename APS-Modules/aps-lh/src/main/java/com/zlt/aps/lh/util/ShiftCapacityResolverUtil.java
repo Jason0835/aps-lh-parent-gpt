@@ -1,6 +1,7 @@
 package com.zlt.aps.lh.util;
 
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
+import com.zlt.aps.lh.api.domain.dto.CapsuleReplacementTimeWindowDTO;
 import com.zlt.aps.lh.api.domain.dto.MachineCleaningWindowDTO;
 import com.zlt.aps.lh.api.domain.dto.MachineMaintenanceWindowDTO;
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
@@ -52,6 +53,8 @@ public final class ShiftCapacityResolverUtil {
     private static final int AFTERNOON_PLUS_SHIFT_TYPE = 3;
     /** 容量计算专用的计划性维修窗口类型；该窗口只在方法调用期间使用，不写入机台精度保养运行态。 */
     private static final String PLANNED_REPAIR_CAPACITY_WINDOW_TYPE = "05_CAPACITY";
+    /** 容量计算专用的换胶囊窗口类型；该窗口不参与精度保养摘要、额度或计划回填。 */
+    private static final String CAPSULE_REPLACEMENT_CAPACITY_WINDOW_TYPE = "09_CAPSULE_REPLACEMENT";
 
     private ShiftCapacityResolverUtil() {
     }
@@ -1396,13 +1399,88 @@ public final class ShiftCapacityResolverUtil {
             String machineCode,
             List<MachineMaintenanceWindowDTO> maintenanceWindowList) {
         int sourceSize = CollectionUtils.isEmpty(maintenanceWindowList) ? 0 : maintenanceWindowList.size();
-        List<MachineMaintenanceWindowDTO> capacityWindowList = new ArrayList<>(sourceSize + 2);
+        List<MachineMaintenanceWindowDTO> capsuleReplacementWindowList =
+                resolveCapsuleReplacementCapacityWindowList(context, machineCode);
+        List<MachineMaintenanceWindowDTO> capacityWindowList = new ArrayList<>(
+                sourceSize + capsuleReplacementWindowList.size() + 2);
         if (!CollectionUtils.isEmpty(maintenanceWindowList)) {
             capacityWindowList.addAll(maintenanceWindowList);
         }
         capacityWindowList.addAll(resolvePlannedRepairCapacityWindowList(
                 context, devicePlanShutList, machineCode));
+        // 换胶囊只作为产能和时间推进的运行态占用，不写入机台保养列表，避免污染精度业务。
+        capacityWindowList.addAll(capsuleReplacementWindowList);
         return capacityWindowList;
+    }
+
+    /**
+     * 将换胶囊运行态时间事件转换为容量计算窗口。
+     *
+     * <p>容量工具沿用既有“保养窗口不可生产区间”并集算法，因此仅在本方法临时适配为
+     * {@link MachineMaintenanceWindowDTO}。该临时对象不会写回机台，也不会传入结果保养摘要链路。</p>
+     *
+     * @param context 排程上下文
+     * @param machineCode 机台编号
+     * @return 当前物理机台的换胶囊容量窗口
+     */
+    private static List<MachineMaintenanceWindowDTO> resolveCapsuleReplacementCapacityWindowList(
+            LhScheduleContext context, String machineCode) {
+        List<MachineMaintenanceWindowDTO> capacityWindowList = new ArrayList<MachineMaintenanceWindowDTO>();
+        if (Objects.isNull(context) || StringUtils.isEmpty(machineCode)
+                || CollectionUtils.isEmpty(context.getCapsuleReplacementTimeWindowMap())) {
+            return capacityWindowList;
+        }
+        String physicalMachineCode = LhSingleControlMachineUtil.resolvePhysicalMachineCode(machineCode);
+        for (CapsuleReplacementTimeWindowDTO replacementWindow
+                : context.getCapsuleReplacementTimeWindowMap().values()) {
+            if (Objects.isNull(replacementWindow)
+                    || !StringUtils.equals(physicalMachineCode, replacementWindow.getPhysicalMachineCode())
+                    || Objects.isNull(replacementWindow.getReplacementStartTime())
+                    || Objects.isNull(replacementWindow.getReplacementEndTime())
+                    || !replacementWindow.getReplacementStartTime().before(replacementWindow.getReplacementEndTime())) {
+                continue;
+            }
+            MachineMaintenanceWindowDTO capacityWindow = new MachineMaintenanceWindowDTO();
+            capacityWindow.setMachineCode(machineCode);
+            capacityWindow.setMaintenanceType(CAPSULE_REPLACEMENT_CAPACITY_WINDOW_TYPE);
+            capacityWindow.setMaintenanceStartTime(replacementWindow.getReplacementStartTime());
+            capacityWindow.setMaintenanceEndTime(replacementWindow.getReplacementEndTime());
+            capacityWindow.setProductionResumeTime(replacementWindow.getReplacementEndTime());
+            capacityWindow.setTriggerReason("换胶囊时间占用");
+            capacityWindowList.add(capacityWindow);
+        }
+        return capacityWindowList;
+    }
+
+    /**
+     * 解析机台在换胶囊时间事件后的最早可用时间。
+     *
+     * <p>仅当当前机台就绪时间已经进入换胶囊窗口时后延到窗口结束；尚未到达窗口的切换时间
+     * 仍由后续产能时间轴判断，避免提前阻断本可在换胶囊前完成的生产。</p>
+     *
+     * @param context 排程上下文
+     * @param machineCode 机台编号
+     * @param baseReadyTime 既有规则计算出的机台就绪时间
+     * @return 合并换胶囊时间窗口后的机台最早可用时间
+     */
+    public static Date resolveCapsuleReplacementReadyTime(LhScheduleContext context,
+                                                           String machineCode,
+                                                           Date baseReadyTime) {
+        if (Objects.isNull(baseReadyTime)) {
+            return null;
+        }
+        Date resolvedReadyTime = baseReadyTime;
+        for (MachineMaintenanceWindowDTO replacementWindow
+                : resolveCapsuleReplacementCapacityWindowList(context, machineCode)) {
+            Date replacementStartTime = replacementWindow.getMaintenanceStartTime();
+            Date replacementEndTime = replacementWindow.getProductionResumeTime();
+            if (Objects.nonNull(replacementStartTime) && Objects.nonNull(replacementEndTime)
+                    && !resolvedReadyTime.before(replacementStartTime)
+                    && resolvedReadyTime.before(replacementEndTime)) {
+                resolvedReadyTime = replacementEndTime;
+            }
+        }
+        return resolvedReadyTime;
     }
 
     /**

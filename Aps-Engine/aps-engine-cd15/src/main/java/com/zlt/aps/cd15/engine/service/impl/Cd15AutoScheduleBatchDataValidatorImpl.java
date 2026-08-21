@@ -1,6 +1,7 @@
 package com.zlt.aps.cd15.engine.service.impl;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.cd15.api.domain.entity.Cd15AngleWidthMapping;
 import com.zlt.aps.cd15.api.domain.entity.Cd15CurlLength;
 import com.zlt.aps.cd15.api.domain.entity.Cd15MachineInfo;
@@ -30,8 +31,10 @@ import org.springframework.util.StringUtils;
 import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.sql.Date;
+import java.text.MessageFormat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -55,7 +58,11 @@ import java.util.stream.IntStream;
 public class Cd15AutoScheduleBatchDataValidatorImpl implements Cd15AutoScheduleBatchDataValidator {
 
     private static final int CONSTRUCTION_LAYERS = 3;
+    private static final int FORMING_CLASS_COUNT = 8;
     private static final int ACTIVE = 1;
+    private static final int FORMING_SHIFT_HOURS = 8;
+    private static final LocalTime FORMING_FIRST_SHIFT_TIME = LocalTime.of(6, 0);
+    private static final LocalTime FIRST_FORMING_DEMAND_TIME = LocalTime.of(22, 0);
     private static final String DATA_MISSING = "DATA_MISSING";
     private static final String ANGLE_WIDTH_CONFIG_MISSING = "ANGLE_WIDTH_CONFIG_MISSING";
     private static final String DUPLICATE_STORAGE_LANE = "DUPLICATE_STORAGE_LANE";
@@ -87,17 +94,12 @@ public class Cd15AutoScheduleBatchDataValidatorImpl implements Cd15AutoScheduleB
         }
 
         Cd15BatchDataCheckResult.Builder builder = Cd15BatchDataCheckResult.builder();
-        List<Cd15ShiftDescriptor> shifts = this.checkShiftConfig(
-                builder, factoryCode, scheduleDate);
-        this.checkStorageLaneBaseline(builder, factoryCode);
-        Set<Integer> activeClassIndexes = shifts.stream()
-                .map(Cd15ShiftDescriptor::getShiftOrder)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toCollection(LinkedHashSet::new));
+        this.checkShiftConfig(builder, factoryCode, scheduleDate);
+        this.checkStorageLaneBaseline(builder, factoryCode, scheduleDate);
         List<CxScheduleResult> formingSchedules = this.checkFormingSchedule(builder, factoryCode, scheduleDate);
         this.checkMachineInfo(builder, factoryCode);
         ConstructionCheckScope scope = this.checkConstructionInfo(
-                builder, factoryCode, formingSchedules, activeClassIndexes);
+                builder, factoryCode, scheduleDate, formingSchedules);
         this.checkCurlLength(builder, factoryCode, scope.getSteelStripCodes());
         this.checkAngleWidthMapping(builder, factoryCode, scope.getCuttingAngles());
 
@@ -121,22 +123,27 @@ public class Cd15AutoScheduleBatchDataValidatorImpl implements Cd15AutoScheduleB
     }
 
     /**
-     * 检查任务启动时当前班次库排资源基线是否存在，且同一物理库排只有一条活动记录。
+     * 检查排程窗口首班次库排资源基线是否存在，且同一物理库排只有一条活动记录。
      */
     private void checkStorageLaneBaseline(Cd15BatchDataCheckResult.Builder builder,
-                                          String factoryCode) {
+                                          String factoryCode, LocalDate scheduleDate) {
         List<Cd15ShiftConfig> configs = this.shiftConfigMapper.selectList(
                 Wrappers.<Cd15ShiftConfig>lambdaQuery()
                         .eq(Cd15ShiftConfig::getFactoryCode, factoryCode)
                         .eq(Cd15ShiftConfig::getIsActive, ACTIVE));
         Cd15ShiftDescriptor baselineShift;
         try {
-            baselineShift = this.shiftWindowResolver.resolveCurrentResourceShift(
-                    LocalDateTime.now(), configs);
+            baselineShift = this.shiftWindowResolver.resolveScheduleBaselineShift(
+                    scheduleDate, configs);
         } catch (IllegalArgumentException exception) {
-            builder.addError("库排资源", DATA_MISSING,
-                    "无法确定任务启动时的当前资源班次: " + exception.getMessage(),
-                    "请检查CD15启用班次的起止时间和跨天配置");
+            builder.addError(I18nUtil.getMessage(
+                            "ui.data.column.cd15StorageLaneLimit.modelName"),
+                    DATA_MISSING,
+                    MessageFormat.format(I18nUtil.getMessage(
+                                    "ui.cd15.autoSchedule.resourceBaselineResolveFailed"),
+                            exception.getMessage()),
+                    I18nUtil.getMessage(
+                            "ui.cd15.autoSchedule.resourceBaselineResolveSuggestion"));
             return;
         }
         List<Cd15StorageLaneLimit> lanes = this.storageLaneMapper.selectList(
@@ -148,10 +155,14 @@ public class Cd15AutoScheduleBatchDataValidatorImpl implements Cd15AutoScheduleB
                                 baselineShift.getShiftCode())
                         .orderByAsc(Cd15StorageLaneLimit::getStorageLaneCode));
         if (lanes == null || lanes.isEmpty()) {
-            builder.addError("库排资源", DATA_MISSING,
-                    "未找到任务启动时当前班次 " + baselineShift.getScheduleDate() + "/"
-                            + baselineShift.getShiftCode() + " 的库排资源基线",
-                    "请同步当前自然班次库排快照，后续排程班次无需预先维护");
+            builder.addError(I18nUtil.getMessage(
+                            "ui.data.column.cd15StorageLaneLimit.modelName"),
+                    DATA_MISSING,
+                    MessageFormat.format(I18nUtil.getMessage(
+                                    "ui.cd15.autoSchedule.resourceBaselineMissing"),
+                            baselineShift.getScheduleDate(), baselineShift.getShiftCode()),
+                    I18nUtil.getMessage(
+                            "ui.cd15.autoSchedule.resourceBaselineSyncSuggestion"));
             return;
         }
         Set<String> enabledMachineCodes = this.machineInfoMapper.selectList(
@@ -178,11 +189,15 @@ public class Cd15AutoScheduleBatchDataValidatorImpl implements Cd15AutoScheduleB
         List<String> duplicateLaneCodes =
                 this.storageLaneBaselineValidator.findDuplicateLaneCodes(lanes);
         if (!duplicateLaneCodes.isEmpty()) {
-            builder.addError("库排资源", DUPLICATE_STORAGE_LANE,
-                    "任务启动时当前班次 " + baselineShift.getScheduleDate() + "/"
-                            + baselineShift.getShiftCode() + " 存在重复库排号: "
-                            + String.join(",", duplicateLaneCodes),
-                    "请按工厂、日期、班次、库排号清理重复的活动记录");
+            builder.addError(I18nUtil.getMessage(
+                            "ui.data.column.cd15StorageLaneLimit.modelName"),
+                    DUPLICATE_STORAGE_LANE,
+                    MessageFormat.format(I18nUtil.getMessage(
+                                    "ui.cd15.autoSchedule.resourceBaselineDuplicate"),
+                            baselineShift.getScheduleDate(), baselineShift.getShiftCode(),
+                            String.join(",", duplicateLaneCodes)),
+                    I18nUtil.getMessage(
+                            "ui.cd15.autoSchedule.resourceBaselineDuplicateSuggestion"));
         }
     }
     /** 检查并解析排程、滚动共用的启用班次配置。 */
@@ -209,7 +224,7 @@ public class Cd15AutoScheduleBatchDataValidatorImpl implements Cd15AutoScheduleB
         }
     }
 
-    /** 检查排程日成型计划是否存在。 */
+    /** 按斜裁排程日期精确检查同日成型计划。 */
     private List<CxScheduleResult> checkFormingSchedule(Cd15BatchDataCheckResult.Builder builder,
                                                         String factoryCode,
                                                         LocalDate scheduleDate) {
@@ -275,32 +290,37 @@ public class Cd15AutoScheduleBatchDataValidatorImpl implements Cd15AutoScheduleB
     /** 检查施工记录和施工层位字段。 */
     private ConstructionCheckScope checkConstructionInfo(Cd15BatchDataCheckResult.Builder builder,
                                                          String factoryCode,
-                                                         List<CxScheduleResult> formingSchedules,
-                                                         Set<Integer> activeClassIndexes) {
+                                                         LocalDate scheduleDate,
+                                                         List<CxScheduleResult> formingSchedules) {
         ConstructionCheckScope scope = new ConstructionCheckScope();
         if (formingSchedules == null || formingSchedules.isEmpty()) {
             return scope;
         }
 
+        LocalDateTime firstDemandStart = scheduleDate.minusDays(1)
+                .atTime(FIRST_FORMING_DEMAND_TIME);
         Set<String> embryoCodes = formingSchedules.stream()
+                .filter(schedule -> this.hasPositiveDemandInWindow(schedule, firstDemandStart))
                 .map(CxScheduleResult::getEmbryoCode)
                 .filter(StringUtils::hasText)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
         formingSchedules.stream()
+                .filter(schedule -> this.hasPositiveDemandInWindow(schedule, firstDemandStart))
                 .filter(schedule -> !StringUtils.hasText(schedule.getEmbryoCode()))
                 .forEach(schedule -> builder.addError("成型计划", DATA_MISSING,
                         "成型计划存在胎胚代号为空的记录",
                         "请检查成型排程数据的胎胚代号"));
 
         Set<String> constructionVersions = formingSchedules.stream()
-                .flatMap(schedule -> activeClassIndexes.stream()
-                        .filter(classIndex -> this.hasPositivePlan(schedule, classIndex))
+                .flatMap(schedule -> IntStream.rangeClosed(1, FORMING_CLASS_COUNT).boxed()
+                        .filter(classIndex -> this.requiresConstructionCheck(
+                                schedule, classIndex, firstDemandStart))
                         .map(classIndex -> this.readString(schedule, String.format("class%dRecipeNo", classIndex))))
                 .filter(StringUtils::hasText)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
-        Set<String> constructionPairs = new LinkedHashSet<>();
+        Map<String, Set<String>> constructionPairUsages = new LinkedHashMap<>();
         formingSchedules.forEach(schedule -> this.collectConstructionPairs(
-                builder, schedule, constructionPairs, activeClassIndexes));
+                builder, schedule, firstDemandStart, constructionPairUsages));
 
         if (embryoCodes.isEmpty() || constructionVersions.isEmpty()) {
             return scope;
@@ -315,31 +335,38 @@ public class Cd15AutoScheduleBatchDataValidatorImpl implements Cd15AutoScheduleB
                         item -> item.getConstructionCode() + "@" + item.getConstructionVersion(),
                         item -> item, (left, right) -> left, LinkedHashMap::new));
 
-        constructionPairs.forEach(pair -> this.checkConstructionPair(builder, constructionByKey, pair, scope));
+        constructionPairUsages.forEach((pair, usages) ->
+                this.checkConstructionPair(builder, constructionByKey, pair, usages, scope));
         return scope;
     }
 
     /** 收集有正需求班次的胎胚和施工版本配对。 */
     private void collectConstructionPairs(Cd15BatchDataCheckResult.Builder builder,
                                           CxScheduleResult schedule,
-                                          Set<String> constructionPairs,
-                                          Set<Integer> activeClassIndexes) {
+                                          LocalDateTime firstDemandStart,
+                                          Map<String, Set<String>> constructionPairUsages) {
         String embryoCode = schedule.getEmbryoCode();
         if (!StringUtils.hasText(embryoCode)) {
             return;
         }
-        activeClassIndexes.stream()
-                .sorted()
-                .filter(classIndex -> this.hasPositivePlan(schedule, classIndex))
+        IntStream.rangeClosed(1, FORMING_CLASS_COUNT)
+                .boxed()
+                .filter(classIndex -> this.requiresConstructionCheck(
+                        schedule, classIndex, firstDemandStart))
                 .forEach(classIndex -> {
                     String fieldName = String.format("CLASS%d_RECIPE_NO", classIndex);
                     String recipeNo = this.readString(schedule, String.format("class%dRecipeNo", classIndex));
+                    String formingDate = schedule.getScheduleDate() == null ? ""
+                            : new Date(schedule.getScheduleDate().getTime()).toLocalDate().toString();
                     if (!StringUtils.hasText(recipeNo)) {
                         builder.addError("成型计划", DATA_MISSING,
-                                "胎胚 " + embryoCode + " 的 " + fieldName + " 施工版本为空",
+                                "成型日期 " + formingDate + " 胎胚 " + embryoCode
+                                        + " 的 " + fieldName + " 施工版本为空",
                                 "请检查成型排程数据各班次施工版本");
                     } else {
-                        constructionPairs.add(embryoCode + "@" + recipeNo);
+                        constructionPairUsages.computeIfAbsent(embryoCode + "@" + recipeNo,
+                                        ignored -> new LinkedHashSet<>())
+                                .add(formingDate + "/CLASS" + classIndex);
                     }
                 });
     }
@@ -348,6 +375,7 @@ public class Cd15AutoScheduleBatchDataValidatorImpl implements Cd15AutoScheduleB
     private void checkConstructionPair(Cd15BatchDataCheckResult.Builder builder,
                                        Map<String, MdmConstructionInfo> constructionByKey,
                                        String pair,
+                                       Set<String> usages,
                                        ConstructionCheckScope scope) {
         String[] parts = pair.split("@", 2);
         String constructionCode = parts[0];
@@ -510,6 +538,34 @@ public class Cd15AutoScheduleBatchDataValidatorImpl implements Cd15AutoScheduleB
     private boolean hasPositivePlan(CxScheduleResult schedule, int classIndex) {
         BigDecimal planQty = this.readBigDecimal(schedule, String.format("class%dPlanQty", classIndex));
         return this.isPositive(planQty);
+    }
+
+    /** 判断成型记录在首个晚班起点后是否存在正计划量。 */
+    private boolean hasPositiveDemandInWindow(CxScheduleResult schedule,
+                                              LocalDateTime firstDemandStart) {
+        return IntStream.rangeClosed(1, FORMING_CLASS_COUNT)
+                .anyMatch(classIndex -> this.requiresConstructionCheck(
+                        schedule, classIndex, firstDemandStart));
+    }
+
+    /** 首个成型晚班之前的计划不属于本次斜裁供料窗口。 */
+    private boolean requiresConstructionCheck(CxScheduleResult schedule,
+                                              int classIndex,
+                                              LocalDateTime firstDemandStart) {
+        LocalDateTime formingShiftStart = this.formingShiftStart(schedule, classIndex);
+        return this.hasPositivePlan(schedule, classIndex)
+                && formingShiftStart != null
+                && !formingShiftStart.isBefore(firstDemandStart);
+    }
+
+    /** 将成型记录的CLASS序号换算为自然班次开始时间。 */
+    private LocalDateTime formingShiftStart(CxScheduleResult schedule, int classIndex) {
+        if (schedule == null || schedule.getScheduleDate() == null) {
+            return null;
+        }
+        LocalDate formingDate = new Date(schedule.getScheduleDate().getTime()).toLocalDate();
+        return formingDate.minusDays(1).atTime(FORMING_FIRST_SHIFT_TIME)
+                .plusHours((classIndex - 1L) * FORMING_SHIFT_HOURS);
     }
 
     private String readString(Object source, String fieldName) {

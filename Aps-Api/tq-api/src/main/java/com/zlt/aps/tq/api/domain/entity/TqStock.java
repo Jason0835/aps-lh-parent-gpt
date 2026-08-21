@@ -68,10 +68,4 @@ public class TqStock extends BaseEntity {
     @TableField("REMARK")
     @ImportValidated(maxLength = 300)
     private String remark;
-
-    @ApiModelProperty(value = "分厂编码", position = 70)
-    @Excel(name = "ui.data.column.factoryCode", dictType = "biz_factory_name")
-    @TableField("FACTORY_CODE")
-    @ImportValidated(maxLength = 20)
-    private String factoryCode;
 }

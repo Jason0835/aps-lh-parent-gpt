@@ -22,6 +22,7 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.dj.api.domain.entity.DjStock;
 import com.zlt.aps.dj.mapper.DjStockMapper;
 import com.zlt.aps.dj.service.DjStockService;
@@ -74,7 +75,10 @@ public class DjStockController extends AbstractDocBizController<DjStock> {
     @Override
     public AjaxResult save(@RequestBody DjStock stock) {
         if (UserConstants.NOT_UNIQUE.equals(stockService.checkUnique(stock))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.error.message.quota.unique"));
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.djStock.importUnique"));
+        }
+        if (stock.getDataSource() == null) {
+            stock.setDataSource(ApsConstant.DATA_SOURCE_SYSTEM);
         }
         return super.save(stock);
     }
@@ -105,7 +109,7 @@ public class DjStockController extends AbstractDocBizController<DjStock> {
     @Override
     protected List<DjStock> listExportData(DjStock obj) {
         QueryWrapper<DjStock> wrapper = new QueryWrapper<>();
-        startPage("update_time desc");
+        startPage(getOrderBy());
         this.builderCondition(wrapper, obj);
         List<DjStock> list = djStockMapper.selectList(wrapper);
         AppUtils.formatData(list, getQueryFormulas());
@@ -134,6 +138,6 @@ public class DjStockController extends AbstractDocBizController<DjStock> {
 
     @Override
     protected String getOrderBy() {
-        return "STOCK_DATE DESC, MATERIAL_CODE";
+        return "STOCK_DATE DESC, MATERIAL_CODE, ID";
     }
 }

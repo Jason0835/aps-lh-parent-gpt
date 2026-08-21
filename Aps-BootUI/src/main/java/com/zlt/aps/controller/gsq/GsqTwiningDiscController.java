@@ -27,7 +27,7 @@ import java.util.Arrays;
 
 /**
  * 钢丝圈缠绕盘管理 UI 控制层
- * <p>主子表管理：列表显示主表，新增/编辑弹窗含主表表单与子表明细</p>
+ * <p>单表管理：缠绕盘基础信息；规格关系/机台关系按编码关联，独立页面维护</p>
  *
  * @author zlt
  * @date 2026-07-08
@@ -52,7 +52,7 @@ public class GsqTwiningDiscController extends BaseUIController<GsqTwiningDisc> {
     }
 
     /**
-     * 获取钢丝圈缠绕盘详情（含子表明细及钢丝圈名称反显）
+     * 获取钢丝圈缠绕盘详情（单表）
      */
     @ApiOperation("获取钢丝圈缠绕盘详情")
     @GetMapping("/getInfo/{id}")
@@ -62,14 +62,15 @@ public class GsqTwiningDiscController extends BaseUIController<GsqTwiningDisc> {
     }
 
     /**
-     * 保存钢丝圈缠绕盘（id为空新增，id不为空修改），级联保存子表明细
+     * 保存钢丝圈缠绕盘（id为空新增，id不为空修改，单表保存）
      * 保存前先校验缠绕盘编码唯一性
+     * 注意：前端统一以multipart/form-data提交，此处不能用@RequestBody，需用表单绑定（与其他gsq模块一致）
      */
     @ApiOperation("保存钢丝圈缠绕盘")
     @RequiresPermissions("gsq:twiningDisc:edit")
     @PostMapping("/save")
     @ResponseBody
-    public AjaxResult save(@RequestBody GsqTwiningDisc entity) {
+    public AjaxResult save(GsqTwiningDisc entity) {
         if (UserConstants.NOT_UNIQUE.equals(gsqTwiningDiscRemoteService.checkUnique(entity))) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.gsq.twiningDisc.conflict"));
         }
@@ -77,7 +78,7 @@ public class GsqTwiningDiscController extends BaseUIController<GsqTwiningDisc> {
     }
 
     /**
-     * 删除钢丝圈缠绕盘（逻辑删除主表，级联逻辑删除子表）
+     * 删除钢丝圈缠绕盘（逻辑删除主表，按缠绕盘编码级联逻辑删除规格关系及机台关系）
      */
     @ApiOperation("删除钢丝圈缠绕盘")
     @RequiresPermissions("gsq:twiningDisc:remove")
@@ -89,13 +90,23 @@ public class GsqTwiningDiscController extends BaseUIController<GsqTwiningDisc> {
     }
 
     /**
-     * 校验缠绕盘编码唯一性
+     * 校验缠绕盘编码唯一性（表单绑定，不能用@RequestBody）
      */
     @ApiOperation("校验缠绕盘编码唯一性")
     @PostMapping("/checkUnique")
     @ResponseBody
-    public String checkUnique(@RequestBody GsqTwiningDisc entity) {
+    public String checkUnique(GsqTwiningDisc entity) {
         return gsqTwiningDiscRemoteService.checkUnique(entity);
+    }
+
+    /**
+     * 查询施工信息表全部钢丝圈选项（编码+名称，去重），供规格关系页面下拉选择使用
+     */
+    @ApiOperation("查询钢丝圈下拉选项")
+    @GetMapping("/listSteelRingOptions")
+    @ResponseBody
+    public AjaxResult listSteelRingOptions() {
+        return gsqTwiningDiscRemoteService.listSteelRingOptions();
     }
 
     @Override
@@ -114,7 +125,7 @@ public class GsqTwiningDiscController extends BaseUIController<GsqTwiningDisc> {
     }
 
     /**
-     * 下载导入模板
+     * 下载导入模板（单表结构：缠绕盘编号/名称/状态/英寸/数量/排列方式/工厂/备注）
      */
     @ApiOperation("下载导入模板")
     @Override
