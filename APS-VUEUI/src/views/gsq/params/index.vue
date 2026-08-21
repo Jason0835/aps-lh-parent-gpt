@@ -315,6 +315,10 @@ export default {
       });
     },
     handleDeleteAll() {
+      if (this.selection.length === 0) {
+        this.$modal.msgWarning(this.$t("ui.placeholder.selectTableRow"));
+        return;
+      }
       let ids = "";
       for (let i = 0; i < this.selection.length; i++) {
         if (i == this.selection.length - 1) {

@@ -1,6 +1,7 @@
 package com.zlt.aps.gsq.service.impl;
 
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -15,6 +16,7 @@ import com.zlt.aps.gsq.mapper.GsqAssistSpecMapper;
 import com.zlt.aps.gsq.service.GsqAssistSpecService;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.ImportUtil;
+import cn.hutool.core.collection.CollUtil;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang.StringUtils;
 import org.springframework.beans.BeanUtils;
@@ -22,6 +24,7 @@ import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
@@ -140,10 +143,24 @@ public class GsqAssistSpecServiceImpl extends ServiceImpl<GsqAssistSpecMapper, G
         }
         if (CollectionUtils.isNotEmpty(list)) {
             try {
-                //勾选更新记录，调用merge即可
                 if (updateSupport && CollectionUtils.isNotEmpty(importList)) {
-                    successNum = importList.size();
-                    gsqAssistSpecMapper.mergeSql(importList);
+                    // 勾选更新：批量预取已存在外协规格（按物料编码匹配），存在则更新原记录，不存在则新增
+                    Map<String, GsqAssistSpec> existingMap = this.loadExistingAssistSpecMap(importList);
+                    for (GsqAssistSpec excelItem : importList) {
+                        GsqAssistSpec existing = existingMap.get(excelItem.getMaterialCode());
+                        if (existing != null) {
+                            // 已存在：回填主键ID，清空新增审计字段避免覆盖原记录创建信息，setBaseVale补齐更新审计字段后更新
+                            excelItem.setId(existing.getId());
+                            excelItem.setCreateBy(null);
+                            excelItem.setCreateTime(null);
+                            excelItem.setBaseVale(existing.getId());
+                            gsqAssistSpecMapper.updateById(excelItem);
+                        } else {
+                            // 不存在：此前setBaseVale(null)已补齐delFlag/createBy/createTime，直接插入
+                            gsqAssistSpecMapper.insert(excelItem);
+                        }
+                        successNum++;
+                    }
                 } else {
                     //查询数据库已存在对象
                     for (int i = 0; i < list.size(); i++) {
@@ -181,5 +198,30 @@ public class GsqAssistSpecServiceImpl extends ServiceImpl<GsqAssistSpecMapper, G
         } else {
             return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + successNum);
         }
+    }
+
+    /**
+     * 批量预取已存在的外协规格数据（导入更新模式使用）
+     * 按物料编码批量查询数据库未删除的已有记录
+     *
+     * @param importList 导入数据列表
+     * @return 物料编码 -> 已存在外协规格记录 的映射
+     */
+    private Map<String, GsqAssistSpec> loadExistingAssistSpecMap(List<GsqAssistSpec> importList) {
+        // 提取非空物料编码并去重
+        List<String> codeList = importList.stream()
+                .map(GsqAssistSpec::getMaterialCode)
+                .filter(StringUtils::isNotBlank)
+                .distinct()
+                .collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(codeList)) {
+            return new HashMap<>();
+        }
+        // 按1000条一批查询（过滤逻辑删除），避免in条件超长；同编码多条时保留首条
+        return CollUtil.split(codeList, 1000).stream()
+                .flatMap(batch -> gsqAssistSpecMapper.selectList(new LambdaQueryWrapper<GsqAssistSpec>()
+                        .eq(GsqAssistSpec::getDelFlag, ApsConstant.DEL_FLAG_NORMAL)
+                        .in(GsqAssistSpec::getMaterialCode, batch)).stream())
+                .collect(Collectors.toMap(GsqAssistSpec::getMaterialCode, Function.identity(), (v1, v2) -> v1));
     }
 }

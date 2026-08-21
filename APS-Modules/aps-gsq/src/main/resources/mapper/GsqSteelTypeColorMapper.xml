@@ -24,32 +24,4 @@
             order by ${orderStr}
         </if>
     </select>
-
-    <insert id="mergeSql" parameterType="list">
-        INSERT INTO T_GSQ_STEEL_TYPE_COLOR (
-        steel_type, color_type, color_code, status,
-        create_by, create_time, update_by, update_time, remark, del_flag
-        ) VALUES
-        <foreach collection="list" item="STOCK" separator=",">
-            (
-            #{STOCK.steelType,jdbcType=VARCHAR},
-            #{STOCK.colorType,jdbcType=VARCHAR},
-            #{STOCK.colorCode,jdbcType=VARCHAR},
-            #{STOCK.status,jdbcType=VARCHAR},
-            #{STOCK.createBy,jdbcType=VARCHAR},
-            NOW(),
-            #{STOCK.updateBy,jdbcType=VARCHAR},
-            NOW(),
-            #{STOCK.remark,jdbcType=VARCHAR},
-            '0'
-            )
-        </foreach>
-        ON DUPLICATE KEY UPDATE
-        status = VALUES(status),
-        color_type = VALUES(color_type),
-        color_code = VALUES(color_code),
-        update_by = VALUES(create_by),
-        update_time = NOW(),
-        remark = VALUES(remark)
-    </insert>
 </mapper>

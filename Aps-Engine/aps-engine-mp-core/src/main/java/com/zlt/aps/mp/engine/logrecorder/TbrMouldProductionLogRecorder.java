@@ -786,9 +786,13 @@ public class TbrMouldProductionLogRecorder {
      * @return
      */
     public static String addChangeMoldJudgeInfo(Context context, String groupName, String materialDesc, BeforeSkuProductionInfo beforeSkuContent) {
+        String beforeSkuInfo = " Empty ";
+        if(null != beforeSkuContent){
+            beforeSkuInfo = JSON.toJSONString(beforeSkuContent);
+        }
         String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s Sku：%s 判断换模-前Sku信息：%s====",
                 context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
-                groupName, materialDesc, JSON.toJSONString(beforeSkuContent));
+                groupName, materialDesc, beforeSkuInfo);
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.MOULD_PRODUCTION_PLAN, logContent);
         return logContent;

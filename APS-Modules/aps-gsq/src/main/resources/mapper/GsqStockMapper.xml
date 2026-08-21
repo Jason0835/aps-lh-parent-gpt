@@ -12,37 +12,6 @@
         <if test="id != null">and ID != #{id}</if>
     </select>
 
-    <!-- 批量合并保存（存在则更新，否则新增），用于导入场景 -->
-    <insert id="mergeSql" parameterType="list">
-        INSERT INTO T_GSQ_STOCK (
-            STOCK_DATE, STEEL_RING_CODE, STOCK_NUM, MODIFY_NUM, BAD_NUM, REMARK,
-            CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME, IS_DELETE
-        )
-        VALUES
-        <foreach collection="list" item="stock" separator=",">
-            (
-            #{stock.stockDate,jdbcType=DATE},
-            #{stock.steelRingCode,jdbcType=VARCHAR},
-            #{stock.stockNum,jdbcType=DECIMAL},
-            #{stock.modifyNum,jdbcType=DECIMAL},
-            #{stock.badNum,jdbcType=DECIMAL},
-            #{stock.remark,jdbcType=VARCHAR},
-            #{stock.createBy,jdbcType=VARCHAR},
-            NOW(),
-            #{stock.updateBy,jdbcType=VARCHAR},
-            NOW(),
-            '0'
-            )
-        </foreach>
-        ON DUPLICATE KEY UPDATE
-        STOCK_NUM = VALUES(STOCK_NUM),
-        MODIFY_NUM = VALUES(MODIFY_NUM),
-        BAD_NUM = VALUES(BAD_NUM),
-        UPDATE_BY = VALUES(CREATE_BY),
-        UPDATE_TIME = NOW(),
-        REMARK = VALUES(REMARK)
-    </insert>
-
     <!-- 根据库存日期字符串（yyyy-MM-dd）逻辑删除钢丝圈库存，只删当天数据，历史数据保留 -->
     <!-- 使用字符串日期比较，规避JVM时区与MySQL时区不一致导致的Date参数偏移 -->
     <update id="logicDeleteByStockDate">

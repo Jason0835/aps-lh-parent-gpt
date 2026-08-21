@@ -180,14 +180,12 @@ public class GsqTwiningDiscController extends AbstractDocBizController<GsqTwinin
     }
 
     /**
-     * 获取导出数据列表，并补反显字段
+     * 获取导出数据列表（使用含规格数/机台数统计的自定义查询），并补反显字段
      */
     @Override
     protected List<GsqTwiningDisc> listExportData(GsqTwiningDisc obj) {
-        QueryWrapper<GsqTwiningDisc> wrapper = new QueryWrapper<>();
-        this.builderCondition(wrapper, obj);
-        wrapper.last("ORDER BY " + getOrderBy());
-        List<GsqTwiningDisc> list = gsqTwiningDiscMapper.selectList(wrapper);
+        // 使用listTwiningDisc自定义SQL查询，该SQL包含关联规格数(specCount)、关联机台数(machineCount)的子查询统计
+        List<GsqTwiningDisc> list = gsqTwiningDiscMapper.listTwiningDisc(obj);
         AppUtils.formatData(list, getQueryFormulas());
         return list;
     }

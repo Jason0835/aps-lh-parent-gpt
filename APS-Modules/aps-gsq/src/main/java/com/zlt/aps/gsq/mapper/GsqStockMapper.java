@@ -26,13 +26,6 @@ public interface GsqStockMapper extends BaseMapper<GsqStock> {
     int checkUnique(GsqStock entity);
 
     /**
-     * 批量合并保存（存在则更新，否则新增），用于导入场景
-     *
-     * @param list 待保存数据集合
-     */
-    void mergeSql(List<GsqStock> list);
-
-    /**
      * 根据库存日期字符串（yyyy-MM-dd）逻辑删除钢丝圈库存数据
      * 只删除指定库存日期的数据，历史数据保留
      * 使用字符串日期比较，规避JVM时区与SQL Server时区不一致导致的Date参数偏移
