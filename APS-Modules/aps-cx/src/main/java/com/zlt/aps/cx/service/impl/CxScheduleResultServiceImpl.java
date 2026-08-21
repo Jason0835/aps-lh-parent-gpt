@@ -918,8 +918,22 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
         String embryoCode = item.getEmbryoCode();
         // 胶种按 物料编码 + 胎胚代码 + 示方类型 匹配（任意一个物料编码命中即可）
-        String glueKey = buildSmallGlueKey(item.getMaterialCode(), embryoCode, recipeType);
-        String smallGlueVal = smallGlueMap.getOrDefault(glueKey, "");
+        // 注意：MATERIAL_CODE 可能是逗号分隔的多个值，逐个尝试匹配
+        String smallGlueVal = "";
+        String materialCodeStr = item.getMaterialCode();
+        if (StringUtils.isNotBlank(materialCodeStr)) {
+            for (String mc : materialCodeStr.split(",")) {
+                String trimmed = mc.trim();
+                if (StringUtils.isNotBlank(trimmed)) {
+                    String glueKey = buildSmallGlueKey(trimmed, embryoCode, recipeType);
+                    String found = smallGlueMap.get(glueKey);
+                    if (StringUtils.isNotBlank(found)) {
+                        smallGlueVal = found;
+                        break;
+                    }
+                }
+            }
+        }
         row.put("smallGlue", smallGlueVal);
         row.put("placeholder", smallGlueVal);
 
@@ -1402,11 +1416,13 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                 .findFirst()
                 .orElse(null);
 
-        // 收集去重的物料编码
+        // 收集去重的物料编码（注意：MATERIAL_CODE 字段可能包含逗号分隔的多个值）
         Set<String> materialCodes = exportList.stream()
                 .map(CxScheduleResult::getMaterialCode)
                 .filter(StringUtils::isNotBlank)
+                .flatMap(mc -> Arrays.stream(mc.split(",")))
                 .map(String::trim)
+                .filter(StringUtils::isNotBlank)
                 .collect(Collectors.toSet());
 
         // 收集去重的胎胚代码
@@ -1910,8 +1926,24 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
             row.put("embryoCode", embryoCode);
             row.put("mainMaterialDesc", firstNonBlank(groupList, "mainMaterialDesc"));
             // 胶种按 物料编码 + 胎胚代码 + 示方类型 匹配（任意一个物料编码命中即可）
-            String glueKey = buildSmallGlueKey(first.getMaterialCode(), embryoCode, resolveFirstRecipeType(first));
-            row.put("smallGlue", StringUtils.defaultIfBlank(smallGlueMap.get(glueKey), ""));
+            // 注意：MATERIAL_CODE 可能是逗号分隔的多个值，逐个尝试匹配
+            String smallGlueVal2 = "";
+            String materialCodeStr2 = first.getMaterialCode();
+            String recipeType2 = resolveFirstRecipeType(first);
+            if (StringUtils.isNotBlank(materialCodeStr2)) {
+                for (String mc : materialCodeStr2.split(",")) {
+                    String trimmed = mc.trim();
+                    if (StringUtils.isNotBlank(trimmed)) {
+                        String glueKey = buildSmallGlueKey(trimmed, embryoCode, recipeType2);
+                        String found = smallGlueMap.get(glueKey);
+                        if (StringUtils.isNotBlank(found)) {
+                            smallGlueVal2 = found;
+                            break;
+                        }
+                    }
+                }
+            }
+            row.put("smallGlue", smallGlueVal2);
             row.put("cxRemainQty", sumCxRemainQty(groupList));
             row.put("remark", buildCxRemainQtyRemark(groupList, rowRemarkMap));
             dataList.add(row);
