@@ -9952,9 +9952,13 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
              * 否则 56-54=2 会被误当成整台机台的生产上限，新增机台只排2条首检便提前下机。
              * 非 dayN 的历史欠产/严格补偿仍沿用原剩余量合并语义，避免扩大其业务目标。
              */
-            if (dayNShortageCompensationQty <= 0) {
+            if (dayNShortageCompensationQty <= 0
+                    || this.shouldUseActualSurplusForDayNCompensation(sourceSku)) {
                 this.getTargetScheduleQtyResolver().syncProductionRemainingQtyToRemaining(
-                        context, sourceSku, productionRemainingQty, "续作加机台补偿账本合并");
+                        context, sourceSku, productionRemainingQty,
+                        dayNShortageCompensationQty > 0
+                                ? "续作dayN非严格补偿真实余量同步"
+                                : "续作加机台补偿账本合并");
             } else {
                 log.info("续作dayN加机台保留实际生产账本, materialCode: {}, productStatus: {}, "
                                 + "首次增机日: {}, 增机触发差额: {}, 缺口机台数: {}, 实际可生产余量: {}",
@@ -10131,9 +10135,70 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             int dayNShortageCompensationQty,
             int compensationQty) {
         if (dayNShortageCompensationQty > 0) {
+            if (this.shouldUseActualSurplusForDayNCompensation(sourceSku)) {
+                int scheduledQty = this.resolveScheduledQtyByMaterialStatus(
+                        context, sourceSku);
+                int actualSurplusRemainingQty = Math.max(
+                        0, Math.max(0, sourceSku.getSurplusQty()) - scheduledQty);
+                log.info("续作dayN非严格补偿使用真实硫化余量, materialCode: {}, productStatus: {}, "
+                                + "surplusQty: {}, 已排: {}, 真实可生产余量: {}, 增机触发差额: {}",
+                        sourceSku.getMaterialCode(),
+                        this.normalizeProductStatus(sourceSku.getProductStatus()),
+                        Math.max(0, sourceSku.getSurplusQty()), scheduledQty,
+                        actualSurplusRemainingQty, compensationQty);
+                return actualSurplusRemainingQty;
+            }
             return this.getTargetScheduleQtyResolver().resolveProductionRemainingQty(context, sourceSku);
         }
         return Math.max(0, compensationQty);
+    }
+
+    /**
+     * 判断 dayN 续作补偿是否应按真实硫化余量扩展中心账本。
+     *
+     * <p>预计收尾标签可能让续作阶段先按窗口目标初始化账本，但只要当前物理窗口尚未建立
+     * 严格目标，dayN 仍只负责增机日期和台数，实际新增排产必须继续使用硫化余量。
+     * 试制、真实收尾和仅补欠产等严格场景保持原目标账本，不得放大。</p>
+     *
+     * @param sourceSku 来源续作SKU
+     * @return true-使用真实硫化余量并同步中心账本；false-保持原严格目标账本
+     */
+    private boolean shouldUseActualSurplusForDayNCompensation(SkuScheduleDTO sourceSku) {
+        if (Objects.isNull(sourceSku) || sourceSku.getSurplusQty() <= 0) {
+            return false;
+        }
+        ProductionQuantityPolicy policy = ProductionQuantityPolicy.from(
+                sourceSku, sourceSku.isStrictTargetQty());
+        return !policy.isStrictUpperLimit();
+    }
+
+    /**
+     * 汇总当前批次同物料、同产品状态已经落地的全部排产量。
+     *
+     * <p>同物料多机台续作会持有不同SKU副本，dayN补偿扩展真实硫化余量时不能只扣当前
+     * 来源副本，否则会重复开放其他续作机台已经消费的数量。续作、换活字块和新增结果
+     * 统一按最终落地班次数量汇总。</p>
+     *
+     * @param context 排程上下文
+     * @param sourceSku 来源续作SKU
+     * @return 当前批次同物料、同产品状态已排量
+     */
+    private int resolveScheduledQtyByMaterialStatus(
+            LhScheduleContext context,
+            SkuScheduleDTO sourceSku) {
+        if (Objects.isNull(context) || Objects.isNull(sourceSku)
+                || CollectionUtils.isEmpty(context.getScheduleResultList())) {
+            return 0;
+        }
+        return Math.max(0, context.getScheduleResultList().stream()
+                .filter(Objects::nonNull)
+                .filter(result -> StringUtils.equals(
+                        sourceSku.getMaterialCode(), result.getMaterialCode()))
+                .filter(result -> StringUtils.equals(
+                        this.normalizeProductStatus(sourceSku.getProductStatus()),
+                        this.normalizeProductStatus(result.getProductStatus())))
+                .mapToInt(ShiftFieldUtil::resolveScheduledQty)
+                .sum());
     }
 
     /**
