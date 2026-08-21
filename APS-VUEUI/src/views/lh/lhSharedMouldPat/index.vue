@@ -167,14 +167,14 @@ export default {
           align: "center",
           halign: "center",
           label: this.$t("ui.data.column.lhSharedMouldPat.mouldNo"),
-          minWidth: 120,
+          minWidth: 200,
         },
         {
           prop: "patternBlock",
           align: "center",
           halign: "center",
           label: this.$t("ui.data.column.lhSharedMouldPat.patternBlock"),
-          minWidth: 120,
+          minWidth: 200,
         },
         {
           prop: "remark",

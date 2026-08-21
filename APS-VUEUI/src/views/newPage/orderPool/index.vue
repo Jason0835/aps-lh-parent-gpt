@@ -162,6 +162,7 @@ export default {
         // },
         {
           prop: "factoryCode",
+          align: "center",
           label: this.$t("ui.data.column.SalesOrderPool.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
@@ -169,6 +170,7 @@ export default {
         },
         {
           prop: "productType",
+          align: "center",
           label: this.$t("ui.data.column.SalesOrderPool.productType"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_product_type, value);
@@ -214,6 +216,7 @@ export default {
         },
         {
           prop: "locationType",
+          align: "center",
           label: this.$t("ui.data.column.SalesOrderPool.locationType"),
           formatter: (row) => {
             return this.selectDictLabel(
@@ -224,26 +227,31 @@ export default {
         },
         {
           prop: "area",
+          align: "center",
           label: this.$t("ui.data.column.SalesOrderPool.area"),
           width:120
         },
         {
           prop: "salCode",
+          align: "center",
           label: this.$t("ui.data.column.SalesOrderPool.salCode"),
           width: 120,
         },
         {
           prop: "salNCode",
+          align: "center",
           label: this.$t("ui.data.column.SalesOrderPool.salNCode"),
           width:120
         },
         {
           prop: "natCode",
+          align: "center",
           label: this.$t("ui.data.column.SalesOrderPool.natCode"),
           width:120
         },
         {
           prop: "brand",
+          align: "center",
           label: this.$t("ui.data.column.SalesOrderPool.brand"),
           width:120,
           formatter: (row, column, value) => {
@@ -275,10 +283,11 @@ export default {
           prop: "ordQty",
           label: this.$t("ui.data.column.SalesOrderPool.ordQty"),
           width:120,
-          align:'left'
+          align: "center",
         },
         {
           prop: "weekYear",
+          align: "center",
           label: this.$t("ui.data.column.SalesOrderPool.weekYear"),
           width:120
         },
@@ -310,6 +319,7 @@ export default {
         // },
         {
           prop: "isEudr",
+          align: "center",
           label: this.$t("ui.data.column.SalesOrderPool.isEudr"),
           render: ({ row }) => {
             return (
@@ -321,6 +331,7 @@ export default {
         },
         {
           prop: "deliverGoodsType",
+          align: "center",
           label: this.$t("ui.data.column.SalesOrderPool.deliverGoodsType"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(

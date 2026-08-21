@@ -146,6 +146,7 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
+          align: "center",
           label: this.$t("ui.data.column.rawMaterialRequirePlan.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
@@ -153,18 +154,23 @@ export default {
         },
         {
           prop: "year",
+          align: "center",
           label: this.$t("ui.data.column.rawMaterialRequirePlan.year"),
         },
         {
           prop: "month",
+          align: "center",
           label: this.$t("ui.data.column.rawMaterialRequirePlan.month"),
         },
         {
           prop: "version",
+          align: "center",
+          minWidth: 160,
           label: this.$t("ui.data.column.rawMaterialRequirePlan.version"),
         },
         {
           prop: "materialType",
+          align: "center",
           label: this.$t("ui.data.column.rawSpecialMaterialRecord.materialType"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(
@@ -176,14 +182,15 @@ export default {
         },
         {
           prop: "materialDesc",
+          align: "center",
           label: this.$t("ui.data.column.rawSpecialMaterialRecord.materialDesc"),
-          align: "left",
-          minWidth: 350,
+          minWidth: 180,
         },
         {
           prop: "materialCode",
+          align: "center",
           label: this.$t("ui.data.column.rawMaterialRequirePlan.materialCode"),
-          width: 180,
+          minWidth: 140,
         },
         // {
         //   prop: "物料代码",
@@ -195,27 +202,33 @@ export default {
         // },
         {
           prop: "curMonthQty",
+          align: "center",
           label: this.$t("ui.data.column.rawMaterialRequirePlan.curMonthQty"),
         },
         {
           prop: "t1MonthQty",
+          align: "center",
           label: this.$t("ui.data.column.rawMaterialRequirePlan.t1MonthQty"),
         },
 
         {
           prop: "t2MonthQty",
+          align: "center",
           label: this.$t("ui.data.column.rawMaterialRequirePlan.t2MonthQty"),
         },
         {
           prop: "curMonthRudrQty",
+          align: "center",
           label: this.$t("ui.data.column.rawMaterialRequirePlan.curMonthRudrQty"),
         },
         {
           prop: "t1MonthEudrQty",
+          align: "center",
           label: this.$t("ui.data.column.rawMaterialRequirePlan.t1MonthEudrQty"),
         },
         {
           prop: "t2MonthEudrQty",
+          align: "center",
           label: this.$t("ui.data.column.rawMaterialRequirePlan.t2MonthEudrQty"),
         },
         {

@@ -64,6 +64,7 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
+          align: "center",
           label: this.$t("ui.data.column.mouldCleanWarn.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
@@ -71,19 +72,26 @@ export default {
         },
         {
           prop: "lhCode",
+          align: "center",
           label: this.$t("ui.data.column.mouldCleanWarn.lhCode"),
-          width: 180
+          minWidth: 120,
         },
         {
           prop: "operTime",
+          align: "center",
+          minWidth: 180,
           label: this.$t("ui.data.column.mouldCleanWarn.operTime"),
         },
         {
           prop: "firstWashTime",
+          align: "center",
+          minWidth: 180,
           label: this.$t("ui.data.column.mouldCleanWarn.firstWashTime"),
         },
         {
           prop: "secondWashTime",
+          align: "center",
+          minWidth: 180,
           label: this.$t("ui.data.column.mouldCleanWarn.secondWashTime"),
         },
         {
@@ -93,6 +101,7 @@ export default {
         },
         {
           prop: "updateBy",
+          align: "center",
           label: this.$t("ui.data.column.updateBy"),
           width: 100,
         },

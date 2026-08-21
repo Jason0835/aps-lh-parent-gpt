@@ -136,6 +136,7 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
+          align: "center",
           label: this.$t("ui.data.column.rawSpecialMaterialStock.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
@@ -143,65 +144,79 @@ export default {
         },
         {
           prop: "year",
+          align: "center",
           label: this.$t("ui.data.column.monthStock.year"),
-          width: 120,
+          width: 80,
         },
         {
           prop: "month",
+          align: "center",
           label: this.$t("ui.data.column.monthStock.month"),
-          width: 120,
+          width: 80,
         },
         {
           prop: "materialCode",
+          align: "center",
           label: this.$t("ui.data.column.rawSpecialMaterialStock.materialCode"),
           width: 120,
         },
         {
           prop: "materialName",
+          align: "center",
           label: this.$t("ui.data.column.rawSpecialMaterialStock.materialName"),
           width:200
         },
         {
           prop: "standardLength",
+          align: "center",
           label: this.$t("ui.data.column.rawSpecialMaterialStock.standardLength"),
         },
         {
           prop: "warehouseStock",
+          align: "center",
           label: this.$t("ui.data.column.rawSpecialMaterialStock.warehouseStock"),
         },
         {
           prop: "midStock",
+          align: "center",
           label: this.$t("ui.data.column.rawSpecialMaterialStock.midStock"),
         },
         {
           prop: "workshopStock",
+          align: "center",
           label: this.$t("ui.data.column.rawSpecialMaterialStock.workshopStock"),
         },
         {
           prop: "packageNum",
+          align: "center",
           label: this.$t("ui.data.column.rawSpecialMaterialStock.packageNum"),
         },
         {
           prop: "totalStock",
+          align: "center",
           label: this.$t("ui.data.column.rawSpecialMaterialStock.totalStock"),
         },
         {
           prop: "stock",
+          align: "center",
           label: this.$t("ui.data.column.rawSpecialMaterialStock.stock"),
           width: 120,
         },
         {
           prop: "unit",
+          align: "center",
           label: this.$t("ui.data.column.rawSpecialMaterialStock.unit"),
         },
         {
           prop: "stockDate",
+          align: "center",
           label: this.$t("ui.data.column.rawSpecialMaterialStock.stockDate"),
           width: 120,
         },
         {
           prop: "remark",
           label: this.$t("ui.data.column.rawSpecialMaterialRecord.remark"),
+          align: "left",
         },
         {
           prop: "updateBy",
@@ -211,6 +226,7 @@ export default {
         },
         {
           prop: "updateTime",
+          align: "center",
           width: 180,
           label: this.$t("ui.data.column.updateTime"),
         },

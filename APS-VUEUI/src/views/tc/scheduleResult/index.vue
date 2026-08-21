@@ -397,20 +397,21 @@ export default {
         { type: 'selection', fixed: 'left' },
         {
           prop: 'factoryCode',
+          align: 'center',
           label: this.$t('ui.tc.schedule.factoryCode'),
           minWidth: 105,
           formatter: (row, column, value) => this.selectDictLabel(this.dict.type.biz_factory_name, value)
         },
         { prop: 'scheduleDate', label: this.$t('ui.tc.schedule.scheduleDate'), minWidth: 115, align: 'center' },
-        { prop: 'batchNo', label: this.$t('ui.tc.schedule.batchNo'), minWidth: 170, showOverflowTooltip: true },
-        { prop: 'orderNo', label: this.$t('ui.tc.schedule.orderNo'), minWidth: 175, showOverflowTooltip: true },
-        { prop: 'machineCode', label: this.$t('ui.tc.schedule.machineCode'), minWidth: 115 },
-        { prop: 'sidewallCode', label: this.$t('ui.tc.schedule.sidewallCode'), minWidth: 135 },
-        { prop: 'constructionVersion', label: this.$t('ui.tc.schedule.constructionVersion'), minWidth: 125 },
-        { prop: 'sidewallCraft', label: this.$t('ui.tc.schedule.sidewallCraft'), minWidth: 125, showOverflowTooltip: true },
-        { prop: 'glueCode', label: this.$t('ui.tc.schedule.glueCode'), minWidth: 115 },
-        { prop: 'baseGlueCode', label: this.$t('ui.tc.schedule.baseGlueCode'), minWidth: 115 },
-        { prop: 'mouthPlateCode', label: this.$t('ui.tc.schedule.mouthPlateCode'), minWidth: 120 }
+        { prop: 'batchNo', label: this.$t('ui.tc.schedule.batchNo'), align: 'center', minWidth: 200, showOverflowTooltip: true },
+        { prop: 'orderNo', label: this.$t('ui.tc.schedule.orderNo'), align: 'center', minWidth: 200, showOverflowTooltip: true },
+        { prop: 'machineCode', label: this.$t('ui.tc.schedule.machineCode'), align: 'center', minWidth: 115 },
+        { prop: 'sidewallCode', label: this.$t('ui.tc.schedule.sidewallCode'), align: 'center', minWidth: 135 },
+        { prop: 'constructionVersion', label: this.$t('ui.tc.schedule.constructionVersion'), align: 'center', minWidth: 125 },
+        { prop: 'sidewallCraft', label: this.$t('ui.tc.schedule.sidewallCraft'), align: 'center', minWidth: 125, showOverflowTooltip: true },
+        { prop: 'glueCode', label: this.$t('ui.tc.schedule.glueCode'), align: 'center', minWidth: 115 },
+        { prop: 'baseGlueCode', label: this.$t('ui.tc.schedule.baseGlueCode'), align: 'center', minWidth: 200 },
+        { prop: 'mouthPlateCode', label: this.$t('ui.tc.schedule.mouthPlateCode'), align: 'center', minWidth: 120 }
       ]
       const shiftColumns = Array.from({ length: 6 }, (item, index) => {
         const shiftOrder = index + 1
@@ -418,19 +419,20 @@ export default {
           label: this.shiftLabel(shiftOrder),
           children: [
             { prop: `class${shiftOrder}Sequence`, label: this.$t('ui.tc.schedule.sequence'), width: 72, align: 'center' },
-            { prop: `class${shiftOrder}PlanQty`, label: this.$t('ui.tc.schedule.planQty'), width: 88, align: 'right', formatter: (row, column, value) => this.formatQtyForDisplay(value) },
-            { prop: `class${shiftOrder}FinishQty`, label: this.$t('ui.tc.schedule.finishQty'), width: 88, align: 'right', formatter: (row, column, value) => this.formatQtyForDisplay(value) }
+            { prop: `class${shiftOrder}PlanQty`, label: this.$t('ui.tc.schedule.planQty'), width: 88, align: 'center', formatter: (row, column, value) => this.formatQtyForDisplay(value) },
+            { prop: `class${shiftOrder}FinishQty`, label: this.$t('ui.tc.schedule.finishQty'), width: 88, align: 'center', formatter: (row, column, value) => this.formatQtyForDisplay(value) }
           ]
         }
       })
       return baseColumns.concat(shiftColumns, [
         {
           prop: 'releaseStatus',
+          align: 'center',
           label: this.$t('ui.tc.schedule.releaseStatus'),
           minWidth: 105,
           formatter: (row, column, value) => this.selectDictLabel(this.dict.type.IS_RELEASE, value)
         },
-        { prop: 'dataSource', label: this.$t('ui.tc.schedule.dataSource'), minWidth: 100 },
+        { prop: 'dataSource', label: this.$t('ui.tc.schedule.dataSource'), align: 'center', minWidth: 100 },
         { prop: 'currentTaskVersion', label: this.$t('ui.tc.schedule.taskVersion'), minWidth: 90, align: 'center', formatter: row => row.currentTaskVersion == null ? row.taskVersion : row.currentTaskVersion },
         {
           label: this.$t('ui.data.btn.option'),

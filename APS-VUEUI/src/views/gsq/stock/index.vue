@@ -141,6 +141,7 @@ export default {
         },
         {
           prop: "remark",
+          align: "center",
           halign: "center",
           label: this.$t("ui.common.column.remark"),
           minWidth: 100,
@@ -150,9 +151,10 @@ export default {
         },
         {
           prop: "updateTime",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.gsq.stock.updateDate"),
-          minWidth: 150,
+          minWidth: 180,
         },
         {
           align: "center",

@@ -136,6 +136,7 @@ export default {
 
         {
           prop: "factoryCode",
+          align: "center",
           label: this.$t("ui.data.column.supplyOrderPool.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
@@ -143,16 +144,19 @@ export default {
         },
         {
           prop: "year",
+          align: "center",
           label: this.$t("ui.data.column.supplyOrderPool.year"),
           width: 120,
         },
         {
           prop: "month",
+          align: "center",
           label: this.$t("ui.data.column.supplyOrderPool.month"),
           width: 120,
         },
         {
           prop: "productTypeCode",
+          align: "center",
           label: this.$t("ui.data.column.supplyOrderPool.productTypeCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_product_type, value);
@@ -160,6 +164,7 @@ export default {
         },
         {
           prop: "orderType",
+          align: "center",
           label: this.$t("ui.data.column.supplyOrderPool.orderType"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(
@@ -171,6 +176,7 @@ export default {
         },
         {
           prop: "isSchedule",
+          align: "center",
           label: this.$t("ui.data.column.supplyOrderPool.isSchedule"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(
@@ -182,6 +188,7 @@ export default {
         },
         {
           prop: "locationType",
+          align: "center",
           label: this.$t("ui.data.column.supplyOrderPool.locationType"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_stor_type, value);
@@ -189,6 +196,7 @@ export default {
         },
         {
           prop: "brand",
+          align: "center",
           label: this.$t("ui.data.column.supplyOrderPool.brand"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_brand_type, value);
@@ -208,6 +216,7 @@ export default {
         },
         {
           prop: "productCategory",
+          align: "center",
           label: this.$t("ui.data.column.supplyOrderPool.productCategory"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.product_category, value);
@@ -215,6 +224,7 @@ export default {
         },
         {
           prop: "qty",
+          align: "center",
           label: this.$t("ui.data.column.supplyOrderPool.qty"),
         },
         {
@@ -224,34 +234,42 @@ export default {
         },
         {
           prop: "threeAverageQty",
+          align: "center",
           label: this.$t("ui.data.column.supplyOrderPool.threeAverageQty"),
         },
         {
           prop: "sixAverageQty",
+          align: "center",
           label: this.$t("ui.data.column.supplyOrderPool.sixAverageQty"),
         },
         {
           prop: "deliveryFrequency",
+          align: "center",
           label: this.$t("ui.data.column.supplyOrderPool.deliveryFrequency"),
         },
         {
           prop: "structureFrequency",
+          align: "center",
           label: this.$t("ui.data.column.supplyOrderPool.structureFrequency"),
         },
         {
           prop: "threeOverdueStockQty",
+          align: "center",
           label: this.$t("ui.data.column.supplyOrderPool.threeOverdueStockQty"),
         },
         {
           prop: "sixOverdueStockQty",
+          align: "center",
           label: this.$t("ui.data.column.supplyOrderPool.sixOverdueStockQty"),
         },
         {
           prop: "twelveOverdueStockQty",
+          align: "center",
           label: this.$t("ui.data.column.supplyOrderPool.twelveOverdueStockQty"),
         },
         {
           prop: "stockLimit",
+          align: "center",
           label: this.$t("ui.data.column.supplyOrderPool.stockLimit"),
         },
 

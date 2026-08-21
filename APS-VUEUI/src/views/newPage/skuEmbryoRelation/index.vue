@@ -157,6 +157,7 @@ export default {
         {
           prop: "factoryCode",
           label: this.$t("ui.data.column.mdmSkuStructureRef.factoryCode"),
+          align: "center",
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },

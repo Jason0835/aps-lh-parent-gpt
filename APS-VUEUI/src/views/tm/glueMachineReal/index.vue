@@ -115,6 +115,7 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
+          align: "center",
           label: this.$t("ui.data.column.tmGlueMachineReal.factoryCode"),
           type: "select",
           formatter: (row, column, value) => {
@@ -123,21 +124,25 @@ export default {
         },
         {
           prop: "glueCode",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.tmGlueMachineReal.glueCode"),
         },
         {
           prop: "machineName",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.tmGlueMachineReal.machineName"),
         },
         {
           prop: "machineCode",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.tmGlueMachineReal.machineCode"),
         },
         {
           prop: "priority",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.tmGlueMachineReal.priority"),
         },

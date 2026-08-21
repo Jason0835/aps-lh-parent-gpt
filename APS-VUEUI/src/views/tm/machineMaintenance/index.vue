@@ -115,6 +115,7 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
+          align: "center",
           label: this.$t("ui.data.column.tm.machineMaintenance.factoryCode"),
           type: "select",
           formatter: (row, column, value) => {
@@ -123,23 +124,27 @@ export default {
         },
         {
           prop: "machineCode",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.tm.machineMaintenance.machineCode"),
         },
         {
           prop: "stopStartTime",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.tm.machineMaintenance.stopStartTime"),
           width: 180,
         },
         {
           prop: "stopEndTime",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.tm.machineMaintenance.stopEndTime"),
           width: 180,
         },
         {
           prop: "stopShift",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.tm.machineMaintenance.stopShift"),
           type: "select",

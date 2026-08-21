@@ -132,13 +132,14 @@ export default {
         },
         {
           prop: "clothWidthMax",
-          align: "right",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.cd15AngleWidthMapping.clothWidthMax"),
           minWidth: 160,
         },
         {
           prop: "remark",
+          align: "center",
           halign: "center",
           label: this.$t("ui.common.column.remark"),
           minWidth: 140,

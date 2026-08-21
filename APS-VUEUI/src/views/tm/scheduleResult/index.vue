@@ -419,6 +419,7 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
+          align: "center",
           label: this.$t("ui.data.column.tm.scheduleResult.factoryCode"),
           type: "select",
           filterable: true,
@@ -428,14 +429,14 @@ export default {
         },
         {
           prop: "batchNo",
-          align: "left",
-          minWidth: 160,
+          align: "center",
+          minWidth: 200,
           label: this.$t("ui.data.column.tm.scheduleResult.batchNo"),
         },
         {
           prop: "orderNo",
-          align: "left",
-          minWidth: 160,
+          align: "center",
+          minWidth: 200,
           label: this.$t("ui.data.column.tm.scheduleResult.orderNo"),
         },
         {
@@ -446,21 +447,26 @@ export default {
         },
         {
           prop: "machineCode",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.tm.scheduleResult.machineCode"),
         },
         {
           prop: "treadCode",
+          align: "center",
           halign: "center",
+          minWidth: 160,
           label: this.$t("ui.data.column.tm.scheduleResult.treadCode"),
         },
         {
           prop: "glueCode",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.tm.scheduleResult.glueCode"),
         },
         {
           prop: "releaseStatus",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.tm.scheduleResult.releaseStatus"),
           type: "select",
@@ -471,6 +477,7 @@ export default {
         },
         {
           prop: "tailFlag",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.tm.scheduleResult.tailFlag"),
           type: "select",

@@ -108,6 +108,7 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
+          align: "center",
           label: this.$t("ui.data.column.mouldCleanPlan.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
@@ -115,15 +116,19 @@ export default {
         },
         {
           prop: "lhCode",
+          align: "center",
           label: this.$t("ui.data.column.mouldCleanPlan.lhCode"),
-          width: 180
+          minWidth: 120,
         },
         {
           prop: "cleanTime",
+          align: "center",
+          minWidth: 180,
           label: this.$t("ui.data.column.mouldCleanPlan.cleanTime"),
         },
         {
           prop: "cleanType",
+          align: "center",
           label: this.$t("ui.data.column.mouldCleanPlan.cleanType"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.MOULD_CLEAN_TYPE, value);
@@ -131,11 +136,13 @@ export default {
         },
         {
           prop: "leftRightMould",
+          align: "center",
           label: this.$t("ui.data.column.mouldCleanPlan.leftRightMould"),
           width: 100
         },
         {
           prop: "finishStatus",
+          align: "center",
           label: this.$t("ui.data.column.mouldCleanPlan.finishStatus"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.MOULD_CLEAN_FINISH_STATUS, value);
@@ -159,6 +166,8 @@ export default {
         },
         {
           prop: "updateTime",
+          align: "center",
+          minWidth: 180,
           label: this.$t("ui.data.column.updateTime"),
         },
 

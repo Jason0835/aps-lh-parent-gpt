@@ -115,6 +115,7 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
+          align: "center",
           label: this.$t("ui.data.column.tm.machineSpeed.factoryCode"),
           type: "select",
           formatter: (row, column, value) => {
@@ -123,16 +124,19 @@ export default {
         },
         {
           prop: "machineCode",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.tm.machineSpeed.machineCode"),
         },
         {
           prop: "treadCode",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.tm.machineSpeed.treadCode"),
         },
         {
           prop: "productSpeed",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.tm.machineSpeed.productSpeed"),
         },

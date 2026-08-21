@@ -136,6 +136,7 @@ export default {
         {
           prop: "factoryCode",
           label: this.$t("ui.data.column.mdmMouldShellInfo.factoryCode"),
+          align: "center",
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
@@ -143,38 +144,47 @@ export default {
         {
           prop: "mouldSetCode",
           label: this.$t("ui.data.column.mdmMouldShellInfo.moldModelCode"),
+          align: "center",
         },
         {
           prop: "totalQty",
           label: this.$t("ui.data.column.mdmMouldShellInfo.qty"),
+          align: "center",
         },
         {
           prop: "machineQty",
           label: this.$t("ui.data.column.mdmMouldShellInfo.machineQty"),
+          align: "center",
         },
         {
           prop: "onHandQty",
           label: this.$t("ui.data.column.mdmMouldShellInfo.onHandQty"),
+          align: "center",
         },
         {
           prop: "outBoundQty",
           label: this.$t("ui.data.column.mdmMouldShellInfo.outBoundQty"),
+          align: "center",
         },
         {
           prop: "outBoundPlanQty",
           label: this.$t("ui.data.column.mdmMouldShellInfo.outBoundPlanQty"),
+          align: "center",
         },
         {
           prop: "deplaneQty",
           label: this.$t("ui.data.column.mdmMouldShellInfo.deplaneQty"),
+          align: "center",
         },
         {
           prop: "forceOutBoundQty",
           label: this.$t("ui.data.column.mdmMouldShellInfo.forceOutBoundQty"),
+          align: "center",
         },
         {
           prop: "remark",
           label: this.$t("common.remark"),
+          align: "left",
         },
         {
           prop: "updateBy",

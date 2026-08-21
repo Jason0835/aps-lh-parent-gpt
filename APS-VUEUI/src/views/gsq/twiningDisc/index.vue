@@ -239,6 +239,7 @@ export default {
         },
         {
           prop: "remark",
+          align: "center",
           halign: "center",
           label: this.$t("ui.common.column.remark"),
           minWidth: 120,
@@ -248,9 +249,10 @@ export default {
         },
         {
           prop: "updateTime",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.gsq.twiningDisc.updateTime"),
-          minWidth: 150,
+          minWidth: 180,
         },
         {
           align: "center",

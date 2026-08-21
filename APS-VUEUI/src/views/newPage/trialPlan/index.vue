@@ -164,6 +164,7 @@ export default {
 
         {
           prop: "factoryCode",
+          align: "center",
           label: this.$t("ui.data.column.mpTrialPlan.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
@@ -171,14 +172,17 @@ export default {
         },
         {
           prop: "year",
+          align: "center",
           label: this.$t("ui.data.column.mpTrialPlan.year"),
         },
         {
           prop: "month",
+          align: "center",
           label: this.$t("ui.data.column.mpTrialPlan.month"),
         },
         {
           prop: "trialType",
+          align: "center",
           label: this.$t("ui.data.column.mpTrialPlan.trialType"),
           width: 120,
           formatter: (row, column, value) => {
@@ -192,6 +196,7 @@ export default {
         },
         {
           prop: "pattern",
+          align: "center",
           label: this.$t("ui.data.column.mpTrialPlan.pattern"),
           width: 120,
         },
@@ -208,6 +213,7 @@ export default {
         },
         {
           prop: "trialStatus",
+          align: "center",
           label: this.$t("ui.data.column.mpTrialPlan.trialStatus"),
           width: 120,
           formatter: (row, column, value) => {
@@ -224,11 +230,13 @@ export default {
         },
         {
           prop: "trialQty",
+          align: "center",
           label: this.$t("ui.data.column.mpTrialPlan.trialQty"),
           width: 120,
         },
         {
           prop: "urgencyType",
+          align: "center",
           label: this.$t("ui.data.column.mpTrialPlan.urgencyType"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_urgency_type, value);
@@ -305,12 +313,8 @@ export default {
         //   label: this.$t("ui.data.column.mpTrialPlan.vulcanizationInfo"),
         // },
         {
-          prop: "updateByName",
-          label: this.$t("ui.data.column.updateBy"),
-          minWidth: 100,
-        },
-        {
           prop: "deptIdName",
+          align: "center",
           label: this.$t("ui.data.column.mpTrialPlan.deptName"),
           width: 120,
         },
@@ -318,6 +322,12 @@ export default {
           prop: "remark",
           label: this.$t("ui.data.column.sale.remark"),
           width: 120,
+        },
+        {
+          prop: "updateByName",
+          align: "center",
+          label: this.$t("ui.data.column.updateBy"),
+          minWidth: 100,
         },
         {
           prop: "updateTime",

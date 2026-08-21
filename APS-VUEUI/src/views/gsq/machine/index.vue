@@ -145,16 +145,19 @@ export default {
         {
           label: this.$t("ui.data.column.machine.machineCode"),
           prop: "machineCode",
+          align: "center",
           minWidth: 100,
         },
         {
           label: this.$t("ui.data.column.machine.machineName"),
           prop: "machineName",
+          align: "center",
           minWidth: 100,
         },
         {
           label: this.$t("ui.data.column.machine.classShift"),
           prop: "classShift",
+          align: "center",
           minWidth: 100,
           render: ({ row }) => {
             let value = row.classShift;
@@ -167,6 +170,7 @@ export default {
         {
           label: this.$t("ui.data.column.machine.openMachineClass"),
           prop: "openMachineClass",
+          align: "center",
           minWidth: 100,
           render: ({ row }) => {
             let value = row.openMachineClass;
@@ -198,11 +202,13 @@ export default {
         {
           label: this.$t("ui.data.column.machine.quata"),
           prop: "quata",
+          align: "center",
           minWidth: 100,
         },
         {
           label: this.$t("ui.common.column.remark"),
           prop: "remark",
+          align: "center",
           minWidth: 100,
           formatter: (row) => {
             return row.remark || "-";

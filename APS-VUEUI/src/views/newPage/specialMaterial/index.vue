@@ -140,6 +140,7 @@ export default {
         {
           prop: "factoryCode",
           label: this.$t("ui.data.column.rawSpecialMaterialRecord.factoryCode"),
+          align: "center",
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
@@ -147,6 +148,8 @@ export default {
         {
           prop: "materialType",
           label: this.$t("ui.data.column.rawSpecialMaterialRecord.materialType"),
+          align: "center",
+          width: 120,
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_rawMaterial_type, value);
           },
@@ -154,12 +157,13 @@ export default {
         {
           prop: "materialCode",
           label: this.$t("ui.data.column.rawSpecialMaterialRecord.materialCode"),
+          width: 140,
         },
         {
           prop: "materialDesc",
           label: this.$t("ui.data.column.rawSpecialMaterialRecord.materialDesc"),
           align: "left",
-          minWidth: 350
+          minWidth: 220
         },
         {
           prop: "rubberSpec",
@@ -169,10 +173,13 @@ export default {
         {
           prop: "quota",
           label: this.$t("ui.data.column.rawSpecialMaterialRecord.quota"),
+          align: "center",
+          width: 100,
         },
         {
           prop: "unit",
           label: this.$t("ui.data.column.rawSpecialMaterialRecord.unit"),
+          align: "center",
         },
         {
           prop: "partName",

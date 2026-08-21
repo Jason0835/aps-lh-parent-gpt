@@ -116,10 +116,11 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "paramCode",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.paramsCode"),
           // sortable: "custom",
-          width: 360
+          width: 180
         },
         {
           prop: "paramName",
@@ -131,9 +132,10 @@ export default {
         },
         {
           prop: "paramValue",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.paramsValue"),
-          minWidth: 250,
+          minWidth: 120,
           // sortable: "custom",
         },
         {
@@ -145,6 +147,7 @@ export default {
         },
         {
           prop: "updateBy",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.updateBy"),
           minWidth: 100,

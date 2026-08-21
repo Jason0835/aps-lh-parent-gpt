@@ -157,14 +157,17 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "year",
+          align: "center",
           label: this.$t("ui.data.column.mdmAreaCapaAllocation.year"),
         },
         {
           prop: "month",
+          align: "center",
           label: this.$t("ui.data.column.mdmAreaCapaAllocation.month"),
         },
         {
           prop: "factoryCode",
+          align: "center",
           label: this.$t("ui.data.column.mdmAreaCapaAllocation.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
@@ -173,6 +176,7 @@ export default {
 
         {
           prop: "productTypeCode",
+          align: "center",
           label: this.$t("ui.data.column.mdmAreaCapaAllocation.productTypeCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_product_type, value);
@@ -180,10 +184,12 @@ export default {
         },
         {
           prop: "areaCodeNameI18n",
+          align: "center",
           label: this.$t("ui.data.column.mdmAreaCapaAllocation.areaCode"),
         },
         {
           prop: "capacityAllocation",
+          align: "center",
           label: this.$t(
             "ui.data.column.mdmAreaCapaAllocation.capacityAllocation"
           ),

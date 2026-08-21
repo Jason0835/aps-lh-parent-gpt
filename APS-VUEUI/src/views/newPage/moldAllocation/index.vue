@@ -144,6 +144,7 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
+          align: "center",
           label: this.$t("ui.data.column.mdmMouldAllocation.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
@@ -151,14 +152,17 @@ export default {
         },
         {
           prop: "year",
+          align: "center",
           label: this.$t("ui.data.column.mdmMouldAllocation.year"),
         },
         {
           prop: "month",
+          align: "center",
           label: this.$t("ui.data.column.mdmMouldAllocation.month"),
         },
         {
           prop: "productTypeCode",
+          align: "center",
           label: this.$t("ui.data.column.mdmMouldAllocation.productTypeCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_product_type, value);
@@ -171,15 +175,18 @@ export default {
         },
         {
           prop: "specifications",
+          align: "center",
           label: this.$t("ui.data.column.mdmMouldAllocation.specifications"),
           width:200
         },
         {
           prop: "mainPattern",
+          align: "center",
           label: this.$t("ui.data.column.mdmMouldAllocation.mainPattern"),
         },
         {
           prop: "allocationQty",
+          align: "center",
           label: this.$t("ui.data.column.mdmMouldAllocation.allocationQty"),
         },
         {

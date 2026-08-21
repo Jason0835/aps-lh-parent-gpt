@@ -137,6 +137,7 @@ export default {
         {
           prop: "factoryCode",
           label: this.$t("ui.data.column.mdmStructureLhRatio.factoryCode"),
+          align: "center",
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
@@ -144,6 +145,8 @@ export default {
         {
           prop: "cxMachineTypeCode",
           label: this.$t("ui.data.column.mdmStructureLhRatio.cxMachineTypeCode"),
+          align: "center",
+          width: 120,
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.cx_machine_type_code, value);
           },
@@ -156,10 +159,13 @@ export default {
         {
           prop: "lhMachineMaxQty",
           label: this.$t("ui.data.column.mdmStructureLhRatio.lhMachineMaxQty"),
+          align: "center",
+          width: 130,
         },
         {
           prop: "maxEmbryoQty",
           label: this.$t("ui.data.column.mdmStructureLhRatio.maxEmbryoQty"),
+          align: "center",
         },
         {
           prop: "remark",

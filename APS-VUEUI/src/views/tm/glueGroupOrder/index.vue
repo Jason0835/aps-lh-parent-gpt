@@ -111,6 +111,7 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
+          align: "center",
           label: this.$t("ui.data.column.tm.glueGroupOrder.factoryCode"),
           type: "select",
           formatter: (row, column, value) => {
@@ -119,16 +120,19 @@ export default {
         },
         {
           prop: "glueGroupCode",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.tm.glueGroupOrder.glueGroupCode"),
         },
         {
           prop: "glueGroupName",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.tm.glueGroupOrder.glueGroupName"),
         },
         {
           prop: "orderNum",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.tm.glueGroupOrder.orderNum"),
         },

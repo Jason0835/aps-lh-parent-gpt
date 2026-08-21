@@ -67,6 +67,7 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
+          align: "center",
           label: this.$t("ui.data.column.lhSkuDecrement.factoryCode"),
           minWidth: 120,
           formatter: (row, column, value) => this.selectDictLabel(this.dict.type.biz_factory_name, value),
@@ -85,6 +86,7 @@ export default {
         },
         {
           prop: "materialCode",
+          align: "center",
           label: this.$t("ui.data.column.lhSkuDecrement.materialCode"),
           minWidth: 140,
         },
@@ -102,6 +104,7 @@ export default {
         },
         {
           prop: "productStatus",
+          align: "center",
           label: this.$t("ui.data.column.lhSkuDecrement.productStatus"),
           minWidth: 120,
           formatter: (row, column, value) => this.selectDictLabel(this.dict.type.lh_trial_status, value),

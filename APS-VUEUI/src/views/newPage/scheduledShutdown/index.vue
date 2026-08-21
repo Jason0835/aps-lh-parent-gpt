@@ -152,6 +152,7 @@ export default {
         {
           prop: "factoryCode",
           label: this.$t("ui.data.column.mdmDevicePlanShut.factoryCode"),
+          align: "center",
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
@@ -169,6 +170,7 @@ export default {
         {
           prop: "machineType",
           label: this.$t("ui.data.column.mdmDevicePlanShut.machineType"),
+          align: "center",
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.device_shut_machine_type, value);
           },
@@ -176,10 +178,12 @@ export default {
         {
           prop: "machineCode",
           label: this.$t("ui.data.column.mdmDevicePlanShut.machineCode"),
+          align: "center",
         },
         {
           prop: "machineStopType",
           label: this.$t("ui.data.column.mdmDevicePlanShut.machineStopType"),
+          align: "center",
           formatter: (row, column, value) => {
             return this.selectDictLabel(
               this.dict.type.machine_stop_type,
@@ -190,18 +194,25 @@ export default {
         {
           prop: "beginDate",
           label: this.$t("ui.data.column.mdmDevicePlanShut.beginDate"),
+          width: 180,
+          align: "center",
         },
         {
           prop: "endDate",
           label: this.$t("ui.data.column.mdmDevicePlanShut.endDate"),
+          width: 180,
+          align: "center",
         },
         {
           prop: "scheduleDate",
           label: this.$t("ui.data.column.mdmDevicePlanShut.scheduleDate"),
+          width: 180,
+          align: "center",
         },
         {
           prop: "dataSource",
           label: this.$t("ui.data.column.mdmDevicePlanShut.dataSource"),
+          align: "center",
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.lh_precision_data_source, value);
           },
@@ -209,6 +220,8 @@ export default {
         {
           prop: "remark",
           label: this.$t("ui.data.column.mdmMaterialInfo.remark"),
+          minWidth: 150,
+          align: "left",
         },
         {
           prop: "updateBy",
@@ -225,7 +238,7 @@ export default {
         {
           align: "center",
           label: this.$t("common.option"),
-          minWidth: 160, width: 160,
+          minWidth: 120, width: 120,
           fixed: "right",
           render: ({ row }) => {
             return (

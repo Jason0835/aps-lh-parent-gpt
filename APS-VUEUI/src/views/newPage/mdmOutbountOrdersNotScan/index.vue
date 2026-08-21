@@ -59,6 +59,7 @@ export default {
       let columns = [
         {
           prop: "factoryCode",
+          align: "center",
           label: this.$t("ui.data.column.mdmOutbountOrdersNotScan.factoryCode"),
           minWidth: 120,
           formatter: (row, column, value) => {
@@ -67,13 +68,15 @@ export default {
         },
         {
           prop: "saleBillNo",
+          align: "center",
           label: this.$t("ui.data.column.mdmOutbountOrdersNotScan.saleBillNo"),
-          minWidth: 120,
+          minWidth: 160,
         },
         {
           prop: "saleOrderNo",
+          align: "center",
           label: this.$t("ui.data.column.mdmOutbountOrdersNotScan.saleOrderNo"),
-          minWidth: 120,
+          minWidth: 160,
         },
         // {
         //   prop: "saleOrg",
@@ -82,18 +85,21 @@ export default {
         // },
         {
           prop: "saleOrgName",
+          align: "center",
           label: this.$t("ui.data.column.mdmOutbountOrdersNotScan.saleOrgName"),
-          minWidth: 150,
+          minWidth: 200,
         },
         {
           prop: "sellTo",
+          align: "center",
           label: this.$t("ui.data.column.mdmOutbountOrdersNotScan.sellTo"),
           minWidth: 100,
         },
         {
           prop: "billId",
+          align: "center",
           label: this.$t("ui.data.column.mdmOutbountOrdersNotScan.billId"),
-          minWidth: 120,
+          minWidth: 160,
         },
         // {
         //   prop: "materialCode",
@@ -102,6 +108,7 @@ export default {
         // },
         {
           prop: "sapCode",
+          align: "center",
           label: this.$t("ui.data.column.mdmOutbountOrdersNotScan.sapCode"),
           minWidth: 150,
         },
@@ -112,36 +119,43 @@ export default {
         },
         {
           prop: "dot",
+          align: "center",
           label: this.$t("ui.data.column.mdmOutbountOrdersNotScan.dot"),
           minWidth: 120,
         },
         {
           prop: "stockDate",
+          align: "center",
           label: this.$t("ui.data.column.mdmOutbountOrdersNotScan.stockDate"),
           minWidth: 120,
         },
         {
           prop: "scanAmount",
+          align: "center",
           label: this.$t("ui.data.column.mdmOutbountOrdersNotScan.scanAmount"),
           minWidth: 100,
         },
         {
           prop: "outAmount",
+          align: "center",
           label: this.$t("ui.data.column.mdmOutbountOrdersNotScan.outAmount"),
           minWidth: 100,
         },
         {
           prop: "noscanAmount",
+          align: "center",
           label: this.$t("ui.data.column.mdmOutbountOrdersNotScan.noscanAmount"),
           minWidth: 100,
         },
         {
           prop: "saleItemNo",
+          align: "center",
           label: this.$t("ui.data.column.mdmOutbountOrdersNotScan.saleItemNo"),
-          minWidth: 100,
+          minWidth: 140,
         },
         {
           prop: "updateBy",
+          align: "center",
           label: this.$t("ui.data.column.updateBy"),
           minWidth: 100,
         },

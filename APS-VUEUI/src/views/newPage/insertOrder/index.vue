@@ -125,6 +125,7 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
+          align: "center",
           label: this.$t("ui.data.column.simulatedResult.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
@@ -133,16 +134,19 @@ export default {
         },
         {
           prop: "year",
+          align: "center",
           label: this.$t("ui.data.column.simulatedResult.year"),
           width: 120,
         },
         {
           prop: "month",
+          align: "center",
           label: this.$t("ui.data.colume.month"),
           width: 120,
         },
         {
           prop: "productTypeCode",
+          align: "center",
           label: this.$t("ui.data.column.monthplan.productType"),
           width: 120,
           formatter: (row, column, value) => {
@@ -161,16 +165,19 @@ export default {
         },
         {
           prop: "specifications",
+          align: "center",
           label: this.$t("ui.data.column.trialPlan.specifications"),
           width: 120,
         },
         {
           prop: "pattern",
+          align: "center",
           label: this.$t("ui.data.column.modelinfo.pattern"),
           width: 120,
         },
         {
           prop: "mainPattern",
+          align: "center",
           label: this.$t("ui.data.column.moldLedger.mainPattern"),
           width: 120,
         },
@@ -201,31 +208,37 @@ export default {
         },
         {
           prop: "mouldQty",
+          align: "center",
           label: this.$t("ui.data.insertOrder.mouldQty"),
           width: 120,
         },
         {
           prop: "typeBlockQty",
+          align: "center",
           label: this.$t("ui.data.monthlyProductionPlan.typeBlockQty"),
           width: 120,
         },
         {
           prop: "netQty",
+          align: "center",
           label: this.$t("ui.data.monthlyProductionPlan.prodReqPlan"),
           width: 120,
         },
         {
           prop: "heightQty",
+          align: "center",
           label: this.$t("ui.data.insertOrder.heightQty"),
           width: 120,
         },
         {
           prop: "productionQty",
+          align: "center",
           label: this.$t("ui.data.insertOrder.productionQty"),
           width: 120,
         },
         {
           prop: "monthPlanVersion",
+          align: "center",
           label: this.$t("ui.data.column.finishStock.requireVersion"),
           width: 180,
         },

@@ -119,6 +119,7 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
+          align: "center",
           label: this.$t("ui.data.column.tm.mouthPlate.factoryCode"),
           type: "select",
           formatter: (row, column, value) => {
@@ -127,11 +128,13 @@ export default {
         },
         {
           prop: "mouthPlateCode",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.tm.mouthPlate.mouthPlateCode"),
         },
         {
           prop: "machineCode",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.tm.mouthPlate.machineCode"),
         },

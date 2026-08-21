@@ -123,7 +123,8 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
-          width: 180,
+          align: "center",
+          minWidth: 100,
           label: this.$t("ui.data.column.mdmMonCycleSchStruConf.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
@@ -131,26 +132,32 @@ export default {
         },
         {
           prop: "year",
-          width: 180,
+          align: "center",
+          minWidth: 80,
           label: this.$t("ui.data.column.mdmMonCycleSchStruConf.year"),
         },
         {
           prop: "month",
-          width: 180,
+          align: "center",
+          minWidth: 80,
           label: this.$t("ui.data.column.mdmMonCycleSchStruConf.month"),
         },
         {
           prop: "structureName",
+          minWidth: 140,
+          align: "center",
           label: this.$t("ui.data.column.mdmMonCycleSchStruConf.structureName"),
         },
         {
           prop: "turnoverMonth",
-          width: 180,
+          align: "center",
+          minWidth: 90,
           label: this.$t("ui.data.column.mdmMonCycleSchStruConf.turnoverMonth"),
         },
         {
           prop: "minVulcanizingMachine",
-          width: 180,
+          align: "center",
+          minWidth: 140,
           label: this.$t("ui.data.column.mdmMonCycleSchStruConf.minVulcanizingMachine"),
         },
 
@@ -162,11 +169,11 @@ export default {
           prop: "updateBy",
           align: "center",
           label: this.$t("ui.data.column.updateBy"),
-          width: 100,
+          minWidth: 100,
         },
         {
           prop: "updateTime",
-          width: 180,
+          minWidth: 180,
           label: this.$t("ui.data.column.updateTime"),
         },
         {

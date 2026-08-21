@@ -111,6 +111,7 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
+          align: "center",
           label: this.$t("ui.data.column.tc.stock.factoryCode"),
           type: "select",
           formatter: (row, column, value) => {
@@ -119,39 +120,48 @@ export default {
         },
         {
           prop: "stockDate",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.tc.stock.stockDate"),
+          minWidth: 160,
         },
         {
           prop: "sidewallCode",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.tc.stock.sidewallCode"),
+          minWidth: 160,
         },
         {
           prop: "stockQty",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.tc.stock.stockQty"),
         },
         {
           prop: "badQty",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.tc.stock.badQty"),
         },
         {
           prop: "adjustQty",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.tc.stock.adjustQty"),
         },
         {
           prop: "remark",
+          align: "center",
           halign: "center",
           label: this.$t("ui.common.column.remark"),
           minWidth: 100,
         },
         {
           prop: "updateTime",
+          align: "center",
           label: this.$t("ui.data.column.updateTime"),
-          width: 180,
+          minWidth: 180,
         },
         {
           align: "center",

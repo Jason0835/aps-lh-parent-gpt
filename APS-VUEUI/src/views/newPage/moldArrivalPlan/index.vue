@@ -151,6 +151,7 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
+          align: "center",
           label: this.$t("ui.data.column.mpMouldDeliveryPlan.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
@@ -158,15 +159,19 @@ export default {
         },
         {
           prop: "mouldCode",
+          align: "center",
           label: this.$t("ui.data.column.mpMouldDeliveryPlan.mouldCode"),
           width:180
         },
         {
           prop: "mainPattern",
+          align: "center",
           label: this.$t("ui.data.column.mdmMaterialInfo.mainPattern"),
         },
         {
           prop: "materialCode",
+          align: "center",
+          minWidth: 160,
           label: this.$t("ui.data.column.mpMouldDeliveryPlan.materialCode"),
         },
         {

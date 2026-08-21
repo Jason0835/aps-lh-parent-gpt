@@ -119,6 +119,7 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
+          align: "center",
           label: this.$t("ui.data.column.tc.specifyMachine.factoryCode"),
           type: "select",
           formatter: (row, column, value) => {
@@ -127,16 +128,19 @@ export default {
         },
         {
           prop: "sidewallCode",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.tc.specifyMachine.sidewallCode"),
         },
         {
           prop: "machineCode",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.tc.specifyMachine.machineCode"),
         },
         {
           prop: "jobType",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.tc.specifyMachine.jobType"),
           formatter: (row, column, value) => {
@@ -145,6 +149,7 @@ export default {
         },
         {
           prop: "priority",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.tc.specifyMachine.priority"),
         },
@@ -188,14 +193,16 @@ export default {
         },
         {
           prop: "remark",
+          align: "center",
           halign: "center",
           label: this.$t("ui.common.column.remark"),
           minWidth: 100,
         },
         {
           prop: "updateTime",
+          align: "center",
           label: this.$t("ui.data.column.updateTime"),
-          width: 180,
+          minWidth: 180,
         },
         {
           align: "center",

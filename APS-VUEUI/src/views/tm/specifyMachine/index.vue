@@ -119,6 +119,7 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
+          align: "center",
           label: this.$t("ui.data.column.tm.specifyMachine.factoryCode"),
           type: "select",
           formatter: (row, column, value) => {
@@ -127,16 +128,19 @@ export default {
         },
         {
           prop: "treadCode",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.tm.specifyMachine.treadCode"),
         },
         {
           prop: "machineCode",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.tm.specifyMachine.machineCode"),
         },
         {
           prop: "jobType",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.tm.specifyMachine.jobType"),
           formatter: (row, column, value) => {
@@ -145,6 +149,7 @@ export default {
         },
         {
           prop: "priority",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.tm.specifyMachine.priority"),
         },

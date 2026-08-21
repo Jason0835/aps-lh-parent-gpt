@@ -100,6 +100,7 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
+          align: "center",
           label: this.$t("ui.data.column.rawWarningRecord.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
@@ -108,29 +109,33 @@ export default {
 
         {
           prop: "materialCode",
+          align: "center",
+          minWidth: 160,
           label: this.$t("ui.data.column.rawWarningRecord.materialCode"),
         },
         {
           prop: "materialDesc",
           label: this.$t("ui.data.column.rawWarningRecord.materialDesc"),
-          align: "left",
-          minWidth: 350,
+          align: "center",
+          minWidth: 180,
         },
         {
           prop: "relatedMonth",
+          align: "center",
           label: this.$t("ui.data.column.rawWarningRecord.relatedMonth"),
           width: 120,
         },
 
         {
           prop: "relatedWeek",
+          align: "center",
           label: this.$t("ui.data.column.rawWarningRecord.relatedWeek"),
-          width: 180,
+          width: 80,
         },
         {
           prop: "warningContent",
           label: this.$t("ui.data.column.rawWarningRecord.warningContent"),
-          width: 300,
+          minWidth: 300,
         },
         // {
         //   prop: "warningData",
@@ -145,16 +150,18 @@ export default {
         // },
         {
           prop: "warningTitle",
+          align: "center",
           label: this.$t("ui.data.column.rawWarningRecord.warningTitle"),
           width: 280,
         },
         {
           prop: "warningType",
+          align: "center",
           label: this.$t("ui.data.column.rawWarningRecord.warningType"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.warn_type, value);
           },
-          width: 160,
+          width: 120,
         },
 
         {
@@ -164,6 +171,7 @@ export default {
         },
         {
           prop: "updateBy",
+          align: "center",
           label: this.$t("ui.data.column.updateBy"),
           width: 100,
         },

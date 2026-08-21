@@ -274,7 +274,7 @@ export default {
           align: "center",
           halign: "center",
           label: this.$t("ui.data.column.lhMouldChangePlan.lhResultBatchNo"),
-          minWidth: 140,
+          minWidth: 200,
         },
         {
           prop: "orderNo",

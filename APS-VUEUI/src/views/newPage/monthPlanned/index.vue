@@ -132,6 +132,7 @@ export default {
         // { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
+          align: "center",
           label: this.$t("ui.data.column.mdmMonthSurplus.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
@@ -140,14 +141,17 @@ export default {
 
         {
           prop: "year",
+          align: "center",
           label: this.$t("ui.data.column.mdmMonthSurplus.year"),
         },
         {
           prop: "month",
+          align: "center",
           label: this.$t("ui.data.column.mdmMonthSurplus.month"),
         },
         {
           prop: "requireVersion",
+          align: "center",
           label: this.$t("ui.data.column.mdmMonthSurplus.requireVersion"),
         },
         {
@@ -160,6 +164,7 @@ export default {
 
         {
           prop: "brand",
+          align: "center",
           label: this.$t("ui.data.column.mdmMonthSurplus.brand"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_brand_type, value);
@@ -172,6 +177,7 @@ export default {
         },
         {
           prop: "materialCode",
+          minWidth: 160,
           label: this.$t("ui.data.column.mdmMonthSurplus.materialCode"),
         },
         {
@@ -182,11 +188,13 @@ export default {
         },
         {
           prop: "planSurplusQty",
+          align: "center",
           label: this.$t("ui.data.column.mdmMonthSurplus.planSurplusQty"),
         },
 
         {
           prop: "updateBy",
+          align: "center",
           label: this.$t("ui.data.column.updateBy"),
           width: 100,
         },

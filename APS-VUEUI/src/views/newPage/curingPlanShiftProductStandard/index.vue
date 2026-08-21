@@ -144,6 +144,7 @@ export default {
           prop: "factoryCode",
           label: this.$t("ui.data.column.mdmSkuLhCapacity.factoryCode"),
           width: 120,
+          align: "center",
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
@@ -151,7 +152,8 @@ export default {
         {
           prop: "materialCode",
           label: this.$t("ui.data.column.mdmSkuLhCapacity.materialCode"),
-          width:120
+          width:120,
+          align: "center",
         },
         {
           prop: "materialDesc",
@@ -162,10 +164,12 @@ export default {
         {
           prop: "classCapacity",
           label: this.$t("ui.data.column.mdmSkuLhCapacity.classCapacity"),
+          align: "center",
         },
         {
           prop: "standardCapacity",
           label: this.$t("ui.data.column.mdmSkuLhCapacity.standardCapacity"),
+          align: "center",
         },
         // {
         //   prop: "MES日硫化量",
@@ -174,10 +178,12 @@ export default {
         {
           prop: "apsCapacity",
           label: this.$t("ui.data.column.mdmSkuLhCapacity.apsCapacity"),
+          align: "center",
         },
         {
           prop: "sumVulcanization",
           label: this.$t("ui.data.column.mdmSkuLhCapacity.sumVulcanization"),
+          align: "center",
         },
         {
           prop: "vulcanizationTime",
