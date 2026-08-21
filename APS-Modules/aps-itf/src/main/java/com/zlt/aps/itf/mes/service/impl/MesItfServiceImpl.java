@@ -24,6 +24,10 @@ import com.zlt.aps.gsq.api.domain.entity.GsqDayFinishQty;
 import com.zlt.aps.gsq.api.domain.entity.GsqMesStock;
 import com.zlt.aps.gsq.api.domain.entity.GsqScheFinishQty;
 import com.zlt.aps.gsq.api.domain.entity.GsqStock;
+import com.zlt.aps.gsq.api.domain.entity.GsqTwiningDisc;
+import com.zlt.aps.gsq.api.domain.entity.GsqTwiningDiscMachine;
+import com.zlt.aps.gsq.api.domain.entity.GsqTwiningDiscSpec;
+import com.zlt.aps.gsq.api.domain.vo.GsqMesTwiningDiscSyncVO;
 import com.zlt.aps.gsq.api.service.IGsqMesSyncRemoteService;
 import com.zlt.aps.itf.constant.DataSource;
 import com.zlt.aps.itf.constant.SysCode;
@@ -2060,6 +2064,79 @@ public class MesItfServiceImpl implements MesItfService {
         } catch (Exception e) {
             log.error("钢丝圈库存同步：Feign调用异常，待插入数量={}", gsqStockInsertList.size(), e);
             return AjaxResult.error("钢丝圈库存同步失败：" + e.getMessage());
+        }
+        return AjaxResult.success();
+    }
+
+    /**
+     * 同步MES钢丝圈缠绕盘三表数据（缠绕盘清单/规格关系/机台关系）
+     * <p>三表均按业务键取MES DATA_VERSION最大版本行（避免全局最大版本漏历史推送数据），
+     * 聚合为GsqMesTwiningDiscSyncVO后一次Feign调用，由钢丝圈微服务单事务落库保证三表一致性：</p>
+     * <p>1. MES_WIRE_DISC_INFO缠绕盘清单（按MOUTH_PLAT_CODE取最大版本）；
+     * 2. MES_WIRE_DISC_SPEC_MAPPING规格关系（按WIRE_DISC_CODE+STEEL_RING_CODE取最大版本）；
+     * 3. MES_WIRE_DISC_MACHINE_MAPPING机台关系（按WIRE_DISC_CODE+MACHINE_CODE取最大版本）</p>
+     * <p>三表均为字符串/数值字段，无日期字段，不存在SQL Server JDBC跨时区偏移问题；
+     * SORT_TYPE为MES decimal(6,2)，SQL侧CAST为字符串后Java侧去尾零（如34543.00→34543）</p>
+     *
+     * @param syncDataLogs 同步参数（可传factoryCode过滤分厂）
+     * @return 结果
+     */
+    @Override
+    public AjaxResult syncMesTwiningDisc(AuxReqSyncDataLogs syncDataLogs) {
+        // 切换到MES数据源查询三张缠绕盘表（各按业务键取最大版本，SQL已用别名映射APS实体字段）
+        DynamicDataSourceContextHolder.push(DataSource.MES);
+        List<GsqTwiningDisc> discList;
+        List<GsqTwiningDiscSpec> specList;
+        List<GsqTwiningDiscMachine> machineList;
+        try {
+            discList = mesItfMapper.selectMesWireDiscInfoList(syncDataLogs);
+            specList = mesItfMapper.selectMesWireDiscSpecMappingList(syncDataLogs);
+            machineList = mesItfMapper.selectMesWireDiscMachineMappingList(syncDataLogs);
+        } finally {
+            DynamicDataSourceContextHolder.poll();
+        }
+
+        log.info("缠绕盘MES同步：MES侧查询完成，缠绕盘清单={}条，规格关系={}条，机台关系={}条",
+                discList.size(), specList.size(), machineList.size());
+
+        // SORT_TYPE去尾零：MES侧decimal(6,2)经CAST输出如"34543.00"，转为APS侧展示用简洁格式"34543"
+        for (GsqTwiningDisc disc : discList) {
+            if (StringUtils.isNotBlank(disc.getSortType())) {
+                try {
+                    disc.setSortType(new BigDecimal(disc.getSortType().trim()).stripTrailingZeros().toPlainString());
+                } catch (NumberFormatException e) {
+                    log.warn("缠绕盘MES同步：缠绕盘[{}]排列方式[{}]非数值格式，按原值同步",
+                            disc.getTwiningDiscCode(), disc.getSortType());
+                }
+            }
+        }
+
+        // MES三表全部为空视为异常快照（全量同步空清单会导致误清空APS数据，防御性跳过，不发起Feign调用）
+        if (discList.isEmpty() && specList.isEmpty() && machineList.isEmpty()) {
+            log.warn("缠绕盘MES同步：MES三表均无数据，本次跳过同步");
+            return AjaxResult.success("MES无数据可同步");
+        }
+
+        // 聚合三表数据，一次Feign调用在钢丝圈微服务侧单事务落库
+        GsqMesTwiningDiscSyncVO syncVO = new GsqMesTwiningDiscSyncVO();
+        syncVO.setDiscList(discList);
+        syncVO.setSpecList(specList);
+        syncVO.setMachineList(machineList);
+
+        try {
+            FeignTokenHelper.runWithToken(() -> {
+                AjaxResult result = gsqMesSyncRemoteService.syncTwiningDisc("MES", syncVO);
+                // 框架bug：AjaxResult.success()硬编码code=200，须用AJAX_SUCCESS_CODE比较（见常量注释）
+                if (result == null || AJAX_SUCCESS_CODE != Integer.parseInt(result.get("code").toString())) {
+                    throw new RuntimeException("钢丝圈侧缠绕盘落库失败："
+                            + (result == null ? "Feign无返回" : result.get("msg")));
+                }
+            });
+            log.info("缠绕盘MES同步：同步完成，缠绕盘清单={}条，规格关系={}条，机台关系={}条",
+                    discList.size(), specList.size(), machineList.size());
+        } catch (Exception e) {
+            log.error("缠绕盘MES同步：Feign调用异常", e);
+            return AjaxResult.error("缠绕盘MES同步失败：" + e.getMessage());
         }
         return AjaxResult.success();
     }

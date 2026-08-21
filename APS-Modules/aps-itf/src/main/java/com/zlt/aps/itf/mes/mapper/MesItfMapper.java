@@ -15,6 +15,9 @@ import com.zlt.aps.tm.api.domain.entity.TmScheFinishQty;
 import com.zlt.aps.gsq.api.domain.entity.GsqDayFinishQty;
 import com.zlt.aps.gsq.api.domain.entity.GsqMesStock;
 import com.zlt.aps.gsq.api.domain.entity.GsqScheFinishQty;
+import com.zlt.aps.gsq.api.domain.entity.GsqTwiningDisc;
+import com.zlt.aps.gsq.api.domain.entity.GsqTwiningDiscMachine;
+import com.zlt.aps.gsq.api.domain.entity.GsqTwiningDiscSpec;
 import com.zlt.aps.tq.api.domain.entity.TqDayFinishQty;
 import com.zlt.aps.tq.api.domain.entity.TqMesStock;
 import com.zlt.aps.tq.api.domain.entity.TqScheFinishQty;
@@ -187,6 +190,33 @@ public interface MesItfMapper {
      * @return 列表
      */
     List<GsqMesStock> selectMesGsqStockList(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 查询MES缠绕盘清单同步数据（MES_WIRE_DISC_INFO）
+     * 按MOUTH_PLAT_CODE业务键取DATA_VERSION最大版本行
+     *
+     * @param syncDataLogs 参数（可传factoryCode过滤分厂）
+     * @return 缠绕盘清单列表
+     */
+    List<GsqTwiningDisc> selectMesWireDiscInfoList(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 查询MES缠绕盘规格关系同步数据（MES_WIRE_DISC_SPEC_MAPPING）
+     * 按WIRE_DISC_CODE+STEEL_RING_CODE业务键取DATA_VERSION最大版本行
+     *
+     * @param syncDataLogs 参数（可传factoryCode过滤分厂）
+     * @return 规格关系列表（twiningDiscCode为缠绕盘编码，APS落库侧按编码直接关联主表）
+     */
+    List<GsqTwiningDiscSpec> selectMesWireDiscSpecMappingList(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 查询MES缠绕盘机台关系同步数据（MES_WIRE_DISC_MACHINE_MAPPING）
+     * 按WIRE_DISC_CODE+MACHINE_CODE业务键取DATA_VERSION最大版本行
+     *
+     * @param syncDataLogs 参数（可传factoryCode过滤分厂）
+     * @return 机台关系列表
+     */
+    List<GsqTwiningDiscMachine> selectMesWireDiscMachineMappingList(AuxReqSyncDataLogs syncDataLogs);
 
     /**
      * 查询胎圈自动滚动指定物理日的库存。

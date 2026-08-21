@@ -32,27 +32,27 @@ public interface IGsqTwiningDiscService {
     TableDataInfo list(@RequestBody GsqTwiningDisc entity);
 
     /**
-     * 获取钢丝圈缠绕盘详细信息（含子表明细）
+     * 获取钢丝圈缠绕盘详细信息（单表）
      *
      * @param id 主键ID
-     * @return 详细信息（含 subList）
+     * @return 详细信息
      */
     @GetMapping("/gsq/twiningDisc/{id}")
     @ApiOperation("获取钢丝圈缠绕盘详细信息")
     GsqTwiningDisc getInfo(@PathVariable("id") Long id);
 
     /**
-     * 保存钢丝圈缠绕盘（id为空新增，id不为空修改），同时级联保存子表明细
+     * 保存钢丝圈缠绕盘（id为空新增，id不为空修改，单表保存，带编码唯一性校验）
      *
-     * @param entity 实体（含 subList）
+     * @param entity 实体
      * @return 操作结果
      */
     @PostMapping("/gsq/twiningDisc/save")
-    @ApiOperation("保存钢丝圈缠绕盘（含子表）")
+    @ApiOperation("保存钢丝圈缠绕盘")
     AjaxResult save(@RequestBody GsqTwiningDisc entity);
 
     /**
-     * 删除钢丝圈缠绕盘（逻辑删除，级联删除子表）
+     * 删除钢丝圈缠绕盘（逻辑删除主表，按缠绕盘编码级联逻辑删除规格关系及机台关系）
      *
      * @param ids 主键ID集合
      * @return 操作结果
@@ -92,4 +92,13 @@ public interface IGsqTwiningDiscService {
     @PostMapping("/gsq/twiningDisc/checkUnique")
     @ApiOperation("校验缠绕盘编码唯一性")
     String checkUnique(@RequestBody GsqTwiningDisc entity);
+
+    /**
+     * 查询施工信息表全部钢丝圈选项（编码+名称，去重），供规格关系页面下拉选择使用
+     *
+     * @return 钢丝圈选项列表
+     */
+    @GetMapping("/gsq/twiningDisc/listSteelRingOptions")
+    @ApiOperation("查询钢丝圈下拉选项")
+    com.ruoyi.common.core.web.domain.AjaxResult listSteelRingOptions();
 }
