@@ -95,7 +95,8 @@ public class SpecialMaterialScheduleHandler {
         if (CollectionUtils.isEmpty(specialIntersectionMap)) {
             specialIntersectionMap.putAll(materialMap);
         }
-        Map.Entry<String, BigDecimal> entry = specialIntersectionMap.entrySet().stream().findFirst().get();
+        // 以消耗量最大的为准
+        Map.Entry<String, BigDecimal> entry = specialIntersectionMap.entrySet().stream().max((e1, e2) -> BigDecimalUtils.safeCompare(e1.getValue(), e2.getValue())).get();
         // 单耗
         BigDecimal unitConsumeLength = entry.getValue();
         // 标准长度
