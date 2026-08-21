@@ -247,8 +247,13 @@ public class TmManualScheduleApplicationService {
             missingFieldList.add(I18nUtil.getMessage(
                     "ui.data.alert.tm.schedule.constructionFieldRubber"));
         }
-        return MessageFormat.format(I18nUtil.getMessage(
-                        "ui.data.alert.tm.schedule.insertConstructionInvalid"),
+        String messageTemplate = I18nUtil.getMessage(
+                "ui.data.alert.tm.schedule.insertConstructionInvalid");
+        if (StrUtil.isBlank(messageTemplate)
+                || "ui.data.alert.tm.schedule.insertConstructionInvalid".equals(messageTemplate)) {
+            messageTemplate = "施工信息无效：施工编码={0}，施工版本={1}，胎面代码={2}，缺失字段={3}";
+        }
+        return MessageFormat.format(messageTemplate,
                 StrUtil.blankToDefault(construction.getConstructionCode(), "-"),
                 StrUtil.blankToDefault(construction.getConstructionVersion(), "-"),
                 StrUtil.blankToDefault(construction.getTreadCode(), "-"),

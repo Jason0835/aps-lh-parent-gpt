@@ -74,6 +74,10 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
     private final TmScheduleQualitySummaryService qualitySummaryService =
             new TmScheduleQualitySummaryService();
 
+    /** 来源解释与最终目标关联构建组件。 */
+    private final TmScheduleExplainTargetRelationBuilder explainTargetRelationBuilder =
+            new TmScheduleExplainTargetRelationBuilder();
+
     /**
      * 创建胎面自动排程业务快照和落库步骤服务。
      *
@@ -196,7 +200,7 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
         context.getCompletedProcessSteps().add(TmScheduleStepEnum.SNAPSHOT_BUILD.getDesc());
         context.setCurrentProcessStep(null);
         context.appendProcessLog("步骤完成：快照与落库；自动排程批次成功完成，批次号={0}", context.getBatchNo());
-        context.appendFullProcessTrace(new ScheduleProcessTraceEvent(
+        context.appendTailFullProcessTrace(new ScheduleProcessTraceEvent(
                 "快照与落库", "批次级", "批次成功完成",
                 "结果表、未排表、解释表和本批次过程事件。",
                 "结果数量=" + (persistResult == null ? 0 : persistResult.getResultCount()) + "，未排数量="
@@ -252,7 +256,7 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
         BigDecimal unplannedQty = context.getTaskDraftList().stream().filter(this::isUnplannedTask)
                 .map(TmTaskDraft::getPlanQty).map(this::nvl).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal difference = sourceFinalPlanQty.subtract(assignedQty.add(unplannedQty));
-        context.appendFullProcessTrace(new ScheduleProcessTraceEvent(
+        context.appendTailFullProcessTrace(new ScheduleProcessTraceEvent(
                 "快照与落库", "批次级", "最终计划量数量守恒校验",
                 "来源任务最终计划量、已排任务片段和未排任务片段。",
                 "来源最终计划量=" + sourceFinalPlanQty + "米，已排量=" + assignedQty + "米，未排量="
@@ -345,10 +349,14 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
         List<TmScheduleResult> resultList = new ArrayList<>();
         List<TmTaskDraft> unplannedTaskList = new ArrayList<>();
         Map<TmScheduleResult, List<String>> resultBusinessKeyMap = new IdentityHashMap<>();
-        Map<String, TmTaskDraft> taskBusinessKeyMap = new LinkedHashMap<>();
+        Map<String, List<TmTaskDraft>> taskBusinessKeyMap = new LinkedHashMap<>();
         Map<String, Long> resultIdMap = new HashMap<>();
         Map<String, Long> unplannedIdMap = new HashMap<>();
         for (TmTaskDraft taskDraft : context.getTaskDraftList()) {
+            if (taskDraft != null && StrUtil.isNotBlank(taskDraft.getBusinessKey())) {
+                taskBusinessKeyMap.computeIfAbsent(taskDraft.getBusinessKey(), key -> new ArrayList<>())
+                        .add(taskDraft);
+            }
             if (isUnplannedTask(taskDraft)) {
                 unplannedTaskList.add(taskDraft);
             }
@@ -359,7 +367,12 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
                     .filter(Objects::nonNull)
                     .map(ScheduleTaskNode::getTask)
                     .filter(Objects::nonNull)
-                    .forEach(task -> taskBusinessKeyMap.putIfAbsent(task.getBusinessKey(), task));
+                    .forEach(task -> {
+                        TmPlanTaskGroup taskGroup = context.getPlanTaskGroupMap().get(task.getPlanGroupKey());
+                        List<TmTaskDraft> sourceTaskList = taskGroup == null
+                                ? Collections.singletonList(task) : taskGroup.getSourceTaskList();
+                        taskBusinessKeyMap.put(task.getBusinessKey(), sourceTaskList);
+                    });
             List<TmScheduleResult> chainResultList = persistService.convertChainToResult(chain, context);
             registerChainResultBusinessKey(nodeList, chainResultList, resultBusinessKeyMap);
             resultList.addAll(chainResultList);
@@ -403,16 +416,17 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
             persistResult.setUnplannedCount(unplannedList.size());
         }
         // 解释表落库统一批量写入，任何单行失败都会回滚整个最终事务。
+        Map<String, List<TmTaskDraft>> planGroupFragmentMap = this.buildPlanGroupFragmentMap(context);
         List<TmScheduleResultExplain> explainList = new ArrayList<>();
         for (TmTaskDraft taskDraft : this.resolveExplainTaskList(context)) {
             TmSnapshotBuildResult snapshot = context.getSnapshotMap().get(taskDraft.getBusinessKey());
             TmScheduleResultExplain explain = persistService.convertExplain(taskDraft, snapshot, context);
-            Long resultId = this.resolveSourceSingleResultId(taskDraft, context, resultIdMap);
+            Long resultId = this.resolveSourceSingleResultId(taskDraft, resultIdMap, planGroupFragmentMap);
             if (resultId != null) {
                 explain.setResultId(resultId);
             }
             explain.setFinalAssignmentJson(this.buildFinalAssignmentJson(
-                    taskDraft, context, resultIdMap, unplannedIdMap, finalResultMap));
+                    taskDraft, context, resultIdMap, unplannedIdMap, finalResultMap, planGroupFragmentMap));
             explainList.add(explain);
         }
         if (CollUtil.isNotEmpty(explainList)) {
@@ -420,8 +434,8 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
                     (explain, exception) -> this.buildExplainErrorMsg(null, exception));
             persistResult.setExplainCount(explainList.size());
         }
-        List<TmScheduleExplainTargetRel> targetRelList = this.buildExplainTargetRelList(
-                context, explainList, resultIdMap, unplannedIdMap);
+        List<TmScheduleExplainTargetRel> targetRelList = this.explainTargetRelationBuilder.build(
+                context, explainList, resultIdMap, unplannedIdMap, planGroupFragmentMap);
         if (CollUtil.isNotEmpty(targetRelList) && scheduleExplainTargetRelMapper != null) {
             this.batchSaveWithFallback(targetRelList, transactionStatus, "EXPLAIN_TARGET_REL",
                     (relation, exception) -> MessageFormat.format(
@@ -584,19 +598,37 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
     }
 
     /**
+     * 按计划组预聚合正计划量片段，供解释、最终分配和目标关联复用。
+     *
+     * @param context 本次排程上下文
+     * @return 以计划组键（可为空）为键、且保持任务原始顺序的片段索引
+     */
+    private Map<String, List<TmTaskDraft>> buildPlanGroupFragmentMap(TmScheduleContext context) {
+        Map<String, List<TmTaskDraft>> planGroupFragmentMap = new LinkedHashMap<>();
+        if (context == null || CollUtil.isEmpty(context.getTaskDraftList())) {
+            return planGroupFragmentMap;
+        }
+        context.getTaskDraftList().stream()
+                .filter(Objects::nonNull)
+                .filter(task -> this.isPositiveQty(task.getPlanQty()))
+                .forEach(task -> planGroupFragmentMap
+                        .computeIfAbsent(task.getPlanGroupKey(), key -> new ArrayList<>())
+                        .add(task));
+        return planGroupFragmentMap;
+    }
+
+    /**
      * 单一已排结果兼容回填旧 RESULT_ID。
      *
      * @param sourceTask 来源解释任务
-     * @param context 排程上下文
      * @param resultIdMap 任务业务键与结果主键映射
+     * @param planGroupFragmentMap 正计划量片段索引
      * @return 仅关联一个结果且没有未排片段时返回结果主键，否则返回空
      */
-    private Long resolveSourceSingleResultId(TmTaskDraft sourceTask, TmScheduleContext context,
-                                             Map<String, Long> resultIdMap) {
-        List<TmTaskDraft> groupFragmentList = context.getTaskDraftList().stream()
-                .filter(task -> Objects.equals(sourceTask.getPlanGroupKey(), task.getPlanGroupKey()))
-                .filter(task -> this.isPositiveQty(task.getPlanQty()))
-                .collect(java.util.stream.Collectors.toList());
+    private Long resolveSourceSingleResultId(TmTaskDraft sourceTask, Map<String, Long> resultIdMap,
+                                             Map<String, List<TmTaskDraft>> planGroupFragmentMap) {
+        List<TmTaskDraft> groupFragmentList = planGroupFragmentMap.getOrDefault(
+                sourceTask.getPlanGroupKey(), Collections.emptyList());
         if (groupFragmentList.stream().anyMatch(this::isUnplannedTask)) {
             return null;
         }
@@ -605,68 +637,6 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
                 .filter(Objects::nonNull)
                 .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
         return resultIdSet.size() == 1 ? resultIdSet.iterator().next() : null;
-    }
-
-    /**
-     * 构建来源解释与结果/未排片段关联记录。
-     *
-     * @param context 排程上下文
-     * @param explainList 已保存解释列表
-     * @param resultIdMap 任务业务键与结果主键映射
-     * @param unplannedIdMap 任务业务键与未排主键映射
-     * @return 关联记录列表
-     */
-    private List<TmScheduleExplainTargetRel> buildExplainTargetRelList(TmScheduleContext context,
-                                                                       List<TmScheduleResultExplain> explainList,
-                                                                       Map<String, Long> resultIdMap,
-                                                                       Map<String, Long> unplannedIdMap) {
-        Map<String, TmScheduleResultExplain> explainMap = explainList.stream()
-                .collect(java.util.stream.Collectors.toMap(TmScheduleResultExplain::getTaskBusinessKey,
-                        explain -> explain, (first, second) -> first, LinkedHashMap::new));
-        List<TmScheduleExplainTargetRel> relationList = new ArrayList<>();
-        for (TmPlanTaskGroup taskGroup : context.getPlanTaskGroupMap().values()) {
-            List<TmTaskDraft> fragmentList = context.getTaskDraftList().stream()
-                    .filter(task -> Objects.equals(taskGroup.getPlanGroupKey(), task.getPlanGroupKey()))
-                    .filter(task -> this.isPositiveQty(task.getPlanQty()))
-                    .collect(java.util.stream.Collectors.toList());
-            for (TmTaskDraft fragment : fragmentList) {
-                Map<String, BigDecimal> allocationMap = this.allocateByWeight(
-                        fragment.getPlanQty(), taskGroup.getSourceWeightMap());
-                for (Map.Entry<String, BigDecimal> allocationEntry : allocationMap.entrySet()) {
-                    if (!this.isPositiveQty(allocationEntry.getValue())) {
-                        continue;
-                    }
-                    TmScheduleResultExplain explain = explainMap.get(allocationEntry.getKey());
-                    if (explain == null) {
-                        continue;
-                    }
-                    TmScheduleExplainTargetRel relation = new TmScheduleExplainTargetRel();
-                    relation.setFactoryCode(context.getFactoryCode());
-                    relation.setBatchNo(context.getBatchNo());
-                    relation.setScheduleDate(context.getScheduleDate());
-                    relation.setExplainId(explain.getId());
-                    relation.setPlanGroupKey(taskGroup.getPlanGroupKey());
-                    relation.setSourceTaskBusinessKey(allocationEntry.getKey());
-                    boolean unplanned = this.isUnplannedTask(fragment);
-                    relation.setTargetType(unplanned ? "UNPLANNED" : "RESULT");
-                    Long targetId = unplanned
-                            ? unplannedIdMap.get(fragment.getBusinessKey())
-                            : resultIdMap.get(fragment.getBusinessKey());
-                    if (targetId == null) {
-                        throw new ServiceException(MessageFormat.format(
-                                I18nUtil.getMessage("ui.tm.schedule.explainTargetMissing"),
-                                fragment.getBusinessKey()));
-                    }
-                    relation.setTargetId(targetId);
-                    relation.setTargetBusinessKey(fragment.getBusinessKey());
-                    relation.setShiftOrder(fragment.getShiftOrder());
-                    relation.setMachineCode(fragment.getMachineCode());
-                    relation.setAllocatedQty(allocationEntry.getValue());
-                    relationList.add(relation);
-                }
-            }
-        }
-        return relationList;
     }
 
     /**
@@ -680,13 +650,15 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
      * @param resultIdMap 实际片段业务键与结果主键映射
      * @param unplannedIdMap 实际片段业务键与未排主键映射
      * @param finalResultMap 结果主键与最终可见结果映射
+     * @param planGroupFragmentMap 正计划量片段索引
      * @return 带版本号的最终分配JSON
      * @throws ServiceException 正计划量片段无法定位最终目标时抛出
      */
     private String buildFinalAssignmentJson(TmTaskDraft sourceTask, TmScheduleContext context,
                                             Map<String, Long> resultIdMap,
                                             Map<String, Long> unplannedIdMap,
-                                            Map<Long, TmScheduleResult> finalResultMap) {
+                                            Map<Long, TmScheduleResult> finalResultMap,
+                                            Map<String, List<TmTaskDraft>> planGroupFragmentMap) {
         Map<String, Object> root = new LinkedHashMap<>();
         root.put("schemaVersion", "1");
         List<Map<String, Object>> assignmentList = new ArrayList<>();
@@ -699,11 +671,7 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
                 ? null : context.getPlanTaskGroupMap().get(sourceTask.getPlanGroupKey());
         List<TmTaskDraft> fragmentList = taskGroup == null
                 ? Collections.singletonList(sourceTask)
-                : context.getTaskDraftList().stream()
-                .filter(Objects::nonNull)
-                .filter(fragment -> Objects.equals(taskGroup.getPlanGroupKey(), fragment.getPlanGroupKey()))
-                .filter(fragment -> this.isPositiveQty(fragment.getPlanQty()))
-                .collect(java.util.stream.Collectors.toList());
+                : planGroupFragmentMap.getOrDefault(taskGroup.getPlanGroupKey(), Collections.emptyList());
         Map<String, BigDecimal> sourceWeightMap = taskGroup == null
                 ? Collections.singletonMap(sourceTask.getBusinessKey(), BigDecimal.ONE)
                 : taskGroup.getSourceWeightMap();
@@ -854,13 +822,17 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
      */
     private void aggregateResultSnapshot(TmScheduleResult result,
                                          Map<TmScheduleResult, List<String>> mergedResultBusinessKeyMap,
-                                         Map<String, TmTaskDraft> taskBusinessKeyMap) {
+                                         Map<String, List<TmTaskDraft>> taskBusinessKeyMap) {
         List<String> businessKeyList = mergedResultBusinessKeyMap.get(result);
         if (CollUtil.isEmpty(businessKeyList) || CollUtil.isEmpty(taskBusinessKeyMap)) {
             return;
         }
         List<TmTaskDraft> sourceTaskList = businessKeyList.stream()
+                .filter(StrUtil::isNotBlank)
+                .distinct()
                 .map(taskBusinessKeyMap::get)
+                .filter(Objects::nonNull)
+                .flatMap(List::stream)
                 .filter(Objects::nonNull)
                 .collect(java.util.stream.Collectors.toList());
         TmScheduleResultSnapshotAssembler.assemble(result, sourceTaskList);

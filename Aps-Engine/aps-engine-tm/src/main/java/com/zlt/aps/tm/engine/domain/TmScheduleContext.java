@@ -132,11 +132,8 @@ public class TmScheduleContext {
     /** 单任务候选机台过滤和评分快照，key=任务业务键 */
     private Map<String, List<TmMachineCandidate>> candidateTraceMap = new HashMap<>();
 
-    /** 待按最终任务链输出的任务关联过程日志。 */
-    private List<TmTaskProcessLogEntry> deferredTaskProcessLogList = new ArrayList<>();
-
-    /** 任务关联过程日志的原始发生序号。 */
-    private Long deferredTaskProcessLogSequence = 0L;
+    /** 待按最终任务链输出的任务关联过程日志队列。 */
+    private final TmTaskProcessLogQueue taskProcessLogQueue = new TmTaskProcessLogQueue();
 
     /** 班次小时数映射，key=班次顺序(1~6)，来自 T_TM_SHIFT_CONFIG */
     private Map<Integer, BigDecimal> shiftHoursMap = new HashMap<>();
@@ -234,6 +231,15 @@ public class TmScheduleContext {
      */
     public void appendFullProcessTrace(ScheduleProcessTraceEvent event) {
         this.getOrCreateProcessTraceBuffer().appendFull(event);
+    }
+
+    /**
+     * 追加必须在所有班次日志之后输出的完整中文过程事件。
+     *
+     * @param event 完整过程事件
+     */
+    public void appendTailFullProcessTrace(ScheduleProcessTraceEvent event) {
+        this.getOrCreateProcessTraceBuffer().appendTailFull(event);
     }
 
     /**
@@ -346,14 +352,7 @@ public class TmScheduleContext {
      */
     private void appendDeferredTaskProcessLogByCategory(String taskBusinessKey, Integer shiftOrder,
                                                         String logCategory, String format, Object... args) {
-        TmTaskProcessLogEntry entry = new TmTaskProcessLogEntry();
-        entry.setTaskBusinessKey(taskBusinessKey);
-        entry.setShiftOrder(shiftOrder);
-        entry.setLogCategory(logCategory);
-        entry.setOccurrenceOrder(this.nextDeferredTaskProcessLogSequence());
-        entry.setFormat(format);
-        entry.setArgs(args == null ? new Object[0] : args.clone());
-        this.getOrCreateDeferredTaskProcessLogList().add(entry);
+        this.taskProcessLogQueue.appendSummary(taskBusinessKey, shiftOrder, logCategory, format, args);
     }
 
     /**
@@ -368,13 +367,8 @@ public class TmScheduleContext {
         if (event == null) {
             return;
         }
-        TmTaskProcessLogEntry entry = new TmTaskProcessLogEntry();
-        entry.setTaskBusinessKey(taskBusinessKey);
-        entry.setShiftOrder(shiftOrder);
-        entry.setLogCategory(TmTaskProcessLogEntry.CATEGORY_MACHINE_ASSIGN);
-        entry.setOccurrenceOrder(this.nextDeferredTaskProcessLogSequence());
-        entry.setFullEvent(event);
-        this.getOrCreateDeferredTaskProcessLogList().add(entry);
+        this.taskProcessLogQueue.appendFull(taskBusinessKey, shiftOrder,
+                TmTaskProcessLogEntry.CATEGORY_MACHINE_ASSIGN, event);
     }
 
     /**
@@ -414,7 +408,7 @@ public class TmScheduleContext {
         if (task == null || StrUtil.isBlank(task.getBusinessKey())) {
             return;
         }
-        this.getOrCreateDeferredTaskProcessLogList().stream()
+        this.taskProcessLogQueue.getEntries().stream()
                 .filter(entry -> !entry.isRendered())
                 .filter(entry -> task.getBusinessKey().equals(entry.getTaskBusinessKey()))
                 .filter(entry -> this.isLogCategory(entry, logCategory))
@@ -430,7 +424,7 @@ public class TmScheduleContext {
      * 无任务链节点的日志按原始发生顺序稳定兜底，确保异常前已发生过程不丢失。</p>
      */
     public void flushRemainingDeferredTaskProcessLogs() {
-        this.getOrCreateDeferredTaskProcessLogList().stream()
+        this.taskProcessLogQueue.getEntries().stream()
                 .filter(entry -> !entry.isRendered())
                 .sorted(this.buildDeferredTaskProcessLogComparator())
                 .forEach(this::renderDeferredTaskProcessLog);
@@ -451,7 +445,7 @@ public class TmScheduleContext {
      * @param shiftOrder 班次顺序；为空时输出全部班次
      */
     public void flushRemainingDeferredToolProcessLogs(Integer shiftOrder) {
-        this.getOrCreateDeferredTaskProcessLogList().stream()
+        this.taskProcessLogQueue.getEntries().stream()
                 .filter(entry -> !entry.isRendered())
                 .filter(entry -> TmTaskProcessLogEntry.CATEGORY_TOOL_LEDGER_SETTLEMENT.equals(entry.getLogCategory()))
                 .filter(entry -> shiftOrder == null || Objects.equals(shiftOrder, entry.getShiftOrder()))
@@ -477,7 +471,7 @@ public class TmScheduleContext {
      * @param shiftOrder 班次顺序；为空时输出全部班次
      */
     public void flushRemainingDeferredMachineProcessLogs(Integer shiftOrder) {
-        this.getOrCreateDeferredTaskProcessLogList().stream()
+        this.taskProcessLogQueue.getEntries().stream()
                 .filter(entry -> !entry.isRendered())
                 .filter(entry -> this.isLogCategory(entry, TmTaskProcessLogEntry.CATEGORY_CAPACITY_DEDUCTION))
                 .filter(entry -> shiftOrder == null || Objects.equals(shiftOrder, entry.getShiftOrder()))
@@ -513,7 +507,7 @@ public class TmScheduleContext {
         if (ScheduleProcessLogLevel.OFF == this.getProcessLogLevel()) {
             return bufferedEventCount;
         }
-        long pendingEventCount = this.getOrCreateDeferredTaskProcessLogList().stream()
+        long pendingEventCount = this.taskProcessLogQueue.getEntries().stream()
                 .filter(entry -> !entry.isRendered())
                 .filter(entry -> ScheduleProcessLogLevel.FULL == this.getProcessLogLevel()
                         || entry.getFullEvent() == null)
@@ -532,28 +526,6 @@ public class TmScheduleContext {
     }
 
     /**
-     * 获取任务关联过程日志集合，兼容测试注入或反序列化后的空集合。
-     *
-     * @return 非空任务关联过程日志集合
-     */
-    private List<TmTaskProcessLogEntry> getOrCreateDeferredTaskProcessLogList() {
-        if (this.deferredTaskProcessLogList == null) {
-            this.deferredTaskProcessLogList = new ArrayList<>();
-        }
-        return this.deferredTaskProcessLogList;
-    }
-
-    /**
-     * 获取下一个任务关联日志发生序号。
-     *
-     * @return 从 1 开始递增的发生序号
-     */
-    private long nextDeferredTaskProcessLogSequence() {
-        this.deferredTaskProcessLogSequence = Optional.ofNullable(this.deferredTaskProcessLogSequence).orElse(0L) + 1L;
-        return this.deferredTaskProcessLogSequence;
-    }
-
-    /**
      * 构建未输出任务日志的稳定排序器。
      *
      * @return 按班次、是否已排、机台、任务链序号和发生顺序排序的比较器
@@ -566,17 +538,31 @@ public class TmScheduleContext {
         Comparator<TmTaskProcessLogEntry> taskComparator = this.buildTaskDisplayOrderComparator();
         return Comparator.comparingInt((TmTaskProcessLogEntry entry) ->
                         this.resolveTaskProcessLogSection(entry).ordinal())
-                .thenComparing((left, right) -> {
-                    boolean leftIsTool = this.isToolLedgerStage(left);
-                    boolean rightIsTool = this.isToolLedgerStage(right);
-                    if (leftIsTool && rightIsTool) {
-                        return toolLedgerComparator.compare(left, right);
-                    }
-                    if (!leftIsTool && !rightIsTool) {
-                        return taskComparator.compare(left, right);
-                    }
-                    return 0;
-                });
+                .thenComparing((left, right) -> this.compareDeferredTaskProcessLogEntry(
+                        left, right, toolLedgerComparator, taskComparator));
+    }
+
+    /**
+     * 在同一过程日志分区内按业务类别比较两条延后任务日志。
+     *
+     * @param left 左侧日志条目
+     * @param right 右侧日志条目
+     * @param toolLedgerComparator 工装阶段排序器
+     * @param taskComparator 普通任务展示排序器
+     * @return 比较结果；工装与普通任务混合时保留上层分区和原始发生顺序
+     */
+    private int compareDeferredTaskProcessLogEntry(TmTaskProcessLogEntry left, TmTaskProcessLogEntry right,
+                                                   Comparator<TmTaskProcessLogEntry> toolLedgerComparator,
+                                                   Comparator<TmTaskProcessLogEntry> taskComparator) {
+        boolean leftIsTool = this.isToolLedgerStage(left);
+        boolean rightIsTool = this.isToolLedgerStage(right);
+        if (leftIsTool && rightIsTool) {
+            return toolLedgerComparator.compare(left, right);
+        }
+        if (!leftIsTool && !rightIsTool) {
+            return taskComparator.compare(left, right);
+        }
+        return 0;
     }
 
     /**
@@ -628,6 +614,7 @@ public class TmScheduleContext {
                 .filter(Objects::nonNull)
                 .filter(task -> entry.getTaskBusinessKey().equals(task.getBusinessKey()))
                 .map(TmTaskDraft::getToolLedgerOrder)
+                .filter(Objects::nonNull)
                 .findFirst()
                 .orElse(null);
     }

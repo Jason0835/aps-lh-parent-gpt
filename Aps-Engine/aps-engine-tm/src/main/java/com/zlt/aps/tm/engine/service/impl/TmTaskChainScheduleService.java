@@ -3,6 +3,7 @@ package com.zlt.aps.tm.engine.service.impl;
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.StrUtil;
 import com.ruoyi.common.exception.ServiceException;
+import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.common.engine.schedule.ScheduleChainChangeResult;
 import com.zlt.aps.common.engine.schedule.ScheduleOperationContext;
 import com.zlt.aps.common.engine.schedule.ScheduleTaskLinkedList;
@@ -10,6 +11,7 @@ import com.zlt.aps.common.engine.schedule.ScheduleTaskNode;
 import com.zlt.aps.tm.api.constant.TmScheduleConstants;
 import com.zlt.aps.tm.api.enums.TmScheduleErrorCodeEnum;
 import com.zlt.aps.tm.engine.domain.*;
+import com.zlt.aps.tm.engine.util.TmSwitchCapacityCalculator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -201,7 +203,7 @@ public class TmTaskChainScheduleService {
         String sourceMachineCode = sourceNode.getMachineCode();
         sourceNode.setMachineCode(targetMachineCode);
         sourceNode.setShiftOrder(position.getShiftOrder());
-        sourceNode.setShiftCode("CLASS" + position.getShiftOrder());
+        sourceNode.setShiftCode(TmScheduleConstants.SHIFT_CODE_PREFIX + position.getShiftOrder());
         ScheduleTaskNode<TmTaskDraft> anchorNode = targetChain.findByTaskId(position.getAnchorTaskId());
 
         // 执行跨链转移
@@ -346,7 +348,8 @@ public class TmTaskChainScheduleService {
                     : previousTask.getGlueCode();
             BigDecimal glueSwitchCapacityDeduct = this.resolveGlueSwitchCapacityDeduct(context, previousTask,
                     externalPredecessor, currentTask);
-            BigDecimal glueSwitchHours = this.convertCapacityDeductToHours(glueSwitchCapacityDeduct, machineSpeed);
+            BigDecimal glueSwitchHours = TmSwitchCapacityCalculator.convertCapacityDeductToHours(
+                    glueSwitchCapacityDeduct, machineSpeed);
             if (currentTask != null) {
                 currentTask.setPreviousSpecSwitchHours(specSwitchHours);
                 currentTask.setPreviousGlueSwitchHours(glueSwitchHours);
@@ -487,22 +490,6 @@ public class TmTaskChainScheduleService {
     }
 
     /**
-     * 将固定产能扣减量按当前任务速度折算为切换小时数。
-     *
-     * @param capacityDeduct 固定产能扣减量
-     * @param machineSpeed 当前任务机台速度
-     * @return 切换小时数；速度无效时返回0
-     */
-    private BigDecimal convertCapacityDeductToHours(BigDecimal capacityDeduct, BigDecimal machineSpeed) {
-        if (this.nvl(capacityDeduct).compareTo(BigDecimal.ZERO) <= 0
-                || this.nvl(machineSpeed).compareTo(BigDecimal.ZERO) <= 0) {
-            return BigDecimal.ZERO;
-        }
-        return capacityDeduct.divide(machineSpeed, TmScheduleConstants.DECIMAL_CALCULATION_SCALE,
-                RoundingMode.HALF_UP);
-    }
-
-    /**
      * 将切换分钟数参数转换为小时数。
      *
      * @param context   排程上下文
@@ -574,13 +561,13 @@ public class TmTaskChainScheduleService {
      * @return 非空数值
      */
     private BigDecimal nvl(BigDecimal value) {
-        return value == null ? BigDecimal.ZERO : value;
+        return BigDecimalUtils.valueOf(value);
     }
 
     private ScheduleTaskNode<TmTaskDraft> toNode(TmTaskDraft task, String machineCode, Integer shiftOrder,
                                                 TmScheduleContext context) {
         return new ScheduleTaskNode<>(task.getBusinessKey(), task, machineCode, toLocalDate(context),
-                "CLASS" + shiftOrder, shiftOrder, task.getPlanQty());
+                TmScheduleConstants.SHIFT_CODE_PREFIX + shiftOrder, shiftOrder, task.getPlanQty());
     }
 
     /**

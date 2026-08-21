@@ -1,142 +1,323 @@
 <template>
   <el-dialog
+    :append-to-body="true"
+    :close-on-press-escape="false"
+    :title="title"
     :close-on-click-modal="false"
-    :title="$t('ui.tc.schedule.changeQty')"
-    :visible.sync="visible"
-    append-to-body
-    width="560px"
+    :visible="visible"
+    width="1000px"
+    @close="hide"
   >
-    <el-form ref="form" :model="form" :rules="rules" label-width="125px">
-      <el-form-item :label="$t('ui.tc.schedule.sidewallCode')">
-        {{ row.sidewallCode || '-' }}
-      </el-form-item>
-      <el-form-item :label="$t('ui.tc.schedule.machineCode')">
-        {{ row.machineCode || '-' }}
-      </el-form-item>
-      <el-form-item :label="$t('ui.tc.schedule.shiftOrder')" prop="shiftOrder">
-        <el-select v-model="form.shiftOrder" filterable style="width:100%" @change="handleShiftChange">
-          <el-option
-            v-for="item in availableShifts"
-            :key="item.shiftOrder"
-            :label="item.label"
-            :value="item.shiftOrder"
-          />
-        </el-select>
-      </el-form-item>
-      <el-form-item :label="$t('ui.tc.schedule.finishQty')">
-        {{ currentFinishQty }}
-      </el-form-item>
-      <el-form-item :label="$t('ui.tc.schedule.newPlanQty')" prop="newPlanQty">
-        <el-input-number
-          v-model="form.newPlanQty"
-          :min="Number(currentFinishQty || 0)"
-          :precision="2"
-          controls-position="right"
-          style="width:100%"
-        />
-      </el-form-item>
-      <el-form-item :label="$t('ui.tc.schedule.reason')" prop="reason">
-        <el-input v-model.trim="form.reason" :rows="3" maxlength="200" show-word-limit type="textarea" />
-      </el-form-item>
-    </el-form>
-    <span slot="footer">
-      <el-button @click="visible = false">{{ $t('ui.tc.schedule.cancel') }}</el-button>
-      <el-button :loading="submitting" type="primary" @click="submit">{{ $t('ui.tc.schedule.confirm') }}</el-button>
-    </span>
+    <info-form
+      ref="form"
+      v-loading="loading"
+      :columns="columns"
+      :form="form"
+      :rules="rules"
+      class="form-item-height"
+      label-position="right"
+      label-width="160px"
+    />
+    <template slot="footer">
+      <el-button @click="hide">{{ $t('common.button.cancel') }}</el-button>
+      <el-button :loading="loading" type="primary" @click="handleConfirm">
+        {{ $t('common.button.confirm') }}
+      </el-button>
+    </template>
   </el-dialog>
 </template>
 
 <script>
-import {changeQty, getManualOptions} from '@/api/tc/tcScheduleResult'
+import InfoForm from '@/views/components/infoForm.vue'
+import {changeQty} from '@/api/tc/tcScheduleResult'
 import {resolveErrorMessage} from '@/utils/errorMessage'
+
+const MAX_SHIFT_ORDER = 6
+const CHANGE_QTY_EDITABLE_FIELDS = Array.from({ length: MAX_SHIFT_ORDER }, (item, index) => {
+  const shiftOrder = index + 1
+  return [`class${shiftOrder}PlanQty`, `class${shiftOrder}Analysis`]
+}).reduce((fieldList, shiftFields) => fieldList.concat(shiftFields), [])
 
 export default {
   name: 'TcChangeQtyDialog',
+  components: { InfoForm },
+  inject: ['parentDict'],
   data() {
     return {
+      loading: false,
       visible: false,
-      submitting: false,
-      row: {},
-      shiftOptions: [],
-      form: {
-        shiftOrder: undefined,
-        newPlanQty: 0,
-        reason: ''
-      },
+      form: {},
+      originalForm: {},
       rules: {
-        shiftOrder: [{ required: true, message: this.$t('ui.tc.schedule.shiftRequired'), trigger: 'change' }],
-        newPlanQty: [{ required: true, message: this.$t('ui.tc.schedule.qtyRequired'), trigger: 'blur' }],
-        reason: [{ required: true, message: this.$t('ui.tc.schedule.reasonRequired'), trigger: 'blur' }]
+        remark: [
+          {
+            required: true,
+            message: this.$t('ui.tc.schedule.reasonRequired'),
+            trigger: 'blur'
+          }
+        ]
       }
     }
   },
   computed: {
-    availableShifts() {
-      return Array.from({ length: 6 }, (item, index) => index + 1)
-        .filter(shiftOrder => Number(this.row[`class${shiftOrder}PlanQty`] || 0) > 0)
-        // 历史未开班次仍允许减量或清零，是否加量由后端按机台开机班次最终校验。
-        .filter(shiftOrder => this.shiftOptions.some(item => item.shiftOrder === shiftOrder))
-        .map(shiftOrder => {
-          const option = this.shiftOptions.find(item => item.shiftOrder === shiftOrder)
-          return {
-            shiftOrder,
-            label: option ? `${shiftOrder}. ${option.shiftName || option.shiftCode || ''}` : `${this.$t('ui.tc.schedule.shift')} ${shiftOrder}`
-          }
-        })
+    title() {
+      return `${this.$t('ui.data.column.scheduleResult.changePlan')}${this.$t('ui.data.column.tc.scheduleResult.modelName')}`
     },
-    currentFinishQty() {
-      if (!this.form.shiftOrder) return 0
-      return Number(this.row[`class${this.form.shiftOrder}FinishQty`] || 0)
+    columns() {
+      const columns = [
+        {
+          prop: 'factoryCode',
+          label: this.$t('ui.data.column.tm.scheduleResult.factoryCode'),
+          type: 'select',
+          span: 12,
+          dictData: this.parentDict.type.biz_factory_name,
+          filterable: true
+        },
+        {
+          prop: 'batchNo',
+          label: this.$t('ui.data.column.tm.scheduleResult.batchNo'),
+          span: 12
+        },
+        {
+          prop: 'orderNo',
+          label: this.$t('ui.data.column.tm.scheduleResult.orderNo'),
+          span: 12
+        },
+        {
+          prop: 'scheduleDate',
+          label: this.$t('ui.data.column.tm.scheduleResult.scheduleDate'),
+          type: 'date',
+          span: 12,
+          valueFormat: 'yyyy-MM-dd'
+        },
+        {
+          prop: 'machineCode',
+          label: this.$t('ui.data.column.tm.scheduleResult.machineCode'),
+          span: 12
+        },
+        {
+          prop: 'sidewallCode',
+          label: this.$t('ui.data.column.tc.scheduleResult.sidewallCode'),
+          span: 12,
+          maxlength: 50
+        },
+        {
+          prop: 'sidewallCraft',
+          label: this.$t('ui.tc.schedule.sidewallCraft'),
+          span: 12
+        },
+        {
+          prop: 'glueCode',
+          label: this.$t('ui.data.column.tm.scheduleResult.glueCode'),
+          span: 12,
+          maxlength: 50
+        },
+        {
+          prop: 'baseGlueCode',
+          label: this.$t('ui.tc.schedule.baseGlueCode'),
+          span: 12,
+          maxlength: 50
+        },
+        {
+          prop: 'wholeGlueCode',
+          label: this.$t('ui.data.column.tm.scheduleResult.wholeGlueCode'),
+          span: 12,
+          maxlength: 100
+        },
+        {
+          prop: 'glueSeq',
+          label: this.$t('ui.data.column.tm.scheduleResult.glueSeq'),
+          span: 12,
+          maxlength: 50
+        },
+        {
+          prop: 'mouthPlateCode',
+          label: this.$t('ui.data.column.tm.scheduleResult.mouthPlateCode'),
+          span: 12,
+          maxlength: 50
+        },
+        {
+          prop: 'releaseStatus',
+          label: this.$t('ui.data.column.tm.scheduleResult.releaseStatus'),
+          type: 'select',
+          span: 12,
+          dictData: this.parentDict.type.IS_RELEASE,
+          filterable: true
+        },
+        {
+          prop: 'dataSource',
+          label: this.$t('ui.data.column.tm.scheduleResult.dataSource'),
+          span: 12
+        },
+        {
+          prop: 'tailFlag',
+          label: this.$t('ui.data.column.tm.scheduleResult.tailFlag'),
+          span: 12
+        }
+      ]
+
+      for (let shiftOrder = 1; shiftOrder <= MAX_SHIFT_ORDER; shiftOrder += 1) {
+        columns.push(
+          {
+            label: this.$t(`ui.data.column.tm.scheduleResult.class${shiftOrder}Sequence`),
+            span: 24,
+            type: 'group'
+          },
+          {
+            prop: `class${shiftOrder}Sequence`,
+            label: this.$t(`ui.data.column.tm.scheduleResult.class${shiftOrder}Sequence`),
+            span: 8,
+            type: 'number'
+          },
+          {
+            prop: `class${shiftOrder}StartTime`,
+            label: this.$t(`ui.data.column.tm.scheduleResult.class${shiftOrder}StartTime`),
+            span: 8,
+            type: 'date',
+            dateType: 'datetime',
+            valueFormat: 'yyyy-MM-dd HH:mm:ss'
+          },
+          {
+            prop: `class${shiftOrder}EndTime`,
+            label: this.$t(`ui.data.column.tm.scheduleResult.class${shiftOrder}EndTime`),
+            span: 8,
+            type: 'date',
+            dateType: 'datetime',
+            valueFormat: 'yyyy-MM-dd HH:mm:ss'
+          },
+          {
+            prop: `class${shiftOrder}PlanQty`,
+            label: this.$t(`ui.data.column.tm.scheduleResult.class${shiftOrder}PlanQty`),
+            span: 8,
+            type: 'number',
+            min: 0
+          },
+          {
+            prop: `class${shiftOrder}FinishQty`,
+            label: this.$t(`ui.data.column.tm.scheduleResult.class${shiftOrder}FinishQty`),
+            span: 8,
+            type: 'number'
+          },
+          {
+            prop: `class${shiftOrder}Analysis`,
+            label: this.$t(`ui.data.column.tm.scheduleResult.class${shiftOrder}Analysis`),
+            span: 8,
+            maxlength: 200
+          }
+        )
+      }
+
+      columns.push({
+        prop: 'remark',
+        label: this.$t('ui.data.column.tm.scheduleResult.remark'),
+        span: 24,
+        type: 'textarea',
+        rows: 3,
+        maxlength: 500
+      })
+
+      return columns.map(column => ({
+        ...column,
+        disabled: column.prop !== 'remark' && !CHANGE_QTY_EDITABLE_FIELDS.includes(column.prop)
+      }))
     }
   },
   methods: {
-    async show(row) {
-      this.row = { ...row }
-      this.form = { shiftOrder: undefined, newPlanQty: 0, reason: '' }
-      this.shiftOptions = []
+    /**
+     * 打开胎侧修改表单并回填排程结果数据。
+     *
+     * @param {Object} row 待修改的胎侧排程结果
+     * @returns {void}
+     */
+    show(row) {
       this.visible = true
+      this.form = {
+        ...row,
+        remark: ''
+      }
+      this.originalForm = { ...row }
+      this.$nextTick(() => this.$refs.form && this.$refs.form.triggerResetForm())
+    },
+    /**
+     * 关闭修改弹窗并清理表单状态。
+     *
+     * @returns {void}
+     */
+    hide() {
+      this.form = {}
+      this.originalForm = {}
+      if (this.$refs.form) {
+        this.$refs.form.triggerResetForm()
+      }
+      this.visible = false
+    },
+    /**
+     * 比较表单与原始排程结果，定位本次修改的唯一班次。
+     *
+     * @returns {Array<number>} 发生计划量或原因分析变化的班次
+     */
+    getChangedShiftOrders() {
+      return Array.from({ length: MAX_SHIFT_ORDER }, (item, index) => index + 1)
+        .filter(shiftOrder => {
+          const fieldPrefix = `class${shiftOrder}`
+          const oldPlanQty = Number(this.originalForm[`${fieldPrefix}PlanQty`] || 0)
+          const newPlanQty = Number(this.form[`${fieldPrefix}PlanQty`] || 0)
+          const oldAnalysis = this.originalForm[`${fieldPrefix}Analysis`] || ''
+          const newAnalysis = this.form[`${fieldPrefix}Analysis`] || ''
+          return oldPlanQty !== newPlanQty || oldAnalysis !== newAnalysis
+        })
+    },
+    /**
+     * 校验计划量不低于已完成量，并提交 TC 单班次调量请求。
+     *
+     * @param {Object} params 已通过表单校验的修改参数
+     * @returns {Promise<void>} 提交完成
+     */
+    async save(params) {
+      const changedShiftOrders = this.getChangedShiftOrders()
+      if (changedShiftOrders.length !== 1) {
+        this.$modal.alertWarning(this.$t('ui.tc.schedule.changeQty.singleShiftOnly'))
+        return
+      }
+
+      const shiftOrder = changedShiftOrders[0]
+      const finishQty = Number(this.form[`class${shiftOrder}FinishQty`] || 0)
+      const newPlanQty = Number(params[`class${shiftOrder}PlanQty`] || 0)
+      if (newPlanQty < finishQty) {
+        this.$modal.alertWarning(this.$t('ui.tc.schedule.qtyBelowFinish'))
+        return
+      }
+
       try {
-        const data = await getManualOptions({ factoryCode: row.factoryCode, scheduleDate: row.scheduleDate })
-        this.shiftOptions = data.shiftList || []
+        this.loading = true
+        const task = await changeQty({
+          resultId: this.form.id,
+          shiftOrder,
+          newPlanQty,
+          newAnalysis: params[`class${shiftOrder}Analysis`] || '',
+          expectedTaskVersion: this.form.currentTaskVersion == null
+            ? this.form.taskVersion
+            : this.form.currentTaskVersion,
+          reason: params.remark
+        })
+        this.$emit('success', task)
+        this.hide()
       } catch (error) {
         this.$modal.alertError(resolveErrorMessage(
           error,
           this.$t('ui.tc.schedule.operationFailed')
         ))
       } finally {
-        this.$nextTick(() => this.$refs.form && this.$refs.form.clearValidate())
+        this.loading = false
       }
     },
-    handleShiftChange(shiftOrder) {
-      this.form.newPlanQty = Number(this.row[`class${shiftOrder}PlanQty`] || 0)
-    },
-    submit() {
-      this.$refs.form.validate(async valid => {
-        if (!valid) return
-        if (Number(this.form.newPlanQty) < this.currentFinishQty) {
-          this.$modal.alertWarning(this.$t('ui.tc.schedule.qtyBelowFinish'))
-          return
-        }
-        this.submitting = true
-        try {
-          const task = await changeQty({
-            resultId: this.row.id,
-            shiftOrder: this.form.shiftOrder,
-            newPlanQty: this.form.newPlanQty,
-            expectedTaskVersion: this.row.taskVersion,
-            reason: this.form.reason
-          })
-          this.visible = false
-          this.$emit('success', task)
-        } catch (error) {
-          this.$modal.alertError(resolveErrorMessage(
-            error,
-            this.$t('ui.tc.schedule.operationFailed')
-          ))
-        } finally {
-          this.submitting = false
-        }
-      })
+    /**
+     * 执行表单校验并提交修改。
+     *
+     * @returns {void}
+     */
+    handleConfirm() {
+      this.$refs.form.triggerConfirm(this.save)
     }
   }
 }

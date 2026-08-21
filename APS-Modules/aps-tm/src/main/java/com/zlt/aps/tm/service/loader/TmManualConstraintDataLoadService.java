@@ -1,6 +1,5 @@
 package com.zlt.aps.tm.service.loader;
 
-import cn.hutool.core.date.DateUnit;
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -11,7 +10,6 @@ import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.common.engine.schedule.constraint.ScheduleConstraintConfig;
 import com.zlt.aps.tm.api.constant.TmScheduleConstants;
 import com.zlt.aps.tm.api.domain.entity.*;
-import com.zlt.aps.tm.api.enums.TmYesNoEnum;
 import com.zlt.aps.tm.engine.domain.TmParamValue;
 import com.zlt.aps.tm.engine.domain.TmScheduleContext;
 import com.zlt.aps.tm.engine.domain.manual.TmManualRollingCommand;
@@ -24,7 +22,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -88,13 +85,13 @@ public class TmManualConstraintDataLoadService {
         if (context == null || StrUtil.isBlank(context.getFactoryCode()) || context.getScheduleDate() == null) {
             throw new IllegalArgumentException("胎面人工滚动约束上下文不能为空");
         }
-        Set<String> machineCodeSet = Optional.ofNullable(machineCodeList).orElse(new ArrayList<>()).stream()
+        Set<String> machineCodeSet = Optional.ofNullable(machineCodeList).orElse(Collections.emptyList()).stream()
                 .filter(StrUtil::isNotBlank)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
         Map<String, TmParamValue> paramMap = this.loadParamMap(context.getFactoryCode());
-        BigDecimal defaultSpeed = this.getParamValue(paramMap,
+        BigDecimal defaultSpeed = this.getEffectiveDecimal(paramMap,
                 TmScheduleConstants.PARAM_DEFAULT_PRODUCTION_SPEED);
-        BigDecimal defaultCurlLength = this.getParamValue(paramMap,
+        BigDecimal defaultCurlLength = this.getEffectiveDecimal(paramMap,
                 TmScheduleConstants.PARAM_DEFAULT_CURL_LENGTH);
         context.setConstraintConfig(this.buildConstraintConfig(paramMap));
 
@@ -109,7 +106,7 @@ public class TmManualConstraintDataLoadService {
                 defaultSpeed, defaultCurlLength);
         context.setMaintenanceHoursMap(this.loadMaintenanceHoursMap(context, machineCodeSet));
         context.setPredecessorTaskMap(this.loadPredecessorTaskMap(context, machineCodeSet));
-        BigDecimal totalToolQty = this.getParamValue(paramMap, TmScheduleConstants.PARAM_TOOL_TOTAL_QTY);
+        BigDecimal totalToolQty = this.getEffectiveDecimal(paramMap, TmScheduleConstants.PARAM_TOOL_TOTAL_QTY);
         if (this.isPositive(totalToolQty)) {
             context.setTotalToolQty(totalToolQty);
             context.setInitialAvailableToolQty(this.resolveFinalToolLedgerBalance(context));
@@ -138,9 +135,9 @@ public class TmManualConstraintDataLoadService {
      */
     private ScheduleConstraintConfig buildConstraintConfig(Map<String, TmParamValue> paramMap) {
         ScheduleConstraintConfig config = new ScheduleConstraintConfig();
-        config.setSpecChangeMinutes(this.getParamValue(paramMap,
+        config.setSpecChangeMinutes(this.getEffectiveDecimal(paramMap,
                 TmScheduleConstants.PARAM_SPEC_CHANGE_MINUTES));
-        config.setGlueChangeCapacityDeduct(this.getParamValue(paramMap,
+        config.setGlueChangeCapacityDeduct(this.getEffectiveDecimal(paramMap,
                 TmScheduleConstants.PARAM_GLUE_CHANGE_CAPACITY_DEDUCT));
         return config;
     }
@@ -161,7 +158,7 @@ public class TmManualConstraintDataLoadService {
         LambdaQueryWrapper<TmMachineSpeed> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(TmMachineSpeed::getFactoryCode, factoryCode);
         List<TmMachineSpeed> speedList = Optional.ofNullable(tmMachineSpeedMapper.selectList(wrapper))
-                .orElse(new ArrayList<>());
+                .orElse(Collections.emptyList());
         Map<String, BigDecimal> globalTreadSpeedMap = new LinkedHashMap<>();
         Map<String, BigDecimal> machineDefaultSpeedMap = new LinkedHashMap<>();
         Map<String, BigDecimal> machineTreadSpeedMap = new LinkedHashMap<>();
@@ -237,7 +234,7 @@ public class TmManualConstraintDataLoadService {
         wrapper.eq(TmMachineMaintenance::getFactoryCode, context.getFactoryCode());
         wrapper.in(TmMachineMaintenance::getMachineCode, machineCodeSet);
         List<TmMachineMaintenance> maintenanceList =
-                Optional.ofNullable(tmMachineMaintenanceMapper.selectList(wrapper)).orElse(new ArrayList<>());
+                Optional.ofNullable(tmMachineMaintenanceMapper.selectList(wrapper)).orElse(Collections.emptyList());
         maintenanceList.stream()
                 .filter(maintenance -> maintenance != null
                         && maintenance.getStopStartTime() != null && maintenance.getStopEndTime() != null)
@@ -262,34 +259,18 @@ public class TmManualConstraintDataLoadService {
         LambdaQueryWrapper<TmShiftConfig> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(TmShiftConfig::getFactoryCode, context.getFactoryCode());
         List<TmShiftConfig> configList = Optional.ofNullable(tmShiftConfigMapper.selectList(wrapper))
-                .orElse(new ArrayList<>()).stream()
+                .orElse(Collections.emptyList()).stream()
                 .filter(config -> config != null && config.getShiftOrder() != null)
                 .sorted(Comparator.comparing(TmShiftConfig::getShiftOrder))
                 .collect(Collectors.toList());
-        Map<String, Date[]> shiftWindowMap = new LinkedHashMap<>();
         String scheduleDateText = DateUtil.formatDate(context.getScheduleDate());
-        Date previousEndTime = null;
-        for (TmShiftConfig config : configList) {
-            if (StrUtil.isBlank(config.getPlanStartTime()) || StrUtil.isBlank(config.getPlanEndTime())) {
-                continue;
-            }
-            try {
-                Date startTime = DateUtil.parse(scheduleDateText + " " + config.getPlanStartTime());
-                Date endTime = DateUtil.parse(scheduleDateText + " " + config.getPlanEndTime());
-                if (TmYesNoEnum.YES.getCode().equals(config.getCrossDayFlag()) || !endTime.after(startTime)) {
-                    endTime = DateUtil.offsetDay(endTime, 1);
-                }
-                while (previousEndTime != null && startTime.before(previousEndTime)) {
-                    startTime = DateUtil.offsetDay(startTime, 1);
-                    endTime = DateUtil.offsetDay(endTime, 1);
-                }
-                shiftWindowMap.put(String.valueOf(config.getShiftOrder()), new Date[]{startTime, endTime});
-                previousEndTime = endTime;
-            } catch (Exception exception) {
-                log.warn("[TM_MANUAL_SHIFT_WINDOW_PARSE_FAIL] factoryCode={}, scheduleDate={}, shiftOrder={}",
-                        context.getFactoryCode(), scheduleDateText, config.getShiftOrder(), exception);
-            }
-        }
+        Map<String, Date[]> shiftWindowMap = TmScheduleWindowUtils.buildShiftWindowMap(
+                context.getScheduleDate(), configList,
+                (config, exception) -> log.warn("[TM_MANUAL_SHIFT_WINDOW_PARSE_FAIL] factoryCode={}, scheduleDate={}, shiftOrder={}",
+                        context.getFactoryCode(), scheduleDateText, config.getShiftOrder(), exception))
+                .entrySet().stream()
+                .collect(Collectors.toMap(entry -> String.valueOf(entry.getKey()), Map.Entry::getValue,
+                        (left, right) -> left, LinkedHashMap::new));
         if (!shiftWindowMap.isEmpty()) {
             return shiftWindowMap;
         }
@@ -312,14 +293,7 @@ public class TmManualConstraintDataLoadService {
      */
     private BigDecimal calculateOverlapHours(Date sourceStart, Date sourceEnd,
                                              Date targetStart, Date targetEnd) {
-        Date overlapStart = sourceStart.after(targetStart) ? sourceStart : targetStart;
-        Date overlapEnd = sourceEnd.before(targetEnd) ? sourceEnd : targetEnd;
-        if (!overlapStart.before(overlapEnd)) {
-            return BigDecimal.ZERO;
-        }
-        return BigDecimal.valueOf(DateUtil.between(overlapStart, overlapEnd, DateUnit.MINUTE))
-                .divide(BigDecimal.valueOf(TmScheduleConstants.MINUTES_PER_HOUR),
-                        TmScheduleConstants.DECIMAL_CALCULATION_SCALE, RoundingMode.HALF_UP);
+        return TmScheduleWindowUtils.calculateOverlapHours(sourceStart, sourceEnd, targetStart, targetEnd);
     }
 
     /**
@@ -341,7 +315,7 @@ public class TmManualConstraintDataLoadService {
         wrapper.eq(TmScheduleResult::getScheduleDate, previousDate);
         wrapper.in(TmScheduleResult::getMachineCode, machineCodeSet);
         List<TmScheduleResult> resultList =
-                Optional.ofNullable(tmScheduleResultMapper.selectList(wrapper)).orElse(new ArrayList<>());
+                Optional.ofNullable(tmScheduleResultMapper.selectList(wrapper)).orElse(Collections.emptyList());
         resultList.forEach(result -> {
             TmManualTaskDraft predecessor = this.resolveLatestPredecessor(result);
             TmManualTaskDraft exists = predecessorTaskMap.get(result.getMachineCode());
@@ -362,28 +336,21 @@ public class TmManualConstraintDataLoadService {
         if (result == null || StrUtil.isBlank(result.getMachineCode())) {
             return null;
         }
-        TmManualTaskDraft latestTask = null;
-        for (int shiftOrder = 1; shiftOrder <= TmScheduleConstants.TM_MAX_SHIFT_ORDER; shiftOrder++) {
-            BigDecimal planQty = BigDecimalUtils.valueOf(result.getFieldValueByFieldName(
-                    String.format(TmScheduleConstants.SHIFT_PLAN_QTY_FIELD_TEMPLATE, shiftOrder)));
-            Object sequenceValue = result.getFieldValueByFieldName(
-                    String.format(TmScheduleConstants.SHIFT_SEQUENCE_FIELD_TEMPLATE, shiftOrder));
-            if (!this.isPositive(planQty) || !(sequenceValue instanceof Integer)) {
-                continue;
-            }
-            TmManualTaskDraft task = new TmManualTaskDraft();
-            task.setMachineCode(result.getMachineCode());
-            task.setShiftOrder(shiftOrder);
-            task.setSequence((Integer) sequenceValue);
-            task.setTreadCode(result.getTreadCode());
-            task.setGlueCode(result.getGlueCode());
-            task.setBaseGlueCode(result.getBaseGlueCode());
-            task.setMouthPlateCode(result.getMouthPlateCode());
-            if (latestTask == null || this.compareTaskPosition(task, latestTask) > 0) {
-                latestTask = task;
-            }
+        Integer shiftOrder = TmScheduleWindowUtils.resolveLatestShiftOrder(result, false);
+        if (shiftOrder == null) {
+            return null;
         }
-        return latestTask;
+        Object sequenceValue = result.getFieldValueByFieldName(
+                String.format(TmScheduleConstants.SHIFT_SEQUENCE_FIELD_TEMPLATE, shiftOrder));
+        TmManualTaskDraft task = new TmManualTaskDraft();
+        task.setMachineCode(result.getMachineCode());
+        task.setShiftOrder(shiftOrder);
+        task.setSequence((Integer) sequenceValue);
+        task.setTreadCode(result.getTreadCode());
+        task.setGlueCode(result.getGlueCode());
+        task.setBaseGlueCode(result.getBaseGlueCode());
+        task.setMouthPlateCode(result.getMouthPlateCode());
+        return task;
     }
 
     /**
@@ -420,7 +387,7 @@ public class TmManualConstraintDataLoadService {
      * @param paramCode 参数编码
      * @return 参数数值，空值返回 0
      */
-    private BigDecimal getParamValue(Map<String, TmParamValue> paramMap, String paramCode) {
+    private BigDecimal getEffectiveDecimal(Map<String, TmParamValue> paramMap, String paramCode) {
         TmParamValue paramValue = paramMap.get(paramCode);
         return BigDecimalUtils.valueOf(paramValue == null ? null : paramValue.getEffectiveValue());
     }

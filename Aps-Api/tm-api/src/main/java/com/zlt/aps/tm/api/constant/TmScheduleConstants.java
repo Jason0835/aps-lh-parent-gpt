@@ -146,6 +146,12 @@ public final class TmScheduleConstants {
     /** 需求量算法默认编码。 */
     public static final String DEFAULT_ALGORITHM_SWITCH = "1";
 
+    /** 最大窗口需求量算法编码。 */
+    public static final String ALGORITHM_MAX_WINDOW = "1";
+
+    /** 单班需求量算法编码。 */
+    public static final String ALGORITHM_SINGLE_SHIFT = "2";
+
     /** 最低库存班数默认值。 */
     public static final String DEFAULT_MIN_STOCK_CLASS = "1";
 
@@ -412,6 +418,12 @@ public final class TmScheduleConstants {
 
     /** 胎面宽表支持的最大班次序号。 */
     public static final int TM_MAX_SHIFT_ORDER = 6;
+
+    /** 成型需求宽表支持的最大班次序号。 */
+    public static final int FORMING_MAX_SHIFT_ORDER = 8;
+
+    /** 班次编码前缀。 */
+    public static final String SHIFT_CODE_PREFIX = "CLASS";
 
     /** 班次计划量字段名模板。 */
     public static final String SHIFT_PLAN_QTY_FIELD_TEMPLATE = "class%dPlanQty";

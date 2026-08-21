@@ -1,6 +1,7 @@
 package com.zlt.aps.tm.engine.service.impl;
 
 import cn.hutool.core.util.StrUtil;
+import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.common.engine.schedule.MachineShiftTaskChain;
 import com.zlt.aps.common.engine.schedule.ScheduleOperationContext;
 import com.zlt.aps.common.engine.schedule.ScheduleTaskLinkedList;
@@ -73,9 +74,11 @@ public class TmManualRollingEngineService {
             }
             command.setCommandOrder(command.getCommandOrder() == null ? commandIndex : command.getCommandOrder());
             BigDecimal beforeCommandQty = this.sumPlanQty(taskList);
+            Map<String, List<TmManualTaskDraft>> resultGroupTaskMap = this.buildResultGroupTaskMap(taskList);
             ScheduleToolLedgerResult ledgerResult = this.applyCommandToolLimit(
-                    taskList, command, currentAvailableToolQty, context.getTotalToolQty(), unplannedTaskList);
-            BigDecimal currentCommandDeltaQty = this.applyCommand(taskList, command, scopeMap,
+                    command, resultGroupTaskMap, currentAvailableToolQty,
+                    context.getTotalToolQty(), unplannedTaskList);
+            BigDecimal currentCommandDeltaQty = this.applyCommand(taskList, command, resultGroupTaskMap, scopeMap,
                     rollingResult.getAffectedResultGroupKeySet());
             BigDecimal actualCommandDeltaQty = this.sumPlanQty(taskList).subtract(beforeCommandQty);
             if (currentCommandDeltaQty.compareTo(actualCommandDeltaQty) != 0) {
@@ -92,7 +95,8 @@ public class TmManualRollingEngineService {
                 .sorted(Comparator.comparing(TmManualRollingScope::getMachineCode))
                 .collect(Collectors.toList());
         rollingResult.setChainChangeSummaryList(scopeList.stream()
-                .map(scope -> scope.getMachineCode() + ":CLASS" + scope.getStartShiftOrder()
+                .map(scope -> scope.getMachineCode() + ":" + TmScheduleConstants.SHIFT_CODE_PREFIX
+                        + scope.getStartShiftOrder()
                         + ":SEQ" + scope.getStartSequence())
                 .collect(Collectors.toList()));
         for (TmManualRollingScope scope : scopeList) {
@@ -145,15 +149,15 @@ public class TmManualRollingEngineService {
     /**
      * 在业务命令应用前只结算命令计划增量，禁止对既有任务再次消费工装。
      *
-     * @param taskList 当前任务
      * @param command 当前命令
+     * @param resultGroupTaskMap 当前命令的结果分组任务索引
      * @param availableToolQty 当前可用工装
      * @param totalToolQty 工装池上限
      * @param unplannedTaskList 工装不足未排任务收集器
      * @return 本命令工装账本结算结果
      */
-    private ScheduleToolLedgerResult applyCommandToolLimit(List<TmManualTaskDraft> taskList,
-                                                           TmManualRollingCommand command,
+    private ScheduleToolLedgerResult applyCommandToolLimit(TmManualRollingCommand command,
+                                                           Map<String, List<TmManualTaskDraft>> resultGroupTaskMap,
                                                            BigDecimal availableToolQty,
                                                            BigDecimal totalToolQty,
                                                            List<TmManualTaskDraft> unplannedTaskList) {
@@ -168,14 +172,13 @@ public class TmManualRollingEngineService {
             referenceTask = command.getInsertTask();
             requestedProductionQty = referenceTask == null ? BigDecimal.ZERO : this.nvl(referenceTask.getPlanQty());
         } else if (TmManualRollingOperationEnum.CHANGE_QTY == command.getOperationType()) {
-            referenceTask = this.findTask(taskList, command);
+            referenceTask = this.findTask(resultGroupTaskMap, command);
             BigDecimal deltaQty = this.nvl(command.getPlanQty()).subtract(this.nvl(referenceTask.getPlanQty()));
             requestedProductionQty = deltaQty.max(BigDecimal.ZERO);
             releasedDemandQty = deltaQty.min(BigDecimal.ZERO).abs();
         } else if (TmManualRollingOperationEnum.DELETE == command.getOperationType()) {
-            List<TmManualTaskDraft> deleteTaskList = taskList.stream()
-                    .filter(task -> Objects.equals(command.getResultGroupKey(), task.getResultGroupKey()))
-                    .collect(Collectors.toList());
+            List<TmManualTaskDraft> deleteTaskList = resultGroupTaskMap.getOrDefault(
+                    command.getResultGroupKey(), Collections.emptyList());
             referenceTask = deleteTaskList.isEmpty() ? null : deleteTaskList.get(0);
             releasedDemandQty = deleteTaskList.stream().map(TmManualTaskDraft::getPlanQty)
                     .map(this::nvl).reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -211,11 +214,13 @@ public class TmManualRollingEngineService {
      *
      * @param taskList                 当前任务
      * @param command                  业务命令
+     * @param resultGroupTaskMap       当前命令的结果分组任务索引
      * @param scopeMap                 机台影响范围
      * @param affectedResultGroupKeySet 受影响结果分组
      * @return 命令造成的计划量净变化
      */
     private BigDecimal applyCommand(List<TmManualTaskDraft> taskList, TmManualRollingCommand command,
+                                    Map<String, List<TmManualTaskDraft>> resultGroupTaskMap,
                                     Map<String, TmManualRollingScope> scopeMap,
                                     Set<String> affectedResultGroupKeySet) {
         TmManualRollingOperationEnum operationType = command.getOperationType();
@@ -223,12 +228,12 @@ public class TmManualRollingEngineService {
             return this.applyInsert(taskList, command, scopeMap, affectedResultGroupKeySet);
         }
         if (TmManualRollingOperationEnum.DELETE == operationType) {
-            return this.applyDelete(taskList, command, scopeMap, affectedResultGroupKeySet);
+            return this.applyDelete(taskList, command, resultGroupTaskMap, scopeMap, affectedResultGroupKeySet);
         }
         if (TmManualRollingOperationEnum.CHANGE_MACHINE == operationType) {
-            return this.applyChangeMachine(taskList, command, scopeMap, affectedResultGroupKeySet);
+            return this.applyChangeMachine(taskList, command, resultGroupTaskMap, scopeMap, affectedResultGroupKeySet);
         }
-        return this.applyChangeQty(taskList, command, scopeMap, affectedResultGroupKeySet);
+        return this.applyChangeQty(taskList, command, resultGroupTaskMap, scopeMap, affectedResultGroupKeySet);
     }
 
     /**
@@ -273,16 +278,17 @@ public class TmManualRollingEngineService {
      *
      * @param taskList 当前任务
      * @param command  删除命令
+     * @param resultGroupTaskMap 当前命令的结果分组任务索引
      * @param scopeMap 影响范围
      * @param affectedResultGroupKeySet 受影响结果分组
      * @return 删除造成的负向变化量
      */
     private BigDecimal applyDelete(List<TmManualTaskDraft> taskList, TmManualRollingCommand command,
+                                   Map<String, List<TmManualTaskDraft>> resultGroupTaskMap,
                                    Map<String, TmManualRollingScope> scopeMap,
                                    Set<String> affectedResultGroupKeySet) {
-        List<TmManualTaskDraft> deleteTaskList = taskList.stream()
-                .filter(task -> Objects.equals(command.getResultGroupKey(), task.getResultGroupKey()))
-                .collect(Collectors.toList());
+        List<TmManualTaskDraft> deleteTaskList = resultGroupTaskMap.getOrDefault(
+                command.getResultGroupKey(), Collections.emptyList());
         if (deleteTaskList.isEmpty()) {
             throw new IllegalArgumentException("待删除任务不存在:" + command.getResultGroupKey());
         }
@@ -304,14 +310,16 @@ public class TmManualRollingEngineService {
      *
      * @param taskList 当前任务
      * @param command  调量命令
+     * @param resultGroupTaskMap 当前命令的结果分组任务索引
      * @param scopeMap 影响范围
      * @param affectedResultGroupKeySet 受影响结果分组
      * @return 调量净变化
      */
     private BigDecimal applyChangeQty(List<TmManualTaskDraft> taskList, TmManualRollingCommand command,
+                                      Map<String, List<TmManualTaskDraft>> resultGroupTaskMap,
                                       Map<String, TmManualRollingScope> scopeMap,
                                       Set<String> affectedResultGroupKeySet) {
-        TmManualTaskDraft targetTask = this.findTask(taskList, command);
+        TmManualTaskDraft targetTask = this.findTask(resultGroupTaskMap, command);
         BigDecimal targetPlanQty = this.nvl(command.getPlanQty());
         if (targetPlanQty.compareTo(this.nvl(targetTask.getFinishQty())) < 0) {
             throw new IllegalStateException("调整后计划量不能小于完成量:" + targetTask.getTaskId());
@@ -332,14 +340,16 @@ public class TmManualRollingEngineService {
      *
      * @param taskList 当前任务
      * @param command  转机命令
+     * @param resultGroupTaskMap 当前命令的结果分组任务索引
      * @param scopeMap 影响范围
      * @param affectedResultGroupKeySet 受影响结果分组
      * @return 转机台净变化，恒为0
      */
     private BigDecimal applyChangeMachine(List<TmManualTaskDraft> taskList, TmManualRollingCommand command,
+                                          Map<String, List<TmManualTaskDraft>> resultGroupTaskMap,
                                           Map<String, TmManualRollingScope> scopeMap,
                                           Set<String> affectedResultGroupKeySet) {
-        TmManualTaskDraft sourceTask = this.findTask(taskList, command);
+        TmManualTaskDraft sourceTask = this.findTask(resultGroupTaskMap, command);
         this.registerScope(scopeMap, sourceTask.getMachineCode(), sourceTask.getShiftOrder(), sourceTask.getSequence());
         BigDecimal finishQty = this.nvl(sourceTask.getFinishQty());
         BigDecimal moveQty = this.nvl(sourceTask.getPlanQty()).subtract(finishQty);
@@ -682,7 +692,8 @@ public class TmManualRollingEngineService {
             ScheduleTaskLinkedList<TmManualTaskDraft> chain = taskChainGroup.getOrCreate(
                     task.getMachineCode(), scheduleDate, task.getShiftOrder());
             ScheduleTaskNode<TmManualTaskDraft> node = new ScheduleTaskNode<>(task.getTaskId(), task,
-                    task.getMachineCode(), scheduleDate, "CLASS" + task.getShiftOrder(),
+                    task.getMachineCode(), scheduleDate,
+                    TmScheduleConstants.SHIFT_CODE_PREFIX + task.getShiftOrder(),
                     task.getShiftOrder(), task.getPlanQty());
             chain.append(node, new ScheduleOperationContext(context.getOperator(),
                     "TM_MANUAL_ROLLING", context.getTraceId()));
@@ -785,15 +796,34 @@ public class TmManualRollingEngineService {
     }
 
     /**
+     * 按结果分组构建当前命令的任务索引。
+     *
+     * <p>索引在每条命令开始前重建，命令修改任务列表后下一条命令会读取新快照，避免跨命令复用过期任务。</p>
+     *
+     * @param taskList 当前任务列表
+     * @return 结果分组与有序任务列表映射
+     */
+    private Map<String, List<TmManualTaskDraft>> buildResultGroupTaskMap(List<TmManualTaskDraft> taskList) {
+        Map<String, List<TmManualTaskDraft>> resultGroupTaskMap = new LinkedHashMap<>();
+        taskList.stream()
+                .filter(Objects::nonNull)
+                .forEach(task -> resultGroupTaskMap
+                        .computeIfAbsent(task.getResultGroupKey(), key -> new ArrayList<>())
+                        .add(task));
+        return resultGroupTaskMap;
+    }
+
+    /**
      * 按命令定位唯一任务。
      *
-     * @param taskList 当前任务
-     * @param command  业务命令
+     * @param resultGroupTaskMap 当前命令的结果分组任务索引
+     * @param command 业务命令
      * @return 目标任务
      */
-    private TmManualTaskDraft findTask(List<TmManualTaskDraft> taskList, TmManualRollingCommand command) {
-        List<TmManualTaskDraft> candidateList = taskList.stream()
-                .filter(task -> Objects.equals(command.getResultGroupKey(), task.getResultGroupKey()))
+    private TmManualTaskDraft findTask(Map<String, List<TmManualTaskDraft>> resultGroupTaskMap,
+                                       TmManualRollingCommand command) {
+        List<TmManualTaskDraft> candidateList = resultGroupTaskMap
+                .getOrDefault(command.getResultGroupKey(), Collections.emptyList()).stream()
                 .filter(task -> command.getSourceShiftOrder() == null
                         || Objects.equals(command.getSourceShiftOrder(), task.getShiftOrder()))
                 .filter(task -> StrUtil.isBlank(command.getSourceMachineCode())
@@ -950,7 +980,7 @@ public class TmManualRollingEngineService {
      * @return 非空数值
      */
     private BigDecimal nvl(BigDecimal value) {
-        return value == null ? BigDecimal.ZERO : value;
+        return BigDecimalUtils.valueOf(value);
     }
 
     /**

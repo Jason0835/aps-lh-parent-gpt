@@ -5,6 +5,7 @@ import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.StrUtil;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.common.engine.quantity.PlanQuantityAllocationItem;
 import com.zlt.aps.common.engine.quantity.PlanQuantityAllocationUtils;
 import com.zlt.aps.common.engine.schedule.ScheduleSupplyDurationCalculator;
@@ -18,8 +19,8 @@ import com.zlt.aps.tm.engine.strategy.ITmDemandQtyStrategy;
 import com.zlt.aps.tm.engine.strategy.ITmPlanQtyStrategy;
 import com.zlt.aps.tm.engine.strategy.ITmTaskSortStrategy;
 import com.zlt.aps.tm.engine.strategy.TmStrategyRegistry;
+import com.zlt.aps.tm.engine.util.TmScheduleContextValueUtils;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -256,7 +257,7 @@ public class TmPlanCalcService implements ITmPlanCalcService {
                 task.getSupplyHours(), task.getRollingStockQty(), task.getFormingGuardWindowQtyMap(), task.getFormingGuardWindowHoursMap());
         if (task.getPlanQty() == null) {
             TmPlanQtyResult planQtyResult = planQtyStrategy.calculate(task, context);
-            applyPlanQtyResult(task, planQtyResult);
+            task.applyPlanQtyResult(planQtyResult);
         }
         this.addTwoShiftStockCoverageTrace(context, task);
         if (!Boolean.TRUE.equals(task.getTwoShiftStockCovered())) {
@@ -340,7 +341,7 @@ public class TmPlanCalcService implements ITmPlanCalcService {
             TmTaskDraft aggregateTask = groupSourceList.size() == 1
                     ? groupSourceList.get(0) : new TmTaskDraft();
             if (groupSourceList.size() > 1) {
-                BeanUtils.copyProperties(groupSourceList.get(0), aggregateTask);
+                aggregateTask = groupSourceList.get(0).copyForDerivedTask();
             }
             this.planTailDecisionService.applyTailDecision(aggregateTask, groupSourceList);
             boolean formingShutdownCloseOut = groupSourceList.stream()
@@ -527,8 +528,7 @@ public class TmPlanCalcService implements ITmPlanCalcService {
      * @return 不参与后续机台分配的来源任务快照
      */
     private TmTaskDraft copySourceTask(TmTaskDraft sourceTask, String planGroupKey) {
-        TmTaskDraft sourceSnapshot = new TmTaskDraft();
-        BeanUtils.copyProperties(sourceTask, sourceSnapshot);
+        TmTaskDraft sourceSnapshot = sourceTask.copyForDerivedTask();
         sourceSnapshot.setPlanGroupKey(planGroupKey);
         sourceSnapshot.setSourceExplainTask(Boolean.TRUE);
         sourceSnapshot.setSourceTaskBusinessKeyList(null);
@@ -767,7 +767,7 @@ public class TmPlanCalcService implements ITmPlanCalcService {
      * @return yyyy-MM-dd格式日期；日期为空时返回null
      */
     private String formatScheduleDate(TmScheduleContext context) {
-        return context == null || context.getScheduleDate() == null ? null : DateUtil.formatDate(context.getScheduleDate());
+        return TmScheduleContextValueUtils.formatScheduleDate(context);
     }
 
     /**
@@ -1232,7 +1232,7 @@ public class TmPlanCalcService implements ITmPlanCalcService {
      * @return 规则证据对象
      */
     private TmRuleTrace traceOf(TmScheduleContext context, TmTaskDraft task) {
-        return context.getRuleTraceMap().computeIfAbsent(task.getBusinessKey(), key -> new TmRuleTrace());
+        return TmScheduleContextValueUtils.traceOf(context, task);
     }
 
     /**
@@ -1386,35 +1386,8 @@ public class TmPlanCalcService implements ITmPlanCalcService {
      * @return 卷曲长度，无法取得时返回0
      */
     private BigDecimal resolveCurlLength(TmTaskDraft task) {
-        if (task.getCurlRollLength() != null && task.getCurlRollLength().compareTo(BigDecimal.ZERO) > 0) {
-            return task.getCurlRollLength();
-        }
-        return nvl(task.getDefaultCurlRollLength());
+        return TmScheduleContextValueUtils.resolveCurlLength(task);
     }
-    /**
-     * 将计划量策略结果回填到任务草稿，便于解释表落库。
-     *
-     * @param task   任务草稿
-     * @param result 计划量策略结果
-     */
-    private void applyPlanQtyResult(TmTaskDraft task, TmPlanQtyResult result) {
-        if (result == null) {
-            return;
-        }
-        task.setBaseDemandQty(result.getBaseDemandQty());
-        task.setLossAddQty(result.getLossAddQty());
-        task.setToolLimitAdjustQty(result.getToolLimitAdjustQty());
-        task.setToolOverflowQty(result.getToolOverflowQty());
-        task.setMinStartAdjustQty(result.getMinStartAdjustQty());
-        task.setTailRoundAdjustQty(result.getTailRoundAdjustQty());
-        task.setCapacityAdjustQty(result.getCapacityAdjustQty());
-        task.setPreLossPlanQty(result.getPreLossPlanQty());
-        task.setPlanQtyBeforeToolLimit(result.getPlanQtyBeforeToolLimit());
-        task.setPlanQty(result.getFinalPlanQty());
-        task.setCalcFormulaDesc(result.getCalcFormulaDesc());
-    }
-
-
     /**
      * 回写同一胎面的下一任务班初库存状态。
      *
@@ -1440,7 +1413,7 @@ public class TmPlanCalcService implements ITmPlanCalcService {
      * @return 非空数值
      */
     private BigDecimal nvl(BigDecimal value) {
-        return value == null ? BigDecimal.ZERO : value;
+        return BigDecimalUtils.valueOf(value);
     }
 
     /**
@@ -1452,11 +1425,7 @@ public class TmPlanCalcService implements ITmPlanCalcService {
      * @return 参数有效值
      */
     private String readParam(TmScheduleContext context, String paramCode, String defaultValue) {
-        TmParamValue paramValue = context.getParamMap().get(paramCode);
-        if (paramValue == null || StrUtil.isBlank(paramValue.getEffectiveValue())) {
-            return defaultValue;
-        }
-        return paramValue.getEffectiveValue();
+        return TmScheduleContextValueUtils.readParam(context, paramCode, defaultValue, false);
     }
 
     /**

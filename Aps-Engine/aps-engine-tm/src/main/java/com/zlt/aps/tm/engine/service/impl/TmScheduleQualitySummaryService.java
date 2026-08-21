@@ -1,5 +1,6 @@
 package com.zlt.aps.tm.engine.service.impl;
 
+import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.common.engine.schedule.ScheduleTaskNode;
 import com.zlt.aps.tm.api.constant.TmScheduleConstants;
 import com.zlt.aps.tm.engine.domain.*;
@@ -31,7 +32,11 @@ public class TmScheduleQualitySummaryService {
         if (context == null || persistResult == null) {
             throw new IllegalArgumentException("胎面质量快照输入不能为空");
         }
-        double coverageRate = this.calculateCoverageRate(context);
+        Map<String, BigDecimal> planGroupAssignedQtyMap = this.buildPlanGroupAssignedQtyMap(context);
+        Map<String, BigDecimal> machineShiftAssignedQtyMap = new LinkedHashMap<>();
+        Map<String, BigDecimal> machineShiftSwitchDeductMap = new LinkedHashMap<>();
+        this.populateMachineShiftTaskSummary(context, machineShiftAssignedQtyMap, machineShiftSwitchDeductMap);
+        double coverageRate = this.calculateCoverageRate(context, planGroupAssignedQtyMap);
         Map<String, Object> summary = new LinkedHashMap<>();
         summary.put("taskCount", context.getPlanTaskGroupMap().isEmpty()
                 ? context.getTaskDraftList().size() : context.getPlanTaskGroupMap().size());
@@ -39,11 +44,13 @@ public class TmScheduleQualitySummaryService {
         summary.put("unplannedCount", persistResult.getUnplannedCount());
         summary.put("coverageRate", coverageRate);
         summary.put("unplannedRate", 1D - coverageRate);
-        summary.put("machineUtilizationRate", this.calculateMachineUtilizationRate(context));
+        summary.put("machineUtilizationRate", this.calculateMachineUtilizationRate(context,
+                machineShiftAssignedQtyMap, machineShiftSwitchDeductMap));
         summary.put("switchCount", this.calculateSwitchCount(context));
         summary.put("stockGuaranteeRate", this.calculateStockGuaranteeRate(context));
-        summary.put("tailCompletionRate", this.calculateTailCompletionRate(context));
-        summary.put("shiftCapacityHitRate", this.calculateShiftCapacityHitRate(context));
+        summary.put("tailCompletionRate", this.calculateTailCompletionRate(context, planGroupAssignedQtyMap));
+        summary.put("shiftCapacityHitRate", this.calculateShiftCapacityHitRate(context,
+                machineShiftAssignedQtyMap, machineShiftSwitchDeductMap));
         return summary;
     }
 
@@ -51,13 +58,14 @@ public class TmScheduleQualitySummaryService {
      * 按计划组原始计划量与实际已排量计算覆盖率。
      *
      * @param context 排程上下文
+     * @param assignedQtyMap 计划组已排量映射
      * @return 覆盖率
      */
-    private double calculateCoverageRate(TmScheduleContext context) {
+    private double calculateCoverageRate(TmScheduleContext context,
+                                         Map<String, BigDecimal> assignedQtyMap) {
         if (context.getPlanTaskGroupMap().isEmpty()) {
             return 1D;
         }
-        Map<String, BigDecimal> assignedQtyMap = this.buildPlanGroupAssignedQtyMap(context);
         BigDecimal totalQty = context.getPlanTaskGroupMap().values().stream()
                 .map(TmPlanTaskGroup::getGroupFinalPlanQty)
                 .map(this::nvl)
@@ -76,11 +84,13 @@ public class TmScheduleQualitySummaryService {
      * 计算全部启用机台班次的有效容量利用率，空闲机台班次进入分母。
      *
      * @param context 排程上下文
+     * @param assignedQtyMap 机台班次已排量映射
+     * @param switchDeductMap 机台班次切换产能扣减映射
      * @return 利用率
      */
-    private double calculateMachineUtilizationRate(TmScheduleContext context) {
-        Map<String, BigDecimal> assignedQtyMap = this.buildMachineShiftAssignedQtyMap(context);
-        Map<String, BigDecimal> switchDeductMap = this.buildMachineShiftSwitchDeductMap(context);
+    private double calculateMachineUtilizationRate(TmScheduleContext context,
+                                                   Map<String, BigDecimal> assignedQtyMap,
+                                                   Map<String, BigDecimal> switchDeductMap) {
         BigDecimal assignedQty = assignedQtyMap.values().stream()
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal totalCapacity = context.getMachineCandidateList().stream()
@@ -134,9 +144,11 @@ public class TmScheduleQualitySummaryService {
      * 按计划组聚合收尾完成率，避免拆分和顺延重复累计。
      *
      * @param context 排程上下文
+     * @param assignedQtyMap 计划组已排量映射
      * @return 收尾完成率
      */
-    private double calculateTailCompletionRate(TmScheduleContext context) {
+    private double calculateTailCompletionRate(TmScheduleContext context,
+                                               Map<String, BigDecimal> assignedQtyMap) {
         List<TmPlanTaskGroup> tailGroupList = context.getPlanTaskGroupMap().values().stream()
                 .filter(Objects::nonNull)
                 .filter(group -> group.getAggregateTask() != null)
@@ -145,7 +157,6 @@ public class TmScheduleQualitySummaryService {
         if (tailGroupList.isEmpty()) {
             return 1D;
         }
-        Map<String, BigDecimal> assignedQtyMap = this.buildPlanGroupAssignedQtyMap(context);
         long completedCount = tailGroupList.stream()
                 .filter(group -> this.isTailCompleted(group,
                         assignedQtyMap.getOrDefault(group.getPlanGroupKey(), BigDecimal.ZERO)))
@@ -157,9 +168,13 @@ public class TmScheduleQualitySummaryService {
      * 计算全部启用机台班次未超过有效容量的比例。
      *
      * @param context 排程上下文
+     * @param assignedQtyMap 机台班次已排量映射
+     * @param switchDeductMap 机台班次切换产能扣减映射
      * @return 容量命中率
      */
-    private double calculateShiftCapacityHitRate(TmScheduleContext context) {
+    private double calculateShiftCapacityHitRate(TmScheduleContext context,
+                                                 Map<String, BigDecimal> assignedQtyMap,
+                                                 Map<String, BigDecimal> switchDeductMap) {
         List<TmMachineCandidate> candidateList = context.getMachineCandidateList().stream()
                 .filter(Objects::nonNull)
                 .filter(candidate -> !Boolean.FALSE.equals(candidate.getEnabled()))
@@ -167,8 +182,6 @@ public class TmScheduleQualitySummaryService {
         if (candidateList.isEmpty()) {
             return 0D;
         }
-        Map<String, BigDecimal> assignedQtyMap = this.buildMachineShiftAssignedQtyMap(context);
-        Map<String, BigDecimal> switchDeductMap = this.buildMachineShiftSwitchDeductMap(context);
         long hitCount = candidateList.stream()
                 .flatMap(candidate -> java.util.stream.IntStream.rangeClosed(
                                 1, TmScheduleConstants.TM_MAX_SHIFT_ORDER)
@@ -223,44 +236,29 @@ public class TmScheduleQualitySummaryService {
     }
 
     /**
-     * 按机台班次汇总实际已排量。
+     * 一次遍历任务链，同时汇总机台班次已排量和切换产能扣减。
      *
      * @param context 排程上下文
-     * @return 机台班次已排量
+     * @param assignedQtyMap 待填充的机台班次已排量映射
+     * @param switchDeductMap 待填充的机台班次切换产能扣减映射
      */
-    private Map<String, BigDecimal> buildMachineShiftAssignedQtyMap(TmScheduleContext context) {
-        return context.getTaskChainGroup().values().stream()
+    private void populateMachineShiftTaskSummary(TmScheduleContext context,
+                                                 Map<String, BigDecimal> assignedQtyMap,
+                                                 Map<String, BigDecimal> switchDeductMap) {
+        context.getTaskChainGroup().values().stream()
                 .filter(Objects::nonNull)
                 .flatMap(chain -> chain.toList().stream())
                 .map(ScheduleTaskNode::getTask)
                 .filter(Objects::nonNull)
                 .filter(task -> task.getMachineCode() != null && task.getShiftOrder() != null)
-                .collect(Collectors.groupingBy(
-                        task -> task.getMachineCode() + "|" + task.getShiftOrder(),
-                        LinkedHashMap::new, Collectors.reducing(BigDecimal.ZERO,
-                                task -> this.nvl(task.getPlanQty()), BigDecimal::add)));
-    }
-
-    /**
-     * 按机台班次汇总实际发生的规格、胶料切换产能扣减。
-     *
-     * @param context 排程上下文
-     * @return 机台班次切换产能扣减
-     */
-    private Map<String, BigDecimal> buildMachineShiftSwitchDeductMap(TmScheduleContext context) {
-        return context.getTaskChainGroup().values().stream()
-                .filter(Objects::nonNull)
-                .flatMap(chain -> chain.toList().stream())
-                .map(ScheduleTaskNode::getTask)
-                .filter(Objects::nonNull)
-                .filter(task -> task.getMachineCode() != null && task.getShiftOrder() != null)
-                .collect(Collectors.groupingBy(
-                        task -> task.getMachineCode() + "|" + task.getShiftOrder(),
-                        LinkedHashMap::new, Collectors.reducing(BigDecimal.ZERO,
-                                task -> this.nvl(task.getPreviousSpecSwitchHours())
-                                        .multiply(this.nvl(task.getMachineSpeed()))
-                                        .add(this.nvl(task.getPreviousGlueSwitchCapacityDeduct())),
-                                BigDecimal::add)));
+                .forEach(task -> {
+                    String machineShiftKey = task.getMachineCode() + "|" + task.getShiftOrder();
+                    assignedQtyMap.merge(machineShiftKey, this.nvl(task.getPlanQty()), BigDecimal::add);
+                    BigDecimal switchDeductQty = this.nvl(task.getPreviousSpecSwitchHours())
+                            .multiply(this.nvl(task.getMachineSpeed()))
+                            .add(this.nvl(task.getPreviousGlueSwitchCapacityDeduct()));
+                    switchDeductMap.merge(machineShiftKey, switchDeductQty, BigDecimal::add);
+                });
     }
 
     /**
@@ -299,6 +297,6 @@ public class TmScheduleQualitySummaryService {
      * @return 非空值
      */
     private BigDecimal nvl(BigDecimal value) {
-        return value == null ? BigDecimal.ZERO : value;
+        return BigDecimalUtils.valueOf(value);
     }
 }

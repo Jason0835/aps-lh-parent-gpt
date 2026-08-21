@@ -1,6 +1,7 @@
 package com.zlt.aps.tm.engine.strategy;
 
 import com.ruoyi.common.exception.ServiceException;
+import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.common.engine.schedule.ScheduleSupplyDurationCalculator;
 import com.zlt.aps.tm.api.constant.TmScheduleConstants;
 import com.zlt.aps.tm.api.enums.TmDemandAlgorithmEnum;
@@ -74,6 +75,6 @@ public class TmNextShiftDemandQtyStrategy implements ITmDemandQtyStrategy {
      * @return 非空数值
      */
     private BigDecimal nvl(BigDecimal value) {
-        return value == null ? BigDecimal.ZERO : value;
+        return BigDecimalUtils.valueOf(value);
     }
 }

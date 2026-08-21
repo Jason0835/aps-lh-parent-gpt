@@ -1,27 +1,21 @@
 package com.zlt.aps.tm.engine.service.impl;
 
 import cn.hutool.core.collection.CollUtil;
-import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.StrUtil;
 import com.ruoyi.common.exception.ServiceException;
 import com.zlt.aps.tm.api.constant.TmScheduleConstants;
 import com.zlt.aps.tm.api.enums.TmScheduleErrorCodeEnum;
-import com.zlt.aps.tm.api.enums.TmScheduleRuleCodeEnum;
-import com.zlt.aps.tm.api.enums.TmScheduleRuleResultEnum;
 import com.zlt.aps.tm.api.enums.TmScheduleStrategyEnum;
-import com.zlt.aps.tm.engine.domain.TmParamValue;
-import com.zlt.aps.tm.engine.domain.TmRuleTrace;
 import com.zlt.aps.tm.engine.domain.TmScheduleContext;
 import com.zlt.aps.tm.engine.domain.TmTaskDraft;
 import com.zlt.aps.tm.engine.service.ITmTaskSortService;
 import com.zlt.aps.tm.engine.strategy.ITmTaskSortStrategy;
 import com.zlt.aps.tm.engine.strategy.TmStrategyRegistry;
+import com.zlt.aps.tm.engine.util.TmScheduleContextValueUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.Comparator;
-import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -36,6 +30,9 @@ import java.util.stream.Collectors;
 public class TmTaskSortService implements ITmTaskSortService {
 
     private final TmStrategyRegistry strategyRegistry;
+
+    /** 任务排序规则证据记录组件。 */
+    private final RuleTraceRecorder ruleTraceRecorder = new RuleTraceRecorder();
 
     /**
      * 创建任务排序服务。
@@ -82,25 +79,28 @@ public class TmTaskSortService implements ITmTaskSortService {
             int sortIndex = planCalcOrderReady && task.getPlanCalcOrderIndex() != null
                     ? task.getPlanCalcOrderIndex() : i + 1;
             task.setBaseSortIndex(sortIndex);
-            Map<String, Object> evidence = new LinkedHashMap<>();
-            evidence.put("strategyCode", strategyCode);
-            evidence.put("sortSource", sortSource);
-            evidence.put("sortIndex", sortIndex);
-            evidence.put("planCalcOrderIndex", task.getPlanCalcOrderIndex());
-            evidence.put("supplyHours", task.getSupplyHours());
-            evidence.put("startupShift", this.isStartupShift(context, task));
-            evidence.put("startupSortPriority", "SUPPLY_HOURS_ASC");
-            evidence.put("glueCode", task.getGlueCode());
-            evidence.put("baseGlueCode", task.getBaseGlueCode());
-            evidence.put("mouthPlateCode", task.getMouthPlateCode());
-            traceOf(context, task).addRuleHit(TmScheduleRuleCodeEnum.TASK_SORT,
-                    TmScheduleRuleResultEnum.PASS, evidence);
-            log.info("[TM_TASK_SORT_DETAIL] batchNo={}, traceId={}, factoryCode={}, scheduleDate={}, strategyCode={}, sortSource={}, sortIndex={}, planCalcOrderIndex={}, businessKey={}, treadCode={}, shiftOrder={}, supplyHours={}, glueCode={}, baseGlueCode={}, mouthPlateCode={}, planQty={}, demandQty={}",
-                    context.getBatchNo(), context.getTraceId(), context.getFactoryCode(), formatScheduleDate(context),
-                    strategyCode, sortSource, sortIndex, task.getPlanCalcOrderIndex(), task.getBusinessKey(), task.getTreadCode(), task.getShiftOrder(),
-                    task.getSupplyHours(), task.getGlueCode(), task.getBaseGlueCode(), task.getMouthPlateCode(),
-                    task.getPlanQty(), task.getDemandQty());
+            ruleTraceRecorder.recordTaskSort(context, task, strategyCode, sortSource, sortIndex,
+                    this.isStartupShift(context, task));
+            this.logTaskSortDetail(context, task, strategyCode, sortSource, sortIndex);
         }
+    }
+
+    /**
+     * 按固定字段顺序输出单任务排序明细日志。
+     *
+     * @param context 排程上下文
+     * @param task 已确定排序位置的任务
+     * @param strategyCode 排序策略编码
+     * @param sortSource 排序来源
+     * @param sortIndex 最终基础排序号
+     */
+    private void logTaskSortDetail(TmScheduleContext context, TmTaskDraft task, String strategyCode,
+                                   String sortSource, int sortIndex) {
+        log.info("[TM_TASK_SORT_DETAIL] batchNo={}, traceId={}, factoryCode={}, scheduleDate={}, strategyCode={}, sortSource={}, sortIndex={}, planCalcOrderIndex={}, businessKey={}, treadCode={}, shiftOrder={}, supplyHours={}, glueCode={}, baseGlueCode={}, mouthPlateCode={}, planQty={}, demandQty={}",
+                context.getBatchNo(), context.getTraceId(), context.getFactoryCode(), this.formatScheduleDate(context),
+                strategyCode, sortSource, sortIndex, task.getPlanCalcOrderIndex(), task.getBusinessKey(),
+                task.getTreadCode(), task.getShiftOrder(), task.getSupplyHours(), task.getGlueCode(),
+                task.getBaseGlueCode(), task.getMouthPlateCode(), task.getPlanQty(), task.getDemandQty());
     }
 
     /**
@@ -157,18 +157,7 @@ public class TmTaskSortService implements ITmTaskSortService {
      * @return yyyy-MM-dd格式日期；日期为空时返回null
      */
     private String formatScheduleDate(TmScheduleContext context) {
-        return context == null || context.getScheduleDate() == null ? null : DateUtil.formatDate(context.getScheduleDate());
-    }
-
-    /**
-     * 获取任务规则证据对象，不存在时创建。
-     *
-     * @param context 排程上下文
-     * @param task    任务草稿
-     * @return 规则证据对象
-     */
-    private TmRuleTrace traceOf(TmScheduleContext context, TmTaskDraft task) {
-        return context.getRuleTraceMap().computeIfAbsent(task.getBusinessKey(), key -> new TmRuleTrace());
+        return TmScheduleContextValueUtils.formatScheduleDate(context);
     }
 
     /**
@@ -180,10 +169,6 @@ public class TmTaskSortService implements ITmTaskSortService {
      * @return 参数有效值
      */
     private String readParam(TmScheduleContext context, String paramCode, String defaultValue) {
-        TmParamValue paramValue = context.getParamMap().get(paramCode);
-        if (paramValue == null || StrUtil.isBlank(paramValue.getEffectiveValue())) {
-            return defaultValue;
-        }
-        return paramValue.getEffectiveValue();
+        return TmScheduleContextValueUtils.readParam(context, paramCode, defaultValue, false);
     }
 }
