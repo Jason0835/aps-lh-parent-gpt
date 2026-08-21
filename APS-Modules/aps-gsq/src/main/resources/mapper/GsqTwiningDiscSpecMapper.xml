@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.gsq.mapper.GsqTwiningDiscSpecMapper">
+
+    <!-- 查询缠绕盘-规格关系列表（关联缠绕盘主表反显名称/英寸/排列方式） -->
+    <select id="listDiscSpec" parameterType="com.zlt.aps.gsq.api.domain.entity.GsqTwiningDiscSpec" resultType="com.zlt.aps.gsq.api.domain.entity.GsqTwiningDiscSpec">
+        select * from (
+        select s.ID,
+               s.TWINING_DISC_CODE,
+               s.STEEL_RING_CODE,
+               s.STEEL_RING_NAME,
+               s.STATUS,
+               s.FACTORY_CODE,
+               s.DATA_VERSION,
+               s.IS_DELETE,
+               s.CREATE_BY,
+               s.CREATE_TIME,
+               s.UPDATE_BY,
+               s.UPDATE_TIME,
+               s.REMARK,
+               d.TWINING_DISC_NAME,
+               d.PRO_SIZE,
+               d.SORT_TYPE
+        from T_GSQ_TWINING_DISC_SPEC s
+        left join T_GSQ_TWINING_DISC d on d.TWINING_DISC_CODE = s.TWINING_DISC_CODE and d.IS_DELETE = '0'
+        where s.IS_DELETE = '0'
+        <if test="twiningDiscCode != null and twiningDiscCode != ''">
+            and INSTR(s.TWINING_DISC_CODE, #{twiningDiscCode}) > 0
+        </if>
+        <if test="steelRingCode != null and steelRingCode != ''">
+            and INSTR(s.STEEL_RING_CODE, #{steelRingCode}) > 0
+        </if>
+        <if test="status != null and status != ''">
+            and s.STATUS = #{status}
+        </if>
+        <if test="factoryCode != null and factoryCode != ''">
+            and s.FACTORY_CODE = #{factoryCode}
+        </if>
+        <if test="orderStr == null">
+            order by s.CREATE_TIME desc
+        </if>
+        ) t
+        <if test="orderStr != null">
+            order by ${orderStr}
+        </if>
+    </select>
+
+    <!-- 校验缠绕盘+钢丝圈规格组合是否已存在（0=唯一，>0=不唯一） -->
+    <select id="checkUnique" resultType="int">
+        select count(1)
+        from T_GSQ_TWINING_DISC_SPEC
+        where IS_DELETE = '0'
+          and TWINING_DISC_CODE = #{entity.twiningDiscCode}
+          and STEEL_RING_CODE = #{entity.steelRingCode}
+        <if test="entity.id != null">
+            and ID != #{entity.id}
+        </if>
+    </select>
+
+    <!--
+        MES缠绕盘规格关系同步专用批量插入。
+        使用XML显式指定列和值，绕过MyBatis-Plus MetaObjectHandler，
+        确保CREATE_BY/UPDATE_BY为"MES"不被自动填充覆盖。
+        仅用于MES新增组合（已存在的走LambdaUpdateWrapper按ID更新）。
+    -->
+    <insert id="batchInsertMesSpec" parameterType="list">
+        INSERT INTO T_GSQ_TWINING_DISC_SPEC (
+            TWINING_DISC_CODE, STEEL_RING_CODE, STEEL_RING_NAME, STATUS, FACTORY_CODE, DATA_VERSION, DATA_SOURCE,
+            IS_DELETE, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME
+        )
+        VALUES
+        <foreach collection="list" item="item" separator=",">
+            (
+                #{item.twiningDiscCode,jdbcType=VARCHAR},
+                #{item.steelRingCode,jdbcType=VARCHAR},
+                #{item.steelRingName,jdbcType=VARCHAR},
+                #{item.status,jdbcType=VARCHAR},
+                #{item.factoryCode,jdbcType=VARCHAR},
+                #{item.dataVersion,jdbcType=VARCHAR},
+                '0',
+                0,
+                #{item.createBy,jdbcType=VARCHAR},
+                NOW(),
+                #{item.updateBy,jdbcType=VARCHAR},
+                NOW()
+            )
+        </foreach>
+    </insert>
+
+</mapper>

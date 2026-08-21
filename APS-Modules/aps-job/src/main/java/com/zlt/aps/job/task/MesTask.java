@@ -164,6 +164,14 @@ public class MesTask {
     }
 
     /**
+     * 同步MES钢丝圈缠绕盘三表数据（缠绕盘清单/规格关系/机台关系）
+     */
+    @ApiOperation("同步MES钢丝圈缠绕盘三表数据")
+    public void syncMesTwiningDisc() {
+        FeignTokenHelper.runWithToken(() -> iMesItfService.syncMesTwiningDisc(new AuxReqSyncDataLogs()));
+    }
+
+    /**
      * 同步结构整车胎面配置
      */
     @ApiOperation("同步结构整车胎面配置")

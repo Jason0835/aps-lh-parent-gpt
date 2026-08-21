@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.gsq.mapper.GsqTwiningDiscMachineMapper">
+
+    <!-- 查询缠绕盘-机台关系列表（关联缠绕盘主表反显名称/英寸/排列方式，关联机台信息表反显机台名称） -->
+    <select id="listDiscMachine" parameterType="com.zlt.aps.gsq.api.domain.entity.GsqTwiningDiscMachine" resultType="com.zlt.aps.gsq.api.domain.entity.GsqTwiningDiscMachine">
+        select * from (
+        select m.ID,
+               m.TWINING_DISC_CODE,
+               m.MACHINE_CODE,
+               m.STATUS,
+               m.FACTORY_CODE,
+               m.DATA_SOURCE,
+               m.IS_DELETE,
+               m.CREATE_BY,
+               m.CREATE_TIME,
+               m.UPDATE_BY,
+               m.UPDATE_TIME,
+               m.REMARK,
+               d.TWINING_DISC_NAME,
+               d.PRO_SIZE,
+               d.SORT_TYPE,
+               mi.MACHINE_NAME
+        from T_GSQ_TWINING_DISC_MACHINE m
+        left join T_GSQ_TWINING_DISC d on d.TWINING_DISC_CODE = m.TWINING_DISC_CODE and d.IS_DELETE = '0'
+        left join T_GSQ_MACHINE_INFO mi on mi.MACHINE_CODE = m.MACHINE_CODE and mi.IS_DELETE = '0'
+        where m.IS_DELETE = '0'
+        <if test="twiningDiscCode != null and twiningDiscCode != ''">
+            and INSTR(m.TWINING_DISC_CODE, #{twiningDiscCode}) > 0
+        </if>
+        <if test="machineCode != null and machineCode != ''">
+            and INSTR(m.MACHINE_CODE, #{machineCode}) > 0
+        </if>
+        <if test="status != null and status != ''">
+            and m.STATUS = #{status}
+        </if>
+        <if test="factoryCode != null and factoryCode != ''">
+            and m.FACTORY_CODE = #{factoryCode}
+        </if>
+        <if test="dataSource != null and dataSource != ''">
+            and m.DATA_SOURCE = #{dataSource}
+        </if>
+        <if test="orderStr == null">
+            order by m.CREATE_TIME desc
+        </if>
+        ) t
+        <if test="orderStr != null">
+            order by ${orderStr}
+        </if>
+    </select>
+
+    <!-- 校验缠绕盘+机台组合是否已存在（0=唯一，>0=不唯一） -->
+    <select id="checkUnique" resultType="int">
+        select count(1)
+        from T_GSQ_TWINING_DISC_MACHINE
+        where IS_DELETE = '0'
+          and TWINING_DISC_CODE = #{entity.twiningDiscCode}
+          and MACHINE_CODE = #{entity.machineCode}
+        <if test="entity.id != null">
+            and ID != #{entity.id}
+        </if>
+    </select>
+
+    <!--
+        MES缠绕盘机台关系同步专用批量插入。
+        使用XML显式指定列和值，绕过MyBatis-Plus MetaObjectHandler，
+        确保CREATE_BY/UPDATE_BY为"MES"不被自动填充覆盖。
+        仅用于MES新增组合（已存在的走LambdaUpdateWrapper按ID更新）。
+    -->
+    <insert id="batchInsertMesMachine" parameterType="list">
+        INSERT INTO T_GSQ_TWINING_DISC_MACHINE (
+            TWINING_DISC_CODE, MACHINE_CODE, STATUS, FACTORY_CODE, DATA_VERSION, DATA_SOURCE,
+            IS_DELETE, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME
+        )
+        VALUES
+        <foreach collection="list" item="item" separator=",">
+            (
+                #{item.twiningDiscCode,jdbcType=VARCHAR},
+                #{item.machineCode,jdbcType=VARCHAR},
+                #{item.status,jdbcType=VARCHAR},
+                #{item.factoryCode,jdbcType=VARCHAR},
+                #{item.dataVersion,jdbcType=VARCHAR},
+                '0',
+                0,
+                #{item.createBy,jdbcType=VARCHAR},
+                NOW(),
+                #{item.updateBy,jdbcType=VARCHAR},
+                NOW()
+            )
+        </foreach>
+    </insert>
+
+</mapper>

@@ -5,6 +5,7 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.gsq.api.domain.entity.GsqDayFinishQty;
 import com.zlt.aps.gsq.api.domain.entity.GsqScheFinishQty;
 import com.zlt.aps.gsq.api.domain.entity.GsqStock;
+import com.zlt.aps.gsq.api.domain.vo.GsqMesTwiningDiscSyncVO;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -88,4 +89,21 @@ public interface IGsqMesSyncRemoteService {
     AjaxResult logicDeleteAndSaveGsqStockByStockDate(@RequestParam("stockDate") String stockDate,
                                                       @RequestParam("updateBy") String updateBy,
                                                       @RequestBody List<GsqStock> list);
+
+    /**
+     * 同步MES钢丝圈缠绕盘三表数据（事务性操作）
+     * 单事务处理缠绕盘清单/规格关系/机台关系，保证三表一致性：
+     * 1. 主表UPSERT：存在则更新MES字段（保留名称/数量/备注等手工维护字段），不存在则新增；
+     *    APS中MES来源但MES最新清单已不存在的缠绕盘逻辑删除并级联清理子表/机台关系
+     * 2. 子表全量替换：MES规格关系涉及的缠绕盘，按主表ID逻辑删除旧子表后整体替换（钢丝圈名称反显）
+     * 3. 机台关系UPSERT：同主表策略，MES来源已失效的组合逻辑删除
+     *
+     * @param updateBy 更新者（MES同步传"MES"）
+     * @param syncVO   三表聚合数据
+     * @return 结果
+     */
+    @ApiOperation("同步MES钢丝圈缠绕盘三表数据（事务性操作）")
+    @PostMapping("/gsqMesSync/syncTwiningDisc")
+    AjaxResult syncTwiningDisc(@RequestParam("updateBy") String updateBy,
+                               @RequestBody GsqMesTwiningDiscSyncVO syncVO);
 }
