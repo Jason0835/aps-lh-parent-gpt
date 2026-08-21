@@ -642,6 +642,8 @@
   "ui.data.column.mdmMoldingMachine.isZeroRack": "是否有零度供料架",
   "ui.data.column.mdmMoldingMachine.lhMachineMaxQty": "对应硫化机上限",
   "ui.data.column.mdmMoldingMachine.maxDayCapacity": "设备最大日产",
+  "ui.data.column.mdmCxMachineFixed.fixedEmbryoCode": "固定胎胚号",
+  "ui.data.column.mdmCxMachineFixed.fixedMainMaterialDesc": "固定胎胚描述",
   "ui.data.column.mdmStructureName.isMoreMachine": "允许多台",
   "ui.data.lh.column.machine.info": "硫化机台信息",
   "ui.data.column.moldChange.modalName": "模具变动单",
