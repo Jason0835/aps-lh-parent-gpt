@@ -47,7 +47,7 @@ public interface GsqEngineMachineMapper {
 
     /**
      * 查询钢丝圈-缠绕盘代码映射（key=钢丝圈代码, value=缠绕盘代码）
-     * <p>数据源：缠绕盘子表 T_GSQ_TWINING_DISC_SUB 关联主表 T_GSQ_TWINING_DISC，仅取启用(true:STATUS='0')的缠绕盘。</p>
+     * <p>数据源：缠绕盘规格关系表 T_GSQ_TWINING_DISC_SPEC 关联主表 T_GSQ_TWINING_DISC，仅取启用(true:STATUS='0')的缠绕盘。</p>
      * @return 每行含 steelRingCode、twiningDiscCode 两个字段
      */
     List<java.util.Map<String, Object>> listGsqTwiningDiscCode();

@@ -36,18 +36,13 @@ public class TmAutoScheduleIssueCollector {
                                      TmAutoScheduleIssueCategoryEnum category,
                                      String sourceOrderNo, String embryoCode, String recipeNo,
                                      Integer shiftOrder, String fieldName, String message) {
-        TmAutoScheduleIssueVo issue = new TmAutoScheduleIssueVo();
-        issue.setLevel(level.getCode());
-        issue.setStageCode(TmScheduleStepEnum.BOOTSTRAP.getCode());
-        issue.setStageName(TmScheduleStepEnum.BOOTSTRAP.getDesc());
-        issue.setCategory(category.getCode());
+        TmAutoScheduleIssueVo issue = this.createIssue(level, TmScheduleStepEnum.BOOTSTRAP, category, message);
         issue.setSourceOrderNo(sourceOrderNo);
         issue.setEmbryoCode(embryoCode);
         issue.setRecipeNo(recipeNo);
         issue.setShiftOrder(shiftOrder);
         issue.setFieldName(fieldName);
-        issue.setMessage(message);
-        issues.add(issue);
+        this.addIssue(issue);
     }
 
     /**
@@ -60,13 +55,7 @@ public class TmAutoScheduleIssueCollector {
      */
     public void addIssue(TmAutoScheduleIssueLevelEnum level, TmScheduleStepEnum stepEnum,
                          TmAutoScheduleIssueCategoryEnum category, String message) {
-        TmAutoScheduleIssueVo issue = new TmAutoScheduleIssueVo();
-        issue.setLevel(level.getCode());
-        issue.setStageCode(stepEnum.getCode());
-        issue.setStageName(stepEnum.getDesc());
-        issue.setCategory(category.getCode());
-        issue.setMessage(message);
-        issues.add(issue);
+        this.addIssue(this.createIssue(level, stepEnum, category, message));
     }
 
     /**
@@ -77,16 +66,12 @@ public class TmAutoScheduleIssueCollector {
      * @param message     包含汇总组和来源业务键的冲突说明
      */
     public void addPlanGroupAttributeConflictIssue(String treadCode, Integer shiftOrder, String message) {
-        TmAutoScheduleIssueVo issue = new TmAutoScheduleIssueVo();
-        issue.setLevel(TmAutoScheduleIssueLevelEnum.ERROR.getCode());
-        issue.setStageCode(TmScheduleStepEnum.PLAN_CALC.getCode());
-        issue.setStageName(TmScheduleStepEnum.PLAN_CALC.getDesc());
-        issue.setCategory(TmAutoScheduleIssueCategoryEnum.PLAN_GROUP_ATTRIBUTE_CONFLICT.getCode());
+        TmAutoScheduleIssueVo issue = this.createIssue(TmAutoScheduleIssueLevelEnum.ERROR,
+                TmScheduleStepEnum.PLAN_CALC, TmAutoScheduleIssueCategoryEnum.PLAN_GROUP_ATTRIBUTE_CONFLICT, message);
         issue.setTreadCode(treadCode);
         issue.setShiftOrder(shiftOrder);
         issue.setFieldName("productionAttributes");
-        issue.setMessage(message);
-        issues.add(issue);
+        this.addIssue(issue);
     }
 
     /**
@@ -136,15 +121,11 @@ public class TmAutoScheduleIssueCollector {
      * @param message 告警说明
      */
     public void addStockMissingIssue(String treadCode, String message) {
-        TmAutoScheduleIssueVo issue = new TmAutoScheduleIssueVo();
-        issue.setLevel(TmAutoScheduleIssueLevelEnum.WARN.getCode());
-        issue.setStageCode(TmScheduleStepEnum.INVENTORY_PREDICT.getCode());
-        issue.setStageName(TmScheduleStepEnum.INVENTORY_PREDICT.getDesc());
-        issue.setCategory(TmAutoScheduleIssueCategoryEnum.STOCK_MISSING.getCode());
+        TmAutoScheduleIssueVo issue = this.createIssue(TmAutoScheduleIssueLevelEnum.WARN,
+                TmScheduleStepEnum.INVENTORY_PREDICT, TmAutoScheduleIssueCategoryEnum.STOCK_MISSING, message);
         issue.setTreadCode(treadCode);
         issue.setFieldName("stockQty");
-        issue.setMessage(message);
-        issues.add(issue);
+        this.addIssue(issue);
     }
 
     /**
@@ -157,5 +138,34 @@ public class TmAutoScheduleIssueCollector {
             return Collections.emptyList();
         }
         return new ArrayList<>(issues);
+    }
+
+    /**
+     * 创建包含统一阶段和级别字段的异常对象。
+     *
+     * @param level 异常级别
+     * @param stepEnum 排程阶段
+     * @param category 异常类别
+     * @param message 异常说明
+     * @return 已填充公共字段的异常对象
+     */
+    private TmAutoScheduleIssueVo createIssue(TmAutoScheduleIssueLevelEnum level, TmScheduleStepEnum stepEnum,
+                                              TmAutoScheduleIssueCategoryEnum category, String message) {
+        TmAutoScheduleIssueVo issue = new TmAutoScheduleIssueVo();
+        issue.setLevel(level.getCode());
+        issue.setStageCode(stepEnum.getCode());
+        issue.setStageName(stepEnum.getDesc());
+        issue.setCategory(category.getCode());
+        issue.setMessage(message);
+        return issue;
+    }
+
+    /**
+     * 将异常对象追加至当前排程上下文。
+     *
+     * @param issue 待追加异常对象
+     */
+    private void addIssue(TmAutoScheduleIssueVo issue) {
+        issues.add(issue);
     }
 }

@@ -12,11 +12,11 @@ import lombok.EqualsAndHashCode;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
-import java.util.List;
 
 /**
  * 钢丝圈缠绕盘对象 T_GSQ_TWINING_DISC
- * <p>主表：存储缠绕盘基本信息（编码、名称、英寸、数量等）</p>
+ * <p>主表：存储缠绕盘基本信息（编码、名称、英寸、数量等），单表独立管理；
+ * 规格关系见 T_GSQ_TWINING_DISC_SPEC，机台关系见 T_GSQ_TWINING_DISC_MACHINE（均按编码关联）</p>
  *
  * @author zlt
  * @date 2026-07-08
@@ -63,6 +63,31 @@ public class GsqTwiningDisc extends BaseEntity implements Serializable {
     @ImportValidated(number = true, min = 0, max = 999999)
     private Integer qty;
 
+    /** 钢丝排列方式（如3-4-5-4-3，MES同步字段） */
+    @Excel(name = "ui.data.column.gsq.twiningDisc.sortType")
+    @ApiModelProperty(value = "钢丝排列方式", position = 60)
+    @TableField("SORT_TYPE")
+    @ImportValidated(required = true, maxLength = 50)
+    private String sortType;
+
+    /** 工厂代码 */
+    @Excel(name = "ui.data.column.gsq.twiningDisc.factoryCode", dictType = "biz_factory_name")
+    @ApiModelProperty(value = "工厂代码", position = 70)
+    @TableField("FACTORY_CODE")
+    @ImportValidated(maxLength = 50)
+    private String factoryCode;
+
+    /** MES数据版本号（MES同步字段，手工数据为空） */
+    @ApiModelProperty(value = "MES数据版本号", position = 80)
+    @TableField("DATA_VERSION")
+    private String dataVersion;
+
+    /** 数据来源（字典lh_precision_data_source）：0-MES同步，1-手工维护 */
+    @Excel(name = "ui.data.column.gsq.twiningDisc.dataSource", dictType = "lh_precision_data_source")
+    @ApiModelProperty(value = "数据来源（0-MES同步，1-手工维护）", position = 90)
+    @TableField("DATA_SOURCE")
+    private String dataSource;
+
     /** 备注 */
     @Excel(name = "ui.common.column.remark")
     @ApiModelProperty(value = "备注", position = 500)
@@ -70,9 +95,15 @@ public class GsqTwiningDisc extends BaseEntity implements Serializable {
     @ImportValidated(maxLength = 900)
     private String remark;
 
-    /** 钢丝圈缠绕盘明细列表（非数据库字段，主子表编辑时使用） */
+    /** 关联钢丝圈规格数（非数据库字段，列表统计反显用） */
+    @ApiModelProperty(value = "关联钢丝圈规格数", position = 510)
     @TableField(exist = false)
-    private List<GsqTwiningDiscSub> subList;
+    private Integer specCount;
+
+    /** 关联机台数（非数据库字段，列表统计反显用） */
+    @ApiModelProperty(value = "关联机台数", position = 520)
+    @TableField(exist = false)
+    private Integer machineCount;
 
     /** 排序字段（非数据库字段，用于列表动态排序，格式：字段名+排列方式） */
     @TableField(exist = false)

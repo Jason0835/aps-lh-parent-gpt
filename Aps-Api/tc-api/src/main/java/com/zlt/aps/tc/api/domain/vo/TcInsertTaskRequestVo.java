@@ -36,15 +36,11 @@ public class TcInsertTaskRequestVo implements Serializable {
     @ApiModelProperty(value = "胎侧编码", required = true)
     private String sidewallCode;
 
-    /** 胎侧施工版本。 */
-    @ApiModelProperty(value = "胎侧施工版本", required = true)
-    private String constructionVersion;
-
     /** 多班次计划量与顺序。 */
     @ApiModelProperty(value = "多班次计划量与顺序", required = true)
     private List<TcManualShiftItemVo> shiftList = new ArrayList<>();
 
-    /** 操作原因。 */
-    @ApiModelProperty(value = "操作原因", required = true)
-    private String reason;
+    /** 插单备注，同时作为人工操作日志原因。 */
+    @ApiModelProperty(value = "插单备注")
+    private String remark;
 }

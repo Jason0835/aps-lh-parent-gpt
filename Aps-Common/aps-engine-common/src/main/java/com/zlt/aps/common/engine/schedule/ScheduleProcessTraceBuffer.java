@@ -154,6 +154,17 @@ public class ScheduleProcessTraceBuffer {
     }
 
     /**
+     * 追加必须在所有班次日志之后输出的完整过程事件。
+     *
+     * @param event 完整过程事件
+     */
+    public void appendTailFull(ScheduleProcessTraceEvent event) {
+        if (ScheduleProcessLogLevel.FULL == this.level && event != null) {
+            this.tailEntries.add(event);
+        }
+    }
+
+    /**
      * 追加完整中文过程事件。
      *
      * @param event 完整过程事件

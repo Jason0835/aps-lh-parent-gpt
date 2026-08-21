@@ -59,4 +59,16 @@ public final class ScheduleConstants {
 
     /** 不同英寸切换耗时参数编码 */
     public static final String PARAM_DIFF_INCH_SWITCH_HOURS = "SYS04020005";
+
+    /** 库存可供硫化时长预警阈值参数编码 */
+    public static final String PARAM_STOCK_HOURS_WARNING = "SYS04080007";
+
+    /** 动态调整交班前分钟数参数编码 */
+    public static final String PARAM_BEFORE_HANDOVER_MINUTES = "SYS04080002";
+
+    /** 动态调整胎面停放预警分钟数参数编码 */
+    public static final String PARAM_TREAD_PARKING_WARNING_MINUTES = "SYS04080009";
+
+    /** 动态调整胎面停放小时数参数编码 */
+    public static final String PARAM_TREAD_PARKING_HOURS = "SYS04080004";
 }

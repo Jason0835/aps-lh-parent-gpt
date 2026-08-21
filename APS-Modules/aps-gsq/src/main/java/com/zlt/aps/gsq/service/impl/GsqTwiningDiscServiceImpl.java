@@ -1,6 +1,7 @@
 package com.zlt.aps.gsq.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.utils.SecurityUtils;
@@ -8,14 +9,15 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.utils.ImportUtil;
 import com.zlt.aps.gsq.api.domain.entity.GsqTwiningDisc;
-import com.zlt.aps.gsq.api.domain.entity.GsqTwiningDiscSub;
-import com.zlt.aps.gsq.api.domain.vo.GsqTwiningDiscImportVo;
+import com.zlt.aps.gsq.api.domain.entity.GsqTwiningDiscMachine;
+import com.zlt.aps.gsq.api.domain.entity.GsqTwiningDiscSpec;
+import com.zlt.aps.gsq.api.domain.vo.GsqMesTwiningDiscSyncVO;
+import com.zlt.aps.gsq.mapper.GsqTwiningDiscMachineMapper;
 import com.zlt.aps.gsq.mapper.GsqTwiningDiscMapper;
-import com.zlt.aps.gsq.mapper.GsqTwiningDiscSubMapper;
+import com.zlt.aps.gsq.mapper.GsqTwiningDiscSpecMapper;
 import com.zlt.aps.gsq.service.IGsqTwiningDiscService;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.utils.PubUtil;
-import com.zlt.aps.utils.AppUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
 import org.springframework.stereotype.Service;
@@ -23,21 +25,22 @@ import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
 
 /**
  * 钢丝圈缠绕盘Service实现
- * <p>主子表结构：主表 T_GSQ_TWINING_DISC + 子表 T_GSQ_TWINING_DISC_SUB</p>
- * <p>保存/删除均级联处理子表，保证主子表数据一致性</p>
+ * <p>单表管理 T_GSQ_TWINING_DISC（缠绕盘基础信息）；
+ * 规格关系（T_GSQ_TWINING_DISC_SPEC）与机台关系（T_GSQ_TWINING_DISC_MACHINE）均按编码关联、独立页面维护，
+ * 删除主表时级联逻辑删除两关系表，保证数据一致性</p>
  *
  * @author zlt
  * @date 2026-07-08
@@ -51,7 +54,10 @@ public class GsqTwiningDiscServiceImpl extends AbstractDocService<GsqTwiningDisc
     private GsqTwiningDiscMapper gsqTwiningDiscMapper;
 
     @Resource
-    private GsqTwiningDiscSubMapper gsqTwiningDiscSubMapper;
+    private GsqTwiningDiscSpecMapper gsqTwiningDiscSpecMapper;
+
+    @Resource
+    private GsqTwiningDiscMachineMapper gsqTwiningDiscMachineMapper;
 
     /**
      * 单据类型编码
@@ -88,23 +94,22 @@ public class GsqTwiningDiscServiceImpl extends AbstractDocService<GsqTwiningDisc
     }
 
     /**
-     * 保存钢丝圈缠绕盘（主表+子表），事务级联保存
-     * 1. 唯一性校验（缠绕盘编码）
-     * 2. 保存/更新主表
-     * 3. 删除旧子表（按主表ID逻辑删除）
-     * 4. 保存新子表
+     * 保存钢丝圈缠绕盘（单表保存，带唯一性校验）
      *
-     * @param entity 实体（含 subList 子表数据）
+     * @param entity 实体
      * @return 操作结果
      */
     @Override
-    @Transactional(rollbackFor = Exception.class)
-    public AjaxResult saveMainAndSub(GsqTwiningDisc entity) {
+    public AjaxResult saveWithCheck(GsqTwiningDisc entity) {
         // 唯一性校验
         if (UserConstants.NOT_UNIQUE.equals(checkUnique(entity))) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.gsq.twiningDisc.conflict"));
         }
-        // 设置主表基础字段：新增设置createBy/createTime，更新设置updateBy/updateTime
+        // 数据来源为空默认手工维护'1'（字典lh_precision_data_source：0-MES同步，1-手工；MES同步链路会显式设置'0'）
+        if (PubUtil.isEmpty(entity.getDataSource())) {
+            entity.setDataSource("1");
+        }
+        // 设置基础字段：新增设置createBy/createTime，更新设置updateBy/updateTime
         boolean isNew = entity.getId() == null;
         String username = getCurrentUsername();
         if (isNew) {
@@ -114,45 +119,41 @@ public class GsqTwiningDiscServiceImpl extends AbstractDocService<GsqTwiningDisc
             entity.setUpdateBy(username);
             entity.setUpdateTime(new Date());
         }
-        // 保存主表（id为空新增，id不为空更新，由框架baseDao.save内部判断）
+        // 保存（id为空新增，id不为空更新，由框架baseDao.save内部判断）
         this.save(entity);
-        Long mainId = entity.getId();
-        // 删除旧子表（按主表ID，使用LambdaQueryWrapper）
-        LambdaQueryWrapper<GsqTwiningDiscSub> deleteWrapper = new LambdaQueryWrapper<>();
-        deleteWrapper.eq(GsqTwiningDiscSub::getDiscId, mainId);
-        gsqTwiningDiscSubMapper.delete(deleteWrapper);
-        // 保存新子表（重置主键并关联主表，补充基础字段；isDelete由BaseEntity构造器默认为0）
-        List<GsqTwiningDiscSub> subList = entity.getSubList();
-        if (CollectionUtils.isNotEmpty(subList)) {
-            Date now = new Date();
-            for (GsqTwiningDiscSub sub : subList) {
-                sub.setId(null);
-                sub.setDiscId(mainId);
-                sub.setIsDelete(0);
-                sub.setCreateBy(username);
-                sub.setCreateTime(now);
-                gsqTwiningDiscSubMapper.insert(sub);
-            }
-        }
         return AjaxResult.success();
     }
 
     /**
-     * 删除钢丝圈缠绕盘（删除主表，并级联删除子表）
+     * 删除钢丝圈缠绕盘（删除主表，并按缠绕盘编码级联删除规格关系及机台关系）
+     * <p>两关系表均按编码关联（无外键ID），删除主表后同步清理，
+     * 避免残留孤儿关系数据影响排程机台分配</p>
      *
      * @param ids 主表ID集合
      * @return 操作结果
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public AjaxResult removeMainAndSub(List<Long> ids) {
+    public AjaxResult removeMainAndRelation(List<Long> ids) {
         if (CollectionUtils.isEmpty(ids)) {
-            return AjaxResult.error("未选择删除数据");
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.gsq.discMachine.noSelectData"));
         }
-        // 级联删除子表（先删子表，使用LambdaQueryWrapper）
-        LambdaQueryWrapper<GsqTwiningDiscSub> subWrapper = new LambdaQueryWrapper<>();
-        subWrapper.in(GsqTwiningDiscSub::getDiscId, ids);
-        gsqTwiningDiscSubMapper.delete(subWrapper);
+        // 查询待删除缠绕盘的编码集合（用于级联删除两关系表）
+        List<GsqTwiningDisc> discList = gsqTwiningDiscMapper.selectBatchIds(ids);
+        List<String> discCodes = discList.stream()
+                .map(GsqTwiningDisc::getTwiningDiscCode)
+                .filter(PubUtil::isNotEmpty)
+                .collect(Collectors.toList());
+        // 级联删除规格关系（按缠绕盘编码）
+        if (CollectionUtils.isNotEmpty(discCodes)) {
+            LambdaQueryWrapper<GsqTwiningDiscSpec> subWrapper = new LambdaQueryWrapper<>();
+            subWrapper.in(GsqTwiningDiscSpec::getTwiningDiscCode, discCodes);
+            gsqTwiningDiscSpecMapper.delete(subWrapper);
+            // 级联删除机台关系（按缠绕盘编码）
+            LambdaQueryWrapper<GsqTwiningDiscMachine> machineWrapper = new LambdaQueryWrapper<>();
+            machineWrapper.in(GsqTwiningDiscMachine::getTwiningDiscCode, discCodes);
+            gsqTwiningDiscMachineMapper.delete(machineWrapper);
+        }
         // 删除主表
         this.removeByIds(ids);
         return AjaxResult.success();
@@ -181,32 +182,13 @@ public class GsqTwiningDiscServiceImpl extends AbstractDocService<GsqTwiningDisc
     }
 
     /**
-     * 子表反显公式：钢丝圈名称根据钢丝圈编号从施工信息表反显
-     * steelRingName -> 根据 STEEL_RING_CODE 从 T_MDM_CONSTRUCTION_INFO 取 BEAD_NAME
-     */
-    @Override
-    public String[] getSubQueryFormulas() {
-        return new String[]{
-                "steelRingName -> getcolvalue(T_MDM_CONSTRUCTION_INFO, BEAD_NAME, BEAD_CODE, steelRingCode)"
-        };
-    }
-
-    /**
-     * 根据主表ID查询子表数据并反显钢丝圈名称
+     * 查询施工信息表全部钢丝圈选项（编码+名称，去重），供页面下拉选择使用
      *
-     * @param discId 主表ID
-     * @return 子表列表（含反显名称）
+     * @return 钢丝圈选项列表（key：BEAD_CODE 钢丝圈编号、BEAD_NAME 钢丝圈名称）
      */
     @Override
-    public List<GsqTwiningDiscSub> querySubListByDiscId(Long discId) {
-        LambdaQueryWrapper<GsqTwiningDiscSub> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(GsqTwiningDiscSub::getDiscId, discId);
-        wrapper.eq(GsqTwiningDiscSub::getIsDelete, "0");
-        wrapper.orderByAsc(GsqTwiningDiscSub::getCreateTime);
-        List<GsqTwiningDiscSub> list = gsqTwiningDiscSubMapper.selectList(wrapper);
-        // 反显钢丝圈名称
-        AppUtils.formatData(list, getSubQueryFormulas());
-        return list;
+    public List<Map<String, Object>> listSteelRingOptions() {
+        return gsqTwiningDiscMapper.listSteelRingOptions();
     }
 
     /**
@@ -298,212 +280,254 @@ public class GsqTwiningDiscServiceImpl extends AbstractDocService<GsqTwiningDisc
     }
 
     /**
-     * 主子表平铺导入：按缠绕盘编码分组组装主表+子表明细后级联保存
-     * <p>导入模板一行 = 主表字段（缠绕盘编号/名称/状态/英寸/数量/主表备注）
-     * + 子表字段（钢丝圈编号/名称/明细备注）；同一缠绕盘多行明细时主表字段以首行为准</p>
-     * <p>校验规则：
-     * 1. 第一轮（逐行）：缠绕盘编码+钢丝圈编号组合文件内重复校验、注解校验（必填/格式/长度）；
-     * 2. 第二轮（业务，批量预取后校验）：钢丝圈编号必须存在于施工信息表（名称未填时按编号反显）；
-     * 3. 保存：主表新增或更新（已存在且不允许更新时报唯一冲突），更新时级联替换旧子表明细</p>
+     * MES缠绕盘三表同步落库（事务性操作，供GsqMesSyncController远程调用）
+     * <p>单事务处理缠绕盘清单/规格关系/机台关系，保证三表一致性：</p>
+     * <p>1. 主表UPSERT：按缠绕盘编码分流，存在则仅更新MES字段（英寸/排列方式/状态/工厂/版本/来源，
+     * 保留名称/数量/备注等手工维护字段），不存在则批量插入（名称默认取编码，XML显式列绕过MetaObjectHandler）；</p>
+     * <p>2. 主表清理：APS中MES来源但MES最新清单已不存在的缠绕盘逻辑删除，并级联逻辑删除规格关系/机台关系；</p>
+     * <p>3. 规格关系UPSERT：按缠绕盘编码+钢丝圈编号组合分流更新/插入（名称反显自施工信息表），
+     * MES来源已失效的组合逻辑删除；</p>
+     * <p>4. 机台关系UPSERT：按缠绕盘编码+机台编号组合分流更新/插入，MES来源已失效的组合逻辑删除</p>
      *
-     * @param list          平铺导入数据集合
-     * @param updateSupport 已存在是否更新
-     * @param importLogId   导入日志id
-     * @return 导入后提示信息
+     * @param syncVO   MES三表聚合数据
+     * @param updateBy 更新者（MES同步传"MES"）
+     * @return 操作结果
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public AjaxResult importMainAndSubData(List<GsqTwiningDiscImportVo> list, boolean updateSupport, Long importLogId) {
-        int successNum = 0;
-        int failureNum = 0;
-        List<ImportErrorLog> importErrorLogs = new ArrayList<>();
-        // 通过第一轮校验的数据及对应Excel行号（行号用于错误日志定位）
-        Map<GsqTwiningDiscImportVo, Integer> voRowMap = new LinkedHashMap<>();
+    public AjaxResult syncFromMes(GsqMesTwiningDiscSyncVO syncVO, String updateBy) {
+        if (syncVO == null) {
+            return AjaxResult.error("同步数据为空");
+        }
+        List<GsqTwiningDisc> discList = syncVO.getDiscList() == null ? new ArrayList<>() : syncVO.getDiscList();
+        List<GsqTwiningDiscSpec> specList = syncVO.getSpecList() == null ? new ArrayList<>() : syncVO.getSpecList();
+        List<GsqTwiningDiscMachine> machineList = syncVO.getMachineList() == null ? new ArrayList<>() : syncVO.getMachineList();
 
-        // ===== 第一轮校验：文件内组合重复 + 注解校验 =====
-        // 缠绕盘编码因多行明细会合法重复，重复判定使用"缠绕盘编码|钢丝圈编号"组合键
-        Map<String, Long> groupMap = list.stream()
-                .filter(vo -> PubUtil.isNotEmpty(vo.getTwiningDiscCode()) && PubUtil.isNotEmpty(vo.getSteelRingCode()))
-                .collect(Collectors.groupingBy(vo -> vo.getTwiningDiscCode() + "|" + vo.getSteelRingCode(), Collectors.counting()));
-
-        for (int i = 0; i < list.size(); i++) {
-            GsqTwiningDiscImportVo vo = list.get(i);
-            int rowNum = i + 2;
-
-            // 文件内组合重复校验（同缠绕盘+同钢丝圈不允许重复）
-            if (PubUtil.isNotEmpty(vo.getTwiningDiscCode()) && PubUtil.isNotEmpty(vo.getSteelRingCode())) {
-                Long count = groupMap.get(vo.getTwiningDiscCode() + "|" + vo.getSteelRingCode());
-                if (count != null && count > 1) {
-                    failureNum++;
-                    String message = I18nUtil.getMessage("ui.data.column.all.conflictRecord");
-                    String columnName = I18nUtil.getMessage("ui.data.column.gsq.twiningDisc.twiningDiscCode") + "+"
-                            + I18nUtil.getMessage("ui.data.column.gsq.twiningDisc.steelRingCode");
-                    addImportErrorLog(importLogId, rowNum, String.format(message, columnName), importErrorLogs);
-                    continue;
-                }
-            }
-
-            // 字段格式校验（必填/格式/长度）
-            List<ImportErrorLog> validated = ImportUtil.validated(importLogId, rowNum, vo);
-            if (validated.isEmpty()) {
-                voRowMap.put(vo, rowNum);
-            } else {
-                failureNum++;
-                importErrorLogs.addAll(validated);
-            }
+        // MES三表全部为空视为异常快照（主数据全量同步出现空清单会导致误清空APS数据，防御性跳过）
+        if (discList.isEmpty() && specList.isEmpty() && machineList.isEmpty()) {
+            log.warn("缠绕盘MES同步：MES三表均无数据，本次跳过同步，避免误清空APS现有数据");
+            return AjaxResult.success("MES无数据可同步");
         }
 
-        // ===== 批量预取：数据库已存在缠绕盘 + 施工信息表钢丝圈编码->名称映射 =====
-        Map<String, GsqTwiningDisc> existDiscMap = new HashMap<>();
-        Map<String, String> steelRingNameMap = new HashMap<>();
-        if (!voRowMap.isEmpty()) {
-            existDiscMap = this.selectExistDiscMap(voRowMap.keySet());
-            steelRingNameMap = this.selectSteelRingNameMap(voRowMap.keySet());
-        }
+        Date now = new Date();
 
-        // ===== 第二轮校验：业务校验（钢丝圈存在性 + 名称反显）=====
-        List<GsqTwiningDiscImportVo> businessPassList = new ArrayList<>();
-        for (Map.Entry<GsqTwiningDiscImportVo, Integer> entry : voRowMap.entrySet()) {
-            GsqTwiningDiscImportVo vo = entry.getKey();
-            // 钢丝圈编号存在性校验：必须存在于施工信息表
-            if (!steelRingNameMap.containsKey(vo.getSteelRingCode())) {
-                failureNum++;
-                String message = String.format(
-                        I18nUtil.getMessage("ui.data.column.gsq.twiningDisc.steelRingNotExists"), vo.getSteelRingCode());
-                addImportErrorLog(importLogId, entry.getValue(), message, importErrorLogs);
+        // ===== 1. 主表UPSERT：查询APS现有全部未删除缠绕盘（含手工/MES来源），按编码索引 =====
+        LambdaQueryWrapper<GsqTwiningDisc> existWrapper = new LambdaQueryWrapper<>();
+        existWrapper.eq(GsqTwiningDisc::getIsDelete, 0);
+        Map<String, GsqTwiningDisc> existDiscMap = gsqTwiningDiscMapper.selectList(existWrapper).stream()
+                .filter(disc -> PubUtil.isNotEmpty(disc.getTwiningDiscCode()))
+                .collect(Collectors.toMap(GsqTwiningDisc::getTwiningDiscCode, Function.identity(), (v1, v2) -> v1));
+
+        Set<String> mesDiscCodes = new HashSet<>();
+        List<GsqTwiningDisc> discInsertList = new ArrayList<>();
+        for (GsqTwiningDisc mes : discList) {
+            if (PubUtil.isEmpty(mes.getTwiningDiscCode())) {
                 continue;
             }
-            // 钢丝圈名称未填写时按编号从施工信息表反显
-            if (PubUtil.isEmpty(vo.getSteelRingName())) {
-                vo.setSteelRingName(steelRingNameMap.get(vo.getSteelRingCode()));
+            mesDiscCodes.add(mes.getTwiningDiscCode());
+            GsqTwiningDisc exist = existDiscMap.get(mes.getTwiningDiscCode());
+            if (exist != null) {
+                // 已存在：仅更新MES维护字段，保留名称/数量/备注等手工维护字段
+                LambdaUpdateWrapper<GsqTwiningDisc> updateWrapper = new LambdaUpdateWrapper<>();
+                updateWrapper.eq(GsqTwiningDisc::getId, exist.getId())
+                        .set(GsqTwiningDisc::getProSize, mes.getProSize())
+                        .set(GsqTwiningDisc::getSortType, mes.getSortType())
+                        .set(GsqTwiningDisc::getStatus, PubUtil.isEmpty(mes.getStatus()) ? "0" : mes.getStatus())
+                        .set(GsqTwiningDisc::getFactoryCode, mes.getFactoryCode())
+                        .set(GsqTwiningDisc::getDataVersion, mes.getDataVersion())
+                        .set(GsqTwiningDisc::getDataSource, "0")
+                        .set(GsqTwiningDisc::getUpdateBy, updateBy)
+                        .set(GsqTwiningDisc::getUpdateTime, now);
+                gsqTwiningDiscMapper.update(null, updateWrapper);
+            } else {
+                // 不存在：组装新增记录（MES无名称字段，名称默认取编码，可由用户后续手工补充）
+                mes.setTwiningDiscName(PubUtil.isNotEmpty(mes.getTwiningDiscName()) ? mes.getTwiningDiscName() : mes.getTwiningDiscCode());
+                mes.setStatus(PubUtil.isEmpty(mes.getStatus()) ? "0" : mes.getStatus());
+                mes.setDataSource("0");
+                mes.setIsDelete(0);
+                mes.setCreateBy(updateBy);
+                mes.setUpdateBy(updateBy);
+                discInsertList.add(mes);
             }
-            businessPassList.add(vo);
+        }
+        if (!discInsertList.isEmpty()) {
+            gsqTwiningDiscMapper.batchInsertMesDisc(discInsertList);
         }
 
-        // ===== 分组保存：按缠绕盘编码分组（保持文件顺序），组装主子表级联保存 =====
-        try {
-            Map<String, List<GsqTwiningDiscImportVo>> discGroupMap = businessPassList.stream()
-                    .collect(Collectors.groupingBy(GsqTwiningDiscImportVo::getTwiningDiscCode,
-                            LinkedHashMap::new, Collectors.toList()));
-            String username = getCurrentUsername();
-            Date now = new Date();
+        // ===== 2. 主表清理：MES来源但MES最新清单已不存在的缠绕盘，逻辑删除并级联清理 =====
+        List<Long> deleteDiscIds = new ArrayList<>();
+        List<String> deleteDiscCodes = new ArrayList<>();
+        for (GsqTwiningDisc exist : existDiscMap.values()) {
+            // 仅清理MES来源（字典lh_precision_data_source：0-MES同步）且MES最新清单已不存在的缠绕盘，手工数据（1）保留
+            if ("0".equals(exist.getDataSource()) && !mesDiscCodes.contains(exist.getTwiningDiscCode())) {
+                deleteDiscIds.add(exist.getId());
+                deleteDiscCodes.add(exist.getTwiningDiscCode());
+            }
+        }
+        if (!deleteDiscIds.isEmpty()) {
+            LambdaUpdateWrapper<GsqTwiningDisc> deleteWrapper = new LambdaUpdateWrapper<>();
+            deleteWrapper.in(GsqTwiningDisc::getId, deleteDiscIds)
+                    .set(GsqTwiningDisc::getIsDelete, 1)
+                    .set(GsqTwiningDisc::getUpdateBy, updateBy)
+                    .set(GsqTwiningDisc::getUpdateTime, now);
+            gsqTwiningDiscMapper.update(null, deleteWrapper);
+            // 级联逻辑删除规格关系（按缠绕盘编码）
+            LambdaUpdateWrapper<GsqTwiningDiscSpec> subDeleteWrapper = new LambdaUpdateWrapper<>();
+            subDeleteWrapper.in(GsqTwiningDiscSpec::getTwiningDiscCode, deleteDiscCodes)
+                    .set(GsqTwiningDiscSpec::getIsDelete, 1)
+                    .set(GsqTwiningDiscSpec::getUpdateBy, updateBy)
+                    .set(GsqTwiningDiscSpec::getUpdateTime, now);
+            gsqTwiningDiscSpecMapper.update(null, subDeleteWrapper);
+            // 级联逻辑删除机台关系（按缠绕盘编码）
+            LambdaUpdateWrapper<GsqTwiningDiscMachine> machineDeleteWrapper = new LambdaUpdateWrapper<>();
+            machineDeleteWrapper.in(GsqTwiningDiscMachine::getTwiningDiscCode, deleteDiscCodes)
+                    .set(GsqTwiningDiscMachine::getIsDelete, 1)
+                    .set(GsqTwiningDiscMachine::getUpdateBy, updateBy)
+                    .set(GsqTwiningDiscMachine::getUpdateTime, now);
+            gsqTwiningDiscMachineMapper.update(null, machineDeleteWrapper);
+        }
 
-            for (Map.Entry<String, List<GsqTwiningDiscImportVo>> entry : discGroupMap.entrySet()) {
-                List<GsqTwiningDiscImportVo> rows = entry.getValue();
-                GsqTwiningDiscImportVo firstRow = rows.get(0);
-                GsqTwiningDisc existDisc = existDiscMap.get(entry.getKey());
+        // ===== 3. 规格关系UPSERT：按缠绕盘编码+钢丝圈编号组合分流更新/插入 =====
+        if (!specList.isEmpty()) {
+            // 查询APS现有全部未删除规格关系，按组合键索引
+            LambdaQueryWrapper<GsqTwiningDiscSpec> existSubWrapper = new LambdaQueryWrapper<>();
+            existSubWrapper.eq(GsqTwiningDiscSpec::getIsDelete, 0);
+            Map<String, GsqTwiningDiscSpec> existSubMap = gsqTwiningDiscSpecMapper.selectList(existSubWrapper).stream()
+                    .filter(sub -> PubUtil.isNotEmpty(sub.getTwiningDiscCode()) && PubUtil.isNotEmpty(sub.getSteelRingCode()))
+                    .collect(Collectors.toMap(
+                            sub -> sub.getTwiningDiscCode() + "|" + sub.getSteelRingCode(),
+                            Function.identity(), (v1, v2) -> v1));
 
-                // 已存在且不允许更新：该缠绕盘全部行导入失败
-                if (existDisc != null && !updateSupport) {
-                    failureNum += rows.size();
-                    for (GsqTwiningDiscImportVo row : rows) {
-                        addImportErrorLog(importLogId, voRowMap.get(row),
-                                I18nUtil.getMessage("ui.data.column.gsq.twiningDisc.conflict"), importErrorLogs);
-                    }
+            // 批量预取钢丝圈编码->名称映射（用于反显）
+            Set<String> ringCodes = specList.stream()
+                    .map(GsqTwiningDiscSpec::getSteelRingCode)
+                    .filter(PubUtil::isNotEmpty)
+                    .collect(Collectors.toSet());
+            Map<String, String> ringNameMap = new HashMap<>();
+            List<String> ringCodeList = new ArrayList<>(ringCodes);
+            int ringBatchSize = 1000;
+            for (int i = 0; i < ringCodeList.size(); i += ringBatchSize) {
+                List<String> batch = ringCodeList.subList(i, Math.min(i + ringBatchSize, ringCodeList.size()));
+                gsqTwiningDiscMapper.listSteelRingInfoByCodes(batch).forEach(ring ->
+                        ringNameMap.put(String.valueOf(ring.get("BEAD_CODE")),
+                                ring.get("BEAD_NAME") == null ? "" : String.valueOf(ring.get("BEAD_NAME"))));
+            }
+
+            // 分流更新/插入（工厂代码为空时按MES值落库，钢丝圈名称按施工信息表反显）
+            Set<String> mesSubKeys = new HashSet<>();
+            List<GsqTwiningDiscSpec> subInsertList = new ArrayList<>();
+            for (GsqTwiningDiscSpec mes : specList) {
+                if (PubUtil.isEmpty(mes.getTwiningDiscCode()) || PubUtil.isEmpty(mes.getSteelRingCode())) {
                     continue;
                 }
-
-                // 组装主表（主表字段以首行为准，状态为空时默认正常0）
-                GsqTwiningDisc disc = existDisc != null ? existDisc : new GsqTwiningDisc();
-                disc.setTwiningDiscCode(firstRow.getTwiningDiscCode());
-                disc.setTwiningDiscName(firstRow.getTwiningDiscName());
-                disc.setStatus(PubUtil.isEmpty(firstRow.getStatus()) ? "0" : firstRow.getStatus());
-                disc.setProSize(firstRow.getProSize());
-                disc.setQty(firstRow.getQty());
-                disc.setRemark(firstRow.getMainRemark());
-                disc.setIsDelete(0);
-                if (existDisc != null) {
-                    disc.setUpdateBy(username);
-                    disc.setUpdateTime(now);
+                String key = mes.getTwiningDiscCode() + "|" + mes.getSteelRingCode();
+                mesSubKeys.add(key);
+                GsqTwiningDiscSpec exist = existSubMap.get(key);
+                if (exist != null) {
+                    // 已存在：仅更新MES维护字段
+                    LambdaUpdateWrapper<GsqTwiningDiscSpec> updateWrapper = new LambdaUpdateWrapper<>();
+                    updateWrapper.eq(GsqTwiningDiscSpec::getId, exist.getId())
+                            .set(GsqTwiningDiscSpec::getSteelRingName, ringNameMap.get(mes.getSteelRingCode()))
+                            .set(GsqTwiningDiscSpec::getStatus, PubUtil.isEmpty(mes.getStatus()) ? "0" : mes.getStatus())
+                            .set(GsqTwiningDiscSpec::getFactoryCode, mes.getFactoryCode())
+                            .set(GsqTwiningDiscSpec::getDataVersion, mes.getDataVersion())
+                            .set(GsqTwiningDiscSpec::getDataSource, "0")
+                            .set(GsqTwiningDiscSpec::getUpdateBy, updateBy)
+                            .set(GsqTwiningDiscSpec::getUpdateTime, now);
+                    gsqTwiningDiscSpecMapper.update(null, updateWrapper);
                 } else {
-                    disc.setCreateBy(username);
-                    disc.setCreateTime(now);
+                    mes.setSteelRingName(ringNameMap.get(mes.getSteelRingCode()));
+                    mes.setStatus(PubUtil.isEmpty(mes.getStatus()) ? "0" : mes.getStatus());
+                    mes.setIsDelete(0);
+                    mes.setCreateBy(updateBy);
+                    mes.setUpdateBy(updateBy);
+                    subInsertList.add(mes);
                 }
-                // 保存/更新主表（id为空新增，id不为空更新，由框架baseDao.save内部判断）
-                baseDao.save(disc);
-                Long mainId = disc.getId();
-
-                // 更新场景：级联删除旧子表后整体替换（与saveMainAndSub保持一致）
-                if (existDisc != null) {
-                    LambdaQueryWrapper<GsqTwiningDiscSub> deleteWrapper = new LambdaQueryWrapper<>();
-                    deleteWrapper.eq(GsqTwiningDiscSub::getDiscId, mainId);
-                    gsqTwiningDiscSubMapper.delete(deleteWrapper);
-                }
-
-                // 组装子表明细并批量保存（关联主表ID，补充基础字段）
-                List<GsqTwiningDiscSub> subList = rows.stream().map(row -> {
-                    GsqTwiningDiscSub sub = new GsqTwiningDiscSub();
-                    sub.setDiscId(mainId);
-                    sub.setSteelRingCode(row.getSteelRingCode());
-                    sub.setSteelRingName(row.getSteelRingName());
-                    sub.setRemark(row.getSubRemark());
-                    sub.setIsDelete(0);
-                    sub.setCreateBy(username);
-                    sub.setCreateTime(now);
-                    return sub;
-                }).collect(Collectors.toList());
-                baseDao.saveBatch(subList);
-                successNum += rows.size();
             }
-        } catch (Exception e) {
-            log.error("导入钢丝圈缠绕盘异常", e);
-            successNum = 0;
-            failureNum = list.size();
-            importErrorLogs.clear();
-            addImportErrorLog(importLogId, null, e.getMessage(), importErrorLogs);
+            if (!subInsertList.isEmpty()) {
+                gsqTwiningDiscSpecMapper.batchInsertMesSpec(subInsertList);
+            }
+
+            // 规格关系清理：MES来源但MES最新关系已不存在的组合逻辑删除
+            List<Long> deleteSubIds = existSubMap.values().stream()
+                    .filter(sub -> "0".equals(sub.getDataSource()))
+                    .filter(sub -> !mesSubKeys.contains(sub.getTwiningDiscCode() + "|" + sub.getSteelRingCode()))
+                    .map(GsqTwiningDiscSpec::getId)
+                    .collect(Collectors.toList());
+            if (!deleteSubIds.isEmpty()) {
+                LambdaUpdateWrapper<GsqTwiningDiscSpec> deleteWrapper = new LambdaUpdateWrapper<>();
+                deleteWrapper.in(GsqTwiningDiscSpec::getId, deleteSubIds)
+                        .set(GsqTwiningDiscSpec::getIsDelete, 1)
+                        .set(GsqTwiningDiscSpec::getUpdateBy, updateBy)
+                        .set(GsqTwiningDiscSpec::getUpdateTime, now);
+                gsqTwiningDiscSpecMapper.update(null, deleteWrapper);
+            }
         }
 
-        if (failureNum > 0) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum, importErrorLogs);
-        }
-        return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + successNum);
-    }
+        // ===== 4. 机台关系UPSERT：按缠绕盘编码+机台编号组合分流更新/插入 =====
+        LambdaQueryWrapper<GsqTwiningDiscMachine> existMachineWrapper = new LambdaQueryWrapper<>();
+        existMachineWrapper.eq(GsqTwiningDiscMachine::getIsDelete, 0);
+        Map<String, GsqTwiningDiscMachine> existMachineMap = gsqTwiningDiscMachineMapper.selectList(existMachineWrapper).stream()
+                .filter(machine -> PubUtil.isNotEmpty(machine.getTwiningDiscCode()) && PubUtil.isNotEmpty(machine.getMachineCode()))
+                .collect(Collectors.toMap(
+                        machine -> machine.getTwiningDiscCode() + "|" + machine.getMachineCode(),
+                        Function.identity(), (v1, v2) -> v1));
 
-    /**
-     * 批量查询数据库中已存在的缠绕盘（用于唯一性判断与更新定位，1000条一批）
-     *
-     * @param voCollection 通过格式校验的导入数据集合（取缠绕盘编码）
-     * @return 缠绕盘编码 -> 已存在缠绕盘实体
-     */
-    private Map<String, GsqTwiningDisc> selectExistDiscMap(Collection<GsqTwiningDiscImportVo> voCollection) {
-        Set<String> codes = voCollection.stream()
-                .map(GsqTwiningDiscImportVo::getTwiningDiscCode)
-                .collect(Collectors.toSet());
-        Map<String, GsqTwiningDisc> resultMap = new HashMap<>();
-        // 分批查询，避免in条件过长
-        List<String> codeList = new ArrayList<>(codes);
-        int batchSize = 1000;
-        for (int i = 0; i < codeList.size(); i += batchSize) {
-            List<String> batch = codeList.subList(i, Math.min(i + batchSize, codeList.size()));
-            LambdaQueryWrapper<GsqTwiningDisc> wrapper = new LambdaQueryWrapper<>();
-            wrapper.in(GsqTwiningDisc::getTwiningDiscCode, batch);
-            wrapper.eq(GsqTwiningDisc::getIsDelete, "0");
-            gsqTwiningDiscMapper.selectList(wrapper)
-                    .forEach(disc -> resultMap.put(disc.getTwiningDiscCode(), disc));
+        Set<String> mesMachineKeys = new HashSet<>();
+        List<GsqTwiningDiscMachine> machineInsertList = new ArrayList<>();
+        for (GsqTwiningDiscMachine mes : machineList) {
+            if (PubUtil.isEmpty(mes.getTwiningDiscCode()) || PubUtil.isEmpty(mes.getMachineCode())) {
+                continue;
+            }
+            String key = mes.getTwiningDiscCode() + "|" + mes.getMachineCode();
+            mesMachineKeys.add(key);
+            GsqTwiningDiscMachine exist = existMachineMap.get(key);
+            if (exist != null) {
+                // 已存在：仅更新MES维护字段
+                LambdaUpdateWrapper<GsqTwiningDiscMachine> updateWrapper = new LambdaUpdateWrapper<>();
+                updateWrapper.eq(GsqTwiningDiscMachine::getId, exist.getId())
+                        .set(GsqTwiningDiscMachine::getStatus, PubUtil.isEmpty(mes.getStatus()) ? "0" : mes.getStatus())
+                        .set(GsqTwiningDiscMachine::getFactoryCode, mes.getFactoryCode())
+                        .set(GsqTwiningDiscMachine::getDataVersion, mes.getDataVersion())
+                        .set(GsqTwiningDiscMachine::getDataSource, "0")
+                        .set(GsqTwiningDiscMachine::getUpdateBy, updateBy)
+                        .set(GsqTwiningDiscMachine::getUpdateTime, now);
+                gsqTwiningDiscMachineMapper.update(null, updateWrapper);
+            } else {
+                mes.setStatus(PubUtil.isEmpty(mes.getStatus()) ? "0" : mes.getStatus());
+                mes.setDataSource("0");
+                mes.setIsDelete(0);
+                mes.setCreateBy(updateBy);
+                mes.setUpdateBy(updateBy);
+                machineInsertList.add(mes);
+            }
         }
-        return resultMap;
-    }
+        if (!machineInsertList.isEmpty()) {
+            gsqTwiningDiscMachineMapper.batchInsertMesMachine(machineInsertList);
+        }
 
-    /**
-     * 批量查询施工信息表钢丝圈编码->名称映射（用于存在性校验与名称反显，1000条一批）
-     *
-     * @param voCollection 通过格式校验的导入数据集合（取钢丝圈编号）
-     * @return 钢丝圈编码 -> 钢丝圈名称
-     */
-    private Map<String, String> selectSteelRingNameMap(Collection<GsqTwiningDiscImportVo> voCollection) {
-        Set<String> codes = voCollection.stream()
-                .map(GsqTwiningDiscImportVo::getSteelRingCode)
-                .collect(Collectors.toSet());
-        Map<String, String> resultMap = new HashMap<>();
-        // 分批查询，避免in条件过长
-        List<String> codeList = new ArrayList<>(codes);
-        int batchSize = 1000;
-        for (int i = 0; i < codeList.size(); i += batchSize) {
-            List<String> batch = codeList.subList(i, Math.min(i + batchSize, codeList.size()));
-            gsqTwiningDiscMapper.listSteelRingInfoByCodes(batch).forEach(ring ->
-                    resultMap.put(String.valueOf(ring.get("BEAD_CODE")),
-                            ring.get("BEAD_NAME") == null ? "" : String.valueOf(ring.get("BEAD_NAME"))));
+        // 机台关系清理：MES来源（字典lh_precision_data_source：0-MES同步）但MES最新关系已不存在的组合逻辑删除
+        List<Long> deleteMachineIds = existMachineMap.values().stream()
+                .filter(machine -> "0".equals(machine.getDataSource()))
+                .filter(machine -> !mesMachineKeys.contains(machine.getTwiningDiscCode() + "|" + machine.getMachineCode()))
+                .map(GsqTwiningDiscMachine::getId)
+                .collect(Collectors.toList());
+        if (!deleteMachineIds.isEmpty()) {
+            LambdaUpdateWrapper<GsqTwiningDiscMachine> deleteWrapper = new LambdaUpdateWrapper<>();
+            deleteWrapper.in(GsqTwiningDiscMachine::getId, deleteMachineIds)
+                    .set(GsqTwiningDiscMachine::getIsDelete, 1)
+                    .set(GsqTwiningDiscMachine::getUpdateBy, updateBy)
+                    .set(GsqTwiningDiscMachine::getUpdateTime, now);
+            gsqTwiningDiscMachineMapper.update(null, deleteWrapper);
         }
-        return resultMap;
+
+        log.info("缠绕盘MES同步：主表新增={}清理={}，规格关系新增={}，机台关系新增={}清理={}",
+                discInsertList.size(),
+                deleteDiscIds.size(),
+                syncVO.getSpecList() == null ? 0 : (int) specList.stream()
+                        .filter(sub -> PubUtil.isNotEmpty(sub.getTwiningDiscCode()) && PubUtil.isNotEmpty(sub.getSteelRingCode())).count(),
+                machineInsertList.size(),
+                deleteMachineIds.size());
+        return AjaxResult.success();
     }
 }

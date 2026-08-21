@@ -126,7 +126,7 @@ public class TcManualOptionsService {
             List<TcManualConstructionOptionVo> optionList = groupedOptionMap.get(sidewallCode);
             if (optionList == null || optionList.isEmpty()) {
                 throw new ServiceException(MessageFormat.format(I18nUtil.getMessage(
-                        "ui.data.alert.tc.schedule.excel.constructionNotFound"), sidewallCode));
+                        "ui.tc.schedule.insert.sidewallNotFound"), sidewallCode));
             }
             if (optionList.size() != 1) {
                 throw new ServiceException(MessageFormat.format(I18nUtil.getMessage(

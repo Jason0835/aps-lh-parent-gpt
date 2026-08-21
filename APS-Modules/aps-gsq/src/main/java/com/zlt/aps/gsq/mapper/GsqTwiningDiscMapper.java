@@ -45,4 +45,18 @@ public interface GsqTwiningDiscMapper extends BaseMapper<GsqTwiningDisc> {
      * @return 钢丝圈信息列表（key：BEAD_CODE 钢丝圈编号、BEAD_NAME 钢丝圈名称）
      */
     List<Map<String, Object>> listSteelRingInfoByCodes(@Param("codes") List<String> codes);
+
+    /**
+     * 查询施工信息表全部钢丝圈选项（编码+名称，去重），供页面下拉选择使用
+     *
+     * @return 钢丝圈选项列表（key：BEAD_CODE 钢丝圈编号、BEAD_NAME 钢丝圈名称）
+     */
+    List<Map<String, Object>> listSteelRingOptions();
+
+    /**
+     * MES缠绕盘清单同步专用批量插入（XML显式列，绕过MetaObjectHandler，CREATE_BY='MES'）
+     *
+     * @param list 待插入的缠绕盘清单（均为APS中不存在的新增编码）
+     */
+    void batchInsertMesDisc(List<GsqTwiningDisc> list);
 }

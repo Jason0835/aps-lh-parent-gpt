@@ -34,6 +34,7 @@ import { mapState } from "vuex";
 import materialCodeSelect from "@/views/components/materialCodeSelect.vue";
 import structureSelect from "../components/structureSelect.vue";
 import formingCapacitySelect from "@/views/components/formingCapacitySelect.vue";
+import embryoCodeSelect from "@/views/components/embryoCodeSelect.vue";
 import { editCxMachineFixed } from "@/api/monthplan/mdmCxMachineFixed";
 
 import infoForm from "@/views/components/infoForm.vue";
@@ -44,6 +45,7 @@ export default {
     materialCodeSelect,
     structureSelect,
     formingCapacitySelect,
+    embryoCodeSelect,
   },
   inject: ["parentDict"],
   data() {
@@ -191,6 +193,27 @@ export default {
           },
         },
         {
+          prop: "fixedEmbryoCode",
+          label: this.$t("ui.data.column.mdmCxMachineFixed.fixedEmbryoCode"),
+          maxlength: 500,
+          render: (form) => {
+            return (
+              <embryoCodeSelect
+                key={form.fixedEmbryoCode}
+                multiple={true}
+                v-model={form.fixedEmbryoCode}
+                onChange={this.handleFixedEmbryoChange}
+                oldList={form.fixedEmbryoCode}
+              />
+            );
+          },
+        },
+        {
+          prop: "fixedMainMaterialDesc",
+          label: this.$t("ui.data.column.mdmCxMachineFixed.fixedMainMaterialDesc"),
+          disabled: true,
+        },
+        {
           prop: "fixedMaterialCode",
           label: this.$t("ui.data.column.mdmCxMachineFixed.fixedMaterialCode"),
           maxlength: 500,
@@ -261,6 +284,18 @@ export default {
        }
       }
       this.$set(this.form,'fixedMaterialDesc',text)
+    },
+    // 固定胎胚选择变更时，同步拼接固定胎胚描述
+    handleFixedEmbryoChange(val, row) {
+      let text = "";
+      for (let i = 0; i < row.length; i++) {
+        if (i == row.length - 1) {
+          text = text + row[i].embryoDesc;
+        } else {
+          text = text + row[i].embryoDesc + ",";
+        }
+      }
+      this.$set(this.form, "fixedMainMaterialDesc", text);
     },
     handleDisableMaterialChange(val,row){
       let text=''
