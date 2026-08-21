@@ -800,17 +800,22 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 structureRemainderMap, materialByEmbryoMap, materialByCodeMap,
                 sameInchHours, diffInchHours, sortedShiftConfigs, records, allResults);
 
-        // 7. 仅删除本次有新记录的结构（按 factoryCode + scheduleDate + structure 维度），
-        //    返回 null 的结构不进删除范围，保留旧值；其他排程日期的记录也不受影响
+        // 7. 删除范围 = 本次有排产记录的结构 ∪ 本次生成新记录的结构（按 factoryCode + scheduleDate + structure 维度）。
+        //    本次有排产但未生成记录的结构（如场景2预测超排程期跳过）也要删旧：
+        //    旧排程残留的该结构记录已过时（如 H1402 修复前来回切换时期写入的 225->245 错误记录），
+        //    不清理会作为脏数据展示在原因分析/备注中；本次既无排产也无新记录的结构保留旧值；其他排程日期不受影响
         java.sql.Timestamp scheduleDateTs = java.sql.Timestamp.valueOf(context.getScheduleDate().atStartOfDay());
-        if (!records.isEmpty()) {
-            List<String> processedStructures = records.stream()
-                    .map(CxEmbryoLhTime::getStructureName)
-                    .collect(Collectors.toList());
+        Set<String> deleteStructures = new HashSet<>(structureMachineSprMap.keySet());
+        for (CxEmbryoLhTime record : records) {
+            if (record.getStructureName() != null) {
+                deleteStructures.add(record.getStructureName());
+            }
+        }
+        if (!deleteStructures.isEmpty()) {
             embryoLhTimeMapper.delete(new LambdaQueryWrapper<CxEmbryoLhTime>()
                     .eq(CxEmbryoLhTime::getFactoryCode, factoryCode)
                     .eq(CxEmbryoLhTime::getScheduleDate, scheduleDateTs)
-                    .in(CxEmbryoLhTime::getStructureName, processedStructures));
+                    .in(CxEmbryoLhTime::getStructureName, deleteStructures));
         }
         int skipCount = structureMachineSprMap.size() - records.size();
         for (CxEmbryoLhTime record : records) {
@@ -995,7 +1000,10 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
     }
 
     /**
-     * 主表标记：前结构在机台上的所有胎胚行，在标记班次的 ANALYSIS 追加机台切换备注。
+     * 主表标记：前结构在机台上的胎胚行，仅当该行在标记班次（前结构最后生产班）仍有排产量时，
+     * 才在该班次的 ANALYSIS 追加机台切换备注。
+     * <p>已在更早班次收尾/结束的胎胚（标记班次 PLAN_QTY=0，如 H1402 245 结构 21 号白班即收尾的
+     * 215101783/215102642/215101743）不参与切换时刻，不再打标，避免"产量为 0 的班次出现切换说明"。
      */
     private void markMachineSwitchInMainTable(List<CxScheduleResult> allResults,
                                               String machineCode,
@@ -1006,14 +1014,39 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             return;
         }
         int marked = 0;
+        int skipped = 0;
         for (CxScheduleResult result : allResults) {
             if (machineCode.equals(result.getCxMachineCode())
                     && prevStruct != null && prevStruct.equals(result.getStructureName())) {
+                BigDecimal markShiftQty = getClassPlanQty(result, markClassField);
+                if (markShiftQty == null || markShiftQty.compareTo(BigDecimal.ZERO) <= 0) {
+                    skipped++;
+                    continue;
+                }
                 appendClassAnalysis(result, markClassField, remark);
                 marked++;
             }
         }
-        log.info("机台切换主表标记：机台={} 前结构={} 标记班次={} 共 {} 行", machineCode, prevStruct, markClassField, marked);
+        log.info("机台切换主表标记：机台={} 前结构={} 标记班次={} 标记 {} 行（跳过该班无产量已收尾 {} 行）",
+                machineCode, prevStruct, markClassField, marked, skipped);
+    }
+
+    /** 读取指定 CLASS 班次的计划量（CLASS_FIELD -> PLAN_QTY）。 */
+    private BigDecimal getClassPlanQty(CxScheduleResult result, String classField) {
+        if (result == null || classField == null) {
+            return null;
+        }
+        switch (classField) {
+            case "CLASS1": return result.getClass1PlanQty();
+            case "CLASS2": return result.getClass2PlanQty();
+            case "CLASS3": return result.getClass3PlanQty();
+            case "CLASS4": return result.getClass4PlanQty();
+            case "CLASS5": return result.getClass5PlanQty();
+            case "CLASS6": return result.getClass6PlanQty();
+            case "CLASS7": return result.getClass7PlanQty();
+            case "CLASS8": return result.getClass8PlanQty();
+            default: return null;
+        }
     }
 
     /**
@@ -2011,8 +2044,8 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             // 记录本班次该机台有切换扣减：S5.10 跨班次均衡时该班次不作为接收方，
             // 防止均衡把产量挪回切换班次、突破扣减后产能上限（如 2h 扣减后 6h 班被补到 6.7h+）
             recordShiftSwitchDeduct(context, agg.machineCode);
-            log.info("[MQ精排] 机台={} 余量延用切换中，扣除切换耗时{}s({}h)，剩余切换={}s",
-                    agg.machineCode, deduct, deduct / ScheduleConstants.SECONDS_PER_HOUR, holdoverSwitchRemaining);
+            log.info("[MQ精排] 机台={} 余量延用切换中，扣除切换耗时{}s({}h)，扣后剩余切换={}s",
+                    agg.machineCode, deduct, deduct / ScheduleConstants.SECONDS_PER_HOUR, holdoverSwitchRemaining - deduct);
         }
         if (capacitySeconds.compareTo(BigDecimal.ZERO) <= 0) {
             log.info("[MQ精排] 结构={}, 机台={}, 排除任务已占满产能({}s)，可参与任务全部削减为0",

@@ -550,6 +550,14 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
         LambdaQueryWrapper<CxEmbryoLhTime> lhTimeWrapper = new LambdaQueryWrapper<>();
         lhTimeWrapper.eq(CxEmbryoLhTime::getFactoryCode, factoryCode);
+        // 过滤已删除记录
+        lhTimeWrapper.eq(CxEmbryoLhTime::getIsDelete, 0);
+        // 按排程日期过滤，只导出当天的结构切换记录，避免把所有日期的数据都导出来
+        if (scheduleDate != null) {
+            Date dayStart = cn.hutool.core.date.DateUtil.beginOfDay(scheduleDate);
+            Date dayEnd = cn.hutool.core.date.DateUtil.endOfDay(scheduleDate);
+            lhTimeWrapper.between(CxEmbryoLhTime::getScheduleDate, dayStart, dayEnd);
+        }
         lhTimeWrapper.orderByAsc(CxEmbryoLhTime::getCxMachineCode);
 
         List<CxEmbryoLhTime> lhTimeList = cxEmbryoLhTimeMapper.selectList(lhTimeWrapper);
