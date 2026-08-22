@@ -4,7 +4,7 @@ import java.math.BigDecimal;
 
 import com.baomidou.mybatisplus.annotation.*;
 import com.ruoyi.common.core.annotation.Excel;
-import com.zlt.aps.common.core.domain.ApsBaseEntity;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.zlt.common.annotation.ImportExcelValidated;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
@@ -23,10 +23,12 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = false)
 @TableName("T_NC_LOSS_SETTING")
 @ApiModel(value = "NcLossSetting对象", description = "内衬损耗率设定表")
-public class NcLossSetting extends ApsBaseEntity {
+public class NcLossSetting extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
+    @Excel(name = "ui.data.column.factoryCode", dictType = "biz_factory_name")
+    @ImportExcelValidated(required = true, isCode = true, maxLength = 50)
     @ApiModelProperty(value = "工厂编码")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;

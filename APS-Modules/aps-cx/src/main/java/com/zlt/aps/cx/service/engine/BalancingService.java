@@ -561,9 +561,11 @@ public class BalancingService {
         }
 
         // ---- 6. Phase 2: 局部搜索（Move + Swap）修正负荷均衡 ----
+        // 种类差恰好等于阈值（未超标但可通过无损互换进一步收敛）时也进入局部搜索
         int loadGap = calculateLoadGap(machineStates);
         int typeGap = calculateTypeGap(machineStates);
-        if (loadGap > loadDiffThreshold || typeGap > typeDiffThreshold) {
+        if (loadGap > loadDiffThreshold || typeGap > typeDiffThreshold
+                || (typeDiffThreshold > 0 && typeGap == typeDiffThreshold)) {
             log.info("Phase 2 局部搜索: loadGap={}, typeGap={}, 阈值={}/{}",
                     loadGap, typeGap, loadDiffThreshold, typeDiffThreshold);
             localSearch(machineStates, loadDiffThreshold, typeDiffThreshold, params.getLhMachineSupplyMap());
@@ -649,9 +651,11 @@ public class BalancingService {
                 allAssigned, formatMachineLoads(machineStates));
 
         // ---- 5. Phase 2: 局部搜索修正均衡 ----
+        // 种类差恰好等于阈值（未超标但可通过无损互换进一步收敛）时也进入局部搜索
         int loadGap = calculateLoadGap(machineStates);
         int typeGap = calculateTypeGap(machineStates);
-        if (loadGap > loadDiffThreshold || typeGap > typeDiffThreshold) {
+        if (loadGap > loadDiffThreshold || typeGap > typeDiffThreshold
+                || (typeDiffThreshold > 0 && typeGap == typeDiffThreshold)) {
             log.info("贪心R2 Phase 2 局部搜索: loadGap={}, typeGap={}, 阈值={}/{}",
                     loadGap, typeGap, loadDiffThreshold, typeDiffThreshold);
             localSearch(machineStates, loadDiffThreshold, typeDiffThreshold, params.getLhMachineSupplyMap());
@@ -1215,6 +1219,13 @@ public class BalancingService {
             int loadGap = calculateLoadGap(machineStates);
             int typeGap = calculateTypeGap(machineStates);
             if (loadGap <= loadDiffThreshold && typeGap <= typeDiffThreshold) {
+                // 种类差恰好等于阈值（合规但未收敛到更小）：追加一次无损种类互换尝试。
+                // 仅接受"整种对调"候选（双方负荷不变、任一机台种类数不增加、最大种类数-1），
+                // 换不成则按原逻辑判定完成返回，不影响既有行为。
+                if (typeDiffThreshold > 0 && typeGap == typeDiffThreshold
+                        && tryTypeSwap(machineStates, lhMachineSupplyMap, true)) {
+                    continue;
+                }
                 log.info("局部搜索第{}轮: loadGap={} ≤ 阈值{}, typeGap={} ≤ 阈值{}, 完成",
                         iter, loadGap, loadDiffThreshold, typeGap, typeDiffThreshold);
                 return;
@@ -1646,6 +1657,24 @@ public class BalancingService {
      * @return true 如果成功互换
      */
     private boolean tryTypeSwap(List<MachineState> machineStates, Map<String, Set<String>> lhMachineSupplyMap) {
+        return tryTypeSwap(machineStates, lhMachineSupplyMap, false);
+    }
+
+    /**
+     * 种类对向互换（带无损开关）。
+     *
+     * <p>{@code requireLossless=true} 时仅接受"整种对调"候选：独占胎胚在高种类机台仅 1 条且数量为 1
+     * （整种换出，高种类机台种类数-1），共有胎胚在低种类机台仅 1 条且数量为 1（整种换出、换入新种类，
+     * 低种类机台种类数不变）。该约束保证互换后任一机台种类数不增加、机台间最大种类数严格 -1、
+     * 双方负荷不变，用于种类差恰好等于阈值时的无损收敛（不达标不换，不影响既有行为）。
+     *
+     * @param machineStates      机台状态列表
+     * @param lhMachineSupplyMap 硫化机专供成型机映射（null 表示无专供约束）
+     * @param requireLossless    true 时仅接受无损整种对调；false 保持原尽力互换语义
+     * @return true 如果成功互换
+     */
+    private boolean tryTypeSwap(List<MachineState> machineStates, Map<String, Set<String>> lhMachineSupplyMap,
+                                boolean requireLossless) {
         // 找种类最多和最少的机台（同 tryTypeBalance）
         MachineState highTypeMachine = null;
         MachineState lowTypeMachine = null;
@@ -1698,8 +1727,23 @@ public class BalancingService {
                     continue;
                 }
 
+                // 无损模式守卫：仅接受整种对调（独占/共有各自恰好 1 条且数量为 1），
+                // 确保互换后任一机台种类数不增加、最大种类数严格 -1、负荷不变
+                if (requireLossless) {
+                    long highEmbryoEntries = highTypeMachine.getAssignedEmbryos().stream()
+                            .filter(e -> exclusiveEmbryo.equals(e.getEmbryoCode())).count();
+                    long lowEmbryoEntries = lowTypeMachine.getAssignedEmbryos().stream()
+                            .filter(e -> sharedEmbryo.equals(e.getEmbryoCode())).count();
+                    boolean highClearsType = exclusiveEa.getAssignedQty() == 1 && highEmbryoEntries == 1;
+                    boolean lowClearsType = sharedEa.getAssignedQty() == 1 && lowEmbryoEntries == 1;
+                    if (!highClearsType || !lowClearsType) {
+                        continue;
+                    }
+                }
+
                 applyUnitSwap(highTypeMachine, exclusiveEa, lowTypeMachine, sharedEa);
-                log.info("  TypeSwap: {} 的 {}(独占) <-> {} 的 {}(共有), 种类: {}={}, {}={}",
+                log.info("  TypeSwap{}: {} 的 {}(独占) <-> {} 的 {}(共有), 种类: {}={}, {}={}",
+                        requireLossless ? "[无损]" : "",
                         highTypeMachine.getMachineCode(), exclusiveEmbryo,
                         lowTypeMachine.getMachineCode(), sharedEmbryo,
                         highTypeMachine.getMachineCode(), highTypeMachine.getCurrentTypes(),

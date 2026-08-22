@@ -2,14 +2,15 @@ package com.zlt.aps.gsq.service;
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.gsq.api.domain.entity.GsqTwiningDisc;
-import com.zlt.aps.gsq.api.domain.entity.GsqTwiningDiscSub;
-import com.zlt.aps.gsq.api.domain.vo.GsqTwiningDiscImportVo;
+import com.zlt.aps.gsq.api.domain.vo.GsqMesTwiningDiscSyncVO;
 import com.zlt.bill.common.service.IDocService;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 钢丝圈缠绕盘Service接口
+ * <p>单表管理缠绕盘基础信息；规格关系与机台关系按编码关联、独立页面维护</p>
  *
  * @author zlt
  * @date 2026-07-08
@@ -25,22 +26,20 @@ public interface IGsqTwiningDiscService extends IDocService<GsqTwiningDisc> {
     String checkUnique(GsqTwiningDisc entity);
 
     /**
-     * 保存钢丝圈缠绕盘（主表+子表），事务级联保存
-     * - id为空：新增主表及子表
-     * - id不为空：更新主表，先删除旧子表再保存新子表
+     * 保存钢丝圈缠绕盘（单表保存，带编码唯一性校验）
      *
-     * @param entity 实体（含 subList 子表数据）
+     * @param entity 实体
      * @return 操作结果
      */
-    AjaxResult saveMainAndSub(GsqTwiningDisc entity);
+    AjaxResult saveWithCheck(GsqTwiningDisc entity);
 
     /**
-     * 删除钢丝圈缠绕盘（逻辑删除主表，并级联逻辑删除子表）
+     * 删除钢丝圈缠绕盘（逻辑删除主表，并按缠绕盘编码级联逻辑删除规格关系及机台关系）
      *
      * @param ids 主表ID集合
      * @return 操作结果
      */
-    AjaxResult removeMainAndSub(List<Long> ids);
+    AjaxResult removeMainAndRelation(List<Long> ids);
 
     /**
      * 获取主表反显公式（用于列表/导出反显）
@@ -50,22 +49,15 @@ public interface IGsqTwiningDiscService extends IDocService<GsqTwiningDisc> {
     String[] getQueryFormulas();
 
     /**
-     * 获取子表反显公式（钢丝圈名称根据钢丝圈编号从施工信息表反显）
+     * 查询施工信息表全部钢丝圈选项（编码+名称，去重），供页面下拉选择使用
      *
-     * @return 反显公式数组
+     * @return 钢丝圈选项列表（key：BEAD_CODE 钢丝圈编号、BEAD_NAME 钢丝圈名称）
      */
-    String[] getSubQueryFormulas();
-
-    /**
-     * 根据主表ID查询子表数据并反显钢丝圈名称
-     *
-     * @param discId 主表ID
-     * @return 子表列表（含反显名称）
-     */
-    List<GsqTwiningDiscSub> querySubListByDiscId(Long discId);
+    List<Map<String, Object>> listSteelRingOptions();
 
     /**
      * 导入数据，并保存记录
+     * 校验规则：缠绕盘编码必填；按编码校验重复
      *
      * @param list          要导入的数据
      * @param updateSupport 已存在是否更新
@@ -75,15 +67,18 @@ public interface IGsqTwiningDiscService extends IDocService<GsqTwiningDisc> {
     AjaxResult importData(List<GsqTwiningDisc> list, boolean updateSupport, Long importLogId);
 
     /**
-     * 主子表平铺导入：按缠绕盘编码分组组装主表+子表明细后级联保存
-     * <p>导入模板一行 = 主表字段 + 子表字段；同一缠绕盘多行明细时主表字段以首行为准</p>
-     * <p>校验规则：缠绕盘编码/钢丝圈编号必填；同一缠绕盘+钢丝圈组合文件内不允许重复；
-     * 钢丝圈编号必须存在于施工信息表；钢丝圈名称未填写时按编号反显</p>
+     * MES缠绕盘三表同步落库（事务性操作，供GsqMesSyncController远程调用）
+     * <p>单事务处理缠绕盘清单/规格关系/机台关系，保证三表一致性：</p>
+     * <p>1. 主表UPSERT：按缠绕盘编码分流，存在则仅更新MES字段（英寸/排列方式/状态/工厂/版本/来源，
+     * 保留名称/数量/备注等手工维护字段），不存在则批量插入（名称默认取编码）；</p>
+     * <p>2. 主表清理：APS中MES来源但MES最新清单已不存在的缠绕盘逻辑删除，并级联逻辑删除规格关系/机台关系；</p>
+     * <p>3. 规格关系UPSERT：按缠绕盘编码+钢丝圈编号组合分流更新/插入（名称反显自施工信息表），
+     * MES来源已失效的组合逻辑删除；</p>
+     * <p>4. 机台关系UPSERT：按缠绕盘编码+机台编号组合分流更新/插入，MES来源已失效的组合逻辑删除</p>
      *
-     * @param list          平铺导入数据集合
-     * @param updateSupport 已存在是否更新（更新时级联替换旧子表明细）
-     * @param importLogId   导入日志id
-     * @return 导入后提示信息
+     * @param syncVO   MES三表聚合数据
+     * @param updateBy 更新者（MES同步传"MES"）
+     * @return 操作结果
      */
-    AjaxResult importMainAndSubData(List<GsqTwiningDiscImportVo> list, boolean updateSupport, Long importLogId);
+    AjaxResult syncFromMes(GsqMesTwiningDiscSyncVO syncVO, String updateBy);
 }

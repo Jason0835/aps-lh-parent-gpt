@@ -127,7 +127,8 @@ public class TmRollingUpdateServiceImpl implements ITmRollingUpdateService {
         request.setScheduleDate(DateUtil.beginOfDay(request.getScheduleDate()));
         this.resolveStockDate(request);
         request.setOperator(StrUtil.blankToDefault(StrUtil.trim(request.getOperator()), automatic ? "TM_ROLLING_JOB" : "TM_ROLLING_API"));
-        if (automatic && !this.isRollingEnabled(request.getFactoryCode())) {
+        Map<String, TmParams> rollingParamMap = this.loadRollingParamMap(request.getFactoryCode());
+        if (automatic && !this.isRollingEnabled(rollingParamMap)) {
             return this.buildDisabledResponse(request);
         }
         this.ensureShiftStockExists(request);
@@ -148,7 +149,7 @@ public class TmRollingUpdateServiceImpl implements ITmRollingUpdateService {
             TmScheduleContext context = this.loadRollingContext(request, runKey, traceId);
             TransactionTemplate transactionTemplate = new TransactionTemplate(platformTransactionManager);
             TmRollingRecalcResponseVO response = transactionTemplate.execute(status ->
-                    this.executeInsideTransaction(request, context, runKey, traceId));
+                    this.executeInsideTransaction(request, context, runKey, traceId, rollingParamMap));
             if (response == null) {
                 throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.schedule.rollingFailed"));
             }
@@ -168,12 +169,14 @@ public class TmRollingUpdateServiceImpl implements ITmRollingUpdateService {
      * @param context 自动排程加载上下文
      * @param runKey 运行键
      * @param traceId 追踪号
+     * @param rollingParamMap 当前调用的参数快照
      * @return 滚动响应
      */
     private TmRollingRecalcResponseVO executeInsideTransaction(TmRollingRecalcRequestDTO request,
                                                                 TmScheduleContext context,
                                                                 String runKey,
-                                                                String traceId) {
+                                                                String traceId,
+                                                                Map<String, TmParams> rollingParamMap) {
         TmRollingRecalcResponseVO existingResponse = this.loadExistingResponse(request, runKey, traceId);
         if (existingResponse != null) {
             return existingResponse;
@@ -188,12 +191,14 @@ public class TmRollingUpdateServiceImpl implements ITmRollingUpdateService {
             }
         }
         List<TmScheduleResult> beforeList = this.loadScheduleResults(request);
-        List<TmRollingAdjustment> adjustmentList = this.calculateAdjustments(request, context, beforeList);
+        List<TmRollingAdjustment> adjustmentList = this.calculateAdjustments(request, context, beforeList,
+                rollingParamMap);
         this.validateAffectedReleaseStatuses(beforeList, adjustmentList, request.getTargetShiftOrder());
 
+        Map<String, List<TmScheduleResult>> beforeResultMap = this.buildTreadResultMap(beforeList);
         List<TmScheduleResult> changeRequestList = new ArrayList<>();
         for (TmRollingAdjustment adjustment : adjustmentList) {
-            this.appendAdjustmentRequests(request, adjustment, changeRequestList);
+            this.appendAdjustmentRequests(request, adjustment, beforeResultMap, changeRequestList);
         }
         this.validateRollingMachineRelations(context, beforeList, changeRequestList);
         int updateCount = changeRequestList.isEmpty() ? 0
@@ -295,11 +300,13 @@ public class TmRollingUpdateServiceImpl implements ITmRollingUpdateService {
      * @param request 滚动请求
      * @param context 加载上下文
      * @param resultList 当前排程结果
+     * @param rollingParamMap 当前调用的参数快照
      * @return 需要实际修改的胎面调整指令
      */
     private List<TmRollingAdjustment> calculateAdjustments(TmRollingRecalcRequestDTO request,
                                                             TmScheduleContext context,
-                                                            List<TmScheduleResult> resultList) {
+                                                            List<TmScheduleResult> resultList,
+                                                            Map<String, TmParams> rollingParamMap) {
         Map<String, List<TmTaskDraft>> taskMap = context.getTaskDraftList().stream()
                 .filter(Objects::nonNull).filter(task -> StrUtil.isNotBlank(task.getTreadCode()))
                 .collect(Collectors.groupingBy(TmTaskDraft::getTreadCode, LinkedHashMap::new, Collectors.toList()));
@@ -311,16 +318,16 @@ public class TmRollingUpdateServiceImpl implements ITmRollingUpdateService {
                 .filter(entry -> this.sumDemand(entry.getValue(), request.getTargetShiftOrder()).compareTo(BigDecimal.ZERO) > 0)
                 .map(Map.Entry::getKey).collect(Collectors.toCollection(LinkedHashSet::new));
 
-        BigDecimal upThreshold = this.readPositiveDecimalParam(request.getFactoryCode(),
+        BigDecimal upThreshold = this.readPositiveDecimalParam(rollingParamMap,
                 TmScheduleConstants.PARAM_ROLLING_UP_THRESHOLD,
                 new BigDecimal(TmScheduleConstants.DEFAULT_ROLLING_UP_THRESHOLD));
-        BigDecimal downThreshold = this.readPositiveDecimalParam(request.getFactoryCode(),
+        BigDecimal downThreshold = this.readPositiveDecimalParam(rollingParamMap,
                 TmScheduleConstants.PARAM_ROLLING_DOWN_THRESHOLD,
                 new BigDecimal(TmScheduleConstants.DEFAULT_ROLLING_DOWN_THRESHOLD));
-        int rollingShiftCount = this.readPositiveIntegerParam(request.getFactoryCode(),
+        int rollingShiftCount = this.readPositiveIntegerParam(rollingParamMap,
                 TmScheduleConstants.PARAM_ROLLING_SHIFT_COUNT,
                 TmScheduleConstants.DEFAULT_ROLLING_SHIFT_COUNT);
-        BigDecimal downTarget = this.readPositiveDecimalParam(request.getFactoryCode(),
+        BigDecimal downTarget = this.readPositiveDecimalParam(rollingParamMap,
                 TmScheduleConstants.PARAM_ROLLING_DOWN_TARGET,
                 BigDecimal.valueOf(rollingShiftCount));
         List<TmRollingAdjustment> adjustmentList = new ArrayList<>();
@@ -403,8 +410,10 @@ public class TmRollingUpdateServiceImpl implements ITmRollingUpdateService {
      */
     private void appendAdjustmentRequests(TmRollingRecalcRequestDTO request,
                                           TmRollingAdjustment adjustment,
+                                          Map<String, List<TmScheduleResult>> treadResultMap,
                                           List<TmScheduleResult> changeRequestList) {
-        List<TmScheduleResult> currentList = this.loadTreadResults(request, adjustment.getTreadCode());
+        List<TmScheduleResult> currentList = new ArrayList<>(treadResultMap.getOrDefault(
+                adjustment.getTreadCode(), Collections.emptyList()));
         Comparator<TmScheduleResult> comparator = Comparator
                 .comparing((TmScheduleResult result) -> this.readShiftSequence(result, request.getTargetShiftOrder()),
                         Comparator.nullsLast(Integer::compareTo))
@@ -597,15 +606,22 @@ public class TmRollingUpdateServiceImpl implements ITmRollingUpdateService {
     }
 
     /**
-     * 查询同一胎面的当前结果。
+     * 按胎面编码索引同一日已锁定的结果快照。
      *
-     * @param request 滚动请求
-     * @param treadCode 胎面编码
-     * @return 同胎面结果
+     * <p>索引列表保持原始数据库排序；各胎面调量前使用副本排序，避免影响汇总、审计和响应使用的原快照。</p>
+     *
+     * @param resultList 已锁定后的滚动前结果快照
+     * @return 按胎面编码分组的结果索引
      */
-    private List<TmScheduleResult> loadTreadResults(TmRollingRecalcRequestDTO request, String treadCode) {
-        return this.loadScheduleResults(request).stream().filter(result -> treadCode.equals(result.getTreadCode()))
-                .collect(Collectors.toList());
+    private Map<String, List<TmScheduleResult>> buildTreadResultMap(List<TmScheduleResult> resultList) {
+        if (resultList == null || resultList.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        return resultList.stream()
+                .filter(Objects::nonNull)
+                .filter(result -> StrUtil.isNotBlank(result.getTreadCode()))
+                .collect(Collectors.groupingBy(TmScheduleResult::getTreadCode,
+                        LinkedHashMap::new, Collectors.toList()));
     }
 
     /**
@@ -667,13 +683,14 @@ public class TmRollingUpdateServiceImpl implements ITmRollingUpdateService {
     /**
      * 查询滚动参数，空值或非法值使用默认值。
      *
-     * @param factoryCode 工厂编号
+     * @param rollingParamMap 当前调用的参数快照
      * @param paramCode 参数编码
      * @param defaultValue 默认值
      * @return 正数参数值
      */
-    private BigDecimal readPositiveDecimalParam(String factoryCode, String paramCode, BigDecimal defaultValue) {
-        String value = this.readParamValue(factoryCode, paramCode, defaultValue.toPlainString());
+    private BigDecimal readPositiveDecimalParam(Map<String, TmParams> rollingParamMap,
+                                                String paramCode, BigDecimal defaultValue) {
+        String value = this.readParamValue(rollingParamMap, paramCode, defaultValue.toPlainString());
         try {
             BigDecimal parsedValue = new BigDecimal(value);
             return parsedValue.compareTo(BigDecimal.ZERO) > 0 ? parsedValue : defaultValue;
@@ -685,13 +702,14 @@ public class TmRollingUpdateServiceImpl implements ITmRollingUpdateService {
     /**
      * 查询正整数滚动参数，空值、零值或非法值使用默认值。
      *
-     * @param factoryCode 工厂编号
+     * @param rollingParamMap 当前调用的参数快照
      * @param paramCode 参数编码
      * @param defaultValue 默认值
      * @return 正整数参数值
      */
-    private int readPositiveIntegerParam(String factoryCode, String paramCode, int defaultValue) {
-        String value = this.readParamValue(factoryCode, paramCode, String.valueOf(defaultValue));
+    private int readPositiveIntegerParam(Map<String, TmParams> rollingParamMap,
+                                         String paramCode, int defaultValue) {
+        String value = this.readParamValue(rollingParamMap, paramCode, String.valueOf(defaultValue));
         try {
             int parsedValue = Integer.parseInt(value);
             return parsedValue > 0 ? parsedValue : defaultValue;
@@ -701,24 +719,44 @@ public class TmRollingUpdateServiceImpl implements ITmRollingUpdateService {
     }
 
     /**
-     * 查询单个工厂参数。
+     * 一次加载当前滚动调用所需的全部启用参数，并保留同编码的最大主键记录。
      *
      * @param factoryCode 工厂编号
-     * @param paramCode 参数编码
-     * @param defaultValue 默认值
-     * @return 生效参数值
+     * @return 参数编码与生效参数的映射
      */
-    private String readParamValue(String factoryCode, String paramCode, String defaultValue) {
+    private Map<String, TmParams> loadRollingParamMap(String factoryCode) {
         LambdaQueryWrapper<TmParams> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(TmParams::getFactoryCode, factoryCode);
-        wrapper.eq(TmParams::getParamCode, paramCode);
         wrapper.eq(TmParams::getEnableStatus, "1");
         wrapper.orderByDesc(TmParams::getId);
         List<TmParams> paramsList = tmParamsMapper.selectList(wrapper);
         if (paramsList == null || paramsList.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        Map<String, TmParams> rollingParamMap = new LinkedHashMap<>();
+        paramsList.stream()
+                .filter(Objects::nonNull)
+                .filter(param -> StrUtil.isNotBlank(param.getParamCode()))
+                .forEach(param -> rollingParamMap.putIfAbsent(param.getParamCode(), param));
+        return rollingParamMap;
+    }
+
+    /**
+     * 从当前调用参数快照读取单个参数。
+     *
+     * @param rollingParamMap 参数编码与生效参数映射
+     * @param paramCode 参数编码
+     * @param defaultValue 默认值
+     * @return 生效参数值
+     */
+    private String readParamValue(Map<String, TmParams> rollingParamMap, String paramCode, String defaultValue) {
+        if (rollingParamMap == null || rollingParamMap.isEmpty()) {
             return defaultValue;
         }
-        TmParams params = paramsList.get(0);
+        TmParams params = rollingParamMap.get(paramCode);
+        if (params == null) {
+            return defaultValue;
+        }
         return StrUtil.blankToDefault(StrUtil.trim(params.getParamValue()),
                 StrUtil.blankToDefault(StrUtil.trim(params.getDefaultValue()), defaultValue));
     }
@@ -726,11 +764,11 @@ public class TmRollingUpdateServiceImpl implements ITmRollingUpdateService {
     /**
      * 判断工厂自动滚动开关是否开启。
      *
-     * @param factoryCode 工厂编号
+     * @param rollingParamMap 当前调用的参数快照
      * @return true 表示开启
      */
-    private boolean isRollingEnabled(String factoryCode) {
-        return "1".equals(this.readParamValue(factoryCode, TmScheduleConstants.PARAM_ROLLING_ENABLED,
+    private boolean isRollingEnabled(Map<String, TmParams> rollingParamMap) {
+        return "1".equals(this.readParamValue(rollingParamMap, TmScheduleConstants.PARAM_ROLLING_ENABLED,
                 TmScheduleConstants.DEFAULT_ROLLING_ENABLED));
     }
 

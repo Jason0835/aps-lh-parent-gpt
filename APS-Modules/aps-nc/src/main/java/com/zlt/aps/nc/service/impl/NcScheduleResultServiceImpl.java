@@ -612,7 +612,7 @@ public class NcScheduleResultServiceImpl extends AbstractBillService<NcScheduleR
         List<ImportErrorLog> importErrorLogs = new ArrayList<>();
         List<NcScheduleResult> importList = new ArrayList<>();
         NcMachineInfo ncMachineInfo = new NcMachineInfo();
-        ncMachineInfo.setStatus("0");
+        ncMachineInfo.setStatus("1");
         List<NcMachineInfo> machineInfoList = machineInfoService.selectMachineInfoList(ncMachineInfo);
         if (CollectionUtils.isEmpty(machineInfoList)) {
             String message = I18nUtil.getMessage("ui.error.message.column.machineIsNull");

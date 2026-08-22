@@ -60,12 +60,14 @@ public class GsqMachineAssignHandler extends AbsGsqScheduleStepHandler {
         List<GsqScheduleResultVo> sortedList = sortByPriority(scheduleList, context);
 
         // 2. 规格级机台分配（对齐胎圈TQ）：为每个规格选定一台机台，6班次沿用该机台
-        //    使用第一班次上下文执行策略链过滤，选择机台时：
-        //    ① 缠绕盘连续优先（机台末规格缠绕盘与当前规格相同者优先，减少换盘）
+        //    使用第一班次上下文执行策略链过滤（含 DiscMachineFilter 缠绕盘机台关系过滤），选择机台时：
+        //    ① 缠绕盘连续优先（机台末规格缠绕盘与当前规格可用盘有交集者优先，减少换盘）
         //    ② 剩余产能较小优先（剩余产能=QUATA×班次数-已分配量，先把一台机台排满）
         //    确保 machineCode（数据库/页面展示）及 class1~6MachineCode（任务链/质量等消费）均有值
         Map<String, String> machineLastTwiningDisc = new HashMap<>();
         Map<String, Double> machineAssignedQty = new HashMap<>();
+        // 机台→缠绕盘集合反向映射（由盘→机台映射反转，用于机台分配后按交集选定精确缠绕盘）
+        Map<String, Set<String>> machineDiscMap = buildMachineDiscMap(context);
         for (GsqScheduleResultVo scheduleVo : sortedList) {
             if (!hasAnyShiftPlan(scheduleVo)) {
                 continue;
@@ -83,15 +85,16 @@ public class GsqMachineAssignHandler extends AbsGsqScheduleStepHandler {
                 continue;
             }
 
-            final String currentTwiningDisc = scheduleVo.getTwiningDiscCode();
+            // 规格可用缠绕盘集合（多对多：一个钢丝圈可挂多个缠绕盘）
+            final Set<String> currentDiscs = context.getTwiningDiscCodeMap().get(scheduleVo.getSteelRingCode());
             // 选择机台：①缠绕盘连续优先 ②剩余产能较小优先（优先排满一台）
             GsqMachineInfo targetMachine = availableMachines.stream()
                     .min((m1, m2) -> {
-                        // ① 缠绕盘连续优先：机台末规格缠绕盘与当前规格相同者优先
+                        // ① 缠绕盘连续优先：机台末规格缠绕盘在当前规格可用盘集合内者优先（交集判断，适配多对多）
                         String disc1 = machineLastTwiningDisc.get(m1.getMachineCode());
                         String disc2 = machineLastTwiningDisc.get(m2.getMachineCode());
-                        boolean same1 = currentTwiningDisc != null && currentTwiningDisc.equals(disc1);
-                        boolean same2 = currentTwiningDisc != null && currentTwiningDisc.equals(disc2);
+                        boolean same1 = currentDiscs != null && disc1 != null && currentDiscs.contains(disc1);
+                        boolean same2 = currentDiscs != null && disc2 != null && currentDiscs.contains(disc2);
                         if (same1 != same2) {
                             return same1 ? -1 : 1;
                         }
@@ -105,9 +108,13 @@ public class GsqMachineAssignHandler extends AbsGsqScheduleStepHandler {
             String machineCode = targetMachine.getMachineCode();
             // 机台定额来自 QUATA 字段（BigDecimal类型）
             Double quota = targetMachine.getQuata() == null ? 0D : targetMachine.getQuata().doubleValue();
+            // 机台分配确定后，按「规格可用盘 ∩ 机台绑定盘」交集选定精确缠绕盘并二次回填
+            // （S1 预校验初始回填的是集合中最小盘，此处按实际机台精确化）
+            String selectedDisc = pickTwiningDisc(currentDiscs, machineDiscMap.get(machineCode));
+            scheduleVo.setTwiningDiscCode(selectedDisc);
             // 记录该机台末规格缠绕盘及已分配量（供后续规格按缠绕盘连续优先选择）
-            if (currentTwiningDisc != null) {
-                machineLastTwiningDisc.put(machineCode, currentTwiningDisc);
+            if (selectedDisc != null) {
+                machineLastTwiningDisc.put(machineCode, selectedDisc);
             }
             machineAssignedQty.merge(machineCode, getTotalPlanQty(scheduleVo), Double::sum);
 
@@ -261,6 +268,50 @@ public class GsqMachineAssignHandler extends AbsGsqScheduleStepHandler {
     private Double getShiftPlan(GsqScheduleResultVo vo, int classIndex) {
         Object value = vo.getFieldValueByFieldName("class" + classIndex + "PlanQty");
         return value == null ? null : ((Number) value).doubleValue();
+    }
+
+    /**
+     * 构建机台→缠绕盘集合反向映射。
+     *
+     * <p>Context 中的 discMachineMap 为「盘→机台集合」结构（DiscMachineFilter 求并集用），
+     * 本方法将其反转为「机台→盘集合」，供机台分配后按交集选定精确缠绕盘使用。</p>
+     *
+     * @param context 排程上下文
+     * @return 机台→该机台绑定的缠绕盘代码集合映射
+     */
+    private Map<String, Set<String>> buildMachineDiscMap(GsqScheduleContext context) {
+        Map<String, Set<String>> machineDiscMap = new HashMap<>();
+        for (Map.Entry<String, Set<String>> entry : context.getDiscMachineMap().entrySet()) {
+            for (String machineCode : entry.getValue()) {
+                machineDiscMap.computeIfAbsent(machineCode, k -> new HashSet<>()).add(entry.getKey());
+            }
+        }
+        return machineDiscMap;
+    }
+
+    /**
+     * 机台分配后选定精确缠绕盘：取「规格可用盘 ∩ 机台绑定盘」交集中字典序最小的盘（保证确定性）。
+     *
+     * <p>兜底：交集为空（理论不会发生，DiscMachineFilter 已保证机台在规格可用盘的机台并集内；
+     * 仅规格未配置缠绕盘时 filter 放行全部机台可能出现）时回退取规格可用盘中字典序最小值。</p>
+     *
+     * @param specDiscs    规格可用缠绕盘集合（可为null，表示规格未配置缠绕盘）
+     * @param machineDiscs 机台绑定的缠绕盘集合（可为null，表示机台未绑定任何缠绕盘）
+     * @return 选定的缠绕盘代码；规格未配置缠绕盘时返回 null
+     */
+    private String pickTwiningDisc(Set<String> specDiscs, Set<String> machineDiscs) {
+        if (specDiscs == null || specDiscs.isEmpty()) {
+            return null;
+        }
+        if (machineDiscs != null && !machineDiscs.isEmpty()) {
+            Set<String> intersection = specDiscs.stream()
+                    .filter(machineDiscs::contains)
+                    .collect(Collectors.toSet());
+            if (!intersection.isEmpty()) {
+                return Collections.min(intersection);
+            }
+        }
+        return Collections.min(specDiscs);
     }
 
     /**

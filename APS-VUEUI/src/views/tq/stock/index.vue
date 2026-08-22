@@ -213,9 +213,7 @@ export default {
     },
     handleBatchDelete() {
       if (this.selection.length === 0) {
-        this.$modal.msgWarning(
-          this.$t("common.confirm.selectDeleteData") || "请选择需要删除的数据"
-        );
+        this.$modal.msgWarning(this.$t("ui.placeholder.selectTableRow"));
         return;
       }
       this.$confirm(this.$t("common.confirm.delete"), {

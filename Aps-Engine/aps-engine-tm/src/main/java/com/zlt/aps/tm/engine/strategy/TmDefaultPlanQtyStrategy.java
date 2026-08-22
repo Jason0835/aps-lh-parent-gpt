@@ -1,6 +1,7 @@
 package com.zlt.aps.tm.engine.strategy;
 
 import com.ruoyi.common.exception.ServiceException;
+import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.tm.api.enums.TmScheduleErrorCodeEnum;
 import com.zlt.aps.tm.api.enums.TmScheduleStrategyEnum;
 import com.zlt.aps.tm.api.enums.TmYesNoEnum;
@@ -215,6 +216,6 @@ public class TmDefaultPlanQtyStrategy implements ITmPlanQtyStrategy {
     }
 
     private BigDecimal nvl(BigDecimal value) {
-        return value == null ? BigDecimal.ZERO : value;
+        return BigDecimalUtils.valueOf(value);
     }
 }

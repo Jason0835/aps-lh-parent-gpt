@@ -6,6 +6,7 @@ package com.zlt.aps.lh.engine.strategy.impl;
 import cn.hutool.core.bean.BeanUtil;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
+import com.zlt.aps.lh.api.domain.dto.CapsuleReplacementTimeWindowDTO;
 import com.zlt.aps.lh.api.domain.dto.MachineCleaningWindowDTO;
 import com.zlt.aps.lh.api.domain.dto.MachineMaintenanceWindowDTO;
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
@@ -1047,13 +1048,15 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
             LhScheduleResult receiverPair,
             LhShiftConfigVO targetShift,
             int requestPerSideQty) {
+        int receiverShiftCapacity = this.resolveResultShiftCapacity(context, receiver, targetShift);
         int actualPerSideQty = this.capsuleReplacementRuleService.resolveActualPlanQty(
-                context, receiver, targetShift, requestPerSideQty,
-                "共用胎胚同物料胶囊感知尾量分摊");
+                context, receiver, targetShift, requestPerSideQty, receiverShiftCapacity,
+                targetShift.getShiftStartDateTime(), "共用胎胚同物料胶囊感知尾量分摊");
         if (Objects.nonNull(receiverPair)) {
+            int receiverPairShiftCapacity = this.resolveResultShiftCapacity(context, receiverPair, targetShift);
             int pairActualQty = this.capsuleReplacementRuleService.resolveActualPlanQty(
-                    context, receiverPair, targetShift, requestPerSideQty,
-                    "共用胎胚同物料胶囊感知尾量分摊");
+                    context, receiverPair, targetShift, requestPerSideQty, receiverPairShiftCapacity,
+                    targetShift.getShiftStartDateTime(), "共用胎胚同物料胶囊感知尾量分摊");
             actualPerSideQty = Math.min(actualPerSideQty, pairActualQty);
         }
         return actualPerSideQty;
@@ -2443,10 +2446,13 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
             return false;
         }
         int actualPerSideQty = capsuleReplacementRuleService.resolveActualPlanQty(
-                context, receiver, nextShift, perSideTransferQty, "共用胎胚收尾均衡尾量分摊");
+                context, receiver, nextShift, perSideTransferQty,
+                resolveResultShiftCapacity(context, receiver, nextShift), nextShift.getShiftStartDateTime(),
+                "共用胎胚收尾均衡尾量分摊");
         if (receiverPairUnit) {
             int actualPairSideQty = capsuleReplacementRuleService.resolveActualPlanQty(
                     context, receiverPair, nextShift, perSideTransferQty,
+                    resolveResultShiftCapacity(context, receiverPair, nextShift), nextShift.getShiftStartDateTime(),
                     "共用胎胚收尾均衡尾量分摊");
             actualPerSideQty = Math.min(actualPerSideQty, actualPairSideQty);
         }
@@ -2679,10 +2685,12 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
         }
         int actualAddQty = capsuleReplacementRuleService.resolveActualPlanQty(
                 context, result, nextShift, Math.min(perSideAddQty, freeCapacity),
+                resolveResultShiftCapacity(context, result, nextShift), nextShift.getShiftStartDateTime(),
                 "共用胎胚收尾均衡后延补量");
         if (pairUnit) {
             int actualPairAddQty = capsuleReplacementRuleService.resolveActualPlanQty(
                     context, pairResult, nextShift, Math.min(perSideAddQty, freeCapacity),
+                    resolveResultShiftCapacity(context, pairResult, nextShift), nextShift.getShiftStartDateTime(),
                     "共用胎胚收尾均衡后延补量");
             actualAddQty = Math.min(actualAddQty, actualPairAddQty);
         }
@@ -2806,10 +2814,13 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
                 return false;
             }
             int actualAddQty = capsuleReplacementRuleService.resolveActualPlanQty(
-                    context, result, targetShift, freeCapacity, "共用胎胚收尾均衡补量（跨天）");
+                    context, result, targetShift, freeCapacity,
+                    resolveResultShiftCapacity(context, result, targetShift), targetShift.getShiftStartDateTime(),
+                    "共用胎胚收尾均衡补量（跨天）");
             if (pairUnit) {
                 int pairActualAddQty = capsuleReplacementRuleService.resolveActualPlanQty(
                         context, pairResult, targetShift, freeCapacity,
+                        resolveResultShiftCapacity(context, pairResult, targetShift), targetShift.getShiftStartDateTime(),
                         "共用胎胚收尾均衡补量（跨天）");
                 actualAddQty = Math.min(actualAddQty, pairActualAddQty);
             }
@@ -3046,6 +3057,8 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
                 new LinkedHashSet<String>(context.getCapsuleThresholdHandledMachineSet()));
         snapshot.setCapsuleReplacementCapacityLimitMap(
                 new LinkedHashMap<String, Integer>(context.getCapsuleReplacementShiftCapacityLimitMap()));
+        snapshot.setCapsuleReplacementTimeWindowMap(copyCapsuleReplacementTimeWindowMap(
+                context.getCapsuleReplacementTimeWindowMap()));
         snapshot.setSharedEmbryoEndingAllowedOverQtyMap(
                 new IdentityHashMap<LhScheduleResult, Integer>(
                         context.getSharedEmbryoEndingStaggerAllowedOverQtyMap()));
@@ -3107,11 +3120,35 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
         context.getCapsuleReplacementShiftCapacityLimitMap().clear();
         context.getCapsuleReplacementShiftCapacityLimitMap().putAll(
                 snapshot.getCapsuleReplacementCapacityLimitMap());
+        context.setCapsuleReplacementTimeWindowMap(copyCapsuleReplacementTimeWindowMap(
+                snapshot.getCapsuleReplacementTimeWindowMap()));
         context.getSharedEmbryoEndingStaggerAllowedOverQtyMap().clear();
         context.getSharedEmbryoEndingStaggerAllowedOverQtyMap().putAll(
                 snapshot.getSharedEmbryoEndingAllowedOverQtyMap());
         context.getEndingFillAllowedOverQtyMap().clear();
         context.getEndingFillAllowedOverQtyMap().putAll(snapshot.getEndingFillAllowedOverQtyMap());
+    }
+
+    /**
+     * 深复制换胶囊时间窗口，保证均衡候选回滚时不残留机台时间占用。
+     *
+     * @param sourceMap 原始时间窗口
+     * @return 独立时间窗口副本
+     */
+    private Map<String, CapsuleReplacementTimeWindowDTO> copyCapsuleReplacementTimeWindowMap(
+            Map<String, CapsuleReplacementTimeWindowDTO> sourceMap) {
+        Map<String, CapsuleReplacementTimeWindowDTO> targetMap =
+                new LinkedHashMap<String, CapsuleReplacementTimeWindowDTO>(
+                        Math.max(4, Objects.isNull(sourceMap) ? 0 : sourceMap.size() * 2));
+        if (CollectionUtils.isEmpty(sourceMap)) {
+            return targetMap;
+        }
+        for (Map.Entry<String, CapsuleReplacementTimeWindowDTO> entry : sourceMap.entrySet()) {
+            CapsuleReplacementTimeWindowDTO targetWindow = new CapsuleReplacementTimeWindowDTO();
+            BeanUtil.copyProperties(entry.getValue(), targetWindow);
+            targetMap.put(entry.getKey(), targetWindow);
+        }
+        return targetMap;
     }
 
     /**
@@ -4126,6 +4163,10 @@ class BalanceSnapshot {
     /** 换胶囊班次产能上限快照 */
     private Map<String, Integer> capsuleReplacementCapacityLimitMap = new LinkedHashMap<String, Integer>(4);
 
+    /** 换胶囊时间占用窗口快照 */
+    private Map<String, CapsuleReplacementTimeWindowDTO> capsuleReplacementTimeWindowMap =
+            new LinkedHashMap<String, CapsuleReplacementTimeWindowDTO>(4);
+
     /** 共用胎胚收尾允许超量快照 */
     private Map<LhScheduleResult, Integer> sharedEmbryoEndingAllowedOverQtyMap =
             new IdentityHashMap<LhScheduleResult, Integer>(4);
@@ -4156,6 +4197,11 @@ class BalanceSnapshot {
 
     public void setCapsuleReplacementCapacityLimitMap(Map<String, Integer> capsuleReplacementCapacityLimitMap) {
         this.capsuleReplacementCapacityLimitMap = capsuleReplacementCapacityLimitMap;
+    }
+
+    public void setCapsuleReplacementTimeWindowMap(
+            Map<String, CapsuleReplacementTimeWindowDTO> capsuleReplacementTimeWindowMap) {
+        this.capsuleReplacementTimeWindowMap = capsuleReplacementTimeWindowMap;
     }
 
     public void setSharedEmbryoEndingAllowedOverQtyMap(
@@ -4189,6 +4235,10 @@ class BalanceSnapshot {
 
     public Map<String, Integer> getCapsuleReplacementCapacityLimitMap() {
         return capsuleReplacementCapacityLimitMap;
+    }
+
+    public Map<String, CapsuleReplacementTimeWindowDTO> getCapsuleReplacementTimeWindowMap() {
+        return capsuleReplacementTimeWindowMap;
     }
 
     public Map<LhScheduleResult, Integer> getSharedEmbryoEndingAllowedOverQtyMap() {

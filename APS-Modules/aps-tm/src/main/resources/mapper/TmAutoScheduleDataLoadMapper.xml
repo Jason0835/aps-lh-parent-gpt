@@ -30,7 +30,6 @@
         <result column="CLASS6_FINISH_QTY" property="class6FinishQty"/>
         <result column="CLASS7_FINISH_QTY" property="class7FinishQty"/>
         <result column="CLASS8_FINISH_QTY" property="class8FinishQty"/>
-        <result column="MARK_CLOSE_OUT_TIP" property="markCloseOutTip"/>
         <result column="CX_REMAIN_QTY" property="cxRemainQty"/>
         <result column="LH_REMAIN_QTY" property="lhRemainQty"/>
         <result column="TREAD_CODE" property="treadCode"/>
@@ -86,7 +85,6 @@
                cx.CLASS6_FINISH_QTY,
                cx.CLASS7_FINISH_QTY,
                cx.CLASS8_FINISH_QTY,
-               cx.MARK_CLOSE_OUT_TIP,
                cx.CX_REMAIN_QTY,
                cx.LH_REMAIN_QTY,
                ci.TREAD_CODE,
@@ -211,7 +209,6 @@
         <result column="CLASS6_RECIPE_NO" property="class6RecipeNo"/>
         <result column="CLASS7_RECIPE_NO" property="class7RecipeNo"/>
         <result column="CLASS8_RECIPE_NO" property="class8RecipeNo"/>
-        <result column="MARK_CLOSE_OUT_TIP" property="markCloseOutTip"/>
         <result column="CX_REMAIN_QTY" property="cxRemainQty"/>
         <result column="LH_REMAIN_QTY" property="lhRemainQty"/>
     </resultMap>
@@ -259,7 +256,6 @@
                cx.CLASS6_RECIPE_NO,
                cx.CLASS7_RECIPE_NO,
                cx.CLASS8_RECIPE_NO,
-               cx.MARK_CLOSE_OUT_TIP,
                cx.CX_REMAIN_QTY,
                cx.LH_REMAIN_QTY
         FROM T_CX_SCHEDULE_RESULT cx

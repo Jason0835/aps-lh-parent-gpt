@@ -63,9 +63,12 @@ public class GsqMachineInfo extends BaseEntity {
 
     /**
      * 开机班次，如：中班、夜班；对应数据字典class_num_three_plan
+     * 允许以英文逗号分隔多个班次。
+     * 导入模板中由用户直接填写班次名称(如 夜班,早班,中班)，导入时由后端按字典转为编码(01,02,03)存储；
+     * 导出时转回班次名称。此处不配置dictType，避免框架解析层对逗号分隔的多选值转换失败导致数据丢失。
      */
+    @Excel(name = "ui.data.column.machine.openMachineClass")
     @ApiModelProperty(value = "开机班次", position = 85)
-    @Excel(name = "ui.data.column.machine.openMachineClass", dictType = "class_num_three_plan", dictTypeToExcelEnable = false)
     @TableField("OPEN_MACHINE_CLASS")
     @ImportValidated(maxLength = 20)
     private String openMachineClass;

@@ -10,6 +10,7 @@
                    mi.MACHINE_NAME
             from T_TQ_MACHINE_CHUCK mc
             left join T_TQ_MACHINE_INFO mi on mc.MACHINE_CODE = mi.MACHINE_CODE
+                and mi.IS_DELETE = '0'
             where mc.IS_DELETE = '0'
             <if test="machineCode != null and machineCode != ''">
                 and mc.MACHINE_CODE = #{machineCode}

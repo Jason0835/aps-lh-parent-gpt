@@ -107,7 +107,7 @@ public class NcStockController extends AbstractDocBizController<NcStock> {
     @Override
     protected List<NcStock> listExportData(NcStock obj) {
         QueryWrapper<NcStock> wrapper = new QueryWrapper<>();
-        startPage("update_time desc");
+        startPage(getOrderBy());
         this.builderCondition(wrapper, obj);
         List<NcStock> list = ncStockMapper.selectList(wrapper);
         AppUtils.formatData(list, getQueryFormulas());
@@ -136,6 +136,6 @@ public class NcStockController extends AbstractDocBizController<NcStock> {
 
     @Override
     protected String getOrderBy() {
-        return "STOCK_DATE DESC, MATERIAL_CODE";
+        return "STOCK_DATE DESC, MATERIAL_CODE, ID";
     }
 }

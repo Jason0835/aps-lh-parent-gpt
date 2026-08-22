@@ -40,11 +40,13 @@
         >{{ $t("ui.frame.btn.export") }}</el-button>
       </template>
     </page-table>
-    <tlt-upload
+    <tlt-upload-form
       ref="tltUpload"
       downloadUrl="/gsq/twiningDisc/importTemplate"
       uploadUrl="/gsq/twiningDisc/importData"
       @uploadSuccess="getList"
+      labelWidth="0"
+      :columns="importColumns"
     />
     <InfoDialog ref="infoRef" @success="getList" />
   </basic-container>
@@ -55,18 +57,35 @@ import {
   removeTwiningDisc,
   exportTwiningDisc,
 } from "@/api/gsq/twiningDisc";
-import tltUpload from "@/components/tltUpload/tltUpload.vue";
+import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import InfoDialog from "./components/infoDialog.vue";
 
 export default {
   name: "GsqTwiningDisc",
-  dicts: ["sys_normal_disable"],
+  dicts: ["sys_normal_disable", "biz_factory_name", "lh_precision_data_source"],
   components: {
-    tltUpload,
+    TltUploadForm,
     InfoDialog,
   },
   data() {
     return {
+      // 导入弹窗表单配置：是否更新已存在数据复选框
+      importColumns: [
+        {
+          label: "",
+          prop: "updateSupport",
+          render: (form) => {
+            return (
+              <el-checkbox
+                label={this.$t("common.rule.updateSupport")}
+                v-model={form.updateSupport}
+              >
+                {this.$t("common.rule.updateSupport")}
+              </el-checkbox>
+            );
+          },
+        },
+      ],
       loading: false,
       data: [],
       selection: [],
@@ -84,6 +103,14 @@ export default {
     searchColumns() {
       return [
         {
+          label: this.$t("ui.data.column.gsq.twiningDisc.factoryCode"),
+          prop: "factoryCode",
+          type: "select",
+          span: 6,
+          filterable: true,
+          dictData: this.dict.type.biz_factory_name,
+        },
+        {
           label: this.$t("ui.data.column.gsq.twiningDisc.twiningDiscCode"),
           prop: "twiningDiscCode",
           type: "input",
@@ -93,11 +120,45 @@ export default {
           prop: "twiningDiscName",
           type: "input",
         },
+        {
+          label: this.$t("ui.data.column.gsq.twiningDisc.proSize"),
+          prop: "proSize",
+          type: "input",
+        },
+        {
+          label: this.$t("ui.data.column.gsq.twiningDisc.sortType"),
+          prop: "sortType",
+          type: "input",
+        },
+        {
+          label: this.$t("ui.data.column.gsq.twiningDisc.status"),
+          prop: "status",
+          type: "select",
+          filterable: true,
+          dictData: this.dict.type.sys_normal_disable,
+        },
+        {
+          label: this.$t("ui.data.column.gsq.twiningDisc.dataSource"),
+          prop: "dataSource",
+          type: "select",
+          filterable: true,
+          dictData: this.dict.type.lh_precision_data_source,
+        },
       ];
     },
     columns() {
       return [
         { type: "selection", fixed: "left" },
+        {
+          prop: "factoryCode",
+          align: "center",
+          halign: "center",
+          label: this.$t("ui.data.column.gsq.twiningDisc.factoryCode"),
+          minWidth: 100,
+          formatter: (row) => {
+            return this.selectDictLabel(this.dict.type.biz_factory_name, row.factoryCode) || "-";
+          },
+        },
         {
           prop: "twiningDiscCode",
           align: "center",
@@ -119,6 +180,44 @@ export default {
           },
         },
         {
+          prop: "proSize",
+          align: "center",
+          halign: "center",
+          label: this.$t("ui.data.column.gsq.twiningDisc.proSize"),
+          minWidth: 100,
+        },
+        {
+          prop: "sortType",
+          align: "center",
+          halign: "center",
+          label: this.$t("ui.data.column.gsq.twiningDisc.sortType"),
+          minWidth: 120,
+          formatter: (row) => {
+            return row.sortType || "-";
+          },
+        },
+        {
+          prop: "qty",
+          align: "center",
+          halign: "center",
+          label: this.$t("ui.data.column.gsq.twiningDisc.qty"),
+          minWidth: 100,
+        },
+        {
+          prop: "specCount",
+          align: "center",
+          halign: "center",
+          label: this.$t("ui.data.column.gsq.twiningDisc.specCount"),
+          minWidth: 110,
+        },
+        {
+          prop: "machineCount",
+          align: "center",
+          halign: "center",
+          label: this.$t("ui.data.column.gsq.twiningDisc.machineCount"),
+          minWidth: 110,
+        },
+        {
           prop: "status",
           align: "center",
           halign: "center",
@@ -129,18 +228,14 @@ export default {
           },
         },
         {
-          prop: "proSize",
+          prop: "dataSource",
           align: "center",
           halign: "center",
-          label: this.$t("ui.data.column.gsq.twiningDisc.proSize"),
+          label: this.$t("ui.data.column.gsq.twiningDisc.dataSource"),
           minWidth: 100,
-        },
-        {
-          prop: "qty",
-          align: "center",
-          halign: "center",
-          label: this.$t("ui.data.column.gsq.twiningDisc.qty"),
-          minWidth: 100,
+          formatter: (row) => {
+            return this.selectDictLabel(this.dict.type.lh_precision_data_source, row.dataSource) || "-";
+          },
         },
         {
           prop: "remark",
@@ -215,9 +310,7 @@ export default {
     },
     handleBatchDelete() {
       if (this.selection.length === 0) {
-        this.$modal.msgWarning(
-          this.$t("common.confirm.selectDeleteData") || "请选择需要删除的数据"
-        );
+        this.$modal.msgWarning(this.$t("ui.placeholder.selectTableRow"));
         return;
       }
       this.$confirm(this.$t("common.confirm.delete"), {
@@ -301,6 +394,11 @@ export default {
   },
   activated() {
     this.getList();
+  },
+  created() {
+    // 工厂默认越南工厂116（与其他gsq页面保持一致）
+    this.search = { factoryCode: "116" };
+    this.query = { factoryCode: "116" };
   },
 };
 </script>

@@ -555,7 +555,10 @@ export default {
     },
     /** 删除（走任务链路径，删除后resequence重排） */
     handleDelete() {
-      if (this.selection.length === 0) return;
+      if (this.selection.length === 0) {
+        this.$modal.msgWarning(this.$t("ui.placeholder.selectTableRow"));
+        return;
+      }
       const ids = this.selection.map((item) => item.id);
       this.$modal
         .confirm(this.$t("ui.data.column.gsqScheduleResult.confirmDelete"))

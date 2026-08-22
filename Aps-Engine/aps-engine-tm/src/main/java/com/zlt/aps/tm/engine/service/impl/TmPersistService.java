@@ -13,6 +13,7 @@ import com.zlt.aps.tm.engine.domain.TmPersistResult;
 import com.zlt.aps.tm.engine.domain.TmScheduleContext;
 import com.zlt.aps.tm.engine.domain.TmSnapshotBuildResult;
 import com.zlt.aps.tm.engine.domain.TmTaskDraft;
+import com.zlt.aps.tm.engine.service.support.TmTaskStatusPredicates;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -141,6 +142,7 @@ public class TmPersistService {
         }
         if (snapshot != null) {
             explain.setRuleHitJson(snapshot.getRuleHitJson());
+            explain.setRuleSummaryDesc(snapshot.getRuleSummaryDesc());
             explain.setCandidateMachineJson(snapshot.getCandidateMachineJson());
             explain.setSelectedMachineScore(snapshot.getSelectedMachineScore());
             explain.setMachineSelectReason(snapshot.getMachineSelectReason());
@@ -176,14 +178,7 @@ public class TmPersistService {
      * @return true 表示任务需要进入未排语义
      */
     private boolean isUnplannedTask(TmTaskDraft task) {
-        if (task == null) {
-            return false;
-        }
-        if (StrUtil.isNotBlank(task.getUnplannedReasonCode())) {
-            return true;
-        }
-        return task.isUnassigned() && task.getPlanQty() != null
-                && task.getPlanQty().compareTo(BigDecimal.ZERO) > 0;
+        return TmTaskStatusPredicates.isUnplannedTask(task);
     }
 
     /**
@@ -193,8 +188,7 @@ public class TmPersistService {
      * @return true 表示最终计划量为空或小于等于 0，且不是未排任务
      */
     private boolean isNoProductionNeeded(TmTaskDraft task) {
-        return task != null && !isUnplannedTask(task)
-                && (task.getPlanQty() == null || task.getPlanQty().compareTo(BigDecimal.ZERO) <= 0);
+        return TmTaskStatusPredicates.isNoProductionNeeded(task);
     }
 
     /**

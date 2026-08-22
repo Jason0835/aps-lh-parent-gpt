@@ -82,7 +82,7 @@ export function checkMachineCodeUnique(query) {
  * @returns 导出文件
  */
 export function exportData(query) {
-  return downloadLink("/gsq/machine/export", query);
+  return downloadLink("/gsq/machine/exportData/钢丝圈机台信息", query);
 }
 
 /**

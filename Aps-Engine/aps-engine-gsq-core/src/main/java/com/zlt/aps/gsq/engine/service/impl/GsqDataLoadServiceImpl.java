@@ -15,14 +15,18 @@ import com.zlt.aps.gsq.engine.vo.GsqScheduleResultVo;
 import com.zlt.aps.gsq.engine.vo.GsqParamsVo;
 import com.zlt.aps.gsq.engine.vo.GsqSpecifyMachineVo;
 import com.zlt.aps.gsq.engine.vo.GsqStockVo;
+import com.zlt.aps.gsq.engine.vo.GsqTwiningDiscMachineVo;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 钢丝圈排程数据加载Service实现。
@@ -121,19 +125,44 @@ public class GsqDataLoadServiceImpl implements IGsqDataLoadService {
         context.setSpecifyCanMachineMap(convertToSpecifyMachineMap(gsqEngineMachineMapper.listGsqSpecifyMachine("0")));
         context.setSpecifyNotMachineMap(convertToSpecifyMachineMap(gsqEngineMachineMapper.listGsqSpecifyMachine("1")));
 
-        // 10. 加载钢丝圈-缠绕盘代码映射（用于排程结果 twiningDiscCode 回填及机台分配缠绕盘连续优先）
-        Map<String, String> twiningDiscCodeMap = new HashMap<>();
+        // 10. 加载钢丝圈-缠绕盘代码映射（多对多：一个钢丝圈可挂多个缠绕盘）
+        //     用于排程结果 twiningDiscCode 回填及 S3 机台分配缠绕盘连续优先
+        Map<String, Set<String>> twiningDiscCodeMap = new HashMap<>();
         List<Map<String, Object>> twiningDiscCodeList = gsqEngineMachineMapper.listGsqTwiningDiscCode();
         if (twiningDiscCodeList != null) {
             for (Map<String, Object> row : twiningDiscCodeList) {
                 Object steelRingCode = row.get("steelRingCode");
                 Object twiningDiscCode = row.get("twiningDiscCode");
                 if (steelRingCode != null && twiningDiscCode != null) {
-                    twiningDiscCodeMap.put(steelRingCode.toString(), twiningDiscCode.toString());
+                    twiningDiscCodeMap
+                            .computeIfAbsent(steelRingCode.toString(), k -> new HashSet<>())
+                            .add(twiningDiscCode.toString());
                 }
             }
         }
         context.setTwiningDiscCodeMap(twiningDiscCodeMap);
+
+        // 10.1 加载缠绕盘-机台映射（多对多：一个缠绕盘可绑多个机台）
+        //      用于 S3 DiscMachineFilter 过滤：仅保留规格可用盘绑定机台并集内的机台
+        Map<String, Set<String>> discMachineMap = new HashMap<>();
+        List<GsqTwiningDiscMachineVo> discMachineList = gsqEngineMachineMapper.listGsqTwiningDiscMachine();
+        if (discMachineList != null) {
+            for (GsqTwiningDiscMachineVo vo : discMachineList) {
+                if (StringUtils.isEmpty(vo.getTwiningDiscCode()) || StringUtils.isEmpty(vo.getMachineIds())) {
+                    continue;
+                }
+                Set<String> machineSet = discMachineMap
+                        .computeIfAbsent(vo.getTwiningDiscCode(), k -> new HashSet<>());
+                for (String machineCode : vo.getMachineIds().split(",")) {
+                    if (StringUtils.isNotEmpty(machineCode.trim())) {
+                        machineSet.add(machineCode.trim());
+                    }
+                }
+            }
+        }
+        context.setDiscMachineMap(discMachineMap);
+        log.info("[数据加载] 缠绕盘映射加载完成, 规格-盘映射数: {}, 盘-机台映射数: {}",
+                twiningDiscCodeMap.size(), discMachineMap.size());
 
         // 8. 加载钢丝圈库存（排程日期前一天库存，listGsqStock 内部已按 STOCK_DATE=排程日期-1 查询）
         List<GsqStockVo> stockList = gsqEngineStockMapper.listGsqStock(scheduleDate);

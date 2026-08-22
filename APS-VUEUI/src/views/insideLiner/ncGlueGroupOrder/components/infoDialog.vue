@@ -33,18 +33,28 @@ import moment from "moment";
 
 import infoForm from "@/views/components/infoForm.vue";
 
+import { getConfigKey } from "@/api/system/config";
 import { saveGlueGroupOrder } from "@/api/nc/glueGroupOrder";
 
 export default {
   components: { infoForm },
+  inject: ["parentDict"],
   data() {
     return {
       loading: false,
       visible: false,
       isEdit: false,
       editType: null,
+      factoryCode: "",
       form: {},
       rules: {
+        factoryCode: [
+          {
+            required: true,
+            message: this.$t("common.rule.select"),
+            trigger: "blur",
+          },
+        ],
         glueGroupCode: [
           {
             required: true,
@@ -76,6 +86,14 @@ export default {
         ],
       },
       columns: [
+        {
+          label: this.$t("ui.data.column.factoryCode"),
+          prop: "factoryCode",
+          span: 24,
+          type: "select",
+          dictData: this.parentDict.type.biz_factory_name,
+          required: true,
+        },
         {
           label: this.$t("ui.glueGroup.column.glueGroupCode"),
           prop: "glueGroupCode",
@@ -141,6 +159,19 @@ export default {
     //utils
     show(data) {
       this.visible = true;
+      // 获取当前工厂编码（保存时需要带工厂参数）
+      if (!this.factoryCode) {
+        getConfigKey("sys.factory.code").then((response) => {
+          this.factoryCode = response.msg;
+          // 新增时默认选中默认工厂（工厂字段不可编辑）
+          if (!data) {
+            this.form = { ...this.form, factoryCode: response.msg };
+          }
+        });
+      } else if (!data) {
+        // 新增时默认选中默认工厂（工厂字段不可编辑）
+        this.form = { ...this.form, factoryCode: this.factoryCode };
+      }
       if (data) {
         this.isEdit = true;
         this.form = {
@@ -159,7 +190,10 @@ export default {
       this.$refs.form.triggerConfirm(async (params) => {
         try {
           this.loading = true;
-          this.save(params);
+          this.save({
+            ...params,
+            factoryCode: params.factoryCode || this.factoryCode,
+          });
         } catch (error) {
           this.$modal.msgError(error.message);
           this.loading = false;

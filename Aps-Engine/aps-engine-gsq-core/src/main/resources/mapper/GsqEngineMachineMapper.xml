@@ -31,13 +31,21 @@
     </select>
 
     <!--
-        缠绕盘机台映射查询
+        缠绕盘-机台映射查询（缠绕盘机台关系表，多对多）
         原逻辑：从 T_GSQ_TWINING_DISC 按 SPEC+ORDER_WAY 分组关联 MACHINE_ID 构建规格~排列→机台映射
-        新表结构变更：T_GSQ_TWINING_DISC 已移除 SPEC/ORDER_WAY/MACHINE_ID 字段，改为缠绕盘资产管理
-        新表无机台关联字段，该映射暂返回空，排程回退到定点机台（specifyCanMachineMap）逻辑
+        新表结构变更：主表已改为缠绕盘资产管理，机台关系独立到 T_GSQ_TWINING_DISC_MACHINE
+        现按 TWINING_DISC_CODE 分组聚合机台，供 S3 机台分配 DiscMachineFilter 过滤使用：
+        仅取启用缠绕盘(主表 STATUS='0') + 启用机台(T_GSQ_MACHINE_INFO STATUS='1') + 启用关系(STATUS='0')
     -->
     <select id="listGsqTwiningDiscMachine" resultType="com.zlt.aps.gsq.engine.vo.GsqTwiningDiscMachineVo">
-        select null as SPEC, null as ORDER_WAY, null as machine_ids from dual where 1 = 0
+        SELECT dm.TWINING_DISC_CODE AS twiningDiscCode,
+               GROUP_CONCAT(dm.MACHINE_CODE ORDER BY dm.MACHINE_CODE SEPARATOR ',') AS machine_ids
+        FROM T_GSQ_TWINING_DISC_MACHINE dm
+        INNER JOIN T_GSQ_TWINING_DISC d ON d.TWINING_DISC_CODE = dm.TWINING_DISC_CODE AND d.IS_DELETE = '0' AND d.STATUS = '0'
+        INNER JOIN T_GSQ_MACHINE_INFO m ON m.MACHINE_CODE = dm.MACHINE_CODE AND m.IS_DELETE = '0' AND m.STATUS = '1'
+        WHERE dm.IS_DELETE = '0'
+          AND dm.STATUS = '0'
+        GROUP BY dm.TWINING_DISC_CODE
     </select>
 
     <select id="listGsqTwiningDisc" resultType="com.zlt.aps.gsq.engine.vo.GsqTwiningDiscVo">
@@ -56,14 +64,13 @@
         GROUP BY STEEL_RING_CODE
     </select>
 
-    <!-- 查询钢丝圈-缠绕盘代码映射（缠绕盘子表关联主表，仅取启用分支盘 STATUS='0'） -->
+    <!-- 查询钢丝圈-缠绕盘代码映射（规格关系表按缠绕盘编码关联主表，仅取启用分支盘 STATUS='0'） -->
     <select id="listGsqTwiningDiscCode" resultType="java.util.Map">
         SELECT sub.STEEL_RING_CODE AS steelRingCode,
-               d.TWINING_DISC_CODE AS twiningDiscCode
-        FROM T_GSQ_TWINING_DISC_SUB sub
-        INNER JOIN T_GSQ_TWINING_DISC d ON sub.DISC_ID = d.ID
+               sub.TWINING_DISC_CODE AS twiningDiscCode
+        FROM T_GSQ_TWINING_DISC_SPEC sub
+        INNER JOIN T_GSQ_TWINING_DISC d ON d.TWINING_DISC_CODE = sub.TWINING_DISC_CODE AND d.IS_DELETE = '0'
         WHERE d.STATUS = '0'
-          AND d.IS_DELETE = '0'
           AND sub.IS_DELETE = '0'
     </select>
 </mapper>

@@ -20,19 +20,6 @@ public interface GsqEngineMachineService {
     Map<String, String> getSpecifyMachineMap(String jobType);
 
     /**
-     * 获得钢丝圈代码和缠绕盘map (key = 规格尺寸~排列方式 )
-     * @return
-     */
-    Map<String, String> getTwiningDiscMachineMap();
-
-    /**
-     * 获得钢丝圈代码和缠绕盘（value = 规格尺寸~排列方式）map
-     * @Param scheduleDate 排程日期
-     * @return
-     */
-    Map<String, String> getTwiningDiscMap(String scheduleDate);
-    
-    /**
      * 获取上一天规格已排产机台列表
      * @param scheduleDate
      * @return

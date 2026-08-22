@@ -98,7 +98,7 @@ public class NcCurlRollController extends AbstractDocBizController<NcCurlRoll> {
     @Override
     protected List<NcCurlRoll> listExportData(NcCurlRoll obj) {
         QueryWrapper<NcCurlRoll> wrapper = new QueryWrapper<>();
-        startPage("update_time desc");
+        startPage(getOrderBy());
         this.builderCondition(wrapper, obj);
         List<NcCurlRoll> list = curlRollMapper.selectList(wrapper);
         AppUtils.formatData(list, getQueryFormulas());
@@ -127,6 +127,6 @@ public class NcCurlRollController extends AbstractDocBizController<NcCurlRoll> {
 
     @Override
     protected String getOrderBy() {
-        return "LINING_CODE";
+        return "LINING_CODE, ID";
     }
 }

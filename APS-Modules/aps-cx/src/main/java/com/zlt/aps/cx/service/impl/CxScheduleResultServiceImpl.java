@@ -8,7 +8,6 @@ import com.ruoyi.api.gateway.system.service.ISysDictDataCacheService;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.domain.SysDictData;
 import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
@@ -28,10 +27,8 @@ import com.zlt.aps.cx.mapper.*;
 import com.zlt.aps.cx.service.CxScheduleDetailService;
 import com.zlt.aps.cx.service.CxScheduleResultService;
 import com.zlt.aps.cx.vo.CxScheduleResultTemplateImportVO;
-import com.zlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.maindata.mapper.MdmMaterialConsumeDetailMapper;
 import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
-import com.zlt.aps.maindata.mapper.MdmRawMaterialConversionEntityMapper;
-import com.zlt.aps.mdm.api.domain.entity.MdmRawMaterialConversion;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
 import com.zlt.aps.lh.api.domain.vo.ScheduleSummaryReportVO;
@@ -39,8 +36,10 @@ import com.zlt.aps.lh.api.enums.MachineStopTypeEnum;
 import com.zlt.aps.lh.api.enums.MouldChangeTypeEnum;
 import com.zlt.aps.lh.api.service.ILhScheduleResultRemoteService;
 import com.zlt.aps.mp.api.domain.entity.MdmDevicePlanShut;
+import com.zlt.aps.mp.api.domain.entity.MdmMaterialConsumeDetail;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mp.api.domain.entity.MdmMonthSurplus;
+import com.zlt.aps.mp.api.domain.entity.MdmSkuConstructionRef;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.mp.api.service.IFactoryMonthPlanProductionFinalResultRemoteService;
 import com.zlt.aps.mp.api.service.IMpStructureAllocationRemoteService;
@@ -106,7 +105,10 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
     private CxParamConfigMapper cxParamConfigMapper;
 
     @Autowired
-    private MdmRawMaterialConversionEntityMapper mdmRawMaterialConversionMapper;
+    private MdmSkuConstructionRefMapper mdmSkuConstructionRefMapper;
+
+    @Autowired
+    private MdmMaterialConsumeDetailMapper mdmMaterialConsumeDetailMapper;
 
     @Autowired
     private MdmMaterialInfoEntityMapper materialInfoEntityMapper;
@@ -382,6 +384,19 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         List<Map<String, Object>> planRows = buildCxTemplateDataList(exportList, recipeTypeMap, totalDailyPlanQtyMap, todayNightFinishQtyMap, smallGlueMap, placeholderMap, shiftCapacitiesMap, keyProductEmbryoCodes, lhShiftConsumptionMap, endingStructureNames, rowRemarkMap);
         planDataList.add(planRows);
 
+        // 胶种诊断：统计成型日计划行胶种命中情况，并打印未命中行的匹配key样例
+        List<String> missKeys = planRows.stream()
+                .filter(r -> !"小计".equals(r.get("cxMachineCode")))
+                .filter(r -> StringUtils.isBlank((String) r.get("smallGlue")))
+                .map(r -> StringUtils.defaultString((String) r.get("materialCode")).trim() + "|" + "未知recipeType")
+                .distinct()
+                .limit(5)
+                .collect(Collectors.toList());
+        long hitCount = planRows.stream()
+                .filter(r -> StringUtils.isNotBlank((String) r.get("smallGlue")))
+                .count();
+        log.info("胶种诊断-成型日计划: 总行数={}, 胶种命中行数={}, 未命中样例={}", planRows.size(), hitCount, missKeys);
+
         // 为小计行添加 DAEEF3 背景色标识 + 胎胚余量<400 的 J列添加浅红色背景（FFC7CE）
         List<CellStyle> cellStyleList = new ArrayList<>();
         int templateListStartRow = 4;
@@ -535,6 +550,14 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
         LambdaQueryWrapper<CxEmbryoLhTime> lhTimeWrapper = new LambdaQueryWrapper<>();
         lhTimeWrapper.eq(CxEmbryoLhTime::getFactoryCode, factoryCode);
+        // 过滤已删除记录
+        lhTimeWrapper.eq(CxEmbryoLhTime::getIsDelete, 0);
+        // 按排程日期过滤，只导出当天的结构切换记录，避免把所有日期的数据都导出来
+        if (scheduleDate != null) {
+            Date dayStart = cn.hutool.core.date.DateUtil.beginOfDay(scheduleDate);
+            Date dayEnd = cn.hutool.core.date.DateUtil.endOfDay(scheduleDate);
+            lhTimeWrapper.between(CxEmbryoLhTime::getScheduleDate, dayStart, dayEnd);
+        }
         lhTimeWrapper.orderByAsc(CxEmbryoLhTime::getCxMachineCode);
 
         List<CxEmbryoLhTime> lhTimeList = cxEmbryoLhTimeMapper.selectList(lhTimeWrapper);
@@ -902,9 +925,23 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         row.put("cxRemainQty", zeroToEmpty(newLhRemainQty.subtract(totalStock)));
 
         String embryoCode = item.getEmbryoCode();
-        // 胶种按 物料编码 + 示方类型 匹配（任意一个物料编码命中即可）
-        String glueKey = StringUtils.defaultString(item.getMaterialCode()).trim() + "|" + recipeType;
-        String smallGlueVal = smallGlueMap.getOrDefault(glueKey, "");
+        // 胶种按 物料编码 + 胎胚代码 + 示方类型 匹配（任意一个物料编码命中即可）
+        // 注意：MATERIAL_CODE 可能是逗号分隔的多个值，逐个尝试匹配
+        String smallGlueVal = "";
+        String materialCodeStr = item.getMaterialCode();
+        if (StringUtils.isNotBlank(materialCodeStr)) {
+            for (String mc : materialCodeStr.split(",")) {
+                String trimmed = mc.trim();
+                if (StringUtils.isNotBlank(trimmed)) {
+                    String glueKey = buildSmallGlueKey(trimmed, embryoCode, recipeType);
+                    String found = smallGlueMap.get(glueKey);
+                    if (StringUtils.isNotBlank(found)) {
+                        smallGlueVal = found;
+                        break;
+                    }
+                }
+            }
+        }
         row.put("smallGlue", smallGlueVal);
         row.put("placeholder", smallGlueVal);
 
@@ -1361,15 +1398,16 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
     /**
      * 构建小胶种和占位符映射。
-     * <p>数据来源由物料消耗明细表切换为成品原材料折算表 T_MDM_RAW_MATERIAL_CONVERSION：</p>
+     * <p>数据来源为 BOM 物料消耗明细表 T_MDM_MATERIAL_CONSUME_DETAIL，通过 SKU 施工关系表做两段关联：</p>
      * <ul>
-     *   <li>按 MATERIAL_CODE（物料编码）关联成型行，任意一个物料编码命中即可</li>
-     *   <li>按 CONSTRUCTION_STAGE（示方类型 T/X/S）关联成型行示方书类型</li>
-     *   <li>RAW_MATERIAL_NAME 以 AQT 开头，去掉 AQ 前缀后展示</li>
+     *   <li>第一段：按 工厂+物料编码+胎胚代码+制造示方书类型(EMBRYO_TYPE) 匹配 T_MDM_SKU_CONSTRUCTION_REF，
+     *       取制造示方书号(EMBRYO_NO) 作为消耗明细的胎胚版本(EMBRYO_VERSION)</li>
+     *   <li>第二段：按 工厂+胎胚代码+胎胚版本 匹配 T_MDM_MATERIAL_CONSUME_DETAIL，
+     *       取 CHILD_MATERIAL_NAME 以 AQT 开头的原材料描述，去掉 AQ 前缀后展示</li>
      * </ul>
      *
      * @param exportList 成型排程结果列表
-     * @return key=smallGlue/placeholder, value=materialCode|constructionStage→字符串的映射
+     * @return key=smallGlue/placeholder, value=物料编码|胎胚代码|制造示方书类型→胶种字符串的映射
      */
     private Map<String, Map<String, String>> buildSmallGlueMaps(List<CxScheduleResult> exportList) {
         Map<String, Map<String, String>> result = new HashMap<>(2);
@@ -1386,58 +1424,142 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                 .findFirst()
                 .orElse(null);
 
-        // 收集去重的物料编码
+        // 收集去重的物料编码（注意：MATERIAL_CODE 字段可能包含逗号分隔的多个值）
         Set<String> materialCodes = exportList.stream()
                 .map(CxScheduleResult::getMaterialCode)
+                .filter(StringUtils::isNotBlank)
+                .flatMap(mc -> Arrays.stream(mc.split(",")))
+                .map(String::trim)
+                .filter(StringUtils::isNotBlank)
+                .collect(Collectors.toSet());
+
+        // 收集去重的胎胚代码
+        Set<String> embryoCodes = exportList.stream()
+                .map(CxScheduleResult::getEmbryoCode)
                 .filter(StringUtils::isNotBlank)
                 .map(String::trim)
                 .collect(Collectors.toSet());
 
-        // 收集去重的示方类型（取成型行第一个非空的示方书类型）
-        Set<String> recipeTypes = exportList.stream()
+        // 收集去重的制造示方书类型（取成型行第一个非空的示方书类型 S/T/X）
+        Set<String> embryoTypes = exportList.stream()
                 .map(this::resolveFirstRecipeType)
                 .filter(StringUtils::isNotBlank)
                 .map(String::trim)
                 .collect(Collectors.toSet());
 
-        if (materialCodes.isEmpty()) {
+        if (materialCodes.isEmpty() || embryoCodes.isEmpty()) {
             return result;
         }
 
-        // 查询成品原材料折算表：物料编码 + 示方类型 + 原材料名称AQT前缀过滤
-        List<MdmRawMaterialConversion> conversions = mdmRawMaterialConversionMapper.selectList(
-                new LambdaQueryWrapper<MdmRawMaterialConversion>()
-                        .eq(BaseEntity::getIsDelete, YesOrNoEnum.NO.getCode())
-                        .eq(factoryCode != null, MdmRawMaterialConversion::getFactoryCode, factoryCode)
-                        .in(MdmRawMaterialConversion::getMaterialCode, materialCodes)
-                        .in(CollectionUtils.isNotEmpty(recipeTypes), MdmRawMaterialConversion::getConstructionStage, recipeTypes)
-                        .likeRight(MdmRawMaterialConversion::getRawMaterialName, "AQT"));
+        // 第一段：查询 SKU 与施工关系表，按 工厂+物料编码+胎胚代码+制造示方书类型 定位制造示方书号(EMBRYO_NO)
+        // 注意：显式过滤已删除记录，确保一个SKU组合只对应一个示方书号
+        List<MdmSkuConstructionRef> skuRefList = mdmSkuConstructionRefMapper.selectList(
+                new LambdaQueryWrapper<MdmSkuConstructionRef>()
+                        .eq(MdmSkuConstructionRef::getIsDelete, 0)
+                        .eq(factoryCode != null, MdmSkuConstructionRef::getFactoryCode, factoryCode)
+                        .in(MdmSkuConstructionRef::getMaterialCode, materialCodes)
+                        .in(MdmSkuConstructionRef::getEmbryoCode, embryoCodes)
+                        .in(CollectionUtils.isNotEmpty(embryoTypes), MdmSkuConstructionRef::getEmbryoType, embryoTypes));
 
-        if (CollectionUtils.isEmpty(conversions)) {
+        if (CollectionUtils.isEmpty(skuRefList)) {
+            log.info("胶种诊断-SKU施工关系表未命中任何数据");
             return result;
         }
 
-        // materialCode|constructionStage → 原材料名称（去掉AQ前缀，去重后逗号连接）
-        Map<String, String> valueMap = conversions.stream()
-                .filter(c -> StringUtils.isNotBlank(c.getMaterialCode()) && StringUtils.isNotBlank(c.getRawMaterialName()))
+        // 收集所有制造示方书号，作为消耗明细表的胎胚版本(EMBRYO_VERSION)
+        // 注意：EMBRYO_NO 字段可能包含逗号分隔的多个示方书号，需要拆分处理
+        Set<String> embryoVersions = skuRefList.stream()
+                .map(MdmSkuConstructionRef::getEmbryoNo)
+                .filter(StringUtils::isNotBlank)
+                .flatMap(embryoNo -> Arrays.stream(embryoNo.split(",")))
+                .map(String::trim)
+                .filter(StringUtils::isNotBlank)
+                .collect(Collectors.toSet());
+
+        if (CollectionUtils.isEmpty(embryoVersions)) {
+            return result;
+        }
+
+        // 第二段：查询 BOM 物料消耗明细表，按 工厂+胎胚代码+胎胚版本 取 AQT 开头的原材料描述
+        // 注意：显式过滤已删除记录
+        List<MdmMaterialConsumeDetail> consumeDetails = mdmMaterialConsumeDetailMapper.selectList(
+                new LambdaQueryWrapper<MdmMaterialConsumeDetail>()
+                        .eq(MdmMaterialConsumeDetail::getIsDelete, 0)
+                        .eq(factoryCode != null, MdmMaterialConsumeDetail::getFactoryCode, factoryCode)
+                        .in(MdmMaterialConsumeDetail::getEmbryoCode, embryoCodes)
+                        .in(MdmMaterialConsumeDetail::getEmbryoVersion, embryoVersions)
+                        .likeRight(MdmMaterialConsumeDetail::getChildMaterialName, "AQT"));
+
+        if (CollectionUtils.isEmpty(consumeDetails)) {
+            log.info("胶种诊断-物料消耗明细表未命中任何AQT记录");
+            return result;
+        }
+
+        // 胎胚代码|胎胚版本 → 胶种名称集合（去AQ前缀，去重）
+        Map<String, Set<String>> consumeGlueMap = consumeDetails.stream()
+                .filter(c -> StringUtils.isNotBlank(c.getChildMaterialName()))
                 .collect(Collectors.groupingBy(
-                        c -> StringUtils.defaultString(c.getMaterialCode()).trim() + "|"
-                                + StringUtils.defaultString(c.getConstructionStage()).trim(),
+                        c -> StringUtils.defaultString(c.getEmbryoCode()).trim() + "|"
+                                + StringUtils.defaultString(c.getEmbryoVersion()).trim(),
                         Collectors.mapping(
                                 c -> {
-                                    String name = StringUtils.defaultString(c.getRawMaterialName());
+                                    String name = StringUtils.defaultString(c.getChildMaterialName());
                                     return name.startsWith("AQ") ? name.substring(2) : name;
                                 },
-                                Collectors.collectingAndThen(
-                                        Collectors.toList(),
-                                        list -> list.stream().distinct().collect(Collectors.joining(","))
-                                )
-                        )));
+                                Collectors.toCollection(LinkedHashSet::new))));
+
+        // 组装最终映射：物料编码|胎胚代码|制造示方书类型 → 胶种(逗号连接)
+        // 注意：EMBRYO_NO 可能包含逗号分隔的多个示方书号，需要逐个拆分匹配
+        Map<String, Set<String>> glueAccumulator = new LinkedHashMap<>();
+        for (MdmSkuConstructionRef skuRef : skuRefList) {
+            if (StringUtils.isBlank(skuRef.getEmbryoNo()) || StringUtils.isBlank(skuRef.getEmbryoCode())) {
+                continue;
+            }
+            String glueKey = buildSmallGlueKey(skuRef.getMaterialCode(), skuRef.getEmbryoCode(), skuRef.getEmbryoType());
+            // 拆分逗号分隔的示方书号，逐个匹配胶种
+            Set<String> glueNames = new LinkedHashSet<>();
+            for (String embryoNo : skuRef.getEmbryoNo().split(",")) {
+                String trimmedNo = embryoNo.trim();
+                if (StringUtils.isBlank(trimmedNo)) {
+                    continue;
+                }
+                Set<String> found = consumeGlueMap.getOrDefault(
+                        skuRef.getEmbryoCode().trim() + "|" + trimmedNo,
+                        Collections.emptySet());
+                glueNames.addAll(found);
+            }
+            if (!glueNames.isEmpty()) {
+                glueAccumulator.computeIfAbsent(glueKey, key -> new LinkedHashSet<>()).addAll(glueNames);
+            }
+        }
+
+        Map<String, String> valueMap = new HashMap<>();
+        glueAccumulator.forEach((glueKey, glueNames) -> {
+            if (!glueNames.isEmpty()) {
+                valueMap.put(glueKey, String.join(",", glueNames));
+            }
+        });
 
         result.get("smallGlue").putAll(valueMap);
         result.get("placeholder").putAll(valueMap);
+        log.info("胶种诊断-SKU映射{}条, 消耗明细胶种映射{}条, 最终胶种命中{}条",
+                skuRefList.size(), consumeGlueMap.size(), valueMap.size());
 
         return result;
+    }
+
+    /**
+     * 构建胶种匹配键：物料编码|胎胚代码|制造示方书类型。
+     *
+     * @param materialCode 物料编码
+     * @param embryoCode 胎胚代码
+     * @param recipeType 制造示方书类型（S/T/X）
+     * @return 组合键，空值转为空字符串
+     */
+    private String buildSmallGlueKey(String materialCode, String embryoCode, String recipeType) {
+        return StringUtils.defaultString(materialCode).trim() + "|"
+                + StringUtils.defaultString(embryoCode).trim() + "|"
+                + StringUtils.defaultString(recipeType).trim();
     }
 
     /**
@@ -1811,9 +1933,25 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
             String embryoCode = first.getEmbryoCode();
             row.put("embryoCode", embryoCode);
             row.put("mainMaterialDesc", firstNonBlank(groupList, "mainMaterialDesc"));
-            // 胶种按 物料编码 + 示方类型 匹配（任意一个物料编码命中即可）
-            String glueKey = StringUtils.defaultString(first.getMaterialCode()).trim() + "|" + resolveFirstRecipeType(first);
-            row.put("smallGlue", StringUtils.defaultIfBlank(smallGlueMap.get(glueKey), ""));
+            // 胶种按 物料编码 + 胎胚代码 + 示方类型 匹配（任意一个物料编码命中即可）
+            // 注意：MATERIAL_CODE 可能是逗号分隔的多个值，逐个尝试匹配
+            String smallGlueVal2 = "";
+            String materialCodeStr2 = first.getMaterialCode();
+            String recipeType2 = resolveFirstRecipeType(first);
+            if (StringUtils.isNotBlank(materialCodeStr2)) {
+                for (String mc : materialCodeStr2.split(",")) {
+                    String trimmed = mc.trim();
+                    if (StringUtils.isNotBlank(trimmed)) {
+                        String glueKey = buildSmallGlueKey(trimmed, embryoCode, recipeType2);
+                        String found = smallGlueMap.get(glueKey);
+                        if (StringUtils.isNotBlank(found)) {
+                            smallGlueVal2 = found;
+                            break;
+                        }
+                    }
+                }
+            }
+            row.put("smallGlue", smallGlueVal2);
             row.put("cxRemainQty", sumCxRemainQty(groupList));
             row.put("remark", buildCxRemainQtyRemark(groupList, rowRemarkMap));
             dataList.add(row);

@@ -360,6 +360,17 @@ public interface IMesItfService {
     public AjaxResult syncMesGsqStock(@RequestBody AuxReqSyncDataLogs syncDataLogs);
 
     /**
+     * 同步MES钢丝圈缠绕盘三表数据（缠绕盘清单/规格关系/机台关系）
+     * 链路：MES三表(MES_WIRE_DISC_INFO/MES_WIRE_DISC_SPEC_MAPPING/MES_WIRE_DISC_MACHINE_MAPPING)
+     *       → Feign单事务落库(T_GSQ_TWINING_DISC/T_GSQ_TWINING_DISC_SPEC/T_GSQ_TWINING_DISC_MACHINE)
+     * @param syncDataLogs 参数（可传factoryCode过滤分厂）
+     * @return 结果
+     */
+    @ApiOperation("同步MES钢丝圈缠绕盘三表数据")
+    @PostMapping("/mesItf/syncMesTwiningDisc")
+    public AjaxResult syncMesTwiningDisc(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /**
      * 同步胎圈排程完成量
      * 链路：MES中间表(MES_TQ_SCHE_FINISH_QTY) → APS落库表(T_TQ_SCHE_FINISH_QTY) → 回写胎圈排程结果表各班次完成量
      * @param syncDataLogs 参数

@@ -109,6 +109,24 @@ public class MdmCxMachineFixed extends BaseEntity {
     private String fixedMaterialDesc;
 
     /**
+     * 固定胎胚  多个以,分隔拼接
+     */
+    @ImportExcelValidated(maxLength = 500)
+    @Excel(name = "ui.data.column.mdmCxMachineFixed.fixedEmbryoCode")
+    @ApiModelProperty(value = "固定胎胚  多个以,分隔拼接", name = "fixedEmbryoCode")
+    @TableField(value = "FIXED_EMBRYO_CODE", updateStrategy = FieldStrategy.IGNORED)
+    private String fixedEmbryoCode;
+
+    /**
+     * 固定胎胚描述  多个以,分隔拼接
+     */
+    @ImportExcelValidated(maxLength = 500)
+    @Excel(name = "ui.data.column.mdmCxMachineFixed.fixedMainMaterialDesc")
+    @ApiModelProperty(value = "固定胎胚描述  多个以,分隔拼接", name = "fixedMainMaterialDesc")
+    @TableField(value = "FIXED_MAIN_MATERIAL_DESC", updateStrategy = FieldStrategy.IGNORED)
+    private String fixedMainMaterialDesc;
+
+    /**
      * 不可作业结构  多个以,分隔拼接
      */
     @ImportExcelValidated(maxLength = 500)

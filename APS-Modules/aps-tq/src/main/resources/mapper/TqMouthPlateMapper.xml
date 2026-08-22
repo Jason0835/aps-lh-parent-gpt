@@ -12,6 +12,7 @@
             FROM T_TQ_MOUTH_PLATE mp
             LEFT JOIN T_TQ_MACHINE_INFO mi
             ON mp.MACHINE_CODE = mi.MACHINE_CODE
+            AND mi.IS_DELETE = '0'
             where mp.is_delete = '0'
             <if test="mouthPlateCode != null  and mouthPlateCode != ''">
                 and INSTR(mp.mouth_plate_code, #{mouthPlateCode}) > 0

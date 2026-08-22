@@ -244,6 +244,53 @@ export default {
           },
         },
         {
+          prop: "fixedEmbryoCode",
+          label: this.$t("ui.data.column.mdmCxMachineFixed.fixedEmbryoCode"),
+          width: 300,
+          render: ({ row }) => {
+            return (
+              <el-popover
+                placement="left"
+                title={this.$t("ui.data.column.mdmCxMachineFixed.fixedEmbryoCode")}
+                width="500"
+                trigger="click"
+                content={row.fixedEmbryoCode}
+              >
+                <div domPropsInnerHTML={this.renderHtml(row.fixedEmbryoCode)}></div>
+                <div
+                  slot="reference"
+                  style="cursor: pointer;"
+                  domPropsInnerHTML={this.renderHtml(row.fixedEmbryoCode)}
+                ></div>
+              </el-popover>
+            );
+          },
+        },
+        {
+          prop: "fixedMainMaterialDesc",
+          align: "left",
+          label: this.$t("ui.data.column.mdmCxMachineFixed.fixedMainMaterialDesc"),
+          minWidth: 350,
+          render: ({ row }) => {
+            return (
+              <el-popover
+                placement="left"
+                title={this.$t("ui.data.column.mdmCxMachineFixed.fixedMainMaterialDesc")}
+                width="500"
+                trigger="click"
+                content={row.fixedMainMaterialDesc}
+              >
+                <div domPropsInnerHTML={this.renderHtml(row.fixedMainMaterialDesc)}></div>
+                <div
+                  slot="reference"
+                  style="cursor: pointer;"
+                  domPropsInnerHTML={this.renderHtml(row.fixedMainMaterialDesc)}
+                ></div>
+              </el-popover>
+            );
+          },
+        },
+        {
           prop: "fixedMaterialCode",
           label: this.$t("ui.data.column.mdmCxMachineFixed.fixedMaterialCode"),
           width: 300,

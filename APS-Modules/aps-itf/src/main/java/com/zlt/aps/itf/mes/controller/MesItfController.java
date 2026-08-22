@@ -654,6 +654,22 @@ public class MesItfController {
     }
 
     /**
+     * 同步MES钢丝圈缠绕盘三表数据（缠绕盘清单/规格关系/机台关系）
+     * @param syncDataLogs 参数（可传factoryCode过滤分厂）
+     * @return 结果
+     */
+    @ApiOperation("同步MES钢丝圈缠绕盘三表数据")
+    @PostMapping("/syncMesTwiningDisc")
+    @AutoLoginLog
+    public AjaxResult syncMesTwiningDisc(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
+        String factoryCode = syncDataLogs.getFactoryCode();
+        if (StringUtils.isBlank(factoryCode)) {
+            syncDataLogs.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        }
+        return mesItfService.syncMesTwiningDisc(syncDataLogs);
+    }
+
+    /**
      * 同步胎圈排程完成量
      * @param syncDataLogs 参数
      * @return 结果

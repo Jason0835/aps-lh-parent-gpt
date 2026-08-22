@@ -17,11 +17,4 @@ public interface GsqSteelTypeColorMapper extends BaseMapper<GsqSteelTypeColor> {
      * @return
      */
     List<GsqSteelTypeColorDto> listGsqSteelTypeColor(GsqSteelTypeColorDto dto);
-
-    /**
-     * 合并操作，如果记录存在则更新，否则新增
-     *
-     * @param list 要合并的集合
-     */
-    public void mergeSql(List<GsqSteelTypeColorDto> list);
 }

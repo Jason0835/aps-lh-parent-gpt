@@ -287,6 +287,20 @@ public interface MesItfService {
     AjaxResult syncMesGsqStock(AuxReqSyncDataLogs syncDataLogs);
 
     /**
+     * 同步MES钢丝圈缠绕盘三表数据（缠绕盘清单/规格关系/机台关系）
+     * 三表均按业务键取MES DATA_VERSION最大版本行，一次Feign调用在钢丝圈微服务侧单事务落库：
+     *   步骤1：查询MES_WIRE_DISC_INFO缠绕盘清单（按MOUTH_PLAT_CODE取最大版本）
+     *   步骤2：查询MES_WIRE_DISC_SPEC_MAPPING规格关系（按WIRE_DISC_CODE+STEEL_RING_CODE取最大版本）
+     *   步骤3：查询MES_WIRE_DISC_MACHINE_MAPPING机台关系（按WIRE_DISC_CODE+MACHINE_CODE取最大版本）
+     *   步骤4：聚合后远程调用gsqMesSyncRemoteService.syncTwiningDisc落库
+     *          （主表UPSERT保留手工字段、MES失效数据清理级联、子表整体替换、机台关系UPSERT）
+     *
+     * @param syncDataLogs 同步参数（可传factoryCode过滤分厂）
+     * @return 结果
+     */
+    AjaxResult syncMesTwiningDisc(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
      * 同步胎圈排程完成量
      * T_TQ_SCHE_FINISH_QTY：采用逻辑删除+插入方案
      *   步骤1：逻辑删除当天排程日期的所有数据（IS_DELETE置为1）

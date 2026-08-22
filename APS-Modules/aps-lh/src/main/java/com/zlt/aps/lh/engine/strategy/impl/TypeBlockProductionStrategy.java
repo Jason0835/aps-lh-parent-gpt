@@ -45,6 +45,7 @@ import com.zlt.aps.lh.engine.strategy.support.FirstInspectionShiftAllocation;
 import com.zlt.aps.lh.engine.strategy.support.NewSpecEmbryoAvailableTimeResolver;
 import com.zlt.aps.lh.engine.strategy.support.PendingSkuUnscheduledRule;
 import com.zlt.aps.lh.engine.strategy.support.SpecifiedMachineScheduleResult;
+import com.zlt.aps.lh.service.ILhDailyMouldCalcService;
 import com.zlt.aps.lh.service.impl.LhMaintenanceScheduleService;
 import com.zlt.aps.lh.util.CleaningScheduleRuleUtil;
 import com.zlt.aps.lh.util.FirstInspectionQtyUtil;
@@ -152,6 +153,9 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
     private ICapacityCalculateStrategy capacityCalculateStrategy;
     @Resource
     private IMachineMatchStrategy machineMatchStrategy;
+    /** 物料+产品状态+自然日目标总机台数唯一查询入口。 */
+    @Resource
+    private ILhDailyMouldCalcService lhDailyMouldCalcService;
     /** 胶囊次数累计与换胶囊班次扣减统一入口 */
     @Resource
     private CapsuleReplacementRuleService capsuleReplacementRuleService = new CapsuleReplacementRuleService();
@@ -1475,9 +1479,6 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                                                     MachineScheduleDTO machine,
                                                     Date estimatedEndTime,
                                                     Date switchStartTime) {
-        if (isTypeBlockMaintenanceOverlapSwitch(context, machine, estimatedEndTime, switchStartTime)) {
-            return LhScheduleTimeUtil.getMaintenanceOverlapSwitchHours(context);
-        }
         return LhScheduleTimeUtil.getTypeBlockChangeTotalHours(context);
     }
 
@@ -1497,11 +1498,7 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
         if (switchStartTime == null) {
             return null;
         }
-        boolean maintenanceOverlapSwitch = isTypeBlockMaintenanceOverlapSwitch(
-                context, machine, estimatedEndTime, switchStartTime);
-        int switchDurationHours = maintenanceOverlapSwitch
-                ? LhScheduleTimeUtil.getMaintenanceOverlapSwitchHours(context)
-                : LhScheduleTimeUtil.getTypeBlockChangeTotalHours(context);
+        int switchDurationHours = LhScheduleTimeUtil.getTypeBlockChangeTotalHours(context);
         Date switchCompleteTime = LhScheduleTimeUtil.addHours(switchStartTime, switchDurationHours);
         boolean plannedRepairAffectingSwitch = Objects.nonNull(machine)
                 && ShiftCapacityResolverUtil.isPlannedRepairAffectingSwitch(
@@ -1524,9 +1521,6 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                     LhScheduleTimeUtil.formatDateTime(switchCompleteTime),
                     LhScheduleTimeUtil.getCapsulePreheatMinutes(context),
                     LhScheduleTimeUtil.formatDateTime(productionStartTime));
-        } else if (maintenanceOverlapSwitch) {
-            productionStartTime = LhScheduleTimeUtil.addHours(
-                    switchCompleteTime, LhScheduleTimeUtil.getFirstInspectionHours(context));
         } else {
             productionStartTime = switchCompleteTime;
         }
@@ -1627,26 +1621,6 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
         return ShiftCapacityResolverUtil.resolvePlannedRepairProductionReadyTime(
                 context, context.getDevicePlanShutList(), machine.getMachineCode(), estimatedEndTime,
                 switchStartTime, switchCompleteTime);
-    }
-
-    /**
-     * 判断换活字块是否使用精度重叠切换口径。
-     *
-     * <p>最新规则明确精度计划不得与换活字块并行，切换开始时间已由统一时间轴顺延到
-     * 精度及胶囊预热结束后，因此该方法固定返回false。保留方法入口是为了不改变现有
-     * 换活字块时长解析结构，计划性维修的并行判断仍由其独立逻辑负责。</p>
-     *
-     * @param context 排程上下文
-     * @param machine 机台
-     * @param estimatedEndTime 预计收尾时间
-     * @param switchStartTime 实际切换开始时间
-     * @return 固定false
-     */
-    private boolean isTypeBlockMaintenanceOverlapSwitch(LhScheduleContext context,
-                                                        MachineScheduleDTO machine,
-                                                        Date estimatedEndTime,
-                                                        Date switchStartTime) {
-        return false;
     }
 
     /**
@@ -2952,6 +2926,8 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
         for (int shiftIndex = 1; shiftIndex <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shiftIndex++) {
             ShiftFieldUtil.removeShiftAnalysis(
                     pairResult, shiftIndex, CapsuleReplacementRuleService.CAPSULE_REPLACEMENT_ANALYSIS);
+            ShiftFieldUtil.removeShiftAnalysis(
+                    pairResult, shiftIndex, FirstInspectionQtyUtil.FIRST_INSPECTION_ANALYSIS);
         }
         refreshResultSummary(context, pairResult, shifts);
         return pairResult;
@@ -3033,7 +3009,8 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                     ? "单机台收尾共用胎胚仅按余量" : "单机台收尾MAX(余量,胎胚库存)";
         } else if (isSingleMachine && getTargetScheduleQtyResolver().isFullCapacityMode(context)) {
             boolean newSpecExpansionAvailable = !DailyMachineExpansionPlanner.isDailyLookAheadCapacitySatisfied(
-                    context, sku, 1, ScheduleTypeEnum.TYPE_BLOCK.getCode())
+                    this.lhDailyMouldCalcService, context, sku, 1,
+                    ScheduleTypeEnum.TYPE_BLOCK.getCode())
                     && hasSchedulableNewSpecExpansionMachine(context, machine, sku, shifts);
             int adoptedTargetQty = resolveSingleMachineTypeBlockTargetQty(
                     sku, windowCapacityQty, newSpecExpansionAvailable);
@@ -3295,17 +3272,11 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                                                        Date endingTime) {
         Date machineReadyTime = getCapacityCalculateStrategy().calculateStartTime(
                 context, machine.getMachineCode(), endingTime);
-        boolean maintenanceOverlapSwitch = getMaintenanceScheduleService()
-                .shouldApplyMaintenanceOverlapSwitchRule(context, machine, endingTime);
-        Date switchReadyTime = maintenanceOverlapSwitch
-                ? getMaintenanceScheduleService().resolveMaintenanceEndTime(context, machine)
-                : machineReadyTime;
+        Date switchReadyTime = machineReadyTime;
         // 试制SKU换模需在早班完成，不受开产模式限制
         switchReadyTime = ShiftProductionControlUtil.resolveEarliestSwitchStartTime(
                 context, switchReadyTime, specifySku);
-        int switchDurationHours = maintenanceOverlapSwitch
-                ? LhScheduleTimeUtil.getMaintenanceOverlapSwitchHours(context)
-                : LhScheduleTimeUtil.getMouldChangeTotalHours(context);
+        int switchDurationHours = LhScheduleTimeUtil.getMouldChangeTotalHours(context);
         Date mouldChangeStartTime = getMouldChangeBalanceStrategy().allocateMouldChange(
                 context,
                 machine.getMachineCode(),
@@ -3349,9 +3320,7 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                 return false;
             }
             Date defaultProductionStartTime = plannedRepairAffectingSwitch
-                    ? firstInspectionBaseTime : maintenanceOverlapSwitch
-                    ? LhScheduleTimeUtil.addHours(inspectionTime, LhScheduleTimeUtil.getFirstInspectionHours(context))
-                    : mouldChangeCompleteTime;
+                    ? firstInspectionBaseTime : mouldChangeCompleteTime;
             Date productionStartTime = FirstInspectionQtyUtil.resolveTrialProductionStartTime(
                     context, specifySku, shifts, firstInspectionBaseTime, defaultProductionStartTime,
                     ScheduleTypeEnum.NEW_SPEC.getCode());
@@ -4389,7 +4358,9 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                     context, result, Math.min(remaining, shiftMaxQty), shiftMaxQty, mouldQty);
             // 目标量、首检和物理产能全部收口后，再按本班实际候选量执行一次换胶囊扣减。
             shiftQty = capsuleReplacementRuleService.resolveActualPlanQty(
-                    context, result, shift, shiftQty, "换活字块排产");
+                    context, result, shift, shiftQty, shiftMaxQty, effectiveStart, "换活字块排产");
+            // 未满产换胶囊可能刚登记时间窗口，后续班次必须立即读取最新窗口重新计算产能。
+            maintenanceWindowList = resolveMachineMaintenanceWindowList(context, result.getLhMachineCode());
             if (shiftQty <= 0) {
                 logTypeBlockShiftSkip(result, shift, remaining, shiftCapacity,
                         physicalShiftMaxQty, shiftMaxQty, "目标量/硫化余量或换胶囊扣减后为0");

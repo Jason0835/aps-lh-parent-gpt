@@ -6,17 +6,24 @@
 
     <resultMap type="com.zlt.aps.gsq.api.domain.entity.GsqDispatcherLog" id="GsqDispatcherLogResult">
         <result property="id" column="id"/>
+        <result property="scheduleId" column="schedule_id"/>
         <result property="operType" column="oper_type"/>
         <result property="scheduleDate" column="schedule_date"/>
-        <result property="materialCode" column="material_code"/>
-        <result property="beforeMachineId" column="before_machine_id"/>
-        <result property="beforeDayPlan" column="before_day_plan"/>
-        <result property="beforeMidPlan" column="before_mid_plan"/>
-        <result property="beforeNightPlan" column="before_night_plan"/>
-        <result property="afterMachineId" column="after_machine_id"/>
-        <result property="afterDayPlan" column="after_day_plan"/>
-        <result property="afterMidPlan" column="after_mid_plan"/>
-        <result property="afterNightPlan" column="after_night_plan"/>
+        <result property="steelRingCode" column="steel_ring_code"/>
+        <result property="beforeMachineCode" column="before_machine_code"/>
+        <result property="beforeClass1Plan" column="before_class1_plan"/>
+        <result property="beforeClass2Plan" column="before_class2_plan"/>
+        <result property="beforeClass3Plan" column="before_class3_plan"/>
+        <result property="beforeClass4Plan" column="before_class4_plan"/>
+        <result property="beforeClass5Plan" column="before_class5_plan"/>
+        <result property="beforeClass6Plan" column="before_class6_plan"/>
+        <result property="afterMachineCode" column="after_machine_code"/>
+        <result property="afterClass1Plan" column="after_class1_plan"/>
+        <result property="afterClass2Plan" column="after_class2_plan"/>
+        <result property="afterClass3Plan" column="after_class3_plan"/>
+        <result property="afterClass4Plan" column="after_class4_plan"/>
+        <result property="afterClass5Plan" column="after_class5_plan"/>
+        <result property="afterClass6Plan" column="after_class6_plan"/>
         <result property="remark" column="remark"/>
         <result property="delFlag" column="del_flag"/>
         <result property="createBy" column="create_by"/>
@@ -26,7 +33,11 @@
     </resultMap>
 
     <sql id="selectGsqDispatcherLogVo">
-        select id, oper_type, schedule_date, material_code, before_machine_id, before_day_plan, before_mid_plan, before_night_plan, after_machine_id, after_day_plan, after_mid_plan, after_night_plan, remark, del_flag, create_by, create_time, update_by, update_time from t_gsq_dispatcher_log
+        select id, schedule_id, oper_type, schedule_date, steel_ring_code,
+               before_machine_code, before_class1_plan, before_class2_plan, before_class3_plan, before_class4_plan, before_class5_plan, before_class6_plan,
+               after_machine_code, after_class1_plan, after_class2_plan, after_class3_plan, after_class4_plan, after_class5_plan, after_class6_plan,
+               remark, del_flag, create_by, create_time, update_by, update_time
+        from t_gsq_dispatcher_log
     </sql>
 
     <select id="selectGsqDispatcherLogList" parameterType="com.zlt.aps.gsq.api.domain.entity.GsqDispatcherLog"
@@ -35,6 +46,7 @@
         where del_flag = '0'
         <if test="operType != null  and operType != ''">and oper_type = #{operType}</if>
         <if test="scheduleDate != null ">and schedule_date = #{scheduleDate,jdbcType=DATE}</if>
+        <if test="steelRingCode != null and steelRingCode != ''">and steel_ring_code = #{steelRingCode}</if>
         <if test="createBy != null and createBy != ''">
             and INSTR(create_by, #{createBy}) > 0
         </if>
@@ -65,15 +77,21 @@
             <if test="scheduleId != null">schedule_id,</if>
             <if test="operType != null">oper_type,</if>
             <if test="scheduleDate != null">schedule_date,</if>
-            <if test="materialCode != null">material_code,</if>
-            <if test="beforeMachineId != null">before_machine_id,</if>
-            <if test="beforeDayPlan != null">before_day_plan,</if>
-            <if test="beforeMidPlan != null">before_mid_plan,</if>
-            <if test="beforeNightPlan != null">before_night_plan,</if>
-            <if test="afterMachineId != null">after_machine_id,</if>
-            <if test="afterDayPlan != null">after_day_plan,</if>
-            <if test="afterMidPlan != null">after_mid_plan,</if>
-            <if test="afterNightPlan != null">after_night_plan,</if>
+            <if test="steelRingCode != null">steel_ring_code,</if>
+            <if test="beforeMachineCode != null">before_machine_code,</if>
+            <if test="beforeClass1Plan != null">before_class1_plan,</if>
+            <if test="beforeClass2Plan != null">before_class2_plan,</if>
+            <if test="beforeClass3Plan != null">before_class3_plan,</if>
+            <if test="beforeClass4Plan != null">before_class4_plan,</if>
+            <if test="beforeClass5Plan != null">before_class5_plan,</if>
+            <if test="beforeClass6Plan != null">before_class6_plan,</if>
+            <if test="afterMachineCode != null">after_machine_code,</if>
+            <if test="afterClass1Plan != null">after_class1_plan,</if>
+            <if test="afterClass2Plan != null">after_class2_plan,</if>
+            <if test="afterClass3Plan != null">after_class3_plan,</if>
+            <if test="afterClass4Plan != null">after_class4_plan,</if>
+            <if test="afterClass5Plan != null">after_class5_plan,</if>
+            <if test="afterClass6Plan != null">after_class6_plan,</if>
             <if test="remark != null">remark,</if>
             <if test="delFlag != null">del_flag,</if>
             <if test="createBy != null">create_by,</if>
@@ -82,40 +100,55 @@
             <if test="updateTime != null">update_time,</if>
         </trim>
         <trim prefix="values (" suffix=")" suffixOverrides=",">
-            <if test="id != null">#{id},</if>
-            <if test="scheduleId != null">#{scheduleId},</if>
-            <if test="operType != null">#{operType},</if>
-            <if test="scheduleDate != null">#{scheduleDate},</if>
-            <if test="materialCode != null">#{materialCode},</if>
-            <if test="beforeMachineId != null">#{beforeMachineId},</if>
-            <if test="beforeDayPlan != null">#{beforeDayPlan},</if>
-            <if test="beforeMidPlan != null">#{beforeMidPlan},</if>
-            <if test="beforeNightPlan != null">#{beforeNightPlan},</if>
-            <if test="afterMachineId != null">#{afterMachineId},</if>
-            <if test="afterDayPlan != null">#{afterDayPlan},</if>
-            <if test="afterMidPlan != null">#{afterMidPlan},</if>
-            <if test="afterNightPlan != null">#{afterNightPlan},</if>
-            <if test="remark != null">#{remark},</if>
-            <if test="delFlag != null">#{delFlag},</if>
-            <if test="createBy != null">#{createBy},</if>
-            <if test="createTime != null">#{createTime},</if>
-            <if test="updateBy != null">#{updateBy},</if>
-            <if test="updateTime != null">#{updateTime},</if>
+            <if test="id != null">#{id,jdbcType=BIGINT},</if>
+            <if test="scheduleId != null">#{scheduleId,jdbcType=BIGINT},</if>
+            <if test="operType != null">#{operType,jdbcType=VARCHAR},</if>
+            <if test="scheduleDate != null">#{scheduleDate,jdbcType=TIMESTAMP},</if>
+            <if test="steelRingCode != null">#{steelRingCode,jdbcType=VARCHAR},</if>
+            <if test="beforeMachineCode != null">#{beforeMachineCode,jdbcType=VARCHAR},</if>
+            <if test="beforeClass1Plan != null">#{beforeClass1Plan,jdbcType=INTEGER},</if>
+            <if test="beforeClass2Plan != null">#{beforeClass2Plan,jdbcType=INTEGER},</if>
+            <if test="beforeClass3Plan != null">#{beforeClass3Plan,jdbcType=INTEGER},</if>
+            <if test="beforeClass4Plan != null">#{beforeClass4Plan,jdbcType=INTEGER},</if>
+            <if test="beforeClass5Plan != null">#{beforeClass5Plan,jdbcType=INTEGER},</if>
+            <if test="beforeClass6Plan != null">#{beforeClass6Plan,jdbcType=INTEGER},</if>
+            <if test="afterMachineCode != null">#{afterMachineCode,jdbcType=VARCHAR},</if>
+            <if test="afterClass1Plan != null">#{afterClass1Plan,jdbcType=INTEGER},</if>
+            <if test="afterClass2Plan != null">#{afterClass2Plan,jdbcType=INTEGER},</if>
+            <if test="afterClass3Plan != null">#{afterClass3Plan,jdbcType=INTEGER},</if>
+            <if test="afterClass4Plan != null">#{afterClass4Plan,jdbcType=INTEGER},</if>
+            <if test="afterClass5Plan != null">#{afterClass5Plan,jdbcType=INTEGER},</if>
+            <if test="afterClass6Plan != null">#{afterClass6Plan,jdbcType=INTEGER},</if>
+            <if test="remark != null">#{remark,jdbcType=VARCHAR},</if>
+            <if test="delFlag != null">#{delFlag,jdbcType=CHAR},</if>
+            <if test="createBy != null">#{createBy,jdbcType=VARCHAR},</if>
+            <if test="createTime != null">#{createTime,jdbcType=TIMESTAMP},</if>
+            <if test="updateBy != null">#{updateBy,jdbcType=VARCHAR},</if>
+            <if test="updateTime != null">#{updateTime,jdbcType=TIMESTAMP},</if>
         </trim>
     </insert>
 
     <update id="updateGsqDispatcherLog" parameterType="com.zlt.aps.gsq.api.domain.entity.GsqDispatcherLog">
         update t_gsq_dispatcher_log
         <trim prefix="SET" suffixOverrides=",">
+            <if test="scheduleId != null">schedule_id = #{scheduleId},</if>
             <if test="operType != null">oper_type = #{operType},</if>
             <if test="scheduleDate != null">schedule_date = #{scheduleDate},</if>
-            <if test="materialCode != null">material_code = #{materialCode},</if>
-            <if test="beforeMachineId != null">before_machine_id = #{beforeMachineId},</if>
-            <if test="beforeDayPlan != null">before_day_plan = #{beforeDayPlan},</if>
-            <if test="beforeNightPlan != null">before_night_plan = #{beforeNightPlan},</if>
-            <if test="afterMachineId != null">after_machine_id = #{afterMachineId},</if>
-            <if test="afterDayPlan != null">after_day_plan = #{afterDayPlan},</if>
-            <if test="afterNightPlan != null">after_night_plan = #{afterNightPlan},</if>
+            <if test="steelRingCode != null">steel_ring_code = #{steelRingCode},</if>
+            <if test="beforeMachineCode != null">before_machine_code = #{beforeMachineCode},</if>
+            <if test="beforeClass1Plan != null">before_class1_plan = #{beforeClass1Plan},</if>
+            <if test="beforeClass2Plan != null">before_class2_plan = #{beforeClass2Plan},</if>
+            <if test="beforeClass3Plan != null">before_class3_plan = #{beforeClass3Plan},</if>
+            <if test="beforeClass4Plan != null">before_class4_plan = #{beforeClass4Plan},</if>
+            <if test="beforeClass5Plan != null">before_class5_plan = #{beforeClass5Plan},</if>
+            <if test="beforeClass6Plan != null">before_class6_plan = #{beforeClass6Plan},</if>
+            <if test="afterMachineCode != null">after_machine_code = #{afterMachineCode},</if>
+            <if test="afterClass1Plan != null">after_class1_plan = #{afterClass1Plan},</if>
+            <if test="afterClass2Plan != null">after_class2_plan = #{afterClass2Plan},</if>
+            <if test="afterClass3Plan != null">after_class3_plan = #{afterClass3Plan},</if>
+            <if test="afterClass4Plan != null">after_class4_plan = #{afterClass4Plan},</if>
+            <if test="afterClass5Plan != null">after_class5_plan = #{afterClass5Plan},</if>
+            <if test="afterClass6Plan != null">after_class6_plan = #{afterClass6Plan},</if>
             <if test="remark != null">remark = #{remark},</if>
             <if test="delFlag != null">del_flag = #{delFlag},</if>
             <if test="createBy != null">create_by = #{createBy},</if>

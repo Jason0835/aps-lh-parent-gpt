@@ -60,6 +60,14 @@ public class NcMachineInfoController extends AbstractDocBizController<NcMachineI
     public TableDataInfo list(@RequestBody NcMachineInfo queryVO) {
         return super.list(queryVO);
     }
+    
+    @Override
+    protected void builderCondition(QueryWrapper<NcMachineInfo> queryWrapper, NcMachineInfo queryVO) {
+        queryWrapper.ge("FACTORY_CODE", queryVO.getFactoryCode());
+        queryWrapper.like(StringUtils.isNotEmpty(queryVO.getMachineCode()), "MACHINE_CODE", queryVO.getMachineCode());
+        queryWrapper.like(StringUtils.isNotEmpty(queryVO.getMachineName()), "MACHINE_NAME", queryVO.getMachineName());
+        queryWrapper.eq(StringUtils.isNotEmpty(queryVO.getStatus()), "STATUS", queryVO.getStatus());
+    }
 
     /**
      * 新增信息
@@ -99,7 +107,7 @@ public class NcMachineInfoController extends AbstractDocBizController<NcMachineI
     @Override
     protected List<NcMachineInfo> listExportData(NcMachineInfo obj) {
         QueryWrapper<NcMachineInfo> wrapper = new QueryWrapper<>();
-        startPage("update_time desc");
+        startPage(getOrderBy());
         this.builderCondition(wrapper, obj);
         List<NcMachineInfo> list = machineMapper.selectList(wrapper);
         AppUtils.formatData(list, getQueryFormulas());
@@ -128,6 +136,6 @@ public class NcMachineInfoController extends AbstractDocBizController<NcMachineI
 
     @Override
     protected String getOrderBy() {
-        return "MACHINE_CODE";
+        return "MACHINE_CODE, ID";
     }
 }

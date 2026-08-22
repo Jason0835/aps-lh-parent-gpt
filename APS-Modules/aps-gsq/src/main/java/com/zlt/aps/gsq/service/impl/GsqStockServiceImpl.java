@@ -3,6 +3,7 @@ package com.zlt.aps.gsq.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.utils.ImportUtil;
@@ -15,13 +16,17 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.date.DateUtil;
+import org.apache.commons.lang.StringUtils;
 
 import javax.annotation.Resource;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
@@ -127,11 +132,27 @@ public class GsqStockServiceImpl extends AbstractDocService<GsqStock>
             }
         }
 
-        // 保存：updateSupport=true 走 mergeSql（存在则更新）；否则逐条校验唯一后 save
+        // 保存：updateSupport=true 走查-改-插（存在则更新原记录）；否则逐条校验唯一后 save
         try {
             if (updateSupport && !importList.isEmpty()) {
-                successNum = importList.size();
-                gsqStockMapper.mergeSql(importList);
+                // 批量预取已存在库存（按库存日期+钢丝圈代码匹配），存在则更新原记录，不存在则新增
+                Map<String, GsqStock> existingMap = this.loadExistingStockMap(importList);
+                for (GsqStock excelItem : importList) {
+                    GsqStock existing = existingMap.get(this.buildStockKey(excelItem.getStockDate(), excelItem.getSteelRingCode()));
+                    if (existing != null) {
+                        // 已存在：回填主键ID，清空新增审计字段避免覆盖原记录创建信息，补齐更新审计字段后更新
+                        excelItem.setId(existing.getId());
+                        excelItem.setCreateBy(null);
+                        excelItem.setCreateTime(null);
+                        this.setUpdateAuditFields(excelItem);
+                        gsqStockMapper.updateById(excelItem);
+                    } else {
+                        // 不存在：补齐新增审计字段后插入
+                        this.setInsertAuditFields(excelItem);
+                        baseDao.save(excelItem);
+                    }
+                    successNum++;
+                }
             } else {
                 for (int i = 0; i < list.size(); i++) {
                     GsqStock excelItem = list.get(i);
@@ -207,5 +228,77 @@ public class GsqStockServiceImpl extends AbstractDocService<GsqStock>
             }
             log.info("钢丝圈库存同步：批量插入完成，插入数量={}", list.size());
         }
+    }
+
+    /**
+     * 批量预取已存在的库存数据（导入更新模式使用）
+     * 按"库存日期+钢丝圈代码"批量查询数据库已有记录，逻辑删除由框架自动过滤
+     *
+     * @param importList 导入数据列表
+     * @return 库存日期_钢丝圈代码 -> 已存在库存记录 的映射
+     */
+    private Map<String, GsqStock> loadExistingStockMap(List<GsqStock> importList) {
+        // 提取非空钢丝圈代码并去重，用于分批查询
+        List<String> codeList = importList.stream()
+                .map(GsqStock::getSteelRingCode)
+                .filter(StringUtils::isNotBlank)
+                .distinct()
+                .collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(codeList)) {
+            return new HashMap<>();
+        }
+        // 按1000条一批查询，避免in条件超长
+        List<GsqStock> existingList = CollUtil.split(codeList, 1000).stream()
+                .flatMap(batch -> gsqStockMapper.selectList(new LambdaQueryWrapper<GsqStock>()
+                        .in(GsqStock::getSteelRingCode, batch)).stream())
+                .collect(Collectors.toList());
+        // 按"库存日期+钢丝圈代码"组装映射，同键多条时保留首条
+        return existingList.stream()
+                .collect(Collectors.toMap(
+                        stock -> this.buildStockKey(stock.getStockDate(), stock.getSteelRingCode()),
+                        Function.identity(), (oldValue, newValue) -> oldValue));
+    }
+
+    /**
+     * 构建"库存日期+钢丝圈代码"组合键（库存日期格式化为yyyy-MM-dd，规避时分秒差异）
+     *
+     * @param stockDate     库存日期
+     * @param steelRingCode 钢丝圈代码
+     * @return 组合键字符串
+     */
+    private String buildStockKey(Date stockDate, String steelRingCode) {
+        return DateUtil.format(stockDate, "yyyy-MM-dd") + "_" + steelRingCode;
+    }
+
+    /**
+     * 设置导入更新模式的更新审计字段（updateBy/updateTime）
+     * 无登录上下文时回退为system
+     *
+     * @param entity 实体对象
+     */
+    private void setUpdateAuditFields(GsqStock entity) {
+        try {
+            entity.setUpdateBy(SecurityUtils.getUsername());
+        } catch (Exception e) {
+            entity.setUpdateBy("system");
+        }
+        entity.setUpdateTime(new Date());
+    }
+
+    /**
+     * 设置导入新增模式的审计字段（isDelete/createBy/createTime/updateBy/updateTime）
+     * 无登录上下文时回退为system
+     *
+     * @param entity 实体对象
+     */
+    private void setInsertAuditFields(GsqStock entity) {
+        entity.setIsDelete(0);
+        try {
+            entity.setCreateBy(SecurityUtils.getUsername());
+        } catch (Exception e) {
+            entity.setCreateBy("system");
+        }
+        entity.setCreateTime(new Date());
+        this.setUpdateAuditFields(entity);
     }
 }

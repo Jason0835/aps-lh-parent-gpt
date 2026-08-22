@@ -811,7 +811,7 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
 
         // 校验目标机台是否存在且启用
         DjMachineInfo targetMachine = djMachineInfoService.selectMachineInfoList(new DjMachineInfo()).stream()
-                .filter(m -> targetMachineCode.equals(m.getMachineCode()) && "0".equals(m.getStatus())).findFirst()
+                .filter(m -> targetMachineCode.equals(m.getMachineCode()) && "1".equals(m.getStatus())).findFirst()
                 .orElse(null);
         if (targetMachine == null) {
             log.info("目标机台不存在或已禁用，machineCode={}", targetMachineCode);

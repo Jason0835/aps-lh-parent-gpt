@@ -73,13 +73,16 @@ public interface IGsqMachineInfoService {
     String checkMachineCodeUnique(@Validated @RequestBody GsqMachineInfo machineInfo);
 
     /**
-     * 导出钢丝圈机台列表
+     * 导出钢丝圈机台信息
+     * 返回byte[]文件字节流，避免Gateway将List响应包装为统一响应体导致Feign反序列化异常
      *
-     * @param machineInfo
-     * @return
+     * @param entity   查询条件
+     * @param fileName 导出文件名
+     * @return Excel文件字节流
      */
-    @PostMapping("/gsq/machine/exportList")
-    List<GsqMachineInfo> exportList(@RequestBody GsqMachineInfo machineInfo);
+    @PostMapping("/gsq/machine/exportData/{fileName}")
+    @ApiOperation("导出钢丝圈机台信息")
+    byte[] exportData(@RequestBody GsqMachineInfo entity, @PathVariable("fileName") String fileName);
 
     /**
      * 获取钢丝圈机台信息列表

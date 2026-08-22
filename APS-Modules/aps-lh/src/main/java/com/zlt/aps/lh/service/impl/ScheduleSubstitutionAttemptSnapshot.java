@@ -1,6 +1,7 @@
 package com.zlt.aps.lh.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import com.zlt.aps.lh.api.domain.dto.CapsuleReplacementTimeWindowDTO;
 import com.zlt.aps.lh.api.domain.dto.CleaningScheduleDateFillItem;
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.api.domain.dto.SkuDailyPlanQuotaDTO;
@@ -113,6 +114,7 @@ final class ScheduleSubstitutionAttemptSnapshot {
     private Set<String> capsuleReplacementShiftKeySet;
     private Set<String> capsuleThresholdHandledMachineSet;
     private Map<String, Integer> capsuleReplacementShiftCapacityLimitMap;
+    private Map<String, CapsuleReplacementTimeWindowDTO> capsuleReplacementTimeWindowMap;
     /** 置换前运行态有效胎胚 SKU */
     private Map<String, List<String>> activeEmbryoSkuMap;
     /** 置换前动态单胎胚收尾集合 */
@@ -267,6 +269,8 @@ final class ScheduleSubstitutionAttemptSnapshot {
         snapshot.capsuleReplacementShiftCapacityLimitMap =
                 new LinkedHashMap<String, Integer>(
                         context.getCapsuleReplacementShiftCapacityLimitMap());
+        snapshot.capsuleReplacementTimeWindowMap = copyCapsuleReplacementTimeWindowMap(
+                context.getCapsuleReplacementTimeWindowMap());
         snapshot.activeEmbryoSkuMap = copyStringListMap(context.getActiveEmbryoSkuMap());
         snapshot.dynamicSingleEmbryoEndingMaterialSet =
                 new LinkedHashSet<String>(context.getDynamicSingleEmbryoEndingMaterialSet());
@@ -408,6 +412,8 @@ final class ScheduleSubstitutionAttemptSnapshot {
                 new LinkedHashSet<String>(capsuleThresholdHandledMachineSet));
         context.setCapsuleReplacementShiftCapacityLimitMap(
                 new LinkedHashMap<String, Integer>(capsuleReplacementShiftCapacityLimitMap));
+        context.setCapsuleReplacementTimeWindowMap(copyCapsuleReplacementTimeWindowMap(
+                capsuleReplacementTimeWindowMap));
         context.setActiveEmbryoSkuMap(copyStringListMap(activeEmbryoSkuMap));
         context.setDynamicSingleEmbryoEndingMaterialSet(
                 new LinkedHashSet<String>(dynamicSingleEmbryoEndingMaterialSet));
@@ -582,6 +588,25 @@ final class ScheduleSubstitutionAttemptSnapshot {
                 new LinkedHashMap<LocalDate, SkuDailyPlanQuotaDTO>(Math.max(8, sourceMap.size() * 2));
         for (Map.Entry<LocalDate, SkuDailyPlanQuotaDTO> entry : sourceMap.entrySet()) {
             targetMap.put(entry.getKey(), copyBean(entry.getValue(), SkuDailyPlanQuotaDTO.class));
+        }
+        return targetMap;
+    }
+
+    /**
+     * 复制换胶囊时间窗口，保证候选置换回滚不会残留机台不可生产时间。
+     *
+     * @param sourceMap 原始时间窗口
+     * @return 独立时间窗口副本
+     */
+    private static Map<String, CapsuleReplacementTimeWindowDTO> copyCapsuleReplacementTimeWindowMap(
+            Map<String, CapsuleReplacementTimeWindowDTO> sourceMap) {
+        if (sourceMap == null) {
+            return new LinkedHashMap<String, CapsuleReplacementTimeWindowDTO>(0);
+        }
+        Map<String, CapsuleReplacementTimeWindowDTO> targetMap =
+                new LinkedHashMap<String, CapsuleReplacementTimeWindowDTO>(Math.max(4, sourceMap.size() * 2));
+        for (Map.Entry<String, CapsuleReplacementTimeWindowDTO> entry : sourceMap.entrySet()) {
+            targetMap.put(entry.getKey(), copyBean(entry.getValue(), CapsuleReplacementTimeWindowDTO.class));
         }
         return targetMap;
     }

@@ -92,7 +92,7 @@ public class NcGlueGroupOrderController extends AbstractDocBizController<NcGlueG
     @Override
     protected List<NcGlueGroupOrder> listExportData(NcGlueGroupOrder obj) {
         QueryWrapper<NcGlueGroupOrder> wrapper = new QueryWrapper<>();
-        startPage("update_time desc");
+        startPage(getOrderBy());
         this.builderCondition(wrapper, obj);
         List<NcGlueGroupOrder> list = glueGroupOrderMapper.selectList(wrapper);
         AppUtils.formatData(list, getQueryFormulas());
@@ -121,6 +121,6 @@ public class NcGlueGroupOrderController extends AbstractDocBizController<NcGlueG
 
     @Override
     protected String getOrderBy() {
-        return "GLUE_GROUP_CODE";
+        return "GLUE_GROUP_CODE, ID";
     }
 }

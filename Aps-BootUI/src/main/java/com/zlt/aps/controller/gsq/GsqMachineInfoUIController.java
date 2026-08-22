@@ -14,6 +14,7 @@ import com.zlt.file.encryptbyll.FileEncryptUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.io.IOUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletResponse;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.List;
 
@@ -174,17 +176,21 @@ public class GsqMachineInfoUIController extends BaseUIController<GsqMachineInfo>
 
     /**
      * 导出钢丝圈机台信息
+     * 改为byte[]链路：通过Feign获取后端生成的Excel字节流后写出，
+     * 避免原List链路经Gateway包装统一响应体导致Feign反序列化异常、导出无数据
      */
     @ApiOperation("导出钢丝圈机台信息")
-    @GetMapping("/export")
+    @GetMapping("/exportData/{fileName}")
     @RequiresPermissions("gsq:machine:export")
     @ResponseBody
-    @Override
-    public void export(HttpServletResponse response, GsqMachineInfo entity) throws IOException {
-        List<GsqMachineInfo> list = gsqMachineInfoService.exportList(entity);
-        ExcelUtil<GsqMachineInfo> util = new ExcelUtil<>(GsqMachineInfo.class);
-        String fileName = this.getExportTemplateFileName();
-        util.exportExcel(response, list, fileName, fileName);
+    public void export(HttpServletResponse response, GsqMachineInfo entity, @PathVariable("fileName") String fileName) throws IOException {
+        // 调用后端微服务导出接口，获取Excel文件字节流
+        byte[] excelBytes = gsqMachineInfoService.exportData(entity, fileName);
+        ByteArrayInputStream inputStream = new ByteArrayInputStream(excelBytes);
+        // 设置响应头并将文件字节流写出至前端
+        ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
+        IOUtils.copy(inputStream, response.getOutputStream());
+        response.flushBuffer();
     }
 
     /**

@@ -31,6 +31,9 @@ import java.util.Objects;
 @Slf4j
 public final class FirstInspectionQtyUtil {
 
+    /** 班次原因分析中表示当前班次发生首检的固定文案。 */
+    public static final String FIRST_INSPECTION_ANALYSIS = "首检";
+
     /** 单控机台首检数量折算系数，与单控班产 /2 口径一致 */
     private static final int SINGLE_CONTROL_FIRST_INSPECTION_DIVISOR = 2;
 
@@ -546,6 +549,8 @@ public final class FirstInspectionQtyUtil {
         int mergedQty = basePlanQty + firstInspectionQty;
         ShiftFieldUtil.setShiftPlanQty(result, attributionShift.getShiftIndex(), mergedQty,
                 attributionShift.getShiftStartDateTime(), attributionShift.getShiftEndDateTime());
+        ShiftFieldUtil.appendShiftAnalysis(
+                result, attributionShift.getShiftIndex(), FIRST_INSPECTION_ANALYSIS);
         recordFirstInspectionSequence(context, attributionShift);
         boolean singleControl = LhSingleControlMachineUtil.isSingleMouldMachine(result.getLhMachineCode());
         int rawFirstInspectionQty = resolveRawFirstInspectionQty(context, firstInspectionSequence);
@@ -600,6 +605,7 @@ public final class FirstInspectionQtyUtil {
         }
         StringBuilder allocationDetail = new StringBuilder(128);
         int writtenQty = 0;
+        int completionShiftIndex = resolveInspectionCompletionShiftIndex(plan);
         for (FirstInspectionShiftAllocation allocation : plan.getShiftAllocations()) {
             if (Objects.isNull(allocation) || allocation.getQuantity() <= 0
                     || Objects.isNull(allocation.getShift())) {
@@ -619,6 +625,10 @@ public final class FirstInspectionQtyUtil {
                     ? allocation.getOverlapEndTime() : existingEndTime;
             ShiftFieldUtil.setShiftPlanQty(
                     result, shiftIndex, mergedQty, mergedStartTime, mergedEndTime);
+            // 首检可跨多个班次写入计划量，但原因分析仅归属首检完成所在班次，避免前序班次重复备注。
+            if (Objects.equals(shiftIndex, completionShiftIndex)) {
+                ShiftFieldUtil.appendShiftAnalysis(result, shiftIndex, FIRST_INSPECTION_ANALYSIS);
+            }
             writtenQty += allocation.getQuantity();
             if (allocationDetail.length() > 0) {
                 allocationDetail.append("; ");
@@ -652,6 +662,28 @@ public final class FirstInspectionQtyUtil {
                 LhScheduleTimeUtil.formatDateTime(plan.getInspectionStartTime()),
                 LhScheduleTimeUtil.formatDateTime(plan.getInspectionEndTime()), allocationDetail);
         return writtenQty;
+    }
+
+    /**
+     * 解析首检时间区间实际结束所在班次。
+     *
+     * <p>计数班次通常与完成班次一致，但切换完成时间恰好落在班次边界时，
+     * 计数班次会命中后一个班次；原因分析仍应归到首检区间实际结束的前一个班次。</p>
+     *
+     * @param plan 首检时间分摊计划
+     * @return 首检完成所在班次索引
+     */
+    private static int resolveInspectionCompletionShiftIndex(FirstInspectionAllocationPlan plan) {
+        Date inspectionEndTime = plan.getInspectionEndTime();
+        for (FirstInspectionShiftAllocation allocation : plan.getShiftAllocations()) {
+            if (Objects.nonNull(allocation)
+                    && Objects.nonNull(allocation.getShift())
+                    && Objects.nonNull(allocation.getOverlapEndTime())
+                    && Objects.equals(inspectionEndTime, allocation.getOverlapEndTime())) {
+                return allocation.getShift().getShiftIndex();
+            }
+        }
+        return plan.getCountingShift().getShiftIndex();
     }
 
     /**

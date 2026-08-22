@@ -61,6 +61,12 @@ public class TmTaskDraft {
     /** TASK_SORT 阶段生成的稳定基础优先级，数值越小越优先 */
     private Integer baseSortIndex;
 
+    /** 计划量计算阶段确定的统一任务顺序，数值越小越优先。 */
+    private Integer planCalcOrderIndex;
+
+    /** 当前班次实际进入机台资源尝试的顺序，仅用于过程日志和解释证据。 */
+    private Integer machineAssignmentSequence;
+
     /** 成型需求原始映射到的胎面逻辑班次，自动提前时与实际排程班次不同。 */
     private Integer sourceShiftOrder;
 
@@ -326,6 +332,44 @@ public class TmTaskDraft {
             return businessKey;
         }
         return businessKey + "|" + businessKeySuffix;
+    }
+
+    /**
+     * 将计划量策略计算结果回填到当前任务草稿。
+     *
+     * @param planQtyResult 计划量分量及最终计划量；为空时不修改当前草稿
+     */
+    public void applyPlanQtyResult(TmPlanQtyResult planQtyResult) {
+        if (planQtyResult == null) {
+            return;
+        }
+        this.setBaseDemandQty(planQtyResult.getBaseDemandQty());
+        this.setLossAddQty(planQtyResult.getLossAddQty());
+        this.setToolLimitAdjustQty(planQtyResult.getToolLimitAdjustQty());
+        this.setToolOverflowQty(planQtyResult.getToolOverflowQty());
+        this.setMinStartAdjustQty(planQtyResult.getMinStartAdjustQty());
+        this.setTailRoundAdjustQty(planQtyResult.getTailRoundAdjustQty());
+        this.setCapacityAdjustQty(planQtyResult.getCapacityAdjustQty());
+        this.setPreLossPlanQty(planQtyResult.getPreLossPlanQty());
+        this.setPlanQtyBeforeToolLimit(planQtyResult.getPlanQtyBeforeToolLimit());
+        this.setPlanQty(planQtyResult.getFinalPlanQty());
+        this.setCalcFormulaDesc(planQtyResult.getCalcFormulaDesc());
+    }
+
+    /**
+     * 创建派生任务的继承字段副本。
+     *
+     * <p>副本保留来源任务的业务、需求、计划和解释字段；调用方必须显式重置班次、计划量、
+     * 机台分配等运行态字段，避免通用属性复制掩盖派生规则。</p>
+     *
+     * @return 可供汇总、来源追溯或提前任务使用的独立任务副本
+     */
+    public TmTaskDraft copyForDerivedTask() {
+        TmTaskDraft target = new TmTaskDraft();
+        target.setOrderNo(orderNo); target.setSourceOrderNos(sourceOrderNos); target.setMaterialCode(materialCode); target.setMaterialDesc(materialDesc); target.setEmbryoCode(embryoCode); target.setMainMaterialDesc(mainMaterialDesc); target.setCxMachineCode(cxMachineCode); target.setLhMachineCode(lhMachineCode); target.setTreadCode(treadCode); target.setGlueCode(glueCode); target.setBaseGlueCode(baseGlueCode); target.setMouthPlateCode(mouthPlateCode); target.setMachineCode(machineCode); target.setShiftOrder(shiftOrder); target.setBaseSortIndex(baseSortIndex); target.setPlanCalcOrderIndex(planCalcOrderIndex); target.setMachineAssignmentSequence(machineAssignmentSequence); target.setSourceShiftOrder(sourceShiftOrder);
+        target.setCurrentShiftDemandQty(currentShiftDemandQty); target.setNextShiftDemandQty(nextShiftDemandQty); target.setTwoShiftDemandQty(twoShiftDemandQty); target.setTwoShiftStockGapQty(twoShiftStockGapQty); target.setTwoShiftStockCovered(twoShiftStockCovered); target.setCurrentShiftFormingFinishQty(currentShiftFormingFinishQty); target.setGuardDemandQty(guardDemandQty); target.setFormingGuardWindowQtyMap(formingGuardWindowQtyMap); target.setFormingGuardWindowHoursMap(formingGuardWindowHoursMap); target.setRollingStockQty(rollingStockQty); target.setSixClockStockQty(sixClockStockQty); target.setGuardShiftCount(guardShiftCount); target.setGuardRangeHours(guardRangeHours); target.setSupplyHours(supplyHours); target.setCurrentShiftStockGapQty(currentShiftStockGapQty); target.setStockGapQty(stockGapQty); target.setStockDeductQty(stockDeductQty); target.setPlanStockQty(planStockQty); target.setPlanQty(planQty); target.setTreadShoulderLength(treadShoulderLength); target.setTailFlag(tailFlag); target.setTailBalanceQty(tailBalanceQty); target.setFormingLogicalShiftOrder(formingLogicalShiftOrder); target.setFormingShutdownCloseOutFlag(formingShutdownCloseOutFlag); target.setFormingShutdownCloseOutDemandQty(formingShutdownCloseOutDemandQty);
+        target.setLossRate(lossRate); target.setResolvedLossRate(resolvedLossRate); target.setLossMatchLevel(lossMatchLevel); target.setLossMatchSource(lossMatchSource); target.setPreLossPlanQty(preLossPlanQty); target.setPlanQtyBeforeToolLimit(planQtyBeforeToolLimit); target.setBaseDemandQty(baseDemandQty); target.setLossAddQty(lossAddQty); target.setToolLimitAdjustQty(toolLimitAdjustQty); target.setToolOverflowQty(toolOverflowQty); target.setAvailableToolQty(availableToolQty); target.setToolUsedQty(toolUsedQty); target.setRemainingToolQty(remainingToolQty); target.setToolLedgerOrder(toolLedgerOrder); target.setMinStartAdjustQty(minStartAdjustQty); target.setTailRoundAdjustQty(tailRoundAdjustQty); target.setCapacityAdjustQty(capacityAdjustQty); target.setCalcFormulaDesc(calcFormulaDesc); target.setTotalToolQty(totalToolQty); target.setCurlRollLength(curlRollLength); target.setDefaultCurlRollLength(defaultCurlRollLength); target.setMinStartQty(minStartQty); target.setMachineRemainCapacity(machineRemainCapacity); target.setMachineSpeed(machineSpeed); target.setMaintenanceHours(maintenanceHours); target.setPreviousSpecSwitchHours(previousSpecSwitchHours); target.setPreviousGlueSwitchHours(previousGlueSwitchHours); target.setPreviousGlueSwitchCapacityDeduct(previousGlueSwitchCapacityDeduct); target.setStockShortageTime(stockShortageTime); target.setEstimatedProductionHours(estimatedProductionHours); target.setLatestStartTime(latestStartTime); target.setFixedMachineMatched(fixedMachineMatched); target.setDemandQty(demandQty); target.setUnplannedReasonCode(unplannedReasonCode); target.setUnplannedReasonDesc(unplannedReasonDesc); target.setBusinessKeySuffix(businessKeySuffix); target.setPlanGroupKey(planGroupKey); target.setSourceTaskBusinessKeyList(sourceTaskBusinessKeyList == null ? null : new java.util.ArrayList<>(sourceTaskBusinessKeyList)); target.setSourceExplainTask(sourceExplainTask); target.setSourceRequiredQty(sourceRequiredQty); target.setGroupSourceCount(groupSourceCount); target.setGroupRequiredQty(groupRequiredQty); target.setGroupBaseDemandQty(groupBaseDemandQty); target.setGroupMinStartAdjustQty(groupMinStartAdjustQty); target.setGroupRoundAdjustQty(groupRoundAdjustQty); target.setGroupFinalPlanQty(groupFinalPlanQty); target.setNewSpecInfo(newSpecInfo); target.setTwoShiftLeadTask(twoShiftLeadTask); target.setSmallGlueFlag(smallGlueFlag); target.setExperimentSpecInfo(experimentSpecInfo);
+        return target;
     }
 
     /**

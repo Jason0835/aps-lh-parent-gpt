@@ -34,6 +34,7 @@ import { saveDepthConfig } from "@/api/dj/depthConfig";
 
 export default {
   components: { infoForm },
+  inject: ["parentDict"],
   data() {
     return {
       loading: false,
@@ -44,7 +45,7 @@ export default {
         factoryCode: [
           {
             required: true,
-            message: this.$t("common.rule.input"),
+            message: this.$t("common.rule.select"),
             trigger: "blur",
           },
         ],
@@ -105,10 +106,17 @@ export default {
           prop: "factoryCode",
           span: 12,
           type: "select",
-          dictData: this.dict?.type?.biz_factory_name,
+          dictData: this.parentDict.type.biz_factory_name,
           filterable: true,
           required: true,
-          hidden: true,
+        },
+        {
+          label: this.$t("ui.dj.depthConfig.column.depthClassQty"),
+          prop: "depthClassQty",
+          span: 12,
+          type: "number",
+          min: 1,
+          required: true,
         },
         {
           label: this.$t("ui.dj.depthConfig.column.minMachineQty"),
@@ -124,14 +132,6 @@ export default {
           span: 12,
           type: "input",
           tips: '为空表示无上限（仅末行允许）',
-        },
-        {
-          label: this.$t("ui.dj.depthConfig.column.depthClassQty"),
-          prop: "depthClassQty",
-          span: 24,
-          type: "number",
-          min: 1,
-          required: true,
         },
         {
           label: this.$t("ui.common.column.remark"),

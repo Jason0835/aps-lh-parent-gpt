@@ -3,13 +3,13 @@ package com.zlt.aps.lh.engine.strategy.support;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.domain.dto.SkuDailyPlanQuotaDTO;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
-import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
 import com.zlt.aps.lh.api.enums.SkuTagEnum;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.context.LhScheduleConfig;
 import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.service.ILhDailyMouldCalcService;
+import com.zlt.aps.lh.service.impl.LhDailyMouldCalcServiceImpl;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
-import com.zlt.aps.lh.util.ShiftCapacityResolverUtil;
 import com.zlt.aps.lh.util.SkuDailyPlanQuotaUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -20,7 +20,6 @@ import java.time.ZoneId;
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -34,6 +33,13 @@ import java.util.Set;
  */
 @Slf4j
 public final class DailyMachineExpansionPlanner {
+
+    /**
+     * 仅用于兼容未注入Spring容器的历史聚焦测试；生产调用必须显式传入统一查询Service。
+     * 该实现只读取上下文已初始化Map，不会触发数据库查询或重复计算。
+     */
+    private static final ILhDailyMouldCalcService TEST_COMPATIBLE_REQUIRED_MACHINE_READER =
+            new LhDailyMouldCalcServiceImpl();
 
     private DailyMachineExpansionPlanner() {
     }
@@ -299,328 +305,213 @@ public final class DailyMachineExpansionPlanner {
     }
 
     /**
-     * 判断当前机台数是否已满足欠产未超阈值时的逐日后看规则。
-     * <p>该口径用于 S4.4 续作补偿和换活字块回流 S4.5 前置判断：
-     * 本月前日累计欠产未超过阈值时，不要求当前窗口小额剩余全部清完，只检查后续日计划是否会被当前机台产能拖垮。</p>
+     * 判断当前机台数是否已满足排程窗口及T+3的统一目标机台数。
      *
+     * @param dailyMouldCalcService 目标机台数统一查询服务
      * @param context 排程上下文
      * @param sku SKU
-     * @param activeMachineCount 当前已承接机台数
-     * @return true-后续日计划已满足，不需要继续增机台；false-仍需按原缺口规则判断
+     * @param activeMachineCount 当前有效机台数
+     * @param scheduleType 排程类型，仅用于日志区分
+     * @return true-当前机台数已满足；false-存在需要增机的自然日
      */
-    public static boolean isDailyLookAheadCapacitySatisfied(LhScheduleContext context,
-                                                            SkuScheduleDTO sku,
-                                                            int activeMachineCount) {
-        return isDailyLookAheadCapacitySatisfied(context, sku, activeMachineCount, null);
+    public static boolean isDailyLookAheadCapacitySatisfied(
+            ILhDailyMouldCalcService dailyMouldCalcService,
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            int activeMachineCount,
+            String scheduleType) {
+        return Objects.isNull(resolveFirstDailyLookAheadAddMachineDate(
+                dailyMouldCalcService, context, sku, activeMachineCount, scheduleType, null));
     }
 
     /**
-     * 判断当前机台数是否已满足欠产未超阈值时的逐日后看规则。
-     *
-     * @param context 排程上下文
-     * @param sku SKU
-     * @param activeMachineCount 当前已承接机台数
-     * @param scheduleType 排程类型
-     * @return true-后续日计划已满足
+     * 兼容历史测试的旧签名，生产代码不得使用。
      */
+    @Deprecated
     public static boolean isDailyLookAheadCapacitySatisfied(LhScheduleContext context,
                                                             SkuScheduleDTO sku,
                                                             int activeMachineCount,
                                                             String scheduleType) {
-        return Objects.isNull(resolveFirstDailyLookAheadAddMachineDate(context, sku, activeMachineCount, scheduleType));
+        return isDailyLookAheadCapacitySatisfied(
+                TEST_COMPATIBLE_REQUIRED_MACHINE_READER,
+                context, sku, activeMachineCount, scheduleType);
     }
 
     /**
-     * 按新增排产 dayN 节奏和窗口剩余目标量计算特殊材料置换所需机台数。
+     * 从统一目标机台数Map解析首次需要增加机台的自然日。
+     * <p>保留原T+3跨窗口判断，但目标总机台数只读取初始化阶段快照，不再根据日计划量、
+     * 日标准产能、历史欠产或窗口剩余目标量重复推算。</p>
      *
-     * <p>本方法复用新增/续作共同使用的正式日硫化标准和
-     * {@link #resolveFirstOriginalDayPlanAddMachineDate(LhScheduleContext, SkuScheduleDTO, int, String)}
-     * 逐日增机判断，不再由特殊材料置换服务维护一套“日产能×窗口天数”的独立简化公式。
-     * dayN 负责决定机台节奏，窗口剩余目标量只负责防止单机窗口总产能明显不足。</p>
-     *
+     * @param dailyMouldCalcService 目标机台数统一查询服务
      * @param context 排程上下文
-     * @param sku 特殊材料 SKU
-     * @param firstProductionDate 首个有月计划日计划量的业务日期
-     * @param remainingTargetQty 当前待排目标量
-     * @param availableCandidateCount 当前最多可置换的续作机台数
-     * @return 本轮需要尝试置换的机台数
+     * @param sku SKU
+     * @param activeMachineCount 当前有效机台数
+     * @param scheduleType 排程类型，仅用于日志区分
+     * @return 首次需要加机台的自然日；没有缺口时返回null
      */
-    public static int resolveSpecialMaterialRequiredMachineCount(
+    public static LocalDate resolveFirstDailyLookAheadAddMachineDate(
+            ILhDailyMouldCalcService dailyMouldCalcService,
             LhScheduleContext context,
             SkuScheduleDTO sku,
-            LocalDate firstProductionDate,
-            int remainingTargetQty,
-            int availableCandidateCount) {
-        if (Objects.isNull(context) || Objects.isNull(sku) || Objects.isNull(firstProductionDate)
-                || remainingTargetQty <= 0 || availableCandidateCount <= 0) {
-            return 0;
-        }
-        int dailyTheoryCapacityQty = resolveAddMachineDailyTheoryCapacityQty(context, sku);
-        if (dailyTheoryCapacityQty <= 0) {
-            return 1;
-        }
-
-        // 先按新增排产原始 dayN 节奏递增机台数，直到各业务日均不再要求加机。
-        int dailyRhythmMachineCount = 1;
-        while (dailyRhythmMachineCount < availableCandidateCount
-                && Objects.nonNull(resolveFirstOriginalDayPlanAddMachineDate(
-                context, sku, dailyRhythmMachineCount, ScheduleTypeEnum.NEW_SPEC.getCode()))) {
-            dailyRhythmMachineCount++;
-        }
-
-        // 再按目标日起实际排程窗口天数校验总产能，避免目标日起可用天数减少后仍固定只置换一台。
-        Set<LocalDate> availableProductionDateSet = new LinkedHashSet<LocalDate>(4);
-        for (com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO shift : context.getScheduleWindowShifts()) {
-            if (Objects.isNull(shift) || Objects.isNull(shift.getWorkDate())) {
-                continue;
-            }
-            LocalDate workDate = shift.getWorkDate().toInstant()
-                    .atZone(ZoneId.systemDefault()).toLocalDate();
-            if (!workDate.isBefore(firstProductionDate)) {
-                availableProductionDateSet.add(workDate);
-            }
-        }
-        int availableProductionDayCount = Math.max(1, availableProductionDateSet.size());
-        long singleMachineWindowCapacity =
-                (long) dailyTheoryCapacityQty * availableProductionDayCount;
-        int targetQtyMachineCount = (int) Math.min(
-                Integer.MAX_VALUE,
-                ((long) remainingTargetQty + singleMachineWindowCapacity - 1L)
-                        / singleMachineWindowCapacity);
-        int requiredMachineCount = Math.max(dailyRhythmMachineCount, targetQtyMachineCount);
-        return Math.max(1, Math.min(requiredMachineCount, availableCandidateCount));
-    }
-
-    /**
-     * 解析欠产未超阈值时首次需要加机台的业务日期。
-     *
-     * @param context 排程上下文
-     * @param sku SKU
-     * @param activeMachineCount 当前已承接机台数
-     * @param scheduleType 排程类型
-     * @return 首次需要加机台的业务日期；null 表示当前机台数已满足逐日后看规则
-     */
-    public static LocalDate resolveFirstDailyLookAheadAddMachineDate(LhScheduleContext context,
-                                                                     SkuScheduleDTO sku,
-                                                                     int activeMachineCount,
-                                                                     String scheduleType) {
+            int activeMachineCount,
+            String scheduleType) {
         return resolveFirstDailyLookAheadAddMachineDate(
+                dailyMouldCalcService, context, sku, activeMachineCount, scheduleType, null);
+    }
+
+    /**
+     * 兼容历史测试的旧签名，生产代码不得使用。
+     */
+    @Deprecated
+    public static LocalDate resolveFirstDailyLookAheadAddMachineDate(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            int activeMachineCount,
+            String scheduleType) {
+        return resolveFirstDailyLookAheadAddMachineDate(
+                TEST_COMPATIBLE_REQUIRED_MACHINE_READER,
                 context, sku, activeMachineCount, scheduleType, null);
     }
 
     /**
-     * 解析欠产未超阈值时首次需要加机台的业务日期（支持从指定业务日起判断）。
+     * 从统一目标机台数Map解析首次需要增加机台的自然日（支持指定起始日）。
      *
+     * @param dailyMouldCalcService 目标机台数统一查询服务
      * @param context 排程上下文
      * @param sku SKU
-     * @param activeMachineCount 当前已承接机台数
-     * @param scheduleType 排程类型
-     * @param startDate 最早参与判断的业务日；为 null 时从窗口首日判断
-     * @return 首次需要加机台的业务日期；null 表示从 startDate 起已满足逐日后看规则
+     * @param activeMachineCount 当前有效机台数
+     * @param scheduleType 排程类型，仅用于日志区分
+     * @param startDate 最早参与判断的自然日；为空时从T日开始
+     * @return 首次需要加机台的自然日；没有缺口时返回null
      */
-    public static LocalDate resolveFirstDailyLookAheadAddMachineDate(LhScheduleContext context,
-                                                                     SkuScheduleDTO sku,
-                                                                     int activeMachineCount,
-                                                                     String scheduleType,
-                                                                     LocalDate startDate) {
-        Map<LocalDate, SkuDailyPlanQuotaDTO> quotaMap =
-                resolveEffectiveQuotaMap(context, sku);
-        if (Objects.isNull(sku) || sku.isStrictNewSpecShortageOnly()
-                || CollectionUtils.isEmpty(quotaMap)
-                || Math.max(0, sku.getWindowPlanQty()) <= 0
-                || Math.max(0, activeMachineCount) <= 0
-                || Math.max(0, sku.getShiftCapacity()) <= 0) {
+    public static LocalDate resolveFirstDailyLookAheadAddMachineDate(
+            ILhDailyMouldCalcService dailyMouldCalcService,
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            int activeMachineCount,
+            String scheduleType,
+            LocalDate startDate) {
+        if (Objects.isNull(dailyMouldCalcService) || Objects.isNull(context) || Objects.isNull(sku)
+                || StringUtils.isEmpty(sku.getMaterialCode()) || StringUtils.isEmpty(sku.getProductStatus())
+                || Math.max(0, activeMachineCount) <= 0 || Objects.isNull(context.getScheduleDate())
+                || Objects.isNull(context.getWindowEndDate())) {
             return null;
         }
-        int threshold = Math.max(0, resolveShortageAddMachineThreshold(context));
-        int historyShortageQty = Math.max(0, sku.getMonthlyHistoryShortageQty());
-        if (threshold <= 0 || historyShortageQty > threshold) {
-            return null;
-        }
-        return resolveFirstOriginalDayPlanAddMachineDate(
-                context, sku, activeMachineCount, scheduleType, startDate);
-    }
-
-    /**
-     * 按原始 dayN 解析首次需要增加机台的业务日期。
-     * <p>本方法只解析增机生效日期，不决定是否进入欠产超阈值的强制增机模式。
-     * 小欠产逐日判断和强制增机补偿可以复用同一份日期口径，避免强制增机需求虽然已生成，
-     * 但因缺少首次增机日期又被普通日计划剩余额度顺延。</p>
-     *
-     * @param context 排程上下文
-     * @param sku SKU
-     * @param activeMachineCount 当前已承接机台数
-     * @param scheduleType 排程类型
-     * @return 首次需要加机台的业务日期；null 表示原始 dayN 暂不要求增加机台
-     */
-    public static LocalDate resolveFirstOriginalDayPlanAddMachineDate(LhScheduleContext context,
-                                                                       SkuScheduleDTO sku,
-                                                                       int activeMachineCount,
-                                                                       String scheduleType) {
-        return resolveFirstOriginalDayPlanAddMachineDate(
-                context, sku, activeMachineCount, scheduleType, null);
-    }
-
-    /**
-     * 按原始 dayN 解析首次需要增加机台的业务日期（支持从指定业务日起判断）。
-     *
-     * @param context 排程上下文
-     * @param sku SKU
-     * @param activeMachineCount 当前已承接机台数
-     * @param scheduleType 排程类型
-     * @param startDate 最早参与判断的业务日；为 null 时从窗口首日判断
-     * @return 首次需要加机台的业务日期；null 表示从 startDate 起原始 dayN 暂不要求增加机台
-     */
-    public static LocalDate resolveFirstOriginalDayPlanAddMachineDate(LhScheduleContext context,
-                                                                       SkuScheduleDTO sku,
-                                                                       int activeMachineCount,
-                                                                       String scheduleType,
-                                                                       LocalDate startDate) {
-        Map<LocalDate, SkuDailyPlanQuotaDTO> quotaMap =
-                resolveEffectiveQuotaMap(context, sku);
-        if (Objects.isNull(sku) || sku.isStrictNewSpecShortageOnly()
-                || CollectionUtils.isEmpty(quotaMap)
-                || Math.max(0, sku.getWindowPlanQty()) <= 0
-                || Math.max(0, activeMachineCount) <= 0
-                || Math.max(0, sku.getShiftCapacity()) <= 0) {
-            return null;
-        }
-        // dayN 仅用于判断是否需要增加机台，T 日及后续业务日统一按 SKU 正式日硫化标准计算单机理论产能。
-        // 实际剩余班次产能仍由各排产策略和班次产能工具负责，不在此处改变实际排产量及时间窗口语义。
-        int singleMachineDailyTheoryCapacityQty = resolveAddMachineDailyTheoryCapacityQty(context, sku);
-        // 新增与续作均逐日推进；当前日满足只表示当日不增机，后续业务日滚动到该日后仍需重新判断。
-        boolean continuationLookAhead = ScheduleTypeEnum.CONTINUOUS.getCode().equals(scheduleType);
-        for (LocalDate productionDate : quotaMap.keySet()) {
-            // 续作降模释放后补偿判断只能从最后释放日重新评估，释放日前的高计划日已由更多机台覆盖。
-            if (Objects.nonNull(startDate) && productionDate.isBefore(startDate)) {
+        LocalDate scheduleStartDate = context.getScheduleDate().toInstant()
+                .atZone(ZoneId.systemDefault()).toLocalDate();
+        LocalDate scanStartDate = Objects.nonNull(startDate) && startDate.isAfter(scheduleStartDate)
+                ? startDate : scheduleStartDate;
+        LocalDate scanEndDate = context.getWindowEndDate().toInstant()
+                .atZone(ZoneId.systemDefault()).toLocalDate().plusDays(1);
+        for (LocalDate productionDate = scanStartDate;
+             !productionDate.isAfter(scanEndDate);
+             productionDate = productionDate.plusDays(1)) {
+            if (!dailyMouldCalcService.hasRequiredMachineCount(
+                    context, sku.getMaterialCode(), sku.getProductStatus(), productionDate)) {
+                // 扩张型动作遇到缺失维度时不新增，同时调用统一入口输出可对账警告。
+                dailyMouldCalcService.getRequiredMachineCount(
+                        context, sku.getMaterialCode(), sku.getProductStatus(), productionDate);
                 continue;
             }
-            SkuDailyPlanQuotaDTO quota = quotaMap.get(productionDate);
-            int dayPlanQty = quota == null ? 0 : Math.max(0, quota.getDayPlanQty());
-            // 增机节奏判断必须使用原始日计划；T 日已完成量只参与实际目标量和账本扣减。
-            int currentDayPlanQty = dayPlanQty;
-            int currentDayCapacityQty = resolveDailyTheoryCapacityQty(
-                    singleMachineDailyTheoryCapacityQty, activeMachineCount);
-            boolean currentDayPlanSatisfied = currentDayPlanQty <= currentDayCapacityQty;
-            if (currentDayPlanSatisfied) {
-                log.info("dayN加机台逐日判断当前日已满足，不进入后看, materialCode: {}, productionDate: {}, "
-                                + "activeMachineCount: {}, currentDayCapacityQty: {}, dayPlanQty: {}, "
-                                + "currentDayPlanQty: {}, scheduleDayFinishQty: {}, currentDayPlanSatisfied: {}, "
-                                + "nextDayLookAheadEntered: {}, addMachine: {}",
-                        sku.getMaterialCode(), productionDate, activeMachineCount, currentDayCapacityQty,
-                        dayPlanQty, currentDayPlanQty, resolveScheduleDayFinishQty(sku, productionDate),
-                        true, false, false);
-                // 当前日已满足时该日不加机台，但继续逐日推进判断后续业务日，避免首日（含 T-1 滚动日）
-                // 满足后吞掉后续高计划日的增机需求（如 dayN=48,48,68 首日 48 满足却看不到 17 日 68 需增机台）。
-                // 新增排产与续作排产均逐日推进；末日无 T+3 时新增排产滚动不增、续作排产当前日增机台（见下方分支）。
-                continue;
-            }
-            // 解析后看下一日计划量：窗口内有下一生产日时取下一日；窗口末日（T+2）后看 T+3。
-            // T+3 不进扣账账本，仅参与增机台节奏判断，与新增侧 windowLastDayNextPlanLookAhead 语义一致。
-            LocalDate nextProductionDate = resolveNextProductionDate(quotaMap, productionDate);
-            int nextDayPlanQty = 0;
-            boolean nextDayLookAheadEntered = false;
-            String nextDayLookAheadSource = null;
-            int nextDayCapacityQty = resolveDailyTheoryCapacityQty(
-                    singleMachineDailyTheoryCapacityQty, activeMachineCount);
-            if (Objects.nonNull(nextProductionDate)) {
-                SkuDailyPlanQuotaDTO nextQuota = quotaMap.get(nextProductionDate);
-                nextDayPlanQty = nextQuota == null ? 0 : Math.max(0, nextQuota.getDayPlanQty());
-                nextDayLookAheadEntered = true;
-                nextDayLookAheadSource = "windowNextDay";
-            } else {
-                // 窗口末日（T+2）后看 T+3（新增排产与续作排产均后看）：spec 要求 T+2 必须继续判断 T+3 日计划。
-                int nextDayPlanQtyAfterWindow = Math.max(0, sku.getNextDayPlanQtyAfterWindow());
-                if (nextDayPlanQtyAfterWindow > 0) {
-                    nextDayPlanQty = nextDayPlanQtyAfterWindow;
-                    nextDayLookAheadEntered = true;
-                    nextDayLookAheadSource = "windowLastDayNextPlan";
-                }
-            }
-            boolean addMachine = nextDayPlanQty > nextDayCapacityQty;
-            log.info("dayN加机台逐日后看判断, materialCode: {}, productionDate: {}, "
-                            + "activeMachineCount: {}, currentDayCapacityQty: {}, dayPlanQty: {}, "
-                            + "currentDayPlanQty: {}, scheduleDayFinishQty: {}, currentDayPlanSatisfied: {}, "
-                            + "nextDayLookAheadEntered: {}, nextDayLookAheadSource: {}, "
-                            + "nextProductionDate: {}, nextDayPlanQty: {}, nextDayCapacityQty: {}, "
-                            + "addMachine: {}",
-                    sku.getMaterialCode(), productionDate, activeMachineCount, currentDayCapacityQty,
-                    dayPlanQty, currentDayPlanQty, resolveScheduleDayFinishQty(sku, productionDate),
-                    false, nextDayLookAheadEntered, nextDayLookAheadSource, nextProductionDate, nextDayPlanQty,
-                    nextDayCapacityQty, addMachine);
+            int targetMachineCount = dailyMouldCalcService.getRequiredMachineCount(
+                    context, sku.getMaterialCode(), sku.getProductStatus(), productionDate);
+            boolean addMachine = targetMachineCount > Math.max(0, activeMachineCount);
+            log.info("统一Map增机台逐日判断, factoryCode: {}, batchNo: {}, materialCode: {}, productStatus: {}, "
+                            + "scheduleType: {}, productionDate: {}, targetMachineCount: {}, "
+                            + "currentEffectiveMachineCount: {}, addMachine: {}",
+                    context.getFactoryCode(), context.getBatchNo(), sku.getMaterialCode(), sku.getProductStatus(),
+                    scheduleType, productionDate, targetMachineCount, activeMachineCount, addMachine);
             if (addMachine) {
-                // 当前日不满足且后看日（下一生产日或 T+3）也不满足时，当前日必须增机台。
                 return productionDate;
             }
-            if (continuationLookAhead && !nextDayLookAheadEntered) {
-                // 续作排产窗口末日不满足且无 T+3 计划可承接时，无后续业务日分摊，当前日仍需增机台。
-                // 新增排产窗口末日不满足且无 T+3 时，保留现有滚动到后续业务日再判断的语义。
-                log.info("dayN加机台逐日后看末日不足且无T+3计划，直接判定需要加机台, materialCode: {}, productionDate: {}, "
-                                + "activeMachineCount: {}, currentDayCapacityQty: {}, dayPlanQty: {}, "
-                                + "currentDayPlanQty: {}, scheduleDayFinishQty: {}, currentDayPlanSatisfied: {}, "
-                                + "nextDayLookAheadEntered: {}, addMachine: {}",
-                        sku.getMaterialCode(), productionDate, activeMachineCount, currentDayCapacityQty,
-                        dayPlanQty, currentDayPlanQty, resolveScheduleDayFinishQty(sku, productionDate),
-                        false, false, true);
-                return productionDate;
-            }
-            // 当前日不满足但后看日满足时，当前日不加机台，继续逐日推进判断下一业务日。
         }
         return null;
     }
 
     /**
-     * 解析当前业务日日志中展示的 T 日已完成量。
-     * <p>该数值只用于对账，不再从增机判断量中扣减。</p>
-     *
-     * @param sku 当前 SKU
-     * @param productionDate 当前判断业务日
-     * @return T 日已完成量；非 T 日返回 0
+     * 兼容历史测试的旧签名，生产代码不得使用。
      */
-    private static int resolveScheduleDayFinishQty(SkuScheduleDTO sku, LocalDate productionDate) {
-        if (Objects.isNull(sku) || Objects.isNull(productionDate)
-                || CollectionUtils.isEmpty(sku.getDailyPlanQuotaMap())
-                || !productionDate.equals(sku.getDailyPlanQuotaMap().keySet().iterator().next())) {
-            return 0;
-        }
-        return Math.max(0, sku.getScheduleDayFinishQty());
+    @Deprecated
+    public static LocalDate resolveFirstDailyLookAheadAddMachineDate(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            int activeMachineCount,
+            String scheduleType,
+            LocalDate startDate) {
+        return resolveFirstDailyLookAheadAddMachineDate(
+                TEST_COMPATIBLE_REQUIRED_MACHINE_READER,
+                context, sku, activeMachineCount, scheduleType, startDate);
     }
 
     /**
-     * 解析加机台判断使用的单机日理论产能。
-     * <p>优先使用 SKU 日硫化产能主数据的正式日标准；主数据缺失时沿用 DTO 日产能和班产兜底口径。
-     * 本方法只服务 dayN 加机台决策，不得用于计算 T 日实际剩余班次可排量。</p>
+     * 兼容原“原始dayN首次增机日”调用入口，实际统一委托目标机台数Map。
      *
+     * @param dailyMouldCalcService 目标机台数统一查询服务
      * @param context 排程上下文
-     * @param sku 当前 SKU
-     * @return 加机台判断使用的单机日理论产能
+     * @param sku SKU
+     * @param activeMachineCount 当前有效机台数
+     * @param scheduleType 排程类型，仅用于日志区分
+     * @return 首次需要加机台的自然日；没有缺口时返回null
      */
-    private static int resolveAddMachineDailyTheoryCapacityQty(LhScheduleContext context, SkuScheduleDTO sku) {
-        if (Objects.isNull(sku)) {
-            return 0;
-        }
-        int dailyTheoryCapacityQty = ShiftCapacityResolverUtil.resolveDailyStandardQty(
-                context, sku.getMaterialCode());
-        if (dailyTheoryCapacityQty <= 0) {
-            dailyTheoryCapacityQty = Math.max(0, sku.getDailyCapacity());
-        }
-        if (dailyTheoryCapacityQty <= 0) {
-            dailyTheoryCapacityQty = Math.max(0, sku.getShiftCapacity())
-                    * LhScheduleConstant.DEFAULT_SHIFTS_PER_DAY;
-        }
-        return dailyTheoryCapacityQty;
+    public static LocalDate resolveFirstOriginalDayPlanAddMachineDate(
+            ILhDailyMouldCalcService dailyMouldCalcService,
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            int activeMachineCount,
+            String scheduleType) {
+        return resolveFirstDailyLookAheadAddMachineDate(
+                dailyMouldCalcService, context, sku, activeMachineCount, scheduleType, null);
     }
 
     /**
-     * 按正式日硫化标准计算当前机台数的 dayN 理论产能。
-     *
-     * @param singleMachineDailyTheoryCapacityQty 单机正式日硫化标准
-     * @param activeMachineCount 当前已承接机台数
-     * @return 当前机台数对应的 dayN 理论产能
+     * 兼容历史测试的旧签名，生产代码不得使用。
      */
-    private static int resolveDailyTheoryCapacityQty(int singleMachineDailyTheoryCapacityQty,
-                                                     int activeMachineCount) {
-        return Math.max(0, activeMachineCount) * Math.max(0, singleMachineDailyTheoryCapacityQty);
+    @Deprecated
+    public static LocalDate resolveFirstOriginalDayPlanAddMachineDate(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            int activeMachineCount,
+            String scheduleType) {
+        return resolveFirstOriginalDayPlanAddMachineDate(
+                TEST_COMPATIBLE_REQUIRED_MACHINE_READER,
+                context, sku, activeMachineCount, scheduleType, null);
+    }
+
+    /**
+     * 兼容原“原始dayN首次增机日”指定起始日调用入口，实际统一委托目标机台数Map。
+     *
+     * @param dailyMouldCalcService 目标机台数统一查询服务
+     * @param context 排程上下文
+     * @param sku SKU
+     * @param activeMachineCount 当前有效机台数
+     * @param scheduleType 排程类型，仅用于日志区分
+     * @param startDate 最早参与判断的自然日
+     * @return 首次需要加机台的自然日；没有缺口时返回null
+     */
+    public static LocalDate resolveFirstOriginalDayPlanAddMachineDate(
+            ILhDailyMouldCalcService dailyMouldCalcService,
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            int activeMachineCount,
+            String scheduleType,
+            LocalDate startDate) {
+        return resolveFirstDailyLookAheadAddMachineDate(
+                dailyMouldCalcService, context, sku, activeMachineCount, scheduleType, startDate);
+    }
+
+    /**
+     * 兼容历史测试的旧签名，生产代码不得使用。
+     */
+    @Deprecated
+    public static LocalDate resolveFirstOriginalDayPlanAddMachineDate(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            int activeMachineCount,
+            String scheduleType,
+            LocalDate startDate) {
+        return resolveFirstOriginalDayPlanAddMachineDate(
+                TEST_COMPATIBLE_REQUIRED_MACHINE_READER,
+                context, sku, activeMachineCount, scheduleType, startDate);
     }
 
     private static LocalDate resolveNextProductionDate(Map<LocalDate, SkuDailyPlanQuotaDTO> quotaMap,

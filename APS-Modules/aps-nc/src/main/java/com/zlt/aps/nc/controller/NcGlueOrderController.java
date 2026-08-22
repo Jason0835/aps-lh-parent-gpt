@@ -89,7 +89,7 @@ public class NcGlueOrderController extends AbstractDocBizController<NcGlueOrder>
     @Override
     protected List<NcGlueOrder> listExportData(NcGlueOrder obj) {
         QueryWrapper<NcGlueOrder> wrapper = new QueryWrapper<>();
-        startPage("update_time desc");
+        startPage(getOrderBy());
         this.builderCondition(wrapper, obj);
         List<NcGlueOrder> list = glueOrderMapper.selectList(wrapper);
         AppUtils.formatData(list, getQueryFormulas());
@@ -118,7 +118,7 @@ public class NcGlueOrderController extends AbstractDocBizController<NcGlueOrder>
 
     @Override
     protected String getOrderBy() {
-        return "GLUE_CODE";
+        return "GLUE_CODE, ID";
     }
 
     @Override

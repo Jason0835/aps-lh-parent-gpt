@@ -98,7 +98,7 @@ public class DjCurlRollController extends AbstractDocBizController<DjCurlRoll> {
     @Override
     protected List<DjCurlRoll> listExportData(DjCurlRoll obj) {
         QueryWrapper<DjCurlRoll> wrapper = new QueryWrapper<>();
-        startPage("update_time desc");
+        startPage(getOrderBy());
         this.builderCondition(wrapper, obj);
         List<DjCurlRoll> list = curlRollMapper.selectList(wrapper);
         AppUtils.formatData(list, getQueryFormulas());
@@ -127,6 +127,6 @@ public class DjCurlRollController extends AbstractDocBizController<DjCurlRoll> {
 
     @Override
     protected String getOrderBy() {
-        return "PADDING_CODE";
+        return "PADDING_CODE, ID";
     }
 }

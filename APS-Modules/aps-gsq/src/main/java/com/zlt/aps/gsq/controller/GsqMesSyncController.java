@@ -5,10 +5,12 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.gsq.api.domain.entity.GsqDayFinishQty;
 import com.zlt.aps.gsq.api.domain.entity.GsqScheFinishQty;
 import com.zlt.aps.gsq.api.domain.entity.GsqStock;
+import com.zlt.aps.gsq.api.domain.vo.GsqMesTwiningDiscSyncVO;
 import com.zlt.aps.gsq.api.service.IGsqMesSyncRemoteService;
 import com.zlt.aps.gsq.service.IGsqDayFinishQtyService;
 import com.zlt.aps.gsq.service.IGsqScheFinishQtyService;
 import com.zlt.aps.gsq.service.IGsqStockService;
+import com.zlt.aps.gsq.service.IGsqTwiningDiscService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
@@ -41,6 +43,9 @@ public class GsqMesSyncController implements IGsqMesSyncRemoteService {
 
     @Autowired
     private IGsqStockService gsqStockService;
+
+    @Autowired
+    private IGsqTwiningDiscService gsqTwiningDiscService;
 
     /**
      * 逻辑删除并批量保存钢丝圈排程日完成量（事务性操作）
@@ -122,5 +127,22 @@ public class GsqMesSyncController implements IGsqMesSyncRemoteService {
                                                              @RequestBody List<GsqStock> list) {
         gsqStockService.logicDeleteAndSaveBatch(stockDate, updateBy, list);
         return AjaxResult.success();
+    }
+
+    /**
+     * 同步MES钢丝圈缠绕盘三表数据（事务性操作）
+     * 单事务处理缠绕盘清单/规格关系/机台关系，保证三表一致性
+     * （主表UPSERT保留手工字段、MES失效数据清理级联、子表整体替换、机台关系UPSERT）
+     *
+     * @param updateBy 更新者（MES同步传"MES"）
+     * @param syncVO   三表聚合数据（缠绕盘清单/规格关系/机台关系）
+     * @return 结果
+     */
+    @Override
+    @ApiOperation("同步MES钢丝圈缠绕盘三表数据（事务性操作）")
+    @PostMapping("/gsqMesSync/syncTwiningDisc")
+    public AjaxResult syncTwiningDisc(@RequestParam("updateBy") String updateBy,
+                                      @RequestBody GsqMesTwiningDiscSyncVO syncVO) {
+        return gsqTwiningDiscService.syncFromMes(syncVO, updateBy);
     }
 }

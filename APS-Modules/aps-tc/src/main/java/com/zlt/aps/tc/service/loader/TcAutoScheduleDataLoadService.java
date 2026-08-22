@@ -38,6 +38,9 @@ import java.util.stream.Collectors;
 @Service
 public class TcAutoScheduleDataLoadService {
 
+    /** 施工表胎侧长度单位由毫米换算为米的除数。 */
+    private static final BigDecimal CONSTRUCTION_LENGTH_UNIT_DIVISOR = BigDecimal.valueOf(1000L);
+
     private final TcAutoScheduleRedisCacheService tcAutoScheduleRedisCacheService;
     /** 参数装载组件，只负责构建单次排程参数快照 */
     private final TcScheduleParamLoader tcScheduleParamLoader;
@@ -858,7 +861,7 @@ public class TcAutoScheduleDataLoadService {
         for (TcFormingDemandRowVo row : demandRowList) {
             sourceRowIndex++;
             String sidewallCode = row.getSidewallCode();
-            BigDecimal sidewallLength = nvl(row.getSidewallLength());
+            BigDecimal sidewallLength = this.convertConstructionLengthToMeter(row.getSidewallLength());
             if (StrUtil.isBlank(sidewallCode) || sidewallLength.compareTo(BigDecimal.ZERO) <= 0) {
                 continue;
             }
@@ -1142,7 +1145,7 @@ public class TcAutoScheduleDataLoadService {
                     continue;
                 }
                 String sidewallCode = primarySpec.getSidewallCode();
-                BigDecimal sidewallLength = nvl(primarySpec.getSidewallLength());
+                BigDecimal sidewallLength = this.convertConstructionLengthToMeter(primarySpec.getSidewallLength());
                 BigDecimal demandQty = formingQty.multiply(sidewallLength);
                 if (demandQty.compareTo(BigDecimal.ZERO) <= 0) {
                     continue;
@@ -1384,7 +1387,8 @@ public class TcAutoScheduleDataLoadService {
             BigDecimal formingQty = this.resolveGuardClassQty(classQtyArray, index);
             BigDecimal appliedFormingQty = formingQty.min(remainingGuardFormingQty);
             BigDecimal sidewallLength = (index >= 0 && index < 8 && specByClass != null && specByClass[index] != null)
-                    ? this.nvl(specByClass[index].getSidewallLength()) : this.nvl(currentSidewallLength);
+                    ? this.convertConstructionLengthToMeter(specByClass[index].getSidewallLength())
+                    : this.nvl(currentSidewallLength);
             windowQtyMap.put(index + 1, appliedFormingQty.multiply(sidewallLength));
             remainingGuardFormingQty = remainingGuardFormingQty.subtract(appliedFormingQty);
         }
@@ -2565,6 +2569,7 @@ public class TcAutoScheduleDataLoadService {
         }
         context.setWorkCalendarStoppedShiftOrderSet(stoppedShiftOrders);
         context.setWorkCalendarStoppedShiftEvidenceMap(stoppedShiftEvidenceMap);
+        context.appendWorkCalendarStoppedShiftProcessLogs();
     }
 
     /**
@@ -3230,6 +3235,18 @@ public class TcAutoScheduleDataLoadService {
      */
     private BigDecimal nvl(BigDecimal value) {
         return value == null ? BigDecimal.ZERO : value;
+    }
+
+    /**
+     * 将施工表中的胎侧长度由毫米换算为自动排程使用的米。
+     *
+     * <p>仅用于成型计划关联施工信息的任务草稿；原始值仍用于施工字段完整性校验。</p>
+     *
+     * @param constructionLength 施工表胎侧长度，单位毫米
+     * @return 换算后的胎侧长度，单位米；空值按0处理
+     */
+    private BigDecimal convertConstructionLengthToMeter(BigDecimal constructionLength) {
+        return this.nvl(constructionLength).divide(CONSTRUCTION_LENGTH_UNIT_DIVISOR);
     }
 
     /**

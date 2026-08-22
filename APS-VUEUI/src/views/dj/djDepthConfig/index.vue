@@ -45,16 +45,20 @@
         >
         <el-button
           v-hasPermi="['dj:depthConfig:import']"
-          @click="$refs.tltUpload.handleImport()"
+          @click="() => $refs.tltUpload.handleImport(importDefaultValue)"
           >{{ $t("ui.frame.btn.import") }}</el-button
         >
       </template>
     </page-table>
     <tlt-upload-form
       ref="tltUpload"
+      :title="$t('ui.dj.depthConfig.column.modalName')"
       downloadUrl="/dj/depthConfig/importTemplate"
       uploadUrl="/dj/depthConfig/importData"
       @uploadSuccess="getList"
+      labelWidth="0"
+      :columns="importColumns"
+      :rules="importRules"
     />
     <infoDialog ref="infoRef" @success="getList" />
   </basic-container>
@@ -95,6 +99,26 @@ export default {
       query: {
         factoryCode: '',
       },
+      importDefaultValue: {
+        updateSupport: false,
+      },
+      importColumns: [
+        {
+          label: "",
+          prop: "updateSupport",
+          render: (form) => {
+            return (
+              <el-checkbox
+                label={this.$t("ui.checkbox.updateExistingData")}
+                v-model={form.updateSupport}
+              >
+                {this.$t("ui.checkbox.updateExistingData")}
+              </el-checkbox>
+            );
+          },
+        },
+      ],
+      importRules: {},
     };
   },
   computed: {
@@ -118,6 +142,14 @@ export default {
       let columns = [
         { type: "selection", fixed: "left" },
         {
+          label: this.$t("ui.data.column.factoryCode"),
+          prop: "factoryCode",
+          minWidth: 100,
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_factory_name, value);
+          },
+        },
+        {
           prop: "minMachineQty",
           halign: "center",
           label: this.$t("ui.dj.depthConfig.column.minMachineQty"),
@@ -138,6 +170,13 @@ export default {
           halign: "center",
           label: this.$t("ui.common.column.remark"),
           minWidth: 100,
+        },
+        {
+          prop: "updateTime",
+          align: "center",
+          halign: "center",
+          label: this.$t("common.updateTime"),
+          minWidth: 160,
         },
         {
           align: "center",

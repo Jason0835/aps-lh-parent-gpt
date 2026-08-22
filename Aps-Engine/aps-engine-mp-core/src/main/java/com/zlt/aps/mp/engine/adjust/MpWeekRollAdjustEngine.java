@@ -79,6 +79,9 @@ public class MpWeekRollAdjustEngine {
                 //非正式忽略
                 continue;
             }
+            if (finalAdjustVo.getTotalQty() == null){
+                continue;
+            }
             finalAdjustVo.setAdjustDetail(new StringBuilder());
 
             if (finalAdjustVo.getPendingQty() >= 0){
@@ -2785,7 +2788,7 @@ public class MpWeekRollAdjustEngine {
         int startMould = getStartMould(adjustDailyCapacityLimitObj,contextDTO.getParamMap(),newOnLineDay,mpFinalVo,dailyCapacityLimitVo);
         int oriNewPlanQty = newPlanQty;
         int dailyQty = getDayVulcanizationQty(mpFinalVo);
-        int blockQty,diffQty;
+        int blockQty,cavityQty,diffQty;
         Integer dayVulcanizationQty;
         IncMouldContext incMouldContext = new IncMouldContext();
         incMouldContext.setBFirstAddMould(true);
@@ -2868,7 +2871,29 @@ public class MpWeekRollAdjustEngine {
                 mpFinalVo.setFieldValueByFieldName(dayField,dayValue);
                 adjustDailyCapacityLimitObj.calcLhMachinesWithEmbryoTypes(mpProdFinalList,i, dailyCapacityLimitVoMap.get(i), contextDTO.getParamMap(), mpFinalVo.getMainPattern(),mpFinalVo.getEmbryoCode());
                 contextDTO.getLogDetail().append(String.format("结构:%s,【延后增模排产】,物料编码:%s,排产日:%s,其产能限制信息:%s！",contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),i,dailyCapacityLimitVoMap.get(i).toString())).append(ApsConstant.DIVISION);
-
+                //若不是延的时间，才检查: 当前每日硫化机台数\当前每日胎胚种类数\每日换模次数 符合性
+                if (i<=oriEndDay && !adjustDailyCapacityLimitObj.checkCapacitySatisfy(dailyCapacityLimitVoMap.get(i))){
+                    // 将值还原，并退出，继续加模
+                    dayValue -= dayVulcanizationQty;
+                    mpFinalVo.setFieldValueByFieldName(dayField,dayValue == 0 ? null:dayValue);
+                    contextDTO.getLogDetail().append(String.format("结构:%s,【增模排产】,物料编码:%s,排产日:%s,每日硫化机台数或每日胎胚种类数或每日换模次数不符合产能限制,退出！",contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),i)).append(ApsConstant.DIVISION);
+                    if (incMouldContext.getUsedProductionMap().size() >1 && getBeforeProductionQty(incMouldContext) > 0 && YesOrNoEnum.YES.getCode().equals(dailyCapacityLimitVoMap.get(i).getDayOpenCloseFlag())){
+                        break;
+                    }
+                    newPlanQty += revertPreDayQty(contextDTO,mpFinalVo,i,incMouldContext);
+                    continue;
+                }
+                //若不是延的时间，才检查：主花纹向下模具数量(/2转成机台数) 符合性
+                cavityQty = getNewCavityQty(contextDTO,mpFinalVo,i);
+                contextDTO.getLogDetail().append(String.format("结构:%s,【增模排产】,物料编码:%s,排产日:%s,获取到新的型腔数:%s！",contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),i,cavityQty)).append(ApsConstant.DIVISION);
+                if (i<=oriEndDay && !checkMouldSatisfy(dailyCapacityLimitVoMap.get(i),cavityQty)){
+                    // 将值还原，并退出 外循环
+                    dayValue -= dayVulcanizationQty;
+                    mpFinalVo.setFieldValueByFieldName(dayField,dayValue==0?null:dayValue);
+                    contextDTO.getLogDetail().append(String.format("结构:%s,【增模排产】,物料编码:%s,排产日:%s,主花纹:%s,其主花纹模具数不符合产能限制,退出！",contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),i,mpFinalVo.getMainPattern())).append(ApsConstant.DIVISION);
+                    newPlanQty += revertPreDayQty(contextDTO,mpFinalVo,i,incMouldContext);
+                    return resetPlanQty(contextDTO,newOnLineDay,newEndDay,oriNewPlanQty,newPlanQty,incMouldContext.getHasProductionQty(),mpFinalVo,bakMpFinalVo);
+                }
                 newPlanQty -= dayVulcanizationQty;
                 if (newPlanQty <=0 && !isAutoReplenishment){
                     //这里不能再清前日1天的值，因当天实际是正常排的
@@ -3041,7 +3066,7 @@ public class MpWeekRollAdjustEngine {
         DailyMouldAvailabilityResult cavity2BlockVo = contextDTO.getCavity2BlockMap().get(iDay);
         if (cavity2BlockVo != null && cavity2BlockVo.getCavityResults() != null){
             Integer cavityQty = cavity2BlockVo.getCavityResults().get(mpFinalVo.getStructureName()+mpFinalVo.getMainPattern());
-            return cavityQty != null ? cavityQty:mpFinalVo.getMouldCavityQty();
+            return cavityQty != null ? cavityQty:Convert.toInt(mpFinalVo.getMouldCavityQty(),0);
         }
         return mpFinalVo.getMouldCavityQty();
     }

@@ -154,6 +154,12 @@ public class SkuScheduleDTO {
     private int continuationShortageMachineCount;
     /** 续作增机台补偿SKU首次增机日对应的 dayN 计划量 */
     private int continuationAddMachineDayPlanQty;
+    /**
+     * 续作增机台的 dayN 产能缺口量。
+     * <p>该字段只表示“为什么需要增加机台”，用于增机决策与过程审计；实际可排量仍由
+     * 物料+产品状态中心生产账本控制，禁止把本字段当作新增机台的生产目标上限。</p>
+     */
+    private int continuationAddMachineTriggerQty;
     /** 续作机台上的模具号列表 */
     private List<String> mouldCodeList;
     /** 预计收尾时间 */

@@ -9,7 +9,6 @@ import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.constant.UserConstants;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
 import com.zlt.aps.gsq.api.domain.entity.GsqTwiningDisc;
-import com.zlt.aps.gsq.api.domain.vo.GsqTwiningDiscImportVo;
 import com.zlt.aps.gsq.api.service.IGsqTwiningDiscService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
 import io.swagger.annotations.Api;
@@ -28,7 +27,7 @@ import java.util.Arrays;
 
 /**
  * 钢丝圈缠绕盘管理 UI 控制层
- * <p>主子表管理：列表显示主表，新增/编辑弹窗含主表表单与子表明细</p>
+ * <p>单表管理：缠绕盘基础信息；规格关系/机台关系按编码关联，独立页面维护</p>
  *
  * @author zlt
  * @date 2026-07-08
@@ -53,7 +52,7 @@ public class GsqTwiningDiscController extends BaseUIController<GsqTwiningDisc> {
     }
 
     /**
-     * 获取钢丝圈缠绕盘详情（含子表明细及钢丝圈名称反显）
+     * 获取钢丝圈缠绕盘详情（单表）
      */
     @ApiOperation("获取钢丝圈缠绕盘详情")
     @GetMapping("/getInfo/{id}")
@@ -63,7 +62,7 @@ public class GsqTwiningDiscController extends BaseUIController<GsqTwiningDisc> {
     }
 
     /**
-     * 保存钢丝圈缠绕盘（id为空新增，id不为空修改），级联保存子表明细
+     * 保存钢丝圈缠绕盘（id为空新增，id不为空修改，单表保存）
      * 保存前先校验缠绕盘编码唯一性
      * 注意：前端统一以multipart/form-data提交，此处不能用@RequestBody，需用表单绑定（与其他gsq模块一致）
      */
@@ -79,7 +78,7 @@ public class GsqTwiningDiscController extends BaseUIController<GsqTwiningDisc> {
     }
 
     /**
-     * 删除钢丝圈缠绕盘（逻辑删除主表，级联逻辑删除子表）
+     * 删除钢丝圈缠绕盘（逻辑删除主表，按缠绕盘编码级联逻辑删除规格关系及机台关系）
      */
     @ApiOperation("删除钢丝圈缠绕盘")
     @RequiresPermissions("gsq:twiningDisc:remove")
@@ -100,6 +99,16 @@ public class GsqTwiningDiscController extends BaseUIController<GsqTwiningDisc> {
         return gsqTwiningDiscRemoteService.checkUnique(entity);
     }
 
+    /**
+     * 查询施工信息表全部钢丝圈选项（编码+名称，去重），供规格关系页面下拉选择使用
+     */
+    @ApiOperation("查询钢丝圈下拉选项")
+    @GetMapping("/listSteelRingOptions")
+    @ResponseBody
+    public AjaxResult listSteelRingOptions() {
+        return gsqTwiningDiscRemoteService.listSteelRingOptions();
+    }
+
     @Override
     public String getExportTemplateFileName() {
         return getFunctionName();
@@ -116,15 +125,13 @@ public class GsqTwiningDiscController extends BaseUIController<GsqTwiningDisc> {
     }
 
     /**
-     * 下载导入模板
-     * <p>使用主子表平铺结构的导入VO生成模板：主表字段（缠绕盘编号/名称/状态/英寸/数量/主表备注）
-     * + 子表字段（钢丝圈编号/名称/明细备注）在同一行填写，与导入解析保持一致</p>
+     * 下载导入模板（单表结构：缠绕盘编号/名称/状态/英寸/数量/排列方式/工厂/备注）
      */
     @ApiOperation("下载导入模板")
     @Override
     public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
         String fileName = getExportTemplateFileName();
-        ExcelUtil<GsqTwiningDiscImportVo> util = new ExcelUtil<>(GsqTwiningDiscImportVo.class);
+        ExcelUtil<GsqTwiningDisc> util = new ExcelUtil<>(GsqTwiningDisc.class);
         util.exportExcel(response, null, fileName, fileName);
         return AjaxResult.success();
     }

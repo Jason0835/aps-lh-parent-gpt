@@ -41,7 +41,6 @@ export default {
       isEdit: false,
       factoryCode: "",
       form: {
-        classShift: "2",
         openMachineClass: [],
         factoryCode: '',
       },
@@ -88,7 +87,6 @@ export default {
           dictData: this.parentDict.type.biz_factory_name,
           filterable: true,
           required: true,
-          disabled: true,
         },
         {
           label: this.$t("ui.data.column.machine.machineCode"),
@@ -185,8 +183,8 @@ export default {
           label: this.$t("ui.data.column.machine.status"),
           prop: "status",
           type: "switch",
-          activeValue: "0",
-          inactiveValue: "1",
+          activeValue: "1",
+          inactiveValue: "0",
         },
         {
           label: this.$t("ui.common.column.remark"),
@@ -239,7 +237,7 @@ export default {
       }
     },
     hide() {
-      this.form = { classShift: "2", openMachineClass: [], factoryCode: '' };
+      this.form = { openMachineClass: [], factoryCode: '' };
       this.$refs.form.triggerResetForm();
       // this.resetForm("infoForm");
       this.isEdit = false;

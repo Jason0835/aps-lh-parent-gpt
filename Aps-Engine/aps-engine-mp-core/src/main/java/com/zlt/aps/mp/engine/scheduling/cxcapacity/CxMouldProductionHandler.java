@@ -10,8 +10,8 @@ import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.mp.engine.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanStructureLhRatioVo;
-import com.zlt.aps.mp.engine.handler.statistics.DayProductionStatisticsHandler;
 import com.zlt.aps.mp.engine.handler.SimulateProductionSnapshotHandler;
+import com.zlt.aps.mp.engine.handler.statistics.DayProductionStatisticsHandler;
 import com.zlt.aps.mp.engine.logrecorder.TbrMouldProductionLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
 import lombok.RequiredArgsConstructor;
@@ -110,7 +110,11 @@ public class CxMouldProductionHandler {
         //处理结构提前收尾
         groupPlanBeforeConclusionHandler.handlerBeforeConclusion(context, isIgnoreHighPriority, productionPlanInfo, cxMachineInfo, cxLhRatio, productionPlan);
         //20260330 分组计划标记分配完成，需要验证是否需要进行分组计划分配延长处理
-        if (!isTimeExtensionHandlerFlag(isForcedTimeExtension, originStartDay, originEndDay, productionPlan)) {
+        if (isForcedTimeExtension && !productionPlanInfo.isHasBeforeConclusionHandler()) {
+            //20260821+ 特殊原材料拉量，不可延长探测
+            isForcedTimeExtension = false;
+        }
+        if (!isTimeExtensionHandlerFlag(isForcedTimeExtension, originStartDay, originEndDay, cxMachineInfo, productionPlan)) {
             return;
         }
         groupTimeExtensionHandler.handlerTimeExtension(this, context, isIgnoreHighPriority, productionPlan, handledDayInfo);
@@ -242,7 +246,7 @@ public class CxMouldProductionHandler {
     /**
      * 是否需要进行延长探测处理
      * 1、强制延长探测则结果为true
-     * 2、否则如果排产时间范围一直，则不再延长探测
+     * 2、否则如果排产时间范围一样，则不再延长探测
      *
      * @param isForcedTimeExtension 是否需要强制延长探测
      * @param originStartDay        初始排产开始日
@@ -253,6 +257,7 @@ public class CxMouldProductionHandler {
     private boolean isTimeExtensionHandlerFlag(boolean isForcedTimeExtension,
                                                Integer originStartDay,
                                                Integer originEndDay,
+                                               CxMachineBaseInfoVo cxMachineInfo,
                                                CxMachineAllocationPlanHelper productionPlan) {
         if (null == originStartDay || null == originEndDay || null == productionPlan) {
             return true;
@@ -260,7 +265,10 @@ public class CxMouldProductionHandler {
         if (isForcedTimeExtension) {
             return true;
         }
-        return !(originStartDay.equals(productionPlan.getStartDay()) && originEndDay.equals(productionPlan.getEndDay()));
+        Integer previousDay = cxMachineInfo.getPreviousDay(originEndDay);
+        boolean sameStartDay = originStartDay.equals(productionPlan.getStartDay());
+        boolean sameEndDay = originEndDay.equals(productionPlan.getEndDay()) || previousDay.equals(productionPlan.getEndDay());
+        return !(sameStartDay && sameEndDay);
     }
 
 }
