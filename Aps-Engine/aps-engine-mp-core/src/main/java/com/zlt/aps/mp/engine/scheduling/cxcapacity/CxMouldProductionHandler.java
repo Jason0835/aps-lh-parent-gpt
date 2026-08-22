@@ -110,6 +110,10 @@ public class CxMouldProductionHandler {
         //处理结构提前收尾
         groupPlanBeforeConclusionHandler.handlerBeforeConclusion(context, isIgnoreHighPriority, productionPlanInfo, cxMachineInfo, cxLhRatio, productionPlan);
         //20260330 分组计划标记分配完成，需要验证是否需要进行分组计划分配延长处理
+        if (isForcedTimeExtension && !productionPlanInfo.isHasBeforeConclusionHandler()) {
+            //20260821+ 特殊原材料拉量，不可延长探测
+            isForcedTimeExtension = false;
+        }
         if (!isTimeExtensionHandlerFlag(isForcedTimeExtension, originStartDay, originEndDay, cxMachineInfo, productionPlan)) {
             return;
         }

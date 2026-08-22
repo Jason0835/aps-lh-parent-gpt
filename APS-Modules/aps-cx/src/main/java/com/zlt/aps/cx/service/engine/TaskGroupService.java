@@ -4870,7 +4870,36 @@ public class TaskGroupService {
                     log.info("【提前生产-跨班次切换未完成】机台={}, 遗留切换={}s, 无可用产能", machineCode, switchState);
                 }
             } else {
-                // 有前结构占用 → 检查是否全部收尾
+                // 有前结构占用 -> 先检查余量延用让位（S5.9 余量优先）
+                // 前结构处于余量延用中（余量未耗尽，structureHoldoverMachineMap 含该机台）时后结构让位、
+                // 不允许提前上机：否则提前上机后前结构余量仍按延用逻辑回排，出现
+                // 前结构->后结构->前结构->后结构 的来回切换（如 H1402 245/225 2026-08-22 场景），
+                // 且释放时机（余量耗尽口径）与收尾判定（配置到期口径）不一致导致切换耗时位置错乱
+                Map<String, List<MpCxCapacityConfiguration>> holdoverCheckMap = context.getStructureHoldoverMachineMap();
+                if (holdoverCheckMap != null && !holdoverCheckMap.isEmpty()) {
+                    boolean holdoverBlocked = false;
+                    String holdoverStruct = null;
+                    for (String precedingStruct : precedingStructures) {
+                        List<MpCxCapacityConfiguration> holdoverList = holdoverCheckMap.get(precedingStruct);
+                        if (holdoverList == null) continue;
+                        for (MpCxCapacityConfiguration hc : holdoverList) {
+                            if (machineCode.equals(hc.getCxMachineCode())) {
+                                holdoverBlocked = true;
+                                holdoverStruct = precedingStruct;
+                                break;
+                            }
+                        }
+                        if (holdoverBlocked) break;
+                    }
+                    if (holdoverBlocked) {
+                        excluded.add(machineCode);
+                        log.info("【提前生产-余量延用让位】机台={}, 前结构={}余量未耗尽处于延用中，后结构={}让位不提前上机",
+                                machineCode, holdoverStruct, structureName);
+                        continue;
+                    }
+                }
+
+                // 检查是否全部收尾
                 boolean allFullyEnded = true;
                 long maxOccupiedTime = 0;
                 String precedingProSize = null;
