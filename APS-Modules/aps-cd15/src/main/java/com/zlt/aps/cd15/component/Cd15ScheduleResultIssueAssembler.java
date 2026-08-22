@@ -4,19 +4,30 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.zlt.aps.cd15.api.domain.entity.Cd15ScheduleResult;
 import com.zlt.aps.cd15.api.domain.entity.Cd15ScheduleResultIssue;
 import com.zlt.aps.cd15.api.domain.entity.Cd15ShiftConfig;
+import com.zlt.aps.cd15.engine.mapper.Cd15EngineConstructionMapper;
 import com.zlt.aps.cd15.mapper.Cd15ShiftConfigMapper;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.mdm.api.domain.entity.MdmConstructionInfo;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /** 按启用班次把斜裁主结果展开为 MES 下发数据。 */
 @Slf4j
@@ -24,7 +35,10 @@ import java.util.List;
 @RequiredArgsConstructor
 public class Cd15ScheduleResultIssueAssembler {
 
+    private static final int EMBRYO_DESC_MAX_LENGTH = 900;
+
     private final Cd15ShiftConfigMapper shiftConfigMapper;
+    private final Cd15EngineConstructionMapper constructionMapper;
 
     /**
      * 装配 MES 下发列表。
@@ -50,11 +64,14 @@ public class Cd15ScheduleResultIssueAssembler {
             return Collections.emptyList();
         }
         LocalDate localScheduleDate = this.toLocalDate(scheduleDate);
+        Map<String, String> embryoDescBySteelStrip =
+                this.loadEmbryoDescriptions(sourceList, factoryCode);
         List<Cd15ScheduleResultIssue> issues =
                 new ArrayList<>(sourceList.size() * shiftConfigs.size());
         sourceList.forEach(source -> shiftConfigs.forEach(config -> {
             Cd15ScheduleResultIssue issue = this.convert(
-                    source, config, localScheduleDate, publishTraceId);
+                    source, config, localScheduleDate, publishTraceId,
+                    embryoDescBySteelStrip.get(source.getSteelStripCode()));
             if (issue != null) {
                 issues.add(issue);
             }
@@ -82,7 +99,8 @@ public class Cd15ScheduleResultIssueAssembler {
             Cd15ScheduleResult source,
             Cd15ShiftConfig config,
             LocalDate scheduleDate,
-            String publishTraceId) {
+            String publishTraceId,
+            String embryoSpecDesc) {
         String classField = config.getClassField();
         if (classField == null || classField.trim().isEmpty()
                 || config.getScheduleDay() == null) {
@@ -106,6 +124,8 @@ public class Cd15ScheduleResultIssueAssembler {
                 ? fallbackDate : values.scheduleDate);
         issue.setMachineCode(source.getMachineCode());
         issue.setSteelStripCode(source.getSteelStripCode());
+        issue.setMaterialCode(source.getSteelStripCode());
+        issue.setEmbryoSpecDesc(embryoSpecDesc);
         issue.setBigRollCode(source.getBigRollCode());
         issue.setStorageLaneCode(source.getStorageLaneCode());
         issue.setCuttingAngle(source.getCuttingAngle());
@@ -123,10 +143,18 @@ public class Cd15ScheduleResultIssueAssembler {
         issue.setAnalysisInput(values.analysisInput);
         issue.setCraftWidth(source.getCraftWidth());
         issue.setUnitConsumeMillimeter(source.getUnitConsumeMillimeter());
+        issue.setUnitConsume(this.toMeters(
+                source.getUnitConsumeMillimeter()));
         issue.setCurlLength(source.getCurlLength());
         issue.setCordWidth(source.getCordWidth());
         issue.setSourceType(source.getSourceType());
         issue.setProductionStatus(source.getProductionStatus());
+        issue.setStockQty(source.getStockQty());
+        issue.setCxClass1Plan(source.getClass1CxPlanQty());
+        issue.setCxClass2Plan(source.getClass2CxPlanQty());
+        issue.setCxClass3Plan(source.getClass3CxPlanQty());
+        issue.setCxClass4Plan(source.getClass4CxPlanQty());
+        issue.setRemark(source.getRemark());
         issue.setClearExistingPlan(values.clearExistingPlan);
         issue.setFactoryCode(source.getFactoryCode());
         issue.setPublishTraceId(publishTraceId);
@@ -179,6 +207,86 @@ public class Cd15ScheduleResultIssueAssembler {
                     source.getId(), fieldPrefix, exception.getMessage());
             return null;
         }
+    }
+
+    /** 单耗由毫米每条转换为米每条。 */
+    private BigDecimal toMeters(BigDecimal unitConsumeMillimeter) {
+        if (unitConsumeMillimeter == null) {
+            return null;
+        }
+        return unitConsumeMillimeter.divide(BigDecimal.valueOf(1000));
+    }
+
+    /** 按钢带编码汇总施工信息中的胎胚描述。 */
+    private Map<String, String> loadEmbryoDescriptions(
+            List<Cd15ScheduleResult> sourceList, String factoryCode) {
+        Set<String> steelStripCodes = sourceList.stream()
+                .map(Cd15ScheduleResult::getSteelStripCode)
+                .filter(StringUtils::isNotBlank)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        if (steelStripCodes.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        List<MdmConstructionInfo> constructions =
+                this.constructionMapper.selectList(
+                        new LambdaQueryWrapper<MdmConstructionInfo>()
+                                .eq(MdmConstructionInfo::getFactoryCode,
+                                        factoryCode)
+                                .and(condition -> condition
+                                        .in(MdmConstructionInfo::getBeltCode1,
+                                                steelStripCodes)
+                                        .or().in(MdmConstructionInfo::getBeltCode2,
+                                                steelStripCodes)
+                                        .or().in(MdmConstructionInfo::getBeltCode3,
+                                                steelStripCodes)
+                                        .or().in(MdmConstructionInfo::getBeltCode4,
+                                                steelStripCodes)
+                                        .or().in(MdmConstructionInfo::getBeltCodeLeftCode,
+                                                steelStripCodes)
+                                        .or().in(MdmConstructionInfo::getBeltCodeRightCode,
+                                                steelStripCodes)));
+        if (constructions == null || constructions.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        return steelStripCodes.stream().collect(Collectors.toMap(
+                Function.identity(),
+                steelStripCode -> this.joinEmbryoDescriptions(
+                        constructions, steelStripCode),
+                (first, second) -> first,
+                LinkedHashMap::new));
+    }
+
+    /** 汇总包含指定钢带的胎胚描述，并限制在 MES 字段长度内。 */
+    private String joinEmbryoDescriptions(
+            List<MdmConstructionInfo> constructions,
+            String steelStripCode) {
+        String embryoSpecDesc = constructions.stream()
+                .filter(construction -> this.containsSteelStrip(
+                        construction, steelStripCode))
+                .map(MdmConstructionInfo::getEmbryoDesc)
+                .filter(StringUtils::isNotBlank)
+                .map(String::trim)
+                .distinct()
+                .collect(Collectors.joining("/"));
+        return embryoSpecDesc.length() <= EMBRYO_DESC_MAX_LENGTH
+                ? embryoSpecDesc
+                : embryoSpecDesc.substring(0, EMBRYO_DESC_MAX_LENGTH);
+    }
+
+    /** 判断施工信息是否包含指定钢带。 */
+    private boolean containsSteelStrip(
+            MdmConstructionInfo construction, String steelStripCode) {
+        return Objects.equals(steelStripCode, construction.getBeltCode1())
+                || Objects.equals(steelStripCode,
+                construction.getBeltCode2())
+                || Objects.equals(steelStripCode,
+                construction.getBeltCode3())
+                || Objects.equals(steelStripCode,
+                construction.getBeltCode4())
+                || Objects.equals(steelStripCode,
+                construction.getBeltCodeLeftCode())
+                || Objects.equals(steelStripCode,
+                construction.getBeltCodeRightCode());
     }
 
     /** 转换日期并兼容 java.sql.Date。 */
