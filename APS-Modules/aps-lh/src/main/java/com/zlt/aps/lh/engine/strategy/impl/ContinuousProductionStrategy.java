@@ -41,6 +41,7 @@ import com.zlt.aps.lh.engine.strategy.support.DailyMachineShortageQuotaPlan;
 import com.zlt.aps.lh.engine.strategy.support.EarlyProductionChecker;
 import com.zlt.aps.lh.engine.strategy.support.ProductionQuantityPolicy;
 import com.zlt.aps.lh.engine.strategy.support.SmallEndingSurplusSkipRule;
+import com.zlt.aps.lh.service.ILhDailyMouldCalcService;
 import com.zlt.aps.lh.service.impl.LhMaintenanceScheduleService;
 import com.zlt.aps.lh.util.CleaningScheduleRuleUtil;
 import com.zlt.aps.lh.util.LeftRightMouldUtil;
@@ -143,6 +144,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
     private static final int SAME_MATERIAL_STATUS_FORMAL_RESERVED_QTY = 4;
     private static final String SAME_MATERIAL_STATUS_CONTINUATION_REASON =
             "同物料多状态续作跨窗口延续，锁定原机台";
+    /** 续作降模统一Map决策过程日志标题，独立落库便于按批次直接检索核对。 */
+    private static final String CONTINUATION_REDUCE_MAP_LOG_TITLE = "续作降模Map判断";
     @Resource
     private OrderNoGenerator orderNoGenerator;
 
@@ -173,6 +176,10 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
 
     @Resource
     private ICapacityCalculateStrategy capacityCalculateStrategy;
+
+    /** 物料+产品状态+自然日目标总机台数唯一查询入口。 */
+    @Resource
+    private ILhDailyMouldCalcService lhDailyMouldCalcService;
 
     @Override
     public String getStrategyType() {
@@ -844,77 +851,14 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             raiseMultiMachineContinuationTargetFloor(context, sourceSku, skuResults, shifts);
             // 降模排序规则只在当前续作 SKU 分组内生效，提前记录启用条件和清洗候选，便于对账最终下机顺序。
             logContinuationReduceSortRule(context, sourceSku, skuResults);
-            // T 日原始月计划量与 T-1 相等时，必须先阻断所有首日快捷降模分支，并统一进入逐日降模链路。
-            // 该变量只在当前 SKU 本次降模计算中传递，不写入 DTO 或上下文，后续业务日仍会重新选机降模。
-            boolean skipReduceMachineForFirstDay = shouldSkipReduceMachineForFirstDay(
-                    context, sourceSku, skuResults, shifts);
-            if (!skipReduceMachineForFirstDay
-                    && reduceEndingContinuationToSingleMachineWhenCovered(context, sourceSku, skuResults, shifts)) {
+            // 目标机台数已由初始化阶段统一Map确定，首日计划相等、窗口目标量和真实产能均不得再覆盖目标总数。
+            // 收尾单机快捷分支只在统一Map明确目标不超过1台时命中，实际产能仍负责校验该机台能排多少量。
+            if (reduceEndingContinuationToSingleMachineWhenCovered(context, sourceSku, skuResults, shifts)) {
                 continue;
             }
-            boolean reduceByWorkDate = skipReduceMachineForFirstDay
-                    || shouldReduceContinuationByWorkDate(sourceSku, skuResults, shifts);
-            if (shouldUseTargetQtyForContinuationReduction(sourceSku) && !reduceByWorkDate) {
-                log.info("续作多机台跳过dayN降模, materialCode: {}, 目标量: {}, 窗口日计划量: {}, "
-                                + "原因: 日计划仅用于准入和增机台判断，不限制当前窗口清尾排产量",
-                        sourceSku.getMaterialCode(), sourceSku.resolveTargetScheduleQty(),
-                        sumDailyPlanQty(sourceSku.getDailyPlanQuotaMap()));
-                capStrictEndingContinuationGroupToTarget(context, sourceSku, skuResults, shifts);
-                continue;
-            }
-            if (!skipReduceMachineForFirstDay
-                    && capEndingFirstDayOnlyContinuationGroup(context, sourceSku, skuResults, shifts)) {
-                capStrictEndingContinuationGroupToTarget(context, sourceSku, skuResults, shifts);
-                continue;
-            }
-            if (reduceByWorkDate) {
-                reduceContinuationMachinesByWorkDate(
-                        context, sourceSku, skuResults, shifts, skipReduceMachineForFirstDay);
-                capStrictEndingContinuationGroupToTarget(context, sourceSku, skuResults, shifts);
-                continue;
-            }
-            // 非收尾多机台续作不降模，跳过降模流程保留初始排程结果（8班次全满）
-            if (!hasEndingResult(skuResults)
-                    && !ProductionQuantityPolicy.from(sourceSku, false).isStrictUpperLimit()
-                    && skuResults.size() > 1) {
-                log.info("续作多机台非收尾不降模, materialCode: {}, 机台: {}, 原因: 非收尾场景保留全部在机机台全产能排产",
-                        sourceSku.getMaterialCode(), joinMachineCodes(skuResults));
-                continue;
-            }
-
-            int targetQty = resolveContinuationDailyDemand(context, sourceSku, skuResults, shifts);
-            int totalPlanQty = skuResults.stream().mapToInt(ShiftFieldUtil::resolveScheduledQty).sum();
-            Map<LhScheduleResult, Integer> machineDailyCapacityMap =
-                    calculateMachineDailyCapacityMap(context, sourceSku, skuResults, shifts);
-            int currentMaxDailyCapacity = machineDailyCapacityMap.values().stream().mapToInt(Integer::intValue).sum();
-            log.info("续作多机台降模判断, materialCode: {}, dayN保障量: {}, 当前在机最大日产能: {}, 当前排产量: {}",
-                    sourceSku.getMaterialCode(), targetQty, currentMaxDailyCapacity, totalPlanQty);
-            if (targetQty <= 0) {
-                allocateContinuationQtyForKeptMachines(context, sourceSku, skuResults,
-                        new ArrayList<LhScheduleResult>(0), machineDailyCapacityMap, targetQty, shifts);
-                capStrictEndingContinuationGroupToTarget(context, sourceSku, skuResults, shifts);
-                continue;
-            }
-            if (hasEndingResult(skuResults) && totalPlanQty <= targetQty) {
-                log.info("续作多机台收尾无需降模, materialCode: {}, 原因: 当前尾量未超过收尾目标，交由同SKU收尾错峰判断",
-                        sourceSku.getMaterialCode());
-                continue;
-            }
-
-            List<LhScheduleResult> keptResults = selectMachinesToKeepForContinuation(
-                    context, sourceSku, skuResults, machineDailyCapacityMap, targetQty);
-            boolean needReduceMachine = keptResults.size() < skuResults.size()
-                    && currentMaxDailyCapacity > targetQty;
-            if (!needReduceMachine && totalPlanQty <= targetQty) {
-                log.info("续作多机台无需降模, materialCode: {}, 原因: 当前产能或排产量未超过dayN保障量",
-                        sourceSku.getMaterialCode());
-                continue;
-            }
-            allocateContinuationQtyForKeptMachines(context, sourceSku, skuResults,
-                    keptResults, machineDailyCapacityMap, targetQty, shifts);
+            reduceContinuationMachinesByWorkDate(context, sourceSku, skuResults, shifts);
             capStrictEndingContinuationGroupToTarget(context, sourceSku, skuResults, shifts);
         }
-        capEndingFirstDayOnlyContinuationGroups(context, shifts);
         // 降模、补满等后置处理可能再次改变中班计划量，最终扣账前统一按续作日标准公式收敛。
         applyDailyStandardPlanQtyToContinuousResults(context, shifts);
         // 日标准产量公式可能把收尾残班向上补足，扣账前必须复用严格收尾目标再次收口。
@@ -2253,300 +2197,17 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
     }
 
     /**
-     * 判断当前续作多机台组是否应按业务日逐日执行降模。
-     *
-     * @param sourceSku 来源SKU
-     * @param skuResults 同SKU续作结果
-     * @param shifts 排程窗口班次
-     * @return true-按业务日降模
-     */
-    private boolean shouldReduceContinuationByWorkDate(SkuScheduleDTO sourceSku,
-                                                       List<LhScheduleResult> skuResults,
-                                                       List<LhShiftConfigVO> shifts) {
-        if (sourceSku == null
-                || CollectionUtils.isEmpty(sourceSku.getDailyPlanQuotaMap())
-                || CollectionUtils.isEmpty(shifts)) {
-            return false;
-        }
-        // 多机台续作统一进入按天最小机台数模拟；日计划恒定时也要释放超过 dayN 需求的冗余机台。
-        Map<LocalDate, List<LhShiftConfigVO>> shiftMapByDate = groupShiftsByWorkDate(shifts);
-        if (hasEndingResult(skuResults) && hasEndingFirstDayPlanOnly(sourceSku, shiftMapByDate)) {
-            log.info("续作收尾仅首日有计划，按业务日降模, materialCode: {}", sourceSku.getMaterialCode());
-            return true;
-        }
-        if (sourceSku.getDailyPlanQuotaMap().size() <= 1) {
-            return false;
-        }
-        for (LocalDate productionDate : shiftMapByDate.keySet()) {
-            if (hasPositiveDayPlanDropAroundDate(sourceSku, shiftMapByDate, productionDate)) {
-                return true;
-            }
-        }
-        boolean hasPositiveDayPlan = shiftMapByDate.keySet().stream()
-                .anyMatch(date -> resolveContinuationDayPlanQtyByDate(sourceSku, date) > 0);
-        if (hasPositiveDayPlan && skuResults.size() > 1) {
-            log.info("续作多机台日计划恒定，进入最小机台数降模模拟, materialCode: {}, 机台: {}",
-                    sourceSku.getMaterialCode(), joinMachineCodes(skuResults));
-            return true;
-        }
-        return false;
-    }
-
-    /**
-     * 收尾SKU仅首日存在日计划时，按首日目标量最终收口多机台续作结果。
-     * <p>真实月计划中 T 日有量、后续日无量时，S4.4 需要在 S4.5 新增前释放多余续作机台，
-     * 否则后续换模 SKU 会因为机台仍被续作占用而换到其它机台。</p>
-     *
-     * @param context 排程上下文
-     * @param shifts 排程窗口班次
-     */
-    private void capEndingFirstDayOnlyContinuationGroups(LhScheduleContext context, List<LhShiftConfigVO> shifts) {
-        if (context == null || CollectionUtils.isEmpty(context.getScheduleResultList())
-                || CollectionUtils.isEmpty(shifts)) {
-            return;
-        }
-        Map<String, List<LhScheduleResult>> groupResultMap = new LinkedHashMap<String, List<LhScheduleResult>>(8);
-        Map<String, SkuScheduleDTO> sourceSkuMap = new LinkedHashMap<String, SkuScheduleDTO>(8);
-        for (LhScheduleResult result : context.getScheduleResultList()) {
-            if (!isPureContinuousResult(result) || !"1".equals(result.getIsEnd())) {
-                continue;
-            }
-            SkuScheduleDTO sourceSku = resolveResultSourceSku(context, result);
-            if (sourceSku == null || StringUtils.isEmpty(sourceSku.getMaterialCode())) {
-                continue;
-            }
-            String groupKey = MonthPlanDateResolver.buildMaterialStatusKey(
-                    sourceSku.getMaterialCode(), sourceSku.getProductStatus())
-                    + "#ENDING_FIRST_DAY_ONLY";
-            groupResultMap.computeIfAbsent(groupKey, key -> new ArrayList<LhScheduleResult>(4)).add(result);
-            sourceSkuMap.putIfAbsent(groupKey, sourceSku);
-        }
-        for (Map.Entry<String, List<LhScheduleResult>> entry : groupResultMap.entrySet()) {
-            List<LhScheduleResult> results = entry.getValue();
-            if (results.size() <= 1) {
-                continue;
-            }
-            SkuScheduleDTO sourceSku = sourceSkuMap.get(entry.getKey());
-            capEndingFirstDayOnlyContinuationGroup(context, sourceSku, results, shifts);
-        }
-    }
-
-    /**
-     * 对单个收尾首日计划分组执行收口。
-     *
-     * @param context 排程上下文
-     * @param sourceSku 来源SKU
-     * @param results 同物料续作结果
-     * @param shifts 排程窗口班次
-     * @return true-已执行收口
-     */
-    private boolean capEndingFirstDayOnlyContinuationGroup(LhScheduleContext context,
-                                                           SkuScheduleDTO sourceSku,
-                                                           List<LhScheduleResult> results,
-                                                           List<LhShiftConfigVO> shifts) {
-        if (context == null || sourceSku == null || CollectionUtils.isEmpty(results)
-                || CollectionUtils.isEmpty(shifts)) {
-            return false;
-        }
-        int firstDayPlanQty = resolveEndingFirstDayOnlyPlanQty(context, sourceSku, shifts);
-        if (firstDayPlanQty <= 0) {
-            return false;
-        }
-        if (shouldUseTargetQtyForContinuationReduction(sourceSku)) {
-            log.info("续作收尾首日计划收口跳过, materialCode: {}, firstDayPlanQty: {}, 目标量: {}, "
-                            + "原因: 清尾目标量大于窗口日计划量",
-                    sourceSku.getMaterialCode(), firstDayPlanQty, sourceSku.resolveTargetScheduleQty());
-            return false;
-        }
-        LhScheduleResult protectedResult = selectProtectedFirstShiftEndingResult(context, results, shifts);
-        int protectedQty = protectedResult == null ? 0 : ShiftFieldUtil.resolveScheduledQty(protectedResult);
-        int remainingPlanQty = Math.max(0, firstDayPlanQty - protectedQty);
-        List<LhScheduleResult> allocatableResults = new ArrayList<LhScheduleResult>(results.size());
-        for (LhScheduleResult result : results) {
-            if (result != protectedResult) {
-                allocatableResults.add(result);
-            }
-        }
-        Map<LhScheduleResult, Integer> capacityMap = calculateMachineDailyCapacityMap(
-                context, sourceSku, allocatableResults, shifts);
-        List<LhScheduleResult> keptResults = remainingPlanQty > 0
-                ? selectMachinesToKeepForContinuation(
-                        context, sourceSku, allocatableResults, capacityMap, remainingPlanQty)
-                : new ArrayList<LhScheduleResult>(0);
-        if (keptResults.size() > 1) {
-            return false;
-        }
-        allocateContinuationQtyForKeptMachines(context, sourceSku, allocatableResults, keptResults,
-                capacityMap, remainingPlanQty, shifts);
-        List<LhScheduleResult> finalKeptResults = new ArrayList<LhScheduleResult>(keptResults.size() + 1);
-        if (protectedResult != null && protectedQty > 0) {
-            finalKeptResults.add(protectedResult);
-        }
-        finalKeptResults.addAll(keptResults);
-        log.info("续作收尾首日计划最终收口, materialCode: {}, firstDayPlanQty: {}, 保护机台: {}, "
-                        + "保护量: {}, 剩余分配量: {}, 原始机台: {}, 保留机台: {}",
-                sourceSku.getMaterialCode(), firstDayPlanQty,
-                protectedResult == null ? "" : protectedResult.getLhMachineCode(), protectedQty,
-                remainingPlanQty, joinMachineCodes(results), joinMachineCodes(finalKeptResults));
-        return true;
-    }
-
-    /**
-     * 选择已在首班生产尾量、需要优先保护并释放给后续换模的结果。
-     *
-     * @param context 排程上下文
-     * @param results 同物料续作结果
-     * @param shifts 排程窗口班次
-     * @return 保护结果，未命中返回null
-     */
-    private LhScheduleResult selectProtectedFirstShiftEndingResult(LhScheduleContext context,
-                                                                   List<LhScheduleResult> results,
-                                                                   List<LhShiftConfigVO> shifts) {
-        if (context == null || CollectionUtils.isEmpty(results) || CollectionUtils.isEmpty(shifts)) {
-            return null;
-        }
-        LhShiftConfigVO firstShift = shifts.get(0);
-        LhScheduleResult selected = null;
-        for (LhScheduleResult result : results) {
-            if (result == null || resolveLastPlannedShiftIndex(result) != firstShift.getShiftIndex()) {
-                continue;
-            }
-            int scheduledQty = ShiftFieldUtil.resolveScheduledQty(result);
-            int firstShiftCapacity = calculateResultShiftCapacity(context, result, firstShift);
-            if (scheduledQty <= 0 || firstShiftCapacity <= 0 || scheduledQty >= firstShiftCapacity) {
-                continue;
-            }
-            if (selected == null || StringUtils.compare(result.getLhMachineCode(), selected.getLhMachineCode()) < 0) {
-                selected = result;
-            }
-        }
-        return selected;
-    }
-
-    /**
-     * 解析收尾SKU是否仅首日存在日计划，命中时返回首日计划量。
-     *
-     * @param context 排程上下文
-     * @param sourceSku 来源SKU
-     * @param shifts 排程窗口班次
-     * @return 首日计划量，未命中返回0
-     */
-    private int resolveEndingFirstDayOnlyPlanQty(LhScheduleContext context,
-                                                 SkuScheduleDTO sourceSku,
-                                                 List<LhShiftConfigVO> shifts) {
-        Map<LocalDate, List<LhShiftConfigVO>> shiftMapByDate = groupShiftsByWorkDate(shifts);
-        int planQty = resolveEndingFirstDayOnlyPlanQtyByMonthPlan(context, sourceSku, shiftMapByDate);
-        if (planQty > 0) {
-            return planQty;
-        }
-        return resolveEndingFirstDayOnlyPlanQtyByQuota(sourceSku, shiftMapByDate);
-    }
-
-    /**
-     * 从运行态日计划账本解析首日计划量。
-     *
-     * @param sourceSku 来源SKU
-     * @param shiftMapByDate 窗口业务日
-     * @return 首日计划量，未命中返回0
-     */
-    private int resolveEndingFirstDayOnlyPlanQtyByQuota(SkuScheduleDTO sourceSku,
-                                                        Map<LocalDate, List<LhShiftConfigVO>> shiftMapByDate) {
-        if (sourceSku == null || CollectionUtils.isEmpty(sourceSku.getDailyPlanQuotaMap())
-                || CollectionUtils.isEmpty(shiftMapByDate)) {
-            return 0;
-        }
-        int firstDayPlanQty = 0;
-        boolean first = true;
-        for (LocalDate productionDate : shiftMapByDate.keySet()) {
-            SkuDailyPlanQuotaDTO quota = sourceSku.getDailyPlanQuotaMap().get(productionDate);
-            int dayPlanQty = quota == null ? 0 : Math.max(0, quota.getDayPlanQty());
-            if (first) {
-                firstDayPlanQty = dayPlanQty;
-                first = false;
-                continue;
-            }
-            if (dayPlanQty > 0) {
-                return 0;
-            }
-        }
-        return firstDayPlanQty;
-    }
-
-    /**
-     * 从月计划解析首日计划量。
-     *
-     * @param context 排程上下文
-     * @param sourceSku 来源SKU
-     * @param shiftMapByDate 窗口业务日
-     * @return 首日计划量，未命中返回0
-     */
-    private int resolveEndingFirstDayOnlyPlanQtyByMonthPlan(LhScheduleContext context,
-                                                            SkuScheduleDTO sourceSku,
-                                                            Map<LocalDate, List<LhShiftConfigVO>> shiftMapByDate) {
-        if (context == null || sourceSku == null || CollectionUtils.isEmpty(context.getMonthPlanList())
-                || CollectionUtils.isEmpty(shiftMapByDate)) {
-            return 0;
-        }
-        int firstDayPlanQty = 0;
-        boolean first = true;
-        for (LocalDate productionDate : shiftMapByDate.keySet()) {
-            int dayPlanQty = MonthPlanDateResolver.resolveDayQty(
-                    context, sourceSku.getMaterialCode(), sourceSku.getProductStatus(), productionDate);
-            if (first) {
-                firstDayPlanQty = dayPlanQty;
-                first = false;
-                continue;
-            }
-            if (dayPlanQty > 0) {
-                return 0;
-            }
-        }
-        return firstDayPlanQty;
-    }
-
-    /**
-     * 判断收尾续作是否仅首个业务日存在正日计划。
-     * <p>收尾SKU首日一台机台即可覆盖余量时，后续0计划日也应触发按天降模，避免继续保留多台满班续作。</p>
-     *
-     * @param sourceSku 来源SKU
-     * @param shiftMapByDate 业务日班次
-     * @return true-仅首日有计划
-     */
-    private boolean hasEndingFirstDayPlanOnly(SkuScheduleDTO sourceSku,
-                                              Map<LocalDate, List<LhShiftConfigVO>> shiftMapByDate) {
-        if (sourceSku == null || CollectionUtils.isEmpty(shiftMapByDate)) {
-            return false;
-        }
-        boolean firstDate = true;
-        boolean firstDayHasPlan = false;
-        for (LocalDate productionDate : shiftMapByDate.keySet()) {
-            int dayPlanQty = resolveContinuationDayPlanQtyByDate(sourceSku, productionDate);
-            if (firstDate) {
-                firstDayHasPlan = dayPlanQty > 0;
-                firstDate = false;
-                continue;
-            }
-            if (dayPlanQty > 0) {
-                return false;
-            }
-        }
-        return firstDayHasPlan;
-    }
-
-    /**
      * 按业务日逐日执行续作多机台降模。
      *
      * @param context 排程上下文
      * @param sourceSku 来源SKU
      * @param skuResults 同SKU续作结果
      * @param shifts 全窗口班次
-     * @param skipReduceMachineForFirstDay true-T 日跳过降模；false-T 日执行既有降模规则
      */
     private void reduceContinuationMachinesByWorkDate(LhScheduleContext context,
                                                       SkuScheduleDTO sourceSku,
                                                       List<LhScheduleResult> skuResults,
-                                                      List<LhShiftConfigVO> shifts,
-                                                      boolean skipReduceMachineForFirstDay) {
+                                                      List<LhShiftConfigVO> shifts) {
         Map<LocalDate, List<LhShiftConfigVO>> shiftMapByDate = groupShiftsByWorkDate(shifts);
         List<LhScheduleResult> activeResults = new ArrayList<LhScheduleResult>(skuResults);
         int remainingTargetQty = Math.max(0, sourceSku.resolveTargetScheduleQty());
@@ -2574,44 +2235,14 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                     calculateMachineDailyCapacityMapByDate(context, sourceSku, activeResults, dayShifts);
             int totalCapacity = capacityMap.values().stream().mapToInt(Integer::intValue).sum();
             int totalPlanQty = sumScheduledQtyByShifts(activeResults, dayShifts);
-            // 首日保护标识只与当前循环日期组合使用；进入 T+1 后局部判断自然恢复为 false，不会锁定整个窗口。
-            boolean skipReduceMachineForCurrentDay = skipReduceMachineForFirstDay
-                    && productionDate.equals(firstProductionDate);
-            int lookAheadRequiredMachineCount = resolveContinuationLookAheadMinimumMachineCount(
-                    context, sourceSku, activeResults, shiftMapByDate, productionDate, shortageLookAheadDays);
-            // 停产保机命中时，低计划日必须按当日理论机台数生产；后看恢复计划只保留物理占用，不能提前恢复生产。
-            int dailyStandardRequiredMachineCount = resolveContinuousProductionMachineCount(
-                    context, sourceSku, activeResults, productionDate, lookAheadRequiredMachineCount);
+            // 停产保机仍保留前后N日物理占用判断，但当前自然日生产机台数只读取统一Map。
+            int requiredMachineCount = resolveContinuousProductionMachineCount(
+                    context, sourceSku, activeResults, productionDate);
             boolean hasWholeDayUnavailableMachine = capacityMap.values().stream()
                     .anyMatch(capacity -> Objects.isNull(capacity) || capacity <= 0);
-            /*
-             * 机台数决策统一以原始 dayN 与硫化日标准量为准，收尾（严格上限）SKU 同样适用：
-             * 收尾目标量只约束保留机台的实际排量和剩余量顺延，不得因为“保留机台可以完成收尾目标”
-             * 反向扩大机台数。窗口无日计划的收尾清量/仅补欠产场景 dailyStandardRequiredMachineCount 为 0，
-             * 仍继续走目标量驱动的收尾分配链路。
-             */
-            boolean applyDailyStandardMachineCountDecision = !skipReduceMachineForCurrentDay
-                    && !hasWholeDayUnavailableMachine
-                    && dailyStandardRequiredMachineCount > 0;
-            List<LhScheduleResult> keptResults;
-            if (skipReduceMachineForCurrentDay) {
-                // 保留全部 MES 在线续作机台，但继续走公共分配和滚动差额计算，避免破坏 T+1、T+2 判断基础。
-                keptResults = new ArrayList<LhScheduleResult>(activeResults);
-            } else if (applyDailyStandardMachineCountDecision) {
-                // 续作按原始 dayN 与硫化日标准量统一决定机台数（含收尾 SKU），班产和部分停机损失只影响实际排量与欠产。
-                keptResults = selectMachinesToKeepForContinuationByDailyStandardCount(
-                        context, sourceSku, activeResults, dailyStandardRequiredMachineCount);
-            } else {
-                keptResults = selectMachinesToKeepForContinuationByLookAhead(
-                        context, sourceSku, activeResults, shiftMapByDate, productionDate,
-                        rollingDiffQty, remainingTargetQty, shortageLookAheadDays, policy);
-                if (CollectionUtils.isEmpty(keptResults) && effectiveDemandQty > 0) {
-                    keptResults = selectMachinesToKeepForContinuation(
-                            context, sourceSku, activeResults, capacityMap, effectiveDemandQty);
-                }
-                keptResults = protectContinuationDayMinimumMachineCount(
-                        context, sourceSku, activeResults, keptResults, productionDate, dayPlanQty);
-            }
+            // 目标机台数决定保留多少台；机台真实产能、停机和清洗只影响实际排量与欠产，不得扩大目标台数。
+            List<LhScheduleResult> keptResults = selectMachinesToKeepForContinuationByDailyStandardCount(
+                    context, sourceSku, activeResults, requiredMachineCount);
             // 现有规则已完成生产机台和待下机机台选择后，再执行停产保机二次校验；不得改变原有选机排序。
             List<LhScheduleResult> stopHoldResults = selectContinuousStopHoldResults(
                     context, sourceSku, activeResults, keptResults, productionDate);
@@ -2623,16 +2254,16 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                     rollingDiffQty, remainingTargetQty, shortageLookAheadDays, policy);
             log.info("续作多机台按天降模判断, materialCode: {}, 日期: {}, shortageLookAheadDays: {}, dayN计划量: {}, "
                             + "dayN剩余额度: {}, 前日排后差额: {}, 当日需求量: {}, 剩余窗口目标量: {}, 当日生效目标量: {}, 当前在机最大日产能: {}, "
-                            + "保留机台当日产能: {}, 当前排产量: {}, 日标准机台数: {}, 是否存在整日不可用机台: {}, "
-                            + "是否按日标准机台数决策: {}, "
+                            + "保留机台当日产能: {}, 当前排产量: {}, Map目标总机台数: {}, 是否存在整日不可用机台: {}, "
+                            + "是否按统一Map机台数决策: {}, "
                             + "是否满足dayN欠产追补约束: {}",
                     sourceSku.getMaterialCode(), productionDate, shortageLookAheadDays, dayPlanQty,
                     demandQty, rollingDiffQty, todayRequiredQty, remainingTargetQty, effectiveDemandQty, totalCapacity,
-                    keptTodayCapacity, totalPlanQty, dailyStandardRequiredMachineCount, hasWholeDayUnavailableMachine,
-                    applyDailyStandardMachineCountDecision, recoverable);
+                    keptTodayCapacity, totalPlanQty, requiredMachineCount, hasWholeDayUnavailableMachine,
+                    true, recoverable);
             applyContinuationDayAllocation(context, sourceSku, activeResults, keptResults, capacityMap,
                     demandQty, effectiveDemandQty, remainingTargetQty, productionDate, dayShifts, shifts,
-                    recoverable, skipReduceMachineForCurrentDay, applyDailyStandardMachineCountDecision,
+                    recoverable, false, true,
                     stopHoldResults);
             int actualTodayQty = sumScheduledQtyByShifts(activeResults, dayShifts);
             rollingDiffQty = effectiveDemandQty - actualTodayQty;
@@ -2662,20 +2293,21 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                                                                    List<LhScheduleResult> keptResults,
                                                                    LocalDate productionDate) {
         List<LhScheduleResult> stopHoldResults = new ArrayList<LhScheduleResult>(4);
+        int activeMachineCount = this.countDistinctPhysicalMachineCount(activeResults);
+        int keptMachineCount = this.countDistinctPhysicalMachineCount(keptResults);
         if (Objects.isNull(context) || Objects.isNull(sourceSku) || Objects.isNull(productionDate)
-                || CollectionUtils.isEmpty(activeResults) || activeResults.size() <= keptResults.size()) {
+                || CollectionUtils.isEmpty(activeResults) || activeMachineCount <= keptMachineCount) {
             return stopHoldResults;
         }
         int checkDays = context.getScheduleConfig().getContinuousMouldOfflineCheckDays();
         // 停产保机比较的是月计划原始DAY_n，不能使用已经扣减或合入欠产的运行态日额度。
-        int currentDayPlanQty = resolveOriginalMonthPlanDayQty(context, sourceSku, productionDate);
         int currentRequiredMachineCount = resolveContinuationDayMinimumMachineCount(
-                context, sourceSku, currentDayPlanQty, activeResults);
+                context, sourceSku, productionDate, activeResults);
         int previousMaxMachineCount = resolveContinuationAroundMaxMachineCount(
                 context, sourceSku, activeResults, productionDate, checkDays, false);
         int futureMaxMachineCount = resolveContinuationAroundMaxMachineCount(
                 context, sourceSku, activeResults, productionDate, checkDays, true);
-        if (!isContinuousStopHoldScenario(activeResults.size(), currentRequiredMachineCount,
+        if (!isContinuousStopHoldScenario(activeMachineCount, currentRequiredMachineCount,
                 previousMaxMachineCount, futureMaxMachineCount)) {
             log.info("续作停产保机二次校验未命中, factoryCode: {}, batchNo: {}, materialCode: {}, "
                             + "productStatus: {}, 日期: {}, checkDays: {}, 当前理论机台数: {}, "
@@ -2686,8 +2318,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                     joinMachineCodes(activeResults));
             return stopHoldResults;
         }
-        int targetOccupiedMachineCount = Math.min(activeResults.size(), previousMaxMachineCount);
-        int stopHoldMachineCount = Math.max(0, targetOccupiedMachineCount - keptResults.size());
+        int targetOccupiedMachineCount = Math.min(activeMachineCount, previousMaxMachineCount);
+        int stopHoldMachineCount = Math.max(0, targetOccupiedMachineCount - keptMachineCount);
         if (stopHoldMachineCount <= 0) {
             return stopHoldResults;
         }
@@ -2695,25 +2327,26 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                 context, sourceSku, activeResults, keptResults);
         Set<String> wholeSingleControlMachineCodes = resolveWholeSingleControlMachineCodes(context, removedResults);
         Map<String, LhScheduleResult> machineCodeResultMap = buildMachineCodeResultMap(removedResults);
+        Set<String> stopHoldPhysicalMachineCodeSet = new LinkedHashSet<String>(stopHoldMachineCount);
         for (int index = removedResults.size() - 1;
-             index >= 0 && stopHoldResults.size() < stopHoldMachineCount; index--) {
+             index >= 0 && stopHoldPhysicalMachineCodeSet.size() < stopHoldMachineCount; index--) {
             LhScheduleResult result = removedResults.get(index);
             if (stopHoldResults.contains(result)) {
+                continue;
+            }
+            String physicalMachineCode = LhSingleControlMachineUtil.resolvePhysicalMachineCode(
+                    result.getLhMachineCode());
+            if (stopHoldPhysicalMachineCodeSet.contains(physicalMachineCode)) {
                 continue;
             }
             // 正规SKU单控机台必须L/R整组停产保机，不能一侧保机、另一侧释放。
             LhScheduleResult pairResult = resolvePairSingleControlResultInList(
                     result, wholeSingleControlMachineCodes, machineCodeResultMap);
-            int requiredHoldSlotCount = Objects.nonNull(pairResult)
-                    && !stopHoldResults.contains(pairResult) ? 2 : 1;
-            if (stopHoldResults.size() + requiredHoldSlotCount > stopHoldMachineCount) {
-                // 共同峰值剩余名额不足以容纳完整L/R组时，该组继续按原规则真正下机，不能超峰值保机。
-                continue;
-            }
             stopHoldResults.add(result);
             if (Objects.nonNull(pairResult) && !stopHoldResults.contains(pairResult)) {
                 stopHoldResults.add(pairResult);
             }
+            stopHoldPhysicalMachineCodeSet.add(physicalMachineCode);
         }
         if (!CollectionUtils.isEmpty(stopHoldResults)) {
             List<LhScheduleResult> actualRemovedResults =
@@ -2731,6 +2364,48 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             PriorityTraceLogHelper.appendProcessLog(context, "续作停产保机", detail);
         }
         return stopHoldResults;
+    }
+
+    /**
+     * 按物理机台口径统计结果列表中的有效机台数，单控L/R合并为一台。
+     *
+     * @param resultList 排程结果列表
+     * @return 去重后的物理机台数
+     */
+    private int countDistinctPhysicalMachineCount(List<LhScheduleResult> resultList) {
+        if (CollectionUtils.isEmpty(resultList)) {
+            return 0;
+        }
+        return (int) resultList.stream()
+                .filter(Objects::nonNull)
+                .map(LhScheduleResult::getLhMachineCode)
+                .filter(StringUtils::isNotEmpty)
+                .map(LhSingleControlMachineUtil::resolvePhysicalMachineCode)
+                .filter(StringUtils::isNotEmpty)
+                .distinct()
+                .count();
+    }
+
+    /**
+     * 按物理机台口径拼接机台编码，单控L/R合并并按编码升序输出。
+     *
+     * @param resultList 排程结果列表
+     * @return 物理机台编码文本；无机台时返回“-”
+     */
+    private String joinPhysicalMachineCodes(List<LhScheduleResult> resultList) {
+        if (CollectionUtils.isEmpty(resultList)) {
+            return "-";
+        }
+        String machineCodes = resultList.stream()
+                .filter(Objects::nonNull)
+                .map(LhScheduleResult::getLhMachineCode)
+                .filter(StringUtils::isNotEmpty)
+                .map(LhSingleControlMachineUtil::resolvePhysicalMachineCode)
+                .filter(StringUtils::isNotEmpty)
+                .distinct()
+                .sorted()
+                .collect(Collectors.joining(","));
+        return StringUtils.isEmpty(machineCodes) ? "-" : machineCodes;
     }
 
     /**
@@ -2755,9 +2430,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             LocalDate checkDate = future
                     ? productionDate.plusDays(dayOffset) : productionDate.minusDays(dayOffset);
             // 前后自然日统一读取原始月计划，跨月数据由基础数据初始化阶段提前装入上下文。
-            int dayPlanQty = resolveOriginalMonthPlanDayQty(context, sourceSku, checkDate);
             int requiredMachineCount = resolveContinuationDayMinimumMachineCount(
-                    context, sourceSku, dayPlanQty, activeResults);
+                    context, sourceSku, checkDate, activeResults);
             maxMachineCount = Math.max(maxMachineCount, requiredMachineCount);
         }
         return maxMachineCount;
@@ -2781,105 +2455,6 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             }
         }
         return occupiedResults;
-    }
-
-    /**
-     * 判断续作 SKU 是否因 T 日与 T-1 日原始月计划量相等而跳过 T 日降模。
-     * <p>该判断位于续作 SKU 降模计算入口，用于同时阻断收尾单机降模、首日收口等快捷分支；
-     * 命中后统一进入逐日降模链路，并仅在 T 日保留全部 MES 在线续作机台，T+1、T+2
-     * 仍按既有最小机台数、后看欠产、收尾和资源约束重新判断。
-     * T 日经 MES 新加入的续作机台（T 日在机机台数超过 T-1 日在机机台数）不受该保护：
-     * 新增机台没有“昨日已在机、今日计划持平不折腾”的业务前提，必须回到 T 日降模链路，
-     * 按 dayN 最小机台数释放冗余机台，避免“不该增机台增机台”的 T 日多排。</p>
-     *
-     * @param context 排程上下文，提供按年月加载的原始月计划
-     * @param sourceSku 来源续作 SKU
-     * @param activeResults 当前仍在线参与续作的机台结果
-     * @param shifts 全窗口班次，用于解析首个业务日 T
-     * @return true-T 日跳过降模，false-T 日执行原有降模规则
-     */
-    private boolean shouldSkipReduceMachineForFirstDay(LhScheduleContext context,
-                                                       SkuScheduleDTO sourceSku,
-                                                       List<LhScheduleResult> activeResults,
-                                                       List<LhShiftConfigVO> shifts) {
-        if (Objects.isNull(context) || Objects.isNull(sourceSku)
-                || CollectionUtils.isEmpty(shifts) || StringUtils.isEmpty(sourceSku.getMaterialCode())) {
-            return false;
-        }
-        Map<LocalDate, List<LhShiftConfigVO>> shiftMapByDate = groupShiftsByWorkDate(shifts);
-        if (CollectionUtils.isEmpty(shiftMapByDate)) {
-            return false;
-        }
-        LocalDate productionDate = shiftMapByDate.keySet().iterator().next();
-        LocalDate previousProductionDate = productionDate.minusDays(1);
-        FactoryMonthPlanProductionFinalResult currentPlan = MonthPlanDateResolver.resolvePlan(
-                context, sourceSku.getMaterialCode(), sourceSku.getProductStatus(), productionDate);
-        FactoryMonthPlanProductionFinalResult previousPlan = MonthPlanDateResolver.resolvePlan(
-                context, sourceSku.getMaterialCode(), sourceSku.getProductStatus(), previousProductionDate);
-        if (Objects.isNull(currentPlan) || Objects.isNull(previousPlan)) {
-            log.debug("续作T日降模计划量相等前置判断跳过, materialCode: {}, T日: {}, T-1日: {}, 原因: 原始月计划未完整加载",
-                    sourceSku.getMaterialCode(), productionDate, previousProductionDate);
-            return false;
-        }
-        int currentDayPlanQty = MonthPlanDateResolver.resolveDayQty(
-                context, sourceSku.getMaterialCode(), sourceSku.getProductStatus(), productionDate);
-        int previousDayPlanQty = MonthPlanDateResolver.resolveDayQty(
-                context, sourceSku.getMaterialCode(), sourceSku.getProductStatus(), previousProductionDate);
-        boolean skipReduceMachineForCurrentDay = currentDayPlanQty == previousDayPlanQty;
-        // T-1 日在机机台数是“计划持平不降模”保护的业务前提：只有昨日已在机且今日机台集合
-        // 未扩大的续作机台才属于稳定集合。T 日新增的 MES 在机机台（如 K2202 在 2026-07-29
-        // 才经 MES 加入 3302002060）没有昨日在机依据，必须取消跳过，回到 dayN 最小机台数降模。
-        int previousDayMachineCount = resolvePreviousDayContinuationMachineCount(context, sourceSku);
-        if (skipReduceMachineForCurrentDay && activeResults.size() > previousDayMachineCount) {
-            log.info("续作T日降模计划量相等前置判断取消跳过, materialCode: {}, T日: {}, T-1日: {}, "
-                            + "T日原始月计划量: {}, T-1日原始月计划量: {}, 当前续作机台: {}, "
-                            + "T-1日在机机台数: {}, 原因: T日新增MES在机机台，需按dayN最小机台数释放冗余",
-                    sourceSku.getMaterialCode(), productionDate, previousProductionDate, currentDayPlanQty,
-                    previousDayPlanQty, joinMachineCodes(activeResults), previousDayMachineCount);
-            skipReduceMachineForCurrentDay = false;
-        }
-        log.info("续作T日降模计划量相等前置判断, materialCode: {}, T日: {}, T-1日: {}, T日原始月计划量: {}, "
-                        + "T-1日原始月计划量: {}, 当前续作机台: {}, 是否跳过T日降模: {}",
-                sourceSku.getMaterialCode(), productionDate, previousProductionDate, currentDayPlanQty,
-                previousDayPlanQty, joinMachineCodes(activeResults), skipReduceMachineForCurrentDay);
-        return skipReduceMachineForCurrentDay;
-    }
-
-    /**
-     * 统计 T-1 日（前一日排程窗口）同物料同产品状态的在机续作机台数。
-     * <p>以 T-1 日排程结果为准：只有仍处于生产状态（specEndTime 非空）的机台才算在机，
-     * 已释放/零量结果不参与计数，避免把昨日已下机机台误当成稳定在机集合的一部分。</p>
-     *
-     * @param context 排程上下文，提供前一日排程结果
-     * @param sourceSku 来源续作 SKU
-     * @return T-1 日在机续作机台数；无前日数据时返回 0
-     */
-    private int resolvePreviousDayContinuationMachineCount(LhScheduleContext context,
-                                                           SkuScheduleDTO sourceSku) {
-        if (Objects.isNull(context) || Objects.isNull(sourceSku)
-                || StringUtils.isEmpty(sourceSku.getMaterialCode())
-                || CollectionUtils.isEmpty(context.getPreviousScheduleResultList())) {
-            return 0;
-        }
-        Set<String> machineCodeSet = new LinkedHashSet<String>(4);
-        String normalizedProductStatus = StringUtils.trimToEmpty(sourceSku.getProductStatus());
-        for (LhScheduleResult result : context.getPreviousScheduleResultList()) {
-            if (Objects.isNull(result)
-                    || StringUtils.isEmpty(result.getLhMachineCode())
-                    || !StringUtils.equals(sourceSku.getMaterialCode(), result.getMaterialCode())
-                    || !StringUtils.equals(normalizedProductStatus,
-                    StringUtils.trimToEmpty(result.getProductStatus()))) {
-                continue;
-            }
-            // 前日在机判定不能只依赖 specEndTime：历史批次结果可能未回填收尾时间（如 8/4 批次
-            // SPEC_END_TIME 为 NULL），导致 T日==T-1日计划量相等保护被误判为“T日新增MES机台”而取消，
-            // 进而造成 3302000467 这类“不该降模却降模”问题。只要前日结果存在正计划量班次即视为在机。
-            if (Objects.isNull(result.getSpecEndTime()) && ShiftFieldUtil.resolveScheduledQty(result) <= 0) {
-                continue;
-            }
-            machineCodeSet.add(result.getLhMachineCode());
-        }
-        return machineCodeSet.size();
     }
 
     /**
@@ -2910,192 +2485,80 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
     }
 
     /**
-     * 按 dayN 最小机台数保护续作保留结果。
-     * <p>降模可以释放超过日计划节奏的冗余机台，但不能因为首日完成量扣减或后看需求为0，
-     * 把原始 dayN 需要的续作机台释放掉。</p>
+     * 从统一Map获取指定自然日所需的续作目标总机台数。
      *
      * @param context 排程上下文
      * @param sourceSku 来源SKU
-     * @param activeResults 当前在机结果
-     * @param keptResults 已选保留结果
-     * @param productionDate 当前业务日
-     * @param dayPlanQty 当前 dayN 日计划量
-     * @return 补足 dayN 最小机台数后的保留结果
-     */
-    private List<LhScheduleResult> protectContinuationDayMinimumMachineCount(
-            LhScheduleContext context,
-            SkuScheduleDTO sourceSku,
-            List<LhScheduleResult> activeResults,
-            List<LhScheduleResult> keptResults,
-            LocalDate productionDate,
-            int dayPlanQty) {
-        if (sourceSku == null || CollectionUtils.isEmpty(activeResults)) {
-            return keptResults;
-        }
-        // 传入activeResults以便识别单控机台折半产能
-        int minimumMachineCount = resolveContinuationDayMinimumMachineCount(context, sourceSku, dayPlanQty, activeResults);
-        if (minimumMachineCount <= 0 || (!CollectionUtils.isEmpty(keptResults)
-                && keptResults.size() >= minimumMachineCount)) {
-            return keptResults;
-        }
-        List<LhScheduleResult> sortedResults = new ArrayList<LhScheduleResult>(activeResults);
-        sortedResults.sort(buildContinuationReduceKeepComparator(context, sourceSku));
-        LinkedHashSet<LhScheduleResult> protectedResults = new LinkedHashSet<LhScheduleResult>(
-                CollectionUtils.isEmpty(keptResults) ? 0 : keptResults.size());
-        if (!CollectionUtils.isEmpty(keptResults)) {
-            protectedResults.addAll(keptResults);
-        }
-        for (LhScheduleResult result : sortedResults) {
-            if (protectedResults.size() >= minimumMachineCount) {
-                break;
-            }
-            protectedResults.add(result);
-        }
-        List<LhScheduleResult> resultList = new ArrayList<LhScheduleResult>(protectedResults);
-        log.info("续作dayN最小机台数保护, materialCode: {}, 日期: {}, dayN计划量: {}, SKU日标准产量: {}, "
-                        + "最小机台数: {}, 原保留机台: {}, 保护后保留机台: {}",
-                sourceSku.getMaterialCode(), productionDate, dayPlanQty,
-                resolveContinuationDailyStandardQty(context, sourceSku), minimumMachineCount,
-                joinMachineCodes(keptResults), joinMachineCodes(resultList));
-        return resultList;
-    }
-
-    /**
-     * 解析 dayN 计划量对应的续作最小机台数。
-     *
-     * @param context 排程上下文
-     * @param sourceSku 来源SKU
-     * @param dayPlanQty 当前 dayN 日计划量
-     * @return 最小续作机台数
+     * @param productionDate 当前自然日
+     * @return 目标总机台数
      */
     private int resolveContinuationDayMinimumMachineCount(LhScheduleContext context,
                                                           SkuScheduleDTO sourceSku,
-                                                          int dayPlanQty) {
-        return resolveContinuationDayMinimumMachineCount(context, sourceSku, dayPlanQty, null);
+                                                          LocalDate productionDate) {
+        return this.resolveContinuationDayMinimumMachineCount(
+                context, sourceSku, productionDate, null);
     }
 
     /**
-     * 解析 dayN 计划量对应的续作最小机台数（支持单控机台折半产能）。
-     * <p>单控机台每侧（L或R）只有普通机台一半的硫化产能，计算最小机台数时
-     * 必须将硫化日标准量折半，否则会错误判定单台单控机台即可覆盖日计划量，
-     * 导致不必要的降模减机台。</p>
+     * 从统一Map获取指定自然日所需的续作目标总机台数，并对缺失结果执行释放型安全保护。
+     * <p>目标总数已经由日模具计算统一确定，单控L/R只影响当前有效机台数统计和整组保留，
+     * 不允许在续作阶段再次按日标准产能折算目标台数。</p>
      *
      * @param context 排程上下文
      * @param sourceSku 来源SKU
-     * @param dayPlanQty 当前 dayN 日计划量
-     * @param machineResults 当前续作机台结果列表；用于判断是否全部为单控机台
-     * @return 最小续作机台数
+     * @param productionDate 当前自然日
+     * @param machineResults 当前续作机台结果列表；结果缺失时保留其当前有效数量
+     * @return 目标总机台数
      */
     private int resolveContinuationDayMinimumMachineCount(LhScheduleContext context,
                                                           SkuScheduleDTO sourceSku,
-                                                          int dayPlanQty,
+                                                          LocalDate productionDate,
                                                           List<LhScheduleResult> machineResults) {
-        int positiveDayPlanQty = Math.max(0, dayPlanQty);
-        if (positiveDayPlanQty <= 0) {
+        if (Objects.isNull(context) || Objects.isNull(sourceSku) || Objects.isNull(productionDate)
+                || StringUtils.isEmpty(sourceSku.getMaterialCode())
+                || StringUtils.isEmpty(sourceSku.getProductStatus())) {
             return 0;
         }
-        int dailyStandardQty = resolveContinuationDailyStandardQty(context, sourceSku);
-        if (dailyStandardQty <= 0) {
-            return 0;
+        if (!this.lhDailyMouldCalcService.hasRequiredMachineCount(
+                context, sourceSku.getMaterialCode(), sourceSku.getProductStatus(), productionDate)) {
+            int safeRetainedMachineCount = this.countDistinctPhysicalMachineCount(machineResults);
+            log.warn("续作目标机台数Map结果缺失，保持当前机台避免误降模, factoryCode: {}, batchNo: {}, "
+                            + "materialCode: {}, productStatus: {}, productionDate: {}, currentMachineCount: {}",
+                    context.getFactoryCode(), context.getBatchNo(), sourceSku.getMaterialCode(),
+                    sourceSku.getProductStatus(), productionDate, safeRetainedMachineCount);
+            return safeRetainedMachineCount;
         }
-        // 单控机台每侧只有普通机台一半的产能，硫化日标准量折半后再参与最小机台数计算
-        if (isAllSingleControlMachines(context, machineResults)) {
-            dailyStandardQty = Math.max(1, dailyStandardQty / 2);
-        }
-        return (positiveDayPlanQty + dailyStandardQty - 1) / dailyStandardQty;
-    }
-
-    /**
-     * 解析当前业务日到追补结束日按原始 dayN 所需的最大续作机台数。
-     * <p>机台数只由原始 dayN 与硫化日标准量决定；班产、清洗、停机和保养造成的实际产能损失
-     * 继续进入既有滚动差额和日计划欠产账本，不得反向扩大续作机台数。</p>
-     *
-     * @param context 排程上下文
-     * @param sourceSku 来源SKU
-     * @param activeResults 当前在机结果
-     * @param shiftMapByDate 业务日班次
-     * @param productionDate 当前业务日
-     * @param shortageLookAheadDays 欠产追补观察天数
-     * @return 当前日和后看日所需的最大续作机台数
-     */
-    private int resolveContinuationLookAheadMinimumMachineCount(
-            LhScheduleContext context,
-            SkuScheduleDTO sourceSku,
-            List<LhScheduleResult> activeResults,
-            Map<LocalDate, List<LhShiftConfigVO>> shiftMapByDate,
-            LocalDate productionDate,
-            int shortageLookAheadDays) {
-        if (Objects.isNull(sourceSku) || CollectionUtils.isEmpty(activeResults)
-                || CollectionUtils.isEmpty(shiftMapByDate) || Objects.isNull(productionDate)) {
-            return 0;
-        }
-        LocalDate lookAheadEndDate = resolveLookAheadEndDate(
-                shiftMapByDate, productionDate, shortageLookAheadDays);
-        int requiredMachineCount = 0;
-        for (LocalDate workDate : shiftMapByDate.keySet()) {
-            if (workDate.isBefore(productionDate) || workDate.isAfter(lookAheadEndDate)) {
-                continue;
-            }
-            int originalDayPlanQty = resolveContinuationDayPlanQtyByDate(context, sourceSku, workDate);
-            int dayRequiredMachineCount = resolveContinuationDayMinimumMachineCount(
-                    context, sourceSku, originalDayPlanQty, activeResults);
-            requiredMachineCount = Math.max(requiredMachineCount, dayRequiredMachineCount);
-            log.debug("续作日标准机台数解析, materialCode: {}, 当前日期: {}, 观察日期: {}, 原始dayN: {}, "
-                            + "硫化日标准量: {}, 当日所需机台数: {}, 窗口最大所需机台数: {}",
-                    sourceSku.getMaterialCode(), productionDate, workDate, originalDayPlanQty,
-                    resolveContinuationDailyStandardQty(context, sourceSku), dayRequiredMachineCount,
-                    requiredMachineCount);
-        }
-        return Math.min(activeResults.size(), requiredMachineCount);
+        return this.lhDailyMouldCalcService.getRequiredMachineCount(
+                context, sourceSku.getMaterialCode(), sourceSku.getProductStatus(), productionDate);
     }
 
     /**
      * 解析当前业务日最终生产机台数。
-     * <p>普通场景继续使用当前日与欠产后看日的最大理论机台数；当计划呈现“前后峰值一致、
-     * 当前日短期下降”的停产保机形态时，生产机台数必须回到当前日理论值，额外机台仅保留
-     * 原SKU和模具物理占用。这样既不关闭SYS0304019的普通欠产保护，也不会让保机机台在
-     * 计划真正恢复前提前生产。</p>
+     * <p>生产机台数严格等于统一Map当前自然日目标总数；前后N日只参与停产保机物理占用判断，
+     * 不得把未来目标提前变成当前日生产机台数。</p>
      *
      * @param context 排程上下文
      * @param sourceSku 来源SKU
      * @param activeResults 当前有效续作机台
      * @param productionDate 当前业务日
-     * @param lookAheadRequiredMachineCount 当前日与欠产后看日的最大理论机台数
      * @return 当前业务日最终生产机台数
      */
     private int resolveContinuousProductionMachineCount(
             LhScheduleContext context,
             SkuScheduleDTO sourceSku,
             List<LhScheduleResult> activeResults,
-            LocalDate productionDate,
-            int lookAheadRequiredMachineCount) {
+            LocalDate productionDate) {
         if (Objects.isNull(context) || Objects.isNull(sourceSku) || Objects.isNull(productionDate)
                 || CollectionUtils.isEmpty(activeResults)) {
-            return Math.max(0, lookAheadRequiredMachineCount);
+            return 0;
         }
-        int currentDayPlanQty = resolveOriginalMonthPlanDayQty(context, sourceSku, productionDate);
         int currentRequiredMachineCount = resolveContinuationDayMinimumMachineCount(
-                context, sourceSku, currentDayPlanQty, activeResults);
-        if (currentRequiredMachineCount <= 0) {
-            return Math.max(0, lookAheadRequiredMachineCount);
-        }
-        int checkDays = context.getScheduleConfig().getContinuousMouldOfflineCheckDays();
-        int previousMaxMachineCount = resolveContinuationAroundMaxMachineCount(
-                context, sourceSku, activeResults, productionDate, checkDays, false);
-        int futureMaxMachineCount = resolveContinuationAroundMaxMachineCount(
-                context, sourceSku, activeResults, productionDate, checkDays, true);
-        if (!isContinuousStopHoldScenario(activeResults.size(), currentRequiredMachineCount,
-                previousMaxMachineCount, futureMaxMachineCount)) {
-            return Math.max(0, lookAheadRequiredMachineCount);
-        }
-        log.info("续作停产保机优先生产机台数, factoryCode: {}, batchNo: {}, materialCode: {}, "
-                        + "productStatus: {}, 日期: {}, 当前理论机台数: {}, 前N天最大机台数: {}, "
-                        + "后N天最大机台数: {}, 后看原生产机台数: {}, 最终生产机台数: {}, "
-                        + "原因: 低计划日仅停产保机，计划恢复日再恢复生产",
+                context, sourceSku, productionDate, activeResults);
+        log.info("续作统一Map当前日生产机台数, factoryCode: {}, batchNo: {}, materialCode: {}, "
+                        + "productStatus: {}, 日期: {}, Map目标总机台数: {}, 当前有效物理机台数: {}",
                 context.getFactoryCode(), context.getBatchNo(), sourceSku.getMaterialCode(),
                 sourceSku.getProductStatus(), productionDate, currentRequiredMachineCount,
-                previousMaxMachineCount, futureMaxMachineCount, lookAheadRequiredMachineCount,
-                currentRequiredMachineCount);
+                this.countDistinctPhysicalMachineCount(activeResults));
         return currentRequiredMachineCount;
     }
 
@@ -4016,53 +3479,6 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
     }
 
     /**
-     * 解析续作多机台当日需保障量。
-     *
-     * @param context 排程上下文
-     * @param sourceSku 来源SKU
-     * @param skuResults 同SKU续作结果
-     * @param shifts 班次列表
-     * @return 当日需保障量
-     */
-    private int resolveContinuationDailyDemand(LhScheduleContext context,
-                                               SkuScheduleDTO sourceSku,
-                                               List<LhScheduleResult> skuResults,
-                                               List<LhShiftConfigVO> shifts) {
-        if (sourceSku == null) {
-            return 0;
-        }
-        if (shouldUseTargetQtyForContinuationReduction(sourceSku)) {
-            int targetQty = sourceSku.resolveTargetScheduleQty();
-            log.info("续作多机台目标量保障解析, materialCode: {}, 目标量: {}, 窗口日计划量: {}",
-                    sourceSku.getMaterialCode(), targetQty, sumDailyPlanQty(sourceSku.getDailyPlanQuotaMap()));
-            return targetQty;
-        }
-        if (hasEndingResult(skuResults)) {
-            int targetQty = sourceSku.resolveTargetScheduleQty();
-            if (targetQty > 0) {
-                log.info("续作多机台收尾严格目标, materialCode: {}, 目标量: {}, 是否补满: 0, 是否超排: 0",
-                        sourceSku.getMaterialCode(), targetQty);
-                return targetQty;
-            }
-            return !CollectionUtils.isEmpty(skuResults)
-                    ? resolveEndingDemandQty(context, skuResults.get(0)) : 0;
-        }
-        LocalDate productionDate = resolveFirstProductionDate(skuResults, shifts);
-        Map<LocalDate, SkuDailyPlanQuotaDTO> quotaMap = sourceSku.getDailyPlanQuotaMap();
-        if (!CollectionUtils.isEmpty(quotaMap) && productionDate != null) {
-            SkuDailyPlanQuotaDTO quota = quotaMap.get(productionDate);
-            if (quota != null) {
-                int demandQty = quota.getRemainingQty() > 0 ? quota.getRemainingQty() : quota.getDayPlanQty();
-                log.info("续作多机台dayN保障量解析, materialCode: {}, 日期: {}, dayN: {}, 剩余额度: {}, 保障量: {}",
-                        sourceSku.getMaterialCode(), productionDate, quota.getDayPlanQty(),
-                        quota.getRemainingQty(), demandQty);
-                return Math.max(0, demandQty);
-            }
-        }
-        return Math.max(0, sourceSku.resolveTargetScheduleQty());
-    }
-
-    /**
      * 判断续作多机台降模是否应以业务目标量而非dayN日计划量作为收口依据。
      * <p>月计划日计划量只决定当前窗口是否允许排产和是否需要增机台，不限制已有续作清尾量。</p>
      *
@@ -4120,9 +3536,10 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         if (firstDayPlanQty <= 0) {
             return false;
         }
-        // 传入skuResults以便识别单控机台折半产能
+        LocalDate firstProductionDate = resolveFirstProductionDate(skuResults, shifts);
+        // 收尾单机判断的目标总机台数同样只读取统一Map，实际窗口产能仍用于后续排量校验。
         int firstDayMinimumMachineCount = resolveContinuationDayMinimumMachineCount(
-                context, sourceSku, firstDayPlanQty, skuResults);
+                context, sourceSku, firstProductionDate, skuResults);
         if (firstDayMinimumMachineCount > 1) {
             log.info("续作收尾单机降模跳过, materialCode: {}, historyShortageQty: {}, threshold: {}, "
                             + "firstDayPlanQty: {}, SKU日标准产量: {}, dayN最小机台数: {}, 原始机台: {}, "
@@ -4151,6 +3568,10 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         List<LhScheduleResult> keptResults = Collections.singletonList(keptResult);
         List<LhScheduleResult> removedResults = selectMachinesToRemoveForContinuation(
                 context, sourceSku, skuResults, keptResults);
+        // 收尾单机降模不进入普通逐日分配入口，需要在此单独落库同一标题的Map释放决策。
+        this.appendContinuationReduceMapDecisionProcessLog(
+                context, sourceSku, firstProductionDate, skuResults, keptResults,
+                Collections.emptyList(), Collections.emptyList(), removedResults);
         // 登记真实续作降模机台及前物料 SKU，供 S4.6 使用最终运行态余量判断是否按时间下机。
         registerReducedContinuationMachineBeforeSku(context, sourceSku, removedResults);
         for (LhScheduleResult result : removedResults) {
@@ -4651,14 +4072,17 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         Map<String, LhScheduleResult> machineCodeResultMap = buildMachineCodeResultMap(sortedResults);
         List<LhScheduleResult> keptResults = new ArrayList<LhScheduleResult>(
                 Math.min(sortedResults.size(), requiredMachineCount));
+        Set<String> keptPhysicalMachineCodeSet = new LinkedHashSet<String>(requiredMachineCount);
         for (LhScheduleResult result : sortedResults) {
-            if (keptResults.size() >= requiredMachineCount) {
+            if (keptPhysicalMachineCodeSet.size() >= requiredMachineCount) {
                 break;
             }
             if (keptResults.contains(result)) {
                 continue;
             }
             keptResults.add(result);
+            keptPhysicalMachineCodeSet.add(LhSingleControlMachineUtil.resolvePhysicalMachineCode(
+                    result.getLhMachineCode()));
             // 正规 SKU 单控机台必须按 L/R 整机粒度保留，避免机台数收口后出现单边续作。
             LhScheduleResult pairResult = resolvePairSingleControlResultInList(
                     result, wholeSingleControlMachineCodes, machineCodeResultMap);
@@ -4672,77 +4096,6 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                         + "原因: 机台数量按原始dayN/硫化日标准量向上取整，选机复用续作降模统一排序和单控整机规则",
                 requiredMachineCount, joinMachineCodes(sortedResults), joinMachineCodes(keptResults),
                 joinMachineCodes(removedResults));
-        return keptResults;
-    }
-
-    /**
-     * 按追补窗口反向模拟续作降模最小保留机台。
-     *
-     * @param context 排程上下文
-     * @param sourceSku 来源SKU
-     * @param skuResults 当前仍在机结果
-     * @param shiftMapByDate 业务日班次
-     * @param productionDate 当前业务日
-     * @param carryShortageQty 前序欠产量
-     * @param remainingTargetQty 剩余窗口目标量
-     * @param shortageLookAheadDays 欠产追补观察天数
-     * @param policy 排产量策略
-     * @return 保留结果列表
-     */
-    private List<LhScheduleResult> selectMachinesToKeepForContinuationByLookAhead(
-            LhScheduleContext context,
-            SkuScheduleDTO sourceSku,
-            List<LhScheduleResult> skuResults,
-            Map<LocalDate, List<LhShiftConfigVO>> shiftMapByDate,
-            LocalDate productionDate,
-            int carryShortageQty,
-            int remainingTargetQty,
-            int shortageLookAheadDays,
-            ProductionQuantityPolicy policy) {
-        List<LhScheduleResult> sortedResults = new ArrayList<LhScheduleResult>(skuResults);
-        sortedResults.sort(buildContinuationReduceKeepComparator(context, sourceSku));
-        int cumulativeRequired = calculateContinuationFutureRequired(
-                sourceSku, shiftMapByDate, productionDate, carryShortageQty, remainingTargetQty,
-                shortageLookAheadDays, policy);
-        if (cumulativeRequired <= 0) {
-            log.info("续作多机台降模追补模拟, materialCode: {}, 日期: {}, 后续追补需求: 0, 保留机台为空，释放机台: {}",
-                    sourceSku.getMaterialCode(), productionDate, joinMachineCodes(sortedResults));
-            return new ArrayList<LhScheduleResult>(0);
-        }
-        // 冻结为双模的SKU在追补模拟中仍按L/R整组保留，避免模拟结果改变本次排程模式
-        Set<String> wholeSingleControlMachineCodes = resolveWholeSingleControlMachineCodes(context, sortedResults);
-        Map<String, LhScheduleResult> machineCodeResultMap = buildMachineCodeResultMap(sortedResults);
-        List<LhScheduleResult> keptResults = new ArrayList<LhScheduleResult>(sortedResults.size());
-        int cumulativeCapacity = 0;
-        for (LhScheduleResult result : sortedResults) {
-            if (keptResults.contains(result)) {
-                continue;
-            }
-            keptResults.add(result);
-            // 双模降模必须把配对侧作为同一组保留，避免只保留L或R单边
-            LhScheduleResult pairResult = resolvePairSingleControlResultInList(
-                    result, wholeSingleControlMachineCodes, machineCodeResultMap);
-            if (pairResult != null && !keptResults.contains(pairResult)) {
-                keptResults.add(pairResult);
-            }
-            cumulativeCapacity = calculateContinuationFutureCapacity(
-                    context, keptResults, shiftMapByDate, productionDate, shortageLookAheadDays);
-            log.debug("续作多机台降模追补模拟, materialCode: {}, 日期: {}, 尝试保留机台: {}, "
-                            + "前日排后差额: {}, 后续追补需求: {}, 后续追补产能: {}, 是否满足: {}",
-                    sourceSku.getMaterialCode(), productionDate, joinMachineCodes(keptResults),
-                    carryShortageQty, cumulativeRequired, cumulativeCapacity, cumulativeCapacity >= cumulativeRequired);
-            if (cumulativeCapacity >= cumulativeRequired) {
-                break;
-            }
-        }
-        List<LhScheduleResult> removedResults = selectMachinesToRemoveForContinuation(
-                context, sourceSku, skuResults, keptResults);
-        log.info("续作多机台降模排序, 保留排序: {}, 下机排序: {}, 后续追补需求: {}, 后续追补产能: {}, 保留排序明细: {}, 下机排序明细: {}",
-                joinMachineCodes(sortedResults), joinMachineCodes(removedResults), cumulativeRequired, cumulativeCapacity,
-                formatContinuationMachineDetails(context, sourceSku, sortedResults,
-                        calculateMachineDailyCapacityMapByDateSilently(context, sortedResults, shiftMapByDate.get(productionDate))),
-                formatContinuationMachineDetails(context, sourceSku, removedResults,
-                        calculateMachineDailyCapacityMapByDateSilently(context, removedResults, shiftMapByDate.get(productionDate))));
         return keptResults;
     }
 
@@ -4913,28 +4266,6 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             }
         }
         return Math.max(0, cumulativeCapacity);
-    }
-
-    /**
-     * 静默计算指定业务日内每台机台的可用产能。
-     *
-     * @param context 排程上下文
-     * @param skuResults 同SKU续作结果
-     * @param dayShifts 当日班次
-     * @return 结果到日产能的映射
-     */
-    private Map<LhScheduleResult, Integer> calculateMachineDailyCapacityMapByDateSilently(
-            LhScheduleContext context,
-            List<LhScheduleResult> skuResults,
-            List<LhShiftConfigVO> dayShifts) {
-        Map<LhScheduleResult, Integer> capacityMap = new IdentityHashMap<LhScheduleResult, Integer>(16);
-        if (CollectionUtils.isEmpty(skuResults)) {
-            return capacityMap;
-        }
-        for (LhScheduleResult result : skuResults) {
-            capacityMap.put(result, calculateMachineDailyCapacityByDate(context, result, dayShifts));
-        }
-        return capacityMap;
     }
 
     /**
@@ -6735,6 +6066,10 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                 : selectDaySupplementMachines(context, sourceSku, activeResults, occupiedResults);
         List<LhScheduleResult> removedResults = selectMachinesToRemoveForContinuation(
                 context, sourceSku, activeResults, occupiedResults);
+        // 独立落库本次续作降模的Map目标、当前物理机台数和释放决策，避免只能从应用日志反推。
+        this.appendContinuationReduceMapDecisionProcessLog(
+                context, sourceSku, productionDate, activeResults, keptResults,
+                stopHoldResults, supplementResults, removedResults);
         Map<LhScheduleResult, Integer> firstPositiveShiftBeforeOfflineMap =
                 new IdentityHashMap<LhScheduleResult, Integer>(removedResults.size());
         Map<LhScheduleResult, Integer> lastPositiveShiftBeforeOfflineMap =
@@ -6820,6 +6155,94 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                 formatContinuationMachineDetails(context, sourceSku, keptResults, capacityMap),
                 formatContinuationMachineDetails(context, sourceSku, removedResults, capacityMap),
                 demandQty, effectiveDemandQty, remainingTargetQty, dailyStandardMachineCountDecision);
+    }
+
+    /**
+     * 落库续作降模统一Map判断过程日志。
+     * <p>机台数和机台编码均按物理机台口径统计，单控L/R合并为一台。Map结果缺失时目标数记录为“-”
+     * 并明确标识“保持当前”，不得把缺失误当成目标0。</p>
+     *
+     * @param context 排程上下文
+     * @param sourceSku 来源续作SKU
+     * @param productionDate 当前判断自然日
+     * @param activeResults 判断前当前有效续作机台
+     * @param keptResults 本日生产保留机台
+     * @param stopHoldResults 本日停产保机机台
+     * @param supplementResults 本日补量后下机机台
+     * @param removedResults 本次选中的释放机台
+     */
+    private void appendContinuationReduceMapDecisionProcessLog(
+            LhScheduleContext context,
+            SkuScheduleDTO sourceSku,
+            LocalDate productionDate,
+            List<LhScheduleResult> activeResults,
+            List<LhScheduleResult> keptResults,
+            List<LhScheduleResult> stopHoldResults,
+            List<LhScheduleResult> supplementResults,
+            List<LhScheduleResult> removedResults) {
+        if (Objects.isNull(context) || Objects.isNull(sourceSku) || Objects.isNull(productionDate)) {
+            return;
+        }
+        int currentPhysicalMachineCount = this.countDistinctPhysicalMachineCount(activeResults);
+        boolean mapResultPresent = this.lhDailyMouldCalcService.hasRequiredMachineCount(
+                context, sourceSku.getMaterialCode(), sourceSku.getProductStatus(), productionDate);
+        Integer targetTotalMachineCount = mapResultPresent
+                ? this.lhDailyMouldCalcService.getRequiredMachineCount(
+                        context, sourceSku.getMaterialCode(), sourceSku.getProductStatus(), productionDate)
+                : null;
+        int requiredReleaseMachineCount = mapResultPresent
+                ? Math.max(0, currentPhysicalMachineCount - Math.max(0, targetTotalMachineCount))
+                : 0;
+        int selectedReleaseMachineCount = this.countDistinctPhysicalMachineCount(removedResults);
+        String releaseDecision = this.resolveContinuationReduceMapReleaseDecision(
+                mapResultPresent, requiredReleaseMachineCount, selectedReleaseMachineCount);
+
+        String detail = new StringBuilder(512)
+                .append("factoryCode=").append(context.getFactoryCode())
+                .append(", batchNo=").append(context.getBatchNo())
+                .append(", materialCode=").append(sourceSku.getMaterialCode())
+                .append(", productStatus=").append(sourceSku.getProductStatus())
+                .append(", productionDate=").append(productionDate)
+                .append(", mapResultPresent=").append(mapResultPresent)
+                .append(", targetTotalMachineCount=")
+                .append(PriorityTraceLogHelper.safeText(targetTotalMachineCount))
+                .append(", currentPhysicalMachineCount=").append(currentPhysicalMachineCount)
+                .append(", requiredReleaseMachineCount=").append(requiredReleaseMachineCount)
+                .append(", keptPhysicalMachines=").append(this.joinPhysicalMachineCodes(keptResults))
+                .append(", stopHoldPhysicalMachines=").append(this.joinPhysicalMachineCodes(stopHoldResults))
+                .append(", supplementPhysicalMachines=").append(this.joinPhysicalMachineCodes(supplementResults))
+                .append(", selectedReleaseMachineCount=").append(selectedReleaseMachineCount)
+                .append(", selectedReleasePhysicalMachines=").append(this.joinPhysicalMachineCodes(removedResults))
+                .append(", releaseDecision=").append(releaseDecision)
+                .toString();
+        log.info("{}, {}", CONTINUATION_REDUCE_MAP_LOG_TITLE, detail);
+        PriorityTraceLogHelper.appendProcessLog(context, CONTINUATION_REDUCE_MAP_LOG_TITLE, detail);
+    }
+
+    /**
+     * 解析续作降模Map释放决策文本。
+     *
+     * @param mapResultPresent Map完整维度是否存在
+     * @param requiredReleaseMachineCount 按Map目标需要释放的物理机台数
+     * @param selectedReleaseMachineCount 本次实际选中的释放物理机台数
+     * @return 释放决策文本
+     */
+    private String resolveContinuationReduceMapReleaseDecision(boolean mapResultPresent,
+                                                               int requiredReleaseMachineCount,
+                                                               int selectedReleaseMachineCount) {
+        if (!mapResultPresent) {
+            return "Map结果缺失，保持当前物理机台";
+        }
+        if (requiredReleaseMachineCount <= 0) {
+            return "当前物理机台未超过Map目标，无需释放";
+        }
+        if (selectedReleaseMachineCount <= 0) {
+            return "Map目标要求释放，但受现有业务约束暂不释放";
+        }
+        if (selectedReleaseMachineCount < requiredReleaseMachineCount) {
+            return "按Map目标部分释放";
+        }
+        return "按Map目标释放";
     }
 
     /**
@@ -9900,38 +9323,30 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             }
             int addMachineDayPlanQty = resolveContinuationDayPlanQtyByDate(
                     context, sourceSku, firstAddMachineProductionDate);
-            // 传入续作机台结果以便识别单控机台折半产能
             List<LhScheduleResult> continuousMachineResults = resolveContinuousMachineResults(context, sourceSku);
             int requiredMachineCount = resolveContinuationDayMinimumMachineCount(
-                    context, sourceSku, addMachineDayPlanQty, continuousMachineResults);
+                    context, sourceSku, firstAddMachineProductionDate, continuousMachineResults);
             int shortageMachineCount = Math.max(0, requiredMachineCount - activeMachineCount);
-            // dayN 理论机台数已被续作机台满足时（含无需增机、requiredMachineCount<=activeMachineCount），
+            // Map目标总机台数已被续作机台满足时（含目标为0、requiredMachineCount<=activeMachineCount），
             // 任何模式（含历史欠产超阈值的强制增机模式）都禁止再生成新增补偿：
-            // 历史欠产只影响目标量/账本，不得突破 dayN 理论机台数（如 3302002563 dayN=66,66,66
+            // 历史欠产只影响目标量/账本，不得突破统一Map目标总机台数（如 3302002563 dayN=66,66,66
             // 一台 K1303 已满足，却因欠产 470>阈值 100 仍多开 K1201）。
             if (isContinuationDayMachineCountSatisfied(
                     context, sourceSku, activeMachineCount, requiredMachineCount)) {
-                log.info("续作加机台需求跳过，已有续作机台满足正式日硫化标准最小机台数, materialCode: {}, "
-                                + "当前续作机台数: {}, dayN最小机台数: {}, 缺口机台数: {}, 首次增机日: {}",
+                log.info("续作加机台需求跳过，已有续作机台满足统一Map目标总机台数, materialCode: {}, "
+                                + "当前续作机台数: {}, Map目标总机台数: {}, 缺口机台数: {}, 首次增机日: {}",
                         sourceSku.getMaterialCode(), activeMachineCount, requiredMachineCount,
                         shortageMachineCount, firstAddMachineProductionDate);
                 continue;
             }
             int dayNShortageCompensationQty = resolveContinuationAddMachineCompensationQty(
                     context, sourceSku, firstAddMachineProductionDate, activeMachineCount);
-            // expansionTriggerQty 只决定是否进入新增链路；dayN 差额不得直接作为实际生产目标上限。
-            int expansionTriggerQty = resolveContinuousCompensationQty(
-                    context, sourceSku, dayNShortageCompensationQty);
+            // 统一Map已明确存在机台缺口时必须进入新增链路；实际生产量仍由后续真实余量账本决定。
+            // shortageMachineCount仅作为正向触发值，不写入计划量，也不改变日计划/目标量扣账语义。
+            int expansionTriggerQty = this.resolveContinuousCompensationQty(
+                    Math.max(dayNShortageCompensationQty, shortageMachineCount));
             logContinuousExpansionDecision(context, sourceSku, shortageQuotaPlan, expansionTriggerQty);
             if (expansionTriggerQty <= 0 || hasContinuousCompensationSku(context, sourceSku)) {
-                continue;
-            }
-            if (isContinuousDailyRhythmSatisfiedWithoutForcedShortage(context, sourceSku)) {
-                // 理论 8 班/3 班产能已经满足窗口日计划时，不因真实残班缺口生成额外新增机台补偿。
-                log.info("续作补偿增机台跳过，当前续作机台已满足理论日计划增机台规则, materialCode: {}, "
-                        + "continuousMachines: {}, shiftCapacity: {}, windowPlanQty: {}",
-                        sourceSku.getMaterialCode(), resolveContinuousMachineCodes(context, sourceSku),
-                        sourceSku.getShiftCapacity(), sumDailyPlanQty(sourceSku.getDailyPlanQuotaMap()));
                 continue;
             }
             int productionRemainingQty = this.resolveContinuousCompensationProductionQty(
@@ -9969,7 +9384,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             // 续作加机台候选保留同一日计划账本，S4.5 排到后会继续消费剩余额度，避免重复扩大日计划。
             context.getNewSpecSkuList().add(compensationSku);
             log.info("续作加机台需求生成，转新增规格链路统一竞争, materialCode: {}, 原续作机台: {}, "
-                            + "首次增机日: {}, 当前续作机台数: {}, dayN最小机台数: {}, 缺口机台数: {}, "
+                            + "首次增机日: {}, 当前续作机台数: {}, Map目标总机台数: {}, 缺口机台数: {}, "
                             + "增机日计划量: {}, 已排: {}, 增机触发差额: {}, 实际可生产余量: {}, "
                             + "窗口日计划剩余: {}, sourceType: {}, dayPlanSummary: {}",
                     sourceSku.getMaterialCode(), sourceSku.getContinuousMachineCode(),
@@ -9984,138 +9399,35 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
     }
 
     /**
-     * 判断已有续作机台是否已满足 dayN 理论机台数（所有模式生效）。
-     * <p>requiredMachineCount 为 0 表示原始 dayN 无增机业务日（无需增机），同样视为已满足；
-     * 该拦截只约束增机决策，历史欠产超阈值只影响目标量/账本，不得突破 dayN 理论机台数。
-     * 窗口内无原始 dayN 计划的收尾清量/仅欠产场景不适用本拦截，仍走既有补偿规则。</p>
+     * 判断已有续作机台是否已满足统一Map目标总机台数（所有模式生效）。
+     * <p>是否存在日计划、是否收尾以及历史欠产只影响排产量账本，均不得在目标总机台数之外
+     * 重新触发增机；Map目标为0时同样表示无需新增机台。</p>
      *
      * @param context 排程上下文
      * @param sourceSku 来源续作 SKU
      * @param activeMachineCount 当前续作机台数
-     * @param requiredMachineCount 正式日硫化标准计算出的 dayN 最小机台数
+     * @param requiredMachineCount Map中的目标总机台数
      * @return true-已有续作机台满足且不得生成新增补偿；false-继续原补偿判断
      */
     private boolean isContinuationDayMachineCountSatisfied(LhScheduleContext context,
                                                            SkuScheduleDTO sourceSku,
                                                            int activeMachineCount,
                                                            int requiredMachineCount) {
-        if (Objects.isNull(context) || Objects.isNull(sourceSku) || activeMachineCount <= 0) {
+        if (Objects.isNull(context) || Objects.isNull(sourceSku)) {
             return false;
         }
-        // 窗口内无原始 dayN 计划时，dayN 理论机台数约束不适用，避免阻断收尾清量/仅欠产补偿路径。
-        if (!hasWindowOriginalDayPlan(sourceSku)) {
-            return false;
-        }
-        // requiredMachineCount <= 0 表示原始 dayN 逐日判断无增机业务日，已有续作机台即已满足。
-        return requiredMachineCount <= activeMachineCount;
-    }
-
-    /**
-     * 判断续作来源 SKU 窗口内是否存在原始 dayN 计划量。
-     * <p>窗口无日计划时 dayN 理论机台数无法推导（0），收尾清量/仅历史欠产补偿不按本规则拦截。</p>
-     *
-     * @param sourceSku 来源续作 SKU
-     * @return true-窗口内存在正日计划；false-窗口内全部为 0
-     */
-    private boolean hasWindowOriginalDayPlan(SkuScheduleDTO sourceSku) {
-        if (Objects.isNull(sourceSku) || CollectionUtils.isEmpty(sourceSku.getDailyPlanQuotaMap())) {
-            return false;
-        }
-        for (SkuDailyPlanQuotaDTO quota : sourceSku.getDailyPlanQuotaMap().values()) {
-            if (Objects.nonNull(quota) && Math.max(0, quota.getDayPlanQty()) > 0) {
-                return true;
-            }
-        }
-        return false;
+        return Math.max(0, requiredMachineCount) <= Math.max(0, activeMachineCount);
     }
 
     /**
      * 计算续作转新增补偿量。
      *
-     * @param context 排程上下文
-     * @param sourceSku 来源续作SKU
-     * @param dayNShortageCompensationQty dayN 最小机台数缺口对应的补偿量
+     * @param unifiedMapExpansionTriggerQty Map目标总机台数缺口对应的补偿触发量
      * @return 补偿量
      */
-    private int resolveContinuousCompensationQty(LhScheduleContext context,
-                                                 SkuScheduleDTO sourceSku,
-                                                 int dayNShortageCompensationQty) {
-        if (dayNShortageCompensationQty > 0) {
-            // 续作增机台需求只在 S4.4 识别，实际排序和选机统一交给 S4.5 新增排产。
-            return dayNShortageCompensationQty;
-        }
-        ProductionQuantityPolicy compensationPolicy = ProductionQuantityPolicy.from(
-                sourceSku, sourceSku != null && sourceSku.isStrictTargetQty());
-        if (!compensationPolicy.isStrictUpperLimit()
-                && isExistingContinuousMachinesSatisfyOriginalDayMinimum(context, sourceSku)) {
-            return 0;
-        }
-        if (isReducedContinuationGroup(context, sourceSku)) {
-            if (isContinuousDailyCapacitySatisfied(context, sourceSku)
-                    || !DailyMachineExpansionPlanner.needMoreMachine(context, sourceSku)) {
-                // 续作降模后保留机台仍满足 dayN 节奏时，剩余余量留给后续滚动，不转新增链路补回释放机台。
-                log.info("续作已按降模释放机台且保留机台满足dayN节奏，跳过补偿新增, materialCode: {}, "
-                                + "targetQty: {}, remainingQty: {}, dailyPlanRemainingQty: {}, continuousMachines: {}",
-                        sourceSku.getMaterialCode(), sourceSku.resolveTargetScheduleQty(),
-                        sourceSku.getRemainingScheduleQty(),
-                        SkuDailyPlanQuotaUtil.sumRemainingQty(sourceSku.getDailyPlanQuotaMap()),
-                        resolveContinuousMachineCodes(context, sourceSku));
-                return 0;
-            }
-            log.info("续作已降模但保留机台不满足dayN节奏，允许回流新增补偿, materialCode: {}, targetQty: {}, "
-                            + "remainingQty: {}, dailyPlanRemainingQty: {}, continuousMachines: {}",
-                    sourceSku.getMaterialCode(), sourceSku.resolveTargetScheduleQty(),
-                    sourceSku.getRemainingScheduleQty(),
-                    SkuDailyPlanQuotaUtil.sumRemainingQty(sourceSku.getDailyPlanQuotaMap()),
-                    resolveContinuousMachineCodes(context, sourceSku));
-        }
-        if (isSingleMachineReducedContinuationGroup(context, sourceSku)
-                && !DailyMachineExpansionPlanner.needMoreMachine(context, sourceSku)) {
-            // 降模已确认当前窗口只保留一台续作机台，剩余余量留给后续滚动，不转新增链路补回释放机台。
-            return 0;
-        }
-        if (isSingleMachineReducedContinuationGroup(context, sourceSku)) {
-            log.info("续作单机降模后仍需按dayN节奏补偿新增机台, materialCode: {}, targetQty: {}, "
-                            + "remainingQty: {}, dailyPlanRemainingQty: {}",
-                    sourceSku.getMaterialCode(), sourceSku.resolveTargetScheduleQty(),
-                    sourceSku.getRemainingScheduleQty(),
-                    SkuDailyPlanQuotaUtil.sumRemainingQty(sourceSku.getDailyPlanQuotaMap()));
-        }
-        int scheduledQty = resolveScheduledQtyBySourceSku(context, sourceSku);
-        // targetRemainingQty 是业务目标口径缺口；dayN 只参与是否需要增机台判断，不再作为非收尾硬上限。
-        int targetRemainingQty = Math.max(0, sourceSku.resolveTargetScheduleQty() - scheduledQty);
-        if (!CollectionUtils.isEmpty(sourceSku.getDailyPlanQuotaMap())) {
-            int quotaRemainingQty = Math.max(0,
-                    SkuDailyPlanQuotaUtil.sumRemainingQty(sourceSku.getDailyPlanQuotaMap()));
-            if (isSmallShortageFuturePlanCoveredByContinuousResults(context, sourceSku)) {
-                return 0;
-            }
-            if (isContinuousDailyRhythmSatisfiedWithoutForcedShortage(context, sourceSku)) {
-                log.info("续作补偿增机台跳过，当前续作机台已满足dayN增机台规则, materialCode: {}, "
-                                + "continuousMachines: {}, targetRemainingQty: {}, dailyPlanRemainingQty: {}",
-                        sourceSku.getMaterialCode(), resolveContinuousMachineCodes(context, sourceSku),
-                        targetRemainingQty, quotaRemainingQty);
-                return 0;
-            }
-            if (!DailyMachineExpansionPlanner.needMoreMachine(context, sourceSku)) {
-                return 0;
-            }
-            if (targetRemainingQty > 0) {
-                return targetRemainingQty;
-            }
-            if (!compensationPolicy.isStrictUpperLimit()) {
-                return 0;
-            }
-            if (quotaRemainingQty <= 0) {
-                return 0;
-            }
-            // 严格目标场景仍按日计划账本收口，避免收尾或试制补偿量越过业务上限。
-            if (shouldCompensateRemainingDailyQuota(sourceSku)) {
-                return quotaRemainingQty;
-            }
-            return 0;
-        }
-        return targetRemainingQty;
+    private int resolveContinuousCompensationQty(int unifiedMapExpansionTriggerQty) {
+        // Map不存在机台缺口时必须返回0；不得再根据余量、欠产或理论产能重新打开新增机台。
+        return Math.max(0, unifiedMapExpansionTriggerQty);
     }
 
     /**
@@ -10229,7 +9541,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                                                                   LocalDate startDate) {
         int activeMachineCount = resolveContinuousMachineCount(context, sourceSku);
         LocalDate firstAddMachineDate = DailyMachineExpansionPlanner.resolveFirstDailyLookAheadAddMachineDate(
-                context, sourceSku, activeMachineCount, ScheduleTypeEnum.CONTINUOUS.getCode(), startDate);
+                this.lhDailyMouldCalcService, context, sourceSku, activeMachineCount,
+                ScheduleTypeEnum.CONTINUOUS.getCode(), startDate);
         if (Objects.nonNull(firstAddMachineDate) || !isContinuationForcedShortageMode(context, sourceSku)) {
             return firstAddMachineDate;
         }
@@ -10239,7 +9552,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
          * 被已经消费为 0 的日计划剩余额度顺延到更晚日期。
          */
         firstAddMachineDate = DailyMachineExpansionPlanner.resolveFirstOriginalDayPlanAddMachineDate(
-                context, sourceSku, activeMachineCount, ScheduleTypeEnum.CONTINUOUS.getCode(), startDate);
+                this.lhDailyMouldCalcService, context, sourceSku, activeMachineCount,
+                ScheduleTypeEnum.CONTINUOUS.getCode(), startDate);
         if (Objects.nonNull(firstAddMachineDate)) {
             log.info("续作强制增机补偿对齐原始dayN首次增机日期, scheduleDate: {}, materialCode: {}, "
                             + "historyShortageQty: {}, threshold: {}, activeMachineCount: {}, firstAddMachineDate: {}",
@@ -10293,10 +9607,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             if (entry == null || entry.getKey() == null || entry.getKey().isBefore(releaseDate)) {
                 continue;
             }
-            SkuDailyPlanQuotaDTO quota = entry.getValue();
-            int dayPlanQty = quota == null ? 0 : Math.max(0, quota.getDayPlanQty());
             int requiredMachineCount = resolveContinuationDayMinimumMachineCount(
-                    context, sourceSku, dayPlanQty, continuousMachineResults);
+                    context, sourceSku, entry.getKey(), continuousMachineResults);
             if (requiredMachineCount > activeMachineCount) {
                 return false;
             }
@@ -10356,39 +9668,6 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
     }
 
     /**
-     * 判断续作机台是否已满足日计划节奏且不存在强制历史欠产补偿要求。
-     * <p>该判断只用于 S4.4 转 S4.5 补偿前的增机台短路：
-     * 历史欠产超过阈值时仍保留原补偿语义；未超过阈值时，若纯续作结果已覆盖窗口末班，
-     * 且逐日后看不再要求新增机台，则不再仅因硫化余量剩余转新增机台。</p>
-     *
-     * @param context 排程上下文
-     * @param sourceSku 来源续作SKU
-     * @return true-当前续作机台已满足日计划节奏；false-仍按原补偿规则判断
-     */
-    private boolean isContinuousDailyRhythmSatisfiedWithoutForcedShortage(LhScheduleContext context,
-                                                                          SkuScheduleDTO sourceSku) {
-        if (context == null || sourceSku == null || CollectionUtils.isEmpty(sourceSku.getDailyPlanQuotaMap())) {
-            return false;
-        }
-        if (isContinuationForcedShortageMode(context, sourceSku)) {
-            return false;
-        }
-        int activeMachineCount = resolveContinuousMachineCount(context, sourceSku);
-        if (activeMachineCount <= 0) {
-            return false;
-        }
-        // 收尾 SKU 排完严格收尾目标即可，不要求续作机台排到窗口末班；只要 dayN 节奏已满足，
-        // 月计划余量留给后续滚动窗口消费，不在当前窗口盲目回流新增扩机（如 3302001271 dayN=46,46,46，
-        // K1104 排完收尾目标未到窗口末班，不应按月计划余量 700 扩第 2 台）。
-        boolean endingSku = StringUtils.equals(SkuTagEnum.ENDING.getCode(), sourceSku.getSkuTag());
-        if (!endingSku && !hasPureContinuousResultReachWindowEnd(context, sourceSku)) {
-            return false;
-        }
-        return DailyMachineExpansionPlanner.isDailyLookAheadCapacitySatisfied(
-                context, sourceSku, activeMachineCount, ScheduleTypeEnum.CONTINUOUS.getCode());
-    }
-
-    /**
      * 判断续作 SKU 是否进入欠产超阈值的强制增机模式。
      *
      * @param context 排程上下文
@@ -10428,16 +9707,14 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             if (entry == null || entry.getKey() == null) {
                 continue;
             }
-            int dayPlanQty = resolveContinuationDayPlanQtyByDate(context, sourceSku, entry.getKey());
-            // 传入续作机台结果以便识别单控机台折半产能
-            int requiredMachineCount = resolveContinuationDayMinimumMachineCount(context, sourceSku, dayPlanQty, resolveContinuousMachineResults(context, sourceSku));
+            int requiredMachineCount = resolveContinuationDayMinimumMachineCount(
+                    context, sourceSku, entry.getKey(), resolveContinuousMachineResults(context, sourceSku));
             maxRequiredMachineCount = Math.max(maxRequiredMachineCount, requiredMachineCount);
             if (requiredMachineCount > activeMachineCount) {
-                log.info("续作补偿新增判断，已有续作机台不满足原始dayN最小机台数, materialCode: {}, 日期: {}, "
-                                + "dayN计划量: {}, SKU日标准产量: {}, 最小机台数: {}, 已有续作机台数: {}, "
+                log.info("续作补偿新增判断，已有续作机台不满足统一Map目标总机台数, materialCode: {}, 日期: {}, "
+                                + "目标总机台数: {}, 已有续作机台数: {}, "
                                 + "continuousMachines: {}",
-                        sourceSku.getMaterialCode(), entry.getKey(), dayPlanQty,
-                        resolveContinuationDailyStandardQty(context, sourceSku), requiredMachineCount,
+                        sourceSku.getMaterialCode(), entry.getKey(), requiredMachineCount,
                         activeMachineCount, resolveContinuousMachineCodes(context, sourceSku));
                 return false;
             }
@@ -10475,7 +9752,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         }
         if (hasPureContinuousResultReachWindowEnd(context, sourceSku)
                 && DailyMachineExpansionPlanner.isDailyLookAheadCapacitySatisfied(
-                context, sourceSku, activeMachineCount, ScheduleTypeEnum.CONTINUOUS.getCode())) {
+                this.lhDailyMouldCalcService, context, sourceSku, activeMachineCount,
+                ScheduleTypeEnum.CONTINUOUS.getCode())) {
             return true;
         }
         int windowPlanQty = sumDailyPlanQty(sourceSku.getDailyPlanQuotaMap());
@@ -10770,7 +10048,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                 continue;
             }
             if (StringUtils.isNotEmpty(result.getLhMachineCode())) {
-                machineCodeSet.add(result.getLhMachineCode());
+                machineCodeSet.add(LhSingleControlMachineUtil.resolvePhysicalMachineCode(
+                        result.getLhMachineCode()));
             }
         }
         return machineCodeSet.size();

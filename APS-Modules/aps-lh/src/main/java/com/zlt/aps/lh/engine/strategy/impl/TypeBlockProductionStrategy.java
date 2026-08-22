@@ -45,6 +45,7 @@ import com.zlt.aps.lh.engine.strategy.support.FirstInspectionShiftAllocation;
 import com.zlt.aps.lh.engine.strategy.support.NewSpecEmbryoAvailableTimeResolver;
 import com.zlt.aps.lh.engine.strategy.support.PendingSkuUnscheduledRule;
 import com.zlt.aps.lh.engine.strategy.support.SpecifiedMachineScheduleResult;
+import com.zlt.aps.lh.service.ILhDailyMouldCalcService;
 import com.zlt.aps.lh.service.impl.LhMaintenanceScheduleService;
 import com.zlt.aps.lh.util.CleaningScheduleRuleUtil;
 import com.zlt.aps.lh.util.FirstInspectionQtyUtil;
@@ -152,6 +153,9 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
     private ICapacityCalculateStrategy capacityCalculateStrategy;
     @Resource
     private IMachineMatchStrategy machineMatchStrategy;
+    /** 物料+产品状态+自然日目标总机台数唯一查询入口。 */
+    @Resource
+    private ILhDailyMouldCalcService lhDailyMouldCalcService;
     /** 胶囊次数累计与换胶囊班次扣减统一入口 */
     @Resource
     private CapsuleReplacementRuleService capsuleReplacementRuleService = new CapsuleReplacementRuleService();
@@ -3005,7 +3009,8 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                     ? "单机台收尾共用胎胚仅按余量" : "单机台收尾MAX(余量,胎胚库存)";
         } else if (isSingleMachine && getTargetScheduleQtyResolver().isFullCapacityMode(context)) {
             boolean newSpecExpansionAvailable = !DailyMachineExpansionPlanner.isDailyLookAheadCapacitySatisfied(
-                    context, sku, 1, ScheduleTypeEnum.TYPE_BLOCK.getCode())
+                    this.lhDailyMouldCalcService, context, sku, 1,
+                    ScheduleTypeEnum.TYPE_BLOCK.getCode())
                     && hasSchedulableNewSpecExpansionMachine(context, machine, sku, shifts);
             int adoptedTargetQty = resolveSingleMachineTypeBlockTargetQty(
                     sku, windowCapacityQty, newSpecExpansionAvailable);
