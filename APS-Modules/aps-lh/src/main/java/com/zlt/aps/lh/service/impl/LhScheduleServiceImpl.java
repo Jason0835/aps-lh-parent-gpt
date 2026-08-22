@@ -3206,25 +3206,21 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         if (StringUtils.isBlank(factoryCode)) {
             return Collections.emptyMap();
         }
-        Date closeOutBefore = triggerResults.stream()
-                .map(LhScheduleResult::getClass1StartTime)
-                .filter(Objects::nonNull)
-                .min(Date::compareTo)
-                .orElse(null);
-        if (Objects.isNull(closeOutBefore)) {
-            return Collections.emptyMap();
-        }
-        List<String> machineCodes = triggerResults.stream()
-                .map(LhScheduleResult::getLhMachineCode)
-                .filter(StringUtils::isNotBlank)
-                .distinct()
-                .collect(Collectors.toList());
-        if (CollUtil.isEmpty(machineCodes)) {
+        Map<String, Date> machineCloseOutBeforeMap = triggerResults.stream()
+                .filter(result -> StringUtils.isNotBlank(result.getLhMachineCode()))
+                .filter(result -> Objects.nonNull(result.getClass1StartTime()))
+                .collect(Collectors.toMap(
+                        LhScheduleResult::getLhMachineCode,
+                        LhScheduleResult::getClass1StartTime,
+                        (firstStartTime, secondStartTime) -> firstStartTime.before(secondStartTime)
+                                ? firstStartTime : secondStartTime,
+                        LinkedHashMap::new));
+        if (CollUtil.isEmpty(machineCloseOutBeforeMap)) {
             return Collections.emptyMap();
         }
         List<LhScheduleResult> beforeMaterialList = scheduleResultMapper
                 .selectLatestCloseOutBeforeMaterial(
-                        factoryCode, scheduleDate, closeOutBefore, machineCodes);
+                        factoryCode, scheduleDate, machineCloseOutBeforeMap);
         if (CollUtil.isEmpty(beforeMaterialList)) {
             return Collections.emptyMap();
         }
