@@ -1418,17 +1418,20 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
      * 解析生产日前准备必须贴近的正式生产下限。
      *
      * <p>续作补偿或普通新增机台存在明确增机业务日时，优先使用该业务日首个生产班次；
-     * SKU 类型门禁更晚时再取较晚值。该时间只用于把换模准备延后到最后合法窗口，
-     * 不改变 dayN 增机日期、正式开产门禁、胎胚可供时间或候选机台排序。</p>
+     * 普通新增首台没有独立增机日期时，使用当前生产业务日首班。SKU 类型门禁更晚时再取较晚值。
+     * 该时间只用于把换模准备延后到最后合法窗口，不改变 dayN 增机日期、正式开产门禁、
+     * 胎胚可供时间或候选机台排序。</p>
      *
      * @param context 排程上下文
+     * @param dayContext 当前生产业务日上下文
      * @param shifts 当前调用方班次切片
      * @param candidateProductionNotBeforeTime SKU 类型门禁确定的候选生产下限
      * @param addMachineProductionDate 当前机台首次允许增机的业务日期
-     * @return 生产日前准备对齐下限；两个来源均为空时返回null
+     * @return 生产日前准备对齐下限
      */
     private Date resolveProductionPreparationNotBeforeTime(
             LhScheduleContext context,
+            DayScheduleContext dayContext,
             List<LhShiftConfigVO> shifts,
             Date candidateProductionNotBeforeTime,
             LocalDate addMachineProductionDate) {
@@ -1436,7 +1439,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 || CollectionUtils.isEmpty(context.getScheduleWindowShifts())
                 ? shifts : context.getScheduleWindowShifts();
         Date addMachineProductionStartTime = Objects.isNull(addMachineProductionDate)
-                ? null : resolveFirstShiftStartTime(windowShifts, addMachineProductionDate);
+                ? (Objects.isNull(dayContext) ? null : dayContext.getDayStartTime())
+                : resolveFirstShiftStartTime(windowShifts, addMachineProductionDate);
         return this.resolveLaterTime(
                 candidateProductionNotBeforeTime, addMachineProductionStartTime);
     }
@@ -4097,7 +4101,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                         context, switchReadyTime, sku);
                 Date productionPreparationNotBeforeTime =
                         this.resolveProductionPreparationNotBeforeTime(
-                                context, shifts, candidateProductionNotBeforeTime,
+                                context, dayContext, shifts, candidateProductionNotBeforeTime,
                                 currentAddMachineProductionDate);
                 /*
                  * 生产日前准备回看是通用能力，不再只服务结构提前生产。选中机台如果在当前
@@ -7930,7 +7934,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 context, switchReadyTime, sku);
         Date productionPreparationNotBeforeTime =
                 this.resolveProductionPreparationNotBeforeTime(
-                        context, dayContext.getDayShifts(), candidateProductionNotBeforeTime,
+                        context, dayContext, dayContext.getDayShifts(), candidateProductionNotBeforeTime,
                         addMachineProductionDate);
         boolean preparationLookbackAllowed = this.isProductionPreparationLookbackAllowed(
                 context, dayContext, switchReadyTime, switchDurationHours,

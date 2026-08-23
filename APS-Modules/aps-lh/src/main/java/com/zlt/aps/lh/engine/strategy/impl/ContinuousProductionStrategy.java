@@ -2237,7 +2237,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             int totalPlanQty = sumScheduledQtyByShifts(activeResults, dayShifts);
             // 停产保机仍保留前后N日物理占用判断，但当前自然日生产机台数只读取统一Map。
             int requiredMachineCount = resolveContinuousProductionMachineCount(
-                    context, sourceSku, activeResults, productionDate);
+                    context, sourceSku, activeResults, productionDate,
+                    remainingTargetQty, policy.isStrictUpperLimit());
             boolean hasWholeDayUnavailableMachine = capacityMap.values().stream()
                     .anyMatch(capacity -> Objects.isNull(capacity) || capacity <= 0);
             // 目标机台数决定保留多少台；机台真实产能、停机和清洗只影响实际排量与欠产，不得扩大目标台数。
@@ -2534,32 +2535,69 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
 
     /**
      * 解析当前业务日最终生产机台数。
-     * <p>生产机台数严格等于统一Map当前自然日目标总数；前后N日只参与停产保机物理占用判断，
-     * 不得把未来目标提前变成当前日生产机台数。</p>
+     * <p>生产机台数默认严格等于统一Map当前自然日目标总数；前后N日只参与停产保机物理占用判断，
+     * 不得把未来目标提前变成当前日生产机台数。唯一释放保护是：严格目标仍有剩余且Map目标为0时，
+     * 暂留一台现有物理机台继续清量，避免整组释放后出现“余量未排完却收尾下机”。该保护不改写Map，
+     * 也不按日计划、班产或余量重新推算目标机台数。</p>
      *
      * @param context 排程上下文
      * @param sourceSku 来源SKU
      * @param activeResults 当前有效续作机台
      * @param productionDate 当前业务日
+     * @param remainingTargetQty 当前严格目标剩余量
+     * @param strictUpperLimit 是否按严格目标量控制
      * @return 当前业务日最终生产机台数
      */
     private int resolveContinuousProductionMachineCount(
             LhScheduleContext context,
             SkuScheduleDTO sourceSku,
             List<LhScheduleResult> activeResults,
-            LocalDate productionDate) {
+            LocalDate productionDate,
+            int remainingTargetQty,
+            boolean strictUpperLimit) {
         if (Objects.isNull(context) || Objects.isNull(sourceSku) || Objects.isNull(productionDate)
                 || CollectionUtils.isEmpty(activeResults)) {
             return 0;
         }
         int currentRequiredMachineCount = resolveContinuationDayMinimumMachineCount(
                 context, sourceSku, productionDate, activeResults);
+        int currentPhysicalMachineCount = this.countDistinctPhysicalMachineCount(activeResults);
+        boolean strictTargetReleaseProtected = this.shouldProtectStrictTargetFromFullRelease(
+                currentRequiredMachineCount, remainingTargetQty,
+                strictUpperLimit, currentPhysicalMachineCount);
+        int effectiveProductionMachineCount = strictTargetReleaseProtected
+                ? 1 : currentRequiredMachineCount;
         log.info("续作统一Map当前日生产机台数, factoryCode: {}, batchNo: {}, materialCode: {}, "
-                        + "productStatus: {}, 日期: {}, Map目标总机台数: {}, 当前有效物理机台数: {}",
+                        + "productStatus: {}, 日期: {}, Map目标总机台数: {}, 当前有效物理机台数: {}, "
+                        + "严格目标剩余量: {}, 严格目标控制: {}, 释放保护: {}, 实际生产机台数: {}",
                 context.getFactoryCode(), context.getBatchNo(), sourceSku.getMaterialCode(),
                 sourceSku.getProductStatus(), productionDate, currentRequiredMachineCount,
-                this.countDistinctPhysicalMachineCount(activeResults));
-        return currentRequiredMachineCount;
+                currentPhysicalMachineCount, Math.max(0, remainingTargetQty), strictUpperLimit,
+                strictTargetReleaseProtected, effectiveProductionMachineCount);
+        return effectiveProductionMachineCount;
+    }
+
+    /**
+     * 判断严格目标是否需要阻止统一Map把续作物理机台整组释放。
+     *
+     * <p>Map目标仍是机台数唯一数据源，本方法不计算新的目标机台数，只在Map明确为0、
+     * 严格目标仍有剩余时保留一台现有物理机台完成清量。目标完成后下一业务日继续按Map=0释放。</p>
+     *
+     * @param mapTargetMachineCount 统一Map目标总机台数
+     * @param remainingTargetQty 当前严格目标剩余量
+     * @param strictUpperLimit 是否按严格目标量控制
+     * @param currentPhysicalMachineCount 当前有效物理机台数
+     * @return true-阻止整组释放并暂留一台；false-完全按Map执行
+     */
+    private boolean shouldProtectStrictTargetFromFullRelease(
+            int mapTargetMachineCount,
+            int remainingTargetQty,
+            boolean strictUpperLimit,
+            int currentPhysicalMachineCount) {
+        return strictUpperLimit
+                && remainingTargetQty > 0
+                && mapTargetMachineCount <= 0
+                && currentPhysicalMachineCount > 0;
     }
 
     /**
@@ -3568,10 +3606,16 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         List<LhScheduleResult> keptResults = Collections.singletonList(keptResult);
         List<LhScheduleResult> removedResults = selectMachinesToRemoveForContinuation(
                 context, sourceSku, skuResults, keptResults);
+        int remainingTargetQtyAfterSingleMachine = Math.max(0,
+                sourceSku.resolveTargetScheduleQty() - skuResults.stream()
+                        .filter(Objects::nonNull)
+                        .mapToInt(ShiftFieldUtil::resolveScheduledQty)
+                        .sum());
         // 收尾单机降模不进入普通逐日分配入口，需要在此单独落库同一标题的Map释放决策。
         this.appendContinuationReduceMapDecisionProcessLog(
                 context, sourceSku, firstProductionDate, skuResults, keptResults,
-                Collections.emptyList(), Collections.emptyList(), removedResults);
+                Collections.emptyList(), Collections.emptyList(), removedResults,
+                remainingTargetQtyAfterSingleMachine, true);
         // 登记真实续作降模机台及前物料 SKU，供 S4.6 使用最终运行态余量判断是否按时间下机。
         registerReducedContinuationMachineBeforeSku(context, sourceSku, removedResults);
         for (LhScheduleResult result : removedResults) {
@@ -6069,7 +6113,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         // 独立落库本次续作降模的Map目标、当前物理机台数和释放决策，避免只能从应用日志反推。
         this.appendContinuationReduceMapDecisionProcessLog(
                 context, sourceSku, productionDate, activeResults, keptResults,
-                stopHoldResults, supplementResults, removedResults);
+                stopHoldResults, supplementResults, removedResults,
+                remainingTargetQty, policy.isStrictUpperLimit());
         Map<LhScheduleResult, Integer> firstPositiveShiftBeforeOfflineMap =
                 new IdentityHashMap<LhScheduleResult, Integer>(removedResults.size());
         Map<LhScheduleResult, Integer> lastPositiveShiftBeforeOfflineMap =
@@ -6170,6 +6215,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
      * @param stopHoldResults 本日停产保机机台
      * @param supplementResults 本日补量后下机机台
      * @param removedResults 本次选中的释放机台
+     * @param remainingTargetQty 当前严格目标剩余量
+     * @param strictUpperLimit 是否按严格目标量控制
      */
     private void appendContinuationReduceMapDecisionProcessLog(
             LhScheduleContext context,
@@ -6179,7 +6226,9 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             List<LhScheduleResult> keptResults,
             List<LhScheduleResult> stopHoldResults,
             List<LhScheduleResult> supplementResults,
-            List<LhScheduleResult> removedResults) {
+            List<LhScheduleResult> removedResults,
+            int remainingTargetQty,
+            boolean strictUpperLimit) {
         if (Objects.isNull(context) || Objects.isNull(sourceSku) || Objects.isNull(productionDate)) {
             return;
         }
@@ -6194,6 +6243,10 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                 ? Math.max(0, currentPhysicalMachineCount - Math.max(0, targetTotalMachineCount))
                 : 0;
         int selectedReleaseMachineCount = this.countDistinctPhysicalMachineCount(removedResults);
+        boolean strictTargetReleaseProtected = mapResultPresent
+                && this.shouldProtectStrictTargetFromFullRelease(
+                Math.max(0, targetTotalMachineCount), remainingTargetQty,
+                strictUpperLimit, currentPhysicalMachineCount);
         String releaseDecision = this.resolveContinuationReduceMapReleaseDecision(
                 mapResultPresent, requiredReleaseMachineCount, selectedReleaseMachineCount);
 
@@ -6213,6 +6266,9 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                 .append(", supplementPhysicalMachines=").append(this.joinPhysicalMachineCodes(supplementResults))
                 .append(", selectedReleaseMachineCount=").append(selectedReleaseMachineCount)
                 .append(", selectedReleasePhysicalMachines=").append(this.joinPhysicalMachineCodes(removedResults))
+                .append(", strictTargetRemainingQty=").append(Math.max(0, remainingTargetQty))
+                .append(", strictUpperLimit=").append(strictUpperLimit)
+                .append(", strictTargetReleaseProtected=").append(strictTargetReleaseProtected)
                 .append(", releaseDecision=").append(releaseDecision)
                 .toString();
         log.info("{}, {}", CONTINUATION_REDUCE_MAP_LOG_TITLE, detail);
@@ -8123,6 +8179,10 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         if (!isEndingFillCandidate(context, result, sku, shifts)) {
             return;
         }
+        // 收尾标签只表示预计可在窗口内完成；补量前必须按物料+产品状态确认真实硫化余量已经排完。
+        if (!this.isActualSurplusEndingForFill(context, sku)) {
+            return;
+        }
         // 只在确认属于主销/常规收尾补满候选后检查开关，关闭时不修改班次量、结构机台统计和允许超量。
         if (!isEndingAutoFillEnabled(context)) {
             log.info("SKU收尾补满跳过, materialCode: {}, machineCode: {}, productionType: {}, "
@@ -8390,6 +8450,38 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                 && StringUtils.equals(ScheduleTypeEnum.CONTINUOUS.getCode(), result.getScheduleType())
                 && StringUtils.isNotEmpty(sku.getStructureName())
                 && StringUtils.isNotEmpty(result.getLhMachineCode());
+    }
+
+    /**
+     * 判断当前物料和产品状态是否已经形成真实余量收尾，允许进入收尾补满。
+     *
+     * <p>预计收尾标签可能在排产前生成，但续作降模、换胶囊和日标准收敛后，同组实际计划量仍可能
+     * 小于最终收尾目标。只有当前批次同物料、同产品状态全部结果量已经达到最终收尾目标，才允许
+     * 追加“补量”和允许超量，避免未排完余量时提前补量并触发下机。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 来源SKU
+     * @return true-真实余量已经排完；false-仍有严格目标剩余量
+     */
+    private boolean isActualSurplusEndingForFill(LhScheduleContext context,
+                                                  SkuScheduleDTO sku) {
+        if (Objects.isNull(context) || Objects.isNull(sku)) {
+            return false;
+        }
+        int finalEndingTargetQty = this.getTargetScheduleQtyResolver()
+                .resolveFinalEndingTargetQtyByStaticRelation(context, sku);
+        int actualScheduledQty = this.resolveScheduledQtyByMaterialStatus(context, sku);
+        boolean actualSurplusEnding = finalEndingTargetQty > 0
+                && actualScheduledQty >= finalEndingTargetQty;
+        if (!actualSurplusEnding) {
+            log.info("SKU收尾补满跳过, batchNo: {}, scheduleDate: {}, materialCode: {}, productStatus: {}, "
+                            + "actualScheduledQty: {}, finalEndingTargetQty: {}, remainingTargetQty: {}, "
+                            + "原因: 同物料同产品状态真实硫化余量尚未排完",
+                    context.getBatchNo(), context.getScheduleDate(), sku.getMaterialCode(),
+                    sku.getProductStatus(), actualScheduledQty, finalEndingTargetQty,
+                    Math.max(0, finalEndingTargetQty - actualScheduledQty));
+        }
+        return actualSurplusEnding;
     }
 
     /**
