@@ -1449,104 +1449,55 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
      * 解析释放续作机台原样重新启用的生产起点。
      *
      * <p>续作加机台仍在目标业务日参加统一SKU排序和选机；当轮最终选回原释放机台且整套模具
-     * 未变化时，不需要8小时换模，也不应等到目标业务日首班才重新生产。重新启用起点取目标业务日
-     * 首班的相邻上一班开始时刻，并与机台真实就绪时间取较晚值。以2026-08-21为目标业务日时，
-     * 首班为class3（2026-08-20 22:00），相邻上一班即class2（2026-08-20 14:00）。</p>
+     * 未变化时，只豁免换模、换活字块和首检，不豁免增机生效日期。重新启用起点必须同时满足
+     * 机台真实就绪时间、当前业务日首班和 {@code firstAddMachineProductionDate} 首班下限。
+     * 以2026-08-21为首次增机业务日时，最早只能从class3（2026-08-20 22:00）继续续作，
+     * 不得借用T日class2产能。</p>
      *
      * @param context 排程上下文
      * @param dayContext 当前目标业务日上下文
+     * @param sku 当前续作加机台补偿SKU
      * @param machineReadyTime 原续作机台真实就绪时间
-     * @return 允许重新启用的起点；缺少相邻上一班或机台已错过该班时返回null
+     * @return 允许重新启用的起点；当前业务日已无可排时间时返回null
      */
     private Date resolveReleasedContinuationReuseStartTime(
             LhScheduleContext context,
             DayScheduleContext dayContext,
+            SkuScheduleDTO sku,
             Date machineReadyTime) {
-        LhShiftConfigVO previousShift = this.resolvePreviousShiftForDayContext(
-                context, dayContext);
-        if (Objects.isNull(previousShift)
-                || Objects.isNull(previousShift.getShiftStartDateTime())
-                || Objects.isNull(previousShift.getShiftEndDateTime())
-                || Objects.isNull(machineReadyTime)) {
+        if (Objects.isNull(context) || Objects.isNull(dayContext)
+                || Objects.isNull(sku) || Objects.isNull(machineReadyTime)
+                || Objects.isNull(dayContext.getDayStartTime())
+                || Objects.isNull(dayContext.getDayEndTime())) {
             return null;
         }
-        Date reuseStartTime = machineReadyTime.after(previousShift.getShiftStartDateTime())
-                ? machineReadyTime : previousShift.getShiftStartDateTime();
-        return reuseStartTime.before(previousShift.getShiftEndDateTime())
+        Date reuseStartTime = this.resolveLaterTime(
+                machineReadyTime, dayContext.getDayStartTime());
+        reuseStartTime = this.alignAddedMachineProductionStartTime(
+                sku, reuseStartTime, context.getScheduleWindowShifts(), 0,
+                sku.getFirstAddMachineProductionDate());
+        return Objects.nonNull(reuseStartTime)
+                && reuseStartTime.before(dayContext.getDayEndTime())
                 ? reuseStartTime : null;
     }
 
     /**
      * 构建续作重新启用本轮允许写入的班次切片。
      *
-     * <p>只在当前业务日原有班次前追加一个相邻上一班，禁止把完整三天窗口一次性全部写入，
-     * 避免与下一业务日跨日续排重复。普通新增和未命中原样续作的候选仍使用原dayShifts。</p>
+     * <p>同物料同模具只代表无需切换，不代表可以提前生产。当前业务日只允许写入本日班次，
+     * 后续业务日继续由现有跨日续排追加，禁止把增机生效日前一班带入本轮。</p>
      *
-     * @param context 排程上下文
      * @param dayContext 当前业务日上下文
-     * @return 相邻上一班加当前业务日班次；不存在上一班时返回当前业务日班次副本
+     * @return 当前业务日班次副本
      */
     private List<LhShiftConfigVO> resolveReleasedContinuationReuseShifts(
-            LhScheduleContext context,
             DayScheduleContext dayContext) {
         List<LhShiftConfigVO> resultShifts = new ArrayList<LhShiftConfigVO>(4);
-        LhShiftConfigVO previousShift = this.resolvePreviousShiftForDayContext(
-                context, dayContext);
-        if (Objects.nonNull(previousShift)) {
-            resultShifts.add(previousShift);
-        }
         if (Objects.nonNull(dayContext)
                 && !CollectionUtils.isEmpty(dayContext.getDayShifts())) {
             resultShifts.addAll(dayContext.getDayShifts());
         }
         return resultShifts;
-    }
-
-    /**
-     * 解析当前业务日首班相邻的上一班。
-     *
-     * @param context 排程上下文
-     * @param dayContext 当前业务日上下文
-     * @return 相邻上一班；窗口首班或班次不连续时返回null
-     */
-    private LhShiftConfigVO resolvePreviousShiftForDayContext(
-            LhScheduleContext context,
-            DayScheduleContext dayContext) {
-        if (Objects.isNull(context) || Objects.isNull(dayContext)
-                || Objects.isNull(dayContext.getDayStartTime())
-                || CollectionUtils.isEmpty(context.getScheduleWindowShifts())) {
-            return null;
-        }
-        for (LhShiftConfigVO shift : context.getScheduleWindowShifts()) {
-            if (Objects.nonNull(shift)
-                    && Objects.nonNull(shift.getShiftEndDateTime())
-                    && shift.getShiftEndDateTime().equals(dayContext.getDayStartTime())) {
-                return shift;
-            }
-        }
-        return null;
-    }
-
-    /**
-     * 判断续作重新启用起点是否位于本轮追加的相邻上一班。
-     *
-     * @param context 排程上下文
-     * @param dayContext 当前业务日上下文
-     * @param productionStartTime 实际开产时间
-     * @return true-允许写入相邻上一班；false-不属于续作回看窗口
-     */
-    private boolean isReleasedContinuationReuseStartAllowed(
-            LhScheduleContext context,
-            DayScheduleContext dayContext,
-            Date productionStartTime) {
-        LhShiftConfigVO previousShift = this.resolvePreviousShiftForDayContext(
-                context, dayContext);
-        return Objects.nonNull(previousShift)
-                && Objects.nonNull(productionStartTime)
-                && Objects.nonNull(previousShift.getShiftStartDateTime())
-                && Objects.nonNull(previousShift.getShiftEndDateTime())
-                && !productionStartTime.before(previousShift.getShiftStartDateTime())
-                && productionStartTime.before(previousShift.getShiftEndDateTime());
     }
 
     /**
@@ -4054,7 +4005,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 Date releasedContinuationReuseStartTime =
                         Objects.isNull(selectedAvailabilityPlan)
                                 ? null : this.resolveReleasedContinuationReuseStartTime(
-                                context, dayContext,
+                                context, dayContext, sku,
                                 selectedAvailabilityPlan.getMachineReadyTime());
                 boolean substitutionTakeoverWithoutMouldChange =
                         context.isScheduleSubstitutionSku(sku)
@@ -4227,7 +4178,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                         ? selectedAvailabilityPlan.getMachineReadyTime()
                         : capacityCalculate.calculateStartTime(context, machineCode, endingTime);
                 List<LhShiftConfigVO> schedulingShifts = releasedContinuationReuse
-                        ? this.resolveReleasedContinuationReuseShifts(context, dayContext)
+                        ? this.resolveReleasedContinuationReuseShifts(dayContext)
                         : shifts;
                 int switchDurationHours;
                 if (takeoverWithoutMouldChange) {
@@ -4251,7 +4202,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 boolean structureSwitchLookbackAllowed =
                         Objects.nonNull(structureSwitchLookbackDecision);
                 if (releasedContinuationReuse) {
-                    // 原机台原模具重启没有切换动作，直接从目标业务日相邻上一班起排。
+                    // 原机台原模具重启没有切换动作，但仍从增机生效业务日首班开始续作。
                     switchReadyTime = this.resolveLaterTime(
                             machineReadyTime, releasedContinuationReuseStartTime);
                 } else {
@@ -4270,8 +4221,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                  * 生产日之前已经空闲，且按本次真实切换耗时能在当前业务日日终前完成准备，就允许
                  * 在完整八班窗口中寻找换模时点；正式开产仍按换模/首检完成时间与胎胚可供时间取较晚值。
                  */
-                boolean productionPreparationLookbackAllowed = releasedContinuationReuse
-                        || structureSwitchLookbackAllowed
+                boolean productionPreparationLookbackAllowed = structureSwitchLookbackAllowed
                         || this.isProductionPreparationLookbackAllowed(
                                 context, dayContext, switchReadyTime,
                                 switchDurationHours, productionPreparationNotBeforeTime);
@@ -4326,10 +4276,12 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 if (releasedContinuationReuse) {
                     log.info("续作加机台当轮选回原释放机台，按同物料同模具续作重启时间轴处理, "
                                     + "batchNo: {}, scheduleDate: {}, materialCode: {}, productStatus: {}, "
-                                    + "machineCode: {}, machineReadyTime: {}, reuseStartTime: {}, "
-                                    + "effect: 不提前锁机，命中后不换模、不首检、不占用换模配额",
+                                    + "machineCode: {}, firstAddMachineProductionDate: {}, "
+                                    + "machineReadyTime: {}, reuseStartTime: {}, "
+                                    + "effect: 不提前锁机，命中后不换模、不首检、不占用换模配额、不得早于增机生效日",
                             context.getBatchNo(), dayContext.getScheduleDate(),
                             sku.getMaterialCode(), sku.getProductStatus(), machineCode,
+                            sku.getFirstAddMachineProductionDate(),
                             LhScheduleTimeUtil.formatDateTime(machineReadyTime),
                             LhScheduleTimeUtil.formatDateTime(switchReadyTime));
                 } else if (productionPreparationLookbackAllowed) {
@@ -4946,13 +4898,19 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                             : resolveEarlyProductionDecision(
                                     context, sku, firstProductionStartTime, schedulingShifts, isEnding,
                                     dayContext.getCurrentPhase());
-                    // 补偿 SKU 已由续作中心链路确定首次增机日，不得再被已消费的剩余日计划额度推迟。
-                    if (!releasedContinuationReuse) {
-                        firstProductionStartTime = alignProductionStartTimeByAddMachineDate(
-                                context, sku, firstProductionStartTime, schedulingShifts,
-                                totalScheduledQty, currentAddMachineProductionDate,
-                                isEnding, earlyProductionDecision);
-                    }
+                    /*
+                     * 原续作机台原模具重启只豁免切换动作，正式开产仍必须经过与普通增机
+                     * 相同的 dayN 生效日下限。该对齐不调用提前生产，也不会影响真实换模/
+                     * 换活字块在T日中班完成跨日准备的时间轴。
+                     */
+                    LocalDate productionAlignmentDate = releasedContinuationReuse
+                            && Objects.nonNull(sku.getFirstAddMachineProductionDate())
+                            ? sku.getFirstAddMachineProductionDate()
+                            : currentAddMachineProductionDate;
+                    firstProductionStartTime = alignProductionStartTimeByAddMachineDate(
+                            context, sku, firstProductionStartTime, schedulingShifts,
+                            totalScheduledQty, productionAlignmentDate,
+                            isEnding, earlyProductionDecision);
                     theoreticalProductionStartTime = firstProductionStartTime;
                 }
                 if (Objects.nonNull(selectedAvailabilityPlan)
@@ -4979,12 +4937,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                             Objects.isNull(formalTargetShift)
                                     ? "无" : "class" + formalTargetShift.getShiftIndex());
                 }
-                boolean releasedContinuationReuseStartAllowed = releasedContinuationReuse
-                        && this.isReleasedContinuationReuseStartAllowed(
-                        context, dayContext, firstProductionStartTime);
                 if (firstProductionStartTime == null
-                        || (!dayContext.contains(firstProductionStartTime)
-                        && !releasedContinuationReuseStartAllowed)) {
+                        || !dayContext.contains(firstProductionStartTime)) {
                     dailyDeferredReason = "换模或首检完成后当前业务日已无可开产班次";
                     log.debug("新增SKU排程窗口内无可开产时间, materialCode: {}, 机台: {}, 首检时间: {}, 班产: {}, 硫化时间: {}, 模数: {}",
                             sku.getMaterialCode(), machineCode,
@@ -12108,9 +12062,9 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 && this.isContinuationAddMachineCandidate(sku)
                 && Objects.nonNull(sku.getFirstAddMachineProductionDate())) {
             /*
-             * 原续作机台从目标业务日相邻上一班提前恢复生产，但“为什么需要这台机台”仍来自
-             * firstAddMachineProductionDate 的统一Map目标。不能用提前恢复班次所属T日回查机台数，
-             * 否则会把T日目标2台误用于T+1目标3台，并把刚选回的K2201再次判成无需新增。
+             * 原续作机台原模具重启的增机依据和开产下限都来自
+             * firstAddMachineProductionDate 的统一Map目标。这里继续使用同一业务日期统计目标
+             * 机台数，避免按自然时间戳或相邻班次误取其他业务日的机台数。
              */
             productionDate = sku.getFirstAddMachineProductionDate();
         } else {
@@ -14206,11 +14160,13 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         result.setMouldChangeStartTime(null);
         log.info("释放续作机台同物料同模具重新启用, factoryCode: {}, batchNo: {}, "
                         + "scheduleDate: {}, materialCode: {}, productStatus: {}, machineCode: {}, "
-                        + "reuseStartTime: {}, mouldCodes: {}, scheduleType: {}, isChangeMould: 0, "
-                        + "effect: 不换模、不首检、不占用换模配额",
+                        + "firstAddMachineProductionDate: {}, reuseStartTime: {}, mouldCodes: {}, "
+                        + "scheduleType: {}, isChangeMould: 0, "
+                        + "effect: 不换模、不首检、不占用换模配额、不提前生产",
                 context.getFactoryCode(), context.getBatchNo(),
                 LhScheduleTimeUtil.formatDate(context.getScheduleTargetDate()),
                 sku.getMaterialCode(), sku.getProductStatus(), machine.getMachineCode(),
+                sku.getFirstAddMachineProductionDate(),
                 LhScheduleTimeUtil.formatDateTime(productionStartTime),
                 Objects.isNull(allocationResult)
                         ? Collections.emptyList()
@@ -14252,6 +14208,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 .append(", machineCode=").append(machine.getMachineCode())
                 .append(", preferredContinuousMachineCode=")
                 .append(sku.getPreferredContinuousMachineCode())
+                .append(", firstAddMachineProductionDate=")
+                .append(sku.getFirstAddMachineProductionDate())
                 .append(", reuseStartTime=")
                 .append(LhScheduleTimeUtil.formatDateTime(productionStartTime))
                 .append(", startShift=")
@@ -14265,7 +14223,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 .append(Objects.isNull(allocationResult)
                         ? Collections.emptyList()
                         : allocationResult.getAllocatedMouldCodeList())
-                .append(", resultScheduleType=01, isChangeMould=0, firstInspection=0, mouldQuotaConsumed=0")
+                .append(", resultScheduleType=01, isChangeMould=0, firstInspection=0, "
+                        + "mouldQuotaConsumed=0, earlyProduction=0")
                 .toString();
         PriorityTraceLogHelper.appendProcessLog(
                 context, "释放续作机台同物料同模具重新启用", detail);
