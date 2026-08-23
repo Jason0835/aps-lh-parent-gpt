@@ -2173,6 +2173,14 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             }
             String dateKey = LhScheduleTimeUtil.formatDate(plan.getPlanDate());
             dailyMachineMap.computeIfAbsent(dateKey, key -> new ArrayList<>()).add(physicalMachineCode);
+            if (context.isCrossDayPreparationMouldChange(
+                    plan.getLhMachineCode(), plan.getPlanDate())) {
+                /*
+                 * 生产日前跨日准备是贴近下一业务日首班的已确认时间轴：仍计入每日15次
+                 * 硬上限，但不参与早8/中7参考分布告警，否则合法的T日中班准备会被误报。
+                 */
+                continue;
+            }
             if (LhScheduleTimeUtil.isMorningShift(context, plan.getPlanDate())) {
                 morningMachineMap.computeIfAbsent(dateKey, key -> new ArrayList<>()).add(physicalMachineCode);
                 continue;

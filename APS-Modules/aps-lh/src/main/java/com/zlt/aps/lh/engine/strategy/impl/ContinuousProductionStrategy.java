@@ -9450,10 +9450,14 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                         expansionTriggerQty, productionRemainingQty);
                 continue;
             }
+            String preferredReleasedMachineCode =
+                    this.resolvePreferredReleasedContinuousMachineCode(
+                            context, sourceSku);
             SkuScheduleDTO compensationSku = copyContinuousCompensationSku(
                     sourceSku, productionRemainingQty, expansionTriggerQty,
                     firstAddMachineProductionDate, activeMachineCount,
-                    requiredMachineCount, shortageMachineCount, addMachineDayPlanQty);
+                    requiredMachineCount, shortageMachineCount, addMachineDayPlanQty,
+                    preferredReleasedMachineCode);
             /*
              * dayN 产能缺口只负责触发新增机台和限制新增台数，不能收敛“物料+产品状态”实际消费账本：
              * 否则 56-54=2 会被误当成整台机台的生产上限，新增机台只排2条首检便提前下机。
@@ -10392,6 +10396,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
      * @param requiredMachineCount dayN要求的最小机台数
      * @param shortageMachineCount 当前缺少的机台数
      * @param addMachineDayPlanQty 首次增机日的原始日计划量
+     * @param preferredReleasedMachineCode 同物料同状态分组中已经真实释放的原续作机台
      * @return 新增补偿SKU
      */
     private SkuScheduleDTO copyContinuousCompensationSku(SkuScheduleDTO sourceSku,
@@ -10401,15 +10406,21 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                                                          int activeMachineCount,
                                                          int requiredMachineCount,
                                                          int shortageMachineCount,
-                                                         int addMachineDayPlanQty) {
+                                                         int addMachineDayPlanQty,
+                                                         String preferredReleasedMachineCode) {
         SkuScheduleDTO compensationSku = new SkuScheduleDTO();
         BeanUtil.copyProperties(sourceSku, compensationSku);
         ProductionQuantityPolicy policy = ProductionQuantityPolicy.from(sourceSku, sourceSku.isStrictTargetQty());
         compensationSku.setScheduleType(ScheduleTypeEnum.NEW_SPEC.getCode());
         compensationSku.setSourceType(SkuScheduleSourceTypeEnum.CONTINUATION_ADD_MACHINE.getCode());
         compensationSku.setContinuousMachineCode(null);
-        // 续作增机台补偿只进入新增统一排序和统一选机，不锁回原续作机台。
-        compensationSku.setPreferredContinuousMachineCode(null);
+        /*
+         * 只保留同物料同状态分组中已真实释放的原续作机台，作为“轮到当前SKU时
+         * 的优先候选”，不在S4.4提前锁机：
+         * S4.5仍先执行统一SKU排序、硬过滤和真实可开产班次筛选，只有原机台仍在
+         * 当轮候选集中时才优先尝试；原机台已被占用或不满足约束时，继续回落普通候选顺序。
+         */
+        compensationSku.setPreferredContinuousMachineCode(preferredReleasedMachineCode);
         compensationSku.setContinuousCompensationSku(true);
         compensationSku.setTargetScheduleQty(productionRemainingQty);
         compensationSku.setPendingQty(productionRemainingQty);
@@ -10428,6 +10439,42 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         compensationSku.setNextDayPlanQtyAfterWindow(sourceSku.getNextDayPlanQtyAfterWindow());
         compensationSku.setFutureMonthPlanQtyAfterWindow(sourceSku.getFutureMonthPlanQtyAfterWindow());
         return compensationSku;
+    }
+
+    /**
+     * 解析续作加机台候选可在S4.5当轮优先尝试的真实释放机台。
+     *
+     * <p>当前仍在生产的原续作机台不能作为“重新启用”目标，否则会提前关闭历史候选分层并
+     * 误导新增选机。这里只从同物料、同产品状态的续作副本中查找已经被S4.4真实登记释放的
+     * 机台；找到后仅把编码传给S4.5，是否仍在当轮候选、模具是否完全一致继续由S4.5判断。</p>
+     *
+     * @param context 排程上下文
+     * @param sourceSku 当前续作加机台来源SKU
+     * @return 可优先尝试的真实释放机台；不存在时返回null
+     */
+    private String resolvePreferredReleasedContinuousMachineCode(
+            LhScheduleContext context,
+            SkuScheduleDTO sourceSku) {
+        if (Objects.isNull(context) || Objects.isNull(sourceSku)
+                || CollectionUtils.isEmpty(context.getContinuousSkuList())
+                || CollectionUtils.isEmpty(context.getReleasedContinuousMachineCodeSet())) {
+            return null;
+        }
+        for (SkuScheduleDTO continuousSku : context.getContinuousSkuList()) {
+            if (Objects.isNull(continuousSku)
+                    || !StringUtils.equals(
+                    continuousSku.getMaterialCode(), sourceSku.getMaterialCode())
+                    || !StringUtils.equals(
+                    StringUtils.trimToEmpty(continuousSku.getProductStatus()),
+                    StringUtils.trimToEmpty(sourceSku.getProductStatus()))
+                    || StringUtils.isEmpty(continuousSku.getContinuousMachineCode())
+                    || !context.getReleasedContinuousMachineCodeSet().contains(
+                    continuousSku.getContinuousMachineCode())) {
+                continue;
+            }
+            return continuousSku.getContinuousMachineCode();
+        }
+        return null;
     }
 
     /**
