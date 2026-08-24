@@ -291,6 +291,65 @@ public class NewSpecMachineAvailabilityPlan {
                 formalTargetShift, residualCapacityInfo);
     }
 
+    /**
+     * 将当轮已经选中的候选计划切换为原续作机台原模具重新启用时间轴。
+     *
+     * <p>该方法只供正式选机完成后的日志和提交链复用，不参与前置候选筛选，因此不会
+     * 提前锁定原续作机台。重新启用没有换模和首检，候选、准备及正式生产时间统一使用
+     * 实际续作起点，避免选机日志继续展示已经被取消的虚假换模时间。</p>
+     *
+     * @param reuseStartTime 原续作机台实际重新启用时间
+     * @param reuseShift 重新启用时间所属班次
+     * @return 无换模、无首检的续作重新启用计划
+     */
+    public NewSpecMachineAvailabilityPlan withReleasedContinuationReuse(
+            Date reuseStartTime,
+            LhShiftConfigVO reuseShift) {
+        return new NewSpecMachineAvailabilityPlan(
+                machine, Objects.nonNull(reuseStartTime) && Objects.nonNull(reuseShift), null,
+                occupationEndTime, machineReadyTime, null, null,
+                productionNotBeforeTime, candidateProductionNotBeforeTime,
+                reuseStartTime, reuseShift, null, null,
+                reuseStartTime, reuseShift,
+                Objects.nonNull(reuseStartTime) && Objects.nonNull(reuseShift),
+                reuseStartTime, reuseShift, historicalResidualCapacityInfo);
+    }
+
+    /**
+     * 将当轮已选机台计划切换为正式提交成功的跨日准备时间轴。
+     *
+     * <p>候选分组仍保留原换模均衡口径，只有机台最终选定且跨日准备提交成功后才调用
+     * 本方法更新最终选机日志，避免日志继续展示已被正式跨日时间轴替代的次日换模。</p>
+     *
+     * @param committedChangeoverStartTime 正式换模开始时间
+     * @param committedChangeoverEndTime 正式换模完成时间
+     * @param committedProductionStartTime 正式开产时间
+     * @param committedProductionShift 正式开产班次
+     * @param committedInspectionPlan 正式首检计划
+     * @return 正式提交后的跨日准备计划
+     */
+    public NewSpecMachineAvailabilityPlan withCommittedPreparationTimeline(
+            Date committedChangeoverStartTime,
+            Date committedChangeoverEndTime,
+            Date committedProductionStartTime,
+            LhShiftConfigVO committedProductionShift,
+            FirstInspectionAllocationPlan committedInspectionPlan) {
+        boolean committedAvailable = Objects.nonNull(committedChangeoverStartTime)
+                && Objects.nonNull(committedChangeoverEndTime)
+                && Objects.nonNull(committedProductionStartTime)
+                && Objects.nonNull(committedProductionShift);
+        return new NewSpecMachineAvailabilityPlan(
+                machine, committedAvailable, committedAvailable ? null : unavailableReason,
+                occupationEndTime, machineReadyTime,
+                committedChangeoverStartTime, committedChangeoverEndTime,
+                productionNotBeforeTime, candidateProductionNotBeforeTime,
+                committedProductionStartTime, committedProductionShift,
+                committedInspectionPlan, committedChangeoverEndTime,
+                committedProductionStartTime, committedProductionShift,
+                committedAvailable, committedProductionStartTime,
+                committedProductionShift, historicalResidualCapacityInfo);
+    }
+
     public MachineScheduleDTO getMachine() {
         return machine;
     }

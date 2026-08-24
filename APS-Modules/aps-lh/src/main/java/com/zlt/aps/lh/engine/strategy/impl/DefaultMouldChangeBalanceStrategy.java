@@ -163,6 +163,19 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
                 continue;
             }
 
+            /*
+             * 跨日准备已经由新增主链确认：机台在目标业务日前空闲，当前时点是贴近下一业务日
+             * 首班生产下限的最后合法换模窗口。该动作仍计入每日15次硬上限和真实班次计数，
+             * 但不再因早8/中7均衡参考值被搬到次日；否则14:00开始、22:00完成的准备会被
+             * 推迟为次日06:00换模、14:00开产。20:00禁开始换模及停机约束已在上方完成校验。
+             */
+            if (isCrossDayPreparationAction(actionType)
+                    && isSwitchCompletionBeforeBusinessDayEnd(
+                    adjustedTime, switchDurationHours, businessDayEndTime)) {
+                return registerMouldChangeAndLog(
+                        context, adjustedTime, sku, actionType, dateKey);
+            }
+
             if (LhScheduleTimeUtil.isMorningShift(context, adjustedTime)) {
                 // 早班未达参考上限：保持最早合法时间。
                 if (counts[IDX_MORNING] < morningLimit) {
@@ -281,6 +294,11 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
                 adjustedTime = getNextCalendarDayMorningStart(context, adjustedTime);
                 continue;
             }
+            if (isCrossDayPreparationAction(actionType)
+                    && isSwitchCompletionBeforeBusinessDayEnd(
+                    adjustedTime, switchDurationHours, businessDayEndTime)) {
+                return adjustedTime;
+            }
             if (LhScheduleTimeUtil.isMorningShift(context, adjustedTime)) {
                 if (counts[IDX_MORNING] < getMorningLimit(context)) {
                     return adjustedTime;
@@ -310,6 +328,38 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
             adjustedTime = getNextCalendarDayMorningStart(context, adjustedTime);
         }
         return null;
+    }
+
+    /**
+     * 判断当前动作是否为生产日前贴近下一个业务日首班的跨日准备。
+     *
+     * @param actionType 换模动作类型
+     * @return true-跨日准备；false-普通换模、提前生产换模或换活字块
+     */
+    private boolean isCrossDayPreparationAction(String actionType) {
+        return StringUtils.equals(
+                ACTION_CROSS_DAY_PREPARATION_MOULD_CHANGE, actionType);
+    }
+
+    /**
+     * 校验跨日准备换模是否能在当前生产业务日日终前完成。
+     *
+     * @param switchStartTime 换模开始时间
+     * @param switchDurationHours 换模时长
+     * @param businessDayEndTime 当前生产业务日日终；为空时不追加日终限制
+     * @return true-可以承接；false-完成时间到达或越过业务日日终
+     */
+    private boolean isSwitchCompletionBeforeBusinessDayEnd(
+            Date switchStartTime,
+            int switchDurationHours,
+            Date businessDayEndTime) {
+        if (Objects.isNull(businessDayEndTime)) {
+            return true;
+        }
+        Date switchCompleteTime = LhScheduleTimeUtil.addHours(
+                switchStartTime, switchDurationHours);
+        return Objects.nonNull(switchCompleteTime)
+                && switchCompleteTime.before(businessDayEndTime);
     }
 
     /**

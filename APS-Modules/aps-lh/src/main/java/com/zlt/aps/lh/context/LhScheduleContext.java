@@ -757,6 +757,12 @@ public class LhScheduleContext {
      */
     private Map<String, int[]> dailyMouldChangeCountMap = new LinkedHashMap<>();
     /**
+     * 生产日前跨日准备换模事件，key=物理机台编码+切换开始时间戳。
+     * <p>事件仍计入每日15次硬上限，但最终复核早8/中7参考分布时需单独识别，
+     * 避免把已确认贴近下一业务日生产下限的合法准备误报为均衡异常。</p>
+     */
+    private Set<String> crossDayPreparationMouldChangeEventKeySet = new LinkedHashSet<>();
+    /**
      * 同胎胚换模班次占用, key=胎胚编码, value=已安排换模班次索引集合
      */
     private Map<String, Set<Integer>> greenTireChangeoverShiftMap = new LinkedHashMap<>();
@@ -1753,6 +1759,57 @@ public class LhScheduleContext {
         if (details != null) {
             this.validationErrorDetailList.addAll(details);
         }
+    }
+
+    /**
+     * 登记生产日前跨日准备换模事件。
+     *
+     * @param machineCode 换模机台编码
+     * @param mouldChangeStartTime 换模开始时间
+     */
+    public void registerCrossDayPreparationMouldChange(
+            String machineCode,
+            Date mouldChangeStartTime) {
+        String eventKey = this.buildCrossDayPreparationMouldChangeEventKey(
+                machineCode, mouldChangeStartTime);
+        if (StringUtils.isNotEmpty(eventKey)) {
+            this.crossDayPreparationMouldChangeEventKeySet.add(eventKey);
+        }
+    }
+
+    /**
+     * 判断模具交替计划是否属于已登记的生产日前跨日准备。
+     *
+     * @param machineCode 模具交替计划机台编码
+     * @param mouldChangeStartTime 模具交替计划开始时间
+     * @return true-跨日准备；false-普通换模或换活字块
+     */
+    public boolean isCrossDayPreparationMouldChange(
+            String machineCode,
+            Date mouldChangeStartTime) {
+        String eventKey = this.buildCrossDayPreparationMouldChangeEventKey(
+                machineCode, mouldChangeStartTime);
+        return StringUtils.isNotEmpty(eventKey)
+                && this.crossDayPreparationMouldChangeEventKeySet.contains(eventKey);
+    }
+
+    /**
+     * 构建跨日准备物理换模事件键。
+     *
+     * @param machineCode 机台编码；单控L/R统一折算为物理整机
+     * @param mouldChangeStartTime 换模开始时间
+     * @return 事件键；参数不完整时返回空串
+     */
+    private String buildCrossDayPreparationMouldChangeEventKey(
+            String machineCode,
+            Date mouldChangeStartTime) {
+        if (StringUtils.isEmpty(machineCode) || Objects.isNull(mouldChangeStartTime)) {
+            return StringUtils.EMPTY;
+        }
+        String physicalMachineCode = LhSingleControlMachineUtil
+                .resolvePhysicalMachineCode(machineCode);
+        return StringUtils.defaultString(physicalMachineCode)
+                + "|" + mouldChangeStartTime.getTime();
     }
 
     /**
