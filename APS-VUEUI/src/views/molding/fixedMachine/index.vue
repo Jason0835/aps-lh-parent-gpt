@@ -142,6 +142,8 @@ export default {
         {
           prop: "factoryCode",
           label: this.$t("ui.data.column.mdmCxMachineFixed.factoryCode"),
+          align: "center",
+          halign: "center",
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
@@ -150,6 +152,8 @@ export default {
         {
           prop: "cxMachineCode",
           label: this.$t("ui.data.column.mdmCxMachineFixed.cxMachineCode"),
+          align: "center",
+          halign: "center",
           width: 120,
         },
         {
