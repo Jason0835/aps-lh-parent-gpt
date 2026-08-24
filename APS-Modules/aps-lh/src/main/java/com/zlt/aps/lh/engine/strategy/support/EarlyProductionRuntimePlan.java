@@ -32,6 +32,9 @@ public class EarlyProductionRuntimePlan implements Serializable {
     /** 候选观察范围内最早存在原始日计划量的未来日期 */
     private LocalDate futurePlanDate;
 
+    /** 本次排程固定的提前生产原始计划截止日期（窗口结束日 + 参数天数） */
+    private LocalDate earlyProductionMaxDate;
+
     /** 当前月 TOTAL_QTY 为0、只能走提前生产流程的候选标识 */
     private boolean futureOnlyCandidate;
 
@@ -53,7 +56,7 @@ public class EarlyProductionRuntimePlan implements Serializable {
     /** 实际提前自然日数 */
     private int earlyDays;
 
-    /** 本次生效的提前生产天数阈值 */
+    /** 本次生效的窗口外额外拉取天数 */
     private int earlyProductionDaysThreshold;
 
     /** 当前业务日原始日计划量，用于阶段归属审计 */
@@ -74,7 +77,9 @@ public class EarlyProductionRuntimePlan implements Serializable {
     /**
      * 当前 SKU、当前提前生产阶段共享的临时前移日计划账本。
      *
-     * <p>同一 SKU 成功增加多台机时必须共同消费本 Map，禁止为每台机重新复制额度。</p>
+     * <p>账本覆盖从最近未来计划日起至固定截止日的全部正计划来源日，并按实际提前天数
+     * 投影到当前窗口时间轴。同一 SKU 成功增加多台机时必须共同消费本 Map，禁止为每台机
+     * 重新复制额度；窗口外无计划的零额度日期不落 Map，控制批量候选场景内存占用。</p>
      */
     private Map<LocalDate, SkuDailyPlanQuotaDTO> shiftedDailyPlanQuotaMap =
             new LinkedHashMap<LocalDate, SkuDailyPlanQuotaDTO>(4);

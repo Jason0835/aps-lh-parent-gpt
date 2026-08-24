@@ -221,10 +221,16 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         // 不能依赖此时尚未写入上下文的 windowEndDate。
         Date scheduleWindowEndDate = LhScheduleTimeUtil.addDays(endDate, -1);
         int earlyProductionDaysThreshold = resolveEarlyProductionDaysThreshold(context);
-        // SKU提前生产需要从窗口结束日继续向后观察N个自然日，月计划和结构机台数按真实年月批量加载。
-        Date earlyProductionLookupEndDate = LhScheduleTimeUtil.addDays(endDate, earlyProductionDaysThreshold);
-        // requiredMonthMap 使用右开区间；月计划归集查找 dayN 时使用闭区间，需回退一天得到真实结束日。
-        Date earlyProductionRangeEndDate = LhScheduleTimeUtil.addDays(earlyProductionLookupEndDate, -1);
+        /*
+         * SKU 提前生产固定从窗口结束日额外向后观察 N 个自然日。正式入口已在上下文中
+         * 固化截止日；兼容独立测试构造的上下文时按同一公式计算，不再从当前业务日派生。
+         */
+        Date earlyProductionRangeEndDate = Objects.nonNull(context.getEarlyProductionMaxDate())
+                ? LhScheduleTimeUtil.clearTime(context.getEarlyProductionMaxDate())
+                : LhScheduleTimeUtil.addDays(scheduleWindowEndDate, earlyProductionDaysThreshold);
+        // 月份和结构机台统计查询使用右开区间，固定截止日需要再加一天。
+        Date earlyProductionLookupEndDate = LhScheduleTimeUtil.addDays(
+                earlyProductionRangeEndDate, 1);
         Map<String, LocalDate> requiredMonthMap = resolveRequiredMonthMap(startDate, earlyProductionLookupEndDate);
         /*
          * 结构收尾对齐只观察固定三天窗口[T,T+2]。该月份集合必须与提前生产、续作前后看月份隔离，

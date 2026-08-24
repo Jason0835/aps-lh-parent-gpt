@@ -173,11 +173,13 @@ public class EarlyProductionRuntimePlanService {
             EarlyProductionDecision decision) {
         LocalDate futurePlanDate = decision.getFuturePlanDate();
         int earlyDays = (int) ChronoUnit.DAYS.between(currentDate, futurePlanDate);
+        LocalDate earlyProductionMaxDate = EarlyProductionChecker.resolveEarlyProductionMaxDate(
+                context, windowEndDate);
         EarlyProductionRuntimePlan runtimePlan = Objects.isNull(existingRuntimePlan)
                 ? new EarlyProductionRuntimePlan() : existingRuntimePlan;
         this.fillRuntimePlanBaseInfo(
                 context, sku, currentDate, windowStartDate,
-                futurePlanDate, earlyDays, runtimePlan, decision);
+                futurePlanDate, earlyProductionMaxDate, earlyDays, runtimePlan, decision);
         if (!decision.isAllowed()) {
             log.info("提前生产准入未通过，不注册激活运行视图, factoryCode: {}, batchNo: {}, "
                             + "materialCode: {}, currentDate: {}, futurePlanDate: {}, structureName: {}, reason: {}",
@@ -188,10 +190,11 @@ public class EarlyProductionRuntimePlanService {
 
         Map<LocalDate, SkuDailyPlanQuotaDTO> sourceQuotaMap =
                 this.buildSourceQuotaMap(
-                        context, sku, currentDate, windowEndDate, earlyDays);
+                        context, sku, currentDate, earlyProductionMaxDate);
         Map<LocalDate, SkuDailyPlanQuotaDTO> shiftedQuotaMap =
                 SkuDailyPlanQuotaUtil.buildShiftedEarlyProductionQuotaMap(
-                        sourceQuotaMap, currentDate, windowEndDate, futurePlanDate);
+                        sourceQuotaMap, currentDate, windowEndDate,
+                        futurePlanDate, earlyProductionMaxDate);
         if (CollectionUtils.isEmpty(shiftedQuotaMap)) {
             return runtimePlan;
         }
@@ -219,6 +222,7 @@ public class EarlyProductionRuntimePlanService {
      * @param currentDate 当前业务日
      * @param windowStartDate 排程窗口 T 日
      * @param futurePlanDate 未来计划日
+     * @param earlyProductionMaxDate 本次排程固定的最晚原始计划日期
      * @param earlyDays 实际提前天数
      * @param runtimePlan 运行视图
      * @param decision 准入结论
@@ -229,12 +233,14 @@ public class EarlyProductionRuntimePlanService {
             LocalDate currentDate,
             LocalDate windowStartDate,
             LocalDate futurePlanDate,
+            LocalDate earlyProductionMaxDate,
             int earlyDays,
             EarlyProductionRuntimePlan runtimePlan,
             EarlyProductionDecision decision) {
         runtimePlan.setActive(false);
         runtimePlan.setCurrentDate(currentDate);
         runtimePlan.setFuturePlanDate(futurePlanDate);
+        runtimePlan.setEarlyProductionMaxDate(earlyProductionMaxDate);
         runtimePlan.setEarlyDays(earlyDays);
         runtimePlan.setEarlyProductionDaysThreshold(
                 EarlyProductionChecker.resolveEarlyProductionDaysThreshold(context));
@@ -330,14 +336,15 @@ public class EarlyProductionRuntimePlanService {
             int futureMonthSurplusQty,
             int effectiveTargetQty) {
         log.info("提前生产中心运行视图初始化完成, factoryCode: {}, batchNo: {}, materialCode: {}, "
-                        + "currentDate: {}, futurePlanDate: {}, earlyDays: {}, "
+                        + "currentDate: {}, futurePlanDate: {}, earlyProductionMaxDate: {}, earlyDays: {}, "
                         + "originalCurrentDayPlanQty: {}, futureDayPlanQty: {}, "
                         + "shiftedCurrentDayPlanQty: {}, structureName: {}, "
                         + "currentPlanMachineCount: {}, futurePlanMachineCount: {}, "
                         + "scheduledStructureCount: {}, scheduledSkuCount: {}, "
-                        + "historyShortageQty: {}, futureMonthSurplusQty: {}, effectiveTargetQty: {}",
+                        + "historyShortageQty: {}, futureMonthSurplusQty: {}, effectiveTargetQty: {}, "
+                        + "quotaEntryCount: {}, quotaProjectionEndDate: {}",
                 context.getFactoryCode(), context.getBatchNo(), sku.getMaterialCode(),
-                currentDate, futurePlanDate, earlyDays,
+                currentDate, futurePlanDate, runtimePlan.getEarlyProductionMaxDate(), earlyDays,
                 runtimePlan.getOriginalCurrentDayPlanQty(), runtimePlan.getFutureDayPlanQty(),
                 this.resolveQuotaDayPlanQty(shiftedQuotaMap, currentDate),
                 sku.getStructureName(),
@@ -346,7 +353,8 @@ public class EarlyProductionRuntimePlanService {
                 context.getStructureScheduledMachineCount(currentDate, sku.getStructureName()),
                 context.getSkuScheduledMachineCount(
                         currentDate, sku.getMaterialCode(), sku.getProductStatus()),
-                historyShortageQty, futureMonthSurplusQty, effectiveTargetQty);
+                historyShortageQty, futureMonthSurplusQty, effectiveTargetQty,
+                shiftedQuotaMap.size(), SkuDailyPlanQuotaUtil.resolveLastQuotaDate(shiftedQuotaMap));
     }
 
     /**
@@ -382,30 +390,33 @@ public class EarlyProductionRuntimePlanService {
     }
 
     /**
-     * 构造当前业务日至窗口结束日加提前天数的原始计划读取视图。
+     * 构造当前业务日至固定提前生产截止日的原始计划读取视图。
      *
      * @param context 排程上下文
      * @param sku SKU
      * @param currentDate 当前业务日
-     * @param windowEndDate 窗口结束业务日
-     * @param earlyDays 实际提前天数
+     * @param earlyProductionMaxDate 本次排程固定的最晚原始计划日期
      * @return 原始计划临时读取视图
      */
     private Map<LocalDate, SkuDailyPlanQuotaDTO> buildSourceQuotaMap(
             LhScheduleContext context,
             SkuScheduleDTO sku,
             LocalDate currentDate,
-            LocalDate windowEndDate,
-            int earlyDays) {
-        LocalDate sourceEndDate = windowEndDate.plusDays(Math.max(0, earlyDays));
-        int initialCapacity = Math.max(
-                4, (int) ChronoUnit.DAYS.between(currentDate, sourceEndDate) + 1);
+            LocalDate earlyProductionMaxDate) {
+        LocalDate sourceEndDate = Objects.isNull(earlyProductionMaxDate)
+                ? currentDate : earlyProductionMaxDate;
+        int initialCapacity = Math.max(4, Math.min(
+                8, (int) ChronoUnit.DAYS.between(currentDate, sourceEndDate) + 1));
         Map<LocalDate, SkuDailyPlanQuotaDTO> sourceQuotaMap =
                 new LinkedHashMap<LocalDate, SkuDailyPlanQuotaDTO>(initialCapacity);
         LocalDate planDate = currentDate;
         while (!planDate.isAfter(sourceEndDate)) {
             int dayPlanQty = Math.max(0, MonthPlanDateResolver.resolveDayQty(
                     context, sku.getMaterialCode(), sku.getProductStatus(), planDate));
+            if (dayPlanQty <= 0) {
+                planDate = planDate.plusDays(1);
+                continue;
+            }
             SkuDailyPlanQuotaDTO quota = new SkuDailyPlanQuotaDTO();
             quota.setMaterialCode(sku.getMaterialCode());
             quota.setProductionDate(planDate);

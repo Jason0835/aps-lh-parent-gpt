@@ -396,8 +396,9 @@ public class LhScheduleConfigResolver {
     }
 
     /**
-     * 解析SKU提前生产天数阈值。
-     * <p>提前生产最多允许向后查看31个自然日，非法、缺失或小于等于0时统一回退默认值2。</p>
+     * 解析SKU提前生产窗口外额外拉取天数。
+     * <p>从排程窗口结束日最多允许额外向后拉取31个自然日，非法、缺失或小于等于0时
+     * 统一回退默认值2。</p>
      *
      * @param resolvedParamMap 解析后参数
      * @param lhParamsMap      原始参数
@@ -408,7 +409,7 @@ public class LhScheduleConfigResolver {
         int resolvedValue = defaultValue;
         String value = lhParamsMap.get(paramCode);
         if (StringUtils.isEmpty(value)) {
-            log.warn("SKU提前生产天数阈值未配置或为空，使用默认值, paramCode={}, defaultValue={}",
+            log.warn("SKU提前生产窗口外额外拉取天数未配置或为空，使用默认值, paramCode={}, defaultValue={}",
                     paramCode, defaultValue);
         } else {
             try {
@@ -419,12 +420,12 @@ public class LhScheduleConfigResolver {
             }
         }
         if (resolvedValue <= 0) {
-            log.warn("SKU提前生产天数阈值配置无效，使用默认值, paramCode={}, value={}, defaultValue={}",
+            log.warn("SKU提前生产窗口外额外拉取天数配置无效，使用默认值, paramCode={}, value={}, defaultValue={}",
                     paramCode, value, defaultValue);
             resolvedValue = defaultValue;
         }
         if (resolvedValue > LhScheduleConstant.MAX_EARLY_PRODUCTION_DAYS_THRESHOLD) {
-            log.warn("SKU提前生产天数阈值超过最大上限，按31天生效, paramCode={}, value={}, maxValue={}",
+            log.warn("SKU提前生产窗口外额外拉取天数超过最大上限，按31天生效, paramCode={}, value={}, maxValue={}",
                     paramCode, value, LhScheduleConstant.MAX_EARLY_PRODUCTION_DAYS_THRESHOLD);
             resolvedValue = LhScheduleConstant.MAX_EARLY_PRODUCTION_DAYS_THRESHOLD;
         }

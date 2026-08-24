@@ -577,16 +577,16 @@ public class LhScheduleConfig {
     }
 
     /**
-     * 获取SKU提前生产天数阈值。
-     * <p>该阈值只控制新增排产提前生产准入向后查找的自然日范围，实际排程窗口仍保持T～T+2。</p>
+     * 获取SKU提前生产窗口外额外拉取天数。
+     * <p>该值从排程窗口结束日起向后扩展候选范围，实际排程窗口仍保持T～T+2。</p>
      *
-     * @return 提前生产天数阈值，范围1～31
+     * @return 窗口外额外拉取天数，范围1～31
      */
     public int getEarlyProductionDaysThreshold() {
         String rawValue =
                 resolvedParamMap.get(LhScheduleParamConstant.EARLY_PRODUCTION_DAYS_THRESHOLD);
         if (StringUtils.isEmpty(rawValue)) {
-            log.warn("SKU提前生产天数阈值缺失或为空，使用默认值, paramCode: {}, defaultValue: {}",
+            log.warn("SKU提前生产窗口外额外拉取天数缺失或为空，使用默认值, paramCode: {}, defaultValue: {}",
                     LhScheduleParamConstant.EARLY_PRODUCTION_DAYS_THRESHOLD,
                     LhScheduleConstant.DEFAULT_EARLY_PRODUCTION_DAYS_THRESHOLD);
             return LhScheduleConstant.DEFAULT_EARLY_PRODUCTION_DAYS_THRESHOLD;
@@ -595,19 +595,19 @@ public class LhScheduleConfig {
         try {
             threshold = Integer.parseInt(rawValue.trim());
         } catch (NumberFormatException exception) {
-            log.warn("SKU提前生产天数阈值非法，使用默认值, paramCode: {}, rawValue: {}, defaultValue: {}",
+            log.warn("SKU提前生产窗口外额外拉取天数非法，使用默认值, paramCode: {}, rawValue: {}, defaultValue: {}",
                     LhScheduleParamConstant.EARLY_PRODUCTION_DAYS_THRESHOLD, rawValue,
                     LhScheduleConstant.DEFAULT_EARLY_PRODUCTION_DAYS_THRESHOLD);
             return LhScheduleConstant.DEFAULT_EARLY_PRODUCTION_DAYS_THRESHOLD;
         }
         if (threshold <= 0) {
-            log.warn("SKU提前生产天数阈值小于等于0，使用默认值, paramCode: {}, rawValue: {}, defaultValue: {}",
+            log.warn("SKU提前生产窗口外额外拉取天数小于等于0，使用默认值, paramCode: {}, rawValue: {}, defaultValue: {}",
                     LhScheduleParamConstant.EARLY_PRODUCTION_DAYS_THRESHOLD, rawValue,
                     LhScheduleConstant.DEFAULT_EARLY_PRODUCTION_DAYS_THRESHOLD);
             return LhScheduleConstant.DEFAULT_EARLY_PRODUCTION_DAYS_THRESHOLD;
         }
         if (threshold > LhScheduleConstant.MAX_EARLY_PRODUCTION_DAYS_THRESHOLD) {
-            log.warn("SKU提前生产天数阈值超过允许上限，按上限使用, paramCode: {}, rawValue: {}, maxValue: {}",
+            log.warn("SKU提前生产窗口外额外拉取天数超过允许上限，按上限使用, paramCode: {}, rawValue: {}, maxValue: {}",
                     LhScheduleParamConstant.EARLY_PRODUCTION_DAYS_THRESHOLD, rawValue,
                     LhScheduleConstant.MAX_EARLY_PRODUCTION_DAYS_THRESHOLD);
             return LhScheduleConstant.MAX_EARLY_PRODUCTION_DAYS_THRESHOLD;

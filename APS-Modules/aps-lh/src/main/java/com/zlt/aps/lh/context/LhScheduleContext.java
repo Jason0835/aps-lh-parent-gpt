@@ -85,6 +85,14 @@ public class LhScheduleContext {
     private Date windowEndDate;
 
     /**
+     * 本次排程允许拉取提前生产 SKU 的最晚原始计划日期。
+     * <p>统一按“排程窗口结束日 + SYS0304028”在排程上下文初始化时计算，
+     * S4.2 基础数据加载、S4.4 换活字块和 S4.5 新增排产必须共用该边界，
+     * 禁止再按当前业务日分别计算可提前范围。</p>
+     */
+    private Date earlyProductionMaxDate;
+
+    /**
      * 当前排程日期
      */
     private Date currentScheduleDate;
@@ -1138,20 +1146,32 @@ public class LhScheduleContext {
         if (null != windowEndDate) {
             allProductionDateSet.add(windowEndDate);
         }
-        //20260803+ 提前生产阀值
-        LhScheduleConfig scheduleConfig = getScheduleConfig();
-        if (null == scheduleConfig) {
+        // 额外计划日期严格从窗口结束日推进到上下文固化的提前生产截止日。
+        if (Objects.isNull(windowEndDate)) {
             return allProductionDateSet;
         }
-        int value = scheduleConfig.getEarlyProductionDaysThreshold();
-        if (value <= BigDecimal.ZERO.intValue()) {
+        Date fixedMaxDate = earlyProductionMaxDate;
+        if (Objects.isNull(fixedMaxDate)) {
+            LhScheduleConfig scheduleConfig = getScheduleConfig();
+            if (Objects.isNull(scheduleConfig)) {
+                return allProductionDateSet;
+            }
+            int value = scheduleConfig.getEarlyProductionDaysThreshold();
+            if (value <= BigDecimal.ZERO.intValue()) {
+                return allProductionDateSet;
+            }
+            fixedMaxDate = SkuMonthPlanCalculator.getDate(
+                    SkuMonthPlanCalculator.getDate(windowEndDate).plusDays(value));
+        }
+        LocalDate extraStartDate = SkuMonthPlanCalculator.getDate(windowEndDate).plusDays(1);
+        LocalDate extraEndDate = SkuMonthPlanCalculator.getDate(fixedMaxDate);
+        if (extraEndDate.isBefore(extraStartDate)) {
             return allProductionDateSet;
         }
-        LocalDate extraStartDate = SkuMonthPlanCalculator.getDate(windowEndDate);
-        for (int index = BigDecimal.ONE.intValue(); index <= value; index++) {
-            LocalDate addOneDate = extraStartDate.plusDays(index);
-            Date addDate = SkuMonthPlanCalculator.getDate(addOneDate);
-            allProductionDateSet.add(addDate);
+        for (LocalDate productionDate = extraStartDate;
+             !productionDate.isAfter(extraEndDate);
+             productionDate = productionDate.plusDays(1)) {
+            allProductionDateSet.add(SkuMonthPlanCalculator.getDate(productionDate));
         }
         return allProductionDateSet;
     }

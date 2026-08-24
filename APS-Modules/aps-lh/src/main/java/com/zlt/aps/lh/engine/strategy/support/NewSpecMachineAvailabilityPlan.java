@@ -319,7 +319,8 @@ public class NewSpecMachineAvailabilityPlan {
      * 将当轮已选机台计划切换为正式提交成功的跨日准备时间轴。
      *
      * <p>候选分组仍保留原换模均衡口径，只有机台最终选定且跨日准备提交成功后才调用
-     * 本方法更新最终选机日志，避免日志继续展示已被正式跨日时间轴替代的次日换模。</p>
+     * 本方法更新正式换模、准备完成和正式开产时间。选机日志中的粗略基础换模完成时间
+     * 保留候选预演时的原值，避免命中机台与未命中机台出现不同展示口径。</p>
      *
      * @param committedChangeoverStartTime 正式换模开始时间
      * @param committedChangeoverEndTime 正式换模完成时间
@@ -344,7 +345,7 @@ public class NewSpecMachineAvailabilityPlan {
                 committedChangeoverStartTime, committedChangeoverEndTime,
                 productionNotBeforeTime, candidateProductionNotBeforeTime,
                 committedProductionStartTime, committedProductionShift,
-                committedInspectionPlan, committedChangeoverEndTime,
+                committedInspectionPlan, traceChangeoverEndTime,
                 committedProductionStartTime, committedProductionShift,
                 committedAvailable, committedProductionStartTime,
                 committedProductionShift, historicalResidualCapacityInfo);

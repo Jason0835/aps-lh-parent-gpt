@@ -2438,20 +2438,33 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
         if (originalDayPlanQty <= 0) {
             LocalDate firstFuturePlanDate = EarlyProductionChecker.resolveFirstFuturePlanDate(
                     context, sku, productionWorkDate);
-            boolean structureSwitchEarlyProduction =
-                    EarlyProductionChecker.isStructureSwitchEarlyProduction(
-                            context, sku, productionWorkDate, firstFuturePlanDate);
-            if (structureSwitchEarlyProduction) {
-                structureSwitchEarlyProductionCandidateDate = productionWorkDate;
+            if (this.shouldDeferEarlyProductionToDailyNewSpec(
+                    context, firstFuturePlanDate)) {
+                String deferredReason = "提前生产必须等待当前业务日正常新增任务完成后执行";
+                this.recordTypeBlockAppendFailure(failureReason, deferredReason);
+                log.info("换活字块提前生产后置到按日新增主链, factoryCode: {}, batchNo: {}, "
+                                + "materialCode: {}, productionWorkDate: {}, futurePlanDate: {}, "
+                                + "windowEndDate: {}, reason: {}",
+                        context.getFactoryCode(), context.getBatchNo(), sku.getMaterialCode(),
+                        productionWorkDate, firstFuturePlanDate,
+                        this.resolveScheduleTargetLocalDate(context), deferredReason);
+                success = false;
             } else {
-                // 非结构切换提前严格复用本次需求调整前的运行视图准备时点和失败回滚路径。
-                String earlyProductionRejectReason = this.prepareTypeBlockEarlyProduction(
-                        context, machine, sku, productionWorkDate,
-                        switchStartTime, startTime);
-                success = StringUtils.isEmpty(earlyProductionRejectReason);
-                if (!success) {
-                    this.recordTypeBlockAppendFailure(
-                            failureReason, earlyProductionRejectReason);
+                boolean structureSwitchEarlyProduction =
+                        EarlyProductionChecker.isStructureSwitchEarlyProduction(
+                                context, sku, productionWorkDate, firstFuturePlanDate);
+                if (structureSwitchEarlyProduction) {
+                    structureSwitchEarlyProductionCandidateDate = productionWorkDate;
+                } else {
+                    // 非结构切换提前严格复用本次需求调整前的运行视图准备时点和失败回滚路径。
+                    String earlyProductionRejectReason = this.prepareTypeBlockEarlyProduction(
+                            context, machine, sku, productionWorkDate,
+                            switchStartTime, startTime);
+                    success = StringUtils.isEmpty(earlyProductionRejectReason);
+                    if (!success) {
+                        this.recordTypeBlockAppendFailure(
+                                failureReason, earlyProductionRejectReason);
+                    }
                 }
             }
         }
@@ -2467,6 +2480,24 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
             getMouldChangeBalanceStrategy().rollbackMouldChange(context, switchStartTime);
         }
         return success;
+    }
+
+    /**
+     * 判断换活字块提前生产是否应统一后置到 S4.5 提前生产阶段。
+     *
+     * <p>S4.4 位于 S4.5 按日正常新增之前，任何原始日计划为0的未来 SKU 若在这里直接
+     * 落地，都会先于对应业务日正常任务占用机台，并可能在跨日续排后突破结构计划机台数。
+     * 因此只要存在未来来源计划日，就保留 SKU 在新增队列中；S4.5 每日正常任务完成后，
+     * 再复用同一换活字块关系、选机排序和提前生产中心运行视图使用真实剩余资源。</p>
+     *
+     * @param context 排程上下文
+     * @param futurePlanDate 提前生产最近来源日
+     * @return true-后置到正常任务之后；false-保持现有 S4.4 处理
+     */
+    private boolean shouldDeferEarlyProductionToDailyNewSpec(
+            LhScheduleContext context,
+            LocalDate futurePlanDate) {
+        return Objects.nonNull(context) && Objects.nonNull(futurePlanDate);
     }
 
     /**

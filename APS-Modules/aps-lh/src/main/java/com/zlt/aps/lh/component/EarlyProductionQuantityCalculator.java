@@ -75,8 +75,8 @@ public final class EarlyProductionQuantityCalculator {
                 || Objects.isNull(scheduleStartDate) || Objects.isNull(windowEndDate)) {
             return normalResult;
         }
-        LocalDate earlyRangeEndDate = windowEndDate.plusDays(
-                EarlyProductionChecker.resolveEarlyProductionDaysThreshold(context));
+        LocalDate earlyRangeEndDate = EarlyProductionChecker.resolveEarlyProductionMaxDate(
+                context, windowEndDate);
         LocalDate futurePlanDate = findFirstPositivePlanDate(
                 context, plan, scheduleStartDate.plusDays(1), earlyRangeEndDate);
         if (Objects.isNull(futurePlanDate)
@@ -297,7 +297,8 @@ public final class EarlyProductionQuantityCalculator {
             return null;
         }
         int threshold = EarlyProductionChecker.resolveEarlyProductionDaysThreshold(context);
-        LocalDate candidateEndDate = toLocalDate(context.getWindowEndDate()).plusDays(threshold);
+        LocalDate candidateEndDate = EarlyProductionChecker.resolveEarlyProductionMaxDate(
+                context, toLocalDate(context.getWindowEndDate()));
         LocalDate futurePlanDate = findFirstPositivePlanDate(
                 context, sku.getMaterialCode(), sku.getProductStatus(),
                 scheduleStartDate.plusDays(1), candidateEndDate);
@@ -313,6 +314,7 @@ public final class EarlyProductionQuantityCalculator {
         runtimePlan.setActive(false);
         runtimePlan.setCurrentDate(scheduleStartDate);
         runtimePlan.setFuturePlanDate(futurePlanDate);
+        runtimePlan.setEarlyProductionMaxDate(candidateEndDate);
         runtimePlan.setEarlyProductionDaysThreshold(threshold);
         runtimePlan.setCurrentMonthTotalQty(currentMonthTotalQty);
         runtimePlan.setOriginalCurrentDayPlanQty(MonthPlanDateResolver.resolveDayQty(
@@ -670,8 +672,8 @@ public final class EarlyProductionQuantityCalculator {
             return false;
         }
         LocalDate startDate = toLocalDate(context.getScheduleDate());
-        LocalDate endDate = toLocalDate(context.getWindowEndDate()).plusDays(
-                EarlyProductionChecker.resolveEarlyProductionDaysThreshold(context));
+        LocalDate endDate = EarlyProductionChecker.resolveEarlyProductionMaxDate(
+                context, toLocalDate(context.getWindowEndDate()));
         for (LocalDate productionDate = startDate;
              !productionDate.isAfter(endDate);
              productionDate = productionDate.plusDays(1)) {

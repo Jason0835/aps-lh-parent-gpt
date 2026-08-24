@@ -235,7 +235,13 @@ public final class SkuDailyPlanQuotaUtil {
             Map<LocalDate, SkuDailyPlanQuotaDTO> quotaMap,
             LocalDate currentDate,
             LocalDate windowEndDate) {
-        return buildShiftedEarlyProductionQuotaMap(quotaMap, currentDate, windowEndDate, 1);
+        LocalDate futurePlanDate = Objects.isNull(currentDate)
+                ? null : currentDate.plusDays(1);
+        LocalDate sourceEndDate = Objects.isNull(windowEndDate)
+                ? null : windowEndDate.plusDays(1);
+        return buildShiftedEarlyProductionQuotaMap(
+                quotaMap, currentDate, windowEndDate,
+                futurePlanDate, sourceEndDate);
     }
 
     /**
@@ -254,11 +260,37 @@ public final class SkuDailyPlanQuotaUtil {
             LocalDate currentDate,
             LocalDate windowEndDate,
             LocalDate futurePlanDate) {
+        return buildShiftedEarlyProductionQuotaMap(
+                quotaMap, currentDate, windowEndDate, futurePlanDate, null);
+    }
+
+    /**
+     * 构造覆盖固定提前生产截止日的临时日计划额度视图。
+     * <p>未来来源日期统一按“futurePlanDate - currentDate”平移到当前排程时间轴，
+     * 但来源范围固定延伸到 earlyProductionMaxDate。窗口内日期始终保留，窗口外仅保留
+     * 有正计划或剩余额度的稀疏节点，避免参数上限较大且候选 SKU 较多时产生无意义对象。</p>
+     *
+     * @param quotaMap 原始日计划额度账本
+     * @param currentDate 当前业务日期
+     * @param windowEndDate 排程窗口结束日期
+     * @param futurePlanDate 范围内最早未来计划日
+     * @param earlyProductionMaxDate 本次排程固定的最晚原始计划日期
+     * @return 不修改原始账本的临时前移账本
+     */
+    public static Map<LocalDate, SkuDailyPlanQuotaDTO> buildShiftedEarlyProductionQuotaMap(
+            Map<LocalDate, SkuDailyPlanQuotaDTO> quotaMap,
+            LocalDate currentDate,
+            LocalDate windowEndDate,
+            LocalDate futurePlanDate,
+            LocalDate earlyProductionMaxDate) {
         int shiftDays = 1;
         if (Objects.nonNull(currentDate) && Objects.nonNull(futurePlanDate)) {
             shiftDays = (int) Math.max(1, ChronoUnit.DAYS.between(currentDate, futurePlanDate));
         }
-        return buildShiftedEarlyProductionQuotaMap(quotaMap, currentDate, windowEndDate, shiftDays);
+        LocalDate sourceEndDate = Objects.isNull(earlyProductionMaxDate)
+                ? windowEndDate.plusDays(shiftDays) : earlyProductionMaxDate;
+        return buildShiftedEarlyProductionQuotaMap(
+                quotaMap, currentDate, windowEndDate, sourceEndDate, shiftDays);
     }
 
     /**
@@ -267,6 +299,7 @@ public final class SkuDailyPlanQuotaUtil {
      * @param quotaMap 原始日计划额度账本
      * @param currentDate 当前业务日期
      * @param windowEndDate 排程窗口结束日期
+     * @param sourceEndDate 原始计划来源截止日期
      * @param shiftDays 实际提前天数
      * @return 按提前天数前移后的临时额度账本
      */
@@ -274,6 +307,7 @@ public final class SkuDailyPlanQuotaUtil {
             Map<LocalDate, SkuDailyPlanQuotaDTO> quotaMap,
             LocalDate currentDate,
             LocalDate windowEndDate,
+            LocalDate sourceEndDate,
             int shiftDays) {
         Map<LocalDate, SkuDailyPlanQuotaDTO> shiftedQuotaMap =
                 new LinkedHashMap<LocalDate, SkuDailyPlanQuotaDTO>(4);
@@ -282,11 +316,18 @@ public final class SkuDailyPlanQuotaUtil {
             return shiftedQuotaMap;
         }
         int safeShiftDays = Math.max(1, shiftDays);
+        LocalDate projectedSourceEndDate = Objects.isNull(sourceEndDate)
+                ? windowEndDate : sourceEndDate.minusDays(safeShiftDays);
+        LocalDate projectionEndDate = projectedSourceEndDate.isAfter(windowEndDate)
+                ? projectedSourceEndDate : windowEndDate;
         String materialCode = resolveMaterialCode(quotaMap);
         LocalDate date = currentDate;
-        while (!date.isAfter(windowEndDate)) {
+        while (!date.isAfter(projectionEndDate)) {
             SkuDailyPlanQuotaDTO sourceQuota = quotaMap.get(date.plusDays(safeShiftDays));
-            shiftedQuotaMap.put(date, cloneQuotaForProductionDate(sourceQuota, date, materialCode));
+            if (!date.isAfter(windowEndDate) || hasPositiveQuota(sourceQuota)) {
+                shiftedQuotaMap.put(
+                        date, cloneQuotaForProductionDate(sourceQuota, date, materialCode));
+            }
             date = date.plusDays(1);
         }
         refreshRollingFields(shiftedQuotaMap);
@@ -394,7 +435,13 @@ public final class SkuDailyPlanQuotaUtil {
         return consumedQty;
     }
 
-    private static LocalDate resolveLastQuotaDate(Map<LocalDate, SkuDailyPlanQuotaDTO> quotaMap) {
+    /**
+     * 获取账本最后一个有效日期。
+     *
+     * @param quotaMap 日计划额度账本
+     * @return 最后日期；空账本返回 null
+     */
+    public static LocalDate resolveLastQuotaDate(Map<LocalDate, SkuDailyPlanQuotaDTO> quotaMap) {
         if (CollectionUtils.isEmpty(quotaMap)) {
             return null;
         }
@@ -408,6 +455,20 @@ public final class SkuDailyPlanQuotaUtil {
             }
         }
         return lastQuotaDate;
+    }
+
+    /**
+     * 判断来源额度是否需要保留为窗口外稀疏节点。
+     *
+     * @param quota 来源日计划额度
+     * @return true-存在计划或运行态数量；false-全量为0
+     */
+    private static boolean hasPositiveQuota(SkuDailyPlanQuotaDTO quota) {
+        return Objects.nonNull(quota)
+                && (quota.getDayPlanQty() > 0
+                || quota.getScheduledQty() > 0
+                || quota.getRemainingQty() > 0
+                || quota.getActualQty() > 0);
     }
 
     private static String resolveMaterialCode(Map<LocalDate, SkuDailyPlanQuotaDTO> quotaMap) {

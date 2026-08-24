@@ -297,11 +297,23 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         context.setScheduleDate(LhScheduleTimeUtil.addDays(target, -offsetDays));
         // 排程窗口结束日期 = T + 2，用于产能计算、加机台、收尾等核心逻辑
         context.setWindowEndDate(LhScheduleTimeUtil.addDays(context.getScheduleDate(), scheduleDays - 1));
-        log.info("排程上下文构建完成, 工厂: {}, 工厂名称: {}, 目标日(业务): {}, T日: {}, 窗口结束日: {}, 排程天数: {}, 局部搜索: {}, 定点机台规则: {}",
+        /*
+         * SYS0304028 表示排程窗口之外允许额外向后拉取的自然日数。
+         * 截止日期在上下文初始化时只计算一次，后续基础数据、准入和运行账本统一复用，
+         * 避免日驱动循环继续形成 currentDay + N 的漂移口径。
+         */
+        int earlyProductionDays = context.getScheduleConfig().getEarlyProductionDaysThreshold();
+        context.setEarlyProductionMaxDate(
+                LhScheduleTimeUtil.addDays(context.getWindowEndDate(), earlyProductionDays));
+        log.info("排程上下文构建完成, 工厂: {}, 工厂名称: {}, 目标日(业务): {}, T日: {}, "
+                        + "窗口结束日: {}, 提前生产额外天数: {}, 提前生产最晚计划日: {}, "
+                        + "排程天数: {}, 局部搜索: {}, 定点机台规则: {}",
                 context.getFactoryCode(), context.getFactoryDisplayName(),
                 LhScheduleTimeUtil.formatDate(context.getScheduleTargetDate()),
                 LhScheduleTimeUtil.formatDate(context.getScheduleDate()),
                 LhScheduleTimeUtil.formatDate(context.getWindowEndDate()),
+                earlyProductionDays,
+                LhScheduleTimeUtil.formatDate(context.getEarlyProductionMaxDate()),
                 scheduleDays,
                 context.getScheduleConfig().isLocalSearchEnabled(),
                 context.getScheduleConfig().isSpecifyMachineRuleEnabled());
