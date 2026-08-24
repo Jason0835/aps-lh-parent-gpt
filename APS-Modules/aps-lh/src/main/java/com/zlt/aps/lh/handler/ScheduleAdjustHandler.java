@@ -19,6 +19,7 @@ import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.IEndingJudgmentStrategy;
 import com.zlt.aps.lh.engine.strategy.support.EarlyProductionChecker;
 import com.zlt.aps.lh.engine.strategy.support.PendingSkuUnscheduledRule;
+import com.zlt.aps.lh.service.ILhDailyMouldCalcService;
 import com.zlt.aps.lh.util.*;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuLhCapacity;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
@@ -121,6 +122,9 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * 月计划最大自然日
      */
     private static final int MAX_DAY_OF_MONTH = 31;
+    /** 同物料跨状态续作按目标机台数补足过程日志标题。 */
+    private static final String SAME_MATERIAL_STATUS_TARGET_CONTINUATION_LOG_TITLE =
+            "同物料跨状态续作目标机台补足";
 
     @Resource
     private IEndingJudgmentStrategy endingJudgmentStrategy;
@@ -132,6 +136,8 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     private SkuDecrementChecker skuDecrementChecker;
     @Resource
     private StructureMinMachineRetentionService structureMinMachineRetentionService;
+    @Resource
+    private ILhDailyMouldCalcService lhDailyMouldCalcService;
 
     @Override
     protected void doHandle(LhScheduleContext context) {
@@ -2208,6 +2214,12 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
          * 试制、量试SKU。过滤后列表保持原顺序，后续续作机台、加减机台和数量账本不做额外分支。
          */
         filterContinuousTrialDailyPlanAdmission(context, continuousSkuList);
+        /*
+         * 试制/量试无计划过滤可能释放一台“同物料、不同产品状态”的MES在机机台。
+         * 过滤完成后按T日统一目标机台数重新核对：目标状态存在唯一缺口、原在机状态
+         * 整个窗口均无机台需求时，才允许该机台承接目标状态续作，避免转入S4.5虚假换模。
+         */
+        this.supplementSameMaterialStatusContinuousMachineByTarget(context, continuousSkuList);
         for (SkuScheduleDTO continuousSku : continuousSkuList) {
             /*
              * 提前生产只适用于新增排产。MES 在机匹配后最终属于续作的 SKU 即使当前月
@@ -2282,6 +2294,342 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         // SKU减量清单统一前置过滤：命中减量清单的SKU不进入任何排产入口，写未排并从排产集合移除
         skuDecrementChecker.filterDecrementSkus(context);
         log.info("续作/新增SKU区分完成, 续作: {}个, 新增: {}个", continuousSkuList.size(), newSpecSkuList.size());
+    }
+
+    /**
+     * 按T日统一目标机台数补足同物料、不同产品状态的续作机台。
+     *
+     * <p>该收口位于试制/量试无计划过滤之后，只处理仍保留有效续作需求的目标状态。
+     * 同一物料存在多个状态同时缺机时保持原有后置资源竞争，不按列表顺序抢占机台。</p>
+     *
+     * @param context 排程上下文
+     * @param continuousSkuList 已完成无计划过滤的续作SKU列表
+     */
+    private void supplementSameMaterialStatusContinuousMachineByTarget(
+            LhScheduleContext context,
+            List<SkuScheduleDTO> continuousSkuList) {
+        if (Objects.isNull(context) || Objects.isNull(lhDailyMouldCalcService)
+                || CollectionUtils.isEmpty(continuousSkuList)
+                || Objects.isNull(context.getScheduleDate())) {
+            return;
+        }
+        LocalDate productionDate = toLocalDate(context.getScheduleDate());
+        Map<String, List<SkuScheduleDTO>> retainedSkuMap = this.buildRetainedContinuousSkuMap(
+                continuousSkuList);
+        Set<String> assignedPhysicalMachineCodeSet = this.resolveAssignedPhysicalMachineCodeSet(
+                continuousSkuList);
+        Map<String, List<Map.Entry<String, LhMachineOnlineInfo>>> candidatePhysicalMachineMap =
+                this.buildUnassignedOnlinePhysicalMachineMap(context, assignedPhysicalMachineCodeSet);
+        for (Map.Entry<String, List<SkuScheduleDTO>> retainedEntry : retainedSkuMap.entrySet()) {
+            List<SkuScheduleDTO> shortageSkuList = this.resolveUniqueTargetShortageSkuList(
+                    context, continuousSkuList, retainedEntry.getValue(), productionDate);
+            if (shortageSkuList.size() != 1) {
+                this.logAmbiguousSameMaterialStatusTarget(
+                        context, retainedEntry.getKey(), shortageSkuList, productionDate);
+                continue;
+            }
+            SkuScheduleDTO targetSku = shortageSkuList.get(0);
+            int targetMachineCount = lhDailyMouldCalcService.getRequiredMachineCount(
+                    context, targetSku.getMaterialCode(), targetSku.getProductStatus(), productionDate);
+            int currentMachineCount = this.countContinuousPhysicalMachine(
+                    continuousSkuList, targetSku);
+            int shortageMachineCount = Math.max(0, targetMachineCount - currentMachineCount);
+            for (Map.Entry<String, List<Map.Entry<String, LhMachineOnlineInfo>>> candidateEntry
+                    : candidatePhysicalMachineMap.entrySet()) {
+                if (shortageMachineCount <= 0) {
+                    break;
+                }
+                if (!this.isInactiveSameMaterialStatusCandidate(
+                        context, targetSku, candidateEntry.getValue())) {
+                    continue;
+                }
+                this.appendSameMaterialStatusContinuousCopies(
+                        continuousSkuList, targetSku, candidateEntry.getValue());
+                assignedPhysicalMachineCodeSet.add(candidateEntry.getKey());
+                shortageMachineCount--;
+                this.appendSameMaterialStatusTargetContinuationLog(
+                        context, targetSku, candidateEntry.getValue(), productionDate,
+                        targetMachineCount, currentMachineCount, shortageMachineCount);
+                currentMachineCount++;
+            }
+        }
+    }
+
+    /**
+     * 按物料归集仍保留的续作状态模板，同一状态只保留首个SKU对象。
+     *
+     * @param continuousSkuList 已过滤续作SKU列表
+     * @return 物料到续作状态模板列表
+     */
+    private Map<String, List<SkuScheduleDTO>> buildRetainedContinuousSkuMap(
+            List<SkuScheduleDTO> continuousSkuList) {
+        Map<String, Map<String, SkuScheduleDTO>> retainedTemplateMap =
+                new LinkedHashMap<String, Map<String, SkuScheduleDTO>>(16);
+        for (SkuScheduleDTO sku : continuousSkuList) {
+            if (Objects.isNull(sku) || StringUtils.isEmpty(sku.getMaterialCode())
+                    || StringUtils.isEmpty(sku.getProductStatus())) {
+                continue;
+            }
+            retainedTemplateMap.computeIfAbsent(
+                    sku.getMaterialCode(), key -> new LinkedHashMap<String, SkuScheduleDTO>(4))
+                    .putIfAbsent(StringUtils.trim(sku.getProductStatus()), sku);
+        }
+        Map<String, List<SkuScheduleDTO>> retainedSkuMap =
+                new LinkedHashMap<String, List<SkuScheduleDTO>>(retainedTemplateMap.size());
+        for (Map.Entry<String, Map<String, SkuScheduleDTO>> entry : retainedTemplateMap.entrySet()) {
+            retainedSkuMap.put(entry.getKey(), new ArrayList<SkuScheduleDTO>(entry.getValue().values()));
+        }
+        return retainedSkuMap;
+    }
+
+    /**
+     * 解析同物料在T日仍存在目标机台缺口的产品状态。
+     *
+     * @param context 排程上下文
+     * @param continuousSkuList 当前续作SKU列表
+     * @param retainedSkuList 同物料续作状态模板
+     * @param productionDate T日
+     * @return 存在机台缺口的状态模板列表
+     */
+    private List<SkuScheduleDTO> resolveUniqueTargetShortageSkuList(
+            LhScheduleContext context,
+            List<SkuScheduleDTO> continuousSkuList,
+            List<SkuScheduleDTO> retainedSkuList,
+            LocalDate productionDate) {
+        List<SkuScheduleDTO> shortageSkuList = new ArrayList<SkuScheduleDTO>(2);
+        for (SkuScheduleDTO sku : retainedSkuList) {
+            if (!lhDailyMouldCalcService.hasRequiredMachineCount(
+                    context, sku.getMaterialCode(), sku.getProductStatus(), productionDate)) {
+                continue;
+            }
+            int targetMachineCount = lhDailyMouldCalcService.getRequiredMachineCount(
+                    context, sku.getMaterialCode(), sku.getProductStatus(), productionDate);
+            if (targetMachineCount > this.countContinuousPhysicalMachine(continuousSkuList, sku)) {
+                shortageSkuList.add(sku);
+            }
+        }
+        return shortageSkuList;
+    }
+
+    /**
+     * 统计指定物料和产品状态当前已识别的物理续作机台数。
+     *
+     * @param continuousSkuList 续作SKU列表
+     * @param targetSku 目标SKU
+     * @return 去重后的物理机台数
+     */
+    private int countContinuousPhysicalMachine(List<SkuScheduleDTO> continuousSkuList,
+                                               SkuScheduleDTO targetSku) {
+        Set<String> physicalMachineCodeSet = new LinkedHashSet<String>(4);
+        for (SkuScheduleDTO sku : continuousSkuList) {
+            if (Objects.isNull(sku) || StringUtils.isEmpty(sku.getContinuousMachineCode())
+                    || !StringUtils.equals(sku.getMaterialCode(), targetSku.getMaterialCode())
+                    || !StringUtils.equals(StringUtils.trimToEmpty(sku.getProductStatus()),
+                    StringUtils.trimToEmpty(targetSku.getProductStatus()))) {
+                continue;
+            }
+            physicalMachineCodeSet.add(LhSingleControlMachineUtil.resolvePhysicalMachineCode(
+                    sku.getContinuousMachineCode()));
+        }
+        return physicalMachineCodeSet.size();
+    }
+
+    /**
+     * 收集尚未分配续作的MES在机物理机台。
+     *
+     * <p>单控L/R模式在本步骤之后才冻结，跨状态补位无法安全判断单边或整机口径，
+     * 因此单控机台继续沿用既有后置选机链，不在本收口点提前接管。</p>
+     *
+     * @param context 排程上下文
+     * @param assignedPhysicalMachineCodeSet 已分配物理机台
+     * @return 未分配物理机台到MES在机记录列表
+     */
+    private Map<String, List<Map.Entry<String, LhMachineOnlineInfo>>>
+    buildUnassignedOnlinePhysicalMachineMap(
+            LhScheduleContext context,
+            Set<String> assignedPhysicalMachineCodeSet) {
+        Map<String, List<Map.Entry<String, LhMachineOnlineInfo>>> candidateMap =
+                new LinkedHashMap<String, List<Map.Entry<String, LhMachineOnlineInfo>>>(16);
+        for (Map.Entry<String, LhMachineOnlineInfo> entry : context.getMachineOnlineInfoMap().entrySet()) {
+            String machineCode = entry.getKey();
+            String physicalMachineCode = LhSingleControlMachineUtil.resolvePhysicalMachineCode(machineCode);
+            if (StringUtils.isEmpty(machineCode) || LhSingleControlMachineUtil.isSingleMouldMachine(machineCode)
+                    || !context.getMachineScheduleMap().containsKey(machineCode)
+                    || assignedPhysicalMachineCodeSet.contains(physicalMachineCode)) {
+                continue;
+            }
+            candidateMap.computeIfAbsent(
+                    physicalMachineCode,
+                    key -> new ArrayList<Map.Entry<String, LhMachineOnlineInfo>>(2)).add(entry);
+        }
+        return candidateMap;
+    }
+
+    /**
+     * 判断未分配在机机台能否承接同物料其他状态续作。
+     *
+     * @param context 排程上下文
+     * @param targetSku 目标续作SKU
+     * @param onlineEntryList 同一物理机台的MES在机记录
+     * @return true-同物料且原状态整个窗口无机台需求
+     */
+    private boolean isInactiveSameMaterialStatusCandidate(
+            LhScheduleContext context,
+            SkuScheduleDTO targetSku,
+            List<Map.Entry<String, LhMachineOnlineInfo>> onlineEntryList) {
+        if (Objects.isNull(targetSku) || CollectionUtils.isEmpty(onlineEntryList)) {
+            return false;
+        }
+        for (Map.Entry<String, LhMachineOnlineInfo> entry : onlineEntryList) {
+            LhMachineOnlineInfo onlineInfo = entry.getValue();
+            String onlineProductStatus = Objects.isNull(onlineInfo)
+                    ? null : normalizeOnlineProductStatus(onlineInfo.getProductStatus());
+            if (Objects.isNull(onlineInfo)
+                    || !StringUtils.equals(StringUtils.trim(targetSku.getMaterialCode()),
+                    StringUtils.trim(onlineInfo.getMaterialCode()))
+                    || StringUtils.equals(StringUtils.trimToEmpty(targetSku.getProductStatus()),
+                    StringUtils.trimToEmpty(onlineProductStatus))
+                    || this.hasEffectiveMachineTargetInWindow(
+                    context, onlineInfo.getMaterialCode(), onlineProductStatus)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * 判断物料状态在当前排程窗口是否存在有效目标机台数。
+     *
+     * @param context 排程上下文
+     * @param materialCode 物料编码
+     * @param productStatus 产品状态
+     * @return true-存在正目标或Map维度缺失；false-窗口内目标均为0
+     */
+    private boolean hasEffectiveMachineTargetInWindow(LhScheduleContext context,
+                                                      String materialCode,
+                                                      String productStatus) {
+        if (Objects.isNull(context.getScheduleDate()) || Objects.isNull(context.getWindowEndDate())) {
+            return true;
+        }
+        LocalDate startDate = toLocalDate(context.getScheduleDate());
+        LocalDate endDate = toLocalDate(context.getWindowEndDate());
+        for (LocalDate productionDate = startDate;
+             !productionDate.isAfter(endDate);
+             productionDate = productionDate.plusDays(1)) {
+            if (!lhDailyMouldCalcService.hasRequiredMachineCount(
+                    context, materialCode, productStatus, productionDate)
+                    || lhDailyMouldCalcService.getRequiredMachineCount(
+                    context, materialCode, productStatus, productionDate) > 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 为同物料跨状态补位机台创建目标状态续作副本。
+     *
+     * @param continuousSkuList 续作SKU列表
+     * @param targetSku 目标状态模板
+     * @param onlineEntryList MES在机记录
+     */
+    private void appendSameMaterialStatusContinuousCopies(
+            List<SkuScheduleDTO> continuousSkuList,
+            SkuScheduleDTO targetSku,
+            List<Map.Entry<String, LhMachineOnlineInfo>> onlineEntryList) {
+        for (Map.Entry<String, LhMachineOnlineInfo> entry : onlineEntryList) {
+            SkuScheduleDTO continuousCopy = this.copySkuForContinuousMachine(targetSku, entry.getKey());
+            continuousCopy.setScheduleType(ScheduleTypeEnum.CONTINUOUS.getCode());
+            continuousSkuList.add(continuousCopy);
+        }
+    }
+
+    /**
+     * 记录同物料跨状态续作补位决策。
+     *
+     * @param context 排程上下文
+     * @param targetSku 目标状态SKU
+     * @param onlineEntryList 原MES在机记录
+     * @param productionDate T日
+     * @param targetMachineCount 目标机台数
+     * @param beforeMachineCount 补位前机台数
+     * @param remainingShortageCount 补位后剩余缺口
+     */
+    private void appendSameMaterialStatusTargetContinuationLog(
+            LhScheduleContext context,
+            SkuScheduleDTO targetSku,
+            List<Map.Entry<String, LhMachineOnlineInfo>> onlineEntryList,
+            LocalDate productionDate,
+            int targetMachineCount,
+            int beforeMachineCount,
+            int remainingShortageCount) {
+        String machineCodes = onlineEntryList.stream()
+                .map(Map.Entry::getKey)
+                .collect(java.util.stream.Collectors.joining(","));
+        String onlineStatuses = onlineEntryList.stream()
+                .map(entry -> normalizeOnlineProductStatus(entry.getValue().getProductStatus()))
+                .distinct()
+                .collect(java.util.stream.Collectors.joining(","));
+        String detail = new StringBuilder(320)
+                .append("factoryCode=").append(context.getFactoryCode())
+                .append(", batchNo=").append(context.getBatchNo())
+                .append(", productionDate=").append(productionDate)
+                .append(", materialCode=").append(targetSku.getMaterialCode())
+                .append(", targetProductStatus=").append(targetSku.getProductStatus())
+                .append(", onlineProductStatus=").append(onlineStatuses)
+                .append(", machineCodes=").append(machineCodes)
+                .append(", targetMachineCount=").append(targetMachineCount)
+                .append(", beforeMachineCount=").append(beforeMachineCount)
+                .append(", afterMachineCount=").append(beforeMachineCount + 1)
+                .append(", remainingShortageCount=").append(remainingShortageCount)
+                .append(", decision=原在机状态窗口目标为0，按同物料承接目标状态续作")
+                .toString();
+        log.info("{}, {}", SAME_MATERIAL_STATUS_TARGET_CONTINUATION_LOG_TITLE, detail);
+        PriorityTraceLogHelper.appendProcessLog(
+                context, SAME_MATERIAL_STATUS_TARGET_CONTINUATION_LOG_TITLE, detail);
+    }
+
+    /**
+     * 多个产品状态同时存在机台缺口时记录跳过原因，保持原有后置资源竞争。
+     *
+     * @param context 排程上下文
+     * @param materialCode 物料编码
+     * @param shortageSkuList 存在缺口的状态列表
+     * @param productionDate T日
+     */
+    private void logAmbiguousSameMaterialStatusTarget(
+            LhScheduleContext context,
+            String materialCode,
+            List<SkuScheduleDTO> shortageSkuList,
+            LocalDate productionDate) {
+        if (CollectionUtils.isEmpty(shortageSkuList) || shortageSkuList.size() == 1) {
+            return;
+        }
+        String shortageStatuses = shortageSkuList.stream()
+                .map(SkuScheduleDTO::getProductStatus)
+                .collect(java.util.stream.Collectors.joining(","));
+        log.info("同物料跨状态续作目标机台补足跳过, factoryCode: {}, batchNo: {}, productionDate: {}, "
+                        + "materialCode: {}, shortageProductStatuses: {}, reason: 多个产品状态同时缺机，保持后置资源竞争",
+                context.getFactoryCode(), context.getBatchNo(), productionDate,
+                materialCode, shortageStatuses);
+    }
+
+    /**
+     * 解析已分配续作的物理机台编码集合。
+     *
+     * @param continuousSkuList 续作SKU列表
+     * @return 物理机台编码集合
+     */
+    private Set<String> resolveAssignedPhysicalMachineCodeSet(List<SkuScheduleDTO> continuousSkuList) {
+        Set<String> assignedMachineCodeSet = new LinkedHashSet<String>(16);
+        for (SkuScheduleDTO sku : continuousSkuList) {
+            if (Objects.isNull(sku) || StringUtils.isEmpty(sku.getContinuousMachineCode())) {
+                continue;
+            }
+            assignedMachineCodeSet.add(LhSingleControlMachineUtil.resolvePhysicalMachineCode(
+                    sku.getContinuousMachineCode()));
+        }
+        return assignedMachineCodeSet;
     }
 
     /**
