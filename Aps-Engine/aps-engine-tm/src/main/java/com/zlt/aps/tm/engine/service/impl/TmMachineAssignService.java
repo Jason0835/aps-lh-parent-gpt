@@ -780,9 +780,24 @@ public class TmMachineAssignService implements ITmMachineAssignService {
                 String carryoverSourceType = machineShiftBlocked
                         ? TmScheduleRuleCodeEnum.MACHINE_SHIFT_BLOCKED_CARRYOVER.getCode()
                         : TmScheduleRuleCodeEnum.CAPACITY_BLOCKED_CARRYOVER.getCode();
+                context.getCandidateTraceMap().put(task.getBusinessKey(), candidates);
+                if (!this.isPlanQtyCarryoverEnabled(context)) {
+                    TmUnplannedReasonEnum unplannedReason = machineShiftBlocked
+                            ? TmUnplannedReasonEnum.NO_AVAILABLE_MACHINE
+                            : TmUnplannedReasonEnum.CAPACITY_NOT_ENOUGH;
+                    this.markUnplanned(task, unplannedReason);
+                    this.addCarryoverDisabledTrace(context, task, task, carryoverSourceType,
+                            this.nvl(task.getPlanQty()), this.normalizeShiftOrder(task.getShiftOrder()),
+                            unplannedReason);
+                    this.addAssignTrace(context, task, TmScheduleRuleResultEnum.REJECT, null,
+                            unplannedReason.getCode(), unplannedReason.getDesc());
+                    log.info("[TM_PLAN_QTY_CARRYOVER_DISABLED] 任务[{}]来源班[{}]剩余量[{}]直接转未排，原因={}",
+                            task.getBusinessKey(), task.getShiftOrder(), task.getPlanQty(),
+                            unplannedReason.getCode());
+                    return;
+                }
                 this.addSourceCarryoverFailureTrace(context, task, candidates, carryoverSourceType,
                         nvl(task.getPlanQty()));
-                context.getCandidateTraceMap().put(task.getBusinessKey(), candidates);
                 log.info("[TM_MACHINE_ASSIGN] 任务[{}]当前班无可用承接，进入后续班次继续尝试",
                         task.getBusinessKey());
                 this.removeContextTask(context, task);
@@ -832,7 +847,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         addAssignTrace(context, task, TmScheduleRuleResultEnum.PASS,
                 bestCandidate.getMachineCode(), null, null);
 
-        // 当前班只按选中机台真实产能排，工装和产能溢出量统一从下一班开始顺延承接。
+        // 当前班只按选中机台真实产能排；剩余量是否进入后续班由跨班顺延参数控制。
         this.appendTaskWithCapacityOverflow(task, bestCandidate, passedCandidates, filterRule, scoreStrategy, context,
                 "普通排产");
     }
@@ -1359,9 +1374,12 @@ public class TmMachineAssignService implements ITmMachineAssignService {
                 ? TmScheduleRuleCodeEnum.CAPACITY_BLOCKED_CARRYOVER.getCode()
                 : TmScheduleRuleCodeEnum.MACHINE_SHIFT_BLOCKED_CARRYOVER.getCode())
                 : this.resolveCarryoverSourceType(capacityOverflowQty, toolOverflowQty);
+        boolean planQtyCarryoverEnabled = this.isPlanQtyCarryoverEnabled(context);
+        int lastTargetShiftOrder = planQtyCarryoverEnabled
+                ? TmScheduleConstants.TM_MAX_SHIFT_ORDER : sourceShiftOrder;
         int overflowIndex = 1;
         for (int shiftOrder = sourceShiftOrder + 1;
-             shiftOrder <= TmScheduleConstants.TM_MAX_SHIFT_ORDER
+             shiftOrder <= lastTargetShiftOrder
                      && remainingQty.compareTo(BigDecimal.ZERO) > 0;
              shiftOrder++) {
             List<TmMachineCandidate> shiftCandidates = this.resolveShiftAssignableCandidates(sourceTask, context,
@@ -1457,6 +1475,11 @@ public class TmMachineAssignService implements ITmMachineAssignService {
             }
         }
         if (remainingQty.compareTo(BigDecimal.ZERO) > 0) {
+            if (!planQtyCarryoverEnabled) {
+                this.appendCarryoverDisabledUnplanned(sourceTask, context, remainingQty,
+                        capacityOverflowQty, toolOverflowQty, sourceShiftOrder, overflowIndex, sourceType);
+                return;
+            }
             TmTaskDraft unplannedTask = this.copyOverflowTask(sourceTask,
                     TmScheduleConstants.TM_MAX_SHIFT_ORDER, remainingQty, sourceShiftOrder,
                     overflowIndex, TmMachineAssignStatusEnum.UNPLANNED.getCode());
@@ -1489,6 +1512,90 @@ public class TmMachineAssignService implements ITmMachineAssignService {
             this.addAssignTrace(context, unplannedTask, TmScheduleRuleResultEnum.REJECT, null,
                     unplannedReason.getCode(), unplannedReason.getDesc());
         }
+    }
+
+    /**
+     * 判断是否允许把当前班未承接计划量顺延到后续班次。
+     *
+     * @param context 胎面排程上下文
+     * @return true表示允许跨班顺延，参数缺失或非1时返回false
+     */
+    private boolean isPlanQtyCarryoverEnabled(TmScheduleContext context) {
+        String paramValue = this.resolveParamValue(context,
+                TmScheduleConstants.PARAM_PLAN_QTY_CARRYOVER_ENABLED,
+                TmScheduleConstants.DEFAULT_PLAN_QTY_CARRYOVER_ENABLED);
+        return TmYesNoEnum.YES.getCode().equals(paramValue);
+    }
+
+    /**
+     * 将跨班顺延关闭后仍未承接的计划量保留在来源班并转为未排任务。
+     *
+     * @param sourceTask 来源任务
+     * @param context 胎面排程上下文
+     * @param remainingQty 来源班仍未承接计划量
+     * @param capacityOverflowQty 产能不足量
+     * @param toolOverflowQty 工装不足量
+     * @param sourceShiftOrder 来源班次
+     * @param overflowIndex 拆分序号
+     * @param sourceType 未承接来源类型
+     */
+    private void appendCarryoverDisabledUnplanned(TmTaskDraft sourceTask, TmScheduleContext context,
+                                                   BigDecimal remainingQty, BigDecimal capacityOverflowQty,
+                                                   BigDecimal toolOverflowQty, Integer sourceShiftOrder,
+                                                   int overflowIndex, String sourceType) {
+        TmUnplannedReasonEnum unplannedReason = this.resolveCarryoverUnplannedReason(
+                capacityOverflowQty, toolOverflowQty);
+        TmTaskDraft unplannedTask = this.copyOverflowTask(sourceTask, sourceShiftOrder, remainingQty,
+                sourceShiftOrder, overflowIndex, TmMachineAssignStatusEnum.UNPLANNED.getCode());
+        unplannedTask.setPlanQty(remainingQty);
+        unplannedTask.setShiftOrder(sourceShiftOrder);
+        unplannedTask.setMachineCode(null);
+        unplannedTask.setUnplannedReasonCode(unplannedReason.getCode());
+        unplannedTask.setUnplannedReasonDesc(unplannedReason.getDesc());
+        unplannedTask.setCalcFormulaDesc(this.appendFormulaDesc(unplannedTask.getCalcFormulaDesc(),
+                "跨班顺延参数关闭，来源班剩余计划量转未排"));
+        this.addContextTask(context, unplannedTask);
+        if (TmUnplannedReasonEnum.TOOL_NOT_ENOUGH.equals(unplannedReason)) {
+            this.addToolLimitUnplannedTrace(context, unplannedTask, remainingQty, sourceShiftOrder);
+        } else if (TmUnplannedReasonEnum.CAPACITY_NOT_ENOUGH.equals(unplannedReason)) {
+            this.addCapacityUnplannedTrace(context, unplannedTask, remainingQty);
+        }
+        this.addCarryoverDisabledTrace(context, unplannedTask, sourceTask, sourceType,
+                remainingQty, sourceShiftOrder, unplannedReason);
+        this.addAssignTrace(context, unplannedTask, TmScheduleRuleResultEnum.REJECT, null,
+                unplannedReason.getCode(), unplannedReason.getDesc());
+        log.info("[TM_PLAN_QTY_CARRYOVER_DISABLED] 来源任务[{}]来源班[{}]剩余量[{}]转未排，原因={}",
+                sourceTask.getBusinessKey(), sourceShiftOrder, remainingQty, unplannedReason.getCode());
+    }
+
+    /**
+     * 记录跨班顺延关闭后的来源班未排证据。
+     *
+     * @param context 胎面排程上下文
+     * @param targetTask 当前未排任务
+     * @param sourceTask 来源任务
+     * @param sourceType 未承接来源类型
+     * @param remainingQty 来源班剩余计划量
+     * @param sourceShiftOrder 来源班次
+     * @param unplannedReason 未排原因
+     */
+    private void addCarryoverDisabledTrace(TmScheduleContext context, TmTaskDraft targetTask,
+                                           TmTaskDraft sourceTask, String sourceType,
+                                           BigDecimal remainingQty, Integer sourceShiftOrder,
+                                           TmUnplannedReasonEnum unplannedReason) {
+        Map<String, Object> evidence = new LinkedHashMap<>();
+        evidence.put("paramCode", TmScheduleConstants.PARAM_PLAN_QTY_CARRYOVER_ENABLED);
+        evidence.put("paramValue", this.resolveParamValue(context,
+                TmScheduleConstants.PARAM_PLAN_QTY_CARRYOVER_ENABLED,
+                TmScheduleConstants.DEFAULT_PLAN_QTY_CARRYOVER_ENABLED));
+        evidence.put("sourceTask", sourceTask == null ? null : sourceTask.getBusinessKey());
+        evidence.put("sourceType", sourceType);
+        evidence.put("sourceShiftOrder", sourceShiftOrder);
+        evidence.put("remainingQty", this.nvl(remainingQty));
+        evidence.put("unplannedReasonCode", unplannedReason.getCode());
+        evidence.put("unplannedReasonDesc", unplannedReason.getDesc());
+        this.traceOf(context, targetTask).addRuleHit(TmScheduleRuleCodeEnum.PLAN_QTY_CARRYOVER_DISABLED,
+                TmScheduleRuleResultEnum.REJECT, evidence);
     }
 
 

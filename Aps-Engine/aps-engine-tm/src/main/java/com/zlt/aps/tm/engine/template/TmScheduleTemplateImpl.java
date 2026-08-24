@@ -1049,7 +1049,7 @@ public class TmScheduleTemplateImpl extends AbsTmScheduleTemplate {
      *
      * @param machineText 来源机台编码，使用英文逗号分隔
      * @param machineLabel 日志中的机台名称
-     * @return 机台数量及编码展示文本
+     * @return 机台数量及编码展示文本，多个编码使用英文逗号分隔
      */
     private String displayMachineSummary(String machineText, String machineLabel) {
         List<String> machineCodes = StrUtil.isBlank(machineText) ? Collections.emptyList()
@@ -1059,7 +1059,7 @@ public class TmScheduleTemplateImpl extends AbsTmScheduleTemplate {
                 .distinct()
                 .collect(Collectors.toList());
         return machineLabel + " " + machineCodes.size() + "台="
-                + (machineCodes.isEmpty() ? "未提供" : String.join("，", machineCodes));
+                + (machineCodes.isEmpty() ? "未提供" : String.join(",", machineCodes));
     }
 
     /** 格式化库存供应时长并追加小时单位。
