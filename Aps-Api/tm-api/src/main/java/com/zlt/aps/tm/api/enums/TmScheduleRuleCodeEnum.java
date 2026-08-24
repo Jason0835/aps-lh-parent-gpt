@@ -26,6 +26,9 @@ public enum TmScheduleRuleCodeEnum {
     /** 计划量结转。 */
     PLAN_QTY_CARRYOVER("PLAN_QTY_CARRYOVER", "计划量结转"),
 
+    /** 跨班顺延关闭后来源班剩余计划量转未排。 */
+    PLAN_QTY_CARRYOVER_DISABLED("PLAN_QTY_CARRYOVER_DISABLED", "跨班顺延关闭，来源班剩余计划量转未排"),
+
     /** 静态可行但当前班产能不足的顺延。 */
     CAPACITY_BLOCKED_CARRYOVER("CAPACITY_BLOCKED_CARRYOVER", "当前班产能不足顺延"),
 
@@ -82,6 +85,9 @@ public enum TmScheduleRuleCodeEnum {
 
     /** 库存保证需求估算。 */
     GUARD_DEMAND_ESTIMATE("GUARD_DEMAND_ESTIMATE", "库存保证需求估算"),
+
+    /** 库存深度机台数量匹配。 */
+    DEPTH_CONFIG_MATCH("DEPTH_CONFIG_MATCH", "库存深度机台数量匹配"),
 
     /** 计划量计算。 */
     PLAN_QTY_CALC("PLAN_QTY_CALC", "计划量计算"),

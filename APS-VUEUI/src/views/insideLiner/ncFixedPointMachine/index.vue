@@ -136,6 +136,7 @@ export default {
         {
           label: this.$t("ui.data.column.factoryCode"),
           prop: "factoryCode",
+          align: "center",
           minWidth: 100,
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
@@ -193,7 +194,9 @@ export default {
           align: "center",
           halign: "center",
           label: this.$t("ui.data.btn.option"),
+          minWidth: 160, width: 160,
           prop: "option",
+          fixed: "right",
           render: ({ row }) => {
             return (
               <div>

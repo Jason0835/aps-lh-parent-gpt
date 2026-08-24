@@ -26,6 +26,10 @@ public interface ITqMachineChuckService {
     @ApiOperation("保存胎圈机台寸口对应（id为空则新增，id不为空则修改）")
     AjaxResult save(@RequestBody TqMachineChuck entity);
 
+    @PostMapping("/tqMachineChuck/checkUnique")
+    @ApiOperation("校验机台编码+寸口编码组合唯一性")
+    String checkUnique(@RequestBody TqMachineChuck entity);
+
     @PostMapping("/tqMachineChuck/delete/{ids}")
     @ApiOperation("删除胎圈机台寸口对应")
     AjaxResult removeByIds(@PathVariable("ids") List<Long> ids);

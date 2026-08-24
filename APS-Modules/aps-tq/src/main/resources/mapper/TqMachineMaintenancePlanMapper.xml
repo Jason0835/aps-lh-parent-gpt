@@ -26,6 +26,7 @@
         ) t
     </select>
 
+    <!-- 校验"停机日期+机台编号+停机班次"组合唯一性 -->
     <select id="checkUnique" parameterType="com.zlt.aps.tq.api.domain.entity.TqMachineMaintenancePlan" resultType="int">
         SELECT count(1)
         FROM T_TQ_MACHINE_MAINTENANCE_PLAN
@@ -35,34 +36,6 @@
         and DOWNTIME_SHIFT = #{downtimeShift}
         <if test="id != null">and ID != #{id}</if>
     </select>
-
-    <insert id="mergeSql" parameterType="list">
-        INSERT INTO T_TQ_MACHINE_MAINTENANCE_PLAN (
-            factory_code, machine_code, downtime_date, downtime_shift, downtime_hours, remark,
-            create_by, create_time, update_by, update_time, is_delete
-        )
-        VALUES
-        <foreach collection="list" item="Plan" separator=",">
-            (
-            #{Plan.factoryCode,jdbcType=VARCHAR},
-            #{Plan.machineCode,jdbcType=VARCHAR},
-            #{Plan.downtimeDate,jdbcType=DATE},
-            #{Plan.downtimeShift,jdbcType=VARCHAR},
-            #{Plan.downtimeHours,jdbcType=DECIMAL},
-            #{Plan.remark,jdbcType=VARCHAR},
-            #{Plan.createBy,jdbcType=VARCHAR},
-            NOW(),
-            #{Plan.updateBy,jdbcType=VARCHAR},
-            NOW(),
-            '0'
-            )
-        </foreach>
-        ON DUPLICATE KEY UPDATE
-        downtime_hours = VALUES(downtime_hours),
-        update_by = VALUES(create_by),
-        update_time = NOW(),
-        remark = VALUES(remark)
-    </insert>
 
     <update id="deleteAllMachineMaintenancePlan">
         update T_TQ_MACHINE_MAINTENANCE_PLAN set IS_DELETE = '1' where IS_DELETE = '0'

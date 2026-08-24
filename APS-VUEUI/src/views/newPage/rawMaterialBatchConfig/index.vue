@@ -133,6 +133,7 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
+          align: "center",
           label: this.$t("ui.data.column.rawMaterialOutboundRecord.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
@@ -140,10 +141,14 @@ export default {
         },
         {
           prop: "materialCode",
+          align: "center",
+          minWidth: 160,
           label: this.$t("ui.data.column.masterdata.materialCode"),
         },
         {
           prop: "materialType",
+          align: "center",
+          minWidth: 120,
           label: this.$t("ui.data.column.masterdata.materialType"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_rawMaterial_type, value);
@@ -152,19 +157,23 @@ export default {
         {
           prop: "materialDesc",
           label: this.$t("common.name"),
-          align: "left",
-          minWidth: 350
+          align: "center",
+          minWidth: 180
         },
         {
           prop: "outboundDate",
+          align: "center",
+          minWidth: 160,
           label: this.$t("ui.data.column.masterdata.outboundDate"),
         },
         {
           prop: "outboundQty",
+          align: "center",
           label: this.$t("ui.data.column.masterdata.outboundQty"),
         },
         {
           prop: "unit",
+          align: "center",
           label: this.$t("common.unit"),
         },
         {

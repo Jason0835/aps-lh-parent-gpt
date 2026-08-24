@@ -46,9 +46,9 @@ export default {
         { prop: "storageLaneCode", align: "center", halign: "center", label: this.$t("ui.data.column.cd90StorageLaneLimit.storageLaneCode"), minWidth: 130 },
         { prop: "carNum", align: "center", halign: "center", label: this.$t("ui.data.column.cd90StorageLaneLimit.carNum"), minWidth: 90 },
         { prop: "maxCarNum", align: "center", halign: "center", label: this.$t("ui.data.column.cd90StorageLaneLimit.maxCarNum"), minWidth: 90 },
-        { prop: "remark", halign: "center", label: this.$t("ui.common.column.remark"), minWidth: 120 },
-        { prop: "updateTime", align: "center", halign: "center", label: this.$t("common.updateTime"), minWidth: 160 },
-        { align: "center", halign: "center", label: this.$t("ui.data.btn.option"), prop: "option", minWidth: 150, fixed: "right",
+        { prop: "remark", align: "center", halign: "center", label: this.$t("ui.common.column.remark"), minWidth: 120 },
+        { prop: "updateTime", align: "center", halign: "center", label: this.$t("common.updateTime"), minWidth: 180 },
+        { align: "center", halign: "center", label: this.$t("ui.data.btn.option"), prop: "option", minWidth: 160, width: 160, fixed: "right",
           render: ({ row }) => (<div><el-button v-hasPermi={["cd90:storageLaneLimit:edit"]} class="minus" type="success" onClick={() => this.handleEdit(row)}>{this.$t("ui.frame.btn.update")}</el-button><el-button v-hasPermi={["cd90:storageLaneLimit:remove"]} class="minus" type="danger" onClick={() => this.handleDelete(row)}>{this.$t("ui.frame.btn.delete")}</el-button></div>) },
       ];
     },

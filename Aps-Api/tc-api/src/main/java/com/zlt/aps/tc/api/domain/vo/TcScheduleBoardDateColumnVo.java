@@ -22,6 +22,11 @@ public class TcScheduleBoardDateColumnVo implements Serializable {
     @ApiModelProperty(value = "排程日期")
     private Date scheduleDate;
 
+    /** 班次实际开始时间，用于前端判断班次是否已开始。 */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @ApiModelProperty(value = "班次实际开始时间")
+    private Date shiftStartTime;
+
     /** 班次顺序。 */
     @ApiModelProperty(value = "班次顺序")
     private Integer shiftOrder;

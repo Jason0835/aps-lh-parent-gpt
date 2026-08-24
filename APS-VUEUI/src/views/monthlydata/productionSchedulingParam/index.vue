@@ -119,6 +119,7 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
+          align: "center",
           label: this.$t("ui.data.column.factoryParam.factoryCode"),
           formatter: (row, column, value, index) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
@@ -126,6 +127,7 @@ export default {
         },
         {
           prop: "productTypeCode",
+          align: "center",
           label: this.$t("ui.data.column.factoryParam.productTypeCode"),
           formatter: (row, column, value, index) => {
             return this.selectDictLabel(this.dict.type.biz_product_type, value);
@@ -133,8 +135,9 @@ export default {
         },
         {
           prop: "paramCode",
+          align: "center",
           label: this.$t("ui.data.column.factoryParam.paramCode"),
-          width: 200,
+          width: 140,
         },
         {
           prop: "paramName",
@@ -143,10 +146,12 @@ export default {
         },
         {
           prop: "paramValue",
+          align: "center",
           label: this.$t("ui.data.column.factoryParam.paramValue"),
         },
         {
           prop: "defauleValue",
+          align: "center",
           label: this.$t("ui.data.column.factoryParam.defauleValue"),
         },
         {
@@ -156,7 +161,8 @@ export default {
         },
         {
           prop: "updateBy",
-          label: this.$t("common.updateByName"),
+          align: "center",
+          label: this.$t("ui.data.column.updateBy"),
         },
         {
           prop: "updateTime",
@@ -168,6 +174,7 @@ export default {
           halign: "center",
           fixed: "right",
           label: this.$t("ui.data.btn.option"),
+          minWidth: 120, width: 120,
           render: ({ row }) => {
             return (
               <el-button

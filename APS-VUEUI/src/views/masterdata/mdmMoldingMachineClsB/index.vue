@@ -136,6 +136,7 @@ export default {
         {
           prop: "option",
           label: this.$t("common.option"),
+          minWidth: 120, width: 120,
           align: "center",
           render: ({ row }) => {
             return (

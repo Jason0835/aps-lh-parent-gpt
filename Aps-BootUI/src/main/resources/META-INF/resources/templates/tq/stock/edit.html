@@ -84,12 +84,8 @@
             return;
         }
         if ($.validate.form()) {
-            var editType = $("#editType").val();
-            if(editType=='0'){
-                $.operate.save(prefix + "/add", $('#form-stock-edit').serialize());
-            }else{
-                $.operate.save(prefix + "/edit", $('#form-stock-edit').serialize());
-            }
+            // 后端 POST /tq/stock/save 统一处理（id为空则新增，id不为空则修改），原 /add、/edit 接口不存在
+            $.operate.save(prefix + "/save", $('#form-stock-edit').serialize());
         }
     }
 

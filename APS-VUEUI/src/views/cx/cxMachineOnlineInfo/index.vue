@@ -100,7 +100,7 @@ export default {
           align: 'center',
           halign: 'center',
           label: this.$t('ui.data.column.cxMachineOnlineInfo.onlineDate'),
-          minWidth: 100
+          minWidth: 180
         },
         {
           prop: 'cxCode',
@@ -153,7 +153,7 @@ export default {
           align: 'center',
           halign: 'center',
           label: this.$t('ui.data.column.updateTime'),
-          minWidth: 160
+          minWidth: 180
         }
       ]
     }

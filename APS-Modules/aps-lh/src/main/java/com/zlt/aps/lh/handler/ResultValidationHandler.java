@@ -2173,6 +2173,14 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             }
             String dateKey = LhScheduleTimeUtil.formatDate(plan.getPlanDate());
             dailyMachineMap.computeIfAbsent(dateKey, key -> new ArrayList<>()).add(physicalMachineCode);
+            if (context.isCrossDayPreparationMouldChange(
+                    plan.getLhMachineCode(), plan.getPlanDate())) {
+                /*
+                 * 生产日前跨日准备是贴近下一业务日首班的已确认时间轴：仍计入每日15次
+                 * 硬上限，但不参与早8/中7参考分布告警，否则合法的T日中班准备会被误报。
+                 */
+                continue;
+            }
             if (LhScheduleTimeUtil.isMorningShift(context, plan.getPlanDate())) {
                 morningMachineMap.computeIfAbsent(dateKey, key -> new ArrayList<>()).add(physicalMachineCode);
                 continue;
@@ -2591,10 +2599,10 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
 
     /**
      * 解析模具交替计划下机类型。
-     * <p>END_TYPE 描述换模前物料的下机方式，本质是“换模时刻 vs 前物料真实收尾时刻”的时间关系：
-     * 换模班次在前物料跨机台最后正量班次之前，说明换模时前物料尚未收尾，属于按时间下机（1）；
-     * 换模班次在收尾班次或之后，说明前物料已收尾后才下机，属于按余量收尾下机（0）。
-     * 判断按“物料+产品状态”跨机台汇总，避免只看本机台结果而漏掉前物料在其他机台仍在生产。</p>
+     * <p>END_TYPE 描述换模前物料的下机方式。系统先按“物料+产品状态”汇总排程前硫化余量与
+     * 本批全部结果量：真实剩余量大于0时，无论换模落在哪个班次，都属于余量未排完后的按时间下机（1）。
+     * 只有真实剩余量已经归零，才继续比较换模班次与前物料跨机台最后正量班次：换模更早为按时间下机（1），
+     * 换模处于收尾班次或之后为按余量收尾下机（0）。</p>
      * <p>边界口径：前物料硫化余量小于等于0时按余量下机；余量大于0但本次窗口完全没有排产量时
      * 按时间下机；无法解析换模班次时回退到“硫化余量-本次排产量”的真实剩余量口径，
      * 不读取运行期共享的 SKU 实际消费账本，避免账本被上游规则改写后误判。
@@ -2617,7 +2625,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
         Integer beforeSurplusQty = Objects.isNull(beforeSku) ? null : beforeSku.getSurplusQty();
         int beforeMaterialSurplusQty = Objects.isNull(beforeSurplusQty)
                 ? 0 : Math.max(0, beforeSurplusQty);
-        // 真实剩余量仅用于对账与换模班次缺失时的兜底，不参与正常时间口径判定。
+        // 真实剩余量优先判断是否具备余量收尾资格；运行期共享账本仅用于日志对账。
         Integer beforeMaterialRemainingQty = resolveBeforeMaterialRemainingQty(
                 context, beforeSku, machineCode);
         // 前物料排程前无硫化余量，机台不存在“按余量收尾”之外的下机方式。
@@ -2627,6 +2635,15 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
                             + "beforeMaterialCannotFinish: false, endType: 0, reason: 前物料无硫化余量",
                     machineCode, beforeMaterialCode, beforeProductStatus, beforeMaterialSurplusQty, 0, 0);
             return END_TYPE_BY_REMAINING_QTY;
+        }
+        if (Objects.nonNull(beforeMaterialRemainingQty) && beforeMaterialRemainingQty > 0) {
+            log.info("模具交替计划END_TYPE判断, machineCode: {}, beforeMaterialCode: {}, "
+                            + "beforeProductStatus: {}, beforeMaterialSurplusQty: {}, "
+                            + "beforeMaterialRemainingQty: {}, beforeMaterialCannotFinish: true, "
+                            + "endType: 1, reason: 同物料同产品状态真实硫化余量尚未排完",
+                    machineCode, beforeMaterialCode, beforeProductStatus,
+                    beforeMaterialSurplusQty, beforeMaterialRemainingQty);
+            return END_TYPE_BY_TIME;
         }
         // 前物料跨机台最后有正量的班次位置（1-8），0 表示本次窗口内没有班次级正量。
         boolean hasBeforeMaterialResult = hasBeforeMaterialScheduleResult(

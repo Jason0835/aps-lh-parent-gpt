@@ -132,6 +132,7 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
+          align: "center",
           label: this.$t("ui.data.column.lhPrecisionPlan.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
@@ -139,10 +140,12 @@ export default {
         },
         {
           prop: "year",
+          align: "center",
           label: this.$t("ui.data.column.lhPrecisionPlan.year"),
         },
         {
           prop: "machineCode",
+          align: "center",
           label: this.$t("ui.data.column.lhPrecisionPlan.machineCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.lh_machine, value);
@@ -150,6 +153,7 @@ export default {
         },
         {
           prop: "precisionType",
+          align: "center",
           label: this.$t("ui.data.column.lhPrecisionPlan.precisionType"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.lh_precision_type, value);
@@ -157,11 +161,13 @@ export default {
         },
         {
           prop: "planDate",
+          align: "center",
           label: this.$t("ui.data.column.lhPrecisionPlan.planDate"),
           width: 150
         },
         {
           prop: "actualDate",
+          align: "center",
           label: this.$t("ui.data.column.lhPrecisionPlan.actualDate"),
           width: 150
         },
@@ -173,6 +179,7 @@ export default {
         },
         {
           prop: "daysToDue",
+          align: "center",
           label: this.$t("ui.data.column.lhPrecisionPlan.daysToDue"),
           formatter: (row, column, value) => {
             return value < 0 ? 0 : value;
@@ -180,6 +187,7 @@ export default {
         },
         {
           prop: "dataSource",
+          align: "center",
           label: this.$t("ui.lh.precision.plan.data.source"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.lh_precision_data_source, value);
@@ -187,6 +195,7 @@ export default {
         },
         {
           prop: "updateTime",
+          align: "center",
           width: 180,
           label: this.$t("ui.data.column.updateTime"),
         },
@@ -208,7 +217,8 @@ export default {
         {
           align: "center",
           label: this.$t("ui.data.btn.option"),
-          width: 180,
+          width: 160,
+          fixed: "right",
           render: ({ row }) => {
             return (
               <div>

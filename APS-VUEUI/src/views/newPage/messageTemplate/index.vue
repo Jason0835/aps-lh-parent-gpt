@@ -181,7 +181,7 @@ export default {
           align: "center",
           label: this.$t("common.option"),
           fixed: "right",
-          width: 240,
+          width: 280,
           render: ({ row }) => {
             return (
               <div>

@@ -24,6 +24,7 @@ import java.math.BigDecimal;
 import java.text.MessageFormat;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /**
  * 胎面人工插单应用服务。
@@ -127,6 +128,15 @@ public class TmManualScheduleApplicationService {
         result.setClass3PlanQty(requestVo.getClass3PlanQty());
         result.setClass3Sequence(requestVo.getClass3Sequence());
         result.setClass3Analysis(StrUtil.trim(requestVo.getClass3Analysis()));
+        result.setClass4PlanQty(requestVo.getClass4PlanQty());
+        result.setClass4Sequence(requestVo.getClass4Sequence());
+        result.setClass4Analysis(StrUtil.trim(requestVo.getClass4Analysis()));
+        result.setClass5PlanQty(requestVo.getClass5PlanQty());
+        result.setClass5Sequence(requestVo.getClass5Sequence());
+        result.setClass5Analysis(StrUtil.trim(requestVo.getClass5Analysis()));
+        result.setClass6PlanQty(requestVo.getClass6PlanQty());
+        result.setClass6Sequence(requestVo.getClass6Sequence());
+        result.setClass6Analysis(StrUtil.trim(requestVo.getClass6Analysis()));
         result.setRemark(StrUtil.trim(requestVo.getRemark()));
         if (this.hasOverLengthText(result, ANALYSIS_MAX_LENGTH) || StrUtil.length(result.getRemark()) > REMARK_MAX_LENGTH) {
             throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.schedule.insertTextTooLong"));
@@ -135,14 +145,14 @@ public class TmManualScheduleApplicationService {
     }
 
     /**
-     * 校验三个可插单班次的计划量、顺序和原因分析配对关系。
+     * 校验六个可插单班次的计划量、顺序和原因分析配对关系。
      *
      * @param scheduleResult 待校验排程结果
      * @throws ServiceException 没有有效计划量或班次字段未按规则配对时抛出
      */
     private void validateShiftFields(TmScheduleResult scheduleResult) {
         boolean hasPlanQty = false;
-        for (int shiftOrder = 1; shiftOrder <= 3; shiftOrder++) {
+        for (int shiftOrder = 1; shiftOrder <= TmScheduleConstants.TM_MAX_SHIFT_ORDER; shiftOrder++) {
             String planQtyField = String.format(TmScheduleConstants.SHIFT_PLAN_QTY_FIELD_TEMPLATE, shiftOrder);
             String sequenceField = String.format(TmScheduleConstants.SHIFT_SEQUENCE_FIELD_TEMPLATE, shiftOrder);
             String analysisField = String.format(TmScheduleConstants.SHIFT_ANALYSIS_FIELD_TEMPLATE, shiftOrder);
@@ -175,8 +185,10 @@ public class TmManualScheduleApplicationService {
      * @return true 表示至少一个原因分析超长
      */
     private boolean hasOverLengthText(TmScheduleResult scheduleResult, int maxLength) {
-        return Arrays.asList(scheduleResult.getClass1Analysis(), scheduleResult.getClass2Analysis(),
-                        scheduleResult.getClass3Analysis()).stream()
+        return IntStream.rangeClosed(1, TmScheduleConstants.TM_MAX_SHIFT_ORDER)
+                .mapToObj(shiftOrder -> scheduleResult.getFieldValueByFieldName(
+                        String.format(TmScheduleConstants.SHIFT_ANALYSIS_FIELD_TEMPLATE, shiftOrder)))
+                .map(String.class::cast)
                 .filter(Objects::nonNull).anyMatch(value -> value.length() > maxLength);
     }
 

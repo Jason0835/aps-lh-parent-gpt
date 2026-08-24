@@ -143,6 +143,7 @@ export default {
         {
           label: this.$t("ui.data.column.factoryCode"),
           prop: "factoryCode",
+          align: "center",
           minWidth: 100,
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
@@ -151,18 +152,21 @@ export default {
         {
           label: this.$t("ui.data.column.machine.machineCode"),
           prop: "machineCode",
+          align: "center",
           minWidth: 100,
           // sortable: "custom",
         },
         {
           label: this.$t("ui.data.column.machine.machineName"),
           prop: "machineName",
+          align: "center",
           minWidth: 100,
           // sortable: "custom",
         },
         {
           label: this.$t("ui.data.column.machine.widthMin"),
           prop: "widthMin",
+          align: "center",
           minWidth: 100,
           // sortable: "custom",
           type: "number",
@@ -170,6 +174,7 @@ export default {
         {
           label: this.$t("ui.data.column.machine.widthMax"),
           prop: "widthMax",
+          align: "center",
           minWidth: 100,
           // sortable: "custom",
           type: "number",
@@ -177,6 +182,7 @@ export default {
         {
           label: this.$t("ui.data.column.machine.thickMin"),
           prop: "thickMin",
+          align: "center",
           minWidth: 100,
           // sortable: "custom",
           type: "number",
@@ -184,12 +190,14 @@ export default {
         {
           label: this.$t("ui.data.column.machine.quata"),
           prop: "quata",
+          align: "center",
           minWidth: 100,
           type: "number",
         },
         {
           label: this.$t("ui.data.column.machine.classShift"),
           prop: "classShift",
+          align: "center",
           minWidth: 100,
           // sortable: "custom", //CLASS_SHIFT
           render: ({ row }) => {
@@ -203,6 +211,7 @@ export default {
         {
           label: this.$t("ui.data.column.machine.openMachineClass"),
           prop: "openMachineClass",
+          align: "center",
           minWidth: 100,
           // sortable: "custom",
           render: ({ row }) => {
@@ -214,6 +223,7 @@ export default {
           },
         },
         {
+          align: "center",
           label: this.$t("ui.data.column.machine.status"),
           prop: "status",
           minWidth: 100,
@@ -232,6 +242,7 @@ export default {
         {
           label: this.$t("ui.common.column.remark"),
           prop: "remark",
+          align: "center",
           minWidth: 100,
           // sortable: "custom",
           formatter: (row) => {
@@ -243,12 +254,14 @@ export default {
           align: "center",
           halign: "center",
           label: this.$t("common.updateTime"),
-          minWidth: 160,
+          minWidth: 200,
         },
         {
           label: this.$t("common.option"),
           prop: "option",
-          width: "100px",
+          width: "120px",
+          align: "center",
+          fixed: "right",
           render: ({ row }) => {
             return (
               <div>

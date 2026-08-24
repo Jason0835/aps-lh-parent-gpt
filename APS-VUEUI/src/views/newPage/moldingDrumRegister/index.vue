@@ -138,6 +138,7 @@ export default {
           prop: "factoryCode",
           label: this.$t("ui.data.column.mdmWorkWearInfo.factoryCode"),
           type: "select",
+          align: "center",
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
@@ -146,6 +147,7 @@ export default {
           prop: "workWearType",
           label: this.$t("ui.data.column.mdmWorkWearInfo.workWearType"),
           type: "select",
+          align: "center",
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_work_type, value);
           },
@@ -155,6 +157,7 @@ export default {
           prop: "workWearStatus",
           label: this.$t("ui.data.column.mdmWorkWearInfo.workWearStatus"),
           type: "select",
+          align: "center",
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_available_status, value);
           },
@@ -162,12 +165,14 @@ export default {
         {
           prop: "workWearName",
           label: this.$t("ui.data.column.mdmWorkWearInfo.workWearName"),
+          align: "center",
           width:180
         },
         {
           prop: "cxMachineBrandCode",
           label: this.$t("ui.data.column.mdmWorkWearInfo.cxMachineBrandCode"),
           type: "select",
+          align: "center",
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_machine_brand, value);
           },
@@ -177,6 +182,7 @@ export default {
           prop: "cxMachineTypeCode",
           label: this.$t("ui.data.column.mdmWorkWearInfo.cxMachineTypeCode"),
           type: "select",
+          align: "center",
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_class_type, value);
           },
@@ -185,25 +191,30 @@ export default {
         {
           prop: "perimeterMin",
           label: this.$t("ui.data.column.mdmWorkWearInfo.perimeterMin"),
+          align: "center",
         },
         {
           prop: "perimeterMax",
           label: this.$t("ui.data.column.mdmWorkWearInfo.perimeterMax"),
+          align: "center",
         },
 
         {
           prop: "specifications",
           label: this.$t("ui.data.column.mdmWorkWearInfo.specifications"),
+          align: "center",
           width:180
         },
         {
           prop: "qty",
           label: this.$t("ui.data.column.mdmWorkWearInfo.qty"),
+          align: "center",
           width:120
         },
         {
           prop: "unit",
           label: this.$t("ui.data.column.mdmWorkWearInfo.unit"),
+          align: "center",
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_work_unit, value);
           },
@@ -212,6 +223,7 @@ export default {
         {
           prop: "usedType",
           label: this.$t("ui.data.column.mdmWorkWearInfo.usedType"),
+          align: "center",
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.cx_machine_type_code, value);
           },
@@ -220,6 +232,7 @@ export default {
         {
           prop: "remark",
           label: this.$t("ui.common.column.remark"),
+          align: "left",
           width:120
         },
         {
@@ -230,6 +243,7 @@ export default {
         },
         {
           prop: "updateTime",
+          align: "center",
           label: this.$t("ui.data.column.updateTime"),
           width: 180,
         },
@@ -237,7 +251,7 @@ export default {
           align: "center",
           label: this.$t("ui.data.btn.option"),
           fixed: "right",
-          width:200,
+          width: 160,
           render: ({ row }) => {
             return (
               <div>

@@ -2,9 +2,11 @@ package com.zlt.aps.tq.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.tq.api.domain.entity.TqMachineSpecSpeed;
@@ -53,6 +55,10 @@ public class TqMachineSpecSpeedController extends AbstractDocBizController<TqMac
     @PostMapping("/save")
     @Override
     public AjaxResult save(@RequestBody TqMachineSpecSpeed billVO) {
+        // 保存前校验机台编码+胎圈规格组合唯一性，重复时返回友好提示
+        if (UserConstants.NOT_UNIQUE.equals(tqMachineSpecSpeedService.checkUnique(billVO))) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.tq.machineSpecSpeed.column.conflict"));
+        }
         return super.save(billVO);
     }
 
@@ -133,7 +139,6 @@ public class TqMachineSpecSpeedController extends AbstractDocBizController<TqMac
 
     @Override
     protected void builderCondition(QueryWrapper<TqMachineSpecSpeed> queryWrapper, TqMachineSpecSpeed queryVO) {
-        queryWrapper.eq("IS_DELETE", 0);
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getMachineCode()), "MACHINE_CODE", queryVO.getMachineCode());
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getBeadCode()), "BEAD_CODE", queryVO.getBeadCode());
     }

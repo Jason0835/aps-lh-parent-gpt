@@ -828,6 +828,9 @@ public class TmManualInsertRollingService {
      * @return 操作班次
      */
     private int resolveOperationShift(TmScheduleResult operationResult, TmScheduleResult oldResult) {
+        if (operationResult != null && operationResult.getShiftOrder() != null) {
+            return operationResult.getShiftOrder();
+        }
         Integer shiftOrder = TmInsertPositionValidator.resolveShiftOrder(operationResult);
         if (shiftOrder == null) {
             shiftOrder = TmInsertPositionValidator.resolveShiftOrder(oldResult);

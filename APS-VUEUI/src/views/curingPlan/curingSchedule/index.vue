@@ -359,6 +359,7 @@ export default {
         {
           label: this.$t("ui.data.column.factoryCode"),
           prop: "factoryCode",
+          align: "center",
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
@@ -366,15 +367,17 @@ export default {
         {
           label: this.$t("ui.data.column.lhScheduleResult.lhMachineCode"),
           prop: "lhMachineCode",
+          align: "center",
         }, // 硫化机台代码
         {
           label: this.$t("ui.data.column.lhScheduleResult.materialCode"),
+          align: "center",
           width:120,
           prop: "materialCode",
         }, // 物料编码
         {
           label: this.$t("ui.data.column.lhScheduleResult.materialDesc"),
-          align: "left",
+          align: "center",
           prop: "materialDesc",
           minWidth: 350,
           showOverflowTooltip: true,
@@ -388,6 +391,7 @@ export default {
         }, // 胚料描述
         {
           prop: "scheduleType",
+          align: "center",
           label: this.$t("ui.data.column.lhScheduleResult.scheduleType"),
           minWidth: 100,
           formatter: (row, column, value) => {
@@ -398,26 +402,29 @@ export default {
         {
           label: this.$t("ui.data.column.scheduleResult.finishQty"),
           prop: "totalFinishQty",
+          align: "center",
           minWidth: 100,
-          align: "right",
         }, // 今日夜班完成数量
         {
           label: this.$t("ui.data.column.scheduleResult.totalSurplusQty"),
           prop: "mouldSurplusQty",
+          align: "center",
           minWidth: 100,
-          align: "right",
         }, // 模具剩余数量
         {
           label: this.$t("ui.data.column.lhScheduleResult.embryoStock"),
+          align: "center",
           prop: "embryoStock",
         }, // 胚料库存
         {
           label: this.$t("ui.data.column.scheduleResult.lhShiftQty"),
+          align: "center",
           prop: "singleMouldShiftQty",
         }, // 单模班产数量
         {
           label: this.$t("ui.data.column.lhScheduleResult.isRelease"),
           prop: "isRelease",
+          align: "center",
           minWidth: 100,
           formatter: (row, column, value, index) => {
             return this.selectDictLabel(this.dict.type.IS_RELEASE_LH, value);
@@ -429,31 +436,37 @@ export default {
           children: [
             {
               prop: "leftRightMould",
+              align: "center",
               label: this.$t("ui.data.column.lhScheduleResult.leftRightMould"),
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 1),
             }, // 第1班-左右模
             {
           prop: "productStatus",
+          align: "center",
           label: this.$t("ui.data.column.lhScheduleResult.constructionStage"),
           formatter: (row, column, value) => this.shiftLhTypeFormatter(row, column, value, 1),
         }, // 第1班-示方类型
         {
           prop: "class1IsEnd",
+          align: "center",
           label: this.$t("ui.data.column.scheduleResult.type"),
           formatter: (row, column, value) => this.selectDictLabel(this.dict.type.biz_end_type, value),
         }, // 第1班-类型(收尾标识)
             {
               prop: "class1PlanQty",
+              align: "center",
               label: this.$t("ui.data.column.scheduleResult.plan"),
               formatter: (row, column, value) => this.shiftPlanQtyFormatter(row, column, value, 1),
             }, // 第1班-计划数量
             {
               prop: "class1FinishQty",
+              align: "center",
               label: this.$t("ui.data.column.scheduleResult.actual"),
               formatter: (row, column, value) => this.shiftFinishQtyFormatter(row, column, value, 1),
             }, // 第1班-实际数量
             {
               prop: "class1Analysis",
+              align: "center",
               label: this.$t("ui.data.column.scheduleResult.analysis"),
               formatter: (row, column, value) => this.shiftAnalysisFormatter(row, column, value, 1),
             }, // 第1班-分析备注
@@ -464,31 +477,37 @@ export default {
           children: [
             {
               prop: "leftRightMould",
+              align: "center",
               label: this.$t("ui.data.column.lhScheduleResult.leftRightMould"),
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 2),
             }, // 第2班-左右模
             {
               prop: "productStatus",
+              align: "center",
               label: this.$t("ui.data.column.lhScheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftLhTypeFormatter(row, column, value, 2),
             }, // 第2班-示方类型
            {
               prop: "class2IsEnd",
+              align: "center",
               label: this.$t("ui.data.column.scheduleResult.type"),
               formatter: (row, column, value) => this.selectDictLabel(this.dict.type.biz_end_type, value),
             }, // 第2班-类型(收尾标识)
             {
               prop: "class2PlanQty",
+              align: "center",
               label: this.$t("ui.data.column.scheduleResult.plan"),
               formatter: (row, column, value) => this.shiftPlanQtyFormatter(row, column, value, 2),
             }, // 第2班-计划数量
             {
               prop: "class2FinishQty",
+              align: "center",
               label: this.$t("ui.data.column.scheduleResult.actual"),
               formatter: (row, column, value) => this.shiftFinishQtyFormatter(row, column, value, 2),
             }, // 第2班-实际数量
             {
               prop: "class2Analysis",
+              align: "center",
               label: this.$t("ui.data.column.scheduleResult.analysis"),
               formatter: (row, column, value) => this.shiftAnalysisFormatter(row, column, value, 2),
             }, // 第2班-分析备注
@@ -500,31 +519,37 @@ export default {
           children: [
             {
               prop: "leftRightMould",
+              align: "center",
               label: this.$t("ui.data.column.lhScheduleResult.leftRightMould"),
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 3),
             }, // 第3班-左右模
             {
               prop: "productStatus",
+              align: "center",
               label: this.$t("ui.data.column.lhScheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftLhTypeFormatter(row, column, value, 3),
             }, // 第3班-示方类型
            {
               prop: "class3IsEnd",
+              align: "center",
               label: this.$t("ui.data.column.scheduleResult.type"),
               formatter: (row, column, value) => this.selectDictLabel(this.dict.type.biz_end_type, value),
             }, // 第3班-类型(收尾标识)
             {
               prop: "class3PlanQty",
+              align: "center",
               label: this.$t("ui.data.column.scheduleResult.plan"),
               formatter: (row, column, value) => this.shiftPlanQtyFormatter(row, column, value, 3),
             }, // 第3班-计划数量
             {
               prop: "class3FinishQty",
+              align: "center",
               label: this.$t("ui.data.column.scheduleResult.actual"),
               formatter: (row, column, value) => this.shiftFinishQtyFormatter(row, column, value, 3),
             }, // 第3班-实际数量
             {
               prop: "class3Analysis",
+              align: "center",
               label: this.$t("ui.data.column.scheduleResult.analysis"),
               formatter: (row, column, value) => this.shiftAnalysisFormatter(row, column, value, 3),
             }, // 第3班-分析备注
@@ -536,31 +561,37 @@ export default {
           children: [
             {
               prop: "leftRightMould",
+              align: "center",
               label: this.$t("ui.data.column.lhScheduleResult.leftRightMould"),
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 4),
             }, // 第4班-左右模
             {
               prop: "productStatus",
+              align: "center",
               label: this.$t("ui.data.column.lhScheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftLhTypeFormatter(row, column, value, 4),
             }, // 第4班-示方类型
            {
               prop: "class4IsEnd",
+              align: "center",
               label: this.$t("ui.data.column.scheduleResult.type"),
               formatter: (row, column, value) => this.selectDictLabel(this.dict.type.biz_end_type, value),
             }, // 第4班-类型(收尾标识)
             {
               prop: "class4PlanQty",
+              align: "center",
               label: this.$t("ui.data.column.scheduleResult.plan"),
               formatter: (row, column, value) => this.shiftPlanQtyFormatter(row, column, value, 4),
             }, // 第4班-计划数量
             {
               prop: "class4FinishQty",
+              align: "center",
               label: this.$t("ui.data.column.scheduleResult.actual"),
               formatter: (row, column, value) => this.shiftFinishQtyFormatter(row, column, value, 4),
             }, // 第4班-实际数量
             {
               prop: "class4Analysis",
+              align: "center",
               label: this.$t("ui.data.column.scheduleResult.analysis"),
               formatter: (row, column, value) => this.shiftAnalysisFormatter(row, column, value, 4),
             }, // 第4班-分析备注
@@ -745,8 +776,10 @@ export default {
         //   align: "right",
         // },
         {
+          align: "center",
           prop: "rowOperator",
           label: this.$t("common.option"),
+          minWidth: 280,
           width: 280,
           fixed: "right",
           render: ({ row }) => {
@@ -754,9 +787,8 @@ export default {
               <div>
                 {checkPermi(["lh:lhScheduleResult:adjustQuantity"]) ? (
                   <el-button
-                    type="text"
-                    size="mini"
-                    icon="el-icon-edit"
+                    class="minus"
+                    type="success"
                     onClick={() => this.handleChangePlan(row)}
                   >
                     {this.$t("ui.data.column.scheduleResult.changePlan")}
@@ -764,9 +796,8 @@ export default {
                 ) : null}
                 {checkPermi(["lh:skuDecrement:confirm"]) ? (
                   <el-button
-                    type="text"
-                    size="mini"
-                    icon="el-icon-check"
+                    class="minus"
+                    type="primary"
                     onClick={() => this.handleConfirmSkuDecrement(row)}
                   >
                     {this.$t("ui.data.btn.lhSkuDecrement.confirm")}
@@ -774,9 +805,8 @@ export default {
                 ) : null}
                 {checkPermi(["lh:lhScheduleResult:remove"]) ? (
                   <el-button
-                    type="text"
-                    size="mini"
-                    icon="el-icon-delete"
+                    class="minus"
+                    type="danger"
                     onClick={() => this.handleDelete(row)}
                   >
                     {this.$t("ui.frame.btn.delete")}

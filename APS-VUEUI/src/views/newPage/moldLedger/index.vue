@@ -143,6 +143,7 @@ export default {
         {
           prop: "factoryCode",
           label: this.$t("ui.data.column.mdmModelInfo.factoryCode"),
+          align: "center",
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
@@ -151,11 +152,13 @@ export default {
           prop: "mouldCode",
           label: this.$t("ui.data.column.mdmModelInfo.mouldCode"),
           width:180,
+          align: "center",
           sortable:true
         },
         {
           prop: "mouldType",
           label: this.$t("ui.data.column.mdmModelInfo.mouldType"),
+          align: "center",
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_mould_Type, value);
           },
@@ -164,6 +167,7 @@ export default {
         {
           prop: "mouldStatus",
           label: this.$t("ui.data.column.mdmModelInfo.mouldStatus"),
+          align: "center",
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_available_status, value);
           },
@@ -172,6 +176,7 @@ export default {
         {
           prop: "logisticsStatus",
           label: this.$t("ui.data.column.mdmModelInfo.logisticsStatus"),
+          align: "center",
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.logistics_status, value);
           },
@@ -181,27 +186,32 @@ export default {
           prop: "specifications",
           label: this.$t("ui.data.column.mdmModelInfo.specifications"),
           width:180,
+          align: "center",
           sortable:true
         },
         {
           prop: "mainPattern",
           label: this.$t("ui.data.column.mdmMaterialInfo.mainPattern"),
+          align: "center",
           sortable:true
         },
         {
           prop: "pattern",
           label: this.$t("ui.data.column.mdmModelInfo.pattern"),
           width:180,
+          align: "center",
           sortable:true
         },
         {
           prop: "shellStandard",
           label: this.$t("ui.data.column.mdmModelInfo.shellStandard"),
+          align: "center",
           sortable:true
         },
         {
           prop: "remark",
           label: this.$t("ui.remark"),
+          align: "left",
         },
         {
           prop: "updateBy",
@@ -211,6 +221,7 @@ export default {
         },
         {
           prop: "updateTime",
+          align: "center",
           label: this.$t("ui.data.column.updateTime"),
           width:200,
         },

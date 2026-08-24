@@ -248,9 +248,10 @@ export default {
         },
         {
           prop: "updateTime",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.gsq.twiningDisc.updateTime"),
-          minWidth: 150,
+          minWidth: 180,
         },
         {
           align: "center",
@@ -265,7 +266,7 @@ export default {
                 <el-button
                   v-hasPermi={["gsq:twiningDisc:edit"]}
                   class="minus"
-                  type="primary"
+                  type="success"
                   onClick={() => this.handleEdit(row)}
                 >
                   {this.$t("ui.frame.btn.modify")}

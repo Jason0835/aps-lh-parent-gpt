@@ -150,6 +150,7 @@ export default {
         {
           prop: "factoryCode",
           label: this.$t("ui.data.column.mdmBomInfo.factoryCode"),
+          align: "center",
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
@@ -159,6 +160,7 @@ export default {
           prop: "parentMaterialCode",
           label: this.$t("ui.data.column.mdmBomInfo.parentMaterialCode"),
           width: 180,
+          align: "center",
         },
 
         {
@@ -182,7 +184,8 @@ export default {
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.production_stage, value);
           },
-          width: 180,
+          width: 110,
+          align: "center",
         },
         // {
         //   prop: "parentMaterialCode",
@@ -191,41 +194,49 @@ export default {
         {
           prop: "childMaterialCode",
           label: this.$t("ui.data.column.mdmBomInfo.childMaterialCode"),
-          width: 180,
+          width: 120,
+          align: "center",
         },
         {
           prop: "childMaterialName",
           label: this.$t("ui.data.column.mdmBomInfo.childMaterialName"),
-          width: 180,
+          width: 120,
+          align: "center",
         },
         {
           prop: "childCode",
           label: this.$t("ui.data.column.mdmBomInfo.childCode"),
-          width: 180,
+          width: 120,
+          align: "center",
         },
         {
           prop: "childMaterialVersion",
           label: this.$t("ui.data.column.mdmBomInfo.childMaterialVersion"),
           width: 180,
+          align: "center",
         },
         {
           prop: "unit",
           label: this.$t("ui.data.column.mdmBomInfo.unit"),
           width: 180,
+          align: "center",
         },
         {
           prop: "dosage",
           label: this.$t("ui.data.column.mdmBomInfo.dosage"),
-          width: 180,
+          width: 90,
+          align: "center",
         },
         {
           prop: "dosageForm",
           label: this.$t("ui.data.column.mdmBomInfo.dosageForm"),
-          width: 180,
+          width: 90,
+          align: "center",
         },
         {
           prop: "status",
           label: this.$t("ui.data.column.mdmBomInfo.status"),
+          align: "center",
           render: ({ row }) => {
             return (
               <div>
@@ -243,6 +254,7 @@ export default {
           prop: "updateBy",
           label: this.$t("ui.data.column.updateBy"),
           width: 100,
+          align: "center",
         },
         {
           prop: "updateTime",

@@ -142,6 +142,7 @@ export default {
         {
           label: this.$t("ui.data.column.factoryCode"),
           prop: "factoryCode",
+          align: "center",
           minWidth: 120,
           formatter: (row) => {
             return (
@@ -155,11 +156,13 @@ export default {
         {
           label: this.$t("ui.tq.depthConfig.column.minMachineQty"),
           prop: "minMachineQty",
+          align: "center",
           minWidth: 120,
         },
         {
           label: this.$t("ui.tq.depthConfig.column.maxMachineQty"),
           prop: "maxMachineQty",
+          align: "center",
           minWidth: 120,
           formatter: (row) => {
             return row.maxMachineQty != null && row.maxMachineQty !== undefined
@@ -170,11 +173,13 @@ export default {
         {
           label: this.$t("ui.tq.depthConfig.column.depthClassQty"),
           prop: "depthClassQty",
+          align: "center",
           minWidth: 120,
         },
         {
           label: this.$t("ui.common.column.remark"),
           prop: "remark",
+          align: "center",
           minWidth: 100,
           formatter: (row) => {
             return row.remark || "-";
@@ -183,12 +188,15 @@ export default {
         {
           label: this.$t("ui.data.column.updateTime"),
           prop: "updateTime",
+          align: "center",
           minWidth: 150,
         },
         {
           label: this.$t("common.option"),
           prop: "option",
-          width: "180px",
+          width: "160px",
+          align: "center",
+          fixed: "right",
           render: ({ row }) => {
             return (
               <div>
@@ -198,7 +206,7 @@ export default {
                   type="success"
                   onClick={() => this.handleEdit(row)}
                 >
-                  {this.$t("ui.frame.btn.modify")}
+                  {this.$t("ui.frame.btn.update")}
                 </el-button>
                 <el-button
                   v-hasPermi={["tq:stockShiftConfig:remove"]}

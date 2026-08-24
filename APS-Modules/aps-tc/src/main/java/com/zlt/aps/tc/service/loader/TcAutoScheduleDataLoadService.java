@@ -852,6 +852,8 @@ public class TcAutoScheduleDataLoadService {
                 .distinct().collect(Collectors.toList()), newSpecLookbackDays, newSpecAdvanceShiftCount);
         List<TcLossRule> lossRuleList = context.getLossRuleList();
         List<TcDepthConfig> depthConfigList = this.loadDepthConfigs(context);
+        String depthMachineMatchMode = this.resolveDepthMachineMatchMode(context);
+        Map<String, Set<String>> sidewallMachineCodeMap = this.buildSidewallMachineCodeMapByBom(demandRowList);
         Map<String, TcWorkCalendarRowVo> tmCalendarMap = this.loadSixShiftWorkCalendarMap(context,
                 TcProcessCodeEnum.SIDEWALL.getCode());
         Map<String, TcWorkCalendarRowVo> cxCalendarMap = this.loadSixShiftWorkCalendarMap(context,
@@ -871,8 +873,12 @@ public class TcAutoScheduleDataLoadService {
             boolean closeOut = this.isCloseOutByPlanSurplus(row.getCxRemainQty(), totalFormingPlanQty);
             this.logCloseOutJudge(context, row.getOrderNo(), row.getEmbryoCode(), originalClassQtyArray,
                     totalFormingPlanQty, row.getCxRemainQty(), closeOut, "BOM");
-            Integer guardShiftCount = this.resolveGuardShiftCount(context, row.getLhMachineCode(), row.getOrderNo(),
-                    depthConfigList, fallbackGuardShiftCount);
+            Set<String> depthMachineCodeSet = this.resolveDepthMachineCodeSet(depthMachineMatchMode,
+                    row.getLhMachineCode(),
+                    sidewallMachineCodeMap.get(this.normalizeProductCode(sidewallCode)));
+            Integer guardShiftCount = this.resolveGuardShiftCount(context, sidewallCode, row.getOrderNo(),
+                    depthConfigList, fallbackGuardShiftCount, depthMachineMatchMode,
+                    depthMachineCodeSet, this.resolveDepthMachineFieldName(depthMachineMatchMode));
             boolean noShutdownAvailableShift = this.redistributeShutdownDemand(context, classQtyArray,
                     tmCalendarMap, cxCalendarMap);
             for (int shiftOrder = 1; shiftOrder <= TcScheduleConstants.TC_MAX_SHIFT_ORDER + 1; shiftOrder++) {
@@ -927,6 +933,9 @@ public class TcAutoScheduleDataLoadService {
                         demandQty, formingGuardWindowQtyMap));
                 taskDraft.setDemandQty(demandQty);
                 taskDraft.setGuardShiftCount(effectiveGuardShiftCount);
+                this.addDepthConfigMatchTrace(context, taskDraft, sidewallCode, depthMachineMatchMode,
+                        this.resolveDepthMachineFieldName(depthMachineMatchMode), depthMachineCodeSet,
+                        guardShiftCount, depthConfigList, fallbackGuardShiftCount);
                 this.addCloseOutJudgeTrace(context, taskDraft, originalClassQtyArray, totalFormingPlanQty,
                         row.getCxRemainQty(), "BOM");
                 this.addGuardDemandEstimateTrace(context, taskDraft, classQtyArray, shiftOrder,
@@ -1102,6 +1111,9 @@ public class TcAutoScheduleDataLoadService {
         }
         Map<String, TcNewSpecInfo> newSpecInfoMap = buildNewSpecInfoMap(context, allSidewallCodes,
                 newSpecLookbackDays, newSpecAdvanceShiftCount);
+        String depthMachineMatchMode = this.resolveDepthMachineMatchMode(context);
+        Map<String, Set<String>> sidewallMachineCodeMap = this.buildSidewallMachineCodeMapByRecipe(rowList,
+                classQtyArrayList, specByClassList);
 
         // 逐行逐班次生成任务
         List<TcTaskDraft> taskDraftList = new ArrayList<>();
@@ -1120,8 +1132,15 @@ public class TcAutoScheduleDataLoadService {
                     totalFormingPlanQty, row.getCxRemainQty(), closeOut, "RECIPE");
             TcConstructionSidewallRowVo[] specByClass = specByClassList.get(rowIdx);
             this.recordAllPlannedShiftConstructionMissingIssue(context, row, classQtyArray, specByClass);
-            Integer guardShiftCount = this.resolveGuardShiftCount(context, row.getLhMachineCode(), row.getOrderNo(),
-                    depthConfigList, fallbackGuardShiftCount);
+            Integer rowGuardShiftCount = null;
+            if (TcScheduleConstants.DEPTH_MACHINE_MATCH_MODE_ROW.equals(depthMachineMatchMode)) {
+                rowGuardShiftCount = this.resolveGuardShiftCount(context, null, row.getOrderNo(),
+                        depthConfigList, fallbackGuardShiftCount,
+                        TcScheduleConstants.DEPTH_MACHINE_MATCH_MODE_ROW,
+                        this.resolveDepthMachineCodeSet(TcScheduleConstants.DEPTH_MACHINE_MATCH_MODE_ROW,
+                                row.getLhMachineCode(), Collections.emptySet()),
+                        "LH_MACHINE_CODE");
+            }
             boolean noShutdownAvailableShift = this.redistributeShutdownDemand(context, classQtyArray,
                     tmCalendarMap, cxCalendarMap);
             for (int shiftOrder = 1; shiftOrder <= TcScheduleConstants.TC_MAX_SHIFT_ORDER + 1; shiftOrder++) {
@@ -1151,6 +1170,13 @@ public class TcAutoScheduleDataLoadService {
                     continue;
                 }
                 TcNewSpecInfo taskNewSpecInfo = buildTaskNewSpecInfo(newSpecInfoMap.get(sidewallCode), shiftOrder, demandQty);
+                Set<String> depthMachineCodeSet = this.resolveDepthMachineCodeSet(depthMachineMatchMode,
+                        row.getLhMachineCode(),
+                        sidewallMachineCodeMap.get(this.normalizeProductCode(sidewallCode)));
+                Integer guardShiftCount = TcScheduleConstants.DEPTH_MACHINE_MATCH_MODE_CODE.equals(depthMachineMatchMode)
+                        ? this.resolveGuardShiftCount(context, sidewallCode, row.getOrderNo(),
+                        depthConfigList, fallbackGuardShiftCount, depthMachineMatchMode, depthMachineCodeSet,
+                        this.resolveDepthMachineFieldName(depthMachineMatchMode)) : rowGuardShiftCount;
                 int effectiveGuardShiftCount = this.resolveEffectiveGuardShiftCount(taskNewSpecInfo,
                         guardShiftCount, shiftOrder, formingShiftOffset, algorithmCode);
                 int targetShiftOrder = resolveTargetShiftOrder(taskNewSpecInfo, shiftOrder);
@@ -1195,6 +1221,9 @@ public class TcAutoScheduleDataLoadService {
                         demandQty, formingGuardWindowQtyMap));
                 taskDraft.setDemandQty(demandQty);
                 taskDraft.setGuardShiftCount(effectiveGuardShiftCount);
+                this.addDepthConfigMatchTrace(context, taskDraft, sidewallCode, depthMachineMatchMode,
+                        this.resolveDepthMachineFieldName(depthMachineMatchMode), depthMachineCodeSet,
+                        guardShiftCount, depthConfigList, fallbackGuardShiftCount);
                 this.addCloseOutJudgeTrace(context, taskDraft, originalClassQtyArray, totalFormingPlanQty,
                         row.getCxRemainQty(), "RECIPE");
                 this.addGuardDemandEstimateTrace(context, taskDraft, classQtyArray, shiftOrder,
@@ -2148,88 +2177,298 @@ public class TcAutoScheduleDataLoadService {
     }
 
     /**
+     * 解析库存深度机台数量匹配方式，无配置或非法值时按代码合并方式处理。
+     *
+     * @param context 自动排程上下文
+     * @return 有效的库存深度机台数量匹配方式
+     */
+    private String resolveDepthMachineMatchMode(TcScheduleContext context) {
+        String configuredMode = this.getParamValue(context, TcScheduleConstants.PARAM_DEPTH_MACHINE_MATCH_MODE,
+                TcScheduleConstants.DEFAULT_DEPTH_MACHINE_MATCH_MODE);
+        String normalizedMode = StrUtil.trim(configuredMode).toUpperCase(Locale.ROOT);
+        if (!TcScheduleConstants.DEPTH_MACHINE_MATCH_MODE_CODE.equals(normalizedMode)
+                && !TcScheduleConstants.DEPTH_MACHINE_MATCH_MODE_ROW.equals(normalizedMode)) {
+            log.warn("[TC_DEPTH_CONFIG_MATCH] factoryCode={}, depthMachineMatchMode={} 非法，使用默认值 {}",
+                    context.getFactoryCode(), configuredMode,
+                    TcScheduleConstants.DEFAULT_DEPTH_MACHINE_MATCH_MODE);
+            return TcScheduleConstants.DEFAULT_DEPTH_MACHINE_MATCH_MODE;
+        }
+        return normalizedMode;
+    }
+
+    /**
+     * 按 BOM 成型来源构建胎侧代码对应的去重成型机集合。
+     *
+     * @param demandRowList BOM 模式成型来源行
+     * @return 胎侧代码与成型机编码集合的映射
+     */
+    private Map<String, Set<String>> buildSidewallMachineCodeMapByBom(List<TcFormingDemandRowVo> demandRowList) {
+        Map<String, Set<String>> machineCodeMap = new LinkedHashMap<>();
+        if (CollUtil.isEmpty(demandRowList)) {
+            return machineCodeMap;
+        }
+        demandRowList.stream()
+                .filter(row -> StrUtil.isNotBlank(row.getSidewallCode())
+                        && this.convertConstructionLengthToMeter(row.getSidewallLength())
+                        .compareTo(BigDecimal.ZERO) > 0
+                        && this.hasPositiveClassQty(this.buildClassQtyArray(row)))
+                .forEach(row -> this.appendMachineCodesByProductCode(machineCodeMap, row.getSidewallCode(),
+                        row.getCxMachineCode()));
+        return machineCodeMap;
+    }
+
+    /**
+     * 按 RECIPE 解析出的有效施工代码构建胎侧代码对应的去重成型机集合。
+     *
+     * @param rowList 成型来源行
+     * @param classQtyArrayList 各来源行八班成型计划量
+     * @param specByClassList 各来源行按班次解析出的施工资料
+     * @return 胎侧代码与成型机编码集合的映射
+     */
+    private Map<String, Set<String>> buildSidewallMachineCodeMapByRecipe(List<TcFormingDemandRecipeRowVo> rowList,
+                                                                          List<BigDecimal[]> classQtyArrayList,
+                                                                          List<TcConstructionSidewallRowVo[]> specByClassList) {
+        Map<String, Set<String>> machineCodeMap = new LinkedHashMap<>();
+        if (CollUtil.isEmpty(rowList)) {
+            return machineCodeMap;
+        }
+        for (int rowIndex = 0; rowIndex < rowList.size(); rowIndex++) {
+            TcFormingDemandRecipeRowVo row = rowList.get(rowIndex);
+            BigDecimal[] classQtyArray = classQtyArrayList.get(rowIndex);
+            TcConstructionSidewallRowVo[] specByClass = specByClassList.get(rowIndex);
+            for (int classIndex = 0; classIndex < specByClass.length; classIndex++) {
+                TcConstructionSidewallRowVo spec = specByClass[classIndex];
+                if (spec == null || this.readClassQty(classQtyArray, classIndex).compareTo(BigDecimal.ZERO) <= 0
+                        || StrUtil.isBlank(spec.getSidewallCode())
+                        || this.convertConstructionLengthToMeter(spec.getSidewallLength())
+                        .compareTo(BigDecimal.ZERO) <= 0) {
+                    continue;
+                }
+                this.appendMachineCodesByProductCode(machineCodeMap, spec.getSidewallCode(),
+                        row.getCxMachineCode());
+            }
+        }
+        return machineCodeMap;
+    }
+
+    /**
+     * 向代码机台索引追加一行来源的机台编码。
+     *
+     * @param machineCodeMap 代码机台索引
+     * @param productCode 胎侧代码
+     * @param machineCodeText 逗号分隔的成型机编码
+     */
+    private void appendMachineCodesByProductCode(Map<String, Set<String>> machineCodeMap, String productCode,
+                                                 String machineCodeText) {
+        String normalizedProductCode = this.normalizeProductCode(productCode);
+        if (StrUtil.isBlank(normalizedProductCode)) {
+            return;
+        }
+        machineCodeMap.computeIfAbsent(normalizedProductCode, key -> new LinkedHashSet<>())
+                .addAll(this.parseMachineCodes(machineCodeText));
+    }
+
+    /**
+     * 根据匹配方式解析当前任务用于深度匹配的机台集合。
+     *
+     * @param matchMode 深度机台数量匹配方式
+     * @param rowLhMachineCodeText 当前来源行硫化机编码
+     * @param codeMachineCodeSet 相同代码汇总后的机台集合
+     * @return 去重后的机台编码集合
+     */
+    private Set<String> resolveDepthMachineCodeSet(String matchMode, String rowLhMachineCodeText,
+                                                    Set<String> codeMachineCodeSet) {
+        if (TcScheduleConstants.DEPTH_MACHINE_MATCH_MODE_CODE.equals(matchMode)) {
+            return codeMachineCodeSet == null ? new LinkedHashSet<>() : new LinkedHashSet<>(codeMachineCodeSet);
+        }
+        return this.parseMachineCodes(rowLhMachineCodeText);
+    }
+
+    /**
+     * 获取当前匹配方式对应的机台字段名。
+     *
+     * @param matchMode 深度机台数量匹配方式
+     * @return 机台字段名
+     */
+    private String resolveDepthMachineFieldName(String matchMode) {
+        return TcScheduleConstants.DEPTH_MACHINE_MATCH_MODE_CODE.equals(matchMode)
+                ? "CX_MACHINE_CODE" : "LH_MACHINE_CODE";
+    }
+
+    /**
+     * 解析逗号分隔机台编码并去重。
+     *
+     * @param machineCodeText 逗号分隔的机台编码
+     * @return 去空格、去空值、去重后的机台编码集合
+     */
+    private Set<String> parseMachineCodes(String machineCodeText) {
+        if (StrUtil.isBlank(machineCodeText)) {
+            return new LinkedHashSet<>();
+        }
+        return Arrays.stream(machineCodeText.split(","))
+                .map(String::trim)
+                .filter(StrUtil::isNotBlank)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    /**
+     * 标准化产品代码作为索引键。
+     *
+     * @param productCode 胎侧代码
+     * @return 去除首尾空格后的胎侧代码
+     */
+    private String normalizeProductCode(String productCode) {
+        return StrUtil.trim(productCode);
+    }
+
+    /**
+     * 判断八班计划量中是否存在正向成型计划。
+     *
+     * @param classQtyArray 八班计划量
+     * @return 存在正向计划时返回 true
+     */
+    private boolean hasPositiveClassQty(BigDecimal[] classQtyArray) {
+        return Arrays.stream(classQtyArray)
+                .map(this::nvl)
+                .anyMatch(value -> value.compareTo(BigDecimal.ZERO) > 0);
+    }
+
+    /**
      * 解析单条成型需求应使用的库存保证班数。
      *
-     * <p>优先根据成型结果的硫化机数量匹配 {@code T_TC_DEPTH_CONFIG}；硫化机数量为空、
-     * 未命中配置或命中配置的保证班数不是正整数时，回退原参数 {@code TC_MIN_STOCK_CLASS}。</p>
-     *
-     * @param context                 自动排程上下文
-     * @param lhMachineCode           硫化机编码（成型需求行）
-     * @param orderNo                 成型工单号（日志追溯）
-     * @param depthConfigList         库存保证班数配置
+     * @param context 自动排程上下文
+     * @param sidewallCode 当前胎侧代码
+     * @param orderNo 成型工单号
+     * @param depthConfigList 库存保证班数配置
      * @param fallbackGuardShiftCount 参数兜底库存保证班数
+     * @param matchMode 深度机台数量匹配方式
+     * @param machineCodeSet 当前匹配口径下的去重机台集合
+     * @param machineFieldName 参与统计的机台字段名
      * @return 当前成型来源使用的库存保证班数
      */
-    private Integer resolveGuardShiftCount(TcScheduleContext context, String lhMachineCode, String orderNo,
-                                           List<TcDepthConfig> depthConfigList, Integer fallbackGuardShiftCount) {
-        Integer lhMachineQty = this.resolveLhMachineQty(lhMachineCode);
-        if (lhMachineQty == null) {
-            log.warn("[TC_DEPTH_CONFIG_MATCH] factoryCode={}, orderNo={} 硫化机编码为空或无法解析，回退参数 {}={}",
-                    context.getFactoryCode(), orderNo, TcScheduleConstants.PARAM_MIN_STOCK_CLASS,
-                    fallbackGuardShiftCount);
+    private Integer resolveGuardShiftCount(TcScheduleContext context, String sidewallCode, String orderNo,
+                                           List<TcDepthConfig> depthConfigList, Integer fallbackGuardShiftCount,
+                                           String matchMode, Set<String> machineCodeSet, String machineFieldName) {
+        Integer machineQty = machineCodeSet == null || machineCodeSet.isEmpty() ? null : machineCodeSet.size();
+        String machineCodes = machineCodeSet == null ? "" : String.join(",", machineCodeSet);
+        if (machineQty == null) {
+            log.warn("[TC_DEPTH_CONFIG_MATCH] factoryCode={}, orderNo={}, sidewallCode={}, matchMode={}, machineField={}, machineCodes={} 机台编码为空或无法解析，回退参数 {}={}",
+                    context.getFactoryCode(), orderNo, sidewallCode, matchMode, machineFieldName, machineCodes,
+                    TcScheduleConstants.PARAM_MIN_STOCK_CLASS, fallbackGuardShiftCount);
             return fallbackGuardShiftCount;
         }
         if (CollUtil.isEmpty(depthConfigList)) {
-            log.warn("[TC_DEPTH_CONFIG_MATCH] factoryCode={}, orderNo={}, lhMachineQty={} 未维护库存保证班数配置，回退参数 {}={}",
-                    context.getFactoryCode(), orderNo, lhMachineQty, TcScheduleConstants.PARAM_MIN_STOCK_CLASS,
-                    fallbackGuardShiftCount);
+            log.warn("[TC_DEPTH_CONFIG_MATCH] factoryCode={}, orderNo={}, sidewallCode={}, matchMode={}, machineField={}, machineCodes={}, machineQty={} 未维护库存保证班数配置，回退参数 {}={}",
+                    context.getFactoryCode(), orderNo, sidewallCode, matchMode, machineFieldName, machineCodes,
+                    machineQty, TcScheduleConstants.PARAM_MIN_STOCK_CLASS, fallbackGuardShiftCount);
             return fallbackGuardShiftCount;
         }
         Optional<TcDepthConfig> matchedConfigOptional = depthConfigList.stream()
                 .filter(depthConfig -> depthConfig.getMinMachineQty() != null
-                        && lhMachineQty >= depthConfig.getMinMachineQty()
+                        && machineQty >= depthConfig.getMinMachineQty()
                         && (depthConfig.getMaxMachineQty() == null
-                        || lhMachineQty <= depthConfig.getMaxMachineQty()))
+                        || machineQty <= depthConfig.getMaxMachineQty()))
                 .findFirst();
         if (matchedConfigOptional.isPresent()) {
-            return this.resolveMatchedGuardShiftCount(context, orderNo, lhMachineQty, matchedConfigOptional.get(),
-                    fallbackGuardShiftCount);
+            return this.resolveMatchedGuardShiftCount(context, sidewallCode, orderNo, machineQty,
+                    matchedConfigOptional.get(), fallbackGuardShiftCount, matchMode, machineFieldName, machineCodes);
         }
-        log.warn("[TC_DEPTH_CONFIG_MATCH] factoryCode={}, orderNo={}, lhMachineQty={} 未命中库存保证班数配置，回退参数 {}={}",
-                    context.getFactoryCode(), orderNo, lhMachineQty, TcScheduleConstants.PARAM_MIN_STOCK_CLASS,
-                    fallbackGuardShiftCount);
+        log.warn("[TC_DEPTH_CONFIG_MATCH] factoryCode={}, orderNo={}, sidewallCode={}, matchMode={}, machineField={}, machineCodes={}, machineQty={} 未命中库存保证班数配置，回退参数 {}={}",
+                context.getFactoryCode(), orderNo, sidewallCode, matchMode, machineFieldName, machineCodes, machineQty,
+                TcScheduleConstants.PARAM_MIN_STOCK_CLASS, fallbackGuardShiftCount);
         return fallbackGuardShiftCount;
     }
 
     /**
      * 将已命中的深度配置转换为库存保证班数。
      *
-     * @param context                 自动排程上下文
-     * @param orderNo                 成型工单号（日志追溯）
-     * @param lhMachineQty            硫化机数量
-     * @param depthConfig             已命中的深度配置
+     * @param context 自动排程上下文
+     * @param sidewallCode 当前胎侧代码
+     * @param orderNo 成型工单号
+     * @param machineQty 匹配使用的机台数量
+     * @param depthConfig 已命中的深度配置
      * @param fallbackGuardShiftCount 参数兜底库存保证班数
+     * @param matchMode 深度机台数量匹配方式
+     * @param machineFieldName 参与统计的机台字段名
+     * @param machineCodes 去重后的机台编码文本
      * @return 当前成型来源使用的库存保证班数
      */
-    private Integer resolveMatchedGuardShiftCount(TcScheduleContext context, String orderNo,
-                                                  Integer lhMachineQty, TcDepthConfig depthConfig,
-                                                  Integer fallbackGuardShiftCount) {
+    private Integer resolveMatchedGuardShiftCount(TcScheduleContext context, String sidewallCode, String orderNo,
+                                                  Integer machineQty, TcDepthConfig depthConfig,
+                                                  Integer fallbackGuardShiftCount, String matchMode,
+                                                  String machineFieldName, String machineCodes) {
         Integer guardShiftCount = this.toPositiveIntegerDepthClassQty(depthConfig.getDepthClassQty());
         if (guardShiftCount != null) {
+            log.info("[TC_DEPTH_CONFIG_MATCH] factoryCode={}, orderNo={}, sidewallCode={}, matchMode={}, machineField={}, machineCodes={}, machineQty={}, minMachineQty={}, maxMachineQty={}, depthClassQty={}",
+                    context.getFactoryCode(), orderNo, sidewallCode, matchMode, machineFieldName, machineCodes,
+                    machineQty, depthConfig.getMinMachineQty(), depthConfig.getMaxMachineQty(), guardShiftCount);
             return guardShiftCount;
         }
-        log.warn("[TC_DEPTH_CONFIG_MATCH] factoryCode={}, orderNo={}, lhMachineQty={}, minMachineQty={}, maxMachineQty={}, depthClassQty={} 不是正整数，回退参数 {}={}",
-                context.getFactoryCode(), orderNo, lhMachineQty, depthConfig.getMinMachineQty(),
-                    depthConfig.getMaxMachineQty(), depthConfig.getDepthClassQty(),
-                    TcScheduleConstants.PARAM_MIN_STOCK_CLASS, fallbackGuardShiftCount);
+        log.warn("[TC_DEPTH_CONFIG_MATCH] factoryCode={}, orderNo={}, sidewallCode={}, matchMode={}, machineField={}, machineCodes={}, machineQty={}, minMachineQty={}, maxMachineQty={}, depthClassQty={} 不是正整数，回退参数 {}={}",
+                context.getFactoryCode(), orderNo, sidewallCode, matchMode, machineFieldName, machineCodes, machineQty,
+                depthConfig.getMinMachineQty(), depthConfig.getMaxMachineQty(), depthConfig.getDepthClassQty(),
+                TcScheduleConstants.PARAM_MIN_STOCK_CLASS, fallbackGuardShiftCount);
         return fallbackGuardShiftCount;
     }
 
     /**
-     * 根据成型结果硫化机编码解析硫化机数量。
+     * 将库存深度匹配事实写入任务规则证据。
      *
-     * @param lhMachineCode 硫化机编码，多个编码使用英文逗号分隔
-     * @return 去重后的硫化机数量；为空或无法解析时返回 null
+     * @param context 自动排程上下文
+     * @param taskDraft 当前任务草稿
+     * @param sidewallCode 胎侧代码
+     * @param matchMode 深度机台数量匹配方式
+     * @param machineFieldName 参与统计的机台字段名
+     * @param machineCodeSet 去重后的机台编码集合
+     * @param guardShiftCount 最终库存保证班数
+     * @param depthConfigList 库存保证班数配置
+     * @param fallbackGuardShiftCount 兜底库存保证班数
      */
-    private Integer resolveLhMachineQty(String lhMachineCode) {
-        if (StrUtil.isBlank(lhMachineCode)) {
-            return null;
+    private void addDepthConfigMatchTrace(TcScheduleContext context, TcTaskDraft taskDraft, String sidewallCode,
+                                          String matchMode, String machineFieldName, Set<String> machineCodeSet,
+                                          Integer guardShiftCount, List<TcDepthConfig> depthConfigList,
+                                          Integer fallbackGuardShiftCount) {
+        Map<String, Object> evidence = new LinkedHashMap<>();
+        String depthMatchReason = this.resolveDepthMatchReason(machineCodeSet, depthConfigList);
+        evidence.put("sidewallCode", sidewallCode);
+        evidence.put("matchMode", matchMode);
+        evidence.put("machineField", machineFieldName);
+        evidence.put("machineCodes", machineCodeSet == null ? Collections.emptyList()
+                : new ArrayList<>(machineCodeSet));
+        evidence.put("machineQty", machineCodeSet == null ? 0 : machineCodeSet.size());
+        evidence.put("guardShiftCount", guardShiftCount);
+        evidence.put("matchResult", "MATCHED".equals(depthMatchReason) ? "MATCHED" : "FALLBACK");
+        evidence.put("fallbackReason", "MATCHED".equals(depthMatchReason) ? null : depthMatchReason);
+        evidence.put("fallbackGuardShiftCount", fallbackGuardShiftCount);
+        context.getRuleTraceMap().computeIfAbsent(taskDraft.getBusinessKey(), key -> new TcRuleTrace())
+                .addRuleHit(TcScheduleRuleCodeEnum.DEPTH_CONFIG_MATCH, TcScheduleRuleResultEnum.PASS, evidence);
+    }
+
+    /**
+     * 解析库存深度匹配的最终命中或回退原因。
+     *
+     * @param machineCodeSet 当前匹配口径下的去重机台集合
+     * @param depthConfigList 库存保证班数配置
+     * @return MATCHED 或具体回退原因编码
+     */
+    private String resolveDepthMatchReason(Set<String> machineCodeSet, List<TcDepthConfig> depthConfigList) {
+        if (CollUtil.isEmpty(machineCodeSet)) {
+            return "MACHINE_CODE_EMPTY";
         }
-        Set<String> machineCodeSet = Arrays.stream(lhMachineCode.split(","))
-                .map(String::trim)
-                .filter(StrUtil::isNotBlank)
-                .collect(Collectors.toCollection(LinkedHashSet::new));
-        return machineCodeSet.isEmpty() ? null : machineCodeSet.size();
+        if (CollUtil.isEmpty(depthConfigList)) {
+            return "DEPTH_CONFIG_EMPTY";
+        }
+        Optional<TcDepthConfig> matchedConfigOptional = depthConfigList.stream()
+                .filter(depthConfig -> depthConfig.getMinMachineQty() != null
+                        && machineCodeSet.size() >= depthConfig.getMinMachineQty()
+                        && (depthConfig.getMaxMachineQty() == null
+                        || machineCodeSet.size() <= depthConfig.getMaxMachineQty()))
+                .findFirst();
+        if (!matchedConfigOptional.isPresent()) {
+            return "DEPTH_CONFIG_NOT_MATCHED";
+        }
+        return this.toPositiveIntegerDepthClassQty(matchedConfigOptional.get().getDepthClassQty()) == null
+                ? "DEPTH_CLASS_QTY_INVALID" : "MATCHED";
     }
 
     /**
@@ -2467,6 +2706,14 @@ public class TcAutoScheduleDataLoadService {
         }
         context.getRuleTraceMap().computeIfAbsent(task.getBusinessKey(), key -> new TcRuleTrace())
                 .addRuleHit(TcScheduleRuleCodeEnum.FORMING_CONTINUOUS_SHUTDOWN_CLOSE_OUT, result, evidence);
+        context.appendProcessLog("成型连续停产收尾判定：胎侧={0}，最后开放成型日期={1}，最后开放成型班次={2}，"
+                        + "连续停产开始日={3}，连续停产结束日={4}，连续停产天数={5}，停产收尾需求量={6}米，"
+                        + "规则结果={7}，成型停产收尾标识={8}，收尾标识={9}，处理原因={10}",
+                task.getSidewallCode(), DateUtil.formatDate(productionDate),
+                evidence.get("lastOpenCalendarShiftOrder"), evidence.get("shutdownStartDate"),
+                evidence.get("shutdownEndDate"), evidence.get("consecutiveShutdownDays"), closeOutDemandQty,
+                result.getCode(), result == TcScheduleRuleResultEnum.PASS,
+                task.getTailFlag(), evidence.getOrDefault("skipReason", "已按停产前最后开放成型班需求收尾"));
         log.info("[TC_FORMING_SHUTDOWN_CLOSE_OUT] batchNo={}, traceId={}, factoryCode={}, sidewallCode={}, "
                         + "sourceShiftOrder={}, targetShiftOrder={}, formingLogicalShiftOrder={}, "
                         + "shutdownStartDate={}, shutdownEndDate={}, closeOutDemandQty={}, result={}",

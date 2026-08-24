@@ -137,6 +137,7 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
+          align: "center",
           label: this.$t("ui.data.column.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
@@ -144,10 +145,12 @@ export default {
         },
         {
           prop: "cxMachineCode",
+          align: "center",
           label: this.$t("setting.machine.machineCode"),
         },
         {
           prop: "cxMachineTypeCode",
+          align: "center",
           label: this.$t("ui.data.column.curingPlan.cxMachineTypeCode"),
           minWidth: 100,
           formatter: (row, column, value) => {
@@ -156,6 +159,7 @@ export default {
         },
         {
           prop: "cxMachineBrandCode",
+          align: "center",
           label: this.$t("ui.data.column.docMoldingMachine.moldingMachineClassName"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_machine_brand, value);
@@ -163,6 +167,7 @@ export default {
         },
         {
           prop: "rollOverType",
+          align: "center",
           label: this.$t("ui.data.column.capsuleChuck.rollOverType"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.roll_over_type, value);
@@ -178,16 +183,18 @@ export default {
         },
         {
           prop: "lhMachineMaxQty",
+          align: "center",
           label: this.$t("ui.data.column.capsuleChuck.lhMachineMaxQty"),
         },
         {
           prop: "maxDayCapacity",
+          align: "center",
           label: this.$t("ui.data.column.capsuleChuck.maxDayCapacity"),
         },
         {
           prop: "isActive",
           label: this.$t("ui.data.column.machine.status"),
-          aling: 'center',
+          align: "center",
           minWidth: 100,
           render: ({ row }) => {
             return (
@@ -232,6 +239,7 @@ export default {
         },
         {
           prop: "updateTime",
+          align: "center",
           width: 180,
           label: this.$t("ui.data.column.updateTime"),
         },
@@ -239,6 +247,7 @@ export default {
         {
           align: "center",
           label: this.$t("ui.data.btn.option"),
+          minWidth: 160, width: 160,
           fixed: "right",
           render: ({ row }) => {
             return (

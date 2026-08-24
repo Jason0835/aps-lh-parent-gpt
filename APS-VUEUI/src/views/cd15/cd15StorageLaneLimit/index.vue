@@ -100,7 +100,7 @@ export default {
           align: "center",
           halign: "center",
           label: this.$t("ui.data.column.cd15StorageLaneLimit.laneDate"),
-          minWidth: 110,
+          minWidth: 160,
         },
         {
           prop: "machineCode",
@@ -148,6 +148,7 @@ export default {
         },
         {
           prop: "remark",
+          align: "center",
           halign: "center",
           label: this.$t("ui.common.column.remark"),
           minWidth: 120,
@@ -164,7 +165,7 @@ export default {
           halign: "center",
           label: this.$t("ui.data.btn.option"),
           prop: "option",
-          minWidth: 150,
+          minWidth: 160, width: 160,
           fixed: "right",
           render: ({ row }) => (
             <div>

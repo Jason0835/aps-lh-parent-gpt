@@ -176,42 +176,47 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
+          align: "center",
           label: this.$t("ui.data.column.mdmCycleSchStruConf.factoryCode"),
-          width: 180,
+          minWidth: 100,
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
         },
         {
           prop: "structureName",
+          align: "center",
           label: this.$t("ui.data.column.mdmCycleSchStruConf.structureName"),
-
+          minWidth: 180,
         },
         {
           prop: "turnoverMonth",
-          width: 180,
+          align: "center",
+          minWidth: 90,
           label: this.$t("ui.data.column.mdmCycleSchStruConf.turnoverMonth"),
         },
         {
           prop: "minVulcanizingMachine",
-          width: 180,
+          align: "center",
+          minWidth: 140,
           label: this.$t("ui.data.column.mdmCycleSchStruConf.minVulcanizingMachine"),
         },
         {
           prop: "updateBy",
           align: "center",
           label: this.$t("ui.data.column.updateBy"),
-          width: 100,
+          minWidth: 100,
         },
         {
           prop: "updateTime",
-          width: 180,
+          minWidth: 180,
           label: this.$t("ui.data.column.updateTime"),
         },
 
         {
           align: "center",
           label: this.$t("ui.data.btn.option"),
+          minWidth: 160, width: 160,
           fixed: "right",
 
           render: ({ row }) => {

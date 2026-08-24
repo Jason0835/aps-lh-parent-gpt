@@ -74,6 +74,42 @@ public class TmInsertTaskRequestVo implements Serializable {
     @ApiModelProperty(value = "早班原因分析")
     private String class3Analysis;
 
+    /** 中班计划量，对应 class4。 */
+    @ApiModelProperty(value = "中班计划量（第二天）")
+    private BigDecimal class4PlanQty;
+
+    /** 中班顺序，对应 class4。 */
+    @ApiModelProperty(value = "中班顺序（第二天）")
+    private Integer class4Sequence;
+
+    /** 中班原因分析，对应 class4。 */
+    @ApiModelProperty(value = "中班原因分析（第二天）")
+    private String class4Analysis;
+
+    /** 夜班计划量，对应 class5。 */
+    @ApiModelProperty(value = "夜班计划量（第二天）")
+    private BigDecimal class5PlanQty;
+
+    /** 夜班顺序，对应 class5。 */
+    @ApiModelProperty(value = "夜班顺序（第二天）")
+    private Integer class5Sequence;
+
+    /** 夜班原因分析，对应 class5。 */
+    @ApiModelProperty(value = "夜班原因分析（第二天）")
+    private String class5Analysis;
+
+    /** 早班计划量，对应 class6。 */
+    @ApiModelProperty(value = "早班计划量（第二天）")
+    private BigDecimal class6PlanQty;
+
+    /** 早班顺序，对应 class6。 */
+    @ApiModelProperty(value = "早班顺序（第二天）")
+    private Integer class6Sequence;
+
+    /** 早班原因分析，对应 class6。 */
+    @ApiModelProperty(value = "早班原因分析（第二天）")
+    private String class6Analysis;
+
     /** 插单备注。 */
     @ApiModelProperty(value = "备注")
     private String remark;

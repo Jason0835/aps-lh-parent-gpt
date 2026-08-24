@@ -31,10 +31,7 @@ import com.zlt.aps.tm.engine.domain.TmScheduleContext;
 import com.zlt.aps.tm.engine.service.collector.TmAutoScheduleIssueCollector;
 import com.zlt.aps.tm.engine.template.TmScheduleTemplateImpl;
 import com.zlt.aps.tm.mapper.*;
-import com.zlt.aps.tm.service.ITmRollingUpdateService;
-import com.zlt.aps.tm.service.ITmScheduleResultService;
-import com.zlt.aps.tm.service.TmAutoScheduleAsyncExecutor;
-import com.zlt.aps.tm.service.TmAutoScheduleTaskService;
+import com.zlt.aps.tm.service.*;
 import com.zlt.aps.tm.service.cache.TmAutoScheduleRedisCacheService;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.enums.ImportErrorTypeEnums;
@@ -108,6 +105,10 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
 
     @Resource
     private TmScheduleBatchNoGenerator tmScheduleBatchNoGenerator;
+
+    /** 六班实际开始时间解析服务。 */
+    @Resource
+    private TmShiftStartTimeResolver tmShiftStartTimeResolver;
 
     @Override
     protected String getDocTypeCode() {
@@ -1114,6 +1115,9 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
         result.add(buildShiftDateVO(4, "afternoon", dPlus1DateStr));  // D+1日中班
         result.add(buildShiftDateVO(5, "night", dPlus2DateStr));      // D+2日夜班
         result.add(buildShiftDateVO(6, "morning", dPlus2DateStr));    // D+2日早班
+        Map<Integer, Date> shiftStartTimeMap = this.tmShiftStartTimeResolver
+                .resolveShiftStartTimes(factoryCode, scheduleDate);
+        result.forEach(item -> item.setShiftStartTime(shiftStartTimeMap.get(item.getShift())));
         return result;
     }
 

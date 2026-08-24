@@ -119,6 +119,7 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
+          align: "center",
           label: this.$t("ui.data.column.factoryCode"),
           type: "select",
           formatter: (row, column, value) => {
@@ -127,22 +128,28 @@ export default {
         },
         {
           prop: "paramCode",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.paramsCode"),
+          minWidth: 200,
         },
         {
           prop: "paramName",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.paramsName"),
+          minWidth: 250,
           titleTooltip: true,
         },
         {
           prop: "paramValue",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.paramsValue"),
         },
         {
           prop: "paramGroup",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.tq.params.paramGroup"),
           formatter: (row, column, value) => {
@@ -152,6 +159,7 @@ export default {
         },
         {
           prop: "valueType",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.tq.params.valueType"),
           formatter: (row, column, value) => {
@@ -160,6 +168,7 @@ export default {
           },
         },
         {
+          align: "center",
           prop: "enableStatus",
           halign: "center",
           label: this.$t("ui.data.column.tq.params.enableStatus"),
@@ -198,21 +207,23 @@ export default {
         },
         {
           prop: "remark",
+          align: "center",
           halign: "center",
           label: this.$t("ui.common.column.remark"),
-          minWidth: 100,
+          minWidth: 200,
         },
         {
           prop: "updateTime",
+          align: "center",
           label: this.$t("ui.data.column.updateTime"),
-          width: 180,
+          minWidth: 180,
         },
         {
           align: "center",
           halign: "center",
           label: this.$t("ui.data.btn.option"),
-          minWidth: 180,
-          width: 200,
+          minWidth: 160,
+          width: 160,
           fixed: "right",
           render: ({ row }) => {
             return (

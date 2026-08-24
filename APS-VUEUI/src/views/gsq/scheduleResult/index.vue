@@ -311,9 +311,9 @@ export default {
         {
           label: this.$t("ui.data.column.gsqScheduleResult.isRelease"),
           prop: "isRelease",
-          component: "el-select",
+          type: "select",
+          dictData: this.dict.type.IS_RELEASE,
           filterable: true,
-          options: this.dict.type.IS_RELEASE,
         },
         {
           label: this.$t("ui.data.column.gsqScheduleResult.machineCode"),

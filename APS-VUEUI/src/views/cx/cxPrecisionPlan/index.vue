@@ -106,26 +106,30 @@ export default {
         { type: 'selection', fixed: 'left' },
         {
           prop: 'factoryCode',
+          align: 'center',
           label: this.$t('ui.data.column.factoryCode'),
           formatter: (row, column, value) => this.selectDictLabel(this.dict.type.biz_factory_name, value)
         },
-        { prop: 'machineCode', label: this.$t('ui.data.column.cxPrecisionPlan.machineCode') },
+        { prop: 'machineCode', align: 'center', label: this.$t('ui.data.column.cxPrecisionPlan.machineCode') },
         {
           prop: 'precisionType',
+          align: 'center',
           label: this.$t('ui.data.column.cxPrecisionPlan.accuracyType'),
           width: 110,
           formatter: (row, column, value) => this.selectDictLabel(this.dict.type.cx_precision_plan_type, value)
         },
         {
           prop: 'cycle',
+          align: 'center',
           label: this.$t('ui.data.column.cxPrecisionPlan.cycle'),
           formatter: (row) => this.getCycleValue(row.precisionType)
         },
-        { prop: 'planDate', label: this.$t('ui.data.column.cxPrecisionPlan.planDate') ,width: 180},
-        { prop: 'actualDate', label: this.$t('ui.data.column.cxPrecisionPlan.actualDate'),width: 180},
+        { prop: 'planDate', align: 'center', label: this.$t('ui.data.column.cxPrecisionPlan.planDate') ,width: 180},
+        { prop: 'actualDate', align: 'center', label: this.$t('ui.data.column.cxPrecisionPlan.actualDate'),width: 180},
 
         {
           prop: 'daysToDue',
+          align: 'center',
           label: this.$t('ui.data.column.cxPrecisionPlan.dueDate'),
         },
         {
@@ -136,6 +140,7 @@ export default {
         },
         {
           prop: 'dataSource',
+          align: 'center',
           label: this.$t('ui.data.column.lhPrecisionPlan.dataSource'),
           formatter: (row, column, value) => this.selectDictLabel(this.dict.type.lh_precision_data_source, value)
         },
@@ -144,7 +149,8 @@ export default {
         {
           align: 'center',
           label: this.$t('ui.data.btn.option'),
-          width: 180,
+          width: 160,
+          fixed: 'right',
           render: ({ row }) => {
             return (
               <div>

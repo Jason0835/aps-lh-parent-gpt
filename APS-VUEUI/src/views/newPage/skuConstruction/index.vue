@@ -157,7 +157,7 @@ export default {
           prop: "factoryCode",
           label: this.$t("ui.data.column.mdmSkuConstructionRef.factoryCode"),
           width: 120,
-
+          align: "center",
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
@@ -171,6 +171,7 @@ export default {
           prop: "materialCode",
           label: this.$t("ui.data.column.mdmSkuConstructionRef.materialCode"),
           width: 180,
+          align: "center",
         },
         {
           prop: "materialDesc",
@@ -184,7 +185,8 @@ export default {
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.trial_status, value);
           },
-          width: 180,
+          width: 100,
+          align: "center",
         },
         // {
         //   prop: "mouldCavity",
@@ -211,11 +213,13 @@ export default {
             return this.selectDictLabel(this.dict.type.biz_yes_no, value);
           },
           width: 120,
+          align: "center",
         },
         {
           prop: "constructionCode",
           label: this.$t("ui.data.column.mdmSkuConstructionRef.constructionCode"),
           width: 180,
+          align: "center",
         },
         {
           prop: "formingNo",
@@ -226,6 +230,7 @@ export default {
           prop: "embryoCode",
           label: this.$t("ui.data.column.mdmSkuConstructionRef.embryoCode"),
           width: 180,
+          align: "center",
         },
         {
           prop: "mainMaterialDesc",
@@ -261,6 +266,7 @@ export default {
           prop: "embryoNo",
           label: this.$t("ui.data.column.mdmSkuConstructionRef.embryoNo"),
           width: 180,
+          align: "center",
         },
         {
           prop: "embryoType",
@@ -269,6 +275,7 @@ export default {
             return this.selectDictLabel(this.dict.type.trial_status, value);
           },
           width: 180,
+          align: "center",
         },
         {
           prop: "embryoReleaseDate",
@@ -283,7 +290,8 @@ export default {
         {
           prop: "textType",
           label: this.$t("ui.data.column.mdmSkuConstructionRef.textType"),
-          width: 180,
+          width: 140,
+          align: "center",
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.trial_status, value);
           },
@@ -301,7 +309,8 @@ export default {
         {
           prop: "lhType",
           label: this.$t("ui.data.column.mdmSkuConstructionRef.lhType"),
-          width: 180,
+          width: 140,
+          align: "center",
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.trial_status, value);
           },
@@ -313,6 +322,7 @@ export default {
         },
         {
           prop: "updateBy",
+          align: "center",
           label: this.$t("ui.data.column.updateBy"),
           width: 100,
         },

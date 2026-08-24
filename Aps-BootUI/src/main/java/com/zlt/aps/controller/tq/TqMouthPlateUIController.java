@@ -2,6 +2,7 @@ package com.zlt.aps.controller.tq;
 
 
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
@@ -73,6 +74,10 @@ public class TqMouthPlateUIController extends BaseUIController<TqMouthPlate> {
     @ResponseBody
     @ApiOperation("保存胎圈口型板信息（id为空则新增，id不为空则修改）")
     public AjaxResult save(TqMouthPlate entity) {
+        // 系统判断"口型板编号+生产线"是否存在，存在则提示已存在相同口型板信息
+        if (UserConstants.NOT_UNIQUE.equals(iTqMouthPlateService.checkUnique(entity))) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.mouthPlate.message.unique"));
+        }
         return iTqMouthPlateService.save(entity);
     }
 

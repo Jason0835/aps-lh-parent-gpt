@@ -32,7 +32,7 @@ import InfoForm from '@/views/components/infoForm.vue'
 import {insertTask} from '@/api/tc/tcScheduleResult'
 import {resolveErrorMessage} from '@/utils/errorMessage'
 
-const MAX_INSERT_SHIFT_ORDER = 3
+const MAX_INSERT_SHIFT_ORDER = 6
 
 /**
  * 将日期格式化为排程页面使用的日期字符串。
@@ -53,6 +53,10 @@ export default {
   inject: ['parentDict'],
   props: {
     machineOptions: {
+      type: Array,
+      default: () => []
+    },
+    shiftDateList: {
       type: Array,
       default: () => []
     }
@@ -99,21 +103,27 @@ export default {
       return `${this.$t('ui.data.column.scheduleResult.insertOrder')}${this.$t('ui.data.column.tc.scheduleResult.modelName')}`
     },
     columns() {
-      return [
+      const baseColumns = [
         {
           prop: 'factoryCode',
           label: this.$t('ui.data.column.tm.scheduleResult.factoryCode'),
           type: 'select',
           span: 12,
           dictData: this.parentDict.type.biz_factory_name,
-          filterable: true
+          filterable: true,
+          listeners: {
+            change: this.handleFactoryChange
+          }
         },
         {
           prop: 'scheduleDate',
           label: this.$t('ui.data.column.tm.scheduleResult.scheduleDate'),
           type: 'date',
           span: 12,
-          valueFormat: 'yyyy-MM-dd'
+          valueFormat: 'yyyy-MM-dd',
+          listeners: {
+            change: this.handleScheduleDateChange
+          }
         },
         {
           prop: 'machineCode',
@@ -134,84 +144,6 @@ export default {
           maxlength: 50
         },
         {
-          label: this.$t('ui.tm.schedule.insert.middleShift'),
-          span: 24,
-          type: 'title'
-        },
-        {
-          prop: 'class1PlanQty',
-          label: this.$t('ui.tm.schedule.insert.middlePlanQty'),
-          span: 8,
-          type: 'number',
-          min: 0
-        },
-        {
-          prop: 'class1Sequence',
-          label: this.$t('ui.tm.schedule.insert.middleSequence'),
-          span: 8,
-          type: 'number',
-          min: 1,
-          precision: 0
-        },
-        {
-          prop: 'class1Analysis',
-          label: this.$t('ui.tm.schedule.insert.middleAnalysis'),
-          span: 8,
-          maxlength: 200
-        },
-        {
-          label: this.$t('ui.tm.schedule.insert.nightShift'),
-          span: 24,
-          type: 'title'
-        },
-        {
-          prop: 'class2PlanQty',
-          label: this.$t('ui.tm.schedule.insert.nightPlanQty'),
-          span: 8,
-          type: 'number',
-          min: 0
-        },
-        {
-          prop: 'class2Sequence',
-          label: this.$t('ui.tm.schedule.insert.nightSequence'),
-          span: 8,
-          type: 'number',
-          min: 1,
-          precision: 0
-        },
-        {
-          prop: 'class2Analysis',
-          label: this.$t('ui.tm.schedule.insert.nightAnalysis'),
-          span: 8,
-          maxlength: 200
-        },
-        {
-          label: this.$t('ui.tm.schedule.insert.morningShift'),
-          span: 24,
-          type: 'title'
-        },
-        {
-          prop: 'class3PlanQty',
-          label: this.$t('ui.tm.schedule.insert.morningPlanQty'),
-          span: 8,
-          type: 'number',
-          min: 0
-        },
-        {
-          prop: 'class3Sequence',
-          label: this.$t('ui.tm.schedule.insert.morningSequence'),
-          span: 8,
-          type: 'number',
-          min: 1,
-          precision: 0
-        },
-        {
-          prop: 'class3Analysis',
-          label: this.$t('ui.tm.schedule.insert.morningAnalysis'),
-          span: 8,
-          maxlength: 200
-        },
-        {
           prop: 'remark',
           label: this.$t('ui.data.column.tm.scheduleResult.remark'),
           span: 24,
@@ -220,31 +152,65 @@ export default {
           maxlength: 500
         }
       ]
+      const shiftColumns = Array.from({ length: MAX_INSERT_SHIFT_ORDER }, (item, index) => {
+        const shiftOrder = index + 1
+        const fieldPrefix = `class${shiftOrder}`
+        const shiftDisabled = this.isShiftStarted(shiftOrder)
+        return [
+          {
+            label: this.getShiftTitle(shiftOrder),
+            span: 24,
+            type: 'title'
+          },
+          {
+            prop: `${fieldPrefix}PlanQty`,
+            label: this.$t('ui.tc.schedule.planQty'),
+            span: 8,
+            type: 'number',
+            min: 0,
+            disabled: shiftDisabled
+          },
+          {
+            prop: `${fieldPrefix}Sequence`,
+            label: this.$t('ui.tc.schedule.sequence'),
+            span: 8,
+            type: 'number',
+            min: 1,
+            precision: 0,
+            disabled: shiftDisabled
+          },
+          {
+            prop: `${fieldPrefix}Analysis`,
+            label: this.$t('ui.tc.schedule.analysis'),
+            span: 8,
+            maxlength: 200,
+            disabled: shiftDisabled
+          }
+        ]
+      }).reduce((columns, shiftColumn) => columns.concat(shiftColumn), [])
+      return baseColumns.slice(0, 4).concat(shiftColumns, baseColumns.slice(4))
     }
   },
   methods: {
     /**
-     * 创建胎面式三班次插单表单初始值。
+     * 创建胎侧六班次插单表单初始值。
      *
      * @returns {Object} 插单表单对象
      */
     createForm() {
-      return {
+      const form = {
         factoryCode: '',
         scheduleDate: formatDate(new Date()),
         machineCode: '',
         sidewallCode: '',
-        class1PlanQty: undefined,
-        class1Sequence: undefined,
-        class1Analysis: '',
-        class2PlanQty: undefined,
-        class2Sequence: undefined,
-        class2Analysis: '',
-        class3PlanQty: undefined,
-        class3Sequence: undefined,
-        class3Analysis: '',
         remark: ''
       }
+      for (let shiftOrder = 1; shiftOrder <= MAX_INSERT_SHIFT_ORDER; shiftOrder += 1) {
+        form[`class${shiftOrder}PlanQty`] = undefined
+        form[`class${shiftOrder}Sequence`] = undefined
+        form[`class${shiftOrder}Analysis`] = ''
+      }
+      return form
     },
     /**
      * 打开胎侧插单弹窗并回填页面当前查询范围。
@@ -275,11 +241,101 @@ export default {
       this.visible = false
     },
     /**
+     * 获取与胎侧列表页二级表头一致的班次分组标题。
+     *
+     * @param {Number} shiftOrder 班次顺序
+     * @returns {String} 班次名称和实际日期
+     */
+    getShiftTitle(shiftOrder) {
+      const shiftOption = this.shiftDateList.find(item => item.shiftOrder === shiftOrder) || {}
+      const shiftName = shiftOption.shiftName || shiftOption.shiftCode ||
+        `${this.$t('ui.tc.schedule.shift')} ${shiftOrder}`
+      const scheduleDate = shiftOption.scheduleDate
+        ? String(shiftOption.scheduleDate).substring(0, 10)
+        : ''
+      const displayDate = scheduleDate ? scheduleDate.substring(5, 10).replace('-', '/') : ''
+      return `${shiftName} ${displayDate}`.trim()
+    },
+    /**
+     * 判断班次实际开始时间是否已到达。
+     *
+     * @param {Number} shiftOrder 班次顺序
+     * @returns {Boolean} true 表示班次已开始
+     */
+    isShiftStarted(shiftOrder) {
+      const shiftOption = this.shiftDateList.find(item => item.shiftOrder === shiftOrder) || {}
+      if (!shiftOption.shiftStartTime) {
+        return false
+      }
+      const normalizedStartTime = typeof shiftOption.shiftStartTime === 'string'
+        ? shiftOption.shiftStartTime.replace(' ', 'T')
+        : shiftOption.shiftStartTime
+      const timestamp = new Date(normalizedStartTime).getTime()
+      return Number.isFinite(timestamp) && timestamp <= Date.now()
+    },
+    /**
+     * 清除已开始班次的输入值，避免日期或工厂切换后提交失效班次。
+     *
+     * @returns {void}
+     */
+    clearStartedShiftValues() {
+      for (let shiftOrder = 1; shiftOrder <= MAX_INSERT_SHIFT_ORDER; shiftOrder += 1) {
+        if (!this.isShiftStarted(shiftOrder)) {
+          continue
+        }
+        const fieldSuffixList = ['PlanQty', 'Sequence', 'Analysis']
+        fieldSuffixList.forEach(suffix => {
+          this.$set(this.form, `class${shiftOrder}${suffix}`, undefined)
+        })
+      }
+    },
+    /**
+     * 清空全部班次输入值。
+     *
+     * @returns {void}
+     */
+    clearShiftValues() {
+      const fieldSuffixList = ['PlanQty', 'Sequence', 'Analysis']
+      for (let shiftOrder = 1; shiftOrder <= MAX_INSERT_SHIFT_ORDER; shiftOrder += 1) {
+        fieldSuffixList.forEach(suffix => {
+          this.$set(this.form, `class${shiftOrder}${suffix}`, undefined)
+        })
+      }
+    },
+    /**
+     * 工厂变化时清空旧机台和班次输入，并通知父页面刷新选项。
+     *
+     * @param {String} factoryCode 新工厂编码
+     * @returns {void}
+     */
+    handleFactoryChange(factoryCode) {
+      this.$set(this.form, 'machineCode', undefined)
+      this.clearShiftValues()
+      this.$emit('scope-change', {
+        factoryCode,
+        scheduleDate: this.form.scheduleDate
+      })
+    },
+    /**
+     * 排程日期变化时清空旧班次输入，并通知父页面刷新选项。
+     *
+     * @param {String} scheduleDate 新排程日期
+     * @returns {void}
+     */
+    handleScheduleDateChange(scheduleDate) {
+      this.clearShiftValues()
+      this.$emit('scope-change', {
+        factoryCode: this.form.factoryCode,
+        scheduleDate
+      })
+    },
+    /**
      * 校验每个插单班次的计划量、顺序和原因分析配对关系。
      *
      * @returns {Boolean} 是否通过校验
      */
     validateInsertShiftFields() {
+      this.clearStartedShiftValues()
       let hasPlanQty = false
       for (let shiftOrder = 1; shiftOrder <= MAX_INSERT_SHIFT_ORDER; shiftOrder += 1) {
         const planQty = this.form[`class${shiftOrder}PlanQty`]
