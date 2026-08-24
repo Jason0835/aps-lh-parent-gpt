@@ -26,6 +26,10 @@ public class Cd15ScheduleResultIssue implements Serializable {
     private String machineCode;
     /** 钢带代码。 */
     private String steelStripCode;
+    /** 钢带物料号。 */
+    private String materialCode;
+    /** 成型胎胚物料描述，多个规格使用斜杠拼接。 */
+    private String embryoSpecDesc;
     /** GDYY 大卷代码。 */
     private String bigRollCode;
     /** 库排号。 */
@@ -60,6 +64,8 @@ public class Cd15ScheduleResultIssue implements Serializable {
     private BigDecimal craftWidth;
     /** 单耗，单位毫米每条。 */
     private BigDecimal unitConsumeMillimeter;
+    /** 单耗，单位米每条。 */
+    private BigDecimal unitConsume;
     /** 卷曲长度，单位米。 */
     private BigDecimal curlLength;
     /** GDYY 大卷幅宽，单位毫米。 */
@@ -68,6 +74,28 @@ public class Cd15ScheduleResultIssue implements Serializable {
     private String sourceType;
     /** 生产状态。 */
     private String productionStatus;
+    /** 钢带库存数量。 */
+    private Double stockQty;
+    /** 钢带库存供应成型时长，单位小时。 */
+    private Double supplyTime;
+    /** 当前班次示方类型。 */
+    private String exampleType;
+    /** 当前班次示方号。 */
+    private String exampleNo;
+    /** 当前班次备注。 */
+    private String shiftRemark;
+    /** 对应成型一班计划量。 */
+    private Double cxClass1Plan;
+    /** 对应成型二班计划量。 */
+    private Double cxClass2Plan;
+    /** 对应成型三班计划量。 */
+    private Double cxClass3Plan;
+    /** 对应成型四班计划量。 */
+    private Double cxClass4Plan;
+    /** 收尾标识。 */
+    private String markCloseOutTip;
+    /** 排程备注。 */
+    private String remark;
     /** 是否用于清除已发布的原班次计划。 */
     private Boolean clearExistingPlan;
     /** 工厂编码。 */

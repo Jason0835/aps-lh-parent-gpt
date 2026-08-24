@@ -1,8 +1,8 @@
 package com.zlt.aps.itf.mes.mapper;
 
 import com.baomidou.dynamic.datasource.annotation.DS;
-import com.zlt.aps.cd15.api.domain.entity.Cd15ScheduleResultIssue;
 import com.zlt.aps.itf.constant.DataSource;
+import com.zlt.aps.itf.mes.domain.MesCd15ScheduleResult;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -18,26 +18,19 @@ public interface Cd15ScheduleResultIssueMapper {
     /**
      * 按业务键删除历史下发记录。
      *
-     * @param issueList 下发记录
+     * @param rows 中间表宽表记录
      * @param factoryCode 工厂编码
      * @return 删除数量
      */
     int batchDeleteByBusinessKey(
-            @Param("list") List<Cd15ScheduleResultIssue> issueList,
+            @Param("list") List<MesCd15ScheduleResult> rows,
             @Param("factoryCode") String factoryCode);
 
     /**
      * 批量写入斜裁排程结果。
      *
-     * @param issueList 下发记录
-     * @param dataVersion 数据版本
-     * @param companyCode 公司编码
-     * @param factoryCode 工厂编码
+     * @param rows 中间表宽表记录
      * @return 写入数量
      */
-    int batchInsert(
-            @Param("list") List<Cd15ScheduleResultIssue> issueList,
-            @Param("dataVersion") String dataVersion,
-            @Param("companyCode") String companyCode,
-            @Param("factoryCode") String factoryCode);
+    int batchInsert(@Param("list") List<MesCd15ScheduleResult> rows);
 }

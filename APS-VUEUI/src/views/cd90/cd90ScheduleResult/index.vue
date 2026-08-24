@@ -70,8 +70,6 @@
     </page-table>
     <tlt-upload
       ref="tltUpload"
-      download-url="/cd90/cd90ScheduleResult/export"
-      :download-params="importParams"
       upload-url="/cd90/cd90ScheduleResult/importDataByCust"
       :upload-params="importParams"
       @uploadSuccess="getList"

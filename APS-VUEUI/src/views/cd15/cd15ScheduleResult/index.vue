@@ -51,8 +51,6 @@
     </page-table>
     <tlt-upload
       ref="tltUpload"
-      download-url="/cd15/cd15ScheduleResult/export"
-      :download-params="importParams"
       upload-url="/cd15/cd15ScheduleResult/importDataByCust"
       :upload-params="importParams"
       @uploadSuccess="getList"

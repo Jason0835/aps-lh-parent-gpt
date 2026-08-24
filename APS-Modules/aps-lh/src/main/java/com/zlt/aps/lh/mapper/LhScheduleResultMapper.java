@@ -7,6 +7,7 @@ import org.apache.ibatis.annotations.Param;
 
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 硫化排程结果Mapper
@@ -32,15 +33,13 @@ public interface LhScheduleResultMapper extends BaseMapper<LhScheduleResult> {
      *
      * @param factoryCode  分厂编号
      * @param scheduleDate 当前导出排程日期
-     * @param closeOutBefore 当前批次早班开始时间，历史收尾必须早于该时间
-     * @param machineCodes 命中的硫化机台编号
+     * @param machineCloseOutBeforeMap key=硫化机台编号，value=该机台当前早班开始时间
      * @return 每台机最近一次收尾的前规格物料
      */
     List<LhScheduleResult> selectLatestCloseOutBeforeMaterial(
             @Param("factoryCode") String factoryCode,
             @Param("scheduleDate") Date scheduleDate,
-            @Param("closeOutBefore") Date closeOutBefore,
-            @Param("machineCodes") List<String> machineCodes);
+            @Param("machineCloseOutBeforeMap") Map<String, Date> machineCloseOutBeforeMap);
 
     /**
      * 查询指定日期区间内有计划量的物料编码。
