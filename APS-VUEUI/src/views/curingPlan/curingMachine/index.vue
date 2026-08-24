@@ -157,6 +157,7 @@ export default {
         {
           label: this.$t("ui.data.column.factoryCode"),
           prop: "factoryCode",
+          align: "center",
           formatter: (row) => {
             return this.selectDictLabel(
               this.dict.type.biz_factory_name,
@@ -167,16 +168,19 @@ export default {
         {
           label: this.$t("ui.data.column.machine.machineCode"),
           prop: "machineCode",
+          align: "center",
           minWidth: 150,
         },
         {
           label: this.$t("ui.data.column.machine.manufacturer"),
           prop: "manufacturer",
+          align: "center",
           minWidth: 100,
         },
         {
           label: this.$t("ui.data.column.machine.lhMachineType"),
           prop: "machineType",
+          align: "center",
           minWidth: 100,
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.LH_MACHINE_TYPE, value);
@@ -185,31 +189,37 @@ export default {
         {
           label: this.$t("ui.data.column.machine.dimensionSize"),
           prop: "dimensionSize",
+          align: "center",
           minWidth: 100,
         },
         {
           label: this.$t("ui.data.column.machine.hotPlateDiameter"),
           prop: "hotPlateDiameter",
+          align: "center",
           minWidth: 100,
         },
         {
           label: this.$t("ui.data.column.machine.shellStandard"),
           prop: "shellStandard",
+          align: "center",
           minWidth: 100,
         },
         {
           label: this.$t("ui.data.column.lhMachineInfo.dimensionMinimum"),
           prop: "dimensionMinimum",
+          align: "center",
           minWidth: 100,
         },
         {
           label: this.$t("ui.data.column.lhMachineInfo.dimensionMaximum"),
           prop: "dimensionMaximum",
+          align: "center",
           minWidth: 100,
         },
         {
           label: this.$t("ui.data.column.machine.support195WideBase"),
           prop: "support195WideBase",
+          align: "center",
           minWidth: 120,
           formatter: (row) => {
             return this.selectDictLabel(this.dict.type.biz_yes_no, row.support195WideBase);
@@ -218,6 +228,7 @@ export default {
         {
           label: this.$t("ui.data.column.machine.support225WideBase"),
           prop: "support225WideBase",
+          align: "center",
           minWidth: 120,
           formatter: (row) => {
             return this.selectDictLabel(this.dict.type.biz_yes_no, row.support225WideBase);
@@ -226,6 +237,7 @@ export default {
         {
           label: this.$t("ui.data.column.machine.supportChipTire"),
           prop: "supportChipTire",
+          align: "center",
           minWidth: 120,
           formatter: (row) => {
             return this.selectDictLabel(this.dict.type.biz_yes_no, row.supportChipTire);
@@ -234,22 +246,26 @@ export default {
         {
           label: this.$t("ui.data.column.lhMachineInfo.maxMoldNum"),
           prop: "maxMoldNum",
+          align: "center",
           minWidth: 100,
           type: "number",
         },
         {
           label: this.$t("ui.data.column.machine.quata"),
           prop: "quota",
+          align: "center",
           minWidth: 100,
           type: "number",
         },
         {
           label: this.$t("ui.data.column.machine.machineOrder"),
           prop: "machineOrder",
+          align: "center",
           minWidth: 100,
           type: "number",
         },
         {
+          align: "center",
           label: this.$t("ui.data.column.machine.status"),
           prop: "status",
           minWidth: 100,
@@ -293,6 +309,7 @@ export default {
         },
         {
           prop: "updateBy",
+          align: "center",
           label: this.$t("ui.data.column.updateBy"),
           minWidth: 100,
         },

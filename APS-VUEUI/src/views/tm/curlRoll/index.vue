@@ -111,6 +111,7 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
+          align: "center",
           label: this.$t("ui.data.column.tm.curlRoll.factoryCode"),
           type: "select",
           formatter: (row, column, value) => {
@@ -119,11 +120,13 @@ export default {
         },
         {
           prop: "treadCode",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.tm.curlRoll.treadCode"),
         },
         {
           prop: "curlLength",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.tm.curlRoll.curlLength"),
         },
@@ -142,8 +145,8 @@ export default {
           align: "center",
           halign: "center",
           label: this.$t("ui.data.btn.option"),
-          minWidth: 180,
-          width: 200,
+          minWidth: 160,
+          width: 160,
           fixed: "right",
           render: ({ row }) => {
             return (

@@ -97,6 +97,7 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
+          align: "center",
           label: this.$t("ui.data.column.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
@@ -104,18 +105,23 @@ export default {
         },
         {
           prop: "version",
+          align: "center",
+          minWidth: 200,
           label: this.$t("plan.planProduction.planVersion"),
         },
         {
           prop: "deviationQty",
+          align: "center",
           label: this.$t("ui.data.column.rawMaterial.deviationQty"),
         },
         {
           prop: "deviationRate",
+          align: "center",
           label: this.$t("ui.data.column.rawMaterial.deviationRate"),
         },
         {
           prop: "hasWarning",
+          align: "center",
           label: this.$t("ui.data.column.rawMaterial.hasWarning"),
 
           formatter: (row, column, value) => {
@@ -124,28 +130,33 @@ export default {
         },
         {
           prop: "materialCode",
+          align: "center",
           label: this.$t("ui.data.column.rawMaterial.materialCode"),
         },
         {
           prop: "materialDesc",
           label: this.$t("ui.data.column.rawMaterial.materialName"),
           align: "left",
-          minWidth: 350,
+          minWidth: 180,
         },
         {
           prop: "year",
+          align: "center",
           label: this.$t("ui.data.colume.year"),
         },
         {
           prop: "month",
+          align: "center",
           label: this.$t("ui.data.colume.month"),
         },
         {
           prop: "week",
+          align: "center",
           label: this.$t("ui.data.column.rawMaterial.relatedWeek"),
         },
         {
           prop: "warningLevel",
+          align: "center",
           label: this.$t("ui.data.column.rawMaterial.warningLevel"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.warn_level, value);
@@ -153,13 +164,15 @@ export default {
         },
         {
           prop: "remark",
+          align: "center",
           label: this.$t("common.remark"),
-          width: 240,
+          minWidth: 240,
         },
         {
           prop: "updateTime",
+          align: "center",
           label: this.$t("ui.data.column.scheduleAdjust.updata"),
-          width: 180,
+          minWidth: 180,
         },
 
       ];

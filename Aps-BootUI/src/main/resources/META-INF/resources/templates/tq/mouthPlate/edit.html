@@ -58,7 +58,8 @@
             var data = $("#form-plate-edit").serializeArray();
             var status = $("input[id='status']").is(':checked') == true ? 0 : 1;
             data.push({"name": "status", "value": status});
-            $.operate.save(prefix + "/edit", data);
+            // 后端 POST /tq/mouthPlate/save 统一处理（id为空则新增，id不为空则修改），原 /edit 接口不存在
+            $.operate.save(prefix + "/save", data);
         }
     }
 </script>

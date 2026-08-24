@@ -80,82 +80,95 @@ export default {
       let columns = [
         {
           prop: "factoryCode",
+          align: "center",
           label: this.$t("ui.data.column.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
-          width: 120,
+          minWidth: 120,
         },
         {
           prop: "year",
+          align: "center",
           label: this.$t("ui.data.colume.year"),
-          width: 120,
+          minWidth: 80,
         },
         {
           prop: "month",
+          align: "center",
           label: this.$t("ui.data.colume.month"),
-          width: 120,
+          minWidth: 80,
         },
 
         {
           prop: "monthPlanVersion",
+          align: "center",
           label: this.$t("ui.data.column.finishStock.requireVersion"),
-          width: 180,
+          minWidth: 180,
         },
         {
           prop: "productTypeCode",
+          align: "center",
           label: this.$t("ui.data.column.monthplan.productType"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_product_type, value);
           },
-          width: 120,
+          minWidth: 120,
         },
         {
           prop: "locationType",
+          align: "center",
           label: this.$t("ui.data.column.finishStock.wai"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_stor_type, value);
           },
-          width: 120,
+          minWidth: 120,
         },
         {
           prop: "areaCodeNameI18n",
+          align: "center",
           label: this.$t("common.area"),
-          width: 120,
+          minWidth: 120,
         },
         {
           prop: "customCode",
+          align: "center",
           label: this.$t("ui.data.column.monthplan.salCode"),
-          width: 120,
+          minWidth: 120,
         },
         {
           prop: "customNationCodeNameI18n",
+          align: "center",
           label: this.$t("ui.data.column.monthplan.salNCode"),
-          width: 120,
+          minWidth: 120,
         },
         {
           prop: "destinationNationCodeNameI18n",
+          align: "center",
           label: this.$t("ui.data.column.monthplan.natCode"),
-          width: 120,
+          minWidth: 120,
         },
         {
           prop: "poNumber",
+          align: "center",
           label: this.$t("ui.data.column.monthplan.salCodePo"),
-          width: 240,
+          minWidth: 200,
         },
 
         {
           prop: "brand",
+          align: "center",
           label: this.$t("common.brand"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_brand_type, value);
           },
-          width: 120,
+          minWidth: 120,
         },
         {
           prop: "materialCode",
+          align: "center",
           label: this.$t("ui.data.defectiveStock.materialCode"),
-          width: 120,
+          minWidth: 140,
         },
         {
           prop: "materialDesc",
@@ -165,37 +178,44 @@ export default {
         },
         {
           prop: "orderQty",
+          align: "center",
           label: this.$t("book.deliveryOrder.orderNum"),
-          width: 120,
+          minWidth: 120,
         },
 
         {
           prop: "stockQty",
-          width: 120,
+          align: "center",
+          minWidth: 120,
           label: this.$t("ui.data.orderInventoryWriteDown.stockQty"),
         },
         {
           prop: "allocationQty",
-          width: 120,
+          align: "center",
+          minWidth: 120,
           label: this.$t("ui.data.orderInventoryWriteDown.allocationQty"),
         },
         {
           prop: "productionQty",
-          width: 120,
+          align: "center",
+          minWidth: 120,
           label: this.$t("ui.data.orderInventoryWriteDown.productionQty"),
         },
         {
           prop: "plannedSurplus",
-          width: 120,
+          align: "center",
+          minWidth: 120,
           label: this.$t("ui.data.orderInventoryWriteDown.plannedSurplus"),
         },
         {
           prop: "weekYear",
-          width: 120,
+          align: "center",
+          minWidth: 120,
           label: this.$t("ui.data.column.monthplan.weekYear"),
         },
         {
           prop: "isEudr",
+          align: "center",
           label: this.$t("EUDR"),
           type: "select",
           formatter: (row, column, value) => {
@@ -226,6 +246,7 @@ export default {
         // },
         {
           prop: "deliverGoodsType",
+          align: "center",
           label: this.$t("common.shipType"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(
@@ -236,6 +257,7 @@ export default {
         },
         {
           prop: "scmPriority",
+          align: "center",
           label: this.$t("ui.data.column.monthplan.scmPriority"),
           type: "select",
           formatter: (row, column, value) => {
@@ -244,6 +266,7 @@ export default {
         },
         {
           prop: "orderPriority",
+          align: "center",
           label: this.$t("ui.data.column.monthplan.orderPriority"),
           type: "select",
           formatter: (row, column, value) => {
@@ -252,7 +275,7 @@ export default {
 
         },
         {
-          width: 180,
+          minWidth: 180,
           prop: "updateTime",
           label: this.$t("ui.data.column.scheduleAdjust.updata"),
         },

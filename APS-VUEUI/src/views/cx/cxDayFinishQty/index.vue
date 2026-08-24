@@ -50,21 +50,25 @@ export default {
       return [
         {
           prop: 'factoryCode',
+          align: 'center',
           label: this.$t('ui.data.column.factoryCode'),
           formatter: (row, column, value) => this.selectDictLabel(this.dict.type.biz_factory_name, value)
         },
         {
           prop: 'finishDate',
+          align: 'center',
           label: this.$t('ui.data.column.cxDayFinishQty.finishDate'),
           minWidth: 120
         },
         {
           prop: 'embryoCode',
+          align: 'center',
           label: this.$t('ui.data.column.cxDayFinishQty.embryoCode'),
           minWidth: 160
         },
         {
           prop: 'exampleType',
+          align: 'center',
           label: this.$t('ui.data.column.cxDayFinishQty.exampleType'),
           minWidth: 120,
           formatter: (row, column, value) => {
@@ -73,18 +77,21 @@ export default {
         },
         {
           prop: 'dayFinishQty',
+          align: 'center',
           label: this.$t('ui.data.column.cxDayFinishQty.dayFinishQty'),
           minWidth: 120
         },
         {
           prop: 'bomDataVersion',
+          align: 'center',
           label: this.$t('ui.data.column.cxDayFinishQty.bomDataVersion'),
-          minWidth: 140
+          minWidth: 200
         },
         {
           prop: 'dataVersion',
+          align: 'center',
           label: this.$t('ui.data.column.cxDayFinishQty.dataVersion'),
-          minWidth: 120
+          minWidth: 200
         },
         {
           prop: 'remark',

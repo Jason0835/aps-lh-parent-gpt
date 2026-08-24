@@ -17,6 +17,7 @@ import com.zlt.aps.lh.mapper.LhMouldChangePlanEntityMapper;
 import com.zlt.aps.lh.mapper.LhScheduleProcessLogMapper;
 import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
 import com.zlt.aps.lh.mapper.LhUnscheduledResultMapper;
+import com.zlt.aps.lh.service.ILhDailyMouldCalcService;
 import com.zlt.aps.lh.service.ILhScheduleResultService;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
@@ -166,8 +167,10 @@ public class SchedulePersistenceService {
             fillShortageQty(context, context.getScheduleResultList());
             // 回填 SKU 排序名次/描述（来源 sortByPriority 回写到 sourceSku）
             fillSkuSortInfo(context, context.getScheduleResultList());
-            // 回填 T/T+1/T+2 三天的结构计划机台数、结构已排机台数、SKU 已排机台数串
+            // 回填 T/T+1/T+2 三天的结构计划机台数、已排机台数及物料每日目标机台数
             fillMachineCountRange(context, context.getScheduleResultList());
+            // 按来源 SKU 的月计划 productionType 原值回填结果
+            fillProductionType(context, context.getScheduleResultList());
             scheduleResultMapper.insertBatch(context.getScheduleResultList());
         }
         if (!context.getUnscheduledResultList().isEmpty()) {
@@ -635,7 +638,7 @@ public class SchedulePersistenceService {
     }
 
     /**
-     * 回填结构计划/已排机台数串与 SKU 已排机台数串，格式 {@code T=N,T+1=N,T+2=N}。
+     * 回填结构计划/已排机台数、SKU 已排机台数和物料每日目标机台数串。
      * <p>T 日为 {@code context.scheduleDate}，与 {@code dayNRange} 同窗口；
      * 结构名或物料编码为空时对应字段不写。</p>
      *
@@ -665,6 +668,40 @@ public class SchedulePersistenceService {
                 result.setSkuScheduledMachineCountRange(
                         buildSkuScheduledMachineCountRange(
                                 context, dates, result.getMaterialCode(), result.getProductStatus()));
+                result.setDailyLhMachineCountRange(
+                        buildDailyLhMachineCountRange(
+                                context, dates, result.getMaterialCode(), result.getProductStatus()));
+            }
+        }
+    }
+
+    /**
+     * 按来源 SKU 的月计划排产类型回填结果字段。
+     *
+     * <p>自动排程结果通过 {@code scheduleResultSourceSkuMap} 关联到 S4.3 生成的来源 SKU，
+     * 该 SKU 的 {@code productionType} 直接来自月计划 PRODUCTION_TYPE，并原值保存到结果字段；
+     * 业务上 01 表示主销产品，02 表示常规产品。无法关联来源 SKU 的占位结果不覆盖原值。</p>
+     *
+     * @param context 排程上下文
+     * @param scheduleResults 排程结果列表
+     */
+    private void fillProductionType(LhScheduleContext context,
+                                    List<LhScheduleResult> scheduleResults) {
+        if (Objects.isNull(context) || CollectionUtils.isEmpty(scheduleResults)
+                || CollectionUtils.isEmpty(context.getScheduleResultSourceSkuMap())) {
+            return;
+        }
+        Map<LhScheduleResult, SkuScheduleDTO> sourceSkuMap = context.getScheduleResultSourceSkuMap();
+        for (LhScheduleResult result : scheduleResults) {
+            if (Objects.isNull(result)) {
+                continue;
+            }
+            SkuScheduleDTO sourceSku = sourceSkuMap.get(result);
+            if (Objects.isNull(sourceSku)) {
+                continue;
+            }
+            if (StringUtils.isNotEmpty(sourceSku.getProductionType())) {
+                result.setProductionType(sourceSku.getProductionType());
             }
         }
     }
@@ -727,6 +764,51 @@ public class SchedulePersistenceService {
                     dates[offset], materialCode, productStatus));
         }
         return sb.toString();
+    }
+
+    /**
+     * 按月计划日模具计算结果拼接物料排产窗口内每日硫化机台数。
+     *
+     * <p>该字段取统一目标机台数 Map，而不是结果已经使用的机台数 Map，保证落库值与
+     * 排程窗口内每日获取的物料机台数来源一致。</p>
+     *
+     * @param context 排程上下文
+     * @param dates T/T+1/T+2 三天 LocalDate
+     * @param materialCode 物料编码
+     * @param productStatus 产品状态
+     * @return 形如 {@code T=2,T+1=2,T+2=3}
+     */
+    private String buildDailyLhMachineCountRange(LhScheduleContext context,
+                                                  LocalDate[] dates,
+                                                  String materialCode,
+                                                  String productStatus) {
+        StringBuilder sb = new StringBuilder(24);
+        ILhDailyMouldCalcService.DailyMouldSummary summary = resolveDailyMouldSummary(
+                context, materialCode, productStatus);
+        for (int offset = 0; offset < dates.length; offset++) {
+            appendDayKey(sb, offset);
+            int machineCount = Objects.isNull(summary) ? 0 : summary.getDayMachineQty(dates[offset]);
+            sb.append('=').append(machineCount);
+        }
+        return sb.toString();
+    }
+
+    /**
+     * 获取物料和产品状态对应的逐日机台数计算结果。
+     *
+     * @param context 排程上下文
+     * @param materialCode 物料编码
+     * @param productStatus 产品状态
+     * @return 日模具汇总结果，未找到时返回 null
+     */
+    private ILhDailyMouldCalcService.DailyMouldSummary resolveDailyMouldSummary(
+            LhScheduleContext context, String materialCode, String productStatus) {
+        if (Objects.isNull(context) || CollectionUtils.isEmpty(context.getDailyMouldResultMap())) {
+            return null;
+        }
+        String cacheKey = ILhDailyMouldCalcService.DailyMouldResult.buildCacheKey(
+                materialCode, productStatus);
+        return context.getDailyMouldResultMap().get(cacheKey);
     }
 
     /**

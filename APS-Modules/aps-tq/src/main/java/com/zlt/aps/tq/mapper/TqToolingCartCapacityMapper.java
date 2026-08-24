@@ -9,8 +9,6 @@ public interface TqToolingCartCapacityMapper extends BaseMapper<TqToolingCartCap
 
     List<TqToolingCartCapacity> listToolingCartCapacity(TqToolingCartCapacity entity);
 
-    int checkUnique(TqToolingCartCapacity entity);
-
     void mergeSql(List<TqToolingCartCapacity> list);
 
     void deleteAllToolingCartCapacity();

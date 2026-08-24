@@ -224,6 +224,7 @@ export default {
         {
           label: this.$t('ui.data.column.cd90ScheduleResult.factoryCode'),
           prop: 'factoryCode',
+          align: 'center',
           minWidth: 120,
           formatter: (row, column, cellValue) => this.selectDictLabel(this.dict.type.biz_factory_name, cellValue)
         },
@@ -237,20 +238,21 @@ export default {
         {
           label: this.$t('ui.data.column.cd90ScheduleResult.isRelease'),
           prop: 'isRelease',
+          align: 'center',
           minWidth: 100,
           formatter: (row, column, cellValue) => this.selectDictLabel(this.dict.type.IS_RELEASE, cellValue)
         },
-        { label: this.$t('ui.data.column.cd90ScheduleResult.batchNo'), prop: 'batchNo', align: 'left', minWidth: 160 },
-        { label: this.$t('ui.data.column.cd90ScheduleResult.orderNo'), prop: 'orderNo', align: 'left', minWidth: 160 },
-        { label: this.$t('ui.data.column.cd90ScheduleResult.cxBatchNo'), prop: 'cxBatchNo', minWidth: 220, showOverflowTooltip: true },
-        { label: this.$t('ui.data.column.cd90ScheduleResult.cxMachineCodes'), prop: 'cxMachineCodes', minWidth: 180, showOverflowTooltip: true },
-        { label: this.$t('ui.data.column.cd90ScheduleResult.planSurplusQty'), prop: 'planSurplusQty', minWidth: 140, align: 'right' },
-        { label: this.$t('ui.data.column.cd90ScheduleResult.clothCode'), prop: 'clothCode', minWidth: 180 },
-        { label: this.$t('ui.data.column.cd90ScheduleResult.machineCode'), prop: 'machineCode', minWidth: 120 },
-        { label: this.$t('ui.data.column.cd90ScheduleResult.bigRollCode'), prop: 'bigRollCode', minWidth: 140 },
-        { label: this.$t('ui.data.column.cd90ScheduleResult.storageLaneCode'), prop: 'storageLaneCode', minWidth: 200, showOverflowTooltip: true },
+        { label: this.$t('ui.data.column.cd90ScheduleResult.batchNo'), prop: 'batchNo', align: 'center', minWidth: 160 },
+        { label: this.$t('ui.data.column.cd90ScheduleResult.orderNo'), prop: 'orderNo', align: 'center', minWidth: 160 },
+        { label: this.$t('ui.data.column.cd90ScheduleResult.cxBatchNo'), prop: 'cxBatchNo', align: 'center', minWidth: 220, showOverflowTooltip: true },
+        { label: this.$t('ui.data.column.cd90ScheduleResult.cxMachineCodes'), prop: 'cxMachineCodes', align: 'center', minWidth: 180, showOverflowTooltip: true },
+        { label: this.$t('ui.data.column.cd90ScheduleResult.planSurplusQty'), prop: 'planSurplusQty', minWidth: 140, align: 'center' },
+        { label: this.$t('ui.data.column.cd90ScheduleResult.clothCode'), prop: 'clothCode', align: 'center', minWidth: 180 },
+        { label: this.$t('ui.data.column.cd90ScheduleResult.machineCode'), prop: 'machineCode', align: 'center', minWidth: 120 },
+        { label: this.$t('ui.data.column.cd90ScheduleResult.bigRollCode'), prop: 'bigRollCode', align: 'center', minWidth: 140 },
+        { label: this.$t('ui.data.column.cd90ScheduleResult.storageLaneCode'), prop: 'storageLaneCode', align: 'center', minWidth: 200, showOverflowTooltip: true },
         ...this.buildShiftColumns(),
-        { label: this.$t('ui.data.column.cd90ScheduleResult.remark'), prop: 'remark', minWidth: 160 }
+        { label: this.$t('ui.data.column.cd90ScheduleResult.remark'), prop: 'remark', align: 'center', minWidth: 160 }
       ]
     },
     searchColumns() {
@@ -375,27 +377,32 @@ export default {
             {
               label: this.$t('ui.data.column.scheduleResult.plan'),
               prop: `${classField}PlanQty`,
+              align: 'center',
               minWidth: 110
             },
             {
               label: this.$t('ui.data.column.scheduleResult.actual'),
               prop: `${classField}FinishQty`,
+              align: 'center',
               minWidth: 110,
               formatter: (row, column, cellValue) => cellValue === 0 || cellValue === '0' ? '' : cellValue
             },
             {
               label: this.$t('ui.data.column.scheduleResult.produceOrder'),
               prop: `${classField}ProduceOrder`,
+              align: 'center',
               minWidth: 150
             },
             {
               label: this.$t('ui.data.column.scheduleResult.finishRate'),
               prop: `${classField}FinishRate`,
+              align: 'center',
               minWidth: 110
             },
             {
               label: this.$t('ui.data.column.scheduleResult.analysis'),
               prop: `${classField}Analysis`,
+              align: 'center',
               minWidth: 140
             }
           ]

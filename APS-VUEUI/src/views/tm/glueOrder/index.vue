@@ -115,6 +115,7 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
+          align: "center",
           label: this.$t("ui.data.column.tm.glueOrder.factoryCode"),
           type: "select",
           formatter: (row, column, value) => {
@@ -123,21 +124,25 @@ export default {
         },
         {
           prop: "glueGroupCode",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.tm.glueOrder.glueGroupCode"),
         },
         {
           prop: "glueCode",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.tm.glueOrder.glueCode"),
         },
         {
           prop: "machineCode",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.tm.glueOrder.machineCode"),
         },
         {
           prop: "orderNum",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.tm.glueOrder.orderNum"),
         },
@@ -156,8 +161,8 @@ export default {
           align: "center",
           halign: "center",
           label: this.$t("ui.data.btn.option"),
-          minWidth: 180,
-          width: 200,
+          minWidth: 160,
+          width: 160,
           fixed: "right",
           render: ({ row }) => {
             return (

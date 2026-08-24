@@ -119,23 +119,27 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.factoryCode"),
           formatter: (row, column, value) => this.selectDictLabel(this.dict.type.biz_factory_name, value),
         },
         {
           prop: "minMachineQty",
+          align: "center",
           halign: "center",
           label: this.$t("ui.tm.depthConfig.column.minMachineQty"),
         },
         {
           prop: "maxMachineQty",
+          align: "center",
           halign: "center",
           label: this.$t("ui.tm.depthConfig.column.maxMachineQty"),
           formatter: (row, column, value) => value !== null && value !== undefined ? value : "∞",
         },
         {
           prop: "depthClassQty",
+          align: "center",
           halign: "center",
           label: this.$t("ui.tm.depthConfig.column.depthClassQty"),
         },
@@ -149,8 +153,8 @@ export default {
           align: "center",
           halign: "center",
           label: this.$t("ui.data.btn.option"),
-          minWidth: 180,
-          width: 180,
+          minWidth: 160,
+          width: 160,
           fixed: "right",
           render: ({ row }) => {
             return (

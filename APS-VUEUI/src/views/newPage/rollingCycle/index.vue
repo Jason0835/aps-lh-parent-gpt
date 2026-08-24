@@ -843,6 +843,7 @@ export default {
           {
             align: "center",
             label: this.$t("ui.data.btn.option"),
+            minWidth: 120, width: 120,
             fixed: "right",
             render: ({ row }) => {
               return (
@@ -912,6 +913,7 @@ export default {
           {
             align: "center",
             label: this.$t("ui.data.btn.option"),
+            minWidth: 120, width: 120,
             fixed: "right",
             render: ({ row }) => {
               return (
@@ -1237,6 +1239,7 @@ export default {
           {
             align: "center",
             label: this.$t("ui.data.btn.option"),
+            minWidth: 120, width: 120,
             fixed: "right",
             render: ({ row }) => {
               return (

@@ -94,6 +94,7 @@ export default {
           label: this.$t("单机班产定额"),
         },
         {
+          align: "center",
           prop: "option",
           label: this.$t("common.option"),
           render: () => {

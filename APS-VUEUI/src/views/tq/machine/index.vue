@@ -144,16 +144,19 @@ export default {
         {
           label: this.$t("ui.data.column.machine.machineCode"),
           prop: "machineCode",
+          align: "center",
           minWidth: 100,
         },
         {
           label: this.$t("ui.data.column.machine.machineName"),
           prop: "machineName",
+          align: "center",
           minWidth: 100,
         },
         {
           label: this.$t("ui.data.column.machine.classShift"),
           prop: "classShift",
+          align: "center",
           minWidth: 100,
           render: ({ row }) => {
             let value = row.classShift;
@@ -166,6 +169,7 @@ export default {
         {
           label: this.$t("ui.data.column.machine.openMachineClass"),
           prop: "openMachineClass",
+          align: "center",
           minWidth: 100,
           render: ({ row }) => {
             let value = row.openMachineClass;
@@ -179,6 +183,7 @@ export default {
           },
         },
         {
+          align: "center",
           label: this.$t("ui.data.column.machine.status"),
           prop: "status",
           minWidth: 80,
@@ -196,11 +201,13 @@ export default {
         {
           label: this.$t("ui.data.column.machine.quata"),
           prop: "quota",
+          align: "center",
           minWidth: 100,
         },
         {
           label: this.$t("ui.common.column.remark"),
           prop: "remark",
+          align: "center",
           minWidth: 100,
           formatter: (row) => {
             return row.remark || "-";
@@ -209,17 +216,19 @@ export default {
         {
           label: this.$t("common.option"),
           prop: "option",
-          width: "180px",
+          width: "160px",
+          align: "center",
+          fixed: "right",
           render: ({ row }) => {
             return (
               <div>
                 <el-button
                   v-hasPermi={["tq:machine:edit"]}
                   class="minus"
-                  type="primary"
+                  type="success"
                   onClick={() => this.handleEdit(row)}
                 >
-                  {this.$t("ui.frame.btn.modify")}
+                  {this.$t("ui.frame.btn.update")}
                 </el-button>
                 <el-button
                   v-hasPermi={["tq:machine:remove"]}

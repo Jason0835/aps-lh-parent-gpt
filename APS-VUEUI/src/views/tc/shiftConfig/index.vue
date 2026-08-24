@@ -155,6 +155,7 @@ export default {
           width: 120,
         },
         {
+          align: "center",
           prop: "crossDayFlag",
           halign: "center",
           label: this.$t("ui.data.column.tc.shiftConfig.crossDayFlag"),
@@ -192,6 +193,7 @@ export default {
           },
         },
         {
+          align: "center",
           prop: "openFlag",
           halign: "center",
           label: this.$t("ui.data.column.tc.shiftConfig.openFlag"),
@@ -243,8 +245,8 @@ export default {
           align: "center",
           halign: "center",
           label: this.$t("ui.data.btn.option"),
-          minWidth: 180,
-          width: 200,
+          minWidth: 160,
+          width: 160,
           fixed: "right",
           render: ({ row }) => {
             return (

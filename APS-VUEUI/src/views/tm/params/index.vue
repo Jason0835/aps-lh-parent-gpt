@@ -120,6 +120,7 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
+          align: "center",
           label: this.$t("ui.data.column.factoryCode"),
           type: "select",
           formatter: (row, column, value) => {
@@ -128,23 +129,30 @@ export default {
         },
         {
           prop: "paramCode",
+          align: "center",
           halign: "center",
+          minWidth: 200,
           label: this.$t("ui.data.column.paramsCode"),
         },
         {
           prop: "paramName",
+          align: "center",
           halign: "center",
+          minWidth: 250,
           label: this.$t("ui.data.column.paramsName"),
           titleTooltip: true,
         },
         {
           prop: "paramValue",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.paramsValue"),
         },
         {
           prop: "paramGroup",
+          align: "center",
           halign: "center",
+          minWidth: 160,
           label: this.$t("ui.data.column.tm.params.paramGroup"),
           formatter: (row, column, value) => {
             const map = { GLOBAL: "全局参数", SHIFT: "班次参数", MACHINE: "机台参数", TREAD: "胎面参数" };
@@ -153,6 +161,7 @@ export default {
         },
         {
           prop: "valueType",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.tm.params.valueType"),
           formatter: (row, column, value) => {
@@ -161,6 +170,7 @@ export default {
           },
         },
         {
+          align: "center",
           prop: "enableStatus",
           halign: "center",
           label: this.$t("ui.data.column.tm.params.enableStatus"),
@@ -199,9 +209,10 @@ export default {
         },
         {
           prop: "remark",
+          align: "center",
           halign: "center",
           label: this.$t("ui.common.column.remark"),
-          minWidth: 100,
+          minWidth: 200,
         },
         {
           prop: "updateTime",
@@ -212,8 +223,8 @@ export default {
           align: "center",
           halign: "center",
           label: this.$t("ui.data.btn.option"),
-          minWidth: 180,
-          width: 200,
+          minWidth: 160,
+          width: 160,
           fixed: "right",
           render: ({ row }) => {
             return (

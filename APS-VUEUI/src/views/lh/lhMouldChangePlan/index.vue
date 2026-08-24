@@ -274,7 +274,7 @@ export default {
           align: "center",
           halign: "center",
           label: this.$t("ui.data.column.lhMouldChangePlan.lhResultBatchNo"),
-          minWidth: 140,
+          minWidth: 200,
         },
         {
           prop: "orderNo",
@@ -310,7 +310,8 @@ export default {
           halign: "center",
           label: this.$t("ui.data.btn.option"),
           prop: "option",
-          minWidth: 150,
+          minWidth: 160, width: 160,
+          fixed: "right",
           render: ({ row }) => {
             return (
               <div>

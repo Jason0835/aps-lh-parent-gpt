@@ -26,6 +26,10 @@ public interface ITqMouthPlateService {
     @ApiOperation("保存胎圈口型板信息（id为空则新增，id不为空则修改）")
     AjaxResult save(@RequestBody TqMouthPlate entity);
 
+    @PostMapping("/tqMouthPlate/checkUnique")
+    @ApiOperation("校验胎圈口型板信息唯一性")
+    String checkUnique(@RequestBody TqMouthPlate entity);
+
     @PostMapping("/tqMouthPlate/delete/{ids}")
     @ApiOperation("删除胎圈口型板信息")
     AjaxResult removeByIds(@PathVariable("ids") List<Long> ids);

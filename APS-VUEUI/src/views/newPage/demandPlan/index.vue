@@ -250,6 +250,8 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
+          width: 120,
+          align: "center",
           label: this.$t("ui.data.column.demandPlan.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
@@ -257,14 +259,18 @@ export default {
         },
         {
           prop: "year",
+          width: 80,
+          align: "center",
           label: this.$t("ui.data.column.demandPlan.year"),
         },
         {
           prop: "month",
+          align: "center",
           label: this.$t("ui.data.column.demandPlan.month"),
         },
         {
           prop: "productTypeCode",
+          align: "center",
           label: this.$t("ui.data.column.demandPlan.productTypeCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_product_type, value);
@@ -273,6 +279,7 @@ export default {
 
         {
           prop: "locationType",
+          align: "center",
           label: this.$t("ui.data.column.demandPlan.locationType"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_stor_type, value);
@@ -280,11 +287,13 @@ export default {
         },
         {
           prop: "monthPlanVersion",
+          align: "center",
           label: this.$t("ui.data.demandPlan.monthPlanVersion"),
           width: 180,
         },
         {
           prop: "brand",
+          align: "center",
           label: this.$t("ui.data.column.demandPlan.brand"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_brand_type, value);
@@ -293,6 +302,7 @@ export default {
         },
         {
           prop: "scmPriority",
+          align: "center",
           label: this.$t("ui.data.column.demandPlan.scmPriority"),
           // width:120,
           // formatter: (row, column, value) => {
@@ -331,8 +341,9 @@ export default {
         },
         {
           prop: "structurePriority",
+          align: "center",
           label: this.$t("ui.data.column.demandPlan.structurePriority"),
-          width:120,
+          width: 100,
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_yes_no, value);
           },
@@ -341,11 +352,13 @@ export default {
 
         {
           prop: "structureName",
+          align: "center",
           label: this.$t("ui.data.column.demandPlan.structureName"),
           width: 180,
         },
         {
           prop: "mainPattern",
+          align: "center",
           label: this.$t("ui.data.column.demandPlan.mainPattern"),
           width: 120,
         },

@@ -19,42 +19,30 @@
         ) t
     </select>
 
-    <select id="checkUnique" parameterType="com.zlt.aps.tq.api.domain.entity.TqMachineChuck" resultType="int">
-        SELECT count(1)
+    <!-- 按机台编码集合查询寸口记录（含已逻辑删除记录）：
+         唯一索引被逻辑删除记录占用，唯一性判断与复活处理需读取已删除数据，
+         自定义SQL不走框架逻辑删除自动过滤 -->
+    <select id="listIncludeDeleted" resultType="com.zlt.aps.tq.api.domain.entity.TqMachineChuck">
+        SELECT ID, MACHINE_CODE, CHUCK_CODE, CHUCK_NAME, INCH_SIZE, REMARK,
+               IS_DELETE, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME
         FROM T_TQ_MACHINE_CHUCK
-        where IS_DELETE = '0'
-        and MACHINE_CODE = #{machineCode}
-        and CHUCK_CODE = #{chuckCode}
-        <if test="id != null">and ID != #{id}</if>
+        WHERE MACHINE_CODE IN
+        <foreach collection="machineCodes" item="machineCode" open="(" separator="," close=")">
+            #{machineCode,jdbcType=VARCHAR}
+        </foreach>
     </select>
 
-    <insert id="mergeSql" parameterType="list">
-        INSERT INTO T_TQ_MACHINE_CHUCK (
-            machine_code, chuck_code, chuck_name, inch_size, remark,
-            create_by, create_time, update_by, update_time, is_delete
-        )
-        VALUES
-        <foreach collection="list" item="MachineChuck" separator=",">
-            (
-            #{MachineChuck.machineCode,jdbcType=VARCHAR},
-            #{MachineChuck.chuckCode,jdbcType=VARCHAR},
-            #{MachineChuck.chuckName,jdbcType=VARCHAR},
-            #{MachineChuck.inchSize,jdbcType=DECIMAL},
-            #{MachineChuck.remark,jdbcType=VARCHAR},
-            #{MachineChuck.createBy,jdbcType=VARCHAR},
-            NOW(),
-            #{MachineChuck.updateBy,jdbcType=VARCHAR},
-            NOW(),
-            '0'
-            )
-        </foreach>
-        ON DUPLICATE KEY UPDATE
-        chuck_name = VALUES(chuck_name),
-        inch_size = VALUES(inch_size),
-        update_by = VALUES(create_by),
-        update_time = NOW(),
-        remark = VALUES(remark)
-    </insert>
+    <!-- 复活已逻辑删除的机台寸口记录并覆盖业务字段（IS_DELETE 置回 0） -->
+    <update id="reviveMachineChuck" parameterType="com.zlt.aps.tq.api.domain.entity.TqMachineChuck">
+        UPDATE T_TQ_MACHINE_CHUCK
+        SET CHUCK_NAME = #{chuckName,jdbcType=VARCHAR},
+            INCH_SIZE = #{inchSize,jdbcType=DECIMAL},
+            REMARK = #{remark,jdbcType=VARCHAR},
+            UPDATE_BY = #{updateBy,jdbcType=VARCHAR},
+            UPDATE_TIME = NOW(),
+            IS_DELETE = 0
+        WHERE ID = #{id,jdbcType=BIGINT}
+    </update>
 
     <update id="deleteAllMachineChuck">
         update T_TQ_MACHINE_CHUCK set IS_DELETE = '1' where IS_DELETE = '0'

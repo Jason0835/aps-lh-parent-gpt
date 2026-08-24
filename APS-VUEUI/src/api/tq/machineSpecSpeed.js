@@ -24,6 +24,14 @@ export function removeMachineSpecSpeed(ids) {
   })
 }
 
+export function checkUniqueMachineSpecSpeed(data) {
+  return request({
+    url: '/tq/machineSpecSpeed/checkUnique',
+    method: 'post',
+    data: data
+  })
+}
+
 export function exportMachineSpecSpeed(query) {
   return downloadLink("/tq/machineSpecSpeed/export", query)
 }

@@ -114,30 +114,34 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "paramCode",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.paramsCode"),
           // sortable: "custom",
-          width: 460,
+          minWidth: 180,
         },
         {
           prop: "paramName",
           halign: "center",
           label: this.$t("ui.data.column.paramsName"),
           titleTooltip: true,
-          width: 460,
+          minWidth: 250,
           // sortable: "custom",
         },
         {
           prop: "paramValue",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.paramsValue"),
-          width: 460,
+          minWidth: 120,
           // sortable: "custom",
         },
         {
           prop: "remark",
+          align: "center",
           halign: "center",
           label: this.$t("ui.common.column.remark"),
+          minWidth: 200,
           // sortable: "custom",
         },
         {
@@ -158,8 +162,8 @@ export default {
           align: "center",
           halign: "center",
           label: this.$t("ui.data.btn.option"),
-          minWidth: 180,
-          width: 180,
+          minWidth: 120,
+          width: 120,
           fixed: "right",
           render: ({ row }) => {
             return (

@@ -55,6 +55,7 @@
   "ui.tq.machineSpecSpeed.column.quota": "生产定额",
   "ui.tq.machineSpecSpeed.column.quotaMes": "MES生产定额",
   "ui.tq.machineSpecSpeed.column.modalName": "胎圈机台生产速度",
+  "ui.tq.machineSpecSpeed.column.conflict": "机台编号 + 胎圈代码已存在，请确认",
   "ui.tq.machineSpecSpeed.confirm.export": "确定导出所有机台生产速度信息？",
   "ui.glueGroup.column.glueGroupCode": "胶料组别代码",
   "ui.glueGroup.column.glueGroupName": "胶料组别名称",

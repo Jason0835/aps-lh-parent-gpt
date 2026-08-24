@@ -96,6 +96,29 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
 
     private static final int SMALL_RUBBER_END_COL_T2 = 6;
 
+    /**
+     * 硫化精度固定写法关键词：硫化侧班次分析中含"精度"的文本为封闭集合，
+     * 全部来自 ResultDowntimeSummaryUtil 的固定常量（"精度计划"、"喷砂清洗+精度"；
+     * 历史残留的"换模+精度计划"含"精度计划"自动覆盖）。
+     * 判定时先按分隔符拆分为独立原因项，再对每项做包含匹配，
+     * "成型精度影响: ..."拆分后无任何项包含这些关键词，天然被排除。
+     */
+    private static final String[] LH_PRECISION_KEYWORDS = {"精度计划", "喷砂清洗+精度"};
+
+    /**
+     * 成型精度固定原因项：成型侧精度扣减班次由 buildTaskAnalysis 写入独立原因"精度"
+     * （可能与其他原因组合，如"试制,精度"）。判定时先按分隔符拆分为独立原因项，
+     * 再对每项做精确等于匹配，硫化侧写法（"精度计划"等）与"成型精度影响"说明文本均不会误命中。
+     */
+    private static final String CX_PRECISION_ANALYSIS = "精度";
+
+    /**
+     * 班次分析文本的分隔符：硫化侧 ShiftFieldUtil 用英文逗号拼接，
+     * ProductionCalculator.appendClassAnalysisByIndex 同样用英文逗号，
+     * 成型侧结构切换备注用中文分号拼接，统一按两种分隔符拆分为独立原因项
+     */
+    private static final String ANALYSIS_ITEM_SEPARATOR = "[,；]";
+
     @Resource
     private CxLhScheduleResultMapper cxLhScheduleResultMapper;
 
@@ -1386,11 +1409,15 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
      *   <li>class6/7/8 → 8月8日（T+2），对应 T+2 报表栏位</li>
      * </ul>
      *
-     * <p>精度标记判定规则：</p>
+     * <p>精度标记判定规则（硫化精度与成型精度互斥区分，均先按分隔符拆分为独立原因项再匹配）：</p>
      * <ul>
-     *   <li>硫化侧：精度保养结束班次由 {@code ResultDowntimeSummaryUtil} 写入固定原因"精度计划"</li>
-     *   <li>成型侧：精度扣减班次由 {@code buildTaskAnalysis} 写入原因"精度"（可能与其他原因组合，如"试制,精度"）</li>
-     *   <li>统一用 {@code contains("精度")} 匹配两种写法</li>
+     *   <li>硫化侧：精度保养结束班次由 {@code ResultDowntimeSummaryUtil} 写入固定原因"精度计划"，
+     *       独立项包含匹配"精度计划"/"喷砂清洗+精度"（"换模+精度计划"含"精度计划"自动覆盖）；
+     *       成型排程联动写入硫化结果的"成型精度影响: ..."拆分后无独立项命中白名单，天然被排除，
+     *       避免仅受成型精度影响的硫化机台被误计入硫化备注</li>
+     *   <li>成型侧：精度扣减班次由 {@code buildTaskAnalysis} 写入独立原因"精度"
+     *       （可能与其他原因组合，如"试制,精度"），独立项精确等于"精度"才命中；
+     *       硫化侧写法（"精度计划"等）与"成型精度影响"说明文本均不会误命中，只统计成型精度校验</li>
      * </ul>
      *
      * @param cxResults  成型排程结果列表（已按 scheduleDate + factoryCode 过滤）
@@ -1403,10 +1430,10 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                                                          String factoryCode) {
         Map<String, Object> map = new HashMap<>(8);
 
-        // 成型精度机台：按班次分析原因含"精度"标记分组
+        // 成型精度机台：按班次分析原因含成型精度标记分组（排除硫化侧写法及"成型精度影响"文本）
         // T+1（class3/4/5）和 T+2（class6/7/8）从同一份排程结果中取数
         List<String> cxMachineCodesT1 = cxResults.stream()
-                .filter(r -> containsPrecisionKeyword(
+                .filter(r -> this.containsCxPrecisionKeyword(
                         r.getClass3Analysis(), r.getClass4Analysis(), r.getClass5Analysis()))
                 .map(CxScheduleResult::getCxMachineCode)
                 .filter(StringUtils::isNotBlank)
@@ -1414,7 +1441,7 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                 .collect(Collectors.toList());
 
         List<String> cxMachineCodesT2 = cxResults.stream()
-                .filter(r -> containsPrecisionKeyword(
+                .filter(r -> this.containsCxPrecisionKeyword(
                         r.getClass6Analysis(), r.getClass7Analysis(), r.getClass8Analysis()))
                 .map(CxScheduleResult::getCxMachineCode)
                 .filter(StringUtils::isNotBlank)
@@ -1427,9 +1454,9 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         String cxRemarkT2 = cxMachineCodesT2.isEmpty() ? ""
                 : String.join("、", cxMachineCodesT2) + " 6:00-14:00精度校验";
 
-        // 硫化精度机台：按班次分析原因含"精度计划"标记分组
+        // 硫化精度机台：按班次分析原因含硫化精度固定写法分组（白名单匹配，排除"成型精度影响"文本）
         List<String> lhMachineCodesT1 = lhResults.stream()
-                .filter(r -> containsPrecisionKeyword(
+                .filter(r -> this.containsLhPrecisionKeyword(
                         r.getClass3Analysis(), r.getClass4Analysis(), r.getClass5Analysis()))
                 .map(LhScheduleResult::getLhMachineCode)
                 .filter(StringUtils::isNotBlank)
@@ -1437,7 +1464,7 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                 .collect(Collectors.toList());
 
         List<String> lhMachineCodesT2 = lhResults.stream()
-                .filter(r -> containsPrecisionKeyword(
+                .filter(r -> this.containsLhPrecisionKeyword(
                         r.getClass6Analysis(), r.getClass7Analysis(), r.getClass8Analysis()))
                 .map(LhScheduleResult::getLhMachineCode)
                 .filter(StringUtils::isNotBlank)
@@ -1459,24 +1486,92 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
     }
 
     /**
-     * 判断班次分析原因中是否包含"精度"关键字。
+     * 判断硫化侧班次分析原因中是否包含硫化精度保养的固定写法。
      *
-     * <p>硫化侧写入"精度计划"，成型侧写入"精度"（可能与其他原因组合，如"试制,精度"），
-     * 统一用 {@code contains("精度")} 匹配两种写法。</p>
+     * <p>硫化侧含"精度"的文本来自 {@code ResultDowntimeSummaryUtil} 的固定常量，属于封闭集合。
+     * 判定时先按分隔符（英文逗号/中文分号）拆分为独立原因项，再对每项做包含匹配
+     * （"精度计划"、"喷砂清洗+精度"，历史残留的"换模+精度计划"含"精度计划"自动覆盖）。</p>
      *
-     * @param analyses 待检查的班次分析原因文本（可变参数，任一非空且包含"精度"即返回true）
-     * @return true-任一班次分析原因包含"精度"；false-全部不包含
+     * <p>成型排程精度扣量联动硫化时写入的"成型精度影响: 库存X+产量Y=Z&lt;硫化计划W, 缺口V条"
+     * 拆分后无任何独立项包含白名单关键词，天然被排除，避免仅受成型精度影响的硫化机台
+     * 被误计入硫化备注；若同一班次同时含"精度计划"与"成型精度影响"，仍按"精度计划"正确计入。</p>
+     *
+     * @param analyses 待检查的班次分析原因文本（可变参数，任一班次的独立原因项包含白名单关键词即返回true）
+     * @return true-任一班次分析包含硫化精度固定写法；false-全部不包含
      */
-    private boolean containsPrecisionKeyword(String... analyses) {
+    private boolean containsLhPrecisionKeyword(String... analyses) {
         if (analyses == null || analyses.length == 0) {
             return false;
         }
         for (String analysis : analyses) {
-            if (StringUtils.isNotBlank(analysis) && analysis.contains("精度")) {
-                return true;
+            if (StringUtils.isBlank(analysis)) {
+                continue;
+            }
+            // 按分隔符拆分为独立原因项后，逐项对白名单关键词做包含匹配
+            for (String item : this.splitAnalysisItems(analysis)) {
+                for (String keyword : LH_PRECISION_KEYWORDS) {
+                    if (item.contains(keyword)) {
+                        return true;
+                    }
+                }
             }
         }
         return false;
+    }
+
+    /**
+     * 判断成型侧班次分析原因中是否包含成型精度标记。
+     *
+     * <p>成型侧精度扣减班次由 {@code buildTaskAnalysis} 写入独立原因"精度"
+     * （可能与其他原因组合，如"试制,精度"；也可能与结构切换备注用中文分号拼接）。
+     * 判定时先按分隔符拆分为独立原因项，再对每项做<b>精确等于</b>"精度"匹配：</p>
+     * <ul>
+     *   <li>"试制,精度" 拆分后含独立项"精度" → 命中</li>
+     *   <li>"精度；本成型机计划23号切换..." 拆分后含独立项"精度" → 命中</li>
+     *   <li>"精度计划"（硫化侧写法）拆分后独立项为"精度计划" ≠ "精度" → 不命中，防御性排除硫化精度</li>
+     *   <li>"成型精度影响: ..."拆分后无独立项等于"精度" → 不命中，防御性排除</li>
+     * </ul>
+     *
+     * @param analyses 待检查的班次分析原因文本（可变参数）
+     * @return true-任一班次分析含独立原因项"精度"；false-全部不含
+     */
+    private boolean containsCxPrecisionKeyword(String... analyses) {
+        if (analyses == null || analyses.length == 0) {
+            return false;
+        }
+        for (String analysis : analyses) {
+            if (StringUtils.isBlank(analysis)) {
+                continue;
+            }
+            // 按分隔符拆分为独立原因项后，逐项与"精度"做精确等于匹配
+            for (String item : this.splitAnalysisItems(analysis)) {
+                if (CX_PRECISION_ANALYSIS.equals(item)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 将班次分析文本按分隔符拆分为独立原因项。
+     *
+     * <p>硫化侧 {@code ShiftFieldUtil.appendShiftAnalysis} 与成型联动
+     * {@code ProductionCalculator.appendClassAnalysisByIndex} 均用英文逗号拼接原因项，
+     * 成型侧结构切换备注（{@code markMachineSwitchInMainTable}）用中文分号拼接，
+     * 故统一按英文逗号和中文分号两种分隔符拆分，并对每项做 trim 去除首尾空白。</p>
+     *
+     * @param analysis 班次分析原因文本（可能为多原因拼接串）
+     * @return 拆分并 trim 后的独立原因项数组；入参为空时返回空数组
+     */
+    private String[] splitAnalysisItems(String analysis) {
+        if (StringUtils.isBlank(analysis)) {
+            return new String[0];
+        }
+        return Arrays.stream(analysis.split(ANALYSIS_ITEM_SEPARATOR))
+                .map(String::trim)
+                .filter(StringUtils::isNotBlank)
+                .toArray(String[]::new);
     }
 
     /**

@@ -785,6 +785,7 @@
   "ui.tq.machineSpecSpeed.column.quota": "Chỉ tiêu sản xuất",
   "ui.tq.machineSpecSpeed.column.quotaMes": "Chỉ tiêu sản xuất MES",
   "ui.tq.machineSpecSpeed.column.modalName": "Tốc độ sản xuất máy vòng lốp",
+  "ui.tq.machineSpecSpeed.column.conflict": "Mã máy + Mã vòng lốp đã tồn tại, vui lòng xác nhận",
   "ui.tq.machineSpecSpeed.confirm.export": "Xác nhận xuất tất cả thông tin tốc độ sản xuất máy?",
   "ui.glueGroup.column.glueGroupCode": "Mã nhóm keo",
   "ui.glueGroup.column.glueGroupName": "Tên nhóm keo",

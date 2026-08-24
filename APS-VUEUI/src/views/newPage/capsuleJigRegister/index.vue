@@ -148,6 +148,7 @@ export default {
         {
           prop: "factoryCode",
           label: this.$t("ui.data.column.mdmCapsuleChuck.factoryCode"),
+          align: "center",
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
@@ -163,14 +164,17 @@ export default {
         {
           prop: "internalQty",
           label: this.$t("ui.data.column.mdmCapsuleChuck.internalQty"),
+          align: "center",
         },
         {
           prop: "newChuckQty",
           label: this.$t("ui.data.column.mdmCapsuleChuck.newChuckQty"),
+          align: "center",
         },
         {
           prop: "totalQty",
           label: this.$t("common.sum"),
+          align: "center",
           render: ({ row }) => {
             return Number(row.internalQty) + Number(row.newChuckQty);
           }
@@ -194,6 +198,7 @@ export default {
         {
           align: "center",
           label: this.$t("ui.data.btn.option"),
+          minWidth: 160, width: 160,
           fixed: "right",
           render: ({ row }) => {
             return (

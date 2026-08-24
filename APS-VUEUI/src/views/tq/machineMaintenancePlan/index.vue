@@ -116,7 +116,7 @@ export default {
           align: "center",
           halign: "center",
           label: this.$t("ui.tq.machineMaintenancePlan.column.downtimeDate"),
-          minWidth: 120,
+          minWidth: 180,
           formatter: (row) => {
             return row.downtimeDate || "-";
           },
@@ -147,15 +147,17 @@ export default {
         },
         {
           prop: "remark",
+          align: "center",
           halign: "center",
           label: this.$t("ui.common.column.remark"),
-          minWidth: 100,
+          minWidth: 180,
           formatter: (row) => {
             return row.remark || "-";
           },
         },
         {
           prop: "updateTime",
+          align: "center",
           halign: "center",
           label: this.$t("ui.tq.machineMaintenancePlan.column.updateDate"),
           minWidth: 150,
@@ -165,7 +167,7 @@ export default {
           halign: "center",
           label: this.$t("ui.data.btn.option"),
           prop: "option",
-          width: 180,
+          width: 160,
           fixed: "right",
           render: ({ row }) => {
             return (
@@ -173,10 +175,10 @@ export default {
                 <el-button
                   v-hasPermi={["tq:machineMaintenancePlan:edit"]}
                   class="minus"
-                  type="primary"
+                  type="success"
                   onClick={() => this.handleEdit(row)}
                 >
-                  {this.$t("ui.frame.btn.modify")}
+                  {this.$t("ui.frame.btn.update")}
                 </el-button>
                 <el-button
                   v-hasPermi={["tq:machineMaintenancePlan:remove"]}

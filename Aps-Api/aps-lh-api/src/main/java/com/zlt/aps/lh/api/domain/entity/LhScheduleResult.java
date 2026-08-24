@@ -1112,6 +1112,21 @@ public class LhScheduleResult extends BaseEntity implements Serializable {
     private String skuScheduledMachineCountRange;
 
     /**
+     * 物料排产窗口内每日获取的硫化机台数，格式 {@code T=2,T+1=2,T+2=3}。
+     * <p>取值来源于排程上下文中按物料和产品状态保存的窗口逐日目标机台数。</p>
+     */
+    @ApiModelProperty(value = "物料每日硫化机台数", name = "dailyLhMachineCountRange")
+    @TableField(value = "DAILY_LH_MACHINE_COUNT_RANGE")
+    private String dailyLhMachineCountRange;
+
+    /**
+     * 月计划排产类型，取月计划 PRODUCTION_TYPE 原值：01-主销产品，02-常规产品。
+     */
+    @ApiModelProperty(value = "月计划排产类型：01-主销产品，02-常规产品", name = "productionType")
+    @TableField(value = "PRODUCTION_TYPE")
+    private String productionType;
+
+    /**
      * 胎胚收尾标识 0-否 1-是（默认 0）。
      * <p>取值来源 {@code LhScheduleContext.embryoEndingFlagMap}（key=胎胚代码, value=1-收尾/0-非收尾），
      * 由 S4.6 保存前 {@code SchedulePersistenceService.fillEmbryoEndingAnalysis} 统一回写。</p>

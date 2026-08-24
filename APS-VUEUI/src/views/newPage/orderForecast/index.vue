@@ -95,26 +95,30 @@ export default {
       let columns = [
         {
           prop: "factoryCode",
+          align: "center",
           label: this.$t("ui.data.column.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
-          width: 120,
+          minWidth: 120,
         },
         {
           prop: "year",
+          align: "center",
           label: this.$t("ui.data.colume.year"),
-          width: 120,
+          minWidth: 120,
         },
         {
           prop: "month",
+          align: "center",
           label: this.$t("ui.data.colume.month"),
-          width: 120,
+          minWidth: 120,
         },
         {
           prop: "predictionVersion",
+          align: "center",
           label: this.$t("ui.data.orderForecast.predictionVersion"),
-          width: 180,
+          minWidth: 180,
         },
         // {
         //   prop: "productionVersion",
@@ -123,19 +127,21 @@ export default {
         // },
         {
           prop: "productTypeCode",
+          align: "center",
           label: this.$t("ui.data.column.monthplan.productType"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_product_type, value);
           },
-          width: 120,
+          minWidth: 120,
         },
         {
           prop: "locationType",
+          align: "center",
           label: this.$t("ui.data.column.finishStock.wai"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_stor_type, value);
           },
-          width: 120,
+          minWidth: 120,
         },
         // {
         //   prop: "类型",
@@ -143,16 +149,18 @@ export default {
         // },
         {
           prop: "brand",
+          align: "center",
           label: this.$t("common.brand"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_brand_type, value);
           },
-          width: 120,
+          minWidth: 120,
         },
         {
           prop: "materialCode",
+          align: "center",
           label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
-          width: 180,
+          minWidth: 180,
         },
         {
           prop: "materialDesc",
@@ -162,8 +170,9 @@ export default {
         },
         {
           prop: "month1",
+          align: "center",
           label: this.$t("ui.data.orderForecast.month1"),
-          width: 120,
+          minWidth: 120,
           render: ({ row }) => {
             return (
               <div>
@@ -183,8 +192,9 @@ export default {
 
         {
           prop: "month2",
+          align: "center",
           label: this.$t("ui.data.orderForecast.month2"),
-          width: 120,
+          minWidth: 120,
           render: ({ row }) => {
             return (
               <div>
@@ -203,8 +213,9 @@ export default {
         },
         {
           prop: "month3",
+          align: "center",
           label: this.$t("ui.data.orderForecast.month3"),
-          width: 120,
+          minWidth: 120,
           render: ({ row }) => {
             return (
               <div>
@@ -223,13 +234,15 @@ export default {
         },
         {
           prop: "remark",
+          align: "center",
           label: this.$t("common.remark"),
-          width: 120,
+          minWidth: 120,
         },
         {
           prop: "updateTime",
+          align: "center",
           label: this.$t("ui.data.column.updateTime"),
-          width: 180,
+          minWidth: 180,
         },
       ];
 

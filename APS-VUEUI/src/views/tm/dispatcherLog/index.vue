@@ -100,6 +100,7 @@ export default {
               valign: "middle",
               align: "center",
               halign: "center",
+              minWidth: 160,
             },
             {
               prop: "createBy",
