@@ -751,9 +751,24 @@ public class TcMachineAssignService implements ITcMachineAssignService {
                                 .equals(candidate.getFilterReasonCode()));
                 String carryoverSourceType = machineShiftBlocked
                         ? "MACHINE_SHIFT_BLOCKED_CARRYOVER" : "CAPACITY_BLOCKED_CARRYOVER";
+                context.getCandidateTraceMap().put(task.getBusinessKey(), candidates);
+                if (!this.isPlanQtyCarryoverEnabled(context)) {
+                    TcUnplannedReasonEnum unplannedReason = machineShiftBlocked
+                            ? TcUnplannedReasonEnum.NO_AVAILABLE_MACHINE
+                            : TcUnplannedReasonEnum.CAPACITY_NOT_ENOUGH;
+                    this.markUnplanned(task, unplannedReason);
+                    this.addCarryoverDisabledTrace(context, task, task, carryoverSourceType,
+                            this.nvl(task.getPlanQty()), this.normalizeShiftOrder(task.getShiftOrder()),
+                            unplannedReason);
+                    this.addAssignTrace(context, task, TcScheduleRuleResultEnum.REJECT, null,
+                            unplannedReason.getCode(), unplannedReason.getDesc());
+                    log.info("[TC_PLAN_QTY_CARRYOVER_DISABLED] 任务[{}]来源班[{}]剩余量[{}]直接转未排，原因={}",
+                            task.getBusinessKey(), task.getShiftOrder(), task.getPlanQty(),
+                            unplannedReason.getCode());
+                    return;
+                }
                 this.addSourceCarryoverFailureTrace(context, task, candidates, carryoverSourceType,
                         nvl(task.getPlanQty()));
-                context.getCandidateTraceMap().put(task.getBusinessKey(), candidates);
                 log.info("[TC_MACHINE_ASSIGN] 任务[{}]当前班无可用承接，进入后续班次继续尝试",
                         task.getBusinessKey());
                 this.removeContextTask(context, task);
@@ -803,7 +818,7 @@ public class TcMachineAssignService implements ITcMachineAssignService {
         addAssignTrace(context, task, TcScheduleRuleResultEnum.PASS,
                 bestCandidate.getMachineCode(), null, null);
 
-        // 当前班先由选中机台承接；产能溢出先尝试同班其他机台，工装溢出及同班剩余量再顺延。
+        // 当前班先由选中机台承接，产能溢出继续尝试同班其他机台；同班剩余量是否跨班由参数控制。
         this.appendTaskWithCapacityOverflow(task, bestCandidate, passedCandidates, filterRule, scoreStrategy, context,
                 "普通排产");
     }
@@ -1288,11 +1303,14 @@ public class TcMachineAssignService implements ITcMachineAssignService {
                 ? (nvl(capacityOverflowQty).compareTo(BigDecimal.ZERO) > 0
                 ? "CAPACITY_BLOCKED_CARRYOVER" : "MACHINE_SHIFT_BLOCKED_CARRYOVER")
                 : this.resolveCarryoverSourceType(capacityOverflowQty, toolOverflowQty);
+        boolean planQtyCarryoverEnabled = this.isPlanQtyCarryoverEnabled(context);
+        int lastTargetShiftOrder = planQtyCarryoverEnabled
+                ? TcScheduleConstants.TC_MAX_SHIFT_ORDER : sourceShiftOrder;
         int overflowIndex = 1;
         int firstTargetShiftOrder = sameShiftCapacityQty.compareTo(BigDecimal.ZERO) > 0
                 ? sourceShiftOrder : sourceShiftOrder + 1;
         for (int shiftOrder = firstTargetShiftOrder;
-             shiftOrder <= TcScheduleConstants.TC_MAX_SHIFT_ORDER
+             shiftOrder <= lastTargetShiftOrder
                      && remainingQty.compareTo(BigDecimal.ZERO) > 0;
              shiftOrder++) {
             BigDecimal shiftProbeQty = shiftOrder == sourceShiftOrder
@@ -1401,14 +1419,19 @@ public class TcMachineAssignService implements ITcMachineAssignService {
             }
         }
         if (remainingQty.compareTo(BigDecimal.ZERO) > 0) {
+            if (!planQtyCarryoverEnabled) {
+                this.appendCarryoverDisabledUnplanned(sourceTask, context, remainingQty,
+                        capacityOverflowQty, toolOverflowQty, sourceShiftOrder, overflowIndex, sourceType);
+                return;
+            }
             TcTaskDraft unplannedTask = this.copyOverflowTask(sourceTask,
                     TcScheduleConstants.TC_MAX_SHIFT_ORDER, remainingQty, sourceShiftOrder,
                     overflowIndex, TcMachineAssignStatusEnum.UNPLANNED.getCode());
             unplannedTask.setPlanQty(remainingQty);
             unplannedTask.setShiftOrder(TcScheduleConstants.TC_MAX_SHIFT_ORDER);
             unplannedTask.setMachineCode(null);
-            TcUnplannedReasonEnum unplannedReason = nvl(toolOverflowQty).compareTo(BigDecimal.ZERO) > 0
-                    ? TcUnplannedReasonEnum.TOOL_NOT_ENOUGH : TcUnplannedReasonEnum.CAPACITY_NOT_ENOUGH;
+            TcUnplannedReasonEnum unplannedReason = this.resolveCarryoverUnplannedReason(
+                    capacityOverflowQty, toolOverflowQty);
             unplannedTask.setUnplannedReasonCode(unplannedReason.getCode());
             unplannedTask.setUnplannedReasonDesc(unplannedReason.getDesc());
             if (capacityBlockedCarryover) {
@@ -1431,6 +1454,90 @@ public class TcMachineAssignService implements ITcMachineAssignService {
             this.addAssignTrace(context, unplannedTask, TcScheduleRuleResultEnum.REJECT, null,
                     unplannedReason.getCode(), unplannedReason.getDesc());
         }
+    }
+
+    /**
+     * 判断是否允许把当前班未承接计划量顺延到后续班次。
+     *
+     * @param context 胎侧排程上下文
+     * @return true表示允许跨班顺延，参数缺失或非1时返回false
+     */
+    private boolean isPlanQtyCarryoverEnabled(TcScheduleContext context) {
+        String paramValue = this.resolveParamValue(context,
+                TcScheduleConstants.PARAM_PLAN_QTY_CARRYOVER_ENABLED,
+                TcScheduleConstants.DEFAULT_PLAN_QTY_CARRYOVER_ENABLED);
+        return TcYesNoEnum.YES.getCode().equals(paramValue);
+    }
+
+    /**
+     * 将跨班顺延关闭后仍未承接的计划量保留在来源班并转为未排任务。
+     *
+     * @param sourceTask 来源任务
+     * @param context 胎侧排程上下文
+     * @param remainingQty 来源班仍未承接计划量
+     * @param capacityOverflowQty 产能不足量
+     * @param toolOverflowQty 工装不足量
+     * @param sourceShiftOrder 来源班次
+     * @param overflowIndex 拆分序号
+     * @param sourceType 未承接来源类型
+     */
+    private void appendCarryoverDisabledUnplanned(TcTaskDraft sourceTask, TcScheduleContext context,
+                                                   BigDecimal remainingQty, BigDecimal capacityOverflowQty,
+                                                   BigDecimal toolOverflowQty, Integer sourceShiftOrder,
+                                                   int overflowIndex, String sourceType) {
+        TcUnplannedReasonEnum unplannedReason = this.resolveCarryoverUnplannedReason(
+                capacityOverflowQty, toolOverflowQty);
+        TcTaskDraft unplannedTask = this.copyOverflowTask(sourceTask, sourceShiftOrder, remainingQty,
+                sourceShiftOrder, overflowIndex, TcMachineAssignStatusEnum.UNPLANNED.getCode());
+        unplannedTask.setPlanQty(remainingQty);
+        unplannedTask.setShiftOrder(sourceShiftOrder);
+        unplannedTask.setMachineCode(null);
+        unplannedTask.setUnplannedReasonCode(unplannedReason.getCode());
+        unplannedTask.setUnplannedReasonDesc(unplannedReason.getDesc());
+        unplannedTask.setCalcFormulaDesc(this.appendFormulaDesc(unplannedTask.getCalcFormulaDesc(),
+                "跨班顺延参数关闭，来源班剩余计划量转未排"));
+        this.addContextTask(context, unplannedTask);
+        if (TcUnplannedReasonEnum.TOOL_NOT_ENOUGH.equals(unplannedReason)) {
+            this.addToolLimitUnplannedTrace(context, unplannedTask, remainingQty, sourceShiftOrder);
+        } else if (TcUnplannedReasonEnum.CAPACITY_NOT_ENOUGH.equals(unplannedReason)) {
+            this.addCapacityUnplannedTrace(context, unplannedTask, remainingQty);
+        }
+        this.addCarryoverDisabledTrace(context, unplannedTask, sourceTask, sourceType,
+                remainingQty, sourceShiftOrder, unplannedReason);
+        this.addAssignTrace(context, unplannedTask, TcScheduleRuleResultEnum.REJECT, null,
+                unplannedReason.getCode(), unplannedReason.getDesc());
+        log.info("[TC_PLAN_QTY_CARRYOVER_DISABLED] 来源任务[{}]来源班[{}]剩余量[{}]转未排，原因={}",
+                sourceTask.getBusinessKey(), sourceShiftOrder, remainingQty, unplannedReason.getCode());
+    }
+
+    /**
+     * 记录跨班顺延关闭后的来源班未排证据。
+     *
+     * @param context 胎侧排程上下文
+     * @param targetTask 当前未排任务
+     * @param sourceTask 来源任务
+     * @param sourceType 未承接来源类型
+     * @param remainingQty 来源班剩余计划量
+     * @param sourceShiftOrder 来源班次
+     * @param unplannedReason 未排原因
+     */
+    private void addCarryoverDisabledTrace(TcScheduleContext context, TcTaskDraft targetTask,
+                                           TcTaskDraft sourceTask, String sourceType,
+                                           BigDecimal remainingQty, Integer sourceShiftOrder,
+                                           TcUnplannedReasonEnum unplannedReason) {
+        Map<String, Object> evidence = new LinkedHashMap<>();
+        evidence.put("paramCode", TcScheduleConstants.PARAM_PLAN_QTY_CARRYOVER_ENABLED);
+        evidence.put("paramValue", this.resolveParamValue(context,
+                TcScheduleConstants.PARAM_PLAN_QTY_CARRYOVER_ENABLED,
+                TcScheduleConstants.DEFAULT_PLAN_QTY_CARRYOVER_ENABLED));
+        evidence.put("sourceTask", sourceTask == null ? null : sourceTask.getBusinessKey());
+        evidence.put("sourceType", sourceType);
+        evidence.put("sourceShiftOrder", sourceShiftOrder);
+        evidence.put("remainingQty", this.nvl(remainingQty));
+        evidence.put("unplannedReasonCode", unplannedReason.getCode());
+        evidence.put("unplannedReasonDesc", unplannedReason.getDesc());
+        this.traceOf(context, targetTask).addRuleHit(TcScheduleRuleCodeEnum.PLAN_QTY_CARRYOVER_DISABLED,
+                TcScheduleRuleResultEnum.REJECT, evidence);
     }
 
 
@@ -2898,6 +3005,24 @@ public class TcMachineAssignService implements ITcMachineAssignService {
     private void markUnplanned(TcTaskDraft task, TcUnplannedReasonEnum reason) {
         task.setUnplannedReasonCode(reason.getCode());
         task.setUnplannedReasonDesc(reason.getDesc());
+    }
+
+    /**
+     * 根据未承接来源确定最终未排原因，工装与产能同时不足时优先暴露工装瓶颈。
+     *
+     * @param capacityOverflowQty 产能不足量
+     * @param toolOverflowQty 工装不足量
+     * @return 未排原因
+     */
+    private TcUnplannedReasonEnum resolveCarryoverUnplannedReason(BigDecimal capacityOverflowQty,
+                                                                   BigDecimal toolOverflowQty) {
+        if (this.nvl(toolOverflowQty).compareTo(BigDecimal.ZERO) > 0) {
+            return TcUnplannedReasonEnum.TOOL_NOT_ENOUGH;
+        }
+        if (this.nvl(capacityOverflowQty).compareTo(BigDecimal.ZERO) > 0) {
+            return TcUnplannedReasonEnum.CAPACITY_NOT_ENOUGH;
+        }
+        return TcUnplannedReasonEnum.NO_AVAILABLE_MACHINE;
     }
 
     /**

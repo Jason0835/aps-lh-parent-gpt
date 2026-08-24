@@ -28,6 +28,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.MessageFormat;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -380,6 +381,10 @@ public class TmPlanCalcService implements ITmPlanCalcService {
                     .filter(StrUtil::isNotBlank)
                     .distinct()
                     .collect(Collectors.joining(",")));
+            // 成型代码、成型机和硫化机取来源任务去重合并值，多个编码使用英文逗号分隔，供过程日志和结果追溯。
+            aggregateTask.setEmbryoCode(this.mergeDistinctText(groupSourceList, TmTaskDraft::getEmbryoCode));
+            aggregateTask.setCxMachineCode(this.mergeDistinctText(groupSourceList, TmTaskDraft::getCxMachineCode));
+            aggregateTask.setLhMachineCode(this.mergeDistinctText(groupSourceList, TmTaskDraft::getLhMachineCode));
             aggregateTask.setCurrentShiftDemandQty(currentShiftDemandQty);
             aggregateTask.setNextShiftDemandQty(nextShiftDemandQty);
             aggregateTask.setGuardDemandQty(guardDemandQty);
@@ -533,6 +538,28 @@ public class TmPlanCalcService implements ITmPlanCalcService {
         sourceSnapshot.setSourceExplainTask(Boolean.TRUE);
         sourceSnapshot.setSourceTaskBusinessKeyList(null);
         return sourceSnapshot;
+    }
+
+    /**
+     * 合并来源任务的编码字段并去重。
+     *
+     * <p>来源值本身可能包含多个编码（英文或中文逗号分隔），先拆分再统一去重。</p>
+     *
+     * @param sourceTaskList 计划组来源任务列表
+     * @param valueGetter 编码取值方法引用
+     * @return 英文逗号分隔的去重编码；全部为空时返回 null
+     */
+    private String mergeDistinctText(List<TmTaskDraft> sourceTaskList,
+            Function<TmTaskDraft, String> valueGetter) {
+        String mergedText = sourceTaskList.stream()
+                .map(valueGetter)
+                .filter(StrUtil::isNotBlank)
+                .flatMap(value -> Arrays.stream(value.split("[,，]")))
+                .map(String::trim)
+                .filter(StrUtil::isNotBlank)
+                .distinct()
+                .collect(Collectors.joining(","));
+        return StrUtil.blankToDefault(mergedText, null);
     }
 
     /**

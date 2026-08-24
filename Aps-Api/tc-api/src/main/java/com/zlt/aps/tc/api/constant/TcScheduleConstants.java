@@ -16,6 +16,18 @@ public final class TcScheduleConstants {
     /** 最低库存班数参数键。 */
     public static final String PARAM_MIN_STOCK_CLASS = "TC_MIN_STOCK_CLASS";
 
+    /** 库存深度机台数量匹配方式参数键。 */
+    public static final String PARAM_DEPTH_MACHINE_MATCH_MODE = "TC_DEPTH_MACHINE_MATCH_MODE";
+
+    /** 按胎侧代码合并去重机台后匹配库存深度。 */
+    public static final String DEPTH_MACHINE_MATCH_MODE_CODE = "CODE";
+
+    /** 按单条成型来源行匹配库存深度。 */
+    public static final String DEPTH_MACHINE_MATCH_MODE_ROW = "ROW";
+
+    /** 库存深度机台数量匹配方式默认值。 */
+    public static final String DEFAULT_DEPTH_MACHINE_MATCH_MODE = DEPTH_MACHINE_MATCH_MODE_CODE;
+
     /** 最小开机量参数键。 */
     public static final String PARAM_MIN_START_QTY = "TC_MIN_START_QTY";
 
@@ -27,6 +39,9 @@ public final class TcScheduleConstants {
 
     /** 停产需求重分配开关参数键。 */
     public static final String PARAM_SHUTDOWN_REDISTRIBUTION_ENABLED = "TC_SHUTDOWN_REDISTRIBUTION_ENABLED";
+
+    /** 自动排程计划量跨班顺延开关参数键。 */
+    public static final String PARAM_PLAN_QTY_CARRYOVER_ENABLED = "TC_PLAN_QTY_CARRYOVER_ENABLED";
 
     /** 计划量策略参数键。 */
     public static final String PARAM_PLAN_QTY_STRATEGY = "TC_PLAN_QTY_STRATEGY";
@@ -152,9 +167,6 @@ public final class TcScheduleConstants {
     /** 需求量算法默认编码。 */
     public static final String DEFAULT_ALGORITHM_SWITCH = "1";
 
-    /** 最低库存班数默认值。 */
-    public static final String DEFAULT_MIN_STOCK_CLASS = "3";
-
     /** 最小开机量默认值。 */
     public static final String DEFAULT_MIN_START_QTY = "300";
 
@@ -173,20 +185,8 @@ public final class TcScheduleConstants {
     /** 自动排程中文过程日志默认级别。 */
     public static final String DEFAULT_PROCESS_LOG_LEVEL = "SUMMARY";
 
-    /** 新规格回看天数默认值。 */
-    public static final String DEFAULT_NEW_SPEC_LOOKBACK_DAYS = "7";
-
-    /** 新规格提前班次数默认值。 */
-    public static final String DEFAULT_NEW_SPEC_ADVANCE_SHIFT_COUNT = "2";
-
-    /** 实验规格回看天数默认值。 */
-    public static final String DEFAULT_EXPERIMENT_SPEC_LOOKBACK_DAYS = "5";
-
-    /** 实验规格计划量默认值。 */
-    public static final String DEFAULT_EXPERIMENT_SPEC_PLAN_QTY = "30";
-
-    /** 成型需求偏移班次数默认值。 */
-    public static final String DEFAULT_FORMING_SHIFT_OFFSET = "2";
+    /** 自动排程计划量跨班顺延默认关闭。 */
+    public static final String DEFAULT_PLAN_QTY_CARRYOVER_ENABLED = "0";
 
     /** 班次表头起始日期相对排程日期的默认偏移天数。 */
     public static final int DEFAULT_SHIFT_DATE_START_OFFSET = -1;
@@ -205,9 +205,6 @@ public final class TcScheduleConstants {
 
     /** 默认生产速度缺省值。 */
     public static final String DEFAULT_PRODUCTION_SPEED = "0";
-
-    /** 停产检查窗口默认值。 */
-    public static final String DEFAULT_SHUTDOWN_CHECK_WINDOW = "3";
 
     /** 开班阈值默认值。 */
     public static final String DEFAULT_OPEN_SHIFT_THRESHOLD = "1";
@@ -350,7 +347,7 @@ public final class TcScheduleConstants {
     public static final int EXPERIMENT_SPEC_SHIFT_ORDER = 1;
 
     /** 最低库存班数数值默认值。 */
-    public static final int DEFAULT_MIN_STOCK_CLASS_VALUE = 3;
+    public static final int DEFAULT_MIN_STOCK_CLASS_VALUE = 1;
 
     /** 算法1回看成型班次数值默认值。 */
     public static final int DEFAULT_ALG1_LOOKBACK_SHIFTS_VALUE = 3;

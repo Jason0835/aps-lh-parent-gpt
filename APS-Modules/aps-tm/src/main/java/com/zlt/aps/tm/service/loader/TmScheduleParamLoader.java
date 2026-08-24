@@ -117,7 +117,9 @@ public class TmScheduleParamLoader {
         this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_ALGORITHM_SWITCH,
                 TmScheduleConstants.DEFAULT_ALGORITHM_SWITCH);
         this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_MIN_STOCK_CLASS,
-                TmScheduleConstants.DEFAULT_MIN_STOCK_CLASS);
+                String.valueOf(TmScheduleConstants.DEFAULT_MIN_STOCK_CLASS_VALUE));
+        this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_DEPTH_MACHINE_MATCH_MODE,
+                TmScheduleConstants.DEFAULT_DEPTH_MACHINE_MATCH_MODE);
         this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_MIN_START_QTY,
                 TmScheduleConstants.DEFAULT_MIN_START_QTY);
         this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_DEFAULT_CURL_LENGTH,
@@ -126,6 +128,8 @@ public class TmScheduleParamLoader {
                 TmScheduleConstants.DEFAULT_TOOL_TOTAL_QTY);
         this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_SHUTDOWN_REDISTRIBUTION_ENABLED,
                 TmScheduleConstants.DEFAULT_SHUTDOWN_REDISTRIBUTION_ENABLED);
+        this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_PLAN_QTY_CARRYOVER_ENABLED,
+                TmScheduleConstants.DEFAULT_PLAN_QTY_CARRYOVER_ENABLED);
         this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_PLAN_QTY_STRATEGY,
                 TmScheduleStrategyEnum.DEFAULT.getCode());
         this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_TASK_SORT_STRATEGY,
@@ -133,15 +137,15 @@ public class TmScheduleParamLoader {
         this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_PROCESS_LOG_LEVEL,
                 TmScheduleConstants.DEFAULT_PROCESS_LOG_LEVEL);
         this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_NEW_SPEC_LOOKBACK_DAYS,
-                TmScheduleConstants.DEFAULT_NEW_SPEC_LOOKBACK_DAYS);
+                String.valueOf(TmScheduleConstants.DEFAULT_NEW_SPEC_LOOKBACK_DAYS_VALUE));
         this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_NEW_SPEC_ADVANCE_SHIFT_COUNT,
-                TmScheduleConstants.DEFAULT_NEW_SPEC_ADVANCE_SHIFT_COUNT);
+                String.valueOf(TmScheduleConstants.DEFAULT_NEW_SPEC_ADVANCE_SHIFT_COUNT_VALUE));
         this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_EXPERIMENT_SPEC_LOOKBACK_DAYS,
-                TmScheduleConstants.DEFAULT_EXPERIMENT_SPEC_LOOKBACK_DAYS);
+                String.valueOf(TmScheduleConstants.DEFAULT_EXPERIMENT_SPEC_LOOKBACK_DAYS_VALUE));
         this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_EXPERIMENT_SPEC_PLAN_QTY,
-                TmScheduleConstants.DEFAULT_EXPERIMENT_SPEC_PLAN_QTY);
+                String.valueOf(TmScheduleConstants.DEFAULT_EXPERIMENT_SPEC_PLAN_QTY_VALUE));
         this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_FORMING_SHIFT_OFFSET,
-                TmScheduleConstants.DEFAULT_FORMING_SHIFT_OFFSET);
+                String.valueOf(TmScheduleConstants.DEFAULT_FORMING_SHIFT_OFFSET_VALUE));
         this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_SMALL_GLUE_CODES,
                 TmScheduleConstants.DEFAULT_SMALL_GLUE_CODES);
         this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_VERSION_MATCH_MODE,
@@ -157,7 +161,7 @@ public class TmScheduleParamLoader {
         this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_DEFAULT_PRODUCTION_SPEED,
                 TmScheduleConstants.DEFAULT_PRODUCTION_SPEED);
         this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_SHUTDOWN_CHECK_WINDOW,
-                TmScheduleConstants.DEFAULT_SHUTDOWN_CHECK_WINDOW);
+                String.valueOf(TmScheduleConstants.DEFAULT_SHUTDOWN_CHECK_WINDOW_VALUE));
         this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_OPEN_SHIFT_THRESHOLD,
                 TmScheduleConstants.DEFAULT_OPEN_SHIFT_THRESHOLD);
         this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_SPEC_CHANGE_MINUTES,
