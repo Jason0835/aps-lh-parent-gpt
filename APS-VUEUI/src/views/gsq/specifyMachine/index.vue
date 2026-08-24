@@ -186,7 +186,7 @@ export default {
           halign: "center",
           label: this.$t("ui.data.btn.option"),
           prop: "option",
-          width: 180,
+          width: 160,
           fixed: "right",
           render: ({ row }) => {
             return (
@@ -194,10 +194,10 @@ export default {
                 <el-button
                   v-hasPermi={["gsq:specifyMachine:edit"]}
                   class="minus"
-                  type="primary"
+                  type="success"
                   onClick={() => this.handleEdit(row)}
                 >
-                  {this.$t("ui.frame.btn.modify")}
+                  {this.$t("ui.frame.btn.update")}
                 </el-button>
                 <el-button
                   v-hasPermi={["gsq:specifyMachine:remove"]}

@@ -147,6 +147,7 @@ export default {
           prop: "isMoreMachine",
           label: this.$t("ui.data.column.mdmStructureName.isMoreMachine"),
           align: "center",
+          width: 100,
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_yes_no, value);
           },
@@ -174,6 +175,7 @@ export default {
         {
           align: "center",
           label: this.$t("ui.data.btn.option"),
+          minWidth: 160, width: 160,
           fixed: "right",
           render: ({ row }) => {
             return (

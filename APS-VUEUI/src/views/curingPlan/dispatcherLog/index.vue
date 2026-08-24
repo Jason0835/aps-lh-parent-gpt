@@ -269,7 +269,7 @@ export default {
         {
           label: this.$t("ui.data.column.maintenance.log.createTime"),
           prop: "createTime",
-          date: "date",
+          type: "date",
           dateType: "daterange",
           valueFormat: "yyyy-MM-dd",
         },

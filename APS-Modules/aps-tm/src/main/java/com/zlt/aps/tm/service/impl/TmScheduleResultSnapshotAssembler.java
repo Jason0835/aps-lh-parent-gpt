@@ -16,7 +16,7 @@ import java.util.stream.Collectors;
  * 胎面排程结果来源快照聚合器。
  *
  * <p>同一结果行可能由多个成型工单和多个班次任务合并而来。本聚合器统一处理文本稳定去重、
- * 成型余量按来源工单去重求和，以及数值快照冲突的确定性取值。</p>
+ * 成型余量按稳定来源顺序取一条，以及数值快照冲突的确定性取值。</p>
  */
 @Slf4j
 public final class TmScheduleResultSnapshotAssembler {
@@ -53,7 +53,7 @@ public final class TmScheduleResultSnapshotAssembler {
         if (treadShoulderLength != null) {
             result.setTreadShoulderLength(treadShoulderLength);
         }
-        result.setCxRemainQty(sumRemainQtyBySourceOrder(result, sortedTaskList));
+        result.setCxRemainQty(selectRemainQtyBySourceOrder(result, sortedTaskList));
         result.setWholeGlueCode(buildWholeGlueCode(sortedTaskList));
         result.setMaterialCode(joinStableText(sortedTaskList, TmTaskDraft::getMaterialCode));
         result.setMaterialDesc(joinStableText(sortedTaskList, TmTaskDraft::getMaterialDesc));
@@ -137,16 +137,16 @@ public final class TmScheduleResultSnapshotAssembler {
     }
 
     /**
-     * 按来源成型工单去重后汇总成型余量。
+     * 按来源成型工单去重后选择成型余量。
      *
      * <p>同一来源工单因班次拆分产生多条任务时只计一次；同源值冲突时保留稳定首值并记录告警。</p>
      *
      * @param result         胎面排程结果，用于输出冲突定位信息
      * @param sortedTaskList 已按来源工单和业务键排序的任务
-     * @return 成型余量合计；没有有效来源工单或余量时返回 null
+     * @return 稳定首个成型余量；没有有效来源工单或余量时返回 null
      */
-    private static BigDecimal sumRemainQtyBySourceOrder(TmScheduleResult result,
-                                                         List<TmTaskDraft> sortedTaskList) {
+    private static BigDecimal selectRemainQtyBySourceOrder(TmScheduleResult result,
+                                                            List<TmTaskDraft> sortedTaskList) {
         Map<String, BigDecimal> remainQtyMap = new LinkedHashMap<>();
         for (TmTaskDraft task : sortedTaskList) {
             String sourceOrderNo = resolveSourceOrderNo(task);
@@ -167,7 +167,18 @@ public final class TmScheduleResultSnapshotAssembler {
         if (remainQtyMap.isEmpty()) {
             return null;
         }
-        return remainQtyMap.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+        List<BigDecimal> distinctValueList = new ArrayList<>();
+        remainQtyMap.values().forEach(value -> {
+            boolean exists = distinctValueList.stream().anyMatch(existing -> existing.compareTo(value) == 0);
+            if (!exists) {
+                distinctValueList.add(value);
+            }
+        });
+        BigDecimal selectedValue = remainQtyMap.values().iterator().next();
+        if (distinctValueList.size() > 1) {
+            logConflict(result, "cxRemainQty", selectedValue, distinctValueList);
+        }
+        return selectedValue;
     }
 
     /**

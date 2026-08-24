@@ -2,6 +2,7 @@ package com.zlt.aps.controller.tq;
 
 
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
@@ -71,6 +72,10 @@ public class TqMachineSpecSpeedUIController extends BaseUIController<TqMachineSp
     @PostMapping("/save")
     @ResponseBody
     public AjaxResult save(TqMachineSpecSpeed entity) {
+        // 保存前校验机台编码+胎圈规格组合唯一性，重复时返回友好提示
+        if (UserConstants.NOT_UNIQUE.equals(iTqMachineSpecSpeedService.checkUnique(entity))) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.tq.machineSpecSpeed.column.conflict"));
+        }
         return iTqMachineSpecSpeedService.save(entity);
     }
 
@@ -81,6 +86,13 @@ public class TqMachineSpecSpeedUIController extends BaseUIController<TqMachineSp
     public AjaxResult remove(@RequestParam String ids) {
         Long[] arr = Convert.toLongArray(ids);
         return iTqMachineSpecSpeedService.removeByIds(Arrays.asList(arr));
+    }
+
+    @ApiOperation("校验机台编码+胎圈规格组合唯一性")
+    @PostMapping("/checkUnique")
+    @ResponseBody
+    public String checkUnique(TqMachineSpecSpeed entity) {
+        return iTqMachineSpecSpeedService.checkUnique(entity);
     }
 
     @Override

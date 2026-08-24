@@ -130,6 +130,7 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
+          align: "center",
           label: this.$t("ui.data.column.rawWarningConfig.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
@@ -138,14 +139,17 @@ export default {
 
         {
           prop: "deviationUpper",
+          align: "center",
           label: this.$t("ui.data.column.rawWarningConfig.deviationUpper"),
         },
         {
           prop: "deviationLower",
+          align: "center",
           label: this.$t("ui.data.column.rawWarningConfig.deviationLower"),
         },
         {
           prop: "enabled",
+          align: "center",
           label: this.$t("ui.data.column.rawWarningConfig.enabled"),
 
           formatter: (row, column, value) => {
@@ -154,17 +158,20 @@ export default {
         },
         {
           prop: "materialCode",
+          align: "center",
+          minWidth: 160,
           label: this.$t("ui.data.column.rawWarningConfig.materialCode"),
         },
         {
           prop: "materialDesc",
           label: this.$t("ui.data.column.rawWarningConfig.materialDesc"),
-          align: "left",
-          minWidth: 350,
+          align: "center",
+          minWidth: 180,
         },
 
         {
           prop: "warningLevel",
+          align: "center",
           label: this.$t("ui.data.column.rawWarningConfig.warningLevel"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.warn_level, value);
@@ -172,6 +179,8 @@ export default {
         },
         {
           prop: "warningType",
+          align: "center",
+          minWidth: 140,
           label: this.$t("ui.data.column.rawWarningConfig.warningType"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.warn_type, value);
@@ -183,6 +192,7 @@ export default {
         },
         {
           prop: "updateBy",
+          align: "center",
           label: this.$t("ui.data.column.updateBy"),
           width: 100,
         },
@@ -197,6 +207,7 @@ export default {
         {
           align: "center",
           label: this.$t("ui.data.btn.option"),
+          minWidth: 160, width: 160,
           fixed: "right",
           render: ({ row }) => {
             return (

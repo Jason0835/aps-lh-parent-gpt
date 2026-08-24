@@ -2,9 +2,11 @@ package com.zlt.aps.tq.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.tq.api.domain.entity.TqToolingCartCapacity;
@@ -53,6 +55,11 @@ public class TqToolingCartCapacityController extends AbstractDocBizController<Tq
     @PostMapping("/save")
     @Override
     public AjaxResult save(@RequestBody TqToolingCartCapacity billVO) {
+        // 保存前校验胎圈编码唯一性（与数据库唯一索引同口径，逻辑删除记录仍占用唯一键），
+        // 重复时返回友好提示，避免直接插入触发数据库唯一键冲突异常
+        if (UserConstants.NOT_UNIQUE.equals(tqToolingCartCapacityService.checkUnique(billVO))) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.tq.toolingCartCapacity.column.conflict"));
+        }
         return super.save(billVO);
     }
 

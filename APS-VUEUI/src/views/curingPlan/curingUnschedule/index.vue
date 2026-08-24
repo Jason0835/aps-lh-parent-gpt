@@ -178,7 +178,7 @@ export default {
       if (this.$auth.hasPermi("lh:lhScheduleResult:insertOrder")) {
         columns.push({
           align: "center",
-          width: 100,
+          width: 120,
           fixed: "right",
           label: this.$t("ui.data.btn.option"),
           render: ({ row }) => {

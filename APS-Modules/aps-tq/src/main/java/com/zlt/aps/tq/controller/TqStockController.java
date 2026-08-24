@@ -2,8 +2,10 @@ package com.zlt.aps.tq.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.tq.api.domain.entity.TqStock;
@@ -47,6 +49,10 @@ public class TqStockController extends AbstractDocBizController<TqStock> {
     @PostMapping("/save")
     @Override
     public AjaxResult save(@RequestBody TqStock billVO) {
+        // 双保险校验：系统判断"库存日期+物料编号"是否已存在，存在则拒绝保存
+        if (UserConstants.NOT_UNIQUE.equals(tqStockService.checkUnique(billVO))) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.tqStock.notUnique"));
+        }
         return super.save(billVO);
     }
 

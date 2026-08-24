@@ -133,6 +133,7 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
+          align: "center",
           label: this.$t("ui.data.column.mdmMaterialConsumeDetail.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
@@ -140,14 +141,18 @@ export default {
         },
         {
           prop: "embryoCode",
+          align: "center",
           label: this.$t("ui.data.column.mdmMaterialConsumeDetail.embryoCode"),
         },
         {
           prop: "embryoVersion",
+          align: "center",
           label: this.$t("ui.data.column.mdmMaterialConsumeDetail.embryoVersion"),
+          width: 180,
         },
         {
           prop: "childMaterialCode",
+          align: "center",
           label: this.$t("ui.data.column.mdmMaterialConsumeDetail.childMaterialCode"),
         },
         // {
@@ -156,25 +161,31 @@ export default {
         // },
         {
           prop: "childMaterialName",
+          align: "center",
           label: this.$t("ui.data.column.mdmMaterialConsumeDetail.childMaterialName"),
         },
 
         {
           prop: "unit",
+          align: "center",
           label: this.$t("ui.data.column.mdmMaterialConsumeDetail.unit"),
         },
         {
           prop: "dosage",
+          align: "center",
           label: this.$t("ui.data.column.mdmMaterialConsumeDetail.dosage"),
+          width: 100,
         },
 
         {
           prop: "updateBy",
+          align: "center",
           label: this.$t("ui.data.column.updateBy"),
           minWidth: 100,
         },
         {
           prop: "updateTime",
+          align: "center",
           label: this.$t("ui.data.column.updateTime"),
           minWidth: 180,
         },

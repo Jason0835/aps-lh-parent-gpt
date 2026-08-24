@@ -261,26 +261,31 @@ export default {
         {
           prop: "mesMaterialCategory",
           width: 120,
+          align: "center",
           label: this.$t("ui.data.column.mdmMaterialInfo.mesMaterialCategory"),
         },
         {
           prop: "mesMaterialSubcategory",
           width: 120,
+          align: "center",
           label: this.$t("ui.data.column.mdmMaterialInfo.mesMaterialSubcategory"),
         },
         {
           prop: "mesMaterialCateName",
           width: 120,
+          align: "center",
           label: this.$t("ui.data.column.mdmMaterialInfo.mesMaterialCateName"),
         },
         {
           prop: "mesMaterialSubcatName",
           width: 120,
+          align: "center",
           label: this.$t("ui.data.column.mdmMaterialInfo.mesMaterialSubcatName"),
         },
         {
           prop: "productCategory",
           width: 120,
+          align: "center",
           label: this.$t("ui.data.column.mdmMaterialInfo.productCategory"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.product_category, value);
@@ -289,6 +294,7 @@ export default {
         {
           prop: "qualityStateCode",
           width: 120,
+          align: "center",
           label: this.$t("ui.data.column.GoodsBox.qualityStateCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.quality_state, value);
@@ -308,6 +314,7 @@ export default {
           prop: "structureName",
           label: this.$t("ui.data.column.mdmMaterialInfo.structureName"),
           width: 200,
+          align: "center",
         },
         {
           prop: "materialCode",
@@ -319,6 +326,7 @@ export default {
         {
           prop: "mesMaterialCode",
           width: 120,
+          align: "center",
           label: this.$t("ui.data.column.mdmMaterialInfo.mesMaterialCode"),
         },
         // {
@@ -448,8 +456,8 @@ export default {
           align: "center",
           halign: "center",
           label: this.$t("common.option"),
-          minWidth: 180,
-          width: 180,
+          minWidth: 120,
+          width: 120,
           fixed: "right",
           render: ({ row }) => {
             return (

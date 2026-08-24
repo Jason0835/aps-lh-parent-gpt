@@ -106,6 +106,7 @@ export default {
         // { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
+          align: "center",
           label: this.$t("ui.data.column.dpStockVersion.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
@@ -113,6 +114,7 @@ export default {
         },
         {
           prop: "productTypeCode",
+          align: "center",
           label: this.$t("ui.data.column.dpStockVersion.productTypeCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_product_type, value);
@@ -120,14 +122,17 @@ export default {
         },
         {
           prop: "year",
+          align: "center",
           label: this.$t("ui.data.column.dpStockVersion.year"),
         },
         {
           prop: "month",
+          align: "center",
           label: this.$t("ui.data.column.dpStockVersion.month"),
         },
         {
           prop: "requireVersion",
+          align: "center",
           label: this.$t("ui.data.column.dpStockVersion.requireVersion"),
           width:150
 
@@ -135,6 +140,7 @@ export default {
 
         {
           prop: "brand",
+          align: "center",
           label: this.$t("ui.data.column.dpStockVersion.brand"),
           width:120,
           formatter: (row, column, value) => {
@@ -143,6 +149,7 @@ export default {
         },
         {
           prop: "materialCode",
+          align: "center",
           label: this.$t("ui.data.column.dpStockVersion.materialCode"),
           width:180
         },
@@ -155,10 +162,12 @@ export default {
         },
         {
           prop: "stockQty",
+          align: "center",
           label: this.$t("ui.data.column.dpStockVersion.stockQty"),
         },
         {
           prop: "weekYear",
+          align: "center",
           label: this.$t("ui.data.column.dpStockVersion.weekYear"),
         },
         // {
@@ -179,6 +188,7 @@ export default {
 
         {
           prop: "isExceedSixMonth",
+          align: "center",
           label: this.$t("ui.data.column.dpStockVersion.isExceedSixMonth"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_yes_no, value);
@@ -187,6 +197,7 @@ export default {
 
         {
           prop: "isExceedNineMonth",
+          align: "center",
           label: this.$t("ui.data.column.dpStockVersion.isExceedTwelveMonth"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_yes_no, value);
@@ -195,6 +206,7 @@ export default {
 
         {
           prop: "updateBy",
+          align: "center",
           label: this.$t("ui.data.column.updateBy"),
           width: 100,
         },

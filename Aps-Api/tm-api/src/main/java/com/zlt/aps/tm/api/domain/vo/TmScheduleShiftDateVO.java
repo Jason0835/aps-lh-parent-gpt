@@ -1,8 +1,10 @@
 package com.zlt.aps.tm.api.domain.vo;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Data;
 
 import java.io.Serializable;
+import java.util.Date;
 
 /**
  * 胎面排程班次日期VO
@@ -23,4 +25,8 @@ public class TmScheduleShiftDateVO implements Serializable {
 
     /** 班次对应日期展示，格式 MM/dd，如 06/23 */
     private String shiftDate;
+
+    /** 班次实际开始时间，用于前端禁用已经开始的插单班次。 */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    private Date shiftStartTime;
 }

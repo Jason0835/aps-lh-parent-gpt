@@ -16,6 +16,15 @@ export function saveMachineChuck(query) {
   })
 }
 
+// 校验机台编码+寸口编码组合唯一性（返回 "1"-不唯一，"0"-唯一）
+export function checkMachineChuckUnique(query) {
+  return request({
+    url: '/tq/machineChuck/checkUnique',
+    method: 'post',
+    data: query
+  })
+}
+
 export function removeMachineChuck(ids) {
   return request({
     url: '/tq/machineChuck/remove',

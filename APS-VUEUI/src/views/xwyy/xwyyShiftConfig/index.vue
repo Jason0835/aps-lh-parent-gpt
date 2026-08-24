@@ -49,7 +49,7 @@ export default {
         { prop: "classField", align: "center", halign: "center", label: this.$t("ui.data.column.xwyyShiftConfig.classField"), minWidth: 120 },
         { prop: "isActive", align: "center", halign: "center", label: this.$t("ui.data.column.xwyyShiftConfig.isActive"), minWidth: 80, formatter: (row, column, value) => this.selectDictLabel(this.dict.type.sys_enable_disable, value) },
         { prop: "remark", halign: "center", label: this.$t("ui.common.column.remark"), minWidth: 120 },
-        { align: "center", halign: "center", label: this.$t("ui.data.btn.option"), prop: "option", minWidth: 200, fixed: "right",
+        { align: "center", halign: "center", label: this.$t("ui.data.btn.option"), prop: "option", minWidth: 260, width: 260, fixed: "right",
           render: ({ row }) => (<div><el-button v-hasPermi={["xwyy:shiftConfig:edit"]} class="minus" type="success" onClick={() => this.handleEdit(row)}>{this.$t("ui.frame.btn.update")}</el-button><el-button v-hasPermi={["xwyy:shiftConfig:edit"]} class="minus" type="warning" onClick={() => this.handleToggleStatus(row)}>{row.isActive === 1 ? this.$t("common.disable") : this.$t("common.enable")}</el-button><el-button v-hasPermi={["xwyy:shiftConfig:remove"]} class="minus" type="danger" onClick={() => this.handleDelete(row)}>{this.$t("ui.frame.btn.delete")}</el-button></div>) },
       ];
     },

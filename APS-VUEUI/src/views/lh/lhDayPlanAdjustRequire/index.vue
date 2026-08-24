@@ -124,7 +124,7 @@ export default {
         {
           prop: "option",
           label: this.$t("ui.data.btn.option"),
-          width: 100,
+          width: 120,
           fixed: "right",
           align: "center",
           render: ({ row }) => (

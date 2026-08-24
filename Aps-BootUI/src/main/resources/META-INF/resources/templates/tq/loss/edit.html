@@ -19,10 +19,10 @@
         <div class="form-group">
             <label class="col-sm-3 control-label">[[#{ui.data.column.loss.line}]]：</label>
             <div class="col-sm-8">
-                <select name="machineId" class="form-control" th:with="type=${@tq.getMachineInfo()}">
+                <select name="machineCode" class="form-control" th:with="type=${@tq.getMachineInfo()}">
                     <option value="">[[#{ui.data.column.selectMachineName}]]</option>
-                    <option  th:each="machineInfo : ${type}" th:text="${machineInfo.machineName}"
-                            th:value="${machineInfo.id}" th:field="*{machineId}"></option>
+                    <option th:each="machineInfo : ${type}" th:text="${machineInfo.machineName}"
+                            th:value="${machineInfo.machineCode}" th:field="*{machineCode}"></option>
                 </select>
             </div>
         </div>
@@ -54,7 +54,7 @@
 
     function submitHandler() {
         if ($.validate.form()) {
-            $.operate.save(prefix + "/edit", $('#form-loss-edit').serialize());
+            $.operate.save(prefix + "/save", $('#form-loss-edit').serialize());
         }
     }
 </script>

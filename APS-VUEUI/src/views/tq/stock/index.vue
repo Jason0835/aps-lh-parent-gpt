@@ -151,8 +151,8 @@ export default {
           align: "center",
           halign: "center",
           label: this.$t("ui.data.btn.option"),
-          minWidth: 180,
-          width: 180,
+          minWidth: 160,
+          width: 160,
           fixed: "right",
           render: ({ row }) => {
             return (
@@ -160,10 +160,10 @@ export default {
                 <el-button
                   v-hasPermi={["tq:stock:edit"]}
                   class="minus"
-                  type="primary"
+                  type="success"
                   onClick={() => this.handleEdit(row)}
                 >
-                  {this.$t("ui.frame.btn.modify")}
+                  {this.$t("ui.frame.btn.update")}
                 </el-button>
                 <el-button
                   v-hasPermi={["tq:stock:remove"]}

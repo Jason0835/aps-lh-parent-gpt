@@ -2706,6 +2706,14 @@ public class TcAutoScheduleDataLoadService {
         }
         context.getRuleTraceMap().computeIfAbsent(task.getBusinessKey(), key -> new TcRuleTrace())
                 .addRuleHit(TcScheduleRuleCodeEnum.FORMING_CONTINUOUS_SHUTDOWN_CLOSE_OUT, result, evidence);
+        context.appendProcessLog("成型连续停产收尾判定：胎侧={0}，最后开放成型日期={1}，最后开放成型班次={2}，"
+                        + "连续停产开始日={3}，连续停产结束日={4}，连续停产天数={5}，停产收尾需求量={6}米，"
+                        + "规则结果={7}，成型停产收尾标识={8}，收尾标识={9}，处理原因={10}",
+                task.getSidewallCode(), DateUtil.formatDate(productionDate),
+                evidence.get("lastOpenCalendarShiftOrder"), evidence.get("shutdownStartDate"),
+                evidence.get("shutdownEndDate"), evidence.get("consecutiveShutdownDays"), closeOutDemandQty,
+                result.getCode(), result == TcScheduleRuleResultEnum.PASS,
+                task.getTailFlag(), evidence.getOrDefault("skipReason", "已按停产前最后开放成型班需求收尾"));
         log.info("[TC_FORMING_SHUTDOWN_CLOSE_OUT] batchNo={}, traceId={}, factoryCode={}, sidewallCode={}, "
                         + "sourceShiftOrder={}, targetShiftOrder={}, formingLogicalShiftOrder={}, "
                         + "shutdownStartDate={}, shutdownEndDate={}, closeOutDemandQty={}, result={}",

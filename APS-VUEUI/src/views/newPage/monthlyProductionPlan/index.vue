@@ -538,22 +538,26 @@ export default {
         // },
         {
           prop: "structureName",
+          align: "center",
           label: this.$t("ui.data.column.FactoryMonthPlanFinalResult.structureName"),
           width: 180,
         },
         {
           prop: "structureType",
+          align: "center",
           label: this.$t("ui.data.column.monthPlanFinalAdjustQuery.structureType"),
           width: 110,
           formatter: (row, column, value) => structureTypeLabel(value),
         },
         {
           prop: "cxMachineCode",
+          align: "center",
           label: this.$t("ui.data.column.FactoryMonthPlanFinalResult.cxMachineCode"),
           width: 120,
         },
         {
           prop: "materialCode",
+          align: "center",
           label: this.$t("ui.data.column.FactoryMonthPlanFinalResult.materialCode"),
           width: 120,
         },
@@ -567,7 +571,7 @@ export default {
           prop: "constructionStage",
           label: this.$t("ui.data.column.FactoryMonthPlanFinalResult.schedulingType"),
           minWidth: 100,
-          align: "left",
+          align: "center",
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_construction_stage, value);
           },
@@ -576,7 +580,7 @@ export default {
           prop: "embryoCode",
           label: this.$t("ui.data.column.FactoryMonthPlanFinalResult.embryoCode"),
           width: 100,
-          align: "left",
+          align: "center",
         },
         {
           prop: "mainMaterialDesc",
@@ -586,6 +590,7 @@ export default {
         },
         {
           prop: "brand",
+          align: "center",
           label: this.$t("ui.data.column.FactoryMonthPlanFinalResult.brand"),
           width: 100,
           formatter: (row, column, value) => {
@@ -594,36 +599,43 @@ export default {
         },
         {
           prop: "specifications",
+          align: "center",
           label: this.$t("ui.data.column.FactoryMonthPlanFinalResult.specifications"),
           width: 100,
         },
         {
           prop: "mainPattern",
+          align: "center",
           label: this.$t("ui.data.column.FactoryMonthPlanFinalResult.pattern"),
           width: 100,
         },
         {
           prop: "proSize",
+          align: "center",
           label: this.$t("ui.data.column.FactoryMonthPlanFinalResult.proSize"),
           width: 80,
         },
         {
           prop: "mouldCavityQty",
+          align: "center",
           label: this.$t("ui.data.column.FactoryMonthPlanFinalResult.mouldCavityQty"),
           width: 80,
         },
         {
           prop: "typeBlockQty",
+          align: "center",
           label: this.$t("ui.data.column.FactoryMonthPlanFinalResult.typeBlockQty"),
           width: 80,
         },
         {
           prop: "dayLhQty",
+          align: "center",
           label: this.$t("ui.data.column.FactoryMonthPlanFinalResult.dayVulcanizationQty"),
           width: 100,
         },
         {
           prop: "originalTotalQty",
+          align: "center",
           label: this.$t(
             "ui.data.column.FactoryMonthPlanFinalResult.originalTotalQty"
           ),
@@ -631,26 +643,31 @@ export default {
         },
         {
           prop: "adjustQty1",
+          align: "center",
           label: this.$t("ui.data.column.monthlyProductionPlan.adjustQty1"),
           width: 80,
         },
         {
           prop: "adjustQty2",
+          align: "center",
           label: this.$t("ui.data.column.monthlyProductionPlan.adjustQty2"),
           width: 80,
         },
         {
           prop: "adjustQty3",
+          align: "center",
           label: this.$t("ui.data.column.monthlyProductionPlan.adjustQty3"),
           width: 80,
         },
         {
           prop: "adjustQty4",
+          align: "center",
           label: this.$t("ui.data.column.monthlyProductionPlan.adjustQty4"),
           width: 80,
         },
         {
           prop: "netQty",
+          align: "center",
           label: this.$t("ui.data.column.demandPlanSum.netQty"),
           width: 100,
           formatter: (row, column, value) =>
@@ -658,21 +675,25 @@ export default {
         },
         {
           prop: "heightQty",
+          align: "center",
           label: this.$t("ui.data.column.FactoryMonthPlanFinalResult.heightQty"),
           width: 120,
         },
         {
           prop: "midQty",
+          align: "center",
           label: this.$t("ui.data.column.demandPlanSum.midQty"),
           width: 120,
         },
         {
           prop: "cycleReserveQty",
+          align: "center",
           label: this.$t("ui.data.column.demandPlanSum.cycleReserveQty"),
           width: 120,
         },
         {
           prop: "conventionReserveQty",
+          align: "center",
           label: this.$t("ui.data.column.demandPlanSum.conventionReserveQty"),
           width: 120,
         },
@@ -715,6 +736,7 @@ export default {
         },
         {
           prop: "pendingQty",
+          align: "center",
           label: this.$t("ui.data.rollingCycle.pendingQty"),
           width: 120,
         },
@@ -772,11 +794,13 @@ export default {
         },
         {
           prop: "beginDay",
+          align: "center",
           label: this.$t("common.startDate"),
           width: 90,
         },
         {
           prop: "endDay",
+          align: "center",
           label: this.$t("common.endDate"),
           width: 90,
         },
@@ -926,6 +950,7 @@ export default {
         },
         {
           prop: "hasSpecialMaterial",
+          align: "center",
           label: this.$t("ui.data.column.mpAdjustResult.hasSpecialMaterial"),
           width: 120,
           formatter: (row, column, value) => {

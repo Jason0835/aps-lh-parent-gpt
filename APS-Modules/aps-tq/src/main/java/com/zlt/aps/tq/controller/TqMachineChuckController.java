@@ -58,11 +58,11 @@ public class TqMachineChuckController extends AbstractDocBizController<TqMachine
     }
 
     @Log(title = "胎圈机台寸口对应", businessType = BusinessType.INSERT_OR_UPDATE)
-    @ApiOperation("保存")
+    @ApiOperation("保存（带机台编码+寸口编码组合唯一性校验）")
     @PostMapping("/save")
     @Override
     public AjaxResult save(@RequestBody TqMachineChuck billVO) {
-        return super.save(billVO);
+        return tqMachineChuckService.saveWithCheck(billVO);
     }
 
     @Log(title = "胎圈机台寸口对应", businessType = BusinessType.DELETE)

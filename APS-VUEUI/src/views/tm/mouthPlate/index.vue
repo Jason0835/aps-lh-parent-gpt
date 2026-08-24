@@ -119,6 +119,7 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
+          align: "center",
           label: this.$t("ui.data.column.tm.mouthPlate.factoryCode"),
           type: "select",
           formatter: (row, column, value) => {
@@ -127,15 +128,18 @@ export default {
         },
         {
           prop: "mouthPlateCode",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.tm.mouthPlate.mouthPlateCode"),
         },
         {
           prop: "machineCode",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.tm.mouthPlate.machineCode"),
         },
         {
+          align: "center",
           prop: "plateStatus",
           halign: "center",
           label: this.$t("ui.data.column.tm.mouthPlate.plateStatus"),
@@ -187,8 +191,8 @@ export default {
           align: "center",
           halign: "center",
           label: this.$t("ui.data.btn.option"),
-          minWidth: 180,
-          width: 200,
+          minWidth: 160,
+          width: 160,
           fixed: "right",
           render: ({ row }) => {
             return (

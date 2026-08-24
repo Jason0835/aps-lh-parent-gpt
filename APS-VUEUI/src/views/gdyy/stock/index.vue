@@ -191,6 +191,7 @@ export default {
           minWidth: 120,
         },
         {
+          align: "center",
           label: this.$t("ui.frame.table.action"),
           fixed: "right",
           minWidth: 150,

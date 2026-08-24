@@ -11,7 +11,5 @@ public interface TqMachineMaintenancePlanMapper extends BaseMapper<TqMachineMain
 
     int checkUnique(TqMachineMaintenancePlan entity);
 
-    void mergeSql(List<TqMachineMaintenancePlan> list);
-
     void deleteAllMachineMaintenancePlan();
 }

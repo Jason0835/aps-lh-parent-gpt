@@ -118,6 +118,7 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
+          align: "center",
           label: this.$t("ui.data.column.factoryCode"),
           type: "select",
           formatter: (row, column, value) => {
@@ -126,17 +127,20 @@ export default {
         },
         {
           prop: "machineCode",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.tm.machineInfo.machineCode"),
         },
         {
           prop: "machineName",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.tm.machineInfo.machineName"),
           titleTooltip: true,
         },
         {
           prop: "maxCapacity",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.tm.machineInfo.maxCapacity"),
         },
@@ -207,8 +211,8 @@ export default {
           align: "center",
           halign: "center",
           label: this.$t("ui.data.btn.option"),
-          minWidth: 180,
-          width: 200,
+          minWidth: 160,
+          width: 160,
           fixed: "right",
           render: ({ row }) => {
             return (

@@ -111,6 +111,7 @@ export default {
       let columns = [
         {
           prop: "factoryCode",
+          align: "center",
           label: this.$t("ui.data.column.mpMonthlySaleQty.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
@@ -118,6 +119,7 @@ export default {
         },
         {
           prop: "productTypeCode",
+          align: "center",
           label: this.$t("ui.data.column.mpMonthlySaleQty.productTypeCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_product_type, value);
@@ -125,6 +127,7 @@ export default {
         },
         {
           prop: "locationType",
+          align: "center",
           label: this.$t("ui.data.column.mpMonthlySaleQty.locationType"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_stor_type, value);
@@ -132,6 +135,7 @@ export default {
         },
         {
           prop: "brand",
+          align: "center",
           label: this.$t("ui.data.column.mpMonthlySaleQty.brand"),
           width: 120,
           formatter: (row, column, value) => {
@@ -140,6 +144,7 @@ export default {
         },
         {
           prop: "materialCode",
+          align: "center",
           width: 120,
           label: this.$t("ui.data.column.mpMonthlySaleQty.materialCode"),
         },
@@ -151,12 +156,14 @@ export default {
         },
         {
           prop: "rollTwelveMonthSaleQty",
+          align: "center",
           label: this.$t(
             "ui.data.column.mpMonthlySaleQty.rollTwelveMonthSaleQty"
           ),
         },
         {
           prop: "deliveryFrequency",
+          align: "center",
           label: this.$t(
             "ui.data.defectiveStock.deliveryFrequency"
           ),
@@ -182,6 +189,7 @@ export default {
         },
         {
           prop: "updateBy",
+          align: "center",
           label: this.$t("ui.data.column.updateBy"),
           width: 100,
         },

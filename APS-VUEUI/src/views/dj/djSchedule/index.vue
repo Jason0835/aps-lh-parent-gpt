@@ -353,6 +353,14 @@ export default {
           label: this.$t("ui.data.column.dj.scheduleResult.glueCode"),
         },
         {
+          prop: "mouthPlateCode",
+          valign: "middle",
+          halign: 'center',
+          align: "left",
+          minWidth: 120,
+          label: this.$t("ui.data.column.dj.scheduleResult.mouthPlateCode"),
+        },
+        {
           prop: "machineCode",
           valign: "middle",
           halign: 'center',
@@ -697,6 +705,22 @@ export default {
               label: this.$t("ui.data.column.dj.scheduleResult.analysis"),
             },
           ],
+        },
+        {
+          prop: "batchNo",
+          valign: "middle",
+          halign: 'center',
+          align: "left",
+          minWidth: 140,
+          label: this.$t("ui.data.column.dj.scheduleResult.batchNo"),
+        },
+        {
+          prop: "orderNo",
+          valign: "middle",
+          halign: 'center',
+          align: "left",
+          minWidth: 160,
+          label: this.$t("ui.data.column.dj.scheduleResult.orderNo"),
         },
       ];
 

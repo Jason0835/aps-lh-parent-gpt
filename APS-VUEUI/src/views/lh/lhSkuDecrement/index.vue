@@ -67,6 +67,7 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
+          align: "center",
           label: this.$t("ui.data.column.lhSkuDecrement.factoryCode"),
           minWidth: 120,
           formatter: (row, column, value) => this.selectDictLabel(this.dict.type.biz_factory_name, value),
@@ -85,6 +86,7 @@ export default {
         },
         {
           prop: "materialCode",
+          align: "center",
           label: this.$t("ui.data.column.lhSkuDecrement.materialCode"),
           minWidth: 140,
         },
@@ -102,6 +104,7 @@ export default {
         },
         {
           prop: "productStatus",
+          align: "center",
           label: this.$t("ui.data.column.lhSkuDecrement.productStatus"),
           minWidth: 120,
           formatter: (row, column, value) => this.selectDictLabel(this.dict.type.lh_trial_status, value),
@@ -119,20 +122,21 @@ export default {
         {
           prop: "option",
           label: this.$t("common.option"),
-          width: 90,
+          width: 120,
           fixed: "right",
           align: "center",
           render: ({ row }) => {
             return (
-              <el-button
-                v-hasPermi={["lh:skuDecrement:remove"]}
-                type="text"
-                size="mini"
-                icon="el-icon-delete"
-                onClick={() => this.handleDelete(row)}
-              >
-                {this.$t("ui.frame.btn.delete")}
-              </el-button>
+              <div>
+                <el-button
+                  v-hasPermi={["lh:skuDecrement:remove"]}
+                  class="minus"
+                  type="danger"
+                  onClick={() => this.handleDelete(row)}
+                >
+                  {this.$t("ui.frame.btn.delete")}
+                </el-button>
+              </div>
             );
           },
         },
@@ -150,9 +154,9 @@ export default {
         {
           label: this.$t("ui.data.column.lhSkuDecrement.yearMonth"),
           prop: "yearMonth",
-          type: "month",
+          type: "date",
+          dateType: "month",
           valueFormat: "yyyy-MM",
-          format: "yyyy-MM",
           minWidth: 150,
         },
         {

@@ -140,6 +140,7 @@ export default {
         {
           label: this.$t("ui.data.column.factoryCode"),
           prop: "factoryCode",
+          align: "center",
           minWidth: 100,
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
@@ -150,7 +151,7 @@ export default {
           align: "center",
           halign: "center",
           label: this.$t("ui.data.column.stock.stockDate"),
-          minWidth: 100,
+          minWidth: 160,
           // sortable: "custom",
         },
 
@@ -159,11 +160,12 @@ export default {
           align: "center",
           halign: "center",
           label: this.$t("ui.data.column.quota.paddingCode"),
+          minWidth: 160,
           // sortable: "custom",
         },
         {
           prop: "stockNum",
-          align: "right",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.stock.stockNum.meter"),
           // sortable: "custom",
@@ -171,20 +173,21 @@ export default {
 
         {
           prop: "modifyNum",
-          align: "right",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.stock.modifyNum.meter"),
           // sortable: "custom",
         },
         {
           prop: "badNum",
-          align: "right",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.stock.badNum.meter"),
           // sortable: "custom",
         },
         {
           prop: "remark",
+          align: "center",
           halign: "center",
           label: this.$t("ui.common.column.remark"),
           minWidth: 100,
@@ -201,8 +204,8 @@ export default {
           align: "center",
           halign: "center",
           label: this.$t("ui.data.btn.option"),
-          minWidth: 180,
-          width: 180,
+          minWidth: 200,
+          width: 200,
           fixed: "right",
           render: ({ row }) => {
             return (

@@ -111,6 +111,7 @@ export default {
         // { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
+          align: "center",
           label: this.$t("ui.data.column.productStock.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
@@ -118,6 +119,7 @@ export default {
         },
         {
           prop: "productTypeCode",
+          align: "center",
           label: this.$t("ui.data.column.productStock.productTypeCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_product_type, value);
@@ -125,6 +127,7 @@ export default {
         },
         {
           prop: "brand",
+          align: "center",
           label: this.$t("ui.data.column.productStock.brand"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_brand_type, value);
@@ -133,6 +136,7 @@ export default {
         },
         {
           prop: "finalGrade",
+          align: "center",
           label: this.$t("ui.data.column.productStock.finalGrade"),
           width:120
         },
@@ -143,6 +147,7 @@ export default {
         },
         {
           prop: "locationType",
+          align: "center",
           label: this.$t("ui.data.column.productStock.locationType"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_stor_type, value);
@@ -151,6 +156,7 @@ export default {
         },
         {
           prop: "materialCode",
+          align: "center",
           label: this.$t("ui.data.column.productStock.materialCode"),
           width:180
         },
@@ -163,15 +169,18 @@ export default {
 
         {
           prop: "stockQty",
+          align: "center",
           label: this.$t("ui.data.column.productStock.stockQty"),
         },
         {
           prop: "stockDate",
+          align: "center",
           label: this.$t("ui.data.defectiveStock.stockDate"),
           width:120
         },
         {
           prop: "weekYear",
+          align: "center",
           label: this.$t("ui.data.column.productStock.weekYear"),
         },
 
@@ -191,6 +200,7 @@ export default {
         // },
         {
           prop: "isExceedTire",
+          align: "center",
           label: this.$t("ui.data.column.productStock.isExceedTire"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_yes_no, value);
@@ -198,6 +208,7 @@ export default {
         },
         {
           prop: "isExceedThreeMonth",
+          align: "center",
           label: this.$t("ui.data.column.productStock.isExceedThreeMonth"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_yes_no, value);
@@ -205,6 +216,7 @@ export default {
         },
         {
           prop: "isExceedSixMonth",
+          align: "center",
           label: this.$t("ui.data.column.productStock.isExceedSixMonth"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_yes_no, value);
@@ -212,6 +224,7 @@ export default {
         },
         {
           prop: "isExceedTwelveMonth",
+          align: "center",
           label: this.$t("ui.data.column.productStock.isExceedTwelveMonth"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_yes_no, value);
@@ -219,6 +232,7 @@ export default {
         },
         {
           prop: "updateBy",
+          align: "center",
           label: this.$t("ui.data.column.updateBy"),
           width: 100,
         },

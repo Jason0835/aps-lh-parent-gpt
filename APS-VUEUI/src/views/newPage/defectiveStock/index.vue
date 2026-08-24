@@ -91,6 +91,7 @@ export default {
       let columns = [
         {
           prop: "factoryCode",
+          align: "center",
           label: this.$t("ui.data.column.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
@@ -98,25 +99,32 @@ export default {
         },
         {
           prop: "stockDate",
+          align: "center",
+          minWidth: 120,
           label: this.$t("ui.data.defectiveStock.stockDate"),
         },
         {
           prop: "year",
+          align: "center",
           label: this.$t("ui.data.colume.year"),
-          width: 120,
+          minWidth: 80,
         },
         {
           prop: "month",
+          align: "center",
           label: this.$t("ui.data.colume.month"),
-          width: 120,
+          minWidth: 80,
         },
         {
           prop: "materialCode",
+          align: "center",
           label: this.$t("ui.data.defectiveStock.materialCode"),
-          width:180
+          minWidth: 180,
         },
         {
           prop: "mesMaterialCode",
+          align: "center",
+          minWidth: 180,
           label: this.$t("ui.data.defectiveStock.mesMaterialCode"),
 
         },
@@ -130,13 +138,15 @@ export default {
         },
         {
           prop: "stockQty",
+          align: "center",
           label: this.$t("ui.data.defectiveStock.stockQty"),
-          width:180
+          minWidth: 120,
         },
         {
           prop: "updateTime",
+          align: "center",
           label: this.$t("ui.data.column.scheduleAdjust.updata"),
-          width:200,
+          minWidth: 200,
         },
 
       ];

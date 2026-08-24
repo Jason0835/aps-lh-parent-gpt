@@ -75,12 +75,21 @@ public class Cd15DefaultShiftDemandProvider implements Cd15ShiftDemandProvider {
         List<Cd15DemandShift> window = demandWindowSelector.select(availableShifts, depthClassQty);
         BigDecimal demandQuantity = calculateWindowDemand(
                 window, context.getParameters().getDemandCalcMode(), depthClassQty);
+        LocalDateTime demandDeadline = window.isEmpty()
+                ? demandStart : window.get(window.size() - 1).getStartTime();
+        log.info("[CD15_DEMAND_WINDOW] 窗口需求明细及 SUM/AVERAGE 计算过程 factoryCode={}, "
+                        + "scheduleDate={}, classField={}, shiftCode={}, shiftStart={}, "
+                        + "steelStripCode={}, materialKey={}, mode={}, depthClassQty={}, "
+                        + "demandStart={}, demandDeadline={}, windowDetails={}, calculation={}, "
+                        + "demandQuantity={}",
+                context.getFactoryCode(), context.getScheduleDate(), shift.getClassField(),
+                shift.getShiftCode(), shift.getStartTime(), candidate.getSteelStripCode(),
+                candidate.getMaterialKey(), context.getParameters().getDemandCalcMode(),
+                depthClassQty, demandStart, demandDeadline, this.windowDetails(window),
+                this.demandCalculationProcess(window,
+                        context.getParameters().getDemandCalcMode(), depthClassQty), demandQuantity);
         BigDecimal netDemand = this.sharedNetDemand(
                 context, input, shift, candidate, rolling, demandStart);
-        log.debug("[斜裁自动排程] 当前班次净需求计算完成, classField={}, steelStripCode={}, "
-                        + "materialKey={}, demandQuantity={}, sharedNetDemand={}",
-                shift.getClassField(), candidate.getSteelStripCode(),
-                candidate.getMaterialKey(), demandQuantity, netDemand);
         return Cd15ShiftDemandDecision.builder()
                 .netDemandQuantity(netDemand).planSurplusQuantity(null)
                 .stopAffected(window.stream().anyMatch(Cd15DemandShift::isStopped))
@@ -152,22 +161,49 @@ public class Cd15DefaultShiftDemandProvider implements Cd15ShiftDemandProvider {
         BigDecimal backlog = inventoryBalance.signum() < 0
                 ? inventoryBalance.abs() : BigDecimal.ZERO;
         int inboundIndex = 0;
+        int profileOrder = 0;
+        BigDecimal futureInboundBeforeDeadline = BigDecimal.ZERO;
         for (MaterialWindowDemand profile : profiles) {
+            profileOrder++;
             while (inboundIndex < futureInbound.size()
                     && !futureInbound.get(inboundIndex).getInboundTime()
                             .isAfter(profile.deadline)) {
-                available = available.add(this.inboundQuantity(
-                        futureInbound.get(inboundIndex), coilMeter));
+                BigDecimal inboundQuantity = this.inboundQuantity(
+                        futureInbound.get(inboundIndex), coilMeter);
+                available = available.add(inboundQuantity);
+                futureInboundBeforeDeadline = futureInboundBeforeDeadline.add(inboundQuantity);
                 inboundIndex++;
             }
+            BigDecimal expectedStock = available;
+            BigDecimal shortage = backlog;
             BigDecimal netDemand = demandCalculator.calculateNetDemand(
-                    profile.demandQuantity, backlog, available, BigDecimal.ZERO);
+                    profile.demandQuantity, shortage, expectedStock, BigDecimal.ZERO);
+            if (candidate.getMaterialKey().equals(profile.materialKey)) {
+                log.info("[CD15_INVENTORY_BALANCE] 预计库存及缺口计算过程 factoryCode={}, "
+                                + "scheduleDate={}, classField={}, shiftCode={}, shiftStart={}, "
+                                + "steelStripCode={}, materialKey={}, stockBaselineTime={}, "
+                                + "stockAtSix={}, inboundBeforeShift={}, consumedBeforeWindow={}, "
+                                + "initialFormula={}-{}+{}, inventoryBalance={}, profileOrder={}, "
+                                + "futureInboundBeforeDeadline={}, expectedStock={}, shortage={}",
+                        context.getFactoryCode(), context.getScheduleDate(), shift.getClassField(),
+                        shift.getShiftCode(), shift.getStartTime(), steelStripCode,
+                        candidate.getMaterialKey(), stockBaselineTime, stockAtSix,
+                        inboundBeforeShift, consumedBeforeWindow, stockAtSix,
+                        consumedBeforeWindow, inboundBeforeShift, inventoryBalance, profileOrder,
+                        futureInboundBeforeDeadline, expectedStock, shortage);
+                log.info("[CD15_NET_DEMAND] 净需求计算过程 factoryCode={}, scheduleDate={}, "
+                                + "classField={}, shiftCode={}, shiftStart={}, steelStripCode={}, "
+                                + "materialKey={}, demandQuantity={}, shortage={}, expectedStock={}, "
+                                + "futureEffectivePlan=0, formula=max(0,{}+{}-{}-0), netDemand={}",
+                        context.getFactoryCode(), context.getScheduleDate(), shift.getClassField(),
+                        shift.getShiftCode(), shift.getStartTime(), steelStripCode,
+                        candidate.getMaterialKey(), profile.demandQuantity, shortage, expectedStock,
+                        profile.demandQuantity, shortage, expectedStock, netDemand);
+                return netDemand;
+            }
             BigDecimal totalNeed = profile.demandQuantity.add(backlog);
             available = available.subtract(totalNeed).max(BigDecimal.ZERO);
             backlog = BigDecimal.ZERO;
-            if (candidate.getMaterialKey().equals(profile.materialKey)) {
-                return netDemand;
-            }
         }
         return BigDecimal.ZERO;
     }
@@ -293,11 +329,76 @@ public class Cd15DefaultShiftDemandProvider implements Cd15ShiftDemandProvider {
         if (missingWeight.signum() <= 0) {
             return this.normalize(total);
         }
-        BigDecimal maxShiftDemand = effective.stream()
+        // SUM窗口不足时，使用最后3个有正需求班次的平均值预测每个缺失窗口。
+        int recentStartIndex = Math.max(0, effective.size() - 3);
+        List<Cd15DemandShift> recentEffective = effective.subList(recentStartIndex, effective.size());
+        BigDecimal recentTotal = recentEffective.stream()
                 .map(item -> value(item.getSteelStripDemandQuantity()))
-                .max(BigDecimal::compareTo).orElse(BigDecimal.ZERO);
-        return this.normalize(total.add(maxShiftDemand.multiply(missingWeight)));
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal recentAverage = recentTotal.divide(
+                BigDecimal.valueOf(recentEffective.size()), 10, RoundingMode.HALF_UP);
+        return this.normalize(total.add(recentAverage.multiply(missingWeight)));
     }
+
+    /** 输出固定结构的需求窗口明细，供测试日志和大模型复算。 */
+    private String windowDetails(List<Cd15DemandShift> window) {
+        return this.safe(window).stream()
+                .filter(Objects::nonNull)
+                .map(item -> "{classField=" + item.getClassField()
+                        + ",startTime=" + item.getStartTime()
+                        + ",demandQuantity=" + this.decimal(item.getSteelStripDemandQuantity())
+                        + ",windowWeight=" + this.decimal(this.windowWeight(item)) + "}")
+                .collect(Collectors.joining(",", "[", "]"));
+    }
+
+    /** 输出与需求计算一致的中间量，避免日志只有最终结果而无法复算。 */
+    private String demandCalculationProcess(List<Cd15DemandShift> window,
+                                            String mode,
+                                            BigDecimal depthClassQty) {
+        List<Cd15DemandShift> effective = this.safe(window).stream()
+                .filter(Objects::nonNull)
+                .filter(Cd15DemandShift::isIncluded)
+                .filter(item -> this.value(item.getSteelStripDemandQuantity()).signum() > 0)
+                .collect(Collectors.toList());
+        if (effective.isEmpty()) {
+            return "effectiveTotal=0,totalWeight=0,missingWeight="
+                    + this.decimal(depthClassQty) + ",formula=ZERO_DEMAND";
+        }
+        BigDecimal effectiveTotal = effective.stream()
+                .map(item -> this.value(item.getSteelStripDemandQuantity()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalWeight = effective.stream()
+                .map(this::windowWeight)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal missingWeight = this.value(depthClassQty)
+                .subtract(totalWeight).max(BigDecimal.ZERO);
+        if ("AVERAGE".equals(mode)) {
+            BigDecimal average = effectiveTotal.divide(totalWeight, 10, RoundingMode.HALF_UP);
+            return "effectiveTotal=" + this.decimal(effectiveTotal)
+                    + ",totalWeight=" + this.decimal(totalWeight)
+                    + ",missingWeight=" + this.decimal(missingWeight)
+                    + ",average=" + this.decimal(average)
+                    + ",formula=AVERAGE";
+        }
+        int recentStartIndex = Math.max(0, effective.size() - 3);
+        List<Cd15DemandShift> recentEffective = effective.subList(recentStartIndex, effective.size());
+        BigDecimal recentTotal = recentEffective.stream()
+                .map(item -> this.value(item.getSteelStripDemandQuantity()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal recentAverage = recentTotal.divide(
+                BigDecimal.valueOf(recentEffective.size()), 10, RoundingMode.HALF_UP);
+        return "effectiveTotal=" + this.decimal(effectiveTotal)
+                + ",totalWeight=" + this.decimal(totalWeight)
+                + ",missingWeight=" + this.decimal(missingWeight)
+                + ",recentShiftCount=" + recentEffective.size()
+                + ",recentAverage=" + this.decimal(recentAverage)
+                + ",formula=SUM";
+    }
+
+    private String decimal(BigDecimal quantity) {
+        return this.normalize(this.value(quantity)).toPlainString();
+    }
+
     private BigDecimal requiredDepth(Cd15AutoScheduleInput input, String steelStripCode) {
         BigDecimal depthClassQty = input.getDepthClassQtyBySteelStrip() == null
                 ? null : input.getDepthClassQtyBySteelStrip().get(steelStripCode);

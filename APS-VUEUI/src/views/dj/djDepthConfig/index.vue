@@ -144,6 +144,8 @@ export default {
         {
           label: this.$t("ui.data.column.factoryCode"),
           prop: "factoryCode",
+          align: "center",
+          halign: "center",
           minWidth: 100,
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
@@ -151,22 +153,26 @@ export default {
         },
         {
           prop: "minMachineQty",
+          align: "center",
           halign: "center",
           label: this.$t("ui.dj.depthConfig.column.minMachineQty"),
         },
         {
           prop: "maxMachineQty",
+          align: "center",
           halign: "center",
           label: this.$t("ui.dj.depthConfig.column.maxMachineQty"),
           formatter: (row, column, value) => value !== null && value !== undefined ? value : '∞',
         },
         {
           prop: "depthClassQty",
+          align: "center",
           halign: "center",
           label: this.$t("ui.dj.depthConfig.column.depthClassQty"),
         },
         {
           prop: "remark",
+          align: "center",
           halign: "center",
           label: this.$t("ui.common.column.remark"),
           minWidth: 100,

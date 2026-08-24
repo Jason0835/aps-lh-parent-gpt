@@ -194,9 +194,10 @@ export default {
         { type: "selection", fixed: "left" },
         // { type: "index", fixed: "left" },
         {
+          align: "center",
           label: this.$t("common.option"),
           prop: "option",
-          width: "100px",
+          width: "160px",
           fixed: "left",
           render: ({ row }) => {
             return (
