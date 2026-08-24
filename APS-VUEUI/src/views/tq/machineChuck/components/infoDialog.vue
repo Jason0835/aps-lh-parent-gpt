@@ -29,7 +29,7 @@
 
 <script>
 import infoForm from "@/views/components/infoForm.vue";
-import { saveMachineChuck } from "@/api/tq/machineChuck";
+import { saveMachineChuck, checkMachineChuckUnique } from "@/api/tq/machineChuck";
 import { listEnabledMachines } from "@/api/tq/machine";
 
 export default {
@@ -55,6 +55,11 @@ export default {
             required: true,
             message: this.$t("common.rule.input"),
             trigger: "blur",
+          },
+          // 机台编码+寸口编码组合唯一性校验（表单红字提示，后端保存时兜底校验）
+          {
+            validator: this.checkUniqueValidator,
+            trigger: ["blur", "change"],
           },
         ],
       },
@@ -85,6 +90,10 @@ export default {
             value: "machineCode",
           },
           onFocus: this.handleMachineFocus,
+          // 机台编码变化后重新触发寸口编码的唯一性校验（组合维度变化）
+          listeners: {
+            change: () => this.reValidateChuckCode(),
+          },
         },
         {
           label: this.$t("ui.tq.machineChuck.column.chuckCode"),
@@ -116,6 +125,37 @@ export default {
     },
   },
   methods: {
+    /**
+     * 机台编码+寸口编码组合唯一性校验器（表单红字提示）
+     * 后端返回 "1"（NOT_UNIQUE）不唯一 / "0"（UNIQUE）唯一
+     */
+    checkUniqueValidator(rule, value, callback) {
+      // 机台编码或寸口编码未填写完整时跳过唯一性校验（由必填规则处理）
+      if (!this.form.machineCode || !value) {
+        callback();
+        return;
+      }
+      checkMachineChuckUnique({ ...this.form })
+        .then((res) => {
+          if (String(res) === "1") {
+            callback(new Error(this.$t("ui.tq.machineChuck.column.conflict")));
+          } else {
+            callback();
+          }
+        })
+        .catch(() => {
+          // 校验接口异常时放行，由保存时后端唯一性校验兜底拦截
+          callback();
+        });
+    },
+    /**
+     * 机台编码变化后重新触发寸口编码字段校验（组合唯一性维度变化）
+     */
+    reValidateChuckCode() {
+      if (this.$refs.form && this.$refs.form.$refs.infoForm && this.form.chuckCode) {
+        this.$refs.form.$refs.infoForm.validateField("chuckCode");
+      }
+    },
     async save(params) {
       try {
         this.loading = true;

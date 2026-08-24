@@ -44,11 +44,14 @@
         >
       </template>
     </page-table>
-    <tlt-upload
+    <tlt-upload-form
       ref="tltUpload"
+      :updateSupport="false"
       downloadUrl="/tq/machineChuck/importTemplate"
       uploadUrl="/tq/machineChuck/importData"
       @uploadSuccess="getList"
+      labelWidth="0"
+      :columns="importColumns"
     />
     <InfoDialog ref="infoRef" @success="getList" />
   </basic-container>
@@ -60,13 +63,13 @@ import {
   exportMachineChuck,
 } from "@/api/tq/machineChuck";
 import { listEnabledMachines } from "@/api/tq/machine";
-import tltUpload from "@/components/tltUpload/tltUpload.vue";
+import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import InfoDialog from "./components/infoDialog.vue";
 
 export default {
   name: "TqMachineChuck",
   components: {
-    tltUpload,
+    TltUploadForm,
     InfoDialog,
   },
   data() {
@@ -75,6 +78,18 @@ export default {
       machineLoading: false,
       data: [],
       selection: [],
+      // 导入弹窗表单列：是否更新已经存在的数据勾选框（勾选后按"机台编码+寸口编码"维度键全覆盖更新）
+      importColumns: [
+        {
+          label: "",
+          prop: "updateSupport",
+          render: (form) => (
+            <el-checkbox v-model={form.updateSupport}>
+              {this.$t("common.rule.updateSupport")}
+            </el-checkbox>
+          ),
+        },
+      ],
       page: {
         current: 1,
         pageSize: 20,

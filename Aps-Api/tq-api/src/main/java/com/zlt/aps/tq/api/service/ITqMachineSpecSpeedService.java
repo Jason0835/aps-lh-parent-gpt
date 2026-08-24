@@ -41,4 +41,8 @@ public interface ITqMachineSpecSpeedService {
     @PostMapping("/tqMachineSpecSpeed/importData")
     @ApiOperation("导入胎圈机台生产速度信息")
     AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport);
+
+    @PostMapping("/tqMachineSpecSpeed/checkUnique")
+    @ApiOperation("校验机台编码+胎圈规格组合唯一性")
+    String checkUnique(@RequestBody TqMachineSpecSpeed entity);
 }

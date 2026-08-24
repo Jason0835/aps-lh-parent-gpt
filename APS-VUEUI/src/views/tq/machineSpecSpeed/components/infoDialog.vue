@@ -29,7 +29,7 @@
 
 <script>
 import infoForm from "@/views/components/infoForm.vue";
-import { saveMachineSpecSpeed } from "@/api/tq/machineSpecSpeed";
+import { saveMachineSpecSpeed, checkUniqueMachineSpecSpeed } from "@/api/tq/machineSpecSpeed";
 import { listEnabledMachines } from "@/api/tq/machine";
 
 export default {
@@ -127,6 +127,12 @@ export default {
     async save(params) {
       try {
         this.loading = true;
+        // 保存前校验机台编码+胎圈规格组合唯一性
+        const checkRes = await checkUniqueMachineSpecSpeed(params);
+        if (checkRes === "1") {
+          this.$modal.msgError(this.$t("ui.tq.machineSpecSpeed.column.conflict"));
+          return;
+        }
         const res = await saveMachineSpecSpeed(params);
         this.$modal.msgSuccess(res.msg);
         this.$emit("success");

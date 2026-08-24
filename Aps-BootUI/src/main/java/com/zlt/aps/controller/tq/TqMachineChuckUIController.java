@@ -75,6 +75,16 @@ public class TqMachineChuckUIController extends BaseUIController<TqMachineChuck>
         return iTqMachineChuckService.save(entity);
     }
 
+    /**
+     * 校验机台编码+寸口编码组合唯一性（表单绑定，不能用@RequestBody）
+     */
+    @ApiOperation("校验机台编码+寸口编码组合唯一性")
+    @PostMapping("/checkUnique")
+    @ResponseBody
+    public String checkUnique(TqMachineChuck entity) {
+        return iTqMachineChuckService.checkUnique(entity);
+    }
+
     @RequiresPermissions("tq:machineChuck:remove")
     @PostMapping("/remove")
     @ResponseBody

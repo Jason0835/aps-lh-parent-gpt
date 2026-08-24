@@ -22,7 +22,6 @@ public class TqMachineSpecSpeed extends BaseEntity {
     @Excel(name = "ui.tq.machineSpecSpeed.column.machineCode")
     @ApiModelProperty(value = "机台编号", position = 20)
     @TableField("MACHINE_CODE")
-    @ImportValidated(required = true, isCode = true, maxLength = 50)
     private String machineCode;
 
     @Excel(name = "ui.tq.machineSpecSpeed.column.beadCode")
@@ -56,5 +55,6 @@ public class TqMachineSpecSpeed extends BaseEntity {
     @Excel(name = "ui.specifyMachine.column.machineName")
     @ApiModelProperty(value = "机台名称", position = 80)
     @TableField(exist = false)
+    @ImportValidated(required = true, maxLength = 100)
     private String machineName;
 }

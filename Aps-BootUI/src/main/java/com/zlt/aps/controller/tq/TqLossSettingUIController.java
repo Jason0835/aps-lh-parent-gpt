@@ -1,6 +1,7 @@
 package com.zlt.aps.controller.tq;
 
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
@@ -57,14 +58,14 @@ public class TqLossSettingUIController extends BaseUIController<TqLossSetting> {
     @GetMapping(value = "/edit/{id}")
     @ApiOperation("获取胎圈损耗率设定详细信息,跳转到编辑页面")
     public String getInfo(@PathVariable("id") Long id, ModelMap mmap) {
-        mmap.put("LossSetting", iTqLossSettingService.getInfo(id));
+        mmap.put("tqLossSetting", iTqLossSettingService.getInfo(id));
         return prefix + "/edit";
     }
 
     @ApiOperation("跳转到胎圈损耗率设定新增页面")
     @GetMapping("/add")
     public String add(ModelMap mmap) {
-        mmap.put("LossSetting", new TqLossSetting());
+        mmap.put("tqLossSetting", new TqLossSetting());
         return prefix + "/edit";
     }
 
@@ -73,6 +74,10 @@ public class TqLossSettingUIController extends BaseUIController<TqLossSetting> {
     @ResponseBody
     @ApiOperation("保存胎圈损耗率设定（id为空则新增，id不为空则修改）")
     public AjaxResult save(TqLossSetting entity) {
+        // 系统判断"胎圈代码+生产线"是否存在，存在则提示"损耗率记录已存在"
+        if (UserConstants.NOT_UNIQUE.equals(iTqLossSettingService.checkUnique(entity))) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.error.message.loss.unique"));
+        }
         return iTqLossSettingService.save(entity);
     }
 

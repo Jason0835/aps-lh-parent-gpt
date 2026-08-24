@@ -16,37 +16,30 @@
         ) t
     </select>
 
-    <select id="checkUnique" parameterType="com.zlt.aps.tq.api.domain.entity.TqToolingCartCapacity" resultType="int">
-        SELECT count(1)
-        FROM T_TQ_TOOLING_CART_CAPACITY
-        where IS_DELETE = '0'
-        and BEAD_CODE = #{beadCode}
-        <if test="id != null">and ID != #{id}</if>
-    </select>
-
     <insert id="mergeSql" parameterType="list">
         INSERT INTO T_TQ_TOOLING_CART_CAPACITY (
             bead_code, cart_capacity, remark,
             create_by, create_time, update_by, update_time, is_delete
         )
         VALUES
-        <foreach collection="list" item="CartCapacity" separator=",">
+        <foreach collection="list" item="cartCapacity" separator=",">
             (
-            #{CartCapacity.beadCode,jdbcType=VARCHAR},
-            #{CartCapacity.cartCapacity,jdbcType=INTEGER},
-            #{CartCapacity.remark,jdbcType=VARCHAR},
-            #{CartCapacity.createBy,jdbcType=VARCHAR},
+            #{cartCapacity.beadCode,jdbcType=VARCHAR},
+            #{cartCapacity.cartCapacity,jdbcType=INTEGER},
+            #{cartCapacity.remark,jdbcType=VARCHAR},
+            #{cartCapacity.createBy,jdbcType=VARCHAR},
             NOW(),
-            #{CartCapacity.updateBy,jdbcType=VARCHAR},
+            #{cartCapacity.updateBy,jdbcType=VARCHAR},
             NOW(),
             '0'
             )
         </foreach>
         ON DUPLICATE KEY UPDATE
         cart_capacity = VALUES(cart_capacity),
-        update_by = VALUES(create_by),
+        update_by = VALUES(update_by),
         update_time = NOW(),
-        remark = VALUES(remark)
+        remark = VALUES(remark),
+        is_delete = '0'
     </insert>
 
     <update id="deleteAllToolingCartCapacity">
