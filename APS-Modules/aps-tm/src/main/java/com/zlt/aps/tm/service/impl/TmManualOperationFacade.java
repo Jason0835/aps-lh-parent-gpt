@@ -110,6 +110,7 @@ public class TmManualOperationFacade {
         TmScheduleResult persisted = this.loadOperationResult(scheduleResult,
                 "ui.data.alert.tm.schedule.changeQtyIdEmpty", "调量排程结果不能为空",
                 "ui.data.alert.tm.schedule.changeQtyResultNotFound", "调量排程结果不存在或已失效");
+        this.prepareChangeQtyRequest(scheduleResult, persisted);
         this.validateChangeQtyEditableFields(scheduleResult, persisted);
         this.normalizeExistingOperationRequest(scheduleResult, persisted, false);
         List<String> machineCodes = Collections.singletonList(persisted.getMachineCode());
@@ -118,6 +119,7 @@ public class TmManualOperationFacade {
                     TmScheduleResult current = this.reloadAndValidateOperationResult(scheduleResult.getId(),
                             "ui.data.alert.tm.schedule.changeQtyResultNotFound", "调量排程结果不存在或已失效");
                     this.validateLockedSourceMachine(persisted, current);
+                    this.prepareChangeQtyRequest(scheduleResult, current);
                     this.normalizeExistingOperationRequest(scheduleResult, current, false);
                     this.validatePlanIncreaseMachineOpenShift(current, scheduleResult);
                     this.validatePlanIncreaseMachineRelations(current, scheduleResult);
@@ -587,7 +589,7 @@ public class TmManualOperationFacade {
     }
 
     /**
-     * 校验人工插单只包含 class1~class3，并且每个参与班次的计划量和顺序成对。
+     * 校验人工插单包含六个班次，并且每个参与班次的计划量和顺序成对。
      *
      * @param scheduleResult 插单排程结果
      * @throws ServiceException 班次字段不符合插单契约时抛出
@@ -601,13 +603,6 @@ public class TmManualOperationFacade {
             BigDecimal planQty = (BigDecimal) scheduleResult.getFieldValueByFieldName(planQtyField);
             Integer sequence = (Integer) scheduleResult.getFieldValueByFieldName(sequenceField);
             Object analysis = scheduleResult.getFieldValueByFieldName(analysisField);
-            if (shiftOrder > 3 && (planQty != null || sequence != null || analysis != null)) {
-                throw new ServiceException(this.resolveTmMessage(
-                        "ui.data.alert.tm.schedule.insertShiftPairRequired", "插单班次计划量和顺序必须成对填写"));
-            }
-            if (shiftOrder > 3) {
-                continue;
-            }
             if (planQty == null) {
                 if (sequence != null || analysis != null) {
                     throw new ServiceException(this.resolveTmMessage(
@@ -759,6 +754,37 @@ public class TmManualOperationFacade {
             this.validateProtectedShiftField(request, persisted,
                     String.format(TmScheduleConstants.SHIFT_FINISH_QTY_FIELD_TEMPLATE, shiftOrder));
         }
+    }
+
+    /**
+     * 准备显式班次调量请求。
+     *
+     * <p>新请求使用 shiftOrder 定位班次，classNSequence 只允许由数据库当前值提供，
+     * 从而避免页面快照中的顺序值与数据库重排后的顺序值不一致时误报字段篡改。
+     * 未携带 shiftOrder 的旧请求保持原有完整字段校验路径。</p>
+     *
+     * @param request 调量请求
+     * @param persisted 数据库当前排程结果
+     * @throws ServiceException 调量班次为空或超出六班范围时抛出
+     */
+    private void prepareChangeQtyRequest(TmScheduleResult request, TmScheduleResult persisted) {
+        if (request == null || request.getShiftOrder() == null) {
+            return;
+        }
+        int shiftOrder = request.getShiftOrder();
+        if (shiftOrder < 1 || shiftOrder > TmScheduleConstants.TM_MAX_SHIFT_ORDER) {
+            throw new ServiceException(this.resolveTmMessage(
+                    "ui.data.alert.tm.schedule.operationTaskArgumentsInvalid", "调量班次参数不合法"));
+        }
+        for (int currentShiftOrder = 1;
+             currentShiftOrder <= TmScheduleConstants.TM_MAX_SHIFT_ORDER; currentShiftOrder++) {
+            request.setFieldValueByFieldName(String.format(
+                    TmScheduleConstants.SHIFT_SEQUENCE_FIELD_TEMPLATE, currentShiftOrder), null);
+        }
+        request.setFieldValueByFieldName(String.format(
+                TmScheduleConstants.SHIFT_SEQUENCE_FIELD_TEMPLATE, shiftOrder),
+                persisted.getFieldValueByFieldName(String.format(
+                        TmScheduleConstants.SHIFT_SEQUENCE_FIELD_TEMPLATE, shiftOrder)));
     }
 
     /**
@@ -1159,7 +1185,7 @@ public class TmManualOperationFacade {
         }
         List<TmScheduleResult> resultList = this.loadManualOpSnapshot(scheduleResult,
                 Collections.singletonList(scheduleResult.getMachineCode()));
-        for (int shiftOrder = 1; shiftOrder <= 3; shiftOrder++) {
+        for (int shiftOrder = 1; shiftOrder <= TmScheduleConstants.TM_MAX_SHIFT_ORDER; shiftOrder++) {
             Integer insertSequence = (Integer) scheduleResult.getFieldValueByFieldName(
                     String.format(TmScheduleConstants.SHIFT_SEQUENCE_FIELD_TEMPLATE, shiftOrder));
             if (insertSequence == null) {

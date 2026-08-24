@@ -14,6 +14,7 @@ import com.zlt.aps.tc.api.domain.vo.*;
 import com.zlt.aps.tc.mapper.TcScheduleResultMapper;
 import com.zlt.aps.tc.mapper.TcScheduleUnplannedMapper;
 import com.zlt.aps.tc.mapper.TcShiftConfigMapper;
+import com.zlt.aps.tc.service.TcShiftStartTimeResolver;
 import com.zlt.aps.tc.service.query.TcManualOptionsService;
 import org.springframework.stereotype.Service;
 
@@ -39,6 +40,8 @@ public class TcManualScheduleApplicationService {
 
     private final TcShiftConfigMapper shiftConfigMapper;
 
+    private final TcShiftStartTimeResolver shiftStartTimeResolver;
+
     private final TcScheduleUnplannedMapper scheduleUnplannedMapper;
 
     /**
@@ -49,17 +52,20 @@ public class TcManualScheduleApplicationService {
      * @param scheduleResultMapper 排程结果 Mapper
      * @param shiftConfigMapper 班次配置 Mapper
      * @param scheduleUnplannedMapper 未排任务 Mapper
+     * @param shiftStartTimeResolver 班次开始时间解析服务
      */
     public TcManualScheduleApplicationService(TcManualOptionsService manualOptionsService,
                                               TcManualOperationFacade manualOperationFacade,
                                               TcScheduleResultMapper scheduleResultMapper,
                                               TcShiftConfigMapper shiftConfigMapper,
-                                              TcScheduleUnplannedMapper scheduleUnplannedMapper) {
+                                              TcScheduleUnplannedMapper scheduleUnplannedMapper,
+                                              TcShiftStartTimeResolver shiftStartTimeResolver) {
         this.manualOptionsService = manualOptionsService;
         this.manualOperationFacade = manualOperationFacade;
         this.scheduleResultMapper = scheduleResultMapper;
         this.shiftConfigMapper = shiftConfigMapper;
         this.scheduleUnplannedMapper = scheduleUnplannedMapper;
+        this.shiftStartTimeResolver = shiftStartTimeResolver;
     }
 
     /**
@@ -312,7 +318,7 @@ public class TcManualScheduleApplicationService {
     }
 
     /**
-     * 校验插单班次已开班且尚未结束。
+     * 校验人工操作班次尚未到达实际开始时间。
      *
      * @param factoryCode 工厂编码
      * @param scheduleDate 排程日期
@@ -348,32 +354,20 @@ public class TcManualScheduleApplicationService {
         Map<Integer, TcShiftConfig> shiftConfigMap = shiftConfigList == null ? Collections.emptyMap()
                 : shiftConfigList.stream().filter(item -> item.getShiftOrder() != null)
                 .collect(Collectors.toMap(TcShiftConfig::getShiftOrder, Function.identity(), (left, right) -> left));
+        Map<Integer, Date> shiftStartTimeMap = this.shiftStartTimeResolver
+                .resolveShiftStartTimes(factoryCode, scheduleDate);
+        Date currentTime = new Date();
         for (Integer shiftOrder : shiftOrderList.stream().filter(Objects::nonNull).distinct()
                 .collect(Collectors.toList())) {
             TcShiftConfig shiftConfig = shiftConfigMap.get(shiftOrder);
             if (shiftConfig == null) {
                 throw new ServiceException(I18nUtil.getMessage("ui.tc.schedule.manual.shiftClosed"));
             }
-            if (targetDate.equals(today) && this.resolveShiftEndTime(shiftConfig, scheduleDate).before(new Date())) {
+            Date shiftStartTime = shiftStartTimeMap.get(shiftOrder);
+            if (shiftStartTime == null || !shiftStartTime.after(currentTime)) {
                 throw new ServiceException(I18nUtil.getMessage("ui.tc.schedule.manual.pastShiftBlocked"));
             }
         }
-    }
-
-    /**
-     * 解析班次结束时间，跨天班次顺延一天。
-     *
-     * @param shiftConfig 班次配置
-     * @param scheduleDate 排程日期
-     * @return 班次结束时间
-     */
-    private Date resolveShiftEndTime(TcShiftConfig shiftConfig, Date scheduleDate) {
-        String endTime = shiftConfig.getPlanEndTime();
-        if (endTime != null && endTime.length() == 5) {
-            endTime = endTime + ":00";
-        }
-        Date shiftEndTime = DateUtil.parseDateTime(DateUtil.formatDate(scheduleDate) + " " + endTime);
-        return "1".equals(shiftConfig.getCrossDayFlag()) ? DateUtil.offsetDay(shiftEndTime, 1) : shiftEndTime;
     }
 
     /**

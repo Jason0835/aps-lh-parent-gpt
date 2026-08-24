@@ -4,11 +4,14 @@ import cn.hutool.core.collection.CollUtil;
 import com.zlt.aps.tm.api.enums.TmYesNoEnum;
 import com.zlt.aps.tm.engine.domain.TmTaskDraft;
 import com.zlt.aps.tm.engine.service.ITmPlanTailDecisionService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 /**
  * 基于现有收尾标识和收尾余量的胎面兼容判定实现。
@@ -17,13 +20,14 @@ import java.util.Objects;
  * 余量大于零为非收尾，余量小于等于零为收尾。</p>
  */
 @Service
+@Slf4j
 public class TmLegacyPlanTailDecisionService implements ITmPlanTailDecisionService {
 
     /**
      * 汇总来源任务的收尾信息。
      *
-     * <p>收尾标识由计划量汇总前的生产属性校验保证一致；成型余量属于独立来源行级数据，
-     * 需累加为汇总任务的组级收尾余量，不能复制首条来源值。</p>
+     * <p>收尾标识由计划量汇总前的生产属性校验保证一致；同一胎面计划组内的成型余量
+     * 代表同一成型余量，按来源工单和业务键稳定排序后取一条非空值，不能重复累加。</p>
      *
      * @param aggregateTask 汇总生产任务
      * @param sourceTaskList 原始来源任务
@@ -44,11 +48,54 @@ public class TmLegacyPlanTailDecisionService implements ITmPlanTailDecisionServi
             aggregateTask.setTailBalanceQty(BigDecimal.ZERO);
             return;
         }
-        BigDecimal groupTailBalanceQty = sourceTaskList.stream()
+        aggregateTask.setTailBalanceQty(this.selectStableTailBalanceQty(sourceTaskList));
+    }
+
+    /**
+     * 按来源工单和业务键稳定排序后选择一条收尾余量。
+     *
+     * @param sourceTaskList 原始来源任务
+     * @return 首个非空收尾余量；没有余量时返回零
+     */
+    private BigDecimal selectStableTailBalanceQty(List<TmTaskDraft> sourceTaskList) {
+        List<TmTaskDraft> sortedTaskList = sourceTaskList.stream()
                 .filter(Objects::nonNull)
+                .sorted(Comparator
+                        .comparing(this::resolveSourceOrderNo, Comparator.nullsLast(String::compareTo))
+                        .thenComparing(TmTaskDraft::getBusinessKey, Comparator.nullsLast(String::compareTo)))
+                .collect(Collectors.toList());
+        List<BigDecimal> remainQtyList = sortedTaskList.stream()
                 .map(TmTaskDraft::getTailBalanceQty)
                 .filter(Objects::nonNull)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        aggregateTask.setTailBalanceQty(groupTailBalanceQty);
+                .collect(Collectors.toList());
+        if (remainQtyList.isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal selectedValue = remainQtyList.get(0);
+        boolean conflict = remainQtyList.stream()
+                .anyMatch(value -> value.compareTo(selectedValue) != 0);
+        if (conflict) {
+            log.warn("[TM_TAIL_BALANCE_QTY_CONFLICT] treadCode={}, selectedValue={}, sourceValues={}",
+                    sortedTaskList.stream()
+                            .map(TmTaskDraft::getTreadCode)
+                            .filter(Objects::nonNull)
+                            .findFirst()
+                            .orElse(null), selectedValue, remainQtyList);
+        }
+        return selectedValue;
+    }
+
+    /**
+     * 解析来源成型工单号，用于确定性排序。
+     *
+     * @param task 来源任务
+     * @return 去除首尾空格后的来源工单号；空值返回 null
+     */
+    private String resolveSourceOrderNo(TmTaskDraft task) {
+        if (task == null || task.getSourceOrderNos() == null
+                || task.getSourceOrderNos().trim().isEmpty()) {
+            return null;
+        }
+        return task.getSourceOrderNos().trim();
     }
 }

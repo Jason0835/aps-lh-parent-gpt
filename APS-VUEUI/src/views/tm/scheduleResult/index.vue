@@ -109,7 +109,13 @@
       uploadUrl="/tm/tmScheduleResult/importDataCust"
     ></tlt-upload-form>
     <autoPlanDialog ref="autoPlanRef" @success="handleAutoPlanSuccess" />
-    <infoDialog ref="infoRef" :machine-options="machines" @success="handleOperationTask" />
+    <infoDialog
+      ref="infoRef"
+      :machine-options="insertMachineOptions"
+      :shift-date-list="insertDateList"
+      @success="handleOperationTask"
+      @scope-change="handleInsertScopeChange"
+    />
     <changeMachineDialog ref="changeMachineRef" @success="handleOperationTask" />
     <releaseStatusDialog ref="releaseStatusRef" @success="getList" />
     <unplanned-dialog ref="unplannedRef" @count-change="handleUnplannedCountChange" />
@@ -307,6 +313,7 @@ export default {
       search: {},
       query: {},
       machineOptions: [],
+      insertMachineOptions: [],
       pageActivatedOnce: false,
       importDefaultValue: {},
       importRules: {
@@ -366,6 +373,7 @@ export default {
         { shift: 5, shiftType: "morning", shiftDate: "" },
         { shift: 6, shiftType: "afternoon", shiftDate: "" },
       ],
+      insertDateList: [],
     };
   },
   computed: {
@@ -757,7 +765,7 @@ export default {
         return;
       }
       try {
-        const response = await listTmMachineInfo({factoryCode});
+        const response = await listTmMachineInfo({factoryCode, machineStatus: "1"});
         if (this.search.factoryCode === factoryCode) {
           this.machineOptions = response.rows || [];
         }
@@ -765,6 +773,25 @@ export default {
         if (this.search.factoryCode === factoryCode) {
           this.machineOptions = [];
         }
+        console.error(error);
+      }
+    },
+    /**
+     * 按插单弹窗工厂查询启用机台，避免弹窗切换工厂影响列表筛选机台。
+     *
+     * @param {String} factoryCode 插单工厂编码
+     * @returns {Promise<void>} 插单机台选项加载完成后返回
+     */
+    async loadInsertMachineOptions(factoryCode) {
+      if (!factoryCode) {
+        this.insertMachineOptions = [];
+        return;
+      }
+      try {
+        const response = await listTmMachineInfo({factoryCode, machineStatus: "1"});
+        this.insertMachineOptions = response.rows || [];
+      } catch (error) {
+        this.insertMachineOptions = [];
         console.error(error);
       }
     },
@@ -783,27 +810,55 @@ export default {
       this.query.scheduleDate = val;
       this.getDate();
     },
-    async getDate() {
+    async getDate(factoryCode, scheduleDate, target) {
       try {
+        const targetFactoryCode = factoryCode || this.query.factoryCode || this.search.factoryCode;
+        const targetScheduleDate = scheduleDate || this.query.scheduleDate || this.search.scheduleDate;
         let res = await listScheduleShiftDates({
-          factoryCode: this.query.factoryCode || this.search.factoryCode,
-          scheduleDate: this.query.scheduleDate || this.search.scheduleDate,
+          factoryCode: targetFactoryCode,
+          scheduleDate: targetScheduleDate,
         });
         if (res && res.length > 0) {
-          this.dateList = res;
+          if (target === "insert") {
+            this.insertDateList = res;
+          } else {
+            this.dateList = res;
+          }
         }
       } catch (error) {
         console.error(error);
       }
     },
-    handleAdd() {
+    async handleAdd() {
       if (this.writeTaskRunning) return;
       if (this.$refs.infoRef) {
+        const factoryCode = this.query.factoryCode || this.search.factoryCode || "116";
+        const scheduleDate = this.query.scheduleDate || this.search.scheduleDate;
+        await Promise.all([
+          this.loadInsertMachineOptions(factoryCode),
+          this.getDate(factoryCode, scheduleDate, "insert"),
+        ]);
         this.$refs.infoRef.show({
-          factoryCode: this.query.factoryCode || this.search.factoryCode || "116",
-          scheduleDate: this.query.scheduleDate || this.search.scheduleDate,
+          factoryCode,
+          scheduleDate,
         });
       }
+    },
+    /**
+     * 刷新插单弹窗的工厂关联机台和六班日期。
+     *
+     * @param {Object} scope 插单工厂和排程日期
+     * @returns {Promise<void>} 关联数据刷新完成
+     */
+    async handleInsertScopeChange(scope) {
+      const factoryCode = scope && scope.factoryCode;
+      const scheduleDate = scope && scope.scheduleDate;
+      this.insertMachineOptions = [];
+      this.insertDateList = [];
+      await Promise.all([
+        this.loadInsertMachineOptions(factoryCode),
+        this.getDate(factoryCode, scheduleDate, "insert"),
+      ]);
     },
     // 自动排程入口：打开弹窗选择工厂和排程日期，具体接口由弹窗调用胎面接口。
     handleAutoPlan() {

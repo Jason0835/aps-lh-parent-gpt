@@ -464,6 +464,10 @@ public class TcScheduleResultExcelServiceImpl implements ITcScheduleResultExcelS
                 .stream().filter(Objects::nonNull)
                 .filter(row -> StrUtil.isNotBlank(row.getSidewallCode())
                         && StrUtil.isNotBlank(row.getConstructionVersion()))
+                .sorted(Comparator.comparing(TcFormingDemandRowVo::getOrderNo,
+                                Comparator.nullsLast(String::compareTo))
+                        .thenComparing(TcFormingDemandRowVo::getSourceRecordId,
+                                Comparator.nullsLast(Long::compareTo)))
                 .forEach(row -> this.mergeFormingData(resultMap, row.getSidewallCode(),
                         row.getConstructionVersion(), BigDecimalUtils.add(row.getClass1PlanQty(),
                                 row.getClass2PlanQty(), row.getClass3PlanQty(), row.getClass4PlanQty()),
@@ -504,12 +508,18 @@ public class TcScheduleResultExcelServiceImpl implements ITcScheduleResultExcelS
                                 item.getConstructionVersion()), Function.identity(),
                         (first, ignored) -> first, LinkedHashMap::new));
         Map<String, TcScheduleResultFormingDataVo> resultMap = new LinkedHashMap<>();
-        rowList.forEach(row -> this.mergeRecipeRow(resultMap, constructionMap, row));
+        rowList.stream()
+                .filter(Objects::nonNull)
+                .sorted(Comparator.comparing(TcFormingDemandRecipeRowVo::getOrderNo,
+                                Comparator.nullsLast(String::compareTo))
+                        .thenComparing(TcFormingDemandRecipeRowVo::getSourceRecordId,
+                                Comparator.nullsLast(Long::compareTo)))
+                .forEach(row -> this.mergeRecipeRow(resultMap, constructionMap, row));
         return resultMap;
     }
 
     /**
-     * 将一条成型 RECIPE 行按胎侧版本归并，余量只对同一成型行和胎侧版本累计一次。
+     * 将一条成型 RECIPE 行按胎侧版本归并，余量按稳定来源顺序取一条。
      *
      * @param resultMap 汇总结果
      * @param constructionMap 施工版本映射
@@ -585,15 +595,41 @@ public class TcScheduleResultExcelServiceImpl implements ITcScheduleResultExcelS
             dataVo.setSidewallCode(sidewallCode);
             dataVo.setConstructionVersion(constructionVersion);
             dataVo.setCxPlanQty(BigDecimal.ZERO);
-            dataVo.setCxRemainQty(BigDecimal.ZERO);
+            dataVo.setCxRemainQty(null);
             return dataVo;
         });
         target.setCxPlanQty(BigDecimalUtils.add(target.getCxPlanQty(), planQty));
-        target.setCxRemainQty(BigDecimalUtils.add(target.getCxRemainQty(), remainQty));
+        this.selectStableFormingRemainQty(target, sidewallCode, constructionVersion, remainQty);
         if (StrUtil.isBlank(target.getMaterialDesc()) && StrUtil.isNotBlank(materialDesc)) {
             target.setMaterialDesc(materialDesc);
         }
         this.mergeDistinctMachineCodes(target, cxMachineCode);
+    }
+
+    /**
+     * 为同一胎侧和施工版本的成型汇总选择一条稳定余量，不重复累加相同来源口径。
+     *
+     * @param target 成型数据汇总对象
+     * @param sidewallCode 胎侧编码
+     * @param constructionVersion 施工版本
+     * @param remainQty 当前成型余量
+     */
+    private void selectStableFormingRemainQty(TcScheduleResultFormingDataVo target,
+                                              String sidewallCode,
+                                              String constructionVersion,
+                                              BigDecimal remainQty) {
+        if (remainQty == null) {
+            return;
+        }
+        if (target.getCxRemainQty() == null) {
+            target.setCxRemainQty(remainQty);
+            return;
+        }
+        if (target.getCxRemainQty().compareTo(remainQty) != 0) {
+            log.warn("[TC_FORMING_CX_REMAIN_QTY_CONFLICT] sidewallCode={}, constructionVersion={}, "
+                            + "selectedValue={}, sourceValue={}",
+                    sidewallCode, constructionVersion, target.getCxRemainQty(), remainQty);
+        }
     }
 
     /**

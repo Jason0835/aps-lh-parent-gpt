@@ -14,7 +14,9 @@ import com.zlt.aps.tc.api.domain.entity.*;
 import com.zlt.aps.tc.api.domain.vo.*;
 import com.zlt.aps.tc.api.enums.TcYesNoEnum;
 import com.zlt.aps.tc.mapper.*;
+import com.zlt.aps.tc.service.TcShiftStartTimeResolver;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -41,8 +43,35 @@ public class TcScheduleBoardQueryService {
 
     private final TcParamsMapper paramsMapper;
 
+    private final TcShiftStartTimeResolver shiftStartTimeResolver;
+
     /**
      * 构造胎侧排程看板查询服务。
+     *
+     * @param scheduleResultMapper 排程结果 Mapper
+     * @param scheduleUnplannedMapper 未排任务 Mapper
+     * @param scheduleResultExplainMapper 排程解释 Mapper
+     * @param shiftConfigMapper 班次配置 Mapper
+     * @param paramsMapper 胎侧参数 Mapper
+     * @param shiftStartTimeResolver 班次开始时间解析服务
+     */
+    @Autowired
+    public TcScheduleBoardQueryService(TcScheduleResultMapper scheduleResultMapper,
+                                       TcScheduleUnplannedMapper scheduleUnplannedMapper,
+                                       TcScheduleResultExplainMapper scheduleResultExplainMapper,
+                                       TcShiftConfigMapper shiftConfigMapper,
+                                       TcParamsMapper paramsMapper,
+                                       TcShiftStartTimeResolver shiftStartTimeResolver) {
+        this.scheduleResultMapper = scheduleResultMapper;
+        this.scheduleUnplannedMapper = scheduleUnplannedMapper;
+        this.scheduleResultExplainMapper = scheduleResultExplainMapper;
+        this.shiftConfigMapper = shiftConfigMapper;
+        this.paramsMapper = paramsMapper;
+        this.shiftStartTimeResolver = shiftStartTimeResolver;
+    }
+
+    /**
+     * 创建兼容旧单元测试和调用方的看板查询服务。
      *
      * @param scheduleResultMapper 排程结果 Mapper
      * @param scheduleUnplannedMapper 未排任务 Mapper
@@ -55,11 +84,8 @@ public class TcScheduleBoardQueryService {
                                        TcScheduleResultExplainMapper scheduleResultExplainMapper,
                                        TcShiftConfigMapper shiftConfigMapper,
                                        TcParamsMapper paramsMapper) {
-        this.scheduleResultMapper = scheduleResultMapper;
-        this.scheduleUnplannedMapper = scheduleUnplannedMapper;
-        this.scheduleResultExplainMapper = scheduleResultExplainMapper;
-        this.shiftConfigMapper = shiftConfigMapper;
-        this.paramsMapper = paramsMapper;
+        this(scheduleResultMapper, scheduleUnplannedMapper, scheduleResultExplainMapper,
+                shiftConfigMapper, paramsMapper, null);
     }
 
     /**
@@ -317,8 +343,11 @@ public class TcScheduleBoardQueryService {
         Date endDate = DateUtil.beginOfDay(queryVo.getEndDate());
         while (!currentDate.after(endDate)) {
             Date scheduleDate = currentDate;
+            Map<Integer, Date> shiftStartTimeMap = this.shiftStartTimeResolver == null
+                    ? Collections.emptyMap()
+                    : this.shiftStartTimeResolver.resolveShiftStartTimes(queryVo.getFactoryCode(), scheduleDate);
             shiftConfigList.forEach(shiftConfig -> columnList.add(
-                    this.buildDateColumn(scheduleDate, shiftConfig, shiftDateStartOffset)));
+                    this.buildDateColumn(scheduleDate, shiftConfig, shiftDateStartOffset, shiftStartTimeMap)));
             currentDate = DateUtil.offsetDay(currentDate, 1);
         }
         return columnList;
@@ -330,13 +359,18 @@ public class TcScheduleBoardQueryService {
      * @param scheduleDate 排程日期
      * @param shiftConfig 班次配置
      * @param shiftDateStartOffset 一班相对排程日期的偏移天数
+     * @param shiftStartTimeMap 班次实际开始时间
      * @return 日期班次列
      */
     private TcScheduleBoardDateColumnVo buildDateColumn(Date scheduleDate, TcShiftConfig shiftConfig,
-                                                         int shiftDateStartOffset) {
+                                                         int shiftDateStartOffset,
+                                                         Map<Integer, Date> shiftStartTimeMap) {
         TcScheduleBoardDateColumnVo columnVo = new TcScheduleBoardDateColumnVo();
-        columnVo.setScheduleDate(this.resolveShiftScheduleDate(
-                scheduleDate, shiftConfig.getShiftOrder(), shiftDateStartOffset));
+        Date shiftStartTime = shiftStartTimeMap.get(shiftConfig.getShiftOrder());
+        columnVo.setScheduleDate(shiftStartTime == null
+                ? this.resolveShiftScheduleDate(scheduleDate, shiftConfig.getShiftOrder(), shiftDateStartOffset)
+                : DateUtil.beginOfDay(shiftStartTime));
+        columnVo.setShiftStartTime(shiftStartTime);
         columnVo.setShiftOrder(shiftConfig.getShiftOrder());
         columnVo.setShiftCode(shiftConfig.getShiftCode());
         columnVo.setShiftName(shiftConfig.getShiftName());

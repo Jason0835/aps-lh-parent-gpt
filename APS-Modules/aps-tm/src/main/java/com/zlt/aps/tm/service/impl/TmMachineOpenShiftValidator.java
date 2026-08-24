@@ -15,8 +15,10 @@ import com.zlt.aps.tm.domain.vo.TmWorkCalendarRowVo;
 import com.zlt.aps.tm.mapper.TmAutoScheduleDataLoadMapper;
 import com.zlt.aps.tm.mapper.TmMachineInfoMapper;
 import com.zlt.aps.tm.mapper.TmShiftConfigMapper;
+import com.zlt.aps.tm.service.TmShiftStartTimeResolver;
 import org.springframework.stereotype.Service;
 
+import javax.annotation.Resource;
 import java.math.BigDecimal;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -35,6 +37,10 @@ public class TmMachineOpenShiftValidator {
     private final TmShiftConfigMapper shiftConfigMapper;
 
     private final TmAutoScheduleDataLoadMapper autoScheduleDataLoadMapper;
+
+    /** 六班实际开始时间解析服务。 */
+    @Resource
+    private TmShiftStartTimeResolver shiftStartTimeResolver;
 
     /**
      * 创建机台开机班次校验器。
@@ -55,11 +61,38 @@ public class TmMachineOpenShiftValidator {
      * 校验插单中全部正计划量班次均为目标机台开机班次。
      *
      * @param scheduleResult 插单结果
-     * @throws ServiceException 机台或班次不存在、当前班次未开机时抛出
+     * @throws ServiceException 机台或班次不存在、班次已开始或当前班次未开机时抛出
      */
     public void validateInsert(TmScheduleResult scheduleResult) {
+        this.validateInsertShiftNotStarted(scheduleResult);
         this.validatePositivePlanShifts(scheduleResult, scheduleResult.getMachineCode(),
                 new TmMachineOpenShiftValidationCache());
+    }
+
+    /**
+     * 校验插单中有正计划量的班次尚未开始。
+     *
+     * @param scheduleResult 插单结果
+     * @throws ServiceException 班次开始时间已到达时抛出
+     */
+    private void validateInsertShiftNotStarted(TmScheduleResult scheduleResult) {
+        if (scheduleResult == null || scheduleResult.getScheduleDate() == null
+                || this.shiftStartTimeResolver == null) {
+            return;
+        }
+        Map<Integer, Date> shiftStartTimeMap = this.shiftStartTimeResolver.resolveShiftStartTimes(
+                scheduleResult.getFactoryCode(), scheduleResult.getScheduleDate());
+        Date now = new Date();
+        for (int shiftOrder = 1; shiftOrder <= TmScheduleConstants.TM_MAX_SHIFT_ORDER; shiftOrder++) {
+            if (this.readPlanQty(scheduleResult, shiftOrder).compareTo(BigDecimal.ZERO) <= 0) {
+                continue;
+            }
+            Date shiftStartTime = shiftStartTimeMap.get(shiftOrder);
+            if (shiftStartTime != null && !shiftStartTime.after(now)) {
+                throw new ServiceException(I18nUtil.getMessage(
+                        "ui.data.alert.tm.schedule.insertShiftStarted"));
+            }
+        }
     }
 
     /**

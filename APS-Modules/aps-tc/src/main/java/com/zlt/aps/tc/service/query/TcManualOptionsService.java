@@ -1,9 +1,11 @@
 package com.zlt.aps.tc.service.query;
 
+import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
+import com.zlt.aps.tc.api.constant.TcScheduleConstants;
 import com.zlt.aps.tc.api.domain.entity.TcMachineInfo;
 import com.zlt.aps.tc.api.domain.entity.TcScheduleResult;
 import com.zlt.aps.tc.api.domain.entity.TcShiftConfig;
@@ -15,6 +17,8 @@ import com.zlt.aps.tc.domain.vo.TcConstructionSidewallRowVo;
 import com.zlt.aps.tc.mapper.TcAutoScheduleDataLoadMapper;
 import com.zlt.aps.tc.mapper.TcMachineInfoMapper;
 import com.zlt.aps.tc.mapper.TcShiftConfigMapper;
+import com.zlt.aps.tc.service.TcShiftStartTimeResolver;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.text.MessageFormat;
@@ -35,8 +39,29 @@ public class TcManualOptionsService {
 
     private final TcShiftConfigMapper shiftConfigMapper;
 
+    private final TcShiftStartTimeResolver shiftStartTimeResolver;
+
     /**
      * 构造人工操作选项查询服务。
+     *
+     * @param autoScheduleDataLoadMapper 自动排程数据加载 Mapper
+     * @param machineInfoMapper 机台资料 Mapper
+     * @param shiftConfigMapper 班次配置 Mapper
+     * @param shiftStartTimeResolver 班次开始时间解析服务
+     */
+    @Autowired
+    public TcManualOptionsService(TcAutoScheduleDataLoadMapper autoScheduleDataLoadMapper,
+                                  TcMachineInfoMapper machineInfoMapper,
+                                  TcShiftConfigMapper shiftConfigMapper,
+                                  TcShiftStartTimeResolver shiftStartTimeResolver) {
+        this.autoScheduleDataLoadMapper = autoScheduleDataLoadMapper;
+        this.machineInfoMapper = machineInfoMapper;
+        this.shiftConfigMapper = shiftConfigMapper;
+        this.shiftStartTimeResolver = shiftStartTimeResolver;
+    }
+
+    /**
+     * 创建兼容旧单元测试和调用方的人工选项服务。
      *
      * @param autoScheduleDataLoadMapper 自动排程数据加载 Mapper
      * @param machineInfoMapper 机台资料 Mapper
@@ -45,9 +70,7 @@ public class TcManualOptionsService {
     public TcManualOptionsService(TcAutoScheduleDataLoadMapper autoScheduleDataLoadMapper,
                                   TcMachineInfoMapper machineInfoMapper,
                                   TcShiftConfigMapper shiftConfigMapper) {
-        this.autoScheduleDataLoadMapper = autoScheduleDataLoadMapper;
-        this.machineInfoMapper = machineInfoMapper;
-        this.shiftConfigMapper = shiftConfigMapper;
+        this(autoScheduleDataLoadMapper, machineInfoMapper, shiftConfigMapper, null);
     }
 
     /**
@@ -272,15 +295,25 @@ public class TcManualOptionsService {
         if (shiftConfigList == null) {
             return Collections.emptyList();
         }
-        return shiftConfigList.stream().map(shiftConfig -> {
-            TcManualShiftOptionVo optionVo = new TcManualShiftOptionVo();
-            optionVo.setScheduleDate(scheduleDate);
-            optionVo.setShiftOrder(shiftConfig.getShiftOrder());
-            optionVo.setShiftCode(shiftConfig.getShiftCode());
-            optionVo.setShiftName(shiftConfig.getShiftName());
-            optionVo.setOpenFlag(shiftConfig.getOpenFlag());
-            return optionVo;
-        }).collect(Collectors.toList());
+        Map<Integer, Date> shiftStartTimeMap = this.shiftStartTimeResolver == null
+                ? Collections.emptyMap()
+                : this.shiftStartTimeResolver.resolveShiftStartTimes(factoryCode, scheduleDate);
+        return shiftConfigList.stream()
+                .filter(shiftConfig -> shiftConfig.getShiftOrder() != null
+                        && shiftConfig.getShiftOrder() >= 1
+                        && shiftConfig.getShiftOrder() <= TcScheduleConstants.TC_MAX_SHIFT_ORDER)
+                .map(shiftConfig -> {
+                    TcManualShiftOptionVo optionVo = new TcManualShiftOptionVo();
+                    Date shiftStartTime = shiftStartTimeMap.get(shiftConfig.getShiftOrder());
+                    optionVo.setScheduleDate(shiftStartTime == null
+                            ? scheduleDate : DateUtil.beginOfDay(shiftStartTime));
+                    optionVo.setShiftStartTime(shiftStartTime);
+                    optionVo.setShiftOrder(shiftConfig.getShiftOrder());
+                    optionVo.setShiftCode(shiftConfig.getShiftCode());
+                    optionVo.setShiftName(shiftConfig.getShiftName());
+                    optionVo.setOpenFlag(shiftConfig.getOpenFlag());
+                    return optionVo;
+                }).collect(Collectors.toList());
     }
 
     /**

@@ -123,7 +123,9 @@
     <auto-plan-dialog ref="autoPlanRef" @success="handleAutoPlanSuccess" />
     <insert-task-dialog
       ref="insertTaskRef"
-      :machine-options="machineOptions"
+      :machine-options="insertMachineOptions"
+      :shift-date-list="insertDateList"
+      @scope-change="handleInsertScopeChange"
       @success="handleOperationTask"
     />
     <change-qty-dialog ref="changeQtyRef" @success="handleOperationTask" />
@@ -304,6 +306,8 @@ export default {
       batchMap: {},
       dateColumns: [],
       machineOptions: [],
+      insertMachineOptions: [],
+      insertDateList: [],
       autoPlanTimer: null,
       autoPlanPollTimes: 0,
       maxAutoPlanPollTimes: 120,
@@ -772,9 +776,41 @@ export default {
         ))
       }
     },
-    handleAdd() {
+    async handleAdd() {
       if (this.writeTaskRunning) return
-      this.$refs.insertTaskRef.show(this.query.factoryCode, this.query.scheduleDate)
+      const factoryCode = this.query.factoryCode || this.search.factoryCode
+      const scheduleDate = this.query.scheduleDate || this.search.scheduleDate
+      await this.loadInsertOptions(factoryCode, scheduleDate)
+      this.$refs.insertTaskRef.show(factoryCode, scheduleDate)
+    },
+    /**
+     * 按插单弹窗的工厂和日期预加载启用机台及六班日期。
+     *
+     * @param {String} factoryCode 插单工厂编码
+     * @param {String} scheduleDate 插单排程日期
+     * @returns {Promise<void>} 选项加载完成
+     */
+    async loadInsertOptions(factoryCode, scheduleDate) {
+      this.insertMachineOptions = []
+      this.insertDateList = []
+      if (!factoryCode || !scheduleDate) return
+      try {
+        const options = await getManualOptions({ factoryCode, scheduleDate })
+        this.insertMachineOptions = options.machineList || []
+        this.insertDateList = options.shiftList || []
+      } catch (error) {
+        this.insertMachineOptions = []
+        this.insertDateList = []
+      }
+    },
+    /**
+     * 刷新插单弹窗的工厂关联机台和六班日期，防止沿用旧工厂选项。
+     *
+     * @param {Object} scope 插单工厂和排程日期
+     * @returns {Promise<void>} 选项加载完成
+     */
+    async handleInsertScopeChange(scope) {
+      await this.loadInsertOptions(scope && scope.factoryCode, scope && scope.scheduleDate)
     },
     /**
      * 打开胎侧调量弹窗，支持顶部单选和列表行操作两种入口。

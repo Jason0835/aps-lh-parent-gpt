@@ -462,15 +462,13 @@ public class TmScheduleResultUIController extends BaseUIController<TmScheduleRes
     /**
      * 获取胎面排程班次日期列表
      *
-     * @param scheduleDate 排程日期
+     * @param scheduleResult 工厂和排程日期
      * @return 班次日期列表
      */
     @ApiOperation("获取胎面排程班次日期列表")
     @PostMapping("/listScheduleShiftDates")
     @ResponseBody
-    public AjaxResult listScheduleShiftDates(Date scheduleDate) {
-        TmScheduleResult scheduleResult = new TmScheduleResult();
-        scheduleResult.setScheduleDate(scheduleDate);
+    public AjaxResult listScheduleShiftDates(TmScheduleResult scheduleResult) {
         List<TmScheduleShiftDateVO> list = iTmScheduleResultService.listScheduleShiftDates(scheduleResult);
         return AjaxResult.success(list);
     }

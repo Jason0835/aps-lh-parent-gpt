@@ -3,6 +3,7 @@ package com.zlt.aps.tm.api.domain.entity;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import io.swagger.annotations.ApiModel;
@@ -393,4 +394,14 @@ public class TmScheduleResult extends BaseEntity {
     @ApiModelProperty(value = "是否仅导出空模板", name = "exportTemplate")
     @TableField(exist = false)
     private Boolean exportTemplate;
+
+    /**
+     * 调量目标班次，仅用于调量请求，不映射数据库字段。
+     *
+     * <p>调量请求不再信任前端传入的 classNSequence，后端根据该班次从数据库恢复真实顺序。</p>
+     */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    @ApiModelProperty(value = "调量目标班次", name = "shiftOrder")
+    @TableField(exist = false)
+    private Integer shiftOrder;
 }
