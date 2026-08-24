@@ -1088,6 +1088,62 @@ public class LhScheduleResult extends BaseEntity implements Serializable {
     private String skuSortDesc;
 
     /**
+     * 最早胎胚可供硫化时间。
+     * <p>直接取排程上下文按结构加载的既有计算结果，无配置时保持为空。</p>
+     */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @ApiModelProperty(value = "最早胎胚可供硫化时间", name = "earliestEmbryoAvailableTime")
+    @TableField(value = "EARLIEST_EMBRYO_AVAILABLE_TIME")
+    private Date earliestEmbryoAvailableTime;
+
+    /**
+     * 轮到当前 SKU 选机时，实际命中机台在排程窗口内的前序 SKU 实时收尾明细。
+     * <p>格式示例：{@code SKU1=2026-08-20 10:00:00,SKU2=2026-08-20 18:00:00}。</p>
+     */
+    @ApiModelProperty(value = "实时机台收尾时间", name = "realtimeMachineEndingInfo")
+    @TableField(value = "REALTIME_MACHINE_ENDING_INFO")
+    private String realtimeMachineEndingInfo;
+
+    /**
+     * 新增选机前排程窗口各班次已经落地的总计划量。
+     * <p>格式：{@code c1=2000,c2=3000,...}。</p>
+     */
+    @ApiModelProperty(value = "实时班次总计划量", name = "realtimeShiftTotalPlanQty")
+    @TableField(value = "REALTIME_SHIFT_TOTAL_PLAN_QTY")
+    private String realtimeShiftTotalPlanQty;
+
+    /**
+     * 新增选机前排程窗口各班次已经正式占用的换模/换活字块次数。
+     * <p>格式：{@code c1=1,c2=2,...}。</p>
+     */
+    @ApiModelProperty(value = "实时班次换模/换活字块次数", name = "realtimeShiftChangeoverCount")
+    @TableField(value = "REALTIME_SHIFT_CHANGEOVER_COUNT")
+    private String realtimeShiftChangeoverCount;
+
+    /**
+     * 新增选机前当前结构按排程日已经占用的物理硫化机台数。
+     * <p>格式：{@code T=1,T+1=2,T+2=2}。</p>
+     */
+    @ApiModelProperty(value = "实时结构已排硫化机台数", name = "realtimeStructureScheduledMachineCount")
+    @TableField(value = "REALTIME_STRUCTURE_SCHEDULED_MACHINE_COUNT")
+    private String realtimeStructureScheduledMachineCount;
+
+    /**
+     * 新增 SKU 选机时的正式候选机台顺序、正式可开产时间和软排序指标描述。
+     */
+    @ApiModelProperty(value = "SKU选机描述", name = "skuMachineSelectionDesc")
+    @TableField(value = "SKU_MACHINE_SELECTION_DESC")
+    private String skuMachineSelectionDesc;
+
+    /**
+     * 新增 SKU 在各排程日真正进入并命中新增选机流程的实时顺序。
+     * <p>格式：{@code T=1,T+1=3}。</p>
+     */
+    @ApiModelProperty(value = "SKU实时选机顺序", name = "skuRealtimeSelectionOrder")
+    @TableField(value = "SKU_REALTIME_SELECTION_ORDER")
+    private String skuRealtimeSelectionOrder;
+
+    /**
      * 结构计划硫化机台数，格式 {@code T=2,T+1=2,T+2=3}。
      */
     @Excel(name = "ui.data.column.lhScheduleResult.structurePlanMachineCountRange")

@@ -78,6 +78,7 @@ public class DailyNewSpecOrderLogCollector {
         }
         DailyNewSpecOrderLogEntry entry = new DailyNewSpecOrderLogEntry(
                 materialCode,
+                entryList.size() + 1,
                 this.resolveProductionPhase(phase),
                 this.resolveMaterialSourceType(sourceType),
                 originalDayPlanQty,
@@ -152,6 +153,15 @@ public class DailyNewSpecOrderLogCollector {
      */
     public int size() {
         return entryList.size();
+    }
+
+    /**
+     * 获取当前业务日相对排程 T 日的偏移。
+     *
+     * @return 0 表示 T 日，1 表示 T+1 日，以此类推
+     */
+    public int getDateOffset() {
+        return dateOffset;
     }
 
     /**

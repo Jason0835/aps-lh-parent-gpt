@@ -167,6 +167,8 @@ public class SchedulePersistenceService {
             fillShortageQty(context, context.getScheduleResultList());
             // 回填 SKU 排序名次/描述（来源 sortByPriority 回写到 sourceSku）
             fillSkuSortInfo(context, context.getScheduleResultList());
+            // 通用字段直接复用结构维度已加载的最早胎胚可供硫化时间，不在保存阶段重复计算。
+            fillEarliestEmbryoAvailableTime(context, context.getScheduleResultList());
             // 回填 T/T+1/T+2 三天的结构计划机台数、已排机台数及物料每日目标机台数
             fillMachineCountRange(context, context.getScheduleResultList());
             // 按来源 SKU 的月计划 productionType 原值回填结果
@@ -633,6 +635,34 @@ public class SchedulePersistenceService {
             }
             if (StringUtils.isNotEmpty(sourceSku.getSortDesc())) {
                 result.setSkuSortDesc(sourceSku.getSortDesc());
+            }
+        }
+    }
+
+    /**
+     * 按结构名称回填最早胎胚可供硫化时间。
+     *
+     * <p>直接复用 S4.2 已加载到 {@code structureEarliestLhTimeMap} 的现有计算结果，
+     * 不读取数据库、不重新推导胎胚时间；无配置的结构保持结果字段原值为空。</p>
+     *
+     * @param context 排程上下文
+     * @param scheduleResults 排程结果列表
+     */
+    private void fillEarliestEmbryoAvailableTime(
+            LhScheduleContext context,
+            List<LhScheduleResult> scheduleResults) {
+        if (Objects.isNull(context) || CollectionUtils.isEmpty(scheduleResults)
+                || CollectionUtils.isEmpty(context.getStructureEarliestLhTimeMap())) {
+            return;
+        }
+        Map<String, Date> earliestTimeMap = context.getStructureEarliestLhTimeMap();
+        for (LhScheduleResult result : scheduleResults) {
+            if (Objects.isNull(result) || StringUtils.isEmpty(result.getStructureName())) {
+                continue;
+            }
+            Date earliestTime = earliestTimeMap.get(result.getStructureName());
+            if (Objects.nonNull(earliestTime)) {
+                result.setEarliestEmbryoAvailableTime(new Date(earliestTime.getTime()));
             }
         }
     }

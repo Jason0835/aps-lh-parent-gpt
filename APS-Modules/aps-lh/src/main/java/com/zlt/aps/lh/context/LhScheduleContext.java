@@ -678,6 +678,20 @@ public class LhScheduleContext {
      */
     private Map<LhScheduleResult, SkuScheduleDTO> scheduleResultSourceSkuMap = new IdentityHashMap<>();
     /**
+     * 新增 SKU 按业务日真实命中的首次选机顺序。
+     * <p>外层使用对象身份区分同物料不同运行态 SKU；内层 key 为 T 日偏移、value 为当天稳定顺序。
+     * 同一 SKU 同一天多机台拆量只保留首次顺序，候选机台失败重试不会重复递增。</p>
+     */
+    private Map<SkuScheduleDTO, Map<Integer, Integer>> newSpecRealtimeSelectionOrderMap =
+            new IdentityHashMap<SkuScheduleDTO, Map<Integer, Integer>>();
+    /**
+     * 已回写新增选机实时快照字段的结果集合。
+     * <p>使用结果对象身份区分同物料多机台结果，供同一 SKU 跨日再次命中时统一刷新
+     * {@code SKU_REALTIME_SELECTION_ORDER}，不会把续作或 S4.4 换活字块结果误纳入新增专用字段。</p>
+     */
+    private Set<LhScheduleResult> newSpecRealtimeSnapshotResultSet =
+            Collections.newSetFromMap(new IdentityHashMap<LhScheduleResult, Boolean>());
+    /**
      * 已正式提交的精度前插排结果集合。
      * <p>使用对象身份精确标记结果，保存前时间轴复核只能撤销真正的插排结果，
      * 不能把同机台在06:00前自然收尾的前SKU误识别为插排。</p>
@@ -1521,6 +1535,56 @@ public class LhScheduleContext {
         String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(
                 materialCode, normalizedProductStatus);
         return this.getScheduledMachineCount(skuScheduledMachineCodeMap, productionDate, skuKey);
+    }
+
+    /**
+     * 登记新增 SKU 在指定业务日真实命中的选机顺序。
+     *
+     * <p>只有排程结果正式提交后调用；同一 SKU 同一天因多机台拆量再次命中时保留首次顺序，
+     * 防止候选机台重试或第二台机台重复增加当天 SKU 顺序。</p>
+     *
+     * @param sku 已正式命中的新增 SKU
+     * @param dateOffset 当前业务日相对 T 日偏移
+     * @param selectionOrder 当前业务日真实进入选机流程的顺序
+     */
+    public void recordNewSpecRealtimeSelectionOrder(
+            SkuScheduleDTO sku,
+            int dateOffset,
+            int selectionOrder) {
+        if (Objects.isNull(sku) || dateOffset < 0 || selectionOrder <= 0) {
+            return;
+        }
+        Map<Integer, Integer> dailyOrderMap = newSpecRealtimeSelectionOrderMap.computeIfAbsent(
+                sku, key -> new LinkedHashMap<Integer, Integer>(4));
+        dailyOrderMap.putIfAbsent(dateOffset, selectionOrder);
+    }
+
+    /**
+     * 构建新增 SKU 已真实命中的跨日选机顺序文本。
+     *
+     * @param sku 新增 SKU
+     * @return {@code T=1,T+1=3}；尚未命中时返回空
+     */
+    public String buildNewSpecRealtimeSelectionOrderText(SkuScheduleDTO sku) {
+        if (Objects.isNull(sku) || CollectionUtils.isEmpty(newSpecRealtimeSelectionOrderMap)) {
+            return null;
+        }
+        Map<Integer, Integer> dailyOrderMap = newSpecRealtimeSelectionOrderMap.get(sku);
+        if (CollectionUtils.isEmpty(dailyOrderMap)) {
+            return null;
+        }
+        StringBuilder orderTextBuilder = new StringBuilder(24);
+        dailyOrderMap.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .forEach(entry -> {
+                    if (orderTextBuilder.length() > 0) {
+                        orderTextBuilder.append(',');
+                    }
+                    orderTextBuilder.append(entry.getKey() == 0
+                                    ? "T" : "T+" + entry.getKey())
+                            .append('=').append(entry.getValue());
+                });
+        return orderTextBuilder.toString();
     }
 
     /**

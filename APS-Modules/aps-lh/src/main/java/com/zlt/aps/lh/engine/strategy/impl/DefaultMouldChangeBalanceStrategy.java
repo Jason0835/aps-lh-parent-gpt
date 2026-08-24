@@ -554,6 +554,34 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
         }
     }
 
+    /**
+     * 读取指定班次已经正式分配的换模/换活字块次数。
+     *
+     * <p>直接读取 {@code dailyMouldChangeCountMap} 的早班/中班槽位，保证排查字段与
+     * {@link #allocateMouldChange}、{@link #rollbackMouldChange} 使用完全相同的实时账本。</p>
+     *
+     * @param context 排程上下文
+     * @param shiftTime 班次内任一时间
+     * @return 当前班次已经正式占用的切换次数
+     */
+    @Override
+    public int getAllocatedChangeoverCount(LhScheduleContext context, Date shiftTime) {
+        if (Objects.isNull(context) || Objects.isNull(shiftTime)) {
+            return 0;
+        }
+        int[] counts = context.getDailyMouldChangeCountMap().get(formatDateKey(shiftTime));
+        if (Objects.isNull(counts)) {
+            return 0;
+        }
+        if (LhScheduleTimeUtil.isMorningShift(context, shiftTime)) {
+            return Math.max(0, counts[IDX_MORNING]);
+        }
+        if (LhScheduleTimeUtil.isAfternoonShift(context, shiftTime)) {
+            return Math.max(0, counts[IDX_AFTERNOON]);
+        }
+        return 0;
+    }
+
     @Override
     public Date previewEndingStaggerMouldChange(LhScheduleContext context,
                                                 String machineCode,

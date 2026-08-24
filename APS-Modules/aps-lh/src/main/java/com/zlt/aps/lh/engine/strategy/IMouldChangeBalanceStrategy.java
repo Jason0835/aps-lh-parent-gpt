@@ -192,4 +192,18 @@ public interface IMouldChangeBalanceStrategy {
      * @return 剩余换模次数
      */
     int getRemainingCapacity(LhScheduleContext context, Date targetDate);
+
+    /**
+     * 获取指定班次已经正式占用的换模/换活字块次数。
+     *
+     * <p>该入口只读取正式分配使用的实时计数，不执行预演、分配或回滚，供排查快照与
+     * 每日硬限制判断复用同一份早班/中班统计口径。</p>
+     *
+     * @param context 排程上下文
+     * @param shiftTime 班次内任一时间，通常传班次开始时间
+     * @return 已正式占用的换模/换活字块次数；夜班或无数据时返回 0
+     */
+    default int getAllocatedChangeoverCount(LhScheduleContext context, Date shiftTime) {
+        return 0;
+    }
 }

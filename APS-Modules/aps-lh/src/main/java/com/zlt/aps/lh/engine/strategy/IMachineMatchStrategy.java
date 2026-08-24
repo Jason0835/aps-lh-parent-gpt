@@ -281,6 +281,24 @@ public interface IMachineMatchStrategy {
     }
 
     /**
+     * 获取当前 SKU 选机时命中机台在窗口内的前序 SKU 实时释放明细。
+     *
+     * <p>默认策略会从与选机日志相同的实时机台分配结果中读取；非默认策略不具备该观察能力时
+     * 保持空值，禁止为了排查字段反向增加候选或修改机台状态。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 当前待选机 SKU
+     * @param machineCode 实际命中机台编码
+     * @return {@code SKU1=收尾时间,SKU2=收尾时间}；无观察能力时返回空
+     */
+    default String resolveRealtimeMachineEndingText(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            String machineCode) {
+        return null;
+    }
+
+    /**
      * 输出续作排产后全量启用机台排序日志（不依赖具体SKU）。
      * <p>排除续作排满机台、保留续作收尾机台，按"单控优先->收尾时间->普通机台优先->特殊支持能力数"排序。</p>
      *

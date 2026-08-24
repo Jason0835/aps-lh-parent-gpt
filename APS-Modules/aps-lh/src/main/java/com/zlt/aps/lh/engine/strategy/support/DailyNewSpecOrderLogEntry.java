@@ -19,6 +19,8 @@ public class DailyNewSpecOrderLogEntry implements Serializable {
     private final String materialCode;
     /** 当前真实执行的新增排产阶段名称 */
     private final String productionPhase;
+    /** 当前 SKU 在本业务日真正进入新增选机流程时的稳定顺序 */
+    private final int selectionOrder;
     /** 当前进入新增排产入口的主来源类型 */
     private final String materialSourceType;
     /** 当前实际业务日的原始月计划 dayN 数量 */
@@ -32,6 +34,7 @@ public class DailyNewSpecOrderLogEntry implements Serializable {
      * 创建每日新增排产顺序明细。
      *
      * @param materialCode 物料编码/SKU
+     * @param selectionOrder 当前 SKU 在本业务日真正进入新增选机流程的顺序
      * @param productionPhase 当前真实执行阶段名称
      * @param materialSourceType 当前新增入口主来源类型
      * @param originalDayPlanQty 当前实际业务日原始月计划 dayN 数量
@@ -39,12 +42,14 @@ public class DailyNewSpecOrderLogEntry implements Serializable {
      * @param requiredMachineCount 当前业务日初始目标机台数
      */
     public DailyNewSpecOrderLogEntry(String materialCode,
+                                     int selectionOrder,
                                      String productionPhase,
                                      String materialSourceType,
                                      int originalDayPlanQty,
                                      boolean structureEarlyProduction,
                                      int requiredMachineCount) {
         this.materialCode = materialCode;
+        this.selectionOrder = selectionOrder;
         this.productionPhase = productionPhase;
         this.materialSourceType = materialSourceType;
         // 日志必须展示现有计划数据的原值，不在观察对象中二次修正。
@@ -73,6 +78,10 @@ public class DailyNewSpecOrderLogEntry implements Serializable {
 
     public String getProductionPhase() {
         return productionPhase;
+    }
+
+    public int getSelectionOrder() {
+        return selectionOrder;
     }
 
     public String getMaterialSourceType() {

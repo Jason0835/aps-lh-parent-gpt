@@ -68,12 +68,14 @@ import com.zlt.aps.lh.engine.strategy.support.FirstInspectionShiftAllocation;
 import com.zlt.aps.lh.engine.strategy.support.MachineProductionSegment;
 import com.zlt.aps.lh.engine.strategy.support.MachinePriorityMetricSnapshot;
 import com.zlt.aps.lh.engine.strategy.support.MachinePriorityTraceSnapshot;
+import com.zlt.aps.lh.engine.strategy.support.MachineSelectionDescriptionFormatter;
 import com.zlt.aps.lh.engine.strategy.support.MachineScheduleRole;
 import com.zlt.aps.lh.engine.strategy.support.MouldResourceAllocationResult;
 import com.zlt.aps.lh.engine.strategy.support.MouldResourceContext;
 import com.zlt.aps.lh.engine.strategy.support.NewSpecCandidateCache;
 import com.zlt.aps.lh.engine.strategy.support.NewSpecEmbryoAvailableTimeResolver;
 import com.zlt.aps.lh.engine.strategy.support.NewSpecMachineAvailabilityPlan;
+import com.zlt.aps.lh.engine.strategy.support.NewSpecSelectionRealtimeSnapshot;
 import com.zlt.aps.lh.engine.strategy.support.PendingSkuUnscheduledRule;
 import com.zlt.aps.lh.engine.strategy.support.ProductionQuantityPolicy;
 import com.zlt.aps.lh.engine.strategy.support.ScheduleResultBaseline;
@@ -1217,6 +1219,155 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 NEW_SPEC_ORDER_LOG_SECTION_SEPARATOR, newSpecOrderLogSections);
         PriorityTraceLogHelper.appendProcessLog(
                 context, NEW_SPEC_ORDER_MERGED_LOG_TITLE, mergedDetail);
+    }
+
+    /**
+     * 记录新增 SKU 实际命中机台时的完整实时选机快照。
+     *
+     * <p>调用点位于主副结果、机台状态和跨日在机绑定全部提交之后；统计值在正式换模分配和
+     * 当前结果写入前已经冻结，因此班次计划量、切换次数和结构机台数均不包含本次结果。
+     * 候选描述保持正式选机主链的真实顺序，不执行展示层收尾时间重排。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 当前已命中的新增 SKU
+     * @param machine 实际命中机台
+     * @param result 当前实际命中的主结果
+     * @param pairResult 单控整机配对侧结果；普通机台为空
+     * @param realtimeSnapshot 选机前实时统计快照
+     * @param realtimeMachineEndingText 命中机台选机前的前序 SKU 收尾明细
+     * @param machineSelectionDescription 正式候选顺序及软排序描述
+     */
+    private void appendNewSpecSelectionRealtimeSnapshotLog(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            MachineScheduleDTO machine,
+            LhScheduleResult result,
+            LhScheduleResult pairResult,
+            NewSpecSelectionRealtimeSnapshot realtimeSnapshot,
+            String realtimeMachineEndingText,
+            String machineSelectionDescription) {
+        if (Objects.isNull(context) || Objects.isNull(sku) || Objects.isNull(machine)
+                || Objects.isNull(realtimeSnapshot)) {
+            return;
+        }
+        context.recordNewSpecRealtimeSelectionOrder(
+                sku, realtimeSnapshot.getDateOffset(), realtimeSnapshot.getSelectionOrder());
+        String selectionOrderText = context.buildNewSpecRealtimeSelectionOrderText(sku);
+        // 过程日志与结果表共用同一次冻结快照，禁止为落库重新扫描或重新计算选机状态。
+        this.fillNewSpecSelectionRealtimeFields(
+                context, sku, result, pairResult, realtimeSnapshot,
+                realtimeMachineEndingText, machineSelectionDescription, selectionOrderText);
+        String earliestEmbryoAvailableTimeText =
+                Objects.isNull(realtimeSnapshot.getEarliestEmbryoAvailableTime())
+                        ? StringUtils.EMPTY
+                        : LhScheduleTimeUtil.formatDateTime(
+                                realtimeSnapshot.getEarliestEmbryoAvailableTime());
+        String title = "【" + sku.getMaterialCode() + "】【"
+                + StringUtils.defaultString(sku.getProductStatus()) + "】新增选机实时快照";
+        StringBuilder detailBuilder = new StringBuilder(
+                Math.max(768, StringUtils.length(machineSelectionDescription) + 512));
+        detailBuilder.append("批次=").append(context.getBatchNo())
+                .append("，工厂=").append(context.getFactoryCode())
+                .append("，物料=").append(sku.getMaterialCode())
+                .append("，产品状态=").append(sku.getProductStatus())
+                .append("，结构=").append(sku.getStructureName())
+                .append("，实际命中机台=").append(machine.getMachineCode())
+                .append('\n')
+                .append("最早胎胚可供硫化时间=").append(earliestEmbryoAvailableTimeText)
+                .append('\n')
+                .append("实时机台收尾时间=")
+                .append(StringUtils.defaultString(realtimeMachineEndingText))
+                .append('\n')
+                .append("实时班次总计划量=")
+                .append(realtimeSnapshot.getRealtimeShiftTotalPlanQty())
+                .append('\n')
+                .append("实时班次换模/换活字块次数=")
+                .append(realtimeSnapshot.getRealtimeShiftChangeCount())
+                .append('\n')
+                .append("实时结构已排硫化机台数=")
+                .append(realtimeSnapshot.getRealtimeStructureMachineCount())
+                .append('\n')
+                .append("SKU选机描述=")
+                .append(StringUtils.defaultString(machineSelectionDescription))
+                .append('\n')
+                .append("SKU实时选机顺序=")
+                .append(StringUtils.defaultString(selectionOrderText));
+        PriorityTraceLogHelper.appendProcessLog(context, title, detailBuilder.toString());
+    }
+
+    /**
+     * 将新增选机实时快照回写到当前主副结果，并刷新同一 SKU 已落地新增结果的跨日选机顺序。
+     *
+     * @param context 排程上下文
+     * @param sku 当前新增 SKU
+     * @param result 当前主结果
+     * @param pairResult 单控整机配对侧结果
+     * @param realtimeSnapshot 选机前实时统计快照
+     * @param realtimeMachineEndingText 命中机台前序 SKU 收尾明细
+     * @param machineSelectionDescription 正式候选选机描述
+     * @param selectionOrderText 当前 SKU 已命中日期的累计顺序文本
+     */
+    private void fillNewSpecSelectionRealtimeFields(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            LhScheduleResult result,
+            LhScheduleResult pairResult,
+            NewSpecSelectionRealtimeSnapshot realtimeSnapshot,
+            String realtimeMachineEndingText,
+            String machineSelectionDescription,
+            String selectionOrderText) {
+        this.fillSingleNewSpecSelectionRealtimeFields(
+                result, realtimeSnapshot, realtimeMachineEndingText,
+                machineSelectionDescription, selectionOrderText);
+        this.fillSingleNewSpecSelectionRealtimeFields(
+                pairResult, realtimeSnapshot, realtimeMachineEndingText,
+                machineSelectionDescription, selectionOrderText);
+        if (Objects.nonNull(result)) {
+            context.getNewSpecRealtimeSnapshotResultSet().add(result);
+        }
+        if (Objects.nonNull(pairResult)) {
+            context.getNewSpecRealtimeSnapshotResultSet().add(pairResult);
+        }
+        /*
+         * 同一 SKU 跨 T/T+1/T+2 再次命中时，统一刷新之前已落地的新增快照结果；
+         * 只遍历身份集合，不扫描全部排程结果，也不触碰续作和 S4.4 换活字块结果。
+         */
+        for (LhScheduleResult snapshotResult : context.getNewSpecRealtimeSnapshotResultSet()) {
+            if (context.getScheduleResultSourceSkuMap().get(snapshotResult) == sku) {
+                snapshotResult.setSkuRealtimeSelectionOrder(selectionOrderText);
+            }
+        }
+    }
+
+    /**
+     * 回写单条新增排产结果的实时快照字段。
+     *
+     * @param result 待回写结果；允许为空
+     * @param realtimeSnapshot 选机前实时统计快照
+     * @param realtimeMachineEndingText 命中机台前序 SKU 收尾明细
+     * @param machineSelectionDescription 正式候选选机描述
+     * @param selectionOrderText 当前 SKU 跨日选机顺序
+     */
+    private void fillSingleNewSpecSelectionRealtimeFields(
+            LhScheduleResult result,
+            NewSpecSelectionRealtimeSnapshot realtimeSnapshot,
+            String realtimeMachineEndingText,
+            String machineSelectionDescription,
+            String selectionOrderText) {
+        if (Objects.isNull(result) || Objects.isNull(realtimeSnapshot)) {
+            return;
+        }
+        result.setEarliestEmbryoAvailableTime(
+                realtimeSnapshot.getEarliestEmbryoAvailableTime());
+        result.setRealtimeMachineEndingInfo(realtimeMachineEndingText);
+        result.setRealtimeShiftTotalPlanQty(
+                realtimeSnapshot.getRealtimeShiftTotalPlanQty());
+        result.setRealtimeShiftChangeoverCount(
+                realtimeSnapshot.getRealtimeShiftChangeCount());
+        result.setRealtimeStructureScheduledMachineCount(
+                realtimeSnapshot.getRealtimeStructureMachineCount());
+        result.setSkuMachineSelectionDesc(machineSelectionDescription);
+        result.setSkuRealtimeSelectionOrder(selectionOrderText);
     }
 
     /**
@@ -3858,6 +4009,16 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                                     dayContext.getScheduleDate()));
                 }
                 /*
+                 * 当前选机回合只采集一次实时统计：结果列表扫描不进入候选机台循环；候选失败重试
+                 * 复用该快照，当前 SKU 成功落地后下一台机台回合会重新采集并看到最新状态。
+                 * 采集点位于换模/换活字块正式分配之前，确保次数统计不包含本次即将产生的切换。
+                 */
+                NewSpecSelectionRealtimeSnapshot selectionRealtimeSnapshot =
+                        NewSpecSelectionRealtimeSnapshot.capture(
+                                context, sku, configuredEarliestEmbryoAvailableTime,
+                                dailyOrderEntry, mouldChangeBalance,
+                                dayContext.getNewSpecOrderLogCollector().getDateOffset());
+                /*
                  * 基础硬约束或当前日尝试失败仍可能在后续业务日恢复，T、T+1 必须保留历史
                  * “机台+后物料”关系；窗口最后一日才结算这类临时失败。整窗产能为0属于
                  * 终局失败，在形成真实可选候选后单独即时结算，不受该日期门槛限制。
@@ -5537,6 +5698,14 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 pendingTraceDayEndTime = null;
                 pendingPriorityMetricSnapshotMap =
                         Collections.<String, MachinePriorityMetricSnapshot>emptyMap();
+                /*
+                 * 排程结果尚未写入、机台运行态尚未推进，此时冻结实际命中机台的前序 SKU 收尾明细。
+                 * 候选描述只消费已经冻结的正式候选顺序、时间和软排序指标，不重新执行比较。
+                 */
+                String realtimeMachineEndingText = machineMatch.resolveRealtimeMachineEndingText(
+                        context, sku, candidateMachine.getMachineCode());
+                String machineSelectionDescription =
+                        MachineSelectionDescriptionFormatter.format(pendingCandidateTraceSnapshot);
                 context.getScheduleResultList().add(result);
                 context.getScheduleResultSourceSkuMap().put(result, sku);
                 if (embryoAvailableTimeConstrained) {
@@ -5688,6 +5857,14 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                         isEnding);
                 state.registerBinding(activeBinding);
                 state.markScheduledAndCarryOver(sku);
+                /*
+                 * 主副结果、机台状态和跨日在机绑定全部提交后，才写实际命中的实时选机快照。
+                 * 失败候选及日计划回裁为零的尝试不会留下排查日志或消耗跨日命中顺序。
+                 */
+                this.appendNewSpecSelectionRealtimeSnapshotLog(
+                        context, sku, candidateMachine, result, pairResult,
+                        selectionRealtimeSnapshot,
+                        realtimeMachineEndingText, machineSelectionDescription);
                 /*
                  * 首检分摊在候选构建阶段已经写入结果并推进计数，但候选随后仍可能被日计划账本、
                  * 精度计划或结果有效性校验拒绝。必须等主副结果、机台运行态和跨日在机绑定全部

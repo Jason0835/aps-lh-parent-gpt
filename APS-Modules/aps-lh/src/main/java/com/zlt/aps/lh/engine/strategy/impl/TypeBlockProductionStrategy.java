@@ -2019,6 +2019,12 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
             return false;
         }
 
+        /*
+         * 结果和机台分配尚未提交，此时冻结换活字块选机命中机台的前序 SKU 收尾明细。
+         * 通用胎胚时间直接读取既有结构 Map；新增排产专用五个字段继续保持为空。
+         */
+        this.fillTypeBlockRealtimeCommonFields(
+                context, sku, machine, result, pairResult);
         context.getScheduleResultList().add(result);
         context.getScheduleResultSourceSkuMap().put(result, sku);
         if (getMaintenanceScheduleService().shouldMarkPrecisionPreInsert(
@@ -2095,6 +2101,57 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                 context, machine, sku, adoptedTargetQty, scheduledQty,
                 remainingQty, originalStrictTargetQty);
         return true;
+    }
+
+    /**
+     * 回写换活字块结果共用的最早胎胚时间和实时机台收尾明细。
+     *
+     * <p>调用点位于结果加入列表及机台状态推进之前，保证收尾明细只包含前序结果；
+     * 新增排产专用的班次负荷、切换次数、结构机台数、候选描述和实时顺序不在 S4.4 回写。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 当前换活字块 SKU
+     * @param machine 实际命中机台
+     * @param result 主结果
+     * @param pairResult 单控整机配对侧结果
+     */
+    private void fillTypeBlockRealtimeCommonFields(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            MachineScheduleDTO machine,
+            LhScheduleResult result,
+            LhScheduleResult pairResult) {
+        if (Objects.isNull(context) || Objects.isNull(sku) || Objects.isNull(machine)) {
+            return;
+        }
+        Date earliestEmbryoAvailableTime =
+                NewSpecEmbryoAvailableTimeResolver.resolveEarliestAvailableTime(context, sku);
+        String realtimeMachineEndingInfo = machineMatchStrategy.resolveRealtimeMachineEndingText(
+                context, sku, machine.getMachineCode());
+        this.fillSingleTypeBlockRealtimeCommonFields(
+                result, earliestEmbryoAvailableTime, realtimeMachineEndingInfo);
+        this.fillSingleTypeBlockRealtimeCommonFields(
+                pairResult, earliestEmbryoAvailableTime, realtimeMachineEndingInfo);
+    }
+
+    /**
+     * 回写单条换活字块结果的通用实时排查字段。
+     *
+     * @param result 待回写结果；允许为空
+     * @param earliestEmbryoAvailableTime 最早胎胚可供硫化时间
+     * @param realtimeMachineEndingInfo 命中机台前序 SKU 收尾明细
+     */
+    private void fillSingleTypeBlockRealtimeCommonFields(
+            LhScheduleResult result,
+            Date earliestEmbryoAvailableTime,
+            String realtimeMachineEndingInfo) {
+        if (Objects.isNull(result)) {
+            return;
+        }
+        result.setEarliestEmbryoAvailableTime(
+                Objects.isNull(earliestEmbryoAvailableTime)
+                        ? null : new Date(earliestEmbryoAvailableTime.getTime()));
+        result.setRealtimeMachineEndingInfo(realtimeMachineEndingInfo);
     }
 
     /**

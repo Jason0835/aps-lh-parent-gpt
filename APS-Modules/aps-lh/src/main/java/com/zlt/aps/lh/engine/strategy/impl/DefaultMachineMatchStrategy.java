@@ -52,7 +52,9 @@ import javax.annotation.Resource;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.AbstractMap;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
@@ -1735,9 +1737,32 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
     private String resolveMachineOccupationText(
             LhScheduleContext context,
             List<String> memberMachineCodes) {
+        List<MachineOccupationGroup> occupationGroups =
+                this.resolveMachineOccupationGroups(context, memberMachineCodes);
+        if (CollectionUtils.isEmpty(occupationGroups)) {
+            return "无";
+        }
+        return occupationGroups.stream()
+                .map(this::formatMachineOccupationGroup)
+                .collect(Collectors.joining("、"));
+    }
+
+    /**
+     * 汇总普通机台或单控整机成员在排程窗口内的实时占用分组。
+     *
+     * <p>选机日志占用详情和结果排查字段共用该方法，保证窗口裁剪、空班排除、SKU 分组与
+     * 稳定排序完全一致。</p>
+     *
+     * @param context 排程上下文
+     * @param memberMachineCodes 普通机台自身或单控 L/R 成员编码
+     * @return 按最早占用时间稳定排序的占用分组
+     */
+    private List<MachineOccupationGroup> resolveMachineOccupationGroups(
+            LhScheduleContext context,
+            List<String> memberMachineCodes) {
         if (Objects.isNull(context) || CollectionUtils.isEmpty(memberMachineCodes)
                 || CollectionUtils.isEmpty(context.getMachineAssignmentMap())) {
-            return "无";
+            return Collections.emptyList();
         }
         Map<String, MachineOccupationGroup> groupMap =
                 new LinkedHashMap<String, MachineOccupationGroup>(8);
@@ -1783,7 +1808,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
             }
         }
         if (CollectionUtils.isEmpty(groupMap)) {
-            return "无";
+            return Collections.emptyList();
         }
 
         List<MachineOccupationGroup> occupationGroups =
@@ -1804,9 +1829,71 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
                         .thenComparing(
                                 MachineOccupationGroup::getScheduleType,
                                 Comparator.nullsLast(String::compareTo)));
+        return occupationGroups;
+    }
+
+    /**
+     * 获取实际命中机台在当前选机时点的前序 SKU 收尾明细。
+     *
+     * <p>有多个前序 SKU 时按各自最后占用结束时间升序输出；没有任何窗口内占用时，
+     * 使用排程窗口首班开始时间作为默认释放时间。该方法只读取实时分配结果，不修改选机排序。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 当前待选机 SKU
+     * @param machineCode 实际命中机台编码
+     * @return 前序 SKU 收尾文本
+     */
+    @Override
+    public String resolveRealtimeMachineEndingText(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            String machineCode) {
+        if (Objects.isNull(context) || Objects.isNull(sku)
+                || StringUtils.isEmpty(machineCode)) {
+            return null;
+        }
+        List<String> memberMachineCodes;
+        if (LhSingleControlMachineUtil.isWholeMachineGranularitySku(context, sku)
+                && isSingleControlMachine(context, machineCode)) {
+            memberMachineCodes = Arrays.asList(
+                    LhSingleControlMachineUtil.resolveLeftMachineCode(machineCode),
+                    LhSingleControlMachineUtil.resolveRightMachineCode(machineCode));
+        } else {
+            memberMachineCodes = Collections.singletonList(machineCode);
+        }
+        List<MachineOccupationGroup> occupationGroups =
+                this.resolveMachineOccupationGroups(context, memberMachineCodes);
+        if (CollectionUtils.isEmpty(occupationGroups)) {
+            return "默认=" + PriorityTraceLogHelper.formatDateTime(
+                    this.resolveScheduleWindowStartTime(context));
+        }
         return occupationGroups.stream()
-                .map(this::formatMachineOccupationGroup)
-                .collect(Collectors.joining("、"));
+                .map(group -> new AbstractMap.SimpleImmutableEntry<MachineOccupationGroup, Date>(
+                        group, this.resolveOccupationGroupEndingTime(group)))
+                .sorted(Map.Entry.<MachineOccupationGroup, Date>comparingByValue(
+                                Comparator.nullsLast(Date::compareTo))
+                        .thenComparing(entry -> entry.getKey().getMaterialCode(),
+                                Comparator.nullsLast(String::compareTo)))
+                .map(entry -> entry.getKey().getMaterialCode()
+                        + "=" + PriorityTraceLogHelper.formatDateTime(entry.getValue()))
+                .collect(Collectors.joining(","));
+    }
+
+    /**
+     * 获取一个前序 SKU 占用分组在窗口内的最后结束时间。
+     *
+     * @param occupationGroup 前序 SKU 占用分组
+     * @return 最晚占用结束时间
+     */
+    private Date resolveOccupationGroupEndingTime(MachineOccupationGroup occupationGroup) {
+        if (Objects.isNull(occupationGroup)) {
+            return null;
+        }
+        return occupationGroup.getIntervals().stream()
+                .map(MachineOccupationInterval::getEndTime)
+                .filter(Objects::nonNull)
+                .max(Date::compareTo)
+                .orElse(null);
     }
 
     /**
