@@ -117,10 +117,31 @@ public class Cd90DefaultShiftDemandProvider implements Cd90ShiftDemandProvider {
         // 净需求口径：窗口需求 + 历史缺口 - 可用库存 - 截止前有效计划入库，最低为0。
         BigDecimal netDemand = demandCalculator.calculateNetDemand(
                 demandQuantity, shortage, expectedStock, futureEffectivePlan);
-        log.debug("[直裁自动排程] 当前班次净需求计算完成, classField={}, clothCode={}, "
-                        + "demandQuantity={}, expectedStock={}, shortage={}, futurePlan={}, netDemand={}",
-                shift.getClassField(), candidate.getClothCode(), demandQuantity,
-                expectedStock, shortage, futureEffectivePlan, netDemand);
+        log.info("[CD90_DEMAND_WINDOW] 窗口需求明细及 SUM/AVERAGE 计算过程 factoryCode={}, scheduleDate={}, classField={}, shiftCode={}, "
+                        + "shiftStart={}, clothCode={}, mode={}, depthClassQty={}, demandStart={}, "
+                        + "demandDeadline={}, windowDetails={}, calculation={}, demandQuantity={}",
+                context.getFactoryCode(), context.getScheduleDate(), shift.getClassField(),
+                shift.getShiftCode(), shift.getStartTime(), candidate.getClothCode(),
+                context.getParameters().getDemandCalcMode(), depthClassQty, demandStart,
+                demandDeadline, this.windowDetails(window),
+                this.demandCalculationProcess(window,
+                        context.getParameters().getDemandCalcMode(), depthClassQty), demandQuantity);
+        log.info("[CD90_INVENTORY_BALANCE] 预计库存及缺口计算过程 factoryCode={}, scheduleDate={}, classField={}, shiftCode={}, "
+                        + "shiftStart={}, clothCode={}, stockBaselineTime={}, stockAtSix={}, "
+                        + "inboundBeforeShift={}, consumedBeforeWindow={}, "
+                        + "formula=max/min split({}+{}-{}), inventoryBalance={}, expectedStock={}, shortage={}",
+                context.getFactoryCode(), context.getScheduleDate(), shift.getClassField(),
+                shift.getShiftCode(), shift.getStartTime(), candidate.getClothCode(), stockBaselineTime,
+                stockAtSix, inboundBeforeShift, consumedBeforeWindow,
+                stockAtSix, inboundBeforeShift, consumedBeforeWindow,
+                inventoryBalance, expectedStock, shortage);
+        log.info("[CD90_NET_DEMAND] 净需求计算过程 factoryCode={}, scheduleDate={}, classField={}, shiftCode={}, "
+                        + "shiftStart={}, clothCode={}, demandQuantity={}, shortage={}, expectedStock={}, "
+                        + "futureEffectivePlan={}, formula=max(0,{}+{}-{}-{}), netDemand={}",
+                context.getFactoryCode(), context.getScheduleDate(), shift.getClassField(),
+                shift.getShiftCode(), shift.getStartTime(), candidate.getClothCode(),
+                demandQuantity, shortage, expectedStock, futureEffectivePlan,
+                demandQuantity, shortage, expectedStock, futureEffectivePlan, netDemand);
         return Cd90ShiftDemandDecision.builder()
                 .netDemandQuantity(netDemand).planSurplusQuantity(null).build();
     }
@@ -189,6 +210,64 @@ public class Cd90DefaultShiftDemandProvider implements Cd90ShiftDemandProvider {
                 BigDecimal.valueOf(recentEffective.size()), 10, RoundingMode.HALF_UP);
         return this.normalize(total.add(recentAverage.multiply(missingWeight)));
     }
+    /** 输出固定结构的需求窗口明细，供测试日志和大模型复算。 */
+    private String windowDetails(List<Cd90DemandShift> window) {
+        return safe(window).stream()
+                .filter(Objects::nonNull)
+                .map(item -> "{classField=" + item.getClassField()
+                        + ",startTime=" + item.getStartTime()
+                        + ",demandQuantity=" + this.decimal(item.getClothDemandQuantity())
+                        + ",windowWeight=" + this.decimal(this.windowWeight(item)) + "}")
+                .collect(Collectors.joining(",", "[", "]"));
+    }
+
+    /** 输出与需求计算一致的中间量，避免日志只有最终结果而无法复算。 */
+    private String demandCalculationProcess(List<Cd90DemandShift> window,
+                                            String mode,
+                                            BigDecimal depthClassQty) {
+        List<Cd90DemandShift> effective = safe(window).stream()
+                .filter(Objects::nonNull)
+                .filter(Cd90DemandShift::isIncluded)
+                .filter(item -> value(item.getClothDemandQuantity()).signum() > 0)
+                .collect(Collectors.toList());
+        if (effective.isEmpty()) {
+            return "effectiveTotal=0,totalWeight=0,missingWeight="
+                    + this.decimal(depthClassQty) + ",formula=ZERO_DEMAND";
+        }
+        BigDecimal effectiveTotal = effective.stream()
+                .map(item -> value(item.getClothDemandQuantity()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalWeight = effective.stream()
+                .map(this::windowWeight)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal missingWeight = value(depthClassQty).subtract(totalWeight).max(BigDecimal.ZERO);
+        if ("AVERAGE".equals(mode)) {
+            BigDecimal average = effectiveTotal.divide(totalWeight, 10, RoundingMode.HALF_UP);
+            return "effectiveTotal=" + this.decimal(effectiveTotal)
+                    + ",totalWeight=" + this.decimal(totalWeight)
+                    + ",missingWeight=" + this.decimal(missingWeight)
+                    + ",average=" + this.decimal(average)
+                    + ",formula=AVERAGE";
+        }
+        int recentStartIndex = Math.max(0, effective.size() - 3);
+        List<Cd90DemandShift> recentEffective = effective.subList(recentStartIndex, effective.size());
+        BigDecimal recentTotal = recentEffective.stream()
+                .map(item -> value(item.getClothDemandQuantity()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal recentAverage = recentTotal.divide(
+                BigDecimal.valueOf(recentEffective.size()), 10, RoundingMode.HALF_UP);
+        return "effectiveTotal=" + this.decimal(effectiveTotal)
+                + ",totalWeight=" + this.decimal(totalWeight)
+                + ",missingWeight=" + this.decimal(missingWeight)
+                + ",recentShiftCount=" + recentEffective.size()
+                + ",recentAverage=" + this.decimal(recentAverage)
+                + ",formula=SUM";
+    }
+
+    private String decimal(BigDecimal quantity) {
+        return this.normalize(this.value(quantity)).toPlainString();
+    }
+
     private BigDecimal requiredDepth(Cd90AutoScheduleInput input, String clothCode) {
         BigDecimal depthClassQty = input.getDepthClassQtyByCloth() == null
                 ? null : input.getDepthClassQtyByCloth().get(clothCode);
