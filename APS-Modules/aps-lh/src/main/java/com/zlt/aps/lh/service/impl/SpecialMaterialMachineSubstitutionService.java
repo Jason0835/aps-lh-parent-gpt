@@ -23,11 +23,11 @@ import com.zlt.aps.lh.engine.strategy.IMachineMatchStrategy;
 import com.zlt.aps.lh.engine.strategy.IMouldChangeBalanceStrategy;
 import com.zlt.aps.lh.engine.strategy.IProductionStrategy;
 import com.zlt.aps.lh.engine.strategy.ITypeBlockProductionStrategy;
-import com.zlt.aps.lh.engine.strategy.support.DailyMachineExpansionPlanner;
 import com.zlt.aps.lh.engine.strategy.support.MouldResourceAllocationResult;
 import com.zlt.aps.lh.engine.strategy.support.MouldResourceContext;
 import com.zlt.aps.lh.engine.strategy.support.SpecialMaterialSubstitutionRecord;
 import com.zlt.aps.lh.engine.strategy.support.SpecifiedMachineScheduleResult;
+import com.zlt.aps.lh.service.ILhDailyMouldCalcService;
 import com.zlt.aps.lh.util.LhMachineHardMatchUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
@@ -99,6 +99,10 @@ public class SpecialMaterialMachineSubstitutionService {
 
     @Resource
     private TargetScheduleQtyResolver targetScheduleQtyResolver;
+
+    /** 物料+产品状态+自然日目标总机台数唯一查询入口。 */
+    @Resource
+    private ILhDailyMouldCalcService lhDailyMouldCalcService;
 
     /** 换活字块指定机台入口，置换时复用现有同胎胚、同模具判断和切换主链 */
     @Resource
@@ -240,17 +244,25 @@ public class SpecialMaterialMachineSubstitutionService {
 
         List<LhScheduleResult> allCandidates =
                 collectContinuationCandidates(context, sku, firstPlanDate, Collections.<String>emptySet());
-        int requiredMachineCount = DailyMachineExpansionPlanner.resolveSpecialMaterialRequiredMachineCount(
-                context, sku, firstPlanDate, remainingTargetQty, allCandidates.size());
+        int targetTotalMachineCount = this.lhDailyMouldCalcService.getRequiredMachineCount(
+                context, sku.getMaterialCode(), sku.getProductStatus(), firstPlanDate);
+        int currentEffectiveMachineCount = this.countCurrentEffectiveSameSkuMachines(context, sku);
+        int requiredMachineCount = Math.max(
+                0, targetTotalMachineCount - currentEffectiveMachineCount);
         if (requiredMachineCount <= 0) {
             updateUnscheduledReason(unscheduled, UNSCHEDULED_REASON_NO_CANDIDATE);
+            log.info("特殊材料置换跳过，统一Map目标机台数无新增缺口, materialCode: {}, productStatus: {}, "
+                            + "productionDate: {}, targetTotalMachineCount: {}, currentEffectiveMachineCount: {}",
+                    sku.getMaterialCode(), sku.getProductStatus(), firstPlanDate,
+                    targetTotalMachineCount, currentEffectiveMachineCount);
             return false;
         }
 
         log.info("特殊材料置换开始, materialCode: {}, productStatus: {}, 首个有量日期: {}, "
-                        + "待排量: {}, 续作候选数: {}, 需置换机台数: {}",
+                        + "待排量: {}, 续作候选数: {}, Map目标总机台数: {}, 当前有效机台数: {}, 需置换机台数: {}",
                 sku.getMaterialCode(), sku.getProductStatus(), firstPlanDate,
-                remainingTargetQty, allCandidates.size(), requiredMachineCount);
+                remainingTargetQty, allCandidates.size(), targetTotalMachineCount,
+                currentEffectiveMachineCount, requiredMachineCount);
 
         Set<String> attemptedMachineCodeSet = new LinkedHashSet<String>(allCandidates.size());
         int successMachineCount = 0;
@@ -653,28 +665,54 @@ public class SpecialMaterialMachineSubstitutionService {
             if (context.getScheduleResultList().contains(scheduledResult)
                     && isSameSku(result.getMaterialCode(), result.getProductStatus(), scheduledResult)
                     && hasPositivePlanQtyOnDate(context, scheduledResult, targetDate)) {
-                activeMachineCodeSet.add(scheduledResult.getLhMachineCode());
+                activeMachineCodeSet.add(LhSingleControlMachineUtil.resolvePhysicalMachineCode(
+                        scheduledResult.getLhMachineCode()));
             }
         }
         if (activeMachineCodeSet.size() <= 1) {
             return -1;
         }
-        int dailyCapacity = Objects.isNull(result.getStandardCapacity())
-                ? 0 : result.getStandardCapacity();
-        if (dailyCapacity <= 0) {
-            return -1;
-        }
         for (int dayOffset = 0; dayOffset <= MONTH_PLAN_REDUCE_WITHIN_DAYS; dayOffset++) {
             LocalDate businessDate = targetDate.plusDays(dayOffset);
-            int dayPlanQty = MonthPlanDateResolver.resolveDayQty(
+            if (!this.lhDailyMouldCalcService.hasRequiredMachineCount(
+                    context, result.getMaterialCode(), result.getProductStatus(), businessDate)) {
+                continue;
+            }
+            int requiredMachineCount = this.lhDailyMouldCalcService.getRequiredMachineCount(
                     context, result.getMaterialCode(), result.getProductStatus(), businessDate);
-            int requiredMachineCount = dayPlanQty <= 0
-                    ? 0 : (dayPlanQty + dailyCapacity - 1) / dailyCapacity;
             if (requiredMachineCount < activeMachineCodeSet.size()) {
                 return dayOffset;
             }
         }
         return -1;
+    }
+
+    /**
+     * 统计特殊材料SKU当前已落地的有效物理机台数。
+     *
+     * @param context 排程上下文
+     * @param sku 特殊材料SKU
+     * @return 当前有效物理机台数
+     */
+    private int countCurrentEffectiveSameSkuMachines(LhScheduleContext context, SkuScheduleDTO sku) {
+        if (Objects.isNull(context) || Objects.isNull(sku)
+                || CollectionUtils.isEmpty(context.getScheduleResultList())) {
+            return 0;
+        }
+        Set<String> physicalMachineCodeSet = new LinkedHashSet<String>(4);
+        for (LhScheduleResult result : context.getScheduleResultList()) {
+            if (Objects.isNull(result) || StringUtils.isEmpty(result.getLhMachineCode())
+                    || !isSameSku(sku.getMaterialCode(), sku.getProductStatus(), result)
+                    || ShiftFieldUtil.resolveScheduledQty(result) <= 0) {
+                continue;
+            }
+            String physicalMachineCode = LhSingleControlMachineUtil.resolvePhysicalMachineCode(
+                    result.getLhMachineCode());
+            if (StringUtils.isNotEmpty(physicalMachineCode)) {
+                physicalMachineCodeSet.add(physicalMachineCode);
+            }
+        }
+        return physicalMachineCodeSet.size();
     }
 
     /**

@@ -25,6 +25,7 @@ import com.zlt.aps.cx.enums.DayVulcanizationModeEnum;
 import com.zlt.aps.cx.mapper.*;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
+import com.zlt.aps.lh.api.domain.entity.LhDayPlanAdjustRequire;
 import com.zlt.aps.lh.api.domain.entity.LhParams;
 import com.zlt.aps.cx.mapper.LhParamsMapper;
 import com.zlt.aps.maindata.mapper.FactoryParamMapper;
@@ -50,6 +51,7 @@ import com.zlt.aps.cx.api.domain.entity.CxStructureTreadConfig;
 import com.zlt.aps.cx.mapper.CxStructureTreadConfigMapper;
 import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.mp.api.domain.entity.MdmDevicePlanShut;
+import com.zlt.aps.utils.BeanCopyUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -805,6 +807,7 @@ public class ScheduleServiceImpl implements ScheduleService {
     private void loadParamConfigs(ScheduleContextVo context) {
         List<CxParamConfig> paramConfigs = paramConfigMapper.selectList(
                 new LambdaQueryWrapper<CxParamConfig>()
+                        .eq(CxParamConfig::getIsActive, 1)
                         .eq(CxParamConfig::getIsDelete, "0"));
         log.info("加载参数配置，共 {} 条记录", paramConfigs != null ? paramConfigs.size() : 0);
         if (paramConfigs != null && !paramConfigs.isEmpty()) {
@@ -912,7 +915,7 @@ public class ScheduleServiceImpl implements ScheduleService {
         log.info("机台最大胎胚种类数: {}", machineMaxTypesMap);
 
         // 加载库存可供硫化时长预警阈值（默认18小时）
-        CxParamConfig stockHoursWarningConfig = paramConfigMap.get("SYS04070001");
+        CxParamConfig stockHoursWarningConfig = paramConfigMap.get(ScheduleConstants.PARAM_STOCK_HOURS_WARNING);
         if (stockHoursWarningConfig != null && stockHoursWarningConfig.getParamValue() != null) {
             try {
                 context.setStockHoursWarningThreshold(Integer.parseInt(stockHoursWarningConfig.getParamValue()));
@@ -1640,8 +1643,8 @@ public class ScheduleServiceImpl implements ScheduleService {
      * @return 当月的硫化日计划调整量明细（空集合而非 null）
      */
     private List<LhDayPlanAdjustVo> getMonthPlanLhDayAdjustList(YearMonth yearMonth,
-                                                                 List<String> factoryCodeList,
-                                                                 List<String> materialCodeList) {
+                                                                List<String> factoryCodeList,
+                                                                List<String> materialCodeList) {
         if (null == yearMonth || CollectionUtils.isEmpty(factoryCodeList)) {
             return Collections.emptyList();
         }
@@ -2760,6 +2763,7 @@ public class ScheduleServiceImpl implements ScheduleService {
         // 1. 过滤硫化排程结果
         int originalLhCount = context.getLhScheduleResults() != null ? context.getLhScheduleResults().size() : 0;
         if (context.getLhScheduleResults() != null) {
+            List<LhScheduleResult> removedLhResults = new ArrayList<>();
             List<LhScheduleResult> filteredLhResults = context.getLhScheduleResults().stream()
                     .filter(r -> {
                         String materialCode = r.getMaterialCode();
@@ -2769,12 +2773,18 @@ public class ScheduleServiceImpl implements ScheduleService {
                         if (materialCode != null && completedStatusKeys.contains(materialStatusKey)) {
                             log.debug("过滤硫化排程结果：物料状态账户={}，成型余量={}",
                                     materialStatusKey, formingRemainderMap.get(materialStatusKey));
+                            removedLhResults.add(r);
                             return false;
                         }
                         return true;
                     })
                     .collect(Collectors.toList());
             context.setLhScheduleResults(filteredLhResults);
+            // 被移除任务留档：运行中库存被共用胎胚消耗后可能重新出现成型余量缺口，供提前收尾收集补全数据源
+            if (!removedLhResults.isEmpty()) {
+                context.setFilteredCompletedLhResults(removedLhResults);
+                log.info("已收尾过滤移除任务留档 {} 条（供提前收尾候选补全）", removedLhResults.size());
+            }
             log.info("过滤硫化排程结果：{} -> {} 条（移除 {} 条已收尾物料任务）",
                     originalLhCount, filteredLhResults.size(), originalLhCount - filteredLhResults.size());
         }

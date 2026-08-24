@@ -21,6 +21,7 @@ import com.zlt.aps.lh.handler.ScheduleAdjustHandler;
 import com.zlt.aps.lh.handler.SkuMonthPlanCalculator;
 import com.zlt.aps.lh.mapper.*;
 import com.zlt.aps.lh.service.ILhBaseDataService;
+import com.zlt.aps.lh.service.ILhDailyMouldCalcService;
 import com.zlt.aps.lh.service.ILhDayPlanAdjustRequireService;
 import com.zlt.aps.lh.util.*;
 import com.zlt.aps.maindata.mapper.MpMouldDeliveryPlanEntityMapper;
@@ -114,7 +115,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     private MpFactoryProductionVersionMapper mpFactoryProductionVersionMapper;
 
     @Resource
-    private MpStructureAllocationMapper mpStructureAllocationMapper;
+    private LhMpStructureAllocationMapper lhMpStructureAllocationMapper;
 
     @Resource
     private MpMonthPlanStatisticsMapper monthPlanStatisticsMapper;
@@ -194,6 +195,9 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     @Resource
     private ScheduleAdjustHandler scheduleAdjustHandler;
 
+    @Resource
+    private ILhDailyMouldCalcService lhDailyMouldCalcService;
+
     @Resource(name = "lhDataInitExecutor")
     private Executor lhDataInitExecutor;
 
@@ -245,10 +249,13 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         Map<String, LocalDate> structurePriorityWindowMonthMap =
                 this.resolveRequiredMonthMap(startDate, structurePriorityWindowEndExclusive);
         int continuousMouldOfflineCheckDays = context.getScheduleConfig().getContinuousMouldOfflineCheckDays();
-        Date continuousMouldOfflineLookupEndDate =
-                LhScheduleTimeUtil.addDays(endDate, continuousMouldOfflineCheckDays);
-        Date monthPlanLookupEndDate = continuousMouldOfflineLookupEndDate.after(earlyProductionLookupEndDate)
-                ? continuousMouldOfflineLookupEndDate : earlyProductionLookupEndDate;
+        int requiredMachineLookAheadDays = Math.max(
+                continuousMouldOfflineCheckDays,
+                LhScheduleConstant.REQUIRED_MACHINE_CROSS_WINDOW_EXTRA_DAYS);
+        Date requiredMachineLookupEndDate =
+                LhScheduleTimeUtil.addDays(endDate, requiredMachineLookAheadDays);
+        Date monthPlanLookupEndDate = requiredMachineLookupEndDate.after(earlyProductionLookupEndDate)
+                ? requiredMachineLookupEndDate : earlyProductionLookupEndDate;
         // 续作降模停产保机需读取窗口内每个业务日前后N天原始月计划；月初、月末及跨年时必须加载相邻月份。
         // 月计划额外覆盖续作前看范围；结构机台统计和月完成量至少覆盖排程窗口结束日+提前生产阈值。
         Map<String, LocalDate> monthPlanRequiredMonthMap =
@@ -263,8 +270,13 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                 new LinkedHashMap<String, LocalDate>(monthPlanRequiredMonthMap);
         productionVersionRequiredMonthMap.putAll(structureEndingWindowMonthMap);
         productionVersionRequiredMonthMap.putAll(structurePriorityWindowMonthMap);
-        // 设备停机、工作日历沿用 T-1 覆盖范围，保证跨日停机判断可复用同一窗口。
+        // 设备停机沿用T-1覆盖范围；目标机台数Map需要覆盖停产保机前N日及窗口后N日，
+        // 工作日历再向前多取一天，保证计算范围首日的“前一日停产→当日开产”能跨月准确识别。
         Date calendarControlStartDate = LhScheduleTimeUtil.addDays(startDate, -1);
+        Date requiredMachineCalendarStartDate = LhScheduleTimeUtil.addDays(
+                startDate, -continuousMouldOfflineCheckDays - 1);
+        Date requiredMachineCalendarEndDate = LhScheduleTimeUtil.addDays(
+                endDate, requiredMachineLookAheadDays);
 
         // 获取年月信息（按排程目标日取月计划所属年月）
         Calendar cal = Calendar.getInstance();
@@ -361,7 +373,8 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                 embryoStockFuture,
                 embryoAvailableTimeFuture,
                 runDataInitTaskAsync("工作日历",
-                        () -> loadWorkCalendar(context, factoryCode, calendarControlStartDate, endDate),
+                        () -> loadWorkCalendar(context, factoryCode,
+                                requiredMachineCalendarStartDate, requiredMachineCalendarEndDate),
                         () -> sizeOf(context.getWorkCalendarList())),
                 runDataInitTaskAsync("SKU日硫化产能",
                         () -> loadSkuLhCapacity(context, factoryCode),
@@ -425,6 +438,11 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         // 4. 胎胚收尾标识：依赖月计划、胎胚库存、月累计完成量、T日班次完成量、前日排程结果等均已就绪，
         //    故在屏障同步之后计算；以胎胚维度合并硫化余量并按主销参与情况判定收尾。
         this.loadEmbryoEndingFlagMap(context);
+
+        // 5. 目标机台数统一Map预计算：依赖工作日历和月计划均已就绪，覆盖停产保机前N日、
+        //    实际排程窗口、T+3增机及特殊材料窗口后两日判断；以物料+产品状态+自然日为完整维度，
+        //    供续作降模、续作加机台、新增排产和特殊材料置换统一查询目标总机台数。
+        this.lhDailyMouldCalcService.loadDailyMouldSummary(context);
 
         if (context.isInterrupted()) {
             log.warn("基础数据加载中断, 工厂: {}, 目标日: {}, T日: {}, 原因: {}",
@@ -821,7 +839,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                         .eq(MpStructureAllocation::getPlanType,
                                 STRUCTURE_ALLOCATION_NORMAL_PLAN_TYPE)
                         .in(MpStructureAllocation::getStructureName, structureNameSet);
-        return mpStructureAllocationMapper.selectList(wrapper);
+        return lhMpStructureAllocationMapper.selectList(wrapper);
     }
 
     /**

@@ -44,11 +44,4 @@ public interface GsqReserveStockMapper extends BaseMapper<GsqReserveStock> {
      * @return 结果
      */
     public int deleteReserveStockByIds(Long[] ids);
-
-    /**
-     * 合并操作，如果记录存在则更新，否则新增
-     *
-     * @param list 要合并的集合
-     */
-    public void mergeSql(List<GsqReserveStockDto> list);
 }

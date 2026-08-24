@@ -4,74 +4,95 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.itf.mes.mapper.Cd15ScheduleResultIssueMapper">
 
-    <!-- 业务键不含DATA_VERSION，重发时覆盖相同任务的所有历史版本。 -->
+    <!-- 业务键不含DATA_VERSION，重发时覆盖相同排程对象的历史版本。 -->
     <delete id="batchDeleteByBusinessKey">
         DELETE FROM MES_CD15_SCHEDULE_RESULT
         WHERE FACTORY_CODE = #{factoryCode}
           AND (
         <foreach collection="list" item="item" separator=" OR ">
-            (COALESCE(CD15_BATCH_NO, '') = COALESCE(#{item.cd15BatchNo}, '')
+            (SCHEDULE_DATE = #{item.scheduleDate}
+             AND COALESCE(SPLIT_BATCH_NO, '') = COALESCE(#{item.splitBatchNo}, '')
+             AND COALESCE(BATCH_NO, '') = COALESCE(#{item.batchNo}, '')
              AND COALESCE(ORDER_NO, '') = COALESCE(#{item.orderNo}, '')
-             AND COALESCE(GROUP_NO, '') = COALESCE(#{item.groupNo}, '')
-             AND SCHEDULE_DATE = #{item.scheduleDate}
              AND COALESCE(MACHINE_CODE, '') = COALESCE(#{item.machineCode}, '')
-             AND COALESCE(STEEL_STRIP_CODE, '') = COALESCE(#{item.steelStripCode}, '')
              AND COALESCE(BIG_ROLL_CODE, '') = COALESCE(#{item.bigRollCode}, '')
-             AND COALESCE(CUTTING_ANGLE, '') = COALESCE(#{item.cuttingAngle}, '')
-             AND COALESCE(CLASS_FIELD, '') = COALESCE(#{item.classField}, ''))
+             AND COALESCE(STEEL_STRIP_CODE1, '') = COALESCE(#{item.steelStripCode1}, '')
+             AND COALESCE(CUTTING_ANGLE, 0) = COALESCE(#{item.cuttingAngle}, 0))
         </foreach>
           )
     </delete>
 
     <insert id="batchInsert">
         INSERT INTO MES_CD15_SCHEDULE_RESULT (
-            CD15_BATCH_NO, ORDER_NO, GROUP_NO, SCHEDULE_DATE,
-            MACHINE_CODE, STEEL_STRIP_CODE, BIG_ROLL_CODE,
-            STORAGE_LANE_CODE, CUTTING_ANGLE, CUT_MODE,
-            SHIFT_NAME, CLASS_FIELD, SCHEDULE_DAY, DAY_SHIFT_ORDER,
-            PLAN_QTY, CX_PLAN_QTY, FINISH_QTY, PRODUCE_ORDER,
-            FINISH_RATE, ANALYSIS, ANALYSIS_INPUT, CRAFT_WIDTH,
-            UNIT_CONSUME_MILLIMETER, CURL_LENGTH, CORD_WIDTH,
-            SOURCE_TYPE, PRODUCTION_STATUS, CLEAR_EXISTING_PLAN,
-            PUBLISH_TRACE_ID, IS_RELEASE, DATA_VERSION,
+            SCHEDULE_DATE, SPLIT_BATCH_NO, BATCH_NO, ORDER_NO,
+            BIG_ROLL_CODE, MACHINE_CODE, STOCK_CODE, EMBRYO_SPEC_DESC,
+            STEEL_STRIP_CODE1, MATERIAL_CODE1, UNIT_CONSUME1,
+            STOCK1_QTY1, CUTTING_ANGLE, SUPPLY_TIME1,
+            NIGHT_PLAN_QTY1, NIGHT_PRODUCE_ORDER1,
+            NIGHT_SYS_ANALYSIS1, NIGHT_HAND_ANALYSIS1,
+            NIGHT_EXAMPLE_TYPE, NIGHT_EXAMPLE_NO, NIGHT_REMARK,
+            DAY_PLAN_QTY1, DAY_PRODUCE_ORDER1, DAY_SYS_ANALYSIS1,
+            DAY_HAND_ANALYSIS1, DAY_EXAMPLE_TYPE, DAY_EXAMPLE_NO,
+            DAY_REMARK, MID_PLAN_QTY1, MID_PRODUCE_ORDER1,
+            MID_SYS_ANALYSIS1, MID_HAND_ANALYSIS1, MID_EXAMPLE_TYPE,
+            MID_EXAMPLE_NO, MID_REMARK, CX_CLASS1_PLAN,
+            CX_CLASS2_PLAN, CX_CLASS3_PLAN, CX_CLASS5_PLAN,
+            MARK_CLOSE_OUT_TIP, REMARK, DEL_FLAG, CREATE_BY,
+            CREATE_TIME, UPDATE_BY, UPDATE_TIME, DATA_VERSION,
             COMPANY_CODE, FACTORY_CODE
         )
         SELECT * FROM (
         <foreach collection="list" item="item" separator=" UNION ALL ">
             SELECT
-                #{item.cd15BatchNo} AS CD15_BATCH_NO,
-                #{item.orderNo} AS ORDER_NO,
-                #{item.groupNo} AS GROUP_NO,
                 #{item.scheduleDate} AS SCHEDULE_DATE,
-                #{item.machineCode} AS MACHINE_CODE,
-                #{item.steelStripCode} AS STEEL_STRIP_CODE,
+                #{item.splitBatchNo} AS SPLIT_BATCH_NO,
+                #{item.batchNo} AS BATCH_NO,
+                #{item.orderNo} AS ORDER_NO,
                 #{item.bigRollCode} AS BIG_ROLL_CODE,
-                #{item.storageLaneCode} AS STORAGE_LANE_CODE,
+                #{item.machineCode} AS MACHINE_CODE,
+                #{item.stockCode} AS STOCK_CODE,
+                #{item.embryoSpecDesc} AS EMBRYO_SPEC_DESC,
+                #{item.steelStripCode1} AS STEEL_STRIP_CODE1,
+                #{item.materialCode1} AS MATERIAL_CODE1,
+                #{item.unitConsume1} AS UNIT_CONSUME1,
+                #{item.stock1Qty1} AS STOCK1_QTY1,
                 #{item.cuttingAngle} AS CUTTING_ANGLE,
-                #{item.cutMode} AS CUT_MODE,
-                #{item.shiftName} AS SHIFT_NAME,
-                #{item.classField} AS CLASS_FIELD,
-                #{item.scheduleDay} AS SCHEDULE_DAY,
-                #{item.dayShiftOrder} AS DAY_SHIFT_ORDER,
-                #{item.planQty} AS PLAN_QTY,
-                #{item.cxPlanQty} AS CX_PLAN_QTY,
-                #{item.finishQty} AS FINISH_QTY,
-                #{item.produceOrder} AS PRODUCE_ORDER,
-                #{item.finishRate} AS FINISH_RATE,
-                #{item.analysis} AS ANALYSIS,
-                #{item.analysisInput} AS ANALYSIS_INPUT,
-                #{item.craftWidth} AS CRAFT_WIDTH,
-                #{item.unitConsumeMillimeter} AS UNIT_CONSUME_MILLIMETER,
-                #{item.curlLength} AS CURL_LENGTH,
-                #{item.cordWidth} AS CORD_WIDTH,
-                #{item.sourceType} AS SOURCE_TYPE,
-                #{item.productionStatus} AS PRODUCTION_STATUS,
-                #{item.clearExistingPlan} AS CLEAR_EXISTING_PLAN,
-                #{item.publishTraceId} AS PUBLISH_TRACE_ID,
-                '1' AS IS_RELEASE,
-                #{dataVersion} AS DATA_VERSION,
-                #{companyCode} AS COMPANY_CODE,
-                #{factoryCode} AS FACTORY_CODE
+                #{item.supplyTime1} AS SUPPLY_TIME1,
+                #{item.nightPlanQty1} AS NIGHT_PLAN_QTY1,
+                #{item.nightProduceOrder1} AS NIGHT_PRODUCE_ORDER1,
+                #{item.nightSysAnalysis1} AS NIGHT_SYS_ANALYSIS1,
+                #{item.nightHandAnalysis1} AS NIGHT_HAND_ANALYSIS1,
+                #{item.nightExampleType} AS NIGHT_EXAMPLE_TYPE,
+                #{item.nightExampleNo} AS NIGHT_EXAMPLE_NO,
+                #{item.nightRemark} AS NIGHT_REMARK,
+                #{item.dayPlanQty1} AS DAY_PLAN_QTY1,
+                #{item.dayProduceOrder1} AS DAY_PRODUCE_ORDER1,
+                #{item.daySysAnalysis1} AS DAY_SYS_ANALYSIS1,
+                #{item.dayHandAnalysis1} AS DAY_HAND_ANALYSIS1,
+                #{item.dayExampleType} AS DAY_EXAMPLE_TYPE,
+                #{item.dayExampleNo} AS DAY_EXAMPLE_NO,
+                #{item.dayRemark} AS DAY_REMARK,
+                #{item.midPlanQty1} AS MID_PLAN_QTY1,
+                #{item.midProduceOrder1} AS MID_PRODUCE_ORDER1,
+                #{item.midSysAnalysis1} AS MID_SYS_ANALYSIS1,
+                #{item.midHandAnalysis1} AS MID_HAND_ANALYSIS1,
+                #{item.midExampleType} AS MID_EXAMPLE_TYPE,
+                #{item.midExampleNo} AS MID_EXAMPLE_NO,
+                #{item.midRemark} AS MID_REMARK,
+                #{item.cxClass1Plan} AS CX_CLASS1_PLAN,
+                #{item.cxClass2Plan} AS CX_CLASS2_PLAN,
+                #{item.cxClass3Plan} AS CX_CLASS3_PLAN,
+                #{item.cxClass5Plan} AS CX_CLASS5_PLAN,
+                #{item.markCloseOutTip} AS MARK_CLOSE_OUT_TIP,
+                #{item.remark} AS REMARK,
+                #{item.delFlag} AS DEL_FLAG,
+                #{item.createBy} AS CREATE_BY,
+                #{item.createTime} AS CREATE_TIME,
+                #{item.updateBy} AS UPDATE_BY,
+                #{item.updateTime} AS UPDATE_TIME,
+                #{item.dataVersion} AS DATA_VERSION,
+                #{item.companyCode} AS COMPANY_CODE,
+                #{item.factoryCode} AS FACTORY_CODE
         </foreach>
         ) AS source_data
     </insert>

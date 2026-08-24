@@ -11,6 +11,7 @@
                    mi.MACHINE_NAME
             from T_TQ_MACHINE_MAINTENANCE_PLAN mp
             left join T_TQ_MACHINE_INFO mi on mp.MACHINE_CODE = mi.MACHINE_CODE
+                and mi.IS_DELETE = '0'
             where mp.IS_DELETE = '0'
             <if test="downtimeDateBegin != null">
                 and mp.DOWNTIME_DATE &gt;= #{downtimeDateBegin}

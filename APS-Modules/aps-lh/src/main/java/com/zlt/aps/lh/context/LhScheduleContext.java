@@ -5,6 +5,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.zlt.aps.common.engine.domain.LhDayPlanAdjustVo;
 import com.zlt.aps.lh.api.domain.dto.*;
+import com.zlt.aps.lh.service.ILhDailyMouldCalcService;
 import com.zlt.aps.lh.api.domain.entity.*;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.enums.SingleControlMachineModeEnum;
@@ -16,6 +17,7 @@ import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
 import com.zlt.aps.lh.util.SkuConstructionRefResolverUtil;
 import com.zlt.aps.mdm.api.domain.entity.*;
+import com.zlt.aps.mp.api.domain.capacity.MpDailyCapacityLimitVo;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
@@ -196,6 +198,22 @@ public class LhScheduleContext {
      * 工作日历列表
      */
     private List<MdmWorkCalendar> workCalendarList = new ArrayList<>();
+    /**
+     * 日产能限制VoMap, key=日期(支持跨月不冲突)；由 {@link com.zlt.aps.lh.service.ILhDailyMouldCalcService#loadDailyCapacityLimitMap} 按年月合并加载
+     * <p>用于 {@link com.zlt.aps.mp.engine.adjust.MpWeekRollAdjustEngine#getMouldByDay} 的 dailyCapacityLimitVo 参数</p>
+     */
+    private Map<LocalDate, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = new HashMap<>();
+    /**
+     * 模具计算排产参数Map, key=paramCode(如 SYS0203003~SYS0203006)；由 {@link com.zlt.aps.lh.service.ILhDailyMouldCalcService#loadMouldAdjustParamMap} 加载
+     * <p>用于 {@link com.zlt.aps.mp.engine.adjust.MpWeekRollAdjustEngine#getMouldByDay} 的 paramMap 参数</p>
+     */
+    private Map<String, Object> mouldAdjustParamMap = new HashMap<>();
+    /**
+     * 排程日期(T日) ~ T+2日窗口日模具计算结果Map, key=物料编码|产品状态, value=窗口内逐日模具数/机台数汇总；
+     * 由 {@link com.zlt.aps.lh.service.ILhDailyMouldCalcService#loadDailyMouldSummary} 在数据加载环节预计算。
+     * <p>供后续判断是否需要加机台或获取机台数时，直接按物料编码+产品状态（+日期）查询</p>
+     */
+    private Map<String, ILhDailyMouldCalcService.DailyMouldSummary> dailyMouldResultMap = new HashMap<>();
     /**
      * SKU日硫化产能Map, key=materialCode
      */

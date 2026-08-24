@@ -23,6 +23,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 钢丝圈排程上下文。
@@ -111,8 +112,23 @@ public class GsqScheduleContext {
     /** 全部机台列表 */
     private List<GsqMachineInfo> allMachineList = new ArrayList<>();
 
-    /** 钢丝圈-缠绕盘代码映射，key=钢丝圈代码(steelRingCode), value=缠绕盘代码(twiningDiscCode) */
-    private Map<String, String> twiningDiscCodeMap = new HashMap<>();
+    /**
+     * 钢丝圈-缠绕盘代码映射（多对多），key=钢丝圈代码(steelRingCode), value=该规格可用的缠绕盘代码集合。
+     *
+     * <p>数据源：T_GSQ_TWINING_DISC_SPEC 关联 T_GSQ_TWINING_DISC（仅启用盘）。
+     * S1 预校验回填排程结果 twiningDiscCode 字段取集合首个（字典序最小，保证确定性），
+     * S3 机台分配确定后按「规格可用盘 ∩ 机台绑定盘」交集二次回填精确盘。</p>
+     */
+    private Map<String, Set<String>> twiningDiscCodeMap = new HashMap<>();
+
+    /**
+     * 缠绕盘-机台映射（多对多），key=缠绕盘代码(twiningDiscCode), value=该缠绕盘绑定的可用机台编号集合。
+     *
+     * <p>数据源：T_GSQ_TWINING_DISC_MACHINE 关联主表与机台表（仅启用盘+启用机台+启用关系）。
+     * S3 机台分配时由 DiscMachineFilter 使用：规格可用盘对应机台并集之外的机台将被过滤，
+     * 确保机台只能生产其绑定缠绕盘所支持的规格。</p>
+     */
+    private Map<String, Set<String>> discMachineMap = new HashMap<>();
 
     /** 机台寸口映射，key=机台编号，value=该机台可做的寸口值列表 */
     private Map<String, List<java.math.BigDecimal>> machineChuckMap = new HashMap<>();

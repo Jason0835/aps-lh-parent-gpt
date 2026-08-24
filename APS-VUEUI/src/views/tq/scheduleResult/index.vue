@@ -562,28 +562,28 @@ export default {
     },
     handleInsertOrder() {
       if (this.selection.length !== 1) {
-        this.$modal.msgWarning(this.$t("common.tip.selectOne"));
+        this.$modal.msgWarning(this.$t("ui.placeholder.selectTableRow"));
         return;
       }
       this.$refs.insertOrderDialog.show(this.selection[0]);
     },
     handleChangeMachine() {
       if (this.selection.length !== 1) {
-        this.$modal.msgWarning(this.$t("common.tip.selectOne"));
+        this.$modal.msgWarning(this.$t("ui.placeholder.selectTableRow"));
         return;
       }
       this.$refs.changeMachineDialog.show(this.selection[0]);
     },
     handleAdjustQty() {
       if (this.selection.length !== 1) {
-        this.$modal.msgWarning(this.$t("common.tip.selectOne"));
+        this.$modal.msgWarning(this.$t("ui.placeholder.selectTableRow"));
         return;
       }
       this.$refs.adjustQtyDialog.show(this.selection[0]);
     },
     handleRelease() {
       if (!this.selection || this.selection.length === 0) {
-        this.$modal.msgWarning(this.$t("common.tip.selectOne"));
+        this.$modal.msgWarning(this.$t("ui.placeholder.selectTableRow"));
         return;
       }
       this.$confirm(this.$t("ui.biz.alter.makeSurePublish"), {
@@ -597,7 +597,7 @@ export default {
     },
     handleBatchDelete() {
       if (!this.selection || this.selection.length === 0) {
-        this.$modal.msgWarning(this.$t("common.tip.selectOne"));
+        this.$modal.msgWarning(this.$t("ui.placeholder.selectTableRow"));
         return;
       }
       const ids = this.selection.map(item => item.id);
@@ -614,7 +614,7 @@ export default {
     /** 批量转机台（走任务链路径，支持锚点、目标班次） */
     handleBatchChangeMachine() {
       if (!this.selection || this.selection.length === 0) {
-        this.$modal.msgWarning(this.$t("common.tip.selectOne"));
+        this.$modal.msgWarning(this.$t("ui.placeholder.selectTableRow"));
         return;
       }
       // 复用现有转机台对话框，传入选中列表的第一条作为模板
@@ -624,7 +624,7 @@ export default {
     /** 批量调量（走任务链路径） */
     handleBatchChangeQty() {
       if (!this.selection || this.selection.length === 0) {
-        this.$modal.msgWarning(this.$t("common.tip.selectOne"));
+        this.$modal.msgWarning(this.$t("ui.placeholder.selectTableRow"));
         return;
       }
       this.$refs.adjustQtyDialog.show(this.selection[0], this.selection);

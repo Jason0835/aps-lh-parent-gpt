@@ -12,11 +12,12 @@ import java.util.List;
  * <p>策略链按以下顺序执行（顺序不可调换）：</p>
  * <ol>
  *   <li>SpecifyMachineFilter - 定点机台过滤（限制作业/排除不可作业）</li>
+ *   <li>DiscMachineFilter - 缠绕盘机台关系过滤（规格可用盘绑定机台并集之外的机台排除）</li>
  *   <li>MaintenanceFilter - 检修计划过滤（整班禁用）</li>
  *   <li>ClassAvailabilityFilter - 班次可用状态过滤（仅启用机台）</li>
  * </ol>
  *
- * <p>注：钢丝圈机台分配仅需上述约束；英寸/钢丝直径/产线过滤为胎圈TQ规范，不适用于钢丝圈，已移除。</p>
+ * <p>注：英寸/钢丝直径/产线过滤为胎圈TQ规范，不适用于钢丝圈，已移除。</p>
  *
  * @author APS
  */

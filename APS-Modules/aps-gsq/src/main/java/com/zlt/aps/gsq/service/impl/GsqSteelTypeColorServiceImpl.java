@@ -5,16 +5,20 @@ import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import javax.annotation.Resource;
 
+import cn.hutool.core.collection.CollUtil;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.StringUtils;
 import org.springframework.stereotype.Service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -143,10 +147,27 @@ public class GsqSteelTypeColorServiceImpl  extends ServiceImpl<GsqSteelTypeColor
         }
         if (CollectionUtils.isNotEmpty(list)) {
             try {
-                //勾选更新记录，调用merge即可
                 if (updateSupport && CollectionUtils.isNotEmpty(importList)) {
-                    successNum = importList.size();
-                    gsqSteelTypeColorMapper.mergeSql(importList);
+                    // 勾选更新：批量预取已存在大卷颜色（按大卷编号匹配），存在则更新原记录，不存在则新增
+                    Map<String, GsqSteelTypeColor> existingMap = this.loadExistingSteelTypeColorMap(importList);
+                    for (GsqSteelTypeColorDto excelItem : importList) {
+                        GsqSteelTypeColor color = new GsqSteelTypeColor();
+                        BeanUtils.copyProperties(excelItem, color);
+                        GsqSteelTypeColor existing = existingMap.get(excelItem.getSteelType());
+                        if (existing != null) {
+                            // 已存在：回填主键ID，清空新增审计字段避免覆盖原记录创建信息，setBaseVale补齐更新审计字段后更新
+                            color.setId(existing.getId());
+                            color.setCreateBy(null);
+                            color.setCreateTime(null);
+                            color.setBaseVale(existing.getId());
+                            gsqSteelTypeColorMapper.updateById(color);
+                        } else {
+                            // 不存在：setBaseVale(null)自动补齐delFlag/createBy/createTime后插入
+                            color.setBaseVale(null);
+                            gsqSteelTypeColorMapper.insert(color);
+                        }
+                        successNum++;
+                    }
                 } else {
                     //查询数据库已存在对象
                     for (int i = 0; i < list.size(); i++) {
@@ -186,5 +207,30 @@ public class GsqSteelTypeColorServiceImpl  extends ServiceImpl<GsqSteelTypeColor
         } else {
             return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + successNum);
         }
+    }
+
+    /**
+     * 批量预取已存在的大卷颜色数据（导入更新模式使用）
+     * 按大卷编号批量查询数据库未删除的已有记录
+     *
+     * @param importList 导入数据列表
+     * @return 大卷编号 -> 已存在大卷颜色记录 的映射
+     */
+    private Map<String, GsqSteelTypeColor> loadExistingSteelTypeColorMap(List<GsqSteelTypeColorDto> importList) {
+        // 提取非空大卷编号并去重
+        List<String> codeList = importList.stream()
+                .map(GsqSteelTypeColorDto::getSteelType)
+                .filter(StringUtils::isNotBlank)
+                .distinct()
+                .collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(codeList)) {
+            return new HashMap<>();
+        }
+        // 按1000条一批查询（过滤逻辑删除），避免in条件超长；同编号多条时保留首条
+        return CollUtil.split(codeList, 1000).stream()
+                .flatMap(batch -> gsqSteelTypeColorMapper.selectList(new LambdaQueryWrapper<GsqSteelTypeColor>()
+                        .eq(GsqSteelTypeColor::getDelFlag, ApsConstant.DEL_FLAG_NORMAL)
+                        .in(GsqSteelTypeColor::getSteelType, batch)).stream())
+                .collect(Collectors.toMap(GsqSteelTypeColor::getSteelType, Function.identity(), (v1, v2) -> v1));
     }
 }

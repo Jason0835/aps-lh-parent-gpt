@@ -32,13 +32,6 @@ public interface GsqTwiningDiscMapper extends BaseMapper<GsqTwiningDisc> {
     int checkUnique(GsqTwiningDisc entity);
 
     /**
-     * 批量合并保存（存在则更新，否则新增），用于导入场景
-     *
-     * @param list 待保存数据集合
-     */
-    void mergeSql(List<GsqTwiningDisc> list);
-
-    /**
      * 按钢丝圈编号批量查询施工信息表中的钢丝圈信息（编号->名称映射，用于导入校验与名称反显）
      *
      * @param codes 钢丝圈编号集合

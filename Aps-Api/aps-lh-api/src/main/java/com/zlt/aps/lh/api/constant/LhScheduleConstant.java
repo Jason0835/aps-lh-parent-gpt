@@ -325,6 +325,11 @@ public final class LhScheduleConstant {
     public static final int SCHEDULE_DAYS = 3;
     /** 结构收尾对齐固定观察窗口天数：T、T+1、T+2三个自然日 */
     public static final int STRUCTURE_ENDING_ALIGNMENT_WINDOW_DAYS = 3;
+    /**
+     * 目标机台数统一Map在排程窗口结束日后的额外覆盖天数。
+     * <p>第1天承接原有T+3增机判断，第2天承接特殊材料候选从窗口末日继续后看两天的降模判断。</p>
+     */
+    public static final int REQUIRED_MACHINE_CROSS_WINDOW_EXTRA_DAYS = 2;
     /** 是否按产能满排默认值（0-按需求排产，1-按产能满排） */
     public static final int ENABLE_FULL_CAPACITY_SCHEDULING = 1;
     /** 满排模式是否按余量命中收尾规则2默认值（0-关闭，1-开启） */

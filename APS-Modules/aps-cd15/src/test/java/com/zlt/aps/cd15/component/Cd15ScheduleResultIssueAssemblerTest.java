@@ -4,10 +4,13 @@ import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.zlt.aps.cd15.api.domain.entity.Cd15ScheduleResult;
 import com.zlt.aps.cd15.api.domain.entity.Cd15ScheduleResultIssue;
 import com.zlt.aps.cd15.api.domain.entity.Cd15ShiftConfig;
+import com.zlt.aps.cd15.engine.mapper.Cd15EngineConstructionMapper;
 import com.zlt.aps.cd15.mapper.Cd15ShiftConfigMapper;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.mdm.api.domain.entity.MdmConstructionInfo;
 import org.junit.Test;
 
+import java.math.BigDecimal;
 import java.sql.Date;
 import java.time.LocalDate;
 import java.util.Collections;
@@ -44,6 +47,11 @@ public class Cd15ScheduleResultIssueAssemblerTest {
         assertEquals(Integer.valueOf(3), issue.getProduceOrder());
         assertEquals(Date.valueOf(LocalDate.of(2026, 7, 17)),
                 issue.getScheduleDate());
+        assertEquals("BELT-1", issue.getMaterialCode());
+        assertEquals("胎胚规格A", issue.getEmbryoSpecDesc());
+        assertEquals(new BigDecimal("1.5"), issue.getUnitConsume());
+        assertEquals(Double.valueOf(50D), issue.getStockQty());
+        assertEquals(Double.valueOf(40D), issue.getCxClass4Plan());
         assertFalse(issue.getClearExistingPlan());
     }
 
@@ -76,7 +84,15 @@ public class Cd15ScheduleResultIssueAssemblerTest {
         config.setIsActive(1);
         when(mapper.selectList(any(Wrapper.class)))
                 .thenReturn(Collections.singletonList(config));
-        return new Cd15ScheduleResultIssueAssembler(mapper);
+        Cd15EngineConstructionMapper constructionMapper =
+                mock(Cd15EngineConstructionMapper.class);
+        MdmConstructionInfo construction = new MdmConstructionInfo();
+        construction.setBeltCode1("BELT-1");
+        construction.setEmbryoDesc("胎胚规格A");
+        when(constructionMapper.selectList(any(Wrapper.class)))
+                .thenReturn(Collections.singletonList(construction));
+        return new Cd15ScheduleResultIssueAssembler(
+                mapper, constructionMapper);
     }
 
     /** 构造分裁来源结果。 */
@@ -90,8 +106,15 @@ public class Cd15ScheduleResultIssueAssemblerTest {
         source.setMachineCode("G1101");
         source.setSteelStripCode("BELT-1");
         source.setBigRollCode("CSS24524");
+        source.setStorageLaneCode("A01");
         source.setCuttingAngle("15");
         source.setCutMode("SPLIT");
+        source.setUnitConsumeMillimeter(new BigDecimal("1500"));
+        source.setStockQty(50D);
+        source.setClass1CxPlanQty(10D);
+        source.setClass2CxPlanQty(20D);
+        source.setClass3CxPlanQty(30D);
+        source.setClass4CxPlanQty(40D);
         return source;
     }
 }

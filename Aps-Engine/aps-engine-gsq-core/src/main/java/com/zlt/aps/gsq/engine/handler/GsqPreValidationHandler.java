@@ -16,9 +16,11 @@ import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * S1: 钢丝圈前置校验与数据加载Handler。
@@ -134,8 +136,11 @@ public class GsqPreValidationHandler extends AbsGsqScheduleStepHandler {
             scheduleVo.setOrderNo(generateOrderNo(batchNo, orderSeq[0]++));
             // 库存
             scheduleVo.setStockQty(context.getStockMap().getOrDefault(scheduleVo.getSteelRingCode(), 0D));
-            // 缠绕盘代码（从钢丝圈-缠绕盘绑定映射回填）
-            scheduleVo.setTwiningDiscCode(context.getTwiningDiscCodeMap().get(scheduleVo.getSteelRingCode()));
+            // 缠绕盘代码（从钢丝圈-缠绕盘多对多映射回填；初始取集合中字典序最小的盘保证确定性，
+            // S3 机台分配确定后将按「规格可用盘 ∩ 机台绑定盘」交集二次回填精确盘）
+            Set<String> specDiscs = context.getTwiningDiscCodeMap().get(scheduleVo.getSteelRingCode());
+            scheduleVo.setTwiningDiscCode(specDiscs == null || specDiscs.isEmpty()
+                    ? null : Collections.min(specDiscs));
             // 月计划剩余量（对齐胎圈TQ：从月计划剩余量映射按钢丝圈代码取值）
             double remainQty = Optional.ofNullable(context.getMonthSurplusMap().get(scheduleVo.getSteelRingCode()))
                     .map(vo -> vo.getMonthRemainQty())

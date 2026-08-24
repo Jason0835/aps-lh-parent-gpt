@@ -144,10 +144,13 @@ export default {
           filterable: true,
         },
         {
+          // 数据来源（字典lh_precision_data_source）：系统维护字段，0-MES同步，1-手工维护，只读展示
           label: this.$t("ui.data.column.gsq.twiningDisc.dataSource"),
-          prop: "dataSourceLabel",
+          prop: "dataSource",
           span: 12,
-          type: "input",
+          type: "select",
+          dictData: this.dict.type.lh_precision_data_source,
+          filterable: true,
           disabled: true,
         },
         {
@@ -193,9 +196,6 @@ export default {
           const detail = res.data || res;
           this.form = {
             ...detail,
-            // 数据来源只读展示（字典lh_precision_data_source反显）
-            dataSourceLabel:
-              this.selectDictLabel(this.dict.type.lh_precision_data_source, detail.dataSource) || "-",
           };
         } catch (error) {
           console.error(error);
@@ -209,6 +209,9 @@ export default {
           // 工厂默认越南工厂116，用户可切换
           factoryCode: "116",
           status: "0",
+          // 数据来源默认1-手工维护（字典lh_precision_data_source）
+          dataSource: "1",
+          subList: [],
         };
       }
     },

@@ -302,7 +302,7 @@ public class Cd90AutoScheduleOutputDraftBuilder {
             return "库排容量不足";
         }
         if ("AGING_PERIOD_LIMIT".equals(failureReason)) {
-            return "大卷静置期未满";
+            return "纤维大卷暂无可用库存（库存不足或静置期未满）";
         }
         if ("ROLL_TOOL_LIMIT".equals(failureReason) || "TOOLING_LIMIT".equals(failureReason)) {
             return "工装不足";
