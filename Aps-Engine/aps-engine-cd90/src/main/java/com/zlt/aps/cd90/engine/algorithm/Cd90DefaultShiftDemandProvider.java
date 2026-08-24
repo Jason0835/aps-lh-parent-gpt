@@ -179,10 +179,15 @@ public class Cd90DefaultShiftDemandProvider implements Cd90ShiftDemandProvider {
         if (missingWeight.signum() <= 0) {
             return this.normalize(total);
         }
-        BigDecimal maxShiftDemand = effective.stream()
+        // SUM窗口不足时，使用最后3个有正需求班次的平均值预测每个缺失窗口。
+        int recentStartIndex = Math.max(0, effective.size() - 3);
+        List<Cd90DemandShift> recentEffective = effective.subList(recentStartIndex, effective.size());
+        BigDecimal recentTotal = recentEffective.stream()
                 .map(item -> value(item.getClothDemandQuantity()))
-                .max(BigDecimal::compareTo).orElse(BigDecimal.ZERO);
-        return this.normalize(total.add(maxShiftDemand.multiply(missingWeight)));
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal recentAverage = recentTotal.divide(
+                BigDecimal.valueOf(recentEffective.size()), 10, RoundingMode.HALF_UP);
+        return this.normalize(total.add(recentAverage.multiply(missingWeight)));
     }
     private BigDecimal requiredDepth(Cd90AutoScheduleInput input, String clothCode) {
         BigDecimal depthClassQty = input.getDepthClassQtyByCloth() == null
