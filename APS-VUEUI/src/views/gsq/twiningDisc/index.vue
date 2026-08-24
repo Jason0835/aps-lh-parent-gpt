@@ -239,7 +239,6 @@ export default {
         },
         {
           prop: "remark",
-          align: "center",
           halign: "center",
           label: this.$t("ui.common.column.remark"),
           minWidth: 120,
@@ -249,17 +248,16 @@ export default {
         },
         {
           prop: "updateTime",
-          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.gsq.twiningDisc.updateTime"),
-          minWidth: 180,
+          minWidth: 150,
         },
         {
           align: "center",
           halign: "center",
           label: this.$t("ui.data.btn.option"),
           prop: "option",
-          width: 160,
+          width: 180,
           fixed: "right",
           render: ({ row }) => {
             return (
@@ -267,10 +265,10 @@ export default {
                 <el-button
                   v-hasPermi={["gsq:twiningDisc:edit"]}
                   class="minus"
-                  type="success"
+                  type="primary"
                   onClick={() => this.handleEdit(row)}
                 >
-                  {this.$t("ui.frame.btn.update")}
+                  {this.$t("ui.frame.btn.modify")}
                 </el-button>
                 <el-button
                   v-hasPermi={["gsq:twiningDisc:remove"]}

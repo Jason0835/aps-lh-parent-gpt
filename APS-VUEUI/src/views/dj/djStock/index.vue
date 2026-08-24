@@ -158,7 +158,6 @@ export default {
           align: "center",
           halign: "center",
           label: this.$t("ui.data.column.dj.scheduleResult.paddingName"),
-          minWidth: 160,
           // sortable: "custom",
         },
         {
@@ -170,7 +169,7 @@ export default {
         },
         {
           prop: "stockNum",
-          align: "center",
+          align: "right",
           halign: "center",
           label: this.$t("ui.data.column.stock.stockNum.meter"),
           // sortable: "custom",
@@ -178,21 +177,20 @@ export default {
 
         {
           prop: "modifyNum",
-          align: "center",
+          align: "right",
           halign: "center",
           label: this.$t("ui.data.column.stock.modifyNum.meter"),
           // sortable: "custom",
         },
         {
           prop: "badNum",
-          align: "center",
+          align: "right",
           halign: "center",
           label: this.$t("ui.data.column.stock.badNum.meter"),
           // sortable: "custom",
         },
         {
           prop: "remark",
-          align: "center",
           halign: "center",
           label: this.$t("ui.common.column.remark"),
           minWidth: 100,
@@ -209,8 +207,8 @@ export default {
           align: "center",
           halign: "center",
           label: this.$t("ui.data.btn.option"),
-          minWidth: 200,
-          width: 200,
+          minWidth: 180,
+          width: 180,
           fixed: "right",
           render: ({ row }) => {
             return (

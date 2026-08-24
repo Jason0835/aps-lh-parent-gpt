@@ -146,13 +146,11 @@ export default {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
           width: 120,
-          align: "center",
         },
         {
           prop: "cxMachineCode",
           label: this.$t("ui.data.column.mdmCxMachineFixed.cxMachineCode"),
           width: 120,
-          align: "center",
         },
         {
           prop: "fixedStructure1",
