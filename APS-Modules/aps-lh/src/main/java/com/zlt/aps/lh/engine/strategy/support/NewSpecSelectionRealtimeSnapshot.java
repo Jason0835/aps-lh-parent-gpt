@@ -9,7 +9,6 @@ import com.zlt.aps.lh.engine.strategy.IMouldChangeBalanceStrategy;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
 import org.apache.commons.collections4.CollectionUtils;
 
-import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Date;
 import java.util.Objects;
@@ -32,7 +31,7 @@ public final class NewSpecSelectionRealtimeSnapshot {
     private final String realtimeShiftTotalPlanQty;
     /** 选机前窗口各班次已经正式占用的换模/换活字块次数 */
     private final String realtimeShiftChangeCount;
-    /** 选机前当前结构按日已经占用的物理硫化机台数 */
+    /** 选机前当前结构按班次已经占用的物理硫化机台数 */
     private final String realtimeStructureMachineCount;
     /** 当前业务日相对 T 日偏移 */
     private final int dateOffset;
@@ -138,32 +137,40 @@ public final class NewSpecSelectionRealtimeSnapshot {
     }
 
     /**
-     * 按既有结构物理机台去重口径读取 T～T+2 实时已排机台数。
+     * 按既有结构班次索引读取 c1～c8 实时已排物理机台数。
+     *
+     * <p>结构班次索引在 S4.4 换活字块前基于续作结果构建、随换活字块结果更新，并在
+     * S4.5开始前按最终结果重建；这里通过上下文统一查询入口读取同一账本，禁止回退到
+     * 日级统计或重新扫描结果。</p>
      *
      * @param context 排程上下文
      * @param sku 当前待选机 SKU
-     * @return {@code T=1,T+1=2,T+2=2}
+     * @return {@code c1=1,c2=2,...,c8=2} 完整八班文本
      */
     private static String buildStructureMachineCount(
             LhScheduleContext context,
             SkuScheduleDTO sku) {
-        if (Objects.isNull(context) || Objects.isNull(context.getScheduleDate())
-                || Objects.isNull(sku)) {
-            return "T=0,T+1=0,T+2=0";
-        }
-        LocalDate baseDate = context.getScheduleDate().toInstant()
-                .atZone(ZoneId.systemDefault()).toLocalDate();
-        StringBuilder textBuilder = new StringBuilder(24);
-        for (int dateOffset = 0; dateOffset < 3; dateOffset++) {
-            if (dateOffset > 0) {
-                textBuilder.append(',');
+        int[] shiftMachineCountArray =
+                new int[LhScheduleConstant.MAX_SHIFT_SLOT_COUNT];
+        if (Objects.nonNull(context) && Objects.nonNull(sku)
+                && CollectionUtils.isNotEmpty(context.getScheduleWindowShifts())) {
+            for (LhShiftConfigVO shift : context.getScheduleWindowShifts()) {
+                if (Objects.isNull(shift) || Objects.isNull(shift.getShiftIndex())
+                        || Objects.isNull(shift.getWorkDate())
+                        || shift.getShiftIndex() < 1
+                        || shift.getShiftIndex()
+                        > LhScheduleConstant.MAX_SHIFT_SLOT_COUNT) {
+                    continue;
+                }
+                int shiftIndex = shift.getShiftIndex();
+                shiftMachineCountArray[shiftIndex - 1] =
+                        context.getStructureScheduledMachineCount(
+                                shift.getWorkDate().toInstant()
+                                        .atZone(ZoneId.systemDefault()).toLocalDate(),
+                                shiftIndex, sku.getStructureName());
             }
-            textBuilder.append(dateOffset == 0 ? "T" : "T+" + dateOffset)
-                    .append('=')
-                    .append(context.getStructureScheduledMachineCount(
-                            baseDate.plusDays(dateOffset), sku.getStructureName()));
         }
-        return textBuilder.toString();
+        return buildShiftValueText(shiftMachineCountArray);
     }
 
     /**

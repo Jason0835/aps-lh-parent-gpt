@@ -17,15 +17,15 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * 结构收尾对齐在机机台统计缓存。
+ * 结构班次在机机台统计缓存。
  *
  * <p>按【结构 × 班次】维护去重后的物理机台集合，避免新增选机阶段
  * “SKU × 候选机台 × 全量排程结果”反复全表扫描。</p>
  *
  * <p>使用方式：</p>
  * <ul>
- *   <li>续作及换活字块排产全部完成、S4.5新增选机开始前调用 {@link #build} 一次性构建；</li>
- *   <li>新增选机过程中每提交一条结果调用 {@link #onResultCommitted} 增量更新；</li>
+ *   <li>S4.4换活字块前基于续作稳定结果构建，换活字块结果提交后增量更新；</li>
+ *   <li>S4.5新增选机前基于续作和换活字块最终结果重建，新增结果提交后继续增量更新；</li>
  *   <li>机台运行态被后置逻辑回写时调用 {@link #refreshMachine} 按单台重算兜底。</li>
  * </ul>
  *
@@ -71,17 +71,19 @@ public class StructureShiftInMachineIndex {
                 registerStructureShiftPhysicalCodes(structureName, shiftIndex, physicalMachineCodes);
             }
         }
-        log.info("结构收尾对齐在机统计缓存构建完成, structureCount: {}, shiftMachineCount: {}",
+        log.info("结构班次在机统计缓存构建完成, structureCount: {}, shiftMachineCount: {}",
                 structureShiftPhysicalMachineMap.size(),
                 structureShiftPhysicalMachineMap.values().stream()
                         .mapToInt(Map::size).sum());
     }
 
     /**
-     * 结果提交后增量更新缓存。
+     * 换活字块或新增结果提交后增量更新缓存。
      *
-     * <p>新结果代表机台从旧物料切换到当前SKU：从首个占用班次起，机台不再属于旧结构，
-     * 改为属于新结构；同结构接管时移除再添加等价于空操作。单控整机配对侧结果只登记一次。</p>
+     * <p>新结果代表机台从首个占用班次起可能切换到当前SKU。每个后续班次继续复用
+     * {@link StructureMinMachineRetentionService#isMachineInStructureAtShift} 判断正量生产、
+     * 停产保机和业务停机，计划量为0且已经真实下机的班次不得继续占用结构机台名额。
+     * 单控整机配对侧结果按物理机台编码去重。</p>
      *
      * @param context 排程上下文
      * @param retentionService 结构在机统计工具
@@ -109,10 +111,14 @@ public class StructureShiftInMachineIndex {
                 LhSingleControlMachineUtil.resolvePhysicalMachineCode(result.getLhMachineCode());
         for (int shiftIndex = firstOccupiedShiftIndex;
              shiftIndex <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shiftIndex++) {
-            removePhysicalCodeFromAllStructures(physicalMachineCode, shiftIndex);
-            addPhysicalCodeToStructureShift(structureName, shiftIndex, physicalMachineCode);
+            this.removePhysicalCodeFromAllStructures(physicalMachineCode, shiftIndex);
+            if (retentionService.isMachineInStructureAtShift(
+                    context, structureName, result.getLhMachineCode(), shiftIndex)) {
+                this.addPhysicalCodeToStructureShift(
+                        structureName, shiftIndex, physicalMachineCode);
+            }
         }
-        log.debug("结构收尾对齐在机缓存增量更新, batchNo: {}, machineCode: {}, physicalMachineCode: {}, "
+        log.debug("结构班次在机缓存增量更新, batchNo: {}, machineCode: {}, physicalMachineCode: {}, "
                         + "structureName: {}, firstOccupiedShift: {}",
                 context.getBatchNo(), result.getLhMachineCode(), physicalMachineCode,
                 structureName, firstOccupiedShiftIndex);
@@ -183,6 +189,30 @@ public class StructureShiftInMachineIndex {
         return CollectionUtils.isEmpty(physicalMachineCodes)
                 ? Collections.<String>emptySet()
                 : Collections.unmodifiableSet(physicalMachineCodes);
+    }
+
+    /**
+     * 判断候选机台对应的物理整机是否已经计入指定结构、指定班次。
+     *
+     * <p>单控 L/R 在写入索引时已经按物理整机去重，查询时继续统一解析物理机台编码，
+     * 避免调用方直接操作缓存集合并重复实现单控口径。</p>
+     *
+     * @param structureName 结构名称
+     * @param shiftIndex 班次索引
+     * @param machineCode 候选运行态机台编码
+     * @return true-已经计入；false-尚未计入
+     */
+    public boolean containsPhysicalMachine(String structureName,
+                                           int shiftIndex,
+                                           String machineCode) {
+        if (StringUtils.isEmpty(machineCode)) {
+            return false;
+        }
+        String physicalMachineCode =
+                LhSingleControlMachineUtil.resolvePhysicalMachineCode(machineCode);
+        return StringUtils.isNotEmpty(physicalMachineCode)
+                && this.resolveInMachinePhysicalCodes(structureName, shiftIndex)
+                .contains(physicalMachineCode);
     }
 
     /**

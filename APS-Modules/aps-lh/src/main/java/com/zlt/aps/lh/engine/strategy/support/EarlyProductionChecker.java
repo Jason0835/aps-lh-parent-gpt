@@ -147,33 +147,18 @@ public final class EarlyProductionChecker {
                     context.getFactoryCode(), currentDate, firstFuturePlanDate,
                     sku.getMaterialCode(), sku.getStructureName());
         }
-        if (planMachineCount > 0 && scheduledStructureCount > planMachineCount) {
-            String exceededReason = "结构已排机台数已超过计划机台数，禁止提前生产";
-            logEarlyProductionDecision(context, sku, currentDate, firstFuturePlanDate,
-                    planMachineCount, scheduledStructureCount, scheduledSkuCount,
-                    threshold, earlyProductionDaysThreshold, earlyDays, futurePlanQty,
-                    false, exceededReason);
-            String sceneType = currentPlanMachineCount > 0
-                    ? EarlyProductionDecision.SCENE_NORMAL
-                    : EarlyProductionDecision.SCENE_STRUCTURE_SWITCH;
-            return EarlyProductionDecision.earlyProduction(
-                    false, sceneType, firstFuturePlanDate,
-                    structurePlanMachineCounts, exceededReason);
-        }
         if (planMachineCount > 0) {
             /*
-             * 结构计划机台数只能限制“提前生产是否新增物理机台”，不能在选机前整体拒绝 SKU：
-             * 达到计划数后，SKU 仍可能复用已经计入本结构的机台。最终硬控下沉到候选机台
-             * 确定后、模具和胎胚等资源正式扣减前执行，当前日正常排产不走该校验。
+             * 日级已排数不能代表候选实际开产班次的结构占用：同一业务日内可能存在前班下机、
+             * 后班恢复或换料。普通结构提前和结构切换提前都只在这里完成基础准入，最终机台
+             * 上限统一下沉到候选真实目标班次确定后、模具和胎胚资源正式扣减前执行。
              */
-            boolean reachedPlanMachineCount = scheduledStructureCount >= planMachineCount;
+            boolean normalStructureEarlyProduction = currentPlanMachineCount > 0;
             logEarlyProductionDecision(context, sku, currentDate, firstFuturePlanDate, planMachineCount,
                     scheduledStructureCount, scheduledSkuCount, threshold,
                     earlyProductionDaysThreshold, earlyDays, futurePlanQty, true,
-                    reachedPlanMachineCount
-                            ? "结构已排机台数达到计划机台数，仅允许复用已计入同结构的物理机台"
-                            : "结构已排机台数未达到计划机台数");
-            String sceneType = currentPlanMachineCount > 0
+                    "提前生产进入候选实际目标班次机台数判断");
+            String sceneType = normalStructureEarlyProduction
                     ? EarlyProductionDecision.SCENE_NORMAL : EarlyProductionDecision.SCENE_STRUCTURE_SWITCH;
             if (currentPlanMachineCount == 0) {
                 log.info("提前生产结构切换准入, currentDate: {}, futurePlanDate: {}, structureName: {}, "
@@ -185,9 +170,7 @@ public final class EarlyProductionChecker {
             }
             return EarlyProductionDecision.earlyProduction(true, sceneType, firstFuturePlanDate,
                     structurePlanMachineCounts,
-                    reachedPlanMachineCount
-                            ? "结构已排机台数达到计划机台数，仅允许复用已计入同结构的物理机台"
-                            : "结构已排机台数未达到计划机台数");
+                    "提前生产进入候选实际目标班次机台数判断");
         }
         /*
          * 历史欠产/收尾遗留阶段下线后，结构没有有效计划机台数时不得再使用历史欠产
@@ -440,15 +423,15 @@ public final class EarlyProductionChecker {
     /**
      * 判断提前生产是否可以使用当前候选机台。
      *
-     * <p>结构计划机台数达到上限后，只允许复用已经计入同结构的物理机台；尚未达到上限时
-     * 可以新增机台；当前已排数已经超过计划数时，复用原机台也不得继续提前生产。
-     * 调用方必须仅在 {@code EARLY_PRODUCTION} 阶段、资源扣减前调用，普通排产不得使用
-     * 该方法作为公共准入条件。</p>
+     * <p>必须按候选实际开产班次读取结构在机物理机台数：达到上限后只允许复用当前班次
+     * 已计入同结构的物理机台；尚未达到上限时可以新增；已超过计划数时全部拒绝。
+     * 调用方必须仅在提前生产候选真实目标班次确定后、资源扣减前调用。</p>
      *
      * @param context 排程上下文
      * @param sku 提前生产 SKU
      * @param currentDate 当前业务日期
      * @param futurePlanDate 提前生产来源计划日
+     * @param targetShiftIndex 候选实际开产班次索引
      * @param machineCode 当前候选机台编码
      * @return true-允许使用；false-结构机台数已满且候选会新增物理机台
      */
@@ -456,25 +439,27 @@ public final class EarlyProductionChecker {
                                                            SkuScheduleDTO sku,
                                                            LocalDate currentDate,
                                                            LocalDate futurePlanDate,
+                                                           int targetShiftIndex,
                                                            String machineCode) {
         if (Objects.isNull(context) || Objects.isNull(sku) || Objects.isNull(currentDate)
                 || StringUtils.isEmpty(sku.getStructureName())
+                || targetShiftIndex < 1
                 || StringUtils.isEmpty(machineCode)) {
             return false;
         }
         int planMachineCount = resolveEffectiveStructurePlanMachineCount(
                 context, sku, currentDate, futurePlanDate);
         if (planMachineCount <= 0) {
-            return true;
+            return false;
         }
         int scheduledStructureMachineCount =
                 context.getStructureScheduledMachineCount(
-                        currentDate, sku.getStructureName());
+                        currentDate, targetShiftIndex, sku.getStructureName());
         if (scheduledStructureMachineCount > planMachineCount) {
             return false;
         }
         if (context.hasStructureScheduledMachine(
-                currentDate, sku.getStructureName(), machineCode)) {
+                currentDate, targetShiftIndex, sku.getStructureName(), machineCode)) {
             return true;
         }
         return scheduledStructureMachineCount < planMachineCount;

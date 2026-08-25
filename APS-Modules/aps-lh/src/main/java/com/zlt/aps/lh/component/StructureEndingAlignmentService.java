@@ -58,11 +58,11 @@ public class StructureEndingAlignmentService {
     private StructureMinMachineRetentionService structureMinMachineRetentionService;
 
     /**
-     * 在S4.5新增选机开始前构建结构收尾对齐在机统计缓存。
+     * 构建结构班次在机统计缓存。
      *
-     * <p>S4.2已完成结构转产最大收尾日期加载，本方法不得再次查询配置表；这里只基于
-     * 续作+换活字块排产完成后的实时排程结果构建动态在机缓存。之后每次选机先读日期快照，
-     * 三天门禁通过后再读在机缓存，并在结果提交时增量更新，避免SKU×候选×全量结果反复扫描。</p>
+     * <p>S4.4换活字块前基于续作稳定结果构建一次，供换活字块提前生产班次机台数门禁读取；
+     * S4.5新增选机前再基于续作和换活字块最终结果重建。两个阶段共用同一索引类型和增量更新
+     * 入口，不查询数据库，也不创建平行统计账本。</p>
      *
      * @param context 排程上下文
      */

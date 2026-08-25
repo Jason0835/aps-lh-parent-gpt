@@ -181,9 +181,6 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
     private static final String EARLY_PRODUCTION_PARTIAL_REMAINING_REASON_TEMPLATE =
             "提前生产已使用正常阶段后的剩余资源，按当前结构及日计划机台节奏不再扩机，"
                     + "剩余%d保留原计划日期";
-    /** 结构计划机台数达到上限时，提前生产禁止新增物理机台的原因前缀。 */
-    private static final String EARLY_PRODUCTION_STRUCTURE_MACHINE_LIMIT_REASON =
-            "同结构计划硫化机台数已达上限，禁止提前生产";
     private static final int NEW_SPEC_CHANGEOVER_PROBE_LIMIT = 16;
     /** 日驱动新增排产固定覆盖 T、T+1、T+2 三个业务日。 */
     private static final int DAY_DRIVEN_SCHEDULE_DAY_COUNT = 3;
@@ -2455,6 +2452,9 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             if (earlyProductionOnly != shouldRunInEarlyProductionPhase) {
                 continue;
             }
+            Date carryOverProductionStartTime =
+                    this.resolveSchedulableCarryOverProductionStartTime(
+                            context, dayContext, binding);
             if (earlyProductionOnly) {
                 /*
                  * 前一日提前生产形成的绑定在当前日正常任务完成后才能续排。此时必须按当前日
@@ -2463,11 +2463,11 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                  */
                 String structureLimitReason =
                         this.resolveEarlyProductionStructureMachineLimitReason(
-                                context, dayContext, sku, binding.getMachineCode());
+                                context, dayContext, sku, binding.getMachineCode(),
+                                NewSpecEmbryoAvailableTimeResolver.resolveProductionShift(
+                                        dayContext.getDayShifts(),
+                                        carryOverProductionStartTime));
                 if (StringUtils.isNotEmpty(structureLimitReason)) {
-                    this.appendEarlyProductionStructureMachineLimitLog(
-                            context, dayContext, sku, binding.getMachineCode(),
-                            structureLimitReason);
                     deferSkuToNextDay(
                             context, dayContext, state, sku, structureLimitReason);
                     log.info("提前生产在机绑定跨日续排受结构机台数限制, batchNo: {}, "
@@ -2501,7 +2501,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
 
             int deltaQty = appendCarryOverDayDelta(
                     context, dayContext, binding, allShifts,
-                    earlyProductionOnly);
+                    earlyProductionOnly, carryOverProductionStartTime);
             if (deltaQty > 0) {
                 scheduledBindingCount++;
                 state.markScheduledAndCarryOver(sku);
@@ -2611,6 +2611,42 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
     }
 
     /**
+     * 解析跨日在机绑定当前业务日的首个真实可开产时间。
+     *
+     * <p>提前生产的班次机台数门禁与实际续排共用该时间，确保门禁读取的目标班次
+     * 已经过机台收尾、停机、维修和班次生产管控，不用日首班或理论班次代替。</p>
+     *
+     * @param context 排程上下文
+     * @param dayContext 当前业务日上下文
+     * @param binding 跨日在机绑定
+     * @return 首个真实可开产时间；机台或班次不可用时返回null
+     */
+    private Date resolveSchedulableCarryOverProductionStartTime(
+            LhScheduleContext context,
+            DayScheduleContext dayContext,
+            ActiveMachineBinding binding) {
+        if (Objects.isNull(context) || Objects.isNull(dayContext)
+                || Objects.isNull(binding) || Objects.isNull(binding.getSku())) {
+            return null;
+        }
+        MachineScheduleDTO machine =
+                context.getMachineScheduleMap().get(binding.getMachineCode());
+        if (Objects.isNull(machine)) {
+            return null;
+        }
+        SkuScheduleDTO sku = binding.getSku();
+        Date productionStartTime = this.resolveCarryOverProductionStartTime(
+                dayContext, machine, binding);
+        int mouldQty = ShiftCapacityResolverUtil.resolveMachineMouldQty(machine);
+        int runtimeShiftCapacity = ShiftCapacityResolverUtil.resolveRuntimeShiftCapacity(
+                context, machine, sku.getShiftCapacity());
+        return ShiftProductionControlUtil.resolveFirstSchedulableStartIgnoringCleaning(
+                context, machine.getMachineCode(), productionStartTime,
+                dayContext.getDayShifts(), runtimeShiftCapacity,
+                sku.getLhTimeSeconds(), mouldQty);
+    }
+
+    /**
      * 在原新增结果中追加当前业务日班次增量。
      *
      * @param context 排程上下文
@@ -2618,27 +2654,24 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
      * @param binding 跨日在机绑定
      * @param allShifts 完整窗口班次
      * @param allowFutureQuotaConsumption true-提前生产阶段允许继续消费固定范围未来额度
+     * @param productionStartTime 与班次结构机台数门禁共用的真实可开产时间
      * @return 当前日实际新增排产量
      */
     private int appendCarryOverDayDelta(LhScheduleContext context,
                                         DayScheduleContext dayContext,
                                         ActiveMachineBinding binding,
                                         List<LhShiftConfigVO> allShifts,
-                                        boolean allowFutureQuotaConsumption) {
+                                        boolean allowFutureQuotaConsumption,
+                                        Date productionStartTime) {
         SkuScheduleDTO sku = binding.getSku();
         MachineScheduleDTO machine = context.getMachineScheduleMap().get(binding.getMachineCode());
-        if (Objects.isNull(machine)) {
+        if (Objects.isNull(machine) || Objects.isNull(productionStartTime)) {
             return 0;
         }
         List<LhShiftConfigVO> dayShifts = dayContext.getDayShifts();
-        Date productionStartTime = resolveCarryOverProductionStartTime(
-                dayContext, machine, binding);
         int mouldQty = ShiftCapacityResolverUtil.resolveMachineMouldQty(machine);
         int runtimeShiftCapacity = ShiftCapacityResolverUtil.resolveRuntimeShiftCapacity(
                 context, machine, sku.getShiftCapacity());
-        productionStartTime = ShiftProductionControlUtil.resolveFirstSchedulableStartIgnoringCleaning(
-                context, machine.getMachineCode(), productionStartTime, dayShifts,
-                runtimeShiftCapacity, sku.getLhTimeSeconds(), mouldQty);
         if (!dayContext.contains(productionStartTime)) {
             return 0;
         }
@@ -4233,23 +4266,6 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 // 当前轮已消费上一轮重试标记；本轮若再次需要顺延，会在对应失败分支重新写入。
                 pendingFirstInspectionRetryMachineCode = null;
                 if (Objects.isNull(candidateMachine)) {
-                    /*
-                     * 提前生产结构已达计划机台数、且当前不存在真实可复用候选时，虽然没有机台进入
-                     * 后续资源扣减，也必须把“禁止再新增物理机台”的业务原因带到最终未排结果。
-                     * 该判断只补充本阶段选机失败原因，不在公共候选入口拦截正常排产或历史欠产。
-                     */
-                    if (StringUtils.isEmpty(dailyDeferredReason)
-                            && CollectionUtils.isEmpty(currentSelectableCandidates)) {
-                        String noSelectableMachineLimitReason =
-                                this.resolveEarlyProductionStructureMachineLimitReason(
-                                        context, dayContext, sku, null);
-                        if (StringUtils.isNotEmpty(noSelectableMachineLimitReason)) {
-                            dailyDeferredReason = noSelectableMachineLimitReason;
-                            this.appendEarlyProductionStructureMachineLimitLog(
-                                    context, dayContext, sku, null,
-                                    noSelectableMachineLimitReason);
-                        }
-                    }
                     break;
                 }
                 String machineCode = candidateMachine.getMachineCode();
@@ -4260,6 +4276,23 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                  */
                 NewSpecMachineAvailabilityPlan selectedAvailabilityPlan =
                         candidateAvailabilityPlanMap.get(machineCode);
+                /*
+                 * 历史指定机台不参加普通候选的逐班分组，因此计划缓存可能尚未生成。普通结构
+                 * 提前生产仍必须在资源提交前读取真实目标班次：复用同一无副作用时间轴只预演
+                 * 当前已选机台，不改变历史指定关系、候选顺序或正式资源分配结果。
+                 */
+                NewSpecMachineAvailabilityPlan structureLimitAvailabilityPlan =
+                        selectedAvailabilityPlan;
+                if (Objects.isNull(structureLimitAvailabilityPlan)
+                        && this.isEarlyProductionShiftLimitApplicable(
+                        context, dayContext, sku)) {
+                    structureLimitAvailabilityPlan = this.resolveMachineAvailabilityPlan(
+                            context, sku, candidateMachine, dayContext,
+                            capacityCalculate, mouldChangeBalance, inspectionBalance,
+                            candidateProductionNotBeforeTime, productionNotBeforeTime,
+                            dynamicTargetQty, totalScheduledQty,
+                            currentAddMachineProductionDate, isEnding, false);
+                }
                 Date releasedContinuationReuseStartTime =
                         Objects.isNull(selectedAvailabilityPlan)
                                 ? null : this.resolveReleasedContinuationReuseStartTime(
@@ -4317,6 +4350,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                                     releasedContinuationReuseStartTime, reuseShift);
                     candidateAvailabilityPlanMap.put(
                             machineCode, selectedAvailabilityPlan);
+                    structureLimitAvailabilityPlan = selectedAvailabilityPlan;
                 }
                 boolean takeoverWithoutMouldChange =
                         substitutionTakeoverWithoutMouldChange || releasedContinuationReuse;
@@ -4340,7 +4374,9 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                  */
                 String earlyProductionStructureLimitReason =
                         this.resolveEarlyProductionStructureMachineLimitReason(
-                                context, dayContext, sku, candidateMachine.getMachineCode());
+                                context, dayContext, sku, candidateMachine.getMachineCode(),
+                                Objects.isNull(structureLimitAvailabilityPlan)
+                                        ? null : structureLimitAvailabilityPlan.getFormalTargetShift());
                 if (StringUtils.isNotEmpty(earlyProductionStructureLimitReason)) {
                     excludedMachineCodes.add(machineCode);
                     candidateCache.removeMachine(machineCode);
@@ -4348,9 +4384,6 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                             excludedMachineReasonMap, machineCode,
                             earlyProductionStructureLimitReason,
                             null, null, null, null, null, null, null, null, null);
-                    this.appendEarlyProductionStructureMachineLimitLog(
-                            context, dayContext, sku, candidateMachine.getMachineCode(),
-                            earlyProductionStructureLimitReason);
                     dailyDeferredReason = earlyProductionStructureLimitReason;
                     failReason = this.selectHigherPriorityFailReason(
                             failReason, NewSpecFailReasonEnum.MACHINE_SELECTION_FAILED);
@@ -9649,125 +9682,181 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
     }
 
     /**
-     * 校验提前生产候选是否会突破同结构计划硫化机台数。
+     * 判断当前调用是否需要执行提前生产班次机台数门禁。
      *
-     * <p>本校验只绑定 {@link DailySchedulePhase#EARLY_PRODUCTION}。结构已达到计划机台数时，
-     * 已经计入同结构的物理机台仍可复用，只有会新增物理机台的候选返回限制原因。
-     * 调用位置位于候选确定后、模具及其它生产资源扣减前，保证拒绝时不产生资源副作用。</p>
+     * @param context 排程上下文
+     * @param dayContext 当前业务日上下文
+     * @param sku 当前 SKU
+     * @return true-需要形成真实目标班次并执行门禁；false-保持原业务逻辑
+     */
+    private boolean isEarlyProductionShiftLimitApplicable(
+            LhScheduleContext context,
+            DayScheduleContext dayContext,
+            SkuScheduleDTO sku) {
+        if (Objects.isNull(context) || Objects.isNull(dayContext) || Objects.isNull(sku)
+                || dayContext.getCurrentPhase() != DailySchedulePhase.EARLY_PRODUCTION) {
+            return false;
+        }
+        EarlyProductionRuntimePlan runtimePlan =
+                context.getEarlyProductionRuntimePlan(sku);
+        EarlyProductionDecision decision = Objects.isNull(runtimePlan)
+                ? null : runtimePlan.getDecision();
+        return Objects.nonNull(runtimePlan)
+                && runtimePlan.isActive()
+                && Objects.nonNull(decision)
+                && decision.isEarlyProduction()
+                && decision.isAllowed();
+    }
+
+    /**
+     * 校验提前生产候选是否会突破实际目标班次的结构计划硫化机台数。
+     *
+     * <p>本校验只绑定 {@link DailySchedulePhase#EARLY_PRODUCTION}。
+     * 候选真实时间轴已经确定目标班次、模具及胎胚等资源尚未正式扣减时执行：班次已排数
+     * 小于计划数时可新增机台，等于计划数时只可复用本班次已有同结构物理机台，超过计划数
+     * 时全部拒绝。普通结构使用当前日计划机台数，结构切换使用未来来源计划日机台数；
+     * 正常排产保持原逻辑。</p>
      *
      * @param context 排程上下文
      * @param dayContext 当前业务日上下文
      * @param sku 当前提前生产 SKU
-     * @param candidateMachineCode 当前候选机台编码；为空表示当前无真实可复用候选，仅解析失败原因
-     * @return 空串表示允许；非空表示禁止提前生产的明确原因
+     * @param candidateMachineCode 当前候选机台编码
+     * @param targetShift 候选实际可开产时间所属班次
+     * @return 空串表示允许；非空表示拒绝当前候选的明确原因
      */
     private String resolveEarlyProductionStructureMachineLimitReason(
             LhScheduleContext context,
             DayScheduleContext dayContext,
             SkuScheduleDTO sku,
-            String candidateMachineCode) {
-        if (Objects.isNull(context) || Objects.isNull(dayContext) || Objects.isNull(sku)
-                || dayContext.getCurrentPhase() != DailySchedulePhase.EARLY_PRODUCTION) {
+            String candidateMachineCode,
+            LhShiftConfigVO targetShift) {
+        if (!this.isEarlyProductionShiftLimitApplicable(
+                context, dayContext, sku)) {
             return null;
         }
-        EarlyProductionRuntimePlan runtimePlan =
-                context.getEarlyProductionRuntimePlan(sku);
-        if (Objects.isNull(runtimePlan) || !runtimePlan.isActive()
-                || Objects.isNull(runtimePlan.getDecision())
-                || !runtimePlan.getDecision().isEarlyProduction()) {
-            return null;
-        }
-        LocalDate currentDate = dayContext.getScheduleDate();
-        LocalDate futurePlanDate = runtimePlan.getFuturePlanDate();
-        if (StringUtils.isNotEmpty(candidateMachineCode)
-                && EarlyProductionChecker.canUseMachineForEarlyProduction(
-                context, sku, currentDate, futurePlanDate,
-                candidateMachineCode)) {
-            return null;
-        }
-        int scheduledStructureMachineCount =
-                context.getStructureScheduledMachineCount(
-                        currentDate, sku.getStructureName());
-        int planMachineCount =
-                EarlyProductionChecker.resolveEffectiveStructurePlanMachineCount(
-                        context, sku, currentDate, futurePlanDate);
         /*
-         * 没有实际候选时，本方法只在结构确已达到计划数后补充组合失败原因；结构尚有新增
-         * 机台额度时继续沿用原选机失败原因，避免把普通资源不足误报成结构上限限制。
+         * 无候选或尚未形成正式目标班次时缺少班次级事实，不能再用日级统计替代并误报结构
+         * 上限。当前候选继续由既有时间轴/资源失败原因收口，后续真实候选仍会独立执行门禁。
          */
         if (StringUtils.isEmpty(candidateMachineCode)
-                && (planMachineCount <= 0
-                || scheduledStructureMachineCount < planMachineCount)) {
+                || Objects.isNull(targetShift)
+                || Objects.isNull(targetShift.getShiftIndex())) {
             return null;
         }
-        String physicalMachineCode =
-                LhSingleControlMachineUtil.resolvePhysicalMachineCode(
-                        candidateMachineCode);
-        StringBuilder reasonBuilder = new StringBuilder(192)
-                .append(EARLY_PRODUCTION_STRUCTURE_MACHINE_LIMIT_REASON)
-                .append("，结构=").append(PriorityTraceLogHelper.safeText(sku.getStructureName()))
-                .append("，当前已排物理机台数=").append(scheduledStructureMachineCount)
-                .append("，计划机台数=").append(planMachineCount);
-        if (StringUtils.isEmpty(candidateMachineCode)) {
-            reasonBuilder.append("，当前无可复用的同结构物理机台");
-        } else {
-            reasonBuilder.append("，候选物理机台=")
-                    .append(PriorityTraceLogHelper.safeText(physicalMachineCode));
+        LocalDate targetBusinessDate = this.resolveShiftWorkDate(targetShift);
+        if (Objects.isNull(targetBusinessDate)) {
+            return "提前生产候选实际开产班次业务日无法解析";
         }
-        return reasonBuilder.toString();
+        int targetShiftIndex = targetShift.getShiftIndex();
+        EarlyProductionRuntimePlan runtimePlan =
+                context.getEarlyProductionRuntimePlan(sku);
+        int planMachineCount = EarlyProductionChecker.resolveEffectiveStructurePlanMachineCount(
+                context, sku, targetBusinessDate, runtimePlan.getFuturePlanDate());
+        int scheduledStructureMachineCount =
+                context.getStructureScheduledMachineCount(
+                        targetBusinessDate, targetShiftIndex, sku.getStructureName());
+        boolean candidateAlreadyInStructure =
+                context.hasStructureScheduledMachine(
+                        targetBusinessDate, targetShiftIndex, sku.getStructureName(),
+                        candidateMachineCode);
+        boolean machineAllowed = EarlyProductionChecker.canUseMachineForEarlyProduction(
+                context, sku, targetBusinessDate, runtimePlan.getFuturePlanDate(),
+                targetShiftIndex, candidateMachineCode);
+        String reason;
+        String result;
+        if (!machineAllowed && planMachineCount <= 0) {
+            result = "REJECT";
+            reason = "当前业务日及提前生产来源日结构计划硫化机台数均为0，禁止提前生产";
+        } else if (!machineAllowed && scheduledStructureMachineCount > planMachineCount) {
+            result = "REJECT";
+            reason = "当前班次结构已排硫化机台数已超过计划机台数，禁止提前生产";
+        } else if (!machineAllowed) {
+            result = "REJECT";
+            reason = "当前班次结构计划硫化机台数已达上限，仅允许复用当前班次已计入该结构的物理机台";
+        } else if (candidateAlreadyInStructure
+                && scheduledStructureMachineCount >= planMachineCount) {
+            result = "PASS";
+            reason = "当前班次结构机台数已达计划上限，复用已有同结构物理机台";
+        } else {
+            result = "PASS";
+            reason = "当前班次结构机台数未达到计划上限，可新增物理机台";
+        }
+        this.appendEarlyProductionShiftLimitLog(
+                context, dayContext, sku, candidateMachineCode, targetShift,
+                planMachineCount, scheduledStructureMachineCount,
+                candidateAlreadyInStructure, result, reason);
+        if (StringUtils.equals("PASS", result)) {
+            return null;
+        }
+        return new StringBuilder(224)
+                .append(reason)
+                .append("，结构=").append(PriorityTraceLogHelper.safeText(sku.getStructureName()))
+                .append("，目标班次业务日=").append(targetBusinessDate)
+                .append("，目标班次=class").append(targetShiftIndex)
+                .append("，当前已排物理机台数=").append(scheduledStructureMachineCount)
+                .append("，计划机台数=").append(planMachineCount)
+                .append("，候选物理机台=").append(PriorityTraceLogHelper.safeText(
+                        LhSingleControlMachineUtil.resolvePhysicalMachineCode(
+                                candidateMachineCode)))
+                .toString();
     }
 
     /**
-     * 记录提前生产因结构计划机台数达到上限而排除候选机台的过程日志。
+     * 记录 SKU 提前生产的班次机台数准入过程日志。
      *
      * @param context 排程上下文
      * @param dayContext 当前业务日上下文
      * @param sku 当前提前生产 SKU
-     * @param candidateMachineCode 被拒绝的候选机台编码；为空表示没有真实可复用候选
-     * @param reason 明确限制原因
+     * @param candidateMachineCode 候选机台编码
+     * @param targetShift 实际目标班次
+     * @param planMachineCount 目标班次业务日生效的结构计划机台数
+     * @param scheduledStructureMachineCount 当前班次结构已排物理机台数
+     * @param candidateAlreadyInStructure 候选是否已计入当前班次结构
+     * @param result 判断结果
+     * @param reason 判断原因
      */
-    private void appendEarlyProductionStructureMachineLimitLog(
+    private void appendEarlyProductionShiftLimitLog(
             LhScheduleContext context,
             DayScheduleContext dayContext,
             SkuScheduleDTO sku,
             String candidateMachineCode,
+            LhShiftConfigVO targetShift,
+            int planMachineCount,
+            int scheduledStructureMachineCount,
+            boolean candidateAlreadyInStructure,
+            String result,
             String reason) {
-        if (Objects.isNull(context) || Objects.isNull(dayContext) || Objects.isNull(sku)) {
-            return;
-        }
-        EarlyProductionRuntimePlan runtimePlan =
-                context.getEarlyProductionRuntimePlan(sku);
-        LocalDate futurePlanDate = Objects.isNull(runtimePlan)
-                ? null : runtimePlan.getFuturePlanDate();
-        int planMachineCount =
-                EarlyProductionChecker.resolveEffectiveStructurePlanMachineCount(
-                        context, sku, dayContext.getScheduleDate(), futurePlanDate);
-        int scheduledStructureMachineCount =
-                context.getStructureScheduledMachineCount(
-                        dayContext.getScheduleDate(), sku.getStructureName());
         String physicalMachineCode =
                 LhSingleControlMachineUtil.resolvePhysicalMachineCode(
                         candidateMachineCode);
-        String detail = new StringBuilder(384)
+        String detail = new StringBuilder(448)
                 .append("batchNo=").append(PriorityTraceLogHelper.safeText(context.getBatchNo()))
                 .append(", scheduleDate=")
                 .append(LhScheduleTimeUtil.formatDate(context.getScheduleTargetDate()))
                 .append(", currentDate=").append(dayContext.getScheduleDate())
-                .append(", futurePlanDate=").append(PriorityTraceLogHelper.safeText(futurePlanDate))
-                .append(", phase=").append(DailySchedulePhase.EARLY_PRODUCTION)
+                .append(", targetBusinessDate=").append(this.resolveShiftWorkDate(targetShift))
                 .append(", materialCode=").append(sku.getMaterialCode())
-                .append(", structureName=").append(PriorityTraceLogHelper.safeText(sku.getStructureName()))
-                .append(", candidateMachineCode=")
-                .append(PriorityTraceLogHelper.safeText(candidateMachineCode))
-                .append(", physicalMachineCode=").append(PriorityTraceLogHelper.safeText(physicalMachineCode))
-                .append(", scheduledStructureMachineCount=").append(scheduledStructureMachineCount)
-                .append(", planMachineCount=").append(planMachineCount)
-                .append(", result=REJECT")
-                .append(", reason=").append(PriorityTraceLogHelper.safeText(reason))
+                .append(", productStatus=").append(PriorityTraceLogHelper.safeText(
+                        sku.getProductStatus()))
+                .append(", structureName=").append(PriorityTraceLogHelper.safeText(
+                        sku.getStructureName()))
+                .append(", targetShiftIndex=").append(targetShift.getShiftIndex())
+                .append(", targetShiftName=class").append(targetShift.getShiftIndex())
+                .append(", candidateMachineCode=").append(PriorityTraceLogHelper.safeText(
+                        candidateMachineCode))
+                .append(", physicalMachineCode=").append(PriorityTraceLogHelper.safeText(
+                        physicalMachineCode))
+                .append(", effectivePlanMachineCount=").append(planMachineCount)
+                .append(", scheduledStructureCount=").append(
+                        scheduledStructureMachineCount)
+                .append(", candidateAlreadyInStructure=").append(
+                        candidateAlreadyInStructure)
+                .append(", result=").append(result)
+                .append(", reason=").append(reason)
                 .toString();
-        log.info("提前生产结构机台数限制, {}", detail);
+        log.info("SKU提前生产班次机台数准入, {}", detail);
         PriorityTraceLogHelper.appendProcessLog(
-                context, "提前生产结构机台数限制", detail);
+                context, "SKU提前生产班次机台数准入", detail);
     }
 
     /**

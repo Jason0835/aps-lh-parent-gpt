@@ -120,3 +120,10 @@ UIController extends BaseUIController<Entity>
 - 有涉及到胎侧业务调整的部分，都需要同步更新到详设文档：`docs/tc/tc_schedule_detailed_design.md`,非业务部分不可新增到详设文档，避免文档臃肿
 - 胎侧独有业务点（与胎面差异，落地和调整时需保留）：整车率使用胎侧参数 `TC_VEHICLE_RATE`（胎面使用独立的 `TM_VEHICLE_RATE`，均默认1）、单班最大可排量取 `T_TC_MACHINE_INFO.MAX_CAPACITY`（无效时固定回退5500米，不读取统一容量参数）、库存最低保证班数 `TC_MIN_STOCK_CLASS`（默认3班，胎面为1班）、胎侧+垫胶共用机台 `T_TC_DJ_SHARED_MACHINE` 班次错开约束、机台选择"优先排满一台"口径。
 - 参数与表名统一 `TC_` / `T_TC_*` 前缀，班次映射、版本匹配 `TC_VERSION_MATCH_MODE`、成型偏移 `TC_FORMING_SHIFT_OFFSET` 等与胎面 `TM_*` 对齐。
+
+## 数据库查询与排查规范
+
+- 排查、分析硫化排程问题时，数据库证据一律优先使用 db-mcp 插件工具：`query`（只读查询）、`list_tables`（列表）、`describe_table`（表结构）、`list_databases`（库清单）、`list_connections`（列出连接）、`use_connection`（切换连接）、`execute`（写操作，谨慎使用）；不要手写 shell 的 mysql 命令或临时 JDBC helper。
+- 当前会话没有 db-mcp 工具时，先挂载插件再继续查询：在输入框引用 `[@db-mcp](plugin://db-mcp@personal)`，或打开 Sources → Use plugins 勾选 db-mcp；仅当 db-mcp 不可用或无法覆盖（如跨库多语句、特殊 mysql 参数）时才回退到 mysql CLI。
+- 默认连接为 `local`（本机 127.0.0.1:3307/apslh）；需要连其它库时用 `use_connection` 或工具里的 `connection` 参数指定。
+- 查询不熟悉的表前先用 `describe_table` 确认真实字段；排查证据链统一联合结果表、未排表、换模表和过程日志，按批次 + 物料 + 产品状态窄查再扩大。

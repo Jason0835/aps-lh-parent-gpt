@@ -1121,8 +1121,8 @@ public class LhScheduleResult extends BaseEntity implements Serializable {
     private String realtimeShiftChangeoverCount;
 
     /**
-     * 新增选机前当前结构按排程日已经占用的物理硫化机台数。
-     * <p>格式：{@code T=1,T+1=2,T+2=2}。</p>
+     * 新增选机前当前结构按排程班次已经占用的物理硫化机台数。
+     * <p>格式：{@code c1=1,c2=2,...,c8=2}，单控 L/R 按物理整机去重。</p>
      */
     @ApiModelProperty(value = "实时结构已排硫化机台数", name = "realtimeStructureScheduledMachineCount")
     @TableField(value = "REALTIME_STRUCTURE_SCHEDULED_MACHINE_COUNT")

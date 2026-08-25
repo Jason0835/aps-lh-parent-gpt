@@ -26,6 +26,7 @@ import org.springframework.util.CollectionUtils;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.time.ZoneId;
 import java.util.*;
 
 /**
@@ -467,9 +468,9 @@ public class LhScheduleContext {
     private Set<String> sharedEmbryoEndingBalanceEligibleMachineCodeSet =
             new LinkedHashSet<String>(8);
     /**
-     * 结构收尾对齐在机机台统计缓存（内存态，不落库）。
-     * <p>S4.5新增选机开始前由{@link com.zlt.aps.lh.component.StructureEndingAlignmentService}
-     * 基于续作+换活字块完成后的实时排程结果构建，选机过程中随结果提交增量更新。</p>
+     * 结构班次在机机台统计缓存（内存态，不落库）。
+     * <p>S4.4换活字块前基于续作稳定结果构建并随换活字块结果增量更新，S4.5新增选机前
+     * 再按续作+换活字块最终结果重建；结构收尾对齐和全部提前生产入口共用同一实例。</p>
      */
     private StructureShiftInMachineIndex structureShiftInMachineIndex;
     /**
@@ -1516,6 +1517,74 @@ public class LhScheduleContext {
                 && structureMachineCodeSet.stream()
                 .map(LhSingleControlMachineUtil::resolvePhysicalMachineCode)
                 .anyMatch(physicalMachineCode::equals);
+    }
+
+    /**
+     * 获取指定业务日、指定班次、指定结构的实时在机物理机台数。
+     *
+     * <p>该入口代理 S4.4换活字块前及S4.5新增排产前构建、并随结果提交实时更新的结构
+     * 班次索引，供结构收尾对齐和全部提前生产入口共享；不会创建第二套统计账本。</p>
+     *
+     * @param productionDate 目标班次业务日期
+     * @param shiftIndex 目标班次索引
+     * @param structureName 产品结构
+     * @return 当前班次已计入该结构的去重物理机台数
+     */
+    public int getStructureScheduledMachineCount(LocalDate productionDate,
+                                                 int shiftIndex,
+                                                 String structureName) {
+        if (!this.isTargetShiftMatched(productionDate, shiftIndex)
+                || StringUtils.isEmpty(structureName)
+                || Objects.isNull(structureShiftInMachineIndex)) {
+            return 0;
+        }
+        return structureShiftInMachineIndex.resolveInMachineCount(
+                structureName, shiftIndex);
+    }
+
+    /**
+     * 判断候选物理机台是否已经计入指定业务日、班次、结构。
+     *
+     * @param productionDate 目标班次业务日期
+     * @param shiftIndex 目标班次索引
+     * @param structureName 产品结构
+     * @param machineCode 候选运行态机台编码
+     * @return true-已计入，可在结构机台数达到上限时复用；false-会新增物理机台
+     */
+    public boolean hasStructureScheduledMachine(LocalDate productionDate,
+                                                int shiftIndex,
+                                                String structureName,
+                                                String machineCode) {
+        if (!this.isTargetShiftMatched(productionDate, shiftIndex)
+                || StringUtils.isEmpty(structureName)
+                || StringUtils.isEmpty(machineCode)
+                || Objects.isNull(structureShiftInMachineIndex)) {
+            return false;
+        }
+        return structureShiftInMachineIndex.containsPhysicalMachine(
+                structureName, shiftIndex, machineCode);
+    }
+
+    /**
+     * 校验班次索引与业务日期属于同一个排程窗口班次。
+     *
+     * @param productionDate 业务日期
+     * @param shiftIndex 班次索引
+     * @return true-班次存在且业务日期一致；false-不一致
+     */
+    private boolean isTargetShiftMatched(LocalDate productionDate, int shiftIndex) {
+        if (Objects.isNull(productionDate)
+                || shiftIndex < 1
+                || CollectionUtils.isEmpty(scheduleWindowShifts)) {
+            return false;
+        }
+        return scheduleWindowShifts.stream()
+                .filter(Objects::nonNull)
+                .filter(shift -> Objects.equals(shift.getShiftIndex(), shiftIndex))
+                .filter(shift -> Objects.nonNull(shift.getWorkDate()))
+                .map(shift -> shift.getWorkDate().toInstant()
+                        .atZone(ZoneId.systemDefault()).toLocalDate())
+                .anyMatch(productionDate::equals);
     }
 
     /**
