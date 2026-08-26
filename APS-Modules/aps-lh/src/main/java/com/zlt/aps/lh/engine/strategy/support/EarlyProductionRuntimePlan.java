@@ -75,6 +75,13 @@ public class EarlyProductionRuntimePlan implements Serializable {
     private EarlyProductionDecision decision;
 
     /**
+     * 当前提前生产业务日对应的判断日志明细。
+     * <p>日志对象只保存标量快照，后续真实选机和结果提交阶段在同一对象上回填结果，
+     * 不重新执行准入、模具或产能判断。</p>
+     */
+    private EarlyProductionDecisionLogEntry decisionLogEntry;
+
+    /**
      * 当前 SKU、当前提前生产阶段共享的临时前移日计划账本。
      *
      * <p>账本覆盖从最近未来计划日起至固定截止日的全部正计划来源日，并按实际提前天数

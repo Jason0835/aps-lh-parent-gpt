@@ -2112,6 +2112,20 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
         this.completeSuccessfulTypeBlockSchedule(
                 context, machine, sku, adoptedTargetQty, scheduledQty,
                 remainingQty, originalStrictTargetQty);
+        if (StringUtils.equals(YES_FLAG, result.getIsEarlyProduction())) {
+            LocalDate actualProductionDate =
+                    this.resolveTypeBlockProductionWorkDate(shifts, startTime);
+            LhShiftConfigVO actualProductionShift =
+                    NewSpecEmbryoAvailableTimeResolver.resolveProductionShift(
+                            shifts, startTime);
+            earlyProductionRuntimePlanService.recordSuccessfulSchedule(
+                    context, sku, Objects.isNull(structureSwitchEarlyProductionCandidateDate)
+                            ? actualProductionDate : structureSwitchEarlyProductionCandidateDate,
+                    actualProductionDate,
+                    Objects.isNull(actualProductionShift)
+                            ? null : actualProductionShift.getShiftIndex(),
+                    machine.getMachineCode(), scheduledQty, 0);
+        }
         return true;
     }
 
@@ -2523,25 +2537,32 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
         int originalDayPlanQty = resolveTypeBlockOriginalDayPlanQty(
                 context, sku, productionWorkDate);
         LocalDate structureSwitchEarlyProductionCandidateDate = null;
+        LocalDate earlyProductionSourceDate = null;
         boolean success = true;
         if (originalDayPlanQty <= 0) {
-            LocalDate firstFuturePlanDate = EarlyProductionChecker.resolveFirstFuturePlanDate(
+            earlyProductionSourceDate = EarlyProductionChecker.resolveFirstFuturePlanDate(
                     context, sku, productionWorkDate);
             if (this.shouldDeferEarlyProductionToDailyNewSpec(
-                    context, firstFuturePlanDate)) {
+                    context, earlyProductionSourceDate)) {
                 String deferredReason = "提前生产必须等待当前业务日正常新增任务完成后执行";
+                earlyProductionRuntimePlanService.recordDecisionSnapshot(
+                        context, sku, productionWorkDate,
+                        EarlyProductionDecision.earlyProduction(
+                                false, EarlyProductionDecision.SCENE_NORMAL,
+                                earlyProductionSourceDate, Collections.<Integer>emptyList(),
+                                deferredReason));
                 this.recordTypeBlockAppendFailure(failureReason, deferredReason);
                 log.info("换活字块提前生产后置到按日新增主链, factoryCode: {}, batchNo: {}, "
                                 + "materialCode: {}, productionWorkDate: {}, futurePlanDate: {}, "
                                 + "windowEndDate: {}, reason: {}",
                         context.getFactoryCode(), context.getBatchNo(), sku.getMaterialCode(),
-                        productionWorkDate, firstFuturePlanDate,
+                        productionWorkDate, earlyProductionSourceDate,
                         this.resolveScheduleTargetLocalDate(context), deferredReason);
                 success = false;
             } else {
                 boolean structureSwitchEarlyProduction =
                         EarlyProductionChecker.isStructureSwitchEarlyProduction(
-                                context, sku, productionWorkDate, firstFuturePlanDate);
+                                context, sku, productionWorkDate, earlyProductionSourceDate);
                 if (structureSwitchEarlyProduction) {
                     structureSwitchEarlyProductionCandidateDate = productionWorkDate;
                 } else {
@@ -2567,6 +2588,18 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
         if (!success && switchStartTime != null) {
             // 换活字块结果落地失败时，回滚本轮已占用的切换配额。
             getMouldChangeBalanceStrategy().rollbackMouldChange(context, switchStartTime);
+        }
+        if (!success && originalDayPlanQty <= 0
+                && Objects.nonNull(earlyProductionSourceDate)) {
+            LhShiftConfigVO attemptShift = Objects.isNull(startTime)
+                    ? null : NewSpecEmbryoAvailableTimeResolver.resolveProductionShift(
+                    shifts, startTime);
+            earlyProductionRuntimePlanService.recordFailedSchedule(
+                    context, sku, productionWorkDate,
+                    Objects.isNull(failureReason)
+                            ? "换活字块提前生产未形成有效结果" : failureReason.toString(),
+                    null, 1, Objects.isNull(attemptShift)
+                            ? null : attemptShift.getShiftIndex());
         }
         return success;
     }
@@ -2723,6 +2756,8 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
         EarlyProductionDecision decision =
                 earlyProductionRuntimePlanService.evaluateEarlyProductionAdmission(
                         context, sku, productionWorkDate);
+        earlyProductionRuntimePlanService.recordDecisionSnapshot(
+                context, sku, productionWorkDate, decision);
         return this.resolveTypeBlockEarlyProductionAdmissionRejectReason(
                 context, machine, sku, productionWorkDate, productionStartTime,
                 decision, true);
@@ -2839,97 +2874,12 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                     .append("，目标班次业务日=").append(targetBusinessDate)
                     .toString();
         }
-        int targetShiftIndex = targetShift.getShiftIndex();
-        int scheduledMachineCount = context.getStructureScheduledMachineCount(
-                productionWorkDate, targetShiftIndex, sku.getStructureName());
-        int planMachineCount = EarlyProductionChecker.resolveEffectiveStructurePlanMachineCount(
-                context, sku, productionWorkDate, decision.getFuturePlanDate());
-        boolean candidateAlreadyInStructure = context.hasStructureScheduledMachine(
-                productionWorkDate, targetShiftIndex, sku.getStructureName(),
-                machine.getMachineCode());
-        boolean machineAllowed = EarlyProductionChecker.canUseMachineForEarlyProduction(
-                context, sku, productionWorkDate, decision.getFuturePlanDate(),
-                targetShiftIndex, machine.getMachineCode());
-        if (!machineAllowed) {
-            boolean exceededPlanMachineCount =
-                    planMachineCount > 0 && scheduledMachineCount > planMachineCount;
-            String reasonPrefix = exceededPlanMachineCount
-                    ? "同结构当前已排物理机台数超过计划硫化机台数，禁止提前生产，结构="
-                    : "同结构计划硫化机台数已达上限，禁止提前生产新增物理机台，结构=";
-            String reason = new StringBuilder(reasonPrefix)
-                    .append(PriorityTraceLogHelper.safeText(sku.getStructureName()))
-                    .append("，当前已排物理机台数=").append(scheduledMachineCount)
-                    .append("，计划机台数=").append(planMachineCount)
-                    .append("，目标班次=class").append(targetShiftIndex)
-                    .append("，候选机台=")
-                    .append(PriorityTraceLogHelper.safeText(machine.getMachineCode()))
-                    .toString();
-            this.appendTypeBlockEarlyProductionShiftLimitLog(
-                    context, sku, machine, productionWorkDate, decision.getFuturePlanDate(),
-                    targetShiftIndex, planMachineCount, scheduledMachineCount,
-                    candidateAlreadyInStructure, "REJECT", reason);
-            return reason;
-        }
-        String passReason = candidateAlreadyInStructure
-                && scheduledMachineCount >= planMachineCount
-                ? "当前班次结构机台数已达计划上限，复用已有同结构物理机台"
-                : "当前班次结构机台数未达到计划上限，可新增物理机台";
-        this.appendTypeBlockEarlyProductionShiftLimitLog(
-                context, sku, machine, productionWorkDate, decision.getFuturePlanDate(),
-                targetShiftIndex, planMachineCount, scheduledMachineCount,
-                candidateAlreadyInStructure, "PASS", passReason);
+        /*
+         * 结构机台数已经由共享提前生产中心按理论业务日最后一个班次生成当天唯一资格。
+         * 此处只保留实际生产班次与业务日一致性校验；通过资格后不再因候选落到其他班次
+         * 重复比较结构机台数，继续执行换活字块、胎胚、首检和产能等既有约束。
+         */
         return StringUtils.EMPTY;
-    }
-
-    /**
-     * 记录换活字块提前生产的班次结构机台数准入结果。
-     *
-     * @param context 排程上下文
-     * @param sku 换活字块目标SKU
-     * @param machine 候选机台
-     * @param productionWorkDate 候选业务日
-     * @param futurePlanDate 提前生产来源计划日
-     * @param targetShiftIndex 实际开产班次
-     * @param planMachineCount 生效结构计划机台数
-     * @param scheduledMachineCount 当前班次结构已排物理机台数
-     * @param candidateAlreadyInStructure 候选是否已计入当前班次结构
-     * @param result 判断结果
-     * @param reason 判断原因
-     */
-    private void appendTypeBlockEarlyProductionShiftLimitLog(
-            LhScheduleContext context,
-            SkuScheduleDTO sku,
-            MachineScheduleDTO machine,
-            LocalDate productionWorkDate,
-            LocalDate futurePlanDate,
-            int targetShiftIndex,
-            int planMachineCount,
-            int scheduledMachineCount,
-            boolean candidateAlreadyInStructure,
-            String result,
-            String reason) {
-        String detail = new StringBuilder(384)
-                .append("batchNo=").append(PriorityTraceLogHelper.safeText(context.getBatchNo()))
-                .append(", productionWorkDate=").append(productionWorkDate)
-                .append(", futurePlanDate=").append(futurePlanDate)
-                .append(", materialCode=").append(sku.getMaterialCode())
-                .append(", productStatus=").append(PriorityTraceLogHelper.safeText(
-                        sku.getProductStatus()))
-                .append(", structureName=").append(PriorityTraceLogHelper.safeText(
-                        sku.getStructureName()))
-                .append(", targetShiftIndex=").append(targetShiftIndex)
-                .append(", machineCode=").append(PriorityTraceLogHelper.safeText(
-                        machine.getMachineCode()))
-                .append(", effectivePlanMachineCount=").append(planMachineCount)
-                .append(", scheduledStructureCount=").append(scheduledMachineCount)
-                .append(", candidateAlreadyInStructure=").append(
-                        candidateAlreadyInStructure)
-                .append(", result=").append(result)
-                .append(", reason=").append(reason)
-                .toString();
-        log.info("换活字块提前生产班次机台数准入, {}", detail);
-        PriorityTraceLogHelper.appendProcessLog(
-                context, "换活字块提前生产班次机台数准入", detail);
     }
 
     /**

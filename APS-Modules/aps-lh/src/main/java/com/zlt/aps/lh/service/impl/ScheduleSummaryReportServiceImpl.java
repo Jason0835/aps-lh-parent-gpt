@@ -28,6 +28,7 @@ import com.zlt.aps.maindata.mapper.LhMachineInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmMaterialConsumeDetailMapper;
 import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
+import com.zlt.aps.mdm.api.domain.entity.MdmSkuConstructionRef;
 import com.zlt.aps.mp.api.domain.entity.FactoryParam;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialConsumeDetail;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
@@ -97,13 +98,16 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
     private static final int SMALL_RUBBER_END_COL_T2 = 6;
 
     /**
-     * 硫化精度固定写法关键词：硫化侧班次分析中含"精度"的文本为封闭集合，
-     * 全部来自 ResultDowntimeSummaryUtil 的固定常量（"精度计划"、"喷砂清洗+精度"；
-     * 历史残留的"换模+精度计划"含"精度计划"自动覆盖）。
-     * 判定时先按分隔符拆分为独立原因项，再对每项做包含匹配，
-     * "成型精度影响: ..."拆分后无任何项包含这些关键词，天然被排除。
+     * 硫化精度固定原因项：硫化侧班次分析中真正表示精度保养的固定写法为独立原因项"精度计划"
+     * （来自 ResultDowntimeSummaryUtil 的固定常量）。
+     * 判定时先按分隔符拆分为独立原因项，再对每项做<b>精确等于</b>匹配：
+     * <ul>
+     *   <li>"喷砂清洗+精度"属于模具清洗与精度重叠的组合原因，应归入模具清洗栏位展示，精确不等于"精度计划"被排除</li>
+     *   <li>"换模+精度计划"属于换模组合原因（历史残留写法），应归入模具交替栏位展示，被排除</li>
+     *   <li>"成型精度影响: ..."拆分后无任何独立项等于"精度计划"，天然被排除</li>
+     * </ul>
      */
-    private static final String[] LH_PRECISION_KEYWORDS = {"精度计划", "喷砂清洗+精度"};
+    private static final String LH_PRECISION_ANALYSIS = "精度计划";
 
     /**
      * 成型精度固定原因项：成型侧精度扣减班次由 buildTaskAnalysis 写入独立原因"精度"
@@ -148,6 +152,9 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
 
     @Resource
     private CxParamConfigMapper cxParamConfigMapper;
+
+    @Resource
+    private MdmSkuConstructionRefMapper mdmSkuConstructionRefMapper;
 
     @Override
     public byte[] exportScheduleSummaryReport(ScheduleSummaryReportVO queryVO) {
@@ -215,18 +222,19 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         Date scheduleDateT2 = DateUtil.offsetDay(scheduleDate, 1);
         // 硫化机台单双模(模台数)映射：用于硫化开动机台数统计时合并K1501L/K1501R等单控机台
         Map<String, Integer> machineMaxMouldMap = this.loadMachineMaxMouldMap(factoryCode);
+        // SKU与示方书关系映射（物料级类型兜底数据源，T+1/T+2 共用一次查询）
+        Map<String, Set<String>> skuEmbryoTypeMap = this.loadSkuEmbryoTypeMap();
         Map<String, Object> tableMap = this.buildTableMapFromResults(
                 scheduleDate, scheduleDate, scheduleDateT2, factoryCode,
-                classShiftTypeMap, cxResults, lhResults, "", machineMaxMouldMap);
+                classShiftTypeMap, cxResults, lhResults, "", machineMaxMouldMap, skuEmbryoTypeMap);
 
         // 新模板（右侧，后缀2）：T+2数据，从同一份排程结果中取class6/7/8班次
         Map<String, Object> tableMapT2 = this.buildTableMapFromResults(
                 scheduleDateT2, scheduleDate, scheduleDateT2, factoryCode,
-                classShiftTypeMap, cxResults, lhResults, "2", machineMaxMouldMap);
+                classShiftTypeMap, cxResults, lhResults, "2", machineMaxMouldMap, skuEmbryoTypeMap);
         tableMap.putAll(tableMapT2);
 
-        // 模具交替/清洗信息：一次性查询该排程批次所有数据，按 planDate 分组到 T+1/T+2 栏位
-        // 查询口径与硫化日计划导出"硫化换模计划"tab页一致：SCHEDULE_DATE = 排程目标日(T+1)
+        // 模具交替/清洗信息：一次性查询排程窗口（T日 ~ T+2）所有数据，按 planDate 分组到 T+1/T+2 栏位
         Map<String, Object> mouldChangeAndCleanMap = this.buildMouldChangeAndCleanInfo(
                 scheduleDate, scheduleDateT2, factoryCode);
         tableMap.putAll(mouldChangeAndCleanMap);
@@ -241,7 +249,7 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
 
         // 小胶种列表：T+1 和 T+2 从同一份排程结果中按不同班次过滤，按胶种做 full outer join
         List<Map<String, Object>> smallRubberList = this.buildMergedSmallRubberList(
-                scheduleDate, scheduleDateT2, factoryCode, cxResults);
+                scheduleDate, scheduleDateT2, factoryCode, cxResults, skuEmbryoTypeMap);
         List<List<Map<String, Object>>> dataList = new ArrayList<>();
         dataList.add(smallRubberList);
 
@@ -288,16 +296,18 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
      * <p>按胶种编码做合并：T+1 和 T+2 出现的胶种取并集，T+1 缺失时仅填 T+2 的 key，
      * T+2 缺失时仅填 T+1 的 key，两边都有则同时填充。height 字段两个模板共用一行高度。</p>
      *
-     * @param scheduleDateT1 T+1 排程日期
-     * @param scheduleDateT2 T+2 排程日期（排程日期+1天）
-     * @param factoryCode    分厂编码
-     * @param cxResults      预查询的成型排程结果（排程日期=T+1）
+     * @param scheduleDateT1  T+1 排程日期
+     * @param scheduleDateT2  T+2 排程日期（排程日期+1天）
+     * @param factoryCode     分厂编码
+     * @param cxResults       预查询的成型排程结果（排程日期=T+1）
+     * @param skuEmbryoTypeMap SKU与示方书关系映射（物料编码→示方类型集合，物料级类型兜底数据源）
      * @return 合并后的小胶种行数据列表（两边都无数据返回空列表）
      */
     private List<Map<String, Object>> buildMergedSmallRubberList(Date scheduleDateT1, Date scheduleDateT2,
-                                                                  String factoryCode, List<CxScheduleResult> cxResults) {
-        List<Map<String, Object>> listT1 = this.buildSmallRubberList(scheduleDateT1, factoryCode, cxResults, "");
-        List<Map<String, Object>> listT2 = this.buildSmallRubberList(scheduleDateT1, factoryCode, cxResults, "2");
+                                                                  String factoryCode, List<CxScheduleResult> cxResults,
+                                                                  Map<String, Set<String>> skuEmbryoTypeMap) {
+        List<Map<String, Object>> listT1 = this.buildSmallRubberList(scheduleDateT1, factoryCode, cxResults, "", skuEmbryoTypeMap);
+        List<Map<String, Object>> listT2 = this.buildSmallRubberList(scheduleDateT1, factoryCode, cxResults, "2", skuEmbryoTypeMap);
 
         if (listT1.isEmpty() && listT2.isEmpty()) {
             return new ArrayList<>();
@@ -350,12 +360,14 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
      * @param keySuffix          key 后缀（"" 或 "2"）
      * @param machineMaxMouldMap 硫化机台单双模(模台数)映射，key=机台编号(大写), value=单双模值；
      *                           用于硫化开动机台数统计时合并K1501L/K1501R等单控机台
+     * @param skuEmbryoTypeMap   SKU与示方书关系映射（物料编码→示方类型集合，物料级类型兜底数据源）
      * @return 模板参数映射
      */
     private Map<String, Object> buildTableMapFromResults(Date reportDate, Date actualScheduleDate, Date scheduleDateT2,
                                                          String factoryCode, Map<Integer, String> classShiftTypeMap,
                                                          List<CxScheduleResult> cxResults, List<LhScheduleResult> lhResults,
-                                                         String keySuffix, Map<String, Integer> machineMaxMouldMap) {
+                                                         String keySuffix, Map<String, Integer> machineMaxMouldMap,
+                                                         Map<String, Set<String>> skuEmbryoTypeMap) {
         Map<String, Object> map = new HashMap<>(32);
 
         map.put("titleDate" + keySuffix, DateUtil.format(reportDate, "MM月dd日") + "计划排产\n"
@@ -418,11 +430,21 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                 recipeTypes = collectRecipeTypesFromShift678(result);
             }
             recipeTypes.removeIf(StringUtils::isBlank);
+            if (recipeTypes.isEmpty()) {
+                recipeTypes.add("S");
+            }
+            // 物料级类型判定：materialCode 可能是逗号分隔的多个物料编码（排程生成时按胎胚+机台合并），
+            // 记录级 recipeType 仅代表第一个物料（主物料），其余共用胎胚物料需用SKU关系表的
+            // 物料全部类型兜底，否则共用胎胚下的量试/试制物料会被漏统计
+            Map<String, Set<String>> materialTypes = this.resolveMaterialTypes(result, recipeTypes, skuEmbryoTypeMap);
+            Set<String> allMaterialTypes = materialTypes.values().stream()
+                    .flatMap(Set::stream)
+                    .collect(Collectors.toSet());
             // 按示方书类型归集：T=量试，X=试制
-            if (recipeTypes.contains("T")) {
+            if (allMaterialTypes.contains("T")) {
                 trialSpecs.add(specDesc);
             }
-            if (recipeTypes.contains("X")) {
+            if (allMaterialTypes.contains("X")) {
                 setupSpecs.add(specDesc);
             }
         }
@@ -433,7 +455,8 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         // 用 reportDate 作为查询日期，实现 T+1/T+2 日期隔离：
         //   keySuffix=""  → reportDate=T+1，查T+1的结构切换
         //   keySuffix="2" → reportDate=T+2，查T+2的结构切换
-        map.put("cxSpecSwitch" + keySuffix, this.buildCxSpecSwitch(reportDate, reportDate, factoryCode));
+        map.put("cxSpecSwitch" + keySuffix, this.buildCxSpecSwitch(
+                reportDate, reportDate, factoryCode, cxResults, classShiftTypeMap, keySuffix));
 
         // 硫化产量和机台数：根据 keySuffix 限制班次序号范围
         // keySuffix="" → 班次3~5（class3~5映射的01/02/03，与成型T+1班次范围一致），keySuffix="2" → 班次6~8（class6~8映射的01/02/03）
@@ -593,26 +616,29 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
     private Map<String, Object> buildMouldChangeAndCleanInfo(Date scheduleDateT1, Date scheduleDateT2, String factoryCode) {
         Map<String, Object> map = new HashMap<>(8);
 
-        // 一次查出该排程批次所有模具交替计划
-        // 查询口径与硫化日计划导出"硫化换模计划"tab页完全一致：
+        // 一次查出排程窗口内所有模具交替/清洗计划（按真实执行时间 PLAN_DATE 过滤，范围 T日 ~ T+2）
+        // 现场报表的模具交替/清洗按真实执行日期展示：T日（排程目标日前一天）晚上做的模具准备
+        // 由上一次排程批次生成（SCHEDULE_DATE=T日），只查 SCHEDULE_DATE=排程目标日会漏掉T日数据，
+        // 故改为按 PLAN_DATE 范围过滤，T日计划随T+1栏位一起展示；
         // 项目未配置 MyBatis-Plus 全局逻辑删除，tab 页 selectList 不自动过滤 is_delete，故此处也不加该条件；
         // changeMouldType 不在 SQL 层过滤，改为在内存中按 01/02→交替、03/04→清洗 分组，避免漏掉脏数据。
-        List<LhMouldChangePlan> allPlans = lhMouldChangePlanEntityMapper.selectList(
-                new LambdaQueryWrapper<LhMouldChangePlan>()
-                        .eq(LhMouldChangePlan::getFactoryCode, factoryCode)
-                        .eq(LhMouldChangePlan::getScheduleDate, scheduleDateT1));
-        log.info("模具交替/清洗计划查询完成, 排程目标日(T+1): {}, 分厂: {}, 总数量: {}",
-                DateUtil.formatDate(scheduleDateT1), factoryCode, allPlans.size());
-
-        // 按 planDate 落地日期划分 T+1 / T+2 时间范围
+        Date t0Start = LhScheduleTimeUtil.clearTime(DateUtil.offsetDay(scheduleDateT1, -1));
         Date t1Start = LhScheduleTimeUtil.clearTime(scheduleDateT1);
         Date t1End = LhScheduleTimeUtil.getEndTime(scheduleDateT1);
         Date t2Start = LhScheduleTimeUtil.clearTime(scheduleDateT2);
         Date t2End = LhScheduleTimeUtil.getEndTime(scheduleDateT2);
+        List<LhMouldChangePlan> allPlans = lhMouldChangePlanEntityMapper.selectList(
+                new LambdaQueryWrapper<LhMouldChangePlan>()
+                        .eq(LhMouldChangePlan::getFactoryCode, factoryCode)
+                        .ge(LhMouldChangePlan::getPlanDate, t0Start)
+                        .le(LhMouldChangePlan::getPlanDate, t2End));
+        log.info("模具交替/清洗计划查询完成, 排程目标日(T+1): {}, 分厂: {}, 计划日期范围: {} ~ {}, 总数量: {}",
+                DateUtil.formatDate(scheduleDateT1), factoryCode,
+                DateUtil.formatDate(t0Start), DateUtil.formatDate(t2End), allPlans.size());
 
-        // T+1 模具交替机台（planDate 在 T+1 当天，更换类型 01/02）
+        // T+1 模具交替机台（planDate 在 T日 ~ T+1，更换类型 01/02；T日为现场前一日准备，随T+1栏位展示）
         String mouldChangeInfoT1 = allPlans.stream()
-                .filter(p -> this.isPlanDateInRange(p, t1Start, t1End))
+                .filter(p -> this.isPlanDateInRange(p, t0Start, t1End))
                 .filter(p -> MouldChangeTypeEnum.containsAnyCode(p.getChangeMouldType(),
                         MouldChangeTypeEnum.REGULAR.getCode(), MouldChangeTypeEnum.TYPE_BLOCK.getCode()))
                 .map(LhMouldChangePlan::getLhMachineCode)
@@ -632,9 +658,9 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                 .limit(15)
                 .collect(Collectors.joining(";"));
 
-        // T+1 模具清洗机台（planDate 在 T+1 当天，更换类型 03/04）
+        // T+1 模具清洗机台（planDate 在 T日 ~ T+1，更换类型 03/04；T日为现场前一日准备，随T+1栏位展示）
         String mouldCleanInfoT1 = allPlans.stream()
-                .filter(p -> this.isPlanDateInRange(p, t1Start, t1End))
+                .filter(p -> this.isPlanDateInRange(p, t0Start, t1End))
                 .filter(p -> MouldChangeTypeEnum.containsAnyCode(p.getChangeMouldType(),
                         MouldChangeTypeEnum.SAND_BLAST.getCode(), MouldChangeTypeEnum.DRY_ICE.getCode()))
                 .map(LhMouldChangePlan::getLhMachineCode)
@@ -655,10 +681,21 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         log.info("模具交替/清洗分组结果 - T+1交替: [{}], T+2交替: [{}], T+1清洗: [{}], T+2清洗: [{}]",
                 mouldChangeInfoT1, mouldChangeInfoT2, mouldCleanInfoT1, mouldCleanInfoT2);
 
+        // 模具清洗日期：显示栏位内实际有清洗计划的执行日期（T+1栏位可能同时含T日与T+1日，去重后逗号拼接），
+        // 无清洗计划时回退显示栏位默认日期，与现场报表"模具清洗 08月22号：机台..."格式一致
+        String mouldCleanDateT1 = this.resolveMouldCleanDateText(allPlans, t0Start, t1End);
+        if (StringUtils.isBlank(mouldCleanDateT1)) {
+            mouldCleanDateT1 = DateUtil.format(scheduleDateT1, "MM月dd日");
+        }
+        String mouldCleanDateT2 = this.resolveMouldCleanDateText(allPlans, t2Start, t2End);
+        if (StringUtils.isBlank(mouldCleanDateT2)) {
+            mouldCleanDateT2 = DateUtil.format(scheduleDateT2, "MM月dd日");
+        }
+
         map.put("mouldChangeInfo", mouldChangeInfoT1);
         map.put("mouldChangeInfo2", mouldChangeInfoT2);
-        map.put("mouldCleanDate", DateUtil.format(scheduleDateT1, "MM月dd日"));
-        map.put("mouldCleanDate2", DateUtil.format(scheduleDateT2, "MM月dd日"));
+        map.put("mouldCleanDate", mouldCleanDateT1);
+        map.put("mouldCleanDate2", mouldCleanDateT2);
         map.put("mouldCleanInfo", mouldCleanInfoT1);
         map.put("mouldCleanInfo2", mouldCleanInfoT2);
         return map;
@@ -677,6 +714,32 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
             return false;
         }
         return !plan.getPlanDate().before(start) && !plan.getPlanDate().after(end);
+    }
+
+    /**
+     * 收集指定日期范围内实际有模具清洗计划的执行日期文本。
+     *
+     * <p>仅统计更换类型为清洗（03/04）的计划，按 PLAN_DATE 升序去重，
+     * 格式化为"MM月dd日"后用逗号拼接（如"08月22日"或"08月22日,08月23日"），
+     * 用于模具清洗日期栏位展示真实执行日期而非固定栏位日期。</p>
+     *
+     * @param allPlans 模具交替/清洗计划列表
+     * @param start    范围起始时间（00:00:00）
+     * @param end      范围结束时间（23:59:59）
+     * @return 执行日期文本，无清洗计划返回空字符串
+     */
+    private String resolveMouldCleanDateText(List<LhMouldChangePlan> allPlans, Date start, Date end) {
+        return allPlans.stream()
+                .filter(p -> this.isPlanDateInRange(p, start, end))
+                .filter(p -> MouldChangeTypeEnum.containsAnyCode(p.getChangeMouldType(),
+                        MouldChangeTypeEnum.SAND_BLAST.getCode(), MouldChangeTypeEnum.DRY_ICE.getCode()))
+                .map(LhMouldChangePlan::getPlanDate)
+                .filter(Objects::nonNull)
+                .sorted()
+                .map(d -> DateUtil.format(d, "MM月dd日"))
+                .collect(Collectors.toCollection(LinkedHashSet::new))
+                .stream()
+                .collect(Collectors.joining(","));
     }
 
 
@@ -701,10 +764,12 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
      * @param factoryCode  分厂编码
      * @param cxResults    预查询的成型排程结果
      * @param keySuffix    key 后缀（"" 过滤class3/4/5，"2" 过滤class6/7/8）
+     * @param skuEmbryoTypeMap SKU与示方书关系映射（物料编码→示方类型集合，物料级类型兜底数据源）
      * @return 小胶种行数据列表（无数据返回空列表）
      */
     private List<Map<String, Object>> buildSmallRubberList(Date scheduleDate, String factoryCode,
-                                                            List<CxScheduleResult> cxResults, String keySuffix) {
+                                                            List<CxScheduleResult> cxResults, String keySuffix,
+                                                            Map<String, Set<String>> skuEmbryoTypeMap) {
         List<Map<String, Object>> smallRubberList = new ArrayList<>();
 
         List<String> rubberTypeCodes = this.loadRubberTypeCodes(factoryCode);
@@ -742,8 +807,8 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
             return smallRubberList;
         }
 
-        // 构建物料→示方类型集合映射（根据keySuffix选择班次范围）
-        Map<String, Set<String>> materialRecipeTypeMap = this.buildMaterialRecipeTypeMap(cxResults, keySuffix);
+        // 构建物料→示方类型集合映射（根据keySuffix选择班次范围，SKU关系表兜底共用胎胚物料类型）
+        Map<String, Set<String>> materialRecipeTypeMap = this.buildMaterialRecipeTypeMap(cxResults, keySuffix, skuEmbryoTypeMap);
         log.info("物料示方类型映射构建完成[keySuffix={}], 映射数量: {}", keySuffix, materialRecipeTypeMap.size());
 
         // 按胶种类型查询对应的胎胚，构建胶种→胎胚映射
@@ -984,11 +1049,18 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
      * 同一胎胚下不同物料可能有不同的示方类型（如正规和量试），因此按物料级别映射，
      * 确保每种物料都能正确归入对应的示方类型分组。</p>
      *
+     * <p><b>多物料合并修复：</b>CxScheduleResult.materialCode 可能是逗号分隔的多个物料编码
+     * （排程生成时按胎胚+机台合并），必须拆分后逐个物料作为key放入映射，否则用整条组合串作key
+     * 会导致后续按单个物料编码查询时匹配失败、回退默认"正规"，使量试/试制物料被错误归入正规分组。</p>
+     *
      * @param cxResults 成型排程结果列表
      * @param keySuffix key 后缀（"" 取class3/4/5，"2" 取class6/7/8）
+     * @param skuEmbryoTypeMap SKU与示方书关系映射（物料编码→示方类型集合，物料级类型兜底数据源）
      * @return 物料编码→示方类型编码集合映射（S-正规，T-量试，X-试制）
      */
-    private Map<String, Set<String>> buildMaterialRecipeTypeMap(List<CxScheduleResult> cxResults, String keySuffix) {
+    private Map<String, Set<String>> buildMaterialRecipeTypeMap(List<CxScheduleResult> cxResults, String keySuffix,
+                                                                 Map<String, Set<String>> skuEmbryoTypeMap) {
+
         Map<String, Set<String>> materialRecipeTypeMap = new HashMap<>();
         for (CxScheduleResult result : cxResults) {
             boolean hasPlanQty = "".equals(keySuffix)
@@ -1013,10 +1085,88 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                 recipeTypes.add("S");
             }
 
+            // 拆分逗号分隔的多物料编码后逐个物料归集类型
+            //（主物料沿用排程写入的班次示方类型，共用胎胚物料用SKU关系表类型兜底），
             // 同一物料可能有多条排程结果记录（不同机台），合并所有示方类型
-            materialRecipeTypeMap.computeIfAbsent(materialCode, k -> new HashSet<>()).addAll(recipeTypes);
+            Map<String, Set<String>> materialTypes = this.resolveMaterialTypes(result, recipeTypes, skuEmbryoTypeMap);
+            for (Map.Entry<String, Set<String>> typeEntry : materialTypes.entrySet()) {
+                materialRecipeTypeMap.computeIfAbsent(typeEntry.getKey(), k -> new HashSet<>())
+                        .addAll(typeEntry.getValue());
+            }
         }
         return materialRecipeTypeMap;
+    }
+
+    /**
+     * 加载SKU与示方书关系映射（物料编码→示方类型集合）。
+     *
+     * <p>数据来源：T_MDM_SKU_CONSTRUCTION_REF（物料+产品状态→制造示方书类型），
+     * 与排程引擎 CoreScheduleAlgorithmServiceImpl 构建的 materialCode|trialStatus→embryoType
+     * 映射同源。一个物料可能存在多种产品状态（正式/量试/试制），因此收集其全部有效示方类型，
+     * 用于共用胎胚合并记录中非主物料的类型兜底判定。</p>
+     *
+     * @return 物料编码→示方类型编码集合映射（S-正规，T-量试，X-试制）
+     */
+    private Map<String, Set<String>> loadSkuEmbryoTypeMap() {
+        List<MdmSkuConstructionRef> skuRefList = mdmSkuConstructionRefMapper.selectList(
+                new LambdaQueryWrapper<MdmSkuConstructionRef>()
+                        .select(MdmSkuConstructionRef::getMaterialCode, MdmSkuConstructionRef::getEmbryoType)
+                        .eq(MdmSkuConstructionRef::getIsDelete, 0));
+        Map<String, Set<String>> skuEmbryoTypeMap = new HashMap<>();
+        for (MdmSkuConstructionRef ref : skuRefList) {
+            if (ref == null || StringUtils.isBlank(ref.getMaterialCode())
+                    || StringUtils.isBlank(ref.getEmbryoType())) {
+                continue;
+            }
+            // 仅保留有效示方类型（S-正规，T-量试，X-试制），过滤脏数据
+            String embryoType = ref.getEmbryoType().trim();
+            if (!"S".equals(embryoType) && !"T".equals(embryoType) && !"X".equals(embryoType)) {
+                continue;
+            }
+            skuEmbryoTypeMap.computeIfAbsent(ref.getMaterialCode().trim(), k -> new HashSet<>()).add(embryoType);
+        }
+        log.info("SKU与示方书关系映射加载完成, 物料数量: {}", skuEmbryoTypeMap.size());
+        return skuEmbryoTypeMap;
+    }
+
+    /**
+     * 解析单条排程记录的物料级示方类型映射。
+     *
+     * <p>将逗号分隔的多物料编码拆分后逐个归集类型：</p>
+     * <ul>
+     *   <li>第一个物料（主物料）：沿用排程写入的班次示方类型 recipeTypes
+     *       （与排程引擎 resolveRecipeType 多物料合并时仅取第一个物料的行为一致）</li>
+     *   <li>其余共用胎胚物料：记录级 recipeType 仅代表主物料，无法感知物料级差异，
+     *       用 SKU 与示方书关系表的物料全部类型兜底；SKU 关系查不到时回退 recipeTypes</li>
+     * </ul>
+     *
+     * @param result           成型排程结果（materialCode 可能是逗号分隔的多物料编码）
+     * @param recipeTypes      排程写入的班次示方类型集合（记录级，代表主物料）
+     * @param skuEmbryoTypeMap SKU与示方书关系映射（物料编码→示方类型集合）
+     * @return 单个物料编码→示方类型集合映射
+     */
+    private Map<String, Set<String>> resolveMaterialTypes(CxScheduleResult result, Set<String> recipeTypes,
+                                                           Map<String, Set<String>> skuEmbryoTypeMap) {
+        Map<String, Set<String>> materialTypes = new LinkedHashMap<>();
+        String materialCode = StringUtils.defaultString(result.getMaterialCode());
+        String[] codes = materialCode.split("[,，]");
+        boolean isFirst = true;
+        for (String code : codes) {
+            String trimmedCode = code.trim();
+            if (StringUtils.isBlank(trimmedCode)) {
+                continue;
+            }
+            Set<String> types = isFirst
+                    ? recipeTypes
+                    : skuEmbryoTypeMap.getOrDefault(trimmedCode, recipeTypes);
+            materialTypes.computeIfAbsent(trimmedCode, k -> new HashSet<>()).addAll(types);
+            isFirst = false;
+        }
+        // materialCode 无法拆分出有效编码时，整体作为key兜底，保持与旧逻辑兼容
+        if (materialTypes.isEmpty() && StringUtils.isNotBlank(materialCode)) {
+            materialTypes.put(materialCode.trim(), new HashSet<>(recipeTypes));
+        }
+        return materialTypes;
     }
 
     /**
@@ -1489,15 +1639,20 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
      * 判断硫化侧班次分析原因中是否包含硫化精度保养的固定写法。
      *
      * <p>硫化侧含"精度"的文本来自 {@code ResultDowntimeSummaryUtil} 的固定常量，属于封闭集合。
-     * 判定时先按分隔符（英文逗号/中文分号）拆分为独立原因项，再对每项做包含匹配
-     * （"精度计划"、"喷砂清洗+精度"，历史残留的"换模+精度计划"含"精度计划"自动覆盖）。</p>
+     * 判定时先按分隔符（英文逗号/中文分号）拆分为独立原因项，再对每项与"精度计划"做
+     * <b>精确等于</b>匹配（仅真正做精度保养的机台计入硫化精度备注）：</p>
+     * <ul>
+     *   <li>"精度计划" → 命中，计入硫化精度备注</li>
+     *   <li>"喷砂清洗+精度"（模具清洗与精度重叠的组合原因）→ 不等于独立项，归入模具清洗栏位展示</li>
+     *   <li>"换模+精度计划"（历史残留写法）→ 不等于独立项，归入模具交替栏位展示</li>
+     *   <li>"成型精度影响: 库存X+产量Y=Z&lt;硫化计划W, 缺口V条" → 拆分后无独立项等于"精度计划"，天然被排除</li>
+     * </ul>
      *
-     * <p>成型排程精度扣量联动硫化时写入的"成型精度影响: 库存X+产量Y=Z&lt;硫化计划W, 缺口V条"
-     * 拆分后无任何独立项包含白名单关键词，天然被排除，避免仅受成型精度影响的硫化机台
-     * 被误计入硫化备注；若同一班次同时含"精度计划"与"成型精度影响"，仍按"精度计划"正确计入。</p>
+     * <p>避免仅做模具清洗（如喷砂清洗叠加精度时段）的机台被误计入硫化精度维保备注；
+     * 若同一班次同时含"精度计划"与"成型精度影响"，仍按"精度计划"正确计入。</p>
      *
-     * @param analyses 待检查的班次分析原因文本（可变参数，任一班次的独立原因项包含白名单关键词即返回true）
-     * @return true-任一班次分析包含硫化精度固定写法；false-全部不包含
+     * @param analyses 待检查的班次分析原因文本（可变参数，任一班次的独立原因项精确等于"精度计划"即返回true）
+     * @return true-任一班次分析含独立原因项"精度计划"；false-全部不含
      */
     private boolean containsLhPrecisionKeyword(String... analyses) {
         if (analyses == null || analyses.length == 0) {
@@ -1507,12 +1662,11 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
             if (StringUtils.isBlank(analysis)) {
                 continue;
             }
-            // 按分隔符拆分为独立原因项后，逐项对白名单关键词做包含匹配
+            // 按分隔符拆分为独立原因项后，与"精度计划"做精确等于匹配，
+            // 排除"喷砂清洗+精度"/"换模+精度计划"等组合原因
             for (String item : this.splitAnalysisItems(analysis)) {
-                for (String keyword : LH_PRECISION_KEYWORDS) {
-                    if (item.contains(keyword)) {
-                        return true;
-                    }
+                if (LH_PRECISION_ANALYSIS.equals(item)) {
+                    return true;
                 }
             }
         }
@@ -1671,7 +1825,8 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
      * 构建成型规格切换信息。
      * 从T_MP_STRUCTURE_ALLOCATION表获取结构排产数据，按成型机台分组，
      * 找到结束日等于排程日期日号的前结构，以及开始日等于排程日期日号或后一天日号的后结构，
-     * 只展示第二天切换的数据，展示格式为"前结构 换 后结构"，多个切换用"；"隔开。
+     * 只展示第二天切换的数据，展示格式为"机台号：前结构 换 后结构（班次）"，
+     * 多个切换用"；"隔开（班次为夜班/早班/中班，从排程结果切换备注推断，推断不到默认夜班）。
      *
      * <p>两种场景：</p>
      * <ul>
@@ -1682,12 +1837,17 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
      *
      * <p>T+1和T+2共用相同的结构切换数据（以actualScheduleDate为准），确保两个日期显示一致。</p>
      *
-     * @param reportDate   报告日期（未使用，保留为兼容调用）
-     * @param scheduleDate 排程日期（用于确定查询年月和日号）
-     * @param factoryCode  分厂编码
-     * @return 规格切换信息字符串，如"结构A 换 结构B；结构C 换 结构D"
+     * @param reportDate        报告日期（未使用，保留为兼容调用）
+     * @param scheduleDate      排程日期（用于确定查询年月和日号）
+     * @param factoryCode       分厂编码
+     * @param cxResults         预查询的成型排程结果（用于推断切换班次）
+     * @param classShiftTypeMap 班次类型映射（班次序号→班次类型编码 01夜/02早/03中）
+     * @param keySuffix         key 后缀（"" 查class3/4/5班次备注，"2" 查class6/7/8班次备注）
+     * @return 规格切换信息字符串，如"H1401：结构A 换 结构B（夜班）"
      */
-    private String buildCxSpecSwitch(Date reportDate, Date scheduleDate, String factoryCode) {
+    private String buildCxSpecSwitch(Date reportDate, Date scheduleDate, String factoryCode,
+                                      List<CxScheduleResult> cxResults, Map<Integer, String> classShiftTypeMap,
+                                      String keySuffix) {
         LocalDate localScheduleDate = DateUtil.toLocalDateTime(scheduleDate).toLocalDate();
 
         // 跨月场景：排程日期是1号时，直接取排程日期所在月的转产数据；否则取排程日期所在月的数据
@@ -1717,6 +1877,7 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         int scheduleDayOfMonth = localScheduleDate.getDayOfMonth();
 
         for (Map.Entry<String, List<MpStructureAllocation>> entry : machineGroupMap.entrySet()) {
+            String machineCode = entry.getKey();
             List<MpStructureAllocation> structures = entry.getValue().stream()
                     .sorted(Comparator.comparing(MpStructureAllocation::getBeginDay, Comparator.nullsLast(Comparator.naturalOrder())))
                     .collect(Collectors.toList());
@@ -1750,13 +1911,98 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
             String nextStructureName = StringUtils.defaultString(nextStructure.getStructureName()).trim();
 
             if (StringUtils.isNotBlank(prevStructureName) && StringUtils.isNotBlank(nextStructureName)) {
-                switchList.add(prevStructureName + " 换 " + nextStructureName);
+                // 推断切换班次：从成型排程结果该机台+前结构的班次分析备注（"本成型机计划XX号切换..."）定位切换班次，
+                // 推断不到时默认夜班（结构切换通常在生产日切换的夜班完成）
+                String shiftName = this.resolveSwitchShiftName(machineCode, prevStructureName,
+                        cxResults, classShiftTypeMap, keySuffix);
+                if (StringUtils.isBlank(shiftName)) {
+                    shiftName = "夜班";
+                }
+                switchList.add(machineCode + "：" + prevStructureName + " 换 " + nextStructureName
+                        + "（" + shiftName + "）");
             }
         }
 
         String result = String.join("；", switchList);
         log.info("成型规格切换: {}", result);
         return result;
+    }
+
+    /**
+     * 推断机台结构切换的班次名称。
+     *
+     * <p>排程引擎 {@code CoreScheduleAlgorithmServiceImpl.markMachineSwitchInMainTable} 会在
+     * 该机台前结构记录的切换班次 ANALYSIS 中写入"本成型机计划XX号切换XX结构..."备注，
+     * 据此定位切换发生的班次索引，再经班次类型映射转换为中文名称（夜班/早班/中班）。</p>
+     *
+     * @param machineCode       成型机台编号（已trim）
+     * @param prevStructureName 前结构名称（已trim）
+     * @param cxResults         预查询的成型排程结果
+     * @param classShiftTypeMap 班次类型映射（班次序号→班次类型编码 01夜/02早/03中）
+     * @param keySuffix         key 后缀（"" 查class3/4/5班次，"2" 查class6/7/8班次）
+     * @return 班次中文名称（夜班/早班/中班），推断不到返回空字符串
+     */
+    private String resolveSwitchShiftName(String machineCode, String prevStructureName,
+                                           List<CxScheduleResult> cxResults,
+                                           Map<Integer, String> classShiftTypeMap, String keySuffix) {
+        if (cxResults == null || cxResults.isEmpty()) {
+            return "";
+        }
+        // keySuffix="" 查T+1班次范围（class3/4/5），keySuffix="2" 查T+2班次范围（class6/7/8）
+        int[] shiftIndexes = "".equals(keySuffix) ? new int[]{3, 4, 5} : new int[]{6, 7, 8};
+        for (CxScheduleResult result : cxResults) {
+            if (!machineCode.equals(StringUtils.trimToEmpty(result.getCxMachineCode()))) {
+                continue;
+            }
+            if (!prevStructureName.equals(StringUtils.trimToEmpty(result.getStructureName()))) {
+                continue;
+            }
+            // 逐班次检查分析备注，命中机台切换备注即认定该班次为切换班次
+            for (int shiftIndex : shiftIndexes) {
+                String analysis = this.getCxShiftAnalysis(result, shiftIndex);
+                if (analysis != null && analysis.contains("本成型机计划")) {
+                    return this.resolveShiftName(classShiftTypeMap.get(shiftIndex));
+                }
+            }
+        }
+        return "";
+    }
+
+    /**
+     * 读取成型排程结果指定班次索引的原因分析文本。
+     *
+     * @param result     成型排程结果
+     * @param shiftIndex 班次索引（3~8）
+     * @return 班次分析文本，索引超范围返回null
+     */
+    private String getCxShiftAnalysis(CxScheduleResult result, int shiftIndex) {
+        switch (shiftIndex) {
+            case 3: return result.getClass3Analysis();
+            case 4: return result.getClass4Analysis();
+            case 5: return result.getClass5Analysis();
+            case 6: return result.getClass6Analysis();
+            case 7: return result.getClass7Analysis();
+            case 8: return result.getClass8Analysis();
+            default: return null;
+        }
+    }
+
+    /**
+     * 班次类型编码转换为中文名称。
+     *
+     * @param shiftType 班次类型编码（T_LH_SHIFT_CONFIG.SHIFT_TYPE：01-夜班，02-早班，03-中班）
+     * @return 班次中文名称，无法识别返回空字符串
+     */
+    private String resolveShiftName(String shiftType) {
+        if (StringUtils.isBlank(shiftType)) {
+            return "";
+        }
+        switch (shiftType.trim()) {
+            case "01": return "夜班";
+            case "02": return "早班";
+            case "03": return "中班";
+            default: return "";
+        }
     }
 
     /**

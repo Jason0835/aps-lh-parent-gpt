@@ -3,15 +3,25 @@ package com.zlt.aps.lh.component;
 import com.zlt.aps.lh.api.domain.dto.SkuDailyPlanQuotaDTO;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
+import com.zlt.aps.lh.api.enums.NewSpecFailReasonEnum;
 import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.engine.strategy.IMouldChangeBalanceStrategy;
 import com.zlt.aps.lh.engine.strategy.support.DailyMachineExpansionPlanner;
+import com.zlt.aps.lh.engine.strategy.support.DailyNewSpecOrderLogEntry;
 import com.zlt.aps.lh.engine.strategy.support.EarlyProductionChecker;
 import com.zlt.aps.lh.engine.strategy.support.EarlyProductionDecision;
+import com.zlt.aps.lh.engine.strategy.support.EarlyProductionDecisionLogCollector;
+import com.zlt.aps.lh.engine.strategy.support.EarlyProductionDecisionLogEntry;
+import com.zlt.aps.lh.engine.strategy.support.EarlyProductionLogReason;
 import com.zlt.aps.lh.engine.strategy.support.EarlyProductionRuntimePlan;
+import com.zlt.aps.lh.engine.strategy.support.MouldResourceAllocationResult;
+import com.zlt.aps.lh.engine.strategy.support.NewSpecSelectionRealtimeSnapshot;
 import com.zlt.aps.lh.exception.ScheduleErrorCode;
 import com.zlt.aps.lh.exception.ScheduleException;
+import com.zlt.aps.lh.util.PriorityTraceLogHelper;
 import com.zlt.aps.lh.util.SkuDailyPlanQuotaUtil;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
@@ -19,7 +29,9 @@ import javax.annotation.Resource;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
+import java.util.Collection;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -41,6 +53,12 @@ public class EarlyProductionRuntimePlanService {
     /** 提前生产实际消费账本、胎胚有效 SKU 和共用胎胚分配统一入口。 */
     @Resource
     private TargetScheduleQtyResolver targetScheduleQtyResolver;
+    /** 结构当天最后班次已排机台数及班内收尾排除的统一统计入口。 */
+    @Resource
+    private StructureMinMachineRetentionService structureMinMachineRetentionService;
+    /** 换模/换活字块统一计数入口，用于冻结提前生产判断时点的实时班次次数。 */
+    @Resource
+    private IMouldChangeBalanceStrategy mouldChangeBalanceStrategy;
 
     /**
      * 准备并注册指定业务日的提前生产运行视图。
@@ -146,9 +164,173 @@ public class EarlyProductionRuntimePlanService {
             return EarlyProductionDecision.notEarlyProduction(
                     false, "提前生产业务日超出排程窗口");
         }
-        return EarlyProductionChecker.checkEarlyProduction(
+        EarlyProductionDecision decision = EarlyProductionChecker.checkEarlyProduction(
                 context, sku, currentDate, windowStartDate, windowEndDate,
                 DailyMachineExpansionPlanner.resolveShortageAddMachineThreshold(context));
+        if (Objects.isNull(decision) || !decision.isEarlyProduction()
+                || !decision.isAllowed() || Objects.isNull(decision.getFuturePlanDate())) {
+            return decision;
+        }
+        StructureEarlyProductionAdmission admission =
+                this.evaluateStructureDailyAdmission(
+                        context, sku, currentDate,
+                        decision.getFuturePlanDate());
+        if (Objects.isNull(admission) || !admission.isAllowed()) {
+            String reason = Objects.isNull(admission)
+                    ? "结构当天提前生产资格无法生成，禁止提前生产"
+                    : admission.getReason();
+            return EarlyProductionDecision.earlyProduction(
+                    false, decision.getSceneType(), decision.getFuturePlanDate(),
+                    decision.getStructurePlanMachineCounts(), reason);
+        }
+        decision.setReason("结构已取得当天提前生产资格，继续使用当天其他班次剩余资源");
+        return decision;
+    }
+
+    /**
+     * 评估并固化结构当天唯一的提前生产资格。
+     *
+     * <p>资格只读取当天最后一个班次。首次判断后按“业务日期+结构”保存快照；同结构后续
+     * SKU、换活字块、新增候选及跨日在机续排均复用该结论，不再因早班或中班的结构机台数
+     * 达到计划值而重新拦截。计划机台数继续复用现有结构切换规则：当前日为0时读取提前
+     * 生产来源日，不改变原场景识别和胎胚时间门禁。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 待提前生产SKU
+     * @param currentDate 当前业务日期
+     * @param futurePlanDate 提前生产来源计划日
+     * @return 结构当天提前生产资格
+     */
+    public StructureEarlyProductionAdmission evaluateStructureDailyAdmission(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            LocalDate currentDate,
+            LocalDate futurePlanDate) {
+        if (Objects.isNull(context) || Objects.isNull(sku)
+                || Objects.isNull(currentDate)
+                || StringUtils.isEmpty(sku.getStructureName())) {
+            return null;
+        }
+        StructureEarlyProductionAdmission cachedAdmission =
+                context.getStructureEarlyProductionAdmission(
+                        currentDate, sku.getStructureName());
+        if (Objects.nonNull(cachedAdmission)) {
+            return cachedAdmission;
+        }
+        LhShiftConfigVO admissionShift =
+                this.resolveLastBusinessDayShift(context, currentDate);
+        StructureEarlyProductionAdmission admission =
+                Objects.isNull(admissionShift)
+                        ? new StructureEarlyProductionAdmission()
+                        : structureMinMachineRetentionService
+                        .resolveEarlyProductionMachineStatistics(
+                                context, sku.getStructureName(), admissionShift);
+        admission.setBusinessDate(currentDate);
+        admission.setStructureName(sku.getStructureName());
+        int originalCurrentPlanMachineCount =
+                context.getStructurePlanMachineCount(
+                        currentDate, sku.getStructureName());
+        LocalDate planSourceDate = originalCurrentPlanMachineCount > 0
+                ? currentDate : futurePlanDate;
+        int currentPlanMachineCount =
+                EarlyProductionChecker.resolveEffectiveStructurePlanMachineCount(
+                        context, sku, currentDate, futurePlanDate);
+        admission.setPlanSourceDate(planSourceDate);
+        admission.setCurrentPlanMachineCount(currentPlanMachineCount);
+        String reason;
+        boolean allowed;
+        if (Objects.isNull(admissionShift)) {
+            allowed = false;
+            reason = "当天最后一个班次无法解析，禁止提前生产";
+        } else if (currentPlanMachineCount <= 0) {
+            allowed = false;
+            reason = "结构无有效计划机台数，禁止提前生产";
+        } else if (admission.getScheduledStructureCount()
+                >= currentPlanMachineCount) {
+            allowed = false;
+            reason = "当天最后一个班次结构已排硫化机台数已达到或超过计划机台数，禁止提前生产";
+        } else {
+            allowed = true;
+            reason = "当天最后一个班次结构已排硫化机台数未达到计划机台数，取得当天提前生产资格";
+        }
+        admission.setAllowed(allowed);
+        admission.setReason(reason);
+        context.registerStructureEarlyProductionAdmission(admission);
+        this.logStructureDailyAdmission(
+                context, sku, futurePlanDate, admission);
+        return context.getStructureEarlyProductionAdmission(
+                currentDate, sku.getStructureName());
+    }
+
+    /**
+     * 解析指定业务日用于提前生产资格判断的最后一个班次。
+     *
+     * @param context 排程上下文
+     * @param businessDate 业务日期
+     * @return 当天最后班次；无法解析返回null
+     */
+    private LhShiftConfigVO resolveLastBusinessDayShift(
+            LhScheduleContext context,
+            LocalDate businessDate) {
+        if (Objects.isNull(context) || Objects.isNull(businessDate)
+                || CollectionUtils.isEmpty(context.getScheduleWindowShifts())) {
+            return null;
+        }
+        LhShiftConfigVO lastShift = null;
+        for (LhShiftConfigVO shift : context.getScheduleWindowShifts()) {
+            if (Objects.isNull(shift) || Objects.isNull(shift.getWorkDate())) {
+                continue;
+            }
+            LocalDate shiftWorkDate = shift.getWorkDate().toInstant()
+                    .atZone(ZoneId.systemDefault()).toLocalDate();
+            if (businessDate.equals(shiftWorkDate)) {
+                lastShift = shift;
+            }
+        }
+        return lastShift;
+    }
+
+    /**
+     * 记录结构当天提前生产资格及班内收尾排除明细。
+     *
+     * @param context 排程上下文
+     * @param sku 当前SKU
+     * @param futurePlanDate 提前生产来源计划日
+     * @param admission 结构当天资格快照
+     */
+    private void logStructureDailyAdmission(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            LocalDate futurePlanDate,
+            StructureEarlyProductionAdmission admission) {
+        String detail = new StringBuilder(512)
+                .append("factoryCode=").append(context.getFactoryCode())
+                .append(", batchNo=").append(PriorityTraceLogHelper.safeText(
+                        context.getBatchNo()))
+                .append(", businessDate=").append(admission.getBusinessDate())
+                .append(", futurePlanDate=").append(futurePlanDate)
+                .append(", planSourceDate=").append(admission.getPlanSourceDate())
+                .append(", materialCode=").append(sku.getMaterialCode())
+                .append(", productStatus=").append(PriorityTraceLogHelper.safeText(
+                        sku.getProductStatus()))
+                .append(", structureName=").append(PriorityTraceLogHelper.safeText(
+                        admission.getStructureName()))
+                .append(", admissionShiftIndex=").append(
+                        admission.getAdmissionShiftIndex())
+                .append(", currentPlanMachineCount=").append(
+                        admission.getCurrentPlanMachineCount())
+                .append(", rawScheduledStructureCount=").append(
+                        admission.getRawScheduledPhysicalMachineCodes().size())
+                .append(", scheduledStructureCount=").append(
+                        admission.getScheduledStructureCount())
+                .append(", excludedEndingMachines=").append(
+                        admission.getExcludedEndingPhysicalMachineCodes())
+                .append(", result=").append(admission.isAllowed())
+                .append(", reason=").append(admission.getReason())
+                .toString();
+        log.info("结构当天SKU提前生产资格, {}", detail);
+        PriorityTraceLogHelper.appendProcessLog(
+                context, "结构当天SKU提前生产资格", detail);
     }
 
     /**
@@ -180,6 +362,7 @@ public class EarlyProductionRuntimePlanService {
         this.fillRuntimePlanBaseInfo(
                 context, sku, currentDate, windowStartDate,
                 futurePlanDate, earlyProductionMaxDate, earlyDays, runtimePlan, decision);
+        this.recordDecisionLog(context, sku, currentDate, runtimePlan, decision);
         if (!decision.isAllowed()) {
             log.info("提前生产准入未通过，不注册激活运行视图, factoryCode: {}, batchNo: {}, "
                             + "materialCode: {}, currentDate: {}, futurePlanDate: {}, structureName: {}, reason: {}",
@@ -335,12 +518,16 @@ public class EarlyProductionRuntimePlanService {
             int historyShortageQty,
             int futureMonthSurplusQty,
             int effectiveTargetQty) {
+        StructureEarlyProductionAdmission admission =
+                context.getStructureEarlyProductionAdmission(
+                        currentDate, sku.getStructureName());
         log.info("提前生产中心运行视图初始化完成, factoryCode: {}, batchNo: {}, materialCode: {}, "
                         + "currentDate: {}, futurePlanDate: {}, earlyProductionMaxDate: {}, earlyDays: {}, "
                         + "originalCurrentDayPlanQty: {}, futureDayPlanQty: {}, "
                         + "shiftedCurrentDayPlanQty: {}, structureName: {}, "
                         + "currentPlanMachineCount: {}, futurePlanMachineCount: {}, "
-                        + "scheduledStructureCount: {}, scheduledSkuCount: {}, "
+                        + "admissionShiftIndex: {}, scheduledStructureCount: {}, "
+                        + "excludedEndingMachines: {}, scheduledSkuCount: {}, "
                         + "historyShortageQty: {}, futureMonthSurplusQty: {}, effectiveTargetQty: {}, "
                         + "quotaEntryCount: {}, quotaProjectionEndDate: {}",
                 context.getFactoryCode(), context.getBatchNo(), sku.getMaterialCode(),
@@ -350,7 +537,12 @@ public class EarlyProductionRuntimePlanService {
                 sku.getStructureName(),
                 context.getStructurePlanMachineCount(currentDate, sku.getStructureName()),
                 context.getStructurePlanMachineCount(futurePlanDate, sku.getStructureName()),
-                context.getStructureScheduledMachineCount(currentDate, sku.getStructureName()),
+                Objects.isNull(admission) ? null : admission.getAdmissionShiftIndex(),
+                Objects.isNull(admission)
+                        ? 0 : admission.getScheduledStructureCount(),
+                Objects.isNull(admission)
+                        ? java.util.Collections.emptySet()
+                        : admission.getExcludedEndingPhysicalMachineCodes(),
                 context.getSkuScheduledMachineCount(
                         currentDate, sku.getMaterialCode(), sku.getProductStatus()),
                 historyShortageQty, futureMonthSurplusQty, effectiveTargetQty,
@@ -381,12 +573,448 @@ public class EarlyProductionRuntimePlanService {
         runtimePlan.setDecision(decision);
         runtimePlan.getShiftedDailyPlanQuotaMap().clear();
         context.registerEarlyProductionRuntimePlan(sku, runtimePlan);
+        this.recordDecisionLog(context, sku, currentDate, runtimePlan, decision);
         log.info("提前生产候选尚未激活, factoryCode: {}, batchNo: {}, materialCode: {}, "
                         + "currentDate: {}, futurePlanDate: {}, reason: {}",
                 context.getFactoryCode(), context.getBatchNo(), sku.getMaterialCode(),
                 currentDate, runtimePlan.getFuturePlanDate(),
                 Objects.isNull(decision) ? "未形成准入结论" : decision.getReason());
         return runtimePlan;
+    }
+
+    /**
+     * 确保当前 SKU 已形成提前生产判断日志明细。
+     *
+     * <p>该方法只创建或读取轻量日志对象，不重新执行提前生产判断。新增主链在真实进入选机
+     * 前调用时，会继续复用中心服务已经形成的准入结论。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 当前 SKU
+     * @param businessDate 当前业务日期
+     * @return 当前判断日志明细
+     */
+    public EarlyProductionDecisionLogEntry ensureDecisionLogEntry(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            LocalDate businessDate) {
+        if (Objects.isNull(context) || Objects.isNull(sku) || Objects.isNull(businessDate)) {
+            return null;
+        }
+        EarlyProductionRuntimePlan runtimePlan = context.getEarlyProductionRuntimePlan(sku);
+        EarlyProductionDecision decision = Objects.isNull(runtimePlan)
+                ? null : runtimePlan.getDecision();
+        return this.recordDecisionLog(context, sku, businessDate, runtimePlan, decision);
+    }
+
+    /**
+     * 记录其他提前生产消费者已经得到的共享准入结论。
+     *
+     * <p>主要供 S4.4 换活字块只读理论日校验使用；调用方传入的判断结果直接复用，
+     * 不在日志层再次调用 {@link EarlyProductionChecker}。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 当前 SKU
+     * @param businessDate 判断业务日期
+     * @param decision 共享准入结果
+     * @return 日志明细
+     */
+    public EarlyProductionDecisionLogEntry recordDecisionSnapshot(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            LocalDate businessDate,
+            EarlyProductionDecision decision) {
+        EarlyProductionRuntimePlan runtimePlan = Objects.isNull(context)
+                ? null : context.getEarlyProductionRuntimePlan(sku);
+        return this.recordDecisionLog(context, sku, businessDate, runtimePlan, decision);
+    }
+
+    /**
+     * 记录真实进入提前生产选机流程时的实时快照。
+     *
+     * @param context 排程上下文
+     * @param sku 当前 SKU
+     * @param businessDate 当前业务日期
+     * @param orderEntry 现有真实新增选机顺序明细
+     * @param candidates 当前正式候选机台
+     * @param snapshot 既有选机前实时快照
+     * @param attemptShiftIndex 当前尝试班次
+     */
+    public void recordSelectionSnapshot(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            LocalDate businessDate,
+            DailyNewSpecOrderLogEntry orderEntry,
+            List<?> candidates,
+            NewSpecSelectionRealtimeSnapshot snapshot,
+            Integer attemptShiftIndex) {
+        EarlyProductionDecisionLogEntry entry =
+                this.ensureDecisionLogEntry(context, sku, businessDate);
+        if (Objects.isNull(entry)) {
+            return;
+        }
+        if (Objects.nonNull(attemptShiftIndex)
+                && Objects.nonNull(entry.getAttemptShiftIndex())
+                && !Objects.equals(attemptShiftIndex, entry.getAttemptShiftIndex())) {
+            entry = this.createAttemptLogEntry(context, sku, businessDate, entry);
+        }
+        if (Objects.nonNull(orderEntry)) {
+            entry.setActualSelectionOrder(orderEntry.getSelectionOrder());
+        }
+        entry.setCandidateMachineCount(Objects.isNull(candidates) ? 0 : candidates.size());
+        entry.setAttemptShiftIndex(attemptShiftIndex);
+        entry.setAttemptScheduledStructureCount(
+                this.resolveAttemptScheduledStructureCount(
+                        context, sku, businessDate, attemptShiftIndex));
+        entry.setAllowedAdvance(true);
+        entry.setReasonCode(EarlyProductionLogReason.PENDING.getCode());
+        if (Objects.nonNull(snapshot)) {
+            entry.setRealtimeShiftTotalPlanQty(snapshot.getRealtimeShiftTotalPlanQty());
+            entry.setRealtimeShiftChangeCount(snapshot.getRealtimeShiftChangeCount());
+            entry.setRealtimeStructureMachineCount(snapshot.getRealtimeStructureMachineCount());
+        }
+    }
+
+    /**
+     * 记录当前候选机台的模具资源判断。
+     *
+     * @param context 排程上下文
+     * @param sku 当前 SKU
+     * @param businessDate 当前业务日期
+     * @param allocationResult 既有模具分配结果
+     */
+    public void recordMouldAllocation(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            LocalDate businessDate,
+            MouldResourceAllocationResult allocationResult) {
+        EarlyProductionDecisionLogEntry entry =
+                this.ensureDecisionLogEntry(context, sku, businessDate);
+        if (Objects.isNull(entry) || Objects.isNull(allocationResult)) {
+            return;
+        }
+        entry.setMouldSatisfied(allocationResult.isAllowed());
+        entry.setRequiredMouldQty(allocationResult.getRequiredMouldQty());
+        entry.setAvailableMouldQty(allocationResult.getAvailableMouldQty());
+        entry.setOccupiedMouldQty(allocationResult.getOccupiedMouldQty());
+        entry.setRemainingAvailableMouldQty(
+                allocationResult.getRemainingAvailableMouldQty());
+        if (!allocationResult.isAllowed() && Objects.nonNull(allocationResult.getSkipReason())) {
+            entry.setReasonCode(EarlyProductionLogReason.fromFailure(
+                    allocationResult.getSkipReason().getDescription(), null).getCode());
+            entry.setDetail(allocationResult.getSkipReason().getDescription());
+        }
+    }
+
+    /**
+     * 记录实际形成提前生产结果的成功结论。
+     *
+     * @param context 排程上下文
+     * @param sku 当前 SKU
+     * @param businessDate 当前判断业务日期
+     * @param actualProductionDate 实际结果业务日期
+     * @param shiftIndex 实际生产班次
+     * @param machineCode 实际机台
+     * @param plannedQty 实际计划量
+     * @param remainingCapacity 当前候选剩余产能
+     */
+    public void recordSuccessfulSchedule(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            LocalDate businessDate,
+            LocalDate actualProductionDate,
+            Integer shiftIndex,
+            String machineCode,
+            Integer plannedQty,
+            Integer remainingCapacity) {
+        EarlyProductionDecisionLogEntry entry =
+                this.ensureDecisionLogEntry(context, sku, businessDate);
+        if (Objects.isNull(entry)) {
+            return;
+        }
+        if (Objects.nonNull(shiftIndex)
+                && Objects.nonNull(entry.getAttemptShiftIndex())
+                && !Objects.equals(shiftIndex, entry.getAttemptShiftIndex())) {
+            entry = this.createAttemptLogEntry(context, sku, businessDate, entry);
+        }
+        entry.setActualProductionDate(actualProductionDate);
+        entry.setAttemptShiftIndex(shiftIndex);
+        entry.setActualMachineCode(machineCode);
+        entry.setPlannedQty(plannedQty);
+        entry.setRemainingCapacity(remainingCapacity);
+        entry.setAllowedAdvance(true);
+        entry.setMouldSatisfied(true);
+        entry.setActualScheduled(true);
+        entry.setReasonCode(EarlyProductionLogReason.SUCCESS.getCode());
+        entry.setDetail("提前生产结果已提交");
+    }
+
+    /**
+     * 记录当前业务日提前生产未形成有效结果的结论。
+     *
+     * @param context 排程上下文
+     * @param sku 当前 SKU
+     * @param businessDate 当前业务日期
+     * @param detail 既有业务失败明细
+     * @param failReason 既有新增排产失败原因
+     * @param candidateMachineCount 当前候选机台数量
+     * @param attemptShiftIndex 当前尝试班次
+     */
+    public void recordFailedSchedule(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            LocalDate businessDate,
+            String detail,
+            NewSpecFailReasonEnum failReason,
+            Integer candidateMachineCount,
+            Integer attemptShiftIndex) {
+        EarlyProductionDecisionLogEntry entry =
+                this.ensureDecisionLogEntry(context, sku, businessDate);
+        if (Objects.isNull(entry)) {
+            return;
+        }
+        String effectiveDetail = StringUtils.isEmpty(detail)
+                ? Objects.isNull(failReason) ? "提前生产未形成有效结果" : failReason.getDescription()
+                : detail;
+        if (Objects.nonNull(attemptShiftIndex)
+                && Objects.nonNull(entry.getAttemptShiftIndex())
+                && !Objects.equals(attemptShiftIndex, entry.getAttemptShiftIndex())) {
+            entry = this.createAttemptLogEntry(context, sku, businessDate, entry);
+        }
+        entry.setCandidateMachineCount(candidateMachineCount);
+        entry.setAttemptShiftIndex(attemptShiftIndex);
+        entry.setAttemptScheduledStructureCount(
+                this.resolveAttemptScheduledStructureCount(
+                        context, sku, businessDate, attemptShiftIndex));
+        entry.setAllowedAdvance(Boolean.TRUE.equals(entry.getAllowedAdvance()));
+        entry.setActualScheduled(false);
+        entry.setReasonCode(EarlyProductionLogReason.fromFailure(
+                effectiveDetail, failReason).getCode());
+        entry.setDetail(effectiveDetail);
+    }
+
+    /**
+     * 构建提前生产判断日志明细并写入业务日采集器。
+     *
+     * @param context 排程上下文
+     * @param sku 当前 SKU
+     * @param businessDate 当前业务日期
+     * @param runtimePlan 当前运行视图
+     * @param decision 既有提前生产判断结果
+     * @return 日志明细
+     */
+    private EarlyProductionDecisionLogEntry recordDecisionLog(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            LocalDate businessDate,
+            EarlyProductionRuntimePlan runtimePlan,
+            EarlyProductionDecision decision) {
+        if (Objects.isNull(context) || Objects.isNull(sku) || Objects.isNull(businessDate)) {
+            return null;
+        }
+        if (Objects.nonNull(runtimePlan)
+                && Objects.nonNull(runtimePlan.getDecisionLogEntry())
+                && businessDate.equals(runtimePlan.getDecisionLogEntry().getBusinessDate())
+                && !Boolean.TRUE.equals(runtimePlan.getDecisionLogEntry().getActualScheduled())) {
+            return runtimePlan.getDecisionLogEntry();
+        }
+        LocalDate sourcePlanDate = Objects.isNull(decision)
+                ? null : decision.getFuturePlanDate();
+        StructureEarlyProductionAdmission admission =
+                StringUtils.isEmpty(sku.getStructureName())
+                        ? null : context.getStructureEarlyProductionAdmission(
+                        businessDate, sku.getStructureName());
+        EarlyProductionDecisionLogCollector collector =
+                context.getOrCreateEarlyProductionDecisionLogCollector(
+                        businessDate, this.resolveDateOffset(context, businessDate));
+        EarlyProductionDecisionLogEntry existingEntry = Objects.isNull(collector)
+                ? null : Objects.isNull(sourcePlanDate)
+                ? collector.findLatest(sku.getMaterialCode(), sku.getProductStatus())
+                : collector.findLatest(
+                sku.getMaterialCode(), sku.getProductStatus(), sourcePlanDate);
+        if (Objects.nonNull(existingEntry)
+                && !Boolean.TRUE.equals(existingEntry.getActualScheduled())) {
+            if (Objects.nonNull(runtimePlan)) {
+                runtimePlan.setDecisionLogEntry(existingEntry);
+            }
+            return existingEntry;
+        }
+        EarlyProductionDecisionLogEntry entry = new EarlyProductionDecisionLogEntry();
+        entry.setBusinessDate(businessDate);
+        entry.setSourcePlanDate(sourcePlanDate);
+        entry.setMaterialCode(sku.getMaterialCode());
+        entry.setProductStatus(sku.getProductStatus());
+        entry.setStructureName(sku.getStructureName());
+        entry.setPhase("提前生产阶段");
+        entry.setSource(sku.getSourceType());
+        entry.setCurrentDatePlanMachineCount(
+                context.getStructurePlanMachineCount(businessDate, sku.getStructureName()));
+        entry.setEffectivePlanMachineCount(Objects.isNull(admission)
+                ? this.resolveEffectivePlanMachineCount(context, sku, sourcePlanDate, businessDate)
+                : admission.getCurrentPlanMachineCount());
+        entry.setStructurePlanMachineCountRange(
+                this.resolveStructurePlanMachineCountRange(context, sku, businessDate, decision));
+        /*
+         * 提前生产准入拒绝不会进入新增选机主链。必须在创建每条判断明细时冻结实时快照，
+         * 使准入拒绝、候选失败和最终排产三类明细均可展示相同口径的机台数和切换次数。
+         * 后续真实选机仍会复用既有逻辑回填该次选机前的最新快照。
+         */
+        this.fillDecisionRealtimeSnapshot(context, sku, entry);
+        entry.setAdmissionShiftIndex(Objects.isNull(admission)
+                ? null : admission.getAdmissionShiftIndex());
+        entry.setScheduledStructureCount(Objects.isNull(admission)
+                ? context.getStructureScheduledMachineCount(businessDate, sku.getStructureName())
+                : admission.getScheduledStructureCount());
+        entry.setStructureAdmission(Objects.isNull(admission)
+                ? null : admission.isAllowed());
+        entry.setAllowedAdvance(Objects.nonNull(decision)
+                && decision.isEarlyProduction() && decision.isAllowed());
+        entry.setActualScheduled(false);
+        entry.setReasonCode(EarlyProductionLogReason.fromDecision(decision, admission).getCode());
+        entry.setDetail(Objects.isNull(decision) ? "未形成提前生产判断结果" : decision.getReason());
+        if (Objects.nonNull(collector)) {
+            collector.record(entry);
+        }
+        if (Objects.nonNull(runtimePlan)) {
+            runtimePlan.setDecisionLogEntry(entry);
+        }
+        return entry;
+    }
+
+    /**
+     * 冻结提前生产判断创建时点的实时班次快照。
+     *
+     * <p>该方法仅复用现有 {@link NewSpecSelectionRealtimeSnapshot} 的只读统计，不写入排程
+     * 结果、结构机台账本或换模次数。它保证未进入真实选机的前置拒绝明细也有完整 c1～c8
+     * 统计；真实选机明细随后由 {@link #recordSelectionSnapshot} 覆盖为同一选机回合的快照。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 当前 SKU
+     * @param entry 当前提前生产判断日志明细
+     */
+    private void fillDecisionRealtimeSnapshot(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            EarlyProductionDecisionLogEntry entry) {
+        NewSpecSelectionRealtimeSnapshot snapshot = NewSpecSelectionRealtimeSnapshot.capture(
+                context, sku, null, null, mouldChangeBalanceStrategy,
+                this.resolveDateOffset(context, entry.getBusinessDate()));
+        entry.setRealtimeShiftTotalPlanQty(snapshot.getRealtimeShiftTotalPlanQty());
+        entry.setRealtimeShiftChangeCount(snapshot.getRealtimeShiftChangeCount());
+        entry.setRealtimeStructureMachineCount(snapshot.getRealtimeStructureMachineCount());
+    }
+
+    /**
+     * 复用既有提前生产判定中的窗口结构计划机台数文本。
+     *
+     * <p>优先使用 Checker 已经生成的 T～T+2 结果；只有共享判定未携带该结果时，才从
+     * 上下文已加载的结构计划 Map 读取，避免新增数据库查询或重复执行提前生产判断。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 当前 SKU
+     * @param businessDate 当前业务日期
+     * @param decision 既有提前生产判断结果
+     * @return 计划硫化机台数范围文本
+     */
+    private String resolveStructurePlanMachineCountRange(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            LocalDate businessDate,
+            EarlyProductionDecision decision) {
+        Collection<Integer> decisionMachineCounts = Objects.isNull(decision)
+                ? null : decision.getStructurePlanMachineCounts();
+        if (CollectionUtils.isEmpty(decisionMachineCounts)) {
+            LocalDate windowStartDate = this.resolveScheduleWindowStartDate(context);
+            if (Objects.isNull(windowStartDate)) {
+                return null;
+            }
+            StringBuilder fallbackRangeBuilder = new StringBuilder(32);
+            for (int dayOffset = 0; dayOffset < 3; dayOffset++) {
+                if (dayOffset > 0) {
+                    fallbackRangeBuilder.append(',');
+                }
+                fallbackRangeBuilder.append(this.resolvePlanDateLabel(dayOffset))
+                        .append('=')
+                        .append(context.getStructurePlanMachineCount(
+                                windowStartDate.plusDays(dayOffset), sku.getStructureName()));
+            }
+            return fallbackRangeBuilder.toString();
+        }
+        StringBuilder rangeBuilder = new StringBuilder(32);
+        int dayOffset = 0;
+        for (Integer machineCount : decisionMachineCounts) {
+            if (dayOffset > 0) {
+                rangeBuilder.append(',');
+            }
+            rangeBuilder.append(this.resolvePlanDateLabel(dayOffset))
+                    .append('=')
+                    .append(Objects.isNull(machineCount) ? 0 : machineCount);
+            dayOffset++;
+        }
+        return rangeBuilder.toString();
+    }
+
+    /** 获取结构计划机台数范围中的业务日标签。 */
+    private String resolvePlanDateLabel(int dayOffset) {
+        return dayOffset == 0 ? "T" : "T+" + dayOffset;
+    }
+
+    /**
+     * 基于上一条准入快照创建新的实际班次尝试明细。
+     *
+     * @param context 排程上下文
+     * @param sku 当前 SKU
+     * @param businessDate 当前业务日期
+     * @param previousEntry 上一条尝试明细
+     * @return 新的尝试明细
+     */
+    private EarlyProductionDecisionLogEntry createAttemptLogEntry(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            LocalDate businessDate,
+            EarlyProductionDecisionLogEntry previousEntry) {
+        EarlyProductionDecisionLogEntry entry = previousEntry.copyForAttempt();
+        EarlyProductionDecisionLogCollector collector =
+                context.getOrCreateEarlyProductionDecisionLogCollector(
+                        businessDate, this.resolveDateOffset(context, businessDate));
+        if (Objects.nonNull(collector)) {
+            collector.record(entry);
+        }
+        EarlyProductionRuntimePlan runtimePlan = context.getEarlyProductionRuntimePlan(sku);
+        if (Objects.nonNull(runtimePlan)) {
+            runtimePlan.setDecisionLogEntry(entry);
+        }
+        return entry;
+    }
+
+    /** 解析结构切换场景下现有准入使用的有效结构计划机台数。 */
+    private int resolveEffectivePlanMachineCount(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            LocalDate sourcePlanDate,
+            LocalDate businessDate) {
+        if (Objects.isNull(sourcePlanDate)) {
+            return 0;
+        }
+        return EarlyProductionChecker.resolveEffectiveStructurePlanMachineCount(
+                context, sku, businessDate, sourcePlanDate);
+    }
+
+    /** 解析当前候选实际尝试班次的结构已排物理机台数。 */
+    private int resolveAttemptScheduledStructureCount(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            LocalDate businessDate,
+            Integer shiftIndex) {
+        return Objects.isNull(shiftIndex) ? 0
+                : context.getStructureScheduledMachineCount(
+                businessDate, shiftIndex, sku.getStructureName());
+    }
+
+    /** 解析业务日相对窗口 T 日的偏移。 */
+    private int resolveDateOffset(LhScheduleContext context, LocalDate businessDate) {
+        LocalDate windowStartDate = this.resolveScheduleWindowStartDate(context);
+        return Objects.isNull(windowStartDate) ? 0
+                : Math.max(0, (int) ChronoUnit.DAYS.between(windowStartDate, businessDate));
     }
 
     /**

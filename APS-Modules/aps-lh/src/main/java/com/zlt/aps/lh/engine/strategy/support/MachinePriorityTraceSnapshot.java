@@ -38,6 +38,24 @@ public class MachinePriorityTraceSnapshot {
     /** 正式选机主链在当前时点确认的实际可选机台编码。 */
     private final Set<String> actualSelectableMachineCodes;
 
+    /** 选机优先级日志两段候选范围内的全部机台编码。 */
+    private final Set<String> priorityTraceSelectableMachineCodes;
+
+    /** SKU 轮到选机时实际参与的前日历史剩余产能候选池。 */
+    private final List<MachineScheduleDTO> historicalResidualCapacityCandidates;
+
+    /** SKU 轮到选机时实际参与的当日本班次候选池。 */
+    private final List<MachineScheduleDTO> currentCandidates;
+
+    /** 是否已经显式冻结历史候选段和本次候选段。 */
+    private final boolean candidateSectionsCaptured;
+
+    /** 历史剩余产能候选段标题日期。 */
+    private final Date historicalCandidateDate;
+
+    /** 本次候选段标题日期。 */
+    private final Date currentCandidateDate;
+
     /** 本轮正式选机主链确定的首选候选机台编码。 */
     private final String actualSelectedMachineCode;
 
@@ -228,6 +246,53 @@ public class MachinePriorityTraceSnapshot {
     }
 
     /**
+     * 创建显式携带历史剩余产能候选段和本次候选段的完整日志快照。
+     *
+     * <p>两段候选只服务日志还原，不改变正式选机集合和实际首选机台。构造时对两段候选
+     * 分别执行深复制，避免延迟写日志时读取被后续 SKU 推进的机台运行态。</p>
+     *
+     * @param orderedCandidates 正式选机有序候选
+     * @param actualSelectableMachineCodes 正式选机主链实际可选机台编码
+     * @param priorityTraceSelectableMachineCodes 日志两段候选机台编码
+     * @param actualSelectedMachineCode 实际首选机台编码
+     * @param displayMachineCodeMap 展示编码映射
+     * @param memberMachineCodeMap 物理成员编码映射
+     * @param occupationTextMap 选机时点占用明细
+     * @param priorityTraceEndingTimeMap 选机时点日志收尾时间
+     * @param priorityMetricSnapshotMap 选机时点软排序指标
+     * @param traceChangeoverEndTimeMap 换模或换活字块完成时间
+     * @param preparationAvailableTimeMap 准备完成时间
+     * @param realAvailableProductionTimeMap 正式可开产时间
+     * @param historicalResidualCapacityCandidates 历史剩余产能候选池
+     * @param currentCandidates 当日本班次候选池
+     */
+    public MachinePriorityTraceSnapshot(
+            List<MachineScheduleDTO> orderedCandidates,
+            Set<String> actualSelectableMachineCodes,
+            Set<String> priorityTraceSelectableMachineCodes,
+            String actualSelectedMachineCode,
+            Map<String, String> displayMachineCodeMap,
+            Map<String, List<String>> memberMachineCodeMap,
+            Map<String, String> occupationTextMap,
+            Map<String, Date> priorityTraceEndingTimeMap,
+            Map<String, MachinePriorityMetricSnapshot> priorityMetricSnapshotMap,
+            Map<String, Date> traceChangeoverEndTimeMap,
+            Map<String, Date> preparationAvailableTimeMap,
+            Map<String, Date> realAvailableProductionTimeMap,
+            List<MachineScheduleDTO> historicalResidualCapacityCandidates,
+            List<MachineScheduleDTO> currentCandidates) {
+        this(orderedCandidates, actualSelectableMachineCodes, actualSelectedMachineCode,
+                displayMachineCodeMap, memberMachineCodeMap, occupationTextMap,
+                priorityTraceEndingTimeMap, priorityMetricSnapshotMap,
+                traceChangeoverEndTimeMap, preparationAvailableTimeMap,
+                realAvailableProductionTimeMap,
+                null, null, null, null, 0, null,
+                priorityTraceSelectableMachineCodes,
+                historicalResidualCapacityCandidates, currentCandidates,
+                true, null, null);
+    }
+
+    /**
      * 创建同时冻结占用明细和日志收尾时间的完整快照。
      *
      * @param orderedCandidates 日志观察候选原顺序
@@ -386,6 +451,70 @@ public class MachinePriorityTraceSnapshot {
             Date traceScheduleDate,
             int traceSortRank,
             String traceSkuType) {
+        this(orderedCandidates, actualSelectableMachineCodes, actualSelectedMachineCode,
+                displayMachineCodeMap, memberMachineCodeMap, occupationTextMap,
+                priorityTraceEndingTimeMap, priorityMetricSnapshotMap,
+                traceChangeoverEndTimeMap, preparationAvailableTimeMap,
+                realAvailableProductionTimeMap,
+                actualHitMachineCode, selectionSucceeded, noHitReason,
+                traceScheduleDate, traceSortRank, traceSkuType,
+                actualSelectableMachineCodes,
+                Collections.<MachineScheduleDTO>emptyList(),
+                Collections.<MachineScheduleDTO>emptyList(),
+                false, null, null);
+    }
+
+    /**
+     * 创建不可变的完整日志快照。
+     *
+     * @param orderedCandidates 正式选机有序候选
+     * @param actualSelectableMachineCodes 正式选机实际可选机台编码
+     * @param actualSelectedMachineCode 实际首选机台编码
+     * @param displayMachineCodeMap 展示编码映射
+     * @param memberMachineCodeMap 物理成员编码映射
+     * @param occupationTextMap 冻结占用明细
+     * @param priorityTraceEndingTimeMap 冻结收尾时间
+     * @param priorityMetricSnapshotMap 冻结软排序指标
+     * @param traceChangeoverEndTimeMap 冻结切换完成时间
+     * @param preparationAvailableTimeMap 冻结准备完成时间
+     * @param realAvailableProductionTimeMap 冻结正式可开产时间
+     * @param actualHitMachineCode 实际命中机台编码
+     * @param selectionSucceeded 选机结果
+     * @param noHitReason 未命中原因
+     * @param traceScheduleDate 实际选机业务日期
+     * @param traceSortRank 实际选机排序名次
+     * @param traceSkuType SKU 类型
+     * @param priorityTraceSelectableMachineCodes 日志两段可选机台编码
+     * @param historicalResidualCapacityCandidates 历史候选段
+     * @param currentCandidates 本次候选段
+     * @param candidateSectionsCaptured 是否显式冻结候选分段
+     * @param historicalCandidateDate 历史候选段日期
+     * @param currentCandidateDate 本次候选段日期
+     */
+    private MachinePriorityTraceSnapshot(
+            List<MachineScheduleDTO> orderedCandidates,
+            Set<String> actualSelectableMachineCodes,
+            String actualSelectedMachineCode,
+            Map<String, String> displayMachineCodeMap,
+            Map<String, List<String>> memberMachineCodeMap,
+            Map<String, String> occupationTextMap,
+            Map<String, Date> priorityTraceEndingTimeMap,
+            Map<String, MachinePriorityMetricSnapshot> priorityMetricSnapshotMap,
+            Map<String, Date> traceChangeoverEndTimeMap,
+            Map<String, Date> preparationAvailableTimeMap,
+            Map<String, Date> realAvailableProductionTimeMap,
+            String actualHitMachineCode,
+            Boolean selectionSucceeded,
+            String noHitReason,
+            Date traceScheduleDate,
+            int traceSortRank,
+            String traceSkuType,
+            Set<String> priorityTraceSelectableMachineCodes,
+            List<MachineScheduleDTO> historicalResidualCapacityCandidates,
+            List<MachineScheduleDTO> currentCandidates,
+            boolean candidateSectionsCaptured,
+            Date historicalCandidateDate,
+            Date currentCandidateDate) {
         /*
          * 新增排产在候选命中后会原地推进 MachineScheduleDTO 的前物料、前规格、英寸和收尾时间。
          * 选机日志属于延迟写入，如果这里只复制 List 容器，列表中的可变 DTO 仍会被本轮结果污染，
@@ -398,6 +527,23 @@ public class MachinePriorityTraceSnapshot {
                         CollectionUtils.isEmpty(actualSelectableMachineCodes)
                                 ? Collections.<String>emptySet()
                                 : actualSelectableMachineCodes));
+        Set<String> selectableMachineCodes = new LinkedHashSet<String>(
+                Math.max(4, this.actualSelectableMachineCodes.size() * 2));
+        selectableMachineCodes.addAll(this.actualSelectableMachineCodes);
+        if (!CollectionUtils.isEmpty(priorityTraceSelectableMachineCodes)) {
+            selectableMachineCodes.addAll(priorityTraceSelectableMachineCodes);
+        }
+        addMachineCodes(selectableMachineCodes, historicalResidualCapacityCandidates);
+        addMachineCodes(selectableMachineCodes, currentCandidates);
+        this.priorityTraceSelectableMachineCodes = Collections.unmodifiableSet(
+                selectableMachineCodes);
+        this.historicalResidualCapacityCandidates = Collections.unmodifiableList(
+                copyTraceCandidates(historicalResidualCapacityCandidates));
+        this.currentCandidates = Collections.unmodifiableList(
+                copyTraceCandidates(currentCandidates));
+        this.candidateSectionsCaptured = candidateSectionsCaptured;
+        this.historicalCandidateDate = copyDate(historicalCandidateDate);
+        this.currentCandidateDate = copyDate(currentCandidateDate);
         this.actualSelectedMachineCode = actualSelectedMachineCode;
         this.actualHitMachineCode = actualHitMachineCode;
         this.selectionSucceeded = selectionSucceeded;
@@ -453,6 +599,26 @@ public class MachinePriorityTraceSnapshot {
                     new ArrayList<String>(memberCodes)));
         }
         return copiedMap;
+    }
+
+    /**
+     * 将候选机台编码加入日志可选集合。
+     *
+     * @param machineCodes 日志可选机台编码集合
+     * @param candidates 候选机台
+     */
+    private static void addMachineCodes(
+            Set<String> machineCodes,
+            List<MachineScheduleDTO> candidates) {
+        if (CollectionUtils.isEmpty(candidates)) {
+            return;
+        }
+        for (MachineScheduleDTO candidate : candidates) {
+            if (Objects.nonNull(candidate)
+                    && StringUtils.isNotEmpty(candidate.getMachineCode())) {
+                machineCodes.add(candidate.getMachineCode());
+            }
+        }
     }
 
     /**
@@ -584,6 +750,52 @@ public class MachinePriorityTraceSnapshot {
     }
 
     /**
+     * 获取选机时点冻结的历史剩余产能候选池。
+     *
+     * @return 防御性复制后的历史候选
+     */
+    public List<MachineScheduleDTO> getHistoricalResidualCapacityCandidates() {
+        return Collections.unmodifiableList(
+                copyTraceCandidates(historicalResidualCapacityCandidates));
+    }
+
+    /**
+     * 获取选机时点冻结的当日本班次候选池。
+     *
+     * @return 防御性复制后的本次候选
+     */
+    public List<MachineScheduleDTO> getCurrentCandidates() {
+        return Collections.unmodifiableList(copyTraceCandidates(currentCandidates));
+    }
+
+    /**
+     * 判断快照是否显式冻结了两段候选池。
+     *
+     * @return true-按历史候选段和本次候选段输出；false-兼容旧单段日志
+     */
+    public boolean hasCandidateSections() {
+        return candidateSectionsCaptured;
+    }
+
+    /**
+     * 获取历史候选段日期。
+     *
+     * @return 防御性复制后的日期
+     */
+    public Date getHistoricalCandidateDate() {
+        return copyDate(historicalCandidateDate);
+    }
+
+    /**
+     * 获取本次候选段日期。
+     *
+     * @return 防御性复制后的日期
+     */
+    public Date getCurrentCandidateDate() {
+        return copyDate(currentCandidateDate);
+    }
+
+    /**
      * 获取指定机台在选机时点冻结的候选画像。
      *
      * <p>TOP5 日志和详细优先级日志必须统一读取该快照，禁止在排产提交后再次读取已经推进的
@@ -625,6 +837,66 @@ public class MachinePriorityTraceSnapshot {
     public boolean isActualSelectable(String machineCode) {
         return StringUtils.isNotEmpty(machineCode)
                 && actualSelectableMachineCodes.contains(machineCode);
+    }
+
+    /**
+     * 判断机台是否属于选机日志两段真实候选范围。
+     *
+     * @param machineCode 代表机台编码
+     * @return true-属于历史候选段或本次候选段
+     */
+    public boolean isPriorityTraceSelectable(String machineCode) {
+        return StringUtils.isNotEmpty(machineCode)
+                && priorityTraceSelectableMachineCodes.contains(machineCode);
+    }
+
+    /**
+     * 冻结历史剩余产能候选段和本次候选段。
+     *
+     * @param historicalCandidates 历史剩余产能候选
+     * @param currentCandidates 当日本班次候选
+     * @return 携带两段候选池的新快照
+     */
+    public MachinePriorityTraceSnapshot withCandidateSections(
+            List<MachineScheduleDTO> historicalCandidates,
+            List<MachineScheduleDTO> currentCandidates) {
+        Set<String> selectableMachineCodes = new LinkedHashSet<String>(
+                priorityTraceSelectableMachineCodes);
+        addMachineCodes(selectableMachineCodes, historicalCandidates);
+        addMachineCodes(selectableMachineCodes, currentCandidates);
+        return new MachinePriorityTraceSnapshot(
+                orderedCandidates, actualSelectableMachineCodes, actualSelectedMachineCode,
+                displayMachineCodeMap, memberMachineCodeMap, occupationTextMap,
+                priorityTraceEndingTimeMap, priorityMetricSnapshotMap,
+                traceChangeoverEndTimeMap, preparationAvailableTimeMap,
+                realAvailableProductionTimeMap,
+                actualHitMachineCode, selectionSucceeded, noHitReason,
+                traceScheduleDate, traceSortRank, traceSkuType,
+                selectableMachineCodes, historicalCandidates, currentCandidates,
+                true, historicalCandidateDate, currentCandidateDate);
+    }
+
+    /**
+     * 冻结两段候选标题日期。
+     *
+     * @param historicalCandidateDate 历史候选段日期
+     * @param currentCandidateDate 本次候选段日期
+     * @return 携带两段日期的新快照
+     */
+    public MachinePriorityTraceSnapshot withCandidateSectionDates(
+            Date historicalCandidateDate,
+            Date currentCandidateDate) {
+        return new MachinePriorityTraceSnapshot(
+                orderedCandidates, actualSelectableMachineCodes, actualSelectedMachineCode,
+                displayMachineCodeMap, memberMachineCodeMap, occupationTextMap,
+                priorityTraceEndingTimeMap, priorityMetricSnapshotMap,
+                traceChangeoverEndTimeMap, preparationAvailableTimeMap,
+                realAvailableProductionTimeMap,
+                actualHitMachineCode, selectionSucceeded, noHitReason,
+                traceScheduleDate, traceSortRank, traceSkuType,
+                priorityTraceSelectableMachineCodes,
+                historicalResidualCapacityCandidates, currentCandidates,
+                true, historicalCandidateDate, currentCandidateDate);
     }
 
     /**
@@ -738,7 +1010,11 @@ public class MachinePriorityTraceSnapshot {
                 traceChangeoverEndTimeMap, preparationAvailableTimeMap,
                 realAvailableProductionTimeMap,
                 actualHitMachineCode, Boolean.TRUE, null,
-                traceScheduleDate, traceSortRank, traceSkuType);
+                traceScheduleDate, traceSortRank, traceSkuType,
+                priorityTraceSelectableMachineCodes,
+                historicalResidualCapacityCandidates, currentCandidates,
+                candidateSectionsCaptured,
+                historicalCandidateDate, currentCandidateDate);
     }
 
     /**
@@ -755,7 +1031,11 @@ public class MachinePriorityTraceSnapshot {
                 traceChangeoverEndTimeMap, preparationAvailableTimeMap,
                 realAvailableProductionTimeMap,
                 null, Boolean.FALSE, noHitReason,
-                traceScheduleDate, traceSortRank, traceSkuType);
+                traceScheduleDate, traceSortRank, traceSkuType,
+                priorityTraceSelectableMachineCodes,
+                historicalResidualCapacityCandidates, currentCandidates,
+                candidateSectionsCaptured,
+                historicalCandidateDate, currentCandidateDate);
     }
 
     /**
@@ -775,7 +1055,11 @@ public class MachinePriorityTraceSnapshot {
                 traceChangeoverEndTimeMap, preparationAvailableTimeMap,
                 realAvailableProductionTimeMap,
                 actualHitMachineCode, selectionSucceeded, noHitReason,
-                traceScheduleDate, traceSortRank, traceSkuType);
+                traceScheduleDate, traceSortRank, traceSkuType,
+                priorityTraceSelectableMachineCodes,
+                historicalResidualCapacityCandidates, currentCandidates,
+                candidateSectionsCaptured,
+                historicalCandidateDate, currentCandidateDate);
     }
 
     /**
@@ -796,7 +1080,11 @@ public class MachinePriorityTraceSnapshot {
                 traceChangeoverEndTimeMap, preparationAvailableTimeMap,
                 realAvailableProductionTimeMap,
                 actualHitMachineCode, selectionSucceeded, noHitReason,
-                traceScheduleDate, traceSortRank, traceSkuType);
+                traceScheduleDate, traceSortRank, traceSkuType,
+                priorityTraceSelectableMachineCodes,
+                historicalResidualCapacityCandidates, currentCandidates,
+                candidateSectionsCaptured,
+                historicalCandidateDate, currentCandidateDate);
     }
 
     /**
@@ -816,7 +1104,11 @@ public class MachinePriorityTraceSnapshot {
                 traceChangeoverEndTimeMap, preparationAvailableTimeMap,
                 realAvailableProductionTimeMap,
                 actualHitMachineCode, selectionSucceeded, noHitReason,
-                traceScheduleDate, traceSortRank, traceSkuType);
+                traceScheduleDate, traceSortRank, traceSkuType,
+                priorityTraceSelectableMachineCodes,
+                historicalResidualCapacityCandidates, currentCandidates,
+                candidateSectionsCaptured,
+                historicalCandidateDate, currentCandidateDate);
     }
 
     /**

@@ -91,6 +91,13 @@ public class NewSpecMachineAvailabilityPlan {
     /** 当前选机回合命中的历史班次剩余产能画像；未命中时为空。 */
     private final HistoricalResidualCapacityInfo historicalResidualCapacityInfo;
 
+    /**
+     * 首检是否因同班次总计划量上限顺延。
+     *
+     * <p>该标识只表示首检和正式生产起点后移，已合法分配的换模开始、完成时间保持不变。</p>
+     */
+    private final boolean firstInspectionDeferredByClassTotalLimit;
+
     public NewSpecMachineAvailabilityPlan(
             MachineScheduleDTO machine,
             boolean available,
@@ -112,7 +119,7 @@ public class NewSpecMachineAvailabilityPlan {
                 targetShift, available && Objects.nonNull(candidateAvailableProductionTime)
                         && Objects.nonNull(targetShift),
                 available ? candidateAvailableProductionTime : null,
-                available ? targetShift : null, null);
+                available ? targetShift : null, null, false);
     }
 
     /**
@@ -158,7 +165,7 @@ public class NewSpecMachineAvailabilityPlan {
                 firstInspectionPlan, traceChangeoverEndTime, preparationAvailableTime,
                 preparationTargetShift, preparationAvailable,
                 available ? candidateAvailableProductionTime : null,
-                available ? targetShift : null, null);
+                available ? targetShift : null, null, false);
     }
 
     /**
@@ -207,7 +214,7 @@ public class NewSpecMachineAvailabilityPlan {
                 candidateProductionNotBeforeTime, candidateAvailableProductionTime, targetShift,
                 firstInspectionPlan, traceChangeoverEndTime, preparationAvailableTime,
                 preparationTargetShift, preparationAvailable, formalAvailableProductionTime,
-                formalTargetShift, null);
+                formalTargetShift, null, false);
     }
 
     /**
@@ -232,6 +239,7 @@ public class NewSpecMachineAvailabilityPlan {
      * @param formalAvailableProductionTime 正式可开产时间
      * @param formalTargetShift 正式可开产班次
      * @param historicalResidualCapacityInfo 历史班次剩余产能画像
+     * @param firstInspectionDeferredByClassTotalLimit 首检是否因同班次总计划量上限顺延
      */
     private NewSpecMachineAvailabilityPlan(
             MachineScheduleDTO machine,
@@ -252,7 +260,8 @@ public class NewSpecMachineAvailabilityPlan {
             boolean preparationAvailable,
             Date formalAvailableProductionTime,
             LhShiftConfigVO formalTargetShift,
-            HistoricalResidualCapacityInfo historicalResidualCapacityInfo) {
+            HistoricalResidualCapacityInfo historicalResidualCapacityInfo,
+            boolean firstInspectionDeferredByClassTotalLimit) {
         this.machine = machine;
         this.available = available;
         this.unavailableReason = unavailableReason;
@@ -272,6 +281,7 @@ public class NewSpecMachineAvailabilityPlan {
         this.preparationTargetShift = preparationTargetShift;
         this.preparationAvailable = preparationAvailable;
         this.historicalResidualCapacityInfo = historicalResidualCapacityInfo;
+        this.firstInspectionDeferredByClassTotalLimit = firstInspectionDeferredByClassTotalLimit;
     }
 
     /**
@@ -288,7 +298,8 @@ public class NewSpecMachineAvailabilityPlan {
                 candidateProductionNotBeforeTime, candidateAvailableProductionTime, targetShift,
                 firstInspectionPlan, traceChangeoverEndTime, preparationAvailableTime,
                 preparationTargetShift, preparationAvailable, formalAvailableProductionTime,
-                formalTargetShift, residualCapacityInfo);
+                formalTargetShift, residualCapacityInfo,
+                firstInspectionDeferredByClassTotalLimit);
     }
 
     /**
@@ -312,7 +323,7 @@ public class NewSpecMachineAvailabilityPlan {
                 reuseStartTime, reuseShift, null, null,
                 reuseStartTime, reuseShift,
                 Objects.nonNull(reuseStartTime) && Objects.nonNull(reuseShift),
-                reuseStartTime, reuseShift, historicalResidualCapacityInfo);
+                reuseStartTime, reuseShift, historicalResidualCapacityInfo, false);
     }
 
     /**
@@ -348,7 +359,25 @@ public class NewSpecMachineAvailabilityPlan {
                 committedInspectionPlan, traceChangeoverEndTime,
                 committedProductionStartTime, committedProductionShift,
                 committedAvailable, committedProductionStartTime,
-                committedProductionShift, historicalResidualCapacityInfo);
+                committedProductionShift, historicalResidualCapacityInfo,
+                firstInspectionDeferredByClassTotalLimit);
+    }
+
+    /**
+     * 标记首检因同班次总计划量上限顺延。
+     *
+     * <p>仅补充时间轴决策标识，不修改已经计算完成的候选、换模、准备和正式生产时间。</p>
+     *
+     * @return 携带首检班次总量顺延标识的新计划对象
+     */
+    public NewSpecMachineAvailabilityPlan withFirstInspectionClassTotalDeferral() {
+        return new NewSpecMachineAvailabilityPlan(
+                machine, available, unavailableReason, occupationEndTime, machineReadyTime,
+                changeoverStartTime, changeoverEndTime, productionNotBeforeTime,
+                candidateProductionNotBeforeTime, candidateAvailableProductionTime, targetShift,
+                firstInspectionPlan, traceChangeoverEndTime, preparationAvailableTime,
+                preparationTargetShift, preparationAvailable, formalAvailableProductionTime,
+                formalTargetShift, historicalResidualCapacityInfo, true);
     }
 
     public MachineScheduleDTO getMachine() {
@@ -443,6 +472,15 @@ public class NewSpecMachineAvailabilityPlan {
      */
     public FirstInspectionAllocationPlan getFirstInspectionPlan() {
         return firstInspectionPlan;
+    }
+
+    /**
+     * 判断首检是否因同班次总计划量上限顺延。
+     *
+     * @return true-保留换模，仅顺延首检和正式生产；false-未触发该规则
+     */
+    public boolean isFirstInspectionDeferredByClassTotalLimit() {
+        return firstInspectionDeferredByClassTotalLimit;
     }
 
     /**

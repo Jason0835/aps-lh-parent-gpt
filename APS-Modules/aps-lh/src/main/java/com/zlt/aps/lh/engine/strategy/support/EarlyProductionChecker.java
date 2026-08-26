@@ -149,15 +149,15 @@ public final class EarlyProductionChecker {
         }
         if (planMachineCount > 0) {
             /*
-             * 日级已排数不能代表候选实际开产班次的结构占用：同一业务日内可能存在前班下机、
-             * 后班恢复或换料。普通结构提前和结构切换提前都只在这里完成基础准入，最终机台
-             * 上限统一下沉到候选真实目标班次确定后、模具和胎胚资源正式扣减前执行。
+             * SKU类型、未来计划日、结构切换和胎胚时间等基础条件通过后，结构机台数统一交给
+             * 提前生产中心按“业务日最后一个班次”生成当天唯一资格。资格通过后，当天其他班次
+             * 不再根据候选实际开产班次重复校验结构机台数。
              */
             boolean normalStructureEarlyProduction = currentPlanMachineCount > 0;
             logEarlyProductionDecision(context, sku, currentDate, firstFuturePlanDate, planMachineCount,
                     scheduledStructureCount, scheduledSkuCount, threshold,
                     earlyProductionDaysThreshold, earlyDays, futurePlanQty, true,
-                    "提前生产进入候选实际目标班次机台数判断");
+                    "提前生产进入结构当天最后班次机台数资格判断");
             String sceneType = normalStructureEarlyProduction
                     ? EarlyProductionDecision.SCENE_NORMAL : EarlyProductionDecision.SCENE_STRUCTURE_SWITCH;
             if (currentPlanMachineCount == 0) {
@@ -170,7 +170,7 @@ public final class EarlyProductionChecker {
             }
             return EarlyProductionDecision.earlyProduction(true, sceneType, firstFuturePlanDate,
                     structurePlanMachineCounts,
-                    "提前生产进入候选实际目标班次机台数判断");
+                    "提前生产进入结构当天最后班次机台数资格判断");
         }
         /*
          * 历史欠产/收尾遗留阶段下线后，结构没有有效计划机台数时不得再使用历史欠产
@@ -418,51 +418,6 @@ public final class EarlyProductionChecker {
             planDate = planDate.plusDays(1);
         }
         return null;
-    }
-
-    /**
-     * 判断提前生产是否可以使用当前候选机台。
-     *
-     * <p>必须按候选实际开产班次读取结构在机物理机台数：达到上限后只允许复用当前班次
-     * 已计入同结构的物理机台；尚未达到上限时可以新增；已超过计划数时全部拒绝。
-     * 调用方必须仅在提前生产候选真实目标班次确定后、资源扣减前调用。</p>
-     *
-     * @param context 排程上下文
-     * @param sku 提前生产 SKU
-     * @param currentDate 当前业务日期
-     * @param futurePlanDate 提前生产来源计划日
-     * @param targetShiftIndex 候选实际开产班次索引
-     * @param machineCode 当前候选机台编码
-     * @return true-允许使用；false-结构机台数已满且候选会新增物理机台
-     */
-    public static boolean canUseMachineForEarlyProduction(LhScheduleContext context,
-                                                           SkuScheduleDTO sku,
-                                                           LocalDate currentDate,
-                                                           LocalDate futurePlanDate,
-                                                           int targetShiftIndex,
-                                                           String machineCode) {
-        if (Objects.isNull(context) || Objects.isNull(sku) || Objects.isNull(currentDate)
-                || StringUtils.isEmpty(sku.getStructureName())
-                || targetShiftIndex < 1
-                || StringUtils.isEmpty(machineCode)) {
-            return false;
-        }
-        int planMachineCount = resolveEffectiveStructurePlanMachineCount(
-                context, sku, currentDate, futurePlanDate);
-        if (planMachineCount <= 0) {
-            return false;
-        }
-        int scheduledStructureMachineCount =
-                context.getStructureScheduledMachineCount(
-                        currentDate, targetShiftIndex, sku.getStructureName());
-        if (scheduledStructureMachineCount > planMachineCount) {
-            return false;
-        }
-        if (context.hasStructureScheduledMachine(
-                currentDate, targetShiftIndex, sku.getStructureName(), machineCode)) {
-            return true;
-        }
-        return scheduledStructureMachineCount < planMachineCount;
     }
 
     /**

@@ -120,9 +120,9 @@ public interface IMachineMatchStrategy {
     /**
      * 构建当前选机时点的优先级日志快照。
      *
-     * <p>默认实现只包装正式可选集合，保证非默认策略和既有测试替身继续兼容。
-     * 生产默认策略会额外读取实时机台占用结果，补充“仅因其它 SKU 占用而暂不可选”的机台；
-     * 快照不得写回正式候选集合，也不得触发模具、产能或结果资源扣减。</p>
+     * <p>默认实现只包装调用方在当前 SKU 真实选机时点传入的候选池，保证非默认策略和既有
+     * 测试替身继续兼容。生产默认策略仅补充这些候选的冻结明细，不再扫描或补入未实际进入
+     * 本轮候选池的机台；快照不得写回正式候选集合，也不得触发模具、产能或结果资源扣减。</p>
      *
      * @param context 排程上下文
      * @param sku 当前待选机 SKU
@@ -148,7 +148,7 @@ public interface IMachineMatchStrategy {
      * 构建携带正式模具分配前软排序指标的选机日志快照。
      *
      * <p>默认实现继续调用原快照入口，保证非默认策略和测试替身无需同步修改。
-     * 生产默认策略会将调用方已冻结的指标并入完整日志观察快照。</p>
+     * 生产默认策略会将调用方已冻结的指标并入同一真实候选池快照。</p>
      *
      * @param context 排程上下文
      * @param sku 当前待选机 SKU
@@ -241,6 +241,46 @@ public interface IMachineMatchStrategy {
     }
 
     /**
+     * 构建显式携带历史剩余产能候选段和本次候选段的完整日志快照。
+     *
+     * <p>默认实现继续回落到原完整快照入口，保证非默认策略无需同步实现。生产默认策略
+     * 覆盖本方法后，只为日志冻结两段候选范围，不修改正式候选、排序或排产结果。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 当前待选机 SKU
+     * @param actualOrderedCandidates 正式选机主链本轮有序候选
+     * @param actualSelectedMachine 正式选机主链确定的本轮首选机台
+     * @param currentDayEndTime 当前业务日结束时间
+     * @param targetScheduleQtyResolver 产能计算组件
+     * @param priorityMetricSnapshotMap 正式模具分配前冻结的软排序指标
+     * @param traceChangeoverEndTimeMap 换模或换活字块完成时间
+     * @param preparationAvailableTimeMap 准备完成时间
+     * @param realAvailableProductionTimeMap 正式可开产时间
+     * @param historicalResidualCapacityCandidates 实际历史剩余产能候选池
+     * @param currentCandidates 实际当日本班次候选池
+     * @return 当前选机时点的只读日志快照
+     */
+    default MachinePriorityTraceSnapshot buildMachinePriorityTraceSnapshot(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            List<MachineScheduleDTO> actualOrderedCandidates,
+            MachineScheduleDTO actualSelectedMachine,
+            Date currentDayEndTime,
+            TargetScheduleQtyResolver targetScheduleQtyResolver,
+            Map<String, MachinePriorityMetricSnapshot> priorityMetricSnapshotMap,
+            Map<String, Date> traceChangeoverEndTimeMap,
+            Map<String, Date> preparationAvailableTimeMap,
+            Map<String, Date> realAvailableProductionTimeMap,
+            List<MachineScheduleDTO> historicalResidualCapacityCandidates,
+            List<MachineScheduleDTO> currentCandidates) {
+        return this.buildMachinePriorityTraceSnapshot(
+                context, sku, actualOrderedCandidates, actualSelectedMachine,
+                currentDayEndTime, targetScheduleQtyResolver, priorityMetricSnapshotMap,
+                traceChangeoverEndTimeMap, preparationAvailableTimeMap,
+                realAvailableProductionTimeMap);
+    }
+
+    /**
      * 在正式模具分配前冻结候选机台软排序指标。
      *
      * <p>默认策略外不具备完整排序指标，返回空映射即可；该方法不得修改模具、机台或产能运行态。</p>
@@ -265,7 +305,8 @@ public interface IMachineMatchStrategy {
      * 快照不得调用本方法落库，避免 dayN 停止扩机及其它中间失败产生重复日志。</p>
      *
      * <p>默认实现回落到原有列表日志入口，使既有测试替身无需同步实现新接口。
-     * 生产默认策略覆盖本方法后，会输出机台类型、实时占用、实际范围、实际命中及完整排序依据。</p>
+     * 生产默认策略覆盖本方法后，会基于真实候选池输出机台类型、冻结占用、实际范围、
+     * 实际命中及完整排序依据。</p>
      *
      * @param context 排程上下文
      * @param sku 当前待选机 SKU

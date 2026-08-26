@@ -10,6 +10,7 @@ import com.zlt.aps.lh.api.domain.entity.*;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.enums.SingleControlMachineModeEnum;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
+import com.zlt.aps.lh.component.StructureEarlyProductionAdmission;
 import com.zlt.aps.lh.component.StructureShiftInMachineIndex;
 import com.zlt.aps.lh.engine.strategy.support.*;
 import com.zlt.aps.lh.handler.SkuMonthPlanCalculator;
@@ -478,6 +479,22 @@ public class LhScheduleContext {
      */
     private Map<LocalDate, Map<String, Integer>> structurePlanMachineCountMap =
             new LinkedHashMap<LocalDate, Map<String, Integer>>(4);
+    /**
+     * 业务日期 -> 产品结构 -> 当天提前生产资格快照。
+     * <p>资格只按当天最后一个班次生成一次；S4.4换活字块、S4.5新增和跨日在机续排
+     * 共同读取该快照，禁止因候选实际落到早班或中班而重复执行结构机台数判断。</p>
+     */
+    private Map<LocalDate, Map<String, StructureEarlyProductionAdmission>>
+            structureEarlyProductionAdmissionMap =
+            new LinkedHashMap<LocalDate, Map<String, StructureEarlyProductionAdmission>>(4);
+    /**
+     * 业务日期 -> 提前生产判断日志采集器。
+     * <p>采集器只保存日志标量快照，S4.4 换活字块和 S4.5 新增排产共用同一份内存态日志上下文，
+     * 最终仍通过既有过程日志批量落库，不参与任何排程决策。</p>
+     */
+    private Map<LocalDate, EarlyProductionDecisionLogCollector>
+            earlyProductionDecisionLogCollectorMap =
+            new LinkedHashMap<LocalDate, EarlyProductionDecisionLogCollector>(4);
     /**
      * 业务日期 -> 产品结构 -> 已排硫化机台运行态编码集合。
      * <p>集合保留 KxxxxL/KxxxxR 原码，保证单侧结果回滚时不会误删仍在生产的配对侧；
@@ -1227,6 +1244,71 @@ public class LhScheduleContext {
         }
         Integer machineCount = structureMap.get(structureName);
         return Objects.isNull(machineCount) ? 0 : Math.max(0, machineCount);
+    }
+
+    /**
+     * 获取指定业务日、指定结构已经固化的提前生产资格。
+     *
+     * @param productionDate 业务日期
+     * @param structureName 产品结构
+     * @return 结构当天提前生产资格；尚未判断时返回null
+     */
+    public StructureEarlyProductionAdmission getStructureEarlyProductionAdmission(
+            LocalDate productionDate,
+            String structureName) {
+        if (Objects.isNull(productionDate) || StringUtils.isEmpty(structureName)
+                || CollectionUtils.isEmpty(structureEarlyProductionAdmissionMap)) {
+            return null;
+        }
+        Map<String, StructureEarlyProductionAdmission> structureAdmissionMap =
+                structureEarlyProductionAdmissionMap.get(productionDate);
+        return CollectionUtils.isEmpty(structureAdmissionMap)
+                ? null : structureAdmissionMap.get(structureName);
+    }
+
+    /**
+     * 固化指定结构当天唯一的提前生产资格。
+     *
+     * @param admission 结构当天提前生产资格
+     */
+    public void registerStructureEarlyProductionAdmission(
+            StructureEarlyProductionAdmission admission) {
+        if (Objects.isNull(admission) || Objects.isNull(admission.getBusinessDate())
+                || StringUtils.isEmpty(admission.getStructureName())) {
+            return;
+        }
+        Map<String, StructureEarlyProductionAdmission> structureAdmissionMap =
+                structureEarlyProductionAdmissionMap.computeIfAbsent(
+                        admission.getBusinessDate(),
+                        key -> new LinkedHashMap<String, StructureEarlyProductionAdmission>(8));
+        structureAdmissionMap.putIfAbsent(admission.getStructureName(), admission);
+    }
+
+    /**
+     * 获取或创建指定业务日的提前生产判断日志采集器。
+     *
+     * @param businessDate 当前业务日期
+     * @param dateOffset 相对窗口 T 日偏移
+     * @return 业务日提前生产日志采集器
+     */
+    public EarlyProductionDecisionLogCollector getOrCreateEarlyProductionDecisionLogCollector(
+            LocalDate businessDate,
+            int dateOffset) {
+        if (Objects.isNull(businessDate)) {
+            return null;
+        }
+        return earlyProductionDecisionLogCollectorMap.computeIfAbsent(
+                businessDate,
+                key -> new EarlyProductionDecisionLogCollector(key, dateOffset));
+    }
+
+    /**
+     * 清理提前生产判断日志采集器。
+     *
+     * <p>只清理内存态日志对象，不影响已经追加到 {@code scheduleLogList} 的过程日志实体。</p>
+     */
+    public void clearEarlyProductionDecisionLogCollectors() {
+        earlyProductionDecisionLogCollectorMap.clear();
     }
 
     /**

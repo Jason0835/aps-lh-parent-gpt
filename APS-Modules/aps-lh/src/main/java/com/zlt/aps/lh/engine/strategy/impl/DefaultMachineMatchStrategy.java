@@ -1153,9 +1153,54 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
             Map<String, Date> traceChangeoverEndTimeMap,
             Map<String, Date> preparationAvailableTimeMap,
             Map<String, Date> realAvailableProductionTimeMap) {
+        return this.buildMachinePriorityTraceSnapshot(
+                context, sku, actualOrderedCandidates, actualSelectedMachine,
+                currentDayEndTime, targetScheduleQtyResolver,
+                priorityMetricSnapshotMap, traceChangeoverEndTimeMap,
+                preparationAvailableTimeMap, realAvailableProductionTimeMap,
+                Collections.<MachineScheduleDTO>emptyList(),
+                Collections.<MachineScheduleDTO>emptyList());
+    }
+
+    /**
+     * 构建按真实选机时点分段的完整日志快照。
+     *
+     * @param context 排程上下文
+     * @param sku 当前待选机 SKU
+     * @param actualOrderedCandidates 正式选机主链本轮有序候选
+     * @param actualSelectedMachine 正式选机主链确定的本轮首选机台
+     * @param currentDayEndTime 当前业务日结束时间
+     * @param targetScheduleQtyResolver 产能计算组件
+     * @param priorityMetricSnapshotMap 正式模具分配前冻结的软排序指标
+     * @param traceChangeoverEndTimeMap 换模或换活字块完成时间
+     * @param preparationAvailableTimeMap 准备完成时间
+     * @param realAvailableProductionTimeMap 正式可开产时间
+     * @param historicalResidualCapacityCandidates 实际历史剩余产能候选池
+     * @param currentCandidates 实际当日本班次候选池
+     * @return 当前选机时点的只读日志快照
+     */
+    @Override
+    public MachinePriorityTraceSnapshot buildMachinePriorityTraceSnapshot(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            List<MachineScheduleDTO> actualOrderedCandidates,
+            MachineScheduleDTO actualSelectedMachine,
+            Date currentDayEndTime,
+            TargetScheduleQtyResolver targetScheduleQtyResolver,
+            Map<String, MachinePriorityMetricSnapshot> priorityMetricSnapshotMap,
+            Map<String, Date> traceChangeoverEndTimeMap,
+            Map<String, Date> preparationAvailableTimeMap,
+            Map<String, Date> realAvailableProductionTimeMap,
+            List<MachineScheduleDTO> historicalResidualCapacityCandidates,
+            List<MachineScheduleDTO> currentCandidates) {
         MachinePriorityTraceSnapshot actualOnlySnapshot =
                 MachinePriorityTraceSnapshot.fromActualCandidates(
-                        actualOrderedCandidates, actualSelectedMachine);
+                        actualOrderedCandidates, actualSelectedMachine)
+                        .withCandidateSections(
+                                historicalResidualCapacityCandidates, currentCandidates)
+                        .withCandidateSectionDates(
+                                Objects.isNull(context) ? null : context.getScheduleDate(),
+                                Objects.isNull(context) ? null : context.getScheduleTargetDate());
         if (!PriorityTraceLogHelper.isEnabled(context) || Objects.isNull(context)
                 || Objects.isNull(sku) || Objects.isNull(targetScheduleQtyResolver)) {
             return actualOnlySnapshot;
@@ -1169,15 +1214,22 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
         registerTraceMachineDisplayMetadata(
                 context, sku, actualOrderedCandidates,
                 displayMachineCodeMap, memberMachineCodeMap);
+        registerTraceMachineDisplayMetadata(
+                context, sku, historicalResidualCapacityCandidates,
+                displayMachineCodeMap, memberMachineCodeMap);
+        registerTraceMachineDisplayMetadata(
+                context, sku, currentCandidates,
+                displayMachineCodeMap, memberMachineCodeMap);
 
-        List<MachineScheduleDTO> occupiedOnlyCandidates =
-                resolveOccupiedOnlyTraceCandidates(
-                        context, sku, actualMachineCodes, currentDayEndTime,
-                        displayMachineCodeMap, memberMachineCodeMap);
-        List<MachineScheduleDTO> mergedCandidates =
-                mergeTraceCandidatesKeepingActualOrder(
-                        context, sku, actualOrderedCandidates,
-                        actualSelectedMachine, occupiedOnlyCandidates);
+        /*
+         * 日志候选范围由新增排产主链在 SKU 真正轮到选机时确定，已经包含本轮实际参与的
+         * 历史剩余产能候选池和当日本班次候选池。这里禁止再扫描全厂运行态补入“仅日志展示”
+         * 机台，否则会把提前预计算但未进入本轮候选池的机台误写成 SKU 当时的选机现场。
+         */
+        List<MachineScheduleDTO> mergedCandidates = this.mergeTraceCandidatesForDisplay(
+                actualOrderedCandidates,
+                historicalResidualCapacityCandidates,
+                currentCandidates);
         /*
          * 完整候选确定后立即冻结每台机台的占用明细。日志会等到实际命中或窗口最终未命中后才写入，
          * 禁止届时重新读取 machineAssignmentMap，以免把本轮刚提交的当前 SKU 误记成前序占用。
@@ -1194,17 +1246,23 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
                 capturePriorityTraceEndingTime(
                         context, sku, mergedCandidates, occupationTextMap);
         /*
-         * 仅日志展示候选在延迟构建时补算指标；正式可选候选必须用调用方在模具分配前冻结的值覆盖，
-         * 避免 selected machine 已绑定目标模具后被误判为同模壳。
+         * 兼容入口未携带冻结指标时，按同一真实候选池补齐指标；新增排产主链必须使用调用方
+         * 在正式模具分配前冻结的值覆盖，避免已选机台绑定目标模具后被误判为同模壳。
          */
         Map<String, MachinePriorityMetricSnapshot> mergedPriorityMetricSnapshotMap =
                 this.captureMachinePriorityMetricSnapshots(context, sku, mergedCandidates);
         if (!CollectionUtils.isEmpty(priorityMetricSnapshotMap)) {
             mergedPriorityMetricSnapshotMap.putAll(priorityMetricSnapshotMap);
         }
+        Set<String> priorityTraceMachineCodes =
+                this.resolveTraceCandidateMachineCodes(
+                        historicalResidualCapacityCandidates, currentCandidates);
         return new MachinePriorityTraceSnapshot(
-                mergedCandidates,
+                CollectionUtils.isEmpty(actualOrderedCandidates)
+                        ? Collections.<MachineScheduleDTO>emptyList()
+                        : new ArrayList<MachineScheduleDTO>(actualOrderedCandidates),
                 actualMachineCodes,
+                priorityTraceMachineCodes,
                 Objects.isNull(actualSelectedMachine)
                         ? null : actualSelectedMachine.getMachineCode(),
                 displayMachineCodeMap,
@@ -1214,7 +1272,11 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
                 mergedPriorityMetricSnapshotMap,
                 traceChangeoverEndTimeMap,
                 preparationAvailableTimeMap,
-                realAvailableProductionTimeMap)
+                realAvailableProductionTimeMap,
+                historicalResidualCapacityCandidates,
+                currentCandidates)
+                .withCandidateSectionDates(
+                        context.getScheduleDate(), context.getScheduleTargetDate())
                 .withTraceSnapshotContext(context.getCurrentScheduleDate(), sku.getSortRank());
     }
 
@@ -1255,6 +1317,98 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
                     this.resolveMachineOccupationText(context, memberMachineCodes));
         }
         return occupationTextMap;
+    }
+
+    /**
+     * 合并正式有序候选、历史候选段和本次候选段，供一次性冻结机台明细。
+     *
+     * <p>该列表只服务日志快照，不参与正式选机；按来源顺序追加并按代表机台编码去重。</p>
+     *
+     * @param actualOrderedCandidates 正式选机有序候选
+     * @param historicalResidualCapacityCandidates 历史剩余产能候选池
+     * @param currentCandidates 当日本班次候选池
+     * @return 日志冻结使用的候选并集
+     */
+    private List<MachineScheduleDTO> mergeTraceCandidatesForDisplay(
+            List<MachineScheduleDTO> actualOrderedCandidates,
+            List<MachineScheduleDTO> historicalResidualCapacityCandidates,
+            List<MachineScheduleDTO> currentCandidates) {
+        int expectedSize = PriorityTraceLogHelper.sizeOf(actualOrderedCandidates)
+                + PriorityTraceLogHelper.sizeOf(historicalResidualCapacityCandidates)
+                + PriorityTraceLogHelper.sizeOf(currentCandidates);
+        List<MachineScheduleDTO> mergedCandidates =
+                new ArrayList<MachineScheduleDTO>(Math.max(4, expectedSize));
+        Set<String> addedMachineCodes =
+                new LinkedHashSet<String>(Math.max(8, expectedSize * 2));
+        this.appendTraceCandidatesForDisplay(
+                actualOrderedCandidates, addedMachineCodes, mergedCandidates);
+        this.appendTraceCandidatesForDisplay(
+                historicalResidualCapacityCandidates, addedMachineCodes, mergedCandidates);
+        this.appendTraceCandidatesForDisplay(
+                currentCandidates, addedMachineCodes, mergedCandidates);
+        return mergedCandidates;
+    }
+
+    /**
+     * 提取两段真实候选池的机台编码。
+     *
+     * @param historicalResidualCapacityCandidates 历史剩余产能候选池
+     * @param currentCandidates 当日本班次候选池
+     * @return 保持来源顺序的机台编码集合
+     */
+    private Set<String> resolveTraceCandidateMachineCodes(
+            List<MachineScheduleDTO> historicalResidualCapacityCandidates,
+            List<MachineScheduleDTO> currentCandidates) {
+        Set<String> machineCodes = new LinkedHashSet<String>(
+                Math.max(8,
+                        (PriorityTraceLogHelper.sizeOf(historicalResidualCapacityCandidates)
+                                + PriorityTraceLogHelper.sizeOf(currentCandidates)) * 2));
+        this.appendTraceMachineCodes(
+                historicalResidualCapacityCandidates, machineCodes);
+        this.appendTraceMachineCodes(currentCandidates, machineCodes);
+        return machineCodes;
+    }
+
+    /**
+     * 向日志候选并集追加未重复机台。
+     *
+     * @param candidates 候选机台
+     * @param addedMachineCodes 已追加机台编码
+     * @param mergedCandidates 日志候选并集
+     */
+    private void appendTraceCandidatesForDisplay(
+            List<MachineScheduleDTO> candidates,
+            Set<String> addedMachineCodes,
+            List<MachineScheduleDTO> mergedCandidates) {
+        if (CollectionUtils.isEmpty(candidates)) {
+            return;
+        }
+        for (MachineScheduleDTO candidate : candidates) {
+            if (Objects.nonNull(candidate)
+                    && StringUtils.isNotEmpty(candidate.getMachineCode())
+                    && addedMachineCodes.add(candidate.getMachineCode())) {
+                mergedCandidates.add(candidate);
+            }
+        }
+    }
+
+    /**
+     * 向机台编码集合追加候选编码。
+     *
+     * @param candidates 候选机台
+     * @param machineCodes 机台编码集合
+     */
+    private void appendTraceMachineCodes(
+            List<MachineScheduleDTO> candidates,
+            Set<String> machineCodes) {
+        if (CollectionUtils.isEmpty(candidates)) {
+            return;
+        }
+        candidates.stream()
+                .filter(Objects::nonNull)
+                .map(MachineScheduleDTO::getMachineCode)
+                .filter(StringUtils::isNotEmpty)
+                .forEach(machineCodes::add);
     }
 
     /**
@@ -2153,10 +2307,10 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
     /**
      * 输出当前选机时点的完整优先级日志。
      *
-     * <p>快照已由调用处和诊断构建入口共同确定。本方法只复制日志候选并按冻结收尾时间
+     * <p>快照已由调用处按真实选机候选池确定。本方法只复制日志候选并按冻结收尾时间
      * 调整展示顺序，然后格式化并写入过程日志，不修改快照或正式选机顺序。
-     * 实际可选机台显示“可用”；仅因其它 SKU 占用而补入的机台显示“已被占用、仅日志展示”。
-     * 部分占用后仍可接续的正式候选继续显示“可用”，同时完整展示前序占用明细。</p>
+     * 候选机台状态、前序占用、收尾时间、正式可开产时间和软排序指标全部读取冻结快照，
+     * 禁止在延迟写日志时重新读取已经被后续排产推进的运行态。</p>
      *
      * @param context 排程上下文
      * @param sku 当前待选机 SKU
@@ -2194,25 +2348,69 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
                 resolveActualHitDisplayMachineCode(traceSnapshot);
         String traceHeader = this.buildMachinePriorityTraceHeader(
                 context, sku, traceSnapshot, selectedDisplayMachineCode, actualHitDisplayMachineCode);
-        if (CollectionUtils.isEmpty(orderedCandidates)) {
-            PriorityTraceLogHelper.logSortSummary(
-                    log, context, title,
-                    traceHeader + "\n无日志候选机台");
-            return;
-        }
-
         Map<String, Date> referenceTimeCache =
                 new HashMap<String, Date>(Math.max(4, orderedCandidates.size() * 2));
+        String logDetail;
+        if (traceSnapshot.hasCandidateSections()) {
+            String historicalSection = this.buildMachinePriorityTraceSectionDetail(
+                    context, sku, traceSnapshot,
+                    this.buildCandidateSectionTitle("[历史剩余产能机台]"),
+                    traceSnapshot.getHistoricalResidualCapacityCandidates(),
+                    traceHeader, referenceTimeCache);
+            String currentSection = this.buildMachinePriorityTraceSectionDetail(
+                    context, sku, traceSnapshot,
+                    this.buildCandidateSectionTitle("[本次候选机台]"),
+                    traceSnapshot.getCurrentCandidates(),
+                    traceHeader, referenceTimeCache);
+            logDetail = historicalSection + "\n\n" + currentSection;
+        } else {
+            logDetail = this.buildMachinePriorityTraceSectionDetail(
+                    context, sku, traceSnapshot, StringUtils.EMPTY,
+                    orderedCandidates, traceHeader, referenceTimeCache);
+        }
+        PriorityTraceLogHelper.logSortSummary(log, context, title, logDetail);
+    }
+
+    /**
+     * 构建单个候选分段的日志明细。
+     *
+     * <p>分段只改变候选来源和记录范围；日志头、机台字段、字段顺序及展示排序全部复用
+     * 原有逻辑。空候选段保留标题和日志头，并输出固定“无日志候选机台”。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 当前待选机 SKU
+     * @param traceSnapshot 选机时点冻结快照
+     * @param sectionTitle 分段标题；兼容旧日志时为空
+     * @param candidates 当前分段候选
+     * @param traceHeader 原日志头
+     * @param referenceTimeCache 冻结收尾时间缓存
+     * @return 当前分段完整日志明细
+     */
+    private String buildMachinePriorityTraceSectionDetail(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            MachinePriorityTraceSnapshot traceSnapshot,
+            String sectionTitle,
+            List<MachineScheduleDTO> candidates,
+            String traceHeader,
+            Map<String, Date> referenceTimeCache) {
+        int candidateSize = PriorityTraceLogHelper.sizeOf(candidates);
+        StringBuilder detailBuilder =
+                new StringBuilder(Math.max(512, candidateSize * 360));
+        if (StringUtils.isNotEmpty(sectionTitle)) {
+            detailBuilder.append(sectionTitle).append('\n');
+        }
+        detailBuilder.append(traceHeader).append('\n');
+        if (CollectionUtils.isEmpty(candidates)) {
+            return detailBuilder.append("无日志候选机台").toString();
+        }
         /*
          * 日志展示使用独立列表按冻结收尾时间稳定排序，收尾时间相同保持快照原顺序，空时间放最后。
          * 禁止修改快照中的正式候选顺序，首选候选和实际命中仍以主链已经确认的结果为准。
          */
         List<MachineScheduleDTO> displayCandidates =
                 this.sortPriorityTraceDisplayCandidates(
-                        context, sku, traceSnapshot, orderedCandidates, referenceTimeCache);
-        StringBuilder detailBuilder =
-                new StringBuilder(Math.max(512, displayCandidates.size() * 360));
-        detailBuilder.append(traceHeader).append('\n');
+                        context, sku, traceSnapshot, candidates, referenceTimeCache);
         for (int i = 0; i < displayCandidates.size(); i++) {
             MachineScheduleDTO machine = displayCandidates.get(i);
             /*
@@ -2237,7 +2435,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
             String proSizeMatchedValue = metricSnapshot.getProSizeMatchedValue();
             boolean singleControlMachine = metricSnapshot.isSingleControlMachine();
             boolean actualSelectable =
-                    traceSnapshot.isActualSelectable(machine.getMachineCode());
+                    traceSnapshot.isPriorityTraceSelectable(machine.getMachineCode());
             boolean actualSelected =
                     traceSnapshot.isActualSelected(machine.getMachineCode());
             boolean actualHit =
@@ -2310,7 +2508,17 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
                 detailBuilder.append('\n');
             }
         }
-        PriorityTraceLogHelper.logSortSummary(log, context, title, detailBuilder.toString());
+        return detailBuilder.toString();
+    }
+
+    /**
+     * 构建候选分段标题。
+     *
+     * @param sectionName 固定分段名称
+     * @return 不携带日期的候选分段标题
+     */
+    private String buildCandidateSectionTitle(String sectionName) {
+        return sectionName;
     }
 
     /**

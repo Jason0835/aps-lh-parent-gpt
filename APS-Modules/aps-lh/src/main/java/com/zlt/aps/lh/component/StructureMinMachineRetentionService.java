@@ -1,6 +1,7 @@
 package com.zlt.aps.lh.component;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
 import com.zlt.aps.lh.api.domain.dto.MachineCleaningWindowDTO;
 import com.zlt.aps.lh.api.domain.dto.MachineMaintenanceWindowDTO;
@@ -146,6 +147,54 @@ public class StructureMinMachineRetentionService {
             }
         }
         return physicalMachineCodes;
+    }
+
+    /**
+     * 统计提前生产资格班次内仍应计入结构的物理机台。
+     *
+     * <p>先复用现有结构班次在机口径得到原始物理机台集合，再按排程结果真实收尾时间、
+     * 班次收尾标识、续作降模释放边界和机台下机状态排除“在当前班次内完成生产并下机”
+     * 的机台。计划量大于0只表示参与过当前班次生产，不能单独证明班次结束时仍在机。</p>
+     *
+     * <p>单控L/R先归并为物理整机；只有同一物理机台下全部有效结构占用均能证明已在
+     * 当前班次内释放时才排除。任一侧仍继续生产或缺少明确结束证据时，整机继续计数。</p>
+     *
+     * @param context 排程上下文
+     * @param structureName 产品结构
+     * @param shift 资格判断使用的当天最后班次
+     * @return 班次收尾调整后的结构物理机台统计
+     */
+    public StructureEarlyProductionAdmission resolveEarlyProductionMachineStatistics(
+            LhScheduleContext context,
+            String structureName,
+            LhShiftConfigVO shift) {
+        StructureEarlyProductionAdmission admission =
+                new StructureEarlyProductionAdmission();
+        admission.setStructureName(structureName);
+        if (Objects.isNull(context) || StringUtils.isEmpty(structureName)
+                || Objects.isNull(shift) || Objects.isNull(shift.getShiftIndex())) {
+            return admission;
+        }
+        int shiftIndex = shift.getShiftIndex();
+        admission.setAdmissionShiftIndex(shiftIndex);
+        Set<String> rawPhysicalMachineCodes =
+                this.collectStructureInMachinePhysicalCodes(
+                        context, structureName, shiftIndex);
+        admission.getRawScheduledPhysicalMachineCodes().addAll(
+                rawPhysicalMachineCodes);
+        for (String physicalMachineCode : rawPhysicalMachineCodes) {
+            if (this.isPhysicalMachineEndingWithinShift(
+                    context, structureName, physicalMachineCode, shift)) {
+                admission.getExcludedEndingPhysicalMachineCodes().add(
+                        physicalMachineCode);
+                continue;
+            }
+            admission.getScheduledPhysicalMachineCodes().add(
+                    physicalMachineCode);
+        }
+        admission.setScheduledStructureCount(
+                admission.getScheduledPhysicalMachineCodes().size());
+        return admission;
     }
 
     /**
@@ -558,10 +607,8 @@ public class StructureMinMachineRetentionService {
                                              String machineCode,
                                              int shiftIndex) {
         for (LhScheduleResult result : context.getScheduleResultList()) {
-            if (Objects.nonNull(result) && StringUtils.equals(machineCode, result.getLhMachineCode())
-                    && (StringUtils.equals(structureName, result.getStructureName())
-                    || isSnapshotStructureMaterial(
-                    context, structureName, result.getMaterialCode()))) {
+            if (this.isResultForStructure(
+                    context, result, structureName, machineCode)) {
                 Integer planQty = ShiftFieldUtil.getShiftPlanQty(result, shiftIndex);
                 if (Objects.nonNull(planQty) && planQty > 0) {
                     return true;
@@ -569,6 +616,263 @@ public class StructureMinMachineRetentionService {
             }
         }
         return false;
+    }
+
+    /**
+     * 判断物理机台是否能够证明在目标班次内完成当前结构生产并下机。
+     *
+     * @param context 排程上下文
+     * @param structureName 产品结构
+     * @param physicalMachineCode 物理机台编码
+     * @param shift 目标班次
+     * @return true-物理整机在本班内已经明确释放；false-仍占用或证据不足
+     */
+    private boolean isPhysicalMachineEndingWithinShift(
+            LhScheduleContext context,
+            String structureName,
+            String physicalMachineCode,
+            LhShiftConfigVO shift) {
+        Set<String> structureRuntimeMachineCodes =
+                this.collectStructureRuntimeMachineCodes(context, structureName);
+        boolean activeMachineFound = false;
+        boolean releaseEvidenceFound = false;
+        for (String machineCode : structureRuntimeMachineCodes) {
+            if (!StringUtils.equals(
+                    physicalMachineCode,
+                    LhSingleControlMachineUtil.resolvePhysicalMachineCode(machineCode))
+                    || !this.isMachineInStructureAtShift(
+                    context, structureName, machineCode, shift.getShiftIndex())) {
+                continue;
+            }
+            activeMachineFound = true;
+            List<LhScheduleResult> positiveResultList =
+                    this.collectPositiveStructureResults(
+                            context, structureName, machineCode,
+                            shift.getShiftIndex());
+            if (CollectionUtils.isEmpty(positiveResultList)) {
+                if (!this.isRuntimeMachineEndingWithinShift(
+                        context, machineCode, shift)) {
+                    return false;
+                }
+                releaseEvidenceFound = true;
+                continue;
+            }
+            for (LhScheduleResult result : positiveResultList) {
+                if (!this.isResultEndingWithinShift(
+                        context, result, shift)) {
+                    return false;
+                }
+                releaseEvidenceFound = true;
+            }
+        }
+        return activeMachineFound && releaseEvidenceFound;
+    }
+
+    /**
+     * 收集指定结构、机台在目标班次的正量排程结果。
+     *
+     * @param context 排程上下文
+     * @param structureName 产品结构
+     * @param machineCode 运行态机台编码
+     * @param shiftIndex 目标班次索引
+     * @return 正量结果列表
+     */
+    private List<LhScheduleResult> collectPositiveStructureResults(
+            LhScheduleContext context,
+            String structureName,
+            String machineCode,
+            int shiftIndex) {
+        List<LhScheduleResult> resultList = new ArrayList<LhScheduleResult>(2);
+        for (LhScheduleResult result : context.getScheduleResultList()) {
+            if (!this.isResultForStructure(
+                    context, result, structureName, machineCode)) {
+                continue;
+            }
+            Integer planQty = ShiftFieldUtil.getShiftPlanQty(result, shiftIndex);
+            if (Objects.nonNull(planQty) && planQty > 0) {
+                resultList.add(result);
+            }
+        }
+        return resultList;
+    }
+
+    /**
+     * 判断排程结果是否属于指定结构和机台。
+     *
+     * @param context 排程上下文
+     * @param result 排程结果
+     * @param structureName 产品结构
+     * @param machineCode 机台编码
+     * @return true-属于；false-不属于
+     */
+    private boolean isResultForStructure(
+            LhScheduleContext context,
+            LhScheduleResult result,
+            String structureName,
+            String machineCode) {
+        return Objects.nonNull(result)
+                && StringUtils.equals(machineCode, result.getLhMachineCode())
+                && (StringUtils.equals(structureName, result.getStructureName())
+                || this.isSnapshotStructureMaterial(
+                context, structureName, result.getMaterialCode()));
+    }
+
+    /**
+     * 判断正量结果是否在目标班次内完成生产并释放机台。
+     *
+     * @param context 排程上下文
+     * @param result 排程结果
+     * @param shift 目标班次
+     * @return true-班次内完成并下机；false-仍生产或证据不足
+     */
+    private boolean isResultEndingWithinShift(
+            LhScheduleContext context,
+            LhScheduleResult result,
+            LhShiftConfigVO shift) {
+        int shiftIndex = shift.getShiftIndex();
+        if (this.resolveLastPositiveShiftIndex(result) > shiftIndex) {
+            // 后续班次仍有正量是“尚未下机”的直接证据，任何当前班收尾标识都不得覆盖该事实。
+            return false;
+        }
+        Date actualEndingTime = ShiftFieldUtil.getShiftEndTime(
+                result, shiftIndex);
+        if (Objects.isNull(actualEndingTime)) {
+            actualEndingTime = result.getSpecEndTime();
+        }
+        if (!this.isEndingTimeWithinShift(actualEndingTime, shift)) {
+            return false;
+        }
+        boolean shiftEnding = StringUtils.equals(
+                "1", ShiftFieldUtil.getShiftIsEnd(result, shiftIndex));
+        boolean resultEnding = StringUtils.equals("1", result.getIsEnd())
+                && this.resolveLastPositiveShiftIndex(result) == shiftIndex;
+        Integer releaseBoundary =
+                context.getContinuousReducedMachineReleaseBoundaryShiftIndex(
+                        result.getLhMachineCode());
+        boolean reducedOffline = Objects.nonNull(releaseBoundary)
+                && releaseBoundary <= shiftIndex;
+        MachineScheduleDTO machine =
+                context.getMachineScheduleMap().get(result.getLhMachineCode());
+        boolean runtimeEnding = Objects.nonNull(machine)
+                && machine.isEnding()
+                && this.isEndingTimeWithinShift(
+                machine.getEstimatedEndTime(), shift);
+        /*
+         * 日驱动新增在当前业务日收口时可能临时把结果标记为收尾，但同一SKU实际消费账本
+         * 仍有余量，下一业务日还会继续在原机台生产。只有账本已经归零时，收尾标识和机台
+         * ending状态才代表真正完成并下机；真正降模释放边界属于明确下机事实，不受此限制。
+         */
+        boolean productionCompleted =
+                this.isResultProductionCompleted(context, result);
+        return reducedOffline
+                || (productionCompleted
+                && (shiftEnding || resultEnding || runtimeEnding));
+    }
+
+    /**
+     * 判断无正量结果的运行态机台是否在目标班次内明确下机。
+     *
+     * @param context 排程上下文
+     * @param machineCode 机台编码
+     * @param shift 目标班次
+     * @return true-班次内明确下机；false-继续占用或证据不足
+     */
+    private boolean isRuntimeMachineEndingWithinShift(
+            LhScheduleContext context,
+            String machineCode,
+            LhShiftConfigVO shift) {
+        MachineScheduleDTO machine =
+                context.getMachineScheduleMap().get(machineCode);
+        LhScheduleResult latestResult =
+                this.resolveLatestMachineResult(context, machineCode);
+        if (Objects.nonNull(machine) && machine.isEnding()
+                && this.isEndingTimeWithinShift(
+                machine.getEstimatedEndTime(), shift)
+                && this.isResultProductionCompleted(
+                context, latestResult)) {
+            return true;
+        }
+        Integer releaseBoundary =
+                context.getContinuousReducedMachineReleaseBoundaryShiftIndex(
+                        machineCode);
+        if (Objects.isNull(releaseBoundary)
+                || releaseBoundary > shift.getShiftIndex()) {
+            return false;
+        }
+        return Objects.nonNull(latestResult)
+                && this.isEndingTimeWithinShift(
+                latestResult.getSpecEndTime(), shift);
+    }
+
+    /**
+     * 判断结果对应 SKU 的实际生产剩余账本是否已经归零。
+     *
+     * <p>能够定位来源 SKU 时优先读取“物料+产品状态”实际消费账本；账本尚未初始化时，
+     * 再使用 SKU 当前剩余量和待排量。历史结果缺少来源映射时保持原收尾标识语义。</p>
+     *
+     * @param context 排程上下文
+     * @param result 排程结果
+     * @return true-已实际完成；false-仍有后续待排量
+     */
+    private boolean isResultProductionCompleted(
+            LhScheduleContext context,
+            LhScheduleResult result) {
+        if (Objects.isNull(context) || Objects.isNull(result)) {
+            return false;
+        }
+        SkuScheduleDTO sourceSku =
+                context.getScheduleResultSourceSkuMap().get(result);
+        if (Objects.isNull(sourceSku)) {
+            return true;
+        }
+        String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(
+                sourceSku.getMaterialCode(), sourceSku.getProductStatus());
+        Integer ledgerRemainingQty =
+                context.getSkuProductionRemainingQtyMap().get(skuKey);
+        if (Objects.nonNull(ledgerRemainingQty)) {
+            return ledgerRemainingQty <= 0;
+        }
+        return Math.max(0, sourceSku.getRemainingScheduleQty()) <= 0
+                && Math.max(0, sourceSku.getPendingQty()) <= 0;
+    }
+
+    /**
+     * 判断结束时刻是否位于目标班次内或恰好落在班次结束边界。
+     *
+     * @param endingTime 实际结束时刻
+     * @param shift 目标班次
+     * @return true-本班内完成；false-不在本班或时间缺失
+     */
+    private boolean isEndingTimeWithinShift(
+            Date endingTime,
+            LhShiftConfigVO shift) {
+        return Objects.nonNull(endingTime)
+                && Objects.nonNull(shift)
+                && Objects.nonNull(shift.getShiftStartDateTime())
+                && Objects.nonNull(shift.getShiftEndDateTime())
+                && endingTime.after(shift.getShiftStartDateTime())
+                && !endingTime.after(shift.getShiftEndDateTime());
+    }
+
+    /**
+     * 获取结果最后一个正量班次。
+     *
+     * @param result 排程结果
+     * @return 最后正量班次索引；无正量返回-1
+     */
+    private int resolveLastPositiveShiftIndex(LhScheduleResult result) {
+        if (Objects.isNull(result)) {
+            return -1;
+        }
+        for (int shiftIndex = LhScheduleConstant.MAX_SHIFT_SLOT_COUNT;
+             shiftIndex >= 1; shiftIndex--) {
+            Integer planQty = ShiftFieldUtil.getShiftPlanQty(
+                    result, shiftIndex);
+            if (Objects.nonNull(planQty) && planQty > 0) {
+                return shiftIndex;
+            }
+        }
+        return -1;
     }
 
     /**
