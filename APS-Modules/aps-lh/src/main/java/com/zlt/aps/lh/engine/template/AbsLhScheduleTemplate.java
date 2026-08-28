@@ -186,6 +186,7 @@ public abstract class AbsLhScheduleTemplate {
         String message = "排程中断[" + context.getCurrentStep() + "]: " + context.getInterruptReason();
         LhScheduleResponseDTO response = LhScheduleResponseDTO.fail(context.getBatchNo(), message);
         this.fillValidationProblems(context, response);
+        this.fillWarningMessages(context, response);
         return response;
     }
 
@@ -205,6 +206,7 @@ public abstract class AbsLhScheduleTemplate {
          * 因此成功响应也必须返回这些问题，不能只在中断响应中回传，否则调用方会误认为最终结果已全部满足约束。
          */
         this.fillValidationProblems(context, response);
+        this.fillWarningMessages(context, response);
         return response;
     }
 
@@ -224,6 +226,21 @@ public abstract class AbsLhScheduleTemplate {
         }
         if (!CollectionUtils.isEmpty(context.getValidationErrorDetailList())) {
             response.setValidationErrorDetails(new ArrayList<>(context.getValidationErrorDetailList()));
+        }
+    }
+
+    /**
+     * 将本次排程收集到的非阻断提示信息复制到响应对象。
+     *
+     * <p>提示信息（如跨月排程时下月未定稿）不中断排程，成功响应也必须回传，
+     * 供前端提示展示。响应侧创建新集合，避免调用方修改响应时污染排程上下文。</p>
+     *
+     * @param context 排程上下文
+     * @param response 排程响应对象
+     */
+    private void fillWarningMessages(LhScheduleContext context, LhScheduleResponseDTO response) {
+        if (!CollectionUtils.isEmpty(context.getWarningMessageList())) {
+            response.setWarningMessages(new ArrayList<>(context.getWarningMessageList()));
         }
     }
 

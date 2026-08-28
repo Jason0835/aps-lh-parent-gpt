@@ -943,6 +943,11 @@ public class LhScheduleContext {
      */
     private List<MouldValidationErrorDetail> validationErrorDetailList = new ArrayList<>();
     /**
+     * 非阻断提示信息列表（如跨月排程时下月未定稿）。
+     * <p>仅用于回传前端提示，不中断排程，本月排产正常继续。</p>
+     */
+    private List<String> warningMessageList = new ArrayList<>();
+    /**
      * 优先级跟踪日志静默深度（局部搜索模拟分支时递增）
      */
     private int priorityTraceMuteDepth = 0;
@@ -1994,6 +1999,21 @@ public class LhScheduleContext {
         if (details != null) {
             this.validationErrorDetailList.addAll(details);
         }
+    }
+
+    /**
+     * 追加一条非阻断提示信息（空串或 null 将被忽略，重复信息不重复添加）
+     *
+     * @param message 提示信息
+     */
+    public void addWarningMessage(String message) {
+        if (StringUtils.isEmpty(message)) {
+            return;
+        }
+        if (this.warningMessageList.contains(message)) {
+            return;
+        }
+        this.warningMessageList.add(message);
     }
 
     /**

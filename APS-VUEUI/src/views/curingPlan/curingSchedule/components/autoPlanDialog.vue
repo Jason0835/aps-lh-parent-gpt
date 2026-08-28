@@ -163,10 +163,25 @@ export default {
       this.$modal.msgSuccess(
         tip || this.$t("ui.data.column.scheduleResult.lhScheduleCompleted")
       );
+      // 展示非阻断提示信息（如跨月排程时下月无定稿数据），排程本身已正常完成
+      this.showScheduleWarnings(data);
       if (params.isAutoExecCx === "1") {
         await this.handleCxScheduleGenerate(params);
       }
       this.$emit("success", { ...params, batchNo: data.batchNo });
+    },
+    /**
+     * 展示硫化排程非阻断提示信息（如下月未定稿：没有2026年09月定稿数据，请提前定稿）
+     * @param {Object} data 接口响应
+     */
+    showScheduleWarnings(data) {
+      const warnings = Array.isArray(data.warningMessages)
+        ? data.warningMessages.filter((item) => !!item)
+        : [];
+      if (warnings.length === 0) {
+        return;
+      }
+      this.$modal.alertWarning(warnings.join("；"));
     },
     /**
      * 提交硫化自动排程：先提示用户后台执行中，再异步调用后端接口

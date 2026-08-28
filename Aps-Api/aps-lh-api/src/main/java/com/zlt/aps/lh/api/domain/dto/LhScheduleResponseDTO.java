@@ -31,6 +31,8 @@ public class LhScheduleResponseDTO {
     private List<String> validationErrors = new ArrayList<>();
     /** 校验错误结构化明细（如模具禁用/缺失的详细信息，便于前端分页展示） */
     private List<MouldValidationErrorDetail> validationErrorDetails = new ArrayList<>();
+    /** 非阻断提示信息（如跨月排程时下月未定稿），排程仍成功完成，仅供前端提示展示 */
+    private List<String> warningMessages = new ArrayList<>();
 
     /**
      * 构建成功响应

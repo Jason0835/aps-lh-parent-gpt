@@ -1142,7 +1142,9 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     }
 
     /**
-     * 加载定稿排产版本：工厂 + 年 + 月 + 已定稿且未删除；无数据则中断；多条时取更新时间最新一条（再按主键降序）
+     * 加载定稿排产版本：工厂 + 年 + 月 + 已定稿且未删除；多条时取更新时间最新一条（再按主键降序）。
+     * <p>主月（排程目标日所在月）未定稿时保持中断，无定稿月计划无法排产；
+     * 跨月相邻月（如下月）未定稿时不中断，仅写入提示信息回传前端，本月排产正常继续。</p>
      *
      * @param context      排程上下文
      * @param factoryCode  分厂编号
@@ -1172,6 +1174,20 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
             if (context.isInterrupted()) {
                 return;
             }
+            if (Objects.isNull(versionRow)) {
+                // 主月未定稿：保持原有中断口径，无定稿月计划无法排产
+                if (monthStartDate.getYear() == primaryYear && monthStartDate.getMonthValue() == primaryMonth) {
+                    interruptByDataIncomplete(context, String.format("%s 未找到定稿排产版本数据",
+                            formatFactoryYearMonth(context.getFactoryDisplayName(), primaryYear, primaryMonth)));
+                    return;
+                }
+                // 跨月相邻月（如下月）未定稿：不阻断本月排产，仅记录提示信息回传前端
+                log.warn("跨月相邻月未定稿，跳过该月定稿版本加载并提示前端, factoryCode: {}, year: {}, month: {}",
+                        factoryCode, monthStartDate.getYear(), monthStartDate.getMonthValue());
+                context.addWarningMessage(this.buildFinalVersionMissingMessage(
+                        monthStartDate.getYear(), monthStartDate.getMonthValue()));
+                continue;
+            }
             String yearMonthKey = MonthPlanDateResolver.buildYearMonthKey(
                     monthStartDate.getYear(), monthStartDate.getMonthValue());
             productionVersionMap.put(yearMonthKey, versionRow.getProductionVersion());
@@ -1193,9 +1209,24 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                 factoryCode, productionVersionMap.keySet(), primaryMonthPlanVersion, primaryProductionVersion);
     }
 
+    /**
+     * 加载主月定稿排产版本（兼容月份集合为空的旧链路）。
+     * <p>本方法只处理主月，主月未定稿时保持原有中断口径。</p>
+     *
+     * @param context     排程上下文
+     * @param factoryCode 分厂编号
+     * @param year        年份
+     * @param month       月份（1-12）
+     */
     private void loadFinalProductionVersion(LhScheduleContext context, String factoryCode, int year, int month) {
         MpFactoryProductionVersion versionRow = resolveFinalProductionVersionRow(context, factoryCode, year, month);
-        if (context.isInterrupted() || Objects.isNull(versionRow)) {
+        if (context.isInterrupted()) {
+            return;
+        }
+        if (Objects.isNull(versionRow)) {
+            // 主月未定稿：保持原有中断口径，无定稿月计划无法排产
+            interruptByDataIncomplete(context, String.format("%s 未找到定稿排产版本数据",
+                    formatFactoryYearMonth(context.getFactoryDisplayName(), year, month)));
             return;
         }
         context.setProductionVersion(versionRow.getProductionVersion());
@@ -1204,12 +1235,14 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
 
     /**
      * 解析指定年月定稿版本记录。
+     * <p>无定稿数据时不再中断排程，返回 null 由调用方处理：
+     * 主月缺失仍需中断，跨月相邻月（如下月）缺失仅提示前端，不影响本月排产。</p>
      *
      * @param context     排程上下文
      * @param factoryCode 工厂编码
      * @param year        年份
      * @param month       月份
-     * @return 定稿版本记录
+     * @return 定稿版本记录；无定稿数据时返回 null
      */
     private MpFactoryProductionVersion resolveFinalProductionVersionRow(LhScheduleContext context,
                                                                         String factoryCode,
@@ -1223,8 +1256,8 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                         .last(FINAL_PRODUCTION_VERSION_LIMIT_TWO));
         String locationText = formatFactoryYearMonth(context.getFactoryDisplayName(), year, month);
         if (CollectionUtils.isEmpty(list)) {
-            log.error("定稿排产版本无数据, 工厂: {}, 年: {}, 月: {}", factoryCode, year, month);
-            interruptByDataIncomplete(context, String.format("%s 未找到定稿排产版本数据", locationText));
+            // 未定稿属于正常业务状态（如下月尚未定稿），不再中断排程，由调用方决定是否阻断
+            log.warn("定稿排产版本无数据, 工厂: {}, 年: {}, 月: {}, 位置: {}", factoryCode, year, month, locationText);
             return null;
         }
         if (list.size() > 1) {
@@ -1315,6 +1348,38 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     private String formatFactoryYearMonth(String factoryName, int year, int month) {
         String yearMonthText = String.format("%04d-%02d", year, month);
         return String.format("工厂【%s】 计划月份【%s】", factoryName, yearMonthText);
+    }
+
+    /**
+     * 判断指定年月是否为主月（排程目标日所在月）。
+     * <p>无法确定排程目标日时按主月从严处理，保持原有中断口径。</p>
+     *
+     * @param context 排程上下文
+     * @param year    年份
+     * @param month   月份（1-12）
+     * @return true-主月，false-非主月
+     */
+    private boolean isPrimaryPlanMonth(LhScheduleContext context, int year, int month) {
+        Date targetDate = context.getScheduleTargetDate();
+        if (Objects.isNull(targetDate)) {
+            return true;
+        }
+        Calendar calendar = Calendar.getInstance();
+        calendar.setTime(targetDate);
+        return calendar.get(Calendar.YEAR) == year && calendar.get(Calendar.MONTH) + 1 == month;
+    }
+
+    /**
+     * 构建定稿数据缺失提示信息，输出如"没有2026年09月定稿数据，请提前定稿"。
+     * <p>按业务要求提示文案固定为中文硬编码，不走国际化配置。</p>
+     *
+     * @param year  年份
+     * @param month 月份（1-12）
+     * @return 提示信息
+     */
+    private String buildFinalVersionMissingMessage(int year, int month) {
+        // 月份按两位补零，保证输出"2026年09月"格式
+        return String.format("没有%d年%02d月定稿数据，请提前定稿", year, month);
     }
 
     /**
@@ -1418,6 +1483,8 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
 
     /**
      * 查询指定月份月生产计划。
+     * <p>该月排产版本为空时：主月（排程目标日所在月）保持中断口径；
+     * 跨月相邻月（如下月未定稿）跳过加载按无数据处理，不阻断本月排产。</p>
      *
      * @param context     排程上下文
      * @param factoryCode 工厂编码
@@ -1432,9 +1499,16 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         String locationText = formatFactoryYearMonth(context.getFactoryDisplayName(), year, month);
         String productionVersion = resolveProductionVersion(context, year, month);
         if (StringUtils.isEmpty(productionVersion)) {
-            log.error("月生产计划加载失败，排产版本为空, factoryCode: {}, year: {}, month: {}",
+            // 主月排产版本缺失必须中断，保持原有口径
+            if (this.isPrimaryPlanMonth(context, year, month)) {
+                log.error("月生产计划加载失败，排产版本为空, factoryCode: {}, year: {}, month: {}",
+                        factoryCode, year, month);
+                interruptByDataIncomplete(context, String.format("%s 的定稿排产版本为空", locationText));
+                return new ArrayList<FactoryMonthPlanProductionFinalResult>(0);
+            }
+            // 跨月相邻月（如下月）未定稿：不阻断本月排产，该月月计划按无数据处理
+            log.warn("月生产计划跳过加载，排产版本为空, factoryCode: {}, year: {}, month: {}",
                     factoryCode, year, month);
-            interruptByDataIncomplete(context, String.format("%s 的定稿排产版本为空", locationText));
             return new ArrayList<FactoryMonthPlanProductionFinalResult>(0);
         }
         // 同一排产版本下可能同时存在原始需求版本和调整需求版本，不能用 MONTH_PLAN_VERSION 过滤。
