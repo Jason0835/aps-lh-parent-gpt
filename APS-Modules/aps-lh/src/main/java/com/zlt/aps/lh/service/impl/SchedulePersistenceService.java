@@ -9,6 +9,7 @@ import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.entity.LhUnscheduledResult;
 import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
 import com.zlt.aps.lh.api.enums.ScheduleStepEnum;
+import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.exception.ScheduleErrorCode;
@@ -74,6 +75,12 @@ public class SchedulePersistenceService {
 
     /** 胎胚收尾班次原因分析备注 */
     private static final String EMBRYO_ENDING_ANALYSIS = "胎胚收尾";
+
+    /** 月计划定稿备注模具号前缀：仅备注以该前缀开头时同步到新增排产结果 */
+    private static final String MOULD_NO_REMARK_PREFIX = "模具号";
+
+    /** 结果备注追加分隔符，与提前生产备注追加口径一致 */
+    private static final String REMARK_SEPARATOR = "；";
 
     @Resource
     private LhScheduleResultMapper scheduleResultMapper;
@@ -173,6 +180,8 @@ public class SchedulePersistenceService {
             fillMachineCountRange(context, context.getScheduleResultList());
             // 按来源 SKU 的月计划 productionType 原值回填结果
             fillProductionType(context, context.getScheduleResultList());
+            // 为新增排产SKU结果行追加月计划定稿"模具号"开头备注
+            fillNewSpecMonthPlanRemark(context, context.getScheduleResultList());
             scheduleResultMapper.insertBatch(context.getScheduleResultList());
         }
         if (!context.getUnscheduledResultList().isEmpty()) {
@@ -733,6 +742,60 @@ public class SchedulePersistenceService {
             if (StringUtils.isNotEmpty(sourceSku.getProductionType())) {
                 result.setProductionType(sourceSku.getProductionType());
             }
+        }
+    }
+
+    /**
+     * 保存前为新增排产SKU结果行追加月计划定稿"模具号"开头备注。
+     *
+     * <p>按来源SKU维度过滤：来源SKU排程类型为02（新增，含新增补偿SKU）的全部结果行
+     * （含同链路被改写为03换活字块、01续作复用的行）都同步月计划定稿表备注；
+     * 续作SKU结果行不追加。月计划备注不以"模具号"开头或结果行已包含该片段时跳过，
+     * 保证滚动排程重复执行不重复追加。</p>
+     *
+     * @param context 排程上下文
+     * @param scheduleResults 排程结果列表
+     */
+    private void fillNewSpecMonthPlanRemark(LhScheduleContext context,
+                                            List<LhScheduleResult> scheduleResults) {
+        if (Objects.isNull(context) || CollectionUtils.isEmpty(scheduleResults)
+                || CollectionUtils.isEmpty(context.getScheduleResultSourceSkuMap())) {
+            return;
+        }
+        Map<LhScheduleResult, SkuScheduleDTO> sourceSkuMap = context.getScheduleResultSourceSkuMap();
+        for (LhScheduleResult result : scheduleResults) {
+            if (Objects.isNull(result)) {
+                continue;
+            }
+            // 仅新增排产SKU（含新增补偿SKU）的结果行同步月计划备注
+            SkuScheduleDTO sourceSku = sourceSkuMap.get(result);
+            if (Objects.isNull(sourceSku)
+                    || !StringUtils.equals(ScheduleTypeEnum.NEW_SPEC.getCode(), sourceSku.getScheduleType())) {
+                continue;
+            }
+            // 月计划定稿备注必须以"模具号"开头才同步
+            String monthPlanRemark = StringUtils.trim(sourceSku.getMonthPlanRemark());
+            if (StringUtils.isEmpty(monthPlanRemark)
+                    || !monthPlanRemark.startsWith(MOULD_NO_REMARK_PREFIX)) {
+                continue;
+            }
+            // 结果行已包含同片段时跳过，避免滚动/重复排程重复追加
+            if (StringUtils.contains(result.getRemark(), monthPlanRemark)) {
+                continue;
+            }
+            if (StringUtils.isEmpty(result.getRemark())) {
+                result.setRemark(monthPlanRemark);
+            } else {
+                String oldRemark = result.getRemark();
+                result.setRemark(new StringBuilder(oldRemark.length() + REMARK_SEPARATOR.length() + monthPlanRemark.length())
+                        .append(oldRemark).append(REMARK_SEPARATOR).append(monthPlanRemark).toString());
+            }
+            log.info("新增排产SKU结果追加月计划定稿备注, factoryCode: {}, batchNo: {}, scheduleDate: {}, "
+                            + "materialCode: {}, productStatus: {}, machineCode: {}, remark: {}",
+                    context.getFactoryCode(), context.getBatchNo(),
+                    LhScheduleTimeUtil.formatDate(result.getScheduleDate()),
+                    result.getMaterialCode(), result.getProductStatus(), result.getLhMachineCode(),
+                    result.getRemark());
         }
     }
 

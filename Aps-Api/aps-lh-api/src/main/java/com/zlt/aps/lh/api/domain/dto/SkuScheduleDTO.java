@@ -230,6 +230,8 @@ public class SkuScheduleDTO {
     private Integer monthPlanYear;
     /** 月计划所属月份（来自月计划 FactoryMonthPlanProductionFinalResult.month），用于SKU减量清单按年月精确匹配 */
     private Integer monthPlanMonth;
+    /** 月计划定稿表备注（来自月计划 FactoryMonthPlanProductionFinalResult.remark），S4.6 保存前为新增排产SKU结果追加"模具号"开头备注 */
+    private String monthPlanRemark;
 
     /**
      * 解析本轮排产目标量。

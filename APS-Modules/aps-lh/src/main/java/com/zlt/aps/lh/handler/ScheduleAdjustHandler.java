@@ -1346,6 +1346,8 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         // 月计划所属年月（来自月计划），用于SKU减量清单按年月精确匹配
         dto.setMonthPlanYear(targetMonthPlan.getYear());
         dto.setMonthPlanMonth(targetMonthPlan.getMonth());
+        // 月计划定稿表备注，供 S4.6 保存前为新增排产SKU结果追加"模具号"开头备注
+        dto.setMonthPlanRemark(targetMonthPlan.getRemark());
 
         // 试制SKU严格限制目标量，不允许超出dayN补满班次；量试/正规仍可按后续策略补满可用班次。
         if (StringUtils.equals(ConstructionStageEnum.TRIAL.getCode(), dto.getConstructionStage())) {
