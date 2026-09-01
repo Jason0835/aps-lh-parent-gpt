@@ -151,10 +151,12 @@ public class TargetScheduleQtyResolver {
             return Math.max(0, oldQty);
         }
         ledgerMap.put(skuKey, initialQty);
-        log.info("SKU实际消费账本初始化, materialCode: {}, productStatus: {}, reason: {}, surplusQty: {}, targetQty: {}, strictTargetQty: {}, ledgerQty: {}",
+        log.info("SKU实际消费账本初始化, materialCode: {}, productStatus: {}, reason: {}, surplusQty: {}, "
+                        + "targetQty: {}, strictTargetQty: {}, ledgerBasis: {}, ledgerQty: {}",
                 sku.getMaterialCode(), sku.getProductStatus(), reason,
                 Math.max(0, sku.getSurplusQty()), Math.max(0, targetQty),
-                sku.isStrictTargetQty(), initialQty);
+                sku.isStrictTargetQty(), shouldUseTargetQtyAsProductionLedger(sku) ? "业务目标量" : "硫化余量优先",
+                initialQty);
         return initialQty;
     }
 
@@ -217,6 +219,35 @@ public class TargetScheduleQtyResolver {
                         + "原账本目标: {}, 原账本剩余: {}, 已消费: {}, 新账本目标: {}, 同步后剩余: {}",
                 sku.getMaterialCode(), sku.getProductStatus(), reason, oldTargetQty,
                 oldRemainingQtyValue, consumedQty, resolvedTargetQty, synchronizedRemainingQty);
+        return synchronizedRemainingQty;
+    }
+
+    /**
+     * 统一应用 SKU 目标量并同步实际消费账本。
+     * <p>排产策略重新计算目标量时，必须同时更新 DTO 目标量、DTO 剩余量和上下文消费账本，
+     * 避免后续结果收敛仍按旧账本把有效计划裁剪为0。账本同步会保留同一物料和产品状态已经
+     * 消费的数量，因此重复进入续作、收尾或新增阶段时不会把已排数量重新加回。</p>
+     * <p>{@code pendingQty} 属于各排产场景的待排队列口径，由调用方按业务语义单独维护，
+     * 本方法不修改该字段。</p>
+     *
+     * @param context 排程上下文
+     * @param sku SKU
+     * @param targetQty 新目标量
+     * @param reason 同步原因
+     * @return 保留已消费量后的实际剩余量
+     */
+    public int applyProductionTargetState(LhScheduleContext context,
+                                          SkuScheduleDTO sku,
+                                          int targetQty,
+                                          String reason) {
+        int resolvedTargetQty = Math.max(0, targetQty);
+        if (Objects.isNull(sku)) {
+            return resolvedTargetQty;
+        }
+        sku.setTargetScheduleQty(resolvedTargetQty);
+        int synchronizedRemainingQty = this.syncProductionRemainingQtyToTarget(
+                context, sku, resolvedTargetQty, reason);
+        sku.setRemainingScheduleQty(synchronizedRemainingQty);
         return synchronizedRemainingQty;
     }
 
@@ -550,7 +581,7 @@ public class TargetScheduleQtyResolver {
         sku.setEmbryoStock(originalEmbryoStock);
         sku.setStrictTargetQty(true);
         sku.setTargetScheduleQty(targetQty);
-        syncEndingDailyQuotaToTargetQty(sku, targetQty, windowRemainingPlanQty);
+        syncEndingDailyQuotaToTargetQty(context, sku, targetQty, windowRemainingPlanQty);
         int remainingQty = syncEmbryoStockEndingProductionRemainingQty(context, sku, targetQty);
         int ledgerRemainQty = Objects.isNull(ledger) ? NO_EMBRYO_STOCK_LEDGER_LIMIT : Math.max(0, ledger.getRemainQty());
         sku.setRemainingScheduleQty(ledgerRemainQty < 0 ? remainingQty : Math.min(remainingQty, ledgerRemainQty));
@@ -807,7 +838,8 @@ public class TargetScheduleQtyResolver {
         sku.setEmbryoStock(resolvedOriginalStock);
         sku.setStrictTargetQty(true);
         sku.setTargetScheduleQty(resolvedQuotaQty);
-        syncEndingDailyQuotaToTargetQty(sku, resolvedQuotaQty, Math.max(0, sku.getWindowRemainingPlanQty()));
+        syncEndingDailyQuotaToTargetQty(
+                context, sku, resolvedQuotaQty, Math.max(0, sku.getWindowRemainingPlanQty()));
         int remainingQty = syncEmbryoStockEndingProductionRemainingQty(context, sku, resolvedQuotaQty);
         int ledgerRemainQty = resolveEmbryoStockLedgerRemainingQty(context, sku);
         sku.setRemainingScheduleQty(ledgerRemainQty < 0 ? remainingQty : Math.min(remainingQty, ledgerRemainQty));
@@ -1226,7 +1258,12 @@ public class TargetScheduleQtyResolver {
         if (Objects.isNull(sku)) {
             return false;
         }
-        return StringUtils.equals(SkuTagEnum.ENDING.getCode(), sku.getSkuTag())
+        /*
+         * skuTag=ENDING 是S4.3预期收尾及排序标签，不代表当前真实机台窗口已经能够完成收尾。
+         * 只有明确进入严格目标场景时才按业务目标量初始化账本；真实收尾会先设置严格标识，
+         * 再通过 applyProductionTargetState 统一同步目标和剩余额度。
+         */
+        return sku.isStrictTargetQty()
                 || StringUtils.equals(ConstructionStageEnum.TRIAL.getCode(), sku.getConstructionStage())
                 || sku.isStrictNewSpecShortageOnly();
     }
@@ -1554,8 +1591,8 @@ public class TargetScheduleQtyResolver {
                 switchStartTime, mouldChangeCompleteTime)
                 : mouldChangeCompleteTime;
         /*
-         * 目标量预演与最终排产共用维修后预热完成时刻：非试制SKU不会在
-         * resolveTrialProductionStartTime 内主动抬高开产点，因此这里先显式取现有开产点与维修恢复点的较晚值，
+         * 目标量预演与最终排产共用维修后预热完成时刻：正规、小批量不会在
+         * 试制/量试中班门禁方法内主动抬高开产点，因此这里先显式取现有开产点与维修恢复点的较晚值，
          * 避免预演仍从维修或预热区间开始累计产能。
          */
         Date repairAdjustedProductionStartTime = plannedRepairAffectingSwitch
@@ -1599,12 +1636,15 @@ public class TargetScheduleQtyResolver {
         FirstInspectionAllocationPlan firstInspectionAllocationPlan =
                 FirstInspectionAllocationUtil.buildPlan(
                         context, sku, inspectionShifts, mouldChangeCompleteTime,
+                        productionStartTime,
                         shiftCapacity, Math.max(sku.resolveTargetScheduleQty(), shiftCapacity),
                         scheduleType, machine.getMachineCode(), null);
         Map<Integer, Integer> firstInspectionQtyMap =
                 FirstInspectionAllocationUtil.toShiftQtyMap(firstInspectionAllocationPlan);
         boolean crossShiftInspection = firstInspectionAllocationPlan.isValid()
                 && firstInspectionAllocationPlan.getInspectionQty() > 0;
+        cursorStartTime = FirstInspectionQtyUtil.resolveProductionStartAfterFirstInspection(
+                sku, scheduleType, cursorStartTime, firstInspectionAllocationPlan);
         int firstInspectionQty = crossShiftInspection
                 ? firstInspectionAllocationPlan.getInspectionQty()
                 : FirstInspectionQtyUtil.resolvePreviewFirstInspectionQty(
@@ -1768,7 +1808,17 @@ public class TargetScheduleQtyResolver {
             log.warn("机台匹配策略未注入，无法计算多机台合计产能, materialCode: {}", sku.getMaterialCode());
             return 0;
         }
-        List<MachineScheduleDTO> candidates = matchStrategy.matchMachines(context, sku);
+        /*
+         * 收尾产能计算会反复调用正向选机，但该调用只消费候选集合与排序结果，不属于最终选机决策。
+         * 静默优先级明细日志，避免 Machine×SKU 试算把完整候选排序文本重复写入应用日志。
+         */
+        context.enterPriorityTraceMuteScope();
+        List<MachineScheduleDTO> candidates;
+        try {
+            candidates = matchStrategy.matchMachines(context, sku);
+        } finally {
+            context.exitPriorityTraceMuteScope();
+        }
         if (CollectionUtils.isEmpty(candidates)) {
             log.debug("SKU无候选机台，多机台合计产能为0, materialCode: {}", sku.getMaterialCode());
             return 0;
@@ -1782,8 +1832,10 @@ public class TargetScheduleQtyResolver {
             int machineCapacity = calculateMachineAvailableCapacityInWindow(context, sku, machine, shifts);
             totalCapacity += machineCapacity;
         }
-        log.debug("SKU多机台合计产能计算完成, materialCode: {}, 候选机台数: {}, 合计产能: {}",
-                sku.getMaterialCode(), candidates.size(), totalCapacity);
+        if (!context.isNewSpecProposalPreview()) {
+            log.debug("SKU多机台合计产能计算完成, materialCode: {}, 候选机台数: {}, 合计产能: {}",
+                    sku.getMaterialCode(), candidates.size(), totalCapacity);
+        }
         return totalCapacity;
     }
 
@@ -2521,6 +2573,13 @@ public class TargetScheduleQtyResolver {
             sku.setStrictTargetQty(true);
             sku.setTargetScheduleQty(earlyProductionTargetQty);
             sku.setRemainingScheduleQty(runtimeRemainingQty);
+            /*
+             * future-only 场景同样必须让严格收尾目标与提前生产有效账本一致；这里只补齐
+             * dayN 运行账本，不重置已经扣减的 SKU 实际消费账本。
+             */
+            syncEndingDailyQuotaToTargetQty(
+                    context, sku, runtimeRemainingQty,
+                    Math.max(0, sku.getWindowRemainingPlanQty()));
             log.info("提前生产中心目标保留完成, materialCode: {}, productStatus: {}, "
                             + "effectiveTargetQty: {}, runtimeRemainingQty: {}, genericSurplusQty: {}, "
                             + "embryoStock: {}, rule: 普通收尾不得覆盖中心目标",
@@ -2567,10 +2626,8 @@ public class TargetScheduleQtyResolver {
                 activeSkuCount, sharedEmbryo, qtySource,
                 currentTargetQty, endingBaseQty, sku.getMouldQty(), endingTargetQty,
                 windowPlanQty, windowRemainingPlanQty, embryoStock, surplusQty, unscheduledReason);
-        sku.setTargetScheduleQty(endingTargetQty);
-        sku.setRemainingScheduleQty(endingTargetQty);
-        syncEndingDailyQuotaToTargetQty(sku, endingTargetQty, windowRemainingPlanQty);
-        syncProductionRemainingQtyToTarget(context, sku, endingTargetQty, "收尾目标量同步");
+        this.applyProductionTargetState(context, sku, endingTargetQty, "收尾目标量同步");
+        syncEndingDailyQuotaToTargetQty(context, sku, endingTargetQty, windowRemainingPlanQty);
         if (endingTargetQty <= 0) {
             removeActiveEmbryoSku(context, sku, unscheduledReason);
         }
@@ -2582,11 +2639,13 @@ public class TargetScheduleQtyResolver {
      * <p>收尾 SKU 的业务目标不受窗口 dayN 限制；若只上调 targetScheduleQty，
      * 后续新增排产或换活字块按账本消费时仍会被原 dayN 剩余额度回裁。</p>
      *
+     * @param context 排程上下文
      * @param sku 当前收尾 SKU
      * @param endingTargetQty 收尾目标量
      * @param originalWindowRemainingQty 原窗口剩余额度
      */
-    private void syncEndingDailyQuotaToTargetQty(SkuScheduleDTO sku,
+    private void syncEndingDailyQuotaToTargetQty(LhScheduleContext context,
+                                                 SkuScheduleDTO sku,
                                                  int endingTargetQty,
                                                  int originalWindowRemainingQty) {
         if (Objects.isNull(sku) || endingTargetQty <= 0) {
@@ -2594,7 +2653,13 @@ public class TargetScheduleQtyResolver {
         }
         sku.setWindowPlanQty(Math.max(Math.max(0, sku.getWindowPlanQty()), endingTargetQty));
         sku.setWindowRemainingPlanQty(Math.max(Math.max(0, sku.getWindowRemainingPlanQty()), endingTargetQty));
-        Map<LocalDate, SkuDailyPlanQuotaDTO> quotaMap = sku.getDailyPlanQuotaMap();
+        /*
+         * 提前生产激活后，选机、模拟和实际扣账统一读取临时前移账本。收尾清量也必须同步
+         * 同一份有效账本；若仍只修改 SKU 原始账本，严格收尾会被未来 dayN 小额额度回裁，
+         * 出现“硫化余量尚未排完但当前机台提前下机”的账本分裂。
+         */
+        Map<LocalDate, SkuDailyPlanQuotaDTO> quotaMap = Objects.isNull(context)
+                ? sku.getDailyPlanQuotaMap() : context.resolveEffectiveDailyPlanQuotaMap(sku);
         if (CollectionUtils.isEmpty(quotaMap)) {
             return;
         }
@@ -2622,10 +2687,12 @@ public class TargetScheduleQtyResolver {
         quota.setRemainingQty(Math.max(0, quota.getRemainingQty()) + appendQty);
         quota.setCompleted(false);
         SkuDailyPlanQuotaUtil.refreshRollingFields(quotaMap);
+        String quotaSource = quotaMap == sku.getDailyPlanQuotaMap()
+                ? "SKU原始运行账本" : "提前生产有效运行账本";
         log.info("收尾SKU日计划账本同步, materialCode: {}, targetQty: {}, 原窗口剩余: {}, "
-                        + "原账本剩余: {}, 补齐量: {}, 同步日期: {}",
+                        + "原账本剩余: {}, 补齐量: {}, 同步日期: {}, 账本来源: {}",
                 sku.getMaterialCode(), endingTargetQty, originalWindowRemainingQty,
-                currentRemainingQty, appendQty, firstEntry.getKey());
+                currentRemainingQty, appendQty, firstEntry.getKey(), quotaSource);
     }
 
     /**

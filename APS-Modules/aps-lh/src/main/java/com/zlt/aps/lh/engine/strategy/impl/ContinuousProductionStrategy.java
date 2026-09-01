@@ -226,7 +226,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                     DailyMachineExpansionPlanner.prepareShortageQuota(context, sku, "续作排产");
             boolean embryoStockEnding = getTargetScheduleQtyResolver().isEmbryoStockEnding(context, sku);
             if (!embryoStockEnding && shouldReleaseWindowNoPlanContinuousSku(sku, shortageQuotaPlan)) {
-                // 当前窗口没有日计划且无本月历史欠产时，不提前消耗远期计划，释放机台给换活字块/新增。
+                // 当前窗口没有日计划、历史欠产和硫化余量时，释放机台给换活字块/新增。
                 appendWindowNoPlanContinuousUnscheduledResult(context, sku);
                 registerReleasedContinuousMachine(context, machineCode, sku.getMaterialCode(), "窗口内无日计划");
                 log.info("续作SKU当前窗口无日计划量，释放续作机台给换模/新增排产, materialCode: {}, "
@@ -257,13 +257,13 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             if (shortageQuotaPlan.isForceEndingByNoFuturePlan()) {
                 isEnding = true;
                 if (!embryoStockEnding) {
-                    applyContinuousNoFutureEndingStrictTarget(sku, shortageQuotaPlan);
+                    this.applyContinuousNoFutureEndingStrictTarget(context, sku, shortageQuotaPlan);
                 }
             } else if (sku.isStrictNewSpecShortageOnly()) {
                 isEnding = false;
             }
             if (shouldSkipSmallEndingSurplusContinuousConsideringEmbryoEnding(context, sku, isEnding)) {
-                // 收尾小余量 + 前日 T+1 夜班未排满不排产：释放原续作机台给换活字块/新增链路。
+                // 收尾小余量未命中比例豁免且前日T+1夜班未排满：释放原续作机台给换活字块/新增链路。
                 appendSmallEndingSurplusUnscheduledResult(context, sku);
                 registerReleasedContinuousMachine(context, machineCode, sku.getMaterialCode(),
                         "收尾小余量且前日T+1夜班未排满不排产");
@@ -419,8 +419,9 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         } else if (isSingleMachine && sku.isStrictNewSpecShortageOnly()) {
             appliedRule = "窗口无计划仅补本月欠产";
         } else if (isSingleMachine && getTargetScheduleQtyResolver().isFullCapacityMode(context)) {
-            sku.setTargetScheduleQty(windowCapacityQty);
-            sku.setRemainingScheduleQty(windowCapacityQty);
+            // 单机台目标量与实际消费账本必须原子同步，避免跨月路由清零账本后生成的续作结果被再次裁成0。
+            this.getTargetScheduleQtyResolver().applyProductionTargetState(
+                    context, sku, windowCapacityQty, "续作单机台满排窗口目标");
             appliedRule = "单机台非收尾满排窗口";
         } else if (!isSingleMachine) {
             appliedRule = "多机台沿用原规则";
@@ -639,10 +640,12 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
     /**
      * 续作窗口及月底均无日计划时，按硫化余量严格控制收尾目标。
      *
+     * @param context 排程上下文
      * @param sku 续作SKU
      * @param shortageQuotaPlan 欠产账本准备结果
      */
-    private void applyContinuousNoFutureEndingStrictTarget(SkuScheduleDTO sku,
+    private void applyContinuousNoFutureEndingStrictTarget(LhScheduleContext context,
+                                                           SkuScheduleDTO sku,
                                                            DailyMachineShortageQuotaPlan shortageQuotaPlan) {
         if (sku == null || shortageQuotaPlan == null || !shortageQuotaPlan.isForceEndingByNoFuturePlan()) {
             return;
@@ -656,8 +659,9 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         int strictTargetQty = ShiftCapacityResolverUtil.roundUpQtyToMouldMultiple(
                 Math.max(0, sku.getSurplusQty()), sku.getMouldQty());
         sku.setStrictTargetQty(true);
-        sku.setTargetScheduleQty(strictTargetQty);
-        sku.setRemainingScheduleQty(strictTargetQty);
+        // 严格收尾目标与实际消费账本统一同步，防止旧账本继续限制本轮真实清尾量。
+        this.getTargetScheduleQtyResolver().applyProductionTargetState(
+                context, sku, strictTargetQty, "续作窗口及月底无计划严格收尾目标");
         sku.setWindowPlanQty(strictTargetQty);
         sku.setWindowRemainingPlanQty(strictTargetQty);
         log.info("续作窗口及月底均无日计划，按硫化余量严格控量并同步收尾状态, materialCode: {}, "
@@ -1632,6 +1636,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                         originalPendingQty,
                         remainingGroupTargetQty);
                 specialSku.setScheduleType(CONTINUOUS_SCHEDULE_TYPE);
+                // 同状态多个 DTO 已在组级账本统一同步，这里只拆分对象内目标，禁止逐对象重置共享消费账本。
                 specialSku.setTargetScheduleQty(skuTargetQty);
                 specialSku.setPendingQty(skuTargetQty);
                 specialSku.setRemainingScheduleQty(skuTargetQty);
@@ -2860,10 +2865,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             ruleName = "非收尾多机台满排窗口产能";
         }
         if (floorTargetQty > currentTargetQty) {
-            // 抬高目标量必须同步覆盖实际消费账本，否则后续 capResultByProductionRemainingQty 仍按旧账本裁剪。
-            sourceSku.setTargetScheduleQty(floorTargetQty);
-            sourceSku.setRemainingScheduleQty(floorTargetQty);
-            getTargetScheduleQtyResolver().syncProductionRemainingQtyToTarget(
+            // 多机台目标量与账本统一更新，并把保留已消费量后的真实剩余回写 DTO。
+            this.getTargetScheduleQtyResolver().applyProductionTargetState(
                     context, sourceSku, floorTargetQty, "续作多机台目标量下限");
         }
         log.info("续作多机台目标量下限同步, materialCode: {}, productStatus: {}, 原目标量: {}, 下限目标量: {}, "
@@ -2917,7 +2920,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
      *
      * @param sku 续作SKU
      * @param shortageQuotaPlan 欠产账本准备结果
-     * @return true-无本月历史欠产且不应在当前窗口续作，释放机台；false-继续排历史欠产或清尾余量
+     * @return true-无本月历史欠产和硫化余量，释放机台；false-继续排历史欠产或清尾余量
      */
     private boolean shouldReleaseWindowNoPlanContinuousSku(
             SkuScheduleDTO sku, DailyMachineShortageQuotaPlan shortageQuotaPlan) {
@@ -2925,8 +2928,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                 && Objects.nonNull(shortageQuotaPlan)
                 && shortageQuotaPlan.isNoWindowPlan()
                 && Math.max(0, shortageQuotaPlan.getHistoryShortageQty()) <= 0
-                && (Math.max(0, sku.getSurplusQty()) <= 0
-                || Math.max(0, shortageQuotaPlan.getFutureMonthPlanQtyAfterWindow()) > 0);
+                && Math.max(0, sku.getSurplusQty()) <= 0;
     }
 
     /**
@@ -2942,7 +2944,6 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                 && Objects.nonNull(shortageQuotaPlan)
                 && shortageQuotaPlan.isNoWindowPlan()
                 && Math.max(0, shortageQuotaPlan.getHistoryShortageQty()) <= 0
-                && Math.max(0, shortageQuotaPlan.getFutureMonthPlanQtyAfterWindow()) <= 0
                 && Math.max(0, sku.getSurplusQty()) > 0;
     }
 
@@ -2972,8 +2973,9 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
     /**
      * 判断续作收尾小余量是否允许本次不排产。
      *
-     * <p>这是“收尾小余量 + 前日 T+1 夜班未排满”的特殊不排产规则；
-     * 非收尾 SKU、余量大于参数值或前日 T+1 夜班已排满时继续沿用原收尾排产规则。</p>
+     * <p>这是“收尾小余量 + 比例未豁免 + 前日 T+1 夜班未排满”的特殊不排产规则；
+     * 非收尾SKU、余量大于参数值、余量占原始TOTAL_QTY达到比例阈值或前日T+1夜班已排满时，
+     * 继续沿用原收尾排产规则。</p>
      *
      * @param context 排程上下文
      * @param sku 续作SKU
@@ -3341,6 +3343,9 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             builder.append(machineCode)
                     .append("(在机模具=")
                     .append(StringUtils.defaultString(LhMouldCodeUtil.resolveInMachineMouldCode(context, machineCode)))
+                    .append(Objects.nonNull(sourceSku) ? ",优先续作前缀=" : "")
+                    .append(Objects.nonNull(sourceSku)
+                            ? String.valueOf(isPriorityContinuationMachine(context, result)) : "")
                     .append(",模具共用性=")
                     .append(resolveMachineMouldSharedSkuCount(context, result, mouldSharedSkuCountMap))
                     .append(Objects.nonNull(sourceSku) ? ",有效清洗计划=" : "")
@@ -3634,7 +3639,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                 buildSingleMachineReducedContinuationKey(sourceSku));
         log.info("续作收尾单机降模完成, materialCode: {}, 保留机台: {}, 下机机台: {}, historyShortageQty: {}, "
                         + "threshold: {}, firstDayPlanQty: {}, keptMachineCapacity: {}, materialAvailableQty: {}, "
-                        + "保留规则: 模具共用性按当前SKU月计划条件启用，再按清洗计划、胶囊最大使用次数和机台编码排序",
+                        + "保留规则: 优先续作机台前缀优先，再按模具共用性、清洗计划、胶囊最大使用次数和机台编码排序",
                 sourceSku.getMaterialCode(), keptResult.getLhMachineCode(), joinMachineCodes(removedResults),
                 historyShortageQty, threshold, firstDayPlanQty, keptMachineCapacity, materialAvailableQty);
         return true;
@@ -4512,9 +4517,10 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
 
     /**
      * 构建续作降模专用保留排序。
-     * <p>保留顺序与下机顺序严格反向：先保留“关联且未来有计划的其他 SKU”较少的模具所在机台；
-     * 随后保留无有效清洗计划、胶囊使用次数较多、机台编码较小的机台。当前续作 SKU 本身不计入
-     * 共用性；所有候选均没有可计数的关联 SKU 时，共用性比较自然相等，直接从清洗计划开始比较。</p>
+     * <p>保留顺序与下机顺序严格反向：先保留命中优先续作前缀的机台，再保留“关联且未来有计划的
+     * 其他 SKU”较少的模具所在机台；随后保留无有效清洗计划、胶囊使用次数较多、机台编码较小的
+     * 机台。当前续作 SKU 本身不计入共用性；所有候选均没有可计数的关联 SKU 时，共用性比较
+     * 自然相等，直接从清洗计划开始比较。</p>
      *
      * @param context 排程上下文
      * @param sourceSku 当前续作SKU
@@ -4524,7 +4530,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                                                                                 SkuScheduleDTO sourceSku) {
         Map<String, Integer> mouldSharedSkuCountMap = buildFuturePlanMouldSharedSkuCountMap(context, sourceSku);
         return Comparator
-                .comparingInt((LhScheduleResult result) ->
+                .comparingInt((LhScheduleResult result) -> isPriorityContinuationMachine(context, result) ? 0 : 1)
+                .thenComparingInt(result ->
                         resolveMachineMouldSharedSkuCount(context, result, mouldSharedSkuCountMap))
                 .thenComparingInt(result -> hasValidCleaningPlanForMachine(context, result) ? 1 : 0)
                 .thenComparingInt(result -> -resolveCapsuleUsageCount(context, result))
@@ -4533,8 +4540,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
 
     /**
      * 构建续作降模专用下机排序。
-     * <p>只有上一层级完全相同时才比较下一层级：关联且未来有计划的其他 SKU 数量降序、
-     * 有清洗计划优先、胶囊最大使用次数升序、机台编码降序。</p>
+     * <p>只有上一层级完全相同时才比较下一层级：未命中优先续作前缀的机台优先、关联且未来有计划的
+     * 其他 SKU 数量降序、有清洗计划优先、胶囊最大使用次数升序、机台编码降序。</p>
      *
      * @param context 排程上下文
      * @param sourceSku 当前续作SKU
@@ -4544,12 +4551,27 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                                                                                   SkuScheduleDTO sourceSku) {
         Map<String, Integer> mouldSharedSkuCountMap = buildFuturePlanMouldSharedSkuCountMap(context, sourceSku);
         return Comparator
-                .comparingInt((LhScheduleResult result) ->
+                .comparingInt((LhScheduleResult result) -> isPriorityContinuationMachine(context, result) ? 1 : 0)
+                .thenComparingInt(result ->
                         -resolveMachineMouldSharedSkuCount(context, result, mouldSharedSkuCountMap))
                 .thenComparingInt(result -> hasValidCleaningPlanForMachine(context, result) ? 0 : 1)
                 .thenComparingInt(result -> resolveCapsuleUsageCount(context, result))
                 .thenComparing(Comparator.comparing(
                         (LhScheduleResult result) -> StringUtils.defaultString(result.getLhMachineCode())).reversed());
+    }
+
+    /**
+     * 判断续作机台是否命中优先保留前缀。
+     *
+     * @param context 排程上下文
+     * @param result 续作排程结果
+     * @return true-命中参数配置前缀；false-按原降模优先级排序
+     */
+    private boolean isPriorityContinuationMachine(LhScheduleContext context, LhScheduleResult result) {
+        return Objects.nonNull(context)
+                && Objects.nonNull(context.getScheduleConfig())
+                && Objects.nonNull(result)
+                && context.getScheduleConfig().isPriorityContinuationMachine(result.getLhMachineCode());
     }
 
     /**
@@ -4778,9 +4800,13 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             }
         }
         log.info("续作降模下机排序条件, materialCode: {}, productStatus: {}, T日: {}, 月末: {}, "
-                        + "未来有计划的其他关联SKU: {}, 关联SKU数量: {}, 有效清洗机台: {}, "
-                        + "排序规则: 未来计划关联SKU模具共用性->清洗计划->胶囊最大使用次数->机台编码",
+                        + "优先续作机台前缀: {}, 未来有计划的其他关联SKU: {}, 关联SKU数量: {}, "
+                        + "有效清洗机台: {}, 排序规则: 优先续作机台前缀->未来计划关联SKU模具共用性"
+                        + "->清洗计划->胶囊最大使用次数->机台编码",
                 sourceSku.getMaterialCode(), sourceSku.getProductStatus(), scheduleDate, monthEndDate,
+                Objects.nonNull(context.getScheduleConfig())
+                        ? StringUtils.join(context.getScheduleConfig()
+                        .getPriorityContinuationMachinePrefixSet(), ",") : "",
                 StringUtils.join(futurePlanRelatedMaterialCodeSet, ","), futurePlanRelatedMaterialCodeSet.size(),
                 joinMachineCodes(cleaningResults));
     }
@@ -5816,7 +5842,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             }
         }
         log.info("续作多机台降模结果, materialCode: {}, 原始机台: {}, 保留机台: {}, 下机机台: {}, 原始机台明细: {}, "
-                        + "保留机台明细: {}, 下机机台明细: {}, 原因: dayN保障量={}，按未来计划关联SKU模具共用性、清洗计划、胶囊最大使用次数和机台编码排序",
+                        + "保留机台明细: {}, 下机机台明细: {}, 原因: dayN保障量={}，按优先续作机台前缀、"
+                        + "未来计划关联SKU模具共用性、清洗计划、胶囊最大使用次数和机台编码排序",
                 sourceSku.getMaterialCode(), joinMachineCodes(skuResults), joinMachineCodes(keptResults),
                 joinMachineCodes(removedResults), formatContinuationMachineDetails(context, sourceSku, skuResults, capacityMap),
                 formatContinuationMachineDetails(context, sourceSku, keptResults, capacityMap),
@@ -6193,7 +6220,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         }
         log.info("续作多机台降模结果, materialCode: {}, 日期: {}, 原始机台: {}, 保留机台: {}, 当日补量下机机台: {}, 下机机台: {}, 原始机台明细: {}, "
                         + "保留机台明细: {}, 下机机台明细: {}, 原因: dayN保障量={}，当日生效目标量={}，剩余窗口目标量={}，"
-                        + "是否按日标准机台数决策={}，按未来计划关联SKU模具共用性、清洗计划、胶囊最大使用次数和机台编码排序",
+                        + "是否按日标准机台数决策={}，按优先续作机台前缀、未来计划关联SKU模具共用性、"
+                        + "清洗计划、胶囊最大使用次数和机台编码排序",
                 sourceSku.getMaterialCode(), productionDate, joinMachineCodes(activeResults), joinMachineCodes(keptResults),
                 joinMachineCodes(supplementResults), joinMachineCodes(removedResults),
                 formatContinuationMachineDetails(context, sourceSku, activeResults, capacityMap),
@@ -9068,6 +9096,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         int lhTimeSeconds = result.getLhTime() != null ? result.getLhTime() : 0;
         int mouldQty = ShiftCapacityResolverUtil.resolveMachineMouldQty(
                 result.getMouldQty() != null ? result.getMouldQty() : 0);
+        synchronizeMissingShiftEndTimes(context, result, shifts, lhTimeSeconds, mouldQty);
         Date specEndTime = calcSpecEndTime(context, result, shifts, lhTimeSeconds, mouldQty, "1".equals(result.getIsEnd()));
         if (specEndTime == null) {
             // 非收尾结果也要保留可推导完工时刻，避免后续校验出现 specEndTime 缺失。
@@ -9079,6 +9108,56 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         if (Objects.nonNull(context)
                 && context.isContinuousStopHoldMachine(result.getLhMachineCode())) {
             extendContinuousStopHoldOccupancyToWindowEnd(context, result, shifts);
+        }
+    }
+
+    /**
+     * 补齐续作后置裁剪后缺失的班次结束时间。
+     *
+     * <p>账本回裁、日标准收敛和目标量收口都会写班次计划量。只要留下正量与开始时间，
+     * 结束时间必须同步保留；这里按当前最终数量重新推导，避免有量无完工边界的数据进入S4.6。</p>
+     *
+     * @param context 排程上下文
+     * @param result 排程结果
+     * @param shifts 排程窗口班次
+     * @param lhTimeSeconds 硫化周期秒数
+     * @param mouldQty 机台模台数
+     */
+    private void synchronizeMissingShiftEndTimes(LhScheduleContext context,
+                                                 LhScheduleResult result,
+                                                 List<LhShiftConfigVO> shifts,
+                                                 int lhTimeSeconds,
+                                                 int mouldQty) {
+        if (Objects.isNull(context) || Objects.isNull(result)
+                || CollectionUtils.isEmpty(shifts)
+                || lhTimeSeconds <= 0 || mouldQty <= 0) {
+            return;
+        }
+        List<MachineCleaningWindowDTO> cleaningWindowList = resolveEffectiveCleaningWindowList(
+                context, result, resolveFirstPlannedShiftStartTime(result));
+        List<MachineMaintenanceWindowDTO> maintenanceWindowList =
+                resolveMachineMaintenanceWindowList(context, result.getLhMachineCode());
+        for (LhShiftConfigVO shift : shifts) {
+            Integer planQty = ShiftFieldUtil.getShiftPlanQty(result, shift.getShiftIndex());
+            Date shiftStartTime = ShiftFieldUtil.getShiftStartTime(result, shift.getShiftIndex());
+            Date shiftEndTime = ShiftFieldUtil.getShiftEndTime(result, shift.getShiftIndex());
+            if (Objects.isNull(planQty) || planQty <= 0
+                    || Objects.isNull(shiftStartTime) || Objects.nonNull(shiftEndTime)) {
+                continue;
+            }
+            long productionSeconds =
+                    (long) Math.ceil((double) planQty / mouldQty) * lhTimeSeconds;
+            Date recalculatedEndTime = ShiftCapacityResolverUtil.resolveCompletionTimeWithDowntimes(
+                    context.getDevicePlanShutList(), cleaningWindowList, maintenanceWindowList,
+                    result.getLhMachineCode(), shiftStartTime, productionSeconds);
+            ShiftFieldUtil.setShiftPlanQty(
+                    result, shift.getShiftIndex(), planQty, shiftStartTime, recalculatedEndTime);
+            log.info("续作排产班次结束时间补齐, batchNo: {}, materialCode: {}, machineCode: {}, "
+                            + "classNo: class{}, planQty: {}, shiftStartTime: {}, shiftEndTime: {}",
+                    context.getBatchNo(), result.getMaterialCode(), result.getLhMachineCode(),
+                    shift.getShiftIndex(), planQty,
+                    LhScheduleTimeUtil.formatDateTime(shiftStartTime),
+                    LhScheduleTimeUtil.formatDateTime(recalculatedEndTime));
         }
     }
 
@@ -9335,7 +9414,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             List<LhScheduleResult> groupResults = entry.getValue();
             SkuScheduleDTO sku = groupSkuMap.get(entry.getKey());
             if (groupResults.size() > 1 && Objects.nonNull(sku)) {
-                // 多机台组内按保留排序（共享数升序、无清洗优先、胶囊次数降序、机台编码升序），
+                // 多机台组内按保留排序（优先续作前缀、共享数升序、无清洗优先、胶囊次数降序、机台编码升序），
                 // 保证账本不足时优先保留降模规则选中的机台。
                 groupResults.sort(buildContinuationReduceKeepComparator(context, sku));
             }
@@ -9636,9 +9715,11 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                                                                   SkuScheduleDTO sourceSku,
                                                                   LocalDate startDate) {
         int activeMachineCount = resolveContinuousMachineCount(context, sourceSku);
+        LocalDate earlyProductionMaxDate = EarlyProductionChecker.resolveEarlyProductionMaxDate(
+                context, null);
         LocalDate firstAddMachineDate = DailyMachineExpansionPlanner.resolveFirstDailyLookAheadAddMachineDate(
                 this.lhDailyMouldCalcService, context, sourceSku, activeMachineCount,
-                ScheduleTypeEnum.CONTINUOUS.getCode(), startDate);
+                ScheduleTypeEnum.CONTINUOUS.getCode(), startDate, earlyProductionMaxDate);
         if (Objects.nonNull(firstAddMachineDate) || !isContinuationForcedShortageMode(context, sourceSku)) {
             return firstAddMachineDate;
         }
@@ -9647,9 +9728,9 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
          * 日期仍按同一套原始 dayN 逐日后看规则计算，避免补偿 SKU 进入 S4.5 后
          * 被已经消费为 0 的日计划剩余额度顺延到更晚日期。
          */
-        firstAddMachineDate = DailyMachineExpansionPlanner.resolveFirstOriginalDayPlanAddMachineDate(
+        firstAddMachineDate = DailyMachineExpansionPlanner.resolveFirstDailyLookAheadAddMachineDate(
                 this.lhDailyMouldCalcService, context, sourceSku, activeMachineCount,
-                ScheduleTypeEnum.CONTINUOUS.getCode(), startDate);
+                ScheduleTypeEnum.CONTINUOUS.getCode(), startDate, earlyProductionMaxDate);
         if (Objects.nonNull(firstAddMachineDate)) {
             log.info("续作强制增机补偿对齐原始dayN首次增机日期, scheduleDate: {}, materialCode: {}, "
                             + "historyShortageQty: {}, threshold: {}, activeMachineCount: {}, firstAddMachineDate: {}",
@@ -10422,6 +10503,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
          */
         compensationSku.setPreferredContinuousMachineCode(preferredReleasedMachineCode);
         compensationSku.setContinuousCompensationSku(true);
+        // 补偿副本与来源续作共享同一物料状态账本，只初始化候选视图，禁止重新同步并放大已消费额度。
         compensationSku.setTargetScheduleQty(productionRemainingQty);
         compensationSku.setPendingQty(productionRemainingQty);
         compensationSku.setRemainingScheduleQty(productionRemainingQty);
@@ -11784,7 +11866,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             if (sku == null || StringUtils.isEmpty(sku.getContinuousMachineCode())) {
                 continue;
             }
-            if (isContinuousWindowNoDailyPlan(sku) && Math.max(0, sku.getMonthlyHistoryShortageQty()) <= 0) {
+            if (shouldPreReleaseWindowNoPlanContinuousSku(context, sku)) {
                 registerReleasedContinuousMachine(context, sku.getContinuousMachineCode(),
                         sku.getMaterialCode(), "窗口内无日计划");
                 continue;
@@ -11794,6 +11876,25 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                         sku.getContinuousMachineCode(), sku.getMaterialCode());
             }
         }
+    }
+
+    /**
+     * 判断窗口无计划续作机台是否可以在正式排产前预释放。
+     * <p>预释放口径必须与正式续作一致：有硫化余量时先按严格收尾目标排完，不能因为窗口后仍有计划
+     * 就提前把机台开放给换活字块或新增排产；胎胚库存收尾仍由既有库存目标链处理。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 续作SKU
+     * @return true-可以预释放；false-必须保持续作占用并进入正式排产判断
+     */
+    private boolean shouldPreReleaseWindowNoPlanContinuousSku(
+            LhScheduleContext context, SkuScheduleDTO sku) {
+        return Objects.nonNull(context)
+                && Objects.nonNull(sku)
+                && isContinuousWindowNoDailyPlan(sku)
+                && Math.max(0, sku.getMonthlyHistoryShortageQty()) <= 0
+                && Math.max(0, sku.getSurplusQty()) <= 0
+                && !getTargetScheduleQtyResolver().isEmbryoStockEnding(context, sku);
     }
 
     /**

@@ -9,6 +9,7 @@ import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.support.MachinePriorityMetricSnapshot;
 import com.zlt.aps.lh.engine.strategy.support.MachinePriorityTraceSnapshot;
+import com.zlt.aps.lh.engine.strategy.support.MachineSkuMatchResult;
 import com.zlt.aps.lh.engine.strategy.support.SpecifiedMachineMatchResult;
 
 import java.util.Date;
@@ -40,6 +41,23 @@ public interface IMachineMatchStrategy {
      * @return 候选机台列表(按优先级排序)
      */
     List<MachineScheduleDTO> matchMachines(LhScheduleContext context, SkuScheduleDTO sku);
+
+    /**
+     * 反向校验指定机台是否可以承接当前 SKU。
+     *
+     * <p>该入口只检查传入机台及正规单控整机的配对侧，不得再次扫描全量机台。
+     * 正向选机与反向选 SKU 必须复用同一硬约束实现，避免两条链路产生不同候选口径。</p>
+     *
+     * @param context 排程上下文
+     * @param machine 指定机台
+     * @param sku 待校验 SKU
+     * @return 反向匹配结果，失败时携带明确原因
+     */
+    default MachineSkuMatchResult matchSkuOnMachine(LhScheduleContext context,
+                                                     MachineScheduleDTO machine,
+                                                     SkuScheduleDTO sku) {
+        return MachineSkuMatchResult.failed(machine, sku, "当前机台匹配策略不支持反向匹配");
+    }
 
     /**
      * 校验并返回指定机台。

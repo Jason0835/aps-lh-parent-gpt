@@ -220,6 +220,16 @@ public class LhScheduleConfigResolver {
                 LhScheduleConstant.NEW_SPEC_SHORTAGE_LOOK_AHEAD_DAYS, 1);
         putIntValue(resolvedParamMap, lhParamsMap, LhScheduleParamConstant.NEW_SPEC_SHORTAGE_ADD_MACHINE_THRESHOLD,
                 LhScheduleConstant.NEW_SPEC_SHORTAGE_ADD_MACHINE_THRESHOLD, 0);
+        // 收尾小余量两个阈值必须进入同一批次配置快照，避免数据库配置只写入原始参数Map而未实际生效。
+        putNonNegativeIntValue(resolvedParamMap, lhParamsMap,
+                LhScheduleParamConstant.CONTINUOUS_ENDING_SURPLUS_TOLERANCE_QTY,
+                LhScheduleConstant.CONTINUOUS_ENDING_SURPLUS_TOLERANCE_QTY);
+        putNonNegativeIntValue(resolvedParamMap, lhParamsMap,
+                LhScheduleParamConstant.SMALL_ENDING_SURPLUS_KEEP_RATIO_PERCENT,
+                LhScheduleConstant.SMALL_ENDING_SURPLUS_KEEP_RATIO_PERCENT);
+        putStringValue(resolvedParamMap, lhParamsMap,
+                LhScheduleParamConstant.PRIORITY_CONTINUATION_MACHINE_PREFIXES,
+                LhScheduleConstant.PRIORITY_CONTINUATION_MACHINE_PREFIXES);
         putEarlyProductionDaysThreshold(resolvedParamMap, lhParamsMap);
         // 收尾自动补量只允许0/1，在配置快照入口统一校验，避免两条补量链各自解析。
         putEndingAutoFillEnabled(resolvedParamMap, lhParamsMap);
@@ -232,6 +242,8 @@ public class LhScheduleConfigResolver {
         // 结构清单按字符串原值进入配置快照，由配置对象统一完成逗号拆分、去空格和精确匹配。
         putStringValue(resolvedParamMap, lhParamsMap, LhScheduleParamConstant.DAILY_STANDARD_CAPACITY_STRUCTURE_LIST,
                 LhScheduleConstant.DAILY_STANDARD_CAPACITY_STRUCTURE_LIST);
+        // 机台资源归班口径只允许0/1，默认按包含换模、首检、胎胚和设备计划的实际可开产时间归班。
+        putNewSpecMachineResourceShiftMode(resolvedParamMap, lhParamsMap);
         putIntValue(resolvedParamMap, lhParamsMap, LhScheduleParamConstant.ENABLE_CHANGEOVER_BALANCE,
                 LhScheduleConstant.ENABLE_CHANGEOVER_BALANCE);
         putIntValue(resolvedParamMap, lhParamsMap, LhScheduleParamConstant.CONTINUOUS_SHORTAGE_LOOK_AHEAD_DAYS,
@@ -266,8 +278,38 @@ public class LhScheduleConfigResolver {
                 LhScheduleConstant.SINGLE_CONTROL_MACHINE_CODES);
         putIntValue(resolvedParamMap, lhParamsMap, LhScheduleParamConstant.SMALL_BATCH_SKU_THRESHOLD,
                 LhScheduleConstant.SMALL_BATCH_SKU_THRESHOLD, 1);
+        // 试制量试参与排产开关只允许0/1，非法配置统一回到默认不参与排产。
+        putTrialMassTrialSchedulingEnabled(resolvedParamMap, lhParamsMap);
 
         return new LhScheduleConfig(resolvedParamMap);
+    }
+
+    /**
+     * 解析试制量试参与排产开关。
+     * <p>只有0和1是合法值；未配置、空值或非法值均按默认0生效，确保试制量试默认不进入排产源数据。</p>
+     *
+     * @param resolvedParamMap 解析后参数
+     * @param lhParamsMap 原始硫化参数
+     */
+    private void putTrialMassTrialSchedulingEnabled(Map<String, String> resolvedParamMap,
+                                                     Map<String, String> lhParamsMap) {
+        String paramCode = LhScheduleParamConstant.TRIAL_MASS_TRIAL_SCHEDULING_ENABLED;
+        int defaultValue = LhScheduleConstant.TRIAL_MASS_TRIAL_SCHEDULING_ENABLED;
+        String value = lhParamsMap.get(paramCode);
+        if (StringUtils.isEmpty(value)) {
+            log.warn("试制量试参与排产开关未配置或为空，使用默认值, paramCode={}, defaultValue={}",
+                    paramCode, defaultValue);
+            resolvedParamMap.put(paramCode, String.valueOf(defaultValue));
+            return;
+        }
+        String trimmedValue = value.trim();
+        if (StringUtils.equals("0", trimmedValue) || StringUtils.equals("1", trimmedValue)) {
+            resolvedParamMap.put(paramCode, trimmedValue);
+            return;
+        }
+        log.warn("试制量试参与排产开关配置非法，使用默认值, paramCode={}, value={}, defaultValue={}",
+                paramCode, value, defaultValue);
+        resolvedParamMap.put(paramCode, String.valueOf(defaultValue));
     }
 
     /**
@@ -334,6 +376,37 @@ public class LhScheduleConfigResolver {
                 }
             } catch (NumberFormatException e) {
                 log.warn("硫化正整数参数解析失败，使用默认值, paramCode={}, value={}, defaultValue={}",
+                        paramCode, value, defaultValue);
+            }
+        }
+        resolvedParamMap.put(paramCode, String.valueOf(resolvedValue));
+    }
+
+    /**
+     * 解析非负整数参数，空值、非数字或负数统一使用业务默认值。
+     *
+     * @param resolvedParamMap 解析后参数
+     * @param lhParamsMap 原始参数
+     * @param paramCode 参数编码
+     * @param defaultValue 业务默认值
+     */
+    private void putNonNegativeIntValue(Map<String, String> resolvedParamMap,
+                                        Map<String, String> lhParamsMap,
+                                        String paramCode,
+                                        int defaultValue) {
+        String value = lhParamsMap.get(paramCode);
+        int resolvedValue = defaultValue;
+        if (StringUtils.isNotEmpty(value)) {
+            try {
+                int parsedValue = Integer.parseInt(value.trim());
+                if (parsedValue >= 0) {
+                    resolvedValue = parsedValue;
+                } else {
+                    log.warn("硫化非负整数参数配置越界，使用默认值, paramCode={}, value={}, defaultValue={}",
+                            paramCode, value, defaultValue);
+                }
+            } catch (NumberFormatException e) {
+                log.warn("硫化非负整数参数解析失败，使用默认值, paramCode={}, value={}, defaultValue={}",
                         paramCode, value, defaultValue);
             }
         }
@@ -451,11 +524,45 @@ public class LhScheduleConfigResolver {
             return;
         }
         String trimmedValue = value.trim();
-        if (StringUtils.equals("0", trimmedValue) || StringUtils.equals("1", trimmedValue)) {
+        if (StringUtils.equals(String.valueOf(
+                LhScheduleConstant.NEW_SPEC_MACHINE_RESOURCE_SHIFT_BY_ENDING_TIME), trimmedValue)
+                || StringUtils.equals(String.valueOf(
+                LhScheduleConstant.NEW_SPEC_MACHINE_RESOURCE_SHIFT_BY_ACTUAL_AVAILABLE_TIME),
+                trimmedValue)) {
             resolvedParamMap.put(paramCode, trimmedValue);
             return;
         }
         log.warn("收尾自动补量开关配置非法，使用默认值, paramCode={}, value={}, defaultValue={}",
+                paramCode, value, defaultValue);
+        resolvedParamMap.put(paramCode, String.valueOf(defaultValue));
+    }
+
+    /**
+     * 解析新增排产机台资源归属班次口径。
+     * <p>1表示使用候选SKU完整时间轴计算出的实际可开产时间；0表示仅使用机台收尾时间。
+     * 未配置、空值或非法值均回落默认1，避免配置异常把资源提前归入错误班次。</p>
+     *
+     * @param resolvedParamMap 解析后参数
+     * @param lhParamsMap 原始硫化参数
+     */
+    private void putNewSpecMachineResourceShiftMode(
+            Map<String, String> resolvedParamMap,
+            Map<String, String> lhParamsMap) {
+        String paramCode = LhScheduleParamConstant.NEW_SPEC_MACHINE_RESOURCE_SHIFT_MODE;
+        int defaultValue = LhScheduleConstant.NEW_SPEC_MACHINE_RESOURCE_SHIFT_MODE;
+        String value = lhParamsMap.get(paramCode);
+        if (StringUtils.isEmpty(value)) {
+            log.warn("新增排产机台资源归属班次口径未配置或为空，使用默认值, paramCode={}, defaultValue={}",
+                    paramCode, defaultValue);
+            resolvedParamMap.put(paramCode, String.valueOf(defaultValue));
+            return;
+        }
+        String trimmedValue = value.trim();
+        if (StringUtils.equals("0", trimmedValue) || StringUtils.equals("1", trimmedValue)) {
+            resolvedParamMap.put(paramCode, trimmedValue);
+            return;
+        }
+        log.warn("新增排产机台资源归属班次口径配置非法，使用默认值, paramCode={}, value={}, defaultValue={}",
                 paramCode, value, defaultValue);
         resolvedParamMap.put(paramCode, String.valueOf(defaultValue));
     }

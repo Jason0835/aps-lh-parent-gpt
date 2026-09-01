@@ -28,6 +28,8 @@ public class EarlyProductionDecision implements Serializable {
     public static final String SCENE_STRUCTURE_SWITCH = "STRUCTURE_SWITCH";
     /** 产品结构收尾 */
     public static final String SCENE_STRUCTURE_ENDING = "STRUCTURE_ENDING";
+    /** 续作增机提前生产 */
+    public static final String SCENE_CONTINUATION_ADD_MACHINE = "CONTINUATION_ADD_MACHINE";
 
     /** 是否属于后续日 SKU 提前生产场景 */
     private boolean earlyProduction;

@@ -106,11 +106,11 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     /** 新开规格历史生产检查天数。 */
     private static final int NEW_SPEC_HISTORY_DAYS = 4;
 
-    /** 多机台收尾备注最少机台数。 */
-    private static final int MULTI_MACHINE_ENDING_MIN_COUNT = 2;
+    /** 收尾备注最少物理机台数。 */
+    private static final int ENDING_REMARK_MIN_MACHINE_COUNT = 1;
 
-    /** 导出备注分隔符。 */
-    private static final String EXPORT_REMARK_SEPARATOR = "；";
+    /** 导出备注分隔符：同一单元格中的多条说明分行显示。 */
+    private static final String EXPORT_REMARK_SEPARATOR = "\n";
 
     /** 新开规格导出备注国际化Key。 */
     private static final String NEW_SPEC_REMARK_KEY = "ui.data.column.lhScheduleResult.remark.newSpec";
@@ -817,7 +817,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         // 当前只有一个明细列表，因此只放入一个 List<Map<String,Object>>。
         List<List<Map<String, Object>>> excelDataList = new ArrayList<>();
         ExportDataBuildResult exportDataBuildResult = buildExportDataList(
-                sortedExportList, result.getScheduleDate());
+                sortedExportList, result.getScheduleDate(), mouldChangePlanList);
         List<Map<String, Object>> exportDataList = exportDataBuildResult.getDataList();
         excelDataList.add(exportDataList);
 
@@ -1086,14 +1086,15 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                     } else {
                         setNumericCell(row, dailyPlanQtyCol, dailyPlanValue);
                     }
-                    // 20260810+ 淡橙标识规则调整：8 个班次内存在收尾标识（classXIsEnd ∈ 1/2/3）的行才标淡橙，
-                    // 不再按 |合计余量| ≤ 400 判断。
-                    // 20260818+ 胎胚库存收尾标识（isEmbryoEnding=1）时，淡橙标记在“胎胚库存”列；
-                    // 其余收尾标识沿用原“合计余量”列淡橙。
+                    // 20260831+ 余量收尾淡橙标识只判断主字段 isEnd=1，
+                    // 不再扫描 classXIsEnd 的收尾、量试和试验标识。
+                    // 胎胚库存收尾标识（isEmbryoEnding=1）时，淡橙标记在“胎胚库存”列。
                     int highlightCol = ApsConstant.APS_STRING_1.equals(rowResult.getIsEmbryoEnding())
                             ? this.resolveExportColorColumn(placeholderMap, "embryoStock", dailyPlanQtyCol)
                             : dailyPlanQtyCol;
-                    if (isCloseOutSku(rowResult) && highlightCol >= 0) {
+                    boolean shouldHighlightEnding = ApsConstant.APS_STRING_1.equals(rowResult.getIsEnd())
+                            || ApsConstant.APS_STRING_1.equals(rowResult.getIsEmbryoEnding());
+                    if (shouldHighlightEnding && highlightCol >= 0) {
                         this.applyRowForegroundColor(workbook, row, highlightCol,
                                 new byte[]{(byte) 0xFC, (byte) 0xD5, (byte) 0xB4});
                     }
@@ -2793,7 +2794,9 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      * @param scheduleDate 导出入口传入的排程日期，用于固定 T 日完成量查询口径
      * @return 模板列表数据及与Excel行对齐的排程结果
      */
-    private ExportDataBuildResult buildExportDataList(List<LhScheduleResult> list, Date scheduleDate) {
+    private ExportDataBuildResult buildExportDataList(List<LhScheduleResult> list,
+                                                      Date scheduleDate,
+                                                      List<LhMouldChangePlan> mouldChangePlanList) {
         List<Map<String, Object>> dataList = new ArrayList<>(list.size() + 1);
         List<LhScheduleResult> alignedExportList = new ArrayList<>(list.size() + 1);
         Map<String, LhRepairCapsule> capsuleMap = buildRepairCapsuleExportMap(list);
@@ -2815,7 +2818,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         Map<String, Map<Integer, Integer>> shiftOrderMap = buildContinuousShiftOrderMap(shiftOrderSourceList);
         Map<LhScheduleResult, ExportRowStyleFlag> rowStyleFlagMap = buildMachinePostCloseOutStyleFlagMap(sortedList);
         Map<LhScheduleResult, LinkedHashSet<String>> exportRemarkMap = this.buildExportRemarkMap(
-                sortedList, scheduleDate);
+                sortedList, scheduleDate, mouldChangePlanList);
         Set<String> insertedReferenceMachineCodes = new HashSet<>();
 
         for (LhScheduleResult result : sortedList) {
@@ -2830,7 +2833,6 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                 alignedExportList.add(null);
             }
             Map<String, Object> row = new HashMap<>(112);
-            row.put("height", 17);
             row.put("lhMachineCode", result.getLhMachineCode());
             row.put("materialCode", result.getMaterialCode());
             row.put("embryoCode", result.getEmbryoCode());
@@ -2868,7 +2870,9 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             row.put("totalPlanQty", result.getDailyPlanQty());
             row.put("totalDailyPlanQty", result.getTotalDailyPlanQty());
             row.put("monthPlanSumTotal", result.getMonthPlanSumTotal());
-            row.put("remark", this.mergeExportRemarks(result.getRemark(), exportRemarkMap.get(result)));
+            String exportRemark = this.mergeExportRemarks(result.getRemark(), exportRemarkMap.get(result));
+            row.put("remark", exportRemark);
+            row.put("height", this.calculateExportRemarkRowHeight(exportRemark));
 
             // 公式列占位符：模板中 BZ/CA/CB 列使用 {.nightPlanQtyTotal} / {.nightFinishQtyTotal} /
             // {.totalPlanQtyFormula} 占位符标记列位置，writeMultiList 会将其替换为空字符串，
@@ -2916,14 +2920,18 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      */
     private Map<LhScheduleResult, LinkedHashSet<String>> buildExportRemarkMap(
             List<LhScheduleResult> sortedList,
-            Date scheduleDate) {
+            Date scheduleDate,
+            List<LhMouldChangePlan> mouldChangePlanList) {
         Map<LhScheduleResult, LinkedHashSet<String>> remarkMap = new IdentityHashMap<>(sortedList.size());
         if (PubUtil.isEmpty(sortedList)) {
             return remarkMap;
         }
         Set<String> recentlyProducedMaterialCodeSet = this.loadRecentlyProducedMaterialCodeSet(
                 sortedList, scheduleDate);
-        this.appendNewSpecExportRemarks(sortedList, recentlyProducedMaterialCodeSet, remarkMap);
+        Set<String> mouldChangeAfterMaterialKeySet = this.buildMouldChangeAfterMaterialKeySet(
+                mouldChangePlanList);
+        this.appendNewSpecExportRemarks(sortedList, recentlyProducedMaterialCodeSet,
+                mouldChangeAfterMaterialKeySet, remarkMap);
         Set<LhScheduleResult> embryoEndingRemarkResultSet = this.appendEmbryoEndingExportRemarks(
                 sortedList, remarkMap);
         this.appendMaterialEndingExportRemarks(sortedList, embryoEndingRemarkResultSet, remarkMap);
@@ -2971,6 +2979,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      */
     private void appendNewSpecExportRemarks(List<LhScheduleResult> sortedList,
                                             Set<String> recentlyProducedMaterialCodeSet,
+                                            Set<String> mouldChangeAfterMaterialKeySet,
                                             Map<LhScheduleResult, LinkedHashSet<String>> remarkMap) {
         for (LhScheduleResult result : sortedList) {
             if (!hasAnyPlanQty(result)) {
@@ -2980,10 +2989,49 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             if (StringUtils.isBlank(materialCode)) {
                 continue;
             }
-            if (!recentlyProducedMaterialCodeSet.contains(materialCode)) {
+            String mouldChangeAfterMaterialKey = this.buildMouldChangeAfterMaterialKey(result.getBatchNo(),
+                    result.getScheduleDate(), result.getLhMachineCode(), materialCode);
+            if (!recentlyProducedMaterialCodeSet.contains(materialCode)
+                    || mouldChangeAfterMaterialKeySet.contains(mouldChangeAfterMaterialKey)) {
                 this.appendExportRemark(remarkMap, result, I18nUtil.getMessage(NEW_SPEC_REMARK_KEY));
             }
         }
+    }
+
+    /**
+     * 构建当前批次模具交替计划中的后规格命中键。
+     * <p>同一批次、同一排程日、同一机台的交替计划后规格，视为该机台新增上机物料，
+     * 即使物料在其他机台近期生产过，也必须标记“新开规格”。</p>
+     *
+     * @param mouldChangePlanList 当前导出批次的模具交替计划
+     * @return 批次+排程日+机台+后物料命中键集合
+     */
+    private Set<String> buildMouldChangeAfterMaterialKeySet(List<LhMouldChangePlan> mouldChangePlanList) {
+        if (CollUtil.isEmpty(mouldChangePlanList)) {
+            return Collections.emptySet();
+        }
+        return mouldChangePlanList.stream()
+                .filter(plan -> StringUtils.isNotBlank(plan.getLhResultBatchNo()))
+                .filter(plan -> Objects.nonNull(plan.getScheduleDate()))
+                .filter(plan -> StringUtils.isNotBlank(plan.getLhMachineCode()))
+                .filter(plan -> StringUtils.isNotBlank(plan.getAfterMaterialCode()))
+                .filter(plan -> !StringUtils.equals(StringUtils.trimToEmpty(plan.getBeforeMaterialCode()),
+                        StringUtils.trimToEmpty(plan.getAfterMaterialCode())))
+                .map(plan -> this.buildMouldChangeAfterMaterialKey(plan.getLhResultBatchNo(),
+                        plan.getScheduleDate(), plan.getLhMachineCode(), plan.getAfterMaterialCode()))
+                .collect(Collectors.toSet());
+    }
+
+    /**
+     * 构建模具交替计划后规格与排程结果的匹配键。
+     */
+    private String buildMouldChangeAfterMaterialKey(String batchNo, Date scheduleDate,
+                                                     String machineCode, String materialCode) {
+        return StringUtils.defaultString(batchNo).trim() + "|"
+                + (Objects.nonNull(scheduleDate)
+                    ? DateUtil.formatDate(DateUtil.beginOfDay(scheduleDate)) : "") + "|"
+                + StringUtils.defaultString(machineCode).trim() + "|"
+                + StringUtils.defaultString(materialCode).trim();
     }
 
     /**
@@ -3001,7 +3049,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                 .collect(Collectors.groupingBy(LhScheduleResult::getMaterialCode));
         materialEndingResultMap.values().forEach(resultList -> {
             Set<String> machineCodeSet = this.collectMachineCodeSet(resultList);
-            if (machineCodeSet.size() < MULTI_MACHINE_ENDING_MIN_COUNT) {
+            if (machineCodeSet.size() < ENDING_REMARK_MIN_MACHINE_COUNT) {
                 return;
             }
             String machineCodeText = String.join("/", machineCodeSet);
@@ -3024,7 +3072,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                 .collect(Collectors.groupingBy(LhScheduleResult::getEmbryoCode));
         embryoEndingResultMap.values().forEach(resultList -> {
             Set<String> machineCodeSet = this.collectMachineCodeSet(resultList);
-            if (machineCodeSet.size() < MULTI_MACHINE_ENDING_MIN_COUNT) {
+            if (machineCodeSet.size() < ENDING_REMARK_MIN_MACHINE_COUNT) {
                 return;
             }
             String machineCodeText = String.join("/", machineCodeSet);
@@ -3106,6 +3154,18 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     }
 
     /**
+     * 按备注中的换行数计算导出行高，避免多条备注换行后内容被遮挡。
+     *
+     * @param remark 导出备注
+     * @return Excel 行高，单位为点
+     */
+    private float calculateExportRemarkRowHeight(String remark) {
+        String normalizedRemark = StringUtils.replace(StringUtils.defaultString(remark), "\r\n", "\n");
+        int lineCount = normalizedRemark.isEmpty() ? 1 : normalizedRemark.split("\n", -1).length;
+        return Math.max(17F, lineCount * 17F);
+    }
+
+    /**
      * 构建前规格参考行。
      * <p>参考行沿用历史收尾记录的规格及状态信息；8个班次的顺序、计划量、实际量，
      * 以及当前计划相关的汇总量、库存、胶囊次数和产量字段不写入，保持为空。</p>
@@ -3122,7 +3182,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             Map<String, String> recipeTypeMap,
             Map<String, String> endTypeMap) {
         Map<String, Object> referenceRow = new HashMap<>(96);
-        referenceRow.put("height", 17);
+        referenceRow.put("height", this.calculateExportRemarkRowHeight(beforeMaterialResult.getRemark()));
         referenceRow.put("lhMachineCode", beforeMaterialResult.getLhMachineCode());
         referenceRow.put("materialCode", beforeMaterialResult.getMaterialCode());
         referenceRow.put("materialDesc", beforeMaterialResult.getMaterialDesc());
@@ -3892,8 +3952,8 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      *
      * <p>规则：同一机台发生收尾后，后续再次排产的规格视为收尾后的新开规格或再生产，
      * 机台/物料号/物料描述列涂灰；同时把对应收尾行的机台列涂灰。</p>
-     * <p>规则 3（已移至 exportData 方法）：8 个班次内存在收尾标识（classXIsEnd ∈ 1/2/3）的行，
-     * dailyPlanQty（合计余量）列涂淡橙；不再按 |合计余量| ≤ 400 判断。</p>
+     * <p>规则 3（已移至 exportData 方法）：主字段 isEnd=1 的余量收尾行，
+     * dailyPlanQty（合计余量）列涂淡橙；isEmbryoEnding=1 的胎胚收尾行改为胎胚库存列涂淡橙。</p>
      *
      * @param row       导出行数据
      * @param styleFlag 导出行样式标记

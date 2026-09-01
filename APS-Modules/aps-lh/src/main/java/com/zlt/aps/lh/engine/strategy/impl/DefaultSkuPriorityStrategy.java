@@ -11,9 +11,11 @@ import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.api.enums.ConstructionStageEnum;
 import com.zlt.aps.lh.api.enums.ScheduleStepEnum;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
+import com.zlt.aps.lh.component.StructureEndingPrioritySnapshotResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.IEndingJudgmentStrategy;
 import com.zlt.aps.lh.engine.strategy.ISkuPriorityStrategy;
+import com.zlt.aps.lh.engine.strategy.support.StructureEndingPrioritySnapshot;
 import com.zlt.aps.lh.util.LhSpecialMaterialUtil;
 import com.zlt.aps.lh.util.LhSpecifyMachineUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
@@ -26,8 +28,6 @@ import org.springframework.util.CollectionUtils;
 
 import javax.annotation.Resource;
 import java.time.LocalDate;
-import java.time.ZoneId;
-import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -58,6 +58,9 @@ public class DefaultSkuPriorityStrategy implements ISkuPriorityStrategy {
 
     @Resource
     private IEndingJudgmentStrategy endingJudgmentStrategy;
+    /** 排序器与特殊 SKU 分类器共用的结构收尾只读快照入口。 */
+    @Resource
+    private StructureEndingPrioritySnapshotResolver structureEndingPrioritySnapshotResolver;
 
     @Override
     public void sortByPriority(LhScheduleContext context) {
@@ -176,7 +179,72 @@ public class DefaultSkuPriorityStrategy implements ISkuPriorityStrategy {
                 pendingNewSpecSkuList.size(), pendingNewSpecSkuList.stream()
                         .filter(Objects::nonNull)
                         .map(SkuScheduleDTO::getMaterialCode)
-                        .collect(Collectors.toList()));
+                .collect(Collectors.toList()));
+    }
+
+    /**
+     * 对机台驱动日期池执行无副作用排序。
+     *
+     * <p>比较器、结构收尾快照和胎胚时间换位与业务日排序完全一致；区别仅是不回写共享SKU
+     * 的全局名次和排序说明，避免T池、T+1池依次排序后互相覆盖运行态字段。</p>
+     *
+     * @param context 排程上下文
+     * @param poolSkuList 单个日期池SKU列表
+     */
+    @Override
+    public void sortNewSpecPoolByPriority(LhScheduleContext context,
+                                          List<SkuScheduleDTO> poolSkuList) {
+        if (Objects.isNull(context) || CollectionUtils.isEmpty(poolSkuList)) {
+            return;
+        }
+        Map<SkuScheduleDTO, Integer> structureEndingDaysMap = new IdentityHashMap<>(
+                Math.max(16, poolSkuList.size() * 2));
+        Map<String, StructurePriorityMeta> structurePriorityMap =
+                this.buildStructurePriorityMap(context, structureEndingDaysMap);
+        for (SkuScheduleDTO sku : poolSkuList) {
+            if (Objects.isNull(sku) || StringUtils.isEmpty(sku.getStructureName())) {
+                continue;
+            }
+            StructurePriorityMeta structureMeta = structurePriorityMap.get(sku.getStructureName());
+            if (Objects.nonNull(structureMeta) && structureMeta.isAllSkusEndingPriority()) {
+                structureEndingDaysMap.put(sku, structureMeta.getLatestEndingDays());
+            }
+        }
+        Comparator<SkuScheduleDTO> comparator = this.buildNewSpecComparator(
+                context, structurePriorityMap, structureEndingDaysMap,
+                this.buildTailComparator(context));
+        this.sortSkuList(poolSkuList, context.getStructureEarliestLhTimeMap(), comparator);
+    }
+
+    /**
+     * 复用当前排序器的结构 N 天内收尾快照解析特殊 SKU。
+     *
+     * @param context 排程上下文
+     * @param pendingNewSpecSkuList 当前待排 SKU
+     * @return 特殊 SKU 对象身份集合
+     */
+    @Override
+    public Set<SkuScheduleDTO> resolveSpecialNewSpecSkus(
+            LhScheduleContext context,
+            List<SkuScheduleDTO> pendingNewSpecSkuList) {
+        Set<SkuScheduleDTO> specialSkuSet =
+                Collections.newSetFromMap(new IdentityHashMap<SkuScheduleDTO, Boolean>());
+        if (Objects.isNull(context) || CollectionUtils.isEmpty(pendingNewSpecSkuList)) {
+            return specialSkuSet;
+        }
+        StructureEndingPrioritySnapshot structureSnapshot =
+                structureEndingPrioritySnapshotResolver.resolve(context);
+        for (SkuScheduleDTO sku : pendingNewSpecSkuList) {
+            if (Objects.isNull(sku)) {
+                continue;
+            }
+            if (sku.isDeliveryLocked()
+                    || (Objects.nonNull(sku.getDelayDays()) && sku.getDelayDays() < 0)
+                    || structureSnapshot.isPriorityStructure(sku.getStructureName())) {
+                specialSkuSet.add(sku);
+            }
+        }
+        return specialSkuSet;
     }
 
 
@@ -509,13 +577,10 @@ public class DefaultSkuPriorityStrategy implements ISkuPriorityStrategy {
         if (CollectionUtils.isEmpty(context.getStructureSkuMap())) {
             return structurePriorityMap;
         }
-        int structureEndingDays = context.getScheduleConfig() != null
-                ? context.getScheduleConfig().getStructureEndingDays()
-                : context.getParamIntValue(LhScheduleParamConstant.STRUCTURE_ENDING_DAYS,
-                LhScheduleConstant.DEFAULT_STRUCTURE_ENDING_DAYS);
-        LocalDate scheduleDate = this.toLocalDate(context.getScheduleDate());
-        Map<String, LocalDate> structureMaxEndingDateMap =
-                context.getStructurePriorityMaxEndingDateMap();
+        StructureEndingPrioritySnapshot structureSnapshot =
+                structureEndingPrioritySnapshotResolver.resolve(context);
+        int structureEndingDays = structureSnapshot.getThresholdDays();
+        LocalDate scheduleDate = structureSnapshot.getScheduleDate();
         int hitStructureCount = 0;
         int markedSkuCount = 0;
         for (Map.Entry<String, List<SkuScheduleDTO>> entry : context.getStructureSkuMap().entrySet()) {
@@ -526,12 +591,10 @@ public class DefaultSkuPriorityStrategy implements ISkuPriorityStrategy {
                     .filter(Objects::nonNull)
                     .collect(Collectors.toList());
             int totalSkuCount = structureSkuList.size();
-            LocalDate maxEndingDate = CollectionUtils.isEmpty(structureMaxEndingDateMap)
-                    ? null : structureMaxEndingDateMap.get(entry.getKey());
-            int distanceDays = this.calculateInclusiveDistanceDays(scheduleDate, maxEndingDate);
+            LocalDate maxEndingDate = structureSnapshot.resolveMaximumEndingDate(entry.getKey());
+            int distanceDays = structureSnapshot.resolveInclusiveDistanceDays(entry.getKey());
             boolean structureEndingPriority = totalSkuCount > 0
-                    && distanceDays > 0
-                    && distanceDays < structureEndingDays;
+                    && structureSnapshot.isPriorityStructure(entry.getKey());
             if (structureEndingPriority) {
                 /*
                  * 结构命中后统一标记本次仍参与排产的全部SKU，不再逐SKU判断预计收尾、余量或产能。
@@ -594,38 +657,6 @@ public class DefaultSkuPriorityStrategy implements ISkuPriorityStrategy {
                 .filter(Objects::nonNull)
                 .filter(sku -> Objects.equals(structureName, sku.getStructureName()))
                 .forEach(sku -> structureEndingDaysMap.put(sku, distanceDays));
-    }
-
-    /**
-     * 计算两个完整自然日之间包含首尾的距离天数。
-     *
-     * <p>使用LocalDate和ChronoUnit计算，能够正确处理跨月、跨年和不同月份天数；结束日早于T日、
-     * 任一日期为空时返回-1，调用方据此判定结构不命中。</p>
-     *
-     * @param scheduleDate 排程上下文T日
-     * @param maxEndingDate 结构转产表中该结构的最大END_DAY完整自然日
-     * @return 包含首尾的距离天数；无法判断或结束日早于T日时返回-1
-     */
-    private int calculateInclusiveDistanceDays(LocalDate scheduleDate, LocalDate maxEndingDate) {
-        if (Objects.isNull(scheduleDate)
-                || Objects.isNull(maxEndingDate)
-                || maxEndingDate.isBefore(scheduleDate)) {
-            return -1;
-        }
-        return Math.toIntExact(ChronoUnit.DAYS.between(scheduleDate, maxEndingDate) + 1L);
-    }
-
-    /**
-     * 将带时间部分的排程T日转换为系统时区自然日，避免时分秒影响结构收尾距离。
-     *
-     * @param date 排程上下文T日
-     * @return T日自然日；日期为空时返回null
-     */
-    private LocalDate toLocalDate(Date date) {
-        if (Objects.isNull(date)) {
-            return null;
-        }
-        return date.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
     }
 
     /**

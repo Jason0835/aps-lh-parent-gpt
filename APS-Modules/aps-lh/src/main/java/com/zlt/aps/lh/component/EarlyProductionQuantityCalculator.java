@@ -46,6 +46,34 @@ public final class EarlyProductionQuantityCalculator {
     }
 
     /**
+     * 解析提前生产统一Map目标机台数的计划来源日。
+     *
+     * <p>原始 T～T+2 dayN 保持不变；提前生产候选必须使用运行视图或候选预览中的
+     * {@code futurePlanDate} 查询目标机台数，避免当前提前日原计划为0时误读为0。
+     * 该方法只统一查询日期，不修改原月计划、临时dayN账本或实际开产日期。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 当前 SKU
+     * @param previewPlan 尚未激活的提前生产候选预览，可为空
+     * @param defaultDate 普通排产默认业务日
+     * @return 目标机台数对应的计划来源日
+     */
+    public static LocalDate resolveRequiredMachineCountDate(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            EarlyProductionRuntimePlan previewPlan,
+            LocalDate defaultDate) {
+        EarlyProductionRuntimePlan runtimePlan = previewPlan;
+        if (Objects.isNull(runtimePlan) && Objects.nonNull(context)
+                && Objects.nonNull(sku)) {
+            runtimePlan = context.getEarlyProductionRuntimePlan(sku);
+        }
+        return Objects.nonNull(runtimePlan)
+                && Objects.nonNull(runtimePlan.getFuturePlanDate())
+                ? runtimePlan.getFuturePlanDate() : defaultDate;
+    }
+
+    /**
      * 计算包含提前生产观察范围的硫化月计划总量。
      *
      * <p>普通窗口内计划继续复用 {@link CuringMonthPlanTotalCalculator}。仅当窗口内无计划、
@@ -143,8 +171,8 @@ public final class EarlyProductionQuantityCalculator {
         sku.setPendingQty(0);
         sku.setRemainingScheduleQty(0);
         if (Objects.nonNull(targetScheduleQtyResolver)) {
-            // 调用处同步清零实际消费账本，确保正常新增、续作和收尾分支均无法消费原目标。
-            targetScheduleQtyResolver.syncProductionRemainingQtyToTarget(
+            // 当前月隔离同样复用目标状态统一入口，保证 DTO 与实际消费账本同时清零。
+            targetScheduleQtyResolver.applyProductionTargetState(
                     context, sku, 0, "当前业务月TOTAL_QTY为0，禁止进入正常排产");
         }
         registerFutureOnlyCandidateView(context, sku, scheduleStartDate);

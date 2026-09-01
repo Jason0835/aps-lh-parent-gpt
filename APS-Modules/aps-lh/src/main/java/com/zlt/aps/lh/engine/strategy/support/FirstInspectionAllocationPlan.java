@@ -2,6 +2,7 @@ package com.zlt.aps.lh.engine.strategy.support;
 
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
@@ -10,8 +11,9 @@ import java.util.List;
 /**
  * 一次换模或换活字块首检的完整时间分摊计划。
  *
- * <p>首检结束时间等于切换结束时间，开始时间按首检数量和小时产量向前倒推。
- * 计划一旦通过预演，正式排产直接复用其时间、班次和数量，不再二次推导。</p>
+ * <p>普通 SKU 的首检结束时间等于切换结束时间，开始时间按首检数量和小时产量向前倒推；
+ * 量试 SKU 命中开产门禁时，首检从门禁开始并按所需时长向后分摊。计划一旦通过预演，
+ * 正式排产直接复用其时间、班次和数量，不再二次推导。</p>
  *
  * @author APS
  */
@@ -29,8 +31,8 @@ public class FirstInspectionAllocationPlan {
     /** 本次首检总条数。 */
     private final int inspectionQty;
 
-    /** 按班产和有效班时长向下取整后的小时产量。 */
-    private final int hourlyOutput;
+    /** 按班产和有效班时长精确折算的小时产量。 */
+    private final BigDecimal hourlyOutput;
 
     /** 首检生产时长，按秒向上取整。 */
     private final long inspectionDurationSeconds;
@@ -38,7 +40,7 @@ public class FirstInspectionAllocationPlan {
     /** 首检真实开始时间（含）。 */
     private final Date inspectionStartTime;
 
-    /** 首检真实结束时间（不含），等于换模或换活字块结束时间。 */
+    /** 首检真实结束时间（不含）；普通SKU等于切换结束时间，量试门禁场景为门禁后的实际结束时间。 */
     private final Date inspectionEndTime;
 
     /** 沿用项目既有“同班次前2台”计数语义的事件计数班次。 */
@@ -51,7 +53,7 @@ public class FirstInspectionAllocationPlan {
                                           String invalidReason,
                                           int sequence,
                                           int inspectionQty,
-                                          int hourlyOutput,
+                                          BigDecimal hourlyOutput,
                                           long inspectionDurationSeconds,
                                           Date inspectionStartTime,
                                           Date inspectionEndTime,
@@ -75,7 +77,7 @@ public class FirstInspectionAllocationPlan {
      *
      * @param sequence 当前事件在计数班次内的序号
      * @param inspectionQty 本次首检总条数
-     * @param hourlyOutput 按班产和有效班时长向下取整后的小时产量
+     * @param hourlyOutput 按班产和有效班时长精确折算的小时产量
      * @param inspectionDurationSeconds 首检真实生产时长（秒）
      * @param inspectionStartTime 首检区间开始时间（含）
      * @param inspectionEndTime 首检区间结束时间（不含）
@@ -85,7 +87,7 @@ public class FirstInspectionAllocationPlan {
      */
     public static FirstInspectionAllocationPlan valid(int sequence,
                                                       int inspectionQty,
-                                                      int hourlyOutput,
+                                                      BigDecimal hourlyOutput,
                                                       long inspectionDurationSeconds,
                                                       Date inspectionStartTime,
                                                       Date inspectionEndTime,
@@ -108,7 +110,7 @@ public class FirstInspectionAllocationPlan {
                                                         LhShiftConfigVO countingShift,
                                                         Date inspectionEndTime) {
         return new FirstInspectionAllocationPlan(
-                false, invalidReason, 0, 0, 0, 0L, null, inspectionEndTime,
+                false, invalidReason, 0, 0, BigDecimal.ZERO, 0L, null, inspectionEndTime,
                 countingShift, Collections.<FirstInspectionShiftAllocation>emptyList());
     }
 
@@ -128,7 +130,7 @@ public class FirstInspectionAllocationPlan {
         return inspectionQty;
     }
 
-    public int getHourlyOutput() {
+    public BigDecimal getHourlyOutput() {
         return hourlyOutput;
     }
 

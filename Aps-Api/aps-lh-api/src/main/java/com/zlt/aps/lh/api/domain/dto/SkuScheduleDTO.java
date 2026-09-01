@@ -50,6 +50,8 @@ public class SkuScheduleDTO {
     // ========== 计划量信息 ==========
     /** 月度计划总量 */
     private int monthPlanQty;
+    /** 本轮目标月月计划原始TOTAL_QTY，不含上月超欠产和排程运行态扣减 */
+    private int originalMonthPlanTotalQty;
     /** 非断点计划总量（各月计划量汇总，不扣除断点） */
     private int monthPlanSumTotal;
     /** 已完成合格量 */

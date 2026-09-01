@@ -190,6 +190,8 @@ public final class LhScheduleParamConstant {
     public static final String SINGLE_CONTROL_MACHINE_CODES = "SYS0311002";
     /** 小批量验证SKU阈值 */
     public static final String SMALL_BATCH_SKU_THRESHOLD = "SYS0311003";
+    /** 试制量试是否参与排产（0-不参与，1-参与） */
+    public static final String TRIAL_MASS_TRIAL_SCHEDULING_ENABLED = "SYS0311004";
     /** 模具交替计划天数 */
     public static final String MOULD_CHANGE_PLAN_DAYS = "SYS0302011";
     /** 模具交替计划导出模具号往前追溯天数（机台在机信息取排程日期前N天内最近一条） */
@@ -240,4 +242,10 @@ public final class LhScheduleParamConstant {
     public static final String CONTINUOUS_MOULD_OFFLINE_CHECK_DAYS = "SYS0304030";
     /** 按日标准量排产结构清单，多个结构名称使用英文逗号分隔 */
     public static final String DAILY_STANDARD_CAPACITY_STRUCTURE_LIST = "SYS0304031";
+    /** 新增排产机台资源归属班次口径（1-实际可开产时间，0-机台收尾时间） */
+    public static final String NEW_SPEC_MACHINE_RESOURCE_SHIFT_MODE = "SYS0304032";
+    /** 收尾小余量不忽略比例阈值（百分比） */
+    public static final String SMALL_ENDING_SURPLUS_KEEP_RATIO_PERCENT = "SYS0304033";
+    /** 优先续作硫化机台前缀，多个前缀使用英文逗号分隔 */
+    public static final String PRIORITY_CONTINUATION_MACHINE_PREFIXES = "SYS0304034";
 }

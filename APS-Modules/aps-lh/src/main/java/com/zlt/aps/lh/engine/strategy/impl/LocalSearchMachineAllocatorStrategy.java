@@ -460,8 +460,8 @@ public class LocalSearchMachineAllocatorStrategy {
                 mouldChangeStartTime, mouldChangeCompleteTime)
                 : mouldChangeCompleteTime;
         /*
-         * 局部搜索不仅要把首检归属放在维修预热之后，还必须显式抬高非试制SKU的开产时间；
-         * resolveTrialProductionStartTime 对非试制SKU会原样返回默认值，若不先取较晚时刻，搜索评分仍会高估维修班次产能。
+         * 局部搜索不仅要把首检归属放在维修预热之后，还必须显式抬高正规、小批量SKU的开产时间；
+         * 试制、量试由统一中班门禁继续收敛，若不先取较晚时刻，搜索评分仍会高估维修班次产能。
          */
         Date repairAdjustedProductionStartTime = plannedRepairAffectingSwitch
                 && productionStartTime.before(firstInspectionBaseTime)
@@ -511,6 +511,7 @@ public class LocalSearchMachineAllocatorStrategy {
         FirstInspectionAllocationPlan firstInspectionAllocationPlan = embryoAvailableTimeConstrained
                 ? null : FirstInspectionAllocationUtil.buildPlan(
                         context, sku, inspectionShifts, mouldChangeCompleteTime,
+                        productionStartTime,
                         shiftCapacity, remainingQty, ScheduleTypeEnum.NEW_SPEC.getCode(),
                         machine.getMachineCode(), null);
         Map<Integer, Integer> firstInspectionQtyMap = Objects.isNull(firstInspectionAllocationPlan)
@@ -519,6 +520,9 @@ public class LocalSearchMachineAllocatorStrategy {
         boolean crossShiftInspection = Objects.nonNull(firstInspectionAllocationPlan)
                 && firstInspectionAllocationPlan.isValid()
                 && firstInspectionAllocationPlan.getInspectionQty() > 0;
+        cursorStartTime = FirstInspectionQtyUtil.resolveProductionStartAfterFirstInspection(
+                sku, ScheduleTypeEnum.NEW_SPEC.getCode(), cursorStartTime,
+                firstInspectionAllocationPlan);
         if (crossShiftInspection) {
             firstInspectionQty = firstInspectionAllocationPlan.getInspectionQty();
             /*

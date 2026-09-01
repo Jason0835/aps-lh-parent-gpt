@@ -23,8 +23,8 @@ import java.util.Objects;
 /**
  * 换模与换活字块首检数量工具。
  *
- * <p>业务口径：换模和换活字块都需要首检，切换耗时已经包含首检，
- * 首检数量只影响班次计划量归属和班产占用，不额外增加切换耗时。</p>
+ * <p>业务口径：换模和换活字块都需要首检。普通场景切换耗时已经包含首检；
+ * 量试命中中班开产门禁时，首检条数从门禁开始占用真实生产时间，普通生产从首检结束后继续。</p>
  *
  * @author APS
  */
@@ -123,7 +123,7 @@ public final class FirstInspectionQtyUtil {
     /**
      * 解析换模/换活字块后的首检归属班次。
      *
-     * <p>默认仍按切换完成时间归属；仅当试制 SKU 的切换完成归属早班时，
+     * <p>默认仍按切换完成时间归属；当试制或量试 SKU 的切换完成归属早班时，
      * 首检与生产开产归属调整为同业务日中班。找不到同日中班时返回 null，
      * 由上游按无可归属班次处理，不构造兜底时间。</p>
      *
@@ -140,12 +140,12 @@ public final class FirstInspectionQtyUtil {
                                                                          Date switchCompleteTime,
                                                                          String scheduleType) {
         LhShiftConfigVO defaultShift = resolveAttributionShift(shifts, switchCompleteTime);
-        if (!isTrialMorningSwitchAttribution(sku, defaultShift, scheduleType)) {
+        if (!isTrialOrMassTrialMorningSwitchAttribution(sku, defaultShift, scheduleType)) {
             return defaultShift;
         }
         LhShiftConfigVO afternoonShift = resolveAfternoonShiftOnSameWorkDate(shifts, defaultShift);
         if (Objects.isNull(afternoonShift)) {
-            log.warn("试制SKU早班切换后未找到同业务日中班，首检无归属班次, batchNo: {}, materialCode: {}, "
+            log.warn("试制/量试SKU早班切换后未找到同业务日中班，首检无归属班次, batchNo: {}, materialCode: {}, "
                             + "scheduleType: {}, 切换完成: {}, 早班日期: {}, 早班班次: {}",
                     Objects.isNull(context) ? null : context.getBatchNo(),
                     Objects.isNull(sku) ? null : sku.getMaterialCode(),
@@ -153,7 +153,7 @@ public final class FirstInspectionQtyUtil {
                     LhScheduleTimeUtil.formatDate(defaultShift.getWorkDate()), defaultShift.getShiftIndex());
             return null;
         }
-        log.debug("试制SKU早班切换首检归属调整为中班, batchNo: {}, materialCode: {}, scheduleType: {}, "
+        log.debug("试制/量试SKU早班切换首检归属调整为中班, batchNo: {}, materialCode: {}, scheduleType: {}, "
                         + "切换完成: {}, 原归属班次: {}, 调整后班次: {}",
                 Objects.isNull(context) ? null : context.getBatchNo(),
                 Objects.isNull(sku) ? null : sku.getMaterialCode(),
@@ -165,7 +165,7 @@ public final class FirstInspectionQtyUtil {
     /**
      * 解析首检资源占用起点。
      *
-     * <p>试制 SKU 早班切换完成时，首检资源从同业务日中班开始占用；
+     * <p>试制、量试 SKU 早班切换完成时，首检资源从同业务日中班开始占用；
      * 其他 SKU 仍以切换完成时间作为首检资源占用起点。</p>
      *
      * @param context 排程上下文
@@ -186,17 +186,17 @@ public final class FirstInspectionQtyUtil {
         if (Objects.isNull(attributionShift)) {
             return null;
         }
-        if (isTrialMorningSwitchAttribution(sku, defaultShift, scheduleType)) {
+        if (isTrialOrMassTrialMorningSwitchAttribution(sku, defaultShift, scheduleType)) {
             return attributionShift.getShiftStartDateTime();
         }
         return switchCompleteTime;
     }
 
     /**
-     * 解析试制 SKU 切换后的实际开产时间。
+     * 解析试制、量试 SKU 切换后的实际开产时间。
      *
-     * <p>仅当试制 SKU 的切换完成归属早班时，开产时间不得早于同业务日中班开始；
-     * 量试、正规、小批量沿用传入的默认开产时间。</p>
+     * <p>当试制或量试 SKU 的切换完成归属早班时，开产时间不得早于同业务日中班开始；
+     * 正规、小批量沿用传入的默认开产时间。</p>
      *
      * @param context 排程上下文
      * @param sku SKU 排程信息
@@ -216,7 +216,7 @@ public final class FirstInspectionQtyUtil {
             return null;
         }
         LhShiftConfigVO defaultShift = resolveAttributionShift(shifts, switchCompleteTime);
-        if (!isTrialMorningSwitchAttribution(sku, defaultShift, scheduleType)) {
+        if (!isTrialOrMassTrialMorningSwitchAttribution(sku, defaultShift, scheduleType)) {
             return defaultProductionStartTime;
         }
         LhShiftConfigVO attributionShift = resolveFirstInspectionAttributionShift(
@@ -1373,13 +1373,16 @@ public final class FirstInspectionQtyUtil {
                 + SHIFT_COUNTER_KEY_SEPARATOR + shift.getShiftIndex();
     }
 
-    private static boolean isTrialMorningSwitchAttribution(SkuScheduleDTO sku,
-                                                           LhShiftConfigVO defaultShift,
-                                                           String scheduleType) {
+    private static boolean isTrialOrMassTrialMorningSwitchAttribution(
+            SkuScheduleDTO sku,
+            LhShiftConfigVO defaultShift,
+            String scheduleType) {
         if (Objects.isNull(sku) || Objects.isNull(defaultShift)) {
             return false;
         }
-        if (!Objects.equals(ConstructionStageEnum.TRIAL.getCode(), sku.getConstructionStage())) {
+        if (!Objects.equals(ConstructionStageEnum.TRIAL.getCode(), sku.getConstructionStage())
+                && !Objects.equals(
+                ConstructionStageEnum.MASS_TRIAL.getCode(), sku.getConstructionStage())) {
             return false;
         }
         if (!Objects.equals(ScheduleTypeEnum.NEW_SPEC.getCode(), scheduleType)
@@ -1409,6 +1412,83 @@ public final class FirstInspectionQtyUtil {
         }
         return Objects.equals(ScheduleTypeEnum.NEW_SPEC.getCode(), scheduleType)
                 || Objects.equals(ScheduleTypeEnum.TYPE_BLOCK.getCode(), scheduleType);
+    }
+
+    /**
+     * 判断当前首检是否为量试 SKU 的计件首检。
+     *
+     * <p>量试与试制共用“首次正计划日中班才能开产”的时间门禁，但数量语义不同：
+     * 量试继续读取 SYS0303002/SYS0303003 并生成首检条数，不能误用试制固定2小时规则。</p>
+     *
+     * @param sku SKU排程信息
+     * @param scheduleType 排程类型
+     * @return true-量试新增或换活字块首检；false-其它场景
+     */
+    public static boolean isMassTrialQuantityFirstInspection(SkuScheduleDTO sku,
+                                                              String scheduleType) {
+        if (Objects.isNull(sku)
+                || !Objects.equals(
+                ConstructionStageEnum.MASS_TRIAL.getCode(), sku.getConstructionStage())) {
+            return false;
+        }
+        return Objects.equals(ScheduleTypeEnum.NEW_SPEC.getCode(), scheduleType)
+                || Objects.equals(ScheduleTypeEnum.TYPE_BLOCK.getCode(), scheduleType);
+    }
+
+    /**
+     * 判断统一生产门禁是否需要同步约束首检时间。
+     *
+     * <p>普通 SKU 只有门禁严格晚于准备完成时间时才移动首检；量试首检本身属于开产，
+     * 门禁恰好等于换模完成时间时也必须从该门禁开始，禁止再向前倒推到早班。</p>
+     *
+     * @param sku SKU排程信息
+     * @param productionNotBeforeTime 统一生产门禁
+     * @param preparationReadyTime 换模、换活字块或维修后的准备完成时间
+     * @param scheduleType 排程类型
+     * @return true-首检必须按生产门禁重新落位；false-保持原时间轴
+     */
+    public static boolean isProductionGateConstrainingFirstInspection(
+            SkuScheduleDTO sku,
+            Date productionNotBeforeTime,
+            Date preparationReadyTime,
+            String scheduleType) {
+        if (Objects.isNull(productionNotBeforeTime) || Objects.isNull(preparationReadyTime)) {
+            return false;
+        }
+        if (productionNotBeforeTime.after(preparationReadyTime)) {
+            return true;
+        }
+        return Objects.equals(productionNotBeforeTime, preparationReadyTime)
+                && isMassTrialQuantityFirstInspection(sku, scheduleType);
+    }
+
+    /**
+     * 量试计件首检完成后再开始普通生产。
+     *
+     * <p>量试首检从中班门禁开始时，首检条数占用真实生产时间；普通生产起点必须取
+     * 原开产时间与首检结束时间的较晚值。其它 SKU 保持既有时间轴。</p>
+     *
+     * @param sku SKU排程信息
+     * @param scheduleType 排程类型
+     * @param productionStartTime 原正式生产开始时间
+     * @param plan 首检时间分摊计划
+     * @return 收敛后的正式生产开始时间
+     */
+    public static Date resolveProductionStartAfterFirstInspection(
+            SkuScheduleDTO sku,
+            String scheduleType,
+            Date productionStartTime,
+            FirstInspectionAllocationPlan plan) {
+        if (!isMassTrialQuantityFirstInspection(sku, scheduleType)
+                || Objects.isNull(productionStartTime)
+                || Objects.isNull(plan)
+                || !plan.isValid()
+                || plan.getInspectionQty() <= 0
+                || Objects.isNull(plan.getInspectionEndTime())) {
+            return productionStartTime;
+        }
+        return plan.getInspectionEndTime().after(productionStartTime)
+                ? plan.getInspectionEndTime() : productionStartTime;
     }
 
     private static LhShiftConfigVO resolveAfternoonShiftOnSameWorkDate(List<LhShiftConfigVO> shifts,

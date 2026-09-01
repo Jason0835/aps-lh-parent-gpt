@@ -11,10 +11,7 @@ import org.springframework.util.CollectionUtils;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.YearMonth;
-import java.util.Collections;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -112,6 +109,7 @@ public class SkuMonthPlanCalculator {
                 isNextMonthFinal, allProductionList, allMonthPlanList, skuInfo);
     }
 
+
     /**
      * 获取硫化余量
      * 硫化余量 = 计划量(月计划量 + 硫化日调整量) - 已完成量 + 超欠产
@@ -148,6 +146,7 @@ public class SkuMonthPlanCalculator {
      * 2.1.2.2、如果最晚日计划量所处月份为前一个月，则统计前一个月的所有计划量(计划量计算起始日~当月月底)
      *
      * @param allProductionDate      日排产周期信息(通常为三天8个班)
+     * @param maxDiscontinueDays     排产周期内间隔天数
      * @param allMonthPlanList       所有月计划量
      * @param allLhDayAdjustList     所有月份-硫化日计划调整量
      * @param skuMonthProductionInfo Sku信息
@@ -155,12 +154,12 @@ public class SkuMonthPlanCalculator {
      * @return
      */
     public static Map<YearMonth, Integer> getPlanQty(List<Date> allProductionDate,
+                                                     Integer maxDiscontinueDays,
                                                      List<FactoryMonthPlanProductionFinalResult> allMonthPlanList,
                                                      List<LhDayPlanAdjustVo> allLhDayAdjustList,
                                                      FactoryMonthPlanProductionFinalResult skuMonthProductionInfo,
                                                      Integer startDay) {
-        return MonthPlanSurplusCalculator.getPlanQty(
-                allProductionDate, allMonthPlanList, allLhDayAdjustList, skuMonthProductionInfo, startDay);
+        return MonthPlanSurplusCalculator.getPlanQty(allProductionDate, maxDiscontinueDays, allMonthPlanList, allLhDayAdjustList, skuMonthProductionInfo, startDay);
     }
 
     /**

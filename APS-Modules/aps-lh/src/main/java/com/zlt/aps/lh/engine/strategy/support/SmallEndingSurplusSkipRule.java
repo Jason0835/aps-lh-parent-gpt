@@ -7,6 +7,7 @@ import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
 
@@ -16,11 +17,13 @@ import java.util.Objects;
 /**
  * 收尾小余量不排产规则。
  *
-     * <p>规则口径：收尾 SKU 的硫化余量小于等于允许欠产偏差值，且业务目标日前一日排程结果中
-     * T+1 日夜班未排满时，本次不排产并进入未排结果。该口径固定使用业务目标日前一日的排程结果。</p>
+ * <p>规则口径：收尾 SKU 的有效硫化余量小于等于允许欠产偏差值时，先判断余量占本轮目标月
+ * 原始TOTAL_QTY的比例；达到不忽略阈值时继续排产，未达到且业务目标日前一日排程结果中
+ * T+1日夜班未排满时，本次不排产并进入未排结果。</p>
  *
  * @author APS
  */
+@Slf4j
 public final class SmallEndingSurplusSkipRule {
 
     /** 收尾小余量且前日 T+1 夜班未排满的统一未排原因 */
@@ -38,7 +41,7 @@ public final class SmallEndingSurplusSkipRule {
      * @param context 排程上下文
      * @param sku SKU
      * @param isEnding 是否收尾
-     * @return true-命中规则，本次不排产；false-继续按原排程逻辑处理
+     * @return true-命中规则，本次不排产；false-命中比例豁免或继续按原排程逻辑处理
      */
     public static boolean shouldSkip(LhScheduleContext context, SkuScheduleDTO sku, boolean isEnding) {
         int genericSurplusQty = Objects.isNull(sku)
@@ -56,7 +59,7 @@ public final class SmallEndingSurplusSkipRule {
      * @param sku SKU
      * @param isEnding 是否收尾
      * @param ruleSurplusQty 当前运行场景下的有效余量
-     * @return true-命中规则，本次不排产；false-继续按原排程逻辑处理
+     * @return true-命中规则，本次不排产；false-命中比例豁免或继续按原排程逻辑处理
      */
     public static boolean shouldSkip(LhScheduleContext context,
                                      SkuScheduleDTO sku,
@@ -70,8 +73,45 @@ public final class SmallEndingSurplusSkipRule {
         if (surplusQty > toleranceQty) {
             return false;
         }
+        int originalMonthPlanTotalQty = Math.max(0, sku.getOriginalMonthPlanTotalQty());
+        int keepRatioPercent = resolveKeepRatioPercent(context);
+        boolean keepScheduleByRatio = isKeepScheduleBySurplusRatio(
+                surplusQty, originalMonthPlanTotalQty, keepRatioPercent);
+        int previousT1NightPlanQty = resolveTargetPreviousT1NightPlanQty(context, sku.getMaterialCode());
+        boolean previousT1NightFull = isTargetPreviousT1NightFull(context, sku);
+        boolean skipSchedule = !keepScheduleByRatio && !previousT1NightFull;
+        log.info("收尾小余量统一判断, factoryCode: {}, batchNo: {}, materialCode: {}, productStatus: {}, "
+                        + "surplusQty: {}, toleranceQty: {}, originalMonthPlanTotalQty: {}, "
+                        + "keepRatioPercent: {}, keepScheduleByRatio: {}, previousT1NightPlanQty: {}, "
+                        + "shiftCapacity: {}, previousT1NightFull: {}, skipSchedule: {}",
+                Objects.isNull(context) ? null : context.getFactoryCode(),
+                Objects.isNull(context) ? null : context.getBatchNo(),
+                sku.getMaterialCode(), sku.getProductStatus(), surplusQty, toleranceQty,
+                originalMonthPlanTotalQty, keepRatioPercent, keepScheduleByRatio,
+                previousT1NightPlanQty, sku.getShiftCapacity(), previousT1NightFull, skipSchedule);
         // 前日 T+1 夜班未排满是本规则的必要条件，已排满时仍按原收尾排产规则继续。
-        return !isTargetPreviousT1NightFull(context, sku);
+        return skipSchedule;
+    }
+
+    /**
+     * 判断小余量SKU是否达到继续排产比例。
+     *
+     * <p>使用long交叉相乘避免浮点舍入误差；月计划原始TOTAL_QTY不大于0时比例无有效分母，
+     * 不触发继续排产豁免。</p>
+     *
+     * @param surplusQty 当前场景有效硫化余量
+     * @param originalMonthPlanTotalQty 本轮目标月原始TOTAL_QTY
+     * @param keepRatioPercent 继续排产比例阈值
+     * @return true-不忽略小余量并继续排产；false-继续执行现有小余量跳过逻辑
+     */
+    static boolean isKeepScheduleBySurplusRatio(int surplusQty,
+                                                int originalMonthPlanTotalQty,
+                                                int keepRatioPercent) {
+        if (originalMonthPlanTotalQty <= 0 || keepRatioPercent < 0) {
+            return false;
+        }
+        return (long) Math.max(0, surplusQty) * 100L
+                >= (long) originalMonthPlanTotalQty * keepRatioPercent;
     }
 
     /**
@@ -85,6 +125,19 @@ public final class SmallEndingSurplusSkipRule {
             return LhScheduleConstant.CONTINUOUS_ENDING_SURPLUS_TOLERANCE_QTY;
         }
         return context.getScheduleConfig().getContinuousEndingSurplusToleranceQty();
+    }
+
+    /**
+     * 解析收尾小余量继续排产比例阈值。
+     *
+     * @param context 排程上下文
+     * @return 继续排产的最低百分比
+     */
+    public static int resolveKeepRatioPercent(LhScheduleContext context) {
+        if (Objects.isNull(context) || Objects.isNull(context.getScheduleConfig())) {
+            return LhScheduleConstant.SMALL_ENDING_SURPLUS_KEEP_RATIO_PERCENT;
+        }
+        return context.getScheduleConfig().getSmallEndingSurplusKeepRatioPercent();
     }
 
     /**

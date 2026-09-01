@@ -8,6 +8,7 @@ import org.apache.commons.lang3.StringUtils;
 import java.util.Collection;
 import java.util.Date;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * 优先级跟踪日志辅助工具。
@@ -211,7 +212,8 @@ public final class PriorityTraceLogHelper {
      * @param detail 日志明细
      */
     public static void logSortSummary(org.slf4j.Logger log, LhScheduleContext context, String title, String detail) {
-        if (StringUtils.isEmpty(detail)) {
+        if (StringUtils.isEmpty(detail)
+                || (Objects.nonNull(context) && context.isPriorityTraceMuted())) {
             return;
         }
         log.debug("{}\n{}", title, detail);

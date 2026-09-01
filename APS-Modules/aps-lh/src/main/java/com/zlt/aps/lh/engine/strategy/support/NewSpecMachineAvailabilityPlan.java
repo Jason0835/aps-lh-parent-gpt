@@ -74,6 +74,17 @@ public class NewSpecMachineAvailabilityPlan {
     private final LhShiftConfigVO formalTargetShift;
 
     /**
+     * 目标业务日跨日准备提案的资源竞争班次。
+     *
+     * <p>普通提案为空并继续按正式开产班次竞争；当目标日中班完成换模、正式生产落到
+     * 紧邻下一夜班时，保存换模开始所在班次，避免把同一候选错误归到下一业务日。</p>
+     */
+    private final LhShiftConfigVO sourceDayResourceShift;
+
+    /** 是否为“目标业务日准备、紧邻下一夜班正式生产”的跨日提案。 */
+    private final boolean sourceDayCrossDayPreparation;
+
+    /**
      * 不使用换模均衡配额时，经过停机、维修、清洗、禁换模和首检资源校验后的准备完成时间。
      * <p>该时间只服务候选机台的准备班次筛选，不代表正式生产时间，也不触发计划量或账本扣减。</p>
      */
@@ -262,6 +273,64 @@ public class NewSpecMachineAvailabilityPlan {
             LhShiftConfigVO formalTargetShift,
             HistoricalResidualCapacityInfo historicalResidualCapacityInfo,
             boolean firstInspectionDeferredByClassTotalLimit) {
+        this(machine, available, unavailableReason, occupationEndTime, machineReadyTime,
+                changeoverStartTime, changeoverEndTime, productionNotBeforeTime,
+                candidateProductionNotBeforeTime, candidateAvailableProductionTime, targetShift,
+                firstInspectionPlan, traceChangeoverEndTime, preparationAvailableTime,
+                preparationTargetShift, preparationAvailable, formalAvailableProductionTime,
+                formalTargetShift, historicalResidualCapacityInfo,
+                firstInspectionDeferredByClassTotalLimit, null, false);
+    }
+
+    /**
+     * 创建携带目标日跨日准备竞争班次的完整候选计划。
+     *
+     * @param machine 候选机台
+     * @param available 正式候选是否可用
+     * @param unavailableReason 不可用原因
+     * @param occupationEndTime 前序占用结束时间
+     * @param machineReadyTime 机台准备就绪时间
+     * @param changeoverStartTime 换模开始时间
+     * @param changeoverEndTime 换模完成时间
+     * @param productionNotBeforeTime 正式生产门禁
+     * @param candidateProductionNotBeforeTime 候选预演门禁
+     * @param candidateAvailableProductionTime 候选预演可开产时间
+     * @param targetShift 候选预演班次
+     * @param firstInspectionPlan 首检计划
+     * @param traceChangeoverEndTime 日志展示换模完成时间
+     * @param preparationAvailableTime 准备完成时间
+     * @param preparationTargetShift 准备完成班次
+     * @param preparationAvailable 准备时间轴是否可用
+     * @param formalAvailableProductionTime 正式可开产时间
+     * @param formalTargetShift 正式开产班次
+     * @param historicalResidualCapacityInfo 历史剩余产能画像
+     * @param firstInspectionDeferredByClassTotalLimit 首检是否因班次总量顺延
+     * @param sourceDayResourceShift 目标日准备动作参与竞争的班次
+     * @param sourceDayCrossDayPreparation 是否为目标日跨日准备提案
+     */
+    private NewSpecMachineAvailabilityPlan(
+            MachineScheduleDTO machine,
+            boolean available,
+            String unavailableReason,
+            Date occupationEndTime,
+            Date machineReadyTime,
+            Date changeoverStartTime,
+            Date changeoverEndTime,
+            Date productionNotBeforeTime,
+            Date candidateProductionNotBeforeTime,
+            Date candidateAvailableProductionTime,
+            LhShiftConfigVO targetShift,
+            FirstInspectionAllocationPlan firstInspectionPlan,
+            Date traceChangeoverEndTime,
+            Date preparationAvailableTime,
+            LhShiftConfigVO preparationTargetShift,
+            boolean preparationAvailable,
+            Date formalAvailableProductionTime,
+            LhShiftConfigVO formalTargetShift,
+            HistoricalResidualCapacityInfo historicalResidualCapacityInfo,
+            boolean firstInspectionDeferredByClassTotalLimit,
+            LhShiftConfigVO sourceDayResourceShift,
+            boolean sourceDayCrossDayPreparation) {
         this.machine = machine;
         this.available = available;
         this.unavailableReason = unavailableReason;
@@ -282,6 +351,8 @@ public class NewSpecMachineAvailabilityPlan {
         this.preparationAvailable = preparationAvailable;
         this.historicalResidualCapacityInfo = historicalResidualCapacityInfo;
         this.firstInspectionDeferredByClassTotalLimit = firstInspectionDeferredByClassTotalLimit;
+        this.sourceDayResourceShift = sourceDayResourceShift;
+        this.sourceDayCrossDayPreparation = sourceDayCrossDayPreparation;
     }
 
     /**
@@ -299,7 +370,8 @@ public class NewSpecMachineAvailabilityPlan {
                 firstInspectionPlan, traceChangeoverEndTime, preparationAvailableTime,
                 preparationTargetShift, preparationAvailable, formalAvailableProductionTime,
                 formalTargetShift, residualCapacityInfo,
-                firstInspectionDeferredByClassTotalLimit);
+                firstInspectionDeferredByClassTotalLimit,
+                sourceDayResourceShift, sourceDayCrossDayPreparation);
     }
 
     /**
@@ -360,7 +432,8 @@ public class NewSpecMachineAvailabilityPlan {
                 committedProductionStartTime, committedProductionShift,
                 committedAvailable, committedProductionStartTime,
                 committedProductionShift, historicalResidualCapacityInfo,
-                firstInspectionDeferredByClassTotalLimit);
+                firstInspectionDeferredByClassTotalLimit,
+                sourceDayResourceShift, sourceDayCrossDayPreparation);
     }
 
     /**
@@ -377,7 +450,30 @@ public class NewSpecMachineAvailabilityPlan {
                 candidateProductionNotBeforeTime, candidateAvailableProductionTime, targetShift,
                 firstInspectionPlan, traceChangeoverEndTime, preparationAvailableTime,
                 preparationTargetShift, preparationAvailable, formalAvailableProductionTime,
-                formalTargetShift, historicalResidualCapacityInfo, true);
+                formalTargetShift, historicalResidualCapacityInfo, true,
+                sourceDayResourceShift, sourceDayCrossDayPreparation);
+    }
+
+    /**
+     * 将当前合法时间轴标记为目标业务日跨日准备提案。
+     *
+     * @param resourceShift 换模开始所在的目标日资源班次
+     * @return 携带跨日准备竞争口径的新计划对象
+     */
+    public NewSpecMachineAvailabilityPlan withSourceDayCrossDayPreparation(
+            LhShiftConfigVO resourceShift) {
+        boolean crossDayAvailable = available && Objects.nonNull(resourceShift)
+                && Objects.nonNull(formalTargetShift);
+        return new NewSpecMachineAvailabilityPlan(
+                machine, crossDayAvailable,
+                crossDayAvailable ? unavailableReason : "目标日跨日准备资源班次为空",
+                occupationEndTime, machineReadyTime, changeoverStartTime, changeoverEndTime,
+                productionNotBeforeTime, candidateProductionNotBeforeTime,
+                candidateAvailableProductionTime, targetShift, firstInspectionPlan,
+                traceChangeoverEndTime, preparationAvailableTime, preparationTargetShift,
+                preparationAvailable, formalAvailableProductionTime, formalTargetShift,
+                historicalResidualCapacityInfo, firstInspectionDeferredByClassTotalLimit,
+                resourceShift, crossDayAvailable);
     }
 
     public MachineScheduleDTO getMachine() {
@@ -463,6 +559,34 @@ public class NewSpecMachineAvailabilityPlan {
      */
     public LhShiftConfigVO getFormalTargetShift() {
         return formalTargetShift;
+    }
+
+    /**
+     * 获取机台驱动本轮实际使用的资源竞争班次。
+     *
+     * @return 目标日跨日准备返回换模资源班次；普通场景返回正式开产班次
+     */
+    public LhShiftConfigVO getCompetitionTargetShift() {
+        return sourceDayCrossDayPreparation
+                ? sourceDayResourceShift : formalTargetShift;
+    }
+
+    /**
+     * 获取目标日跨日准备的换模资源班次。
+     *
+     * @return 资源班次；普通计划为空
+     */
+    public LhShiftConfigVO getSourceDayResourceShift() {
+        return sourceDayResourceShift;
+    }
+
+    /**
+     * 判断当前计划是否为目标业务日准备、紧邻下一夜班生产。
+     *
+     * @return true-目标日跨日准备；false-普通或生产日前回看计划
+     */
+    public boolean isSourceDayCrossDayPreparation() {
+        return sourceDayCrossDayPreparation;
     }
 
     /**

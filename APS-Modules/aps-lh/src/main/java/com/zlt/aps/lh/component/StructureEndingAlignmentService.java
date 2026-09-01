@@ -84,6 +84,25 @@ public class StructureEndingAlignmentService {
     public StructureEndingAlignmentDecision evaluateCandidate(LhScheduleContext context,
                                                               SkuScheduleDTO sku,
                                                               MachineScheduleDTO machine) {
+        return this.evaluateCandidate(context, sku, machine, true);
+    }
+
+    /**
+     * 对单个候选机台执行结构收尾对齐实时判断。
+     *
+     * <p>机台驱动批量预演必须复用与正式选机完全相同的判断，但不得为每个被拒绝组合
+     * 输出逐条明细；正式选机继续输出原有审计日志。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 当前待排SKU
+     * @param machine 候选机台
+     * @param traceEnabled 是否输出本次判断明细日志
+     * @return 结构收尾对齐判断结果
+     */
+    public StructureEndingAlignmentDecision evaluateCandidate(LhScheduleContext context,
+                                                              SkuScheduleDTO sku,
+                                                              MachineScheduleDTO machine,
+                                                              boolean traceEnabled) {
         StructureEndingAlignmentDecision decision = new StructureEndingAlignmentDecision();
         if (Objects.isNull(context) || Objects.isNull(sku) || Objects.isNull(machine)
                 || StringUtils.isEmpty(machine.getMachineCode())) {
@@ -92,8 +111,10 @@ public class StructureEndingAlignmentService {
         String structureName = sku.getStructureName();
         decision.setStructureName(structureName);
         if (StringUtils.isEmpty(structureName)) {
-            log.info("结构收尾对齐跳过, batchNo: {}, materialCode: {}, machineCode: {}, reason: 待排SKU无结构",
-                    context.getBatchNo(), sku.getMaterialCode(), machine.getMachineCode());
+            if (traceEnabled) {
+                log.info("结构收尾对齐跳过, batchNo: {}, materialCode: {}, machineCode: {}, reason: 待排SKU无结构",
+                        context.getBatchNo(), sku.getMaterialCode(), machine.getMachineCode());
+            }
             return decision;
         }
         /*
@@ -101,35 +122,41 @@ public class StructureEndingAlignmentService {
          * 不读取最低机台数、不统计在机机台，也不改变后续正常候选列表及既有机台优先级。
          */
         if (!this.isStructureEndingWithinScheduleWindow(
-                context, sku, machine, structureName)) {
+                context, sku, machine, structureName, traceEnabled)) {
             return decision;
         }
         Integer minimumMachineCount =
                 context.getStructureMinVulcanizingMachineMap().get(structureName);
         if (Objects.isNull(minimumMachineCount) || minimumMachineCount <= 0) {
-            log.info("结构收尾对齐跳过, batchNo: {}, materialCode: {}, structureName: {}, "
-                            + "machineCode: {}, reason: 最低机台数未配置或为0",
-                    context.getBatchNo(), sku.getMaterialCode(), structureName,
-                    machine.getMachineCode());
+            if (traceEnabled) {
+                log.info("结构收尾对齐跳过, batchNo: {}, materialCode: {}, structureName: {}, "
+                                + "machineCode: {}, reason: 最低机台数未配置或为0",
+                        context.getBatchNo(), sku.getMaterialCode(), structureName,
+                        machine.getMachineCode());
+            }
             return decision;
         }
         decision.setMinimumMachineCount(minimumMachineCount);
         StructureShiftInMachineIndex structureShiftInMachineIndex =
                 context.getStructureShiftInMachineIndex();
         if (Objects.isNull(structureShiftInMachineIndex)) {
-            log.warn("结构收尾对齐在机缓存未构建，跳过触发判断, batchNo: {}, materialCode: {}, "
-                            + "structureName: {}, machineCode: {}",
-                    context.getBatchNo(), sku.getMaterialCode(), structureName,
-                    machine.getMachineCode());
+            if (traceEnabled) {
+                log.warn("结构收尾对齐在机缓存未构建，跳过触发判断, batchNo: {}, materialCode: {}, "
+                                + "structureName: {}, machineCode: {}",
+                        context.getBatchNo(), sku.getMaterialCode(), structureName,
+                        machine.getMachineCode());
+            }
             return decision;
         }
         int countingShiftIndex = resolveCountingShiftIndex(context, machine);
         decision.setCountingShiftIndex(countingShiftIndex);
         if (countingShiftIndex < 1) {
-            log.info("结构收尾对齐跳过, batchNo: {}, materialCode: {}, structureName: {}, "
-                            + "machineCode: {}, reason: 无法定位机台收尾时间所在班次",
-                    context.getBatchNo(), sku.getMaterialCode(), structureName,
-                    machine.getMachineCode());
+            if (traceEnabled) {
+                log.info("结构收尾对齐跳过, batchNo: {}, materialCode: {}, structureName: {}, "
+                                + "machineCode: {}, reason: 无法定位机台收尾时间所在班次",
+                        context.getBatchNo(), sku.getMaterialCode(), structureName,
+                        machine.getMachineCode());
+            }
             return decision;
         }
         int inMachineCount = structureShiftInMachineIndex.resolveInMachineCount(
@@ -138,11 +165,13 @@ public class StructureEndingAlignmentService {
         boolean triggered = inMachineCount < minimumMachineCount - 1;
         decision.setTriggered(triggered);
         if (!triggered) {
-            log.info("结构收尾对齐未触发, batchNo: {}, materialCode: {}, structureName: {}, "
-                            + "machineCode: {}, countingShift: {}, inMachineCount: {}, minimumMachineCount: {}",
-                    context.getBatchNo(), sku.getMaterialCode(), structureName,
-                    machine.getMachineCode(), countingShiftIndex, inMachineCount,
-                    minimumMachineCount);
+            if (traceEnabled) {
+                log.info("结构收尾对齐未触发, batchNo: {}, materialCode: {}, structureName: {}, "
+                                + "machineCode: {}, countingShift: {}, inMachineCount: {}, minimumMachineCount: {}",
+                        context.getBatchNo(), sku.getMaterialCode(), structureName,
+                        machine.getMachineCode(), countingShiftIndex, inMachineCount,
+                        minimumMachineCount);
+            }
             return decision;
         }
         /*
@@ -158,13 +187,15 @@ public class StructureEndingAlignmentService {
                             context, machine.getMachineCode(), countingShiftIndex);
             if (Objects.isNull(activeOwnerResult)) {
                 decision.setRealIdleMachine(true);
-                log.info("结构收尾对齐真实空机放行, batchNo: {}, materialCode: {}, structureName: {}, "
-                                + "machineCode: {}, previousMaterialCode: null, previousStructureName: null, "
-                                + "countingShift: {}, inMachineCount: {}, minimumMachineCount: {}, "
-                                + "triggered: true, reason: 机台无运行态物料且无实时排程归属",
-                        context.getBatchNo(), sku.getMaterialCode(), structureName,
-                        machine.getMachineCode(), countingShiftIndex, inMachineCount,
-                        minimumMachineCount);
+                if (traceEnabled) {
+                    log.info("结构收尾对齐真实空机放行, batchNo: {}, materialCode: {}, structureName: {}, "
+                                    + "machineCode: {}, previousMaterialCode: null, previousStructureName: null, "
+                                    + "countingShift: {}, inMachineCount: {}, minimumMachineCount: {}, "
+                                    + "triggered: true, reason: 机台无运行态物料且无实时排程归属",
+                            context.getBatchNo(), sku.getMaterialCode(), structureName,
+                            machine.getMachineCode(), countingShiftIndex, inMachineCount,
+                            minimumMachineCount);
+                }
                 return decision;
             }
             previousMaterialCode = activeOwnerResult.getMaterialCode();
@@ -174,13 +205,15 @@ public class StructureEndingAlignmentService {
         if (StringUtils.isEmpty(previousMaterialCode)) {
             decision.setAllowed(false);
             decision.setExcludedReason("候选机台存在实时排程归属，但有效前物料为空");
-            log.warn("结构收尾对齐运行态数据异常排除, batchNo: {}, materialCode: {}, structureName: {}, "
-                            + "machineCode: {}, previousMaterialSource: {}, countingShift: {}, "
-                            + "inMachineCount: {}, minimumMachineCount: {}, triggered: true, "
-                            + "reason: 存在实时排程归属但有效前物料为空",
-                    context.getBatchNo(), sku.getMaterialCode(), structureName,
-                    machine.getMachineCode(), previousMaterialSource, countingShiftIndex, inMachineCount,
-                    minimumMachineCount);
+            if (traceEnabled) {
+                log.warn("结构收尾对齐运行态数据异常排除, batchNo: {}, materialCode: {}, structureName: {}, "
+                                + "machineCode: {}, previousMaterialSource: {}, countingShift: {}, "
+                                + "inMachineCount: {}, minimumMachineCount: {}, triggered: true, "
+                                + "reason: 存在实时排程归属但有效前物料为空",
+                        context.getBatchNo(), sku.getMaterialCode(), structureName,
+                        machine.getMachineCode(), previousMaterialSource, countingShiftIndex, inMachineCount,
+                        minimumMachineCount);
+            }
             return decision;
         }
         String previousStructureName = structureMinMachineRetentionService
@@ -189,31 +222,37 @@ public class StructureEndingAlignmentService {
         if (StringUtils.isEmpty(previousStructureName)) {
             decision.setAllowed(false);
             decision.setExcludedReason("候选机台前物料无法归属结构，按不同结构排除");
-            log.info("结构收尾对齐前物料无结构排除, batchNo: {}, materialCode: {}, structureName: {}, "
-                            + "machineCode: {}, previousMaterialCode: {}, previousMaterialSource: {}, countingShift: {}, "
-                            + "inMachineCount: {}, minimumMachineCount: {}",
-                    context.getBatchNo(), sku.getMaterialCode(), structureName,
-                    machine.getMachineCode(), previousMaterialCode, previousMaterialSource, countingShiftIndex,
-                    inMachineCount, minimumMachineCount);
+            if (traceEnabled) {
+                log.info("结构收尾对齐前物料无结构排除, batchNo: {}, materialCode: {}, structureName: {}, "
+                                + "machineCode: {}, previousMaterialCode: {}, previousMaterialSource: {}, countingShift: {}, "
+                                + "inMachineCount: {}, minimumMachineCount: {}",
+                        context.getBatchNo(), sku.getMaterialCode(), structureName,
+                        machine.getMachineCode(), previousMaterialCode, previousMaterialSource, countingShiftIndex,
+                        inMachineCount, minimumMachineCount);
+            }
             return decision;
         }
         if (StringUtils.equals(previousStructureName, structureName)) {
-            log.info("结构收尾对齐同结构放行, batchNo: {}, materialCode: {}, structureName: {}, "
-                            + "machineCode: {}, previousMaterialCode: {}, previousMaterialSource: {}, previousStructureName: {}, "
-                            + "countingShift: {}, inMachineCount: {}, minimumMachineCount: {}, reason: 同结构",
-                    context.getBatchNo(), sku.getMaterialCode(), structureName,
-                    machine.getMachineCode(), previousMaterialCode, previousMaterialSource, previousStructureName,
-                    countingShiftIndex, inMachineCount, minimumMachineCount);
+            if (traceEnabled) {
+                log.info("结构收尾对齐同结构放行, batchNo: {}, materialCode: {}, structureName: {}, "
+                                + "machineCode: {}, previousMaterialCode: {}, previousMaterialSource: {}, previousStructureName: {}, "
+                                + "countingShift: {}, inMachineCount: {}, minimumMachineCount: {}, reason: 同结构",
+                        context.getBatchNo(), sku.getMaterialCode(), structureName,
+                        machine.getMachineCode(), previousMaterialCode, previousMaterialSource, previousStructureName,
+                        countingShiftIndex, inMachineCount, minimumMachineCount);
+            }
             return decision;
         }
         decision.setAllowed(false);
         decision.setExcludedReason("候选机台前物料结构与待排SKU不同结构");
-        log.info("结构收尾对齐不同结构排除, batchNo: {}, materialCode: {}, structureName: {}, "
-                        + "machineCode: {}, previousMaterialCode: {}, previousMaterialSource: {}, previousStructureName: {}, "
-                        + "countingShift: {}, inMachineCount: {}, minimumMachineCount: {}, reason: 不同结构",
-                context.getBatchNo(), sku.getMaterialCode(), structureName,
-                machine.getMachineCode(), previousMaterialCode, previousMaterialSource, previousStructureName,
-                countingShiftIndex, inMachineCount, minimumMachineCount);
+        if (traceEnabled) {
+            log.info("结构收尾对齐不同结构排除, batchNo: {}, materialCode: {}, structureName: {}, "
+                            + "machineCode: {}, previousMaterialCode: {}, previousMaterialSource: {}, previousStructureName: {}, "
+                            + "countingShift: {}, inMachineCount: {}, minimumMachineCount: {}, reason: 不同结构",
+                    context.getBatchNo(), sku.getMaterialCode(), structureName,
+                    machine.getMachineCode(), previousMaterialCode, previousMaterialSource, previousStructureName,
+                    countingShiftIndex, inMachineCount, minimumMachineCount);
+        }
         return decision;
     }
 
@@ -235,7 +274,8 @@ public class StructureEndingAlignmentService {
             LhScheduleContext context,
             SkuScheduleDTO sku,
             MachineScheduleDTO machine,
-            String structureName) {
+            String structureName,
+            boolean traceEnabled) {
         LocalDate windowStartDate = this.toLocalDate(context.getScheduleDate());
         LocalDate windowEndDate = Objects.isNull(windowStartDate)
                 ? null : windowStartDate.plusDays(
@@ -244,36 +284,44 @@ public class StructureEndingAlignmentService {
         LocalDate maxEndingDate = CollectionUtils.isEmpty(maxEndingDateMap)
                 ? null : maxEndingDateMap.get(structureName);
         if (Objects.isNull(windowStartDate) || Objects.isNull(windowEndDate)) {
-            log.warn("结构收尾对齐三天门禁未通过, batchNo: {}, materialCode: {}, structureName: {}, "
-                            + "machineCode: {}, windowStartDate: {}, windowEndDate: {}, maxEndingDate: {}, "
-                            + "reason: 排程窗口日期不完整，继续正常选机",
-                    context.getBatchNo(), sku.getMaterialCode(), structureName,
-                    machine.getMachineCode(), windowStartDate, windowEndDate, maxEndingDate);
+            if (traceEnabled) {
+                log.warn("结构收尾对齐三天门禁未通过, batchNo: {}, materialCode: {}, structureName: {}, "
+                                + "machineCode: {}, windowStartDate: {}, windowEndDate: {}, maxEndingDate: {}, "
+                                + "reason: 排程窗口日期不完整，继续正常选机",
+                        context.getBatchNo(), sku.getMaterialCode(), structureName,
+                        machine.getMachineCode(), windowStartDate, windowEndDate, maxEndingDate);
+            }
             return false;
         }
         if (Objects.isNull(maxEndingDate)) {
-            log.info("结构收尾对齐三天门禁未通过, batchNo: {}, materialCode: {}, structureName: {}, "
-                            + "machineCode: {}, windowStartDate: {}, windowEndDate: {}, maxEndingDate: null, "
-                            + "reason: 未查询到结构转产配置或END_DAY为空，继续正常选机",
-                    context.getBatchNo(), sku.getMaterialCode(), structureName,
-                    machine.getMachineCode(), windowStartDate, windowEndDate);
+            if (traceEnabled) {
+                log.info("结构收尾对齐三天门禁未通过, batchNo: {}, materialCode: {}, structureName: {}, "
+                                + "machineCode: {}, windowStartDate: {}, windowEndDate: {}, maxEndingDate: null, "
+                                + "reason: 未查询到结构转产配置或END_DAY为空，继续正常选机",
+                        context.getBatchNo(), sku.getMaterialCode(), structureName,
+                        machine.getMachineCode(), windowStartDate, windowEndDate);
+            }
             return false;
         }
         boolean withinWindow = !maxEndingDate.isBefore(windowStartDate)
                 && !maxEndingDate.isAfter(windowEndDate);
         if (!withinWindow) {
-            log.info("结构收尾对齐三天门禁未通过, batchNo: {}, materialCode: {}, structureName: {}, "
-                            + "machineCode: {}, windowStartDate: {}, windowEndDate: {}, maxEndingDate: {}, "
-                            + "reason: 结构最大收尾日期不在三天窗口内，继续正常选机",
-                    context.getBatchNo(), sku.getMaterialCode(), structureName,
-                    machine.getMachineCode(), windowStartDate, windowEndDate, maxEndingDate);
+            if (traceEnabled) {
+                log.info("结构收尾对齐三天门禁未通过, batchNo: {}, materialCode: {}, structureName: {}, "
+                                + "machineCode: {}, windowStartDate: {}, windowEndDate: {}, maxEndingDate: {}, "
+                                + "reason: 结构最大收尾日期不在三天窗口内，继续正常选机",
+                        context.getBatchNo(), sku.getMaterialCode(), structureName,
+                        machine.getMachineCode(), windowStartDate, windowEndDate, maxEndingDate);
+            }
             return false;
         }
-        log.info("结构收尾对齐三天门禁通过, batchNo: {}, materialCode: {}, structureName: {}, "
-                        + "machineCode: {}, windowStartDate: {}, windowEndDate: {}, maxEndingDate: {}, "
-                        + "reason: 结构最大收尾日期位于三天窗口内，继续执行现有结构对齐规则",
-                context.getBatchNo(), sku.getMaterialCode(), structureName,
-                machine.getMachineCode(), windowStartDate, windowEndDate, maxEndingDate);
+        if (traceEnabled) {
+            log.info("结构收尾对齐三天门禁通过, batchNo: {}, materialCode: {}, structureName: {}, "
+                            + "machineCode: {}, windowStartDate: {}, windowEndDate: {}, maxEndingDate: {}, "
+                            + "reason: 结构最大收尾日期位于三天窗口内，继续执行现有结构对齐规则",
+                    context.getBatchNo(), sku.getMaterialCode(), structureName,
+                    machine.getMachineCode(), windowStartDate, windowEndDate, maxEndingDate);
+        }
         return true;
     }
 

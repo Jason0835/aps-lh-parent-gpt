@@ -371,7 +371,17 @@ public class LhDailyMouldCalcServiceImpl implements ILhDailyMouldCalcService {
         int lookAheadDays = Math.max(
                 context.getScheduleConfig().getContinuousMouldOfflineCheckDays(),
                 LhScheduleConstant.REQUIRED_MACHINE_CROSS_WINDOW_EXTRA_DAYS);
-        return windowEndDate.plusDays(lookAheadDays);
+        LocalDate defaultCalculationEndDate = windowEndDate.plusDays(lookAheadDays);
+        /*
+         * 续作增机提前会在窗口最后业务日检查参数范围内的窗口外首次增机日。
+         * 目标机台数统一Map必须覆盖同一固定截止日，否则准入虽然允许后看，
+         * 但机台数维度缺失仍会把合法候选静默过滤。
+         */
+        LocalDate earlyProductionMaxDate = Objects.isNull(context.getEarlyProductionMaxDate())
+                ? null : this.toLocalDate(context.getEarlyProductionMaxDate());
+        return Objects.nonNull(earlyProductionMaxDate)
+                && earlyProductionMaxDate.isAfter(defaultCalculationEndDate)
+                ? earlyProductionMaxDate : defaultCalculationEndDate;
     }
 
     /**

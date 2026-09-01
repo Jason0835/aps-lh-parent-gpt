@@ -71,9 +71,9 @@ public class LhDeviceStopPlanScheduleService {
             if (!isValidCleaningStopPlan(planShut)) {
                 continue;
             }
-            // 服务层再次执行 T 日边界校验，防止其他初始化入口误把历史清洗计划放入上下文并占用本次名额。
-            if (!isPlanBeginOnOrAfterScheduleDate(context, planShut.getBeginDate())) {
-                log.info("清洗计划早于T日，本次不纳入候选, T日: {}, 机台: {}, 停机类型: {}, 计划开始: {}",
+            // 服务层再次校验计划日期必须落在本次排程窗口内，防止其他初始化入口误把窗口外清洗计划放入上下文。
+            if (!isPlanBeginWithinScheduleWindow(context, planShut.getBeginDate())) {
+                log.info("清洗计划日期不在排程窗口内，本次不纳入候选, T日: {}, 机台: {}, 停机类型: {}, 计划开始: {}",
                         LhScheduleTimeUtil.formatDate(context.getScheduleDate()),
                         planShut.getMachineCode(), planShut.getMachineStopType(),
                         LhScheduleTimeUtil.formatDateTime(planShut.getBeginDate()));
@@ -285,37 +285,15 @@ public class LhDeviceStopPlanScheduleService {
      *
      * @param context 排程上下文
      * @param planBeginTime 设备停机计划开始时间
-     * @return true-计划开始时间不早于 T 日零点
+     * @return true-计划开始时间落在排程窗口内
      */
-    private boolean isPlanBeginOnOrAfterScheduleDate(LhScheduleContext context, Date planBeginTime) {
+    private boolean isPlanBeginWithinScheduleWindow(LhScheduleContext context, Date planBeginTime) {
         if (Objects.isNull(context) || Objects.isNull(context.getScheduleDate()) || Objects.isNull(planBeginTime)) {
             return true;
         }
-        Date scheduleStartTime = LhScheduleTimeUtil.clearTime(context.getScheduleDate());
-        return !planBeginTime.before(scheduleStartTime);
-    }
-
-    /**
-     * 校验清洗实际安排日期是否不晚于计划开始日期。
-     *
-     * <p>业务规则：实际清洗日期 ≤ 计划开始日期所在自然日。允许提前安排、允许安排在计划开始日当天，
-     * 禁止晚于计划开始日期安排；比较按自然日（归零时分秒）进行，与"允许当天"口径一致。</p>
-     *
-     * <p>任一参数为 null 时返回 true，保持与 {@link #isPlanBeginOnOrAfterScheduleDate} 一致的容错口径，
-     * 由调用方保证传入有效时间，不在本方法内新增兜底默认值。</p>
-     *
-     * @param planBeginDate        设备停机清洗计划的计划开始时间（beginDate）
-     * @param actualCleanStartTime 实际清洗开始时间
-     * @return true-实际清洗日不晚于计划开始日（含当天），可继续安排；false-已晚于计划开始日，应跳过
-     */
-    public boolean isCleaningActualDateNotLaterThanPlanBegin(Date planBeginDate, Date actualCleanStartTime) {
-        if (Objects.isNull(planBeginDate) || Objects.isNull(actualCleanStartTime)) {
-            return true;
-        }
-        // 归零到自然日后比较：实际清洗日 <= 计划开始日（含当天）
-        Date planBeginDay = LhScheduleTimeUtil.clearTime(planBeginDate);
-        Date actualCleanDay = LhScheduleTimeUtil.clearTime(actualCleanStartTime);
-        return !actualCleanDay.after(planBeginDay);
+        Date windowStartTime = LhScheduleTimeUtil.clearTime(context.getScheduleDate());
+        Date windowEndTime = LhScheduleTimeUtil.addDays(windowStartTime, LhScheduleTimeUtil.getScheduleDays(context));
+        return !planBeginTime.before(windowStartTime) && planBeginTime.before(windowEndTime);
     }
 
     /**

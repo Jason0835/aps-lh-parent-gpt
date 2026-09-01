@@ -7,6 +7,10 @@ import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.context.LhScheduleContext;
 
 import java.util.List;
+import java.util.Collections;
+import java.util.IdentityHashMap;
+import java.util.Objects;
+import java.util.Set;
 
 /**
  * SKU排产优先级策略接口
@@ -45,4 +49,46 @@ public interface ISkuPriorityStrategy {
      */
     void sortNewSpecByPriority(LhScheduleContext context,
                                List<SkuScheduleDTO> pendingNewSpecSkuList);
+
+    /**
+     * 对单个日期池执行无副作用优先级排序。
+     *
+     * <p>生产实现必须复用新增SKU比较器，但不得改写共享DTO的sortRank、scheduleOrder和sortDesc，
+     * 防止多个日期池依次排序后污染窗口级全局名次。默认实现仅用于兼容测试替身。</p>
+     *
+     * @param context 排程上下文
+     * @param poolSkuList 单个日期池SKU列表
+     */
+    default void sortNewSpecPoolByPriority(LhScheduleContext context,
+                                           List<SkuScheduleDTO> poolSkuList) {
+        sortNewSpecByPriority(context, poolSkuList);
+    }
+
+    /**
+     * 解析需要进入特殊 SKU 置换阶段的候选。
+     *
+     * <p>默认实现只识别交期锁定和负延误；生产默认策略还会复用结构 N 天内收尾快照。
+     * 返回集合只用于阶段分类，特殊 SKU 在置换前仍具有正常资源竞争资格。</p>
+     *
+     * @param context 排程上下文
+     * @param pendingNewSpecSkuList 当前待排 SKU
+     * @return 特殊 SKU 对象身份集合
+     */
+    default Set<SkuScheduleDTO> resolveSpecialNewSpecSkus(
+            LhScheduleContext context,
+            List<SkuScheduleDTO> pendingNewSpecSkuList) {
+        Set<SkuScheduleDTO> specialSkuSet =
+                Collections.newSetFromMap(new IdentityHashMap<SkuScheduleDTO, Boolean>());
+        if (Objects.isNull(pendingNewSpecSkuList)) {
+            return specialSkuSet;
+        }
+        for (SkuScheduleDTO sku : pendingNewSpecSkuList) {
+            if (Objects.nonNull(sku)
+                    && (sku.isDeliveryLocked()
+                    || (Objects.nonNull(sku.getDelayDays()) && sku.getDelayDays() < 0))) {
+                specialSkuSet.add(sku);
+            }
+        }
+        return specialSkuSet;
+    }
 }

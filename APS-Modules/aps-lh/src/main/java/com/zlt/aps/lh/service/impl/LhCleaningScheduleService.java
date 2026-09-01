@@ -188,20 +188,13 @@ public class LhCleaningScheduleService {
                     LhScheduleTimeUtil.formatDateTime(cleaningPlan.getBeginDate()));
             return null;
         }
+        // 按计划日期（beginDate）定位实际清洗班次，不再从排程窗口 T 日提前寻找空档
         Date cleanStartTime = resolveNextDeviceStopCleaningStartTime(context, cleanType,
+                cleaningPlan.getBeginDate(),
                 dryIceDailyCountMap, dryIceMorningCountMap, dryIceAfternoonCountMap, sandBlastDailyCountMap);
         if (Objects.isNull(cleanStartTime)) {
-            log.info("清洗计划超过本次窗口可安排上限，本次不纳入, 机台: {}, 类型: {}, 计划开始: {}",
+            log.info("清洗计划超过可安排上限，本次不纳入, 机台: {}, 类型: {}, 计划开始: {}",
                     cleaningPlan.getMachineCode(), cleanType, LhScheduleTimeUtil.formatDateTime(cleaningPlan.getBeginDate()));
-            return null;
-        }
-        // 最晚安排日期校验：实际清洗日期不得晚于计划开始日期（含当天），超过则跳过且不占用每日上限名额
-        if (!getDeviceStopPlanScheduleService()
-                .isCleaningActualDateNotLaterThanPlanBegin(cleaningPlan.getBeginDate(), cleanStartTime)) {
-            log.info("清洗实际安排日期晚于计划开始日期，跳过清洗, 机台: {}, 类型: {}, 计划开始: {}, 实际清洗开始: {}",
-                    cleaningPlan.getMachineCode(), cleanType,
-                    LhScheduleTimeUtil.formatDateTime(cleaningPlan.getBeginDate()),
-                    LhScheduleTimeUtil.formatDateTime(cleanStartTime));
             return null;
         }
         LhMachineOnlineInfo machineOnlineInfo = resolveMachineOnlineInfo(context, cleaningPlan.getMachineCode());
@@ -231,91 +224,153 @@ public class LhCleaningScheduleService {
     }
 
     /**
-     * 解析下一条设备停机来源清洗在本次排程窗口内的实际清洗开始时间。
-     * <p>该方法是清洗专用逻辑：不使用设备停机计划的计划开始/结束作为实际执行时间，
-     * 只根据当前已占用的每日/班次名额，从 T～T+2 窗口内寻找可安排班次。</p>
+     * 解析下一条设备停机来源清洗的实际清洗开始时间。
+     * <p>以计划日期（beginDate）为基准定位清洗班次，不再从排程窗口 T 日提前寻找空档；
+     * 计划日期当天班次额度已满时顺延到后续有额度的班次/日期。</p>
      *
      * @param context 排程上下文
      * @param cleanType 清洗类型
+     * @param planBeginTime 设备停机清洗计划开始时间
      * @param dryIceDailyCountMap 干冰每日已安排台数
      * @param dryIceMorningCountMap 干冰早班已安排台数
      * @param dryIceAfternoonCountMap 干冰中班已安排台数
      * @param sandBlastDailyCountMap 喷砂每日已安排台数
-     * @return 本次窗口内实际清洗开始时间；窗口额度耗尽时返回 null
+     * @return 实际清洗开始时间；搜索上限内无可用班次时返回 null
      */
     private Date resolveNextDeviceStopCleaningStartTime(LhScheduleContext context,
                                                         String cleanType,
+                                                        Date planBeginTime,
                                                         Map<String, Integer> dryIceDailyCountMap,
                                                         Map<String, Integer> dryIceMorningCountMap,
                                                         Map<String, Integer> dryIceAfternoonCountMap,
                                                         Map<String, Integer> sandBlastDailyCountMap) {
         if (CleaningTypeEnum.SAND_BLAST.getCode().equals(cleanType)) {
-            return resolveNextDeviceStopSandBlastStartTime(context, sandBlastDailyCountMap);
+            return resolveNextDeviceStopSandBlastStartTime(context, planBeginTime, sandBlastDailyCountMap);
         }
         if (CleaningTypeEnum.DRY_ICE.getCode().equals(cleanType)) {
-            return resolveNextDeviceStopDryIceStartTime(context, dryIceDailyCountMap,
+            return resolveNextDeviceStopDryIceStartTime(context, planBeginTime, dryIceDailyCountMap,
                     dryIceMorningCountMap, dryIceAfternoonCountMap);
         }
         return null;
     }
 
     /**
-     * 解析设备停机来源干冰清洗在本次窗口内的下一个早班/中班开始时间。
+     * 解析设备停机来源干冰清洗从计划日期开始的早班/中班开始时间。
+     * <p>按计划日期安排，不提前、不顺延：计划日期当天班次额度满时直接放过（返回 null）。</p>
      *
      * @param context 排程上下文
+     * @param planBeginTime 设备停机清洗计划开始时间
      * @param dryIceDailyCountMap 干冰每日已安排台数
      * @param dryIceMorningCountMap 干冰早班已安排台数
      * @param dryIceAfternoonCountMap 干冰中班已安排台数
      * @return 实际干冰清洗开始时间；无可用班次时返回 null
      */
     private Date resolveNextDeviceStopDryIceStartTime(LhScheduleContext context,
+                                                      Date planBeginTime,
                                                       Map<String, Integer> dryIceDailyCountMap,
                                                       Map<String, Integer> dryIceMorningCountMap,
                                                       Map<String, Integer> dryIceAfternoonCountMap) {
-        Date windowStartTime = LhScheduleTimeUtil.clearTime(context.getScheduleDate());
-        int scheduleDays = LhScheduleTimeUtil.getScheduleDays(context);
+        if (Objects.isNull(planBeginTime)) {
+            return null;
+        }
         int dryIceDailyLimit = context.getParamIntValue(
                 LhScheduleParamConstant.DRY_ICE_DAILY_LIMIT, LhScheduleConstant.DRY_ICE_DAILY_LIMIT);
-        int morningLimit = (dryIceDailyLimit + 1) / 2;
-        int afternoonLimit = dryIceDailyLimit - morningLimit;
-        for (int dayIndex = 0; dayIndex < scheduleDays; dayIndex++) {
-            Date currentDate = LhScheduleTimeUtil.addDays(windowStartTime, dayIndex);
-            String dateKey = LhScheduleTimeUtil.formatDate(currentDate);
-            if (dryIceDailyCountMap.getOrDefault(dateKey, 0) >= dryIceDailyLimit) {
-                continue;
-            }
+        int morningLimit = context.getParamIntValue(LhScheduleParamConstant.DRY_ICE_MORNING_SHIFT_LIMIT,
+                LhScheduleConstant.DRY_ICE_MORNING_SHIFT_LIMIT);
+        int afternoonLimit = context.getParamIntValue(LhScheduleParamConstant.DRY_ICE_AFTERNOON_SHIFT_LIMIT,
+                LhScheduleConstant.DRY_ICE_AFTERNOON_SHIFT_LIMIT);
+        // 起点按计划时间点归一为干冰可执行班次：早班前/早班内→当天早班；中班内→当天中班；中班后/夜班→次日早班
+        Date candidateStartTime = resolveDryIceShiftStartTime(context, planBeginTime);
+        Date currentDate = LhScheduleTimeUtil.clearTime(candidateStartTime);
+        String dateKey = LhScheduleTimeUtil.formatDate(currentDate);
+        // 按计划日期安排，不提前不顺延：当日额度满就放过
+        if (dryIceDailyCountMap.getOrDefault(dateKey, 0) >= dryIceDailyLimit) {
+            return null;
+        }
+        if (LhScheduleTimeUtil.isMorningShift(context, candidateStartTime)) {
             if (dryIceMorningCountMap.getOrDefault(dateKey, 0) < morningLimit) {
-                return LhScheduleTimeUtil.getMorningShiftStart(context, currentDate);
+                return candidateStartTime;
             }
+            // 早班额度满，尝试当日中班
+            Date afternoonStartTime = LhScheduleTimeUtil.getAfternoonShiftStart(context, currentDate);
             if (dryIceAfternoonCountMap.getOrDefault(dateKey, 0) < afternoonLimit) {
-                return LhScheduleTimeUtil.getAfternoonShiftStart(context, currentDate);
+                return afternoonStartTime;
+            }
+        } else if (LhScheduleTimeUtil.isAfternoonShift(context, candidateStartTime)) {
+            if (dryIceAfternoonCountMap.getOrDefault(dateKey, 0) < afternoonLimit) {
+                return candidateStartTime;
             }
         }
         return null;
     }
 
     /**
-     * 解析设备停机来源喷砂清洗在本次窗口内的下一个中班开始时间。
+     * 将计划时间点归一为干冰可执行班次开始时间。
      *
      * @param context 排程上下文
+     * @param planBeginTime 设备停机清洗计划开始时间
+     * @return 归一后的班次开始时间（早班或中班）
+     */
+    private Date resolveDryIceShiftStartTime(LhScheduleContext context, Date planBeginTime) {
+        if (LhScheduleTimeUtil.isMorningShift(context, planBeginTime)) {
+            return LhScheduleTimeUtil.getMorningShiftStart(context, planBeginTime);
+        }
+        if (LhScheduleTimeUtil.isAfternoonShift(context, planBeginTime)) {
+            return LhScheduleTimeUtil.getAfternoonShiftStart(context, planBeginTime);
+        }
+        Date morningStart = LhScheduleTimeUtil.getMorningShiftStart(context, planBeginTime);
+        if (planBeginTime.before(morningStart)) {
+            return morningStart;
+        }
+        // 中班后或夜班 → 次日早班
+        return LhScheduleTimeUtil.getMorningShiftStart(context, LhScheduleTimeUtil.addDays(planBeginTime, 1));
+    }
+
+    /**
+     * 解析设备停机来源喷砂清洗从计划日期开始的中班开始时间。
+     * <p>按计划日期安排，不提前、不顺延：计划日期当天命中禁止日期或额度满时直接放过（返回 null）。</p>
+     *
+     * @param context 排程上下文
+     * @param planBeginTime 设备停机清洗计划开始时间
      * @param sandBlastDailyCountMap 喷砂每日已安排台数
      * @return 实际喷砂清洗开始时间；无可用中班时返回 null
      */
     private Date resolveNextDeviceStopSandBlastStartTime(LhScheduleContext context,
+                                                         Date planBeginTime,
                                                          Map<String, Integer> sandBlastDailyCountMap) {
-        Date windowStartTime = LhScheduleTimeUtil.clearTime(context.getScheduleDate());
-        int scheduleDays = LhScheduleTimeUtil.getScheduleDays(context);
-        for (int dayIndex = 0; dayIndex < scheduleDays; dayIndex++) {
-            Date currentDate = LhScheduleTimeUtil.addDays(windowStartTime, dayIndex);
-            Date afternoonStartTime = LhScheduleTimeUtil.getAfternoonShiftStart(context, currentDate);
-            String dateKey = LhScheduleTimeUtil.formatDate(afternoonStartTime);
-            // 喷砂只允许中班执行，且命中周日、维保日、不可排日期时整日跳过。
-            if (sandBlastDailyCountMap.getOrDefault(dateKey, 0) < SAND_BLAST_DAILY_LIMIT
-                    && !isSandBlastForbiddenDate(context, afternoonStartTime)) {
-                return afternoonStartTime;
-            }
+        if (Objects.isNull(planBeginTime)) {
+            return null;
         }
-        return null;
+        // 喷砂固定中班：按计划时间点归一到中班（中班前→当天中班；中班内→当天中班；中班后/夜班→次日中班）
+        Date candidateStartTime = resolveSandBlastShiftStartTime(context, planBeginTime);
+        String dateKey = LhScheduleTimeUtil.formatDate(candidateStartTime);
+        int sandBlastDailyLimit = context.getParamIntValue(LhScheduleParamConstant.SAND_BLAST_DAILY_LIMIT,
+                LhScheduleConstant.SAND_BLAST_DAILY_LIMIT);
+        // 按计划日期安排，不提前不顺延：禁止日期或额度满就放过
+        if (sandBlastDailyCountMap.getOrDefault(dateKey, 0) >= sandBlastDailyLimit
+                || isSandBlastForbiddenDate(context, candidateStartTime)) {
+            return null;
+        }
+        return candidateStartTime;
+    }
+
+    /**
+     * 将计划时间点归一为喷砂可执行中班开始时间。
+     *
+     * @param context 排程上下文
+     * @param planBeginTime 设备停机清洗计划开始时间
+     * @return 归一后的中班开始时间
+     */
+    private Date resolveSandBlastShiftStartTime(LhScheduleContext context, Date planBeginTime) {
+        Date afternoonStart = LhScheduleTimeUtil.getAfternoonShiftStart(context, planBeginTime);
+        if (LhScheduleTimeUtil.isAfternoonShift(context, planBeginTime)) {
+            return afternoonStart;
+        }
+        if (planBeginTime.before(afternoonStart)) {
+            return afternoonStart;
+        }
+        // 计划在中班后（夜班）→ 次日中班
+        return LhScheduleTimeUtil.getAfternoonShiftStart(context, LhScheduleTimeUtil.addDays(planBeginTime, 1));
     }
 
     /**
@@ -789,7 +844,10 @@ public class LhCleaningScheduleService {
         if (Objects.isNull(cleanTime)) {
             return false;
         }
-        if (isSandBlastMaintenanceDate(context, cleanTime)) {
+        // 维保日：仅当"维保日允许喷砂"开关未启用时才禁止
+        if (isSandBlastMaintenanceDate(context, cleanTime)
+                && context.getParamIntValue(LhScheduleParamConstant.SAND_BLAST_ALLOW_ON_MAINTENANCE_DATE,
+                LhScheduleConstant.SAND_BLAST_ALLOW_ON_MAINTENANCE_DATE) != ENABLED) {
             return true;
         }
         if (isSunday(cleanTime)

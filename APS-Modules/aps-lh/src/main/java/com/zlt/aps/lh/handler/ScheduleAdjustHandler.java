@@ -2,6 +2,9 @@ package com.zlt.aps.lh.handler;
 
 import com.google.common.collect.Lists;
 import com.zlt.aps.common.engine.domain.LhDayPlanAdjustVo;
+import com.zlt.aps.common.engine.domain.LhSurplusProductionDayInfo;
+import com.zlt.aps.common.engine.domain.LhSurplusResultVo;
+import com.zlt.aps.common.engine.domain.LhSurplusSkuInfo;
 import com.zlt.aps.common.engine.utils.MonthPlanSurplusCalculator;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
@@ -15,6 +18,7 @@ import com.zlt.aps.lh.api.domain.entity.LhUnscheduledResult;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.enums.*;
 import com.zlt.aps.lh.component.*;
+import com.zlt.aps.lh.context.LhScheduleConfig;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.IEndingJudgmentStrategy;
 import com.zlt.aps.lh.engine.strategy.support.EarlyProductionChecker;
@@ -23,6 +27,7 @@ import com.zlt.aps.lh.service.ILhDailyMouldCalcService;
 import com.zlt.aps.lh.util.*;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuLhCapacity;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
+import com.zlt.aps.utils.BeanCopyUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
@@ -122,7 +127,9 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * 月计划最大自然日
      */
     private static final int MAX_DAY_OF_MONTH = 31;
-    /** 同物料跨状态续作按目标机台数补足过程日志标题。 */
+    /**
+     * 同物料跨状态续作按目标机台数补足过程日志标题。
+     */
     private static final String SAME_MATERIAL_STATUS_TARGET_CONTINUATION_LOG_TITLE =
             "同物料跨状态续作目标机台补足";
 
@@ -475,9 +482,9 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     /**
      * 判断SKU是否属于当前运行态的共用胎胚零余量候选。
      *
-     * @param context   排程上下文
+     * @param context    排程上下文
      * @param allSkuList 当前结构待排池中的完整SKU集合
-     * @param sku       当前SKU
+     * @param sku        当前SKU
      * @return true-属于共用胎胚零余量候选；false-不属于
      */
     private boolean isSharedEmbryoZeroSurplusCandidate(
@@ -558,7 +565,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * 因此必须等新增准入清理结束后再刷新活跃集合并动态转单胎胚，确保该续作按剩余胎胚库存
      * 建立严格目标，不会被“窗口无日计划”规则释放。混合余量组也在此统一复核剩余关系。</p>
      *
-     * @param context             排程上下文
+     * @param context            排程上下文
      * @param normalizeEmbryoSet 需要重新归一化的胎胚集合
      */
     private void finalizeSharedEmbryoZeroSurplusGroups(
@@ -986,40 +993,39 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * @return 硫化余量计算结果
      */
     private SurplusCalculation calculateSurplusQty(LhScheduleContext context, FactoryMonthPlanProductionFinalResult plan) {
-        int actualFinishedQty = calculateFinishedQty(context, plan);
+        YearMonth productionYearMonth = MonthPlanSurplusCalculator.getProductionYearAndMonth(context.getScheduleDate());
+        FactoryMonthPlanProductionFinalResult findFinishedQtyInfo = BeanCopyUtils.copyBean(plan, FactoryMonthPlanProductionFinalResult.class);
+        findFinishedQtyInfo.setYear(productionYearMonth.getYear());
+        findFinishedQtyInfo.setMonth(productionYearMonth.getMonthValue());
+        int actualFinishedQty = calculateFinishedQty(context, findFinishedQtyInfo);
         int scheDayFinishQty = resolveScheDayFinishQty(context, plan);
-        YearMonth productionYearMonth = MonthPlanSurplusCalculator.getProductionYearAndMonth(
-                context.getScheduleDate());
         //20260702+ 欠产都只看当月
         List<Date> allProductionDate = Lists.newArrayList(context.getAllProductionDateInfo());
         List<FactoryMonthPlanProductionFinalResult> allMonthPlanList = context.getLoadedMonthPlanList();
-        Map<YearMonth, Integer> monthOverdueQtyMap = MonthPlanSurplusCalculator.getOverdueProduction(
-                context.isNextMonthFinal(), allProductionDate, allMonthPlanList, plan);
-        //20260702+ 计划量，支持跨月连续
-        Map<YearMonth, FactoryMonthPlanProductionFinalResult> dayProductionPlanMap =
-                MonthPlanSurplusCalculator.getHasProductionPlan(
-                        allMonthPlanList, allProductionDate, plan.getFactoryCode(),
-                        plan.getMaterialCode(), plan.getProductStatus());
-        //20260817+ 月计划量包含(硫化日计划调整量)
-        Map<YearMonth, Integer> monthPlanQtyMap = context.getMonthPlanQty(plan);
+        Map<YearMonth, Integer> monthOverdueQtyMap = MonthPlanSurplusCalculator.getOverdueProduction(context.isNextMonthFinal(), allProductionDate, allMonthPlanList, plan);
+        //20260830+ 余量计算新逻辑需考虑调整的库存抓取日
+        Integer startDay = context.getStartDay();
+        //20260829+ 排产周期中间间断间隔限制
+        Integer maxDiscontinueDays = null;
+        LhScheduleConfig scheduleConfig = context.getScheduleConfig();
+        if (null != scheduleConfig) {
+            maxDiscontinueDays = scheduleConfig.getEarlyProductionDaysThreshold();
+        }
+        List<LhDayPlanAdjustVo> allLhDayPlanAdjustList = context.getAllLhDayPlanAdjustList();
+        LhSurplusProductionDayInfo productionDayInfo = new LhSurplusProductionDayInfo(productionYearMonth, startDay, allProductionDate, maxDiscontinueDays);
+        LhSurplusSkuInfo lhSurplusSkuInfo = new LhSurplusSkuInfo(plan, allMonthPlanList, monthOverdueQtyMap, actualFinishedQty, allLhDayPlanAdjustList);
+        LhSurplusResultVo lhSurplusResult = MonthPlanSurplusCalculator.getSurplusInfo(productionDayInfo, lhSurplusSkuInfo);
         boolean isCrossMonth = context.isCrossMonthByProductionDateInfo();
-        //当前排产计划总量
-        int totalPlanQty = MonthPlanSurplusCalculator.sumQty(monthPlanQtyMap);
-        int remainingDemandQty = MonthPlanSurplusCalculator.getSurplusQty(
-                productionYearMonth, allProductionDate, dayProductionPlanMap,
-                monthOverdueQtyMap, monthPlanQtyMap, actualFinishedQty);
+        //20260817+ 月计划量包含(硫化日计划调整量)
+        int totalPlanQty = lhSurplusResult.getPlanQty();
+        int remainingDemandQty = lhSurplusResult.getSurplusQty();
         remainingDemandQty = Math.max(BigDecimal.ZERO.intValue(), remainingDemandQty);
         // 保留逐日超产统计用于诊断日志，不参与余量计算
         int ignoredOverProductionQty = calculateIgnoredOverProductionQty(context, plan);
-        //超欠产信息 由resolveEffectiveLastMonthOverdueQty(plan)改为monthOverdueQtyMap直接获取
-        int lastMonthOverdueQty = BigDecimal.ZERO.intValue();
-        Integer currentOverdueQty = monthOverdueQtyMap.get(productionYearMonth);
-        if (null != currentOverdueQty) {
-            lastMonthOverdueQty = currentOverdueQty;
-        }
+        //超欠产信息 由resolveEffectiveLastMonthOverdueQty(plan)改为直接获取
+        int lastMonthOverdueQty = lhSurplusResult.getMonthOverdueQty();
         //月计划总量 20260817+ 月计划总量包含(硫化日计划调整量)
-        Map<YearMonth, Integer> monthTotalMap = context.getSumPlanQty(plan);
-        int monthPlanTotalQty = MonthPlanSurplusCalculator.sumQty(monthTotalMap);
+        int monthPlanTotalQty = lhSurplusResult.getSumPlanQty();
         log.info("硫化余量计算完成, materialCode: {}, monthPlanQty: {}, monthFinishedAndScheDayQty: {}, "
                         + "scheDayFinishQty: {}, lastMonthValidFlag: {}, lastMonthOverdueQty: {}, surplusQty: {}, "
                         + "crossMonth: {}, monthPlanTotalQty: {}",
@@ -1219,6 +1225,8 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
 
         // 计划量信息 20260713+ 含上月超欠产 surplus.getMonthPlanTotal()
         dto.setMonthPlanQty(surplus.getRealMonthPlanTotal());
+        // 比例规则分母严格保留本轮目标月定稿表原始TOTAL_QTY，不叠加上月超欠产或运行态扣减。
+        dto.setOriginalMonthPlanTotalQty(safeInt(targetMonthPlan.getTotalQty()));
         dto.setFinishedQty(surplus.getActualFinishedQty());
         String materialStatusKey = MonthPlanDateResolver.buildMaterialStatusKey(
                 plan.getMaterialCode(), plan.getProductStatus());
@@ -1268,6 +1276,21 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         dto.setDailyPlanQty(targetMonthPlan.getDayVulcanizationQty() != null
                 ? targetMonthPlan.getDayVulcanizationQty() : 0);
 
+        /*
+         * 目标量和实际消费账本使用“物料+产品状态”作为运行态唯一身份，并依赖施工阶段判断
+         * 是否为严格目标。必须在初始化目标量与账本前完成这些字段，禁止先以空产品状态创建
+         * 一份账本，再在后续排产阶段按正式状态懒加载出第二份账本。
+         */
+        dto.setProductStatus(targetMonthPlan.getProductStatus());
+        dto.setConstructionStage(targetMonthPlan.getConstructionStage());
+        dto.setTrialDemandQty(safeInt(targetMonthPlan.getTrialQty()));
+        dto.setTrial(isTrialStage(targetMonthPlan.getConstructionStage()));
+        dto.setSkuTag(SkuTagEnum.NORMAL.getCode());
+        // 试制SKU严格限制目标量，不允许超出dayN补满班次；量试/正规仍可按后续策略补满可用班次。
+        if (StringUtils.equals(ConstructionStageEnum.TRIAL.getCode(), dto.getConstructionStage())) {
+            dto.setStrictTargetQty(true);
+        }
+
         // 产能信息（从SKU日硫化产能Map获取）
         MdmSkuLhCapacity capacity = context.getSkuLhCapacityMap().get(plan.getMaterialCode());
         if (capacity != null) {
@@ -1310,15 +1333,12 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         dto.setMidPriorityPendingQty(safeInt(targetMonthPlan.getMidProductionQty()));
         dto.setConventionProductionPendingQty(safeInt(targetMonthPlan.getConventionProductionQty()));
 
-        // 施工阶段：试制/量试/正规来自月计划，后续影响排序、单控机台选择和严格目标量。
-        dto.setConstructionStage(targetMonthPlan.getConstructionStage());
-        dto.setTrialDemandQty(safeInt(targetMonthPlan.getTrialQty()));
+        // 施工阶段已在账本初始化前写入；此处继续补齐排序和展示字段。
         dto.setBeginDay(targetMonthPlan.getBeginDay());
         // 月计划结构结束日，仅用于全量SKU排序日志展示，不参与排序与排产
         dto.setEndDay(targetMonthPlan.getEndDay());
         // 月计划模具变化信息只在 S4.5 窗口无日计划历史欠产补排时用于判断计划使用模数。
         dto.setMouldChangeInfo(targetMonthPlan.getMouldChangeInfo());
-        dto.setTrial(isTrialStage(targetMonthPlan.getConstructionStage()));
         // 正规SKU仍按月计划表原始 totalQty 标记小批量，仅供分类和排序；不得再决定单控单模/双模。
         // 这里不能再用运行态余量，否则大计划 SKU 会在后期余量变小后被误判成小批量。
         int monthPlanTotalQty = safeInt(targetMonthPlan.getTotalQty());
@@ -1340,22 +1360,11 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         dto.setMonthPlanVersion(targetMonthPlan.getMonthPlanVersion());
         dto.setProductionVersion(targetMonthPlan.getProductionVersion());
 
-        // 产品状态（来自月计划）
-        dto.setProductStatus(targetMonthPlan.getProductStatus());
-
         // 月计划所属年月（来自月计划），用于SKU减量清单按年月精确匹配
         dto.setMonthPlanYear(targetMonthPlan.getYear());
         dto.setMonthPlanMonth(targetMonthPlan.getMonth());
         // 月计划定稿表备注，供 S4.6 保存前为新增排产SKU结果追加"模具号"开头备注
         dto.setMonthPlanRemark(targetMonthPlan.getRemark());
-
-        // 试制SKU严格限制目标量，不允许超出dayN补满班次；量试/正规仍可按后续策略补满可用班次。
-        if (StringUtils.equals(ConstructionStageEnum.TRIAL.getCode(), dto.getConstructionStage())) {
-            dto.setStrictTargetQty(true);
-        }
-
-        // 默认标记为常规
-        dto.setSkuTag(SkuTagEnum.NORMAL.getCode());
 
         return dto;
     }
@@ -2304,7 +2313,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * <p>该收口位于试制/量试无计划过滤之后，只处理仍保留有效续作需求的目标状态。
      * 同一物料存在多个状态同时缺机时保持原有后置资源竞争，不按列表顺序抢占机台。</p>
      *
-     * @param context 排程上下文
+     * @param context           排程上下文
      * @param continuousSkuList 已完成无计划过滤的续作SKU列表
      */
     private void supplementSameMaterialStatusContinuousMachineByTarget(
@@ -2373,7 +2382,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
                 continue;
             }
             retainedTemplateMap.computeIfAbsent(
-                    sku.getMaterialCode(), key -> new LinkedHashMap<String, SkuScheduleDTO>(4))
+                            sku.getMaterialCode(), key -> new LinkedHashMap<String, SkuScheduleDTO>(4))
                     .putIfAbsent(StringUtils.trim(sku.getProductStatus()), sku);
         }
         Map<String, List<SkuScheduleDTO>> retainedSkuMap =
@@ -2387,10 +2396,10 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     /**
      * 解析同物料在T日仍存在目标机台缺口的产品状态。
      *
-     * @param context 排程上下文
+     * @param context           排程上下文
      * @param continuousSkuList 当前续作SKU列表
-     * @param retainedSkuList 同物料续作状态模板
-     * @param productionDate T日
+     * @param retainedSkuList   同物料续作状态模板
+     * @param productionDate    T日
      * @return 存在机台缺口的状态模板列表
      */
     private List<SkuScheduleDTO> resolveUniqueTargetShortageSkuList(
@@ -2417,7 +2426,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * 统计指定物料和产品状态当前已识别的物理续作机台数。
      *
      * @param continuousSkuList 续作SKU列表
-     * @param targetSku 目标SKU
+     * @param targetSku         目标SKU
      * @return 去重后的物理机台数
      */
     private int countContinuousPhysicalMachine(List<SkuScheduleDTO> continuousSkuList,
@@ -2442,7 +2451,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * <p>单控L/R模式在本步骤之后才冻结，跨状态补位无法安全判断单边或整机口径，
      * 因此单控机台继续沿用既有后置选机链，不在本收口点提前接管。</p>
      *
-     * @param context 排程上下文
+     * @param context                        排程上下文
      * @param assignedPhysicalMachineCodeSet 已分配物理机台
      * @return 未分配物理机台到MES在机记录列表
      */
@@ -2470,8 +2479,8 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     /**
      * 判断未分配在机机台能否承接同物料其他状态续作。
      *
-     * @param context 排程上下文
-     * @param targetSku 目标续作SKU
+     * @param context         排程上下文
+     * @param targetSku       目标续作SKU
      * @param onlineEntryList 同一物理机台的MES在机记录
      * @return true-同物料且原状态整个窗口无机台需求
      */
@@ -2502,8 +2511,8 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     /**
      * 判断物料状态在当前排程窗口是否存在有效目标机台数。
      *
-     * @param context 排程上下文
-     * @param materialCode 物料编码
+     * @param context       排程上下文
+     * @param materialCode  物料编码
      * @param productStatus 产品状态
      * @return true-存在正目标或Map维度缺失；false-窗口内目标均为0
      */
@@ -2532,8 +2541,8 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * 为同物料跨状态补位机台创建目标状态续作副本。
      *
      * @param continuousSkuList 续作SKU列表
-     * @param targetSku 目标状态模板
-     * @param onlineEntryList MES在机记录
+     * @param targetSku         目标状态模板
+     * @param onlineEntryList   MES在机记录
      */
     private void appendSameMaterialStatusContinuousCopies(
             List<SkuScheduleDTO> continuousSkuList,
@@ -2549,12 +2558,12 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     /**
      * 记录同物料跨状态续作补位决策。
      *
-     * @param context 排程上下文
-     * @param targetSku 目标状态SKU
-     * @param onlineEntryList 原MES在机记录
-     * @param productionDate T日
-     * @param targetMachineCount 目标机台数
-     * @param beforeMachineCount 补位前机台数
+     * @param context                排程上下文
+     * @param targetSku              目标状态SKU
+     * @param onlineEntryList        原MES在机记录
+     * @param productionDate         T日
+     * @param targetMachineCount     目标机台数
+     * @param beforeMachineCount     补位前机台数
      * @param remainingShortageCount 补位后剩余缺口
      */
     private void appendSameMaterialStatusTargetContinuationLog(
@@ -2594,10 +2603,10 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     /**
      * 多个产品状态同时存在机台缺口时记录跳过原因，保持原有后置资源竞争。
      *
-     * @param context 排程上下文
-     * @param materialCode 物料编码
+     * @param context         排程上下文
+     * @param materialCode    物料编码
      * @param shortageSkuList 存在缺口的状态列表
-     * @param productionDate T日
+     * @param productionDate  T日
      */
     private void logAmbiguousSameMaterialStatusTarget(
             LhScheduleContext context,
@@ -3066,6 +3075,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         copy.setBrand(source.getBrand());
         // 计划量信息
         copy.setMonthPlanQty(source.getMonthPlanQty());
+        copy.setOriginalMonthPlanTotalQty(source.getOriginalMonthPlanTotalQty());
         copy.setMonthPlanSumTotal(source.getMonthPlanSumTotal());
         copy.setFinishedQty(source.getFinishedQty());
         copy.setSurplusQty(source.getSurplusQty());

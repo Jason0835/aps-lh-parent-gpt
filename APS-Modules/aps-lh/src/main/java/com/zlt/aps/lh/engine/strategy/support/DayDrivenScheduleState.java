@@ -52,6 +52,9 @@ public class DayDrivenScheduleState {
     /** 当前业务日各 SKU 的执行结果 */
     private final Map<SkuScheduleDTO, SkuDayScheduleOutcome> currentDayOutcomeMap =
             new IdentityHashMap<SkuScheduleDTO, SkuDayScheduleOutcome>();
+    /** SKU对象身份到跨日持续候选运行态，避免每天重建候选时丢失原日期池和机台机会。 */
+    private final Map<SkuScheduleDTO, NewSpecCandidateRuntimeState> candidateRuntimeStateMap =
+            new IdentityHashMap<SkuScheduleDTO, NewSpecCandidateRuntimeState>();
     /**
      * 尚未形成实际命中的最后一次选机诊断快照。
      *
@@ -74,6 +77,11 @@ public class DayDrivenScheduleState {
                 ? Collections.<SkuScheduleDTO>emptyList() : orderedSkuList;
         this.orderedSkuList = new ArrayList<SkuScheduleDTO>(sourceList);
         this.pendingSkuSet.addAll(sourceList);
+        for (SkuScheduleDTO sku : sourceList) {
+            if (Objects.nonNull(sku)) {
+                candidateRuntimeStateMap.put(sku, new NewSpecCandidateRuntimeState());
+            }
+        }
     }
 
     /**
@@ -99,6 +107,7 @@ public class DayDrivenScheduleState {
             orderedSkuList.add(insertIndex, sku);
         }
         pendingSkuSet.add(sku);
+        this.resolveCandidateRuntimeState(sku);
     }
 
     /**
@@ -439,6 +448,20 @@ public class DayDrivenScheduleState {
             }
         }
         return resultList;
+    }
+
+    /**
+     * 获取或创建SKU在当前三天窗口内唯一的候选运行态。
+     *
+     * @param sku 当前SKU
+     * @return 窗口级轻量运行态
+     */
+    public NewSpecCandidateRuntimeState resolveCandidateRuntimeState(SkuScheduleDTO sku) {
+        if (Objects.isNull(sku)) {
+            throw new IllegalArgumentException("新增排产SKU不能为空");
+        }
+        return candidateRuntimeStateMap.computeIfAbsent(
+                sku, key -> new NewSpecCandidateRuntimeState());
     }
 
     /**

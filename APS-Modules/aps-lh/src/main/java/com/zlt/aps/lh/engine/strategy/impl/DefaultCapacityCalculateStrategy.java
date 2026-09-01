@@ -68,13 +68,15 @@ public class DefaultCapacityCalculateStrategy implements ICapacityCalculateStrat
             maxStartTime = capsuleReplacementReadyTime;
         }
 
-        log.debug("计算机台准备就绪时间, 机台: {}, 收尾时间: {}, 保养后就绪时间: {}, 维修后就绪时间: {}, "
-                        + "换胶囊后就绪时间: {}, 最终就绪时间: {}",
-                machineCode, LhScheduleTimeUtil.formatDateTime(endingTime),
-                LhScheduleTimeUtil.formatDateTime(maintenanceStartTime),
-                LhScheduleTimeUtil.formatDateTime(repairStartTime),
-                LhScheduleTimeUtil.formatDateTime(capsuleReplacementReadyTime),
-                LhScheduleTimeUtil.formatDateTime(maxStartTime));
+        if (context == null || !context.isNewSpecProposalPreview()) {
+            log.debug("计算机台准备就绪时间, 机台: {}, 收尾时间: {}, 保养后就绪时间: {}, 维修后就绪时间: {}, "
+                            + "换胶囊后就绪时间: {}, 最终就绪时间: {}",
+                    machineCode, LhScheduleTimeUtil.formatDateTime(endingTime),
+                    LhScheduleTimeUtil.formatDateTime(maintenanceStartTime),
+                    LhScheduleTimeUtil.formatDateTime(repairStartTime),
+                    LhScheduleTimeUtil.formatDateTime(capsuleReplacementReadyTime),
+                    LhScheduleTimeUtil.formatDateTime(maxStartTime));
+        }
         return maxStartTime;
     }
 

@@ -8,7 +8,9 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.zlt.aps.common.engine.domain.LhDayPlanAdjustVo;
-import com.zlt.aps.common.engine.domain.YearMonthLhDayAdjustVo;
+import com.zlt.aps.common.engine.domain.LhSurplusProductionDayInfo;
+import com.zlt.aps.common.engine.domain.LhSurplusResultVo;
+import com.zlt.aps.common.engine.domain.LhSurplusSkuInfo;
 import com.zlt.aps.common.engine.utils.MonthPlanSurplusCalculator;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
@@ -23,6 +25,7 @@ import com.zlt.aps.lh.handler.LhInsertOrderValidateHandler;
 import com.zlt.aps.lh.handler.SkuMonthPlanCalculator;
 import com.zlt.aps.lh.mapper.*;
 import com.zlt.aps.lh.service.ILhDayPlanAdjustRequireService;
+import com.zlt.aps.lh.service.ILhMonthStartService;
 import com.zlt.aps.lh.service.ILhScheduleResultService;
 import com.zlt.aps.lh.util.LeftRightMouldUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
@@ -104,6 +107,9 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
     private MdmMonthSurplusMapper monthSurplusMapper;
     @Resource
     private LhParamsMapper lhParamsMapper;
+
+    @Resource
+    private ILhMonthStartService lhMonthStartService;
 
     private static final AtomicInteger INSERT_ORDER_SEQ = new AtomicInteger(0);
 
@@ -622,6 +628,7 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
             return;
         }
         String factoryCode = lhScheduleResultList.get(BigDecimal.ZERO.intValue()).getFactoryCode();
+        List<Date> realProductionDateList = getRealProductionDateInfo(scheduleDate);
         List<Date> allProductionDate = getAllProductionDateInfo(scheduleDate, factoryCode);
         YearMonth firstMonth = SkuMonthPlanCalculator.getFirstYearMonth(allProductionDate);
         YearMonth nextMonth = SkuMonthPlanCalculator.getNextMonth(allProductionDate);
@@ -632,7 +639,7 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
         int year = DateUtil.year(dateTime);
         int month = DateUtil.month(dateTime) + 1;
         YearMonth productionYearMonth = YearMonth.of(year, month);
-
+        Integer maxDiscontinueDays = getDiscontinueDays(factoryCode);
         log.info("fillScheduleResultFields: 开始填充排程结果字段, 排程日期={}, 结果数量={}, year={}, month={}", DateUtil.formatDate(scheduleDate), lhScheduleResultList.size(), year, month);
 
         // scheduleDate 业务上为 T+1，计算 T 日用于完成量相关查询
@@ -745,9 +752,9 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
         // key: factoryCode + "|" + materialCode, value: 累计完成量
         Map<String, Integer> dayFinishSumMap = new HashMap<>(materialCodes.size());
         Date dayBeforeTDay = DateUtil.offsetDay(tDay, -1);
-        //获取起始天
+        //20260831+ 获取起始天，需要考虑调整后库存抓取日
         YearMonth yearMonthKey = SkuMonthPlanCalculator.getFirstYearMonth(allProductionDate);
-        Date startDate = monthStartDateMap.get(yearMonthKey);
+        Date startDate = lhMonthStartService.getMonthPlanStartDate(factoryCode, yearMonthKey);
         if (null == startDate || startDate.after(tDay) || startDate.equals(tDay)) {
             startDate = SkuMonthPlanCalculator.getDate(yearMonthKey.atDay(BigDecimal.ONE.intValue()));
         }
@@ -795,26 +802,36 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
                 monthPlan = SkuMonthPlanCalculator.getSkuYearMonthFinal(allMonthPlanList, skuInfo, nextMonth);
             }
             Integer startDay = DateUtil.dayOfMonth(startDate);
-            //20260817+ 硫化日计划调整信息
-            Map<YearMonth, Integer> yearMonthPlanQtyMap = SkuMonthPlanCalculator.getPlanQty(allProductionDate, allMonthPlanList, allLhDayAdjustList, skuInfo, startDay);
             //20260713+ 计划总量加上上个月的超欠产
             Map<YearMonth, Integer> monthOverdueQtyMap = SkuMonthPlanCalculator.getOverdueProduction(isNextMonthFinal, allProductionDate, allMonthPlanList, skuInfo);
-            int lastMonthOverdueQty = BigDecimal.ZERO.intValue();
-            if (null != monthOverdueQtyMap && !monthOverdueQtyMap.isEmpty()) {
-                lastMonthOverdueQty = monthOverdueQtyMap.values().stream().mapToInt(Integer::intValue).sum();
+            // ---------- TOTAL_FINISH_QTY：月累计已完成量 ----------
+            // total_finish_qty = 本月1日至T-1日日完成量汇总 + T日夜班完成量
+            int finishedQty = 0;
+            Integer dayFinishSum = dayFinishSumMap.get(fcMatKey);
+            if (dayFinishSum != null) {
+                finishedQty += dayFinishSum;
             }
-            Integer planQty = SkuMonthPlanCalculator.sumQty(yearMonthPlanQtyMap);
+            BigDecimal nightFinish = scheNightFinishMap.get(fcMatKey);
+            if (nightFinish != null) {
+                finishedQty += nightFinish.intValue();
+            }
+            // 防御性非负保护，避免数据库异常负值导致余量计算错误
+            finishedQty = Math.max(finishedQty, 0);
+            result.setTotalFinishQty(finishedQty);
+            //20260830+ 余量计算
+            LhSurplusProductionDayInfo productionDayInfo = new LhSurplusProductionDayInfo(productionYearMonth, startDay, realProductionDateList, maxDiscontinueDays);
+            LhSurplusSkuInfo lhSurplusSkuInfo = new LhSurplusSkuInfo(skuInfo, allMonthPlanList, monthOverdueQtyMap, finishedQty, allLhDayAdjustList);
+            LhSurplusResultVo lhSurplusResult = MonthPlanSurplusCalculator.getSurplusInfo(productionDayInfo, lhSurplusSkuInfo);
 
             // ---------- TOTAL_DAILY_PLAN_QTY：到断点月计划总量 ----------
+            Integer planQty = lhSurplusResult.getAllPlanQty();
             if (Objects.nonNull(planQty)) {
-                result.setTotalDailyPlanQty(planQty + lastMonthOverdueQty);
+                result.setTotalDailyPlanQty(planQty);
             }
             // ---------- MONTH_PLAN_SUM_TOTAL：非断点月计划总量 ----------
-            //20260817+ 硫化日计划调整信息
-            Map<YearMonth, Integer> yearMonthSumPlanQtyMap = SkuMonthPlanCalculator.statisticsSumPlanQtyBySku(skuInfo, startDate, allMonthPlanList, allLhDayAdjustList);
-            Integer sumPlanQty = SkuMonthPlanCalculator.sumQty(yearMonthSumPlanQtyMap);
+            Integer sumPlanQty = lhSurplusResult.getAllSumPlanQty();
             if (Objects.nonNull(sumPlanQty)) {
-                result.setMonthPlanSumTotal(sumPlanQty + lastMonthOverdueQty);
+                result.setMonthPlanSumTotal(sumPlanQty);
             }
             // ---------- PRODUCTION_VERSION：排产版本 ----------
             MpFactoryProductionVersion finalVersion = productionVersionMap.get(fc);
@@ -885,25 +902,10 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
             }
             result.setDailyPlanQty(dailyPlanQty);
 
-            // ---------- TOTAL_FINISH_QTY：月累计已完成量 ----------
-            // total_finish_qty = 本月1日至T-1日日完成量汇总 + T日夜班完成量
-            int finishedQty = 0;
-            Integer dayFinishSum = dayFinishSumMap.get(fcMatKey);
-            if (dayFinishSum != null) {
-                finishedQty += dayFinishSum;
-            }
-            BigDecimal nightFinish = scheNightFinishMap.get(fcMatKey);
-            if (nightFinish != null) {
-                finishedQty += nightFinish.intValue();
-            }
-            // 防御性非负保护，避免数据库异常负值导致余量计算错误
-            finishedQty = Math.max(finishedQty, 0);
-            result.setTotalFinishQty(finishedQty);
 
             // ---------- MOULD_SURPLUS_QTY：硫化余量 ----------
             //硫化余量计算：不在排产后期内：
-            Map<YearMonth, FactoryMonthPlanProductionFinalResult> hasProductionPlanMap = SkuMonthPlanCalculator.getHasProductionPlan(allMonthPlanList, allProductionDate, fc, matCode, result.getLhType());
-            int surplus = SkuMonthPlanCalculator.getSurplusQty(productionYearMonth, allProductionDate, hasProductionPlanMap, monthOverdueQtyMap, yearMonthPlanQtyMap, finishedQty);
+            int surplus = lhSurplusResult.getSurplusQty();
             result.setMouldSurplusQty(Math.max(surplus, BigDecimal.ZERO.intValue()));
             // ---------- SPEC_CODE：规格编码 ----------
             MdmMaterialInfo materialInfo = materialInfoMap.get(matCode);
@@ -1053,13 +1055,9 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
      * @return
      */
     private List<Date> getAllProductionDateInfo(Date scheduleDate, String factoryCode) {
+        Set<Date> allProductionDate = getCurrentProductionDateInfo(scheduleDate);
         LocalDate currentDate = SkuMonthPlanCalculator.getDate(scheduleDate);
-        Set<Date> allProductionDate = Sets.newHashSet();
-        LocalDate before = currentDate.plusDays(-BigDecimal.ONE.intValue());
-        allProductionDate.add(SkuMonthPlanCalculator.getDate(before));
-        allProductionDate.add(scheduleDate);
         LocalDate after = currentDate.plusDays(BigDecimal.ONE.intValue());
-        allProductionDate.add(SkuMonthPlanCalculator.getDate(after));
         int advanceDays = getAdvanceDays(factoryCode);
         if (advanceDays <= BigDecimal.ZERO.intValue()) {
             return Lists.newArrayList(allProductionDate);
@@ -1071,6 +1069,40 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
             allProductionDate.add(addDate);
         }
         return Lists.newArrayList(allProductionDate);
+    }
+
+    /**
+     * 获取实际排产日信息
+     *
+     * @param scheduleDate
+     * @return
+     */
+    private List<Date> getRealProductionDateInfo(Date scheduleDate) {
+        Set<Date> allProductionDate = getCurrentProductionDateInfo(scheduleDate);
+        if (CollectionUtils.isEmpty(allProductionDate)) {
+            return Collections.emptyList();
+        }
+        return Lists.newArrayList(allProductionDate);
+    }
+
+    /**
+     * 获取当前排产周期日(3天8个班)
+     *
+     * @param scheduleDate
+     * @return
+     */
+    private Set<Date> getCurrentProductionDateInfo(Date scheduleDate) {
+        Set<Date> allProductionDate = Sets.newHashSet();
+        LocalDate currentDate = SkuMonthPlanCalculator.getDate(scheduleDate);
+        //当天-调整
+        LocalDate before = currentDate.plusDays(-BigDecimal.ONE.intValue());
+        allProductionDate.add(SkuMonthPlanCalculator.getDate(before));
+        //下一天-排产
+        allProductionDate.add(scheduleDate);
+        //下两天-预排
+        LocalDate after = currentDate.plusDays(BigDecimal.ONE.intValue());
+        allProductionDate.add(SkuMonthPlanCalculator.getDate(after));
+        return allProductionDate;
     }
 
     /**
@@ -1107,6 +1139,33 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
             return LhScheduleConstant.MAX_EARLY_PRODUCTION_DAYS_THRESHOLD;
         }
         return resolvedValue;
+    }
+
+    /**
+     * 获取连续生产间隔天数约束
+     *
+     * @param factoryCode
+     * @return
+     */
+    private Integer getDiscontinueDays(String factoryCode) {
+        if (StringUtils.isBlank(factoryCode)) {
+            return null;
+        }
+        Wrapper<LhParams> paramsQuery = new LambdaQueryWrapper<LhParams>().eq(LhParams::getFactoryCode, factoryCode).eq(LhParams::getParamCode, LhScheduleParamConstant.EARLY_PRODUCTION_DAYS_THRESHOLD).eq(LhParams::getIsDelete, DeleteFlagEnum.NORMAL.getCode());
+        LhParams param = lhParamsMapper.selectOne(paramsQuery);
+        if (null == param) {
+            return null;
+        }
+        String configurationValue = param.getParamValue();
+        if (StringUtils.isBlank(configurationValue)) {
+            return null;
+        }
+        try {
+            return Integer.parseInt(configurationValue.trim());
+        } catch (NumberFormatException e) {
+            log.warn("硫化参数解析失败, paramCode={}, value={}, 使用默认值: {}", LhScheduleParamConstant.EARLY_PRODUCTION_DAYS_THRESHOLD, configurationValue, null);
+            return null;
+        }
     }
 
     /**

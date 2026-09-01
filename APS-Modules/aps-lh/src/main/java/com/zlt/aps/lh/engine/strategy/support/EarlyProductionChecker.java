@@ -78,17 +78,43 @@ public final class EarlyProductionChecker {
                 || CollectionUtils.isEmpty(sku.getDailyPlanQuotaMap())) {
             return EarlyProductionDecision.notEarlyProduction(true, "非提前生产判定范围");
         }
-        if (!isEligibleNewProductionSku(sku)) {
+        int earlyProductionDaysThreshold = resolveEarlyProductionDaysThreshold(context);
+        LocalDate earlyProductionMaxDate = resolveEarlyProductionMaxDate(context, windowEndDate);
+        boolean continuationAddMachineEarlyProduction =
+                isEligibleContinuationAddMachineEarlyProduction(
+                        context, sku, currentDate, windowEndDate, earlyProductionMaxDate);
+        if (!continuationAddMachineEarlyProduction && !isEligibleNewProductionSku(sku)) {
             return EarlyProductionDecision.notEarlyProduction(false,
                     "非正规新增排产SKU或换活字块回流场景");
         }
-        if (hasCurrentDayPlan(context, sku, currentDate)) {
+        /*
+         * 普通提前生产只处理当前日无计划的 SKU；续作增机提前处理的是“当前已有续作机台
+         * 已覆盖当天计划、未来首次增机日需要增加物理机台”的独立业务场景，因此不能被
+         * 当前日已有计划直接拦截。未来需求来源仍以 firstAddMachineProductionDate 为准。
+         */
+        if (!continuationAddMachineEarlyProduction && hasCurrentDayPlan(context, sku, currentDate)) {
             return EarlyProductionDecision.notEarlyProduction(true, "当前业务日已有日计划量");
         }
-        int earlyProductionDaysThreshold = resolveEarlyProductionDaysThreshold(context);
-        LocalDate earlyProductionMaxDate = resolveEarlyProductionMaxDate(context, windowEndDate);
-        LocalDate firstFuturePlanDate = resolveFirstFuturePlanDate(
+        LocalDate firstFuturePlanDate = continuationAddMachineEarlyProduction
+                ? resolveContinuationAddMachineSourcePlanDate(
+                        context, sku, currentDate, earlyProductionMaxDate)
+                : resolveFirstFuturePlanDate(
                 context, sku, currentDate, earlyProductionMaxDate);
+        if (continuationAddMachineEarlyProduction
+                && Objects.nonNull(firstFuturePlanDate)
+                && Objects.nonNull(earlyProductionMaxDate)
+                && firstFuturePlanDate.isAfter(earlyProductionMaxDate)) {
+            String outOfRangeReason = "续作首次增机日超出提前生产范围";
+            logEarlyProductionDecision(context, sku, currentDate, firstFuturePlanDate, 0,
+                    context.getStructureScheduledMachineCount(currentDate, sku.getStructureName()),
+                    context.getSkuScheduledMachineCount(
+                            currentDate, sku.getMaterialCode(), sku.getProductStatus()),
+                    shortageThreshold, earlyProductionDaysThreshold,
+                    (int) ChronoUnit.DAYS.between(currentDate, firstFuturePlanDate),
+                    resolveDayPlanQty(context, sku, firstFuturePlanDate), false,
+                    outOfRangeReason);
+            return EarlyProductionDecision.notEarlyProduction(false, outOfRangeReason);
+        }
         if (Objects.isNull(firstFuturePlanDate)) {
             String noFuturePlanReason = "排程窗口外额外" + earlyProductionDaysThreshold
                     + "天范围内无日计划量";
@@ -100,6 +126,17 @@ public final class EarlyProductionChecker {
             return EarlyProductionDecision.notEarlyProduction(false, noFuturePlanReason);
         }
         int futurePlanQty = resolveDayPlanQty(context, sku, firstFuturePlanDate);
+        if (continuationAddMachineEarlyProduction && futurePlanQty <= 0) {
+            String noAddMachineDayPlanReason = "续作首次增机日无有效原始日计划量";
+            logEarlyProductionDecision(context, sku, currentDate, firstFuturePlanDate, 0,
+                    context.getStructureScheduledMachineCount(currentDate, sku.getStructureName()),
+                    context.getSkuScheduledMachineCount(
+                            currentDate, sku.getMaterialCode(), sku.getProductStatus()),
+                    shortageThreshold, earlyProductionDaysThreshold,
+                    (int) ChronoUnit.DAYS.between(currentDate, firstFuturePlanDate),
+                    futurePlanQty, false, noAddMachineDayPlanReason);
+            return EarlyProductionDecision.notEarlyProduction(false, noAddMachineDayPlanReason);
+        }
         int earlyDays = (int) ChronoUnit.DAYS.between(currentDate, firstFuturePlanDate);
         List<Integer> structurePlanMachineCounts = resolveWindowStructurePlanMachineCounts(
                 context, sku.getStructureName(), windowStartDate);
@@ -158,7 +195,9 @@ public final class EarlyProductionChecker {
                     scheduledStructureCount, scheduledSkuCount, threshold,
                     earlyProductionDaysThreshold, earlyDays, futurePlanQty, true,
                     "提前生产进入结构当天最后班次机台数资格判断");
-            String sceneType = normalStructureEarlyProduction
+            String sceneType = continuationAddMachineEarlyProduction
+                    ? EarlyProductionDecision.SCENE_CONTINUATION_ADD_MACHINE
+                    : normalStructureEarlyProduction
                     ? EarlyProductionDecision.SCENE_NORMAL : EarlyProductionDecision.SCENE_STRUCTURE_SWITCH;
             if (currentPlanMachineCount == 0) {
                 log.info("提前生产结构切换准入, currentDate: {}, futurePlanDate: {}, structureName: {}, "
@@ -168,9 +207,11 @@ public final class EarlyProductionChecker {
                         currentPlanMachineCount, futurePlanMachineCount,
                         scheduledStructureCount, true);
             }
+            String allowedReason = continuationAddMachineEarlyProduction
+                    ? "续作增机提前生产进入结构当天最后班次机台数资格判断"
+                    : "提前生产进入结构当天最后班次机台数资格判断";
             return EarlyProductionDecision.earlyProduction(true, sceneType, firstFuturePlanDate,
-                    structurePlanMachineCounts,
-                    "提前生产进入结构当天最后班次机台数资格判断");
+                    structurePlanMachineCounts, allowedReason);
         }
         /*
          * 历史欠产/收尾遗留阶段下线后，结构没有有效计划机台数时不得再使用历史欠产
@@ -463,6 +504,96 @@ public final class EarlyProductionChecker {
     }
 
     /**
+     * 判断是否为允许进入提前生产中心的正规续作增机补偿 SKU。
+     *
+     * <p>该场景必须已经由 S4.4 续作中心识别出未来首次增机日，并复制为 S4.5 新增链路候选。
+     * 直接续作结果、普通新增、换活字块回流、试制和量试均不进入本分支。</p>
+     *
+     * @param sku 待判断 SKU
+     * @param currentDate 当前业务日
+     * @return true-可按首次增机日判断提前生产；false-保持原入口语义
+     */
+    public static boolean isEligibleContinuationAddMachineEarlyProduction(
+            SkuScheduleDTO sku,
+            LocalDate currentDate) {
+        if (Objects.isNull(sku) || Objects.isNull(currentDate)
+                || !sku.isContinuousCompensationSku()
+                || !StringUtils.equals(
+                SkuScheduleSourceTypeEnum.CONTINUATION_ADD_MACHINE.getCode(), sku.getSourceType())
+                || Objects.isNull(sku.getFirstAddMachineProductionDate())
+                || sku.getFirstAddMachineProductionDate().isBefore(currentDate)) {
+            return false;
+        }
+        if (StringUtils.isNotEmpty(sku.getScheduleType())
+                && !StringUtils.equals(
+                ScheduleTypeEnum.NEW_SPEC.getCode(), sku.getScheduleType())) {
+            return false;
+        }
+        return !StringUtils.equals(
+                ConstructionStageEnum.TRIAL.getCode(), sku.getConstructionStage())
+                && !StringUtils.equals(
+                ConstructionStageEnum.MASS_TRIAL.getCode(), sku.getConstructionStage());
+    }
+
+    /**
+     * 判断续作增机补偿是否允许在排程窗口最后业务日使用窗口外计划额度。
+     *
+     * <p>窗口内首次增机日继续由正常资源阶段处理，禁止再次向前提前；只有首次增机日
+     * 位于窗口最后日或窗口外参数范围内时，才在窗口最后日进入共享提前生产中心。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 待判断SKU
+     * @param currentDate 当前业务日
+     * @return true-允许进入续作增机提前生产；false-保持原日期门禁
+     */
+    public static boolean isEligibleContinuationAddMachineEarlyProduction(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            LocalDate currentDate) {
+        LocalDate windowEndDate = Objects.isNull(context) || Objects.isNull(context.getWindowEndDate())
+                ? null : context.getWindowEndDate().toInstant()
+                .atZone(ZoneId.systemDefault()).toLocalDate();
+        LocalDate earlyProductionMaxDate = resolveEarlyProductionMaxDate(context, windowEndDate);
+        return isEligibleContinuationAddMachineEarlyProduction(
+                context, sku, currentDate, windowEndDate, earlyProductionMaxDate);
+    }
+
+    private static boolean isEligibleContinuationAddMachineEarlyProduction(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            LocalDate currentDate,
+            LocalDate windowEndDate,
+            LocalDate earlyProductionMaxDate) {
+        if (!isEligibleContinuationAddMachineEarlyProduction(sku, currentDate)
+                || Objects.isNull(context) || Objects.isNull(windowEndDate)
+                || Objects.isNull(earlyProductionMaxDate)
+                || !currentDate.equals(windowEndDate)) {
+            return false;
+        }
+        return !sku.getFirstAddMachineProductionDate().isAfter(earlyProductionMaxDate);
+    }
+
+    /**
+     * 解析续作增机提前实际借用的原始计划来源日。
+     *
+     * <p>首次增机日在窗口外时直接使用该日；首次增机日等于窗口最后日时，说明统一
+     * 目标机台数Map已基于后续高计划提前给出增机日期，此时从下一正计划日借用额度，
+     * 避免再次把窗口内较小日计划当成新增机台生产目标。</p>
+     */
+    private static LocalDate resolveContinuationAddMachineSourcePlanDate(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            LocalDate currentDate,
+            LocalDate earlyProductionMaxDate) {
+        LocalDate firstAddMachineDate = sku.getFirstAddMachineProductionDate();
+        if (Objects.nonNull(firstAddMachineDate) && firstAddMachineDate.isAfter(currentDate)) {
+            return firstAddMachineDate;
+        }
+        return resolveFirstFuturePlanDate(
+                context, sku, currentDate, earlyProductionMaxDate);
+    }
+
+    /**
      * 解析当前业务日应使用的本月前日累计欠产。
      *
      * @param context 排程上下文
@@ -573,6 +704,46 @@ public final class EarlyProductionChecker {
                     currentPlanMachineCount, futurePlanMachineCount);
         }
         return futurePlanMachineCount;
+    }
+
+    /**
+     * 按目标班次和候选物理机台校验提前生产是否可以使用当前机台。
+     *
+     * <p>候选机台已经计入同结构、同班次时允许复用；否则只有当前实时物理机台数严格小于
+     * 有效计划机台数时才允许新增。单控L/R由结构在机索引统一按物理整机去重。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 当前SKU
+     * @param currentDate 当前业务日
+     * @param futurePlanDate 提前生产来源计划日
+     * @param shiftIndex 提案正式目标班次
+     * @param machineCode 候选运行态机台编码
+     * @return true-允许复用或新增；false-结构机台数已达上限
+     */
+    public static boolean canUseMachineForEarlyProduction(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            LocalDate currentDate,
+            LocalDate futurePlanDate,
+            int shiftIndex,
+            String machineCode) {
+        if (Objects.isNull(context) || Objects.isNull(sku)
+                || StringUtils.isEmpty(sku.getStructureName())
+                || Objects.isNull(context.getStructureShiftInMachineIndex())
+                || shiftIndex <= 0 || StringUtils.isEmpty(machineCode)) {
+            return false;
+        }
+        int planMachineCount = resolveEffectiveStructurePlanMachineCount(
+                context, sku, currentDate, futurePlanDate);
+        if (planMachineCount <= 0) {
+            return false;
+        }
+        if (context.getStructureShiftInMachineIndex().containsPhysicalMachine(
+                sku.getStructureName(), shiftIndex, machineCode)) {
+            return true;
+        }
+        return context.getStructureShiftInMachineIndex().resolveInMachineCount(
+                sku.getStructureName(), shiftIndex) < planMachineCount;
     }
 
     /**

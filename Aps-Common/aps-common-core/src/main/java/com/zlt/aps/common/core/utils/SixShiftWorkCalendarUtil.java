@@ -8,7 +8,8 @@ import java.util.Date;
  * 六班排程与三班工作日历映射工具。
  *
  * <p>排程六班从排程日前一天中班开始，依次映射为：前一天中班、当天夜班、当天早班、
- * 当天中班、后一天夜班、后一天早班。</p>
+ * 当天中班、后一天夜班、后一天早班；成型 CLASS1 至 CLASS8 映射为前一天早班、
+ * 前一天中班、当天夜班、当天早班、当天中班、后一天夜班、后一天早班、后一天中班。</p>
  */
 public final class SixShiftWorkCalendarUtil {
 
@@ -67,7 +68,8 @@ public final class SixShiftWorkCalendarUtil {
     /**
      * 解析成型 CLASS1 至 CLASS8 对应的工作日历生产日期。
      *
-     * <p>成型逻辑班从排程日前一天中班开始，随后按夜班、早班、中班逐日推进。</p>
+     * <p>成型 CLASS1 对应排程日前一天早班，CLASS2 对应前一天中班；CLASS3 至 CLASS5
+     * 对应排程日夜班、早班、中班；CLASS6 至 CLASS8 对应排程日后一天夜班、早班、中班。</p>
      *
      * @param scheduleDate             排程日期
      * @param formingLogicalShiftOrder 成型逻辑班次，取值1到8
@@ -79,9 +81,23 @@ public final class SixShiftWorkCalendarUtil {
             throw new IllegalArgumentException("scheduleDate must not be null");
         }
         validateFormingLogicalShiftOrder(formingLogicalShiftOrder);
-        int dayOffset = formingLogicalShiftOrder == 1
-                ? -1 : (formingLogicalShiftOrder - 2) / 3;
+        int[] dayOffsets = {-1, -1, 0, 0, 0, 1, 1, 1};
+        int dayOffset = dayOffsets[formingLogicalShiftOrder - 1];
         return DateUtil.beginOfDay(DateUtil.offsetDay(scheduleDate, dayOffset));
+    }
+
+    /**
+     * 解析未来停产来源任务对应的成型逻辑班次。
+     *
+     * <p>未来停产来源需求按胎侧来源班次顺序直接叠加成型偏移量，
+     * 不复用当前班需求为避免与保证窗口重叠而使用的前一班起点。</p>
+     *
+     * @param shiftOrder          胎侧来源班次顺序，从1开始
+     * @param formingShiftOffset 胎侧班次到成型班次的非负偏移量
+     * @return 成型逻辑班次顺序；例如班次1且偏移量2返回CLASS3
+     */
+    public static int resolveFormingLogicalShiftOrder(int shiftOrder, int formingShiftOffset) {
+        return Math.max(shiftOrder, MIN_SHIFT_ORDER) + Math.max(formingShiftOffset, 0);
     }
 
     /**
@@ -93,10 +109,8 @@ public final class SixShiftWorkCalendarUtil {
      */
     public static int resolveFormingCalendarShiftOrder(int formingLogicalShiftOrder) {
         validateFormingLogicalShiftOrder(formingLogicalShiftOrder);
-        if (formingLogicalShiftOrder == 1) {
-            return 3;
-        }
-        return (formingLogicalShiftOrder - 2) % 3 + 1;
+        int[] mapping = {2, 3, 1, 2, 3, 1, 2, 3};
+        return mapping[formingLogicalShiftOrder - 1];
     }
 
     private static void validate(Date scheduleDate, int shiftOrder) {

@@ -1,5 +1,6 @@
 package com.zlt.aps.lh.component;
 
+import cn.hutool.core.bean.BeanUtil;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
 import com.zlt.aps.lh.api.domain.dto.CapsuleReplacementTimeWindowDTO;
@@ -44,7 +45,8 @@ import java.util.Set;
  *   <li>只有当前次数加扣减前胶囊次数增量严格大于上限时才首次换胶囊，刚好达到上限不触发；</li>
  *   <li>本批首次跨限时，满产班次固定扣减配置量；未满产班次登记换胶囊时间窗口，二者互斥；</li>
  *   <li>L/R整机结果按左右实际量合计一次，结果复制和同班多个结果不得重复累计；</li>
- *   <li>候选预演、选机模拟和产能模拟不得调用本类，避免污染正式运行态。</li>
+ *   <li>候选预演只能调用无副作用 {@link #previewActualPlanQty}；正式登记统一调用
+ *       {@link #applyPreviewedPlanQty} 并校验预演与提交结果一致。</li>
  * </ul>
  *
  * <p>本组件不保存批次状态。所有可变状态均放在 {@link LhScheduleContext}，并且每次正式分配前
@@ -195,6 +197,118 @@ public class CapsuleReplacementRuleService {
                     true, getMachineRuntimeUsage(context, physicalMachineCode));
         }
         return actualPlanQty;
+    }
+
+    /**
+     * 无副作用预演正式落班候选的换胶囊调整量。
+     *
+     * <p>预演使用结果副本，并在结束后恢复胶囊次数、阈值标记、班次上限和时间窗口；
+     * 调用方只能把返回值写入Proposal，最终提交仍需调用 {@link #applyPreviewedPlanQty}。</p>
+     *
+     * @param context 排程上下文
+     * @param result 当前排程结果
+     * @param shift 当前班次
+     * @param candidateQty 扣减前候选量
+     * @param shiftCapacityBeforeReplacement 换胶囊前实际班产
+     * @param effectiveStartTime 实际开产时间
+     * @param scene 调用场景
+     * @return 无副作用预演后的实际排产量
+     */
+    public int previewActualPlanQty(LhScheduleContext context,
+                                    LhScheduleResult result,
+                                    LhShiftConfigVO shift,
+                                    int candidateQty,
+                                    int shiftCapacityBeforeReplacement,
+                                    Date effectiveStartTime,
+                                    String scene) {
+        if (Objects.isNull(context) || Objects.isNull(result)) {
+            return Math.max(0, candidateQty);
+        }
+        Map<String, Integer> usageBaseline =
+                new LinkedHashMap<String, Integer>(context.getCapsuleRuntimeUsageMap());
+        Set<String> shiftKeyBaseline =
+                new LinkedHashSet<String>(context.getCapsuleReplacementShiftKeySet());
+        Set<String> thresholdBaseline =
+                new LinkedHashSet<String>(context.getCapsuleThresholdHandledMachineSet());
+        Map<String, Integer> capacityLimitBaseline =
+                new LinkedHashMap<String, Integer>(
+                        context.getCapsuleReplacementShiftCapacityLimitMap());
+        Map<String, CapsuleReplacementTimeWindowDTO> timeWindowBaseline =
+                this.copyReplacementTimeWindowMap(
+                        context.getCapsuleReplacementTimeWindowMap());
+        LhScheduleResult previewResult = new LhScheduleResult();
+        BeanUtil.copyProperties(result, previewResult);
+        try {
+            return this.resolveActualPlanQty(
+                    context, previewResult, shift, candidateQty,
+                    shiftCapacityBeforeReplacement, effectiveStartTime,
+                    scene + "预演");
+        } finally {
+            context.setCapsuleRuntimeUsageMap(usageBaseline);
+            context.setCapsuleReplacementShiftKeySet(shiftKeyBaseline);
+            context.setCapsuleThresholdHandledMachineSet(thresholdBaseline);
+            context.setCapsuleReplacementShiftCapacityLimitMap(capacityLimitBaseline);
+            context.setCapsuleReplacementTimeWindowMap(timeWindowBaseline);
+        }
+    }
+
+    /**
+     * 按无副作用预演结果正式登记换胶囊运行态。
+     *
+     * @param context 排程上下文
+     * @param result 当前排程结果
+     * @param shift 当前班次
+     * @param candidateQty 扣减前候选量
+     * @param shiftCapacityBeforeReplacement 换胶囊前实际班产
+     * @param effectiveStartTime 实际开产时间
+     * @param scene 调用场景
+     * @param previewQty 预演实际量
+     * @return 正式登记后的实际量
+     */
+    public int applyPreviewedPlanQty(LhScheduleContext context,
+                                     LhScheduleResult result,
+                                     LhShiftConfigVO shift,
+                                     int candidateQty,
+                                     int shiftCapacityBeforeReplacement,
+                                     Date effectiveStartTime,
+                                     String scene,
+                                     int previewQty) {
+        int actualQty = this.resolveActualPlanQty(
+                context, result, shift, candidateQty,
+                shiftCapacityBeforeReplacement, effectiveStartTime, scene);
+        if (actualQty != previewQty) {
+            throw new IllegalStateException(new StringBuilder(
+                    "换胶囊预演与正式登记结果不一致, materialCode=")
+                    .append(result.getMaterialCode())
+                    .append(", machineCode=").append(result.getLhMachineCode())
+                    .append(", shiftIndex=").append(
+                            Objects.isNull(shift) ? null : shift.getShiftIndex())
+                    .append(", previewQty=").append(previewQty)
+                    .append(", actualQty=").append(actualQty)
+                    .toString());
+        }
+        return actualQty;
+    }
+
+    private Map<String, CapsuleReplacementTimeWindowDTO> copyReplacementTimeWindowMap(
+            Map<String, CapsuleReplacementTimeWindowDTO> sourceMap) {
+        Map<String, CapsuleReplacementTimeWindowDTO> targetMap =
+                new LinkedHashMap<String, CapsuleReplacementTimeWindowDTO>(
+                        Math.max(8, CollectionUtils.isEmpty(sourceMap) ? 0 : sourceMap.size() * 2));
+        if (CollectionUtils.isEmpty(sourceMap)) {
+            return targetMap;
+        }
+        for (Map.Entry<String, CapsuleReplacementTimeWindowDTO> entry : sourceMap.entrySet()) {
+            if (Objects.isNull(entry.getValue())) {
+                targetMap.put(entry.getKey(), null);
+                continue;
+            }
+            CapsuleReplacementTimeWindowDTO copiedWindow =
+                    new CapsuleReplacementTimeWindowDTO();
+            BeanUtil.copyProperties(entry.getValue(), copiedWindow);
+            targetMap.put(entry.getKey(), copiedWindow);
+        }
+        return targetMap;
     }
 
     /**

@@ -23,6 +23,8 @@ import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.IMachineMatchStrategy;
 import com.zlt.aps.lh.engine.strategy.support.MachinePriorityMetricSnapshot;
 import com.zlt.aps.lh.engine.strategy.support.MachinePriorityTraceSnapshot;
+import com.zlt.aps.lh.engine.strategy.support.MachineSkuMatchLevel;
+import com.zlt.aps.lh.engine.strategy.support.MachineSkuMatchResult;
 import com.zlt.aps.lh.engine.strategy.support.MouldResourceAllocationResult;
 import com.zlt.aps.lh.engine.strategy.support.MouldResourceContext;
 import com.zlt.aps.lh.engine.strategy.support.NewSpecEmbryoAvailableTimeResolver;
@@ -193,7 +195,9 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
 
     @Override
     public List<MachineScheduleDTO> matchMachines(LhScheduleContext context, SkuScheduleDTO sku) {
-        log.debug("匹配可用硫化机台, SKU: {}", sku.getMaterialCode());
+        if (!context.isPriorityTraceMuted()) {
+            log.debug("匹配可用硫化机台, SKU: {}", sku.getMaterialCode());
+        }
 
         // 1. 从硫化定点机台获取限制作业优先机台和不可作业机台。
         Set<String> limitSpecifyMachineCodes = LhSpecifyMachineUtil.resolveLimitSpecifyMachineCodes(
@@ -209,9 +213,11 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
         BigDecimal skuInch = parseInch(sku.getProSize());
         SpecialMaterialMatchResult specialMaterialMatchResult =
                 LhSpecialMaterialUtil.resolveMatchResult(context, sku);
-        log.debug("SKU特殊物料判定, materialCode: {}, special: {}, matchSource: {}, category: {}",
-                sku.getMaterialCode(), specialMaterialMatchResult.isSpecial(),
-                specialMaterialMatchResult.getMatchSource(), specialMaterialMatchResult.getCategoryDisplayText());
+        if (!context.isPriorityTraceMuted()) {
+            log.debug("SKU特殊物料判定, materialCode: {}, special: {}, matchSource: {}, category: {}",
+                    sku.getMaterialCode(), specialMaterialMatchResult.isSpecial(),
+                    specialMaterialMatchResult.getMatchSource(), specialMaterialMatchResult.getCategoryDisplayText());
+        }
         List<MachineScheduleDTO> candidates = new ArrayList<>();
         List<MachineScheduleDTO> stopTimeoutCandidates = new ArrayList<>();
         MachineFilterTrace trace = new MachineFilterTrace(context.getMachineScheduleMap().size());
@@ -261,7 +267,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
         this.traceMachineCandidatesByEightLevels(
                 context, sku, specialMaterialMatchResult, candidates, trace);
 
-        if (CollectionUtils.isEmpty(candidates)) {
+        if (CollectionUtils.isEmpty(candidates) && !context.isPriorityTraceMuted()) {
             log.warn("SKU候选机台为空, materialCode: {}, SKU类型: {}, 规格: {}, 寸口: {}, 特殊分类: {}, 机台总数: {}, 不可作业过滤: {}, 禁用过滤: {}, 超时停机过滤: {}, 寸口过滤: {}, 模套过滤: {}, 特殊支持过滤: {}, 模具过滤: {}, 单控规则过滤: {}, 限制作业优先机台: {}",
                     sku.getMaterialCode(), resolveSkuTypeDesc(sku), sku.getSpecCode(), sku.getProSize(),
                     specialMaterialMatchResult.getCategoryDisplayText(), trace.totalMachineCount,
@@ -270,10 +276,215 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
                     trace.mouldSetMismatchCount, trace.resolveSpecialSupportFilteredCount(),
                     trace.mouldConflictCount, trace.singleControlRuleFilteredCount, limitSpecifyMachineCodes);
         }
-        log.info("SKU可用机台匹配完成, materialCode: {}, special: {}, category: {}, 候选机台数: {}",
-                sku.getMaterialCode(), specialMaterialMatchResult.isSpecial(),
-                specialMaterialMatchResult.getCategoryDisplayText(), candidates.size());
+        if (!context.isPriorityTraceMuted()) {
+            log.info("SKU可用机台匹配完成, materialCode: {}, special: {}, category: {}, 候选机台数: {}",
+                    sku.getMaterialCode(), specialMaterialMatchResult.isSpecial(),
+                    specialMaterialMatchResult.getCategoryDisplayText(), candidates.size());
+        }
         return candidates;
+    }
+
+    /**
+     * 反向校验指定机台是否可以承接当前 SKU。
+     *
+     * <p>普通机台只校验自身；正规单控整机只额外校验同一物理机台的配对侧。
+     * 本方法不会为了单控判断再次扫描 {@code machineScheduleMap}，正向和反向入口共同复用
+     * {@link #resolveMachineAvailabilityReason} 以及相同的定点、历史反选和占用约束。</p>
+     *
+     * @param context 排程上下文
+     * @param machine 指定机台
+     * @param sku 待校验 SKU
+     * @return 无副作用反向匹配结果
+     */
+    @Override
+    public MachineSkuMatchResult matchSkuOnMachine(LhScheduleContext context,
+                                                   MachineScheduleDTO machine,
+                                                   SkuScheduleDTO sku) {
+        if (Objects.isNull(context) || Objects.isNull(machine) || Objects.isNull(sku)
+                || StringUtils.isEmpty(machine.getMachineCode())) {
+            return MachineSkuMatchResult.failed(machine, sku, "排程上下文、机台或SKU为空");
+        }
+        Set<String> notAllowedMachineCodes = LhSpecifyMachineUtil.resolveNotAllowedMachineCodes(
+                context, sku.getMaterialCode());
+        MachineSkuMatchResult primaryMatch = this.matchSingleMachineHardConstraints(
+                context, sku, machine, notAllowedMachineCodes);
+        if (!primaryMatch.isMatched()) {
+            return primaryMatch;
+        }
+        boolean singleControlMachine = isSingleControlMachine(context, machine.getMachineCode());
+        boolean wholeMachineGranularity = singleControlMachine
+                && LhSingleControlMachineUtil.isWholeMachineGranularitySku(context, sku);
+        if (isTrialConstructionStage(sku)
+                && LhSingleControlMachineUtil.isSingleSideGranularitySku(context, sku)
+                && !singleControlMachine) {
+            return MachineSkuMatchResult.failed(machine, sku, "试制SKU单模只能使用单控单边");
+        }
+
+        MachineScheduleDTO effectiveMachine = machine;
+        List<String> declaredMachineCodes = new ArrayList<String>(wholeMachineGranularity ? 2 : 1);
+        if (wholeMachineGranularity) {
+            String leftMachineCode = LhSingleControlMachineUtil.resolveLeftMachineCode(
+                    machine.getMachineCode());
+            String rightMachineCode = LhSingleControlMachineUtil.resolveRightMachineCode(
+                    machine.getMachineCode());
+            MachineScheduleDTO leftMachine = context.getMachineScheduleMap().get(leftMachineCode);
+            MachineScheduleDTO rightMachine = context.getMachineScheduleMap().get(rightMachineCode);
+            if (Objects.isNull(leftMachine) || Objects.isNull(rightMachine)) {
+                return MachineSkuMatchResult.failed(machine, sku, "单控整机L/R运行态不完整");
+            }
+            MachineSkuMatchResult leftMatch = this.matchSingleMachineHardConstraints(
+                    context, sku, leftMachine, notAllowedMachineCodes);
+            MachineSkuMatchResult rightMatch = this.matchSingleMachineHardConstraints(
+                    context, sku, rightMachine, notAllowedMachineCodes);
+            if (!leftMatch.isMatched() || !rightMatch.isMatched()) {
+                String failureReason = !leftMatch.isMatched()
+                        ? "单控整机左侧未通过硬约束：" + leftMatch.getFailureReason()
+                        : "单控整机右侧未通过硬约束：" + rightMatch.getFailureReason();
+                return MachineSkuMatchResult.failed(machine, sku, failureReason);
+            }
+            if (hasUnfinishedOtherSkuAssignment(context, sku, leftMachineCode)
+                    || hasUnfinishedOtherSkuAssignment(context, sku, rightMachineCode)) {
+                return MachineSkuMatchResult.failed(machine, sku, "单控整机L/R存在未结束的其他SKU占用");
+            }
+            effectiveMachine = leftMachine;
+            declaredMachineCodes.add(leftMachineCode);
+            declaredMachineCodes.add(rightMachineCode);
+        } else {
+            declaredMachineCodes.add(machine.getMachineCode());
+        }
+
+        Map<String, MachinePriorityMetricSnapshot> metricSnapshotMap =
+                this.captureMachinePriorityMetricSnapshots(
+                        context, sku, Collections.singletonList(effectiveMachine));
+        MachinePriorityMetricSnapshot metricSnapshot =
+                metricSnapshotMap.get(effectiveMachine.getMachineCode());
+        MachineSkuMatchLevel matchLevel = this.resolveMachineSkuMatchLevel(metricSnapshot);
+        return MachineSkuMatchResult.matched(
+                effectiveMachine, sku, declaredMachineCodes, matchLevel, metricSnapshot);
+    }
+
+    /**
+     * 校验一台运行态机台的公共硬约束。
+     *
+     * @param context 排程上下文
+     * @param sku SKU
+     * @param machine 指定机台
+     * @param notAllowedMachineCodes 当前 SKU 不可作业机台
+     * @return 仅表示单台硬约束的匹配结果
+     */
+    private MachineSkuMatchResult matchSingleMachineHardConstraints(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            MachineScheduleDTO machine,
+            Set<String> notAllowedMachineCodes) {
+        if (Objects.isNull(machine) || StringUtils.isEmpty(machine.getMachineCode())) {
+            return MachineSkuMatchResult.failed(machine, sku, "指定机台不存在");
+        }
+        if (isHistoricalReverseSelectedMachine(context, sku, machine.getMachineCode())) {
+            return MachineSkuMatchResult.failed(machine, sku, "同状态SKU已在该反选机台排产");
+        }
+        if (isNotAllowedMachine(notAllowedMachineCodes, machine)) {
+            return MachineSkuMatchResult.failed(machine, sku, "指定机台命中SKU定点不可作业限制");
+        }
+        MouldResourceContext mouldResourceContext = resolveMouldResourceContext(context);
+        BigDecimal skuInch = parseInch(sku.getProSize());
+        SpecialMaterialMatchResult specialMaterialMatchResult =
+                LhSpecialMaterialUtil.resolveMatchResult(context, sku);
+        MachineAvailabilityReason availabilityReason = resolveMachineAvailabilityReason(
+                context, sku, mouldResourceContext, skuInch,
+                specialMaterialMatchResult, machine);
+        if (MachineAvailabilityReason.AVAILABLE != availabilityReason) {
+            return MachineSkuMatchResult.failed(
+                    machine, sku, resolveSpecifiedMachineFailureReason(availabilityReason));
+        }
+        if (hasPlanStopExceededTimeout(context, sku, machine)
+                && hasOtherHardAvailableMachineWithoutStopTimeout(
+                context, sku, machine, notAllowedMachineCodes,
+                mouldResourceContext, skuInch, specialMaterialMatchResult)) {
+            return MachineSkuMatchResult.failed(machine, sku, "计划停机超过自动换机阈值");
+        }
+        return MachineSkuMatchResult.matched(
+                machine, sku, Collections.singletonList(machine.getMachineCode()),
+                MachineSkuMatchLevel.NEAR_INCH, null);
+    }
+
+    /**
+     * 判断当前超时停机机台以外是否还存在可承接SKU的常规候选。
+     *
+     * <p>正向 {@code matchMachines} 只有在全部候选均因超时停机被暂存时才回落；
+     * 反向指定机台校验复用同一边界，存在其它常规候选时不得选择超时停机机台。
+     * 单控L/R属于同一物理机台组，判断其它候选时整体排除，避免配对侧被误认为其它候选。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 待排SKU
+     * @param targetMachine 当前反向校验机台
+     * @param notAllowedMachineCodes 当前SKU不可作业机台
+     * @param mouldResourceContext 模具运行态
+     * @param skuInch SKU寸口
+     * @param specialMaterialMatchResult 特殊物料匹配结果
+     * @return true-存在其它未超时停机候选；false-当前机台可按唯一候选回落
+     */
+    private boolean hasOtherHardAvailableMachineWithoutStopTimeout(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            MachineScheduleDTO targetMachine,
+            Set<String> notAllowedMachineCodes,
+            MouldResourceContext mouldResourceContext,
+            BigDecimal skuInch,
+            SpecialMaterialMatchResult specialMaterialMatchResult) {
+        String targetPhysicalMachineCode = LhSingleControlMachineUtil.resolvePhysicalMachineCode(
+                targetMachine.getMachineCode());
+        for (MachineScheduleDTO machine : context.getMachineScheduleMap().values()) {
+            if (Objects.isNull(machine) || StringUtils.isEmpty(machine.getMachineCode())) {
+                continue;
+            }
+            String physicalMachineCode = LhSingleControlMachineUtil.resolvePhysicalMachineCode(
+                    machine.getMachineCode());
+            if (StringUtils.equals(targetPhysicalMachineCode, physicalMachineCode)) {
+                continue;
+            }
+            if (isHistoricalReverseSelectedMachine(context, sku, machine.getMachineCode())
+                    || isNotAllowedMachine(notAllowedMachineCodes, machine)
+                    || hasPlanStopExceededTimeout(context, sku, machine)) {
+                continue;
+            }
+            MachineAvailabilityReason availabilityReason = resolveMachineAvailabilityReason(
+                    context, sku, mouldResourceContext, skuInch,
+                    specialMaterialMatchResult, machine);
+            if (MachineAvailabilityReason.AVAILABLE == availabilityReason) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 把正向选机已使用的软指标快照归一为反向六层匹配。
+     *
+     * @param metricSnapshot 单台软指标快照
+     * @return 最高命中的通用匹配层级
+     */
+    private MachineSkuMatchLevel resolveMachineSkuMatchLevel(
+            MachinePriorityMetricSnapshot metricSnapshot) {
+        if (Objects.isNull(metricSnapshot)) {
+            return MachineSkuMatchLevel.NEAR_INCH;
+        }
+        if (metricSnapshot.getEmbryoMatchScore() == 0) {
+            return MachineSkuMatchLevel.SAME_EMBRYO;
+        }
+        if (metricSnapshot.getMouldShellMatchScore() == 0) {
+            return MachineSkuMatchLevel.SAME_MOULD_SHELL;
+        }
+        if (metricSnapshot.getSpecMatchScore() == 0) {
+            return MachineSkuMatchLevel.SAME_SPEC;
+        }
+        if (metricSnapshot.getCapsuleScore() == 0) {
+            return MachineSkuMatchLevel.SAME_CAPSULE_GROUP;
+        }
+        if (metricSnapshot.getProSizeMatchScore() == 0) {
+            return MachineSkuMatchLevel.SAME_INCH;
+        }
+        return MachineSkuMatchLevel.NEAR_INCH;
     }
 
     /**
@@ -300,51 +511,16 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
         if (Objects.isNull(specifiedMachine)) {
             return SpecifiedMachineMatchResult.failed("本批次不存在历史指定机台");
         }
-        if (isHistoricalReverseSelectedMachine(context, sku, machineCode)) {
-            return SpecifiedMachineMatchResult.failed("同状态SKU已在历史指定机台完成反选，不重复排产");
-        }
-        Set<String> notAllowedMachineCodes = LhSpecifyMachineUtil.resolveNotAllowedMachineCodes(
-                context, sku.getMaterialCode());
-        if (isNotAllowedMachine(notAllowedMachineCodes, specifiedMachine)) {
-            return SpecifiedMachineMatchResult.failed("历史指定机台命中SKU定点不可作业限制");
-        }
-
-        MouldResourceContext mouldResourceContext = resolveMouldResourceContext(context);
-        BigDecimal skuInch = parseInch(sku.getProSize());
-        SpecialMaterialMatchResult matchResult = LhSpecialMaterialUtil.resolveMatchResult(context, sku);
-        MachineAvailabilityReason availabilityReason = resolveMachineAvailabilityReason(
-                context, sku, mouldResourceContext, skuInch, matchResult, specifiedMachine);
-        if (MachineAvailabilityReason.AVAILABLE != availabilityReason) {
-            return SpecifiedMachineMatchResult.failed(
-                    resolveSpecifiedMachineFailureReason(availabilityReason));
-        }
-
         /*
-         * 单控规则需要同时观察当前SKU的全部硬过滤候选，不能只校验单台。否则正规双模可能在
-         * 缺少配对侧时被错误放行，试制单模也可能错误落到普通机台。
+         * 历史指定机台与机台驱动反向匹配共用同一个单机硬约束入口。
+         * 正规单控整机只额外读取 L/R 配对侧，禁止再次全量扫描机台。
          */
-        List<MachineScheduleDTO> hardMatchedCandidates =
-                new ArrayList<MachineScheduleDTO>(context.getMachineScheduleMap().size());
-        for (MachineScheduleDTO machine : context.getMachineScheduleMap().values()) {
-            if (Objects.isNull(machine)
-                    || isHistoricalReverseSelectedMachine(context, sku, machine.getMachineCode())
-                    || isNotAllowedMachine(notAllowedMachineCodes, machine)) {
-                continue;
-            }
-            if (MachineAvailabilityReason.AVAILABLE == resolveMachineAvailabilityReason(
-                    context, sku, mouldResourceContext, skuInch, matchResult, machine)) {
-                hardMatchedCandidates.add(machine);
-            }
+        MachineSkuMatchResult reverseMatch = this.matchSkuOnMachine(
+                context, specifiedMachine, sku);
+        if (!reverseMatch.isMatched()) {
+            return SpecifiedMachineMatchResult.failed(reverseMatch.getFailureReason());
         }
-        MachineFilterTrace trace = new MachineFilterTrace(context.getMachineScheduleMap().size());
-        List<MachineScheduleDTO> singleControlFiltered =
-                applySingleControlReservationRule(context, sku, hardMatchedCandidates, trace);
-        MachineScheduleDTO effectiveMachine = resolveSpecifiedMachineFromFilteredCandidates(
-                context, sku, machineCode, singleControlFiltered);
-        if (Objects.isNull(effectiveMachine)) {
-            return SpecifiedMachineMatchResult.failed("历史指定机台未通过单控整机/单边硬约束");
-        }
-        return SpecifiedMachineMatchResult.success(effectiveMachine);
+        return SpecifiedMachineMatchResult.success(reverseMatch.getMachine());
     }
 
     /**

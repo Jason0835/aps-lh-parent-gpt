@@ -160,6 +160,30 @@ public final class DailyMachineExpansionPlanner {
     }
 
     /**
+     * 只读判断新增SKU是否因“窗口和本月月底均无计划”需要按收尾清量处理。
+     *
+     * <p>机台驱动竞争前不能先执行欠产账本入账，否则正式提交阶段重复调用
+     * {@link #prepareShortageQuota} 时可能污染目标量、窗口余量或共享日计划账本。
+     * 本方法只复用正式准备的判断输入，不修改任何SKU和账本状态。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 新增排产SKU
+     * @return true-窗口与本月月底均无计划且存在本月历史欠产，需要按收尾清量处理；false-不命中
+     */
+    public static boolean isForceEndingByNoFuturePlan(LhScheduleContext context,
+                                                      SkuScheduleDTO sku) {
+        if (Objects.isNull(context) || Objects.isNull(sku)
+                || Math.max(0, sku.getMonthlyHistoryShortageQty()) <= 0) {
+            return false;
+        }
+        Map<LocalDate, SkuDailyPlanQuotaDTO> quotaMap =
+                resolveEffectiveQuotaMap(context, sku);
+        boolean noWindowPlan = !CollectionUtils.isEmpty(quotaMap)
+                && sumDayPlanQty(quotaMap) <= 0;
+        return noWindowPlan && resolveCurrentMonthPlanQtyAfterWindow(context, sku) <= 0;
+    }
+
+    /**
      * 汇总当前排程窗口结束后到本月末的原始定稿月计划量。
      * <p>“月底仍有计划”的业务口径仅指当前自然月 T+3～月末，不得把下月计划视为月底计划：
      * 若把下月计划计入，窗口无计划的续作/新增 SKU 会误判为“仅补本月欠产”，
@@ -391,6 +415,34 @@ public final class DailyMachineExpansionPlanner {
             int activeMachineCount,
             String scheduleType,
             LocalDate startDate) {
+        return resolveFirstDailyLookAheadAddMachineDate(
+                dailyMouldCalcService, context, sku, activeMachineCount,
+                scheduleType, startDate, null);
+    }
+
+    /**
+     * 从统一目标机台数Map解析首次需要增加机台的自然日（支持指定扫描截止日）。
+     *
+     * <p>普通新增和既有逐日判断继续使用窗口结束后一天；续作增机提前由调用方显式
+     * 传入固定提前生产截止日，避免扩大其他入口的后看范围。</p>
+     *
+     * @param dailyMouldCalcService 目标机台数统一查询服务
+     * @param context 排程上下文
+     * @param sku SKU
+     * @param activeMachineCount 当前有效机台数
+     * @param scheduleType 排程类型，仅用于日志区分
+     * @param startDate 最早参与判断的自然日；为空时从T日开始
+     * @param specifiedScanEndDate 指定扫描截止日；为空时沿用窗口结束后一天
+     * @return 首次需要加机台的自然日；没有缺口时返回null
+     */
+    public static LocalDate resolveFirstDailyLookAheadAddMachineDate(
+            ILhDailyMouldCalcService dailyMouldCalcService,
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            int activeMachineCount,
+            String scheduleType,
+            LocalDate startDate,
+            LocalDate specifiedScanEndDate) {
         if (Objects.isNull(dailyMouldCalcService) || Objects.isNull(context) || Objects.isNull(sku)
                 || StringUtils.isEmpty(sku.getMaterialCode()) || StringUtils.isEmpty(sku.getProductStatus())
                 || Math.max(0, activeMachineCount) <= 0 || Objects.isNull(context.getScheduleDate())
@@ -401,8 +453,11 @@ public final class DailyMachineExpansionPlanner {
                 .atZone(ZoneId.systemDefault()).toLocalDate();
         LocalDate scanStartDate = Objects.nonNull(startDate) && startDate.isAfter(scheduleStartDate)
                 ? startDate : scheduleStartDate;
-        LocalDate scanEndDate = context.getWindowEndDate().toInstant()
+        LocalDate defaultScanEndDate = context.getWindowEndDate().toInstant()
                 .atZone(ZoneId.systemDefault()).toLocalDate().plusDays(1);
+        LocalDate scanEndDate = Objects.nonNull(specifiedScanEndDate)
+                && specifiedScanEndDate.isAfter(defaultScanEndDate)
+                ? specifiedScanEndDate : defaultScanEndDate;
         for (LocalDate productionDate = scanStartDate;
              !productionDate.isAfter(scanEndDate);
              productionDate = productionDate.plusDays(1)) {

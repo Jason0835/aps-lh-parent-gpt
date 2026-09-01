@@ -9,8 +9,21 @@ import com.zlt.aps.cx.entity.config.CxEmbryoLhTime;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
-import com.zlt.aps.lh.api.domain.entity.*;
-import com.zlt.aps.lh.api.enums.*;
+import com.zlt.aps.lh.api.domain.entity.LhDayFinishQty;
+import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
+import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
+import com.zlt.aps.lh.api.domain.entity.LhPrecisionPlan;
+import com.zlt.aps.lh.api.domain.entity.LhRepairCapsule;
+import com.zlt.aps.lh.api.domain.entity.LhScheFinishQty;
+import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
+import com.zlt.aps.lh.api.domain.entity.LhSpecialMaterialBom;
+import com.zlt.aps.lh.api.domain.entity.LhSpecifyMachine;
+import com.zlt.aps.lh.api.enums.ConstructionStageEnum;
+import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
+import com.zlt.aps.lh.api.enums.LhSpecialMaterialCategoryEnum;
+import com.zlt.aps.lh.api.enums.MachineStopTypeEnum;
+import com.zlt.aps.lh.api.enums.MouldChangeTypeEnum;
+import com.zlt.aps.lh.api.enums.ScheduleStepEnum;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.component.SkuDecrementChecker;
 import com.zlt.aps.lh.context.LhScheduleContext;
@@ -19,12 +32,45 @@ import com.zlt.aps.lh.exception.ScheduleErrorCode;
 import com.zlt.aps.lh.exception.ScheduleException;
 import com.zlt.aps.lh.handler.ScheduleAdjustHandler;
 import com.zlt.aps.lh.handler.SkuMonthPlanCalculator;
-import com.zlt.aps.lh.mapper.*;
+import com.zlt.aps.lh.mapper.CxEmbryoLhTimeMapper;
+import com.zlt.aps.lh.mapper.CxStockMapper;
+import com.zlt.aps.lh.mapper.FactoryMonthPlanProductionFinalResultMapper;
+import com.zlt.aps.lh.mapper.LhDayFinishQtyMapper;
+import com.zlt.aps.lh.mapper.LhMachineInfoMapper;
+import com.zlt.aps.lh.mapper.LhMachineOnlineInfoMapper;
+import com.zlt.aps.lh.mapper.LhMouldChangePlanEntityMapper;
+import com.zlt.aps.lh.mapper.LhMpStructureAllocationMapper;
+import com.zlt.aps.lh.mapper.LhPrecisionPlanMapper;
+import com.zlt.aps.lh.mapper.LhRepairCapsuleMapper;
+import com.zlt.aps.lh.mapper.LhScheFinishQtyMapper;
+import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
+import com.zlt.aps.lh.mapper.LhSpecialMaterialBomEntityMapper;
+import com.zlt.aps.lh.mapper.LhSpecifyMachineMapper;
+import com.zlt.aps.lh.mapper.MdmCapsuleChuckMapper;
+import com.zlt.aps.lh.mapper.MdmDevicePlanShutMapper;
+import com.zlt.aps.lh.mapper.MdmMaterialInfoMapper;
+import com.zlt.aps.lh.mapper.MdmModelInfoMapper;
+import com.zlt.aps.lh.mapper.MdmMonthSurplusMapper;
+import com.zlt.aps.lh.mapper.MdmSkuConstructionRefMapper;
+import com.zlt.aps.lh.mapper.MdmSkuLhCapacityMapper;
+import com.zlt.aps.lh.mapper.MdmSkuMouldRelMapper;
+import com.zlt.aps.lh.mapper.MdmSkuScheduleCategoryMapper;
+import com.zlt.aps.lh.mapper.MdmWorkCalendarMapper;
+import com.zlt.aps.lh.mapper.MpFactoryProductionVersionMapper;
+import com.zlt.aps.lh.mapper.MpMonthPlanStatisticsMapper;
 import com.zlt.aps.lh.service.ILhBaseDataService;
 import com.zlt.aps.lh.service.ILhDailyMouldCalcService;
 import com.zlt.aps.lh.service.ILhDayPlanAdjustRequireService;
-import com.zlt.aps.lh.util.*;
+import com.zlt.aps.lh.service.ILhMonthStartService;
+import com.zlt.aps.lh.util.LhMouldCodeUtil;
+import com.zlt.aps.lh.util.LhScheduleTimeUtil;
+import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
+import com.zlt.aps.lh.util.MachineStatusUtil;
+import com.zlt.aps.lh.util.MonthPlanDayQtyUtil;
+import com.zlt.aps.lh.util.MonthPlanStatisticsDayUtil;
+import com.zlt.aps.lh.util.PriorityTraceLogHelper;
 import com.zlt.aps.maindata.mapper.MpMouldDeliveryPlanEntityMapper;
+import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmDevicePlanShut;
 import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmModelInfo;
@@ -33,10 +79,13 @@ import com.zlt.aps.mdm.api.domain.entity.MdmSkuLhCapacity;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuMouldRel;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuScheduleCategory;
 import com.zlt.aps.mdm.api.domain.entity.MdmWorkCalendar;
-import com.zlt.aps.mdm.api.domain.entity.*;
+import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.mp.api.domain.entity.MdmCapsuleChuck;
 import com.zlt.aps.mp.api.domain.entity.MdmMonthSurplus;
-import com.zlt.aps.mp.api.domain.entity.*;
+import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
+import com.zlt.aps.mp.api.domain.entity.MpMonthPlanStatistics;
+import com.zlt.aps.mp.api.domain.entity.MpMouldDeliveryPlan;
+import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
@@ -48,7 +97,21 @@ import java.time.DateTimeException;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.ZoneId;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
@@ -197,6 +260,9 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
 
     @Resource
     private ILhDailyMouldCalcService lhDailyMouldCalcService;
+
+    @Resource
+    private ILhMonthStartService lhMonthStartService;
 
     @Resource(name = "lhDataInitExecutor")
     private Executor lhDataInitExecutor;
@@ -459,6 +525,59 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         log.info("基础数据加载完成, 工厂: {}, 目标日: {}, T日: {}",
                 factoryCode, LhScheduleTimeUtil.formatDate(targetDate), LhScheduleTimeUtil.formatDate(scheduleDate));
         log.info("[DataInit] 全部初始化完成：totalCost={}ms", System.currentTimeMillis() - totalStartTime);
+    }
+
+    /**
+     * 仅加载硫化余量计算所需的基础数据（供成型侧 Feign 批量余量接口复用，不执行完整排程初始化）。
+     *
+     * <p>与 {@link #loadAllBaseData(LhScheduleContext)} 中"月计划、日计划调整量、月累计完成量、
+     * T日班次完成量"四类数据的加载口径保持一致，按依赖顺序串行执行：
+     * 定稿排产版本（月计划与 planStartDate 的前置）→ 月计划（内部设置 planStartDate）→
+     * 日计划调整量 → 月累计完成量 → T日班次完成量。</p>
+     *
+     * <p>调用方需先构造好 context 的日期/参数字段（scheduleDate、scheduleTargetDate、
+     * windowEndDate、scheduleConfig、earlyProductionMaxDate）。</p>
+     *
+     * @param context 排程上下文（日期/参数字段已就绪，仅缺余量相关数据）
+     */
+    public void loadMonthSurplusData(LhScheduleContext context) {
+        String factoryCode = context.getFactoryCode();
+        Date scheduleDate = context.getScheduleDate();
+        Date targetDate = context.getScheduleTargetDate();
+
+        // 排程窗口 [T, T+(scheduleDays-1)]，与 loadAllBaseData 口径一致
+        Date startDate = LhScheduleTimeUtil.clearTime(scheduleDate);
+        int scheduleDays = LhScheduleTimeUtil.getScheduleDays(context);
+        Date endDate = LhScheduleTimeUtil.addDays(startDate, scheduleDays);
+        Date scheduleWindowEndDate = LhScheduleTimeUtil.addDays(endDate, -1);
+        int earlyProductionDaysThreshold = resolveEarlyProductionDaysThreshold(context);
+        Date earlyProductionRangeEndDate = Objects.nonNull(context.getEarlyProductionMaxDate())
+                ? LhScheduleTimeUtil.clearTime(context.getEarlyProductionMaxDate())
+                : LhScheduleTimeUtil.addDays(scheduleWindowEndDate, earlyProductionDaysThreshold);
+        Date earlyProductionLookupEndDate = LhScheduleTimeUtil.addDays(earlyProductionRangeEndDate, 1);
+        // 余量计算只需覆盖窗口 + 提前生产涉及的月份
+        Map<String, LocalDate> requiredMonthMap = resolveRequiredMonthMap(startDate, earlyProductionLookupEndDate);
+
+        // 主月（排程目标日所在月）
+        Calendar cal = Calendar.getInstance();
+        cal.setTime(targetDate);
+        int year = cal.get(Calendar.YEAR);
+        int month = cal.get(Calendar.MONTH) + 1;
+
+        // ① 定稿排产版本：月计划加载与 planStartDate 的前置条件
+        loadFinalProductionVersions(context, factoryCode, requiredMonthMap, year, month);
+        if (context.isInterrupted()) {
+            return;
+        }
+        // ② 月计划（内部会设置 planStartDate，即次月定稿口径）
+        loadMonthPlan(context, factoryCode, requiredMonthMap, scheduleWindowEndDate, earlyProductionRangeEndDate);
+        // ③ 硫化日计划调整量
+        loadLhDayPlanAdjust(context, factoryCode);
+        // ④ 月累计完成量（截止 T-1 日）
+        loadMaterialMonthFinishedQty(context, factoryCode, requiredMonthMap,
+                LhScheduleTimeUtil.addDays(scheduleDate, -1), year, month);
+        // ⑤ T日排程班次完成量
+        loadScheDayFinishQty(context, factoryCode, scheduleDate);
     }
 
     /**
@@ -1410,13 +1529,13 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
 
         //20260707+ 补充计划量起始计算日
         List<Date> allProductionDate = Lists.newArrayList(context.getAllProductionDateInfo());
-        YearMonth nextMonth = SkuMonthPlanCalculator.getNextMonth(allProductionDate);
-        Map<YearMonth, Date> monthStartDayMap = getStartDay(nextMonth);
-        Date date = monthStartDayMap.get(SkuMonthPlanCalculator.getFirstYearMonth(allProductionDate));
+        YearMonth productionYearMonth = SkuMonthPlanCalculator.getFirstYearMonth(allProductionDate);
+        Date date = lhMonthStartService.getMonthPlanStartDate(factoryCode, productionYearMonth);
         if (date != null && (context.getScheduleDate().after(date) || context.getScheduleDate().equals(date))) {
+            //如果排产计划在前，则置空
             context.setPlanStartDate(date);
         }
-        List<FactoryMonthPlanProductionFinalResult> loadedPlanList = new ArrayList<FactoryMonthPlanProductionFinalResult>(256);
+        List<FactoryMonthPlanProductionFinalResult> loadedPlanList = new ArrayList<>(256);
         if (CollectionUtils.isEmpty(requiredMonthMap)) {
             Calendar cal = Calendar.getInstance();
             cal.setTime(context.getScheduleTargetDate());
@@ -1428,12 +1547,16 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                         monthStartDate.getYear(), monthStartDate.getMonthValue()));
             }
         }
-        context.setLoadedMonthPlanList(loadedPlanList);
-        context.setMonthPlanByMaterialMonthMap(MonthPlanDateResolver.buildMaterialMonthPlanMap(loadedPlanList));
+        List<FactoryMonthPlanProductionFinalResult> schedulingSourcePlanList =
+                this.filterTrialMassTrialMonthPlans(context, loadedPlanList);
+        context.setLoadedMonthPlanList(schedulingSourcePlanList);
+        context.setMonthPlanByMaterialMonthMap(
+                MonthPlanDateResolver.buildMaterialMonthPlanMap(schedulingSourcePlanList));
         context.setMonthPlanList(selectSchedulingMonthPlanList(
-                context, loadedPlanList, scheduleWindowEndDate, earlyProductionRangeEndDate));
-        log.info("月生产计划加载完成, loadedCount: {}, scheduleSkuCount: {}, requiredMonths: {}",
-                loadedPlanList.size(), context.getMonthPlanList().size(),
+                context, schedulingSourcePlanList, scheduleWindowEndDate, earlyProductionRangeEndDate));
+        log.info("月生产计划加载完成, sourceLoadedCount: {}, effectiveLoadedCount: {}, scheduleSkuCount: {}, "
+                        + "requiredMonths: {}",
+                loadedPlanList.size(), schedulingSourcePlanList.size(), context.getMonthPlanList().size(),
                 CollectionUtils.isEmpty(requiredMonthMap) ? new ArrayList<String>(0) : requiredMonthMap.keySet());
     }
 
@@ -1475,10 +1598,62 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
 
     private void loadMonthPlan(LhScheduleContext context, String factoryCode, int year, int month) {
         List<FactoryMonthPlanProductionFinalResult> monthPlanList = queryMonthPlan(context, factoryCode, year, month);
-        context.setLoadedMonthPlanList(monthPlanList);
-        context.setMonthPlanByMaterialMonthMap(MonthPlanDateResolver.buildMaterialMonthPlanMap(monthPlanList));
-        context.setMonthPlanList(monthPlanList);
+        List<FactoryMonthPlanProductionFinalResult> schedulingSourcePlanList =
+                this.filterTrialMassTrialMonthPlans(context, monthPlanList);
+        context.setLoadedMonthPlanList(schedulingSourcePlanList);
+        context.setMonthPlanByMaterialMonthMap(
+                MonthPlanDateResolver.buildMaterialMonthPlanMap(schedulingSourcePlanList));
+        context.setMonthPlanList(schedulingSourcePlanList);
         log.debug("月生产计划加载完成, 数量: {}", context.getMonthPlanList().size());
+    }
+
+    /**
+     * 按本批参数在月计划源头过滤试制、量试数据。
+     * <p>过滤结果同时作为全量月计划、跨月索引和S4.3归集来源，确保关闭开关后试制量试不会进入
+     * 余量、日计划、续作、新增、胎胚、换模或后置补排链路。原始数据库记录不做任何修改。</p>
+     *
+     * @param context 排程上下文
+     * @param sourcePlanList 数据库加载的原始月计划
+     * @return 本批允许参与排产的月计划
+     */
+    private List<FactoryMonthPlanProductionFinalResult> filterTrialMassTrialMonthPlans(
+            LhScheduleContext context,
+            List<FactoryMonthPlanProductionFinalResult> sourcePlanList) {
+        if (CollectionUtils.isEmpty(sourcePlanList)) {
+            return new ArrayList<FactoryMonthPlanProductionFinalResult>(0);
+        }
+        if (Objects.nonNull(context)
+                && Objects.nonNull(context.getScheduleConfig())
+                && context.getScheduleConfig().isTrialMassTrialSchedulingEnabled()) {
+            return new ArrayList<FactoryMonthPlanProductionFinalResult>(sourcePlanList);
+        }
+        int trialCount = 0;
+        int massTrialCount = 0;
+        List<FactoryMonthPlanProductionFinalResult> filteredPlanList =
+                new ArrayList<FactoryMonthPlanProductionFinalResult>(sourcePlanList.size());
+        for (FactoryMonthPlanProductionFinalResult plan : sourcePlanList) {
+            if (Objects.nonNull(plan)
+                    && StringUtils.equals(ConstructionStageEnum.TRIAL.getCode(), plan.getConstructionStage())) {
+                trialCount++;
+                continue;
+            }
+            if (Objects.nonNull(plan)
+                    && StringUtils.equals(ConstructionStageEnum.MASS_TRIAL.getCode(), plan.getConstructionStage())) {
+                massTrialCount++;
+                continue;
+            }
+            filteredPlanList.add(plan);
+        }
+        log.info("试制量试月计划源头过滤完成, factoryCode: {}, batchNo: {}, scheduleDate: {}, paramCode: {}, "
+                        + "paramValue: 0, sourceCount: {}, trialFilteredCount: {}, massTrialFilteredCount: {}, "
+                        + "effectiveCount: {}",
+                Objects.isNull(context) ? null : context.getFactoryCode(),
+                Objects.isNull(context) ? null : context.getBatchNo(),
+                Objects.isNull(context) ? null
+                        : LhScheduleTimeUtil.formatDate(context.getScheduleTargetDate()),
+                LhScheduleParamConstant.TRIAL_MASS_TRIAL_SCHEDULING_ENABLED,
+                sourcePlanList.size(), trialCount, massTrialCount, filteredPlanList.size());
+        return filteredPlanList;
     }
 
     /**
@@ -2078,10 +2253,9 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
 
     /**
      * 加载设备停机计划。
-     * <p>普通维修、精度等停机仍按排程窗口交集加载；干冰/喷砂清洗需要额外按计划开始时间加载
-     * T 日及之后的未来候选，后续由清洗排程服务按班次和每日上限重新安排实际执行时间。
-     * 两类查询均只加载排程日期为空的记录；排程日期非空代表该停机计划已被上一轮硫化排程回填、
-     * 已安排执行时间，排程时不得再重复加载参与产能扣减、机台阻断或清洗重排。</p>
+     * <p>普通停机计划性维修(05)按计划日期单独加载、不排除已回填记录（维修执行时间=计划开始时间，不提前）
+     * 干冰/喷砂清洗同样按计划日期单独加载、不排除已回填记录。保证上一轮回填过排程日期但计划日期仍与本次窗口相交/落在窗口内的
+     * 维修、清洗计划能重新纳入。</p>
      *
      * @param context     排程上下文
      * @param factoryCode 分厂编号
@@ -2089,25 +2263,26 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
      * @param endDate     结束日期
      */
     private void loadDevicePlanShut(LhScheduleContext context, String factoryCode, Date startDate, Date endDate) {
-        // 普通设备停机只加载与排程窗口相交且尚未回填排程日期的非清洗数据；
-        // 干冰/喷砂必须由下方清洗专用查询按 T 日边界加载，避免 T-1 清洗混入后重复占用本次清洗名额。
-        List<MdmDevicePlanShut> normalDevicePlanShutList = devicePlanShutMapper.selectList(
+        // 干冰/喷砂、计划性维修由下方专用查询按计划日期单独加载。
+        Date cleaningCandidateStartDate = LhScheduleTimeUtil.clearTime(context.getScheduleDate());
+        // 计划性维修(05)按计划日期加载，不排除已回填排程日期的记录；维修执行时间=计划开始时间(beginDate)，
+        // 不提前、不顺延：计划日期落在排程窗口内才纳入，延误（窗口外）就放过。
+        List<MdmDevicePlanShut> repairPlanList = devicePlanShutMapper.selectList(
                 new LambdaQueryWrapper<MdmDevicePlanShut>()
                         .eq(MdmDevicePlanShut::getFactoryCode, factoryCode)
-                        .notIn(MdmDevicePlanShut::getMachineStopType, resolveCleaningStopTypeList())
+                        .eq(MdmDevicePlanShut::getMachineStopType, MachineStopTypeEnum.PLANNED_REPAIR.getCode())
+                        .ge(MdmDevicePlanShut::getBeginDate, cleaningCandidateStartDate)
                         .le(MdmDevicePlanShut::getBeginDate, endDate)
-                        .ge(MdmDevicePlanShut::getEndDate, startDate)
-                        .isNull(MdmDevicePlanShut::getScheduleDate)
                         .eq(MdmDevicePlanShut::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
-        Date cleaningCandidateStartDate = LhScheduleTimeUtil.clearTime(context.getScheduleDate());
-        // 清洗候选按 T 日及之后的计划开始时间单独加载，且排除已回填排程日期记录，允许未安排候选来源超出 T～T+2 排程窗口。
+        // 清洗候选按 T 日及之后的计划开始日期单独加载，不排除已回填排程日期的记录：
+        // 清洗按计划日期重排，上一轮回填过排程日期但计划日期仍落在本次窗口内的清洗计划需重新纳入。
         // 注意：本方法入参 startDate 是普通停机使用的 T-1 覆盖起点，清洗候选必须回到 T 日口径。
         List<MdmDevicePlanShut> futureCleaningPlanList = devicePlanShutMapper.selectList(
                 new LambdaQueryWrapper<MdmDevicePlanShut>()
                         .eq(MdmDevicePlanShut::getFactoryCode, factoryCode)
                         .ge(MdmDevicePlanShut::getBeginDate, cleaningCandidateStartDate)
                         .in(MdmDevicePlanShut::getMachineStopType, resolveCleaningStopTypeList())
-                        .isNull(MdmDevicePlanShut::getScheduleDate)
+                        .le(MdmDevicePlanShut::getBeginDate, endDate)
                         .eq(MdmDevicePlanShut::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
         // 保留本次已加载的原始清洗候选快照。后续清洗排程会从普通停机列表剥离 07/08 数据，
         // 续作降模仍需按“已加载且计划开始时间不早于 T 日”的业务口径判断机台是否有清洗计划。
@@ -2115,9 +2290,9 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                 ? new ArrayList<MdmDevicePlanShut>(0)
                 : new ArrayList<MdmDevicePlanShut>(futureCleaningPlanList));
         List<MdmDevicePlanShut> devicePlanShutList = mergeDevicePlanShutList(
-                normalDevicePlanShutList, futureCleaningPlanList);
+                 repairPlanList, futureCleaningPlanList);
         context.setDevicePlanShutList(devicePlanShutList);
-        log.debug("设备停机计划加载完成（已过滤已排程记录）, 数量: {}", context.getDevicePlanShutList().size());
+        log.debug("设备停机计划加载完成（维修/清洗按计划日期保留重排）, 数量: {}", context.getDevicePlanShutList().size());
     }
 
     /**
@@ -2445,7 +2620,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         calendar.set(Calendar.YEAR, year);
         calendar.set(Calendar.MONTH, month - 1);
         calendar.set(Calendar.DAY_OF_MONTH, 1);
-        //20260707+ 下个月定稿后，完成量起始日从下个月定稿库存日开始计算
+        //20260707+ 需要考虑调整日期
         Date monthStart;
         if (null == monthStartDate) {
             monthStart = LhScheduleTimeUtil.clearTime(calendar.getTime());

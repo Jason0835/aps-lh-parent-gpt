@@ -6,14 +6,21 @@ import com.zlt.aps.lh.api.domain.dto.CleaningScheduleDateFillItem;
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.api.domain.dto.SkuDailyPlanQuotaDTO;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
+import com.zlt.aps.lh.api.domain.dto.ShiftRuntimeState;
 import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleProcessLog;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.entity.LhUnscheduledResult;
 import com.zlt.aps.lh.context.EmbryoStockConsumeLedger;
 import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.component.StructureEarlyProductionAdmission;
 import com.zlt.aps.lh.engine.strategy.support.EarlyProductionRuntimePlan;
+import com.zlt.aps.lh.engine.strategy.support.EarlyProductionDecision;
+import com.zlt.aps.lh.engine.strategy.support.EarlyProductionDecisionLogEntry;
 import com.zlt.aps.lh.engine.strategy.support.MouldResourceContext;
+import com.zlt.aps.lh.engine.strategy.support.ScheduleSubstitutionDirective;
+import com.zlt.aps.lh.engine.strategy.support.HistoricalReverseSelectionDirective;
+import com.zlt.aps.lh.engine.strategy.support.DayTypeBlockReverseSelectionDirective;
 import com.zlt.aps.lh.engine.strategy.support.SharedMouldSubstitutionRecord;
 import com.zlt.aps.lh.engine.strategy.support.SpecialMaterialSubstitutionRecord;
 
@@ -26,6 +33,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -53,6 +61,8 @@ final class ScheduleSubstitutionAttemptSnapshot {
     private Map<String, MachineScheduleDTO> machineScheduleStateMap;
     /** 置换前机台班次剩余产能 */
     private Map<String, int[]> machineShiftCapacityMap;
+    /** 候选前班次运行态剩余产能 */
+    private Map<Integer, ShiftRuntimeState> shiftRuntimeStateMap;
     /** 置换前未排结果对象顺序 */
     private List<LhUnscheduledResult> unscheduledResultList;
     /** 置换前每条未排结果字段快照 */
@@ -95,6 +105,9 @@ final class ScheduleSubstitutionAttemptSnapshot {
     private Map<String, String> mouldChangeLimitBlockedReasonMap;
     /** 置换前新增选机日志序号 */
     private Map<String, Integer> newSpecMachineSelectionCountMap;
+    /** 新增机台驱动实时顺序和结果快照 */
+    private Map<SkuScheduleDTO, Map<Integer, Integer>> newSpecRealtimeSelectionOrderMap;
+    private Set<LhScheduleResult> newSpecRealtimeSnapshotResultSet;
     /** 置换前新增待排类型计数 */
     private int pendingFormalNewSpecSkuCount;
     private int pendingTrialNewSpecSkuCount;
@@ -109,6 +122,8 @@ final class ScheduleSubstitutionAttemptSnapshot {
     /** 置换前定点机台挤量预留信息 */
     private Map<String, String> specifyMachineReservedMaterialMap;
     private Map<String, Date> specifyMachineReservedSwitchStartTimeMap;
+    /** 跨日准备换模事件 */
+    private Set<String> crossDayPreparationMouldChangeEventKeySet;
     /** 置换前胶囊运行态及换胶囊班次资源 */
     private Map<String, Integer> capsuleRuntimeUsageMap;
     private Set<String> capsuleReplacementShiftKeySet;
@@ -129,6 +144,15 @@ final class ScheduleSubstitutionAttemptSnapshot {
     private List<LhMouldChangePlan> mouldChangePlanList;
     /** 置换前持久化过程日志；预演日志必须随快照回滚。 */
     private List<LhScheduleProcessLog> scheduleLogList;
+    /** 历史反选、按天换活字块反选及结构待排视图 */
+    private List<HistoricalReverseSelectionDirective> historicalReverseSelectionDirectiveList;
+    private List<DayTypeBlockReverseSelectionDirective> dayTypeBlockReverseSelectionDirectiveList;
+    private Map<String, String> dayTypeBlockReverseSelectedSkuKeyMap;
+    private Map<String, Set<String>> historicalReverseSelectedMachineCodeMap;
+    private Set<LhScheduleResult> historicalReverseProtectedResultSet;
+    private Map<String, List<SkuScheduleDTO>> structureSkuMap;
+    private Map<LocalDate, Map<String, StructureEarlyProductionAdmission>>
+            structureEarlyProductionAdmissionMap;
     /** 置换前结果级收尾、共用胎胚错峰和精度前插运行态。 */
     private Map<LhScheduleResult, Integer> sharedEmbryoReleaseShiftIndexMap;
     private Map<LhScheduleResult, Integer> sharedEmbryoReleaseShiftQtyMap;
@@ -144,6 +168,11 @@ final class ScheduleSubstitutionAttemptSnapshot {
     private Map<SkuScheduleDTO, EarlyProductionRuntimePlan> earlyProductionRuntimePlanMap;
     /** 置换前当前排程日期 */
     private Date currentScheduleDate;
+    /** 置换前临时指定机台与共用模具联动指令，内部候选失败恢复时必须保持调用方原指令。 */
+    private String specialMaterialSpecifiedMachineCode;
+    private String specialMaterialSpecifiedSkuKey;
+    private Date specialMaterialEarliestSwitchTime;
+    private ScheduleSubstitutionDirective scheduleSubstitutionDirective;
     /** 置换前所有联动 SKU 字段快照，按对象身份保存 A、B 及必要来源 SKU。 */
     private Map<SkuScheduleDTO, SkuScheduleDTO> skuStateMap;
     /** 置换前所有联动 SKU 日计划账本深拷贝。 */
@@ -192,6 +221,8 @@ final class ScheduleSubstitutionAttemptSnapshot {
         snapshot.machineAssignmentMap = copyResultListMap(context.getMachineAssignmentMap());
         snapshot.machineScheduleStateMap = copyMachineScheduleMap(context.getMachineScheduleMap());
         snapshot.machineShiftCapacityMap = copyIntArrayMap(context.getMachineShiftCapacityMap());
+        snapshot.shiftRuntimeStateMap = copyShiftRuntimeStateMap(
+                context.getShiftRuntimeStateMap());
 
         snapshot.unscheduledResultList =
                 new ArrayList<LhUnscheduledResult>(context.getUnscheduledResultList());
@@ -241,6 +272,11 @@ final class ScheduleSubstitutionAttemptSnapshot {
                 new LinkedHashMap<String, String>(context.getMouldChangeLimitBlockedReasonMap());
         snapshot.newSpecMachineSelectionCountMap =
                 new LinkedHashMap<String, Integer>(context.getNewSpecMachineSelectionCountMap());
+        snapshot.newSpecRealtimeSelectionOrderMap =
+                copyRealtimeSelectionOrderMap(
+                        context.getNewSpecRealtimeSelectionOrderMap());
+        snapshot.newSpecRealtimeSnapshotResultSet =
+                copyIdentityResultSet(context.getNewSpecRealtimeSnapshotResultSet());
         snapshot.pendingFormalNewSpecSkuCount = context.getPendingFormalNewSpecSkuCount();
         snapshot.pendingTrialNewSpecSkuCount = context.getPendingTrialNewSpecSkuCount();
         snapshot.pendingMassTrialNewSpecSkuCount = context.getPendingMassTrialNewSpecSkuCount();
@@ -260,6 +296,9 @@ final class ScheduleSubstitutionAttemptSnapshot {
         snapshot.specifyMachineReservedSwitchStartTimeMap =
                 new LinkedHashMap<String, Date>(
                         context.getSpecifyMachineReservedSwitchStartTimeMap());
+        snapshot.crossDayPreparationMouldChangeEventKeySet =
+                new LinkedHashSet<String>(
+                        context.getCrossDayPreparationMouldChangeEventKeySet());
         snapshot.capsuleRuntimeUsageMap =
                 new LinkedHashMap<String, Integer>(context.getCapsuleRuntimeUsageMap());
         snapshot.capsuleReplacementShiftKeySet =
@@ -285,6 +324,23 @@ final class ScheduleSubstitutionAttemptSnapshot {
                 new ArrayList<LhMouldChangePlan>(context.getMouldChangePlanList());
         snapshot.scheduleLogList =
                 new ArrayList<LhScheduleProcessLog>(context.getScheduleLogList());
+        snapshot.historicalReverseSelectionDirectiveList = copyBeanList(
+                context.getHistoricalReverseSelectionDirectiveList(),
+                HistoricalReverseSelectionDirective.class);
+        snapshot.dayTypeBlockReverseSelectionDirectiveList = copyBeanList(
+                context.getDayTypeBlockReverseSelectionDirectiveList(),
+                DayTypeBlockReverseSelectionDirective.class);
+        snapshot.dayTypeBlockReverseSelectedSkuKeyMap =
+                new LinkedHashMap<String, String>(
+                        context.getDayTypeBlockReverseSelectedSkuKeyMap());
+        snapshot.historicalReverseSelectedMachineCodeMap =
+                copyStringSetMap(context.getHistoricalReverseSelectedMachineCodeMap());
+        snapshot.historicalReverseProtectedResultSet =
+                copyIdentityResultSet(context.getHistoricalReverseProtectedResultSet());
+        snapshot.structureSkuMap = copySkuListMap(context.getStructureSkuMap());
+        snapshot.structureEarlyProductionAdmissionMap =
+                copyStructureAdmissionMap(
+                        context.getStructureEarlyProductionAdmissionMap());
         snapshot.sharedEmbryoReleaseShiftIndexMap =
                 new IdentityHashMap<LhScheduleResult, Integer>(
                         context.getSharedEmbryoEndingStaggerReleaseShiftIndexMap());
@@ -315,9 +371,19 @@ final class ScheduleSubstitutionAttemptSnapshot {
                 new IdentityHashMap<LhScheduleResult, Integer>(
                         context.getPrecisionPreInsertInspectionShiftIndexMap());
         snapshot.earlyProductionRuntimePlanMap =
-                new IdentityHashMap<SkuScheduleDTO, EarlyProductionRuntimePlan>(
+                copyEarlyProductionRuntimePlanMap(
                         context.getEarlyProductionRuntimePlanMap());
         snapshot.currentScheduleDate = context.getCurrentScheduleDate();
+        snapshot.specialMaterialSpecifiedMachineCode =
+                context.getSpecialMaterialSpecifiedMachineCode();
+        snapshot.specialMaterialSpecifiedSkuKey =
+                context.getSpecialMaterialSpecifiedSkuKey();
+        snapshot.specialMaterialEarliestSwitchTime =
+                context.getSpecialMaterialEarliestSwitchTime();
+        snapshot.scheduleSubstitutionDirective = Objects.isNull(
+                context.getScheduleSubstitutionDirective())
+                ? null : copyBean(context.getScheduleSubstitutionDirective(),
+                ScheduleSubstitutionDirective.class);
         snapshot.skuStateMap = new IdentityHashMap<SkuScheduleDTO, SkuScheduleDTO>(4);
         snapshot.skuDailyQuotaMap =
                 new IdentityHashMap<SkuScheduleDTO, Map<LocalDate, SkuDailyPlanQuotaDTO>>(4);
@@ -348,6 +414,7 @@ final class ScheduleSubstitutionAttemptSnapshot {
         context.setMachineAssignmentMap(copyResultListMap(machineAssignmentMap));
         restoreMachineScheduleMap(context);
         context.setMachineShiftCapacityMap(copyIntArrayMap(machineShiftCapacityMap));
+        context.setShiftRuntimeStateMap(copyShiftRuntimeStateMap(shiftRuntimeStateMap));
 
         for (Map.Entry<LhUnscheduledResult, LhUnscheduledResult> entry
                 : unscheduledResultStateMap.entrySet()) {
@@ -387,6 +454,10 @@ final class ScheduleSubstitutionAttemptSnapshot {
                 new LinkedHashMap<String, String>(mouldChangeLimitBlockedReasonMap));
         context.setNewSpecMachineSelectionCountMap(
                 new LinkedHashMap<String, Integer>(newSpecMachineSelectionCountMap));
+        context.setNewSpecRealtimeSelectionOrderMap(
+                copyRealtimeSelectionOrderMap(newSpecRealtimeSelectionOrderMap));
+        context.setNewSpecRealtimeSnapshotResultSet(
+                copyIdentityResultSet(newSpecRealtimeSnapshotResultSet));
         context.setPendingFormalNewSpecSkuCount(pendingFormalNewSpecSkuCount);
         context.setPendingTrialNewSpecSkuCount(pendingTrialNewSpecSkuCount);
         context.setPendingMassTrialNewSpecSkuCount(pendingMassTrialNewSpecSkuCount);
@@ -404,6 +475,8 @@ final class ScheduleSubstitutionAttemptSnapshot {
                 new LinkedHashMap<String, String>(specifyMachineReservedMaterialMap));
         context.setSpecifyMachineReservedSwitchStartTimeMap(
                 new LinkedHashMap<String, Date>(specifyMachineReservedSwitchStartTimeMap));
+        context.setCrossDayPreparationMouldChangeEventKeySet(
+                new LinkedHashSet<String>(crossDayPreparationMouldChangeEventKeySet));
         context.setCapsuleRuntimeUsageMap(
                 new LinkedHashMap<String, Integer>(capsuleRuntimeUsageMap));
         context.setCapsuleReplacementShiftKeySet(
@@ -424,6 +497,21 @@ final class ScheduleSubstitutionAttemptSnapshot {
         context.setNewSpecSkuList(new ArrayList<SkuScheduleDTO>(newSpecSkuList));
         context.setMouldChangePlanList(new ArrayList<LhMouldChangePlan>(mouldChangePlanList));
         context.setScheduleLogList(new ArrayList<LhScheduleProcessLog>(scheduleLogList));
+        context.setHistoricalReverseSelectionDirectiveList(copyBeanList(
+                historicalReverseSelectionDirectiveList,
+                HistoricalReverseSelectionDirective.class));
+        context.setDayTypeBlockReverseSelectionDirectiveList(copyBeanList(
+                dayTypeBlockReverseSelectionDirectiveList,
+                DayTypeBlockReverseSelectionDirective.class));
+        context.setDayTypeBlockReverseSelectedSkuKeyMap(
+                new LinkedHashMap<String, String>(dayTypeBlockReverseSelectedSkuKeyMap));
+        context.setHistoricalReverseSelectedMachineCodeMap(
+                copyStringSetMap(historicalReverseSelectedMachineCodeMap));
+        context.setHistoricalReverseProtectedResultSet(
+                copyIdentityResultSet(historicalReverseProtectedResultSet));
+        context.setStructureSkuMap(copySkuListMap(structureSkuMap));
+        context.setStructureEarlyProductionAdmissionMap(
+                copyStructureAdmissionMap(structureEarlyProductionAdmissionMap));
         context.setSharedEmbryoEndingStaggerReleaseShiftIndexMap(
                 new IdentityHashMap<LhScheduleResult, Integer>(
                         sharedEmbryoReleaseShiftIndexMap));
@@ -454,9 +542,17 @@ final class ScheduleSubstitutionAttemptSnapshot {
                 new IdentityHashMap<LhScheduleResult, Integer>(
                         precisionPreInsertInspectionShiftIndexMap));
         context.setEarlyProductionRuntimePlanMap(
-                new IdentityHashMap<SkuScheduleDTO, EarlyProductionRuntimePlan>(
-                        earlyProductionRuntimePlanMap));
+                copyEarlyProductionRuntimePlanMap(earlyProductionRuntimePlanMap));
         context.setCurrentScheduleDate(currentScheduleDate);
+        context.setSpecialMaterialSpecifiedMachineCode(
+                specialMaterialSpecifiedMachineCode);
+        context.setSpecialMaterialSpecifiedSkuKey(specialMaterialSpecifiedSkuKey);
+        context.setSpecialMaterialEarliestSwitchTime(
+                specialMaterialEarliestSwitchTime);
+        context.setScheduleSubstitutionDirective(
+                Objects.isNull(scheduleSubstitutionDirective)
+                        ? null : copyBean(scheduleSubstitutionDirective,
+                        ScheduleSubstitutionDirective.class));
 
         for (Map.Entry<SkuScheduleDTO, SkuScheduleDTO> entry : skuStateMap.entrySet()) {
             BeanUtil.copyProperties(entry.getValue(), entry.getKey());
@@ -469,8 +565,6 @@ final class ScheduleSubstitutionAttemptSnapshot {
          * 可确保机台旧模具绑定、特殊材料预占模具和全局占用集合同时回到候选前口径。
          */
         context.setMouldResourceContext(MouldResourceContext.from(context));
-        context.clearSpecialMaterialSpecifiedMachineDirective();
-        context.clearScheduleSubstitutionDirective();
     }
 
     private void restoreMachineScheduleMap(LhScheduleContext context) {
@@ -523,6 +617,111 @@ final class ScheduleSubstitutionAttemptSnapshot {
                 new LinkedHashMap<String, int[]>(Math.max(16, sourceMap.size() * 2));
         for (Map.Entry<String, int[]> entry : sourceMap.entrySet()) {
             targetMap.put(entry.getKey(), entry.getValue() == null ? null : entry.getValue().clone());
+        }
+        return targetMap;
+    }
+
+    private static Map<Integer, ShiftRuntimeState> copyShiftRuntimeStateMap(
+            Map<Integer, ShiftRuntimeState> sourceMap) {
+        Map<Integer, ShiftRuntimeState> targetMap =
+                new LinkedHashMap<Integer, ShiftRuntimeState>(
+                        Math.max(8, sourceMap == null ? 0 : sourceMap.size() * 2));
+        if (sourceMap == null || sourceMap.isEmpty()) {
+            return targetMap;
+        }
+        for (Map.Entry<Integer, ShiftRuntimeState> entry : sourceMap.entrySet()) {
+            targetMap.put(entry.getKey(), copyBean(entry.getValue(), ShiftRuntimeState.class));
+        }
+        return targetMap;
+    }
+
+    private static Map<SkuScheduleDTO, Map<Integer, Integer>>
+    copyRealtimeSelectionOrderMap(
+            Map<SkuScheduleDTO, Map<Integer, Integer>> sourceMap) {
+        Map<SkuScheduleDTO, Map<Integer, Integer>> targetMap =
+                new IdentityHashMap<SkuScheduleDTO, Map<Integer, Integer>>(
+                        Math.max(4, sourceMap == null ? 0 : sourceMap.size() * 2));
+        if (sourceMap == null || sourceMap.isEmpty()) {
+            return targetMap;
+        }
+        for (Map.Entry<SkuScheduleDTO, Map<Integer, Integer>> entry : sourceMap.entrySet()) {
+            targetMap.put(entry.getKey(), entry.getValue() == null
+                    ? new LinkedHashMap<Integer, Integer>(0)
+                    : new LinkedHashMap<Integer, Integer>(entry.getValue()));
+        }
+        return targetMap;
+    }
+
+    private static Set<LhScheduleResult> copyIdentityResultSet(
+            Set<LhScheduleResult> sourceSet) {
+        Set<LhScheduleResult> targetSet = java.util.Collections.newSetFromMap(
+                new IdentityHashMap<LhScheduleResult, Boolean>());
+        if (sourceSet != null) {
+            targetSet.addAll(sourceSet);
+        }
+        return targetSet;
+    }
+
+    private static Map<String, List<SkuScheduleDTO>> copySkuListMap(
+            Map<String, List<SkuScheduleDTO>> sourceMap) {
+        Map<String, List<SkuScheduleDTO>> targetMap =
+                new LinkedHashMap<String, List<SkuScheduleDTO>>(
+                        Math.max(8, sourceMap == null ? 0 : sourceMap.size() * 2));
+        if (sourceMap == null || sourceMap.isEmpty()) {
+            return targetMap;
+        }
+        for (Map.Entry<String, List<SkuScheduleDTO>> entry : sourceMap.entrySet()) {
+            targetMap.put(entry.getKey(), entry.getValue() == null
+                    ? new ArrayList<SkuScheduleDTO>(0)
+                    : new ArrayList<SkuScheduleDTO>(entry.getValue()));
+        }
+        return targetMap;
+    }
+
+    private static <T> List<T> copyBeanList(List<T> sourceList,
+                                             Class<T> targetClass) {
+        List<T> targetList = new ArrayList<T>(
+                sourceList == null ? 0 : sourceList.size());
+        if (sourceList == null || sourceList.isEmpty()) {
+            return targetList;
+        }
+        for (T source : sourceList) {
+            targetList.add(copyBean(source, targetClass));
+        }
+        return targetList;
+    }
+
+    private static Map<LocalDate, Map<String, StructureEarlyProductionAdmission>>
+    copyStructureAdmissionMap(
+            Map<LocalDate, Map<String, StructureEarlyProductionAdmission>> sourceMap) {
+        Map<LocalDate, Map<String, StructureEarlyProductionAdmission>> targetMap =
+                new LinkedHashMap<LocalDate, Map<String, StructureEarlyProductionAdmission>>(4);
+        if (sourceMap == null || sourceMap.isEmpty()) {
+            return targetMap;
+        }
+        for (Map.Entry<LocalDate, Map<String, StructureEarlyProductionAdmission>> dateEntry
+                : sourceMap.entrySet()) {
+            Map<String, StructureEarlyProductionAdmission> structureMap =
+                    new LinkedHashMap<String, StructureEarlyProductionAdmission>(8);
+            if (dateEntry.getValue() != null) {
+                for (Map.Entry<String, StructureEarlyProductionAdmission> structureEntry
+                        : dateEntry.getValue().entrySet()) {
+                    StructureEarlyProductionAdmission copiedAdmission =
+                            copyBean(structureEntry.getValue(),
+                                    StructureEarlyProductionAdmission.class);
+                    copiedAdmission.setRawScheduledPhysicalMachineCodes(
+                            new LinkedHashSet<String>(structureEntry.getValue()
+                                    .getRawScheduledPhysicalMachineCodes()));
+                    copiedAdmission.setExcludedEndingPhysicalMachineCodes(
+                            new LinkedHashSet<String>(structureEntry.getValue()
+                                    .getExcludedEndingPhysicalMachineCodes()));
+                    copiedAdmission.setScheduledPhysicalMachineCodes(
+                            new LinkedHashSet<String>(structureEntry.getValue()
+                                    .getScheduledPhysicalMachineCodes()));
+                    structureMap.put(structureEntry.getKey(), copiedAdmission);
+                }
+            }
+            targetMap.put(dateEntry.getKey(), structureMap);
         }
         return targetMap;
     }
@@ -588,6 +787,43 @@ final class ScheduleSubstitutionAttemptSnapshot {
                 new LinkedHashMap<LocalDate, SkuDailyPlanQuotaDTO>(Math.max(8, sourceMap.size() * 2));
         for (Map.Entry<LocalDate, SkuDailyPlanQuotaDTO> entry : sourceMap.entrySet()) {
             targetMap.put(entry.getKey(), copyBean(entry.getValue(), SkuDailyPlanQuotaDTO.class));
+        }
+        return targetMap;
+    }
+
+    private static Map<SkuScheduleDTO, EarlyProductionRuntimePlan>
+    copyEarlyProductionRuntimePlanMap(
+            Map<SkuScheduleDTO, EarlyProductionRuntimePlan> sourceMap) {
+        Map<SkuScheduleDTO, EarlyProductionRuntimePlan> targetMap =
+                new IdentityHashMap<SkuScheduleDTO, EarlyProductionRuntimePlan>(
+                        Math.max(4, sourceMap == null ? 0 : sourceMap.size() * 2));
+        if (sourceMap == null || sourceMap.isEmpty()) {
+            return targetMap;
+        }
+        for (Map.Entry<SkuScheduleDTO, EarlyProductionRuntimePlan> entry
+                : sourceMap.entrySet()) {
+            if (entry.getValue() == null) {
+                targetMap.put(entry.getKey(), null);
+                continue;
+            }
+            EarlyProductionRuntimePlan copiedPlan =
+                    copyBean(entry.getValue(), EarlyProductionRuntimePlan.class);
+            copiedPlan.setShiftedDailyPlanQuotaMap(
+                    copyDailyQuotaMap(entry.getValue().getShiftedDailyPlanQuotaMap()));
+            if (entry.getValue().getDecision() != null) {
+                EarlyProductionDecision copiedDecision =
+                        copyBean(entry.getValue().getDecision(), EarlyProductionDecision.class);
+                copiedDecision.setStructurePlanMachineCounts(
+                        new ArrayList<Integer>(
+                                entry.getValue().getDecision().getStructurePlanMachineCounts()));
+                copiedPlan.setDecision(copiedDecision);
+            }
+            if (entry.getValue().getDecisionLogEntry() != null) {
+                copiedPlan.setDecisionLogEntry(copyBean(
+                        entry.getValue().getDecisionLogEntry(),
+                        EarlyProductionDecisionLogEntry.class));
+            }
+            targetMap.put(entry.getKey(), copiedPlan);
         }
         return targetMap;
     }

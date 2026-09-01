@@ -28,6 +28,9 @@ public class LhScheduleConfig {
     /** 按日标准量排产结构集合；构造配置快照时一次解析，排产过程中只做精确匹配 */
     private final Set<String> dailyStandardCapacityStructureSet;
 
+    /** 优先续作硫化机台前缀集合；构造配置快照时一次解析，降模排序过程中只做前缀匹配 */
+    private final Set<String> priorityContinuationMachinePrefixSet;
+
     /**
      * 构造配置快照
      *
@@ -37,6 +40,11 @@ public class LhScheduleConfig {
         this.resolvedParamMap = new HashMap<>(resolvedParamMap);
         this.dailyStandardCapacityStructureSet = parseDailyStandardCapacityStructureSet(
                 this.resolvedParamMap.get(LhScheduleParamConstant.DAILY_STANDARD_CAPACITY_STRUCTURE_LIST));
+        Set<String> configuredPrefixSet = parseCommaSeparatedValueSet(
+                this.resolvedParamMap.get(LhScheduleParamConstant.PRIORITY_CONTINUATION_MACHINE_PREFIXES));
+        this.priorityContinuationMachinePrefixSet = configuredPrefixSet.isEmpty()
+                ? parseCommaSeparatedValueSet(LhScheduleConstant.PRIORITY_CONTINUATION_MACHINE_PREFIXES)
+                : configuredPrefixSet;
     }
 
     /**
@@ -132,6 +140,16 @@ public class LhScheduleConfig {
     public boolean isEndingBySurplusInFullModeEnabled() {
         return getParamIntValue(LhScheduleParamConstant.ENABLE_ENDING_BY_SURPLUS_IN_FULL_MODE,
                 LhScheduleConstant.ENABLE_ENDING_BY_SURPLUS_IN_FULL_MODE) == 1;
+    }
+
+    /**
+     * 判断试制、量试月计划是否允许参与排产。
+     *
+     * @return true-参与排产；false-在月计划源头过滤
+     */
+    public boolean isTrialMassTrialSchedulingEnabled() {
+        return getParamIntValue(LhScheduleParamConstant.TRIAL_MASS_TRIAL_SCHEDULING_ENABLED,
+                LhScheduleConstant.TRIAL_MASS_TRIAL_SCHEDULING_ENABLED) == 1;
     }
 
     public ScheduleTargetModeEnum getScheduleTargetMode() {
@@ -646,6 +664,50 @@ public class LhScheduleConfig {
     }
 
     /**
+     * 获取收尾小余量不忽略比例阈值。
+     *
+     * <p>参数按百分比整数解释，未配置、负数或非数字时使用默认100；大于100的配置保持原值，
+     * 用于支持余量因有效欠产超过当月原始计划总量的场景。</p>
+     *
+     * @return 收尾小余量继续排产的最低比例阈值
+     */
+    public int getSmallEndingSurplusKeepRatioPercent() {
+        String value = resolvedParamMap.get(LhScheduleParamConstant.SMALL_ENDING_SURPLUS_KEEP_RATIO_PERCENT);
+        if (StringUtils.isEmpty(value)) {
+            return LhScheduleConstant.SMALL_ENDING_SURPLUS_KEEP_RATIO_PERCENT;
+        }
+        try {
+            int ratioPercent = Integer.parseInt(value.trim());
+            return ratioPercent >= 0
+                    ? ratioPercent : LhScheduleConstant.SMALL_ENDING_SURPLUS_KEEP_RATIO_PERCENT;
+        } catch (NumberFormatException e) {
+            return LhScheduleConstant.SMALL_ENDING_SURPLUS_KEEP_RATIO_PERCENT;
+        }
+    }
+
+    /**
+     * 判断机台是否命中优先续作前缀。
+     *
+     * @param machineCode 硫化机台编码
+     * @return true-优先保留；false-按原续作降模优先级排序
+     */
+    public boolean isPriorityContinuationMachine(String machineCode) {
+        if (StringUtils.isEmpty(machineCode) || priorityContinuationMachinePrefixSet.isEmpty()) {
+            return false;
+        }
+        return priorityContinuationMachinePrefixSet.stream().anyMatch(machineCode::startsWith);
+    }
+
+    /**
+     * 获取优先续作硫化机台前缀快照。
+     *
+     * @return 不可变机台前缀集合
+     */
+    public Set<String> getPriorityContinuationMachinePrefixSet() {
+        return priorityContinuationMachinePrefixSet;
+    }
+
+    /**
      * 判断是否允许收尾场景自动补量。
      * <p>该开关只控制主销/常规SKU收尾补满和共用胎胚SKU收尾错峰后延，</p>
      * <p>不影响普通排产、续作降模补满夜班、奇数余量修正和其他允许超量规则。</p>
@@ -713,6 +775,20 @@ public class LhScheduleConfig {
     }
 
     /**
+     * 判断新增排产机台资源是否按实际可开产时间归属班次。
+     * <p>实际可开产时间包含机台收尾、换模/换活字块、首检、胎胚门禁、设备计划和生产门禁；
+     * 配置为0时只改变机台资源首次进入竞争的班次，正式排产仍执行完整时间轴校验。</p>
+     *
+     * @return true-按实际可开产时间归班；false-按机台收尾时间归班
+     */
+    public boolean isNewSpecMachineResourceUseActualAvailableTime() {
+        int mode = getParamIntValue(
+                LhScheduleParamConstant.NEW_SPEC_MACHINE_RESOURCE_SHIFT_MODE,
+                LhScheduleConstant.NEW_SPEC_MACHINE_RESOURCE_SHIFT_MODE);
+        return mode != LhScheduleConstant.NEW_SPEC_MACHINE_RESOURCE_SHIFT_BY_ENDING_TIME;
+    }
+
+    /**
      * 判断新增排产是否启用换模均衡。
      *
      * @return true-启用；false-关闭
@@ -769,23 +845,33 @@ public class LhScheduleConfig {
      * @return 不可变结构名称集合
      */
     private Set<String> parseDailyStandardCapacityStructureSet(String structureListValue) {
-        if (StringUtils.isEmpty(structureListValue)) {
+        return parseCommaSeparatedValueSet(structureListValue);
+    }
+
+    /**
+     * 解析英文逗号分隔配置值。
+     *
+     * @param configValue 配置原值
+     * @return 去空格、去空项、去重后的不可变集合
+     */
+    private Set<String> parseCommaSeparatedValueSet(String configValue) {
+        if (StringUtils.isEmpty(configValue)) {
             return Collections.emptySet();
         }
-        String[] structureNameArray = StringUtils.split(structureListValue, ',');
-        if (structureNameArray == null || structureNameArray.length == 0) {
+        String[] configValueArray = StringUtils.split(configValue, ',');
+        if (configValueArray == null || configValueArray.length == 0) {
             return Collections.emptySet();
         }
-        Set<String> structureSet = new LinkedHashSet<String>(structureNameArray.length);
-        for (String structureName : structureNameArray) {
-            String trimmedStructureName = StringUtils.trim(structureName);
-            if (StringUtils.isNotEmpty(trimmedStructureName)) {
-                structureSet.add(trimmedStructureName);
+        Set<String> configValueSet = new LinkedHashSet<String>(configValueArray.length);
+        for (String itemValue : configValueArray) {
+            String trimmedItemValue = StringUtils.trim(itemValue);
+            if (StringUtils.isNotEmpty(trimmedItemValue)) {
+                configValueSet.add(trimmedItemValue);
             }
         }
-        if (structureSet.isEmpty()) {
+        if (configValueSet.isEmpty()) {
             return Collections.emptySet();
         }
-        return Collections.unmodifiableSet(structureSet);
+        return Collections.unmodifiableSet(configValueSet);
     }
 }

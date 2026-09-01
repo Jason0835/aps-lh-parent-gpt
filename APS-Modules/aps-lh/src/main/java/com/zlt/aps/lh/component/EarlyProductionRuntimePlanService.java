@@ -1,5 +1,6 @@
 package com.zlt.aps.lh.component;
 
+import cn.hutool.core.bean.BeanUtil;
 import com.zlt.aps.lh.api.domain.dto.SkuDailyPlanQuotaDTO;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
@@ -61,17 +62,18 @@ public class EarlyProductionRuntimePlanService {
     private IMouldChangeBalanceStrategy mouldChangeBalanceStrategy;
 
     /**
-     * 准备并注册指定业务日的提前生产运行视图。
+     * 只读预览指定业务日的提前生产运行视图。
      *
-     * <p>同一 SKU、同一业务日已经激活时直接复用，防止 S4.4 多台候选重复初始化目标量；
-     * 业务日变化时仍按现有日驱动规则重新生成当日临时前移账本。</p>
+     * <p>本方法会完整计算准入、未来来源日、临时前移dayN和有效目标量，但不会注册运行视图，
+     * 不会改写SKU目标量、实际生产余量、胎胚配额或结构资格缓存。机台驱动引擎只有在Machine×SKU
+     * 完整时间轴和全部实时约束通过后，才能调用 {@link #activateRuntimePlan} 正式激活。</p>
      *
      * @param context 排程上下文
-     * @param sku 待提前生产 SKU
-     * @param currentDate 实际尝试开产的业务日期
-     * @return 提前生产运行视图；不属于提前生产范围时返回 null
+     * @param sku 待提前生产SKU
+     * @param currentDate 当前尝试业务日
+     * @return 只读预览；不属于提前生产范围时返回null
      */
-    public EarlyProductionRuntimePlan prepareRuntimePlan(
+    public EarlyProductionRuntimePlan previewRuntimePlan(
             LhScheduleContext context,
             SkuScheduleDTO sku,
             LocalDate currentDate) {
@@ -84,35 +86,70 @@ public class EarlyProductionRuntimePlanService {
                 || currentDate.isBefore(windowStartDate) || currentDate.isAfter(windowEndDate)) {
             return null;
         }
-        EarlyProductionRuntimePlan runtimePlan = context.getEarlyProductionRuntimePlan(sku);
-        if (Objects.nonNull(runtimePlan) && runtimePlan.isActive()
-                && currentDate.equals(runtimePlan.getCurrentDate())) {
-            log.info("提前生产中心运行视图复用, factoryCode: {}, batchNo: {}, materialCode: {}, "
-                            + "currentDate: {}, futurePlanDate: {}, remainingQty: {}",
-                    context.getFactoryCode(), context.getBatchNo(), sku.getMaterialCode(),
-                    currentDate, runtimePlan.getFuturePlanDate(),
-                    targetScheduleQtyResolver.resolveProductionRemainingQty(context, sku));
-            return runtimePlan;
+        EarlyProductionRuntimePlan existingRuntimePlan =
+                context.getEarlyProductionRuntimePlan(sku);
+        if (Objects.nonNull(existingRuntimePlan) && existingRuntimePlan.isActive()
+                && currentDate.equals(existingRuntimePlan.getCurrentDate())) {
+            return existingRuntimePlan;
         }
-
-        /*
-         * S4.4 换活字块提前生产与 S4.5 新规格提前生产统一从提前生产中心申请运行视图。
-         * 调用共享准入检查时，只有原始机台数命中结构切换提前，才校验同结构是否存在
-         * “有效最早胎胚可供硫化时间”；若同结构已有有效续作排产，则关闭该时间约束。
-         * 普通结构提前和结构收尾提前继续执行原有条件。
-         * 本服务不复制场景识别、胎胚时间获取或计算逻辑，避免两个入口形成不同口径。
-         */
         EarlyProductionDecision decision = this.evaluateEarlyProductionAdmission(
-                context, sku, currentDate, windowStartDate, windowEndDate);
+                context, sku, currentDate, windowStartDate, windowEndDate, false);
         if (Objects.isNull(decision) || !decision.isEarlyProduction()
                 || Objects.isNull(decision.getFuturePlanDate())) {
-            return this.keepFutureOnlyCandidateInactive(
-                    context, sku, currentDate, runtimePlan, decision);
+            return this.buildInactivePreview(
+                    existingRuntimePlan, currentDate, decision);
         }
-
-        return this.initializeRuntimePlan(
+        return this.initializeRuntimePlanPreview(
                 context, sku, currentDate, windowStartDate, windowEndDate,
-                runtimePlan, decision);
+                existingRuntimePlan, decision);
+    }
+
+    /**
+     * 激活已经通过Machine×SKU完整试算的提前生产运行视图。
+     *
+     * @param context 排程上下文
+     * @param sku 最终选中的SKU
+     * @param previewPlan 无副作用预览
+     * @return 已注册的激活运行视图；预览不可激活时返回null
+     */
+    public EarlyProductionRuntimePlan activateRuntimePlan(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            EarlyProductionRuntimePlan previewPlan) {
+        if (Objects.isNull(context) || Objects.isNull(sku) || Objects.isNull(previewPlan)
+                || Objects.isNull(previewPlan.getDecision())
+                || !previewPlan.getDecision().isEarlyProduction()
+                || !previewPlan.getDecision().isAllowed()
+                || Objects.isNull(previewPlan.getCurrentDate())
+                || Objects.isNull(previewPlan.getFuturePlanDate())
+                || CollectionUtils.isEmpty(previewPlan.getShiftedDailyPlanQuotaMap())
+                || previewPlan.getEffectiveTargetQty() <= 0) {
+            return null;
+        }
+        EarlyProductionRuntimePlan existingRuntimePlan =
+                context.getEarlyProductionRuntimePlan(sku);
+        if (Objects.nonNull(existingRuntimePlan) && existingRuntimePlan.isActive()
+                && previewPlan.getCurrentDate().equals(existingRuntimePlan.getCurrentDate())) {
+            return existingRuntimePlan;
+        }
+        StructureEarlyProductionAdmission admission = this.evaluateStructureDailyAdmission(
+                context, sku, previewPlan.getCurrentDate(), previewPlan.getFuturePlanDate());
+        if (Objects.isNull(admission) || !admission.isAllowed()) {
+            return null;
+        }
+        EarlyProductionRuntimePlan activationPlan =
+                this.copyRuntimePlanBase(previewPlan);
+        Map<LocalDate, SkuDailyPlanQuotaDTO> shiftedQuotaMap =
+                this.copyQuotaMap(activationPlan.getShiftedDailyPlanQuotaMap());
+        activationPlan.setShiftedDailyPlanQuotaMap(shiftedQuotaMap);
+        this.activateRuntimePlan(
+                context, sku, activationPlan.getCurrentDate(), activationPlan.getFuturePlanDate(),
+                activationPlan.getEarlyDays(), activationPlan, activationPlan.getDecision(),
+                shiftedQuotaMap, activationPlan.getHistoryShortageQty(),
+                activationPlan.isFutureOnlyCandidate()
+                        ? activationPlan.getFutureMonthSurplusQty() : Math.max(0, sku.getSurplusQty()),
+                activationPlan.getEffectiveTargetQty());
+        return activationPlan;
     }
 
     /**
@@ -136,25 +173,16 @@ public class EarlyProductionRuntimePlanService {
         LocalDate windowEndDate = Objects.isNull(context)
                 ? null : this.resolveScheduleWindowEndDate(context);
         return this.evaluateEarlyProductionAdmission(
-                context, sku, currentDate, windowStartDate, windowEndDate);
+                context, sku, currentDate, windowStartDate, windowEndDate, false);
     }
 
-    /**
-     * 使用已解析的排程窗口执行共享提前生产准入判断。
-     *
-     * @param context 排程上下文
-     * @param sku 待判断 SKU
-     * @param currentDate 当前业务日
-     * @param windowStartDate 排程窗口开始业务日
-     * @param windowEndDate 排程窗口结束业务日
-     * @return 共享提前生产准入结论
-     */
     private EarlyProductionDecision evaluateEarlyProductionAdmission(
             LhScheduleContext context,
             SkuScheduleDTO sku,
             LocalDate currentDate,
             LocalDate windowStartDate,
-            LocalDate windowEndDate) {
+            LocalDate windowEndDate,
+            boolean registerStructureAdmission) {
         if (Objects.isNull(context) || Objects.isNull(sku) || Objects.isNull(currentDate)) {
             return EarlyProductionDecision.notEarlyProduction(
                     false, "提前生产准入参数不完整");
@@ -171,10 +199,11 @@ public class EarlyProductionRuntimePlanService {
                 || !decision.isAllowed() || Objects.isNull(decision.getFuturePlanDate())) {
             return decision;
         }
-        StructureEarlyProductionAdmission admission =
-                this.evaluateStructureDailyAdmission(
-                        context, sku, currentDate,
-                        decision.getFuturePlanDate());
+        StructureEarlyProductionAdmission admission = registerStructureAdmission
+                ? this.evaluateStructureDailyAdmission(
+                context, sku, currentDate, decision.getFuturePlanDate())
+                : this.previewStructureDailyAdmission(
+                context, sku, currentDate, decision.getFuturePlanDate());
         if (Objects.isNull(admission) || !admission.isAllowed()) {
             String reason = Objects.isNull(admission)
                     ? "结构当天提前生产资格无法生成，禁止提前生产"
@@ -206,16 +235,37 @@ public class EarlyProductionRuntimePlanService {
             SkuScheduleDTO sku,
             LocalDate currentDate,
             LocalDate futurePlanDate) {
+        return this.resolveStructureDailyAdmission(
+                context, sku, currentDate, futurePlanDate, true);
+    }
+
+    private StructureEarlyProductionAdmission previewStructureDailyAdmission(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            LocalDate currentDate,
+            LocalDate futurePlanDate) {
+        return this.resolveStructureDailyAdmission(
+                context, sku, currentDate, futurePlanDate, false);
+    }
+
+    private StructureEarlyProductionAdmission resolveStructureDailyAdmission(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            LocalDate currentDate,
+            LocalDate futurePlanDate,
+            boolean registerAdmission) {
         if (Objects.isNull(context) || Objects.isNull(sku)
                 || Objects.isNull(currentDate)
                 || StringUtils.isEmpty(sku.getStructureName())) {
             return null;
         }
-        StructureEarlyProductionAdmission cachedAdmission =
-                context.getStructureEarlyProductionAdmission(
-                        currentDate, sku.getStructureName());
-        if (Objects.nonNull(cachedAdmission)) {
-            return cachedAdmission;
+        if (registerAdmission) {
+            StructureEarlyProductionAdmission cachedAdmission =
+                    context.getStructureEarlyProductionAdmission(
+                            currentDate, sku.getStructureName());
+            if (Objects.nonNull(cachedAdmission)) {
+                return cachedAdmission;
+            }
         }
         LhShiftConfigVO admissionShift =
                 this.resolveLastBusinessDayShift(context, currentDate);
@@ -247,19 +297,114 @@ public class EarlyProductionRuntimePlanService {
             reason = "结构无有效计划机台数，禁止提前生产";
         } else if (admission.getScheduledStructureCount()
                 >= currentPlanMachineCount) {
-            allowed = false;
-            reason = "当天最后一个班次结构已排硫化机台数已达到或超过计划机台数，禁止提前生产";
+            /*
+             * 日级资格不能整体拒绝：候选可能复用已经计入目标结构的物理机台，或实际落到
+             * 结构尚未满的其他班次。最终是否允许新增物理机台由Machine×SKU提案按目标班次实时判断。
+             */
+            allowed = true;
+            reason = "当天最后班次结构机台数已达到计划值，进入候选机台级实时判断";
         } else {
             allowed = true;
             reason = "当天最后一个班次结构已排硫化机台数未达到计划机台数，取得当天提前生产资格";
         }
         admission.setAllowed(allowed);
         admission.setReason(reason);
+        if (!registerAdmission) {
+            return admission;
+        }
         context.registerStructureEarlyProductionAdmission(admission);
-        this.logStructureDailyAdmission(
-                context, sku, futurePlanDate, admission);
+        this.logStructureDailyAdmission(context, sku, futurePlanDate, admission);
         return context.getStructureEarlyProductionAdmission(
                 currentDate, sku.getStructureName());
+    }
+
+    private EarlyProductionRuntimePlan initializeRuntimePlanPreview(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            LocalDate currentDate,
+            LocalDate windowStartDate,
+            LocalDate windowEndDate,
+            EarlyProductionRuntimePlan existingRuntimePlan,
+            EarlyProductionDecision decision) {
+        LocalDate futurePlanDate = decision.getFuturePlanDate();
+        int earlyDays = (int) ChronoUnit.DAYS.between(currentDate, futurePlanDate);
+        LocalDate earlyProductionMaxDate = EarlyProductionChecker.resolveEarlyProductionMaxDate(
+                context, windowEndDate);
+        EarlyProductionRuntimePlan previewPlan = this.copyRuntimePlanBase(existingRuntimePlan);
+        this.fillRuntimePlanBaseInfo(
+                context, sku, currentDate, windowStartDate,
+                futurePlanDate, earlyProductionMaxDate, earlyDays, previewPlan, decision);
+        if (!decision.isAllowed()) {
+            return previewPlan;
+        }
+        Map<LocalDate, SkuDailyPlanQuotaDTO> sourceQuotaMap =
+                this.buildSourceQuotaMap(context, sku, currentDate, earlyProductionMaxDate);
+        Map<LocalDate, SkuDailyPlanQuotaDTO> shiftedQuotaMap =
+                SkuDailyPlanQuotaUtil.buildShiftedEarlyProductionQuotaMap(
+                        sourceQuotaMap, currentDate, windowEndDate,
+                        futurePlanDate, earlyProductionMaxDate);
+        if (CollectionUtils.isEmpty(shiftedQuotaMap)) {
+            return previewPlan;
+        }
+        int futureMonthSurplusQty = previewPlan.isFutureOnlyCandidate()
+                ? previewPlan.getFutureMonthSurplusQty() : Math.max(0, sku.getSurplusQty());
+        int effectiveTargetQty = this.resolveEffectiveTargetQty(
+                sku, futurePlanDate, futureMonthSurplusQty);
+        previewPlan.setHistoryShortageQty(0);
+        previewPlan.setEffectiveTargetQty(effectiveTargetQty);
+        previewPlan.setShiftedDailyPlanQuotaMap(shiftedQuotaMap);
+        previewPlan.setActive(false);
+        return previewPlan;
+    }
+
+    private EarlyProductionRuntimePlan buildInactivePreview(
+            EarlyProductionRuntimePlan existingRuntimePlan,
+            LocalDate currentDate,
+            EarlyProductionDecision decision) {
+        if (Objects.isNull(existingRuntimePlan)
+                || !existingRuntimePlan.isFutureOnlyCandidate()) {
+            return null;
+        }
+        EarlyProductionRuntimePlan previewPlan = this.copyRuntimePlanBase(existingRuntimePlan);
+        previewPlan.setCurrentDate(currentDate);
+        previewPlan.setActive(false);
+        previewPlan.setDecision(decision);
+        previewPlan.setShiftedDailyPlanQuotaMap(
+                new LinkedHashMap<LocalDate, SkuDailyPlanQuotaDTO>(0));
+        return previewPlan;
+    }
+
+    private EarlyProductionRuntimePlan copyRuntimePlanBase(
+            EarlyProductionRuntimePlan source) {
+        EarlyProductionRuntimePlan target = new EarlyProductionRuntimePlan();
+        if (Objects.isNull(source)) {
+            return target;
+        }
+        BeanUtil.copyProperties(source, target);
+        target.setShiftedDailyPlanQuotaMap(
+                this.copyQuotaMap(source.getShiftedDailyPlanQuotaMap()));
+        target.setActive(false);
+        return target;
+    }
+
+    private Map<LocalDate, SkuDailyPlanQuotaDTO> copyQuotaMap(
+            Map<LocalDate, SkuDailyPlanQuotaDTO> sourceMap) {
+        Map<LocalDate, SkuDailyPlanQuotaDTO> targetMap =
+                new LinkedHashMap<LocalDate, SkuDailyPlanQuotaDTO>(
+                        Math.max(4, CollectionUtils.isEmpty(sourceMap) ? 0 : sourceMap.size() * 2));
+        if (CollectionUtils.isEmpty(sourceMap)) {
+            return targetMap;
+        }
+        for (Map.Entry<LocalDate, SkuDailyPlanQuotaDTO> entry : sourceMap.entrySet()) {
+            if (Objects.isNull(entry.getValue())) {
+                targetMap.put(entry.getKey(), null);
+                continue;
+            }
+            SkuDailyPlanQuotaDTO copiedQuota = new SkuDailyPlanQuotaDTO();
+            BeanUtil.copyProperties(entry.getValue(), copiedQuota);
+            targetMap.put(entry.getKey(), copiedQuota);
+        }
+        return targetMap;
     }
 
     /**
@@ -334,70 +479,6 @@ public class EarlyProductionRuntimePlanService {
     }
 
     /**
-     * 根据已形成的提前生产准入结论初始化数量、临时 dayN 和实际消费账本。
-     *
-     * @param context 排程上下文
-     * @param sku SKU
-     * @param currentDate 当前业务日
-     * @param windowStartDate 排程窗口 T 日
-     * @param windowEndDate 排程窗口结束日
-     * @param existingRuntimePlan 已有候选视图
-     * @param decision 提前生产准入结论
-     * @return 初始化后的运行视图
-     */
-    private EarlyProductionRuntimePlan initializeRuntimePlan(
-            LhScheduleContext context,
-            SkuScheduleDTO sku,
-            LocalDate currentDate,
-            LocalDate windowStartDate,
-            LocalDate windowEndDate,
-            EarlyProductionRuntimePlan existingRuntimePlan,
-            EarlyProductionDecision decision) {
-        LocalDate futurePlanDate = decision.getFuturePlanDate();
-        int earlyDays = (int) ChronoUnit.DAYS.between(currentDate, futurePlanDate);
-        LocalDate earlyProductionMaxDate = EarlyProductionChecker.resolveEarlyProductionMaxDate(
-                context, windowEndDate);
-        EarlyProductionRuntimePlan runtimePlan = Objects.isNull(existingRuntimePlan)
-                ? new EarlyProductionRuntimePlan() : existingRuntimePlan;
-        this.fillRuntimePlanBaseInfo(
-                context, sku, currentDate, windowStartDate,
-                futurePlanDate, earlyProductionMaxDate, earlyDays, runtimePlan, decision);
-        this.recordDecisionLog(context, sku, currentDate, runtimePlan, decision);
-        if (!decision.isAllowed()) {
-            log.info("提前生产准入未通过，不注册激活运行视图, factoryCode: {}, batchNo: {}, "
-                            + "materialCode: {}, currentDate: {}, futurePlanDate: {}, structureName: {}, reason: {}",
-                    context.getFactoryCode(), context.getBatchNo(), sku.getMaterialCode(),
-                    currentDate, futurePlanDate, sku.getStructureName(), decision.getReason());
-            return runtimePlan;
-        }
-
-        Map<LocalDate, SkuDailyPlanQuotaDTO> sourceQuotaMap =
-                this.buildSourceQuotaMap(
-                        context, sku, currentDate, earlyProductionMaxDate);
-        Map<LocalDate, SkuDailyPlanQuotaDTO> shiftedQuotaMap =
-                SkuDailyPlanQuotaUtil.buildShiftedEarlyProductionQuotaMap(
-                        sourceQuotaMap, currentDate, windowEndDate,
-                        futurePlanDate, earlyProductionMaxDate);
-        if (CollectionUtils.isEmpty(shiftedQuotaMap)) {
-            return runtimePlan;
-        }
-        /*
-         * 历史欠产/收尾遗留阶段下线后，提前生产只前移未来原始计划量。
-         * 历史欠产不再追加到临时dayN，也不参与本轮有效目标量计算。
-         */
-        int historyShortageQty = 0;
-        int futureMonthSurplusQty = runtimePlan.isFutureOnlyCandidate()
-                ? runtimePlan.getFutureMonthSurplusQty() : Math.max(0, sku.getSurplusQty());
-        int effectiveTargetQty = this.resolveEffectiveTargetQty(
-                sku, futurePlanDate, futureMonthSurplusQty);
-        this.activateRuntimePlan(
-                context, sku, currentDate, futurePlanDate, earlyDays,
-                runtimePlan, decision, shiftedQuotaMap, historyShortageQty,
-                futureMonthSurplusQty, effectiveTargetQty);
-        return runtimePlan;
-    }
-
-    /**
      * 填充运行视图的准入、日期和原始数量审计字段。
      *
      * @param context 排程上下文
@@ -469,13 +550,11 @@ public class EarlyProductionRuntimePlanService {
             int effectiveTargetQty) {
         sku.setMonthlyHistoryShortageQty(historyShortageQty);
         sku.setEffectiveCarryForwardQty(historyShortageQty);
-        sku.setTargetScheduleQty(effectiveTargetQty);
         sku.setPendingQty(effectiveTargetQty);
-        sku.setRemainingScheduleQty(effectiveTargetQty);
         sku.setWindowPlanQty(this.sumWindowPlanQty(shiftedQuotaMap));
         sku.setWindowRemainingPlanQty(
                 SkuDailyPlanQuotaUtil.sumRemainingQty(shiftedQuotaMap));
-        targetScheduleQtyResolver.syncProductionRemainingQtyToTarget(
+        targetScheduleQtyResolver.applyProductionTargetState(
                 context, sku, effectiveTargetQty, "提前生产中心运行视图初始化");
         targetScheduleQtyResolver.refreshActiveEmbryoSkuMap(context);
         targetScheduleQtyResolver.refreshAllSharedEmbryoStockAllocations(
@@ -547,39 +626,6 @@ public class EarlyProductionRuntimePlanService {
                         currentDate, sku.getMaterialCode(), sku.getProductStatus()),
                 historyShortageQty, futureMonthSurplusQty, effectiveTargetQty,
                 shiftedQuotaMap.size(), SkuDailyPlanQuotaUtil.resolveLastQuotaDate(shiftedQuotaMap));
-    }
-
-    /**
-     * 保留尚未进入提前生产阈值的 future-only 候选视图。
-     *
-     * @param context 排程上下文
-     * @param sku SKU
-     * @param currentDate 当前业务日
-     * @param runtimePlan 已有运行视图
-     * @param decision 当前准入结论
-     * @return 保留后的候选视图；普通 SKU 返回 null
-     */
-    private EarlyProductionRuntimePlan keepFutureOnlyCandidateInactive(
-            LhScheduleContext context,
-            SkuScheduleDTO sku,
-            LocalDate currentDate,
-            EarlyProductionRuntimePlan runtimePlan,
-            EarlyProductionDecision decision) {
-        if (Objects.isNull(runtimePlan) || !runtimePlan.isFutureOnlyCandidate()) {
-            return null;
-        }
-        runtimePlan.setCurrentDate(currentDate);
-        runtimePlan.setActive(false);
-        runtimePlan.setDecision(decision);
-        runtimePlan.getShiftedDailyPlanQuotaMap().clear();
-        context.registerEarlyProductionRuntimePlan(sku, runtimePlan);
-        this.recordDecisionLog(context, sku, currentDate, runtimePlan, decision);
-        log.info("提前生产候选尚未激活, factoryCode: {}, batchNo: {}, materialCode: {}, "
-                        + "currentDate: {}, futurePlanDate: {}, reason: {}",
-                context.getFactoryCode(), context.getBatchNo(), sku.getMaterialCode(),
-                currentDate, runtimePlan.getFuturePlanDate(),
-                Objects.isNull(decision) ? "未形成准入结论" : decision.getReason());
-        return runtimePlan;
     }
 
     /**

@@ -309,6 +309,9 @@ public final class LhScheduleConstant {
     /** 小批量验证SKU默认阈值 */
     public static final int SMALL_BATCH_SKU_THRESHOLD = 100;
 
+    /** 试制量试参与排产开关默认值（0-不参与，1-参与） */
+    public static final int TRIAL_MASS_TRIAL_SCHEDULING_ENABLED = 0;
+
     // ======================== 量试充抵正规 ========================
 
     /** 量试充抵正规开关默认值（0-关闭，1-开启）；默认开启，与存量行为一致 */
@@ -369,6 +372,12 @@ public final class LhScheduleConstant {
     /** 收尾小余量允许欠产偏差值默认值 */
     public static final int CONTINUOUS_ENDING_SURPLUS_TOLERANCE_QTY = 2;
 
+    /** 收尾小余量不忽略比例阈值默认值（百分比） */
+    public static final int SMALL_ENDING_SURPLUS_KEEP_RATIO_PERCENT = 100;
+
+    /** 优先续作硫化机台前缀默认值 */
+    public static final String PRIORITY_CONTINUATION_MACHINE_PREFIXES = "K21,K22";
+
     /** 收尾落在夜班或错开模具交替自动补量开关默认值（0-关闭，1-开启） */
     public static final int ENDING_AUTO_FILL_ENABLED = 1;
 
@@ -389,6 +398,16 @@ public final class LhScheduleConstant {
 
     /** 按日标准量排产结构清单默认值，空值表示所有结构均按原始班产排产 */
     public static final String DAILY_STANDARD_CAPACITY_STRUCTURE_LIST = "";
+
+    /** 新增排产机台资源按机台收尾时间归属班次 */
+    public static final int NEW_SPEC_MACHINE_RESOURCE_SHIFT_BY_ENDING_TIME = 0;
+
+    /** 新增排产机台资源按实际可开产时间归属班次 */
+    public static final int NEW_SPEC_MACHINE_RESOURCE_SHIFT_BY_ACTUAL_AVAILABLE_TIME = 1;
+
+    /** 新增排产机台资源归属班次默认口径：实际可开产时间 */
+    public static final int NEW_SPEC_MACHINE_RESOURCE_SHIFT_MODE =
+            NEW_SPEC_MACHINE_RESOURCE_SHIFT_BY_ACTUAL_AVAILABLE_TIME;
 
     /** 新增排产换模均衡开关默认值（0-关闭，1-开启） */
     public static final int ENABLE_CHANGEOVER_BALANCE = 1;

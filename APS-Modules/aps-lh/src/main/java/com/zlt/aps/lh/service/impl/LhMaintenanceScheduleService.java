@@ -42,6 +42,9 @@ public class LhMaintenanceScheduleService {
 
     /** 普通收尾触发原因 */
     private static final String TRIGGER_REASON_AFTER_ENDING = "首个规格收尾后保养";
+    /** 正日计划优先时普通精度延后触发原因 */
+    private static final String TRIGGER_REASON_POSITIVE_PLAN_PRIORITY =
+            "正日计划优先，普通精度延后至计划日前最后合规日";
     /** 3天内精度计划强制下机触发原因 */
     public static final String TRIGGER_REASON_FORCE_DOWN = "精度计划到期强制下机";
     /** 长期在机天数阈值 */
@@ -134,6 +137,32 @@ public class LhMaintenanceScheduleService {
                     && (Objects.isNull(knownEndingTime) || knownEndingTime.after(firstCutoffTime));
             boolean preInsertAllowed = false;
             Date finalPlanDate = firstCandidateDate;
+            String triggerReason = TRIGGER_REASON_AFTER_ENDING;
+
+            /*
+             * 空闲机台存在正日计划待排物料时，4～30天普通精度不得抢占当前三天生产窗口。
+             * 精度仍必须保留，并从原PLAN_DATE向前寻找最后一个合规执行日；这样日计划只获得
+             * 当前窗口的生产优先级，不会绕过精度、突破每日额度或把精度延后到计划日之后。
+             */
+            if (shouldPostponeOrdinaryMaintenanceForPositivePlan(
+                    context, machine, plan, forceDays)) {
+                Date latestPlanDate = resolveLatestAvailableMaintenanceDate(
+                        context, plan.getPlanDate(), context.getScheduleDate(),
+                        machine.getMachineCode(), plan);
+                if (Objects.isNull(latestPlanDate)) {
+                    appendMaintenanceProcessLog(context, MAINTENANCE_PROCESS_LOG_TITLE,
+                            machine.getMachineCode(), plan, plan.getPlanDate(),
+                            "正日计划优先后，计划日前不存在合规精度执行日",
+                            "取消本轮安排，禁止延后执行");
+                    continue;
+                }
+                finalPlanDate = latestPlanDate;
+                triggerReason = TRIGGER_REASON_POSITIVE_PLAN_PRIORITY;
+                appendMaintenanceProcessLog(context, MAINTENANCE_PROCESS_LOG_TITLE,
+                        machine.getMachineCode(), plan, finalPlanDate,
+                        "机台在窗口开始时已释放，且存在正日计划待排物料",
+                        "普通精度让位当前生产窗口，改排计划日前最后合规日");
+            }
 
             /*
              * 普通4～30天计划不允许在前SKU收尾时间未知时直接占用最早执行日。
@@ -190,7 +219,7 @@ public class LhMaintenanceScheduleService {
             }
             attachMaintenanceWindow(context, machine, plan, finalPlanDate,
                     forceDown, preInsertAllowed,
-                    forceDown ? TRIGGER_REASON_FORCE_DOWN : TRIGGER_REASON_AFTER_ENDING);
+                    forceDown ? TRIGGER_REASON_FORCE_DOWN : triggerReason);
         }
         log.info("精度计划处理排序完成, 工厂: {}, 目标日: {}, 计划数: {}, 排序结果: {}",
                 context.getFactoryCode(), LhScheduleTimeUtil.formatDate(context.getScheduleDate()),
@@ -1151,6 +1180,122 @@ public class LhMaintenanceScheduleService {
             skippedDays++;
             cursorDate = LhScheduleTimeUtil.addDays(cursorDate, 1);
         }
+    }
+
+    /**
+     * 从计划日期向前寻找最后一个合规精度执行日。
+     *
+     * <p>该入口只用于空闲机台为正日计划让位的4～30天普通精度。搜索下限固定为当前排程T日，
+     * 继续复用每日台数、周日、盘点日、节假日、停机、维修和清洗全部日期硬约束。</p>
+     *
+     * @param context 排程上下文
+     * @param planDate 精度原计划日期，也是允许执行的最晚日期
+     * @param lowerBoundDate 本轮允许提前执行的最早日期
+     * @param machineCode 机台编码
+     * @param plan 精度计划
+     * @return 最后一个合规执行日；计划日前无合规日期时返回null
+     */
+    private Date resolveLatestAvailableMaintenanceDate(LhScheduleContext context,
+                                                       Date planDate,
+                                                       Date lowerBoundDate,
+                                                       String machineCode,
+                                                       LhPrecisionPlan plan) {
+        if (Objects.isNull(planDate) || Objects.isNull(lowerBoundDate)) {
+            return null;
+        }
+        Date cursorDate = LhScheduleTimeUtil.clearTime(planDate);
+        Date lowerBound = LhScheduleTimeUtil.clearTime(lowerBoundDate);
+        int advancedDays = 0;
+        String firstUnavailableReason = StringUtils.EMPTY;
+        String lastUnavailableReason = StringUtils.EMPTY;
+        while (!cursorDate.before(lowerBound)) {
+            String unavailableReason = resolveDateUnavailableReason(
+                    context, cursorDate, machineCode);
+            if (StringUtils.isEmpty(unavailableReason)) {
+                String dateKey = LhScheduleTimeUtil.formatDate(cursorDate);
+                String rule = "反向搜索起点=" + LhScheduleTimeUtil.formatDate(planDate)
+                        + "，向前天数=" + advancedDays
+                        + "，首个排除原因="
+                        + (StringUtils.isEmpty(firstUnavailableReason)
+                        ? "无" : firstUnavailableReason)
+                        + "，最后排除原因="
+                        + (StringUtils.isEmpty(lastUnavailableReason)
+                        ? "无" : lastUnavailableReason)
+                        + "，最终当天保养物理机台数="
+                        + resolveDailyMaintenanceCount(context, dateKey)
+                        + "/" + DAILY_MAINTENANCE_LIMIT;
+                appendMaintenanceProcessLog(context, MAINTENANCE_PROCESS_LOG_TITLE,
+                        machineCode, plan, cursorDate, rule, "日期可用");
+                log.info("精度计划最后合规执行日期搜索完成, 机台: {}, 计划日期: {}, 最终日期: {}, "
+                                + "向前天数: {}, 首个排除原因: {}, 最后排除原因: {}",
+                        machineCode, LhScheduleTimeUtil.formatDate(planDate),
+                        LhScheduleTimeUtil.formatDate(cursorDate), advancedDays,
+                        StringUtils.isEmpty(firstUnavailableReason) ? "无" : firstUnavailableReason,
+                        StringUtils.isEmpty(lastUnavailableReason) ? "无" : lastUnavailableReason);
+                return cursorDate;
+            }
+            if (StringUtils.isEmpty(firstUnavailableReason)) {
+                firstUnavailableReason = unavailableReason;
+            }
+            lastUnavailableReason = unavailableReason;
+            advancedDays++;
+            cursorDate = LhScheduleTimeUtil.addDays(cursorDate, -1);
+        }
+        return null;
+    }
+
+    /**
+     * 判断普通精度是否应为当前窗口正日计划让位。
+     *
+     * @param context 排程上下文
+     * @param machine 精度机台
+     * @param plan 精度计划
+     * @param forceDays 强制精度天数阈值
+     * @return true-普通精度改排计划日前最后合规日；false-沿用现有精度日期规则
+     */
+    private boolean shouldPostponeOrdinaryMaintenanceForPositivePlan(
+            LhScheduleContext context,
+            MachineScheduleDTO machine,
+            LhPrecisionPlan plan,
+            int forceDays) {
+        if (Objects.isNull(context) || Objects.isNull(machine) || Objects.isNull(plan)
+                || Objects.isNull(plan.getDaysToDue()) || plan.getDaysToDue() <= forceDays
+                || CollectionUtils.isEmpty(context.getNewSpecSkuList())) {
+            return false;
+        }
+        Date windowStartTime = resolveScheduleWindowStartTime(context);
+        Date knownEndingTime = resolvePhysicalKnownEndingTime(context, machine);
+        if (Objects.isNull(windowStartTime) || Objects.isNull(knownEndingTime)
+                || knownEndingTime.after(windowStartTime)) {
+            return false;
+        }
+        return context.getNewSpecSkuList().stream()
+                .filter(Objects::nonNull)
+                .anyMatch(sku -> sku.getSurplusQty() > 0 && sku.getWindowPlanQty() > 0);
+    }
+
+    /**
+     * 获取本次固定排程窗口首班开始时间。
+     *
+     * @param context 排程上下文
+     * @return 首班开始时间；班次尚未初始化时返回排程T日
+     */
+    private Date resolveScheduleWindowStartTime(LhScheduleContext context) {
+        if (Objects.isNull(context)) {
+            return null;
+        }
+        if (!CollectionUtils.isEmpty(context.getScheduleWindowShifts())) {
+            Date earliestStartTime = context.getScheduleWindowShifts().stream()
+                    .filter(Objects::nonNull)
+                    .map(LhShiftConfigVO::getShiftStartDateTime)
+                    .filter(Objects::nonNull)
+                    .min(Date::compareTo)
+                    .orElse(null);
+            if (Objects.nonNull(earliestStartTime)) {
+                return earliestStartTime;
+            }
+        }
+        return context.getScheduleDate();
     }
 
     private String resolveDateUnavailableReason(LhScheduleContext context,

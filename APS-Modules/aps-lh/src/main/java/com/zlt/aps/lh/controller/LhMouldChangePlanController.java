@@ -29,7 +29,6 @@ import com.zlt.aps.common.core.domain.ExcelStyleVo;
 import com.zlt.aps.common.core.utils.ApsCommonUtil;
 import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.constant.FactoryConstant;
-import com.zlt.aps.enums.ConstructionStageEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
 import com.zlt.aps.lh.api.domain.dto.LhScheduleImportDTO;
@@ -439,15 +438,12 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
     }
 
     public List<Map<String, Object>> buildExportDataList(List<LhMouldChangePlanVo> list, LhMouldChangePlan queryVO) {
-        // 按 干冰清洗 > 喷砂清洗 > 其余、计划日期、班次、机台排序，计划日期仅按年月日比较，避免时分秒影响导出顺序
+        // 按 干冰清洗、喷砂清洗 > 其余、计划日期、班次、机台排序，计划日期仅按年月日比较，避免时分秒影响导出顺序
         list = list.stream().sorted(
                 Comparator.comparingInt((LhMouldChangePlanVo item) -> {
-                    // 干冰清洗排最前(0)，喷砂清洗次之(1)，其余(2)
-                    if (YesOrNoEnum.YES.getCode().equals(item.getIsDryIceClean())) {
+                    // 干冰清洗、喷砂清洗排最前(0)，其余(2)
+                    if (YesOrNoEnum.YES.getCode().equals(item.getIsDryIceClean()) || YesOrNoEnum.YES.getCode().equals(item.getIsSandblastingClean())) {
                         return 0;
-                    }
-                    if (YesOrNoEnum.YES.getCode().equals(item.getIsSandblastingClean())) {
-                        return 1;
                     }
                     return 2;
                 })
@@ -478,7 +474,7 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
                 materialDescList.add(mouldChangePlanVo.getAfterMaterialDesc());
             }
         }
-        // 查询硫化排程结果，获取规格示方类型
+        // 查询硫化排程结果，获取规格产品状态
         Map<String, String> lhScheduleResultMap = new HashMap<>();
         if (CollUtil.isNotEmpty(materialCodeList)) {
             LambdaQueryWrapper<LhScheduleResult> queryWrapper = new LambdaQueryWrapper<>();
@@ -489,9 +485,9 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
             List<LhScheduleResult> lhScheduleResultList = lhScheduleResultMapper.selectList(queryWrapper);
             if (CollectionUtils.isNotEmpty(lhScheduleResultList)) {
                 lhScheduleResultMap = lhScheduleResultList.stream()
-                        .sorted(Comparator.comparing(item -> StringUtils.defaultIfBlank(item.getConstructionStage(), "")))
+                        .sorted(Comparator.comparing(item -> StringUtils.defaultIfBlank(item.getProductStatus(), "")))
                         .collect(Collectors.toMap(item -> StringUtils.defaultIfBlank(item.getMaterialCode(), ""),
-                                item -> StringUtils.defaultIfBlank(item.getConstructionStage(), ""),
+                                item -> StringUtils.defaultIfBlank(item.getProductStatus(), ""),
                                 (s1, s2) -> s1));
             }
         }
@@ -525,10 +521,9 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
             row.put("afterMaterialCode", afterMaterialCode);
             String afterMaterialDesc = item.getAfterMaterialDesc();
             row.put("afterMaterialDesc", afterMaterialDesc);
-            // 示方类型
-            String constructionStage = lhScheduleResultMap.getOrDefault(afterMaterialCode, "");
-            String markFlag = ConstructionStageEnum.getInstance(constructionStage).getMarkFlag();
-            row.put("afterMaterialType", lhTrialStatusDictDictMap.getOrDefault(markFlag, ""));
+            // 产品状态
+            String productStatus = lhScheduleResultMap.getOrDefault(afterMaterialCode, "");
+            row.put("afterMaterialType", lhTrialStatusDictDictMap.getOrDefault(productStatus, ""));
             // 按时间下机
             String endType = item.getEndType();
             if (YesOrNoEnum.YES.getCode().equals(endType)) {

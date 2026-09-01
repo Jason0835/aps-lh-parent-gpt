@@ -93,20 +93,24 @@ public class DefaultEndingJudgmentStrategy implements IEndingJudgmentStrategy {
         }
         int tailTargetQty = resolveTailTargetQty(context, sku);
         if (tailTargetQty <= 0) {
-            log.info("SKU当前窗口收尾判断, materialCode: {}, tailTargetQty: {}, currentWindowTailFlag: false",
-                    sku.getMaterialCode(), tailTargetQty);
+            if (!context.isNewSpecProposalPreview()) {
+                log.info("SKU当前窗口收尾判断, materialCode: {}, tailTargetQty: {}, currentWindowTailFlag: false",
+                        sku.getMaterialCode(), tailTargetQty);
+            }
             return false;
         }
         int totalAvailableCapacity = getTargetScheduleQtyResolver()
                 .calcSkuEndingAvailableCapacityInWindow(context, sku);
         boolean currentWindowTailFlag = totalAvailableCapacity >= tailTargetQty;
         boolean sharedEmbryo = getTargetScheduleQtyResolver().isSharedEmbryoInWindow(context, sku);
-        log.info("SKU当前窗口收尾判断, materialCode: {}, window: 3天/8班, sharedEmbryo: {}, "
-                        + "surplusQty: {}, embryoStock: {}, tailTargetQty: {}, totalAvailableCapacity: {}, "
-                        + "currentWindowTailFlag: {}",
-                sku.getMaterialCode(), sharedEmbryo, Math.max(0, sku.getSurplusQty()),
-                Math.max(0, sku.getEmbryoStock()), tailTargetQty, totalAvailableCapacity,
-                currentWindowTailFlag);
+        if (!context.isNewSpecProposalPreview()) {
+            log.info("SKU当前窗口收尾判断, materialCode: {}, window: 3天/8班, sharedEmbryo: {}, "
+                            + "surplusQty: {}, embryoStock: {}, tailTargetQty: {}, totalAvailableCapacity: {}, "
+                            + "currentWindowTailFlag: {}",
+                    sku.getMaterialCode(), sharedEmbryo, Math.max(0, sku.getSurplusQty()),
+                    Math.max(0, sku.getEmbryoStock()), tailTargetQty, totalAvailableCapacity,
+                    currentWindowTailFlag);
+        }
         return currentWindowTailFlag;
     }
 

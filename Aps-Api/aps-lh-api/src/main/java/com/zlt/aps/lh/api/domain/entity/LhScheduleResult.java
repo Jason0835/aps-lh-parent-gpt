@@ -3,6 +3,7 @@ package com.zlt.aps.lh.api.domain.entity;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.collect.Lists;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
@@ -1218,6 +1219,14 @@ public class LhScheduleResult extends BaseEntity implements Serializable {
      */
     @TableField(exist = false)
     private boolean rollingInherited;
+
+    /**
+     * 目标业务日跨日准备来源日期，仅用于本次排程运行态重建目标机台数，不落库。
+     * <p>换模在来源日完成、正式生产从紧邻下一夜班开始时使用。</p>
+     */
+    @JsonIgnore
+    @TableField(exist = false)
+    private Date sourceDayCrossDayPreparationDate;
 
     /**
      * 硫化产量今天夜班 - 列表接口动态赋值，不落库

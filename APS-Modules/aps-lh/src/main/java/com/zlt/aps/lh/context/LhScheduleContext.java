@@ -5,7 +5,6 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.zlt.aps.common.engine.domain.LhDayPlanAdjustVo;
 import com.zlt.aps.lh.api.domain.dto.*;
-import com.zlt.aps.lh.service.ILhDailyMouldCalcService;
 import com.zlt.aps.lh.api.domain.entity.*;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.enums.SingleControlMachineModeEnum;
@@ -14,6 +13,7 @@ import com.zlt.aps.lh.component.StructureEarlyProductionAdmission;
 import com.zlt.aps.lh.component.StructureShiftInMachineIndex;
 import com.zlt.aps.lh.engine.strategy.support.*;
 import com.zlt.aps.lh.handler.SkuMonthPlanCalculator;
+import com.zlt.aps.lh.service.ILhDailyMouldCalcService;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
 import com.zlt.aps.lh.util.SkuConstructionRefResolverUtil;
@@ -621,10 +621,6 @@ public class LhScheduleContext {
      */
     private Map<String, SingleControlMachineModeEnum> singleControlModeSnapshotMap = new LinkedHashMap<>();
     /**
-     * 冻结时满足单控静态准入且初始待排量大于0的不同试制SKU键集合
-     */
-    private Set<String> singleControlEligibleTrialSkuKeySet = new LinkedHashSet<>();
-    /**
      * 单控模式快照是否已完成初始化；完成后禁止再次按动态运行态覆盖
      */
     private boolean singleControlModeSnapshotInitialized;
@@ -952,6 +948,11 @@ public class LhScheduleContext {
      */
     private int priorityTraceMuteDepth = 0;
     /**
+     * 新增排产机台驱动提案预演深度。
+     * <p>只用于静默Machine×SKU批量试算中的逐班明细日志，不改变任何排产判断。</p>
+     */
+    private int newSpecProposalPreviewDepth = 0;
+    /**
      * 新增排产SKU选机日志次数，key=物料编码+产品状态。
      * <p>仅用于当前排程上下文内的过程日志编号，不参与候选过滤、选机排序和排产结果计算。</p>
      */
@@ -1084,6 +1085,18 @@ public class LhScheduleContext {
     }
 
     /**
+     * 获取起始天数
+     *
+     * @return
+     */
+    public Integer getStartDay() {
+        if (null == planStartDate) {
+            return BigDecimal.ONE.intValue();
+        }
+        return DateUtil.dayOfMonth(planStartDate);
+    }
+
+    /**
      * 20260701+ 获取后一个月的年份-月份
      *
      * @return
@@ -1146,8 +1159,14 @@ public class LhScheduleContext {
         } else {
             startDay = DateUtil.dayOfMonth(planStartDate);
         }
+        //20260829+ 排产周期中间间断间隔限制
+        Integer maxDiscontinueDays = null;
+        LhScheduleConfig scheduleConfig = getScheduleConfig();
+        if (null != scheduleConfig) {
+            maxDiscontinueDays = scheduleConfig.getEarlyProductionDaysThreshold();
+        }
         //20260817+ 硫化日计划调整量
-        return SkuMonthPlanCalculator.getPlanQty(allProductionDateList, loadedMonthPlanList, allLhDayPlanAdjustList, skuProductionInfo, startDay);
+        return SkuMonthPlanCalculator.getPlanQty(allProductionDateList, maxDiscontinueDays, loadedMonthPlanList, allLhDayPlanAdjustList, skuProductionInfo, startDay);
     }
 
     /**
@@ -1183,33 +1202,33 @@ public class LhScheduleContext {
         if (null != windowEndDate) {
             allProductionDateSet.add(windowEndDate);
         }
-        // 额外计划日期严格从窗口结束日推进到上下文固化的提前生产截止日。
-        if (Objects.isNull(windowEndDate)) {
-            return allProductionDateSet;
-        }
-        Date fixedMaxDate = earlyProductionMaxDate;
-        if (Objects.isNull(fixedMaxDate)) {
-            LhScheduleConfig scheduleConfig = getScheduleConfig();
-            if (Objects.isNull(scheduleConfig)) {
-                return allProductionDateSet;
-            }
-            int value = scheduleConfig.getEarlyProductionDaysThreshold();
-            if (value <= BigDecimal.ZERO.intValue()) {
-                return allProductionDateSet;
-            }
-            fixedMaxDate = SkuMonthPlanCalculator.getDate(
-                    SkuMonthPlanCalculator.getDate(windowEndDate).plusDays(value));
-        }
+//        // 额外计划日期严格从窗口结束日推进到上下文固化的提前生产截止日。
+//        if (Objects.isNull(windowEndDate)) {
+//            return allProductionDateSet;
+//        }
+//        Date fixedMaxDate = earlyProductionMaxDate;
+//        if (Objects.isNull(fixedMaxDate)) {
+//            LhScheduleConfig scheduleConfig = getScheduleConfig();
+//            if (Objects.isNull(scheduleConfig)) {
+//                return allProductionDateSet;
+//            }
+//            int value = scheduleConfig.getEarlyProductionDaysThreshold();
+//            if (value <= BigDecimal.ZERO.intValue()) {
+//                return allProductionDateSet;
+//            }
+//            fixedMaxDate = SkuMonthPlanCalculator.getDate(
+//                    SkuMonthPlanCalculator.getDate(windowEndDate).plusDays(value));
+//        }
         LocalDate extraStartDate = SkuMonthPlanCalculator.getDate(windowEndDate).plusDays(1);
-        LocalDate extraEndDate = SkuMonthPlanCalculator.getDate(fixedMaxDate);
-        if (extraEndDate.isBefore(extraStartDate)) {
-            return allProductionDateSet;
-        }
-        for (LocalDate productionDate = extraStartDate;
-             !productionDate.isAfter(extraEndDate);
-             productionDate = productionDate.plusDays(1)) {
-            allProductionDateSet.add(SkuMonthPlanCalculator.getDate(productionDate));
-        }
+//        LocalDate extraEndDate = SkuMonthPlanCalculator.getDate(fixedMaxDate);
+//        if (extraEndDate.isBefore(extraStartDate)) {
+//            return allProductionDateSet;
+//        }
+//        for (LocalDate productionDate = extraStartDate;
+//             !productionDate.isAfter(extraEndDate);
+//             productionDate = productionDate.plusDays(1)) {
+//            allProductionDateSet.add(SkuMonthPlanCalculator.getDate(productionDate));
+//        }
         return allProductionDateSet;
     }
 
@@ -1255,7 +1274,7 @@ public class LhScheduleContext {
      * 获取指定业务日、指定结构已经固化的提前生产资格。
      *
      * @param productionDate 业务日期
-     * @param structureName 产品结构
+     * @param structureName  产品结构
      * @return 结构当天提前生产资格；尚未判断时返回null
      */
     public StructureEarlyProductionAdmission getStructureEarlyProductionAdmission(
@@ -1293,7 +1312,7 @@ public class LhScheduleContext {
      * 获取或创建指定业务日的提前生产判断日志采集器。
      *
      * @param businessDate 当前业务日期
-     * @param dateOffset 相对窗口 T 日偏移
+     * @param dateOffset   相对窗口 T 日偏移
      * @return 业务日提前生产日志采集器
      */
     public EarlyProductionDecisionLogCollector getOrCreateEarlyProductionDecisionLogCollector(
@@ -1329,7 +1348,8 @@ public class LhScheduleContext {
      *
      * <p>S4.4 换活字块与 S4.5 新增排产都依赖该统计执行提前生产机台数门禁，
      * 必须在各阶段开始前纳入已经落地的续作、换活字块和新增结果。结构机台数在读取时
-     * 统一按物理机台去重，单控 L/R 结果不会重复计数。</p>
+     * 统一按物理机台去重，单控 L/R 结果不会重复计数。目标日跨日准备结果还需读取
+     * 运行态来源日期，使换模已完成但正产从下一夜班开始的机台仍计入来源日目标。</p>
      *
      * @param shifts 排程窗口班次
      * @return 实际登记的“结果业务日”数量
@@ -1356,6 +1376,15 @@ public class LhScheduleContext {
                     recordedDateSet.add(
                             SkuMonthPlanCalculator.getDate(shift.getWorkDate()));
                 }
+            }
+            if (!recordedDateSet.isEmpty()
+                    && Objects.nonNull(result.getSourceDayCrossDayPreparationDate())) {
+                /*
+                 * 目标日跨日准备结果从紧邻下一夜班才产生正计划量，不能只按正计划班次
+                 * 重建已排机台；来源日已经完成选机、占模和换模，同样属于目标机台已落实。
+                 */
+                recordedDateSet.add(SkuMonthPlanCalculator.getDate(
+                        result.getSourceDayCrossDayPreparationDate()));
             }
             for (LocalDate businessDate : recordedDateSet) {
                 this.recordScheduledMachine(
@@ -1613,8 +1642,8 @@ public class LhScheduleContext {
      * 班次索引，供结构收尾对齐和全部提前生产入口共享；不会创建第二套统计账本。</p>
      *
      * @param productionDate 目标班次业务日期
-     * @param shiftIndex 目标班次索引
-     * @param structureName 产品结构
+     * @param shiftIndex     目标班次索引
+     * @param structureName  产品结构
      * @return 当前班次已计入该结构的去重物理机台数
      */
     public int getStructureScheduledMachineCount(LocalDate productionDate,
@@ -1633,9 +1662,9 @@ public class LhScheduleContext {
      * 判断候选物理机台是否已经计入指定业务日、班次、结构。
      *
      * @param productionDate 目标班次业务日期
-     * @param shiftIndex 目标班次索引
-     * @param structureName 产品结构
-     * @param machineCode 候选运行态机台编码
+     * @param shiftIndex     目标班次索引
+     * @param structureName  产品结构
+     * @param machineCode    候选运行态机台编码
      * @return true-已计入，可在结构机台数达到上限时复用；false-会新增物理机台
      */
     public boolean hasStructureScheduledMachine(LocalDate productionDate,
@@ -1656,7 +1685,7 @@ public class LhScheduleContext {
      * 校验班次索引与业务日期属于同一个排程窗口班次。
      *
      * @param productionDate 业务日期
-     * @param shiftIndex 班次索引
+     * @param shiftIndex     班次索引
      * @return true-班次存在且业务日期一致；false-不一致
      */
     private boolean isTargetShiftMatched(LocalDate productionDate, int shiftIndex) {
@@ -1699,8 +1728,8 @@ public class LhScheduleContext {
      * <p>只有排程结果正式提交后调用；同一 SKU 同一天因多机台拆量再次命中时保留首次顺序，
      * 防止候选机台重试或第二台机台重复增加当天 SKU 顺序。</p>
      *
-     * @param sku 已正式命中的新增 SKU
-     * @param dateOffset 当前业务日相对 T 日偏移
+     * @param sku            已正式命中的新增 SKU
+     * @param dateOffset     当前业务日相对 T 日偏移
      * @param selectionOrder 当前业务日真实进入选机流程的顺序
      */
     public void recordNewSpecRealtimeSelectionOrder(
@@ -2019,7 +2048,7 @@ public class LhScheduleContext {
     /**
      * 登记生产日前跨日准备换模事件。
      *
-     * @param machineCode 换模机台编码
+     * @param machineCode          换模机台编码
      * @param mouldChangeStartTime 换模开始时间
      */
     public void registerCrossDayPreparationMouldChange(
@@ -2035,7 +2064,7 @@ public class LhScheduleContext {
     /**
      * 判断模具交替计划是否属于已登记的生产日前跨日准备。
      *
-     * @param machineCode 模具交替计划机台编码
+     * @param machineCode          模具交替计划机台编码
      * @param mouldChangeStartTime 模具交替计划开始时间
      * @return true-跨日准备；false-普通换模或换活字块
      */
@@ -2051,7 +2080,7 @@ public class LhScheduleContext {
     /**
      * 构建跨日准备物理换模事件键。
      *
-     * @param machineCode 机台编码；单控L/R统一折算为物理整机
+     * @param machineCode          机台编码；单控L/R统一折算为物理整机
      * @param mouldChangeStartTime 换模开始时间
      * @return 事件键；参数不完整时返回空串
      */
@@ -2266,6 +2295,31 @@ public class LhScheduleContext {
      */
     public boolean isPriorityTraceMuted() {
         return priorityTraceMuteDepth > 0;
+    }
+
+    /**
+     * 进入新增排产机台驱动提案预演区间。
+     */
+    public void enterNewSpecProposalPreviewScope() {
+        newSpecProposalPreviewDepth++;
+    }
+
+    /**
+     * 退出新增排产机台驱动提案预演区间。
+     */
+    public void exitNewSpecProposalPreviewScope() {
+        if (newSpecProposalPreviewDepth > 0) {
+            newSpecProposalPreviewDepth--;
+        }
+    }
+
+    /**
+     * 判断当前是否处于新增排产机台驱动提案预演。
+     *
+     * @return true-预演批量试算；false-正式排产
+     */
+    public boolean isNewSpecProposalPreview() {
+        return newSpecProposalPreviewDepth > 0;
     }
 
     /**
