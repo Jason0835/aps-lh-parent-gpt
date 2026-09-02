@@ -1,6 +1,8 @@
 package com.zlt.aps.lh.engine.strategy.support;
 
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * 新增排产候选在T～T+2窗口内持续生效的轻量运行态。
@@ -23,7 +25,7 @@ public class NewSpecCandidateRuntimeState {
     private boolean machineCountInitialized;
     /** 剩余机台机会最近一次对账业务日 */
     private LocalDate machineCountReconciliationDate;
-    /** 严格收尾尚有真实余量时持续补充机台机会，不受dayN目标台数截断 */
+    /** 严格收尾尚有真实余量时保留清量身份，最终机台机会仍由统一目标机台数收口 */
     private boolean strictEndingClearance;
     /** 是否命中特殊SKU置换阶段分类 */
     private boolean specialSku;
@@ -31,20 +33,51 @@ public class NewSpecCandidateRuntimeState {
     private boolean specialSkuClassified;
     /** 最近一次Machine×SKU试算失败原因 */
     private String lastFailure;
+    /** 按机台、阶段、日期池和班次隔离的首次决策轨迹 */
+    private final Map<String, String> firstDecisionTraceMap =
+            new LinkedHashMap<String, String>(16);
 
     public LocalDate getOriginalPoolDate() {
         return originalPoolDate;
     }
 
     /**
-     * 仅在首次形成日期池时登记来源日期，后续延期、部分成功和跨日在机均不得覆盖。
+     * 登记候选最早的权威来源日期。
      *
-     * @param poolDate 首次来源日期
+     * <p>部分成功和跨日在机不能把来源日期向后推迟；但候选曾以未来计划进入提前池后，
+     * 若当前任务出现更早的正常日计划或增机日期，必须向前纠正过期的未来来源。</p>
+     *
+     * @param poolDate 本次候选权威来源日期
      */
     public void initializeOriginalPoolDate(LocalDate poolDate) {
-        if (originalPoolDate == null && poolDate != null) {
+        if (poolDate != null
+                && (originalPoolDate == null || poolDate.isBefore(originalPoolDate))) {
             originalPoolDate = poolDate;
         }
+    }
+
+    /**
+     * 记录指定Machine×SKU维度的首次决策轨迹，后续重复试算不得覆盖。
+     *
+     * @param traceKey 机台、阶段、日期池和班次组成的轨迹键
+     * @param reason 准确原因
+     * @return true-首次写入；false-该维度已存在轨迹
+     */
+    public boolean recordFirstDecisionTrace(String traceKey, String reason) {
+        if (traceKey == null || reason == null || firstDecisionTraceMap.containsKey(traceKey)) {
+            return false;
+        }
+        firstDecisionTraceMap.put(traceKey, reason);
+        return true;
+    }
+
+    /**
+     * 获取候选首次决策轨迹只读副本。
+     *
+     * @return 决策轨迹副本
+     */
+    public Map<String, String> getFirstDecisionTraceMap() {
+        return new LinkedHashMap<String, String>(firstDecisionTraceMap);
     }
 
     public int getRemainingMachineCount() {

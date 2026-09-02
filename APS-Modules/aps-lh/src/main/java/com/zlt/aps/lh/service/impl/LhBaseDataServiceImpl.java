@@ -1547,16 +1547,19 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                         monthStartDate.getYear(), monthStartDate.getMonthValue()));
             }
         }
-        List<FactoryMonthPlanProductionFinalResult> schedulingSourcePlanList =
-                this.filterTrialMassTrialMonthPlans(context, loadedPlanList);
-        context.setLoadedMonthPlanList(schedulingSourcePlanList);
+        /*
+         * 试制量试月计划不在源头过滤：续作排产不受 SYS0311004 影响，参数=0 时试制、量试行
+         * 必须保留在全量月计划、跨月索引和S4.3归集来源中，才能通过MES在机匹配参与续作排产
+         * （含同物料多状态续作切换）。参数=0 对新增排产的拦截统一收口在S4.5新增排产入口。
+         */
+        context.setLoadedMonthPlanList(loadedPlanList);
         context.setMonthPlanByMaterialMonthMap(
-                MonthPlanDateResolver.buildMaterialMonthPlanMap(schedulingSourcePlanList));
+                MonthPlanDateResolver.buildMaterialMonthPlanMap(loadedPlanList));
         context.setMonthPlanList(selectSchedulingMonthPlanList(
-                context, schedulingSourcePlanList, scheduleWindowEndDate, earlyProductionRangeEndDate));
+                context, loadedPlanList, scheduleWindowEndDate, earlyProductionRangeEndDate));
         log.info("月生产计划加载完成, sourceLoadedCount: {}, effectiveLoadedCount: {}, scheduleSkuCount: {}, "
                         + "requiredMonths: {}",
-                loadedPlanList.size(), schedulingSourcePlanList.size(), context.getMonthPlanList().size(),
+                loadedPlanList.size(), loadedPlanList.size(), context.getMonthPlanList().size(),
                 CollectionUtils.isEmpty(requiredMonthMap) ? new ArrayList<String>(0) : requiredMonthMap.keySet());
     }
 
@@ -1598,62 +1601,16 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
 
     private void loadMonthPlan(LhScheduleContext context, String factoryCode, int year, int month) {
         List<FactoryMonthPlanProductionFinalResult> monthPlanList = queryMonthPlan(context, factoryCode, year, month);
-        List<FactoryMonthPlanProductionFinalResult> schedulingSourcePlanList =
-                this.filterTrialMassTrialMonthPlans(context, monthPlanList);
-        context.setLoadedMonthPlanList(schedulingSourcePlanList);
+        /*
+         * 试制量试月计划不在源头过滤：续作排产不受 SYS0311004 影响，参数=0 时试制、量试行
+         * 必须保留在全量月计划、跨月索引和S4.3归集来源中，才能通过MES在机匹配参与续作排产
+         * （含同物料多状态续作切换）。参数=0 对新增排产的拦截统一收口在S4.5新增排产入口。
+         */
+        context.setLoadedMonthPlanList(monthPlanList);
         context.setMonthPlanByMaterialMonthMap(
-                MonthPlanDateResolver.buildMaterialMonthPlanMap(schedulingSourcePlanList));
-        context.setMonthPlanList(schedulingSourcePlanList);
+                MonthPlanDateResolver.buildMaterialMonthPlanMap(monthPlanList));
+        context.setMonthPlanList(monthPlanList);
         log.debug("月生产计划加载完成, 数量: {}", context.getMonthPlanList().size());
-    }
-
-    /**
-     * 按本批参数在月计划源头过滤试制、量试数据。
-     * <p>过滤结果同时作为全量月计划、跨月索引和S4.3归集来源，确保关闭开关后试制量试不会进入
-     * 余量、日计划、续作、新增、胎胚、换模或后置补排链路。原始数据库记录不做任何修改。</p>
-     *
-     * @param context 排程上下文
-     * @param sourcePlanList 数据库加载的原始月计划
-     * @return 本批允许参与排产的月计划
-     */
-    private List<FactoryMonthPlanProductionFinalResult> filterTrialMassTrialMonthPlans(
-            LhScheduleContext context,
-            List<FactoryMonthPlanProductionFinalResult> sourcePlanList) {
-        if (CollectionUtils.isEmpty(sourcePlanList)) {
-            return new ArrayList<FactoryMonthPlanProductionFinalResult>(0);
-        }
-        if (Objects.nonNull(context)
-                && Objects.nonNull(context.getScheduleConfig())
-                && context.getScheduleConfig().isTrialMassTrialSchedulingEnabled()) {
-            return new ArrayList<FactoryMonthPlanProductionFinalResult>(sourcePlanList);
-        }
-        int trialCount = 0;
-        int massTrialCount = 0;
-        List<FactoryMonthPlanProductionFinalResult> filteredPlanList =
-                new ArrayList<FactoryMonthPlanProductionFinalResult>(sourcePlanList.size());
-        for (FactoryMonthPlanProductionFinalResult plan : sourcePlanList) {
-            if (Objects.nonNull(plan)
-                    && StringUtils.equals(ConstructionStageEnum.TRIAL.getCode(), plan.getConstructionStage())) {
-                trialCount++;
-                continue;
-            }
-            if (Objects.nonNull(plan)
-                    && StringUtils.equals(ConstructionStageEnum.MASS_TRIAL.getCode(), plan.getConstructionStage())) {
-                massTrialCount++;
-                continue;
-            }
-            filteredPlanList.add(plan);
-        }
-        log.info("试制量试月计划源头过滤完成, factoryCode: {}, batchNo: {}, scheduleDate: {}, paramCode: {}, "
-                        + "paramValue: 0, sourceCount: {}, trialFilteredCount: {}, massTrialFilteredCount: {}, "
-                        + "effectiveCount: {}",
-                Objects.isNull(context) ? null : context.getFactoryCode(),
-                Objects.isNull(context) ? null : context.getBatchNo(),
-                Objects.isNull(context) ? null
-                        : LhScheduleTimeUtil.formatDate(context.getScheduleTargetDate()),
-                LhScheduleParamConstant.TRIAL_MASS_TRIAL_SCHEDULING_ENABLED,
-                sourcePlanList.size(), trialCount, massTrialCount, filteredPlanList.size());
-        return filteredPlanList;
     }
 
     /**

@@ -3,7 +3,7 @@ server:
   port: 9669
 
 nacos:
-  server-addr: 10.135.55.216:8848
+  server-addr: 172.21.7.167:8848
   run-group: APS_PROD_GROUP
   cfg-group: APS_PROD_GROUP
   run-namespace: prod

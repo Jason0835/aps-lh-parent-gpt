@@ -15,6 +15,7 @@ import org.springframework.util.CollectionUtils;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -48,9 +49,10 @@ public final class EarlyProductionQuantityCalculator {
     /**
      * 解析提前生产统一Map目标机台数的计划来源日。
      *
-     * <p>原始 T～T+2 dayN 保持不变；提前生产候选必须使用运行视图或候选预览中的
-     * {@code futurePlanDate} 查询目标机台数，避免当前提前日原计划为0时误读为0。
-     * 该方法只统一查询日期，不修改原月计划、临时dayN账本或实际开产日期。</p>
+     * <p>原始 T～T+2 dayN 保持不变；提前生产候选按固定提前天数，把当前实际生产日
+     * 投影到对应的原始计划来源日查询目标机台数。例如提前1天时，实际T+1必须读取原T+2，
+     * 不能在整个三天窗口内始终固定读取首次未来计划日。</p>
+     * <p>该方法只统一查询日期，不修改原月计划、临时dayN账本或实际开产日期。</p>
      *
      * @param context 排程上下文
      * @param sku 当前 SKU
@@ -68,9 +70,69 @@ public final class EarlyProductionQuantityCalculator {
                 && Objects.nonNull(sku)) {
             runtimePlan = context.getEarlyProductionRuntimePlan(sku);
         }
-        return Objects.nonNull(runtimePlan)
-                && Objects.nonNull(runtimePlan.getFuturePlanDate())
-                ? runtimePlan.getFuturePlanDate() : defaultDate;
+        if (Objects.isNull(runtimePlan)
+                || Objects.isNull(runtimePlan.getFuturePlanDate())) {
+            return defaultDate;
+        }
+        int earlyDays = resolveEarlyDays(runtimePlan);
+        boolean projectedRuntimePlan = Objects.nonNull(previewPlan)
+                || runtimePlan.isActive();
+        return projectedRuntimePlan && Objects.nonNull(defaultDate) && earlyDays > 0
+                ? defaultDate.plusDays(earlyDays)
+                : runtimePlan.getFuturePlanDate();
+    }
+
+    /**
+     * 将统一Map原始来源日投影为实际执行日，并支持尚未激活的候选预览。
+     *
+     * <p>普通新增第2+台仍从原始统一Map解析首次增机来源日；若当前SKU已形成提前生产
+     * 运行视图，换模和开产日期必须同步减去相同提前天数。只转换日期，不改变目标台数。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 当前SKU
+     * @param previewPlan 尚未激活的提前生产候选预览，可为空
+     * @param sourcePlanDate 原始计划来源日
+     * @return 提前生产实际执行日；非提前生产场景原样返回
+     */
+    public static LocalDate resolveActualProductionDate(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            EarlyProductionRuntimePlan previewPlan,
+            LocalDate sourcePlanDate) {
+        if (Objects.isNull(sourcePlanDate) || Objects.isNull(context)
+                || Objects.isNull(sku)) {
+            return sourcePlanDate;
+        }
+        EarlyProductionRuntimePlan runtimePlan = Objects.nonNull(previewPlan)
+                ? previewPlan : context.getEarlyProductionRuntimePlan(sku);
+        if (Objects.isNull(previewPlan)
+                && Objects.nonNull(runtimePlan) && !runtimePlan.isActive()) {
+            return sourcePlanDate;
+        }
+        int earlyDays = resolveEarlyDays(runtimePlan);
+        return earlyDays > 0 ? sourcePlanDate.minusDays(earlyDays) : sourcePlanDate;
+    }
+
+    /**
+     * 解析运行视图固定提前天数；旧候选视图未写earlyDays时按起止日期差兼容读取。
+     *
+     * @param runtimePlan 提前生产运行视图
+     * @return 非负提前天数
+     */
+    private static int resolveEarlyDays(EarlyProductionRuntimePlan runtimePlan) {
+        if (Objects.isNull(runtimePlan)) {
+            return 0;
+        }
+        if (runtimePlan.getEarlyDays() > 0) {
+            return runtimePlan.getEarlyDays();
+        }
+        if (Objects.isNull(runtimePlan.getCurrentDate())
+                || Objects.isNull(runtimePlan.getFuturePlanDate())
+                || !runtimePlan.getFuturePlanDate().isAfter(runtimePlan.getCurrentDate())) {
+            return 0;
+        }
+        return (int) ChronoUnit.DAYS.between(
+                runtimePlan.getCurrentDate(), runtimePlan.getFuturePlanDate());
     }
 
     /**

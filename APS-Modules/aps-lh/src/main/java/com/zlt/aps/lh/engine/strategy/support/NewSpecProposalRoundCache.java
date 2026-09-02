@@ -1,17 +1,19 @@
 package com.zlt.aps.lh.engine.strategy.support;
 
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
+import com.zlt.aps.lh.component.StructureEarlyProductionAdmission;
 import org.apache.commons.lang3.StringUtils;
 
 import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
  * 新增排产同一运行态版本内的提案只读缓存。
  *
- * <p>缓存只保存 SKU 级收尾判断、日志指纹和扫描统计，不保存 Machine×SKU 反向匹配、
- * 结构准入或真实时间轴计划。正式结果、终局未排、候选池或业务日阶段变化时清空 SKU 级
- * 快照；失败组合由主循环保存轻量 AssignmentKey，避免构造完整匹配矩阵。</p>
+ * <p>缓存只保存 SKU 级收尾判断、结构×班次有效机台统计、日志指纹和扫描统计，不保存
+ * Machine×SKU反向匹配或真实时间轴计划。正式结果、终局未排、候选池或业务日阶段变化时
+ * 清空快照；失败组合由主循环保存轻量AssignmentKey，避免构造完整匹配矩阵。</p>
  *
  * <p>缓存对象只在单次业务日阶段内存活，不进入排程上下文、不跨批次共享。</p>
  *
@@ -23,6 +25,9 @@ public final class NewSpecProposalRoundCache {
     private final Map<DailyNewSpecCandidate, Boolean> endingFlagMap;
     /** 当前运行态版本下日志展示使用的预计收尾判断 */
     private final Map<SkuScheduleDTO, Boolean> expectedEndingTraceMap;
+    /** 当前运行态版本下结构×正式班次的有效物理机台统计 */
+    private final Map<String, StructureEarlyProductionAdmission>
+            structureMachineStatisticsMap;
     /** 上一次已经输出的待排队列指纹 */
     private String lastQueueTraceFingerprint;
     /** 当前业务日阶段累计被只读准入拒绝的Machine×SKU数量 */
@@ -45,6 +50,8 @@ public final class NewSpecProposalRoundCache {
                 new IdentityHashMap<DailyNewSpecCandidate, Boolean>(normalizedCandidateCount * 2);
         this.expectedEndingTraceMap =
                 new IdentityHashMap<SkuScheduleDTO, Boolean>(normalizedCandidateCount * 2);
+        this.structureMachineStatisticsMap =
+                new LinkedHashMap<String, StructureEarlyProductionAdmission>(16);
     }
 
     /**
@@ -53,6 +60,7 @@ public final class NewSpecProposalRoundCache {
     public void clearAfterStateChanged() {
         endingFlagMap.clear();
         expectedEndingTraceMap.clear();
+        structureMachineStatisticsMap.clear();
         lastQueueTraceFingerprint = null;
     }
 
@@ -110,6 +118,31 @@ public final class NewSpecProposalRoundCache {
     /** @return 当前运行态版本下日志预计收尾判断缓存 */
     public Map<SkuScheduleDTO, Boolean> getExpectedEndingTraceMap() {
         return expectedEndingTraceMap;
+    }
+
+    /**
+     * 获取当前运行态版本的结构班次有效机台统计。
+     *
+     * @param statisticsKey 结构与正式班次复合键
+     * @return 已冻结统计；尚未计算时返回null
+     */
+    public StructureEarlyProductionAdmission getStructureMachineStatistics(
+            String statisticsKey) {
+        return structureMachineStatisticsMap.get(statisticsKey);
+    }
+
+    /**
+     * 保存当前运行态版本的结构班次有效机台统计。
+     *
+     * @param statisticsKey 结构与正式班次复合键
+     * @param statistics 只读统计快照
+     */
+    public void putStructureMachineStatistics(
+            String statisticsKey,
+            StructureEarlyProductionAdmission statistics) {
+        if (StringUtils.isNotEmpty(statisticsKey) && statistics != null) {
+            structureMachineStatisticsMap.put(statisticsKey, statistics);
+        }
     }
 
     /**

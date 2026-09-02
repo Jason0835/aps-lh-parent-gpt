@@ -190,7 +190,7 @@ public final class LhScheduleParamConstant {
     public static final String SINGLE_CONTROL_MACHINE_CODES = "SYS0311002";
     /** 小批量验证SKU阈值 */
     public static final String SMALL_BATCH_SKU_THRESHOLD = "SYS0311003";
-    /** 试制量试是否参与排产（0-不参与，1-参与） */
+    /** 试制量试是否参与新增排产（0-新增排产不参与，1-参与；续作排产不受该参数影响） */
     public static final String TRIAL_MASS_TRIAL_SCHEDULING_ENABLED = "SYS0311004";
     /** 模具交替计划天数 */
     public static final String MOULD_CHANGE_PLAN_DAYS = "SYS0302011";

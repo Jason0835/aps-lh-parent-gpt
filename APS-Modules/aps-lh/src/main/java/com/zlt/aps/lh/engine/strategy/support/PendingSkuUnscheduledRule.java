@@ -21,7 +21,8 @@ import java.util.Objects;
 /**
  * 新增待排SKU前置未排规则。
  *
- * <p>统一处理新增SKU日计划准入、纯遗留SKU静默出队、收尾小余量和仅历史欠产规则。
+ * <p>统一处理新增SKU日计划准入、纯遗留SKU静默出队、收尾小余量和仅历史欠产规则，
+ * 以及硫化参数SYS0311004=0时新增排产链路试制量试SKU的参数拦截。
  * 换活字块和新增排产必须复用本规则，避免SKU在S4.4被提前消费后绕过S4.5判断。</p>
  *
  * @author APS
@@ -36,6 +37,10 @@ public final class PendingSkuUnscheduledRule {
     /** 续作试制、量试SKU完整判断范围无日计划量的统一未排原因 */
     public static final String CONTINUOUS_TRIAL_DAILY_PLAN_ADMISSION_UNSCHEDULED_REASON =
             "试制、量试月计划排产量全部为0，跳过排产";
+
+    /** 硫化参数SYS0311004=0时，新增排产链路试制、量试SKU的统一未排原因（续作链路不受该参数影响） */
+    public static final String NEW_SPEC_TRIAL_EXCLUSION_UNSCHEDULED_REASON =
+            "新增排产试制量试不参与排产（SYS0311004=0）";
 
     /** 仅历史欠产且最近一次已有完成量的统一未排原因 */
     public static final String HISTORY_SHORTAGE_UNSCHEDULED_REASON =
@@ -210,6 +215,59 @@ public final class PendingSkuUnscheduledRule {
     }
 
     /**
+     * 评估硫化参数SYS0311004=0时，新增排产链路的试制、量试SKU是否直接进入未排。
+     * <p>该参数仅控制新增排产：参数=0时施工阶段为试制（01）、量试（02）的SKU不得通过
+     * 换活字块、前日交替反选和普通新增选机排产，统一在S4.5新增排产入口拦截并写未排记录；
+     * 续作排产不受该参数影响，续作试制量试及同物料多状态续作切换照常参与。</p>
+     * <p>续作加机台补偿SKU由S4.4从已排续作SKU复制生成，属于续作衍生的产能承接，
+     * 不视为新增排产试制量试，本方法对其放行。</p>
+     * <p>本方法只负责判断和构造未排结果，不修改SKU目标量、排产集合、胎胚库存或日计划账本。</p>
+     *
+     * @param context 排程上下文，提供硫化参数配置
+     * @param sku 待评估的新增待排SKU
+     * @return 命中拦截时返回未排结果；参数=1、非试制量试或续作补偿SKU返回null
+     */
+    public static LhUnscheduledResult evaluateNewSpecTrialExclusion(LhScheduleContext context,
+                                                                    SkuScheduleDTO sku) {
+        if (Objects.isNull(context) || Objects.isNull(sku)
+                || isTrialMassTrialSchedulingEnabled(context)
+                || sku.isContinuousCompensationSku()
+                || !isTrialOrMassTrialSku(sku)) {
+            return null;
+        }
+        String detail = String.format("工厂: %s, 批次: %s, 物料: %s, 产品状态: %s, 施工阶段: %s, "
+                        + "排程类型: %s, 窗口原始计划量: %d, 原因: %s",
+                context.getFactoryCode(), context.getBatchNo(), sku.getMaterialCode(), sku.getProductStatus(),
+                sku.getConstructionStage(), sku.getScheduleType(), sku.getOriginalWindowPlanQty(),
+                NEW_SPEC_TRIAL_EXCLUSION_UNSCHEDULED_REASON);
+        log.info("新增排产试制量试SKU参数拦截, factoryCode: {}, batchNo: {}, materialCode: {}, "
+                        + "productStatus: {}, constructionStage: {}, scheduleType: {}, "
+                        + "originalWindowPlanQty: {}, reason: {}",
+                context.getFactoryCode(), context.getBatchNo(), sku.getMaterialCode(), sku.getProductStatus(),
+                sku.getConstructionStage(), sku.getScheduleType(), sku.getOriginalWindowPlanQty(),
+                NEW_SPEC_TRIAL_EXCLUSION_UNSCHEDULED_REASON);
+        PriorityTraceLogHelper.appendProcessLog(context, "新增排产试制量试不排产", detail);
+        LhUnscheduledResult unscheduledResult = buildUnscheduledResult(
+                context, sku, 0, NEW_SPEC_TRIAL_EXCLUSION_UNSCHEDULED_REASON);
+        unscheduledResult.setMonthPlanVersion(sku.getMonthPlanVersion());
+        unscheduledResult.setProductionVersion(sku.getProductionVersion());
+        return unscheduledResult;
+    }
+
+    /**
+     * 判断试制量试参与排产开关是否开启（SYS0311004=1）。
+     * <p>参数配置或上下文缺失时按默认值0（关闭）处理，与参数解析默认口径保持一致。</p>
+     *
+     * @param context 排程上下文
+     * @return true-开关开启，新增排产允许试制量试按日计划准入参与；false-开关关闭，新增排产拦截试制量试
+     */
+    public static boolean isTrialMassTrialSchedulingEnabled(LhScheduleContext context) {
+        return Objects.nonNull(context)
+                && Objects.nonNull(context.getScheduleConfig())
+                && context.getScheduleConfig().isTrialMassTrialSchedulingEnabled();
+    }
+
+    /**
      * 判断完整准入范围内是否存在正日计划量。
      * <p>窗口内使用SKU初始化时按月计划DAY_N汇总的原始计划量；窗口结束后
      * 继续复用提前生产判断器，按物料、产品状态和实际年月读取后续DAY_N。</p>
@@ -249,7 +307,7 @@ public final class PendingSkuUnscheduledRule {
      * @param sku SKU排程信息
      * @return true-试制或量试；false-其他施工阶段
      */
-    private static boolean isTrialOrMassTrialSku(SkuScheduleDTO sku) {
+    public static boolean isTrialOrMassTrialSku(SkuScheduleDTO sku) {
         return Objects.nonNull(sku)
                 && (StringUtils.equals(ConstructionStageEnum.TRIAL.getCode(), sku.getConstructionStage())
                 || StringUtils.equals(ConstructionStageEnum.MASS_TRIAL.getCode(), sku.getConstructionStage()));

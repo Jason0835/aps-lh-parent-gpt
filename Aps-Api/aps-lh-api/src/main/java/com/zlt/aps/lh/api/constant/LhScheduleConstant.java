@@ -309,7 +309,7 @@ public final class LhScheduleConstant {
     /** 小批量验证SKU默认阈值 */
     public static final int SMALL_BATCH_SKU_THRESHOLD = 100;
 
-    /** 试制量试参与排产开关默认值（0-不参与，1-参与） */
+    /** 试制量试参与新增排产开关默认值（0-新增排产不参与，1-参与；续作排产不受该参数影响） */
     public static final int TRIAL_MASS_TRIAL_SCHEDULING_ENABLED = 0;
 
     // ======================== 量试充抵正规 ========================

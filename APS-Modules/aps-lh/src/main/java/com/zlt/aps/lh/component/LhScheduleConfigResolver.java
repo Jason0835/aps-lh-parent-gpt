@@ -278,15 +278,16 @@ public class LhScheduleConfigResolver {
                 LhScheduleConstant.SINGLE_CONTROL_MACHINE_CODES);
         putIntValue(resolvedParamMap, lhParamsMap, LhScheduleParamConstant.SMALL_BATCH_SKU_THRESHOLD,
                 LhScheduleConstant.SMALL_BATCH_SKU_THRESHOLD, 1);
-        // 试制量试参与排产开关只允许0/1，非法配置统一回到默认不参与排产。
+        // 试制量试参与新增排产开关只允许0/1，非法配置统一回到默认（新增排产不参与，续作不受影响）。
         putTrialMassTrialSchedulingEnabled(resolvedParamMap, lhParamsMap);
 
         return new LhScheduleConfig(resolvedParamMap);
     }
 
     /**
-     * 解析试制量试参与排产开关。
-     * <p>只有0和1是合法值；未配置、空值或非法值均按默认0生效，确保试制量试默认不进入排产源数据。</p>
+     * 解析试制量试参与新增排产开关。
+     * <p>只有0和1是合法值；未配置、空值或非法值均按默认0生效，即新增排产默认拦截试制量试；
+     * 续作排产不受该参数影响，试制量试月计划始终完整进入排程源数据。</p>
      *
      * @param resolvedParamMap 解析后参数
      * @param lhParamsMap 原始硫化参数
@@ -297,7 +298,7 @@ public class LhScheduleConfigResolver {
         int defaultValue = LhScheduleConstant.TRIAL_MASS_TRIAL_SCHEDULING_ENABLED;
         String value = lhParamsMap.get(paramCode);
         if (StringUtils.isEmpty(value)) {
-            log.warn("试制量试参与排产开关未配置或为空，使用默认值, paramCode={}, defaultValue={}",
+            log.warn("试制量试参与新增排产开关未配置或为空，使用默认值, paramCode={}, defaultValue={}",
                     paramCode, defaultValue);
             resolvedParamMap.put(paramCode, String.valueOf(defaultValue));
             return;
@@ -307,7 +308,7 @@ public class LhScheduleConfigResolver {
             resolvedParamMap.put(paramCode, trimmedValue);
             return;
         }
-        log.warn("试制量试参与排产开关配置非法，使用默认值, paramCode={}, value={}, defaultValue={}",
+        log.warn("试制量试参与新增排产开关配置非法，使用默认值, paramCode={}, value={}, defaultValue={}",
                 paramCode, value, defaultValue);
         resolvedParamMap.put(paramCode, String.valueOf(defaultValue));
     }

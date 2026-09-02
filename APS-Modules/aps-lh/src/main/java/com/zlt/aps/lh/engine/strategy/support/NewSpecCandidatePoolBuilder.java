@@ -5,6 +5,7 @@ import com.zlt.aps.lh.component.EarlyProductionQuantityCalculator;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.ISkuPriorityStrategy;
 import com.zlt.aps.lh.service.ILhDailyMouldCalcService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
@@ -29,6 +30,7 @@ import java.util.TreeMap;
  * @author APS
  */
 @Component
+@Slf4j
 public class NewSpecCandidatePoolBuilder {
 
     /** SKU 日期池内排序唯一入口 */
@@ -85,6 +87,18 @@ public class NewSpecCandidatePoolBuilder {
             this.refreshRemainingMachineCount(context, currentDate, candidate);
             poolMap.computeIfAbsent(poolDate,
                     key -> new ArrayList<DailyNewSpecCandidate>(4)).add(candidate);
+            log.info("新增排产候选归池, batchNo: {}, phase: {}, businessDate: {}, "
+                            + "materialCode: {}, productStatus: {}, targetPlanDate: {}, poolDate: {}, "
+                            + "runtimeOriginalPoolDate: {}, originalDayPlanQty: {}, dailyQuotaRemaining: {}, "
+                            + "futureOnlyEarlyProductionCandidate: {}, bound: {}, targetMachineCount: {}, "
+                            + "scheduledMachineCount: {}, remainingMachineCount: {}, enteredCandidatePool: true",
+                    context.getBatchNo(), phase, currentDate,
+                    candidate.getSku().getMaterialCode(), candidate.getSku().getProductStatus(),
+                    candidate.getTargetPlanDate(), poolDate, candidate.getPoolDate(),
+                    candidate.getOriginalDayPlanQty(), candidate.getRealtimeDayPlanRemainingQty(),
+                    candidate.isFutureOnlyEarlyProductionCandidate(), candidate.isBoundOnMachine(),
+                    candidate.getTargetMachineCount(), candidate.getScheduledMachineCount(),
+                    candidate.getRemainingMachineCount());
         }
         for (List<DailyNewSpecCandidate> poolCandidates : poolMap.values()) {
             this.sortPoolCandidates(context, poolCandidates);
@@ -121,11 +135,13 @@ public class NewSpecCandidatePoolBuilder {
         }
         int scheduledMachineCount = context.getSkuScheduledMachineCount(
                 currentDate, sku.getMaterialCode(), sku.getProductStatus());
-        if (candidate.isStrictEndingClearance()
+        if (requiredMachineCount <= 0
+                && candidate.isStrictEndingClearance()
                 && sku.getRemainingScheduleQty() > 0) {
             /*
-             * 严格收尾已由新增主链确认按真实余量清量。跨业务日重建候选池时至少
-             * 保留下一台真实尝试机会，不能再次被统一Map已满足的计算结果归零。
+             * 严格收尾已由新增主链确认按真实余量清量。仅当统一Map没有正数dayN
+             * 目标机台数时，才按已排机台数保留下一台真实尝试机会；存在明确目标时
+             * 必须保持统一Map上限，禁止为了清完余量持续放大物理机台数。
              */
             requiredMachineCount = Math.max(
                     requiredMachineCount, scheduledMachineCount + 1);
@@ -134,6 +150,8 @@ public class NewSpecCandidatePoolBuilder {
             // 收尾、固定指令等既有合法场景没有 dayN 理论台数时，仍保留一次真实尝试机会。
             requiredMachineCount = 1;
         }
+        candidate.setTargetMachineCount(requiredMachineCount);
+        candidate.setScheduledMachineCount(scheduledMachineCount);
         candidate.reconcileRemainingMachineCount(
                 requiredMachineCount, scheduledMachineCount, currentDate);
     }
@@ -141,16 +159,22 @@ public class NewSpecCandidatePoolBuilder {
     private LocalDate resolvePoolDate(LocalDate windowStartDate,
                                       DailySchedulePhase phase,
                                       DailyNewSpecCandidate candidate) {
-        if (Objects.nonNull(candidate.getPoolDate())) {
-            // 已在前序业务日进入候选池的SKU必须保留原日期；部分成功和跨日在机不得改写来源池。
-            return candidate.getPoolDate();
-        }
         if (Objects.nonNull(candidate.getTargetPlanDate())) {
             /*
-             * targetPlanDate 是候选首次归属日期：正常阶段的历史延期保留 deferredFromDate，
-             * 提前阶段保留 futurePlanDate。只有尚未形成明确来源时才由 delayDays 推导。
+             * targetPlanDate 是本次候选的权威归属日期。运行态可能先被未来提前候选写入，
+             * 当原始日计划或增机日期变化为更早业务日时必须向前纠正，不能继续滞留未来池。
+             * 延期任务传入 deferredFromDate，因此向前取最早日期仍能保留历史池语义。
              */
-            return candidate.getTargetPlanDate();
+            LocalDate originalPoolDate = candidate.getPoolDate();
+            if (Objects.isNull(originalPoolDate)
+                    || candidate.getTargetPlanDate().isBefore(originalPoolDate)) {
+                return candidate.getTargetPlanDate();
+            }
+            return originalPoolDate;
+        }
+        if (Objects.nonNull(candidate.getPoolDate())) {
+            // 没有新的权威目标日期时，部分成功和跨日在机继续保留已登记来源池。
+            return candidate.getPoolDate();
         }
         Integer delayDays = candidate.getSku().getDelayDays();
         int normalizedDelayDays = Objects.isNull(delayDays) ? 0 : Math.max(0, delayDays);

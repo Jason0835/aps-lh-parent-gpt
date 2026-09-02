@@ -1,11 +1,15 @@
 package com.zlt.aps.lh.handler;
 
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
+import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
+import com.zlt.aps.lh.api.domain.entity.LhUnscheduledResult;
 import com.zlt.aps.lh.api.enums.ScheduleStepEnum;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
+import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.component.NewSpecDelayDaysResolver;
 import com.zlt.aps.lh.component.StructureEndingAlignmentService;
+import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.factory.ScheduleStrategyFactory;
 import com.zlt.aps.lh.engine.strategy.ICapacityCalculateStrategy;
@@ -15,13 +19,20 @@ import com.zlt.aps.lh.engine.strategy.IMachineMatchStrategy;
 import com.zlt.aps.lh.engine.strategy.IMouldChangeBalanceStrategy;
 import com.zlt.aps.lh.engine.strategy.IProductionStrategy;
 import com.zlt.aps.lh.engine.strategy.ISkuPriorityStrategy;
+import com.zlt.aps.lh.engine.strategy.support.PendingSkuUnscheduledRule;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
+import org.springframework.util.CollectionUtils;
 
 import javax.annotation.Resource;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.IdentityHashMap;
+import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * S4.5 新增规格排产处理器。
@@ -34,7 +45,9 @@ import java.util.Objects;
  * </ul>
  *
  * <p>注意：试制、量试、小批量、正规 SKU 的差异主要在排序 tie-break、单控机台约束、
- * 严格目标量和班次补满策略中体现，不应在本 Handler 中新增并行业务分支。</p>
+ * 严格目标量和班次补满策略中体现，不应在本 Handler 中新增并行业务分支；
+ * 唯一例外是硫化参数 SYS0311004=0 时在入口统一拦截试制、量试 SKU（续作排产不受该参数影响），
+ * 该拦截只做准入排除和未排落库，不参与选机和数量分配。</p>
  *
  * @author APS
  */
@@ -50,6 +63,8 @@ public class NewProductionHandler extends AbsScheduleStepHandler {
     private StructureEndingAlignmentService structureEndingAlignmentService;
     @Resource
     private NewSpecDelayDaysResolver newSpecDelayDaysResolver;
+    @Resource
+    private TargetScheduleQtyResolver targetScheduleQtyResolver;
 
     @Override
     protected void doHandle(LhScheduleContext context) {
@@ -57,6 +72,14 @@ public class NewProductionHandler extends AbsScheduleStepHandler {
                 context.getFactoryCode(), LhScheduleTimeUtil.formatDate(context.getScheduleTargetDate()),
                 context.getNewSpecSkuList().size(), context.getScheduleResultList().size(),
                 context.getUnscheduledResultList().size());
+
+        /*
+         * SYS0311004=0 时试制、量试不参与新增排产（续作排产不受该参数影响）。
+         * 必须在排序、前日交替反选和普通新增选机之前统一拦截：同物料多状态续作切换在S4.4
+         * 已按续作口径消费可承接的X/T候选，此处只拦截仍残留在新增待排列表中的试制、量试SKU，
+         * 写未排记录并清理运行态，避免其继续进入任何新增选机环节。
+         */
+        this.excludeTrialMassTrialNewSpecSkus(context);
 
         /*
          * S4.5 开始前冻结“排程开始时已在机且仍由原物料续作”的结果身份。
@@ -154,6 +177,103 @@ public class NewProductionHandler extends AbsScheduleStepHandler {
              */
             context.clearEarlyProductionRuntimePlans();
         }
+    }
+
+    /**
+     * SYS0311004=0时拦截新增排产链路中的试制、量试SKU。
+     *
+     * <p>硫化参数SYS0311004只控制新增排产：参数=0时施工阶段为试制（01）、量试（02）的SKU
+     * 不得通过新增排产上机；续作排产、同物料多状态续作切换和续作加机台补偿（续作衍生）
+     * 均不受该参数影响。本方法在S4.5入口统一执行拦截：</p>
+     * <ul>
+     *   <li>命中SKU写未排记录（按物料+产品状态去重替换，未排数量为0）；</li>
+     *   <li>目标量清零、移出结构待排池、全量SKU复合索引和活跃胎胚清单，语义与S4.3准入拦截清理一致；</li>
+     *   <li>按对象身份从新增待排列表移除，避免DTO值相等误删同键其它副本。</li>
+     * </ul>
+     *
+     * @param context 排程上下文
+     */
+    private void excludeTrialMassTrialNewSpecSkus(LhScheduleContext context) {
+        if (PendingSkuUnscheduledRule.isTrialMassTrialSchedulingEnabled(context)
+                || CollectionUtils.isEmpty(context.getNewSpecSkuList())) {
+            return;
+        }
+        List<SkuScheduleDTO> blockedSkuList = new ArrayList<>(context.getNewSpecSkuList().size());
+        List<LhUnscheduledResult> blockedResultList =
+                new ArrayList<>(context.getNewSpecSkuList().size());
+        for (SkuScheduleDTO sku : context.getNewSpecSkuList()) {
+            LhUnscheduledResult unscheduledResult =
+                    PendingSkuUnscheduledRule.evaluateNewSpecTrialExclusion(context, sku);
+            if (Objects.isNull(unscheduledResult)) {
+                continue;
+            }
+            blockedSkuList.add(sku);
+            blockedResultList.add(unscheduledResult);
+        }
+        if (CollectionUtils.isEmpty(blockedSkuList)) {
+            return;
+        }
+        // 按对象身份移除，与同物料多状态切换链的消费口径保持一致。
+        Set<SkuScheduleDTO> blockedSkuIdentitySet = Collections.newSetFromMap(
+                new IdentityHashMap<SkuScheduleDTO, Boolean>(blockedSkuList.size() * 2));
+        blockedSkuIdentitySet.addAll(blockedSkuList);
+        context.getNewSpecSkuList().removeIf(blockedSkuIdentitySet::contains);
+        for (int index = 0; index < blockedSkuList.size(); index++) {
+            this.appendOrReplaceUnscheduledResult(context, blockedResultList.get(index));
+            this.cleanupExcludedTrialSku(context, blockedSkuList.get(index));
+        }
+        log.info("新增排产试制量试参数拦截完成, factoryCode: {}, batchNo: {}, blockedCount: {}, "
+                        + "remainingNewSpecCount: {}, reason: {}",
+                context.getFactoryCode(), context.getBatchNo(), blockedSkuList.size(),
+                context.getNewSpecSkuList().size(),
+                PendingSkuUnscheduledRule.NEW_SPEC_TRIAL_EXCLUSION_UNSCHEDULED_REASON);
+    }
+
+    /**
+     * 清理被参数拦截的试制、量试SKU运行态。
+     *
+     * <p>清理语义与S4.3新增准入拦截（cleanupBlockedSku）保持一致：目标量清零、
+     * 移出结构待排池、全量SKU复合索引和活跃胎胚清单，保证后续换活字块、
+     * 特殊材料置换等阶段不再找回该SKU。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 被拦截的试制、量试SKU
+     */
+    private void cleanupExcludedTrialSku(LhScheduleContext context, SkuScheduleDTO sku) {
+        sku.setTargetScheduleQty(0);
+        sku.setRemainingScheduleQty(0);
+        context.removePendingSkuFromStructureMap(sku);
+        context.getAllSkuScheduleDtoMap().remove(MonthPlanDateResolver.buildMaterialStatusKey(
+                sku.getMaterialCode(), sku.getProductStatus()));
+        targetScheduleQtyResolver.removeActiveEmbryoSku(context, sku,
+                PendingSkuUnscheduledRule.NEW_SPEC_TRIAL_EXCLUSION_UNSCHEDULED_REASON);
+    }
+
+    /**
+     * 按物料和产品状态写入或替换未排结果。
+     *
+     * <p>同一“物料+产品状态”可能因多副本SKU重复命中参数拦截，或S4.4同物料切换失败链
+     * 已写入同键未排；本方法保持列表位置并替换为本次参数拦截结果，避免同一SKU重复落库。</p>
+     *
+     * @param context 排程上下文
+     * @param unscheduledResult 参数拦截生成的未排结果
+     */
+    private void appendOrReplaceUnscheduledResult(LhScheduleContext context,
+                                                  LhUnscheduledResult unscheduledResult) {
+        if (Objects.isNull(context) || Objects.isNull(unscheduledResult)) {
+            return;
+        }
+        for (int index = 0; index < context.getUnscheduledResultList().size(); index++) {
+            LhUnscheduledResult existing = context.getUnscheduledResultList().get(index);
+            if (Objects.nonNull(existing)
+                    && StringUtils.equals(existing.getMaterialCode(), unscheduledResult.getMaterialCode())
+                    && StringUtils.equals(StringUtils.trimToEmpty(existing.getProductStatus()),
+                    StringUtils.trimToEmpty(unscheduledResult.getProductStatus()))) {
+                context.getUnscheduledResultList().set(index, unscheduledResult);
+                return;
+            }
+        }
+        context.getUnscheduledResultList().add(unscheduledResult);
     }
 
     /**

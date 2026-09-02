@@ -562,13 +562,51 @@ public class NewSpecMachineAvailabilityPlan {
     }
 
     /**
+     * 获取当前Machine×SKU真正开始占用结构机台名额的时间。
+     *
+     * <p>首检属于开产时取首检开始时间；无计件首检时取正式可开产时间。</p>
+     *
+     * @return 生产占用开始时间；计划不可用时返回null
+     */
+    public Date getProductionOccupationStartTime() {
+        if (Objects.nonNull(firstInspectionPlan)
+                && firstInspectionPlan.isValid()
+                && firstInspectionPlan.getInspectionQty() > 0
+                && Objects.nonNull(firstInspectionPlan.getInspectionStartTime())) {
+            return firstInspectionPlan.getInspectionStartTime();
+        }
+        return formalAvailableProductionTime;
+    }
+
+    /**
+     * 获取当前Machine×SKU真正开始占用结构机台名额的班次。
+     *
+     * <p>首检可跨班时取首个正量分摊班次；无计件首检时取正式生产班次。</p>
+     *
+     * @return 生产占用班次；计划不可用时返回null
+     */
+    public LhShiftConfigVO getProductionOccupationShift() {
+        if (Objects.nonNull(firstInspectionPlan)
+                && firstInspectionPlan.isValid()
+                && firstInspectionPlan.getInspectionQty() > 0
+                && !firstInspectionPlan.getShiftAllocations().isEmpty()) {
+            FirstInspectionShiftAllocation firstAllocation =
+                    firstInspectionPlan.getShiftAllocations().get(0);
+            if (Objects.nonNull(firstAllocation)) {
+                return firstAllocation.getShift();
+            }
+        }
+        return formalTargetShift;
+    }
+
+    /**
      * 获取机台驱动本轮实际使用的资源竞争班次。
      *
      * @return 目标日跨日准备返回换模资源班次；普通场景返回正式开产班次
      */
     public LhShiftConfigVO getCompetitionTargetShift() {
         return sourceDayCrossDayPreparation
-                ? sourceDayResourceShift : formalTargetShift;
+                ? sourceDayResourceShift : this.getProductionOccupationShift();
     }
 
     /**

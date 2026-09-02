@@ -29,6 +29,14 @@ public class DailyNewSpecCandidate {
     private LocalDate targetPlanDate;
     /** 构建候选时读取的当前日实时日计划余额 */
     private int realtimeDayPlanRemainingQty;
+    /** 当前业务日原始日计划量，禁止使用临时前移后的额度替代 */
+    private int originalDayPlanQty;
+    /** 当前SKU是否仅允许进入提前生产阶段 */
+    private boolean futureOnlyEarlyProductionCandidate;
+    /** 当前业务日正式结果中已排物理机台数 */
+    private int scheduledMachineCount;
+    /** 当前业务日中心目标物理机台数 */
+    private int targetMachineCount;
     /** 当前 SKU 是否已经存在跨日在机绑定 */
     private boolean boundOnMachine;
     /** 当前业务日是否被机台无关的业务门禁阻止进入资源竞争 */
@@ -116,6 +124,39 @@ public class DailyNewSpecCandidate {
 
     public void setRealtimeDayPlanRemainingQty(int realtimeDayPlanRemainingQty) {
         this.realtimeDayPlanRemainingQty = Math.max(0, realtimeDayPlanRemainingQty);
+    }
+
+    public int getOriginalDayPlanQty() {
+        return originalDayPlanQty;
+    }
+
+    public void setOriginalDayPlanQty(int originalDayPlanQty) {
+        this.originalDayPlanQty = Math.max(0, originalDayPlanQty);
+    }
+
+    public boolean isFutureOnlyEarlyProductionCandidate() {
+        return futureOnlyEarlyProductionCandidate;
+    }
+
+    public void setFutureOnlyEarlyProductionCandidate(
+            boolean futureOnlyEarlyProductionCandidate) {
+        this.futureOnlyEarlyProductionCandidate = futureOnlyEarlyProductionCandidate;
+    }
+
+    public int getScheduledMachineCount() {
+        return scheduledMachineCount;
+    }
+
+    public void setScheduledMachineCount(int scheduledMachineCount) {
+        this.scheduledMachineCount = Math.max(0, scheduledMachineCount);
+    }
+
+    public int getTargetMachineCount() {
+        return targetMachineCount;
+    }
+
+    public void setTargetMachineCount(int targetMachineCount) {
+        this.targetMachineCount = Math.max(0, targetMachineCount);
     }
 
     public boolean isBoundOnMachine() {
@@ -207,5 +248,16 @@ public class DailyNewSpecCandidate {
 
     public NewSpecCandidateRuntimeState getRuntimeState() {
         return runtimeState;
+    }
+
+    /**
+     * 记录当前Machine×SKU维度的首次决策轨迹。
+     *
+     * @param traceKey 轨迹键
+     * @param reason 准确原因
+     * @return true-首次写入；false-已有轨迹
+     */
+    public boolean recordFirstDecisionTrace(String traceKey, String reason) {
+        return runtimeState.recordFirstDecisionTrace(traceKey, reason);
     }
 }

@@ -64,15 +64,15 @@ public final class FirstInspectionAllocationUtil {
             Map<Integer, Integer> availableCapacityMap) {
         return buildPlan(
                 context, sku, shifts, changeoverEndTime, null, shiftCapacity,
-                remainingQty, scheduleType, machineCode, availableCapacityMap);
+                remainingQty, scheduleType, machineCode, availableCapacityMap, false);
     }
 
     /**
      * 按统一时间与实际产能口径构建首检分摊计划，并支持量试首检生产门禁。
      *
-     * <p>普通 SKU 继续按换模/换活字块结束时间向前倒推首检区间；量试 SKU 的首检属于
-     * 开产，当统一门禁不早于准备完成时间时，首检必须从门禁开始并按所需时长向后分摊。
-     * 试制 SKU 仍执行固定2小时产能扣减，不生成首检条数。</p>
+     * <p>共享入口默认保持普通SKU从换模/换活字块结束时间向前倒推的既有语义；量试SKU
+     * 的首检属于开产，当统一门禁不早于准备完成时间时，从门禁开始向后分摊。新增排产
+     * 需要统一“首检即开产”时，调用带方向参数的重载并显式传入真实生产就绪时间。</p>
      *
      * @param context 排程上下文
      * @param sku 当前 SKU
@@ -97,6 +97,43 @@ public final class FirstInspectionAllocationUtil {
             String scheduleType,
             String machineCode,
             Map<Integer, Integer> availableCapacityMap) {
+        return buildPlan(
+                context, sku, shifts, changeoverEndTime, inspectionNotBeforeTime,
+                shiftCapacity, remainingQty, scheduleType, machineCode,
+                availableCapacityMap, false);
+    }
+
+    /**
+     * 按统一时间与实际产能口径构建首检分摊计划。
+     *
+     * <p>新增排产确认“首检即开产”时，通过 {@code forwardFromProductionReadyTime}
+     * 将首检从真实生产就绪时间向后执行；其它共享入口继续保持既有倒推语义。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 当前SKU
+     * @param shifts 排程班次
+     * @param changeoverEndTime 换模或换活字块结束时间
+     * @param inspectionNotBeforeTime 首检不得早于的生产就绪时间
+     * @param shiftCapacity 当前SKU在目标机台的运行态班产
+     * @param remainingQty 当前机台最多允许消费的目标量
+     * @param scheduleType 排程类型
+     * @param machineCode 机台编码
+     * @param availableCapacityMap 各班次首检可用容量
+     * @param forwardFromProductionReadyTime 是否从生产就绪时间向后执行首检
+     * @return 无副作用首检分摊计划
+     */
+    public static FirstInspectionAllocationPlan buildPlan(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            List<LhShiftConfigVO> shifts,
+            Date changeoverEndTime,
+            Date inspectionNotBeforeTime,
+            int shiftCapacity,
+            int remainingQty,
+            String scheduleType,
+            String machineCode,
+            Map<Integer, Integer> availableCapacityMap,
+            boolean forwardFromProductionReadyTime) {
         if (CollectionUtils.isEmpty(shifts) || Objects.isNull(changeoverEndTime)) {
             return FirstInspectionAllocationPlan.invalid(
                     "首检缺少完整班次或切换结束时间", null, changeoverEndTime);
@@ -108,13 +145,13 @@ public final class FirstInspectionAllocationUtil {
                 .filter(shift -> Objects.nonNull(shift.getShiftEndDateTime()))
                 .sorted(Comparator.comparing(LhShiftConfigVO::getShiftStartDateTime))
                 .collect(Collectors.toList());
-        boolean forwardMassTrialInspection = FirstInspectionQtyUtil
-                .isMassTrialQuantityFirstInspection(sku, scheduleType)
-                && Objects.nonNull(inspectionNotBeforeTime);
-        Date inspectionReferenceTime = forwardMassTrialInspection
-                ? (inspectionNotBeforeTime.after(changeoverEndTime)
-                ? inspectionNotBeforeTime : changeoverEndTime)
-                : changeoverEndTime;
+        boolean forwardInspection = Objects.nonNull(inspectionNotBeforeTime)
+                && (forwardFromProductionReadyTime || FirstInspectionQtyUtil
+                .isMassTrialQuantityFirstInspection(sku, scheduleType));
+        Date inspectionReferenceTime = changeoverEndTime;
+        if (forwardInspection && inspectionNotBeforeTime.after(changeoverEndTime)) {
+            inspectionReferenceTime = inspectionNotBeforeTime;
+        }
         LhShiftConfigVO countingShift = FirstInspectionQtyUtil.resolveFirstInspectionAttributionShift(
                 context, sku, orderedShifts, inspectionReferenceTime, scheduleType);
         if (Objects.isNull(countingShift)) {
@@ -157,10 +194,10 @@ public final class FirstInspectionAllocationUtil {
         long durationSeconds = ceilDivide(
                 (long) inspectionQty * effectiveSeconds, shiftCapacity);
         long durationMillis = durationSeconds * MILLIS_PER_SECOND;
-        Date inspectionStartTime = forwardMassTrialInspection
+        Date inspectionStartTime = forwardInspection
                 ? inspectionReferenceTime
                 : new Date(inspectionReferenceTime.getTime() - durationMillis);
-        Date inspectionEndTime = forwardMassTrialInspection
+        Date inspectionEndTime = forwardInspection
                 ? new Date(inspectionStartTime.getTime() + durationMillis)
                 : inspectionReferenceTime;
 

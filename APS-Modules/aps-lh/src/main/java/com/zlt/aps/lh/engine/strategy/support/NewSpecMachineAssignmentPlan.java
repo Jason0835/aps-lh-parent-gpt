@@ -23,6 +23,9 @@ import java.time.LocalDate;
  */
 public final class NewSpecMachineAssignmentPlan {
 
+    /** 结构上限失败键前缀，避免被资源竞争班次的通用提交失败键提前误拦截。 */
+    private static final String STRUCTURE_LIMIT_FAILURE_PREFIX = "STRUCTURE_LIMIT|";
+
     /** 本轮指定 SKU */
     private final DailyNewSpecCandidate candidate;
     /** 反向匹配结果 */
@@ -148,6 +151,25 @@ public final class NewSpecMachineAssignmentPlan {
                 : StringUtils.defaultString(machine.getMachineCode());
         return buildAssignmentKey(
                 machineResourceCode, sku, targetShiftIndex);
+    }
+
+    /**
+     * 构造按正式目标班次隔离的结构上限失败键。
+     *
+     * <p>结构准入发生在完整时间轴之后，正式目标班次可能与资源竞争班次不同。独立前缀
+     * 防止class5的结构拒绝被通用资源失败键误用于class6及后续班次。</p>
+     *
+     * @param matchResult 反向匹配结果
+     * @param sku 当前SKU
+     * @param formalTargetShiftIndex 正式目标班次
+     * @return 结构上限失败键
+     */
+    public static String buildStructureLimitAssignmentKey(
+            MachineSkuMatchResult matchResult,
+            SkuScheduleDTO sku,
+            Integer formalTargetShiftIndex) {
+        return STRUCTURE_LIMIT_FAILURE_PREFIX + buildAssignmentKey(
+                matchResult, sku, formalTargetShiftIndex);
     }
 
     /**

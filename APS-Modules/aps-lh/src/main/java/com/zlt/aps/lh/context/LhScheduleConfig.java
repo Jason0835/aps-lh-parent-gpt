@@ -143,9 +143,12 @@ public class LhScheduleConfig {
     }
 
     /**
-     * 判断试制、量试月计划是否允许参与排产。
+     * 判断试制、量试是否允许参与新增排产。
+     * <p>该参数只控制新增排产：关闭时试制、量试不得通过换活字块、前日反选和普通新增上机，
+     * 统一在S4.5新增排产入口拦截并写未排；续作排产、同物料多状态续作切换和续作加机台补偿
+     * 均不受该参数影响。</p>
      *
-     * @return true-参与排产；false-在月计划源头过滤
+     * @return true-新增排产允许试制量试按日计划准入参与排产；false-新增排产拦截试制量试（默认）
      */
     public boolean isTrialMassTrialSchedulingEnabled() {
         return getParamIntValue(LhScheduleParamConstant.TRIAL_MASS_TRIAL_SCHEDULING_ENABLED,

@@ -7,6 +7,7 @@ import com.zlt.aps.lh.api.enums.ConstructionStageEnum;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.IMachineMatchStrategy;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
@@ -35,6 +36,7 @@ import java.util.function.Predicate;
  * @author APS
  */
 @Component
+@Slf4j
 public class NewSpecMachineSkuCompetitionService {
 
     /** 单个 Machine×SKU 的完整只读准入和真实时间轴预演入口。 */
@@ -136,40 +138,102 @@ public class NewSpecMachineSkuCompetitionService {
             }
             NewSpecScheduleProposal bestProposal = null;
             for (DailyNewSpecCandidate candidate : poolCandidates) {
-                if (!this.isExecutableCandidate(candidate, pendingSkuIdentitySet)
-                        || !effectiveScope.test(candidate)) {
+                if (!effectiveScope.test(candidate)) {
+                    continue;
+                }
+                String executableFailure = this.resolveExecutableFailure(
+                        candidate, pendingSkuIdentitySet);
+                if (StringUtils.isNotEmpty(executableFailure)) {
+                    this.traceMachineSkuDecision(
+                            context, dayContext, shift, machineResource,
+                            poolDate, candidate, "CANDIDATE_STATE", executableFailure);
                     continue;
                 }
                 roundCache.recordEvaluatedPair();
                 MachineSkuMatchResult matchResult = machineMatch.matchSkuOnMachine(
                         context, machineResource.getMachine(), candidate.getSku());
                 if (!matchResult.isMatched()) {
-                    if (StringUtils.isEmpty(candidate.getLastFailure())) {
-                        candidate.setLastFailure(matchResult.getFailureReason());
-                    }
+                    String failureReason = StringUtils.defaultIfEmpty(
+                            matchResult.getFailureReason(), "机台与SKU硬匹配失败");
+                    this.recordCandidateFailureIfAbsent(candidate, failureReason);
+                    this.traceMachineSkuDecision(
+                            context, dayContext, shift, machineResource,
+                            poolDate, candidate, "HARD_MATCH", failureReason);
                     continue;
                 }
                 String assignmentKey = NewSpecMachineAssignmentPlan.buildAssignmentKey(
                         matchResult, candidate.getSku(), shift.getShiftIndex());
                 if (normalizedFailureSet.contains(assignmentKey)) {
+                    this.traceMachineSkuDecision(
+                            context, dayContext, shift, machineResource,
+                            poolDate, candidate, "FAILED_ASSIGNMENT_CACHE",
+                            "当前运行态下该机台、SKU和班次已提交失败");
                     continue;
                 }
                 String eligibilityFailureReason = candidateAttemptService
                         .resolveReadOnlyEligibilityFailure(context, candidate, matchResult);
                 if (StringUtils.isNotEmpty(eligibilityFailureReason)) {
                     roundCache.recordEligibilityRejected();
-                    candidate.setLastFailure("机台选择失败");
+                    this.recordCandidateFailureIfAbsent(candidate, eligibilityFailureReason);
+                    this.traceMachineSkuDecision(
+                            context, dayContext, shift, machineResource,
+                            poolDate, candidate, "READ_ONLY_ELIGIBILITY",
+                            eligibilityFailureReason);
                     continue;
                 }
                 NewSpecMachineAvailabilityPlan availabilityPlan = availabilityResolver.resolve(
                         context, dayContext, candidate, matchResult.getMachine());
-                NewSpecScheduleProposal proposal = candidateAttemptService.previewWithPlan(
-                        context, dayContext, shift, machineResource, poolDate, candidate,
-                        matchResult, availabilityPlan, actualAvailableTimeMode);
-                if (Objects.isNull(proposal)) {
-                    roundCache.recordTimelineRejected();
+                Integer formalTargetShiftIndex = Objects.isNull(availabilityPlan)
+                        || Objects.isNull(availabilityPlan.getFormalTargetShift())
+                        ? null : availabilityPlan.getFormalTargetShift().getShiftIndex();
+                String formalAssignmentKey = NewSpecMachineAssignmentPlan
+                        .buildStructureLimitAssignmentKey(
+                                matchResult, candidate.getSku(), formalTargetShiftIndex);
+                if (Objects.nonNull(formalTargetShiftIndex)
+                        && normalizedFailureSet.contains(formalAssignmentKey)) {
+                    this.traceMachineSkuDecision(
+                            context, dayContext, shift, machineResource,
+                            poolDate, candidate, "STRUCTURE_ASSIGNMENT_CACHE",
+                            "当前运行态下该机台、SKU和正式班次已被结构准入拒绝");
                     continue;
                 }
+                StructureMachineLimitDecision structureLimitDecision = candidateAttemptService
+                        .resolveStructureMachineLimitDecision(
+                                context, dayContext, candidate, matchResult,
+                                availabilityPlan, poolDate, roundCache);
+                if (Objects.nonNull(structureLimitDecision)
+                        && structureLimitDecision.isApplicable()
+                        && !structureLimitDecision.isAllowed()) {
+                    roundCache.recordEligibilityRejected();
+                    this.recordCandidateFailureIfAbsent(
+                            candidate, structureLimitDecision.getReason());
+                    if (Objects.nonNull(failedAssignmentKeySet)) {
+                        failedAssignmentKeySet.add(formalAssignmentKey);
+                    }
+                    candidateAttemptService.logStructureMachineLimitDecision(
+                            "PREVIEW_REJECT", structureLimitDecision, candidate);
+                    this.traceMachineSkuDecision(
+                            context, dayContext, shift, machineResource,
+                            poolDate, candidate, "STRUCTURE_ADMISSION",
+                            structureLimitDecision.getReason());
+                    continue;
+                }
+                NewSpecScheduleProposal proposal = candidateAttemptService.previewWithPlan(
+                        context, dayContext, shift, machineResource, poolDate, candidate,
+                        matchResult, availabilityPlan, actualAvailableTimeMode,
+                        structureLimitDecision);
+                if (Objects.isNull(proposal)) {
+                    roundCache.recordTimelineRejected();
+                    String timelineFailure = this.resolveTimelineFailureReason(
+                            shift, candidate, availabilityPlan);
+                    this.traceMachineSkuDecision(
+                            context, dayContext, shift, machineResource,
+                            poolDate, candidate, "TIMELINE", timelineFailure);
+                    continue;
+                }
+                this.traceMachineSkuDecision(
+                        context, dayContext, shift, machineResource,
+                        poolDate, candidate, "PROPOSAL_GENERATED", "已形成完整可执行提案");
                 if (Objects.isNull(bestProposal)
                         || this.compareCandidateProposal(
                         proposal, bestProposal, prioritizeTargetMachineGap) < 0) {
@@ -468,15 +532,147 @@ public class NewSpecMachineSkuCompetitionService {
      * @param pendingSkuIdentitySet 当前仍待排 SKU 对象身份集合
      * @return true-可进入扫描；false-已阻断、无剩余机会或已出队
      */
-    private boolean isExecutableCandidate(
+    private String resolveExecutableFailure(
             DailyNewSpecCandidate candidate,
             Set<SkuScheduleDTO> pendingSkuIdentitySet) {
-        if (Objects.isNull(candidate) || Objects.isNull(candidate.getSku())
-                || candidate.isMachineCompetitionBlocked()
-                || candidate.getRemainingMachineCount() <= 0
-                || CollectionUtils.isEmpty(pendingSkuIdentitySet)) {
-            return false;
+        if (Objects.isNull(candidate) || Objects.isNull(candidate.getSku())) {
+            return "候选或SKU为空";
         }
-        return pendingSkuIdentitySet.contains(candidate.getSku());
+        if (candidate.isMachineCompetitionBlocked()) {
+            return StringUtils.defaultIfEmpty(
+                    candidate.getLastFailure(), "候选被机台无关业务门禁阻断");
+        }
+        if (candidate.getRemainingMachineCount() <= 0) {
+            return candidate.getScheduledMachineCount() >= candidate.getTargetMachineCount()
+                    ? "正常需求已满足，剩余机台数为0"
+                    : "候选剩余机台数为0";
+        }
+        if (CollectionUtils.isEmpty(pendingSkuIdentitySet)
+                || !pendingSkuIdentitySet.contains(candidate.getSku())) {
+            return "SKU已不在当前待排队列";
+        }
+        return null;
+    }
+
+    /**
+     * 解析真实时间轴未形成提案的准确原因。
+     *
+     * @param shift 当前资源班次
+     * @param candidate 当前候选
+     * @param availabilityPlan 真实时间轴计划
+     * @return 时间轴失败原因
+     */
+    private String resolveTimelineFailureReason(
+            LhShiftConfigVO shift,
+            DailyNewSpecCandidate candidate,
+            NewSpecMachineAvailabilityPlan availabilityPlan) {
+        if (Objects.isNull(availabilityPlan)) {
+            return "未形成真实可开产时间计划";
+        }
+        if (StringUtils.isNotEmpty(availabilityPlan.getUnavailableReason())) {
+            return availabilityPlan.getUnavailableReason();
+        }
+        LhShiftConfigVO competitionTargetShift =
+                availabilityPlan.getCompetitionTargetShift();
+        if (Objects.nonNull(shift) && Objects.nonNull(shift.getShiftIndex())
+                && Objects.nonNull(competitionTargetShift)
+                && Objects.nonNull(competitionTargetShift.getShiftIndex())
+                && !Objects.equals(
+                shift.getShiftIndex(), competitionTargetShift.getShiftIndex())) {
+            return new StringBuilder(160)
+                    .append("真实可开产班次与当前资源班次不一致，currentShift=")
+                    .append(shift.getShiftIndex())
+                    .append(", competitionTargetShift=")
+                    .append(competitionTargetShift.getShiftIndex())
+                    .append(", formalTargetShift=")
+                    .append(Objects.isNull(availabilityPlan.getFormalTargetShift())
+                            ? null : availabilityPlan.getFormalTargetShift().getShiftIndex())
+                    .append(", formalAvailableTime=")
+                    .append(availabilityPlan.getFormalAvailableProductionTime())
+                    .toString();
+        }
+        if (Objects.nonNull(candidate)
+                && StringUtils.isNotEmpty(candidate.getLastFailure())) {
+            return candidate.getLastFailure();
+        }
+        return "真实时间轴未形成当前资源班次可执行提案";
+    }
+
+    /**
+     * 只登记候选当前运行态的首个失败原因，后续机台试算不得覆盖。
+     *
+     * @param candidate 当前候选
+     * @param failureReason 准确失败原因
+     */
+    private void recordCandidateFailureIfAbsent(
+            DailyNewSpecCandidate candidate,
+            String failureReason) {
+        if (Objects.nonNull(candidate)
+                && StringUtils.isEmpty(candidate.getLastFailure())
+                && StringUtils.isNotEmpty(failureReason)) {
+            candidate.setLastFailure(failureReason);
+        }
+    }
+
+    /**
+     * 记录Machine×SKU×阶段×日期池×班次的首次决策轨迹。
+     *
+     * <p>同一组合可能被多个班次和多轮重复试算，运行态只接受首次原因，避免后续机台判断
+     * 覆盖首个淘汰点。日志仅读取已计算状态，不重新匹配、预分配模具或查询数据库。</p>
+     */
+    private void traceMachineSkuDecision(
+            LhScheduleContext context,
+            DayScheduleContext dayContext,
+            LhShiftConfigVO shift,
+            MachineResource machineResource,
+            LocalDate poolDate,
+            DailyNewSpecCandidate candidate,
+            String decisionStage,
+            String reason) {
+        if (Objects.isNull(candidate) || Objects.isNull(candidate.getSku())
+                || Objects.isNull(machineResource)
+                || Objects.isNull(machineResource.getMachine())) {
+            return;
+        }
+        MachineScheduleDTO machine = machineResource.getMachine();
+        String traceKey = new StringBuilder(128)
+                .append(machine.getMachineCode()).append('|')
+                .append(Objects.isNull(dayContext) ? null : dayContext.getCurrentPhase()).append('|')
+                .append(poolDate).append('|')
+                .append(Objects.isNull(shift) ? null : shift.getShiftIndex())
+                .toString();
+        String traceValue = new StringBuilder(96)
+                .append(decisionStage).append(": ").append(reason)
+                .toString();
+        if (!candidate.recordFirstDecisionTrace(traceKey, traceValue)) {
+            return;
+        }
+        String logTemplate = "新增排产Machine-SKU决策轨迹, batchNo: {}, phase: {}, businessDate: {}, "
+                        + "workDate: {}, shift: {}, machineCode: {}, machineEndTime: {}, "
+                        + "materialCode: {}, productStatus: {}, targetPlanDate: {}, poolDate: {}, "
+                        + "runtimeOriginalPoolDate: {}, originalDayPlanQty: {}, dailyQuotaRemaining: {}, "
+                        + "futureOnlyEarlyProductionCandidate: {}, alreadyScheduled: {}, bound: {}, "
+                        + "targetMachineCount: {}, scheduledMachineCount: {}, remainingMachineCount: {}, "
+                        + "decisionStage: {}, reason: {}";
+        Object[] logArguments = new Object[]{
+                Objects.isNull(context) ? null : context.getBatchNo(),
+                Objects.isNull(dayContext) ? null : dayContext.getCurrentPhase(),
+                Objects.isNull(dayContext) ? null : dayContext.getScheduleDate(),
+                Objects.isNull(shift) ? null : shift.getWorkDate(),
+                Objects.isNull(shift) ? null : shift.getShiftIndex(),
+                machine.getMachineCode(), machine.getEstimatedEndTime(),
+                candidate.getSku().getMaterialCode(), candidate.getSku().getProductStatus(),
+                candidate.getTargetPlanDate(), poolDate, candidate.getPoolDate(),
+                candidate.getOriginalDayPlanQty(), candidate.getRealtimeDayPlanRemainingQty(),
+                candidate.isFutureOnlyEarlyProductionCandidate(),
+                candidate.getScheduledMachineCount() > 0, candidate.isBoundOnMachine(),
+                candidate.getTargetMachineCount(), candidate.getScheduledMachineCount(),
+                candidate.getRemainingMachineCount(), decisionStage, reason};
+        if (StringUtils.equals("PROPOSAL_GENERATED", decisionStage)) {
+            // 可执行提案数量远多于最终淘汰点，默认仅调试输出，避免正常排程产生海量INFO日志。
+            log.debug(logTemplate, logArguments);
+        } else {
+            log.info(logTemplate, logArguments);
+        }
     }
 }

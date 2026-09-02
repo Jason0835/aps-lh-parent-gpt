@@ -38,6 +38,7 @@ import com.zlt.aps.lh.engine.strategy.ITypeBlockProductionStrategy;
 import com.zlt.aps.lh.engine.strategy.support.DailyMachineExpansionPlanner;
 import com.zlt.aps.lh.engine.strategy.support.DailyMachineShortageQuotaPlan;
 import com.zlt.aps.lh.engine.strategy.support.DailyQuotaLedgerBaseline;
+import com.zlt.aps.lh.engine.strategy.support.DailySchedulePhase;
 import com.zlt.aps.lh.engine.strategy.support.DayTypeBlockReverseSelectionDirective;
 import com.zlt.aps.lh.engine.strategy.support.EarlyProductionChecker;
 import com.zlt.aps.lh.engine.strategy.support.EarlyProductionDecision;
@@ -47,6 +48,8 @@ import com.zlt.aps.lh.engine.strategy.support.FirstInspectionShiftAllocation;
 import com.zlt.aps.lh.engine.strategy.support.NewSpecEmbryoAvailableTimeResolver;
 import com.zlt.aps.lh.engine.strategy.support.PendingSkuUnscheduledRule;
 import com.zlt.aps.lh.engine.strategy.support.SpecifiedMachineScheduleResult;
+import com.zlt.aps.lh.engine.strategy.support.StructureMachineLimitAdmissionService;
+import com.zlt.aps.lh.engine.strategy.support.StructureMachineLimitDecision;
 import com.zlt.aps.lh.service.ILhDailyMouldCalcService;
 import com.zlt.aps.lh.service.impl.LhMaintenanceScheduleService;
 import com.zlt.aps.lh.util.CleaningScheduleRuleUtil;
@@ -162,6 +165,9 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
     /** 换活字块与新增排产共用的结构班次在机索引构建及增量更新入口。 */
     @Resource
     private StructureEndingAlignmentService structureEndingAlignmentService;
+    /** 换活字块提前生产与普通新增共用的结构机台上限准入入口。 */
+    @Resource
+    private StructureMachineLimitAdmissionService structureMachineLimitAdmissionService;
     /** 物料+产品状态+自然日目标总机台数唯一查询入口。 */
     @Resource
     private ILhDailyMouldCalcService lhDailyMouldCalcService;
@@ -1076,6 +1082,10 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
             if (sku == null || StringUtils.isEmpty(sku.getMaterialCode()) || sku.resolveTargetScheduleQty() <= 0) {
                 continue;
             }
+            // SYS0311004=0时试制、量试不参与新增排产，定点机台直选同属新增侧入口，一并拦截。
+            if (this.isParamBlockedTrialNewSpecSku(context, sku)) {
+                continue;
+            }
             if (LhSpecifyMachineUtil.isLimitSpecifyMachine(context, machineCode, sku.getMaterialCode())) {
                 return sku;
             }
@@ -1129,6 +1139,25 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
     }
 
     /**
+     * 判断SKU是否为SYS0311004=0时禁止参与换活字块等新增侧入口的试制、量试SKU。
+     *
+     * <p>硫化参数SYS0311004只控制新增排产：参数关闭时施工阶段为试制（01）、量试（02）的SKU
+     * 不得通过换活字块、定点机台直选等新增侧入口上机，残留SKU统一由S4.5新增排产入口拦截并写未排。
+     * 同物料多状态续作切换属于续作口径，不受该参数限制；续作加机台补偿SKU是S4.4从已排续作SKU
+     * 复制生成的续作衍生产能承接，同样不受该参数限制。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 候选SKU
+     * @return true-参数关闭且属于应拦截的试制、量试SKU；false-放行
+     */
+    private boolean isParamBlockedTrialNewSpecSku(LhScheduleContext context, SkuScheduleDTO sku) {
+        return !PendingSkuUnscheduledRule.isTrialMassTrialSchedulingEnabled(context)
+                && Objects.nonNull(sku)
+                && !sku.isContinuousCompensationSku()
+                && PendingSkuUnscheduledRule.isTrialOrMassTrialSku(sku);
+    }
+
+    /**
      * 按月度计划SKU排序结果选择候选首位。
      *
      * @param candidates 候选SKU
@@ -1170,6 +1199,14 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                                          SkuScheduleDTO sku,
                                          boolean writeDecisionLog) {
         if (sku == null) {
+            return false;
+        }
+        // SYS0311004=0时试制、量试不参与新增排产，换活字块作为新增侧入口同样拦截。
+        if (this.isParamBlockedTrialNewSpecSku(context, sku)) {
+            log.info("换活字块候选跳过, machineCode: {}, candidateMaterialCode: {}, productStatus: {}, "
+                            + "constructionStage: {}, reason: 新增排产试制量试不参与排产（SYS0311004=0）",
+                    machine == null ? null : machine.getMachineCode(), sku.getMaterialCode(),
+                    sku.getProductStatus(), sku.getConstructionStage());
             return false;
         }
         String machineMaterialCode = Objects.isNull(machine) ? null : machine.getCurrentMaterialCode();
@@ -2988,14 +3025,17 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                     .append("，目标班次业务日=").append(targetBusinessDate)
                     .toString();
         }
-        if (!EarlyProductionChecker.canUseMachineForEarlyProduction(
-                context, sku, productionWorkDate, decision.getFuturePlanDate(),
-                targetShift.getShiftIndex(), machine.getMachineCode())) {
-            return new StringBuilder("禁止提前生产新增物理机台：换活字块目标班次结构物理机台数已达到计划上限，structureName=")
-                    .append(sku.getStructureName())
-                    .append("，targetShift=class").append(targetShift.getShiftIndex())
-                    .append("，machineCode=").append(machine.getMachineCode())
-                    .toString();
+        StructureMachineLimitDecision structureLimitDecision =
+                structureMachineLimitAdmissionService.evaluate(
+                        context, DailySchedulePhase.EARLY_PRODUCTION,
+                        sku, targetShift, machine.getMachineCode(),
+                        decision.getFuturePlanDate(), null);
+        if (Objects.nonNull(structureLimitDecision)
+                && structureLimitDecision.isApplicable()
+                && !structureLimitDecision.isAllowed()) {
+            structureMachineLimitAdmissionService.logDecision(
+                    "TYPE_BLOCK_PRECHECK", structureLimitDecision, null, false);
+            return structureLimitDecision.getReason();
         }
         return StringUtils.EMPTY;
     }

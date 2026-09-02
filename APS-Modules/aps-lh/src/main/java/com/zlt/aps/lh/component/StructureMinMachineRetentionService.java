@@ -168,6 +168,25 @@ public class StructureMinMachineRetentionService {
             LhScheduleContext context,
             String structureName,
             LhShiftConfigVO shift) {
+        return this.resolveEffectiveStructureMachineStatistics(
+                context, structureName, shift);
+    }
+
+    /**
+     * 统计正式目标班次内仍有效占用结构名额的物理机台。
+     *
+     * <p>普通新增、续作加机和提前生产统一复用本方法。原始结构索引只作为历史在机视图，
+     * 本方法按目标班次边界排除已经完成生产且无后续正量的机台，不回写或删除原始索引。</p>
+     *
+     * @param context 排程上下文
+     * @param structureName 产品结构
+     * @param shift 正式目标班次
+     * @return 班次收尾调整后的结构物理机台统计
+     */
+    public StructureEarlyProductionAdmission resolveEffectiveStructureMachineStatistics(
+            LhScheduleContext context,
+            String structureName,
+            LhShiftConfigVO shift) {
         StructureEarlyProductionAdmission admission =
                 new StructureEarlyProductionAdmission();
         admission.setStructureName(structureName);
@@ -178,13 +197,23 @@ public class StructureMinMachineRetentionService {
         int shiftIndex = shift.getShiftIndex();
         admission.setAdmissionShiftIndex(shiftIndex);
         Set<String> rawPhysicalMachineCodes =
-                this.collectStructureInMachinePhysicalCodes(
+                Objects.nonNull(context.getStructureShiftInMachineIndex())
+                        ? context.getStructureShiftInMachineIndex()
+                        .resolveInMachinePhysicalCodes(structureName, shiftIndex)
+                        : this.collectStructureInMachinePhysicalCodes(
                         context, structureName, shiftIndex);
         admission.getRawScheduledPhysicalMachineCodes().addAll(
                 rawPhysicalMachineCodes);
+        /*
+         * 同一结构班次只收集一次运行态机台编码，后续按物理机台核对收尾边界时复用，
+         * 避免每台候选重复扫描全部机台运行态。
+         */
+        Set<String> structureRuntimeMachineCodes =
+                this.collectStructureRuntimeMachineCodes(context, structureName);
         for (String physicalMachineCode : rawPhysicalMachineCodes) {
             if (this.isPhysicalMachineEndingWithinShift(
-                    context, structureName, physicalMachineCode, shift)) {
+                    context, structureName, physicalMachineCode, shift,
+                    structureRuntimeMachineCodes)) {
                 admission.getExcludedEndingPhysicalMachineCodes().add(
                         physicalMachineCode);
                 continue;
@@ -631,9 +660,8 @@ public class StructureMinMachineRetentionService {
             LhScheduleContext context,
             String structureName,
             String physicalMachineCode,
-            LhShiftConfigVO shift) {
-        Set<String> structureRuntimeMachineCodes =
-                this.collectStructureRuntimeMachineCodes(context, structureName);
+            LhShiftConfigVO shift,
+            Set<String> structureRuntimeMachineCodes) {
         boolean activeMachineFound = false;
         boolean releaseEvidenceFound = false;
         for (String machineCode : structureRuntimeMachineCodes) {

@@ -364,11 +364,14 @@ public class NewSpecMachineDrivenSchedulingEngine {
                 context, dayContext.getScheduleDate(), proposal.getCandidate().getSku(),
                 proposal.getMatchResult(), competitionScope);
         log.info("新增排产机台驱动提案胜出, batchNo: {}, businessDate: {}, phase: {}, "
-                        + "competitionScope: {}, resourceShiftIndex: {}, formalShiftIndex: {}, mode: {}, "
+                        + "competitionScope: {}, resourceShiftIndex: {}, productionOccupationShiftIndex: {}, "
+                        + "formalShiftIndex: {}, mode: {}, "
                         + "machineCode: {}, poolDate: {}, materialCode: {}, productStatus: {}, "
-                        + "remainingMachineGap: {}, matchLevel: {}, formalAvailableTime: {}, {}",
+                        + "remainingMachineGap: {}, matchLevel: {}, productionOccupationStartTime: {}, "
+                        + "formalAvailableTime: {}, {}",
                 context.getBatchNo(), dayContext.getScheduleDate(), dayContext.getCurrentPhase(),
                 competitionScope, resourceShift.getShiftIndex(),
+                plan.getProductionOccupationShift().getShiftIndex(),
                 plan.getFormalTargetShift().getShiftIndex(),
                 actualAvailableTimeMode ? "实际可开产时间" : "机台收尾时间",
                 proposal.getMatchResult().getMachine().getMachineCode(), proposal.getPoolDate(),
@@ -376,6 +379,7 @@ public class NewSpecMachineDrivenSchedulingEngine {
                 proposal.getCandidate().getSku().getProductStatus(),
                 proposal.getCandidate().getRemainingMachineCount(),
                 proposal.getMatchResult().getMatchLevel().getDescription(),
+                plan.getProductionOccupationStartTime(),
                 plan.getFormalAvailableProductionTime(), decisionEvidence);
         String detail = new StringBuilder(896)
                 .append("batchNo=").append(context.getBatchNo())
@@ -385,6 +389,8 @@ public class NewSpecMachineDrivenSchedulingEngine {
                 .append(", resourceShift=class").append(resourceShift.getShiftIndex())
                 .append(", formalShift=class").append(
                         plan.getFormalTargetShift().getShiftIndex())
+                .append(", productionOccupationShift=class").append(
+                        plan.getProductionOccupationShift().getShiftIndex())
                 .append(", shiftMode=").append(actualAvailableTimeMode
                         ? "实际可开产时间" : "机台收尾时间")
                 .append(", machineCode=").append(
@@ -408,6 +414,9 @@ public class NewSpecMachineDrivenSchedulingEngine {
                 .append(", formalAvailableTime=").append(
                         LhScheduleTimeUtil.formatDateTime(
                                 plan.getFormalAvailableProductionTime()))
+                .append(", productionOccupationStartTime=").append(
+                        LhScheduleTimeUtil.formatDateTime(
+                                plan.getProductionOccupationStartTime()))
                 .append(", ").append(decisionEvidence)
                 .toString();
         PriorityTraceLogHelper.appendProcessLog(

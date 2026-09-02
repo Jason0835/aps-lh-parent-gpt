@@ -5,7 +5,6 @@ import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.component.StructureEndingAlignmentDecision;
 import com.zlt.aps.lh.component.StructureEndingAlignmentService;
 import com.zlt.aps.lh.context.LhScheduleContext;
-import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 
@@ -29,6 +28,9 @@ public class NewSpecCandidateAttemptService {
     /** 结构收尾对齐只读候选准入入口 */
     @Resource
     private StructureEndingAlignmentService structureEndingAlignmentService;
+    /** 普通新增、续作加机和提前生产共用的结构机台上限准入入口 */
+    @Resource
+    private StructureMachineLimitAdmissionService structureMachineLimitAdmissionService;
 
     /**
      * 在完整时间轴试算和运行态快照前执行机台相关只读准入。
@@ -121,9 +123,45 @@ public class NewSpecCandidateAttemptService {
             MachineSkuMatchResult matchResult,
             NewSpecMachineAvailabilityPlan availabilityPlan,
             boolean actualAvailableTimeMode) {
+        return this.previewWithPlan(
+                context, dayContext, shift, machineResource, poolDate,
+                candidate, matchResult, availabilityPlan,
+                actualAvailableTimeMode, null);
+    }
+
+    /**
+     * 使用已冻结结构准入结果构建提案，避免同一Machine×SKU重复统计结构机台。
+     *
+     * @param context 排程上下文
+     * @param dayContext 当前业务日
+     * @param shift 当前机台资源归属班次
+     * @param machineResource 当前机台资源
+     * @param poolDate 候选原始日期池
+     * @param candidate 当前SKU候选
+     * @param matchResult 反向匹配结果
+     * @param availabilityPlan 冻结真实时间轴
+     * @param actualAvailableTimeMode 是否按实际开产时间归班
+     * @param structureLimitDecision 已冻结结构准入结果；为空时现场计算
+     * @return 可提交提案；不满足结构或时间轴约束时返回null
+     */
+    public NewSpecScheduleProposal previewWithPlan(
+            LhScheduleContext context,
+            DayScheduleContext dayContext,
+            LhShiftConfigVO shift,
+            MachineResource machineResource,
+            LocalDate poolDate,
+            DailyNewSpecCandidate candidate,
+            MachineSkuMatchResult matchResult,
+            NewSpecMachineAvailabilityPlan availabilityPlan,
+            boolean actualAvailableTimeMode,
+            StructureMachineLimitDecision structureLimitDecision) {
+        LhShiftConfigVO productionOccupationShift = Objects.isNull(availabilityPlan)
+                ? null : availabilityPlan.getProductionOccupationShift();
         if (Objects.isNull(availabilityPlan) || !availabilityPlan.isAvailable()
                 || Objects.isNull(availabilityPlan.getFormalTargetShift())
-                || Objects.isNull(availabilityPlan.getFormalTargetShift().getShiftIndex())) {
+                || Objects.isNull(availabilityPlan.getFormalTargetShift().getShiftIndex())
+                || Objects.isNull(productionOccupationShift)
+                || Objects.isNull(productionOccupationShift.getShiftIndex())) {
             if (StringUtils.isEmpty(candidate.getLastFailure())) {
                 candidate.setLastFailure(Objects.isNull(availabilityPlan)
                         ? "未形成真实可开产时间计划"
@@ -140,10 +178,18 @@ public class NewSpecCandidateAttemptService {
                 competitionTargetShift.getShiftIndex()))) {
             return null;
         }
-        String structureLimitReason = this.resolveEarlyProductionStructureLimitReason(
-                context, dayContext, candidate, matchResult, availabilityPlan);
-        if (StringUtils.isNotEmpty(structureLimitReason)) {
-            candidate.setLastFailure(structureLimitReason);
+        StructureMachineLimitDecision effectiveStructureLimitDecision =
+                Objects.nonNull(structureLimitDecision)
+                        ? structureLimitDecision
+                        : this.resolveStructureMachineLimitDecision(
+                        context, dayContext, candidate, matchResult,
+                        availabilityPlan, poolDate, null);
+        if (Objects.nonNull(effectiveStructureLimitDecision)
+                && effectiveStructureLimitDecision.isApplicable()
+                && !effectiveStructureLimitDecision.isAllowed()) {
+            candidate.setLastFailure(effectiveStructureLimitDecision.getReason());
+            this.logStructureMachineLimitDecision(
+                    "PREVIEW_REJECT", effectiveStructureLimitDecision, candidate);
             return null;
         }
         return new NewSpecScheduleProposal(
@@ -152,56 +198,57 @@ public class NewSpecCandidateAttemptService {
     }
 
     /**
-     * 按提案真实目标班次和候选物理机台校验提前生产结构计划机台数。
+     * 按提案生产占用班次和候选物理机台统一校验结构机台数上限。
      *
-     * @return 空值表示允许；非空表示拒绝原因
+     * @param context 排程上下文
+     * @param dayContext 当前业务日
+     * @param candidate 当前SKU候选
+     * @param matchResult 反向匹配结果
+     * @param availabilityPlan 冻结真实时间轴
+     * @param poolDate SKU原始候选池日期
+     * @param roundCache 当前运行态版本轻量缓存
+     * @return 不适用时返回null；否则返回结构准入结果
      */
-    private String resolveEarlyProductionStructureLimitReason(
+    public StructureMachineLimitDecision resolveStructureMachineLimitDecision(
             LhScheduleContext context,
             DayScheduleContext dayContext,
             DailyNewSpecCandidate candidate,
             MachineSkuMatchResult matchResult,
-            NewSpecMachineAvailabilityPlan availabilityPlan) {
-        if (dayContext.getCurrentPhase() != DailySchedulePhase.EARLY_PRODUCTION
+            NewSpecMachineAvailabilityPlan availabilityPlan,
+            LocalDate poolDate,
+            NewSpecProposalRoundCache roundCache) {
+        LhShiftConfigVO productionOccupationShift = Objects.isNull(availabilityPlan)
+                ? null : availabilityPlan.getProductionOccupationShift();
+        if (Objects.isNull(dayContext) || Objects.isNull(candidate)
                 || Objects.isNull(candidate.getSku())
                 || StringUtils.isEmpty(candidate.getSku().getStructureName())
-                || Objects.isNull(availabilityPlan.getFormalTargetShift())
-                || Objects.isNull(availabilityPlan.getFormalTargetShift().getShiftIndex())) {
+                || Objects.isNull(matchResult) || Objects.isNull(matchResult.getMachine())
+                || Objects.isNull(productionOccupationShift)
+                || Objects.isNull(productionOccupationShift.getShiftIndex())) {
             return null;
         }
-        EarlyProductionRuntimePlan runtimePlan = Objects.nonNull(candidate.getEarlyProductionPreview())
-                ? candidate.getEarlyProductionPreview()
-                : context.getEarlyProductionRuntimePlan(candidate.getSku());
-        if (Objects.isNull(runtimePlan) || Objects.isNull(runtimePlan.getDecision())
-                || !runtimePlan.getDecision().isAllowed()
-                || Objects.isNull(runtimePlan.getFuturePlanDate())) {
-            return "提前生产未形成可提交的运行视图";
-        }
-        int shiftIndex = availabilityPlan.getFormalTargetShift().getShiftIndex();
-        int planMachineCount = EarlyProductionChecker.resolveEffectiveStructurePlanMachineCount(
-                context, candidate.getSku(), dayContext.getScheduleDate(),
-                runtimePlan.getFuturePlanDate());
-        if (planMachineCount <= 0) {
-            return "结构无有效计划机台数，禁止提前生产";
-        }
-        if (Objects.isNull(context.getStructureShiftInMachineIndex())) {
-            return "结构班次在机索引未初始化，禁止提前生产";
-        }
-        String machineCode = matchResult.getMachine().getMachineCode();
-        int currentMachineCount = context.getStructureShiftInMachineIndex().resolveInMachineCount(
-                candidate.getSku().getStructureName(), shiftIndex);
-        if (EarlyProductionChecker.canUseMachineForEarlyProduction(
-                context, candidate.getSku(), dayContext.getScheduleDate(),
-                runtimePlan.getFuturePlanDate(), shiftIndex, machineCode)) {
-            return null;
-        }
-        return new StringBuilder("禁止提前生产新增物理机台：目标班次结构物理机台数已达到计划上限，structureName=")
-                .append(candidate.getSku().getStructureName())
-                .append(", shiftIndex=").append(shiftIndex)
-                .append(", physicalMachineCode=")
-                .append(LhSingleControlMachineUtil.resolvePhysicalMachineCode(machineCode))
-                .append(", currentMachineCount=").append(currentMachineCount)
-                .append(", planMachineCount=").append(planMachineCount)
-                .toString();
+        return structureMachineLimitAdmissionService.evaluate(
+                context, dayContext.getCurrentPhase(), candidate.getSku(),
+                productionOccupationShift,
+                matchResult.getMachine().getMachineCode(), poolDate, roundCache);
+    }
+
+    /**
+     * 输出包含候选生命周期状态的结构准入日志。
+     *
+     * @param checkStage 校验阶段
+     * @param decision 结构准入结果
+     * @param candidate 当前SKU候选
+     */
+    public void logStructureMachineLimitDecision(
+            String checkStage,
+            StructureMachineLimitDecision decision,
+            DailyNewSpecCandidate candidate) {
+        structureMachineLimitAdmissionService.logDecision(
+                checkStage, decision,
+                Objects.isNull(candidate)
+                        ? null : candidate.getRemainingMachineCount(),
+                Objects.isNull(candidate)
+                        ? null : candidate.isMachineCompetitionBlocked());
     }
 }

@@ -863,11 +863,9 @@ public final class FirstInspectionQtyUtil {
     /**
      * 使用跨班首检计划调整“首检 + 正式生产”班次总产能图。
      *
-     * <p>首检覆盖正式开产前班次时，即使原正常生产产能图中没有该班次，也会补入真实首检量。
-     * 同班同时存在首检和正式生产时，两个时间段前后相邻且不重叠：首检区间截止到切换结束，
-     * 正式生产从真实可开产时间开始。因此这里合并两段各自已经按停机、清洗、维修和班次管控
-     * 计算出的产能；完整班产及日标准上限由调用方后续统一收敛，禁止拿首检短区间容量再次
-     * 截断正式生产时段。</p>
+     * <p>首检覆盖正常生产前班次时，即使原正常生产产能图中没有该班次，也会补入真实首检量。
+     * 同班同时存在首检和正常生产时，两个时间段前后相邻且不重叠；这里合并两段已经按停机、
+     * 清洗、维修和班次管控计算出的产能。完整班产及日标准上限由调用方后续统一收敛。</p>
      *
      * @param shifts 完整排程班次
      * @param shiftCapacityMap 正式生产产能图
@@ -1463,10 +1461,11 @@ public final class FirstInspectionQtyUtil {
     }
 
     /**
-     * 量试计件首检完成后再开始普通生产。
+     * 计件首检完成后再开始普通生产。
      *
-     * <p>量试首检从中班门禁开始时，首检条数占用真实生产时间；普通生产起点必须取
-     * 原开产时间与首检结束时间的较晚值。其它 SKU 保持既有时间轴。</p>
+     * <p>当首检计划从生产就绪时间向后执行时，首检条数占用真实生产时间；普通生产
+     * 起点必须取原开产时间与首检结束时间的较晚值。既有倒推计划的结束时间不晚于
+     * 原开产时间，因此保持原行为。</p>
      *
      * @param sku SKU排程信息
      * @param scheduleType 排程类型
@@ -1479,8 +1478,7 @@ public final class FirstInspectionQtyUtil {
             String scheduleType,
             Date productionStartTime,
             FirstInspectionAllocationPlan plan) {
-        if (!isMassTrialQuantityFirstInspection(sku, scheduleType)
-                || Objects.isNull(productionStartTime)
+        if (Objects.isNull(productionStartTime)
                 || Objects.isNull(plan)
                 || !plan.isValid()
                 || plan.getInspectionQty() <= 0
