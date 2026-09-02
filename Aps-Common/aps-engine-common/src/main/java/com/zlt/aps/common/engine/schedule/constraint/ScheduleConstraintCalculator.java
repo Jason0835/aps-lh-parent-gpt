@@ -15,6 +15,9 @@ public class ScheduleConstraintCalculator {
 
     private static final int CALCULATION_SCALE = 8;
 
+    /** 保持 TM/TC 既有切换小时折算精度，避免公共化改变排程结果。 */
+    private static final int SWITCH_CALCULATION_SCALE = 6;
+
     private static final BigDecimal ONE_HUNDRED = new BigDecimal("100");
 
     /**
@@ -113,6 +116,24 @@ public class ScheduleConstraintCalculator {
     }
 
     /**
+     * 将固定产能扣减量按生产速度换算为切换小时数。
+     *
+     * @param capacityDeduct 固定产能扣减量
+     * @param machineSpeed 当前任务生产速度
+     * @return 非负切换小时数；扣减量或速度无效时返回零
+     */
+    public BigDecimal convertCapacityDeductToHours(BigDecimal capacityDeduct, BigDecimal machineSpeed) {
+        BigDecimal normalizedCapacityDeduct = this.nonNegative(capacityDeduct);
+        BigDecimal normalizedMachineSpeed = this.nonNegative(machineSpeed);
+        if (normalizedCapacityDeduct.compareTo(BigDecimal.ZERO) <= 0
+                || normalizedMachineSpeed.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO;
+        }
+        return normalizedCapacityDeduct.divide(normalizedMachineSpeed, SWITCH_CALCULATION_SCALE,
+                RoundingMode.HALF_UP);
+    }
+
+    /**
      * 计算班次扣除已排计划量和完整任务链切换后的剩余产能。
      *
      * @param baseCapacity 已扣除维修等班次静态限制的基础产能
@@ -126,6 +147,25 @@ public class ScheduleConstraintCalculator {
                 .subtract(this.nonNegative(assignedPlanQty))
                 .subtract(this.nonNegative(switchCapacityDeduct))
                 .max(BigDecimal.ZERO);
+    }
+
+    /**
+     * 计算扣除检修、已排计划和切换损失后的剩余产能。
+     *
+     * @param maxCapacity 班次最大产能
+     * @param maintenanceDeduct 检修产能扣减量
+     * @param assignedPlanQty 班次已排计划量
+     * @param existingSwitchDeduct 班次内已发生切换扣减量
+     * @param currentSwitchDeduct 当前候选任务切换扣减量
+     * @return 不小于零的剩余产能
+     */
+    public BigDecimal calculateRemainCapacity(BigDecimal maxCapacity, BigDecimal maintenanceDeduct,
+                                              BigDecimal assignedPlanQty, BigDecimal existingSwitchDeduct,
+                                              BigDecimal currentSwitchDeduct) {
+        BigDecimal baseCapacity = this.nonNegative(maxCapacity).subtract(this.nonNegative(maintenanceDeduct));
+        BigDecimal totalSwitchDeduct = this.nonNegative(existingSwitchDeduct)
+                .add(this.nonNegative(currentSwitchDeduct));
+        return this.calculateRemainCapacity(baseCapacity, assignedPlanQty, totalSwitchDeduct);
     }
 
     /**
@@ -163,10 +203,35 @@ public class ScheduleConstraintCalculator {
     }
 
     /**
+     * 按历史班次级接口口径计算成型消耗折算的释放工装，并限制在工装池上下限内。
+     *
+     * <p>自动排程的班前释放由机台分配策略调用本方法完成；任务结算阶段不再重复释放成型需求。
+     * 本方法仍保留给兼容调用方使用。</p>
+     *
+     * @param availableToolQty 释放前可用工装数量
+     * @param releasedToolQty 成型消耗折算的释放工装数量
+     * @param totalToolQty 工装池上限；为空时不限制上限
+     * @return 释放后的可用工装数量；释放前余额为空时返回空
+     */
+    public BigDecimal settleReleasedToolLedger(BigDecimal availableToolQty,
+                                               BigDecimal releasedToolQty,
+                                               BigDecimal totalToolQty) {
+        if (availableToolQty == null) {
+            return null;
+        }
+        BigDecimal settledQty = this.nonNegative(availableToolQty)
+                .add(this.nonNegative(releasedToolQty));
+        if (totalToolQty != null) {
+            settledQty = settledQty.min(this.nonNegative(totalToolQty));
+        }
+        return settledQty.max(BigDecimal.ZERO).setScale(CALCULATION_SCALE, RoundingMode.HALF_UP);
+    }
+
+    /**
      * 按生产增量和成型消耗量结算一次全局工装账本。
      *
-     * <p>生产增量受当前可用工装限制，成型消耗量用于释放已占用工装。人工滚动只传命令增量，
-     * 自动排程传当前任务实际生产量和当前班成型需求量，两条链路因此共用同一净占用公式。</p>
+     * <p>生产增量受当前可用工装限制，成型消耗量用于释放已占用工装。人工滚动仍可传入命令增量，
+     * 自动排程的班前释放和任务生产占用也通过本计算器保持同一工装折算口径。</p>
      *
      * @param requestedProductionQty 请求新增的生产量
      * @param releasedDemandQty 当前结算释放的成型需求量
@@ -254,11 +319,11 @@ public class ScheduleConstraintCalculator {
     }
 
     /**
-     * 按生产前已有工装余额限制本任务计划量，并在计划量确认后结算成型消耗释放。
+     * 按生产前已有工装余额限制本任务计划量，并按兼容参数结算成型消耗释放。
      *
-     * <p>本方法与人工滚动使用的“先释放再计算增量”口径相互独立。自动排程必须先使用
-     * {@code availableToolQty} 计算本任务允许量，再用实际允许量减去当班成型消耗量结算下一任务余额，
-     * 因此本任务不能使用自身结算时释放的工装。</p>
+     * <p>本方法与人工滚动使用的“先释放再计算增量”口径相互独立。自动排程调用时
+     * {@code releasedDemandQty} 传 0，班前成型释放已经写入 {@code availableToolQty}；兼容调用方
+     * 仍可传入释放量，但不会改变班前预释放的流程语义。</p>
      *
      * @param requestedProductionQty 本任务请求计划量
      * @param releasedDemandQty 本任务结算时释放的当班成型消耗量

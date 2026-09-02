@@ -30,8 +30,9 @@ import java.util.function.Predicate;
  * S4.5 新增排产 Machine-SKU 动态竞争选择器。
  *
  * <p>本选择器只读取当前日期候选池和排程运行态。每台机台扫描时只保留一个最佳可排提案，
- * 不缓存完整 Machine×SKU 矩阵；跨机台阶段再按单控试制/量试优先、匹配等级、收尾时间和
- * 机台编码选出本轮唯一提案。正式资源扣减和结果写入仍由现有提交链完成。</p>
+ * 不缓存完整 Machine×SKU 矩阵；跨机台阶段先按历史来源班次，再按单控试制/量试作用域、
+ * 目标机台缺口、匹配等级、收尾时间和机台编码选出本轮唯一提案。正式资源扣减和结果写入
+ * 仍由现有提交链完成。</p>
  *
  * @author APS
  */
@@ -46,10 +47,10 @@ public class NewSpecMachineSkuCompetitionService {
     /**
      * 按原 SKU 业务顺序为当前机台查找最佳可排 SKU。
      *
-     * <p>每个候选必须先通过反向硬匹配、结构准入和真实时间轴，之后先比较统一Map剩余
-     * 目标物理机台缺口，缺口相同再比较匹配等级；缺口和等级均相同不替换，保证原业务
-     * 排序靠前的 SKU 获胜。标准S4.5必须扫描完整日期池才能确认最大缺口；关闭缺口优先的
-     * 固定指令和辅助入口仍可在形成可提交的“同胎胚”提案后提前结束。</p>
+     * <p>每个候选必须先通过反向硬匹配、结构准入和真实时间轴，之后先比较历史来源班次，
+     * 来源相同再比较统一Map剩余目标物理机台缺口和匹配等级；全部相同时不替换，保证原业务
+     * 排序靠前的 SKU 获胜。标准S4.5必须扫描完整日期池；关闭缺口优先的固定指令和辅助入口
+     * 仍可在形成可提交的“同胎胚”提案后提前结束。</p>
      *
      * @param context 排程上下文
      * @param dayContext 当前业务日
@@ -257,7 +258,8 @@ public class NewSpecMachineSkuCompetitionService {
      * 从每台机台的最佳提案中选出当前轮唯一胜出组合。
      *
      * <p>先按声明范围合并重复物理机台，再在存在合法单控试制/量试提案时收窄到单控作用域；
-     * 作用域内先补统一Map目标物理机台缺口，再按匹配等级、收尾时间、机台编码决胜。</p>
+     * 标准作用域内先比较历史来源班次，再补统一Map目标物理机台缺口，最后按匹配等级、
+     * 收尾时间、机台编码决胜。</p>
      *
      * @param context 排程上下文
      * @param machineBestProposalList 每台机台当前最佳提案
@@ -411,6 +413,10 @@ public class NewSpecMachineSkuCompetitionService {
                                 NewSpecScheduleProposal left,
                                 NewSpecScheduleProposal right,
                                 boolean prioritizeTargetMachineGap) {
+        int historySourceCompareResult = this.compareHistoricalSourceShift(left, right);
+        if (historySourceCompareResult != 0) {
+            return historySourceCompareResult;
+        }
         if (prioritizeTargetMachineGap) {
             int gapCompareResult = this.compareRemainingMachineGap(left, right);
             if (gapCompareResult != 0) {
@@ -439,8 +445,8 @@ public class NewSpecMachineSkuCompetitionService {
     /**
      * 比较同一机台上的两个可排 SKU 提案。
      *
-     * <p>先补统一Map目标物理机台缺口，再比较Machine-SKU匹配等级。剩余缺口相同时，
-     * 继续沿用原匹配等级和业务顺序，避免目标机台数只成为上限而在资源竞争中静默缺台。</p>
+     * <p>标准S4.5先比较历史来源班次，再补统一Map目标物理机台缺口和Machine-SKU匹配等级。
+     * 来源、缺口和等级均相同时继续保留原业务顺序。</p>
      *
      * @param left 左提案
      * @param right 右提案
@@ -449,6 +455,10 @@ public class NewSpecMachineSkuCompetitionService {
     private int compareCandidateProposal(NewSpecScheduleProposal left,
                                          NewSpecScheduleProposal right,
                                          boolean prioritizeTargetMachineGap) {
+        int historySourceCompareResult = this.compareHistoricalSourceShift(left, right);
+        if (historySourceCompareResult != 0) {
+            return historySourceCompareResult;
+        }
         if (prioritizeTargetMachineGap) {
             int compareResult = this.compareRemainingMachineGap(left, right);
             if (compareResult != 0) {
@@ -456,6 +466,48 @@ public class NewSpecMachineSkuCompetitionService {
             }
         }
         return this.compareMatchLevel(left.getMatchResult(), right.getMatchResult());
+    }
+
+    /**
+     * 比较标准S4.5提案的历史来源班次。
+     *
+     * <p>历史机台整体优先于当前资源班次原有机台；两台历史机台按来源班次绝对开始时间
+     * 升序比较。来源相同后返回相等，继续执行目标机台缺口、匹配等级和收尾时间等既有规则。</p>
+     *
+     * @param left 左提案
+     * @param right 右提案
+     * @return 负数表示左提案来源更早，正数表示右提案来源更早，0表示来源层级相同
+     */
+    private int compareHistoricalSourceShift(NewSpecScheduleProposal left,
+                                             NewSpecScheduleProposal right) {
+        HistoricalResidualCapacityInfo leftInfo = this.resolveHistoricalResidualCapacityInfo(left);
+        HistoricalResidualCapacityInfo rightInfo = this.resolveHistoricalResidualCapacityInfo(right);
+        if (Objects.nonNull(leftInfo) != Objects.nonNull(rightInfo)) {
+            return Objects.nonNull(leftInfo) ? -1 : 1;
+        }
+        if (Objects.isNull(leftInfo)) {
+            return 0;
+        }
+        Date leftSourceStartTime = Objects.isNull(leftInfo.getSourceShift())
+                ? null : leftInfo.getSourceShift().getShiftStartDateTime();
+        Date rightSourceStartTime = Objects.isNull(rightInfo.getSourceShift())
+                ? null : rightInfo.getSourceShift().getShiftStartDateTime();
+        return Comparator.nullsLast(Date::compareTo).compare(
+                leftSourceStartTime, rightSourceStartTime);
+    }
+
+    /**
+     * 读取提案冻结的历史剩余产能画像。
+     *
+     * @param proposal 待比较提案
+     * @return 历史剩余产能画像；当前班次原有机台返回null
+     */
+    private HistoricalResidualCapacityInfo resolveHistoricalResidualCapacityInfo(
+            NewSpecScheduleProposal proposal) {
+        if (Objects.isNull(proposal) || Objects.isNull(proposal.getAvailabilityPlan())) {
+            return null;
+        }
+        return proposal.getAvailabilityPlan().getHistoricalResidualCapacityInfo();
     }
 
     /**

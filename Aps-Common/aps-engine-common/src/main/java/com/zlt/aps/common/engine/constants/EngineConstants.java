@@ -560,4 +560,10 @@ public class EngineConstants {
 
     /** SYS1101031：机台定额超排容忍阈值（计划量超出机台剩余产能，且超出部分≤此值时允许当班超排，不延后到下一班），默认0不启用 */
     public static String TQ_MACHINE_OVER_ASSIGN_TOLERANCE = "SYS1101031";
+
+    /** SYS1101032：胎圈新规格回看天数（判定新规格时回看历史排程计划量的天数），默认7天 */
+    public static String TQ_NEW_SPEC_LOOKBACK_DAYS = "SYS1101032";
+
+    /** SYS1101033：胎圈新规格保底备库班数（新规格/试制规格主动备库时的保底班数，与备库配置班数取最大），默认2班 */
+    public static String TQ_NEW_SPEC_BACKUP_SHIFT_COUNT = "SYS1101033";
 }

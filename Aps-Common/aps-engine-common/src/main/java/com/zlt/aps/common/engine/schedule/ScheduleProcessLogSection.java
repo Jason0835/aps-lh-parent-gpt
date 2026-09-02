@@ -10,6 +10,9 @@ public enum ScheduleProcessLogSection {
     /** 库存滚动分区。 */
     INVENTORY_ROLLING("库存滚动"),
 
+    /** 班次开始预释放成型工装分区。 */
+    SHIFT_TOOL_PRE_RELEASE("班次工装班前释放"),
+
     /** 计划量计算分区。 */
     PLAN_QTY_CALCULATION("计划量计算"),
 

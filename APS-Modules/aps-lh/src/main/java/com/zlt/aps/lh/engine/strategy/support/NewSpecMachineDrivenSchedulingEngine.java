@@ -573,12 +573,16 @@ public class NewSpecMachineDrivenSchedulingEngine {
         }
         List<MachineResource> resources = new ArrayList<MachineResource>(
                 context.getMachineScheduleMap().size());
+        Date defaultAvailableTime = this.resolveDefaultMachineAvailableTime(
+                context, dayContext);
         for (MachineScheduleDTO machine : context.getMachineScheduleMap().values()) {
             if (Objects.isNull(machine) || StringUtils.isEmpty(machine.getMachineCode())) {
                 continue;
             }
             resources.add(new MachineResource(
-                    machine, Collections.singletonList(machine.getMachineCode())));
+                    machine, Collections.singletonList(machine.getMachineCode()),
+                    Objects.nonNull(machine.getEstimatedEndTime())
+                            ? machine.getEstimatedEndTime() : defaultAvailableTime));
         }
         Set<String> fixedPhysicalMachineCodeSet = this.resolveFixedPhysicalMachineCodes(
                 context, dayContext, candidatePoolMap);
@@ -871,8 +875,39 @@ public class NewSpecMachineDrivenSchedulingEngine {
 
     private boolean isResourceReadyBeforeShiftEnd(MachineResource machineResource,
                                                    LhShiftConfigVO shift) {
-        Date endingTime = machineResource.getEndingTime();
-        return Objects.isNull(endingTime) || endingTime.before(shift.getShiftEndDateTime());
+        Date latestAvailableTime = machineResource.getEndingTime();
+        return Objects.nonNull(latestAvailableTime)
+                && Objects.nonNull(shift)
+                && Objects.nonNull(shift.getShiftEndDateTime())
+                && latestAvailableTime.before(shift.getShiftEndDateTime());
+    }
+
+    /**
+     * 解析从未占用机台进入本轮竞争时的默认可用时间。
+     *
+     * <p>排产提交成功后机台预计结束时间会立即更新，下一轮重新构建资源时自然读取最新值。
+     * 从未占用的空闲机台以本次排程窗口开始时间作为可用时间，保证后续准入统一执行严格
+     * {@code machineAvailableTime < shiftEndTime}，不通过null分支绕过边界。</p>
+     *
+     * @param context 排程上下文
+     * @param dayContext 当前业务日
+     * @return 从未占用机台的默认可用时间
+     */
+    private Date resolveDefaultMachineAvailableTime(LhScheduleContext context,
+                                                    DayScheduleContext dayContext) {
+        if (Objects.nonNull(context)
+                && !CollectionUtils.isEmpty(context.getScheduleWindowShifts())) {
+            Date windowStartTime = context.getScheduleWindowShifts().stream()
+                    .filter(Objects::nonNull)
+                    .map(LhShiftConfigVO::getShiftStartDateTime)
+                    .filter(Objects::nonNull)
+                    .min(Date::compareTo)
+                    .orElse(null);
+            if (Objects.nonNull(windowStartTime)) {
+                return windowStartTime;
+            }
+        }
+        return Objects.isNull(dayContext) ? null : dayContext.getDayStartTime();
     }
 
     private LocalDate resolveWindowStartDate(LhScheduleContext context,

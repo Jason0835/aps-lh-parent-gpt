@@ -28,7 +28,6 @@ import com.zlt.aps.maindata.mapper.LhMachineInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmMaterialConsumeDetailMapper;
 import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
-import com.zlt.aps.mdm.api.domain.entity.MdmSkuConstructionRef;
 import com.zlt.aps.mp.api.domain.entity.FactoryParam;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialConsumeDetail;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
@@ -153,9 +152,6 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
     @Resource
     private CxParamConfigMapper cxParamConfigMapper;
 
-    @Resource
-    private MdmSkuConstructionRefMapper mdmSkuConstructionRefMapper;
-
     @Override
     public byte[] exportScheduleSummaryReport(ScheduleSummaryReportVO queryVO) {
         if (queryVO == null || StringUtils.isBlank(queryVO.getScheduleDate())) {
@@ -222,16 +218,14 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         Date scheduleDateT2 = DateUtil.offsetDay(scheduleDate, 1);
         // 硫化机台单双模(模台数)映射：用于硫化开动机台数统计时合并K1501L/K1501R等单控机台
         Map<String, Integer> machineMaxMouldMap = this.loadMachineMaxMouldMap(factoryCode);
-        // SKU与示方书关系映射（物料级类型兜底数据源，T+1/T+2 共用一次查询）
-        Map<String, Set<String>> skuEmbryoTypeMap = this.loadSkuEmbryoTypeMap();
         Map<String, Object> tableMap = this.buildTableMapFromResults(
                 scheduleDate, scheduleDate, scheduleDateT2, factoryCode,
-                classShiftTypeMap, cxResults, lhResults, "", machineMaxMouldMap, skuEmbryoTypeMap);
+                classShiftTypeMap, cxResults, lhResults, "", machineMaxMouldMap);
 
         // 新模板（右侧，后缀2）：T+2数据，从同一份排程结果中取class6/7/8班次
         Map<String, Object> tableMapT2 = this.buildTableMapFromResults(
                 scheduleDateT2, scheduleDate, scheduleDateT2, factoryCode,
-                classShiftTypeMap, cxResults, lhResults, "2", machineMaxMouldMap, skuEmbryoTypeMap);
+                classShiftTypeMap, cxResults, lhResults, "2", machineMaxMouldMap);
         tableMap.putAll(tableMapT2);
 
         // 模具交替/清洗信息：一次性查询排程窗口（T+1 ~ T+2）数据，按 planDate 分组到 T+1/T+2 栏位，不含T日
@@ -249,7 +243,7 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
 
         // 小胶种列表：T+1 和 T+2 从同一份排程结果中按不同班次过滤，按胶种做 full outer join
         List<Map<String, Object>> smallRubberList = this.buildMergedSmallRubberList(
-                scheduleDate, scheduleDateT2, factoryCode, cxResults, skuEmbryoTypeMap);
+                scheduleDate, scheduleDateT2, factoryCode, cxResults);
         List<List<Map<String, Object>>> dataList = new ArrayList<>();
         dataList.add(smallRubberList);
 
@@ -300,14 +294,12 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
      * @param scheduleDateT2  T+2 排程日期（排程日期+1天）
      * @param factoryCode     分厂编码
      * @param cxResults       预查询的成型排程结果（排程日期=T+1）
-     * @param skuEmbryoTypeMap SKU与示方书关系映射（物料编码→示方类型集合，物料级类型兜底数据源）
      * @return 合并后的小胶种行数据列表（两边都无数据返回空列表）
      */
     private List<Map<String, Object>> buildMergedSmallRubberList(Date scheduleDateT1, Date scheduleDateT2,
-                                                                  String factoryCode, List<CxScheduleResult> cxResults,
-                                                                  Map<String, Set<String>> skuEmbryoTypeMap) {
-        List<Map<String, Object>> listT1 = this.buildSmallRubberList(scheduleDateT1, factoryCode, cxResults, "", skuEmbryoTypeMap);
-        List<Map<String, Object>> listT2 = this.buildSmallRubberList(scheduleDateT1, factoryCode, cxResults, "2", skuEmbryoTypeMap);
+                                                                  String factoryCode, List<CxScheduleResult> cxResults) {
+        List<Map<String, Object>> listT1 = this.buildSmallRubberList(scheduleDateT1, factoryCode, cxResults, "");
+        List<Map<String, Object>> listT2 = this.buildSmallRubberList(scheduleDateT1, factoryCode, cxResults, "2");
 
         if (listT1.isEmpty() && listT2.isEmpty()) {
             return new ArrayList<>();
@@ -360,14 +352,12 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
      * @param keySuffix          key 后缀（"" 或 "2"）
      * @param machineMaxMouldMap 硫化机台单双模(模台数)映射，key=机台编号(大写), value=单双模值；
      *                           用于硫化开动机台数统计时合并K1501L/K1501R等单控机台
-     * @param skuEmbryoTypeMap   SKU与示方书关系映射（物料编码→示方类型集合，物料级类型兜底数据源）
      * @return 模板参数映射
      */
     private Map<String, Object> buildTableMapFromResults(Date reportDate, Date actualScheduleDate, Date scheduleDateT2,
                                                          String factoryCode, Map<Integer, String> classShiftTypeMap,
                                                          List<CxScheduleResult> cxResults, List<LhScheduleResult> lhResults,
-                                                         String keySuffix, Map<String, Integer> machineMaxMouldMap,
-                                                         Map<String, Set<String>> skuEmbryoTypeMap) {
+                                                         String keySuffix, Map<String, Integer> machineMaxMouldMap) {
         Map<String, Object> map = new HashMap<>(32);
 
         map.put("titleDate" + keySuffix, DateUtil.format(reportDate, "MM月dd日") + "计划排产\n"
@@ -433,18 +423,14 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
             if (recipeTypes.isEmpty()) {
                 recipeTypes.add("S");
             }
-            // 物料级类型判定：materialCode 可能是逗号分隔的多个物料编码（排程生成时按胎胚+机台合并），
-            // 记录级 recipeType 仅代表第一个物料（主物料），其余共用胎胚物料需用SKU关系表的
-            // 物料全部类型兜底，否则共用胎胚下的量试/试制物料会被漏统计
-            Map<String, Set<String>> materialTypes = this.resolveMaterialTypes(result, recipeTypes, skuEmbryoTypeMap);
-            Set<String> allMaterialTypes = materialTypes.values().stream()
-                    .flatMap(Set::stream)
-                    .collect(Collectors.toSet());
-            // 按示方书类型归集：T=量试，X=试制
-            if (allMaterialTypes.contains("T")) {
+            // 按记录级示方书类型归集：T=量试，X=试制
+            // 口径说明：成型排程结果按"机台|胎胚|产品状态|施工阶段"分组落库，同一记录行内
+            // 所有物料必然同产品状态、同施工阶段，记录级示方类型即代表整行物料，
+            // 与成型排表页面/导出的展示口径完全一致
+            if (recipeTypes.contains("T")) {
                 trialSpecs.add(specDesc);
             }
-            if (allMaterialTypes.contains("X")) {
+            if (recipeTypes.contains("X")) {
                 setupSpecs.add(specDesc);
             }
         }
@@ -746,12 +732,10 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
      * @param factoryCode  分厂编码
      * @param cxResults    预查询的成型排程结果
      * @param keySuffix    key 后缀（"" 过滤class3/4/5，"2" 过滤class6/7/8）
-     * @param skuEmbryoTypeMap SKU与示方书关系映射（物料编码→示方类型集合，物料级类型兜底数据源）
      * @return 小胶种行数据列表（无数据返回空列表）
      */
     private List<Map<String, Object>> buildSmallRubberList(Date scheduleDate, String factoryCode,
-                                                            List<CxScheduleResult> cxResults, String keySuffix,
-                                                            Map<String, Set<String>> skuEmbryoTypeMap) {
+                                                            List<CxScheduleResult> cxResults, String keySuffix) {
         List<Map<String, Object>> smallRubberList = new ArrayList<>();
 
         List<String> rubberTypeCodes = this.loadRubberTypeCodes(factoryCode);
@@ -789,8 +773,8 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
             return smallRubberList;
         }
 
-        // 构建物料→示方类型集合映射（根据keySuffix选择班次范围，SKU关系表兜底共用胎胚物料类型）
-        Map<String, Set<String>> materialRecipeTypeMap = this.buildMaterialRecipeTypeMap(cxResults, keySuffix, skuEmbryoTypeMap);
+        // 构建物料→示方类型集合映射（根据keySuffix选择班次范围，拆分多物料合并记录）
+        Map<String, Set<String>> materialRecipeTypeMap = this.buildMaterialRecipeTypeMap(cxResults, keySuffix);
         log.info("物料示方类型映射构建完成[keySuffix={}], 映射数量: {}", keySuffix, materialRecipeTypeMap.size());
 
         // 按胶种类型查询对应的胎胚，构建胶种→胎胚映射
@@ -1031,17 +1015,19 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
      * 同一胎胚下不同物料可能有不同的示方类型（如正规和量试），因此按物料级别映射，
      * 确保每种物料都能正确归入对应的示方类型分组。</p>
      *
-     * <p><b>多物料合并修复：</b>CxScheduleResult.materialCode 可能是逗号分隔的多个物料编码
+     * <p><b>多物料合并拆分：</b>CxScheduleResult.materialCode 可能是逗号分隔的多个物料编码
      * （排程生成时按胎胚+机台合并），必须拆分后逐个物料作为key放入映射，否则用整条组合串作key
      * 会导致后续按单个物料编码查询时匹配失败、回退默认"正规"，使量试/试制物料被错误归入正规分组。</p>
      *
+     * <p>口径说明：成型排程结果按"机台|胎胚|产品状态|施工阶段"分组落库，同一记录行内所有物料
+     * 必然同产品状态、同施工阶段，记录级示方类型对行内全部物料统一生效（与成型排表展示口径一致），
+     * 不再用SKU关系表的物料历史示方类型兜底。</p>
+     *
      * @param cxResults 成型排程结果列表
      * @param keySuffix key 后缀（"" 取class3/4/5，"2" 取class6/7/8）
-     * @param skuEmbryoTypeMap SKU与示方书关系映射（物料编码→示方类型集合，物料级类型兜底数据源）
      * @return 物料编码→示方类型编码集合映射（S-正规，T-量试，X-试制）
      */
-    private Map<String, Set<String>> buildMaterialRecipeTypeMap(List<CxScheduleResult> cxResults, String keySuffix,
-                                                                 Map<String, Set<String>> skuEmbryoTypeMap) {
+    private Map<String, Set<String>> buildMaterialRecipeTypeMap(List<CxScheduleResult> cxResults, String keySuffix) {
 
         Map<String, Set<String>> materialRecipeTypeMap = new HashMap<>();
         for (CxScheduleResult result : cxResults) {
@@ -1067,10 +1053,9 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                 recipeTypes.add("S");
             }
 
-            // 拆分逗号分隔的多物料编码后逐个物料归集类型
-            //（主物料沿用排程写入的班次示方类型，共用胎胚物料用SKU关系表类型兜底），
+            // 拆分逗号分隔的多物料编码后逐个物料归集类型（行内物料同状态同施工阶段，统一用记录级示方类型），
             // 同一物料可能有多条排程结果记录（不同机台），合并所有示方类型
-            Map<String, Set<String>> materialTypes = this.resolveMaterialTypes(result, recipeTypes, skuEmbryoTypeMap);
+            Map<String, Set<String>> materialTypes = this.resolveMaterialTypes(result, recipeTypes);
             for (Map.Entry<String, Set<String>> typeEntry : materialTypes.entrySet()) {
                 materialRecipeTypeMap.computeIfAbsent(typeEntry.getKey(), k -> new HashSet<>())
                         .addAll(typeEntry.getValue());
@@ -1080,69 +1065,32 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
     }
 
     /**
-     * 加载SKU与示方书关系映射（物料编码→示方类型集合）。
-     *
-     * <p>数据来源：T_MDM_SKU_CONSTRUCTION_REF（物料+产品状态→制造示方书类型），
-     * 与排程引擎 CoreScheduleAlgorithmServiceImpl 构建的 materialCode|trialStatus→embryoType
-     * 映射同源。一个物料可能存在多种产品状态（正式/量试/试制），因此收集其全部有效示方类型，
-     * 用于共用胎胚合并记录中非主物料的类型兜底判定。</p>
-     *
-     * @return 物料编码→示方类型编码集合映射（S-正规，T-量试，X-试制）
-     */
-    private Map<String, Set<String>> loadSkuEmbryoTypeMap() {
-        List<MdmSkuConstructionRef> skuRefList = mdmSkuConstructionRefMapper.selectList(
-                new LambdaQueryWrapper<MdmSkuConstructionRef>()
-                        .select(MdmSkuConstructionRef::getMaterialCode, MdmSkuConstructionRef::getEmbryoType)
-                        .eq(MdmSkuConstructionRef::getIsDelete, 0));
-        Map<String, Set<String>> skuEmbryoTypeMap = new HashMap<>();
-        for (MdmSkuConstructionRef ref : skuRefList) {
-            if (ref == null || StringUtils.isBlank(ref.getMaterialCode())
-                    || StringUtils.isBlank(ref.getEmbryoType())) {
-                continue;
-            }
-            // 仅保留有效示方类型（S-正规，T-量试，X-试制），过滤脏数据
-            String embryoType = ref.getEmbryoType().trim();
-            if (!"S".equals(embryoType) && !"T".equals(embryoType) && !"X".equals(embryoType)) {
-                continue;
-            }
-            skuEmbryoTypeMap.computeIfAbsent(ref.getMaterialCode().trim(), k -> new HashSet<>()).add(embryoType);
-        }
-        log.info("SKU与示方书关系映射加载完成, 物料数量: {}", skuEmbryoTypeMap.size());
-        return skuEmbryoTypeMap;
-    }
-
-    /**
      * 解析单条排程记录的物料级示方类型映射。
      *
-     * <p>将逗号分隔的多物料编码拆分后逐个归集类型：</p>
+     * <p>将逗号分隔的多物料编码拆分后逐个物料作为key，统一映射到排程写入的记录级示方类型：</p>
      * <ul>
-     *   <li>第一个物料（主物料）：沿用排程写入的班次示方类型 recipeTypes
-     *       （与排程引擎 resolveRecipeType 多物料合并时仅取第一个物料的行为一致）</li>
-     *   <li>其余共用胎胚物料：记录级 recipeType 仅代表主物料，无法感知物料级差异，
-     *       用 SKU 与示方书关系表的物料全部类型兜底；SKU 关系查不到时回退 recipeTypes</li>
+     *   <li>成型排程结果按"机台|胎胚|产品状态|施工阶段"分组落库，同一记录行内所有物料
+     *       必然同产品状态、同施工阶段，记录级示方类型对整行物料统一生效，
+     *       与成型排表页面/导出的展示口径完全一致</li>
+     *   <li>不再用SKU与示方书关系表的物料历史示方类型兜底：物料转正后其试制/量试关系记录
+     *       仍会保留在关系表中，按"物料存在试制/量试试方书记录"兜底会把正式排产的物料
+     *       误判为试制/量试（与成型排表展示不一致）</li>
      * </ul>
      *
-     * @param result           成型排程结果（materialCode 可能是逗号分隔的多物料编码）
-     * @param recipeTypes      排程写入的班次示方类型集合（记录级，代表主物料）
-     * @param skuEmbryoTypeMap SKU与示方书关系映射（物料编码→示方类型集合）
+     * @param result      成型排程结果（materialCode 可能是逗号分隔的多物料编码）
+     * @param recipeTypes 排程写入的班次示方类型集合（记录级，对行内全部物料统一生效）
      * @return 单个物料编码→示方类型集合映射
      */
-    private Map<String, Set<String>> resolveMaterialTypes(CxScheduleResult result, Set<String> recipeTypes,
-                                                           Map<String, Set<String>> skuEmbryoTypeMap) {
+    private Map<String, Set<String>> resolveMaterialTypes(CxScheduleResult result, Set<String> recipeTypes) {
         Map<String, Set<String>> materialTypes = new LinkedHashMap<>();
         String materialCode = StringUtils.defaultString(result.getMaterialCode());
         String[] codes = materialCode.split("[,，]");
-        boolean isFirst = true;
         for (String code : codes) {
             String trimmedCode = code.trim();
             if (StringUtils.isBlank(trimmedCode)) {
                 continue;
             }
-            Set<String> types = isFirst
-                    ? recipeTypes
-                    : skuEmbryoTypeMap.getOrDefault(trimmedCode, recipeTypes);
-            materialTypes.computeIfAbsent(trimmedCode, k -> new HashSet<>()).addAll(types);
-            isFirst = false;
+            materialTypes.computeIfAbsent(trimmedCode, k -> new HashSet<>()).addAll(recipeTypes);
         }
         // materialCode 无法拆分出有效编码时，整体作为key兜底，保持与旧逻辑兼容
         if (materialTypes.isEmpty() && StringUtils.isNotBlank(materialCode)) {

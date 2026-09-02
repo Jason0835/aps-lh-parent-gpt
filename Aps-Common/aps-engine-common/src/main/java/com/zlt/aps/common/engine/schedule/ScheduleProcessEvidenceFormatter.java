@@ -149,7 +149,12 @@ public final class ScheduleProcessEvidenceFormatter {
         fieldNames.put("planQtyBeforeToolLimit", "工装限制前计划量");
         fieldNames.put("toolOverflowQty", "工装溢出量");
         fieldNames.put("totalToolQty", "工装总量");
+        fieldNames.put("effectiveToolQtyLimit", "有效工装上限");
         fieldNames.put("availableToolQty", "可用工装量");
+        fieldNames.put("availableToolQtyBeforeShift", "班前可用工装量");
+        fieldNames.put("formingReleaseQtyBeforePlan", "班前成型释放工装量");
+        fieldNames.put("availableToolQtyBeforePlan", "班前计划可用工装量");
+        fieldNames.put("releaseDetails", "班前成型释放明细");
         fieldNames.put("toolUsedQty", "已占用工装量");
         fieldNames.put("remainingToolQty", "剩余工装量");
         fieldNames.put("curlRollLength", "卷长");
