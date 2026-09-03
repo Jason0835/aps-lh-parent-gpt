@@ -200,8 +200,8 @@ public class NewSpecMachineDrivenSchedulingEngine {
                         actualAvailableTimeMode, COMPETITION_SCOPE_SINGLE_CONTROL_TRIAL);
                 return singleControlTrialWinner;
             }
-            List<NewSpecScheduleProposal> machineBestProposalList =
-                    this.buildMachineBestProposalList(
+            List<NewSpecMachineProposalBuckets> machineProposalBucketList =
+                    this.buildMachineProposalBuckets(
                             context, dayContext, shift, machineResources,
                             orderedPoolDates, candidatePoolMap, machineMatch,
                             normalizedFailureSet, availabilityResolver,
@@ -209,27 +209,37 @@ public class NewSpecMachineDrivenSchedulingEngine {
                             machineResource -> true,
                             machineResource -> candidate -> true,
                             roundCache, true);
-            NewSpecScheduleProposal winner = machineSkuCompetitionService
-                    .selectRoundWinner(context, machineBestProposalList, roundCache);
-            if (Objects.nonNull(winner)) {
-                /*
-                 * 跨日准备是空闲资源优化路径：同一业务日仍有普通提案时，普通提案优先提交；
-                 * 只有全日无普通提案时才返回最早暂存的跨日准备提案。
-                 */
-                if (winner.getAvailabilityPlan().isSourceDayCrossDayPreparation()) {
-                    if (Objects.isNull(deferredCrossDayProposal)) {
-                        deferredCrossDayProposal = winner;
-                        deferredCrossDayShift = shift;
-                        this.logSourceDayCrossDayProposalAction(
-                                "暂存并继续查找当前业务日普通提案",
-                                context, dayContext, shift, winner);
-                    }
-                    continue;
+            List<NewSpecScheduleProposal> ordinaryProposalList =
+                    new ArrayList<NewSpecScheduleProposal>(machineProposalBucketList.size());
+            List<NewSpecScheduleProposal> crossDayProposalList =
+                    new ArrayList<NewSpecScheduleProposal>(machineProposalBucketList.size());
+            for (NewSpecMachineProposalBuckets proposalBucket : machineProposalBucketList) {
+                if (proposalBucket.hasOrdinaryProposal()) {
+                    ordinaryProposalList.add(proposalBucket.getOrdinaryProposal());
                 }
+                if (proposalBucket.hasCrossDayProposal()) {
+                    crossDayProposalList.add(proposalBucket.getCrossDayProposal());
+                }
+            }
+            NewSpecScheduleProposal ordinaryWinner = machineSkuCompetitionService
+                    .selectRoundWinner(context, ordinaryProposalList, roundCache);
+            if (Objects.nonNull(ordinaryWinner)) {
                 this.traceWinningProposal(
-                        context, dayContext, shift, winner,
+                        context, dayContext, shift, ordinaryWinner,
                         actualAvailableTimeMode, COMPETITION_SCOPE_DYNAMIC);
-                return winner;
+                return ordinaryWinner;
+            }
+            NewSpecScheduleProposal crossDayWinner = machineSkuCompetitionService
+                    .selectRoundWinner(context, crossDayProposalList, roundCache);
+            if (Objects.nonNull(crossDayWinner)) {
+                if (Objects.isNull(deferredCrossDayProposal)) {
+                    deferredCrossDayProposal = crossDayWinner;
+                    deferredCrossDayShift = shift;
+                    this.logSourceDayCrossDayProposalAction(
+                            "暂存并继续查找当前业务日普通提案",
+                            context, dayContext, shift, crossDayWinner);
+                }
+                continue;
             }
         }
         if (Objects.nonNull(deferredCrossDayProposal)) {
@@ -328,6 +338,66 @@ public class NewSpecMachineDrivenSchedulingEngine {
     }
 
     /**
+     * 为当前班次构建每台机台的普通/跨日准备双桶提案。
+     *
+     * @param context 排程上下文
+     * @param dayContext 当前业务日
+     * @param shift 当前竞争班次
+     * @param machineResources 当前机台资源
+     * @param orderedPoolDates 有序日期池
+     * @param candidatePoolMap 日期候选池
+     * @param machineMatch 反向硬匹配策略
+     * @param failedAssignmentKeySet 已失败组合
+     * @param availabilityResolver 真实时间轴解析器
+     * @param actualAvailableTimeMode 是否按真实可开产时间归班
+     * @param pendingSkuIdentitySet 当前仍待排 SKU
+     * @param machineScope 当前机台作用域
+     * @param candidateScopeResolver 每台机台的候选作用域
+     * @param roundCache 当前阶段轻量缓存
+     * @param prioritizeTargetMachineGap 是否优先补统一Map目标物理机台缺口
+     * @return 每台机台最多一个普通桶和最多一个跨日准备桶
+     */
+    private List<NewSpecMachineProposalBuckets> buildMachineProposalBuckets(
+            LhScheduleContext context,
+            DayScheduleContext dayContext,
+            LhShiftConfigVO shift,
+            List<MachineResource> machineResources,
+            List<LocalDate> orderedPoolDates,
+            Map<LocalDate, List<DailyNewSpecCandidate>> candidatePoolMap,
+            IMachineMatchStrategy machineMatch,
+            Set<String> failedAssignmentKeySet,
+            NewSpecMachineAvailabilityResolver availabilityResolver,
+            boolean actualAvailableTimeMode,
+            Set<SkuScheduleDTO> pendingSkuIdentitySet,
+            Predicate<MachineResource> machineScope,
+            java.util.function.Function<MachineResource, Predicate<DailyNewSpecCandidate>>
+                    candidateScopeResolver,
+            NewSpecProposalRoundCache roundCache,
+            boolean prioritizeTargetMachineGap) {
+        List<NewSpecMachineProposalBuckets> proposalBucketList =
+                new ArrayList<NewSpecMachineProposalBuckets>(machineResources.size());
+        for (MachineResource machineResource : machineResources) {
+            if (!machineScope.test(machineResource)
+                    || !this.isResourceReadyBeforeShiftEnd(machineResource, shift)) {
+                continue;
+            }
+            NewSpecMachineProposalBuckets proposalBucket =
+                    machineSkuCompetitionService.findProposalBucketsForMachine(
+                            context, dayContext, shift, machineResource,
+                            orderedPoolDates, candidatePoolMap, machineMatch,
+                            failedAssignmentKeySet, availabilityResolver,
+                            actualAvailableTimeMode, pendingSkuIdentitySet,
+                            candidateScopeResolver.apply(machineResource), roundCache,
+                            prioritizeTargetMachineGap);
+            if (proposalBucket.hasOrdinaryProposal()
+                    || proposalBucket.hasCrossDayProposal()) {
+                proposalBucketList.add(proposalBucket);
+            }
+        }
+        return proposalBucketList;
+    }
+
+    /**
      * 共享新增内核的辅助入口保持现有机台顺序，避免 S4.5.1/S4.5.2 继承跨 SKU 动态竞争。
      *
      * @param context 排程上下文
@@ -359,6 +429,7 @@ public class NewSpecMachineDrivenSchedulingEngine {
             Set<SkuScheduleDTO> pendingSkuIdentitySet,
             Set<String> fixedPhysicalMachineCodeSet,
             NewSpecProposalRoundCache roundCache) {
+        NewSpecScheduleProposal firstCrossDayProposal = null;
         for (MachineResource machineResource : machineResources) {
             if (!this.isResourceReadyBeforeShiftEnd(machineResource, shift)) {
                 continue;
@@ -378,16 +449,21 @@ public class NewSpecMachineDrivenSchedulingEngine {
                     return fixedProposal;
                 }
             }
-            NewSpecScheduleProposal proposal = machineSkuCompetitionService.findBestSkuForMachine(
+            NewSpecMachineProposalBuckets proposalBucket =
+                    machineSkuCompetitionService.findProposalBucketsForMachine(
                     context, dayContext, shift, machineResource, orderedPoolDates,
                     candidatePoolMap, machineMatch, failedAssignmentKeySet,
                     availabilityResolver, actualAvailableTimeMode,
                     pendingSkuIdentitySet, candidate -> true, roundCache, false);
-            if (Objects.nonNull(proposal)) {
-                return proposal;
+            if (proposalBucket.hasOrdinaryProposal()) {
+                return proposalBucket.getOrdinaryProposal();
+            }
+            if (proposalBucket.hasCrossDayProposal()
+                    && Objects.isNull(firstCrossDayProposal)) {
+                firstCrossDayProposal = proposalBucket.getCrossDayProposal();
             }
         }
-        return null;
+        return firstCrossDayProposal;
     }
 
     /**
