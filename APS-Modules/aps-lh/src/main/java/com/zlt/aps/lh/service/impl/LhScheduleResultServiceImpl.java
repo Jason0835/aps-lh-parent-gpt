@@ -7,10 +7,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-import com.zlt.aps.common.engine.domain.LhDayPlanAdjustVo;
-import com.zlt.aps.common.engine.domain.LhSurplusProductionDayInfo;
-import com.zlt.aps.common.engine.domain.LhSurplusResultVo;
-import com.zlt.aps.common.engine.domain.LhSurplusSkuInfo;
+import com.zlt.aps.common.engine.domain.*;
 import com.zlt.aps.common.engine.utils.MonthPlanSurplusCalculator;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
@@ -754,7 +751,13 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
         Date dayBeforeTDay = DateUtil.offsetDay(tDay, -1);
         //20260831+ 获取起始天，需要考虑调整后库存抓取日
         YearMonth yearMonthKey = SkuMonthPlanCalculator.getFirstYearMonth(allProductionDate);
-        Date startDate = lhMonthStartService.getMonthPlanStartDate(factoryCode, yearMonthKey);
+        LhMonthStartDayResult monthStartResult = lhMonthStartService.getMonthPlanStartDate(factoryCode, yearMonthKey);
+        boolean addLastMonthOverdueQty = false;
+        Date startDate = null;
+        if (null != monthStartResult) {
+            startDate = monthStartResult.getPlanStartDate();
+            addLastMonthOverdueQty = monthStartResult.isAddLastMonthOverdueQty();
+        }
         if (null == startDate || startDate.after(tDay) || startDate.equals(tDay)) {
             startDate = SkuMonthPlanCalculator.getDate(yearMonthKey.atDay(BigDecimal.ONE.intValue()));
         }
@@ -819,7 +822,7 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
             finishedQty = Math.max(finishedQty, 0);
             result.setTotalFinishQty(finishedQty);
             //20260830+ 余量计算
-            LhSurplusProductionDayInfo productionDayInfo = new LhSurplusProductionDayInfo(productionYearMonth, startDay, realProductionDateList, maxDiscontinueDays);
+            LhSurplusProductionDayInfo productionDayInfo = new LhSurplusProductionDayInfo(productionYearMonth, startDay, addLastMonthOverdueQty, realProductionDateList, maxDiscontinueDays);
             LhSurplusSkuInfo lhSurplusSkuInfo = new LhSurplusSkuInfo(skuInfo, allMonthPlanList, monthOverdueQtyMap, finishedQty, allLhDayAdjustList);
             LhSurplusResultVo lhSurplusResult = MonthPlanSurplusCalculator.getSurplusInfo(productionDayInfo, lhSurplusSkuInfo);
 

@@ -25,6 +25,10 @@ public class LhSurplusProductionDayInfo implements Serializable {
      */
     private Integer startDay;
     /**
+     * 是否含上个月超欠产
+     */
+    private boolean addLastMonthOverdueQty;
+    /**
      * 排产周期排产日集合(3天8个班)
      */
     private List<Date> realProductionCycleList;
@@ -41,9 +45,10 @@ public class LhSurplusProductionDayInfo implements Serializable {
      * @param realProductionCycleList 排产周期排产日集合(3天8个班)
      * @param maxDiscontinueDays      最大间断天数
      */
-    public LhSurplusProductionDayInfo(YearMonth productionYearMonth, Integer startDay, List<Date> realProductionCycleList, Integer maxDiscontinueDays) {
+    public LhSurplusProductionDayInfo(YearMonth productionYearMonth, Integer startDay, boolean addLastMonthOverdueQty, List<Date> realProductionCycleList, Integer maxDiscontinueDays) {
         this.productionYearMonth = productionYearMonth;
         this.startDay = startDay;
+        this.addLastMonthOverdueQty = addLastMonthOverdueQty;
         this.realProductionCycleList = realProductionCycleList;
         this.maxDiscontinueDays = maxDiscontinueDays;
     }

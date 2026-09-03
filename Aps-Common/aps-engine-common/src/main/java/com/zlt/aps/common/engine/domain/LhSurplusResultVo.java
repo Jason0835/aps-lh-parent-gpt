@@ -36,7 +36,10 @@ public class LhSurplusResultVo implements Serializable {
      * 完成量
      */
     private Integer finishedQty;
-
+    /**
+     * 欠产余量标识
+     */
+    private boolean overdueSurplusFlag;
 
     public LhSurplusResultVo(FactoryMonthPlanProductionFinalResult skuInfo, Integer monthOverdueQty, Integer planQty, Integer sumPlanQty, Integer finishedQty) {
         this.skuInfo = skuInfo;
@@ -44,10 +47,12 @@ public class LhSurplusResultVo implements Serializable {
         this.planQty = planQty;
         this.sumPlanQty = sumPlanQty;
         this.finishedQty = finishedQty;
+        this.overdueSurplusFlag = false;
     }
 
     /**
      * 余量信息
+     * 计划量 - 已完成量 - 上月超欠产
      *
      * @return
      */
@@ -58,7 +63,7 @@ public class LhSurplusResultVo implements Serializable {
         Integer planQty = Optional.ofNullable(this.planQty).orElse(BigDecimal.ZERO.intValue());
         Integer finishedQty = Optional.ofNullable(this.finishedQty).orElse(BigDecimal.ZERO.intValue());
         Integer lastMonthOverDueQty = Optional.ofNullable(this.monthOverdueQty).orElse(BigDecimal.ZERO.intValue());
-        Integer surplusQty = planQty - finishedQty + lastMonthOverDueQty;
+        Integer surplusQty = planQty - finishedQty - lastMonthOverDueQty;
         if (null == surplusQty) {
             return BigDecimal.ZERO.intValue();
         }
@@ -67,6 +72,7 @@ public class LhSurplusResultVo implements Serializable {
 
     /**
      * 总的有效计划量，加上上月超欠产
+     * 总的有效计划量 = 月断点计划总量 - 上月超欠产
      *
      * @return
      */
@@ -76,7 +82,7 @@ public class LhSurplusResultVo implements Serializable {
         }
         Integer planQty = Optional.ofNullable(this.planQty).orElse(BigDecimal.ZERO.intValue());
         Integer lastMonthOverDueQty = Optional.ofNullable(this.monthOverdueQty).orElse(BigDecimal.ZERO.intValue());
-        Integer sum = planQty + lastMonthOverDueQty;
+        Integer sum = planQty - lastMonthOverDueQty;
         if (null == sum) {
             return BigDecimal.ZERO.intValue();
         }
@@ -85,6 +91,7 @@ public class LhSurplusResultVo implements Serializable {
 
     /**
      * 总的计划量，加上上月超欠产
+     * 总计划量 = 月总计划量 - 上月超欠产
      *
      * @return
      */
@@ -94,10 +101,14 @@ public class LhSurplusResultVo implements Serializable {
         }
         Integer sumPlanQty = Optional.ofNullable(this.sumPlanQty).orElse(BigDecimal.ZERO.intValue());
         Integer lastMonthOverDueQty = Optional.ofNullable(this.monthOverdueQty).orElse(BigDecimal.ZERO.intValue());
-        Integer sum = sumPlanQty + lastMonthOverDueQty;
+        Integer sum = sumPlanQty - lastMonthOverDueQty;
         if (null == sum) {
             return BigDecimal.ZERO.intValue();
         }
         return sum;
+    }
+
+    public void markBeforeSurplusQty() {
+        this.overdueSurplusFlag = true;
     }
 }

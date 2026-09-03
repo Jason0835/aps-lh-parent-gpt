@@ -261,13 +261,54 @@ public final class ScheduleProcessLogFormatter {
         return hours == null ? "未提供" : hours.stripTrailingZeros().toPlainString() + "H";
     }
 
+    /**
+     * 展示库存供应窗口内的成型需求，保留原有日志格式。
+     *
+     * @param windowQtyMap 窗口班次到成型需求量的映射
+     * @return 窗口需求合计及班次明细
+     */
     public String displayGuardWindow(Map<Integer, BigDecimal> windowQtyMap) {
-        if (windowQtyMap == null || windowQtyMap.isEmpty()) {
+        return this.displayGuardWindow(windowQtyMap, null);
+    }
+
+    /**
+     * 展示库存供应窗口内的备库需求，日志只列备库窗口，不重复列当班成型消耗。
+     *
+     * @param windowQtyMap 窗口班次到成型需求量的映射
+     * @param currentFormingShiftOrder 当前任务成型班次
+     * @return 窗口需求合计及班次明细
+     */
+    public String displayGuardWindow(Map<Integer, BigDecimal> windowQtyMap, Integer currentFormingShiftOrder) {
+        return this.displayGuardWindow(windowQtyMap, currentFormingShiftOrder, null);
+    }
+
+    /**
+     * 展示当前任务最终有效备库窗口内的成型需求，日志只列备库窗口，不重复列当班成型消耗。
+     *
+     * @param windowQtyMap 窗口班次到成型需求量的映射
+     * @param currentFormingShiftOrder 当前任务成型班次
+     * @param effectiveGuardShiftCount 当前任务最终有效备库班数
+     * @return 窗口需求合计及班次明细
+     */
+    public String displayGuardWindow(Map<Integer, BigDecimal> windowQtyMap, Integer currentFormingShiftOrder,
+                                     Integer effectiveGuardShiftCount) {
+        Map<Integer, BigDecimal> displayWindowQtyMap = windowQtyMap;
+        if (windowQtyMap != null && currentFormingShiftOrder != null) {
+            long displayGuardWindowLimit = effectiveGuardShiftCount == null || effectiveGuardShiftCount <= 0
+                    ? Long.MAX_VALUE : effectiveGuardShiftCount;
+            displayWindowQtyMap = windowQtyMap.entrySet().stream()
+                    .filter(entry -> entry.getKey() != null && entry.getKey() > currentFormingShiftOrder)
+                    .sorted(Map.Entry.comparingByKey())
+                    .limit(displayGuardWindowLimit)
+                    .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue,
+                            (leftValue, rightValue) -> rightValue, LinkedHashMap::new));
+        }
+        if (displayWindowQtyMap == null || displayWindowQtyMap.isEmpty()) {
             return "库存供应计算窗口内成型需求合计=0";
         }
-        BigDecimal total = windowQtyMap.values().stream().filter(Objects::nonNull)
+        BigDecimal total = displayWindowQtyMap.values().stream().filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        String detail = windowQtyMap.entrySet().stream().sorted(Map.Entry.comparingByKey())
+        String detail = displayWindowQtyMap.entrySet().stream().sorted(Map.Entry.comparingByKey())
                 .map(entry -> "班" + entry.getKey() + "=" + this.nvl(entry.getValue()).stripTrailingZeros().toPlainString())
                 .collect(Collectors.joining(" "));
         return "库存供应计算窗口内成型需求合计=" + total.stripTrailingZeros().toPlainString() + "：" + detail;

@@ -197,6 +197,7 @@ public class MonthPlanSurplusCalculator {
         FactoryMonthPlanProductionFinalResult skuInfo = calculateSkuInfo.getSkuInfo();
         YearMonth productionYearMonth = productionDateInfo.getProductionYearMonth();
         Integer startDay = productionDateInfo.getStartDay();
+        boolean addLastMonthOverdueQty = productionDateInfo.isAddLastMonthOverdueQty();
         List<Date> realProductionCycleList = productionDateInfo.getRealProductionCycleList();
         Integer maxDiscontinueDays = productionDateInfo.getMaxDiscontinueDays();
         List<FactoryMonthPlanProductionFinalResult> allMonthPlanList = calculateSkuInfo.getAllMonthPlanList();
@@ -214,10 +215,12 @@ public class MonthPlanSurplusCalculator {
         //周期排产日内信息
         Map<YearMonth, List<Date>> realProductionCycleMap = getYearMonthProductionDateInfo(realProductionCycleList);
         Map<YearMonth, FactoryMonthPlanProductionFinalResult> realProductionCycleMonthPlanMap = getHasProductionPlan(allMonthPlanList, realProductionCycleMap, skuInfo);
-        LhSurplusResultVo surplusInfo = buildSurplusResult(skuInfo, productionYearMonth, startDay, maxDiscontinueDays, realProductionCycleMap, montPlanMap, yearMonthLhDayAdjustInfo, monthOverdueQtyMap, finishedQty);
-        if (CollectionUtils.isEmpty(realProductionCycleMonthPlanMap) && surplusInfo.getSurplusQty() > BigDecimal.ZERO.intValue()) {
+        //周期排产内是否有计划量
+        boolean realProductionCycleNoPlan = CollectionUtils.isEmpty(realProductionCycleMonthPlanMap);
+        LhSurplusResultVo beforeSurplusInfo = buildSurplusResult(skuInfo, productionYearMonth, startDay, maxDiscontinueDays, realProductionCycleNoPlan, addLastMonthOverdueQty, realProductionCycleMap, montPlanMap, yearMonthLhDayAdjustInfo, monthOverdueQtyMap, finishedQty);
+        if (realProductionCycleNoPlan && beforeSurplusInfo.getSurplusQty() > BigDecimal.ZERO.intValue()) {
             //周期排产内没有计划量且有余量
-            return surplusInfo;
+            return beforeSurplusInfo;
         }
         //周期排产内有计划量或是没有计划也没有余量：需要扩展判断计划量的日期
         List<Date> calculateDayQtyList = getAllProductionDateByDiscontinueDays(realProductionCycleList, maxDiscontinueDays);
@@ -234,10 +237,7 @@ public class MonthPlanSurplusCalculator {
         Integer firstMonthEndDay = productionYearMonth.lengthOfMonth();
         Integer planQty = getMonthPlanQty(firstMonthPlan, startDay, firstMonthDateList, yearMonthLhDayAdjustInfo, productionYearMonth, maxDiscontinueDays);
         Integer sumQty = getMonthPlanSumQty(firstMonthPlan, productionYearMonth, startDay, firstMonthEndDay, yearMonthLhDayAdjustInfo);
-        Integer monthOverdueQty = BigDecimal.ZERO.intValue();
-        if (!CollectionUtils.isEmpty(monthOverdueQtyMap) && null != monthOverdueQtyMap.get(productionYearMonth)) {
-            monthOverdueQty = monthOverdueQty + monthOverdueQtyMap.get(productionYearMonth);
-        }
+        Integer monthOverdueQty = getLastMonthOverdueQty(addLastMonthOverdueQty, productionYearMonth, monthOverdueQtyMap);
         if (!isFindNextMonth) {
             return new LhSurplusResultVo(skuInfo, monthOverdueQty, planQty, sumQty, finishedQty);
         }
@@ -247,9 +247,6 @@ public class MonthPlanSurplusCalculator {
         Integer nextMonthEndDay = productionYearMonth.lengthOfMonth();
         planQty = planQty + getMonthPlanQty(nextMonthPlan, BigDecimal.ONE.intValue(), nextMonthDateList, yearMonthLhDayAdjustInfo, nextMonth, maxDiscontinueDays);
         sumQty = sumQty + getMonthPlanSumQty(nextMonthPlan, nextMonth, BigDecimal.ONE.intValue(), nextMonthEndDay, yearMonthLhDayAdjustInfo);
-        if (!CollectionUtils.isEmpty(monthOverdueQtyMap) && null != monthOverdueQtyMap.get(nextMonth)) {
-            monthOverdueQty = monthOverdueQty + monthOverdueQtyMap.get(nextMonth);
-        }
         return new LhSurplusResultVo(skuInfo, monthOverdueQty, planQty, sumQty, finishedQty);
     }
 
@@ -443,111 +440,7 @@ public class MonthPlanSurplusCalculator {
         return surplus;
     }
 
-    /**
-     * 根据Sku日排产周期内的月计划安排情况，获取Sku对应的计划量
-     * 需要看日排产周期是否存在跨月
-     * 1、不存在跨月
-     * 1.1、看下个月是否定稿
-     * 1.1.1、如果定稿则计划量计算起始日为下一个月定稿对应需求的库存抓取日
-     * 1.1.2、如果没有定稿，则计划量计算起始日为当月计划的第一天
-     * 1.2、看日排产周期内是否有计划量
-     * 1.2.1、没有计划量，则取当前周期日之前的所有月计划量(计划量计算起始日~当前周期日)
-     * 1.2.2、有计划量，则取得最晚计划量日，从最晚日往后找，找到第一个没有计划量日前一日，统计从计划量计算起始日~找到的日之间的计划量
-     * 2、存在跨月
-     * 2.1、日排产周期内是否有计划量
-     * 2.1.1、没有计划量，则取前一个月的所有计划量(计划量计算起始日~当月月底)
-     * 2.1.2、有计划量，则看最晚一个计划量所处月
-     * 2.1.2.1、如果最晚日计划量所处月份为后一个月，则从最晚日开始，查找后一个月最晚日往后，第一个没有计划量日前一日，统计前一个月的所有计划量(计划量计算起始日~当月月底)+后一个月开始日~找到的日之间的计划量
-     * 2.1.2.2、如果最晚日计划量所处月份为前一个月，则统计前一个月的所有计划量(计划量计算起始日~当月月底)
-     *
-     * @param allProductionDate      日排产周期信息(通常为三天8个班)
-     * @param maxDiscontinueDays     排产周期内间隔天数
-     * @param allMonthPlanList       所有月计划量
-     * @param allLhDayAdjustList     所有月份的硫化日计划调整量
-     * @param skuMonthProductionInfo Sku信息
-     * @param startDay               第一个月的计划量起始日
-     * @return
-     */
-    public static Map<YearMonth, Integer> getPlanQty(List<Date> allProductionDate,
-                                                     Integer maxDiscontinueDays,
-                                                     List<FactoryMonthPlanProductionFinalResult> allMonthPlanList,
-                                                     List<LhDayPlanAdjustVo> allLhDayAdjustList,
-                                                     FactoryMonthPlanProductionFinalResult skuMonthProductionInfo,
-                                                     Integer startDay) {
-        if (CollectionUtils.isEmpty(allProductionDate) || CollectionUtils.isEmpty(allMonthPlanList)
-                || null == skuMonthProductionInfo || null == startDay) {
-            return Collections.emptyMap();
-        }
-        if (startDay < BigDecimal.ONE.intValue()) {
-            return Collections.emptyMap();
-        }
-        return getPlanQtyByMonthPlan(skuMonthProductionInfo, startDay, allProductionDate, maxDiscontinueDays, allMonthPlanList, allLhDayAdjustList);
-    }
-
-    /**
-     * 统计从startPlanDate开始，在allMonthPlanList中SKU的所有计划量
-     *
-     * @param skuInfo            需统计SKU信息
-     * @param startPlanDate      开始统计日
-     * @param allMonthPlanList   所有计划
-     * @param allLhDayAdjustList 所有月份-日计划调整量
-     * @return 年-月 -> 计划量
-     */
-    public static Map<YearMonth, Integer> statisticsSumPlanQtyBySku(FactoryMonthPlanProductionFinalResult skuInfo,
-                                                                    Date startPlanDate,
-                                                                    List<FactoryMonthPlanProductionFinalResult> allMonthPlanList,
-                                                                    List<LhDayPlanAdjustVo> allLhDayAdjustList) {
-        if (null == skuInfo || null == startPlanDate || CollectionUtils.isEmpty(allMonthPlanList)) {
-            return Collections.emptyMap();
-        }
-        List<FactoryMonthPlanProductionFinalResult> findPlanList = allMonthPlanList.stream()
-                .filter(single -> single.getMaterialStatusKey().equals(skuInfo.getMaterialStatusKey()))
-                .collect(Collectors.toList());
-        if (CollectionUtils.isEmpty(findPlanList)) {
-            return Collections.emptyMap();
-        }
-        YearMonthLhDayAdjustVo yearMonthLhDayAdjust = getYearMonthLhDayAdjustInfo(skuInfo, allLhDayAdjustList);
-        Map<YearMonth, Integer> sumMap = Maps.newHashMap();
-        YearMonth firstMonth = getProductionYearAndMonth(startPlanDate);
-        Integer startDay = getDate(startPlanDate).getDayOfMonth();
-        findPlanList.forEach(singleMonthPlan -> {
-            YearMonth productionYearMonth = YearMonth.of(singleMonthPlan.getYear(), singleMonthPlan.getMonth());
-            Integer monthEndDay = productionYearMonth.lengthOfMonth();
-            //同年-月
-            Integer sumQty;
-            if (productionYearMonth.equals(firstMonth)) {
-                sumQty = statisticsPlanQtyEndDay(startDay, monthEndDay, singleMonthPlan);
-            } else {
-                //下一个年月
-                sumQty = statisticsPlanQtyEndDay(BigDecimal.ONE.intValue(), monthEndDay, singleMonthPlan);
-            }
-            //20260817+ 增加日计划的调整量
-            sumQty = sumQty + getYearMonthLhDayAdjustQty(yearMonthLhDayAdjust, productionYearMonth);
-            sumMap.put(productionYearMonth, sumQty);
-        });
-        return sumMap;
-    }
-
-    /**
-     * 获取对应的排产计划（排产周期内有计划量的月计划）
-     *
-     * @param allMonthPlanList  所有排产计划
-     * @param allProductionList 日排产周期信息
-     * @param factoryCode       工厂
-     * @param materialCode      物料
-     * @param productStatus     计划类型
-     * @return 年-月 -> 有计划量的月计划记录
-     */
-    public static Map<YearMonth, FactoryMonthPlanProductionFinalResult> getHasProductionPlan(
-            List<FactoryMonthPlanProductionFinalResult> allMonthPlanList, List<Date> allProductionList,
-            String factoryCode, String materialCode, String productStatus) {
-        Map<YearMonth, List<Date>> yearMonthMap = getYearMonthProductionDateInfo(allProductionList);
-        FactoryMonthPlanProductionFinalResult skuInfo = new FactoryMonthPlanProductionFinalResult();
-        skuInfo.setFactoryCode(factoryCode);
-        skuInfo.setMaterialCode(materialCode);
-        skuInfo.setProductStatus(productStatus);
-        return getHasProductionPlan(allMonthPlanList, yearMonthMap, skuInfo);
-    }
+    // ==================== 以下为内部计算方法 ====================
 
     /**
      * 汇总月数据量
@@ -555,48 +448,74 @@ public class MonthPlanSurplusCalculator {
      * @param needSumQtyMap 需汇总月数量集合
      * @return 汇总值
      */
-    public static int sumQty(Map<YearMonth, Integer> needSumQtyMap) {
+    private static int sumQty(Map<YearMonth, Integer> needSumQtyMap) {
         if (CollectionUtils.isEmpty(needSumQtyMap)) {
             return BigDecimal.ZERO.intValue();
         }
         return needSumQtyMap.values().stream().mapToInt(Integer::intValue).sum();
     }
 
-    // ==================== 以下为内部计算方法 ====================
-
     /**
      * 根据信息构建某个月份的余量信息
      *
-     * @param skuInfo                  排产Sku信息
-     * @param productionYearMonth      排产月份
-     * @param startDay                 计算起始日，正常为1
-     * @param maxDiscontinueDays       最大间隔天数
-     * @param monthProductionDateMap   月份排产日信息
-     * @param monthPlanMap             月份计划
-     * @param yearMonthLhDayAdjustInfo 日硫化调整信息
-     * @param monthOverdueQtyMap       超欠产
-     * @param finishedQty              完成量
+     * @param skuInfo                   排产Sku信息
+     * @param productionYearMonth       排产月份
+     * @param startDay                  计算起始日，正常为1
+     * @param maxDiscontinueDays        最大间隔天数
+     * @param realProductionCycleNoPlan 实际排产周期内是否有计划 true 没有计划 false表示有计划
+     * @param addLastMonthOverdueQty    是否计算上月超欠产
+     * @param monthProductionDateMap    月份排产日信息
+     * @param monthPlanMap              月份计划
+     * @param yearMonthLhDayAdjustInfo  日硫化调整信息
+     * @param monthOverdueQtyMap        超欠产
+     * @param finishedQty               完成量
      * @return
      */
     private static LhSurplusResultVo buildSurplusResult(FactoryMonthPlanProductionFinalResult skuInfo,
                                                         YearMonth productionYearMonth,
                                                         Integer startDay,
                                                         Integer maxDiscontinueDays,
+                                                        boolean realProductionCycleNoPlan,
+                                                        boolean addLastMonthOverdueQty,
                                                         Map<YearMonth, List<Date>> monthProductionDateMap,
                                                         Map<YearMonth, FactoryMonthPlanProductionFinalResult> monthPlanMap,
                                                         YearMonthLhDayAdjustVo yearMonthLhDayAdjustInfo,
                                                         Map<YearMonth, Integer> monthOverdueQtyMap,
                                                         Integer finishedQty) {
-        FactoryMonthPlanProductionFinalResult monthPlan = monthPlanMap.get(productionYearMonth);
-        List<Date> monthProductionDateList = monthProductionDateMap.get(productionYearMonth);
-        Integer monthEndDay = productionYearMonth.lengthOfMonth();
-        Integer planQty = getMonthPlanQty(monthPlan, startDay, monthProductionDateList, yearMonthLhDayAdjustInfo, productionYearMonth, maxDiscontinueDays);
-        Integer sumQty = getMonthPlanSumQty(monthPlan, productionYearMonth, startDay, monthEndDay, yearMonthLhDayAdjustInfo);
-        Integer monthOverdueQty = BigDecimal.ZERO.intValue();
-        if (!CollectionUtils.isEmpty(monthOverdueQtyMap) && null != monthOverdueQtyMap.get(productionYearMonth)) {
-            monthOverdueQty = monthOverdueQtyMap.get(productionYearMonth);
+        if (!realProductionCycleNoPlan) {
+            Integer defaultValue = BigDecimal.ZERO.intValue();
+            return new LhSurplusResultVo(skuInfo, defaultValue, defaultValue, defaultValue, defaultValue);
         }
-        return new LhSurplusResultVo(skuInfo, monthOverdueQty, planQty, sumQty, finishedQty);
+        YearMonth nextMonth = productionYearMonth.plusMonths(BigDecimal.ONE.longValue());
+        Integer planQty = BigDecimal.ZERO.intValue();
+        Integer sumQty = BigDecimal.ZERO.intValue();
+        for (Map.Entry<YearMonth, List<Date>> entry : monthProductionDateMap.entrySet()) {
+            YearMonth yearMonth = entry.getKey();
+            List<Date> productionDateList = entry.getValue();
+            productionDateList.sort(null);
+            Integer endIndex = productionDateList.size() - BigDecimal.ONE.intValue();
+            Date lastDate = productionDateList.get(endIndex);
+            Integer endDay = DateUtil.dayOfMonth(lastDate);
+            //硫化日计划调整量
+            Integer dayAdjustQty = getYearMonthLhDayAdjustQty(yearMonthLhDayAdjustInfo, yearMonth);
+            FactoryMonthPlanProductionFinalResult statisticsMonthPlan = monthPlanMap.get(yearMonth);
+            Integer monthStartDay = startDay;
+            if (nextMonth.equals(yearMonth)) {
+                monthStartDay = BigDecimal.ONE.intValue();
+            }
+            if (monthStartDay > endDay) {
+                monthStartDay = BigDecimal.ONE.intValue();
+            }
+            Integer beforeAllQty = statisticsPlanQtyEndDay(monthStartDay, endDay, statisticsMonthPlan);
+            planQty = planQty + beforeAllQty + dayAdjustQty;
+            sumQty = sumQty + beforeAllQty + dayAdjustQty;
+        }
+        Integer monthOverdueQty = getLastMonthOverdueQty(addLastMonthOverdueQty, productionYearMonth, monthOverdueQtyMap);
+        LhSurplusResultVo beforeResult = new LhSurplusResultVo(skuInfo, monthOverdueQty, planQty, sumQty, finishedQty);
+        if (beforeResult.getSurplusQty() > BigDecimal.ZERO.intValue()) {
+            beforeResult.markBeforeSurplusQty();
+        }
+        return beforeResult;
     }
 
     /**
@@ -618,107 +537,25 @@ public class MonthPlanSurplusCalculator {
     }
 
     /**
-     * 根据Sku日排产周期内的月计划安排情况，获取Sku对应的计划量
-     * 需要看日排产周期是否存在跨月
-     * 1、不存在跨月
-     * 1.1、看日排产周期内是否有计划量
-     * 1.1.1、没有计划量，则取当前周期日之前的所有月计划量
-     * 1.1.2、有计划量，则取得最晚计划量日，从最晚日往后找，找到第一个没有计划量日前一日，统计从月周期起始日~找到的日之间的计划量
-     * 2、存在跨月
-     * 2.1、日排产周期内是否有计划量
-     * 2.1.1、没有计划量，则取前一个月的所有计划量
-     * 2.1.2、有计划量，则看最晚一个计划量所处月
-     * 2.1.2.1、如果最晚日计划量所处月份为后一个月，则从最晚日开始，查找后一个月最晚日往后，第一个没有计划量日前一日，统计前一个月的所有计划量+后一个月开始日~找到的日之间的计划量
-     * 2.1.2.2、如果最晚日计划量所处月份为前一个月，则统计前一个月的所有计划量
+     * 获取对应年-月的上月超欠产信息
      *
-     * @param skuMonthProductionInfo Sku信息
-     * @param startDay               前一个月份计划量计算起始日
-     * @param allProductionList      日排产周期
-     * @param maxDiscontinueDays     最大允许的间隔天数
-     * @param allMonthPlanList       所有月排产计划
-     * @param allLhDayAdjustList     所有对应年-月日计划调整量信息
+     * @param addLastMonthOverdueQty 是否需要考虑上月超欠产
+     * @param productionYearMonth    排产月份
+     * @param monthOverdueQtyMap     年-月超欠产
      * @return
      */
-    private static Map<YearMonth, Integer> getPlanQtyByMonthPlan(FactoryMonthPlanProductionFinalResult skuMonthProductionInfo,
-                                                                 Integer startDay,
-                                                                 List<Date> allProductionList,
-                                                                 Integer maxDiscontinueDays,
-                                                                 List<FactoryMonthPlanProductionFinalResult> allMonthPlanList,
-                                                                 List<LhDayPlanAdjustVo> allLhDayAdjustList) {
-        if (null == skuMonthProductionInfo || CollectionUtils.isEmpty(allProductionList) || CollectionUtils.isEmpty(allMonthPlanList)) {
-            return Collections.emptyMap();
+    private static Integer getLastMonthOverdueQty(boolean addLastMonthOverdueQty, YearMonth productionYearMonth, Map<YearMonth, Integer> monthOverdueQtyMap) {
+        if (!addLastMonthOverdueQty) {
+            return BigDecimal.ZERO.intValue();
         }
-        //20260817+ 硫化日计划调整信息
-        YearMonthLhDayAdjustVo yearMonthLhDayAdjustInfo = getYearMonthLhDayAdjustInfo(skuMonthProductionInfo, allLhDayAdjustList);
-        if (!isCrossMonthByProductionDateInfo(allProductionList)) {
-            //非跨月
-            YearMonth yearMonth = getFirstYearMonth(allProductionList);
-            FactoryMonthPlanProductionFinalResult skuYearMonth = getSkuYearMonthFinal(allMonthPlanList, skuMonthProductionInfo, yearMonth);
-            if (null == skuYearMonth) {
-                return Collections.emptyMap();
-            }
-            Map<YearMonth, Integer> result = Maps.newHashMap();
-            Integer planQty = getEarliestContinuousPlanQty(skuYearMonth, startDay, allProductionList, maxDiscontinueDays);
-            //20260817+ 增加日计划的调整量
-            planQty = planQty + getYearMonthLhDayAdjustQty(yearMonthLhDayAdjustInfo, yearMonth);
-            result.put(yearMonth, planQty);
-            return result;
+        if (null == productionYearMonth || CollectionUtils.isEmpty(monthOverdueQtyMap)) {
+            return BigDecimal.ZERO.intValue();
         }
-        //取得跨月的年、月信息
-        YearMonth firstYearMonth = getFirstYearMonth(allProductionList);
-        YearMonth lastYearMonth = getLastYearMonth(allProductionList);
-        //各月排产日分组
-        Map<YearMonth, List<Date>> yearMonthMap = getYearMonthProductionDateInfo(allProductionList);
-        if (CollectionUtils.isEmpty(yearMonthMap)) {
-            return Collections.emptyMap();
+        Integer monthOverdueQty = monthOverdueQtyMap.get(productionYearMonth);
+        if (null == monthOverdueQty) {
+            return BigDecimal.ZERO.intValue();
         }
-        Map<YearMonth, FactoryMonthPlanProductionFinalResult> yearMonthSkuProductionMap = getHasProductionPlan(allMonthPlanList, yearMonthMap, skuMonthProductionInfo);
-        if (CollectionUtils.isEmpty(yearMonthSkuProductionMap)) {
-            //日排产周期内都没有计划量——取第一个月的全部计划量
-            FactoryMonthPlanProductionFinalResult skuYearMonth = getSkuYearMonthFinal(allMonthPlanList, skuMonthProductionInfo, firstYearMonth);
-            if (null == skuYearMonth) {
-                return Collections.emptyMap();
-            }
-            Map<YearMonth, Integer> result = Maps.newHashMap();
-            Integer planQty = statisticsPlanQtyEndDay(startDay, firstYearMonth.lengthOfMonth(), skuYearMonth);
-            //20260817+ 增加日计划的调整量
-            planQty = planQty + getYearMonthLhDayAdjustQty(yearMonthLhDayAdjustInfo, firstYearMonth);
-            result.put(firstYearMonth, planQty);
-            return result;
-        }
-        /**
-         * 日排产周期内有计划量
-         * 1、有跨月计划量
-         * 2、不跨月计划量
-         */
-        Map<YearMonth, Integer> result = Maps.newHashMap();
-        if (yearMonthSkuProductionMap.containsKey(lastYearMonth)) {
-            boolean isFindNextMonth = isNextMonthPlanQty(allProductionList, lastYearMonth, yearMonthSkuProductionMap, yearMonthMap, maxDiscontinueDays);
-            //当月计划量
-            FactoryMonthPlanProductionFinalResult skuYearMonth = getSkuYearMonthFinal(allMonthPlanList, skuMonthProductionInfo, firstYearMonth);
-            if (null != skuYearMonth) {
-                Integer firstPlanQty = statisticsPlanQtyEndDay(startDay, firstYearMonth.lengthOfMonth(), skuYearMonth);
-                //20260817+ 增加日计划的调整量
-                firstPlanQty = firstPlanQty + getYearMonthLhDayAdjustQty(yearMonthLhDayAdjustInfo, firstYearMonth);
-                result.put(firstYearMonth, firstPlanQty);
-            }
-            if (!isLimit(maxDiscontinueDays) || isFindNextMonth) {
-                //跨月计划量，到新断点为止
-                FactoryMonthPlanProductionFinalResult nextYearMonth = yearMonthSkuProductionMap.get(lastYearMonth);
-                Integer nextPlanQty = getEarliestContinuousPlanQty(nextYearMonth, BigDecimal.ONE.intValue(), yearMonthMap.get(lastYearMonth), maxDiscontinueDays);
-                //20260817+ 增加日计划的调整量
-                nextPlanQty = nextPlanQty + getYearMonthLhDayAdjustQty(yearMonthLhDayAdjustInfo, lastYearMonth);
-                result.put(lastYearMonth, nextPlanQty);
-            }
-            return result;
-        }
-        //跨月没有计划量，只有当月有计划量
-        FactoryMonthPlanProductionFinalResult firstMonthInfo = yearMonthSkuProductionMap.get(firstYearMonth);
-        Integer planQty = getEarliestContinuousPlanQty(firstMonthInfo, startDay, yearMonthMap.get(firstYearMonth), maxDiscontinueDays);
-        //20260817+ 增加日计划的调整量
-        planQty = planQty + getYearMonthLhDayAdjustQty(yearMonthLhDayAdjustInfo, firstYearMonth);
-        result.put(firstYearMonth, planQty);
-        return result;
+        return monthOverdueQty;
     }
 
     /**

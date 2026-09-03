@@ -1,5 +1,7 @@
 package com.zlt.aps.lh.service;
 
+import com.zlt.aps.common.engine.domain.LhMonthStartDayResult;
+
 import java.time.YearMonth;
 import java.util.Date;
 
@@ -23,5 +25,5 @@ public interface ILhMonthStartService {
      * @param yearMonth 排产年-月份
      * @return
      */
-    Date getMonthPlanStartDate(String factory, YearMonth yearMonth);
+    LhMonthStartDayResult getMonthPlanStartDate(String factory, YearMonth yearMonth);
 }

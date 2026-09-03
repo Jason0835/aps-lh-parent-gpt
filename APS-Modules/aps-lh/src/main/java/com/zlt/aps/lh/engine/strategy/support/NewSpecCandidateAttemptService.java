@@ -227,8 +227,14 @@ public class NewSpecCandidateAttemptService {
                 || Objects.isNull(productionOccupationShift.getShiftIndex())) {
             return null;
         }
+        EarlyProductionRuntimePlan earlyProductionPlan =
+                candidate.getEarlyProductionPreview();
+        EarlyProductionDecision earlyProductionDecision =
+                Objects.isNull(earlyProductionPlan)
+                        ? null : earlyProductionPlan.getDecision();
         return structureMachineLimitAdmissionService.evaluate(
                 context, dayContext.getCurrentPhase(), candidate.getSku(),
+                earlyProductionDecision,
                 productionOccupationShift,
                 matchResult.getMachine().getMachineCode(), poolDate, roundCache);
     }

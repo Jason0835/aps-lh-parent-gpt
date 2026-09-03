@@ -11,6 +11,7 @@ import org.apache.commons.io.IOUtils;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.util.CellRangeAddress;
+import org.apache.poi.ss.util.PaneInformation;
 import org.apache.poi.xssf.usermodel.*;
 
 import javax.servlet.http.HttpServletResponse;
@@ -994,7 +995,29 @@ public class ExcelUtils {
         // 2. 在目标工作簿中创建新Sheet
         Sheet targetSheet = targetWorkbook.createSheet(sourceSheet.getSheetName());
 
-        // 3. 复制列宽（遍历实际列数，避免用行索引误设列宽）
+        // 3. 复制冻结/拆分窗格（固定列、固定行），保持与源Sheet一致的视图设置
+        // 注意：PaneInformation 位于 org.apache.poi.ss.util 包，POI 5.x 无 getLeftColumn()/getTopRow() 方法，
+        // 滚动区可视位置需通过 getVerticalSplitLeftColumn()/getHorizontalSplitTopRow() 获取
+        PaneInformation paneInfo = sourceSheet.getPaneInformation();
+        if (paneInfo != null) {
+            if (paneInfo.isFreezePane()) {
+                // 冻结窗格：前两个参数为冻结列数/行数（分割位置），后两个参数为滚动区可视首列/首行
+                targetSheet.createFreezePane(paneInfo.getVerticalSplitPosition(),
+                        paneInfo.getHorizontalSplitPosition(),
+                        paneInfo.getVerticalSplitLeftColumn(),
+                        paneInfo.getHorizontalSplitTopRow());
+            } else {
+                // 拆分窗格：按源Sheet的拆分位置（1/20磅）、滚动区可视首列/首行及激活面板重建
+                // POI 4.x 无 getActivePaneType()（5.x新增），激活面板通过 getActivePane() 取 byte 值
+                targetSheet.createSplitPane(paneInfo.getVerticalSplitPosition(),
+                        paneInfo.getHorizontalSplitPosition(),
+                        paneInfo.getVerticalSplitLeftColumn(),
+                        paneInfo.getHorizontalSplitTopRow(),
+                        paneInfo.getActivePane());
+            }
+        }
+
+        // 4. 复制列宽（遍历实际列数，避免用行索引误设列宽）
         int maxColumns = 0;
         for (int i = 0; i <= sourceSheet.getLastRowNum(); i++) {
             Row sourceRow = sourceSheet.getRow(i);
@@ -1034,7 +1057,7 @@ public class ExcelUtils {
             targetSheet.addMergedRegion(region);
         }
 
-        // 6. 复制列隐藏状态
+        // 7. 复制列隐藏状态
         for (int i = 0; i < 256; i++) {
             if (sourceSheet.isColumnHidden(i)) {
                 targetSheet.setColumnHidden(i, true);

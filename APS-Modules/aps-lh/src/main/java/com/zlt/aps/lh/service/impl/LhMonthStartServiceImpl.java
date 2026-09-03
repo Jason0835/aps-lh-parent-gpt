@@ -2,6 +2,7 @@ package com.zlt.aps.lh.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.google.common.collect.Lists;
+import com.zlt.aps.common.engine.domain.LhMonthStartDayResult;
 import com.zlt.aps.common.engine.utils.MonthPlanSurplusCalculator;
 import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
 import com.zlt.aps.lh.handler.SkuMonthPlanCalculator;
@@ -33,9 +34,9 @@ public class LhMonthStartServiceImpl implements ILhMonthStartService {
     private final FactoryMonthPlanProductionFinalResultMapper monthPlanMapper;
 
     @Override
-    public Date getMonthPlanStartDate(String factory, YearMonth yearMonth) {
+    public LhMonthStartDayResult getMonthPlanStartDate(String factory, YearMonth yearMonth) {
         if (StringUtils.isBlank(factory) || null == yearMonth) {
-            return null;
+            return LhMonthStartDayResult.EMPTY;
         }
         List<Date> findStartDateList = Lists.newArrayList();
         FactoryMonthPlanProductionFinalResult currentMonthPlan = getAnyOne(factory, yearMonth);
@@ -48,7 +49,7 @@ public class LhMonthStartServiceImpl implements ILhMonthStartService {
             findStartDateList.add(nextMonthPlan.getStockCaptureDate());
         }
         if (CollectionUtils.isEmpty(findStartDateList)) {
-            return null;
+            return LhMonthStartDayResult.EMPTY;
         }
         int endIndex = findStartDateList.size() - BigDecimal.ONE.intValue();
         //从小到大排序
@@ -56,9 +57,10 @@ public class LhMonthStartServiceImpl implements ILhMonthStartService {
         Date maxDate = findStartDateList.get(endIndex);
         YearMonth maxDateYearMonth = YearMonth.from(MonthPlanSurplusCalculator.getDate(maxDate));
         if (maxDateYearMonth.equals(yearMonth)) {
-            return maxDate;
+            return new LhMonthStartDayResult(maxDate, false);
         }
-        return SkuMonthPlanCalculator.getDate(yearMonth.atDay(BigDecimal.ONE.intValue()));
+        Date startDate = SkuMonthPlanCalculator.getDate(yearMonth.atDay(BigDecimal.ONE.intValue()));
+        return new LhMonthStartDayResult(startDate, true);
     }
 
     /**

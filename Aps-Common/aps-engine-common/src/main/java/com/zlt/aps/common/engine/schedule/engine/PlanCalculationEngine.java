@@ -227,13 +227,19 @@ public final class PlanCalculationEngine<C extends PlanCalculationContext<T, F, 
             List<T> sourceSnapshotList = groupSourceList.stream()
                     .map(sourceTask -> this.copySourceTask(policy, sourceTask, planGroupKey))
                     .collect(Collectors.toList());
-            BigDecimal currentShiftDemandQty = this.sum(groupSourceList,
+            Map<Integer, BigDecimal> guardWindowQtyMap = this.resolveGroupGuardWindowQtyMap(groupSourceList);
+            BigDecimal rawCurrentShiftDemandQty = this.sum(groupSourceList,
                     ScheduleTaskDraftModel::getCurrentShiftDemandQty);
+            BigDecimal currentShiftDemandQty = this.resolveGroupCurrentShiftDemandQty(groupSourceList,
+                    rawCurrentShiftDemandQty, guardWindowQtyMap);
             BigDecimal originalCurrentShiftDemandQty = groupSourceList.stream()
                     .map(this::resolveOriginalCurrentShiftDemandQty).reduce(BigDecimal.ZERO, BigDecimal::add);
             BigDecimal nextShiftDemandQty = this.sum(groupSourceList,
                     ScheduleTaskDraftModel::getNextShiftDemandQty);
-            BigDecimal guardDemandQty = this.resolveGroupGuardDemandQty(groupSourceList, currentShiftDemandQty);
+            BigDecimal guardDemandQty = this.resolveGroupGuardDemandQty(groupSourceList,
+                    rawCurrentShiftDemandQty, guardWindowQtyMap);
+            Integer formingLogicalShiftOrder = this.resolveGroupCurrentLogicalShiftOrder(groupSourceList,
+                    guardWindowQtyMap);
 
             aggregateTask.setPlanGroupKey(planGroupKey);
             aggregateTask.setSourceTaskBusinessKeyList(sourceSnapshotList.stream()
@@ -256,8 +262,10 @@ public final class PlanCalculationEngine<C extends PlanCalculationContext<T, F, 
             aggregateTask.setOriginalCurrentShiftDemandQty(originalCurrentShiftDemandQty);
             aggregateTask.setNextShiftDemandQty(nextShiftDemandQty);
             aggregateTask.setGuardDemandQty(guardDemandQty);
-            Map<Integer, BigDecimal> guardWindowQtyMap = this.resolveGroupGuardWindowQtyMap(groupSourceList);
             aggregateTask.setFormingGuardWindowQtyMap(guardWindowQtyMap);
+            if (formingLogicalShiftOrder != null) {
+                aggregateTask.setFormingLogicalShiftOrder(formingLogicalShiftOrder);
+            }
             aggregateTask.setFormingGuardWindowHoursMap(
                     this.resolveGroupGuardWindowHoursMap(context, guardWindowQtyMap, 6));
             aggregateTask.setDemandQty(null);
@@ -326,14 +334,8 @@ public final class PlanCalculationEngine<C extends PlanCalculationContext<T, F, 
             return;
         }
         boolean twoShiftStockCovered = Boolean.TRUE.equals(aggregateTask.getTwoShiftStockCovered());
-        Map<String, BigDecimal> sourceWeightMap = taskGroup.getSourceTaskList().stream()
-                .collect(Collectors.toMap(ScheduleTaskDraftModel::getBusinessKey,
-                        sourceTask -> Boolean.TRUE.equals(aggregateTask.getFormingShutdownCloseOutFlag())
-                                ? this.nvl(sourceTask.getFormingShutdownCloseOutDemandQty())
-                                : this.nvl(sourceTask.getCurrentShiftDemandQty()).add(this.nvl(
-                                twoShiftStockCovered ? sourceTask.getNextShiftDemandQty()
-                                        : sourceTask.getGuardDemandQty())),
-                        BigDecimal::add, LinkedHashMap::new));
+        Map<String, BigDecimal> sourceWeightMap = this.resolveSourceWeightMap(taskGroup.getSourceTaskList(),
+                aggregateTask, twoShiftStockCovered);
         taskGroup.setSourceWeightMap(sourceWeightMap);
         taskGroup.setGroupBaseDemandQty(aggregateTask.getBaseDemandQty());
         taskGroup.setGroupMinStartAdjustQty(aggregateTask.getMinStartAdjustQty());
@@ -434,33 +436,210 @@ public final class PlanCalculationEngine<C extends PlanCalculationContext<T, F, 
     }
 
     public BigDecimal resolveGroupGuardDemandQty(List<T> sourceTaskList, BigDecimal currentShiftDemandQty) {
-        boolean allNewSpec = sourceTaskList.stream().allMatch(task -> task.getCommonNewSpecInfo() != null
-                && task.getCommonNewSpecInfo().isNewSpecHit());
+        return this.resolveGroupGuardDemandQty(sourceTaskList, currentShiftDemandQty,
+                this.resolveGroupGuardWindowQtyMap(sourceTaskList));
+    }
+
+    private BigDecimal resolveGroupGuardDemandQty(List<T> sourceTaskList, BigDecimal currentShiftDemandQty,
+                                                  Map<Integer, BigDecimal> guardWindowQtyMap) {
+        boolean allNewSpec = this.isAllNewSpecGroup(sourceTaskList);
         if (!allNewSpec) {
             return sourceTaskList.stream().map(ScheduleTaskDraftModel::getGuardDemandQty)
                     .map(this::nvl).reduce(BigDecimal.ZERO, BigDecimal::add);
         }
+        Integer currentLogicalShiftOrder = this.resolveGroupCurrentLogicalShiftOrder(sourceTaskList,
+                guardWindowQtyMap);
+        if (currentLogicalShiftOrder != null) {
+            return guardWindowQtyMap.entrySet().stream()
+                    .filter(entry -> entry.getKey() != null && entry.getKey() > currentLogicalShiftOrder)
+                    .map(Map.Entry::getValue).map(this::nvl)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+        }
         BigDecimal anchorQty = sourceTaskList.stream()
-                .min(Comparator.comparing(task -> Optional.ofNullable(
-                        task.getCommonNewSpecInfo().getNormalTargetShift()).orElse(Integer.MAX_VALUE)))
+                .min(this.newSpecAnchorComparator())
                 .map(ScheduleTaskDraftModel::getGuardDemandQty).map(this::nvl).orElse(BigDecimal.ZERO);
         return anchorQty.max(this.nvl(currentShiftDemandQty));
     }
 
     public Map<Integer, BigDecimal> resolveGroupGuardWindowQtyMap(List<T> sourceTaskList) {
-        boolean allNewSpec = sourceTaskList.stream().allMatch(task -> task.getCommonNewSpecInfo() != null
-                && task.getCommonNewSpecInfo().isNewSpecHit());
+        boolean allNewSpec = this.isAllNewSpecGroup(sourceTaskList);
         if (allNewSpec) {
-            return sourceTaskList.stream()
-                    .min(Comparator.comparing(task -> Optional.ofNullable(
-                            task.getCommonNewSpecInfo().getNormalTargetShift()).orElse(Integer.MAX_VALUE)))
-                    .map(ScheduleTaskDraftModel::getFormingGuardWindowQtyMap).orElse(Collections.emptyMap());
+            Map<Integer, BigDecimal> mergedWindowQtyMap = new LinkedHashMap<>();
+            this.resolveNewSpecWindowAnchorList(sourceTaskList).forEach(anchorTask -> {
+                Map<Integer, BigDecimal> sourceWindowQtyMap = anchorTask.getFormingGuardWindowQtyMap();
+                if (sourceWindowQtyMap != null) {
+                    sourceWindowQtyMap.forEach((logicalShiftOrder, quantity) ->
+                            mergedWindowQtyMap.merge(logicalShiftOrder, this.nvl(quantity), BigDecimal::add));
+                }
+            });
+            return mergedWindowQtyMap.entrySet().stream()
+                    .filter(entry -> entry.getKey() != null)
+                    .sorted(Map.Entry.comparingByKey())
+                    .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue,
+                            BigDecimal::add, LinkedHashMap::new));
         }
         Map<Integer, BigDecimal> resultMap = new LinkedHashMap<>();
         sourceTaskList.stream().map(ScheduleTaskDraftModel::getFormingGuardWindowQtyMap)
                 .filter(Objects::nonNull).forEach(window -> window.forEach(
                         (shift, quantity) -> resultMap.merge(shift, this.nvl(quantity), BigDecimal::add)));
         return resultMap;
+    }
+
+    /**
+     * 解析计划组当班成型需求；新规格组按完整窗口最早逻辑班次取值，避免提前任务重复相加。
+     *
+     * @param sourceTaskList 来源任务
+     * @param rawCurrentShiftDemandQty 原始来源任务当班需求合计
+     * @param guardWindowQtyMap 已合并的成型需求窗口
+     * @return 计划组当班成型需求
+     */
+    private BigDecimal resolveGroupCurrentShiftDemandQty(List<T> sourceTaskList,
+                                                         BigDecimal rawCurrentShiftDemandQty,
+                                                         Map<Integer, BigDecimal> guardWindowQtyMap) {
+        if (!this.isAllNewSpecGroup(sourceTaskList) || guardWindowQtyMap == null
+                || guardWindowQtyMap.isEmpty()) {
+            return rawCurrentShiftDemandQty;
+        }
+        Integer currentLogicalShiftOrder = this.resolveGroupCurrentLogicalShiftOrder(sourceTaskList,
+                guardWindowQtyMap);
+        return currentLogicalShiftOrder == null || !guardWindowQtyMap.containsKey(currentLogicalShiftOrder)
+                ? rawCurrentShiftDemandQty : this.nvl(guardWindowQtyMap.get(currentLogicalShiftOrder));
+    }
+
+    /**
+     * 解析计划组当前成型逻辑班次。
+     *
+     * @param sourceTaskList 来源任务
+     * @param guardWindowQtyMap 已合并的成型需求窗口
+     * @return 当前成型逻辑班次；普通规格或空窗口返回空值
+     */
+    private Integer resolveGroupCurrentLogicalShiftOrder(List<T> sourceTaskList,
+                                                          Map<Integer, BigDecimal> guardWindowQtyMap) {
+        if (!this.isAllNewSpecGroup(sourceTaskList)) {
+            return null;
+        }
+        if (guardWindowQtyMap == null || guardWindowQtyMap.isEmpty()) {
+            return null;
+        }
+        Integer anchorLogicalShiftOrder = this.resolveNewSpecWindowAnchorList(sourceTaskList).stream()
+                .map(ScheduleTaskDraftModel::getFormingLogicalShiftOrder)
+                .filter(Objects::nonNull).min(Integer::compareTo).orElse(null);
+        return anchorLogicalShiftOrder == null
+                ? this.resolveEarliestLogicalShiftOrder(guardWindowQtyMap) : anchorLogicalShiftOrder;
+    }
+
+    /**
+     * 判断来源任务是否全部命中新规格提前排产。
+     *
+     * @param sourceTaskList 来源任务
+     * @return true 表示全部为新规格任务
+     */
+    private boolean isAllNewSpecGroup(List<T> sourceTaskList) {
+        return sourceTaskList != null && !sourceTaskList.isEmpty()
+                && sourceTaskList.stream().allMatch(task -> task != null
+                && task.getCommonNewSpecInfo() != null
+                && task.getCommonNewSpecInfo().isNewSpecHit());
+    }
+
+    /**
+     * 按成型来源键分组并为每个来源选择唯一窗口锚点。
+     *
+     * @param sourceTaskList 来源任务
+     * @return 每个成型来源的窗口锚点任务
+     */
+    private List<T> resolveNewSpecWindowAnchorList(List<T> sourceTaskList) {
+        Map<String, List<T>> sourceTaskMap = sourceTaskList.stream()
+                .filter(Objects::nonNull)
+                .collect(Collectors.groupingBy(this::resolveFormingSourceKey,
+                        LinkedHashMap::new, Collectors.toList()));
+        return sourceTaskMap.values().stream()
+                .map(sourceTasks -> sourceTasks.stream().min(this.newSpecAnchorComparator()).orElse(null))
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 构造新规格窗口锚点排序器。
+     *
+     * @return 按目标班次、来源班次和业务键排序的比较器
+     */
+    private Comparator<T> newSpecAnchorComparator() {
+        return Comparator.comparing((T task) -> Optional.ofNullable(
+                        task.getCommonNewSpecInfo().getNormalTargetShift()).orElse(Integer.MAX_VALUE))
+                .thenComparing(task -> Optional.ofNullable(task.getSourceShiftOrder())
+                        .orElse(Integer.MAX_VALUE))
+                .thenComparing(task -> this.defaultString(task.getBusinessKey()));
+    }
+
+    /**
+     * 解析运行态成型来源唯一键，并为旧测试或旧调用保留稳定降级键。
+     *
+     * @param task 来源任务
+     * @return 成型来源唯一键
+     */
+    private String resolveFormingSourceKey(T task) {
+        if (this.isNotBlank(task.getFormingSourceKey())) {
+            return task.getFormingSourceKey();
+        }
+        if (this.isNotBlank(task.getSourceOrderNos())) {
+            return task.getSourceOrderNos();
+        }
+        return this.defaultString(task.getBusinessKey());
+    }
+
+    /**
+     * 解析窗口中的最早逻辑班次。
+     *
+     * @param guardWindowQtyMap 成型需求窗口
+     * @return 最早逻辑班次；空窗口返回空值
+     */
+    private Integer resolveEarliestLogicalShiftOrder(Map<Integer, BigDecimal> guardWindowQtyMap) {
+        return guardWindowQtyMap == null ? null : guardWindowQtyMap.keySet().stream()
+                .filter(Objects::nonNull).min(Integer::compareTo).orElse(null);
+    }
+
+    /**
+     * 生成来源任务需求权重；新规格组按来源键和逻辑班次归属完整窗口。
+     *
+     * @param sourceTaskList 来源任务
+     * @param aggregateTask 汇总任务
+     * @param twoShiftStockCovered 是否命中两班库存覆盖
+     * @return 来源业务键到需求权重的映射
+     */
+    private Map<String, BigDecimal> resolveSourceWeightMap(List<T> sourceTaskList, T aggregateTask,
+                                                            boolean twoShiftStockCovered) {
+        if (!this.isAllNewSpecGroup(sourceTaskList)
+                || aggregateTask.getFormingGuardWindowQtyMap() == null
+                || aggregateTask.getFormingGuardWindowQtyMap().isEmpty()
+                || twoShiftStockCovered) {
+            return sourceTaskList.stream().collect(Collectors.toMap(ScheduleTaskDraftModel::getBusinessKey,
+                    sourceTask -> Boolean.TRUE.equals(aggregateTask.getFormingShutdownCloseOutFlag())
+                            ? this.nvl(sourceTask.getFormingShutdownCloseOutDemandQty())
+                            : this.nvl(sourceTask.getCurrentShiftDemandQty()).add(this.nvl(
+                            twoShiftStockCovered ? sourceTask.getNextShiftDemandQty()
+                                    : sourceTask.getGuardDemandQty())),
+                    BigDecimal::add, LinkedHashMap::new));
+        }
+        Map<String, BigDecimal> sourceWeightMap = sourceTaskList.stream()
+                .collect(Collectors.toMap(ScheduleTaskDraftModel::getBusinessKey,
+                        sourceTask -> BigDecimal.ZERO, BigDecimal::add, LinkedHashMap::new));
+        Map<String, List<T>> sourceTaskMap = sourceTaskList.stream()
+                .collect(Collectors.groupingBy(this::resolveFormingSourceKey,
+                        LinkedHashMap::new, Collectors.toList()));
+        sourceTaskMap.values().forEach(sourceTasks -> {
+            T anchorTask = sourceTasks.stream().min(this.newSpecAnchorComparator()).orElse(null);
+            if (anchorTask == null || anchorTask.getFormingGuardWindowQtyMap() == null) {
+                return;
+            }
+            anchorTask.getFormingGuardWindowQtyMap().forEach((logicalShiftOrder, quantity) -> {
+                T targetTask = sourceTasks.stream()
+                        .filter(sourceTask -> Objects.equals(sourceTask.getFormingLogicalShiftOrder(),
+                                logicalShiftOrder))
+                        .findFirst().orElse(anchorTask);
+                sourceWeightMap.merge(targetTask.getBusinessKey(), this.nvl(quantity), BigDecimal::add);
+            });
+        });
+        return sourceWeightMap;
     }
 
     public Map<Integer, BigDecimal> resolveGroupGuardWindowHoursMap(

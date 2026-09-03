@@ -21,6 +21,8 @@ public class ScheduleTaskDraftModel implements ScheduleSortableTask, ScheduleQua
     protected String orderNo;
     /** 来源成型工单号集合，仅用于解释追踪，不写入产品排程结果工单号 */
     protected String sourceOrderNos;
+    /** 成型来源唯一键；同一成型结果行生成的多个班次任务共用该键，仅用于运行态聚合。 */
+    protected String formingSourceKey;
     /** 成型物料编号 */
     protected String materialCode;
     /** 成型物料描述 */

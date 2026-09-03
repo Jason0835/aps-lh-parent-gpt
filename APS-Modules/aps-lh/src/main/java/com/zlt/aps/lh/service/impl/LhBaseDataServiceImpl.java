@@ -4,26 +4,14 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.zlt.aps.common.engine.domain.LhDayPlanAdjustVo;
+import com.zlt.aps.common.engine.domain.LhMonthStartDayResult;
 import com.zlt.aps.cx.entity.CxStock;
 import com.zlt.aps.cx.entity.config.CxEmbryoLhTime;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
-import com.zlt.aps.lh.api.domain.entity.LhDayFinishQty;
-import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
-import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
-import com.zlt.aps.lh.api.domain.entity.LhPrecisionPlan;
-import com.zlt.aps.lh.api.domain.entity.LhRepairCapsule;
-import com.zlt.aps.lh.api.domain.entity.LhScheFinishQty;
-import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
-import com.zlt.aps.lh.api.domain.entity.LhSpecialMaterialBom;
-import com.zlt.aps.lh.api.domain.entity.LhSpecifyMachine;
-import com.zlt.aps.lh.api.enums.ConstructionStageEnum;
-import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
-import com.zlt.aps.lh.api.enums.LhSpecialMaterialCategoryEnum;
-import com.zlt.aps.lh.api.enums.MachineStopTypeEnum;
-import com.zlt.aps.lh.api.enums.MouldChangeTypeEnum;
-import com.zlt.aps.lh.api.enums.ScheduleStepEnum;
+import com.zlt.aps.lh.api.domain.entity.*;
+import com.zlt.aps.lh.api.enums.*;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.component.SkuDecrementChecker;
 import com.zlt.aps.lh.context.LhScheduleContext;
@@ -32,45 +20,13 @@ import com.zlt.aps.lh.exception.ScheduleErrorCode;
 import com.zlt.aps.lh.exception.ScheduleException;
 import com.zlt.aps.lh.handler.ScheduleAdjustHandler;
 import com.zlt.aps.lh.handler.SkuMonthPlanCalculator;
-import com.zlt.aps.lh.mapper.CxEmbryoLhTimeMapper;
-import com.zlt.aps.lh.mapper.CxStockMapper;
-import com.zlt.aps.lh.mapper.FactoryMonthPlanProductionFinalResultMapper;
-import com.zlt.aps.lh.mapper.LhDayFinishQtyMapper;
-import com.zlt.aps.lh.mapper.LhMachineInfoMapper;
-import com.zlt.aps.lh.mapper.LhMachineOnlineInfoMapper;
-import com.zlt.aps.lh.mapper.LhMouldChangePlanEntityMapper;
-import com.zlt.aps.lh.mapper.LhMpStructureAllocationMapper;
-import com.zlt.aps.lh.mapper.LhPrecisionPlanMapper;
-import com.zlt.aps.lh.mapper.LhRepairCapsuleMapper;
-import com.zlt.aps.lh.mapper.LhScheFinishQtyMapper;
-import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
-import com.zlt.aps.lh.mapper.LhSpecialMaterialBomEntityMapper;
-import com.zlt.aps.lh.mapper.LhSpecifyMachineMapper;
-import com.zlt.aps.lh.mapper.MdmCapsuleChuckMapper;
-import com.zlt.aps.lh.mapper.MdmDevicePlanShutMapper;
-import com.zlt.aps.lh.mapper.MdmMaterialInfoMapper;
-import com.zlt.aps.lh.mapper.MdmModelInfoMapper;
-import com.zlt.aps.lh.mapper.MdmMonthSurplusMapper;
-import com.zlt.aps.lh.mapper.MdmSkuConstructionRefMapper;
-import com.zlt.aps.lh.mapper.MdmSkuLhCapacityMapper;
-import com.zlt.aps.lh.mapper.MdmSkuMouldRelMapper;
-import com.zlt.aps.lh.mapper.MdmSkuScheduleCategoryMapper;
-import com.zlt.aps.lh.mapper.MdmWorkCalendarMapper;
-import com.zlt.aps.lh.mapper.MpFactoryProductionVersionMapper;
-import com.zlt.aps.lh.mapper.MpMonthPlanStatisticsMapper;
+import com.zlt.aps.lh.mapper.*;
 import com.zlt.aps.lh.service.ILhBaseDataService;
 import com.zlt.aps.lh.service.ILhDailyMouldCalcService;
 import com.zlt.aps.lh.service.ILhDayPlanAdjustRequireService;
 import com.zlt.aps.lh.service.ILhMonthStartService;
-import com.zlt.aps.lh.util.LhMouldCodeUtil;
-import com.zlt.aps.lh.util.LhScheduleTimeUtil;
-import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
-import com.zlt.aps.lh.util.MachineStatusUtil;
-import com.zlt.aps.lh.util.MonthPlanDayQtyUtil;
-import com.zlt.aps.lh.util.MonthPlanStatisticsDayUtil;
-import com.zlt.aps.lh.util.PriorityTraceLogHelper;
+import com.zlt.aps.lh.util.*;
 import com.zlt.aps.maindata.mapper.MpMouldDeliveryPlanEntityMapper;
-import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmDevicePlanShut;
 import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmModelInfo;
@@ -79,13 +35,10 @@ import com.zlt.aps.mdm.api.domain.entity.MdmSkuLhCapacity;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuMouldRel;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuScheduleCategory;
 import com.zlt.aps.mdm.api.domain.entity.MdmWorkCalendar;
-import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
+import com.zlt.aps.mdm.api.domain.entity.*;
 import com.zlt.aps.mp.api.domain.entity.MdmCapsuleChuck;
 import com.zlt.aps.mp.api.domain.entity.MdmMonthSurplus;
-import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
-import com.zlt.aps.mp.api.domain.entity.MpMonthPlanStatistics;
-import com.zlt.aps.mp.api.domain.entity.MpMouldDeliveryPlan;
-import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
+import com.zlt.aps.mp.api.domain.entity.*;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
@@ -97,21 +50,7 @@ import java.time.DateTimeException;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.ZoneId;
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
@@ -1530,10 +1469,14 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         //20260707+ 补充计划量起始计算日
         List<Date> allProductionDate = Lists.newArrayList(context.getAllProductionDateInfo());
         YearMonth productionYearMonth = SkuMonthPlanCalculator.getFirstYearMonth(allProductionDate);
-        Date date = lhMonthStartService.getMonthPlanStartDate(factoryCode, productionYearMonth);
+        LhMonthStartDayResult lhMonthStartDayResult = lhMonthStartService.getMonthPlanStartDate(factoryCode, productionYearMonth);
+        Date date = null;
+        if (null != lhMonthStartDayResult) {
+            date = lhMonthStartDayResult.getPlanStartDate();
+        }
         if (date != null && (context.getScheduleDate().after(date) || context.getScheduleDate().equals(date))) {
             //如果排产计划在前，则置空
-            context.setPlanStartDate(date);
+            context.setLhMonthStartDayInfo(lhMonthStartDayResult);
         }
         List<FactoryMonthPlanProductionFinalResult> loadedPlanList = new ArrayList<>(256);
         if (CollectionUtils.isEmpty(requiredMonthMap)) {
@@ -2247,7 +2190,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                 ? new ArrayList<MdmDevicePlanShut>(0)
                 : new ArrayList<MdmDevicePlanShut>(futureCleaningPlanList));
         List<MdmDevicePlanShut> devicePlanShutList = mergeDevicePlanShutList(
-                 repairPlanList, futureCleaningPlanList);
+                repairPlanList, futureCleaningPlanList);
         context.setDevicePlanShutList(devicePlanShutList);
         log.debug("设备停机计划加载完成（维修/清洗按计划日期保留重排）, 数量: {}", context.getDevicePlanShutList().size());
     }
@@ -2324,7 +2267,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     private void loadSkuMouldRel(LhScheduleContext context, String factoryCode) {
         Set<String> materialCodeSet = collectMonthPlanMaterialCodes(context);
         if (CollectionUtils.isEmpty(materialCodeSet)) {
-            context.setSkuMouldRelMap(new HashMap<String, List<MdmSkuMouldRel>>(0));
+            context.setSkuMouldRelMap(new HashMap<>(0));
             log.debug("SKU与模具关系加载跳过, 本次月计划SKU为空");
             return;
         }

@@ -1,9 +1,10 @@
 package com.zlt.aps.lh.context;
 
-import cn.hutool.core.date.DateUtil;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.zlt.aps.common.engine.domain.LhDayPlanAdjustVo;
+import com.zlt.aps.common.engine.domain.LhMonthStartDayResult;
+import com.zlt.aps.common.engine.utils.MonthPlanSurplusCalculator;
 import com.zlt.aps.lh.api.domain.dto.*;
 import com.zlt.aps.lh.api.domain.entity.*;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
@@ -58,8 +59,9 @@ public class LhScheduleContext {
     /**
      * 计划量计算起始日：默认为月份第一天
      * 当下个月定稿后，则为定稿需求的库存取值日
+     * 以及是否需要含上个月超欠产标记
      */
-    private Date planStartDate;
+    private LhMonthStartDayResult lhMonthStartDayInfo;
     /**
      * 分厂编号
      */
@@ -1071,119 +1073,41 @@ public class LhScheduleContext {
      * @return
      */
     public boolean isNextMonthFinal() {
+        Date planStartDate = null;
+        if (null != lhMonthStartDayInfo) {
+            planStartDate = lhMonthStartDayInfo.getPlanStartDate();
+        }
         return null == planStartDate ? false : true;
     }
 
     /**
-     * 20260701+ 获取前一个月的年份-月份
+     * 获取起始天
      *
      * @return
      */
-    public YearMonth getFirstYearMonth() {
-        List<Date> allProductionDateList = Lists.newArrayList(getAllProductionDateInfo());
-        return SkuMonthPlanCalculator.getFirstYearMonth(allProductionDateList);
-    }
-
-    /**
-     * 获取起始天数
-     *
-     * @return
-     */
-    public Integer getStartDay() {
+    public Date getPlanStartDate() {
+        YearMonth productionYearMonth = MonthPlanSurplusCalculator.getProductionYearAndMonth(scheduleDate);
+        Date monthStartDate = SkuMonthPlanCalculator.getDate(productionYearMonth.atDay(BigDecimal.ONE.intValue()));
+        if (null == lhMonthStartDayInfo) {
+            return monthStartDate;
+        }
+        Date planStartDate = lhMonthStartDayInfo.getPlanStartDate();
         if (null == planStartDate) {
-            return BigDecimal.ONE.intValue();
+            return monthStartDate;
         }
-        return DateUtil.dayOfMonth(planStartDate);
+        return planStartDate;
     }
 
     /**
-     * 20260701+ 获取后一个月的年份-月份
+     * 获取硫化月起始日信息
      *
      * @return
      */
-    public YearMonth getLastYearMonth() {
-        List<Date> allProductionDateList = Lists.newArrayList(getAllProductionDateInfo());
-        return SkuMonthPlanCalculator.getLastYearMonth(allProductionDateList);
-    }
-
-    /**
-     * 20260701+ 获取对应年、月的月计划排产计划
-     *
-     * @param skuMonthProductionInfo 需要查找的Sku信息
-     * @param yearMonth              年、月
-     * @return
-     */
-    public FactoryMonthPlanProductionFinalResult getSkuYearMonthFinal(FactoryMonthPlanProductionFinalResult skuMonthProductionInfo, YearMonth yearMonth) {
-        if (null == skuMonthProductionInfo || null == yearMonth || CollectionUtils.isEmpty(loadedMonthPlanList)) {
-            return null;
+    public LhMonthStartDayResult getMonthStartInfo() {
+        if (null == lhMonthStartDayInfo) {
+            return LhMonthStartDayResult.EMPTY;
         }
-        return SkuMonthPlanCalculator.getSkuYearMonthFinal(loadedMonthPlanList, skuMonthProductionInfo, yearMonth);
-    }
-
-    /**
-     * 20260701+ 根据Sku日排产周期内的月计划安排情况，获取Sku对应的计划量
-     * 需要看日排产周期是否存在跨月
-     * 1、不存在跨月
-     * 1.1、看日排产周期内是否有计划量
-     * 1.1.1、没有计划量，则取当前周期日之前的所有月计划量
-     * 1.1.2、有计划量，则取得最晚计划量日，从最晚日往后找，找到第一个没有计划量日前一日，统计从月周期起始日~找到的日之间的计划量
-     * 2、存在跨月
-     * 2.1、日排产周期内是否有计划量
-     * 2.1.1、没有计划量，则取前一个月的所有计划量
-     * 2.1.2、有计划量，则看最晚一个计划量所处月
-     * 2.1.2.1、如果最晚日计划量所处月份为后一个月，则从最晚日开始，查找后一个月最晚日往后，第一个没有计划量日前一日，统计前一个月的所有计划量+后一个月开始日~找到的日之间的计划量
-     * 2.1.2.2、如果最晚日计划量所处月份为前一个月，则统计前一个月的所有计划量
-     *
-     * @param skuProductionInfo Sku信息
-     * @return
-     */
-    public Integer getPlanQty(FactoryMonthPlanProductionFinalResult skuProductionInfo) {
-        Map<YearMonth, Integer> yearMonthPlanQty = getMonthPlanQty(skuProductionInfo);
-        if (CollectionUtils.isEmpty(yearMonthPlanQty)) {
-            return BigDecimal.ZERO.intValue();
-        }
-        return yearMonthPlanQty.values().stream().mapToInt(Integer::intValue).sum();
-    }
-
-    /**
-     * 获取月计划排产计划量
-     *
-     * @param skuProductionInfo
-     * @return
-     */
-    public Map<YearMonth, Integer> getMonthPlanQty(FactoryMonthPlanProductionFinalResult skuProductionInfo) {
-        List<Date> allProductionDateList = Lists.newArrayList(getAllProductionDateInfo());
-        Integer startDay;
-        if (null == planStartDate) {
-            startDay = BigDecimal.ONE.intValue();
-        } else {
-            startDay = DateUtil.dayOfMonth(planStartDate);
-        }
-        //20260829+ 排产周期中间间断间隔限制
-        Integer maxDiscontinueDays = null;
-        LhScheduleConfig scheduleConfig = getScheduleConfig();
-        if (null != scheduleConfig) {
-            maxDiscontinueDays = scheduleConfig.getEarlyProductionDaysThreshold();
-        }
-        //20260817+ 硫化日计划调整量
-        return SkuMonthPlanCalculator.getPlanQty(allProductionDateList, maxDiscontinueDays, loadedMonthPlanList, allLhDayPlanAdjustList, skuProductionInfo, startDay);
-    }
-
-    /**
-     * 获取从planStartDate的月计划总计划量
-     *
-     * @param skuInfo
-     * @return
-     */
-    public Map<YearMonth, Integer> getSumPlanQty(FactoryMonthPlanProductionFinalResult skuInfo) {
-        YearMonth firstMonth = getFirstYearMonth();
-        Date realPlanStartDate;
-        if (null == planStartDate) {
-            realPlanStartDate = SkuMonthPlanCalculator.getDate(firstMonth.atDay(BigDecimal.ONE.intValue()));
-        } else {
-            realPlanStartDate = planStartDate;
-        }
-        return SkuMonthPlanCalculator.statisticsSumPlanQtyBySku(skuInfo, realPlanStartDate, loadedMonthPlanList, allLhDayPlanAdjustList);
+        return lhMonthStartDayInfo;
     }
 
     /**
@@ -1202,33 +1126,6 @@ public class LhScheduleContext {
         if (null != windowEndDate) {
             allProductionDateSet.add(windowEndDate);
         }
-//        // 额外计划日期严格从窗口结束日推进到上下文固化的提前生产截止日。
-//        if (Objects.isNull(windowEndDate)) {
-//            return allProductionDateSet;
-//        }
-//        Date fixedMaxDate = earlyProductionMaxDate;
-//        if (Objects.isNull(fixedMaxDate)) {
-//            LhScheduleConfig scheduleConfig = getScheduleConfig();
-//            if (Objects.isNull(scheduleConfig)) {
-//                return allProductionDateSet;
-//            }
-//            int value = scheduleConfig.getEarlyProductionDaysThreshold();
-//            if (value <= BigDecimal.ZERO.intValue()) {
-//                return allProductionDateSet;
-//            }
-//            fixedMaxDate = SkuMonthPlanCalculator.getDate(
-//                    SkuMonthPlanCalculator.getDate(windowEndDate).plusDays(value));
-//        }
-        LocalDate extraStartDate = SkuMonthPlanCalculator.getDate(windowEndDate).plusDays(1);
-//        LocalDate extraEndDate = SkuMonthPlanCalculator.getDate(fixedMaxDate);
-//        if (extraEndDate.isBefore(extraStartDate)) {
-//            return allProductionDateSet;
-//        }
-//        for (LocalDate productionDate = extraStartDate;
-//             !productionDate.isAfter(extraEndDate);
-//             productionDate = productionDate.plusDays(1)) {
-//            allProductionDateSet.add(SkuMonthPlanCalculator.getDate(productionDate));
-//        }
         return allProductionDateSet;
     }
 
