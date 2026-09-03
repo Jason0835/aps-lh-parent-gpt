@@ -126,6 +126,8 @@ public class NewSpecMachineDrivenSchedulingEngine {
                 context, dayContext, candidatePoolMap);
         Set<String> fixedPhysicalMachineCodeSet = this.resolveFixedPhysicalMachineCodes(
                 context, dayContext, candidatePoolMap);
+        NewSpecScheduleProposal deferredCrossDayProposal = null;
+        LhShiftConfigVO deferredCrossDayShift = null;
         for (LhShiftConfigVO shift : dayContext.getDayShifts()) {
             if (Objects.isNull(shift) || Objects.isNull(shift.getShiftEndDateTime())) {
                 continue;
@@ -210,13 +212,60 @@ public class NewSpecMachineDrivenSchedulingEngine {
             NewSpecScheduleProposal winner = machineSkuCompetitionService
                     .selectRoundWinner(context, machineBestProposalList, roundCache);
             if (Objects.nonNull(winner)) {
+                /*
+                 * 跨日准备是空闲资源优化路径：同一业务日仍有普通提案时，普通提案优先提交；
+                 * 只有全日无普通提案时才返回最早暂存的跨日准备提案。
+                 */
+                if (winner.getAvailabilityPlan().isSourceDayCrossDayPreparation()) {
+                    if (Objects.isNull(deferredCrossDayProposal)) {
+                        deferredCrossDayProposal = winner;
+                        deferredCrossDayShift = shift;
+                        this.logSourceDayCrossDayProposalAction(
+                                "暂存并继续查找当前业务日普通提案",
+                                context, dayContext, shift, winner);
+                    }
+                    continue;
+                }
                 this.traceWinningProposal(
                         context, dayContext, shift, winner,
                         actualAvailableTimeMode, COMPETITION_SCOPE_DYNAMIC);
                 return winner;
             }
         }
+        if (Objects.nonNull(deferredCrossDayProposal)) {
+            this.logSourceDayCrossDayProposalAction(
+                    "启用目标日跨日准备兜底", context, dayContext,
+                    deferredCrossDayShift, deferredCrossDayProposal);
+            this.traceWinningProposal(
+                    context, dayContext, deferredCrossDayShift, deferredCrossDayProposal,
+                    actualAvailableTimeMode, COMPETITION_SCOPE_DYNAMIC);
+            return deferredCrossDayProposal;
+        }
         return null;
+    }
+
+    /**
+     * 输出目标日跨日准备提案的关键对账日志。
+     *
+     * @param action 当前决策动作
+     * @param context 排程上下文
+     * @param dayContext 当前业务日
+     * @param shift 跨日准备占用的资源班次
+     * @param proposal 跨日准备提案
+     */
+    private void logSourceDayCrossDayProposalAction(String action,
+                                                    LhScheduleContext context,
+                                                    DayScheduleContext dayContext,
+                                                    LhShiftConfigVO shift,
+                                                    NewSpecScheduleProposal proposal) {
+        log.info("目标日跨日准备提案{}, batchNo: {}, businessDate: {}, resourceShift: class{}, "
+                        + "formalShift: class{}, machineCode: {}, materialCode: {}, productStatus: {}",
+                action, context.getBatchNo(), dayContext.getScheduleDate(),
+                shift.getShiftIndex(),
+                proposal.getAvailabilityPlan().getFormalTargetShift().getShiftIndex(),
+                proposal.getMatchResult().getMachine().getMachineCode(),
+                proposal.getCandidate().getSku().getMaterialCode(),
+                proposal.getCandidate().getSku().getProductStatus());
     }
 
     /**

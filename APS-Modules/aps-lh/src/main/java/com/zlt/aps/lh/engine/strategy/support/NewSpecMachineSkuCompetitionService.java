@@ -258,8 +258,8 @@ public class NewSpecMachineSkuCompetitionService {
      * 从每台机台的最佳提案中选出当前轮唯一胜出组合。
      *
      * <p>先按声明范围合并重复物理机台，再在存在合法单控试制/量试提案时收窄到单控作用域；
-     * 标准作用域内先比较历史来源班次，再补统一Map目标物理机台缺口，最后按匹配等级、
-     * 收尾时间、机台编码决胜。</p>
+     * 标准作用域内先比较历史来源班次，再让普通提案优先于目标日跨日准备提案，随后补统一Map
+     * 目标物理机台缺口，最后按匹配等级、收尾时间、机台编码决胜。</p>
      *
      * @param context 排程上下文
      * @param machineBestProposalList 每台机台当前最佳提案
@@ -417,6 +417,11 @@ public class NewSpecMachineSkuCompetitionService {
         if (historySourceCompareResult != 0) {
             return historySourceCompareResult;
         }
+        int crossDayCompareResult = this.compareSourceDayCrossDayPreparation(
+                left, right, prioritizeTargetMachineGap);
+        if (crossDayCompareResult != 0) {
+            return crossDayCompareResult;
+        }
         if (prioritizeTargetMachineGap) {
             int gapCompareResult = this.compareRemainingMachineGap(left, right);
             if (gapCompareResult != 0) {
@@ -445,8 +450,8 @@ public class NewSpecMachineSkuCompetitionService {
     /**
      * 比较同一机台上的两个可排 SKU 提案。
      *
-     * <p>标准S4.5先比较历史来源班次，再补统一Map目标物理机台缺口和Machine-SKU匹配等级。
-     * 来源、缺口和等级均相同时继续保留原业务顺序。</p>
+     * <p>标准S4.5先比较历史来源班次，再让普通提案优先于目标日跨日准备提案，随后补统一Map
+     * 目标物理机台缺口和Machine-SKU匹配等级。来源、普通/跨日档和等级均相同时继续保留原业务顺序。</p>
      *
      * @param left 左提案
      * @param right 右提案
@@ -459,6 +464,11 @@ public class NewSpecMachineSkuCompetitionService {
         if (historySourceCompareResult != 0) {
             return historySourceCompareResult;
         }
+        int crossDayCompareResult = this.compareSourceDayCrossDayPreparation(
+                left, right, prioritizeTargetMachineGap);
+        if (crossDayCompareResult != 0) {
+            return crossDayCompareResult;
+        }
         if (prioritizeTargetMachineGap) {
             int compareResult = this.compareRemainingMachineGap(left, right);
             if (compareResult != 0) {
@@ -466,6 +476,30 @@ public class NewSpecMachineSkuCompetitionService {
             }
         }
         return this.compareMatchLevel(left.getMatchResult(), right.getMatchResult());
+    }
+
+    /**
+     * 比较普通提案和目标日跨日准备提案。
+     *
+     * <p>标准动态竞争和单控试制/量试优先必须让当前业务日普通可开产提案优先；
+     * 跨日准备只是资源空闲优化，不能抢占普通提案。固定指令保持原独立语义，不参与本层改序。</p>
+     *
+     * @param left 左提案
+     * @param right 右提案
+     * @param prioritizeTargetMachineGap 是否启用标准动态/单控优先口径
+     * @return 负数表示左提案优先，正数表示右提案优先，0表示该层不区分
+     */
+    private int compareSourceDayCrossDayPreparation(NewSpecScheduleProposal left,
+                                                    NewSpecScheduleProposal right,
+                                                    boolean prioritizeTargetMachineGap) {
+        if (!prioritizeTargetMachineGap) {
+            return 0;
+        }
+        boolean leftNormalProposal = Objects.isNull(left.getAvailabilityPlan())
+                || !left.getAvailabilityPlan().isSourceDayCrossDayPreparation();
+        boolean rightNormalProposal = Objects.isNull(right.getAvailabilityPlan())
+                || !right.getAvailabilityPlan().isSourceDayCrossDayPreparation();
+        return Boolean.compare(rightNormalProposal, leftNormalProposal);
     }
 
     /**
