@@ -6,6 +6,7 @@ import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.support.FirstInspectionAllocationPlan;
 import com.zlt.aps.lh.engine.strategy.support.FirstInspectionShiftAllocation;
+import com.zlt.aps.lh.engine.strategy.support.FirstInspectionTimelinePlan;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
@@ -122,6 +123,7 @@ public final class FirstInspectionAllocationUtil {
      * @param forwardFromProductionReadyTime 是否从生产就绪时间向后执行首检
      * @return 无副作用首检分摊计划
      */
+    @Deprecated
     public static FirstInspectionAllocationPlan buildPlan(
             LhScheduleContext context,
             SkuScheduleDTO sku,
@@ -134,6 +136,41 @@ public final class FirstInspectionAllocationUtil {
             String machineCode,
             Map<Integer, Integer> availableCapacityMap,
             boolean forwardFromProductionReadyTime) {
+        return buildPlan(
+                context, sku, shifts, changeoverEndTime, inspectionNotBeforeTime,
+                shiftCapacity, remainingQty, scheduleType, machineCode, availableCapacityMap,
+                resolveCompatibilityTimingMode(
+                        sku, scheduleType, forwardFromProductionReadyTime));
+    }
+
+    /**
+     * 按显式时间模式构建首检分摊计划。
+     *
+     * @param context 排程上下文
+     * @param sku 当前SKU
+     * @param shifts 排程班次
+     * @param changeoverEndTime 切换完成时间
+     * @param inspectionNotBeforeTime 生产就绪或硬性生产门禁时间
+     * @param shiftCapacity 当前SKU在目标机台的运行态班产
+     * @param remainingQty 当前机台最多允许消费的目标量
+     * @param scheduleType 排程类型
+     * @param machineCode 机台编码
+     * @param availableCapacityMap 各班次首检可用容量
+     * @param timingMode 集中解析出的首检时间模式
+     * @return 无副作用首检分摊计划
+     */
+    public static FirstInspectionAllocationPlan buildPlan(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            List<LhShiftConfigVO> shifts,
+            Date changeoverEndTime,
+            Date inspectionNotBeforeTime,
+            int shiftCapacity,
+            int remainingQty,
+            String scheduleType,
+            String machineCode,
+            Map<Integer, Integer> availableCapacityMap,
+            FirstInspectionTimingMode timingMode) {
         if (CollectionUtils.isEmpty(shifts) || Objects.isNull(changeoverEndTime)) {
             return FirstInspectionAllocationPlan.invalid(
                     "首检缺少完整班次或切换结束时间", null, changeoverEndTime);
@@ -146,8 +183,7 @@ public final class FirstInspectionAllocationUtil {
                 .sorted(Comparator.comparing(LhShiftConfigVO::getShiftStartDateTime))
                 .collect(Collectors.toList());
         boolean forwardInspection = Objects.nonNull(inspectionNotBeforeTime)
-                && (forwardFromProductionReadyTime || FirstInspectionQtyUtil
-                .isMassTrialQuantityFirstInspection(sku, scheduleType));
+                && FirstInspectionTimingMode.START_AT_PRODUCTION_READY == timingMode;
         Date inspectionReferenceTime = changeoverEndTime;
         if (forwardInspection && inspectionNotBeforeTime.after(changeoverEndTime)) {
             inspectionReferenceTime = inspectionNotBeforeTime;
@@ -273,6 +309,95 @@ public final class FirstInspectionAllocationUtil {
         return FirstInspectionAllocationPlan.valid(
                 sequence, inspectionQty, hourlyOutput, durationSeconds,
                 inspectionStartTime, inspectionEndTime, countingShift, positiveAllocations);
+    }
+
+    /**
+     * 构建候选预演和正式提交共用的冻结首检时间轴。
+     *
+     * @param context 排程上下文
+     * @param sku 当前SKU
+     * @param machineCode 机台编码
+     * @param shifts 完整排程窗口班次
+     * @param changeoverAction 切换动作
+     * @param businessScene 业务场景
+     * @param changeoverStartTime 切换开始时间
+     * @param changeoverEndTime 切换完成时间
+     * @param productionReadyTime 生产就绪或硬性生产门禁时间
+     * @param shiftCapacity 运行态班产
+     * @param remainingQty 当前机台最多允许消费的目标量
+     * @param scheduleType 排程类型
+     * @param availableCapacityMap 首检可用容量；为空时按班产上限
+     * @return 冻结时间轴
+     */
+    public static FirstInspectionTimelinePlan buildTimelinePlan(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            String machineCode,
+            List<LhShiftConfigVO> shifts,
+            String changeoverAction,
+            String businessScene,
+            Date changeoverStartTime,
+            Date changeoverEndTime,
+            Date productionReadyTime,
+            int shiftCapacity,
+            int remainingQty,
+            String scheduleType,
+            Map<Integer, Integer> availableCapacityMap) {
+        FirstInspectionTimingModeDecision decision = FirstInspectionTimingModeResolver.resolve(
+                sku, scheduleType, changeoverAction, businessScene,
+                productionReadyTime, changeoverEndTime);
+        FirstInspectionAllocationPlan allocationPlan = buildPlan(
+                context, sku, shifts, changeoverEndTime, productionReadyTime,
+                shiftCapacity, remainingQty, scheduleType, machineCode,
+                availableCapacityMap, decision.getTimingMode());
+        Date formalProductionStartTime =
+                FirstInspectionTimingMode.START_AT_PRODUCTION_READY == decision.getTimingMode()
+                        ? resolveLaterTime(
+                        resolveLaterTime(productionReadyTime, changeoverEndTime),
+                        allocationPlan.getInspectionEndTime())
+                        : changeoverEndTime;
+        LhShiftConfigVO formalProductionShift = FirstInspectionQtyUtil.resolveAttributionShift(
+                shifts, formalProductionStartTime);
+        return FirstInspectionTimelinePlan.of(
+                allocationPlan, decision.getTimingMode(), decision.getModeReason(),
+                changeoverStartTime, changeoverEndTime, productionReadyTime,
+                formalProductionStartTime, formalProductionShift);
+    }
+
+    /**
+     * 解析旧布尔入口的兼容模式。
+     *
+     * @param sku 当前SKU
+     * @param scheduleType 排程类型
+     * @param forwardFromProductionReadyTime 旧正向标识
+     * @return 兼容模式
+     */
+    private static FirstInspectionTimingMode resolveCompatibilityTimingMode(
+            SkuScheduleDTO sku,
+            String scheduleType,
+            boolean forwardFromProductionReadyTime) {
+        if (forwardFromProductionReadyTime
+                || FirstInspectionQtyUtil.isMassTrialQuantityFirstInspection(sku, scheduleType)) {
+            return FirstInspectionTimingMode.START_AT_PRODUCTION_READY;
+        }
+        return FirstInspectionTimingMode.INCLUDED_IN_CHANGEOVER;
+    }
+
+    /**
+     * 取两个时间的较晚值。
+     *
+     * @param first 第一个时间
+     * @param second 第二个时间
+     * @return 较晚时间；两个时间均为空时返回null
+     */
+    private static Date resolveLaterTime(Date first, Date second) {
+        if (Objects.isNull(first)) {
+            return second;
+        }
+        if (Objects.isNull(second)) {
+            return first;
+        }
+        return first.after(second) ? first : second;
     }
 
     /**

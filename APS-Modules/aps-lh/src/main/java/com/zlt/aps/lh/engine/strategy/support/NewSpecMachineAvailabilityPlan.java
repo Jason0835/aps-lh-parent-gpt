@@ -99,6 +99,9 @@ public class NewSpecMachineAvailabilityPlan {
     /** 与候选时间轴同源的首检分摊计划。 */
     private final FirstInspectionAllocationPlan firstInspectionPlan;
 
+    /** 与候选时间轴同源的冻结首检时间轴；旧入口为空。 */
+    private final FirstInspectionTimelinePlan firstInspectionTimelinePlan;
+
     /** 当前选机回合命中的历史班次剩余产能画像；未命中时为空。 */
     private final HistoricalResidualCapacityInfo historicalResidualCapacityInfo;
 
@@ -331,6 +334,67 @@ public class NewSpecMachineAvailabilityPlan {
             boolean firstInspectionDeferredByClassTotalLimit,
             LhShiftConfigVO sourceDayResourceShift,
             boolean sourceDayCrossDayPreparation) {
+        this(machine, available, unavailableReason, occupationEndTime, machineReadyTime,
+                changeoverStartTime, changeoverEndTime, productionNotBeforeTime,
+                candidateProductionNotBeforeTime, candidateAvailableProductionTime, targetShift,
+                firstInspectionPlan, traceChangeoverEndTime, preparationAvailableTime,
+                preparationTargetShift, preparationAvailable, formalAvailableProductionTime,
+                formalTargetShift, historicalResidualCapacityInfo,
+                firstInspectionDeferredByClassTotalLimit, sourceDayResourceShift,
+                sourceDayCrossDayPreparation, null);
+    }
+
+    /**
+     * 创建携带冻结首检时间轴的完整候选计划。
+     *
+     * @param machine 候选机台
+     * @param available 是否可用
+     * @param unavailableReason 不可用原因
+     * @param occupationEndTime 前序占用结束时间
+     * @param machineReadyTime 机台准备就绪时间
+     * @param changeoverStartTime 切换开始时间
+     * @param changeoverEndTime 切换完成时间
+     * @param productionNotBeforeTime 正式生产门禁
+     * @param candidateProductionNotBeforeTime 候选预演门禁
+     * @param candidateAvailableProductionTime 候选预演可开产时间
+     * @param targetShift 候选预演班次
+     * @param firstInspectionPlan 首检分摊计划
+     * @param traceChangeoverEndTime 日志展示切换完成时间
+     * @param preparationAvailableTime 准备完成时间
+     * @param preparationTargetShift 准备完成班次
+     * @param preparationAvailable 准备是否可用
+     * @param formalAvailableProductionTime 正式可开产时间
+     * @param formalTargetShift 正式开产班次
+     * @param historicalResidualCapacityInfo 历史剩余产能画像
+     * @param firstInspectionDeferredByClassTotalLimit 首检是否顺延
+     * @param sourceDayResourceShift 跨日准备资源班次
+     * @param sourceDayCrossDayPreparation 是否跨日准备
+     * @param firstInspectionTimelinePlan 冻结首检时间轴
+     */
+    private NewSpecMachineAvailabilityPlan(
+            MachineScheduleDTO machine,
+            boolean available,
+            String unavailableReason,
+            Date occupationEndTime,
+            Date machineReadyTime,
+            Date changeoverStartTime,
+            Date changeoverEndTime,
+            Date productionNotBeforeTime,
+            Date candidateProductionNotBeforeTime,
+            Date candidateAvailableProductionTime,
+            LhShiftConfigVO targetShift,
+            FirstInspectionAllocationPlan firstInspectionPlan,
+            Date traceChangeoverEndTime,
+            Date preparationAvailableTime,
+            LhShiftConfigVO preparationTargetShift,
+            boolean preparationAvailable,
+            Date formalAvailableProductionTime,
+            LhShiftConfigVO formalTargetShift,
+            HistoricalResidualCapacityInfo historicalResidualCapacityInfo,
+            boolean firstInspectionDeferredByClassTotalLimit,
+            LhShiftConfigVO sourceDayResourceShift,
+            boolean sourceDayCrossDayPreparation,
+            FirstInspectionTimelinePlan firstInspectionTimelinePlan) {
         this.machine = machine;
         this.available = available;
         this.unavailableReason = unavailableReason;
@@ -346,6 +410,7 @@ public class NewSpecMachineAvailabilityPlan {
         this.formalAvailableProductionTime = formalAvailableProductionTime;
         this.formalTargetShift = formalTargetShift;
         this.firstInspectionPlan = firstInspectionPlan;
+        this.firstInspectionTimelinePlan = firstInspectionTimelinePlan;
         this.preparationAvailableTime = preparationAvailableTime;
         this.preparationTargetShift = preparationTargetShift;
         this.preparationAvailable = preparationAvailable;
@@ -396,6 +461,25 @@ public class NewSpecMachineAvailabilityPlan {
                 reuseStartTime, reuseShift,
                 Objects.nonNull(reuseStartTime) && Objects.nonNull(reuseShift),
                 reuseStartTime, reuseShift, historicalResidualCapacityInfo, false);
+    }
+
+    /**
+     * 在不重建其它时间轴的前提下冻结首检时间轴。
+     *
+     * @param timelinePlan 候选预演生成的时间轴
+     * @return 携带同一时间轴的新候选计划
+     */
+    public NewSpecMachineAvailabilityPlan withFirstInspectionTimelinePlan(
+            FirstInspectionTimelinePlan timelinePlan) {
+        return new NewSpecMachineAvailabilityPlan(
+                machine, available, unavailableReason, occupationEndTime, machineReadyTime,
+                changeoverStartTime, changeoverEndTime, productionNotBeforeTime,
+                candidateProductionNotBeforeTime, candidateAvailableProductionTime, targetShift,
+                firstInspectionPlan, traceChangeoverEndTime, preparationAvailableTime,
+                preparationTargetShift, preparationAvailable, formalAvailableProductionTime,
+                formalTargetShift, historicalResidualCapacityInfo,
+                firstInspectionDeferredByClassTotalLimit,
+                sourceDayResourceShift, sourceDayCrossDayPreparation, timelinePlan);
     }
 
     /**
@@ -569,6 +653,10 @@ public class NewSpecMachineAvailabilityPlan {
      * @return 生产占用开始时间；计划不可用时返回null
      */
     public Date getProductionOccupationStartTime() {
+        if (Objects.nonNull(firstInspectionTimelinePlan)
+                && Objects.nonNull(firstInspectionTimelinePlan.getProductionOccupationStartTime())) {
+            return firstInspectionTimelinePlan.getProductionOccupationStartTime();
+        }
         if (Objects.nonNull(firstInspectionPlan)
                 && firstInspectionPlan.isValid()
                 && firstInspectionPlan.getInspectionQty() > 0
@@ -586,6 +674,10 @@ public class NewSpecMachineAvailabilityPlan {
      * @return 生产占用班次；计划不可用时返回null
      */
     public LhShiftConfigVO getProductionOccupationShift() {
+        if (Objects.nonNull(firstInspectionTimelinePlan)
+                && Objects.nonNull(firstInspectionTimelinePlan.getProductionOccupationShift())) {
+            return firstInspectionTimelinePlan.getProductionOccupationShift();
+        }
         if (Objects.nonNull(firstInspectionPlan)
                 && firstInspectionPlan.isValid()
                 && firstInspectionPlan.getInspectionQty() > 0
@@ -634,6 +726,15 @@ public class NewSpecMachineAvailabilityPlan {
      */
     public FirstInspectionAllocationPlan getFirstInspectionPlan() {
         return firstInspectionPlan;
+    }
+
+    /**
+     * 获取候选预演冻结的首检时间轴。
+     *
+     * @return 冻结时间轴；旧调用链或无首检场景可能为空
+     */
+    public FirstInspectionTimelinePlan getFirstInspectionTimelinePlan() {
+        return firstInspectionTimelinePlan;
     }
 
     /**

@@ -68,6 +68,7 @@ import com.zlt.aps.lh.engine.strategy.support.HistoricalReverseSelectionDirectiv
 import com.zlt.aps.lh.engine.strategy.support.HistoricalResidualCapacityInfo;
 import com.zlt.aps.lh.engine.strategy.support.FirstInspectionAllocationPlan;
 import com.zlt.aps.lh.engine.strategy.support.FirstInspectionShiftAllocation;
+import com.zlt.aps.lh.engine.strategy.support.FirstInspectionTimelinePlan;
 import com.zlt.aps.lh.engine.strategy.support.MachineProductionSegment;
 import com.zlt.aps.lh.engine.strategy.support.MachinePriorityMetricSnapshot;
 import com.zlt.aps.lh.engine.strategy.support.MachinePriorityTraceSnapshot;
@@ -104,6 +105,8 @@ import com.zlt.aps.lh.service.impl.NewSpecScheduleCommitResult;
 import com.zlt.aps.lh.util.CleaningScheduleRuleUtil;
 import com.zlt.aps.lh.util.FirstInspectionQtyUtil;
 import com.zlt.aps.lh.util.FirstInspectionAllocationUtil;
+import com.zlt.aps.lh.util.FirstInspectionTimingMode;
+import com.zlt.aps.lh.util.FirstInspectionTimingModeResolver;
 import com.zlt.aps.lh.util.TypeBlockRelationUtil;
 import com.zlt.aps.lh.util.LeftRightMouldUtil;
 import com.zlt.aps.lh.util.LhMachineHardMatchUtil;
@@ -3771,6 +3774,10 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 return scheduledCount;
             }
             NewSpecMachineAssignmentPlan assignmentPlan = proposal.getAssignmentPlan();
+            this.logFirstInspectionTimelinePlan(
+                    "PREVIEW", context, dayContext, assignmentPlan.getCandidate().getSku(),
+                    assignmentPlan.getMatchResult().getMachine().getMachineCode(),
+                    assignmentPlan.getAvailabilityPlan());
             /*
              * 结构机台数在只读预演后可能被前一轮胜出提案改变。进入正式提交快照前，
              * 使用同一计算器无缓存复核；拒绝仅登记formalTargetShift失败键，不触碰共享运行态。
@@ -5343,6 +5350,9 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 }
                 boolean takeoverWithoutMouldChange =
                         substitutionTakeoverWithoutMouldChange || releasedContinuationReuse;
+                this.logFirstInspectionTimelinePlan(
+                        "COMMIT", context, dayContext, sku, machineCode,
+                        selectedAvailabilityPlan);
                 /*
                  * 同胎胚且同模具的异物料切换按换活字块口径处理；同物料原模具续作重启
                  * 已在上方识别为无换模续作，禁止再落成换活字块或正规换模。
@@ -5915,8 +5925,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                             mouldChangeStartTime, mouldChangeCompleteTime);
                     /*
                      * 精度计划、正规换模和计划性维修继续按既有并行规则取最晚恢复时间。
-                     * 选机计划会在设备、预热和胎胚门禁全部满足后正向安排计件首检，
-                     * 正常生产再从首检结束时间开始。
+                     * 选机计划的时间模式由统一解析器决定；普通模式首检在切换完成前完成，
+                     * 试制、量试或门禁后移场景才从生产就绪时间正向执行。
                      */
                     Date firstInspectionBaseTime = maintenanceReadyTime;
                     if (plannedRepairAffectingSwitch && Objects.nonNull(plannedRepairReadyTime)
@@ -5924,8 +5934,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                         firstInspectionBaseTime = plannedRepairReadyTime;
                     }
                     /*
-                     * 换模与换活字块共用同一无副作用计划。机台驱动选机命中时直接复用其中
-                     * 已按真实生产就绪时间正向形成的首检区间，禁止提交阶段再次推导班次。
+                     * 换模与换活字块共用同一无副作用计划。机台驱动选机命中时直接复用冻结
+                     * 时间轴，禁止提交阶段再次推导首检模式或计数班次。
                      */
                     boolean selectedInspectionTimelineMatched =
                             Objects.nonNull(selectedAvailabilityPlan)
@@ -5938,9 +5948,51 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                     if (selectedInspectionTimelineMatched) {
                         firstInspectionAllocationPlan =
                                 selectedAvailabilityPlan.getFirstInspectionPlan();
+                        FirstInspectionTimelinePlan selectedTimelinePlan =
+                                selectedAvailabilityPlan.getFirstInspectionTimelinePlan();
+                        if (Objects.nonNull(selectedTimelinePlan)
+                                && !selectedTimelinePlan.matches(
+                                mouldChangeStartTime, mouldChangeCompleteTime,
+                                selectedTimelinePlan.getTimingMode())) {
+                            rollbackMouldChangeAllocation(
+                                    context, sku, mouldChangeBalance, mouldChangeStartTime);
+                            rollbackMouldResourceAllocation(
+                                    context, sku, mouldResourceAllocationResult,
+                                    pairMouldResourceAllocationResult);
+                            excludedMachineCodes.add(machineCode);
+                            candidateCache.removeMachine(machineCode);
+                            log.warn("新增SKU候选首检时间轴指纹校验失败，提案已失效, "
+                                            + "batchNo: {}, scheduleDate: {}, materialCode: {}, "
+                                            + "machineCode: {}, previewChangeover: [{}, {}), "
+                                            + "actualChangeover: [{}, {}), timingMode: {}, "
+                                            + "timelineFingerprint: {}",
+                                    context.getBatchNo(), dayContext.getScheduleDate(),
+                                    sku.getMaterialCode(), machineCode,
+                                    LhScheduleTimeUtil.formatDateTime(
+                                            selectedTimelinePlan.getChangeoverStartTime()),
+                                    LhScheduleTimeUtil.formatDateTime(
+                                            selectedTimelinePlan.getChangeoverEndTime()),
+                                    LhScheduleTimeUtil.formatDateTime(mouldChangeStartTime),
+                                    LhScheduleTimeUtil.formatDateTime(mouldChangeCompleteTime),
+                                    selectedTimelinePlan.getTimingMode(),
+                                    selectedTimelinePlan.getTimelineFingerprint());
+                            continue;
+                        }
                     } else if (Objects.nonNull(selectedAvailabilityPlan)
                             && Objects.nonNull(
                             selectedAvailabilityPlan.getProductionOccupationStartTime())) {
+                        FirstInspectionTimingMode retryTimingMode =
+                                FirstInspectionTimingModeResolver.resolve(
+                                        sku, inspectionScheduleTypeCode,
+                                        isTypeBlockRelation
+                                                ? FirstInspectionTimingModeResolver
+                                                .CHANGE_OVER_ACTION_TYPE_BLOCK_CHANGE
+                                                : FirstInspectionTimingModeResolver
+                                                .CHANGE_OVER_ACTION_MOULD_CHANGE,
+                                        FirstInspectionTimingModeResolver.BUSINESS_SCENE_COMMIT,
+                                        selectedAvailabilityPlan
+                                                .getProductionOccupationStartTime(),
+                                        mouldChangeCompleteTime).getTimingMode();
                         firstInspectionAllocationPlan =
                                 this.resolveFirstInspectionAllocationPlan(
                                         context, sku, candidateMachine,
@@ -5953,7 +6005,9 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                                                 sku.getShiftCapacity()),
                                         ShiftCapacityResolverUtil.resolveMachineMouldQty(
                                                 candidateMachine),
-                                        dynamicTargetQty, inspectionScheduleTypeCode, true);
+                                        dynamicTargetQty, inspectionScheduleTypeCode,
+                                        FirstInspectionTimingMode.START_AT_PRODUCTION_READY
+                                                == retryTimingMode);
                     } else {
                         firstInspectionAllocationPlan = FirstInspectionAllocationUtil.buildPlan(
                                 context, sku, context.getScheduleWindowShifts(),
@@ -6068,12 +6122,24 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                             && firstInspectionAllocationPlan.isValid()
                             && firstInspectionAllocationPlan.getInspectionQty() > 0) {
                         /*
-                         * 首检计数、资源占用和结构准入共同使用冻结计划的生产占用班次。
+                         * 首检计数、资源占用和结构准入共同使用冻结时间轴的真实占用班次。
+                         * 旧入口没有时间轴时保持原有切换完成班次兼容语义。
                          */
-                        firstInspectionAttributionShift =
-                                firstInspectionAllocationPlan.getCountingShift();
-                        firstInspectionAttributionTime =
-                                firstInspectionAllocationPlan.getInspectionEndTime();
+                        FirstInspectionTimelinePlan commitTimelinePlan =
+                                Objects.isNull(selectedAvailabilityPlan)
+                                        ? null : selectedAvailabilityPlan.getFirstInspectionTimelinePlan();
+                        if (Objects.nonNull(commitTimelinePlan)
+                                && Objects.nonNull(commitTimelinePlan.getProductionOccupationShift())) {
+                            firstInspectionAttributionShift =
+                                    commitTimelinePlan.getProductionOccupationShift();
+                            firstInspectionAttributionTime =
+                                    commitTimelinePlan.getProductionOccupationStartTime();
+                        } else {
+                            firstInspectionAttributionShift =
+                                    firstInspectionAllocationPlan.getCountingShift();
+                            firstInspectionAttributionTime =
+                                    firstInspectionAllocationPlan.getInspectionEndTime();
+                        }
                     }
                     if (firstInspectionDeferredByClassTotalLimit
                             && Objects.nonNull(firstInspectionAttributionShift)) {
@@ -10077,21 +10143,34 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                     && Objects.nonNull(formalTargetShift);
         }
         String formalUnavailableReason = null;
+        FirstInspectionTimelinePlan frozenTimelinePlan = null;
         if (formalAvailable && !takeoverWithoutMouldChange
                 && Objects.nonNull(inspectionPlan)
                 && inspectionPlan.isValid()
                 && inspectionPlan.getInspectionQty() > 0) {
             /*
-             * 首检属于SKU开产过程。候选正式生产时间轴已完成换模、维修、预热、胎胚门禁和
-             * 设备窗口校验后，从该真实就绪时间向后执行首检；普通生产从首检结束后开始。
+             * 集中解析首检时间模式：普通切换总时长包含首检，按完成时间倒推；
+             * 试制、量试或硬性门禁晚于切换完成时才从生产就绪时间正向执行。
              * 同一份计划同时供结构准入、机台竞争、容量计算和正式提交使用。
              */
+            FirstInspectionTimingMode timingMode = FirstInspectionTimingModeResolver.resolve(
+                    sku, inspectionScheduleType,
+                    typeBlockRelation
+                            ? FirstInspectionTimingModeResolver.CHANGE_OVER_ACTION_TYPE_BLOCK_CHANGE
+                            : FirstInspectionTimingModeResolver.CHANGE_OVER_ACTION_MOULD_CHANGE,
+                    FirstInspectionTimingModeResolver.BUSINESS_SCENE_PREVIEW,
+                    resolveLaterTimelineReadyTime(
+                            preparationReadyTime, formalAvailableProductionTime),
+                    changeoverEndTime).getTimingMode();
             FirstInspectionAllocationPlan forwardInspectionPlan =
                     this.resolveFirstInspectionAllocationPlan(
                             context, sku, machine, context.getScheduleWindowShifts(),
                             changeoverStartTime, changeoverEndTime,
-                            formalAvailableProductionTime, runtimeShiftCapacity,
-                            machineMouldQty, remainingQty, inspectionScheduleType, true);
+                            resolveLaterTimelineReadyTime(
+                                    preparationReadyTime, formalAvailableProductionTime),
+                            runtimeShiftCapacity,
+                            machineMouldQty, remainingQty, inspectionScheduleType,
+                            FirstInspectionTimingMode.START_AT_PRODUCTION_READY == timingMode);
             if (!forwardInspectionPlan.isValid()) {
                 inspectionPlan = forwardInspectionPlan;
                 formalAvailable = false;
@@ -10104,10 +10183,21 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 formalUnavailableReason = "首检资源在生产占用班次无可承接位置";
             } else {
                 inspectionPlan = forwardInspectionPlan;
-                Date regularProductionStartTime = FirstInspectionQtyUtil
-                        .resolveProductionStartAfterFirstInspection(
-                                sku, inspectionScheduleType,
-                                formalAvailableProductionTime, inspectionPlan);
+                frozenTimelinePlan = FirstInspectionAllocationUtil.buildTimelinePlan(
+                        context, sku, machine.getMachineCode(),
+                        context.getScheduleWindowShifts(),
+                        typeBlockRelation
+                                ? FirstInspectionTimingModeResolver
+                                .CHANGE_OVER_ACTION_TYPE_BLOCK_CHANGE
+                                : FirstInspectionTimingModeResolver.CHANGE_OVER_ACTION_MOULD_CHANGE,
+                        FirstInspectionTimingModeResolver.BUSINESS_SCENE_PREVIEW,
+                        changeoverStartTime, changeoverEndTime,
+                        resolveLaterTimelineReadyTime(
+                                preparationReadyTime, formalAvailableProductionTime),
+                        runtimeShiftCapacity,
+                        remainingQty, inspectionScheduleType, null);
+                Date regularProductionStartTime =
+                        frozenTimelinePlan.getFormalProductionStartTime();
                 formalAvailableProductionTime = this.resolveFormalAvailableProductionTime(
                         context, sku, machine, changeoverStartTime, changeoverEndTime,
                         preparationReadyTime, regularProductionStartTime,
@@ -10121,13 +10211,16 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 if (!formalAvailable) {
                     formalUnavailableReason = "首检完成后正式生产时间轴无可开产班次";
                 } else {
-                    log.info("新增SKU首检按生产占用起点正向分摊, batchNo: {}, "
+                    log.info("新增SKU首检时间轴已冻结, batchNo: {}, "
                                     + "scheduleDate: {}, materialCode: {}, machineCode: {}, "
+                                    + "timingMode: {}, modeReason: {}, "
                                     + "changeoverEndTime: {}, productionOccupationStartTime: {}, "
                                     + "inspectionEndTime: {}, formalProductionStartTime: {}, "
                                     + "productionOccupationShift: class{}, formalTargetShift: class{}",
                             context.getBatchNo(), dayContext.getScheduleDate(),
                             sku.getMaterialCode(), machine.getMachineCode(),
+                            frozenTimelinePlan.getTimingMode(),
+                            frozenTimelinePlan.getModeReason(),
                             LhScheduleTimeUtil.formatDateTime(changeoverEndTime),
                             LhScheduleTimeUtil.formatDateTime(
                                     inspectionPlan.getInspectionStartTime()),
@@ -10141,10 +10234,12 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             }
         }
         if (!preparationLookbackAllowed) {
-            // 非跨日准备场景下，准备完成时间与候选预演时间共用同一条准备时间轴。
-            preparationAvailableTime = availableProductionTime;
-            preparationTargetShift = targetShift;
-            preparationAvailable = candidatePreviewAvailable;
+            if (!preparationAvailable) {
+                // 非跨日准备且准备时间轴未单独通过时，才与候选预演时间共用同一条时间轴。
+                preparationAvailableTime = availableProductionTime;
+                preparationTargetShift = targetShift;
+                preparationAvailable = candidatePreviewAvailable;
+            }
         } else if (!preparationAvailable && formalAvailable) {
             /*
              * 跨日准备只是利用历史空闲窗口的优化路径。历史准备中的首检资源无法承接时，
@@ -10180,6 +10275,9 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         NewSpecMachineAvailabilityPlan completedPlan = firstInspectionDeferredByClassTotalLimit
                 ? availabilityPlan.withFirstInspectionClassTotalDeferral()
                 : availabilityPlan;
+        if (Objects.nonNull(frozenTimelinePlan)) {
+            completedPlan = completedPlan.withFirstInspectionTimelinePlan(frozenTimelinePlan);
+        }
         if (!candidateAvailable || Objects.isNull(adjacentNextShift)
                 || !Objects.equals(adjacentNextShift.getShiftIndex(),
                 formalTargetShift.getShiftIndex())) {
@@ -10187,7 +10285,10 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         }
         LhShiftConfigVO resourceShift = FirstInspectionQtyUtil.resolveAttributionShift(
                 dayContext.getDayShifts(), changeoverStartTime);
-        return completedPlan.withSourceDayCrossDayPreparation(resourceShift);
+        NewSpecMachineAvailabilityPlan crossDayPlan =
+                completedPlan.withSourceDayCrossDayPreparation(resourceShift);
+        return Objects.isNull(frozenTimelinePlan)
+                ? crossDayPlan : crossDayPlan.withFirstInspectionTimelinePlan(frozenTimelinePlan);
     }
 
     /**
@@ -10258,6 +10359,25 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             cursorTime = shift.getShiftEndDateTime();
         }
         return null;
+    }
+
+    /**
+     * 合并设备准备与候选开产时间，作为首检模式解析输入。
+     *
+     * @param preparationReadyTime 换模、维修和预热就绪时间
+     * @param candidateAvailableProductionTime 候选设备扣减后的可开产时间
+     * @return 首检模式使用的生产就绪时间
+     */
+    private Date resolveLaterTimelineReadyTime(Date preparationReadyTime,
+                                               Date candidateAvailableProductionTime) {
+        if (Objects.isNull(preparationReadyTime)) {
+            return candidateAvailableProductionTime;
+        }
+        if (Objects.isNull(candidateAvailableProductionTime)) {
+            return preparationReadyTime;
+        }
+        return candidateAvailableProductionTime.after(preparationReadyTime)
+                ? candidateAvailableProductionTime : preparationReadyTime;
     }
 
     /**
@@ -10517,8 +10637,10 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         if (inspectionPlan.getInspectionQty() <= 0) {
             return true;
         }
-        Date quantityAttributionTime = inspectionPlan.getInspectionEndTime();
-        LhShiftConfigVO quantityShift = inspectionPlan.getCountingShift();
+        Date quantityAttributionTime = inspectionPlan.getInspectionStartTime();
+        LhShiftConfigVO quantityShift = inspectionPlan.getShiftAllocations().isEmpty()
+                ? inspectionPlan.getCountingShift()
+                : inspectionPlan.getShiftAllocations().get(0).getShift();
         Date inspectionResourceTime = inspectionBalance.previewInspection(
                 context, machine.getMachineCode(), quantityAttributionTime);
         LhShiftConfigVO inspectionResourceShift = FirstInspectionQtyUtil
@@ -10615,6 +10737,70 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             return IMouldChangeBalanceStrategy.ACTION_EARLY_PRODUCTION_NEW_SPEC_MOULD_CHANGE;
         }
         return IMouldChangeBalanceStrategy.ACTION_NEW_SPEC_MOULD_CHANGE;
+    }
+
+    /**
+     * 输出统一首检时间轴诊断日志。
+     *
+     * @param phase PREVIEW或COMMIT
+     * @param context 排程上下文
+     * @param dayContext 当前业务日
+     * @param sku 当前SKU
+     * @param machineCode 机台编码
+     * @param availabilityPlan 候选冻结计划
+     */
+    private void logFirstInspectionTimelinePlan(String phase,
+                                                LhScheduleContext context,
+                                                DayScheduleContext dayContext,
+                                                SkuScheduleDTO sku,
+                                                String machineCode,
+                                                NewSpecMachineAvailabilityPlan availabilityPlan) {
+        if (Objects.isNull(context) || Objects.isNull(dayContext) || Objects.isNull(sku)
+                || Objects.isNull(availabilityPlan)
+                || Objects.isNull(availabilityPlan.getFirstInspectionTimelinePlan())) {
+            return;
+        }
+        FirstInspectionTimelinePlan timelinePlan =
+                availabilityPlan.getFirstInspectionTimelinePlan();
+        FirstInspectionAllocationPlan allocationPlan = timelinePlan.getAllocationPlan();
+        log.info("新增SKU首检时间轴诊断, batchNo: {}, phase: {}, businessDate: {}, "
+                        + "materialCode: {}, productStatus: {}, machineCode: {}, skuType: {}, "
+                        + "scheduleType: {}, timingMode: {}, modeReason: {}, "
+                        + "changeoverStartTime: {}, changeoverEndTime: {}, "
+                        + "productionReadyTime: {}, inspectionQty: {}, hourlyCapacity: {}, "
+                        + "inspectionDurationSeconds: {}, inspectionStartTime: {}, "
+                        + "inspectionEndTime: {}, productionOccupationStartTime: {}, "
+                        + "productionOccupationShift: class{}, formalProductionStartTime: {}, "
+                        + "formalProductionShift: class{}, inspectionCountDate: {}, "
+                        + "inspectionCountShift: class{}, inspectionAllocationDetail: {}, "
+                        + "timelineFingerprint: {}",
+                context.getBatchNo(), phase, dayContext.getScheduleDate(),
+                sku.getMaterialCode(), sku.getProductStatus(), machineCode,
+                sku.getConstructionStage(), NEW_SPEC_SCHEDULE_TYPE,
+                timelinePlan.getTimingMode(), timelinePlan.getModeReason(),
+                LhScheduleTimeUtil.formatDateTime(timelinePlan.getChangeoverStartTime()),
+                LhScheduleTimeUtil.formatDateTime(timelinePlan.getChangeoverEndTime()),
+                LhScheduleTimeUtil.formatDateTime(timelinePlan.getProductionReadyTime()),
+                Objects.isNull(allocationPlan) ? 0 : allocationPlan.getInspectionQty(),
+                Objects.isNull(allocationPlan) ? null : allocationPlan.getHourlyOutput(),
+                Objects.isNull(allocationPlan) ? 0 : allocationPlan.getInspectionDurationSeconds(),
+                LhScheduleTimeUtil.formatDateTime(
+                        Objects.isNull(allocationPlan) ? null : allocationPlan.getInspectionStartTime()),
+                LhScheduleTimeUtil.formatDateTime(
+                        Objects.isNull(allocationPlan) ? null : allocationPlan.getInspectionEndTime()),
+                LhScheduleTimeUtil.formatDateTime(
+                        timelinePlan.getProductionOccupationStartTime()),
+                Objects.isNull(timelinePlan.getProductionOccupationShift())
+                        ? "无" : timelinePlan.getProductionOccupationShift().getShiftIndex(),
+                LhScheduleTimeUtil.formatDateTime(timelinePlan.getFormalProductionStartTime()),
+                Objects.isNull(timelinePlan.getFormalProductionShift())
+                        ? "无" : timelinePlan.getFormalProductionShift().getShiftIndex(),
+                timelinePlan.getInspectionCountDate(),
+                Objects.isNull(timelinePlan.getInspectionCountShift())
+                        ? "无" : timelinePlan.getInspectionCountShift().getShiftIndex(),
+                Objects.isNull(allocationPlan) ? "无"
+                        : this.formatFirstInspectionAllocationPlan(allocationPlan),
+                timelinePlan.getTimelineFingerprint());
     }
 
     private NewSpecMachineAvailabilityPlan unavailablePlan(
@@ -12398,6 +12584,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
      * @param forwardFromProductionReadyTime 是否从生产就绪时间向后执行首检
      * @return 无副作用首检分摊计划
      */
+    @Deprecated
     private FirstInspectionAllocationPlan resolveFirstInspectionAllocationPlan(
             LhScheduleContext context,
             SkuScheduleDTO sku,
