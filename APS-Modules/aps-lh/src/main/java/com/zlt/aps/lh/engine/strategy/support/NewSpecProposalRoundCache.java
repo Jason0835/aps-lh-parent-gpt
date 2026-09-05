@@ -4,6 +4,7 @@ import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.component.StructureEarlyProductionAdmission;
 import org.apache.commons.lang3.StringUtils;
 
+import java.util.Date;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -28,6 +29,8 @@ public final class NewSpecProposalRoundCache {
     /** 当前运行态版本下结构×正式班次的有效物理机台统计 */
     private final Map<String, StructureEarlyProductionAdmission>
             structureMachineStatisticsMap;
+    /** 当前运行态版本下结构×班次的物理机台释放时刻 */
+    private final Map<String, Map<String, Date>> structureMachineReleaseTimeMap;
     /** 上一次已经输出的待排队列指纹 */
     private String lastQueueTraceFingerprint;
     /** 当前业务日阶段累计被只读准入拒绝的Machine×SKU数量 */
@@ -52,6 +55,8 @@ public final class NewSpecProposalRoundCache {
                 new IdentityHashMap<SkuScheduleDTO, Boolean>(normalizedCandidateCount * 2);
         this.structureMachineStatisticsMap =
                 new LinkedHashMap<String, StructureEarlyProductionAdmission>(16);
+        this.structureMachineReleaseTimeMap =
+                new LinkedHashMap<String, Map<String, Date>>(16);
     }
 
     /**
@@ -61,6 +66,7 @@ public final class NewSpecProposalRoundCache {
         endingFlagMap.clear();
         expectedEndingTraceMap.clear();
         structureMachineStatisticsMap.clear();
+        structureMachineReleaseTimeMap.clear();
         lastQueueTraceFingerprint = null;
     }
 
@@ -142,6 +148,31 @@ public final class NewSpecProposalRoundCache {
             StructureEarlyProductionAdmission statistics) {
         if (StringUtils.isNotEmpty(statisticsKey) && statistics != null) {
             structureMachineStatisticsMap.put(statisticsKey, statistics);
+        }
+    }
+
+    /**
+     * 获取当前运行态版本的结构班次物理机台释放时刻。
+     *
+     * @param releaseTimeKey 结构与班次复合键
+     * @return 物理机台释放时刻；尚未计算时返回null
+     */
+    public Map<String, Date> getStructureMachineReleaseTimeMap(
+            String releaseTimeKey) {
+        return structureMachineReleaseTimeMap.get(releaseTimeKey);
+    }
+
+    /**
+     * 保存当前运行态版本的结构班次物理机台释放时刻。
+     *
+     * @param releaseTimeKey 结构与班次复合键
+     * @param releaseTimeMap 物理机台释放时刻
+     */
+    public void putStructureMachineReleaseTimeMap(
+            String releaseTimeKey,
+            Map<String, Date> releaseTimeMap) {
+        if (StringUtils.isNotEmpty(releaseTimeKey) && releaseTimeMap != null) {
+            structureMachineReleaseTimeMap.put(releaseTimeKey, releaseTimeMap);
         }
     }
 

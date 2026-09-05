@@ -95,6 +95,7 @@ import com.zlt.aps.lh.engine.strategy.support.ScheduleResultBaseline;
 import com.zlt.aps.lh.engine.strategy.support.SkuDayScheduleOutcome;
 import com.zlt.aps.lh.engine.strategy.support.SmallEndingSurplusSkipRule;
 import com.zlt.aps.lh.engine.strategy.support.SpecifiedMachineMatchResult;
+import com.zlt.aps.lh.engine.strategy.support.StructureMachineLimitAdmissionService;
 import com.zlt.aps.lh.engine.strategy.support.StructureMachineLimitDecision;
 import com.zlt.aps.lh.exception.ScheduleErrorCode;
 import com.zlt.aps.lh.exception.ScheduleException;
@@ -262,6 +263,9 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
     /** S4.5 Machine×SKU预演与正式提交共用的只读准入入口。 */
     @Resource
     private NewSpecCandidateAttemptService newSpecCandidateAttemptService;
+    /** 结构在线机台数时点准入与班内最早释放时刻解析入口。 */
+    @Resource
+    private StructureMachineLimitAdmissionService structureMachineLimitAdmissionService;
     /** S4.5 全部正向班次增量的统一原子上限约束。 */
     @Resource
     private NewSpecShiftTotalQtyConstraint shiftTotalQtyConstraint;
@@ -3737,7 +3741,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                     }
                     return this.resolveMachineDrivenAvailabilityPlan(
                             scheduleContext, businessDayContext, candidate, machine,
-                            capacityCalculate, mouldChangeBalance, inspectionBalance, isEnding);
+                            capacityCalculate, mouldChangeBalance, inspectionBalance,
+                            isEnding, proposalRoundCache);
                 };
         while (true) {
             NewSpecScheduleProposal proposal;
@@ -4112,6 +4117,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
      * @param mouldChangeBalance 换模均衡策略
      * @param inspectionBalance 首检均衡策略
      * @param isEnding 当前提案快照下的窗口收尾标识
+     * @param proposalRoundCache 当前运行态版本轻量缓存
      * @return 无副作用真实可开产计划
      */
     private NewSpecMachineAvailabilityPlan resolveMachineDrivenAvailabilityPlan(
@@ -4122,7 +4128,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             ICapacityCalculateStrategy capacityCalculate,
             IMouldChangeBalanceStrategy mouldChangeBalance,
             IFirstInspectionBalanceStrategy inspectionBalance,
-            boolean isEnding) {
+            boolean isEnding,
+            NewSpecProposalRoundCache proposalRoundCache) {
         if (Objects.isNull(context) || Objects.isNull(dayContext)
                 || Objects.isNull(candidate) || Objects.isNull(candidate.getSku())
                 || Objects.isNull(machine)) {
@@ -4147,6 +4154,41 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 context, sku, machine, dayContext, capacityCalculate, mouldChangeBalance,
                 inspectionBalance, candidateProductionNotBeforeTime, productionNotBeforeTime,
                 remainingQty, 0, addMachineProductionDate, isEnding, true);
+        Date productionOccupationStartTime = Objects.isNull(availabilityPlan)
+                ? null : availabilityPlan.getProductionOccupationStartTime();
+        EarlyProductionDecision earlyProductionDecision =
+                Objects.isNull(candidate.getEarlyProductionPreview())
+                        ? null : candidate.getEarlyProductionPreview().getDecision();
+        Date structureAllowedStartTime = structureMachineLimitAdmissionService
+                .resolveEarliestAllowedProductionOccupationTime(
+                        context, dayContext.getCurrentPhase(), sku,
+                        earlyProductionDecision, machine.getMachineCode(),
+                        productionOccupationStartTime, dayContext.getDayShifts(),
+                        proposalRoundCache);
+        if (Objects.nonNull(structureAllowedStartTime)
+                && Objects.nonNull(productionOccupationStartTime)
+                && structureAllowedStartTime.after(productionOccupationStartTime)) {
+            Date adjustedCandidateNotBeforeTime = this.resolveLaterTime(
+                    candidateProductionNotBeforeTime, structureAllowedStartTime);
+            Date adjustedProductionNotBeforeTime = this.resolveLaterTime(
+                    productionNotBeforeTime, structureAllowedStartTime);
+            availabilityPlan = this.resolveMachineAvailabilityPlan(
+                    context, sku, machine, dayContext, capacityCalculate,
+                    mouldChangeBalance, inspectionBalance,
+                    adjustedCandidateNotBeforeTime, adjustedProductionNotBeforeTime,
+                    remainingQty, 0, addMachineProductionDate, isEnding, true);
+            log.info("新增SKU按结构在线机台释放时刻顺延开产, batchNo: {}, "
+                            + "scheduleDate: {}, materialCode: {}, machineCode: {}, "
+                            + "beforeOccupationStartTime: {}, structureAllowedStartTime: {}, "
+                            + "afterOccupationStartTime: {}",
+                    context.getBatchNo(), dayContext.getScheduleDate(),
+                    sku.getMaterialCode(), machine.getMachineCode(),
+                    LhScheduleTimeUtil.formatDateTime(productionOccupationStartTime),
+                    LhScheduleTimeUtil.formatDateTime(structureAllowedStartTime),
+                    Objects.isNull(availabilityPlan) ? null
+                            : LhScheduleTimeUtil.formatDateTime(
+                            availabilityPlan.getProductionOccupationStartTime()));
+        }
         return this.attachHistoricalResidualCapacityInfo(
                 context, sku, machine, availabilityPlan, isEnding);
     }
@@ -10518,13 +10560,20 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             LhScheduleContext context,
             DayScheduleContext dayContext,
             SkuScheduleDTO sku) {
-        return Objects.nonNull(context)
-                && Objects.nonNull(dayContext)
-                && Objects.nonNull(sku)
-                && Objects.nonNull(sku.getFirstAddMachineProductionDate())
-                && sku.getFirstAddMachineProductionDate().isAfter(dayContext.getScheduleDate())
+        if (Objects.isNull(context) || Objects.isNull(dayContext)
+                || Objects.isNull(dayContext.getScheduleDate())
+                || Objects.isNull(sku)
+                || Objects.isNull(sku.getFirstAddMachineProductionDate())) {
+            return false;
+        }
+        LocalDate windowEndDate = this.resolveScheduleTargetLocalDate(context);
+        LocalDate currentDate = dayContext.getScheduleDate();
+        LocalDate firstAddMachineDate = sku.getFirstAddMachineProductionDate();
+        return Objects.nonNull(windowEndDate)
+                && currentDate.equals(windowEndDate)
+                && firstAddMachineDate.isAfter(windowEndDate)
                 && EarlyProductionChecker.isEligibleContinuationAddMachineEarlyProduction(
-                        context, sku, dayContext.getScheduleDate());
+                        context, sku, currentDate);
     }
 
     /**

@@ -3028,7 +3028,8 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
         StructureMachineLimitDecision structureLimitDecision =
                 structureMachineLimitAdmissionService.evaluate(
                         context, DailySchedulePhase.EARLY_PRODUCTION,
-                        sku, decision, targetShift, machine.getMachineCode(),
+                        sku, decision, targetShift, productionStartTime,
+                        machine.getMachineCode(),
                         decision.getFuturePlanDate(), null);
         if (Objects.nonNull(structureLimitDecision)
                 && structureLimitDecision.isApplicable()

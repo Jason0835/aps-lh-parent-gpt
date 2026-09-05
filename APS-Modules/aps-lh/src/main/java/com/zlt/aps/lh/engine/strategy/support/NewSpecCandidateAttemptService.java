@@ -236,6 +236,7 @@ public class NewSpecCandidateAttemptService {
                 context, dayContext.getCurrentPhase(), candidate.getSku(),
                 earlyProductionDecision,
                 productionOccupationShift,
+                availabilityPlan.getProductionOccupationStartTime(),
                 matchResult.getMachine().getMachineCode(), poolDate, roundCache);
     }
 

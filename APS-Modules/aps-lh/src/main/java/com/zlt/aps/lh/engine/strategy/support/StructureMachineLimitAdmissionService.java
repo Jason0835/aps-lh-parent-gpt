@@ -9,11 +9,16 @@ import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
+import org.springframework.util.CollectionUtils;
 
 import javax.annotation.Resource;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -60,6 +65,36 @@ public class StructureMachineLimitAdmissionService {
             String machineCode,
             LocalDate originalPoolDate,
             NewSpecProposalRoundCache roundCache) {
+        return this.evaluate(
+                context, phase, sku, earlyProductionDecision,
+                formalTargetShift, null, machineCode,
+                originalPoolDate, roundCache);
+    }
+
+    /**
+     * 按首检或正式生产实际占用时刻计算结构机台上限准入结果。
+     *
+     * @param context 排程上下文
+     * @param phase 当前排程阶段
+     * @param sku 当前SKU
+     * @param earlyProductionDecision 当前提前生产准入结论
+     * @param formalTargetShift 生产占用班次
+     * @param productionOccupationStartTime 首检或正式生产实际占用开始时刻
+     * @param machineCode 候选机台编码
+     * @param originalPoolDate SKU原始候选池日期
+     * @param roundCache 当前运行态版本轻量缓存
+     * @return 只读结构准入结果
+     */
+    public StructureMachineLimitDecision evaluate(
+            LhScheduleContext context,
+            DailySchedulePhase phase,
+            SkuScheduleDTO sku,
+            EarlyProductionDecision earlyProductionDecision,
+            LhShiftConfigVO formalTargetShift,
+            Date productionOccupationStartTime,
+            String machineCode,
+            LocalDate originalPoolDate,
+            NewSpecProposalRoundCache roundCache) {
         if (Objects.isNull(sku) || StringUtils.isEmpty(sku.getStructureName())) {
             return this.buildDecision(
                     false, true, phase, null, formalTargetShift, machineCode,
@@ -98,13 +133,19 @@ public class StructureMachineLimitAdmissionService {
                     "结构班次在机索引未初始化");
         }
         String statisticsKey = this.buildStatisticsKey(
-                sku.getStructureName(), formalTargetShift.getShiftIndex());
+                sku.getStructureName(), formalTargetShift.getShiftIndex(),
+                productionOccupationStartTime);
         StructureEarlyProductionAdmission statistics = Objects.isNull(roundCache)
                 ? null : roundCache.getStructureMachineStatistics(statisticsKey);
         if (Objects.isNull(statistics)) {
-            statistics = structureMinMachineRetentionService
+            statistics = Objects.isNull(productionOccupationStartTime)
+                    ? structureMinMachineRetentionService
                     .resolveEffectiveStructureMachineStatistics(
-                            context, sku.getStructureName(), formalTargetShift);
+                            context, sku.getStructureName(), formalTargetShift)
+                    : structureMinMachineRetentionService
+                    .resolveEffectiveStructureMachineStatisticsAtTime(
+                            context, sku.getStructureName(), formalTargetShift,
+                            productionOccupationStartTime);
             if (Objects.nonNull(roundCache)) {
                 roundCache.putStructureMachineStatistics(statisticsKey, statistics);
             }
@@ -136,6 +177,116 @@ public class StructureMachineLimitAdmissionService {
                 statistics.getExcludedEndingPhysicalMachineCodes(),
                 effectivePhysicalMachineCodes, newMachineDelta,
                 structureMachineLimit, reason);
+    }
+
+    /**
+     * 解析当前业务日内最早满足结构在线机台数上限的开产时刻。
+     *
+     * <p>首检计入在线硫化机。当前时刻已满时，按同结构物理机台的真实收尾时刻顺序
+     * 逐点复核；只推进生产时间，不改变机台、SKU、模具或日计划。</p>
+     *
+     * @param context 排程上下文
+     * @param phase 当前排程阶段
+     * @param sku 当前SKU
+     * @param earlyProductionDecision 当前提前生产准入结论
+     * @param machineCode 候选机台编码
+     * @param requestedStartTime 当前时间轴给出的首检或生产占用开始时刻
+     * @param dayShifts 当前业务日可用班次
+     * @param roundCache 当前运行态版本轻量缓存
+     * @return 最早合法占用时刻；当前业务日没有结构名额时返回null
+     */
+    public Date resolveEarliestAllowedProductionOccupationTime(
+            LhScheduleContext context,
+            DailySchedulePhase phase,
+            SkuScheduleDTO sku,
+            EarlyProductionDecision earlyProductionDecision,
+            String machineCode,
+            Date requestedStartTime,
+            List<LhShiftConfigVO> dayShifts,
+            NewSpecProposalRoundCache roundCache) {
+        if (Objects.isNull(context) || Objects.isNull(sku)
+                || StringUtils.isEmpty(sku.getStructureName())
+                || StringUtils.isEmpty(machineCode)
+                || Objects.isNull(requestedStartTime)
+                || CollectionUtils.isEmpty(dayShifts)) {
+            return null;
+        }
+        if (this.shouldSkipNormalStructureShiftLimit(
+                phase, earlyProductionDecision)) {
+            return requestedStartTime;
+        }
+        for (LhShiftConfigVO shift : dayShifts) {
+            Date allowedTime = this.resolveAllowedTimeWithinShift(
+                    context, phase, sku, earlyProductionDecision,
+                    machineCode, requestedStartTime, shift, roundCache);
+            if (Objects.nonNull(allowedTime)) {
+                return allowedTime;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 在单个班次内按当前时刻和结构收尾事件顺序查找合法占用时刻。
+     *
+     * @param context 排程上下文
+     * @param phase 当前排程阶段
+     * @param sku 当前SKU
+     * @param earlyProductionDecision 当前提前生产准入结论
+     * @param machineCode 候选机台编码
+     * @param requestedStartTime 当前请求时刻
+     * @param shift 待扫描班次
+     * @param roundCache 当前运行态版本轻量缓存
+     * @return 本班最早合法时刻；没有可用结构名额时返回null
+     */
+    private Date resolveAllowedTimeWithinShift(
+            LhScheduleContext context,
+            DailySchedulePhase phase,
+            SkuScheduleDTO sku,
+            EarlyProductionDecision earlyProductionDecision,
+            String machineCode,
+            Date requestedStartTime,
+            LhShiftConfigVO shift,
+            NewSpecProposalRoundCache roundCache) {
+        if (Objects.isNull(shift) || Objects.isNull(shift.getShiftStartDateTime())
+                || Objects.isNull(shift.getShiftEndDateTime())
+                || !requestedStartTime.before(shift.getShiftEndDateTime())) {
+            return null;
+        }
+        Date shiftRequestedTime = requestedStartTime.after(
+                shift.getShiftStartDateTime())
+                ? requestedStartTime : shift.getShiftStartDateTime();
+        List<Date> candidateTimeList = new ArrayList<Date>(4);
+        candidateTimeList.add(shiftRequestedTime);
+        String releaseTimeKey = this.buildReleaseTimeKey(
+                sku.getStructureName(), shift.getShiftIndex());
+        Map<String, Date> releaseTimeMap = Objects.isNull(roundCache)
+                ? null : roundCache.getStructureMachineReleaseTimeMap(releaseTimeKey);
+        if (Objects.isNull(releaseTimeMap)) {
+            releaseTimeMap = structureMinMachineRetentionService
+                    .resolveStructurePhysicalMachineReleaseTimeMap(
+                            context, sku.getStructureName(), shift);
+            if (Objects.nonNull(roundCache)) {
+                roundCache.putStructureMachineReleaseTimeMap(
+                        releaseTimeKey, releaseTimeMap);
+            }
+        }
+        releaseTimeMap.values().stream()
+                .filter(Objects::nonNull)
+                .filter(releaseTime -> releaseTime.after(shiftRequestedTime))
+                .filter(releaseTime -> releaseTime.before(shift.getShiftEndDateTime()))
+                .sorted()
+                .distinct()
+                .forEach(candidateTimeList::add);
+        for (Date candidateTime : candidateTimeList) {
+            StructureMachineLimitDecision decision = this.evaluate(
+                    context, phase, sku, earlyProductionDecision,
+                    shift, candidateTime, machineCode, null, roundCache);
+            if (Objects.nonNull(decision) && decision.isAllowed()) {
+                return candidateTime;
+            }
+        }
+        return null;
     }
 
     /**
@@ -211,7 +362,29 @@ public class StructureMachineLimitAdmissionService {
                 effectiveMachineCodes, 0, structureMachineLimit, reason);
     }
 
-    private String buildStatisticsKey(String structureName, Integer shiftIndex) {
+    private String buildStatisticsKey(
+            String structureName,
+            Integer shiftIndex,
+            Date productionOccupationStartTime) {
+        return new StringBuilder(StringUtils.defaultString(structureName))
+                .append("|class")
+                .append(Objects.isNull(shiftIndex) ? 0 : shiftIndex)
+                .append('|')
+                .append(Objects.isNull(productionOccupationStartTime)
+                        ? "SHIFT_END" : productionOccupationStartTime.getTime())
+                .toString();
+    }
+
+    /**
+     * 构造结构班次释放时刻缓存键。
+     *
+     * @param structureName 产品结构
+     * @param shiftIndex 班次序号
+     * @return 结构与班次复合键
+     */
+    private String buildReleaseTimeKey(
+            String structureName,
+            Integer shiftIndex) {
         return new StringBuilder(StringUtils.defaultString(structureName))
                 .append("|class")
                 .append(Objects.isNull(shiftIndex) ? 0 : shiftIndex)

@@ -187,6 +187,29 @@ public class StructureMinMachineRetentionService {
             LhScheduleContext context,
             String structureName,
             LhShiftConfigVO shift) {
+        Date statisticsTime = Objects.isNull(shift)
+                ? null : shift.getShiftEndDateTime();
+        return this.resolveEffectiveStructureMachineStatisticsAtTime(
+                context, structureName, shift, statisticsTime);
+    }
+
+    /**
+     * 统计指定时刻仍在线占用结构名额的物理机台。
+     *
+     * <p>首检属于开产并计入在线硫化机，因此候选首检开始前，仅排除结束时间不晚于
+     * 该时刻且已明确完成下机的物理机台；同班次稍后才收尾的机台继续计数。</p>
+     *
+     * @param context 排程上下文
+     * @param structureName 产品结构
+     * @param shift 候选生产占用班次
+     * @param productionOccupationStartTime 首检或正式生产实际占用开始时刻
+     * @return 指定时刻的结构物理机台统计
+     */
+    public StructureEarlyProductionAdmission resolveEffectiveStructureMachineStatisticsAtTime(
+            LhScheduleContext context,
+            String structureName,
+            LhShiftConfigVO shift,
+            Date productionOccupationStartTime) {
         StructureEarlyProductionAdmission admission =
                 new StructureEarlyProductionAdmission();
         admission.setStructureName(structureName);
@@ -210,10 +233,15 @@ public class StructureMinMachineRetentionService {
          */
         Set<String> structureRuntimeMachineCodes =
                 this.collectStructureRuntimeMachineCodes(context, structureName);
+        Map<String, Date> releaseTimeMap =
+                this.resolvePhysicalMachineReleaseTimeMap(
+                        context, structureName, shift,
+                        rawPhysicalMachineCodes, structureRuntimeMachineCodes);
         for (String physicalMachineCode : rawPhysicalMachineCodes) {
-            if (this.isPhysicalMachineEndingWithinShift(
-                    context, structureName, physicalMachineCode, shift,
-                    structureRuntimeMachineCodes)) {
+            Date releaseTime = releaseTimeMap.get(physicalMachineCode);
+            if (Objects.nonNull(productionOccupationStartTime)
+                    && Objects.nonNull(releaseTime)
+                    && !releaseTime.after(productionOccupationStartTime)) {
                 admission.getExcludedEndingPhysicalMachineCodes().add(
                         physicalMachineCode);
                 continue;
@@ -224,6 +252,63 @@ public class StructureMinMachineRetentionService {
         admission.setScheduledStructureCount(
                 admission.getScheduledPhysicalMachineCodes().size());
         return admission;
+    }
+
+    /**
+     * 获取目标班次内各物理机台明确完成当前结构生产的释放时刻。
+     *
+     * @param context 排程上下文
+     * @param structureName 产品结构
+     * @param shift 目标班次
+     * @return 物理机台到释放时刻的映射；未明确释放的机台不返回
+     */
+    public Map<String, Date> resolveStructurePhysicalMachineReleaseTimeMap(
+            LhScheduleContext context,
+            String structureName,
+            LhShiftConfigVO shift) {
+        if (Objects.isNull(context) || StringUtils.isEmpty(structureName)
+                || Objects.isNull(shift) || Objects.isNull(shift.getShiftIndex())) {
+            return new LinkedHashMap<String, Date>(0);
+        }
+        Set<String> rawPhysicalMachineCodes =
+                Objects.nonNull(context.getStructureShiftInMachineIndex())
+                        ? context.getStructureShiftInMachineIndex()
+                        .resolveInMachinePhysicalCodes(
+                                structureName, shift.getShiftIndex())
+                        : this.collectStructureInMachinePhysicalCodes(
+                        context, structureName, shift.getShiftIndex());
+        return this.resolvePhysicalMachineReleaseTimeMap(
+                context, structureName, shift, rawPhysicalMachineCodes,
+                this.collectStructureRuntimeMachineCodes(context, structureName));
+    }
+
+    /**
+     * 按物理整机汇总目标班次内的最晚释放时刻。
+     *
+     * @param context 排程上下文
+     * @param structureName 产品结构
+     * @param shift 目标班次
+     * @param rawPhysicalMachineCodes 原始结构物理机台
+     * @param structureRuntimeMachineCodes 结构运行态机台
+     * @return 已明确释放的物理机台时刻映射
+     */
+    private Map<String, Date> resolvePhysicalMachineReleaseTimeMap(
+            LhScheduleContext context,
+            String structureName,
+            LhShiftConfigVO shift,
+            Set<String> rawPhysicalMachineCodes,
+            Set<String> structureRuntimeMachineCodes) {
+        Map<String, Date> releaseTimeMap =
+                new LinkedHashMap<String, Date>(rawPhysicalMachineCodes.size());
+        for (String physicalMachineCode : rawPhysicalMachineCodes) {
+            Date releaseTime = this.resolvePhysicalMachineEndingTimeWithinShift(
+                    context, structureName, physicalMachineCode, shift,
+                    structureRuntimeMachineCodes);
+            if (Objects.nonNull(releaseTime)) {
+                releaseTimeMap.put(physicalMachineCode, releaseTime);
+            }
+        }
+        return releaseTimeMap;
     }
 
     /**
@@ -654,16 +739,15 @@ public class StructureMinMachineRetentionService {
      * @param structureName 产品结构
      * @param physicalMachineCode 物理机台编码
      * @param shift 目标班次
-     * @return true-物理整机在本班内已经明确释放；false-仍占用或证据不足
+     * @return 物理整机在本班内的最晚释放时刻；仍占用或证据不足时返回null
      */
-    private boolean isPhysicalMachineEndingWithinShift(
+    private Date resolvePhysicalMachineEndingTimeWithinShift(
             LhScheduleContext context,
             String structureName,
             String physicalMachineCode,
             LhShiftConfigVO shift,
             Set<String> structureRuntimeMachineCodes) {
-        boolean activeMachineFound = false;
-        boolean releaseEvidenceFound = false;
+        Date physicalReleaseTime = null;
         for (String machineCode : structureRuntimeMachineCodes) {
             if (!StringUtils.equals(
                     physicalMachineCode,
@@ -672,28 +756,37 @@ public class StructureMinMachineRetentionService {
                     context, structureName, machineCode, shift.getShiftIndex())) {
                 continue;
             }
-            activeMachineFound = true;
             List<LhScheduleResult> positiveResultList =
                     this.collectPositiveStructureResults(
                             context, structureName, machineCode,
                             shift.getShiftIndex());
             if (CollectionUtils.isEmpty(positiveResultList)) {
-                if (!this.isRuntimeMachineEndingWithinShift(
-                        context, machineCode, shift)) {
-                    return false;
+                Date runtimeReleaseTime =
+                        this.resolveRuntimeMachineEndingTimeWithinShift(
+                                context, machineCode, shift);
+                if (Objects.isNull(runtimeReleaseTime)) {
+                    return null;
                 }
-                releaseEvidenceFound = true;
+                if (Objects.isNull(physicalReleaseTime)
+                        || runtimeReleaseTime.after(physicalReleaseTime)) {
+                    physicalReleaseTime = runtimeReleaseTime;
+                }
                 continue;
             }
             for (LhScheduleResult result : positiveResultList) {
-                if (!this.isResultEndingWithinShift(
-                        context, result, shift)) {
-                    return false;
+                Date resultReleaseTime =
+                        this.resolveResultEndingTimeWithinShift(
+                                context, result, shift);
+                if (Objects.isNull(resultReleaseTime)) {
+                    return null;
                 }
-                releaseEvidenceFound = true;
+                if (Objects.isNull(physicalReleaseTime)
+                        || resultReleaseTime.after(physicalReleaseTime)) {
+                    physicalReleaseTime = resultReleaseTime;
+                }
             }
         }
-        return activeMachineFound && releaseEvidenceFound;
+        return physicalReleaseTime;
     }
 
     /**
@@ -751,16 +844,16 @@ public class StructureMinMachineRetentionService {
      * @param context 排程上下文
      * @param result 排程结果
      * @param shift 目标班次
-     * @return true-班次内完成并下机；false-仍生产或证据不足
+     * @return 班次内完成并下机的实际时刻；仍生产或证据不足时返回null
      */
-    private boolean isResultEndingWithinShift(
+    private Date resolveResultEndingTimeWithinShift(
             LhScheduleContext context,
             LhScheduleResult result,
             LhShiftConfigVO shift) {
         int shiftIndex = shift.getShiftIndex();
         if (this.resolveLastPositiveShiftIndex(result) > shiftIndex) {
             // 后续班次仍有正量是“尚未下机”的直接证据，任何当前班收尾标识都不得覆盖该事实。
-            return false;
+            return null;
         }
         Date actualEndingTime = ShiftFieldUtil.getShiftEndTime(
                 result, shiftIndex);
@@ -768,7 +861,7 @@ public class StructureMinMachineRetentionService {
             actualEndingTime = result.getSpecEndTime();
         }
         if (!this.isEndingTimeWithinShift(actualEndingTime, shift)) {
-            return false;
+            return null;
         }
         boolean shiftEnding = StringUtils.equals(
                 "1", ShiftFieldUtil.getShiftIsEnd(result, shiftIndex));
@@ -794,7 +887,8 @@ public class StructureMinMachineRetentionService {
                 this.isResultProductionCompleted(context, result);
         return reducedOffline
                 || (productionCompleted
-                && (shiftEnding || resultEnding || runtimeEnding));
+                && (shiftEnding || resultEnding || runtimeEnding))
+                ? actualEndingTime : null;
     }
 
     /**
@@ -803,9 +897,9 @@ public class StructureMinMachineRetentionService {
      * @param context 排程上下文
      * @param machineCode 机台编码
      * @param shift 目标班次
-     * @return true-班次内明确下机；false-继续占用或证据不足
+     * @return 班次内明确下机的实际时刻；继续占用或证据不足时返回null
      */
-    private boolean isRuntimeMachineEndingWithinShift(
+    private Date resolveRuntimeMachineEndingTimeWithinShift(
             LhScheduleContext context,
             String machineCode,
             LhShiftConfigVO shift) {
@@ -818,18 +912,19 @@ public class StructureMinMachineRetentionService {
                 machine.getEstimatedEndTime(), shift)
                 && this.isResultProductionCompleted(
                 context, latestResult)) {
-            return true;
+            return machine.getEstimatedEndTime();
         }
         Integer releaseBoundary =
                 context.getContinuousReducedMachineReleaseBoundaryShiftIndex(
                         machineCode);
         if (Objects.isNull(releaseBoundary)
                 || releaseBoundary > shift.getShiftIndex()) {
-            return false;
+            return null;
         }
         return Objects.nonNull(latestResult)
                 && this.isEndingTimeWithinShift(
-                latestResult.getSpecEndTime(), shift);
+                latestResult.getSpecEndTime(), shift)
+                ? latestResult.getSpecEndTime() : null;
     }
 
     /**

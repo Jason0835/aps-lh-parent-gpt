@@ -1,6 +1,7 @@
 package com.zlt.aps.lh.engine.strategy.support;
 
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
+import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.component.EarlyProductionQuantityCalculator;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.ISkuPriorityStrategy;
@@ -11,8 +12,10 @@ import org.springframework.util.CollectionUtils;
 
 import javax.annotation.Resource;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -78,23 +81,34 @@ public class NewSpecCandidatePoolBuilder {
             if (Objects.isNull(candidate) || Objects.isNull(candidate.getSku())) {
                 continue;
             }
-            LocalDate poolDate = this.resolvePoolDate(
+            // 先完整保留现有日期池语义，再叠加胎胚最早可供业务日下限。
+            LocalDate basePoolDate = this.resolvePoolDate(
                     windowStartDate, phase, candidate);
-            candidate.setPoolDate(poolDate);
+            candidate.setPoolDate(basePoolDate);
+            Date earliestLhTime = NewSpecEmbryoAvailableTimeResolver
+                    .resolveEffectiveEarliestAvailableTime(context, candidate.getSku());
+            LocalDate earliestLhPoolDate = this.resolveEarliestLhPoolDate(
+                    context, earliestLhTime);
+            LocalDate effectivePoolDate = this.resolveEffectivePoolDate(
+                    basePoolDate, earliestLhPoolDate);
+            boolean poolDateAdjusted = !Objects.equals(basePoolDate, effectivePoolDate);
             if (!candidate.isSpecialSkuClassified()) {
                 candidate.setSpecialSku(specialSkuSet.contains(candidate.getSku()));
             }
             this.refreshRemainingMachineCount(context, currentDate, candidate);
-            poolMap.computeIfAbsent(poolDate,
+            poolMap.computeIfAbsent(effectivePoolDate,
                     key -> new ArrayList<DailyNewSpecCandidate>(4)).add(candidate);
             log.info("新增排产候选归池, batchNo: {}, phase: {}, businessDate: {}, "
-                            + "materialCode: {}, productStatus: {}, targetPlanDate: {}, poolDate: {}, "
-                            + "runtimeOriginalPoolDate: {}, originalDayPlanQty: {}, dailyQuotaRemaining: {}, "
+                            + "materialCode: {}, productStatus: {}, targetPlanDate: {}, originalPoolDate: {}, "
+                            + "basePoolDate: {}, earliestLhTime: {}, earliestLhPoolDate: {}, "
+                            + "effectivePoolDate: {}, poolDateAdjusted: {}, originalDayPlanQty: {}, "
+                            + "dailyQuotaRemaining: {}, "
                             + "futureOnlyEarlyProductionCandidate: {}, bound: {}, targetMachineCount: {}, "
                             + "scheduledMachineCount: {}, remainingMachineCount: {}, enteredCandidatePool: true",
                     context.getBatchNo(), phase, currentDate,
                     candidate.getSku().getMaterialCode(), candidate.getSku().getProductStatus(),
-                    candidate.getTargetPlanDate(), poolDate, candidate.getPoolDate(),
+                    candidate.getTargetPlanDate(), candidate.getPoolDate(), basePoolDate,
+                    earliestLhTime, earliestLhPoolDate, effectivePoolDate, poolDateAdjusted,
                     candidate.getOriginalDayPlanQty(), candidate.getRealtimeDayPlanRemainingQty(),
                     candidate.isFutureOnlyEarlyProductionCandidate(), candidate.isBoundOnMachine(),
                     candidate.getTargetMachineCount(), candidate.getScheduledMachineCount(),
@@ -179,6 +193,46 @@ public class NewSpecCandidatePoolBuilder {
         Integer delayDays = candidate.getSku().getDelayDays();
         int normalizedDelayDays = Objects.isNull(delayDays) ? 0 : Math.max(0, delayDays);
         return windowStartDate.plusDays(normalizedDelayDays);
+    }
+
+    /**
+     * 将窗口内实际生效的胎胚最早可供时间转换为对应班次业务日期。
+     *
+     * <p>班次定位使用左闭右开时间区间，日期归属严格读取班次 workDate，确保跨零点晚班
+     * 仍归入下一业务日。窗口外时间不在此处调整日期池，继续复用现有超窗拦截规则。</p>
+     *
+     * @param context 排程上下文
+     * @param earliestLhTime 当前实际生效的胎胚最早可供硫化时间
+     * @return 窗口内命中班次的业务日期；未命中或时间未生效时返回 null
+     */
+    private LocalDate resolveEarliestLhPoolDate(LhScheduleContext context,
+                                                Date earliestLhTime) {
+        if (Objects.isNull(context) || Objects.isNull(earliestLhTime)) {
+            return null;
+        }
+        LhShiftConfigVO earliestLhShift = NewSpecEmbryoAvailableTimeResolver
+                .resolveProductionShift(context.getScheduleWindowShifts(), earliestLhTime);
+        if (Objects.isNull(earliestLhShift) || Objects.isNull(earliestLhShift.getWorkDate())) {
+            return null;
+        }
+        return earliestLhShift.getWorkDate().toInstant()
+                .atZone(ZoneId.systemDefault()).toLocalDate();
+    }
+
+    /**
+     * 在现有候选池日期上叠加胎胚最早可供业务日下限。
+     *
+     * @param basePoolDate 现有规则计算出的候选池日期
+     * @param earliestLhPoolDate 胎胚最早可供时间对应业务日期
+     * @return 本轮实际写入日期池 Map 的日期，只允许相对现有日期向后推迟
+     */
+    private LocalDate resolveEffectivePoolDate(LocalDate basePoolDate,
+                                               LocalDate earliestLhPoolDate) {
+        if (Objects.nonNull(earliestLhPoolDate)
+                && earliestLhPoolDate.isAfter(basePoolDate)) {
+            return earliestLhPoolDate;
+        }
+        return basePoolDate;
     }
 
     private void sortPoolCandidates(LhScheduleContext context,

@@ -504,14 +504,15 @@ public final class EarlyProductionChecker {
     }
 
     /**
-     * 判断是否为允许进入提前生产中心的正规续作增机补偿 SKU。
+     * 判断是否具备正规续作增机提前生产的基础身份和日期条件。
      *
-     * <p>该场景必须已经由 S4.4 续作中心识别出未来首次增机日，并复制为 S4.5 新增链路候选。
-     * 直接续作结果、普通新增、换活字块回流、试制和量试均不进入本分支。</p>
+     * <p>该场景必须已经由 S4.4 续作中心识别出首次增机日，并复制为 S4.5 新增链路候选。
+     * 本方法只校验候选身份和首次增机日未过期；是否属于未来增机日提前执行或窗口最后日
+     * 等值借用后续计划，由包含排程窗口参数的重载方法统一判断。</p>
      *
      * @param sku 待判断 SKU
      * @param currentDate 当前业务日
-     * @return true-可按首次增机日判断提前生产；false-保持原入口语义
+     * @return true-具备续作增机提前生产基础条件；false-保持原入口语义
      */
     public static boolean isEligibleContinuationAddMachineEarlyProduction(
             SkuScheduleDTO sku,
@@ -536,10 +537,11 @@ public final class EarlyProductionChecker {
     }
 
     /**
-     * 判断续作增机补偿是否允许在排程窗口最后业务日使用窗口外计划额度。
+     * 判断续作增机补偿是否允许在当前业务日进入共享提前生产中心。
      *
-     * <p>窗口内首次增机日继续由正常资源阶段处理，禁止再次向前提前；只有首次增机日
-     * 位于窗口最后日或窗口外参数范围内时，才在窗口最后日进入共享提前生产中心。</p>
+     * <p>未来首次增机日晚于当前业务日且未超过固定截止日时，允许在正常任务冻结后使用
+     * 当前日剩余资源提前执行；首次增机日已经到达时恢复正常增机。原有“窗口最后日首次
+     * 增机日等于当天、借用后续正计划额度”的场景继续保留。</p>
      *
      * @param context 排程上下文
      * @param sku 待判断SKU
@@ -558,6 +560,16 @@ public final class EarlyProductionChecker {
                 context, sku, currentDate, windowEndDate, earlyProductionMaxDate);
     }
 
+    /**
+     * 结合排程窗口判断续作增机补偿的提前生产日期场景。
+     *
+     * @param context 排程上下文
+     * @param sku 续作增机补偿 SKU
+     * @param currentDate 当前业务日
+     * @param windowEndDate 排程窗口最后业务日
+     * @param earlyProductionMaxDate 固定提前生产截止日
+     * @return true-命中未来增机日提前执行或窗口最后日等值借用；false-恢复正常日期门禁
+     */
     private static boolean isEligibleContinuationAddMachineEarlyProduction(
             LhScheduleContext context,
             SkuScheduleDTO sku,
@@ -566,17 +578,52 @@ public final class EarlyProductionChecker {
             LocalDate earlyProductionMaxDate) {
         if (!isEligibleContinuationAddMachineEarlyProduction(sku, currentDate)
                 || Objects.isNull(context) || Objects.isNull(windowEndDate)
-                || Objects.isNull(earlyProductionMaxDate)
-                || !currentDate.equals(windowEndDate)) {
+                || Objects.isNull(earlyProductionMaxDate)) {
             return false;
         }
-        return !sku.getFirstAddMachineProductionDate().isAfter(earlyProductionMaxDate);
+        LocalDate firstAddMachineDate = sku.getFirstAddMachineProductionDate();
+        return isFutureAddMachineDateEarlyExecution(
+                currentDate, firstAddMachineDate, earlyProductionMaxDate)
+                || isWindowEndEqualDatePlanBorrowing(
+                currentDate, firstAddMachineDate, windowEndDate);
+    }
+
+    /**
+     * 判断是否属于未来首次增机日提前执行。
+     *
+     * @param currentDate 当前业务日
+     * @param firstAddMachineDate 首次增机需求日
+     * @param earlyProductionMaxDate 固定提前生产截止日
+     * @return true-首次增机日晚于当前日且未超过固定截止日；false-不属于提前执行
+     */
+    private static boolean isFutureAddMachineDateEarlyExecution(
+            LocalDate currentDate,
+            LocalDate firstAddMachineDate,
+            LocalDate earlyProductionMaxDate) {
+        return firstAddMachineDate.isAfter(currentDate)
+                && !firstAddMachineDate.isAfter(earlyProductionMaxDate);
+    }
+
+    /**
+     * 判断是否属于窗口最后日等值借用后续正计划额度。
+     *
+     * @param currentDate 当前业务日
+     * @param firstAddMachineDate 首次增机需求日
+     * @param windowEndDate 排程窗口最后业务日
+     * @return true-窗口最后日与首次增机日相等；false-不属于等值借用场景
+     */
+    private static boolean isWindowEndEqualDatePlanBorrowing(
+            LocalDate currentDate,
+            LocalDate firstAddMachineDate,
+            LocalDate windowEndDate) {
+        return currentDate.equals(windowEndDate)
+                && firstAddMachineDate.equals(windowEndDate);
     }
 
     /**
      * 解析续作增机提前实际借用的原始计划来源日。
      *
-     * <p>首次增机日在窗口外时直接使用该日；首次增机日等于窗口最后日时，说明统一
+     * <p>首次增机日晚于当前业务日时直接使用该日；首次增机日等于窗口最后日时，说明统一
      * 目标机台数Map已基于后续高计划提前给出增机日期，此时从下一正计划日借用额度，
      * 避免再次把窗口内较小日计划当成新增机台生产目标。</p>
      */
