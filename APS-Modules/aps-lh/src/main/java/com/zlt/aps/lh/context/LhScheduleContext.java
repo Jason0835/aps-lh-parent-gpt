@@ -524,6 +524,13 @@ public class LhScheduleContext {
      */
     private List<SkuScheduleDTO> newSpecSkuList = new ArrayList<>();
     /**
+     * 试制/量试虚拟机台兜底候选快照。
+     * <p>S4.3 保留无日计划但有硫化余量的试制/量试，S4.5 再合并参数拦截前的正常新增候选；
+     * S4.5.3 只读取该快照核对实际机台已排量和剩余硫化余量。该集合不写入机台资源池，
+     * 也不持久化虚拟机台主数据。</p>
+     */
+    private List<SkuScheduleDTO> trialVirtualMachineCandidateList = new ArrayList<>();
+    /**
      * 本月历史欠产向当前排程窗口传导的数量，key=materialCode_productStatus
      */
     private Map<String, Integer> carryForwardQtyMap = new HashMap<>();
@@ -1396,6 +1403,33 @@ public class LhScheduleContext {
         if (Objects.nonNull(sku) && Objects.nonNull(runtimePlan)) {
             earlyProductionRuntimePlanMap.put(sku, runtimePlan);
         }
+    }
+
+    /**
+     * 登记试制/量试虚拟机台兜底候选。
+     * <p>按“物料+产品状态”去重，保证S4.3无日计划过滤与S4.5参数拦截前合并候选时，
+     * 同一SKU只分配一台虚拟机台。</p>
+     *
+     * @param sku 试制/量试候选
+     * @return void
+     */
+    public void registerTrialVirtualMachineCandidate(SkuScheduleDTO sku) {
+        if (Objects.isNull(sku) || StringUtils.isEmpty(sku.getMaterialCode())) {
+            return;
+        }
+        String targetSkuKey = MonthPlanDateResolver.buildMaterialStatusKey(
+                sku.getMaterialCode(), sku.getProductStatus());
+        for (SkuScheduleDTO candidate : trialVirtualMachineCandidateList) {
+            if (Objects.isNull(candidate)) {
+                continue;
+            }
+            String candidateSkuKey = MonthPlanDateResolver.buildMaterialStatusKey(
+                    candidate.getMaterialCode(), candidate.getProductStatus());
+            if (StringUtils.equals(targetSkuKey, candidateSkuKey)) {
+                return;
+            }
+        }
+        trialVirtualMachineCandidateList.add(sku);
     }
 
     /**

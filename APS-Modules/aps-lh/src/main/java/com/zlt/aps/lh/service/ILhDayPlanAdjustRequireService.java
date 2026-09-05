@@ -3,6 +3,7 @@ package com.zlt.aps.lh.service;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.common.engine.domain.LhDayPlanAdjustVo;
 import com.zlt.aps.lh.api.domain.entity.LhDayPlanAdjustRequire;
+import com.zlt.aps.lh.api.domain.vo.LhDayPlanAdjustRequireSummaryVo;
 import com.zlt.bill.common.service.IDocService;
 
 import java.time.YearMonth;
@@ -20,6 +21,14 @@ public interface ILhDayPlanAdjustRequireService extends IDocService<LhDayPlanAdj
      * @return 分页列表
      */
     TableDataInfo listPage(LhDayPlanAdjustRequire queryVO);
+
+    /**
+     * 汇总当前查询条件下全部月计划行的调整量。
+     *
+     * @param queryVO 查询条件
+     * @return 调整1、调整2、调整3和调整后总合计
+     */
+    LhDayPlanAdjustRequireSummaryVo summary(LhDayPlanAdjustRequire queryVO);
 
     /**
      * 保存当前行三次调整。

@@ -14,7 +14,6 @@ import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.factory.ScheduleStrategyFactory;
 import com.zlt.aps.lh.engine.strategy.ICapacityCalculateStrategy;
 import com.zlt.aps.lh.engine.strategy.IFirstInspectionBalanceStrategy;
-import com.zlt.aps.lh.engine.strategy.IHistoricalMouldChangeReverseSelectionStrategy;
 import com.zlt.aps.lh.engine.strategy.IMachineMatchStrategy;
 import com.zlt.aps.lh.engine.strategy.IMouldChangeBalanceStrategy;
 import com.zlt.aps.lh.engine.strategy.IProductionStrategy;
@@ -46,8 +45,8 @@ import java.util.Set;
  *
  * <p>注意：试制、量试、小批量、正规 SKU 的差异主要在排序 tie-break、单控机台约束、
  * 严格目标量和班次补满策略中体现，不应在本 Handler 中新增并行业务分支；
- * 唯一例外是硫化参数 SYS0311004=0 时在入口统一拦截试制、量试 SKU（续作排产不受该参数影响），
- * 该拦截只做准入排除和未排落库，不参与选机和数量分配。</p>
+ * 唯一例外是硫化参数 SYS0311004=0 时在入口统一拦截试制、量试 SKU 的真实机台排产
+ * （续作排产不受该参数影响），同时在拦截前冻结候选，供 S4.5.3 虚拟机台最终兜底。</p>
  *
  * @author APS
  */
@@ -57,8 +56,6 @@ public class NewProductionHandler extends AbsScheduleStepHandler {
 
     @Resource
     private ScheduleStrategyFactory strategyFactory;
-    @Resource
-    private IHistoricalMouldChangeReverseSelectionStrategy historicalReverseSelectionStrategy;
     @Resource
     private StructureEndingAlignmentService structureEndingAlignmentService;
     @Resource
@@ -74,10 +71,18 @@ public class NewProductionHandler extends AbsScheduleStepHandler {
                 context.getUnscheduledResultList().size());
 
         /*
-         * SYS0311004=0 时试制、量试不参与新增排产（续作排产不受该参数影响）。
-         * 必须在排序、前日交替反选和普通新增选机之前统一拦截：同物料多状态续作切换在S4.4
+         * SYS0311004 只控制试制/量试是否进入真实机台新增排产。参数未配置或为0时，
+         * 这些 SKU 仍属于虚拟机台最终兜底范围，因此必须在参数拦截前冻结候选；
+         * 正常新增选机结束后会把终局未排 SKU 移出待排列表，S4.5.3 只能读取该快照
+         * 核对实际机台已排量，且不得把虚拟机台写回真实机台资源池。
+         */
+        this.captureTrialVirtualMachineCandidates(context);
+
+        /*
+         * SYS0311004=0 时试制、量试不参与真实机台新增排产（续作排产不受该参数影响）。
+         * 必须在排序和普通新增选机之前统一拦截：同物料多状态续作切换在S4.4
          * 已按续作口径消费可承接的X/T候选，此处只拦截仍残留在新增待排列表中的试制、量试SKU，
-         * 写未排记录并清理运行态，避免其继续进入任何新增选机环节。
+         * 写未排记录并清理真实机台运行态；前面冻结的对象身份快照继续留给S4.5.3虚拟机台兜底。
          */
         this.excludeTrialMassTrialNewSpecSkus(context);
 
@@ -113,18 +118,7 @@ public class NewProductionHandler extends AbsScheduleStepHandler {
             log.debug("新增规格SKU优先级排序完成, 待排新增SKU: {}", context.getNewSpecSkuList().size());
 
             /*
-             * S4.5.3 前日交替计划机台反选：
-             * 必须在新增SKU业务优先级排序完成后、普通新增选机前执行。反选策略会按历史班次4、5的
-             * “机台+后物料”关系登记指定机台指令；机台驱动主链先在固定组合独立作用域执行
-             * 完整可排校验，失败后再进入普通动态竞争。指令不得改写上一步形成的 SKU 业务排序字段。
-             */
-            historicalReverseSelectionStrategy.reverseSelect(context);
-            log.info("前日交替计划机台反选完成, 排程结果数: {}, 待新增SKU: {}, 指令数: {}",
-                    context.getScheduleResultList().size(), context.getNewSpecSkuList().size(),
-                    context.getHistoricalReverseSelectionDirectiveList().size());
-
-            /*
-             * S4.5.3.1 结构收尾对齐在机统计缓存构建：
+             * S4.5.3 结构收尾对齐在机统计缓存构建：
              * 结构转产表最大收尾日期已在S4.2月计划完成后的依赖任务中加载，本调用不再查询数据库。
              * 基于续作+换活字块排产完成后的实时排程结果构建【结构×班次】在机统计，
              * 后续每次新增选机先用S4.2日期快照校验[T,T+2]门禁；通过后才读取该动态缓存执行
@@ -146,7 +140,7 @@ public class NewProductionHandler extends AbsScheduleStepHandler {
 
             /*
              * S4.5.8 新增排产按业务日编排：
-             * 1. 保持上方已生成的SKU业务顺序和历史反选指令，不在日循环内重算业务排序权重；
+             * 1. 保持上方已生成的SKU业务顺序，不在日循环内重算业务排序权重；
              * 2. 将class1～class8按workDate拆为T日2班、T+1/T+2各3班；
              * 3. 每日依次执行“在机延续、当天计划/锁定、加机台、提前生产、日终结转”；
              * 4. 每台机台按原业务顺序扫描候选，匹配等级优先、同等级以业务顺序兜底；
@@ -227,6 +221,28 @@ public class NewProductionHandler extends AbsScheduleStepHandler {
                 context.getFactoryCode(), context.getBatchNo(), blockedSkuList.size(),
                 context.getNewSpecSkuList().size(),
                 PendingSkuUnscheduledRule.NEW_SPEC_TRIAL_EXCLUSION_UNSCHEDULED_REASON);
+    }
+
+    /**
+     * 冻结本次新增排产归集形成的试制/量试候选。
+     * <p>调用时点必须早于SYS0311004参数拦截，保证参数未配置或为0时，SKU只退出真实机台
+     * 新增排产，不退出S4.5.3虚拟机台最终兜底。</p>
+     *
+     * @param context 排程上下文
+     * @return void
+     */
+    private void captureTrialVirtualMachineCandidates(LhScheduleContext context) {
+        if (CollectionUtils.isEmpty(context.getNewSpecSkuList())) {
+            return;
+        }
+        context.getNewSpecSkuList().stream()
+                .filter(Objects::nonNull)
+                .filter(PendingSkuUnscheduledRule::isTrialOrMassTrialSku)
+                .filter(sku -> sku.getSurplusQty() > 0)
+                .forEach(context::registerTrialVirtualMachineCandidate);
+        log.info("试制量试虚拟机台候选快照完成, factoryCode: {}, batchNo: {}, candidateCount: {}",
+                context.getFactoryCode(), context.getBatchNo(),
+                context.getTrialVirtualMachineCandidateList().size());
     }
 
     /**

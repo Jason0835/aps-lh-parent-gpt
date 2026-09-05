@@ -7,6 +7,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.lh.api.domain.entity.LhDayPlanAdjustRequire;
+import com.zlt.aps.lh.api.domain.vo.LhDayPlanAdjustRequireSummaryVo;
 import com.zlt.aps.lh.service.ILhDayPlanAdjustRequireService;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
@@ -47,6 +48,23 @@ public class LhDayPlanAdjustRequireController extends AbstractDocBizController<L
             tableDataInfo.setCode(500);
             tableDataInfo.setMsg(exception.getMessage());
             return tableDataInfo;
+        }
+    }
+
+    /**
+     * 查询汇总。
+     *
+     * @param queryVO 查询条件，与列表一致
+     * @return 全部匹配行的调整量汇总
+     */
+    @ApiOperation("查询硫化日计划调整需求汇总")
+    @PostMapping("/summary")
+    public AjaxResult summary(@RequestBody LhDayPlanAdjustRequire queryVO) {
+        try {
+            LhDayPlanAdjustRequireSummaryVo summaryVo = lhDayPlanAdjustRequireService.summary(queryVO);
+            return AjaxResult.success(summaryVo);
+        } catch (IllegalArgumentException exception) {
+            return AjaxResult.error(exception.getMessage());
         }
     }
 

@@ -9,6 +9,7 @@ import com.zlt.aps.lh.handler.PreValidationHandler;
 import com.zlt.aps.lh.handler.ResultValidationHandler;
 import com.zlt.aps.lh.handler.ScheduleAdjustHandler;
 import com.zlt.aps.lh.handler.SpecialMaterialSubstitutionHandler;
+import com.zlt.aps.lh.handler.TrialVirtualMachineProductionHandler;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -24,6 +25,7 @@ import javax.annotation.Resource;
  *   <li>{@link ScheduleAdjustHandler}：月计划 SKU 归集、欠产传导、收尾和续作/新增分类；</li>
  *   <li>{@link ContinuousProductionHandler}：续作、换活字块、续作降模；</li>
  *   <li>{@link NewProductionHandler}：新增 SKU 选机、换模、首检、班次分配；</li>
+ *   <li>{@link TrialVirtualMachineProductionHandler}：实际机台阶段结束后的试制/量试虚拟机台兜底；</li>
  *   <li>{@link ResultValidationHandler}：后置校验、换模计划、工单号和结果保存。</li>
  * </ul>
  *
@@ -55,6 +57,9 @@ public class LhScheduleTemplateImpl extends AbsLhScheduleTemplate {
 
     @Resource
     private SpecialMaterialSubstitutionHandler specialMaterialSubstitutionHandler;
+
+    @Resource
+    private TrialVirtualMachineProductionHandler trialVirtualMachineProductionHandler;
 
     @Resource
     private ResultValidationHandler resultValidationHandler;
@@ -93,6 +98,11 @@ public class LhScheduleTemplateImpl extends AbsLhScheduleTemplate {
     protected void doSpecialMaterialSubstitution(LhScheduleContext context) {
         // S4.5.1 Handler 内部固定按“共用模具联动置换 -> 原特殊材料兜底置换”顺序执行。
         specialMaterialSubstitutionHandler.handle(context);
+    }
+
+    @Override
+    protected void doTrialVirtualMachineProduction(LhScheduleContext context) {
+        trialVirtualMachineProductionHandler.handle(context);
     }
 
     @Override

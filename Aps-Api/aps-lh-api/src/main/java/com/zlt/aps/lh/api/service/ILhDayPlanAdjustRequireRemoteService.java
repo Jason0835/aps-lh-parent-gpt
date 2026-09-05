@@ -27,6 +27,16 @@ public interface ILhDayPlanAdjustRequireRemoteService {
     TableDataInfo list(@RequestBody LhDayPlanAdjustRequire queryVO);
 
     /**
+     * 查询硫化日计划调整需求汇总。
+     *
+     * @param queryVO 查询条件，与列表一致
+     * @return 全部匹配行的调整量汇总
+     */
+    @ApiOperation("查询硫化日计划调整需求汇总")
+    @PostMapping("/lhDayPlanAdjustRequire/summary")
+    AjaxResult summary(@RequestBody LhDayPlanAdjustRequire queryVO);
+
+    /**
      * 保存当前行三次调整。
      *
      * @param entity 当前行数据

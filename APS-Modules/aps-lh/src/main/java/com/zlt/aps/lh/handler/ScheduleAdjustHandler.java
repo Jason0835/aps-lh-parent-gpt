@@ -2315,6 +2315,12 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
                 LhUnscheduledResult dailyPlanUnscheduledResult =
                         PendingSkuUnscheduledRule.evaluateDailyPlanAdmission(context, sku);
                 if (Objects.nonNull(dailyPlanUnscheduledResult)) {
+                    /*
+                     * 无日计划仍保持原逻辑，不进入续作、换活字块、真实机台新增或特殊置换。
+                     * 仅试制/量试且硫化余量大于0时，额外保留对象给S4.5.3虚拟机台最终兜底；
+                     * 正规SKU继续只写未排，不进入虚拟候选。
+                     */
+                    this.preserveNoDailyPlanTrialVirtualCandidate(context, sku);
                     context.getUnscheduledResultList().add(dailyPlanUnscheduledResult);
                     blockedDailyPlanSkuList.add(sku);
                     continue;
@@ -2360,6 +2366,29 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         // SKU减量清单统一前置过滤：命中减量清单的SKU不进入任何排产入口，写未排并从排产集合移除
         skuDecrementChecker.filterDecrementSkus(context);
         log.info("续作/新增SKU区分完成, 续作: {}个, 新增: {}个", continuousSkuList.size(), newSpecSkuList.size());
+    }
+
+    /**
+     * 保留无日计划但仍有硫化余量的试制/量试虚拟机台候选。
+     * <p>该方法只登记S4.5.3专用快照，不修改新增列表、结构池、机台、模具、胎胚或日计划账本；
+     * 调用后仍由原准入分支写未排并执行完整清理，确保其他排产阶段行为不变。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 无日计划SKU
+     * @return void
+     */
+    private void preserveNoDailyPlanTrialVirtualCandidate(LhScheduleContext context,
+                                                          SkuScheduleDTO sku) {
+        if (Objects.isNull(context) || Objects.isNull(sku)
+                || !PendingSkuUnscheduledRule.isTrialOrMassTrialSku(sku)
+                || sku.getSurplusQty() <= 0) {
+            return;
+        }
+        context.registerTrialVirtualMachineCandidate(sku);
+        log.info("无日计划试制量试保留虚拟机台兜底候选, factoryCode: {}, batchNo: {}, "
+                        + "materialCode: {}, productStatus: {}, constructionStage: {}, surplusQty: {}",
+                context.getFactoryCode(), context.getBatchNo(), sku.getMaterialCode(),
+                sku.getProductStatus(), sku.getConstructionStage(), sku.getSurplusQty());
     }
 
     /**
@@ -2701,7 +2730,8 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     /**
      * 清理已判定不进入新增排产的SKU运行态数据。
      * <p>该方法必须在结构SKU遍历完成后调用，避免遍历过程中修改结构集合。清理后SKU不会进入新增、
-     * 换活字块、空闲产能补排或胎胚动态分配入口。</p>
+     * 换活字块、空闲产能补排或胎胚动态分配入口。无日计划但有硫化余量的试制/量试若已登记
+     * S4.5.3专用快照，该快照独立保留，不恢复上述真实资源排产入口。</p>
      *
      * @param context 排程上下文
      * @param sku     被拦截的SKU

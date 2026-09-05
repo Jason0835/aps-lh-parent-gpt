@@ -1021,6 +1021,48 @@ public class TargetScheduleQtyResolver {
                                             int scheduledQty,
                                             String scene,
                                             String machineCode) {
+        return this.deductProductionRemainingQty(
+                context, sku, scheduledQty, scene, machineCode, true);
+    }
+
+    /**
+     * 扣减试制/量试虚拟机台使用的硫化余量账本。
+     * <p>虚拟机台是正常实际机台排产失败后的最终兜底，只按硫化余量排产，不消费或限制
+     * 真实胎胚库存账本，避免虚拟结果反向影响真实机台后续资源判断。</p>
+     *
+     * @param context 排程上下文
+     * @param sku SKU
+     * @param scheduledQty 本班计划量
+     * @param scene 排产场景
+     * @param machineCode 虚拟机台编码
+     * @return 实际扣减量
+     */
+    public int deductVirtualMachineCuringRemainingQty(LhScheduleContext context,
+                                                       SkuScheduleDTO sku,
+                                                       int scheduledQty,
+                                                       String scene,
+                                                       String machineCode) {
+        return this.deductProductionRemainingQty(
+                context, sku, scheduledQty, scene, machineCode, false);
+    }
+
+    /**
+     * 扣减 SKU 实际排产剩余账本。
+     *
+     * @param context 排程上下文
+     * @param sku SKU
+     * @param scheduledQty 本次实际排产量
+     * @param scene 排产场景
+     * @param machineCode 机台编码
+     * @param limitByEmbryoStock 是否同时受胎胚库存账本限制并消费胎胚库存
+     * @return 实际扣减量
+     */
+    private int deductProductionRemainingQty(LhScheduleContext context,
+                                              SkuScheduleDTO sku,
+                                              int scheduledQty,
+                                              String scene,
+                                              String machineCode,
+                                              boolean limitByEmbryoStock) {
         if (scheduledQty <= 0 || Objects.isNull(sku)) {
             return 0;
         }
@@ -1028,19 +1070,23 @@ public class TargetScheduleQtyResolver {
             return 0;
         }
         int currentRemainingQty = resolveProductionRemainingQty(context, sku);
-        int ledgerRemainingQty = resolveEmbryoStockLedgerRemainingQty(context, sku);
-        int effectiveRemainingQty = ledgerRemainingQty < 0
+        int ledgerRemainingQty = limitByEmbryoStock
+                ? resolveEmbryoStockLedgerRemainingQty(context, sku) : -1;
+        int effectiveRemainingQty = !limitByEmbryoStock || ledgerRemainingQty < 0
                 ? currentRemainingQty : Math.min(currentRemainingQty, ledgerRemainingQty);
         int deductedQty = Math.min(effectiveRemainingQty, scheduledQty);
         if (Objects.nonNull(context) && StringUtils.isNotEmpty(sku.getMaterialCode())) {
             context.getSkuProductionRemainingQtyMap().put(
                     buildSkuKey(sku), Math.max(0, currentRemainingQty - deductedQty));
         }
-        deductEmbryoStockLedger(context, sku, deductedQty, scene, machineCode);
+        if (limitByEmbryoStock) {
+            deductEmbryoStockLedger(context, sku, deductedQty, scene, machineCode);
+        }
         log.info("SKU实际消费账本扣减, scene: {}, materialCode: {}, machineCode: {}, 本次排产量: {}, "
-                        + "SKU扣减前剩余: {}, 胎胚账本剩余: {}, 实际扣减: {}, SKU扣减后剩余: {}",
+                        + "SKU扣减前剩余: {}, 胎胚账本剩余: {}, 是否受胎胚限制: {}, 实际扣减: {}, SKU扣减后剩余: {}",
                 scene, sku.getMaterialCode(), machineCode, scheduledQty,
-                currentRemainingQty, ledgerRemainingQty, deductedQty, Math.max(0, currentRemainingQty - deductedQty));
+                currentRemainingQty, ledgerRemainingQty, limitByEmbryoStock,
+                deductedQty, Math.max(0, currentRemainingQty - deductedQty));
         return deductedQty;
     }
 

@@ -955,15 +955,6 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
 
 
     /**
-     * 补全MES物料编码和示方号
-     * 1. 通过物料编码关联物料信息表(MdmMaterialInfo)获取MES物料编码
-     * 2. 通过物料编码关联SKU与示方书关系表(MdmSkuConstructionRef)获取硫化示方书号作为示方号
-     * 3个班的示方号都取同一个值
-     *
-     * @param issueList 硫化排程结果下发列表
-     */
-
-    /**
      * 判断硫化排程结果某天对应班次的计划量是否全为空(null或0)
      * 用于下发MES前过滤：某天班次组全空则不下发该天数据
      *
@@ -979,6 +970,14 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         return true;
     }
 
+    /**
+     * 补全MES物料编码和示方号
+     * 1. 通过物料编码关联物料信息表(MdmMaterialInfo)获取MES物料编码
+     * 2. 通过物料编码关联SKU与示方书关系表(MdmSkuConstructionRef)获取硫化示方书号作为示方号
+     * 3个班的示方号都取同一个值
+     *
+     * @param issueList 硫化排程结果下发列表
+     */
     private void enrichMaterialAndExampleInfo(List<LhScheduleResultIssue> issueList) {
         if (CollectionUtils.isEmpty(issueList)) {
             return;

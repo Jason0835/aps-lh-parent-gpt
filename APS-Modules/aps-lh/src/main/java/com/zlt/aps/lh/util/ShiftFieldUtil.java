@@ -63,6 +63,27 @@ public final class ShiftFieldUtil {
     }
 
     /**
+     * 设置指定班次的硫化示方书号和类型。
+     *
+     * @param result 排程结果
+     * @param shiftIndex 班次索引1～8
+     * @param lhNo 硫化示方书号
+     * @param lhType 硫化示方书类型
+     */
+    public static void setShiftCureFormula(LhScheduleResult result,
+                                           int shiftIndex,
+                                           String lhNo,
+                                           String lhType) {
+        if (Objects.isNull(result) || !isValidIndex(shiftIndex)) {
+            log.warn("未知班次索引: {}", shiftIndex);
+            return;
+        }
+        String prefix = propertyPrefix(shiftIndex);
+        BeanUtil.setProperty(result, prefix + "LhNo", lhNo);
+        BeanUtil.setProperty(result, prefix + "LhType", lhType);
+    }
+
+    /**
      * 设置班次完成量
      *
      * @param result     排程结果

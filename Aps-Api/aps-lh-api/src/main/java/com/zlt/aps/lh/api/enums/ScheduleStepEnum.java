@@ -24,6 +24,8 @@ public enum ScheduleStepEnum {
     S4_5_2_DAY_PLAN_ADJUST("S4.5.2", "硫化日计划调整排产"),
     /** S4.5.1 特殊材料硫化机置换：续作、换活字块、新增排产全部完成后，对仍未排上机台的特殊材料SKU执行兜底置换 */
     S4_5_1_SPECIAL_MATERIAL_SUBSTITUTION("S4.5.1", "特殊材料硫化机置换"),
+    /** S4.5.3 试制/量试虚拟机台排产：全部实际机台排产阶段完成后，对仍有硫化余量的试制/量试新增候选执行最终兜底 */
+    S4_5_3_TRIAL_VIRTUAL_MACHINE_PRODUCTION("S4.5.3", "试制/量试虚拟机台排产"),
     S4_6_RESULT_VALIDATION("S4.6", "结果校验与发布保存");
 
     /** 步骤编码 */

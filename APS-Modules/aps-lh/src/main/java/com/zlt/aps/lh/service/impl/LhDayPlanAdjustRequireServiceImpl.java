@@ -11,6 +11,7 @@ import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.common.engine.domain.LhDayPlanAdjustVo;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.lh.api.domain.entity.LhDayPlanAdjustRequire;
+import com.zlt.aps.lh.api.domain.vo.LhDayPlanAdjustRequireSummaryVo;
 import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
 import com.zlt.aps.lh.mapper.FactoryMonthPlanProductionFinalResultMapper;
 import com.zlt.aps.lh.mapper.LhDayPlanAdjustRequireMapper;
@@ -86,6 +87,36 @@ public class LhDayPlanAdjustRequireServiceImpl extends AbstractDocService<LhDayP
         this.fillTreadGlueTd(pageRows, queryVO.getFactoryCode());
         pageRows.forEach(this::calculateAdjustedTotalQty);
         return this.buildTableData(pageRows, allRows.size());
+    }
+
+    /**
+     * 汇总当前查询条件下全部月计划行的调整量。
+     *
+     * @param queryVO 查询条件
+     * @return 调整1、调整2、调整3和调整后总合计
+     */
+    @Override
+    public LhDayPlanAdjustRequireSummaryVo summary(LhDayPlanAdjustRequire queryVO) {
+        this.normalizeQuery(queryVO);
+        LhDayPlanAdjustRequireSummaryVo summaryVo = new LhDayPlanAdjustRequireSummaryVo();
+        String productionVersion = this.resolveFinalProductionVersion(queryVO);
+        if (StringUtils.isBlank(productionVersion)) {
+            return summaryVo;
+        }
+        List<FactoryMonthPlanProductionFinalResult> monthPlanList = this.queryMonthPlanList(queryVO, productionVersion);
+        List<LhDayPlanAdjustRequire> allRows = this.aggregateMonthPlanRows(queryVO, productionVersion, monthPlanList);
+        this.fillAdjustRows(allRows);
+        for (LhDayPlanAdjustRequire row : allRows) {
+            summaryVo.setAdjustQty1(BigDecimalUtils.add(summaryVo.getAdjustQty1(), row.getAdjustQty1()));
+            summaryVo.setAdjustQty2(BigDecimalUtils.add(summaryVo.getAdjustQty2(), row.getAdjustQty2()));
+            summaryVo.setAdjustQty3(BigDecimalUtils.add(summaryVo.getAdjustQty3(), row.getAdjustQty3()));
+            summaryVo.setAdjustedTotalQty(BigDecimalUtils.add(
+                    summaryVo.getAdjustedTotalQty(),
+                    BigDecimalUtils.add(row.getMonthPlanQty(),
+                            BigDecimalUtils.add(row.getAdjustQty1(),
+                                    BigDecimalUtils.add(row.getAdjustQty2(), row.getAdjustQty3())))));
+        }
+        return summaryVo;
     }
 
     /**

@@ -24,7 +24,8 @@ import java.util.ArrayList;
  * <pre>
  * 流程: S4.1前置校验 -> S4.2数据初始化 -> S4.3排程调整与SKU归集
  *       -> S4.4续作规格排产 -> S4.5新增规格排产 -> S4.5.2硫化日计划调整排产
- *       -> S4.5.1特殊材料硫化机置换 -> S4.6结果校验与发布保存
+ *       -> S4.5.1特殊材料硫化机置换 -> S4.5.3试制/量试虚拟机台排产
+ *       -> S4.6结果校验与发布保存
  * </pre>
  *
  * @author APS
@@ -123,6 +124,20 @@ public abstract class AbsLhScheduleTemplate {
                 return buildInterruptResponse(context);
             }
 
+            /*
+             * S4.5.3 试制/量试虚拟机台最终兜底：
+             * 必须在全部实际机台排产和置换结束后执行，只消费 S4.5 前冻结的新增候选快照，
+             * 不向真实机台、模具、换活字块或首检资源账本写入任何虚拟资源。
+             */
+            context.setCurrentStep(ScheduleStepEnum.S4_5_3_TRIAL_VIRTUAL_MACHINE_PRODUCTION.getCode());
+            log.info(">>> 步骤 S4.5.3: {}",
+                    ScheduleStepEnum.S4_5_3_TRIAL_VIRTUAL_MACHINE_PRODUCTION.getDescription());
+            doTrialVirtualMachineProduction(context);
+            logStepSnapshot(context, ScheduleStepEnum.S4_5_3_TRIAL_VIRTUAL_MACHINE_PRODUCTION);
+            if (context.isInterrupted()) {
+                return buildInterruptResponse(context);
+            }
+
             // S4.6 结果校验与发布保存：生成换模计划、补全工单号，并原子替换目标日结果。
             context.setCurrentStep(ScheduleStepEnum.S4_6_RESULT_VALIDATION.getCode());
             log.info(">>> 步骤 S4.6: {}", ScheduleStepEnum.S4_6_RESULT_VALIDATION.getDescription());
@@ -171,6 +186,9 @@ public abstract class AbsLhScheduleTemplate {
 
     /** S4.5.1 特殊材料硫化机置换 */
     protected abstract void doSpecialMaterialSubstitution(LhScheduleContext context);
+
+    /** S4.5.3 试制/量试虚拟机台排产 */
+    protected abstract void doTrialVirtualMachineProduction(LhScheduleContext context);
 
     /** S4.6 结果校验与发布保存 */
     protected abstract void doResultValidationAndSave(LhScheduleContext context);
