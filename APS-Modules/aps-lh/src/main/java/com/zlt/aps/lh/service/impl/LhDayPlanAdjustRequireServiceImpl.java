@@ -272,10 +272,16 @@ public class LhDayPlanAdjustRequireServiceImpl extends AbstractDocService<LhDayP
                         row.setDisplaySeq(plan.getDisplaySeq());
                     }
                 });
-        return rowMap.values().stream()
+        /*return rowMap.values().stream()
                 .sorted(Comparator.comparing(LhDayPlanAdjustRequire::getDisplaySeq,
                                 Comparator.nullsLast(Integer::compareTo))
                         .thenComparing(LhDayPlanAdjustRequire::getMaterialCode,
+                                Comparator.nullsLast(String::compareTo))
+                        .thenComparing(LhDayPlanAdjustRequire::getProductStatus,
+                                Comparator.nullsLast(String::compareTo)))
+                .collect(Collectors.toList());*/
+        return rowMap.values().stream()
+                .sorted(Comparator.comparing(LhDayPlanAdjustRequire::getMaterialDesc,
                                 Comparator.nullsLast(String::compareTo))
                         .thenComparing(LhDayPlanAdjustRequire::getProductStatus,
                                 Comparator.nullsLast(String::compareTo)))
