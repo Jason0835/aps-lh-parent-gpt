@@ -3,7 +3,7 @@ package com.zlt.aps.common.engine.schedule.engine;
 import lombok.Data;
 
 import java.math.BigDecimal;
-import java.util.Date;
+import java.time.LocalDate;
 import java.util.List;
 /** TM/TC 新规格识别公共运行态模型。 */
 @Data
@@ -18,11 +18,11 @@ public class ScheduleNewSpecInfoModel {
     protected Integer formingWindowStartClass;
     protected Integer formingWindowEndClass;
     protected Integer formingWindowEstimatedShiftCount;
-    protected Date previousStockDate;
+    protected LocalDate previousStockDate;
     protected BigDecimal previousDayStockQty;
     protected Boolean previousDayStockExists;
-    protected Date historyStartDate;
-    protected Date historyEndDate;
+    protected LocalDate historyStartDate;
+    protected LocalDate historyEndDate;
     protected Boolean historySchedulePlanExists;
     protected Integer normalTargetShift;
     protected Integer adjustedTargetShift;

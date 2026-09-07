@@ -1,12 +1,18 @@
 package com.zlt.aps.common.engine.schedule.engine;
 
 import cn.hutool.core.util.StrUtil;
+import com.ruoyi.common.exception.ServiceException;
 import com.zlt.aps.common.engine.schedule.*;
 import com.zlt.aps.common.engine.schedule.constraint.ScheduleToolLedgerSnapshot;
+import lombok.AccessLevel;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.*;
+import java.util.function.Supplier;
 
 /**
  * TM/TC 自动排程公共运行态上下文模型。
@@ -14,17 +20,31 @@ import java.util.*;
  * <p>该模型不落库，只统一两侧步骤服务共享的数据总线；产品差异通过领域上下文和边界模型承载。</p>
  */
 @Data
-public class ScheduleContextModel<T extends ScheduleTaskDraftModel, S, R extends ScheduleRuleTrace, PR,
-        F extends ScheduleInventoryForecast, M extends ScheduleMachineCandidateModel,
-        L, I, Pred> {
+public abstract class ScheduleContextModel<T extends ScheduleTaskDraftModel,
+        S extends ScheduleSnapshotBuildResultModel, R extends ScheduleRuleTrace,
+        F extends ScheduleInventoryForecast, M extends ScheduleMachineCandidateModel>
+        implements InventoryPredictionContext<F>,
+        PlanCalculationContext<T, F, SchedulePlanTaskGroup<T>>,
+        TaskChainContextAccess<T>, MachineAssignmentContext<T> {
 
     protected String factoryCode;
     protected String batchNo;
     protected String traceId;
+    /** 参数为空消息工厂，保持领域国际化消息在使用时读取。 */
+    @Getter(AccessLevel.NONE)
+    @EqualsAndHashCode.Exclude
+    private final Supplier<String> paramEmptyMessageSupplier;
     protected ScheduleProcessTraceBuffer processTraceBuffer = new ScheduleProcessTraceBuffer();
-    protected Date scheduleDate;
+    protected LocalDate scheduleDate;
     protected String operator;
     protected Map<String, ScheduleParamValueModel> paramMap = new HashMap<>();
+    /** 排程日期为空消息工厂，保持领域国际化消息在使用时读取。 */
+    @Getter(AccessLevel.NONE)
+    @EqualsAndHashCode.Exclude
+    private final Supplier<String> scheduleDateEmptyMessageSupplier;
+    /** 最大班次配置。 */
+    @EqualsAndHashCode.Exclude
+    private final int maxShiftOrder;
     protected List<T> taskDraftList = new ArrayList<>();
     protected List<T> sourceTaskDraftList = new ArrayList<>();
     protected Map<String, SchedulePlanTaskGroup<T>> planTaskGroupMap = new LinkedHashMap<>();
@@ -35,7 +55,8 @@ public class ScheduleContextModel<T extends ScheduleTaskDraftModel, S, R extends
     protected Map<String, Integer> processRuleTraceCursorMap = new HashMap<>();
     protected String currentProcessStep;
     protected List<String> completedProcessSteps = new ArrayList<>();
-    protected PR persistResult;
+    /** 本次异步自动排程任务编号。 */
+    protected String taskId;
     protected Map<String, Object> qualitySummary = new LinkedHashMap<>();
     protected Map<String, F> stockForecastMap = new HashMap<>();
     /** 用于库存预测和工装占用的产品集合，与可排任务集合严格分离。 */
@@ -46,7 +67,8 @@ public class ScheduleContextModel<T extends ScheduleTaskDraftModel, S, R extends
     protected List<M> machineCandidateList = new ArrayList<>();
     protected Set<String> configuredMouthPlateCodeSet = new HashSet<>();
     protected Set<String> configuredGlueCodeSet = new HashSet<>();
-    protected List<L> lossRuleList = new ArrayList<>();
+    /** 数据加载阶段按产品编码形成的实验规格月计划映射。 */
+    protected Map<String, ScheduleExperimentSpecInfoModel> experimentSpecInfoMap = new LinkedHashMap<>();
     protected BigDecimal initialAvailableToolQty;
     protected BigDecimal currentAvailableToolQty;
     protected Map<String, ScheduleToolLedgerSnapshot> toolLedgerSnapshotMap = new LinkedHashMap<>();
@@ -55,9 +77,10 @@ public class ScheduleContextModel<T extends ScheduleTaskDraftModel, S, R extends
     protected Integer toolLedgerSequence = 0;
     protected Set<String> smallGlueCodeSet = new HashSet<>();
     protected Map<String, String> smallGlueMachineMap = new HashMap<>();
-    protected I issueCollector;
+    /** 本次排程使用的胶料组合顺序只读快照。 */
+    protected Map<String, Long> glueCombinedOrderMap = Collections.emptyMap();
     protected ScheduleProgressListener progressListener;
-    protected Map<String, Pred> machinePredecessorMap = new HashMap<>();
+    protected SchedulePersistResultModel persistResult;
     protected Map<String, List<M>> candidateTraceMap = new HashMap<>();
     protected Map<Integer, BigDecimal> shiftHoursMap = new HashMap<>();
     protected Set<Integer> startupShiftOrderSet = new HashSet<>();
@@ -68,9 +91,93 @@ public class ScheduleContextModel<T extends ScheduleTaskDraftModel, S, R extends
     protected String emptyFormingTaskMessage;
     protected List<ScheduleTaskProcessLogEntry> deferredTaskProcessLogList = new ArrayList<>();
     protected Long deferredTaskProcessLogSequence = 0L;
+    protected List<ScheduleLossRuleModel> lossRuleList = new ArrayList<>();
+    protected ScheduleIssueCollector issueCollector = new ScheduleIssueCollector();
+    protected Map<String, ScheduleTaskPredecessorModel> machinePredecessorMap = new HashMap<>();
 
-    /** 创建公共排程上下文。 */
-    protected ScheduleContextModel() {
+    /**
+     * 创建公共排程上下文并初始化领域差异配置。
+     *
+     * @param maxShiftOrder 最大支持班次
+     * @param paramEmptyMessageSupplier 参数为空消息工厂
+     * @param scheduleDateEmptyMessageSupplier 排程日期为空消息工厂
+     */
+    protected ScheduleContextModel(int maxShiftOrder, Supplier<String> paramEmptyMessageSupplier,
+                                   Supplier<String> scheduleDateEmptyMessageSupplier) {
+        this.paramEmptyMessageSupplier = Objects.requireNonNull(paramEmptyMessageSupplier,
+                "参数为空消息工厂不能为空");
+        this.scheduleDateEmptyMessageSupplier = Objects.requireNonNull(scheduleDateEmptyMessageSupplier,
+                "排程日期为空消息工厂不能为空");
+        this.maxShiftOrder = maxShiftOrder;
+    }
+
+    /**
+     * 返回领域允许参与自动排程的最大班次序号。
+     *
+     * @return 最大班次序号
+     */
+    @Override
+    public int getMaxShiftOrder() {
+        return this.maxShiftOrder;
+    }
+
+    /**
+     * 追加必须在所有班次日志之后输出的完整过程事件。
+     *
+     * @param event 完整过程事件
+     */
+    public void appendTailFullProcessTrace(ScheduleProcessTraceEvent event) {
+        this.getOrCreateProcessTraceBuffer().appendTailFull(event);
+    }
+
+    /**
+     * 设置胶料组合顺序快照，并复制为不可变映射。
+     *
+     * @param glueCombinedOrderMap 胶料编码到组合顺序的映射
+     */
+    public void setGlueCombinedOrderMap(Map<String, Long> glueCombinedOrderMap) {
+        this.glueCombinedOrderMap = glueCombinedOrderMap == null || glueCombinedOrderMap.isEmpty()
+                ? Collections.emptyMap()
+                : Collections.unmodifiableMap(new LinkedHashMap<>(glueCombinedOrderMap));
+    }
+
+    /**
+     * 按参数编码读取本次排程参数快照。
+     *
+     * @param paramCode 参数编码
+     * @return 参数快照值
+     * @throws ServiceException 参数不存在或没有有效值时抛出
+     */
+    public ScheduleParamValueModel getParam(String paramCode) {
+        ScheduleParamValueModel paramValue = this.paramMap.get(paramCode);
+        if (paramValue == null || StrUtil.isBlank(paramValue.getEffectiveValue())) {
+            throw new ServiceException(this.paramEmptyMessageSupplier.get() + ":" + paramCode);
+        }
+        return paramValue;
+    }
+
+    /**
+     * 获取指定机台班次任务链。
+     *
+     * @param machineCode 机台编码
+     * @param shiftOrder 班次顺序
+     * @return 已存在任务链；不存在时返回空
+     * @throws ServiceException 排程日期为空时抛出
+     */
+    public ScheduleTaskLinkedList<T> getTaskChain(String machineCode, Integer shiftOrder) {
+        if (this.scheduleDate == null) {
+            throw new ServiceException(this.scheduleDateEmptyMessageSupplier.get());
+        }
+        return this.taskChainGroup.get(machineCode, this.scheduleDate, shiftOrder);
+    }
+
+    /**
+     * 设置质量摘要；传入空值时使用空摘要。
+     *
+     * @param qualitySummary 质量摘要
+     */
+    public void setQualitySummary(Map<String, Object> qualitySummary) {
+        this.qualitySummary = qualitySummary == null ? new LinkedHashMap<>() : qualitySummary;
     }
 
 /**
@@ -95,7 +202,7 @@ public class ScheduleContextModel<T extends ScheduleTaskDraftModel, S, R extends
     }
 
 /**
-     * 追加指定班次和业务分区的胎面过程日志。
+     * 追加指定班次和业务分区的 TM/TC 过程日志。
      *
      * @param shiftOrder 班次顺序
      * @param section    过程日志分区
@@ -119,7 +226,7 @@ public class ScheduleContextModel<T extends ScheduleTaskDraftModel, S, R extends
     }
 
 /**
-     * 追加指定班次和业务分区的延后胎面过程日志。
+     * 追加指定班次和业务分区的延后 TM/TC 过程日志。
      *
      * @param shiftOrder 班次顺序
      * @param section    过程日志分区
@@ -161,7 +268,7 @@ public class ScheduleContextModel<T extends ScheduleTaskDraftModel, S, R extends
     }
 
 /**
-     * 追加指定班次和业务分区的胎面 FULL 过程事件。
+     * 追加指定班次和业务分区的 TM/TC FULL 过程事件。
      *
      * @param shiftOrder 班次顺序
      * @param section    过程日志分区
@@ -183,7 +290,7 @@ public class ScheduleContextModel<T extends ScheduleTaskDraftModel, S, R extends
     }
 
 /**
-     * 追加指定班次和业务分区的延后胎面 FULL 过程事件。
+     * 追加指定班次和业务分区的延后 TM/TC FULL 过程事件。
      *
      * @param shiftOrder 班次顺序
      * @param section    过程日志分区
@@ -692,11 +799,16 @@ public class ScheduleContextModel<T extends ScheduleTaskDraftModel, S, R extends
         this.smallGlueMachineMap = smallGlueMachineMap == null ? new HashMap<>() : smallGlueMachineMap;
     }
 
-    public void setIssueCollector(I issueCollector) {
-        this.issueCollector = issueCollector;
+    /**
+     * 设置公共异常收集器；传入空值时恢复默认收集器。
+     *
+     * @param issueCollector 公共异常收集器
+     */
+    public void setIssueCollector(ScheduleIssueCollector issueCollector) {
+        this.issueCollector = issueCollector == null ? new ScheduleIssueCollector() : issueCollector;
     }
 
-    public void setMachinePredecessorMap(Map<String, Pred> machinePredecessorMap) {
+    public void setMachinePredecessorMap(Map<String, ScheduleTaskPredecessorModel> machinePredecessorMap) {
         this.machinePredecessorMap = machinePredecessorMap == null ? new HashMap<>() : machinePredecessorMap;
     }
 
@@ -753,7 +865,7 @@ public class ScheduleContextModel<T extends ScheduleTaskDraftModel, S, R extends
         this.shiftTimeWindowMap = shiftTimeWindowMap == null ? new HashMap<>() : shiftTimeWindowMap;
     }
 
-    public void setLossRuleList(List<L> lossRuleList) {
+    public void setLossRuleList(List<ScheduleLossRuleModel> lossRuleList) {
         this.lossRuleList = lossRuleList == null ? new ArrayList<>() : lossRuleList;
     }
 }

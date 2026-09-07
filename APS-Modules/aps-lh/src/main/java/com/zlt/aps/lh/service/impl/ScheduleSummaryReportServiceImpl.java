@@ -63,7 +63,7 @@ import java.util.stream.Collectors;
  *   <li>{cxSpecSwitch} - 成型规格切换</li>
  *   <li>{lhNightQty}/{lhMorningQty}/{lhMiddleQty}/{lhTotalQty} - 硫化各班产量</li>
  *   <li>{lhNightMachines}/{lhMorningMachines}/{lhMiddleMachines}/{lhTotalMachines} - 硫化各班开动机台数</li>
- *   <li>{mouldCleanDate} - 模具清洗日期（固定显示排程目标日T+1，如"08月23日"）</li>
+ *   <li>{mouldCleanDate} - 模具清洗日期（查询排程日期前一天，如"14日"）</li>
  *   <li>{mouldChangeInfo} - 模具交替机台信息（去重；隔开，上限15台）</li>
  *   <li>{mouldCleanInfo} - 模具清洗机台信息（去重；隔开）</li>
  *   <li>{cxRemark} - 成型备注</li>
@@ -228,7 +228,7 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                 classShiftTypeMap, cxResults, lhResults, "2", machineMaxMouldMap);
         tableMap.putAll(tableMapT2);
 
-        // 模具交替/清洗信息：一次性查询排程窗口（T+1 ~ T+2）数据，按 planDate 分组到 T+1/T+2 栏位，不含T日
+        // 模具交替/清洗信息：一次性查询排程窗口（T日 ~ T+2）所有数据，按 planDate 分组到 T+1/T+2 栏位
         Map<String, Object> mouldChangeAndCleanMap = this.buildMouldChangeAndCleanInfo(
                 scheduleDate, scheduleDateT2, factoryCode);
         tableMap.putAll(mouldChangeAndCleanMap);
@@ -584,14 +584,9 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
     /**
      * 一次性构建 T+1 和 T+2 的模具交替/清洗信息。
      *
-     * <p>按真实执行时间 PLAN_DATE 范围（T+1 ~ T+2）查询模具交替/清洗计划，
-     * T+1/T+2 栏位各自只取栏位对应当天的数据，不并入T日。</p>
-     *
-     * <p>查询必须做批次隔离（SCHEDULE_DATE = 排程目标日 T+1）并显式过滤 IS_DELETE=0：
-     * 模具交替计划表按排程批次（LH_RESULT_BATCH_NO）管理，同一排程日重跑会生成多个批次、
-     * 旧批次置 IS_DELETE=1；且上一排程日批次的6班排程窗口会延伸到次日（如9/1批次仍
-     * 存在 PLAN_DATE 落在9/2 的有效记录）。不加这两个条件会把旧批次/已删除批次的机台
-     * 混入本报表（2026-08-31 生产库核对：9/2报表T+1交替曾多出 K1204/K1406/K1908）。</p>
+     * <p>查询口径与硫化日计划导出"硫化换模计划"tab页一致：
+     * SCHEDULE_DATE = 排程目标日(T+1)，不按 planDate 过滤，一次查出该排程批次下所有模具交替计划，
+     * 再按 planDate 落地日期分组到 T+1/T+2 栏位。</p>
      *
      * <p>数据库字段语义（由 ResultValidationHandler.generateMouldChangePlan 生成）：</p>
      * <ul>
@@ -607,19 +602,15 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
     private Map<String, Object> buildMouldChangeAndCleanInfo(Date scheduleDateT1, Date scheduleDateT2, String factoryCode) {
         Map<String, Object> map = new HashMap<>(8);
 
-        // 一次查出本次排程批次窗口内所有模具交替/清洗计划（按真实执行时间 PLAN_DATE 过滤，范围 T+1 ~ T+2）
-        // 模具交替/清洗口径（2026-08-31 业务确认）：T+1/T+2 栏位均只取栏位对应当天 PLAN_DATE 的数据，
-        // 不并入T日（T日白天的换模/清洗属于前一批次T日生产自己的数据，与T+1报表无关；
-        // 此前曾把T日并入T+1栏位，导致T+1报表混入T日白天的机台，已于2026-08-31回滚为仅取当天）。
-        // 批次隔离（2026-08-31 生产库逐条核对确认，两个条件缺一不可）：
-        //   ① SCHEDULE_DATE = 排程目标日(T+1)：模具交替计划表按排程批次管理，上一排程日批次的6班窗口
-        //      会延伸到次日（如9/1批次 LHPC20260901014 仍为有效数据，但其 PLAN_DATE 落在9/2 06:00/14:00
-        //      的换模计划属于9/1批次，不应进入9/2报表——9/2报表多出的 K1204/K1406/K1908 即来源于此）；
-        //      T+2栏位同样取本批次对次日的预测，与硫化日计划tab页 eq(SCHEDULE_DATE) 的口径一致；
-        //   ② IS_DELETE = 0：同一排程日重跑会生成多个批次（如 LHPC20260902001/002 被003取代后已置为
-        //      逻辑删除）；项目未配置 MyBatis-Plus 全局逻辑删除，selectList 不会自动过滤 is_delete，
-        //      必须显式加该条件，否则已删除批次的机台也会混入；
+        // 一次查出排程窗口内所有模具交替/清洗计划（按真实执行时间 PLAN_DATE 过滤，范围 T日 ~ T+2）
+        // 现场报表的模具交替/清洗按真实执行日期展示：T日（排程目标日前一天）晚上做的模具准备
+        // 由上一次排程批次生成（SCHEDULE_DATE=T日），只查 SCHEDULE_DATE=排程目标日会漏掉T日数据，
+        // 故改为按 PLAN_DATE 范围过滤，T日计划随T+1栏位一起展示；
+        // 显式过滤逻辑删除（IS_DELETE=0）：按PLAN_DATE跨批次查询时，同一排程日重跑被取代的旧批次
+        // （IS_DELETE=1）也在查询范围内，项目未配置 MyBatis-Plus 全局逻辑删除，selectList 不会自动过滤，
+        // 必须显式加该条件，否则已删除批次的机台会混入报表；
         // changeMouldType 不在 SQL 层过滤，改为在内存中按 01/02→交替、03/04→清洗 分组，避免漏掉脏数据。
+        Date t0Start = LhScheduleTimeUtil.clearTime(DateUtil.offsetDay(scheduleDateT1, -1));
         Date t1Start = LhScheduleTimeUtil.clearTime(scheduleDateT1);
         Date t1End = LhScheduleTimeUtil.getEndTime(scheduleDateT1);
         Date t2Start = LhScheduleTimeUtil.clearTime(scheduleDateT2);
@@ -627,19 +618,17 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         List<LhMouldChangePlan> allPlans = lhMouldChangePlanEntityMapper.selectList(
                 new LambdaQueryWrapper<LhMouldChangePlan>()
                         .eq(LhMouldChangePlan::getFactoryCode, factoryCode)
-                        // 批次隔离：只取本次排程（SCHEDULE_DATE=T+1）生成的计划，排除上一排程日批次延伸到次日的残留记录
-                        .eq(LhMouldChangePlan::getScheduleDate, t1Start)
-                        // 显式过滤逻辑删除：同排程日重跑后旧批次 IS_DELETE=1，框架无全局逻辑删除不会自动过滤
+                        // 显式过滤逻辑删除：排除同排程日重跑后被取代的旧批次（IS_DELETE=1）
                         .eq(LhMouldChangePlan::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
-                        .ge(LhMouldChangePlan::getPlanDate, t1Start)
+                        .ge(LhMouldChangePlan::getPlanDate, t0Start)
                         .le(LhMouldChangePlan::getPlanDate, t2End));
         log.info("模具交替/清洗计划查询完成, 排程目标日(T+1): {}, 分厂: {}, 计划日期范围: {} ~ {}, 总数量: {}",
                 DateUtil.formatDate(scheduleDateT1), factoryCode,
-                DateUtil.formatDate(t1Start), DateUtil.formatDate(t2End), allPlans.size());
+                DateUtil.formatDate(t0Start), DateUtil.formatDate(t2End), allPlans.size());
 
-        // T+1 模具交替机台（planDate 仅取 T+1 当天，更换类型 01/02；不并入T日数据）
+        // T+1 模具交替机台（planDate 在 T日 ~ T+1，更换类型 01/02；T日为现场前一日准备，随T+1栏位展示）
         String mouldChangeInfoT1 = allPlans.stream()
-                .filter(p -> this.isPlanDateInRange(p, t1Start, t1End))
+                .filter(p -> this.isPlanDateInRange(p, t0Start, t1End))
                 .filter(p -> MouldChangeTypeEnum.containsAnyCode(p.getChangeMouldType(),
                         MouldChangeTypeEnum.REGULAR.getCode(), MouldChangeTypeEnum.TYPE_BLOCK.getCode()))
                 .map(LhMouldChangePlan::getLhMachineCode)
@@ -659,9 +648,9 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                 .limit(15)
                 .collect(Collectors.joining(";"));
 
-        // T+1 模具清洗机台（planDate 仅取 T+1 当天，更换类型 03/04；业务确认清洗不并入T日前一日的准备数据）
+        // T+1 模具清洗机台（planDate 在 T日 ~ T+1，更换类型 03/04；T日为现场前一日准备，随T+1栏位展示）
         String mouldCleanInfoT1 = allPlans.stream()
-                .filter(p -> this.isPlanDateInRange(p, t1Start, t1End))
+                .filter(p -> this.isPlanDateInRange(p, t0Start, t1End))
                 .filter(p -> MouldChangeTypeEnum.containsAnyCode(p.getChangeMouldType(),
                         MouldChangeTypeEnum.SAND_BLAST.getCode(), MouldChangeTypeEnum.DRY_ICE.getCode()))
                 .map(LhMouldChangePlan::getLhMachineCode)
@@ -682,9 +671,16 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         log.info("模具交替/清洗分组结果 - T+1交替: [{}], T+2交替: [{}], T+1清洗: [{}], T+2清洗: [{}]",
                 mouldChangeInfoT1, mouldChangeInfoT2, mouldCleanInfoT1, mouldCleanInfoT2);
 
-        // 模具清洗日期：清洗机台仅取栏位对应当天（T+1/T+2）的数据，日期固定显示栏位日期，不再拼接多日
-        String mouldCleanDateT1 = DateUtil.format(scheduleDateT1, "MM月dd日");
-        String mouldCleanDateT2 = DateUtil.format(scheduleDateT2, "MM月dd日");
+        // 模具清洗日期：显示栏位内实际有清洗计划的执行日期（T+1栏位可能同时含T日与T+1日，去重后逗号拼接），
+        // 无清洗计划时回退显示栏位默认日期，与现场报表"模具清洗 08月22号：机台..."格式一致
+        String mouldCleanDateT1 = this.resolveMouldCleanDateText(allPlans, t0Start, t1End);
+        if (StringUtils.isBlank(mouldCleanDateT1)) {
+            mouldCleanDateT1 = DateUtil.format(scheduleDateT1, "MM月dd日");
+        }
+        String mouldCleanDateT2 = this.resolveMouldCleanDateText(allPlans, t2Start, t2End);
+        if (StringUtils.isBlank(mouldCleanDateT2)) {
+            mouldCleanDateT2 = DateUtil.format(scheduleDateT2, "MM月dd日");
+        }
 
         map.put("mouldChangeInfo", mouldChangeInfoT1);
         map.put("mouldChangeInfo2", mouldChangeInfoT2);
@@ -708,6 +704,32 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
             return false;
         }
         return !plan.getPlanDate().before(start) && !plan.getPlanDate().after(end);
+    }
+
+    /**
+     * 收集指定日期范围内实际有模具清洗计划的执行日期文本。
+     *
+     * <p>仅统计更换类型为清洗（03/04）的计划，按 PLAN_DATE 升序去重，
+     * 格式化为"MM月dd日"后用逗号拼接（如"08月22日"或"08月22日,08月23日"），
+     * 用于模具清洗日期栏位展示真实执行日期而非固定栏位日期。</p>
+     *
+     * @param allPlans 模具交替/清洗计划列表
+     * @param start    范围起始时间（00:00:00）
+     * @param end      范围结束时间（23:59:59）
+     * @return 执行日期文本，无清洗计划返回空字符串
+     */
+    private String resolveMouldCleanDateText(List<LhMouldChangePlan> allPlans, Date start, Date end) {
+        return allPlans.stream()
+                .filter(p -> this.isPlanDateInRange(p, start, end))
+                .filter(p -> MouldChangeTypeEnum.containsAnyCode(p.getChangeMouldType(),
+                        MouldChangeTypeEnum.SAND_BLAST.getCode(), MouldChangeTypeEnum.DRY_ICE.getCode()))
+                .map(LhMouldChangePlan::getPlanDate)
+                .filter(Objects::nonNull)
+                .sorted()
+                .map(d -> DateUtil.format(d, "MM月dd日"))
+                .collect(Collectors.toCollection(LinkedHashSet::new))
+                .stream()
+                .collect(Collectors.joining(","));
     }
 
 
@@ -1754,21 +1776,25 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
     /**
      * 构建成型规格切换信息。
      * 从T_MP_STRUCTURE_ALLOCATION表获取结构排产数据，按成型机台分组，
-     * 找到结束日等于排程日期日号的前结构，以及开始日等于排程日期日号或后一天日号的后结构，
-     * 只展示第二天切换的数据，展示格式为"机台号：前结构 换 后结构（班次）"，
-     * 多个切换用"；"隔开（班次为夜班/早班/中班，从排程结果切换备注推断，推断不到默认夜班）。
+     * 以"后结构开始日=报表日日号"为锚点识别当日切换（切换日=后结构首产日，
+     * 与排程引擎 CoreScheduleAlgorithmServiceImpl 的切换日语义及现场转产数据
+     * 的衔接型维护习惯一致），展示格式为"机台号：前结构 换 后结构（班次）"，
+     * 多个切换用"；"隔开（班次为夜班/早班/中班，从排程结果备注推断，推断不到默认夜班）。
      *
-     * <p>两种场景：</p>
+     * <p>前结构匹配口径（兼容两种维护方式，优先取结束日较大者）：</p>
      * <ul>
-     *   <li>非跨月场景：排程日期12号，取当月转产数据，找endDay=12的前结构，
-     *       后结构先查beginDay=12，12号没有再查beginDay=13</li>
-     *   <li>跨月场景：排程日期6月1号，取6月转产数据，找endDay=1且后结构beginDay=1</li>
+     *   <li>衔接型（现场主流）：前结构endDay=切换日前一天（前结构生产到切换日前一天止，
+     *       后结构切换日首产），如报表日12号，后结构beginDay=12、前结构endDay=11</li>
+     *   <li>同日型：前结构endDay=切换日当天（切换日当天前结构仍有生产）</li>
      * </ul>
      *
-     * <p>T+1和T+2共用相同的结构切换数据（以actualScheduleDate为准），确保两个日期显示一致。</p>
+     * <p>跨月场景：报表日为1号且前结构排在上月（endDay=上月最后一天）时，
+     * 追加查询上月转产数据匹配前结构。</p>
      *
-     * @param reportDate        报告日期（未使用，保留为兼容调用）
-     * @param scheduleDate      排程日期（用于确定查询年月和日号）
+     * <p>T+1和T+2分别以各自报表日为锚点独立识别当日切换，两天各显示各的切换数据。</p>
+     *
+     * @param reportDate        报告日期（用于确定查询年月和日号，即切换日）
+     * @param scheduleDate      排程日期（同报告日期）
      * @param factoryCode       分厂编码
      * @param cxResults         预查询的成型排程结果（用于推断切换班次）
      * @param classShiftTypeMap 班次类型映射（班次序号→班次类型编码 01夜/02早/03中）
@@ -1779,21 +1805,21 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                                       List<CxScheduleResult> cxResults, Map<Integer, String> classShiftTypeMap,
                                       String keySuffix) {
         LocalDate localScheduleDate = DateUtil.toLocalDateTime(scheduleDate).toLocalDate();
-
-        // 跨月场景：排程日期是1号时，直接取排程日期所在月的转产数据；否则取排程日期所在月的数据
+        // 查询月份：取报表日所在月的转产数据
         LocalDate queryMonthBase = localScheduleDate;
+        int scheduleDayOfMonth = localScheduleDate.getDayOfMonth();
 
-        MpStructureAllocation structureQuery = new MpStructureAllocation();
-        structureQuery.setFactoryCode(factoryCode);
-        structureQuery.setYear(queryMonthBase.getYear());
-        structureQuery.setMonth(queryMonthBase.getMonthValue());
-
-        List<MpStructureAllocation> structureList = queryStructureAllocationList(structureQuery);
+        List<MpStructureAllocation> structureList = this.queryStructureAllocationList(factoryCode, queryMonthBase);
         if (structureList.isEmpty()) {
             log.info("成型规格切换：未查询到结构排产数据, 查询年月: {}-{}, 分厂: {}",
                     queryMonthBase.getYear(), queryMonthBase.getMonthValue(), factoryCode);
             return "";
         }
+
+        // 跨月场景：报表日为1号时前结构可能排在上月（结束日=上月最后一天），提前加载上月末结构按机台分组
+        Map<String, List<MpStructureAllocation>> prevMonthEndMachineMap = scheduleDayOfMonth == 1
+                ? this.loadPrevMonthEndStructures(factoryCode, queryMonthBase)
+                : Collections.emptyMap();
 
         Map<String, List<MpStructureAllocation>> machineGroupMap = structureList.stream()
                 .filter(Objects::nonNull)
@@ -1804,7 +1830,6 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                         Collectors.toList()));
 
         List<String> switchList = new ArrayList<>();
-        int scheduleDayOfMonth = localScheduleDate.getDayOfMonth();
 
         for (Map.Entry<String, List<MpStructureAllocation>> entry : machineGroupMap.entrySet()) {
             String machineCode = entry.getKey();
@@ -1817,33 +1842,36 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                 continue;
             }
 
-            // 查找前结构：结束日等于排程日期日号
-            int prevEndDay = scheduleDayOfMonth;
-            MpStructureAllocation prevStructure = null;
-            for (MpStructureAllocation s : structures) {
-                if (s.getEndDay() != null && s.getEndDay() == prevEndDay) {
-                    prevStructure = s;
-                    break;
+            // 后结构（主锚点）：开始日等于报表日日号（切换日=后结构首产日，
+            // 与排程引擎及现场衔接型维护口径一致：前结构生产到切换日前一天止、后结构切换日首产）
+            MpStructureAllocation nextStructure = this.findStructureByBeginDay(structures, scheduleDayOfMonth);
+            if (nextStructure == null) {
+                continue;
+            }
+
+            // 前结构：结束日等于切换日当天（同日型）或切换日前一天（衔接型，现场主流），优先取结束日较大的
+            MpStructureAllocation prevStructure = this.findPrevStructureByEndDay(
+                    structures, nextStructure, scheduleDayOfMonth - 1, scheduleDayOfMonth);
+
+            // 跨月兜底：本月无前结构且报表日为1号时，取上月该机台结束日=上月最后一天的结构作前结构
+            if (prevStructure == null && scheduleDayOfMonth == 1) {
+                List<MpStructureAllocation> prevMonthEnds = prevMonthEndMachineMap.get(machineCode);
+                if (prevMonthEnds != null && !prevMonthEnds.isEmpty()) {
+                    prevStructure = prevMonthEnds.get(0);
                 }
             }
             if (prevStructure == null) {
                 continue;
             }
 
-            // 查找后结构：先查开始日等于排程日期日号，没有再查开始日等于排程日期后一天日号
-            MpStructureAllocation nextStructure = findNextStructure(structures, prevStructure,
-                    scheduleDayOfMonth, scheduleDayOfMonth + 1);
-            if (nextStructure == null) {
-                continue;
-            }
-
             String prevStructureName = StringUtils.defaultString(prevStructure.getStructureName()).trim();
             String nextStructureName = StringUtils.defaultString(nextStructure.getStructureName()).trim();
 
-            if (StringUtils.isNotBlank(prevStructureName) && StringUtils.isNotBlank(nextStructureName)) {
-                // 推断切换班次：从成型排程结果该机台+前结构的班次分析备注（"本成型机计划XX号切换..."）定位切换班次，
-                // 推断不到时默认夜班（结构切换通常在生产日切换的夜班完成）
-                String shiftName = this.resolveSwitchShiftName(machineCode, prevStructureName,
+            // 前后结构名非空且不相同（相同结构名的"切换"无意义，多为数据维护错误）才展示
+            if (StringUtils.isNotBlank(prevStructureName) && StringUtils.isNotBlank(nextStructureName)
+                    && !prevStructureName.equals(nextStructureName)) {
+                // 推断切换班次：优先前结构行引擎切换备注，其次后结构行"新增"备注，均推断不到默认夜班
+                String shiftName = this.resolveSwitchShiftName(machineCode, prevStructureName, nextStructureName,
                         cxResults, classShiftTypeMap, keySuffix);
                 if (StringUtils.isBlank(shiftName)) {
                     shiftName = "夜班";
@@ -1861,41 +1889,69 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
     /**
      * 推断机台结构切换的班次名称。
      *
-     * <p>排程引擎 {@code CoreScheduleAlgorithmServiceImpl.markMachineSwitchInMainTable} 会在
-     * 该机台前结构记录的切换班次 ANALYSIS 中写入"本成型机计划XX号切换XX结构..."备注，
-     * 据此定位切换发生的班次索引，再经班次类型映射转换为中文名称（夜班/早班/中班）。</p>
+     * <p>推断链（按优先级）：</p>
+     * <ol>
+     *   <li>前结构行引擎切换备注：排程引擎 {@code CoreScheduleAlgorithmServiceImpl.markMachineSwitchInMainTable}
+     *       在前结构"未收尾"时于切换班次 ANALYSIS 写入"本成型机计划XX号切换XX结构..."备注，
+     *       据此定位切换发生的班次</li>
+     *   <li>后结构行"新增"备注：前结构正常收尾的切换没有引擎切换备注，
+     *       但后结构首次开产班次会标"新增"，该班次即切换发生的班次</li>
+     * </ol>
+     * <p>均推断不到时返回空字符串，由调用方默认"夜班"（结构切换通常在生产日切换的夜班完成）。</p>
      *
      * @param machineCode       成型机台编号（已trim）
      * @param prevStructureName 前结构名称（已trim）
+     * @param nextStructureName 后结构名称（已trim）
      * @param cxResults         预查询的成型排程结果
      * @param classShiftTypeMap 班次类型映射（班次序号→班次类型编码 01夜/02早/03中）
      * @param keySuffix         key 后缀（"" 查class3/4/5班次，"2" 查class6/7/8班次）
      * @return 班次中文名称（夜班/早班/中班），推断不到返回空字符串
      */
-    private String resolveSwitchShiftName(String machineCode, String prevStructureName,
+    private String resolveSwitchShiftName(String machineCode, String prevStructureName, String nextStructureName,
                                            List<CxScheduleResult> cxResults,
                                            Map<Integer, String> classShiftTypeMap, String keySuffix) {
+        // keySuffix="" 查T+1班次范围（class3/4/5），keySuffix="2" 查T+2班次范围（class6/7/8）
+        int[] shiftIndexes = "".equals(keySuffix) ? new int[]{3, 4, 5} : new int[]{6, 7, 8};
+        // 一级：前结构行的引擎切换备注（仅前结构未收尾时写入）
+        String shiftName = this.findShiftByAnalysis(cxResults, machineCode, prevStructureName,
+                shiftIndexes, "本成型机计划", classShiftTypeMap);
+        if (StringUtils.isNotBlank(shiftName)) {
+            return shiftName;
+        }
+        // 二级：后结构行首次开产班次的"新增"备注（前结构正常收尾切换的可靠信号）
+        return this.findShiftByAnalysis(cxResults, machineCode, nextStructureName,
+                shiftIndexes, "新增", classShiftTypeMap);
+    }
+
+    /**
+     * 在指定机台+结构的排程结果行中，查找包含指定关键字的班次分析备注并返回其班次名称。
+     *
+     * @param cxResults         成型排程结果
+     * @param machineCode       成型机台编号（已trim）
+     * @param structureName     结构名称（已trim）
+     * @param shiftIndexes      班次索引数组（3~8）
+     * @param keyword           班次分析备注关键字
+     * @param classShiftTypeMap 班次类型映射（班次序号→班次类型编码 01夜/02早/03中）
+     * @return 命中关键字的第一个班次的中文名称，未命中返回空字符串
+     */
+    private String findShiftByAnalysis(List<CxScheduleResult> cxResults, String machineCode, String structureName,
+                                        int[] shiftIndexes, String keyword, Map<Integer, String> classShiftTypeMap) {
         if (cxResults == null || cxResults.isEmpty()) {
             return "";
         }
-        // keySuffix="" 查T+1班次范围（class3/4/5），keySuffix="2" 查T+2班次范围（class6/7/8）
-        int[] shiftIndexes = "".equals(keySuffix) ? new int[]{3, 4, 5} : new int[]{6, 7, 8};
-        for (CxScheduleResult result : cxResults) {
-            if (!machineCode.equals(StringUtils.trimToEmpty(result.getCxMachineCode()))) {
-                continue;
-            }
-            if (!prevStructureName.equals(StringUtils.trimToEmpty(result.getStructureName()))) {
-                continue;
-            }
-            // 逐班次检查分析备注，命中机台切换备注即认定该班次为切换班次
-            for (int shiftIndex : shiftIndexes) {
-                String analysis = this.getCxShiftAnalysis(result, shiftIndex);
-                if (analysis != null && analysis.contains("本成型机计划")) {
-                    return this.resolveShiftName(classShiftTypeMap.get(shiftIndex));
-                }
-            }
-        }
-        return "";
+        return cxResults.stream()
+                .filter(r -> machineCode.equals(StringUtils.trimToEmpty(r.getCxMachineCode())))
+                .filter(r -> structureName.equals(StringUtils.trimToEmpty(r.getStructureName())))
+                .flatMap(r -> Arrays.stream(shiftIndexes)
+                        // 逐班次检查分析备注，命中关键字即认定该班次为切换班次
+                        .filter(idx -> {
+                            String analysis = this.getCxShiftAnalysis(r, idx);
+                            return analysis != null && analysis.contains(keyword);
+                        })
+                        .mapToObj(idx -> this.resolveShiftName(classShiftTypeMap.get(idx))))
+                .filter(StringUtils::isNotBlank)
+                .findFirst()
+                .orElse("");
     }
 
     /**
@@ -1936,49 +1992,96 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
     }
 
     /**
-     * 查找下一个结构切换数据。
-     * 优先查找开始日等于排程日期日号的结构，若没有则查找开始日等于排程日期后一天日号的结构。
+     * 按开始日查找后结构。
+     * 切换日=后结构首产日（与排程引擎 CoreScheduleAlgorithmServiceImpl 的切换日语义
+     * 及现场转产数据的衔接型维护习惯一致），因此以"开始日=报表日日号"为唯一锚点识别当日切换。
      *
-     * @param structures            按beginDay排序的转产数据列表
-     * @param prevStructure         前结构（已确定结束日的前结构）
-     * @param scheduleDayOfMonth    排程日期的日号
-     * @param nextDayOfMonth        排程日期后一天的日号
-     * @return 下一个结构切换数据，未找到返回null
+     * @param structures 按beginDay排序的转产数据列表
+     * @param beginDay   报表日的日号（切换日）
+     * @return 开始日等于报表日日号的结构，未找到返回null
      */
-    private MpStructureAllocation findNextStructure(List<MpStructureAllocation> structures,
-                                                    MpStructureAllocation prevStructure,
-                                                    int scheduleDayOfMonth,
-                                                    int nextDayOfMonth) {
-        // 优先查找开始日等于排程日期日号的结构
-        for (MpStructureAllocation s : structures) {
-            if (s == prevStructure) {
-                continue;
-            }
-            if (s.getBeginDay() != null && s.getBeginDay() == scheduleDayOfMonth) {
-                return s;
-            }
+    private MpStructureAllocation findStructureByBeginDay(List<MpStructureAllocation> structures, int beginDay) {
+        return structures.stream()
+                .filter(s -> s.getBeginDay() != null && s.getBeginDay() == beginDay)
+                .findFirst()
+                .orElse(null);
+    }
+
+    /**
+     * 按结束日查找前结构，兼容两种维护方式（优先取结束日较大的）：
+     * <ul>
+     *   <li>衔接型（现场主流）：前结构endDay=切换日前一天（前结构生产到切换日前一天止、后结构切换日首产）</li>
+     *   <li>同日型：前结构endDay=切换日当天（切换日当天前结构仍有生产）</li>
+     * </ul>
+     *
+     * @param structures    按beginDay排序的转产数据列表
+     * @param nextStructure 已确定的后结构（排除自身）
+     * @param prevDayEnd    切换日前一天的日号（衔接型前结构结束日）
+     * @param sameDayEnd    切换日当天的日号（同日型前结构结束日）
+     * @return 前结构，未找到返回null
+     */
+    private MpStructureAllocation findPrevStructureByEndDay(List<MpStructureAllocation> structures,
+                                                             MpStructureAllocation nextStructure,
+                                                             int prevDayEnd, int sameDayEnd) {
+        // 同日型（结束日较大：切换日当天前结构仍有生产）优先
+        MpStructureAllocation sameDay = structures.stream()
+                .filter(s -> s != nextStructure && s.getEndDay() != null && s.getEndDay() == sameDayEnd)
+                .findFirst()
+                .orElse(null);
+        if (sameDay != null) {
+            return sameDay;
         }
-        // 排程日期日号没有匹配，再查找开始日等于排程日期后一天日号的结构
-        for (MpStructureAllocation s : structures) {
-            if (s == prevStructure) {
-                continue;
-            }
-            if (s.getBeginDay() != null && s.getBeginDay() == nextDayOfMonth) {
-                return s;
-            }
+        // 衔接型：前结构生产到切换日前一天止
+        return structures.stream()
+                .filter(s -> s != nextStructure && s.getEndDay() != null && s.getEndDay() == prevDayEnd)
+                .findFirst()
+                .orElse(null);
+    }
+
+    /**
+     * 加载上月转产数据中"结束日=上月最后一天"的结构，按机台分组。
+     * 用于跨月切换场景：报表日为1号、前结构排在上月且生产到月末最后一天时，
+     * 本月数据中查不到前结构，需从上月数据匹配。
+     *
+     * @param factoryCode    分厂编码
+     * @param queryMonthBase 报表日所在月
+     * @return 机台编号→上月末结构列表（上月无数据返回空映射）
+     */
+    private Map<String, List<MpStructureAllocation>> loadPrevMonthEndStructures(String factoryCode,
+                                                                                 LocalDate queryMonthBase) {
+        LocalDate prevMonth = queryMonthBase.minusMonths(1);
+        List<MpStructureAllocation> prevMonthList = this.queryStructureAllocationList(factoryCode, prevMonth);
+        if (prevMonthList.isEmpty()) {
+            return Collections.emptyMap();
         }
-        return null;
+        // 上月最后一天（1号切换的前结构结束日）
+        int lastDayOfPrevMonth = prevMonth.lengthOfMonth();
+        Map<String, List<MpStructureAllocation>> machineMap = new LinkedHashMap<>();
+        prevMonthList.stream()
+                .filter(Objects::nonNull)
+                .filter(s -> StringUtils.isNotBlank(s.getCxMachineCode()))
+                .filter(s -> s.getEndDay() != null && s.getEndDay() == lastDayOfPrevMonth)
+                .forEach(s -> machineMap.computeIfAbsent(s.getCxMachineCode().trim(), k -> new ArrayList<>()).add(s));
+        log.info("成型规格切换跨月匹配：上月末结构加载完成, 查询年月: {}-{}, 机台数: {}",
+                prevMonth.getYear(), prevMonth.getMonthValue(), machineMap.size());
+        return machineMap;
     }
 
     /**
      * 通过Feign远程调用查询结构排产数据列表，
      * 并将返回的LinkedHashMap转换为MpStructureAllocation实体列表。
+     * 注意：mp服务会自动按当月最新定稿版本（T_MP_PROC_VERSION.IS_FINAL=1）过滤数据。
      *
-     * @param structureQuery 查询条件（含factoryCode、year、month）
-     * @return MpStructureAllocation实体列表
+     * @param factoryCode 分厂编码
+     * @param monthBase   查询年月（取该月的转产数据）
+     * @return MpStructureAllocation实体列表，调用异常返回空列表
      */
-    private List<MpStructureAllocation> queryStructureAllocationList(MpStructureAllocation structureQuery) {
+    private List<MpStructureAllocation> queryStructureAllocationList(String factoryCode, LocalDate monthBase) {
         try {
+            MpStructureAllocation structureQuery = new MpStructureAllocation();
+            structureQuery.setFactoryCode(factoryCode);
+            structureQuery.setYear(monthBase.getYear());
+            structureQuery.setMonth(monthBase.getMonthValue());
             TableDataInfo structureDataInfo = mpStructureAllocationRemoteService.list(structureQuery);
             if (structureDataInfo == null || structureDataInfo.getRows() == null) {
                 return Collections.emptyList();

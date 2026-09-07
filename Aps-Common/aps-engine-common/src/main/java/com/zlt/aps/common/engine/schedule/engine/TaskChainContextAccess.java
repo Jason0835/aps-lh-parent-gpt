@@ -3,7 +3,7 @@ package com.zlt.aps.common.engine.schedule.engine;
 import com.zlt.aps.common.engine.schedule.MachineShiftTaskChain;
 import com.zlt.aps.common.engine.schedule.ScheduleTaskNode;
 
-import java.util.Date;
+import java.time.LocalDate;
 
 /**
  * 任务链公共引擎上下文访问端口。
@@ -14,7 +14,7 @@ public interface TaskChainContextAccess<T extends ScheduleTaskDraftModel> {
 
     MachineShiftTaskChain<T> getTaskChainGroup();
 
-    Date getScheduleDate();
+    LocalDate getScheduleDate();
 
     String getOperator();
 

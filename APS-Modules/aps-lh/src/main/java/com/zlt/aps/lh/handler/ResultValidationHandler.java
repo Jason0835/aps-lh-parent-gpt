@@ -35,6 +35,7 @@ import com.zlt.aps.lh.engine.strategy.support.SpecialMaterialSubstitutionRecord;
 import com.zlt.aps.lh.exception.ScheduleErrorCode;
 import com.zlt.aps.lh.exception.ScheduleException;
 import com.zlt.aps.lh.service.impl.SchedulePersistenceService;
+import com.zlt.aps.lh.service.impl.LhNextShiftNewPlanService;
 import com.zlt.aps.lh.util.*;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -77,6 +78,10 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
     @Resource
     private SchedulePersistenceService schedulePersistenceService;
 
+    /** 原8班落库成功后生成班次9独立计划。 */
+    @Resource
+    private LhNextShiftNewPlanService nextShiftNewPlanService;
+
     @Resource
     private TargetScheduleQtyResolver targetScheduleQtyResolver;
 
@@ -99,6 +104,8 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
     private static final String DRY_ICE_ENDING_ANALYSIS = "干冰清洗+收尾";
     /** 喷砂清洗因三天内收尾跳过时的固定原因 */
     private static final String SAND_BLAST_ENDING_ANALYSIS = "喷砂清洗+收尾";
+    /** 喷砂专用首检原因，与正常换模/换活字块首检资源和计数完全隔离 */
+    private static final String SAND_BLAST_FIRST_INSPECTION_ANALYSIS = "喷砂清洗首检";
 
     @Override
     protected void doHandle(LhScheduleContext context) {
@@ -110,6 +117,9 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             // 保存前按机台实际挂载窗口绑定保养摘要：只处理本批班次覆盖范围内的保养，
             // 优先绑定首条保养后结果，无后续SKU时绑定最后一条结果，并统一写入“精度计划”。
             bindMaintenanceWindowsToFinalResults(context);
+
+            // 喷砂后的2条首检在最终时间轴确定后统一归入首检结束所在班次，保持结果总量及业务账本不变。
+            applySandBlastFirstInspectionToFinalResults(context);
 
             // S4.6.1 排程后置校验：保存前校验结果必填字段和关键数量约束。
             postValidation(context);
@@ -162,6 +172,20 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
 
             // S4.6.6 保存排程结果到数据库：由持久化服务统一做目标日原子替换。
             schedulePersistenceService.replaceScheduleAtomically(context);
+
+            /*
+             * 原8班事务已经提交后再生成班次9，确保后置计算或独立表写入失败时，
+             * 不会回滚已完成的结果、未排、换模和过程日志。班次9属于独立补充计划，
+             * 失败时只写应用警告日志，不向排程成功响应追加前端提示。
+             */
+            try {
+                nextShiftNewPlanService.generateAndReplace(context);
+            } catch (Exception exception) {
+                log.warn("班次9独立后置计划生成失败, factoryCode: {}, scheduleDate: {}, batchNo: {}",
+                        context.getFactoryCode(),
+                        LhScheduleTimeUtil.formatDate(context.getScheduleTargetDate()),
+                        context.getBatchNo(), exception);
+            }
 
             // S4.6.7 发布排程完成事件（观察者模式）
             scheduleEventPublisher.publish(ScheduleEvent.completed(context));
@@ -311,6 +335,342 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
                             resolveMaintenanceResumeTime(machine.getMaintenanceWindowList())),
                     maintenanceAnalysis);
         }
+    }
+
+    /**
+     * 将喷砂清洗后的固定首检量归入首检结束时间所在班次。
+     * <p>排产主链已经按喷砂完整12小时占用计算正式生产量，本方法只把结果中已有的2条
+     * 重新标识为喷砂首检，不增加日计划、月计划、胎胚或SKU剩余量，避免保存阶段形成第二套数量账本。</p>
+     *
+     * @param context 排程上下文
+     */
+    private void applySandBlastFirstInspectionToFinalResults(LhScheduleContext context) {
+        if (Objects.isNull(context) || CollectionUtils.isEmpty(context.getScheduleResultList())
+                || CollectionUtils.isEmpty(context.getScheduleWindowShifts())) {
+            return;
+        }
+        List<Map.Entry<MachineScheduleDTO, MachineCleaningWindowDTO>> cleaningPlanItems =
+                collectCleaningPlanItems(context);
+        Map<String, Integer> eventSideCountMap = this.buildSandBlastEventSideCountMap(cleaningPlanItems);
+        Set<String> processedSideSet = new HashSet<String>(cleaningPlanItems.size());
+        for (Map.Entry<MachineScheduleDTO, MachineCleaningWindowDTO> item : cleaningPlanItems) {
+            MachineCleaningWindowDTO cleaningWindow = item.getValue();
+            String machineCode = resolveCleaningMachineCode(item.getKey(), cleaningWindow);
+            if (!this.isValidSandBlastFirstInspectionWindow(cleaningWindow)
+                    || StringUtils.isEmpty(machineCode)) {
+                continue;
+            }
+            String sideKey = this.buildSandBlastInspectionSideKey(machineCode, cleaningWindow);
+            if (!processedSideSet.add(sideKey)
+                    || Objects.nonNull(resolveCleaningEndingResult(
+                    context, context.getScheduleResultList(), machineCode, cleaningWindow))) {
+                continue;
+            }
+            Date inspectionEndTime = MachineCleaningOverlapUtil.resolveEffectiveCleanEndTime(cleaningWindow);
+            LhShiftConfigVO attributionShift = LhScheduleTimeUtil.resolveShiftByTime(
+                    context.getScheduleWindowShifts(), inspectionEndTime);
+            int inspectionQty = this.resolveSandBlastFirstInspectionQty(
+                    machineCode, cleaningWindow, eventSideCountMap);
+            LhScheduleResult result = this.resolveSandBlastFirstInspectionResult(
+                    context, machineCode, attributionShift, inspectionEndTime, inspectionQty);
+            this.reclassifySandBlastFirstInspectionQty(
+                    context, result, attributionShift, cleaningWindow, inspectionQty);
+        }
+    }
+
+    /**
+     * 统计同一喷砂物理事件实际挂载的运行侧数量，单控L/R共享固定2条首检量。
+     *
+     * @param cleaningPlanItems 清洗窗口及机台列表
+     * @return 喷砂物理事件键到运行侧数量的映射
+     */
+    private Map<String, Integer> buildSandBlastEventSideCountMap(
+            List<Map.Entry<MachineScheduleDTO, MachineCleaningWindowDTO>> cleaningPlanItems) {
+        Map<String, Set<String>> eventSideSetMap = new HashMap<String, Set<String>>(16);
+        for (Map.Entry<MachineScheduleDTO, MachineCleaningWindowDTO> item : cleaningPlanItems) {
+            MachineCleaningWindowDTO cleaningWindow = item.getValue();
+            String machineCode = resolveCleaningMachineCode(item.getKey(), cleaningWindow);
+            if (!this.isValidSandBlastFirstInspectionWindow(cleaningWindow)
+                    || StringUtils.isEmpty(machineCode)) {
+                continue;
+            }
+            String eventKey = this.buildSandBlastInspectionEventKey(machineCode, cleaningWindow);
+            eventSideSetMap.computeIfAbsent(eventKey, key -> new HashSet<String>(2)).add(machineCode);
+        }
+        Map<String, Integer> eventSideCountMap = new HashMap<String, Integer>(eventSideSetMap.size());
+        eventSideSetMap.forEach((eventKey, machineCodeSet) ->
+                eventSideCountMap.put(eventKey, machineCodeSet.size()));
+        return eventSideCountMap;
+    }
+
+    /**
+     * 解析单条喷砂窗口应写入当前运行侧的固定首检量。
+     *
+     * @param machineCode 机台编码
+     * @param cleaningWindow 喷砂清洗窗口
+     * @param eventSideCountMap 物理喷砂事件运行侧数量
+     * @return 当前运行侧首检量
+     */
+    private int resolveSandBlastFirstInspectionQty(
+            String machineCode,
+            MachineCleaningWindowDTO cleaningWindow,
+            Map<String, Integer> eventSideCountMap) {
+        if (!LhSingleControlMachineUtil.isSingleMouldMachine(machineCode)) {
+            return LhScheduleConstant.SAND_BLAST_FIRST_INSPECTION_QTY;
+        }
+        int sideCount = eventSideCountMap.getOrDefault(
+                this.buildSandBlastInspectionEventKey(machineCode, cleaningWindow), 1);
+        return sideCount > 1
+                ? LhScheduleConstant.SAND_BLAST_FIRST_INSPECTION_QTY / sideCount
+                : LhScheduleConstant.SAND_BLAST_FIRST_INSPECTION_QTY;
+    }
+
+    /**
+     * 选择承接喷砂首检量的最终结果。
+     * <p>优先复用首检结束班次已有产量的结果；该班无量时取喷砂释放后的首条结果，
+     * 最后才取同机台末条结果。候选必须至少有足够总量可重新归属，禁止额外制造计划量。</p>
+     *
+     * @param context 排程上下文
+     * @param machineCode 机台编码
+     * @param attributionShift 首检结束归属班次
+     * @param inspectionEndTime 首检结束时间
+     * @param inspectionQty 固定首检量
+     * @return 承接首检的结果；不存在返回null
+     */
+    private LhScheduleResult resolveSandBlastFirstInspectionResult(
+            LhScheduleContext context,
+            String machineCode,
+            LhShiftConfigVO attributionShift,
+            Date inspectionEndTime,
+            int inspectionQty) {
+        if (Objects.isNull(attributionShift) || inspectionQty <= 0) {
+            return null;
+        }
+        List<LhScheduleResult> candidates = context.getScheduleResultList().stream()
+                .filter(Objects::nonNull)
+                .filter(result -> StringUtils.equals(machineCode, result.getLhMachineCode()))
+                .filter(result -> this.resolveSandBlastReclassifiableQty(result) >= inspectionQty)
+                .filter(result -> !this.isNormalFirstInspectionShift(
+                        result, attributionShift.getShiftIndex()))
+                .sorted(this::compareResultTime)
+                .collect(Collectors.toList());
+        LhScheduleResult sameShiftResult = candidates.stream()
+                .filter(result -> Objects.nonNull(ShiftFieldUtil.getShiftPlanQty(
+                        result, attributionShift.getShiftIndex())))
+                .filter(result -> ShiftFieldUtil.getShiftPlanQty(
+                        result, attributionShift.getShiftIndex()) > 0)
+                .findFirst().orElse(null);
+        if (Objects.nonNull(sameShiftResult)) {
+            return sameShiftResult;
+        }
+        LhScheduleResult postCleaningResult = candidates.stream()
+                .filter(result -> Objects.nonNull(resolveProductionStartTime(result)))
+                .filter(result -> !resolveProductionStartTime(result).before(inspectionEndTime))
+                .findFirst().orElse(null);
+        return Objects.nonNull(postCleaningResult) ? postCleaningResult
+                : candidates.stream().reduce((previous, current) -> current).orElse(null);
+    }
+
+    /**
+     * 在结果总量不变的前提下，将固定数量重新归入喷砂首检班次。
+     *
+     * @param context 排程上下文
+     * @param result 承接首检的结果
+     * @param attributionShift 首检结束归属班次
+     * @param cleaningWindow 喷砂清洗窗口
+     * @param inspectionQty 当前运行侧固定首检量
+     */
+    private void reclassifySandBlastFirstInspectionQty(
+            LhScheduleContext context,
+            LhScheduleResult result,
+            LhShiftConfigVO attributionShift,
+            MachineCleaningWindowDTO cleaningWindow,
+            int inspectionQty) {
+        if (Objects.isNull(result) || Objects.isNull(attributionShift) || inspectionQty <= 0) {
+            log.warn("喷砂首检没有可承接的排程结果，仅记录日志并继续保存, batchNo: {}, "
+                            + "machineCode: {}, cleanStartTime: {}, readyTime: {}",
+                    context.getBatchNo(), Objects.isNull(cleaningWindow) ? null : cleaningWindow.getLhCode(),
+                    LhScheduleTimeUtil.formatDateTime(Objects.isNull(cleaningWindow)
+                            ? null : cleaningWindow.getCleanStartTime()),
+                    LhScheduleTimeUtil.formatDateTime(MachineCleaningOverlapUtil
+                            .resolveEffectiveCleanEndTime(cleaningWindow)));
+            return;
+        }
+        int shiftIndex = attributionShift.getShiftIndex();
+        int originalTotalQty = resolveResultPlanQty(result);
+        int existingShiftQty = Math.max(0, Objects.isNull(ShiftFieldUtil.getShiftPlanQty(result, shiftIndex))
+                ? 0 : ShiftFieldUtil.getShiftPlanQty(result, shiftIndex));
+        int moveQty = Math.max(0, inspectionQty - existingShiftQty);
+        int movedQty = this.moveResultQtyToSandBlastInspectionShift(
+                context, result, shiftIndex, moveQty);
+        if (movedQty != moveQty) {
+            log.warn("喷砂首检固定量重新归属失败，仅记录日志并继续保存, batchNo: {}, "
+                            + "materialCode: {}, machineCode: {}, targetShift: {}, "
+                            + "requiredMoveQty: {}, actualMoveQty: {}",
+                    context.getBatchNo(), result.getMaterialCode(), result.getLhMachineCode(),
+                    shiftIndex, moveQty, movedQty);
+            return;
+        }
+        Date inspectionStartTime = cleaningWindow.getCleanEndTime();
+        Date inspectionEndTime = MachineCleaningOverlapUtil.resolveEffectiveCleanEndTime(cleaningWindow);
+        int mergedShiftQty = existingShiftQty + movedQty;
+        Date existingEndTime = ShiftFieldUtil.getShiftEndTime(result, shiftIndex);
+        Date mergedEndTime = inspectionEndTime;
+        if (mergedShiftQty > inspectionQty && Objects.nonNull(existingEndTime)
+                && existingEndTime.after(inspectionEndTime)) {
+            mergedEndTime = existingEndTime;
+        }
+        ShiftFieldUtil.setShiftPlanQty(
+                result, shiftIndex, mergedShiftQty, inspectionStartTime, mergedEndTime);
+        // 喷砂首检只写专用原因，不调用正常首检工具，避免读取参数或推进正常首检顺序计数。
+        ShiftFieldUtil.appendShiftAnalysis(result, shiftIndex, SAND_BLAST_FIRST_INSPECTION_ANALYSIS);
+        ResultShiftTimeUtil.refreshSummary(context, result);
+        log.info("喷砂固定首检量归属完成, batchNo: {}, materialCode: {}, machineCode: {}, "
+                        + "cleanStartTime: {}, cleanEndTime: {}, inspectionEndTime: {}, "
+                        + "attributionShift: {}, inspectionQty: {}, resultTotalQty: {}",
+                context.getBatchNo(), result.getMaterialCode(), result.getLhMachineCode(),
+                LhScheduleTimeUtil.formatDateTime(cleaningWindow.getCleanStartTime()),
+                LhScheduleTimeUtil.formatDateTime(inspectionStartTime),
+                LhScheduleTimeUtil.formatDateTime(inspectionEndTime), shiftIndex,
+                inspectionQty, resolveResultPlanQty(result));
+        if (originalTotalQty != resolveResultPlanQty(result)) {
+            log.error("喷砂首检重新归属后结果总计划量发生变化，仅记录日志并继续保存, "
+                            + "batchNo: {}, materialCode: {}, machineCode: {}, originalTotalQty: {}, actualTotalQty: {}",
+                    context.getBatchNo(), result.getMaterialCode(), result.getLhMachineCode(),
+                    originalTotalQty, resolveResultPlanQty(result));
+        }
+    }
+
+    /**
+     * 从同一结果的其他班次移动指定数量到喷砂首检班次。
+     *
+     * @param context 排程上下文
+     * @param result 排程结果
+     * @param targetShiftIndex 首检目标班次
+     * @param requiredQty 需要移动的数量
+     * @return 实际移动数量
+     */
+    private int moveResultQtyToSandBlastInspectionShift(
+            LhScheduleContext context,
+            LhScheduleResult result,
+            int targetShiftIndex,
+            int requiredQty) {
+        int remainingQty = requiredQty;
+        List<Integer> donorShiftIndexList = new ArrayList<Integer>(
+                LhScheduleConstant.MAX_SHIFT_SLOT_COUNT - 1);
+        for (int shiftIndex = targetShiftIndex + 1;
+             shiftIndex <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shiftIndex++) {
+            donorShiftIndexList.add(shiftIndex);
+        }
+        for (int shiftIndex = targetShiftIndex - 1; shiftIndex >= 1; shiftIndex--) {
+            donorShiftIndexList.add(shiftIndex);
+        }
+        for (Integer donorShiftIndex : donorShiftIndexList) {
+            if (remainingQty <= 0) {
+                break;
+            }
+            // 喷砂首检独立于正常换模/换活字块首检，禁止从正常首检所在班次挪量。
+            if (this.isNormalFirstInspectionShift(result, donorShiftIndex)) {
+                continue;
+            }
+            int donorQty = Math.max(0, Objects.isNull(ShiftFieldUtil.getShiftPlanQty(result, donorShiftIndex))
+                    ? 0 : ShiftFieldUtil.getShiftPlanQty(result, donorShiftIndex));
+            int deductedQty = Math.min(donorQty, remainingQty);
+            if (deductedQty <= 0) {
+                continue;
+            }
+            int retainedQty = donorQty - deductedQty;
+            ShiftFieldUtil.setShiftPlanQty(result, donorShiftIndex, retainedQty,
+                    ShiftFieldUtil.getShiftStartTime(result, donorShiftIndex),
+                    ShiftFieldUtil.getShiftEndTime(result, donorShiftIndex));
+            if (retainedQty <= 0) {
+                ShiftFieldUtil.clearShiftPlanAuxFields(result, donorShiftIndex);
+            } else {
+                Date retainedEndTime = this.resolveNormalizedShiftEndTime(
+                        context, result, donorShiftIndex, retainedQty);
+                ShiftFieldUtil.setShiftPlanQty(result, donorShiftIndex, retainedQty,
+                        ShiftFieldUtil.getShiftStartTime(result, donorShiftIndex), retainedEndTime);
+            }
+            remainingQty -= deductedQty;
+        }
+        return requiredQty - remainingQty;
+    }
+
+    /**
+     * 统计结果中不属于正常首检班次、可供喷砂首检重新归属的计划量。
+     *
+     * @param result 排程结果
+     * @return 可重新归属计划量
+     */
+    private int resolveSandBlastReclassifiableQty(LhScheduleResult result) {
+        int availableQty = 0;
+        for (int shiftIndex = 1; shiftIndex <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shiftIndex++) {
+            if (this.isNormalFirstInspectionShift(result, shiftIndex)) {
+                continue;
+            }
+            Integer planQty = ShiftFieldUtil.getShiftPlanQty(result, shiftIndex);
+            availableQty += Math.max(0, Objects.isNull(planQty) ? 0 : planQty);
+        }
+        return availableQty;
+    }
+
+    /**
+     * 判断班次是否已承载正常换模/换活字块首检。
+     *
+     * @param result 排程结果
+     * @param shiftIndex 班次索引
+     * @return true-正常首检班次；false-非正常首检班次
+     */
+    private boolean isNormalFirstInspectionShift(LhScheduleResult result, int shiftIndex) {
+        String analysis = ShiftFieldUtil.getShiftAnalysis(result, shiftIndex);
+        return StringUtils.contains(analysis, FirstInspectionQtyUtil.FIRST_INSPECTION_ANALYSIS)
+                && !StringUtils.contains(analysis, SAND_BLAST_FIRST_INSPECTION_ANALYSIS);
+    }
+
+    /**
+     * 判断窗口是否满足喷砂首检时间轴要求。
+     *
+     * @param cleaningWindow 清洗窗口
+     * @return true-可归属喷砂首检；false-窗口不完整
+     */
+    private boolean isValidSandBlastFirstInspectionWindow(MachineCleaningWindowDTO cleaningWindow) {
+        Date readyTime = MachineCleaningOverlapUtil.resolveEffectiveCleanEndTime(cleaningWindow);
+        return MachineCleaningOverlapUtil.isSandBlastCleaning(cleaningWindow)
+                && Objects.nonNull(cleaningWindow.getCleanStartTime())
+                && Objects.nonNull(cleaningWindow.getCleanEndTime())
+                && Objects.nonNull(readyTime)
+                && cleaningWindow.getCleanStartTime().before(cleaningWindow.getCleanEndTime())
+                && cleaningWindow.getCleanEndTime().before(readyTime);
+    }
+
+    /**
+     * 构建喷砂物理事件键。
+     *
+     * @param machineCode 运行侧机台编码
+     * @param cleaningWindow 喷砂窗口
+     * @return 同一来源计划及物理机台共用的事件键
+     */
+    private String buildSandBlastInspectionEventKey(
+            String machineCode,
+            MachineCleaningWindowDTO cleaningWindow) {
+        String physicalMachineCode = LhSingleControlMachineUtil.resolvePhysicalMachineCode(machineCode);
+        return String.valueOf(cleaningWindow.getSourcePlanId()) + '|'
+                + StringUtils.defaultString(physicalMachineCode) + '|'
+                + cleaningWindow.getCleanStartTime().getTime();
+    }
+
+    /**
+     * 构建喷砂运行侧去重键。
+     *
+     * @param machineCode 运行侧机台编码
+     * @param cleaningWindow 喷砂窗口
+     * @return 喷砂事件及运行侧唯一键
+     */
+    private String buildSandBlastInspectionSideKey(
+            String machineCode,
+            MachineCleaningWindowDTO cleaningWindow) {
+        return this.buildSandBlastInspectionEventKey(machineCode, cleaningWindow)
+                + '|' + machineCode;
     }
 
     /**
@@ -1404,9 +1764,10 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             if (normalizedQty == planQty) {
                 continue;
             }
+            // 保存前归整改变实际数量，必须同步时间；首检已落班的原始归属不重排。
+            Date normalizedEndTime = this.resolveNormalizedShiftEndTime(context, result, shiftIndex, normalizedQty);
             ShiftFieldUtil.setShiftPlanQty(result, shiftIndex, normalizedQty,
-                    ShiftFieldUtil.getShiftStartTime(result, shiftIndex),
-                    ShiftFieldUtil.getShiftEndTime(result, shiftIndex));
+                    ShiftFieldUtil.getShiftStartTime(result, shiftIndex), normalizedEndTime);
             adjusted = true;
             log.info("双模计划量保存前收敛, batchNo: {}, materialCode: {}, machineCode: {}, "
                             + "shiftIndex: {}, mouldQty: {}, 原计划量: {}, 收敛后: {}",
@@ -1414,7 +1775,74 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
                     shiftIndex, mouldQty, planQty, normalizedQty);
         }
         if (adjusted) {
-            ShiftFieldUtil.syncDailyPlanQty(result);
+            // 结果、机台和班次缓存按最终数量同步；后料的开始时间和交替安排保持不动。
+            ResultShiftTimeUtil.refreshSummary(context, result);
+            ResultShiftTimeUtil.refreshMachine(context, result);
+            this.logNormalizedResultHandoverConflict(context, result);
+        }
+    }
+
+    /**
+     * 按真实班次配置重新计算归整后的结束时间。
+     * @param context 排程上下文
+     * @param result 当前结果
+     * @param shiftIndex 归整班次
+     * @param planQty 归整后数量
+     * @return 完成时间；没有可计算的班次或开始时间时保留原值，交由既有字段校验处理
+     */
+    private Date resolveNormalizedShiftEndTime(LhScheduleContext context, LhScheduleResult result,
+                                                int shiftIndex, int planQty) {
+        LhShiftConfigVO shift = context.getScheduleWindowShifts().stream()
+                .filter(currentShift -> Objects.equals(currentShift.getShiftIndex(), shiftIndex))
+                .findFirst().orElse(null);
+        if (Objects.isNull(shift) || Objects.isNull(ShiftFieldUtil.getShiftStartTime(result, shiftIndex))) {
+            return ShiftFieldUtil.getShiftEndTime(result, shiftIndex);
+        }
+        return ResultShiftTimeUtil.resolveNormalizedEndTime(context, result, shift, planQty);
+    }
+
+    /**
+     * 归整后核对同机台后料衔接，只输出应用日志，不阻断保存、不平移后料。
+     * @param context 排程上下文
+     * @param result 已归整的前料结果
+     */
+    private void logNormalizedResultHandoverConflict(LhScheduleContext context, LhScheduleResult result) {
+        Date beforeEndTime = result.getSpecEndTime();
+        if (Objects.isNull(beforeEndTime)) {
+            return;
+        }
+        Date beforeStartTime = null;
+        for (LhShiftConfigVO shift : context.getScheduleWindowShifts()) {
+            Date shiftStart = ShiftFieldUtil.getShiftStartTime(result, shift.getShiftIndex());
+            Integer qty = ShiftFieldUtil.getShiftPlanQty(result, shift.getShiftIndex());
+            if (Objects.nonNull(qty) && qty > 0 && Objects.nonNull(shiftStart)
+                    && (Objects.isNull(beforeStartTime) || shiftStart.before(beforeStartTime))) {
+                beforeStartTime = shiftStart;
+            }
+        }
+        for (LhScheduleResult nextResult : context.getScheduleResultList()) {
+            if (nextResult == result || !StringUtils.equals(result.getLhMachineCode(), nextResult.getLhMachineCode())) {
+                continue;
+            }
+            Date nextStartTime = nextResult.getMouldChangeStartTime();
+            for (LhShiftConfigVO shift : context.getScheduleWindowShifts()) {
+                Integer qty = ShiftFieldUtil.getShiftPlanQty(nextResult, shift.getShiftIndex());
+                Date shiftStart = ShiftFieldUtil.getShiftStartTime(nextResult, shift.getShiftIndex());
+                if (Objects.nonNull(qty) && qty > 0 && Objects.nonNull(shiftStart)
+                        && (Objects.isNull(nextStartTime) || shiftStart.before(nextStartTime))) {
+                    nextStartTime = shiftStart;
+                }
+            }
+            if (Objects.nonNull(beforeStartTime) && Objects.nonNull(nextStartTime)
+                    && nextStartTime.after(beforeStartTime) && nextStartTime.before(beforeEndTime)) {
+                log.warn("保存前数量归整后料衔接冲突, batchNo: {}, factoryCode: {}, machineCode: {}, "
+                                + "beforeMaterial: {}, beforeStatus: {}, beforeEndTime: {}, afterMaterial: {}, "
+                                + "afterStatus: {}, afterStartTime: {}, afterShift: {}，仅记录日志，继续保存，不自动重排后料",
+                        context.getBatchNo(), context.getFactoryCode(), result.getLhMachineCode(),
+                        result.getMaterialCode(), result.getProductStatus(), beforeEndTime,
+                        nextResult.getMaterialCode(), nextResult.getProductStatus(), nextStartTime,
+                        LhScheduleTimeUtil.resolveShiftByTime(context.getScheduleWindowShifts(), nextStartTime));
+            }
         }
     }
 

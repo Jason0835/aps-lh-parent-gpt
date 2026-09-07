@@ -2,6 +2,7 @@ package com.zlt.aps.lh.engine.strategy.support;
 
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
+import com.zlt.aps.lh.api.enums.ScheduleStepEnum;
 import com.zlt.aps.lh.component.StructureEndingAlignmentDecision;
 import com.zlt.aps.lh.component.StructureEndingAlignmentService;
 import com.zlt.aps.lh.context.LhScheduleContext;
@@ -192,9 +193,14 @@ public class NewSpecCandidateAttemptService {
                     "PREVIEW_REJECT", effectiveStructureLimitDecision, candidate);
             return null;
         }
+        // 复用标准S4.5已经解析的资源尺寸，辅助入口和独立班次9不启用55寸并列选择规则。
+        boolean standardNewProduction = Objects.nonNull(context)
+                && !context.isIsolatedNextShiftPlan() && StringUtils.equals(
+                ScheduleStepEnum.S4_5_NEW_PRODUCTION.getCode(), context.getCurrentStep());
         return new NewSpecScheduleProposal(
                 candidate, matchResult, shift.getShiftIndex(), poolDate,
-                availabilityPlan, actualAvailableTimeMode);
+                availabilityPlan, actualAvailableTimeMode,
+                standardNewProduction ? machineResource.getDimensionSize() : null);
     }
 
     /**

@@ -10,8 +10,8 @@ import java.util.Objects;
 /**
  * 首检时间轴模式统一解析器。
  *
- * <p>普通切换总时长已包含首检，默认按切换完成时间倒推；试制、量试或硬性生产
- * 门禁晚于切换完成时才从生产就绪时间正向执行。调用方不得复制该判断。</p>
+ * <p>普通切换总时长已包含首检，默认按切换完成时间倒推；试制、量试、硬性生产
+ * 门禁或结构占用起点约束从对应允许时刻正向执行。调用方不得复制该判断。</p>
  */
 public final class FirstInspectionTimingModeResolver {
 
@@ -40,6 +40,8 @@ public final class FirstInspectionTimingModeResolver {
             "试制或量试首检属于开产，从生产就绪时间正向执行";
     private static final String REASON_PRODUCTION_GATE =
             "硬性生产门禁晚于切换完成时间，首检随生产就绪时间正向执行";
+    private static final String REASON_PRODUCTION_OCCUPATION_BOUNDARY =
+            "结构机台名额释放后，首检从允许占用时刻正向执行";
 
     private FirstInspectionTimingModeResolver() {
     }
@@ -75,6 +77,35 @@ public final class FirstInspectionTimingModeResolver {
         return FirstInspectionTimingModeDecision.of(
                 FirstInspectionTimingMode.INCLUDED_IN_CHANGEOVER,
                 buildNormalReason(changeoverAction, businessScene));
+    }
+
+    /**
+     * 解析带结构占用起点约束的首检时间模式。
+     *
+     * @param sku 当前SKU
+     * @param scheduleType 排程类型
+     * @param changeoverAction 切换动作
+     * @param businessScene 业务场景
+     * @param productionReadyTime 生产就绪或硬性生产门禁时间
+     * @param changeoverEndTime 切换完成时间
+     * @param productionOccupationNotBeforeTime 首检或正式生产不得早于的结构占用时刻
+     * @return 模式及原因
+     */
+    public static FirstInspectionTimingModeDecision resolve(
+            SkuScheduleDTO sku,
+            String scheduleType,
+            String changeoverAction,
+            String businessScene,
+            Date productionReadyTime,
+            Date changeoverEndTime,
+            Date productionOccupationNotBeforeTime) {
+        if (Objects.nonNull(productionOccupationNotBeforeTime)) {
+            return FirstInspectionTimingModeDecision.of(
+                    FirstInspectionTimingMode.START_AT_OCCUPATION_BOUNDARY,
+                    REASON_PRODUCTION_OCCUPATION_BOUNDARY);
+        }
+        return resolve(sku, scheduleType, changeoverAction, businessScene,
+                productionReadyTime, changeoverEndTime);
     }
 
     /**

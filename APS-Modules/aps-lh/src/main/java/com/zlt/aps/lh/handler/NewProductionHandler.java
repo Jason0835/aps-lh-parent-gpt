@@ -71,6 +71,15 @@ public class NewProductionHandler extends AbsScheduleStepHandler {
                 context.getUnscheduledResultList().size());
 
         /*
+         * 班次9后置计划必须以全部前置阶段最终余量重新判断，但正常新增执行期间会把完成、
+         * 未排或参数拦截SKU移出待排列表。因此在任何新增消费前只冻结候选身份，数量仍由
+         * 后置服务读取最终生产剩余账本，避免改变原班次1～8的准入和排序。
+         */
+        context.getNewSpecSkuList().stream()
+                .filter(Objects::nonNull)
+                .forEach(context::registerNextShiftNewPlanCandidate);
+
+        /*
          * SYS0311004 只控制试制/量试是否进入真实机台新增排产。参数未配置或为0时，
          * 这些 SKU 仍属于虚拟机台最终兜底范围，因此必须在参数拦截前冻结候选；
          * 正常新增选机结束后会把终局未排 SKU 移出待排列表，S4.5.3 只能读取该快照

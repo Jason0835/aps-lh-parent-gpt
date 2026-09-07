@@ -197,9 +197,6 @@ public final class MachineCleaningOverlapUtil {
         if (Objects.isNull(cleaningWindow)) {
             return null;
         }
-        if (isSandBlastCleaning(cleaningWindow)) {
-            return cleaningWindow.getCleanEndTime();
-        }
         return Objects.nonNull(cleaningWindow.getReadyTime())
                 ? cleaningWindow.getReadyTime() : cleaningWindow.getCleanEndTime();
     }

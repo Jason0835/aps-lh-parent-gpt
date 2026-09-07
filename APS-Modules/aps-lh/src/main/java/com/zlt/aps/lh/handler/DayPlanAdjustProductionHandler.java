@@ -60,6 +60,11 @@ public class DayPlanAdjustProductionHandler extends AbsScheduleStepHandler {
             return;
         }
 
+        // 日计划调整属于独立新增来源，正式排产消费前同步登记班次9候选身份。
+        dayPlanAdjustSkuList.stream()
+                .filter(Objects::nonNull)
+                .forEach(context::registerNextShiftNewPlanCandidate);
+
         IProductionStrategy strategy = strategyFactory.getProductionStrategy(
                 ScheduleTypeEnum.NEW_SPEC.getCode());
         IMachineMatchStrategy machineMatchStrategy = strategyFactory.getMachineMatchStrategy();

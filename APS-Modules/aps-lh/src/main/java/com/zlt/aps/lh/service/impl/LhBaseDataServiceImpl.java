@@ -225,6 +225,8 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         // 月计划归集发生在班次窗口初始化之前，因此必须直接使用本方法已计算出的窗口末日，
         // 不能依赖此时尚未写入上下文的 windowEndDate。
         Date scheduleWindowEndDate = LhScheduleTimeUtil.addDays(endDate, -1);
+        Map<String, LocalDate> continuationReduceDimensionMonthMap =
+                this.resolveContinuationReduceDimensionMonthMap(scheduleWindowEndDate);
         int earlyProductionDaysThreshold = resolveEarlyProductionDaysThreshold(context);
         /*
          * SKU 提前生产固定从窗口结束日额外向后观察 N 个自然日。正式入口已在上下文中
@@ -322,6 +324,15 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                         scheduleWindowEndDate, earlyProductionRangeEndDate),
                 () -> sizeOf(context.getMonthPlanList()));
         /*
+         * 续作降模尺寸排序只观察窗口后的 T+3～T+7。该任务使用专用月份范围和上下文索引，
+         * 不合并到通用月计划列表，避免扩大新增、增机、停产保机及提前生产的取数范围。
+         */
+        CompletableFuture<Void> continuationReduceDimensionMonthPlanFuture = runDataInitTaskAsync(
+                "续作降模尺寸排序未来月计划",
+                () -> this.loadContinuationReduceDimensionFuturePlan(
+                        context, factoryCode, continuationReduceDimensionMonthMap),
+                () -> this.sizeOf(context.getContinuationReduceDimensionMonthPlanByMaterialMonthMap()));
+        /*
          * 加载年-月的硫化日计划调整信息
          */
         CompletableFuture<Void> yearMonthLhDayAdjustFuture = runDataInitTaskAsync("日计划调整",
@@ -377,6 +388,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         //      因此此处只需等待顶层 Future 完成即可（底层依赖链会自动传递完成状态）。
         waitForDataInitTasks(
                 monthPlanFuture,
+                continuationReduceDimensionMonthPlanFuture,
                 yearMonthLhDayAdjustFuture,
                 structureEndingDateFuture,
                 monthPlanStatisticsFuture,
@@ -973,6 +985,20 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     }
 
     /**
+     * 解析续作降模尺寸排序专用月计划月份。
+     * <p>观察范围固定为排程窗口结束日后第 1～5 天，即标准三天窗口下的 T+3～T+7。</p>
+     *
+     * @param scheduleWindowEndDate 排程窗口结束日 T+2
+     * @return key=year_month，value=对应月月初
+     */
+    private Map<String, LocalDate> resolveContinuationReduceDimensionMonthMap(Date scheduleWindowEndDate) {
+        Date futurePlanStartDate = LhScheduleTimeUtil.addDays(scheduleWindowEndDate, 1);
+        Date futurePlanEndDateExclusive = LhScheduleTimeUtil.addDays(
+                futurePlanStartDate, LhScheduleConstant.CONTINUATION_REDUCE_DIMENSION_FUTURE_PLAN_DAYS);
+        return this.resolveRequiredMonthMap(futurePlanStartDate, futurePlanEndDateExclusive);
+    }
+
+    /**
      * 加载月计划结构维度计划硫化机台数。
      * <p>提前生产需要同时读取当前业务日和 futurePlanDate 的 dayN.lhMachines，
      * 因此按“排程窗口开始日～窗口结束日+N”真实日期加载，并按 structureName 聚合 SUM 后缓存。</p>
@@ -1004,35 +1030,39 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                                          int month,
                                          Date startDate,
                                          Date endDateExclusive) {
-        String monthPlanVersion = resolveMonthPlanVersion(context, year, month);
         String productionVersion = resolveProductionVersion(context, year, month);
-        if (StringUtils.isEmpty(monthPlanVersion) || StringUtils.isEmpty(productionVersion)) {
-            log.warn("月计划结构机台统计跳过加载，需求版本或排产版本为空, factoryCode: {}, year: {}, month: {}, "
-                            + "monthPlanVersion: {}, productionVersion: {}",
-                    factoryCode, year, month, monthPlanVersion, productionVersion);
+        if (StringUtils.isEmpty(productionVersion)) {
+            log.warn("月计划结构机台统计跳过加载，排产版本为空, factoryCode: {}, year: {}, month: {}",
+                    factoryCode, year, month);
             return;
         }
+        /*
+         * 月计划滚动调整后，同一定稿排产版本内可能同时存在原始需求版本和调整需求版本。
+         * 结构统计必须与月计划明细保持同一快照口径，只按排产版本加载，避免调整结构被漏掉后
+         * 将真实计划机台数误判为0，进而阻断提前生产、普通新增和换活字块等共享门禁。
+         */
         List<MpMonthPlanStatistics> statisticsList = monthPlanStatisticsMapper.selectList(
                 new LambdaQueryWrapper<MpMonthPlanStatistics>()
                         .eq(MpMonthPlanStatistics::getFactoryCode, factoryCode)
                         .eq(MpMonthPlanStatistics::getYear, year)
                         .eq(MpMonthPlanStatistics::getMonth, month)
-                        .eq(MpMonthPlanStatistics::getMonthPlanVersion, monthPlanVersion)
                         .eq(MpMonthPlanStatistics::getProductionVersion, productionVersion)
-                        .eq(MpMonthPlanStatistics::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
                         .and(wrapper -> wrapper.eq(MpMonthPlanStatistics::getTempFlag, "0")
                                 .or().isNull(MpMonthPlanStatistics::getTempFlag)
                                 .or().eq(MpMonthPlanStatistics::getTempFlag, "")));
         if (CollectionUtils.isEmpty(statisticsList)) {
             log.warn("月计划结构机台统计无数据，按空缓存继续排程, factoryCode: {}, year: {}, month: {}, "
-                            + "monthPlanVersion: {}, productionVersion: {}",
-                    factoryCode, year, month, monthPlanVersion, productionVersion);
+                            + "productionVersion: {}",
+                    factoryCode, year, month, productionVersion);
             return;
         }
+        this.warnDuplicateMonthPlanStatistics(
+                factoryCode, year, month, productionVersion, statisticsList);
         LocalDate startLocalDate = toLocalDate(startDate);
         LocalDate endLocalDate = toLocalDate(endDateExclusive);
         for (MpMonthPlanStatistics row : statisticsList) {
-            if (Objects.isNull(row) || StringUtils.isBlank(row.getStructureName())) {
+            if (Objects.isNull(row) || StringUtils.isEmpty(
+                    StringUtils.trim(row.getStructureName()))) {
                 continue;
             }
             for (LocalDate productionDate = startLocalDate; productionDate.isBefore(endLocalDate);
@@ -1050,8 +1080,8 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                      */
                     String message = new StringBuilder(192)
                             .append("月计划结构机台统计 dayN 非法, factoryCode: ").append(factoryCode)
-                            .append(", monthPlanVersion: ").append(monthPlanVersion)
                             .append(", productionVersion: ").append(productionVersion)
+                            .append(", monthPlanVersion: ").append(row.getMonthPlanVersion())
                             .append(", structureName: ").append(row.getStructureName())
                             .append(", productionDate: ").append(productionDate)
                             .append(", reason: ").append(e.getMessage())
@@ -1064,14 +1094,61 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         }
         if (CollectionUtils.isEmpty(context.getStructurePlanMachineCountMap())) {
             log.warn("月计划结构机台统计无有效结构数据，按空缓存继续排程, factoryCode: {}, year: {}, month: {}, "
-                            + "monthPlanVersion: {}, productionVersion: {}, rowCount: {}",
-                    factoryCode, year, month, monthPlanVersion, productionVersion, statisticsList.size());
+                            + "productionVersion: {}, rowCount: {}",
+                    factoryCode, year, month, productionVersion, statisticsList.size());
             return;
         }
-        log.info("月计划结构机台统计加载完成, factoryCode: {}, year: {}, month: {}, monthPlanVersion: {}, "
-                        + "productionVersion: {}, rowCount: {}, dateCount: {}",
-                factoryCode, year, month, monthPlanVersion, productionVersion, statisticsList.size(),
+        Set<String> demandVersionSet = statisticsList.stream()
+                .map(MpMonthPlanStatistics::getMonthPlanVersion)
+                .filter(StringUtils::isNotEmpty)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        log.info("月计划结构机台统计加载完成, factoryCode: {}, year: {}, month: {}, productionVersion: {}, "
+                        + "需求版本集合: {}, rowCount: {}, dateCount: {}",
+                factoryCode, year, month, productionVersion, demandVersionSet, statisticsList.size(),
                 context.getStructurePlanMachineCountMap().size());
+    }
+
+    /**
+     * 检查同一排产版本下是否存在重复结构统计。
+     *
+     * <p>重复结构属于月计划快照数据质量问题，但按业务要求不能阻断硫化排程；这里只记录
+     * 可对账告警，后续仍沿用现有 {@link LhScheduleContext#addStructurePlanMachineCount(LocalDate, String, int)}
+     * 汇总口径继续处理。</p>
+     *
+     * @param factoryCode 工厂编码
+     * @param year 年份
+     * @param month 月份
+     * @param productionVersion 排产版本
+     * @param statisticsList 月计划结构统计列表
+     */
+    private void warnDuplicateMonthPlanStatistics(String factoryCode,
+                                                  int year,
+                                                  int month,
+                                                  String productionVersion,
+                                                  List<MpMonthPlanStatistics> statisticsList) {
+        Map<String, List<String>> structureDemandVersionMap = statisticsList.stream()
+                .filter(Objects::nonNull)
+                .filter(row -> StringUtils.isNotEmpty(
+                        StringUtils.trim(row.getStructureName())))
+                .collect(Collectors.groupingBy(
+                        MpMonthPlanStatistics::getStructureName,
+                        LinkedHashMap::new,
+                        Collectors.mapping(
+                                row -> StringUtils.defaultString(row.getMonthPlanVersion()),
+                                Collectors.toList())));
+        Map<String, List<String>> duplicateStructureMap = structureDemandVersionMap.entrySet().stream()
+                .filter(entry -> entry.getValue().size() > 1)
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        Map.Entry::getValue,
+                        (left, right) -> left,
+                        LinkedHashMap::new));
+        if (CollectionUtils.isEmpty(duplicateStructureMap)) {
+            return;
+        }
+        log.warn("月计划结构机台统计存在重复结构，按现有汇总口径继续排程, factoryCode: {}, year: {}, "
+                        + "month: {}, productionVersion: {}, duplicateStructures: {}",
+                factoryCode, year, month, productionVersion, duplicateStructureMap);
     }
 
     /**
@@ -1557,6 +1634,83 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     }
 
     /**
+     * 加载续作降模尺寸排序专用未来月计划。
+     * <p>该数据只写入专用索引，不合并通用月计划列表、索引及版本Map。跨月所需版本优先复用
+     * 已加载版本；专用范围新增月份则独立读取定稿版本，不扩大其他排程规则的数据范围。</p>
+     *
+     * @param context 排程上下文
+     * @param factoryCode 工厂编码
+     * @param requiredMonthMap T+3～T+7 涉及的月份
+     */
+    private void loadContinuationReduceDimensionFuturePlan(
+            LhScheduleContext context,
+            String factoryCode,
+            Map<String, LocalDate> requiredMonthMap) {
+        List<FactoryMonthPlanProductionFinalResult> futurePlanList =
+                new ArrayList<FactoryMonthPlanProductionFinalResult>(256);
+        if (!CollectionUtils.isEmpty(requiredMonthMap)) {
+            for (LocalDate monthStartDate : requiredMonthMap.values()) {
+                int year = monthStartDate.getYear();
+                int month = monthStartDate.getMonthValue();
+                String productionVersion = this.resolveProductionVersion(context, year, month);
+                if (StringUtils.isEmpty(productionVersion)) {
+                    productionVersion = this.resolveContinuationReduceDimensionProductionVersion(
+                            factoryCode, year, month);
+                }
+                if (StringUtils.isEmpty(productionVersion)) {
+                    continue;
+                }
+                futurePlanList.addAll(this.queryMonthPlanByProductionVersion(
+                        factoryCode, year, month, productionVersion));
+            }
+        }
+        context.setContinuationReduceDimensionMonthPlanByMaterialMonthMap(
+                MonthPlanDateResolver.buildMaterialMonthPlanMap(futurePlanList));
+        log.info("续作降模尺寸排序未来月计划加载完成, factoryCode: {}, requiredMonths: {}, planCount: {}",
+                factoryCode,
+                CollectionUtils.isEmpty(requiredMonthMap)
+                        ? new ArrayList<String>(0) : requiredMonthMap.keySet(),
+                futurePlanList.size());
+    }
+
+    /**
+     * 解析续作降模尺寸排序专用月份的定稿排产版本。
+     * <p>该观察范围不属于通用排程月计划加载范围，缺少有效定稿版本时仅表示该月无有效未来计划，
+     * 不写入通用版本Map，也不得中断其他排程逻辑。</p>
+     *
+     * @param factoryCode 工厂编码
+     * @param year 年份
+     * @param month 月份
+     * @return 定稿排产版本；不存在有效版本时返回null
+     */
+    private String resolveContinuationReduceDimensionProductionVersion(
+            String factoryCode,
+            int year,
+            int month) {
+        List<MpFactoryProductionVersion> versionList = mpFactoryProductionVersionMapper.selectList(
+                this.wrapFinalProductionVersion(factoryCode, year, month)
+                        .orderByDesc(MpFactoryProductionVersion::getUpdateTime)
+                        .orderByDesc(MpFactoryProductionVersion::getId)
+                        .last(FINAL_PRODUCTION_VERSION_LIMIT_TWO));
+        if (CollectionUtils.isEmpty(versionList)) {
+            log.warn("续作降模尺寸排序未来月计划跳过加载，定稿版本无数据, factoryCode: {}, year: {}, month: {}",
+                    factoryCode, year, month);
+            return null;
+        }
+        if (versionList.size() > 1) {
+            log.warn("续作降模尺寸排序定稿版本存在多条，已按更新时间最新取值, factoryCode: {}, year: {}, month: {}",
+                    factoryCode, year, month);
+        }
+        String productionVersion = versionList.get(0).getProductionVersion();
+        if (StringUtils.isEmpty(productionVersion)) {
+            log.warn("续作降模尺寸排序未来月计划跳过加载，定稿排产版本号为空, factoryCode: {}, year: {}, month: {}",
+                    factoryCode, year, month);
+            return null;
+        }
+        return productionVersion;
+    }
+
+    /**
      * 查询指定月份月生产计划。
      * <p>该月排产版本为空时：主月（排程目标日所在月）保持中断口径；
      * 跨月相邻月（如下月未定稿）跳过加载按无数据处理，不阻断本月排产。</p>
@@ -1586,6 +1740,24 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                     factoryCode, year, month);
             return new ArrayList<FactoryMonthPlanProductionFinalResult>(0);
         }
+        return this.queryMonthPlanByProductionVersion(factoryCode, year, month, productionVersion);
+    }
+
+    /**
+     * 按指定定稿排产版本查询月生产计划。
+     * <p>通用月计划和续作降模尺寸排序专用月计划共用相同查询口径，专用加载仅隔离月份范围和存储位置。</p>
+     *
+     * @param factoryCode 工厂编码
+     * @param year 年份
+     * @param month 月份
+     * @param productionVersion 定稿排产版本
+     * @return 月计划列表
+     */
+    private List<FactoryMonthPlanProductionFinalResult> queryMonthPlanByProductionVersion(
+            String factoryCode,
+            int year,
+            int month,
+            String productionVersion) {
         // 同一排产版本下可能同时存在原始需求版本和调整需求版本，不能用 MONTH_PLAN_VERSION 过滤。
         LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> wrapper = new LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult>()
                 .eq(FactoryMonthPlanProductionFinalResult::getFactoryCode, factoryCode)

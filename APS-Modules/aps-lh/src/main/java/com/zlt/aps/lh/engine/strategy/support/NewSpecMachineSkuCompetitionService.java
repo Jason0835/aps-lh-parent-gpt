@@ -41,6 +41,13 @@ import java.util.function.Predicate;
 @Slf4j
 public class NewSpecMachineSkuCompetitionService {
 
+    /** 单台机台硬匹配失败，仅代表当前机台不可用 */
+    private static final int HARD_MATCH_FAILURE_PRIORITY = 10;
+    /** 已通过硬匹配后的只读业务门禁失败 */
+    private static final int READ_ONLY_ELIGIBILITY_FAILURE_PRIORITY = 20;
+    /** 结构机台上限失败，属于正式时间轴前的最终共享业务门禁 */
+    private static final int STRUCTURE_ADMISSION_FAILURE_PRIORITY = 30;
+
     /** 单个 Machine×SKU 的完整只读准入和真实时间轴预演入口。 */
     @Resource
     private NewSpecCandidateAttemptService candidateAttemptService;
@@ -219,6 +226,14 @@ public class NewSpecMachineSkuCompetitionService {
                             poolDate, candidate, "HARD_MATCH", failureReason);
                     continue;
                 }
+                if (!this.isDeclaredMachineScopeAllowed(context, matchResult)) {
+                    String failureReason = "单控整机声明包含班次8未释放机台";
+                    this.recordCandidateFailureIfAbsent(candidate, failureReason);
+                    this.traceMachineSkuDecision(
+                            context, dayContext, shift, machineResource,
+                            poolDate, candidate, "MACHINE_SCOPE", failureReason);
+                    continue;
+                }
                 String assignmentKey = NewSpecMachineAssignmentPlan.buildAssignmentKey(
                         matchResult, candidate.getSku(), shift.getShiftIndex());
                 if (normalizedFailureSet.contains(assignmentKey)) {
@@ -232,7 +247,9 @@ public class NewSpecMachineSkuCompetitionService {
                         .resolveReadOnlyEligibilityFailure(context, candidate, matchResult);
                 if (StringUtils.isNotEmpty(eligibilityFailureReason)) {
                     roundCache.recordEligibilityRejected();
-                    this.recordCandidateFailureIfAbsent(candidate, eligibilityFailureReason);
+                    this.recordCandidateBusinessGateFailure(
+                            candidate, eligibilityFailureReason,
+                            READ_ONLY_ELIGIBILITY_FAILURE_PRIORITY);
                     this.traceMachineSkuDecision(
                             context, dayContext, shift, machineResource,
                             poolDate, candidate, "READ_ONLY_ELIGIBILITY",
@@ -263,8 +280,9 @@ public class NewSpecMachineSkuCompetitionService {
                         && structureLimitDecision.isApplicable()
                         && !structureLimitDecision.isAllowed()) {
                     roundCache.recordEligibilityRejected();
-                    this.recordCandidateFailureIfAbsent(
-                            candidate, structureLimitDecision.getReason());
+                    this.recordCandidateBusinessGateFailure(
+                            candidate, structureLimitDecision.getReason(),
+                            STRUCTURE_ADMISSION_FAILURE_PRIORITY);
                     if (Objects.nonNull(failedAssignmentKeySet)) {
                         failedAssignmentKeySet.add(formalAssignmentKey);
                     }
@@ -297,13 +315,13 @@ public class NewSpecMachineSkuCompetitionService {
                 if (crossDayPreparation) {
                     if (Objects.isNull(crossDayProposalOfDate)
                             || this.compareCandidateProposal(
-                            proposal, crossDayProposalOfDate, prioritizeTargetMachineGap) < 0) {
+                            context, proposal, crossDayProposalOfDate, prioritizeTargetMachineGap) < 0) {
                         crossDayProposalOfDate = proposal;
                     }
                 } else {
                     if (Objects.isNull(ordinaryProposalOfDate)
                             || this.compareCandidateProposal(
-                            proposal, ordinaryProposalOfDate, prioritizeTargetMachineGap) < 0) {
+                            context, proposal, ordinaryProposalOfDate, prioritizeTargetMachineGap) < 0) {
                         ordinaryProposalOfDate = proposal;
                     }
                 }
@@ -402,6 +420,14 @@ public class NewSpecMachineSkuCompetitionService {
                             poolDate, candidate, "HARD_MATCH", failureReason);
                     continue;
                 }
+                if (!this.isDeclaredMachineScopeAllowed(context, matchResult)) {
+                    String failureReason = "单控整机声明包含班次8未释放机台";
+                    this.recordCandidateFailureIfAbsent(candidate, failureReason);
+                    this.traceMachineSkuDecision(
+                            context, dayContext, shift, machineResource,
+                            poolDate, candidate, "MACHINE_SCOPE", failureReason);
+                    continue;
+                }
                 String assignmentKey = NewSpecMachineAssignmentPlan.buildAssignmentKey(
                         matchResult, candidate.getSku(), shift.getShiftIndex());
                 if (normalizedFailureSet.contains(assignmentKey)) {
@@ -415,7 +441,9 @@ public class NewSpecMachineSkuCompetitionService {
                         .resolveReadOnlyEligibilityFailure(context, candidate, matchResult);
                 if (StringUtils.isNotEmpty(eligibilityFailureReason)) {
                     roundCache.recordEligibilityRejected();
-                    this.recordCandidateFailureIfAbsent(candidate, eligibilityFailureReason);
+                    this.recordCandidateBusinessGateFailure(
+                            candidate, eligibilityFailureReason,
+                            READ_ONLY_ELIGIBILITY_FAILURE_PRIORITY);
                     this.traceMachineSkuDecision(
                             context, dayContext, shift, machineResource,
                             poolDate, candidate, "READ_ONLY_ELIGIBILITY",
@@ -446,8 +474,9 @@ public class NewSpecMachineSkuCompetitionService {
                         && structureLimitDecision.isApplicable()
                         && !structureLimitDecision.isAllowed()) {
                     roundCache.recordEligibilityRejected();
-                    this.recordCandidateFailureIfAbsent(
-                            candidate, structureLimitDecision.getReason());
+                    this.recordCandidateBusinessGateFailure(
+                            candidate, structureLimitDecision.getReason(),
+                            STRUCTURE_ADMISSION_FAILURE_PRIORITY);
                     if (Objects.nonNull(failedAssignmentKeySet)) {
                         failedAssignmentKeySet.add(formalAssignmentKey);
                     }
@@ -477,7 +506,7 @@ public class NewSpecMachineSkuCompetitionService {
                         poolDate, candidate, "PROPOSAL_GENERATED", "已形成完整可执行提案");
                 if (Objects.isNull(bestProposal)
                         || this.compareCandidateProposal(
-                        proposal, bestProposal, prioritizeTargetMachineGap) < 0) {
+                        context, proposal, bestProposal, prioritizeTargetMachineGap) < 0) {
                     bestProposal = proposal;
                 }
                 if (MachineSkuMatchLevel.SAME_EMBRYO
@@ -499,7 +528,7 @@ public class NewSpecMachineSkuCompetitionService {
      *
      * <p>先按声明范围合并重复物理机台，再在存在合法单控试制/量试提案时收窄到单控作用域；
      * 标准作用域内先让普通提案优先于目标日跨日准备提案，再比较历史来源班次，随后补统一Map
-     * 目标物理机台缺口，最后按匹配等级、收尾时间、机台编码决胜。</p>
+     * 目标物理机台缺口和匹配等级；55寸匹配并列后先比较余量和既有SKU名次，再沿用收尾时间、机台编码。</p>
      *
      * @param context 排程上下文
      * @param machineBestProposalList 每台机台当前最佳提案
@@ -647,6 +676,7 @@ public class NewSpecMachineSkuCompetitionService {
      * @param context 排程上下文
      * @param left 左提案
      * @param right 右提案
+     * @param prioritizeTargetMachineGap 是否启用标准动态竞争；固定指令保持原规则
      * @return 负数表示左提案优先，正数表示右提案优先
      */
     private int compareProposal(LhScheduleContext context,
@@ -673,6 +703,11 @@ public class NewSpecMachineSkuCompetitionService {
         if (compareResult != 0) {
             return compareResult;
         }
+        // 55寸匹配并列时，两层决策共同消费本轮余量和既有SKU名次快照。
+        compareResult = this.compareFiftyFiveSkuTie(context, left, right, prioritizeTargetMachineGap);
+        if (compareResult != 0) {
+            return compareResult;
+        }
         Date leftEndingTime = this.resolveCompetitionEndingTime(
                 context, left.getMatchResult());
         Date rightEndingTime = this.resolveCompetitionEndingTime(
@@ -691,13 +726,17 @@ public class NewSpecMachineSkuCompetitionService {
      * 比较同一机台上的两个可排 SKU 提案。
      *
      * <p>标准S4.5先让普通提案优先于目标日跨日准备提案，再比较历史来源班次，随后补统一Map
-     * 目标物理机台缺口和Machine-SKU匹配等级。普通/跨日档、来源和等级均相同时继续保留原业务顺序。</p>
+     * 目标物理机台缺口和Machine-SKU匹配等级。以上均相同时，55寸组先比较本轮硫化余量，
+     * 再比较既有SKU名次；其它尺寸保留原业务顺序。</p>
      *
+     * @param context 排程上下文，用于记录并列决胜证据
      * @param left 左提案
      * @param right 右提案
+     * @param prioritizeTargetMachineGap 是否启用标准动态竞争；固定指令保持原规则
      * @return 负数表示左提案优先，正数表示右提案优先
      */
-    private int compareCandidateProposal(NewSpecScheduleProposal left,
+    private int compareCandidateProposal(LhScheduleContext context,
+                                         NewSpecScheduleProposal left,
                                          NewSpecScheduleProposal right,
                                          boolean prioritizeTargetMachineGap) {
         int crossDayCompareResult = this.compareSourceDayCrossDayPreparation(
@@ -715,7 +754,58 @@ public class NewSpecMachineSkuCompetitionService {
                 return compareResult;
             }
         }
-        return this.compareMatchLevel(left.getMatchResult(), right.getMatchResult());
+        int matchCompareResult = this.compareMatchLevel(left.getMatchResult(), right.getMatchResult());
+        if (matchCompareResult != 0) {
+            return matchCompareResult;
+        }
+        // 匹配等级优先于余量，只有并列后才允许55寸组按统一硫化余量决胜。
+        return this.compareFiftyFiveSkuTie(context, left, right, prioritizeTargetMachineGap);
+    }
+
+    /**
+     * 比较55寸组同匹配等级SKU，余量相同后复用既有全局名次语义。
+     *
+     * @param context 排程上下文，用于记录本轮并列决胜证据
+     * @param left 左提案
+     * @param right 右提案
+     * @param prioritizeTargetMachineGap 是否为标准动态竞争；固定指令和共享顺序入口不改序
+     * @return 负数表示左侧优先；全部相同或不适用时返回0，由调用方继续原兜底规则
+     */
+    private int compareFiftyFiveSkuTie(LhScheduleContext context,
+                                      NewSpecScheduleProposal left,
+                                      NewSpecScheduleProposal right,
+                                      boolean prioritizeTargetMachineGap) {
+        if (!prioritizeTargetMachineGap || !left.isFiftyFiveDimension()
+                || !right.isFiftyFiveDimension()) {
+            return 0;
+        }
+        int compareResult = Integer.compare(
+                right.getCompetitionSurplusQty(), left.getCompetitionSurplusQty());
+        String decisionReason = "硫化余量降序";
+        if (compareResult == 0) {
+            int leftRank = left.getCompetitionSortRank();
+            int rightRank = right.getCompetitionSortRank();
+            // 与日期池既有全局顺序一致：正数名次优先，均未排名时保持原相对顺序。
+            compareResult = leftRank > 0 && rightRank > 0
+                    ? Integer.compare(leftRank, rightRank)
+                    : Boolean.compare(rightRank > 0, leftRank > 0);
+            decisionReason = "既有SKU排序优先级";
+        }
+        if (compareResult != 0) {
+            log.debug("55寸匹配并列决胜, batchNo: {}, poolDate: {}, dimensionSize: 55, "
+                            + "leftMachine: {}, leftSku: {}, leftSurplusQty: {}, leftSortRank: {}, "
+                            + "rightMachine: {}, rightSku: {}, rightSurplusQty: {}, rightSortRank: {}, "
+                            + "decisionReason: {}, winnerSku: {}",
+                    context.getBatchNo(), left.getPoolDate(),
+                    left.getMatchResult().getMachine().getMachineCode(),
+                    left.getCandidate().getSkuKey(), left.getCompetitionSurplusQty(),
+                    left.getCompetitionSortRank(),
+                    right.getMatchResult().getMachine().getMachineCode(),
+                    right.getCandidate().getSkuKey(), right.getCompetitionSurplusQty(),
+                    right.getCompetitionSortRank(), decisionReason,
+                    compareResult < 0 ? left.getCandidate().getSkuKey() : right.getCandidate().getSkuKey());
+        }
+        return compareResult;
     }
 
     /**
@@ -852,6 +942,26 @@ public class NewSpecMachineSkuCompetitionService {
     }
 
     /**
+     * 校验单控整机声明的全部运行态机台均位于本次资源作用域。
+     * <p>原S4.5作用域为空时保持现有全部机台语义；班次9独立上下文仅允许班次8真实释放机台，
+     * 防止代表侧已释放、配对侧仍在产时把整机提前纳入。</p>
+     *
+     * @param context 排程上下文
+     * @param matchResult 反向机台匹配结果
+     * @return true-声明范围允许；false-至少一台不在当前作用域
+     */
+    private boolean isDeclaredMachineScopeAllowed(
+            LhScheduleContext context,
+            MachineSkuMatchResult matchResult) {
+        if (Objects.isNull(context) || Objects.isNull(matchResult)
+                || CollectionUtils.isEmpty(context.getNewSpecMachineResourceScopeCodeSet())) {
+            return true;
+        }
+        return context.getNewSpecMachineResourceScopeCodeSet()
+                .containsAll(matchResult.getDeclaredMachineCodes());
+    }
+
+    /**
      * 判断候选是否仍有资格进入当前机台扫描。
      *
      * @param candidate 当前日期池候选
@@ -936,7 +1046,26 @@ public class NewSpecMachineSkuCompetitionService {
         if (Objects.nonNull(candidate)
                 && StringUtils.isEmpty(candidate.getLastFailure())
                 && StringUtils.isNotEmpty(failureReason)) {
-            candidate.setLastFailure(failureReason);
+            candidate.recordFailure(failureReason, HARD_MATCH_FAILURE_PRIORITY);
+        }
+    }
+
+    /**
+     * 登记已通过机台硬匹配后的业务门禁失败原因。
+     *
+     * <p>寸口、模套等硬匹配失败只代表单台机台不可用；候选已经在其他机台进入结构、模具等
+     * 更深层业务门禁后，应使用真实阻断原因替换早期局部失败，避免日终未排原因误导排查。</p>
+     *
+     * @param candidate 当前候选
+     * @param failureReason 业务门禁失败原因
+     * @param failurePriority 业务门禁阶段优先级
+     */
+    private void recordCandidateBusinessGateFailure(
+            DailyNewSpecCandidate candidate,
+            String failureReason,
+            int failurePriority) {
+        if (Objects.nonNull(candidate) && StringUtils.isNotEmpty(failureReason)) {
+            candidate.recordFailure(failureReason, failurePriority);
         }
     }
 

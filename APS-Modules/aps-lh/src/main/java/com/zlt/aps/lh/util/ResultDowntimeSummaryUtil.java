@@ -388,7 +388,8 @@ public final class ResultDowntimeSummaryUtil {
             if (Objects.isNull(maintenanceWindow)) {
                 continue;
             }
-            appendOverlapAnalysis(result, cleaningWindow.getCleanStartTime(), cleaningWindow.getCleanEndTime(),
+            appendOverlapAnalysis(result, cleaningWindow.getCleanStartTime(),
+                    MachineCleaningOverlapUtil.resolveEffectiveCleanEndTime(cleaningWindow),
                     maintenanceWindow.getMaintenanceStartTime(), maintenanceWindow.getMaintenanceEndTime(),
                     SAND_BLAST_PRECISION_ANALYSIS, scheduleWindowShifts);
         }
@@ -412,7 +413,8 @@ public final class ResultDowntimeSummaryUtil {
             if (Objects.isNull(planShut)) {
                 continue;
             }
-            appendOverlapAnalysis(result, cleaningWindow.getCleanStartTime(), cleaningWindow.getCleanEndTime(),
+            appendOverlapAnalysis(result, cleaningWindow.getCleanStartTime(),
+                    MachineCleaningOverlapUtil.resolveEffectiveCleanEndTime(cleaningWindow),
                     planShut.getBeginDate(), planShut.getEndDate(), SAND_BLAST_SHUTDOWN_ANALYSIS,
                     scheduleWindowShifts);
         }
@@ -446,7 +448,8 @@ public final class ResultDowntimeSummaryUtil {
             // 实际清洗时间已由硫化排程重新安排，来源计划窗口不再作为重叠判定依据。
             // 换模窗口必须按真实换模总时长(8h)判断，不能用首个生产班次开始时间截断，否则首检落在换模班次时会漏判。
             appendOverlapAnalysis(result,
-                    cleaningWindow.getCleanStartTime(), cleaningWindow.getCleanEndTime(),
+                    cleaningWindow.getCleanStartTime(),
+                    MachineCleaningOverlapUtil.resolveEffectiveCleanEndTime(cleaningWindow),
                     mouldChangeStartTime, mouldChangeCompleteTime, analysis, fallbackShiftIndex,
                     scheduleWindowShifts);
         }
@@ -506,7 +509,8 @@ public final class ResultDowntimeSummaryUtil {
         if (!CollectionUtils.isEmpty(maintenanceWindowList)) {
             for (MachineMaintenanceWindowDTO maintenanceWindow : maintenanceWindowList) {
                 if (Objects.nonNull(maintenanceWindow) && isWindowOverlap(cleaningWindow.getCleanStartTime(),
-                        cleaningWindow.getCleanEndTime(), maintenanceWindow.getMaintenanceStartTime(),
+                        MachineCleaningOverlapUtil.resolveEffectiveCleanEndTime(cleaningWindow),
+                        maintenanceWindow.getMaintenanceStartTime(),
                         maintenanceWindow.getMaintenanceEndTime())) {
                     return true;
                 }
@@ -515,7 +519,8 @@ public final class ResultDowntimeSummaryUtil {
         if (!CollectionUtils.isEmpty(devicePlanShutList)) {
             for (MdmDevicePlanShut planShut : devicePlanShutList) {
                 if (Objects.nonNull(planShut) && isWindowOverlap(cleaningWindow.getCleanStartTime(),
-                        cleaningWindow.getCleanEndTime(), planShut.getBeginDate(), planShut.getEndDate())) {
+                        MachineCleaningOverlapUtil.resolveEffectiveCleanEndTime(cleaningWindow),
+                        planShut.getBeginDate(), planShut.getEndDate())) {
                     return true;
                 }
             }
@@ -537,7 +542,8 @@ public final class ResultDowntimeSummaryUtil {
         // 单独清洗横跨多个班次时，备注应写入最后一个重叠班次（Spec：清洗重叠原因备注规则第2条）；
         // 未命中重叠班次时回退到按开始时间定位，避免边界场景漏写备注。
         int shiftIndex = resolveLastOverlapShiftIndex(scheduleWindowShifts,
-                cleaningWindow.getCleanStartTime(), cleaningWindow.getCleanEndTime());
+                cleaningWindow.getCleanStartTime(),
+                MachineCleaningOverlapUtil.resolveEffectiveCleanEndTime(cleaningWindow));
         if (shiftIndex <= 0) {
             shiftIndex = resolveShiftIndexByStartTime(scheduleWindowShifts, cleaningWindow.getCleanStartTime());
         }

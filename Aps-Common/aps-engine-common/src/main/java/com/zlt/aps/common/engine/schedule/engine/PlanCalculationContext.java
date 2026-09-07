@@ -1,7 +1,7 @@
 package com.zlt.aps.common.engine.schedule.engine;
 
 import java.math.BigDecimal;
-import java.util.Date;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
@@ -28,7 +28,7 @@ public interface PlanCalculationContext<T extends ScheduleTaskDraftModel,
 
     String getFactoryCode();
 
-    Date getScheduleDate();
+    LocalDate getScheduleDate();
 
     Map<String, F> getStockForecastMap();
 

@@ -2223,10 +2223,12 @@ public final class ShiftCapacityResolverUtil {
             return cleaningIntervals;
         }
         for (MachineCleaningWindowDTO cleaningWindow : cleaningWindowList) {
+            Date cleaningOccupationEndTime = MachineCleaningOverlapUtil
+                    .resolveEffectiveCleanEndTime(cleaningWindow);
             if (Objects.isNull(cleaningWindow)
                     || Objects.isNull(cleaningWindow.getCleanStartTime())
-                    || Objects.isNull(cleaningWindow.getCleanEndTime())
-                    || !cleaningWindow.getCleanStartTime().before(cleaningWindow.getCleanEndTime())) {
+                    || Objects.isNull(cleaningOccupationEndTime)
+                    || !cleaningWindow.getCleanStartTime().before(cleaningOccupationEndTime)) {
                 continue;
             }
             if (StringUtils.isNotEmpty(cleanType)
@@ -2235,8 +2237,8 @@ public final class ShiftCapacityResolverUtil {
             }
             Date overlapStartTime = later(cleaningWindow.getCleanStartTime(), windowStartTime);
             Date overlapEndTime = windowEndTime == null
-                    ? cleaningWindow.getCleanEndTime()
-                    : earlier(cleaningWindow.getCleanEndTime(), windowEndTime);
+                    ? cleaningOccupationEndTime
+                    : earlier(cleaningOccupationEndTime, windowEndTime);
             if (overlapStartTime.before(overlapEndTime)) {
                 cleaningIntervals.add(new Date[]{overlapStartTime, overlapEndTime});
             }

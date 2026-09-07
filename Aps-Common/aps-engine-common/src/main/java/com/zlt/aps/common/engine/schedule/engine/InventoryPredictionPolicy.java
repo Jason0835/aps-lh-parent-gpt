@@ -1,7 +1,7 @@
 package com.zlt.aps.common.engine.schedule.engine;
 
 import java.math.BigDecimal;
-import java.util.Date;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
@@ -33,7 +33,7 @@ public interface InventoryPredictionPolicy<C, F extends ScheduleInventoryForecas
      * @param scheduleDate 排程日期
      */
     void handleMissingStock(C context, List<String> productCodes,
-                            Map<String, BigDecimal> stockMap, Date scheduleDate);
+                            Map<String, BigDecimal> stockMap, LocalDate scheduleDate);
 
     /** @param context 排程上下文 @return 是否使用示方书模式 */
     boolean isRecipeMode(C context);
@@ -47,14 +47,14 @@ public interface InventoryPredictionPolicy<C, F extends ScheduleInventoryForecas
      * @param scheduleDate 排程日期
      * @return 产品编码到六点净库存的映射
      */
-    Map<String, BigDecimal> querySixClockStock(String factoryCode, Date scheduleDate);
+    Map<String, BigDecimal> querySixClockStock(String factoryCode, LocalDate scheduleDate);
 
     /** @return 早班需求量 */
-    Map<String, BigDecimal> queryFirstShiftDemand(String factoryCode, Date scheduleDate,
+    Map<String, BigDecimal> queryFirstShiftDemand(String factoryCode, LocalDate scheduleDate,
                                                    List<String> productCodes, boolean useRecipe);
 
     /** @return 早班计划量 */
-    Map<String, BigDecimal> queryFirstShiftPlan(String factoryCode, Date scheduleDate,
+    Map<String, BigDecimal> queryFirstShiftPlan(String factoryCode, LocalDate scheduleDate,
                                                  List<String> productCodes);
 
     /** @param productCode 产品编码 @return 新预测结果 */

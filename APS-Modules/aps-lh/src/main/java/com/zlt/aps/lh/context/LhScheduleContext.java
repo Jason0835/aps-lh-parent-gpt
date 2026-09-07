@@ -179,6 +179,13 @@ public class LhScheduleContext {
      */
     private Map<String, FactoryMonthPlanProductionFinalResult> monthPlanByMaterialMonthMap = new LinkedHashMap<>();
     /**
+     * 续作降模尺寸排序专用月计划索引，key=物料+产品状态+年月。
+     * <p>仅加载排程窗口结束日后的 T+3～T+7 月计划，禁止合并到通用月计划列表或索引，
+     * 避免尺寸排序观察范围影响新增、增机、停产保机、提前生产等其他规则。</p>
+     */
+    private Map<String, FactoryMonthPlanProductionFinalResult>
+            continuationReduceDimensionMonthPlanByMaterialMonthMap = new LinkedHashMap<>();
+    /**
      * 年月 -> 定稿需求版本，跨月加载月计划和周程调整时按自然月取版本
      */
     private Map<String, String> monthPlanVersionByYearMonthMap = new LinkedHashMap<>();
@@ -261,6 +268,12 @@ public class LhScheduleContext {
      * 硫化机台信息Map, key=machineCode
      */
     private Map<String, LhMachineInfo> machineInfoMap = new LinkedHashMap<>();
+    /**
+     * 新增排产机台资源作用域。
+     * <p>空集合表示沿用原主流程全部机台；班次9独立上下文写入班次8真实释放机台编码，
+     * 只限制机台驱动竞争入口，不删除其它机台，确保模具占用等全局硬约束仍可读取完整状态。</p>
+     */
+    private Set<String> newSpecMachineResourceScopeCodeSet = new LinkedHashSet<>();
     /**
      * 旧模具清洗计划兼容列表；干冰/喷砂清洗排程不再使用该列表作为来源
      */
@@ -530,6 +543,17 @@ public class LhScheduleContext {
      * 也不持久化虚拟机台主数据。</p>
      */
     private List<SkuScheduleDTO> trialVirtualMachineCandidateList = new ArrayList<>();
+    /**
+     * 班次9独立后置计划候选快照。
+     * <p>在真实新增排产和日计划调整排产消费候选前登记，仅作为后置服务恢复候选全集的只读来源；
+     * 班次9实际可排量必须重新读取全部前置阶段完成后的生产剩余账本，禁止直接使用快照中的旧余量。</p>
+     */
+    private List<SkuScheduleDTO> nextShiftNewPlanCandidateList = new ArrayList<>();
+    /** 班次9候选最终生效日期池，按物料和产品状态记录，不保存前置阶段数量。 */
+    private Map<String, LocalDate> nextShiftNewPlanPoolDateMap = new LinkedHashMap<>(16);
+    /** 仅班次9独立副本启用：沿用前置最终日期池，不重新归池或登记原窗口候选。 */
+    private boolean isolatedNextShiftPlan;
+
     /**
      * 本月历史欠产向当前排程窗口传导的数量，key=materialCode_productStatus
      */
@@ -1430,6 +1454,55 @@ public class LhScheduleContext {
             }
         }
         trialVirtualMachineCandidateList.add(sku);
+    }
+
+    /**
+     * 登记班次9后置计划候选。
+     * <p>按“物料编码+产品状态”去重，保证正规新增、续作转新增、日计划调整和试制/量试
+     * 候选只保留一个业务身份；本方法不修改SKU数量、排序和原8班排产集合。</p>
+     *
+     * @param sku 班次9候选SKU
+     * @return void
+     */
+    public void registerNextShiftNewPlanCandidate(SkuScheduleDTO sku) {
+        if (Objects.isNull(sku) || StringUtils.isEmpty(sku.getMaterialCode())) {
+            return;
+        }
+        String targetSkuKey = MonthPlanDateResolver.buildMaterialStatusKey(
+                sku.getMaterialCode(), sku.getProductStatus());
+        for (SkuScheduleDTO candidate : nextShiftNewPlanCandidateList) {
+            if (Objects.isNull(candidate)) {
+                continue;
+            }
+            String candidateSkuKey = MonthPlanDateResolver.buildMaterialStatusKey(
+                    candidate.getMaterialCode(), candidate.getProductStatus());
+            if (StringUtils.equals(targetSkuKey, candidateSkuKey)) {
+                return;
+            }
+        }
+        nextShiftNewPlanCandidateList.add(sku);
+    }
+
+    /**
+     * 在现有候选池完成日期调整后登记最终归属；后续合法归池覆盖先前记录。
+     *
+     * @param sku 本轮候选对象，保留最新日计划等业务属性
+     * @param poolDate 实际日期池 Map 的日期，不能使用调整前的原始日期
+     */
+    public void registerNextShiftNewPlanPool(SkuScheduleDTO sku, LocalDate poolDate) {
+        if (isolatedNextShiftPlan || Objects.isNull(sku) || Objects.isNull(poolDate)
+                || StringUtils.isEmpty(sku.getMaterialCode())) {
+            return;
+        }
+        String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(
+                sku.getMaterialCode(), sku.getProductStatus());
+        this.registerNextShiftNewPlanCandidate(sku);
+        // 只更新班次9信息，不改变原8班待排队列和候选运行态。
+        nextShiftNewPlanCandidateList.replaceAll(candidate ->
+                Objects.nonNull(candidate) && StringUtils.equals(skuKey,
+                        MonthPlanDateResolver.buildMaterialStatusKey(
+                                candidate.getMaterialCode(), candidate.getProductStatus())) ? sku : candidate);
+        nextShiftNewPlanPoolDateMap.put(skuKey, poolDate);
     }
 
     /**

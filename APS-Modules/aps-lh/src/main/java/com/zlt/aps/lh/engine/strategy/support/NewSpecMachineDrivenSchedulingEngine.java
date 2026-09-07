@@ -10,12 +10,14 @@ import com.zlt.aps.lh.engine.strategy.IMachineMatchStrategy;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.PriorityTraceLogHelper;
+import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
 import javax.annotation.Resource;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -26,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.function.Predicate;
 
 /**
@@ -109,11 +112,21 @@ public class NewSpecMachineDrivenSchedulingEngine {
         }
         List<LocalDate> orderedPoolDates = this.resolveOrderedPoolDates(
                 candidatePoolMap, dayContext.getScheduleDate(), phase);
+        boolean dynamicBestMatchCompetitionEnabled =
+                this.isDynamicBestMatchCompetitionEnabled(context);
         List<MachineResource> machineResources = this.buildMachineResources(
-                context, dayContext, candidatePoolMap);
+                context, dayContext, candidatePoolMap, dynamicBestMatchCompetitionEnabled);
         if (CollectionUtils.isEmpty(orderedPoolDates) || CollectionUtils.isEmpty(machineResources)) {
             return null;
         }
+        /*
+         * 尺寸建立同班次机台处理层级，不改变硬匹配和匹配等级；55寸组另在匹配并列后比较余量。
+         * 组内继续保持现有固定指令、最新可用时间和机台编码顺序。
+         */
+        List<List<MachineResource>> dimensionMachineGroups =
+                dynamicBestMatchCompetitionEnabled
+                        ? this.groupMachineResourcesByDimension(machineResources)
+                        : Collections.<List<MachineResource>>emptyList();
         Set<String> normalizedFailureSet = Objects.isNull(failedAssignmentKeySet)
                 ? Collections.<String>emptySet() : failedAssignmentKeySet;
         boolean actualAvailableTimeMode = Objects.isNull(context.getScheduleConfig())
@@ -132,7 +145,7 @@ public class NewSpecMachineDrivenSchedulingEngine {
             if (Objects.isNull(shift) || Objects.isNull(shift.getShiftEndDateTime())) {
                 continue;
             }
-            if (!this.isDynamicBestMatchCompetitionEnabled(context)) {
+            if (!dynamicBestMatchCompetitionEnabled) {
                 NewSpecScheduleProposal existingOrderProposal =
                         this.findFirstProposalByExistingMachineOrder(
                                 context, dayContext, shift, machineResources,
@@ -153,9 +166,9 @@ public class NewSpecMachineDrivenSchedulingEngine {
              * 才允许进入普通动态竞争，避免把固定指令作为普通匹配分值污染 bestSku 比较。
              */
             if (!CollectionUtils.isEmpty(fixedPhysicalMachineCodeSet)) {
-                List<NewSpecScheduleProposal> fixedProposalList =
-                        this.buildMachineBestProposalList(
-                                context, dayContext, shift, machineResources,
+                NewSpecScheduleProposal fixedWinner =
+                        this.selectFirstDimensionGroupWinner(
+                                context, dayContext, shift, dimensionMachineGroups,
                                 orderedPoolDates, candidatePoolMap, machineMatch,
                                 normalizedFailureSet, availabilityResolver,
                                 actualAvailableTimeMode, pendingSkuIdentitySet,
@@ -166,8 +179,6 @@ public class NewSpecMachineDrivenSchedulingEngine {
                                                 context, dayContext, candidate.getSku(),
                                                 machineResource.getMachine()) == 0,
                                 roundCache, false);
-                NewSpecScheduleProposal fixedWinner = machineSkuCompetitionService
-                        .selectRoundWinner(context, fixedProposalList, roundCache, false);
                 if (Objects.nonNull(fixedWinner)) {
                     this.traceWinningProposal(
                             context, dayContext, shift, fixedWinner,
@@ -180,9 +191,9 @@ public class NewSpecMachineDrivenSchedulingEngine {
              * 否则单控机台可能因正规 SKU 匹配等级更高而把自身 bestSku 选成正规 SKU，
              * 进而漏掉池内已经完整可排的试制/量试组合，违背单控资源优先目的。
              */
-            List<NewSpecScheduleProposal> singleControlTrialProposalList =
-                    this.buildMachineBestProposalList(
-                            context, dayContext, shift, machineResources,
+            NewSpecScheduleProposal singleControlTrialWinner =
+                    this.selectFirstDimensionGroupWinner(
+                            context, dayContext, shift, dimensionMachineGroups,
                             orderedPoolDates, candidatePoolMap, machineMatch,
                             normalizedFailureSet, availabilityResolver,
                             actualAvailableTimeMode, pendingSkuIdentitySet,
@@ -192,45 +203,28 @@ public class NewSpecMachineDrivenSchedulingEngine {
                                             machineResource.getMachine().getMachineCode()),
                             machineResource -> this::isTrialOrMassTrialCandidate,
                             roundCache, true);
-            NewSpecScheduleProposal singleControlTrialWinner = machineSkuCompetitionService
-                    .selectRoundWinner(context, singleControlTrialProposalList, roundCache);
             if (Objects.nonNull(singleControlTrialWinner)) {
                 this.traceWinningProposal(
                         context, dayContext, shift, singleControlTrialWinner,
                         actualAvailableTimeMode, COMPETITION_SCOPE_SINGLE_CONTROL_TRIAL);
                 return singleControlTrialWinner;
             }
-            List<NewSpecMachineProposalBuckets> machineProposalBucketList =
-                    this.buildMachineProposalBuckets(
-                            context, dayContext, shift, machineResources,
+            NewSpecMachineProposalBuckets dimensionGroupWinnerBuckets =
+                    this.selectFirstDimensionGroupProposalBuckets(
+                            context, dayContext, shift, dimensionMachineGroups,
                             orderedPoolDates, candidatePoolMap, machineMatch,
                             normalizedFailureSet, availabilityResolver,
-                            actualAvailableTimeMode, pendingSkuIdentitySet,
-                            machineResource -> true,
-                            machineResource -> candidate -> true,
-                            roundCache, true);
-            List<NewSpecScheduleProposal> ordinaryProposalList =
-                    new ArrayList<NewSpecScheduleProposal>(machineProposalBucketList.size());
-            List<NewSpecScheduleProposal> crossDayProposalList =
-                    new ArrayList<NewSpecScheduleProposal>(machineProposalBucketList.size());
-            for (NewSpecMachineProposalBuckets proposalBucket : machineProposalBucketList) {
-                if (proposalBucket.hasOrdinaryProposal()) {
-                    ordinaryProposalList.add(proposalBucket.getOrdinaryProposal());
-                }
-                if (proposalBucket.hasCrossDayProposal()) {
-                    crossDayProposalList.add(proposalBucket.getCrossDayProposal());
-                }
-            }
-            NewSpecScheduleProposal ordinaryWinner = machineSkuCompetitionService
-                    .selectRoundWinner(context, ordinaryProposalList, roundCache);
+                            actualAvailableTimeMode, pendingSkuIdentitySet, roundCache);
+            NewSpecScheduleProposal ordinaryWinner =
+                    dimensionGroupWinnerBuckets.getOrdinaryProposal();
             if (Objects.nonNull(ordinaryWinner)) {
                 this.traceWinningProposal(
                         context, dayContext, shift, ordinaryWinner,
                         actualAvailableTimeMode, COMPETITION_SCOPE_DYNAMIC);
                 return ordinaryWinner;
             }
-            NewSpecScheduleProposal crossDayWinner = machineSkuCompetitionService
-                    .selectRoundWinner(context, crossDayProposalList, roundCache);
+            NewSpecScheduleProposal crossDayWinner =
+                    dimensionGroupWinnerBuckets.getCrossDayProposal();
             if (Objects.nonNull(crossDayWinner)) {
                 if (Objects.isNull(deferredCrossDayProposal)) {
                     deferredCrossDayProposal = crossDayWinner;
@@ -335,6 +329,136 @@ public class NewSpecMachineDrivenSchedulingEngine {
             }
         }
         return proposalList;
+    }
+
+    /**
+     * 按尺寸升序查找第一个能够形成胜出提案的机台组。
+     *
+     * <p>每个尺寸组内部完整复用现有单机最佳SKU和跨机台唯一胜者逻辑；小尺寸组仍有
+     * 合法提案时不会扫描更大尺寸组。固定指令、单控试制量试等作用域由调用方保持原顺序。</p>
+     *
+     * @param context 排程上下文
+     * @param dayContext 当前业务日
+     * @param shift 当前竞争班次
+     * @param dimensionMachineGroups 尺寸升序机台组
+     * @param orderedPoolDates 有序日期池
+     * @param candidatePoolMap 日期候选池
+     * @param machineMatch 反向硬匹配策略
+     * @param failedAssignmentKeySet 已失败组合
+     * @param availabilityResolver 真实时间轴解析器
+     * @param actualAvailableTimeMode 是否按真实可开产时间归班
+     * @param pendingSkuIdentitySet 当前仍待排SKU
+     * @param machineScope 当前机台作用域
+     * @param candidateScopeResolver 每台机台候选作用域
+     * @param roundCache 当前阶段轻量缓存
+     * @param prioritizeTargetMachineGap 是否优先补目标物理机台缺口
+     * @return 最小可排尺寸组的胜出提案；全部不可排时返回null
+     */
+    private NewSpecScheduleProposal selectFirstDimensionGroupWinner(
+            LhScheduleContext context,
+            DayScheduleContext dayContext,
+            LhShiftConfigVO shift,
+            List<List<MachineResource>> dimensionMachineGroups,
+            List<LocalDate> orderedPoolDates,
+            Map<LocalDate, List<DailyNewSpecCandidate>> candidatePoolMap,
+            IMachineMatchStrategy machineMatch,
+            Set<String> failedAssignmentKeySet,
+            NewSpecMachineAvailabilityResolver availabilityResolver,
+            boolean actualAvailableTimeMode,
+            Set<SkuScheduleDTO> pendingSkuIdentitySet,
+            Predicate<MachineResource> machineScope,
+            java.util.function.Function<MachineResource, Predicate<DailyNewSpecCandidate>>
+                    candidateScopeResolver,
+            NewSpecProposalRoundCache roundCache,
+            boolean prioritizeTargetMachineGap) {
+        if (CollectionUtils.isEmpty(dimensionMachineGroups)) {
+            return null;
+        }
+        for (List<MachineResource> dimensionMachineGroup : dimensionMachineGroups) {
+            List<NewSpecScheduleProposal> proposalList = this.buildMachineBestProposalList(
+                    context, dayContext, shift, dimensionMachineGroup,
+                    orderedPoolDates, candidatePoolMap, machineMatch,
+                    failedAssignmentKeySet, availabilityResolver,
+                    actualAvailableTimeMode, pendingSkuIdentitySet,
+                    machineScope, candidateScopeResolver, roundCache,
+                    prioritizeTargetMachineGap);
+            NewSpecScheduleProposal winner = machineSkuCompetitionService.selectRoundWinner(
+                    context, proposalList, roundCache, prioritizeTargetMachineGap);
+            if (Objects.nonNull(winner)) {
+                return winner;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 按尺寸升序选择普通提案，并保留现有跨日准备兜底。
+     *
+     * <p>普通提案在第一个可排尺寸组产生后立即返回；跨日准备提案只暂存最小尺寸组胜者，
+     * 继续扫描后续尺寸组的普通提案，确保“普通优先、跨日兜底”的既有语义不变。</p>
+     *
+     * @param context 排程上下文
+     * @param dayContext 当前业务日
+     * @param shift 当前竞争班次
+     * @param dimensionMachineGroups 尺寸升序机台组
+     * @param orderedPoolDates 有序日期池
+     * @param candidatePoolMap 日期候选池
+     * @param machineMatch 反向硬匹配策略
+     * @param failedAssignmentKeySet 已失败组合
+     * @param availabilityResolver 真实时间轴解析器
+     * @param actualAvailableTimeMode 是否按真实可开产时间归班
+     * @param pendingSkuIdentitySet 当前仍待排SKU
+     * @param roundCache 当前阶段轻量缓存
+     * @return 普通胜出提案及最小尺寸组跨日兜底提案
+     */
+    private NewSpecMachineProposalBuckets selectFirstDimensionGroupProposalBuckets(
+            LhScheduleContext context,
+            DayScheduleContext dayContext,
+            LhShiftConfigVO shift,
+            List<List<MachineResource>> dimensionMachineGroups,
+            List<LocalDate> orderedPoolDates,
+            Map<LocalDate, List<DailyNewSpecCandidate>> candidatePoolMap,
+            IMachineMatchStrategy machineMatch,
+            Set<String> failedAssignmentKeySet,
+            NewSpecMachineAvailabilityResolver availabilityResolver,
+            boolean actualAvailableTimeMode,
+            Set<SkuScheduleDTO> pendingSkuIdentitySet,
+            NewSpecProposalRoundCache roundCache) {
+        NewSpecScheduleProposal firstCrossDayWinner = null;
+        for (List<MachineResource> dimensionMachineGroup : dimensionMachineGroups) {
+            List<NewSpecMachineProposalBuckets> proposalBucketList =
+                    this.buildMachineProposalBuckets(
+                            context, dayContext, shift, dimensionMachineGroup,
+                            orderedPoolDates, candidatePoolMap, machineMatch,
+                            failedAssignmentKeySet, availabilityResolver,
+                            actualAvailableTimeMode, pendingSkuIdentitySet,
+                            machineResource -> true,
+                            machineResource -> candidate -> true,
+                            roundCache, true);
+            List<NewSpecScheduleProposal> ordinaryProposalList =
+                    new ArrayList<NewSpecScheduleProposal>(proposalBucketList.size());
+            List<NewSpecScheduleProposal> crossDayProposalList =
+                    new ArrayList<NewSpecScheduleProposal>(proposalBucketList.size());
+            for (NewSpecMachineProposalBuckets proposalBucket : proposalBucketList) {
+                if (proposalBucket.hasOrdinaryProposal()) {
+                    ordinaryProposalList.add(proposalBucket.getOrdinaryProposal());
+                }
+                if (proposalBucket.hasCrossDayProposal()) {
+                    crossDayProposalList.add(proposalBucket.getCrossDayProposal());
+                }
+            }
+            NewSpecScheduleProposal ordinaryWinner = machineSkuCompetitionService
+                    .selectRoundWinner(context, ordinaryProposalList, roundCache);
+            if (Objects.nonNull(ordinaryWinner)) {
+                return NewSpecMachineProposalBuckets.of(
+                        ordinaryWinner, firstCrossDayWinner);
+            }
+            if (Objects.isNull(firstCrossDayWinner)) {
+                firstCrossDayWinner = machineSkuCompetitionService
+                        .selectRoundWinner(context, crossDayProposalList, roundCache);
+            }
+        }
+        return NewSpecMachineProposalBuckets.of(null, firstCrossDayWinner);
     }
 
     /**
@@ -488,23 +612,32 @@ public class NewSpecMachineDrivenSchedulingEngine {
         String decisionEvidence = this.buildWinningDecisionEvidence(
                 context, dayContext.getScheduleDate(), proposal.getCandidate().getSku(),
                 proposal.getMatchResult(), competitionScope);
+        String machineCode = proposal.getMatchResult().getMachine().getMachineCode();
+        String dimensionSize = this.isDynamicBestMatchCompetitionEnabled(context)
+                ? this.resolveMachineDimensionSize(context, machineCode).toPlainString()
+                : "-";
+        boolean fiftyFiveTieRuleEnabled = proposal.isFiftyFiveDimension()
+                && (StringUtils.equals(COMPETITION_SCOPE_DYNAMIC, competitionScope)
+                || StringUtils.equals(COMPETITION_SCOPE_SINGLE_CONTROL_TRIAL, competitionScope));
         log.info("新增排产机台驱动提案胜出, batchNo: {}, businessDate: {}, phase: {}, "
                         + "competitionScope: {}, resourceShiftIndex: {}, productionOccupationShiftIndex: {}, "
                         + "formalShiftIndex: {}, mode: {}, "
-                        + "machineCode: {}, poolDate: {}, materialCode: {}, productStatus: {}, "
-                        + "remainingMachineGap: {}, matchLevel: {}, productionOccupationStartTime: {}, "
+                        + "dimensionSize: {}, machineCode: {}, poolDate: {}, materialCode: {}, productStatus: {}, "
+                        + "remainingMachineGap: {}, matchLevel: {}, fiftyFiveTieRuleEnabled: {}, "
+                        + "competitionSurplusQty: {}, competitionSortRank: {}, productionOccupationStartTime: {}, "
                         + "formalAvailableTime: {}, {}",
                 context.getBatchNo(), dayContext.getScheduleDate(), dayContext.getCurrentPhase(),
                 competitionScope, resourceShift.getShiftIndex(),
                 plan.getProductionOccupationShift().getShiftIndex(),
                 plan.getFormalTargetShift().getShiftIndex(),
                 actualAvailableTimeMode ? "实际可开产时间" : "机台收尾时间",
-                proposal.getMatchResult().getMachine().getMachineCode(), proposal.getPoolDate(),
+                dimensionSize, machineCode, proposal.getPoolDate(),
                 proposal.getCandidate().getSku().getMaterialCode(),
                 proposal.getCandidate().getSku().getProductStatus(),
                 proposal.getCandidate().getRemainingMachineCount(),
                 proposal.getMatchResult().getMatchLevel().getDescription(),
-                plan.getProductionOccupationStartTime(),
+                fiftyFiveTieRuleEnabled, proposal.getCompetitionSurplusQty(),
+                proposal.getCompetitionSortRank(), plan.getProductionOccupationStartTime(),
                 plan.getFormalAvailableProductionTime(), decisionEvidence);
         String detail = new StringBuilder(896)
                 .append("batchNo=").append(context.getBatchNo())
@@ -518,8 +651,9 @@ public class NewSpecMachineDrivenSchedulingEngine {
                         plan.getProductionOccupationShift().getShiftIndex())
                 .append(", shiftMode=").append(actualAvailableTimeMode
                         ? "实际可开产时间" : "机台收尾时间")
+                .append(", dimensionSize=").append(dimensionSize)
                 .append(", machineCode=").append(
-                        proposal.getMatchResult().getMachine().getMachineCode())
+                        machineCode)
                 .append(", physicalMachineCode=").append(
                         LhSingleControlMachineUtil.resolvePhysicalMachineCode(
                                 proposal.getMatchResult().getMachine().getMachineCode()))
@@ -532,6 +666,9 @@ public class NewSpecMachineDrivenSchedulingEngine {
                         proposal.getCandidate().getRemainingMachineCount())
                 .append(", matchLevel=").append(
                         proposal.getMatchResult().getMatchLevel().getDescription())
+                .append(", fiftyFiveTieRuleEnabled=").append(fiftyFiveTieRuleEnabled)
+                .append(", competitionSurplusQty=").append(proposal.getCompetitionSurplusQty())
+                .append(", competitionSortRank=").append(proposal.getCompetitionSortRank())
                 .append(", machineEndingTime=").append(
                         LhScheduleTimeUtil.formatDateTime(
                                 machineSkuCompetitionService.resolveCompetitionEndingTime(
@@ -689,10 +826,20 @@ public class NewSpecMachineDrivenSchedulingEngine {
         return orderedDates;
     }
 
+    /**
+     * 构建当前轮次的轻量机台资源。
+     *
+     * @param context 排程上下文
+     * @param dayContext 当前业务日
+     * @param candidatePoolMap 日期候选池
+     * @param resolveDimensionSize 是否为标准S4.5资源解析尺寸
+     * @return 按现有固定指令、可用时间和机台编码排序的机台资源
+     */
     private List<MachineResource> buildMachineResources(
             LhScheduleContext context,
             DayScheduleContext dayContext,
-            Map<LocalDate, List<DailyNewSpecCandidate>> candidatePoolMap) {
+            Map<LocalDate, List<DailyNewSpecCandidate>> candidatePoolMap,
+            boolean resolveDimensionSize) {
         if (Objects.isNull(context) || CollectionUtils.isEmpty(context.getMachineScheduleMap())) {
             return Collections.emptyList();
         }
@@ -700,14 +847,23 @@ public class NewSpecMachineDrivenSchedulingEngine {
                 context.getMachineScheduleMap().size());
         Date defaultAvailableTime = this.resolveDefaultMachineAvailableTime(
                 context, dayContext);
+        Set<String> machineResourceScopeCodeSet =
+                context.getNewSpecMachineResourceScopeCodeSet();
         for (MachineScheduleDTO machine : context.getMachineScheduleMap().values()) {
             if (Objects.isNull(machine) || StringUtils.isEmpty(machine.getMachineCode())) {
+                continue;
+            }
+            if (!CollectionUtils.isEmpty(machineResourceScopeCodeSet)
+                    && !machineResourceScopeCodeSet.contains(machine.getMachineCode())) {
                 continue;
             }
             resources.add(new MachineResource(
                     machine, Collections.singletonList(machine.getMachineCode()),
                     Objects.nonNull(machine.getEstimatedEndTime())
-                            ? machine.getEstimatedEndTime() : defaultAvailableTime));
+                            ? machine.getEstimatedEndTime() : defaultAvailableTime,
+                    resolveDimensionSize
+                            ? this.resolveMachineDimensionSize(context, machine.getMachineCode())
+                            : null));
         }
         Set<String> fixedPhysicalMachineCodeSet = this.resolveFixedPhysicalMachineCodes(
                 context, dayContext, candidatePoolMap);
@@ -716,6 +872,67 @@ public class NewSpecMachineDrivenSchedulingEngine {
                         fixedPhysicalMachineCodeSet.contains(resource.getPhysicalMachineCode()) ? 0 : 1)
                 .thenComparing(MachineResource.RESOURCE_ORDER));
         return resources;
+    }
+
+    /**
+     * 将已有有序机台资源按数值尺寸升序分组。
+     *
+     * <p>TreeMap按BigDecimal数值比较，因此55与55.0归入同一组；组内按资源进入顺序
+     * 保留固定指令、最新可用时间和机台编码等现有顺序。</p>
+     *
+     * @param machineResources 已按现有规则排序的机台资源
+     * @return 尺寸升序的机台资源组
+     */
+    private List<List<MachineResource>> groupMachineResourcesByDimension(
+            List<MachineResource> machineResources) {
+        if (CollectionUtils.isEmpty(machineResources)) {
+            return Collections.emptyList();
+        }
+        Map<BigDecimal, List<MachineResource>> dimensionGroupMap =
+                new TreeMap<BigDecimal, List<MachineResource>>();
+        for (MachineResource machineResource : machineResources) {
+            BigDecimal dimensionSize = Objects.requireNonNull(
+                    machineResource.getDimensionSize(), "机台尺寸不能为空");
+            dimensionGroupMap.computeIfAbsent(
+                    dimensionSize, key -> new ArrayList<MachineResource>())
+                    .add(machineResource);
+        }
+        return new ArrayList<List<MachineResource>>(dimensionGroupMap.values());
+    }
+
+    /**
+     * 从硫化机台基础资料解析数值尺寸。
+     *
+     * <p>单控L/R运行态优先读取本侧配置，缺失时再按物理机台编码读取。尺寸属于本次分组
+     * 的必填业务输入，不设置默认值，避免基础数据异常时静默改变机台处理顺序。</p>
+     *
+     * @param context 排程上下文
+     * @param machineCode 运行态机台编码
+     * @return 数值尺寸
+     */
+    private BigDecimal resolveMachineDimensionSize(
+            LhScheduleContext context,
+            String machineCode) {
+        if (Objects.isNull(context) || CollectionUtils.isEmpty(context.getMachineInfoMap())
+                || StringUtils.isEmpty(machineCode)) {
+            throw new IllegalArgumentException("新增排产机台尺寸基础数据不能为空, machineCode="
+                    + machineCode);
+        }
+        LhMachineInfo machineInfo = context.getMachineInfoMap().get(machineCode);
+        if (Objects.isNull(machineInfo)) {
+            machineInfo = context.getMachineInfoMap().get(
+                    LhSingleControlMachineUtil.resolvePhysicalMachineCode(machineCode));
+        }
+        if (Objects.isNull(machineInfo) || StringUtils.isEmpty(machineInfo.getDimensionSize())) {
+            throw new IllegalArgumentException("新增排产机台尺寸未配置, machineCode=" + machineCode);
+        }
+        try {
+            return new BigDecimal(StringUtils.trim(machineInfo.getDimensionSize()));
+        } catch (NumberFormatException exception) {
+            throw new IllegalArgumentException(
+                    "新增排产机台尺寸不是有效数字, machineCode=" + machineCode
+                            + ", dimensionSize=" + machineInfo.getDimensionSize(), exception);
+        }
     }
 
     /**

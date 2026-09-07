@@ -182,10 +182,15 @@ public final class FirstInspectionAllocationUtil {
                 .filter(shift -> Objects.nonNull(shift.getShiftEndDateTime()))
                 .sorted(Comparator.comparing(LhShiftConfigVO::getShiftStartDateTime))
                 .collect(Collectors.toList());
-        boolean forwardInspection = Objects.nonNull(inspectionNotBeforeTime)
+        boolean productionReadyForward = Objects.nonNull(inspectionNotBeforeTime)
                 && FirstInspectionTimingMode.START_AT_PRODUCTION_READY == timingMode;
+        boolean occupationBoundaryForward = Objects.nonNull(inspectionNotBeforeTime)
+                && FirstInspectionTimingMode.START_AT_OCCUPATION_BOUNDARY == timingMode;
+        boolean forwardInspection = productionReadyForward || occupationBoundaryForward;
         Date inspectionReferenceTime = changeoverEndTime;
-        if (forwardInspection && inspectionNotBeforeTime.after(changeoverEndTime)) {
+        if (occupationBoundaryForward) {
+            inspectionReferenceTime = inspectionNotBeforeTime;
+        } else if (productionReadyForward && inspectionNotBeforeTime.after(changeoverEndTime)) {
             inspectionReferenceTime = inspectionNotBeforeTime;
         }
         LhShiftConfigVO countingShift = FirstInspectionQtyUtil.resolveFirstInspectionAttributionShift(
@@ -343,15 +348,57 @@ public final class FirstInspectionAllocationUtil {
             int remainingQty,
             String scheduleType,
             Map<Integer, Integer> availableCapacityMap) {
+        return buildTimelinePlan(
+                context, sku, machineCode, shifts, changeoverAction, businessScene,
+                changeoverStartTime, changeoverEndTime, productionReadyTime,
+                shiftCapacity, remainingQty, scheduleType, availableCapacityMap, null);
+    }
+
+    /**
+     * 构建带结构占用起点约束的统一首检时间轴。
+     *
+     * @param context 排程上下文
+     * @param sku 当前SKU
+     * @param machineCode 机台编码
+     * @param shifts 完整排程窗口班次
+     * @param changeoverAction 切换动作
+     * @param businessScene 业务场景
+     * @param changeoverStartTime 切换开始时间
+     * @param changeoverEndTime 切换完成时间
+     * @param productionReadyTime 生产就绪或硬性生产门禁时间
+     * @param shiftCapacity 运行态班产
+     * @param remainingQty 当前机台最多允许消费的目标量
+     * @param scheduleType 排程类型
+     * @param availableCapacityMap 首检可用容量；为空时按班产上限
+     * @param productionOccupationNotBeforeTime 首检或正式生产不得早于的结构占用时刻
+     * @return 冻结时间轴
+     */
+    public static FirstInspectionTimelinePlan buildTimelinePlan(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            String machineCode,
+            List<LhShiftConfigVO> shifts,
+            String changeoverAction,
+            String businessScene,
+            Date changeoverStartTime,
+            Date changeoverEndTime,
+            Date productionReadyTime,
+            int shiftCapacity,
+            int remainingQty,
+            String scheduleType,
+            Map<Integer, Integer> availableCapacityMap,
+            Date productionOccupationNotBeforeTime) {
         FirstInspectionTimingModeDecision decision = FirstInspectionTimingModeResolver.resolve(
                 sku, scheduleType, changeoverAction, businessScene,
-                productionReadyTime, changeoverEndTime);
+                productionReadyTime, changeoverEndTime,
+                productionOccupationNotBeforeTime);
+        Date inspectionNotBeforeTime = Objects.nonNull(productionOccupationNotBeforeTime)
+                ? productionOccupationNotBeforeTime : productionReadyTime;
         FirstInspectionAllocationPlan allocationPlan = buildPlan(
-                context, sku, shifts, changeoverEndTime, productionReadyTime,
+                context, sku, shifts, changeoverEndTime, inspectionNotBeforeTime,
                 shiftCapacity, remainingQty, scheduleType, machineCode,
                 availableCapacityMap, decision.getTimingMode());
-        Date formalProductionStartTime =
-                FirstInspectionTimingMode.START_AT_PRODUCTION_READY == decision.getTimingMode()
+        Date formalProductionStartTime = isForwardTimingMode(decision.getTimingMode())
                         ? resolveLaterTime(
                         resolveLaterTime(productionReadyTime, changeoverEndTime),
                         allocationPlan.getInspectionEndTime())
@@ -362,6 +409,17 @@ public final class FirstInspectionAllocationUtil {
                 allocationPlan, decision.getTimingMode(), decision.getModeReason(),
                 changeoverStartTime, changeoverEndTime, productionReadyTime,
                 formalProductionStartTime, formalProductionShift);
+    }
+
+    /**
+     * 判断首检是否按明确起点向后执行。
+     *
+     * @param timingMode 首检时间模式
+     * @return true-从生产就绪或结构占用边界正向执行；false-包含在切换时长内倒推
+     */
+    private static boolean isForwardTimingMode(FirstInspectionTimingMode timingMode) {
+        return FirstInspectionTimingMode.START_AT_PRODUCTION_READY == timingMode
+                || FirstInspectionTimingMode.START_AT_OCCUPATION_BOUNDARY == timingMode;
     }
 
     /**

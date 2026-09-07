@@ -3,7 +3,7 @@ package com.zlt.aps.common.engine.schedule.engine;
 import lombok.Data;
 
 import java.math.BigDecimal;
-import java.util.Date;
+import java.time.LocalDate;
 import java.util.List;
 /** TM/TC 实验规格识别公共运行态模型。 */
 @Data
@@ -29,9 +29,9 @@ public class ScheduleExperimentSpecInfoModel {
     /** 超过 CLASS8 后需要按末三班平均量估算的班次数。 */
     protected Integer formingWindowEstimatedShiftCount;
     /** 排程日期。 */
-    protected Date scheduleDate;
+    protected LocalDate scheduleDate;
     /** 实验月计划日期。 */
-    protected Date experimentPlanDate;
+    protected LocalDate experimentPlanDate;
     /** 月计划对应日期的定稿数量。 */
     protected BigDecimal monthPlanDayQty;
     /** 命中的月计划主键。 */

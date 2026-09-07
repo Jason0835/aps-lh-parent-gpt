@@ -4,6 +4,7 @@ import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import org.apache.commons.lang3.StringUtils;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -33,12 +34,14 @@ public final class MachineResource {
     private final String physicalMachineCode;
     /** 本轮构建时的最新可用时间 */
     private final Date endingTime;
+    /** 机台基础资料中的尺寸，用于同班次尺寸分组，不参与 Machine-SKU 匹配评分 */
+    private final BigDecimal dimensionSize;
     /** 当前物理机台可能声明的运行态编码 */
     private final List<String> declaredMachineCodes;
 
     public MachineResource(MachineScheduleDTO machine, List<String> declaredMachineCodes) {
         this(machine, declaredMachineCodes,
-                Objects.isNull(machine) ? null : machine.getEstimatedEndTime());
+                Objects.isNull(machine) ? null : machine.getEstimatedEndTime(), null);
     }
 
     /**
@@ -51,10 +54,26 @@ public final class MachineResource {
     public MachineResource(MachineScheduleDTO machine,
                            List<String> declaredMachineCodes,
                            Date latestAvailableTime) {
+        this(machine, declaredMachineCodes, latestAvailableTime, null);
+    }
+
+    /**
+     * 创建携带本轮最新可用时间和尺寸分组值的轻量机台资源。
+     *
+     * @param machine 正式运行态机台
+     * @param declaredMachineCodes 当前物理资源声明的运行态编码
+     * @param latestAvailableTime 本轮从上下文冻结的最新可用时间
+     * @param dimensionSize 机台尺寸，仅用于同班次机台组处理顺序
+     */
+    public MachineResource(MachineScheduleDTO machine,
+                           List<String> declaredMachineCodes,
+                           Date latestAvailableTime,
+                           BigDecimal dimensionSize) {
         this.machine = Objects.requireNonNull(machine, "机台资源不能为空");
         this.physicalMachineCode = LhSingleControlMachineUtil.resolvePhysicalMachineCode(
                 machine.getMachineCode());
         this.endingTime = latestAvailableTime;
+        this.dimensionSize = dimensionSize;
         this.declaredMachineCodes = declaredMachineCodes == null
                 ? Collections.singletonList(machine.getMachineCode())
                 : Collections.unmodifiableList(new ArrayList<String>(declaredMachineCodes));
@@ -70,6 +89,10 @@ public final class MachineResource {
 
     public Date getEndingTime() {
         return endingTime;
+    }
+
+    public BigDecimal getDimensionSize() {
+        return dimensionSize;
     }
 
     public List<String> getDeclaredMachineCodes() {

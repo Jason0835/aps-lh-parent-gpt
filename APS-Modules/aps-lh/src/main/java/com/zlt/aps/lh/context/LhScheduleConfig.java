@@ -332,7 +332,7 @@ public class LhScheduleConfig {
     }
 
     public int getSandBlastDurationHours() {
-        return getParamIntValue(LhScheduleParamConstant.SAND_BLAST_DURATION_HOURS, LhScheduleConstant.SAND_BLAST_DURATION_HOURS);
+        return LhScheduleConstant.SAND_BLAST_DURATION_HOURS;
     }
 
     public int getSandBlastWarningDays() {
@@ -346,8 +346,8 @@ public class LhScheduleConfig {
     }
 
     public int getSandBlastWithInspectionHours() {
-        return getParamIntValue(LhScheduleParamConstant.SAND_BLAST_WITH_INSPECTION_HOURS,
-                LhScheduleConstant.SAND_BLAST_WITH_INSPECTION_HOURS);
+        return LhScheduleConstant.SAND_BLAST_DURATION_HOURS
+                + LhScheduleConstant.SAND_BLAST_FIRST_INSPECTION_HOURS;
     }
 
     public int getSandBlastDailyLimit() {

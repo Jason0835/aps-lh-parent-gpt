@@ -91,6 +91,16 @@ public class NewSpecCandidatePoolBuilder {
                     context, earliestLhTime);
             LocalDate effectivePoolDate = this.resolveEffectivePoolDate(
                     basePoolDate, earliestLhPoolDate);
+            if (context.isIsolatedNextShiftPlan()) {
+                // 班次9沿用前置最终归属，班次8准备槽不得把T+2池重新解释为T+3池。
+                effectivePoolDate = context.getNextShiftNewPlanPoolDateMap().get(candidate.getSkuKey());
+                if (Objects.isNull(effectivePoolDate)) {
+                    continue;
+                }
+            } else {
+                // 只采集最终归属和身份，前置排序、数量及资源消费保持不变。
+                context.registerNextShiftNewPlanPool(candidate.getSku(), effectivePoolDate);
+            }
             boolean poolDateAdjusted = !Objects.equals(basePoolDate, effectivePoolDate);
             if (!candidate.isSpecialSkuClassified()) {
                 candidate.setSpecialSku(specialSkuSet.contains(candidate.getSku()));

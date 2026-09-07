@@ -1,5 +1,7 @@
 package com.zlt.aps.lh.engine.strategy.support;
 
+import org.apache.commons.lang3.StringUtils;
+
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -31,8 +33,10 @@ public class NewSpecCandidateRuntimeState {
     private boolean specialSku;
     /** 特殊SKU是否已经按中心排序口径完成分类 */
     private boolean specialSkuClassified;
-    /** 最近一次Machine×SKU试算失败原因 */
+    /** 当前已记录的最高业务阶段Machine×SKU试算失败原因 */
     private String lastFailure;
+    /** 最近失败原因的业务阶段优先级，数值越大表示越接近最终排产决策 */
+    private int lastFailurePriority;
     /** 按机台、阶段、日期池和班次隔离的首次决策轨迹 */
     private final Map<String, String> firstDecisionTraceMap =
             new LinkedHashMap<String, String>(16);
@@ -148,5 +152,20 @@ public class NewSpecCandidateRuntimeState {
 
     public void setLastFailure(String lastFailure) {
         this.lastFailure = lastFailure;
+        this.lastFailurePriority = 0;
+    }
+
+    /**
+     * 按业务阶段优先级登记候选失败原因。
+     *
+     * @param failureReason 失败原因
+     * @param failurePriority 业务阶段优先级
+     */
+    public void recordFailure(String failureReason, int failurePriority) {
+        if (StringUtils.isEmpty(failureReason) || failurePriority < lastFailurePriority) {
+            return;
+        }
+        this.lastFailure = failureReason;
+        this.lastFailurePriority = failurePriority;
     }
 }

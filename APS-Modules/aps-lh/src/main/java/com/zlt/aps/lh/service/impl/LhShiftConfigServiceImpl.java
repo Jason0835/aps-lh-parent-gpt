@@ -22,6 +22,7 @@ import javax.annotation.Resource;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * 硫化班次配置加载与解析
@@ -31,6 +32,11 @@ import java.util.List;
 @Slf4j
 @Service
 public class LhShiftConfigServiceImpl implements ILhShiftConfigService {
+
+    /** 独立后置计划业务班次号。 */
+    private static final int NEXT_SHIFT_INDEX = 9;
+    /** 班次9归属T+3业务日期。 */
+    private static final int NEXT_SHIFT_DATE_OFFSET = 3;
 
     @Resource
     private LhShiftConfigMapper lhShiftConfigMapper;
@@ -60,6 +66,49 @@ public class LhShiftConfigServiceImpl implements ILhShiftConfigService {
 
         context.setScheduleWindowShifts(shifts);
         return shifts;
+    }
+
+    /**
+     * 解析T+3业务日期晚班，供班次9独立后置计划使用。
+     *
+     * @param context 原8班排程上下文
+     * @return 复用当前工厂晚班起止时间的班次9对象
+     */
+    @Override
+    public LhShiftConfigVO resolveNextShiftNight(LhScheduleContext context) {
+        if (Objects.isNull(context) || StringUtils.isEmpty(context.getFactoryCode())
+                || Objects.isNull(context.getScheduleDate())) {
+            throw new IllegalArgumentException("工厂编号或排程T日为空，无法解析班次9");
+        }
+        List<LhShiftConfig> rows = lhShiftConfigMapper.selectList(
+                new LambdaQueryWrapper<LhShiftConfig>()
+                        .eq(LhShiftConfig::getFactoryCode, context.getFactoryCode())
+                        .orderByAsc(LhShiftConfig::getShiftIndex));
+        LhShiftConfig nightTemplate = rows.stream()
+                .filter(java.util.Objects::nonNull)
+                .filter(row -> ShiftEnum.NIGHT_SHIFT == ShiftTypeParseUtil.parse(row.getShiftType()))
+                .findFirst()
+                .orElse(null);
+        LhShiftConfigVO nextShift = new LhShiftConfigVO();
+        if (Objects.nonNull(nightTemplate)) {
+            BeanUtil.copyProperties(nightTemplate, nextShift);
+        } else {
+            LhShiftConfigVO defaultNightShift = LhScheduleTimeUtil
+                    .buildDefaultScheduleShifts(context, context.getScheduleDate()).stream()
+                    .filter(LhShiftConfigVO::isNightShift)
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalStateException("默认班次模板缺少晚班"));
+            BeanUtil.copyProperties(defaultNightShift, nextShift);
+        }
+        nextShift.setScheduleBaseDate(context.getScheduleDate());
+        nextShift.setShiftIndex(NEXT_SHIFT_INDEX);
+        nextShift.setDateOffset(NEXT_SHIFT_DATE_OFFSET);
+        nextShift.setShiftType(ShiftEnum.NIGHT_SHIFT.getCode());
+        nextShift.setShiftName("T+3日晚班");
+        if (nextShift.getShiftStartDateTime() == null || nextShift.getShiftEndDateTime() == null) {
+            throw new IllegalArgumentException("班次9起止时间无法按当前工厂晚班配置解析");
+        }
+        return nextShift;
     }
 
     /**

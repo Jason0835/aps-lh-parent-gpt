@@ -566,4 +566,7 @@ public class EngineConstants {
 
     /** SYS1101033：胎圈新规格保底备库班数（新规格/试制规格主动备库时的保底班数，与备库配置班数取最大），默认2班 */
     public static String TQ_NEW_SPEC_BACKUP_SHIFT_COUNT = "SYS1101033";
+
+    /** SYS1101034：胎圈备库二次触发阈值（S5.8滚动重估时班初库存低于 阈值×班N需求 触发二次备库），默认0.7 */
+    public static String TQ_BACKUP_TRIGGER_THRESHOLD_CLASS = "SYS1101034";
 }

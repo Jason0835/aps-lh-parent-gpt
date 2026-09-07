@@ -67,6 +67,7 @@ import com.zlt.aps.lh.util.MachineCleaningOverlapUtil;
 import com.zlt.aps.lh.util.PriorityTraceLogHelper;
 import com.zlt.aps.lh.util.ResultDowntimeSummaryUtil;
 import com.zlt.aps.lh.util.ShiftCapacityResolverUtil;
+import com.zlt.aps.lh.util.ResultShiftTimeUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
 import com.zlt.aps.lh.util.ShiftProductionControlUtil;
 import com.zlt.aps.lh.util.SingleMouldShiftQtyUtil;
@@ -1608,17 +1609,19 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
         }
         Date resolvedStartTime = productionStartTime;
         for (MachineCleaningWindowDTO cleaningWindow : machine.getCleaningWindowList()) {
+            Date cleaningOccupationEndTime = MachineCleaningOverlapUtil
+                    .resolveEffectiveCleanEndTime(cleaningWindow);
             if (Objects.isNull(cleaningWindow)
                     || Objects.isNull(cleaningWindow.getCleanStartTime())
-                    || Objects.isNull(cleaningWindow.getCleanEndTime())
-                    || !cleaningWindow.getCleanStartTime().before(cleaningWindow.getCleanEndTime())) {
+                    || Objects.isNull(cleaningOccupationEndTime)
+                    || !cleaningWindow.getCleanStartTime().before(cleaningOccupationEndTime)) {
                 continue;
             }
             // 只有清洗与换活字块实际相交时才并行取最大结束时间，未重叠场景不改变原开产时间。
             if (cleaningWindow.getCleanStartTime().before(productionStartTime)
-                    && cleaningWindow.getCleanEndTime().after(switchStartTime)
-                    && cleaningWindow.getCleanEndTime().after(resolvedStartTime)) {
-                resolvedStartTime = cleaningWindow.getCleanEndTime();
+                    && cleaningOccupationEndTime.after(switchStartTime)
+                    && cleaningOccupationEndTime.after(resolvedStartTime)) {
+                resolvedStartTime = cleaningOccupationEndTime;
             }
         }
         return resolvedStartTime;
@@ -5023,28 +5026,14 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
             Integer shiftPlanQty = ShiftFieldUtil.getShiftPlanQty(result, shift.getShiftIndex());
             Date shiftStartTime = ShiftFieldUtil.getShiftStartTime(result, shift.getShiftIndex());
             Date shiftEndTime = ShiftFieldUtil.getShiftEndTime(result, shift.getShiftIndex());
-            if (shiftEndTime == null) {
-                shiftEndTime = shift.getShiftEndDateTime();
-            }
             if (shiftPlanQty == null || shiftPlanQty <= 0 || shiftStartTime == null) {
                 continue;
             }
-            if (lhTimeSeconds <= 0 || mouldQty <= 0) {
+            // 正式落班或数量修改入口已经计算完成时间，不再使用另一套周期口径二次推导。
+            if (Objects.nonNull(shiftEndTime)) {
                 return shiftEndTime;
             }
-            long secondsNeeded = (long) Math.ceil((double) shiftPlanQty / mouldQty) * lhTimeSeconds;
-            List<MachineCleaningWindowDTO> cleaningWindowList = resolveEffectiveCleaningWindowList(
-                    context, result, resolveFirstPlannedShiftStartTime(result));
-            Date shiftCompletionTime = ShiftCapacityResolverUtil.resolveCompletionTimeWithDowntimes(
-                    context.getDevicePlanShutList(),
-                    cleaningWindowList,
-                    result.getLhMachineCode(),
-                    shiftStartTime,
-                    secondsNeeded);
-            if (shiftCompletionTime != null) {
-                return constrainCompletionWithinShift(shiftCompletionTime, shiftEndTime);
-            }
-            return shiftEndTime;
+            return this.resolveResultShiftEndTime(context, result, shift, shiftStartTime, shiftPlanQty);
         }
         return null;
     }
@@ -5067,6 +5056,16 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
             result.setTdaySpecEndTime(null);
             ResultDowntimeSummaryUtil.clearDowntimeSummary(result);
             return;
+        }
+        // 裁量会清空原结束时间，必须同时补齐班次字段，不能只更新规格汇总时间。
+        for (LhShiftConfigVO shift : shifts) {
+            Integer qty = ShiftFieldUtil.getShiftPlanQty(result, shift.getShiftIndex());
+            Date startTime = ShiftFieldUtil.getShiftStartTime(result, shift.getShiftIndex());
+            if (Objects.nonNull(qty) && qty > 0 && Objects.nonNull(startTime)
+                    && Objects.isNull(ShiftFieldUtil.getShiftEndTime(result, shift.getShiftIndex()))) {
+                Date endTime = this.resolveResultShiftEndTime(context, result, shift, startTime, qty);
+                ShiftFieldUtil.setShiftPlanQty(result, shift.getShiftIndex(), qty, startTime, endTime);
+            }
         }
         int lhTimeSeconds = result.getLhTime() != null ? result.getLhTime() : 0;
         int mouldQty = ShiftCapacityResolverUtil.resolveMachineMouldQty(
@@ -5121,10 +5120,6 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                 result.getMouldQty() != null ? result.getMouldQty() : 0);
         if (lhTimeSeconds > 0 && mouldQty > 0) {
             Date actualCompletionTime = null;
-            List<MachineCleaningWindowDTO> cleaningWindowList = resolveEffectiveCleaningWindowList(
-                    context, result, resolveFirstPlannedShiftStartTime(result));
-            List<MachineMaintenanceWindowDTO> maintenanceWindowList = resolveMachineMaintenanceWindowList(
-                    context, result.getLhMachineCode());
             for (int shiftIndex = 1; shiftIndex <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shiftIndex++) {
                 Integer shiftPlanQty = ShiftFieldUtil.getShiftPlanQty(result, shiftIndex);
                 Date shiftStartTime = ShiftFieldUtil.getShiftStartTime(result, shiftIndex);
@@ -5132,18 +5127,17 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                     continue;
                 }
                 Date shiftEndTime = ShiftFieldUtil.getShiftEndTime(result, shiftIndex);
-                long secondsNeeded = (long) Math.ceil((double) shiftPlanQty / mouldQty) * lhTimeSeconds;
-                Date shiftCompletionTime = ShiftCapacityResolverUtil.resolveCompletionTimeWithDowntimes(
-                        context.getDevicePlanShutList(),
-                        cleaningWindowList,
-                        maintenanceWindowList,
-                        result.getLhMachineCode(),
-                        shiftStartTime,
-                        secondsNeeded);
-                if (shiftCompletionTime == null) {
-                    shiftCompletionTime = shiftEndTime;
-                } else {
-                    shiftCompletionTime = constrainCompletionWithinShift(shiftCompletionTime, shiftEndTime);
+                final int currentShiftIndex = shiftIndex;
+                Date shiftCompletionTime = shiftEndTime;
+                if (Objects.isNull(shiftCompletionTime)) {
+                    LhShiftConfigVO shift = context.getScheduleWindowShifts().stream()
+                            .filter(currentShift -> Objects.equals(currentShift.getShiftIndex(), currentShiftIndex))
+                            .findFirst().orElse(null);
+                    shiftCompletionTime = this.resolveResultShiftEndTime(
+                            context, result, shift, shiftStartTime, shiftPlanQty);
+                }
+                if (Objects.isNull(shiftCompletionTime)) {
+                    continue;
                 }
                 if (actualCompletionTime == null || shiftCompletionTime.after(actualCompletionTime)) {
                     actualCompletionTime = shiftCompletionTime;
@@ -6018,5 +6012,22 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
             return;
         }
         setShiftPlanQty(result, shiftIndex, trimmedQty, shiftStartTime, null);
+    }
+
+    /**
+     * 数量修改后的完成时间统一沿用本策略的有效清洗、维修和胶囊窗口。
+     * @param context 排程上下文
+     * @param result 当前结果
+     * @param shift 真实班次
+     * @param startTime 实际开始时间
+     * @param planQty 当前最终数量
+     * @return 相同班产口径的完成时间
+     */
+    private Date resolveResultShiftEndTime(LhScheduleContext context, LhScheduleResult result,
+                                            LhShiftConfigVO shift, Date startTime, int planQty) {
+        // 保留本策略已有清洗豁免语义，复用公共入口计算容量和完成时间。
+        return ResultShiftTimeUtil.resolveEndTime(context, result, shift, startTime, planQty,
+                this.resolveEffectiveCleaningWindowList(context, result, this.resolveFirstPlannedShiftStartTime(result)),
+                this.resolveMachineMaintenanceWindowList(context, result.getLhMachineCode()));
     }
 }

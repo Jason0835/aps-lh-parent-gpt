@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.lh.mapper.LhNextShiftNewPlanMapper">
+
+    <resultMap type="com.zlt.aps.lh.api.domain.entity.LhNextShiftNewPlan" id="LhNextShiftNewPlanResult">
+        <id property="id" column="ID"/>
+        <result property="factoryCode" column="FACTORY_CODE"/>
+        <result property="scheduleDate" column="SCHEDULE_DATE"/>
+        <result property="batchNo" column="BATCH_NO"/>
+        <result property="materialCode" column="MATERIAL_CODE"/>
+        <result property="productStatus" column="PRODUCT_STATUS"/>
+        <result property="constructionStage" column="CONSTRUCTION_STAGE"/>
+        <result property="embryoCode" column="EMBRYO_CODE"/>
+        <result property="structureName" column="STRUCTURE_NAME"/>
+        <result property="shiftPlanQty" column="SHIFT_PLAN_QTY"/>
+        <result property="lhTime" column="LH_TIME"/>
+        <result property="mouldQty" column="MOULD_QTY"/>
+        <result property="singleMouldShiftQty" column="SINGLE_MOULD_SHIFT_QTY"/>
+        <result property="machineCode" column="MACHINE_CODE"/>
+        <result property="createBy" column="CREATE_BY"/>
+        <result property="createTime" column="CREATE_TIME"/>
+        <result property="updateBy" column="UPDATE_BY"/>
+        <result property="updateTime" column="UPDATE_TIME"/>
+        <result property="isDelete" column="IS_DELETE"/>
+        <result property="remark" column="REMARK"/>
+    </resultMap>
+
+    <sql id="selectLhNextShiftNewPlanVo">
+        select ID,
+               FACTORY_CODE,
+               SCHEDULE_DATE,
+               BATCH_NO,
+               MATERIAL_CODE,
+               PRODUCT_STATUS,
+               CONSTRUCTION_STAGE,
+               EMBRYO_CODE,
+               STRUCTURE_NAME,
+               SHIFT_PLAN_QTY,
+               LH_TIME,
+               MOULD_QTY,
+               SINGLE_MOULD_SHIFT_QTY,
+               MACHINE_CODE,
+               CREATE_BY,
+               CREATE_TIME,
+               UPDATE_BY,
+               UPDATE_TIME,
+               IS_DELETE,
+               REMARK
+        from T_LH_NEXT_SHIFT_NEW_PLAN
+    </sql>
+
+    <!-- 按条件查询下一班次新计划列表，逻辑删除由框架处理，此处显式带出 IS_DELETE = 0 兼容自定义查询场景 -->
+    <select id="selectLhNextShiftNewPlanList" parameterType="com.zlt.aps.lh.api.domain.entity.LhNextShiftNewPlan"
+            resultMap="LhNextShiftNewPlanResult">
+        <include refid="selectLhNextShiftNewPlanVo"/>
+        <where>
+            IS_DELETE = 0
+            <if test="factoryCode != null and factoryCode != ''">
+                AND FACTORY_CODE = #{factoryCode}
+            </if>
+            <if test="scheduleDate != null">
+                AND SCHEDULE_DATE = #{scheduleDate}
+            </if>
+            <if test="batchNo != null and batchNo != ''">
+                AND BATCH_NO = #{batchNo}
+            </if>
+            <if test="materialCode != null and materialCode != ''">
+                AND MATERIAL_CODE = #{materialCode}
+            </if>
+            <if test="constructionStage != null and constructionStage != ''">
+                AND CONSTRUCTION_STAGE = #{constructionStage}
+            </if>
+            <if test="embryoCode != null and embryoCode != ''">
+                AND EMBRYO_CODE = #{embryoCode}
+            </if>
+            <if test="machineCode != null and machineCode != ''">
+                AND MACHINE_CODE = #{machineCode}
+            </if>
+        </where>
+        order by SCHEDULE_DATE asc, FACTORY_CODE asc, MACHINE_CODE asc, MATERIAL_CODE asc
+    </select>
+
+</mapper>

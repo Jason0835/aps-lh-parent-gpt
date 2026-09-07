@@ -165,6 +165,40 @@ public final class MonthPlanDateResolver {
     }
 
     /**
+     * 从指定月计划索引汇总业务日期窗口内的原始日计划量。
+     * <p>用于必须与通用月计划加载范围隔离的规则；日期到年月、DAY_n 的映射仍复用本类统一口径。</p>
+     *
+     * @param planIndex 月计划索引，key=物料+产品状态+年月
+     * @param materialCode 物料编码
+     * @param productStatus 产品状态
+     * @param startDate 开始日期，包含当天
+     * @param endDate 结束日期，包含当天
+     * @return 窗口内原始日计划量合计
+     */
+    public static int resolveWindowPlanQty(
+            Map<String, FactoryMonthPlanProductionFinalResult> planIndex,
+            String materialCode,
+            String productStatus,
+            LocalDate startDate,
+            LocalDate endDate) {
+        if (CollectionUtils.isEmpty(planIndex) || StringUtils.isEmpty(materialCode)
+                || Objects.isNull(startDate) || Objects.isNull(endDate) || startDate.isAfter(endDate)) {
+            return 0;
+        }
+        int totalQty = 0;
+        LocalDate cursor = startDate;
+        String materialStatusKey = buildMaterialStatusKey(materialCode, productStatus);
+        while (!cursor.isAfter(endDate)) {
+            String materialMonthKey = buildMaterialMonthKey(
+                    materialStatusKey, cursor.getYear(), cursor.getMonthValue());
+            FactoryMonthPlanProductionFinalResult plan = planIndex.get(materialMonthKey);
+            totalQty += Math.max(0, MonthPlanDayQtyUtil.resolveDayQty(plan, cursor.getDayOfMonth()));
+            cursor = cursor.plusDays(1);
+        }
+        return Math.max(0, totalQty);
+    }
+
+    /**
      * 汇总指定月份 day1 到 endDate 当日的计划量。
      *
      * @param context 排程上下文

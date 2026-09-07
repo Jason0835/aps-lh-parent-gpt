@@ -173,11 +173,32 @@ public final class NewSpecEmbryoAvailableTimeResolver {
      * @param context 排程上下文
      * @param sku 待排 SKU
      * @param shifts 完整排程窗口班次
-     * @return SKU 类型门禁时间；正规及小批量返回 null，试制量试首次计划日在窗口外时返回该日零点供调用方判定超窗
+     * @return SKU类型门禁时间；班次9副本额外取目标槽开始时间下限，原8班返回值保持不变
      */
     public static Date resolveSkuProductionGateTime(LhScheduleContext context,
                                                     SkuScheduleDTO sku,
                                                     List<LhShiftConfigVO> shifts) {
+        Date typeGateTime = resolveTypeProductionGateTime(context, sku, shifts);
+        if (Objects.nonNull(context) && context.isIsolatedNextShiftPlan()
+                && !CollectionUtils.isEmpty(shifts)) {
+            // 班次9副本最后一个槽位才允许生产；该下限不是胎胚到位证据，不能放宽提前准入。
+            Date targetShiftStartTime = shifts.get(shifts.size() - 1).getShiftStartDateTime();
+            return resolveActualProductionStartTime(typeGateTime, targetShiftStartTime);
+        }
+        return typeGateTime;
+    }
+
+    /**
+     * 解析原有SKU类型门禁，原8班沿用原判断和返回值。
+     *
+     * @param context 排程上下文
+     * @param sku 待排SKU
+     * @param shifts 当前计算窗口
+     * @return 原有类型门禁，未命中时返回null
+     */
+    private static Date resolveTypeProductionGateTime(LhScheduleContext context,
+                                                       SkuScheduleDTO sku,
+                                                       List<LhShiftConfigVO> shifts) {
         if (Objects.isNull(context) || Objects.isNull(sku) || CollectionUtils.isEmpty(shifts)) {
             return null;
         }

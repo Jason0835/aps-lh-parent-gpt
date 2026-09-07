@@ -306,11 +306,13 @@ public class DefaultProductionShutdownStrategy implements IProductionShutdownStr
 
     /**
      * 构建班次管控 Map。
+     * 按上下文当前真实班次构建新的管控映射，不修改输入上下文或既有管控对象。
+     * 原8班初始化和班次9独立副本共用日历、产能比例与开停产规则。
      *
-     * @param context 排程上下文
-     * @return 班次管控 Map
+     * @param context 提供真实班次、日历和已解析开停产时刻的上下文
+     * @return 新建的班次管控映射，由调用方保存到自己的上下文
      */
-    private Map<Integer, ShiftProductionControlDTO> buildShiftControlMap(LhScheduleContext context) {
+    public Map<Integer, ShiftProductionControlDTO> buildShiftControlMap(LhScheduleContext context) {
         List<LhShiftConfigVO> shifts = context.getScheduleWindowShifts();
         Map<Integer, ShiftProductionControlDTO> controlMap = new LinkedHashMap<>(
                 CollectionUtils.isEmpty(shifts) ? 1 : shifts.size());

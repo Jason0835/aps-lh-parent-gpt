@@ -140,6 +140,10 @@ final class ScheduleSubstitutionAttemptSnapshot {
     private List<SharedMouldSubstitutionRecord> sharedMouldSubstitutionRecordList;
     /** 置换前新增待排 SKU 列表，预演会临时隔离为 A 或 B 单个 SKU。 */
     private List<SkuScheduleDTO> newSpecSkuList;
+    /** 班次9候选归属也随失败预演恢复，不能残留未生效的日期池。 */
+    private List<SkuScheduleDTO> nextShiftNewPlanCandidateList;
+    private Map<String, LocalDate> nextShiftNewPlanPoolDateMap;
+
     /** 置换前模具交替计划；换活字块或局部策略不得在失败预演中残留。 */
     private List<LhMouldChangePlan> mouldChangePlanList;
     /** 置换前持久化过程日志；预演日志必须随快照回滚。 */
@@ -210,6 +214,8 @@ final class ScheduleSubstitutionAttemptSnapshot {
             Collection<SkuScheduleDTO> skuCollection) {
         ScheduleSubstitutionAttemptSnapshot snapshot =
                 new ScheduleSubstitutionAttemptSnapshot();
+        snapshot.nextShiftNewPlanCandidateList = new ArrayList<>(context.getNextShiftNewPlanCandidateList());
+        snapshot.nextShiftNewPlanPoolDateMap = new LinkedHashMap<>(context.getNextShiftNewPlanPoolDateMap());
         snapshot.scheduleResultList = new ArrayList<LhScheduleResult>(context.getScheduleResultList());
         snapshot.scheduleResultStateMap = new IdentityHashMap<LhScheduleResult, LhScheduleResult>(
                 Math.max(16, context.getScheduleResultList().size() * 2));
@@ -405,8 +411,30 @@ final class ScheduleSubstitutionAttemptSnapshot {
      * @param context 排程上下文
      */
     void restore(LhScheduleContext context) {
-        for (Map.Entry<LhScheduleResult, LhScheduleResult> entry : scheduleResultStateMap.entrySet()) {
-            BeanUtil.copyProperties(entry.getValue(), entry.getKey());
+        this.restore(context, true);
+    }
+
+    /**
+     * 将资源快照复制到班次9副本，不恢复或改写原结果和原SKU对象。
+     * 调用方必须先切断机台Map引用，并在排产前替换副本中的结果及SKU视图。
+     *
+     * @param context 班次9独立上下文
+     */
+    void copyResourcesTo(LhScheduleContext context) {
+        this.restore(context, false);
+    }
+
+    /**
+     * 恢复资源容器，原窗口回滚才允许恢复原对象字段。
+     *
+     * @param context 目标上下文
+     * @param restoreSourceObjects 是否恢复原结果和SKU对象
+     */
+    private void restore(LhScheduleContext context, boolean restoreSourceObjects) {
+        if (restoreSourceObjects) {
+            for (Map.Entry<LhScheduleResult, LhScheduleResult> entry : scheduleResultStateMap.entrySet()) {
+                BeanUtil.copyProperties(entry.getValue(), entry.getKey());
+            }
         }
         context.setScheduleResultList(new ArrayList<LhScheduleResult>(scheduleResultList));
         context.setScheduleResultSourceSkuMap(
@@ -416,9 +444,11 @@ final class ScheduleSubstitutionAttemptSnapshot {
         context.setMachineShiftCapacityMap(copyIntArrayMap(machineShiftCapacityMap));
         context.setShiftRuntimeStateMap(copyShiftRuntimeStateMap(shiftRuntimeStateMap));
 
-        for (Map.Entry<LhUnscheduledResult, LhUnscheduledResult> entry
-                : unscheduledResultStateMap.entrySet()) {
-            BeanUtil.copyProperties(entry.getValue(), entry.getKey());
+        if (restoreSourceObjects) {
+            for (Map.Entry<LhUnscheduledResult, LhUnscheduledResult> entry
+                    : unscheduledResultStateMap.entrySet()) {
+                BeanUtil.copyProperties(entry.getValue(), entry.getKey());
+            }
         }
         context.setUnscheduledResultList(new ArrayList<LhUnscheduledResult>(unscheduledResultList));
         context.setSkuProductionRemainingQtyMap(
@@ -495,6 +525,8 @@ final class ScheduleSubstitutionAttemptSnapshot {
         context.setSharedMouldSubstitutionRecordList(
                 new ArrayList<SharedMouldSubstitutionRecord>(sharedMouldSubstitutionRecordList));
         context.setNewSpecSkuList(new ArrayList<SkuScheduleDTO>(newSpecSkuList));
+        context.setNextShiftNewPlanCandidateList(new ArrayList<>(nextShiftNewPlanCandidateList));
+        context.setNextShiftNewPlanPoolDateMap(new LinkedHashMap<>(nextShiftNewPlanPoolDateMap));
         context.setMouldChangePlanList(new ArrayList<LhMouldChangePlan>(mouldChangePlanList));
         context.setScheduleLogList(new ArrayList<LhScheduleProcessLog>(scheduleLogList));
         context.setHistoricalReverseSelectionDirectiveList(copyBeanList(
@@ -554,10 +586,12 @@ final class ScheduleSubstitutionAttemptSnapshot {
                         ? null : copyBean(scheduleSubstitutionDirective,
                         ScheduleSubstitutionDirective.class));
 
-        for (Map.Entry<SkuScheduleDTO, SkuScheduleDTO> entry : skuStateMap.entrySet()) {
-            BeanUtil.copyProperties(entry.getValue(), entry.getKey());
-            entry.getKey().setDailyPlanQuotaMap(
-                    copyDailyQuotaMap(skuDailyQuotaMap.get(entry.getKey())));
+        if (restoreSourceObjects) {
+            for (Map.Entry<SkuScheduleDTO, SkuScheduleDTO> entry : skuStateMap.entrySet()) {
+                BeanUtil.copyProperties(entry.getValue(), entry.getKey());
+                entry.getKey().setDailyPlanQuotaMap(
+                        copyDailyQuotaMap(skuDailyQuotaMap.get(entry.getKey())));
+            }
         }
 
         /*

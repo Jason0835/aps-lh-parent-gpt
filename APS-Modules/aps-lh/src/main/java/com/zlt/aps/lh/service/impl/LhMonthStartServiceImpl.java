@@ -76,6 +76,7 @@ public class LhMonthStartServiceImpl implements ILhMonthStartService {
                 .eq(FactoryMonthPlanProductionFinalResult::getYear, yearMonth.getYear())
                 .eq(FactoryMonthPlanProductionFinalResult::getMonth, yearMonth.getMonthValue())
                 .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode());
+        wrapper.orderByAsc(FactoryMonthPlanProductionFinalResult::getId);
         wrapper.last("LIMIT 1");
         return monthPlanMapper.selectOne(wrapper);
     }

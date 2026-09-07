@@ -7,7 +7,6 @@ import com.zlt.aps.common.engine.schedule.ScheduleTaskNode;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.ZoneId;
 
 /**
  * 自动排程任务链公共主流程引擎。
@@ -199,7 +198,7 @@ public final class TaskChainScheduleEngine<C extends TaskChainContextAccess<T>,
         if (context.getScheduleDate() == null) {
             throw policy.error(TaskChainErrorType.SCHEDULE_DATE_EMPTY, null);
         }
-        return context.getScheduleDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+        return context.getScheduleDate();
     }
 
     private void validateTaskAndContext(T task, C context, TaskChainPolicy<C, T> policy) {

@@ -18,4 +18,13 @@ public interface ILhShiftConfigService {
      * @throws IllegalArgumentException 配置非法（班次数、序号、偏移等）
      */
     List<LhShiftConfigVO> resolveAndAttachScheduleShifts(LhScheduleContext context);
+
+    /**
+     * 解析独立后置计划使用的班次9，即T+3业务日期晚班。
+     * <p>该方法复用工厂班次配置，但不写入原8班排程窗口。</p>
+     *
+     * @param context 原8班排程上下文
+     * @return 班次9日历对象
+     */
+    LhShiftConfigVO resolveNextShiftNight(LhScheduleContext context);
 }

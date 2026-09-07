@@ -149,6 +149,12 @@ public final class LhScheduleConstant {
     /** 喷砂清洗含首检耗时（小时） */
     public static final int SAND_BLAST_WITH_INSPECTION_HOURS = 12;
 
+    /** 喷砂清洗后固定首检耗时（小时） */
+    public static final int SAND_BLAST_FIRST_INSPECTION_HOURS = 2;
+
+    /** 喷砂清洗后固定首检计划量 */
+    public static final int SAND_BLAST_FIRST_INSPECTION_QTY = 2;
+
     /** 每日喷砂清洗上限 */
     public static final int SAND_BLAST_DAILY_LIMIT = 1;
 
@@ -333,6 +339,12 @@ public final class LhScheduleConstant {
      * <p>第1天承接原有T+3增机判断，第2天承接特殊材料候选从窗口末日继续后看两天的降模判断。</p>
      */
     public static final int REQUIRED_MACHINE_CROSS_WINDOW_EXTRA_DAYS = 2;
+    /**
+     * 续作降模尺寸排序观察天数。
+     * <p>固定观察排程窗口结束日后的 T+3～T+7，共 5 个自然日；仅用于判断是否启用
+     * “大尺寸硫化机优先下机”，不得扩大通用月计划、目标机台数或提前生产的数据范围。</p>
+     */
+    public static final int CONTINUATION_REDUCE_DIMENSION_FUTURE_PLAN_DAYS = 5;
     /** 是否按产能满排默认值（0-按需求排产，1-按产能满排） */
     public static final int ENABLE_FULL_CAPACITY_SCHEDULING = 1;
     /** 满排模式是否按余量命中收尾规则2默认值（0-关闭，1-开启） */

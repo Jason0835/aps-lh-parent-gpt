@@ -1,6 +1,6 @@
 package com.zlt.aps.common.engine.schedule.engine;
 
-import java.util.Date;
+import java.time.LocalDate;
 import java.util.Map;
 import java.util.Set;
 
@@ -12,7 +12,7 @@ import java.util.Set;
 public interface InventoryPredictionContext<F extends ScheduleInventoryForecast> {
 
     /** @return 排程日期 */
-    Date getScheduleDate();
+    LocalDate getScheduleDate();
 
     /** @return 工厂编号 */
     String getFactoryCode();

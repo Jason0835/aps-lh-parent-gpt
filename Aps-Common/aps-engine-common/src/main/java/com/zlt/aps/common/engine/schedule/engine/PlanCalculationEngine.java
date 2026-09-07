@@ -4,7 +4,6 @@ import com.zlt.aps.common.engine.quantity.PlanQuantityAllocationItem;
 import com.zlt.aps.common.engine.quantity.PlanQuantityAllocationUtils;
 
 import java.math.BigDecimal;
-import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -300,7 +299,7 @@ public final class PlanCalculationEngine<C extends PlanCalculationContext<T, F, 
 
     private String buildPlanGroupKey(C context, T task) {
         String dateText = context.getScheduleDate() == null ? null
-                : new SimpleDateFormat("yyyy-MM-dd").format(context.getScheduleDate());
+                : context.getScheduleDate().toString();
         String groupKey = this.defaultString(context.getFactoryCode())
                 + "|" + dateText
                 + "|" + this.defaultString(task.getProcessCode())

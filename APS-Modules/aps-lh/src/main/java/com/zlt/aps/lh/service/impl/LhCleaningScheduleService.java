@@ -214,10 +214,16 @@ public class LhCleaningScheduleService {
         }
         increaseDeviceStopCleaningUsage(context, dryIceDailyCountMap, dryIceMorningCountMap,
                 dryIceAfternoonCountMap, sandBlastDailyCountMap, cleanType, cleanStartTime);
-        log.info("设备停机清洗纳入本次窗口, 机台: {}, 类型: {}, 计划开始: {}, 实际清洗开始: {}, 清洗时长小时: {}",
-                cleaningPlan.getMachineCode(), cleanType, LhScheduleTimeUtil.formatDateTime(cleaningPlan.getBeginDate()),
-                LhScheduleTimeUtil.formatDateTime(cleanStartTime), cleanDurationHours);
         MachineCleaningWindowDTO cleaningWindow = buildCleaningWindow(context, cleaningPlan, cleanType, cleanStartTime, cleanDurationHours);
+        log.info("设备停机清洗纳入本次窗口, 机台: {}, 类型: {}, 计划开始: {}, 实际清洗开始: {}, "
+                        + "清洗结束: {}, 机台释放: {}, 清洗时长小时: {}, 喷砂首检时长小时: {}",
+                cleaningPlan.getMachineCode(), cleanType,
+                LhScheduleTimeUtil.formatDateTime(cleaningPlan.getBeginDate()),
+                LhScheduleTimeUtil.formatDateTime(cleanStartTime),
+                LhScheduleTimeUtil.formatDateTime(cleaningWindow.getCleanEndTime()),
+                LhScheduleTimeUtil.formatDateTime(cleaningWindow.getReadyTime()), cleanDurationHours,
+                CleaningTypeEnum.SAND_BLAST.getCode().equals(cleanType)
+                        ? LhScheduleConstant.SAND_BLAST_FIRST_INSPECTION_HOURS : 0);
         // 清洗成功排程：回填实际清洗开始时间到设备停机计划排程日期
         collectCleaningScheduleDateFill(context, cleaningPlan, cleanType, cleanStartTime, "清洗成功");
         return cleaningWindow;
@@ -396,11 +402,12 @@ public class LhCleaningScheduleService {
         cleaningWindow.setLeftRightMould(LeftRightMouldUtil.resolveCleaningLeftRightMould(cleaningPlan.getMachineCode()));
         cleaningWindow.setMouldCode(resolveCleaningMouldCode(context, cleaningPlan.getMachineCode()));
         cleaningWindow.setCleanStartTime(cleanStartTime);
-        // 喷砂清洗含首检耗时（12h）用于班次产能扣减和机台可开产时间；干冰清洗时长不变
-        int readyDurationHours = resolveReadyDurationHours(context, cleanType, cleanDurationHours);
-        Date cleanEndTime = LhScheduleTimeUtil.addHours(cleanStartTime, readyDurationHours);
+        // 喷砂清洗结束与首检结束分开记录，后续机台可用时间统一取 readyTime。
+        int readyDurationHours = resolveReadyDurationHours(cleanType, cleanDurationHours);
+        Date cleanEndTime = LhScheduleTimeUtil.addHours(cleanStartTime, cleanDurationHours);
+        Date readyTime = LhScheduleTimeUtil.addHours(cleanStartTime, readyDurationHours);
         cleaningWindow.setCleanEndTime(cleanEndTime);
-        cleaningWindow.setReadyTime(cleanEndTime);
+        cleaningWindow.setReadyTime(readyTime);
         // 保留来源设备停机计划窗口，后续换模重叠判断用计划窗口识别“清洗+换模”，但不作为实际清洗时间。
         cleaningWindow.setSourcePlanStartTime(cleaningPlan.getBeginDate());
         cleaningWindow.setSourcePlanEndTime(cleaningPlan.getEndDate());
@@ -553,7 +560,7 @@ public class LhCleaningScheduleService {
         String cleanType = cleaningPlan.getCleanType();
         Date candidateStartTime = resolvePreferredCleaningStartTime(context, cleaningPlan);
         int cleanDurationHours = resolveCleanDurationHours(context, cleanType);
-        int readyDurationHours = resolveReadyDurationHours(context, cleanType, cleanDurationHours);
+        int readyDurationHours = resolveReadyDurationHours(cleanType, cleanDurationHours);
         if (Objects.isNull(candidateStartTime) || cleanDurationHours <= 0) {
             return null;
         }
@@ -609,7 +616,7 @@ public class LhCleaningScheduleService {
             cleanDurationHours = resolveCleanDurationHours(context, cleanType);
             // 喷砂总停机口径用于班次扣减；机台再次可开产时间仍沿用喷砂清洗原时长，
             // 后续换模/换活字块时间继续由各自排产链路单独叠加，避免重复计时。
-            readyDurationHours = resolveReadyDurationHours(context, cleanType, cleanDurationHours);
+            readyDurationHours = resolveReadyDurationHours(cleanType, cleanDurationHours);
         } else {
             return null;
         }
@@ -681,17 +688,16 @@ public class LhCleaningScheduleService {
                     LhScheduleConstant.DRY_ICE_DURATION_HOURS);
         }
         if (CleaningTypeEnum.SAND_BLAST.getCode().equals(cleanType)) {
-            return context.getParamIntValue(LhScheduleParamConstant.SAND_BLAST_DURATION_HOURS,
-                    LhScheduleConstant.SAND_BLAST_DURATION_HOURS);
+            // 喷砂清洗时长按业务规则固定为10小时，不再受参数快照改变。
+            return LhScheduleConstant.SAND_BLAST_DURATION_HOURS;
         }
         return 0;
     }
 
-    private int resolveReadyDurationHours(LhScheduleContext context, String cleanType, int cleanDurationHours) {
-        // 喷砂清洗含首检耗时（默认12h = 10h清洗 + 2h首检），用于产能扣减和机台可开产时间
+    private int resolveReadyDurationHours(String cleanType, int cleanDurationHours) {
+        // 喷砂机台固定占用12小时（10小时清洗+2小时首检），不再受参数快照改变。
         if (CleaningTypeEnum.SAND_BLAST.getCode().equals(cleanType)) {
-            return context.getParamIntValue(LhScheduleParamConstant.SAND_BLAST_WITH_INSPECTION_HOURS,
-                    LhScheduleConstant.SAND_BLAST_WITH_INSPECTION_HOURS);
+            return cleanDurationHours + LhScheduleConstant.SAND_BLAST_FIRST_INSPECTION_HOURS;
         }
         return cleanDurationHours;
     }

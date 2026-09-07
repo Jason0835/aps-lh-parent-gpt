@@ -246,6 +246,16 @@ public class DailyNewSpecCandidate {
         runtimeState.setLastFailure(lastFailure);
     }
 
+    /**
+     * 按业务阶段优先级登记候选失败原因。
+     *
+     * @param failureReason 失败原因
+     * @param failurePriority 业务阶段优先级
+     */
+    public void recordFailure(String failureReason, int failurePriority) {
+        runtimeState.recordFailure(failureReason, failurePriority);
+    }
+
     public NewSpecCandidateRuntimeState getRuntimeState() {
         return runtimeState;
     }

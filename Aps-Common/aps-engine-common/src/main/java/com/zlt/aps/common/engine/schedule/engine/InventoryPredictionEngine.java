@@ -1,6 +1,7 @@
 package com.zlt.aps.common.engine.schedule.engine;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.*;
 
 /**
@@ -22,7 +23,7 @@ public final class InventoryPredictionEngine<C extends InventoryPredictionContex
     public void predict(C context, InventoryPredictionPolicy<C, F> policy,
                         InventoryPredictionTracePort<F> tracePort) {
         policy.validateContext(context);
-        Date scheduleDate = context.getScheduleDate();
+        LocalDate scheduleDate = context.getScheduleDate();
         String factoryCode = context.getFactoryCode();
         List<String> taskProductCodes = policy.getTaskProductCodes(context);
         Map<String, BigDecimal> sixClockStockMap = policy.querySixClockStock(factoryCode, scheduleDate);

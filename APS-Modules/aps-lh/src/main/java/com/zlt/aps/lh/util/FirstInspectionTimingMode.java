@@ -15,5 +15,10 @@ public enum FirstInspectionTimingMode {
     /**
      * 试制、量试或明确的生产门禁场景：首检从生产就绪时间开始。
      */
-    START_AT_PRODUCTION_READY
+    START_AT_PRODUCTION_READY,
+
+    /**
+     * 结构名额释放等占用门禁场景：首检从允许占用结构机台的时刻开始。
+     */
+    START_AT_OCCUPATION_BOUNDARY
 }

@@ -22,8 +22,14 @@ public class ScheduleMachineCandidateModel implements ScheduleQualityMachineCand
     protected BigDecimal machineSpeed;
     /** 产品规格对应的机台生产速度。TM/TC 运行态统一使用 processCode 作为键。 */
     protected Map<String, BigDecimal> processSpeedMap = new LinkedHashMap<>();
+    /**
+     * 机台可支持的口型板(口型板配置)
+     */
     protected Set<String> configuredMouthPlateCodes;
     protected Set<String> mouthPlateCodes;
+    /**
+     * 机台支持的胶料(胶料机台关系配置)
+     */
     protected Set<String> configuredGlueCodes;
     protected Set<String> allowedGlueCodes;
     protected Set<String> forbiddenGlueCodes;
@@ -31,11 +37,11 @@ public class ScheduleMachineCandidateModel implements ScheduleQualityMachineCand
     protected Boolean glueMachineMatched;
     protected Boolean fixedMachineSelected;
     protected Boolean fixedMachineExcluded;
-    /** 工厂已配置的定点允许产品集合。 */
+    /** 工厂已配置的定点允许产品集合(有配置的定点机台) */
     protected Set<String> configuredFixedAllowProcessCodes;
-    /** 当前机台可定点生产的产品集合。 */
+    /** 当前机台可定点生产的产品集合(定点机台对应产品规格) */
     protected Set<String> fixedAllowProcessCodes;
-    /** 当前机台禁止定点生产的产品集合。 */
+    /** 当前机台禁止定点生产的产品集合(禁排机台对应产品规格) */
     protected Set<String> fixedForbidProcessCodes;
     protected String tailMainGlueCode;
     protected String tailBaseGlueCode;
