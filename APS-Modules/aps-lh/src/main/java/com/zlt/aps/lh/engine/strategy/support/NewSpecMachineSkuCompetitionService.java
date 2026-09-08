@@ -4,6 +4,8 @@ import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.enums.ConstructionStageEnum;
+import com.zlt.aps.lh.api.enums.UnscheduledReasonEnum;
+import com.zlt.aps.lh.component.UnscheduledResultCollector;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.IMachineMatchStrategy;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
@@ -51,6 +53,9 @@ public class NewSpecMachineSkuCompetitionService {
     /** 单个 Machine×SKU 的完整只读准入和真实时间轴预演入口。 */
     @Resource
     private NewSpecCandidateAttemptService candidateAttemptService;
+    /** 仅登记已经执行的候选失败证据，不参与Machine-SKU竞争。 */
+    @Resource
+    private UnscheduledResultCollector unscheduledResultCollector;
 
     /**
      * 按原 SKU 业务顺序为当前机台查找最佳可排 SKU。
@@ -1102,6 +1107,22 @@ public class NewSpecMachineSkuCompetitionService {
         if (!candidate.recordFirstDecisionTrace(traceKey, traceValue)) {
             return;
         }
+        if (!StringUtils.equals("PROPOSAL_GENERATED", decisionStage)
+                && Objects.nonNull(unscheduledResultCollector)) {
+            UnscheduledReasonEnum reasonCode = this.resolveAttemptReasonCode(
+                    decisionStage, reason);
+            String detail = new StringBuilder(256)
+                    .append("decisionStage=").append(decisionStage)
+                    .append(", businessDate=")
+                    .append(Objects.isNull(dayContext) ? null : dayContext.getScheduleDate())
+                    .append(", shift=").append(Objects.isNull(shift) ? null : shift.getShiftIndex())
+                    .append(", machineCode=").append(machine.getMachineCode())
+                    .append(", poolDate=").append(poolDate)
+                    .append(", reason=").append(reason)
+                    .toString();
+            unscheduledResultCollector.recordAttempt(
+                    context, candidate.getSku(), reasonCode, detail);
+        }
         String logTemplate = "新增排产Machine-SKU决策轨迹, batchNo: {}, phase: {}, businessDate: {}, "
                         + "workDate: {}, shift: {}, machineCode: {}, machineEndTime: {}, "
                         + "materialCode: {}, productStatus: {}, targetPlanDate: {}, poolDate: {}, "
@@ -1129,5 +1150,31 @@ public class NewSpecMachineSkuCompetitionService {
         } else {
             log.info(logTemplate, logArguments);
         }
+    }
+
+    /**
+     * 将候选生命周期阶段转换为统一诊断原因，不改变原候选优先级。
+     *
+     * @param decisionStage 候选决策阶段
+     * @param reason 原分支原因
+     * @return 统一未排原因
+     */
+    private UnscheduledReasonEnum resolveAttemptReasonCode(
+            String decisionStage,
+            String reason) {
+        if (StringUtils.equals("HARD_MATCH", decisionStage)) {
+            return UnscheduledReasonEnum.NO_HARD_MATCH_MACHINE;
+        }
+        if (StringUtils.contains(decisionStage, "STRUCTURE")) {
+            return UnscheduledReasonEnum.STRUCTURE_MACHINE_LIMIT;
+        }
+        if (StringUtils.equals("TIMELINE", decisionStage)) {
+            return UnscheduledReasonEnum.CAPACITY_INSUFFICIENT;
+        }
+        if (StringUtils.equals("MACHINE_SCOPE", decisionStage)
+                || StringUtils.equals("CANDIDATE_STATE", decisionStage)) {
+            return UnscheduledReasonEnum.NO_REMAINING_MATCHED_MACHINE;
+        }
+        return unscheduledResultCollector.resolveReasonCode(reason);
     }
 }

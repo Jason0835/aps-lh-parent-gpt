@@ -5,6 +5,7 @@ import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
 import com.zlt.aps.lh.api.domain.entity.LhUnscheduledResult;
 import com.zlt.aps.lh.api.enums.ConstructionStageEnum;
+import com.zlt.aps.lh.api.enums.UnscheduledReasonEnum;
 import com.zlt.aps.lh.component.EarlyProductionQuantityCalculator;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
@@ -156,7 +157,8 @@ public final class PendingSkuUnscheduledRule {
                 DAILY_PLAN_ADMISSION_UNSCHEDULED_REASON);
         PriorityTraceLogHelper.appendProcessLog(context, "SKU无计划量不排产", detail);
         LhUnscheduledResult unscheduledResult = buildUnscheduledResult(
-                context, sku, 0, DAILY_PLAN_ADMISSION_UNSCHEDULED_REASON);
+                context, sku, 0, DAILY_PLAN_ADMISSION_UNSCHEDULED_REASON,
+                UnscheduledReasonEnum.NO_DAILY_PLAN_IN_FULL_RANGE, detail);
         // 月计划版本和生产版本属于本次准入未排结果的对账字段，仅在新增规则命中时回填，
         // 避免扩展公共构造方法后改变既有收尾小余量、仅历史欠产规则的落库内容。
         unscheduledResult.setMonthPlanVersion(sku.getMonthPlanVersion());
@@ -165,14 +167,15 @@ public final class PendingSkuUnscheduledRule {
     }
 
     /**
-     * 评估续作试制、量试SKU是否因排程窗口内无日计划量而直接进入未排。
+     * 评估续作试制、量试SKU是否因排程窗口内无日计划量且无硫化余量而直接进入未排。
      * <p>本规则仅按施工阶段识别试制和量试，判断范围严格限制为排程窗口首日~窗口末日，
-     * 不叠加提前生产天数阈值。前日T+1交替计划只是非续作候选的放行条件，不得放行全窗口为零的续作试制、量试SKU。</p>
+     * 不叠加提前生产天数阈值。已识别为续作且仍有硫化余量的SKU优先保留续作身份，
+     * 由续作收尾目标量和实际消费账本控制实际排产量；前日T+1交替计划仍不得放行无余量的全窗口为零SKU。</p>
      * <p>本方法只负责判断和构造未排结果，不修改续作列表、机台或日计划账本。</p>
      *
      * @param context 排程上下文，提供排程窗口和跨月月计划数据
      * @param sku 已识别为续作的SKU
-     * @return 命中规则时返回未排结果；非试制量试或窗口内有计划时返回null
+     * @return 命中规则时返回未排结果；非试制量试、窗口内有计划或仍有硫化余量时返回null
      */
     public static LhUnscheduledResult evaluateContinuousTrialDailyPlanAdmission(
             LhScheduleContext context, SkuScheduleDTO sku) {
@@ -188,8 +191,20 @@ public final class PendingSkuUnscheduledRule {
                 || hasPositiveDailyPlanInWindow(sku)) {
             return null;
         }
+        int surplusQty = Math.max(0, sku.getSurplusQty());
+        if (surplusQty > 0) {
+            String retainDetail = String.format("工厂: %s, 批次: %s, 物料: %s, 产品状态: %s, 施工阶段: %s, "
+                            + "续作机台: %s, 排程窗口: %s～%s, 窗口原始计划量: %d, 硫化余量: %d, "
+                            + "决策: 保留续作并按余量严格排产",
+                    context.getFactoryCode(), context.getBatchNo(), sku.getMaterialCode(), sku.getProductStatus(),
+                    sku.getConstructionStage(), sku.getContinuousMachineCode(), windowStartDate, windowEndDate,
+                    sku.getOriginalWindowPlanQty(), surplusQty);
+            log.info("续作试制量试SKU余量优先放行, {}", retainDetail);
+            PriorityTraceLogHelper.appendProcessLog(context, "续作试制量试余量优先放行", retainDetail);
+            return null;
+        }
 
-        // 试制、量试不适用提前生产天数阈值，判断截止日即窗口末日。
+        // 无硫化余量时，试制、量试不适用提前生产天数阈值，判断截止日即窗口末日。
         int earlyProductionDaysThreshold = 0;
         LocalDate admissionEndDate = windowEndDate;
         String detail = String.format("工厂: %s, 批次: %s, 物料: %s, 产品状态: %s, 施工阶段: %s, "
@@ -209,7 +224,8 @@ public final class PendingSkuUnscheduledRule {
                 CONTINUOUS_TRIAL_DAILY_PLAN_ADMISSION_UNSCHEDULED_REASON);
         PriorityTraceLogHelper.appendProcessLog(context, "续作试制量试无计划量不排产", detail);
         LhUnscheduledResult unscheduledResult = buildUnscheduledResult(
-                context, sku, 0, CONTINUOUS_TRIAL_DAILY_PLAN_ADMISSION_UNSCHEDULED_REASON);
+                context, sku, 0, CONTINUOUS_TRIAL_DAILY_PLAN_ADMISSION_UNSCHEDULED_REASON,
+                UnscheduledReasonEnum.TRIAL_MASS_TRIAL_BLOCKED, detail);
         unscheduledResult.setMonthPlanVersion(sku.getMonthPlanVersion());
         unscheduledResult.setProductionVersion(sku.getProductionVersion());
         return unscheduledResult;
@@ -249,7 +265,8 @@ public final class PendingSkuUnscheduledRule {
                 NEW_SPEC_TRIAL_EXCLUSION_UNSCHEDULED_REASON);
         PriorityTraceLogHelper.appendProcessLog(context, "新增排产试制量试不排产", detail);
         LhUnscheduledResult unscheduledResult = buildUnscheduledResult(
-                context, sku, 0, NEW_SPEC_TRIAL_EXCLUSION_UNSCHEDULED_REASON);
+                context, sku, 0, NEW_SPEC_TRIAL_EXCLUSION_UNSCHEDULED_REASON,
+                UnscheduledReasonEnum.TRIAL_MASS_TRIAL_BLOCKED, detail);
         unscheduledResult.setMonthPlanVersion(sku.getMonthPlanVersion());
         unscheduledResult.setProductionVersion(sku.getProductionVersion());
         return unscheduledResult;
@@ -421,8 +438,17 @@ public final class PendingSkuUnscheduledRule {
                     quantitySource, toleranceQty, previousNightPlanQty,
                     sku.getShiftCapacity(), smallEndingSkipped);
             if (smallEndingSkipped) {
+                String detail = new StringBuilder(256)
+                        .append("materialCode=").append(sku.getMaterialCode())
+                        .append(", productStatus=").append(sku.getProductStatus())
+                        .append(", actualQty=").append(resolvedSmallEndingRuleQty)
+                        .append(", toleranceQty=").append(toleranceQty)
+                        .append(", previousT1NightPlanQty=").append(previousNightPlanQty)
+                        .append(", shiftCapacity=").append(sku.getShiftCapacity())
+                        .toString();
                 return buildUnscheduledResult(context, sku, resolvedSmallEndingRuleQty,
-                        SmallEndingSurplusSkipRule.UNSCHEDULED_REASON);
+                        SmallEndingSurplusSkipRule.UNSCHEDULED_REASON,
+                        UnscheduledReasonEnum.SMALL_ENDING_SURPLUS, detail);
             }
         }
         Integer latestPreviousFinishedQty = resolveLatestPreviousFinishedQty(
@@ -437,8 +463,17 @@ public final class PendingSkuUnscheduledRule {
                 sku.getMaterialCode(), sku.getMonthlyHistoryShortageQty(), sku.getEffectiveLastMonthOverdueQty(),
                 historyShortageRemainingQty, context.getScheduleDate(), latestPreviousFinishedQty,
                 HISTORY_SHORTAGE_UNSCHEDULED_REASON);
+        String detail = new StringBuilder(256)
+                .append("materialCode=").append(sku.getMaterialCode())
+                .append(", productStatus=").append(sku.getProductStatus())
+                .append(", monthlyHistoryShortageQty=").append(sku.getMonthlyHistoryShortageQty())
+                .append(", effectiveLastMonthOverdueQty=").append(sku.getEffectiveLastMonthOverdueQty())
+                .append(", remainingQty=").append(historyShortageRemainingQty)
+                .append(", latestPreviousFinishedQty=").append(latestPreviousFinishedQty)
+                .toString();
         return buildUnscheduledResult(context, sku, historyShortageRemainingQty,
-                HISTORY_SHORTAGE_UNSCHEDULED_REASON);
+                HISTORY_SHORTAGE_UNSCHEDULED_REASON,
+                UnscheduledReasonEnum.HISTORY_SHORTAGE_SKIPPED, detail);
     }
 
     /**
@@ -584,10 +619,13 @@ public final class PendingSkuUnscheduledRule {
      * @param reason 未排原因
      * @return 未排结果
      */
-    private static LhUnscheduledResult buildUnscheduledResult(LhScheduleContext context,
-                                                              SkuScheduleDTO sku,
-                                                              int unscheduledQty,
-                                                              String reason) {
+    private static LhUnscheduledResult buildUnscheduledResult(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            int unscheduledQty,
+            String reason,
+            UnscheduledReasonEnum reasonCode,
+            String reasonDetail) {
         LhUnscheduledResult unscheduled = new LhUnscheduledResult();
         unscheduled.setFactoryCode(context.getFactoryCode());
         unscheduled.setBatchNo(context.getBatchNo());
@@ -596,6 +634,9 @@ public final class PendingSkuUnscheduledRule {
         unscheduled.setMaterialDesc(sku.getMaterialDesc());
         unscheduled.setScheduleDate(context.getScheduleTargetDate());
         unscheduled.setUnscheduledReason(reason);
+        unscheduled.setUnscheduledReasonCode(reasonCode.getCode());
+        unscheduled.setUnscheduledReasonStage(reasonCode.getStage());
+        unscheduled.setUnscheduledReasonDetail(reasonDetail);
         unscheduled.setUnscheduledQty(Math.max(0, unscheduledQty));
         unscheduled.setStructureName(sku.getStructureName());
         unscheduled.setMainMaterialDesc(sku.getMainMaterialDesc());

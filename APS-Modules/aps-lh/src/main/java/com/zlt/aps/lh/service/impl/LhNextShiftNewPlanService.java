@@ -25,6 +25,7 @@ import com.zlt.aps.lh.engine.strategy.impl.DefaultProductionShutdownStrategy;
 import com.zlt.aps.lh.engine.strategy.support.DayScheduleContext;
 import com.zlt.aps.lh.engine.strategy.support.EarlyProductionRuntimePlan;
 import com.zlt.aps.lh.engine.strategy.support.MouldResourceContext;
+import com.zlt.aps.lh.engine.strategy.support.UnscheduledResultRuntime;
 import com.zlt.aps.lh.mapper.MdmDevicePlanShutMapper;
 import com.zlt.aps.lh.mapper.MdmWorkCalendarMapper;
 import com.zlt.aps.lh.service.ILhShiftConfigService;
@@ -281,6 +282,8 @@ public class LhNextShiftNewPlanService {
                 new IdentityHashMap<LhScheduleResult, SkuScheduleDTO>());
         isolatedContext.setMachineAssignmentMap(new LinkedHashMap<String, List<LhScheduleResult>>());
         isolatedContext.setUnscheduledResultList(new ArrayList<>());
+        // 班次9未排诊断运行态必须与原8班完全隔离，禁止反向清理或扩大原窗口分类。
+        isolatedContext.setUnscheduledResultRuntime(new UnscheduledResultRuntime());
         isolatedContext.setMouldChangePlanList(new ArrayList<>());
         isolatedContext.setScheduleLogList(new ArrayList<>());
         isolatedContext.setMachineShiftCapacityMap(new LinkedHashMap<String, int[]>());

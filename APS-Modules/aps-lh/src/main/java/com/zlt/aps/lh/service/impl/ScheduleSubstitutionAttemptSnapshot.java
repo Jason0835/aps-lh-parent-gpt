@@ -23,6 +23,7 @@ import com.zlt.aps.lh.engine.strategy.support.HistoricalReverseSelectionDirectiv
 import com.zlt.aps.lh.engine.strategy.support.DayTypeBlockReverseSelectionDirective;
 import com.zlt.aps.lh.engine.strategy.support.SharedMouldSubstitutionRecord;
 import com.zlt.aps.lh.engine.strategy.support.SpecialMaterialSubstitutionRecord;
+import com.zlt.aps.lh.engine.strategy.support.UnscheduledResultRuntime;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -67,6 +68,8 @@ final class ScheduleSubstitutionAttemptSnapshot {
     private List<LhUnscheduledResult> unscheduledResultList;
     /** 置换前每条未排结果字段快照 */
     private Map<LhUnscheduledResult, LhUnscheduledResult> unscheduledResultStateMap;
+    /** 置换前未排需求快照和原因事件运行态。 */
+    private UnscheduledResultRuntime unscheduledResultRuntime;
     /** 置换前 SKU 剩余量账本 */
     private Map<String, Integer> skuProductionRemainingQtyMap;
     /** 置换前 SKU 目标量账本 */
@@ -238,6 +241,7 @@ final class ScheduleSubstitutionAttemptSnapshot {
         for (LhUnscheduledResult result : context.getUnscheduledResultList()) {
             snapshot.unscheduledResultStateMap.put(result, copyBean(result, LhUnscheduledResult.class));
         }
+        snapshot.unscheduledResultRuntime = context.getUnscheduledResultRuntime().copy();
 
         snapshot.skuProductionRemainingQtyMap =
                 new LinkedHashMap<String, Integer>(context.getSkuProductionRemainingQtyMap());
@@ -451,6 +455,7 @@ final class ScheduleSubstitutionAttemptSnapshot {
             }
         }
         context.setUnscheduledResultList(new ArrayList<LhUnscheduledResult>(unscheduledResultList));
+        context.setUnscheduledResultRuntime(unscheduledResultRuntime.copy());
         context.setSkuProductionRemainingQtyMap(
                 new LinkedHashMap<String, Integer>(skuProductionRemainingQtyMap));
         context.setSkuProductionTargetQtyMap(

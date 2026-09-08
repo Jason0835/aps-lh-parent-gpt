@@ -33,4 +33,8 @@ public class ScheduleIssueModel {
     private String fieldName;
     /** 异常说明。 */
     private String message;
+    /**
+     * 建议处理。
+     */
+    private String suggestion;
 }

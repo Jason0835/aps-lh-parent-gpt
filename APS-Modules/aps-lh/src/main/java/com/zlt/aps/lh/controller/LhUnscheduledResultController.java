@@ -164,6 +164,10 @@ public class LhUnscheduledResultController extends AbstractDocBizController<LhUn
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("specDesc")), "SPEC_DESC", queryVO.getFieldValueByFieldName("specDesc"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("unscheduledQty")), "UNSCHEDULED_QTY", queryVO.getFieldValueByFieldName("unscheduledQty"));
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("unscheduledReason")), "UNSCHEDULED_REASON", queryVO.getFieldValueByFieldName("unscheduledReason"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("groupType")), "GROUP_TYPE", queryVO.getFieldValueByFieldName("groupType"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("unscheduledReasonCode")), "UNSCHEDULED_REASON_CODE", queryVO.getFieldValueByFieldName("unscheduledReasonCode"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("unscheduledReasonStage")), "UNSCHEDULED_REASON_STAGE", queryVO.getFieldValueByFieldName("unscheduledReasonStage"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("unscheduledReasonDetail")), "UNSCHEDULED_REASON_DETAIL", queryVO.getFieldValueByFieldName("unscheduledReasonDetail"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("mouldQty")), "MOULD_QTY", queryVO.getFieldValueByFieldName("mouldQty"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("dataSource")), "DATA_SOURCE", queryVO.getFieldValueByFieldName("dataSource"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("processedTime")), "PROCESSED_TIME", queryVO.getFieldValueByFieldName("processedTime"));

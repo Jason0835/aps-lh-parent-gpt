@@ -52,6 +52,9 @@ public class DayPlanAdjustRequireAssembler {
      */
     private static final int DEFAULT_LH_TIME_SECONDS = 3600;
 
+    @javax.annotation.Resource
+    private UnscheduledResultCollector unscheduledResultCollector;
+
     /**
      * 加载并汇总月计划不存在的日计划调整待排物料。
      *
@@ -104,6 +107,8 @@ public class DayPlanAdjustRequireAssembler {
 
             SkuScheduleDTO sku = this.buildSkuScheduleDTO(context, adjustVo, surplusQty, ++scheduleOrder);
             if (Objects.nonNull(sku)) {
+                // 日计划调整属于独立有效需求，现有账本将其正常开产日固定为T日。
+                unscheduledResultCollector.registerDayPlanAdjustDemand(context, sku);
                 resultList.add(sku);
                 log.info("硫化日计划调整物料进入待排清单, factoryCode: {}, materialCode: {}, "
                                 + "productStatus: {}, adjustTotalQty: {}, finishedQty: {}, surplusQty: {}, "

@@ -10,6 +10,7 @@ import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.component.NewSpecDelayDaysResolver;
 import com.zlt.aps.lh.component.StructureEndingAlignmentService;
 import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
+import com.zlt.aps.lh.component.UnscheduledResultCollector;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.factory.ScheduleStrategyFactory;
 import com.zlt.aps.lh.engine.strategy.ICapacityCalculateStrategy;
@@ -62,6 +63,8 @@ public class NewProductionHandler extends AbsScheduleStepHandler {
     private NewSpecDelayDaysResolver newSpecDelayDaysResolver;
     @Resource
     private TargetScheduleQtyResolver targetScheduleQtyResolver;
+    @Resource
+    private UnscheduledResultCollector unscheduledResultCollector;
 
     @Override
     protected void doHandle(LhScheduleContext context) {
@@ -222,7 +225,8 @@ public class NewProductionHandler extends AbsScheduleStepHandler {
         blockedSkuIdentitySet.addAll(blockedSkuList);
         context.getNewSpecSkuList().removeIf(blockedSkuIdentitySet::contains);
         for (int index = 0; index < blockedSkuList.size(); index++) {
-            this.appendOrReplaceUnscheduledResult(context, blockedResultList.get(index));
+            this.appendOrReplaceUnscheduledResult(
+                    context, blockedSkuList.get(index), blockedResultList.get(index));
             this.cleanupExcludedTrialSku(context, blockedSkuList.get(index));
         }
         log.info("新增排产试制量试参数拦截完成, factoryCode: {}, batchNo: {}, blockedCount: {}, "
@@ -284,21 +288,12 @@ public class NewProductionHandler extends AbsScheduleStepHandler {
      * @param unscheduledResult 参数拦截生成的未排结果
      */
     private void appendOrReplaceUnscheduledResult(LhScheduleContext context,
+                                                  SkuScheduleDTO sku,
                                                   LhUnscheduledResult unscheduledResult) {
         if (Objects.isNull(context) || Objects.isNull(unscheduledResult)) {
             return;
         }
-        for (int index = 0; index < context.getUnscheduledResultList().size(); index++) {
-            LhUnscheduledResult existing = context.getUnscheduledResultList().get(index);
-            if (Objects.nonNull(existing)
-                    && StringUtils.equals(existing.getMaterialCode(), unscheduledResult.getMaterialCode())
-                    && StringUtils.equals(StringUtils.trimToEmpty(existing.getProductStatus()),
-                    StringUtils.trimToEmpty(unscheduledResult.getProductStatus()))) {
-                context.getUnscheduledResultList().set(index, unscheduledResult);
-                return;
-            }
-        }
-        context.getUnscheduledResultList().add(unscheduledResult);
+        unscheduledResultCollector.addOrReplace(context, sku, unscheduledResult);
     }
 
     /**

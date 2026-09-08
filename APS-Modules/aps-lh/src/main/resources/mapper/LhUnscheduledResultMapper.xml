@@ -9,6 +9,7 @@
             FACTORY_CODE, BATCH_NO, ORDER_NO, SCHEDULE_DATE, MONTH_PLAN_VERSION,
             PRODUCTION_VERSION, MATERIAL_CODE, PRODUCT_STATUS, STRUCTURE_NAME, MATERIAL_DESC, MAIN_MATERIAL_DESC,
             SPEC_CODE, EMBRYO_CODE, SPEC_DESC, UNSCHEDULED_QTY, UNSCHEDULED_REASON,
+            GROUP_TYPE, UNSCHEDULED_REASON_CODE, UNSCHEDULED_REASON_STAGE, UNSCHEDULED_REASON_DETAIL,
             MOULD_QTY, DATA_SOURCE, PROCESSED_TIME,
             CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME, REMARK, IS_DELETE
         ) VALUES
@@ -17,6 +18,7 @@
                 #{item.factoryCode}, #{item.batchNo}, #{item.orderNo}, #{item.scheduleDate}, #{item.monthPlanVersion},
                 #{item.productionVersion}, #{item.materialCode}, #{item.productStatus}, #{item.structureName}, #{item.materialDesc}, #{item.mainMaterialDesc},
                 #{item.specCode}, #{item.embryoCode}, #{item.specDesc}, #{item.unscheduledQty}, #{item.unscheduledReason},
+                #{item.groupType}, #{item.unscheduledReasonCode}, #{item.unscheduledReasonStage}, #{item.unscheduledReasonDetail},
                 #{item.mouldQty}, #{item.dataSource}, #{item.processedTime},
                 #{item.createBy}, #{item.createTime}, #{item.updateBy}, #{item.updateTime}, #{item.remark}, #{item.isDelete}
             )

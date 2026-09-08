@@ -8,8 +8,10 @@ import com.zlt.aps.lh.api.domain.entity.LhUnscheduledResult;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
 import com.zlt.aps.lh.api.enums.SkuScheduleSourceTypeEnum;
+import com.zlt.aps.lh.api.enums.UnscheduledReasonEnum;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
+import com.zlt.aps.lh.component.UnscheduledResultCollector;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.support.ContinuationCutoverResult;
 import com.zlt.aps.lh.engine.strategy.support.EarlyProductionChecker;
@@ -70,6 +72,8 @@ public class SharedMouldSubstitutionCoordinator {
 
     @Resource
     private TargetScheduleQtyResolver targetScheduleQtyResolver;
+    @Resource
+    private UnscheduledResultCollector unscheduledResultCollector;
     @Resource
     private ContinuationCutoverService continuationCutoverService;
     @Resource
@@ -494,7 +498,7 @@ public class SharedMouldSubstitutionCoordinator {
                     "A 正式接管时间与预演不一致");
         }
         SkuScheduleDTO relocationSku = buildRelocationSku(
-                plan.getContinuationSku(),
+                context, plan.getContinuationSku(),
                 cutoverResult.getRemovedQty(),
                 plan.getContinuationOfflineTime());
         ScheduleSubstitutionDirective relocationDirective =
@@ -767,12 +771,14 @@ public class SharedMouldSubstitutionCoordinator {
      * <p>副本复用 B 的业务属性和日计划账本，但目标量严格限定为本组截断尾量，
      * 不改变原 B 对象的续作属性。</p>
      *
+     * @param context 排程上下文
      * @param sourceSku 原续作物料 B
      * @param relocatedQty 精确迁移量
      * @param offlineTime B 原机台下机时间
      * @return 仅用于本次隔离主链的 B 迁移副本
      */
     private SkuScheduleDTO buildRelocationSku(
+            LhScheduleContext context,
             SkuScheduleDTO sourceSku,
             int relocatedQty,
             Date offlineTime) {
@@ -798,6 +804,8 @@ public class SharedMouldSubstitutionCoordinator {
         // B 迁移副本与来源续作 SKU 必须共享同一日计划账本，精确消费刚恢复的截断尾量。
         relocationSku.setDailyPlanQuotaMap(
                 sourceSku.getDailyPlanQuotaMap());
+        unscheduledResultCollector.bindDerivedDemand(
+                context, sourceSku, relocationSku);
         return relocationSku;
     }
 
@@ -965,10 +973,7 @@ public class SharedMouldSubstitutionCoordinator {
             LhScheduleContext context,
             SkuScheduleDTO targetSku,
             LhUnscheduledResult originalUnscheduled) {
-        context.getUnscheduledResultList().removeIf(
-                result -> isSameSku(
-                        targetSku.getMaterialCode(),
-                        targetSku.getProductStatus(), result));
+        unscheduledResultCollector.remove(context, targetSku);
         int remainingQty =
                 targetScheduleQtyResolver.resolveProductionRemainingQty(
                         context, targetSku);
@@ -982,8 +987,16 @@ public class SharedMouldSubstitutionCoordinator {
         retainedUnscheduled.setUnscheduledQty(remainingQty);
         retainedUnscheduled.setUnscheduledReason(
                 "共用模具联动置换后仍有待排量");
-        context.getUnscheduledResultList().add(
-                retainedUnscheduled);
+        retainedUnscheduled.setUnscheduledReasonCode(
+                UnscheduledReasonEnum.SUBSTITUTION_REMAINING.getCode());
+        retainedUnscheduled.setUnscheduledReasonStage(
+                UnscheduledReasonEnum.SUBSTITUTION_REMAINING.getStage());
+        retainedUnscheduled.setUnscheduledReasonDetail(new StringBuilder(192)
+                .append("materialCode=").append(targetSku.getMaterialCode())
+                .append(", productStatus=").append(targetSku.getProductStatus())
+                .append(", remainingQty=").append(remainingQty)
+                .toString());
+        unscheduledResultCollector.add(context, targetSku, retainedUnscheduled);
     }
 
     /**

@@ -1,5 +1,6 @@
 package com.zlt.aps.common.engine.schedule.engine;
 
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.domain.vo.AutoScheduleIssueVo;
 import com.zlt.aps.common.engine.enums.ScheduleIssueCategoryEnum;
 import com.zlt.aps.common.engine.enums.ScheduleIssueLevelEnum;
@@ -38,6 +39,7 @@ public class ScheduleIssueCollector {
         issue.setStageName(stageName);
         issue.setCategory(category);
         issue.setMessage(message);
+        issue.setSuggestion(this.resolveSuggestion(category));
         return issue;
     }
 
@@ -185,7 +187,21 @@ public class ScheduleIssueCollector {
         target.setShiftOrder(source.getShiftOrder());
         target.setFieldName(source.getFieldName());
         target.setMessage(source.getMessage());
+        target.setSuggestion(source.getSuggestion());
         return target;
+    }
+
+    /**
+     * 按自动排程问题类别读取建议处理国际化文案。
+     *
+     * @param category 问题类别编码
+     * @return 建议处理文案
+     */
+    private String resolveSuggestion(String category) {
+        ScheduleIssueCategoryEnum issueCategory = ScheduleIssueCategoryEnum.fromCode(category);
+        String messageKey = issueCategory == null
+                ? "ui.schedule.issue.suggestion.default" : issueCategory.getSuggestion();
+        return I18nUtil.getMessage(messageKey);
     }
 
     /**
@@ -243,6 +259,7 @@ public class ScheduleIssueCollector {
         target.setShiftOrder(source.getShiftOrder());
         target.setFieldName(source.getFieldName());
         target.setMessage(source.getMessage());
+        target.setSuggestion(source.getSuggestion());
         return target;
     }
 }

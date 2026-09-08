@@ -5,6 +5,7 @@ import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.api.domain.entity.LhSkuDecrement;
 import com.zlt.aps.lh.api.domain.entity.LhUnscheduledResult;
 import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
+import com.zlt.aps.lh.api.enums.UnscheduledReasonEnum;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.mapper.LhSkuDecrementMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -46,17 +47,14 @@ public class SkuDecrementChecker {
     /** 命中减量清单的未排备注，统一文案 */
     private static final String SKU_DECREMENT_UNSCHEDULED_REASON = "命中SKU减量清单，不进行排产";
 
-    /** 自动排程数据来源（与现有未排结果口径一致：0-自动排程） */
-    private static final String DATA_SOURCE_AUTO = "0";
-
-    /** 未删除标识（与现有未排结果口径一致：0-未删除） */
-    private static final int DELETE_FLAG_NORMAL = 0;
-
     @Resource
     private LhSkuDecrementMapper skuDecrementMapper;
 
     @Resource
     private TargetScheduleQtyResolver targetScheduleQtyResolver;
+
+    @Resource
+    private UnscheduledResultCollector unscheduledResultCollector;
 
     /**
      * 批量加载排程工厂的 SKU 减量清单并构建索引写入上下文。
@@ -167,26 +165,21 @@ public class SkuDecrementChecker {
         if (!context.getDecrementHandledSkuKeySet().add(handledKey)) {
             return false;
         }
-        LhUnscheduledResult unscheduled = new LhUnscheduledResult();
-        unscheduled.setFactoryCode(context.getFactoryCode());
-        unscheduled.setBatchNo(context.getBatchNo());
-        unscheduled.setScheduleDate(context.getScheduleTargetDate());
-        unscheduled.setMonthPlanVersion(sku.getMonthPlanVersion());
-        unscheduled.setProductionVersion(sku.getProductionVersion());
-        unscheduled.setMaterialCode(sku.getMaterialCode());
-        unscheduled.setProductStatus(sku.getProductStatus());
-        unscheduled.setMaterialDesc(sku.getMaterialDesc());
-        unscheduled.setStructureName(sku.getStructureName());
-        unscheduled.setMainMaterialDesc(sku.getMainMaterialDesc());
-        unscheduled.setSpecCode(sku.getSpecCode());
-        unscheduled.setEmbryoCode(sku.getEmbryoCode());
-        unscheduled.setMouldQty(sku.getMouldQty());
-        // 未排数量取月计划余量，体现该SKU本月目标量全部未排
-        unscheduled.setUnscheduledQty(Math.max(0, sku.getSurplusQty()));
-        unscheduled.setUnscheduledReason(SKU_DECREMENT_UNSCHEDULED_REASON);
-        unscheduled.setDataSource(DATA_SOURCE_AUTO);
-        unscheduled.setIsDelete(DELETE_FLAG_NORMAL);
-        context.getUnscheduledResultList().add(unscheduled);
+        // 未排数量继续沿用月计划余量口径，公共组件只补分类和诊断字段。
+        String detail = new StringBuilder(192)
+                .append("factoryCode=").append(context.getFactoryCode())
+                .append(", batchNo=").append(context.getBatchNo())
+                .append(", materialCode=").append(sku.getMaterialCode())
+                .append(", productStatus=").append(sku.getProductStatus())
+                .append(", monthPlanYear=").append(sku.getMonthPlanYear())
+                .append(", monthPlanMonth=").append(sku.getMonthPlanMonth())
+                .append(", surplusQty=").append(Math.max(0, sku.getSurplusQty()))
+                .toString();
+        LhUnscheduledResult unscheduled = unscheduledResultCollector.buildResult(
+                context, sku, Math.max(0, sku.getSurplusQty()),
+                UnscheduledReasonEnum.SKU_DECREMENT_HIT,
+                SKU_DECREMENT_UNSCHEDULED_REASON, detail);
+        unscheduledResultCollector.add(context, sku, unscheduled);
         return true;
     }
 

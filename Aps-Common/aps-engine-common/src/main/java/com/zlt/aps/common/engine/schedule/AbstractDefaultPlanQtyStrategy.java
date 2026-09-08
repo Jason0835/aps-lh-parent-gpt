@@ -345,7 +345,9 @@ public abstract class AbstractDefaultPlanQtyStrategy<C, T, R> {
     private R calculateFormingShutdownCloseOut(T task, BigDecimal stock) {
         BigDecimal closeOutDemandQty = this.nvl(this.getFormingShutdownCloseOutDemandQty(task));
         BigDecimal stockDeductQty = stock.min(closeOutDemandQty);
-        BigDecimal planQty = closeOutDemandQty.subtract(stock).max(BigDecimal.ZERO);
+        BigDecimal basePlanQty = closeOutDemandQty.subtract(stock).max(BigDecimal.ZERO);
+        BigDecimal tailLimitQty = this.nvl(this.getFormingShutdownCloseOutTailLimitQty(task));
+        BigDecimal planQty = basePlanQty.min(tailLimitQty);
         this.setTwoShiftDemandQty(task, closeOutDemandQty);
         this.setTwoShiftStockGapQty(task, closeOutDemandQty.subtract(stock));
         this.setTwoShiftStockCovered(task, planQty.compareTo(BigDecimal.ZERO) == 0);
@@ -354,12 +356,13 @@ public abstract class AbstractDefaultPlanQtyStrategy<C, T, R> {
         this.setPlanQty(task, planQty);
 
         R result = this.newResult();
-        this.setResultBaseDemandQty(result, planQty);
         this.initializeZeroAdjustments(result);
+        this.setResultBaseDemandQty(result, basePlanQty);
+        this.setResultTailRoundAdjustQty(result, planQty.subtract(basePlanQty));
         this.setResultPreLossPlanQty(result, planQty);
         this.setResultPlanQtyBeforeToolLimit(result, planQty);
         this.setResultFinalPlanQty(result, planQty);
-        this.setResultCalcFormulaDesc(result, "成型连续停产收尾需求->库存抵扣");
+        this.setResultCalcFormulaDesc(result, "成型连续停产收尾需求->库存抵扣->收尾上限");
         return result;
     }
 
@@ -370,6 +373,17 @@ public abstract class AbstractDefaultPlanQtyStrategy<C, T, R> {
      * @return 停产收尾需求量
      */
     protected abstract BigDecimal getFormingShutdownCloseOutDemandQty(T task);
+
+    /**
+     * 获取成型连续停产收尾的收尾上限。
+     *
+     * @param task 任务
+     * @return 收尾上限，无法取得时返回空值
+     */
+    protected BigDecimal getFormingShutdownCloseOutTailLimitQty(T task) {
+        return this.nvl(this.getTailBalanceQty(task))
+                .multiply(this.nvl(this.getProductLength(task)));
+    }
 
     /**
      * 构建两班库存已覆盖的零计划结果。

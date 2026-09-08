@@ -605,6 +605,12 @@ public class LhScheduleContext {
     private Map<LhScheduleResult, Integer> endingFillAllowedOverQtyMap =
             new IdentityHashMap<LhScheduleResult, Integer>();
     /**
+     * 已完成T日定机台、整窗守恒分摊的多物理机台续作硫化余量收尾结果。
+     * 只保存结果身份，防止日标准补量、胎胚均衡及dayN回裁覆盖最终分摊；单机台不登记。
+     */
+    private Set<LhScheduleResult> continuationSurplusEndingAllocatedResults =
+            Collections.newSetFromMap(new IdentityHashMap<LhScheduleResult, Boolean>(16));
+    /**
      * SKU收尾补满动作前的机台结果基准量，用于多机台同SKU组级允许超量重算。
      * <p>键为结果对象身份，值是该机台结果在本次收尾补满前的计划总量；
      * 组级重算时按“最终量-补满前量”识别各机台实际保留的补满新增量。</p>
@@ -940,6 +946,11 @@ public class LhScheduleContext {
      * 硫化未排结果列表
      */
     private List<LhUnscheduledResult> unscheduledResultList = new ArrayList<>();
+    /**
+     * 本批次未排需求快照、原因事件及SKU身份绑定。
+     * <p>该运行态只服务未排分类和诊断，不参与机台选择、排量或资源扣账。</p>
+     */
+    private UnscheduledResultRuntime unscheduledResultRuntime = new UnscheduledResultRuntime();
     /**
      * 模具交替计划列表
      */

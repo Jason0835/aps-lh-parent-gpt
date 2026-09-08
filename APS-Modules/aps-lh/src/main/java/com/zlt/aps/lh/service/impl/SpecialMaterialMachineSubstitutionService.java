@@ -13,8 +13,10 @@ import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.enums.MachineStopTypeEnum;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
 import com.zlt.aps.lh.api.enums.SubstitutionTypeEnum;
+import com.zlt.aps.lh.api.enums.UnscheduledReasonEnum;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
+import com.zlt.aps.lh.component.UnscheduledResultCollector;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.factory.ScheduleStrategyFactory;
 import com.zlt.aps.lh.engine.strategy.ICapacityCalculateStrategy;
@@ -99,6 +101,9 @@ public class SpecialMaterialMachineSubstitutionService {
 
     @Resource
     private TargetScheduleQtyResolver targetScheduleQtyResolver;
+
+    @Resource
+    private UnscheduledResultCollector unscheduledResultCollector;
 
     /** 物料+产品状态+自然日目标总机台数唯一查询入口。 */
     @Resource
@@ -299,7 +304,7 @@ public class SpecialMaterialMachineSubstitutionService {
             return false;
         }
 
-        removeUnscheduledResult(context, unscheduled.getMaterialCode(), unscheduled.getProductStatus());
+        removeUnscheduledResult(context, sku);
         if (finalRemainingQty > 0) {
             String reason = String.format(
                     "特殊材料SKU置换不足：按加机台规则需要 %d 台，实际成功置换 %d 台",
@@ -1849,7 +1854,7 @@ public class SpecialMaterialMachineSubstitutionService {
             }
         }
         LhUnscheduledResult result = buildUnscheduledResult(context, sku, removedQty, reason);
-        context.getUnscheduledResultList().add(result);
+        unscheduledResultCollector.add(context, sku, result);
     }
 
     /**
@@ -1907,15 +1912,12 @@ public class SpecialMaterialMachineSubstitutionService {
      * 按物料和产品状态移除特殊材料原未排结果。
      *
      * @param context 排程上下文
-     * @param materialCode 物料编码
-     * @param productStatus 产品状态
+     * @param sku 已完成置换的需求
      */
     private void removeUnscheduledResult(
             LhScheduleContext context,
-            String materialCode,
-            String productStatus) {
-        context.getUnscheduledResultList().removeIf(result ->
-                isSameSku(materialCode, productStatus, result));
+            SkuScheduleDTO sku) {
+        unscheduledResultCollector.remove(context, sku);
     }
 
     /**
@@ -1932,13 +1934,18 @@ public class SpecialMaterialMachineSubstitutionService {
             int remainingQty,
             String reason) {
         for (LhUnscheduledResult result : context.getUnscheduledResultList()) {
-            if (isSameSku(sku.getMaterialCode(), sku.getProductStatus(), result)) {
+            if (unscheduledResultCollector.isSameDemand(context, sku, result)) {
                 result.setUnscheduledQty(remainingQty);
                 result.setUnscheduledReason(reason);
+                result.setUnscheduledReasonCode(
+                        UnscheduledReasonEnum.SUBSTITUTION_REMAINING.getCode());
+                result.setUnscheduledReasonStage(
+                        UnscheduledReasonEnum.SUBSTITUTION_REMAINING.getStage());
+                result.setUnscheduledReasonDetail(reason);
                 return;
             }
         }
-        context.getUnscheduledResultList().add(
+        unscheduledResultCollector.add(context, sku,
                 buildUnscheduledResult(context, sku, remainingQty, reason));
     }
 
@@ -1956,23 +1963,10 @@ public class SpecialMaterialMachineSubstitutionService {
             SkuScheduleDTO sku,
             int unscheduledQty,
             String reason) {
-        LhUnscheduledResult result = new LhUnscheduledResult();
-        result.setFactoryCode(context.getFactoryCode());
-        result.setBatchNo(context.getBatchNo());
-        result.setMaterialCode(sku.getMaterialCode());
-        result.setProductStatus(sku.getProductStatus());
-        result.setMaterialDesc(sku.getMaterialDesc());
-        result.setStructureName(sku.getStructureName());
-        result.setSpecCode(sku.getSpecCode());
-        result.setMainMaterialDesc(sku.getMainMaterialDesc());
-        result.setEmbryoCode(sku.getEmbryoCode());
-        result.setMouldQty(sku.getMouldQty());
-        result.setScheduleDate(context.getScheduleTargetDate());
-        result.setUnscheduledQty(unscheduledQty);
-        result.setUnscheduledReason(reason);
-        result.setMonthPlanVersion(sku.getMonthPlanVersion());
-        result.setProductionVersion(sku.getProductionVersion());
-        return result;
+        return unscheduledResultCollector.buildResult(
+                context, sku, unscheduledQty,
+                UnscheduledReasonEnum.SUBSTITUTION_REMAINING,
+                reason, reason);
     }
 
     /**
@@ -1985,6 +1979,10 @@ public class SpecialMaterialMachineSubstitutionService {
             LhUnscheduledResult unscheduled,
             String reason) {
         unscheduled.setUnscheduledReason(reason);
+        UnscheduledReasonEnum reasonCode = unscheduledResultCollector.resolveReasonCode(reason);
+        unscheduled.setUnscheduledReasonCode(reasonCode.getCode());
+        unscheduled.setUnscheduledReasonStage(reasonCode.getStage());
+        unscheduled.setUnscheduledReasonDetail(reason);
     }
 
     /**

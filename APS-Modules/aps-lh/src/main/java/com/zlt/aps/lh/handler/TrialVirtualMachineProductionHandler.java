@@ -6,8 +6,10 @@ import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.entity.LhUnscheduledResult;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
+import com.zlt.aps.lh.api.enums.UnscheduledReasonEnum;
 import com.zlt.aps.lh.component.OrderNoGenerator;
 import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
+import com.zlt.aps.lh.component.UnscheduledResultCollector;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.support.PendingSkuUnscheduledRule;
 import com.zlt.aps.lh.util.LeftRightMouldUtil;
@@ -68,6 +70,9 @@ public class TrialVirtualMachineProductionHandler extends AbsScheduleStepHandler
 
     @Resource
     private TargetScheduleQtyResolver targetScheduleQtyResolver;
+
+    @Resource
+    private UnscheduledResultCollector unscheduledResultCollector;
 
     /**
      * 执行试制/量试虚拟机台最终兜底排产。
@@ -441,7 +446,8 @@ public class TrialVirtualMachineProductionHandler extends AbsScheduleStepHandler
         LhUnscheduledResult retainedResult = null;
         List<LhUnscheduledResult> matchingResults = new ArrayList<LhUnscheduledResult>(2);
         for (LhUnscheduledResult result : context.getUnscheduledResultList()) {
-            if (Objects.nonNull(result) && this.isSameSku(result, sku)) {
+            if (Objects.nonNull(result)
+                    && unscheduledResultCollector.isSameDemand(context, sku, result)) {
                 matchingResults.add(result);
                 if (Objects.isNull(retainedResult)) {
                     retainedResult = result;
@@ -453,40 +459,26 @@ public class TrialVirtualMachineProductionHandler extends AbsScheduleStepHandler
             return;
         }
         if (Objects.isNull(retainedResult)) {
-            retainedResult = this.buildUnscheduledResult(context, sku);
+            retainedResult = unscheduledResultCollector.buildResult(
+                    context, sku, remainingQty,
+                    UnscheduledReasonEnum.VIRTUAL_MACHINE_CAPACITY_INSUFFICIENT,
+                    "虚拟机台排程窗口容量不足，原未排原因：" + originalReason,
+                    "remainingQty=" + remainingQty + ", originalReason=" + originalReason);
+            retainedResult.setMouldQty(VIRTUAL_MACHINE_MOULD_QTY);
         }
         retainedResult.setUnscheduledQty(remainingQty);
         retainedResult.setUnscheduledReason("虚拟机台排程窗口容量不足，原未排原因：" + originalReason);
-        context.getUnscheduledResultList().add(retainedResult);
-    }
-
-    /**
-     * 构建虚拟机台窗口仍不足时的未排结果。
-     *
-     * @param context 排程上下文
-     * @param sku 当前SKU
-     * @return 未排结果
-     */
-    private LhUnscheduledResult buildUnscheduledResult(LhScheduleContext context,
-                                                       SkuScheduleDTO sku) {
-        LhUnscheduledResult result = new LhUnscheduledResult();
-        result.setFactoryCode(context.getFactoryCode());
-        result.setBatchNo(context.getBatchNo());
-        result.setScheduleDate(context.getScheduleTargetDate());
-        result.setMonthPlanVersion(sku.getMonthPlanVersion());
-        result.setProductionVersion(sku.getProductionVersion());
-        result.setMaterialCode(sku.getMaterialCode());
-        result.setProductStatus(sku.getProductStatus());
-        result.setMaterialDesc(sku.getMaterialDesc());
-        result.setStructureName(sku.getStructureName());
-        result.setMainMaterialDesc(sku.getMainMaterialDesc());
-        result.setSpecCode(sku.getSpecCode());
-        result.setSpecDesc(sku.getSpecDesc());
-        result.setEmbryoCode(sku.getEmbryoCode());
-        result.setMouldQty(VIRTUAL_MACHINE_MOULD_QTY);
-        result.setDataSource("0");
-        result.setIsDelete(0);
-        return result;
+        retainedResult.setUnscheduledReasonCode(
+                UnscheduledReasonEnum.VIRTUAL_MACHINE_CAPACITY_INSUFFICIENT.getCode());
+        retainedResult.setUnscheduledReasonStage(
+                UnscheduledReasonEnum.VIRTUAL_MACHINE_CAPACITY_INSUFFICIENT.getStage());
+        retainedResult.setUnscheduledReasonDetail(new StringBuilder(256)
+                .append("materialCode=").append(sku.getMaterialCode())
+                .append(", productStatus=").append(sku.getProductStatus())
+                .append(", remainingQty=").append(remainingQty)
+                .append(", originalReason=").append(originalReason)
+                .toString());
+        unscheduledResultCollector.add(context, sku, retainedResult);
     }
 
     /**

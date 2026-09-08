@@ -35,10 +35,10 @@ public class ScheduleConstraintCalculator {
      * @return 计划量各阶段结算结果
      */
     public SchedulePlanQtyAdjustmentResult calculatePlanQtyAfterLoss(BigDecimal preLossPlanQty,
-                                                                      BigDecimal lossRatePercent,
-                                                                      BigDecimal minStartQty,
-                                                                      BigDecimal curlRollLength,
-                                                                      boolean skipMinStartAndRound,
+                                                                     BigDecimal lossRatePercent,
+                                                                     BigDecimal minStartQty,
+                                                                     BigDecimal curlRollLength,
+                                                                     boolean skipMinStartAndRound,
                                                                       int calculationScale) {
         int normalizedScale = Math.max(calculationScale, 0);
         BigDecimal normalizedPreLossPlanQty = this.nonNegative(preLossPlanQty)
@@ -112,6 +112,32 @@ public class ScheduleConstraintCalculator {
             result.setGlueSwitchCapacityDeduct(
                     this.nonNegative(constraintConfig.getGlueChangeCapacityDeduct()));
         }
+        return result;
+    }
+
+    /**
+     * 分别计算收尾计划候选和收尾上限候选的含损耗数量，并取两者较小值。
+     *
+     * @param planBaseQty      计划候选损耗前数量
+     * @param tailLimitQty     收尾上限损耗前数量
+     * @param lossRatePercent  损耗率百分比
+     * @param calculationScale 计算小数位数
+     * @return 两类候选及最终选中候选
+     */
+    public ScheduleTailPlanQtyAdjustmentResult calculateTailPlanQtyAfterLoss(BigDecimal planBaseQty,
+                                                                             BigDecimal tailLimitQty,
+                                                                             BigDecimal lossRatePercent,
+                                                                             int calculationScale) {
+        SchedulePlanQtyAdjustmentResult planCandidate = this.calculatePlanQtyAfterLoss(
+                planBaseQty, lossRatePercent, null, null, true, calculationScale);
+        SchedulePlanQtyAdjustmentResult tailLimitCandidate = this.calculatePlanQtyAfterLoss(
+                tailLimitQty, lossRatePercent, null, null, true, calculationScale);
+        ScheduleTailPlanQtyAdjustmentResult result = new ScheduleTailPlanQtyAdjustmentResult();
+        result.setPlanCandidate(planCandidate);
+        result.setTailLimitCandidate(tailLimitCandidate);
+        result.setSelectedCandidate(planCandidate.getFinalPlanQty()
+                .compareTo(tailLimitCandidate.getFinalPlanQty()) <= 0
+                ? planCandidate : tailLimitCandidate);
         return result;
     }
 

@@ -22,12 +22,14 @@ import com.zlt.aps.lh.api.enums.MachineStopTypeEnum;
 import com.zlt.aps.lh.api.enums.MouldChangeTypeEnum;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
 import com.zlt.aps.lh.api.enums.SkuScheduleSourceTypeEnum;
+import com.zlt.aps.lh.api.enums.UnscheduledReasonEnum;
 import com.zlt.aps.lh.component.CapsuleReplacementRuleService;
 import com.zlt.aps.lh.component.EarlyProductionRuntimePlanService;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.component.OrderNoGenerator;
 import com.zlt.aps.lh.component.StructureEndingAlignmentService;
 import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
+import com.zlt.aps.lh.component.UnscheduledResultCollector;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.ICapacityCalculateStrategy;
 import com.zlt.aps.lh.engine.strategy.IEndingJudgmentStrategy;
@@ -150,6 +152,9 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
     private IEndingJudgmentStrategy endingJudgmentStrategy;
     @Resource
     private TargetScheduleQtyResolver targetScheduleQtyResolver;
+    /** 换活字块终局未排统一登记入口。 */
+    @Resource
+    private UnscheduledResultCollector unscheduledResultCollector;
     /** S4.4 与 S4.5 共用的提前生产运行态计划入口。 */
     @Resource
     private EarlyProductionRuntimePlanService earlyProductionRuntimePlanService;
@@ -673,6 +678,14 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
      * @param originalSize 尝试前未排结果数量
      */
     private void clearAddedUnscheduledResults(LhScheduleContext context, int originalSize) {
+        int currentSize = context.getUnscheduledResultList().size();
+        if (currentSize <= originalSize) {
+            return;
+        }
+        List<LhUnscheduledResult> addedResults = new ArrayList<LhUnscheduledResult>(
+                context.getUnscheduledResultList().subList(
+                        originalSize, currentSize));
+        addedResults.forEach(result -> unscheduledResultCollector.discard(context, result));
         if (context.getUnscheduledResultList().size() > originalSize) {
             context.getUnscheduledResultList().subList(
                     originalSize, context.getUnscheduledResultList().size()).clear();
@@ -2515,7 +2528,7 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
         if (Objects.isNull(unscheduledResult)) {
             return false;
         }
-        context.getUnscheduledResultList().add(unscheduledResult);
+        unscheduledResultCollector.add(context, sku, unscheduledResult);
         context.getNewSpecSkuList().remove(sku);
         context.removePendingSkuFromStructureMap(sku);
         String unscheduledReason = unscheduledResult.getUnscheduledReason();
@@ -2553,23 +2566,17 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
      * @param sku SKU
      */
     private void addSharedEmbryoZeroSurplusUnscheduledResult(LhScheduleContext context, SkuScheduleDTO sku) {
-        LhUnscheduledResult unscheduled = new LhUnscheduledResult();
-        unscheduled.setFactoryCode(context.getFactoryCode());
-        unscheduled.setBatchNo(context.getBatchNo());
-        unscheduled.setMaterialCode(sku.getMaterialCode());
-        unscheduled.setProductStatus(sku.getProductStatus());
-        unscheduled.setMaterialDesc(sku.getMaterialDesc());
-        unscheduled.setScheduleDate(context.getScheduleTargetDate());
-        unscheduled.setUnscheduledReason(SHARED_EMBRYO_ZERO_SURPLUS_UNSCHEDULED_REASON);
-        unscheduled.setUnscheduledQty(0);
-        unscheduled.setStructureName(sku.getStructureName());
-        unscheduled.setMainMaterialDesc(sku.getMainMaterialDesc());
-        unscheduled.setSpecCode(sku.getSpecCode());
-        unscheduled.setEmbryoCode(sku.getEmbryoCode());
-        unscheduled.setMouldQty(sku.getMouldQty());
-        unscheduled.setDataSource(AUTO_DATA_SOURCE);
-        unscheduled.setIsDelete(0);
-        context.getUnscheduledResultList().add(unscheduled);
+        String detail = new StringBuilder(192)
+                .append("materialCode=").append(sku.getMaterialCode())
+                .append(", productStatus=").append(sku.getProductStatus())
+                .append(", embryoCode=").append(sku.getEmbryoCode())
+                .append(", surplusQty=").append(sku.getSurplusQty())
+                .toString();
+        LhUnscheduledResult unscheduled = unscheduledResultCollector.buildResult(
+                context, sku, 0,
+                UnscheduledReasonEnum.SHARED_EMBRYO_ALLOCATION_BLOCKED,
+                SHARED_EMBRYO_ZERO_SURPLUS_UNSCHEDULED_REASON, detail);
+        unscheduledResultCollector.add(context, sku, unscheduled);
     }
 
     /**

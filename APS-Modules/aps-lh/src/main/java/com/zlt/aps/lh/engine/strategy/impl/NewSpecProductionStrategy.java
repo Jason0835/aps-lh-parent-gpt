@@ -26,6 +26,7 @@ import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
 import com.zlt.aps.lh.api.enums.ShiftEnum;
 import com.zlt.aps.lh.api.enums.SkuScheduleSourceTypeEnum;
 import com.zlt.aps.lh.api.enums.SkuTagEnum;
+import com.zlt.aps.lh.api.enums.UnscheduledReasonEnum;
 import com.zlt.aps.lh.component.CapsuleReplacementRuleService;
 import com.zlt.aps.lh.component.EarlyProductionQuantityCalculator;
 import com.zlt.aps.lh.component.EarlyProductionRuntimePlanService;
@@ -36,6 +37,7 @@ import com.zlt.aps.lh.component.StructureEndingAlignmentDecision;
 import com.zlt.aps.lh.component.StructureEndingAlignmentService;
 import com.zlt.aps.lh.component.StructureEarlyProductionAdmission;
 import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
+import com.zlt.aps.lh.component.UnscheduledResultCollector;
 import com.zlt.aps.lh.context.LhScheduleConfig;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.ICapacityCalculateStrategy;
@@ -240,6 +242,9 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
     private LocalSearchMachineAllocatorStrategy localSearchMachineAllocator;
     @Resource
     private TargetScheduleQtyResolver targetScheduleQtyResolver;
+    /** 未排原因事件和最终投影统一管理入口。 */
+    @Resource
+    private UnscheduledResultCollector unscheduledResultCollector;
     /** S4.4 与 S4.5 共用的提前生产运行态计划入口。 */
     @Resource
     private EarlyProductionRuntimePlanService earlyProductionRuntimePlanService;
@@ -4153,7 +4158,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                     context, sku, smallEndingSurplusRuleEnding,
                     embryoStockEndingTargetApplied, smallEndingRuleQty);
             if (Objects.nonNull(ruleUnscheduledResult)) {
-                context.getUnscheduledResultList().add(ruleUnscheduledResult);
+                unscheduledResultCollector.add(context, sku, ruleUnscheduledResult);
                 String reason = ruleUnscheduledResult.getUnscheduledReason();
                 unscheduledReasonCountMap.merge(reason, 1, Integer::sum);
                 this.removePendingSkuByIdentity(context, sku);
@@ -4781,7 +4786,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                     context, sku, smallEndingSurplusRuleEnding,
                     embryoStockEndingTargetApplied, smallEndingRuleQty);
             if (Objects.nonNull(ruleUnscheduledResult)) {
-                context.getUnscheduledResultList().add(ruleUnscheduledResult);
+                unscheduledResultCollector.add(context, sku, ruleUnscheduledResult);
                 String unscheduledReason = ruleUnscheduledResult.getUnscheduledReason();
                 unscheduledReasonCountMap.merge(unscheduledReason, 1, Integer::sum);
                 removeCurrentNewSpecSku(context, iterator, sku);
@@ -4834,6 +4839,20 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                             context, sku, dayContext.getScheduleDate(),
                             productionGateDeferredReason, null, 0, null);
                 }
+                // 只登记当前业务日真实命中的生产门禁，不在此阶段提前形成最终未排。
+                unscheduledResultCollector.recordAttempt(
+                        context, sku,
+                        embryoCausedDeferral
+                                ? UnscheduledReasonEnum.EMBRYO_AVAILABLE_OUT_OF_WINDOW
+                                : UnscheduledReasonEnum.CAPACITY_INSUFFICIENT,
+                        new StringBuilder(256)
+                                .append(productionGateDeferredReason)
+                                .append(", businessDate=").append(dayContext.getScheduleDate())
+                                .append(", productionNotBeforeTime=")
+                                .append(LhScheduleTimeUtil.formatDateTime(productionNotBeforeTime))
+                                .append(", dayEndTime=")
+                                .append(LhScheduleTimeUtil.formatDateTime(dayContext.getDayEndTime()))
+                                .toString());
                 deferCurrentDailyCandidate(
                         context, iterator, dayContext, state, sku, productionGateDeferredReason);
                 continue;
@@ -4957,6 +4976,15 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                                 getTargetScheduleQtyResolver())
                                 .withTraceSkuType(this.resolveTraceSkuType(context, sku));
                 String noCandidateReason = resolveNoCandidateMachineReason(context, sku);
+                unscheduledResultCollector.recordAttempt(
+                        context, sku,
+                        unscheduledResultCollector.resolveReasonCode(noCandidateReason),
+                        new StringBuilder(192)
+                                .append(noCandidateReason)
+                                .append(", businessDate=").append(dayContext.getScheduleDate())
+                                .append(", phase=").append(dayContext.getCurrentPhase())
+                                .append(", candidateMachineCount=0")
+                                .toString());
                 /*
                  * 当前日、当前阶段无正式候选并不等于三天窗口最终未排。只把实时快照保存在日驱动状态，
                  * 后续若实际命中会自动清理；只有窗口最终仍未命中才输出一次完整诊断日志。
@@ -7443,6 +7471,16 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                         excludedMachineCodes, excludedMachineReasonMap, failReason, false, null, null);
                 String failureReason = StringUtils.isNotEmpty(dailyDeferredReason)
                         ? dailyDeferredReason : resolveScheduleFailureReason(context, sku, failReason);
+                unscheduledResultCollector.recordAttempt(
+                        context, sku,
+                        unscheduledResultCollector.resolveReasonCode(failureReason),
+                        new StringBuilder(256)
+                                .append(failureReason)
+                                .append(", businessDate=").append(dayContext.getScheduleDate())
+                                .append(", phase=").append(dayContext.getCurrentPhase())
+                                .append(", candidateMachineCount=").append(candidates.size())
+                                .append(", excludedMachineReasons=").append(excludedMachineReasonMap)
+                                .toString());
                 if (isEarlyProductionPhase(dayContext.getCurrentPhase())) {
                     String earlyProductionLogFailureReason =
                             this.resolveEarlyProductionLogFailureReason(
@@ -21247,23 +21285,10 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                     context.getBatchNo(), sku.getMaterialCode(), sku.getProductStatus(), reason);
             return;
         }
-        LhUnscheduledResult unscheduled = new LhUnscheduledResult();
-        unscheduled.setFactoryCode(context.getFactoryCode());
-        unscheduled.setBatchNo(context.getBatchNo());
-        unscheduled.setMaterialCode(sku.getMaterialCode());
-        unscheduled.setProductStatus(sku.getProductStatus());
-        unscheduled.setMaterialDesc(sku.getMaterialDesc());
-        unscheduled.setScheduleDate(context.getScheduleTargetDate());
-        unscheduled.setUnscheduledReason(reason);
-        unscheduled.setUnscheduledQty(Math.max(0, unscheduledQty));
-        unscheduled.setStructureName(sku.getStructureName());
-        unscheduled.setMainMaterialDesc(sku.getMainMaterialDesc());
-        unscheduled.setSpecCode(sku.getSpecCode());
-        unscheduled.setEmbryoCode(sku.getEmbryoCode());
-        unscheduled.setMouldQty(sku.getMouldQty());
-        unscheduled.setDataSource(AUTO_DATA_SOURCE);
-        unscheduled.setIsDelete(0);
-        context.getUnscheduledResultList().add(unscheduled);
+        UnscheduledReasonEnum reasonCode = unscheduledResultCollector.resolveReasonCode(reason);
+        LhUnscheduledResult unscheduled = unscheduledResultCollector.buildResult(
+                context, sku, Math.max(0, unscheduledQty), reasonCode, reason, reason);
+        unscheduledResultCollector.add(context, sku, unscheduled);
         // 命中胎胚库存硬目标的新增SKU进入未排后，必须退出运行态有效集合，触发同胎胚剩余SKU二次分摊。
         if (getTargetScheduleQtyResolver().isEmbryoStockEnding(context, sku)) {
             getTargetScheduleQtyResolver().removeActiveEmbryoSku(context, sku, reason);
@@ -22277,8 +22302,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         if (context == null || sku == null || StringUtils.isEmpty(sku.getMaterialCode()) || unscheduledQty <= 0) {
             return;
         }
-        LhUnscheduledResult existing = findUnscheduledResultBySku(
-                context, sku.getMaterialCode(), sku.getProductStatus());
+        LhUnscheduledResult existing = unscheduledResultCollector.find(context, sku);
         if (existing != null) {
             int existingQty = existing.getUnscheduledQty() != null ? existing.getUnscheduledQty() : 0;
             existing.setUnscheduledQty(existingQty + unscheduledQty);
@@ -22303,31 +22327,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         unscheduled.setUnscheduledReason(ZERO_PLAN_UNSCHEDULED_REASON);
         unscheduled.setDataSource(AUTO_DATA_SOURCE);
         unscheduled.setIsDelete(0);
-        context.getUnscheduledResultList().add(unscheduled);
-    }
-
-    /**
-     * 查找已存在的未排结果。
-     *
-     * @param context 排程上下文
-     * @param materialCode 物料编码
-     * @param productStatus 产品状态
-     * @return 未排结果
-     */
-    private LhUnscheduledResult findUnscheduledResultBySku(LhScheduleContext context,
-                                                           String materialCode,
-                                                           String productStatus) {
-        if (context == null || CollectionUtils.isEmpty(context.getUnscheduledResultList())) {
-            return null;
-        }
-        for (LhUnscheduledResult unscheduledResult : context.getUnscheduledResultList()) {
-            if (StringUtils.equals(materialCode, unscheduledResult.getMaterialCode())
-                    && StringUtils.equals(StringUtils.trimToEmpty(productStatus),
-                    StringUtils.trimToEmpty(unscheduledResult.getProductStatus()))) {
-                return unscheduledResult;
-            }
-        }
-        return null;
+        unscheduledResultCollector.add(context, sku, unscheduled);
     }
 
     /**
@@ -22336,39 +22336,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
      * @param context 排程上下文
      */
     private void normalizeUnscheduledResultsBySku(LhScheduleContext context) {
-        if (context == null || CollectionUtils.isEmpty(context.getUnscheduledResultList())) {
-            return;
-        }
-        Map<String, LhUnscheduledResult> mergedMap = new LinkedHashMap<>(context.getUnscheduledResultList().size());
-        for (LhUnscheduledResult unscheduledResult : context.getUnscheduledResultList()) {
-            if (unscheduledResult == null
-                    || StringUtils.isEmpty(unscheduledResult.getMaterialCode())) {
-                continue;
-            }
-            // 零量未排中的“日计划准入拦截”与“S4.3前置剔除（共用胎胚零余量、无排产目标量、
-            // 余量与胎胚库存均为0）”代表“有SKU但无排产任务”，是明确的未排记录，必须保留落库；
-            // 其余零量/负量残留视为排产主链已消纳完毕，按原逻辑跳过。
-            if (Objects.isNull(unscheduledResult.getUnscheduledQty())
-                    || (unscheduledResult.getUnscheduledQty() <= 0
-                    && !isRetainableZeroQtyUnscheduledReason(unscheduledResult.getUnscheduledReason()))) {
-                continue;
-            }
-            String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(
-                    unscheduledResult.getMaterialCode(), unscheduledResult.getProductStatus());
-            if (!mergedMap.containsKey(skuKey)) {
-                mergedMap.put(skuKey, unscheduledResult);
-                continue;
-            }
-            LhUnscheduledResult existing = mergedMap.get(skuKey);
-            int existingQty = existing.getUnscheduledQty() != null ? existing.getUnscheduledQty() : 0;
-            int currentQty = unscheduledResult.getUnscheduledQty() != null ? unscheduledResult.getUnscheduledQty() : 0;
-            existing.setUnscheduledQty(existingQty + currentQty);
-            if (StringUtils.isEmpty(existing.getUnscheduledReason())) {
-                existing.setUnscheduledReason(unscheduledResult.getUnscheduledReason());
-            }
-        }
-        context.getUnscheduledResultList().clear();
-        context.getUnscheduledResultList().addAll(mergedMap.values());
+        // 归并键升级为原始需求标识，避免同物料多状态或独立需求相互覆盖。
+        unscheduledResultCollector.finalizeResults(context);
     }
 
     /**

@@ -288,6 +288,12 @@ public class LhOrderInsertDTO implements Serializable {
     private String isDelivery;
 
     /**
+     * 示方类型（插单弹窗开放编辑，用户修改后随插单提交；为空时沿用SKU关联数据或原始值）
+     */
+    @ApiModelProperty(value = "示方类型（用户修改值）", name = "trialStatus")
+    private String trialStatus;
+
+    /**
      * 原始示方类型（从列表行带入，用于校验结果为空时的兜底）
      */
     @ApiModelProperty(value = "原始示方类型", name = "originalTrialStatus")

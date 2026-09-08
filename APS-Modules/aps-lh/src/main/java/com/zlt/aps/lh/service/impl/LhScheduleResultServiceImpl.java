@@ -344,7 +344,11 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
             if (validateResult.getSingleMouldShiftQty() != null) {
                 result.setSingleMouldShiftQty(validateResult.getSingleMouldShiftQty());
             }
-            if (StringUtils.isNotBlank(validateResult.getTrialStatus())) {
+            // 示方类型取值优先级：用户在插单弹窗手工修改的值 > SKU关联数据带出值 > 列表行原始值
+            if (StringUtils.isNotBlank(dto.getTrialStatus())) {
+                result.setProductStatus(dto.getTrialStatus());
+                result.setChangedTrialStatus(dto.getTrialStatus());
+            } else if (StringUtils.isNotBlank(validateResult.getTrialStatus())) {
                 result.setProductStatus(validateResult.getTrialStatus());
                 result.setChangedTrialStatus(validateResult.getTrialStatus());
             } else if (StringUtils.isNotBlank(dto.getOriginalTrialStatus())) {

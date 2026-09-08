@@ -50,6 +50,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 默认共用胎胚多机台收尾均衡策略实现。
@@ -358,7 +359,13 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
              */
             if (groupResultList.size() >= MIN_GROUP_MACHINE_COUNT
                     && this.isRuntimeSharedEmbryo(context, groupSourceSku)) {
-                adjustableResultList.addAll(groupResultList);
+                // 多机台硫化余量收尾已按整组守恒完成分摊，只参与固定换模计数，不能再跨SKU搬量。
+                List<LhScheduleResult> remainingResults = groupResultList.stream()
+                        .filter(result -> !context.getContinuationSurplusEndingAllocatedResults().contains(result))
+                        .collect(Collectors.toList());
+                if (remainingResults.size() >= MIN_GROUP_MACHINE_COUNT) {
+                    adjustableResultList.addAll(remainingResults);
+                }
             }
         }
         // 登记本轮仍满足均衡适用范围的物理机台快照（单控整机按物理机台去重），

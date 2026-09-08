@@ -3,6 +3,7 @@ package com.zlt.aps.lh.api.domain.entity;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import io.swagger.annotations.ApiModel;
@@ -154,6 +155,45 @@ public class LhUnscheduledResult extends BaseEntity implements Serializable {
     @ApiModelProperty(value = "未排原因", name = "unscheduledReason")
     @TableField(value = "UNSCHEDULED_REASON")
     private String unscheduledReason;
+
+    /**
+     * 未排分类：1-排产窗口内；2-其他
+     */
+    @Excel(name = "ui.data.column.lhUnscheduledResult.groupType")
+    @ApiModelProperty(value = "未排分类：1-排产窗口内；2-其他", name = "groupType")
+    @TableField(value = "GROUP_TYPE")
+    private Integer groupType;
+
+    /**
+     * 未排原因编码
+     */
+    @Excel(name = "ui.data.column.lhUnscheduledResult.unscheduledReasonCode")
+    @ApiModelProperty(value = "未排原因编码", name = "unscheduledReasonCode")
+    @TableField(value = "UNSCHEDULED_REASON_CODE")
+    private String unscheduledReasonCode;
+
+    /**
+     * 未排原因阶段
+     */
+    @Excel(name = "ui.data.column.lhUnscheduledResult.unscheduledReasonStage")
+    @ApiModelProperty(value = "未排原因阶段", name = "unscheduledReasonStage")
+    @TableField(value = "UNSCHEDULED_REASON_STAGE")
+    private String unscheduledReasonStage;
+
+    /**
+     * 未排原因详情
+     */
+    @Excel(name = "ui.data.column.lhUnscheduledResult.unscheduledReasonDetail")
+    @ApiModelProperty(value = "未排原因详情", name = "unscheduledReasonDetail")
+    @TableField(value = "UNSCHEDULED_REASON_DETAIL")
+    private String unscheduledReasonDetail;
+
+    /**
+     * 本次排程运行态原始需求标识，仅用于未排归并，不落库、不返回前端
+     */
+    @JsonIgnore
+    @TableField(exist = false)
+    private String runtimeDemandKey;
 
     /**
      * 使用模数

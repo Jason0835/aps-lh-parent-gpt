@@ -143,6 +143,9 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     private SingleControlModeSnapshotInitializer singleControlModeSnapshotInitializer;
     @Resource
     private SkuDecrementChecker skuDecrementChecker;
+    /** 未排需求快照和最终结果统一管理入口。 */
+    @Resource
+    private UnscheduledResultCollector unscheduledResultCollector;
     @Resource
     private StructureMinMachineRetentionService structureMinMachineRetentionService;
     @Resource
@@ -876,10 +879,19 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * @param sku     SKU排程DTO
      */
     private void addSharedEmbryoZeroSurplusUnscheduledResult(LhScheduleContext context, SkuScheduleDTO sku) {
-        LhUnscheduledResult unscheduled = buildBaseUnscheduledResult(context, sku);
-        unscheduled.setUnscheduledQty(0);
-        unscheduled.setUnscheduledReason(SHARED_EMBRYO_ZERO_SURPLUS_UNSCHEDULED_REASON);
-        this.appendOrReplaceUnscheduledResult(context, unscheduled);
+        String detail = new StringBuilder(256)
+                .append("materialCode=").append(sku.getMaterialCode())
+                .append(", embryoCode=").append(sku.getEmbryoCode())
+                .append(", originalSharedSkuCount=").append(resolveOriginalSharedEmbryoSkuCount(context, sku))
+                .append(", activeSharedSkuCount=").append(resolveActiveEmbryoSkuCount(context, sku))
+                .append(", surplusQty=").append(sku.getSurplusQty())
+                .append(", embryoStock=").append(sku.getEmbryoStock())
+                .toString();
+        LhUnscheduledResult unscheduled = unscheduledResultCollector.buildResult(
+                context, sku, 0,
+                UnscheduledReasonEnum.SHARED_EMBRYO_ALLOCATION_BLOCKED,
+                SHARED_EMBRYO_ZERO_SURPLUS_UNSCHEDULED_REASON, detail);
+        this.appendOrReplaceUnscheduledResult(context, sku, unscheduled);
         log.info("共用胎胚零余量SKU写入未排, materialCode: {}, embryoCode: {}, "
                         + "原始共用SKU数: {}, 有效共用SKU数: {}, 是否动态共用: {}, "
                         + "余量: {}, 胎胚库存: {}, 目标量: {}, 未排原因: {}",
@@ -1362,6 +1374,14 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
 
         // 填充日硫化产能
         fillDailyCapacity(dto, capacity);
+        // 未排需求快照需要使用真实版本和年月，且必须早于目标量计算、清零和候选移除。
+        dto.setMonthPlanVersion(targetMonthPlan.getMonthPlanVersion());
+        dto.setProductionVersion(targetMonthPlan.getProductionVersion());
+        dto.setMonthPlanYear(targetMonthPlan.getYear());
+        dto.setMonthPlanMonth(targetMonthPlan.getMonth());
+        if (StringUtils.isNotEmpty(dto.getStructureName())) {
+            unscheduledResultCollector.registerMonthlyDemand(context, dto, plan);
+        }
         dto.setTargetScheduleQty(getTargetScheduleQtyResolver().resolveInitialTargetQty(context, dto));
         getTargetScheduleQtyResolver().initializeProductionRemainingQty(
                 context, dto, dto.resolveTargetScheduleQty(), "SKU初始化");
@@ -1411,13 +1431,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         dto.setTextNo(targetMonthPlan.getTextNo());
         dto.setLhNo(targetMonthPlan.getLhNo());
 
-        // 版本信息
-        dto.setMonthPlanVersion(targetMonthPlan.getMonthPlanVersion());
-        dto.setProductionVersion(targetMonthPlan.getProductionVersion());
-
-        // 月计划所属年月（来自月计划），用于SKU减量清单按年月精确匹配
-        dto.setMonthPlanYear(targetMonthPlan.getYear());
-        dto.setMonthPlanMonth(targetMonthPlan.getMonth());
+        // 版本和月计划年月已在目标量计算前赋值并冻结到未排需求快照。
         // 月计划定稿表备注，供 S4.6 保存前为新增排产SKU结果追加"模具号"开头备注
         dto.setMonthPlanRemark(targetMonthPlan.getRemark());
 
@@ -1867,10 +1881,11 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
                 thresholdRate.stripTrailingZeros().toPlainString());
         log.warn(reason);
 
-        LhUnscheduledResult unscheduled = buildBaseUnscheduledResult(context, sku);
-        unscheduled.setUnscheduledQty(shortageQty);
-        unscheduled.setUnscheduledReason(reason);
-        context.getUnscheduledResultList().add(unscheduled);
+        LhUnscheduledResult unscheduled = unscheduledResultCollector.buildResult(
+                context, sku, shortageQty,
+                UnscheduledReasonEnum.OPEN_PRODUCTION_CONTROL_SHORTAGE,
+                reason, reason);
+        unscheduledResultCollector.add(context, sku, unscheduled);
     }
 
     /**
@@ -1883,10 +1898,12 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         String reason = resolveNoPlanUnscheduledReason(sku);
         log.warn(reason);
 
-        LhUnscheduledResult unscheduled = buildBaseUnscheduledResult(context, sku);
-        unscheduled.setUnscheduledQty(0);
-        unscheduled.setUnscheduledReason(reason);
-        context.getUnscheduledResultList().add(unscheduled);
+        UnscheduledReasonEnum reasonCode = isZeroSurplusAndEmbryoStockSku(sku)
+                ? UnscheduledReasonEnum.ZERO_SURPLUS_AND_EMBRYO
+                : UnscheduledReasonEnum.NO_ORIGINAL_TARGET;
+        LhUnscheduledResult unscheduled = unscheduledResultCollector.buildResult(
+                context, sku, 0, reasonCode, reason, reason);
+        unscheduledResultCollector.add(context, sku, unscheduled);
     }
 
     /**
@@ -1913,33 +1930,6 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
             return false;
         }
         return sku.getSurplusQty() <= 0 && sku.getEmbryoStock() <= 0;
-    }
-
-    /**
-     * 构建未排结果公共字段。
-     *
-     * @param context 排程上下文
-     * @param sku     SKU排程DTO
-     * @return 未排结果
-     */
-    private LhUnscheduledResult buildBaseUnscheduledResult(LhScheduleContext context, SkuScheduleDTO sku) {
-        LhUnscheduledResult unscheduled = new LhUnscheduledResult();
-        unscheduled.setFactoryCode(context.getFactoryCode());
-        unscheduled.setBatchNo(context.getBatchNo());
-        unscheduled.setScheduleDate(context.getScheduleTargetDate());
-        unscheduled.setMonthPlanVersion(sku.getMonthPlanVersion());
-        unscheduled.setProductionVersion(sku.getProductionVersion());
-        unscheduled.setMaterialCode(sku.getMaterialCode());
-        unscheduled.setProductStatus(sku.getProductStatus());
-        unscheduled.setStructureName(sku.getStructureName());
-        unscheduled.setMaterialDesc(sku.getMaterialDesc());
-        unscheduled.setMainMaterialDesc(sku.getMainMaterialDesc());
-        unscheduled.setSpecCode(sku.getSpecCode());
-        unscheduled.setEmbryoCode(sku.getEmbryoCode());
-        unscheduled.setMouldQty(sku.getMouldQty());
-        unscheduled.setDataSource(DATA_SOURCE_AUTO);
-        unscheduled.setIsDelete(DELETE_FLAG_NORMAL);
-        return unscheduled;
     }
 
     private int resolveShiftFinishedQty(LhScheduleResult result, LhScheduleContext context) {
@@ -2321,7 +2311,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
                      * 正规SKU继续只写未排，不进入虚拟候选。
                      */
                     this.preserveNoDailyPlanTrialVirtualCandidate(context, sku);
-                    context.getUnscheduledResultList().add(dailyPlanUnscheduledResult);
+                    unscheduledResultCollector.add(context, sku, dailyPlanUnscheduledResult);
                     blockedDailyPlanSkuList.add(sku);
                     continue;
                 }
@@ -2439,7 +2429,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
                     continue;
                 }
                 this.appendSameMaterialStatusContinuousCopies(
-                        continuousSkuList, targetSku, candidateEntry.getValue());
+                        context, continuousSkuList, targetSku, candidateEntry.getValue());
                 assignedPhysicalMachineCodeSet.add(candidateEntry.getKey());
                 shortageMachineCount--;
                 this.appendSameMaterialStatusTargetContinuationLog(
@@ -2624,16 +2614,19 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     /**
      * 为同物料跨状态补位机台创建目标状态续作副本。
      *
+     * @param context 排程上下文
      * @param continuousSkuList 续作SKU列表
      * @param targetSku         目标状态模板
      * @param onlineEntryList   MES在机记录
      */
     private void appendSameMaterialStatusContinuousCopies(
+            LhScheduleContext context,
             List<SkuScheduleDTO> continuousSkuList,
             SkuScheduleDTO targetSku,
             List<Map.Entry<String, LhMachineOnlineInfo>> onlineEntryList) {
         for (Map.Entry<String, LhMachineOnlineInfo> entry : onlineEntryList) {
-            SkuScheduleDTO continuousCopy = this.copySkuForContinuousMachine(targetSku, entry.getKey());
+            SkuScheduleDTO continuousCopy = this.copySkuForContinuousMachine(
+                    context, targetSku, entry.getKey());
             continuousCopy.setScheduleType(ScheduleTypeEnum.CONTINUOUS.getCode());
             continuousSkuList.add(continuousCopy);
         }
@@ -2803,7 +2796,8 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
 
         // 每个物料+产品状态只保留一条未排，并统一清理结构、胎胚和后置索引。
         for (Map.Entry<String, SkuScheduleDTO> entry : blockedSkuMap.entrySet()) {
-            appendOrReplaceUnscheduledResult(context, blockedResultMap.get(entry.getKey()));
+            appendOrReplaceUnscheduledResult(
+                    context, entry.getValue(), blockedResultMap.get(entry.getKey()));
             cleanupBlockedSku(context, entry.getValue(),
                     PendingSkuUnscheduledRule.CONTINUOUS_TRIAL_DAILY_PLAN_ADMISSION_UNSCHEDULED_REASON);
         }
@@ -2818,21 +2812,12 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * @param unscheduledResult 未排结果
      */
     private void appendOrReplaceUnscheduledResult(LhScheduleContext context,
+                                                  SkuScheduleDTO sku,
                                                   LhUnscheduledResult unscheduledResult) {
         if (Objects.isNull(context) || Objects.isNull(unscheduledResult)) {
             return;
         }
-        for (int index = 0; index < context.getUnscheduledResultList().size(); index++) {
-            LhUnscheduledResult existing = context.getUnscheduledResultList().get(index);
-            if (Objects.nonNull(existing)
-                    && StringUtils.equals(existing.getMaterialCode(), unscheduledResult.getMaterialCode())
-                    && StringUtils.equals(StringUtils.trimToEmpty(existing.getProductStatus()),
-                    StringUtils.trimToEmpty(unscheduledResult.getProductStatus()))) {
-                context.getUnscheduledResultList().set(index, unscheduledResult);
-                return;
-            }
-        }
-        context.getUnscheduledResultList().add(unscheduledResult);
+        unscheduledResultCollector.addOrReplace(context, sku, unscheduledResult);
     }
 
 
@@ -2857,7 +2842,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
                     || !schedulableMachineMap.containsKey(entry.getKey())) {
                 continue;
             }
-            assignContinuousSku(entry.getKey(), entry.getValue().getMaterialCode(),
+            assignContinuousSku(context, entry.getKey(), entry.getValue().getMaterialCode(),
                     entry.getValue().getProductStatus(), skuByMaterialMap,
                     continuousTemplateMap, continuousSkuList, allowMaterialFallback);
         }
@@ -2974,10 +2959,10 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * @param sku     SKU排程DTO
      */
     private void appendWindowNoPlanNewSkuUnscheduledResult(LhScheduleContext context, SkuScheduleDTO sku) {
-        LhUnscheduledResult unscheduled = buildBaseUnscheduledResult(context, sku);
-        unscheduled.setUnscheduledQty(0);
-        unscheduled.setUnscheduledReason(WINDOW_NO_PLAN_NO_SHORTAGE_UNSCHEDULED_REASON);
-        context.getUnscheduledResultList().add(unscheduled);
+        LhUnscheduledResult unscheduled = unscheduledResultCollector.buildResult(
+                context, sku, 0, UnscheduledReasonEnum.NO_DAILY_PLAN_IN_WINDOW,
+                WINDOW_NO_PLAN_NO_SHORTAGE_UNSCHEDULED_REASON, null);
+        unscheduledResultCollector.add(context, sku, unscheduled);
 
         String window = String.format("%s～%s",
                 LhScheduleTimeUtil.formatDate(context.getScheduleDate()),
@@ -3046,7 +3031,8 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * @param continuousSkuList     续作SKU列表
      * @param allowMaterialFallback 是否允许按物料编码降级
      */
-    private void assignContinuousSku(String machineCode,
+    private void assignContinuousSku(LhScheduleContext context,
+                                     String machineCode,
                                      String materialCode,
                                      String productStatus,
                                      Map<String, List<SkuScheduleDTO>> skuByMaterialMap,
@@ -3069,7 +3055,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
                 normalizedMaterialCode, normalizedProductStatus);
         SkuScheduleDTO templateSku = continuousTemplateMap.get(exactSkuKey);
         if (Objects.nonNull(templateSku)) {
-            SkuScheduleDTO matchedSku = copySkuForContinuousMachine(templateSku, machineCode);
+            SkuScheduleDTO matchedSku = copySkuForContinuousMachine(context, templateSku, machineCode);
             matchedSku.setScheduleType(ScheduleTypeEnum.CONTINUOUS.getCode());
             continuousSkuList.add(matchedSku);
             return;
@@ -3140,11 +3126,15 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * <p>副本复制源SKU的核心计划量、产能、状态字段，并<b>共享</b> {@code dailyPlanQuotaMap}，
      * 确保多台机台排产时共用同一个日计划额度账本。</p>
      *
+     * @param context 排程上下文
      * @param source      源SKU（模板）
      * @param machineCode 目标机台编码
      * @return 副本SKU，sharedDailyPlanQuotaMap 指向源SKU的同一实例
      */
-    private SkuScheduleDTO copySkuForContinuousMachine(SkuScheduleDTO source, String machineCode) {
+    private SkuScheduleDTO copySkuForContinuousMachine(
+            LhScheduleContext context,
+            SkuScheduleDTO source,
+            String machineCode) {
         SkuScheduleDTO copy = new SkuScheduleDTO();
         // 基本信息
         copy.setMaterialCode(source.getMaterialCode());
@@ -3229,6 +3219,9 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         copy.setContinuousMachineCode(machineCode);
         log.debug("同物料多机台续作副本已创建, materialCode: {}, targetMachine: {}",
                 source.getMaterialCode(), machineCode);
+        // 多机台续作副本必须共享同一原始需求身份，防止未排量按机台重复累计。
+        unscheduledResultCollector.bindDerivedDemand(
+                context, source, copy);
         return copy;
     }
 

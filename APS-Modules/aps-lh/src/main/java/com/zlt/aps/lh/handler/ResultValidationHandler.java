@@ -21,10 +21,13 @@ import com.zlt.aps.lh.api.enums.MouldChangeTypeEnum;
 import com.zlt.aps.lh.api.enums.ScheduleStepEnum;
 import com.zlt.aps.lh.api.enums.ShiftEnum;
 import com.zlt.aps.lh.api.enums.TrialStatusEnum;
+import com.zlt.aps.lh.api.enums.UnscheduledReasonEnum;
+import com.zlt.aps.lh.api.enums.UnscheduledGroupTypeEnum;
 import com.zlt.aps.lh.component.CapsuleReplacementRuleService;
 import com.zlt.aps.lh.component.IncrSerialGenerator;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
+import com.zlt.aps.lh.component.UnscheduledResultCollector;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.observer.ScheduleEvent;
 import com.zlt.aps.lh.engine.observer.ScheduleEventPublisher;
@@ -88,6 +91,9 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
     /** 保存前按物料和产品状态统一复核最终收尾标识。 */
     @Resource
     private IEndingJudgmentStrategy endingJudgmentStrategy;
+    /** 保存前统一归并未排结果并计算实际窗口分类。 */
+    @Resource
+    private UnscheduledResultCollector unscheduledResultCollector;
     /** 最终结果阶段只重建并核对胶囊运行态，不得再次扣减班次计划量 */
     @Resource
     private CapsuleReplacementRuleService capsuleReplacementRuleService = new CapsuleReplacementRuleService();
@@ -151,9 +157,6 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             // S4.6.4 赋值排程顺序
             assignScheduleOrder(context, scheduleOrderBusinessKey);
 
-            // S4.6.5 添加排程汇总日志
-            addSummaryLog(context);
-
             // S4.6.5.1 按SKU+日期汇总校验日计划完成情况
             addDailyPlanSummaryLog(context);
 
@@ -169,6 +172,13 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
              */
             refreshFinalEndingFlagByMaterialStatus(context);
 //            validateProductionQuantityPolicy(context);
+
+            /*
+             * 所有会改变最终结果数量的后置处理已经结束。此处只整理未排诊断投影，
+             * 不再执行准入、选机、排量或资源扣账，并保证汇总日志和落库读取同一最终列表。
+             */
+            unscheduledResultCollector.finalizeResults(context);
+            addSummaryLog(context);
 
             // S4.6.6 保存排程结果到数据库：由持久化服务统一做目标日原子替换。
             schedulePersistenceService.replaceScheduleAtomically(context);
@@ -1305,26 +1315,18 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
                                                          SkuScheduleDTO sku,
                                                          int rollbackQty,
                                                          String reason) {
-        LhUnscheduledResult unscheduled = new LhUnscheduledResult();
-        unscheduled.setFactoryCode(context.getFactoryCode());
-        unscheduled.setBatchNo(context.getBatchNo());
-        unscheduled.setScheduleDate(context.getScheduleTargetDate());
-        unscheduled.setMonthPlanVersion(sku.getMonthPlanVersion());
-        unscheduled.setProductionVersion(sku.getProductionVersion());
-        unscheduled.setMaterialCode(sku.getMaterialCode());
-        unscheduled.setProductStatus(sku.getProductStatus());
-        unscheduled.setMaterialDesc(sku.getMaterialDesc());
-        unscheduled.setStructureName(sku.getStructureName());
-        unscheduled.setMainMaterialDesc(sku.getMainMaterialDesc());
-        unscheduled.setSpecCode(sku.getSpecCode());
-        unscheduled.setSpecDesc(sku.getSpecDesc());
-        unscheduled.setEmbryoCode(sku.getEmbryoCode());
-        unscheduled.setMouldQty(sku.getMouldQty());
-        unscheduled.setUnscheduledQty(rollbackQty);
-        unscheduled.setUnscheduledReason(reason + "，机台空等至精度开始");
-        unscheduled.setDataSource("0");
-        unscheduled.setIsDelete(0);
-        context.getUnscheduledResultList().add(unscheduled);
+        String summary = reason + "，机台空等至精度开始";
+        String detail = new StringBuilder(256)
+                .append("materialCode=").append(sku.getMaterialCode())
+                .append(", productStatus=").append(sku.getProductStatus())
+                .append(", rollbackQty=").append(rollbackQty)
+                .append(", reason=").append(reason)
+                .toString();
+        LhUnscheduledResult unscheduled = unscheduledResultCollector.buildResult(
+                context, sku, rollbackQty,
+                UnscheduledReasonEnum.PRECISION_PRE_INSERT_ROLLBACK,
+                summary, detail);
+        unscheduledResultCollector.add(context, sku, unscheduled);
     }
 
     /**
@@ -3518,14 +3520,26 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
      * 添加排程汇总日志
      */
     private void addSummaryLog(LhScheduleContext context) {
+        long inWindowCount = context.getUnscheduledResultList().stream()
+                .filter(Objects::nonNull)
+                .filter(result -> Objects.equals(
+                        UnscheduledGroupTypeEnum.IN_SCHEDULE_WINDOW.getValue(), result.getGroupType()))
+                .count();
+        long otherCount = context.getUnscheduledResultList().stream()
+                .filter(Objects::nonNull)
+                .filter(result -> Objects.equals(
+                        UnscheduledGroupTypeEnum.OTHER.getValue(), result.getGroupType()))
+                .count();
         LhScheduleProcessLog summaryLog = new LhScheduleProcessLog();
         summaryLog.setBatchNo(context.getBatchNo());
         summaryLog.setTitle(ScheduleStepEnum.S4_6_RESULT_VALIDATION.getDescription());
         summaryLog.setBusiCode(context.getFactoryCode());
         summaryLog.setLogDetail(String.format(
-                "排程完成: 排程结果%d条, 未排产%d条, 换模计划%d条",
+                "排程完成: 排程结果%d条, 未排产%d条(窗口内%d条, 其他%d条), 换模计划%d条",
                 context.getScheduleResultList().size(),
                 context.getUnscheduledResultList().size(),
+                inWindowCount,
+                otherCount,
                 context.getMouldChangePlanList().size()
         ));
         summaryLog.setIsDelete(0);

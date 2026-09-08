@@ -11,6 +11,7 @@ import com.zlt.aps.lh.api.domain.entity.LhUnscheduledResult;
 import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
 import com.zlt.aps.lh.api.enums.ScheduleStepEnum;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
+import com.zlt.aps.lh.api.enums.UnscheduledGroupTypeEnum;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.exception.ScheduleErrorCode;
@@ -184,6 +185,17 @@ public class SchedulePersistenceService {
             scheduleResultMapper.insertBatch(context.getScheduleResultList());
         }
         if (!context.getUnscheduledResultList().isEmpty()) {
+            // GROUP_TYPE和结构化原因必须由保存前收口显式生成，禁止依赖数据库默认值掩盖漏算。
+            boolean invalidUnscheduledResult = context.getUnscheduledResultList().stream()
+                    .filter(Objects::nonNull)
+                    .anyMatch(result -> (Objects.isNull(result.getGroupType())
+                            || result.getGroupType() < UnscheduledGroupTypeEnum.IN_SCHEDULE_WINDOW.getValue()
+                            || result.getGroupType() > UnscheduledGroupTypeEnum.OTHER.getValue())
+                            || StringUtils.isEmpty(result.getUnscheduledReasonCode())
+                            || StringUtils.isEmpty(result.getUnscheduledReasonStage()));
+            if (invalidUnscheduledResult) {
+                throw new IllegalStateException("未排结果保存前分类或结构化原因未完成收口");
+            }
             unscheduledResultMapper.insertBatch(context.getUnscheduledResultList());
         }
         if (!context.getMouldChangePlanList().isEmpty()) {
