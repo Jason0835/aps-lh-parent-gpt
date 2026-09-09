@@ -751,9 +751,6 @@ final class ScheduleSubstitutionAttemptSnapshot {
                     copiedAdmission.setRawScheduledPhysicalMachineCodes(
                             new LinkedHashSet<String>(structureEntry.getValue()
                                     .getRawScheduledPhysicalMachineCodes()));
-                    copiedAdmission.setExcludedEndingPhysicalMachineCodes(
-                            new LinkedHashSet<String>(structureEntry.getValue()
-                                    .getExcludedEndingPhysicalMachineCodes()));
                     copiedAdmission.setScheduledPhysicalMachineCodes(
                             new LinkedHashSet<String>(structureEntry.getValue()
                                     .getScheduledPhysicalMachineCodes()));

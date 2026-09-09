@@ -1000,7 +1000,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
 
     /**
      * 加载月计划结构维度计划硫化机台数。
-     * <p>提前生产需要同时读取当前业务日和 futurePlanDate 的 dayN.lhMachines，
+     * <p>提前生产需要同时读取当前业务日和 futurePlanDate 的 dayN.maxLhMachines，
      * 因此按“排程窗口开始日～窗口结束日+N”真实日期加载，并按 structureName 聚合 SUM 后缓存。</p>
      *
      * @param context          排程上下文
@@ -1070,9 +1070,9 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                 if (productionDate.getYear() != year || productionDate.getMonthValue() != month) {
                     continue;
                 }
-                int lhMachines;
+                int maxLhMachines;
                 try {
-                    lhMachines = MonthPlanStatisticsDayUtil.resolveLhMachines(row, productionDate);
+                    maxLhMachines = MonthPlanStatisticsDayUtil.resolveMaxLhMachines(row, productionDate);
                 } catch (IllegalArgumentException e) {
                     /*
                      * dayN 非法 JSON 属于排程基础数据错误。静默按 0 会把结构计划误判为收尾，
@@ -1089,7 +1089,8 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                     throw new ScheduleException(ScheduleStepEnum.S4_2_DATA_INIT,
                             ScheduleErrorCode.DATA_INCOMPLETE, message, e);
                 }
-                context.addStructurePlanMachineCount(productionDate, row.getStructureName(), lhMachines);
+                context.addStructurePlanMachineCount(
+                        productionDate, row.getStructureName(), maxLhMachines);
             }
         }
         if (CollectionUtils.isEmpty(context.getStructurePlanMachineCountMap())) {
@@ -1103,7 +1104,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                 .filter(StringUtils::isNotEmpty)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
         log.info("月计划结构机台统计加载完成, factoryCode: {}, year: {}, month: {}, productionVersion: {}, "
-                        + "需求版本集合: {}, rowCount: {}, dateCount: {}",
+                        + "计划机台数字段: maxLhMachines, 需求版本集合: {}, rowCount: {}, dateCount: {}",
                 factoryCode, year, month, productionVersion, demandVersionSet, statisticsList.size(),
                 context.getStructurePlanMachineCountMap().size());
     }

@@ -139,8 +139,18 @@ public class LhScheduleConfigResolver {
                 LhScheduleConstant.DRY_ICE_WORK_END_TIME);
         putIntValue(resolvedParamMap, lhParamsMap, LhScheduleParamConstant.SAND_BLAST_DURATION_HOURS,
                 LhScheduleConstant.SAND_BLAST_DURATION_HOURS);
-        putIntValue(resolvedParamMap, lhParamsMap, LhScheduleParamConstant.SAND_BLAST_WITH_INSPECTION_HOURS,
-                LhScheduleConstant.SAND_BLAST_WITH_INSPECTION_HOURS);
+        putIntValue(resolvedParamMap, lhParamsMap, LhScheduleParamConstant.SAND_BLAST_FIRST_INSPECTION_HOURS,
+                LhScheduleConstant.SAND_BLAST_FIRST_INSPECTION_HOURS, 1);
+        putIntValue(resolvedParamMap, lhParamsMap, LhScheduleParamConstant.SAND_BLAST_FIRST_INSPECTION_QTY,
+                LhScheduleConstant.SAND_BLAST_FIRST_INSPECTION_QTY, 1);
+        putStringValue(resolvedParamMap, lhParamsMap, LhScheduleParamConstant.SAND_BLAST_FIRST_START_TIME,
+                LhScheduleConstant.SAND_BLAST_FIRST_START_TIME);
+        putStringValue(resolvedParamMap, lhParamsMap, LhScheduleParamConstant.SAND_BLAST_SECOND_START_TIME,
+                LhScheduleConstant.SAND_BLAST_SECOND_START_TIME);
+        // 兼容读取总时长的消费者，但唯一计算依据是清洗、首检两个独立参数。
+        resolvedParamMap.put(LhScheduleParamConstant.SAND_BLAST_WITH_INSPECTION_HOURS,
+                String.valueOf(Integer.parseInt(resolvedParamMap.get(LhScheduleParamConstant.SAND_BLAST_DURATION_HOURS))
+                        + Integer.parseInt(resolvedParamMap.get(LhScheduleParamConstant.SAND_BLAST_FIRST_INSPECTION_HOURS))));
         putIntValue(resolvedParamMap, lhParamsMap, LhScheduleParamConstant.SAND_BLAST_DAILY_LIMIT,
                 LhScheduleConstant.SAND_BLAST_DAILY_LIMIT, 1);
         putIntValue(resolvedParamMap, lhParamsMap, LhScheduleParamConstant.SAND_BLAST_WARNING_DAYS,
@@ -280,6 +290,11 @@ public class LhScheduleConfigResolver {
                 LhScheduleConstant.SMALL_BATCH_SKU_THRESHOLD, 1);
         // 试制量试参与新增排产开关只允许0/1，非法配置统一回到默认（新增排产不参与，续作不受影响）。
         putTrialMassTrialSchedulingEnabled(resolvedParamMap, lhParamsMap);
+
+        // 本参数仅控制T+1资源日的历史交替匹配，不复用提前生产或机台资源归班参数。
+        this.putIntValue(resolvedParamMap, lhParamsMap,
+                LhScheduleParamConstant.NEXT_DAY_PREVIOUS_ALTERNATION_PRIORITY_ENABLED,
+                LhScheduleConstant.NEXT_DAY_PREVIOUS_ALTERNATION_PRIORITY_ENABLED);
 
         return new LhScheduleConfig(resolvedParamMap);
     }

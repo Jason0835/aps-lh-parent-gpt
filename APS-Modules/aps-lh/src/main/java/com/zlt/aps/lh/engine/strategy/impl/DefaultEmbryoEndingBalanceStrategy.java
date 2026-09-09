@@ -22,6 +22,7 @@ import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.IEmbryoEndingBalanceStrategy;
 import com.zlt.aps.lh.engine.strategy.IMouldChangeBalanceStrategy;
+import com.zlt.aps.lh.engine.strategy.support.ContinuationEndingAllocationSnapshot;
 import com.zlt.aps.lh.util.CleaningScheduleRuleUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
@@ -414,6 +415,12 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
         }
         List<LhScheduleResult> sortedFixedResultList =
                 new ArrayList<LhScheduleResult>(fixedCountResultList);
+        Map<String, Date> formalActions = context.getScheduleResultList().stream()
+                .filter(result -> Objects.nonNull(result) && Objects.nonNull(result.getMouldChangeStartTime()))
+                .collect(Collectors.toMap(result -> LhSingleControlMachineUtil.resolvePhysicalMachineCode(result.getLhMachineCode()),
+                        LhScheduleResult::getMouldChangeStartTime, (first, second) -> first.after(second) ? first : second,
+                        () -> new LinkedHashMap<String, Date>(fixedCountResultList.size())));
+        Set<String> fixedPhysicalMachines = new HashSet<>(fixedCountResultList.size());
         sortedFixedResultList.sort(Comparator.comparing(
                 result -> StringUtils.defaultString(result.getLhMachineCode())));
         for (LhScheduleResult result : sortedFixedResultList) {
@@ -421,6 +428,17 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
             // 固定计数使用实际生产结束时间，避免独立续作停产保机的窗口末班占用边界
             // 把后物料换模错误预测到窗口末班之后；旧结构统一释放时间已不再进入本链路。
             Date endingTime = this.resolveBalanceEndingTime(context, result, endingShiftIndex);
+            ContinuationEndingAllocationSnapshot snapshot = context.getContinuationSurplusEndingSnapshotMap().get(result);
+            if (Objects.nonNull(snapshot)) {
+                String physical = LhSingleControlMachineUtil.resolvePhysicalMachineCode(result.getLhMachineCode());
+                Date formal = formalActions.get(physical);
+                if (!fixedPhysicalMachines.add(physical) || (Objects.nonNull(formal)
+                        && Objects.nonNull(snapshot.getProductionStartTime()) && !formal.before(snapshot.getProductionStartTime()))) {
+                    // 已正式交替的机台已计入真实次数；L/R只占一个物理事件，不重复加入旧均衡基线。
+                    continue;
+                }
+                endingTime = snapshot.getReleaseTime();
+            }
             if (Objects.isNull(endingTime)) {
                 continue;
             }
@@ -3386,7 +3404,7 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
                 startTime,
                 shift.getShiftEndDateTime(),
                 planQty,
-                capacity);
+                capacity, context, result, shift);
         return Objects.isNull(endTime) ? shift.getShiftEndDateTime() : endTime;
     }
 

@@ -701,7 +701,10 @@ public class LocalSearchMachineAllocatorStrategy {
                     effectiveStartTime,
                     effectiveEndTime,
                     allocationQty,
-                    shiftMaxQty);
+                    shiftMaxQty, ShiftCapacityResolverUtil.resolveActualShiftPlanQty(shiftCapacity, shift,
+                            ShiftCapacityResolverUtil.resolveOddShiftCapacityPlusShiftType(context),
+                            ScheduleTypeEnum.NEW_SPEC.getCode()),
+                    lhTimeSeconds, mouldQty, ShiftCapacityResolverUtil.resolveShiftDurationSeconds(shift));
             // 当前班次结束后再推进到下一班次，避免跨班次重叠计算
             cursorStartTime = effectiveEndTime;
         }

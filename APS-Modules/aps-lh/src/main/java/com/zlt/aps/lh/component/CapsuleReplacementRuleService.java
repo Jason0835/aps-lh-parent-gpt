@@ -944,7 +944,7 @@ public class CapsuleReplacementRuleService {
         Date plannedEndTime = ShiftCapacityResolverUtil.resolveShiftPlanEndTime(
                 context.getDevicePlanShutList(), cleaningWindowList, maintenanceWindowList,
                 result.getLhMachineCode(), shiftStartTime, shift.getShiftEndDateTime(),
-                Math.max(0, plannedQtyAfterCandidate), Math.max(1, shiftCapacityBeforeReplacement));
+                Math.max(0, plannedQtyAfterCandidate), Math.max(1, shiftCapacityBeforeReplacement), context, result, shift);
         return Objects.nonNull(plannedEndTime) ? plannedEndTime : shiftStartTime;
     }
 

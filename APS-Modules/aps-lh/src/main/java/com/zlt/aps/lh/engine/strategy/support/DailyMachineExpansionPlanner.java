@@ -3,13 +3,17 @@ package com.zlt.aps.lh.engine.strategy.support;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.domain.dto.SkuDailyPlanQuotaDTO;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
+import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
 import com.zlt.aps.lh.api.enums.SkuTagEnum;
+import com.zlt.aps.lh.component.EarlyProductionQuantityCalculator;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.context.LhScheduleConfig;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.service.ILhDailyMouldCalcService;
 import com.zlt.aps.lh.service.impl.LhDailyMouldCalcServiceImpl;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
+import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
+import com.zlt.aps.lh.util.ShiftFieldUtil;
 import com.zlt.aps.lh.util.SkuDailyPlanQuotaUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -42,6 +46,107 @@ public final class DailyMachineExpansionPlanner {
             new LhDailyMouldCalcServiceImpl();
 
     private DailyMachineExpansionPlanner() {
+    }
+
+    /**
+     * 判断物料及产品状态是否已有有效换活字块结果，限定跨阶段补机规则的适用范围。
+     *
+     * @param context 排程上下文
+     * @param sku 当前 SKU
+     * @return 是否存在已提交的正量换活字块结果
+     */
+    public static boolean hasTypeBlockScheduledResult(LhScheduleContext context, SkuScheduleDTO sku) {
+        if (Objects.isNull(context) || Objects.isNull(sku)
+                || CollectionUtils.isEmpty(context.getScheduleResultList())) {
+            return false;
+        }
+        return context.getScheduleResultList().stream()
+                .filter(Objects::nonNull)
+                .anyMatch(result -> StringUtils.equals(sku.getMaterialCode(), result.getMaterialCode())
+                        && StringUtils.equals(sku.getProductStatus(), result.getProductStatus())
+                        && StringUtils.equals(ScheduleTypeEnum.TYPE_BLOCK.getCode(), result.getScheduleType())
+                        && ShiftFieldUtil.resolveScheduledQty(result) > 0);
+    }
+
+    /**
+     * 按业务日读取已提交机台索引，合并 L/R，避免全窗口机台数覆盖某日真实缺口。
+     *
+     * @param context 排程上下文
+     * @param sku 当前 SKU
+     * @param productionDate 机台实际执行的业务日期
+     * @return 当日已排物理机台数
+     */
+    public static int countScheduledPhysicalMachines(LhScheduleContext context,
+                                                      SkuScheduleDTO sku,
+                                                      LocalDate productionDate) {
+        Map<String, Set<String>> dayMachines = context.getSkuScheduledMachineCodeMap().get(productionDate);
+        if (CollectionUtils.isEmpty(dayMachines)) {
+            return 0;
+        }
+        Set<String> machineCodes = dayMachines.get(MonthPlanDateResolver.buildMaterialStatusKey(
+                sku.getMaterialCode(), sku.getProductStatus()));
+        if (CollectionUtils.isEmpty(machineCodes)) {
+            return 0;
+        }
+        return (int) machineCodes.stream()
+                .filter(StringUtils::isNotEmpty)
+                .map(LhSingleControlMachineUtil::resolvePhysicalMachineCode)
+                .distinct().count();
+    }
+
+    /**
+     * 普通换活字块与续作增机补偿共用的窗口内首次补机日期。
+     * 已排结果和消费账本保持原样，只比较同一业务日的统一 Map 与已排物理机台数。
+     *
+     * @param service 统一目标机台查询服务
+     * @param context 排程上下文
+     * @param sku 已换活字块的 SKU
+     * @return 首次缺口业务日；余量耗尽或窗口内无缺口时返回 null
+     */
+    public static LocalDate resolveTypeBlockAddMachineDate(ILhDailyMouldCalcService service,
+                                                            LhScheduleContext context,
+                                                            SkuScheduleDTO sku) {
+        return resolveTypeBlockAddMachineDate(service, context, sku, null);
+    }
+
+    /**
+     * 按已批准的提前生产视图解析补机实际日期，不新增提前生产准入。
+     *
+     * @param service 统一目标机台查询服务
+     * @param context 排程上下文
+     * @param sku 已换活字块的 SKU
+     * @param previewPlan 当前候选已获准的提前生产预览；普通排产为空
+     * @return 窗口内首次仍有机台缺口的实际业务日期
+     */
+    public static LocalDate resolveTypeBlockAddMachineDate(ILhDailyMouldCalcService service,
+                                                            LhScheduleContext context,
+                                                            SkuScheduleDTO sku,
+                                                            EarlyProductionRuntimePlan previewPlan) {
+        if (!hasTypeBlockScheduledResult(context, sku) || sku.getRemainingScheduleQty() <= 0
+                || Objects.isNull(context.getScheduleDate()) || Objects.isNull(context.getWindowEndDate())) {
+            return null;
+        }
+        LocalDate startDate = context.getScheduleDate().toInstant()
+                .atZone(ZoneId.systemDefault()).toLocalDate();
+        LocalDate endDate = context.getWindowEndDate().toInstant()
+                .atZone(ZoneId.systemDefault()).toLocalDate();
+        EarlyProductionRuntimePlan runtimePlan = context.getEarlyProductionRuntimePlan(sku);
+        boolean projected = Objects.nonNull(previewPlan)
+                || (Objects.nonNull(runtimePlan) && runtimePlan.isActive());
+        for (LocalDate productionDate = startDate; !productionDate.isAfter(endDate);
+             productionDate = productionDate.plusDays(1)) {
+            // 提前生产只投影目标来源日；已排机台仍属于实际业务日，避免把未来机台当作今日供给。
+            LocalDate requiredDate = projected
+                    ? EarlyProductionQuantityCalculator.resolveRequiredMachineCountDate(
+                            context, sku, previewPlan, productionDate) : productionDate;
+            // Map 缺失继续由统一查询入口记录，不以余量或产能推算目标台数。
+            int targetCount = service.getRequiredMachineCount(
+                    context, sku.getMaterialCode(), sku.getProductStatus(), requiredDate);
+            if (targetCount > countScheduledPhysicalMachines(context, sku, productionDate)) {
+                return productionDate;
+            }
+        }
+        return null;
     }
 
     /**

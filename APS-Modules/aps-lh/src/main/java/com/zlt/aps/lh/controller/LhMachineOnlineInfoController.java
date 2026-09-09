@@ -90,6 +90,8 @@ public class LhMachineOnlineInfoController extends AbstractDocBizController<LhMa
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getMesMaterialCode()), "MES_MATERIAL_CODE", queryVO.getMesMaterialCode());
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getSpecDesc()), "SPEC_DESC", queryVO.getSpecDesc());
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getLrMolds()), "LR_MOLDS", queryVO.getLrMolds());
+        // 在机模号模糊查询
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getInMachineMouldCode()), "IN_MACHINE_MOULD_CODE", queryVO.getInMachineMouldCode());
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getDataVersion()), "DATA_VERSION", queryVO.getDataVersion());
     }
 

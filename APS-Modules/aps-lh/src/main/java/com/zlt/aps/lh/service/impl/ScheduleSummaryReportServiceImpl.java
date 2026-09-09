@@ -6,6 +6,7 @@ import com.ruoyi.common.exception.ServiceException;
 import com.zlt.aps.common.core.domain.ExcelCellRangeAddress;
 import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.constant.FactoryConstant;
+import com.zlt.aps.cx.entity.config.CxEmbryoLhTime;
 import com.zlt.aps.cx.entity.config.CxParamConfig;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
 import com.zlt.aps.enums.ConstructionStageEnum;
@@ -54,7 +55,7 @@ import java.util.stream.Collectors;
  *   <li>{cxNightQty}/{cxMorningQty}/{cxMiddleQty}/{cxTotalQty} - 成型各班产量</li>
  *   <li>{cxSetupInfo} - 试制规格（成型3/4/5班次有排计划量且示方书类型=X的物料描述）</li>
  *   <li>{cxTrialInfo} - 量试规格（成型3/4/5班次有排计划量且示方书类型=T的物料描述）</li>
- *   <li>{cxSpecSwitch} - 成型规格切换</li>
+ *   <li>{cxSpecSwitch} - 成型规格切换（与结构切换Sheet同源T_CX_EMBRYO_LH_TIME，按开产预计时间日历日分栏）</li>
  *   <li>{lhNightQty}/{lhMorningQty}/{lhMiddleQty}/{lhTotalQty} - 硫化各班产量</li>
  *   <li>{lhNightMachines}/{lhMorningMachines}/{lhMiddleMachines}/{lhTotalMachines} - 硫化各班开动机台数</li>
  *   <li>{mouldCleanDate} - 模具清洗日期（固定显示排程目标日T+1，如"08月23日"）</li>
@@ -143,6 +144,13 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
     @Resource
     private CxParamConfigMapper cxParamConfigMapper;
 
+    /**
+     * 成型结构切换明细Mapper（T_CX_EMBRYO_LH_TIME）：排产小结的结构切换行
+     * 与"成型结构切换"Sheet共用同一数据源，保证同一份导出中口径一致
+     */
+    @Resource
+    private CxEmbryoLhTimeMapper cxEmbryoLhTimeMapper;
+
     @Override
     public byte[] exportScheduleSummaryReport(ScheduleSummaryReportVO queryVO) {
         if (queryVO == null || StringUtils.isBlank(queryVO.getScheduleDate())) {
@@ -207,18 +215,29 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                         .eq(LhScheduleResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
         log.info("硫化排程结果查询完成, 排程日期: {}, 数量: {}", DateUtil.formatDate(scheduleDate), lhResults.size());
 
+        // 成型结构切换明细：与"成型结构切换"Sheet同源（T_CX_EMBRYO_LH_TIME），
+        // 该表由排程算法每次排程按批次（SCHEDULE_DATE=排程日）先删后插，重跑自动刷新；
+        // 与排程结果查询同口径（批次隔离 + 显式过滤逻辑删除记录）
+        List<CxEmbryoLhTime> embryoLhTimes = cxEmbryoLhTimeMapper.selectList(
+                new LambdaQueryWrapper<CxEmbryoLhTime>()
+                        .eq(CxEmbryoLhTime::getScheduleDate, scheduleDate)
+                        .eq(CxEmbryoLhTime::getFactoryCode, factoryCode)
+                        .eq(CxEmbryoLhTime::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
+        log.info("成型结构切换明细查询完成, 排程日期: {}, 数量: {}",
+                DateUtil.formatDate(scheduleDate), embryoLhTimes.size());
+
         // 原模板（左侧，无后缀）：T+1数据，取class3/4/5班次
         Date scheduleDateT2 = DateUtil.offsetDay(scheduleDate, 1);
         // 硫化机台单双模(模台数)映射：用于硫化开动机台数统计时合并K1501L/K1501R等单控机台
         Map<String, Integer> machineMaxMouldMap = this.loadMachineMaxMouldMap(factoryCode);
         Map<String, Object> tableMap = this.buildTableMapFromResults(
                 scheduleDate, scheduleDate, scheduleDateT2, factoryCode,
-                classShiftTypeMap, cxResults, lhResults, "", machineMaxMouldMap);
+                classShiftTypeMap, cxResults, lhResults, embryoLhTimes, "", machineMaxMouldMap);
 
         // 新模板（右侧，后缀2）：T+2数据，从同一份排程结果中取class6/7/8班次
         Map<String, Object> tableMapT2 = this.buildTableMapFromResults(
                 scheduleDateT2, scheduleDate, scheduleDateT2, factoryCode,
-                classShiftTypeMap, cxResults, lhResults, "2", machineMaxMouldMap);
+                classShiftTypeMap, cxResults, lhResults, embryoLhTimes, "2", machineMaxMouldMap);
         tableMap.putAll(tableMapT2);
 
         // 模具交替/清洗信息：一次性查询排程窗口（T+1 ~ T+2）数据，按 planDate 分组到 T+1/T+2 栏位，不含T日
@@ -342,6 +361,7 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
      * @param classShiftTypeMap  班次类型映射
      * @param cxResults          预查询的成型排程结果
      * @param lhResults          预查询的硫化排程结果
+     * @param embryoLhTimes      预查询的成型结构切换明细（T_CX_EMBRYO_LH_TIME，与结构切换Sheet同源）
      * @param keySuffix          key 后缀（"" 或 "2"）
      * @param machineMaxMouldMap 硫化机台单双模(模台数)映射，key=机台编号(大写), value=单双模值；
      *                           用于硫化开动机台数统计时合并K1501L/K1501R等单控机台
@@ -350,11 +370,12 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
     private Map<String, Object> buildTableMapFromResults(Date reportDate, Date actualScheduleDate, Date scheduleDateT2,
                                                          String factoryCode, Map<Integer, String> classShiftTypeMap,
                                                          List<CxScheduleResult> cxResults, List<LhScheduleResult> lhResults,
+                                                         List<CxEmbryoLhTime> embryoLhTimes,
                                                          String keySuffix, Map<String, Integer> machineMaxMouldMap) {
         Map<String, Object> map = new HashMap<>(32);
 
         map.put("titleDate" + keySuffix, DateUtil.format(reportDate, "MM月dd日") + "计划排产\n"
-                + "Ke hoach san xuat ngay " + DateUtil.format(reportDate, "dd/MM"));
+                + "Kế hoạch sản xuất ngày " + DateUtil.format(reportDate, "dd/MM"));
 
         // 成型产量：根据 keySuffix 选择不同班次
         // keySuffix="" → class3/4/5（T+1的夜/早/中班），keySuffix="2" → class6/7/8（T+2的夜/早/中班）
@@ -430,12 +451,12 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         map.put("cxSetupInfo" + keySuffix, setupSpecs.isEmpty() ? "无 Không" : String.join("，", setupSpecs));
         map.put("cxTrialInfo" + keySuffix, trialSpecs.isEmpty() ? "无 Không" : String.join("，", trialSpecs));
 
-        // 成型规格切换：从日排程结果（T_CX_SCHEDULE_RESULT，SCHEDULE_DATE=本报表排程批次）
-        // 按后结构首产班次推导，班次归属栏位与硫化栏位班次划分口径一致：
-        //   keySuffix=""  → 切换班次落在class3/4/5 → T+1栏位
-        //   keySuffix="2" → 切换班次落在class6/7/8 → T+2栏位
+        // 成型规格切换：与"成型结构切换"Sheet同源（T_CX_EMBRYO_LH_TIME，SCHEDULE_DATE=本报表排程批次），
+        // 按开产预计时间（EARLIEST_LH_TIME）的日历日分栏：
+        //   keySuffix=""  → 开产时间落在报告日（本方法 reportDate 参数）→ T+1栏位
+        //   keySuffix="2" → 开产时间落在报告日+1 → T+2栏位
         map.put("cxSpecSwitch" + keySuffix, this.buildCxSpecSwitch(
-                cxResults, classShiftTypeMap, keySuffix));
+                embryoLhTimes, reportDate, keySuffix));
 
         // 硫化产量和机台数：根据 keySuffix 限制班次序号范围
         // keySuffix="" → 班次3~5（class3~5映射的01/02/03，与成型T+1班次范围一致），keySuffix="2" → 班次6~8（class6~8映射的01/02/03）
@@ -1745,82 +1766,54 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
     }
 
     /**
-     * 构建成型规格切换信息。
-     * 从日排程结果（T_CX_SCHEDULE_RESULT，SCHEDULE_DATE=本报表排程批次）的实际排班推导：
-     * 按"机台|结构"归集每个结构在排程窗口内（class1~8）的首个有计划量班次（首产班次），
-     * 同机台按首产班次升序排序后，相邻结构对（前结构→后结构）即一次切换，
-     * 切换班次=后结构的首产班次，展示格式为"机台号：前结构 换 后结构（班次）"，
-     * 多个切换用"；"隔开（班次为夜班/早班/中班，取自班次类型映射，取不到默认夜班）。
+     * 构建成型规格切换信息（结构切换行）。
      *
-     * <p>栏位归属口径（2026-09-07业务确认，与本报表硫化栏位的班次划分一致）：</p>
+     * <p>数据源与"成型结构切换"Sheet完全同源（T_CX_EMBRYO_LH_TIME），保证同一份导出中
+     * 两个Sheet的机台/结构/时间口径一致。该表由排程算法每次排程按批次
+     * （SCHEDULE_DATE=排程日）先删后插生成，每条记录代表一次结构切换：
+     * 前结构 {@code structureName} → 后结构 {@code nextStructureName}，
+     * {@code earliestLhTime} 为后结构开产（胎胚最早可供硫化）预计时间。</p>
+     *
+     * <p>栏位归属按 {@code earliestLhTime} 的<b>日历日</b>划分：
      * <ul>
-     *   <li>keySuffix=""  → T+1栏位：切换班次落在class3/4/5</li>
-     *   <li>keySuffix="2" → T+2栏位：切换班次落在class6/7/8</li>
-     *   <li>切换班次落在class1/2的切换属上一日报表范围，本报表不显示（不重不漏）</li>
-     * </ul>
+     *   <li>落在本栏位对应日历日（{@code reportDate}）→ 本栏位显示</li>
+     *   <li>其余日历日 → 本栏位不显示（T+1/T+2两次调用各取各的日历日，不重不漏）</li>
+     * </ul></p>
      *
-     * <p>变更说明（2026-09-07）：原实现从月度结构排产（T_MP_STRUCTURE_ALLOCATION）按
-     * "后结构开始日=报表日日号"锚点识别切换，因月计划与日排程存在偏差（引擎可能提前或
-     * 调整实际开产班次，跨天夜班的日历归属与天号也不一致），导致漏报当日实际切换机台
-     * （如9/6报表漏H1402/H1503），改为直接从日排程结果推导，与排程引擎的切换日语义
-     * （后结构首次排产班次）天然一致。</p>
+     * <p>变更说明（2026-09-07）：原实现从日排程结果（T_CX_SCHEDULE_RESULT）按后结构首产班次
+     * 推导切换，但排程引擎会把后结构排到跨天夜班（如切换明细预计9/6下午中班开产，
+     * 实际排程推到9/6晚22点后的class6夜班），8班次粒度无精确时间戳、班次日历归属跨天后
+     * 被划入T+2栏位，且日排程首产机台与切换明细机台存在偏差（如H1503 vs H1205），
+     * 导致与"成型结构切换"Sheet矛盾。改为直接按开产预计时间的日历日分栏。</p>
      *
-     * @param cxResults         预查询的成型排程结果（SCHEDULE_DATE=本报表排程日批次）
-     * @param classShiftTypeMap 班次类型映射（班次序号→班次类型编码 01夜/02早/03中）
-     * @param keySuffix         key 后缀（"" 为T+1栏位，"2" 为T+2栏位）
-     * @return 规格切换信息字符串，如"H1401：结构A 换 结构B（夜班）"
+     * @param embryoLhTimes 成型结构切换明细（SCHEDULE_DATE=本报表排程批次，IS_DELETE=0）
+     * @param reportDate    本栏位对应的日历日（T+1栏=报告日，T+2栏=报告日+1）
+     * @param keySuffix     key 后缀（"" 为T+1栏位，"2" 为T+2栏位）
+     * @return 规格切换信息字符串，如"H1102：结构A 换 结构B（早班）"，多条用"；"隔开
      */
-    private String buildCxSpecSwitch(List<CxScheduleResult> cxResults,
-                                      Map<Integer, String> classShiftTypeMap, String keySuffix) {
-        if (cxResults == null || cxResults.isEmpty()) {
-            log.info("成型规格切换：排程结果为空, keySuffix: {}", keySuffix);
+    private String buildCxSpecSwitch(List<CxEmbryoLhTime> embryoLhTimes, Date reportDate, String keySuffix) {
+        if (embryoLhTimes == null || embryoLhTimes.isEmpty()) {
+            log.info("成型规格切换：结构切换明细为空, keySuffix: {}", keySuffix);
             return "";
         }
-        // 栏位班次范围：T+1取class3/4/5，T+2取class6/7/8（与硫化栏位的班次划分口径一致）
-        int rangeMin = "".equals(keySuffix) ? 3 : 6;
-        int rangeMax = "".equals(keySuffix) ? 5 : 8;
-
-        // 1. 按"机台→结构"归集每个结构在排程窗口内（class1~8）的首产班次
-        //    （同一结构多行时取最早班次），整行无排产量的结构不参与
-        Map<String, Map<String, Integer>> machineStructureFirstShiftMap = new LinkedHashMap<>();
-        for (CxScheduleResult result : cxResults) {
-            String machineCode = StringUtils.trimToEmpty(result.getCxMachineCode());
-            String structureName = StringUtils.trimToEmpty(result.getStructureName());
-            if (machineCode.isEmpty() || structureName.isEmpty()) {
-                continue;
-            }
-            int firstShiftIndex = this.findFirstPlanShiftIndex(result);
-            if (firstShiftIndex < 1) {
-                continue;
-            }
-            machineStructureFirstShiftMap
-                    .computeIfAbsent(machineCode, k -> new LinkedHashMap<>())
-                    .merge(structureName, firstShiftIndex, Math::min);
-        }
+        // 过滤本栏位日历日的切换记录：开产预计时间必须有效且落在本栏位对应日历日
+        List<CxEmbryoLhTime> daySwitchList = embryoLhTimes.stream()
+                .filter(r -> r.getEarliestLhTime() != null
+                        && DateUtil.isSameDay(r.getEarliestLhTime(), reportDate)
+                        && StringUtils.isNotBlank(r.getCxMachineCode())
+                        && StringUtils.isNotBlank(r.getStructureName())
+                        && StringUtils.isNotBlank(r.getNextStructureName()))
+                // 按开产预计时间升序（早班→中班→夜班），与切换明细的开产时间顺序一致
+                .sorted(Comparator.comparing(CxEmbryoLhTime::getEarliestLhTime))
+                .collect(Collectors.toList());
 
         List<String> switchList = new ArrayList<>();
-        for (Map.Entry<String, Map<String, Integer>> machineEntry : machineStructureFirstShiftMap.entrySet()) {
-            String machineCode = machineEntry.getKey();
-            // 2. 同机台按首产班次升序排序，相邻结构对（前结构→后结构）即一次切换
-            List<Map.Entry<String, Integer>> sortedStructures = machineEntry.getValue().entrySet().stream()
-                    .sorted(Map.Entry.comparingByValue())
-                    .collect(Collectors.toList());
-            for (int i = 1; i < sortedStructures.size(); i++) {
-                String prevStructureName = sortedStructures.get(i - 1).getKey();
-                String nextStructureName = sortedStructures.get(i).getKey();
-                int switchShiftIndex = sortedStructures.get(i).getValue();
-                // 3. 栏位归属：切换班次（后结构首产班次）落在栏位范围内才显示；
-                //    首产班次落在class1/2的切换属上一日报表范围，本报表不显示
-                if (switchShiftIndex < rangeMin || switchShiftIndex > rangeMax) {
-                    continue;
-                }
-                String shiftName = this.resolveShiftName(classShiftTypeMap.get(switchShiftIndex));
-                if (StringUtils.isBlank(shiftName)) {
-                    shiftName = "夜班";
-                }
-                switchList.add(machineCode + "：" + prevStructureName + " 换 " + nextStructureName
-                        + "（" + shiftName + "）");
-            }
+        for (CxEmbryoLhTime record : daySwitchList) {
+            // 班次按开产时刻所在小时推断：6~14点早班、14~22点中班、其余夜班
+            // （22~6点跨天夜班按开产时刻所在小时判定）
+            String shiftName = this.resolveShiftNameByHour(DateUtil.hour(record.getEarliestLhTime(), true));
+            switchList.add(record.getCxMachineCode().trim() + "：" + record.getStructureName().trim()
+                    + " 换 " + record.getNextStructureName().trim() + "（" + shiftName + "）");
         }
 
         String result = String.join("；", switchList);
@@ -1829,41 +1822,19 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
     }
 
     /**
-     * 取成型排程结果行在排程窗口内（class1~8）首个有计划量的班次序号（首产班次）。
+     * 按开产时刻所在小时推断班次名称。
      *
-     * @param result 成型排程结果
-     * @return 首产班次序号（1~8），整行无排产量返回0
+     * @param hour 开产时刻的小时（0~23，24小时制）
+     * @return 班次中文名称：6~13点早班、14~21点中班、其余（0~5、22~23点）夜班
      */
-    private int findFirstPlanShiftIndex(CxScheduleResult result) {
-        BigDecimal[] planQties = {
-                result.getClass1PlanQty(), result.getClass2PlanQty(), result.getClass3PlanQty(),
-                result.getClass4PlanQty(), result.getClass5PlanQty(), result.getClass6PlanQty(),
-                result.getClass7PlanQty(), result.getClass8PlanQty()
-        };
-        for (int i = 0; i < planQties.length; i++) {
-            if (planQties[i] != null && planQties[i].compareTo(BigDecimal.ZERO) > 0) {
-                return i + 1;
-            }
+    private String resolveShiftNameByHour(int hour) {
+        if (hour >= 6 && hour < 14) {
+            return "早班";
         }
-        return 0;
-    }
-
-    /**
-     * 班次类型编码转换为中文名称。
-     *
-     * @param shiftType 班次类型编码（T_LH_SHIFT_CONFIG.SHIFT_TYPE：01-夜班，02-早班，03-中班）
-     * @return 班次中文名称，无法识别返回空字符串
-     */
-    private String resolveShiftName(String shiftType) {
-        if (StringUtils.isBlank(shiftType)) {
-            return "";
+        if (hour >= 14 && hour < 22) {
+            return "中班";
         }
-        switch (shiftType.trim()) {
-            case "01": return "夜班";
-            case "02": return "早班";
-            case "03": return "中班";
-            default: return "";
-        }
+        return "夜班";
     }
 
     /**

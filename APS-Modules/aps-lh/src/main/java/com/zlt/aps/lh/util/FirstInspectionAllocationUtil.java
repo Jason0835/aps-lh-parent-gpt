@@ -195,6 +195,13 @@ public final class FirstInspectionAllocationUtil {
         }
         LhShiftConfigVO countingShift = FirstInspectionQtyUtil.resolveFirstInspectionAttributionShift(
                 context, sku, orderedShifts, inspectionReferenceTime, scheduleType);
+        // 倒推首检的结束是区间右边界。恰好在窗口末端结束时，计数归属末班而非不存在的下一班。
+        if (!forwardInspection && Objects.isNull(countingShift) && !orderedShifts.isEmpty()) {
+            LhShiftConfigVO lastShift = orderedShifts.get(orderedShifts.size() - 1);
+            if (Objects.equals(inspectionReferenceTime, lastShift.getShiftEndDateTime())) {
+                countingShift = lastShift;
+            }
+        }
         if (Objects.isNull(countingShift)) {
             return FirstInspectionAllocationPlan.invalid(
                     "首检时间未命中排程班次", null, inspectionReferenceTime);

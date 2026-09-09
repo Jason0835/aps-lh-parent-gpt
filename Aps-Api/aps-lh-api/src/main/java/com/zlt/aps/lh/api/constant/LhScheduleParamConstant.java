@@ -118,6 +118,15 @@ public final class LhScheduleParamConstant {
     public static final String SAND_BLAST_MAINTENANCE_DAY_MID = "SYS0306012";
     /** 喷砂保养月末日期 */
     public static final String SAND_BLAST_MAINTENANCE_DAY_END = "SYS0306013";
+    /** 喷砂首检耗时（小时） */
+    public static final String SAND_BLAST_FIRST_INSPECTION_HOURS = "SYS0306014";
+    /** 同一次物理喷砂事件的首检总条数 */
+    public static final String SAND_BLAST_FIRST_INSPECTION_QTY = "SYS0306015";
+    /** 当天第一台喷砂开始时刻（HH:mm） */
+    public static final String SAND_BLAST_FIRST_START_TIME = "SYS0306016";
+    /** 当天第二台喷砂开始时刻（HH:mm） */
+    public static final String SAND_BLAST_SECOND_START_TIME = "SYS0306017";
+
     /** 保养耗时（小时） */
     public static final String MAINTENANCE_DURATION_HOURS = "SYS0307001";
     /** 保养开始小时 */
@@ -248,4 +257,6 @@ public final class LhScheduleParamConstant {
     public static final String SMALL_ENDING_SURPLUS_KEEP_RATIO_PERCENT = "SYS0304033";
     /** 优先续作硫化机台前缀，多个前缀使用英文逗号分隔 */
     public static final String PRIORITY_CONTINUATION_MACHINE_PREFIXES = "SYS0304034";
+    /** T+1日机台是否优先匹配前一次交替计划的物料（1-是，0-否，默认1） */
+    public static final String NEXT_DAY_PREVIOUS_ALTERNATION_PRIORITY_ENABLED = "SYS0304035";
 }

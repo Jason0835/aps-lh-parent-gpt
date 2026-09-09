@@ -258,6 +258,8 @@ public final class MachineCleaningOverlapUtil {
         if (CollectionUtils.isEmpty(cleaningWindowList)) {
             return java.util.Collections.emptyList();
         }
+        // 切换后的后料不再承接此前已经完成的喷砂首检事件，防止同一时刻衔接重复补量。
+        cleaningWindowList = CleaningScheduleRuleUtil.excludeCompletedWindows(cleaningWindowList, switchEndTime);
         if (Objects.isNull(switchStartTime)
                 || Objects.isNull(switchEndTime)
                 || !switchStartTime.before(switchEndTime)) {

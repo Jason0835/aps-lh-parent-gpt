@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
 import java.time.LocalDate;
+import java.util.Date;
 import java.util.Objects;
 
 /**
@@ -159,8 +160,6 @@ public class NewSpecCandidateAttemptService {
         LhShiftConfigVO productionOccupationShift = Objects.isNull(availabilityPlan)
                 ? null : availabilityPlan.getProductionOccupationShift();
         if (Objects.isNull(availabilityPlan) || !availabilityPlan.isAvailable()
-                || Objects.isNull(availabilityPlan.getFormalTargetShift())
-                || Objects.isNull(availabilityPlan.getFormalTargetShift().getShiftIndex())
                 || Objects.isNull(productionOccupationShift)
                 || Objects.isNull(productionOccupationShift.getShiftIndex())) {
             if (StringUtils.isEmpty(candidate.getLastFailure())) {
@@ -204,7 +203,7 @@ public class NewSpecCandidateAttemptService {
     }
 
     /**
-     * 按提案生产占用班次和候选物理机台统一校验结构机台数上限。
+     * 按首检实际覆盖班次和首个正式生产班次统一校验结构机台数上限。
      *
      * @param context 排程上下文
      * @param dayContext 当前业务日
@@ -238,12 +237,24 @@ public class NewSpecCandidateAttemptService {
         EarlyProductionDecision earlyProductionDecision =
                 Objects.isNull(earlyProductionPlan)
                         ? null : earlyProductionPlan.getDecision();
-        return structureMachineLimitAdmissionService.evaluate(
-                context, dayContext.getCurrentPhase(), candidate.getSku(),
-                earlyProductionDecision,
-                productionOccupationShift,
-                availabilityPlan.getProductionOccupationStartTime(),
-                matchResult.getMachine().getMachineCode(), poolDate, roundCache);
+        StructureMachineLimitDecision firstDecision = null;
+        // 预演和提交均校验原首检班次，不能因为候选在下一业务日竞争而漏检历史名额。
+        for (LhShiftConfigVO occupationShift : availabilityPlan.getStructureOccupationShifts()) {
+            Date occupationStartTime = Objects.equals(occupationShift.getShiftIndex(),
+                    productionOccupationShift.getShiftIndex())
+                    ? availabilityPlan.getProductionOccupationStartTime() : occupationShift.getShiftStartDateTime();
+            StructureMachineLimitDecision decision = structureMachineLimitAdmissionService.evaluate(
+                    context, dayContext.getCurrentPhase(), candidate.getSku(), earlyProductionDecision,
+                    occupationShift, occupationStartTime,
+                    matchResult.getMachine().getMachineCode(), poolDate, roundCache);
+            if (Objects.isNull(firstDecision)) {
+                firstDecision = decision;
+            }
+            if (Objects.nonNull(decision) && decision.isApplicable() && !decision.isAllowed()) {
+                return decision;
+            }
+        }
+        return firstDecision;
     }
 
     /**

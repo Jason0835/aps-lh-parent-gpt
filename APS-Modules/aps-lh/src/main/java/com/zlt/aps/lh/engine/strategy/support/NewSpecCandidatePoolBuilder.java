@@ -151,15 +151,19 @@ public class NewSpecCandidatePoolBuilder {
         int requiredMachineCount = lhDailyMouldCalcService.getRequiredMachineCount(
                 context, sku.getMaterialCode(), sku.getProductStatus(),
                 requiredMachineCountDate);
-        if (sku.getContinuationShortageMachineCount() > 0) {
+        boolean typeBlockScheduled = DailyMachineExpansionPlanner.hasTypeBlockScheduledResult(context, sku);
+        if (!typeBlockScheduled && sku.getContinuationShortageMachineCount() > 0) {
             requiredMachineCount = Math.max(
                     requiredMachineCount,
                     sku.getContinuationActiveMachineCount()
                             + sku.getContinuationShortageMachineCount());
         }
-        int scheduledMachineCount = context.getSkuScheduledMachineCount(
-                currentDate, sku.getMaterialCode(), sku.getProductStatus());
-        if (requiredMachineCount <= 0
+        // 换活字块后的补机机会使用同日统一 Map 和物理机台数，不能再放大冻结补偿缺口。
+        int scheduledMachineCount = typeBlockScheduled
+                ? DailyMachineExpansionPlanner.countScheduledPhysicalMachines(context, sku, currentDate)
+                : context.getSkuScheduledMachineCount(
+                        currentDate, sku.getMaterialCode(), sku.getProductStatus());
+        if (!typeBlockScheduled && requiredMachineCount <= 0
                 && candidate.isStrictEndingClearance()
                 && sku.getRemainingScheduleQty() > 0) {
             /*
@@ -170,7 +174,7 @@ public class NewSpecCandidatePoolBuilder {
             requiredMachineCount = Math.max(
                     requiredMachineCount, scheduledMachineCount + 1);
         }
-        if (requiredMachineCount <= 0) {
+        if (!typeBlockScheduled && requiredMachineCount <= 0) {
             // 收尾、固定指令等既有合法场景没有 dayN 理论台数时，仍保留一次真实尝试机会。
             requiredMachineCount = 1;
         }

@@ -5,6 +5,7 @@ import com.zlt.aps.lh.api.domain.dto.CapsuleReplacementTimeWindowDTO;
 import com.zlt.aps.lh.api.domain.dto.MachineCleaningWindowDTO;
 import com.zlt.aps.lh.api.domain.dto.MachineMaintenanceWindowDTO;
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
+import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.enums.CleaningTypeEnum;
 import com.zlt.aps.lh.api.enums.MachineStopTypeEnum;
@@ -1268,6 +1269,20 @@ public final class ShiftCapacityResolverUtil {
         if (isPlannedRepairStartShift(devicePlanShutList, machineCode, windowStartTime, windowEndTime)) {
             return Math.max(0, plannedRepairFixedQty);
         }
+        // 喷砂首检是独立产出，正常生产仍按净可生产时长和原有模数规则折算。
+        List<MachineCleaningWindowDTO> inspectionWindows = CleaningScheduleRuleUtil.resolveSandBlastInspectionWindows(
+                cleaningWindowList, windowStartTime, windowEndTime);
+        if (!CollectionUtils.isEmpty(inspectionWindows)) {
+            long productiveSeconds = resolveNetProductiveSeconds(devicePlanShutList, cleaningWindowList,
+                    maintenanceWindowList, machineCode, windowStartTime, windowEndTime);
+            int normalQty = resolveShiftCapacity(shiftCapacity, lhTimeSeconds, mouldQty,
+                    shiftDurationSeconds, productiveSeconds);
+            int inspectionQty = inspectionWindows.stream()
+                    .mapToInt(MachineCleaningWindowDTO::getSandBlastFirstInspectionQty).sum();
+            int fullShiftCapacity = resolveShiftCapacity(shiftCapacity, lhTimeSeconds, mouldQty,
+                    shiftDurationSeconds, shiftDurationSeconds);
+            return Math.min(fullShiftCapacity, normalQty + inspectionQty);
+        }
         long availableSeconds = Math.max(0L, (windowEndTime.getTime() - windowStartTime.getTime()) / 1000L);
         List<Date[]> stopIntervals = collectMergedPlannedStopIntervals(
                 devicePlanShutList, machineCode, windowStartTime, windowEndTime);
@@ -1337,9 +1352,13 @@ public final class ShiftCapacityResolverUtil {
                                                        int plannedRepairFixedQty) {
         int actualShiftCapacity = resolveActualShiftPlanQty(
                 shiftCapacity, shift, configPlusShiftType, scheduleType);
+        // 喷砂后的正常生产按标准班长折算，不能把被门禁截短的窗口当成一个完整班次。
+        long productionDurationSeconds = CleaningScheduleRuleUtil.resolveSandBlastInspectionWindows(
+                cleaningWindowList, windowStartTime, windowEndTime).isEmpty()
+                ? shiftDurationSeconds : resolveShiftDurationSeconds(shift);
         return resolveShiftCapacityWithDowntime(devicePlanShutList, cleaningWindowList, maintenanceWindowList,
                 machineCode, windowStartTime, windowEndTime, actualShiftCapacity, lhTimeSeconds, mouldQty,
-                shiftDurationSeconds, dryIceLossQty, dryIceDurationHours, plannedRepairFixedQty);
+                productionDurationSeconds, dryIceLossQty, dryIceDurationHours, plannedRepairFixedQty);
     }
 
 
@@ -1784,6 +1803,153 @@ public final class ShiftCapacityResolverUtil {
         // 该校正只影响时间字段，不改变已受真实余量、日计划和胎胚库存约束的最终排产量。
         return Objects.nonNull(repairStartTime) && completionTime.after(repairStartTime)
                 ? repairStartTime : completionTime;
+    }
+
+    /**
+     * 将首检承接班次的实际起点同步到喷砂首检开始，正常首检时间轴不参与。
+     * @param deviceStops 普通停机
+     * @param cleaningWindows 本结果清洗窗口
+     * @param maintenanceWindows 维护窗口
+     * @param machineCode 机台
+     * @param originalStart 原计算起点
+     * @param windowEnd 班次计算终点
+     * @param actualEnd 已计算的实际完工时间
+     * @return 有清洗前生产则保留原起点，否则返回本次首检起点
+     */
+    public static Date resolveSandBlastShiftPlanStartTime(List<MdmDevicePlanShut> deviceStops,
+            List<MachineCleaningWindowDTO> cleaningWindows, List<MachineMaintenanceWindowDTO> maintenanceWindows,
+            String machineCode, Date originalStart, Date windowEnd, Date actualEnd) {
+        for (MachineCleaningWindowDTO inspection : CleaningScheduleRuleUtil.resolveSandBlastInspectionWindows(
+                cleaningWindows, originalStart, windowEnd)) {
+            if (Objects.isNull(actualEnd) || actualEnd.before(inspection.getReadyTime())) {
+                continue;
+            }
+            long beforeSeconds = resolveNetProductiveSeconds(deviceStops, cleaningWindows, maintenanceWindows,
+                    machineCode, originalStart, inspection.getCleanEndTime());
+            if (beforeSeconds <= 0) {
+                return inspection.getCleanEndTime();
+            }
+        }
+        return originalStart;
+    }
+
+    /**
+     * 使用结果的实际机台班产及标准班次配置推导完工时间。
+     * @param deviceStops 普通停机
+     * @param cleaningWindows 当前结果清洗窗口
+     * @param maintenanceWindows 当前结果维护窗口
+     * @param machineCode 运行机台
+     * @param startTime 计算开始
+     * @param endTime 计算结束
+     * @param quantity 实际总量
+     * @param capacity 原分配上限
+     * @param context 参数上下文
+     * @param result 班产与硫化周期来源
+     * @param shift 标准班次
+     * @return 真实完成时间
+     */
+    public static Date resolveShiftPlanEndTime(List<MdmDevicePlanShut> deviceStops,
+            List<MachineCleaningWindowDTO> cleaningWindows, List<MachineMaintenanceWindowDTO> maintenanceWindows,
+            String machineCode, Date startTime, Date endTime, int quantity, int capacity,
+            LhScheduleContext context, LhScheduleResult result, LhShiftConfigVO shift) {
+        // 无喷砂首检时直接走原内核，不引入普通首检或其他排程的额外数据依赖。
+        if (CleaningScheduleRuleUtil.resolveSandBlastInspectionWindows(cleaningWindows, startTime, endTime).isEmpty()) {
+            return resolveShiftPlanEndTime(deviceStops, cleaningWindows, maintenanceWindows,
+                    machineCode, startTime, endTime, quantity, capacity);
+        }
+        int baseCapacity = Objects.isNull(result.getSingleMouldShiftQty()) ? 0 : result.getSingleMouldShiftQty();
+        int actualCapacity = resolveActualShiftPlanQty(baseCapacity, shift,
+                resolveOddShiftCapacityPlusShiftType(context), result.getScheduleType());
+        return resolveShiftPlanEndTime(deviceStops, cleaningWindows, maintenanceWindows, machineCode,
+                startTime, endTime, quantity, capacity, actualCapacity,
+                Objects.isNull(result.getLhTime()) ? 0 : result.getLhTime(),
+                Objects.isNull(result.getMouldQty()) ? 0 : result.getMouldQty(), resolveShiftDurationSeconds(shift));
+    }
+
+    /**
+     * 按真实班产计算含喷砂首检的完工时间，其余场景保持原时间折算。
+     * <p>首检量在首检完成时产出，正常数量才占用净生产时长。班产封顶、日计划或
+     * 余量回裁不能降低单位时间产能，因此单独传入未回裁的班产及标准班长。</p>
+     * @param devicePlanShutList 普通设备停机
+     * @param cleaningWindowList 当前结果生效的清洗窗口
+     * @param maintenanceWindowList 保养及维修预热窗口
+     * @param machineCode 运行机台
+     * @param effectiveStartTime 当前计算起点
+     * @param shiftEndTime 当前计算终点
+     * @param allocationQty 实际分配总量，包含首检
+     * @param shiftMaxQty 原流程计算的分配上限
+     * @param baseShiftCapacity 未经需求回裁的实际机台班产
+     * @param lhTimeSeconds 硫化周期秒数
+     * @param mouldQty 运行模数
+     * @param shiftDurationSeconds 标准班次秒数
+     * @return 实际完成时间
+     */
+    public static Date resolveShiftPlanEndTime(List<MdmDevicePlanShut> devicePlanShutList,
+                                               List<MachineCleaningWindowDTO> cleaningWindowList,
+                                               List<MachineMaintenanceWindowDTO> maintenanceWindowList,
+                                               String machineCode, Date effectiveStartTime, Date shiftEndTime,
+                                               int allocationQty, int shiftMaxQty,
+                                               int baseShiftCapacity, int lhTimeSeconds, int mouldQty,
+                                               long shiftDurationSeconds) {
+        List<MachineCleaningWindowDTO> inspections = CleaningScheduleRuleUtil.resolveSandBlastInspectionWindows(
+                cleaningWindowList, effectiveStartTime, shiftEndTime);
+        if (CollectionUtils.isEmpty(inspections) || allocationQty <= 0 || shiftMaxQty <= 0
+                || isPlannedRepairStartShift(devicePlanShutList, machineCode, effectiveStartTime, shiftEndTime)) {
+            return resolveShiftPlanEndTime(devicePlanShutList, cleaningWindowList, maintenanceWindowList,
+                    machineCode, effectiveStartTime, shiftEndTime, allocationQty, shiftMaxQty);
+        }
+        Date cursor = effectiveStartTime;
+        int remainingQty = allocationQty;
+        for (MachineCleaningWindowDTO inspection : inspections) {
+            // 先完成首检前确实可生产的数量；默认中班场景该段为零，不能把首检当成正常生产。
+            Date inspectionStart = inspection.getCleanEndTime();
+            long beforeSeconds = cursor.before(inspectionStart)
+                    ? resolveNetProductiveSeconds(devicePlanShutList, cleaningWindowList, maintenanceWindowList,
+                            machineCode, cursor, inspectionStart) : 0L;
+            int beforeQty = resolveShiftCapacity(baseShiftCapacity, lhTimeSeconds, mouldQty,
+                    shiftDurationSeconds, beforeSeconds);
+            if (remainingQty <= beforeQty) {
+                return resolveNormalProductionCompletion(devicePlanShutList, cleaningWindowList,
+                        maintenanceWindowList, machineCode, cursor, inspectionStart, remainingQty,
+                        baseShiftCapacity, lhTimeSeconds, mouldQty, shiftDurationSeconds);
+            }
+            remainingQty -= beforeQty;
+            remainingQty -= Math.min(remainingQty, inspection.getSandBlastFirstInspectionQty());
+            cursor = inspection.getReadyTime();
+            if (remainingQty <= 0) {
+                return cursor;
+            }
+        }
+        return resolveNormalProductionCompletion(devicePlanShutList, cleaningWindowList,
+                maintenanceWindowList, machineCode, cursor, shiftEndTime, remainingQty,
+                baseShiftCapacity, lhTimeSeconds, mouldQty, shiftDurationSeconds);
+    }
+
+    /**
+     * 复用正常生产的原有产能及时间比例折算，首检数量不进入此方法。
+     * @param deviceStops 普通停机
+     * @param cleaningWindows 生效清洗窗口
+     * @param maintenanceWindows 生效保养窗口
+     * @param machineCode 机台
+     * @param startTime 正常生产起点
+     * @param endTime 正常生产窗口终点
+     * @param quantity 正常生产条数
+     * @param capacity 原始机台班产
+     * @param lhSeconds 硫化周期
+     * @param mouldQty 模数
+     * @param durationSeconds 标准班长
+     * @return 正常生产完成时间
+     */
+    private static Date resolveNormalProductionCompletion(List<MdmDevicePlanShut> deviceStops,
+            List<MachineCleaningWindowDTO> cleaningWindows, List<MachineMaintenanceWindowDTO> maintenanceWindows,
+            String machineCode, Date startTime, Date endTime, int quantity, int capacity, int lhSeconds,
+            int mouldQty, long durationSeconds) {
+        long productiveSeconds = resolveNetProductiveSeconds(deviceStops, cleaningWindows, maintenanceWindows,
+                machineCode, startTime, endTime);
+        int normalCapacity = resolveShiftCapacity(capacity, lhSeconds, mouldQty, durationSeconds, productiveSeconds);
+        // 分母取未经总量封顶/需求回裁的正常产能，保持原单位时间产能和取整口径。
+        return resolveShiftPlanEndTime(deviceStops, cleaningWindows, maintenanceWindows,
+                machineCode, startTime, endTime, quantity, normalCapacity);
     }
 
     /**

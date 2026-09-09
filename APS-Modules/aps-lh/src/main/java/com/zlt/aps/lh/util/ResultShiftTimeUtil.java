@@ -67,13 +67,16 @@ public final class ResultShiftTimeUtil {
             return null;
         }
         // 一模内的尾数使用同一完成点；完整奇数班产仍保留既有班别修正上限。
-        int timeQty = ShiftCapacityResolverUtil.roundUpQtyToMouldMultiple(planQty, mouldQty);
+        boolean hasSandBlastInspection = !CleaningScheduleRuleUtil.resolveSandBlastInspectionWindows(
+                cleaningWindows, control.getEffectiveStartTime(), control.getEffectiveEndTime()).isEmpty();
+        int timeQty = hasSandBlastInspection ? planQty
+                : ShiftCapacityResolverUtil.roundUpQtyToMouldMultiple(planQty, mouldQty);
         if (planQty <= capacity) {
             timeQty = Math.min(timeQty, capacity);
         }
         Date endTime = ShiftCapacityResolverUtil.resolveShiftPlanEndTime(context.getDevicePlanShutList(),
                 cleaningWindows, maintenanceWindows, result.getLhMachineCode(),
-                control.getEffectiveStartTime(), control.getEffectiveEndTime(), timeQty, capacity);
+                control.getEffectiveStartTime(), control.getEffectiveEndTime(), timeQty, capacity, context, result, shift);
         if (planQty > capacity || (Objects.nonNull(endTime) && endTime.after(shift.getShiftEndDateTime()))) {
             log.warn("班次数量时间超限, batchNo: {}, materialCode: {}, machineCode: {}, shiftIndex: {}, "
                             + "planQty: {}, capacity: {}, endTime: {}, shiftEndTime: {}，保留真实计算时间，不截断掩盖超量",

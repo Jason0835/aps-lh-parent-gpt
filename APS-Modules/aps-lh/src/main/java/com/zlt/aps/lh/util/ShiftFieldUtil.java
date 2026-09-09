@@ -27,6 +27,9 @@ import java.util.*;
 @Slf4j
 public final class ShiftFieldUtil {
 
+    /** 续作降模停产保机班次原因。 */
+    public static final String CONTINUOUS_STOP_HOLD_ANALYSIS = "停产保机";
+
     private static final String SHIFT_END_NORMAL = "0";
 
     private static final String SHIFT_END_MARK = "1";
@@ -519,6 +522,37 @@ public final class ShiftFieldUtil {
         }
         Object value = BeanUtil.getProperty(result, propertyPrefix(shiftIndex) + "Analysis");
         return value == null ? null : String.valueOf(value);
+    }
+
+    /**
+     * 判断指定班次是否包含目标原因项。
+     *
+     * <p>原因分析可能由多个英文逗号分隔的业务原因组成，本方法按独立原因项精确匹配，
+     * 避免使用模糊包含误判组合文本。</p>
+     *
+     * @param result 排程结果
+     * @param shiftIndex 班次索引
+     * @param analysis 目标原因项
+     * @return true-包含目标原因；false-不包含
+     */
+    public static boolean hasShiftAnalysis(
+            LhScheduleResult result,
+            int shiftIndex,
+            String analysis) {
+        if (Objects.isNull(result) || StringUtils.isEmpty(analysis)) {
+            return false;
+        }
+        String currentAnalysis = getShiftAnalysis(result, shiftIndex);
+        if (StringUtils.isEmpty(currentAnalysis)) {
+            return false;
+        }
+        String[] analysisArray = currentAnalysis.split(ANALYSIS_SEPARATOR);
+        for (String currentItem : analysisArray) {
+            if (StringUtils.equals(StringUtils.trim(currentItem), analysis)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static Integer toInteger(Object v) {

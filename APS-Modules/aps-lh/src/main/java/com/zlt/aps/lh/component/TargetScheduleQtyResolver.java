@@ -183,6 +183,22 @@ public class TargetScheduleQtyResolver {
     }
 
     /**
+     * 只读预演实际消费余量，初始化口径与正式入口相同，但不懒加载写入中心账本。
+     * @param context 排程上下文
+     * @param sku 来源SKU
+     * @return 当前可消费余量
+     */
+    public int previewProductionRemainingQty(LhScheduleContext context, SkuScheduleDTO sku) {
+        if (Objects.isNull(sku)) {
+            return 0;
+        }
+        Integer remaining = Objects.nonNull(context) && StringUtils.isNotEmpty(sku.getMaterialCode())
+                ? context.getSkuProductionRemainingQtyMap().get(this.buildSkuKey(sku)) : null;
+        return Objects.nonNull(remaining) ? Math.max(0, remaining)
+                : this.resolveInitialProductionRemainingQty(sku, sku.resolveTargetScheduleQty());
+    }
+
+    /**
      * 将 SKU 实际消费账本同步到指定目标量。
      * <p>目标量调整只改变账本总目标，必须保留同一“物料+产品状态”已经消费的数量。
      * 续作、新增、换活字块会在不同阶段重复进入收尾目标量解析，禁止后进入阶段把
@@ -1138,7 +1154,7 @@ public class TargetScheduleQtyResolver {
                 continue;
             }
             int currentShiftQty = resolveRetainedShiftQty(
-                    context, sku, Math.min(planQty, remainingRetainQty), mouldQty);
+                    context, sku, Math.min(planQty, remainingRetainQty), mouldQty, result, shift);
             Date shiftStartTime = ShiftFieldUtil.getShiftStartTime(result, shift.getShiftIndex());
             Date originalShiftEndTime = ShiftFieldUtil.getShiftEndTime(result, shift.getShiftIndex());
             if (currentShiftQty <= 0) {
@@ -1205,7 +1221,7 @@ public class TargetScheduleQtyResolver {
         return ShiftCapacityResolverUtil.resolveShiftPlanEndTime(
                 context.getDevicePlanShutList(), cleaningWindowList, maintenanceWindowList,
                 result.getLhMachineCode(), shiftStartTime, calculationEndTime,
-                retainedQty, originalQty);
+                retainedQty, originalQty, context, result, shift);
     }
 
     /**
@@ -1358,6 +1374,77 @@ public class TargetScheduleQtyResolver {
     }
 
     /**
+     * 分配含喷砂首检的班次量，首检不参与正常生产模数归整。
+     * @param context 排程上下文
+     * @param sku SKU
+     * @param allocationQty 目标分配量
+     * @param shiftMaxQty 班次上限
+     * @param mouldQty 模数
+     * @param windows 生效清洗窗口
+     * @param startTime 分配窗口开始
+     * @param endTime 分配窗口结束
+     * @return 不超过班次上限的实际数量
+     */
+    public int resolveAllocatedShiftQty(LhScheduleContext context, SkuScheduleDTO sku,
+            int allocationQty, int shiftMaxQty, int mouldQty,
+            List<MachineCleaningWindowDTO> windows, Date startTime, Date endTime) {
+        List<MachineCleaningWindowDTO> inspections = CleaningScheduleRuleUtil.resolveSandBlastInspectionWindows(
+                windows, startTime, endTime);
+        if (CollectionUtils.isEmpty(inspections)) {
+            return this.resolveAllocatedShiftQty(context, sku, allocationQty, shiftMaxQty, mouldQty);
+        }
+        int inspectionQty = inspections.stream().mapToInt(MachineCleaningWindowDTO::getSandBlastFirstInspectionQty).sum();
+        return this.resolveSandBlastAllocatedQty(allocationQty, shiftMaxQty, mouldQty,
+                inspectionQty, this.isEmbryoStockEnding(context, sku));
+    }
+
+    /**
+     * 结果回裁及续作使用与SKU分配相同的喷砂口径。
+     * @param context 排程上下文
+     * @param result 排程结果
+     * @param allocationQty 目标分配量
+     * @param shiftMaxQty 班次上限
+     * @param mouldQty 模数
+     * @param windows 生效清洗窗口
+     * @param startTime 分配窗口开始
+     * @param endTime 分配窗口结束
+     * @return 实际数量
+     */
+    public int resolveAllocatedShiftQty(LhScheduleContext context, LhScheduleResult result,
+            int allocationQty, int shiftMaxQty, int mouldQty,
+            List<MachineCleaningWindowDTO> windows, Date startTime, Date endTime) {
+        List<MachineCleaningWindowDTO> inspections = CleaningScheduleRuleUtil.resolveSandBlastInspectionWindows(
+                windows, startTime, endTime);
+        if (CollectionUtils.isEmpty(inspections)) {
+            return this.resolveAllocatedShiftQty(context, result, allocationQty, shiftMaxQty, mouldQty);
+        }
+        int inspectionQty = inspections.stream().mapToInt(MachineCleaningWindowDTO::getSandBlastFirstInspectionQty).sum();
+        return this.resolveSandBlastAllocatedQty(allocationQty, shiftMaxQty, mouldQty,
+                inspectionQty, this.isEmbryoStockEnding(context, result));
+    }
+
+    /**
+     * 首检量优先占用真实目标，只有正常生产量沿用原模数规则，最后受班产上限约束。
+     * @param allocationQty 原目标
+     * @param shiftMaxQty 班次上限
+     * @param mouldQty 模数
+     * @param configuredInspectionQty 当前班次的首检总量
+     * @param exactEnding 是否按胎胚库存精确收尾
+     * @return 分配总量
+     */
+    private int resolveSandBlastAllocatedQty(int allocationQty, int shiftMaxQty, int mouldQty,
+            int configuredInspectionQty, boolean exactEnding) {
+        int boundedQty = Math.max(0, Math.min(allocationQty, shiftMaxQty));
+        if (exactEnding) {
+            return boundedQty;
+        }
+        int inspectionQty = Math.min(boundedQty, configuredInspectionQty);
+        int normalQty = ShiftCapacityResolverUtil.normalizeAllocatedShiftQty(
+                boundedQty - inspectionQty, shiftMaxQty - inspectionQty, mouldQty);
+        return Math.min(shiftMaxQty, inspectionQty + normalQty);
+    }
+
+    /**
      * 解析最终收尾判断使用的严格目标量。
      * <p>成型胎胚库存收尾属于精确硬目标，直接使用已经完成单胎胚库存赋值或共用胎胚分摊后的SKU目标量，
      * 不再按模台数向上归整；普通收尾继续沿用共用胎胚仅取硫化余量、单胎胚取MAX(余量,库存)并按模台数归整的口径。</p>
@@ -1448,6 +1535,34 @@ public class TargetScheduleQtyResolver {
             return Math.max(0, retainedQty);
         }
         return normalizeRetainedShiftQty(retainedQty, mouldQty);
+    }
+
+    /**
+     * 喷砂班次回裁时保留独立首检量，正常生产部分继续按原收尾模数规则向下规整。
+     * @param context 排程上下文
+     * @param sku 当前SKU
+     * @param retainedQty 账本允许保留量
+     * @param mouldQty 模数
+     * @param result 当前结果
+     * @param shift 回裁班次
+     * @return 实际保留量
+     */
+    private int resolveRetainedShiftQty(LhScheduleContext context, SkuScheduleDTO sku,
+            int retainedQty, int mouldQty, LhScheduleResult result, LhShiftConfigVO shift) {
+        MachineScheduleDTO machine = context.getMachineScheduleMap().get(result.getLhMachineCode());
+        if (Objects.isNull(machine) || CleaningScheduleRuleUtil.shouldSkipCleaningByResultEnding(result)
+                || this.isEmbryoStockEnding(context, sku)) {
+            return this.resolveRetainedShiftQty(context, sku, retainedQty, mouldQty);
+        }
+        int inspectionQty = CleaningScheduleRuleUtil.resolveSandBlastInspectionWindows(
+                machine.getCleaningWindowList(), ShiftFieldUtil.getShiftStartTime(result, shift.getShiftIndex()),
+                shift.getShiftEndDateTime()).stream()
+                .mapToInt(MachineCleaningWindowDTO::getSandBlastFirstInspectionQty).sum();
+        if (inspectionQty <= 0) {
+            return this.resolveRetainedShiftQty(context, sku, retainedQty, mouldQty);
+        }
+        int retainedInspectionQty = Math.min(Math.max(0, retainedQty), inspectionQty);
+        return retainedInspectionQty + this.normalizeRetainedShiftQty(retainedQty - retainedInspectionQty, mouldQty);
     }
 
     /**
@@ -2355,7 +2470,9 @@ public class TargetScheduleQtyResolver {
                                 context, context.getDevicePlanShutList(), machine.getMachineCode(),
                                 machine.getMaintenanceWindowList()),
                         machine.getMachineCode(), effectiveStartTime, effectiveEndTime,
-                        remainingQty, shiftMaxQty);
+                        remainingQty, shiftMaxQty, ShiftCapacityResolverUtil.resolveActualShiftPlanQty(shiftCapacity, shift,
+                                plusShiftType, ScheduleTypeEnum.CONTINUOUS.getCode()),
+                        lhTimeSeconds, mouldQty, ShiftCapacityResolverUtil.resolveShiftDurationSeconds(shift));
                 log.info("长期在机自然收尾时间预测完成, materialCode: {}, machineCode: {}, targetQty: {}, "
                                 + "predictedEndingTime: {}",
                         sku.getMaterialCode(), machine.getMachineCode(), sku.resolveTargetScheduleQty(),

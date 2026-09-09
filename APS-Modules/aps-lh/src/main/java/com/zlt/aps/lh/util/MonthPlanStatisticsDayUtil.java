@@ -17,7 +17,8 @@ public final class MonthPlanStatisticsDayUtil {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-    private static final String LH_MACHINES_KEY = "lhMachines";
+    /** 月计划结构统计中的最大硫化机台数字段。 */
+    private static final String MAX_LH_MACHINES_KEY = "maxLhMachines";
 
     /** dayN 字段名前缀，对应实体 day1~day31 */
     private static final String DAY_FIELD_PREFIX = "day";
@@ -38,37 +39,37 @@ public final class MonthPlanStatisticsDayUtil {
      * @param productionDate 业务日期
      * @return 计划硫化机台数
      */
-    public static int resolveLhMachines(MpMonthPlanStatistics row, LocalDate productionDate) {
+    public static int resolveMaxLhMachines(MpMonthPlanStatistics row, LocalDate productionDate) {
         if (Objects.isNull(row) || Objects.isNull(productionDate)) {
             return 0;
         }
         String dayJson = resolveDayJson(row, productionDate.getDayOfMonth());
-        return resolveLhMachines(dayJson, row.getStructureName(), productionDate);
+        return resolveMaxLhMachines(dayJson, row.getStructureName(), productionDate);
     }
 
     /**
-     * 从 dayN JSON 字符串解析 lhMachines。
+     * 从 dayN JSON 字符串解析 maxLhMachines。
      *
      * @param dayJson dayN JSON字符串
      * @param structureName 产品结构
      * @param productionDate 业务日期
      * @return 计划硫化机台数
      */
-    public static int resolveLhMachines(String dayJson, String structureName, LocalDate productionDate) {
+    public static int resolveMaxLhMachines(String dayJson, String structureName, LocalDate productionDate) {
         if (StringUtils.isEmpty(dayJson)) {
             return 0;
         }
         try {
             JsonNode rootNode = OBJECT_MAPPER.readTree(dayJson);
-            JsonNode lhMachinesNode = rootNode.get(LH_MACHINES_KEY);
-            if (Objects.isNull(lhMachinesNode) || lhMachinesNode.isNull()) {
+            JsonNode maxLhMachinesNode = rootNode.get(MAX_LH_MACHINES_KEY);
+            if (Objects.isNull(maxLhMachinesNode) || maxLhMachinesNode.isNull()) {
                 return 0;
             }
-            if (lhMachinesNode.isNumber()) {
-                return Math.max(0, lhMachinesNode.asInt());
+            if (maxLhMachinesNode.isNumber()) {
+                return Math.max(0, maxLhMachinesNode.asInt());
             }
-            if (lhMachinesNode.isTextual()) {
-                String textValue = lhMachinesNode.asText();
+            if (maxLhMachinesNode.isTextual()) {
+                String textValue = maxLhMachinesNode.asText();
                 return StringUtils.isEmpty(textValue) ? 0 : Math.max(0, Integer.parseInt(textValue.trim()));
             }
             return 0;

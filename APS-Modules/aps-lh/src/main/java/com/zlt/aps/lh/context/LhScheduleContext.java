@@ -15,6 +15,7 @@ import com.zlt.aps.lh.component.StructureShiftInMachineIndex;
 import com.zlt.aps.lh.engine.strategy.support.*;
 import com.zlt.aps.lh.handler.SkuMonthPlanCalculator;
 import com.zlt.aps.lh.service.ILhDailyMouldCalcService;
+import com.zlt.aps.lh.engine.strategy.support.ContinuationEndingAllocationSnapshot;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
 import com.zlt.aps.lh.util.SkuConstructionRefResolverUtil;
@@ -382,14 +383,13 @@ public class LhScheduleContext {
      */
     private List<LhPrecisionPlan> orderedMaintenancePlanList = new ArrayList<>();
     /**
-     * 是否已经完成本批精度计划中心预决策。
-     * <p>用于阻止旧的“首个SKU收尾后再单机挂窗”入口覆盖全局排序、06:00截止和到期前风险结论。</p>
+     * 是否由本批精度中心统一决策。
+     * <p>续作前登记，阻止逐SKU挂窗；续作最终收口后统一按优先级分配日期和每日额度。</p>
      */
     private boolean maintenancePreDecisionCompleted;
     /**
-     * 中心预决策时因在机SKU收尾时间未知而暂缓的物理机台。
-     * <p>这些机台允许在续作主链得到真实首个收尾时间后补做一次精度日期决策；
-     * 其他已经完成中心决策的机台仍禁止旧入口重复挂窗。</p>
+     * 中心决策时尚未形成真实收尾时间的物理机台。
+     * <p>本轮不挂窗、不截断续作；后续滚动获得真实收尾后再由中心统一决策，逐SKU入口不得抢占额度。</p>
      */
     private Set<String> maintenanceDeferredPhysicalMachineCodeSet =
             new LinkedHashSet<String>(8);
@@ -440,6 +440,9 @@ public class LhScheduleContext {
      * 窗口起点口径互相隔离。</p>
      */
     private List<LhMouldChangePlan> historicalReverseMouldChangePlanList = new ArrayList<>();
+    /** 本次排程只读历史关系索引，首次启用匹配时构建；不随资源账本变化重建。 */
+    private Map<String, List<LhMouldChangePlan>> previousAlternationPlanIndex;
+
     /**
      * 解析、去重并绑定当前产品状态后的反选指令。
      * <p>换活字块指令在S4.4内立即委托既有换活字块主链；其余指令由S4.5新增主链在普通候选
@@ -490,7 +493,7 @@ public class LhScheduleContext {
      */
     private StructureShiftInMachineIndex structureShiftInMachineIndex;
     /**
-     * 业务日期 -> 产品结构 -> 计划硫化机台数，来源于月计划统计表 dayN.lhMachines
+     * 业务日期 -> 产品结构 -> 计划硫化机台数，来源于月计划统计表 dayN.maxLhMachines
      */
     private Map<LocalDate, Map<String, Integer>> structurePlanMachineCountMap =
             new LinkedHashMap<LocalDate, Map<String, Integer>>(4);
@@ -605,11 +608,15 @@ public class LhScheduleContext {
     private Map<LhScheduleResult, Integer> endingFillAllowedOverQtyMap =
             new IdentityHashMap<LhScheduleResult, Integer>();
     /**
-     * 已完成T日定机台、整窗守恒分摊的多物理机台续作硫化余量收尾结果。
+     * 已由T日定机台规则接管的多物理机台续作硫化余量收尾结果。
      * 只保存结果身份，防止日标准补量、胎胚均衡及dayN回裁覆盖最终分摊；单机台不登记。
+     * 数据不足时也保护原合法结果不被旧逐日降模接管，成功提交则另存轻量快照供最终复核。
      */
     private Set<LhScheduleResult> continuationSurplusEndingAllocatedResults =
             Collections.newSetFromMap(new IdentityHashMap<LhScheduleResult, Boolean>(16));
+    /** 多机台余量收尾成功提交后的轻量快照，供S4.6只读复核预测与正式交替，不能反向修改后料。 */
+    private Map<LhScheduleResult, ContinuationEndingAllocationSnapshot> continuationSurplusEndingSnapshotMap =
+            new IdentityHashMap<LhScheduleResult, ContinuationEndingAllocationSnapshot>(16);
     /**
      * SKU收尾补满动作前的机台结果基准量，用于多机台同SKU组级允许超量重算。
      * <p>键为结果对象身份，值是该机台结果在本次收尾补满前的计划总量；

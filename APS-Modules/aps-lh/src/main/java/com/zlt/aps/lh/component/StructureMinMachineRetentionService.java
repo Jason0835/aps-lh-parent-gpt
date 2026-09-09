@@ -49,9 +49,11 @@ import java.util.Set;
  *       在机统计缓存，以及{@link StructureEndingAlignmentService}做结构收尾对齐实时判断。</li>
  * </ul>
  *
- * <p>在机统计口径：班次计划量大于0直接计入；计划量为0或空时，只有机台仍归属当前结构，
- * 且清洗、精度保养、计划性维修等业务停机与班次重叠，或处于续作停产保机（SYS0304030）
- * 占用期内才计入。真实释放边界已早于目标班次或后物料已接管的机台会被排除。
+ * <p>在机统计口径：非续作降模停产保机的班次计划量大于0时直接计入；计划量为0或空时，
+ * 只有机台仍归属当前结构，
+ * 且清洗、精度保养、计划性维修等业务停机与班次重叠才计入。续作降模产生的停产保机
+ * （SYS0304030）只保留资源占用关系，不计入实际硫化在机机台数。真实释放边界已早于目标
+ * 班次或后物料已接管的机台会被排除。
  * 单控L/R按物理整机去重。原“续作排产后结构停产保机”阶段判断、补零占位、保机状态冻结
  * 与统一释放时间已整体废弃，本服务不再保留任何保机运行态。</p>
  *
@@ -121,9 +123,11 @@ public class StructureMinMachineRetentionService {
     /**
      * 收集指定结构在目标班次仍保持在机关系的物理机台编码。
      *
-     * <p>统计优先使用实际排程结果：班次计划量大于0直接计入；计划量为0或空时，只有机台仍归属
-     * 当前结构，且清洗、精度保养、计划性维修等业务停机与班次重叠，或者处于续作停产保机
-     * 占用期内才计入。真实释放边界已早于目标班次或后物料已接管的机台会被排除。</p>
+     * <p>统计优先使用实际排程结果：非续作降模停产保机的班次计划量大于0时直接计入；计划量
+     * 为0或空时，只有机台仍归属当前结构，且清洗、精度保养、计划性维修等业务停机与班次
+     * 重叠才计入。续作降模停产
+     * 保机只保留资源占用关系，不计入实际硫化在机机台数。真实释放边界已早于目标班次或
+     * 后物料已接管的机台会被排除。</p>
      *
      * <p>返回值统一转换为物理机台编码，因此单控L/R、重复结果行和同机台同班次天然去重。</p>
      *
@@ -152,17 +156,13 @@ public class StructureMinMachineRetentionService {
     /**
      * 统计提前生产资格班次内仍应计入结构的物理机台。
      *
-     * <p>先复用现有结构班次在机口径得到原始物理机台集合，再按排程结果真实收尾时间、
-     * 班次收尾标识、续作降模释放边界和机台下机状态排除“在当前班次内完成生产并下机”
-     * 的机台。计划量大于0只表示参与过当前班次生产，不能单独证明班次结束时仍在机。</p>
-     *
-     * <p>单控L/R先归并为物理整机；只有同一物理机台下全部有效结构占用均能证明已在
-     * 当前班次内释放时才排除。任一侧仍继续生产或缺少明确结束证据时，整机继续计数。</p>
+     * <p>复用统一结构班次在机口径。正量收尾机台在其收尾班次仍完整计入，不能因班内
+     * 收尾时间提前释放本班次名额；只有后续班次无计划且无清洗、精度或维修占用时才不计入。</p>
      *
      * @param context 排程上下文
      * @param structureName 产品结构
      * @param shift 资格判断使用的当天最后班次
-     * @return 班次收尾调整后的结构物理机台统计
+     * @return 结构班次物理机台统计
      */
     public StructureEarlyProductionAdmission resolveEarlyProductionMachineStatistics(
             LhScheduleContext context,
@@ -173,37 +173,35 @@ public class StructureMinMachineRetentionService {
     }
 
     /**
-     * 统计正式目标班次内仍有效占用结构名额的物理机台。
+     * 统计正式目标班次内占用结构名额的物理机台。
      *
-     * <p>普通新增、续作加机和提前生产统一复用本方法。原始结构索引只作为历史在机视图，
-     * 本方法按目标班次边界排除已经完成生产且无后续正量的机台，不回写或删除原始索引。</p>
+     * <p>普通新增、续作加机和提前生产统一复用本方法。正量收尾机台在当前班次仍计入，
+     * 不按班内收尾时刻提前扣减结构机台数。</p>
      *
      * @param context 排程上下文
      * @param structureName 产品结构
      * @param shift 正式目标班次
-     * @return 班次收尾调整后的结构物理机台统计
+     * @return 结构班次物理机台统计
      */
     public StructureEarlyProductionAdmission resolveEffectiveStructureMachineStatistics(
             LhScheduleContext context,
             String structureName,
             LhShiftConfigVO shift) {
-        Date statisticsTime = Objects.isNull(shift)
-                ? null : shift.getShiftEndDateTime();
         return this.resolveEffectiveStructureMachineStatisticsAtTime(
-                context, structureName, shift, statisticsTime);
+                context, structureName, shift, null);
     }
 
     /**
-     * 统计指定时刻仍在线占用结构名额的物理机台。
+     * 统计指定班次占用结构名额的物理机台。
      *
-     * <p>首检属于开产并计入在线硫化机，因此候选首检开始前，仅排除结束时间不晚于
-     * 该时刻且已明确完成下机的物理机台；同班次稍后才收尾的机台继续计数。</p>
+     * <p>参数 {@code productionOccupationStartTime} 为兼容现有调用链保留，但班次机台数不再
+     * 随班内时刻变化。只要机台在当前班次符合统一在机口径，就在整个班次内计入。</p>
      *
      * @param context 排程上下文
      * @param structureName 产品结构
      * @param shift 候选生产占用班次
      * @param productionOccupationStartTime 首检或正式生产实际占用开始时刻
-     * @return 指定时刻的结构物理机台统计
+     * @return 指定班次的结构物理机台统计
      */
     public StructureEarlyProductionAdmission resolveEffectiveStructureMachineStatisticsAtTime(
             LhScheduleContext context,
@@ -227,28 +225,8 @@ public class StructureMinMachineRetentionService {
                         context, structureName, shiftIndex);
         admission.getRawScheduledPhysicalMachineCodes().addAll(
                 rawPhysicalMachineCodes);
-        /*
-         * 同一结构班次只收集一次运行态机台编码，后续按物理机台核对收尾边界时复用，
-         * 避免每台候选重复扫描全部机台运行态。
-         */
-        Set<String> structureRuntimeMachineCodes =
-                this.collectStructureRuntimeMachineCodes(context, structureName);
-        Map<String, Date> releaseTimeMap =
-                this.resolvePhysicalMachineReleaseTimeMap(
-                        context, structureName, shift,
-                        rawPhysicalMachineCodes, structureRuntimeMachineCodes);
-        for (String physicalMachineCode : rawPhysicalMachineCodes) {
-            Date releaseTime = releaseTimeMap.get(physicalMachineCode);
-            if (Objects.nonNull(productionOccupationStartTime)
-                    && Objects.nonNull(releaseTime)
-                    && !releaseTime.after(productionOccupationStartTime)) {
-                admission.getExcludedEndingPhysicalMachineCodes().add(
-                        physicalMachineCode);
-                continue;
-            }
-            admission.getScheduledPhysicalMachineCodes().add(
-                    physicalMachineCode);
-        }
+        // 收尾班次仍完整计入结构机台数，不再根据班内收尾时刻移出有效集合。
+        admission.getScheduledPhysicalMachineCodes().addAll(rawPhysicalMachineCodes);
         admission.setScheduledStructureCount(
                 admission.getScheduledPhysicalMachineCodes().size());
         return admission;
@@ -321,7 +299,7 @@ public class StructureMinMachineRetentionService {
      * @param structureName 结构名称
      * @param machineCode 运行态机台编码
      * @param shiftIndex 班次索引
-     * @return true-仍在机；false-已释放或被后物料接管
+     * @return true-仍在机；false-停产保机、已释放或被后物料接管
      */
     public boolean isMachineInStructureAtShift(LhScheduleContext context,
                                                String structureName,
@@ -331,6 +309,14 @@ public class StructureMinMachineRetentionService {
                 || StringUtils.isEmpty(machineCode) || shiftIndex < 1) {
             return false;
         }
+        LhShiftConfigVO shift = resolveShift(context, shiftIndex);
+        if (Objects.isNull(shift)) {
+            return false;
+        }
+        // 续作降模停产保机只保留资源占用关系，不属于实际硫化在机机台。
+        if (isContinuousStopHoldAtShift(context, machineCode, shift)) {
+            return false;
+        }
         if (hasPositiveStructurePlan(context, structureName, machineCode, shiftIndex)) {
             return true;
         }
@@ -338,17 +324,10 @@ public class StructureMinMachineRetentionService {
                 || !isStructureRelationshipIntact(context, structureName, machineCode, shiftIndex)) {
             return false;
         }
-        LhShiftConfigVO shift = resolveShift(context, shiftIndex);
-        if (Objects.isNull(shift)) {
-            return false;
-        }
         Integer releaseBoundary =
                 context.getContinuousReducedMachineReleaseBoundaryShiftIndex(machineCode);
         if (Objects.nonNull(releaseBoundary) && releaseBoundary < shiftIndex) {
             return false;
-        }
-        if (isContinuousStopHoldAtShift(context, machineCode, shift)) {
-            return true;
         }
         return hasBusinessDowntimeAtShift(context, machineCode, shift);
     }
@@ -662,13 +641,26 @@ public class StructureMinMachineRetentionService {
     private boolean isContinuousStopHoldAtShift(LhScheduleContext context,
                                                 String machineCode,
                                                 LhShiftConfigVO shift) {
-        if (Objects.isNull(shift) || Objects.isNull(shift.getShiftStartDateTime())) {
+        if (Objects.isNull(shift)) {
             return context.isContinuousStopHoldMachine(machineCode);
         }
-        LocalDate productionDate = shift.getShiftStartDateTime().toInstant()
+        Date businessDate = Objects.nonNull(shift.getWorkDate())
+                ? shift.getWorkDate() : shift.getShiftStartDateTime();
+        if (Objects.isNull(businessDate)) {
+            return context.isContinuousStopHoldMachine(machineCode);
+        }
+        LocalDate productionDate = businessDate.toInstant()
                 .atZone(ZoneId.systemDefault()).toLocalDate();
-        return context.isContinuousStopHoldDate(machineCode, productionDate)
-                || context.isContinuousStopHoldMachine(machineCode);
+        if (!context.isContinuousStopHoldDate(machineCode, productionDate)) {
+            return false;
+        }
+        return context.getScheduleResultList().stream()
+                .filter(Objects::nonNull)
+                .filter(result -> StringUtils.equals(
+                        machineCode, result.getLhMachineCode()))
+                .anyMatch(result -> ShiftFieldUtil.hasShiftAnalysis(
+                        result, shift.getShiftIndex(),
+                        ShiftFieldUtil.CONTINUOUS_STOP_HOLD_ANALYSIS));
     }
 
     /**

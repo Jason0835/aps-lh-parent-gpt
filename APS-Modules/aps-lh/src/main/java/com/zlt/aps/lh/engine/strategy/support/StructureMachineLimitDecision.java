@@ -42,11 +42,9 @@ public final class StructureMachineLimitDecision {
     private final String structureName;
     /** SKU首次进入候选池的原始日期 */
     private final LocalDate originalPoolDate;
-    /** 收尾排除前的结构物理机台编码 */
+    /** 结构班次原始物理机台编码 */
     private final Set<String> rawPhysicalMachineCodes;
-    /** 在正式目标班次边界完成下机的物理机台编码 */
-    private final Set<String> excludedEndingPhysicalMachineCodes;
-    /** 调整后仍有效占用结构名额的物理机台编码 */
+    /** 按统一在机口径占用结构名额的物理机台编码 */
     private final Set<String> effectivePhysicalMachineCodes;
     /** 候选物理机台新增结构名额 */
     private final int newMachineDelta;
@@ -71,7 +69,6 @@ public final class StructureMachineLimitDecision {
      * @param structureName 结构名称
      * @param originalPoolDate 原始候选池日期
      * @param rawPhysicalMachineCodes 原始结构机台集合
-     * @param excludedEndingPhysicalMachineCodes 收尾排除机台集合
      * @param effectivePhysicalMachineCodes 有效结构机台集合
      * @param newMachineDelta 新增结构机台增量
      * @param structureMachineLimit 结构机台数上限
@@ -91,7 +88,6 @@ public final class StructureMachineLimitDecision {
             String structureName,
             LocalDate originalPoolDate,
             Set<String> rawPhysicalMachineCodes,
-            Set<String> excludedEndingPhysicalMachineCodes,
             Set<String> effectivePhysicalMachineCodes,
             int newMachineDelta,
             int structureMachineLimit,
@@ -109,8 +105,6 @@ public final class StructureMachineLimitDecision {
         this.structureName = structureName;
         this.originalPoolDate = originalPoolDate;
         this.rawPhysicalMachineCodes = immutableView(rawPhysicalMachineCodes);
-        this.excludedEndingPhysicalMachineCodes = immutableView(
-                excludedEndingPhysicalMachineCodes);
         this.effectivePhysicalMachineCodes = immutableView(
                 effectivePhysicalMachineCodes);
         this.newMachineDelta = Math.max(0, newMachineDelta);
@@ -118,12 +112,12 @@ public final class StructureMachineLimitDecision {
         this.reason = reason;
     }
 
-    /** @return 收尾排除前结构物理机台数 */
+    /** @return 结构班次原始物理机台数 */
     public int getRawMachineCount() {
         return rawPhysicalMachineCodes.size();
     }
 
-    /** @return 班次边界收尾调整后的结构有效物理机台数 */
+    /** @return 按统一在机口径统计的结构有效物理机台数 */
     public int getEffectiveMachineCount() {
         return effectivePhysicalMachineCodes.size();
     }

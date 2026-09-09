@@ -96,8 +96,7 @@ public final class EarlyProductionChecker {
             return EarlyProductionDecision.notEarlyProduction(true, "当前业务日已有日计划量");
         }
         LocalDate firstFuturePlanDate = continuationAddMachineEarlyProduction
-                ? resolveContinuationAddMachineSourcePlanDate(
-                        context, sku, currentDate, earlyProductionMaxDate)
+                ? sku.getFirstAddMachineProductionDate()
                 : resolveFirstFuturePlanDate(
                 context, sku, currentDate, earlyProductionMaxDate);
         if (continuationAddMachineEarlyProduction
@@ -507,8 +506,8 @@ public final class EarlyProductionChecker {
      * 判断是否具备正规续作增机提前生产的基础身份和日期条件。
      *
      * <p>该场景必须已经由 S4.4 续作中心识别出首次增机日，并复制为 S4.5 新增链路候选。
-     * 本方法只校验候选身份和首次增机日未过期；是否属于未来增机日提前执行或窗口最后日
-     * 等值借用后续计划，由包含排程窗口参数的重载方法统一判断。</p>
+     * 首次增机日必须严格晚于当前业务日；到期和逾期需求统一由正常增机或延期链路处理，
+     * 不因当前日是窗口最后日而借用后续计划改变阶段。</p>
      *
      * @param sku 待判断 SKU
      * @param currentDate 当前业务日
@@ -522,7 +521,7 @@ public final class EarlyProductionChecker {
                 || !StringUtils.equals(
                 SkuScheduleSourceTypeEnum.CONTINUATION_ADD_MACHINE.getCode(), sku.getSourceType())
                 || Objects.isNull(sku.getFirstAddMachineProductionDate())
-                || sku.getFirstAddMachineProductionDate().isBefore(currentDate)) {
+                || !sku.getFirstAddMachineProductionDate().isAfter(currentDate)) {
             return false;
         }
         if (StringUtils.isNotEmpty(sku.getScheduleType())
@@ -540,8 +539,8 @@ public final class EarlyProductionChecker {
      * 判断续作增机补偿是否允许在当前业务日进入共享提前生产中心。
      *
      * <p>未来首次增机日晚于当前业务日且未超过固定截止日时，允许在正常任务冻结后使用
-     * 当前日剩余资源提前执行；首次增机日已经到达时恢复正常增机。原有“窗口最后日首次
-     * 增机日等于当天、借用后续正计划额度”的场景继续保留。</p>
+     * 当前日剩余资源提前执行；首次增机日已经到达时恢复正常增机。窗口最后日也遵循相同日期边界，
+     * 不再将当天到期增机转入提前生产。</p>
      *
      * @param context 排程上下文
      * @param sku 待判断SKU
@@ -568,7 +567,7 @@ public final class EarlyProductionChecker {
      * @param currentDate 当前业务日
      * @param windowEndDate 排程窗口最后业务日
      * @param earlyProductionMaxDate 固定提前生产截止日
-     * @return true-命中未来增机日提前执行或窗口最后日等值借用；false-恢复正常日期门禁
+     * @return true-命中未来增机日提前执行；false-恢复正常日期门禁
      */
     private static boolean isEligibleContinuationAddMachineEarlyProduction(
             LhScheduleContext context,
@@ -583,9 +582,7 @@ public final class EarlyProductionChecker {
         }
         LocalDate firstAddMachineDate = sku.getFirstAddMachineProductionDate();
         return isFutureAddMachineDateEarlyExecution(
-                currentDate, firstAddMachineDate, earlyProductionMaxDate)
-                || isWindowEndEqualDatePlanBorrowing(
-                currentDate, firstAddMachineDate, windowEndDate);
+                currentDate, firstAddMachineDate, earlyProductionMaxDate);
     }
 
     /**
@@ -602,42 +599,6 @@ public final class EarlyProductionChecker {
             LocalDate earlyProductionMaxDate) {
         return firstAddMachineDate.isAfter(currentDate)
                 && !firstAddMachineDate.isAfter(earlyProductionMaxDate);
-    }
-
-    /**
-     * 判断是否属于窗口最后日等值借用后续正计划额度。
-     *
-     * @param currentDate 当前业务日
-     * @param firstAddMachineDate 首次增机需求日
-     * @param windowEndDate 排程窗口最后业务日
-     * @return true-窗口最后日与首次增机日相等；false-不属于等值借用场景
-     */
-    private static boolean isWindowEndEqualDatePlanBorrowing(
-            LocalDate currentDate,
-            LocalDate firstAddMachineDate,
-            LocalDate windowEndDate) {
-        return currentDate.equals(windowEndDate)
-                && firstAddMachineDate.equals(windowEndDate);
-    }
-
-    /**
-     * 解析续作增机提前实际借用的原始计划来源日。
-     *
-     * <p>首次增机日晚于当前业务日时直接使用该日；首次增机日等于窗口最后日时，说明统一
-     * 目标机台数Map已基于后续高计划提前给出增机日期，此时从下一正计划日借用额度，
-     * 避免再次把窗口内较小日计划当成新增机台生产目标。</p>
-     */
-    private static LocalDate resolveContinuationAddMachineSourcePlanDate(
-            LhScheduleContext context,
-            SkuScheduleDTO sku,
-            LocalDate currentDate,
-            LocalDate earlyProductionMaxDate) {
-        LocalDate firstAddMachineDate = sku.getFirstAddMachineProductionDate();
-        if (Objects.nonNull(firstAddMachineDate) && firstAddMachineDate.isAfter(currentDate)) {
-            return firstAddMachineDate;
-        }
-        return resolveFirstFuturePlanDate(
-                context, sku, currentDate, earlyProductionMaxDate);
     }
 
     /**

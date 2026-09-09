@@ -3532,39 +3532,8 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
                     context, sku, left, metricSnapshotCache);
             MachinePriorityMetricSnapshot rightMetric = this.resolveMachinePriorityMetricSnapshot(
                     context, sku, right, metricSnapshotCache);
-            int compareResult = Integer.compare(
-                    leftMetric.getEmbryoMatchScore(), rightMetric.getEmbryoMatchScore());
-            if (compareResult != 0) {
-                return compareResult;
-            }
-
-            // 同模壳优先级高于同规格，避免同一窗口内规格命中机台抢占更匹配模壳能力的机台。
-            compareResult = Integer.compare(
-                    leftMetric.getMouldShellMatchScore(), rightMetric.getMouldShellMatchScore());
-            if (compareResult != 0) {
-                return compareResult;
-            }
-
-            compareResult = Integer.compare(
-                    leftMetric.getSpecMatchScore(), rightMetric.getSpecMatchScore());
-            if (compareResult != 0) {
-                return compareResult;
-            }
-
-            compareResult = Integer.compare(
-                    leftMetric.getCapsuleScore(), rightMetric.getCapsuleScore());
-            if (compareResult != 0) {
-                return compareResult;
-            }
-
-            compareResult = Integer.compare(
-                    leftMetric.getProSizeMatchScore(), rightMetric.getProSizeMatchScore());
-            if (compareResult != 0) {
-                return compareResult;
-            }
-
-            compareResult = Double.compare(
-                    leftMetric.getInchDistance(), rightMetric.getInchDistance());
+            // 正向选机与标准反向竞争共用完整软指标，后续机台决胜口径保持不变。
+            int compareResult = MachinePriorityMetricSnapshot.compareSoftMatch(leftMetric, rightMetric);
             if (compareResult != 0) {
                 return compareResult;
             }

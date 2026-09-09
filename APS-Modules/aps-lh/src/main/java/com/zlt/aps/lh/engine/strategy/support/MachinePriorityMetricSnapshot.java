@@ -125,6 +125,92 @@ public class MachinePriorityMetricSnapshot {
         this.mouldSetHardCompatible = mouldSetHardCompatible;
     }
 
+    /**
+     * 比较冻结的完整适配指标；未知距离沿用生成快照时的既有取值。
+     *
+     * @param left 左侧完整指标快照
+     * @param right 右侧完整指标快照
+     * @return 负数表示左侧更适配，全部指标相同返回0
+     */
+    public static int compareSoftMatch(MachinePriorityMetricSnapshot left,
+                                       MachinePriorityMetricSnapshot right) {
+        int compareResult = Integer.compare(
+                left.getEmbryoMatchScore(), right.getEmbryoMatchScore());
+        if (compareResult != 0) {
+            return compareResult;
+        }
+
+        // 同模壳优先级高于同规格，避免同一窗口内规格命中机台抢占更匹配模壳能力的机台。
+        compareResult = Integer.compare(
+                left.getMouldShellMatchScore(), right.getMouldShellMatchScore());
+        if (compareResult != 0) {
+            return compareResult;
+        }
+
+        compareResult = Integer.compare(
+                left.getSpecMatchScore(), right.getSpecMatchScore());
+        if (compareResult != 0) {
+            return compareResult;
+        }
+
+        compareResult = Integer.compare(
+                left.getCapsuleScore(), right.getCapsuleScore());
+        if (compareResult != 0) {
+            return compareResult;
+        }
+
+        compareResult = Integer.compare(
+                left.getProSizeMatchScore(), right.getProSizeMatchScore());
+        if (compareResult != 0) {
+            return compareResult;
+        }
+
+        return Double.compare(left.getInchDistance(), right.getInchDistance());
+    }
+
+    /**
+     * 输出固定顺序的完整适配指标，前五项0表示命中；仅供胜出日志及已开启的调试日志使用。
+     *
+     * @return 同胎胚、同模壳、同规格、胶囊共用、同英寸、实际英寸差
+     */
+    public String describeSoftMatch() {
+        return new StringBuilder(96)
+                .append("同胎胚=").append(embryoMatchScore)
+                .append(",同模壳=").append(mouldShellMatchScore)
+                .append(",同规格=").append(specMatchScore)
+                .append(",胶囊共用=").append(capsuleScore)
+                .append(",同英寸=").append(proSizeMatchScore)
+                .append(",英寸差=").append(inchDistance).toString();
+    }
+
+    /**
+     * 解析首次决定完整适配胜负的维度，仅在调试日志启用时调用。
+     *
+     * @param other 对方冻结指标
+     * @return 首个不同的指标名称，全部相同时返回完整适配同分
+     */
+    public String resolveSoftMatchDecisionDimension(MachinePriorityMetricSnapshot other) {
+        if (embryoMatchScore != other.embryoMatchScore) {
+            return "同胎胚";
+        }
+        if (mouldShellMatchScore != other.mouldShellMatchScore) {
+            return "同模壳";
+        }
+        if (specMatchScore != other.specMatchScore) {
+            return "同规格";
+        }
+        if (capsuleScore != other.capsuleScore) {
+            return "胶囊共用";
+        }
+        if (proSizeMatchScore != other.proSizeMatchScore) {
+            return "同英寸";
+        }
+        if (Double.compare(inchDistance, other.inchDistance) != 0) {
+            return "实际英寸差";
+        }
+        return "完整适配同分";
+    }
+
     public int getSingleControlScore() {
         return singleControlScore;
     }

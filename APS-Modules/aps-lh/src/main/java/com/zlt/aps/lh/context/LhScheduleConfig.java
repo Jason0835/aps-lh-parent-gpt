@@ -332,7 +332,8 @@ public class LhScheduleConfig {
     }
 
     public int getSandBlastDurationHours() {
-        return LhScheduleConstant.SAND_BLAST_DURATION_HOURS;
+        return this.getParamIntValue(LhScheduleParamConstant.SAND_BLAST_DURATION_HOURS,
+                LhScheduleConstant.SAND_BLAST_DURATION_HOURS);
     }
 
     public int getSandBlastWarningDays() {
@@ -346,13 +347,26 @@ public class LhScheduleConfig {
     }
 
     public int getSandBlastWithInspectionHours() {
-        return LhScheduleConstant.SAND_BLAST_DURATION_HOURS
-                + LhScheduleConstant.SAND_BLAST_FIRST_INSPECTION_HOURS;
+        // 总占用时间只由两个独立时长推导，旧总时长参数不再参与排程。
+        return this.getSandBlastDurationHours() + this.getSandBlastFirstInspectionHours();
+    }
+
+    /** @return 喷砂首检时长，单位小时 */
+    public int getSandBlastFirstInspectionHours() {
+        return this.getParamIntValue(LhScheduleParamConstant.SAND_BLAST_FIRST_INSPECTION_HOURS,
+                LhScheduleConstant.SAND_BLAST_FIRST_INSPECTION_HOURS);
+    }
+
+    /** @return 一次物理喷砂事件的首检总条数 */
+    public int getSandBlastFirstInspectionQty() {
+        return this.getParamIntValue(LhScheduleParamConstant.SAND_BLAST_FIRST_INSPECTION_QTY,
+                LhScheduleConstant.SAND_BLAST_FIRST_INSPECTION_QTY);
     }
 
     public int getSandBlastDailyLimit() {
-        return Math.max(1, getParamIntValue(LhScheduleParamConstant.SAND_BLAST_DAILY_LIMIT,
-                LhScheduleConstant.SAND_BLAST_DAILY_LIMIT));
+        return Math.min(LhScheduleConstant.SAND_BLAST_MAX_DAILY_LIMIT,
+                Math.max(1, this.getParamIntValue(LhScheduleParamConstant.SAND_BLAST_DAILY_LIMIT,
+                        LhScheduleConstant.SAND_BLAST_DAILY_LIMIT)));
     }
 
     public boolean isSandBlastSkipSundayEnabled() {
@@ -775,6 +789,16 @@ public class LhScheduleConfig {
     public boolean isDailyStandardCapacityStructureMatched(String structureName) {
         return StringUtils.isNotEmpty(structureName)
                 && dailyStandardCapacityStructureSet.contains(structureName);
+    }
+
+    /**
+     * T+1资源日是否启用前次交替优先；T日固定规则由公共匹配服务独立判断。
+     *
+     * @return true-启用；缺失或空值按业务默认1处理
+     */
+    public boolean isNextDayPreviousAlternationPriorityEnabled() {
+        return this.getParamIntValue(LhScheduleParamConstant.NEXT_DAY_PREVIOUS_ALTERNATION_PRIORITY_ENABLED,
+                LhScheduleConstant.NEXT_DAY_PREVIOUS_ALTERNATION_PRIORITY_ENABLED) == 1;
     }
 
     /**

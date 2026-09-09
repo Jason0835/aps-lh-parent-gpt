@@ -2,8 +2,13 @@ package com.zlt.aps.lh.engine.strategy.support;
 
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
+import org.springframework.util.CollectionUtils;
 
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -83,6 +88,9 @@ public class NewSpecMachineAvailabilityPlan {
 
     /** 是否为“目标业务日准备、紧邻下一夜班正式生产”的跨日提案。 */
     private final boolean sourceDayCrossDayPreparation;
+
+    /** 当前业务日回看历史首检时使用的资源竞争班次，不改变首检真实占用班次。 */
+    private final LhShiftConfigVO currentDayResourceShift;
 
     /**
      * 不使用换模均衡配额时，经过停机、维修、清洗、禁换模和首检资源校验后的准备完成时间。
@@ -341,7 +349,7 @@ public class NewSpecMachineAvailabilityPlan {
                 preparationTargetShift, preparationAvailable, formalAvailableProductionTime,
                 formalTargetShift, historicalResidualCapacityInfo,
                 firstInspectionDeferredByClassTotalLimit, sourceDayResourceShift,
-                sourceDayCrossDayPreparation, null);
+                sourceDayCrossDayPreparation, null, null);
     }
 
     /**
@@ -370,6 +378,7 @@ public class NewSpecMachineAvailabilityPlan {
      * @param sourceDayResourceShift 跨日准备资源班次
      * @param sourceDayCrossDayPreparation 是否跨日准备
      * @param firstInspectionTimelinePlan 冻结首检时间轴
+     * @param currentDayResourceShift 回看历史首检时的当前日资源班次
      */
     private NewSpecMachineAvailabilityPlan(
             MachineScheduleDTO machine,
@@ -394,7 +403,8 @@ public class NewSpecMachineAvailabilityPlan {
             boolean firstInspectionDeferredByClassTotalLimit,
             LhShiftConfigVO sourceDayResourceShift,
             boolean sourceDayCrossDayPreparation,
-            FirstInspectionTimelinePlan firstInspectionTimelinePlan) {
+            FirstInspectionTimelinePlan firstInspectionTimelinePlan,
+            LhShiftConfigVO currentDayResourceShift) {
         this.machine = machine;
         this.available = available;
         this.unavailableReason = unavailableReason;
@@ -418,6 +428,7 @@ public class NewSpecMachineAvailabilityPlan {
         this.firstInspectionDeferredByClassTotalLimit = firstInspectionDeferredByClassTotalLimit;
         this.sourceDayResourceShift = sourceDayResourceShift;
         this.sourceDayCrossDayPreparation = sourceDayCrossDayPreparation;
+        this.currentDayResourceShift = currentDayResourceShift;
     }
 
     /**
@@ -428,6 +439,7 @@ public class NewSpecMachineAvailabilityPlan {
      */
     public NewSpecMachineAvailabilityPlan withHistoricalResidualCapacityInfo(
             HistoricalResidualCapacityInfo residualCapacityInfo) {
+        // 附加历史产能画像不改变首检时间轴，必须保留选机阶段冻结的同一计划。
         return new NewSpecMachineAvailabilityPlan(
                 machine, available, unavailableReason, occupationEndTime, machineReadyTime,
                 changeoverStartTime, changeoverEndTime, productionNotBeforeTime,
@@ -436,7 +448,8 @@ public class NewSpecMachineAvailabilityPlan {
                 preparationTargetShift, preparationAvailable, formalAvailableProductionTime,
                 formalTargetShift, residualCapacityInfo,
                 firstInspectionDeferredByClassTotalLimit,
-                sourceDayResourceShift, sourceDayCrossDayPreparation);
+                sourceDayResourceShift, sourceDayCrossDayPreparation, firstInspectionTimelinePlan,
+                currentDayResourceShift);
     }
 
     /**
@@ -479,7 +492,8 @@ public class NewSpecMachineAvailabilityPlan {
                 preparationTargetShift, preparationAvailable, formalAvailableProductionTime,
                 formalTargetShift, historicalResidualCapacityInfo,
                 firstInspectionDeferredByClassTotalLimit,
-                sourceDayResourceShift, sourceDayCrossDayPreparation, timelinePlan);
+                sourceDayResourceShift, sourceDayCrossDayPreparation, timelinePlan,
+                currentDayResourceShift);
     }
 
     /**
@@ -517,7 +531,7 @@ public class NewSpecMachineAvailabilityPlan {
                 committedAvailable, committedProductionStartTime,
                 committedProductionShift, historicalResidualCapacityInfo,
                 firstInspectionDeferredByClassTotalLimit,
-                sourceDayResourceShift, sourceDayCrossDayPreparation);
+                sourceDayResourceShift, sourceDayCrossDayPreparation, null, currentDayResourceShift);
     }
 
     /**
@@ -535,7 +549,8 @@ public class NewSpecMachineAvailabilityPlan {
                 firstInspectionPlan, traceChangeoverEndTime, preparationAvailableTime,
                 preparationTargetShift, preparationAvailable, formalAvailableProductionTime,
                 formalTargetShift, historicalResidualCapacityInfo, true,
-                sourceDayResourceShift, sourceDayCrossDayPreparation);
+                sourceDayResourceShift, sourceDayCrossDayPreparation, firstInspectionTimelinePlan,
+                currentDayResourceShift);
     }
 
     /**
@@ -557,7 +572,38 @@ public class NewSpecMachineAvailabilityPlan {
                 traceChangeoverEndTime, preparationAvailableTime, preparationTargetShift,
                 preparationAvailable, formalAvailableProductionTime, formalTargetShift,
                 historicalResidualCapacityInfo, firstInspectionDeferredByClassTotalLimit,
-                resourceShift, crossDayAvailable);
+                resourceShift, crossDayAvailable, firstInspectionTimelinePlan, currentDayResourceShift);
+    }
+
+    /**
+     * 将生产日前首检与当前业务日的资源竞争分开归班。
+     *
+     * <p>当前日候选可利用历史空闲窗口完成首检，并在当前日正式生产。此时按正式生产
+     * 班次参与本轮竞争，但结构准入、首检计数和结果落量继续使用原首检班次。
+     * 目标日向下一夜班准备和窗口末班仅首检仍保持原竞争归属。</p>
+     *
+     * @param dayShifts 本轮业务日班次，按时间升序排列
+     * @return 携带当前日竞争班次的同源计划；不属于历史首检时返回原计划
+     */
+    public NewSpecMachineAvailabilityPlan withCurrentDayResourceShift(List<LhShiftConfigVO> dayShifts) {
+        LhShiftConfigVO occupationShift = this.getProductionOccupationShift();
+        if (!available || sourceDayCrossDayPreparation || Objects.isNull(formalTargetShift)
+                || Objects.isNull(occupationShift)
+                || CollectionUtils.isEmpty(dayShifts)
+                || !occupationShift.getShiftStartDateTime().before(dayShifts.get(0).getShiftStartDateTime())
+                || dayShifts.stream().noneMatch(shift -> Objects.equals(
+                shift.getShiftIndex(), formalTargetShift.getShiftIndex()))) {
+            return this;
+        }
+        return new NewSpecMachineAvailabilityPlan(
+                machine, available, unavailableReason, occupationEndTime, machineReadyTime,
+                changeoverStartTime, changeoverEndTime, productionNotBeforeTime,
+                candidateProductionNotBeforeTime, candidateAvailableProductionTime, targetShift,
+                firstInspectionPlan, traceChangeoverEndTime, preparationAvailableTime,
+                preparationTargetShift, preparationAvailable, formalAvailableProductionTime,
+                formalTargetShift, historicalResidualCapacityInfo,
+                firstInspectionDeferredByClassTotalLimit, sourceDayResourceShift,
+                sourceDayCrossDayPreparation, firstInspectionTimelinePlan, formalTargetShift);
     }
 
     public MachineScheduleDTO getMachine() {
@@ -646,6 +692,14 @@ public class NewSpecMachineAvailabilityPlan {
     }
 
     /**
+     * 获取有计划量的目标班次；仅首检候选使用首检占用班次，不伪造正式生产班次。
+     * @return 正式生产班次或首检占用班次
+     */
+    public LhShiftConfigVO getQuantityTargetShift() {
+        return Objects.nonNull(formalTargetShift) ? formalTargetShift : this.getProductionOccupationShift();
+    }
+
+    /**
      * 获取当前Machine×SKU真正开始占用结构机台名额的时间。
      *
      * <p>首检属于开产时取首检开始时间；无计件首检时取正式可开产时间。</p>
@@ -692,13 +746,44 @@ public class NewSpecMachineAvailabilityPlan {
     }
 
     /**
+     * 获取首检实际覆盖班次及首个正式生产班次，供预演和提交执行同一结构准入。
+     *
+     * <p>历史首检通过上限不代表当前日正式生产也有名额；跨班首检的每个正量班次
+     * 都必须校验，同一班次只校验一次。没有首检时仍只检查首个正式生产班次。</p>
+     *
+     * @return 按首检到正式生产顺序去重后的结构占用班次
+     */
+    public List<LhShiftConfigVO> getStructureOccupationShifts() {
+        int inspectionShiftCount = Objects.isNull(firstInspectionPlan)
+                ? 0 : firstInspectionPlan.getShiftAllocations().size();
+        Map<Integer, LhShiftConfigVO> occupationShifts = new LinkedHashMap<>(inspectionShiftCount + 2);
+        LhShiftConfigVO occupationShift = this.getProductionOccupationShift();
+        if (Objects.nonNull(occupationShift)) {
+            occupationShifts.put(occupationShift.getShiftIndex(), occupationShift);
+        }
+        if (Objects.nonNull(firstInspectionPlan) && firstInspectionPlan.isValid()) {
+            firstInspectionPlan.getShiftAllocations().stream()
+                    .filter(allocation -> allocation.getQuantity() > 0)
+                    .map(FirstInspectionShiftAllocation::getShift)
+                    .forEach(shift -> occupationShifts.put(shift.getShiftIndex(), shift));
+        }
+        if (Objects.nonNull(formalTargetShift)) {
+            occupationShifts.put(formalTargetShift.getShiftIndex(), formalTargetShift);
+        }
+        return new ArrayList<>(occupationShifts.values());
+    }
+
+    /**
      * 获取机台驱动本轮实际使用的资源竞争班次。
      *
-     * @return 目标日跨日准备返回换模资源班次；普通场景返回正式开产班次
+     * @return 目标日跨日准备返回换模资源班次；历史首检返回当前日正式班次；其余返回真实占用班次
      */
     public LhShiftConfigVO getCompetitionTargetShift() {
-        return sourceDayCrossDayPreparation
-                ? sourceDayResourceShift : this.getProductionOccupationShift();
+        if (sourceDayCrossDayPreparation) {
+            return sourceDayResourceShift;
+        }
+        return Objects.nonNull(currentDayResourceShift)
+                ? currentDayResourceShift : this.getProductionOccupationShift();
     }
 
     /**

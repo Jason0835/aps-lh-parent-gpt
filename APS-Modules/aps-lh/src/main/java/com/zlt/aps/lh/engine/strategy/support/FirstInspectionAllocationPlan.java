@@ -1,12 +1,14 @@
 package com.zlt.aps.lh.engine.strategy.support;
 
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
+import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * 一次换模或换活字块首检的完整时间分摊计划。
@@ -131,6 +133,27 @@ public class FirstInspectionAllocationPlan {
 
     public BigDecimal getHourlyOutput() {
         return hourlyOutput;
+    }
+
+    /**
+     * 判断完整首检是否在指定可写班次内形成正计划量。
+     * 首检结束允许等于班末；无效、不完整或跨出可写窗口的计划不能独立支撑开产。
+     * @param shifts 当前允许写入的班次
+     * @return 是否存在完整且有正量的首检
+     */
+    public boolean hasPositiveQuantityInShifts(List<LhShiftConfigVO> shifts) {
+        if (!valid || inspectionQty <= 0 || CollectionUtils.isEmpty(shifts)
+                || CollectionUtils.isEmpty(shiftAllocations)) {
+            return false;
+        }
+        return shiftAllocations.stream().allMatch(allocation ->
+                Objects.nonNull(allocation) && shifts.stream().anyMatch(shift ->
+                        Objects.nonNull(shift)
+                                && Objects.equals(shift.getShiftIndex(), allocation.getShift().getShiftIndex())
+                                && !allocation.getOverlapStartTime().before(shift.getShiftStartDateTime())
+                                && !allocation.getOverlapEndTime().after(shift.getShiftEndDateTime())))
+                && shiftAllocations.stream().mapToInt(FirstInspectionShiftAllocation::getQuantity).sum()
+                == inspectionQty;
     }
 
     public long getInspectionDurationSeconds() {

@@ -57,8 +57,8 @@ public class ContinuousProductionHandler extends AbsScheduleStepHandler {
                 context.getContinuousSkuList().size(), context.getNewSpecSkuList().size());
 
         /*
-         * S4.4开始前按到期天数、计划日期和物理机台编码统一预留精度窗口。
-         * 必须先于逐SKU续作排产执行，避免普通SKU遍历顺序抢占3天内精度计划的每日名额。
+         * S4.4开始前只登记中心决策，禁止逐SKU回调提前挂载精度窗口。
+         * 精度统一等待续作最终收口，不能将初始化首班起点误当成物料已收尾。
          */
         maintenanceScheduleService.prepareMaintenancePlanWindows(context);
 
@@ -89,6 +89,9 @@ public class ContinuousProductionHandler extends AbsScheduleStepHandler {
         strategy.scheduleReduceMould(context);
         log.info("续作降模及共用胎胚收尾均衡完成, 排程结果数: {}, 未排产数: {}",
                 context.getScheduleResultList().size(), context.getUnscheduledResultList().size());
+
+        // 续作最终数量、真实收尾和物理交接时间已经稳定，按精度优先级统一分配每日一台额度。
+        maintenanceScheduleService.finalizeMaintenancePlanWindows(context);
 
         // S4.4.5 收尾后换活字块衔接排产：只读取均衡后的最终机台可用时间。
         typeBlockProductionStrategy.scheduleTypeBlockChange(context);

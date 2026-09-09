@@ -149,14 +149,23 @@ public final class LhScheduleConstant {
     /** 喷砂清洗含首检耗时（小时） */
     public static final int SAND_BLAST_WITH_INSPECTION_HOURS = 12;
 
-    /** 喷砂清洗后固定首检耗时（小时） */
+    /** 喷砂清洗后默认首检耗时（小时） */
     public static final int SAND_BLAST_FIRST_INSPECTION_HOURS = 2;
 
-    /** 喷砂清洗后固定首检计划量 */
+    /** 喷砂清洗后默认首检计划量 */
     public static final int SAND_BLAST_FIRST_INSPECTION_QTY = 2;
 
     /** 每日喷砂清洗上限 */
-    public static final int SAND_BLAST_DAILY_LIMIT = 1;
+    public static final int SAND_BLAST_DAILY_LIMIT = 2;
+
+    /** 当前喷砂规则支持的最大日台数，与两档开始时刻对应 */
+    public static final int SAND_BLAST_MAX_DAILY_LIMIT = 2;
+
+    /** 当天第一台喷砂默认开始时刻 */
+    public static final String SAND_BLAST_FIRST_START_TIME = "06:00";
+
+    /** 当天第二台喷砂默认开始时刻 */
+    public static final String SAND_BLAST_SECOND_START_TIME = "09:00";
 
     /** 喷砂清洗预警天数 */
     public static final int SAND_BLAST_WARNING_DAYS = 25;
@@ -413,6 +422,9 @@ public final class LhScheduleConstant {
 
     /** 新增排产机台资源按机台收尾时间归属班次 */
     public static final int NEW_SPEC_MACHINE_RESOURCE_SHIFT_BY_ENDING_TIME = 0;
+
+    /** T+1资源日默认启用前次交替优先，T日固定规则不受此参数影响。 */
+    public static final int NEXT_DAY_PREVIOUS_ALTERNATION_PRIORITY_ENABLED = 1;
 
     /** 新增排产机台资源按实际可开产时间归属班次 */
     public static final int NEW_SPEC_MACHINE_RESOURCE_SHIFT_BY_ACTUAL_AVAILABLE_TIME = 1;

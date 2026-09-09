@@ -4,6 +4,8 @@ import lombok.Data;
 
 import java.io.Serializable;
 import java.time.LocalDate;
+import java.util.List;
+import java.util.Collections;
 
 /**
  * 按天换活字块机台反选指令。
@@ -39,6 +41,22 @@ public class DayTypeBlockReverseSelectionDirective implements Serializable {
 
     /** 换活字块匹配层级说明，当前统一为“同胎胚+同模具” */
     private String matchedLayer;
+
+    /** 当前配对是否为前次交替优先候选，失败时仅恢复本次偏好。 */
+    private boolean previousAlternationPreferred;
+
+    /** 原候选池中按前次计划日期排序的物料状态键；每个当前班次重新验证可排性。 */
+    private List<String> previousAlternationCandidateKeys = Collections.emptyList();
+
+
+    /** 历史偏好生效前原首选物料，不参与跨机台比较。 */
+    private String originalMaterialCode;
+
+    /** 原首选物料产品状态。 */
+    private String originalProductStatus;
+
+    /** 原首选物料名次。 */
+    private Integer originalSkuSortRank;
 
     /** 是否已在当天正常资源竞争阶段尝试 */
     private boolean attempted;

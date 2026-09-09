@@ -2,6 +2,7 @@ package com.zlt.aps.lh.api.domain.dto;
 
 import lombok.Data;
 
+import java.io.Serializable;
 import java.util.Date;
 
 /**
@@ -10,7 +11,16 @@ import java.util.Date;
  * @author APS
  */
 @Data
-public class MachineCleaningWindowDTO {
+public class MachineCleaningWindowDTO implements Serializable {
+
+    private static final long serialVersionUID = 1L;
+
+    /** 计划自然日内已实际安排的喷砂序号；配对侧共享同一序号 */
+    private Integer sandBlastSequence;
+    /** 当前运行侧首检条数快照；同一物理事件在单控左右侧守恒分配 */
+    private Integer sandBlastFirstInspectionQty;
+    /** 首检结束归属班次的标准开始时间，用于跨班边界识别 */
+    private Date sandBlastInspectionShiftStartTime;
 
     /** 来源设备停机计划主键，用于最终处置阶段精确回填排程日期 */
     private Long sourcePlanId;

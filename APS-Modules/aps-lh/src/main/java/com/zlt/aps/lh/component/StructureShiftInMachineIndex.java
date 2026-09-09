@@ -30,7 +30,7 @@ import java.util.Set;
  * </ul>
  *
  * <p>统计口径与 {@link StructureMinMachineRetentionService#isMachineInStructureAtShift} 保持一致：
- * 正量班次、清洗/精度/计划性维修零量班次、续作停产保机占位均算在机；真实释放边界和后物料接管不算。
+ * 正量班次、清洗/精度/计划性维修零量班次算在机；续作降模停产保机、真实释放边界和后物料接管不算。
  * 单控L/R统一按物理整机编码去重。</p>
  *
  * @author APS

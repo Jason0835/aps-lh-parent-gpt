@@ -124,6 +124,13 @@ public class LhMouldChangePlan extends BaseEntity implements Serializable {
     @TableField(value = "MOULD_CODE")
     private String mouldCode;
 
+    /**
+     * 页面展示模具号，按照当前排程日期、在机信息及共享模具配置动态解析，不落库。
+     */
+    @ApiModelProperty(value = "展示模具号")
+    @TableField(exist = false)
+    private String displayMouldCode;
+
     @ApiModelProperty(value = "是否发布 0-未发布，1-已发布 2-发布失败 3-超时发布 4-待发布")
     @Excel(name = "ui.data.column.lhMouldChangePlan.isRelease", dictType = "IS_RELEASE")
     @TableField(value = "IS_RELEASE")

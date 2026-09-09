@@ -185,6 +185,24 @@ public interface IMouldChangeBalanceStrategy {
     }
 
     /**
+     * 以完整动作输入联合预演，成功只登记调用方的模拟次数，不占用真实资源。
+     * @param context 排程上下文
+     * @param machineCode 机台编码
+     * @param switchReadyTime 真实可交接时间
+     * @param switchDurationHours 切换时长
+     * @param sku 待切换SKU
+     * @param actionType 动作类型，与正式分配一致
+     * @param businessDayEndTime 业务日日终，与正式分配一致
+     * @param simulatedCountMap 深复制的组级次数，逐台累计
+     * @return 预演落点；失败不改变模拟计数
+     */
+    default Date previewEndingStaggerMouldChange(LhScheduleContext context, String machineCode,
+            Date switchReadyTime, int switchDurationHours, SkuScheduleDTO sku, String actionType,
+            Date businessDayEndTime, Map<String, int[]> simulatedCountMap) {
+        return null;
+    }
+
+    /**
      * 获取指定日期剩余换模能力
      *
      * @param context    排程上下文

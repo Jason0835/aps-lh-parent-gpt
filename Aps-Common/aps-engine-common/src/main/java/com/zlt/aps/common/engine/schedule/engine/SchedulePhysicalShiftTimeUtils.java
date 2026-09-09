@@ -2,6 +2,7 @@ package com.zlt.aps.common.engine.schedule.engine;
 
 import cn.hutool.core.util.StrUtil;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -11,6 +12,7 @@ import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.BiConsumer;
+import java.util.function.IntFunction;
 
 /**
  * TM 与 TC 共用的六班物理日期和时间窗口工具。
@@ -27,6 +29,11 @@ public final class SchedulePhysicalShiftTimeUtils {
     private static final int[] SHIFT_DAY_OFFSETS = {0, 1, 1, 1, 2, 2};
 
     private static final int MAX_SHIFT_ORDER = SHIFT_DAY_OFFSETS.length;
+
+    /**
+     * 前一排程日已生产链尾只允许从早班结束边界 CLASS3 向前选择。
+     */
+    private static final int PREVIOUS_DAY_PREDECESSOR_MAX_SHIFT_ORDER = 3;
 
     private static final DateTimeFormatter DATE_TIME_FORMATTER =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
@@ -67,6 +74,39 @@ public final class SchedulePhysicalShiftTimeUtils {
         } catch (RuntimeException exception) {
             return ZoneId.of(DEFAULT_FACTORY_ZONE_ID);
         }
+    }
+
+    /**
+     * 解析前一排程日已经完成生产范围内的最后有效班次。
+     *
+     * <p>当前一班启动时，上一排程日的 CLASS4～CLASS6 仍属于未来计划，不能作为实际生产链尾。
+     * 因此本方法固定从 CLASS3 向 CLASS1 查找计划量大于0且顺序为有效整数的最后任务。</p>
+     *
+     * @param planQtyValueProvider        按班次顺序读取计划量的函数，可为空
+     * @param sequenceValueProvider       按班次顺序读取顺序值的函数，可为空
+     * @param acceptNumericStringSequence 是否兼容数字字符串形式的历史顺序值
+     * @return CLASS1～CLASS3 范围内最后有效班次；无有效任务时返回 null
+     */
+    public static Integer resolvePreviousDayPredecessorShiftOrder(
+            IntFunction<Object> planQtyValueProvider,
+            IntFunction<Object> sequenceValueProvider,
+            boolean acceptNumericStringSequence) {
+        if (planQtyValueProvider == null || sequenceValueProvider == null) {
+            return null;
+        }
+        for (int shiftOrder = PREVIOUS_DAY_PREDECESSOR_MAX_SHIFT_ORDER; shiftOrder >= 1; shiftOrder--) {
+            try {
+                Object planQtyValue = planQtyValueProvider.apply(shiftOrder);
+                Object sequenceValue = sequenceValueProvider.apply(shiftOrder);
+                if (parseDecimal(planQtyValue).compareTo(BigDecimal.ZERO) > 0
+                        && parseSequence(sequenceValue, acceptNumericStringSequence) != null) {
+                    return shiftOrder;
+                }
+            } catch (RuntimeException exception) {
+                // 单个动态字段读取失败时按该班次无有效链尾处理，继续检查更早班次。
+            }
+        }
+        return null;
     }
 
     /**
@@ -295,10 +335,57 @@ public final class SchedulePhysicalShiftTimeUtils {
         return formatShiftWindow(shiftWindow, ZoneId.of(DEFAULT_FACTORY_ZONE_ID));
     }
 
+    /**
+     * 将计划量动态字段转换为数值。
+     *
+     * @param value 动态字段原始值
+     * @return 有效数值；空值或非法值返回0
+     */
+    private static BigDecimal parseDecimal(Object value) {
+        if (value == null || (value instanceof String && StrUtil.isBlank((String) value))) {
+            return BigDecimal.ZERO;
+        }
+        try {
+            return new BigDecimal(String.valueOf(value).trim());
+        } catch (NumberFormatException exception) {
+            return BigDecimal.ZERO;
+        }
+    }
+
+    /**
+     * 按调用方兼容策略解析有效整数顺序。
+     *
+     * @param value                       动态顺序字段原始值
+     * @param acceptNumericStringSequence 是否兼容数字字符串
+     * @return 有效整数顺序；类型或数值非法时返回 null
+     */
+    private static Integer parseSequence(Object value, boolean acceptNumericStringSequence) {
+        if (value instanceof Number) {
+            try {
+                return new BigDecimal(String.valueOf(value)).intValueExact();
+            } catch (ArithmeticException | NumberFormatException exception) {
+                return null;
+            }
+        }
+        if (!acceptNumericStringSequence || !(value instanceof String)
+                || StrUtil.isBlank((String) value)) {
+            return null;
+        }
+        try {
+            return new BigDecimal(((String) value).trim()).intValueExact();
+        } catch (ArithmeticException | NumberFormatException exception) {
+            return null;
+        }
+    }
+
     private static LocalTime parseTime(String timeText) {
         String normalizedTime = timeText.trim();
-        if (normalizedTime.length() == 5) {
+        String[] timeParts = normalizedTime.split(":");
+        if (timeParts.length == 2) {
             normalizedTime = normalizedTime + ":00";
+        }
+        if (!timeParts[0].isEmpty() && timeParts[0].length() == 1) {
+            normalizedTime = "0" + normalizedTime;
         }
         return LocalTime.parse(normalizedTime);
     }

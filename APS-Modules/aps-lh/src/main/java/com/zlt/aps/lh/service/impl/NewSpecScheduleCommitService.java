@@ -1,6 +1,8 @@
 package com.zlt.aps.lh.service.impl;
 
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
+import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
+import cn.hutool.core.bean.BeanUtil;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.component.StructureEndingAlignmentService;
 import lombok.extern.slf4j.Slf4j;
@@ -9,7 +11,10 @@ import org.springframework.stereotype.Component;
 import javax.annotation.Resource;
 import java.util.ArrayList;
 import java.util.Objects;
+import java.util.Map;
+import java.util.LinkedHashMap;
 import java.util.function.IntSupplier;
+import java.util.function.BooleanSupplier;
 
 /**
  * S4.5 新增排产提案一次性提交服务。
@@ -72,6 +77,37 @@ public class NewSpecScheduleCommitService {
                     context.getBatchNo(), selectedSku.getMaterialCode(),
                     selectedSku.getProductStatus(), exception);
             throw exception;
+        }
+    }
+
+    /**
+     * 执行历史优先候选，失败必须恢复完整基线后交还原选择路径。
+     *
+     * <p>只供额外的历史候选尝试使用；普通提交仍保持原终局未排处理语义。</p>
+     *
+     * @param context 排程上下文
+     * @param attemptAction 原换活字块排产动作
+     * @return 是否形成有效结果；失败或异常恢复全部资源，异常继续传播
+     */
+    public boolean tryPreviousAlternation(LhScheduleContext context, BooleanSupplier attemptAction) {
+        // S4.4原循环持有机台对象引用，失败恢复时需一并恢复这些引用，避免继续使用试排后的旧对象。
+        Map<String, MachineScheduleDTO> originalMachines =
+                new LinkedHashMap<String, MachineScheduleDTO>(context.getMachineScheduleMap());
+        ScheduleSubstitutionAttemptSnapshot snapshot = ScheduleSubstitutionAttemptSnapshot.capture(
+                context, new ArrayList<SkuScheduleDTO>(context.getNewSpecSkuList()));
+        boolean success = false;
+        try {
+            success = attemptAction.getAsBoolean();
+            return success;
+        } finally {
+            if (!success) {
+                snapshot.restore(context);
+                originalMachines.forEach((machineCode, originalMachine) -> {
+                    BeanUtil.copyProperties(context.getMachineScheduleMap().get(machineCode), originalMachine);
+                    context.getMachineScheduleMap().put(machineCode, originalMachine);
+                });
+                this.rebuildStructureInMachineIndex(context);
+            }
         }
     }
 

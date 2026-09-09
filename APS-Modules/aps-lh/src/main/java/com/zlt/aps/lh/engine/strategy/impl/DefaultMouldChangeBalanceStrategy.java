@@ -60,10 +60,8 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
                                     String machineCode,
                                     Date endingTime,
                                     int switchDurationHours) {
-        if (!isChangeoverBalanceEnabled(context)) {
-            return allocateLegacyMouldChange(context, machineCode, endingTime, switchDurationHours);
-        }
-        return allocateMouldChange(context, machineCode, endingTime, switchDurationHours, null, ACTION_CHANGEOVER);
+        return this.allocateMouldChange(context, machineCode, endingTime, switchDurationHours,
+                null, ACTION_CHANGEOVER, null);
     }
 
     @Override
@@ -103,149 +101,32 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
                                     SkuScheduleDTO sku,
                                     String actionType,
                                     Date businessDayEndTime) {
-        if (!isChangeoverBalanceEnabled(context)) {
-            return allocateLegacyMouldChange(context, machineCode, endingTime, switchDurationHours);
-        }
-        if (endingTime == null) {
+        if (Objects.isNull(context) || Objects.isNull(endingTime)) {
             return null;
         }
-
-        clearBlockedReason(context, sku);
-        Date adjustedTime = endingTime;
-        // 首台日终约束下的顺延只记录一次过程日志，避免同一事件在多次尝试中重复刷日志。
-        boolean dayEndDeferLogged = false;
-
-        // 最多向后探索有限次数，避免极端数据导致死循环
-        for (int attempt = 0; attempt < MAX_ALLOCATION_ATTEMPTS; attempt++) {
-            // 先处理设备停机窗口：05允许并行，其他停机仍从停机结束时刻继续判断。
-            Date downtimeAdjustedTime = resolveDowntimeAdjustedStartTime(
-                    context, machineCode, adjustedTime, switchDurationHours);
-            if (downtimeAdjustedTime.after(adjustedTime)) {
-                adjustedTime = downtimeAdjustedTime;
-                continue;
-            }
-
-            // 若在禁止换模时间段内（20:00-次日6:00），顺延到禁止时段结束后的第一个早班（凌晨段为当日早班，晚间段为次日早班）
-            if (LhScheduleTimeUtil.isNoMouldChangeTime(context, adjustedTime)) {
-                adjustedTime = LhScheduleTimeUtil.resolveNextMorningAfterNoMouldChangeWindow(
-                        context, adjustedTime);
-                continue;
-            }
-
-            String dateKey = formatDateKey(adjustedTime);
-            int[] counts = context.getDailyMouldChangeCountMap()
-                    .computeIfAbsent(dateKey, key -> new int[]{0, 0});
-            int dailyLimit = getDailyLimit(context);
-            int totalUsed = getTotalUsed(counts);
-            int morningLimit = getMorningLimit(context);
-            int afternoonLimit = getAfternoonLimit(context);
-
-            // 每日总次数为硬上限：达到后T+2直接拒绝，之前日期顺延次日早班。
-            if (totalUsed >= dailyLimit) {
-                if (isOnOrAfterScheduleTargetDate(context, adjustedTime)) {
-                    recordBlockedReason(context, sku, dailyLimit);
-                    log.warn("换模/换活字块每日次数达到T+2上限，进入未排, materialCode: {}, embryoCode: {}, "
-                                    + "actionType: {}, 日期: {}, 当天总次数: {}/{}, 早班次数: {}, 中班次数: {}",
-                            sku == null ? null : sku.getMaterialCode(),
-                            sku == null ? null : sku.getEmbryoCode(),
-                            StringUtils.defaultIfEmpty(actionType, ACTION_CHANGEOVER),
-                            dateKey, totalUsed, dailyLimit, counts[IDX_MORNING], counts[IDX_AFTERNOON]);
-                    return null;
-                }
-                Date nextDayMorningStart = getNextCalendarDayMorningStart(context, adjustedTime);
-                log.info("换模/换活字块每日次数已达上限，顺延到后一天, materialCode: {}, embryoCode: {}, "
-                                + "actionType: {}, 当前日期: {}, 顺延日期: {}, 当天总次数: {}/{}",
-                        sku == null ? null : sku.getMaterialCode(),
-                        sku == null ? null : sku.getEmbryoCode(),
-                        StringUtils.defaultIfEmpty(actionType, ACTION_CHANGEOVER),
-                        dateKey, LhScheduleTimeUtil.formatDate(nextDayMorningStart), totalUsed, dailyLimit);
-                adjustedTime = nextDayMorningStart;
-                continue;
-            }
-
-            /*
-             * 跨日准备已经由新增主链确认：机台在目标业务日前空闲，当前时点是贴近下一业务日
-             * 首班生产下限的最后合法换模窗口。该动作仍计入每日15次硬上限和真实班次计数，
-             * 但不再因早8/中7均衡参考值被搬到次日；否则14:00开始、22:00完成的准备会被
-             * 推迟为次日06:00换模、14:00开产。20:00禁开始换模及停机约束已在上方完成校验。
-             */
-            if (isCrossDayPreparationAction(actionType)
-                    && isSwitchCompletionBeforeBusinessDayEnd(
-                    adjustedTime, switchDurationHours, businessDayEndTime)) {
-                return registerMouldChangeAndLog(
-                        context, adjustedTime, sku, actionType, dateKey);
-            }
-
-            if (LhScheduleTimeUtil.isMorningShift(context, adjustedTime)) {
-                // 早班未达参考上限：保持最早合法时间。
-                if (counts[IDX_MORNING] < morningLimit) {
-                    return registerMouldChangeAndLog(
-                            context, adjustedTime, sku, actionType, dateKey);
-                }
-                // 早班已达参考上限：尝试当天中班，避免早班换模过于集中。
-                Date afternoonCandidate = resolveAfternoonBalanceCandidate(
-                        context, machineCode, dateKey, adjustedTime,
-                        switchDurationHours, counts, afternoonLimit, businessDayEndTime);
-                if (Objects.nonNull(afternoonCandidate)) {
-                    return registerMouldChangeAndLog(
-                            context, afternoonCandidate, sku, actionType,
-                            formatDateKey(afternoonCandidate));
-                }
-                // 中班不可承接：顺延次日早班；首台日终约束下必须留下过程日志便于对账。
-                if (Objects.nonNull(businessDayEndTime) && !dayEndDeferLogged) {
-                    appendDayEndDeferProcessLog(
-                            context, dateKey, adjustedTime, sku, businessDayEndTime);
-                    dayEndDeferLogged = true;
-                }
-                // 软目标顺延同样受排程窗口约束：顺延落点已到/越过窗口结束日时直接拒绝，
-                // 避免生成窗口外换模时间（与每日15次硬上限顺延语义保持一致）。
-                if (isOnOrAfterScheduleTargetDate(context, adjustedTime)) {
-                    log.warn("换模/换活字块早中班参考上限顺延超出排程窗口，进入未排, materialCode: {}, "
-                                    + "embryoCode: {}, actionType: {}, 日期: {}, 早班次数: {}, 中班次数: {}",
-                            sku == null ? null : sku.getMaterialCode(),
-                            sku == null ? null : sku.getEmbryoCode(),
-                            StringUtils.defaultIfEmpty(actionType, ACTION_CHANGEOVER),
-                            dateKey, counts[IDX_MORNING], counts[IDX_AFTERNOON]);
-                    return null;
-                }
-                adjustedTime = getNextCalendarDayMorningStart(context, adjustedTime);
-                continue;
-            }
-
-            if (LhScheduleTimeUtil.isAfternoonShift(context, adjustedTime)) {
-                // 中班未达参考上限：直接落中班。
-                if (counts[IDX_AFTERNOON] < afternoonLimit) {
-                    return registerMouldChangeAndLog(
-                            context, adjustedTime, sku, actionType, dateKey);
-                }
-                // 中班已达参考上限：顺延次日早班，不把中班推到8次。
-                if (isOnOrAfterScheduleTargetDate(context, adjustedTime)) {
-                    log.warn("换模/换活字块中班参考上限顺延超出排程窗口，进入未排, materialCode: {}, "
-                                    + "embryoCode: {}, actionType: {}, 日期: {}, 早班次数: {}, 中班次数: {}",
-                            sku == null ? null : sku.getMaterialCode(),
-                            sku == null ? null : sku.getEmbryoCode(),
-                            StringUtils.defaultIfEmpty(actionType, ACTION_CHANGEOVER),
-                            dateKey, counts[IDX_MORNING], counts[IDX_AFTERNOON]);
-                    return null;
-                }
-                adjustedTime = getNextCalendarDayMorningStart(context, adjustedTime);
-                continue;
-            }
-
-            adjustedTime = getNextCalendarDayMorningStart(context, adjustedTime);
+        if (this.isChangeoverBalanceEnabled(context)) {
+            this.clearBlockedReason(context, sku);
         }
-
-        log.warn("换模均衡分配失败，无可用换模班次, 原始时间: {}",
-                LhScheduleTimeUtil.formatDateTime(endingTime));
-        return null;
+        // 所有预演和正式分配只使用同一个只读决策内核；此处是唯一真实次数登记入口。
+        Date allocatedTime = this.resolveMouldChangeStart(context, machineCode, endingTime,
+                switchDurationHours, actionType, businessDayEndTime, context.getDailyMouldChangeCountMap());
+        this.recordMouldChangeDecision(context, machineCode, endingTime, switchDurationHours,
+                sku, businessDayEndTime, allocatedTime);
+        if (Objects.isNull(allocatedTime)) {
+            log.warn("换模/换活字块无合法落点, materialCode: {}, machineCode: {}, actionType: {}, readyTime: {}",
+                    Objects.nonNull(sku) ? sku.getMaterialCode() : null, machineCode, actionType,
+                    LhScheduleTimeUtil.formatDateTime(endingTime));
+            return null;
+        }
+        return this.registerMouldChangeAndLog(context, allocatedTime, sku, actionType,
+                this.formatDateKey(allocatedTime));
     }
 
     /**
      * 无副作用预演换模/换活字块落点。
      *
-     * <p>该方法逐分支复用正式分配的判断顺序，只读取真实早/中班计数，不调用登记、
-     * 回滚、未排原因和过程日志方法。关闭均衡开关时只保留停机与20:00禁换模约束，
-     * 与新增正式基础换模入口保持一致。</p>
+     * <p>直接复用正式分配的只读内核，只读取真实计数。开关关闭时沿用正式旧口径的
+     * 早/中班限制，不能因预演而绕过正式限制；不调用登记、回滚或未排日志。</p>
      *
      * @param context 排程上下文
      * @param machineCode 机台编码
@@ -264,70 +145,115 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
                                    SkuScheduleDTO sku,
                                    String actionType,
                                    Date businessDayEndTime) {
-        if (Objects.isNull(endingTime)) {
+        return Objects.isNull(context) ? null : this.resolveMouldChangeStart(context, machineCode, endingTime,
+                switchDurationHours, actionType, businessDayEndTime, context.getDailyMouldChangeCountMap());
+    }
+
+    /**
+     * 换模/换活字块唯一无副作用落点内核。只读传入次数，禁止访问真实次数写入口。
+     * <p>开关开启采用现有日上限、早中班上限和跨日准备例外；关闭保持原正式早中班限制。
+     * 日期避让、动作类型、耗时和业务日日终判断均由预演与正式分配共同消费。</p>
+     * @param context 上下文
+     * @param machineCode 机台编码
+     * @param readyTime 可交接时间
+     * @param durationHours 动作耗时
+     * @param actionType 动作类型
+     * @param dayEnd 当前业务日日终
+     * @param countMap 当前资源快照（真实或独立模拟次数）
+     * @return 最早合法落点；没有落点返回null
+     */
+    private Date resolveMouldChangeStart(LhScheduleContext context, String machineCode, Date readyTime,
+            int durationHours, String actionType, Date dayEnd, Map<String, int[]> countMap) {
+        if (Objects.isNull(context) || Objects.isNull(readyTime) || Objects.isNull(countMap)) {
             return null;
         }
-        Date adjustedTime = endingTime;
+        boolean balanced = this.isChangeoverBalanceEnabled(context);
+        Date cursor = readyTime;
         for (int attempt = 0; attempt < MAX_ALLOCATION_ATTEMPTS; attempt++) {
-            Date downtimeAdjustedTime = resolveDowntimeAdjustedStartTime(
-                    context, machineCode, adjustedTime, switchDurationHours);
-            if (downtimeAdjustedTime.after(adjustedTime)) {
-                adjustedTime = downtimeAdjustedTime;
+            Date adjusted = this.resolveDowntimeAdjustedStartTime(context, machineCode, cursor, durationHours);
+            if (adjusted.after(cursor)) {
+                cursor = adjusted;
                 continue;
             }
-            if (LhScheduleTimeUtil.isNoMouldChangeTime(context, adjustedTime)) {
-                adjustedTime = LhScheduleTimeUtil.resolveNextMorningAfterNoMouldChangeWindow(
-                        context, adjustedTime);
+            if (LhScheduleTimeUtil.isNoMouldChangeTime(context, cursor)) {
+                cursor = LhScheduleTimeUtil.resolveNextMorningAfterNoMouldChangeWindow(context, cursor);
                 continue;
             }
-            if (!isChangeoverBalanceEnabled(context)) {
-                return adjustedTime;
-            }
-
-            String dateKey = formatDateKey(adjustedTime);
-            int[] counts = context.getDailyMouldChangeCountMap()
-                    .getOrDefault(dateKey, new int[]{0, 0});
-            if (getTotalUsed(counts) >= getDailyLimit(context)) {
-                if (isOnOrAfterScheduleTargetDate(context, adjustedTime)) {
+            String dateKey = this.formatDateKey(cursor);
+            int[] counts = countMap.getOrDefault(dateKey, new int[]{0, 0});
+            if (balanced && this.getTotalUsed(counts) >= this.getDailyLimit(context)) {
+                if (this.isOnOrAfterScheduleTargetDate(context, cursor)) {
                     return null;
                 }
-                adjustedTime = getNextCalendarDayMorningStart(context, adjustedTime);
+                cursor = this.getNextCalendarDayMorningStart(context, cursor);
                 continue;
             }
-            if (isCrossDayPreparationAction(actionType)
-                    && isSwitchCompletionBeforeBusinessDayEnd(
-                    adjustedTime, switchDurationHours, businessDayEndTime)) {
-                return adjustedTime;
+            if (balanced && this.isCrossDayPreparationAction(actionType)
+                    && this.isSwitchCompletionBeforeBusinessDayEnd(cursor, durationHours, dayEnd)) {
+                return cursor;
             }
-            if (LhScheduleTimeUtil.isMorningShift(context, adjustedTime)) {
-                if (counts[IDX_MORNING] < getMorningLimit(context)) {
-                    return adjustedTime;
+            if (LhScheduleTimeUtil.isMorningShift(context, cursor)) {
+                if (counts[IDX_MORNING] < this.getMorningLimit(context)) {
+                    return cursor;
                 }
-                Date afternoonCandidate = resolveAfternoonBalanceCandidate(
-                        context, machineCode, dateKey, adjustedTime, switchDurationHours,
-                        counts, getAfternoonLimit(context), businessDayEndTime);
-                if (Objects.nonNull(afternoonCandidate)) {
-                    return afternoonCandidate;
+                if (!balanced) {
+                    // 关闭态保持原正式行为：早班满后从中班起点继续避让，不附加新日终限制。
+                    cursor = LhScheduleTimeUtil.getAfternoonShiftStart(context, cursor);
+                    continue;
                 }
-                if (isOnOrAfterScheduleTargetDate(context, adjustedTime)) {
-                    return null;
+                Date afternoon = this.resolveAfternoonBalanceCandidate(context, machineCode, dateKey,
+                        cursor, durationHours, counts, this.getAfternoonLimit(context), dayEnd);
+                if (Objects.nonNull(afternoon)) {
+                    return afternoon;
                 }
-                adjustedTime = getNextCalendarDayMorningStart(context, adjustedTime);
-                continue;
+            } else if (LhScheduleTimeUtil.isAfternoonShift(context, cursor)
+                    && counts[IDX_AFTERNOON] < this.getAfternoonLimit(context)) {
+                return cursor;
             }
-            if (LhScheduleTimeUtil.isAfternoonShift(context, adjustedTime)) {
-                if (counts[IDX_AFTERNOON] < getAfternoonLimit(context)) {
-                    return adjustedTime;
-                }
-                if (isOnOrAfterScheduleTargetDate(context, adjustedTime)) {
-                    return null;
-                }
-                adjustedTime = getNextCalendarDayMorningStart(context, adjustedTime);
-                continue;
+            if (balanced && this.isOnOrAfterScheduleTargetDate(context, cursor)) {
+                return null;
             }
-            adjustedTime = getNextCalendarDayMorningStart(context, adjustedTime);
+            cursor = this.getNextCalendarDayMorningStart(context, cursor);
         }
         return null;
+    }
+
+    /**
+     * 正式调用才记录阻塞与日终顺延，预演不产生上下文副作用。
+     * @param context 上下文
+     * @param machineCode 机台编码
+     * @param readyTime 原可交接时间
+     * @param durationHours 切换时长
+     * @param sku SKU
+     * @param dayEnd 业务日日终
+     * @param allocatedTime 内核确定的落点
+     */
+    private void recordMouldChangeDecision(LhScheduleContext context, String machineCode, Date readyTime,
+            int durationHours, SkuScheduleDTO sku, Date dayEnd, Date allocatedTime) {
+        if (!this.isChangeoverBalanceEnabled(context)) {
+            return;
+        }
+        if (Objects.isNull(allocatedTime) && Objects.nonNull(context.getWindowEndDate())) {
+            int[] counts = context.getDailyMouldChangeCountMap().get(this.formatDateKey(context.getWindowEndDate()));
+            if (this.getTotalUsed(counts) >= this.getDailyLimit(context)) {
+                this.recordBlockedReason(context, sku, this.getDailyLimit(context));
+            }
+        }
+        if (Objects.isNull(dayEnd)) {
+            return;
+        }
+        Date first = this.resolveEndingStaggerPreviewStartTime(context, machineCode, readyTime, durationHours);
+        if (Objects.isNull(first) || !LhScheduleTimeUtil.isMorningShift(context, first)) {
+            return;
+        }
+        String dateKey = this.formatDateKey(first);
+        int[] counts = context.getDailyMouldChangeCountMap().getOrDefault(dateKey, new int[]{0, 0});
+        if (counts[IDX_MORNING] >= this.getMorningLimit(context)
+                && this.getTotalUsed(counts) < this.getDailyLimit(context)
+                && Objects.isNull(this.resolveAfternoonBalanceCandidate(context, machineCode, dateKey, first,
+                durationHours, counts, this.getAfternoonLimit(context), dayEnd))) {
+            this.appendDayEndDeferProcessLog(context, dateKey, first, sku, dayEnd);
+        }
     }
 
     /**
@@ -399,12 +325,12 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
                 || !LhScheduleTimeUtil.isAfternoonShift(context, afternoonTime)) {
             return null;
         }
-        // 首台当日必须开产：中班换模无法在业务日日终前完成时，禁止承接中班。
+        // 总时长包含首检，日终等值交给完整时间轴验证首检正量；越过日终仍不承接。
         if (Objects.nonNull(businessDayEndTime)) {
             Date afternoonCompleteTime =
                     LhScheduleTimeUtil.addHours(afternoonTime, switchDurationHours);
             if (Objects.isNull(afternoonCompleteTime)
-                    || !afternoonCompleteTime.before(businessDayEndTime)) {
+                    || afternoonCompleteTime.after(businessDayEndTime)) {
                 return null;
             }
         }
@@ -466,75 +392,6 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
         log.info("{}", detail);
     }
 
-    /**
-     * 旧换模均衡逻辑。
-     * <p>参数关闭时保持原早班8次/中班7次硬限制口径不变，避免关闭态排程结果漂移。</p>
-     */
-    private Date allocateLegacyMouldChange(LhScheduleContext context,
-                                           String machineCode,
-                                           Date endingTime,
-                                           int switchDurationHours) {
-        if (endingTime == null) {
-            return null;
-        }
-
-        Date adjustedTime = endingTime;
-
-        // 最多向后探索有限次数，避免极端数据导致死循环
-        for (int attempt = 0; attempt < MAX_ALLOCATION_ATTEMPTS; attempt++) {
-            // 先处理设备停机窗口：05允许并行，其他停机仍从停机结束时刻继续判断。
-            Date downtimeAdjustedTime = resolveDowntimeAdjustedStartTime(
-                    context, machineCode, adjustedTime, switchDurationHours);
-            if (downtimeAdjustedTime.after(adjustedTime)) {
-                adjustedTime = downtimeAdjustedTime;
-                continue;
-            }
-
-            // 若在禁止换模时间段内（20:00-次日6:00），顺延到禁止时段结束后的第一个早班（凌晨段为当日早班，晚间段为次日早班）
-            if (LhScheduleTimeUtil.isNoMouldChangeTime(context, adjustedTime)) {
-                adjustedTime = LhScheduleTimeUtil.resolveNextMorningAfterNoMouldChangeWindow(context, adjustedTime);
-                continue;
-            }
-
-            String dateKey = formatDateKey(adjustedTime);
-            int[] counts = context.getDailyMouldChangeCountMap().computeIfAbsent(dateKey, k -> new int[]{0, 0});
-
-            int morningLimit = getMorningLimit(context);
-            int afternoonLimit = getAfternoonLimit(context);
-
-            if (LhScheduleTimeUtil.isMorningShift(context, adjustedTime)) {
-                // 当前时间在早班
-                if (counts[IDX_MORNING] < morningLimit) {
-                    counts[IDX_MORNING]++;
-                    log.debug("换模分配到早班, 日期: {}, 早班已用: {}/{}", dateKey, counts[IDX_MORNING], morningLimit);
-                    return adjustedTime;
-                }
-                // 早班已满，换模后移到当天中班开始时间
-                adjustedTime = LhScheduleTimeUtil.getAfternoonShiftStart(context, adjustedTime);
-                continue;
-            }
-
-            if (LhScheduleTimeUtil.isAfternoonShift(context, adjustedTime)) {
-                // 当前时间在中班
-                if (counts[IDX_AFTERNOON] < afternoonLimit) {
-                    counts[IDX_AFTERNOON]++;
-                    log.debug("换模分配到中班, 日期: {}, 中班已用: {}/{}", dateKey, counts[IDX_AFTERNOON], afternoonLimit);
-                    return adjustedTime;
-                }
-                // 中班也满了，延后到日历次日早班（与禁止换模窗口后的「当日早班」语义不同）
-                adjustedTime = getNextCalendarDayMorningStart(context, adjustedTime);
-                continue;
-            }
-
-            // 夜班不换模，直接顺延到日历次日早班（常规配置下多由禁止换模分支先行处理）
-            adjustedTime = getNextCalendarDayMorningStart(context, adjustedTime);
-        }
-
-        log.warn("换模均衡分配失败，无可用换模班次, 原始时间: {}",
-                LhScheduleTimeUtil.formatDateTime(endingTime));
-        return null;
-    }
-
     @Override
     public void rollbackMouldChange(LhScheduleContext context, Date allocatedTime) {
         if (context == null || allocatedTime == null) {
@@ -589,45 +446,21 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
                                                 int switchDurationHours,
                                                 SkuScheduleDTO sku,
                                                 Map<String, int[]> simulatedCountMap) {
-        if (context == null || switchReadyTime == null || simulatedCountMap == null) {
-            return null;
+        return this.previewEndingStaggerMouldChange(context, machineCode, switchReadyTime, switchDurationHours,
+                sku, ACTION_CHANGEOVER, null, simulatedCountMap);
+    }
+
+    @Override
+    public Date previewEndingStaggerMouldChange(LhScheduleContext context, String machineCode,
+            Date switchReadyTime, int switchDurationHours, SkuScheduleDTO sku, String actionType,
+            Date businessDayEndTime, Map<String, int[]> simulatedCountMap) {
+        // 内核不修改Map，失败时不会留下空日期或部分次数；成功才计入组内模拟账本。
+        Date time = this.resolveMouldChangeStart(context, machineCode, switchReadyTime,
+                switchDurationHours, actionType, businessDayEndTime, simulatedCountMap);
+        if (Objects.nonNull(time)) {
+            this.registerMouldChangeCount(context, time, simulatedCountMap);
         }
-        Date adjustedTime = switchReadyTime;
-        // 预演必须与正式allocateMouldChange使用同一落点规则：停机/禁换模避让后取最早合法班次，
-        // 只有当天达到每日硬上限时才跨天，不能仅为早8中7软目标把早班动作虚拟挪到中班。
-        for (int attempt = 0; attempt < MAX_ALLOCATION_ATTEMPTS; attempt++) {
-            Date earliestTime = resolveEndingStaggerPreviewStartTime(
-                    context, machineCode, adjustedTime, switchDurationHours);
-            if (earliestTime == null) {
-                return null;
-            }
-            String dateKey = formatDateKey(earliestTime);
-            int[] counts = simulatedCountMap.computeIfAbsent(dateKey, key -> new int[]{0, 0});
-            int dailyLimit = getDailyLimit(context);
-            if (getTotalUsed(counts) >= dailyLimit) {
-                // 与正式分配一致：T+2达到上限直接拒绝；之前日期达到上限才顺延到次日早班。
-                if (isOnOrAfterScheduleTargetDate(context, earliestTime)) {
-                    return null;
-                }
-                adjustedTime = getNextCalendarDayMorningStart(context, earliestTime);
-                continue;
-            }
-            if (LhScheduleTimeUtil.isMorningShift(context, earliestTime)) {
-                counts[IDX_MORNING]++;
-            } else if (LhScheduleTimeUtil.isAfternoonShift(context, earliestTime)) {
-                counts[IDX_AFTERNOON]++;
-            } else {
-                adjustedTime = getNextCalendarDayMorningStart(context, earliestTime);
-                continue;
-            }
-            log.debug("共用胎胚收尾错峰换模预演完成, materialCode: {}, machineCode: {}, 换模日期: {}, "
-                            + "早班模拟次数: {}, 中班模拟次数: {}, 每日上限: {}, 早班目标: {}, 中班目标: {}",
-                    sku == null ? null : sku.getMaterialCode(), machineCode, dateKey,
-                    counts[IDX_MORNING], counts[IDX_AFTERNOON], dailyLimit,
-                    getMorningLimit(context), getAfternoonLimit(context));
-            return earliestTime;
-        }
-        return null;
+        return time;
     }
 
     /**
@@ -867,11 +700,23 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
      * @return true-登记成功；false-无法登记
      */
     private boolean registerMouldChangeCount(LhScheduleContext context, Date allocatedTime) {
+        return Objects.nonNull(context)
+                && this.registerMouldChangeCount(context, allocatedTime, context.getDailyMouldChangeCountMap());
+    }
+
+    /**
+     * 将已通过内核验证的动作登记到指定次数账本。
+     * @param context 时间配置
+     * @param allocatedTime 合法落点
+     * @param countMap 真实账本或独立模拟账本
+     * @return 是否登记成功
+     */
+    private boolean registerMouldChangeCount(LhScheduleContext context, Date allocatedTime, Map<String, int[]> countMap) {
         if (context == null || allocatedTime == null) {
             return false;
         }
         String dateKey = formatDateKey(allocatedTime);
-        int[] counts = context.getDailyMouldChangeCountMap().computeIfAbsent(dateKey, key -> new int[]{0, 0});
+        int[] counts = countMap.computeIfAbsent(dateKey, key -> new int[]{0, 0});
         if (LhScheduleTimeUtil.isMorningShift(context, allocatedTime)) {
             counts[IDX_MORNING]++;
             return true;

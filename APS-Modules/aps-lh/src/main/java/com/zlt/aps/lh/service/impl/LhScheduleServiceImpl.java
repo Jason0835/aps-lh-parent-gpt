@@ -781,11 +781,24 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         // 以及 8 个班次标题里的 shiftDate1 ~ shiftDate8。
         Map<String, Object> tableMap = buildExportTableMap(exportList, result.getScheduleDate());
 
-        // 换模计划同时用于硫化计划的一班顺序和换模计划Sheet导出，查询一次后复用。
+        // 当前日换模计划同时用于硫化计划的一班顺序和换模计划Sheet导出，查询一次后复用。
         LhMouldChangePlan mouldChangePlan = BeanCopyUtils.copyBean(result, LhMouldChangePlan.class);
+        // LhScheduleResult 的 mouldCode 是硫化结果字段，不是换模计划的派生模具号查询条件。
+        mouldChangePlan.setMouldCode(null);
         QueryWrapper<LhMouldChangePlan> wrapper = new QueryWrapper<>();
         lhMouldChangePlanController.builderCondition(wrapper, mouldChangePlan);
         List<LhMouldChangePlan> mouldChangePlanList = lhMouldChangePlanMapper.selectList(wrapper);
+        // 硫化日计划导出的换模计划页同样需要对比前日计划；使用副本调整日期，避免影响当前计划的导出条件和标题。
+        Set<String> previousDayPlanKeySet = null;
+        Date scheduleDate = mouldChangePlan.getScheduleDate();
+        if (scheduleDate != null) {
+            LhMouldChangePlan previousDayQuery = BeanCopyUtils.copyBean(mouldChangePlan, LhMouldChangePlan.class);
+            previousDayQuery.setScheduleDate(DateUtil.offsetDay(scheduleDate, -1));
+            QueryWrapper<LhMouldChangePlan> previousDayWrapper = new QueryWrapper<>();
+            lhMouldChangePlanController.builderCondition(previousDayWrapper, previousDayQuery);
+            List<LhMouldChangePlan> previousDayPlanList = lhMouldChangePlanMapper.selectList(previousDayWrapper);
+            previousDayPlanKeySet = lhMouldChangePlanController.buildMouldChangePlanKeySet(previousDayPlanList);
+        }
 
         // 节点4：模板第 7 行为 {.xxx} 明细模板行，writeMultiList 会从该行开始复制填充。
         // 当前只有一个明细列表，因此只放入一个 List<Map<String,Object>>。
@@ -805,7 +818,8 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         Map<String, Object> mouldChangePlanTableMap = lhMouldChangePlanController.buildExportTableMap(result.getScheduleDate());
         lhMouldChangePlanController.setExportTitleFieldName(mouldChangePlanTableMap);
         List<List<Map<String, Object>>> mouldChangePlanExcelDataList = new ArrayList<>();
-        mouldChangePlanExcelDataList.add(lhMouldChangePlanController.buildExportDataList(mouldChangePlanExportList, mouldChangePlan));
+        mouldChangePlanExcelDataList.add(lhMouldChangePlanController.buildExportDataList(
+                mouldChangePlanExportList, mouldChangePlan, previousDayPlanKeySet));
 
         inputStream = new ByteArrayInputStream(exportBytes);
         exportBytes = ExcelUtils.writeMultiList(inputStream, 1, mouldChangePlanTableMap, mouldChangePlanExcelDataList);

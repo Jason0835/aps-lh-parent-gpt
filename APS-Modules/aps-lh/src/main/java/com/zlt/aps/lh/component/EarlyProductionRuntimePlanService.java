@@ -468,8 +468,6 @@ public class EarlyProductionRuntimePlanService {
                         admission.getRawScheduledPhysicalMachineCodes().size())
                 .append(", scheduledStructureCount=").append(
                         admission.getScheduledStructureCount())
-                .append(", excludedEndingMachines=").append(
-                        admission.getExcludedEndingPhysicalMachineCodes())
                 .append(", result=").append(admission.isAllowed())
                 .append(", reason=").append(admission.getReason())
                 .toString();
@@ -606,7 +604,7 @@ public class EarlyProductionRuntimePlanService {
                         + "shiftedCurrentDayPlanQty: {}, structureName: {}, "
                         + "currentPlanMachineCount: {}, futurePlanMachineCount: {}, "
                         + "admissionShiftIndex: {}, scheduledStructureCount: {}, "
-                        + "excludedEndingMachines: {}, scheduledSkuCount: {}, "
+                        + "scheduledSkuCount: {}, "
                         + "historyShortageQty: {}, futureMonthSurplusQty: {}, effectiveTargetQty: {}, "
                         + "quotaEntryCount: {}, quotaProjectionEndDate: {}",
                 context.getFactoryCode(), context.getBatchNo(), sku.getMaterialCode(),
@@ -619,9 +617,6 @@ public class EarlyProductionRuntimePlanService {
                 Objects.isNull(admission) ? null : admission.getAdmissionShiftIndex(),
                 Objects.isNull(admission)
                         ? 0 : admission.getScheduledStructureCount(),
-                Objects.isNull(admission)
-                        ? java.util.Collections.emptySet()
-                        : admission.getExcludedEndingPhysicalMachineCodes(),
                 context.getSkuScheduledMachineCount(
                         currentDate, sku.getMaterialCode(), sku.getProductStatus()),
                 historyShortageQty, futureMonthSurplusQty, effectiveTargetQty,

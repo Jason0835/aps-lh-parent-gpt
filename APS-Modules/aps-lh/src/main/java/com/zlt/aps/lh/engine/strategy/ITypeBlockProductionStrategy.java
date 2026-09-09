@@ -12,6 +12,7 @@ import com.zlt.aps.lh.engine.strategy.support.SpecifiedMachineScheduleResult;
 import java.time.LocalDate;
 import java.util.Date;
 import java.util.List;
+import java.util.function.BiPredicate;
 
 /**
  * 换活字块排产子策略接口
@@ -47,6 +48,23 @@ public interface ITypeBlockProductionStrategy {
             List<SkuScheduleDTO> dayMaterials,
             List<MachineScheduleDTO> dayMachines) {
         return java.util.Collections.emptyList();
+    }
+
+    /**
+     * 在原按天配对中提供历史候选的完整只读准入，其他策略仍沿用原配对实现。
+     *
+     * @param context 排程上下文
+     * @param scheduleDate 资源业务日
+     * @param dayMaterials 原当天候选
+     * @param dayMachines 原当天机台
+     * @param historicalEligibility 历史候选完整预演；为空时保持原选择
+     * @return 原流程下的机台物料配对
+     */
+    default List<DayTypeBlockReverseSelectionDirective> matchDayTypeBlockReversePairs(
+            LhScheduleContext context, LocalDate scheduleDate, List<SkuScheduleDTO> dayMaterials,
+            List<MachineScheduleDTO> dayMachines,
+            BiPredicate<MachineScheduleDTO, SkuScheduleDTO> historicalEligibility) {
+        return this.matchDayTypeBlockReversePairs(context, scheduleDate, dayMaterials, dayMachines);
     }
 
     /**
